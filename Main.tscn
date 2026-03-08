@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3 uid="uid://mainscene123"]
+
+[ext_resource type="Script" path="res://Main.gd" id="1_d8abc"]
+[ext_resource type="PackedScene" uid="uid://cx62c12j3fgh" path="res://Lobby.tscn" id="2_xdobby"]
+
+[node name="Main" type="Node"]
+script = ExtResource("1_d8abc")
+
+[node name="Lobby" parent="." instance=ExtResource("2_xdobby")]
+
+[node name="LevelSpawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://Level.tscn")
+spawn_path = NodePath("..")
+spawn_limit = 1

@@ -1,0 +1,46 @@
+[gd_scene load_steps=2 format=3 uid="uid://cx62c12j3fgh"]
+
+[ext_resource type="Script" path="res://Lobby.gd" id="1_x8abc"]
+
+[node name="Lobby" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_x8abc")
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="LabelName" type="Label" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+text = "Player Name:"
+
+[node name="LineEditName" type="LineEdit" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+text = "Racer"
+
+[node name="ButtonHost" type="Button" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+text = "Host LAN Game"
+
+[node name="HSeparator" type="HSeparator" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="LabelServers" type="Label" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+text = "Discovered LAN Games:"
+
+[node name="ServerList" type="VBoxContainer" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
