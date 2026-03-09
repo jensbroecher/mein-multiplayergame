@@ -9,6 +9,9 @@ ground_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
 [sub_resource type="Sky" id="Sky_y"]
 sky_material = SubResource("ProceduralSkyMaterial_x")
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_floor"]
+size = Vector3(100, 1, 100)
+
 [node name="Level" type="Node3D"]
 script = ExtResource("1_lev99")
 
@@ -22,8 +25,12 @@ environment = SubResource("Sky_y")
 [node name="Track" type="Node3D" parent="."]
 
 [node name="Floor" type="CSGBox3D" parent="Track"]
-use_collision = true
 size = Vector3(100, 1, 100)
+
+[node name="StaticBody3D" type="StaticBody3D" parent="Track/Floor"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Track/Floor/StaticBody3D"]
+shape = SubResource("BoxShape3D_floor")
 
 [node name="Obstacle1" type="CSGCylinder3D" parent="Track"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 2, 10)
