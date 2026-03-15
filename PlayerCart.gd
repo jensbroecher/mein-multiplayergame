@@ -71,9 +71,12 @@ func _process(delta):
 	# We use the current velocity (which is synced for remote players too)
 	var speed = velocity.length()
 	# Base pitch 1.0 at idle, increases with speed. max 2.5
-	engine_sound.pitch_scale = 1.0 + (speed / SPEED) * 1.5
-	# Volume could also be slightly higher when moving
-	engine_sound.unit_size = 1.0 + (speed / SPEED) * 2.0
+	var target_pitch = 1.0 + (speed / SPEED) * 1.5
+	var target_volume = 1.0 + (speed / SPEED) * 2.0
+	
+	# AUDIO SMOOTHING: Use lerp to prevent DJ-scratching artifacts from jittery network updates
+	engine_sound.pitch_scale = lerp(engine_sound.pitch_scale, target_pitch, 10.0 * delta)
+	engine_sound.unit_size = lerp(engine_sound.unit_size, target_volume, 10.0 * delta)
 
 func _physics_process(delta):
 	# Handle movement for non-local players via interpolation
