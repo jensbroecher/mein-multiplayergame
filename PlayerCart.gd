@@ -76,21 +76,26 @@ func _process(delta):
 	engine_sound.unit_size = 1.0 + (speed / SPEED) * 2.0
 
 func _physics_process(delta):
-	# Gravity
-	if not is_on_floor():
-		velocity.y -= GRAVITY * delta
-
 	# Handle movement for non-local players via interpolation
 	if not is_local_player:
+		var prev_pos = position
 		# Interpolate smoothly towards the network synced transforms
 		position = position.lerp(sync_position, 15.0 * delta)
 		rotation.y = lerp_angle(rotation.y, sync_rotation.y, 15.0 * delta)
 		rotation.x = lerp_angle(rotation.x, sync_rotation.x, 15.0 * delta)
 		rotation.z = lerp_angle(rotation.z, sync_rotation.z, 15.0 * delta)
 		
+		# Calculate a "visual velocity" so the engine sound still works on remote clients
+		# This prevents gravity from accumulating in velocity.y indefinitely
+		velocity = (position - prev_pos) / delta
+		
 		sync_position = position
 		sync_rotation = rotation
 		return
+
+	# Gravity - Only for local player (remote players follow synced position)
+	if not is_on_floor():
+		velocity.y -= GRAVITY * delta
 
 	# Only local player processes physics input from here down
 	if not can_move:
