@@ -1,6 +1,7 @@
 [gd_scene load_steps=5 format=3 uid="uid://cart123"]
 
 [ext_resource type="Script" path="res://PlayerCart.gd" id="1_cscript"]
+[ext_resource type="AudioStream" uid="uid://d3p8x8r6b8h8y" path="res://sounds/freesound_community-engine-47745.mp3" id="2_sound"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_cart"]
 size = Vector3(1.2, 0.8, 2.0)
@@ -23,25 +24,33 @@ script = ExtResource("1_cscript")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
 shape = SubResource("BoxShape3D_cart")
 
-[node name="BodyMesh" type="CSGBox3D" parent="."]
+[node name="Visuals" type="Node3D" parent="."]
+top_level = true
+
+[node name="BodyMesh" type="CSGBox3D" parent="Visuals"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
 size = Vector3(1.2, 0.5, 2.0)
 material_override = null
 
-[node name="CabinMesh" type="CSGBox3D" parent="."]
+[node name="CabinMesh" type="CSGBox3D" parent="Visuals"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0.2)
 size = Vector3(0.8, 0.4, 1.0)
 material_override = null
 
-[node name="NameTag" type="Label3D" parent="."]
+[node name="NameTag" type="Label3D" parent="Visuals"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
 billboard = 1
 text = "Player"
 
-[node name="CameraPivot" type="Node3D" parent="."]
+[node name="CameraPivot" type="Node3D" parent="Visuals"]
 transform = Transform3D(1, 0, 0, 0, 0.965926, 0.258819, 0, -0.258819, 0.965926, 0, 1.5, 4)
 
-[node name="Camera3D" type="Camera3D" parent="CameraPivot"]
+[node name="Camera3D" type="Camera3D" parent="Visuals/CameraPivot"]
+
+[node name="EngineSound" type="AudioStreamPlayer3D" parent="."]
+stream = ExtResource("2_sound")
+autoplay = true
+bus = &"Master"
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
 replication_config = SubResource("SceneReplicationConfig_sync")

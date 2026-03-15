@@ -3,6 +3,9 @@ extends Node3D
 const PLAYER_CART = preload("res://PlayerCart.tscn")
 const RACE_UI_SCENE = preload("res://RaceUI.tscn")
 
+@export var finish_line: Area3D
+@export var halfway_checkpoint: Area3D
+
 enum RaceState {LOBBY, RACING, FINISHED}
 var race_state: int = RaceState.LOBBY
 
@@ -19,7 +22,7 @@ func _ready():
 	race_ui = RACE_UI_SCENE.instantiate()
 	add_child(race_ui)
 	
-	_create_checkpoints()
+	_setup_checkpoints()
 	
 	if multiplayer.is_server():
 		NetworkManager.player_connected.connect(_on_server_player_connected)
@@ -38,68 +41,18 @@ func _ready():
 	race_ui.ready_pressed.connect(_on_local_ready_pressed)
 	race_ui.start_pressed.connect(_on_host_start_pressed)
 
-func _create_checkpoints():
-	var finish = Area3D.new()
-	finish.name = "FinishLine"
-	finish.position = Vector3(0, 0, 39)
-	var f_shape = CollisionShape3D.new()
-	var b1 = BoxShape3D.new()
-	b1.size = Vector3(2, 10, 30)
-	f_shape.shape = b1
-	finish.add_child(f_shape)
+func _setup_checkpoints():
+	# If not assigned in inspector, try to find by name as fallback
+	if not finish_line:
+		finish_line = get_node_or_null("FinishLine")
+	if not halfway_checkpoint:
+		halfway_checkpoint = get_node_or_null("Halfway")
 	
-	var finish_mesh = CSGCombiner3D.new()
-	var left_post = CSGBox3D.new()
-	left_post.size = Vector3(1, 6, 1)
-	left_post.position = Vector3(0, 3, -10)
-	finish_mesh.add_child(left_post)
-	var right_post = CSGBox3D.new()
-	right_post.size = Vector3(1, 6, 1)
-	right_post.position = Vector3(0, 3, 10)
-	finish_mesh.add_child(right_post)
-	var top_bar = CSGBox3D.new()
-	top_bar.size = Vector3(1, 1, 21)
-	top_bar.position = Vector3(0, 6, 0)
-	var mat = StandardMaterial3D.new()
-	mat.albedo_color = Color.GREEN
-	top_bar.material = mat
-	finish_mesh.add_child(top_bar)
-	finish.add_child(finish_mesh)
-	
-	add_child(finish)
-
-	var halfway = Area3D.new()
-	halfway.name = "Halfway"
-	halfway.position = Vector3(0, 0, -39)
-	var f_shape2 = CollisionShape3D.new()
-	var b2 = BoxShape3D.new()
-	b2.size = Vector3(2, 10, 30)
-	f_shape2.shape = b2
-	halfway.add_child(f_shape2)
-	
-	var hw_mesh = CSGCombiner3D.new()
-	var hl_post = CSGBox3D.new()
-	hl_post.size = Vector3(1, 6, 1)
-	hl_post.position = Vector3(0, 3, -10)
-	hw_mesh.add_child(hl_post)
-	var hr_post = CSGBox3D.new()
-	hr_post.size = Vector3(1, 6, 1)
-	hr_post.position = Vector3(0, 3, 10)
-	hw_mesh.add_child(hr_post)
-	var htop = CSGBox3D.new()
-	htop.size = Vector3(1, 1, 21)
-	htop.position = Vector3(0, 6, 0)
-	var hmat = StandardMaterial3D.new()
-	hmat.albedo_color = Color.YELLOW
-	htop.material = hmat
-	hw_mesh.add_child(htop)
-	halfway.add_child(hw_mesh)
-	
-	add_child(halfway)
-
 	if multiplayer.is_server():
-		finish.body_entered.connect(_on_finish_line_entered)
-		halfway.body_entered.connect(_on_halfway_entered)
+		if finish_line:
+			finish_line.body_entered.connect(_on_finish_line_entered)
+		if halfway_checkpoint:
+			halfway_checkpoint.body_entered.connect(_on_halfway_entered)
 
 func _on_finish_line_entered(body: Node3D):
 	if race_state != RaceState.RACING: return
@@ -223,9 +176,9 @@ func _update_positions():
 			score = 1000000.0 + (3 - pinfo["pos"]) * 1000 # keep their position
 		else:
 			if pinfo["next_checkpoint"] == 1:
-				dist = cart.global_position.distance_to(Vector3(0, 0, -39))
+				dist = cart.global_position.distance_to(halfway_checkpoint.global_position if halfway_checkpoint else Vector3(0,0,0))
 			else:
-				dist = cart.global_position.distance_to(Vector3(0, 0, 39))
+				dist = cart.global_position.distance_to(finish_line.global_position if finish_line else Vector3(0,0,0))
 			
 			score = pinfo["laps"] * 10000.0
 			if pinfo["next_checkpoint"] == 0:

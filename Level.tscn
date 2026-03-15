@@ -1,64 +1,139 @@
-[gd_scene load_steps=4 format=3 uid="uid://level123"]
+[gd_scene format=3 uid="uid://level123"]
 
-[ext_resource type="Script" path="res://Level.gd" id="1_lev99"]
+[ext_resource type="Script" uid="uid://d2hujjwkl3s4a" path="res://Level.gd" id="1_lev99"]
 
-[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_x"]
-sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
-ground_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
+[sub_resource type="PhysicalSkyMaterial" id="PhysicalSkyMaterial_clouds"]
+rayleigh_color = Color(0.15, 0.2, 0.4, 1)
+mie_color = Color(0.69, 0.73, 0.77, 1)
+sun_disk_scale = 2.0
 
 [sub_resource type="Sky" id="Sky_y"]
-sky_material = SubResource("ProceduralSkyMaterial_x")
+sky_material = SubResource("PhysicalSkyMaterial_clouds")
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_floor"]
-size = Vector3(100, 1, 100)
+[sub_resource type="Environment" id="Environment_nice"]
+background_mode = 2
+sky = SubResource("Sky_y")
+tonemap_mode = 2
+glow_enabled = true
+volumetric_fog_enabled = true
+volumetric_fog_density = 0.01
+volumetric_fog_albedo = Color(0.8, 0.81, 0.85, 1)
 
-[node name="Level" type="Node3D"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_checkpoint"]
+size = Vector3(20, 10, 5)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_finish"]
+albedo_color = Color(0, 1, 0, 1)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_halfway"]
+albedo_color = Color(1, 1, 0, 1)
+
+[node name="Level" type="Node3D" unique_id=1916914083]
 script = ExtResource("1_lev99")
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=337555859]
 transform = Transform3D(-0.866025, -0.433013, 0.25, 0, 0.5, 0.866025, -0.5, 0.75, -0.433013, 0, 0, 0)
 shadow_enabled = true
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
-environment = SubResource("Sky_y")
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1836663372]
+environment = SubResource("Environment_nice")
 
-[node name="Track" type="CSGCombiner3D" parent="."]
+[node name="Track" type="CSGCombiner3D" parent="." unique_id=314708686]
 use_collision = true
 
-[node name="Floor" type="CSGBox3D" parent="Track"]
+[node name="Floor" type="CSGBox3D" parent="Track" unique_id=469957712]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
-size = Vector3(120, 1, 120)
+size = Vector3(300, 1, 300)
 
-[node name="OuterBounds" type="CSGBox3D" parent="Track"]
+[node name="OuterBounds" type="CSGBox3D" parent="Track" unique_id=64436333]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
-size = Vector3(100, 4, 100)
+size = Vector3(250, 4, 250)
 
-[node name="InnerBounds" type="CSGBox3D" parent="Track"]
+[node name="InnerBounds" type="CSGBox3D" parent="Track" unique_id=1644707896]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
 operation = 2
-size = Vector3(96, 5, 96)
+size = Vector3(230, 5, 230)
 
-[node name="InnerIsland" type="CSGBox3D" parent="Track"]
+[node name="ObstacleMiddle" type="CSGBox3D" parent="Track" unique_id=303542291]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
-size = Vector3(60, 4, 60)
+size = Vector3(180, 4, 180)
 
-[node name="SpawnPoints" type="Node3D" parent="."]
+[node name="ObstacleMiddleSub" type="CSGBox3D" parent="Track" unique_id=1346263965]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+operation = 2
+size = Vector3(160, 5, 160)
 
-[node name="Spawn1" type="Marker3D" parent="SpawnPoints"]
-transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -10, 0.5, 34)
+[node name="ChicaneSub" type="CSGBox3D" parent="Track" unique_id=2123455146]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 95, 2, 0)
+operation = 2
+size = Vector3(40, 5, 30)
 
-[node name="Spawn2" type="Marker3D" parent="SpawnPoints"]
-transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -10, 0.5, 44)
+[node name="ChicaneSub2" type="CSGBox3D" parent="Track" unique_id=2127205985]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -95, 2, 0)
+operation = 2
+size = Vector3(40, 5, 30)
 
-[node name="Spawn3" type="Marker3D" parent="SpawnPoints"]
-transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -20, 0.5, 34)
+[node name="SpawnPoints" type="Node3D" parent="." unique_id=1348899380]
 
-[node name="Spawn4" type="Marker3D" parent="SpawnPoints"]
-transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -20, 0.5, 44)
+[node name="Spawn1" type="Marker3D" parent="SpawnPoints" unique_id=970672272]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -10, 0.5, 105)
 
-[node name="Players" type="Node3D" parent="."]
+[node name="Spawn2" type="Marker3D" parent="SpawnPoints" unique_id=939913088]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -10, 0.5, 115)
 
-[node name="PlayerSpawner" type="MultiplayerSpawner" parent="."]
-_spawnable_scenes = PackedStringArray("res://PlayerCart.tscn")
+[node name="Spawn3" type="Marker3D" parent="SpawnPoints" unique_id=969095215]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -20, 0.5, 105)
+
+[node name="Spawn4" type="Marker3D" parent="SpawnPoints" unique_id=1374749789]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -20, 0.5, 115)
+
+[node name="Players" type="Node3D" parent="." unique_id=1251708478]
+
+[node name="FinishLine" type="Area3D" parent="." unique_id=1637951958]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, -0.7727947, 102.64114)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="FinishLine" unique_id=1077663900]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 5, 0)
+shape = SubResource("BoxShape3D_checkpoint")
+
+[node name="VisualGate" type="CSGCombiner3D" parent="FinishLine" unique_id=1865286454]
+
+[node name="LeftPost" type="CSGBox3D" parent="FinishLine/VisualGate" unique_id=2000146831]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 3, 0)
+size = Vector3(1, 6, 1)
+
+[node name="RightPost" type="CSGBox3D" parent="FinishLine/VisualGate" unique_id=1999838663]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 3, 0)
+size = Vector3(1, 6, 1)
+
+[node name="TopBar" type="CSGBox3D" parent="FinishLine/VisualGate" unique_id=1744222530]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0)
+size = Vector3(21, 1, 1)
+material = SubResource("StandardMaterial3D_finish")
+
+[node name="Halfway" type="Area3D" parent="." unique_id=6535659]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, -1.0620966, -102.31252)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Halfway" unique_id=970656649]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 0)
+shape = SubResource("BoxShape3D_checkpoint")
+
+[node name="VisualGate" type="CSGCombiner3D" parent="Halfway" unique_id=177148747]
+
+[node name="LeftPost" type="CSGBox3D" parent="Halfway/VisualGate" unique_id=899763577]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 3, 0)
+size = Vector3(1, 6, 1)
+
+[node name="RightPost" type="CSGBox3D" parent="Halfway/VisualGate" unique_id=987781105]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 3, 0)
+size = Vector3(1, 6, 1)
+
+[node name="TopBar" type="CSGBox3D" parent="Halfway/VisualGate" unique_id=721812634]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0)
+size = Vector3(21, 1, 1)
+material = SubResource("StandardMaterial3D_halfway")
+
+[node name="PlayerSpawner" type="MultiplayerSpawner" parent="." unique_id=776326826]
+_spawnable_scenes = PackedStringArray("uid://cart123")
 spawn_path = NodePath("../Players")
 spawn_limit = 4
