@@ -8,6 +8,7 @@ var peer: ENetMultiplayerPeer
 signal player_connected(id: int, info: Dictionary)
 signal player_disconnected(id: int)
 signal server_disconnected
+signal player_ready_changed(id: int, is_ready: bool)
 
 # We can store player info like names here
 # format: { id: { "name": "PlayerName" } }
@@ -85,6 +86,14 @@ func _on_server_disconnected():
 @rpc("any_peer", "call_local", "reliable")
 func register_player(info: Dictionary):
 	var id = multiplayer.get_remote_sender_id()
+	info["ready"] = false
 	players[id] = info
 	player_connected.emit(id, info)
 	print("NetworkManager: Player registered ", id, ", info: ", info)
+
+@rpc("any_peer", "call_local", "reliable")
+func cmd_set_ready(is_ready: bool):
+	var id = multiplayer.get_remote_sender_id()
+	if players.has(id):
+		players[id]["ready"] = is_ready
+		player_ready_changed.emit(id, is_ready)

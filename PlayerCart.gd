@@ -17,8 +17,14 @@ const GRAVITY = 20.0
 @onready var name_tag = $NameTag
 
 var is_local_player = false
+var can_move = false
+
+func on_race_started():
+	if is_local_player:
+		can_move = true
 
 func _ready():
+	add_to_group("player_carts")
 	_update_authority()
 	
 	name_tag.text = player_name
@@ -49,6 +55,12 @@ func _physics_process(delta):
 	if not is_local_player:
 		return
 
+	if not can_move:
+		velocity.x = move_toward(velocity.x, 0, FRICTION * delta)
+		velocity.z = move_toward(velocity.z, 0, FRICTION * delta)
+		move_and_slide()
+		return
+
 	var input_dir = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
 	
 	# Steering
@@ -59,13 +71,13 @@ func _physics_process(delta):
 		rotate_y(-steer_amount)
 
 	# Acceleration / Braking
-	var forward_dir = -transform.basis.z
+	var forward_dir = - transform.basis.z
 	var target_speed = 0.0
 	
 	if input_dir.y < 0: # Forward (ui_up is -1)
 		target_speed = SPEED
 	elif input_dir.y > 0: # Backward (ui_down is 1)
-		target_speed = -REVERSE_SPEED
+		target_speed = - REVERSE_SPEED
 		
 	if target_speed != 0:
 		# Accelerate

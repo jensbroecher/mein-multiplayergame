@@ -1,0 +1,121 @@
+[gd_scene load_steps=2 format=3 uid="uid://ci11yow3h0tq8"]
+
+[ext_resource type="Script" path="res://RaceUI.gd" id="1_ruisc"]
+
+[node name="RaceUI" type="CanvasLayer"]
+script = ExtResource("1_ruisc")
+
+[node name="LobbyPanel" type="PanelContainer" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -150.0
+offset_top = -100.0
+offset_right = 150.0
+offset_bottom = 100.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="LobbyPanel"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="LobbyPanel/VBoxContainer"]
+layout_mode = 2
+text = "Race Lobby"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="LobbyPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="PlayerList" type="VBoxContainer" parent="LobbyPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="HSeparator2" type="HSeparator" parent="LobbyPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="ButtonReady" type="Button" parent="LobbyPanel/VBoxContainer"]
+layout_mode = 2
+text = "Ready Up"
+
+[node name="ButtonStart" type="Button" parent="LobbyPanel/VBoxContainer"]
+layout_mode = 2
+text = "Start Race (Host)"
+disabled = true
+
+[node name="HUDPanel" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="LabelPosition" type="Label" parent="HUDPanel"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 120.0
+offset_bottom = 54.0
+theme_override_font_sizes/font_size = 24
+text = "Pos: 1/1"
+
+[node name="LabelLap" type="Label" parent="HUDPanel"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -120.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = 54.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 24
+text = "Lap: 1/3"
+horizontal_alignment = 2
+
+[node name="LabelMessage" type="Label" parent="HUDPanel"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -200.0
+offset_top = 50.0
+offset_right = 200.0
+offset_bottom = 100.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 32
+horizontal_alignment = 1
+
+[node name="EndPanel" type="PanelContainer" parent="."]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -150.0
+offset_top = -50.0
+offset_right = 150.0
+offset_bottom = 50.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="EndPanel"]
+layout_mode = 2
+alignment = 1
+
+[node name="LabelFinished" type="Label" parent="EndPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Race Finished!"
+horizontal_alignment = 1
+
+[node name="LabelTimer" type="Label" parent="EndPanel/VBoxContainer"]
+layout_mode = 2
+text = "Waiting for others: 30 s"
+horizontal_alignment = 1
+
