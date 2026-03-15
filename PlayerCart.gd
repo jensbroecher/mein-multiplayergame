@@ -19,6 +19,10 @@ const GRAVITY = 20.0
 var is_local_player = false
 var can_move = false
 
+# Network sync targets
+var sync_position: Vector3
+var sync_rotation: Vector3
+
 func on_race_started():
 	if is_local_player:
 		can_move = true
@@ -51,14 +55,27 @@ func _physics_process(delta):
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
 
-	# Only the local player controls this cart
+	# Handle movement for non-local players via interpolation
 	if not is_local_player:
+		# Interpolate smoothly towards the network synced transforms
+		position = position.lerp(sync_position, 15.0 * delta)
+		rotation.y = lerp_angle(rotation.y, sync_rotation.y, 15.0 * delta)
+		rotation.x = lerp_angle(rotation.x, sync_rotation.x, 15.0 * delta)
+		rotation.z = lerp_angle(rotation.z, sync_rotation.z, 15.0 * delta)
+		
+		# Also copy actual velocity for local effects (skidmarks, etc if added later)
+		# But we don't call move_and_slide() for remote players, we just sync position.
 		return
 
+	# Only local player processes physics input from here down
 	if not can_move:
 		velocity.x = move_toward(velocity.x, 0, FRICTION * delta)
 		velocity.z = move_toward(velocity.z, 0, FRICTION * delta)
 		move_and_slide()
+		
+		# Important: When we can't move (like starting grid), keep sync vars updated
+		sync_position = position
+		sync_rotation = rotation
 		return
 
 	var input_dir = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
@@ -89,3 +106,7 @@ func _physics_process(delta):
 		velocity.z = move_toward(velocity.z, 0, FRICTION * delta)
 
 	move_and_slide()
+	
+	# Update sync variables so MultiplayerSynchronizer pushes them
+	sync_position = position
+	sync_rotation = rotation
