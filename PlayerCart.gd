@@ -83,15 +83,28 @@ func _physics_process(delta):
 	# Handle movement for non-local players via interpolation
 	if not is_local_player:
 		var prev_pos = position
-		# Interpolate smoothly towards the network synced transforms
-		position = position.lerp(sync_position, 15.0 * delta)
-		rotation.y = lerp_angle(rotation.y, sync_rotation.y, 15.0 * delta)
-		rotation.x = lerp_angle(rotation.x, sync_rotation.x, 15.0 * delta)
-		rotation.z = lerp_angle(rotation.z, sync_rotation.z, 15.0 * delta)
 		
-		# Calculate a "visual velocity" so the engine sound still works on remote clients
-		# This prevents gravity from accumulating in velocity.y indefinitely
-		velocity = (position - prev_pos) / delta
+		# SPAWN SNAPPING: Prevent flying in from origin when joining
+		if position.distance_squared_to(sync_position) > 25.0: # > 5 units away
+			position = sync_position
+			rotation = sync_rotation
+			velocity = Vector3.ZERO
+		else:
+			# Interpolate smoothly towards the network synced transforms
+			position = position.lerp(sync_position, 15.0 * delta)
+			rotation.y = lerp_angle(rotation.y, sync_rotation.y, 15.0 * delta)
+			rotation.x = lerp_angle(rotation.x, sync_rotation.x, 15.0 * delta)
+			rotation.z = lerp_angle(rotation.z, sync_rotation.z, 15.0 * delta)
+			
+			# Calculate a "visual velocity" so the engine sound still works on remote clients
+			# This prevents gravity from accumulating in velocity.y indefinitely
+			velocity = (position - prev_pos) / delta
+			
+			# SPEED CLAMPING: Prevent network catch-up spikes from causing extreme engine pitches
+			# Limit remote visual speed slightly above max normal speed
+			var max_visual_speed = SPEED * 1.2
+			if velocity.length() > max_visual_speed:
+				velocity = velocity.normalized() * max_visual_speed
 		
 		sync_position = position
 		sync_rotation = rotation
