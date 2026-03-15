@@ -35,7 +35,16 @@ func create_server(player_name: String):
 	# Broadcast ourselves on LAN
 	LANDiscovery.start_broadcasting(player_name, DEFAULT_PORT)
 	
+	
 	print("NetworkManager: Server created on port ", DEFAULT_PORT)
+	return OK
+
+func start_single_player(player_name: String):
+	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
+	players.clear()
+	players[1] = {"name": player_name, "ready": false}
+	LANDiscovery.stop_all()
+	print("NetworkManager: Started single player mode")
 	return OK
 
 var local_player_name = ""

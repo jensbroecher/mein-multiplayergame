@@ -31,6 +31,13 @@ text = "Player Name:"
 layout_mode = 2
 text = "Racer"
 
+[node name="ButtonSingle" type="Button" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+text = "Play Solo"
+
+[node name="HSeparatorSingle" type="HSeparator" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+
 [node name="ButtonHost" type="Button" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
 text = "Host LAN Game"
