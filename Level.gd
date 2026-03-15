@@ -8,12 +8,14 @@ var race_state: int = RaceState.LOBBY
 
 @onready var spawn_points = $SpawnPoints.get_children()
 @onready var players_container = $Players
+@onready var player_spawner = $PlayerSpawner
 
 var race_ui
 var player_stats = {} # id -> {"laps": 0, "next_checkpoint": 1, "finished": false, "pos": 0}
 var end_timer = 0.0
 
 func _ready():
+	player_spawner.spawn_function = _spawn_custom
 	race_ui = RACE_UI_SCENE.instantiate()
 	add_child(race_ui)
 	
@@ -155,17 +157,29 @@ func _on_server_player_disconnected(id: int):
 			p.queue_free()
 		player_stats.erase(id)
 
-func _add_player(id: int, p_name: String):
+func _spawn_custom(data: Variant) -> Node:
 	var cart = PLAYER_CART.instantiate()
-	cart.name = str(id) # Name must be string of network ID for syncing
+	cart.name = str(data["id"])
+	cart.player_name = data["name"]
+	cart.global_transform = data["transform"]
 	
-	cart.player_name = p_name
-	
-	var idx = players_container.get_child_count() % spawn_points.size()
-	cart.global_transform = spawn_points[idx].global_transform
-	
-	players_container.add_child(cart)
-	player_stats[id] = {"laps": 0, "next_checkpoint": 1, "finished": false, "pos": 0}
+	# If race is already started (e.g. late join), enable movement if local
+	if race_state == RaceState.RACING:
+		cart.can_move = true
+		
+	return cart
+
+func _add_player(id: int, p_name: String):
+	if not player_stats.has(id):
+		var idx = player_stats.size() % spawn_points.size()
+		player_stats[id] = {"laps": 0, "next_checkpoint": 1, "finished": false, "pos": 0}
+		
+		var data = {
+			"id": id,
+			"name": p_name,
+			"transform": spawn_points[idx].global_transform
+		}
+		player_spawner.spawn(data)
 
 func _on_local_ready_pressed(is_ready: bool):
 	NetworkManager.cmd_set_ready.rpc(is_ready)
