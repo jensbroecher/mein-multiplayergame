@@ -16,7 +16,7 @@ const GRAVITY = 20.0
 @onready var visuals = $Visuals
 @onready var camera = $Visuals/CameraPivot/Camera3D
 @onready var name_tag = $Visuals/NameTag
-@onready var engine_sound = $EngineSound
+@onready var engine_sound = $Visuals/EngineSound
 
 var is_local_player = false
 var can_move = false
@@ -76,7 +76,8 @@ func _process(delta):
 	
 	# AUDIO SMOOTHING: Use lerp to prevent DJ-scratching artifacts from jittery network updates
 	engine_sound.pitch_scale = lerp(engine_sound.pitch_scale, target_pitch, 10.0 * delta)
-	engine_sound.unit_size = lerp(engine_sound.unit_size, target_volume, 10.0 * delta)
+	# Increased unit_size baseline to 10.0 so host/solo can hear it (1.0 was too quiet)
+	engine_sound.unit_size = lerp(engine_sound.unit_size, 10.0 + (speed / SPEED) * 20.0, 10.0 * delta)
 
 func _physics_process(delta):
 	# Handle movement for non-local players via interpolation
