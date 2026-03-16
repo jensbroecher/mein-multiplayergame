@@ -1,7 +1,6 @@
-[gd_scene load_steps=5 format=3 uid="uid://cart123"]
+[gd_scene load_steps=6 format=3 uid="uid://cart123"]
 
 [ext_resource type="Script" path="res://PlayerCart.gd" id="1_cscript"]
-[ext_resource type="AudioStream" uid="uid://d3p8x8r6b8h8y" path="res://sounds/freesound_community-engine-47745.mp3" id="2_sound"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_cart"]
 size = Vector3(1.2, 0.8, 2.0)
@@ -16,6 +15,12 @@ properties/1/replication_mode = 1
 properties/2/path = NodePath(".:player_name")
 properties/2/spawn = true
 properties/2/replication_mode = 2
+properties/3/path = NodePath(".:sync_velocity")
+properties/3/spawn = true
+properties/3/replication_mode = 1
+
+[sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_engine"]
+buffer_length = 0.1
 
 [node name="PlayerCart" type="CharacterBody3D"]
 script = ExtResource("1_cscript")
@@ -46,9 +51,13 @@ text = "Player"
 transform = Transform3D(1, 0, 0, 0, 0.965926, 0.258819, 0, -0.258819, 0.965926, 0, 1.5, 4)
 
 [node name="Camera3D" type="Camera3D" parent="Visuals/CameraPivot"]
+current = true
+
+[node name="AudioListener3D" type="AudioListener3D" parent="Visuals/CameraPivot/Camera3D"]
+current = true
 
 [node name="EngineSound" type="AudioStreamPlayer3D" parent="Visuals"]
-stream = ExtResource("2_sound")
+stream = SubResource("AudioStreamGenerator_engine")
 autoplay = true
 bus = &"Master"
 
