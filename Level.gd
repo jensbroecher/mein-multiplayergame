@@ -149,6 +149,7 @@ func start_race():
 	race_ui.show_hud()
 	race_ui.show_message("GO!", 2.0)
 	
+	MusicManager.play_race_music()
 	get_tree().call_group("player_carts", "on_race_started")
 
 func _process(delta):

@@ -1,9 +1,14 @@
-[gd_scene load_steps=6 format=3 uid="uid://cart123"]
+[gd_scene format=3 uid="uid://cart123"]
 
-[ext_resource type="Script" path="res://PlayerCart.gd" id="1_cscript"]
+[ext_resource type="Script" uid="uid://cgxoltdv3a2ap" path="res://PlayerCart.gd" id="1_cscript"]
+[ext_resource type="PackedScene" uid="uid://b2todmhcp14i1" path="res://models/cart.glb" id="2_cart"]
+[ext_resource type="PackedScene" uid="uid://cedxbolyht6sf" path="res://models/wheel.glb" id="3_wheel"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_cart"]
-size = Vector3(1.2, 0.8, 2.0)
+size = Vector3(1.2, 0.8, 2)
+
+[sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_engine"]
+buffer_length = 0.1
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_sync"]
 properties/0/path = NodePath(".:sync_position")
@@ -18,48 +23,68 @@ properties/2/replication_mode = 2
 properties/3/path = NodePath(".:sync_velocity")
 properties/3/spawn = true
 properties/3/replication_mode = 1
+properties/4/path = NodePath(".:sync_steer")
+properties/4/spawn = true
+properties/4/replication_mode = 1
 
-[sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_engine"]
-buffer_length = 0.1
-
-[node name="PlayerCart" type="CharacterBody3D"]
+[node name="PlayerCart" type="CharacterBody3D" unique_id=1637232811]
 script = ExtResource("1_cscript")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=654514439]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
 shape = SubResource("BoxShape3D_cart")
 
-[node name="Visuals" type="Node3D" parent="."]
+[node name="Visuals" type="Node3D" parent="." unique_id=1001732157]
 top_level = true
 
-[node name="BodyMesh" type="CSGBox3D" parent="Visuals"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
-size = Vector3(1.2, 0.5, 2.0)
-material_override = null
+[node name="CartModel" parent="Visuals" unique_id=768104268 instance=ExtResource("2_cart")]
+transform = Transform3D(-6.1192225e-08, -0.015417921, -1.3999149, -6.7393785e-10, 1.3999149, -0.015417921, 1.3999997, 2.990315e-17, -6.1195934e-08, 0, 0.13765013, 0)
 
-[node name="CabinMesh" type="CSGBox3D" parent="Visuals"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0.2)
-size = Vector3(0.8, 0.4, 1.0)
-material_override = null
+[node name="WheelPivotFL" type="Node3D" parent="Visuals" unique_id=40001]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.44312996, 0.228309, -0.64313036)
 
-[node name="NameTag" type="Label3D" parent="Visuals"]
+[node name="WheelFL" parent="Visuals/WheelPivotFL" unique_id=471895820 instance=ExtResource("3_wheel")]
+transform = Transform3D(-1.7484556e-08, 0, 0.4, 0, 0.4, 0, -0.4, 0, -1.7484556e-08, 0, -0.228309, 0)
+
+[node name="WheelPivotFR" type="Node3D" parent="Visuals" unique_id=40002]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4259705, 0.228309, -0.68688697)
+
+[node name="WheelFR" parent="Visuals/WheelPivotFR" unique_id=292410534 instance=ExtResource("3_wheel")]
+transform = Transform3D(-1.7484556e-08, 0, -0.4, 0, 0.4, 0, 0.4, 0, -1.7484556e-08, 0, -0.228309, 0)
+
+[node name="WheelPivotRL" type="Node3D" parent="Visuals" unique_id=40003]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45103335, 0.228309, 0.41018802)
+
+[node name="WheelRL" parent="Visuals/WheelPivotRL" unique_id=1288615826 instance=ExtResource("3_wheel")]
+transform = Transform3D(-1.7484556e-08, 0, 0.4, 0, 0.4, 0, -0.4, 0, -1.7484556e-08, 0, -0.228309, 0)
+
+[node name="WheelPivotRR" type="Node3D" parent="Visuals" unique_id=40004]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.433761, 0.228309, 0.4703167)
+
+[node name="WheelRR" parent="Visuals/WheelPivotRR" unique_id=1528504604 instance=ExtResource("3_wheel")]
+transform = Transform3D(-1.7484556e-08, 0, -0.4, 0, 0.4, 0, 0.4, 0, -1.7484556e-08, 0, -0.228309, 0)
+
+[node name="NameTag" type="Label3D" parent="Visuals" unique_id=1335975530]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
 billboard = 1
 text = "Player"
 
-[node name="CameraPivot" type="Node3D" parent="Visuals"]
+[node name="CameraPivot" type="Node3D" parent="Visuals" unique_id=473408400]
 transform = Transform3D(1, 0, 0, 0, 0.965926, 0.258819, 0, -0.258819, 0.965926, 0, 1.5, 4)
 
-[node name="Camera3D" type="Camera3D" parent="Visuals/CameraPivot"]
+[node name="Camera3D" type="Camera3D" parent="Visuals/CameraPivot" unique_id=1774877887]
 current = true
 
-[node name="AudioListener3D" type="AudioListener3D" parent="Visuals/CameraPivot/Camera3D"]
+[node name="AudioListener3D" type="AudioListener3D" parent="Visuals/CameraPivot/Camera3D" unique_id=648148666]
 current = true
 
-[node name="EngineSound" type="AudioStreamPlayer3D" parent="Visuals"]
+[node name="EngineSound" type="AudioStreamPlayer3D" parent="Visuals" unique_id=466950016]
 stream = SubResource("AudioStreamGenerator_engine")
 autoplay = true
-bus = &"Master"
+bus = &"SFX"
 
-[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
+[node name="GroundRay" type="RayCast3D" parent="."]
+target_position = Vector3(0, -1.5, 0)
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="." unique_id=1093522993]
 replication_config = SubResource("SceneReplicationConfig_sync")

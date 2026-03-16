@@ -2,11 +2,15 @@
 
 [ext_resource type="Script" path="res://Main.gd" id="1_d8abc"]
 [ext_resource type="PackedScene" uid="uid://cx62c12j3fgh" path="res://Lobby.tscn" id="2_xdobby"]
+[ext_resource type="PackedScene" uid="uid://mainmenu123" path="res://MainMenu.tscn" id="3_menu"]
 
 [node name="Main" type="Node"]
 script = ExtResource("1_d8abc")
 
 [node name="Lobby" parent="." instance=ExtResource("2_xdobby")]
+visible = false
+
+[node name="MainMenu" parent="." instance=ExtResource("3_menu")]
 
 [node name="LevelSpawner" type="MultiplayerSpawner" parent="."]
 _spawnable_scenes = PackedStringArray("res://Level.tscn")

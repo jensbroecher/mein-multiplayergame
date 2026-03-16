@@ -23,6 +23,7 @@ config/icon="res://icon.svg"
 
 NetworkManager="*res://NetworkManager.gd"
 LANDiscovery="*res://LANDiscovery.gd"
+MusicManager="*res://MusicManager.gd"
 
 [display]
 

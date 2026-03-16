@@ -14,9 +14,15 @@ const FRICTION = 5.0
 const GRAVITY = 25.0
 
 @onready var visuals = $Visuals
+@onready var camera_pivot = $Visuals/CameraPivot
 @onready var camera = $Visuals/CameraPivot/Camera3D
 @onready var name_tag = $Visuals/NameTag
 @onready var engine_sound = $Visuals/EngineSound
+@onready var wheel_fl = $Visuals/WheelPivotFL
+@onready var wheel_fr = $Visuals/WheelPivotFR
+@onready var wheel_rl = $Visuals/WheelPivotRL
+@onready var wheel_rr = $Visuals/WheelPivotRR
+@onready var ground_ray = $GroundRay
 
 var playback: AudioStreamGeneratorPlayback
 var sample_rate: float
@@ -25,6 +31,13 @@ var phase2: float = 0.0
 var phase3: float = 0.0
 var time_accum: float = 0.0
 var current_base_freq: float = 30.0
+var wheel_rotation: float = 0.0
+var visual_steer: float = 0.0
+
+# Procedural Animation States
+var was_on_floor: bool = true
+var bounce_y: float = 0.0
+var bounce_vel: float = 0.0
 
 var is_local_player = false
 var can_move = false
@@ -33,6 +46,7 @@ var can_move = false
 var sync_position: Vector3
 var sync_rotation: Vector3
 var sync_velocity: Vector3
+var sync_steer: float # For wheel steering visuals
 
 func on_race_started():
 	if is_local_player:
@@ -54,6 +68,8 @@ func _ready():
 	
 	if is_local_player:
 		camera.current = true
+		camera_pivot.top_level = true
+		camera_pivot.global_transform = global_transform * camera_pivot.transform
 		if has_node("Visuals/CameraPivot/Camera3D/AudioListener3D"):
 			get_node("Visuals/CameraPivot/Camera3D/AudioListener3D").make_current()
 	else:
@@ -82,21 +98,105 @@ func _process(delta):
 	var forward = -global_transform.basis.z
 	var up = Vector3.UP
 	
-	if is_on_floor():
+	# Use ground ray normal for more robust alignment, falling back to on_floor normal
+	if ground_ray.is_colliding():
+		up = ground_ray.get_collision_normal()
+	elif is_on_floor():
 		up = get_floor_normal()
 	
-	# Fix for mirrored controls: Use looking_at to correctly align visuals
-	# to the floor normal while facing the movement direction (-Z is forward).
+	# Use looking_at for robust orientation (fixes mirrored controls)
 	target_basis = Basis.looking_at(forward, up)
 	
-	var target_transform = Transform3D(target_basis, global_position)
+	# DYNAMIC LEANING:
+	# Speed-dependent factor: No leaning at low speeds (zero below 2.0, max at 15.0+)
+	var speed_lean_factor = clamp((velocity.length() - 2.0) / 13.0, 0.0, 1.0)
+	
+	# 1. Softened side-lean into turns, now speed-dependent
+	var turn_lean = -sync_steer * 0.08 * speed_lean_factor
+	# 2. Pitch-lean reinforcement: rotate slightly more based on slope steepness
+	# We want the nose to tilt UP when climbing (positive slope)
+	var slope_intensity = forward.dot(up)
+	var pitch_lean = -slope_intensity * 0.5
+	
+	target_basis = target_basis.rotated(target_basis.z.normalized(), turn_lean)
+	target_basis = target_basis.rotated(target_basis.x.normalized(), pitch_lean)
+	
+	# GROUNDING: Adjust target position to actual ground height on levels/ramps
+	var target_pos = global_position
+	if is_on_floor() and ground_ray.is_colliding():
+		target_pos.y = ground_ray.get_collision_point().y
+	
+	# BOUNCE EFFECT: Decimate and apply
+	bounce_vel -= bounce_y * 110.0 * delta # Spring
+	bounce_vel *= 0.9 # Damping
+	bounce_y += bounce_vel * delta
+	target_pos.y += bounce_y
+	
+	var target_transform = Transform3D(target_basis, target_pos)
 	
 	# Buttery smooth lerp for both position and rotation (leaning)
-	visuals.global_transform = visuals.global_transform.interpolate_with(target_transform, 15.0 * delta)
+	visuals.global_transform = visuals.global_transform.interpolate_with(target_transform, 18.0 * delta)
+	
+	# WHEEL SUSPENSION ANIMATION (Smoothed):
+	# Wheels move up/down relative to their pivot to simulate suspension
+	# Reduced intensity to 20% of previous value for sublte realism
+	# Added speed_lean_factor so wheels don't compress when standing still
+	var susp_intensity = sync_steer * 0.08 * 0.2 * speed_lean_factor
+	var susp_pitch = pitch_lean * 0.1 * 0.2
+	
+	var target_fl = 0.228309 + susp_intensity - susp_pitch
+	var target_fr = 0.228309 - susp_intensity - susp_pitch
+	var target_rl = 0.228309 + susp_intensity + susp_pitch
+	var target_rr = 0.228309 - susp_intensity + susp_pitch
+	
+	# Smoothing speed (~10.0 for fluid but responsive feel)
+	var s_speed = 10.0 * delta
+	wheel_fl.position.y = lerp(wheel_fl.position.y, target_fl, s_speed)
+	wheel_fr.position.y = lerp(wheel_fr.position.y, target_fr, s_speed)
+	wheel_rl.position.y = lerp(wheel_rl.position.y, target_rl, s_speed)
+	wheel_rr.position.y = lerp(wheel_rr.position.y, target_rr, s_speed)
+	
+	# DYNAMIC CAMERA FOLLOW:
+	if is_local_player:
+		# Define target position in global space based on visuals
+		# (We use the visuals transform to get a stable but responsive target)
+		var cam_offset = Vector3(0, 1.5, 4.0)
+		var target_cam_pos = visuals.global_transform * cam_offset
+		
+		# Define target orientation
+		var target_cam_basis = visuals.global_transform.basis
+		
+		# CURVE LEANING: Tilt the camera slightly based on steering
+		var cam_lean = sync_steer * 0.08
+		target_cam_basis = target_cam_basis.rotated(target_cam_basis.z.normalized(), cam_lean)
+		
+		# SMOOTHING: 
+		# Position follows relatively fast (12.0)
+		# Rotation follows slower (6.0) to create that "lag" feel in corners
+		camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 12.0 * delta)
+		camera_pivot.global_basis = camera_pivot.global_basis.slerp(target_cam_basis, 6.0 * delta)
 	
 	# Keep visuals pinned if they drift too far (emergency snap)
 	if visuals.global_position.distance_to(global_position) > 10.0:
 		visuals.global_position = global_position
+	
+	# WHEEL ANIMATION:
+	var wheel_speed = velocity.length()
+	# Estimate wheel circumference for realistic spin (approx 2.0 factor)
+	wheel_rotation -= wheel_speed * delta * 4.0 
+	
+	# Smooth out steering visuals (lerp towards sync_steer)
+	visual_steer = lerp(visual_steer, sync_steer, 8.0 * delta)
+	var steer_angle = visual_steer * 0.4 # Max ~23 degrees
+	
+	# Rotate all wheels for rolling
+	for wheel in [wheel_fl, wheel_fr, wheel_rl, wheel_rr]:
+		if wheel:
+			wheel.rotation.x = wheel_rotation
+			
+	# Steer front wheels
+	if wheel_fl: wheel_fl.rotation.y = steer_angle
+	if wheel_fr: wheel_fr.rotation.y = steer_angle
 	
 	# PROCEDURAL AUDIO SYNTHESIS:
 	if playback:
@@ -109,14 +209,15 @@ func _process(delta):
 	# Modulate engine sound pitch based on speed
 	var speed = velocity.length()
 	# Base volume calculation for HUD/Audio
-	var target_vol_linear = 1.5 + (speed / SPEED) * 2.0
+	# Base volume calculation for HUD/Audio
+	var target_vol_linear = 0.5 + (speed / SPEED) * 1.0
 	
 	# Apply overall volume (DB)
 	var target_db = linear_to_db(target_vol_linear)
 	engine_sound.volume_db = lerp(engine_sound.volume_db, target_db, 10.0 * delta)
 	
-	# Increased unit_size baseline significantly to ensure it's heard across the scene
-	engine_sound.unit_size = lerp(engine_sound.unit_size, 20.0 + (speed / SPEED) * 30.0, 10.0 * delta)
+	# Reduced unit_size baseline to make it less overwhelming at distance
+	engine_sound.unit_size = lerp(engine_sound.unit_size, 10.0 + (speed / SPEED) * 20.0, 10.0 * delta)
 
 func _fill_audio_buffer():
 	var speed = velocity.length()
@@ -201,7 +302,12 @@ func _physics_process(delta):
 	# Gravity and Terrain Alignment - Reverted physics rotation to fix jitter
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
-
+	
+	# LANDING BOUNCE DETECTION
+	if is_on_floor() and not was_on_floor:
+		bounce_vel = -velocity.y * 0.02 # Convert downward momentum to bounce
+	was_on_floor = is_on_floor()
+	
 	# Only local player processes physics input from here down
 	if not can_move:
 		velocity.x = move_toward(velocity.x, 0, FRICTION * delta)
@@ -252,3 +358,7 @@ func _physics_process(delta):
 	sync_position = position
 	sync_rotation = rotation
 	sync_velocity = velocity
+	
+	# Progressive Steering: Accumulate steer building over time (0.0 to 1.0)
+	var target_steer = -input_dir.x if can_move else 0.0
+	sync_steer = move_toward(sync_steer, target_steer, 2.5 * delta)
