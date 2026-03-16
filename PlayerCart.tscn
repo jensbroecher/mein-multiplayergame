@@ -3,12 +3,154 @@
 [ext_resource type="Script" uid="uid://cgxoltdv3a2ap" path="res://PlayerCart.gd" id="1_cscript"]
 [ext_resource type="PackedScene" uid="uid://b2todmhcp14i1" path="res://models/cart.glb" id="2_cart"]
 [ext_resource type="PackedScene" uid="uid://cedxbolyht6sf" path="res://models/wheel.glb" id="3_wheel"]
+[ext_resource type="AudioStream" uid="uid://404333" path="res://sounds/404333__strexet__nitro-activation.mp3" id="4_nitro"]
+[ext_resource type="AudioStream" uid="uid://774270" path="res://sounds/774270__thelittlecrow__rocket-launch-boost-and-burning-version-b.wav" id="5_rocket"]
+[ext_resource type="AudioStream" uid="uid://434430" path="res://sounds/434430__v-ktor__explosion05.wav" id="6_release"]
+[ext_resource type="AudioStream" uid="uid://511492" path="res://sounds/511492__andersmmg__double-beep.wav" id="7_beep2"]
+[ext_resource type="AudioStream" uid="uid://467882" path="res://sounds/467882__samsterbirdies__beep-warning.ogg" id="8_beep1"]
+[ext_resource type="AudioStream" uid="uid://490255" path="res://sounds/490255__anomaex__sci-fi_explosion_1.wav" id="9_explosion"]
+[ext_resource type="AudioStream" uid="uid://188211" path="res://sounds/floraphonic-burning-fire-loop-1-188211.mp3" id="10_fireloop"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_cart"]
-size = Vector3(1.2, 0.8, 2)
+size = Vector3(1.2, 0.5, 2)
 
 [sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_engine"]
 buffer_length = 0.1
+
+[sub_resource type="Gradient" id="Gradient_soft"]
+offsets = PackedFloat32Array(0, 0.7, 1)
+colors = PackedColorArray(1, 1, 1, 1, 0.5, 0.5, 0.5, 0.5, 0, 0, 0, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_soft"]
+gradient = SubResource("Gradient_soft")
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(0.8, 0.2)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_flame"]
+transparency = 1
+blend_mode = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
+particles_anim_loop = false
+albedo_color = Color(1, 0.4, 0.1, 0.8)
+albedo_texture = SubResource("GradientTexture2D_soft")
+emission_enabled = true
+emission = Color(1, 0.3, 0, 1)
+emission_energy_multiplier = 4.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_smoke"]
+transparency = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
+particles_anim_loop = false
+albedo_color = Color(0.1, 0.1, 0.1, 0.6)
+albedo_texture = SubResource("GradientTexture2D_soft")
+
+[sub_resource type="Curve" id="Curve_boost"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_scale"]
+curve = SubResource("Curve_boost")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_boost"]
+direction = Vector3(0, 1, 0)
+spread = 5.0
+initial_velocity_min = 5.0
+initial_velocity_max = 8.0
+gravity = Vector3(0, 0, 0)
+scale_curve = SubResource("CurveTexture_scale")
+color = Color(0.956863, 0.584314, 0.101961, 1)
+
+[sub_resource type="QuadMesh" id="QuadMesh_flame"]
+material = SubResource("StandardMaterial3D_flame")
+size = Vector2(0.3, 0.3)
+
+[sub_resource type="QuadMesh" id="QuadMesh_smoke"]
+material = SubResource("StandardMaterial3D_smoke")
+size = Vector2(0.5, 0.5)
+
+[sub_resource type="QuadMesh" id="QuadMesh_expl"]
+material = SubResource("StandardMaterial3D_flame")
+size = Vector2(1.5, 1.5)
+
+[sub_resource type="Curve" id="Curve_expl"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_expl"]
+curve = SubResource("Curve_expl")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_expl"]
+spread = 180.0
+initial_velocity_min = 2.0
+initial_velocity_max = 5.0
+gravity = Vector3(0, 1, 0)
+scale_min = 0.8
+scale_max = 2.0
+scale_curve = SubResource("CurveTexture_expl")
+color = Color(1, 0.5, 0.1, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_expl"]
+material = SubResource("StandardMaterial3D_flame")
+radius = 0.2
+height = 0.4
+radial_segments = 8
+rings = 4
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_burning"]
+emission_shape = 1
+emission_sphere_radius = 0.3
+direction = Vector3(0, 1, 0)
+spread = 25.0
+initial_velocity_min = 2.0
+initial_velocity_max = 4.0
+gravity = Vector3(0, 3, 0)
+scale_min = 0.4
+scale_max = 0.8
+scale_curve = SubResource("CurveTexture_expl")
+color = Color(1, 0.5, 0, 1)
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_smoke"]
+emission_shape = 1
+emission_sphere_radius = 0.4
+direction = Vector3(0, 1, 0)
+spread = 40.0
+initial_velocity_min = 1.0
+initial_velocity_max = 2.5
+gravity = Vector3(0, 2, 0)
+scale_min = 0.8
+scale_max = 1.5
+scale_curve = SubResource("CurveTexture_expl")
+color = Color(0.3, 0.3, 0.3, 0.5)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_smoke_old"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(0.3, 0.3, 0.3, 0.8)
+
+[sub_resource type="SphereMesh" id="SphereMesh_smoke"]
+material = SubResource("StandardMaterial3D_smoke_old")
+radius = 0.2
+height = 0.4
+radial_segments = 8
+rings = 4
+
+[sub_resource type="SphereMesh" id="SphereMesh_burning"]
+material = SubResource("StandardMaterial3D_flame")
+radius = 0.15
+height = 0.3
+radial_segments = 6
+rings = 4
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_sync"]
 properties/0/path = NodePath(".:sync_position")
@@ -26,51 +168,90 @@ properties/3/replication_mode = 1
 properties/4/path = NodePath(".:sync_steer")
 properties/4/spawn = true
 properties/4/replication_mode = 1
+properties/5/path = NodePath(".:is_boosting")
+properties/5/spawn = true
+properties/5/replication_mode = 1
+properties/6/path = NodePath(".:is_exploding")
+properties/6/spawn = true
+properties/6/replication_mode = 1
 
 [node name="PlayerCart" type="CharacterBody3D" unique_id=1637232811]
 script = ExtResource("1_cscript")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=654514439]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
 shape = SubResource("BoxShape3D_cart")
 
 [node name="Visuals" type="Node3D" parent="." unique_id=1001732157]
 top_level = true
 
 [node name="CartModel" parent="Visuals" unique_id=768104268 instance=ExtResource("2_cart")]
-transform = Transform3D(-6.1192225e-08, -0.015417921, -1.3999149, -6.7393785e-10, 1.3999149, -0.015417921, 1.3999997, 2.990315e-17, -6.1195934e-08, 0, 0.13765013, 0)
+transform = Transform3D(-6.1192225e-08, -0.015417921, -1.3999149, -6.7393785e-10, 1.3999149, -0.015417921, 1.3999997, 2.990315e-17, -6.1195934e-08, 0, -0.11234987, 0)
+
+[node name="BoostParticles" type="GPUParticles3D" parent="Visuals"]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0.6, 1.1)
+emitting = false
+amount = 40
+lifetime = 0.4
+process_material = SubResource("ParticleProcessMaterial_boost")
+draw_pass_1 = SubResource("QuadMesh_flame")
+
+[node name="ExplosionParticles" type="GPUParticles3D" parent="Visuals"]
+emitting = false
+amount = 400
+lifetime = 1.2
+one_shot = true
+explosiveness = 1.0
+local_coords = false
+process_material = SubResource("ParticleProcessMaterial_expl")
+draw_pass_1 = SubResource("QuadMesh_expl")
+
+[node name="BurningParticles" type="GPUParticles3D" parent="Visuals"]
+emitting = false
+amount = 250
+lifetime = 1.2
+local_coords = false
+process_material = SubResource("ParticleProcessMaterial_burning")
+draw_pass_1 = SubResource("QuadMesh_flame")
+
+[node name="BurningSmokeParticles" type="GPUParticles3D" parent="Visuals"]
+emitting = false
+amount = 200
+lifetime = 2.0
+local_coords = false
+process_material = SubResource("ParticleProcessMaterial_smoke")
+draw_pass_1 = SubResource("QuadMesh_smoke")
 
 [node name="WheelPivotFL" type="Node3D" parent="Visuals" unique_id=40001]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.44312996, 0.228309, -0.64313036)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.44312996, -0.021691, -0.64313036)
 
 [node name="WheelFL" parent="Visuals/WheelPivotFL" unique_id=471895820 instance=ExtResource("3_wheel")]
 transform = Transform3D(-1.7484556e-08, 0, 0.4, 0, 0.4, 0, -0.4, 0, -1.7484556e-08, 0, -0.228309, 0)
 
 [node name="WheelPivotFR" type="Node3D" parent="Visuals" unique_id=40002]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4259705, 0.228309, -0.68688697)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4259705, -0.021691, -0.68688697)
 
 [node name="WheelFR" parent="Visuals/WheelPivotFR" unique_id=292410534 instance=ExtResource("3_wheel")]
 transform = Transform3D(-1.7484556e-08, 0, -0.4, 0, 0.4, 0, 0.4, 0, -1.7484556e-08, 0, -0.228309, 0)
 
 [node name="WheelPivotRL" type="Node3D" parent="Visuals" unique_id=40003]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45103335, 0.228309, 0.41018802)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45103335, -0.021691, 0.41018802)
 
 [node name="WheelRL" parent="Visuals/WheelPivotRL" unique_id=1288615826 instance=ExtResource("3_wheel")]
 transform = Transform3D(-1.7484556e-08, 0, 0.4, 0, 0.4, 0, -0.4, 0, -1.7484556e-08, 0, -0.228309, 0)
 
 [node name="WheelPivotRR" type="Node3D" parent="Visuals" unique_id=40004]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.433761, 0.228309, 0.4703167)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.433761, -0.021691, 0.4703167)
 
 [node name="WheelRR" parent="Visuals/WheelPivotRR" unique_id=1528504604 instance=ExtResource("3_wheel")]
 transform = Transform3D(-1.7484556e-08, 0, -0.4, 0, 0.4, 0, 0.4, 0, -1.7484556e-08, 0, -0.228309, 0)
 
 [node name="NameTag" type="Label3D" parent="Visuals" unique_id=1335975530]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, 0)
 billboard = 1
 text = "Player"
 
 [node name="CameraPivot" type="Node3D" parent="Visuals" unique_id=473408400]
-transform = Transform3D(1, 0, 0, 0, 0.965926, 0.258819, 0, -0.258819, 0.965926, 0, 1.5, 4)
+transform = Transform3D(1, 0, 0, 0, 0.965926, 0.258819, 0, -0.258819, 0.965926, 0, 1.25, 4)
 
 [node name="Camera3D" type="Camera3D" parent="Visuals/CameraPivot" unique_id=1774877887]
 current = true
@@ -82,6 +263,44 @@ current = true
 stream = SubResource("AudioStreamGenerator_engine")
 autoplay = true
 bus = &"SFX"
+
+[node name="SFX_NitroStart" type="AudioStreamPlayer3D" parent="Visuals"]
+stream = ExtResource("4_nitro")
+bus = &"SFX"
+unit_size = 20.0
+volume_db = 5.0
+
+[node name="SFX_RocketLoop" type="AudioStreamPlayer3D" parent="Visuals"]
+stream = ExtResource("5_rocket")
+bus = &"SFX"
+unit_size = 20.0
+volume_db = 5.0
+
+[node name="SFX_ReleasePop" type="AudioStreamPlayer3D" parent="Visuals"]
+stream = ExtResource("6_release")
+bus = &"SFX"
+unit_size = 20.0
+volume_db = 3.0
+
+[node name="SFX_DoubleBeep" type="AudioStreamPlayer3D" parent="Visuals"]
+stream = ExtResource("8_beep1")
+bus = &"SFX"
+unit_size = 15.0
+
+[node name="SFX_BeepWarning" type="AudioStreamPlayer3D" parent="Visuals"]
+stream = ExtResource("7_beep2")
+bus = &"SFX"
+unit_size = 15.0
+
+[node name="SFX_Explosion" type="AudioStreamPlayer3D" parent="Visuals"]
+stream = ExtResource("9_explosion")
+bus = &"SFX"
+unit_size = 20.0
+
+[node name="SFX_FireLoop" type="AudioStreamPlayer3D" parent="Visuals"]
+stream = ExtResource("10_fireloop")
+bus = &"SFX"
+unit_size = 15.0
 
 [node name="GroundRay" type="RayCast3D" parent="."]
 target_position = Vector3(0, -1.5, 0)

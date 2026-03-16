@@ -1,6 +1,13 @@
-[gd_scene load_steps=2 format=3 uid="uid://ci11yow3h0tq8"]
+[gd_scene load_steps=3 format=3 uid="uid://ci11yow3h0tq8"]
 
 [ext_resource type="Script" path="res://RaceUI.gd" id="1_ruisc"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_heat"]
+bg_color = Color(0, 0.8, 1, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
 
 [node name="RaceUI" type="CanvasLayer"]
 script = ExtResource("1_ruisc")
@@ -88,6 +95,39 @@ offset_right = 200.0
 offset_bottom = 100.0
 grow_horizontal = 2
 theme_override_font_sizes/font_size = 32
+horizontal_alignment = 1
+
+[node name="HeatBar" type="ProgressBar" parent="HUDPanel"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -150.0
+offset_top = -60.0
+offset_right = 150.0
+offset_bottom = -33.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_styles/fill = SubResource("StyleBoxFlat_heat")
+value = 0.0
+show_percentage = false
+
+[node name="LabelHeat" type="Label" parent="HUDPanel/HeatBar"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -11.5
+offset_right = 20.0
+offset_bottom = 11.5
+grow_horizontal = 2
+grow_vertical = 2
+text = "HEAT"
 horizontal_alignment = 1
 
 [node name="EndPanel" type="PanelContainer" parent="."]

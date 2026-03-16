@@ -9,6 +9,7 @@ extends CanvasLayer
 @onready var label_pos = $HUDPanel/LabelPosition
 @onready var label_lap = $HUDPanel/LabelLap
 @onready var label_msg = $HUDPanel/LabelMessage
+@onready var heat_bar = $HUDPanel/HeatBar
 
 @onready var end_panel = $EndPanel
 @onready var end_timer_label = $EndPanel/VBoxContainer/LabelTimer
@@ -70,6 +71,26 @@ func show_message(msg: String, duration: float = 0.0):
 		var tw = create_tween()
 		tw.tween_interval(duration)
 		tw.tween_callback(func(): if label_msg.text == msg: label_msg.text = "")
+
+func update_heat(val: float):
+	if heat_bar:
+		heat_bar.value = val
+		
+		# Create a unique stylebox to avoid shared resource issues
+		var style = StyleBoxFlat.new()
+		style.corner_radius_top_left = 4
+		style.corner_radius_top_right = 4
+		style.corner_radius_bottom_right = 4
+		style.corner_radius_bottom_left = 4
+		
+		if val > 80:
+			style.bg_color = Color(1, 0, 0) # Red
+		elif val > 50:
+			style.bg_color = Color(1, 0.5, 0) # Orange
+		else:
+			style.bg_color = Color(0, 0.8, 1) # Cyan/Blue
+			
+		heat_bar.add_theme_stylebox_override("fill", style)
 
 func show_end_screen():
 	end_panel.show()

@@ -18,6 +18,7 @@ var player_stats = {} # id -> {"laps": 0, "next_checkpoint": 1, "finished": fals
 var end_timer = 0.0
 
 func _ready():
+	add_to_group("level")
 	player_spawner.spawn_function = _spawn_custom
 	race_ui = RACE_UI_SCENE.instantiate()
 	add_child(race_ui)
@@ -221,3 +222,8 @@ func _end_race():
 func end_race_rpc():
 	race_ui.show_message("Race Over!", 5.0)
 	_disable_local_cart()
+
+func on_player_exploded(is_local: bool):
+	if is_local:
+		race_ui.show_message("GAME OVER", 10.0)
+		_disable_local_cart()

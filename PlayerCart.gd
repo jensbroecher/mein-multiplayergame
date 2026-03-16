@@ -12,6 +12,10 @@ const STEER_SPEED = 2.5
 const ACCELERATION = 12.0
 const FRICTION = 5.0
 const GRAVITY = 25.0
+const BOOST_ACCEL = 30.0
+const BOOST_SPEED = 40.0
+const HEAT_RATE = 25.0 # Heat per second while boosting
+const COOL_RATE = 15.0 # Heat per second while not boosting
 
 @onready var visuals = $Visuals
 @onready var camera_pivot = $Visuals/CameraPivot
@@ -23,6 +27,21 @@ const GRAVITY = 25.0
 @onready var wheel_rl = $Visuals/WheelPivotRL
 @onready var wheel_rr = $Visuals/WheelPivotRR
 @onready var ground_ray = $GroundRay
+
+var race_ui # Reference to UI
+
+# Boost / SFX Nodes
+@onready var sfx_nitro_start = $Visuals/SFX_NitroStart
+@onready var sfx_rocket_loop = $Visuals/SFX_RocketLoop
+@onready var sfx_release_pop = $Visuals/SFX_ReleasePop
+@onready var sfx_double_beep = $Visuals/SFX_DoubleBeep
+@onready var sfx_beep_warning = $Visuals/SFX_BeepWarning
+@onready var sfx_explosion = $Visuals/SFX_Explosion
+@onready var sfx_fire_loop = $Visuals/SFX_FireLoop
+@onready var boost_particles = $Visuals/BoostParticles
+@onready var explosion_particles = $Visuals/ExplosionParticles
+@onready var burning_particles = $Visuals/BurningParticles
+@onready var burning_smoke_particles = $Visuals/BurningSmokeParticles
 
 var playback: AudioStreamGeneratorPlayback
 var sample_rate: float
@@ -42,6 +61,16 @@ var bounce_vel: float = 0.0
 var is_local_player = false
 var can_move = false
 
+# Boost and Heat
+var heat: float = 0.0
+var is_boosting: bool = false
+var boost_time: float = 0.0 # How long the current boost has lasted
+var is_exploding: bool = false
+var is_waiting_to_explode: bool = false
+var explosion_delay_timer: float = 0.0
+var tumble_velocity: Vector3 = Vector3.ZERO
+var warning_beep_timer: float = 0.0
+
 # Network sync targets
 var sync_position: Vector3
 var sync_rotation: Vector3
@@ -55,6 +84,14 @@ func on_race_started():
 func _ready():
 	add_to_group("player_carts")
 	_update_authority()
+	
+	# Find race UI in scene
+	var root = get_tree().root
+	# Wait a frame to ensure Level has instantiated RaceUI
+	await get_tree().process_frame
+	var level = get_tree().get_first_node_in_group("level")
+	if level and level.has_node("RaceUI"):
+		race_ui = level.get_node("RaceUI")
 	
 	name_tag.text = player_name
 	
@@ -105,26 +142,32 @@ func _process(delta):
 		up = get_floor_normal()
 	
 	# Use looking_at for robust orientation (fixes mirrored controls)
-	target_basis = Basis.looking_at(forward, up)
+	var speed_lean_factor = 0.0
+	var pitch_lean = 0.0
 	
-	# DYNAMIC LEANING:
-	# Speed-dependent factor: No leaning at low speeds (zero below 2.0, max at 15.0+)
-	var speed_lean_factor = clamp((velocity.length() - 2.0) / 13.0, 0.0, 1.0)
-	
-	# 1. Softened side-lean into turns, now speed-dependent
-	var turn_lean = -sync_steer * 0.08 * speed_lean_factor
-	# 2. Pitch-lean reinforcement: rotate slightly more based on slope steepness
-	# We want the nose to tilt UP when climbing (positive slope)
-	var slope_intensity = forward.dot(up)
-	var pitch_lean = -slope_intensity * 0.5
-	
-	target_basis = target_basis.rotated(target_basis.z.normalized(), turn_lean)
-	target_basis = target_basis.rotated(target_basis.x.normalized(), pitch_lean)
+	if is_exploding:
+		target_basis = global_transform.basis
+	else:
+		target_basis = Basis.looking_at(forward, up)
+		
+		# DYNAMIC LEANING:
+		# Speed-dependent factor: No leaning at low speeds (zero below 2.0, max at 15.0+)
+		speed_lean_factor = clamp((velocity.length() - 2.0) / 13.0, 0.0, 1.0)
+		
+		# 1. Softened side-lean into turns, now speed-dependent
+		var turn_lean = -sync_steer * 0.08 * speed_lean_factor
+		# 2. Pitch-lean reinforcement: rotate slightly more based on slope steepness
+		# We want the nose to tilt UP when climbing (positive slope)
+		var slope_intensity = forward.dot(up)
+		pitch_lean = -slope_intensity * 0.5
+		
+		target_basis = target_basis.rotated(target_basis.z.normalized(), turn_lean)
+		target_basis = target_basis.rotated(target_basis.x.normalized(), pitch_lean)
 	
 	# GROUNDING: Adjust target position to actual ground height on levels/ramps
 	var target_pos = global_position
 	if is_on_floor() and ground_ray.is_colliding():
-		target_pos.y = ground_ray.get_collision_point().y
+		target_pos.y = ground_ray.get_collision_point().y + 0.25
 	
 	# BOUNCE EFFECT: Decimate and apply
 	bounce_vel -= bounce_y * 110.0 * delta # Spring
@@ -135,7 +178,13 @@ func _process(delta):
 	var target_transform = Transform3D(target_basis, target_pos)
 	
 	# Buttery smooth lerp for both position and rotation (leaning)
-	visuals.global_transform = visuals.global_transform.interpolate_with(target_transform, 18.0 * delta)
+	if is_exploding:
+		visuals.global_transform = global_transform
+		# Ensure fire burns upwards by forcing emitter bases to be world-upright
+		burning_particles.global_rotation = Vector3.ZERO
+		burning_smoke_particles.global_rotation = Vector3.ZERO
+	else:
+		visuals.global_transform = visuals.global_transform.interpolate_with(target_transform, 18.0 * delta)
 	
 	# WHEEL SUSPENSION ANIMATION (Smoothed):
 	# Wheels move up/down relative to their pivot to simulate suspension
@@ -144,10 +193,10 @@ func _process(delta):
 	var susp_intensity = sync_steer * 0.08 * 0.2 * speed_lean_factor
 	var susp_pitch = pitch_lean * 0.1 * 0.2
 	
-	var target_fl = 0.228309 + susp_intensity - susp_pitch
-	var target_fr = 0.228309 - susp_intensity - susp_pitch
-	var target_rl = 0.228309 + susp_intensity + susp_pitch
-	var target_rr = 0.228309 - susp_intensity + susp_pitch
+	var target_fl = -0.021691 + susp_intensity - susp_pitch
+	var target_fr = -0.021691 - susp_intensity - susp_pitch
+	var target_rl = -0.021691 + susp_intensity + susp_pitch
+	var target_rr = -0.021691 - susp_intensity + susp_pitch
 	
 	# Smoothing speed (~10.0 for fluid but responsive feel)
 	var s_speed = 10.0 * delta
@@ -158,17 +207,26 @@ func _process(delta):
 	
 	# DYNAMIC CAMERA FOLLOW:
 	if is_local_player:
-		# Define target position in global space based on visuals
-		# (We use the visuals transform to get a stable but responsive target)
-		var cam_offset = Vector3(0, 1.5, 4.0)
-		var target_cam_pos = visuals.global_transform * cam_offset
+		var target_cam_pos: Vector3
+		var target_cam_basis: Basis
 		
-		# Define target orientation
-		var target_cam_basis = visuals.global_transform.basis
-		
-		# CURVE LEANING: Tilt the camera slightly based on steering
-		var cam_lean = sync_steer * 0.08
-		target_cam_basis = target_cam_basis.rotated(target_cam_basis.z.normalized(), cam_lean)
+		if is_exploding:
+			# STABILIZED CAMERA: Keep camera upright and steady during tumble
+			# Look at wreckage from a fixed relative world-space offset
+			var stable_offset = Vector3(0, 1.5, 4.0)
+			target_cam_pos = global_position + stable_offset
+			target_cam_basis = Basis.looking_at(-stable_offset, Vector3.UP)
+		else:
+			# Normal follow logic
+			# CAM PULL-BACK: Move camera further back the longer boost lasts
+			var cam_dist = lerp(3.5, 6.0, clamp(boost_time / 4.0, 0.0, 1.0))
+			var cam_offset = Vector3(0, 1.5, cam_dist)
+			target_cam_pos = visuals.global_transform * cam_offset
+			target_cam_basis = visuals.global_transform.basis
+			
+			# CURVE LEANING: Tilt the camera slightly based on steering
+			var cam_lean = sync_steer * 0.08
+			target_cam_basis = target_cam_basis.rotated(target_cam_basis.z.normalized(), cam_lean)
 		
 		# SMOOTHING: 
 		# Position follows relatively fast (12.0)
@@ -180,6 +238,33 @@ func _process(delta):
 	if visuals.global_position.distance_to(global_position) > 10.0:
 		visuals.global_position = global_position
 	
+	if is_local_player and race_ui:
+		race_ui.update_heat(heat)
+	
+	# BOOST VISUALS AND SOUNDS
+	if is_local_player:
+		if is_boosting and not is_exploding:
+			if not sfx_rocket_loop.playing:
+				sfx_rocket_loop.play()
+			boost_particles.emitting = true
+		else:
+			if sfx_rocket_loop.playing:
+				sfx_rocket_loop.stop()
+			boost_particles.emitting = false
+			
+		# Warning Beeps
+		if heat > 70.0 and not is_exploding:
+			warning_beep_timer -= delta
+			if warning_beep_timer <= 0.0:
+				if heat > 90.0:
+					sfx_double_beep.play()
+					warning_beep_timer = 0.3
+				else:
+					sfx_beep_warning.play()
+					warning_beep_timer = 0.6
+		else:
+			warning_beep_timer = 0.0
+
 	# WHEEL ANIMATION:
 	var wheel_speed = velocity.length()
 	# Estimate wheel circumference for realistic spin (approx 2.0 factor)
@@ -300,9 +385,40 @@ func _physics_process(delta):
 		return
 
 	# Gravity and Terrain Alignment - Reverted physics rotation to fix jitter
-	if not is_on_floor():
+	if not is_on_floor() or is_exploding or is_waiting_to_explode:
 		velocity.y -= GRAVITY * delta
 	
+	if is_exploding:
+		# Use visuals transform for tumbling to allow the body to land in any orientation
+		# Actually, rotation of the body itself is fine, but we need to stop the auto-alignment
+		rotate_x(tumble_velocity.x * delta)
+		rotate_y(tumble_velocity.y * delta)
+		rotate_z(tumble_velocity.z * delta)
+		
+		# TUMBLE DAMPING: Stop rotations much faster
+		tumble_velocity = tumble_velocity.lerp(Vector3.ZERO, 2.0 * delta)
+		
+		# FRICTION: Slow down movement faster
+		# Much higher horizontal damping
+		var friction_factor = 2.0
+		if is_on_floor():
+			friction_factor = 10.0 # Even more friction when on ground
+			# Also dampen tumble faster when touching ground
+			tumble_velocity = tumble_velocity.lerp(Vector3.ZERO, 5.0 * delta)
+			
+		velocity.x = move_toward(velocity.x, 0, friction_factor * delta)
+		velocity.z = move_toward(velocity.z, 0, friction_factor * delta)
+		
+		move_and_slide()
+		sync_position = position
+		sync_rotation = rotation
+		sync_velocity = velocity
+		return
+
+	if is_waiting_to_explode:
+		# Allow steering and movement during the 1s delay
+		pass
+
 	# LANDING BOUNCE DETECTION
 	if is_on_floor() and not was_on_floor:
 		bounce_vel = -velocity.y * 0.02 # Convert downward momentum to bounce
@@ -328,6 +444,39 @@ func _physics_process(delta):
 	if Input.is_key_pressed(KEY_D): input_dir.x += 1.0
 	input_dir = input_dir.normalized()
 	
+	# Boost Input
+	var was_boosting = is_boosting
+	is_boosting = Input.is_key_pressed(KEY_SPACE) and can_move and not is_exploding
+	
+	if is_boosting and not was_boosting:
+		sfx_nitro_start.play()
+	elif not is_boosting and was_boosting:
+		sfx_release_pop.play()
+	
+	# Heat Logic
+	if is_boosting:
+		heat += HEAT_RATE * delta
+		boost_time += delta
+	else:
+		heat = move_toward(heat, 0.0, COOL_RATE * delta)
+		boost_time = 0.0
+	
+	if heat >= 100.0 and not is_exploding and not is_waiting_to_explode:
+		is_waiting_to_explode = true
+		explosion_delay_timer = 1.0
+		# Speed should drop?
+		
+	if is_waiting_to_explode:
+		if not is_boosting:
+			# SAVING GRACE: Player let go in time!
+			is_waiting_to_explode = false
+			heat = 98.0 # Nudge just below 100% to allow cooling
+		else:
+			explosion_delay_timer -= delta
+			if explosion_delay_timer <= 0.0:
+				is_waiting_to_explode = false
+				explode()
+
 	# Steering - Lowered threshold to 0.1 to prevent stutter at low speeds
 	if input_dir.x != 0 and velocity.length() > 0.1:
 		var steer_dir = -1.0 if velocity.dot(transform.basis.z) > 0 else 1.0
@@ -345,14 +494,21 @@ func _physics_process(delta):
 	var current_forward_speed = Vector2(velocity.x, velocity.z).dot(Vector2(forward_dir.x, forward_dir.z).normalized())
 	
 	var target_speed = 0.0
-	if input_dir.y < 0: # Forward
+	var accel = ACCELERATION
+	
+	if is_boosting:
+		# ACCELERATING BOOST: Speed increases from 40 to 60 over 4 seconds
+		target_speed = BOOST_SPEED + (clamp(boost_time, 0.0, 4.0) * 5.0)
+		accel = BOOST_ACCEL
+	elif input_dir.y < 0: # Forward
 		target_speed = SPEED
+		accel = ACCELERATION
 	elif input_dir.y > 0: # Backward
 		target_speed = -REVERSE_SPEED
 		
 	# Apply acceleration/friction to the scalar forward speed
 	if target_speed != 0:
-		current_forward_speed = move_toward(current_forward_speed, target_speed, ACCELERATION * delta)
+		current_forward_speed = move_toward(current_forward_speed, target_speed, accel * delta)
 	else:
 		current_forward_speed = move_toward(current_forward_speed, 0, FRICTION * delta)
 		
@@ -370,3 +526,77 @@ func _physics_process(delta):
 	# Progressive Steering: Accumulate steer building over time (0.0 to 1.0)
 	var target_steer = -input_dir.x if can_move else 0.0
 	sync_steer = move_toward(sync_steer, target_steer, 2.5 * delta)
+
+func explode():
+	if is_exploding: return
+	print("PlayerCart: EXPLODING!")
+	is_exploding = true
+	can_move = false
+	is_boosting = false
+	
+	sfx_explosion.play()
+	sfx_fire_loop.play()
+	explosion_particles.emitting = true
+	burning_particles.emitting = true
+	burning_smoke_particles.emitting = true
+	
+	# Stop engine sound
+	if engine_sound.playing:
+		engine_sound.stop()
+		playback = null # Stop filling audio buffer
+	
+	# Visual effects of explosion
+	# Spawn physical wheel debris instead of just hiding
+	for wheel in [wheel_fl, wheel_fr, wheel_rl, wheel_rr]:
+		if wheel and randf() > 0.4: # 60% chance for each wheel to fall off
+			_spawn_wheel_debris(wheel)
+	
+	# Apply some random tumble velocity
+	velocity += Vector3(randf_range(-1,1), 10.0, randf_range(-1,1)).normalized() * 15.0
+	tumble_velocity = Vector3(randf_range(-5,5), randf_range(-5,5), randf_range(-5,5))
+	
+func _spawn_wheel_debris(wheel_node: Node3D):
+	if not wheel_node: return
+	
+	# Hide the original wheel on the cart
+	wheel_node.visible = false
+	
+	# Create a new RigidBody3D for the debris
+	var debris = RigidBody3D.new()
+	debris.global_transform = wheel_node.global_transform
+	
+	# Add a collision shape (approximate wheel size)
+	var collision = CollisionShape3D.new()
+	var shape = SphereShape3D.new()
+	shape.radius = 0.25
+	collision.shape = shape
+	debris.add_child(collision)
+	
+	# Clone the mesh from the original wheel glb
+	# The wheel mesh is usually a child of the wheel_node (which is the WheelPivot)
+	# WheelFL -> wheel (instance of wheel.glb)
+	var mesh_node = wheel_node.get_child(0)
+	if mesh_node:
+		var mesh_clone = mesh_node.duplicate()
+		debris.add_child(mesh_clone)
+		# Reset internal transform since debris root is at global_transform
+		mesh_clone.position = Vector3.ZERO
+		mesh_clone.rotation = Vector3.ZERO
+	
+	# Add to scene tree (Level root)
+	get_parent().get_parent().add_child(debris)
+	
+	# Toss it away from the car
+	var impulse_dir = (debris.global_position - global_position).normalized()
+	impulse_dir.y += 0.5 # Add some upward lift
+	debris.apply_central_impulse(impulse_dir * randf_range(5.0, 10.0))
+	debris.apply_torque_impulse(Vector3(randf(), randf(), randf()) * 2.0)
+	
+	# Optional: Clean up debris after 10 seconds
+	get_tree().create_timer(10.0).timeout.connect(func(): debris.queue_free())
+	
+	# Notify Level/UI about game over
+	# For now just show message
+	var level = get_parent().get_parent() # Level node
+	if level.has_method("on_player_exploded"):
+		level.on_player_exploded(is_local_player)
