@@ -10,12 +10,13 @@ signal start_pressed
 func _ready():
 	button_start.pressed.connect(_on_start_pressed)
 	button_quit.pressed.connect(_on_quit_pressed)
+	
+	# Sync UI with saved settings
+	music_slider.value = MusicManager.music_volume
+	sfx_slider.value = MusicManager.sfx_volume
+	
 	music_slider.value_changed.connect(_on_music_volume_changed)
 	sfx_slider.value_changed.connect(_on_sfx_volume_changed)
-	
-	# Initial volume sync
-	_on_music_volume_changed(music_slider.value)
-	_on_sfx_volume_changed(sfx_slider.value)
 
 func _on_start_pressed():
 	start_pressed.emit()

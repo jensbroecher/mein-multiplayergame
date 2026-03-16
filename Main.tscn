@@ -1,13 +1,13 @@
-[gd_scene load_steps=3 format=3 uid="uid://mainscene123"]
+[gd_scene load_steps=4 format=3]
 
-[ext_resource type="Script" path="res://Main.gd" id="1_d8abc"]
-[ext_resource type="PackedScene" uid="uid://cx62c12j3fgh" path="res://Lobby.tscn" id="2_xdobby"]
-[ext_resource type="PackedScene" uid="uid://mainmenu123" path="res://MainMenu.tscn" id="3_menu"]
+[ext_resource type="Script" path="res://Main.gd" id="1_main"]
+[ext_resource type="PackedScene" path="res://Lobby.tscn" id="2_lobby"]
+[ext_resource type="PackedScene" path="res://MainMenu.tscn" id="3_menu"]
 
 [node name="Main" type="Node"]
-script = ExtResource("1_d8abc")
+script = ExtResource("1_main")
 
-[node name="Lobby" parent="." instance=ExtResource("2_xdobby")]
+[node name="Lobby" parent="." instance=ExtResource("2_lobby")]
 visible = false
 
 [node name="MainMenu" parent="." instance=ExtResource("3_menu")]

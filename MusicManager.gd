@@ -2,6 +2,11 @@ extends Node
 
 var music_folder = "res://music/"
 var playlist = []
+const SETTINGS_FILE = "user://settings.cfg"
+
+var music_volume: float = 0.8
+var sfx_volume: float = 0.7
+
 var current_track_index = -1
 var audio_player: AudioStreamPlayer
 
@@ -22,17 +27,33 @@ func _ensure_audio_buses():
 
 func _ready():
 	_ensure_audio_buses()
+	load_settings()
 	
 	# Configure the audio player
 	audio_player = AudioStreamPlayer.new()
-	audio_player.bus = "Music" # We'll ensure this exists or use Master
-	audio_player.volume_db = -10.0 # Initial background level
+	audio_player.bus = "Music"
+	audio_player.volume_db = -10.0
 	add_child(audio_player)
 	
 	audio_player.finished.connect(_on_track_finished)
-	
 	_load_playlist()
-	# Music only starts when play_race_music() is called
+
+func load_settings():
+	var config = ConfigFile.new()
+	var err = config.load(SETTINGS_FILE)
+	if err == OK:
+		music_volume = config.get_value("audio", "music", 0.8)
+		sfx_volume = config.get_value("audio", "sfx", 0.7)
+		
+	# Apply loaded settings
+	set_music_volume(music_volume, false)
+	set_sfx_volume(sfx_volume, false)
+
+func save_settings():
+	var config = ConfigFile.new()
+	config.set_value("audio", "music", music_volume)
+	config.set_value("audio", "sfx", sfx_volume)
+	config.save(SETTINGS_FILE)
 
 func _load_playlist():
 	playlist.clear()
@@ -77,23 +98,16 @@ func _on_track_finished():
 	play_next()
 
 # Independent volume controls for the UI
-func set_music_volume(linear_val: float):
+func set_music_volume(linear_val: float, save: bool = true):
+	music_volume = linear_val
 	var bus_idx = AudioServer.get_bus_index("Music")
 	if bus_idx == -1: bus_idx = AudioServer.get_bus_index("Master")
 	AudioServer.set_bus_volume_db(bus_idx, linear_to_db(linear_val))
+	if save: save_settings()
 
-func set_sfx_volume(linear_val: float):
+func set_sfx_volume(linear_val: float, save: bool = true):
+	sfx_volume = linear_val
 	var bus_idx = AudioServer.get_bus_index("SFX")
 	if bus_idx == -1: bus_idx = AudioServer.get_bus_index("Master")
 	AudioServer.set_bus_volume_db(bus_idx, linear_to_db(linear_val))
-
-# Helper methods for game control if needed
-func set_volume(volume_db: float):
-	audio_player.volume_db = volume_db
-
-func stop():
-	audio_player.stop()
-
-func play():
-	if not audio_player.playing:
-		audio_player.play()
+	if save: save_settings()

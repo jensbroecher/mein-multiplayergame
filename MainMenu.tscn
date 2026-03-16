@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://mainmenu123"]
+[gd_scene load_steps=2 format=3]
 
 [ext_resource type="Script" path="res://MainMenu.gd" id="1_menu"]
 
@@ -18,7 +18,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.12, 0.12, 0.16, 1)
+color = Color(0.117647, 0.117647, 0.156863, 1)
 
 [node name="CenterContainer" type="CenterContainer" parent="."]
 layout_mode = 1
