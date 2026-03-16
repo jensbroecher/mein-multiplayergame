@@ -337,21 +337,29 @@ func _physics_process(delta):
 		# This prevents the "sideways skid" feel when turning while coasting
 		velocity = velocity.rotated(Vector3.UP, -steer_amount)
 
-	# Acceleration / Braking
-	var forward_dir = - transform.basis.z
-	var target_speed = 0.0
+	# Acceleration / Braking (ARCADE GRIP)
+	var forward_dir = -transform.basis.z
+	var current_velocity_y = velocity.y # Preserve gravity
 	
+	# Project current horizontal velocity onto the forward direction to get signed speed
+	var current_forward_speed = Vector2(velocity.x, velocity.z).dot(Vector2(forward_dir.x, forward_dir.z).normalized())
+	
+	var target_speed = 0.0
 	if input_dir.y < 0: # Forward
 		target_speed = SPEED
 	elif input_dir.y > 0: # Backward
-		target_speed = - REVERSE_SPEED
+		target_speed = -REVERSE_SPEED
 		
+	# Apply acceleration/friction to the scalar forward speed
 	if target_speed != 0:
-		velocity.x = move_toward(velocity.x, forward_dir.x * target_speed, ACCELERATION * delta)
-		velocity.z = move_toward(velocity.z, forward_dir.z * target_speed, ACCELERATION * delta)
+		current_forward_speed = move_toward(current_forward_speed, target_speed, ACCELERATION * delta)
 	else:
-		velocity.x = move_toward(velocity.x, 0, FRICTION * delta)
-		velocity.z = move_toward(velocity.z, 0, FRICTION * delta)
+		current_forward_speed = move_toward(current_forward_speed, 0, FRICTION * delta)
+		
+	# Reconstruct velocity: Keep it strictly in the forward heading
+	velocity.x = forward_dir.x * current_forward_speed
+	velocity.z = forward_dir.z * current_forward_speed
+	velocity.y = current_velocity_y
 
 	move_and_slide()
 	
