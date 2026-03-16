@@ -46,14 +46,19 @@ func _setup_checkpoints():
 	if checkpoints.is_empty():
 		var cp_container = get_node_or_null("Checkpoints")
 		if cp_container:
+			var container_cps = []
 			for child in cp_container.get_children():
 				if child is Area3D:
-					checkpoints.append(child)
-		else:
-			# Fallback to old names
-			var fl = get_node_or_null("FinishLine")
+					container_cps.append(child)
+			checkpoints.append_array(container_cps)
+			
+		# ALWAYS append the FinishLine as the absolute final checkpoint of the lap
+		var fl = get_node_or_null("FinishLine")
+		if fl and not checkpoints.has(fl):
+			checkpoints.append(fl)
+		elif not fl and checkpoints.is_empty():
+			# Fallback for old scenes
 			var hw = get_node_or_null("Halfway")
-			if fl: checkpoints.append(fl)
 			if hw: checkpoints.append(hw)
 	
 	if multiplayer.is_server():
@@ -72,6 +77,10 @@ func _on_checkpoint_entered(body: Node3D, cp_idx: int):
 		if cp_idx == stats["next_checkpoint_idx"]:
 			# Progress to next checkpoint
 			stats["next_checkpoint_idx"] += 1
+			
+			# Inform the player cart of its last passed checkpoint for respawn purposes
+			var cp = checkpoints[cp_idx]
+			_sync_checkpoint_to_player.rpc_id(id, cp.global_transform)
 			
 			# If they hit the last checkpoint (Finish Line), complete a lap
 			if stats["next_checkpoint_idx"] >= checkpoints.size():
@@ -93,6 +102,12 @@ func _check_finish(id: int):
 func show_player_finished_rpc():
 	race_ui.show_message("You Finished!", 5.0)
 	_disable_local_cart()
+
+@rpc("authority", "call_local", "reliable")
+func _sync_checkpoint_to_player(checkpoint_transform: Transform3D):
+	var local_cart = get_tree().get_nodes_in_group("player_carts").filter(func(node): return node.is_multiplayer_authority())
+	if local_cart.size() > 0:
+		local_cart[0].last_checkpoint_transform = checkpoint_transform
 
 func _disable_local_cart():
 	var carts = get_tree().get_nodes_in_group("player_carts")

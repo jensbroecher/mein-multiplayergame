@@ -10,6 +10,7 @@ extends CanvasLayer
 @onready var label_lap = $HUDPanel/LabelLap
 @onready var label_msg = $HUDPanel/LabelMessage
 @onready var heat_bar = $HUDPanel/HeatBar
+@onready var label_speed = $HUDPanel/LabelSpeed
 
 @onready var end_panel = $EndPanel
 @onready var end_timer_label = $EndPanel/VBoxContainer/LabelTimer
@@ -97,3 +98,7 @@ func show_end_screen():
 
 func update_end_timer(time_left: int):
 	end_timer_label.text = "Waiting for others: %d s" % time_left
+
+func update_speed(val_kmh: float):
+	if label_speed:
+		label_speed.text = "%d KM/H" % int(val_kmh)

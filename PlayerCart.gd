@@ -77,6 +77,10 @@ var warning_beep_timer: float = 0.0
 var is_drifting: bool = false
 @onready var sfx_brake_drift = $Visuals/SFX_BrakeDrift
 
+var last_checkpoint_transform: Transform3D
+var respawn_timer: float = 0.0
+var normal_accel_time: float = 0.0
+
 # Network sync targets
 var sync_position: Vector3
 var sync_rotation: Vector3
@@ -100,6 +104,9 @@ func _ready():
 		race_ui = level.get_node("RaceUI")
 	
 	name_tag.text = player_name
+	
+	# Initial checkpoint info - fallback to start pos
+	last_checkpoint_transform = global_transform
 	
 	# Initialize procedural engine sound
 	if engine_sound.stream is AudioStreamGenerator:
@@ -245,6 +252,10 @@ func _process(delta):
 		# Rotation follows slower (6.0) to create that "lag" feel in corners
 		camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 12.0 * delta)
 		camera_pivot.global_basis = camera_pivot.global_basis.slerp(target_cam_basis, 6.0 * delta)
+		
+		# UPDATE SPEEDOMETER
+		if race_ui:
+			race_ui.update_speed(velocity.length() * 3.6)
 	
 	# Keep visuals pinned if they drift too far (emergency snap)
 	if visuals.global_position.distance_to(global_position) > 10.0:
@@ -401,6 +412,11 @@ func _physics_process(delta):
 		velocity.y -= GRAVITY * delta
 	
 	if is_exploding:
+		respawn_timer += delta
+		if respawn_timer >= 3.0:
+			respawn()
+			return
+			
 		# Use visuals transform for tumbling to allow the body to land in any orientation
 		# Actually, rotation of the body itself is fine, but we need to stop the auto-alignment
 		rotate_x(tumble_velocity.x * delta)
@@ -539,15 +555,27 @@ func _physics_process(delta):
 	var target_speed = 0.0
 	var accel = ACCELERATION
 	
+	# CALCULATE RAMPED BASE SPEED
+	# RAMP UP: Increase top speed from SPEED (~80 kmh) up to 130 kmh (~36.1 units) over 8 seconds
+	var ramp_percent = clamp(normal_accel_time / 8.0, 0.0, 1.0)
+	var max_normal_units = 130.0 / 3.6 # Exactly 130 KM/H
+	var current_base_top_speed = lerp(SPEED, max_normal_units, ramp_percent)
+	
 	if is_boosting:
-		# ACCELERATING BOOST: Speed increases from 40 to 60 over 4 seconds
-		target_speed = BOOST_SPEED + (clamp(boost_time, 0.0, 4.0) * 5.0)
+		# ADDITIVE BOOST: Adds on top of your current ramped momentum
+		# Note: Nitro can still push you above 130 kmh
+		var boost_bonus = 15.0 + (clamp(boost_time, 0.0, 4.0) * 5.0)
+		target_speed = current_base_top_speed + boost_bonus
 		accel = BOOST_ACCEL
 	elif input_dir.y < 0: # Forward
-		target_speed = SPEED
+		normal_accel_time += delta
+		target_speed = current_base_top_speed
 		accel = ACCELERATION
 	elif input_dir.y > 0: # Backward
 		target_speed = -REVERSE_SPEED
+		normal_accel_time = 0.0 # Reset on brake/reverse
+	else:
+		normal_accel_time = move_toward(normal_accel_time, 0.0, delta * 2.0) # Slow decay on coast
 		
 	# Apply acceleration/friction to the scalar forward speed
 	if target_speed != 0:
@@ -597,6 +625,41 @@ func explode():
 	# Apply some random tumble velocity
 	velocity += Vector3(randf_range(-1,1), 10.0, randf_range(-1,1)).normalized() * 15.0
 	tumble_velocity = Vector3(randf_range(-5,5), randf_range(-5,5), randf_range(-5,5))
+	respawn_timer = 0.0
+
+func respawn():
+	print("PlayerCart: RESPAWNING!")
+	is_exploding = false
+	can_move = true
+	is_boosting = false
+	heat = 0.0
+	boost_time = 0.0
+	is_waiting_to_explode = false
+	
+	# Restore visuals
+	for wheel in [wheel_fl, wheel_fr, wheel_rl, wheel_rr]:
+		if wheel: wheel.visible = true
+	
+	explosion_particles.emitting = false
+	burning_particles.emitting = false
+	burning_smoke_particles.emitting = false
+	sfx_fire_loop.stop()
+	
+	# Physics reset
+	velocity = Vector3.ZERO
+	tumble_velocity = Vector3.ZERO
+	
+	# Calculate respawn position: 5m behind last checkpoint, 2m up
+	var spawn_pos = last_checkpoint_transform.origin + (last_checkpoint_transform.basis.z * 5.0) + Vector3(0, 2.0, 0)
+	global_transform.origin = spawn_pos
+	# Face the checkpoint (forward)
+	look_at(last_checkpoint_transform.origin, Vector3.UP)
+	
+	# Re-enable engine sound
+	if not engine_sound.playing:
+		engine_sound.play()
+		if engine_sound.stream is AudioStreamGenerator:
+			playback = engine_sound.get_stream_playback()
 	
 func _spawn_wheel_debris(wheel_node: Node3D):
 	if not wheel_node: return
