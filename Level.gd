@@ -3,8 +3,7 @@ extends Node3D
 const PLAYER_CART = preload("res://PlayerCart.tscn")
 const RACE_UI_SCENE = preload("res://RaceUI.tscn")
 
-@export var finish_line: Area3D
-@export var halfway_checkpoint: Area3D
+@export var checkpoints: Array[Area3D] = []
 
 enum RaceState {LOBBY, RACING, FINISHED}
 var race_state: int = RaceState.LOBBY
@@ -14,7 +13,7 @@ var race_state: int = RaceState.LOBBY
 @onready var player_spawner = $PlayerSpawner
 
 var race_ui
-var player_stats = {} # id -> {"laps": 0, "next_checkpoint": 1, "finished": false, "pos": 0}
+var player_stats = {} # id -> {"laps": 0, "next_checkpoint_idx": 0, "finished": false, "pos": 0}
 var end_timer = 0.0
 
 func _ready():
@@ -43,35 +42,42 @@ func _ready():
 	race_ui.start_pressed.connect(_on_host_start_pressed)
 
 func _setup_checkpoints():
-	# If not assigned in inspector, try to find by name as fallback
-	if not finish_line:
-		finish_line = get_node_or_null("FinishLine")
-	if not halfway_checkpoint:
-		halfway_checkpoint = get_node_or_null("Halfway")
+	# If no checkpoints assigned, try to find any Area3Ds in a "Checkpoints" node
+	if checkpoints.is_empty():
+		var cp_container = get_node_or_null("Checkpoints")
+		if cp_container:
+			for child in cp_container.get_children():
+				if child is Area3D:
+					checkpoints.append(child)
+		else:
+			# Fallback to old names
+			var fl = get_node_or_null("FinishLine")
+			var hw = get_node_or_null("Halfway")
+			if fl: checkpoints.append(fl)
+			if hw: checkpoints.append(hw)
 	
 	if multiplayer.is_server():
-		if finish_line:
-			finish_line.body_entered.connect(_on_finish_line_entered)
-		if halfway_checkpoint:
-			halfway_checkpoint.body_entered.connect(_on_halfway_entered)
+		for i in range(checkpoints.size()):
+			var cp = checkpoints[i]
+			cp.body_entered.connect(_on_checkpoint_entered.bind(i))
 
-func _on_finish_line_entered(body: Node3D):
+func _on_checkpoint_entered(body: Node3D, cp_idx: int):
 	if race_state != RaceState.RACING: return
 	var id = body.name.to_int()
 	if id > 0 and player_stats.has(id):
 		var stats = player_stats[id]
-		if stats["next_checkpoint"] == 0 and not stats["finished"]:
-			stats["laps"] += 1
-			stats["next_checkpoint"] = 1
-			_check_finish(id)
-
-func _on_halfway_entered(body: Node3D):
-	if race_state != RaceState.RACING: return
-	var id = body.name.to_int()
-	if id > 0 and player_stats.has(id):
-		var stats = player_stats[id]
-		if stats["next_checkpoint"] == 1 and not stats["finished"]:
-			stats["next_checkpoint"] = 0
+		if stats["finished"]: return
+		
+		# Players must hit checkpoints in order
+		if cp_idx == stats["next_checkpoint_idx"]:
+			# Progress to next checkpoint
+			stats["next_checkpoint_idx"] += 1
+			
+			# If they hit the last checkpoint (Finish Line), complete a lap
+			if stats["next_checkpoint_idx"] >= checkpoints.size():
+				stats["laps"] += 1
+				stats["next_checkpoint_idx"] = 0 # Loop back to first checkpoint
+				_check_finish(id)
 
 func _check_finish(id: int):
 	var stats = player_stats[id]
@@ -126,7 +132,7 @@ func _spawn_custom(data: Variant) -> Node:
 func _add_player(id: int, p_name: String):
 	if not player_stats.has(id):
 		var idx = player_stats.size() % spawn_points.size()
-		player_stats[id] = {"laps": 0, "next_checkpoint": 1, "finished": false, "pos": 0}
+		player_stats[id] = {"laps": 0, "next_checkpoint_idx": 0, "finished": false, "pos": 0}
 		
 		var data = {
 			"id": id,
@@ -170,21 +176,20 @@ func _update_positions():
 		var cart = players_container.get_node_or_null(str(id))
 		if cart == null: continue
 		var pinfo = player_stats[id]
-		var dist = 0.0
 		
 		# If they finished, give them a massive score boost so they stay top
 		var score = 0.0
 		if pinfo["finished"]:
 			score = 1000000.0 + (3 - pinfo["pos"]) * 1000 # keep their position
 		else:
-			if pinfo["next_checkpoint"] == 1:
-				dist = cart.global_position.distance_to(halfway_checkpoint.global_position if halfway_checkpoint else Vector3(0,0,0))
-			else:
-				dist = cart.global_position.distance_to(finish_line.global_position if finish_line else Vector3(0,0,0))
+			var dist = 0.0
+			var next_idx = pinfo["next_checkpoint_idx"]
+			if not checkpoints.is_empty():
+				dist = cart.global_position.distance_to(checkpoints[next_idx].global_position)
 			
-			score = pinfo["laps"] * 10000.0
-			if pinfo["next_checkpoint"] == 0:
-				score += 5000.0
+			# Score = Laps * 100000 + CheckpointIndex * 10000 - distance
+			score = pinfo["laps"] * 100000.0
+			score += next_idx * 1000.0
 			score -= dist
 		
 		ranking.append({"id": id, "score": score, "laps": pinfo["laps"], "finished": pinfo["finished"]})

@@ -1,0 +1,27 @@
+[gd_scene format=3 uid="uid://gate123"]
+
+[ext_resource type="Script" path="res://CheckpointGate.gd" id="1_gate_script"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_checkpoint"]
+size = Vector3(20, 10, 5)
+
+[node name="CheckpointGate" type="Area3D"]
+script = ExtResource("1_gate_script")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 0)
+shape = SubResource("BoxShape3D_checkpoint")
+
+[node name="VisualGate" type="CSGCombiner3D" parent="."]
+
+[node name="LeftPost" type="CSGBox3D" parent="VisualGate"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 3, 0)
+size = Vector3(1, 6, 1)
+
+[node name="RightPost" type="CSGBox3D" parent="VisualGate"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 3, 0)
+size = Vector3(1, 6, 1)
+
+[node name="TopBar" type="CSGBox3D" parent="VisualGate"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0)
+size = Vector3(21, 1, 1)

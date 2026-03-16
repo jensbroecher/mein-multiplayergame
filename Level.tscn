@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://level123"]
 
 [ext_resource type="Script" uid="uid://d2hujjwkl3s4a" path="res://Level.gd" id="1_lev99"]
+[ext_resource type="PackedScene" uid="uid://gate123" path="res://CheckpointGate.tscn" id="2_gate"]
 
 [sub_resource type="PhysicalSkyMaterial" id="PhysicalSkyMaterial_clouds"]
 rayleigh_color = Color(0.15, 0.2, 0.4, 1)
@@ -88,51 +89,16 @@ transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -20, 0.5, 110)
 
 [node name="Players" type="Node3D" parent="." unique_id=1251708478]
 
-[node name="FinishLine" type="Area3D" parent="." unique_id=1637951958]
-transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, -0.7727947, 102.64114)
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="FinishLine" unique_id=1077663900]
-transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 5, 0)
-shape = SubResource("BoxShape3D_checkpoint")
-
-[node name="VisualGate" type="CSGCombiner3D" parent="FinishLine" unique_id=1865286454]
-
-[node name="LeftPost" type="CSGBox3D" parent="FinishLine/VisualGate" unique_id=2000146831]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 3, 0)
-size = Vector3(1, 6, 1)
-
-[node name="RightPost" type="CSGBox3D" parent="FinishLine/VisualGate" unique_id=1999838663]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 3, 0)
-size = Vector3(1, 6, 1)
-
-[node name="TopBar" type="CSGBox3D" parent="FinishLine/VisualGate" unique_id=1744222530]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0)
-size = Vector3(21, 1, 1)
-material = SubResource("StandardMaterial3D_finish")
-
-[node name="Halfway" type="Area3D" parent="." unique_id=6535659]
-transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, -1.0620966, -102.31252)
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Halfway" unique_id=970656649]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 0)
-shape = SubResource("BoxShape3D_checkpoint")
-
-[node name="VisualGate" type="CSGCombiner3D" parent="Halfway" unique_id=177148747]
-
-[node name="LeftPost" type="CSGBox3D" parent="Halfway/VisualGate" unique_id=899763577]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 3, 0)
-size = Vector3(1, 6, 1)
-
-[node name="RightPost" type="CSGBox3D" parent="Halfway/VisualGate" unique_id=987781105]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 3, 0)
-size = Vector3(1, 6, 1)
-
-[node name="TopBar" type="CSGBox3D" parent="Halfway/VisualGate" unique_id=721812634]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0)
-size = Vector3(21, 1, 1)
-material = SubResource("StandardMaterial3D_halfway")
+[node name="FinishLine" parent="." unique_id=1637951958 instance=ExtResource("2_gate")]
+transform = Transform3D(-4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, 0, -0.7727947, 102.64114)
+gate_color = Color(0, 1, 0, 1)
 
 [node name="PlayerSpawner" type="MultiplayerSpawner" parent="." unique_id=776326826]
 _spawnable_scenes = PackedStringArray("uid://cart123")
 spawn_path = NodePath("../Players")
 spawn_limit = 4
+
+[node name="Checkpoints" type="Node3D" parent="." unique_id=1961324992]
+
+[node name="Halfway" parent="Checkpoints" unique_id=6535659 instance=ExtResource("2_gate")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, -1.0620966, -102.31252)

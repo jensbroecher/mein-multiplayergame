@@ -10,6 +10,9 @@
 [ext_resource type="AudioStream" uid="uid://467882" path="res://sounds/467882__samsterbirdies__beep-warning.ogg" id="8_beep1"]
 [ext_resource type="AudioStream" uid="uid://490255" path="res://sounds/490255__anomaex__sci-fi_explosion_1.wav" id="9_explosion"]
 [ext_resource type="AudioStream" uid="uid://188211" path="res://sounds/floraphonic-burning-fire-loop-1-188211.mp3" id="10_fireloop"]
+[ext_resource type="AudioStream" uid="uid://402331" path="res://sounds/dragon-studio-winter-wind-402331.mp3" id="11_wind"]
+[ext_resource type="AudioStream" uid="uid://46000" path="res://sounds/freesound_community-bonk-46000.mp3" id="12_bonk"]
+[ext_resource type="AudioStream" uid="uid://267282" path="res://sounds/sound-of-breaks-squeaking-of-vehicle-hd-267282.mp3" id="13_brake"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_cart"]
 size = Vector3(1.2, 0.5, 2)
@@ -301,6 +304,24 @@ unit_size = 20.0
 stream = ExtResource("10_fireloop")
 bus = &"SFX"
 unit_size = 15.0
+
+[node name="SFX_WindLoop" type="AudioStreamPlayer3D" parent="Visuals"]
+stream = ExtResource("11_wind")
+bus = &"SFX"
+unit_size = 10.0
+autoplay = false
+
+[node name="SFX_LandingBonk" type="AudioStreamPlayer3D" parent="Visuals"]
+stream = ExtResource("12_bonk")
+bus = &"SFX"
+unit_size = 15.0
+autoplay = false
+
+[node name="SFX_BrakeDrift" type="AudioStreamPlayer3D" parent="Visuals"]
+stream = ExtResource("13_brake")
+bus = &"SFX"
+unit_size = 12.0
+autoplay = false
 
 [node name="GroundRay" type="RayCast3D" parent="."]
 target_position = Vector3(0, -1.5, 0)

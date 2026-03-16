@@ -42,6 +42,8 @@ var race_ui # Reference to UI
 @onready var explosion_particles = $Visuals/ExplosionParticles
 @onready var burning_particles = $Visuals/BurningParticles
 @onready var burning_smoke_particles = $Visuals/BurningSmokeParticles
+@onready var sfx_wind_loop = $Visuals/SFX_WindLoop
+@onready var sfx_landing_bonk = $Visuals/SFX_LandingBonk
 
 var playback: AudioStreamGeneratorPlayback
 var sample_rate: float
@@ -57,6 +59,8 @@ var visual_steer: float = 0.0
 var was_on_floor: bool = true
 var bounce_y: float = 0.0
 var bounce_vel: float = 0.0
+var frame_bump_y: float = 0.0
+var frame_bump_vel: float = 0.0
 
 var is_local_player = false
 var can_move = false
@@ -70,6 +74,8 @@ var is_waiting_to_explode: bool = false
 var explosion_delay_timer: float = 0.0
 var tumble_velocity: Vector3 = Vector3.ZERO
 var warning_beep_timer: float = 0.0
+var is_drifting: bool = false
+@onready var sfx_brake_drift = $Visuals/SFX_BrakeDrift
 
 # Network sync targets
 var sync_position: Vector3
@@ -173,7 +179,13 @@ func _process(delta):
 	bounce_vel -= bounce_y * 110.0 * delta # Spring
 	bounce_vel *= 0.9 # Damping
 	bounce_y += bounce_vel * delta
-	target_pos.y += bounce_y
+	
+	# FRAME BUMP: Snappier spring for engine pops/impacts
+	frame_bump_vel -= frame_bump_y * 400.0 * delta
+	frame_bump_vel *= 0.85
+	frame_bump_y += frame_bump_vel * delta
+	
+	target_pos.y += bounce_y + frame_bump_y
 	
 	var target_transform = Transform3D(target_basis, target_pos)
 	
@@ -422,7 +434,19 @@ func _physics_process(delta):
 	# LANDING BOUNCE DETECTION
 	if is_on_floor() and not was_on_floor:
 		bounce_vel = -velocity.y * 0.02 # Convert downward momentum to bounce
+		frame_bump_vel -= velocity.y * 0.05 # Add squash impact
+		sfx_landing_bonk.play() # PLAY BONK
 	was_on_floor = is_on_floor()
+	
+	# WIND SFX LOGIC: Fade in when airborne, fade out on ground
+	if not is_on_floor() and not is_exploding:
+		if not sfx_wind_loop.playing:
+			sfx_wind_loop.play()
+		sfx_wind_loop.volume_db = lerp(sfx_wind_loop.volume_db, 0.0, 5.0 * delta)
+	else:
+		sfx_wind_loop.volume_db = lerp(sfx_wind_loop.volume_db, -40.0, 10.0 * delta)
+		if sfx_wind_loop.volume_db < -35.0:
+			sfx_wind_loop.stop()
 	
 	# Only local player processes physics input from here down
 	if not can_move:
@@ -450,8 +474,10 @@ func _physics_process(delta):
 	
 	if is_boosting and not was_boosting:
 		sfx_nitro_start.play()
+		frame_bump_vel += 2.0 # Torque pop
 	elif not is_boosting and was_boosting:
 		sfx_release_pop.play()
+		frame_bump_vel -= 0.5 # Subtle dip on release
 	
 	# Heat Logic
 	if is_boosting:
@@ -477,14 +503,31 @@ func _physics_process(delta):
 				is_waiting_to_explode = false
 				explode()
 
+	# DRIFT LOGIC
+	var is_braking = input_dir.y > 0
+	var is_steering = abs(input_dir.x) > 0.1
+	var was_drifting = is_drifting
+	
+	# Drift triggers when braking + steering at enough speed
+	is_drifting = is_braking and is_steering and velocity.length() > 5.0 and is_on_floor() and not is_exploding
+	
+	if is_drifting and not was_drifting:
+		if not sfx_brake_drift.playing:
+			sfx_brake_drift.play()
+	elif not is_drifting and was_drifting:
+		sfx_brake_drift.stop()
+
 	# Steering - Lowered threshold to 0.1 to prevent stutter at low speeds
 	if input_dir.x != 0 and velocity.length() > 0.1:
 		var steer_dir = -1.0 if velocity.dot(transform.basis.z) > 0 else 1.0
-		var steer_amount = input_dir.x * STEER_SPEED * delta * steer_dir
+		# Increase steer speed during drift
+		var actual_steer_speed = STEER_SPEED * 1.8 if is_drifting else STEER_SPEED
+		var steer_amount = input_dir.x * actual_steer_speed * delta * steer_dir
 		rotate_y(-steer_amount)
-		# MOMENTUM ALIGNMENT: Rotate velocity vector so it stays aligned with the car's orientation
-		# This prevents the "sideways skid" feel when turning while coasting
-		velocity = velocity.rotated(Vector3.UP, -steer_amount)
+		
+		# MOMENTUM ALIGNMENT: Reduced during drift to allow sideways sliding
+		var alignment_strength = 0.4 if is_drifting else 1.0
+		velocity = velocity.rotated(Vector3.UP, -steer_amount * alignment_strength)
 
 	# Acceleration / Braking (ARCADE GRIP)
 	var forward_dir = -transform.basis.z
