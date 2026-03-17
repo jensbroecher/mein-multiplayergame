@@ -2,6 +2,8 @@
 
 [ext_resource type="Script" uid="uid://d2hujjwkl3s4a" path="res://Level.gd" id="1_lev99"]
 [ext_resource type="PackedScene" uid="uid://gate123" path="res://CheckpointGate.tscn" id="2_gate"]
+[ext_resource type="Texture2D" uid="uid://bsmrfxbh6vqe2" path="res://materials/asphalt.png" id="3_asph"]
+[ext_resource type="Texture2D" uid="uid://bdpalxltdtjpv" path="res://materials/brick.png" id="4_brick"]
 
 [sub_resource type="PhysicalSkyMaterial" id="PhysicalSkyMaterial_clouds"]
 rayleigh_color = Color(0.15, 0.2, 0.4, 1)
@@ -20,14 +22,15 @@ volumetric_fog_enabled = true
 volumetric_fog_density = 0.01
 volumetric_fog_albedo = Color(0.8, 0.81, 0.85, 1)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_checkpoint"]
-size = Vector3(20, 10, 5)
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_asphalt"]
+albedo_texture = ExtResource("3_asph")
+uv1_scale = Vector3(0.05, 0.05, 0.05)
+uv1_triplanar = true
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_finish"]
-albedo_color = Color(0, 1, 0, 1)
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_halfway"]
-albedo_color = Color(1, 1, 0, 1)
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_brick"]
+albedo_texture = ExtResource("4_brick")
+uv1_scale = Vector3(0.1, 0.1, 0.1)
+uv1_triplanar = true
 
 [node name="Level" type="Node3D" unique_id=1916914083]
 script = ExtResource("1_lev99")
@@ -35,9 +38,6 @@ script = ExtResource("1_lev99")
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=337555859]
 transform = Transform3D(-0.866025, -0.433013, 0.25, 0, 0.5, 0.866025, -0.5, 0.75, -0.433013, 0, 10, 0)
 shadow_enabled = true
-shadow_bias = 0.005
-directional_shadow_blend_splits = true
-directional_shadow_max_distance = 150.0
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1836663372]
 environment = SubResource("Environment_nice")
@@ -45,33 +45,96 @@ environment = SubResource("Environment_nice")
 [node name="Track" type="CSGCombiner3D" parent="." unique_id=314708686]
 use_collision = true
 
-[node name="Floor" type="CSGBox3D" parent="Track" unique_id=469957712]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
-size = Vector3(300, 1, 300)
+[node name="Floor" type="CSGBox3D" parent="Track" unique_id=970628684]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 0)
+size = Vector3(260, 2, 260)
+material = SubResource("StandardMaterial3D_asphalt")
 
-[node name="OuterBounds" type="CSGBox3D" parent="Track" unique_id=64436333]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
-size = Vector3(250, 4, 250)
+[node name="WallNorth" type="CSGBox3D" parent="Track" unique_id=2140050548]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -125)
+size = Vector3(260, 5, 10)
+material = SubResource("StandardMaterial3D_brick")
 
-[node name="InnerBounds" type="CSGBox3D" parent="Track" unique_id=1644707896]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
-operation = 2
-size = Vector3(230, 5, 230)
+[node name="WallSouth" type="CSGBox3D" parent="Track" unique_id=474248396]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 125)
+size = Vector3(260, 5, 10)
+material = SubResource("StandardMaterial3D_brick")
 
-[node name="ChicaneSub" type="CSGBox3D" parent="Track" unique_id=2123455146]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 95, 2, 0)
-operation = 2
-size = Vector3(40, 5, 30)
+[node name="WallEast" type="CSGBox3D" parent="Track" unique_id=1806977628]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 125, 1.5, 0)
+size = Vector3(10, 5, 260)
+material = SubResource("StandardMaterial3D_brick")
 
-[node name="ChicaneSub2" type="CSGBox3D" parent="Track" unique_id=2127205985]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -95, 2, 0)
-operation = 2
-size = Vector3(40, 5, 30)
+[node name="WallWest" type="CSGBox3D" parent="Track" unique_id=670237485]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -125, 1.5, 0)
+size = Vector3(10, 5, 260)
+material = SubResource("StandardMaterial3D_brick")
+
+[node name="WallEast2" type="CSGBox3D" parent="Track" unique_id=396255396]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 125, 1.5, 0)
+size = Vector3(10, 5, 260)
+material = SubResource("StandardMaterial3D_brick")
+
+[node name="WallWest2" type="CSGBox3D" parent="Track" unique_id=1676449759]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -125, 1.5, 0)
+size = Vector3(10, 5, 260)
+material = SubResource("StandardMaterial3D_brick")
+
+[node name="WallEast1" type="CSGBox3D" parent="Track" unique_id=279345607]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 125, 1.5, -100)
+size = Vector3(10, 5, 60)
+material = SubResource("StandardMaterial3D_brick")
+
+[node name="WallEast3" type="CSGBox3D" parent="Track" unique_id=1133627144]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 125, 1.5, -40)
+size = Vector3(10, 5, 60)
+material = SubResource("StandardMaterial3D_brick")
+
+[node name="WallEast4" type="CSGBox3D" parent="Track" unique_id=952219140]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 125, 1.5, 20)
+size = Vector3(10, 5, 60)
+material = SubResource("StandardMaterial3D_brick")
+
+[node name="WallEast5" type="CSGBox3D" parent="Track" unique_id=1386747909]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 125, 1.5, 80)
+size = Vector3(10, 5, 60)
+material = SubResource("StandardMaterial3D_brick")
+
+[node name="WallEast6" type="CSGBox3D" parent="Track" unique_id=1862016577]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 125, 1.5, 115)
+size = Vector3(10, 5, 30)
+material = SubResource("StandardMaterial3D_brick")
+
+[node name="WallWest1" type="CSGBox3D" parent="Track" unique_id=612001633]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -125, 1.5, -100)
+size = Vector3(10, 5, 60)
+material = SubResource("StandardMaterial3D_brick")
+
+[node name="InnerWallNorth" type="CSGBox3D" parent="Track" unique_id=1569346438]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, -115)
+size = Vector3(240, 4, 10)
+material = SubResource("StandardMaterial3D_brick")
+
+[node name="InnerWallSouth" type="CSGBox3D" parent="Track" unique_id=279514566]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 115)
+size = Vector3(240, 4, 10)
+material = SubResource("StandardMaterial3D_brick")
+
+[node name="InnerWallEast" type="CSGBox3D" parent="Track" unique_id=819152733]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 115, 2, 0)
+size = Vector3(10, 4, 240)
+material = SubResource("StandardMaterial3D_brick")
+
+[node name="InnerWallWest" type="CSGBox3D" parent="Track" unique_id=707133324]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -115, 2, 0)
+size = Vector3(10, 4, 240)
+material = SubResource("StandardMaterial3D_brick")
 
 [node name="JumpRamp" type="CSGPolygon3D" parent="Track" unique_id=1126375394]
 transform = Transform3D(-4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, 109.20671, -1.1023977, 40)
 polygon = PackedVector2Array(0, 0, 20, 5, 22, 0)
 depth = 15.0
+material = SubResource("StandardMaterial3D_asphalt")
 
 [node name="SpawnPoints" type="Node3D" parent="." unique_id=1348899380]
 

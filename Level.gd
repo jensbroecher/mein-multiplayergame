@@ -245,5 +245,4 @@ func end_race_rpc():
 
 func on_player_exploded(is_local: bool):
 	if is_local:
-		race_ui.show_message("GAME OVER", 10.0)
-		_disable_local_cart()
+		race_ui.show_message("OVERHEATED", 3.0)

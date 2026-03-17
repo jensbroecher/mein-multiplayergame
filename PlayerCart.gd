@@ -203,7 +203,7 @@ func _process(delta):
 		burning_particles.global_rotation = Vector3.ZERO
 		burning_smoke_particles.global_rotation = Vector3.ZERO
 	else:
-		visuals.global_transform = visuals.global_transform.interpolate_with(target_transform, 18.0 * delta)
+		visuals.global_transform = visuals.global_transform.interpolate_with(target_transform, 18.0 * delta).orthonormalized()
 	
 	# WHEEL SUSPENSION ANIMATION (Smoothed):
 	# Wheels move up/down relative to their pivot to simulate suspension
@@ -251,7 +251,7 @@ func _process(delta):
 		# Position follows relatively fast (12.0)
 		# Rotation follows slower (6.0) to create that "lag" feel in corners
 		camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 12.0 * delta)
-		camera_pivot.global_basis = camera_pivot.global_basis.slerp(target_cam_basis, 6.0 * delta)
+		camera_pivot.global_basis = camera_pivot.global_basis.slerp(target_cam_basis.orthonormalized(), 6.0 * delta).orthonormalized()
 		
 		# UPDATE SPEEDOMETER
 		if race_ui:
@@ -276,7 +276,7 @@ func _process(delta):
 			boost_particles.emitting = false
 			
 		# Warning Beeps
-		if heat > 70.0 and not is_exploding:
+		if heat > 70.0 and not is_exploding and can_move:
 			warning_beep_timer -= delta
 			if warning_beep_timer <= 0.0:
 				if heat > 90.0:
@@ -466,8 +466,16 @@ func _physics_process(delta):
 	
 	# Only local player processes physics input from here down
 	if not can_move:
-		velocity.x = move_toward(velocity.x, 0, FRICTION * delta)
-		velocity.z = move_toward(velocity.z, 0, FRICTION * delta)
+		# FINISH DECELERATION: Stop much faster when race is over
+		var finish_friction = FRICTION * 4.0
+		velocity.x = move_toward(velocity.x, 0, finish_friction * delta)
+		velocity.z = move_toward(velocity.z, 0, finish_friction * delta)
+		
+		# Ensure boost and warnings stop when finished
+		is_boosting = false
+		boost_time = 0.0
+		heat = move_toward(heat, 0.0, COOL_RATE * delta)
+		
 		move_and_slide()
 		
 		sync_position = position
@@ -475,18 +483,17 @@ func _physics_process(delta):
 		sync_velocity = velocity
 		return
 
-	var input_dir = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+	var input_dir = Vector2.ZERO
+	input_dir.x = Input.get_axis("steer_left", "steer_right")
+	input_dir.y = Input.get_axis("throttle", "brake")
 	
-	# Add WASD support
-	if Input.is_key_pressed(KEY_W): input_dir.y -= 1.0
-	if Input.is_key_pressed(KEY_S): input_dir.y += 1.0
-	if Input.is_key_pressed(KEY_A): input_dir.x -= 1.0
-	if Input.is_key_pressed(KEY_D): input_dir.x += 1.0
-	input_dir = input_dir.normalized()
+	# Clamp input for analog sticks
+	if input_dir.length() > 1.0:
+		input_dir = input_dir.normalized()
 	
 	# Boost Input
 	var was_boosting = is_boosting
-	is_boosting = Input.is_key_pressed(KEY_SPACE) and can_move and not is_exploding
+	is_boosting = Input.is_action_pressed("boost") and can_move and not is_exploding
 	
 	if is_boosting and not was_boosting:
 		sfx_nitro_start.play()
@@ -611,6 +618,11 @@ func explode():
 	burning_particles.emitting = true
 	burning_smoke_particles.emitting = true
 	
+	# Notify Level/UI about explosion
+	var level = get_parent().get_parent() # Level node
+	if level.has_method("on_player_exploded"):
+		level.on_player_exploded(is_local_player)
+	
 	# Stop engine sound
 	if engine_sound.playing:
 		engine_sound.stop()
@@ -648,18 +660,30 @@ func respawn():
 	# Physics reset
 	velocity = Vector3.ZERO
 	tumble_velocity = Vector3.ZERO
+	normal_accel_time = 0.0 # Fix "slow" driving by resetting ramp-up
+	sync_steer = 0.0
+	visual_steer = 0.0
 	
-	# Calculate respawn position: 5m behind last checkpoint, 2m up
-	var spawn_pos = last_checkpoint_transform.origin + (last_checkpoint_transform.basis.z * 5.0) + Vector3(0, 2.0, 0)
-	global_transform.origin = spawn_pos
-	# Face the checkpoint (forward)
-	look_at(last_checkpoint_transform.origin, Vector3.UP)
+	# Calculate respawn position: 5m behind last checkpoint, 2.5m up
+	var spawn_pos = last_checkpoint_transform.origin + (last_checkpoint_transform.basis.z * 5.0) + Vector3(0, 2.5, 0)
+	global_position = spawn_pos
+	
+	# Face the checkpoint (forward) - keep it level to avoid "pointing at ground" issues
+	var look_target = last_checkpoint_transform.origin
+	look_target.y = spawn_pos.y
+	look_at(look_target, Vector3.UP)
 	
 	# Re-enable engine sound
 	if not engine_sound.playing:
 		engine_sound.play()
-		if engine_sound.stream is AudioStreamGenerator:
-			playback = engine_sound.get_stream_playback()
+	if engine_sound.stream is AudioStreamGenerator:
+		playback = engine_sound.get_stream_playback()
+	
+	# Snap visuals and sync variables to prevent jitter/floating
+	visuals.global_transform = global_transform
+	sync_position = global_position
+	sync_rotation = rotation
+	sync_velocity = Vector3.ZERO
 	
 func _spawn_wheel_debris(wheel_node: Node3D):
 	if not wheel_node: return
@@ -700,9 +724,3 @@ func _spawn_wheel_debris(wheel_node: Node3D):
 	
 	# Optional: Clean up debris after 10 seconds
 	get_tree().create_timer(10.0).timeout.connect(func(): debris.queue_free())
-	
-	# Notify Level/UI about game over
-	# For now just show message
-	var level = get_parent().get_parent() # Level node
-	if level.has_method("on_player_exploded"):
-		level.on_player_exploded(is_local_player)
