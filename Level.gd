@@ -4,6 +4,7 @@ const PLAYER_CART = preload("res://PlayerCart.tscn")
 const RACE_UI_SCENE = preload("res://RaceUI.tscn")
 
 @export var checkpoints: Array[Area3D] = []
+@export var track_path: Path3D
 
 enum RaceState {LOBBY, RACING, FINISHED}
 var race_state: int = RaceState.LOBBY
@@ -90,7 +91,7 @@ func _on_checkpoint_entered(body: Node3D, cp_idx: int):
 
 func _check_finish(id: int):
 	var stats = player_stats[id]
-	if stats["laps"] >= 3 and not stats["finished"]:
+	if stats["laps"] >= NetworkManager.max_laps and not stats["finished"]:
 		stats["finished"] = true
 		show_player_finished_rpc.rpc_id(id)
 		
@@ -149,10 +150,37 @@ func _add_player(id: int, p_name: String):
 		var idx = player_stats.size() % spawn_points.size()
 		player_stats[id] = {"laps": 0, "next_checkpoint_idx": 0, "finished": false, "pos": 0}
 		
+		# ALIGN SPAWN TO TRACK:
+		# Calculate the orientation based on the track curve
+		var spawn_transform = spawn_points[idx].global_transform
+		if track_path:
+			var curve = track_path.curve
+			var pos = spawn_transform.origin
+			var offset = curve.get_closest_offset(pos)
+			var curve_pos = curve.sample_baked(offset)
+			
+			# Find tangent at this point
+			var next_offset = min(offset + 0.5, curve.get_baked_length())
+			var tangent = (curve.sample_baked(next_offset) - curve_pos).normalized()
+			if tangent.length() < 0.01:
+				tangent = Vector3.BACK # Fallback
+				
+			var up = Vector3.UP
+			var right = tangent.cross(up).normalized()
+			# Re-calculate UP to be perfectly orthogonal to tangent and right
+			up = right.cross(tangent).normalized()
+			
+			# Create a new basis facing along the tangent
+			# forward = -z in Godot
+			spawn_transform.basis = Basis(right, up, -tangent)
+			
+			# LIFT SLIGHTLY: Prevent spawning stuck in road (y_offset=0.15 for road)
+			spawn_transform.origin.y += 0.2
+		
 		var data = {
 			"id": id,
 			"name": p_name,
-			"transform": spawn_points[idx].global_transform
+			"transform": spawn_transform
 		}
 		player_spawner.spawn(data)
 
@@ -221,7 +249,7 @@ func _update_positions():
 			pos = player_stats[id]["pos"]
 			
 		var l = ranking[i]["laps"]
-		update_hud_rpc.rpc_id(id, pos, ranking.size(), mini(l + 1, 3), 3)
+		update_hud_rpc.rpc_id(id, pos, ranking.size(), mini(l + 1, NetworkManager.max_laps), NetworkManager.max_laps)
 
 @rpc("authority", "call_local", "unreliable")
 func update_hud_rpc(pos, total, lap, max_laps):

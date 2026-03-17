@@ -9,6 +9,9 @@ signal player_connected(id: int, info: Dictionary)
 signal player_disconnected(id: int)
 signal server_disconnected
 signal player_ready_changed(id: int, is_ready: bool)
+signal max_laps_changed(laps: int)
+
+var max_laps: int = 3
 
 # We can store player info like names here
 # format: { id: { "name": "PlayerName" } }
@@ -99,6 +102,10 @@ func register_player(info: Dictionary):
 	players[id] = info
 	player_connected.emit(id, info)
 	print("NetworkManager: Player registered ", id, ", info: ", info)
+	
+	# If we are the server, sync current settings to the new player
+	if multiplayer.is_server():
+		update_max_laps.rpc_id(id, max_laps)
 
 @rpc("any_peer", "call_local", "reliable")
 func cmd_set_ready(is_ready: bool):
@@ -106,3 +113,13 @@ func cmd_set_ready(is_ready: bool):
 	if players.has(id):
 		players[id]["ready"] = is_ready
 		player_ready_changed.emit(id, is_ready)
+
+func set_max_laps(laps: int):
+	if multiplayer.is_server():
+		update_max_laps.rpc(laps)
+
+@rpc("authority", "call_local", "reliable")
+func update_max_laps(laps: int):
+	max_laps = laps
+	max_laps_changed.emit(laps)
+	print("NetworkManager: Max laps updated to ", laps)

@@ -13,7 +13,7 @@ const ACCELERATION = 12.0
 const FRICTION = 5.0
 const GRAVITY = 25.0
 const BOOST_ACCEL = 30.0
-const BOOST_SPEED = 40.0
+const BOOST_SPEED = 60.0
 const HEAT_RATE = 25.0 # Heat per second while boosting
 const COOL_RATE = 15.0 # Heat per second while not boosting
 
@@ -259,9 +259,9 @@ func _process(delta):
 		camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 12.0 * delta)
 		camera_pivot.global_basis = camera_pivot.global_basis.slerp(target_cam_basis.orthonormalized(), 6.0 * delta).orthonormalized()
 		
-		# UPDATE SPEEDOMETER
+		# UPDATE SPEEDOMETER (2x Scale Adjustment: 3.6 / 2 = 1.8)
 		if race_ui:
-			race_ui.update_speed(velocity.length() * 3.6)
+			race_ui.update_speed(velocity.length() * 1.8)
 	
 	# Keep visuals pinned if they drift too far (emergency snap)
 	if visuals.global_position.distance_to(global_position) > 10.0:
@@ -473,9 +473,10 @@ func _physics_process(delta):
 	# Only local player processes physics input from here down
 	if not can_move:
 		# FINISH DECELERATION: Stop much faster when race is over
-		var finish_friction = FRICTION * 4.0
+		var finish_friction = FRICTION * 10.0
 		velocity.x = move_toward(velocity.x, 0, finish_friction * delta)
 		velocity.z = move_toward(velocity.z, 0, finish_friction * delta)
+		velocity.y = move_toward(velocity.y, 0, finish_friction * delta) # Also stop bouncing/sliding
 		
 		# Ensure boost and warnings stop when finished
 		is_boosting = false
@@ -571,12 +572,12 @@ func _physics_process(delta):
 	# CALCULATE RAMPED BASE SPEED
 	# RAMP UP: Increase top speed from SPEED (~80 kmh) up to 130 kmh (~36.1 units) over 8 seconds
 	var ramp_percent = clamp(normal_accel_time / 8.0, 0.0, 1.0)
-	var max_normal_units = 130.0 / 3.6 # Exactly 130 KM/H
+	var max_normal_units = 100.0 / 1.8 # Target 100 KM/H top speed
 	var current_base_top_speed = lerp(SPEED, max_normal_units, ramp_percent)
 	
 	if is_boosting:
 		# ADDITIVE BOOST: Adds on top of your current ramped momentum
-		# Note: Nitro can still push you above 130 kmh
+		# Scaled for 2x world balance
 		var boost_bonus = 15.0 + (clamp(boost_time, 0.0, 4.0) * 5.0)
 		target_speed = current_base_top_speed + boost_bonus
 		accel = BOOST_ACCEL
@@ -648,7 +649,14 @@ func explode():
 func respawn():
 	print("PlayerCart: RESPAWNING!")
 	is_exploding = false
-	can_move = true
+	# Only re-enable movement if they haven't finished the race
+	var level = get_tree().get_first_node_in_group("level")
+	var id = name.to_int()
+	var finished = false
+	if level and level.player_stats.has(id):
+		finished = level.player_stats[id]["finished"]
+	
+	can_move = not finished
 	is_boosting = false
 	heat = 0.0
 	boost_time = 0.0

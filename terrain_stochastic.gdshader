@@ -2,7 +2,7 @@ shader_type spatial;
 
 uniform sampler2D albedo_texture : source_color;
 uniform float uv_scale = 40.0;
-uniform float smoothness : hint_range(0.0, 1.0) = 0.5;
+uniform float smoothness : hint_range(0.0, 1.0) = 1.0;
 
 // Hash function for random offsets/rotations
 vec2 hash(vec2 p) {
@@ -46,4 +46,5 @@ void fragment() {
     vec3 color = stochastic_sample(albedo_texture, UV);
     ALBEDO = color;
     ROUGHNESS = smoothness;
+    SPECULAR = 0.0;
 }

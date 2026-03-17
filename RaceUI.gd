@@ -18,14 +18,62 @@ extends CanvasLayer
 signal ready_pressed(is_ready: bool)
 signal start_pressed()
 
+var style_blue = StyleBoxFlat.new()
+var style_orange = StyleBoxFlat.new()
+var style_red = StyleBoxFlat.new()
+
+var laps_spinbox: SpinBox
 var local_ready = false
 
 func _ready():
+	_init_styleboxes()
+	_setup_lap_settings()
+	
+	NetworkManager.max_laps_changed.connect(_on_network_max_laps_changed)
+	
 	btn_ready.pressed.connect(_on_ready_pressed)
 	btn_start.pressed.connect(_on_start_pressed)
 	
 	if not multiplayer.is_server():
 		btn_start.hide()
+
+func _init_styleboxes():
+	for s in [style_blue, style_orange, style_red]:
+		s.corner_radius_top_left = 4
+		s.corner_radius_top_right = 4
+		s.corner_radius_bottom_right = 4
+		s.corner_radius_bottom_left = 4
+	
+	style_blue.bg_color = Color(0, 0.8, 1) # Cyan/Blue
+	style_orange.bg_color = Color(1, 0.5, 0) # Orange
+	style_red.bg_color = Color(1, 0, 0) # Red
+
+func _setup_lap_settings():
+	var laps_container = HBoxContainer.new()
+	var label = Label.new()
+	label.text = "Laps: "
+	laps_container.add_child(label)
+	
+	laps_spinbox = SpinBox.new()
+	laps_spinbox.min_value = 1
+	laps_spinbox.max_value = 20
+	laps_spinbox.value = NetworkManager.max_laps
+	laps_spinbox.editable = multiplayer.is_server()
+	laps_spinbox.value_changed.connect(_on_laps_changed)
+	laps_container.add_child(laps_spinbox)
+	
+	$LobbyPanel/VBoxContainer.add_child(laps_container)
+	# Place it after player list but before buttons
+	# PlayerList is child 2 (0: Title, 1: HSep, 2: PlayerList)
+	$LobbyPanel/VBoxContainer.move_child(laps_container, 3)
+
+func _on_laps_changed(value: float):
+	if multiplayer.is_server():
+		NetworkManager.set_max_laps.rpc(int(value))
+
+func _on_network_max_laps_changed(laps: int):
+	if laps_spinbox:
+		laps_spinbox.set_value_no_signal(laps)
 
 func update_lobby(players: Dictionary):
 	# Clear list
@@ -77,19 +125,11 @@ func update_heat(val: float):
 	if heat_bar:
 		heat_bar.value = val
 		
-		# Create a unique stylebox to avoid shared resource issues
-		var style = StyleBoxFlat.new()
-		style.corner_radius_top_left = 4
-		style.corner_radius_top_right = 4
-		style.corner_radius_bottom_right = 4
-		style.corner_radius_bottom_left = 4
-		
+		var style = style_blue
 		if val > 80:
-			style.bg_color = Color(1, 0, 0) # Red
+			style = style_red
 		elif val > 50:
-			style.bg_color = Color(1, 0.5, 0) # Orange
-		else:
-			style.bg_color = Color(0, 0.8, 1) # Cyan/Blue
+			style = style_orange
 			
 		heat_bar.add_theme_stylebox_override("fill", style)
 
