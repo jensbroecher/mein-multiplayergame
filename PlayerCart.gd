@@ -108,6 +108,11 @@ func _ready():
 	# Initial checkpoint info - fallback to start pos
 	last_checkpoint_transform = global_transform
 	
+	# Adjust for 2x scale: stronger floor adherence and larger ground ray
+	floor_snap_length = 0.0 # Disabled for natural jumps
+	floor_max_angle = deg_to_rad(60.0)
+	ground_ray.target_position = Vector3(0, -2.5, 0)
+	
 	# Initialize procedural engine sound
 	if engine_sound.stream is AudioStreamGenerator:
 		sample_rate = engine_sound.stream.mix_rate
@@ -180,6 +185,7 @@ func _process(delta):
 	# GROUNDING: Adjust target position to actual ground height on levels/ramps
 	var target_pos = global_position
 	if is_on_floor() and ground_ray.is_colliding():
+		# 0.25 offset matches the physics collision box exactly
 		target_pos.y = ground_ray.get_collision_point().y + 0.25
 	
 	# BOUNCE EFFECT: Decimate and apply
@@ -664,8 +670,8 @@ func respawn():
 	sync_steer = 0.0
 	visual_steer = 0.0
 	
-	# Calculate respawn position: 5m behind last checkpoint, 2.5m up
-	var spawn_pos = last_checkpoint_transform.origin + (last_checkpoint_transform.basis.z * 5.0) + Vector3(0, 2.5, 0)
+	# Calculate respawn position: 5m behind last checkpoint, 4.0m up (for 2x scale)
+	var spawn_pos = last_checkpoint_transform.origin + (last_checkpoint_transform.basis.z * 5.0) + Vector3(0, 4.0, 0)
 	global_position = spawn_pos
 	
 	# Face the checkpoint (forward) - keep it level to avoid "pointing at ground" issues
