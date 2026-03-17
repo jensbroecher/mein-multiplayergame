@@ -69,7 +69,7 @@ func _setup_lap_settings():
 
 func _on_laps_changed(value: float):
 	if multiplayer.is_server():
-		NetworkManager.set_max_laps.rpc(int(value))
+		NetworkManager.set_max_laps(int(value))
 
 func _on_network_max_laps_changed(laps: int):
 	if laps_spinbox:

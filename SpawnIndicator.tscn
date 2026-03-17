@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://clxv8p6x0y6k2"]
+
+[ext_resource type="Texture2D" uid="uid://dps8p6x0y6k2" path="res://materials/spawn_indicator.png" id="1_tex"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1"]
+transparency = 1
+albedo_texture = ExtResource("1_tex")
+
+[sub_resource type="QuadMesh" id="QuadMesh_1"]
+material = SubResource("StandardMaterial3D_1")
+size = Vector2(2, 2)
+orientation = 1
+
+[node name="SpawnIndicator" type="Node3D"]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+cast_shadow = 0
+mesh = SubResource("QuadMesh_1")
