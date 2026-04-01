@@ -2,6 +2,7 @@ extends Node3D
 
 const PLAYER_CART = preload("res://PlayerCart.tscn")
 const RACE_UI_SCENE = preload("res://RaceUI.tscn")
+const ITEM_BOX_SCENE = preload("res://ItemBox.tscn")
 
 @export var checkpoints: Array[Area3D] = []
 @export var track_path: Path3D
@@ -24,6 +25,7 @@ func _ready():
 	add_child(race_ui)
 	
 	_setup_checkpoints()
+	_spawn_item_boxes()
 	
 	if multiplayer.is_server():
 		NetworkManager.player_connected.connect(_on_server_player_connected)
@@ -273,4 +275,28 @@ func end_race_rpc():
 
 func on_player_exploded(is_local: bool):
 	if is_local:
-		race_ui.show_message("OVERHEATED", 3.0)
+		race_ui.show_message("WRECKED", 3.0)
+
+func _spawn_item_boxes():
+	if track_path:
+		var curve = track_path.curve
+		var length = curve.get_baked_length()
+		var step = 150.0 # Standard spacing
+		# If the track is small, reduce step
+		if length < 500: step = 50.0
+		
+		for d in range(0, int(length), int(step)):
+			# MUST use global position!
+			var local_pos = curve.sample_baked(d)
+			var global_pos = track_path.to_global(local_pos)
+			global_pos.y += 1.0 # Float above road
+			
+			var box = ITEM_BOX_SCENE.instantiate()
+			add_child(box) # Add first to set global_transform correctly
+			box.global_position = global_pos
+	elif not checkpoints.is_empty():
+		# Fallback: Spawn items at each checkpoint
+		for cp in checkpoints:
+			var box = ITEM_BOX_SCENE.instantiate()
+			add_child(box)
+			box.global_position = cp.global_position + Vector3(0, 1.5, 0)

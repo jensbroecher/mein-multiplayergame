@@ -148,12 +148,28 @@ height = 0.4
 radial_segments = 8
 rings = 4
 
-[sub_resource type="SphereMesh" id="SphereMesh_burning"]
-material = SubResource("StandardMaterial3D_flame")
-radius = 0.15
-height = 0.3
-radial_segments = 6
-rings = 4
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_shield"]
+transparency = 1
+albedo_color = Color(0, 0.6, 1, 0.4)
+emission_enabled = true
+emission = Color(0, 0.4, 1, 1)
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_shield"]
+material = SubResource("StandardMaterial3D_shield")
+radius = 1.0
+height = 2.5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_shock"]
+transparency = 1
+albedo_color = Color(1, 1, 1, 0.5)
+shading_mode = 0
+
+[sub_resource type="SphereMesh" id="SphereMesh_shock"]
+material = SubResource("StandardMaterial3D_shock")
+radius = 1.0
+height = 2.0
+radial_segments = 16
+rings = 8
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_sync"]
 properties/0/path = NodePath(".:sync_position")
@@ -177,6 +193,12 @@ properties/5/replication_mode = 1
 properties/6/path = NodePath(".:is_exploding")
 properties/6/spawn = true
 properties/6/replication_mode = 1
+properties/7/path = NodePath(".:is_shielded")
+properties/7/spawn = true
+properties/7/replication_mode = 1
+properties/8/path = NodePath(".:current_item")
+properties/8/spawn = true
+properties/8/replication_mode = 1
 
 [node name="PlayerCart" type="CharacterBody3D" unique_id=1637232811]
 script = ExtResource("1_cscript")
@@ -197,6 +219,14 @@ amount = 40
 lifetime = 0.4
 process_material = SubResource("ParticleProcessMaterial_boost")
 draw_pass_1 = SubResource("QuadMesh_flame")
+
+[node name="ShieldMesh" type="MeshInstance3D" parent="Visuals"]
+visible = false
+mesh = SubResource("CapsuleMesh_shield")
+
+[node name="ShockwaveVisual" type="MeshInstance3D" parent="Visuals"]
+visible = false
+mesh = SubResource("SphereMesh_shock")
 
 [node name="ExplosionParticles" type="GPUParticles3D" parent="Visuals"]
 emitting = false
