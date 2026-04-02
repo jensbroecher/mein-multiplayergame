@@ -19,7 +19,19 @@ extends Node3D
 @export var road_width: float = 14.0
 @export var sand_width: float = 16.0
 
+@export_group("Visual Offsets")
+@export var road_y_offset: float = 0.15
+@export var curb_y_offset: float = 0.10
+@export var terrain_recession_visual: float = 0.20
+@export var terrain_recession_collision: float = 0.10
+
 @export_group("Procedural Generation")
+@export var regenerate: bool:
+	set(val):
+		regenerate = false
+		if Engine.is_editor_hint():
+			generate_world()
+
 @export var create_longer_track: bool:
 	set(val):
 		create_longer_track = false
@@ -125,22 +137,22 @@ func _generate_mesh(for_collision: bool) -> ArrayMesh:
 			var dist = Vector2(px, pz).distance_to(Vector2(closest_pos.x, closest_pos.z))
 			
 			var sand_edge = sand_width / 2.0
-			var blend_dist = 100.0 # Even wider clearing to prevent intersections
-			var blend = clamp((dist - sand_edge) / blend_dist, 0.0, 1.0)
+			var blend_dist = 60.0 # Tighter clearing for better mountain-road integration
 			
-			var curve_pos = curve.get_closest_point(Vector3(px, 0.0, pz))
-			var road_h = curve_pos.y
+			# Use smoothstep for the clearing transition to prevent floating-point "jagged" edges
+			var clearing_blend = 1.0 - smoothstep(sand_edge - 2.0, sand_edge + blend_dist, dist)
+			
+			var road_h = curve.get_closest_point(Vector3(px, 0.0, pz)).y
 			
 			# Blend the natural hill noise with the road's elevation
-			# This ensures mountains 'bow' to the road's height even outside the sand area
-			var height = lerp(road_h, h_noise, blend)
+			var height = lerp(h_noise, road_h, clearing_blend)
 			
-			if dist < sand_edge:
-				if for_collision:
-					# SUBTLE DEPTH: Just enough to prevent jitter without creating holes
-					height = road_h - 1.0 
-				else:
-					height = road_h - 1.5 # Visual buffer
+			# Apply the road basin (recession) with a smooth falloff to avoid gaps
+			var basin_blend = 1.0 - smoothstep(sand_edge - 2.0, sand_edge, dist)
+			if for_collision:
+				height = lerp(height, road_h - terrain_recession_collision, basin_blend)
+			else:
+				height = lerp(height, road_h - terrain_recession_visual, basin_blend)
 
 			
 			# ORGANIC COASTLINE LOGIC:
@@ -204,9 +216,8 @@ func _generate_road_and_sand():
 	concrete_mat.metallic = 0.0
 	
 	# 3. Visual Overlays: Curbs and Road
-	# Restored vertical offset (15cm) to fix the Z-fighting across the whole road face
-	_create_path_visual(points_count, sand_width, curb_mat, concrete_mat, 0.40, "Visual_Curbs") 
-	_create_path_visual(points_count, road_width, road_material, null, 0.45, "Visual_Road")
+	_create_path_visual(points_count, sand_width, curb_mat, concrete_mat, curb_y_offset, "Visual_Curbs") 
+	_create_path_visual(points_count, road_width, road_material, null, road_y_offset, "Visual_Road")
 	
 	# Create ONE unified collision surface for EVERYTHING (Road + Border)
 	_create_track_collision(points_count, sand_width, "Visual_Road")
@@ -260,13 +271,20 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 			
 		var right = tangent.cross(Vector3.UP).normalized() * half_w
 		
+		# EXPLICIT LOOP SNAPPING: 
+		# If this is the last vertex of a loop, force it to match the first vertex exactly
+		var final_pos = pos
+		if is_loop and i == point_count:
+			# Re-calculate first pos for perfect match
+			final_pos = curve.sample_baked(0.0)
+		
 		st.set_normal(Vector3.UP)
 		st.set_uv(Vector2(0, offset))
-		st.add_vertex(pos - right + Vector3(0, y_offset, 0))
+		st.add_vertex(final_pos - right + Vector3(0, y_offset, 0))
 		
 		st.set_normal(Vector3.UP)
 		st.set_uv(Vector2(1, offset))
-		st.add_vertex(pos + right + Vector3(0, y_offset, 0))
+		st.add_vertex(final_pos + right + Vector3(0, y_offset, 0))
 		
 	# INDEX LOOP (CCW - Facing UP)
 	for i in range(point_count):
@@ -314,8 +332,8 @@ func _create_track_collision(point_count: int, width: float, node_name: String):
 	var curve = track_path.curve
 	var length = curve.get_baked_length()
 	var half_w = width / 2.0
-	var y_offset = 0.4 # Match road height exactly
-	var thickness = 3.0 # Extra thickness for steep hills 
+	var y_offset = road_y_offset # Match road height exactly
+	var thickness = 5.0 # Increased thickness for better underground anchoring
 
 	
 	# Create Top and Bottom vertices
@@ -346,8 +364,12 @@ func _create_track_collision(point_count: int, width: float, node_name: String):
 			tangent = (pos - curve.sample_baked(max(offset - 0.5, 0.0))).normalized()
 		var right = tangent.cross(Vector3.UP).normalized() * half_w
 		
-		var tl = pos - right + Vector3(0, y_offset, 0)
-		var tr = pos + right + Vector3(0, y_offset, 0)
+		var final_pos = pos
+		if is_loop and i == point_count:
+			final_pos = curve.sample_baked(0.0)
+			
+		var tl = final_pos - right + Vector3(0, y_offset, 0)
+		var tr = final_pos + right + Vector3(0, y_offset, 0)
 		var bl = tl - Vector3(0, thickness, 0)
 		var br = tr - Vector3(0, thickness, 0)
 		
@@ -411,6 +433,15 @@ func _generate_bridge_supports(point_count: int):
 			support.position = pos + Vector3(0, -box.size.y/2.0, 0)
 			support.material_override = support_mat
 			add_child(support)
+			
+			# Add collision to the bridge supports
+			var static_body = StaticBody3D.new()
+			support.add_child(static_body)
+			var collision_shape = CollisionShape3D.new()
+			var shape = BoxShape3D.new()
+			shape.size = box.size
+			collision_shape.shape = shape
+			static_body.add_child(collision_shape)
 
 func _rebuild_longer_track():
 	if not track_path: return

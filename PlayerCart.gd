@@ -203,8 +203,8 @@ func _process(delta):
 		var ground_y = ground_ray.get_collision_point().y
 		# Corrected grounded offset for the new 2x scale
 		if abs(global_position.y - ground_y) < 1.5:
-			# 0.51 offset provides grounded tires without hovering
-			var h_offset = 0.51 / max(0.1, up.y)
+			# 0.43 offset (lowered from 0.51) to fix floating tires
+			var h_offset = 0.43 / max(0.1, up.y)
 			target_pos.y = ground_y + h_offset
 	
 	# BOUNCE EFFECT: Decimate and apply
