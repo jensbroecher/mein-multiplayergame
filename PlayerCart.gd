@@ -6,14 +6,14 @@ extends CharacterBody3D
 		if is_inside_tree() and $NameTag:
 			$NameTag.text = value
 
-const SPEED = 13.0
-const REVERSE_SPEED = 6.0
-const STEER_SPEED = 2.5
-const ACCELERATION = 8.0
-const FRICTION = 5.0
-const GRAVITY = 25.0
-const BOOST_ACCEL = 35.0
-const BOOST_SPEED = 40.0
+const SPEED = 20.0
+const REVERSE_SPEED = 10.0
+const STEER_SPEED = 2.8
+const ACCELERATION = 18.0
+const FRICTION = 6.0
+const GRAVITY = 12.0 # Extra light for satisfying arcade jumps
+const BOOST_ACCEL = 55.0
+const BOOST_SPEED = 65.0
 # Preload item scenes
 const MISSILE_SCENE = preload("res://Missile.tscn")
 const BOMB_SCENE = preload("res://Bomb.tscn")
@@ -118,10 +118,14 @@ func _ready():
 	# Initial checkpoint info - fallback to start pos
 	last_checkpoint_transform = global_transform
 	
-	# Adjust for 2x scale: stronger floor adherence and larger ground ray
-	floor_snap_length = 0.1 # Further reduced to prevent snapping at ramp exits
-	floor_max_angle = deg_to_rad(60.0)
-	ground_ray.target_position = Vector3(0, -2.5, 0)
+	# Robust physics for high-speed mountain racing
+	floor_snap_length = 3.0 # Maximum stickiness for loops/hills
+	floor_max_angle = deg_to_rad(60) 
+	motion_mode = MOTION_MODE_GROUNDED # Better stability for characters on slopes
+	safe_margin = 0.05 # Prevent snagging on track edges
+	ground_ray.target_position = Vector3(0, -5.0, 0) # Deep reach
+
+
 	
 	# Initialize procedural engine sound
 	if engine_sound.stream is AudioStreamGenerator:
@@ -171,6 +175,7 @@ func _process(delta):
 	
 	# Use looking_at for robust orientation (fixes mirrored controls)
 	var speed_lean_factor = 0.0
+	# Removed erroneous material duplication here – road material handling is done in the generator
 	var pitch_lean = 0.0
 	
 	if is_exploding:
@@ -196,12 +201,10 @@ func _process(delta):
 	var target_pos = global_position
 	if is_on_floor() and ground_ray.is_colliding():
 		var ground_y = ground_ray.get_collision_point().y
-		# Only snap visuals if the ground is actually close to the car (within 0.6m)
-		# This prevents the car "teleporting" to the floor after a ramp while the body is still airborne
-		if abs(global_position.y - ground_y) < 0.6:
-			# account for slope angle via normal dot-up (up.y)
-			# 0.28 offset helps prevent sinking with the 1.4x visual scale
-			var h_offset = 0.28 / max(0.1, up.y)
+		# Corrected grounded offset for the new 2x scale
+		if abs(global_position.y - ground_y) < 1.5:
+			# 0.51 offset provides grounded tires without hovering
+			var h_offset = 0.51 / max(0.1, up.y)
 			target_pos.y = ground_y + h_offset
 	
 	# BOUNCE EFFECT: Decimate and apply
@@ -433,12 +436,14 @@ func _physics_process(delta):
 	if not is_on_floor() or is_exploding or is_waiting_to_explode:
 		velocity.y -= GRAVITY * delta
 	else:
-		# STICKY GRAVITY: Only apply strong force if stationary to prevent sinking/sliding
-		# Use much smaller force when moving to allow jumping from ramps
-		if horizontal_speed < 0.1:
-			velocity.y = -2.0
+		# MODIFIED: Instead of hard-setting velocity.y = -8.0, 
+		# we simply clear it OR set it to a very small negative value to keep traction.
+		# This allows the car to preserve vertical momentum when it leaves the ground!
+		if velocity.y > 0 and not is_on_floor(): # We are jumping!
+			pass
 		else:
-			velocity.y = -0.1
+			velocity.y = -2.0 # Gentle grounding force (stickiness)
+
 	
 	if is_exploding:
 		respawn_timer += delta
@@ -590,10 +595,17 @@ func _physics_process(delta):
 	else:
 		current_forward_speed = move_toward(current_forward_speed, 0, FRICTION * delta)
 		
-	# Reconstruct velocity: Keep it strictly in the forward heading
-	velocity.x = forward_dir.x * current_forward_speed
-	velocity.z = forward_dir.z * current_forward_speed
-	velocity.y = current_velocity_y
+	# Reconstruct velocity: Handle climbs by projecting onto the floor if possible
+	var move_dir = forward_dir
+	if is_on_floor():
+		var floor_normal = get_floor_normal()
+		# Align movement to the slope
+		move_dir = (forward_dir - floor_normal * forward_dir.dot(floor_normal)).normalized()
+		
+	velocity.x = move_dir.x * current_forward_speed
+	velocity.z = move_dir.z * current_forward_speed
+	# Apply engine push vertically for slopes + gravity
+	velocity.y = (move_dir.y * current_forward_speed) + current_velocity_y
 
 	move_and_slide()
 	
@@ -671,8 +683,9 @@ func respawn():
 	sync_steer = 0.0
 	visual_steer = 0.0
 	
-	# Calculate respawn position: 5m behind last checkpoint, 4.0m up (for 2x scale)
-	var spawn_pos = last_checkpoint_transform.origin + (last_checkpoint_transform.basis.z * 5.0) + Vector3(0, 4.0, 0)
+	# Respawn: 5m behind checkpoint, safely elevated for thick road (6.0m)
+	var spawn_pos = last_checkpoint_transform.origin + (last_checkpoint_transform.basis.z * 5.0) + Vector3(0, 6.0, 0)
+
 	global_position = spawn_pos
 	
 	# Face the checkpoint (forward) - keep it level to avoid "pointing at ground" issues
@@ -835,12 +848,24 @@ func _spawn_wheel_debris(wheel_node: Node3D):
 	# The wheel mesh is usually a child of the wheel_node (which is the WheelPivot)
 	# WheelFL -> wheel (instance of wheel.glb)
 	var mesh_node = wheel_node.get_child(0)
-	if mesh_node:
+	if mesh_node and mesh_node is MeshInstance3D:
 		var mesh_clone = mesh_node.duplicate()
+		# Apply a simple double‑sided material to the debris wheel
+		var side_mat = StandardMaterial3D.new()
+		side_mat.albedo_color = Color(0.8, 0.8, 0.8)
+		side_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		mesh_clone.material_override = side_mat
 		debris.add_child(mesh_clone)
 		# Reset internal transform since debris root is at global_transform
 		mesh_clone.position = Vector3.ZERO
 		mesh_clone.rotation = Vector3.ZERO
+	else:
+		# Fallback: just duplicate whatever is there
+		var mesh_clone = mesh_node.duplicate()
+		debris.add_child(mesh_clone)
+		mesh_clone.position = Vector3.ZERO
+		mesh_clone.rotation = Vector3.ZERO
+
 	
 	# Add to scene tree (Level root)
 	get_parent().get_parent().add_child(debris)

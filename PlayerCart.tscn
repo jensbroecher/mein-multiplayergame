@@ -14,8 +14,8 @@
 [ext_resource type="AudioStream" uid="uid://46000" path="res://sounds/freesound_community-bonk-46000.mp3" id="12_bonk"]
 [ext_resource type="AudioStream" uid="uid://267282" path="res://sounds/sound-of-breaks-squeaking-of-vehicle-hd-267282.mp3" id="13_brake"]
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_cart"]
-size = Vector3(1.2, 0.5, 2)
+[sub_resource type="SphereShape3D" id="SphereShape3D_cart"]
+radius = 0.7
 
 [sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_engine"]
 buffer_length = 0.1
@@ -204,7 +204,7 @@ properties/8/replication_mode = 1
 script = ExtResource("1_cscript")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=654514439]
-shape = SubResource("BoxShape3D_cart")
+shape = SubResource("SphereShape3D_cart")
 
 [node name="Visuals" type="Node3D" parent="." unique_id=1001732157]
 top_level = true

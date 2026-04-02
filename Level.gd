@@ -1,3 +1,4 @@
+@tool
 extends Node3D
 
 const PLAYER_CART = preload("res://PlayerCart.tscn")
@@ -6,6 +7,13 @@ const ITEM_BOX_SCENE = preload("res://ItemBox.tscn")
 
 @export var checkpoints: Array[Area3D] = []
 @export var track_path: Path3D
+
+@export_group("Editor Tools")
+@export var redistribute_checkpoints: bool:
+	set(val):
+		redistribute_checkpoints = false
+		if Engine.is_editor_hint():
+			_rebuild_checkpoints()
 
 enum RaceState {LOBBY, RACING, FINISHED}
 var race_state: int = RaceState.LOBBY
@@ -300,3 +308,28 @@ func _spawn_item_boxes():
 			var box = ITEM_BOX_SCENE.instantiate()
 			add_child(box)
 			box.global_position = cp.global_position + Vector3(0, 1.5, 0)
+
+func _rebuild_checkpoints():
+	if not track_path: return
+	var cp_container = get_node_or_null("Checkpoints")
+	if not cp_container: return
+	
+	var curve = track_path.curve
+	var length = curve.get_baked_length()
+	var children = cp_container.get_children()
+	if children.is_empty(): return
+	
+	for i in range(children.size()):
+		var child = children[i]
+		if child is Node3D:
+			var offset = (float(i) / children.size()) * length
+			var pos = curve.sample_baked(offset)
+			child.global_position = track_path.to_global(pos)
+			
+			# Orient to track
+			var next_offset = min(offset + 1.0, length)
+			var tangent = (curve.sample_baked(next_offset) - pos).normalized()
+			if tangent.length() > 0.01:
+				child.look_at(child.global_position + tangent, Vector3.UP)
+	
+	print("Checkpoints redistributed along track!")
