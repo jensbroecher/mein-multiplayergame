@@ -1,0 +1,47 @@
+[gd_scene load_steps=5 format=3 uid="uid://missile123"]
+
+[ext_resource type="Script" path="res://Missile.gd" id="1_mscript"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_m"]
+radius = 0.2
+height = 0.8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_m"]
+albedo_color = Color(1, 0, 0, 1)
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_m"]
+material = SubResource("StandardMaterial3D_m")
+radius = 0.15
+height = 0.6
+radial_segments = 8
+ Rings = 4
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_missile"]
+properties/0/path = NodePath(".:position")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:rotation")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+properties/2/path = NodePath(".:is_guided")
+properties/2/spawn = true
+properties/2/replication_mode = 1
+
+[node name="Missile" type="CharacterBody3D"]
+script = ExtResource("1_mscript")
+
+[node name="Area3D" type="Area3D" parent="."]
+collision_layer = 4
+collision_mask = 1
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Area3D"]
+shape = SubResource("CapsuleShape3D_m")
+
+[node name="Visuals" type="Node3D" parent="."]
+
+[node name="Mesh" type="MeshInstance3D" parent="Visuals"]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0)
+mesh = SubResource("CapsuleMesh_m")
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_missile")

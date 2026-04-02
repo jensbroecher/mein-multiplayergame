@@ -9,8 +9,8 @@ extends CanvasLayer
 @onready var label_pos = $HUDPanel/LabelPosition
 @onready var label_lap = $HUDPanel/LabelLap
 @onready var label_msg = $HUDPanel/LabelMessage
-@onready var heat_bar = $HUDPanel/HeatBar
 @onready var label_speed = $HUDPanel/LabelSpeed
+@onready var label_item = $HUDPanel/LabelItem
 
 @onready var end_panel = $EndPanel
 @onready var end_timer_label = $EndPanel/VBoxContainer/LabelTimer
@@ -121,17 +121,9 @@ func show_message(msg: String, duration: float = 0.0):
 		tw.tween_interval(duration)
 		tw.tween_callback(func(): if label_msg.text == msg: label_msg.text = "")
 
-func update_heat(val: float):
-	if heat_bar:
-		heat_bar.value = val
-		
-		var style = style_blue
-		if val > 80:
-			style = style_red
-		elif val > 50:
-			style = style_orange
-			
-		heat_bar.add_theme_stylebox_override("fill", style)
+func update_item(item_name: String):
+	if label_item:
+		label_item.text = "ITEM: " + item_name
 
 func show_end_screen():
 	end_panel.show()

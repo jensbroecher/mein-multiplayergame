@@ -6,16 +6,17 @@ extends CharacterBody3D
 		if is_inside_tree() and $NameTag:
 			$NameTag.text = value
 
-const SPEED = 22.0
+const SPEED = 20.0
 const REVERSE_SPEED = 10.0
-const STEER_SPEED = 2.5
-const ACCELERATION = 12.0
-const FRICTION = 5.0
-const GRAVITY = 25.0
-const BOOST_ACCEL = 30.0
-const BOOST_SPEED = 60.0
-const HEAT_RATE = 25.0 # Heat per second while boosting
-const COOL_RATE = 15.0 # Heat per second while not boosting
+const STEER_SPEED = 2.8
+const ACCELERATION = 18.0
+const FRICTION = 6.0
+const GRAVITY = 12.0 # Extra light for satisfying arcade jumps
+const BOOST_ACCEL = 55.0
+const BOOST_SPEED = 65.0
+# Preload item scenes
+const MISSILE_SCENE = preload("res://Missile.tscn")
+const BOMB_SCENE = preload("res://Bomb.tscn")
 
 @onready var visuals = $Visuals
 @onready var camera_pivot = $Visuals/CameraPivot
@@ -44,6 +45,8 @@ var race_ui # Reference to UI
 @onready var burning_smoke_particles = $Visuals/BurningSmokeParticles
 @onready var sfx_wind_loop = $Visuals/SFX_WindLoop
 @onready var sfx_landing_bonk = $Visuals/SFX_LandingBonk
+@onready var shield_mesh = $Visuals/ShieldMesh
+@onready var shockwave_visual = $Visuals/ShockwaveVisual
 
 var playback: AudioStreamGeneratorPlayback
 var sample_rate: float
@@ -77,6 +80,13 @@ var warning_beep_timer: float = 0.0
 var is_drifting: bool = false
 @onready var sfx_brake_drift = $Visuals/SFX_BrakeDrift
 
+# Item System
+enum ItemType { NONE, BOOST, MISSILE, GUIDED_MISSILE, SHIELD, SHOCKWAVE, BOMB }
+var current_item: ItemType = ItemType.NONE
+var is_shielded: bool = false
+var shield_timer: float = 0.0 # Duration of shield
+var boost_timer: float = 0.0 # Duration of current boost effect
+
 var last_checkpoint_transform: Transform3D
 var respawn_timer: float = 0.0
 var normal_accel_time: float = 0.0
@@ -108,10 +118,14 @@ func _ready():
 	# Initial checkpoint info - fallback to start pos
 	last_checkpoint_transform = global_transform
 	
-	# Adjust for 2x scale: stronger floor adherence and larger ground ray
-	floor_snap_length = 0.0 # Disabled for natural jumps
-	floor_max_angle = deg_to_rad(60.0)
-	ground_ray.target_position = Vector3(0, -2.5, 0)
+	# Robust physics for high-speed mountain racing
+	floor_snap_length = 3.0 # Maximum stickiness for loops/hills
+	floor_max_angle = deg_to_rad(60) 
+	motion_mode = MOTION_MODE_GROUNDED # Better stability for characters on slopes
+	safe_margin = 0.05 # Prevent snagging on track edges
+	ground_ray.target_position = Vector3(0, -5.0, 0) # Deep reach
+
+
 	
 	# Initialize procedural engine sound
 	if engine_sound.stream is AudioStreamGenerator:
@@ -161,6 +175,7 @@ func _process(delta):
 	
 	# Use looking_at for robust orientation (fixes mirrored controls)
 	var speed_lean_factor = 0.0
+	# Removed erroneous material duplication here – road material handling is done in the generator
 	var pitch_lean = 0.0
 	
 	if is_exploding:
@@ -185,8 +200,12 @@ func _process(delta):
 	# GROUNDING: Adjust target position to actual ground height on levels/ramps
 	var target_pos = global_position
 	if is_on_floor() and ground_ray.is_colliding():
-		# 0.25 offset matches the physics collision box exactly
-		target_pos.y = ground_ray.get_collision_point().y + 0.25
+		var ground_y = ground_ray.get_collision_point().y
+		# Corrected grounded offset for the new 2x scale
+		if abs(global_position.y - ground_y) < 1.5:
+			# 0.51 offset provides grounded tires without hovering
+			var h_offset = 0.51 / max(0.1, up.y)
+			target_pos.y = ground_y + h_offset
 	
 	# BOUNCE EFFECT: Decimate and apply
 	bounce_vel -= bounce_y * 110.0 * delta # Spring
@@ -268,7 +287,17 @@ func _process(delta):
 		visuals.global_position = global_position
 	
 	if is_local_player and race_ui:
-		race_ui.update_heat(heat)
+		# Heat bar is removed, we just update the shield visual here
+		pass
+	
+	if shield_mesh:
+		shield_mesh.visible = is_shielded
+		
+	if is_local_player and is_shielded:
+		shield_timer -= delta
+		if shield_timer <= 0:
+			is_shielded = false
+			race_ui.show_message("SHIELD EXPIRED", 2.0)
 	
 	# BOOST VISUALS AND SOUNDS
 	if is_local_player:
@@ -281,18 +310,7 @@ func _process(delta):
 				sfx_rocket_loop.stop()
 			boost_particles.emitting = false
 			
-		# Warning Beeps
-		if heat > 70.0 and not is_exploding and can_move:
-			warning_beep_timer -= delta
-			if warning_beep_timer <= 0.0:
-				if heat > 90.0:
-					sfx_double_beep.play()
-					warning_beep_timer = 0.3
-				else:
-					sfx_beep_warning.play()
-					warning_beep_timer = 0.6
-		else:
-			warning_beep_timer = 0.0
+		# Warning Beeps (Removed since heat is gone)
 
 	# WHEEL ANIMATION:
 	var wheel_speed = velocity.length()
@@ -414,8 +432,18 @@ func _physics_process(delta):
 		return
 
 	# Gravity and Terrain Alignment - Reverted physics rotation to fix jitter
+	var horizontal_speed = Vector2(velocity.x, velocity.z).length()
 	if not is_on_floor() or is_exploding or is_waiting_to_explode:
 		velocity.y -= GRAVITY * delta
+	else:
+		# MODIFIED: Instead of hard-setting velocity.y = -8.0, 
+		# we simply clear it OR set it to a very small negative value to keep traction.
+		# This allows the car to preserve vertical momentum when it leaves the ground!
+		if velocity.y > 0 and not is_on_floor(): # We are jumping!
+			pass
+		else:
+			velocity.y = -2.0 # Gentle grounding force (stickiness)
+
 	
 	if is_exploding:
 		respawn_timer += delta
@@ -480,8 +508,8 @@ func _physics_process(delta):
 		
 		# Ensure boost and warnings stop when finished
 		is_boosting = false
-		boost_time = 0.0
-		heat = move_toward(heat, 0.0, COOL_RATE * delta)
+		boost_timer = 0.0
+		# heat = move_toward(heat, 0.0, COOL_RATE * delta)
 		
 		move_and_slide()
 		
@@ -498,40 +526,9 @@ func _physics_process(delta):
 	if input_dir.length() > 1.0:
 		input_dir = input_dir.normalized()
 	
-	# Boost Input
-	var was_boosting = is_boosting
-	is_boosting = Input.is_action_pressed("boost") and can_move and not is_exploding
-	
-	if is_boosting and not was_boosting:
-		sfx_nitro_start.play()
-		frame_bump_vel += 2.0 # Torque pop
-	elif not is_boosting and was_boosting:
-		sfx_release_pop.play()
-		frame_bump_vel -= 0.5 # Subtle dip on release
-	
-	# Heat Logic
-	if is_boosting:
-		heat += HEAT_RATE * delta
-		boost_time += delta
-	else:
-		heat = move_toward(heat, 0.0, COOL_RATE * delta)
-		boost_time = 0.0
-	
-	if heat >= 100.0 and not is_exploding and not is_waiting_to_explode:
-		is_waiting_to_explode = true
-		explosion_delay_timer = 1.0
-		# Speed should drop?
-		
-	if is_waiting_to_explode:
-		if not is_boosting:
-			# SAVING GRACE: Player let go in time!
-			is_waiting_to_explode = false
-			heat = 98.0 # Nudge just below 100% to allow cooling
-		else:
-			explosion_delay_timer -= delta
-			if explosion_delay_timer <= 0.0:
-				is_waiting_to_explode = false
-				explode()
+	# Item Use
+	if Input.is_action_just_pressed("boost") and can_move and not is_exploding:
+		_use_item()
 
 	# DRIFT LOGIC
 	var is_braking = input_dir.y > 0
@@ -548,7 +545,7 @@ func _physics_process(delta):
 		sfx_brake_drift.stop()
 
 	# Steering - Lowered threshold to 0.1 to prevent stutter at low speeds
-	if input_dir.x != 0 and velocity.length() > 0.1:
+	if input_dir.x != 0 and horizontal_speed > 0.1:
 		var steer_dir = -1.0 if velocity.dot(transform.basis.z) > 0 else 1.0
 		# Increase steer speed during drift
 		var actual_steer_speed = STEER_SPEED * 1.8 if is_drifting else STEER_SPEED
@@ -570,26 +567,27 @@ func _physics_process(delta):
 	var accel = ACCELERATION
 	
 	# CALCULATE RAMPED BASE SPEED
-	# RAMP UP: Increase top speed from SPEED (~80 kmh) up to 130 kmh (~36.1 units) over 8 seconds
+	# Target 80 KM/H top speed (~22.2 units)
 	var ramp_percent = clamp(normal_accel_time / 8.0, 0.0, 1.0)
-	var max_normal_units = 100.0 / 1.8 # Target 100 KM/H top speed
+	var max_normal_units = 80.0 / 1.8 
 	var current_base_top_speed = lerp(SPEED, max_normal_units, ramp_percent)
 	
-	if is_boosting:
-		# ADDITIVE BOOST: Adds on top of your current ramped momentum
-		# Scaled for 2x world balance
-		var boost_bonus = 15.0 + (clamp(boost_time, 0.0, 4.0) * 5.0)
-		target_speed = current_base_top_speed + boost_bonus
+	if boost_timer > 0:
+		boost_timer -= delta
+		is_boosting = true
+		target_speed = current_base_top_speed + 15.0
 		accel = BOOST_ACCEL
-	elif input_dir.y < 0: # Forward
-		normal_accel_time += delta
-		target_speed = current_base_top_speed
-		accel = ACCELERATION
-	elif input_dir.y > 0: # Backward
-		target_speed = -REVERSE_SPEED
-		normal_accel_time = 0.0 # Reset on brake/reverse
 	else:
-		normal_accel_time = move_toward(normal_accel_time, 0.0, delta * 2.0) # Slow decay on coast
+		is_boosting = false
+		if input_dir.y < 0: # Forward
+			normal_accel_time += delta
+			target_speed = current_base_top_speed
+			accel = ACCELERATION
+		elif input_dir.y > 0: # Backward
+			target_speed = -REVERSE_SPEED
+			normal_accel_time = 0.0 # Reset on brake/reverse
+		else:
+			normal_accel_time = move_toward(normal_accel_time, 0.0, delta * 2.0) # Slow decay on coast
 		
 	# Apply acceleration/friction to the scalar forward speed
 	if target_speed != 0:
@@ -597,10 +595,17 @@ func _physics_process(delta):
 	else:
 		current_forward_speed = move_toward(current_forward_speed, 0, FRICTION * delta)
 		
-	# Reconstruct velocity: Keep it strictly in the forward heading
-	velocity.x = forward_dir.x * current_forward_speed
-	velocity.z = forward_dir.z * current_forward_speed
-	velocity.y = current_velocity_y
+	# Reconstruct velocity: Handle climbs by projecting onto the floor if possible
+	var move_dir = forward_dir
+	if is_on_floor():
+		var floor_normal = get_floor_normal()
+		# Align movement to the slope
+		move_dir = (forward_dir - floor_normal * forward_dir.dot(floor_normal)).normalized()
+		
+	velocity.x = move_dir.x * current_forward_speed
+	velocity.z = move_dir.z * current_forward_speed
+	# Apply engine push vertically for slopes + gravity
+	velocity.y = (move_dir.y * current_forward_speed) + current_velocity_y
 
 	move_and_slide()
 	
@@ -678,8 +683,9 @@ func respawn():
 	sync_steer = 0.0
 	visual_steer = 0.0
 	
-	# Calculate respawn position: 5m behind last checkpoint, 4.0m up (for 2x scale)
-	var spawn_pos = last_checkpoint_transform.origin + (last_checkpoint_transform.basis.z * 5.0) + Vector3(0, 4.0, 0)
+	# Respawn: 5m behind checkpoint, safely elevated for thick road (6.0m)
+	var spawn_pos = last_checkpoint_transform.origin + (last_checkpoint_transform.basis.z * 5.0) + Vector3(0, 6.0, 0)
+
 	global_position = spawn_pos
 	
 	# Face the checkpoint (forward) - keep it level to avoid "pointing at ground" issues
@@ -698,7 +704,129 @@ func respawn():
 	sync_position = global_position
 	sync_rotation = rotation
 	sync_velocity = Vector3.ZERO
+	is_shielded = false # Remove shield on respawn
+	if is_local_player and race_ui:
+		race_ui.update_item("NONE")
+
+@rpc("authority", "call_local", "reliable")
+func give_item(type: int):
+	current_item = type as ItemType
+	if is_local_player and race_ui:
+		var item_name = ItemType.keys()[type]
+		race_ui.show_message("Gained " + item_name, 2.0)
+		race_ui.update_item(item_name)
+
+func _get_random_item_rpc():
+	# Server only
+	# 1: BOOST, 2: MISSILE, 3: GUIDED_MISSILE, 4: SHIELD, 5: SHOCKWAVE, 6: BOMB
+	# WEIGHTING: Boost is 3x more common than other items
+	var items = [1, 1, 1, 2, 3, 4, 5, 6]
+	return items[randi() % items.size()]
+
+func _use_item():
+	if current_item == ItemType.NONE: return
 	
+	match current_item:
+		ItemType.BOOST:
+			boost_timer = 2.5
+			sfx_nitro_start.play()
+			frame_bump_vel += 2.0
+		ItemType.MISSILE:
+			_fire_missile.rpc_id(1, false)
+		ItemType.GUIDED_MISSILE:
+			_fire_missile.rpc_id(1, true)
+		ItemType.SHIELD:
+			_activate_shield()
+		ItemType.SHOCKWAVE:
+			_trigger_shockwave.rpc_id(1)
+		ItemType.BOMB:
+			_drop_bomb.rpc_id(1)
+			
+	current_item = ItemType.NONE
+	if is_local_player and race_ui:
+		race_ui.update_item("NONE")
+
+func _activate_shield():
+	is_shielded = true
+	shield_timer = 10.0 # Lasts 10 seconds
+	# Visual feedback for shield
+	if is_local_player:
+		race_ui.show_message("SHIELD ON", 2.0)
+
+func on_hit():
+	if is_exploding: return
+	
+	if is_shielded:
+		is_shielded = false
+		if is_local_player:
+			race_ui.show_message("SHIELD BROKEN", 2.0)
+		return
+		
+	# Hits from items are like overheats, they explode the car
+	explode()
+
+@rpc("any_peer", "call_local", "reliable")
+func _fire_missile(guided: bool = false):
+	if not multiplayer.is_server(): return
+	var missile = MISSILE_SCENE.instantiate()
+	missile.owner_id = name.to_int()
+	missile.is_guided = guided
+	# Spawn in front of the cart
+	missile.global_transform = global_transform.translated(Vector3(0, 0.5, -2.0))
+	# Level parent structure: Level/Players/Cart
+	get_parent().get_parent().add_child(missile, true)
+
+@rpc("any_peer", "call_local", "reliable")
+func _drop_bomb():
+	if not multiplayer.is_server(): return
+	var bomb = BOMB_SCENE.instantiate()
+	bomb.owner_id = name.to_int()
+	# Spawn behind the cart
+	bomb.global_transform = global_transform.translated(Vector3(0, 0.5, 2.0))
+	get_parent().get_parent().add_child(bomb, true)
+
+@rpc("any_peer", "call_local", "reliable")
+func _trigger_shockwave():
+	if not multiplayer.is_server(): return
+	# Push away other players in radius
+	var radius = 10.0
+	var push_force = 20.0
+	var players = get_tree().get_nodes_in_group("player_carts")
+	for p in players:
+		if p == self: continue
+		var dist = global_position.distance_to(p.global_position)
+		if dist < radius:
+			var dir = (p.global_position - global_position).normalized()
+			dir.y = 0.5 # Upward lift
+			# Trigger push on that player (maybe via RPC)
+			p.apply_shockwave_force.rpc(dir * push_force)
+
+	# Trigger visual for everyone
+	_show_shockwave_visual.rpc()
+
+@rpc("authority", "call_local", "reliable")
+func _show_shockwave_visual():
+	if not shockwave_visual: return
+	shockwave_visual.visible = true
+	shockwave_visual.scale = Vector3.ZERO
+	# Reset transparency (need to access material since it's a sub-resource or just use transparency property if Godot 4.x)
+	# In Godot 4, transparency is a property of GeometryInstance3D
+	shockwave_visual.transparency = 0.5
+	
+	var tw = create_tween()
+	tw.set_parallel(true)
+	tw.set_trans(Tween.TRANS_QUAD)
+	tw.set_ease(Tween.EASE_OUT)
+	tw.tween_property(shockwave_visual, "scale", Vector3(10.0, 10.0, 10.0), 0.4)
+	tw.tween_property(shockwave_visual, "transparency", 1.0, 0.4)
+	
+	tw.chain().tween_callback(func(): shockwave_visual.visible = false)
+
+@rpc("authority", "call_local", "reliable")
+func apply_shockwave_force(force: Vector3):
+	velocity += force
+	frame_bump_vel += 2.0 # Impact feel
+
 func _spawn_wheel_debris(wheel_node: Node3D):
 	if not wheel_node: return
 	
@@ -720,12 +848,24 @@ func _spawn_wheel_debris(wheel_node: Node3D):
 	# The wheel mesh is usually a child of the wheel_node (which is the WheelPivot)
 	# WheelFL -> wheel (instance of wheel.glb)
 	var mesh_node = wheel_node.get_child(0)
-	if mesh_node:
+	if mesh_node and mesh_node is MeshInstance3D:
 		var mesh_clone = mesh_node.duplicate()
+		# Apply a simple double‑sided material to the debris wheel
+		var side_mat = StandardMaterial3D.new()
+		side_mat.albedo_color = Color(0.8, 0.8, 0.8)
+		side_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		mesh_clone.material_override = side_mat
 		debris.add_child(mesh_clone)
 		# Reset internal transform since debris root is at global_transform
 		mesh_clone.position = Vector3.ZERO
 		mesh_clone.rotation = Vector3.ZERO
+	else:
+		# Fallback: just duplicate whatever is there
+		var mesh_clone = mesh_node.duplicate()
+		debris.add_child(mesh_clone)
+		mesh_clone.position = Vector3.ZERO
+		mesh_clone.rotation = Vector3.ZERO
+
 	
 	# Add to scene tree (Level root)
 	get_parent().get_parent().add_child(debris)
