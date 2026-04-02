@@ -13,6 +13,9 @@ extends Node3D
 @export var noise_frequency: float = 0.008 # Detailed hills
 @export var hill_height: float = 50.0 # Taller hills
 
+@export_group("Layout")
+@export var is_loop: bool = true
+
 @export var road_width: float = 14.0
 @export var sand_width: float = 16.0
 
@@ -230,15 +233,29 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 		var offset = (float(i) / point_count) * length
 		var pos = curve.sample_baked(offset)
 		
-		# Robust Loop Tangent: FORCE START AND END TO MATCH
+		# Robust Tangent Calculation
 		var tangent: Vector3
-		if i == 0 or i == point_count:
-			# Sample forward and backward at the loop point for a perfect average tangent
-			var p_next = curve.sample_baked(0.2)
-			var p_prev = curve.sample_baked(max(0.0, length - 0.2))
-			tangent = (p_next - p_prev).normalized()
+		if i == 0:
+			if is_loop:
+				# Sample forward and backward at the loop point for a perfect average tangent
+				var p_next = curve.sample_baked(0.2)
+				var p_prev = curve.sample_baked(max(0.0, length - 0.2))
+				tangent = (p_next - p_prev).normalized()
+			else:
+				# Simple forward difference at start
+				var p_next = curve.sample_baked(0.2)
+				tangent = (p_next - pos).normalized()
+		elif i == point_count:
+			if is_loop:
+				var p_next = curve.sample_baked(0.2)
+				var p_prev = curve.sample_baked(max(0.0, length - 0.2))
+				tangent = (p_next - p_prev).normalized()
+			else:
+				# Simple backward difference at end
+				var p_prev = curve.sample_baked(max(0.0, length - 0.2))
+				tangent = (pos - p_prev).normalized()
 		else:
-			var p_next = curve.sample_baked(offset + 0.2)
+			var p_next = curve.sample_baked(min(length, offset + 0.2))
 			tangent = (p_next - pos).normalized()
 			
 		var right = tangent.cross(Vector3.UP).normalized() * half_w
@@ -305,8 +322,26 @@ func _create_track_collision(point_count: int, width: float, node_name: String):
 	for i in range(point_count + 1):
 		var offset = (float(i) / point_count) * length
 		var pos = curve.sample_baked(offset)
-		var next_pos = curve.sample_baked(min(offset + 0.5, length))
-		var tangent = (next_pos - pos).normalized()
+		
+		var tangent: Vector3
+		if i == 0:
+			if is_loop:
+				var p_next = curve.sample_baked(0.2)
+				var p_prev = curve.sample_baked(max(0.0, length - 0.2))
+				tangent = (p_next - p_prev).normalized()
+			else:
+				tangent = (curve.sample_baked(0.2) - pos).normalized()
+		elif i == point_count:
+			if is_loop:
+				var p_next = curve.sample_baked(0.2)
+				var p_prev = curve.sample_baked(max(0.0, length - 0.2))
+				tangent = (p_next - p_prev).normalized()
+			else:
+				tangent = (pos - curve.sample_baked(max(0.0, length - 0.2))).normalized()
+		else:
+			var next_pos = curve.sample_baked(min(offset + 0.5, length))
+			tangent = (next_pos - pos).normalized()
+		
 		if tangent.length() < 0.01:
 			tangent = (pos - curve.sample_baked(max(offset - 0.5, 0.0))).normalized()
 		var right = tangent.cross(Vector3.UP).normalized() * half_w
@@ -413,7 +448,7 @@ func _rebuild_longer_track():
 		Vector3(100, 2, 280),         # Gentle final turn
 		Vector3(50, 1, 200),           
 		Vector3(20, 0.5, 100),         # Final approach smoothing
-		Vector3(0, 0, 0)              # Home
+		Vector3(0, 0, 0) if is_loop else Vector3(0, 0, 50) # Home or Gap
 	]
 
 
@@ -422,22 +457,46 @@ func _rebuild_longer_track():
 	for p in pts:
 		curve.add_point(p)
 	
-	# Adjust handles for smoothness - Improved for sharp turns
+	# Adjust handles for smoothness - Improved for loops
 	for i in range(curve.point_count):
 		var p = curve.get_point_position(i)
 		var prev_idx = (i - 1 + curve.point_count) % curve.point_count
 		var next_idx = (i + 1) % curve.point_count
+		
+		# For non-loops, don't wrap handles at ends
+		if not is_loop:
+			if i == 0: prev_idx = 0
+			if i == curve.point_count - 1: next_idx = curve.point_count - 1
+			
 		var prev = curve.get_point_position(prev_idx)
 		var next = curve.get_point_position(next_idx)
 		
 		# Proportional handles to avoid "broken" sharp geometry
-		var dir = (next - prev).normalized()
+		var dir: Vector3
+		if is_loop and (i == 0 or i == curve.point_count - 1):
+			# If loop, use the actual circuit points for average tangent
+			var p_start = curve.get_point_position(0)
+			var p_end = curve.get_point_position(curve.point_count - 1)
+			if p_start.distance_to(p_end) < 0.1:
+				dir = (curve.get_point_position(1) - curve.get_point_position(curve.point_count - 2)).normalized()
+			else:
+				dir = (next - prev).normalized()
+		else:
+			dir = (next - prev).normalized()
+			
 		var d_prev = p.distance_to(prev)
 		var d_next = p.distance_to(next)
 		var handle_dist = min(d_prev, d_next) * 0.25 # Much shorter handles for safer sharp turns
 		
-		curve.set_point_in(i, -dir * handle_dist)
-		curve.set_point_out(i, dir * handle_dist)
+		if i == 0 and not is_loop:
+			curve.set_point_in(i, Vector3.ZERO)
+			curve.set_point_out(i, dir * handle_dist)
+		elif i == curve.point_count - 1 and not is_loop:
+			curve.set_point_in(i, -dir * handle_dist)
+			curve.set_point_out(i, Vector3.ZERO)
+		else:
+			curve.set_point_in(i, -dir * handle_dist)
+			curve.set_point_out(i, dir * handle_dist)
 	
 	print("New longer track generated!")
 	generate_world()
@@ -455,13 +514,23 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 		var offset = (float(i) / point_count) * length
 		var pos = curve.sample_baked(offset)
 		
-		# Proper Loop Tangent
-		var next_offset = offset + 0.1
-		if next_offset >= length:
-			next_offset = 0.1
-			
-		var next_pos = curve.sample_baked(next_offset)
-		var tangent = (next_pos - pos).normalized()
+		var tangent: Vector3
+		if i == 0:
+			if is_loop:
+				tangent = (curve.sample_baked(0.1) - curve.sample_baked(length - 0.1)).normalized()
+			else:
+				tangent = (curve.sample_baked(0.1) - pos).normalized()
+		elif i == point_count:
+			if is_loop:
+				tangent = (curve.sample_baked(0.1) - curve.sample_baked(length - 0.1)).normalized()
+			else:
+				tangent = (pos - curve.sample_baked(max(0, length - 0.1))).normalized()
+		else:
+			var next_offset = offset + 0.1
+			if next_offset >= length:
+				next_offset = 0.1
+			var next_pos = curve.sample_baked(next_offset)
+			tangent = (next_pos - pos).normalized()
 		
 		if tangent.length() < 0.01:
 			tangent = (pos - curve.sample_baked(max(0, offset - 0.1))).normalized()
