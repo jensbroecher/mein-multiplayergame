@@ -3,60 +3,19 @@
 [ext_resource type="Script" uid="uid://cgxoltdv3a2ap" path="res://PlayerCart.gd" id="1_cscript"]
 [ext_resource type="PackedScene" uid="uid://b2todmhcp14i1" path="res://models/cart.glb" id="2_cart"]
 [ext_resource type="PackedScene" uid="uid://cedxbolyht6sf" path="res://models/wheel.glb" id="3_wheel"]
-[ext_resource type="AudioStream" uid="uid://404333" path="res://sounds/404333__strexet__nitro-activation.mp3" id="4_nitro"]
-[ext_resource type="AudioStream" uid="uid://774270" path="res://sounds/774270__thelittlecrow__rocket-launch-boost-and-burning-version-b.wav" id="5_rocket"]
-[ext_resource type="AudioStream" uid="uid://434430" path="res://sounds/434430__v-ktor__explosion05.wav" id="6_release"]
-[ext_resource type="AudioStream" uid="uid://511492" path="res://sounds/511492__andersmmg__double-beep.wav" id="7_beep2"]
-[ext_resource type="AudioStream" uid="uid://467882" path="res://sounds/467882__samsterbirdies__beep-warning.ogg" id="8_beep1"]
-[ext_resource type="AudioStream" uid="uid://490255" path="res://sounds/490255__anomaex__sci-fi_explosion_1.wav" id="9_explosion"]
-[ext_resource type="AudioStream" uid="uid://188211" path="res://sounds/floraphonic-burning-fire-loop-1-188211.mp3" id="10_fireloop"]
-[ext_resource type="AudioStream" uid="uid://402331" path="res://sounds/dragon-studio-winter-wind-402331.mp3" id="11_wind"]
-[ext_resource type="AudioStream" uid="uid://46000" path="res://sounds/freesound_community-bonk-46000.mp3" id="12_bonk"]
-[ext_resource type="AudioStream" uid="uid://267282" path="res://sounds/sound-of-breaks-squeaking-of-vehicle-hd-267282.mp3" id="13_brake"]
+[ext_resource type="AudioStream" uid="uid://bblp15g61n0br" path="res://sounds/404333__strexet__nitro-activation.mp3" id="4_nitro"]
+[ext_resource type="AudioStream" uid="uid://dq2xlrtwb6vl0" path="res://sounds/774270__thelittlecrow__rocket-launch-boost-and-burning-version-b.wav" id="5_rocket"]
+[ext_resource type="AudioStream" uid="uid://th125s4xka82" path="res://sounds/434430__v-ktor__explosion05.wav" id="6_release"]
+[ext_resource type="AudioStream" uid="uid://cphictex845bp" path="res://sounds/511492__andersmmg__double-beep.wav" id="7_beep2"]
+[ext_resource type="AudioStream" uid="uid://dt04vn4rjr6in" path="res://sounds/467882__samsterbirdies__beep-warning.ogg" id="8_beep1"]
+[ext_resource type="AudioStream" uid="uid://citd4tl517h1r" path="res://sounds/490255__anomaex__sci-fi_explosion_1.wav" id="9_explosion"]
+[ext_resource type="AudioStream" uid="uid://bue32aws7o5ae" path="res://sounds/floraphonic-burning-fire-loop-1-188211.mp3" id="10_fireloop"]
+[ext_resource type="AudioStream" uid="uid://c5oedqihaf3kp" path="res://sounds/dragon-studio-winter-wind-402331.mp3" id="11_wind"]
+[ext_resource type="AudioStream" uid="uid://c6guv3kt5kkdb" path="res://sounds/freesound_community-bonk-46000.mp3" id="12_bonk"]
+[ext_resource type="AudioStream" uid="uid://ey8gigy86g5l" path="res://sounds/sound-of-breaks-squeaking-of-vehicle-hd-267282.mp3" id="13_brake"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_cart"]
 radius = 0.7
-
-[sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_engine"]
-buffer_length = 0.1
-
-[sub_resource type="Gradient" id="Gradient_soft"]
-offsets = PackedFloat32Array(0, 0.7, 1)
-colors = PackedColorArray(1, 1, 1, 1, 0.5, 0.5, 0.5, 0.5, 0, 0, 0, 0)
-
-[sub_resource type="GradientTexture2D" id="GradientTexture2D_soft"]
-gradient = SubResource("Gradient_soft")
-fill = 1
-fill_from = Vector2(0.5, 0.5)
-fill_to = Vector2(0.8, 0.2)
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_flame"]
-transparency = 1
-blend_mode = 1
-shading_mode = 0
-vertex_color_use_as_albedo = true
-billboard_mode = 3
-billboard_keep_scale = true
-particles_anim_h_frames = 1
-particles_anim_v_frames = 1
-particles_anim_loop = false
-albedo_color = Color(1, 0.4, 0.1, 0.8)
-albedo_texture = SubResource("GradientTexture2D_soft")
-emission_enabled = true
-emission = Color(1, 0.3, 0, 1)
-emission_energy_multiplier = 4.0
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_smoke"]
-transparency = 1
-shading_mode = 0
-vertex_color_use_as_albedo = true
-billboard_mode = 3
-billboard_keep_scale = true
-particles_anim_h_frames = 1
-particles_anim_v_frames = 1
-particles_anim_loop = false
-albedo_color = Color(0.1, 0.1, 0.1, 0.6)
-albedo_texture = SubResource("GradientTexture2D_soft")
 
 [sub_resource type="Curve" id="Curve_boost"]
 _data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
@@ -74,17 +33,55 @@ gravity = Vector3(0, 0, 0)
 scale_curve = SubResource("CurveTexture_scale")
 color = Color(0.956863, 0.584314, 0.101961, 1)
 
+[sub_resource type="Gradient" id="Gradient_soft"]
+offsets = PackedFloat32Array(0, 0.7, 1)
+colors = PackedColorArray(1, 1, 1, 1, 0.5, 0.5, 0.5, 0.5, 0, 0, 0, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_soft"]
+gradient = SubResource("Gradient_soft")
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(0.8, 0.2)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_flame"]
+transparency = 1
+blend_mode = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_color = Color(1, 0.4, 0.1, 0.8)
+albedo_texture = SubResource("GradientTexture2D_soft")
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
+particles_anim_loop = false
+
 [sub_resource type="QuadMesh" id="QuadMesh_flame"]
 material = SubResource("StandardMaterial3D_flame")
 size = Vector2(0.3, 0.3)
 
-[sub_resource type="QuadMesh" id="QuadMesh_smoke"]
-material = SubResource("StandardMaterial3D_smoke")
-size = Vector2(0.5, 0.5)
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_shield"]
+transparency = 1
+albedo_color = Color(0, 0.6, 1, 0.4)
+emission_enabled = true
+emission = Color(0, 0.4, 1, 1)
 
-[sub_resource type="QuadMesh" id="QuadMesh_expl"]
-material = SubResource("StandardMaterial3D_flame")
-size = Vector2(1.5, 1.5)
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_shield"]
+material = SubResource("StandardMaterial3D_shield")
+radius = 1.0
+height = 2.5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_shock"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(1, 1, 1, 0.5)
+
+[sub_resource type="SphereMesh" id="SphereMesh_shock"]
+material = SubResource("StandardMaterial3D_shock")
+radius = 1.0
+height = 2.0
+radial_segments = 16
+rings = 8
 
 [sub_resource type="Curve" id="Curve_expl"]
 _data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
@@ -103,12 +100,9 @@ scale_max = 2.0
 scale_curve = SubResource("CurveTexture_expl")
 color = Color(1, 0.5, 0.1, 1)
 
-[sub_resource type="SphereMesh" id="SphereMesh_expl"]
+[sub_resource type="QuadMesh" id="QuadMesh_expl"]
 material = SubResource("StandardMaterial3D_flame")
-radius = 0.2
-height = 0.4
-radial_segments = 8
-rings = 4
+size = Vector2(1.5, 1.5)
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_burning"]
 emission_shape = 1
@@ -136,40 +130,24 @@ scale_max = 1.5
 scale_curve = SubResource("CurveTexture_expl")
 color = Color(0.3, 0.3, 0.3, 0.5)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_smoke_old"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_smoke"]
 transparency = 1
 shading_mode = 0
-albedo_color = Color(0.3, 0.3, 0.3, 0.8)
+vertex_color_use_as_albedo = true
+albedo_color = Color(0.1, 0.1, 0.1, 0.6)
+albedo_texture = SubResource("GradientTexture2D_soft")
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
+particles_anim_loop = false
 
-[sub_resource type="SphereMesh" id="SphereMesh_smoke"]
-material = SubResource("StandardMaterial3D_smoke_old")
-radius = 0.2
-height = 0.4
-radial_segments = 8
-rings = 4
+[sub_resource type="QuadMesh" id="QuadMesh_smoke"]
+material = SubResource("StandardMaterial3D_smoke")
+size = Vector2(0.5, 0.5)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_shield"]
-transparency = 1
-albedo_color = Color(0, 0.6, 1, 0.4)
-emission_enabled = true
-emission = Color(0, 0.4, 1, 1)
-
-[sub_resource type="CapsuleMesh" id="CapsuleMesh_shield"]
-material = SubResource("StandardMaterial3D_shield")
-radius = 1.0
-height = 2.5
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_shock"]
-transparency = 1
-albedo_color = Color(1, 1, 1, 0.5)
-shading_mode = 0
-
-[sub_resource type="SphereMesh" id="SphereMesh_shock"]
-material = SubResource("StandardMaterial3D_shock")
-radius = 1.0
-height = 2.0
-radial_segments = 16
-rings = 8
+[sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_engine"]
+buffer_length = 0.1
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_sync"]
 properties/0/path = NodePath(".:sync_position")
@@ -212,7 +190,7 @@ top_level = true
 [node name="CartModel" parent="Visuals" unique_id=768104268 instance=ExtResource("2_cart")]
 transform = Transform3D(-6.1192225e-08, -0.015417921, -1.3999149, -6.7393785e-10, 1.3999149, -0.015417921, 1.3999997, 2.990315e-17, -6.1195934e-08, 0, -0.11234987, 0)
 
-[node name="BoostParticles" type="GPUParticles3D" parent="Visuals"]
+[node name="BoostParticles" type="GPUParticles3D" parent="Visuals" unique_id=457637679]
 transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0.6, 1.1)
 emitting = false
 amount = 40
@@ -220,37 +198,34 @@ lifetime = 0.4
 process_material = SubResource("ParticleProcessMaterial_boost")
 draw_pass_1 = SubResource("QuadMesh_flame")
 
-[node name="ShieldMesh" type="MeshInstance3D" parent="Visuals"]
+[node name="ShieldMesh" type="MeshInstance3D" parent="Visuals" unique_id=1328601433]
 visible = false
 mesh = SubResource("CapsuleMesh_shield")
 
-[node name="ShockwaveVisual" type="MeshInstance3D" parent="Visuals"]
+[node name="ShockwaveVisual" type="MeshInstance3D" parent="Visuals" unique_id=642203688]
 visible = false
 mesh = SubResource("SphereMesh_shock")
 
-[node name="ExplosionParticles" type="GPUParticles3D" parent="Visuals"]
+[node name="ExplosionParticles" type="GPUParticles3D" parent="Visuals" unique_id=710811188]
 emitting = false
 amount = 400
 lifetime = 1.2
 one_shot = true
 explosiveness = 1.0
-local_coords = false
 process_material = SubResource("ParticleProcessMaterial_expl")
 draw_pass_1 = SubResource("QuadMesh_expl")
 
-[node name="BurningParticles" type="GPUParticles3D" parent="Visuals"]
+[node name="BurningParticles" type="GPUParticles3D" parent="Visuals" unique_id=2035370128]
 emitting = false
 amount = 250
 lifetime = 1.2
-local_coords = false
 process_material = SubResource("ParticleProcessMaterial_burning")
 draw_pass_1 = SubResource("QuadMesh_flame")
 
-[node name="BurningSmokeParticles" type="GPUParticles3D" parent="Visuals"]
+[node name="BurningSmokeParticles" type="GPUParticles3D" parent="Visuals" unique_id=629764324]
 emitting = false
 amount = 200
 lifetime = 2.0
-local_coords = false
 process_material = SubResource("ParticleProcessMaterial_smoke")
 draw_pass_1 = SubResource("QuadMesh_smoke")
 
@@ -295,65 +270,50 @@ current = true
 [node name="EngineSound" type="AudioStreamPlayer3D" parent="Visuals" unique_id=466950016]
 stream = SubResource("AudioStreamGenerator_engine")
 autoplay = true
-bus = &"SFX"
 
-[node name="SFX_NitroStart" type="AudioStreamPlayer3D" parent="Visuals"]
+[node name="SFX_NitroStart" type="AudioStreamPlayer3D" parent="Visuals" unique_id=1794322746]
 stream = ExtResource("4_nitro")
-bus = &"SFX"
-unit_size = 20.0
 volume_db = 5.0
+unit_size = 20.0
 
-[node name="SFX_RocketLoop" type="AudioStreamPlayer3D" parent="Visuals"]
+[node name="SFX_RocketLoop" type="AudioStreamPlayer3D" parent="Visuals" unique_id=1561564001]
 stream = ExtResource("5_rocket")
-bus = &"SFX"
-unit_size = 20.0
 volume_db = 5.0
+unit_size = 20.0
 
-[node name="SFX_ReleasePop" type="AudioStreamPlayer3D" parent="Visuals"]
+[node name="SFX_ReleasePop" type="AudioStreamPlayer3D" parent="Visuals" unique_id=1004046228]
 stream = ExtResource("6_release")
-bus = &"SFX"
-unit_size = 20.0
 volume_db = 3.0
-
-[node name="SFX_DoubleBeep" type="AudioStreamPlayer3D" parent="Visuals"]
-stream = ExtResource("8_beep1")
-bus = &"SFX"
-unit_size = 15.0
-
-[node name="SFX_BeepWarning" type="AudioStreamPlayer3D" parent="Visuals"]
-stream = ExtResource("7_beep2")
-bus = &"SFX"
-unit_size = 15.0
-
-[node name="SFX_Explosion" type="AudioStreamPlayer3D" parent="Visuals"]
-stream = ExtResource("9_explosion")
-bus = &"SFX"
 unit_size = 20.0
 
-[node name="SFX_FireLoop" type="AudioStreamPlayer3D" parent="Visuals"]
+[node name="SFX_DoubleBeep" type="AudioStreamPlayer3D" parent="Visuals" unique_id=1121517406]
+stream = ExtResource("8_beep1")
+unit_size = 15.0
+
+[node name="SFX_BeepWarning" type="AudioStreamPlayer3D" parent="Visuals" unique_id=428971605]
+stream = ExtResource("7_beep2")
+unit_size = 15.0
+
+[node name="SFX_Explosion" type="AudioStreamPlayer3D" parent="Visuals" unique_id=568730595]
+stream = ExtResource("9_explosion")
+unit_size = 20.0
+
+[node name="SFX_FireLoop" type="AudioStreamPlayer3D" parent="Visuals" unique_id=84107851]
 stream = ExtResource("10_fireloop")
-bus = &"SFX"
 unit_size = 15.0
 
-[node name="SFX_WindLoop" type="AudioStreamPlayer3D" parent="Visuals"]
+[node name="SFX_WindLoop" type="AudioStreamPlayer3D" parent="Visuals" unique_id=1673527994]
 stream = ExtResource("11_wind")
-bus = &"SFX"
-unit_size = 10.0
-autoplay = false
 
-[node name="SFX_LandingBonk" type="AudioStreamPlayer3D" parent="Visuals"]
+[node name="SFX_LandingBonk" type="AudioStreamPlayer3D" parent="Visuals" unique_id=864462752]
 stream = ExtResource("12_bonk")
-bus = &"SFX"
 unit_size = 15.0
-autoplay = false
 
-[node name="SFX_BrakeDrift" type="AudioStreamPlayer3D" parent="Visuals"]
+[node name="SFX_BrakeDrift" type="AudioStreamPlayer3D" parent="Visuals" unique_id=1825206901]
 stream = ExtResource("13_brake")
-bus = &"SFX"
 unit_size = 12.0
-autoplay = false
 
-[node name="GroundRay" type="RayCast3D" parent="."]
+[node name="GroundRay" type="RayCast3D" parent="." unique_id=1744416628]
 target_position = Vector3(0, -1.5, 0)
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="." unique_id=1093522993]

@@ -203,8 +203,8 @@ func _process(delta):
 		var ground_y = ground_ray.get_collision_point().y
 		# Corrected grounded offset for the new 2x scale
 		if abs(global_position.y - ground_y) < 1.5:
-			# 0.43 offset (lowered from 0.51) to fix floating tires
-			var h_offset = 0.43 / max(0.1, up.y)
+			# 0.28 offset (lowered further from 0.38) to fix hovering and sit deeper in the road
+			var h_offset = 0.28 / max(0.1, up.y)
 			target_pos.y = ground_y + h_offset
 	
 	# BOUNCE EFFECT: Decimate and apply
@@ -313,9 +313,12 @@ func _process(delta):
 		# Warning Beeps (Removed since heat is gone)
 
 	# WHEEL ANIMATION:
-	var wheel_speed = velocity.length()
-	# Estimate wheel circumference for realistic spin (approx 2.0 factor)
-	wheel_rotation -= wheel_speed * delta * 4.0 
+	# SIGNED SPEED: Use dot product to determine if moving forward or backward
+	var forward_dir = -global_transform.basis.z
+	var signed_speed = velocity.dot(forward_dir)
+	
+	# Estimate wheel circumference for realistic spin
+	wheel_rotation -= signed_speed * delta * 4.0 
 	
 	# Smooth out steering visuals (lerp towards sync_steer)
 	visual_steer = lerp(visual_steer, sync_steer, 8.0 * delta)
