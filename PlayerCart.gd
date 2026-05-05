@@ -1,19 +1,20 @@
-extends CharacterBody3D
+extends VehicleBody3D
 
 @export var player_name: String = "Player":
 	set(value):
 		player_name = value
-		if is_inside_tree() and $NameTag:
-			$NameTag.text = value
+		if is_inside_tree() and $Visuals/NameTag:
+			$Visuals/NameTag.text = value
 
-const SPEED = 20.0
-const REVERSE_SPEED = 10.0
-const STEER_SPEED = 2.8
-const ACCELERATION = 18.0
-const FRICTION = 6.0
-const GRAVITY = 12.0 # Extra light for satisfying arcade jumps
-const BOOST_ACCEL = 55.0
-const BOOST_SPEED = 65.0
+const SPEED = 25.0
+const REVERSE_SPEED = 12.0
+const STEER_SPEED = 0.6
+const ENGINE_FORCE = 4000.0
+const BRAKE_FORCE = 300.0
+const HANDBRAKE_FORCE = 500.0
+
+const GRAVITY = 9.8
+
 # Preload item scenes
 const MISSILE_SCENE = preload("res://Missile.tscn")
 const BOMB_SCENE = preload("res://Bomb.tscn")
@@ -23,15 +24,10 @@ const BOMB_SCENE = preload("res://Bomb.tscn")
 @onready var camera = $Visuals/CameraPivot/Camera3D
 @onready var name_tag = $Visuals/NameTag
 @onready var engine_sound = $Visuals/EngineSound
-@onready var wheel_fl = $Visuals/WheelPivotFL
-@onready var wheel_fr = $Visuals/WheelPivotFR
-@onready var wheel_rl = $Visuals/WheelPivotRL
-@onready var wheel_rr = $Visuals/WheelPivotRR
 @onready var ground_ray = $GroundRay
 
-var race_ui # Reference to UI
+var race_ui
 
-# Boost / SFX Nodes
 @onready var sfx_nitro_start = $Visuals/SFX_NitroStart
 @onready var sfx_rocket_loop = $Visuals/SFX_RocketLoop
 @onready var sfx_release_pop = $Visuals/SFX_ReleasePop
@@ -46,838 +42,399 @@ var race_ui # Reference to UI
 @onready var sfx_wind_loop = $Visuals/SFX_WindLoop
 @onready var sfx_landing_bonk = $Visuals/SFX_LandingBonk
 @onready var shield_mesh = $Visuals/ShieldMesh
-@onready var shockwave_visual = $Visuals/ShockwaveVisual
 
 var playback: AudioStreamGeneratorPlayback
 var sample_rate: float
-var phase: float = 0.0
-var phase2: float = 0.0
-var phase3: float = 0.0
-var time_accum: float = 0.0
-var current_base_freq: float = 30.0
-var wheel_rotation: float = 0.0
-var visual_steer: float = 0.0
 
-# Procedural Animation States
-var was_on_floor: bool = true
-var bounce_y: float = 0.0
-var bounce_vel: float = 0.0
-var frame_bump_y: float = 0.0
-var frame_bump_vel: float = 0.0
+var bounce_y = 0.0
+var bounce_vel = 0.0
+var frame_bump_y = 0.0
+var frame_bump_vel = 0.0
 
 var is_local_player = false
 var can_move = false
+var can_control = true
 
-# Boost and Heat
-var heat: float = 0.0
-var is_boosting: bool = false
-var boost_time: float = 0.0 # How long the current boost has lasted
-var is_exploding: bool = false
-var is_waiting_to_explode: bool = false
-var explosion_delay_timer: float = 0.0
+var is_exploding = false
+var heat = 0.0
+var boost_time = 0.0
+var boost_timer = 0.0
+var is_boosting = false
+var is_waiting_to_explode = false
+
 var tumble_velocity: Vector3 = Vector3.ZERO
 var warning_beep_timer: float = 0.0
-var is_drifting: bool = false
-@onready var sfx_brake_drift = $Visuals/SFX_BrakeDrift
 
-# Item System
-enum ItemType { NONE, BOOST, MISSILE, GUIDED_MISSILE, SHIELD, SHOCKWAVE, BOMB }
-var current_item: ItemType = ItemType.NONE
+@onready var sfx_brake_drift = $Visuals/SFX_BrakeDrift
+var is_drifting: bool = false
+var wheel_rotation: float = 0.0
+var is_teleporting: bool = false
 var is_shielded: bool = false
-var shield_timer: float = 0.0 # Duration of shield
-var boost_timer: float = 0.0 # Duration of current boost effect
+
+var is_underwater: bool = false
+const WATER_LEVEL = -10.0
+var water_timer: float = 0.0
+
+enum ItemType { NONE, BOOST, MISSILE, GUIDED_MISSILE, SHIELD, SHOCKWAVE, BOMB }
+var current_item = ItemType.NONE
 
 var last_checkpoint_transform: Transform3D
-var respawn_timer: float = 0.0
-var normal_accel_time: float = 0.0
 
-# Network sync targets
 var sync_position: Vector3
 var sync_rotation: Vector3
 var sync_velocity: Vector3
-var sync_steer: float # For wheel steering visuals
+var sync_steer: float = 0.0
+
+var visual_steer: float = 0.0
+var was_on_floor: bool = false
+
 
 func on_race_started():
 	if is_local_player:
 		can_move = true
 
+
 func _ready():
 	add_to_group("player_carts")
 	_update_authority()
-	
-	# Find race UI in scene
-	var root = get_tree().root
-	# Wait a frame to ensure Level has instantiated RaceUI
+
 	await get_tree().process_frame
 	var level = get_tree().get_first_node_in_group("level")
 	if level and level.has_node("RaceUI"):
 		race_ui = level.get_node("RaceUI")
-	
+
 	name_tag.text = player_name
-	
-	# Initial checkpoint info - fallback to start pos
 	last_checkpoint_transform = global_transform
-	
-	# Robust physics for high-speed mountain racing
-	floor_snap_length = 3.0 # Maximum stickiness for loops/hills
-	floor_max_angle = deg_to_rad(60) 
-	motion_mode = MOTION_MODE_GROUNDED # Better stability for characters on slopes
-	safe_margin = 0.05 # Prevent snagging on track edges
-	ground_ray.target_position = Vector3(0, -5.0, 0) # Deep reach
 
+	visuals.top_level = true
 
-	
-	# Initialize procedural engine sound
 	if engine_sound.stream is AudioStreamGenerator:
 		sample_rate = engine_sound.stream.mix_rate
 		playback = engine_sound.get_stream_playback()
 		if not engine_sound.playing:
 			engine_sound.play()
-		print("PlayerCart: Procedural engine sound initialized.")
-	
+
 	if is_local_player:
 		camera.current = true
 		camera_pivot.top_level = true
-		camera_pivot.global_transform = global_transform * camera_pivot.transform
-		if has_node("Visuals/CameraPivot/Camera3D/AudioListener3D"):
-			get_node("Visuals/CameraPivot/Camera3D/AudioListener3D").make_current()
 	else:
 		camera.current = false
 		if has_node("Visuals/CameraPivot/Camera3D/AudioListener3D"):
 			get_node("Visuals/CameraPivot/Camera3D/AudioListener3D").current = false
-	
-	# Initial visual snap
+
 	visuals.global_transform = global_transform
-	# Always top_level to ensure smooth, independent visual-only rotation/leaning
 	visuals.top_level = true
+
 
 func _enter_tree():
 	_update_authority()
 
+
 func _update_authority():
 	var id = name.to_int()
-	$MultiplayerSynchronizer.set_multiplayer_authority(id)
-	is_local_player = (id == multiplayer.get_unique_id())
+	if id > 0:
+		$MultiplayerSynchronizer.set_multiplayer_authority(id)
+	is_local_player = is_multiplayer_authority()
+
 
 func _process(delta):
-	# SMOOTH VISUALS:
-	# We smoothly lerp the 'Visuals' container to follow the physics body.
-	# We also align its orientation to the ground normal for leaning.
-	var target_basis = Basis.IDENTITY
-	var forward = -global_transform.basis.z
-	var up = Vector3.UP
-	
-	# Use ground ray normal for more robust alignment, falling back to on_floor normal
-	if ground_ray.is_colliding():
-		up = ground_ray.get_collision_normal()
-	elif is_on_floor():
-		up = get_floor_normal()
-	
-	# Use looking_at for robust orientation (fixes mirrored controls)
-	var speed_lean_factor = 0.0
-	# Removed erroneous material duplication here – road material handling is done in the generator
-	var pitch_lean = 0.0
-	
-	if is_exploding:
-		target_basis = global_transform.basis
-	else:
-		target_basis = Basis.looking_at(forward, up)
-		
-		# DYNAMIC LEANING:
-		# Speed-dependent factor: No leaning at low speeds (zero below 2.0, max at 15.0+)
-		speed_lean_factor = clamp((velocity.length() - 2.0) / 13.0, 0.0, 1.0)
-		
-		# 1. Softened side-lean into turns, now speed-dependent
-		var turn_lean = -sync_steer * 0.08 * speed_lean_factor
-		# 2. Pitch-lean reinforcement: rotate slightly more based on slope steepness
-		# We want the nose to tilt UP when climbing (positive slope)
-		var slope_intensity = forward.dot(up)
-		pitch_lean = -slope_intensity * 0.5
-		
-		target_basis = target_basis.rotated(target_basis.z.normalized(), turn_lean)
-		target_basis = target_basis.rotated(target_basis.x.normalized(), pitch_lean)
-	
-	# GROUNDING: Adjust target position to actual ground height on levels/ramps
-	var target_pos = global_position
-	if is_on_floor() and ground_ray.is_colliding():
-		var ground_y = ground_ray.get_collision_point().y
-		# Corrected grounded offset for the new 2x scale
-		if abs(global_position.y - ground_y) < 1.5:
-			# 0.28 offset (lowered further from 0.38) to fix hovering and sit deeper in the road
-			var h_offset = 0.28 / max(0.1, up.y)
-			target_pos.y = ground_y + h_offset
-	
-	# BOUNCE EFFECT: Decimate and apply
-	bounce_vel -= bounce_y * 110.0 * delta # Spring
-	bounce_vel *= 0.9 # Damping
-	bounce_y += bounce_vel * delta
-	
-	# FRAME BUMP: Snappier spring for engine pops/impacts
-	frame_bump_vel -= frame_bump_y * 400.0 * delta
-	frame_bump_vel *= 0.85
-	frame_bump_y += frame_bump_vel * delta
-	
-	target_pos.y += bounce_y + frame_bump_y
-	
-	var target_transform = Transform3D(target_basis, target_pos)
-	
-	# Buttery smooth lerp for both position and rotation (leaning)
-	if is_exploding:
-		visuals.global_transform = global_transform
-		# Ensure fire burns upwards by forcing emitter bases to be world-upright
-		burning_particles.global_rotation = Vector3.ZERO
-		burning_smoke_particles.global_rotation = Vector3.ZERO
-	else:
-		visuals.global_transform = visuals.global_transform.interpolate_with(target_transform, 18.0 * delta).orthonormalized()
-	
-	# WHEEL SUSPENSION ANIMATION (Smoothed):
-	# Wheels move up/down relative to their pivot to simulate suspension
-	# Reduced intensity to 20% of previous value for sublte realism
-	# Added speed_lean_factor so wheels don't compress when standing still
-	var susp_intensity = sync_steer * 0.08 * 0.2 * speed_lean_factor
-	var susp_pitch = pitch_lean * 0.1 * 0.2
-	
-	var target_fl = -0.021691 + susp_intensity - susp_pitch
-	var target_fr = -0.021691 - susp_intensity - susp_pitch
-	var target_rl = -0.021691 + susp_intensity + susp_pitch
-	var target_rr = -0.021691 - susp_intensity + susp_pitch
-	
-	# Smoothing speed (~10.0 for fluid but responsive feel)
-	var s_speed = 10.0 * delta
-	wheel_fl.position.y = lerp(wheel_fl.position.y, target_fl, s_speed)
-	wheel_fr.position.y = lerp(wheel_fr.position.y, target_fr, s_speed)
-	wheel_rl.position.y = lerp(wheel_rl.position.y, target_rl, s_speed)
-	wheel_rr.position.y = lerp(wheel_rr.position.y, target_rr, s_speed)
-	
-	# DYNAMIC CAMERA FOLLOW:
-	if is_local_player:
-		var target_cam_pos: Vector3
-		var target_cam_basis: Basis
-		
-		if is_exploding:
-			# STABILIZED CAMERA: Keep camera upright and steady during tumble
-			# Look at wreckage from a fixed relative world-space offset
-			var stable_offset = Vector3(0, 1.5, 4.0)
-			target_cam_pos = global_position + stable_offset
-			target_cam_basis = Basis.looking_at(-stable_offset, Vector3.UP)
-		else:
-			# Normal follow logic
-			# CAM PULL-BACK: Move camera further back the longer boost lasts
-			var cam_dist = lerp(3.5, 6.0, clamp(boost_time / 4.0, 0.0, 1.0))
-			var cam_offset = Vector3(0, 1.5, cam_dist)
-			target_cam_pos = visuals.global_transform * cam_offset
-			target_cam_basis = visuals.global_transform.basis
-			
-			# CURVE LEANING: Tilt the camera slightly based on steering
-			var cam_lean = sync_steer * 0.08
-			target_cam_basis = target_cam_basis.rotated(target_cam_basis.z.normalized(), cam_lean)
-		
-		# SMOOTHING: 
-		# Position follows relatively fast (12.0)
-		# Rotation follows slower (6.0) to create that "lag" feel in corners
-		camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 12.0 * delta)
-		camera_pivot.global_basis = camera_pivot.global_basis.slerp(target_cam_basis.orthonormalized(), 6.0 * delta).orthonormalized()
-		
-		# UPDATE SPEEDOMETER (2x Scale Adjustment: 3.6 / 2 = 1.8)
-		if race_ui:
-			race_ui.update_speed(velocity.length() * 1.8)
-	
-	# Keep visuals pinned if they drift too far (emergency snap)
-	if visuals.global_position.distance_to(global_position) > 10.0:
-		visuals.global_position = global_position
-	
-	if is_local_player and race_ui:
-		# Heat bar is removed, we just update the shield visual here
-		pass
-	
-	if shield_mesh:
-		shield_mesh.visible = is_shielded
-		
-	if is_local_player and is_shielded:
-		shield_timer -= delta
-		if shield_timer <= 0:
-			is_shielded = false
-			race_ui.show_message("SHIELD EXPIRED", 2.0)
-	
-	# BOOST VISUALS AND SOUNDS
-	if is_local_player:
-		if is_boosting and not is_exploding:
-			if not sfx_rocket_loop.playing:
-				sfx_rocket_loop.play()
-			boost_particles.emitting = true
-		else:
-			if sfx_rocket_loop.playing:
-				sfx_rocket_loop.stop()
-			boost_particles.emitting = false
-			
-		# Warning Beeps (Removed since heat is gone)
+	if not is_local_player:
+		return
 
-	# WHEEL ANIMATION:
-	# SIGNED SPEED: Use dot product to determine if moving forward or backward
-	var forward_dir = -global_transform.basis.z
-	var signed_speed = velocity.dot(forward_dir)
-	
-	# Estimate wheel circumference for realistic spin
-	wheel_rotation -= signed_speed * delta * 4.0 
-	
-	# Smooth out steering visuals (lerp towards sync_steer)
-	visual_steer = lerp(visual_steer, sync_steer, 8.0 * delta)
-	var steer_angle = visual_steer * 0.4 # Max ~23 degrees
-	
-	# Rotate all wheels for rolling
-	for wheel in [wheel_fl, wheel_fr, wheel_rl, wheel_rr]:
-		if wheel:
-			wheel.rotation.x = wheel_rotation
-			
-	# Steer front wheels
-	if wheel_fl: wheel_fl.rotation.y = steer_angle
-	if wheel_fr: wheel_fr.rotation.y = steer_angle
-	
-	# PROCEDURAL AUDIO SYNTHESIS:
-	if playback:
+	# Smooth visual follow
+	visuals.global_transform = visuals.global_transform.interpolate_with(global_transform, 15.0 * delta)
+
+	# Camera follows vehicle
+	var cam_dist = lerp(3.5, 6.0, clamp(boost_time / 4.0, 0.0, 1.0))
+	var cam_offset = Vector3(0, 1.5, cam_dist)
+	target_cam_pos = global_transform * cam_offset
+	camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 12.0 * delta)
+	camera_pivot.look_at(global_position, Vector3.UP)
+
+	# Speedometer
+	if race_ui:
+		race_ui.update_speed(linear_velocity.length() * 1.8)
+
+	# Procedural engine sound
+	if engine_sound.stream is AudioStreamGenerator and engine_sound.playing:
 		_fill_audio_buffer()
-	
-	# Ensure sound is playing (especially important if it was paused or failed to start)
-	if not engine_sound.playing:
-		engine_sound.play()
-	
-	# Modulate engine sound pitch based on speed
-	var speed = velocity.length()
-	# Base volume calculation for HUD/Audio
-	# Base volume calculation for HUD/Audio
-	var target_vol_linear = 0.5 + (speed / SPEED) * 1.0
-	
-	# Apply overall volume (DB)
-	var target_db = linear_to_db(target_vol_linear)
-	engine_sound.volume_db = lerp(engine_sound.volume_db, target_db, 10.0 * delta)
-	
-	# Reduced unit_size baseline to make it less overwhelming at distance
-	engine_sound.unit_size = lerp(engine_sound.unit_size, 10.0 + (speed / SPEED) * 20.0, 10.0 * delta)
 
-func _fill_audio_buffer():
-	var speed = velocity.length()
-	# Target RPM frequency: 30Hz at idle, up to 100Hz at full speed
-	var target_freq = 30.0 + (speed / SPEED) * 70.0
-	
-	# Smoothly interpolate the frequency to prevent clicks from sudden speed changes
-	current_base_freq = lerp(current_base_freq, target_freq, 0.2)
-	
-	# VARIETY: Add a subtle fluctuation to the frequency at higher speeds
-	# This creates a more "organic" engine sound that isn't perfectly static
-	var high_speed_variety = 0.0
-	if speed > SPEED * 0.7:
-		time_accum += 1.0 / sample_rate
-		high_speed_variety = sin(time_accum * 4.0) * 2.0
-	
-	var base_freq = current_base_freq + high_speed_variety
-	var frames_available = playback.get_frames_available()
-	
-	for i in range(frames_available):
-		# PHASE ACCUMULATION: 
-		# We increment phases individually per harmonic to ensure smooth transitions
-		phase += base_freq / sample_rate
-		phase2 += (base_freq * 0.5) / sample_rate
-		phase3 += (base_freq * 1.5) / sample_rate
-		
-		# Wrap phases to keep precision
-		phase = fmod(phase, 1.0)
-		phase2 = fmod(phase2, 1.0)
-		phase3 = fmod(phase3, 1.0)
-		
-		var pulse = 0.0
-		# Main explosion pulse
-		if phase < 0.12: pulse = 1.0
-		# Sub-harmonic rumble
-		if phase2 < 0.06: pulse += 0.4
-		# Mid-harmonic for fullness
-		if phase3 < 0.04: pulse += 0.2
-			
-		# Very low noise floor for mechanical finish
-		var noise = (randf() * 2.0 - 1.0) * 0.03
-		
-		var sample = (pulse + noise) * 0.4
-		sample = clamp(sample, -1.0, 1.0)
-		
-		playback.push_frame(Vector2(sample, sample))
 
 func _physics_process(delta):
-	# Handle movement for non-local players via interpolation
-	if not is_local_player:
-		var prev_pos = position
-		
-		# SPAWN SNAPPING: Prevent flying in from origin when joining
-		if position.distance_squared_to(sync_position) > 25.0: # > 5 units away
-			position = sync_position
-			rotation = sync_rotation
-			velocity = Vector3.ZERO
-		else:
-			# DEAD RECKONING: Extrapolate the sync position based on the last known velocity
-			# This keeps the cart moving even if we haven't received a new packet yet
-			sync_position += sync_velocity * delta
-			
-			# Interpolate smoothly towards the extrapolated network transform
-			position = position.lerp(sync_position, 15.0 * delta)
-			rotation.y = lerp_angle(rotation.y, sync_rotation.y, 15.0 * delta)
-			rotation.x = lerp_angle(rotation.x, sync_rotation.x, 15.0 * delta)
-			rotation.z = lerp_angle(rotation.z, sync_rotation.z, 15.0 * delta)
-			
-			# Calculate a "visual velocity" so the engine sound still works on remote clients
-			# We use the actual movement from this frame
-			velocity = (position - prev_pos) / delta
-			
-			# SPEED CLAMPING: Prevent network catch-up spikes from causing extreme engine pitches
-			# Limit remote visual speed slightly above max normal speed
-			var max_visual_speed = SPEED * 1.2
-			if velocity.length() > max_visual_speed:
-				velocity = velocity.normalized() * max_visual_speed
-		
-		# Removed manual sync_position override to allow clean dead reckoning extrapolation
+	if is_teleporting:
 		return
 
-	# Gravity and Terrain Alignment - Reverted physics rotation to fix jitter
-	var horizontal_speed = Vector2(velocity.x, velocity.z).length()
-	if not is_on_floor() or is_exploding or is_waiting_to_explode:
-		velocity.y -= GRAVITY * delta
-	else:
-		# MODIFIED: Instead of hard-setting velocity.y = -8.0, 
-		# we simply clear it OR set it to a very small negative value to keep traction.
-		# This allows the car to preserve vertical momentum when it leaves the ground!
-		if velocity.y > 0 and not is_on_floor(): # We are jumping!
-			pass
-		else:
-			velocity.y = -2.0 # Gentle grounding force (stickiness)
+	# Audio buffer
+	if engine_sound.stream is AudioStreamGenerator and playback:
+		_fill_audio_buffer()
 
-	
+	# Reset if fallen too far
+	if global_position.y < -50:
+		respawn()
+
+	# Explosion physics
 	if is_exploding:
-		respawn_timer += delta
-		if respawn_timer >= 3.0:
-			respawn()
-			return
-			
-		# Use visuals transform for tumbling to allow the body to land in any orientation
-		# Actually, rotation of the body itself is fine, but we need to stop the auto-alignment
-		rotate_x(tumble_velocity.x * delta)
-		rotate_y(tumble_velocity.y * delta)
-		rotate_z(tumble_velocity.z * delta)
-		
-		# TUMBLE DAMPING: Stop rotations much faster
-		tumble_velocity = tumble_velocity.lerp(Vector3.ZERO, 2.0 * delta)
-		
-		# FRICTION: Slow down movement faster
-		# Much higher horizontal damping
-		var friction_factor = 2.0
-		if is_on_floor():
-			friction_factor = 10.0 # Even more friction when on ground
-			# Also dampen tumble faster when touching ground
-			tumble_velocity = tumble_velocity.lerp(Vector3.ZERO, 5.0 * delta)
-			
-		velocity.x = move_toward(velocity.x, 0, friction_factor * delta)
-		velocity.z = move_toward(velocity.z, 0, friction_factor * delta)
-		
-		move_and_slide()
-		sync_position = position
-		sync_rotation = rotation
-		sync_velocity = velocity
+		apply_central_force(Vector3.UP * 5.0)
+		apply_torque(Vector3(randf()-0.5, randf()-0.5, randf()-0.5) * 20.0)
+
+		if sfx_fire_loop.playing:
+			sfx_fire_loop.volume_db = lerp(sfx_fire_loop.volume_db, -10.0, 2.0 * delta)
+
+		burning_particles.global_position = global_position + Vector3(0, 0.5, 0)
+		burning_smoke_particles.global_position = global_position + Vector3(0, 0.5, 0)
+
+		_move_and_sync()
 		return
 
-	if is_waiting_to_explode:
-		# Allow steering and movement during the 1s delay
-		pass
+	# Water detection
+	var currently_underwater = global_position.y < WATER_LEVEL
+	if currently_underwater != is_underwater:
+		if currently_underwater:
+			sfx_landing_bonk.play()
+			_apply_water_drag()
+		is_underwater = currently_underwater
+		water_timer = 0.0
 
-	# LANDING BOUNCE DETECTION
-	if is_on_floor() and not was_on_floor:
-		bounce_vel = -velocity.y * 0.02 # Convert downward momentum to bounce
-		frame_bump_vel -= velocity.y * 0.05 # Add squash impact
-		sfx_landing_bonk.play() # PLAY BONK
-	was_on_floor = is_on_floor()
-	
-	# WIND SFX LOGIC: Fade in when airborne, fade out on ground
-	if not is_on_floor() and not is_exploding:
-		if not sfx_wind_loop.playing:
-			sfx_wind_loop.play()
-		sfx_wind_loop.volume_db = lerp(sfx_wind_loop.volume_db, 0.0, 5.0 * delta)
-	else:
-		sfx_wind_loop.volume_db = lerp(sfx_wind_loop.volume_db, -40.0, 10.0 * delta)
-		if sfx_wind_loop.volume_db < -35.0:
-			sfx_wind_loop.stop()
-	
-	# Only local player processes physics input from here down
+	if is_underwater:
+		water_timer += delta
+		if water_timer > 2.0:
+			explode()
+
+	_apply_water_buoyancy(delta)
+
 	if not can_move:
-		# FINISH DECELERATION: Stop much faster when race is over
-		var finish_friction = FRICTION * 10.0
-		velocity.x = move_toward(velocity.x, 0, finish_friction * delta)
-		velocity.z = move_toward(velocity.z, 0, finish_friction * delta)
-		velocity.y = move_toward(velocity.y, 0, finish_friction * delta) # Also stop bouncing/sliding
-		
-		# Ensure boost and warnings stop when finished
-		is_boosting = false
-		boost_timer = 0.0
-		# heat = move_toward(heat, 0.0, COOL_RATE * delta)
-		
-		move_and_slide()
-		
-		sync_position = position
-		sync_rotation = rotation
-		sync_velocity = velocity
+		brake = 1.0
+		_apply_finish_deceleration(delta)
+		_move_and_sync()
 		return
 
+	# Item usage
+	if Input.is_action_just_pressed("boost"):
+		_use_item()
+
+	# Input
 	var input_dir = Vector2.ZERO
 	input_dir.x = Input.get_axis("steer_left", "steer_right")
 	input_dir.y = Input.get_axis("throttle", "brake")
-	
-	# Clamp input for analog sticks
+
 	if input_dir.length() > 1.0:
 		input_dir = input_dir.normalized()
-	
-	# Item Use
-	if Input.is_action_just_pressed("boost") and can_move and not is_exploding:
-		_use_item()
 
-	# DRIFT LOGIC
-	var is_braking = input_dir.y > 0
-	var is_steering = abs(input_dir.x) > 0.1
-	var was_drifting = is_drifting
-	
-	# Drift triggers when braking + steering at enough speed
-	is_drifting = is_braking and is_steering and velocity.length() > 5.0 and is_on_floor() and not is_exploding
-	
-	if is_drifting and not was_drifting:
-		if not sfx_brake_drift.playing:
-			sfx_brake_drift.play()
-	elif not is_drifting and was_drifting:
-		sfx_brake_drift.stop()
+	# Apply input to vehicle
+	_steer_input = -input_dir.x * STEER_SPEED
 
-	# Steering - Lowered threshold to 0.1 to prevent stutter at low speeds
-	if input_dir.x != 0 and horizontal_speed > 0.1:
-		var steer_dir = -1.0 if velocity.dot(transform.basis.z) > 0 else 1.0
-		# Increase steer speed during drift
-		var actual_steer_speed = STEER_SPEED * 1.8 if is_drifting else STEER_SPEED
-		var steer_amount = input_dir.x * actual_steer_speed * delta * steer_dir
-		rotate_y(-steer_amount)
-		
-		# MOMENTUM ALIGNMENT: Reduced during drift to allow sideways sliding
-		var alignment_strength = 0.4 if is_drifting else 1.0
-		velocity = velocity.rotated(Vector3.UP, -steer_amount * alignment_strength)
-
-	# Acceleration / Braking (ARCADE GRIP)
-	var forward_dir = -transform.basis.z
-	var current_velocity_y = velocity.y # Preserve gravity
-	
-	# Project current horizontal velocity onto the forward direction to get signed speed
-	var current_forward_speed = Vector2(velocity.x, velocity.z).dot(Vector2(forward_dir.x, forward_dir.z).normalized())
-	
-	var target_speed = 0.0
-	var accel = ACCELERATION
-	
-	# CALCULATE RAMPED BASE SPEED
-	# Target 80 KM/H top speed (~22.2 units)
-	var ramp_percent = clamp(normal_accel_time / 8.0, 0.0, 1.0)
-	var max_normal_units = 80.0 / 1.8 
-	var current_base_top_speed = lerp(SPEED, max_normal_units, ramp_percent)
-	
-	if boost_timer > 0:
-		boost_timer -= delta
-		is_boosting = true
-		target_speed = current_base_top_speed + 15.0
-		accel = BOOST_ACCEL
-	else:
-		is_boosting = false
-		if input_dir.y < 0: # Forward
-			normal_accel_time += delta
-			target_speed = current_base_top_speed
-			accel = ACCELERATION
-		elif input_dir.y > 0: # Backward
-			target_speed = -REVERSE_SPEED
-			normal_accel_time = 0.0 # Reset on brake/reverse
+	# Acceleration / braking
+	if input_dir.y < -0.1:
+		# Throttle forward
+		var force = ENGINE_FORCE
+		if boost_timer > 0:
+			force *= 2.0
+			boost_timer -= delta
+			is_boosting = true
+			if not sfx_rocket_loop.playing:
+				sfx_rocket_loop.play()
 		else:
-			normal_accel_time = move_toward(normal_accel_time, 0.0, delta * 2.0) # Slow decay on coast
-		
-	# Apply acceleration/friction to the scalar forward speed
-	if target_speed != 0:
-		current_forward_speed = move_toward(current_forward_speed, target_speed, accel * delta)
-	else:
-		current_forward_speed = move_toward(current_forward_speed, 0, FRICTION * delta)
-		
-	# Reconstruct velocity: Handle climbs by projecting onto the floor if possible
-	var move_dir = forward_dir
-	if is_on_floor():
-		var floor_normal = get_floor_normal()
-		# Align movement to the slope
-		move_dir = (forward_dir - floor_normal * forward_dir.dot(floor_normal)).normalized()
-		
-	velocity.x = move_dir.x * current_forward_speed
-	velocity.z = move_dir.z * current_forward_speed
-	# Apply engine push vertically for slopes + gravity
-	velocity.y = (move_dir.y * current_forward_speed) + current_velocity_y
+			is_boosting = false
+			if sfx_rocket_loop.playing:
+				sfx_rocket_loop.stop()
 
-	move_and_slide()
+		engine_force = -force
+		boost_time += delta
+
+	elif input_dir.y > 0.1:
+		# Brake/reverse
+		engine_force = 0.0
+		brake = BRAKE_FORCE
+		boost_time = 0.0
+
+		# Handbrake drift
+		if abs(input_dir.x) > 0.5 and linear_velocity.length() > 10.0:
+			brake = HANDBRAKE_FORCE
+			if not sfx_brake_drift.playing:
+				sfx_brake_drift.play()
+			is_drifting = true
+		else:
+			if sfx_brake_drift.playing:
+				sfx_brake_drift.stop()
+			is_drifting = false
+	else:
+		# No input - coast
+		engine_force = 0.0
+		brake = 0.0
+		boost_time = 0.0
+		if sfx_rocket_loop.playing:
+			sfx_rocket_loop.stop()
+		if sfx_brake_drift.playing:
+			sfx_brake_drift.stop()
+		is_drifting = false
+
+	# Wind sound
+	var speed = linear_velocity.length()
+	# Check if any wheel is on ground
+	var on_ground = $WheelFL.is_in_contact() or $WheelFR.is_in_contact() or $WheelRL.is_in_contact() or $WheelRR.is_in_contact()
+	if speed > 20.0 and on_ground:
+		if not sfx_wind_loop.playing:
+			sfx_wind_loop.play()
+		sfx_wind_loop.volume_db = lerp(sfx_wind_loop.volume_db, -10.0, 2.0 * delta)
+	else:
+		sfx_wind_loop.volume_db = lerp(sfx_wind_loop.volume_db, -40.0, 5.0 * delta)
+		if sfx_wind_loop.volume_db < -35.0:
+			sfx_wind_loop.stop()
+
+	# Update sync vars
+	sync_steer = move_toward(sync_steer, _steer_input, 10.0 * delta)
+	steering = sync_steer
+
+	# Visual wheel rotation
+	_update_wheel_visuals(delta)
+
+	# Sync position for multiplayer
+	_move_and_sync()
+
+
+var target_cam_pos: Vector3
+var _steer_input: float = 0.0
+var _prev_flat_vel: Vector2 = Vector2.ZERO
+
+
+func _fill_audio_buffer():
+	if not playback:
+		return
+
+	var available = playback.get_frames_available()
+	if available == 0:
+		return
+
+	var freq = 120.0 + abs(linear_velocity.dot(-global_transform.basis.z)) * 8.0
+	if is_boosting:
+		freq *= 1.5
+
+	for i in range(available):
+		var t = float(i) / sample_rate
+		var sample = sin(t * freq * TAU) * 0.3
+		sample += sin(t * freq * 2.0 * TAU) * 0.1
+		playback.push_frame(Vector2(sample, sample))
+
+
+func _update_wheel_visuals(delta):
+	# Steering visuals
+	$Visuals/WheelPivotFL.rotation.y = steering
+	$Visuals/WheelPivotFR.rotation.y = steering
+
+	# Rotation visuals (spinning wheels)
+	var avg_rpm = ($WheelFL.get_rpm() + $WheelFR.get_rpm() + $WheelRL.get_rpm() + $WheelRR.get_rpm()) / 4.0
+	wheel_rotation -= (avg_rpm / 60.0) * TAU * delta
 	
-	sync_position = position
+	$Visuals/WheelPivotFL/WheelFL.rotation.x = wheel_rotation
+	$Visuals/WheelPivotFR/WheelFR.rotation.x = wheel_rotation
+	$Visuals/WheelPivotRL/WheelRL.rotation.x = wheel_rotation
+	$Visuals/WheelPivotRR/WheelRR.rotation.x = wheel_rotation
+
+
+func _apply_water_drag():
+	linear_velocity *= 0.5
+
+
+func _apply_water_buoyancy(delta):
+	if is_underwater:
+		apply_central_force(Vector3.UP * 15.0)
+
+
+func _apply_finish_deceleration(delta):
+	linear_velocity = linear_velocity.lerp(Vector3.ZERO, 5.0 * delta)
+	angular_velocity = angular_velocity.lerp(Vector3.ZERO, 3.0 * delta)
+
+
+func _move_and_sync():
+	sync_position = global_position
 	sync_rotation = rotation
-	sync_velocity = velocity
-	
-	# Progressive Steering: Accumulate steer building over time (0.0 to 1.0)
-	var target_steer = -input_dir.x if can_move else 0.0
-	sync_steer = move_toward(sync_steer, target_steer, 2.5 * delta)
+	sync_velocity = linear_velocity
+
+
+func _use_item():
+	if current_item == ItemType.NONE:
+		return
+
+	match current_item:
+		ItemType.BOOST:
+			boost_timer = 2.0
+			sfx_nitro_start.play()
+			boost_particles.emitting = true
+
+	current_item = ItemType.NONE
+
+
+func _on_body_entered(body):
+	pass
+
 
 func explode():
-	if is_exploding: return
+	if is_exploding:
+		return
 	print("PlayerCart: EXPLODING!")
 	is_exploding = true
 	can_move = false
-	is_boosting = false
-	
+
 	sfx_explosion.play()
 	sfx_fire_loop.play()
 	explosion_particles.emitting = true
 	burning_particles.emitting = true
 	burning_smoke_particles.emitting = true
-	
-	# Notify Level/UI about explosion
-	var level = get_parent().get_parent() # Level node
-	if level.has_method("on_player_exploded"):
-		level.on_player_exploded(is_local_player)
-	
-	# Stop engine sound
+
 	if engine_sound.playing:
 		engine_sound.stop()
-		playback = null # Stop filling audio buffer
-	
-	# Visual effects of explosion
-	# Spawn physical wheel debris instead of just hiding
-	for wheel in [wheel_fl, wheel_fr, wheel_rl, wheel_rr]:
-		if wheel and randf() > 0.4: # 60% chance for each wheel to fall off
-			_spawn_wheel_debris(wheel)
-	
-	# Apply some random tumble velocity
-	velocity += Vector3(randf_range(-1,1), 10.0, randf_range(-1,1)).normalized() * 15.0
-	tumble_velocity = Vector3(randf_range(-5,5), randf_range(-5,5), randf_range(-5,5))
+
+	linear_velocity += Vector3(randf()-0.5, 10.0, randf()-0.5).normalized() * 15.0
+
 	respawn_timer = 0.0
+
 
 func respawn():
 	print("PlayerCart: RESPAWNING!")
 	is_exploding = false
-	# Only re-enable movement if they haven't finished the race
+
 	var level = get_tree().get_first_node_in_group("level")
 	var id = name.to_int()
 	var finished = false
 	if level and level.player_stats.has(id):
 		finished = level.player_stats[id]["finished"]
-	
+
 	can_move = not finished
 	is_boosting = false
 	heat = 0.0
 	boost_time = 0.0
 	is_waiting_to_explode = false
-	
-	# Restore visuals
-	for wheel in [wheel_fl, wheel_fr, wheel_rl, wheel_rr]:
-		if wheel: wheel.visible = true
-	
+
 	explosion_particles.emitting = false
 	burning_particles.emitting = false
 	burning_smoke_particles.emitting = false
 	sfx_fire_loop.stop()
-	
-	# Physics reset
-	velocity = Vector3.ZERO
-	tumble_velocity = Vector3.ZERO
-	normal_accel_time = 0.0 # Fix "slow" driving by resetting ramp-up
-	sync_steer = 0.0
-	visual_steer = 0.0
-	
-	# Respawn: 5m behind checkpoint, safely elevated for thick road (6.0m)
-	var spawn_pos = last_checkpoint_transform.origin + (last_checkpoint_transform.basis.z * 5.0) + Vector3(0, 6.0, 0)
 
+	linear_velocity = Vector3.ZERO
+	angular_velocity = Vector3.ZERO
+
+	var spawn_pos = last_checkpoint_transform.origin + (last_checkpoint_transform.basis.z * 5.0) + Vector3(0, 2.0, 0)
 	global_position = spawn_pos
-	
-	# Face the checkpoint (forward) - keep it level to avoid "pointing at ground" issues
+
 	var look_target = last_checkpoint_transform.origin
 	look_target.y = spawn_pos.y
 	look_at(look_target, Vector3.UP)
-	
-	# Re-enable engine sound
+
 	if not engine_sound.playing:
 		engine_sound.play()
-	if engine_sound.stream is AudioStreamGenerator:
-		playback = engine_sound.get_stream_playback()
-	
-	# Snap visuals and sync variables to prevent jitter/floating
-	visuals.global_transform = global_transform
-	sync_position = global_position
-	sync_rotation = rotation
-	sync_velocity = Vector3.ZERO
-	is_shielded = false # Remove shield on respawn
-	if is_local_player and race_ui:
-		race_ui.update_item("NONE")
 
-@rpc("authority", "call_local", "reliable")
+
 func give_item(type: int):
-	current_item = type as ItemType
+	current_item = type
 	if is_local_player and race_ui:
 		var item_name = ItemType.keys()[type]
-		race_ui.show_message("Gained " + item_name, 2.0)
 		race_ui.update_item(item_name)
 
-func _get_random_item_rpc():
-	# Server only
-	# 1: BOOST, 2: MISSILE, 3: GUIDED_MISSILE, 4: SHIELD, 5: SHOCKWAVE, 6: BOMB
-	# WEIGHTING: Boost is 3x more common than other items
-	var items = [1, 1, 1, 2, 3, 4, 5, 6]
+
+func _get_random_item_rpc() -> int:
+	# Randomly pick from available items (excluding NONE)
+	var items = [ItemType.BOOST, ItemType.MISSILE, ItemType.SHIELD, ItemType.SHOCKWAVE, ItemType.BOMB]
 	return items[randi() % items.size()]
 
-func _use_item():
-	if current_item == ItemType.NONE: return
-	
-	match current_item:
-		ItemType.BOOST:
-			boost_timer = 2.5
-			sfx_nitro_start.play()
-			frame_bump_vel += 2.0
-		ItemType.MISSILE:
-			_fire_missile.rpc_id(1, false)
-		ItemType.GUIDED_MISSILE:
-			_fire_missile.rpc_id(1, true)
-		ItemType.SHIELD:
-			_activate_shield()
-		ItemType.SHOCKWAVE:
-			_trigger_shockwave.rpc_id(1)
-		ItemType.BOMB:
-			_drop_bomb.rpc_id(1)
-			
-	current_item = ItemType.NONE
-	if is_local_player and race_ui:
-		race_ui.update_item("NONE")
 
-func _activate_shield():
-	is_shielded = true
-	shield_timer = 10.0 # Lasts 10 seconds
-	# Visual feedback for shield
-	if is_local_player:
-		race_ui.show_message("SHIELD ON", 2.0)
-
-func on_hit():
-	if is_exploding: return
-	
-	if is_shielded:
-		is_shielded = false
-		if is_local_player:
-			race_ui.show_message("SHIELD BROKEN", 2.0)
-		return
-		
-	# Hits from items are like overheats, they explode the car
-	explode()
-
-@rpc("any_peer", "call_local", "reliable")
-func _fire_missile(guided: bool = false):
-	if not multiplayer.is_server(): return
-	var missile = MISSILE_SCENE.instantiate()
-	missile.owner_id = name.to_int()
-	missile.is_guided = guided
-	# Spawn in front of the cart
-	missile.global_transform = global_transform.translated(Vector3(0, 0.5, -2.0))
-	# Level parent structure: Level/Players/Cart
-	get_parent().get_parent().add_child(missile, true)
-
-@rpc("any_peer", "call_local", "reliable")
-func _drop_bomb():
-	if not multiplayer.is_server(): return
-	var bomb = BOMB_SCENE.instantiate()
-	bomb.owner_id = name.to_int()
-	# Spawn behind the cart
-	bomb.global_transform = global_transform.translated(Vector3(0, 0.5, 2.0))
-	get_parent().get_parent().add_child(bomb, true)
-
-@rpc("any_peer", "call_local", "reliable")
-func _trigger_shockwave():
-	if not multiplayer.is_server(): return
-	# Push away other players in radius
-	var radius = 10.0
-	var push_force = 20.0
-	var players = get_tree().get_nodes_in_group("player_carts")
-	for p in players:
-		if p == self: continue
-		var dist = global_position.distance_to(p.global_position)
-		if dist < radius:
-			var dir = (p.global_position - global_position).normalized()
-			dir.y = 0.5 # Upward lift
-			# Trigger push on that player (maybe via RPC)
-			p.apply_shockwave_force.rpc(dir * push_force)
-
-	# Trigger visual for everyone
-	_show_shockwave_visual.rpc()
-
-@rpc("authority", "call_local", "reliable")
-func _show_shockwave_visual():
-	if not shockwave_visual: return
-	shockwave_visual.visible = true
-	shockwave_visual.scale = Vector3.ZERO
-	# Reset transparency (need to access material since it's a sub-resource or just use transparency property if Godot 4.x)
-	# In Godot 4, transparency is a property of GeometryInstance3D
-	shockwave_visual.transparency = 0.5
-	
-	var tw = create_tween()
-	tw.set_parallel(true)
-	tw.set_trans(Tween.TRANS_QUAD)
-	tw.set_ease(Tween.EASE_OUT)
-	tw.tween_property(shockwave_visual, "scale", Vector3(10.0, 10.0, 10.0), 0.4)
-	tw.tween_property(shockwave_visual, "transparency", 1.0, 0.4)
-	
-	tw.chain().tween_callback(func(): shockwave_visual.visible = false)
-
-@rpc("authority", "call_local", "reliable")
-func apply_shockwave_force(force: Vector3):
-	velocity += force
-	frame_bump_vel += 2.0 # Impact feel
-
-func _spawn_wheel_debris(wheel_node: Node3D):
-	if not wheel_node: return
-	
-	# Hide the original wheel on the cart
-	wheel_node.visible = false
-	
-	# Create a new RigidBody3D for the debris
-	var debris = RigidBody3D.new()
-	debris.global_transform = wheel_node.global_transform
-	
-	# Add a collision shape (approximate wheel size)
-	var collision = CollisionShape3D.new()
-	var shape = SphereShape3D.new()
-	shape.radius = 0.25
-	collision.shape = shape
-	debris.add_child(collision)
-	
-	# Clone the mesh from the original wheel glb
-	# The wheel mesh is usually a child of the wheel_node (which is the WheelPivot)
-	# WheelFL -> wheel (instance of wheel.glb)
-	var mesh_node = wheel_node.get_child(0)
-	if mesh_node and mesh_node is MeshInstance3D:
-		var mesh_clone = mesh_node.duplicate()
-		# Apply a simple double‑sided material to the debris wheel
-		var side_mat = StandardMaterial3D.new()
-		side_mat.albedo_color = Color(0.8, 0.8, 0.8)
-		side_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-		mesh_clone.material_override = side_mat
-		debris.add_child(mesh_clone)
-		# Reset internal transform since debris root is at global_transform
-		mesh_clone.position = Vector3.ZERO
-		mesh_clone.rotation = Vector3.ZERO
-	else:
-		# Fallback: just duplicate whatever is there
-		var mesh_clone = mesh_node.duplicate()
-		debris.add_child(mesh_clone)
-		mesh_clone.position = Vector3.ZERO
-		mesh_clone.rotation = Vector3.ZERO
-
-	
-	# Add to scene tree (Level root)
-	get_parent().get_parent().add_child(debris)
-	
-	# Toss it away from the car
-	var impulse_dir = (debris.global_position - global_position).normalized()
-	impulse_dir.y += 0.5 # Add some upward lift
-	debris.apply_central_impulse(impulse_dir * randf_range(5.0, 10.0))
-	debris.apply_torque_impulse(Vector3(randf(), randf(), randf()) * 2.0)
-	
-	# Optional: Clean up debris after 10 seconds
-	get_tree().create_timer(10.0).timeout.connect(func(): debris.queue_free())
+var respawn_timer: float = 0.0

@@ -11,6 +11,11 @@ extends CanvasLayer
 @onready var label_msg = $HUDPanel/LabelMessage
 @onready var label_speed = $HUDPanel/LabelSpeed
 @onready var label_item = $HUDPanel/LabelItem
+@onready var underwater_overlay = $UnderwaterOverlay
+
+func set_underwater(is_underwater: bool):
+	if underwater_overlay:
+		underwater_overlay.visible = is_underwater
 
 @onready var end_panel = $EndPanel
 @onready var end_timer_label = $EndPanel/VBoxContainer/LabelTimer

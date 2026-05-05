@@ -27,27 +27,32 @@ var player_stats = {} # id -> {"laps": 0, "next_checkpoint_idx": 0, "finished": 
 var end_timer = 0.0
 
 func _ready():
+	# @tool makes _ready() run in the editor too; skip all game/multiplayer
+	# setup in that context — editor tools use the export-var setters instead.
+	if Engine.is_editor_hint():
+		return
+
 	add_to_group("level")
 	player_spawner.spawn_function = _spawn_custom
 	race_ui = RACE_UI_SCENE.instantiate()
 	add_child(race_ui)
-	
+
 	_setup_checkpoints()
 	_spawn_item_boxes()
-	
+
 	if multiplayer.is_server():
 		NetworkManager.player_connected.connect(_on_server_player_connected)
 		NetworkManager.player_disconnected.connect(_on_server_player_disconnected)
-		
+
 		# Spawn existing players (host first)
 		for id in NetworkManager.players:
 			var info = NetworkManager.players[id]
 			_add_player(id, info["name"])
-			
+
 	NetworkManager.player_ready_changed.connect(_on_player_ready_changed)
 	NetworkManager.player_connected.connect(_on_player_list_changed)
 	NetworkManager.player_disconnected.connect(_on_player_list_changed)
-	
+
 	race_ui.update_lobby(NetworkManager.players)
 	race_ui.ready_pressed.connect(_on_local_ready_pressed)
 	race_ui.start_pressed.connect(_on_host_start_pressed)
@@ -62,7 +67,7 @@ func _setup_checkpoints():
 				if child is Area3D:
 					container_cps.append(child)
 			checkpoints.append_array(container_cps)
-			
+
 		# ALWAYS append the FinishLine as the absolute final checkpoint of the lap
 		var fl = get_node_or_null("FinishLine")
 		if fl and not checkpoints.has(fl):
@@ -71,7 +76,7 @@ func _setup_checkpoints():
 			# Fallback for old scenes
 			var hw = get_node_or_null("Halfway")
 			if hw: checkpoints.append(hw)
-	
+
 	if multiplayer.is_server():
 		for i in range(checkpoints.size()):
 			var cp = checkpoints[i]
@@ -83,16 +88,16 @@ func _on_checkpoint_entered(body: Node3D, cp_idx: int):
 	if id > 0 and player_stats.has(id):
 		var stats = player_stats[id]
 		if stats["finished"]: return
-		
+
 		# Players must hit checkpoints in order
 		if cp_idx == stats["next_checkpoint_idx"]:
 			# Progress to next checkpoint
 			stats["next_checkpoint_idx"] += 1
-			
+
 			# Inform the player cart of its last passed checkpoint for respawn purposes
 			var cp = checkpoints[cp_idx]
 			_sync_checkpoint_to_player.rpc_id(id, cp.global_transform)
-			
+
 			# If they hit the last checkpoint (Finish Line), complete a lap
 			if stats["next_checkpoint_idx"] >= checkpoints.size():
 				stats["laps"] += 1
@@ -104,7 +109,7 @@ func _check_finish(id: int):
 	if stats["laps"] >= NetworkManager.max_laps and not stats["finished"]:
 		stats["finished"] = true
 		show_player_finished_rpc.rpc_id(id)
-		
+
 		# Start 30s timer if this is the first finisher
 		if end_timer <= 0.0:
 			end_timer = 30.0
@@ -148,18 +153,18 @@ func _spawn_custom(data: Variant) -> Node:
 	cart.name = str(data["id"])
 	cart.player_name = data["name"]
 	cart.global_transform = data["transform"]
-	
+
 	# If race is already started (e.g. late join), enable movement if local
 	if race_state == RaceState.RACING:
 		cart.can_move = true
-		
+
 	return cart
 
 func _add_player(id: int, p_name: String):
 	if not player_stats.has(id):
 		var idx = player_stats.size() % spawn_points.size()
 		player_stats[id] = {"laps": 0, "next_checkpoint_idx": 0, "finished": false, "pos": 0}
-		
+
 		# ALIGN SPAWN TO TRACK:
 		# Calculate the orientation based on the track curve
 		var spawn_transform = spawn_points[idx].global_transform
@@ -168,25 +173,25 @@ func _add_player(id: int, p_name: String):
 			var pos = spawn_transform.origin
 			var offset = curve.get_closest_offset(pos)
 			var curve_pos = curve.sample_baked(offset)
-			
+
 			# Find tangent at this point
 			var next_offset = min(offset + 0.5, curve.get_baked_length())
 			var tangent = (curve.sample_baked(next_offset) - curve_pos).normalized()
 			if tangent.length() < 0.01:
 				tangent = Vector3.BACK # Fallback
-				
+
 			var up = Vector3.UP
 			var right = tangent.cross(up).normalized()
 			# Re-calculate UP to be perfectly orthogonal to tangent and right
 			up = right.cross(tangent).normalized()
-			
+
 			# Create a new basis facing along the tangent
 			# forward = -z in Godot
 			spawn_transform.basis = Basis(right, up, -tangent)
-			
-			# LIFT SLIGHTLY: Prevent spawning stuck in road (y_offset=0.15 for road)
-			spawn_transform.origin.y += 0.2
-		
+
+			# LIFT SLIGHTLY: Prevent spawning stuck in road
+			spawn_transform.origin.y += 1.5
+
 		var data = {
 			"id": id,
 			"name": p_name,
@@ -208,7 +213,7 @@ func start_race():
 	race_state = RaceState.RACING
 	race_ui.show_hud()
 	race_ui.show_message("GO!", 2.0)
-	
+
 	MusicManager.play_race_music()
 	get_tree().call_group("player_carts", "on_race_started")
 
@@ -216,7 +221,7 @@ func _process(delta):
 	if multiplayer.is_server():
 		if race_state == RaceState.RACING:
 			_update_positions()
-			
+
 			if end_timer > 0.0:
 				end_timer -= delta
 				update_timer_rpc.rpc(int(end_timer))
@@ -229,7 +234,7 @@ func _update_positions():
 		var cart = players_container.get_node_or_null(str(id))
 		if cart == null: continue
 		var pinfo = player_stats[id]
-		
+
 		# If they finished, give them a massive score boost so they stay top
 		var score = 0.0
 		if pinfo["finished"]:
@@ -239,16 +244,16 @@ func _update_positions():
 			var next_idx = pinfo["next_checkpoint_idx"]
 			if not checkpoints.is_empty():
 				dist = cart.global_position.distance_to(checkpoints[next_idx].global_position)
-			
+
 			# Score = Laps * 100000 + CheckpointIndex * 10000 - distance
 			score = pinfo["laps"] * 100000.0
 			score += next_idx * 1000.0
 			score -= dist
-		
+
 		ranking.append({"id": id, "score": score, "laps": pinfo["laps"], "finished": pinfo["finished"]})
-		
+
 	ranking.sort_custom(func(a, b): return a["score"] > b["score"])
-	
+
 	for i in range(ranking.size()):
 		var id = ranking[i]["id"]
 		var pos = i + 1
@@ -257,7 +262,7 @@ func _update_positions():
 			player_stats[id]["pos"] = pos
 		else:
 			pos = player_stats[id]["pos"]
-			
+
 		var l = ranking[i]["laps"]
 		update_hud_rpc.rpc_id(id, pos, ranking.size(), mini(l + 1, NetworkManager.max_laps), NetworkManager.max_laps)
 
@@ -292,13 +297,13 @@ func _spawn_item_boxes():
 		var step = 150.0 # Standard spacing
 		# If the track is small, reduce step
 		if length < 500: step = 50.0
-		
+
 		for d in range(0, int(length), int(step)):
 			# MUST use global position!
 			var local_pos = curve.sample_baked(d)
 			var global_pos = track_path.to_global(local_pos)
 			global_pos.y += 1.0 # Float above road
-			
+
 			var box = ITEM_BOX_SCENE.instantiate()
 			add_child(box) # Add first to set global_transform correctly
 			box.global_position = global_pos
@@ -313,23 +318,23 @@ func _rebuild_checkpoints():
 	if not track_path: return
 	var cp_container = get_node_or_null("Checkpoints")
 	if not cp_container: return
-	
+
 	var curve = track_path.curve
 	var length = curve.get_baked_length()
 	var children = cp_container.get_children()
 	if children.is_empty(): return
-	
+
 	for i in range(children.size()):
 		var child = children[i]
 		if child is Node3D:
 			var offset = (float(i) / children.size()) * length
 			var pos = curve.sample_baked(offset)
 			child.global_position = track_path.to_global(pos)
-			
+
 			# Orient to track
 			var next_offset = min(offset + 1.0, length)
 			var tangent = (curve.sample_baked(next_offset) - pos).normalized()
 			if tangent.length() > 0.01:
 				child.look_at(child.global_position + tangent, Vector3.UP)
-	
+
 	print("Checkpoints redistributed along track!")

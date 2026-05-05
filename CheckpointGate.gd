@@ -6,7 +6,7 @@ extends Area3D
 		if is_inside_tree():
 			_update_visuals()
 
-@onready var top_bar = $VisualGate/TopBar
+@onready var top_bar = find_child("TopBar", true, false)
 
 func _ready():
 	_update_visuals()
@@ -20,4 +20,4 @@ func _update_visuals():
 			mat.emission_enabled = true
 			mat.emission = gate_color
 			mat.emission_energy_multiplier = 0.5
-		top_bar.material = mat
+		top_bar.material_override = mat

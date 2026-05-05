@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://cart123"]
 
 [ext_resource type="Script" uid="uid://cgxoltdv3a2ap" path="res://PlayerCart.gd" id="1_cscript"]
-[ext_resource type="PackedScene" uid="uid://b2todmhcp14i1" path="res://models/cart.glb" id="2_cart"]
+[ext_resource type="PackedScene" uid="uid://car_fbx_new" path="res://models/cars/20260505221030_500312d9.fbx" id="2_cart"]
 [ext_resource type="PackedScene" uid="uid://cedxbolyht6sf" path="res://models/wheel.glb" id="3_wheel"]
 [ext_resource type="AudioStream" uid="uid://bblp15g61n0br" path="res://sounds/404333__strexet__nitro-activation.mp3" id="4_nitro"]
 [ext_resource type="AudioStream" uid="uid://dq2xlrtwb6vl0" path="res://sounds/774270__thelittlecrow__rocket-launch-boost-and-burning-version-b.wav" id="5_rocket"]
@@ -13,9 +13,6 @@
 [ext_resource type="AudioStream" uid="uid://c5oedqihaf3kp" path="res://sounds/dragon-studio-winter-wind-402331.mp3" id="11_wind"]
 [ext_resource type="AudioStream" uid="uid://c6guv3kt5kkdb" path="res://sounds/freesound_community-bonk-46000.mp3" id="12_bonk"]
 [ext_resource type="AudioStream" uid="uid://ey8gigy86g5l" path="res://sounds/sound-of-breaks-squeaking-of-vehicle-hd-267282.mp3" id="13_brake"]
-
-[sub_resource type="SphereShape3D" id="SphereShape3D_cart"]
-radius = 0.7
 
 [sub_resource type="Curve" id="Curve_boost"]
 _data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
@@ -52,9 +49,6 @@ albedo_color = Color(1, 0.4, 0.1, 0.8)
 albedo_texture = SubResource("GradientTexture2D_soft")
 billboard_mode = 3
 billboard_keep_scale = true
-particles_anim_h_frames = 1
-particles_anim_v_frames = 1
-particles_anim_loop = false
 
 [sub_resource type="QuadMesh" id="QuadMesh_flame"]
 material = SubResource("StandardMaterial3D_flame")
@@ -100,10 +94,6 @@ scale_max = 2.0
 scale_curve = SubResource("CurveTexture_expl")
 color = Color(1, 0.5, 0.1, 1)
 
-[sub_resource type="QuadMesh" id="QuadMesh_expl"]
-material = SubResource("StandardMaterial3D_flame")
-size = Vector2(1.5, 1.5)
-
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_burning"]
 emission_shape = 1
 emission_sphere_radius = 0.3
@@ -138,16 +128,41 @@ albedo_color = Color(0.1, 0.1, 0.1, 0.6)
 albedo_texture = SubResource("GradientTexture2D_soft")
 billboard_mode = 3
 billboard_keep_scale = true
-particles_anim_h_frames = 1
-particles_anim_v_frames = 1
-particles_anim_loop = false
 
 [sub_resource type="QuadMesh" id="QuadMesh_smoke"]
 material = SubResource("StandardMaterial3D_smoke")
 size = Vector2(0.5, 0.5)
 
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_splash"]
+emission_shape = 1
+emission_sphere_radius = 0.8
+direction = Vector3(0, 1, 0)
+spread = 45.0
+initial_velocity_min = 4.0
+initial_velocity_max = 8.0
+gravity = Vector3(0, -15, 0)
+scale_min = 0.2
+scale_max = 0.6
+scale_curve = SubResource("CurveTexture_expl")
+color = Color(0.7, 0.85, 1, 0.8)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_splash"]
+transparency = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = SubResource("GradientTexture2D_soft")
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_splash"]
+material = SubResource("StandardMaterial3D_splash")
+size = Vector2(0.6, 0.6)
+
 [sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_engine"]
 buffer_length = 0.1
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_cart"]
+size = Vector3(1, 0.5, 1.8)
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_sync"]
 properties/0/path = NodePath(".:sync_position")
@@ -178,17 +193,80 @@ properties/8/path = NodePath(".:current_item")
 properties/8/spawn = true
 properties/8/replication_mode = 1
 
-[node name="PlayerCart" type="CharacterBody3D" unique_id=1637232811]
+[node name="PlayerCart" type="VehicleBody3D" unique_id=1637232811]
 script = ExtResource("1_cscript")
+mass = 600.0
+center_of_mass_mode = 1
+center_of_mass = Vector3(0, -0.2, 0)
+physics_material_override = null
+state_lock_callback = null
+state_lock_value = 0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=654514439]
-shape = SubResource("SphereShape3D_cart")
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
+shape = SubResource("BoxShape3D_cart")
+
+[node name="WheelFL" type="VehicleWheel3D" parent="." unique_id=100]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.44, 0.0, -0.65)
+suspension_stiffness = 20.0
+suspension_max_force = 8000.0
+damping_compression = 1.5
+damping_relaxation = 2.0
+wheel_radius = 0.4
+suspension_rest_length = 0.15
+friction_slip = 2.0
+roll_influence = 0.0
+use_as_steering = true
+use_as_traction = true
+use_as_brake = false
+
+[node name="WheelFR" type="VehicleWheel3D" parent="." unique_id=101]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.44, 0.0, -0.65)
+suspension_stiffness = 20.0
+suspension_max_force = 8000.0
+damping_compression = 1.5
+damping_relaxation = 2.0
+wheel_radius = 0.4
+suspension_rest_length = 0.15
+friction_slip = 2.0
+roll_influence = 0.0
+use_as_steering = true
+use_as_traction = true
+use_as_brake = false
+
+[node name="WheelRL" type="VehicleWheel3D" parent="." unique_id=102]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.44, 0.0, 0.45)
+suspension_stiffness = 20.0
+suspension_max_force = 8000.0
+damping_compression = 1.5
+damping_relaxation = 2.0
+wheel_radius = 0.4
+suspension_rest_length = 0.15
+friction_slip = 2.0
+roll_influence = 0.0
+use_as_steering = false
+use_as_traction = true
+use_as_brake = true
+
+[node name="WheelRR" type="VehicleWheel3D" parent="." unique_id=103]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.44, 0.0, 0.45)
+suspension_stiffness = 20.0
+suspension_max_force = 8000.0
+damping_compression = 1.5
+damping_relaxation = 2.0
+wheel_radius = 0.4
+suspension_rest_length = 0.15
+friction_slip = 2.0
+roll_influence = 0.0
+use_as_steering = false
+use_as_traction = true
+use_as_brake = true
 
 [node name="Visuals" type="Node3D" parent="." unique_id=1001732157]
 top_level = true
 
 [node name="CartModel" parent="Visuals" unique_id=768104268 instance=ExtResource("2_cart")]
-transform = Transform3D(-6.1192225e-08, -0.015417921, -1.3999149, -6.7393785e-10, 1.3999149, -0.015417921, 1.3999997, 2.990315e-17, -6.1195934e-08, 0, -0.11234987, 0)
+transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, 0, 0, 0)
 
 [node name="BoostParticles" type="GPUParticles3D" parent="Visuals" unique_id=457637679]
 transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0.6, 1.1)
@@ -213,7 +291,7 @@ lifetime = 1.2
 one_shot = true
 explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_expl")
-draw_pass_1 = SubResource("QuadMesh_expl")
+draw_pass_1 = SubResource("QuadMesh_flame")
 
 [node name="BurningParticles" type="GPUParticles3D" parent="Visuals" unique_id=2035370128]
 emitting = false
@@ -229,25 +307,38 @@ lifetime = 2.0
 process_material = SubResource("ParticleProcessMaterial_smoke")
 draw_pass_1 = SubResource("QuadMesh_smoke")
 
+[node name="SplashParticles" type="GPUParticles3D" parent="Visuals"]
+emitting = false
+amount = 80
+lifetime = 1.0
+one_shot = true
+explosiveness = 0.9
+process_material = SubResource("ParticleProcessMaterial_splash")
+draw_pass_1 = SubResource("QuadMesh_splash")
+
 [node name="WheelPivotFL" type="Node3D" parent="Visuals" unique_id=40001]
+visible = false
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.44312996, -0.021691, -0.64313036)
 
 [node name="WheelFL" parent="Visuals/WheelPivotFL" unique_id=471895820 instance=ExtResource("3_wheel")]
 transform = Transform3D(-1.7484556e-08, 0, 0.4, 0, 0.4, 0, -0.4, 0, -1.7484556e-08, 0, -0.228309, 0)
 
 [node name="WheelPivotFR" type="Node3D" parent="Visuals" unique_id=40002]
+visible = false
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4259705, -0.021691, -0.68688697)
 
 [node name="WheelFR" parent="Visuals/WheelPivotFR" unique_id=292410534 instance=ExtResource("3_wheel")]
 transform = Transform3D(-1.7484556e-08, 0, -0.4, 0, 0.4, 0, 0.4, 0, -1.7484556e-08, 0, -0.228309, 0)
 
 [node name="WheelPivotRL" type="Node3D" parent="Visuals" unique_id=40003]
+visible = false
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45103335, -0.021691, 0.41018802)
 
 [node name="WheelRL" parent="Visuals/WheelPivotRL" unique_id=1288615826 instance=ExtResource("3_wheel")]
 transform = Transform3D(-1.7484556e-08, 0, 0.4, 0, 0.4, 0, -0.4, 0, -1.7484556e-08, 0, -0.228309, 0)
 
 [node name="WheelPivotRR" type="Node3D" parent="Visuals" unique_id=40004]
+visible = false
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.433761, -0.021691, 0.4703167)
 
 [node name="WheelRR" parent="Visuals/WheelPivotRR" unique_id=1528504604 instance=ExtResource("3_wheel")]
@@ -281,7 +372,7 @@ stream = ExtResource("5_rocket")
 volume_db = 5.0
 unit_size = 20.0
 
-[node name="SFX_ReleasePop" type="AudioStreamPlayer3D" parent="Visuals" unique_id=1004046228]
+[node name="SFX_ReleasePop" type="AudioStreamPlayer3D" parent="Visuals" unique_id=100404628]
 stream = ExtResource("6_release")
 volume_db = 3.0
 unit_size = 20.0
