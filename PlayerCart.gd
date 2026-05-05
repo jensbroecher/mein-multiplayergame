@@ -70,6 +70,7 @@ var is_drifting: bool = false
 var wheel_rotation: float = 0.0
 var is_teleporting: bool = false
 var is_shielded: bool = false
+var wheel_pivots: Dictionary = {}
 
 var is_underwater: bool = false
 const WATER_LEVEL = -10.0
@@ -113,7 +114,10 @@ func _ready():
 		playback = engine_sound.get_stream_playback()
 		if not engine_sound.playing:
 			engine_sound.play()
-
+	
+	# Setup new car wheels
+	_setup_new_car_wheels()
+	
 	if is_local_player:
 		camera.current = true
 		camera_pivot.top_level = true
@@ -242,9 +246,17 @@ func _physics_process(delta):
 		boost_time += delta
 
 	elif input_dir.y > 0.1:
-		# Brake/reverse
-		engine_force = 0.0
-		brake = BRAKE_FORCE
+		# Brake or Reverse
+		var forward_speed = -linear_velocity.dot(global_transform.basis.z)
+		if forward_speed > 0.5:
+			# Still moving forward: Brake
+			engine_force = 0.0
+			brake = BRAKE_FORCE * input_dir.y
+		else:
+			# Stopped or already moving back: Reverse
+			brake = 0.0
+			engine_force = ENGINE_FORCE * 0.5 * input_dir.y # Positive force for reverse in this setup
+		
 		boost_time = 0.0
 
 		# Handbrake drift
@@ -317,18 +329,59 @@ func _fill_audio_buffer():
 
 
 func _update_wheel_visuals(delta):
-	# Steering visuals
-	$Visuals/WheelPivotFL.rotation.y = steering
-	$Visuals/WheelPivotFR.rotation.y = steering
-
-	# Rotation visuals (spinning wheels)
+	# Update average RPM for spinning
 	var avg_rpm = ($WheelFL.get_rpm() + $WheelFR.get_rpm() + $WheelRL.get_rpm() + $WheelRR.get_rpm()) / 4.0
 	wheel_rotation -= (avg_rpm / 60.0) * TAU * delta
+
+	if not wheel_pivots.is_empty():
+		# Steering visuals for front wheels
+		if wheel_pivots.has("FL"): wheel_pivots["FL"].rotation.y = steering
+		if wheel_pivots.has("FR"): wheel_pivots["FR"].rotation.y = steering
+		
+		# Rotation visuals for all wheels
+		for key in wheel_pivots:
+			wheel_pivots[key].rotation.x = wheel_rotation
+	else:
+		# Fallback to old pivots if they exist and are visible
+		if $Visuals/WheelPivotFL.visible:
+			$Visuals/WheelPivotFL.rotation.y = steering
+			$Visuals/WheelPivotFR.rotation.y = steering
+			$Visuals/WheelPivotFL/WheelFL.rotation.x = wheel_rotation
+			$Visuals/WheelPivotFR/WheelFR.rotation.x = wheel_rotation
+			$Visuals/WheelPivotRL/WheelRL.rotation.x = wheel_rotation
+			$Visuals/WheelPivotRR/WheelRR.rotation.x = wheel_rotation
+
+
+func _setup_new_car_wheels():
+	var wheels_config = {
+		"FL": "CartModel/part_5",
+		"FR": "CartModel/part_2",
+		"RL": "CartModel/part_6",
+		"RR": "CartModel/part_0"
+	}
 	
-	$Visuals/WheelPivotFL/WheelFL.rotation.x = wheel_rotation
-	$Visuals/WheelPivotFR/WheelFR.rotation.x = wheel_rotation
-	$Visuals/WheelPivotRL/WheelRL.rotation.x = wheel_rotation
-	$Visuals/WheelPivotRR/WheelRR.rotation.x = wheel_rotation
+	for key in wheels_config:
+		var path = wheels_config[key]
+		var node = get_node_or_null("Visuals/" + path)
+		if node and node is MeshInstance3D:
+			# Create a pivot at the wheel's geometric center
+			var aabb = node.get_mesh().get_aabb()
+			var center = aabb.get_center()
+			
+			var pivot = Node3D.new()
+			pivot.name = "Pivot" + key
+			node.get_parent().add_child(pivot)
+			
+			# Position pivot at the wheel center (relative to parent)
+			pivot.transform = node.transform
+			pivot.translate(center)
+			
+			# Reparent wheel to pivot and center it
+			node.reparent(pivot, false)
+			node.transform = Transform3D.IDENTITY
+			node.translate(-center)
+			
+			wheel_pivots[key] = pivot
 
 
 func _apply_water_drag():

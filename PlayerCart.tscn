@@ -208,10 +208,10 @@ shape = SubResource("BoxShape3D_cart")
 
 [node name="WheelFL" type="VehicleWheel3D" parent="." unique_id=100]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.44, 0.0, -0.65)
-suspension_stiffness = 20.0
+suspension_stiffness = 15.0
 suspension_max_force = 8000.0
-damping_compression = 1.5
-damping_relaxation = 2.0
+damping_compression = 2.0
+damping_relaxation = 3.0
 wheel_radius = 0.4
 suspension_rest_length = 0.15
 friction_slip = 2.0
@@ -222,10 +222,10 @@ use_as_brake = false
 
 [node name="WheelFR" type="VehicleWheel3D" parent="." unique_id=101]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.44, 0.0, -0.65)
-suspension_stiffness = 20.0
+suspension_stiffness = 15.0
 suspension_max_force = 8000.0
-damping_compression = 1.5
-damping_relaxation = 2.0
+damping_compression = 2.0
+damping_relaxation = 3.0
 wheel_radius = 0.4
 suspension_rest_length = 0.15
 friction_slip = 2.0
@@ -236,10 +236,10 @@ use_as_brake = false
 
 [node name="WheelRL" type="VehicleWheel3D" parent="." unique_id=102]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.44, 0.0, 0.45)
-suspension_stiffness = 20.0
+suspension_stiffness = 15.0
 suspension_max_force = 8000.0
-damping_compression = 1.5
-damping_relaxation = 2.0
+damping_compression = 2.0
+damping_relaxation = 3.0
 wheel_radius = 0.4
 suspension_rest_length = 0.15
 friction_slip = 2.0
@@ -250,10 +250,10 @@ use_as_brake = true
 
 [node name="WheelRR" type="VehicleWheel3D" parent="." unique_id=103]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.44, 0.0, 0.45)
-suspension_stiffness = 20.0
+suspension_stiffness = 15.0
 suspension_max_force = 8000.0
-damping_compression = 1.5
-damping_relaxation = 2.0
+damping_compression = 2.0
+damping_relaxation = 3.0
 wheel_radius = 0.4
 suspension_rest_length = 0.15
 friction_slip = 2.0
@@ -266,7 +266,7 @@ use_as_brake = true
 top_level = true
 
 [node name="CartModel" parent="Visuals" unique_id=768104268 instance=ExtResource("2_cart")]
-transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, 0, 0, 0)
+transform = Transform3D(-2, 0, -1.74846e-07, 0, 2, 0, 1.74846e-07, 0, -2, 0, 0, 0)
 
 [node name="BoostParticles" type="GPUParticles3D" parent="Visuals" unique_id=457637679]
 transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0.6, 1.1)
