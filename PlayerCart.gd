@@ -145,8 +145,8 @@ func _process(delta):
 	if not is_local_player:
 		return
 
-	# Smooth visual follow
-	visuals.global_transform = visuals.global_transform.interpolate_with(global_transform, 15.0 * delta)
+	# Direct visual follow (no lag)
+	visuals.global_transform = global_transform
 
 	# Camera follows vehicle
 	var cam_dist = lerp(3.5, 6.0, clamp(boost_time / 4.0, 0.0, 1.0))

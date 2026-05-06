@@ -162,7 +162,7 @@ size = Vector2(0.6, 0.6)
 buffer_length = 0.1
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_cart"]
-size = Vector3(1, 0.5, 1.8)
+size = Vector3(1.4, 0.6, 2.5)
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_sync"]
 properties/0/path = NodePath(".:sync_position")
@@ -195,9 +195,9 @@ properties/8/replication_mode = 1
 
 [node name="PlayerCart" type="VehicleBody3D" unique_id=1637232811]
 script = ExtResource("1_cscript")
-mass = 600.0
+mass = 1200.0
 center_of_mass_mode = 1
-center_of_mass = Vector3(0, -0.2, 0)
+center_of_mass = Vector3(0, -0.6, 0)
 physics_material_override = null
 state_lock_callback = null
 state_lock_value = 0
@@ -207,13 +207,13 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
 shape = SubResource("BoxShape3D_cart")
 
 [node name="WheelFL" type="VehicleWheel3D" parent="." unique_id=100]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.44, 0.0, -0.65)
-suspension_stiffness = 15.0
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8, 0.0, -1.2)
+suspension_stiffness = 30.0
 suspension_max_force = 8000.0
-damping_compression = 2.0
-damping_relaxation = 3.0
+damping_compression = 3.0
+damping_relaxation = 4.0
 wheel_radius = 0.4
-suspension_rest_length = 0.15
+suspension_rest_length = 0.05
 friction_slip = 2.0
 roll_influence = 0.0
 use_as_steering = true
@@ -221,13 +221,13 @@ use_as_traction = true
 use_as_brake = false
 
 [node name="WheelFR" type="VehicleWheel3D" parent="." unique_id=101]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.44, 0.0, -0.65)
-suspension_stiffness = 15.0
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 0.0, -1.2)
+suspension_stiffness = 30.0
 suspension_max_force = 8000.0
-damping_compression = 2.0
-damping_relaxation = 3.0
+damping_compression = 3.0
+damping_relaxation = 4.0
 wheel_radius = 0.4
-suspension_rest_length = 0.15
+suspension_rest_length = 0.05
 friction_slip = 2.0
 roll_influence = 0.0
 use_as_steering = true
@@ -235,13 +235,13 @@ use_as_traction = true
 use_as_brake = false
 
 [node name="WheelRL" type="VehicleWheel3D" parent="." unique_id=102]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.44, 0.0, 0.45)
-suspension_stiffness = 15.0
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8, 0.0, 1.0)
+suspension_stiffness = 30.0
 suspension_max_force = 8000.0
-damping_compression = 2.0
-damping_relaxation = 3.0
+damping_compression = 3.0
+damping_relaxation = 4.0
 wheel_radius = 0.4
-suspension_rest_length = 0.15
+suspension_rest_length = 0.05
 friction_slip = 2.0
 roll_influence = 0.0
 use_as_steering = false
@@ -249,13 +249,13 @@ use_as_traction = true
 use_as_brake = true
 
 [node name="WheelRR" type="VehicleWheel3D" parent="." unique_id=103]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.44, 0.0, 0.45)
-suspension_stiffness = 15.0
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 0.0, 1.0)
+suspension_stiffness = 30.0
 suspension_max_force = 8000.0
-damping_compression = 2.0
-damping_relaxation = 3.0
+damping_compression = 3.0
+damping_relaxation = 4.0
 wheel_radius = 0.4
-suspension_rest_length = 0.15
+suspension_rest_length = 0.05
 friction_slip = 2.0
 roll_influence = 0.0
 use_as_steering = false
