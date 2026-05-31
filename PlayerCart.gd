@@ -76,6 +76,9 @@ var is_underwater: bool = false
 const WATER_LEVEL = -10.0
 var water_timer: float = 0.0
 
+# Remote interpolation tuning
+const REMOTE_LERP_SPEED: float = 18.0
+
 enum ItemType { NONE, BOOST, MISSILE, GUIDED_MISSILE, SHIELD, SHOCKWAVE, BOMB }
 var current_item = ItemType.NONE
 
@@ -85,6 +88,7 @@ var sync_position: Vector3
 var sync_rotation: Vector3
 var sync_velocity: Vector3
 var sync_steer: float = 0.0
+var sync_rotation_quat: Quaternion = Quaternion.IDENTITY
 
 var visual_steer: float = 0.0
 var was_on_floor: bool = false
@@ -139,36 +143,43 @@ func _update_authority():
 	if id > 0:
 		$MultiplayerSynchronizer.set_multiplayer_authority(id)
 	is_local_player = is_multiplayer_authority()
+	
+	if not is_local_player:
+		# Freeze remote bodies so they don't fight network state with local physics sim.
+		# We drive them purely via interpolation from sync data.
+		freeze = true
+		freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
 
 
 func _process(delta):
-	if not is_local_player:
-		return
+	if is_local_player:
+		# Direct visual follow for local player (no lag)
+		visuals.global_transform = global_transform
 
-	# Direct visual follow (no lag)
-	visuals.global_transform = global_transform
+		# Camera follows vehicle
+		var cam_dist = lerp(3.5, 6.0, clamp(boost_time / 4.0, 0.0, 1.0))
+		var cam_offset = Vector3(0, 1.5, cam_dist)
+		target_cam_pos = global_transform * cam_offset
+		camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 12.0 * delta)
+		camera_pivot.look_at(global_position, Vector3.UP)
 
-	# Camera follows vehicle
-	var cam_dist = lerp(3.5, 6.0, clamp(boost_time / 4.0, 0.0, 1.0))
-	var cam_offset = Vector3(0, 1.5, cam_dist)
-	target_cam_pos = global_transform * cam_offset
-	camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 12.0 * delta)
-	camera_pivot.look_at(global_position, Vector3.UP)
+		# Speedometer
+		if race_ui:
+			race_ui.update_speed(linear_velocity.length() * 1.8)
 
-	# Speedometer
-	if race_ui:
-		race_ui.update_speed(linear_velocity.length() * 1.8)
-
-	# Procedural engine sound
-	if engine_sound.stream is AudioStreamGenerator and engine_sound.playing:
-		_fill_audio_buffer()
+		# Procedural engine sound
+		if engine_sound.stream is AudioStreamGenerator and engine_sound.playing:
+			_fill_audio_buffer()
+	else:
+		# Remote players: smooth interpolation from network state
+		_interpolate_remote(delta)
 
 
 func _physics_process(delta):
 	if is_teleporting:
 		return
 
-	# Audio buffer
+	# Audio buffer (needed for both local and remote sometimes)
 	if engine_sound.stream is AudioStreamGenerator and playback:
 		_fill_audio_buffer()
 
@@ -176,10 +187,11 @@ func _physics_process(delta):
 	if global_position.y < -50:
 		respawn()
 
-	# Explosion physics
+	# Explosion physics (visual + some force even on remotes for consistency)
 	if is_exploding:
-		apply_central_force(Vector3.UP * 5.0)
-		apply_torque(Vector3(randf()-0.5, randf()-0.5, randf()-0.5) * 20.0)
+		if is_local_player:
+			apply_central_force(Vector3.UP * 5.0)
+			apply_torque(Vector3(randf()-0.5, randf()-0.5, randf()-0.5) * 20.0)
 
 		if sfx_fire_loop.playing:
 			sfx_fire_loop.volume_db = lerp(sfx_fire_loop.volume_db, -10.0, 2.0 * delta)
@@ -187,10 +199,11 @@ func _physics_process(delta):
 		burning_particles.global_position = global_position + Vector3(0, 0.5, 0)
 		burning_smoke_particles.global_position = global_position + Vector3(0, 0.5, 0)
 
-		_move_and_sync()
+		if is_local_player:
+			_move_and_sync()
 		return
 
-	# Water detection
+	# Water detection (everyone needs this for drowning/explode logic)
 	var currently_underwater = global_position.y < WATER_LEVEL
 	if currently_underwater != is_underwater:
 		if currently_underwater:
@@ -206,6 +219,15 @@ func _physics_process(delta):
 
 	_apply_water_buoyancy(delta)
 
+	# === REMOTE PLAYERS: driven by network interpolation in _process ===
+	# We skip all local input + vehicle physics simulation.
+	if not is_local_player:
+		if not can_move:
+			# Still decelerate a frozen remote if finished
+			linear_velocity = linear_velocity.lerp(Vector3.ZERO, 4.0 * delta)
+		return
+
+	# === LOCAL / AUTHORITY ONLY from here down ===
 	if not can_move:
 		brake = 1.0
 		_apply_finish_deceleration(delta)
@@ -293,14 +315,14 @@ func _physics_process(delta):
 		if sfx_wind_loop.volume_db < -35.0:
 			sfx_wind_loop.stop()
 
-	# Update sync vars
+	# Update sync vars (authority only)
 	sync_steer = move_toward(sync_steer, _steer_input, 10.0 * delta)
 	steering = sync_steer
 
-	# Visual wheel rotation
+	# Visual wheel rotation (physics-driven for local)
 	_update_wheel_visuals(delta)
 
-	# Sync position for multiplayer
+	# Sync position/rotation/velocity for multiplayer
 	_move_and_sync()
 
 
@@ -329,7 +351,7 @@ func _fill_audio_buffer():
 
 
 func _update_wheel_visuals(delta):
-	# Update average RPM for spinning
+	# Update average RPM for spinning (local player only - physics wheels)
 	var avg_rpm = ($WheelFL.get_rpm() + $WheelFR.get_rpm() + $WheelRL.get_rpm() + $WheelRR.get_rpm()) / 4.0
 	wheel_rotation -= (avg_rpm / 60.0) * TAU * delta
 
@@ -350,6 +372,62 @@ func _update_wheel_visuals(delta):
 			$Visuals/WheelPivotFR/WheelFR.rotation.x = wheel_rotation
 			$Visuals/WheelPivotRL/WheelRL.rotation.x = wheel_rotation
 			$Visuals/WheelPivotRR/WheelRR.rotation.x = wheel_rotation
+
+
+# Smoothly interpolate remote carts from replicated network state.
+# This is the main fix for "jittering cars".
+func _interpolate_remote(delta: float):
+	var t = clamp(REMOTE_LERP_SPEED * delta, 0.0, 1.0)
+	
+	# Position lerp (very effective on LAN)
+	global_position = global_position.lerp(sync_position, t)
+	
+	# Rotation: prefer quaternion slerp (smooth, no gimbal issues)
+	var current_quat := Quaternion.from_euler(rotation)
+	var target_quat := sync_rotation_quat
+	if target_quat == Quaternion.IDENTITY:
+		target_quat = Quaternion.from_euler(sync_rotation)
+	
+	var rot_t = clamp(REMOTE_LERP_SPEED * 0.65 * delta, 0.0, 1.0)
+	var new_quat := current_quat.slerp(target_quat, rot_t)
+	rotation = new_quat.get_euler()
+	
+	# Gently blend velocity (helps if anything reads it)
+	linear_velocity = linear_velocity.lerp(sync_velocity, 0.6)
+	
+	# Keep the top_level visuals node perfectly in sync with our interpolated body
+	visuals.global_transform = global_transform
+	
+	# Drive nice-looking wheel animation on remotes without physics wheels
+	_update_remote_wheel_visuals(delta)
+
+
+func _update_remote_wheel_visuals(delta: float):
+	# Use replicated steer value
+	var steer := sync_steer
+	
+	# Estimate wheel spin purely from replicated linear velocity (good enough visually)
+	var speed := sync_velocity.length()
+	# Approximate: distance per wheel rotation ≈ 2.5m (rough for these carts)
+	var wheel_spin_rate := speed / 2.5   # revolutions per second
+	wheel_rotation -= wheel_spin_rate * TAU * delta
+	
+	if not wheel_pivots.is_empty():
+		if wheel_pivots.has("FL"): wheel_pivots["FL"].rotation.y = steer
+		if wheel_pivots.has("FR"): wheel_pivots["FR"].rotation.y = steer
+		
+		for key in wheel_pivots:
+			wheel_pivots[key].rotation.x = wheel_rotation
+	else:
+		# Fallback old wheel pivots
+		if $Visuals/WheelPivotFL.visible:
+			$Visuals/WheelPivotFL.rotation.y = steer
+			$Visuals/WheelPivotFR.rotation.y = steer
+			var wr := wheel_rotation
+			$Visuals/WheelPivotFL/WheelFL.rotation.x = wr
+			$Visuals/WheelPivotFR/WheelFR.rotation.x = wr
+			$Visuals/WheelPivotRL/WheelRL.rotation.x = wr
+			$Visuals/WheelPivotRR/WheelRR.rotation.x = wr
 
 
 func _setup_new_car_wheels():
@@ -402,6 +480,7 @@ func _move_and_sync():
 	sync_position = global_position
 	sync_rotation = rotation
 	sync_velocity = linear_velocity
+	sync_rotation_quat = Quaternion.from_euler(rotation)
 
 
 func _use_item():

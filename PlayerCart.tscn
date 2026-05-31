@@ -192,6 +192,9 @@ properties/7/replication_mode = 1
 properties/8/path = NodePath(".:current_item")
 properties/8/spawn = true
 properties/8/replication_mode = 1
+properties/9/path = NodePath(".:sync_rotation_quat")
+properties/9/spawn = true
+properties/9/replication_mode = 1
 
 [node name="PlayerCart" type="VehicleBody3D" unique_id=1637232811]
 script = ExtResource("1_cscript")

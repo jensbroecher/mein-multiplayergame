@@ -17,15 +17,19 @@ varying float height_val;
 varying float world_y;
 
 void vertex() {
-	vec2 uv = UV * 40.0;
+	// Use world-space XZ for stable waves that don't swim with camera movement.
+	// This is key for large water planes in racing games.
+	vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	vec2 world_uv = world_pos.xz * 0.08;   // scale tuned for visible wave size
+	
 	vec2 motion = vec2(TIME * wave_speed);
 	
-	float h1 = texture(noise_tex, uv + motion).r;
-	float h2 = texture(noise_tex, uv * 0.5 - motion * 0.7).r;
+	float h1 = texture(noise_tex, world_uv + motion).r;
+	float h2 = texture(noise_tex, world_uv * 0.5 - motion * 0.65).r;
 	height_val = (h1 + h2) * 0.5;
 	
 	VERTEX.y += height_val * wave_height;
-	world_y = (MODEL_MATRIX * vec4(VERTEX, 1.0)).y;
+	world_y = world_pos.y;
 }
 
 void fragment() {
