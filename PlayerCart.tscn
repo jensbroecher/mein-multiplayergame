@@ -161,8 +161,8 @@ size = Vector2(0.6, 0.6)
 [sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_engine"]
 buffer_length = 0.1
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_cart"]
-size = Vector3(1.4, 0.6, 2.5)
+[sub_resource type="SphereShape3D" id="SphereShape3D_cart"]
+radius = 0.8
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_sync"]
 properties/0/path = NodePath(".:sync_position")
@@ -196,80 +196,32 @@ properties/9/path = NodePath(".:sync_rotation_quat")
 properties/9/spawn = true
 properties/9/replication_mode = 1
 
-[node name="PlayerCart" type="VehicleBody3D" unique_id=1637232811]
+[sub_resource type="PhysicsMaterial" id="PhysicsMaterial_frictionless"]
+friction = 0.0
+
+[node name="PlayerCart" type="RigidBody3D" unique_id=1637232811]
+physics_material_override = SubResource("PhysicsMaterial_frictionless")
 script = ExtResource("1_cscript")
 mass = 1200.0
 center_of_mass_mode = 1
-center_of_mass = Vector3(0, -0.6, 0)
+center_of_mass = Vector3(0, -0.3, 0)
 physics_material_override = null
 state_lock_callback = null
 state_lock_value = 0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=654514439]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
-shape = SubResource("BoxShape3D_cart")
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.42, 0)
+shape = SubResource("SphereShape3D_cart")
 
-[node name="WheelFL" type="VehicleWheel3D" parent="." unique_id=100]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8, 0.0, -1.2)
-suspension_stiffness = 30.0
-suspension_max_force = 8000.0
-damping_compression = 3.0
-damping_relaxation = 4.0
-wheel_radius = 0.4
-suspension_rest_length = 0.05
-friction_slip = 2.0
-roll_influence = 0.0
-use_as_steering = true
-use_as_traction = true
-use_as_brake = false
 
-[node name="WheelFR" type="VehicleWheel3D" parent="." unique_id=101]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 0.0, -1.2)
-suspension_stiffness = 30.0
-suspension_max_force = 8000.0
-damping_compression = 3.0
-damping_relaxation = 4.0
-wheel_radius = 0.4
-suspension_rest_length = 0.05
-friction_slip = 2.0
-roll_influence = 0.0
-use_as_steering = true
-use_as_traction = true
-use_as_brake = false
 
-[node name="WheelRL" type="VehicleWheel3D" parent="." unique_id=102]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8, 0.0, 1.0)
-suspension_stiffness = 30.0
-suspension_max_force = 8000.0
-damping_compression = 3.0
-damping_relaxation = 4.0
-wheel_radius = 0.4
-suspension_rest_length = 0.05
-friction_slip = 2.0
-roll_influence = 0.0
-use_as_steering = false
-use_as_traction = true
-use_as_brake = true
 
-[node name="WheelRR" type="VehicleWheel3D" parent="." unique_id=103]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 0.0, 1.0)
-suspension_stiffness = 30.0
-suspension_max_force = 8000.0
-damping_compression = 3.0
-damping_relaxation = 4.0
-wheel_radius = 0.4
-suspension_rest_length = 0.05
-friction_slip = 2.0
-roll_influence = 0.0
-use_as_steering = false
-use_as_traction = true
-use_as_brake = true
 
 [node name="Visuals" type="Node3D" parent="." unique_id=1001732157]
 top_level = true
 
 [node name="CartModel" parent="Visuals" unique_id=768104268 instance=ExtResource("2_cart")]
-transform = Transform3D(-2, 0, -1.74846e-07, 0, 2, 0, 1.74846e-07, 0, -2, 0, 0, 0)
+transform = Transform3D(-2, 0, -1.74846e-07, 0, 2, 0, 1.74846e-07, 0, -2, 0, 0.18, 0)
 
 [node name="BoostParticles" type="GPUParticles3D" parent="Visuals" unique_id=457637679]
 transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0.6, 1.1)

@@ -9,25 +9,35 @@ uniform float roughness : hint_range(0.0, 1.0) = 0.1;
 
 uniform sampler2D noise_tex;
 uniform sampler2D normal_tex; 
-uniform float wave_speed = 0.03; // Even slower for calm water
-uniform float wave_strength = 0.8;
-uniform float wave_height = 0.6; // Reduced height for more stable look
+uniform float wave_speed = 0.028;
+uniform float wave_strength = 0.55;
+uniform float wave_height = 0.55;
 
 varying float height_val;
 varying float world_y;
 
 void vertex() {
-	// Use world-space XZ for stable waves that don't swim with camera movement.
-	// This is key for large water planes in racing games.
+	// Layered world-space waves for realistic look (big swells + medium waves + small chop).
+	// Prevents the "entire surface bobbing as one" problem.
 	vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	vec2 world_uv = world_pos.xz * 0.08;   // scale tuned for visible wave size
-	
+	vec2 w = world_pos.xz;
+
 	vec2 motion = vec2(TIME * wave_speed);
-	
-	float h1 = texture(noise_tex, world_uv + motion).r;
-	float h2 = texture(noise_tex, world_uv * 0.5 - motion * 0.65).r;
-	height_val = (h1 + h2) * 0.5;
-	
+
+	// Layer 1: Large slow swells (very subtle, long wavelength)
+	vec2 uv1 = w * 0.018;
+	float h1 = texture(noise_tex, uv1 + motion * 0.6).r * 0.55;
+
+	// Layer 2: Medium rolling waves (main visible movement)
+	vec2 uv2 = w * 0.065;
+	float h2 = texture(noise_tex, uv2 - motion * 1.15).r * 0.75;
+
+	// Layer 3: Small chop / surface detail (fast, higher frequency)
+	vec2 uv3 = w * 0.21;
+	float h3 = texture(noise_tex, uv3 + motion * 2.4).r * 0.45;
+
+	height_val = (h1 + h2 + h3) * 0.48;   // normalized-ish combined height
+
 	VERTEX.y += height_val * wave_height;
 	world_y = world_pos.y;
 }

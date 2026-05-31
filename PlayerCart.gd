@@ -1,4 +1,4 @@
-extends VehicleBody3D
+extends RigidBody3D
 
 @export var player_name: String = "Player":
 	set(value):
@@ -6,14 +6,15 @@ extends VehicleBody3D
 		if is_inside_tree() and $Visuals/NameTag:
 			$Visuals/NameTag.text = value
 
-const SPEED = 25.0
-const REVERSE_SPEED = 12.0
-const STEER_SPEED = 0.6
-const ENGINE_FORCE = 4000.0
-const BRAKE_FORCE = 300.0
-const HANDBRAKE_FORCE = 500.0
+# Vehicle Parameters
+const MAX_SPEED = 40.0
+const REVERSE_SPEED = 15.0
+const ACCELERATION = 50.0
+const BRAKING = 40.0
+const STEER_SPEED = 2.5
+const GRIP = 5.0
 
-const GRAVITY = 9.8
+const GRAVITY = 30.0 # extra gravity so it falls faster
 
 # Preload item scenes
 const MISSILE_SCENE = preload("res://Missile.tscn")
@@ -25,6 +26,7 @@ const BOMB_SCENE = preload("res://Bomb.tscn")
 @onready var name_tag = $Visuals/NameTag
 @onready var engine_sound = $Visuals/EngineSound
 @onready var ground_ray = $GroundRay
+
 
 var race_ui
 
@@ -46,31 +48,21 @@ var race_ui
 var playback: AudioStreamGeneratorPlayback
 var sample_rate: float
 
-var bounce_y = 0.0
-var bounce_vel = 0.0
-var frame_bump_y = 0.0
-var frame_bump_vel = 0.0
-
 var is_local_player = false
 var can_move = false
 var can_control = true
 
 var is_exploding = false
-var heat = 0.0
 var boost_time = 0.0
 var boost_timer = 0.0
 var is_boosting = false
-var is_waiting_to_explode = false
-
-var tumble_velocity: Vector3 = Vector3.ZERO
-var warning_beep_timer: float = 0.0
 
 @onready var sfx_brake_drift = $Visuals/SFX_BrakeDrift
 var is_drifting: bool = false
 var wheel_rotation: float = 0.0
 var is_teleporting: bool = false
 var is_shielded: bool = false
-var wheel_pivots: Dictionary = {}
+var camera_look_at: Vector3 = Vector3.ZERO
 
 var is_underwater: bool = false
 const WATER_LEVEL = -10.0
@@ -90,14 +82,13 @@ var sync_velocity: Vector3
 var sync_steer: float = 0.0
 var sync_rotation_quat: Quaternion = Quaternion.IDENTITY
 
-var visual_steer: float = 0.0
-var was_on_floor: bool = false
-
+# Visual alignment variables
+var target_mesh_transform := Transform3D.IDENTITY
+var current_steer: float = 0.0
 
 func on_race_started():
 	if is_local_player:
 		can_move = true
-
 
 func _ready():
 	add_to_group("player_carts")
@@ -108,10 +99,17 @@ func _ready():
 	if level and level.has_node("RaceUI"):
 		race_ui = level.get_node("RaceUI")
 
+	ground_ray.add_exception(self)
+
 	name_tag.text = player_name
 	last_checkpoint_transform = global_transform
+	camera_look_at = global_position
 
+	visuals.global_transform = global_transform
 	visuals.top_level = true
+	
+	_remove_collisions_recursive(visuals)
+	_setup_new_car_wheels()
 
 	if engine_sound.stream is AudioStreamGenerator:
 		sample_rate = engine_sound.stream.mix_rate
@@ -119,96 +117,81 @@ func _ready():
 		if not engine_sound.playing:
 			engine_sound.play()
 	
-	# Setup new car wheels
-	_setup_new_car_wheels()
-	
 	if is_local_player:
 		camera.current = true
 		camera_pivot.top_level = true
+		
+		# Lock rotation so we handle it manually
+		axis_lock_angular_x = true
+		axis_lock_angular_y = true
+		axis_lock_angular_z = true
 	else:
 		camera.current = false
 		if has_node("Visuals/CameraPivot/Camera3D/AudioListener3D"):
 			get_node("Visuals/CameraPivot/Camera3D/AudioListener3D").current = false
 
-	visuals.global_transform = global_transform
-	visuals.top_level = true
-
-
 func _enter_tree():
 	_update_authority()
-
 
 func _update_authority():
 	var id = name.to_int()
 	if id > 0:
+		set_multiplayer_authority(id)
 		$MultiplayerSynchronizer.set_multiplayer_authority(id)
 	is_local_player = is_multiplayer_authority()
 	
 	if not is_local_player:
-		# Freeze remote bodies so they don't fight network state with local physics sim.
-		# We drive them purely via interpolation from sync data.
 		freeze = true
 		freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
 
-
 func _process(delta):
 	if is_local_player:
-		# Direct visual follow for local player (no lag)
-		visuals.global_transform = global_transform
+		_update_visuals_alignment(delta)
 
-		# Camera follows vehicle
 		var cam_dist = lerp(3.5, 6.0, clamp(boost_time / 4.0, 0.0, 1.0))
 		var cam_offset = Vector3(0, 1.5, cam_dist)
-		target_cam_pos = global_transform * cam_offset
-		camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 12.0 * delta)
-		camera_pivot.look_at(global_position, Vector3.UP)
+		
+		# Smooth camera trailing
+		var visual_forward = -visuals.global_transform.basis.z
+		var target_cam_pos = visuals.global_position - visual_forward * cam_dist + Vector3(0, 1.5, 0)
+		camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 10.0 * delta)
+		
+		camera_look_at = camera_look_at.lerp(visuals.global_position + visual_forward * 5.0, 12.0 * delta)
+		camera_pivot.look_at(camera_look_at, Vector3.UP)
 
-		# Speedometer
 		if race_ui:
 			race_ui.update_speed(linear_velocity.length() * 1.8)
 
-		# Procedural engine sound
 		if engine_sound.stream is AudioStreamGenerator and engine_sound.playing:
 			_fill_audio_buffer()
 	else:
-		# Remote players: smooth interpolation from network state
 		_interpolate_remote(delta)
-
 
 func _physics_process(delta):
 	if is_teleporting:
 		return
 
-	# Audio buffer (needed for both local and remote sometimes)
-	if engine_sound.stream is AudioStreamGenerator and playback:
-		_fill_audio_buffer()
-
-	# Reset if fallen too far
 	if global_position.y < -50:
 		respawn()
 
-	# Explosion physics (visual + some force even on remotes for consistency)
 	if is_exploding:
 		if is_local_player:
 			apply_central_force(Vector3.UP * 5.0)
-			apply_torque(Vector3(randf()-0.5, randf()-0.5, randf()-0.5) * 20.0)
-
+		
 		if sfx_fire_loop.playing:
 			sfx_fire_loop.volume_db = lerp(sfx_fire_loop.volume_db, -10.0, 2.0 * delta)
 
 		burning_particles.global_position = global_position + Vector3(0, 0.5, 0)
 		burning_smoke_particles.global_position = global_position + Vector3(0, 0.5, 0)
-
 		if is_local_player:
 			_move_and_sync()
 		return
 
-	# Water detection (everyone needs this for drowning/explode logic)
 	var currently_underwater = global_position.y < WATER_LEVEL
 	if currently_underwater != is_underwater:
 		if currently_underwater:
 			sfx_landing_bonk.play()
-			_apply_water_drag()
+			linear_velocity *= 0.5
 		is_underwater = currently_underwater
 		water_timer = 0.0
 
@@ -216,96 +199,108 @@ func _physics_process(delta):
 		water_timer += delta
 		if water_timer > 2.0:
 			explode()
+		apply_central_force(Vector3.UP * 15.0)
 
-	_apply_water_buoyancy(delta)
-
-	# === REMOTE PLAYERS: driven by network interpolation in _process ===
-	# We skip all local input + vehicle physics simulation.
 	if not is_local_player:
-		if not can_move:
-			# Still decelerate a frozen remote if finished
-			linear_velocity = linear_velocity.lerp(Vector3.ZERO, 4.0 * delta)
 		return
 
-	# === LOCAL / AUTHORITY ONLY from here down ===
+	# Apply extra gravity
+	apply_central_force(Vector3.DOWN * GRAVITY * mass)
+
 	if not can_move:
-		brake = 1.0
-		_apply_finish_deceleration(delta)
+		linear_velocity = linear_velocity.lerp(Vector3.ZERO, 3.0 * delta)
 		_move_and_sync()
 		return
 
-	# Item usage
 	if Input.is_action_just_pressed("boost"):
 		_use_item()
 
-	# Input
 	var input_dir = Vector2.ZERO
 	input_dir.x = Input.get_axis("steer_left", "steer_right")
 	input_dir.y = Input.get_axis("throttle", "brake")
 
-	if input_dir.length() > 1.0:
-		input_dir = input_dir.normalized()
+	var on_ground = ground_ray.is_colliding()
+	var ground_normal = Vector3.UP
+	if on_ground:
+		ground_normal = ground_ray.get_collision_normal()
 
-	# Apply input to vehicle
-	_steer_input = -input_dir.x * STEER_SPEED
+	var fwd = -visuals.global_transform.basis.z
+	var right = visuals.global_transform.basis.x
+	
+	current_steer = lerp(current_steer, input_dir.x, 10.0 * delta)
 
-	# Acceleration / braking
-	if input_dir.y < -0.1:
-		# Throttle forward
-		var force = ENGINE_FORCE
-		if boost_timer > 0:
-			force *= 2.0
-			boost_timer -= delta
-			is_boosting = true
-			if not sfx_rocket_loop.playing:
-				sfx_rocket_loop.play()
-		else:
-			is_boosting = false
-			if sfx_rocket_loop.playing:
-				sfx_rocket_loop.stop()
-
-		engine_force = -force
-		boost_time += delta
-
-	elif input_dir.y > 0.1:
-		# Brake or Reverse
-		var forward_speed = -linear_velocity.dot(global_transform.basis.z)
-		if forward_speed > 0.5:
-			# Still moving forward: Brake
-			engine_force = 0.0
-			brake = BRAKE_FORCE * input_dir.y
-		else:
-			# Stopped or already moving back: Reverse
-			brake = 0.0
-			engine_force = ENGINE_FORCE * 0.5 * input_dir.y # Positive force for reverse in this setup
+	if on_ground:
+		# Acceleration
+		var current_speed = linear_velocity.dot(fwd)
+		var accel_force = 0.0
 		
-		boost_time = 0.0
-
-		# Handbrake drift
-		if abs(input_dir.x) > 0.5 and linear_velocity.length() > 10.0:
-			brake = HANDBRAKE_FORCE
-			if not sfx_brake_drift.playing:
-				sfx_brake_drift.play()
-			is_drifting = true
+		if input_dir.y < -0.1: # Forward
+			var max_sp = MAX_SPEED
+			if boost_timer > 0:
+				max_sp *= 1.5
+				accel_force = ACCELERATION * 2.0
+				boost_timer -= delta
+				is_boosting = true
+				if not sfx_rocket_loop.playing: sfx_rocket_loop.play()
+			else:
+				is_boosting = false
+				accel_force = ACCELERATION
+				if sfx_rocket_loop.playing: sfx_rocket_loop.stop()
+				
+			if current_speed < max_sp:
+				apply_central_force(fwd * accel_force * mass)
+			boost_time += delta
+			
+		elif input_dir.y > 0.1: # Brake / Reverse
+			boost_time = 0.0
+			is_boosting = false
+			if sfx_rocket_loop.playing: sfx_rocket_loop.stop()
+			
+			if current_speed > 1.0:
+				# Brake
+				apply_central_force(-fwd * BRAKING * mass)
+			else:
+				# Reverse
+				if current_speed > -REVERSE_SPEED:
+					apply_central_force(-fwd * (ACCELERATION * 0.5) * mass)
 		else:
-			if sfx_brake_drift.playing:
-				sfx_brake_drift.stop()
-			is_drifting = false
+			boost_time = 0.0
+			is_boosting = false
+			if sfx_rocket_loop.playing: sfx_rocket_loop.stop()
+			# Natural friction
+			apply_central_force(-linear_velocity * 0.5 * mass)
+
+		# Steering
+		if linear_velocity.length() > 1.0:
+			var turn_speed = STEER_SPEED
+			if abs(input_dir.x) > 0.1 and input_dir.y > 0.1 and current_speed > 5.0:
+				# Drifting (handbrake)
+				turn_speed *= 1.5
+				if not sfx_brake_drift.playing: sfx_brake_drift.play()
+				is_drifting = true
+			else:
+				if sfx_brake_drift.playing: sfx_brake_drift.stop()
+				is_drifting = false
+				
+			var steer_amount = -current_steer * turn_speed * (min(linear_velocity.length() / 10.0, 1.0)) * delta
+			visuals.global_rotate(ground_normal, steer_amount)
+			
+			# Kill lateral velocity (adds grip)
+			var lat_vel = linear_velocity.dot(right)
+			var grip_factor = GRIP
+			if is_drifting: grip_factor *= 0.3
+			apply_central_force(-right * lat_vel * mass * grip_factor)
 	else:
-		# No input - coast
-		engine_force = 0.0
-		brake = 0.0
-		boost_time = 0.0
-		if sfx_rocket_loop.playing:
-			sfx_rocket_loop.stop()
-		if sfx_brake_drift.playing:
-			sfx_brake_drift.stop()
+		is_boosting = false
+		if sfx_rocket_loop.playing: sfx_rocket_loop.stop()
+		if sfx_brake_drift.playing: sfx_brake_drift.stop()
 		is_drifting = false
+		
+		# Slight air control
+		visuals.global_rotate(Vector3.UP, -current_steer * STEER_SPEED * 0.5 * delta)
 
 	# Wind sound
 	var speed = linear_velocity.length()
-	# Check if any wheel is on ground
-	var on_ground = $WheelFL.is_in_contact() or $WheelFR.is_in_contact() or $WheelRL.is_in_contact() or $WheelRR.is_in_contact()
 	if speed > 20.0 and on_ground:
 		if not sfx_wind_loop.playing:
 			sfx_wind_loop.play()
@@ -315,33 +310,39 @@ func _physics_process(delta):
 		if sfx_wind_loop.volume_db < -35.0:
 			sfx_wind_loop.stop()
 
-	# Update sync vars (authority only)
-	sync_steer = move_toward(sync_steer, _steer_input, 10.0 * delta)
-	steering = sync_steer
-
-	# Visual wheel rotation (physics-driven for local)
-	_update_wheel_visuals(delta)
-
-	# Sync position/rotation/velocity for multiplayer
+	sync_steer = current_steer
 	_move_and_sync()
 
-
-var target_cam_pos: Vector3
-var _steer_input: float = 0.0
-var _prev_flat_vel: Vector2 = Vector2.ZERO
-
+func _update_visuals_alignment(delta):
+	var on_ground = ground_ray.is_colliding()
+	var normal = Vector3.UP
+	if on_ground:
+		normal = ground_ray.get_collision_normal()
+		
+	# Smoothly align the visual mesh normal
+	var current_basis = visuals.global_transform.basis
+	var forward = -current_basis.z
+	var right = current_basis.x
+	
+	var target_up = normal
+	var target_right = forward.cross(target_up).normalized()
+	var target_forward = target_up.cross(target_right).normalized()
+	
+	var target_basis = Basis(target_right, target_up, -target_forward)
+	visuals.global_transform.basis = current_basis.slerp(target_basis, 8.0 * delta)
+	
+	# Keep visuals at the rigid body pos, maybe slightly offset based on sphere
+	visuals.global_position = global_position - Vector3(0, 0.4, 0)
+	
+	_update_wheel_visuals(delta)
 
 func _fill_audio_buffer():
-	if not playback:
-		return
-
+	if not playback: return
 	var available = playback.get_frames_available()
-	if available == 0:
-		return
+	if available == 0: return
 
-	var freq = 120.0 + abs(linear_velocity.dot(-global_transform.basis.z)) * 8.0
-	if is_boosting:
-		freq *= 1.5
+	var freq = 120.0 + linear_velocity.length() * 8.0
+	if is_boosting: freq *= 1.5
 
 	for i in range(available):
 		var t = float(i) / sample_rate
@@ -349,40 +350,26 @@ func _fill_audio_buffer():
 		sample += sin(t * freq * 2.0 * TAU) * 0.1
 		playback.push_frame(Vector2(sample, sample))
 
-
 func _update_wheel_visuals(delta):
-	# Update average RPM for spinning (local player only - physics wheels)
-	var avg_rpm = ($WheelFL.get_rpm() + $WheelFR.get_rpm() + $WheelRL.get_rpm() + $WheelRR.get_rpm()) / 4.0
-	wheel_rotation -= (avg_rpm / 60.0) * TAU * delta
+	var speed = linear_velocity.length()
+	var fwd_dot = linear_velocity.dot(-visuals.global_transform.basis.z)
+	var rot_speed = speed * sign(fwd_dot) / 0.4 # approx radius
+	wheel_rotation -= rot_speed * delta
 
-	if not wheel_pivots.is_empty():
-		# Steering visuals for front wheels
-		if wheel_pivots.has("FL"): wheel_pivots["FL"].rotation.y = steering
-		if wheel_pivots.has("FR"): wheel_pivots["FR"].rotation.y = steering
-		
-		# Rotation visuals for all wheels
-		for key in wheel_pivots:
-			wheel_pivots[key].rotation.x = wheel_rotation
-	else:
-		# Fallback to old pivots if they exist and are visible
-		if $Visuals/WheelPivotFL.visible:
-			$Visuals/WheelPivotFL.rotation.y = steering
-			$Visuals/WheelPivotFR.rotation.y = steering
-			$Visuals/WheelPivotFL/WheelFL.rotation.x = wheel_rotation
-			$Visuals/WheelPivotFR/WheelFR.rotation.x = wheel_rotation
-			$Visuals/WheelPivotRL/WheelRL.rotation.x = wheel_rotation
-			$Visuals/WheelPivotRR/WheelRR.rotation.x = wheel_rotation
+	for wheel in ["FL", "FR", "RL", "RR"]:
+		var w_node = get_node_or_null("Visuals/WheelPivot" + wheel)
+		if w_node:
+			if wheel == "FL" or wheel == "FR":
+				# Rotate on Y for steering
+				w_node.rotation.y = -sync_steer * 0.5
+			# The wheel model inside the pivot rotates on X
+			if w_node.get_child_count() > 0:
+				w_node.get_child(0).rotation.x = wheel_rotation
 
-
-# Smoothly interpolate remote carts from replicated network state.
-# This is the main fix for "jittering cars".
 func _interpolate_remote(delta: float):
 	var t = clamp(REMOTE_LERP_SPEED * delta, 0.0, 1.0)
-	
-	# Position lerp (very effective on LAN)
 	global_position = global_position.lerp(sync_position, t)
 	
-	# Rotation: prefer quaternion slerp (smooth, no gimbal issues)
 	var current_quat := Quaternion.from_euler(rotation)
 	var target_quat := sync_rotation_quat
 	if target_quat == Quaternion.IDENTITY:
@@ -392,43 +379,23 @@ func _interpolate_remote(delta: float):
 	var new_quat := current_quat.slerp(target_quat, rot_t)
 	rotation = new_quat.get_euler()
 	
-	# Gently blend velocity (helps if anything reads it)
 	linear_velocity = linear_velocity.lerp(sync_velocity, 0.6)
 	
-	# Keep the top_level visuals node perfectly in sync with our interpolated body
-	visuals.global_transform = global_transform
+	# Remotes also need their visuals to follow the rigid body
+	visuals.global_transform.basis = Basis(new_quat)
+	visuals.global_position = global_position - Vector3(0, 0.4, 0)
 	
-	# Drive nice-looking wheel animation on remotes without physics wheels
-	_update_remote_wheel_visuals(delta)
-
-
-func _update_remote_wheel_visuals(delta: float):
-	# Use replicated steer value
-	var steer := sync_steer
-	
-	# Estimate wheel spin purely from replicated linear velocity (good enough visually)
 	var speed := sync_velocity.length()
-	# Approximate: distance per wheel rotation ≈ 2.5m (rough for these carts)
-	var wheel_spin_rate := speed / 2.5   # revolutions per second
-	wheel_rotation -= wheel_spin_rate * TAU * delta
+	var wheel_spin_rate := speed / 0.4
+	wheel_rotation -= wheel_spin_rate * delta
 	
-	if not wheel_pivots.is_empty():
-		if wheel_pivots.has("FL"): wheel_pivots["FL"].rotation.y = steer
-		if wheel_pivots.has("FR"): wheel_pivots["FR"].rotation.y = steer
-		
-		for key in wheel_pivots:
-			wheel_pivots[key].rotation.x = wheel_rotation
-	else:
-		# Fallback old wheel pivots
-		if $Visuals/WheelPivotFL.visible:
-			$Visuals/WheelPivotFL.rotation.y = steer
-			$Visuals/WheelPivotFR.rotation.y = steer
-			var wr := wheel_rotation
-			$Visuals/WheelPivotFL/WheelFL.rotation.x = wr
-			$Visuals/WheelPivotFR/WheelFR.rotation.x = wr
-			$Visuals/WheelPivotRL/WheelRL.rotation.x = wr
-			$Visuals/WheelPivotRR/WheelRR.rotation.x = wr
-
+	for wheel in ["FL", "FR", "RL", "RR"]:
+		var w_node = get_node_or_null("Visuals/WheelPivot" + wheel)
+		if w_node:
+			if wheel == "FL" or wheel == "FR":
+				w_node.rotation.y = -sync_steer * 0.5
+			if w_node.get_child_count() > 0:
+				w_node.get_child(0).rotation.x = wheel_rotation
 
 func _setup_new_car_wheels():
 	var wheels_config = {
@@ -441,120 +408,74 @@ func _setup_new_car_wheels():
 	for key in wheels_config:
 		var path = wheels_config[key]
 		var node = get_node_or_null("Visuals/" + path)
-		if node and node is MeshInstance3D:
-			# Create a pivot at the wheel's geometric center
-			var aabb = node.get_mesh().get_aabb()
-			var center = aabb.get_center()
+		var pivot_node = get_node_or_null("Visuals/WheelPivot" + key)
+		if node and node is MeshInstance3D and pivot_node:
+			node.reparent(pivot_node, false)
+			node.position = Vector3.ZERO
+			node.rotation = Vector3.ZERO
 			
-			var pivot = Node3D.new()
-			pivot.name = "Pivot" + key
-			node.get_parent().add_child(pivot)
-			
-			# Position pivot at the wheel center (relative to parent)
-			pivot.transform = node.transform
-			pivot.translate(center)
-			
-			# Reparent wheel to pivot and center it
-			node.reparent(pivot, false)
-			node.transform = Transform3D.IDENTITY
-			node.translate(-center)
-			
-			wheel_pivots[key] = pivot
-
-
-func _apply_water_drag():
-	linear_velocity *= 0.5
-
-
-func _apply_water_buoyancy(delta):
-	if is_underwater:
-		apply_central_force(Vector3.UP * 15.0)
-
-
-func _apply_finish_deceleration(delta):
-	linear_velocity = linear_velocity.lerp(Vector3.ZERO, 5.0 * delta)
-	angular_velocity = angular_velocity.lerp(Vector3.ZERO, 3.0 * delta)
-
+			var dark_mat = StandardMaterial3D.new()
+			dark_mat.albedo_color = Color(0.12, 0.12, 0.12)
+			dark_mat.roughness = 0.85
+			node.material_override = dark_mat
+			pivot_node.visible = true
 
 func _move_and_sync():
 	sync_position = global_position
-	sync_rotation = rotation
+	# Store visual rotation, not rigid body rotation (which is locked)
+	sync_rotation = visuals.rotation
 	sync_velocity = linear_velocity
-	sync_rotation_quat = Quaternion.from_euler(rotation)
-
+	sync_rotation_quat = Quaternion.from_euler(visuals.rotation)
 
 func _use_item():
-	if current_item == ItemType.NONE:
-		return
-
+	if current_item == ItemType.NONE: return
 	match current_item:
 		ItemType.BOOST:
 			boost_timer = 2.0
 			sfx_nitro_start.play()
 			boost_particles.emitting = true
-
 	current_item = ItemType.NONE
 
-
-func _on_body_entered(body):
-	pass
-
-
 func explode():
-	if is_exploding:
-		return
-	print("PlayerCart: EXPLODING!")
+	if is_exploding: return
 	is_exploding = true
 	can_move = false
-
 	sfx_explosion.play()
 	sfx_fire_loop.play()
 	explosion_particles.emitting = true
 	burning_particles.emitting = true
 	burning_smoke_particles.emitting = true
-
-	if engine_sound.playing:
-		engine_sound.stop()
-
+	if engine_sound.playing: engine_sound.stop()
 	linear_velocity += Vector3(randf()-0.5, 10.0, randf()-0.5).normalized() * 15.0
 
-	respawn_timer = 0.0
-
-
 func respawn():
-	print("PlayerCart: RESPAWNING!")
 	is_exploding = false
-
 	var level = get_tree().get_first_node_in_group("level")
 	var id = name.to_int()
 	var finished = false
 	if level and level.player_stats.has(id):
 		finished = level.player_stats[id]["finished"]
-
+	
 	can_move = not finished
 	is_boosting = false
-	heat = 0.0
 	boost_time = 0.0
-	is_waiting_to_explode = false
-
+	
 	explosion_particles.emitting = false
 	burning_particles.emitting = false
 	burning_smoke_particles.emitting = false
 	sfx_fire_loop.stop()
-
+	
 	linear_velocity = Vector3.ZERO
 	angular_velocity = Vector3.ZERO
-
+	
 	var spawn_pos = last_checkpoint_transform.origin + (last_checkpoint_transform.basis.z * 5.0) + Vector3(0, 2.0, 0)
 	global_position = spawn_pos
-
+	
 	var look_target = last_checkpoint_transform.origin
 	look_target.y = spawn_pos.y
-	look_at(look_target, Vector3.UP)
-
-	if not engine_sound.playing:
-		engine_sound.play()
-
+	visuals.look_at(look_target, Vector3.UP)
+	
+	if not engine_sound.playing: engine_sound.play()
 
 func give_item(type: int):
 	current_item = type
@@ -562,11 +483,9 @@ func give_item(type: int):
 		var item_name = ItemType.keys()[type]
 		race_ui.update_item(item_name)
 
-
-func _get_random_item_rpc() -> int:
-	# Randomly pick from available items (excluding NONE)
-	var items = [ItemType.BOOST, ItemType.MISSILE, ItemType.SHIELD, ItemType.SHOCKWAVE, ItemType.BOMB]
-	return items[randi() % items.size()]
-
-
-var respawn_timer: float = 0.0
+func _remove_collisions_recursive(node: Node):
+	if node == null: return
+	for child in node.get_children():
+		_remove_collisions_recursive(child)
+	if node is CollisionObject3D or node is CollisionShape3D:
+		node.free()
