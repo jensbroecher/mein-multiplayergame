@@ -227,69 +227,78 @@ func _physics_process(delta):
 		_move_and_sync()
 		return
 
+	# DEBUG: Print input state
 	if Input.is_action_just_pressed("boost"):
+		print("DEBUG: Boost pressed, current_item = ", current_item, " (", ItemType.keys()[current_item] if current_item < ItemType.keys().size() else "invalid", ")")
 		_use_item()
 
 	var input_dir = Vector2.ZERO
 	input_dir.x = Input.get_axis("steer_left", "steer_right")
 	input_dir.y = Input.get_axis("throttle", "brake")
 
+	# DEBUG: Print input_dir occasionally
+	if abs(input_dir.y) > 0.1 or abs(input_dir.x) > 0.1:
+		print("DEBUG: input_dir = ", input_dir, " on_ground check...")
+
 	var on_ground = ground_ray.is_colliding()
 	var ground_normal = Vector3.UP
 	if on_ground:
 		ground_normal = ground_ray.get_collision_normal()
 
+	# DEBUG
+	if not on_ground:
+		print("DEBUG: NOT on ground! ground_ray target: ", ground_ray.target_position, " global_pos: ", global_position)
+
 	var fwd = -visuals.global_transform.basis.z
 	var right = visuals.global_transform.basis.x
-	
+
 	current_steer = lerp(current_steer, input_dir.x, 10.0 * delta)
 
-	if on_ground:
-		# Acceleration
-		var current_speed = linear_velocity.dot(fwd)
-		var accel_force = 0.0
-		
-		if input_dir.y < -0.1: # Forward
-			var max_sp = MAX_SPEED
-			if boost_timer > 0:
-				max_sp *= 1.5
-				accel_force = ACCELERATION * 2.0
-				boost_timer -= delta
-				is_boosting = true
-				if not sfx_rocket_loop.playing: sfx_rocket_loop.play()
-			else:
-				is_boosting = false
-				accel_force = ACCELERATION
-				if sfx_rocket_loop.playing: sfx_rocket_loop.stop()
-				
-			if current_speed < max_sp:
-				apply_central_force(fwd * accel_force * mass)
-			boost_time += delta
-			
-		elif input_dir.y > 0.1: # Brake / Reverse
-			boost_time = 0.0
-			is_boosting = false
-			if sfx_rocket_loop.playing: sfx_rocket_loop.stop()
-			
-			if current_speed > 1.0:
-				# Brake hard when moving forward
-				apply_central_force(-fwd * BRAKING * mass)
-			elif current_speed < -0.5:
-				# Already moving backward, apply reverse acceleration (more speed)
-				if current_speed > -REVERSE_SPEED:
-					apply_central_force(-fwd * (ACCELERATION * 0.5) * mass)
-			else:
-				# Stationary or very slow - initiate reverse
-				if current_speed > -REVERSE_SPEED:
-					apply_central_force(-fwd * (ACCELERATION * 0.7) * mass)
+	# Handle acceleration/braking even when slightly airborne for better control
+	var current_speed = linear_velocity.dot(fwd)
+	
+	if input_dir.y < -0.1: # Forward
+		var max_sp = MAX_SPEED
+		if boost_timer > 0:
+			max_sp *= 1.5
+			accel_force = ACCELERATION * 2.0
+			boost_timer -= delta
+			is_boosting = true
+			if not sfx_rocket_loop.playing: sfx_rocket_loop.play()
 		else:
-			boost_time = 0.0
 			is_boosting = false
+			accel_force = ACCELERATION
 			if sfx_rocket_loop.playing: sfx_rocket_loop.stop()
-			# Natural friction
-			apply_central_force(-linear_velocity * 0.5 * mass)
+		
+		if current_speed < max_sp:
+			apply_central_force(fwd * accel_force * mass)
+		boost_time += delta
+		
+	elif input_dir.y > 0.1: # Brake / Reverse
+		boost_time = 0.0
+		is_boosting = false
+		if sfx_rocket_loop.playing: sfx_rocket_loop.stop()
+		
+		if current_speed > 1.0:
+			# Brake hard when moving forward
+			apply_central_force(-fwd * BRAKING * mass)
+		elif current_speed < -0.5:
+			# Already moving backward, apply reverse acceleration (more speed)
+			if current_speed > -REVERSE_SPEED:
+				apply_central_force(-fwd * (ACCELERATION * 0.5) * mass)
+		else:
+			# Stationary or very slow - initiate reverse
+			if current_speed > -REVERSE_SPEED:
+				apply_central_force(-fwd * (ACCELERATION * 0.7) * mass)
+	else:
+		boost_time = 0.0
+		is_boosting = false
+		if sfx_rocket_loop.playing: sfx_rocket_loop.stop()
+		# Natural friction
+		apply_central_force(-linear_velocity * 0.5 * mass)
 
-		# Steering
+	# Steering (works on ground and slightly airborne)
+	if on_ground or linear_velocity.length() > 0.5:
 		if linear_velocity.length() > 1.0:
 			var turn_speed = STEER_SPEED
 			if abs(input_dir.x) > 0.1 and input_dir.y > 0.1 and current_speed > 5.0:
@@ -300,7 +309,7 @@ func _physics_process(delta):
 			else:
 				if sfx_brake_drift.playing: sfx_brake_drift.stop()
 				is_drifting = false
-				
+			
 			var steer_amount = -current_steer * turn_speed * (min(linear_velocity.length() / 10.0, 1.0)) * delta
 			visuals.global_rotate(ground_normal, steer_amount)
 			
@@ -460,6 +469,16 @@ func _use_item():
 			boost_timer = 2.0
 			sfx_nitro_start.play()
 			boost_particles.emitting = true
+		ItemType.MISSILE:
+			_fire_missile(false)
+		ItemType.GUIDED_MISSILE:
+			_fire_missile(true)
+		ItemType.SHIELD:
+			_activate_shield()
+		ItemType.SHOCKWAVE:
+			_activate_shockwave()
+		ItemType.BOMB:
+			_drop_bomb()
 	current_item = ItemType.NONE
 
 func explode():
@@ -528,3 +547,56 @@ func _remove_collisions_recursive(node: Node):
 		_remove_collisions_recursive(child)
 	if node is CollisionObject3D or node is CollisionShape3D:
 		node.free()
+
+# Item implementations
+func _fire_missile(guided: bool):
+	if not is_local_player: return
+	var missile = MISSILE_SCENE.instantiate()
+	missile.owner_id = name.to_int()
+	missile.is_guided = guided
+	missile.global_position = global_position + (-visuals.global_transform.basis.z * 2.0) + Vector3(0, 1.0, 0)
+	missile.global_rotation = visuals.global_rotation
+	get_tree().root.add_child(missile)
+	if multiplayer.is_server():
+		missile.set_multiplayer_authority(1)
+
+func _activate_shield():
+	if not is_local_player: return
+	is_shielded = true
+	shield_mesh.visible = true
+	# Shield lasts 10 seconds
+	get_tree().create_timer(10.0).timeout.connect(_on_shield_timeout.bind())
+
+func _on_shield_timeout():
+	is_shielded = false
+	shield_mesh.visible = false
+
+func _activate_shockwave():
+	if not is_local_player: return
+	# Create shockwave visual
+	ShockwaveVisual.visible = true
+	ShockwaveVisual.scale = Vector3(0.1, 0.1, 0.1)
+	var tween = create_tween()
+	tween.tween_property(ShockwaveVisual, "scale", Vector3(15.0, 15.0, 15.0), 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(ShockwaveVisual, "material:albedo_color:a", 0.0, 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.finished.connect(func(): ShockwaveVisual.visible = false)
+	
+	# Apply force to nearby players
+	if multiplayer.is_server():
+		var players = get_tree().get_nodes_in_group("player_carts")
+		for p in players:
+			if p == self: continue
+			var dist = global_position.distance_to(p.global_position)
+			if dist < 15.0:
+				var dir = (p.global_position - global_position).normalized()
+				p.apply_central_force(dir * 2000.0 + Vector3.UP * 500.0)
+
+func _drop_bomb():
+	if not is_local_player: return
+	var bomb = BOMB_SCENE.instantiate()
+	bomb.owner_id = name.to_int()
+	bomb.global_position = global_position + Vector3(0, 1.0, 0)
+	bomb.linear_velocity = linear_velocity * 0.5
+	get_tree().root.add_child(bomb)
+	if multiplayer.is_server():
+		bomb.set_multiplayer_authority(1)
