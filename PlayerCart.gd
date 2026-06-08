@@ -50,6 +50,7 @@ var race_ui
 @onready var sfx_wind_loop = $Visuals/SFX_WindLoop
 @onready var sfx_landing_bonk = $Visuals/SFX_LandingBonk
 @onready var shield_mesh = $Visuals/ShieldMesh
+@onready var shockwave_visual = $Visuals/ShockwaveVisual
 
 var playback: AudioStreamGeneratorPlayback
 var sample_rate: float
@@ -575,12 +576,12 @@ func _on_shield_timeout():
 func _activate_shockwave():
 	if not is_local_player: return
 	# Create shockwave visual
-	ShockwaveVisual.visible = true
-	ShockwaveVisual.scale = Vector3(0.1, 0.1, 0.1)
+	shockwave_visual.visible = true
+	shockwave_visual.scale = Vector3(0.1, 0.1, 0.1)
 	var tween = create_tween()
-	tween.tween_property(ShockwaveVisual, "scale", Vector3(15.0, 15.0, 15.0), 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tween.tween_property(ShockwaveVisual, "material:albedo_color:a", 0.0, 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tween.finished.connect(func(): ShockwaveVisual.visible = false)
+	tween.tween_property(shockwave_visual, "scale", Vector3(15.0, 15.0, 15.0), 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(shockwave_visual, "material:albedo_color:a", 0.0, 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.finished.connect(func(): shockwave_visual.visible = false)
 	
 	# Apply force to nearby players
 	if multiplayer.is_server():
