@@ -16,6 +16,12 @@ const GRIP = 5.0
 
 const GRAVITY = 30.0 # extra gravity so it falls faster
 
+# Wheel/collision alignment constants
+const WHEEL_RADIUS = 0.4
+const WHEEL_Y_OFFSET = -0.35  # Visual wheel center relative to body center
+const COLLISION_Y_OFFSET = 0.0  # Collision sphere center relative to body center
+const COLLISION_RADIUS = WHEEL_RADIUS + 0.1  # Slightly larger than wheel radius
+
 # Preload item scenes
 const MISSILE_SCENE = preload("res://Missile.tscn")
 const BOMB_SCENE = preload("res://Bomb.tscn")
@@ -105,6 +111,15 @@ func _ready():
 	last_checkpoint_transform = global_transform
 	camera_look_at = global_position
 
+	# Setup collision shape to match wheel positions
+	var collision_shape = $CollisionShape3D
+	if collision_shape and collision_shape.shape is SphereShape3D:
+		collision_shape.shape.radius = COLLISION_RADIUS
+		collision_shape.transform.origin = Vector3(0, COLLISION_Y_OFFSET, 0)
+
+	# Adjust ground ray to reach just below collision sphere
+	ground_ray.target_position = Vector3(0, -(COLLISION_RADIUS + 0.2), 0)
+
 	visuals.global_transform = global_transform
 	visuals.top_level = true
 	
@@ -116,7 +131,7 @@ func _ready():
 		playback = engine_sound.get_stream_playback()
 		if not engine_sound.playing:
 			engine_sound.play()
-	
+
 	if is_local_player:
 		camera.current = true
 		camera_pivot.top_level = true
@@ -257,12 +272,16 @@ func _physics_process(delta):
 			if sfx_rocket_loop.playing: sfx_rocket_loop.stop()
 			
 			if current_speed > 1.0:
-				# Brake
+				# Brake hard when moving forward
 				apply_central_force(-fwd * BRAKING * mass)
-			else:
-				# Reverse
+			elif current_speed < -0.5:
+				# Already moving backward, apply reverse acceleration (more speed)
 				if current_speed > -REVERSE_SPEED:
 					apply_central_force(-fwd * (ACCELERATION * 0.5) * mass)
+			else:
+				# Stationary or very slow - initiate reverse
+				if current_speed > -REVERSE_SPEED:
+					apply_central_force(-fwd * (ACCELERATION * 0.7) * mass)
 		else:
 			boost_time = 0.0
 			is_boosting = false
@@ -323,17 +342,22 @@ func _update_visuals_alignment(delta):
 	var current_basis = visuals.global_transform.basis
 	var forward = -current_basis.z
 	var right = current_basis.x
-	
+
 	var target_up = normal
 	var target_right = forward.cross(target_up).normalized()
 	var target_forward = target_up.cross(target_right).normalized()
-	
+
 	var target_basis = Basis(target_right, target_up, -target_forward)
 	visuals.global_transform.basis = current_basis.slerp(target_basis, 8.0 * delta)
-	
-	# Keep visuals at the rigid body pos, maybe slightly offset based on sphere
-	visuals.global_position = global_position - Vector3(0, 0.4, 0)
-	
+
+	# Position visuals so wheels sit on ground (collision sphere bottom aligns with ground)
+	# collision sphere center is at global_position + COLLISION_Y_OFFSET
+	# collision sphere bottom is at global_position.y + COLLISION_Y_OFFSET - COLLISION_RADIUS
+	# wheels visual center should be at that height + WHEEL_RADIUS (so wheel bottom touches ground)
+	# visual origin needs to be at: wheel_center_y - WHEEL_Y_OFFSET
+	var wheel_visual_y = global_position.y + COLLISION_Y_OFFSET - COLLISION_RADIUS + WHEEL_RADIUS
+	visuals.global_position = Vector3(global_position.x, wheel_visual_y - WHEEL_Y_OFFSET, global_position.z)
+
 	_update_wheel_visuals(delta)
 
 func _fill_audio_buffer():
@@ -369,26 +393,29 @@ func _update_wheel_visuals(delta):
 func _interpolate_remote(delta: float):
 	var t = clamp(REMOTE_LERP_SPEED * delta, 0.0, 1.0)
 	global_position = global_position.lerp(sync_position, t)
-	
+
 	var current_quat := Quaternion.from_euler(rotation)
 	var target_quat := sync_rotation_quat
 	if target_quat == Quaternion.IDENTITY:
 		target_quat = Quaternion.from_euler(sync_rotation)
-	
+
 	var rot_t = clamp(REMOTE_LERP_SPEED * 0.65 * delta, 0.0, 1.0)
 	var new_quat := current_quat.slerp(target_quat, rot_t)
 	rotation = new_quat.get_euler()
-	
+
 	linear_velocity = linear_velocity.lerp(sync_velocity, 0.6)
-	
-	# Remotes also need their visuals to follow the rigid body
+
+	# Remotes also need their visuals to follow the rigid body with proper wheel alignment
 	visuals.global_transform.basis = Basis(new_quat)
-	visuals.global_position = global_position - Vector3(0, 0.4, 0)
 	
+	# Position visuals so wheels sit on ground (same as local player)
+	var wheel_visual_y = global_position.y + COLLISION_Y_OFFSET - COLLISION_RADIUS + WHEEL_RADIUS
+	visuals.global_position = Vector3(global_position.x, wheel_visual_y - WHEEL_Y_OFFSET, global_position.z)
+
 	var speed := sync_velocity.length()
 	var wheel_spin_rate := speed / 0.4
 	wheel_rotation -= wheel_spin_rate * delta
-	
+
 	for wheel in ["FL", "FR", "RL", "RR"]:
 		var w_node = get_node_or_null("Visuals/WheelPivot" + wheel)
 		if w_node:
@@ -398,27 +425,26 @@ func _interpolate_remote(delta: float):
 				w_node.get_child(0).rotation.x = wheel_rotation
 
 func _setup_new_car_wheels():
-	var wheels_config = {
-		"FL": "CartModel/part_5",
-		"FR": "CartModel/part_2",
-		"RL": "CartModel/part_6",
-		"RR": "CartModel/part_0"
-	}
-	
-	for key in wheels_config:
-		var path = wheels_config[key]
+	# Hide FBX wheel parts (part_0, part_2, part_5, part_6) and use the glb wheel instances at pivots
+	var fbx_wheel_paths = ["CartModel/part_0", "CartModel/part_2", "CartModel/part_5", "CartModel/part_6"]
+	for path in fbx_wheel_paths:
 		var node = get_node_or_null("Visuals/" + path)
-		var pivot_node = get_node_or_null("Visuals/WheelPivot" + key)
-		if node and node is MeshInstance3D and pivot_node:
-			node.reparent(pivot_node, false)
-			node.position = Vector3.ZERO
-			node.rotation = Vector3.ZERO
-			
-			var dark_mat = StandardMaterial3D.new()
-			dark_mat.albedo_color = Color(0.12, 0.12, 0.12)
-			dark_mat.roughness = 0.85
-			node.material_override = dark_mat
+		if node:
+			node.visible = false
+	
+	# The glb wheel instances at WheelPivotFL/FR/RL/RR are already positioned correctly
+	# Just ensure they're visible and have proper material
+	for wheel in ["FL", "FR", "RL", "RR"]:
+		var pivot_node = get_node_or_null("Visuals/WheelPivot" + wheel)
+		if pivot_node:
 			pivot_node.visible = true
+			if pivot_node.get_child_count() > 0:
+				var wheel_mesh = pivot_node.get_child(0)
+				if wheel_mesh is MeshInstance3D:
+					var dark_mat = StandardMaterial3D.new()
+					dark_mat.albedo_color = Color(0.12, 0.12, 0.12)
+					dark_mat.roughness = 0.85
+					wheel_mesh.material_override = dark_mat
 
 func _move_and_sync():
 	sync_position = global_position
@@ -464,17 +490,21 @@ func respawn():
 	burning_particles.emitting = false
 	burning_smoke_particles.emitting = false
 	sfx_fire_loop.stop()
-	
+
 	linear_velocity = Vector3.ZERO
 	angular_velocity = Vector3.ZERO
-	
+
 	var spawn_pos = last_checkpoint_transform.origin + (last_checkpoint_transform.basis.z * 5.0) + Vector3(0, 2.0, 0)
 	global_position = spawn_pos
-	
+
+	# Reset visuals position to align wheels with ground
+	var wheel_visual_y = global_position.y + COLLISION_Y_OFFSET - COLLISION_RADIUS + WHEEL_RADIUS
+	visuals.global_position = Vector3(global_position.x, wheel_visual_y - WHEEL_Y_OFFSET, global_position.z)
+
 	var look_target = last_checkpoint_transform.origin
 	look_target.y = spawn_pos.y
 	visuals.look_at(look_target, Vector3.UP)
-	
+
 	if not engine_sound.playing: engine_sound.play()
 
 func give_item(type: int):
@@ -482,6 +512,15 @@ func give_item(type: int):
 	if is_local_player and race_ui:
 		var item_name = ItemType.keys()[type]
 		race_ui.update_item(item_name)
+
+func _get_random_item_rpc() -> int:
+	# Returns a random item type (excluding NONE)
+	var item_keys = ItemType.keys()
+	var valid_items = []
+	for key in item_keys:
+		if key != "NONE":
+			valid_items.append(ItemType[key])
+	return valid_items[randi() % valid_items.size()]
 
 func _remove_collisions_recursive(node: Node):
 	if node == null: return
