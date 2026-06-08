@@ -256,6 +256,7 @@ func _physics_process(delta):
 
 	# Handle acceleration/braking even when slightly airborne for better control
 	var current_speed = linear_velocity.dot(fwd)
+	var accel_force = 0.0
 	
 	if input_dir.y < -0.1: # Forward
 		var max_sp = MAX_SPEED
