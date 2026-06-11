@@ -715,25 +715,30 @@ func _remove_collisions_recursive(node: Node):
 func _fire_missile(guided: bool):
 	# Projectile instantiation now happens only on the server
 	if not multiplayer.is_server(): return
-	var missile = MISSILE_SCENE.instantiate()
-	missile.owner_id = name.to_int()
-	missile.is_guided = guided
 	var forward = -global_transform.basis.z
+	var pos = global_position
 	var rot = global_rotation
 	if visuals and visuals.is_inside_tree():
 		forward = -visuals.global_transform.basis.z
 		rot = visuals.global_rotation
 	
-	missile.global_position = global_position + (forward * 2.0) + Vector3(0, 1.0, 0)
-	missile.global_rotation = rot
-	
+	var spawn_pos = pos + (forward * 2.0) + Vector3(0, 1.0, 0)
+	_spawn_missile_rpc.rpc(spawn_pos, rot, name.to_int(), guided)
+
+@rpc("authority", "call_local", "reliable")
+func _spawn_missile_rpc(spawn_pos: Vector3, spawn_rot: Vector3, shooter_id: int, guided: bool):
+	var missile = MISSILE_SCENE.instantiate()
+	missile.owner_id = shooter_id
+	missile.is_guided = guided
 	var level = get_tree().get_first_node_in_group("level")
 	if level:
 		level.add_child(missile)
 	else:
 		get_tree().root.add_child(missile)
-	
-	missile.set_multiplayer_authority(1)
+	missile.global_position = spawn_pos
+	missile.global_rotation = spawn_rot
+	if multiplayer.is_server():
+		missile.set_multiplayer_authority(1)
 
 func _activate_shield():
 	is_shielded = true
@@ -806,50 +811,45 @@ func _enable_shadows_recursive(node: Node):
 func _update_antenna(delta):
 	if not antenna or not visuals or not visuals.is_inside_tree(): return
 	
-	# Get current local velocity of the car
+	# Get current local-space velocity
 	var current_velocity_local = visuals.global_transform.basis.inverse() * linear_velocity
 	
-	# Calculate local acceleration
+	# Calculate local-space acceleration
 	var acceleration_local = Vector3.ZERO
 	if delta > 0.0001:
 		acceleration_local = (current_velocity_local - last_velocity_local) / delta
 	last_velocity_local = current_velocity_local
 	
-	# Cap extreme accelerations to keep simulation stable
-	acceleration_local = acceleration_local.clamp(Vector3(-100.0, -100.0, -100.0), Vector3(100.0, 100.0, 100.0))
+	# Cap to avoid instability
+	acceleration_local = acceleration_local.clamp(Vector3(-80.0, -80.0, -80.0), Vector3(80.0, 80.0, 80.0))
 	
-	# Inertia force pushes the antenna tip in the opposite direction of acceleration
-	var force = -acceleration_local * 0.02
-	
-	# Add engine rumble when car is running / idle
-	var rumble = Vector3(
-		randf_range(-1.0, 1.0) * 0.05,
-		0.0,
-		randf_range(-1.0, 1.0) * 0.05
-	)
-	# Scale rumble by engine frequency or velocity
+	# --- Target tilt based on inertia ---
+	# Local Z = forward, so braking (positive accel.z) bends tip forward (negative rotation.x)
+	# Accelerating (negative accel.z) bends tip backward (positive rotation.x)
+	# Local X = right, so left turn (negative accel.x) bends tip left (positive rotation.z)
 	var speed = linear_velocity.length()
-	var rumble_scale = 1.0 + (speed / 10.0)
-	force += rumble * rumble_scale
+	var rumble_strength = clamp(speed * 0.0003, 0.0, 0.008)
+	var rumble_x = randf_range(-1.0, 1.0) * rumble_strength
+	var rumble_z = randf_range(-1.0, 1.0) * rumble_strength
 	
-	# Gravity force if the car tilts (local Y direction tilting relative to global gravity)
-	var local_gravity = visuals.global_transform.basis.inverse() * Vector3.DOWN
-	# Pulls the antenna in the direction of local gravity projection (X and Z)
-	force += Vector3(local_gravity.x, 0.0, local_gravity.z) * 0.5
+	# Target angle driven directly by acceleration (inertia: tip lags behind base)
+	var target_tilt_x = clamp(acceleration_local.z * 0.004, -0.55, 0.55) + rumble_x
+	var target_tilt_z = clamp(-acceleration_local.x * 0.003, -0.45, 0.45) + rumble_z
 	
-	# Spring-damper physics simulation
-	var spring_force = -180.0 * antenna_tilt
-	var damping_force = -10.0 * antenna_velocity
+	# Soft spring towards target — stiffness 12, damping 6 feels like flexible metal
+	const STIFFNESS = 12.0
+	const DAMPING = 6.0
 	
-	var antenna_accel = force + spring_force + damping_force
-	antenna_velocity += antenna_accel * delta
-	# Clamp velocity to prevent wild swinging
-	antenna_velocity = antenna_velocity.clamp(Vector3(-30.0, -30.0, -30.0), Vector3(30.0, 30.0, 30.0))
+	var error_x = target_tilt_x - antenna_tilt.x
+	var error_z = target_tilt_z - antenna_tilt.z
 	
-	antenna_tilt += antenna_velocity * delta
-	# Limit maximum bend angle (approx 35 degrees)
-	antenna_tilt = antenna_tilt.clamp(Vector3(-0.6, -0.6, -0.6), Vector3(0.6, 0.6, 0.6))
+	antenna_velocity.x += (error_x * STIFFNESS - antenna_velocity.x * DAMPING) * delta
+	antenna_velocity.z += (error_z * STIFFNESS - antenna_velocity.z * DAMPING) * delta
 	
-	# Apply tilt to rotation (Z rotation for side-to-side, X rotation for front-to-back)
-	antenna.rotation.z = antenna_tilt.x
-	antenna.rotation.x = -antenna_tilt.z
+	antenna_tilt.x += antenna_velocity.x * delta
+	antenna_tilt.z += antenna_velocity.z * delta
+	antenna_tilt = antenna_tilt.clamp(Vector3(-0.55, -0.55, -0.55), Vector3(0.55, 0.55, 0.55))
+	
+	# Apply: X rotation = forward/back bend, Z rotation = side bend
+	antenna.rotation.x = antenna_tilt.x
+	antenna.rotation.z = antenna_tilt.z
