@@ -27,8 +27,8 @@ func _ready():
 	broadcast_timer.wait_time = BROADCAST_INTERVAL
 	broadcast_timer.timeout.connect(_on_broadcast_timer_timeout)
 
-func start_broadcasting(name: String, port: int):
-	server_name = name
+func start_broadcasting(host_name: String, port: int):
+	server_name = host_name
 	server_port = port
 	
 	broadcast_peer = PacketPeerUDP.new()
@@ -79,7 +79,7 @@ func _on_broadcast_timer_timeout():
 		if err != OK:
 			printerr("LANDiscovery: Failed to broadcast packet")
 
-func _process(delta):
+func _process(_delta):
 	# Timeout old servers
 	if is_listening:
 		var now = Time.get_ticks_msec() / 1000.0

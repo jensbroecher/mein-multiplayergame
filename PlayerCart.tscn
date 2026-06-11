@@ -220,7 +220,7 @@ shape = SubResource("SphereShape3D_cart")
 top_level = true
 
 [node name="CartModel" parent="Visuals" unique_id=768104268 instance=ExtResource("2_cart")]
-transform = Transform3D(-2, 0, -1.74846e-07, 0, 2, 0, 1.74846e-07, 0, -2, 0, 0.18, 0)
+transform = Transform3D(-2, 0, -1.74846e-07, 0, 2, 0, 1.74846e-07, 0, -2, 0, 0.02, 0)
 
 [node name="BoostParticles" type="GPUParticles3D" parent="Visuals" unique_id=457637679]
 transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0.6, 1.1)
@@ -272,28 +272,28 @@ draw_pass_1 = SubResource("QuadMesh_splash")
 
 [node name="WheelPivotFL" type="Node3D" parent="Visuals" unique_id=40001]
 visible = false
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.44312996, -0.021691, -0.64313036)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.52, -0.021691, -0.65)
 
 [node name="WheelFL" parent="Visuals/WheelPivotFL" unique_id=471895820 instance=ExtResource("3_wheel")]
 transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0, -0.228309, 0)
 
 [node name="WheelPivotFR" type="Node3D" parent="Visuals" unique_id=40002]
 visible = false
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4259705, -0.021691, -0.68688697)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.52, -0.021691, -0.65)
 
 [node name="WheelFR" parent="Visuals/WheelPivotFR" unique_id=292410534 instance=ExtResource("3_wheel")]
 transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0, -0.228309, 0)
 
 [node name="WheelPivotRL" type="Node3D" parent="Visuals" unique_id=40003]
 visible = false
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45103335, -0.021691, 0.41018802)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.52, -0.021691, 0.45)
 
 [node name="WheelRL" parent="Visuals/WheelPivotRL" unique_id=1288615826 instance=ExtResource("3_wheel")]
 transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0, -0.228309, 0)
 
 [node name="WheelPivotRR" type="Node3D" parent="Visuals" unique_id=40004]
 visible = false
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.433761, -0.021691, 0.4703167)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.52, -0.021691, 0.45)
 
 [node name="WheelRR" parent="Visuals/WheelPivotRR" unique_id=1528504604 instance=ExtResource("3_wheel")]
 transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0, -0.228309, 0)

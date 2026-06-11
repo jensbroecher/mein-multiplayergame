@@ -7,7 +7,7 @@ extends RigidBody3D
 			$Visuals/NameTag.text = value
 
 # Vehicle Parameters
-const MAX_SPEED = 40.0
+const MAX_SPEED = 30.0
 const REVERSE_SPEED = 15.0
 const ACCELERATION = 50.0
 const BRAKING = 40.0
@@ -18,9 +18,9 @@ const GRAVITY = 30.0 # extra gravity so it falls faster
 
 # Wheel/collision alignment constants
 const WHEEL_RADIUS = 0.4
-const WHEEL_Y_OFFSET = -0.35  # Visual wheel center relative to body center
+const WHEEL_Y_OFFSET = -0.021691  # Match the actual WheelPivot Y position to prevent hovering
 const COLLISION_Y_OFFSET = 0.0  # Collision sphere center relative to body center
-const COLLISION_RADIUS = WHEEL_RADIUS + 0.1  # Slightly larger than wheel radius
+const COLLISION_RADIUS = WHEEL_RADIUS + 0.2  # Slightly larger to prevent tunneling without CCD
 
 # Preload item scenes
 const MISSILE_SCENE = preload("res://Missile.tscn")
@@ -72,6 +72,7 @@ var is_shielded: bool = false
 var camera_look_at: Vector3 = Vector3.ZERO
 var is_isometric: bool = false
 var engine_phase: float = 0.0
+var hop_cooldown: float = 0.0
 
 var is_underwater: bool = false
 const WATER_LEVEL = -10.0
@@ -128,6 +129,7 @@ func _ready():
 	
 	_remove_collisions_recursive(visuals)
 	_setup_new_car_wheels()
+	_enable_shadows_recursive(visuals)
 
 	# Route all sound effects under visuals to the SFX bus
 	for child in visuals.get_children():
@@ -182,12 +184,26 @@ func _process(delta):
 			if is_isometric:
 				camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 				camera.size = 22.0
+				camera.far = 150.0
+				camera.near = 0.1
 			else:
 				camera.projection = Camera3D.PROJECTION_PERSPECTIVE
+				camera.far = 4000.0
+				camera.near = 0.05
 
 		if is_isometric:
 			var iso_offset = Vector3(-20, 20, 20)
 			var target_cam_pos = visuals.global_position + iso_offset
+			
+			# Avoid clipping through bridge/terrain
+			var space_state = get_world_3d().direct_space_state
+			var ray_start = visuals.global_position + Vector3.UP * 1.0
+			var query = PhysicsRayQueryParameters3D.create(ray_start, target_cam_pos)
+			query.exclude = [self.get_rid()]
+			var result = space_state.intersect_ray(query)
+			if result:
+				target_cam_pos = result.position - (target_cam_pos - ray_start).normalized() * 0.5
+				
 			camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 10.0 * delta)
 			camera_pivot.look_at(visuals.global_position, Vector3.UP)
 		else:
@@ -196,6 +212,16 @@ func _process(delta):
 			# Smooth camera trailing
 			var visual_forward = -visuals.global_transform.basis.z
 			var target_cam_pos = visuals.global_position - visual_forward * cam_dist + Vector3(0, 1.5, 0)
+			
+			# Avoid clipping through bridge/terrain
+			var space_state = get_world_3d().direct_space_state
+			var ray_start = visuals.global_position + Vector3.UP * 1.0
+			var query = PhysicsRayQueryParameters3D.create(ray_start, target_cam_pos)
+			query.exclude = [self.get_rid()]
+			var result = space_state.intersect_ray(query)
+			if result:
+				target_cam_pos = result.position - (target_cam_pos - ray_start).normalized() * 0.5
+				
 			camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 10.0 * delta)
 			
 			camera_look_at = camera_look_at.lerp(visuals.global_position + visual_forward * 5.0, 12.0 * delta)
@@ -210,6 +236,9 @@ func _process(delta):
 		_interpolate_remote(delta)
 
 func _physics_process(delta):
+	if hop_cooldown > 0:
+		hop_cooldown -= delta
+
 	if is_teleporting:
 		return
 
@@ -280,6 +309,21 @@ func _physics_process(delta):
 	var right = visuals.global_transform.basis.x
 
 	current_steer = lerp(current_steer, input_dir.x, 10.0 * delta)
+
+	# Auto-hop over small obstacles/bumps
+	if on_ground and input_dir.y < -0.1 and linear_velocity.length() < 15.0 and hop_cooldown <= 0.0:
+		var space_state = get_world_3d().direct_space_state
+		var ray_start = global_position + fwd * 0.5 + Vector3.UP * 0.1
+		var ray_end = global_position + fwd * 1.1 - Vector3.UP * 0.1
+		var query = PhysicsRayQueryParameters3D.create(ray_start, ray_end)
+		query.exclude = [self.get_rid()]
+		var result = space_state.intersect_ray(query)
+		if result:
+			var local_hit = global_transform.inverse() * result.position
+			# If obstacle is low (below bumper/axle height), jump over it
+			if local_hit.y > -0.5 and local_hit.y < 0.1:
+				apply_central_impulse(Vector3.UP * 4.5 * mass + fwd * 2.0 * mass)
+				hop_cooldown = 0.8 # Cooldown to prevent double jumps
 
 	# Handle acceleration/braking even when slightly airborne for better control
 	var current_speed = linear_velocity.dot(fwd)
@@ -496,17 +540,11 @@ func _setup_new_car_wheels():
 				wrapper.name = wheel + "_Wrapper"
 				pivot_node.add_child(wrapper)
 				
-				# Reparent wheel_mesh under the wrapper
-				wheel_mesh.reparent(wrapper)
+				# Reparent wheel_mesh under the wrapper, preserving its local transform from the editor
+				wheel_mesh.reparent(wrapper, false)
 				
 				# Position wrapper at pivot origin (0, 0, 0)
-				# and keep wheel_mesh at its original relative offset of -0.228309
 				wrapper.position = Vector3.ZERO
-				wheel_mesh.position = Vector3(0, -0.228309, 0)
-				
-				# Scale is 0.4, rotation is zero relative to wrapper
-				wheel_mesh.scale = Vector3(0.4, 0.4, 0.4)
-				wheel_mesh.rotation = Vector3.ZERO
 				
 				if wheel_mesh is MeshInstance3D:
 					var dark_mat = StandardMaterial3D.new()
@@ -586,7 +624,7 @@ func respawn():
 	if not engine_sound.playing: engine_sound.play()
 
 func give_item(type: int):
-	current_item = type
+	current_item = type as ItemType
 	if is_local_player and race_ui:
 		var item_name = ItemType.keys()[type]
 		race_ui.update_item(item_name)
@@ -659,3 +697,10 @@ func _drop_bomb():
 	get_tree().root.add_child(bomb)
 	if multiplayer.is_server():
 		bomb.set_multiplayer_authority(1)
+
+func _enable_shadows_recursive(node: Node):
+	if node == null: return
+	if node is GeometryInstance3D:
+		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	for child in node.get_children():
+		_enable_shadows_recursive(child)
