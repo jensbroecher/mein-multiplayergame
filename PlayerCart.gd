@@ -70,7 +70,7 @@ var wheel_rotation: float = 0.0
 var is_teleporting: bool = false
 var is_shielded: bool = false
 var camera_look_at: Vector3 = Vector3.ZERO
-var is_isometric: bool = false
+var is_isometric: bool = true
 var engine_phase: float = 0.0
 var hop_cooldown: float = 0.0
 
@@ -146,6 +146,10 @@ func _ready():
 		camera.current = true
 		camera_pivot.top_level = true
 		
+		# Set initial top-view camera settings
+		camera.projection = Camera3D.PROJECTION_PERSPECTIVE
+		camera.fov = 35.0
+		
 		# Lock rotation so we handle it manually
 		axis_lock_angular_x = true
 		axis_lock_angular_y = true
@@ -156,6 +160,12 @@ func _ready():
 			var ev = InputEventKey.new()
 			ev.physical_keycode = KEY_C
 			InputMap.action_add_event("toggle_camera", ev)
+
+		# Position camera immediately at start to avoid sliding in
+		if is_isometric:
+			var iso_offset = Vector3(-20, 20, 20)
+			camera_pivot.global_position = visuals.global_position + iso_offset
+			camera_pivot.look_at(visuals.global_position, Vector3.UP)
 	else:
 		camera.current = false
 		if has_node("Visuals/CameraPivot/Camera3D/AudioListener3D"):
@@ -182,14 +192,11 @@ func _process(delta):
 		if Input.is_action_just_pressed("toggle_camera"):
 			is_isometric = not is_isometric
 			if is_isometric:
-				camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-				camera.size = 22.0
-				camera.far = 150.0
-				camera.near = 0.1
+				camera.projection = Camera3D.PROJECTION_PERSPECTIVE
+				camera.fov = 35.0  # Narrow FOV for an isometric perspective look
 			else:
 				camera.projection = Camera3D.PROJECTION_PERSPECTIVE
-				camera.far = 4000.0
-				camera.near = 0.05
+				camera.fov = 75.0  # Default perspective FOV
 
 		if is_isometric:
 			var iso_offset = Vector3(-20, 20, 20)
@@ -431,13 +438,8 @@ func _update_visuals_alignment(delta):
 	var target_basis = Basis(target_right, target_up, -target_forward)
 	visuals.global_transform.basis = current_basis.slerp(target_basis, 8.0 * delta)
 
-	# Position visuals so wheels sit on ground (collision sphere bottom aligns with ground)
-	# collision sphere center is at global_position + COLLISION_Y_OFFSET
-	# collision sphere bottom is at global_position.y + COLLISION_Y_OFFSET - COLLISION_RADIUS
-	# wheels visual center should be at that height + WHEEL_RADIUS (so wheel bottom touches ground)
-	# visual origin needs to be at: wheel_center_y - WHEEL_Y_OFFSET
-	var wheel_visual_y = global_position.y + COLLISION_Y_OFFSET - COLLISION_RADIUS + WHEEL_RADIUS
-	visuals.global_position = Vector3(global_position.x, wheel_visual_y - WHEEL_Y_OFFSET, global_position.z)
+	# Allow the user to place wheels/body themselves in the scene editor
+	visuals.global_position = global_position
 
 	_update_wheel_visuals(delta)
 
@@ -495,12 +497,9 @@ func _interpolate_remote(delta: float):
 
 	linear_velocity = linear_velocity.lerp(sync_velocity, 0.6)
 
-	# Remotes also need their visuals to follow the rigid body with proper wheel alignment
+	# Remotes also need their visuals to follow the rigid body
 	visuals.global_transform.basis = Basis(new_quat)
-	
-	# Position visuals so wheels sit on ground (same as local player)
-	var wheel_visual_y = global_position.y + COLLISION_Y_OFFSET - COLLISION_RADIUS + WHEEL_RADIUS
-	visuals.global_position = Vector3(global_position.x, wheel_visual_y - WHEEL_Y_OFFSET, global_position.z)
+	visuals.global_position = global_position
 
 	var speed := sync_velocity.length()
 	var wheel_spin_rate := speed / 0.4
@@ -613,9 +612,8 @@ func respawn():
 	var spawn_pos = last_checkpoint_transform.origin + (last_checkpoint_transform.basis.z * 5.0) + Vector3(0, 2.0, 0)
 	global_position = spawn_pos
 
-	# Reset visuals position to align wheels with ground
-	var wheel_visual_y = global_position.y + COLLISION_Y_OFFSET - COLLISION_RADIUS + WHEEL_RADIUS
-	visuals.global_position = Vector3(global_position.x, wheel_visual_y - WHEEL_Y_OFFSET, global_position.z)
+	# Reset visuals position
+	visuals.global_position = global_position
 
 	var look_target = last_checkpoint_transform.origin
 	look_target.y = spawn_pos.y

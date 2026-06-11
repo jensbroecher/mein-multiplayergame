@@ -89,7 +89,7 @@ func generate_world():
 		_set_owner_recursive(self)
 
 func _save_resource(res: Resource, res_name: String) -> Resource:
-	if not Engine.is_editor_hint() or not save_to_files:
+	if not save_to_files:
 		return res
 
 	var dir_path = "res://generated/"
@@ -283,7 +283,7 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 		st.add_vertex(final_pos - right + Vector3(0, y_offset, 0))
 
 		st.set_normal(Vector3.UP)
-		st.set_uv(Vector2(1, offset))
+		st.set_uv(Vector2(width, offset)) # Use width instead of 1 to prevent texture stretching
 		st.add_vertex(final_pos + right + Vector3(0, y_offset, 0))
 
 	# INDEX LOOP (CCW - Facing UP)
@@ -314,7 +314,7 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 	mesh_instance.name = node_name
 	mesh_instance.mesh = _save_resource(st.commit(), node_name)
 	mesh_instance.material_override = mat_dup
-	mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON # Enable shadows to prevent shadow leaking under bridges
 	add_child(mesh_instance)
 
 
