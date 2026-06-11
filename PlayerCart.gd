@@ -70,6 +70,7 @@ var wheel_rotation: float = 0.0
 var is_teleporting: bool = false
 var is_shielded: bool = false
 var camera_look_at: Vector3 = Vector3.ZERO
+var is_isometric: bool = false
 
 var is_underwater: bool = false
 const WATER_LEVEL = -10.0
@@ -141,6 +142,12 @@ func _ready():
 		axis_lock_angular_x = true
 		axis_lock_angular_y = true
 		axis_lock_angular_z = true
+
+		if not InputMap.has_action("toggle_camera"):
+			InputMap.add_action("toggle_camera")
+			var ev = InputEventKey.new()
+			ev.physical_keycode = KEY_C
+			InputMap.action_add_event("toggle_camera", ev)
 	else:
 		camera.current = false
 		if has_node("Visuals/CameraPivot/Camera3D/AudioListener3D"):
@@ -164,16 +171,29 @@ func _process(delta):
 	if is_local_player:
 		_update_visuals_alignment(delta)
 
-		var cam_dist = lerp(3.5, 6.0, clamp(boost_time / 4.0, 0.0, 1.0))
-		var cam_offset = Vector3(0, 1.5, cam_dist)
-		
-		# Smooth camera trailing
-		var visual_forward = -visuals.global_transform.basis.z
-		var target_cam_pos = visuals.global_position - visual_forward * cam_dist + Vector3(0, 1.5, 0)
-		camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 10.0 * delta)
-		
-		camera_look_at = camera_look_at.lerp(visuals.global_position + visual_forward * 5.0, 12.0 * delta)
-		camera_pivot.look_at(camera_look_at, Vector3.UP)
+		if Input.is_action_just_pressed("toggle_camera"):
+			is_isometric = not is_isometric
+			if is_isometric:
+				camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+				camera.size = 14.0
+			else:
+				camera.projection = Camera3D.PROJECTION_PERSPECTIVE
+
+		if is_isometric:
+			var iso_offset = Vector3(-12, 12, 12)
+			var target_cam_pos = visuals.global_position + iso_offset
+			camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 10.0 * delta)
+			camera_pivot.look_at(visuals.global_position, Vector3.UP)
+		else:
+			var cam_dist = lerp(3.5, 6.0, clamp(boost_time / 4.0, 0.0, 1.0))
+			
+			# Smooth camera trailing
+			var visual_forward = -visuals.global_transform.basis.z
+			var target_cam_pos = visuals.global_position - visual_forward * cam_dist + Vector3(0, 1.5, 0)
+			camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 10.0 * delta)
+			
+			camera_look_at = camera_look_at.lerp(visuals.global_position + visual_forward * 5.0, 12.0 * delta)
+			camera_pivot.look_at(camera_look_at, Vector3.UP)
 
 		if race_ui:
 			race_ui.update_speed(linear_velocity.length() * 1.8)
@@ -397,9 +417,12 @@ func _update_wheel_visuals(delta):
 			if wheel == "FL" or wheel == "FR":
 				# Rotate on Y for steering
 				w_node.rotation.y = -sync_steer * 0.5
-			# The wheel model inside the pivot rotates on X
+			# The wheel model inside the pivot rotates on Z (axle)
 			if w_node.get_child_count() > 0:
-				w_node.get_child(0).rotation.x = wheel_rotation
+				var wheel_mesh = w_node.get_child(0)
+				var y_rot = PI / 2 if (wheel == "FL" or wheel == "RL") else -PI / 2
+				var z_rot = -wheel_rotation if (wheel == "FL" or wheel == "RL") else wheel_rotation
+				wheel_mesh.rotation = Vector3(0, y_rot, z_rot)
 
 func _interpolate_remote(delta: float):
 	var t = clamp(REMOTE_LERP_SPEED * delta, 0.0, 1.0)
@@ -433,7 +456,10 @@ func _interpolate_remote(delta: float):
 			if wheel == "FL" or wheel == "FR":
 				w_node.rotation.y = -sync_steer * 0.5
 			if w_node.get_child_count() > 0:
-				w_node.get_child(0).rotation.x = wheel_rotation
+				var wheel_mesh = w_node.get_child(0)
+				var y_rot = PI / 2 if (wheel == "FL" or wheel == "RL") else -PI / 2
+				var z_rot = -wheel_rotation if (wheel == "FL" or wheel == "RL") else wheel_rotation
+				wheel_mesh.rotation = Vector3(0, y_rot, z_rot)
 
 func _setup_new_car_wheels():
 	# Hide FBX wheel parts (part_0, part_2, part_5, part_6) and use the glb wheel instances at pivots
@@ -451,6 +477,13 @@ func _setup_new_car_wheels():
 			pivot_node.visible = true
 			if pivot_node.get_child_count() > 0:
 				var wheel_mesh = pivot_node.get_child(0)
+				
+				# Rotate 90 degrees on Y so axle (Z of GLB model) points sideways (X of pivot)
+				if wheel == "FL" or wheel == "RL":
+					wheel_mesh.rotation.y = PI / 2
+				else:
+					wheel_mesh.rotation.y = -PI / 2
+					
 				if wheel_mesh is MeshInstance3D:
 					var dark_mat = StandardMaterial3D.new()
 					dark_mat.albedo_color = Color(0.12, 0.12, 0.12)
