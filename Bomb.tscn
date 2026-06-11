@@ -1,4 +1,4 @@
-[gd_scene load_steps=5 format=3 uid="uid://bomb123"]
+[gd_scene load_steps=6 format=3 uid="uid://bomb123"]
 
 [ext_resource type="Script" path="res://Bomb.gd" id="1_bscript"]
 
@@ -14,6 +14,14 @@ radius = 0.4
 height = 0.8
 radial_segments = 8
 rings = 4
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_bomb"]
+properties/0/path = NodePath(".:position")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:rotation")
+properties/1/spawn = true
+properties/1/replication_mode = 1
 
 [node name="Bomb" type="RigidBody3D"]
 collision_layer = 4
@@ -36,3 +44,4 @@ shape = SubResource("SphereShape3D_b")
 mesh = SubResource("SphereMesh_b")
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_bomb")

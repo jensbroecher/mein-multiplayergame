@@ -96,6 +96,12 @@ var sync_rotation_quat: Quaternion = Quaternion.IDENTITY
 var target_mesh_transform := Transform3D.IDENTITY
 var current_steer: float = 0.0
 
+# RC Antenna variables
+@onready var antenna = $Visuals/Antenna
+var antenna_tilt: Vector3 = Vector3.ZERO
+var antenna_velocity: Vector3 = Vector3.ZERO
+var last_velocity_local: Vector3 = Vector3.ZERO
+
 func on_race_started():
 	if is_local_player:
 		can_move = true
@@ -186,6 +192,8 @@ func _update_authority():
 		freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
 
 func _process(delta):
+	_update_visual_states(delta)
+	_update_antenna(delta)
 	if is_local_player:
 		_update_visuals_alignment(delta)
 
@@ -285,6 +293,13 @@ func _physics_process(delta):
 	# Apply extra gravity
 	apply_central_force(Vector3.DOWN * GRAVITY * mass)
 
+	# Continuous boost timer check for the local player
+	if boost_timer > 0.0:
+		boost_timer -= delta
+		if boost_timer <= 0.0:
+			boost_timer = 0.0
+	is_boosting = boost_timer > 0.0
+
 	if not can_move:
 		linear_velocity = linear_velocity.lerp(Vector3.ZERO, 3.0 * delta)
 		_move_and_sync()
@@ -338,16 +353,11 @@ func _physics_process(delta):
 	
 	if input_dir.y < -0.1: # Forward
 		var max_sp = MAX_SPEED
-		if boost_timer > 0:
+		if is_boosting:
 			max_sp *= 1.5
 			accel_force = ACCELERATION * 2.0
-			boost_timer -= delta
-			is_boosting = true
-			if not sfx_rocket_loop.playing: sfx_rocket_loop.play()
 		else:
-			is_boosting = false
 			accel_force = ACCELERATION
-			if sfx_rocket_loop.playing: sfx_rocket_loop.stop()
 		
 		if current_speed < max_sp:
 			apply_central_force(fwd * accel_force * mass)
@@ -355,8 +365,6 @@ func _physics_process(delta):
 		
 	elif input_dir.y > 0.1: # Brake / Reverse
 		boost_time = 0.0
-		is_boosting = false
-		if sfx_rocket_loop.playing: sfx_rocket_loop.stop()
 		
 		if current_speed > 1.0:
 			# Brake hard when moving forward
@@ -560,22 +568,61 @@ func _move_and_sync():
 
 func _use_item():
 	if current_item == ItemType.NONE: return
-	match current_item:
+	# Request server to execute item use so it is authority-approved and spawned correctly on all clients
+	request_use_item.rpc_id(1)
+
+@rpc("any_peer", "call_local", "reliable")
+func request_use_item():
+	if not multiplayer.is_server(): return
+	if current_item == ItemType.NONE: return
+	
+	var item_to_use = current_item
+	current_item = ItemType.NONE # Clear item on server, replicates to client
+	
+	_execute_use_item(item_to_use)
+
+func _execute_use_item(type: int):
+	match type:
 		ItemType.BOOST:
-			boost_timer = 2.0
-			sfx_nitro_start.play()
-			boost_particles.emitting = true
+			client_start_boost.rpc_id(name.to_int())
 		ItemType.MISSILE:
 			_fire_missile(false)
 		ItemType.GUIDED_MISSILE:
 			_fire_missile(true)
 		ItemType.SHIELD:
-			_activate_shield()
+			client_start_shield.rpc_id(name.to_int())
 		ItemType.SHOCKWAVE:
 			_activate_shockwave()
 		ItemType.BOMB:
 			_drop_bomb()
-	current_item = ItemType.NONE
+
+@rpc("authority", "call_local", "reliable")
+func client_start_boost():
+	boost_timer = 2.0
+	is_boosting = true
+	sfx_nitro_start.play()
+	boost_particles.emitting = true
+
+@rpc("authority", "call_local", "reliable")
+func client_start_shield():
+	_activate_shield()
+
+func _update_visual_states(delta):
+	# Sync shield visual
+	if shield_mesh.visible != is_shielded:
+		shield_mesh.visible = is_shielded
+	
+	# Sync boost particles
+	if boost_particles.emitting != is_boosting:
+		boost_particles.emitting = is_boosting
+		
+	# Sync rocket sound
+	if is_boosting:
+		if not sfx_rocket_loop.playing:
+			sfx_rocket_loop.play()
+	else:
+		if sfx_rocket_loop.playing:
+			sfx_rocket_loop.stop()
 
 func explode():
 	if is_exploding: return
@@ -645,18 +692,23 @@ func _remove_collisions_recursive(node: Node):
 
 # Item implementations
 func _fire_missile(guided: bool):
-	if not is_local_player: return
+	# Projectile instantiation now happens only on the server
+	if not multiplayer.is_server(): return
 	var missile = MISSILE_SCENE.instantiate()
 	missile.owner_id = name.to_int()
 	missile.is_guided = guided
 	missile.global_position = global_position + (-visuals.global_transform.basis.z * 2.0) + Vector3(0, 1.0, 0)
 	missile.global_rotation = visuals.global_rotation
-	get_tree().root.add_child(missile)
-	if multiplayer.is_server():
-		missile.set_multiplayer_authority(1)
+	
+	var level = get_tree().get_first_node_in_group("level")
+	if level:
+		level.add_child(missile)
+	else:
+		get_tree().root.add_child(missile)
+	
+	missile.set_multiplayer_authority(1)
 
 func _activate_shield():
-	if not is_local_player: return
 	is_shielded = true
 	shield_mesh.visible = true
 	# Shield lasts 10 seconds
@@ -667,16 +719,7 @@ func _on_shield_timeout():
 	shield_mesh.visible = false
 
 func _activate_shockwave():
-	if not is_local_player: return
-	# Create shockwave visual
-	shockwave_visual.visible = true
-	shockwave_visual.scale = Vector3(0.1, 0.1, 0.1)
-	var tween = create_tween()
-	tween.tween_property(shockwave_visual, "scale", Vector3(15.0, 15.0, 15.0), 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tween.tween_property(shockwave_visual, "material:albedo_color:a", 0.0, 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tween.finished.connect(func(): shockwave_visual.visible = false)
-	
-	# Apply force to nearby players
+	# Apply force to nearby players (only on server)
 	if multiplayer.is_server():
 		var players = get_tree().get_nodes_in_group("player_carts")
 		for p in players:
@@ -684,17 +727,36 @@ func _activate_shockwave():
 			var dist = global_position.distance_to(p.global_position)
 			if dist < 15.0:
 				var dir = (p.global_position - global_position).normalized()
-				p.apply_central_force(dir * 2000.0 + Vector3.UP * 500.0)
+				p.apply_central_impulse(dir * 5000.0 * p.mass + Vector3.UP * 1500.0 * p.mass)
+		
+		# Play visual for all clients
+		client_play_shockwave.rpc()
+
+@rpc("authority", "call_local", "reliable")
+func client_play_shockwave():
+	shockwave_visual.visible = true
+	shockwave_visual.scale = Vector3(0.1, 0.1, 0.1)
+	var tween = create_tween()
+	tween.tween_property(shockwave_visual, "scale", Vector3(15.0, 15.0, 15.0), 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(shockwave_visual, "material:albedo_color:a", 0.0, 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.finished.connect(func(): shockwave_visual.visible = false)
+	sfx_release_pop.play()
 
 func _drop_bomb():
-	if not is_local_player: return
+	# Bomb instantiation now happens only on the server
+	if not multiplayer.is_server(): return
 	var bomb = BOMB_SCENE.instantiate()
 	bomb.owner_id = name.to_int()
 	bomb.global_position = global_position + Vector3(0, 1.0, 0)
 	bomb.linear_velocity = linear_velocity * 0.5
-	get_tree().root.add_child(bomb)
-	if multiplayer.is_server():
-		bomb.set_multiplayer_authority(1)
+	
+	var level = get_tree().get_first_node_in_group("level")
+	if level:
+		level.add_child(bomb)
+	else:
+		get_tree().root.add_child(bomb)
+	
+	bomb.set_multiplayer_authority(1)
 
 func _enable_shadows_recursive(node: Node):
 	if node == null: return
@@ -702,3 +764,54 @@ func _enable_shadows_recursive(node: Node):
 		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	for child in node.get_children():
 		_enable_shadows_recursive(child)
+
+func _update_antenna(delta):
+	if not antenna: return
+	
+	# Get current local velocity of the car
+	var current_velocity_local = visuals.global_transform.basis.inverse() * linear_velocity
+	
+	# Calculate local acceleration
+	var acceleration_local = Vector3.ZERO
+	if delta > 0.0001:
+		acceleration_local = (current_velocity_local - last_velocity_local) / delta
+	last_velocity_local = current_velocity_local
+	
+	# Cap extreme accelerations to keep simulation stable
+	acceleration_local = acceleration_local.clamp(Vector3(-100.0, -100.0, -100.0), Vector3(100.0, 100.0, 100.0))
+	
+	# Inertia force pushes the antenna tip in the opposite direction of acceleration
+	var force = -acceleration_local * 0.02
+	
+	# Add engine rumble when car is running / idle
+	var rumble = Vector3(
+		randf_range(-1.0, 1.0) * 0.05,
+		0.0,
+		randf_range(-1.0, 1.0) * 0.05
+	)
+	# Scale rumble by engine frequency or velocity
+	var speed = linear_velocity.length()
+	var rumble_scale = 1.0 + (speed / 10.0)
+	force += rumble * rumble_scale
+	
+	# Gravity force if the car tilts (local Y direction tilting relative to global gravity)
+	var local_gravity = visuals.global_transform.basis.inverse() * Vector3.DOWN
+	# Pulls the antenna in the direction of local gravity projection (X and Z)
+	force += Vector3(local_gravity.x, 0.0, local_gravity.z) * 0.5
+	
+	# Spring-damper physics simulation
+	var spring_force = -180.0 * antenna_tilt
+	var damping_force = -10.0 * antenna_velocity
+	
+	var antenna_accel = force + spring_force + damping_force
+	antenna_velocity += antenna_accel * delta
+	# Clamp velocity to prevent wild swinging
+	antenna_velocity = antenna_velocity.clamp(Vector3(-30.0, -30.0, -30.0), Vector3(30.0, 30.0, 30.0))
+	
+	antenna_tilt += antenna_velocity * delta
+	# Limit maximum bend angle (approx 35 degrees)
+	antenna_tilt = antenna_tilt.clamp(Vector3(-0.6, -0.6, -0.6), Vector3(0.6, 0.6, 0.6))
+	
+	# Apply tilt to rotation (Z rotation for side-to-side, X rotation for front-to-back)
+	antenna.rotation.z = antenna_tilt.x
+	antenna.rotation.x = -antenna_tilt.z

@@ -206,6 +206,33 @@ properties/9/path = NodePath(".:sync_rotation_quat")
 properties/9/spawn = true
 properties/9/replication_mode = 1
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rod"]
+albedo_color = Color(0.2, 0.2, 0.2, 1)
+metallic = 1.0
+roughness = 0.3
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_rod"]
+material = SubResource("StandardMaterial3D_rod")
+top_radius = 0.005
+bottom_radius = 0.01
+height = 0.8
+radial_segments = 6
+rings = 4
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tip"]
+albedo_color = Color(1, 0.2, 0, 1)
+roughness = 0.2
+emission_enabled = true
+emission = Color(1, 0.2, 0, 1)
+emission_energy_multiplier = 1.5
+
+[sub_resource type="SphereMesh" id="SphereMesh_tip"]
+material = SubResource("StandardMaterial3D_tip")
+radius = 0.04
+height = 0.08
+radial_segments = 8
+rings = 6
+
 [node name="PlayerCart" type="RigidBody3D" unique_id=1637232811]
 mass = 1200.0
 physics_material_override = SubResource("PhysicsMaterial_frictionless")
@@ -292,6 +319,16 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.52, -0.069490165, 0.45)
 
 [node name="WheelRR" parent="Visuals/WheelPivotRR" unique_id=1528504604 instance=ExtResource("3_wheel")]
 transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0, -0.228309, 0)
+[node name="Antenna" type="Node3D" parent="Visuals" unique_id=987654321]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, 0.6)
+
+[node name="Rod" type="MeshInstance3D" parent="Visuals/Antenna"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
+mesh = SubResource("CylinderMesh_rod")
+
+[node name="Tip" type="MeshInstance3D" parent="Visuals/Antenna"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+mesh = SubResource("SphereMesh_tip")
 
 [node name="NameTag" type="Label3D" parent="Visuals" unique_id=1335975530]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5, 0)

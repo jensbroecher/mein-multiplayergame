@@ -603,7 +603,7 @@ shape = ExtResource("7_dn5x0")
 
 [node name="Visual_Curbs" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1889004361]
 material_override = SubResource("ShaderMaterial_5qkpu")
-cast_shadow = 0
+cast_shadow = 1
 mesh = ExtResource("9_5qkpu")
 
 [node name="Visual_Curbs_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1844951276]
@@ -612,7 +612,7 @@ mesh = ExtResource("10_dcckh")
 
 [node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=647434573]
 material_override = SubResource("ShaderMaterial_jftiw")
-cast_shadow = 0
+cast_shadow = 1
 mesh = ExtResource("9_esphl")
 
 [node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=2138280574]

@@ -40,6 +40,14 @@ func _ready():
 	_setup_checkpoints()
 	_spawn_item_boxes()
 
+	# Projectile spawner for multiplayer sync of missiles/bombs
+	var proj_spawner = MultiplayerSpawner.new()
+	proj_spawner.name = "ProjectileSpawner"
+	proj_spawner.spawn_path = get_path()
+	proj_spawner.add_spawnable_scene("res://Missile.tscn")
+	proj_spawner.add_spawnable_scene("res://Bomb.tscn")
+	add_child(proj_spawner)
+
 	if multiplayer.is_server():
 		NetworkManager.player_connected.connect(_on_server_player_connected)
 		NetworkManager.player_disconnected.connect(_on_server_player_disconnected)
