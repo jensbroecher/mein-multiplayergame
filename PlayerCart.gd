@@ -137,6 +137,14 @@ func _ready():
 	_setup_new_car_wheels()
 	_enable_shadows_recursive(visuals)
 
+	# Setup unique material for shockwave visual to prevent sharing/crashing
+	if shockwave_visual:
+		var mat = StandardMaterial3D.new()
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.albedo_color = Color(1.0, 1.0, 1.0, 0.5)
+		shockwave_visual.material_override = mat
+
 	# Route all sound effects under visuals to the SFX bus
 	for child in visuals.get_children():
 		if child is AudioStreamPlayer3D:
@@ -481,8 +489,9 @@ func _update_wheel_visuals(delta):
 		var w_node = get_node_or_null("Visuals/WheelPivot" + wheel)
 		if w_node:
 			if wheel == "FL" or wheel == "FR":
-				# Rotate on Y for steering
-				w_node.rotation.y = -sync_steer * 0.5
+				# Rotate on Y for steering (invert when going in reverse to match physical wheel path)
+				var steer_direction = 1.0 if fwd_dot >= -1.0 else -1.0
+				w_node.rotation.y = -sync_steer * 0.5 * steer_direction
 			
 			var wrapper = w_node.get_node_or_null(wheel + "_Wrapper")
 			if wrapper:
@@ -513,11 +522,14 @@ func _interpolate_remote(delta: float):
 	var wheel_spin_rate := speed / 0.4
 	wheel_rotation -= wheel_spin_rate * delta
 
+	var remote_fwd_dot = sync_velocity.dot(-visuals.global_transform.basis.z)
+	var steer_direction = 1.0 if remote_fwd_dot >= -1.0 else -1.0
+
 	for wheel in ["FL", "FR", "RL", "RR"]:
 		var w_node = get_node_or_null("Visuals/WheelPivot" + wheel)
 		if w_node:
 			if wheel == "FL" or wheel == "FR":
-				w_node.rotation.y = -sync_steer * 0.5
+				w_node.rotation.y = -sync_steer * 0.5 * steer_direction
 			
 			var wrapper = w_node.get_node_or_null(wheel + "_Wrapper")
 			if wrapper:
@@ -568,17 +580,16 @@ func _move_and_sync():
 
 func _use_item():
 	if current_item == ItemType.NONE: return
+	var item_to_use = current_item
+	current_item = ItemType.NONE # Clear locally so it replicates to server immediately
+	if race_ui:
+		race_ui.update_item("NONE")
 	# Request server to execute item use so it is authority-approved and spawned correctly on all clients
-	request_use_item.rpc_id(1)
+	request_use_item.rpc_id(1, item_to_use)
 
 @rpc("any_peer", "call_local", "reliable")
-func request_use_item():
+func request_use_item(item_to_use: int):
 	if not multiplayer.is_server(): return
-	if current_item == ItemType.NONE: return
-	
-	var item_to_use = current_item
-	current_item = ItemType.NONE # Clear item on server, replicates to client
-	
 	_execute_use_item(item_to_use)
 
 func _execute_use_item(type: int):
@@ -623,6 +634,12 @@ func _update_visual_states(delta):
 	else:
 		if sfx_rocket_loop.playing:
 			sfx_rocket_loop.stop()
+
+func on_hit():
+	if is_shielded:
+		is_shielded = false
+		return
+	explode()
 
 func explode():
 	if is_exploding: return
@@ -674,6 +691,10 @@ func give_item(type: int):
 		var item_name = ItemType.keys()[type]
 		race_ui.update_item(item_name)
 
+@rpc("authority", "call_local", "reliable")
+func give_item_rpc(type: int):
+	give_item(type)
+
 func _get_random_item_rpc() -> int:
 	# Returns a random item type (excluding NONE)
 	var item_keys = ItemType.keys()
@@ -697,8 +718,14 @@ func _fire_missile(guided: bool):
 	var missile = MISSILE_SCENE.instantiate()
 	missile.owner_id = name.to_int()
 	missile.is_guided = guided
-	missile.global_position = global_position + (-visuals.global_transform.basis.z * 2.0) + Vector3(0, 1.0, 0)
-	missile.global_rotation = visuals.global_rotation
+	var forward = -global_transform.basis.z
+	var rot = global_rotation
+	if visuals and visuals.is_inside_tree():
+		forward = -visuals.global_transform.basis.z
+		rot = visuals.global_rotation
+	
+	missile.global_position = global_position + (forward * 2.0) + Vector3(0, 1.0, 0)
+	missile.global_rotation = rot
 	
 	var level = get_tree().get_first_node_in_group("level")
 	if level:
@@ -736,10 +763,21 @@ func _activate_shockwave():
 func client_play_shockwave():
 	shockwave_visual.visible = true
 	shockwave_visual.scale = Vector3(0.1, 0.1, 0.1)
+	if shockwave_visual.material_override:
+		shockwave_visual.material_override.albedo_color.a = 0.5
+	
 	var tween = create_tween()
-	tween.tween_property(shockwave_visual, "scale", Vector3(15.0, 15.0, 15.0), 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tween.tween_property(shockwave_visual, "material:albedo_color:a", 0.0, 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tween.finished.connect(func(): shockwave_visual.visible = false)
+	if tween:
+		var t1 = tween.tween_property(shockwave_visual, "scale", Vector3(15.0, 15.0, 15.0), 0.5)
+		if t1:
+			t1.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		
+		var t2 = tween.tween_property(shockwave_visual, "material_override:albedo_color:a", 0.0, 0.5)
+		if t2:
+			t2.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			
+		tween.finished.connect(func(): shockwave_visual.visible = false)
+	
 	sfx_release_pop.play()
 
 func _drop_bomb():
@@ -766,7 +804,7 @@ func _enable_shadows_recursive(node: Node):
 		_enable_shadows_recursive(child)
 
 func _update_antenna(delta):
-	if not antenna: return
+	if not antenna or not visuals or not visuals.is_inside_tree(): return
 	
 	# Get current local velocity of the car
 	var current_velocity_local = visuals.global_transform.basis.inverse() * linear_velocity

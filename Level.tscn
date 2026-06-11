@@ -4,17 +4,17 @@
 [ext_resource type="PackedScene" uid="uid://gate123" path="res://CheckpointGate.tscn" id="2_gate"]
 [ext_resource type="Texture2D" uid="uid://bsmrfxbh6vqe2" path="res://materials/asphalt.png" id="3_asph"]
 [ext_resource type="Texture2D" uid="uid://ce51lhh2jn4l0" path="res://materials/grass.png" id="5_grass"]
-[ext_resource type="ArrayMesh" uid="uid://c2iwrw3ka0fo5" path="res://generated/terrain_visual.res" id="6_d6u53"]
+[ext_resource type="ArrayMesh" path="res://generated/terrain_visual.res" id="6_d6u53"]
 [ext_resource type="Texture2D" uid="uid://dh0ue4kmyvxwd" path="res://materials/sand.png" id="6_sand"]
-[ext_resource type="Shape3D" uid="uid://c7uax04fsxgbe" path="res://generated/terrain_collision_shape.res" id="7_dn5x0"]
+[ext_resource type="Shape3D" path="res://generated/terrain_collision_shape.res" id="7_dn5x0"]
 [ext_resource type="Script" uid="uid://b2sbc4x8rba5g" path="res://TerrainGenerator.gd" id="7_gen"]
 [ext_resource type="Shader" uid="uid://cvne02d6iyem5" path="res://curb_stripes.gdshader" id="8_esphl"]
 [ext_resource type="PackedScene" uid="uid://clxv8p6x0y6k2" path="res://SpawnIndicator.tscn" id="8_spawn"]
-[ext_resource type="ArrayMesh" uid="uid://sbpu0gmuiaan" path="res://generated/Visual_Curbs.res" id="9_5qkpu"]
-[ext_resource type="ArrayMesh" uid="uid://ygwuiusgwtu6" path="res://generated/Visual_Road.res" id="9_esphl"]
-[ext_resource type="ArrayMesh" uid="uid://dpbgv25xrnwe7" path="res://generated/Visual_Road_Sides.res" id="10_5qkpu"]
-[ext_resource type="ArrayMesh" uid="uid://dog18r4yevq5y" path="res://generated/Visual_Curbs_Sides.res" id="10_dcckh"]
-[ext_resource type="Shape3D" uid="uid://bf0r64xb5tp74" path="res://generated/track_collision_shape.res" id="12_esphl"]
+[ext_resource type="ArrayMesh" path="res://generated/Visual_Curbs.res" id="9_5qkpu"]
+[ext_resource type="ArrayMesh" path="res://generated/Visual_Road.res" id="9_esphl"]
+[ext_resource type="ArrayMesh" path="res://generated/Visual_Road_Sides.res" id="10_5qkpu"]
+[ext_resource type="ArrayMesh" path="res://generated/Visual_Curbs_Sides.res" id="10_dcckh"]
+[ext_resource type="Shape3D" path="res://generated/track_collision_shape.res" id="12_esphl"]
 [ext_resource type="Shader" uid="uid://srampgbp5hcn" path="res://water.gdshader" id="14_5qkpu"]
 
 [sub_resource type="PhysicalSkyMaterial" id="PhysicalSkyMaterial_clouds"]
@@ -1351,6 +1351,10 @@ transform = Transform3D(0.90456676, 0, 0.42633194, 0, 1, 0, -0.42633194, 0, 0.90
 _spawnable_scenes = PackedStringArray("uid://cart123")
 spawn_path = NodePath("../Players")
 spawn_limit = 4
+
+[node name="ProjectileSpawner" type="MultiplayerSpawner" parent="." unique_id=642896598]
+_spawnable_scenes = PackedStringArray("uid://missile123", "uid://bomb123")
+spawn_path = NodePath(".")
 
 [node name="Checkpoints" type="Node3D" parent="." unique_id=342440943]
 

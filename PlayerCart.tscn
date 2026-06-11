@@ -171,6 +171,32 @@ particles_anim_loop = false
 material = SubResource("StandardMaterial3D_splash")
 size = Vector2(0.6, 0.6)
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rod"]
+albedo_color = Color(0.2, 0.2, 0.2, 1)
+metallic = 1.0
+roughness = 0.3
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_rod"]
+material = SubResource("StandardMaterial3D_rod")
+top_radius = 0.005
+bottom_radius = 0.01
+height = 0.8
+radial_segments = 6
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tip"]
+albedo_color = Color(1, 0.2, 0, 1)
+roughness = 0.2
+emission_enabled = true
+emission = Color(1, 0.2, 0, 1)
+emission_energy_multiplier = 1.5
+
+[sub_resource type="SphereMesh" id="SphereMesh_tip"]
+material = SubResource("StandardMaterial3D_tip")
+radius = 0.04
+height = 0.08
+radial_segments = 8
+rings = 6
+
 [sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_engine"]
 buffer_length = 0.1
 
@@ -206,33 +232,6 @@ properties/9/path = NodePath(".:sync_rotation_quat")
 properties/9/spawn = true
 properties/9/replication_mode = 1
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rod"]
-albedo_color = Color(0.2, 0.2, 0.2, 1)
-metallic = 1.0
-roughness = 0.3
-
-[sub_resource type="CylinderMesh" id="CylinderMesh_rod"]
-material = SubResource("StandardMaterial3D_rod")
-top_radius = 0.005
-bottom_radius = 0.01
-height = 0.8
-radial_segments = 6
-rings = 4
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tip"]
-albedo_color = Color(1, 0.2, 0, 1)
-roughness = 0.2
-emission_enabled = true
-emission = Color(1, 0.2, 0, 1)
-emission_energy_multiplier = 1.5
-
-[sub_resource type="SphereMesh" id="SphereMesh_tip"]
-material = SubResource("StandardMaterial3D_tip")
-radius = 0.04
-height = 0.08
-radial_segments = 8
-rings = 6
-
 [node name="PlayerCart" type="RigidBody3D" unique_id=1637232811]
 mass = 1200.0
 physics_material_override = SubResource("PhysicsMaterial_frictionless")
@@ -247,7 +246,7 @@ shape = SubResource("SphereShape3D_cart")
 top_level = true
 
 [node name="CartModel" parent="Visuals" unique_id=768104268 instance=ExtResource("2_cart")]
-transform = Transform3D(-2, 0, -1.74846e-07, 0, 2, 0, 1.74846e-07, 0, -2, 0, -0.2506416, 0)
+transform = Transform3D(-2, 0, -1.74846e-07, 0, 2, 0, 1.74846e-07, 0, -2, 0, -0.6072377, 0)
 
 [node name="BoostParticles" type="GPUParticles3D" parent="Visuals" unique_id=457637679]
 transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0.6, 1.1)
@@ -297,36 +296,37 @@ process_material = SubResource("ParticleProcessMaterial_splash")
 draw_pass_1 = SubResource("QuadMesh_splash")
 
 [node name="WheelPivotFL" type="Node3D" parent="Visuals" unique_id=40001]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.52, -0.069490165, -0.65)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.52, -0.42080304, -0.8016523)
 
 [node name="WheelFL" parent="Visuals/WheelPivotFL" unique_id=471895820 instance=ExtResource("3_wheel")]
 transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0, -0.228309, 0)
 
 [node name="WheelPivotFR" type="Node3D" parent="Visuals" unique_id=40002]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.52, -0.069490165, -0.65)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.52, -0.42080304, -0.8016523)
 
 [node name="WheelFR" parent="Visuals/WheelPivotFR" unique_id=292410534 instance=ExtResource("3_wheel")]
 transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0, -0.228309, 0)
 
 [node name="WheelPivotRL" type="Node3D" parent="Visuals" unique_id=40003]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.52, -0.069490165, 0.45)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.52, -0.42080304, 0.54913574)
 
 [node name="WheelRL" parent="Visuals/WheelPivotRL" unique_id=1288615826 instance=ExtResource("3_wheel")]
 transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0, -0.228309, 0)
 
 [node name="WheelPivotRR" type="Node3D" parent="Visuals" unique_id=40004]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.52, -0.069490165, 0.45)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.52, -0.42080304, 0.54913574)
 
 [node name="WheelRR" parent="Visuals/WheelPivotRR" unique_id=1528504604 instance=ExtResource("3_wheel")]
 transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0, -0.228309, 0)
-[node name="Antenna" type="Node3D" parent="Visuals" unique_id=987654321]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, 0.6)
 
-[node name="Rod" type="MeshInstance3D" parent="Visuals/Antenna"]
+[node name="Antenna" type="Node3D" parent="Visuals" unique_id=987654321]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.111918926, 0.31964839, 0.09517008)
+
+[node name="Rod" type="MeshInstance3D" parent="Visuals/Antenna" unique_id=1044727396]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
 mesh = SubResource("CylinderMesh_rod")
 
-[node name="Tip" type="MeshInstance3D" parent="Visuals/Antenna"]
+[node name="Tip" type="MeshInstance3D" parent="Visuals/Antenna" unique_id=1367687176]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
 mesh = SubResource("SphereMesh_tip")
 

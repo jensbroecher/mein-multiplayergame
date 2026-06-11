@@ -9,6 +9,7 @@ extends CharacterBody3D
 var target: Node3D = null
 var lifetime = 5.0
 var search_timer = 0.0
+var spawn_safety_timer = 0.2
 
 func _ready():
 	add_to_group("missiles")
@@ -38,6 +39,9 @@ func _find_target():
 
 func _physics_process(delta):
 	if multiplayer.is_server():
+		if spawn_safety_timer > 0.0:
+			spawn_safety_timer -= delta
+
 		if is_guided:
 			search_timer += delta
 			if search_timer > 0.5: # Re-evaluate target every 0.5s
@@ -71,7 +75,8 @@ func _on_body_entered(body):
 				_explode()
 	elif body is StaticBody3D or body is CSGShape3D or body is GridMap:
 		# Hit wall/terrain
-		_explode()
+		if spawn_safety_timer <= 0.0:
+			_explode()
 
 func _explode():
 	# Emit particles or play sound via RPC?

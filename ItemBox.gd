@@ -30,10 +30,10 @@ func _on_body_entered(body):
 	if not is_active: return
 	
 	if body.is_in_group("player_carts"):
-		if body.has_method("give_item"):
+		if body.has_method("give_item_rpc"):
 			# Only give item if player doesn't have one
 			if body.current_item == body.ItemType.NONE:
-				body.give_item(body._get_random_item_rpc()) # Kart decides which item locally or via RPC
+				body.give_item_rpc.rpc_id(body.name.to_int(), body._get_random_item_rpc())
 				_deactivate_rpc.rpc()
 
 @rpc("authority", "call_local", "reliable")
