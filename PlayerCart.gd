@@ -71,6 +71,7 @@ var is_teleporting: bool = false
 var is_shielded: bool = false
 var camera_look_at: Vector3 = Vector3.ZERO
 var is_isometric: bool = false
+var engine_phase: float = 0.0
 
 var is_underwater: bool = false
 const WATER_LEVEL = -10.0
@@ -128,6 +129,11 @@ func _ready():
 	_remove_collisions_recursive(visuals)
 	_setup_new_car_wheels()
 
+	# Route all sound effects under visuals to the SFX bus
+	for child in visuals.get_children():
+		if child is AudioStreamPlayer3D:
+			child.bus = &"SFX"
+
 	if engine_sound.stream is AudioStreamGenerator:
 		sample_rate = engine_sound.stream.mix_rate
 		playback = engine_sound.get_stream_playback()
@@ -175,12 +181,12 @@ func _process(delta):
 			is_isometric = not is_isometric
 			if is_isometric:
 				camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-				camera.size = 14.0
+				camera.size = 22.0
 			else:
 				camera.projection = Camera3D.PROJECTION_PERSPECTIVE
 
 		if is_isometric:
-			var iso_offset = Vector3(-12, 12, 12)
+			var iso_offset = Vector3(-20, 20, 20)
 			var target_cam_pos = visuals.global_position + iso_offset
 			camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 10.0 * delta)
 			camera_pivot.look_at(visuals.global_position, Vector3.UP)
@@ -396,13 +402,19 @@ func _fill_audio_buffer():
 	var available = playback.get_frames_available()
 	if available == 0: return
 
-	var freq = 120.0 + linear_velocity.length() * 8.0
+	# Electric RC motor frequency mapping
+	var freq = 200.0 + linear_velocity.length() * 25.0
 	if is_boosting: freq *= 1.5
 
 	for i in range(available):
-		var t = float(i) / sample_rate
-		var sample = sin(t * freq * TAU) * 0.3
-		sample += sin(t * freq * 2.0 * TAU) * 0.1
+		engine_phase += freq / sample_rate
+		if engine_phase > 1.0:
+			engine_phase -= 1.0
+		
+		# Electric RC motor sound: high pitch whine + first harmonic + gear whine
+		var sample = sin(engine_phase * TAU) * 0.25
+		sample += sin(engine_phase * 2.0 * TAU) * 0.15
+		sample += sin(engine_phase * 3.0 * TAU) * 0.08
 		playback.push_frame(Vector2(sample, sample))
 
 func _update_wheel_visuals(delta):
@@ -417,12 +429,12 @@ func _update_wheel_visuals(delta):
 			if wheel == "FL" or wheel == "FR":
 				# Rotate on Y for steering
 				w_node.rotation.y = -sync_steer * 0.5
-			# The wheel model inside the pivot rotates on Z (axle)
-			if w_node.get_child_count() > 0:
-				var wheel_mesh = w_node.get_child(0)
+			
+			var wrapper = w_node.get_node_or_null(wheel + "_Wrapper")
+			if wrapper:
 				var y_rot = PI / 2 if (wheel == "FL" or wheel == "RL") else -PI / 2
 				var z_rot = -wheel_rotation if (wheel == "FL" or wheel == "RL") else wheel_rotation
-				wheel_mesh.rotation = Vector3(0, y_rot, z_rot)
+				wrapper.rotation = Vector3(0, y_rot, z_rot)
 
 func _interpolate_remote(delta: float):
 	var t = clamp(REMOTE_LERP_SPEED * delta, 0.0, 1.0)
@@ -455,11 +467,12 @@ func _interpolate_remote(delta: float):
 		if w_node:
 			if wheel == "FL" or wheel == "FR":
 				w_node.rotation.y = -sync_steer * 0.5
-			if w_node.get_child_count() > 0:
-				var wheel_mesh = w_node.get_child(0)
+			
+			var wrapper = w_node.get_node_or_null(wheel + "_Wrapper")
+			if wrapper:
 				var y_rot = PI / 2 if (wheel == "FL" or wheel == "RL") else -PI / 2
 				var z_rot = -wheel_rotation if (wheel == "FL" or wheel == "RL") else wheel_rotation
-				wheel_mesh.rotation = Vector3(0, y_rot, z_rot)
+				wrapper.rotation = Vector3(0, y_rot, z_rot)
 
 func _setup_new_car_wheels():
 	# Hide FBX wheel parts (part_0, part_2, part_5, part_6) and use the glb wheel instances at pivots
@@ -478,12 +491,23 @@ func _setup_new_car_wheels():
 			if pivot_node.get_child_count() > 0:
 				var wheel_mesh = pivot_node.get_child(0)
 				
-				# Rotate 90 degrees on Y so axle (Z of GLB model) points sideways (X of pivot)
-				if wheel == "FL" or wheel == "RL":
-					wheel_mesh.rotation.y = PI / 2
-				else:
-					wheel_mesh.rotation.y = -PI / 2
-					
+				# Create a wrapper node to act as the clean center of rotation
+				var wrapper = Node3D.new()
+				wrapper.name = wheel + "_Wrapper"
+				pivot_node.add_child(wrapper)
+				
+				# Reparent wheel_mesh under the wrapper
+				wheel_mesh.reparent(wrapper)
+				
+				# Position wrapper at pivot origin (0, 0, 0)
+				# and keep wheel_mesh at its original relative offset of -0.228309
+				wrapper.position = Vector3.ZERO
+				wheel_mesh.position = Vector3(0, -0.228309, 0)
+				
+				# Scale is 0.4, rotation is zero relative to wrapper
+				wheel_mesh.scale = Vector3(0.4, 0.4, 0.4)
+				wheel_mesh.rotation = Vector3.ZERO
+				
 				if wheel_mesh is MeshInstance3D:
 					var dark_mat = StandardMaterial3D.new()
 					dark_mat.albedo_color = Color(0.12, 0.12, 0.12)

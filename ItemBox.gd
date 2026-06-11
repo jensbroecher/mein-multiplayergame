@@ -10,6 +10,8 @@ const RESPAWN_TIME = 5.0
 
 func _ready():
 	area.body_entered.connect(_on_body_entered)
+	if sfx_pickup:
+		sfx_pickup.bus = &"SFX"
 
 func _process(delta):
 	# Animation for everyone
