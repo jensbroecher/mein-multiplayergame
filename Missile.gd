@@ -1,6 +1,6 @@
 extends CharacterBody3D
 
-@export var speed = 80.0
+@export var speed = 22.0
 @export var owner_id: int
 @export var is_guided: bool = false
 @onready var area = $Area3D
@@ -79,6 +79,9 @@ func _on_body_entered(body):
 			_explode()
 
 func _explode():
-	# Emit particles or play sound via RPC?
-	# For now just queue_free
+	if not is_instance_valid(self): return
+	_explode_rpc.rpc()
+
+@rpc("authority", "call_local", "reliable")
+func _explode_rpc():
 	queue_free()

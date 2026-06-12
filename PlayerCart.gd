@@ -266,7 +266,10 @@ func _physics_process(delta):
 		return
 
 	if global_position.y < -50:
-		respawn()
+		if multiplayer.is_server():
+			respawn_rpc.rpc_id(name.to_int())
+		elif is_local_player:
+			respawn() # single-player / host fallback
 
 	if is_exploding:
 		if is_local_player:
@@ -639,6 +642,14 @@ func on_hit():
 	if is_shielded:
 		is_shielded = false
 		return
+	# Server triggers the explosion for all clients
+	if multiplayer.is_server():
+		explode_rpc.rpc()
+	else:
+		explode() # fallback for local-only / single-player
+
+@rpc("authority", "call_local", "reliable")
+func explode_rpc():
 	explode()
 
 func explode():
@@ -651,7 +662,17 @@ func explode():
 	burning_particles.emitting = true
 	burning_smoke_particles.emitting = true
 	if engine_sound.playing: engine_sound.stop()
-	linear_velocity += Vector3(randf()-0.5, 10.0, randf()-0.5).normalized() * 15.0
+	if is_local_player:
+		linear_velocity += Vector3(randf()-0.5, 10.0, randf()-0.5).normalized() * 15.0
+	# Server schedules the respawn for everyone after 3 seconds
+	if multiplayer.is_server():
+		get_tree().create_timer(3.0).timeout.connect(
+			func(): if is_instance_valid(self): respawn_rpc.rpc_id(name.to_int())
+		)
+
+@rpc("authority", "call_local", "reliable")
+func respawn_rpc():
+	respawn()
 
 func respawn():
 	is_exploding = false
@@ -681,7 +702,9 @@ func respawn():
 
 	var look_target = last_checkpoint_transform.origin
 	look_target.y = spawn_pos.y
-	visuals.look_at(look_target, Vector3.UP)
+	# Guard against degenerate look_at (target == position)
+	if look_target.distance_to(spawn_pos) > 0.01:
+		visuals.look_at(look_target, Vector3.UP)
 
 	if not engine_sound.playing: engine_sound.play()
 
