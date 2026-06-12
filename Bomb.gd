@@ -63,25 +63,35 @@ func _explode():
 @rpc("authority", "call_local", "reliable")
 func _explode_rpc():
 	is_exploding = true
-	# Hide the bomb body, play particles in-place
-	visuals.visible = false
-	# Detach particles from bomb so they linger after queue_free
-	if explosion_particles:
-		explosion_particles.top_level = true
-		explosion_particles.global_position = global_position
-		explosion_particles.emitting = true
-	if smoke_particles:
-		smoke_particles.top_level = true
-		smoke_particles.global_position = global_position
-		smoke_particles.emitting = true
 	# Disable collisions immediately
 	var col = get_node_or_null("CollisionShape3D")
 	if col: col.disabled = true
 	var area_col = get_node_or_null("Area3D/CollisionShape3D")
 	if area_col: area_col.disabled = true
-	# Wait for particles to finish, then clean up
-	get_tree().create_timer(2.0).timeout.connect(func():
-		if is_instance_valid(explosion_particles): explosion_particles.queue_free()
-		if is_instance_valid(smoke_particles): smoke_particles.queue_free()
-	)
+	
+	# CRITICAL: reparent particles to scene root BEFORE freeing the bomb.
+	# top_level=true only affects transform, NOT lifetime — children still die with parent.
+	var scene_root = get_tree().current_scene
+	var expl_pos = global_position
+	
+	if is_instance_valid(explosion_particles):
+		var ep = explosion_particles
+		remove_child(ep)
+		scene_root.add_child(ep)
+		ep.global_position = expl_pos
+		ep.emitting = true
+		get_tree().create_timer(ep.lifetime + 0.5).timeout.connect(
+			func(): if is_instance_valid(ep): ep.queue_free()
+		)
+	
+	if is_instance_valid(smoke_particles):
+		var sp = smoke_particles
+		remove_child(sp)
+		scene_root.add_child(sp)
+		sp.global_position = expl_pos
+		sp.emitting = true
+		get_tree().create_timer(sp.lifetime + 0.5).timeout.connect(
+			func(): if is_instance_valid(sp): sp.queue_free()
+		)
+	
 	queue_free()

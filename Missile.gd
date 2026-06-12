@@ -1,34 +1,38 @@
 extends CharacterBody3D
 
-@export var speed = 22.0
+@export var speed: float = 33.0   # Starts slightly above car top speed
+const SPEED_MAX: float = 50.0     # Gradually accelerates to this
+const SPEED_ACCEL: float = 8.0    # m/s² acceleration
 @export var owner_id: int
 @export var is_guided: bool = false
 @onready var area = $Area3D
 @onready var visuals = $Visuals
+@onready var smoke_trail = $SmokeTrail
 
 var target: Node3D = null
 var lifetime = 5.0
 var search_timer = 0.0
-var spawn_safety_timer = 0.2
+var spawn_safety_timer = 0.3
 
 func _ready():
 	add_to_group("missiles")
 	area.body_entered.connect(_on_body_entered)
 	
 	if is_guided:
-		lifetime = 8.0 # Guided missiles last longer
+		lifetime = 8.0
 		_find_target()
-		# Change visual for guided
-		var mesh_inst = $Visuals/Mesh
+		# Purple tint for guided missiles
+		var mesh_inst = get_node_or_null("Visuals/Mesh")
 		if mesh_inst:
 			var mat = StandardMaterial3D.new()
-			mat.albedo_color = Color(0.6, 0, 1) # Purple
+			mat.albedo_color = Color(0.5, 0.0, 0.9, 1)
 			mat.emission_enabled = true
-			mat.emission = Color(0.4, 0, 0.8)
+			mat.emission = Color(0.4, 0.0, 0.8, 1)
+			mat.emission_energy_multiplier = 2.0
 			mesh_inst.set_surface_override_material(0, mat)
 
 func _find_target():
-	var nearest_dist = 50.0 # Search radius
+	var nearest_dist = 80.0
 	var players = get_tree().get_nodes_in_group("player_carts")
 	for p in players:
 		if p.name.to_int() == owner_id: continue
@@ -44,37 +48,33 @@ func _physics_process(delta):
 
 		if is_guided:
 			search_timer += delta
-			if search_timer > 0.5: # Re-evaluate target every 0.5s
+			if search_timer > 0.5:
 				_find_target()
 				search_timer = 0.0
-				
 			if target and is_instance_valid(target):
-				var target_pos = target.global_position
-				var dir = (target_pos - global_position).normalized()
+				var dir = (target.global_position - global_position).normalized()
 				var target_basis = Basis.looking_at(-dir, Vector3.UP)
-				# Smoothly rotate towards target
 				global_basis = global_basis.slerp(target_basis, 5.0 * delta).orthonormalized()
-		
+
+		# Gradually accelerate from start speed to max
+		speed = min(speed + SPEED_ACCEL * delta, SPEED_MAX)
+
 		var forward = -transform.basis.z
 		velocity = forward * speed
 		move_and_slide()
-		
+
 		lifetime -= delta
 		if lifetime <= 0:
 			_explode()
-			
-	# Everyone else syncs position/rotation (MultiplayerSynchronizer should handle it)
 
 func _on_body_entered(body):
 	if not multiplayer.is_server(): return
-	
 	if body.is_in_group("player_carts"):
 		if body.name.to_int() != owner_id:
 			if body.has_method("on_hit"):
 				body.on_hit()
-				_explode()
+			_explode()
 	elif body is StaticBody3D or body is CSGShape3D or body is GridMap:
-		# Hit wall/terrain
 		if spawn_safety_timer <= 0.0:
 			_explode()
 
@@ -84,4 +84,15 @@ func _explode():
 
 @rpc("authority", "call_local", "reliable")
 func _explode_rpc():
+	# Stop trail emitting — reparent it so it lingers in world space
+	if is_instance_valid(smoke_trail):
+		var scene_root = get_tree().current_scene
+		var trail_pos = smoke_trail.global_position
+		remove_child(smoke_trail)
+		scene_root.add_child(smoke_trail)
+		smoke_trail.global_position = trail_pos
+		smoke_trail.emitting = false
+		get_tree().create_timer(smoke_trail.lifetime + 0.2).timeout.connect(
+			func(): if is_instance_valid(smoke_trail): smoke_trail.queue_free()
+		)
 	queue_free()
