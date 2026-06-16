@@ -58,6 +58,22 @@ func _on_body_entered(body):
 func _explode():
 	if is_exploding: return
 	is_exploding = true
+	
+	# Server-side blast radius check
+	if multiplayer.is_server():
+		var blast_radius = 8.0
+		var players = get_tree().get_nodes_in_group("player_carts")
+		for p in players:
+			var dist = global_position.distance_to(p.global_position)
+			if dist <= blast_radius:
+				if p.has_method("on_hit"):
+					p.on_hit()
+					var dir = (p.global_position - global_position).normalized()
+					if dir.length_squared() < 0.01:
+						dir = Vector3.UP
+					# Blast force away from bomb (reduced so players don't fly off the map)
+					p.apply_central_impulse(dir * 8.0 * p.mass + Vector3.UP * 4.0 * p.mass)
+					
 	_explode_rpc.rpc()
 
 @rpc("authority", "call_local", "reliable")
@@ -93,11 +109,11 @@ func _explode_rpc():
 	
 	var tween = get_tree().create_tween()
 	if tween:
-		var t1 = tween.tween_property(expl_mesh, "scale", Vector3(5.0, 5.0, 5.0), 0.4)
+		var t1 = tween.tween_property(expl_mesh, "scale", Vector3(8.0, 8.0, 8.0), 0.45)
 		if t1:
 			t1.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		
-		var t2 = tween.parallel().tween_property(mat, "albedo_color:a", 0.0, 0.4)
+		var t2 = tween.parallel().tween_property(mat, "albedo_color:a", 0.0, 0.45)
 		if t2:
 			t2.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 			

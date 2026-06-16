@@ -267,7 +267,7 @@ func _process(delta):
 				_fill_audio_buffer()
 		else:
 			if engine_sound.playing:
-				engine_sound.volume_db = move_toward(engine_sound.volume_db, -45.0, 40.0 * delta)
+				engine_sound.volume_db = move_toward(engine_sound.volume_db, -45.0, 15.0 * delta)
 				if engine_sound.volume_db <= -44.9:
 					engine_sound.stop()
 					playback = null
@@ -381,40 +381,40 @@ func _physics_process(delta):
 
 	# Handle acceleration/braking even when slightly airborne for better control
 	var current_speed = linear_velocity.dot(fwd)
-	var accel_force = 0.0
 	
-	if input_dir.y < -0.1: # Forward
-		var max_sp = MAX_SPEED
-		if is_boosting:
-			max_sp *= 1.5
-			accel_force = ACCELERATION * 2.0
-		else:
-			accel_force = ACCELERATION
-		
+	if is_boosting:
+		var max_sp = MAX_SPEED * 1.5
+		var accel_force = ACCELERATION * 2.0
 		if current_speed < max_sp:
 			apply_central_force(fwd * accel_force * mass)
 		boost_time += delta
-		
-	elif input_dir.y > 0.1: # Brake / Reverse
+	
+	if input_dir.y < -0.1: # Forward input
+		if not is_boosting:
+			var accel_force = ACCELERATION
+			if current_speed < MAX_SPEED:
+				apply_central_force(fwd * accel_force * mass)
+			boost_time += delta
+	elif input_dir.y > 0.1: # Brake / Reverse input
 		boost_time = 0.0
-		
-		if current_speed > 1.0:
-			# Brake hard when moving forward
-			apply_central_force(-fwd * BRAKING * mass)
-		elif current_speed < -0.5:
-			# Already moving backward, apply reverse acceleration (more speed)
-			if current_speed > -REVERSE_SPEED:
-				apply_central_force(-fwd * (ACCELERATION * 0.5) * mass)
+		if is_boosting:
+			# If boosting, braking just reduces the boost effectiveness a bit
+			apply_central_force(-fwd * BRAKING * 0.5 * mass)
 		else:
-			# Stationary or very slow - initiate reverse
-			if current_speed > -REVERSE_SPEED:
-				apply_central_force(-fwd * (ACCELERATION * 0.7) * mass)
-	else:
-		boost_time = 0.0
-		is_boosting = false
-		if sfx_rocket_loop.playing: sfx_rocket_loop.stop()
-		# Natural friction
-		apply_central_force(-linear_velocity * 0.5 * mass)
+			if current_speed > 1.0:
+				apply_central_force(-fwd * BRAKING * mass)
+			elif current_speed < -0.5:
+				if current_speed > -REVERSE_SPEED:
+					apply_central_force(-fwd * (ACCELERATION * 0.5) * mass)
+			else:
+				if current_speed > -REVERSE_SPEED:
+					apply_central_force(-fwd * (ACCELERATION * 0.7) * mass)
+	else: # No throttle/brake input (coasting or stationary)
+		if not is_boosting:
+			boost_time = 0.0
+			is_boosting = false
+			if sfx_rocket_loop.playing: sfx_rocket_loop.stop()
+			apply_central_force(-linear_velocity * 0.5 * mass)
 
 	# Steering (works on ground and slightly airborne)
 	if on_ground or linear_velocity.length() > 0.5:
@@ -488,19 +488,20 @@ func _fill_audio_buffer():
 	var available = playback.get_frames_available()
 	if available == 0: return
 
-	# Electric RC motor frequency mapping
-	var freq = 200.0 + linear_velocity.length() * 25.0
-	if is_boosting: freq *= 1.5
+	# Electric RC motor frequency mapping - made less high-pitched (deeper base and slower rise)
+	var freq = 80.0 + linear_velocity.length() * 12.0
+	if is_boosting: freq *= 1.4
 
 	for i in range(available):
 		engine_phase += freq / sample_rate
 		if engine_phase > 1.0:
 			engine_phase -= 1.0
 		
-		# Electric RC motor sound: high pitch whine + first harmonic + gear whine
+		# Electric RC motor sound: high pitch whine + sub-harmonic for deep rumble + harmonics
 		var sample = sin(engine_phase * TAU) * 0.25
-		sample += sin(engine_phase * 2.0 * TAU) * 0.15
-		sample += sin(engine_phase * 3.0 * TAU) * 0.08
+		sample += sin(engine_phase * 0.5 * TAU) * 0.15 # Deep sub-harmonic rumble
+		sample += sin(engine_phase * 2.0 * TAU) * 0.10
+		sample += sin(engine_phase * 3.0 * TAU) * 0.05
 		playback.push_frame(Vector2(sample, sample))
 
 func _update_wheel_visuals(delta):
