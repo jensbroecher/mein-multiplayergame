@@ -215,6 +215,10 @@ func _process(delta):
 				camera.projection = Camera3D.PROJECTION_PERSPECTIVE
 				camera.fov = 75.0  # Default perspective FOV
 
+		var visual_forward = -visuals.global_transform.basis.z
+		var speed_factor = clamp(linear_velocity.length() / MAX_SPEED, 0.0, 1.0)
+		var look_ahead_dist = 4.0 + speed_factor * 6.0
+
 		if is_isometric:
 			var iso_offset = Vector3(-20, 20, 20)
 			var target_cam_pos = visuals.global_position + iso_offset
@@ -229,12 +233,12 @@ func _process(delta):
 				target_cam_pos = result.position - (target_cam_pos - ray_start).normalized() * 0.5
 				
 			camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 10.0 * delta)
-			camera_pivot.look_at(visuals.global_position, Vector3.UP)
+			camera_look_at = camera_look_at.lerp(visuals.global_position + visual_forward * look_ahead_dist, 10.0 * delta)
+			camera_pivot.look_at(camera_look_at, Vector3.UP)
 		else:
 			var cam_dist = lerp(3.5, 6.0, clamp(boost_time / 4.0, 0.0, 1.0))
 			
 			# Smooth camera trailing
-			var visual_forward = -visuals.global_transform.basis.z
 			var target_cam_pos = visuals.global_position - visual_forward * cam_dist + Vector3(0, 1.5, 0)
 			
 			# Avoid clipping through bridge/terrain
@@ -248,7 +252,7 @@ func _process(delta):
 				
 			camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 10.0 * delta)
 			
-			camera_look_at = camera_look_at.lerp(visuals.global_position + visual_forward * 5.0, 12.0 * delta)
+			camera_look_at = camera_look_at.lerp(visuals.global_position + visual_forward * (look_ahead_dist + 2.0), 12.0 * delta)
 			camera_pivot.look_at(camera_look_at, Vector3.UP)
 
 		if race_ui:
