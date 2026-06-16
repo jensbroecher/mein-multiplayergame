@@ -74,6 +74,35 @@ func _explode_rpc():
 	var scene_root = get_tree().current_scene
 	var expl_pos = global_position
 	
+	# Create spherical explosion visual
+	var expl_mesh = MeshInstance3D.new()
+	var sphere = SphereMesh.new()
+	sphere.radius = 1.0
+	sphere.height = 2.0
+	expl_mesh.mesh = sphere
+	
+	var mat = StandardMaterial3D.new()
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(1.0, 0.5, 0.1, 0.8) # Vibrant orange/fire
+	expl_mesh.material_override = mat
+	
+	scene_root.add_child(expl_mesh)
+	expl_mesh.global_position = expl_pos
+	expl_mesh.scale = Vector3(0.1, 0.1, 0.1)
+	
+	var tween = get_tree().create_tween()
+	if tween:
+		var t1 = tween.tween_property(expl_mesh, "scale", Vector3(5.0, 5.0, 5.0), 0.4)
+		if t1:
+			t1.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		
+		var t2 = tween.parallel().tween_property(mat, "albedo_color:a", 0.0, 0.4)
+		if t2:
+			t2.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			
+		tween.finished.connect(func(): if is_instance_valid(expl_mesh): expl_mesh.queue_free())
+	
 	if is_instance_valid(explosion_particles):
 		var ep = explosion_particles
 		remove_child(ep)

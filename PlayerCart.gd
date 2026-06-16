@@ -47,6 +47,7 @@ var race_ui
 @onready var explosion_particles = $Visuals/ExplosionParticles
 @onready var burning_particles = $Visuals/BurningParticles
 @onready var burning_smoke_particles = $Visuals/BurningSmokeParticles
+@onready var splash_particles = $Visuals/SplashParticles
 @onready var sfx_wind_loop = $Visuals/SFX_WindLoop
 @onready var sfx_landing_bonk = $Visuals/SFX_LandingBonk
 @onready var shield_mesh = $Visuals/ShieldMesh
@@ -253,8 +254,25 @@ func _process(delta):
 		if race_ui:
 			race_ui.update_speed(linear_velocity.length() * 1.8)
 
-		if engine_sound.stream is AudioStreamGenerator and engine_sound.playing:
-			_fill_audio_buffer()
+		var throttle_input = Input.get_axis("throttle", "brake")
+		var wants_to_play = can_move and not is_exploding and abs(throttle_input) > 0.1
+		
+		if wants_to_play:
+			if not engine_sound.playing:
+				engine_sound.play()
+				playback = engine_sound.get_stream_playback()
+				engine_sound.volume_db = -45.0
+			engine_sound.volume_db = move_toward(engine_sound.volume_db, 0.0, 80.0 * delta)
+			if engine_sound.stream is AudioStreamGenerator and engine_sound.playing:
+				_fill_audio_buffer()
+		else:
+			if engine_sound.playing:
+				engine_sound.volume_db = move_toward(engine_sound.volume_db, -45.0, 40.0 * delta)
+				if engine_sound.volume_db <= -44.9:
+					engine_sound.stop()
+					playback = null
+				elif engine_sound.stream is AudioStreamGenerator:
+					_fill_audio_buffer()
 	else:
 		_interpolate_remote(delta)
 
@@ -289,6 +307,9 @@ func _physics_process(delta):
 		if currently_underwater:
 			sfx_landing_bonk.play()
 			linear_velocity *= 0.5
+			if splash_particles:
+				splash_particles.global_position = Vector3(global_position.x, WATER_LEVEL, global_position.z)
+				splash_particles.emitting = true
 		is_underwater = currently_underwater
 		water_timer = 0.0
 
@@ -706,7 +727,6 @@ func respawn():
 	if look_target.distance_to(spawn_pos) > 0.01:
 		visuals.look_at(look_target, Vector3.UP)
 
-	if not engine_sound.playing: engine_sound.play()
 
 func give_item(type: int):
 	current_item = type as ItemType
@@ -813,14 +833,15 @@ func _drop_bomb():
 	if not multiplayer.is_server(): return
 	var bomb = BOMB_SCENE.instantiate()
 	bomb.owner_id = name.to_int()
-	bomb.global_position = global_position + Vector3(0, 1.0, 0)
-	bomb.linear_velocity = linear_velocity * 0.5
 	
 	var level = get_tree().get_first_node_in_group("level")
 	if level:
 		level.add_child(bomb)
 	else:
 		get_tree().root.add_child(bomb)
+	
+	bomb.global_position = global_position + Vector3(0, 1.0, 0)
+	bomb.linear_velocity = linear_velocity * 0.5
 	
 	bomb.set_multiplayer_authority(1)
 
