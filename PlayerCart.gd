@@ -393,6 +393,18 @@ func _process(delta):
 	else:
 		_interpolate_remote_visual(delta)
 
+	# Update top-level drift particle emitters to follow their target wheel pivots
+	for p in drift_particles:
+		if is_instance_valid(p) and p is CPUParticles3D:
+			var pivot = p.get_meta("pivot", null)
+			if is_instance_valid(pivot):
+				p.global_rotation = pivot.global_rotation
+				if p.name.ends_with("_Skid"):
+					var local_offset = Vector3(0, WHEEL_Y_OFFSET + 0.02, 0)
+					p.global_position = pivot.global_position + pivot.global_transform.basis * local_offset
+				else:
+					p.global_position = pivot.global_position
+
 func _physics_process(delta):
 	if hop_cooldown > 0:
 		hop_cooldown -= delta
@@ -1542,6 +1554,10 @@ func _create_drift_particles(wheel_name: String):
 	smoke.lifetime = 0.6
 	smoke.mesh = QuadMesh.new()
 	smoke.local_coords = false # Emit in global coordinates so it trails behind the wheel rather than rotating with it
+	smoke.top_level = true
+	smoke.set_meta("pivot", pivot)
+	smoke.global_position = pivot.global_position
+	smoke.global_rotation = pivot.global_rotation
 	
 	var mat_smoke = StandardMaterial3D.new()
 	mat_smoke.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -1614,7 +1630,11 @@ func _create_drift_particles(wheel_name: String):
 	skid.direction = Vector3.ZERO
 	skid.spread = 0.0
 	skid.local_coords = false
-	skid.position.y = WHEEL_Y_OFFSET + 0.02
+	skid.top_level = true
+	skid.set_meta("pivot", pivot)
+	var local_offset = Vector3(0, WHEEL_Y_OFFSET + 0.02, 0)
+	skid.global_position = pivot.global_position + pivot.global_transform.basis * local_offset
+	skid.global_rotation = pivot.global_rotation
 	
 	pivot.add_child(skid)
 	drift_particles.append(skid)
