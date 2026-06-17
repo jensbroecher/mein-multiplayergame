@@ -1,6 +1,7 @@
-[gd_scene load_steps=17 format=3 uid="uid://bomb123"]
+[gd_scene load_steps=23 format=3 uid="uid://bomb123"]
 
 [ext_resource type="Script" path="res://Bomb.gd" id="1_bscript"]
+[ext_resource type="Texture2D" uid="uid://bn6adfe24wsar" path="res://materials/fire_particle.png" id="2_fire"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_b"]
 radius = 0.5
@@ -105,6 +106,40 @@ properties/1/path = NodePath(".:rotation")
 properties/1/spawn = true
 properties/1/replication_mode = 1
 
+[sub_resource type="Gradient" id="Gradient_fire_sprite"]
+offsets = PackedFloat32Array(0, 0.15, 0.75, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 0.8, 0.4, 0.9, 0.8, 0.2, 0.05, 0.7, 0, 0, 0, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_fire_sprite"]
+gradient = SubResource("Gradient_fire_sprite")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_fire_sprite"]
+spread = 180.0
+initial_velocity_min = 3.0
+initial_velocity_max = 6.0
+gravity = Vector3(0, 0.2, 0)
+angle_min = 0.0
+angle_max = 360.0
+angular_velocity_min = -180.0
+angular_velocity_max = 180.0
+scale_min = 1.0
+scale_max = 2.5
+scale_curve = SubResource("CurveTexture_expl")
+color_ramp = SubResource("GradientTexture1D_fire_sprite")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_fire_sprite"]
+transparency = 1
+blend_mode = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("2_fire")
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_fire_sprite"]
+material = SubResource("StandardMaterial3D_fire_sprite")
+size = Vector2(1.5, 1.5)
+
 [node name="Bomb" type="RigidBody3D"]
 collision_layer = 4
 collision_mask = 5
@@ -146,6 +181,15 @@ one_shot = true
 explosiveness = 0.8
 process_material = SubResource("ParticleProcessMaterial_smoke")
 draw_pass_1 = SubResource("QuadMesh_smoke")
+
+[node name="FireSpriteParticles" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 10
+lifetime = 0.8
+one_shot = true
+explosiveness = 0.95
+process_material = SubResource("ParticleProcessMaterial_fire_sprite")
+draw_pass_1 = SubResource("QuadMesh_fire_sprite")
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
 replication_config = SubResource("SceneReplicationConfig_bomb")

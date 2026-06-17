@@ -4,6 +4,7 @@ extends RigidBody3D
 @onready var visuals = $Visuals
 @onready var explosion_particles = $ExplosionParticles
 @onready var smoke_particles = $SmokeParticles
+@onready var fire_sprite_particles = $FireSpriteParticles
 @export var owner_id: int
 
 var pulse_time = 0.0
@@ -146,6 +147,16 @@ func _explode_rpc():
 		sp.emitting = true
 		get_tree().create_timer(sp.lifetime + 0.5).timeout.connect(
 			func(): if is_instance_valid(sp): sp.queue_free()
+		)
+	
+	if is_instance_valid(fire_sprite_particles):
+		var fsp = fire_sprite_particles
+		remove_child(fsp)
+		scene_root.add_child(fsp)
+		fsp.global_position = expl_pos
+		fsp.emitting = true
+		get_tree().create_timer(fsp.lifetime + 0.5).timeout.connect(
+			func(): if is_instance_valid(fsp): fsp.queue_free()
 		)
 	
 	queue_free()

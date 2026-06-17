@@ -92,7 +92,10 @@ var race_ui
 @onready var explosion_particles = $Visuals/ExplosionParticles
 @onready var burning_particles = $Visuals/BurningParticles
 @onready var burning_smoke_particles = $Visuals/BurningSmokeParticles
+@onready var fire_sprite_particles = $Visuals/FireSpriteParticles
 @onready var splash_particles = $Visuals/SplashParticles
+@onready var splash_spray_particles = $Visuals/SplashSprayParticles
+@onready var splash_ripple_particles = $Visuals/SplashRippleParticles
 @onready var sfx_wind_loop = $Visuals/SFX_WindLoop
 @onready var sfx_shield_loop = $Visuals/SFX_ShieldLoop
 @onready var sfx_landing_bonk = $Visuals/SFX_LandingBonk
@@ -129,12 +132,15 @@ var is_underwater: bool = false
 const WATER_LEVEL = -10.0
 var water_timer: float = 0.0
 var is_drowned: bool = false
+var _drown_tween: Tween = null
 var original_wheel_transforms: Dictionary = {}
 var original_cart_model_transform: Transform3D
 var part_velocities: Dictionary = {}
 var part_rotations: Dictionary = {}
 var explosion_time: float = 0.0
 var respawn_indicator_time: float = 0.0
+var original_body_part_transforms: Dictionary = {}
+var part_on_ground: Dictionary = {}
 
 # Remote interpolation tuning
 const REMOTE_LERP_SPEED: float = 18.0
@@ -371,9 +377,9 @@ func _process(delta):
 			if not engine_sound.playing:
 				engine_sound.play()
 				playback = engine_sound.get_stream_playback()
-				engine_sound.volume_db = -45.0
+				engine_sound.volume_db = -5.0
 			var speed_ratio = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
-			var target_vol = lerp(0.0, -12.0, speed_ratio)
+			var target_vol = lerp(-5.0, -12.0, speed_ratio)
 			engine_sound.volume_db = move_toward(engine_sound.volume_db, target_vol, 80.0 * delta)
 			if engine_sound.stream is AudioStreamGenerator and engine_sound.playing:
 				_fill_audio_buffer()
@@ -421,11 +427,31 @@ func _physics_process(delta):
 	var currently_underwater = global_position.y < WATER_LEVEL
 	if currently_underwater != is_underwater:
 		if currently_underwater:
+			# --- Water Impact ---
 			sfx_landing_bonk.play()
-			linear_velocity *= 0.5
+			# Strong velocity kill simulating hitting dense water
+			var impact_speed = linear_velocity.length()
+			linear_velocity *= 0.18
+			# Kill any remaining downward momentum so the car doesn't bounce back up
+			# (upward impulse would push it above WATER_LEVEL and cause a bounce loop)
+			if linear_velocity.y < 0:
+				linear_velocity.y = 0.0
+			
+			# Trigger all three splash layers — toggle emitting to restart each burst
+			# while in-flight particles from the previous burst keep flying naturally
+			var splash_pos = Vector3(global_position.x, WATER_LEVEL, global_position.z)
 			if splash_particles:
-				splash_particles.global_position = Vector3(global_position.x, WATER_LEVEL, global_position.z)
+				splash_particles.global_position = splash_pos
+				splash_particles.emitting = false
 				splash_particles.emitting = true
+			if splash_spray_particles:
+				splash_spray_particles.global_position = splash_pos
+				splash_spray_particles.emitting = false
+				splash_spray_particles.emitting = true
+			if splash_ripple_particles:
+				splash_ripple_particles.global_position = splash_pos
+				splash_ripple_particles.emitting = false
+				splash_ripple_particles.emitting = true
 		is_underwater = currently_underwater
 		water_timer = 0.0
 
@@ -436,6 +462,14 @@ func _physics_process(delta):
 				drown_rpc.rpc()
 			elif not multiplayer.has_multiplayer_peer():
 				drown()
+		# Strong water drag: cap horizontal speed and dampen movement heavily
+		var underwater_max_speed = max_speed * 0.35
+		var h_vel = Vector3(linear_velocity.x, 0, linear_velocity.z)
+		if h_vel.length() > underwater_max_speed:
+			var damped = h_vel.normalized() * underwater_max_speed
+			linear_velocity.x = lerp(linear_velocity.x, damped.x, 8.0 * delta)
+			linear_velocity.z = lerp(linear_velocity.z, damped.z, 8.0 * delta)
+		# Slow sink: upward buoyancy force (weaker than gravity so car still sinks slowly)
 		apply_central_force(Vector3.UP * 15.0)
 
 	if not is_local_player:
@@ -606,6 +640,13 @@ func _physics_process(delta):
 
 func _update_visuals_alignment(delta):
 	if is_exploding:
+		if is_drowned:
+			# While fading out underwater, keep the visual's current orientation.
+			# (Don't copy the physics body's locked/upright transform, which would snap
+			# the car to a default pose and ignore where it actually landed.)
+			visuals.global_position = global_position
+			return
+		# Normal explosion: body parts fly, so follow the physics transform
 		visuals.global_transform = global_transform
 		return
 
@@ -908,14 +949,14 @@ func _update_visual_states(delta):
 			var alpha_osc = 0.35 + 0.15 * sin(time * 35.0)
 			mat.albedo_color.a = alpha_osc
 			
-			var energy_osc = 2.5 + 1.5 * sin(time * 30.0) + 0.8 * cos(time * 60.0)
+			var energy_osc = 1.2 + 0.4 * sin(time * 30.0) + 0.2 * cos(time * 60.0)
 			mat.emission_energy_multiplier = energy_osc
 
-		# Play and modulate shield buzzing sound
+		# Play and modulate shield sound — deep low hum with very slow wobble
 		if not sfx_shield_loop.playing:
 			sfx_shield_loop.play()
-		sfx_shield_loop.pitch_scale = 1.9 + 0.15 * sin(time * 30.0)
-		sfx_shield_loop.volume_db = -10.0 + 2.0 * cos(time * 40.0)
+		sfx_shield_loop.pitch_scale = 0.28 + 0.04 * sin(time * 2.5)
+		sfx_shield_loop.volume_db = 4.0 + 1.5 * cos(time * 3.0)
 	
 	# Explosion visual details (parts physics and fade out)
 	if is_exploding:
@@ -924,11 +965,24 @@ func _update_visual_states(delta):
 			# Simulate parts physics locally
 			for part in part_velocities.keys():
 				if is_instance_valid(part):
+					if part_on_ground.get(part, false):
+						continue
+						
 					part_velocities[part].y -= 9.8 * delta # gravity
 					part.position += part_velocities[part] * delta
-					part.rotate_x(part_rotations[part].x * delta)
-					part.rotate_y(part_rotations[part].y * delta)
-					part.rotate_z(part_rotations[part].z * delta)
+					
+					var ground_y = _get_ground_height(part.global_position)
+					if ground_y != -999.0 and part.global_position.y <= ground_y:
+						part_on_ground[part] = true
+						part_velocities[part] = Vector3.ZERO
+						part_rotations[part] = Vector3.ZERO
+						var g_target = part.global_position
+						g_target.y = ground_y
+						part.global_position = g_target
+					else:
+						part.rotate_x(part_rotations[part].x * delta)
+						part.rotate_y(part_rotations[part].y * delta)
+						part.rotate_z(part_rotations[part].z * delta)
 			
 			# Fade out in the last second
 			if explosion_time > 2.0:
@@ -990,6 +1044,7 @@ func explode():
 	explosion_particles.emitting = true
 	burning_particles.emitting = true
 	burning_smoke_particles.emitting = true
+	fire_sprite_particles.emitting = true
 	if engine_sound.playing: engine_sound.stop()
 	
 	visuals.visible = true
@@ -1008,6 +1063,8 @@ func explode():
 	# Setup disintegrating parts
 	part_velocities.clear()
 	part_rotations.clear()
+	part_on_ground.clear()
+	original_body_part_transforms.clear()
 	
 	for corner in ["FL", "FR", "RL", "RR"]:
 		var pivot = get_node_or_null("Visuals/WheelPivot" + corner)
@@ -1019,14 +1076,17 @@ func explode():
 				"RL": dir = Vector3(1.0, 1.2, -1.0)
 				"RR": dir = Vector3(-1.0, 1.2, -1.0)
 			dir = (dir + Vector3(randf_range(-0.5, 0.5), randf_range(-0.2, 0.4), randf_range(-0.5, 0.5))).normalized()
-			part_velocities[pivot] = dir * randf_range(4.0, 8.0)
-			part_rotations[pivot] = Vector3(randf_range(-10.0, 10.0), randf_range(-10.0, 10.0), randf_range(-10.0, 10.0))
+			part_velocities[pivot] = dir * randf_range(5.0, 9.0)
+			part_rotations[pivot] = Vector3(randf_range(-12.0, 12.0), randf_range(-12.0, 12.0), randf_range(-12.0, 12.0))
 			
 	var cart_model = get_node_or_null("Visuals/CartModel")
 	if cart_model:
-		var dir = Vector3(randf_range(-0.2, 0.2), 1.0, randf_range(-0.4, 0.4)).normalized()
-		part_velocities[cart_model] = dir * randf_range(2.0, 4.0)
-		part_rotations[cart_model] = Vector3(randf_range(-4.0, 4.0), randf_range(-4.0, 4.0), randf_range(-4.0, 4.0))
+		for child in cart_model.get_children():
+			if child is Node3D:
+				original_body_part_transforms[child] = child.transform
+				var dir = Vector3(randf_range(-1.0, 1.0), randf_range(0.2, 1.5), randf_range(-1.0, 1.0)).normalized()
+				part_velocities[child] = dir * randf_range(4.0, 8.0)
+				part_rotations[child] = Vector3(randf_range(-15.0, 15.0), randf_range(-15.0, 15.0), randf_range(-15.0, 15.0))
 
 	if multiplayer.is_server():
 		get_tree().create_timer(3.0).timeout.connect(
@@ -1042,13 +1102,34 @@ func drown():
 	is_exploding = true
 	is_drowned = true
 	can_move = false
-	visuals.visible = false
 	if engine_sound.playing: engine_sound.stop()
+	
+	# Force-clear the shield — it must not persist into the respawn
+	is_shielded = false
+	shield_mesh.visible = false
+	shield_mesh.scale = Vector3.ONE
+	sfx_shield_loop.stop()
 	
 	if is_local_player:
 		linear_velocity = Vector3.ZERO
 		angular_velocity = Vector3.ZERO
-		
+	
+	# Fade the car out over ~1 second instead of instantly hiding it
+	_set_visuals_alpha(1.0)
+	if _drown_tween:
+		_drown_tween.kill()
+	_drown_tween = create_tween()
+	var fade_duration = 1.0
+	# Animate alpha from 1 → 0
+	_drown_tween.tween_method(
+		func(a: float): _set_visuals_alpha(a),
+		1.0, 0.0, fade_duration
+	)
+	# Also fade the name tag
+	if name_tag:
+		_drown_tween.parallel().tween_property(name_tag, "modulate:a", 0.0, fade_duration)
+	_drown_tween.tween_callback(func(): visuals.visible = false)
+	
 	if multiplayer.is_server():
 		get_tree().create_timer(1.5).timeout.connect(
 			func(): if is_instance_valid(self): respawn_rpc.rpc()
@@ -1061,7 +1142,19 @@ func respawn_rpc():
 func respawn():
 	is_exploding = false
 	is_drowned = false
+	is_underwater = false
+	water_timer = 0.0
+	# Kill any in-flight drown fade tween so it can't overwrite the restored alpha
+	if _drown_tween:
+		_drown_tween.kill()
+		_drown_tween = null
+	# Directly restore visibility and alpha regardless of tween state
 	visuals.visible = true
+	# Clear shield in case it was active when the player drowned
+	is_shielded = false
+	shield_mesh.visible = false
+	shield_mesh.scale = Vector3.ONE
+	sfx_shield_loop.stop()
 	
 	# Reset parts positions/rotations
 	for corner in original_wheel_transforms.keys():
@@ -1069,12 +1162,14 @@ func respawn():
 		if pivot:
 			pivot.transform = original_wheel_transforms[corner]
 			
-	var cart_model = get_node_or_null("Visuals/CartModel")
-	if cart_model and original_cart_model_transform:
-		cart_model.transform = original_cart_model_transform
-		
+	for child in original_body_part_transforms.keys():
+		if is_instance_valid(child):
+			child.transform = original_body_part_transforms[child]
+			
 	part_velocities.clear()
 	part_rotations.clear()
+	part_on_ground.clear()
+	original_body_part_transforms.clear()
 	
 	_set_visuals_alpha(1.0)
 	if name_tag:
@@ -1096,6 +1191,7 @@ func respawn():
 	explosion_particles.emitting = false
 	burning_particles.emitting = false
 	burning_smoke_particles.emitting = false
+	fire_sprite_particles.emitting = false
 	sfx_fire_loop.stop()
 
 	if is_local_player:
@@ -1266,15 +1362,18 @@ func client_play_shockwave():
 	
 	var tween = create_tween()
 	if tween:
+		# Run scale and alpha in parallel so the sphere is always fading as it expands.
+		# Previously they were sequential — fully opaque giant sphere, then fade — which
+		# caused the white distortion bloom on surrounding terrain.
 		var t1 = tween.tween_property(shockwave_visual, "scale", Vector3(15.0, 15.0, 15.0), 0.5)
 		if t1:
 			t1.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		
-		var t2 = tween.tween_property(shockwave_visual, "material_override:albedo_color:a", 0.0, 0.5)
+		var t2 = tween.parallel().tween_property(shockwave_visual, "material_override:albedo_color:a", 0.0, 0.45)
 		if t2:
-			t2.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			t2.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 			
-		tween.finished.connect(func(): shockwave_visual.visible = false)
+		tween.tween_callback(func(): shockwave_visual.visible = false)
 	
 	sfx_release_pop.play()
 
@@ -1452,3 +1551,18 @@ func _set_drift_emitting(emitting: bool):
 	for p in drift_particles:
 		if is_instance_valid(p) and p is CPUParticles3D:
 			p.emitting = emitting
+
+func _get_ground_height(global_pos: Vector3) -> float:
+	var space_state = get_world_3d().direct_space_state
+	# Cast a ray from 5 units above global_pos to 15 units below global_pos
+	var start = global_pos + Vector3(0, 5.0, 0)
+	var end = global_pos + Vector3(0, -15.0, 0)
+	var query = PhysicsRayQueryParameters3D.create(start, end)
+	# Exclude the player cart itself so it doesn't collide with its own body shape
+	query.exclude = [self.get_rid()]
+	# Collide with world environment (layer 1)
+	query.collision_mask = 1
+	var result = space_state.intersect_ray(query)
+	if result:
+		return result.position.y
+	return -999.0

@@ -7,7 +7,10 @@ const SPEED_ACCEL: float = 8.0    # m/s² acceleration
 @export var is_guided: bool = false
 @onready var area = $Area3D
 @onready var visuals = $Visuals
-@onready var smoke_trail = $SmokeTrail
+@onready var fire_trail = $FireTrail
+@onready var explosion_particles = $ExplosionParticles
+@onready var smoke_particles = $SmokeParticles
+@onready var fire_sprite_particles = $FireSpriteParticles
 
 var target: Node3D = null
 var lifetime = 5.0
@@ -20,15 +23,25 @@ func _ready():
 	
 	if is_guided:
 		lifetime = 8.0
-		# Purple tint for guided missiles
-		var mesh_inst = get_node_or_null("Visuals/Mesh")
-		if mesh_inst:
-			var mat = StandardMaterial3D.new()
-			mat.albedo_color = Color(0.5, 0.0, 0.9, 1)
-			mat.emission_enabled = true
-			mat.emission = Color(0.4, 0.0, 0.8, 1)
-			mat.emission_energy_multiplier = 2.0
-			mesh_inst.set_surface_override_material(0, mat)
+		# Purple tint for guided missiles — apply to all MeshInstance3D children
+		var mat = StandardMaterial3D.new()
+		mat.albedo_color = Color(0.45, 0.0, 0.85, 1)
+		mat.roughness = 0.2
+		mat.metallic = 0.6
+		mat.emission_enabled = true
+		mat.emission = Color(0.4, 0.0, 0.8, 1)
+		mat.emission_energy_multiplier = 1.5
+		_tint_meshes_recursive(visuals, mat)
+		# Also tint the nozzle glow orange→purple
+		var nozzle = get_node_or_null("Visuals/Nozzle")
+		if nozzle:
+			var nm = StandardMaterial3D.new()
+			nm.albedo_color = Color(0.3, 0.0, 0.5, 1)
+			nm.metallic = 0.9
+			nm.emission_enabled = true
+			nm.emission = Color(0.5, 0.0, 0.9, 1)
+			nm.emission_energy_multiplier = 3.0
+			nozzle.material_override = nm
 	else:
 		lifetime = 5.0
 		
@@ -83,8 +96,15 @@ func _on_body_entered(body):
 		if spawn_safety_timer <= 0.0:
 			_explode()
 
+func _tint_meshes_recursive(node: Node, mat: StandardMaterial3D):
+	if node is MeshInstance3D:
+		node.material_override = mat
+	for child in node.get_children():
+		_tint_meshes_recursive(child, mat)
+
 func _explode():
 	if not is_instance_valid(self): return
+
 	
 	# Server-side blast radius damage logic (similar to Bomb.gd)
 	if multiplayer.is_server():
@@ -117,48 +137,50 @@ func _explode_rpc():
 	var area_col = get_node_or_null("Area3D/CollisionShape3D")
 	if area_col: area_col.disabled = true
 	
-	# Stop trail emitting — reparent it so it lingers in world space
-	if is_instance_valid(smoke_trail):
-		var scene_root = get_tree().current_scene
-		var trail_pos = smoke_trail.global_position
-		remove_child(smoke_trail)
-		scene_root.add_child(smoke_trail)
-		smoke_trail.global_position = trail_pos
-		smoke_trail.emitting = false
-		get_tree().create_timer(smoke_trail.lifetime + 0.2).timeout.connect(
-			func(): if is_instance_valid(smoke_trail): smoke_trail.queue_free()
-		)
-		
-	# Create spherical explosion visual (exactly like Bomb.gd)
 	var scene_root = get_tree().current_scene
 	var expl_pos = global_position
-	
+
+	# Stop and detach the fire trail so it fades out naturally
+	if is_instance_valid(fire_trail):
+		var trail_pos = fire_trail.global_position
+		remove_child(fire_trail)
+		scene_root.add_child(fire_trail)
+		fire_trail.global_position = trail_pos
+		fire_trail.emitting = false
+		get_tree().create_timer(fire_trail.lifetime + 0.2).timeout.connect(
+			func(): if is_instance_valid(fire_trail): fire_trail.queue_free()
+		)
+
+	# Detach and fire explosion particles so they outlive the missile node
+	for ps in [explosion_particles, smoke_particles, fire_sprite_particles]:
+		if is_instance_valid(ps):
+			var ps_pos = global_position
+			remove_child(ps)
+			scene_root.add_child(ps)
+			ps.global_position = ps_pos
+			ps.emitting = true
+			get_tree().create_timer(ps.lifetime + 0.3).timeout.connect(
+				func(): if is_instance_valid(ps): ps.queue_free()
+			)
+
+	# Small bright flash sphere (particles carry the main visual now)
 	var expl_mesh = MeshInstance3D.new()
 	var sphere = SphereMesh.new()
-	sphere.radius = 1.0
-	sphere.height = 2.0
+	sphere.radius = 0.6
+	sphere.height = 1.2
 	expl_mesh.mesh = sphere
-	
 	var mat = StandardMaterial3D.new()
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.albedo_color = Color(1.0, 0.45, 0.05, 0.8) # Vibrant orange flame
+	mat.albedo_color = Color(1.0, 0.75, 0.15, 0.9)
 	expl_mesh.material_override = mat
-	
 	scene_root.add_child(expl_mesh)
 	expl_mesh.global_position = expl_pos
 	expl_mesh.scale = Vector3(0.1, 0.1, 0.1)
-	
 	var tween = get_tree().create_tween()
 	if tween:
-		var t1 = tween.tween_property(expl_mesh, "scale", Vector3(7.0, 7.0, 7.0), 0.45)
-		if t1:
-			t1.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		
-		var t2 = tween.parallel().tween_property(mat, "albedo_color:a", 0.0, 0.45)
-		if t2:
-			t2.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-			
-		tween.finished.connect(func(): if is_instance_valid(expl_mesh): expl_mesh.queue_free())
-		
+		tween.tween_property(expl_mesh, "scale", Vector3(5.0, 5.0, 5.0), 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tween.parallel().tween_property(mat, "albedo_color:a", 0.0, 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tween.tween_callback(func(): if is_instance_valid(expl_mesh): expl_mesh.queue_free())
+	
 	queue_free()
