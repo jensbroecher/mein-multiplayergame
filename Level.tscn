@@ -17,6 +17,14 @@
 [ext_resource type="Shape3D" uid="uid://che45yajcufgc" path="res://generated/track_collision_shape.res" id="12_esphl"]
 [ext_resource type="Shader" uid="uid://srampgbp5hcn" path="res://water.gdshader" id="14_5qkpu"]
 [ext_resource type="PackedScene" uid="uid://dhh7ri67yaupn" path="res://models/ramp.glb" id="17_dcckh"]
+[ext_resource type="Script" uid="uid://dalgqkvhgl13l" path="res://VegetationScatterer.gd" id="18_jftiw"]
+[ext_resource type="PackedScene" uid="uid://brllk1kwohghd" path="res://models/trees/grass.glb" id="19_3ppgv"]
+[ext_resource type="PackedScene" uid="uid://c2bk2f3dha4iv" path="res://models/trees/flower_white.glb" id="20_wesx8"]
+[ext_resource type="PackedScene" uid="uid://c700upvsp7ld4" path="res://models/trees/flower_blue.glb" id="21_qqkhr"]
+[ext_resource type="PackedScene" uid="uid://b7alyucsnyi24" path="res://models/trees/tree_2.glb" id="22_4vjci"]
+[ext_resource type="PackedScene" uid="uid://cso003lyciumg" path="res://models/trees/tree.glb" id="23_b4adj"]
+[ext_resource type="PackedScene" uid="uid://b1tokodxtar6i" path="res://models/trees/tree_4.glb" id="23_wesx8"]
+[ext_resource type="PackedScene" uid="uid://c1lhcyqhickr3" path="res://models/trees/tree_3.glb" id="24_fmksp"]
 
 [sub_resource type="PhysicalSkyMaterial" id="PhysicalSkyMaterial_clouds"]
 rayleigh_color = Color(0.15, 0.2, 0.4, 1)
@@ -568,19 +576,35 @@ _data = {
 }
 point_count = 26
 
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_qqkhr"]
+height = 4.0
+radius = 0.35
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_4vjci"]
+height = 4.0
+radius = 0.35
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_b4adj"]
+height = 4.0
+radius = 0.35
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_fmksp"]
+height = 4.0
+radius = 0.35
+
 [node name="Level" type="Node3D" unique_id=815155767 node_paths=PackedStringArray("checkpoints")]
 script = ExtResource("1_lev99")
 checkpoints = [NodePath("Checkpoints/Halfway"), NodePath("FinishLine")]
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=613663841]
 transform = Transform3D(-0.866025, -0.433013, 0.25, 0, 0.5, 0.866025, -0.5, 0.75, -0.433013, 0, 40, 0)
-directional_shadow_blend_splits = true
-directional_shadow_max_distance = 250.0
+shadow_enabled = true
+shadow_bias = 0.002
 directional_shadow_split_1 = 0.2
 directional_shadow_split_2 = 0.4
 directional_shadow_split_3 = 0.7
-shadow_enabled = true
-shadow_bias = 0.002
+directional_shadow_blend_splits = true
+directional_shadow_max_distance = 250.0
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1882266804]
 environment = SubResource("Environment_nice")
@@ -1373,3 +1397,1879 @@ transform = Transform3D(-0.47679472, 0, -0.8790148, 0, 1, 0, 0.8790148, 0, -0.47
 
 [node name="NewRamp" parent="." unique_id=966004585 instance=ExtResource("17_dcckh")]
 transform = Transform3D(37.264538, 0, 25.226063, 0, 45, 0, -25.226063, 0, 37.264538, -428.5783, 10.270285, 49.70015)
+
+[node name="VegetationScatterer" type="Node3D" parent="." unique_id=40883185]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, -26.707905, 0, 84.94488)
+script = ExtResource("18_jftiw")
+size = Vector2(100, 100)
+tree_count = 4
+flower_count = 10
+grass_count = 600
+
+[node name="VegetationContainer" type="Node3D" parent="VegetationScatterer" unique_id=632620692]
+
+[node name="grass" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2139288772 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.47627687, -0.28944385, 0.3636433, 0.13911381, 0.5855812, 0.28389406, -0.44346538, -0.12716433, 0.47960562, -31.90422, -2.2924194, -28.46556)
+
+[node name="@Node3D@29094" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=207996122 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.2024439, 0.16075908, -0.8206671, -0.34670052, 0.7522539, 0.23288254, 0.7610103, 0.38547638, -0.11221732, -44.26922, -2.9606323, -39.899048)
+
+[node name="@Node3D@29095" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1434279709 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.019601928, -0.14974575, 0.5629307, 0.12037098, 0.5500511, 0.15051112, -0.56993467, 0.12132177, 0.012427111, -5.2781334, 14.441467, 45.628296)
+
+[node name="@Node3D@29096" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=100073031 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.50171906, -0.1164835, -0.46191302, 0.1125725, 0.6808373, -0.04941741, 0.46288174, -0.039322264, 0.5126874, -10.799324, 0.45977783, -25.793442)
+
+[node name="@Node3D@29097" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1812513261 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.82688963, -0.024139566, 0.4231848, -0.10902256, 0.8843701, 0.2634734, -0.40961224, -0.28411514, 0.78416264, 9.565884, 15.584412, 40.155273)
+
+[node name="@Node3D@29098" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=541782571 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.19008006, -0.0280933, 0.4167045, 0.104006544, 0.44659203, -0.017334407, -0.40449288, 0.101629764, 0.19136138, -20.721497, -0.45788574, -39.162354)
+
+[node name="@Node3D@29099" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2049348147 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.46490762, 0.12219057, 0.067761965, 0.10001205, 0.4554281, -0.13507083, -0.09756953, -0.11539497, -0.46133015, 46.137802, 7.220093, 34.655136)
+
+[node name="@Node3D@29100" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1102256531 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5693051, 0.01927467, -0.09694645, 0.0066264244, 0.57289714, 0.0749893, 0.098621584, 0.07277219, -0.5646738, -46.81492, 1.4649658, 16.886948)
+
+[node name="@Node3D@29101" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=444307029 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.52408195, -0.08851076, -0.74296415, 0.28794858, 0.81336844, -0.30001515, 0.6905907, -0.40631187, -0.4387333, -23.615784, 0.979126, 14.242325)
+
+[node name="@Node3D@29102" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=772826118 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.64893323, 0.1761083, -0.09972259, -0.17173731, 0.65639, 0.041612085, 0.107074834, -0.014530689, 0.6711162, 42.542007, 7.026306, 29.791092)
+
+[node name="@Node3D@29103" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1665238093 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.6562248, -0.51476073, 0.30228874, -0.37662193, 0.7055441, 0.38386402, -0.46315554, 0.15561815, -0.74044454, -16.368965, 9.090332, 49.73439)
+
+[node name="@Node3D@29104" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=502502477 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.13779843, -0.021880077, -0.5575526, -0.036008805, 0.57345474, -0.013604592, 0.5568187, 0.03166988, -0.13885985, -48.55738, 0.25720215, 28.728851)
+
+[node name="@Node3D@29105" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=789217040 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.79202753, 0.3805224, 0.27622277, 0.27379325, 0.8131177, -0.3350835, -0.38227424, -0.20602524, -0.8122955, 39.854942, 9.139526, 35.397797)
+
+[node name="@Node3D@29106" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=602167202 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5677109, 0.25988722, 0.2665255, 0.16653685, 0.61201036, -0.24203649, -0.33293048, -0.1370212, -0.5755479, -45.897896, -2.086975, -21.042831)
+
+[node name="@Node3D@29107" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=804851746 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.03524631, -0.1378519, -0.711956, 0.03987729, 0.7120864, -0.13590296, 0.7240817, -0.03250642, 0.04214064, 16.343796, 6.1885986, 1.2944946)
+
+[node name="@Node3D@29108" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=890313656 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5604542, -0.011253475, 0.6297568, 0.08716755, 0.83347493, 0.0924689, -0.6237965, 0.1265782, -0.552888, -49.05076, 2.4934082, 11.895859)
+
+[node name="@Node3D@29109" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1547787570 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.411197, -0.4726663, 0.6363342, -0.030924356, 0.72587717, 0.51919526, -0.7920722, 0.21704045, -0.35061768, -25.49926, 4.640991, 43.898758)
+
+[node name="@Node3D@29110" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=220958424 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.10176322, 0.2786259, 0.6888173, -0.033651955, 0.6962622, -0.27666578, -0.74227303, 0.006632712, 0.10697763, -24.067482, 1.0289307, 4.724945)
+
+[node name="@Node3D@29111" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1341436148 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.88180625, 0.011206366, 0.013761102, -0.009380125, 0.87487364, -0.11137924, -0.015065318, 0.111210346, 0.8748157, 19.77948, 7.908325, -44.850327)
+
+[node name="@Node3D@29112" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1557580004 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.7862833, 0.15220971, 0.14920872, 0.20235029, 0.7122479, 0.33974963, -0.06697314, 0.36497623, -0.72524434, -44.324944, -2.0758667, -41.602463)
+
+[node name="@Node3D@29113" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=856890173 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.10119605, -0.050359182, -0.8129315, 0.16676114, 0.8005472, -0.070350915, 0.7972355, -0.17384614, -0.088472806, -24.229042, 1.0512695, -25.858261)
+
+[node name="@Node3D@29114" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=866522083 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.035371426, -0.14366259, 0.6229015, -0.023046434, 0.6237353, 0.14254622, -0.63883805, -0.014547233, -0.039631482, 22.449696, 6.546814, -16.547043)
+
+[node name="@Node3D@29115" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=98318602 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.072189994, -0.16023606, 0.61307395, -0.20883156, 0.5885844, 0.12924528, -0.5982679, -0.18611653, -0.119090945, -3.7426376, 13.680237, 38.19191)
+
+[node name="@Node3D@29116" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=624391934 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5811645, -0.18736228, 0.038740303, -0.17325687, 0.5679341, 0.14761604, -0.08116336, 0.12924325, -0.59250844, -10.198662, 2.5181885, -45.75081)
+
+[node name="@Node3D@29117" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1908260815 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.76034844, -0.09794768, 0.20357631, 0.1621907, 0.73423433, -0.2525092, -0.15726168, 0.2836776, 0.72385263, 3.4876404, 5.005554, -43.935516)
+
+[node name="@Node3D@29118" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=717069616 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.62483984, -0.121233776, 0.05073701, -0.12306695, 0.6262442, -0.019220222, -0.04611291, -0.02858776, -0.636202, 22.62026, 7.3447876, 0.0055999756)
+
+[node name="@Node3D@29119" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1570944702 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.16180171, -0.15342918, -0.4486837, -0.15533504, 0.46507585, -0.10301854, 0.44802743, 0.105836086, -0.19775614, -12.222183, 0.99420166, -41.987488)
+
+[node name="@Node3D@29120" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1761198961 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.3330625, 0.057592813, 0.58387125, 0.036232308, 0.6721297, -0.045630295, -0.585585, 0.008830146, -0.33491108, -16.584686, 0.30236816, -10.1202545)
+
+[node name="@Node3D@29121" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=945671508 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.61223114, -0.3101578, 0.5649932, -0.15498412, 0.82723904, 0.2861778, -0.6256158, 0.098589845, -0.6238005, -17.750908, 8.833008, 31.269913)
+
+[node name="@Node3D@29122" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1559120020 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.7669866, 0.20278987, -0.27221325, -0.1748134, 0.8125377, 0.1127605, 0.29097092, -0.04637797, 0.78528804, 41.78181, 6.4193115, 3.0094757)
+
+[node name="@Node3D@29123" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1313299498 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.27968127, 0.04182843, 0.6195804, 0.35871905, 0.5655605, 0.12374583, -0.5069025, 0.37715083, -0.25427976, -45.05506, -7.7662964, 44.835266)
+
+[node name="@Node3D@29124" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1907173730 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.7330423, 0.17844854, -0.059073843, 0.18249917, 0.7326116, -0.051565036, 0.04502948, -0.064195156, -0.75268584, 38.540977, 7.1088867, 19.156433)
+
+[node name="@Node3D@29125" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1336980974 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.38114488, -0.03586927, 0.8609341, 0.06200675, 0.9400976, 0.01171641, -0.85944706, 0.051918272, 0.3826496, -47.690254, 0.3735962, 27.221573)
+
+[node name="@Node3D@29126" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=938687693 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.009794591, -0.042634632, 0.84386337, 0.046097968, 0.84263617, 0.043107685, -0.8436813, 0.046535827, -0.0074413414, -38.696846, 0.9446411, 23.369537)
+
+[node name="@Node3D@29127" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=634081706 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.61308354, 0.24706368, -0.07303868, 0.24456835, 0.61739093, 0.035515834, 0.08100267, 0.0058813933, -0.6600383, -20.996124, -0.25476074, 10.453354)
+
+[node name="@Node3D@29128" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=103659487 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.35935518, -0.34620646, 0.20106089, 0.33109403, 0.40888497, 0.11229565, -0.22508025, 0.048730683, 0.48619413, -36.084892, -3.9282837, 43.062317)
+
+[node name="@Node3D@29129" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1450735484 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.20360172, -0.026604906, 0.48483068, -0.0056763333, 0.5258225, 0.02647058, -0.48552692, 0.0050091157, -0.20361923, -30.109055, 1.8079224, 9.993942)
+
+[node name="@Node3D@29130" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=621387427 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.15902838, -0.268959, 0.8018334, -0.35882497, 0.7173551, 0.31178856, -0.76584613, -0.39195472, 0.020417625, -17.18441, 8.311157, 28.513489)
+
+[node name="@Node3D@29131" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=395798466 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.11439074, -0.14030573, 0.6004251, -0.024413096, 0.6091608, 0.14699814, -0.61611694, -0.05018719, 0.10565267, 17.45401, 6.2130737, -1.8589478)
+
+[node name="@Node3D@29132" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2020202870 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.05921939, -0.07153741, -0.4443245, -0.15334293, 0.4181308, -0.08775764, 0.42311674, 0.16154832, 0.03038313, -1.3151665, 2.5511475, -39.377518)
+
+[node name="@Node3D@29133" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1438599029 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.64273435, -0.0095388135, -0.29345208, 0.004415334, 0.70648164, -0.013293857, 0.29357386, 0.010258305, 0.64266765, -40.96766, 3.9291382, 0.4892273)
+
+[node name="@Node3D@29134" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1136073821 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.19918361, 0.087028146, 0.6070113, 0.14619067, 0.6265674, -0.041861184, -0.59553754, 0.12470034, -0.21329708, -33.48931, 1.7779541, 9.621918)
+
+[node name="@Node3D@29135" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1122779624 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.10548006, -0.08662553, -0.49607328, 0.047004092, 0.50631964, -0.078420304, 0.5013814, -0.029242868, 0.11171518, -8.867138, 0.5473633, -30.000244)
+
+[node name="@Node3D@29136" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=356882264 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.47784206, 0.113930225, -0.19761874, 0.102332845, 0.5170395, 0.05064039, 0.20386575, 0.007507557, -0.48861915, -29.568558, 1.7906494, -8.309189)
+
+[node name="@Node3D@29137" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=726315607 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.48091844, 0.09860918, 0.08343566, -0.104217246, 0.48623934, 0.026035974, -0.07631544, -0.042606752, 0.490233, 41.49307, 6.3204956, 17.708344)
+
+[node name="@Node3D@29138" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=802971839 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.6788212, 0.16477059, -0.01760616, -0.16250502, 0.67645746, 0.06522998, 0.032425996, -0.059274636, 0.6954801, 27.906496, 10.561584, 28.99855)
+
+[node name="@Node3D@29139" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1084866141 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5975938, -0.19284707, 0.0478324, 0.19858943, 0.58455986, -0.1242914, -0.0063384045, 0.13302673, 0.61551607, -10.645393, 1.5233154, -42.026382)
+
+[node name="@Node3D@29140" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=217483171 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.7045968, 0.3342389, -0.12549475, -0.31951675, 0.7142169, 0.10827984, 0.15929091, -0.04582424, 0.7723003, 29.451017, 16.286926, 47.18091)
+
+[node name="@Node3D@29141" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1336458500 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.69846493, 0.06073458, 0.120193094, -0.029107256, 0.68795717, -0.17848273, -0.13148323, 0.17033681, 0.6780014, -1.47546, -1.2440186, -9.007751)
+
+[node name="@Node3D@29142" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2055114412 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.027281553, 0.0065819956, -0.51726747, -0.06557719, 0.5138515, 0.0030798786, 0.5131361, 0.06531869, 0.027894802, 19.51516, 8.209717, -47.19465)
+
+[node name="@Node3D@29143" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1249913697 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.7529642, 0.16597472, -0.4411748, -0.33224574, 0.7766596, -0.2748645, 0.33435845, 0.3979826, 0.7203834, -42.08526, -0.23205566, -46.13482)
+
+[node name="@Node3D@29144" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=295559104 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.61892015, -0.39873242, 0.03379654, -0.39955285, 0.61233616, -0.092702806, 0.022073844, -0.0961705, -0.7303806, -18.871315, 8.251099, 38.08548)
+
+[node name="@Node3D@29145" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=705617453 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.8111406, -0.15090767, -0.09289596, -0.115063064, 0.7795271, -0.26162913, 0.1347712, -0.24272656, -0.78247833, 15.159134, 8.664368, 11.816238)
+
+[node name="@Node3D@29146" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=700253995 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.43740612, -0.042600837, 0.3638094, -0.12001438, 0.55204034, -0.079650626, -0.34607604, -0.13759665, -0.4321976, 4.6940575, 11.278748, 25.123047)
+
+[node name="@Node3D@29147" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1503949057 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.061787453, -0.2686898, -0.4113923, 0.11745059, 0.4106889, -0.25059035, 0.47711974, -0.06630202, 0.114962496, -1.7897148, 15.71405, 46.88893)
+
+[node name="@Node3D@29148" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1496982687 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.15002875, 0.13437894, 0.53309083, -0.011618811, 0.55168605, -0.14233626, -0.549644, -0.048341542, -0.14250162, 31.750029, 9.364136, 26.01709)
+
+[node name="@Node3D@29149" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1526718854 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.18427777, -0.09765837, -0.7628629, -0.2984423, 0.73206544, -0.021623861, 0.7088224, 0.2828396, -0.20743158, 4.905998, 4.439575, -41.98095)
+
+[node name="@Node3D@29150" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1790744049 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.49495804, 0.21876127, 0.12469974, -0.22359242, 0.50830936, -0.0042464053, -0.115814276, -0.046423182, 0.54113024, 46.59335, 7.6899414, 37.096283)
+
+[node name="@Node3D@29151" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1322780902 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.32035708, 0.09941302, 0.66177934, 0.012817726, 0.734477, -0.10412885, -0.66908187, -0.033528548, -0.31885546, 31.735065, 7.0770264, -8.5793915)
+
+[node name="@Node3D@29152" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1570742971 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.65801084, 0.23868151, -0.5183863, 0.17171457, 0.83732176, 0.16756454, 0.5442493, 0.024390792, -0.67960966, 32.579594, 6.626709, -44.03047)
+
+[node name="@Node3D@29153" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1328293583 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.7740366, -0.011515012, -0.5329518, 0.0024818433, 0.93969035, -0.016698526, 0.5330704, 0.012345233, 0.77394223, -5.3232536, 0.21881104, -18.111572)
+
+[node name="@Node3D@29154" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1766486973 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.3279826, -0.22262491, -0.5242364, 0.16353695, 0.54266167, -0.33276454, 0.54556507, -0.29650417, -0.21541172, -10.429802, 6.9700317, 21.241653)
+
+[node name="@Node3D@29155" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1504425568 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.4142186, -0.17918748, 0.5317167, 0.22603853, 0.6581975, 0.04572244, -0.5135537, 0.14517507, 0.44899297, -5.3752937, 14.768799, 44.0244)
+
+[node name="@Node3D@29156" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1971171042 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.10879914, -0.047405474, 0.5459643, 0.025215298, 0.5564634, 0.04329222, -0.54743814, 0.016209535, 0.11050029, 19.717346, 7.588196, -40.537003)
+
+[node name="@Node3D@29157" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=551249904 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.015161922, 0.09889166, 0.7312288, -0.031601027, 0.73062515, -0.099465266, -0.7372086, -0.03335269, -0.010775281, 29.102026, 7.810791, -0.3131714)
+
+[node name="@Node3D@29158" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1765148182 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.59583837, 0.07690887, 0.5299659, -0.044715766, 0.7971972, -0.065415844, -0.5336472, 0.019072471, 0.59720945, -20.790375, 0.7835083, -17.675613)
+
+[node name="@Node3D@29159" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2110171656 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.8865216, -0.058160108, -0.33044708, 0.017001512, 0.9245566, -0.20833752, 0.33509523, -0.20077592, -0.86365426, -17.98761, 0.020019531, -32.41475)
+
+[node name="@Node3D@29160" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1529119705 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5825981, 0.21170008, -0.615282, 0.17347561, 0.8465144, 0.12699968, 0.6271324, -0.03749376, -0.60671943, 48.542812, 2.6182861, -48.18843)
+
+[node name="@Node3D@29161" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1315613315 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5375157, -0.30193806, 0.6990558, -0.56060505, 0.7359918, -0.11316705, -0.51533246, -0.48571408, -0.60603875, -5.8978767, 4.5529175, 13.993362)
+
+[node name="@Node3D@29162" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1595974736 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.13833566, -0.20865151, -0.6337131, -0.19110359, 0.63246626, -0.16652425, 0.6392239, 0.14392868, -0.18692748, -10.455914, 2.8903809, -47.759148)
+
+[node name="@Node3D@29163" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1766019650 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.17818707, 0.18811628, 0.7010109, -0.22283016, 0.7011461, -0.1315123, -0.69076097, -0.17765422, 0.2232552, 42.227238, 8.23114, 34.504166)
+
+[node name="@Node3D@29164" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=238542734 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5239863, -0.2246309, 0.0914641, 0.23448546, 0.52482855, -0.054386985, -0.061978206, 0.08650046, 0.5675057, -39.920647, -7.32135, 44.058136)
+
+[node name="@Node3D@29165" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=441418982 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.70151126, 0.19533084, -0.3948382, 0.20503692, 0.8019212, 0.032429073, 0.38988617, -0.070268385, -0.7274754, 31.631382, 9.645569, 28.898224)
+
+[node name="@Node3D@29166" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=403203391 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.008990366, -0.040725496, 0.55265754, -0.16411674, 0.52773887, 0.041559003, -0.52929634, -0.16432557, -0.0034988616, 5.1854706, 8.81665, 15.428741)
+
+[node name="@Node3D@29167" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=4540999 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.7172203, -0.077013664, -0.56852084, -0.029372262, 0.90401554, -0.15951557, 0.5729611, 0.14274749, 0.7034848, 14.21286, 6.5631104, -33.767914)
+
+[node name="@Node3D@29168" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1106433295 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.825518, 0.090030454, -0.43852422, -0.053974148, 0.9332087, 0.08998494, 0.44440496, -0.05389819, 0.82552296, -14.335213, -0.31280518, -33.720108)
+
+[node name="@Node3D@29169" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=468433492 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.057656664, 0.043119278, 0.53907585, 0.18577655, 0.50755996, -0.06046806, -0.50788695, 0.19055192, 0.03907911, -24.21341, 0.35803223, -41.828247)
+
+[node name="@Node3D@29170" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1391925960 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.52881396, 0.15955336, 0.65127283, 0.39183694, 0.7466117, 0.13524967, -0.5441299, 0.38258514, -0.5355455, -48.773132, -1.8234863, -40.239975)
+
+[node name="@Node3D@29171" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=204473457 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5463494, 0.29343283, 0.45047456, -0.3274649, 0.6910069, -0.052952763, -0.4263765, -0.15470752, 0.61789685, -41.74749, -4.1175537, -22.240234)
+
+[node name="@Node3D@29172" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1121339775 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.012949814, 0.14418037, 0.6201079, -0.04971231, 0.6185714, -0.14278498, -0.634705, -0.045506973, 0.023835408, 45.838535, 4.894165, -5.1526337)
+
+[node name="@Node3D@29173" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2009225274 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.08648095, -0.28845474, 0.89254105, 0.18091884, 0.8743664, 0.30011073, -0.92038256, 0.19897725, -0.02487239, -11.832001, 1.2632446, -42.60405)
+
+[node name="@Node3D@29174" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1227232901 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.7576461, 0.21932016, 0.30744568, -0.21022044, 0.81744903, -0.06508589, -0.31373802, -0.01809609, 0.7860616, 49.502296, 5.1309814, 28.530243)
+
+[node name="@Node3D@29175" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1721878658 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5775933, 0.04950488, -0.010448814, 0.045525484, 0.560755, 0.14019705, 0.0220758, 0.13884182, -0.562503, -12.297409, -0.881958, -6.6115265)
+
+[node name="@Node3D@29176" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1691314628 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.0050517153, 0.0956687, 0.44730622, -0.053739317, 0.44435978, -0.09443162, -0.4542548, -0.051504795, 0.016145904, 27.360586, 10.1536255, 24.453384)
+
+[node name="@Node3D@29177" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1074205679 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.8254494, -0.09552709, -0.22384736, -0.056134067, 0.84490585, -0.153567, 0.23681644, -0.13269678, -0.8166452, -8.45237, 12.232544, 36.67894)
+
+[node name="@Node3D@29178" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1308062637 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.24270506, -0.16445947, -0.85601926, 0.21597116, 0.8495304, -0.2244466, 0.8444953, -0.2645239, -0.18861704, 23.804552, 7.814087, 3.7104645)
+
+[node name="@Node3D@29179" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1720584578 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.09109353, -0.17335436, -0.5189443, 0.28824937, 0.46236286, -0.103855, 0.46504545, -0.25262982, 0.16602379, -15.243095, 4.8170166, 20.786407)
+
+[node name="@Node3D@29180" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=996244340 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.6946446, -0.27615, -0.13102427, -0.28413573, 0.7033097, 0.024074731, 0.11266349, 0.07109071, -0.7471347, 0.35595703, 0.8154297, -26.740356)
+
+[node name="@Node3D@29181" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=817351685 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.28144747, -0.012486077, 0.8810008, 0.01659145, 0.92476743, 0.007806003, -0.88093305, 0.013427874, 0.28161615, -44.30561, 3.9675293, -5.2586975)
+
+[node name="@Node3D@29182" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=950470043 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.30103025, -0.10870064, -0.3655433, 0.09966282, 0.47194204, -0.058266375, 0.36811012, -0.038882088, 0.31470633, 21.36026, 6.710083, -6.747055)
+
+[node name="@Node3D@29183" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1775727302 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.19780464, -0.45871937, 0.61270607, 0.024416458, 0.6287323, 0.4786004, -0.7650072, 0.13867614, -0.14314948, -14.407677, 11.50354, 45.280838)
+
+[node name="@Node3D@29184" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=343694932 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.34965554, 0.095193654, 0.5767526, 0.011954398, 0.6730806, -0.10384536, -0.58443344, -0.043184917, -0.34718436, 21.45577, 18.415527, 48.97769)
+
+[node name="@Node3D@29185" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1975952532 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.50340754, 0.057089083, 0.4387027, -0.07234897, 0.66625106, -0.0036804979, -0.4364457, -0.044595465, 0.50662094, -22.188065, 1.3704224, -1.0600433)
+
+[node name="@Node3D@29186" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1881714608 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.8705538, -0.16984034, -0.11593166, 0.1735636, 0.87732553, 0.018038172, 0.11027948, -0.0400495, 0.8867831, 20.092361, 6.975464, 2.6349335)
+
+[node name="@Node3D@29187" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=438411217 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.4836419, -0.181779, 0.4833487, 0.23328173, 0.66771674, 0.017693365, -0.46070516, 0.14727461, 0.51637197, -7.2705154, 13.843689, 45.879364)
+
+[node name="@Node3D@29188" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=198112565 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.60550904, -0.42309704, -0.13222523, 0.35016826, 0.5938021, -0.2965082, 0.27180287, 0.17754944, 0.67656136, -31.398232, -1.2842407, 49.88127)
+
+[node name="@Node3D@29189" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2063700139 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.7209361, -0.028038733, -0.12806639, 0.030340701, 0.66068673, -0.3154499, 0.12754062, -0.31566283, -0.6488656, 16.483368, 15.709961, 41.003128)
+
+[node name="@Node3D@29190" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=28695852 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.82011986, 0.03126398, -0.31750473, 0.055058748, 0.8764848, -0.055912126, 0.31425345, -0.07197357, -0.81880873, 20.083115, 9.131226, 10.661301)
+
+[node name="@Node3D@29191" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=243165047 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.20259283, -0.15450452, 0.3783368, -0.12879929, 0.37661403, 0.2227708, -0.3878416, -0.20577765, 0.12364739, -5.702572, 7.7945557, 19.201279)
+
+[node name="@Node3D@29192" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1573916378 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.080230415, -0.05081401, -0.8245357, -0.17850515, 0.80777776, -0.06715047, 0.8065836, 0.18382385, 0.06715502, -21.302376, -0.98217773, -37.01921)
+
+[node name="@Node3D@29193" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=607347923 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5702797, -0.027031146, 0.4221682, 0.04498905, 0.70845896, -0.0154106505, -0.4206336, 0.039125696, 0.570712, -42.618484, 0.75042725, 23.901001)
+
+[node name="@Node3D@29194" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1922918533 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.47967967, -0.030684644, 0.37258157, -0.0036251617, 0.6064552, 0.04527853, -0.37382543, 0.03349238, -0.47852272, -31.963814, 1.4091797, 21.12703)
+
+[node name="@Node3D@29195" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1922304340 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.3963445, 0.13840842, -0.36654013, 0.11584074, 0.5394669, 0.078446865, 0.37428528, -0.020398412, -0.41242206, 42.434525, 4.6312256, -36.94182)
+
+[node name="@Node3D@29196" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=939022632 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.17538401, -0.07936934, -0.79621696, 0.372774, 0.72936374, 0.009406331, 0.70802575, -0.364348, 0.19227731, -15.082581, -2.1032715, 6.212906)
+
+[node name="@Node3D@29197" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1259022923 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.532582, -0.13301186, -0.045885332, 0.1362445, 0.5323777, 0.03811284, 0.035143312, -0.048197508, 0.5476159, -2.0591965, -1.4022827, -6.6201935)
+
+[node name="@Node3D@29198" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1777422700 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.61006045, -0.2280921, -0.63244265, 0.347984, 0.83783555, 0.03350124, 0.5752538, -0.2649324, 0.65044403, -3.3886375, 12.430359, 33.934555)
+
+[node name="@Node3D@29199" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=100310912 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.21761796, -0.016287811, 0.41798508, 0.17032702, 0.42688677, 0.105313, -0.3820544, 0.19959165, -0.19113357, -48.15647, -3.442871, 37.8936)
+
+[node name="@Node3D@29200" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1813684199 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5626547, 0.11937519, 0.18047792, 0.097164474, 0.58863586, -0.08642873, -0.19334368, -0.051579267, -0.5686483, 47.91861, 5.079834, 18.42096)
+
+[node name="@Node3D@29201" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1219745382 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.35336843, -0.022804236, -0.41107446, -0.00908206, 0.5420271, -0.022261664, 0.41160628, -0.007617896, -0.35340303, -45.711708, 3.8704834, -8.448563)
+
+[node name="@Node3D@29202" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=609022300 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.65526074, 0.11939562, -0.06695226, -0.12020745, 0.6585212, -0.0021310402, 0.06548349, 0.014108846, 0.6660461, 39.39077, 5.187134, -27.800003)
+
+[node name="@Node3D@29203" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=174421649 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.47969335, 0.15015894, -0.55576193, -0.080768436, 0.73380905, 0.12855129, 0.56999606, -0.022388997, 0.48593003, 47.05386, 3.50354, -24.32286)
+
+[node name="@Node3D@29204" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1567286840 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5087229, 0.11869148, 0.23739573, 0.096714914, 0.56083745, -0.07315017, -0.24716517, -0.024840588, -0.51723856, 39.37722, 5.1939087, -41.17482)
+
+[node name="@Node3D@29205" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1064540611 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.0105871465, 0.020372761, 0.6173213, 0.12090512, 0.6055361, -0.017910287, -0.60570836, 0.12051463, -0.014365191, -41.47181, 1.6960449, 14.782242)
+
+[node name="@Node3D@29206" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2057779328 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.040375553, -0.044393476, 0.5197626, 0.018625507, 0.5211074, 0.043061495, -0.52132237, 0.015179625, 0.041793227, 18.757854, 7.42218, -37.642685)
+
+[node name="@Node3D@29207" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1808172487 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.56066704, 0.16861565, 0.68678385, 0.22391751, 0.7890177, -0.37651423, -0.6707938, 0.40431517, 0.44834784, -42.342224, -3.3582764, -39.926773)
+
+[node name="@Node3D@29208" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=89711745 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.32629177, -0.10149218, -0.8480643, 0.09639481, 0.8976654, -0.14451599, 0.8486588, -0.14098287, -0.30964836, -5.499031, 11.95343, 32.77527)
+
+[node name="@Node3D@29209" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=716938357 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.74418974, 0.17595439, 0.29013404, -0.15678358, 0.798518, -0.08212076, -0.30092627, 0.01910407, 0.76028574, -30.010056, 2.1078491, -18.120712)
+
+[node name="@Node3D@29210" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=523407330 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.43442023, -0.042535707, -0.5405329, -0.14614865, 0.67617965, 0.06424798, 0.5221357, 0.15387638, -0.43174347, -17.325287, -0.2609253, -39.08911)
+
+[node name="@Node3D@29211" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=307888019 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.47506604, 0.05157466, 0.6511459, 0.3009203, 0.6973388, -0.27478024, -0.57973945, 0.40422428, 0.39095208, -41.29917, -3.227356, 36.735)
+
+[node name="@Node3D@29212" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=378156304 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5718485, -0.39603126, -0.2755934, -0.4348637, 0.60818803, 0.028355833, 0.20901209, 0.18185085, -0.6950162, -22.357605, 4.954712, 49.69142)
+
+[node name="@Node3D@29213" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1747533777 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.45203376, -0.026447626, -0.264062, 0.0082223015, 0.522714, -0.038278084, 0.2652557, 0.028867649, 0.45118597, -32.728737, 1.3891602, 20.788147)
+
+[node name="@Node3D@29214" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1790487571 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.6215851, -0.30461308, -0.35939136, 0.294872, 0.71557987, -0.09651581, 0.3674259, -0.058954746, 0.68545014, 11.565933, 4.777771, 1.5674133)
+
+[node name="@Node3D@29215" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=737275672 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.63393843, -0.16667059, 0.5838707, 0.095349096, 0.86095196, 0.14224024, -0.59966046, -0.039302062, 0.639863, 25.415588, 7.6937256, -4.205017)
+
+[node name="@Node3D@29216" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1378727285 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.3507453, -0.0073589464, -0.42531088, -0.05923563, 0.5450323, -0.058280855, 0.4212299, 0.082772955, 0.34594762, -48.624825, 3.4881592, 5.3838654)
+
+[node name="@Node3D@29217" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1073357456 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.46496966, -0.027298028, 0.27370244, 0.026134389, 0.53952146, 0.009412316, -0.27381605, 0.005139616, 0.46567518, -37.751427, 1.3572998, 16.695145)
+
+[node name="@Node3D@29218" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1205096451 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.21944578, -0.070089094, 0.48180777, 0.05024855, 0.5224034, 0.09888095, -0.48427916, 0.0859644, -0.20806606, -44.617775, 0.5185547, -49.40555)
+
+[node name="@Node3D@29219" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=361379829 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.16621275, 0.21841766, -0.7483222, 0.024683109, 0.76623404, 0.21816327, 0.77915543, 0.02232002, -0.16654654, 33.045914, 6.6099854, -48.01967)
+
+[node name="@Node3D@29220" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1651816655 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.08817671, -0.45922282, 0.70551544, -0.07763385, 0.7019161, 0.46658283, -0.8382187, -0.11331793, 0.03100314, -4.114876, 14.647156, 49.703033)
+
+[node name="@Node3D@29221" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1732644426 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.6027744, -0.036096387, -0.38363275, -0.0515871, 0.7134135, 0.013929295, 0.38185838, 0.0393993, -0.60369354, -28.957764, 1.7692871, 17.360046)
+
+[node name="@Node3D@29222" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=497044889 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.8167247, 0.19252543, -0.3649005, 0.16610946, 0.8942377, 0.10002124, 0.37765864, 0.023033861, -0.83312726, 37.56551, 7.2489014, 9.70369)
+
+[node name="@Node3D@29223" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=569966940 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.123049185, 0.021171726, 0.6297154, 0.11900088, 0.62928313, -0.044410497, -0.6187314, 0.12524082, 0.116692126, -44.491135, 2.4377441, 11.566132)
+
+[node name="@Node3D@29224" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1564329437 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.47965187, -0.084481664, -0.42090857, -0.13159661, 0.6296773, 0.023578469, 0.40863618, 0.1036169, -0.4864639, -49.47912, -1.0306396, -43.95466)
+
+[node name="@Node3D@29225" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=457493746 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.51396495, -0.032962788, 0.69053423, -0.31566736, 0.7767134, -0.19787483, -0.6150432, -0.3710981, -0.47549146, 24.30045, 12.228455, 33.021957)
+
+[node name="@Node3D@29226" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1396483965 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5716789, -0.11084325, -0.18112484, -0.04612873, 0.57257086, -0.20480229, 0.20727898, -0.17828521, -0.5451229, 21.484089, 7.4676514, 4.0406494)
+
+[node name="@Node3D@29227" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=787364152 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.3863465, -0.16558138, 0.77564347, -0.032911856, 0.8653789, 0.16834441, -0.79243726, 0.04478658, -0.3851506, 19.305237, 6.0043945, -24.13765)
+
+[node name="@Node3D@29228" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1989573885 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.658904, -0.08418897, -0.15356135, 0.020712297, 0.63109654, -0.25712165, 0.17389615, 0.24382938, 0.6124792, 2.7075691, 3.1799927, -39.479767)
+
+[node name="@Node3D@29229" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1436596720 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.49630693, 0.104913585, -0.009502298, 0.10425219, 0.49573442, 0.028223678, 0.015120645, 0.025656108, -0.50648874, 31.460245, 6.6435547, -28.238266)
+
+[node name="@Node3D@29230" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1472186459 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.4711775, -0.23428679, 0.7447396, 0.2883018, 0.86059004, 0.088330954, -0.72554076, 0.18981566, 0.51874477, -3.7227173, 14.991882, 45.05278)
+
+[node name="@Node3D@29231" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1315010343 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.35390112, -0.17219475, 0.38555646, -0.092434555, 0.45926997, 0.28996164, -0.4120202, -0.25093997, 0.26611894, -16.674011, 9.348877, 30.062515)
+
+[node name="@Node3D@29232" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1063732749 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.70807886, 0.17643328, -0.0023482777, 0.17628352, 0.7069321, -0.040999554, -0.0076378826, -0.040350225, -0.7285763, 44.163265, 5.8327637, 3.1455536)
+
+[node name="@Node3D@29233" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1815700407 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.4494915, -0.1679154, 0.26540738, 0.20285097, 0.50898665, -0.021525769, -0.23976684, 0.11582874, 0.47934833, -12.26252, 2.7580566, -49.796616)
+
+[node name="@Node3D@29234" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1435377392 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.407952, 0.09284926, 0.3097911, -0.08126592, 0.5121061, -0.046470292, -0.31302935, -0.011943726, 0.415796, 34.14473, 6.1674194, -17.766739)
+
+[node name="@Node3D@29235" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=625549738 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.4877324, -0.05278812, -0.12617843, 0.08344896, 0.48509565, 0.11962014, 0.108369045, -0.13596366, 0.47577363, -25.122673, 3.295227, 21.10878)
+
+[node name="@Node3D@29236" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=820312006 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.56729245, -0.17268944, -0.15383093, -0.21238923, 0.5502777, 0.16550411, 0.09152278, 0.20658934, -0.5694302, -38.116844, -4.6482544, -37.5963)
+
+[node name="@Node3D@29237" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1655575048 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.6768486, -0.015145228, 0.22766536, -0.054968763, 0.68088216, 0.20871706, -0.22144824, -0.2153021, 0.6440423, 3.8474007, 14.451904, 37.075073)
+
+[node name="@Node3D@29238" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1274978935 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.20742635, 0.1151608, 0.44988954, -0.08197622, 0.49407, -0.08867391, -0.4571023, -0.036347672, 0.22005598, 40.779377, 5.8724365, -7.8845825)
+
+[node name="@Node3D@29239" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=20398400 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.10539335, -0.31379917, -0.76430047, 0.5041425, 0.63485515, -0.19113393, 0.6545727, -0.43843123, 0.2702693, -31.531448, 1.8024902, -19.209)
+
+[node name="@Node3D@29240" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1750160760 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.6450176, -0.25737512, -0.44255906, 0.03715287, 0.6864591, -0.45336714, 0.5106076, -0.37507352, -0.52606833, -13.587624, 9.373596, 27.989807)
+
+[node name="@Node3D@29241" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2099961791 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5687227, -0.16953, 0.5018622, -0.11609324, 0.6785407, 0.36077207, -0.51684475, -0.33895975, 0.47120002, -9.444012, -1.3533936, 5.4110413)
+
+[node name="@Node3D@29242" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2061285106 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.61601746, 0.07846908, 0.39603457, -0.095050685, 0.7303655, 0.0031355023, -0.39238524, -0.053731434, 0.6209872, 34.511745, 7.246338, 0.44700623)
+
+[node name="@Node3D@29243" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1671357000 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5409318, -0.11825645, 0.30065688, -0.08740483, 0.61804426, 0.0858376, -0.3110298, 0.031986088, -0.54701346, 18.37915, 6.0111694, -27.691849)
+
+[node name="@Node3D@29244" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1991217264 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.43457213, -0.013058166, 0.21441418, -0.045745846, 0.47839472, -0.06358213, -0.20988396, -0.077232465, -0.43009385, 1.5109253, 16.650696, 44.865982)
+
+[node name="@Node3D@29245" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=102403083 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.048461467, 0.16280638, 0.8044116, -0.08138926, 0.8027939, -0.15757573, -0.816676, -0.070344865, 0.06343756, 43.086582, 5.991333, 17.639511)
+
+[node name="@Node3D@29246" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1185788188 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.46934313, 0.112541616, -0.11503642, -0.104397, 0.48283306, 0.04642706, 0.12247556, -0.019712633, 0.4804093, 45.752018, 4.5254517, -10.879852)
+
+[node name="@Node3D@29247" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1395707454 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.22607385, -0.10665232, -0.5095673, 0.035123996, 0.5573976, -0.10108013, 0.51942265, 0.008727514, 0.22861958, 22.899487, 6.6397705, -22.900879)
+
+[node name="@Node3D@29248" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=636945725 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5274014, -0.019756643, 0.50929993, -0.067170165, 0.7237987, 0.09763495, -0.50523746, -0.11685071, 0.51866174, 4.7567368, 17.137634, 47.333023)
+
+[node name="@Node3D@29249" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=909333828 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.51804847, -0.030347263, 0.3023288, -0.023325577, 0.5997868, 0.020236608, -0.30295146, 0.0057137115, -0.5185419, -31.014381, 1.7321777, 13.130157)
+
+[node name="@Node3D@29250" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1591515892 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.12049578, 0.11617826, 0.51469064, -0.25107557, 0.47696403, -0.048882376, -0.46407428, -0.22788383, 0.16008478, 28.730467, 10.834106, 30.896637)
+
+[node name="@Node3D@29251" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1091643149 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.26976204, 0.09399344, 0.78419524, -0.121239804, 0.823782, -0.057031985, -0.78044724, -0.09548283, 0.27991727, 20.57875, 11.042603, 24.911377)
+
+[node name="@Node3D@29252" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=295419274 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.332801, -0.33406883, -0.33030307, 0.14419217, 0.45788327, -0.31782094, 0.44711375, 0.10099279, 0.34835088, -14.395683, 10.617371, 49.338394)
+
+[node name="@Node3D@29253" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=499817235 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.035009626, -0.3113962, 0.73315746, -0.08019515, 0.73151445, 0.3068689, -0.7925, -0.06026758, -0.06344096, 10.299694, 4.309265, 2.4231415)
+
+[node name="@Node3D@29254" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2018932278 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.46168855, 0.06314638, 0.5743071, 0.100130536, 0.7152763, -0.15914175, -0.56902546, 0.17710097, 0.43796998, -6.990803, -1.12677, -7.514969)
+
+[node name="@Node3D@29255" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1480838207 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.84478426, 0.08218565, 0.4051953, 0.119563445, 0.9309394, 0.060453497, -0.3957806, 0.10580909, -0.8466169, -0.9898567, -0.78808594, -12.35849)
+
+[node name="@Node3D@29256" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1416863879 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.17124389, 0.075533494, 0.7642138, 0.0018517934, 0.7829408, -0.07779939, -0.7679353, 0.018731391, 0.17022642, -20.977638, 0.7605591, -15.962158)
+
+[node name="@Node3D@29257" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=175453868 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.02011668, 0.056722797, 0.50005656, -0.05567879, 0.4971328, -0.058631036, -0.5001739, -0.05762161, -0.013585222, 26.50974, 9.505981, 17.493057)
+
+[node name="@Node3D@29258" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1128756391 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.37831965, 0.17295541, 0.8269677, 0.31985685, 0.8093253, -0.31559312, -0.78197235, 0.4147214, 0.27099872, -40.016296, -3.999939, -39.644638)
+
+[node name="@Node3D@29259" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=278818312 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.16717117, -0.031617597, -0.8978719, 0.5057681, 0.7515096, -0.12063054, 0.7425444, -0.5189928, -0.11997559, -48.460793, 2.8291016, -11.199936)
+
+[node name="@Node3D@29260" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=972490339 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.46913996, -0.26890433, 0.43052566, -0.11948487, 0.6282692, 0.2622124, -0.4933409, 0.10354926, -0.47291276, -43.650345, -9.854553, 49.742508)
+
+[node name="@Node3D@29261" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1110668537 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.8206931, 0.08498564, -0.32413846, -0.060136184, 0.8809168, 0.078706875, 0.32965428, -0.050878026, 0.821319, -13.875221, -0.14361572, -30.021591)
+
+[node name="@Node3D@29262" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=119561066 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.704387, 0.16891982, 0.3027028, 0.15968004, 0.7665939, -0.056214735, -0.30767712, 0.011131167, -0.7221737, -28.277664, 1.513855, -8.834381)
+
+[node name="@Node3D@29263" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=136639095 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.28343228, -0.20997871, 0.8697285, -0.008428267, 0.9116579, 0.2228484, -0.8946774, -0.07510913, 0.27342916, 20.274506, 6.3338623, -8.278412)
+
+[node name="@Node3D@29264" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=146674001 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.69113135, 0.094274275, 0.09206676, 0.08911493, 0.6965112, -0.044239316, -0.097069345, -0.031795416, -0.69612724, 31.780943, 7.085266, -8.264679)
+
+[node name="@Node3D@29265" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=935889245 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.4385447, -0.020355163, -0.20445654, 0.02132265, 0.48381573, -0.0024318744, 0.2043579, -0.006799768, 0.43901008, -48.7649, 3.7902222, -5.0172424)
+
+[node name="@Node3D@29266" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=471683398 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.6196709, 0.070733614, -0.22759642, -0.04942362, 0.6583663, 0.07004614, 0.23315378, -0.048434623, 0.619749, 39.74817, 6.4768677, -2.3648376)
+
+[node name="@Node3D@29267" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=546614382 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.033115894, 0.024435753, 0.73980266, 0.1434113, 0.726299, -0.030409267, -0.7261806, 0.144549, 0.027731663, -41.17521, 2.0046387, 13.181656)
+
+[node name="@Node3D@29268" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1059238755 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.39135188, 0.19938505, -0.6979661, -0.056365047, 0.79889524, 0.19661298, 0.7236947, -0.045599256, 0.39275184, 44.738525, 5.474304, -0.6194763)
+
+[node name="@Node3D@29269" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=388524184 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.4491583, -0.030827701, -0.22550568, -0.023268908, 0.4900601, -0.11334016, 0.2264105, 0.11152169, 0.43571496, -22.234322, -1.0731201, -36.87738)
+
+[node name="@Node3D@29270" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=401843095 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.11535555, 0.11316398, -0.5004944, -0.03285419, 0.5135621, 0.10854629, 0.51207554, 0.0074570463, 0.11971087, -37.89332, 3.5860596, -5.625229)
+
+[node name="@Node3D@29271" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=216381781 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.85509276, -0.099401474, 0.2996366, -0.16392629, 0.8791733, -0.17615028, -0.26979792, -0.21913488, -0.84263605, -5.1255684, 9.863953, 23.236923)
+
+[node name="@Node3D@29272" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=827607142 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.494765, -0.034788173, 0.6626129, 0.011491725, 0.82686955, 0.034831155, -0.663426, -0.01162121, 0.494762, -43.479836, 3.9820557, -7.1896057)
+
+[node name="@Node3D@29273" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=617256404 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.7919245, -0.3362817, -0.34383658, -0.35253087, 0.85645515, -0.025687756, 0.32715583, 0.1088691, -0.8599825, 12.216812, 6.864746, -39.70294)
+
+[node name="@Node3D@29274" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=553277350 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.13324277, -0.14406909, -0.53879535, 0.13485153, 0.52919936, -0.17485166, 0.54117596, -0.16733837, -0.08908669, -0.06760788, 15.521423, 40.8506)
+
+[node name="@Node3D@29275" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1468746826 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.77707225, -0.20427218, -0.43365553, -0.14124027, 0.8868819, -0.16467309, 0.4580779, -0.07306791, -0.7864167, 19.225052, 6.5478516, -2.7472382)
+
+[node name="@Node3D@29276" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1149318747 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.26373708, -0.22042699, -0.49882242, 0.048649896, 0.561392, -0.22235404, 0.54318047, 0.056745615, 0.2621145, 11.06419, 5.7995605, -34.45308)
+
+[node name="@Node3D@29277" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=457645075 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.26331273, 0.15431768, 0.6807414, -0.08640417, 0.72917724, -0.13187623, -0.6926451, -0.03229669, 0.27523842, 35.775974, 5.954834, -41.20308)
+
+[node name="@Node3D@29278" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1887623261 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.36191794, -0.087837555, -0.34137475, -0.08223305, 0.4968118, -0.040650688, 0.34276795, 0.02644461, -0.37019938, -32.034798, 2.6280518, -49.99385)
+
+[node name="@Node3D@29279" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1541841257 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.35123178, 0.009648786, 0.67322016, 0.08047325, 0.7532732, -0.052780557, -0.66846275, 0.09575298, 0.34737745, 15.30154, 8.423645, -48.45346)
+
+[node name="@Node3D@29280" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=774983881 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.29729167, 0.05380539, -0.78658307, -0.4117376, 0.72750086, -0.10585364, 0.6723691, 0.4217082, 0.2829706, -41.706703, -5.9780884, 41.532364)
+
+[node name="@Node3D@29281" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=793893943 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.3784985, -0.019961784, -0.43499556, 0.2581206, 0.47446537, 0.20282295, 0.3507041, -0.32766584, 0.32019126, -44.785263, 3.4087524, -10.584579)
+
+[node name="@Node3D@29282" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=132668853 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.49356845, 0.14134742, -0.35319307, 0.12964584, 0.60641754, 0.061514385, 0.35765406, -0.02475823, -0.50971055, 46.5282, 4.263672, -12.860168)
+
+[node name="@Node3D@29283" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1020714437 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.8510509, -0.09683102, -0.16520372, 0.11969682, 0.8564389, 0.11463565, 0.14946969, -0.13450804, 0.84883606, -5.048912, 11.911316, 32.183167)
+
+[node name="@Node3D@29284" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=643805714 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.6092027, -0.20289826, -0.45973447, -0.26061577, 0.74529266, 0.016420782, 0.42965445, 0.1643852, -0.64189243, -12.248985, 12.858826, 44.199707)
+
+[node name="@Node3D@29285" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1832852947 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.93334, 0.030805366, 0.021140313, -0.026076386, 0.9156219, -0.18296488, -0.026756413, 0.18222831, 0.91574913, -41.659103, 2.0967407, 12.800751)
+
+[node name="@Node3D@29286" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=15655981 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.39362127, -0.009888504, -0.2499074, 0.06740348, 0.44455656, -0.1237556, 0.24084903, -0.14057344, -0.37379143, 0.7304497, 14.346191, 36.960114)
+
+[node name="@Node3D@29287" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=550891534 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.54165, 0.15596905, -0.2763007, -0.14501475, 0.60791224, 0.058878772, 0.2822041, 0.013024548, 0.56057507, 41.014576, 4.9506226, -33.77794)
+
+[node name="@Node3D@29288" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=104402480 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.9110582, 0.12325365, -0.030340914, 0.1244534, 0.91061497, -0.037826, 0.024967652, -0.041569147, -0.91857916, 27.505005, 8.114197, 1.598587)
+
+[node name="@Node3D@29289" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1767203772 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.7165543, 0.09821751, 0.0798972, 0.111474425, 0.7071264, 0.13048367, -0.060030784, 0.14073327, -0.71138644, -37.908005, 3.1799316, 5.661392)
+
+[node name="@Node3D@29290" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=633501759 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5892145, -0.08526246, -0.6480144, 0.34227088, 0.7835189, 0.20812225, 0.556815, -0.39140075, 0.55778897, -13.763733, -2.4038086, 5.324051)
+
+[node name="@Node3D@29291" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=803708853 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.33345294, -0.13407248, -0.47952816, 0.116682865, 0.5820981, -0.081611656, 0.48405352, -0.047957536, 0.3500083, 16.769524, 5.565735, -7.8030243)
+
+[node name="@Node3D@29292" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=479046179 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.53142613, -0.24725248, 0.43504786, -0.3895975, 0.60269296, -0.13337599, -0.31402904, -0.32930467, -0.57075244, -9.590225, 9.479797, 25.204636)
+
+[node name="@Node3D@29293" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1077261477 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.27570182, -0.32732308, -0.7938336, -0.0008978282, 0.83363897, -0.34404793, 0.8586683, 0.105968766, 0.2545249, 12.821247, 8.227661, -48.557632)
+
+[node name="@Node3D@29294" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=419481659 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.80677855, -0.041008625, -0.07795652, 0.04007311, 0.81049937, -0.01163904, 0.078441516, 0.007721017, 0.8077363, -36.15995, 1.4532471, 15.08107)
+
+[node name="@Node3D@29295" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=544902322 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.3477139, -0.053768873, 0.33292446, -0.09034249, 0.47556806, -0.017549265, -0.3249123, -0.074690364, -0.35140866, -8.034336, 12.440613, 37.702286)
+
+[node name="@Node3D@29296" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1221001245 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.57127887, -0.025751958, 0.25397098, -0.084031105, 0.6068023, -0.12749036, -0.24104606, -0.15050533, -0.5574665, 20.022156, 18.526001, 49.490067)
+
+[node name="@Node3D@29297" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1653633712 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.137239, -0.045152977, -0.44305527, 0.1869793, 0.41493255, -0.100204855, 0.40419737, -0.20727633, -0.10407843, -18.608284, -0.4257202, 10.339066)
+
+[node name="@Node3D@29298" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=567943291 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.4046345, 0.26889756, 0.43315533, 0.061112188, 0.57459253, -0.29961178, -0.50615686, -0.14558852, -0.3824497, 34.10019, 12.880554, 39.533844)
+
+[node name="@Node3D@29299" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=931892559 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.016558917, -0.09045285, 0.9290093, -0.41856578, 0.8312154, 0.073470525, -0.8342917, -0.4152271, -0.055299167, -22.013954, 1.2980957, 14.53183)
+
+[node name="@Node3D@29300" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=507560238 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.40036517, 0.09719468, -0.21505983, 0.11037546, 0.4514476, -0.00145162, 0.208602, -0.052326325, -0.41199148, 31.6124, 9.194885, 24.079514)
+
+[node name="@Node3D@29301" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2063149623 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.030624205, 0.14758448, 0.6341481, -0.0406681, 0.63317597, -0.14932218, -0.6498239, -0.04658142, -0.020540385, 42.533646, 6.021057, -0.3058014)
+
+[node name="@Node3D@29302" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1978075251 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5063248, 0.10851371, 0.624072, -0.11172784, 0.8017143, -0.04875466, -0.6235046, -0.055541884, 0.5155221, 35.826885, 6.020447, -16.282425)
+
+[node name="@Node3D@29303" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=711873462 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.6065724, 0.20825799, 0.5396805, -0.14361967, 0.81171584, -0.15181315, -0.5603568, 0.01739105, 0.6231005, 43.28467, 4.3014526, -30.66629)
+
+[node name="@Node3D@29304" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2065783239 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.7101089, 0.23445721, 0.5762174, -0.20440573, 0.913831, -0.11992686, -0.5875499, -0.034553938, 0.7381343, 49.763577, 2.5827026, -41.388092)
+
+[node name="@Node3D@29305" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=385475574 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.07346566, 0.06643859, 0.61610645, -0.058550972, 0.61838967, -0.05970309, -0.616906, -0.050779793, 0.07903691, 29.461246, 8.828308, 13.41597)
+
+[node name="@Node3D@29306" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1788150634 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.48314282, 0.17144737, -0.6333585, 0.08726739, 0.7963348, 0.14899446, 0.6503242, 0.020512065, -0.49053216, 37.480915, 7.105774, 15.96875)
+
+[node name="@Node3D@29307" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1798912134 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.8576578, 0.1758779, 0.14939536, 0.1593032, 0.86724913, -0.106444456, -0.16695656, -0.07599276, -0.8690106, 44.435314, 5.796875, 18.54242)
+
+[node name="@Node3D@29308" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2043073655 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.84580696, 0.36856937, 0.19737324, -0.36654744, 0.86794657, -0.050007496, -0.20110334, -0.03184952, 0.92126656, -43.049934, -4.1394653, -32.89528)
+
+[node name="@Node3D@29309" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1164609818 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.32662946, 0.09390862, 0.40212858, 0.067947604, 0.51794887, -0.06576549, -0.40731966, 0.011097079, -0.33343747, 36.985535, 5.690796, -30.955048)
+
+[node name="@Node3D@29310" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=744640280 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.6478279, 0.0791087, 0.6576579, 0.21252945, 0.8960854, 0.101564, -0.62737817, 0.22186896, -0.644689, -9.133446, -0.41705322, -9.617355)
+
+[node name="@Node3D@29311" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1337499367 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.055225234, 0.04607475, -0.5349128, -0.0023213006, 0.53770965, 0.04655531, 0.5368885, 0.0070641753, -0.054820728, -18.458061, 0.55462646, -17.102509)
+
+[node name="@Node3D@29312" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=31179287 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.8449838, -0.34188527, -0.22784606, -0.35302225, 0.87072676, 0.0026748055, 0.21017765, 0.0880133, -0.911524, 11.3831215, 5.982605, -35.02516)
+
+[node name="@Node3D@29313" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1533170923 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.21800242, 0.19918656, 0.4157314, -0.16664791, 0.46282598, -0.13436335, -0.42980963, -0.07842036, 0.26295784, 44.424713, 9.926392, 47.713562)
+
+[node name="@Node3D@29314" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1260763932 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.03548687, -0.2488297, 0.7926392, -0.041584004, 0.7928995, 0.24704967, -0.82973725, -0.029095659, -0.04628164, -38.52379, -5.02594, -32.722687)
+
+[node name="@Node3D@29315" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=33595975 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.530845, 0.05452456, 0.35096893, 0.050106063, 0.636322, -0.023069348, -0.3516269, 0.008359717, -0.53313893, -14.533966, 0.15893555, -12.576767)
+
+[node name="@Node3D@29316" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=145858218 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.70211333, 0.02548312, 0.32165283, 0.040096566, 0.75742966, -0.14753176, -0.3201596, 0.15074472, 0.6869111, -43.874825, 2.0601196, 13.359283)
+
+[node name="@Node3D@29317" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1934672044 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.45863864, -0.47551575, -0.33707336, -0.44949132, 0.561605, -0.18066663, 0.3710676, 0.092561804, -0.6354716, -36.019463, -3.921875, 43.465744)
+
+[node name="@Node3D@29318" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2062928203 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.07540525, -0.109784685, 0.43471703, -0.05907737, 0.43941134, 0.100722745, -0.44445634, -0.039781015, -0.08714103, -2.7301369, -0.6688843, 3.3325043)
+
+[node name="@Node3D@29319" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1623053246 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.6055542, 0.09832079, 0.6902398, -0.12143646, 0.9151392, -0.023819031, -0.6865502, -0.07514774, 0.6130216, 33.369564, 7.82135, 6.267639)
+
+[node name="@Node3D@29320" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2065949142 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.47349247, -0.15210475, -0.105070435, -0.14435475, 0.48468402, -0.051126193, 0.11548748, -0.017785592, -0.4946889, -39.38108, -5.1447144, -28.624344)
+
+[node name="@Node3D@29321" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1183808883 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.41197845, -0.16345325, -0.07981604, 0.148387, 0.41628912, -0.086593695, 0.10520867, 0.05291696, 0.43467775, 10.579113, 6.089966, -38.66646)
+
+[node name="@Node3D@29322" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=826700409 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.6511976, -0.020526981, 0.44704333, -0.15289356, 0.75202197, -0.18818572, -0.42058605, -0.24159668, -0.6237514, 11.858139, 16.061218, 41.444687)
+
+[node name="@Node3D@29323" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=84322565 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5368727, 0.08552964, 0.3361365, -0.095762074, 0.63190466, -0.007837708, -0.3333657, -0.04377768, 0.5435864, 38.67305, 5.3983154, -19.702255)
+
+[node name="@Node3D@29324" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1975260546 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.82711554, -0.034239486, 0.3516128, -0.012059646, 0.8973826, 0.05901719, -0.35307005, 0.049559273, -0.82571757, -43.627594, 0.6444702, 25.123703)
+
+[node name="@Node3D@29325" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=415518082 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.54218566, 0.07215764, -0.6468041, 0.08960579, 0.8421067, 0.018833295, 0.6446185, -0.056366354, -0.5466418, -23.702255, 1.3122559, -3.8669891)
+
+[node name="@Node3D@29326" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1550426551 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.30534172, -0.058174606, 0.72812045, -0.23853582, 0.7538526, -0.03980091, -0.69039434, -0.23473212, -0.3082754, 8.486351, 8.780151, 14.493423)
+
+[node name="@Node3D@29327" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1293554969 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5214016, 0.18301548, 0.69097805, -0.14138022, 0.8647792, -0.122365855, -0.7006832, -0.03830277, 0.53887, 39.504063, 5.2679443, -38.897675)
+
+[node name="@Node3D@29328" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1687892522 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.37424615, -0.029345488, 0.44424266, 0.005649806, 0.5799877, 0.04307205, -0.445175, 0.03203067, -0.3729157, -33.458244, 1.2200317, 23.182373)
+
+[node name="@Node3D@29329" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=130529613 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.89943683, -0.2966357, -0.06197871, -0.228412, 0.7911732, -0.47190437, 0.19915332, -0.43228817, -0.82114905, -16.828209, 8.436829, 28.499039)
+
+[node name="@Node3D@29330" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=739675457 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5148512, 0.050007537, -0.067182146, 0.053396285, 0.51835215, -0.023363741, 0.06452156, -0.029937824, -0.5167462, -18.553337, 0.26275635, -30.79924)
+
+[node name="@Node3D@29331" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=456955279 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.028728224, 0.04818992, 0.5617089, 0.0049446686, 0.56239456, -0.048501633, -0.5637506, 0.0073884903, 0.028198773, -23.715355, 0.9298706, -11.376938)
+
+[node name="@Node3D@29332" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=524753991 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.3448255, -0.2731144, -0.5267964, 0.1405695, 0.629541, -0.23436907, 0.57649463, 0.009857085, 0.37224624, 9.329891, 2.9701538, -17.637955)
+
+[node name="@Node3D@29333" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2066813751 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.6236364, 0.11767529, -0.18031792, -0.1169442, 0.6490328, 0.019102143, 0.18079293, 0.013905559, 0.63435394, 31.838316, 6.558716, -27.908875)
+
+[node name="@Node3D@29334" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1829666827 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5375939, -0.23439828, 0.4238206, -0.4003842, 0.57135993, -0.19186969, -0.27250493, -0.37706622, -0.5541983, -7.3622475, 2.7164307, 12.120895)
+
+[node name="@Node3D@29335" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=257165224 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.77307415, 0.3547941, 0.11846332, 0.30800727, 0.7581402, -0.2605973, -0.21223556, -0.19209522, -0.80969846, 39.811985, 9.486389, 36.687515)
+
+[node name="@Node3D@29336" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=801728419 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.48138177, -0.14560679, 0.33271307, 0.08837964, 0.58278865, 0.12717757, -0.35226178, -0.052761324, 0.48657542, -1.8782196, -1.1640625, -4.487625)
+
+[node name="@Node3D@29337" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1236044297 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.6459705, -0.13227426, -0.5379777, -0.15790136, 0.74814695, -0.37354746, 0.5310213, 0.38337195, 0.54335684, -36.88916, 1.4939575, -49.362305)
+
+[node name="@Node3D@29338" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=596523622 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.2038401, -0.18780197, 0.5091955, -0.35470942, 0.45777854, 0.026841773, -0.4107687, -0.30210873, -0.2758621, -1.10923, 5.4520874, 12.379089)
+
+[node name="@Node3D@29339" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=369641663 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.44893682, -0.50064045, 0.66514194, 0.49292764, 0.7688372, 0.24598902, -0.6708777, 0.22988565, 0.625839, -21.220741, 6.168335, 48.108505)
+
+[node name="@Node3D@29340" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1922834462 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.7707262, 0.11978842, -0.43930525, -0.07318377, 0.8850134, 0.112927675, 0.44942465, -0.06131277, 0.7717613, 37.88042, 5.7406006, -16.309692)
+
+[node name="@Node3D@29341" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=173449189 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.22779825, 0.04675062, 0.49710983, -0.013888547, 0.5455974, -0.05767499, -0.4991101, -0.036519527, -0.2252804, -17.733582, 0.48388672, -8.602325)
+
+[node name="@Node3D@29342" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=528057663 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.39693907, -0.169522, -0.22427048, 0.20669186, 0.4389969, 0.03399662, 0.19056085, -0.12304302, 0.43028197, -31.032143, 2.0009155, 23.185623)
+
+[node name="@Node3D@29343" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2144741667 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.1422674, -0.03632427, 0.5748582, 0.13630629, 0.5774378, 0.0027538394, -0.5596445, 0.131406, 0.14680558, -13.849068, 0.45184326, -41.26042)
+
+[node name="@Node3D@29344" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1142497187 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.709357, 0.19560069, -0.44967377, -0.14623159, 0.8391782, 0.13434945, 0.4680624, -0.034261156, 0.72346205, 47.437244, 3.980713, -14.603149)
+
+[node name="@Node3D@29345" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1859285951 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.6216816, -0.018460037, 0.60919666, -0.19628331, 0.82990474, -0.17515795, -0.5770045, -0.2624246, -0.59678173, 1.6956863, 15.873657, 41.722794)
+
+[node name="@Node3D@29346" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1789733498 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.35859844, -0.043132856, -0.6030954, 0.1497684, 0.6856718, 0.040013123, 0.58579344, -0.14889988, 0.3589599, -20.052734, 0.039916992, -31.724945)
+
+[node name="@Node3D@29347" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1245740475 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.21036963, -0.01892058, 0.86696583, -0.25719187, 0.85061103, 0.08097136, -0.82815474, -0.26897216, 0.19508205, 2.054947, 12.878052, 32.223816)
+
+[node name="@Node3D@29348" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=573392199 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.2402108, -0.094922215, -0.4280451, -0.026524018, 0.4903293, -0.09384943, 0.4376406, -0.022383299, -0.24063198, 26.587105, 8.0026245, -2.4064941)
+
+[node name="@Node3D@29349" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1518055306 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.61573815, 0.24691176, -0.040049616, -0.24679084, 0.61701125, 0.009707803, 0.040788047, 0.005877778, 0.6633284, -21.759056, 0.10101318, 5.159134)
+
+[node name="@Node3D@29350" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1327708504 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.69606376, -0.24206395, 0.20433977, 0.2551039, 0.7207967, -0.015120212, -0.18780765, 0.08192463, 0.7367979, 2.598175, 0.04284668, -13.065292)
+
+[node name="@Node3D@29351" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1354531153 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.3468433, -0.022783969, -0.28721562, -0.02028701, 0.4503051, -0.011222664, 0.28740275, 0.004289716, -0.34740964, -33.88472, 1.5993042, 11.834274)
+
+[node name="@Node3D@29352" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=188929554 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.6326068, 0.059678357, 0.2914808, 0.05803991, 0.6964687, -0.016631177, -0.29181147, 0.009149904, -0.6351979, -23.030785, 0.87615967, -11.755905)
+
+[node name="@Node3D@29353" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=937118548 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.4767834, -0.030885346, 0.7540614, -0.4151778, 0.7341046, 0.2925796, -0.63023, -0.5069729, 0.37772152, -41.392235, 1.8476563, -13.051651)
+
+[node name="@Node3D@29354" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1666347233 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.7766926, 0.16426057, 0.02802053, -0.16245416, 0.7761591, -0.046943996, -0.03708545, 0.040169124, 0.7924829, 37.085926, 5.852112, -35.95015)
+
+[node name="@Node3D@29355" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1495092634 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.30009568, -0.08877928, 0.7450976, -0.14827175, 0.77963734, 0.1526127, -0.735573, -0.19337371, 0.27321884, 8.8605995, 17.550537, 48.77884)
+
+[node name="@Node3D@29356" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1587370905 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.44945794, 0.10297026, -0.13225166, 0.14750664, 0.42273927, -0.1721601, 0.07959378, -0.20197634, -0.42775714, 38.317932, 8.225464, 30.324493)
+
+[node name="@Node3D@29357" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=363320742 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.35563436, 0.1649066, 0.6606844, -0.36214626, 0.6770158, 0.025953796, -0.5766699, -0.3234645, 0.39114752, 27.54374, 14.987244, 38.984116)
+
+[node name="@Node3D@29358" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=324753137 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.6890831, 0.024283132, -0.0782494, -0.008749202, 0.6807769, 0.13421787, 0.081462204, -0.13229255, 0.6763215, 19.866882, 10.86084, 23.052567)
+
+[node name="@Node3D@29359" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=556741030 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.54792345, 0.11492893, 0.31902197, -0.09235285, 0.6338854, -0.069742754, -0.32627386, 0.0135810105, 0.555486, 35.603477, 5.9226074, -30.079254)
+
+[node name="@Node3D@29360" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=227276459 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.47518536, -0.007798396, 0.42339724, 0.011384283, 0.6363933, -0.0010552683, -0.42331603, 0.008360652, 0.4752482, -10.074314, 0.12945557, -15.74234)
+
+[node name="@Node3D@29361" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=505063720 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.66070676, 0.0565801, -0.58768123, -0.33190185, 0.7650167, -0.29949075, 0.4882742, 0.4434549, 0.5916418, -46.31356, -4.5406494, 39.640427)
+
+[node name="@Node3D@29362" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2078345788 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.71991175, -0.14080268, 0.4016023, -0.1462508, 0.8229812, 0.026370088, -0.39965045, -0.047531925, -0.73307765, -11.949821, -0.21905518, -34.138885)
+
+[node name="@Node3D@29363" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1901889580 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5648373, -0.024881477, 0.44443375, -0.26879522, 0.59140044, -0.30850637, -0.35480917, -0.40842128, -0.47379744, -45.19683, 2.484497, -11.897812)
+
+[node name="@Node3D@29364" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=627131089 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.3450867, -0.06111877, -0.52448505, 0.26554585, 0.5616502, 0.10926711, 0.45640492, -0.280568, 0.332988, -16.41362, -0.27453613, 10.163803)
+
+[node name="@Node3D@29365" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1266738670 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.041269273, -0.060698137, -0.5418666, 0.08004144, 0.5368551, -0.06623283, 0.5393487, -0.0843158, -0.03163272, -7.6873283, 12.322754, 36.702347)
+
+[node name="@Node3D@29366" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1650019020 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.020948336, 0.22314155, -0.53807896, 0.11878131, 0.5254777, 0.22254018, 0.5702737, -0.11764768, -0.026586806, -49.785316, -0.3491211, -20.653564)
+
+[node name="@Node3D@29367" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=772924485 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.3401643, -0.02357903, 0.4454734, -0.020574419, 0.5604429, 0.013953731, -0.44562227, -0.007876725, -0.3406949, -47.628365, 3.866516, -2.9960327)
+
+[node name="@Node3D@29368" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=420925991 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.4919604, -0.18960758, -0.6911041, 0.21809795, 0.75890106, -0.36346036, 0.68264866, -0.37910303, -0.38193277, -7.927986, -1.897583, 3.5634308)
+
+[node name="@Node3D@29369" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=683986213 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.3076695, -0.106984004, -0.46695143, 0.051411957, 0.559131, -0.09422861, 0.47628352, 0.008754649, 0.31181258, 17.193047, 5.5271606, -21.575104)
+
+[node name="@Node3D@29370" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=472549007 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.15305598, -0.24261357, -0.603772, -0.14084888, 0.6178976, -0.21258453, 0.63526654, 0.07854457, -0.1926014, 10.1034775, 6.052246, -39.839096)
+
+[node name="@Node3D@29371" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=195089363 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.70667475, -0.09349561, 0.2552264, 0.17471854, 0.70086086, -0.22702098, -0.20821953, 0.27078345, 0.6757159, 7.545067, 5.8007813, -44.59288)
+
+[node name="@Node3D@29372" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=403058806 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.94174486, -0.1053242, 0.048191372, -0.111436345, 0.9315581, -0.14170578, -0.031583816, -0.14630584, -0.936961, -12.809937, 10.745911, 30.349594)
+
+[node name="@Node3D@29373" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=313580024 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.58803976, 0.059197795, 0.36556277, 0.025659272, 0.6908607, -0.07060008, -0.36943486, -0.046242733, -0.58678, -16.997948, 0.5293579, -6.9810486)
+
+[node name="@Node3D@29374" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=167687993 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.25570616, 0.27711442, -0.6435785, -0.10892086, 0.69248503, 0.2548964, 0.69218636, 0.006596758, 0.27785945, -23.181313, 0.6682739, 5.353668)
+
+[node name="@Node3D@29375" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=559560495 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.10782026, 0.018077413, 0.5048962, -0.1000777, 0.5068, 0.0032259496, -0.4952085, -0.098484315, 0.10927759, 13.682343, 11.252808, 23.934372)
+
+[node name="@Node3D@29376" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1479360355 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.4943721, -0.20194511, 0.04612371, -0.19374703, 0.40856028, -0.287843, 0.073289186, -0.28215188, -0.4498133, -36.98506, -3.524353, -23.019058)
+
+[node name="@Node3D@29377" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=868585419 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.57461005, -0.19177201, -0.011154343, 0.18918134, 0.57104164, -0.07210693, 0.033336706, 0.06490372, 0.6014597, 3.817604, 1.2469482, -20.056442)
+
+[node name="@Node3D@29378" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=233012503 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.27431747, -0.18624692, 0.4467045, -0.34246302, 0.43752074, -0.027885782, -0.34198233, -0.28873974, -0.33039424, 9.191261, 6.1776733, 6.862259)
+
+[node name="@Node3D@29379" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1247738291 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.09757872, 0.3027721, -0.6602504, 0.22098398, 0.6469772, 0.26402602, 0.69193035, -0.16392905, -0.17743391, 35.01673, 12.878235, 41.217316)
+
+[node name="@Node3D@29380" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1532747278 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.19123885, -0.5890944, -0.6787046, -0.3014633, 0.6957463, -0.5189426, 0.8466358, 0.114670604, -0.33808738, -31.547417, -0.7138672, 46.975845)
+
+[node name="@Node3D@29381" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=484063620 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.32772344, -0.07160036, 0.43024486, 0.027658902, 0.5336678, 0.10987993, -0.43528408, 0.087818004, -0.31694743, -44.053307, 0.43408203, -48.43216)
+
+[node name="@Node3D@29382" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1655866309 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.09814829, -0.22238156, -0.5624279, -0.038188517, 0.56637, -0.23060447, 0.60358953, 0.071994625, 0.076864965, 12.360275, 7.5600586, -44.729294)
+
+[node name="@Node3D@29383" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1608984376 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.65962017, -0.019971183, -0.3943056, 0.13696583, 0.73165905, 0.1920676, 0.37029192, -0.23505478, 0.63135386, 12.60667, 14.177612, 35.51793)
+
+[node name="@Node3D@29384" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1992823248 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5242416, -0.07714016, 0.2543598, 0.11014257, 0.574958, -0.05263794, -0.24190523, 0.094612546, 0.5272657, -44.72033, 0.40625, -48.80667)
+
+[node name="@Node3D@29385" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1031902267 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.6460668, 0.10188417, 0.3877978, -0.10510997, 0.7527341, -0.022650046, -0.38693592, -0.034361966, 0.6536587, 28.185616, 7.4990845, -9.857941)
+
+[node name="@Node3D@29386" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=670954854 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.10156077, -0.20768319, 0.637588, 0.11676141, 0.6295311, 0.22365761, -0.6603162, 0.14326076, -0.05851644, -10.563705, 3.1193848, -48.921616)
+
+[node name="@Node3D@29387" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=286572654 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.62656194, -0.10813356, 0.2579045, 0.18739799, 0.63203263, -0.19027391, -0.20758034, 0.24419113, 0.60668653, -4.067589, 1.1503296, -36.970734)
+
+[node name="@Node3D@29388" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1261805419 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.08118064, 0.041362353, -0.5136848, -0.17507248, 0.4868789, 0.06687165, 0.4846984, 0.1827877, -0.061881524, -25.62156, 2.7540894, -47.89176)
+
+[node name="@Node3D@29389" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=821120452 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.49023584, 0.1175141, 0.24040271, -0.09914361, 0.5458269, -0.06463574, -0.24854292, 0.01405947, 0.49996296, 34.825294, 7.7383423, 13.606201)
+
+[node name="@Node3D@29390" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=118443612 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.47199717, 0.13032974, 0.35897478, -0.06484673, 0.5350621, -0.27952373, -0.37635577, -0.25564188, -0.40203685, 29.651186, 13.416382, 36.770905)
+
+[node name="@Node3D@29391" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1946285255 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.19845268, 0.13926883, 0.6513456, -0.060846463, 0.68059045, -0.12698312, -0.6632832, -0.020765265, 0.2065298, 45.85521, 3.739563, -24.624283)
+
+[node name="@Node3D@29392" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1424622310 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.07829847, -0.10656114, 0.85276246, 0.31879002, 0.7988026, 0.07054784, -0.7980802, 0.30862403, 0.111843325, 8.653667, 7.770508, -49.30835)
+
+[node name="@Node3D@29393" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1234390143 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.52437127, 0.18500446, 0.68801117, 0.030391335, 0.85930467, -0.20790191, -0.71180224, -0.099600144, -0.5157215, 31.415323, 8.616455, 18.72284)
+
+[node name="@Node3D@29394" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=98702926 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.6354346, -0.13217695, 0.25173742, 0.11106474, 0.6827719, 0.07814618, -0.26173863, -0.03116822, 0.64431447, 23.551676, 7.3776245, -3.2253265)
+
+[node name="@Node3D@29395" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2097647378 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.6822926, -0.19602714, 0.2796019, 0.23944455, 0.72005355, -0.079474464, -0.24345462, 0.15881829, 0.70543146, -5.9568405, 13.571777, 48.73358)
+
+[node name="@Node3D@29396" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=93232732 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.26990327, 0.14558508, 0.5651428, 0.02000216, 0.62459815, -0.15134847, -0.5832507, -0.04595036, -0.26671413, 47.504025, 4.582947, -4.106659)
+
+[node name="@Node3D@29397" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2083762701 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.3029292, -0.009716255, -0.73712337, -0.070461825, 0.79290193, -0.039408576, 0.7338123, 0.08014673, 0.300512, -9.590652, 0.29418945, -23.821487)
+
+[node name="@Node3D@29398" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1792072746 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.40704986, 0.062452793, 0.19335902, 0.04324871, 0.4496349, -0.054181974, -0.19853869, -0.030096274, -0.4082331, -33.73752, 2.9818115, 2.543579)
+
+[node name="@Node3D@29399" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1188387309 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.2869681, 0.010354398, 0.76266384, 0.099797904, 0.80836135, 0.026576217, -0.75617707, 0.10275555, -0.2859224, 20.203224, 7.78125, -43.893166)
+
+[node name="@Node3D@29400" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1819666715 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.32765257, -0.11940386, -0.322873, 0.019479271, 0.43859825, -0.18196863, 0.34369287, -0.13868938, -0.29749098, -5.190155, 14.13208, 40.867294)
+
+[node name="@Node3D@29401" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1395935392 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.054655105, -0.020066876, 0.5211815, -0.22673564, 0.47284243, -0.005571551, -0.46970615, -0.22591461, -0.05795531, 26.321419, 13.46167, 35.42354)
+
+[node name="@Node3D@29402" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=259072772 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.38229313, 0.121071525, 0.32064116, 0.06360777, 0.49705312, -0.11184517, -0.33678347, -0.04355431, -0.3850935, 33.229137, 9.347168, 29.93457)
+
+[node name="@Node3D@29403" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=556173509 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.4697463, -0.15399024, -0.6429608, -0.06088491, 0.79545057, -0.14602938, 0.65833473, -0.03631194, -0.4722817, 21.546146, 7.11145, -0.55259705)
+
+[node name="@Node3D@29404" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=207839563 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5799842, -0.1684727, 0.2553654, 0.20748276, 0.6188396, -0.06296515, -0.22482316, 0.13649413, 0.6006664, -10.880463, 12.119873, 49.23906)
+
+[node name="@Node3D@29405" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=682025765 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.29090673, -0.011467747, 0.43727073, -0.0771972, 0.51555336, 0.0648784, -0.43055516, -0.10018536, 0.28381163, 7.9929085, 11.601318, 26.299622)
+
+[node name="@Node3D@29406" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2287731 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.41799805, -0.060600933, 0.69301915, -0.13770695, 0.78529334, 0.15172848, -0.6818979, -0.19573519, 0.39417422, 0.93027496, 9.546814, 19.33995)
+
+[node name="@Node3D@29407" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=161069355 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5273428, -0.17345062, 0.16673751, -0.1716775, 0.5527029, 0.031989012, -0.16856262, -0.020281557, -0.55421317, -35.655235, -4.07135, -31.238678)
+
+[node name="@Node3D@29408" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=921643223 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.62880445, 0.22977044, 0.63797146, -0.14714743, 0.8955637, -0.17751125, -0.6619288, 0.019187503, 0.645507, 45.653984, 3.684143, -30.224915)
+
+[node name="@Node3D@29409" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1886390347 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.38362527, -0.1443252, -0.49813598, 0.12972857, 0.62661207, -0.08164186, 0.50213516, -0.05162495, 0.40166244, 13.696053, 5.0427246, -5.559082)
+
+[node name="@Node3D@29410" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1697602479 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.4400444, 0.31117597, 0.66939855, 0.006672654, 0.7776019, -0.36586168, -0.73816013, 0.19253264, 0.3957459, -18.982811, -0.5739136, 1.748642)
+
+[node name="@Node3D@29411" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=285941006 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.6978677, -0.19927146, 0.5548495, -0.39361048, 0.79758054, -0.20862049, -0.43890536, -0.39842513, -0.6951301, -5.9561806, -0.9961548, 4.3817444)
+
+[node name="@Node3D@29412" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=415240648 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.1652043, 0.10225927, -0.43372545, 0.029947098, 0.4640742, 0.098007835, 0.44460982, 0.006738486, -0.16776139, -33.23957, 2.583496, -7.2025146)
+
+[node name="@Node3D@29413" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=326339799 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.47247928, -0.062928446, -0.4411582, 0.23922653, 0.5782804, 0.17372295, 0.37596697, -0.28887543, 0.44386598, -24.356026, 1.3810425, 15.208023)
+
+[node name="@Node3D@29414" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1800050059 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.72813445, 0.070466995, 0.071548946, -0.07415714, 0.7304241, 0.035298605, -0.067716815, -0.0421862, 0.73068416, -15.011932, -0.037963867, -30.09227)
+
+[node name="@Node3D@29415" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=671910872 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.41633642, -0.11763767, -0.5486455, 0.10308647, 0.6875834, -0.06920143, 0.5515647, -0.03971191, 0.42706653, -7.8329773, 0.45135498, -34.726517)
+
+[node name="@Node3D@29416" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=351155819 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.064989194, -0.048399873, 0.7863911, 0.17871054, 0.76940095, 0.032585133, -0.7673435, 0.17509052, 0.074191324, -16.886574, -0.8034668, -36.58412)
+
+[node name="@Node3D@29417" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1417622565 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.45027697, -0.06704358, 0.7907021, -0.26738775, 0.86878026, -0.07860407, -0.74713343, -0.27051792, -0.4484034, 7.535759, 7.3639526, 10.1809845)
+
+[node name="@Node3D@29418" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=515949519 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.18812698, 0.11396337, -0.452722, 0.07771538, 0.48893267, 0.09078432, 0.46033162, -0.03596973, -0.20034376, 42.71108, 5.6862183, -4.2956085)
+
+[node name="@Node3D@29419" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=405637866 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.44669443, 0.20977077, -0.6850262, 0.099405214, 0.8176123, 0.18555117, 0.70949507, 0.01751739, -0.45728594, 40.405033, 5.097107, -33.31575)
+
+[node name="@Node3D@29420" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=718331800 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.09625246, 0.015612587, 0.45776868, 0.054529686, 0.46404964, -0.027292458, -0.45477733, 0.05894584, 0.09361309, -45.869972, 1.237793, 18.424835)
+
+[node name="@Node3D@29421" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1007056711 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.6241018, -0.20272774, -0.16842929, -0.18912078, 0.645995, -0.076771036, 0.18357639, -0.023704952, -0.65169615, -37.32927, -4.4172974, -26.349152)
+
+[node name="@Node3D@29422" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1057508397 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.47631782, 0.20596668, 0.7025858, -0.17824563, 0.84558594, -0.12704633, -0.710125, -0.074094534, 0.5031503, 30.880688, 9.649597, 26.85791)
+
+[node name="@Node3D@29423" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=753944868 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.24471945, -0.09910985, -0.7075149, -0.14785036, 0.7387073, -0.052339975, 0.69895667, 0.1215584, -0.25878733, -44.38463, 0.30944824, -47.944656)
+
+[node name="@Node3D@29424" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=415210486 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.15140471, -0.1811323, 0.7744191, -0.03060335, 0.78641623, 0.18992154, -0.794731, -0.0647908, 0.14022163, 14.539669, 5.816284, 1.4722137)
+
+[node name="@Node3D@29425" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1015105905 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.6698501, 0.2194152, -0.46950066, -0.16887334, 0.81780326, 0.14125359, 0.4899548, -0.018103939, 0.6905719, 49.296543, 5.1532593, 27.043716)
+
+[node name="@Node3D@29426" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=211259410 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.71244633, -0.07109166, 0.16037308, -0.13405271, 0.65329593, -0.3059208, -0.1131522, -0.32634896, -0.6473378, -20.85556, 0.68133545, 13.044922)
+
+[node name="@Node3D@29427" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1799886736 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.32918608, 0.050847888, -0.49367282, -0.0917018, 0.57596797, 0.12047191, 0.48773882, 0.14260854, -0.31054065, -8.361088, -1.1799316, -6.811447)
+
+[node name="@Node3D@29428" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=500437696 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.41676646, -0.017208256, -0.27090338, 0.1421636, 0.40901724, -0.24469055, 0.23124504, -0.2824674, -0.33781198, -40.193527, -3.3294678, -20.621216)
+
+[node name="@Node3D@29429" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=827162881 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.2959594, 0.14321584, -0.4734378, -0.08636743, 0.55820453, 0.11486719, 0.48702645, 0.011959555, 0.30807185, 42.016544, 4.7019653, -34.1707)
+
+[node name="@Node3D@29430" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2036394625 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.74353915, -0.04989238, 0.32536682, -0.024510749, 0.7931262, 0.17763232, -0.32825604, -0.17223461, 0.7237309, -22.965866, -1.0336304, -35.82495)
+
+[node name="@Node3D@29431" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=187474812 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.38612673, 0.028822476, 0.23196675, 0.13794509, 0.38970694, 0.18119822, -0.18870734, 0.22590022, -0.34218678, -44.991882, -4.2717285, 39.007874)
+
+[node name="@Node3D@29432" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=276863533 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.87742436, -0.14538173, 0.28951943, 0.010789202, 0.8222831, 0.44560623, -0.3237915, 0.42136145, -0.76970416, -32.462593, 1.841919, -48.513947)
+
+[node name="@Node3D@29433" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=461904493 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.2211135, 0.2584619, 0.5675094, -0.116375715, 0.60865366, -0.2318579, -0.6126387, -0.02233468, 0.24886873, -46.324867, -2.5449219, -27.339066)
+
+[node name="@Node3D@29434" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1460706066 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.13442563, -0.27267894, -0.5482831, 0.1926675, 0.5516637, -0.22712286, 0.5812464, -0.1197988, 0.20208727, -28.716057, -1.4743652, -31.95494)
+
+[node name="@Node3D@29435" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=942992942 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.61458784, -0.1191607, -0.044218127, -0.11667603, 0.61553544, -0.037088055, 0.050410494, -0.02809891, -0.62493354, 25.348549, 7.838684, -0.7447052)
+
+[node name="@Node3D@29436" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1592720208 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.22613609, 0.113169335, 0.46128556, -0.03850347, 0.51358634, -0.10712497, -0.4734017, 0.012287267, 0.22906128, -31.808533, 2.4152222, -14.405045)
+
+[node name="@Node3D@29437" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1758246333 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.61089474, -0.046238367, 0.14362845, 0.00015970228, 0.59917706, 0.19221407, -0.15088768, -0.1865698, 0.5817079, 13.376064, 6.531128, 6.058731)
+
+[node name="@Node3D@29438" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1539270189 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.21936755, -0.2539642, -0.836114, -0.2459553, 0.8092607, -0.31033787, 0.83850485, 0.3038187, 0.12771185, -26.945564, 3.2211304, -49.219208)
+
+[node name="@Node3D@29439" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=379638900 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.15862417, -0.24827933, -0.35185516, 0.16571543, 0.38128433, -0.19433722, 0.39747086, -0.05988262, 0.22144368, -21.642265, 6.6243286, 39.2162)
+
+[node name="@Node3D@29440" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1027487947 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.25203052, 0.026275273, -0.70681614, 0.1435758, 0.73662597, -0.023811622, 0.6925788, -0.14314543, -0.25227523, 14.777157, 11.908386, 27.509048)
+
+[node name="@Node3D@29441" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=308097933 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.13219061, -0.13925716, -0.8751044, -0.3854821, 0.7876425, -0.18356892, 0.7978746, 0.40361053, 0.05629715, -37.71309, -1.1104126, -44.564117)
+
+[node name="@Node3D@29442" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=813618227 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.24507025, 0.16705632, -0.7897566, 0.11965256, 0.82375044, 0.13711748, 0.7983148, -0.07218118, -0.26299438, 47.73741, 5.0585938, 17.758575)
+
+[node name="@Node3D@29443" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=387290955 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.41630176, -0.018689247, 0.7766797, -0.22580048, 0.84020895, 0.14124744, -0.7433672, -0.2656829, 0.39205307, 6.47369, 14.357422, 36.591537)
+
+[node name="@Node3D@29444" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=442590002 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.46971655, 0.07579454, 0.28013948, -0.08383913, 0.54569006, -0.0070668203, -0.277838, -0.036525726, 0.47574, -28.129517, 1.5124512, -7.7708282)
+
+[node name="@Node3D@29445" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1468679807 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.1783305, -0.089488894, 0.65202135, 0.13008884, 0.66699827, 0.055964626, -0.6451488, 0.1097583, 0.19151497, -42.488792, 0.66363525, -48.551186)
+
+[node name="@Node3D@29446" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=745820545 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.077384934, -0.097659625, 0.5665034, -0.046333097, 0.5708132, 0.09207343, -0.57298934, -0.03296773, -0.08395422, -5.2106934, 0.9882202, -33.19879)
+
+[node name="@Node3D@29447" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=389584635 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.275996, 0.051668495, 0.3873632, -0.0906333, 0.45283538, -0.12497767, -0.38013878, -0.14547913, -0.25144383, 13.440109, 16.30072, 42.06642)
+
+[node name="@Node3D@29448" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1254485941 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.12096961, 0.113893785, 0.44079405, 0.004206325, 0.45634916, -0.11675861, -0.45525098, -0.026047463, -0.11820689, 45.26853, 5.476074, 1.728302)
+
+[node name="@Node3D@29449" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1586784165 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.35234627, -0.012086098, 0.42688897, -0.08900389, 0.5433538, -0.058078714, -0.41768235, -0.10558767, -0.34773678, 6.97855, 11.808105, 27.47995)
+
+[node name="@Node3D@29450" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1198773445 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.59557587, -0.044112764, -0.06111337, 0.060116313, 0.5716327, 0.17324406, 0.045462165, -0.1779931, 0.57152694, 11.174, 8.785828, 13.845673)
+
+[node name="@Node3D@29451" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1836064176 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.16923584, 0.177223, 0.8497832, 0.0081465235, 0.86606807, -0.17899683, -0.8680282, -0.026424306, -0.16735858, 49.679485, 2.9599, -24.529556)
+
+[node name="@Node3D@29452" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2062792328 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.2551747, 0.22280227, 0.85578585, 0.08635486, 0.8927232, -0.20666991, -0.88008696, 0.022994861, -0.26840737, 40.917027, 6.513611, 9.124481)
+
+[node name="@Node3D@29453" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=246847048 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.29737526, 0.044996303, -0.43423304, 0.0037387086, 0.5251237, 0.056974996, 0.43654212, -0.035149124, 0.29531437, -24.332375, 1.6567993, 0.4733429)
+
+[node name="@Node3D@29454" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=310481409 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.8437816, 0.17754067, -0.2107374, 0.186703, 0.8676201, -0.016602114, 0.2026646, -0.060107794, -0.8620977, 45.8532, 4.1693115, -17.643768)
+
+[node name="@Node3D@29455" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1155088485 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.7628668, -0.047195457, 0.08637167, 0.027463922, 0.75025415, 0.16738446, -0.09451565, -0.16292456, 0.7457718, -17.782295, -0.24346924, -33.687943)
+
+[node name="@Node3D@29456" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1597806362 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.48701757, 0.21270266, 0.095479086, -0.21731192, 0.4942317, 0.0074395565, -0.08446425, -0.045137495, 0.531388, 48.936497, 6.501648, 35.126633)
+
+[node name="@Node3D@29457" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1513022083 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.3225955, 0.32084563, -0.68379396, 0.16404393, 0.75556165, 0.27712855, 0.7372963, -0.027725525, -0.36084563, -40.242546, -5.429016, -35.5486)
+
+[node name="@Node3D@29458" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=232253778 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5889628, 0.06728984, -0.49152035, -0.004389205, 0.7622102, 0.109607, 0.4960856, 0.086631626, -0.58257306, -1.2739983, -0.47869873, -14.85968)
+
+[node name="@Node3D@29459" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2108785130 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.2283542, -0.46166867, 0.6064134, 0.0014974999, 0.63277465, 0.48230162, -0.76215017, 0.13956772, -0.18074498, -16.359085, 9.389343, 48.41136)
+
+[node name="@Node3D@29460" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1809675909 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.7374557, 0.23414667, -0.3625616, 0.19905917, 0.82141304, 0.12558909, 0.38295043, 0.023927359, -0.7634743, 33.03368, 6.6104736, -47.91736)
+
+[node name="@Node3D@29461" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=227698441 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.096390896, -0.23672788, 0.79995924, 0.266536, 0.7543371, 0.25534335, -0.79052734, 0.2831988, -0.011448807, -28.584648, 0.017822266, -42.05686)
+
+[node name="@Node3D@29462" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1452463230 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.84787893, -0.030790329, -0.26859128, 0.12856817, 0.7318456, -0.48975536, 0.23782249, -0.50541276, -0.6928106, -43.24819, 0.8569946, -14.373138)
+
+[node name="@Node3D@29463" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1819791011 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.53690743, 0.024057452, -0.42870826, 0.10028386, 0.67445004, -0.08774639, 0.41750768, -0.13106303, -0.53023475, 19.369415, 9.710693, 17.042542)
+
+[node name="@Node3D@29464" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2010098579 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.09806211, 0.09635405, 0.49704644, 0.24733424, 0.45087767, -0.038607605, -0.44177487, 0.23104255, -0.13194595, -45.985695, -2.5265503, -40.030426)
+
+[node name="@Node3D@29465" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1882019570 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.4221068, -0.12727855, -0.5440605, 0.23898037, 0.65746903, 0.031602237, 0.5050645, -0.20472051, 0.43974456, 14.448166, 7.5670166, 8.734116)
+
+[node name="@Node3D@29466" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=752737036 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.13080454, -0.11945622, 0.61131257, 0.05712833, 0.6243147, 0.109773025, -0.6202493, 0.032310627, 0.13903055, 23.735153, 7.1277466, -29.465378)
+
+[node name="@Node3D@29467" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=879454397 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.61375254, -0.20411329, 0.04390657, 0.20831643, 0.60779047, -0.08647081, -0.013938405, 0.09597244, 0.64099705, 6.417534, 3.3583374, -28.785767)
+
+[node name="@Node3D@29468" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=508077779 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.4613298, -0.078687005, -0.17400004, -0.132179, 0.45991966, 0.14246212, 0.13782732, 0.17769384, -0.4457818, -0.5359459, 5.61792, -46.97014)
+
+[node name="@Node3D@29469" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2032649064 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.25060636, -0.0127969915, 0.40339008, -0.057647824, 0.46882668, 0.050686624, -0.39945468, -0.075687796, 0.24576038, 0.3187561, 16.584412, 44.65651)
+
+[node name="@Node3D@29470" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1228129343 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.49585953, -0.27309373, -0.54180855, 0.3335387, 0.70720786, -0.05120933, 0.5068418, -0.19821781, 0.56376815, -30.72039, 1.5073242, 20.995316)
+
+[node name="@Node3D@29471" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=574550200 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.013099472, 0.21731533, -0.8354696, 0.21533333, 0.8099765, 0.20730802, 0.8359826, -0.20522942, -0.06649006, 42.92936, 7.7804565, 33.469223)
+
+[node name="@Node3D@29472" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1634275153 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.17981516, 0.14276673, -0.76683766, 0.050755594, 0.7874238, 0.13469774, 0.7783612, -0.018364917, -0.18593644, 29.888954, 6.960449, -16.84758)
+
+[node name="@Node3D@29473" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1754448128 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.39591503, 0.010728775, 0.74574715, 0.099037856, 0.83758676, 0.040528882, -0.7392194, 0.106470555, -0.39398125, 14.675854, 8.162842, -46.33844)
+
+[node name="@Node3D@29474" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=573435605 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.39921442, 0.22054332, -0.33282453, 0.2274142, 0.5124501, 0.06679321, 0.32816812, -0.08682856, -0.45116532, 43.068203, 10.822449, 49.5562)
+
+[node name="@Node3D@29475" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2006974064 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.029108768, -0.04971973, -0.80827945, 0.17359985, 0.7903816, -0.042366885, 0.7909809, -0.1716386, 0.039043806, -22.160164, 0.6798096, -28.16806)
+
+[node name="@Node3D@29476" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1562893283 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5044873, 0.21397434, -0.1772749, -0.20368314, 0.5347035, 0.06575824, 0.1890095, 0.005093685, 0.54402965, -20.864021, -0.31311035, 11.033737)
+
+[node name="@Node3D@29477" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1057561083 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.40394622, 0.12836072, 0.3415642, -0.12832348, 0.52697855, -0.04627992, -0.34157822, -0.04617652, 0.42131603, 38.071358, 7.5803223, 23.232239)
+
+[node name="@Node3D@29478" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=600511095 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.7706811, -0.34553275, 0.21357033, 0.3106504, 0.7964686, 0.16759628, -0.26172787, -0.072106324, 0.8278005, 11.3856735, 3.784607, -9.403442)
+
+[node name="@Node3D@29479" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=974832046 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.41351563, -0.13652825, -0.32504553, -0.0010945708, 0.5015, -0.20925163, 0.35255262, -0.15857956, -0.38190165, -3.840454, 13.507874, 37.731155)
+
+[node name="@Node3D@29480" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=110083328 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.41319153, -0.114694536, -0.20430069, 0.121376775, 0.4590629, -0.012237616, 0.2004028, -0.04156013, 0.42864007, -8.033188, -2.1715088, 1.3706818)
+
+[node name="@Node3D@29481" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2115159069 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.6470204, -0.06573419, -0.43771696, -0.122291744, 0.7716128, 0.06489103, 0.42539608, 0.1218406, -0.6471055, 19.737228, 6.6346436, -31.240372)
+
+[node name="@Node3D@29482" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1240223957 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.10672463, -0.083384216, 0.5114695, 0.20255147, 0.48737448, 0.03719108, -0.4769978, 0.1883012, 0.13023017, -7.4986343, 0.96551514, -38.011673)
+
+[node name="@Node3D@29483" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=203744708 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.10575705, -0.019928189, 0.7595063, -0.23500226, 0.73008305, -0.013566596, -0.72251004, -0.23454846, -0.106759705, 12.106419, 14.68634, 37.143967)
+
+[node name="@Node3D@29484" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1621976870 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.50051194, 0.121930405, -0.44943568, 0.101347834, 0.67250186, 0.06958197, 0.4545196, -0.015684612, -0.5104289, 31.074951, 6.698181, -18.872406)
+
+[node name="@Node3D@29485" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1260979217 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.53510374, 0.22430779, -0.16697845, 0.21240187, 0.56052595, 0.07230456, 0.18188249, 0.0053396835, -0.5756927, -24.1484, 1.0438232, 6.563919)
+
+[node name="@Node3D@29486" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1325594314 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.58697003, -0.1740042, 0.07893848, 0.19036634, 0.55446696, -0.19331211, -0.016413227, 0.2081621, 0.58089733, -32.236015, -1.5136719, -41.029617)
+
+[node name="@Node3D@29487" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2046423874 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.74379885, -0.27162725, -0.1767869, -0.1172244, 0.6380913, -0.48720583, 0.30214798, -0.42110538, -0.6242183, 2.3323746, 2.11438, 5.129425)
+
+[node name="@Node3D@29488" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2008033452 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5282795, -0.118181966, 0.022468245, 0.095340535, 0.47302127, 0.24639818, -0.073361985, -0.2362941, 0.4820105, -4.4679604, 0.28149414, 6.1951447)
+
+[node name="@Node3D@29489" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1646862239 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.46109745, -0.14886388, -0.66032904, 0.11826596, 0.7689696, -0.25593892, 0.66648936, -0.23943916, -0.4114202, 21.168934, 8.443176, 7.369629)
+
+[node name="@Node3D@29490" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=707380442 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.36654782, -0.14607312, 0.85292244, 0.34242424, 0.82619363, 0.28865406, -0.79470736, 0.4233653, -0.26902324, -33.678833, -0.61743164, -44.13433)
+
+[node name="@Node3D@29491" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=650051133 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.69876754, -0.009441421, 0.028339356, -0.009021183, 0.6992683, 0.010528704, -0.028475918, 0.0101535665, -0.69875205, -42.812134, 3.9920654, -5.5585785)
+
+[node name="@Node3D@29492" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=733557463 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.663297, -0.12651592, 0.1689604, -0.16813987, 0.6535295, -0.17071913, -0.12760442, -0.20349385, -0.65331787, 19.123497, 9.0251465, 10.510208)
+
+[node name="@Node3D@29493" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1785197625 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.15438929, -0.021300029, 0.537364, 0.023780275, 0.5582523, 0.028960275, -0.53726, 0.030830307, -0.15313734, -42.712067, 0.64904785, 25.67244)
+
+[node name="@Node3D@29494" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1600506035 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.6985541, 0.18900761, -0.5015831, 0.35992458, 0.77596146, -0.20886703, 0.3971949, -0.3707388, -0.6928754, 26.960566, 11.104065, 30.559357)
+
+[node name="@Node3D@29495" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=998645557 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.67507565, -0.026957667, 0.3906241, 0.18668205, 0.70653325, -0.27386433, -0.3441856, 0.33034092, 0.61761814, -44.420555, -1.7507324, 34.57921)
+
+[node name="@Node3D@29496" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1951026682 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.6072678, -0.068606, 0.128606, -0.09629212, 0.60248095, -0.1332854, -0.10942628, -0.14943357, -0.5964193, 11.726318, 17.469177, 47.135056)
+
+[node name="@Node3D@29497" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1905420015 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.07758191, -0.18726501, 0.4976211, -0.17105906, 0.48494446, 0.15582545, -0.503422, -0.13592127, -0.12963626, -29.798454, 2.6638794, 23.851303)
+
+[node name="@Node3D@29498" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1644653087 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.6916724, -0.2751517, 0.32514787, -0.3842177, 0.67069894, -0.24975961, -0.18386503, -0.36646235, -0.7012412, -8.353867, 8.975037, 23.35254)
+
+[node name="@Node3D@29499" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1256782600 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.7720154, -0.10765125, -0.25538757, 0.0590183, 0.80236995, -0.15980844, 0.27079228, 0.13203448, 0.7629272, -48.74466, -0.7920532, -44.805298)
+
+[node name="@Node3D@29500" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1562972929 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.4788861, -0.3004312, -0.05064942, 0.26914126, 0.4613743, -0.19197106, 0.1427839, 0.13795292, 0.53173107, -20.001953, 7.869812, 45.072205)
+
+[node name="@Node3D@29501" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=301199726 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.20746545, 0.102620594, 0.5267711, 0.025112258, 0.56599957, -0.10037242, -0.53608596, -0.013200689, -0.2085624, 27.984043, 7.2580566, -18.896667)
+
+[node name="@Node3D@29502" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=909385861 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.02199793, -0.041163873, 0.5492995, -0.13481915, 0.5334198, 0.034574732, -0.5340863, -0.13295546, -0.031352215, 2.2413483, 10.687683, 23.511078)
+
+[node name="@Node3D@29503" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1645686104 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.45549992, 0.1663718, 0.6306348, -0.17101842, 0.7727598, -0.08034216, -0.62939054, -0.089568935, 0.47823098, 37.408966, 7.3449097, 18.885605)
+
+[node name="@Node3D@29504" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=700297972 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.3493543, -0.18679506, -0.60962737, -0.045171242, 0.6861418, -0.23612568, 0.63600117, 0.1513386, 0.31809667, -6.150982, 14.648987, 43.609985)
+
+[node name="@Node3D@29505" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=706130360 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.33715224, 0.21262579, 0.3059586, -0.17875464, 0.45434847, -0.11876991, -0.32690546, -0.029151032, 0.3804932, 34.36129, 14.011597, 47.53308)
+
+[node name="@Node3D@29506" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=72207485 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.43051806, 0.04221073, -0.23933224, -0.0219203, 0.4781326, 0.123758554, 0.24203548, 0.11838468, -0.41450134, -11.044098, -1.3899536, -5.0068665)
+
+[node name="@Node3D@29507" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1728362590 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.534338, 0.14287849, -0.36743805, 0.11225446, 0.64841276, 0.088892326, 0.37792054, 0.00941515, -0.54592085, -37.776276, 3.4746704, 0.26867676)
+
+[node name="@Node3D@29508" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1643493609 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.09928937, -0.18783648, -0.55409837, -0.098885745, 0.55932283, -0.17188811, 0.5766534, 0.06357179, -0.12488154, 3.3166199, 1.4126587, -22.995102)
+
+[node name="@Node3D@29509" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1353426223 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5946248, -0.29319903, 0.6454669, 0.16942179, 0.7592731, 0.5009715, -0.68839633, 0.44012558, -0.4342486, -33.668663, -0.8274536, 36.581375)
+
+[node name="@Node3D@29510" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1746138114 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.8576883, -0.09643607, -0.19257383, -0.044446453, 0.8529456, -0.22917716, 0.2107347, -0.21259761, -0.83211005, -1.0944328, 11.883484, 29.510727)
+
+[node name="@Node3D@29511" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2013284789 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.40868413, -0.17450249, 0.18353906, 0.18275379, 0.44442967, 0.015612518, -0.17532472, 0.056494072, 0.44410595, 9.179672, 6.2299194, -44.09027)
+
+[node name="@Node3D@29512" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=593388098 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.19372311, 0.08282862, 0.5811484, -0.00057641626, 0.61194915, -0.087410666, -0.58702105, -0.02793521, -0.19169924, 28.10787, 7.8147583, -3.175171)
+
+[node name="@Node3D@29513" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1071925001 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.649781, -0.008863261, -0.09380389, -0.010133437, 0.65644777, 0.008168605, 0.09367519, 0.0095318025, -0.6497901, -46.952072, 3.8286133, 1.8508606)
+
+[node name="@Node3D@29514" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=701380297 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.1730634, 0.22658114, -0.5051607, 0.019270897, 0.5264794, 0.24274534, 0.5533127, -0.08920567, 0.14954819, 46.58044, 8.958313, 47.47534)
+
+[node name="@Node3D@29515" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1650322446 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.45483539, -0.0077816513, -0.36462623, -0.060754873, 0.5763389, 0.06348582, 0.3596133, 0.08752743, -0.45045015, -47.88427, 3.5667114, 4.932556)
+
+[node name="@Node3D@29516" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1890101026 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.1840567, -0.2708045, -0.7396472, 0.37777546, 0.6361587, -0.3269217, 0.6911575, -0.41982976, -0.01827951, 4.1935387, 3.5128784, 6.0480194)
+
+[node name="@Node3D@29517" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=547713183 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.10069179, 0.13060792, 0.51440895, -0.005161341, 0.52331936, -0.13388057, -0.5307056, -0.02987, -0.09629776, 43.17288, 6.0811157, 3.1654053)
+
+[node name="@Node3D@29518" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=294863379 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.64645183, -0.06720655, 0.45275244, -0.041794363, 0.78889585, 0.057428557, -0.4558012, 0.022980178, -0.64739376, 20.627037, 7.751465, -43.480743)
+
+[node name="@Node3D@29519" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=127604318 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.78876173, -0.05193087, 0.30248293, -0.016928678, 0.8255317, 0.18587252, -0.30644116, -0.17927176, 0.7683054, -25.777046, 0.12384033, -29.680313)
+
+[node name="@Node3D@29520" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=790152277 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.0530219, -0.010607703, 0.48290768, -0.09100371, 0.47688895, 0.020467442, -0.474374, -0.09267183, 0.050049264, 4.1805916, 11.52124, 26.32399)
+
+[node name="@Node3D@29521" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=798713286 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.4374255, 0.13090277, -0.24897382, 0.17346668, 0.48790005, -0.048243158, 0.22143352, -0.12362265, -0.45403656, 43.31297, 7.724365, 33.65384)
+
+[node name="@Node3D@29522" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1535200865 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.7345573, -0.14947921, -0.2690185, -0.15433025, 0.7812238, -0.012684284, 0.2662652, 0.04043124, -0.7495048, 23.431541, 6.8462524, -25.148438)
+
+[node name="@Node3D@29523" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=944965881 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.023467755, 0.007148044, 0.56204396, 0.07058429, 0.5580432, -0.0100443605, -0.55763996, 0.07093614, 0.02238171, 20.645897, 8.517395, -49.72902)
+
+[node name="@Node3D@29524" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=478246299 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5359914, -0.007258434, -0.04213099, -0.007847097, 0.537588, 0.0072139045, 0.042025335, 0.007805925, -0.535992, -42.887543, 3.9375, -1.8697357)
+
+[node name="@Node3D@29525" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1579502259 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.47852078, -0.18808638, -0.064740434, -0.19366169, 0.47902572, 0.039742198, 0.045419812, 0.06089176, -0.5126199, 11.201519, 6.1881714, -37.516113)
+
+[node name="@Node3D@29526" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1604524020 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.24083862, 0.024673853, -0.7079132, -0.13046093, 0.7333763, 0.069945365, 0.69622546, 0.14595757, -0.23177509, -42.934013, 3.0914917, 8.017853)
+
+[node name="@Node3D@29527" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1718585884 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.46865922, 0.16672762, -0.45084494, -0.102483734, 0.64984524, 0.13378705, 0.46963426, -0.024572046, 0.47910395, 45.81992, 3.6834717, -39.035812)
+
+[node name="@Node3D@29528" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1515222861 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5484128, 0.074433915, 0.673769, -0.038100414, 0.868672, -0.06495387, -0.67679644, 0.011412224, 0.5496162, -18.192978, 0.5368042, -17.473282)
+
+[node name="@Node3D@29529" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1859786583 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.69952786, -0.026764091, -0.06486358, 0.02302989, 0.70145977, -0.041068994, 0.0662814, 0.038739145, 0.69883394, -48.59458, 0.20996094, 29.5587)
+
+[node name="@Node3D@29530" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1633235051 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.4064461, 0.19790998, -0.30722246, -0.23246695, 0.49455997, 0.011044331, 0.2819807, 0.12245204, 0.45193455, -17.062714, -1.2036743, 1.1888275)
+
+[node name="@Node3D@29531" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=288279871 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.12079449, -0.120778225, -0.62041885, -0.05569729, 0.6312239, -0.11203751, 0.6296068, 0.032668196, -0.12894297, 19.158436, 6.157715, -27.643143)
+
+[node name="@Node3D@29532" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1596517333 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.48774362, 0.13960171, -0.046407208, -0.14032017, 0.48973864, -0.0015496507, 0.044187278, 0.014265864, 0.50732636, 29.804296, 7.453186, -45.245956)
+
+[node name="@Node3D@29533" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1411945977 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.8285147, 0.1869954, 0.39069963, 0.14116928, 0.91382426, -0.1380091, -0.40949324, -0.063308775, -0.83806765, 43.174236, 4.5201416, -20.492508)
+
+[node name="@Node3D@29534" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1589243715 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.3848467, 0.16131337, -0.6431666, 0.065860346, 0.7492648, 0.14851564, 0.6598088, 0.019299647, -0.38996416, 37.286106, 7.3101807, 9.659836)
+
+[node name="@Node3D@29535" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=606823880 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.12704259, -0.033390544, -0.52810687, 0.10465087, 0.5308011, -0.058735948, 0.51870984, -0.11526833, -0.117493995, -18.638954, 0.050720215, -32.084625)
+
+[node name="@Node3D@29536" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1577882409 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.45552742, 0.06398147, 0.1304461, -0.07045946, 0.47270387, 0.014196873, -0.12706408, -0.03274841, 0.45977965, 39.292698, 5.3859253, -18.669662)
+
+[node name="@Node3D@29537" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=853206134 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.44946924, -0.024048515, 0.15461522, 0.024214333, 0.47529775, 0.0035352793, -0.15458934, 0.0045278035, 0.45009822, -32.281975, 1.6780396, 12.0842285)
+
+[node name="@Node3D@29538" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=287374524 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.03800574, 0.12394186, -0.59628487, 0.13874987, 0.5799717, 0.12939464, 0.59301406, -0.14364162, 0.00794038, -45.919777, -3.831726, -34.578842)
+
+[node name="@Node3D@29539" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=986482048 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.40329546, -0.007794492, 0.49606156, 0.044999506, 0.63607424, 0.04657884, -0.49407777, 0.06429455, -0.40067244, 0.033023834, 1.515564, -34.738846)
+
+[node name="@Node3D@29540" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=236935374 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.40309328, -0.05424733, -0.5030994, -0.11225079, 0.6367755, 0.021276455, 0.49340805, 0.100549266, -0.40617028, 13.597366, 6.4575806, -33.43164)
+
+[node name="@Node3D@29541" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1340808774 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.27933893, -0.3368613, -0.6390089, 0.018741898, 0.6815127, -0.3674606, 0.72211957, -0.14799671, -0.23765197, -28.652817, -0.8679199, -29.306152)
+
+[node name="@Node3D@29542" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=907489720 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.34611866, -0.043801706, 0.79354256, 0.02507969, 0.865702, 0.036845755, -0.7943547, 0.008246884, 0.34692812, -29.183647, 1.8223267, 13.395828)
+
+[node name="@Node3D@29543" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1989845266 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.4030179, -0.022323992, -0.504719, -0.20127968, 0.58508956, -0.18660058, 0.4633855, 0.27355975, 0.35791346, -49.146797, -3.4630127, 37.85585)
+
+[node name="@Node3D@29544" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1158558673 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.6710401, -0.08883696, 0.0023314792, 0.088039406, 0.6621391, -0.109604135, 0.0121039245, 0.10895869, 0.6679624, -46.13932, 0.15740967, -48.451637)
+
+[node name="@Node3D@29545" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=70763971 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.8419552, -0.36161733, 0.1328337, -0.36784086, 0.849491, -0.01893214, -0.114477, -0.06998738, -0.9161316, 7.3414497, 2.6814575, -2.0502167)
+
+[node name="@Node3D@29546" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1448973131 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.29467916, -0.17581962, -0.34192815, -0.16013695, 0.44778425, -0.09224228, 0.34954765, 0.056920476, -0.3305143, 3.3861008, 3.081543, -37.21785)
+
+[node name="@Node3D@29547" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1237786719 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.8057455, -0.020980146, 0.050308827, -0.0353288, 0.7686236, -0.2452887, -0.041509286, -0.24693018, -0.76778865, 13.021362, 14.921692, 37.79901)
+
+[node name="@Node3D@29548" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1902983224 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.31523356, 0.14943898, -0.5093066, -0.09213899, 0.59877163, 0.11866042, 0.52271944, 0.015423252, 0.3280608, 45.80069, 5.3085327, 8.58931)
+
+[node name="@Node3D@29549" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2105965269 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.65338105, 0.31946874, 0.37408397, 0.20546158, 0.7423113, -0.2750734, -0.4469727, -0.12577586, -0.67327684, 45.278957, 9.647034, 48.234375)
+
+[node name="@Node3D@29550" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=123675428 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.23396607, -0.20171206, 0.6454676, 0.17210041, 0.64275837, 0.26324758, -0.6539859, 0.24130912, -0.16164336, -29.51918, 0.93811035, -45.289284)
+
+[node name="@Node3D@29551" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=158519280 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.09567647, 0.10312355, -0.7509387, -0.16071475, 0.742448, 0.081481025, 0.74075246, 0.14776306, 0.114670366, -39.052658, 2.6497803, 9.123825)
+
+[node name="@Node3D@29552" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1598679565 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.31115514, -0.2423912, 0.53892344, -0.04729813, 0.6173314, 0.25034845, -0.5890287, 0.07847266, -0.30478957, 9.122871, 6.3569946, -45.265526)
+
+[node name="@Node3D@29553" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1145651261 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.53339434, 0.048721474, 0.19710384, -0.043098368, 0.5685979, -0.023918897, -0.19840927, 0.007469989, 0.53508055, -20.898209, 0.727478, -14.343658)
+
+[node name="@Node3D@29554" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=213812044 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.36296394, 0.097462304, 0.25298703, 0.08612968, 0.44230455, -0.04682473, -0.2570662, 0.010581883, -0.37289298, -31.80085, 2.4749146, -16.971924)
+
+[node name="@Node3D@29555" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=234865097 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.2666678, 0.15115134, -0.6635954, -0.09134012, 0.7142158, 0.12597619, 0.67443496, 0.036963325, 0.27944311, 32.939564, 6.635376, -34.128647)
+
+[node name="@Node3D@29556" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=571202814 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.543353, -0.021247879, -0.285431, 0.14681804, 0.5050332, -0.31708157, 0.24569654, -0.3487761, -0.44175023, -45.058983, -0.7402344, -16.575577)
+
+[node name="@Node3D@29557" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1369149038 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.00035623924, -0.09101353, -0.5784255, -0.26708075, 0.51477516, -0.080833845, 0.52108294, 0.26378548, -0.041826785, -35.9309, 0.49639893, -47.084946)
+
+[node name="@Node3D@29558" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=607047863 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.80183005, 0.18484984, 0.43387708, 0.15323626, 0.91148984, -0.105143435, -0.44602403, -0.01915787, -0.8161163, 48.506676, 4.707947, 11.616501)
+
+[node name="@Node3D@29559" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1037540566 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.1018653, -0.08630827, 0.5389802, 0.23455648, 0.48816198, 0.122500926, -0.4928814, 0.25014818, -0.05309593, -34.871193, -0.6105957, -44.55902)
+
+[node name="@Node3D@29560" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2033842650 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.67012256, 0.10251285, -0.35680845, 0.115153216, 0.75737923, 0.0013294179, 0.35293186, -0.052470416, -0.6779169, 39.92232, 5.684143, -13.135193)
+
+[node name="@Node3D@29561" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=86437925 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.051997572, 0.20705855, 0.5305036, 0.15638907, 0.51742154, -0.18662399, -0.5475854, 0.1281125, -0.10367487, -14.389809, 0.17749023, -8.709671)
+
+[node name="@Node3D@29562" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=407750820 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.57997596, -0.067614734, 0.5561244, 0.03883944, 0.79368746, 0.13700336, -0.5588717, 0.12532626, -0.5676037, 16.85614, 5.838501, -27.75267)
+
+[node name="@Node3D@29563" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1226418500 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.3722118, 0.039465245, 0.27301544, -0.050051462, 0.4605743, 0.0016594989, -0.2712744, -0.030828513, 0.37429455, -25.96167, 1.2297974, -7.9917603)
+
+[node name="@Node3D@29564" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1248475378 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.33318943, -0.29652274, 0.61805385, 0.24794108, 0.692797, 0.19871846, -0.63909435, 0.11418441, 0.39931428, -45.097466, -10.333862, 48.892715)
+
+[node name="@Node3D@29565" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=213124416 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.013045526, 0.08538864, 0.63138515, -0.027292386, 0.63086295, -0.085881926, -0.63654816, -0.028798599, -0.009257476, 34.513924, 6.7891235, -6.6479187)
+
+[node name="@Node3D@29566" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1869673855 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.21692058, -0.0056430018, 0.40625498, 0.007994833, 0.46050084, 0.0021276374, -0.4062155, 0.0060498537, 0.21698354, -10.394943, 0.16778564, -18.956238)
+
+[node name="@Node3D@29567" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=23351558 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.6552114, -0.041555725, -0.16634585, 0.07472792, 0.66060084, 0.12931396, 0.15431641, -0.1434555, 0.6436667, -19.53122, -0.6050415, -34.8459)
+
+[node name="@Node3D@29568" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=179829650 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.524369, 0.06843655, -0.36540958, -0.02588354, 0.63698584, 0.082155995, 0.37086087, -0.052306823, 0.52239525, 36.65994, 7.503418, 6.700241)
+
+[node name="@Node3D@29569" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=517508781 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.84047735, 0.029604914, -0.092010014, -0.01132634, 0.8299729, 0.16358812, 0.09598963, -0.16128518, 0.82493484, 13.717533, 12.202576, 28.828201)
+
+[node name="@Node3D@29570" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1814610053 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.53314203, -0.02197131, 0.016727617, 0.017284304, 0.5177173, 0.12912403, -0.02153612, -0.1284096, 0.5177356, 13.643311, 18.203186, 49.2798)
+
+[node name="@Node3D@29571" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=583939435 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.6345282, 0.095654346, -0.5564418, 0.1359171, 0.8383385, -0.010877177, 0.54799974, -0.097170055, -0.6416054, 22.67936, 11.244202, 28.718796)
+
+[node name="@Node3D@29572" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=451389898 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.39013767, -0.2149711, 0.51169544, 0.15779452, 0.55669266, 0.35418412, -0.5321143, 0.3226964, -0.27013618, -36.13041, -2.22406, 37.350845)
+
+[node name="@Node3D@29573" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=130860598 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.8448783, 0.117355876, -0.16834041, -0.14604205, 0.8449149, -0.14394656, 0.14416175, 0.16815615, 0.84075624, -33.224632, 2.8607788, 3.9962158)
+
+[node name="@Node3D@29574" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1727775369 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5896437, -0.0074148485, 0.13609475, 0.009012209, 0.60509366, -0.0060789646, -0.13599831, 0.00794945, 0.58965904, -3.605301, 0.30541992, -23.104263)
+
+[node name="@Node3D@29575" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1730131962 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5316205, -0.02150431, 0.189738, -0.009752017, 0.56360626, 0.03655352, -0.19070356, 0.031125978, -0.53079814, -49.08512, 0.3902588, 25.956253)
+
+[node name="@Node3D@29576" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1050538910 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.6710848, -0.30013552, -0.59726477, -0.12183508, 0.77723587, -0.52746755, 0.6572387, 0.45053795, 0.5120685, -39.300285, -5.366516, 40.66017)
+
+[node name="@Node3D@29577" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=15615845 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.49658024, 0.056282975, 0.0005005899, -0.05596665, 0.49327806, 0.0574845, 0.0059798085, -0.05717482, 0.4964426, 25.623625, 9.799377, 19.151672)
+
+[node name="@Node3D@29578" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1976049011 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.48144108, 0.08592923, -0.41616377, -0.03582934, 0.634857, 0.089635506, 0.4234293, -0.043982204, 0.48076484, 29.582613, 7.1914673, -11.579224)
+
+[node name="@Node3D@29579" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=803177433 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.13772732, -0.08481068, -0.5132664, -0.16681643, 0.49571195, -0.12667271, 0.49275497, 0.19152245, 0.10057678, -1.1279945, 5.7504272, -47.57527)
+
+[node name="@Node3D@29580" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1949458395 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.82660407, -0.2777295, -0.13305795, 0.24897881, 0.8269981, -0.17943235, 0.1812392, 0.13058612, 0.85335344, 10.732155, 5.1986694, -31.264389)
+
+[node name="@Node3D@29581" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1438966484 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5952873, -0.14971031, -0.08736072, 0.1556374, 0.5992128, 0.033660803, 0.076302506, -0.054248247, 0.61290056, -2.1634903, -0.8548584, -0.28572083)
+
+[node name="@Node3D@29582" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1065829909 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.44373527, 0.06359048, 0.34333768, -0.08974294, 0.557323, 0.012762013, -0.3374474, -0.06459812, 0.44808692, 24.361557, 10.6918335, 25.609634)
+
+[node name="@Node3D@29583" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=244171572 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.62322915, -0.20425653, 0.18916474, -0.20259017, 0.6508666, 0.035332628, -0.19094834, -0.023883704, -0.65489453, -36.270607, -4.3468018, -33.482864)
+
+[node name="@Node3D@29584" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1025291774 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.43531567, -0.07048599, -0.30656, 0.006653959, 0.5253617, -0.11134546, 0.31448853, 0.086451225, 0.42669684, -48.091194, -0.15356445, -48.152985)
+
+[node name="@Node3D@29585" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1647132432 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.09130719, 0.10657983, -0.4750372, 0.013053028, 0.48368174, 0.1060104, 0.4866716, 0.007023203, -0.0919677, -38.037445, 3.6207886, -5.828186)
+
+[node name="@Node3D@29586" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=803963362 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.3499715, 0.117723435, -0.42036617, -0.08636946, 0.54679924, 0.08122498, 0.42790988, 0.014084532, 0.36019626, 31.73182, 8.435486, 12.3984375)
+
+[node name="@Node3D@29587" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=425789352 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.52230185, 0.040174525, 0.39176798, 0.19103059, 0.5431985, -0.3103837, -0.34438848, 0.3622385, 0.42198956, -41.951004, -8.203613, 45.146774)
+
+[node name="@Node3D@29588" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=260473902 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.576841, -0.33931476, -0.6527856, -0.31123236, 0.8641801, -0.17417279, 0.6666318, 0.109850995, -0.64617634, 12.02985, 6.8901367, -40.48059)
+
+[node name="@Node3D@29589" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1475984277 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.83036005, -0.017645694, 0.05240935, -0.032595962, 0.7932966, -0.249347, -0.04467229, -0.25084865, -0.79223436, 7.0644836, 13.336182, 33.320313)
+
+[node name="@Node3D@29590" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1808106915 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.7065516, -0.31184933, 0.14741649, 0.2895529, 0.71882665, 0.13283126, -0.18745859, -0.06507719, 0.76080287, 1.0109901, -0.44586182, -6.4173584)
+
+[node name="@Node3D@29591" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1666017753 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.753163, -0.06341163, -0.024829576, 0.05871517, 0.7443496, -0.11995077, 0.034497403, 0.11753562, 0.7462488, 14.820091, 5.9467163, -29.536697)
+
+[node name="@Node3D@29592" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2066481793 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.7955773, -0.08470498, -0.1433675, -0.041364826, 0.77839524, -0.23035231, 0.16130134, -0.21817034, -0.7661958, -20.211113, 4.194275, 22.409454)
+
+[node name="@Node3D@29593" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1638399934 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.24811892, -0.05716635, 0.7351244, -0.23659818, 0.74078685, -0.022249844, -0.69835323, -0.23066375, -0.2536453, 11.459362, 7.074829, 8.280121)
+
+[node name="@Node3D@29594" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1919830988 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.68093413, -0.2555428, -0.093029395, 0.27058217, 0.66175777, 0.16275705, 0.027237698, -0.18547893, 0.70886075, -32.954872, 1.5812988, 24.3376)
+
+[node name="@Node3D@29595" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1405814326 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.057727434, -0.20695467, -0.57962507, 0.3216971, 0.48616618, -0.20562448, 0.5246965, -0.32084292, 0.06229985, 7.3821297, 5.6156006, 7.1775665)
+
+[node name="@Node3D@29596" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=860675136 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.090381026, -0.041830286, -0.48284176, -0.021802971, 0.49101967, -0.038457565, 0.48415965, 0.014303182, -0.09186685, 22.566671, 7.966919, -45.20317)
+
+[node name="@Node3D@29597" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=173072146 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.85421425, 0.08240737, 0.39103055, -0.030121202, 0.933451, -0.13091886, -0.39848283, 0.1060946, 0.84813505, -0.47904587, 0.10119629, -20.57965)
+
+[node name="@Node3D@29598" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1267125876 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.7403312, 0.16636662, -0.30844387, -0.07333685, 0.7784937, 0.24387515, 0.34269112, -0.19280955, 0.71853536, -49.401016, -2.4956665, -32.18834)
+
+[node name="@Node3D@29599" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1738573806 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.33218586, -0.044519935, 0.8162311, 0.02830997, 0.87989736, 0.05951396, -0.81695396, 0.04859363, -0.3298296, -34.033424, 1.2408447, 22.278778)
+
+[node name="@Node3D@29600" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=582618461 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.83784217, -0.30689713, -0.15720896, 0.34481373, 0.74808, 0.3773059, 0.0019986064, -0.40874243, 0.8085825, -9.7840805, 7.747986, 22.180634)
+
+[node name="@Node3D@29601" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1439996757 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.24212563, -0.23152429, -0.4780349, 0.15114015, 0.53367394, -0.18191887, 0.509193, -0.048314862, 0.28130737, 3.6952972, 0.76013184, -5.958893)
+
+[node name="@Node3D@29602" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1930615337 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.053850718, 0.2050558, -0.87882763, 0.049340427, 0.87974304, 0.20224604, 0.90108347, -0.035917312, -0.063595, 43.794804, 4.9779663, -10.9700165)
+
+[node name="@Node3D@29603" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=385706198 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.35070145, 0.09727518, -0.5933152, -0.011030704, 0.6877987, 0.10624582, 0.6011354, -0.044129234, 0.34808874, 22.39514, 18.309082, 49.389618)
+
+[node name="@Node3D@29604" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=281314751 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.4933205, 0.1973855, 0.69111973, -0.16642629, 0.8468355, -0.123063415, -0.69922084, -0.062299863, 0.51689607, 40.952114, 6.2522583, -2.1736908)
+
+[node name="@Node3D@29605" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1889112229 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.19604428, -0.29207322, 0.72376823, 0.0221956, 0.7438634, 0.30619457, -0.7801632, 0.09455686, -0.17316179, 11.909401, 7.126648, -42.712738)
+
+[node name="@Node3D@29606" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=183207834 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.1424079, 0.26370212, 0.6637628, 0.117445886, 0.658969, -0.2869952, -0.7045043, 0.16315934, 0.0863283, -17.058167, -1.0716553, 0.6479645)
+
+[node name="@Node3D@29607" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=826298485 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.0859121, 0.023181584, -0.6972622, -0.1389552, 0.68902165, 0.0057864613, 0.6836691, 0.13713002, 0.088796355, -43.42231, 2.9573975, 8.774292)
+
+[node name="@Node3D@29608" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=389038850 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.8789005, 0.11972851, -0.0019190134, 0.11704719, 0.86199677, 0.17339624, 0.025269615, 0.17155577, -0.86990505, -31.75724, 2.13385, 6.625061)
+
+[node name="@Node3D@29609" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=167329337 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.25966844, 0.16389474, 0.7462089, -0.1309276, 0.7669266, -0.21400574, -0.75269324, -0.18994479, -0.22020607, -47.520126, -2.5604858, -30.826797)
+
+[node name="@Node3D@29610" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1550076587 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.097908385, 0.03153539, 0.8952947, -0.16752352, 0.88409424, -0.049461048, -0.8800472, -0.17180234, -0.09018945, 14.594563, 10.149414, 18.424255)
+
+[node name="@Node3D@29611" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=258150393 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.24713585, 0.0058944426, -0.39256427, -0.05262206, 0.46017507, -0.026218183, 0.38906598, 0.05849555, 0.24581186, 21.176163, 7.8826294, -44.78888)
+
+[node name="@Node3D@29612" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1713363985 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.4465082, 0.07320805, -0.7283114, -0.1385424, 0.8292472, 0.1682905, 0.71875095, 0.20531991, -0.42000872, -9.184769, -0.6890869, -8.5004425)
+
+[node name="@Node3D@29613" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2138352291 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.2274429, -0.029701486, -0.54120034, -0.016668795, 0.5870237, -0.025211139, 0.54175836, 0.005592134, -0.22798434, -38.250267, 1.3338623, 16.514328)
+
+[node name="@Node3D@29614" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=816910438 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5891342, 0.31179854, -0.4268292, -0.20921326, 0.724489, 0.2404707, 0.4854187, -0.06616657, 0.62166816, 44.491707, 8.832397, 39.701813)
+
+[node name="@Node3D@29615" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1528933181 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.1837321, -0.021965714, 0.82502604, -0.25697863, 0.80472857, -0.035803456, -0.784291, -0.25852928, -0.18154363, 12.447086, 13.86792, 34.56775)
+
+[node name="@Node3D@29616" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=979169125 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.54475296, 0.15345113, -0.64798623, -0.11282926, 0.8463528, 0.10557281, 0.6562796, 0.018133136, 0.55601925, 33.86723, 6.2163696, -29.099594)
+
+[node name="@Node3D@29617" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=881827796 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.6514753, -0.035981987, -0.287854, 0.016969083, 0.71115226, -0.050489943, 0.28959745, 0.039274424, 0.65051174, -31.161324, 1.5771484, 18.820633)
+
+[node name="@Node3D@29618" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1532863816 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.8685763, 0.25177878, 0.16248238, 0.25230014, 0.8832686, -0.019979805, -0.16167165, 0.025729207, -0.9041118, 27.832232, 7.8720093, -40.323776)
+
+[node name="@Node3D@29619" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1564036017 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.761928, 0.33474877, 0.26839313, -0.37157857, 0.7883021, 0.07165957, -0.21452503, -0.17649068, 0.8291297, -49.857094, 0.40368652, -17.427338)
+
+[node name="@Node3D@29620" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=236944647 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.8759703, 0.18736298, 0.2942978, 0.17125797, 0.923882, -0.0784389, -0.30395195, -0.019418295, -0.89234304, 47.25387, 5.026001, 14.659271)
+
+[node name="@Node3D@29621" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1172139628 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5053725, -0.0067912894, -0.05858495, -0.0021274649, 0.50298953, -0.07665979, 0.058938883, 0.07638801, 0.49957058, -49.195107, 2.703186, 10.502258)
+
+[node name="@Node3D@29622" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=26511438 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.61866933, 0.16721848, 0.36703202, 0.11577989, 0.7174111, -0.13169128, -0.38635415, -0.052778423, -0.6271931, 48.56406, 3.9816284, -8.92128)
+
+[node name="@Node3D@29623" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=248302898 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5744854, 0.055343468, 0.012322654, -0.055952497, 0.57366157, 0.03209306, -0.009168727, -0.033132263, 0.57625204, -23.290703, 1.1345215, -23.618698)
+
+[node name="@Node3D@29624" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1713097672 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.2055662, 0.11377239, -0.4906638, 0.10144185, 0.52844745, 0.08003385, 0.49336055, -0.061251204, -0.22089863, 33.832672, 8.016602, 18.037476)
+
+[node name="@Node3D@29625" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1850882700 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5518, 0.058661398, 0.73212284, 0.33736566, 0.7931586, -0.31782395, -0.6524028, 0.45976788, 0.4548762, -42.388268, -5.056946, 40.030228)
+
+[node name="@Node3D@29626" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=675788620 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.624194, -0.23755343, 0.66927296, -0.36295408, 0.87258905, -0.02878838, -0.6104279, -0.2759218, -0.6672489, -0.4895935, 13.195923, 33.859497)
+
+[node name="@Node3D@29627" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=774139012 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.01489889, -0.01035681, 0.47408563, -0.09013756, 0.46560985, 0.013004364, -0.4655531, -0.090480015, 0.012654127, 11.181, 10.716553, 21.381775)
+
+[node name="@Node3D@29628" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1084277076 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.2334882, 0.10061449, -0.41486555, -0.071197525, 0.47542062, 0.07523021, 0.42091283, 0.024604788, 0.24285889, 32.59876, 6.5527344, -31.138428)
+
+[node name="@Node3D@29629" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1095532238 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.79856986, -0.19320069, 0.25744253, 0.17767186, 0.8388133, 0.07837059, -0.268395, -0.019563459, 0.81786203, 25.806643, 7.401123, -13.071808)
+
+[node name="@Node3D@29630" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=987045313 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5362687, -0.18057773, 0.44314864, -0.0053126314, 0.6633041, 0.27671742, -0.47849852, -0.20974377, 0.49357864, -3.272522, 14.295654, 39.733566)
+
+[node name="@Node3D@29631" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=576229499 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5798711, -0.3752755, -0.6466483, 0.3130346, 0.86502695, -0.22130065, 0.67896616, -0.07831307, 0.65429986, 4.2664795, 1.130249, -4.607422)
+
+[node name="@Node3D@29632" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1396924058 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.87282413, -0.24105805, -0.24569198, 0.17183673, 0.88546246, -0.25830966, 0.29823762, 0.1953017, 0.86787504, -5.1217155, 14.374084, 46.12683)
+
+[node name="@Node3D@29633" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=656494839 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.33221573, 0.14163445, -0.46032935, 0.07064142, 0.5675004, 0.12362761, 0.47641706, 0.014617772, -0.3393285, 40.3392, 6.723755, 6.5667725)
+
+[node name="@Node3D@29634" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=778436086 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.36235702, -0.20425732, -0.21798201, 0.22241391, 0.41323817, -0.017495362, 0.19942231, -0.089738436, 0.41559303, -30.922188, -2.1235352, -29.922897)
+
+[node name="@Node3D@29635" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1166511866 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.60950667, -0.04173967, 0.29921436, -0.10023195, 0.6635251, -0.1116147, -0.28499997, -0.14409053, -0.6006519, -15.528336, -0.5415039, -35.71306)
+
+[node name="@Node3D@29636" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1528140679 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.28809, -0.1027309, -0.3424783, -0.037055317, 0.44602343, -0.102620006, 0.3556289, -0.036746748, -0.2881295, 15.662128, 5.3270874, -7.6035156)
+
+[node name="@Node3D@29637" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=977773765 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.2411843, -0.028325211, 0.70330083, 0.04798423, 0.74237525, 0.013443597, -0.7022335, 0.040998768, 0.2424695, -40.878914, 0.699646, 26.022781)
+
+[node name="@Node3D@29638" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=807052652 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.50875133, -0.030898735, 0.33785164, 0.02896125, 0.61068636, 0.012240173, -0.33802325, 0.0058175456, 0.5095418, -30.22979, 1.7803345, 12.250305)
+
+[node name="@Node3D@29639" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=583379767 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.0005255796, 0.10118206, 0.45923364, 0.006711612, 0.45918554, -0.10117913, -0.47020027, 0.0066674873, -0.00093090395, -39.17811, 3.8041992, -1.153595)
+
+[node name="@Node3D@29640" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1435100984 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.6546245, 0.022445641, -0.1540578, -0.041098587, 0.6671473, -0.07743583, 0.15016162, 0.08474429, 0.65041584, -44.41175, 1.2525635, 17.922058)
+
+[node name="@Node3D@29641" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1893847267 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.60682976, 0.13964505, 0.24107638, 0.10053134, 0.6486201, -0.12266317, -0.25983077, -0.07518018, -0.610489, 31.06446, 8.989624, 21.290848)
+
+[node name="@Node3D@29642" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2051804126 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5518527, 0.3919432, 0.6647814, 0.06337998, 0.8375221, -0.44117457, -0.76911426, -0.21220875, -0.51334774, 31.794537, 14.828125, 42.961807)
+
+[node name="@Node3D@29643" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1778998881 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.30116507, -0.013369006, 0.4170689, -0.12015886, 0.4897837, 0.10246644, -0.3996086, -0.15734927, 0.28351325, 9.928146, 15.752563, 40.6481)
+
+[node name="@Node3D@29644" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1308185265 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.15487552, 0.09483864, -0.42115402, 0.010441171, 0.4481286, 0.09707333, 0.43157396, 0.023192307, -0.15348472, 28.125463, 7.1831055, -25.027878)
+
+[node name="@Node3D@29645" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=34097595 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.45156196, -0.13901359, -0.40353182, 0.1373008, 0.60355085, -0.054275636, 0.40411782, -0.049724996, 0.46934757, 13.704529, 5.484558, -0.21972656)
+
+[node name="@Node3D@29646" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1670783862 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.69470173, -0.23832655, -0.16211909, 0.11507422, 0.61717427, -0.41418174, 0.26427272, 0.35775557, 0.6065176, -36.021477, -1.2579346, 35.756485)
+
+[node name="@Node3D@29647" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=13326699 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.47347993, 0.090812884, 0.45299828, -0.09601433, 0.65381604, -0.030715488, -0.4519244, -0.04376315, 0.48113072, -28.47438, 1.7148438, -5.462906)
+
+[node name="@Node3D@29648" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1450030118 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.087663546, -0.1263329, -0.5433272, 0.025717355, 0.54849553, -0.13168399, 0.557228, -0.045189112, -0.079399146, 14.6925125, 5.270569, -5.578903)
+
+[node name="@Node3D@29649" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1938575708 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.4251902, -0.15347652, 0.03087267, 0.118596785, 0.37410825, 0.22643472, -0.10219083, -0.20440851, 0.39124042, -10.05476, 5.865967, 18.939316)
+
+[node name="@Node3D@29650" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=146195395 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.038415097, 0.24112238, -0.51486945, 0.0184804, 0.5152412, 0.24267529, 0.5682333, -0.03305791, 0.026915042, 29.694075, 16.065796, 45.50818)
+
+[node name="@Node3D@29651" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1041992185 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5584243, -0.007953815, 0.33729434, 0.040697213, 0.64907676, -0.052072253, -0.33492458, 0.065608844, 0.5560481, -3.4959564, 0.60253906, -26.133743)
+
+[node name="@Node3D@29652" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=981271088 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.23250344, -0.110701405, 0.37930393, -0.09285989, 0.44308043, 0.07239414, -0.38406163, -0.0401132, -0.24712698, -3.0478249, -1.4661255, -4.5959167)
+
+[node name="@Node3D@29653" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1870194355 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.8540136, 0.23300357, -0.15885668, -0.22537807, 0.86844987, 0.06216914, 0.16950175, -0.019225115, 0.88304305, 42.5754, 6.9832153, 28.248642)
+
+[node name="@Node3D@29654" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=746727761 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.27220654, -0.01339844, -0.54993963, 0.09909558, 0.6023526, -0.06372527, 0.5411037, -0.11705266, -0.26498115, 12.866371, 10.69696, 21.088089)
+
+[node name="@Node3D@29655" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=299449302 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.027737075, -0.08979881, -0.8034983, 0.12850106, 0.7942411, -0.08432832, 0.79822356, -0.12473957, 0.04149586, -9.562386, 12.400391, 38.546463)
+
+[node name="@Node3D@29656" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2039949780 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.22833224, -0.10225081, -0.90364325, 0.19555305, 0.9043751, -0.15174587, 0.8881359, -0.22541647, -0.19890709, -0.93666077, 9.78125, 21.004868)
+
+[node name="@Node3D@29657" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=986717708 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.6764832, 0.27187893, -0.063240916, -0.2713352, 0.67940205, 0.018364258, 0.065534495, 0.006472124, 0.7288419, -23.046272, 0.55615234, 11.453659)
+
+[node name="@Node3D@29658" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1046257134 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.41600847, -0.15799443, -0.239842, 0.00094976055, 0.42139545, -0.27923903, 0.28720295, -0.23024572, -0.34648356, -17.251717, 6.135132, 24.577148)
+
+[node name="@Node3D@29659" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1824086299 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.34628677, 0.078308195, 0.6322382, -0.23033272, 0.68631285, 0.041151043, -0.5939732, -0.22048673, 0.35263762, 17.774055, 13.867249, 36.030945)
+
+[node name="@Node3D@29660" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1812166259 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.07899629, 0.098400645, -0.86458033, 0.10907656, 0.86240804, 0.088187136, 0.8632984, -0.09995989, -0.09025592, 25.755316, 10.1657715, 22.442673)
+
+[node name="@Node3D@29661" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1914755479 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.26667035, 0.10771507, 0.40985617, -0.048689697, 0.48883367, -0.09679166, -0.42096785, 0.011695074, 0.27082646, -30.375557, 2.0796509, -13.577667)
+
+[node name="@Node3D@29662" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=313821488 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.24087034, -0.054714, -0.42654863, 0.09316972, 0.48392743, -0.009461488, 0.41982943, -0.07600325, 0.24682508, -2.8925095, 11.989807, 31.130585)
+
+[node name="@Node3D@29663" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=784447719 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.23994796, -0.05938383, 0.654785, 0.039558496, 0.69706964, 0.048722383, -0.6562812, 0.020305322, 0.24233775, 20.200462, 7.5735474, -38.61824)
+
+[node name="@Node3D@29664" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=559254672 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.50415057, 0.23815502, -0.6666655, 0.123404, 0.8354749, 0.2051379, 0.6970883, 0.024337, -0.5184632, 27.632893, 8.204956, -49.804718)
+
+[node name="@Node3D@29665" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=607584279 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.4849348, 0.18798797, 0.5059782, 0.11844939, 0.7006677, -0.14679854, -0.52661484, -0.01551088, -0.4989504, 47.63149, 5.5911255, 26.645584)
+
+[node name="@Node3D@29666" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1454668205 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5174841, 0.26097113, 0.39691436, 0.2111372, 0.65214425, -0.15351087, -0.42552084, 0.006212485, -0.558865, -26.28666, 1.8188477, 15.022827)
+
+[node name="@Node3D@29667" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1452609074 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.29974112, 0.14432749, 0.49477035, 0.0878892, 0.57829106, -0.11544606, -0.5078421, 0.0148956925, -0.3120054, 46.658035, 5.1727905, 5.553726)
+
+[node name="@Node3D@29668" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=668929518 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.26509884, -0.041439716, -0.4960281, 0.12921834, 0.53699434, -0.11392202, 0.48069087, -0.16720751, -0.24293296, 4.371258, 8.176819, 13.575836)
+
+[node name="@Node3D@29669" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=352442973 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.030084787, 0.05704354, 0.66497874, 0.15790458, 0.6461476, -0.06257203, -0.6484728, 0.15998484, 0.015614122, -13.089661, -0.66363525, -7.2109528)
+
+[node name="@Node3D@29670" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1393490880 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.002759603, -0.056066774, -0.9120487, 0.19374819, 0.89127946, -0.055376243, 0.8929938, -0.19354948, 0.009196205, -26.15065, -0.29101563, -31.482574)
+
+[node name="@Node3D@29671" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1076611180 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.78034955, 0.33117223, 0.009280345, -0.3312958, 0.7798798, 0.027150292, 0.002068815, -0.028617887, 0.84727997, -47.44291, -2.0263062, -26.145325)
+
+[node name="@Node3D@29672" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1249288535 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.78853357, 0.2035721, 0.37719294, 0.16769168, 0.8733775, -0.12079964, -0.39445615, -0.035657436, -0.80537826, 43.123802, 5.0924683, -11.996994)
+
+[node name="@Node3D@29673" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1487052301 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.43695202, -0.009872148, -0.16045173, 0.03955062, 0.44382018, -0.13501368, 0.15581389, -0.14034061, -0.41568714, 0.11921692, 16.230652, 42.962585)
+
+[node name="@Node3D@29674" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=141640935 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.5572416, 0.25288942, 0.01567903, -0.24927452, 0.54038566, 0.14339703, 0.045399435, -0.13692126, 0.59490216, 36.107437, 11.253662, 36.82025)
+
+[node name="@Node3D@29675" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1802010469 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.6606417, 0.17127569, -0.5171953, 0.17102326, 0.8370041, 0.058727067, 0.5172788, -0.057986755, -0.67995137, 46.945526, 3.8340454, -19.256271)
+
+[node name="@Node3D@29676" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1954260655 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.37278706, 0.06189037, 0.52231956, 0.048494283, 0.6415235, -0.04140393, -0.52373314, 0.015348064, -0.3756146, -21.9562, 0.88409424, -17.180084)
+
+[node name="@Node3D@29677" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=235566605 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.430783, -0.19261427, 0.31729227, -0.29779205, 0.46950886, -0.119289525, -0.2215729, -0.25653428, -0.45655698, -10.401909, 9.576599, 25.991196)
+
+[node name="@Node3D@29678" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1553427079 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.018097628, -0.2723219, -0.64163554, 0.06488137, 0.63972324, -0.2696803, 0.694007, -0.052705143, 0.041943822, 10.349655, 4.1622314, 0.38053894)
+
+[node name="@Node3D@29679" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1324503856 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.013073051, 0.07915473, -0.92574024, 0.06316676, 0.9237655, 0.07809386, 0.9269684, -0.061832175, -0.01837731, -25.281776, 1.8395996, 1.9903412)
+
+[node name="@Node3D@29680" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1033713139 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.81832623, -0.28248343, 0.2168468, -0.24549617, 0.84115404, 0.16931832, -0.2579749, 0.095604256, -0.84899116, 9.020859, 3.083374, -20.840134)
+
+[node name="@Node3D@29681" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1415462930 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.52898806, 0.06570131, -0.23706135, -0.032088038, 0.5758228, 0.08798619, 0.24389568, -0.06674241, 0.5257409, 20.634056, 11.005432, 24.645569)
+
+[node name="@Node3D@29682" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=530279877 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.4757381, -0.4973324, -0.5108164, 0.19590098, 0.68165624, -0.4812143, 0.6854894, 0.15034927, 0.4920356, -15.498039, 9.956299, 48.689148)
+
+[node name="@Node3D@29683" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2140616542 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.73033947, -0.03438453, 0.53029615, 0.001481789, 0.9011841, 0.060473755, -0.5314076, 0.04976922, -0.72864324, -40.475533, 0.9647827, 21.500198)
+
+[node name="@Node3D@29684" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1692259697 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5879115, -0.22996645, 0.32471192, -0.35706246, 0.56055725, -0.24948812, -0.17558132, -0.36993694, -0.5798967, -1.6578217, 4.956848, 11.969635)
+
+[node name="@Node3D@29685" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=456624825 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.3805354, -0.18174244, -0.2700039, -0.18357834, 0.46286866, -0.05283193, 0.26875907, 0.05883794, -0.41838533, 10.657867, 6.2834473, -39.945435)
+
+[node name="@Node3D@29686" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=982115949 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.37152457, -0.029622786, -0.45363867, -0.043787416, 0.5854683, -0.0023699454, 0.4524911, 0.032333344, -0.37269616, -33.640846, 1.5490723, 17.056778)
+
+[node name="@Node3D@29687" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1601318614 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.60453093, 0.1265775, 0.13238779, 0.11946883, 0.6185693, -0.045882966, -0.13883655, -0.018872947, -0.61593366, 48.310875, 3.263977, -23.743042)
+
+[node name="@Node3D@29688" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1518861238 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.21562734, -0.012775286, 0.56245106, -0.16525476, 0.57433754, 0.076399125, -0.53777814, -0.18161154, 0.2020434, 0.2509842, 14.225769, 36.612946)
+
+[node name="@Node3D@29689" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1807219742 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(0.23085062, 0.016376195, -0.43933442, -0.09327261, 0.48674673, -0.030867105, 0.42963135, 0.096873, 0.22936307, -42.80443, 2.0672607, 13.14212)
+
+[node name="@Node3D@29690" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1103938551 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.45020896, -0.16656648, -0.4953948, -0.06553933, 0.66667926, -0.164596, 0.51852196, -0.060356174, -0.45093307, -7.03883, -2.038025, 0.100097656)
+
+[node name="@Node3D@29691" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=593371650 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.75099885, 0.33464777, 0.29694548, 0.23345992, 0.78806454, -0.29768407, -0.38165724, -0.17643748, -0.7664024, -44.836365, -2.6973267, -21.755219)
+
+[node name="@Node3D@29692" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=238145601 instance=ExtResource("19_3ppgv")]
+transform = Transform3D(-0.5831358, -0.02298324, -0.31734094, 0.16382883, 0.546283, -0.34061098, 0.27275193, -0.37726316, -0.4738773, -47.469643, 1.3634644, -13.382614)
+
+[node name="flower_blue" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1656756075 instance=ExtResource("21_qqkhr")]
+transform = Transform3D(-0.54915327, -0.039300572, -0.5493746, -0.033022784, 0.77674127, -0.022556212, 0.54978764, 0.0073994384, -0.5500955, -33.408936, 1.5870361, 15.652084)
+
+[node name="@Node3D@29693" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=249169252 instance=ExtResource("21_qqkhr")]
+transform = Transform3D(0.8060917, -0.015445479, 0.83007497, 0.13528223, 1.143952, -0.11008765, -0.8191225, 0.17372972, 0.7986883, -49.12394, 2.6258545, 11.017288)
+
+[node name="flower_white" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=833952038 instance=ExtResource("20_wesx8")]
+transform = Transform3D(0.42064795, -0.022446627, -0.9380059, 0.18799047, 1.0091306, 0.060155515, 0.91924894, -0.19610012, 0.41692907, 12.208107, 10.486694, 20.081223)
+
+[node name="@Node3D@29694" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=483771464 instance=ExtResource("21_qqkhr")]
+transform = Transform3D(-1.1794933, -0.2711093, -0.060707737, -0.26472238, 1.1770664, -0.113254376, 0.08430745, -0.09697544, -1.204939, 19.963493, 6.678711, -3.2230682)
+
+[node name="@Node3D@29695" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2112870651 instance=ExtResource("20_wesx8")]
+transform = Transform3D(-0.9624958, -0.32744324, 0.19123201, -0.29634434, 0.97503155, 0.17798962, -0.23657721, 0.110820584, -1.000968, 12.419594, 4.4398804, -22.732468)
+
+[node name="@Node3D@29696" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=968210507 instance=ExtResource("21_qqkhr")]
+transform = Transform3D(0.754386, 0.21067642, 0.32478505, -0.18627821, 0.821142, -0.09997246, -0.3393675, 0.017592998, 0.7768451, 47.847103, 3.1834717, -33.118988)
+
+[node name="@Node3D@29697" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=987818397 instance=ExtResource("21_qqkhr")]
+transform = Transform3D(0.7392502, 0.19817959, 0.2906322, -0.17666368, 0.7940651, -0.092105605, -0.304191, 0.020453617, 0.7597911, 46.629486, 5.1469116, 6.8344116)
+
+[node name="@Node3D@29698" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=2008900339 instance=ExtResource("21_qqkhr")]
+transform = Transform3D(0.032023832, -0.19143221, 1.0013103, 0.05879968, 1.0004834, 0.18939358, -1.0177481, 0.05177873, 0.04244869, 17.200867, 5.647888, -25.02919)
+
+[node name="@Node3D@29699" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=961176894 instance=ExtResource("20_wesx8")]
+transform = Transform3D(-0.31685022, -0.13003905, 0.76329684, 0.3080077, 0.7355048, 0.25316057, -0.7103967, 0.3768937, -0.23068151, -33.903038, 1.5658569, -48.472313)
+
+[node name="@Node3D@29700" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1135223500 instance=ExtResource("20_wesx8")]
+transform = Transform3D(0.66302174, -0.5043624, 0.4625697, 0.55249316, 0.77455306, 0.052620105, -0.40386072, 0.23159476, 0.8313906, -16.138496, 10.794861, 43.703445)
+
+[node name="AuxScene" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1747607024 instance=ExtResource("22_4vjci")]
+transform = Transform3D(-1.0568597, 0, 0.049379557, 0, 1.0580127, 0, -0.049379557, 0, -1.0568597, 42.406017, 5.2304077, -12.50882)
+
+[node name="StaticBody3D" type="StaticBody3D" parent="VegetationScatterer/VegetationContainer/AuxScene" unique_id=42810186]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="VegetationScatterer/VegetationContainer/AuxScene/StaticBody3D" unique_id=204043795]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+shape = SubResource("CylinderShape3D_qqkhr")
+
+[node name="@Node3D@29701" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=733792392 instance=ExtResource("23_wesx8")]
+transform = Transform3D(-0.05852816, 0, -1.1448858, 0, 1.1463808, 0, 1.1448858, 0, -0.05852816, 2.6081123, 14.7595215, 38.135117)
+
+[node name="StaticBody3D" type="StaticBody3D" parent="VegetationScatterer/VegetationContainer/@Node3D@29701" unique_id=372643490]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="VegetationScatterer/VegetationContainer/@Node3D@29701/StaticBody3D" unique_id=938989533]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+shape = SubResource("CylinderShape3D_4vjci")
+
+[node name="@Node3D@29702" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=1233324581 instance=ExtResource("23_b4adj")]
+transform = Transform3D(1.0382544, 0, 0.6117334, 0, 1.2050683, 0, -0.6117334, 0, 1.0382544, 28.573467, 7.282654, -13.260605)
+
+[node name="StaticBody3D" type="StaticBody3D" parent="VegetationScatterer/VegetationContainer/@Node3D@29702" unique_id=109050416]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="VegetationScatterer/VegetationContainer/@Node3D@29702/StaticBody3D" unique_id=851076120]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+shape = SubResource("CylinderShape3D_b4adj")
+
+[node name="@Node3D@29703" type="Node3D" parent="VegetationScatterer/VegetationContainer" unique_id=69479683 instance=ExtResource("24_fmksp")]
+transform = Transform3D(0.64234984, 0, 0.7811147, 0, 1.0113127, 0, -0.7811147, 0, 0.64234984, 10.78331, 5.549011, 4.8828125)
+
+[node name="StaticBody3D" type="StaticBody3D" parent="VegetationScatterer/VegetationContainer/@Node3D@29703" unique_id=22369872]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="VegetationScatterer/VegetationContainer/@Node3D@29703/StaticBody3D" unique_id=954278086]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+shape = SubResource("CylinderShape3D_fmksp")
