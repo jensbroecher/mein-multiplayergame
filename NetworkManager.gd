@@ -14,8 +14,9 @@ signal max_laps_changed(laps: int)
 var max_laps: int = 3
 
 # We can store player info like names here
-# format: { id: { "name": "PlayerName" } }
+# format: { id: { "name": "PlayerName", "car_index": 0 } }
 var players = {}
+var local_car_index: int = 0
 
 func _ready():
 	multiplayer.peer_connected.connect(_on_player_connected)
@@ -33,7 +34,7 @@ func create_server(player_name: String):
 		return error
 	
 	multiplayer.multiplayer_peer = peer
-	players[1] = {"name": player_name}
+	players[1] = {"name": player_name, "car_index": local_car_index}
 	
 	# Broadcast ourselves on LAN
 	LANDiscovery.start_broadcasting(player_name, DEFAULT_PORT)
@@ -45,7 +46,7 @@ func create_server(player_name: String):
 func start_single_player(player_name: String):
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 	players.clear()
-	players[1] = {"name": player_name, "ready": false}
+	players[1] = {"name": player_name, "ready": false, "car_index": local_car_index}
 	LANDiscovery.stop_all()
 	print("NetworkManager: Started single player mode")
 	return OK
@@ -71,7 +72,7 @@ func join_server(ip: String, port: int, player_name: String):
 
 func _on_connected_to_server():
 	print("NetworkManager: Connected to server!")
-	register_player.rpc_id(1, {"name": local_player_name})
+	register_player.rpc_id(1, {"name": local_player_name, "car_index": local_car_index})
 
 func disconnect_peer():
 	if peer:

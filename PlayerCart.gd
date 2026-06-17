@@ -6,13 +6,58 @@ extends RigidBody3D
 		if is_inside_tree() and $Visuals/NameTag:
 			$Visuals/NameTag.text = value
 
-# Vehicle Parameters
-const MAX_SPEED = 30.0
-const REVERSE_SPEED = 15.0
-const ACCELERATION = 50.0
-const BRAKING = 40.0
-const STEER_SPEED = 2.5
-const GRIP = 5.0
+@export var car_index: int = 0
+
+const CAR_PRESETS = [
+	{
+		"name": "Viper",
+		"model_path": "res://models/cars/20260505221030_500312d9.fbx",
+		"model_y_rotation": PI,       # native FBX faces backward, flip 180°
+		"max_speed": 30.0,
+		"acceleration": 50.0,
+		"steer_speed": 2.5,
+		"grip": 5.0,
+		# Wheel part names inside the FBX, keyed by corner
+		"wheel_parts": {"FL": "part_5", "FR": "part_2", "RL": "part_0", "RR": "part_6"}
+	},
+	{
+		"name": "Lightning",
+		"model_path": "res://models/cars/20260505210312_305e4d34.fbx",
+		"model_y_rotation": PI,
+		"max_speed": 35.0,
+		"acceleration": 40.0,
+		"steer_speed": 2.2,
+		"grip": 4.5,
+		"wheel_parts": {"FL": "part_3", "FR": "part_0", "RL": "part_4", "RR": "part_2"}
+	},
+	{
+		"name": "Strikeforce",
+		"model_path": "res://models/cars/20260505211857_6fc2a5d6.fbx",
+		"model_y_rotation": PI * 1.5, # FBX native orientation requires 270° rotation
+		"max_speed": 28.0,
+		"acceleration": 65.0,
+		"steer_speed": 2.7,
+		"grip": 5.5,
+		"wheel_parts": {"FL": "part_10", "FR": "part_7", "RL": "part_11", "RR": "part_9"}
+	},
+	{
+		"name": "Apex",
+		"model_path": "res://models/cars/20260505221804_6590f061.fbx",
+		"model_y_rotation": PI,
+		"max_speed": 29.0,
+		"acceleration": 55.0,
+		"steer_speed": 3.2,
+		"grip": 6.0,
+		"wheel_parts": {"FL": "part_0", "FR": "part_1", "RL": "part_3", "RR": "part_2"}
+	}
+]
+
+var max_speed = 30.0
+var reverse_speed = 15.0
+var acceleration = 50.0
+var braking = 40.0
+var steer_speed = 2.5
+var grip = 5.0
 
 const GRAVITY = 30.0 # extra gravity so it falls faster
 
@@ -113,6 +158,27 @@ func on_race_started():
 func _ready():
 	add_to_group("player_carts")
 	_update_authority()
+
+	# Load the correct model mesh
+	var preset = CAR_PRESETS[car_index]
+	max_speed = preset.max_speed
+	acceleration = preset.acceleration
+	steer_speed = preset.steer_speed
+	grip = preset.grip
+	
+	# Replace default model with selected model
+	var cart_model = get_node_or_null("Visuals/CartModel")
+	if cart_model:
+		cart_model.name = "OldCartModel"
+		cart_model.queue_free()
+	
+	var new_model_scene = load(preset.model_path)
+	if new_model_scene:
+		var new_model = new_model_scene.instantiate()
+		new_model.name = "CartModel"
+		$Visuals.add_child(new_model)
+		$Visuals.move_child(new_model, 0)
+		new_model.transform = Transform3D(Basis(Vector3(0, 1, 0), preset.get("model_y_rotation", PI)) * 2.0, Vector3(0, -0.6072377, 0))
 
 	await get_tree().process_frame
 	var level = get_tree().get_first_node_in_group("level")
@@ -223,7 +289,7 @@ func _process(delta):
 				camera.fov = 75.0  # Default perspective FOV
 
 		var visual_forward = -visuals.global_transform.basis.z
-		var speed_factor = clamp(linear_velocity.length() / MAX_SPEED, 0.0, 1.0)
+		var speed_factor = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
 		var look_ahead_dist = 4.0 + speed_factor * 6.0
 
 		var excludes = [self.get_rid()]
@@ -283,7 +349,7 @@ func _process(delta):
 				engine_sound.play()
 				playback = engine_sound.get_stream_playback()
 				engine_sound.volume_db = -45.0
-			var speed_ratio = clamp(linear_velocity.length() / MAX_SPEED, 0.0, 1.0)
+			var speed_ratio = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
 			var target_vol = lerp(0.0, -12.0, speed_ratio)
 			engine_sound.volume_db = move_toward(engine_sound.volume_db, target_vol, 80.0 * delta)
 			if engine_sound.stream is AudioStreamGenerator and engine_sound.playing:
@@ -401,39 +467,39 @@ func _physics_process(delta):
 				hop_cooldown = 0.8 # Cooldown to prevent double jumps
 
 	if is_boosting:
-		var max_sp = MAX_SPEED * 1.5
-		var accel_force = ACCELERATION * 2.0
+		var max_sp = max_speed * 1.5
+		var accel_force = acceleration * 2.0
 		if current_speed < max_sp:
 			apply_central_force(fwd * accel_force * mass)
 		boost_time += delta
 	
 	if input_dir.y < -0.1: # Forward input
 		if not is_boosting:
-			var accel_force = ACCELERATION
-			if current_speed < MAX_SPEED:
+			var accel_force = acceleration
+			if current_speed < max_speed:
 				apply_central_force(fwd * accel_force * mass)
 			boost_time += delta
 	elif input_dir.y > 0.1: # Brake / Reverse input
 		boost_time = 0.0
 		if is_boosting:
 			# If boosting, braking just reduces the boost effectiveness a bit
-			apply_central_force(-fwd * BRAKING * 0.5 * mass)
+			apply_central_force(-fwd * braking * 0.5 * mass)
 		elif drift_mode:
 			# If drifting, preserve forward momentum by not applying heavy brakes
-			var speed_ratio = clamp(linear_velocity.length() / MAX_SPEED, 0.0, 1.0)
+			var speed_ratio = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
 			if speed_ratio < 0.85:
-				apply_central_force(fwd * ACCELERATION * 0.8 * mass)
+				apply_central_force(fwd * acceleration * 0.8 * mass)
 			else:
-				apply_central_force(fwd * ACCELERATION * 0.3 * mass)
+				apply_central_force(fwd * acceleration * 0.3 * mass)
 		else:
 			if current_speed > 1.0:
-				apply_central_force(-fwd * BRAKING * mass)
+				apply_central_force(-fwd * braking * mass)
 			elif current_speed < -0.5:
-				if current_speed > -REVERSE_SPEED:
-					apply_central_force(-fwd * (ACCELERATION * 0.5) * mass)
+				if current_speed > -reverse_speed:
+					apply_central_force(-fwd * (acceleration * 0.5) * mass)
 			else:
-				if current_speed > -REVERSE_SPEED:
-					apply_central_force(-fwd * (ACCELERATION * 0.7) * mass)
+				if current_speed > -reverse_speed:
+					apply_central_force(-fwd * (acceleration * 0.7) * mass)
 	else: # No throttle/brake input (coasting or stationary)
 		if not is_boosting:
 			boost_time = 0.0
@@ -441,7 +507,7 @@ func _physics_process(delta):
 			if sfx_rocket_loop.playing: sfx_rocket_loop.stop()
 			if drift_mode:
 				# Keep forward speed by offsetting friction/drag to preserve momentum
-				apply_central_force(fwd * ACCELERATION * 0.45 * mass)
+				apply_central_force(fwd * acceleration * 0.45 * mass)
 			else:
 				apply_central_force(-linear_velocity * 0.5 * mass)
 
@@ -455,7 +521,7 @@ func _physics_process(delta):
 				if input_dir.y < 0.1 or current_speed < 3.0:
 					drift_mode = false
 			
-			var turn_speed = STEER_SPEED
+			var turn_speed = steer_speed
 			is_drifting = drift_mode
 			
 			var play_brake_sfx = is_drifting or (input_dir.y > 0.2 and current_speed > 5.0)
@@ -472,7 +538,7 @@ func _physics_process(delta):
 			
 			# Kill lateral velocity (adds grip)
 			var lat_vel = linear_velocity.dot(right)
-			var grip_factor = GRIP
+			var grip_factor = grip
 			if is_drifting: grip_factor *= 0.22 # Low grip factor for sliding momentum
 			apply_central_force(-right * lat_vel * mass * grip_factor)
 			
@@ -487,7 +553,7 @@ func _physics_process(delta):
 		_set_drift_emitting(false)
 		
 		# Slight air control
-		visuals.global_rotate(Vector3.UP, -current_steer * STEER_SPEED * 0.5 * delta)
+		visuals.global_rotate(Vector3.UP, -current_steer * steer_speed * 0.5 * delta)
 
 	# Wind sound (only while airborne)
 	if not on_ground and linear_velocity.length() > 5.0:
@@ -542,7 +608,7 @@ func _fill_audio_buffer():
 	if is_boosting: freq *= 1.4
 
 	# Fade out high harmonics at high speeds to avoid harsh whines
-	var speed_ratio = clamp(linear_velocity.length() / MAX_SPEED, 0.0, 1.0)
+	var speed_ratio = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
 	var high_harmonic_fade = clamp(1.0 - speed_ratio * 0.85, 0.15, 1.0)
 
 	for i in range(available):
@@ -564,18 +630,17 @@ func _update_wheel_visuals(delta):
 	wheel_rotation -= rot_speed * delta
 
 	for wheel in ["FL", "FR", "RL", "RR"]:
-		var w_node = get_node_or_null("Visuals/WheelPivot" + wheel)
-		if w_node:
-			if wheel == "FL" or wheel == "FR":
-				# Rotate on Y for steering (invert when going in reverse to match physical wheel path)
-				var steer_direction = 1.0 if fwd_dot >= -1.0 else -1.0
-				w_node.rotation.y = -sync_steer * 0.5 * steer_direction
-			
-			var wrapper = w_node.get_node_or_null(wheel + "_Wrapper")
-			if wrapper:
-				var y_rot = PI / 2 if (wheel == "FL" or wheel == "RL") else -PI / 2
-				var z_rot = -wheel_rotation if (wheel == "FL" or wheel == "RL") else wheel_rotation
-				wrapper.rotation = Vector3(0, y_rot, z_rot)
+		var pivot = get_node_or_null("Visuals/WheelPivot" + wheel)
+		if not pivot:
+			continue
+		# Steering: rotate the pivot on its Y axis for front wheels
+		if wheel == "FL" or wheel == "FR":
+			var steer_direction = 1.0 if fwd_dot >= -1.0 else -1.0
+			pivot.rotation.y = -sync_steer * 0.5 * steer_direction
+		# Spin: find the wheel mesh child and rotate on its X axis
+		var mesh_node = pivot.get_node_or_null("WheelMesh")
+		if mesh_node:
+			mesh_node.rotation.x = wheel_rotation
 
 func _interpolate_remote(delta: float):
 	var t = clamp(REMOTE_LERP_SPEED * delta, 0.0, 1.0)
@@ -604,50 +669,96 @@ func _interpolate_remote(delta: float):
 	var steer_direction = 1.0 if remote_fwd_dot >= -1.0 else -1.0
 
 	for wheel in ["FL", "FR", "RL", "RR"]:
-		var w_node = get_node_or_null("Visuals/WheelPivot" + wheel)
-		if w_node:
-			if wheel == "FL" or wheel == "FR":
-				w_node.rotation.y = -sync_steer * 0.5 * steer_direction
-			
-			var wrapper = w_node.get_node_or_null(wheel + "_Wrapper")
-			if wrapper:
-				var y_rot = PI / 2 if (wheel == "FL" or wheel == "RL") else -PI / 2
-				var z_rot = -wheel_rotation if (wheel == "FL" or wheel == "RL") else wheel_rotation
-				wrapper.rotation = Vector3(0, y_rot, z_rot)
+		var pivot = get_node_or_null("Visuals/WheelPivot" + wheel)
+		if not pivot:
+			continue
+		if wheel == "FL" or wheel == "FR":
+			pivot.rotation.y = -sync_steer * 0.5 * steer_direction
+		var mesh_node = pivot.get_node_or_null("WheelMesh")
+		if mesh_node:
+			mesh_node.rotation.x = wheel_rotation
 
 func _setup_new_car_wheels():
-	# Hide FBX wheel parts (part_0, part_2, part_5, part_6) and use the glb wheel instances at pivots
-	var fbx_wheel_paths = ["CartModel/part_0", "CartModel/part_2", "CartModel/part_5", "CartModel/part_6"]
-	for path in fbx_wheel_paths:
-		var node = get_node_or_null("Visuals/" + path)
-		if node:
-			node.visible = false
+	var cart_model = get_node_or_null("Visuals/CartModel")
+	if not cart_model:
+		return
 	
-	# The glb wheel instances at WheelPivotFL/FR/RL/RR are already positioned correctly
-	# Just ensure they're visible and have proper material
-	for wheel in ["FL", "FR", "RL", "RR"]:
-		var pivot_node = get_node_or_null("Visuals/WheelPivot" + wheel)
-		if pivot_node:
-			pivot_node.visible = true
-			if pivot_node.get_child_count() > 0:
-				var wheel_mesh = pivot_node.get_child(0)
-				
-				# Create a wrapper node to act as the clean center of rotation
-				var wrapper = Node3D.new()
-				wrapper.name = wheel + "_Wrapper"
-				pivot_node.add_child(wrapper)
-				
-				# Reparent wheel_mesh under the wrapper, preserving its local transform from the editor
-				wheel_mesh.reparent(wrapper, false)
-				
-				# Position wrapper at pivot origin (0, 0, 0)
-				wrapper.position = Vector3.ZERO
-				
-				if wheel_mesh is MeshInstance3D:
-					var dark_mat = StandardMaterial3D.new()
-					dark_mat.albedo_color = Color(0.12, 0.12, 0.12)
-					dark_mat.roughness = 0.85
-					wheel_mesh.material_override = dark_mat
+	var preset = CAR_PRESETS[car_index]
+	var wheel_parts: Dictionary = preset.get("wheel_parts", {})
+	
+	for corner in ["FL", "FR", "RL", "RR"]:
+		var pivot = get_node_or_null("Visuals/WheelPivot" + corner)
+		if not pivot:
+			continue
+		
+		# Free old GLB wheel children (the wheel.glb instances placed in the scene file)
+		for old_child in pivot.get_children():
+			old_child.queue_free()
+		
+		var part_name: String = wheel_parts.get(corner, "")
+		if part_name.is_empty():
+			continue
+		
+		# Find the wheel part node inside the loaded FBX model
+		var wheel_part = cart_model.get_node_or_null(part_name)
+		if not wheel_part:
+			print("PlayerCart: could not find wheel part '", part_name, "' for corner ", corner)
+			continue
+		
+		# FBX parts often have their node ORIGIN at the scene root (0,0,0),
+		# not at the wheel's visual center. Using wheel_part.global_position would
+		# place the pivot at the car center, causing the wheel mesh to orbit wildly.
+		# Instead we compute the true visual center via the mesh geometry's AABB.
+		var wheel_center = _get_mesh_aabb_world_center(wheel_part)
+		
+		# Move the WheelPivot to the wheel's true visual center so steering and
+		# spin both happen around the correct axis.
+		pivot.global_position = wheel_center
+		
+		# Create a WheelMesh container — _update_wheel_visuals rotates THIS for spinning.
+		# Because WheelMesh sits at wheel_center (= pivot origin), and the wheel geometry
+		# is also centered at wheel_center in WheelMesh local space, rotating
+		# WheelMesh.rotation.x spins the mesh in place.
+		var wheel_mesh_node = Node3D.new()
+		wheel_mesh_node.name = "WheelMesh"
+		pivot.add_child(wheel_mesh_node)
+		
+		# Reparent the actual FBX wheel part into WheelMesh, keeping world transform.
+		wheel_part.reparent(wheel_mesh_node, true)
+		
+		# Override the wheel material to remove baked lighting from the rubber texture.
+		_apply_wheel_material(wheel_part)
+
+func _apply_wheel_material(node: Node):
+	if node is MeshInstance3D:
+		var mat = StandardMaterial3D.new()
+		mat.albedo_color = Color(0.08, 0.08, 0.08)
+		mat.roughness = 0.9
+		mat.metallic = 0.0
+		node.material_override = mat
+	for child in node.get_children():
+		_apply_wheel_material(child)
+
+# Computes the world-space center of all mesh geometry under a node tree.
+# This is the correct spin pivot for FBX parts whose node origin may be at scene root.
+func _get_mesh_aabb_world_center(node: Node) -> Vector3:
+	var centers: Array = []
+	_collect_mesh_world_centers(node, centers)
+	if centers.is_empty():
+		return node.global_position  # fallback if no meshes found
+	var sum = Vector3.ZERO
+	for c in centers:
+		sum += c
+	return sum / centers.size()
+
+func _collect_mesh_world_centers(node: Node, centers: Array):
+	if node is MeshInstance3D:
+		# get_aabb() returns local-space AABB; transform center to world space
+		var local_center: Vector3 = node.get_aabb().get_center()
+		centers.append(node.global_transform * local_center)
+	for child in node.get_children():
+		_collect_mesh_world_centers(child, centers)
+
 
 func _move_and_sync():
 	sync_position = global_position

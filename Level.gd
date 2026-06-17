@@ -175,6 +175,7 @@ func _spawn_custom(data: Variant) -> Node:
 	var cart = PLAYER_CART.instantiate()
 	cart.name = str(data["id"])
 	cart.player_name = data["name"]
+	cart.car_index = data.get("car_index", 0)
 	cart.global_transform = data["transform"]
 
 	# If race is already started (e.g. late join), enable movement if local
@@ -215,10 +216,15 @@ func _add_player(id: int, p_name: String):
 			# LIFT SLIGHTLY: Prevent spawning stuck in road
 			spawn_transform.origin.y += 1.5
 
+		var car_idx = 0
+		if NetworkManager.players.has(id):
+			car_idx = NetworkManager.players[id].get("car_index", 0)
+
 		var data = {
 			"id": id,
 			"name": p_name,
-			"transform": spawn_transform
+			"transform": spawn_transform,
+			"car_index": car_idx
 		}
 		player_spawner.spawn(data)
 
