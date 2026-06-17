@@ -9,10 +9,13 @@ var respawn_timer = 0.0
 const RESPAWN_TIME = 5.0
 var current_scale: float = 0.0
 
+const SFX_PICKUP_SOUND = preload("res://sounds/game_bonus_collected_#3-1781737105214.wav")
+
 func _ready():
 	area.body_entered.connect(_on_body_entered)
 	if sfx_pickup:
 		sfx_pickup.bus = &"SFX"
+		sfx_pickup.stream = SFX_PICKUP_SOUND
 	visuals.scale = Vector3.ZERO
 	current_scale = 0.0
 

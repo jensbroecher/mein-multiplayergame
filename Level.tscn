@@ -106,6 +106,7 @@ shader_parameter/albedo_texture = ExtResource("5_grass")
 shader_parameter/uv_scale = 40.0
 shader_parameter/uv_scale_v2 = Vector2(1, 1)
 shader_parameter/smoothness = 1.0
+shader_parameter/use_world_uv = false
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_asphalt"]
 render_priority = 0
@@ -123,6 +124,7 @@ shader_parameter/albedo_texture = ExtResource("6_sand")
 shader_parameter/uv_scale = 20.0
 shader_parameter/uv_scale_v2 = Vector2(1, 1)
 shader_parameter/smoothness = 1.0
+shader_parameter/use_world_uv = false
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_s0cgv"]
 render_priority = 2
@@ -152,6 +154,7 @@ shader_parameter/albedo_texture = ExtResource("3_asph")
 shader_parameter/uv_scale = 20.0
 shader_parameter/uv_scale_v2 = Vector2(0.416667, 1.25)
 shader_parameter/smoothness = 1.0
+shader_parameter/use_world_uv = false
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_4vjci"]
 albedo_color = Color(0.3, 0.3, 0.3, 1)
@@ -1406,10 +1409,16 @@ spawn_path = NodePath(".")
 [node name="Checkpoints" type="Node3D" parent="." unique_id=342440943]
 
 [node name="Halfway" parent="Checkpoints" unique_id=409562182 instance=ExtResource("2_gate")]
-transform = Transform3D(0.8265594, 0, 0.56284934, 0, 1, 0, -0.56284934, 0, 0.8265594, -400.95517, 8.766577, 88.259705)
+transform = Transform3D(0.048228957, 0, 0.9988362, 0, 1, 0, -0.9988362, 0, 0.048228957, -63.533722, 2.7247596, 289.68365)
 
 [node name="Halfway2" parent="Checkpoints" unique_id=1076613409 instance=ExtResource("2_gate")]
-transform = Transform3D(-0.47679472, 0, -0.8790148, 0, 1, 0, 0.8790148, 0, -0.47679472, -165.23776, 11.180708, -514.9974)
+transform = Transform3D(-0.70418113, 0, -0.7100204, 0, 1, 0, 0.7100204, 0, -0.70418113, -380.10782, 8.770632, 114.18387)
+
+[node name="Halfway3" parent="Checkpoints" unique_id=760818968 instance=ExtResource("2_gate")]
+transform = Transform3D(-0.6727345, 0, -0.739884, 0, 1, 0, 0.739884, 0, -0.6727345, -558.3348, 7.742751, -258.5559)
+
+[node name="Halfway4" parent="Checkpoints" unique_id=970429380 instance=ExtResource("2_gate")]
+transform = Transform3D(0.4104177, 0, 0.91189766, 0, 1, 0, -0.91189766, 0, 0.4104177, -175.9742, 12.490519, -518.55133)
 
 [node name="NewRamp" parent="." unique_id=966004585 instance=ExtResource("17_dcckh")]
 transform = Transform3D(37.264538, 0, 25.226063, 0, 45, 0, -25.226063, 0, 37.264538, -428.5783, 10.270285, 49.70015)

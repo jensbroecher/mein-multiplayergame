@@ -40,7 +40,19 @@ func _ready():
 		freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
 	else:
 		# Freeze after 2 seconds so it settles on the road
-		get_tree().create_timer(2.0).timeout.connect(func(): if is_instance_valid(self): freeze = true)
+		get_tree().create_timer(2.0).timeout.connect(func(): 
+			if is_instance_valid(self): 
+				freeze = true
+				var limit = deg_to_rad(15.0)
+				var target_rot = Vector3(
+					clamp(global_rotation.x, -limit, limit),
+					global_rotation.y,
+					clamp(global_rotation.z, -limit, limit)
+				)
+				var tween = create_tween()
+				if tween:
+					tween.tween_property(self, "global_rotation", target_rot, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		)
 
 	_setup_sparks()
 	_play_fizzle_sound()
