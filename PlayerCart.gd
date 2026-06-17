@@ -331,12 +331,7 @@ func _process(delta):
 
 		if Input.is_action_just_pressed("toggle_camera"):
 			is_isometric = not is_isometric
-			if is_isometric:
-				camera.projection = Camera3D.PROJECTION_PERSPECTIVE
-				camera.fov = 35.0  # Narrow FOV for an isometric perspective look
-			else:
-				camera.projection = Camera3D.PROJECTION_PERSPECTIVE
-				camera.fov = 75.0  # Default perspective FOV
+			camera.projection = Camera3D.PROJECTION_PERSPECTIVE
 
 		var visual_forward = -visuals.global_transform.basis.z
 		var speed_factor = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
@@ -387,6 +382,12 @@ func _process(delta):
 			
 			camera_look_at = camera_look_at.lerp(visuals.global_position + visual_forward * (look_ahead_dist + 2.0), 12.0 * delta)
 			camera_pivot.look_at(camera_look_at, Vector3.UP)
+		
+		# Smoothly lerp camera FOV based on is_isometric and is_boosting
+		var target_fov = 35.0 if is_isometric else 75.0
+		if is_boosting:
+			target_fov += 10.0 if is_isometric else 15.0 # Zoom out when boosting!
+		camera.fov = lerp(camera.fov, target_fov, 8.0 * delta)
 
 		if race_ui:
 			race_ui.update_speed(linear_velocity.length() * 1.8)
@@ -648,7 +649,7 @@ func _physics_process(delta):
 			var turn_speed = steer_speed
 			is_drifting = drift_mode
 			
-			var play_brake_sfx = is_drifting or (input_dir.y > 0.2 and current_speed > 5.0)
+			var play_brake_sfx = on_ground and (is_drifting or (input_dir.y > 0.2 and current_speed > 5.0))
 			if play_brake_sfx:
 				if not sfx_brake_drift.playing: sfx_brake_drift.play()
 			else:

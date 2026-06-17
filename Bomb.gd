@@ -13,6 +13,8 @@ const BOMB_FIZZLE_SOUNDS = [
 	preload("res://sounds/tnt_fizzle_#4-1781732701868.wav")
 ]
 
+const FIRE_PARTICLE_TEXTURE = preload("res://materials/fire_particle.png")
+
 @onready var area = $Area3D
 @onready var visuals = $Visuals
 @onready var explosion_particles = $ExplosionParticles
@@ -27,7 +29,7 @@ var owner_safety_timer = 1.0 # Owner immune for the first second
 var is_exploding = false
 
 var fizzle_player: AudioStreamPlayer3D = null
-var spark_particles: GPUParticles3D = null
+var spark_particles: CPUParticles3D = null
 
 func _ready():
 	add_to_group("bombs")
@@ -61,7 +63,7 @@ func _on_fizzle_finished():
 		fizzle_player.play()
 
 func _setup_sparks():
-	spark_particles = GPUParticles3D.new()
+	spark_particles = CPUParticles3D.new()
 	spark_particles.name = "FuseSparks"
 	spark_particles.position = Vector3(0.0, 0.47, 0.0) # Aligns with the yellow fuse mesh
 	
@@ -70,14 +72,11 @@ func _setup_sparks():
 	spark_particles.explosiveness = 0.0
 	spark_particles.randomness = 1.0
 	
-	var mat = ParticleProcessMaterial.new()
-	mat.direction = Vector3(0, 1, 0)
-	mat.spread = 75.0
-	mat.initial_velocity_min = 2.0
-	mat.initial_velocity_max = 5.0
-	mat.gravity = Vector3(0, -9.8, 0)
-	mat.scale_min = 0.05
-	mat.scale_max = 0.15
+	spark_particles.direction = Vector3(0, 1, 0)
+	spark_particles.spread = 75.0
+	spark_particles.initial_velocity_min = 2.0
+	spark_particles.initial_velocity_max = 5.0
+	spark_particles.gravity = Vector3(0, -9.8, 0)
 	
 	var gradient = Gradient.new()
 	gradient.offsets = PackedFloat32Array([0.0, 0.2, 0.8, 1.0])
@@ -87,30 +86,36 @@ func _setup_sparks():
 		Color(0.8, 0.1, 0.0, 0.6),
 		Color(0.2, 0.0, 0.0, 0.0)
 	])
-	
-	var gradient_tex = GradientTexture1D.new()
-	gradient_tex.gradient = gradient
-	mat.color_ramp = gradient_tex
+	spark_particles.color_ramp = gradient
 	
 	var curve = Curve.new()
 	curve.add_point(Vector2(0, 1))
 	curve.add_point(Vector2(1, 0))
-	var curve_tex = CurveTexture.new()
-	curve_tex.curve = curve
-	mat.scale_curve = curve_tex
-	
-	spark_particles.process_material = mat
+	spark_particles.scale_amount_curve = curve
 	
 	var draw_mat = StandardMaterial3D.new()
 	draw_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	draw_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	draw_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	draw_mat.vertex_color_use_as_albedo = true
+	draw_mat.billboard_mode = StandardMaterial3D.BILLBOARD_PARTICLES
+	draw_mat.billboard_keep_scale = true
+	draw_mat.albedo_texture = FIRE_PARTICLE_TEXTURE
+	
+	# Try to duplicate the working material from the scene node if possible
+	var source_particles = get_node_or_null("FireSpriteParticles")
+	if source_particles and source_particles.draw_pass_1:
+		var source_mat = source_particles.draw_pass_1.material
+		if source_mat is StandardMaterial3D:
+			draw_mat = source_mat.duplicate()
 	
 	var quad_mesh = QuadMesh.new()
 	quad_mesh.material = draw_mat
-	quad_mesh.size = Vector2(0.12, 0.12)
-	spark_particles.draw_pass_1 = quad_mesh
+	quad_mesh.size = Vector2(0.5, 0.5) # Increased size to accommodate the soft fire_particle texture alpha fade
+	spark_particles.mesh = quad_mesh
+	
+	# Explicitly assign material override on the particle system as well
+	spark_particles.material_override = draw_mat
 	
 	visuals.add_child(spark_particles)
 	spark_particles.emitting = true
@@ -133,10 +138,8 @@ func _process(delta):
 	# Update sparks speed and velocity scale based on urgency
 	if is_instance_valid(spark_particles):
 		spark_particles.speed_scale = 1.0 + urgency * 1.5
-		var mat = spark_particles.process_material as ParticleProcessMaterial
-		if mat:
-			mat.initial_velocity_min = 2.0 + urgency * 3.0
-			mat.initial_velocity_max = 5.0 + urgency * 5.0
+		spark_particles.initial_velocity_min = 2.0 + urgency * 3.0
+		spark_particles.initial_velocity_max = 5.0 + urgency * 5.0
 
 func _physics_process(delta):
 	if not multiplayer.is_server(): return
