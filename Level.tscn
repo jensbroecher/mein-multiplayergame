@@ -1418,7 +1418,7 @@ transform = Transform3D(-0.70418113, 0, -0.7100204, 0, 1, 0, 0.7100204, 0, -0.70
 transform = Transform3D(-0.6727345, 0, -0.739884, 0, 1, 0, 0.739884, 0, -0.6727345, -558.3348, 7.742751, -258.5559)
 
 [node name="Halfway4" parent="Checkpoints" unique_id=970429380 instance=ExtResource("2_gate")]
-transform = Transform3D(0.4104177, 0, 0.91189766, 0, 1, 0, -0.91189766, 0, 0.4104177, -175.9742, 12.490519, -518.55133)
+transform = Transform3D(0.4104177, 0, 0.91189766, 0, 1, 0, -0.91189766, 0, 0.4104177, -175.9742, 12.490519, -518.7479)
 
 [node name="NewRamp" parent="." unique_id=966004585 instance=ExtResource("17_dcckh")]
 transform = Transform3D(37.264538, 0, 25.226063, 0, 45, 0, -25.226063, 0, 37.264538, -428.5783, 10.270285, 49.70015)
