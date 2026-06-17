@@ -90,6 +90,9 @@ func _explode():
 			if dist <= blast_radius:
 				if p.has_method("on_hit"):
 					p.on_hit()
+					var dir = (p.global_position - global_position).normalized()
+					if dir.length_squared() < 0.01:
+						dir = Vector3.UP
 					var impulse = dir * 8.0 * p.mass + Vector3.UP * 4.0 * p.mass
 					if p.has_method("apply_blast_impulse"):
 						p.apply_blast_impulse.rpc_id(p.name.to_int(), impulse)
