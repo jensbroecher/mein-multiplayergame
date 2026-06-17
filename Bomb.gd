@@ -71,8 +71,11 @@ func _explode():
 					var dir = (p.global_position - global_position).normalized()
 					if dir.length_squared() < 0.01:
 						dir = Vector3.UP
-					# Blast force away from bomb (reduced so players don't fly off the map)
-					p.apply_central_impulse(dir * 8.0 * p.mass + Vector3.UP * 4.0 * p.mass)
+					var impulse = dir * 8.0 * p.mass + Vector3.UP * 4.0 * p.mass
+					if p.has_method("apply_blast_impulse"):
+						p.apply_blast_impulse.rpc_id(p.name.to_int(), impulse)
+					else:
+						p.apply_central_impulse(impulse)
 					
 	_explode_rpc.rpc()
 

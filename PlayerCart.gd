@@ -670,9 +670,9 @@ func _interpolate_remote_visual(delta: float):
 		target_quat = Quaternion.from_euler(sync_rotation)
 
 	# Smoothly follow visual rotation to prevent remote visual jittering at high refresh rates
-	var current_visual_quat := visuals.global_transform.basis.get_rotation_quaternion()
+	var current_visual_quat: Quaternion = visuals.global_transform.basis.get_rotation_quaternion()
 	var rot_t = clamp(REMOTE_LERP_SPEED * 0.65 * delta, 0.0, 1.0)
-	var new_visual_quat := current_visual_quat.slerp(target_quat, rot_t)
+	var new_visual_quat: Quaternion = current_visual_quat.slerp(target_quat, rot_t)
 	
 	visuals.global_transform.basis = Basis(new_visual_quat)
 	visuals.global_position = global_position
@@ -909,14 +909,14 @@ func respawn():
 		var spawn_pos = last_checkpoint_transform.origin + (last_checkpoint_transform.basis.z * 5.0) + Vector3(0, 2.0, 0)
 		global_position = spawn_pos
 
-	# Reset visuals position
-	visuals.global_position = global_position
+		# Reset visuals position
+		visuals.global_position = global_position
 
-	var look_target = last_checkpoint_transform.origin
-	look_target.y = spawn_pos.y
-	# Guard against degenerate look_at (target == position)
-	if look_target.distance_to(spawn_pos) > 0.01:
-		visuals.look_at(look_target, Vector3.UP)
+		var look_target = last_checkpoint_transform.origin
+		look_target.y = spawn_pos.y
+		# Guard against degenerate look_at (target == position)
+		if look_target.distance_to(spawn_pos) > 0.01:
+			visuals.look_at(look_target, Vector3.UP)
 
 
 func give_item(type: int):
@@ -984,6 +984,11 @@ func _on_shield_timeout():
 	is_shielded = false
 	shield_mesh.visible = false
 
+@rpc("any_peer", "call_local", "reliable")
+func apply_blast_impulse(impulse: Vector3):
+	if is_local_player:
+		apply_central_impulse(impulse)
+
 func _activate_shockwave():
 	# Apply force to nearby players (only on server)
 	if multiplayer.is_server():
@@ -993,7 +998,11 @@ func _activate_shockwave():
 			var dist = global_position.distance_to(p.global_position)
 			if dist < 15.0:
 				var dir = (p.global_position - global_position).normalized()
-				p.apply_central_impulse(dir * 5000.0 * p.mass + Vector3.UP * 1500.0 * p.mass)
+				var impulse = dir * 5000.0 * p.mass + Vector3.UP * 1500.0 * p.mass
+				if p.has_method("apply_blast_impulse"):
+					p.apply_blast_impulse.rpc_id(p.name.to_int(), impulse)
+				else:
+					p.apply_central_impulse(impulse)
 		
 		# Play visual for all clients
 		client_play_shockwave.rpc()
