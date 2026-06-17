@@ -998,7 +998,7 @@ func _activate_shockwave():
 			var dist = global_position.distance_to(p.global_position)
 			if dist < 15.0:
 				var dir = (p.global_position - global_position).normalized()
-				var impulse = dir * 18.0 * p.mass + Vector3.UP * 9.0 * p.mass
+				var impulse = dir * 54.0 * p.mass + Vector3.UP * 27.0 * p.mass
 				if p.has_method("apply_blast_impulse"):
 					p.apply_blast_impulse.rpc_id(p.name.to_int(), impulse)
 				else:
@@ -1034,14 +1034,14 @@ func _drop_bomb():
 	var bomb = BOMB_SCENE.instantiate()
 	bomb.owner_id = name.to_int()
 	
+	bomb.position = global_position + Vector3(0, 1.0, 0)
+	bomb.linear_velocity = linear_velocity * 0.5
+	
 	var level = get_tree().get_first_node_in_group("level")
 	if level:
 		level.add_child(bomb)
 	else:
 		get_tree().root.add_child(bomb)
-	
-	bomb.global_position = global_position + Vector3(0, 1.0, 0)
-	bomb.linear_velocity = linear_velocity * 0.5
 	
 	bomb.set_multiplayer_authority(1)
 
