@@ -514,7 +514,10 @@ func _physics_process(delta):
 				# Keep forward speed by offsetting friction/drag to preserve momentum
 				apply_central_force(fwd * acceleration * 0.45 * mass)
 			else:
-				apply_central_force(-linear_velocity * 0.5 * mass)
+				if linear_velocity.length() < 0.3:
+					linear_velocity = Vector3.ZERO
+				else:
+					apply_central_force(-linear_velocity * 0.5 * mass)
 
 	# Steering (works on ground and slightly airborne)
 	if on_ground or linear_velocity.length() > 0.5:
@@ -1029,21 +1032,27 @@ func client_play_shockwave():
 	sfx_release_pop.play()
 
 func _drop_bomb():
-	# Bomb instantiation now happens only on the server
+	# Projectile instantiation now happens only on the server
 	if not multiplayer.is_server(): return
+	var spawn_pos = global_position - (visuals.global_transform.basis.z * 2.0) + Vector3(0, 1.0, 0)
+	var spawn_vel = linear_velocity * 0.5
+	_spawn_bomb_rpc.rpc(spawn_pos, spawn_vel, name.to_int())
+
+@rpc("any_peer", "call_local", "reliable")
+func _spawn_bomb_rpc(spawn_pos: Vector3, spawn_vel: Vector3, shooter_id: int):
 	var bomb = BOMB_SCENE.instantiate()
-	bomb.owner_id = name.to_int()
-	
-	bomb.position = global_position + Vector3(0, 1.0, 0)
-	bomb.linear_velocity = linear_velocity * 0.5
-	
+	bomb.owner_id = shooter_id
 	var level = get_tree().get_first_node_in_group("level")
 	if level:
 		level.add_child(bomb)
 	else:
 		get_tree().root.add_child(bomb)
 	
-	bomb.set_multiplayer_authority(1)
+	bomb.position = spawn_pos
+	bomb.linear_velocity = spawn_vel
+	
+	if multiplayer.is_server():
+		bomb.set_multiplayer_authority(1)
 
 func _enable_shadows_recursive(node: Node):
 	if node == null: return

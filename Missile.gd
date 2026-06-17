@@ -20,7 +20,6 @@ func _ready():
 	
 	if is_guided:
 		lifetime = 8.0
-		_find_target()
 		# Purple tint for guided missiles
 		var mesh_inst = get_node_or_null("Visuals/Mesh")
 		if mesh_inst:
@@ -30,6 +29,10 @@ func _ready():
 			mat.emission = Color(0.4, 0.0, 0.8, 1)
 			mat.emission_energy_multiplier = 2.0
 			mesh_inst.set_surface_override_material(0, mat)
+	else:
+		lifetime = 5.0
+		
+	_find_target()
 
 func _find_target():
 	var nearest_dist = 500.0
@@ -42,19 +45,26 @@ func _find_target():
 			target = p
 
 func _physics_process(delta):
+	# Decrement lifetime on all peers to prevent stuck/phantom projectiles if RPC is lost
+	lifetime -= delta
+	if lifetime <= 0:
+		_explode()
+		return
+
 	if multiplayer.is_server():
 		if spawn_safety_timer > 0.0:
 			spawn_safety_timer -= delta
 
-		if is_guided:
-			search_timer += delta
-			if search_timer > 0.5:
-				_find_target()
-				search_timer = 0.0
-			if target and is_instance_valid(target):
-				var dir = (target.global_position - global_position).normalized()
-				var target_basis = Basis.looking_at(dir, Vector3.UP)
-				global_basis = global_basis.slerp(target_basis, 5.0 * delta).orthonormalized()
+		search_timer += delta
+		if search_timer > 0.5:
+			_find_target()
+			search_timer = 0.0
+
+		if target and is_instance_valid(target):
+			var dir = (target.global_position - global_position).normalized()
+			var target_basis = Basis.looking_at(dir, Vector3.UP)
+			var turn_speed = 5.0 if is_guided else 1.0
+			global_basis = global_basis.slerp(target_basis, turn_speed * delta).orthonormalized()
 
 		# Gradually accelerate from start speed to max
 		speed = min(speed + SPEED_ACCEL * delta, SPEED_MAX)
@@ -62,10 +72,6 @@ func _physics_process(delta):
 		var forward = -transform.basis.z
 		velocity = forward * speed
 		move_and_slide()
-
-		lifetime -= delta
-		if lifetime <= 0:
-			_explode()
 
 func _on_body_entered(body):
 	if not multiplayer.is_server(): return

@@ -15,8 +15,12 @@ func _ready():
 	add_to_group("bombs")
 	area.body_entered.connect(_on_body_entered)
 	
-	# Freeze after 2 seconds so it settles on the road
-	get_tree().create_timer(2.0).timeout.connect(func(): if is_instance_valid(self): freeze = true)
+	if not multiplayer.is_server():
+		freeze = true
+		freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
+	else:
+		# Freeze after 2 seconds so it settles on the road
+		get_tree().create_timer(2.0).timeout.connect(func(): if is_instance_valid(self): freeze = true)
 
 func _process(delta):
 	if is_exploding: return
