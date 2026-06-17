@@ -70,8 +70,8 @@ emission = Color(0, 0.4, 1, 1)
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_shield"]
 material = SubResource("StandardMaterial3D_shield")
-radius = 1.0
-height = 2.5
+radius = 1.35
+height = 3.1
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_shock"]
 transparency = 1

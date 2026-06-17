@@ -217,6 +217,19 @@ func _ready():
 		mat.albedo_color = Color(1.0, 1.0, 1.0, 0.5)
 		shockwave_visual.material_override = mat
 
+	# Setup unique material for shield visual to allow independent animations
+	if shield_mesh:
+		var mat = shield_mesh.get_active_material(0)
+		if mat:
+			shield_mesh.material_override = mat.duplicate()
+		else:
+			var new_mat = StandardMaterial3D.new()
+			new_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			new_mat.albedo_color = Color(0.0, 0.6, 1.0, 0.4)
+			new_mat.emission_enabled = true
+			new_mat.emission = Color(0.0, 0.4, 1.0, 1.0)
+			shield_mesh.material_override = new_mat
+
 	# Route all sound effects under visuals to the SFX bus
 	for child in visuals.get_children():
 		if child is AudioStreamPlayer3D:
@@ -835,10 +848,33 @@ func client_start_boost():
 func client_start_shield():
 	_activate_shield()
 
+@rpc("any_peer", "call_local", "reliable")
+func client_break_shield():
+	is_shielded = false
+	shield_mesh.visible = false
+	shield_mesh.scale = Vector3.ONE
+
 func _update_visual_states(delta):
 	# Sync shield visual
 	if shield_mesh.visible != is_shielded:
 		shield_mesh.visible = is_shielded
+		if not is_shielded:
+			shield_mesh.scale = Vector3.ONE
+	
+	if is_shielded:
+		var time = Time.get_ticks_msec() * 0.001
+		# Buzzing scale oscillation
+		var scale_osc = 1.0 + 0.04 * sin(time * 25.0) + 0.015 * cos(time * 47.0)
+		shield_mesh.scale = Vector3(scale_osc, scale_osc, scale_osc)
+		
+		# Modulate the duplicated material
+		var mat = shield_mesh.material_override as StandardMaterial3D
+		if mat:
+			var alpha_osc = 0.35 + 0.15 * sin(time * 35.0)
+			mat.albedo_color.a = alpha_osc
+			
+			var energy_osc = 2.5 + 1.5 * sin(time * 30.0) + 0.8 * cos(time * 60.0)
+			mat.emission_energy_multiplier = energy_osc
 	
 	# Sync boost particles
 	if boost_particles.emitting != is_boosting:
@@ -855,6 +891,11 @@ func _update_visual_states(delta):
 func on_hit():
 	if is_shielded:
 		is_shielded = false
+		if multiplayer.is_server() and name.to_int() > 0:
+			client_break_shield.rpc_id(name.to_int())
+		else:
+			shield_mesh.visible = false
+			shield_mesh.scale = Vector3.ONE
 		return
 	# Server triggers the explosion for all clients
 	if multiplayer.is_server():
@@ -1002,6 +1043,11 @@ func _activate_shockwave():
 			if dist < 15.0:
 				if p.is_shielded:
 					p.is_shielded = false
+					if multiplayer.is_server() and p.name.to_int() > 0:
+						p.client_break_shield.rpc_id(p.name.to_int())
+					else:
+						p.shield_mesh.visible = false
+						p.shield_mesh.scale = Vector3.ONE
 					continue
 				
 				var dir = (p.global_position - global_position).normalized()

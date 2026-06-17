@@ -55,8 +55,6 @@ func _on_body_entered(body):
 	if body.is_in_group("player_carts"):
 		if body.name.to_int() == owner_id and owner_safety_timer > 0.0:
 			return
-		if body.has_method("on_hit"):
-			body.on_hit()
 		_explode()
 
 func _explode():
