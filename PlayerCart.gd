@@ -990,6 +990,30 @@ func _update_visual_states(delta):
 				_set_visuals_alpha(alpha)
 				if name_tag:
 					name_tag.modulate.a = alpha
+	else:
+		if explosion_time > 0.0:
+			# Reset explosion/drown visuals when transitioning from exploding -> not exploding
+			explosion_time = 0.0
+			is_drowned = false
+			if _drown_tween:
+				_drown_tween.kill()
+				_drown_tween = null
+			visuals.visible = true
+			_set_visuals_alpha(1.0)
+			if name_tag:
+				name_tag.modulate.a = 1.0
+			# Restore scattered wheel/part transforms
+			for corner in original_wheel_transforms.keys():
+				var pivot = get_node_or_null("Visuals/WheelPivot" + corner)
+				if pivot:
+					pivot.transform = original_wheel_transforms[corner]
+			for child in original_body_part_transforms.keys():
+				if is_instance_valid(child):
+					child.transform = original_body_part_transforms[child]
+			part_velocities.clear()
+			part_rotations.clear()
+			part_on_ground.clear()
+			original_body_part_transforms.clear()
 
 	# Respawn blinking indicator
 	if respawn_indicator_time > 0.0:
