@@ -1,0 +1,296 @@
+[gd_scene format=3 uid="uid://cvnsxs6nsg4ti"]
+
+[ext_resource type="Script" path="res://WaterSplash.gd" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://cgfcrxtwgc8ao" path="res://materials/water_particle.png" id="2_water1"]
+[ext_resource type="Texture2D" uid="uid://nhladv5sjrfh" path="res://materials/water_particle_2.png" id="3_water2"]
+[ext_resource type="Texture2D" uid="uid://c0qwbj26x07t3" path="res://materials/water_particle_3.png" id="4_water3"]
+
+[sub_resource type="Gradient" id="Gradient_splash_drop"]
+offsets = PackedFloat32Array(0, 0.2, 0.75, 1)
+colors = PackedColorArray(1, 1, 1, 0.95, 0.82, 0.93, 1, 0.85, 0.55, 0.78, 1, 0.45, 0, 0, 0, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_splash_drop"]
+gradient = SubResource("Gradient_splash_drop")
+
+[sub_resource type="Curve" id="Curve_splash_scale"]
+_data = [Vector2(0, 0.35), 0.0, 4.0, 0, 0, Vector2(0.35, 1.25), 0.0, 0.0, 0, 0, Vector2(1, 0.15), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_splash_scale"]
+curve = SubResource("Curve_splash_scale")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_splash"]
+emission_shape = 2
+emission_box_extents = Vector3(0.6, 0.05, 0.6)
+direction = Vector3(0, 1, 0)
+spread = 35.0
+initial_velocity_min = 7.0
+initial_velocity_max = 16.0
+angular_velocity_min = -180.0
+angular_velocity_max = 180.0
+gravity = Vector3(0, -60, 0)
+scale_min = 0.8
+scale_max = 2.5
+scale_curve = SubResource("CurveTexture_splash_scale")
+color_ramp = SubResource("GradientTexture1D_splash_drop")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_splash_1"]
+transparency = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_color = Color(0.8, 0.92, 1, 0.95)
+albedo_texture = ExtResource("2_water1")
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
+particles_anim_loop = false
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_splash_2"]
+transparency = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_color = Color(0.8, 0.92, 1, 0.95)
+albedo_texture = ExtResource("3_water2")
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
+particles_anim_loop = false
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_splash_3"]
+transparency = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_color = Color(0.8, 0.92, 1, 0.95)
+albedo_texture = ExtResource("4_water3")
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
+particles_anim_loop = false
+
+[sub_resource type="QuadMesh" id="QuadMesh_splash_1"]
+material = SubResource("StandardMaterial3D_splash_1")
+size = Vector2(1.0, 1.0)
+
+[sub_resource type="QuadMesh" id="QuadMesh_splash_2"]
+material = SubResource("StandardMaterial3D_splash_2")
+size = Vector2(1.0, 1.0)
+
+[sub_resource type="QuadMesh" id="QuadMesh_splash_3"]
+material = SubResource("StandardMaterial3D_splash_3")
+size = Vector2(1.0, 1.0)
+
+[sub_resource type="Gradient" id="Gradient_spray"]
+offsets = PackedFloat32Array(0, 0.25, 0.6, 1)
+colors = PackedColorArray(1, 1, 1, 0.9, 0.8, 0.92, 1, 0.7, 0.6, 0.82, 1, 0.3, 0.4, 0.65, 0.9, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_spray"]
+gradient = SubResource("Gradient_spray")
+
+[sub_resource type="Curve" id="Curve_expl"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_expl"]
+curve = SubResource("Curve_expl")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_spray"]
+emission_shape = 2
+emission_box_extents = Vector3(0.8, 0.05, 0.8)
+direction = Vector3(0, 0.4, 0)
+spread = 75.0
+flatness = 0.6
+initial_velocity_min = 4.0
+initial_velocity_max = 10.0
+angular_velocity_min = -360.0
+angular_velocity_max = 360.0
+gravity = Vector3(0, -50, 0)
+scale_min = 0.4
+scale_max = 1.2
+scale_curve = SubResource("CurveTexture_expl")
+color_ramp = SubResource("GradientTexture1D_spray")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_spray_1"]
+transparency = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_color = Color(0.85, 0.95, 1, 0.85)
+albedo_texture = ExtResource("2_water1")
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
+particles_anim_loop = false
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_spray_2"]
+transparency = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_color = Color(0.85, 0.95, 1, 0.85)
+albedo_texture = ExtResource("3_water2")
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
+particles_anim_loop = false
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_spray_3"]
+transparency = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_color = Color(0.85, 0.95, 1, 0.85)
+albedo_texture = ExtResource("4_water3")
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
+particles_anim_loop = false
+
+[sub_resource type="QuadMesh" id="QuadMesh_spray_1"]
+material = SubResource("StandardMaterial3D_spray_1")
+size = Vector2(0.6, 0.6)
+
+[sub_resource type="QuadMesh" id="QuadMesh_spray_2"]
+material = SubResource("StandardMaterial3D_spray_2")
+size = Vector2(0.6, 0.6)
+
+[sub_resource type="QuadMesh" id="QuadMesh_spray_3"]
+material = SubResource("StandardMaterial3D_spray_3")
+size = Vector2(0.6, 0.6)
+
+[sub_resource type="Gradient" id="Gradient_ripple"]
+offsets = PackedFloat32Array(0, 0.3, 0.8, 1)
+colors = PackedColorArray(0.7, 0.9, 1, 0.7, 0.6, 0.85, 1, 0.5, 0.4, 0.7, 1, 0.2, 0.3, 0.6, 0.9, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_ripple"]
+gradient = SubResource("Gradient_ripple")
+
+[sub_resource type="Curve" id="Curve_ripple_scale"]
+_data = [Vector2(0, 0.2), 0.0, 3.0, 0, 0, Vector2(0.4, 1.5), 0.0, 0.0, 0, 0, Vector2(1, 0.1), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_ripple_scale"]
+curve = SubResource("Curve_ripple_scale")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_ripple"]
+emission_shape = 2
+emission_box_extents = Vector3(0.4, 0.01, 0.4)
+direction = Vector3(0, 0, 0)
+spread = 180.0
+flatness = 1.0
+initial_velocity_min = 1.5
+initial_velocity_max = 4.0
+gravity = Vector3(0, 0, 0)
+scale_min = 1.5
+scale_max = 4.0
+scale_curve = SubResource("CurveTexture_ripple_scale")
+color_ramp = SubResource("GradientTexture1D_ripple")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ripple_2"]
+transparency = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_color = Color(0.7, 0.9, 1, 0.6)
+albedo_texture = ExtResource("3_water2")
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
+particles_anim_loop = false
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ripple_3"]
+transparency = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_color = Color(0.7, 0.9, 1, 0.6)
+albedo_texture = ExtResource("4_water3")
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
+particles_anim_loop = false
+
+[sub_resource type="QuadMesh" id="QuadMesh_ripple_2"]
+material = SubResource("StandardMaterial3D_ripple_2")
+size = Vector2(1.5, 1.5)
+
+[sub_resource type="QuadMesh" id="QuadMesh_ripple_3"]
+material = SubResource("StandardMaterial3D_ripple_3")
+size = Vector2(1.5, 1.5)
+
+[node name="WaterSplash" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="SplashParticles1" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 200
+lifetime = 1.4
+one_shot = true
+explosiveness = 0.85
+process_material = SubResource("ParticleProcessMaterial_splash")
+draw_pass_1 = SubResource("QuadMesh_splash_1")
+
+[node name="SplashParticles2" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 200
+lifetime = 1.4
+one_shot = true
+explosiveness = 0.85
+process_material = SubResource("ParticleProcessMaterial_splash")
+draw_pass_1 = SubResource("QuadMesh_splash_2")
+
+[node name="SplashParticles3" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 200
+lifetime = 1.4
+one_shot = true
+explosiveness = 0.85
+process_material = SubResource("ParticleProcessMaterial_splash")
+draw_pass_1 = SubResource("QuadMesh_splash_3")
+
+[node name="SplashSprayParticles1" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 150
+lifetime = 0.9
+one_shot = true
+explosiveness = 0.7
+process_material = SubResource("ParticleProcessMaterial_spray")
+draw_pass_1 = SubResource("QuadMesh_spray_1")
+
+[node name="SplashSprayParticles2" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 150
+lifetime = 0.9
+one_shot = true
+explosiveness = 0.7
+process_material = SubResource("ParticleProcessMaterial_spray")
+draw_pass_1 = SubResource("QuadMesh_spray_2")
+
+[node name="SplashSprayParticles3" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 150
+lifetime = 0.9
+one_shot = true
+explosiveness = 0.7
+process_material = SubResource("ParticleProcessMaterial_spray")
+draw_pass_1 = SubResource("QuadMesh_spray_3")
+
+[node name="SplashRippleParticles1" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 20
+lifetime = 2.0
+one_shot = true
+explosiveness = 0.6
+process_material = SubResource("ParticleProcessMaterial_ripple")
+draw_pass_1 = SubResource("QuadMesh_ripple_3")
+
+[node name="SplashRippleParticles2" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 20
+lifetime = 2.0
+one_shot = true
+explosiveness = 0.6
+process_material = SubResource("ParticleProcessMaterial_ripple")
+draw_pass_1 = SubResource("QuadMesh_ripple_2")

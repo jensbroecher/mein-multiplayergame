@@ -24,23 +24,26 @@ func _ready():
 	
 	if is_guided:
 		lifetime = 8.0
-		# Purple tint for guided missiles — apply to all MeshInstance3D children
-		var mat = StandardMaterial3D.new()
-		mat.albedo_color = Color(0.45, 0.0, 0.85, 1)
-		mat.roughness = 0.2
-		mat.metallic = 0.6
-		mat.emission_enabled = true
-		mat.emission = Color(0.4, 0.0, 0.8, 1)
-		mat.emission_energy_multiplier = 1.5
-		_tint_meshes_recursive(visuals, mat)
-		# Also tint the nozzle glow orange→purple
+		# Blue/purple tint for the nose cone of guided missiles
+		var nose_cone = get_node_or_null("Visuals/NoseCone")
+		if nose_cone:
+			var mat = StandardMaterial3D.new()
+			mat.albedo_color = Color(0.05, 0.35, 0.95, 1) # Vibrant blue
+			mat.roughness = 0.2
+			mat.metallic = 0.4
+			mat.emission_enabled = true
+			mat.emission = Color(0.02, 0.15, 0.9, 1) # Blue emission
+			mat.emission_energy_multiplier = 0.8
+			nose_cone.material_override = mat
+			
+		# Also tint the nozzle glow to match the blue theme
 		var nozzle = get_node_or_null("Visuals/Nozzle")
 		if nozzle:
 			var nm = StandardMaterial3D.new()
-			nm.albedo_color = Color(0.3, 0.0, 0.5, 1)
+			nm.albedo_color = Color(0.1, 0.1, 0.35, 1)
 			nm.metallic = 0.9
 			nm.emission_enabled = true
-			nm.emission = Color(0.5, 0.0, 0.9, 1)
+			nm.emission = Color(0.05, 0.15, 0.85, 1) # Blue exhaust glow
 			nm.emission_energy_multiplier = 3.0
 			nozzle.material_override = nm
 	else:
@@ -97,11 +100,7 @@ func _on_body_entered(body):
 		if spawn_safety_timer <= 0.0:
 			_explode()
 
-func _tint_meshes_recursive(node: Node, mat: StandardMaterial3D):
-	if node is MeshInstance3D:
-		node.material_override = mat
-	for child in node.get_children():
-		_tint_meshes_recursive(child, mat)
+
 
 func _explode():
 	if not is_instance_valid(self): return
@@ -140,6 +139,25 @@ func _explode_rpc():
 	
 	var scene_root = get_tree().current_scene
 	var expl_pos = global_position
+	
+	# Play a random missile explosion sound
+	var missile_sounds = [
+		"res://sounds/missile_explosion_wi_#1-1781728385875.wav",
+		"res://sounds/missile_explosion_wi_#2-1781728388962.wav",
+		"res://sounds/missile_explosion_wi_#3-1781728394157.wav",
+		"res://sounds/missile_explosion_wi_#4-1781728398285.wav"
+	]
+	var selected_sound = missile_sounds[randi() % missile_sounds.size()]
+	var sound_stream = load(selected_sound)
+	if sound_stream:
+		var ap = AudioStreamPlayer3D.new()
+		ap.stream = sound_stream
+		ap.max_distance = 80.0
+		ap.unit_size = 10.0
+		scene_root.add_child(ap)
+		ap.global_position = expl_pos
+		ap.play()
+		get_tree().create_timer(sound_stream.get_length() + 0.5).timeout.connect(ap.queue_free)
 
 	# Stop and detach the fire trail so it fades out naturally
 	if is_instance_valid(fire_trail):

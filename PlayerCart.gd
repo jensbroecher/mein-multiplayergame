@@ -94,9 +94,6 @@ var race_ui
 @onready var burning_smoke_particles = $Visuals/BurningSmokeParticles
 @onready var fire_sprite_particles = $Visuals/FireSpriteParticles
 @onready var fire_sprite_particles_2 = $Visuals/FireSpriteParticles2
-@onready var splash_particles = $Visuals/SplashParticles
-@onready var splash_spray_particles = $Visuals/SplashSprayParticles
-@onready var splash_ripple_particles = $Visuals/SplashRippleParticles
 @onready var sfx_wind_loop = $Visuals/SFX_WindLoop
 @onready var sfx_shield_loop = $Visuals/SFX_ShieldLoop
 @onready var sfx_landing_bonk = $Visuals/SFX_LandingBonk
@@ -132,6 +129,7 @@ var drift_particles = []
 var is_underwater: bool = false
 const WATER_LEVEL = -10.0
 var water_timer: float = 0.0
+var last_splash_time: float = -999.0
 var is_drowned: bool = false
 var _drown_tween: Tween = null
 var original_wheel_transforms: Dictionary = {}
@@ -425,34 +423,66 @@ func _physics_process(delta):
 			_interpolate_remote_physics(delta)
 		return
 
-	var currently_underwater = global_position.y < WATER_LEVEL
+	# Use hysteresis to prevent rapid underwater state toggling at the boundary
+	var entry_threshold = WATER_LEVEL - 0.25
+	var exit_threshold = WATER_LEVEL + 0.25
+	var currently_underwater = is_underwater
+	if is_underwater:
+		if global_position.y > exit_threshold:
+			currently_underwater = false
+	else:
+		if global_position.y < entry_threshold:
+			currently_underwater = true
+
 	if currently_underwater != is_underwater:
 		if currently_underwater:
 			# --- Water Impact ---
-			sfx_landing_bonk.play()
-			# Strong velocity kill simulating hitting dense water
-			var impact_speed = linear_velocity.length()
-			linear_velocity *= 0.18
-			# Kill any remaining downward momentum so the car doesn't bounce back up
-			# (upward impulse would push it above WATER_LEVEL and cause a bounce loop)
-			if linear_velocity.y < 0:
-				linear_velocity.y = 0.0
-			
-			# Trigger all three splash layers — toggle emitting to restart each burst
-			# while in-flight particles from the previous burst keep flying naturally
-			var splash_pos = Vector3(global_position.x, WATER_LEVEL, global_position.z)
-			if splash_particles:
-				splash_particles.global_position = splash_pos
-				splash_particles.emitting = false
-				splash_particles.emitting = true
-			if splash_spray_particles:
-				splash_spray_particles.global_position = splash_pos
-				splash_spray_particles.emitting = false
-				splash_spray_particles.emitting = true
-			if splash_ripple_particles:
-				splash_ripple_particles.global_position = splash_pos
-				splash_ripple_particles.emitting = false
-				splash_ripple_particles.emitting = true
+			var current_time = Time.get_ticks_msec() / 1000.0
+			if current_time - last_splash_time > 0.2:
+				last_splash_time = current_time
+				
+				var impact_speed = linear_velocity.length()
+				var splash_sounds = []
+				if impact_speed > 15.0:
+					splash_sounds = [
+						"res://sounds/deep_water_splash_#1-1781728153794.wav",
+						"res://sounds/deep_water_splash_#2-1781728156705.wav",
+						"res://sounds/deep_water_splash_#3-1781728161657.wav",
+						"res://sounds/deep_water_splash_#4-1781728165962.wav"
+					]
+				else:
+					splash_sounds = [
+						"res://sounds/water_splash_#2-1781728133304.wav",
+						"res://sounds/water_splash_#3-1781728129266.wav",
+						"res://sounds/water_splash_#4-1781728106730.wav"
+					]
+				
+				var selected_sound = splash_sounds[randi() % splash_sounds.size()]
+				var splash_stream = load(selected_sound)
+				if splash_stream:
+					var ap = AudioStreamPlayer3D.new()
+					ap.stream = splash_stream
+					ap.max_distance = 60.0
+					ap.unit_size = 6.0
+					get_tree().current_scene.add_child(ap)
+					ap.global_position = global_position
+					ap.play()
+					get_tree().create_timer(splash_stream.get_length() + 0.5).timeout.connect(ap.queue_free)
+					
+				# Strong velocity kill simulating hitting dense water
+				linear_velocity *= 0.18
+				# Kill any remaining downward momentum so the car doesn't bounce back up
+				# (upward impulse would push it above WATER_LEVEL and cause a bounce loop)
+				if linear_velocity.y < 0:
+					linear_velocity.y = 0.0
+				
+				# Trigger the new standalone, multi-instanced WaterSplash
+				var splash_pos = Vector3(global_position.x, WATER_LEVEL, global_position.z)
+				var splash_scene = load("res://WaterSplash.tscn")
+				if splash_scene:
+					var splash_instance = splash_scene.instantiate()
+					get_tree().current_scene.add_child(splash_instance)
+					splash_instance.global_position = splash_pos
 		is_underwater = currently_underwater
 		water_timer = 0.0
 
@@ -1064,6 +1094,16 @@ func explode():
 	is_drowned = false
 	explosion_time = 0.0
 	
+	# Play a random bomb explosion sound
+	var bomb_sounds = [
+		"res://sounds/bomb_explosion_#2-1781728320398.wav",
+		"res://sounds/bomb_explosion_#4-1781728322907.wav",
+		"res://sounds/bomb_explosion_with__#1-1781728361227.wav",
+		"res://sounds/bomb_explosion_with__#3-1781728366899.wav",
+		"res://sounds/bomb_explosion_with__#4-1781728370769.wav"
+	]
+	var selected_bomb_sound = bomb_sounds[randi() % bomb_sounds.size()]
+	sfx_explosion.stream = load(selected_bomb_sound)
 	sfx_explosion.play()
 	sfx_fire_loop.play()
 	explosion_particles.emitting = true
@@ -1170,6 +1210,7 @@ func respawn():
 	is_drowned = false
 	is_underwater = false
 	water_timer = 0.0
+	last_splash_time = -999.0
 	# Kill any in-flight drown fade tween so it can't overwrite the restored alpha
 	if _drown_tween:
 		_drown_tween.kill()
@@ -1546,8 +1587,8 @@ func _create_drift_particles(wheel_name: String):
 	var skid = CPUParticles3D.new()
 	skid.name = wheel_name + "_Skid"
 	skid.emitting = false
-	skid.amount = 400
-	skid.lifetime = 8.0
+	skid.amount = 1500
+	skid.lifetime = 30.0
 	skid.mesh = QuadMesh.new()
 	
 	skid.mesh.orientation = PlaneMesh.FACE_Y
@@ -1561,8 +1602,12 @@ func _create_drift_particles(wheel_name: String):
 	skid.material_override = mat_skid
 	
 	var skid_grad = Gradient.new()
-	skid_grad.set_color(0, Color(0.1, 0.1, 0.1, 0.4))
-	skid_grad.set_color(1, Color(0.1, 0.1, 0.1, 0.0))
+	skid_grad.offsets = PackedFloat32Array([0.0, 0.8, 1.0])
+	skid_grad.colors = PackedColorArray([
+		Color(0.1, 0.1, 0.1, 0.4),
+		Color(0.1, 0.1, 0.1, 0.4),
+		Color(0.1, 0.1, 0.1, 0.0)
+	])
 	skid.color_ramp = skid_grad
 	
 	skid.gravity = Vector3.ZERO

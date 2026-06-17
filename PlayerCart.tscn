@@ -16,6 +16,8 @@
 [ext_resource type="Texture2D" uid="uid://bn6adfe24wsar" path="res://materials/fire_particle.png" id="14_fire"]
 [ext_resource type="Texture2D" uid="uid://c6tmb3yh45lja" path="res://materials/fire_particle_2.png" id="15_fire2"]
 
+[ext_resource type="AudioStream" path="res://sounds/force_field_effect_#1-1781728246336.wav" id="19_shield"]
+
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_frictionless"]
 friction = 0.0
 
@@ -155,133 +157,7 @@ particles_anim_loop = false
 material = SubResource("StandardMaterial3D_smoke")
 size = Vector2(0.5, 0.5)
 
-[sub_resource type="Gradient" id="Gradient_splash_drop"]
-offsets = PackedFloat32Array(0, 0.3, 0.7, 1)
-colors = PackedColorArray(1, 1, 1, 1, 0.75, 0.9, 1, 0.9, 0.55, 0.75, 1, 0.5, 0.3, 0.6, 0.9, 0)
 
-[sub_resource type="GradientTexture1D" id="GradientTexture1D_splash_drop"]
-gradient = SubResource("Gradient_splash_drop")
-
-[sub_resource type="Curve" id="Curve_splash_scale"]
-_data = [Vector2(0, 0.3), 0.0, 2.0, 0, 0, Vector2(0.2, 1.0), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
-point_count = 3
-
-[sub_resource type="CurveTexture" id="CurveTexture_splash_scale"]
-curve = SubResource("Curve_splash_scale")
-
-[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_splash"]
-emission_shape = 2
-emission_box_extents = Vector3(0.6, 0.05, 0.6)
-direction = Vector3(0, 1, 0)
-spread = 35.0
-initial_velocity_min = 7.0
-initial_velocity_max = 16.0
-angular_velocity_min = -180.0
-angular_velocity_max = 180.0
-gravity = Vector3(0, -60, 0)
-scale_min = 0.25
-scale_max = 0.8
-scale_curve = SubResource("CurveTexture_splash_scale")
-color_ramp = SubResource("GradientTexture1D_splash_drop")
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_splash"]
-transparency = 1
-shading_mode = 0
-vertex_color_use_as_albedo = true
-albedo_color = Color(0.8, 0.92, 1, 0.95)
-albedo_texture = SubResource("GradientTexture2D_soft")
-billboard_mode = 3
-billboard_keep_scale = true
-particles_anim_h_frames = 1
-particles_anim_v_frames = 1
-particles_anim_loop = false
-
-[sub_resource type="QuadMesh" id="QuadMesh_splash"]
-material = SubResource("StandardMaterial3D_splash")
-size = Vector2(0.55, 0.55)
-
-[sub_resource type="Gradient" id="Gradient_spray"]
-offsets = PackedFloat32Array(0, 0.25, 0.6, 1)
-colors = PackedColorArray(1, 1, 1, 0.9, 0.8, 0.92, 1, 0.7, 0.6, 0.82, 1, 0.3, 0.4, 0.65, 0.9, 0)
-
-[sub_resource type="GradientTexture1D" id="GradientTexture1D_spray"]
-gradient = SubResource("Gradient_spray")
-
-[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_spray"]
-emission_shape = 2
-emission_box_extents = Vector3(0.8, 0.05, 0.8)
-direction = Vector3(0, 0.4, 0)
-spread = 75.0
-flatness = 0.6
-initial_velocity_min = 4.0
-initial_velocity_max = 10.0
-angular_velocity_min = -360.0
-angular_velocity_max = 360.0
-gravity = Vector3(0, -50, 0)
-scale_min = 0.1
-scale_max = 0.4
-scale_curve = SubResource("CurveTexture_expl")
-color_ramp = SubResource("GradientTexture1D_spray")
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_spray"]
-transparency = 1
-shading_mode = 0
-vertex_color_use_as_albedo = true
-albedo_color = Color(0.85, 0.95, 1, 0.85)
-albedo_texture = SubResource("GradientTexture2D_soft")
-billboard_mode = 3
-billboard_keep_scale = true
-particles_anim_h_frames = 1
-particles_anim_v_frames = 1
-particles_anim_loop = false
-
-[sub_resource type="QuadMesh" id="QuadMesh_spray"]
-material = SubResource("StandardMaterial3D_spray")
-size = Vector2(0.3, 0.3)
-
-[sub_resource type="Gradient" id="Gradient_ripple"]
-offsets = PackedFloat32Array(0, 0.3, 0.8, 1)
-colors = PackedColorArray(0.7, 0.9, 1, 0.7, 0.6, 0.85, 1, 0.5, 0.4, 0.7, 1, 0.2, 0.3, 0.6, 0.9, 0)
-
-[sub_resource type="GradientTexture1D" id="GradientTexture1D_ripple"]
-gradient = SubResource("Gradient_ripple")
-
-[sub_resource type="Curve" id="Curve_ripple_scale"]
-_data = [Vector2(0, 0.2), 0.0, 3.0, 0, 0, Vector2(0.4, 1.5), 0.0, 0.0, 0, 0, Vector2(1, 0.1), 0.0, 0.0, 0, 0]
-point_count = 3
-
-[sub_resource type="CurveTexture" id="CurveTexture_ripple_scale"]
-curve = SubResource("Curve_ripple_scale")
-
-[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_ripple"]
-emission_shape = 2
-emission_box_extents = Vector3(0.4, 0.01, 0.4)
-direction = Vector3(0, 0, 0)
-spread = 180.0
-flatness = 1.0
-initial_velocity_min = 1.5
-initial_velocity_max = 4.0
-gravity = Vector3(0, 0, 0)
-scale_min = 0.5
-scale_max = 1.2
-scale_curve = SubResource("CurveTexture_ripple_scale")
-color_ramp = SubResource("GradientTexture1D_ripple")
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ripple"]
-transparency = 1
-shading_mode = 0
-vertex_color_use_as_albedo = true
-albedo_color = Color(0.7, 0.9, 1, 0.6)
-albedo_texture = SubResource("GradientTexture2D_soft")
-billboard_mode = 3
-billboard_keep_scale = true
-particles_anim_h_frames = 1
-particles_anim_v_frames = 1
-particles_anim_loop = false
-
-[sub_resource type="QuadMesh" id="QuadMesh_ripple"]
-material = SubResource("StandardMaterial3D_ripple")
-size = Vector2(1.2, 1.2)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rod"]
 albedo_color = Color(0.2, 0.2, 0.2, 1)
@@ -480,32 +356,7 @@ explosiveness = 0.95
 process_material = SubResource("ParticleProcessMaterial_fire_sprite_2")
 draw_pass_1 = SubResource("QuadMesh_fire_sprite_2")
 
-[node name="SplashParticles" type="GPUParticles3D" parent="Visuals" unique_id=894132791]
-emitting = false
-amount = 220
-lifetime = 1.4
-one_shot = true
-explosiveness = 0.85
-process_material = SubResource("ParticleProcessMaterial_splash")
-draw_pass_1 = SubResource("QuadMesh_splash")
 
-[node name="SplashSprayParticles" type="GPUParticles3D" parent="Visuals" unique_id=894132792]
-emitting = false
-amount = 180
-lifetime = 0.9
-one_shot = true
-explosiveness = 0.7
-process_material = SubResource("ParticleProcessMaterial_spray")
-draw_pass_1 = SubResource("QuadMesh_spray")
-
-[node name="SplashRippleParticles" type="GPUParticles3D" parent="Visuals" unique_id=894132793]
-emitting = false
-amount = 24
-lifetime = 2.0
-one_shot = true
-explosiveness = 0.6
-process_material = SubResource("ParticleProcessMaterial_ripple")
-draw_pass_1 = SubResource("QuadMesh_ripple")
 
 [node name="WheelPivotFL" type="Node3D" parent="Visuals" unique_id=40001]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.52, -0.42080304, -0.8016523)
@@ -597,7 +448,7 @@ unit_size = 15.0
 stream = ExtResource("11_wind")
 
 [node name="SFX_ShieldLoop" type="AudioStreamPlayer3D" parent="Visuals" unique_id=192837465]
-stream = ExtResource("11_wind")
+stream = ExtResource("19_shield")
 unit_size = 18.0
 volume_db = 0.0
 pitch_scale = 2.0

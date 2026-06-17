@@ -101,6 +101,26 @@ func _explode_rpc():
 	var scene_root = get_tree().current_scene
 	var expl_pos = global_position
 	
+	# Play a random bomb explosion sound
+	var bomb_sounds = [
+		"res://sounds/bomb_explosion_#2-1781728320398.wav",
+		"res://sounds/bomb_explosion_#4-1781728322907.wav",
+		"res://sounds/bomb_explosion_with__#1-1781728361227.wav",
+		"res://sounds/bomb_explosion_with__#3-1781728366899.wav",
+		"res://sounds/bomb_explosion_with__#4-1781728370769.wav"
+	]
+	var selected_sound = bomb_sounds[randi() % bomb_sounds.size()]
+	var sound_stream = load(selected_sound)
+	if sound_stream:
+		var ap = AudioStreamPlayer3D.new()
+		ap.stream = sound_stream
+		ap.max_distance = 80.0
+		ap.unit_size = 10.0
+		scene_root.add_child(ap)
+		ap.global_position = expl_pos
+		ap.play()
+		get_tree().create_timer(sound_stream.get_length() + 0.5).timeout.connect(ap.queue_free)
+	
 	# Create spherical explosion visual
 	var expl_mesh = MeshInstance3D.new()
 	var sphere = SphereMesh.new()

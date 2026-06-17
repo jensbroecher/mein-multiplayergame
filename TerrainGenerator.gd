@@ -9,7 +9,7 @@ extends Node3D
 
 @export var track_path: Path3D
 @export var terrain_size: Vector2 = Vector2(2000, 2000)
-@export var terrain_resolution: int = 300 # Balanced for performance and file size
+@export var terrain_resolution: int = 800 # Higher resolution for rounder, more organic hills
 @export var noise_frequency: float = 0.008 # Detailed hills
 @export var hill_height: float = 50.0 # Taller hills
 
@@ -113,8 +113,10 @@ func _set_owner_recursive(node: Node):
 
 func _generate_mesh(for_collision: bool) -> ArrayMesh:
 	var noise = FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	noise.frequency = noise_frequency
 	noise.seed = 12345
+	noise.fractal_octaves = 4
 
 	var st = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -166,7 +168,8 @@ func _generate_mesh(for_collision: bool) -> ArrayMesh:
 			var edge_falloff = 1.0 - clamp((dist_from_center - falloff_start) / (falloff_end - falloff_start), 0.0, 1.0)
 
 			# LAKE AND EDGE LOGIC COMBO:
-			height *= edge_falloff
+			var target_edge_height = -20.0
+			height = lerp(target_edge_height, height, edge_falloff)
 
 			var lake_center = Vector2(-450, -500)
 			var lake_radius = 200.0
@@ -175,9 +178,6 @@ func _generate_mesh(for_collision: bool) -> ArrayMesh:
 				var depth = -15.0
 				var lake_blend = clamp((lake_radius - dist_to_lake) / 40.0, 0.0, 1.0)
 				height = lerp(height, depth, lake_blend)
-
-			if dist_from_center > falloff_end:
-				height = -20.0
 
 			st.set_uv(Vector2(px, pz))
 			st.add_vertex(Vector3(px, height, pz))

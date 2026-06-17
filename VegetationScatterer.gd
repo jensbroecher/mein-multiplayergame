@@ -59,9 +59,11 @@ func _update_boundary():
 		helper.name = "BoundaryHelper"
 		add_child(helper)
 		
-	var box = BoxMesh.new()
-	box.size = Vector3(size.x, 0.1, size.y)
-	helper.mesh = box
+	var cylinder = CylinderMesh.new()
+	cylinder.top_radius = size.x / 2.0
+	cylinder.bottom_radius = size.x / 2.0
+	cylinder.height = 0.1
+	helper.mesh = cylinder
 	
 	var mat = StandardMaterial3D.new()
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -95,7 +97,7 @@ func scatter():
 	
 	var grass_mat = ShaderMaterial.new()
 	grass_mat.shader = shader
-	grass_mat.set_shader_parameter("albedo", Color(0.22, 0.55, 0.16))
+	grass_mat.set_shader_parameter("albedo", Color(0.28, 0.68, 0.15))
 	
 	var tex_path = "res://models/trees/grass_tall-grass-png-44173_bw.webp"
 	if ResourceLoader.exists(tex_path):
@@ -140,9 +142,7 @@ func scatter():
 
 func _scatter_group(scene: PackedScene, count: int, is_tree: bool, scale_min: float, scale_max: float, mat_override: Material, container: Node3D, root: Node, space_state: PhysicsDirectSpaceState3D):
 	for i in range(count):
-		var rx = randf_range(-size.x / 2.0, size.x / 2.0)
-		var rz = randf_range(-size.y / 2.0, size.y / 2.0)
-		var local_pos = Vector3(rx, 0.0, rz)
+		var local_pos = _get_random_point_in_circle(size.x / 2.0)
 		var global_pos = global_transform * local_pos
 		
 		# Raycast down to find ground
@@ -189,12 +189,15 @@ func _scatter_group(scene: PackedScene, count: int, is_tree: bool, scale_min: fl
 			if mat_override:
 				_apply_material_override(instance, mat_override)
 				
-			# Add collisions for trees
+			# Add collisions for trees (as siblings in container to ensure correct serialization)
 			if is_tree:
 				var static_body = StaticBody3D.new()
-				static_body.name = "StaticBody3D"
-				instance.add_child(static_body)
+				static_body.name = "StaticBody_" + instance.name + "_" + str(i)
+				container.add_child(static_body)
 				static_body.owner = root
+				
+				# Position at the exact same location/rotation/scale as the tree instance
+				static_body.global_transform = instance.global_transform
 				
 				var collision_shape = CollisionShape3D.new()
 				collision_shape.name = "CollisionShape3D"
@@ -208,9 +211,7 @@ func _scatter_group(scene: PackedScene, count: int, is_tree: bool, scale_min: fl
 
 func _scatter_group_multi(scenes: Array, count: int, is_tree: bool, scale_min: float, scale_max: float, mat_override: Material, container: Node3D, root: Node, space_state: PhysicsDirectSpaceState3D):
 	for i in range(count):
-		var rx = randf_range(-size.x / 2.0, size.x / 2.0)
-		var rz = randf_range(-size.y / 2.0, size.y / 2.0)
-		var local_pos = Vector3(rx, 0.0, rz)
+		var local_pos = _get_random_point_in_circle(size.x / 2.0)
 		var global_pos = global_transform * local_pos
 		
 		# Raycast down to find ground
@@ -256,12 +257,15 @@ func _scatter_group_multi(scenes: Array, count: int, is_tree: bool, scale_min: f
 			if mat_override:
 				_apply_material_override(instance, mat_override)
 				
-			# Add collisions for trees
+			# Add collisions for trees (as siblings in container to ensure correct serialization)
 			if is_tree:
 				var static_body = StaticBody3D.new()
-				static_body.name = "StaticBody3D"
-				instance.add_child(static_body)
+				static_body.name = "StaticBody_" + instance.name + "_" + str(i)
+				container.add_child(static_body)
 				static_body.owner = root
+				
+				# Position at the exact same location/rotation/scale as the tree instance
+				static_body.global_transform = instance.global_transform
 				
 				var collision_shape = CollisionShape3D.new()
 				collision_shape.name = "CollisionShape3D"
@@ -278,3 +282,15 @@ func _apply_material_override(node: Node, mat: Material):
 		node.material_override = mat
 	for child in node.get_children():
 		_apply_material_override(child, mat)
+
+func _get_random_point_in_circle(radius: float) -> Vector3:
+	while true:
+		var rx = randf_range(-radius, radius)
+		var rz = randf_range(-radius, radius)
+		var dist = sqrt(rx * rx + rz * rz)
+		if dist <= radius:
+			# Linear density falloff: higher chance to spawn at the center, fading to 0 at the edge
+			var prob = 1.0 - (dist / radius)
+			if randf() < prob:
+				return Vector3(rx, 0.0, rz)
+	return Vector3.ZERO
