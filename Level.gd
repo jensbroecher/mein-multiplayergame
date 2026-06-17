@@ -314,28 +314,15 @@ func on_player_exploded(is_local: bool):
 		race_ui.show_message("WRECKED", 3.0)
 
 func _spawn_item_boxes():
-	if track_path:
-		var curve = track_path.curve
-		var length = curve.get_baked_length()
-		var step = 150.0 # Standard spacing
-		# If the track is small, reduce step
-		if length < 500: step = 50.0
-
-		for d in range(0, int(length), int(step)):
-			# MUST use global position!
-			var local_pos = curve.sample_baked(d)
-			var global_pos = track_path.to_global(local_pos)
-			global_pos.y += 1.0 # Float above road
-
-			var box = ITEM_BOX_SCENE.instantiate()
-			add_child(box) # Add first to set global_transform correctly
-			box.global_position = global_pos
-	elif not checkpoints.is_empty():
-		# Fallback: Spawn items at each checkpoint
-		for cp in checkpoints:
+	# Spawn a row of 3 items across each checkpoint gate and the finish line
+	for cp in checkpoints:
+		var right_dir = cp.global_transform.basis.x.normalized()
+		var spacing = 3.5
+		var offsets = [-spacing, 0.0, spacing]
+		for offset in offsets:
 			var box = ITEM_BOX_SCENE.instantiate()
 			add_child(box)
-			box.global_position = cp.global_position + Vector3(0, 1.5, 0)
+			box.global_position = cp.global_position + right_dir * offset + Vector3(0, 1.5, 0)
 
 func _rebuild_checkpoints():
 	if not track_path: return

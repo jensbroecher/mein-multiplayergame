@@ -7,17 +7,32 @@ extends Node3D
 var is_active = true
 var respawn_timer = 0.0
 const RESPAWN_TIME = 5.0
+var current_scale: float = 0.0
 
 func _ready():
 	area.body_entered.connect(_on_body_entered)
 	if sfx_pickup:
 		sfx_pickup.bus = &"SFX"
+	visuals.scale = Vector3.ZERO
+	current_scale = 0.0
 
 func _process(delta):
 	# Animation for everyone
 	visuals.rotate_y(delta * 2.0)
 	visuals.position.y = 0.5 + sin(Time.get_ticks_msec() * 0.003) * 0.2
 	
+	# Scale animation
+	if is_active:
+		if current_scale < 1.0:
+			current_scale = move_toward(current_scale, 1.0, delta * 3.0)
+			visuals.scale = Vector3.ONE * current_scale
+	else:
+		if current_scale > 0.0:
+			current_scale = move_toward(current_scale, 0.0, delta * 8.0)
+			visuals.scale = Vector3.ONE * current_scale
+			if current_scale == 0.0:
+				visuals.visible = false
+				
 	if not multiplayer.is_server(): return
 	
 	if not is_active:
@@ -39,7 +54,6 @@ func _on_body_entered(body):
 @rpc("authority", "call_local", "reliable")
 func _deactivate_rpc():
 	is_active = false
-	visuals.visible = false
 	if multiplayer.is_server():
 		respawn_timer = RESPAWN_TIME
 	if sfx_pickup: sfx_pickup.play()
@@ -48,4 +62,5 @@ func _deactivate_rpc():
 func _activate_rpc():
 	is_active = true
 	visuals.visible = true
-	# area.set_deferred("monitoring", true)
+	current_scale = 0.0
+	visuals.scale = Vector3.ZERO
