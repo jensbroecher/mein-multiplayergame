@@ -74,6 +74,9 @@ var camera_look_at: Vector3 = Vector3.ZERO
 var is_isometric: bool = true
 var engine_phase: float = 0.0
 var hop_cooldown: float = 0.0
+var drift_mode: bool = false
+var drift_right: bool = false
+var drift_particles = []
 
 var is_underwater: bool = false
 const WATER_LEVEL = -10.0
@@ -185,6 +188,10 @@ func _ready():
 		camera.current = false
 		if has_node("Visuals/CameraPivot/Camera3D/AudioListener3D"):
 			get_node("Visuals/CameraPivot/Camera3D/AudioListener3D").current = false
+
+	# Initialize drift/skidmark particles for rear wheels
+	_create_drift_particles("RL")
+	_create_drift_particles("RR")
 
 func _enter_tree():
 	_update_authority()
@@ -420,20 +427,36 @@ func _physics_process(delta):
 			boost_time = 0.0
 			is_boosting = false
 			if sfx_rocket_loop.playing: sfx_rocket_loop.stop()
-			apply_central_force(-linear_velocity * 0.5 * mass)
+			if drift_mode:
+				# Keep forward speed by offsetting friction/drag to preserve momentum
+				apply_central_force(fwd * ACCELERATION * 0.45 * mass)
+			else:
+				apply_central_force(-linear_velocity * 0.5 * mass)
 
 	# Steering (works on ground and slightly airborne)
 	if on_ground or linear_velocity.length() > 0.5:
 		if linear_velocity.length() > 1.0:
+			# Tap-to-drift logic
+			if Input.is_action_just_pressed("brake") and abs(input_dir.x) > 0.2 and current_speed > 5.0:
+				drift_mode = true
+				drift_right = input_dir.x > 0.0
+			
+			# Exit drift mode if:
+			# - heavy accelerating (input_dir.y < -0.6)
+			# - heavy braking (input_dir.y > 0.6)
+			# - car comes to a stop (current_speed < 3.0)
+			if drift_mode:
+				if input_dir.y < -0.6 or input_dir.y > 0.6 or current_speed < 3.0:
+					drift_mode = false
+			
 			var turn_speed = STEER_SPEED
-			if abs(input_dir.x) > 0.1 and input_dir.y > 0.1 and current_speed > 5.0:
-				# Drifting (handbrake)
-				turn_speed *= 1.5
+			is_drifting = drift_mode
+			
+			if is_drifting:
+				turn_speed *= 1.8 # Tighter turn
 				if not sfx_brake_drift.playing: sfx_brake_drift.play()
-				is_drifting = true
 			else:
 				if sfx_brake_drift.playing: sfx_brake_drift.stop()
-				is_drifting = false
 			
 			var steer_amount = -current_steer * turn_speed * (min(linear_velocity.length() / 10.0, 1.0)) * delta
 			visuals.global_rotate(ground_normal, steer_amount)
@@ -441,20 +464,24 @@ func _physics_process(delta):
 			# Kill lateral velocity (adds grip)
 			var lat_vel = linear_velocity.dot(right)
 			var grip_factor = GRIP
-			if is_drifting: grip_factor *= 0.3
+			if is_drifting: grip_factor *= 0.22 # Low grip factor for sliding momentum
 			apply_central_force(-right * lat_vel * mass * grip_factor)
+			
+			# Emit skidmark and smoke particles when drifting or braking (only on ground)
+			var emit_drift = on_ground and (is_drifting or (input_dir.y > 0.2 and current_speed > 5.0))
+			_set_drift_emitting(emit_drift)
 	else:
 		is_boosting = false
 		if sfx_rocket_loop.playing: sfx_rocket_loop.stop()
 		if sfx_brake_drift.playing: sfx_brake_drift.stop()
 		is_drifting = false
+		_set_drift_emitting(false)
 		
 		# Slight air control
 		visuals.global_rotate(Vector3.UP, -current_steer * STEER_SPEED * 0.5 * delta)
 
-	# Wind sound
-	var speed = linear_velocity.length()
-	if speed > 20.0 and on_ground:
+	# Wind sound (only while airborne)
+	if not on_ground and linear_velocity.length() > 5.0:
 		if not sfx_wind_loop.playing:
 			sfx_wind_loop.play()
 		sfx_wind_loop.volume_db = lerp(sfx_wind_loop.volume_db, -10.0, 2.0 * delta)
@@ -484,6 +511,9 @@ func _update_visuals_alignment(delta):
 	var target_forward = target_up.cross(target_right).normalized()
 
 	var target_basis = Basis(target_right, target_up, -target_forward)
+	if is_drifting:
+		var drift_angle = -0.35 if drift_right else 0.35
+		target_basis = target_basis.rotated(target_up, drift_angle)
 	visuals.global_transform.basis = current_basis.slerp(target_basis, 8.0 * delta)
 
 	# Allow the user to place wheels/body themselves in the scene editor
@@ -912,3 +942,85 @@ func _update_antenna(delta):
 	# Apply: X rotation = forward/back bend, Z rotation = side bend
 	antenna.rotation.x = antenna_tilt.x
 	antenna.rotation.z = antenna_tilt.z
+
+func _create_drift_particles(wheel_name: String):
+	var pivot = get_node_or_null("Visuals/WheelPivot" + wheel_name)
+	if not pivot: return
+	
+	# Smoke
+	var smoke = CPUParticles3D.new()
+	smoke.name = wheel_name + "_Smoke"
+	smoke.emitting = false
+	smoke.amount = 30
+	smoke.lifetime = 0.6
+	smoke.mesh = QuadMesh.new()
+	
+	var mat_smoke = StandardMaterial3D.new()
+	mat_smoke.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat_smoke.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat_smoke.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	
+	var grad_tex = GradientTexture2D.new()
+	grad_tex.fill = GradientTexture2D.FILL_RADIAL
+	grad_tex.fill_from = Vector2(0.5, 0.5)
+	grad_tex.fill_to = Vector2(0.5, 0.0)
+	
+	var smoke_grad = Gradient.new()
+	smoke_grad.set_color(0, Color(0.8, 0.8, 0.8, 0.25))
+	smoke_grad.set_color(1, Color(0.8, 0.8, 0.8, 0.0))
+	grad_tex.gradient = smoke_grad
+	
+	mat_smoke.albedo_texture = grad_tex
+	smoke.material_override = mat_smoke
+	
+	smoke.direction = Vector3.UP + Vector3.BACK * 0.5
+	smoke.spread = 30.0
+	smoke.gravity = Vector3(0, 1.0, 0)
+	smoke.initial_velocity_min = 1.0
+	smoke.initial_velocity_max = 3.0
+	smoke.scale_amount_min = 0.2
+	smoke.scale_amount_max = 0.6
+	
+	var scale_curve = Curve.new()
+	scale_curve.add_point(Vector2(0.0, 0.2))
+	scale_curve.add_point(Vector2(1.0, 1.0))
+	smoke.scale_amount_curve = scale_curve
+	
+	var grad = Gradient.new()
+	grad.set_color(0, Color(0.8, 0.8, 0.8, 0.15))
+	grad.set_color(1, Color(0.8, 0.8, 0.8, 0.0))
+	smoke.color_ramp = grad
+	
+	pivot.add_child(smoke)
+	drift_particles.append(smoke)
+	
+	# Skidmarks
+	var skid = CPUParticles3D.new()
+	skid.name = wheel_name + "_Skid"
+	skid.emitting = false
+	skid.amount = 100
+	skid.lifetime = 2.0
+	skid.mesh = QuadMesh.new()
+	
+	skid.mesh.orientation = PlaneMesh.FACE_Y
+	skid.mesh.size = Vector2(0.25, 0.25)
+	
+	var mat_skid = StandardMaterial3D.new()
+	mat_skid.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat_skid.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat_skid.albedo_color = Color(0.1, 0.1, 0.1, 0.4)
+	skid.material_override = mat_skid
+	
+	skid.gravity = Vector3.ZERO
+	skid.direction = Vector3.ZERO
+	skid.spread = 0.0
+	skid.local_coords = false
+	skid.position.y = WHEEL_Y_OFFSET + 0.02
+	
+	pivot.add_child(skid)
+	drift_particles.append(skid)
+
+func _set_drift_emitting(emitting: bool):
+	for p in drift_particles:
+		if is_instance_valid(p) and p is CPUParticles3D:
+			p.emitting = emitting

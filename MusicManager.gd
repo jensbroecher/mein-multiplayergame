@@ -9,7 +9,10 @@ var music_volume: float = 0.8
 var sfx_volume: float = 0.7
 
 var current_track_index = -1
-var audio_player: AudioStreamPlayer
+var player1: AudioStreamPlayer
+var player2: AudioStreamPlayer
+var active_player: AudioStreamPlayer
+var inactive_player: AudioStreamPlayer
 
 func _ensure_audio_buses():
 	# Ensure "Music" bus exists
@@ -30,13 +33,22 @@ func _ready():
 	_ensure_audio_buses()
 	load_settings()
 	
-	# Configure the audio player
-	audio_player = AudioStreamPlayer.new()
-	audio_player.bus = "Music"
-	audio_player.volume_db = -10.0
-	add_child(audio_player)
+	# Configure two audio players for crossfading
+	player1 = AudioStreamPlayer.new()
+	player1.bus = "Music"
+	player1.volume_db = -80.0
+	add_child(player1)
 	
-	audio_player.finished.connect(_on_track_finished)
+	player2 = AudioStreamPlayer.new()
+	player2.bus = "Music"
+	player2.volume_db = -80.0
+	add_child(player2)
+	
+	active_player = player1
+	inactive_player = player2
+	
+	player1.finished.connect(_on_track_finished)
+	player2.finished.connect(_on_track_finished)
 	_load_playlist()
 
 func load_settings():
@@ -78,7 +90,7 @@ func _load_playlist():
 				loaded_playlist.append(stream)
 
 func play_race_music():
-	if not audio_player.playing:
+	if not active_player.playing:
 		play_next()
 
 func play_next():
@@ -93,14 +105,27 @@ func play_next():
 	var stream = loaded_playlist[current_track_index]
 	
 	if stream:
-		audio_player.stream = stream
-		audio_player.play()
+		var prev_active = active_player
+		active_player = inactive_player
+		inactive_player = prev_active
+		
+		active_player.stream = stream
+		active_player.volume_db = -80.0
+		active_player.play()
+		
+		# Crossfade tween
+		var tween = create_tween()
+		tween.tween_property(inactive_player, "volume_db", -80.0, 2.0)
+		tween.parallel().tween_property(active_player, "volume_db", -10.0, 2.0)
+		tween.tween_callback(inactive_player.stop)
 	else:
 		play_next()
 
 func _on_track_finished():
-	await get_tree().create_timer(1.0).timeout
-	play_next()
+	if not active_player.playing:
+		await get_tree().create_timer(1.0).timeout
+		if not active_player.playing:
+			play_next()
 
 # Independent volume controls for the UI
 func set_music_volume(linear_val: float, save: bool = true):
