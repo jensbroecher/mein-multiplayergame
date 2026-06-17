@@ -94,6 +94,7 @@ var race_ui
 @onready var burning_smoke_particles = $Visuals/BurningSmokeParticles
 @onready var splash_particles = $Visuals/SplashParticles
 @onready var sfx_wind_loop = $Visuals/SFX_WindLoop
+@onready var sfx_shield_loop = $Visuals/SFX_ShieldLoop
 @onready var sfx_landing_bonk = $Visuals/SFX_LandingBonk
 @onready var shield_mesh = $Visuals/ShieldMesh
 @onready var shockwave_visual = $Visuals/ShockwaveVisual
@@ -127,6 +128,13 @@ var drift_particles = []
 var is_underwater: bool = false
 const WATER_LEVEL = -10.0
 var water_timer: float = 0.0
+var is_drowned: bool = false
+var original_wheel_transforms: Dictionary = {}
+var original_cart_model_transform: Transform3D
+var part_velocities: Dictionary = {}
+var part_rotations: Dictionary = {}
+var explosion_time: float = 0.0
+var respawn_indicator_time: float = 0.0
 
 # Remote interpolation tuning
 const REMOTE_LERP_SPEED: float = 18.0
@@ -394,14 +402,16 @@ func _physics_process(delta):
 			respawn() # single-player / host fallback
 
 	if is_exploding:
-		if is_local_player:
-			apply_central_force(Vector3.UP * 5.0)
-		
-		if sfx_fire_loop.playing:
-			sfx_fire_loop.volume_db = lerp(sfx_fire_loop.volume_db, -10.0, 2.0 * delta)
+		if not is_drowned:
+			if is_local_player:
+				apply_central_force(Vector3.UP * 5.0)
+			
+			if sfx_fire_loop.playing:
+				sfx_fire_loop.volume_db = lerp(sfx_fire_loop.volume_db, -10.0, 2.0 * delta)
 
-		burning_particles.global_position = global_position + Vector3(0, 0.5, 0)
-		burning_smoke_particles.global_position = global_position + Vector3(0, 0.5, 0)
+			burning_particles.global_position = global_position + Vector3(0, 0.5, 0)
+			burning_smoke_particles.global_position = global_position + Vector3(0, 0.5, 0)
+		
 		if is_local_player:
 			_move_and_sync()
 		else:
@@ -422,7 +432,10 @@ func _physics_process(delta):
 	if is_underwater:
 		water_timer += delta
 		if water_timer > 2.0:
-			explode()
+			if multiplayer.is_server():
+				drown_rpc.rpc()
+			elif not multiplayer.has_multiplayer_peer():
+				drown()
 		apply_central_force(Vector3.UP * 15.0)
 
 	if not is_local_player:
@@ -592,6 +605,10 @@ func _physics_process(delta):
 	_move_and_sync()
 
 func _update_visuals_alignment(delta):
+	if is_exploding:
+		visuals.global_transform = global_transform
+		return
+
 	var on_ground = ground_ray.is_colliding()
 	var target_up = Vector3.UP
 	if on_ground:
@@ -647,6 +664,7 @@ func _fill_audio_buffer():
 		playback.push_frame(Vector2(sample, sample))
 
 func _update_wheel_visuals(delta):
+	if is_exploding: return
 	var speed = linear_velocity.length()
 	var fwd_dot = linear_velocity.dot(-visuals.global_transform.basis.z)
 	var rot_speed = speed * sign(fwd_dot) / 0.4 # approx radius
@@ -681,6 +699,10 @@ func _interpolate_remote_physics(delta: float):
 	linear_velocity = linear_velocity.lerp(sync_velocity, 0.6)
 
 func _interpolate_remote_visual(delta: float):
+	if is_exploding:
+		visuals.global_transform = global_transform
+		return
+
 	var target_quat := sync_rotation_quat
 	if target_quat == Quaternion.IDENTITY:
 		target_quat = Quaternion.from_euler(sync_rotation)
@@ -770,6 +792,15 @@ func _setup_new_car_wheels():
 		# Override the wheel material to remove baked lighting from the rubber texture.
 		_apply_wheel_material(wheel_part)
 
+	original_wheel_transforms.clear()
+	for corner in ["FL", "FR", "RL", "RR"]:
+		var pivot = get_node_or_null("Visuals/WheelPivot" + corner)
+		if pivot:
+			original_wheel_transforms[corner] = pivot.transform
+
+	if cart_model:
+		original_cart_model_transform = cart_model.transform
+
 func _apply_wheel_material(node: Node):
 	if node is MeshInstance3D:
 		var mat = StandardMaterial3D.new()
@@ -855,11 +886,15 @@ func client_break_shield():
 	shield_mesh.scale = Vector3.ONE
 
 func _update_visual_states(delta):
-	# Sync shield visual
+	# Sync shield visual and audio
 	if shield_mesh.visible != is_shielded:
 		shield_mesh.visible = is_shielded
 		if not is_shielded:
 			shield_mesh.scale = Vector3.ONE
+	
+	if not is_shielded:
+		if sfx_shield_loop.playing:
+			sfx_shield_loop.stop()
 	
 	if is_shielded:
 		var time = Time.get_ticks_msec() * 0.001
@@ -875,7 +910,43 @@ func _update_visual_states(delta):
 			
 			var energy_osc = 2.5 + 1.5 * sin(time * 30.0) + 0.8 * cos(time * 60.0)
 			mat.emission_energy_multiplier = energy_osc
+
+		# Play and modulate shield buzzing sound
+		if not sfx_shield_loop.playing:
+			sfx_shield_loop.play()
+		sfx_shield_loop.pitch_scale = 1.9 + 0.15 * sin(time * 30.0)
+		sfx_shield_loop.volume_db = -10.0 + 2.0 * cos(time * 40.0)
 	
+	# Explosion visual details (parts physics and fade out)
+	if is_exploding:
+		explosion_time += delta
+		if not is_drowned:
+			# Simulate parts physics locally
+			for part in part_velocities.keys():
+				if is_instance_valid(part):
+					part_velocities[part].y -= 9.8 * delta # gravity
+					part.position += part_velocities[part] * delta
+					part.rotate_x(part_rotations[part].x * delta)
+					part.rotate_y(part_rotations[part].y * delta)
+					part.rotate_z(part_rotations[part].z * delta)
+			
+			# Fade out in the last second
+			if explosion_time > 2.0:
+				var alpha = clamp(1.0 - (explosion_time - 2.0), 0.0, 1.0)
+				_set_visuals_alpha(alpha)
+				if name_tag:
+					name_tag.modulate.a = alpha
+
+	# Respawn blinking indicator
+	if respawn_indicator_time > 0.0:
+		respawn_indicator_time -= delta
+		if respawn_indicator_time <= 0.0:
+			respawn_indicator_time = 0.0
+			_set_visuals_respawn_effect(false, false)
+		else:
+			var blink_on = int(respawn_indicator_time / 0.06) % 2 == 0
+			_set_visuals_respawn_effect(true, blink_on)
+
 	# Sync boost particles
 	if boost_particles.emitting != is_boosting:
 		boost_particles.emitting = is_boosting
@@ -911,17 +982,75 @@ func explode():
 	if is_exploding: return
 	is_exploding = true
 	can_move = false
+	is_drowned = false
+	explosion_time = 0.0
+	
 	sfx_explosion.play()
 	sfx_fire_loop.play()
 	explosion_particles.emitting = true
 	burning_particles.emitting = true
 	burning_smoke_particles.emitting = true
 	if engine_sound.playing: engine_sound.stop()
+	
+	visuals.visible = true
+	_set_visuals_alpha(1.0)
+	if name_tag:
+		name_tag.modulate.a = 1.0
+		
 	if is_local_player:
 		linear_velocity += Vector3(randf()-0.5, 10.0, randf()-0.5).normalized() * 15.0
-	# Server schedules the respawn for everyone after 3 seconds
+		angular_velocity = Vector3(
+			randf_range(-10.0, 10.0),
+			randf_range(-5.0, 5.0),
+			randf_range(-10.0, 10.0)
+		)
+		
+	# Setup disintegrating parts
+	part_velocities.clear()
+	part_rotations.clear()
+	
+	for corner in ["FL", "FR", "RL", "RR"]:
+		var pivot = get_node_or_null("Visuals/WheelPivot" + corner)
+		if pivot:
+			var dir = Vector3.ZERO
+			match corner:
+				"FL": dir = Vector3(1.0, 1.2, 1.0)
+				"FR": dir = Vector3(-1.0, 1.2, 1.0)
+				"RL": dir = Vector3(1.0, 1.2, -1.0)
+				"RR": dir = Vector3(-1.0, 1.2, -1.0)
+			dir = (dir + Vector3(randf_range(-0.5, 0.5), randf_range(-0.2, 0.4), randf_range(-0.5, 0.5))).normalized()
+			part_velocities[pivot] = dir * randf_range(4.0, 8.0)
+			part_rotations[pivot] = Vector3(randf_range(-10.0, 10.0), randf_range(-10.0, 10.0), randf_range(-10.0, 10.0))
+			
+	var cart_model = get_node_or_null("Visuals/CartModel")
+	if cart_model:
+		var dir = Vector3(randf_range(-0.2, 0.2), 1.0, randf_range(-0.4, 0.4)).normalized()
+		part_velocities[cart_model] = dir * randf_range(2.0, 4.0)
+		part_rotations[cart_model] = Vector3(randf_range(-4.0, 4.0), randf_range(-4.0, 4.0), randf_range(-4.0, 4.0))
+
 	if multiplayer.is_server():
 		get_tree().create_timer(3.0).timeout.connect(
+			func(): if is_instance_valid(self): respawn_rpc.rpc()
+		)
+
+@rpc("any_peer", "call_local", "reliable")
+func drown_rpc():
+	drown()
+
+func drown():
+	if is_exploding: return
+	is_exploding = true
+	is_drowned = true
+	can_move = false
+	visuals.visible = false
+	if engine_sound.playing: engine_sound.stop()
+	
+	if is_local_player:
+		linear_velocity = Vector3.ZERO
+		angular_velocity = Vector3.ZERO
+		
+	if multiplayer.is_server():
+		get_tree().create_timer(1.5).timeout.connect(
 			func(): if is_instance_valid(self): respawn_rpc.rpc()
 		)
 
@@ -931,6 +1060,29 @@ func respawn_rpc():
 
 func respawn():
 	is_exploding = false
+	is_drowned = false
+	visuals.visible = true
+	
+	# Reset parts positions/rotations
+	for corner in original_wheel_transforms.keys():
+		var pivot = get_node_or_null("Visuals/WheelPivot" + corner)
+		if pivot:
+			pivot.transform = original_wheel_transforms[corner]
+			
+	var cart_model = get_node_or_null("Visuals/CartModel")
+	if cart_model and original_cart_model_transform:
+		cart_model.transform = original_cart_model_transform
+		
+	part_velocities.clear()
+	part_rotations.clear()
+	
+	_set_visuals_alpha(1.0)
+	if name_tag:
+		name_tag.modulate.a = 1.0
+		
+	# Start blinking respawn indicator
+	respawn_indicator_time = 1.5
+	
 	var level = get_tree().get_first_node_in_group("level")
 	var id = name.to_int()
 	var finished = false
@@ -953,14 +1105,59 @@ func respawn():
 		var spawn_pos = last_checkpoint_transform.origin + (last_checkpoint_transform.basis.z * 5.0) + Vector3(0, 2.0, 0)
 		global_position = spawn_pos
 
-		# Reset visuals position
 		visuals.global_position = global_position
 
 		var look_target = last_checkpoint_transform.origin
 		look_target.y = spawn_pos.y
-		# Guard against degenerate look_at (target == position)
 		if look_target.distance_to(spawn_pos) > 0.01:
 			visuals.look_at(look_target, Vector3.UP)
+
+func _set_visuals_alpha(alpha: float):
+	_set_alpha_recursive(visuals, alpha)
+
+func _set_alpha_recursive(node: Node, alpha: float):
+	if node is MeshInstance3D:
+		if node == shield_mesh or node == shockwave_visual:
+			return
+		var mat = node.material_override as StandardMaterial3D
+		if not mat:
+			var base_mat = node.get_active_material(0)
+			if base_mat:
+				mat = base_mat.duplicate()
+				node.material_override = mat
+		if mat:
+			if alpha >= 0.99:
+				mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+			else:
+				mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			mat.albedo_color.a = alpha
+	
+	for child in node.get_children():
+		_set_alpha_recursive(child, alpha)
+
+func _set_visuals_respawn_effect(enabled: bool, blink_on: bool):
+	_set_respawn_effect_recursive(visuals, enabled, blink_on)
+
+func _set_respawn_effect_recursive(node: Node, enabled: bool, blink_on: bool):
+	if node is MeshInstance3D:
+		if node == shield_mesh or node == shockwave_visual:
+			return
+		var mat = node.material_override as StandardMaterial3D
+		if not mat:
+			var base_mat = node.get_active_material(0)
+			if base_mat:
+				mat = base_mat.duplicate()
+				node.material_override = mat
+		if mat:
+			if enabled and blink_on:
+				mat.emission_enabled = true
+				mat.emission = Color(1.0, 1.0, 1.0, 1.0)
+				mat.emission_energy_multiplier = 6.0
+			else:
+				mat.emission_enabled = false
+	
+	for child in node.get_children():
+		_set_respawn_effect_recursive(child, enabled, blink_on)
 
 
 func give_item(type: int):
