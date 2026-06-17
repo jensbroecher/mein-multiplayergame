@@ -9,10 +9,14 @@ void fragment() {
 	// UV.y is the distance along the track in meters
 	float dist = UV.y;
 	
-	// Anti-aliased stripes using fwidth to calculate blur based on distance
-	float v = fract(dist / stripe_length);
-	float delta = fwidth(v);
-	float stripe = smoothstep(0.5 - delta, 0.5 + delta, v);
+	float continuous_coord = dist / stripe_length;
+	float v = fract(continuous_coord);
+	float delta = fwidth(continuous_coord);
+	
+	// Anti-alias both the transition in the middle (0.5) and the cell wrap boundaries (0.0 / 1.0)
+	float edge1 = smoothstep(0.5 - delta, 0.5 + delta, v);
+	float edge2 = smoothstep(1.0 - delta, 1.0, v) + (1.0 - smoothstep(0.0, delta, v));
+	float stripe = clamp(edge1 - edge2, 0.0, 1.0);
 	
 	ALBEDO = mix(color_a, color_b, stripe);
 	ROUGHNESS = roughness;

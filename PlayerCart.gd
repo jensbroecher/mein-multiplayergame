@@ -70,6 +70,28 @@ const COLLISION_RADIUS = WHEEL_RADIUS + 0.2  # Slightly larger to prevent tunnel
 # Preload item scenes
 const MISSILE_SCENE = preload("res://Missile.tscn")
 const BOMB_SCENE = preload("res://Bomb.tscn")
+const WATER_SPLASH_SCENE = preload("res://WaterSplash.tscn")
+
+const DEEP_SPLASH_SOUNDS = [
+	preload("res://sounds/deep_water_splash_#1-1781728153794.wav"),
+	preload("res://sounds/deep_water_splash_#2-1781728156705.wav"),
+	preload("res://sounds/deep_water_splash_#3-1781728161657.wav"),
+	preload("res://sounds/deep_water_splash_#4-1781728165962.wav")
+]
+
+const REGULAR_SPLASH_SOUNDS = [
+	preload("res://sounds/water_splash_#2-1781728133304.wav"),
+	preload("res://sounds/water_splash_#3-1781728129266.wav"),
+	preload("res://sounds/water_splash_#4-1781728106730.wav")
+]
+
+const BOMB_EXPLOSION_SOUNDS = [
+	preload("res://sounds/bomb_explosion_#2-1781728320398.wav"),
+	preload("res://sounds/bomb_explosion_#4-1781728322907.wav"),
+	preload("res://sounds/bomb_explosion_with__#1-1781728361227.wav"),
+	preload("res://sounds/bomb_explosion_with__#3-1781728366899.wav"),
+	preload("res://sounds/bomb_explosion_with__#4-1781728370769.wav")
+]
 
 @onready var visuals = $Visuals
 @onready var camera_pivot = $Visuals/CameraPivot
@@ -454,23 +476,12 @@ func _physics_process(delta):
 				last_splash_time = current_time
 				
 				var impact_speed = linear_velocity.length()
-				var splash_sounds = []
+				var splash_stream: AudioStream = null
 				if impact_speed > 15.0:
-					splash_sounds = [
-						"res://sounds/deep_water_splash_#1-1781728153794.wav",
-						"res://sounds/deep_water_splash_#2-1781728156705.wav",
-						"res://sounds/deep_water_splash_#3-1781728161657.wav",
-						"res://sounds/deep_water_splash_#4-1781728165962.wav"
-					]
+					splash_stream = DEEP_SPLASH_SOUNDS[randi() % DEEP_SPLASH_SOUNDS.size()]
 				else:
-					splash_sounds = [
-						"res://sounds/water_splash_#2-1781728133304.wav",
-						"res://sounds/water_splash_#3-1781728129266.wav",
-						"res://sounds/water_splash_#4-1781728106730.wav"
-					]
+					splash_stream = REGULAR_SPLASH_SOUNDS[randi() % REGULAR_SPLASH_SOUNDS.size()]
 				
-				var selected_sound = splash_sounds[randi() % splash_sounds.size()]
-				var splash_stream = load(selected_sound)
 				if splash_stream:
 					var ap = AudioStreamPlayer3D.new()
 					ap.stream = splash_stream
@@ -490,9 +501,8 @@ func _physics_process(delta):
 				
 				# Trigger the new standalone, multi-instanced WaterSplash
 				var splash_pos = Vector3(global_position.x, WATER_LEVEL, global_position.z)
-				var splash_scene = load("res://WaterSplash.tscn")
-				if splash_scene:
-					var splash_instance = splash_scene.instantiate()
+				if WATER_SPLASH_SCENE:
+					var splash_instance = WATER_SPLASH_SCENE.instantiate()
 					get_tree().current_scene.add_child(splash_instance)
 					splash_instance.global_position = splash_pos
 		is_underwater = currently_underwater
@@ -1110,15 +1120,8 @@ func explode():
 	explosion_time = 0.0
 	
 	# Play a random bomb explosion sound
-	var bomb_sounds = [
-		"res://sounds/bomb_explosion_#2-1781728320398.wav",
-		"res://sounds/bomb_explosion_#4-1781728322907.wav",
-		"res://sounds/bomb_explosion_with__#1-1781728361227.wav",
-		"res://sounds/bomb_explosion_with__#3-1781728366899.wav",
-		"res://sounds/bomb_explosion_with__#4-1781728370769.wav"
-	]
-	var selected_bomb_sound = bomb_sounds[randi() % bomb_sounds.size()]
-	sfx_explosion.stream = load(selected_bomb_sound)
+	var selected_bomb_sound = BOMB_EXPLOSION_SOUNDS[randi() % BOMB_EXPLOSION_SOUNDS.size()]
+	sfx_explosion.stream = selected_bomb_sound
 	sfx_explosion.play()
 	sfx_fire_loop.play()
 	explosion_particles.emitting = true

@@ -1,5 +1,18 @@
 extends RigidBody3D
 
+const BOMB_EXPLOSION_SOUNDS = [
+	preload("res://sounds/bomb_explosion_#2-1781728320398.wav"),
+	preload("res://sounds/bomb_explosion_#4-1781728322907.wav"),
+	preload("res://sounds/bomb_explosion_with__#1-1781728361227.wav"),
+	preload("res://sounds/bomb_explosion_with__#3-1781728366899.wav"),
+	preload("res://sounds/bomb_explosion_with__#4-1781728370769.wav")
+]
+
+const BOMB_FIZZLE_SOUNDS = [
+	preload("res://sounds/tnt_fizzle_#3-1781732688592.wav"),
+	preload("res://sounds/tnt_fizzle_#4-1781732701868.wav")
+]
+
 @onready var area = $Area3D
 @onready var visuals = $Visuals
 @onready var explosion_particles = $ExplosionParticles
@@ -13,6 +26,9 @@ var lifetime = 5.0           # Explodes after 5 seconds
 var owner_safety_timer = 1.0 # Owner immune for the first second
 var is_exploding = false
 
+var fizzle_player: AudioStreamPlayer3D = null
+var spark_particles: GPUParticles3D = null
+
 func _ready():
 	add_to_group("bombs")
 	area.body_entered.connect(_on_body_entered)
@@ -23,6 +39,81 @@ func _ready():
 	else:
 		# Freeze after 2 seconds so it settles on the road
 		get_tree().create_timer(2.0).timeout.connect(func(): if is_instance_valid(self): freeze = true)
+
+	_setup_sparks()
+	_play_fizzle_sound()
+
+func _play_fizzle_sound():
+	fizzle_player = AudioStreamPlayer3D.new()
+	var sound_stream = BOMB_FIZZLE_SOUNDS[randi() % BOMB_FIZZLE_SOUNDS.size()]
+	fizzle_player.stream = sound_stream
+	fizzle_player.max_distance = 60.0
+	fizzle_player.unit_size = 5.0
+	add_child(fizzle_player)
+	fizzle_player.play()
+	fizzle_player.finished.connect(_on_fizzle_finished)
+
+func _on_fizzle_finished():
+	if not is_exploding and is_instance_valid(fizzle_player):
+		var current_stream = fizzle_player.stream
+		var next_stream = BOMB_FIZZLE_SOUNDS[0] if current_stream == BOMB_FIZZLE_SOUNDS[1] else BOMB_FIZZLE_SOUNDS[1]
+		fizzle_player.stream = next_stream
+		fizzle_player.play()
+
+func _setup_sparks():
+	spark_particles = GPUParticles3D.new()
+	spark_particles.name = "FuseSparks"
+	spark_particles.position = Vector3(0.0, 0.47, 0.0) # Aligns with the yellow fuse mesh
+	
+	spark_particles.amount = 25
+	spark_particles.lifetime = 0.4
+	spark_particles.explosiveness = 0.0
+	spark_particles.randomness = 1.0
+	
+	var mat = ParticleProcessMaterial.new()
+	mat.direction = Vector3(0, 1, 0)
+	mat.spread = 75.0
+	mat.initial_velocity_min = 2.0
+	mat.initial_velocity_max = 5.0
+	mat.gravity = Vector3(0, -9.8, 0)
+	mat.scale_min = 0.05
+	mat.scale_max = 0.15
+	
+	var gradient = Gradient.new()
+	gradient.offsets = PackedFloat32Array([0.0, 0.2, 0.8, 1.0])
+	gradient.colors = PackedColorArray([
+		Color(1.0, 1.0, 0.5, 1.0),
+		Color(1.0, 0.6, 0.0, 0.9),
+		Color(0.8, 0.1, 0.0, 0.6),
+		Color(0.2, 0.0, 0.0, 0.0)
+	])
+	
+	var gradient_tex = GradientTexture1D.new()
+	gradient_tex.gradient = gradient
+	mat.color_ramp = gradient_tex
+	
+	var curve = Curve.new()
+	curve.add_point(Vector2(0, 1))
+	curve.add_point(Vector2(1, 0))
+	var curve_tex = CurveTexture.new()
+	curve_tex.curve = curve
+	mat.scale_curve = curve_tex
+	
+	spark_particles.process_material = mat
+	
+	var draw_mat = StandardMaterial3D.new()
+	draw_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	draw_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	draw_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	draw_mat.vertex_color_use_as_albedo = true
+	
+	var quad_mesh = QuadMesh.new()
+	quad_mesh.material = draw_mat
+	quad_mesh.size = Vector2(0.12, 0.12)
+	spark_particles.draw_pass_1 = quad_mesh
+	
+	visuals.add_child(spark_particles)
+	spark_particles.emitting = true
 
 func _process(delta):
 	if is_exploding: return
@@ -38,6 +129,14 @@ func _process(delta):
 		var mat = fuse.mesh.material as StandardMaterial3D
 		if mat:
 			mat.emission_energy_multiplier = 2.0 + urgency * 8.0
+			
+	# Update sparks speed and velocity scale based on urgency
+	if is_instance_valid(spark_particles):
+		spark_particles.speed_scale = 1.0 + urgency * 1.5
+		var mat = spark_particles.process_material as ParticleProcessMaterial
+		if mat:
+			mat.initial_velocity_min = 2.0 + urgency * 3.0
+			mat.initial_velocity_max = 5.0 + urgency * 5.0
 
 func _physics_process(delta):
 	if not multiplayer.is_server(): return
@@ -90,6 +189,14 @@ func _explode():
 @rpc("authority", "call_local", "reliable")
 func _explode_rpc():
 	is_exploding = true
+	
+	if is_instance_valid(fizzle_player):
+		fizzle_player.stop()
+		fizzle_player.queue_free()
+	if is_instance_valid(spark_particles):
+		spark_particles.emitting = false
+		spark_particles.queue_free()
+		
 	# Disable collisions immediately
 	var col = get_node_or_null("CollisionShape3D")
 	if col: col.disabled = true
@@ -102,15 +209,7 @@ func _explode_rpc():
 	var expl_pos = global_position
 	
 	# Play a random bomb explosion sound
-	var bomb_sounds = [
-		"res://sounds/bomb_explosion_#2-1781728320398.wav",
-		"res://sounds/bomb_explosion_#4-1781728322907.wav",
-		"res://sounds/bomb_explosion_with__#1-1781728361227.wav",
-		"res://sounds/bomb_explosion_with__#3-1781728366899.wav",
-		"res://sounds/bomb_explosion_with__#4-1781728370769.wav"
-	]
-	var selected_sound = bomb_sounds[randi() % bomb_sounds.size()]
-	var sound_stream = load(selected_sound)
+	var sound_stream = BOMB_EXPLOSION_SOUNDS[randi() % BOMB_EXPLOSION_SOUNDS.size()]
 	if sound_stream:
 		var ap = AudioStreamPlayer3D.new()
 		ap.stream = sound_stream

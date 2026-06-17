@@ -11,7 +11,7 @@ uniform sampler2D noise_tex;
 uniform sampler2D normal_tex; 
 uniform float wave_speed = 0.028;
 uniform float wave_strength = 0.55;
-uniform float wave_height = 0.55;
+uniform float wave_height = 0.0;
 
 varying float height_val;
 varying float world_y;

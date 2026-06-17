@@ -2,7 +2,15 @@ shader_type spatial;
 
 uniform sampler2D albedo_texture : source_color;
 uniform float uv_scale = 40.0;
+uniform vec2 uv_scale_v2 = vec2(1.0, 1.0);
 uniform float smoothness : hint_range(0.0, 1.0) = 1.0;
+uniform bool use_world_uv = false;
+
+varying vec3 world_pos;
+
+void vertex() {
+    world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+}
 
 // Hash function for random offsets/rotations
 vec2 hash(vec2 p) {
@@ -11,7 +19,7 @@ vec2 hash(vec2 p) {
 }
 
 // Samples a texture stochastically to break tiling
-vec3 stochastic_sample(sampler2D tex, vec2 uv) {
+vec3 stochastic_sample(sampler2D tex, vec2 uv, vec2 dx, vec2 dy) {
     // Grid cell coordinates
     vec2 p = floor(uv);
     vec2 f = fract(uv);
@@ -34,7 +42,11 @@ vec3 stochastic_sample(sampler2D tex, vec2 uv) {
             // Weight based on distance to grid center
             float w = pow(1.0 - smoothstep(0.0, 1.414, length(f - offset)), 4.0);
             
-            res += texture(tex, sampled_uv).rgb * w;
+            // Rotate derivatives to match cell rotation
+            vec2 sampled_dx = rot * dx;
+            vec2 sampled_dy = rot * dy;
+            
+            res += textureGrad(tex, sampled_uv, sampled_dx, sampled_dy).rgb * w;
             weight_sum += w;
         }
     }
@@ -43,7 +55,11 @@ vec3 stochastic_sample(sampler2D tex, vec2 uv) {
 }
 
 void fragment() {
-    vec3 color = stochastic_sample(albedo_texture, UV);
+    vec2 base_uv = use_world_uv ? world_pos.xz : UV;
+    vec2 uv = base_uv * (uv_scale * 0.1) * uv_scale_v2;
+    vec2 dx = dFdx(uv);
+    vec2 dy = dFdy(uv);
+    vec3 color = stochastic_sample(albedo_texture, uv, dx, dy);
     ALBEDO = color;
     ROUGHNESS = smoothness;
     SPECULAR = 0.0;

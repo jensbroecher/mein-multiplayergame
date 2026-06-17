@@ -1,5 +1,12 @@
 extends CharacterBody3D
 
+const MISSILE_EXPLOSION_SOUNDS = [
+	preload("res://sounds/missile_explosion_wi_#1-1781728385875.wav"),
+	preload("res://sounds/missile_explosion_wi_#2-1781728388962.wav"),
+	preload("res://sounds/missile_explosion_wi_#3-1781728394157.wav"),
+	preload("res://sounds/missile_explosion_wi_#4-1781728398285.wav")
+]
+
 @export var speed: float = 33.0   # Starts slightly above car top speed
 const SPEED_MAX: float = 50.0     # Gradually accelerates to this
 const SPEED_ACCEL: float = 8.0    # m/s² acceleration
@@ -141,14 +148,7 @@ func _explode_rpc():
 	var expl_pos = global_position
 	
 	# Play a random missile explosion sound
-	var missile_sounds = [
-		"res://sounds/missile_explosion_wi_#1-1781728385875.wav",
-		"res://sounds/missile_explosion_wi_#2-1781728388962.wav",
-		"res://sounds/missile_explosion_wi_#3-1781728394157.wav",
-		"res://sounds/missile_explosion_wi_#4-1781728398285.wav"
-	]
-	var selected_sound = missile_sounds[randi() % missile_sounds.size()]
-	var sound_stream = load(selected_sound)
+	var sound_stream = MISSILE_EXPLOSION_SOUNDS[randi() % MISSILE_EXPLOSION_SOUNDS.size()]
 	if sound_stream:
 		var ap = AudioStreamPlayer3D.new()
 		ap.stream = sound_stream
