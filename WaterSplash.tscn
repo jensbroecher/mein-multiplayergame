@@ -225,7 +225,7 @@ script = ExtResource("1_script")
 
 [node name="SplashParticles1" type="GPUParticles3D" parent="."]
 emitting = false
-amount = 200
+amount = 100
 lifetime = 1.4
 one_shot = true
 explosiveness = 0.85
@@ -234,7 +234,7 @@ draw_pass_1 = SubResource("QuadMesh_splash_1")
 
 [node name="SplashParticles2" type="GPUParticles3D" parent="."]
 emitting = false
-amount = 200
+amount = 100
 lifetime = 1.4
 one_shot = true
 explosiveness = 0.85
@@ -243,7 +243,7 @@ draw_pass_1 = SubResource("QuadMesh_splash_2")
 
 [node name="SplashParticles3" type="GPUParticles3D" parent="."]
 emitting = false
-amount = 200
+amount = 100
 lifetime = 1.4
 one_shot = true
 explosiveness = 0.85
@@ -252,7 +252,7 @@ draw_pass_1 = SubResource("QuadMesh_splash_3")
 
 [node name="SplashSprayParticles1" type="GPUParticles3D" parent="."]
 emitting = false
-amount = 150
+amount = 80
 lifetime = 0.9
 one_shot = true
 explosiveness = 0.7
@@ -261,7 +261,7 @@ draw_pass_1 = SubResource("QuadMesh_spray_1")
 
 [node name="SplashSprayParticles2" type="GPUParticles3D" parent="."]
 emitting = false
-amount = 150
+amount = 80
 lifetime = 0.9
 one_shot = true
 explosiveness = 0.7
@@ -270,7 +270,7 @@ draw_pass_1 = SubResource("QuadMesh_spray_2")
 
 [node name="SplashSprayParticles3" type="GPUParticles3D" parent="."]
 emitting = false
-amount = 150
+amount = 80
 lifetime = 0.9
 one_shot = true
 explosiveness = 0.7
@@ -279,7 +279,7 @@ draw_pass_1 = SubResource("QuadMesh_spray_3")
 
 [node name="SplashRippleParticles1" type="GPUParticles3D" parent="."]
 emitting = false
-amount = 20
+amount = 10
 lifetime = 2.0
 one_shot = true
 explosiveness = 0.6
@@ -288,7 +288,7 @@ draw_pass_1 = SubResource("QuadMesh_ripple_3")
 
 [node name="SplashRippleParticles2" type="GPUParticles3D" parent="."]
 emitting = false
-amount = 20
+amount = 10
 lifetime = 2.0
 one_shot = true
 explosiveness = 0.6

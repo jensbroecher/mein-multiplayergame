@@ -589,7 +589,10 @@ func _physics_process(delta):
 			boost_time += delta
 	elif input_dir.y > 0.1: # Brake / Reverse input
 		boost_time = 0.0
-		if is_boosting:
+		if not on_ground:
+			# Ignore braking and reversing while airborne
+			pass
+		elif is_boosting:
 			# If boosting, braking just reduces the boost effectiveness a bit
 			apply_central_force(-fwd * braking * 0.5 * mass)
 		elif drift_mode:
