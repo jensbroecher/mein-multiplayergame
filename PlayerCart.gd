@@ -149,6 +149,7 @@ var current_steer: float = 0.0
 @onready var antenna = $Visuals/Antenna
 var antenna_tilt: Vector3 = Vector3.ZERO
 var antenna_velocity: Vector3 = Vector3.ZERO
+var antenna_accel_smooth: Vector3 = Vector3.ZERO
 var last_velocity_local: Vector3 = Vector3.ZERO
 
 func on_race_started():
@@ -1020,44 +1021,53 @@ func _enable_shadows_recursive(node: Node):
 func _update_antenna(delta):
 	if not antenna or not visuals or not visuals.is_inside_tree(): return
 	
-	# Get current local-space velocity
-	var current_velocity_local = visuals.global_transform.basis.inverse() * linear_velocity
+	# Velocity in the car's own local space
+	var vel_local = visuals.global_transform.basis.inverse() * linear_velocity
 	
-	# Calculate local-space acceleration
-	var acceleration_local = Vector3.ZERO
+	# Raw per-frame acceleration (noisy — will be smoothed below)
+	var raw_accel = Vector3.ZERO
 	if delta > 0.0001:
-		acceleration_local = (current_velocity_local - last_velocity_local) / delta
-	last_velocity_local = current_velocity_local
+		raw_accel = (vel_local - last_velocity_local) / delta
+	last_velocity_local = vel_local
+	raw_accel = raw_accel.clamp(Vector3(-120.0, -120.0, -120.0), Vector3(120.0, 120.0, 120.0))
 	
-	# Cap to avoid instability
-	acceleration_local = acceleration_local.clamp(Vector3(-80.0, -80.0, -80.0), Vector3(80.0, 80.0, 80.0))
+	# Smooth the signal to reduce per-frame noise while staying responsive
+	antenna_accel_smooth = antenna_accel_smooth.lerp(raw_accel, clamp(delta * 12.0, 0.0, 1.0))
 	
-	# --- Target tilt based on inertia ---
-	# Local Z = forward, so braking (positive accel.z) bends tip forward (negative rotation.x)
-	# Accelerating (negative accel.z) bends tip backward (positive rotation.x)
-	# Local X = right, so left turn (negative accel.x) bends tip left (positive rotation.z)
+	# --- Inertia targets ---
+	# The antenna TIP lags behind the car body:
+	#   Accelerating forward (accel.z < 0 in local -Z forward space)
+	#   → tip hangs back → rotation.x positive (tip toward +Z = backward)
+	#   → target_x = -accel.z * factor  (positive when accelerating forward)
+	var target_x = clamp(-antenna_accel_smooth.z * 0.014, -0.65, 0.65)
+	
+	#   Turning right (centripetal accel.x > 0)
+	#   → tip hangs to outside (left) → rotation.z positive (rod tilts toward -X)
+	#   → target_z = +accel.x * factor
+	var target_z = clamp(antenna_accel_smooth.x * 0.011, -0.55, 0.55)
+	
+	# --- Speed-based micro-vibration (two offset sine waves = more organic feel) ---
 	var speed = linear_velocity.length()
-	var rumble_strength = clamp(speed * 0.0003, 0.0, 0.008)
-	var rumble_x = randf_range(-1.0, 1.0) * rumble_strength
-	var rumble_z = randf_range(-1.0, 1.0) * rumble_strength
+	var t = Time.get_ticks_msec() * 0.001
+	var vib_scale = clamp(speed * 0.0009, 0.0, 0.013)
+	target_x += sin(t * 13.7) * vib_scale
+	target_z += sin(t * 11.3 + 1.4) * vib_scale * 0.7
 	
-	# Target angle driven directly by acceleration (inertia: tip lags behind base)
-	var target_tilt_x = clamp(acceleration_local.z * 0.004, -0.55, 0.55) + rumble_x
-	var target_tilt_z = clamp(-acceleration_local.x * 0.003, -0.45, 0.45) + rumble_z
+	# --- Underdamped spring: stiff but lightly damped → oscillates like flexible wire ---
+	# Damping ratio ζ = DAMPING / (2*sqrt(STIFFNESS)) ≈ 2.5/(2*√40) ≈ 0.20
+	# The antenna rings ~3-4 times before settling, just like a steel RC antenna
+	const STIFFNESS = 40.0
+	const DAMPING = 2.5
 	
-	# Soft spring towards target — stiffness 12, damping 6 feels like flexible metal
-	const STIFFNESS = 12.0
-	const DAMPING = 6.0
+	var err_x = target_x - antenna_tilt.x
+	var err_z = target_z - antenna_tilt.z
 	
-	var error_x = target_tilt_x - antenna_tilt.x
-	var error_z = target_tilt_z - antenna_tilt.z
-	
-	antenna_velocity.x += (error_x * STIFFNESS - antenna_velocity.x * DAMPING) * delta
-	antenna_velocity.z += (error_z * STIFFNESS - antenna_velocity.z * DAMPING) * delta
+	antenna_velocity.x += (err_x * STIFFNESS - antenna_velocity.x * DAMPING) * delta
+	antenna_velocity.z += (err_z * STIFFNESS - antenna_velocity.z * DAMPING) * delta
 	
 	antenna_tilt.x += antenna_velocity.x * delta
 	antenna_tilt.z += antenna_velocity.z * delta
-	antenna_tilt = antenna_tilt.clamp(Vector3(-0.55, -0.55, -0.55), Vector3(0.55, 0.55, 0.55))
+	antenna_tilt = antenna_tilt.clamp(Vector3(-0.70, -0.70, -0.70), Vector3(0.70, 0.70, 0.70))
 	
 	# Apply: X rotation = forward/back bend, Z rotation = side bend
 	antenna.rotation.x = antenna_tilt.x
