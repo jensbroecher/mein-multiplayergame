@@ -998,7 +998,7 @@ func _activate_shockwave():
 			var dist = global_position.distance_to(p.global_position)
 			if dist < 15.0:
 				var dir = (p.global_position - global_position).normalized()
-				var impulse = dir * 5000.0 * p.mass + Vector3.UP * 1500.0 * p.mass
+				var impulse = dir * 18.0 * p.mass + Vector3.UP * 9.0 * p.mass
 				if p.has_method("apply_blast_impulse"):
 					p.apply_blast_impulse.rpc_id(p.name.to_int(), impulse)
 				else:
