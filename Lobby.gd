@@ -14,11 +14,26 @@ func _ready():
 	LANDiscovery.server_lost.connect(_on_server_lost)
 	
 	LANDiscovery.start_listening()
+	
+	# Load saved player name
+	var config = ConfigFile.new()
+	if config.load("user://settings.cfg") == OK:
+		var saved_name = config.get_value("player", "name", "")
+		if not saved_name.is_empty():
+			line_edit_name.text = saved_name
+
+func _save_player_name(p_name: String):
+	var config = ConfigFile.new()
+	config.load("user://settings.cfg") # Load existing if it exists
+	config.set_value("player", "name", p_name)
+	config.save("user://settings.cfg")
 
 func _on_single_pressed():
 	var p_name = line_edit_name.text
 	if p_name.is_empty():
 		p_name = "SoloRacer"
+	else:
+		_save_player_name(p_name)
 	
 	var err = NetworkManager.start_single_player(p_name)
 	if err == OK:
@@ -28,6 +43,8 @@ func _on_host_pressed():
 	var p_name = line_edit_name.text
 	if p_name.is_empty():
 		p_name = "HostRacer"
+	else:
+		_save_player_name(p_name)
 	
 	var err = NetworkManager.create_server(p_name)
 	if err == OK:
@@ -57,6 +74,8 @@ func _on_join_pressed(ip: String, port: int):
 	var p_name = line_edit_name.text
 	if p_name.is_empty():
 		p_name = "GuestRacer"
+	else:
+		_save_player_name(p_name)
 		
 	var err = NetworkManager.join_server(ip, port, p_name)
 	if err == OK:

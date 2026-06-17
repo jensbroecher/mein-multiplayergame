@@ -335,7 +335,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
 mesh = SubResource("SphereMesh_tip")
 
 [node name="NameTag" type="Label3D" parent="Visuals" unique_id=1335975530]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.0, 0)
 pixel_size = 0.0003
 billboard = 1
 fixed_size = true

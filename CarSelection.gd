@@ -55,6 +55,14 @@ func _ready():
 	$CenterContainer/VBoxContainer/NavButtons/ButtonPrev.pressed.connect(_on_prev_pressed)
 	$CenterContainer/VBoxContainer/NavButtons/ButtonNext.pressed.connect(_on_next_pressed)
 	$CenterContainer/VBoxContainer/ButtonConfirm.pressed.connect(_on_confirm_pressed)
+	
+	# Load saved car selection
+	var config = ConfigFile.new()
+	if config.load("user://settings.cfg") == OK:
+		current_car_index = config.get_value("player", "car_index", 0)
+		current_car_index = clamp(current_car_index, 0, CAR_PRESETS.size() - 1)
+	NetworkManager.local_car_index = current_car_index
+	
 	update_car_selection()
 
 func _process(delta):
@@ -80,8 +88,8 @@ func update_car_selection():
 	if scene:
 		rotating_model = scene.instantiate()
 		model_pivot.add_child(rotating_model)
-		# Position/orient preview model
-		rotating_model.transform = Transform3D(Basis(Vector3(0, 1, 0), PI) * 1.5, Vector3(0, -0.4, 0))
+		# Position/orient preview model with larger scale
+		rotating_model.transform = Transform3D(Basis(Vector3(0, 1, 0), PI) * 2.4, Vector3(0, -0.4, 0))
 		# Hide wheels on preview too
 		_hide_preview_wheels(rotating_model)
 
@@ -115,4 +123,11 @@ func _on_next_pressed():
 func _on_confirm_pressed():
 	NetworkManager.local_car_index = current_car_index
 	car_selected.emit(current_car_index)
+	
+	# Save car selection
+	var config = ConfigFile.new()
+	config.load("user://settings.cfg") # Load existing if it exists
+	config.set_value("player", "car_index", current_car_index)
+	config.save("user://settings.cfg")
+	
 	hide()
