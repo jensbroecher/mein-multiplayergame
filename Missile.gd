@@ -95,7 +95,11 @@ func _explode():
 			var dist = global_position.distance_to(p.global_position)
 			if dist <= blast_radius:
 				if p.has_method("on_hit"):
+					var was_shielded = p.is_shielded
 					p.on_hit()
+					if was_shielded:
+						continue
+					
 					var dir = (p.global_position - global_position).normalized()
 					if dir.length_squared() < 0.01:
 						dir = Vector3.UP

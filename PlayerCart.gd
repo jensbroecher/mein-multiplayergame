@@ -1000,6 +1000,10 @@ func _activate_shockwave():
 			if p == self: continue
 			var dist = global_position.distance_to(p.global_position)
 			if dist < 15.0:
+				if p.is_shielded:
+					p.is_shielded = false
+					continue
+				
 				var dir = (p.global_position - global_position).normalized()
 				var impulse = dir * 54.0 * p.mass + Vector3.UP * 27.0 * p.mass
 				if p.has_method("apply_blast_impulse"):
