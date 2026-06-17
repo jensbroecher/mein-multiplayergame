@@ -70,20 +70,40 @@ func _physics_process(delta):
 func _on_body_entered(body):
 	if not multiplayer.is_server(): return
 	if body.is_in_group("player_carts"):
-		if body.name.to_int() != owner_id:
-			if body.has_method("on_hit"):
-				body.on_hit()
-			_explode()
+		# Trigger explosion. We do NOT check for owner_id here because if the missile directly hits any cart (including the owner if they run into it),
+		# it should detonate. The blast damage loop will handle hitting any nearby carts including the owner.
+		_explode()
 	elif body is StaticBody3D or body is CSGShape3D or body is GridMap:
 		if spawn_safety_timer <= 0.0:
 			_explode()
 
 func _explode():
 	if not is_instance_valid(self): return
+	
+	# Server-side blast radius damage logic (similar to Bomb.gd)
+	if multiplayer.is_server():
+		var blast_radius = 7.0
+		var players = get_tree().get_nodes_in_group("player_carts")
+		for p in players:
+			# Notice there is no owner exclusion, so the owner can be hit if close to the blast!
+			var dist = global_position.distance_to(p.global_position)
+			if dist <= blast_radius:
+				if p.has_method("on_hit"):
+					p.on_hit()
+					var dir = (p.global_position - global_position).normalized()
+					if dir.length_squared() < 0.01:
+						dir = Vector3.UP
+					# Blast impulse away from explosion center
+					p.apply_central_impulse(dir * 8.0 * p.mass + Vector3.UP * 4.0 * p.mass)
+
 	_explode_rpc.rpc()
 
 @rpc("authority", "call_local", "reliable")
 func _explode_rpc():
+	# Disable collisions immediately on client
+	var area_col = get_node_or_null("Area3D/CollisionShape3D")
+	if area_col: area_col.disabled = true
+	
 	# Stop trail emitting — reparent it so it lingers in world space
 	if is_instance_valid(smoke_trail):
 		var scene_root = get_tree().current_scene
@@ -95,4 +115,37 @@ func _explode_rpc():
 		get_tree().create_timer(smoke_trail.lifetime + 0.2).timeout.connect(
 			func(): if is_instance_valid(smoke_trail): smoke_trail.queue_free()
 		)
+		
+	# Create spherical explosion visual (exactly like Bomb.gd)
+	var scene_root = get_tree().current_scene
+	var expl_pos = global_position
+	
+	var expl_mesh = MeshInstance3D.new()
+	var sphere = SphereMesh.new()
+	sphere.radius = 1.0
+	sphere.height = 2.0
+	expl_mesh.mesh = sphere
+	
+	var mat = StandardMaterial3D.new()
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(1.0, 0.45, 0.05, 0.8) # Vibrant orange flame
+	expl_mesh.material_override = mat
+	
+	scene_root.add_child(expl_mesh)
+	expl_mesh.global_position = expl_pos
+	expl_mesh.scale = Vector3(0.1, 0.1, 0.1)
+	
+	var tween = get_tree().create_tween()
+	if tween:
+		var t1 = tween.tween_property(expl_mesh, "scale", Vector3(7.0, 7.0, 7.0), 0.45)
+		if t1:
+			t1.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		
+		var t2 = tween.parallel().tween_property(mat, "albedo_color:a", 0.0, 0.45)
+		if t2:
+			t2.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			
+		tween.finished.connect(func(): if is_instance_valid(expl_mesh): expl_mesh.queue_free())
+		
 	queue_free()

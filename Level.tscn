@@ -1323,25 +1323,25 @@ material = SubResource("ShaderMaterial_asphalt")
 curve = SubResource("Curve3D_track")
 
 [node name="SpawnPoints" type="Node3D" parent="." unique_id=2054665162]
-transform = Transform3D(0.3192074, -0.01946647, -0.9474849, -9.366931e-10, 0.999789, -0.020541077, 0.9476848, 0.0065568644, 0.31914002, 48.44937, 1.2273264, 126.775085)
+transform = Transform3D(0.29450348, -0.019630093, -0.95544875, -4.9539295e-10, 0.999789, -0.020541077, 0.95565027, 0.0060494216, 0.29444137, 47.857334, 1.0279112, 126.775085)
 
 [node name="Spawn1" type="Marker3D" parent="SpawnPoints" unique_id=791775617]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -10.307854, 0.19999999, 22.132206)
+transform = Transform3D(-2.9802322e-08, 4.656613e-10, -1, -1.6298145e-09, 1, 0, 1, 9.313226e-10, -2.9802322e-08, -10.307854, 0.18139517, 22.13259)
 
 [node name="SpawnIndicator" parent="SpawnPoints/Spawn1" unique_id=1043507102 instance=ExtResource("8_spawn")]
 
 [node name="Spawn2" type="Marker3D" parent="SpawnPoints" unique_id=1422462358]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -10.305855, 0.19999999, 18.03535)
+transform = Transform3D(-2.9802322e-08, 4.656613e-10, -1, -1.6298145e-09, 1, 0, 1, 9.313226e-10, -2.9802322e-08, -10.305855, 0.10105044, 18.037384)
 
 [node name="SpawnIndicator" parent="SpawnPoints/Spawn2" unique_id=1537917419 instance=ExtResource("8_spawn")]
 
 [node name="Spawn3" type="Marker3D" parent="SpawnPoints" unique_id=392863938]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -14.841003, 0.19999999, 21.998865)
+transform = Transform3D(-2.9802322e-08, 4.656613e-10, -1, -1.6298145e-09, 1, 0, 1, 9.313226e-10, -2.9802322e-08, -14.840996, 0.16136587, 21.999657)
 
 [node name="SpawnIndicator" parent="SpawnPoints/Spawn3" unique_id=185151606 instance=ExtResource("8_spawn")]
 
 [node name="Spawn4" type="Marker3D" parent="SpawnPoints" unique_id=231091969]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -14.915321, 0.19999999, 17.888018)
+transform = Transform3D(-2.9802322e-08, 4.656613e-10, -1, -1.6298145e-09, 1, 0, 1, 9.313226e-10, -2.9802322e-08, -14.915314, 0.07669461, 17.890549)
 
 [node name="SpawnIndicator" parent="SpawnPoints/Spawn4" unique_id=1710912440 instance=ExtResource("8_spawn")]
 

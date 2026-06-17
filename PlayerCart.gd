@@ -377,6 +377,14 @@ func _physics_process(delta):
 
 	current_steer = lerp(current_steer, input_dir.x, 10.0 * delta)
 
+	# Handle acceleration/braking even when slightly airborne for better control
+	var current_speed = linear_velocity.dot(fwd)
+
+	# Tap-to-drift logic (evaluate early so drift_mode is active during the braking/physics forces block)
+	if on_ground and Input.is_action_just_pressed("brake") and abs(input_dir.x) > 0.2 and current_speed > 5.0:
+		drift_mode = true
+		drift_right = input_dir.x > 0.0
+
 	# Auto-hop over small obstacles/bumps
 	if on_ground and input_dir.y < -0.1 and linear_velocity.length() < 15.0 and hop_cooldown <= 0.0:
 		var space_state = get_world_3d().direct_space_state
@@ -392,9 +400,6 @@ func _physics_process(delta):
 				apply_central_impulse(Vector3.UP * 4.5 * mass + fwd * 2.0 * mass)
 				hop_cooldown = 0.8 # Cooldown to prevent double jumps
 
-	# Handle acceleration/braking even when slightly airborne for better control
-	var current_speed = linear_velocity.dot(fwd)
-	
 	if is_boosting:
 		var max_sp = MAX_SPEED * 1.5
 		var accel_force = ACCELERATION * 2.0
@@ -413,6 +418,13 @@ func _physics_process(delta):
 		if is_boosting:
 			# If boosting, braking just reduces the boost effectiveness a bit
 			apply_central_force(-fwd * BRAKING * 0.5 * mass)
+		elif drift_mode:
+			# If drifting, preserve forward momentum by not applying heavy brakes
+			var speed_ratio = clamp(linear_velocity.length() / MAX_SPEED, 0.0, 1.0)
+			if speed_ratio < 0.85:
+				apply_central_force(fwd * ACCELERATION * 0.8 * mass)
+			else:
+				apply_central_force(fwd * ACCELERATION * 0.3 * mass)
 		else:
 			if current_speed > 1.0:
 				apply_central_force(-fwd * BRAKING * mass)
@@ -436,27 +448,24 @@ func _physics_process(delta):
 	# Steering (works on ground and slightly airborne)
 	if on_ground or linear_velocity.length() > 0.5:
 		if linear_velocity.length() > 1.0:
-			# Tap-to-drift logic
-			if Input.is_action_just_pressed("brake") and abs(input_dir.x) > 0.2 and current_speed > 5.0:
-				drift_mode = true
-				drift_right = input_dir.x > 0.0
-			
 			# Exit drift mode if:
-			# - heavy accelerating (input_dir.y < -0.6)
-			# - heavy braking (input_dir.y > 0.6)
+			# - they release brake (input_dir.y < 0.1)
 			# - car comes to a stop (current_speed < 3.0)
 			if drift_mode:
-				if input_dir.y < -0.6 or input_dir.y > 0.6 or current_speed < 3.0:
+				if input_dir.y < 0.1 or current_speed < 3.0:
 					drift_mode = false
 			
 			var turn_speed = STEER_SPEED
 			is_drifting = drift_mode
 			
-			if is_drifting:
-				turn_speed *= 1.8 # Tighter turn
+			var play_brake_sfx = is_drifting or (input_dir.y > 0.2 and current_speed > 5.0)
+			if play_brake_sfx:
 				if not sfx_brake_drift.playing: sfx_brake_drift.play()
 			else:
 				if sfx_brake_drift.playing: sfx_brake_drift.stop()
+			
+			if is_drifting:
+				turn_speed *= 1.8 # Tighter turn
 			
 			var steer_amount = -current_steer * turn_speed * (min(linear_velocity.length() / 10.0, 1.0)) * delta
 			visuals.global_rotate(ground_normal, steer_amount)
@@ -954,11 +963,13 @@ func _create_drift_particles(wheel_name: String):
 	smoke.amount = 30
 	smoke.lifetime = 0.6
 	smoke.mesh = QuadMesh.new()
+	smoke.local_coords = false # Emit in global coordinates so it trails behind the wheel rather than rotating with it
 	
 	var mat_smoke = StandardMaterial3D.new()
 	mat_smoke.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat_smoke.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat_smoke.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	mat_smoke.vertex_color_use_as_albedo = true # Crucial for color_ramp to fade out the particles
 	
 	var grad_tex = GradientTexture2D.new()
 	grad_tex.fill = GradientTexture2D.FILL_RADIAL
@@ -998,8 +1009,8 @@ func _create_drift_particles(wheel_name: String):
 	var skid = CPUParticles3D.new()
 	skid.name = wheel_name + "_Skid"
 	skid.emitting = false
-	skid.amount = 100
-	skid.lifetime = 2.0
+	skid.amount = 400
+	skid.lifetime = 8.0
 	skid.mesh = QuadMesh.new()
 	
 	skid.mesh.orientation = PlaneMesh.FACE_Y
@@ -1009,7 +1020,13 @@ func _create_drift_particles(wheel_name: String):
 	mat_skid.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat_skid.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat_skid.albedo_color = Color(0.1, 0.1, 0.1, 0.4)
+	mat_skid.vertex_color_use_as_albedo = true
 	skid.material_override = mat_skid
+	
+	var skid_grad = Gradient.new()
+	skid_grad.set_color(0, Color(0.1, 0.1, 0.1, 0.4))
+	skid_grad.set_color(1, Color(0.1, 0.1, 0.1, 0.0))
+	skid.color_ramp = skid_grad
 	
 	skid.gravity = Vector3.ZERO
 	skid.direction = Vector3.ZERO
