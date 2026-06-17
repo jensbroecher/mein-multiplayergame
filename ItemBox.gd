@@ -41,15 +41,33 @@ func _process(delta):
 			_activate_rpc.rpc()
 
 func _on_body_entered(body):
+	if not is_active: return
+	
+	if body.is_in_group("player_carts") and body.is_local_player:
+		if body.current_item == body.ItemType.NONE:
+			if multiplayer.is_server():
+				_server_process_pickup(body)
+			else:
+				request_pickup.rpc_id(1, body.name.to_int())
+
+@rpc("any_peer", "call_local", "reliable")
+func request_pickup(player_id: int):
 	if not multiplayer.is_server(): return
 	if not is_active: return
 	
-	if body.is_in_group("player_carts"):
-		if body.has_method("give_item_rpc"):
-			# Only give item if player doesn't have one
-			if body.current_item == body.ItemType.NONE:
-				body.give_item_rpc.rpc_id(body.name.to_int(), body._get_random_item_rpc())
-				_deactivate_rpc.rpc()
+	var body = null
+	for cart in get_tree().get_nodes_in_group("player_carts"):
+		if cart.name == str(player_id):
+			body = cart
+			break
+			
+	if body and body.current_item == body.ItemType.NONE:
+		_server_process_pickup(body)
+
+func _server_process_pickup(body):
+	if body.has_method("give_item_rpc"):
+		body.give_item_rpc.rpc_id(body.name.to_int(), body._get_random_item_rpc())
+		_deactivate_rpc.rpc()
 
 @rpc("authority", "call_local", "reliable")
 func _deactivate_rpc():

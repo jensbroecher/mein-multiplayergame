@@ -321,14 +321,18 @@ func on_player_exploded(is_local: bool):
 
 func _spawn_item_boxes():
 	# Spawn a row of 3 items across each checkpoint gate and the finish line
+	var cp_idx = 0
 	for cp in checkpoints:
 		var right_dir = cp.global_transform.basis.x.normalized()
 		var spacing = 3.5
 		var offsets = [-spacing, 0.0, spacing]
-		for offset in offsets:
+		for offset_idx in range(offsets.size()):
+			var offset = offsets[offset_idx]
 			var box = ITEM_BOX_SCENE.instantiate()
+			box.name = "ItemBox_%d_%d" % [cp_idx, offset_idx]
 			add_child(box)
 			box.global_position = cp.global_position + right_dir * offset + Vector3(0, 1.5, 0)
+		cp_idx += 1
 
 func _rebuild_checkpoints():
 	if not track_path: return

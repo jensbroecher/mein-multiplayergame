@@ -32,7 +32,7 @@ func _ready():
 			mesh_inst.set_surface_override_material(0, mat)
 
 func _find_target():
-	var nearest_dist = 80.0
+	var nearest_dist = 500.0
 	var players = get_tree().get_nodes_in_group("player_carts")
 	for p in players:
 		if p.name.to_int() == owner_id: continue
@@ -53,7 +53,7 @@ func _physics_process(delta):
 				search_timer = 0.0
 			if target and is_instance_valid(target):
 				var dir = (target.global_position - global_position).normalized()
-				var target_basis = Basis.looking_at(-dir, Vector3.UP)
+				var target_basis = Basis.looking_at(dir, Vector3.UP)
 				global_basis = global_basis.slerp(target_basis, 5.0 * delta).orthonormalized()
 
 		# Gradually accelerate from start speed to max

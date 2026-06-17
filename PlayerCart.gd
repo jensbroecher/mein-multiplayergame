@@ -122,6 +122,7 @@ var hop_cooldown: float = 0.0
 var drift_mode: bool = false
 var drift_right: bool = false
 var drift_particles = []
+@export var sync_emit_drift: bool = false
 
 var is_underwater: bool = false
 const WATER_LEVEL = -10.0
@@ -364,7 +365,7 @@ func _process(delta):
 				elif engine_sound.stream is AudioStreamGenerator:
 					_fill_audio_buffer()
 	else:
-		_interpolate_remote(delta)
+		_interpolate_remote_visual(delta)
 
 func _physics_process(delta):
 	if hop_cooldown > 0:
@@ -375,7 +376,7 @@ func _physics_process(delta):
 
 	if global_position.y < -50:
 		if multiplayer.is_server():
-			respawn_rpc.rpc_id(name.to_int())
+			respawn_rpc.rpc()
 		elif is_local_player:
 			respawn() # single-player / host fallback
 
@@ -390,6 +391,8 @@ func _physics_process(delta):
 		burning_smoke_particles.global_position = global_position + Vector3(0, 0.5, 0)
 		if is_local_player:
 			_move_and_sync()
+		else:
+			_interpolate_remote_physics(delta)
 		return
 
 	var currently_underwater = global_position.y < WATER_LEVEL
@@ -410,6 +413,7 @@ func _physics_process(delta):
 		apply_central_force(Vector3.UP * 15.0)
 
 	if not is_local_player:
+		_interpolate_remote_physics(delta)
 		return
 
 	# Apply extra gravity
@@ -546,12 +550,14 @@ func _physics_process(delta):
 			# Emit skidmark and smoke particles when drifting or braking (only on ground)
 			var emit_drift = on_ground and (is_drifting or (input_dir.y > 0.2 and current_speed > 5.0))
 			_set_drift_emitting(emit_drift)
+			sync_emit_drift = emit_drift
 	else:
 		is_boosting = false
 		if sfx_rocket_loop.playing: sfx_rocket_loop.stop()
 		if sfx_brake_drift.playing: sfx_brake_drift.stop()
 		is_drifting = false
 		_set_drift_emitting(false)
+		sync_emit_drift = false
 		
 		# Slight air control
 		visuals.global_rotate(Vector3.UP, -current_steer * steer_speed * 0.5 * delta)
@@ -643,7 +649,7 @@ func _update_wheel_visuals(delta):
 		if mesh_node:
 			mesh_node.rotation.x = wheel_rotation
 
-func _interpolate_remote(delta: float):
+func _interpolate_remote_physics(delta: float):
 	var t = clamp(REMOTE_LERP_SPEED * delta, 0.0, 1.0)
 	global_position = global_position.lerp(sync_position, t)
 
@@ -658,8 +664,17 @@ func _interpolate_remote(delta: float):
 
 	linear_velocity = linear_velocity.lerp(sync_velocity, 0.6)
 
-	# Remotes also need their visuals to follow the rigid body
-	visuals.global_transform.basis = Basis(new_quat)
+func _interpolate_remote_visual(delta: float):
+	var target_quat := sync_rotation_quat
+	if target_quat == Quaternion.IDENTITY:
+		target_quat = Quaternion.from_euler(sync_rotation)
+
+	# Smoothly follow visual rotation to prevent remote visual jittering at high refresh rates
+	var current_visual_quat := visuals.global_transform.basis.get_rotation_quaternion()
+	var rot_t = clamp(REMOTE_LERP_SPEED * 0.65 * delta, 0.0, 1.0)
+	var new_visual_quat := current_visual_quat.slerp(target_quat, rot_t)
+	
+	visuals.global_transform.basis = Basis(new_visual_quat)
 	visuals.global_position = global_position
 
 	var speed := sync_velocity.length()
@@ -678,6 +693,15 @@ func _interpolate_remote(delta: float):
 		var mesh_node = pivot.get_node_or_null("WheelMesh")
 		if mesh_node:
 			mesh_node.rotation.x = wheel_rotation
+
+	# Visual particle/sound effects for remote player carts
+	_set_drift_emitting(sync_emit_drift)
+	if sync_emit_drift:
+		if not sfx_brake_drift.playing:
+			sfx_brake_drift.play()
+	else:
+		if sfx_brake_drift.playing:
+			sfx_brake_drift.stop()
 
 func _setup_new_car_wheels():
 	var cart_model = get_node_or_null("Visuals/CartModel")
@@ -797,14 +821,14 @@ func _execute_use_item(type: int):
 		ItemType.BOMB:
 			_drop_bomb()
 
-@rpc("authority", "call_local", "reliable")
+@rpc("any_peer", "call_local", "reliable")
 func client_start_boost():
 	boost_timer = 2.0
 	is_boosting = true
 	sfx_nitro_start.play()
 	boost_particles.emitting = true
 
-@rpc("authority", "call_local", "reliable")
+@rpc("any_peer", "call_local", "reliable")
 func client_start_shield():
 	_activate_shield()
 
@@ -835,7 +859,7 @@ func on_hit():
 	else:
 		explode() # fallback for local-only / single-player
 
-@rpc("authority", "call_local", "reliable")
+@rpc("any_peer", "call_local", "reliable")
 func explode_rpc():
 	explode()
 
@@ -854,10 +878,10 @@ func explode():
 	# Server schedules the respawn for everyone after 3 seconds
 	if multiplayer.is_server():
 		get_tree().create_timer(3.0).timeout.connect(
-			func(): if is_instance_valid(self): respawn_rpc.rpc_id(name.to_int())
+			func(): if is_instance_valid(self): respawn_rpc.rpc()
 		)
 
-@rpc("authority", "call_local", "reliable")
+@rpc("any_peer", "call_local", "reliable")
 func respawn_rpc():
 	respawn()
 
@@ -878,11 +902,12 @@ func respawn():
 	burning_smoke_particles.emitting = false
 	sfx_fire_loop.stop()
 
-	linear_velocity = Vector3.ZERO
-	angular_velocity = Vector3.ZERO
+	if is_local_player:
+		linear_velocity = Vector3.ZERO
+		angular_velocity = Vector3.ZERO
 
-	var spawn_pos = last_checkpoint_transform.origin + (last_checkpoint_transform.basis.z * 5.0) + Vector3(0, 2.0, 0)
-	global_position = spawn_pos
+		var spawn_pos = last_checkpoint_transform.origin + (last_checkpoint_transform.basis.z * 5.0) + Vector3(0, 2.0, 0)
+		global_position = spawn_pos
 
 	# Reset visuals position
 	visuals.global_position = global_position
@@ -900,7 +925,7 @@ func give_item(type: int):
 		var item_name = ItemType.keys()[type]
 		race_ui.update_item(item_name)
 
-@rpc("authority", "call_local", "reliable")
+@rpc("any_peer", "call_local", "reliable")
 func give_item_rpc(type: int):
 	give_item(type)
 
@@ -934,7 +959,7 @@ func _fire_missile(guided: bool):
 	var spawn_pos = pos + (forward * 2.0) + Vector3(0, 1.0, 0)
 	_spawn_missile_rpc.rpc(spawn_pos, rot, name.to_int(), guided)
 
-@rpc("authority", "call_local", "reliable")
+@rpc("any_peer", "call_local", "reliable")
 func _spawn_missile_rpc(spawn_pos: Vector3, spawn_rot: Vector3, shooter_id: int, guided: bool):
 	var missile = MISSILE_SCENE.instantiate()
 	missile.owner_id = shooter_id
@@ -973,7 +998,7 @@ func _activate_shockwave():
 		# Play visual for all clients
 		client_play_shockwave.rpc()
 
-@rpc("authority", "call_local", "reliable")
+@rpc("any_peer", "call_local", "reliable")
 func client_play_shockwave():
 	shockwave_visual.visible = true
 	shockwave_visual.scale = Vector3(0.1, 0.1, 0.1)
