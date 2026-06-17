@@ -93,6 +93,7 @@ var race_ui
 @onready var burning_particles = $Visuals/BurningParticles
 @onready var burning_smoke_particles = $Visuals/BurningSmokeParticles
 @onready var fire_sprite_particles = $Visuals/FireSpriteParticles
+@onready var fire_sprite_particles_2 = $Visuals/FireSpriteParticles2
 @onready var splash_particles = $Visuals/SplashParticles
 @onready var splash_spray_particles = $Visuals/SplashSprayParticles
 @onready var splash_ripple_particles = $Visuals/SplashRippleParticles
@@ -1069,6 +1070,7 @@ func explode():
 	burning_particles.emitting = true
 	burning_smoke_particles.emitting = true
 	fire_sprite_particles.emitting = true
+	fire_sprite_particles_2.emitting = true
 	if engine_sound.playing: engine_sound.stop()
 	
 	visuals.visible = true
@@ -1216,6 +1218,7 @@ func respawn():
 	burning_particles.emitting = false
 	burning_smoke_particles.emitting = false
 	fire_sprite_particles.emitting = false
+	fire_sprite_particles_2.emitting = false
 	sfx_fire_loop.stop()
 
 	if is_local_player:

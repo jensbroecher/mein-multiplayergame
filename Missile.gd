@@ -11,6 +11,7 @@ const SPEED_ACCEL: float = 8.0    # m/s² acceleration
 @onready var explosion_particles = $ExplosionParticles
 @onready var smoke_particles = $SmokeParticles
 @onready var fire_sprite_particles = $FireSpriteParticles
+@onready var fire_sprite_particles_2 = $FireSpriteParticles2
 
 var target: Node3D = null
 var lifetime = 5.0
@@ -152,7 +153,7 @@ func _explode_rpc():
 		)
 
 	# Detach and fire explosion particles so they outlive the missile node
-	for ps in [explosion_particles, smoke_particles, fire_sprite_particles]:
+	for ps in [explosion_particles, smoke_particles, fire_sprite_particles, fire_sprite_particles_2]:
 		if is_instance_valid(ps):
 			var ps_pos = global_position
 			remove_child(ps)
