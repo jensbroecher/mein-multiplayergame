@@ -2,6 +2,7 @@ extends Node
 
 var music_folder = "res://music/"
 var playlist = []
+var loaded_playlist = []
 const SETTINGS_FILE = "user://settings.cfg"
 
 var music_volume: float = 0.8
@@ -57,6 +58,7 @@ func save_settings():
 
 func _load_playlist():
 	playlist.clear()
+	loaded_playlist.clear()
 	var dir = DirAccess.open(music_folder)
 	if dir:
 		dir.list_dir_begin()
@@ -70,22 +72,25 @@ func _load_playlist():
 	
 	if playlist.size() > 0:
 		playlist.shuffle()
+		for path in playlist:
+			var stream = load(path)
+			if stream:
+				loaded_playlist.append(stream)
 
 func play_race_music():
 	if not audio_player.playing:
 		play_next()
 
 func play_next():
-	if playlist.is_empty():
+	if loaded_playlist.is_empty():
 		return
 		
-	current_track_index = (current_track_index + 1) % playlist.size()
+	current_track_index = (current_track_index + 1) % loaded_playlist.size()
 	
 	if current_track_index == 0:
-		playlist.shuffle()
+		loaded_playlist.shuffle()
 		
-	var track_path = playlist[current_track_index]
-	var stream = load(track_path)
+	var stream = loaded_playlist[current_track_index]
 	
 	if stream:
 		audio_player.stream = stream

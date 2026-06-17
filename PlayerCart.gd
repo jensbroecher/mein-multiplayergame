@@ -219,6 +219,16 @@ func _process(delta):
 		var speed_factor = clamp(linear_velocity.length() / MAX_SPEED, 0.0, 1.0)
 		var look_ahead_dist = 4.0 + speed_factor * 6.0
 
+		var excludes = [self.get_rid()]
+		var level = get_tree().get_first_node_in_group("level")
+		if level:
+			for cp in level.checkpoints:
+				excludes.append(cp.get_rid())
+				for sb in cp.find_children("*", "StaticBody3D", true, false):
+					excludes.append(sb.get_rid())
+		for cart in get_tree().get_nodes_in_group("player_carts"):
+			excludes.append(cart.get_rid())
+
 		if is_isometric:
 			var iso_offset = Vector3(-20, 20, 20)
 			var target_cam_pos = visuals.global_position + iso_offset
@@ -227,7 +237,7 @@ func _process(delta):
 			var space_state = get_world_3d().direct_space_state
 			var ray_start = visuals.global_position + Vector3.UP * 1.0
 			var query = PhysicsRayQueryParameters3D.create(ray_start, target_cam_pos)
-			query.exclude = [self.get_rid()]
+			query.exclude = excludes
 			var result = space_state.intersect_ray(query)
 			if result:
 				target_cam_pos = result.position - (target_cam_pos - ray_start).normalized() * 0.5
@@ -245,7 +255,7 @@ func _process(delta):
 			var space_state = get_world_3d().direct_space_state
 			var ray_start = visuals.global_position + Vector3.UP * 1.0
 			var query = PhysicsRayQueryParameters3D.create(ray_start, target_cam_pos)
-			query.exclude = [self.get_rid()]
+			query.exclude = excludes
 			var result = space_state.intersect_ray(query)
 			if result:
 				target_cam_pos = result.position - (target_cam_pos - ray_start).normalized() * 0.5
@@ -266,7 +276,9 @@ func _process(delta):
 				engine_sound.play()
 				playback = engine_sound.get_stream_playback()
 				engine_sound.volume_db = -45.0
-			engine_sound.volume_db = move_toward(engine_sound.volume_db, 0.0, 80.0 * delta)
+			var speed_ratio = clamp(linear_velocity.length() / MAX_SPEED, 0.0, 1.0)
+			var target_vol = lerp(0.0, -12.0, speed_ratio)
+			engine_sound.volume_db = move_toward(engine_sound.volume_db, target_vol, 80.0 * delta)
 			if engine_sound.stream is AudioStreamGenerator and engine_sound.playing:
 				_fill_audio_buffer()
 		else:
@@ -341,27 +353,17 @@ func _physics_process(delta):
 		_move_and_sync()
 		return
 
-	# DEBUG: Print input state
 	if Input.is_action_just_pressed("boost"):
-		print("DEBUG: Boost pressed, current_item = ", current_item, " (", ItemType.keys()[current_item] if current_item < ItemType.keys().size() else "invalid", ")")
 		_use_item()
 
 	var input_dir = Vector2.ZERO
 	input_dir.x = Input.get_axis("steer_left", "steer_right")
 	input_dir.y = Input.get_axis("throttle", "brake")
 
-	# DEBUG: Print input_dir occasionally
-	if abs(input_dir.y) > 0.1 or abs(input_dir.x) > 0.1:
-		print("DEBUG: input_dir = ", input_dir, " on_ground check...")
-
 	var on_ground = ground_ray.is_colliding()
 	var ground_normal = Vector3.UP
 	if on_ground:
 		ground_normal = ground_ray.get_collision_normal()
-
-	# DEBUG
-	if not on_ground:
-		print("DEBUG: NOT on ground! ground_ray target: ", ground_ray.target_position, " global_pos: ", global_position)
 
 	var fwd = -visuals.global_transform.basis.z
 	var right = visuals.global_transform.basis.x
@@ -466,16 +468,18 @@ func _physics_process(delta):
 
 func _update_visuals_alignment(delta):
 	var on_ground = ground_ray.is_colliding()
-	var normal = Vector3.UP
+	var target_up = Vector3.UP
 	if on_ground:
-		normal = ground_ray.get_collision_normal()
+		target_up = ground_ray.get_collision_normal()
+	else:
+		# If in air, slowly return to global UP instead of snapping
+		target_up = visuals.global_transform.basis.y.lerp(Vector3.UP, 2.0 * delta).normalized()
 		
 	# Smoothly align the visual mesh normal
 	var current_basis = visuals.global_transform.basis
 	var forward = -current_basis.z
 	var right = current_basis.x
 
-	var target_up = normal
 	var target_right = forward.cross(target_up).normalized()
 	var target_forward = target_up.cross(target_right).normalized()
 
@@ -493,8 +497,14 @@ func _fill_audio_buffer():
 	if available == 0: return
 
 	# Electric RC motor frequency mapping - made less high-pitched (deeper base and slower rise)
-	var freq = 80.0 + linear_velocity.length() * 12.0
+	# Add organic frequency fluctuation (LFO)
+	var fluctuation = sin(Time.get_ticks_msec() * 0.03) * 1.5
+	var freq = 80.0 + linear_velocity.length() * 12.0 + fluctuation
 	if is_boosting: freq *= 1.4
+
+	# Fade out high harmonics at high speeds to avoid harsh whines
+	var speed_ratio = clamp(linear_velocity.length() / MAX_SPEED, 0.0, 1.0)
+	var high_harmonic_fade = clamp(1.0 - speed_ratio * 0.85, 0.15, 1.0)
 
 	for i in range(available):
 		engine_phase += freq / sample_rate
@@ -504,8 +514,8 @@ func _fill_audio_buffer():
 		# Electric RC motor sound: high pitch whine + sub-harmonic for deep rumble + harmonics
 		var sample = sin(engine_phase * TAU) * 0.25
 		sample += sin(engine_phase * 0.5 * TAU) * 0.15 # Deep sub-harmonic rumble
-		sample += sin(engine_phase * 2.0 * TAU) * 0.10
-		sample += sin(engine_phase * 3.0 * TAU) * 0.05
+		sample += sin(engine_phase * 2.0 * TAU) * 0.10 * high_harmonic_fade
+		sample += sin(engine_phase * 3.0 * TAU) * 0.05 * high_harmonic_fade
 		playback.push_frame(Vector2(sample, sample))
 
 func _update_wheel_visuals(delta):

@@ -37,8 +37,29 @@ func _ready():
 	race_ui = RACE_UI_SCENE.instantiate()
 	add_child(race_ui)
 
+	_rebuild_checkpoints()
 	_setup_checkpoints()
 	_spawn_item_boxes()
+
+	# Automatically add collisions to checkpoints, finish line, and ramps at runtime
+	_add_collisions_to_matching_nodes(self)
+	for cp in checkpoints:
+		_add_collisions_to_node(cp, true)
+
+	# Automatically add collisions to environmental props/assets
+	for prop_node_name in ["Props", "Environment", "Obstacles", "Buildings", "Vegetation"]:
+		var node = get_node_or_null(prop_node_name)
+		if node:
+			_add_collisions_to_node(node, true)
+
+	# Align dynamically generated or editor-loaded road collision height to Visual_Road's Y position
+	var tg = get_node_or_null("TerrainGenerator")
+	if tg:
+		var road = tg.get_node_or_null("Visual_Road")
+		if road:
+			for child in tg.get_children():
+				if child is StaticBody3D and child.name != "Unified_World_Collision":
+					child.position.y = road.position.y
 
 
 
@@ -60,24 +81,24 @@ func _ready():
 	race_ui.start_pressed.connect(_on_host_start_pressed)
 
 func _setup_checkpoints():
-	# If no checkpoints assigned, try to find any Area3Ds in a "Checkpoints" node
-	if checkpoints.is_empty():
-		var cp_container = get_node_or_null("Checkpoints")
-		if cp_container:
-			var container_cps = []
-			for child in cp_container.get_children():
-				if child is Area3D:
-					container_cps.append(child)
-			checkpoints.append_array(container_cps)
+	# Rebuild checkpoints list from scene tree to prevent inspector array desync
+	var cp_container = get_node_or_null("Checkpoints")
+	if cp_container:
+		checkpoints.clear()
+		var container_cps = []
+		for child in cp_container.get_children():
+			if child is Area3D:
+				container_cps.append(child)
+		checkpoints.append_array(container_cps)
 
-		# ALWAYS append the FinishLine as the absolute final checkpoint of the lap
-		var fl = get_node_or_null("FinishLine")
-		if fl and not checkpoints.has(fl):
-			checkpoints.append(fl)
-		elif not fl and checkpoints.is_empty():
-			# Fallback for old scenes
-			var hw = get_node_or_null("Halfway")
-			if hw: checkpoints.append(hw)
+	# ALWAYS append the FinishLine as the absolute final checkpoint of the lap
+	var fl = get_node_or_null("FinishLine")
+	if fl and not checkpoints.has(fl):
+		checkpoints.append(fl)
+	elif not fl and checkpoints.is_empty():
+		# Fallback for old scenes
+		var hw = get_node_or_null("Halfway")
+		if hw: checkpoints.append(hw)
 
 	if multiplayer.is_server():
 		for i in range(checkpoints.size()):
@@ -329,7 +350,7 @@ func _rebuild_checkpoints():
 	for i in range(children.size()):
 		var child = children[i]
 		if child is Node3D:
-			var offset = (float(i) / children.size()) * length
+			var offset = (float(i + 1) / (children.size() + 1)) * length
 			var pos = curve.sample_baked(offset)
 			child.global_position = track_path.to_global(pos)
 
@@ -340,3 +361,56 @@ func _rebuild_checkpoints():
 				child.look_at(child.global_position + tangent, Vector3.UP)
 
 	print("Checkpoints redistributed along track!")
+
+func _add_collisions_to_node(root_node: Node, use_trimesh: bool = false):
+	if root_node == null: return
+	
+	if root_node is MeshInstance3D:
+		var mesh = root_node.mesh
+		if mesh:
+			var name_key = "Col_" + str(root_node.get_path()).replace("/", "_")
+			var level_root = get_tree().get_first_node_in_group("level")
+			var already_has_collision = false
+			if level_root and level_root.has_node(name_key):
+				already_has_collision = true
+				
+			if not already_has_collision:
+				var shape
+				if use_trimesh:
+					shape = mesh.create_trimesh_shape()
+				else:
+					shape = mesh.create_convex_shape(true, true)
+				if shape:
+					var static_body = StaticBody3D.new()
+					static_body.name = name_key
+					var collision_shape = CollisionShape3D.new()
+					collision_shape.shape = shape
+					static_body.add_child(collision_shape)
+					
+					# Find a parent that is a Node3D but NOT an Area3D to avoid overlapping triggers
+					var target_parent = root_node.get_parent()
+					while target_parent and (target_parent is Area3D or not (target_parent is Node3D)):
+						target_parent = target_parent.get_parent()
+					
+					if target_parent:
+						target_parent.add_child(static_body)
+					else:
+						add_child(static_body)
+					
+					# Align static body exactly to the mesh
+					static_body.global_transform = root_node.global_transform
+					
+	for child in root_node.get_children():
+		_add_collisions_to_node(child, use_trimesh)
+
+func _add_collisions_to_matching_nodes(node: Node):
+	if node == null: return
+	
+	if node.name.to_lower().contains("ramp"):
+		if node is CSGPolygon3D or node is CSGPrimitive3D:
+			if "use_collision" in node:
+				node.use_collision = true
+		_add_collisions_to_node(node, true)
+		
+	for child in node.get_children():
+		_add_collisions_to_matching_nodes(child)

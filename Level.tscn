@@ -16,6 +16,7 @@
 [ext_resource type="ArrayMesh" uid="uid://cyyat43e6ciay" path="res://generated/Visual_Curbs_Sides.res" id="10_dcckh"]
 [ext_resource type="Shape3D" uid="uid://che45yajcufgc" path="res://generated/track_collision_shape.res" id="12_esphl"]
 [ext_resource type="Shader" uid="uid://srampgbp5hcn" path="res://water.gdshader" id="14_5qkpu"]
+[ext_resource type="PackedScene" uid="uid://dhh7ri67yaupn" path="res://models/ramp.glb" id="17_dcckh"]
 
 [sub_resource type="PhysicalSkyMaterial" id="PhysicalSkyMaterial_clouds"]
 rayleigh_color = Color(0.15, 0.2, 0.4, 1)
@@ -602,18 +603,22 @@ mesh = ExtResource("6_d6u53")
 shape = ExtResource("7_dn5x0")
 
 [node name="Visual_Curbs" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1889004361]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.13044024, 0)
 material_override = SubResource("ShaderMaterial_5qkpu")
 mesh = ExtResource("9_5qkpu")
 
 [node name="Visual_Curbs_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1844951276]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.13044024, 0)
 material_override = SubResource("StandardMaterial3D_dcckh")
 mesh = ExtResource("10_dcckh")
 
 [node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=647434573]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.22367454, 0)
 material_override = SubResource("ShaderMaterial_jftiw")
 mesh = ExtResource("9_esphl")
 
 [node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=2138280574]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.13044024, 0)
 material_override = SubResource("ShaderMaterial_yye10")
 mesh = ExtResource("10_5qkpu")
 
@@ -1308,7 +1313,7 @@ material_override = SubResource("ShaderMaterial_ee1ea")
 mesh = SubResource("PlaneMesh_drm6r")
 
 [node name="JumpRamp" type="CSGPolygon3D" parent="." unique_id=1126375394]
-transform = Transform3D(-2.3170195, 0, -0.57318205, 0, 3.283154, 0, 1.6128321, 0, -0.82344216, 184.45612, 7.1166954, -100.9369)
+transform = Transform3D(-2.3170195, 0, -0.57318205, 0, 3.283154, 0, 1.6128321, 0, -0.82344216, 183.29544, 7.1166954, -100.9369)
 use_collision = true
 polygon = PackedVector2Array(0, 0, 8, 2, 8, 0)
 depth = 15.0
@@ -1357,7 +1362,10 @@ spawn_path = NodePath(".")
 [node name="Checkpoints" type="Node3D" parent="." unique_id=342440943]
 
 [node name="Halfway" parent="Checkpoints" unique_id=409562182 instance=ExtResource("2_gate")]
-transform = Transform3D(-0.3496699, 0, -0.93687296, 0, 1, 0, 0.93687296, 0, -0.3496699, -129.99443, 11.268826, -500.84094)
+transform = Transform3D(0.8265594, 0, 0.56284934, 0, 1, 0, -0.56284934, 0, 0.8265594, -400.95517, 8.766577, 88.259705)
 
 [node name="Halfway2" parent="Checkpoints" unique_id=1076613409 instance=ExtResource("2_gate")]
-transform = Transform3D(-0.7624846, 0, -0.64700633, 0, 1, 0, 0.64700633, 0, -0.7624846, -420.0249, 10.523899, 62.70424)
+transform = Transform3D(-0.47679472, 0, -0.8790148, 0, 1, 0, 0.8790148, 0, -0.47679472, -165.23776, 11.180708, -514.9974)
+
+[node name="NewRamp" parent="." unique_id=966004585 instance=ExtResource("17_dcckh")]
+transform = Transform3D(37.264538, 0, 25.226063, 0, 45, 0, -25.226063, 0, 37.264538, -428.5783, 10.270285, 49.70015)
