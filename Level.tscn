@@ -574,7 +574,11 @@ checkpoints = [NodePath("Checkpoints/Halfway"), NodePath("FinishLine")]
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=613663841]
 transform = Transform3D(-0.866025, -0.433013, 0.25, 0, 0.5, 0.866025, -0.5, 0.75, -0.433013, 0, 40, 0)
-directional_shadow_max_distance = 400.0
+directional_shadow_blend_splits = true
+directional_shadow_max_distance = 250.0
+directional_shadow_split_1 = 0.2
+directional_shadow_split_2 = 0.4
+directional_shadow_split_3 = 0.7
 shadow_enabled = true
 shadow_bias = 0.002
 
