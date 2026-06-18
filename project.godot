@@ -80,4 +80,5 @@ common/physics_interpolation=true
 [rendering]
 
 renderer/rendering_method="mobile"
+textures/default_filters/anisotropic_filtering_level=4
 mesh_lod/lod_change/threshold_pixels=10.0
