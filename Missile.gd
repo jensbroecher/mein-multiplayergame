@@ -7,6 +7,8 @@ const MISSILE_EXPLOSION_SOUNDS = [
 	preload("res://sounds/missile_explosion_wi_#4-1781728398285.wav")
 ]
 
+const FLIGHT_SOUND = preload("res://sounds/774270__thelittlecrow__rocket-launch-boost-and-burning-version-b.wav")
+
 @export var speed: float = 33.0   # Starts slightly above car top speed
 const SPEED_MAX: float = 50.0     # Gradually accelerates to this
 const SPEED_ACCEL: float = 8.0    # m/s² acceleration
@@ -28,6 +30,15 @@ var spawn_safety_timer = 0.3
 func _ready():
 	add_to_group("missiles")
 	area.body_entered.connect(_on_body_entered)
+	
+	# Play flight sound looping/starting at launch
+	var flight_audio = AudioStreamPlayer3D.new()
+	flight_audio.name = "FlightAudio"
+	flight_audio.stream = FLIGHT_SOUND
+	flight_audio.autoplay = true
+	flight_audio.unit_size = 20.0
+	flight_audio.max_distance = 100.0
+	add_child(flight_audio)
 	
 	if is_guided:
 		lifetime = 8.0

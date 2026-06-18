@@ -65,6 +65,7 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 @export var terrain_recession_collision: float = 0.10
 
 @export_group("Procedural Generation")
+@export var terrain_grass_count: int = 40000
 @export var regenerate: bool:
 	set(val):
 		regenerate = false
@@ -131,6 +132,9 @@ func generate_world():
 
 	# 5. Water Surface
 	_generate_water()
+
+	# 6. Procedural Hill Grass
+	_generate_terrain_grass()
 
 	if Engine.is_editor_hint():
 		_set_owner_recursive(self)
@@ -744,3 +748,185 @@ func _generate_water():
 
 	water.material_override = mat
 	add_child(water)
+
+func _create_grass_mesh() -> ArrayMesh:
+	# Number of blades baked into every single MultiMesh instance.
+	# Increasing this gives denser-looking grass with zero extra draw calls.
+	const BLADES_PER_CLUSTER := 8
+	# Radius of the cluster footprint (meters)
+	const CLUSTER_RADIUS := 0.28
+	# Half-width of one blade at its base
+	const BLADE_HALF_W := 0.018
+	# Height range for individual blades within a cluster
+	const BLADE_H_MIN := 0.32
+	const BLADE_H_MAX := 0.58
+	# How much a blade can lean outward from the cluster centre
+	const LEAN_STRENGTH := 0.07
+
+	var st = SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 42  # Fixed seed so the mesh is deterministic (same every run)
+
+	for b in range(BLADES_PER_CLUSTER):
+		# Spread blades evenly around the cluster with a bit of jitter
+		var base_angle := (float(b) / BLADES_PER_CLUSTER) * TAU
+		var jitter := rng.randf_range(-0.3, 0.3)
+		var angle := base_angle + jitter
+
+		# Offset from cluster origin
+		var dist := rng.randf_range(0.0, CLUSTER_RADIUS)
+		var ox := cos(angle) * dist
+		var oz := sin(angle) * dist
+
+		# Per-blade variation
+		var bh := rng.randf_range(BLADE_H_MIN, BLADE_H_MAX)
+		var blade_rot := rng.randf_range(0.0, TAU)  # Each blade faces its own direction
+		var lean_x := cos(angle) * LEAN_STRENGTH     # Tip leans away from centre
+		var lean_z := sin(angle) * LEAN_STRENGTH
+
+		# Build a local right-vector based on blade_rot so the blade face is random
+		var rx := cos(blade_rot) * BLADE_HALF_W
+		var rz := sin(blade_rot) * BLADE_HALF_W
+
+		var v0 := Vector3(ox - rx, 0.0, oz - rz)
+		var v1 := Vector3(ox + rx, 0.0, oz + rz)
+		var v2 := Vector3(ox + lean_x, bh, oz + lean_z)
+
+		# Front face
+		st.set_uv(Vector2(0.0, 1.0)); st.add_vertex(v0)
+		st.set_uv(Vector2(1.0, 1.0)); st.add_vertex(v1)
+		st.set_uv(Vector2(0.5, 0.0)); st.add_vertex(v2)
+
+		# Back face (reverse winding so cull_disabled isn't needed, but kept for safety)
+		st.set_uv(Vector2(1.0, 1.0)); st.add_vertex(v1)
+		st.set_uv(Vector2(0.0, 1.0)); st.add_vertex(v0)
+		st.set_uv(Vector2(0.5, 0.0)); st.add_vertex(v2)
+
+	st.generate_normals()
+	st.generate_tangents()
+	return st.commit()
+
+## ------------------------------------------------------------------
+## Fast grass helpers
+## ------------------------------------------------------------------
+
+# Pre-bake the track curve into a flat array of XZ positions (Vector2).
+# Using a coarse sample interval is fine – we only need to approximate
+# the nearest road distance, not follow the curve exactly.
+func _bake_path_points(curve: Curve3D, sample_interval: float) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	var length = curve.get_baked_length()
+	var t := 0.0
+	while t <= length:
+		var p = curve.sample_baked(t)
+		pts.append(Vector2(p.x, p.z))
+		t += sample_interval
+	return pts
+
+# Squared distance from point P to the nearest sample in the baked array.
+# Returns the squared distance so we can compare against (min_dist^2) cheaply.
+func _sq_dist_to_path(px: float, pz: float, baked: PackedVector2Array) -> float:
+	var best_sq := INF
+	var p2 := Vector2(px, pz)
+	for pt in baked:
+		var d = p2.distance_squared_to(pt)
+		if d < best_sq:
+			best_sq = d
+	return best_sq
+
+func _generate_terrain_grass():
+	if terrain_grass_count <= 0: return
+	
+	var curve = track_path.curve
+	
+	# --- CRITICAL: Match noise settings exactly to the terrain mesh (seed 12345, octaves 4) ---
+	var noise = FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	noise.frequency = noise_frequency
+	noise.seed = 12345
+	noise.fractal_octaves = 4
+	
+	var grass_mesh = _create_grass_mesh()
+	
+	# Dynamic wind-sway shader
+	var shader = Shader.new()
+	shader.code = "shader_type spatial;\nrender_mode cull_disabled, diffuse_toon, specular_disabled;\n\nuniform vec4 albedo : source_color = vec4(0.22, 0.62, 0.15, 1.0);\nuniform vec4 albedo_dark : source_color = vec4(0.12, 0.42, 0.08, 1.0);\nuniform float wind_speed = 1.0;\nuniform float wind_strength = 0.05;\n\nvarying float height_val;\n\nvoid vertex() {\n\theight_val = VERTEX.y;\n\tif (VERTEX.y > 0.05) {\n\t\tfloat time = TIME * wind_speed;\n\t\tvec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;\n\t\tfloat offset = sin(time + world_pos.x * 1.5 + world_pos.z * 1.5) * wind_strength * (VERTEX.y / 0.5);\n\t\tVERTEX.x += offset;\n\t\tVERTEX.z += offset * 0.3;\n\t}\n}\n\nvoid fragment() {\n\tfloat h = clamp(height_val * 2.0, 0.0, 1.0);\n\tvec3 color = mix(albedo_dark.rgb, albedo.rgb, h);\n\tALBEDO = color;\n\tROUGHNESS = 1.0;\n\tEMISSION = color * 0.12;\n}"
+	
+	var mat = ShaderMaterial.new()
+	mat.shader = shader
+	
+	# ---------------------------------------------------------------
+	# OPTIMISATION 1: Pre-bake the curve once (sample every 4 m).
+	# This replaces the per-blade curve.get_closest_point() call
+	# (which is O(baked_interval_count)) with a simple array scan.
+	# ---------------------------------------------------------------
+	var baked_path := _bake_path_points(curve, 4.0)
+	var min_dist := sand_width / 2.0 + 1.5
+	var min_dist_sq := min_dist * min_dist
+	
+	# ---------------------------------------------------------------
+	# OPTIMISATION 2: Scatter uniformly across the whole terrain
+	# instead of being anchored to the track.  We simply reject any
+	# candidate that is underwater or too close to the road.
+	# This gives grass *everywhere* on the map and avoids all the
+	# expensive curve.sample_baked() calls in the old loop.
+	# ---------------------------------------------------------------
+	var half_x := terrain_size.x * 0.5
+	var half_z := terrain_size.y * 0.5
+	
+	var transforms: Array[Transform3D] = []
+	var attempts := terrain_grass_count * 3  # upper bound to avoid infinite loop
+	var placed := 0
+	
+	for _i in range(attempts):
+		if placed >= terrain_grass_count:
+			break
+		
+		var px := randf_range(-half_x, half_x)
+		var pz := randf_range(-half_z, half_z)
+		
+		# ---------------------------------------------------------------
+		# OPTIMISATION 3: Height check FIRST (just noise math, very fast).
+		# We still need _get_terrain_height which internally calls
+		# curve.get_closest_point() – but only for the edge-blending.
+		# We avoid the *second* explicit get_closest_point call that
+		# previously followed it by reusing our baked array.
+		# ---------------------------------------------------------------
+		var height := _get_terrain_height(px, pz, noise, curve, false)
+		if height < -9.0:
+			continue
+		
+		# Road-exclusion: fast scan through pre-baked 2-D points
+		if _sq_dist_to_path(px, pz, baked_path) < min_dist_sq:
+			continue
+		
+		var pos := Vector3(px, height, pz)
+		var basis := Basis(Vector3.UP, randf() * PI * 2.0)
+		var sh := randf_range(0.8, 1.4)
+		var sw := randf_range(0.8, 1.2)
+		basis = basis.scaled(Vector3(sw, sh, sw))
+		
+		transforms.append(Transform3D(basis, pos))
+		placed += 1
+		
+	if transforms.is_empty():
+		return
+		
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = "Procedural_Terrain_Grass"
+	add_child(mmi)
+	
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = false
+	mm.use_custom_data = false
+	mm.mesh = grass_mesh
+	mm.instance_count = transforms.size()
+	
+	for i in range(transforms.size()):
+		mm.set_instance_transform(i, transforms[i])
+		
+	mmi.multimesh = _save_resource(mm, "terrain_grass_multimesh")
+	mmi.material_override = mat

@@ -8,9 +8,9 @@ extends Node3D
 		size = val
 		_update_boundary()
 
-@export var tree_count: int = 10
-@export var flower_count: int = 25
-@export var grass_count: int = 150
+@export var tree_count: int = 20
+@export var flower_count: int = 150
+@export var grass_count: int = 1000
 
 @export_group("Actions")
 @export var trigger_scatter: bool = false:
@@ -94,11 +94,11 @@ func scatter():
 	
 	# Create green material for grass using a shader to correctly mask transparency
 	var shader = Shader.new()
-	shader.code = "shader_type spatial;\nrender_mode cull_disabled;\n\nuniform vec4 albedo : source_color = vec4(0.2, 0.52, 0.15, 1.0);\nuniform sampler2D albedo_texture : source_color, filter_nearest_mipmap;\nuniform float alpha_scissor_threshold : hint_range(0.0, 1.0) = 0.1;\n\nvoid fragment() {\n\tvec4 tex_color = texture(albedo_texture, UV);\n\tALBEDO = albedo.rgb;\n\tfloat alpha = tex_color.a;\n\tif (tex_color.a >= 0.99) {\n\t\talpha = tex_color.r;\n\t}\n\tALPHA = alpha;\n\tALPHA_SCISSOR_THRESHOLD = alpha_scissor_threshold;\n}"
+	shader.code = "shader_type spatial;\nrender_mode cull_disabled;\n\nuniform vec4 albedo : source_color = vec4(0.25, 0.72, 0.12, 1.0);\nuniform sampler2D albedo_texture : source_color, filter_nearest_mipmap;\nuniform float alpha_scissor_threshold : hint_range(0.0, 1.0) = 0.1;\n\nvoid fragment() {\n\tvec4 tex_color = texture(albedo_texture, UV);\n\tALBEDO = albedo.rgb * 1.25;\n\tEMISSION = albedo.rgb * 0.15;\n\tfloat alpha = tex_color.a;\n\tif (tex_color.a >= 0.99) {\n\t\talpha = tex_color.r;\n\t}\n\tALPHA = alpha;\n\tALPHA_SCISSOR_THRESHOLD = alpha_scissor_threshold;\n}"
 	
 	var grass_mat = ShaderMaterial.new()
 	grass_mat.shader = shader
-	grass_mat.set_shader_parameter("albedo", Color(0.28, 0.68, 0.15))
+	grass_mat.set_shader_parameter("albedo", Color(0.25, 0.72, 0.12))
 	
 	var tex_path = "res://models/trees/grass_tall-grass-png-44173_bw.webp"
 	if ResourceLoader.exists(tex_path):
@@ -129,11 +129,11 @@ func scatter():
 
 	# Spawn grass
 	if grass_scene and grass_count > 0:
-		_scatter_group(grass_scene, grass_count, false, 0.45, 0.95, grass_mat, container, root, space_state)
+		_scatter_group_multimesh(grass_scene, grass_count, 0.45, 0.95, grass_mat, container, root, space_state, "grass")
 		
 	# Spawn flowers
 	if not flower_scenes.is_empty() and flower_count > 0:
-		_scatter_group_multi(flower_scenes, flower_count, false, 0.7, 1.25, null, container, root, space_state)
+		_scatter_group_multi_multimesh(flower_scenes, flower_count, 0.7, 1.25, container, root, space_state, "flower")
 
 	# Spawn trees
 	if not tree_scenes.is_empty() and tree_count > 0:
@@ -295,3 +295,117 @@ func _get_random_point_in_circle(radius: float) -> Vector3:
 			if randf() < prob:
 				return Vector3(rx, 0.0, rz)
 	return Vector3.ZERO
+
+func _get_mesh_from_scene(scene: PackedScene) -> Mesh:
+	if not scene: return null
+	var inst = scene.instantiate()
+	var mesh = _find_mesh_recursive(inst)
+	inst.free()
+	return mesh
+
+func _find_mesh_recursive(node: Node) -> Mesh:
+	if node is MeshInstance3D:
+		return node.mesh
+	for child in node.get_children():
+		var m = _find_mesh_recursive(child)
+		if m:
+			return m
+	return null
+
+func _get_material_recursive(node: Node) -> Material:
+	if node is MeshInstance3D:
+		if node.material_override:
+			return node.material_override
+		var mat = node.get_active_material(0)
+		if mat:
+			return mat
+	for child in node.get_children():
+		var mat = _get_material_recursive(child)
+		if mat:
+			return mat
+	return null
+
+func _scatter_group_multi_multimesh(scenes: Array, count: int, scale_min: float, scale_max: float, container: Node3D, root: Node, space_state: PhysicsDirectSpaceState3D, name_prefix: String):
+	if scenes.is_empty() or count <= 0: return
+	
+	var count_per_scene = count / scenes.size()
+	var extra = count % scenes.size()
+	
+	for idx in range(scenes.size()):
+		var scene_count = count_per_scene + (1 if idx < extra else 0)
+		if scene_count <= 0: continue
+		var scene = scenes[idx]
+		var sub_prefix = name_prefix + "_" + str(idx)
+		_scatter_group_multimesh(scene, scene_count, scale_min, scale_max, null, container, root, space_state, sub_prefix)
+
+func _scatter_group_multimesh(scene: PackedScene, count: int, scale_min: float, scale_max: float, mat_override: Material, container: Node3D, root: Node, space_state: PhysicsDirectSpaceState3D, name_prefix: String):
+	if not scene or count <= 0: return
+	var mesh = _get_mesh_from_scene(scene)
+	if not mesh:
+		printerr("Could not extract mesh from scene for MultiMesh: ", scene.resource_path)
+		return
+		
+	var transforms: Array[Transform3D] = []
+	for i in range(count):
+		var local_pos = _get_random_point_in_circle(size.x / 2.0)
+		var global_pos = global_transform * local_pos
+		
+		# Raycast down to find ground
+		var start = global_pos + Vector3(0, 300.0, 0)
+		var end = global_pos + Vector3(0, -300.0, 0)
+		var query = PhysicsRayQueryParameters3D.create(start, end)
+		query.collision_mask = 1 # Collide with terrain
+		var result = space_state.intersect_ray(query)
+		
+		if result:
+			# Skip underwater spots
+			if result.position.y < -9.5:
+				continue
+				
+			var up = result.normal
+			var fwd = Vector3.FORWARD
+			if abs(up.dot(fwd)) > 0.99:
+				fwd = Vector3.UP
+			var right = fwd.cross(up).normalized()
+			fwd = up.cross(right).normalized()
+			
+			var basis = Basis(right, up, -fwd)
+			basis = basis.rotated(up, randf_range(0, PI * 2))
+			
+			var s = randf_range(scale_min, scale_max)
+			basis = basis.scaled(Vector3(s, s, s))
+			
+			var pos = result.position
+			var xform = Transform3D(basis, pos)
+			var local_xform = container.global_transform.inverse() * xform
+			transforms.append(local_xform)
+			
+	if transforms.is_empty():
+		return
+		
+	var mmi = MultiMeshInstance3D.new()
+	mmi.name = name_prefix + "_MultiMesh"
+	container.add_child(mmi)
+	mmi.owner = root
+	
+	var mm = MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = false
+	mm.use_custom_data = false
+	mm.mesh = mesh
+	mm.instance_count = transforms.size()
+	
+	for i in range(transforms.size()):
+		mm.set_instance_transform(i, transforms[i])
+		
+	mmi.multimesh = mm
+	
+	# Apply materials
+	if mat_override:
+		mmi.material_override = mat_override
+	else:
+		var inst = scene.instantiate()
+		var original_mat = _get_material_recursive(inst)
+		inst.free()
+		if original_mat:
+			mmi.material_override = original_mat

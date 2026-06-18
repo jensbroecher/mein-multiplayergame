@@ -93,6 +93,11 @@ const BOMB_EXPLOSION_SOUNDS = [
 	preload("res://sounds/bomb_explosion_with__#4-1781728370769.wav")
 ]
 
+const LANDING_SOUNDS = [
+	preload("res://sounds/freesound_community-bonk-46000.mp3"),
+	preload("res://sounds/crash.mp3")
+]
+
 @onready var visuals = $Visuals
 @onready var camera_pivot = $Visuals/CameraPivot
 @onready var camera = $Visuals/CameraPivot/Camera3D
@@ -137,6 +142,7 @@ var is_boosting = false
 @onready var sfx_brake_drift = $Visuals/SFX_BrakeDrift
 var is_drifting: bool = false
 var was_on_ground: bool = true
+var air_time: float = 0.0
 var wheel_rotation: float = 0.0
 var is_teleporting: bool = false
 var is_shielded: bool = false
@@ -568,8 +574,12 @@ func _physics_process(delta):
 	input_dir.y = Input.get_axis("throttle", "brake")
 
 	var on_ground = ground_ray.is_colliding()
-	if on_ground and not was_on_ground:
-		play_landing_sound_rpc.rpc()
+	if not on_ground:
+		air_time += delta
+	else:
+		if not was_on_ground:
+			play_landing_sound_rpc.rpc(air_time)
+		air_time = 0.0
 	was_on_ground = on_ground
 
 	var is_offroad = false
@@ -1013,7 +1023,13 @@ func _execute_use_item(type: int):
 			_drop_bomb()
 
 @rpc("any_peer", "call_local", "unreliable")
-func play_landing_sound_rpc():
+func play_landing_sound_rpc(p_air_time: float):
+	if LANDING_SOUNDS.is_empty(): return
+	var sound = LANDING_SOUNDS[randi() % LANDING_SOUNDS.size()]
+	sfx_landing_bonk.stream = sound
+	# Map air_time to volume_db [-14.0, 4.0] (cap air_time at 1.0 second)
+	var volume = lerp(-14.0, 4.0, clamp(p_air_time / 1.0, 0.0, 1.0))
+	sfx_landing_bonk.volume_db = volume
 	sfx_landing_bonk.play()
 
 @rpc("any_peer", "call_local", "reliable")
@@ -1281,6 +1297,7 @@ func respawn():
 	water_timer = 0.0
 	last_splash_time = -999.0
 	was_on_ground = true
+	air_time = 0.0
 	# Kill any in-flight drown fade tween so it can't overwrite the restored alpha
 	if _drown_tween:
 		_drown_tween.kill()
@@ -1614,6 +1631,10 @@ func _create_drift_particles(wheel_name: String):
 	smoke.local_coords = false # Emit in global coordinates so it trails behind the wheel rather than rotating with it
 	smoke.top_level = true
 	smoke.set_meta("pivot", pivot)
+	
+	pivot.add_child(smoke)
+	drift_particles.append(smoke)
+	
 	if pivot.is_inside_tree():
 		smoke.global_position = pivot.global_position
 		smoke.global_rotation = pivot.global_rotation
@@ -1655,9 +1676,6 @@ func _create_drift_particles(wheel_name: String):
 	grad.set_color(1, Color(0.8, 0.8, 0.8, 0.0))
 	smoke.color_ramp = grad
 	
-	pivot.add_child(smoke)
-	drift_particles.append(smoke)
-	
 	# Skidmarks
 	var skid = CPUParticles3D.new()
 	skid.name = wheel_name + "_Skid"
@@ -1691,13 +1709,14 @@ func _create_drift_particles(wheel_name: String):
 	skid.local_coords = false
 	skid.top_level = true
 	skid.set_meta("pivot", pivot)
+	
+	pivot.add_child(skid)
+	drift_particles.append(skid)
+	
 	if pivot.is_inside_tree():
 		var local_offset = Vector3(0, WHEEL_Y_OFFSET + 0.02, 0)
 		skid.global_position = pivot.global_position + pivot.global_transform.basis * local_offset
 		skid.global_rotation = pivot.global_rotation
-	
-	pivot.add_child(skid)
-	drift_particles.append(skid)
 
 func _set_drift_emitting(emitting: bool):
 	for p in drift_particles:
@@ -1717,6 +1736,10 @@ func _create_dirt_particles(wheel_name: String):
 	dirt.local_coords = false
 	dirt.top_level = true
 	dirt.set_meta("pivot", pivot)
+	
+	pivot.add_child(dirt)
+	dirt_particles.append(dirt)
+	
 	if pivot.is_inside_tree():
 		dirt.global_position = pivot.global_position
 		dirt.global_rotation = pivot.global_rotation
@@ -1733,8 +1756,8 @@ func _create_dirt_particles(wheel_name: String):
 	grad_tex.fill_to = Vector2(0.5, 0.0)
 	
 	var dirt_grad = Gradient.new()
-	dirt_grad.set_color(0, Color(0.45, 0.35, 0.22, 0.35))
-	dirt_grad.set_color(1, Color(0.45, 0.35, 0.22, 0.0))
+	dirt_grad.set_color(0, Color(0.25, 0.18, 0.1, 0.5))
+	dirt_grad.set_color(1, Color(0.25, 0.18, 0.1, 0.0))
 	grad_tex.gradient = dirt_grad
 	
 	mat_dirt.albedo_texture = grad_tex
@@ -1754,12 +1777,9 @@ func _create_dirt_particles(wheel_name: String):
 	dirt.scale_amount_curve = scale_curve
 	
 	var grad = Gradient.new()
-	grad.set_color(0, Color(0.45, 0.35, 0.22, 0.4))
-	grad.set_color(1, Color(0.45, 0.35, 0.22, 0.0))
+	grad.set_color(0, Color(0.25, 0.18, 0.1, 0.65))
+	grad.set_color(1, Color(0.25, 0.18, 0.1, 0.0))
 	dirt.color_ramp = grad
-	
-	pivot.add_child(dirt)
-	dirt_particles.append(dirt)
 
 func _set_dirt_emitting(emitting: bool):
 	for p in dirt_particles:
