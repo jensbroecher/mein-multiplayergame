@@ -98,15 +98,26 @@ func _on_server_disconnected():
 # RPC to register a new player
 @rpc("any_peer", "call_local", "reliable")
 func register_player(info: Dictionary):
+	if not multiplayer.is_server(): return
+	
 	var id = multiplayer.get_remote_sender_id()
+	
+	# Send existing players to the new player first
+	for existing_id in players:
+		register_player_on_client.rpc_id(id, existing_id, players[existing_id])
+		
+	# Broadcast the new player to everyone
 	info["ready"] = false
+	register_player_on_client.rpc(id, info)
+	
+	print("NetworkManager: Server registered player ", id, ", info: ", info)
+	update_max_laps.rpc_id(id, max_laps)
+
+@rpc("authority", "call_local", "reliable")
+func register_player_on_client(id: int, info: Dictionary):
 	players[id] = info
 	player_connected.emit(id, info)
-	print("NetworkManager: Player registered ", id, ", info: ", info)
-	
-	# If we are the server, sync current settings to the new player
-	if multiplayer.is_server():
-		update_max_laps.rpc_id(id, max_laps)
+	print("NetworkManager: Client registered player ", id, ", info: ", info)
 
 @rpc("any_peer", "call_local", "reliable")
 func cmd_set_ready(is_ready: bool):
