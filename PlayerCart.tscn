@@ -222,6 +222,9 @@ properties/9/replication_mode = 1
 properties/10/path = NodePath(".:sync_emit_drift")
 properties/10/spawn = true
 properties/10/replication_mode = 1
+properties/11/path = NodePath(".:sync_emit_dirt")
+properties/11/spawn = true
+properties/11/replication_mode = 1
 [sub_resource type="Gradient" id="Gradient_fire_sprite"]
 offsets = PackedFloat32Array(0, 0.15, 0.75, 1)
 colors = PackedColorArray(1, 1, 1, 1, 1, 0.8, 0.4, 0.9, 0.8, 0.2, 0.05, 0.7, 0, 0, 0, 0)

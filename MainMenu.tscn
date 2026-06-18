@@ -50,44 +50,13 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 24
 text = "PLAY GAME"
 
-[node name="HSeparator2" type="HSeparator" parent="CenterContainer/VBoxContainer"]
+[node name="ButtonOptions" type="Button" parent="CenterContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
-
-[node name="VolumeLabel" type="Label" parent="CenterContainer/VBoxContainer"]
-layout_mode = 2
-text = "Sound Settings"
-horizontal_alignment = 1
-
-[node name="MusicBox" type="HBoxContainer" parent="CenterContainer/VBoxContainer"]
-layout_mode = 2
-
-[node name="Label" type="Label" parent="CenterContainer/VBoxContainer/MusicBox"]
-custom_minimum_size = Vector2(100, 0)
-layout_mode = 2
-text = "Music"
-
-[node name="MusicSlider" type="HSlider" parent="CenterContainer/VBoxContainer/MusicBox"]
-layout_mode = 2
-size_flags_horizontal = 3
-max_value = 1.0
-step = 0.01
-value = 0.8
-
-[node name="SFXBox" type="HBoxContainer" parent="CenterContainer/VBoxContainer"]
-layout_mode = 2
-
-[node name="Label" type="Label" parent="CenterContainer/VBoxContainer/SFXBox"]
-custom_minimum_size = Vector2(100, 0)
-layout_mode = 2
-text = "Sound FX"
-
-[node name="SFXSlider" type="HSlider" parent="CenterContainer/VBoxContainer/SFXBox"]
-layout_mode = 2
-size_flags_horizontal = 3
-max_value = 1.0
-step = 0.01
-value = 0.7
+theme_override_font_sizes/font_size = 24
+text = "OPTIONS"
 
 [node name="ButtonQuit" type="Button" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
 text = "QUIT"
+

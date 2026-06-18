@@ -75,6 +75,7 @@ func _update_boundary():
 func clear_vegetation():
 	var container = get_node_or_null("VegetationContainer")
 	if container:
+		remove_child(container)
 		container.free()
 	print("Vegetation cleared!")
 

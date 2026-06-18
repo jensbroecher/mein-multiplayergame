@@ -7,12 +7,18 @@ const SETTINGS_FILE = "user://settings.cfg"
 
 var music_volume: float = 0.8
 var sfx_volume: float = 0.7
+var show_fps: bool = false
+var window_mode: int = 0 # 0: Windowed, 1: Fullscreen
+var vsync: bool = false
 
 var current_track_index = -1
 var player1: AudioStreamPlayer
 var player2: AudioStreamPlayer
 var active_player: AudioStreamPlayer
 var inactive_player: AudioStreamPlayer
+
+var fps_layer: CanvasLayer
+var fps_label: Label
 
 func _ensure_audio_buses():
 	# Ensure "Music" bus exists
@@ -50,6 +56,43 @@ func _ready():
 	player1.finished.connect(_on_track_finished)
 	player2.finished.connect(_on_track_finished)
 	_load_playlist()
+	
+	# Create FPS layer and label
+	fps_layer = CanvasLayer.new()
+	fps_layer.layer = 128
+	
+	fps_label = Label.new()
+	fps_label.name = "FPSLabel"
+	fps_label.add_theme_color_override("font_color", Color(0.0, 1.0, 0.8))
+	fps_label.add_theme_font_size_override("font_size", 16)
+	
+	var style_box = StyleBoxFlat.new()
+	style_box.bg_color = Color(0.0, 0.0, 0.0, 0.5)
+	style_box.content_margin_left = 10
+	style_box.content_margin_right = 10
+	style_box.content_margin_top = 5
+	style_box.content_margin_bottom = 5
+	style_box.corner_radius_top_left = 4
+	style_box.corner_radius_top_right = 4
+	style_box.corner_radius_bottom_left = 4
+	style_box.corner_radius_bottom_right = 4
+	fps_label.add_theme_stylebox_override("normal", style_box)
+	
+	fps_label.text = "FPS: 60"
+	fps_layer.add_child(fps_label)
+	add_child(fps_layer)
+	
+	# We will position it dynamically in _process relative to the actual viewport size
+	fps_label.position = Vector2(0, 10)
+	
+	fps_layer.visible = show_fps
+
+func _process(_delta):
+	if show_fps and fps_label:
+		fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
+		var viewport_width = get_viewport().get_visible_rect().size.x
+		var label_width = fps_label.get_minimum_size().x
+		fps_label.position = Vector2(viewport_width - label_width - 20, 10)
 
 func load_settings():
 	var config = ConfigFile.new()
@@ -57,15 +100,24 @@ func load_settings():
 	if err == OK:
 		music_volume = config.get_value("audio", "music", 0.8)
 		sfx_volume = config.get_value("audio", "sfx", 0.7)
+		show_fps = config.get_value("display", "show_fps", false)
+		window_mode = config.get_value("display", "window_mode", 0)
+		vsync = config.get_value("display", "vsync", false)
 		
 	# Apply loaded settings
 	set_music_volume(music_volume, false)
 	set_sfx_volume(sfx_volume, false)
+	set_show_fps(show_fps, false)
+	set_window_mode(window_mode, false)
+	set_vsync(vsync, false)
 
 func save_settings():
 	var config = ConfigFile.new()
 	config.set_value("audio", "music", music_volume)
 	config.set_value("audio", "sfx", sfx_volume)
+	config.set_value("display", "show_fps", show_fps)
+	config.set_value("display", "window_mode", window_mode)
+	config.set_value("display", "vsync", vsync)
 	config.save(SETTINGS_FILE)
 
 func _load_playlist():
@@ -141,3 +193,26 @@ func set_sfx_volume(linear_val: float, save: bool = true):
 	if bus_idx == -1: bus_idx = AudioServer.get_bus_index("Master")
 	AudioServer.set_bus_volume_db(bus_idx, linear_to_db(linear_val))
 	if save: save_settings()
+
+func set_show_fps(enabled: bool, save: bool = true):
+	show_fps = enabled
+	if fps_layer:
+		fps_layer.visible = enabled
+	if save: save_settings()
+
+func set_window_mode(mode: int, save: bool = true):
+	window_mode = mode
+	if mode == 1:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+	else:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	if save: save_settings()
+
+func set_vsync(enabled: bool, save: bool = true):
+	vsync = enabled
+	if enabled:
+		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED)
+	else:
+		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+	if save: save_settings()
+

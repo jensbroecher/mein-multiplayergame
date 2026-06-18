@@ -148,6 +148,11 @@ var drift_mode: bool = false
 var drift_right: bool = false
 var drift_particles = []
 @export var sync_emit_drift: bool = false
+var dirt_particles = []
+@export var sync_emit_dirt: bool = false
+var offroad_penalty: float = 1.0
+var offroad_target_penalty: float = 1.0
+var offroad_timer: float = 0.0
 
 var is_underwater: bool = false
 const WATER_LEVEL = -10.0
@@ -309,6 +314,8 @@ func _ready():
 	# Initialize drift/skidmark particles for rear wheels
 	_create_drift_particles("RL")
 	_create_drift_particles("RR")
+	_create_dirt_particles("RL")
+	_create_dirt_particles("RR")
 
 func _enter_tree():
 	_update_authority()
@@ -428,6 +435,13 @@ func _process(delta):
 					p.global_position = pivot.global_position + pivot.global_transform.basis * local_offset
 				else:
 					p.global_position = pivot.global_position
+
+	for p in dirt_particles:
+		if is_instance_valid(p) and p is CPUParticles3D:
+			var pivot = p.get_meta("pivot", null)
+			if is_instance_valid(pivot):
+				p.global_rotation = pivot.global_rotation
+				p.global_position = pivot.global_position
 
 func _physics_process(delta):
 	if hop_cooldown > 0:
@@ -558,6 +572,21 @@ func _physics_process(delta):
 		play_landing_sound_rpc.rpc()
 	was_on_ground = on_ground
 
+	var is_offroad = false
+	if on_ground:
+		var collider = ground_ray.get_collider()
+		if collider and (collider.name.contains("Unified_World_Collision") or collider.name.contains("Terrain")):
+			is_offroad = true
+
+	if is_offroad:
+		offroad_timer += delta
+		if offroad_timer > 0.15:
+			offroad_timer = 0.0
+			offroad_target_penalty = randf_range(0.90, 0.95)
+		offroad_penalty = lerp(offroad_penalty, offroad_target_penalty, 5.0 * delta)
+	else:
+		offroad_penalty = lerp(offroad_penalty, 1.0, 10.0 * delta)
+
 	var ground_normal = Vector3.UP
 	if on_ground:
 		ground_normal = ground_ray.get_collision_normal()
@@ -600,7 +629,7 @@ func _physics_process(delta):
 	if input_dir.y < -0.1: # Forward input
 		if not is_boosting:
 			var accel_force = acceleration
-			if current_speed < max_speed:
+			if current_speed < max_speed * offroad_penalty:
 				apply_central_force(fwd * accel_force * mass)
 			boost_time += delta
 	elif input_dir.y > 0.1: # Brake / Reverse input
@@ -622,10 +651,10 @@ func _physics_process(delta):
 			if current_speed > 1.0:
 				apply_central_force(-fwd * braking * mass)
 			elif current_speed < -0.5:
-				if current_speed > -reverse_speed:
+				if current_speed > -reverse_speed * offroad_penalty:
 					apply_central_force(-fwd * (acceleration * 0.5) * mass)
 			else:
-				if current_speed > -reverse_speed:
+				if current_speed > -reverse_speed * offroad_penalty:
 					apply_central_force(-fwd * (acceleration * 0.7) * mass)
 	else: # No throttle/brake input (coasting or stationary)
 		if not is_boosting:
@@ -696,6 +725,17 @@ func _physics_process(delta):
 		sfx_wind_loop.volume_db = lerp(sfx_wind_loop.volume_db, -40.0, 5.0 * delta)
 		if sfx_wind_loop.volume_db < -35.0:
 			sfx_wind_loop.stop()
+
+	# Dampen speed if exceeding offroad max speed
+	var effective_max = max_speed * offroad_penalty
+	if on_ground and not is_boosting and current_speed > effective_max:
+		var excess_ratio = (current_speed - effective_max) / max_speed
+		apply_central_force(-fwd * excess_ratio * acceleration * 8.0 * mass)
+
+	# Emit dirt particles when offroad and moving
+	var emit_dirt = is_offroad and on_ground and linear_velocity.length() > 2.0
+	_set_dirt_emitting(emit_dirt)
+	sync_emit_dirt = emit_dirt
 
 	sync_steer = current_steer
 	_move_and_sync()
@@ -837,6 +877,7 @@ func _interpolate_remote_visual(delta: float):
 
 	# Visual particle/sound effects for remote player carts
 	_set_drift_emitting(sync_emit_drift)
+	_set_dirt_emitting(sync_emit_dirt)
 	if sync_emit_drift:
 		if not sfx_brake_drift.playing:
 			sfx_brake_drift.play()
@@ -1573,8 +1614,9 @@ func _create_drift_particles(wheel_name: String):
 	smoke.local_coords = false # Emit in global coordinates so it trails behind the wheel rather than rotating with it
 	smoke.top_level = true
 	smoke.set_meta("pivot", pivot)
-	smoke.global_position = pivot.global_position
-	smoke.global_rotation = pivot.global_rotation
+	if pivot.is_inside_tree():
+		smoke.global_position = pivot.global_position
+		smoke.global_rotation = pivot.global_rotation
 	
 	var mat_smoke = StandardMaterial3D.new()
 	mat_smoke.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -1620,25 +1662,25 @@ func _create_drift_particles(wheel_name: String):
 	var skid = CPUParticles3D.new()
 	skid.name = wheel_name + "_Skid"
 	skid.emitting = false
-	skid.amount = 1500
-	skid.lifetime = 30.0
+	skid.amount = 4000
+	skid.lifetime = 15.0
 	skid.mesh = QuadMesh.new()
 	
 	skid.mesh.orientation = PlaneMesh.FACE_Y
-	skid.mesh.size = Vector2(0.25, 0.25)
+	skid.mesh.size = Vector2(0.35, 0.35)
 	
 	var mat_skid = StandardMaterial3D.new()
 	mat_skid.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat_skid.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat_skid.albedo_color = Color(0.1, 0.1, 0.1, 0.4)
+	mat_skid.albedo_color = Color(0.1, 0.1, 0.1, 0.35)
 	mat_skid.vertex_color_use_as_albedo = true
 	skid.material_override = mat_skid
 	
 	var skid_grad = Gradient.new()
-	skid_grad.offsets = PackedFloat32Array([0.0, 0.8, 1.0])
+	skid_grad.offsets = PackedFloat32Array([0.0, 0.85, 1.0])
 	skid_grad.colors = PackedColorArray([
-		Color(0.1, 0.1, 0.1, 0.4),
-		Color(0.1, 0.1, 0.1, 0.4),
+		Color(0.1, 0.1, 0.1, 0.35),
+		Color(0.1, 0.1, 0.1, 0.35),
 		Color(0.1, 0.1, 0.1, 0.0)
 	])
 	skid.color_ramp = skid_grad
@@ -1649,15 +1691,78 @@ func _create_drift_particles(wheel_name: String):
 	skid.local_coords = false
 	skid.top_level = true
 	skid.set_meta("pivot", pivot)
-	var local_offset = Vector3(0, WHEEL_Y_OFFSET + 0.02, 0)
-	skid.global_position = pivot.global_position + pivot.global_transform.basis * local_offset
-	skid.global_rotation = pivot.global_rotation
+	if pivot.is_inside_tree():
+		var local_offset = Vector3(0, WHEEL_Y_OFFSET + 0.02, 0)
+		skid.global_position = pivot.global_position + pivot.global_transform.basis * local_offset
+		skid.global_rotation = pivot.global_rotation
 	
 	pivot.add_child(skid)
 	drift_particles.append(skid)
 
 func _set_drift_emitting(emitting: bool):
 	for p in drift_particles:
+		if is_instance_valid(p) and p is CPUParticles3D:
+			p.emitting = emitting
+
+func _create_dirt_particles(wheel_name: String):
+	var pivot = get_node_or_null("Visuals/WheelPivot" + wheel_name)
+	if not pivot: return
+	
+	var dirt = CPUParticles3D.new()
+	dirt.name = wheel_name + "_Dirt"
+	dirt.emitting = false
+	dirt.amount = 25
+	dirt.lifetime = 0.5
+	dirt.mesh = QuadMesh.new()
+	dirt.local_coords = false
+	dirt.top_level = true
+	dirt.set_meta("pivot", pivot)
+	if pivot.is_inside_tree():
+		dirt.global_position = pivot.global_position
+		dirt.global_rotation = pivot.global_rotation
+	
+	var mat_dirt = StandardMaterial3D.new()
+	mat_dirt.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat_dirt.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat_dirt.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	mat_dirt.vertex_color_use_as_albedo = true
+	
+	var grad_tex = GradientTexture2D.new()
+	grad_tex.fill = GradientTexture2D.FILL_RADIAL
+	grad_tex.fill_from = Vector2(0.5, 0.5)
+	grad_tex.fill_to = Vector2(0.5, 0.0)
+	
+	var dirt_grad = Gradient.new()
+	dirt_grad.set_color(0, Color(0.45, 0.35, 0.22, 0.35))
+	dirt_grad.set_color(1, Color(0.45, 0.35, 0.22, 0.0))
+	grad_tex.gradient = dirt_grad
+	
+	mat_dirt.albedo_texture = grad_tex
+	dirt.material_override = mat_dirt
+	
+	dirt.direction = Vector3.UP + Vector3.BACK * 1.5
+	dirt.spread = 45.0
+	dirt.gravity = Vector3(0, -6.0, 0)
+	dirt.initial_velocity_min = 3.0
+	dirt.initial_velocity_max = 6.0
+	dirt.scale_amount_min = 0.15
+	dirt.scale_amount_max = 0.45
+	
+	var scale_curve = Curve.new()
+	scale_curve.add_point(Vector2(0.0, 0.2))
+	scale_curve.add_point(Vector2(1.0, 0.8))
+	dirt.scale_amount_curve = scale_curve
+	
+	var grad = Gradient.new()
+	grad.set_color(0, Color(0.45, 0.35, 0.22, 0.4))
+	grad.set_color(1, Color(0.45, 0.35, 0.22, 0.0))
+	dirt.color_ramp = grad
+	
+	pivot.add_child(dirt)
+	dirt_particles.append(dirt)
+
+func _set_dirt_emitting(emitting: bool):
+	for p in dirt_particles:
 		if is_instance_valid(p) and p is CPUParticles3D:
 			p.emitting = emitting
 

@@ -1,6 +1,7 @@
 shader_type spatial;
 
-uniform sampler2D albedo_texture : source_color;
+uniform sampler2D albedo_texture : source_color, filter_linear_mipmap_anisotropic;
+uniform vec4 albedo : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 uniform float uv_scale = 40.0;
 uniform vec2 uv_scale_v2 = vec2(1.0, 1.0);
 uniform float smoothness : hint_range(0.0, 1.0) = 1.0;
@@ -37,10 +38,10 @@ vec3 stochastic_sample(sampler2D tex, vec2 uv, vec2 dx, vec2 dy) {
             // Random rotation and offset
             float angle = rand.x * 6.2831;
             mat2 rot = mat2(vec2(cos(angle), -sin(angle)), vec2(sin(angle), cos(angle)));
-            vec2 sampled_uv = rot * f + rand.y;
+            vec2 sampled_uv = rot * (f - vec2(0.5)) + vec2(0.5) + rand.y;
             
             // Weight based on distance to grid center
-            float w = pow(1.0 - smoothstep(0.0, 1.414, length(f - offset)), 4.0);
+            float w = pow(1.0 - smoothstep(0.0, 1.414, length(f - offset)), 2.0);
             
             // Rotate derivatives to match cell rotation
             vec2 sampled_dx = rot * dx;
@@ -60,7 +61,7 @@ void fragment() {
     vec2 dx = dFdx(uv);
     vec2 dy = dFdy(uv);
     vec3 color = stochastic_sample(albedo_texture, uv, dx, dy);
-    ALBEDO = color;
+    ALBEDO = color * albedo.rgb;
     ROUGHNESS = smoothness;
     SPECULAR = 0.0;
 }

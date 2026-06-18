@@ -1,6 +1,45 @@
 @tool
 extends Node3D
 
+func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curve3D, for_collision: bool) -> float:
+	var h_noise = noise.get_noise_2d(px, pz) * hill_height
+
+	var closest_pos = curve.get_closest_point(Vector3(px, 0.0, pz))
+	var dist = Vector2(px, pz).distance_to(Vector2(closest_pos.x, closest_pos.z))
+
+	var sand_edge = sand_width / 2.0
+	var blend_dist = 60.0
+
+	var clearing_blend = 1.0 - smoothstep(sand_edge - 2.0, sand_edge + blend_dist, dist)
+	var road_h = closest_pos.y
+	var height = lerp(h_noise, road_h, clearing_blend)
+
+	var basin_blend = 1.0 - smoothstep(sand_edge - 2.0, sand_edge, dist)
+	if for_collision:
+		height = lerp(height, road_h - terrain_recession_collision, basin_blend)
+	else:
+		height = lerp(height, road_h - terrain_recession_visual, basin_blend)
+
+	var world_pos = Vector2(px, pz)
+	var noise_val = noise.get_noise_2d(px * 0.1, pz * 0.1) * 200.0
+	var dist_from_center = world_pos.length() + noise_val
+
+	var falloff_start = terrain_size.x * 0.25
+	var falloff_end = terrain_size.x * 0.45
+	var edge_falloff = 1.0 - clamp((dist_from_center - falloff_start) / (falloff_end - falloff_start), 0.0, 1.0)
+	height = lerp(-20.0, height, edge_falloff)
+
+	var lake_center = Vector2(-450, -500)
+	var lake_radius = 200.0
+	var dist_to_lake = Vector2(px, pz).distance_to(lake_center)
+	if dist_to_lake < lake_radius:
+		var depth = -15.0
+		var lake_blend = clamp((lake_radius - dist_to_lake) / 40.0, 0.0, 1.0)
+		height = lerp(height, depth, lake_blend)
+
+	return height
+
+
 @export var generate_now: bool:
 	set(val):
 		generate_now = false
@@ -55,6 +94,7 @@ func generate_world():
 	# IMPORTANT: Use free() in editor for immediate cleanup to prevent 'ghost' nodes
 	# queue_free() is too slow for tool scripts and causes scene-save bloat
 	for child in get_children():
+		remove_child(child)
 		child.free()
 
 	# 1. Create Data Meshes
@@ -65,7 +105,14 @@ func generate_world():
 	var terrain_instance = MeshInstance3D.new()
 	terrain_instance.name = "Terrain_Visual"
 	terrain_instance.mesh = _save_resource(visual_mesh, "terrain_visual")
-	terrain_instance.material_override = grass_material
+	if grass_material:
+		terrain_instance.material_override = grass_material
+	else:
+		var terrain_mat = StandardMaterial3D.new()
+		terrain_mat.albedo_color = Color(0.2, 0.6, 0.2)
+		terrain_mat.roughness = 1.0
+		terrain_instance.material_override = terrain_mat
+	terrain_instance.lod_bias = 10.0
 	terrain_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	add_child(terrain_instance)
 
@@ -98,9 +145,13 @@ func _save_resource(res: Resource, res_name: String) -> Resource:
 
 	var extension = ".res"
 	var file_path = dir_path + res_name + extension
+	
+	# Crucial: take over the path in the resource cache so that the editor 
+	# uses this new mesh immediately instead of serving the old cached one.
+	res.take_over_path(file_path)
 	ResourceSaver.save(res, file_path)
-	# Important: Load the resource back from disk to ensure it's treated as an external dependency
-	return load(file_path)
+	
+	return res
 
 func _set_owner_recursive(node: Node):
 
@@ -120,6 +171,7 @@ func _generate_mesh(for_collision: bool) -> ArrayMesh:
 
 	var st = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_smooth_group(0) 
 
 	var step_x = terrain_size.x / terrain_resolution
 	var step_y = terrain_size.y / terrain_resolution
@@ -133,69 +185,35 @@ func _generate_mesh(for_collision: bool) -> ArrayMesh:
 			var px = start_x + x * step_x
 			var pz = start_y + y * step_y
 
-			var h_noise = noise.get_noise_2d(px, pz) * hill_height
+			# Get the exact height at this point
+			var height = _get_terrain_height(px, pz, noise, curve, for_collision)
 
-			var closest_pos = curve.get_closest_point(Vector3(px, 0.0, pz))
-			var dist = Vector2(px, pz).distance_to(Vector2(closest_pos.x, closest_pos.z))
+			# Calculate analytical/sampled smooth normal
+			var eps = 1.0
+			var h_L = _get_terrain_height(px - eps, pz, noise, curve, for_collision)
+			var h_R = _get_terrain_height(px + eps, pz, noise, curve, for_collision)
+			var h_D = _get_terrain_height(px, pz - eps, noise, curve, for_collision)
+			var h_U = _get_terrain_height(px, pz + eps, noise, curve, for_collision)
+			var normal = Vector3(h_L - h_R, 2.0 * eps, h_D - h_U).normalized()
 
-			var sand_edge = sand_width / 2.0
-			var blend_dist = 60.0 # Tighter clearing for better mountain-road integration
-
-			# Use smoothstep for the clearing transition to prevent floating-point "jagged" edges
-			var clearing_blend = 1.0 - smoothstep(sand_edge - 2.0, sand_edge + blend_dist, dist)
-
-			var road_h = curve.get_closest_point(Vector3(px, 0.0, pz)).y
-
-			# Blend the natural hill noise with the road's elevation
-			var height = lerp(h_noise, road_h, clearing_blend)
-
-			# Apply the road basin (recession) with a smooth falloff to avoid gaps
-			var basin_blend = 1.0 - smoothstep(sand_edge - 2.0, sand_edge, dist)
-			if for_collision:
-				height = lerp(height, road_h - terrain_recession_collision, basin_blend)
-			else:
-				height = lerp(height, road_h - terrain_recession_visual, basin_blend)
-
-
-			# ORGANIC COASTLINE LOGIC:
-			var world_pos = Vector2(px, pz)
-			# Add noise to the distance to break the "round" shape
-			var noise_val = noise.get_noise_2d(px * 0.1, pz * 0.1) * 200.0
-			var dist_from_center = world_pos.length() + noise_val
-
-			var falloff_start = terrain_size.x * 0.25
-			var falloff_end = terrain_size.x * 0.45
-			var edge_falloff = 1.0 - clamp((dist_from_center - falloff_start) / (falloff_end - falloff_start), 0.0, 1.0)
-
-			# LAKE AND EDGE LOGIC COMBO:
-			var target_edge_height = -20.0
-			height = lerp(target_edge_height, height, edge_falloff)
-
-			var lake_center = Vector2(-450, -500)
-			var lake_radius = 200.0
-			var dist_to_lake = Vector2(px, pz).distance_to(lake_center)
-			if dist_to_lake < lake_radius:
-				var depth = -15.0
-				var lake_blend = clamp((lake_radius - dist_to_lake) / 40.0, 0.0, 1.0)
-				height = lerp(height, depth, lake_blend)
-
+			st.set_normal(normal)
 			st.set_uv(Vector2(px, pz))
 			st.add_vertex(Vector3(px, height, pz))
 
-	# Fixed Winding Order (CCW - Facing UP)
+	# Winding Order (CCW - Facing UP)
 	for y in range(terrain_resolution):
 		for x in range(terrain_resolution):
 			var i = y * (terrain_resolution + 1) + x
-			# Triangle 1 (v0, v1, v2)
 			st.add_index(i)
 			st.add_index(i + 1)
 			st.add_index(i + terrain_resolution + 1)
-			# Triangle 2 (v1, v3, v2)
+			
 			st.add_index(i + 1)
 			st.add_index(i + terrain_resolution + 2)
 			st.add_index(i + terrain_resolution + 1)
 
-	st.generate_normals()
+	# IMPORTANT: We do NOT call st.generate_normals() because we manually calculated 
+	# them above to eliminate the polygon/faceted look.
 	st.generate_tangents()
 	return st.commit()
 
@@ -229,6 +247,11 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 	var curve = track_path.curve
 	var half_w = width / 2.0
 	var length = curve.get_baked_length()
+	
+	var is_curb = node_name.contains("Curbs")
+	var inner_w = road_width / 2.0
+	var outer_w = half_w
+	var curb_slope = 0.15
 
 	# Ensure we have a high priority to avoid any conflict with terrain
 	var mat_dup = mat.duplicate()
@@ -269,7 +292,8 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 			var p_next = curve.sample_baked(min(length, offset + 0.2))
 			tangent = (p_next - pos).normalized()
 
-		var right = tangent.cross(Vector3.UP).normalized() * half_w
+		var right_dir = tangent.cross(Vector3.UP).normalized()
+		var right = right_dir * half_w
 
 		# EXPLICIT LOOP SNAPPING:
 		# If this is the last vertex of a loop, force it to match the first vertex exactly
@@ -278,35 +302,81 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 			# Re-calculate first pos for perfect match
 			final_pos = curve.sample_baked(0.0)
 
-		st.set_normal(Vector3.UP)
-		st.set_uv(Vector2(0, offset))
-		st.add_vertex(final_pos - right + Vector3(0, y_offset, 0))
+		if is_curb:
+			var p_lo = final_pos - right_dir * outer_w + Vector3(0, y_offset - curb_slope, 0)
+			var p_li = final_pos - right_dir * inner_w + Vector3(0, y_offset, 0)
+			var p_ri = final_pos + right_dir * inner_w + Vector3(0, y_offset, 0)
+			var p_ro = final_pos + right_dir * outer_w + Vector3(0, y_offset - curb_slope, 0)
+			
+			var left_normal = (right_dir * curb_slope + Vector3.UP * (outer_w - inner_w)).normalized()
+			var right_normal = (-right_dir * curb_slope + Vector3.UP * (outer_w - inner_w)).normalized()
+			
+			st.set_normal(left_normal)
+			st.set_uv(Vector2(0, offset))
+			st.add_vertex(p_lo)
+			
+			st.set_normal(left_normal)
+			st.set_uv(Vector2(0.25, offset))
+			st.add_vertex(p_li)
+			
+			st.set_normal(right_normal)
+			st.set_uv(Vector2(0.75, offset))
+			st.add_vertex(p_ri)
+			
+			st.set_normal(right_normal)
+			st.set_uv(Vector2(1.0, offset))
+			st.add_vertex(p_ro)
+		else:
+			st.set_normal(Vector3.UP)
+			st.set_uv(Vector2(0, offset))
+			st.add_vertex(final_pos - right + Vector3(0, y_offset, 0))
 
-		st.set_normal(Vector3.UP)
-		st.set_uv(Vector2(width, offset)) # Use width instead of 1 to prevent texture stretching
-		st.add_vertex(final_pos + right + Vector3(0, y_offset, 0))
+			st.set_normal(Vector3.UP)
+			st.set_uv(Vector2(width, offset)) # Use width instead of 1 to prevent texture stretching
+			st.add_vertex(final_pos + right + Vector3(0, y_offset, 0))
 
 	# INDEX LOOP (CCW - Facing UP)
 	for i in range(point_count):
-		var v0 = i * 2
-		var v1 = v0 + 1
-		var v2 = (i + 1) * 2
-		var v3 = v2 + 1
+		if is_curb:
+			var base = i * 4
+			var nxt = (i + 1) * 4
+			
+			# Left slope
+			st.add_index(base + 0); st.add_index(nxt + 0); st.add_index(base + 1)
+			st.add_index(base + 1); st.add_index(nxt + 0); st.add_index(nxt + 1)
+			
+			# Center flat
+			st.add_index(base + 1); st.add_index(nxt + 1); st.add_index(base + 2)
+			st.add_index(base + 2); st.add_index(nxt + 1); st.add_index(nxt + 2)
+			
+			# Right slope
+			st.add_index(base + 2); st.add_index(nxt + 2); st.add_index(base + 3)
+			st.add_index(base + 3); st.add_index(nxt + 2); st.add_index(nxt + 3)
+			
+			# --- UNDERSIDE ---
+			# Left slope Underside
+			st.add_index(base + 0); st.add_index(base + 1); st.add_index(nxt + 0)
+			st.add_index(base + 1); st.add_index(nxt + 1); st.add_index(nxt + 0)
+			# Center flat Underside
+			st.add_index(base + 1); st.add_index(base + 2); st.add_index(nxt + 1)
+			st.add_index(base + 2); st.add_index(nxt + 2); st.add_index(nxt + 1)
+			# Right slope Underside
+			st.add_index(base + 2); st.add_index(base + 3); st.add_index(nxt + 2)
+			st.add_index(base + 3); st.add_index(nxt + 3); st.add_index(nxt + 2)
+		else:
+			var v0 = i * 2
+			var v1 = v0 + 1
+			var v2 = (i + 1) * 2
+			var v3 = v2 + 1
 
-		# T1: Left i, Left i+1, Right i
-		st.add_index(v0); st.add_index(v2); st.add_index(v1)
-		# T2: Right i, Left i+1, Right i+1
-		st.add_index(v1); st.add_index(v2); st.add_index(v3)
+			# T1: Left i, Left i+1, Right i
+			st.add_index(v0); st.add_index(v2); st.add_index(v1)
+			# T2: Right i, Left i+1, Right i+1
+			st.add_index(v1); st.add_index(v2); st.add_index(v3)
 
-		# --- ADD UNDERSIDE (Visibility from below) ---
-		# Reversed winding order for bottom faces
-		st.add_index(v0); st.add_index(v1); st.add_index(v2)
-		st.add_index(v1); st.add_index(v3); st.add_index(v2)
-
-
-	# REMOVED: Manual Loop Closure.
-	# Since the track path starts and ends at (0,0,0), the naturally generated triangles already close the visual gap.
-	# Adding extra faces created overlapping/degenerate triangles.
+			# --- ADD UNDERSIDE (Visibility from below) ---
+			st.add_index(v0); st.add_index(v1); st.add_index(v2)
+			st.add_index(v1); st.add_index(v3); st.add_index(v2)
 
 
 	st.generate_tangents()
@@ -335,6 +405,9 @@ func _create_track_collision(point_count: int, width: float, node_name: String):
 	var y_offset = road_y_offset # Match road height exactly
 	var thickness = 5.0 # Increased thickness for better underground anchoring
 
+	var inner_w = road_width / 2.0
+	var outer_w = half_w
+	var curb_slope = 0.15
 
 	# Create Top and Bottom vertices
 	for i in range(point_count + 1):
@@ -362,47 +435,74 @@ func _create_track_collision(point_count: int, width: float, node_name: String):
 
 		if tangent.length() < 0.01:
 			tangent = (pos - curve.sample_baked(max(offset - 0.5, 0.0))).normalized()
-		var right = tangent.cross(Vector3.UP).normalized() * half_w
+		var right_dir = tangent.cross(Vector3.UP).normalized()
 
 		var final_pos = pos
 		if is_loop and i == point_count:
 			final_pos = curve.sample_baked(0.0)
 
-		var tl = final_pos - right + Vector3(0, y_offset, 0)
-		var tr = final_pos + right + Vector3(0, y_offset, 0)
-		var bl = tl - Vector3(0, thickness, 0)
-		var br = tr - Vector3(0, thickness, 0)
+		# Top vertices
+		var p_lo = final_pos - right_dir * outer_w + Vector3(0, y_offset - curb_slope, 0)
+		var p_li = final_pos - right_dir * inner_w + Vector3(0, y_offset, 0)
+		var p_ri = final_pos + right_dir * inner_w + Vector3(0, y_offset, 0)
+		var p_ro = final_pos + right_dir * outer_w + Vector3(0, y_offset - curb_slope, 0)
+		
+		# Bottom vertices
+		var p_lob = p_lo - Vector3(0, thickness, 0)
+		var p_lib = p_li - Vector3(0, thickness, 0)
+		var p_rib = p_ri - Vector3(0, thickness, 0)
+		var p_rob = p_ro - Vector3(0, thickness, 0)
 
-		st.add_vertex(tl) # 4*i + 0
-		st.add_vertex(tr) # 4*i + 1
-		st.add_vertex(bl) # 4*i + 2
-		st.add_vertex(br) # 4*i + 3
+		st.add_vertex(p_lo)  # 8*i + 0
+		st.add_vertex(p_li)  # 8*i + 1
+		st.add_vertex(p_ri)  # 8*i + 2
+		st.add_vertex(p_ro)  # 8*i + 3
+		st.add_vertex(p_lob) # 8*i + 4
+		st.add_vertex(p_lib) # 8*i + 5
+		st.add_vertex(p_rib) # 8*i + 6
+		st.add_vertex(p_rob) # 8*i + 7
 
 	for i in range(point_count):
-		var base = i * 4
-		var nxt = (i + 1) * 4
+		var base = i * 8
+		var nxt = (i + 1) * 8
 
-		# Top Face
+		# Top Faces
+		# Left slope
 		st.add_index(base + 0); st.add_index(nxt + 0); st.add_index(base + 1)
 		st.add_index(base + 1); st.add_index(nxt + 0); st.add_index(nxt + 1)
+		
+		# Center flat
+		st.add_index(base + 1); st.add_index(nxt + 1); st.add_index(base + 2)
+		st.add_index(base + 2); st.add_index(nxt + 1); st.add_index(nxt + 2)
+		
+		# Right slope
+		st.add_index(base + 2); st.add_index(nxt + 2); st.add_index(base + 3)
+		st.add_index(base + 3); st.add_index(nxt + 2); st.add_index(nxt + 3)
 
-		# Bottom Face (Reverse winding)
-		st.add_index(base + 2); st.add_index(base + 3); st.add_index(nxt + 2)
-		st.add_index(base + 3); st.add_index(nxt + 3); st.add_index(nxt + 2)
+		# Bottom Faces (Reverse winding)
+		# Left slope bottom
+		st.add_index(base + 4); st.add_index(base + 5); st.add_index(nxt + 4)
+		st.add_index(base + 5); st.add_index(nxt + 5); st.add_index(nxt + 4)
+		
+		# Center flat bottom
+		st.add_index(base + 5); st.add_index(base + 6); st.add_index(nxt + 5)
+		st.add_index(base + 6); st.add_index(nxt + 6); st.add_index(nxt + 5)
+		
+		# Right slope bottom
+		st.add_index(base + 6); st.add_index(base + 7); st.add_index(nxt + 6)
+		st.add_index(base + 7); st.add_index(nxt + 7); st.add_index(nxt + 6)
 
-		# Left Side
-		st.add_index(base + 0); st.add_index(base + 2); st.add_index(nxt + 0)
-		st.add_index(base + 2); st.add_index(nxt + 2); st.add_index(nxt + 0)
+		# Left Side Wall
+		st.add_index(base + 0); st.add_index(base + 4); st.add_index(nxt + 0)
+		st.add_index(base + 4); st.add_index(nxt + 4); st.add_index(nxt + 0)
 
-		# Right Side
-		st.add_index(base + 1); st.add_index(nxt + 1); st.add_index(base + 3)
-		st.add_index(base + 3); st.add_index(nxt + 1); st.add_index(nxt + 3)
-
-	# REMOVED: Manual Collision Loop Closure.
-	# Path naturally loops at (0,0,0). Manual closure was creating degenerate geometry.
+		# Right Side Wall
+		st.add_index(base + 3); st.add_index(nxt + 3); st.add_index(base + 7)
+		st.add_index(base + 7); st.add_index(nxt + 3); st.add_index(nxt + 7)
 
 	var track_mesh = st.commit()
 	var static_body = StaticBody3D.new()
+	static_body.name = "Track_Collision"
 	add_child(static_body)
 	var col_shape = CollisionShape3D.new()
 	var trimesh_shape = track_mesh.create_trimesh_shape()
@@ -540,6 +640,10 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 	var half_w = width / 2.0
 	var depth = 2.5 # Thickness of the road hull
 
+	var side_y_offset = y_offset
+	if node_name.contains("Curbs"):
+		side_y_offset = y_offset - 0.15
+
 	# 1. VERTEX GENERATION
 	for i in range(point_count + 1):
 		var offset = (float(i) / point_count) * length
@@ -568,8 +672,8 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 
 		var right = tangent.cross(Vector3.UP).normalized() * half_w
 
-		var top_l = pos - right + Vector3(0, y_offset, 0)
-		var top_r = pos + right + Vector3(0, y_offset, 0)
+		var top_l = pos - right + Vector3(0, side_y_offset, 0)
+		var top_r = pos + right + Vector3(0, side_y_offset, 0)
 		var bot_l = top_l - Vector3(0, depth, 0)
 		var bot_r = top_r - Vector3(0, depth, 0)
 
