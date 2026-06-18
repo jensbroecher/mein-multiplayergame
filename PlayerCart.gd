@@ -136,6 +136,7 @@ var is_boosting = false
 
 @onready var sfx_brake_drift = $Visuals/SFX_BrakeDrift
 var is_drifting: bool = false
+var was_on_ground: bool = true
 var wheel_rotation: float = 0.0
 var is_teleporting: bool = false
 var is_shielded: bool = false
@@ -553,6 +554,10 @@ func _physics_process(delta):
 	input_dir.y = Input.get_axis("throttle", "brake")
 
 	var on_ground = ground_ray.is_colliding()
+	if on_ground and not was_on_ground:
+		play_landing_sound_rpc.rpc()
+	was_on_ground = on_ground
+
 	var ground_normal = Vector3.UP
 	if on_ground:
 		ground_normal = ground_ray.get_collision_normal()
@@ -966,6 +971,10 @@ func _execute_use_item(type: int):
 		ItemType.BOMB:
 			_drop_bomb()
 
+@rpc("any_peer", "call_local", "unreliable")
+func play_landing_sound_rpc():
+	sfx_landing_bonk.play()
+
 @rpc("any_peer", "call_local", "reliable")
 func client_start_boost():
 	boost_timer = 2.0
@@ -1230,6 +1239,7 @@ func respawn():
 	is_underwater = false
 	water_timer = 0.0
 	last_splash_time = -999.0
+	was_on_ground = true
 	# Kill any in-flight drown fade tween so it can't overwrite the restored alpha
 	if _drown_tween:
 		_drown_tween.kill()

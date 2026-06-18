@@ -6,7 +6,8 @@ extends CanvasLayer
 @onready var btn_start = $LobbyPanel/VBoxContainer/ButtonStart
 
 @onready var hud_panel = $HUDPanel
-@onready var label_pos = $HUDPanel/LabelPosition
+@onready var label_pos = $HUDPanel/PositionContainer/LabelPosition
+@onready var label_pos_total = $HUDPanel/PositionContainer/LabelPositionTotal
 @onready var label_lap = $HUDPanel/LabelLap
 @onready var label_msg = $HUDPanel/LabelMessage
 @onready var label_speed = $HUDPanel/LabelSpeed
@@ -116,7 +117,8 @@ func show_hud():
 	hud_panel.show()
 
 func update_hud(pos: int, total: int, lap: int, max_laps: int):
-	label_pos.text = "Pos: %d/%d" % [pos, total]
+	label_pos.text = "%d" % pos
+	label_pos_total.text = "/ %d" % total
 	label_lap.text = "Lap: %d/%d" % [lap, max_laps]
 
 func show_message(msg: String, duration: float = 0.0):
