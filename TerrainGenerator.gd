@@ -65,12 +65,7 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 @export var terrain_recession_collision: float = 0.10
 
 @export_group("Procedural Generation")
-@export var terrain_grass_count: int = 40000
-@export var regenerate: bool:
-	set(val):
-		regenerate = false
-		if Engine.is_editor_hint():
-			generate_world()
+@export var terrain_grass_count: int = 12000
 
 @export var create_longer_track: bool:
 	set(val):
@@ -80,7 +75,6 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 
 @export var grass_material: Material
 @export var road_material: Material
-@export var sand_material: Material
 @export var save_to_files: bool = true
 
 
@@ -750,59 +744,36 @@ func _generate_water():
 	add_child(water)
 
 func _create_grass_mesh() -> ArrayMesh:
-	# Number of blades baked into every single MultiMesh instance.
-	# Increasing this gives denser-looking grass with zero extra draw calls.
-	const BLADES_PER_CLUSTER := 24
-	# Radius of the cluster footprint (meters)
-	const CLUSTER_RADIUS := 0.7
-	# Half-width of one blade at its base
-	const BLADE_HALF_W := 0.018
-	# Height range for individual blades within a cluster
-	const BLADE_H_MIN := 0.32
-	const BLADE_H_MAX := 0.58
-	# How much a blade can lean outward from the cluster centre
-	const LEAN_STRENGTH := 0.07
-
 	var st = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 42  # Fixed seed so the mesh is deterministic (same every run)
+	var w := 0.75 # half width
+	var h := 0.95 # height
+	var base_y := -0.2
 
-	for b in range(BLADES_PER_CLUSTER):
-		# Spread blades evenly around the cluster with a bit of jitter
-		var base_angle := (float(b) / BLADES_PER_CLUSTER) * TAU
-		var jitter := rng.randf_range(-0.3, 0.3)
-		var angle := base_angle + jitter
+	# Single Plane (along X-axis)
+	var v0 := Vector3(-w, base_y, 0.0)
+	var v1 := Vector3(w, base_y, 0.0)
+	var v2 := Vector3(w, h + base_y, 0.0)
+	var v3 := Vector3(-w, h + base_y, 0.0)
 
-		# Offset from cluster origin
-		var dist := rng.randf_range(0.0, CLUSTER_RADIUS)
-		var ox := cos(angle) * dist
-		var oz := sin(angle) * dist
+	# Front face
+	st.set_uv(Vector2(0.0, 1.0)); st.add_vertex(v0)
+	st.set_uv(Vector2(1.0, 1.0)); st.add_vertex(v1)
+	st.set_uv(Vector2(1.0, 0.0)); st.add_vertex(v2)
 
-		# Per-blade variation
-		var bh := rng.randf_range(BLADE_H_MIN, BLADE_H_MAX)
-		var blade_rot := rng.randf_range(0.0, TAU)  # Each blade faces its own direction
-		var lean_x := cos(angle) * LEAN_STRENGTH     # Tip leans away from centre
-		var lean_z := sin(angle) * LEAN_STRENGTH
+	st.set_uv(Vector2(0.0, 1.0)); st.add_vertex(v0)
+	st.set_uv(Vector2(1.0, 0.0)); st.add_vertex(v2)
+	st.set_uv(Vector2(0.0, 0.0)); st.add_vertex(v3)
 
-		# Build a local right-vector based on blade_rot so the blade face is random
-		var rx := cos(blade_rot) * BLADE_HALF_W
-		var rz := sin(blade_rot) * BLADE_HALF_W
+	# Back face
+	st.set_uv(Vector2(1.0, 1.0)); st.add_vertex(v1)
+	st.set_uv(Vector2(0.0, 1.0)); st.add_vertex(v0)
+	st.set_uv(Vector2(0.0, 0.0)); st.add_vertex(v3)
 
-		var v0 := Vector3(ox - rx, 0.0, oz - rz)
-		var v1 := Vector3(ox + rx, 0.0, oz + rz)
-		var v2 := Vector3(ox + lean_x, bh, oz + lean_z)
-
-		# Front face
-		st.set_uv(Vector2(0.0, 1.0)); st.add_vertex(v0)
-		st.set_uv(Vector2(1.0, 1.0)); st.add_vertex(v1)
-		st.set_uv(Vector2(0.5, 0.0)); st.add_vertex(v2)
-
-		# Back face (reverse winding so cull_disabled isn't needed, but kept for safety)
-		st.set_uv(Vector2(1.0, 1.0)); st.add_vertex(v1)
-		st.set_uv(Vector2(0.0, 1.0)); st.add_vertex(v0)
-		st.set_uv(Vector2(0.5, 0.0)); st.add_vertex(v2)
+	st.set_uv(Vector2(1.0, 1.0)); st.add_vertex(v1)
+	st.set_uv(Vector2(0.0, 0.0)); st.add_vertex(v3)
+	st.set_uv(Vector2(1.0, 0.0)); st.add_vertex(v2)
 
 	st.generate_normals()
 	st.generate_tangents()
@@ -849,13 +820,17 @@ func _generate_terrain_grass():
 	noise.fractal_octaves = 4
 	
 	var grass_mesh = _create_grass_mesh()
-	
-	# Dynamic wind-sway shader
+	# Dynamic grass shader with distance fade-out (collapses far away grass vertices to 0 for maximum performance, no wind sway)
 	var shader = Shader.new()
-	shader.code = "shader_type spatial;\nrender_mode cull_disabled, diffuse_toon, specular_disabled;\n\nuniform vec4 albedo : source_color = vec4(0.22, 0.62, 0.15, 1.0);\nuniform vec4 albedo_dark : source_color = vec4(0.12, 0.42, 0.08, 1.0);\nuniform float wind_speed = 1.0;\nuniform float wind_strength = 0.05;\n\nvarying float height_val;\n\nvoid vertex() {\n\theight_val = VERTEX.y;\n\tif (VERTEX.y > 0.05) {\n\t\tfloat time = TIME * wind_speed;\n\t\tvec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;\n\t\tfloat offset = sin(time + world_pos.x * 1.5 + world_pos.z * 1.5) * wind_strength * (VERTEX.y / 0.5);\n\t\tVERTEX.x += offset;\n\t\tVERTEX.z += offset * 0.3;\n\t}\n}\n\nvoid fragment() {\n\tfloat h = clamp(height_val * 2.0, 0.0, 1.0);\n\tvec3 color = mix(albedo_dark.rgb, albedo.rgb, h);\n\tALBEDO = color;\n\tROUGHNESS = 1.0;\n\tEMISSION = color * 0.12;\n}"
+	shader.code = "shader_type spatial;\nrender_mode cull_disabled, diffuse_toon, specular_disabled;\n\nuniform sampler2D albedo_texture : source_color, filter_nearest_mipmap;\nuniform vec4 albedo_tint : source_color = vec4(1.0, 1.0, 1.0, 1.0);\n\nvarying float height_val;\n\nvoid vertex() {\n\theight_val = VERTEX.y;\n\tvec3 view_pos = (MODELVIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;\n\tfloat dist = length(view_pos);\n\tfloat max_dist = 100.0;\n\tfloat fade_r = 30.0;\n\tif (dist > max_dist) {\n\t\tVERTEX = vec3(0.0);\n\t\theight_val = 0.0;\n\t} else {\n\t\tif (dist > max_dist - fade_r) {\n\t\t\tfloat fade = (max_dist - dist) / fade_r;\n\t\t\tVERTEX *= fade;\n\t\t}\n\t}\n}\n\nvoid fragment() {\n\tvec4 tex_color = texture(albedo_texture, UV);\n\tALBEDO = tex_color.rgb * albedo_tint.rgb;\n\tALPHA = tex_color.a;\n\tALPHA_SCISSOR_THRESHOLD = 0.4;\n\tROUGHNESS = 1.0;\n\tEMISSION = ALBEDO * 0.12;\n}"
 	
 	var mat = ShaderMaterial.new()
 	mat.shader = shader
+	
+	var tex_path = "res://sprites/grass.png"
+	if ResourceLoader.exists(tex_path):
+		var tex = load(tex_path)
+		mat.set_shader_parameter("albedo_texture", tex)
 	
 	# ---------------------------------------------------------------
 	# OPTIMISATION 1: Pre-bake the curve once (sample every 4 m).
@@ -934,6 +909,7 @@ func _generate_terrain_grass():
 		
 	var mmi := MultiMeshInstance3D.new()
 	mmi.name = "Procedural_Terrain_Grass"
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mmi)
 	
 	var mm := MultiMesh.new()

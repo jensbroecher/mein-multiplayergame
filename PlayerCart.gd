@@ -492,7 +492,7 @@ func _physics_process(delta):
 
 	if currently_underwater != is_underwater:
 		if currently_underwater:
-			# --- Water Impact ---
+			# --- Water Impact (Big Splash) ---
 			var current_time = Time.get_ticks_msec() / 1000.0
 			if current_time - last_splash_time > 0.2:
 				last_splash_time = current_time
@@ -516,23 +516,31 @@ func _physics_process(delta):
 					
 				# Strong velocity kill simulating hitting dense water
 				linear_velocity *= 0.18
-				# Kill any remaining downward momentum so the car doesn't bounce back up
-				# (upward impulse would push it above WATER_LEVEL and cause a bounce loop)
 				if linear_velocity.y < 0:
 					linear_velocity.y = 0.0
 				
-				# Trigger the new standalone, multi-instanced WaterSplash
 				var splash_pos = Vector3(global_position.x, WATER_LEVEL, global_position.z)
-				if WATER_SPLASH_SCENE:
-					var splash_instance = WATER_SPLASH_SCENE.instantiate()
-					get_tree().current_scene.add_child(splash_instance)
-					splash_instance.global_position = splash_pos
+				_spawn_splash(splash_pos, 1.0)
+		else:
+			# --- Exit Water (Small Splash) ---
+			var current_time = Time.get_ticks_msec() / 1000.0
+			last_splash_time = current_time
+			var splash_pos = Vector3(global_position.x, WATER_LEVEL, global_position.z)
+			_spawn_splash(splash_pos, 0.4) # Spawn a small splash on exit
 		is_underwater = currently_underwater
 		water_timer = 0.0
 
+	# --- Puddles / Shallow Water periodic small splashes ---
+	if ground_ray.is_colliding() and not is_underwater and global_position.y >= WATER_LEVEL and global_position.y < WATER_LEVEL + 0.6 and linear_velocity.length() > 3.0:
+		var current_time = Time.get_ticks_msec() / 1000.0
+		if current_time - last_splash_time > 0.35:
+			last_splash_time = current_time
+			var splash_pos = Vector3(global_position.x, WATER_LEVEL, global_position.z)
+			_spawn_splash(splash_pos, 0.35)
+
 	if is_underwater:
 		water_timer += delta
-		if water_timer > 2.0:
+		if water_timer > 0.8: # Drown faster (0.8 seconds underwater triggers drown)
 			if multiplayer.is_server():
 				drown_rpc.rpc()
 			elif not multiplayer.has_multiplayer_peer():
@@ -1296,7 +1304,7 @@ func drown():
 	_drown_tween.tween_callback(func(): visuals.visible = false)
 	
 	if multiplayer.is_server():
-		get_tree().create_timer(1.5).timeout.connect(
+		get_tree().create_timer(1.2).timeout.connect(
 			func(): if is_instance_valid(self): respawn_rpc.rpc()
 		)
 
@@ -1814,3 +1822,32 @@ func _get_ground_height(global_pos: Vector3) -> float:
 	if result:
 		return result.position.y
 	return -999.0
+
+func _spawn_splash(pos: Vector3, size_scale: float = 1.0):
+	if WATER_SPLASH_SCENE:
+		var splash_instance = WATER_SPLASH_SCENE.instantiate()
+		splash_instance.scale = Vector3(size_scale, size_scale, size_scale)
+		# Reduce particle counts on smaller splashes using amount_ratio
+		if size_scale < 1.0:
+			for child in splash_instance.get_children():
+				if child is GPUParticles3D or child is CPUParticles3D:
+					if "amount_ratio" in child:
+						child.amount_ratio = size_scale
+		get_tree().current_scene.add_child(splash_instance)
+		splash_instance.global_position = pos
+
+		# Play high-pitched, quieter splash sound for tiny splashes (puddles / exits)
+		if size_scale < 1.0 and not REGULAR_SPLASH_SOUNDS.is_empty():
+			var stream = REGULAR_SPLASH_SOUNDS[randi() % REGULAR_SPLASH_SOUNDS.size()]
+			if stream:
+				var ap = AudioStreamPlayer3D.new()
+				ap.stream = stream
+				ap.bus = &"SFX"
+				ap.max_distance = 50.0
+				ap.unit_size = 5.0
+				ap.volume_db = lerp(-7.0, -1.0, size_scale)
+				ap.pitch_scale = lerp(1.35, 1.0, size_scale)
+				get_tree().current_scene.add_child(ap)
+				ap.global_position = pos
+				ap.play()
+				get_tree().create_timer(stream.get_length() + 0.5).timeout.connect(ap.queue_free)

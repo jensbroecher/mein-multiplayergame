@@ -485,6 +485,8 @@ func _apply_tree_leaves_tint(node: Node):
 						if img and not img.is_empty():
 							# Resize to 1x1 to get average color
 							var temp_img = img.duplicate()
+							if temp_img.is_compressed():
+								temp_img.decompress()
 							temp_img.resize(1, 1, Image.INTERPOLATE_LANCZOS)
 							var avg_color = temp_img.get_pixel(0, 0)
 							var hue = avg_color.h
