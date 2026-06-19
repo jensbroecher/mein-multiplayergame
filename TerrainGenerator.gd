@@ -752,9 +752,9 @@ func _generate_water():
 func _create_grass_mesh() -> ArrayMesh:
 	# Number of blades baked into every single MultiMesh instance.
 	# Increasing this gives denser-looking grass with zero extra draw calls.
-	const BLADES_PER_CLUSTER := 8
+	const BLADES_PER_CLUSTER := 24
 	# Radius of the cluster footprint (meters)
-	const CLUSTER_RADIUS := 0.28
+	const CLUSTER_RADIUS := 0.7
 	# Half-width of one blade at its base
 	const BLADE_HALF_W := 0.018
 	# Height range for individual blades within a cluster
@@ -903,7 +903,25 @@ func _generate_terrain_grass():
 			continue
 		
 		var pos := Vector3(px, height, pz)
-		var basis := Basis(Vector3.UP, randf() * PI * 2.0)
+		
+		# Calculate analytical normal at the grass position to align it with slopes
+		var eps = 0.5
+		var h_L = _get_terrain_height(px - eps, pz, noise, curve, false)
+		var h_R = _get_terrain_height(px + eps, pz, noise, curve, false)
+		var h_D = _get_terrain_height(px, pz - eps, noise, curve, false)
+		var h_U = _get_terrain_height(px, pz + eps, noise, curve, false)
+		var normal = Vector3(h_L - h_R, 2.0 * eps, h_D - h_U).normalized()
+		
+		var up = normal
+		var fwd_vec = Vector3.FORWARD
+		if abs(up.dot(fwd_vec)) > 0.99:
+			fwd_vec = Vector3.UP
+		var right_vec = fwd_vec.cross(up).normalized()
+		fwd_vec = up.cross(right_vec).normalized()
+		
+		var basis := Basis(right_vec, up, -fwd_vec)
+		basis = basis.rotated(up, randf() * PI * 2.0)
+		
 		var sh := randf_range(0.8, 1.4)
 		var sw := randf_range(0.8, 1.2)
 		basis = basis.scaled(Vector3(sw, sh, sw))

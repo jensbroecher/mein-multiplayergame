@@ -42,6 +42,7 @@ const GRASS_PATH = "res://models/trees/grass.glb"
 
 func _ready():
 	_update_boundary()
+	adjust_vegetation_colors()
 	if not Engine.is_editor_hint():
 		# Hide boundary helper during game play
 		var helper = get_node_or_null("BoundaryHelper")
@@ -409,3 +410,105 @@ func _scatter_group_multimesh(scene: PackedScene, count: int, scale_min: float, 
 		inst.free()
 		if original_mat:
 			mmi.material_override = original_mat
+
+func adjust_vegetation_colors():
+	var container = get_node_or_null("VegetationContainer")
+	if not container:
+		return
+		
+	# Shader for grass
+	var grass_shader = Shader.new()
+	grass_shader.code = "shader_type spatial;\nrender_mode cull_disabled;\n\nuniform vec4 albedo : source_color = vec4(0.25, 0.72, 0.12, 1.0);\nuniform sampler2D albedo_texture : source_color, filter_nearest_mipmap;\nuniform float alpha_scissor_threshold : hint_range(0.0, 1.0) = 0.1;\n\nvoid fragment() {\n\tvec4 tex_color = texture(albedo_texture, UV);\n\tALBEDO = albedo.rgb * 1.25;\n\tEMISSION = albedo.rgb * 0.15;\n\tfloat alpha = tex_color.a;\n\tif (tex_color.a >= 0.99) {\n\t\talpha = tex_color.r;\n\t}\n\tALPHA = alpha;\n\tALPHA_SCISSOR_THRESHOLD = alpha_scissor_threshold;\n}"
+	
+	var grass_mat = ShaderMaterial.new()
+	grass_mat.shader = grass_shader
+	grass_mat.set_shader_parameter("albedo", Color(0.25, 0.72, 0.12))
+	
+	var tex_path = "res://models/trees/grass_tall-grass-png-44173_bw.webp"
+	if ResourceLoader.exists(tex_path):
+		var tex = load(tex_path)
+		grass_mat.set_shader_parameter("albedo_texture", tex)
+		
+	_process_node_colors(container, grass_mat)
+
+func _process_node_colors(node: Node, grass_mat: Material):
+	if node is MeshInstance3D or node is MultiMeshInstance3D:
+		var name_lower = node.name.to_lower()
+		
+		# Identify grass meshes
+		if "grass" in name_lower or (node.get_parent() and "grass" in node.get_parent().name.to_lower()):
+			node.material_override = grass_mat
+		else:
+			# Traverse materials and check if we are in a tree (parent/grandparent name containing tree/pine)
+			var is_tree = false
+			var p = node.get_parent()
+			while p and p != get_node_or_null("VegetationContainer"):
+				if "tree" in p.name.to_lower() or "pine" in p.name.to_lower():
+					is_tree = true
+					break
+				p = p.get_parent()
+				
+			if is_tree:
+				_apply_tree_leaves_tint(node)
+				
+	for child in node.get_children():
+		_process_node_colors(child, grass_mat)
+
+func _apply_tree_leaves_tint(node: Node):
+	if node is MeshInstance3D:
+		var mat = node.material_override
+		if not mat:
+			mat = node.get_active_material(0)
+		if mat:
+			var mat_name = mat.resource_name.to_lower()
+			var node_name = node.name.to_lower()
+			var tex_path = ""
+			var is_trunk = false
+			
+			# Check common wood/trunk keywords in node name or material name
+			for kw in ["bark", "wood", "trunk", "log", "branch", "stamm", "ast"]:
+				if kw in mat_name or kw in node_name:
+					is_trunk = true
+					break
+					
+			if mat is StandardMaterial3D:
+				if mat.albedo_texture:
+					tex_path = mat.albedo_texture.resource_path.to_lower()
+					for kw in ["bark", "wood", "trunk", "log", "branch", "stamm", "ast"]:
+						if kw in tex_path:
+							is_trunk = true
+							break
+							
+					# Color classification if name checks are inconclusive
+					if not is_trunk:
+						var img = mat.albedo_texture.get_image()
+						if img and not img.is_empty():
+							# Resize to 1x1 to get average color
+							var temp_img = img.duplicate()
+							temp_img.resize(1, 1, Image.INTERPOLATE_LANCZOS)
+							var avg_color = temp_img.get_pixel(0, 0)
+							var hue = avg_color.h
+							var sat = avg_color.s
+							# Brown/yellow/orange is hue < 0.18. Grey is low saturation.
+							# Green/yellow-green leaves should be hue >= 0.18
+							if hue < 0.18 and sat > 0.05:
+								is_trunk = true
+				else:
+					# No texture, check albedo_color directly
+					var hue = mat.albedo_color.h
+					var sat = mat.albedo_color.s
+					if hue < 0.18 and sat > 0.05:
+						is_trunk = true
+						
+			if is_trunk:
+				return
+				
+			# Duplicate standard materials so we don't modify the source on disk
+			if mat is StandardMaterial3D:
+				var new_mat = mat.duplicate()
+				# Make the leaves greener by multiplying their color or setting a green albedo
+				new_mat.albedo_color = Color(0.25, 0.75, 0.15) # Beautiful vibrant green color
+				# Increase emission slightly to avoid dark shaded parts looking too gray/black
+				new_mat.emission_enabled = true
+				new_mat.emission = Color(0.05, 0.15, 0.03)
+				node.material_override = new_mat

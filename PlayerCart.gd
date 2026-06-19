@@ -632,6 +632,8 @@ func _physics_process(delta):
 	if is_boosting:
 		var max_sp = max_speed * 1.5
 		var accel_force = acceleration * 2.0
+		if on_ground and ground_normal.y < 0.85 and fwd.dot(Vector3.UP) > 0.05:
+			accel_force = 0.0
 		if current_speed < max_sp:
 			apply_central_force(fwd * accel_force * mass)
 		boost_time += delta
@@ -639,6 +641,8 @@ func _physics_process(delta):
 	if input_dir.y < -0.1: # Forward input
 		if not is_boosting:
 			var accel_force = acceleration
+			if on_ground and ground_normal.y < 0.85 and fwd.dot(Vector3.UP) > 0.05:
+				accel_force = 0.0
 			if current_speed < max_speed * offroad_penalty:
 				apply_central_force(fwd * accel_force * mass)
 			boost_time += delta
@@ -662,10 +666,16 @@ func _physics_process(delta):
 				apply_central_force(-fwd * braking * mass)
 			elif current_speed < -0.5:
 				if current_speed > -reverse_speed * offroad_penalty:
-					apply_central_force(-fwd * (acceleration * 0.5) * mass)
+					var accel_force = acceleration * 0.5
+					if on_ground and ground_normal.y < 0.85 and (-fwd).dot(Vector3.UP) > 0.05:
+						accel_force = 0.0
+					apply_central_force(-fwd * accel_force * mass)
 			else:
 				if current_speed > -reverse_speed * offroad_penalty:
-					apply_central_force(-fwd * (acceleration * 0.7) * mass)
+					var accel_force = acceleration * 0.7
+					if on_ground and ground_normal.y < 0.85 and (-fwd).dot(Vector3.UP) > 0.05:
+						accel_force = 0.0
+					apply_central_force(-fwd * accel_force * mass)
 	else: # No throttle/brake input (coasting or stationary)
 		if not is_boosting:
 			boost_time = 0.0
@@ -709,6 +719,10 @@ func _physics_process(delta):
 			var lat_vel = linear_velocity.dot(right)
 			var grip_factor = grip
 			if is_drifting: grip_factor *= 0.22 # Low grip factor for sliding momentum
+			if on_ground and ground_normal.y < 0.85:
+				# Scale grip down as the slope gets steeper, causing the cart to slide down cliffs/steep hills
+				var slope_factor = clamp((ground_normal.y - 0.5) / (0.85 - 0.5), 0.0, 1.0)
+				grip_factor *= slope_factor
 			apply_central_force(-right * lat_vel * mass * grip_factor)
 			
 			# Emit skidmark and smoke particles when drifting or braking (only on ground)
