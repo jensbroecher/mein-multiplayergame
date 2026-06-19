@@ -11,7 +11,10 @@ extends CanvasLayer
 @onready var label_lap = $HUDPanel/LabelLap
 @onready var label_msg = $HUDPanel/LabelMessage
 @onready var label_speed = $HUDPanel/LabelSpeed
-@onready var label_item = $HUDPanel/LabelItem
+@onready var slot1_panel = $HUDPanel/ItemSlots/Slot1
+@onready var slot1_icon = $HUDPanel/ItemSlots/Slot1/Icon
+@onready var slot2_panel = $HUDPanel/ItemSlots/Slot2
+@onready var slot2_icon = $HUDPanel/ItemSlots/Slot2/Icon
 @onready var underwater_overlay = $UnderwaterOverlay
 
 func set_underwater(is_underwater: bool):
@@ -28,6 +31,19 @@ var style_blue = StyleBoxFlat.new()
 var style_orange = StyleBoxFlat.new()
 var style_red = StyleBoxFlat.new()
 
+var style_slot_empty = StyleBoxFlat.new()
+var style_slot_active = StyleBoxFlat.new()
+var style_slot_backup = StyleBoxFlat.new()
+
+var ITEM_ICONS = {
+	"BOOST": load("res://sprites/icon_boost.png"),
+	"MISSILE": load("res://sprites/icon_missile.png"),
+	"GUIDED_MISSILE": load("res://sprites/icon_guided_missile.png"),
+	"SHIELD": load("res://sprites/icon_shield.png"),
+	"SHOCKWAVE": load("res://sprites/icon_shockwave.png"),
+	"BOMB": load("res://sprites/icon_bomb.png")
+}
+
 var laps_spinbox: SpinBox
 var local_ready = false
 
@@ -42,6 +58,9 @@ func _ready():
 	
 	if not multiplayer.is_server():
 		btn_start.hide()
+		
+	if slot1_panel: slot1_panel.add_theme_stylebox_override("panel", style_slot_empty)
+	if slot2_panel: slot2_panel.add_theme_stylebox_override("panel", style_slot_empty)
 
 func _init_styleboxes():
 	for s in [style_blue, style_orange, style_red]:
@@ -53,6 +72,26 @@ func _init_styleboxes():
 	style_blue.bg_color = Color(0, 0.8, 1) # Cyan/Blue
 	style_orange.bg_color = Color(1, 0.5, 0) # Orange
 	style_red.bg_color = Color(1, 0, 0) # Red
+
+	# Style for empty slots (transparent gray border)
+	for s in [style_slot_empty, style_slot_active, style_slot_backup]:
+		s.corner_radius_top_left = 8
+		s.corner_radius_top_right = 8
+		s.corner_radius_bottom_right = 8
+		s.corner_radius_bottom_left = 8
+		s.set_border_width_all(2)
+
+	style_slot_empty.bg_color = Color(0.1, 0.1, 0.1, 0.4)
+	style_slot_empty.border_color = Color(0.3, 0.3, 0.3, 0.5)
+
+	# Style for active Slot 1 (thick gold border)
+	style_slot_active.bg_color = Color(0.12, 0.12, 0.12, 0.75)
+	style_slot_active.border_color = Color(1.0, 0.7, 0.0, 0.95)
+	style_slot_active.set_border_width_all(3)
+
+	# Style for backup Slot 2 (cyan border)
+	style_slot_backup.bg_color = Color(0.1, 0.1, 0.1, 0.7)
+	style_slot_backup.border_color = Color(0.0, 0.8, 1.0, 0.8)
 
 func _setup_lap_settings():
 	var laps_container = HBoxContainer.new()
@@ -128,9 +167,24 @@ func show_message(msg: String, duration: float = 0.0):
 		tw.tween_interval(duration)
 		tw.tween_callback(func(): if label_msg.text == msg: label_msg.text = "")
 
-func update_item(item_name: String):
-	if label_item:
-		label_item.text = "ITEM: " + item_name
+func update_items(item1_name: String, item2_name: String):
+	# Update Slot 1 (Active)
+	if slot1_panel and slot1_icon:
+		if item1_name == "NONE" or not ITEM_ICONS.has(item1_name):
+			slot1_icon.texture = null
+			slot1_panel.add_theme_stylebox_override("panel", style_slot_empty)
+		else:
+			slot1_icon.texture = ITEM_ICONS[item1_name]
+			slot1_panel.add_theme_stylebox_override("panel", style_slot_active)
+
+	# Update Slot 2 (Backup)
+	if slot2_panel and slot2_icon:
+		if item2_name == "NONE" or not ITEM_ICONS.has(item2_name):
+			slot2_icon.texture = null
+			slot2_panel.add_theme_stylebox_override("panel", style_slot_empty)
+		else:
+			slot2_icon.texture = ITEM_ICONS[item2_name]
+			slot2_panel.add_theme_stylebox_override("panel", style_slot_backup)
 
 func show_end_screen():
 	end_panel.show()

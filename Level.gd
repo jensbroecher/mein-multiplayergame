@@ -43,7 +43,7 @@ func _ready():
 
 	_rebuild_checkpoints()
 	_setup_checkpoints()
-	_spawn_item_boxes()
+	_spawn_item_boxes_deferred()
 
 	# Automatically add collisions to checkpoints, finish line, and ramps at runtime
 	_add_collisions_to_matching_nodes(self)
@@ -72,7 +72,7 @@ func _ready():
 		NetworkManager.player_disconnected.connect(_on_server_player_disconnected)
 
 		if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP:
-			var bot_names = ["Viper Bot", "Lightning Bot", "Apex Bot"]
+			var bot_names = ["Viper Bot", "Shadow Bot", "Apex Bot"]
 			var bot_cars = [1, 2, 3]
 			for i in range(3):
 				var bot_id = 100 + i
@@ -404,6 +404,11 @@ func on_player_exploded(is_local: bool):
 	if is_local:
 		race_ui.show_message("WRECKED", 3.0)
 
+func _spawn_item_boxes_deferred():
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	_spawn_item_boxes()
+
 func _spawn_item_boxes():
 	# Spawn a row of 3 items across each checkpoint gate and the finish line
 	var cp_idx = 0
@@ -418,6 +423,74 @@ func _spawn_item_boxes():
 			add_child(box)
 			box.global_position = cp.global_position + right_dir * offset + Vector3(0, 1.5, 0)
 		cp_idx += 1
+	
+	# Spawn 15 additional random item boxes along the track
+	_spawn_random_item_boxes(15)
+
+func _spawn_random_item_boxes(count: int):
+	if not track_path: return
+	var curve = track_path.curve
+	var length = curve.get_baked_length()
+	var space_state = get_world_3d().direct_space_state
+	if not space_state: return
+
+	var spawned_count = 0
+	var attempts = 0
+	var max_attempts = count * 25
+	
+	while spawned_count < count and attempts < max_attempts:
+		attempts += 1
+		var offset = randf_range(10.0, length - 10.0) # Avoid spawning directly on the start line
+		var local_pos = curve.sample_baked(offset)
+		var global_pos = track_path.to_global(local_pos)
+		
+		# Compute track tangent and right vector to offset left/right randomly
+		var next_offset = fmod(offset + 1.0, length)
+		var p1 = curve.sample_baked(offset)
+		var p2 = curve.sample_baked(next_offset)
+		var tangent = (track_path.to_global(p2) - track_path.to_global(p1)).normalized()
+		if tangent.length() < 0.01:
+			continue
+		var right_vec = tangent.cross(Vector3.UP).normalized()
+		
+		var lateral_offset = randf_range(-4.0, 4.0)
+		var spawn_pos = global_pos + right_vec * lateral_offset + Vector3(0, 10.0, 0)
+		
+		# Raycast down to find the road surface
+		var query = PhysicsRayQueryParameters3D.create(spawn_pos, spawn_pos - Vector3(0, 20.0, 0))
+		query.collision_mask = 1 # road/terrain
+		var result = space_state.intersect_ray(query)
+		if not result:
+			continue
+			
+		var hit_pos = result.position
+		var final_pos = hit_pos + Vector3(0, 1.2, 0)
+		
+		# Perform a sphere shape overlap check to make sure it doesn't intersect obstacles or other objects
+		var shape_query = PhysicsShapeQueryParameters3D.new()
+		var sphere = SphereShape3D.new()
+		sphere.radius = 1.5
+		shape_query.shape = sphere
+		shape_query.transform = Transform3D(Basis.IDENTITY, final_pos)
+		shape_query.collision_mask = 1 | 2 | 4
+		
+		var overlaps = space_state.intersect_shape(shape_query)
+		var is_obstructed = false
+		for overlap in overlaps:
+			var collider = overlap.collider
+			if collider:
+				var c_name = collider.name.to_lower()
+				var is_road_or_terrain = c_name.contains("road") or c_name.contains("terrain") or c_name.contains("unified_world") or c_name.contains("gate") or c_name.contains("finishline") or c_name.contains("checkpoint") or c_name.contains("halfway") or c_name.contains("ramp")
+				if not is_road_or_terrain or c_name.contains("itembox") or c_name.contains("cart") or c_name.contains("player"):
+					is_obstructed = true
+					break
+		
+		if not is_obstructed:
+			var box = ITEM_BOX_SCENE.instantiate()
+			box.name = "RandomItemBox_%d" % spawned_count
+			add_child(box)
+			box.global_position = final_pos
+			spawned_count += 1
 
 func _rebuild_checkpoints():
 	if not track_path: return

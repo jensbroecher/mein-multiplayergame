@@ -21,10 +21,10 @@ const CAR_PRESETS = [
 		"wheel_parts": {"FL": "part_5", "FR": "part_2", "RL": "part_0", "RR": "part_6"}
 	},
 	{
-		"name": "Lightning",
+		"name": "Shadow",
 		"model_path": "res://models/cars/20260505210312_305e4d34.fbx",
 		"model_y_rotation": PI,
-		"max_speed": 35.0,
+		"max_speed": 30.5,
 		"acceleration": 40.0,
 		"steer_speed": 2.2,
 		"grip": 4.5,
@@ -187,6 +187,7 @@ const REMOTE_LERP_SPEED: float = 18.0
 
 enum ItemType { NONE, BOOST, MISSILE, GUIDED_MISSILE, SHIELD, SHOCKWAVE, BOMB }
 var current_item = ItemType.NONE
+var current_item_2 = ItemType.NONE
 
 var last_checkpoint_transform: Transform3D
 
@@ -848,8 +849,12 @@ func _update_visuals_alignment(delta):
 		target_basis = target_basis.rotated(target_up, drift_angle)
 	visuals.global_transform.basis = current_basis.slerp(target_basis, 8.0 * delta)
 
-	# Allow the user to place wheels/body themselves in the scene editor
-	visuals.global_position = global_position
+	# Smoothly follow the rigid body position to eliminate physics jitter at low frame rates
+	var dist = visuals.global_position.distance_to(global_position)
+	if dist > 3.0:
+		visuals.global_position = global_position
+	else:
+		visuals.global_position = visuals.global_position.lerp(global_position, 30.0 * delta)
 
 	_update_wheel_visuals(delta)
 
@@ -930,7 +935,12 @@ func _interpolate_remote_visual(delta: float):
 	var new_visual_quat: Quaternion = current_visual_quat.slerp(target_quat, rot_t)
 	
 	visuals.global_transform.basis = Basis(new_visual_quat)
-	visuals.global_position = global_position
+	# Smoothly follow remote position to eliminate physics jitter
+	var dist = visuals.global_position.distance_to(global_position)
+	if dist > 3.0:
+		visuals.global_position = global_position
+	else:
+		visuals.global_position = visuals.global_position.lerp(global_position, 30.0 * delta)
 
 	var speed := sync_velocity.length()
 	var wheel_spin_rate := speed / 0.4
@@ -1060,9 +1070,15 @@ func _move_and_sync():
 func _use_item():
 	if current_item == ItemType.NONE: return
 	var item_to_use = current_item
-	current_item = ItemType.NONE # Clear locally
+	
+	# Shift backup item to active slot
+	current_item = current_item_2
+	current_item_2 = ItemType.NONE
+	
 	if is_local_player and race_ui:
-		race_ui.update_item("NONE")
+		var item1_name = ItemType.keys()[current_item]
+		var item2_name = ItemType.keys()[current_item_2]
+		race_ui.update_items(item1_name, item2_name)
 	
 	if is_ai or multiplayer.is_server():
 		_execute_use_item(item_to_use)
@@ -1496,23 +1512,37 @@ func _set_respawn_effect_recursive(node: Node, enabled: bool, blink_on: bool):
 
 
 func give_item(type: int):
-	current_item = type as ItemType
+	var item_type = type as ItemType
+	if current_item == ItemType.NONE:
+		current_item = item_type
+	elif current_item_2 == ItemType.NONE:
+		current_item_2 = item_type
+	else:
+		# Both slots are full! Drop the item in slot 1.
+		# Shift slot 2 to slot 1, and place new item in slot 2.
+		current_item = current_item_2
+		current_item_2 = item_type
+	
 	if is_local_player and race_ui:
-		var item_name = ItemType.keys()[type]
-		race_ui.update_item(item_name)
+		var item1_name = ItemType.keys()[current_item]
+		var item2_name = ItemType.keys()[current_item_2]
+		race_ui.update_items(item1_name, item2_name)
 
 @rpc("any_peer", "call_local", "reliable")
 func give_item_rpc(type: int):
 	give_item(type)
 
 func _get_random_item_rpc() -> int:
-	# Returns a random item type (excluding NONE)
-	var item_keys = ItemType.keys()
-	var valid_items = []
-	for key in item_keys:
-		if key != "NONE":
-			valid_items.append(ItemType[key])
-	return valid_items[randi() % valid_items.size()]
+	# Weighted list of items: BOOST has 3x weight compared to others
+	var items = [
+		ItemType.BOOST, ItemType.BOOST, ItemType.BOOST,
+		ItemType.MISSILE,
+		ItemType.GUIDED_MISSILE,
+		ItemType.SHIELD,
+		ItemType.SHOCKWAVE,
+		ItemType.BOMB
+	]
+	return items[randi() % items.size()]
 
 func _remove_collisions_recursive(node: Node):
 	if node == null: return

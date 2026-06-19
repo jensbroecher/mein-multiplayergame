@@ -14,7 +14,7 @@ var rotating_model: Node3D = null
 
 const CAR_PRESETS = [
 	{
-		"name": "Viper (Balanced)",
+		"name": "Viper",
 		"model_path": "res://models/cars/20260505221030_500312d9.fbx",
 		"max_speed": 30.0,
 		"acceleration": 50.0,
@@ -23,16 +23,16 @@ const CAR_PRESETS = [
 		"desc": "All-around performer. Great for beginners."
 	},
 	{
-		"name": "Lightning (Speedster)",
+		"name": "Shadow",
 		"model_path": "res://models/cars/20260505210312_305e4d34.fbx",
-		"max_speed": 35.0,
+		"max_speed": 30.5,
 		"acceleration": 40.0,
 		"steer_speed": 2.2,
 		"grip": 4.5,
-		"desc": "Extreme top speed, but slower to accelerate."
+		"desc": "High top speed, but slower to accelerate."
 	},
 	{
-		"name": "Strikeforce (Muscle)",
+		"name": "Strikeforce",
 		"model_path": "res://models/cars/20260505211857_6fc2a5d6.fbx",
 		"max_speed": 28.0,
 		"acceleration": 65.0,
@@ -41,7 +41,7 @@ const CAR_PRESETS = [
 		"desc": "Explosive acceleration and good handling."
 	},
 	{
-		"name": "Apex (Agile)",
+		"name": "Apex",
 		"model_path": "res://models/cars/20260505221804_6590f061.fbx",
 		"max_speed": 29.0,
 		"acceleration": 55.0,

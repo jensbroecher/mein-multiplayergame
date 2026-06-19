@@ -49,7 +49,7 @@ func _on_body_entered(body):
 	if body.is_in_group("player_carts"):
 		var is_colliding_racer = body.is_local_player or (body.get("is_ai") and multiplayer.is_server())
 		if is_colliding_racer:
-			if body.current_item == body.ItemType.NONE:
+			if body.has_method("give_item_rpc"):
 				if multiplayer.is_server():
 					_server_process_pickup(body)
 				else:
@@ -66,7 +66,7 @@ func request_pickup(player_id: int):
 			body = cart
 			break
 			
-	if body and body.current_item == body.ItemType.NONE:
+	if body and body.has_method("give_item_rpc"):
 		_server_process_pickup(body)
 
 func _server_process_pickup(body):
