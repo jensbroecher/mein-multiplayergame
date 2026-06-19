@@ -15,15 +15,17 @@ extends Node3D
 @export_group("Actions")
 @export var trigger_scatter: bool = false:
 	set(val):
-		trigger_scatter = false
-		if Engine.is_editor_hint():
-			scatter()
+		if val:
+			trigger_scatter = false
+			if Engine.is_editor_hint():
+				scatter()
 
 @export var trigger_clear: bool = false:
 	set(val):
-		trigger_clear = false
-		if Engine.is_editor_hint():
-			clear_vegetation()
+		if val:
+			trigger_clear = false
+			if Engine.is_editor_hint():
+				clear_vegetation()
 
 # Paths to the models
 const TREE_PATHS = [
@@ -42,8 +44,8 @@ const GRASS_PATH = "res://models/trees/grass.glb"
 
 func _ready():
 	_update_boundary()
-	adjust_vegetation_colors()
 	if not Engine.is_editor_hint():
+		adjust_vegetation_colors()
 		# Hide boundary helper during game play
 		var helper = get_node_or_null("BoundaryHelper")
 		if helper:
@@ -52,6 +54,9 @@ func _ready():
 func _update_boundary():
 	# Only show boundary helper in editor
 	if not Engine.is_editor_hint():
+		return
+		
+	if not is_inside_tree():
 		return
 		
 	var helper = get_node_or_null("BoundaryHelper")
@@ -81,6 +86,7 @@ func clear_vegetation():
 	print("Vegetation cleared!")
 
 func scatter():
+	force_update_transform()
 	clear_vegetation()
 	
 	var root = get_tree().edited_scene_root if get_tree() else null
@@ -92,6 +98,7 @@ func scatter():
 	container.name = "VegetationContainer"
 	add_child(container)
 	container.owner = root
+	container.force_update_transform()
 	
 	# Create green material for grass using a shader to correctly mask transparency
 	var shader = Shader.new()
@@ -139,6 +146,9 @@ func scatter():
 	# Spawn trees
 	if not tree_scenes.is_empty() and tree_count > 0:
 		_scatter_group_multi(tree_scenes, tree_count, true, 0.65, 1.35, null, container, root, space_state)
+		
+	# Adjust colors of the spawned vegetation
+	adjust_vegetation_colors()
 		
 	print("Vegetation scattering completed successfully!")
 
@@ -297,34 +307,29 @@ func _get_random_point_in_circle(radius: float) -> Vector3:
 				return Vector3(rx, 0.0, rz)
 	return Vector3.ZERO
 
-func _get_mesh_from_scene(scene: PackedScene) -> Mesh:
-	if not scene: return null
+func _get_mesh_data_from_scene(scene: PackedScene) -> Dictionary:
+	if not scene: return {}
 	var inst = scene.instantiate()
-	var mesh = _find_mesh_recursive(inst)
+	var data = _find_mesh_and_relative_transform(inst)
 	inst.free()
-	return mesh
+	return data
 
-func _find_mesh_recursive(node: Node) -> Mesh:
+func _find_mesh_and_relative_transform(node: Node, accum_xform: Transform3D = Transform3D.IDENTITY) -> Dictionary:
+	var local_xform = accum_xform
+	if node is Node3D:
+		local_xform = accum_xform * node.transform
+		
 	if node is MeshInstance3D:
-		return node.mesh
+		var mat = node.material_override
+		if not mat:
+			mat = node.get_active_material(0)
+		return {"mesh": node.mesh, "transform": local_xform, "material": mat}
+		
 	for child in node.get_children():
-		var m = _find_mesh_recursive(child)
-		if m:
-			return m
-	return null
-
-func _get_material_recursive(node: Node) -> Material:
-	if node is MeshInstance3D:
-		if node.material_override:
-			return node.material_override
-		var mat = node.get_active_material(0)
-		if mat:
-			return mat
-	for child in node.get_children():
-		var mat = _get_material_recursive(child)
-		if mat:
-			return mat
-	return null
+		var res = _find_mesh_and_relative_transform(child, local_xform)
+		if not res.is_empty():
+			return res
+	return {}
 
 func _scatter_group_multi_multimesh(scenes: Array, count: int, scale_min: float, scale_max: float, container: Node3D, root: Node, space_state: PhysicsDirectSpaceState3D, name_prefix: String):
 	if scenes.is_empty() or count <= 0: return
@@ -341,11 +346,15 @@ func _scatter_group_multi_multimesh(scenes: Array, count: int, scale_min: float,
 
 func _scatter_group_multimesh(scene: PackedScene, count: int, scale_min: float, scale_max: float, mat_override: Material, container: Node3D, root: Node, space_state: PhysicsDirectSpaceState3D, name_prefix: String):
 	if not scene or count <= 0: return
-	var mesh = _get_mesh_from_scene(scene)
-	if not mesh:
+	var mesh_data = _get_mesh_data_from_scene(scene)
+	if mesh_data.is_empty() or not mesh_data.mesh:
 		printerr("Could not extract mesh from scene for MultiMesh: ", scene.resource_path)
 		return
 		
+	var mesh = mesh_data.mesh
+	var mesh_relative_xform = mesh_data.transform
+	var original_mat = mesh_data.material
+	
 	var transforms: Array[Transform3D] = []
 	for i in range(count):
 		var local_pos = _get_random_point_in_circle(size.x / 2.0)
@@ -378,7 +387,12 @@ func _scatter_group_multimesh(scene: PackedScene, count: int, scale_min: float, 
 			
 			var pos = result.position
 			var xform = Transform3D(basis, pos)
-			var local_xform = container.global_transform.inverse() * xform
+			
+			# Combine with the mesh's relative transform from the glb scene
+			var final_xform = xform * mesh_relative_xform
+			
+			# Calculate local transform relative to self.global_transform to bypass lazy node propagation
+			var local_xform = global_transform.inverse() * final_xform
 			transforms.append(local_xform)
 			
 	if transforms.is_empty():
@@ -404,12 +418,8 @@ func _scatter_group_multimesh(scene: PackedScene, count: int, scale_min: float, 
 	# Apply materials
 	if mat_override:
 		mmi.material_override = mat_override
-	else:
-		var inst = scene.instantiate()
-		var original_mat = _get_material_recursive(inst)
-		inst.free()
-		if original_mat:
-			mmi.material_override = original_mat
+	elif original_mat:
+		mmi.material_override = original_mat
 
 func adjust_vegetation_colors():
 	var container = get_node_or_null("VegetationContainer")
@@ -466,7 +476,7 @@ func _apply_tree_leaves_tint(node: Node):
 			var is_trunk = false
 			
 			# Check common wood/trunk keywords in node name or material name
-			for kw in ["bark", "wood", "trunk", "log", "branch", "stamm", "ast"]:
+			for kw in ["bark", "wood", "trunk", "log", "branch", "stamm", "ast", "_0"]:
 				if kw in mat_name or kw in node_name:
 					is_trunk = true
 					break
@@ -474,27 +484,10 @@ func _apply_tree_leaves_tint(node: Node):
 			if mat is StandardMaterial3D:
 				if mat.albedo_texture:
 					tex_path = mat.albedo_texture.resource_path.to_lower()
-					for kw in ["bark", "wood", "trunk", "log", "branch", "stamm", "ast"]:
+					for kw in ["bark", "wood", "trunk", "log", "branch", "stamm", "ast", "_0.", "_0_"]:
 						if kw in tex_path:
 							is_trunk = true
 							break
-							
-					# Color classification if name checks are inconclusive
-					if not is_trunk:
-						var img = mat.albedo_texture.get_image()
-						if img and not img.is_empty():
-							# Resize to 1x1 to get average color
-							var temp_img = img.duplicate()
-							if temp_img.is_compressed():
-								temp_img.decompress()
-							temp_img.resize(1, 1, Image.INTERPOLATE_LANCZOS)
-							var avg_color = temp_img.get_pixel(0, 0)
-							var hue = avg_color.h
-							var sat = avg_color.s
-							# Brown/yellow/orange is hue < 0.18. Grey is low saturation.
-							# Green/yellow-green leaves should be hue >= 0.18
-							if hue < 0.18 and sat > 0.05:
-								is_trunk = true
 				else:
 					# No texture, check albedo_color directly
 					var hue = mat.albedo_color.h

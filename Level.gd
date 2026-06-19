@@ -11,9 +11,10 @@ const ITEM_BOX_SCENE = preload("res://ItemBox.tscn")
 @export_group("Editor Tools")
 @export var redistribute_checkpoints: bool:
 	set(val):
-		redistribute_checkpoints = false
-		if Engine.is_editor_hint():
-			_rebuild_checkpoints()
+		if val:
+			redistribute_checkpoints = false
+			if Engine.is_editor_hint():
+				_rebuild_checkpoints()
 
 enum RaceState {LOBBY, RACING, FINISHED}
 var race_state: int = RaceState.LOBBY

@@ -42,9 +42,10 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 
 @export var generate_now: bool:
 	set(val):
-		generate_now = false
-		if Engine.is_editor_hint():
-			generate_world()
+		if val:
+			generate_now = false
+			if Engine.is_editor_hint():
+				generate_world()
 
 @export var track_path: Path3D
 @export var terrain_size: Vector2 = Vector2(2000, 2000)
@@ -69,9 +70,10 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 
 @export var create_longer_track: bool:
 	set(val):
-		create_longer_track = false
-		if Engine.is_editor_hint():
-			_rebuild_longer_track()
+		if val:
+			create_longer_track = false
+			if Engine.is_editor_hint():
+				_rebuild_longer_track()
 
 @export var grass_material: Material
 @export var road_material: Material

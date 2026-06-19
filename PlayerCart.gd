@@ -307,6 +307,12 @@ func _ready():
 			ev.physical_keycode = KEY_C
 			InputMap.action_add_event("toggle_camera", ev)
 
+		if not InputMap.has_action("respawn"):
+			InputMap.add_action("respawn")
+			var ev = InputEventKey.new()
+			ev.physical_keycode = KEY_R
+			InputMap.action_add_event("respawn", ev)
+
 		# Position camera immediately at start to avoid sliding in
 		if is_isometric:
 			var iso_offset = Vector3(-20, 20, 20)
@@ -346,6 +352,9 @@ func _process(delta):
 		if Input.is_action_just_pressed("toggle_camera"):
 			is_isometric = not is_isometric
 			camera.projection = Camera3D.PROJECTION_PERSPECTIVE
+
+		if Input.is_action_just_pressed("respawn"):
+			respawn_rpc.rpc()
 
 		var visual_forward = -visuals.global_transform.basis.z
 		var speed_factor = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
