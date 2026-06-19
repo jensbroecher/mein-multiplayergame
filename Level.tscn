@@ -1932,7 +1932,7 @@ cast_shadow = 0
 multimesh = ExtResource("15_wesx8")
 
 [node name="JumpRamp" type="CSGPolygon3D" parent="." unique_id=1126375394]
-transform = Transform3D(-2.3170195, 0, -0.57318205, 0, 3.283154, 0, 1.6128321, 0, -0.82344216, 183.29544, 7.1166954, -100.9369)
+transform = Transform3D(2.2809908, 0, 0.5911521, 0, 3.2831545, 0, -1.6633962, 0, 0.810638, 183.29544, 7.7090282, -81.64349)
 use_collision = true
 polygon = PackedVector2Array(0, 0, 8, 2, 8, 0)
 depth = 15.0
@@ -1983,7 +1983,7 @@ spawn_path = NodePath(".")
 transform = Transform3D(0.048228957, 0, 0.9988362, 0, 1, 0, -0.9988362, 0, 0.048228957, -63.533722, 2.7247596, 289.68365)
 
 [node name="Halfway2" parent="Checkpoints" unique_id=1076613409 instance=ExtResource("2_gate")]
-transform = Transform3D(-0.70418113, 0, -0.7100204, 0, 1, 0, 0.7100204, 0, -0.70418113, -380.10782, 8.770632, 114.18387)
+transform = Transform3D(-0.70418113, 0, -0.7100204, 0, 1, 0, 0.7100204, 0, -0.70418113, -318.36288, 6.2574816, 183.93178)
 
 [node name="Halfway3" parent="Checkpoints" unique_id=760818968 instance=ExtResource("2_gate")]
 transform = Transform3D(-0.6727345, 0, -0.739884, 0, 1, 0, 0.739884, 0, -0.6727345, -558.3348, 7.742751, -258.5559)
@@ -1992,7 +1992,7 @@ transform = Transform3D(-0.6727345, 0, -0.739884, 0, 1, 0, 0.739884, 0, -0.67273
 transform = Transform3D(0.4104177, 0, 0.91189766, 0, 1, 0, -0.91189766, 0, 0.4104177, -175.9742, 12.490519, -518.7479)
 
 [node name="NewRamp" parent="." unique_id=966004585 instance=ExtResource("17_dcckh")]
-transform = Transform3D(37.264538, 0, 25.226063, 0, 45, 0, -25.226063, 0, 37.264538, -428.5783, 10.270285, 49.70015)
+transform = Transform3D(-30.273119, 0, -33.29471, 0, 44.999985, 0, 33.29471, 0, -30.273119, -507.56146, 6.9816875, -210.87714)
 
 [node name="VegetationScatterer" type="Node3D" parent="." unique_id=40883185]
 transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 42.91938, -4.2672634, 57.95951)
@@ -3896,7 +3896,7 @@ multimesh = SubResource("MultiMesh_kr1e0")
 material_override = SubResource("StandardMaterial3D_svdl8")
 multimesh = SubResource("MultiMesh_yr3df")
 
-[node name="AuxScene" type="Node3D" parent="VegetationScatterer2/VegetationContainer" unique_id=60556141 instance=ExtResource("24_fmksp")]
+[node name="AuxScene" parent="VegetationScatterer2/VegetationContainer" unique_id=60556141 instance=ExtResource("24_fmksp")]
 transform = Transform3D(0.52081627, 0, 1.1245445, 0, 1.2392942, 0, -1.1245445, 0, 0.52081627, 17.806297, -2.1630745, -6.2157025)
 
 [node name="StaticBody_AuxScene_1" type="StaticBody3D" parent="VegetationScatterer2/VegetationContainer" unique_id=708194271]
@@ -3906,7 +3906,7 @@ transform = Transform3D(0.52081627, 0, 1.1245445, 0, 1.2392942, 0, -1.1245445, 0
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
 shape = SubResource("CylinderShape3D_dss6r")
 
-[node name="@Node3D@21998" type="Node3D" parent="VegetationScatterer2/VegetationContainer" unique_id=1852533093 instance=ExtResource("23_b4adj")]
+[node name="@Node3D@21998" parent="VegetationScatterer2/VegetationContainer" unique_id=1852533093 instance=ExtResource("23_b4adj")]
 transform = Transform3D(0.3411982, 0, -0.5960964, 0, 0.6868385, 0, 0.5960964, 0, 0.3411982, 59.627098, 12.717724, -36.30258)
 
 [node name="StaticBody__Node3D_21998_2" type="StaticBody3D" parent="VegetationScatterer2/VegetationContainer" unique_id=349149631]
@@ -3916,7 +3916,7 @@ transform = Transform3D(0.3411982, 0, -0.5960964, 0, 0.6868385, 0, 0.5960964, 0,
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
 shape = SubResource("CylinderShape3D_s8mmm")
 
-[node name="@Node3D@21999" type="Node3D" parent="VegetationScatterer2/VegetationContainer" unique_id=1474887207 instance=ExtResource("22_3ppgv")]
+[node name="@Node3D@21999" parent="VegetationScatterer2/VegetationContainer" unique_id=1474887207 instance=ExtResource("22_3ppgv")]
 transform = Transform3D(0.22524624, 0, 0.66058177, 0, 0.6979285, 0, -0.66058177, 0, 0.22524624, -26.895302, 0.5528984, -8.849585)
 
 [node name="StaticBody__Node3D_21999_3" type="StaticBody3D" parent="VegetationScatterer2/VegetationContainer" unique_id=1790265567]
@@ -3926,7 +3926,7 @@ transform = Transform3D(0.22524624, 0, 0.66058177, 0, 0.6979285, 0, -0.66058177,
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
 shape = SubResource("CylinderShape3D_5ekwc")
 
-[node name="@Node3D@22000" type="Node3D" parent="VegetationScatterer2/VegetationContainer" unique_id=156571581 instance=ExtResource("22_3ppgv")]
+[node name="@Node3D@22000" parent="VegetationScatterer2/VegetationContainer" unique_id=156571581 instance=ExtResource("22_3ppgv")]
 transform = Transform3D(-1.215997, 0, 0.36784413, 0, 1.2704165, 0, -0.36784413, 0, -1.215997, 9.819176, -9.549702, 38.15984)
 
 [node name="StaticBody__Node3D_22000_4" type="StaticBody3D" parent="VegetationScatterer2/VegetationContainer" unique_id=1665710112]
@@ -3936,7 +3936,7 @@ transform = Transform3D(-1.215997, 0, 0.36784413, 0, 1.2704165, 0, -0.36784413, 
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
 shape = SubResource("CylinderShape3D_i6xau")
 
-[node name="@Node3D@22001" type="Node3D" parent="VegetationScatterer2/VegetationContainer" unique_id=1957809542 instance=ExtResource("22_3ppgv")]
+[node name="@Node3D@22001" parent="VegetationScatterer2/VegetationContainer" unique_id=1957809542 instance=ExtResource("22_3ppgv")]
 transform = Transform3D(-0.21937704, 0, -0.8474977, 0, 0.8754306, 0, 0.8474977, 0, -0.21937704, -31.27874, 0.104839325, 60.013744)
 
 [node name="StaticBody__Node3D_22001_5" type="StaticBody3D" parent="VegetationScatterer2/VegetationContainer" unique_id=970999600]
@@ -3946,7 +3946,7 @@ transform = Transform3D(-0.21937704, 0, -0.8474977, 0, 0.8754306, 0, 0.8474977, 
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
 shape = SubResource("CylinderShape3D_i1p0x")
 
-[node name="@Node3D@22002" type="Node3D" parent="VegetationScatterer2/VegetationContainer" unique_id=1935274793 instance=ExtResource("33_5ekwc")]
+[node name="@Node3D@22002" parent="VegetationScatterer2/VegetationContainer" unique_id=1935274793 instance=ExtResource("33_5ekwc")]
 transform = Transform3D(-0.07947204, 0, -1.0857629, 0, 1.0886674, 0, 1.0857629, 0, -0.07947204, 48.266777, 0.26472092, 21.640198)
 
 [node name="StaticBody__Node3D_22002_6" type="StaticBody3D" parent="VegetationScatterer2/VegetationContainer" unique_id=1263490667]
@@ -3956,7 +3956,7 @@ transform = Transform3D(-0.07947204, 0, -1.0857629, 0, 1.0886674, 0, 1.0857629, 
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
 shape = SubResource("CylinderShape3D_0e475")
 
-[node name="@Node3D@22003" type="Node3D" parent="VegetationScatterer2/VegetationContainer" unique_id=681471135 instance=ExtResource("24_fmksp")]
+[node name="@Node3D@22003" parent="VegetationScatterer2/VegetationContainer" unique_id=681471135 instance=ExtResource("24_fmksp")]
 transform = Transform3D(-1.2120843, 0, 0.10543347, 0, 1.2166612, 0, -0.10543347, 0, -1.2120843, -32.92109, 0.547802, -11.343475)
 
 [node name="StaticBody__Node3D_22003_7" type="StaticBody3D" parent="VegetationScatterer2/VegetationContainer" unique_id=485031432]
@@ -3966,7 +3966,7 @@ transform = Transform3D(-1.2120843, 0, 0.10543347, 0, 1.2166612, 0, -0.10543347,
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
 shape = SubResource("CylinderShape3D_bc3ha")
 
-[node name="@Node3D@22004" type="Node3D" parent="VegetationScatterer2/VegetationContainer" unique_id=1179215006 instance=ExtResource("22_3ppgv")]
+[node name="@Node3D@22004" parent="VegetationScatterer2/VegetationContainer" unique_id=1179215006 instance=ExtResource("22_3ppgv")]
 transform = Transform3D(1.2636043, 0, 0.28133982, 0, 1.2945454, 0, -0.28133982, 0, 1.2636043, -60.06256, -3.3467293, -58.017963)
 
 [node name="StaticBody__Node3D_22004_9" type="StaticBody3D" parent="VegetationScatterer2/VegetationContainer" unique_id=254971395]

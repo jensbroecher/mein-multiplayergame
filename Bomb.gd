@@ -194,8 +194,12 @@ func _explode():
 					if dir.length_squared() < 0.01:
 						dir = Vector3.UP
 					var impulse = dir * 8.0 * p.mass + Vector3.UP * 4.0 * p.mass
+					var is_real_peer = p.name.to_int() > 0 and not p.get("is_ai")
 					if p.has_method("apply_blast_impulse"):
-						p.apply_blast_impulse.rpc_id(p.name.to_int(), impulse)
+						if is_real_peer:
+							p.apply_blast_impulse.rpc_id(p.name.to_int(), impulse)
+						else:
+							p.apply_blast_impulse(impulse)
 					else:
 						p.apply_central_impulse(impulse)
 					

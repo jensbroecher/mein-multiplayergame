@@ -20,13 +20,54 @@ func _on_menu_options_pressed():
 	options_menu.show()
 
 func _on_car_selected(car_index: int):
-	lobby.show()
+	NetworkManager.local_car_index = car_index
+	if NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER:
+		lobby.show()
+	else:
+		car_selection.hide()
+		# Load saved player name
+		var p_name = "SoloRacer"
+		var config = ConfigFile.new()
+		if config.load("user://settings.cfg") == OK:
+			var saved_name = config.get_value("player", "name", "")
+			if not saved_name.is_empty():
+				p_name = saved_name
+				
+		NetworkManager.start_single_player(p_name)
+		start_game(true)
 
 func start_game(is_host: bool):
 	if is_host:
-		var level = LEVEL_SCENE.instantiate()
+		var level_scene = LEVEL_SCENE
+		if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP:
+			var gp_data = NetworkManager.GP_CUPS.get(NetworkManager.current_gp_name)
+			if gp_data:
+				var stage_idx = NetworkManager.current_gp_stage
+				if stage_idx < gp_data["stages"].size():
+					level_scene = load(gp_data["stages"][stage_idx])
+		
+		var level = level_scene.instantiate()
 		add_child(level)
 	# Clients will get the level spawned automatically by MultiplayerSpawner
+
+func load_gp_stage(stage_idx: int):
+	var level = get_node_or_null("Level")
+	if level:
+		level.name = "OldLevel"
+		level.queue_free()
+		await get_tree().process_frame
+		
+	var gp_data = NetworkManager.GP_CUPS.get(NetworkManager.current_gp_name)
+	if gp_data and stage_idx < gp_data["stages"].size():
+		NetworkManager.current_gp_stage = stage_idx
+		var stage_path = gp_data["stages"][stage_idx]
+		var next_level_scene = load(stage_path)
+		var next_level = next_level_scene.instantiate()
+		add_child(next_level)
+	else:
+		# GP Finished!
+		_on_server_disconnected()
+
 
 func _on_server_disconnected():
 	var level = get_node_or_null("Level")

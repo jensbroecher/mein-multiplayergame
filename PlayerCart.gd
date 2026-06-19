@@ -133,6 +133,13 @@ var sample_rate: float
 var is_local_player = false
 var can_move = false
 var can_control = true
+@export var is_ai: bool = false
+var stuck_timer: float = 0.0
+var ai_item_timer: float = 0.0
+var ai_lane_offset: float = 0.0
+var ai_target_lane_offset: float = 0.0
+var ai_lane_change_timer: float = 0.0
+var track_path: Path3D = null
 
 var is_exploding = false
 var boost_time = 0.0
@@ -201,12 +208,28 @@ var antenna_accel_smooth: Vector3 = Vector3.ZERO
 var last_velocity_local: Vector3 = Vector3.ZERO
 
 func on_race_started():
-	if is_local_player:
+	var has_physics_authority = is_local_player or (is_ai and is_multiplayer_authority())
+	if has_physics_authority:
 		can_move = true
 
 func _ready():
+	# Lock rotation so we handle it manually, preventing physics rolling at start
+	axis_lock_angular_x = true
+	axis_lock_angular_y = true
+	axis_lock_angular_z = true
+
+	# Set initial visuals position/rotation to match spawn point transform
+	# before any process frame runs, preventing wrong starting direction
+	visuals.global_transform = global_transform
+	visuals.top_level = true
+
 	add_to_group("player_carts")
 	_update_authority()
+
+	if is_ai:
+		ai_lane_offset = randf_range(-2.0, 2.0)
+		ai_target_lane_offset = ai_lane_offset
+		ai_lane_change_timer = randf_range(3.0, 6.0)
 
 	# Load the correct model mesh
 	var preset = CAR_PRESETS[car_index]
@@ -248,9 +271,6 @@ func _ready():
 
 	# Adjust ground ray to reach just below collision sphere
 	ground_ray.target_position = Vector3(0, -(COLLISION_RADIUS + 0.2), 0)
-
-	visuals.global_transform = global_transform
-	visuals.top_level = true
 	
 	_remove_collisions_recursive(visuals)
 	_setup_new_car_wheels()
@@ -296,10 +316,7 @@ func _ready():
 		camera.projection = Camera3D.PROJECTION_PERSPECTIVE
 		camera.fov = 35.0
 		
-		# Lock rotation so we handle it manually
-		axis_lock_angular_x = true
-		axis_lock_angular_y = true
-		axis_lock_angular_z = true
+		# Rotation is already locked globally at startup
 
 		if not InputMap.has_action("toggle_camera"):
 			InputMap.add_action("toggle_camera")
@@ -334,20 +351,31 @@ func _enter_tree():
 
 func _update_authority():
 	var id = name.to_int()
-	if id > 0:
+	var is_real_player = NetworkManager.players.has(id) and not NetworkManager.players[id].get("is_ai", false)
+	
+	if id > 0 and is_real_player:
 		set_multiplayer_authority(id)
 		$MultiplayerSynchronizer.set_multiplayer_authority(id)
-	is_local_player = is_multiplayer_authority()
+	else:
+		set_multiplayer_authority(1)
+		$MultiplayerSynchronizer.set_multiplayer_authority(1)
+		
+	is_local_player = (id == multiplayer.get_unique_id())
 	
-	if not is_local_player:
+	var has_physics_authority = is_local_player or (is_ai and is_multiplayer_authority())
+	if not has_physics_authority:
 		freeze = true
 		freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
 
 func _process(delta):
 	_update_visual_states(delta)
 	_update_antenna(delta)
-	if is_local_player:
+	
+	var has_physics_authority = is_local_player or (is_ai and is_multiplayer_authority())
+	if has_physics_authority:
 		_update_visuals_alignment(delta)
+		
+	if is_local_player:
 
 		if Input.is_action_just_pressed("toggle_camera"):
 			is_isometric = not is_isometric
@@ -436,7 +464,7 @@ func _process(delta):
 					playback = null
 				elif engine_sound.stream is AudioStreamGenerator:
 					_fill_audio_buffer()
-	else:
+	elif not has_physics_authority:
 		_interpolate_remote_visual(delta)
 
 	# Update top-level drift particle emitters to follow their target wheel pivots
@@ -471,9 +499,10 @@ func _physics_process(delta):
 		elif is_local_player:
 			respawn() # single-player / host fallback
 
+	var has_physics_authority = is_local_player or (is_ai and is_multiplayer_authority())
 	if is_exploding:
 		if not is_drowned:
-			if is_local_player:
+			if has_physics_authority:
 				apply_central_force(Vector3.UP * 5.0)
 			
 			if sfx_fire_loop.playing:
@@ -482,7 +511,7 @@ func _physics_process(delta):
 			burning_particles.global_position = global_position + Vector3(0, 0.5, 0)
 			burning_smoke_particles.global_position = global_position + Vector3(0, 0.5, 0)
 		
-		if is_local_player:
+		if has_physics_authority:
 			_move_and_sync()
 		else:
 			_interpolate_remote_physics(delta)
@@ -564,7 +593,7 @@ func _physics_process(delta):
 		# Slow sink: upward buoyancy force (weaker than gravity so car still sinks slowly)
 		apply_central_force(Vector3.UP * 15.0)
 
-	if not is_local_player:
+	if not has_physics_authority:
 		_interpolate_remote_physics(delta)
 		return
 
@@ -587,8 +616,12 @@ func _physics_process(delta):
 		_use_item()
 
 	var input_dir = Vector2.ZERO
-	input_dir.x = Input.get_axis("steer_left", "steer_right")
-	input_dir.y = Input.get_axis("throttle", "brake")
+	if is_ai:
+		input_dir = _get_ai_input(delta)
+		_process_ai_items(delta)
+	else:
+		input_dir.x = Input.get_axis("steer_left", "steer_right")
+		input_dir.y = Input.get_axis("throttle", "brake")
 
 	var on_ground = ground_ray.is_colliding()
 	if not on_ground:
@@ -649,7 +682,7 @@ func _physics_process(delta):
 	if is_boosting:
 		var max_sp = max_speed * 1.5
 		var accel_force = acceleration * 2.0
-		if on_ground and ground_normal.y < 0.85 and fwd.dot(Vector3.UP) > 0.05:
+		if is_offroad and on_ground and ground_normal.y < 0.85 and fwd.dot(Vector3.UP) > 0.05:
 			accel_force = 0.0
 		if current_speed < max_sp:
 			apply_central_force(fwd * accel_force * mass)
@@ -658,7 +691,7 @@ func _physics_process(delta):
 	if input_dir.y < -0.1: # Forward input
 		if not is_boosting:
 			var accel_force = acceleration
-			if on_ground and ground_normal.y < 0.85 and fwd.dot(Vector3.UP) > 0.05:
+			if is_offroad and on_ground and ground_normal.y < 0.85 and fwd.dot(Vector3.UP) > 0.05:
 				accel_force = 0.0
 			if current_speed < max_speed * offroad_penalty:
 				apply_central_force(fwd * accel_force * mass)
@@ -684,13 +717,13 @@ func _physics_process(delta):
 			elif current_speed < -0.5:
 				if current_speed > -reverse_speed * offroad_penalty:
 					var accel_force = acceleration * 0.5
-					if on_ground and ground_normal.y < 0.85 and (-fwd).dot(Vector3.UP) > 0.05:
+					if is_offroad and on_ground and ground_normal.y < 0.85 and (-fwd).dot(Vector3.UP) > 0.05:
 						accel_force = 0.0
 					apply_central_force(-fwd * accel_force * mass)
 			else:
 				if current_speed > -reverse_speed * offroad_penalty:
 					var accel_force = acceleration * 0.7
-					if on_ground and ground_normal.y < 0.85 and (-fwd).dot(Vector3.UP) > 0.05:
+					if is_offroad and on_ground and ground_normal.y < 0.85 and (-fwd).dot(Vector3.UP) > 0.05:
 						accel_force = 0.0
 					apply_central_force(-fwd * accel_force * mass)
 	else: # No throttle/brake input (coasting or stationary)
@@ -736,7 +769,7 @@ func _physics_process(delta):
 			var lat_vel = linear_velocity.dot(right)
 			var grip_factor = grip
 			if is_drifting: grip_factor *= 0.22 # Low grip factor for sliding momentum
-			if on_ground and ground_normal.y < 0.85:
+			if is_offroad and on_ground and ground_normal.y < 0.85:
 				# Scale grip down as the slope gets steeper, causing the cart to slide down cliffs/steep hills
 				var slope_factor = clamp((ground_normal.y - 0.5) / (0.85 - 0.5), 0.0, 1.0)
 				grip_factor *= slope_factor
@@ -1027,11 +1060,14 @@ func _move_and_sync():
 func _use_item():
 	if current_item == ItemType.NONE: return
 	var item_to_use = current_item
-	current_item = ItemType.NONE # Clear locally so it replicates to server immediately
-	if race_ui:
+	current_item = ItemType.NONE # Clear locally
+	if is_local_player and race_ui:
 		race_ui.update_item("NONE")
-	# Request server to execute item use so it is authority-approved and spawned correctly on all clients
-	request_use_item.rpc_id(1, item_to_use)
+	
+	if is_ai or multiplayer.is_server():
+		_execute_use_item(item_to_use)
+	else:
+		request_use_item.rpc_id(1, item_to_use)
 
 @rpc("any_peer", "call_local", "reliable")
 func request_use_item(item_to_use: int):
@@ -1041,13 +1077,21 @@ func request_use_item(item_to_use: int):
 func _execute_use_item(type: int):
 	match type:
 		ItemType.BOOST:
-			client_start_boost.rpc_id(name.to_int())
+			var is_real_peer = name.to_int() > 0 and not is_ai
+			if is_real_peer:
+				client_start_boost.rpc_id(name.to_int())
+			else:
+				client_start_boost()
 		ItemType.MISSILE:
 			_fire_missile(false)
 		ItemType.GUIDED_MISSILE:
 			_fire_missile(true)
 		ItemType.SHIELD:
-			client_start_shield.rpc_id(name.to_int())
+			var is_real_peer = name.to_int() > 0 and not is_ai
+			if is_real_peer:
+				client_start_shield.rpc_id(name.to_int())
+			else:
+				client_start_shield()
 		ItemType.SHOCKWAVE:
 			_activate_shockwave()
 		ItemType.BOMB:
@@ -1194,7 +1238,8 @@ func _update_visual_states(delta):
 func on_hit():
 	if is_shielded:
 		is_shielded = false
-		if multiplayer.is_server() and name.to_int() > 0:
+		var is_real_peer = name.to_int() > 0 and not get("is_ai")
+		if multiplayer.is_server() and is_real_peer:
 			client_break_shield.rpc_id(name.to_int())
 		else:
 			shield_mesh.visible = false
@@ -1292,7 +1337,8 @@ func drown():
 	shield_mesh.scale = Vector3.ONE
 	sfx_shield_loop.stop()
 	
-	if is_local_player:
+	var has_physics_authority = is_local_player or (is_ai and is_multiplayer_authority())
+	if has_physics_authority:
 		linear_velocity = Vector3.ZERO
 		angular_velocity = Vector3.ZERO
 	
@@ -1380,18 +1426,25 @@ func respawn():
 	fire_sprite_particles_2.emitting = false
 	sfx_fire_loop.stop()
 
-	if is_local_player:
+	var has_physics_authority = is_local_player or (is_ai and is_multiplayer_authority())
+	if has_physics_authority:
 		linear_velocity = Vector3.ZERO
 		angular_velocity = Vector3.ZERO
 
 		var spawn_pos = last_checkpoint_transform.origin + (last_checkpoint_transform.basis.z * 5.0) + Vector3(0, 2.0, 0)
-		global_position = spawn_pos
-
-		visuals.global_position = global_position
-
+		
+		# Set physics body's position and orientation to face forward towards the checkpoint
 		var look_target = last_checkpoint_transform.origin
 		look_target.y = spawn_pos.y
-		if look_target.distance_to(spawn_pos) > 0.01:
+		var look_dir = (look_target - spawn_pos).normalized()
+		if look_dir.length() > 0.01:
+			var target_basis = Basis.looking_at(look_dir, Vector3.UP)
+			global_transform = Transform3D(target_basis, spawn_pos)
+		else:
+			global_position = spawn_pos
+
+		visuals.global_position = global_position
+		if look_dir.length() > 0.01:
 			visuals.look_at(look_target, Vector3.UP)
 
 func _set_visuals_alpha(alpha: float):
@@ -1494,6 +1547,7 @@ func _spawn_missile_rpc(spawn_pos: Vector3, spawn_rot: Vector3, shooter_id: int,
 		get_tree().root.add_child(missile)
 	missile.global_position = spawn_pos
 	missile.global_rotation = spawn_rot
+	missile.start_position = spawn_pos
 	if multiplayer.is_server():
 		missile.set_multiplayer_authority(1)
 
@@ -1509,7 +1563,7 @@ func _on_shield_timeout():
 
 @rpc("any_peer", "call_local", "reliable")
 func apply_blast_impulse(impulse: Vector3):
-	if is_local_player:
+	if is_local_player or (is_ai and multiplayer.is_server()):
 		apply_central_impulse(impulse)
 
 func _activate_shockwave():
@@ -1522,7 +1576,8 @@ func _activate_shockwave():
 			if dist < 15.0:
 				if p.is_shielded:
 					p.is_shielded = false
-					if multiplayer.is_server() and p.name.to_int() > 0:
+					var is_real_peer = p.name.to_int() > 0 and not p.get("is_ai")
+					if multiplayer.is_server() and is_real_peer:
 						p.client_break_shield.rpc_id(p.name.to_int())
 					else:
 						p.shield_mesh.visible = false
@@ -1532,7 +1587,11 @@ func _activate_shockwave():
 				var dir = (p.global_position - global_position).normalized()
 				var impulse = dir * 54.0 * p.mass + Vector3.UP * 27.0 * p.mass
 				if p.has_method("apply_blast_impulse"):
-					p.apply_blast_impulse.rpc_id(p.name.to_int(), impulse)
+					var is_real_peer = p.name.to_int() > 0 and not p.get("is_ai")
+					if is_real_peer:
+						p.apply_blast_impulse.rpc_id(p.name.to_int(), impulse)
+					else:
+						p.apply_blast_impulse(impulse)
 				else:
 					p.apply_central_impulse(impulse)
 		
@@ -1860,3 +1919,153 @@ func _spawn_splash(pos: Vector3, size_scale: float = 1.0):
 				ap.global_position = pos
 				ap.play()
 				get_tree().create_timer(stream.get_length() + 0.5).timeout.connect(ap.queue_free)
+
+
+func _get_ai_input(delta: float) -> Vector2:
+	var input = Vector2.ZERO
+	
+	if track_path == null:
+		var level = get_tree().get_first_node_in_group("level")
+		if level and "track_path" in level and level.track_path:
+			track_path = level.track_path
+			
+	if track_path == null:
+		var level = get_tree().get_first_node_in_group("level")
+		if level and "checkpoints" in level and not level.checkpoints.is_empty():
+			var next_cp_idx = 0
+			if level.player_stats.has(name.to_int()):
+				next_cp_idx = level.player_stats[name.to_int()]["next_checkpoint_idx"]
+			var cp = level.checkpoints[next_cp_idx]
+			var local_to_cp = visuals.global_transform.inverse() * cp.global_position
+			input.x = clamp(local_to_cp.x * 0.1, -1.0, 1.0)
+			input.y = -1.0
+		return input
+		
+	var curve = track_path.curve
+	var local_pos = track_path.to_local(global_position)
+	var current_offset = curve.get_closest_offset(local_pos)
+	
+	# Periodically change target lane offset to simulate realistic lane shifting / overtaking
+	ai_lane_change_timer -= delta
+	if ai_lane_change_timer <= 0.0:
+		ai_lane_change_timer = randf_range(5.0, 10.0)
+		ai_target_lane_offset = randf_range(-2.0, 2.0)
+	
+	# Smoothly interpolate to target lane offset
+	ai_lane_offset = lerp(ai_lane_offset, ai_target_lane_offset, 1.5 * delta)
+	
+	var speed = linear_velocity.length()
+	var look_ahead = lerp(8.0, 16.0, speed / max_speed)
+	var target_offset = current_offset + look_ahead
+	
+	var curve_length = curve.get_baked_length()
+	target_offset = fmod(target_offset, curve_length)
+	
+	var target_local_pos = curve.sample_baked(target_offset)
+	
+	# Compute perpendicular offset (lane offset) along the track tangent
+	var tangent_offset = fmod(target_offset + 1.0, curve_length)
+	var tangent_local_pos = curve.sample_baked(tangent_offset)
+	var tangent = (tangent_local_pos - target_local_pos).normalized()
+	var right_vec = Vector3(-tangent.z, 0, tangent.x).normalized()
+	target_local_pos += right_vec * ai_lane_offset
+	
+	var target_global_pos = track_path.to_global(target_local_pos)
+	
+	var target_vec = visuals.global_transform.inverse() * target_global_pos
+	var dir_flat = Vector2(target_vec.x, -target_vec.z).normalized()
+	
+	input.x = clamp(dir_flat.x * 2.2, -1.0, 1.0)
+	input.y = -1.0 + abs(input.x) * 0.5
+	
+	# 3-Ray Obstacle Avoidance
+	var space_state = get_world_3d().direct_space_state
+	if space_state:
+		var fwd_dir = -visuals.global_transform.basis.z
+		var right_dir = visuals.global_transform.basis.x
+		var my_pos = global_position + Vector3.UP * 0.2
+		
+		# Define three rays: center (12m), left-angled (10m), right-angled (10m)
+		var rays = [
+			{"end": my_pos + fwd_dir * 12.0, "weight": 1.0, "side": 0.0},
+			{"end": my_pos + (fwd_dir - right_dir * 0.25).normalized() * 10.0, "weight": 0.8, "side": -1.0},
+			{"end": my_pos + (fwd_dir + right_dir * 0.25).normalized() * 10.0, "weight": 0.8, "side": 1.0}
+		]
+		
+		var avoid_force = 0.0
+		var obstacle_count = 0
+		
+		for ray in rays:
+			var query = PhysicsRayQueryParameters3D.create(my_pos, ray["end"])
+			query.exclude = [self.get_rid()]
+			var result = space_state.intersect_ray(query)
+			if result:
+				var collider = result.collider
+				var c_name = collider.name.to_lower()
+				# Exclude the road surface, terrain, halfway markers, checkpoints, gates, and ramps
+				var is_road_or_terrain = c_name.contains("road") or c_name.contains("terrain") or c_name.contains("unified_world") or c_name.contains("gate") or c_name.contains("finishline") or c_name.contains("checkpoint") or c_name.contains("halfway") or c_name.contains("ramp")
+				
+				if not is_road_or_terrain:
+					var dist = my_pos.distance_to(result.position)
+					var intensity = clamp(1.0 - (dist / 12.0), 0.1, 1.0) * ray["weight"]
+					
+					if ray["side"] == 0.0:
+						var local_hit = visuals.global_transform.inverse() * result.position
+						var side = -sign(local_hit.x) if abs(local_hit.x) > 0.05 else -1.0
+						avoid_force += side * 2.0 * intensity
+					else:
+						# Side hit: steer in the opposite direction
+						avoid_force += -ray["side"] * 1.5 * intensity
+					obstacle_count += 1
+					
+		if obstacle_count > 0:
+			input.x = clamp(input.x + avoid_force, -1.0, 1.0)
+	
+	if speed < 1.5 and can_move and not is_exploding:
+		stuck_timer += delta
+		if stuck_timer > 3.5:
+			stuck_timer = 0.0
+			respawn()
+		elif stuck_timer > 1.2:
+			input.y = 1.0
+			input.x = -sign(input.x) if input.x != 0 else 1.0
+	else:
+		stuck_timer = 0.0
+		
+	return input
+
+func _process_ai_items(delta: float):
+	if current_item == ItemType.NONE:
+		return
+		
+	ai_item_timer += delta
+	if ai_item_timer < 0.6:
+		return
+	ai_item_timer = 0.0
+	
+	var should_use = false
+	match current_item:
+		ItemType.BOOST:
+			if abs(sync_steer) < 0.2:
+				should_use = true
+		ItemType.MISSILE, ItemType.GUIDED_MISSILE:
+			var fwd = -visuals.global_transform.basis.z
+			for cart in get_tree().get_nodes_in_group("player_carts"):
+				if cart == self: continue
+				var to_cart = cart.global_position - global_position
+				if to_cart.length() < 40.0 and fwd.dot(to_cart.normalized()) > 0.8:
+					should_use = true
+					break
+		ItemType.BOMB, ItemType.SHOCKWAVE:
+			var fwd = -visuals.global_transform.basis.z
+			for cart in get_tree().get_nodes_in_group("player_carts"):
+				if cart == self: continue
+				var to_cart = cart.global_position - global_position
+				if to_cart.length() < 18.0 and fwd.dot(to_cart.normalized()) < -0.5:
+					should_use = true
+					break
+		ItemType.SHIELD:
+			should_use = true
+			
+	if should_use:
+		_use_item()

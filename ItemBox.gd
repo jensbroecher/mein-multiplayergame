@@ -46,12 +46,14 @@ func _process(delta):
 func _on_body_entered(body):
 	if not is_active: return
 	
-	if body.is_in_group("player_carts") and body.is_local_player:
-		if body.current_item == body.ItemType.NONE:
-			if multiplayer.is_server():
-				_server_process_pickup(body)
-			else:
-				request_pickup.rpc_id(1, body.name.to_int())
+	if body.is_in_group("player_carts"):
+		var is_colliding_racer = body.is_local_player or (body.get("is_ai") and multiplayer.is_server())
+		if is_colliding_racer:
+			if body.current_item == body.ItemType.NONE:
+				if multiplayer.is_server():
+					_server_process_pickup(body)
+				else:
+					request_pickup.rpc_id(1, body.name.to_int())
 
 @rpc("any_peer", "call_local", "reliable")
 func request_pickup(player_id: int):
@@ -69,7 +71,11 @@ func request_pickup(player_id: int):
 
 func _server_process_pickup(body):
 	if body.has_method("give_item_rpc"):
-		body.give_item_rpc.rpc_id(body.name.to_int(), body._get_random_item_rpc())
+		var item_type = body._get_random_item_rpc()
+		if body.get("is_ai"):
+			body.give_item(item_type)
+		else:
+			body.give_item_rpc.rpc_id(body.name.to_int(), item_type)
 		_deactivate_rpc.rpc()
 
 @rpc("authority", "call_local", "reliable")

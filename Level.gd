@@ -33,6 +33,9 @@ func _ready():
 	if Engine.is_editor_hint():
 		return
 
+	if not track_path:
+		track_path = get_node_or_null("TrackPath")
+
 	add_to_group("level")
 	player_spawner.spawn_function = _spawn_custom
 	race_ui = RACE_UI_SCENE.instantiate()
@@ -68,7 +71,19 @@ func _ready():
 		NetworkManager.player_connected.connect(_on_server_player_connected)
 		NetworkManager.player_disconnected.connect(_on_server_player_disconnected)
 
-		# Spawn existing players (host first)
+		if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP:
+			var bot_names = ["Viper Bot", "Lightning Bot", "Apex Bot"]
+			var bot_cars = [1, 2, 3]
+			for i in range(3):
+				var bot_id = 100 + i
+				NetworkManager.players[bot_id] = {
+					"name": bot_names[i],
+					"car_index": bot_cars[i],
+					"ready": true,
+					"is_ai": true
+				}
+
+		# Spawn existing players (host first, then bots if GP)
 		for id in NetworkManager.players:
 			var info = NetworkManager.players[id]
 			_add_player(id, info["name"])
@@ -80,6 +95,9 @@ func _ready():
 	race_ui.update_lobby(NetworkManager.players)
 	race_ui.ready_pressed.connect(_on_local_ready_pressed)
 	race_ui.start_pressed.connect(_on_host_start_pressed)
+	
+	if NetworkManager.current_game_mode != NetworkManager.GameMode.MULTIPLAYER:
+		_run_singleplayer_countdown()
 
 func _setup_checkpoints():
 	# Rebuild checkpoints list from scene tree to prevent inspector array desync
@@ -120,7 +138,11 @@ func _on_checkpoint_entered(body: Node3D, cp_idx: int):
 
 			# Inform the player cart of its last passed checkpoint for respawn purposes
 			var cp = checkpoints[cp_idx]
-			_sync_checkpoint_to_player.rpc_id(id, cp.global_transform)
+			var cart = players_container.get_node_or_null(str(id))
+			if cart and cart.get("is_ai"):
+				cart.last_checkpoint_transform = cp.global_transform
+			else:
+				_sync_checkpoint_to_player.rpc_id(id, cp.global_transform)
 
 			# If they hit the last checkpoint (Finish Line), complete a lap
 			if stats["next_checkpoint_idx"] >= checkpoints.size():
@@ -132,7 +154,12 @@ func _check_finish(id: int):
 	var stats = player_stats[id]
 	if stats["laps"] >= NetworkManager.max_laps and not stats["finished"]:
 		stats["finished"] = true
-		show_player_finished_rpc.rpc_id(id)
+		
+		var cart = players_container.get_node_or_null(str(id))
+		if cart and cart.get("is_ai"):
+			cart.can_move = false
+		else:
+			show_player_finished_rpc.rpc_id(id)
 
 		# Start 30s timer if this is the first finisher
 		if end_timer <= 0.0:
@@ -178,6 +205,7 @@ func _spawn_custom(data: Variant) -> Node:
 	cart.player_name = data["name"]
 	cart.car_index = data.get("car_index", 0)
 	cart.global_transform = data["transform"]
+	cart.is_ai = data.get("is_ai", false)
 
 	# If race is already started (e.g. late join), enable movement if local
 	if race_state == RaceState.RACING:
@@ -191,41 +219,36 @@ func _add_player(id: int, p_name: String):
 		player_stats[id] = {"laps": 0, "next_checkpoint_idx": 0, "finished": false, "pos": 0}
 
 		# ALIGN SPAWN TO TRACK:
-		# Calculate the orientation based on the track curve
+		# Use the track tangent to align orientation, fallback to editor placement
 		var spawn_transform = spawn_points[idx].global_transform
 		if track_path:
 			var curve = track_path.curve
-			var pos = spawn_transform.origin
-			var offset = curve.get_closest_offset(pos)
-			var curve_pos = curve.sample_baked(offset)
-
-			# Find tangent at this point
-			var next_offset = min(offset + 0.5, curve.get_baked_length())
-			var tangent = (curve.sample_baked(next_offset) - curve_pos).normalized()
-			if tangent.length() < 0.01:
-				tangent = Vector3.BACK # Fallback
-
-			var up = Vector3.UP
-			var right = tangent.cross(up).normalized()
-			# Re-calculate UP to be perfectly orthogonal to tangent and right
-			up = right.cross(tangent).normalized()
-
-			# Create a new basis facing along the tangent
-			# forward = -z in Godot
-			spawn_transform.basis = Basis(right, up, -tangent)
-
-			# LIFT SLIGHTLY: Prevent spawning stuck in road
-			spawn_transform.origin.y += 1.5
+			var local_spawn_pos = track_path.to_local(spawn_points[idx].global_position)
+			var offset = curve.get_closest_offset(local_spawn_pos)
+			
+			var next_offset = fmod(offset + 1.0, curve.get_baked_length())
+			var p1 = curve.sample_baked(offset)
+			var p2 = curve.sample_baked(next_offset)
+			var global_tangent = (track_path.to_global(p2) - track_path.to_global(p1)).normalized()
+			
+			if global_tangent.length() > 0.01:
+				spawn_transform.basis = Basis.looking_at(global_tangent, Vector3.UP)
+		
+		# LIFT SLIGHTLY: Prevent spawning stuck in road
+		spawn_transform.origin.y += 1.5
 
 		var car_idx = 0
+		var is_ai = false
 		if NetworkManager.players.has(id):
 			car_idx = NetworkManager.players[id].get("car_index", 0)
+			is_ai = NetworkManager.players[id].get("is_ai", false)
 
 		var data = {
 			"id": id,
 			"name": p_name,
 			"transform": spawn_transform,
-			"car_index": car_idx
+			"car_index": car_idx,
+			"is_ai": is_ai
 		}
 		player_spawner.spawn(data)
 
@@ -294,7 +317,8 @@ func _update_positions():
 			pos = player_stats[id]["pos"]
 
 		var l = ranking[i]["laps"]
-		update_hud_rpc.rpc_id(id, pos, ranking.size(), mini(l + 1, NetworkManager.max_laps), NetworkManager.max_laps)
+		if NetworkManager.players.has(id) and not NetworkManager.players[id].get("is_ai", false):
+			update_hud_rpc.rpc_id(id, pos, ranking.size(), mini(l + 1, NetworkManager.max_laps), NetworkManager.max_laps)
 
 @rpc("authority", "call_local", "unreliable")
 func update_hud_rpc(pos, total, lap, max_laps):
@@ -309,12 +333,72 @@ func update_timer_rpc(t: int):
 
 func _end_race():
 	race_state = RaceState.FINISHED
-	end_race_rpc.rpc()
+	
+	# Build results array
+	var results = []
+	var final_rankings = []
+	for id in player_stats:
+		var stats = player_stats[id]
+		var p_name = "Bot"
+		var is_bot = true
+		if NetworkManager.players.has(id):
+			p_name = NetworkManager.players[id]["name"]
+			is_bot = NetworkManager.players[id].get("is_ai", false)
+		else:
+			var cart = players_container.get_node_or_null(str(id))
+			if cart:
+				p_name = cart.player_name
+				
+		final_rankings.append({
+			"id": id,
+			"name": p_name,
+			"pos": stats["pos"],
+			"is_bot": is_bot
+		})
+	final_rankings.sort_custom(func(a, b): return a["pos"] < b["pos"])
+	
+	var points_map = [10, 8, 6, 4]
+	for i in range(final_rankings.size()):
+		var racer = final_rankings[i]
+		var round_pts = points_map[mini(i, points_map.size() - 1)]
+		
+		if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP:
+			var current_total = NetworkManager.gp_standings.get(racer["name"], 0)
+			NetworkManager.gp_standings[racer["name"]] = current_total + round_pts
+			
+		results.append({
+			"name": racer["name"],
+			"pos": racer["pos"],
+			"round_points": round_pts,
+			"total_points": NetworkManager.gp_standings.get(racer["name"], round_pts)
+		})
+		
+	end_race_rpc.rpc(results)
 
 @rpc("authority", "call_local", "reliable")
-func end_race_rpc():
+func end_race_rpc(results_data: Array):
 	race_ui.show_message("Race Over!", 5.0)
 	_disable_local_cart()
+	if race_ui.has_method("display_race_results"):
+		race_ui.display_race_results(results_data)
+
+func _run_singleplayer_countdown():
+	if race_ui:
+		# Hide lobby and show HUD
+		var lp = race_ui.get_node_or_null("LobbyPanel")
+		if lp: lp.hide()
+		var hp = race_ui.get_node_or_null("HUDPanel")
+		if hp: hp.show()
+		
+		race_ui.show_message("3", 1.0)
+		await get_tree().create_timer(1.0).timeout
+		race_ui.show_message("2", 1.0)
+		await get_tree().create_timer(1.0).timeout
+		race_ui.show_message("1", 1.0)
+		await get_tree().create_timer(1.0).timeout
+		
+		if multiplayer.is_server():
+			start_race.rpc()
 
 func on_player_exploded(is_local: bool):
 	if is_local:

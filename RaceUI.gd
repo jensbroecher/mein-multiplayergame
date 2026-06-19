@@ -141,3 +141,117 @@ func update_end_timer(time_left: int):
 func update_speed(val_kmh: float):
 	if label_speed:
 		label_speed.text = "%d KM/H" % int(val_kmh)
+
+
+var results_container: VBoxContainer = null
+var action_button: Button = null
+
+func display_race_results(results_data: Array):
+	show_end_screen()
+	
+	if NetworkManager.current_game_mode != NetworkManager.GameMode.MULTIPLAYER:
+		end_timer_label.hide()
+	
+	var vbox = $EndPanel/VBoxContainer
+	if results_container == null:
+		results_container = VBoxContainer.new()
+		results_container.add_theme_constant_override("separation", 8)
+		vbox.add_child(results_container)
+		vbox.move_child(results_container, 1)
+	else:
+		for child in results_container.get_children():
+			child.queue_free()
+			
+	var header = HBoxContainer.new()
+	header.custom_minimum_size = Vector2(400, 0)
+	
+	var h_pos = Label.new()
+	h_pos.text = "POS"
+	h_pos.custom_minimum_size = Vector2(50, 0)
+	h_pos.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	header.add_child(h_pos)
+	
+	var h_name = Label.new()
+	h_name.text = "NAME"
+	h_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(h_name)
+	
+	if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP:
+		var h_pts = Label.new()
+		h_pts.text = "PTS"
+		h_pts.custom_minimum_size = Vector2(80, 0)
+		h_pts.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		header.add_child(h_pts)
+		
+		var h_total = Label.new()
+		h_total.text = "TOTAL"
+		h_total.custom_minimum_size = Vector2(80, 0)
+		h_total.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		header.add_child(h_total)
+		
+	results_container.add_child(header)
+	
+	var sep = HSeparator.new()
+	results_container.add_child(sep)
+	
+	for r in results_data:
+		var row = HBoxContainer.new()
+		
+		var r_pos = Label.new()
+		r_pos.text = "%d" % r["pos"]
+		r_pos.custom_minimum_size = Vector2(50, 0)
+		r_pos.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		row.add_child(r_pos)
+		
+		var r_name = Label.new()
+		r_name.text = r["name"]
+		r_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(r_name)
+		
+		if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP:
+			var r_pts = Label.new()
+			r_pts.text = "+%d" % r["round_points"]
+			r_pts.custom_minimum_size = Vector2(80, 0)
+			r_pts.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			row.add_child(r_pts)
+			
+			var r_total = Label.new()
+			r_total.text = "%d" % r["total_points"]
+			r_total.custom_minimum_size = Vector2(80, 0)
+			r_total.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			row.add_child(r_total)
+			
+		results_container.add_child(row)
+		
+	if action_button == null:
+		action_button = Button.new()
+		action_button.custom_minimum_size = Vector2(0, 45)
+		vbox.add_child(action_button)
+		action_button.pressed.connect(_on_action_button_pressed)
+		
+	if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP:
+		var gp_data = NetworkManager.GP_CUPS.get(NetworkManager.current_gp_name)
+		var next_stage = NetworkManager.current_gp_stage + 1
+		if gp_data and next_stage < gp_data["stages"].size():
+			action_button.text = "NEXT STAGE"
+		else:
+			action_button.text = "FINISH GRAND PRIX"
+	elif NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL:
+		action_button.text = "RETURN TO MENU"
+	else:
+		action_button.text = "RETURN TO MENU"
+
+func _on_action_button_pressed():
+	if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP:
+		var gp_data = NetworkManager.GP_CUPS.get(NetworkManager.current_gp_name)
+		var next_stage = NetworkManager.current_gp_stage + 1
+		if gp_data and next_stage < gp_data["stages"].size():
+			var main = get_tree().current_scene
+			if main and main.has_method("load_gp_stage"):
+				main.load_gp_stage(next_stage)
+				return
+				
+	var main = get_tree().current_scene
+	if main and main.has_method("_on_server_disconnected"):
+		main._on_server_disconnected()
+

@@ -26,6 +26,8 @@ var target: Node3D = null
 var lifetime = 5.0
 var search_timer = 0.0
 var spawn_safety_timer = 0.3
+var start_position: Vector3 = Vector3.ZERO
+@export var max_range: float = 75.0
 
 func _ready():
 	add_to_group("missiles")
@@ -40,8 +42,10 @@ func _ready():
 	flight_audio.max_distance = 100.0
 	add_child(flight_audio)
 	
+	start_position = global_position
 	if is_guided:
 		lifetime = 8.0
+		max_range = 100.0
 		# Blue/purple tint for the nose cone of guided missiles
 		var nose_cone = get_node_or_null("Visuals/NoseCone")
 		if nose_cone:
@@ -66,6 +70,7 @@ func _ready():
 			nozzle.material_override = nm
 	else:
 		lifetime = 5.0
+		max_range = 75.0
 		
 	_find_target()
 
@@ -83,6 +88,11 @@ func _physics_process(delta):
 	# Decrement lifetime on all peers to prevent stuck/phantom projectiles if RPC is lost
 	lifetime -= delta
 	if lifetime <= 0:
+		_explode()
+		return
+
+	# Check maximum flight range
+	if global_position.distance_to(start_position) >= max_range:
 		_explode()
 		return
 
@@ -142,8 +152,12 @@ func _explode():
 					if dir.length_squared() < 0.01:
 						dir = Vector3.UP
 					var impulse = dir * 8.0 * p.mass + Vector3.UP * 4.0 * p.mass
+					var is_real_peer = p.name.to_int() > 0 and not p.get("is_ai")
 					if p.has_method("apply_blast_impulse"):
-						p.apply_blast_impulse.rpc_id(p.name.to_int(), impulse)
+						if is_real_peer:
+							p.apply_blast_impulse.rpc_id(p.name.to_int(), impulse)
+						else:
+							p.apply_blast_impulse(impulse)
 					else:
 						p.apply_central_impulse(impulse)
 

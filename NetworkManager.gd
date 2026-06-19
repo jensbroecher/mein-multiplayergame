@@ -18,6 +18,25 @@ var max_laps: int = 3
 var players = {}
 var local_car_index: int = 0
 
+enum GameMode { MULTIPLAYER, SINGLE_PLAYER_GP, SINGLE_PLAYER_TIME_TRIAL }
+var current_game_mode: int = GameMode.MULTIPLAYER
+
+var current_gp_name: String = ""
+var current_gp_stage: int = 0
+var gp_standings: Dictionary = {} # racer_name -> points
+
+const GP_CUPS = {
+	"Starter Cup": {
+		"name": "Starter Cup",
+		"stages": ["res://Level.tscn"]
+	},
+	"Desert Cup": {
+		"name": "Desert Cup",
+		"stages": ["res://Level.tscn"]
+	}
+}
+
+
 func _ready():
 	multiplayer.peer_connected.connect(_on_player_connected)
 	multiplayer.peer_disconnected.connect(_on_player_disconnected)
