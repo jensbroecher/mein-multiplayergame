@@ -627,6 +627,10 @@ func _physics_process(delta):
 		_interpolate_remote_physics(delta)
 		return
 
+	# Align ground ray with visual orientation so it points along the vehicle's local down axis.
+	if is_instance_valid(ground_ray):
+		ground_ray.global_transform.basis = visuals.global_transform.basis
+
 	# Apply extra gravity
 	apply_central_force(Vector3.DOWN * GRAVITY * mass)
 
@@ -856,6 +860,8 @@ func _get_ground_visual_offset() -> float:
 	if not is_instance_valid(ground_ray):
 		return 0.0
 	
+	# Align ground ray with visual orientation so it points along the vehicle's local down axis.
+	ground_ray.global_transform.basis = visuals.global_transform.basis
 	# Force immediate raycast update to get accurate collision info
 	ground_ray.force_raycast_update()
 	if ground_ray.is_colliding():
@@ -882,6 +888,10 @@ func _update_visuals_alignment(delta):
 		# Normal explosion: body parts fly, so follow the physics transform
 		visuals.global_transform = global_transform
 		return
+
+	# Align ground ray with visual orientation so it points along the vehicle's local down axis.
+	if is_instance_valid(ground_ray):
+		ground_ray.global_transform.basis = visuals.global_transform.basis
 
 	var on_ground = ground_ray.is_colliding()
 	var target_up = Vector3.UP

@@ -2192,13 +2192,13 @@ material = SubResource("ShaderMaterial_asphalt")
 transform = Transform3D(7.1962748, 0, -18.660488, 0, 19.999996, 0, 18.660488, 0, 7.1962748, 22.445913, 0.07211912, -9.015505)
 
 [node name="node_0" parent="Ramps/WoodRamp" index="0" unique_id=703926265]
-lod_bias = 0.5
+lod_bias = 0.1
 
 [node name="NewRamp" parent="Ramps" unique_id=966004585 instance=ExtResource("17_dcckh")]
 transform = Transform3D(-30.273119, 0, -33.29471, 0, 44.999985, 0, 33.29471, 0, -30.273119, -507.56146, 6.9816875, -210.87714)
 
 [node name="node_0" parent="Ramps/NewRamp" index="0" unique_id=1515567132]
-lod_bias = 0.5
+lod_bias = 0.1
 
 [editable path="Ramps/WoodRamp"]
 [editable path="Ramps/NewRamp"]
