@@ -9,7 +9,16 @@ var music_volume: float = 0.8
 var sfx_volume: float = 0.7
 var show_fps: bool = false
 var window_mode: int = 0 # 0: Windowed, 1: Fullscreen
+var resolution_index: int = 1 # Default 1920x1080
 var vsync: bool = false
+
+const RESOLUTIONS = [
+	Vector2i(1280, 720),
+	Vector2i(1920, 1080),
+	Vector2i(2560, 1440),
+	Vector2i(3840, 2160)
+]
+
 
 var current_track_index = -1
 var player1: AudioStreamPlayer
@@ -102,12 +111,17 @@ func load_settings():
 		sfx_volume = config.get_value("audio", "sfx", 0.7)
 		show_fps = config.get_value("display", "show_fps", false)
 		window_mode = config.get_value("display", "window_mode", 0)
+		resolution_index = config.get_value("display", "resolution_index", 1)
 		vsync = config.get_value("display", "vsync", false)
 		
 	# Apply loaded settings
 	set_music_volume(music_volume, false)
 	set_sfx_volume(sfx_volume, false)
 	set_show_fps(show_fps, false)
+	call_deferred("_apply_window_settings")
+
+func _apply_window_settings():
+	set_resolution(resolution_index, false)
 	set_window_mode(window_mode, false)
 	set_vsync(vsync, false)
 
@@ -117,6 +131,7 @@ func save_settings():
 	config.set_value("audio", "sfx", sfx_volume)
 	config.set_value("display", "show_fps", show_fps)
 	config.set_value("display", "window_mode", window_mode)
+	config.set_value("display", "resolution_index", resolution_index)
 	config.set_value("display", "vsync", vsync)
 	config.save(SETTINGS_FILE)
 
@@ -200,12 +215,33 @@ func set_show_fps(enabled: bool, save: bool = true):
 		fps_layer.visible = enabled
 	if save: save_settings()
 
+func set_resolution(index: int, save: bool = true):
+	if index < 0 or index >= RESOLUTIONS.size():
+		return
+	resolution_index = index
+	var size = RESOLUTIONS[index]
+	
+	var win = get_window()
+	win.size = size
+	if win.mode != Window.MODE_FULLSCREEN:
+		var screen_id = win.current_screen
+		var screen_size = DisplayServer.screen_get_size(screen_id)
+		win.position = (screen_size - size) / 2
+	
+	if save: save_settings()
+
 func set_window_mode(mode: int, save: bool = true):
 	window_mode = mode
+	var win = get_window()
 	if mode == 1:
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+		win.mode = Window.MODE_FULLSCREEN
 	else:
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+		win.mode = Window.MODE_WINDOWED
+		var size = RESOLUTIONS[resolution_index]
+		win.size = size
+		var screen_id = win.current_screen
+		var screen_size = DisplayServer.screen_get_size(screen_id)
+		win.position = (screen_size - size) / 2
 	if save: save_settings()
 
 func set_vsync(enabled: bool, save: bool = true):

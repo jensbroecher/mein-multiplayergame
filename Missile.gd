@@ -14,6 +14,9 @@ const SPEED_MAX: float = 50.0     # Gradually accelerates to this
 const SPEED_ACCEL: float = 8.0    # m/s² acceleration
 @export var owner_id: int
 @export var is_guided: bool = false
+var sync_position: Vector3
+var sync_rotation: Vector3
+
 @onready var area = $Area3D
 @onready var visuals = $Visuals
 @onready var fire_trail = $FireTrail
@@ -73,6 +76,9 @@ func _ready():
 		max_range = 75.0
 		
 	_find_target()
+	if multiplayer.multiplayer_peer != null and not multiplayer.is_server():
+		sync_position = global_position
+		sync_rotation = global_rotation
 
 func _find_target():
 	var nearest_dist = 500.0
@@ -132,6 +138,30 @@ func _physics_process(delta):
 		var forward = -transform.basis.z
 		velocity = forward * speed
 		move_and_slide()
+		
+		sync_position = global_position
+		sync_rotation = global_rotation
+
+
+func _process(delta):
+	# If we are a client, smoothly interpolate position and rotation to synced values
+	if multiplayer.multiplayer_peer != null and not multiplayer.is_server():
+		# Client-side dead reckoning prediction
+		# 1. Update client-side speed approximation (so it accelerates like the server)
+		speed = min(speed + SPEED_ACCEL * delta, SPEED_MAX)
+		
+		# 2. Predict next position by moving forward along current orientation
+		var forward = -global_transform.basis.z
+		global_position += forward * speed * delta
+		
+		# 3. Blend toward the actual network-synchronized position to correct errors
+		var t = 1.0 - exp(-15.0 * delta)
+		global_position = global_position.lerp(sync_position, t)
+		
+		var current_quat = global_transform.basis.get_rotation_quaternion()
+		var target_quat = Quaternion.from_euler(sync_rotation)
+		global_transform.basis = Basis(current_quat.slerp(target_quat, t))
+
 
 func _on_body_entered(body):
 	if multiplayer.multiplayer_peer != null and not multiplayer.is_server(): return

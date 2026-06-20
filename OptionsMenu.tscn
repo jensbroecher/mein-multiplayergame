@@ -126,6 +126,19 @@ text = "Window Mode"
 layout_mode = 2
 size_flags_horizontal = 3
 
+[node name="ResolutionBox" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/ResolutionBox"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+text = "Resolution"
+
+[node name="OptionResolution" type="OptionButton" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/ResolutionBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+
 [node name="VSyncBox" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList"]
 layout_mode = 2
 

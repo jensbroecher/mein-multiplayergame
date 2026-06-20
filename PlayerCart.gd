@@ -864,12 +864,12 @@ func _get_ground_visual_offset() -> float:
 		var current_height_normal = (global_position - contact_pt).dot(contact_normal)
 		
 		# Mathematically align wheels to ground: offset visuals relative to body center
-		var target_offset = current_height_normal + (avg_wheel_y - WHEEL_RADIUS)
+		var target_offset = current_height_normal + (avg_wheel_y - 0.24)
 		# Clamp to prevent extreme visual displacement during severe physics bounces
-		return clamp(target_offset, -0.2, 0.4)
+		return clamp(target_offset, -0.6, 0.6)
 	
 	# Default visual offset in air (keeps wheels at their resting position)
-	return COLLISION_RADIUS + (avg_wheel_y - WHEEL_RADIUS)
+	return COLLISION_RADIUS + (avg_wheel_y - 0.24)
 
 func _update_visuals_alignment(delta):
 	if is_exploding:
@@ -889,32 +889,28 @@ func _update_visuals_alignment(delta):
 		target_up = ground_ray.get_collision_normal()
 	else:
 		# If in air, slowly return to global UP instead of snapping
-		target_up = visuals.global_transform.basis.y.lerp(Vector3.UP, 2.0 * delta).normalized()
+		target_up = visuals.global_transform.basis.y.lerp(Vector3.UP, 1.0 - exp(-2.0 * delta)).normalized()
 		
 	# Smoothly align the visual mesh normal
 	var current_basis = visuals.global_transform.basis
 	var forward = -current_basis.z
 	var right = current_basis.x
-
+ 
 	var target_right = forward.cross(target_up).normalized()
 	var target_forward = target_up.cross(target_right).normalized()
-
+ 
 	var target_basis = Basis(target_right, target_up, -target_forward)
 	if is_drifting:
 		var drift_angle = -0.35 if drift_right else 0.35
 		target_basis = target_basis.rotated(target_up, drift_angle)
-	visuals.global_transform.basis = current_basis.slerp(target_basis, 8.0 * delta)
-
+	visuals.global_transform.basis = current_basis.slerp(target_basis, 1.0 - exp(-8.0 * delta))
+ 
 	var target_offset = _get_ground_visual_offset()
-	visual_offset_y = lerp(visual_offset_y, target_offset, 10.0 * delta)
-	var target_pos = global_position - target_up * visual_offset_y
-
-	# Smoothly follow the rigid body position to eliminate physics jitter at low frame rates
-	var dist = visuals.global_position.distance_to(target_pos)
-	if dist > 3.0:
-		visuals.global_position = target_pos
-	else:
-		visuals.global_position = visuals.global_position.lerp(target_pos, 30.0 * delta)
+	visual_offset_y = lerp(visual_offset_y, target_offset, 1.0 - exp(-10.0 * delta))
+	var target_pos = get_global_transform_interpolated().origin - target_up * visual_offset_y
+ 
+	# Align visuals position directly to eliminate visual lag/pulsing
+	visuals.global_position = target_pos
 
 	_update_wheel_visuals(delta)
 
@@ -966,7 +962,7 @@ func _update_wheel_visuals(delta):
 			mesh_node.rotation.x = wheel_rotation
 
 func _interpolate_remote_physics(delta: float):
-	var t = clamp(REMOTE_LERP_SPEED * delta, 0.0, 1.0)
+	var t = 1.0 - exp(-REMOTE_LERP_SPEED * delta)
 	global_position = global_position.lerp(sync_position, t)
 
 	var current_quat := Quaternion.from_euler(rotation)
@@ -974,7 +970,7 @@ func _interpolate_remote_physics(delta: float):
 	if target_quat == Quaternion.IDENTITY:
 		target_quat = Quaternion.from_euler(sync_rotation)
 
-	var rot_t = clamp(REMOTE_LERP_SPEED * 0.65 * delta, 0.0, 1.0)
+	var rot_t = 1.0 - exp(-REMOTE_LERP_SPEED * 0.65 * delta)
 	var new_quat := current_quat.slerp(target_quat, rot_t)
 	rotation = new_quat.get_euler()
 
@@ -991,21 +987,17 @@ func _interpolate_remote_visual(delta: float):
 
 	# Smoothly follow visual rotation to prevent remote visual jittering at high refresh rates
 	var current_visual_quat: Quaternion = visuals.global_transform.basis.get_rotation_quaternion()
-	var rot_t = clamp(REMOTE_LERP_SPEED * 0.65 * delta, 0.0, 1.0)
+	var rot_t = 1.0 - exp(-REMOTE_LERP_SPEED * 0.65 * delta)
 	var new_visual_quat: Quaternion = current_visual_quat.slerp(target_quat, rot_t)
 	
 	visuals.global_transform.basis = Basis(new_visual_quat)
 	var target_up = visuals.global_transform.basis.y.normalized()
 	var target_offset = _get_ground_visual_offset()
-	visual_offset_y = lerp(visual_offset_y, target_offset, 10.0 * delta)
-	var target_pos = global_position - target_up * visual_offset_y
+	visual_offset_y = lerp(visual_offset_y, target_offset, 1.0 - exp(-10.0 * delta))
+	var target_pos = get_global_transform_interpolated().origin - target_up * visual_offset_y
 
-	# Smoothly follow remote position to eliminate physics jitter
-	var dist = visuals.global_position.distance_to(target_pos)
-	if dist > 3.0:
-		visuals.global_position = target_pos
-	else:
-		visuals.global_position = visuals.global_position.lerp(target_pos, 30.0 * delta)
+	# Align visuals position directly to eliminate visual lag/pulsing
+	visuals.global_position = target_pos
 
 	var speed := sync_velocity.length()
 	var wheel_spin_rate := speed / 0.4
