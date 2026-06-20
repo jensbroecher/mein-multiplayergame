@@ -21,13 +21,13 @@ const SPEED_ACCEL: float = 8.0    # m/s² acceleration
 @onready var smoke_particles = $SmokeParticles
 @onready var fire_sprite_particles = $FireSpriteParticles
 @onready var fire_sprite_particles_2 = $FireSpriteParticles2
-
 var target: Node3D = null
 var lifetime = 5.0
 var search_timer = 0.0
 var spawn_safety_timer = 0.3
 var start_position: Vector3 = Vector3.ZERO
 @export var max_range: float = 75.0
+var homing_delay: float = 0.5
 
 func _ready():
 	add_to_group("missiles")
@@ -76,13 +76,19 @@ func _ready():
 
 func _find_target():
 	var nearest_dist = 500.0
+	var best_target: Node3D = null
 	var players = get_tree().get_nodes_in_group("player_carts")
+	var forward = -global_transform.basis.z
 	for p in players:
 		if p.name.to_int() == owner_id: continue
-		var dist = global_position.distance_to(p.global_position)
-		if dist < nearest_dist:
-			nearest_dist = dist
-			target = p
+		var dir_to_target = (p.global_position - global_position).normalized()
+		# Only lock target if it is in front of the missile (not behind)
+		if forward.dot(dir_to_target) > 0.1:
+			var dist = global_position.distance_to(p.global_position)
+			if dist < nearest_dist:
+				nearest_dist = dist
+				best_target = p
+	target = best_target
 
 func _physics_process(delta):
 	# Decrement lifetime on all peers to prevent stuck/phantom projectiles if RPC is lost
@@ -96,7 +102,7 @@ func _physics_process(delta):
 		_explode()
 		return
 
-	if multiplayer.is_server():
+	if multiplayer.multiplayer_peer == null or multiplayer.is_server():
 		if spawn_safety_timer > 0.0:
 			spawn_safety_timer -= delta
 
@@ -105,11 +111,20 @@ func _physics_process(delta):
 			_find_target()
 			search_timer = 0.0
 
-		if target and is_instance_valid(target):
-			var dir = (target.global_position - global_position).normalized()
-			var target_basis = Basis.looking_at(dir, Vector3.UP)
-			var turn_speed = 5.0 if is_guided else 1.0
-			global_basis = global_basis.slerp(target_basis, turn_speed * delta).orthonormalized()
+		if homing_delay > 0.0:
+			homing_delay -= delta
+		else:
+			if target and is_instance_valid(target):
+				var dir = (target.global_position - global_position).normalized()
+				var forward = -global_transform.basis.z
+				if forward.dot(dir) > -0.2:
+					if abs(dir.dot(Vector3.UP)) < 0.99:
+						var target_basis = Basis.looking_at(dir, Vector3.UP)
+						var turn_speed = 3.5 if is_guided else 0.3
+						global_basis = global_basis.slerp(target_basis, turn_speed * delta).orthonormalized()
+				else:
+					# Target went too far behind, break the lock
+					target = null
 
 		# Gradually accelerate from start speed to max
 		speed = min(speed + SPEED_ACCEL * delta, SPEED_MAX)
@@ -119,7 +134,7 @@ func _physics_process(delta):
 		move_and_slide()
 
 func _on_body_entered(body):
-	if not multiplayer.is_server(): return
+	if multiplayer.multiplayer_peer != null and not multiplayer.is_server(): return
 	if body.is_in_group("player_carts"):
 		# Trigger explosion. We do NOT check for owner_id here because if the missile directly hits any cart (including the owner if they run into it),
 		# it should detonate. The blast damage loop will handle hitting any nearby carts including the owner.
@@ -128,14 +143,11 @@ func _on_body_entered(body):
 		if spawn_safety_timer <= 0.0:
 			_explode()
 
-
-
 func _explode():
 	if not is_instance_valid(self): return
 
-	
 	# Server-side blast radius damage logic (similar to Bomb.gd)
-	if multiplayer.is_server():
+	if multiplayer.multiplayer_peer == null or multiplayer.is_server():
 		var blast_radius = 7.0
 		var players = get_tree().get_nodes_in_group("player_carts")
 		for p in players:
@@ -154,14 +166,17 @@ func _explode():
 					var impulse = dir * 8.0 * p.mass + Vector3.UP * 4.0 * p.mass
 					var is_real_peer = p.name.to_int() > 0 and not p.get("is_ai")
 					if p.has_method("apply_blast_impulse"):
-						if is_real_peer:
+						if multiplayer.multiplayer_peer != null and is_real_peer:
 							p.apply_blast_impulse.rpc_id(p.name.to_int(), impulse)
 						else:
-							p.apply_blast_impulse(impulse)
+							p.apply_central_impulse(impulse)
 					else:
 						p.apply_central_impulse(impulse)
 
-	_explode_rpc.rpc()
+	if multiplayer.multiplayer_peer != null:
+		_explode_rpc.rpc()
+	else:
+		_explode_rpc()
 
 @rpc("authority", "call_local", "reliable")
 func _explode_rpc():

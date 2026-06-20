@@ -35,7 +35,7 @@ func _ready():
 	add_to_group("bombs")
 	area.body_entered.connect(_on_body_entered)
 	
-	if not multiplayer.is_server():
+	if multiplayer.multiplayer_peer != null and not multiplayer.is_server():
 		freeze = true
 		freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
 	else:
@@ -43,6 +43,7 @@ func _ready():
 		get_tree().create_timer(2.0).timeout.connect(func(): 
 			if is_instance_valid(self): 
 				freeze = true
+				freeze_mode = RigidBody3D.FREEZE_MODE_STATIC
 				var limit = deg_to_rad(15.0)
 				var target_rot = Vector3(
 					clamp(global_rotation.x, -limit, limit),
@@ -154,7 +155,7 @@ func _process(delta):
 		spark_particles.initial_velocity_max = 5.0 + urgency * 5.0
 
 func _physics_process(delta):
-	if not multiplayer.is_server(): return
+	if multiplayer.multiplayer_peer != null and not multiplayer.is_server(): return
 	if is_exploding: return
 	
 	if owner_safety_timer > 0.0:
@@ -165,7 +166,7 @@ func _physics_process(delta):
 		_explode()
 
 func _on_body_entered(body):
-	if not multiplayer.is_server(): return
+	if multiplayer.multiplayer_peer != null and not multiplayer.is_server(): return
 	if is_exploding: return
 	
 	if body.is_in_group("player_carts"):
@@ -178,7 +179,7 @@ func _explode():
 	is_exploding = true
 	
 	# Server-side blast radius check
-	if multiplayer.is_server():
+	if multiplayer.multiplayer_peer == null or multiplayer.is_server():
 		var blast_radius = 8.0
 		var players = get_tree().get_nodes_in_group("player_carts")
 		for p in players:
@@ -196,14 +197,17 @@ func _explode():
 					var impulse = dir * 8.0 * p.mass + Vector3.UP * 4.0 * p.mass
 					var is_real_peer = p.name.to_int() > 0 and not p.get("is_ai")
 					if p.has_method("apply_blast_impulse"):
-						if is_real_peer:
+						if multiplayer.multiplayer_peer != null and is_real_peer:
 							p.apply_blast_impulse.rpc_id(p.name.to_int(), impulse)
 						else:
 							p.apply_blast_impulse(impulse)
 					else:
 						p.apply_central_impulse(impulse)
 					
-	_explode_rpc.rpc()
+	if multiplayer.multiplayer_peer != null:
+		_explode_rpc.rpc()
+	else:
+		_explode_rpc()
 
 @rpc("authority", "call_local", "reliable")
 func _explode_rpc():

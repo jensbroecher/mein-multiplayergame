@@ -768,14 +768,7 @@ func _create_grass_mesh() -> ArrayMesh:
 	st.set_uv(Vector2(1.0, 0.0)); st.add_vertex(v2)
 	st.set_uv(Vector2(0.0, 0.0)); st.add_vertex(v3)
 
-	# Back face
-	st.set_uv(Vector2(1.0, 1.0)); st.add_vertex(v1)
-	st.set_uv(Vector2(0.0, 1.0)); st.add_vertex(v0)
-	st.set_uv(Vector2(0.0, 0.0)); st.add_vertex(v3)
 
-	st.set_uv(Vector2(1.0, 1.0)); st.add_vertex(v1)
-	st.set_uv(Vector2(0.0, 0.0)); st.add_vertex(v3)
-	st.set_uv(Vector2(1.0, 0.0)); st.add_vertex(v2)
 
 	st.generate_normals()
 	st.generate_tangents()
@@ -824,7 +817,7 @@ func _generate_terrain_grass():
 	var grass_mesh = _create_grass_mesh()
 	# Dynamic grass shader with distance fade-out (collapses far away grass vertices to 0 for maximum performance, no wind sway)
 	var shader = Shader.new()
-	shader.code = "shader_type spatial;\nrender_mode cull_disabled, diffuse_toon, specular_disabled;\n\nuniform sampler2D albedo_texture : source_color, filter_nearest_mipmap;\nuniform vec4 albedo_tint : source_color = vec4(1.0, 1.0, 1.0, 1.0);\n\nvarying float height_val;\n\nvoid vertex() {\n\theight_val = VERTEX.y;\n\tvec3 view_pos = (MODELVIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;\n\tfloat dist = length(view_pos);\n\tfloat max_dist = 100.0;\n\tfloat fade_r = 30.0;\n\tif (dist > max_dist) {\n\t\tVERTEX = vec3(0.0);\n\t\theight_val = 0.0;\n\t} else {\n\t\tif (dist > max_dist - fade_r) {\n\t\t\tfloat fade = (max_dist - dist) / fade_r;\n\t\t\tVERTEX *= fade;\n\t\t}\n\t}\n}\n\nvoid fragment() {\n\tvec4 tex_color = texture(albedo_texture, UV);\n\tALBEDO = tex_color.rgb * albedo_tint.rgb;\n\tALPHA = tex_color.a;\n\tALPHA_SCISSOR_THRESHOLD = 0.4;\n\tROUGHNESS = 1.0;\n\tEMISSION = ALBEDO * 0.12;\n}"
+	shader.code = "shader_type spatial;\nrender_mode cull_disabled, diffuse_toon, specular_disabled, depth_draw_opaque;\n\nuniform sampler2D albedo_texture : source_color, filter_linear_mipmap_anisotropic;\nuniform vec4 albedo_tint : source_color = vec4(1.0, 1.0, 1.0, 1.0);\n\nvarying float height_val;\n\nvoid vertex() {\n\theight_val = VERTEX.y;\n\tvec3 view_pos = (MODELVIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;\n\tfloat dist = length(view_pos);\n\tfloat max_dist = 100.0;\n\tfloat fade_r = 30.0;\n\tif (dist > max_dist) {\n\t\tVERTEX = vec3(0.0);\n\t\theight_val = 0.0;\n\t} else {\n\t\tif (dist > max_dist - fade_r) {\n\t\t\tfloat fade = (max_dist - dist) / fade_r;\n\t\t\tVERTEX *= fade;\n\t\t}\n\t}\n}\n\nvoid fragment() {\n\tvec4 tex_color = texture(albedo_texture, UV);\n\tALBEDO = tex_color.rgb * albedo_tint.rgb;\n\tALPHA = tex_color.a;\n\tALPHA_SCISSOR_THRESHOLD = 0.4;\n\tROUGHNESS = 1.0;\n\tEMISSION = ALBEDO * 0.12;\n}"
 	
 	var mat = ShaderMaterial.new()
 	mat.shader = shader

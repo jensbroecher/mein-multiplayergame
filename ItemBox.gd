@@ -36,28 +36,31 @@ func _process(delta):
 			if current_scale == 0.0:
 				visuals.visible = false
 				
-	if not multiplayer.is_server(): return
+	if multiplayer.multiplayer_peer != null and not multiplayer.is_server(): return
 	
 	if not is_active:
 		respawn_timer -= delta
 		if respawn_timer <= 0:
-			_activate_rpc.rpc()
+			if multiplayer.multiplayer_peer != null:
+				_activate_rpc.rpc()
+			else:
+				_activate_rpc()
 
 func _on_body_entered(body):
 	if not is_active: return
 	
 	if body.is_in_group("player_carts"):
-		var is_colliding_racer = body.is_local_player or (body.get("is_ai") and multiplayer.is_server())
+		var is_colliding_racer = body.is_local_player or (body.get("is_ai") and (multiplayer.multiplayer_peer == null or multiplayer.is_server()))
 		if is_colliding_racer:
 			if body.has_method("give_item_rpc"):
-				if multiplayer.is_server():
+				if multiplayer.multiplayer_peer == null or multiplayer.is_server():
 					_server_process_pickup(body)
 				else:
 					request_pickup.rpc_id(1, body.name.to_int())
 
 @rpc("any_peer", "call_local", "reliable")
 func request_pickup(player_id: int):
-	if not multiplayer.is_server(): return
+	if multiplayer.multiplayer_peer != null and not multiplayer.is_server(): return
 	if not is_active: return
 	
 	var body = null
@@ -75,13 +78,19 @@ func _server_process_pickup(body):
 		if body.get("is_ai"):
 			body.give_item(item_type)
 		else:
-			body.give_item_rpc.rpc_id(body.name.to_int(), item_type)
-		_deactivate_rpc.rpc()
+			if multiplayer.multiplayer_peer != null:
+				body.give_item_rpc.rpc_id(body.name.to_int(), item_type)
+			else:
+				body.give_item(item_type)
+		if multiplayer.multiplayer_peer != null:
+			_deactivate_rpc.rpc()
+		else:
+			_deactivate_rpc()
 
 @rpc("authority", "call_local", "reliable")
 func _deactivate_rpc():
 	is_active = false
-	if multiplayer.is_server():
+	if multiplayer.multiplayer_peer == null or multiplayer.is_server():
 		respawn_timer = RESPAWN_TIME
 	if sfx_pickup: sfx_pickup.play()
 

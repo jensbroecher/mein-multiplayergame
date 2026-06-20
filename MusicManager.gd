@@ -92,7 +92,7 @@ func _process(_delta):
 		fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
 		var viewport_width = get_viewport().get_visible_rect().size.x
 		var label_width = fps_label.get_minimum_size().x
-		fps_label.position = Vector2(viewport_width - label_width - 20, 10)
+		fps_label.position = Vector2((viewport_width - label_width) / 2.0, 10)
 
 func load_settings():
 	var config = ConfigFile.new()

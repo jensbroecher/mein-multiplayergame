@@ -264,9 +264,33 @@ func start_race():
 	if race_state != RaceState.LOBBY:
 		return
 	race_state = RaceState.RACING
-	race_ui.show_hud()
-	race_ui.show_message("GO!", 2.0)
+	if race_ui:
+		race_ui.show_hud()
+		var lp = race_ui.get_node_or_null("LobbyPanel")
+		if lp: lp.hide()
+		var hp = race_ui.get_node_or_null("HUDPanel")
+		if hp: hp.show()
 
+	# Start camera intro on all carts
+	get_tree().call_group("player_carts", "start_intro_animation")
+
+	# Wait for intro animation (3.5 seconds)
+	await get_tree().create_timer(3.5).timeout
+
+	# Start countdown
+	if race_ui:
+		race_ui.show_message("3", 1.0)
+	await get_tree().create_timer(1.0).timeout
+	if race_ui:
+		race_ui.show_message("2", 1.0)
+	await get_tree().create_timer(1.0).timeout
+	if race_ui:
+		race_ui.show_message("1", 1.0)
+	await get_tree().create_timer(1.0).timeout
+
+	# Now actually start the race and allow movement!
+	if race_ui:
+		race_ui.show_message("GO!", 2.0)
 	MusicManager.play_race_music()
 	get_tree().call_group("player_carts", "on_race_started")
 
@@ -383,22 +407,9 @@ func end_race_rpc(results_data: Array):
 		race_ui.display_race_results(results_data)
 
 func _run_singleplayer_countdown():
-	if race_ui:
-		# Hide lobby and show HUD
-		var lp = race_ui.get_node_or_null("LobbyPanel")
-		if lp: lp.hide()
-		var hp = race_ui.get_node_or_null("HUDPanel")
-		if hp: hp.show()
-		
-		race_ui.show_message("3", 1.0)
-		await get_tree().create_timer(1.0).timeout
-		race_ui.show_message("2", 1.0)
-		await get_tree().create_timer(1.0).timeout
-		race_ui.show_message("1", 1.0)
-		await get_tree().create_timer(1.0).timeout
-		
-		if multiplayer.is_server():
-			start_race.rpc()
+	await get_tree().process_frame
+	if multiplayer.is_server():
+		start_race.rpc()
 
 func on_player_exploded(is_local: bool):
 	if is_local:
@@ -480,7 +491,7 @@ func _spawn_random_item_boxes(count: int):
 			var collider = overlap.collider
 			if collider:
 				var c_name = collider.name.to_lower()
-				var is_road_or_terrain = c_name.contains("road") or c_name.contains("terrain") or c_name.contains("unified_world") or c_name.contains("gate") or c_name.contains("finishline") or c_name.contains("checkpoint") or c_name.contains("halfway") or c_name.contains("ramp")
+				var is_road_or_terrain = c_name.contains("road") or c_name.contains("terrain") or c_name.contains("track") or c_name.contains("unified_world") or c_name.contains("gate") or c_name.contains("finishline") or c_name.contains("checkpoint") or c_name.contains("halfway") or c_name.contains("ramp")
 				if not is_road_or_terrain or c_name.contains("itembox") or c_name.contains("cart") or c_name.contains("player"):
 					is_obstructed = true
 					break
