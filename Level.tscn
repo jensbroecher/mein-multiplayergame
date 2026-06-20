@@ -3,8 +3,12 @@
 [ext_resource type="Script" uid="uid://d2hujjwkl3s4a" path="res://Level.gd" id="1_lev99"]
 [ext_resource type="PackedScene" uid="uid://gate123" path="res://CheckpointGate.tscn" id="2_gate"]
 [ext_resource type="Texture2D" uid="uid://bsmrfxbh6vqe2" path="res://materials/asphalt.png" id="3_asph"]
+[ext_resource type="Script" uid="uid://cpx88edmwbon1" path="res://addons/GodotWeatherSystem/scripts/SeasonResource.gd" id="3_jpwbr"]
+[ext_resource type="Script" uid="uid://ct8ssg1fuina4" path="res://addons/GodotWeatherSystem/scripts/SkyColourResource.gd" id="4_kr1e0"]
 [ext_resource type="Texture2D" uid="uid://ce51lhh2jn4l0" path="res://materials/grass.png" id="5_grass"]
+[ext_resource type="Script" uid="uid://c0bu4su5psbae" path="res://addons/GodotWeatherSystem/scripts/WeatherOccurrenceResource.gd" id="5_yr3df"]
 [ext_resource type="ArrayMesh" uid="uid://bo6kl2xi1pipd" path="res://generated/terrain_visual.res" id="6_d6u53"]
+[ext_resource type="Resource" uid="uid://bbtqdfvkjixub" path="res://addons/GodotWeatherSystem/weather/clouded.tres" id="6_jpwbr"]
 [ext_resource type="Shape3D" uid="uid://cs2hxo86rcxlp" path="res://generated/terrain_collision_shape.res" id="7_dn5x0"]
 [ext_resource type="Script" uid="uid://b2sbc4x8rba5g" path="res://TerrainGenerator.gd" id="7_gen"]
 [ext_resource type="Shader" uid="uid://cvne02d6iyem5" path="res://curb_stripes.gdshader" id="8_esphl"]
@@ -30,20 +34,33 @@
 [ext_resource type="Texture2D" uid="uid://b64n1u7cxvo7d" path="res://models/trees/flower_white_png2.png" id="25_33gbk"]
 [ext_resource type="Texture2D" uid="uid://dvooxvqtwjnq4" path="res://models/trees/flower_white_leef.png" id="26_jpwbr"]
 [ext_resource type="PackedScene" uid="uid://bfbyxe68bw0dc" path="res://models/ramps/woodramp.fbx" id="30_q2vmi"]
+[ext_resource type="PackedScene" uid="uid://da2i62hjyc1cp" path="res://addons/GodotWeatherSystem/weather_controller.tscn" id="31_weather"]
 
-[sub_resource type="PhysicalSkyMaterial" id="PhysicalSkyMaterial_clouds"]
-rayleigh_color = Color(0.15, 0.2, 0.4, 1)
-mie_color = Color(0.69, 0.73, 0.77, 1)
-sun_disk_scale = 2.0
+[sub_resource type="Curve" id="Curve_8bl6p"]
+_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.0464286, 0), 0.0, 0.0, 0, 0, Vector2(0.107143, 0.0367036), 0.303207, 0.303207, 0, 0, Vector2(0.425, 1), 0.0, 0.0, 0, 0, Vector2(0.571429, 1), 0.0, 0.0, 0, 0, Vector2(0.896429, 0.0277009), 0.0, 0.0, 0, 0, Vector2(0.960714, 0), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 8
 
-[sub_resource type="Sky" id="Sky_y"]
-sky_material = SubResource("PhysicalSkyMaterial_clouds")
+[sub_resource type="Resource" id="Resource_ext2d"]
+script = ExtResource("4_kr1e0")
 
-[sub_resource type="Environment" id="Environment_nice"]
-background_mode = 2
-sky = SubResource("Sky_y")
-tonemap_mode = 2
-glow_enabled = true
+[sub_resource type="Resource" id="Resource_p7jpd"]
+script = ExtResource("4_kr1e0")
+skyColour = Color(0, 0.00784314, 0.105882, 1)
+horizonColour = Color(0.0784314, 0.00784314, 0.0156863, 1)
+groundColour = Color(0, 0, 0, 1)
+cloudBrightness = 0.05
+
+[sub_resource type="Resource" id="Resource_kr1e0"]
+script = ExtResource("5_yr3df")
+weather = ExtResource("6_jpwbr")
+
+[sub_resource type="Resource" id="Resource_yr3df"]
+script = ExtResource("3_jpwbr")
+seasonId = "summer"
+weathers = Array[ExtResource("5_yr3df")]([SubResource("Resource_kr1e0")])
+skyColourDaytime = SubResource("Resource_ext2d")
+skyColourNight = SubResource("Resource_p7jpd")
+dayNightCycleCurve = SubResource("Curve_8bl6p")
 
 [sub_resource type="Shader" id="Shader_stochastic"]
 resource_local_to_scene = true
@@ -1219,18 +1236,11 @@ point_count = 3
 script = ExtResource("1_lev99")
 checkpoints = [NodePath("Checkpoints/Halfway"), NodePath("FinishLine")]
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=613663841]
-transform = Transform3D(-0.866025, -0.433013, 0.25, 0, 0.5, 0.866025, -0.5, 0.75, -0.433013, 0, 40, 0)
-shadow_enabled = true
-shadow_bias = 0.002
-directional_shadow_split_1 = 0.2
-directional_shadow_split_2 = 0.4
-directional_shadow_split_3 = 0.7
-directional_shadow_blend_splits = true
-directional_shadow_max_distance = 250.0
-
-[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1882266804]
-environment = SubResource("Environment_nice")
+[node name="WeatherController" parent="." unique_id=1277823175 instance=ExtResource("31_weather")]
+time_of_day_hours = 13.239
+selected_weather = 1
+seasons = Array[ExtResource("3_jpwbr")]([SubResource("Resource_yr3df")])
+startTime = 47660.4
 
 [node name="TerrainGenerator" type="Node3D" parent="." unique_id=586341718 node_paths=PackedStringArray("track_path")]
 script = ExtResource("7_gen")
@@ -2189,7 +2199,7 @@ depth = 15.0
 material = SubResource("ShaderMaterial_asphalt")
 
 [node name="WoodRamp" parent="Ramps" unique_id=1457045438 instance=ExtResource("30_q2vmi")]
-transform = Transform3D(7.1962748, 0, -18.660488, 0, 19.999996, 0, 18.660488, 0, 7.1962748, 22.445913, 0.07211912, -9.015505)
+transform = Transform3D(7.1962748, 0, -18.660488, 0, 12.650239, 0, 18.660488, 0, 7.1962748, 22.445913, 0.33423603, -9.015505)
 
 [node name="node_0" parent="Ramps/WoodRamp" index="0" unique_id=703926265]
 lod_bias = 0.1
