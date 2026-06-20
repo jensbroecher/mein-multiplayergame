@@ -34,6 +34,12 @@ window/size/mode=3
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 
+[global_group]
+
+collision_trimesh=""
+collision_convex=""
+collision_none=""
+
 [input]
 
 throttle={

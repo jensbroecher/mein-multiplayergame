@@ -66,6 +66,9 @@ func _ready():
 		if node:
 			_add_collisions_to_node(node, true)
 
+	# Automatically build collisions for any node manually placed in the collision groups
+	_add_collisions_for_group_nodes(self)
+
 	# Align dynamically generated or editor-loaded road collision height to Visual_Road's Y position
 	var tg = get_node_or_null("TerrainGenerator")
 	if tg:
@@ -545,39 +548,98 @@ func _add_collisions_to_node(root_node: Node, use_trimesh: bool = false):
 	if root_node == null: return
 	
 	if root_node is MeshInstance3D:
+		# Check group overrides
+		var force_none = _is_node_or_ancestor_in_group(root_node, "collision_none")
+		if force_none:
+			return # Skip building collision for this node
+			
 		var mesh = root_node.mesh
 		if mesh:
 			var name_key = "Col_" + str(root_node.get_path()).replace("/", "_")
-			var level_root = get_tree().get_first_node_in_group("level")
+			
+			# Find a parent that is a Node3D but NOT an Area3D to avoid overlapping triggers
+			var target_parent = root_node.get_parent()
+			while target_parent and (target_parent is Area3D or not (target_parent is Node3D)):
+				target_parent = target_parent.get_parent()
+			
 			var already_has_collision = false
-			if level_root and level_root.has_node(name_key):
+			if target_parent and target_parent.has_node(name_key):
 				already_has_collision = true
+			elif not target_parent:
+				var level_root = get_tree().get_first_node_in_group("level")
+				if level_root and level_root.has_node(name_key):
+					already_has_collision = true
 				
 			if not already_has_collision:
 				var shape
-				if use_trimesh:
+				
+				# Get vertex count of the mesh for fallback and performance checks
+				var vertex_count = 0
+				for s in range(mesh.get_surface_count()):
+					var arrays = mesh.surface_get_arrays(s)
+					if arrays.size() > Mesh.ARRAY_VERTEX:
+						var vertices = arrays[Mesh.ARRAY_VERTEX]
+						if vertices:
+							vertex_count += vertices.size()
+				
+				# Check explicit group collision overrides
+				var force_convex = _is_node_or_ancestor_in_group(root_node, "collision_convex")
+				var force_trimesh = _is_node_or_ancestor_in_group(root_node, "collision_trimesh")
+				
+				var use_trimesh_actual = use_trimesh
+				if force_convex:
+					use_trimesh_actual = false
+				elif force_trimesh:
+					use_trimesh_actual = true
+				else:
+					# High-poly meshes should fallback to convex collision to prevent Jolt failures and lag,
+					# EXCEPT for gates/arches (like checkpoints and finish lines) which need concave trimesh to keep their openings clear.
+					var path_lower = str(root_node.get_path()).to_lower()
+					var is_gate = path_lower.contains("gate") or path_lower.contains("checkpoint") or path_lower.contains("finish")
+					if use_trimesh and vertex_count > 10000 and not is_gate:
+						print("[COLLISION BUILDER] Mesh ", root_node.name, " has high vertex count (", vertex_count, "), falling back to convex shape for stability.")
+						use_trimesh_actual = false
+				
+				if use_trimesh_actual:
 					shape = mesh.create_trimesh_shape()
+					if shape is ConcavePolygonShape3D and shape.data.is_empty():
+						print("[COLLISION BUILDER] WARNING: Trimesh shape for ", root_node.name, " has 0 faces/triangles (untriangulated or invalid geometry). Falling back to convex shape for safety.")
+						shape = mesh.create_convex_shape(true, true)
 				else:
 					shape = mesh.create_convex_shape(true, true)
+					
 				if shape:
+					# Bake the global scale into the shape's vertices/points to prevent Jolt degenerate shape failures on scaled models
+					var global_scale = root_node.global_transform.basis.get_scale()
+					if global_scale != Vector3.ONE:
+						if shape is ConcavePolygonShape3D:
+							var scaled_faces = PackedVector3Array()
+							for vertex in shape.data:
+								scaled_faces.append(vertex * global_scale)
+							shape.data = scaled_faces
+						elif shape is ConvexPolygonShape3D:
+							var scaled_points = PackedVector3Array()
+							for pt in shape.points:
+								scaled_points.append(pt * global_scale)
+							shape.points = scaled_points
+
 					var static_body = StaticBody3D.new()
 					static_body.name = name_key
 					var collision_shape = CollisionShape3D.new()
 					collision_shape.shape = shape
 					static_body.add_child(collision_shape)
 					
-					# Find a parent that is a Node3D but NOT an Area3D to avoid overlapping triggers
-					var target_parent = root_node.get_parent()
-					while target_parent and (target_parent is Area3D or not (target_parent is Node3D)):
-						target_parent = target_parent.get_parent()
-					
 					if target_parent:
+						print("[COLLISION BUILDER] Adding collision static body ", static_body.name, " to parent ", target_parent.name)
 						target_parent.add_child(static_body)
 					else:
+						print("[COLLISION BUILDER] Adding collision static body ", static_body.name, " to level root")
 						add_child(static_body)
 					
-					# Align static body exactly to the mesh
-					static_body.global_transform = root_node.global_transform
+					# Align static body exactly to the mesh, but orthonormalize to remove scale (since we baked it into the shape)
+					var t = root_node.global_transform
+					t.basis = t.basis.orthonormalized()
+					static_body.global_transform = t
 					
 	for child in root_node.get_children():
 		_add_collisions_to_node(child, use_trimesh)
@@ -586,6 +648,7 @@ func _add_collisions_to_matching_nodes(node: Node):
 	if node == null: return
 	
 	if node.name.to_lower().contains("ramp"):
+		print("[COLLISION BUILDER] Matching ramp node found: ", node.name, " (", node.get_class(), ")")
 		if node is CSGPolygon3D or node is CSGPrimitive3D:
 			if "use_collision" in node:
 				node.use_collision = true
@@ -593,3 +656,22 @@ func _add_collisions_to_matching_nodes(node: Node):
 		
 	for child in node.get_children():
 		_add_collisions_to_matching_nodes(child)
+
+func _add_collisions_for_group_nodes(node: Node):
+	if node == null: return
+	
+	if node.is_in_group("collision_trimesh"):
+		_add_collisions_to_node(node, true)
+	elif node.is_in_group("collision_convex"):
+		_add_collisions_to_node(node, false)
+		
+	for child in node.get_children():
+		_add_collisions_for_group_nodes(child)
+
+func _is_node_or_ancestor_in_group(node: Node, group_name: String) -> bool:
+	var current = node
+	while current and current != self:
+		if current.is_in_group(group_name):
+			return true
+		current = current.get_parent()
+	return false
