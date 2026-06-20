@@ -1,10 +1,13 @@
 [gd_scene format=3 uid="uid://gate123"]
 
-[ext_resource type="Script" path="res://CheckpointGate.gd" id="1_gate_script"]
+[ext_resource type="Script" uid="uid://c37rrd3b623o5" path="res://CheckpointGate.gd" id="1_gate_script"]
 [ext_resource type="PackedScene" uid="uid://en1x37rpwtgb" path="res://models/checkpoint gate.glb" id="2_3pha7"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_checkpoint"]
 size = Vector3(20, 10, 5)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_y0lb4"]
+albedo_color = Color(0.81694007, 0.46715403, 0.21352908, 1)
 
 [node name="CheckpointGate" type="Area3D" unique_id=1076613409]
 script = ExtResource("1_gate_script")
@@ -17,3 +20,7 @@ shape = SubResource("BoxShape3D_checkpoint")
 
 [node name="Gate" parent="VisualGate" unique_id=34302034 instance=ExtResource("2_3pha7")]
 transform = Transform3D(20, 0, 0, 0, 20, 0, 0, 0, 20, 0.45436096, 0, -0.33356476)
+
+[node name="CSGBox3D" type="CSGBox3D" parent="VisualGate" unique_id=812271756]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9.776642, 5.16473)
+material = SubResource("StandardMaterial3D_y0lb4")

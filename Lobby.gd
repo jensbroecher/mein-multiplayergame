@@ -1,14 +1,12 @@
 extends Control
 
 @onready var line_edit_name = $CenterContainer/VBoxContainer/LineEditName
-@onready var button_single = $CenterContainer/VBoxContainer/ButtonSingle
 @onready var button_host = $CenterContainer/VBoxContainer/ButtonHost
 @onready var server_list = $CenterContainer/VBoxContainer/ServerList
 
 var server_buttons = {}
 
 func _ready():
-	button_single.pressed.connect(_on_single_pressed)
 	button_host.pressed.connect(_on_host_pressed)
 	LANDiscovery.server_found.connect(_on_server_found)
 	LANDiscovery.server_lost.connect(_on_server_lost)
@@ -28,16 +26,6 @@ func _save_player_name(p_name: String):
 	config.set_value("player", "name", p_name)
 	config.save("user://settings.cfg")
 
-func _on_single_pressed():
-	var p_name = line_edit_name.text
-	if p_name.is_empty():
-		p_name = "SoloRacer"
-	else:
-		_save_player_name(p_name)
-	
-	var err = NetworkManager.start_single_player(p_name)
-	if err == OK:
-		start_game(true)
 
 func _on_host_pressed():
 	var p_name = line_edit_name.text

@@ -2,7 +2,6 @@
 
 [ext_resource type="Script" uid="uid://cgxoltdv3a2ap" path="res://PlayerCart.gd" id="1_cscript"]
 [ext_resource type="PackedScene" uid="uid://dwxqyemil5s53" path="res://models/cars/20260505221030_500312d9.fbx" id="2_cart"]
-[ext_resource type="PackedScene" uid="uid://cedxbolyht6sf" path="res://models/wheel.glb" id="3_wheel"]
 [ext_resource type="AudioStream" uid="uid://bblp15g61n0br" path="res://sounds/404333__strexet__nitro-activation.mp3" id="4_nitro"]
 [ext_resource type="AudioStream" uid="uid://dq2xlrtwb6vl0" path="res://sounds/774270__thelittlecrow__rocket-launch-boost-and-burning-version-b.wav" id="5_rocket"]
 [ext_resource type="AudioStream" uid="uid://th125s4xka82" path="res://sounds/434430__v-ktor__explosion05.wav" id="6_release"]
@@ -367,26 +366,14 @@ draw_pass_1 = SubResource("QuadMesh_fire_sprite_2")
 [node name="WheelPivotFL" type="Node3D" parent="Visuals" unique_id=40001]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.52, -0.42080304, -0.8016523)
 
-[node name="WheelFL" parent="Visuals/WheelPivotFL" unique_id=471895820 instance=ExtResource("3_wheel")]
-transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0, -0.228309, 0)
-
 [node name="WheelPivotFR" type="Node3D" parent="Visuals" unique_id=40002]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.52, -0.42080304, -0.8016523)
-
-[node name="WheelFR" parent="Visuals/WheelPivotFR" unique_id=292410534 instance=ExtResource("3_wheel")]
-transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0, -0.228309, 0)
 
 [node name="WheelPivotRL" type="Node3D" parent="Visuals" unique_id=40003]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.52, -0.42080304, 0.54913574)
 
-[node name="WheelRL" parent="Visuals/WheelPivotRL" unique_id=1288615826 instance=ExtResource("3_wheel")]
-transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0, -0.228309, 0)
-
 [node name="WheelPivotRR" type="Node3D" parent="Visuals" unique_id=40004]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.52, -0.42080304, 0.54913574)
-
-[node name="WheelRR" parent="Visuals/WheelPivotRR" unique_id=1528504604 instance=ExtResource("3_wheel")]
-transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0, -0.228309, 0)
 
 [node name="Antenna" type="Node3D" parent="Visuals" unique_id=987654321]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.111918926, 0.31964839, 0.09517008)

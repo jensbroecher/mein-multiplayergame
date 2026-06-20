@@ -19,6 +19,13 @@ const ITEM_BOX_SCENE = preload("res://ItemBox.tscn")
 			if Engine.is_editor_hint():
 				_rebuild_checkpoints()
 
+@export var align_checkpoints: bool:
+	set(val):
+		if val:
+			align_checkpoints = false
+			if Engine.is_editor_hint():
+				_align_checkpoints_to_track()
+
 enum RaceState {LOBBY, RACING, FINISHED}
 var race_state: int = RaceState.LOBBY
 
@@ -29,6 +36,9 @@ var race_state: int = RaceState.LOBBY
 var race_ui
 var player_stats = {} # id -> {"laps": 0, "next_checkpoint_idx": 0, "finished": false, "pos": 0}
 var end_timer = 0.0
+
+var cp_offsets: Array[float] = []
+var track_length: float = 0.0
 
 func _ready():
 	# @tool makes _ready() run in the editor too; skip all game/multiplayer
@@ -51,7 +61,7 @@ func _ready():
 	race_ui = RACE_UI_SCENE.instantiate()
 	add_child(race_ui)
 
-	_rebuild_checkpoints()
+	_align_checkpoints_to_track()
 	_setup_checkpoints()
 	_spawn_item_boxes_deferred()
 
@@ -121,6 +131,18 @@ func _setup_checkpoints():
 		for child in cp_container.get_children():
 			if child is Area3D:
 				container_cps.append(child)
+		
+		# Sort checkpoints dynamically based on their distance along the track curve
+		if track_path:
+			var curve = track_path.curve
+			container_cps.sort_custom(func(a, b):
+				var a_local = track_path.to_local(a.global_position)
+				var b_local = track_path.to_local(b.global_position)
+				var a_offset = curve.get_closest_offset(a_local)
+				var b_offset = curve.get_closest_offset(b_local)
+				return a_offset < b_offset
+			)
+		
 		checkpoints.append_array(container_cps)
 
 	# ALWAYS append the FinishLine as the absolute final checkpoint of the lap
@@ -133,6 +155,13 @@ func _setup_checkpoints():
 		if hw: checkpoints.append(hw)
 
 	if multiplayer.is_server():
+		if track_path:
+			track_length = track_path.curve.get_baked_length()
+			cp_offsets.clear()
+			for cp in checkpoints:
+				var local_pos = track_path.to_local(cp.global_position)
+				cp_offsets.append(track_path.curve.get_closest_offset(local_pos))
+				
 		for i in range(checkpoints.size()):
 			var cp = checkpoints[i]
 			cp.body_entered.connect(_on_checkpoint_entered.bind(i))
@@ -331,17 +360,51 @@ func _update_positions():
 		# If they finished, give them a massive score boost so they stay top
 		var score = 0.0
 		if pinfo["finished"]:
-			score = 1000000.0 + (3 - pinfo["pos"]) * 1000 # keep their position
+			score = 10000000.0 + (3 - pinfo["pos"]) * 1000 # keep their position
 		else:
-			var dist = 0.0
-			var next_idx = pinfo["next_checkpoint_idx"]
-			if not checkpoints.is_empty():
-				dist = cart.global_position.distance_to(checkpoints[next_idx].global_position)
+			var offset = 0.0
+			if track_path and cp_offsets.size() > 0:
+				var curve = track_path.curve
+				var local_pos = track_path.to_local(cart.global_position)
+				
+				var next_idx = pinfo["next_checkpoint_idx"]
+				var prev_idx = next_idx - 1
+				if prev_idx < 0:
+					prev_idx = cp_offsets.size() - 1
+					
+				if next_idx >= cp_offsets.size():
+					next_idx = cp_offsets.size() - 1
+					
+				var start_off = cp_offsets[prev_idx]
+				var end_off = cp_offsets[next_idx]
+				
+				var segment_length = end_off - start_off
+				if segment_length < 0:
+					segment_length += track_length
+					
+				var min_dist = 9999999.0
+				var best_t = 0.0
+				var step = 5.0
+				var num_steps = int(segment_length / step) + 1
+				
+				var start_i = -int(num_steps * 0.2)
+				var end_i = num_steps + int(num_steps * 0.2)
+				
+				for i in range(start_i, end_i + 1):
+					var t = float(i) / max(1, num_steps)
+					var sample_off = fmod(start_off + t * segment_length + track_length * 2.0, track_length)
+					var p = curve.sample_baked(sample_off)
+					var d = p.distance_squared_to(local_pos)
+					if d < min_dist:
+						min_dist = d
+						best_t = t
+				
+				offset = best_t * segment_length
 
-			# Score = Laps * 100000 + CheckpointIndex * 10000 - distance
-			score = pinfo["laps"] * 100000.0
-			score += next_idx * 1000.0
-			score -= dist
+			# Score = Laps * 1000000 + CheckpointIndex * 50000 + offset
+			score = pinfo["laps"] * 1000000.0
+			score += pinfo["next_checkpoint_idx"] * 50000.0
+			score += offset
 
 		ranking.append({"id": id, "score": score, "laps": pinfo["laps"], "finished": pinfo["finished"]})
 
@@ -543,6 +606,34 @@ func _rebuild_checkpoints():
 				child.look_at(child.global_position + tangent, Vector3.UP)
 
 	print("Checkpoints redistributed along track!")
+
+func _align_checkpoints_to_track():
+	if not track_path: return
+	var cp_container = get_node_or_null("Checkpoints")
+	if not cp_container: return
+
+	var curve = track_path.curve
+	var length = curve.get_baked_length()
+	var children = cp_container.get_children()
+	if children.is_empty(): return
+
+	for child in children:
+		if child is Node3D:
+			# Find closest offset along the track curve
+			var local_pos = track_path.to_local(child.global_position)
+			var offset = curve.get_closest_offset(local_pos)
+			var snapped_local_pos = curve.sample_baked(offset)
+			
+			child.global_position = track_path.to_global(snapped_local_pos)
+
+			# Orient to track tangent at this offset
+			var next_offset = fmod(offset + 1.0, length)
+			var tangent_local = (curve.sample_baked(next_offset) - snapped_local_pos).normalized()
+			if tangent_local.length() > 0.01:
+				var tangent_global = (track_path.to_global(snapped_local_pos + tangent_local) - child.global_position).normalized()
+				child.look_at(child.global_position + tangent_global, Vector3.UP)
+
+	print("Checkpoints aligned and oriented to track curve!")
 
 func _add_collisions_to_node(root_node: Node, use_trimesh: bool = false):
 	if root_node == null: return

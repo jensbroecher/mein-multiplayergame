@@ -526,7 +526,7 @@ func _physics_process(delta):
 	if global_position.y < -50:
 		if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 			respawn_rpc.rpc()
-		elif is_local_player:
+		elif is_local_player or (is_ai and multiplayer.multiplayer_peer == null):
 			respawn() # single-player / host fallback
 
 	var has_physics_authority = has_physics_authority()
@@ -1541,21 +1541,37 @@ func respawn():
 		linear_velocity = Vector3.ZERO
 		angular_velocity = Vector3.ZERO
 
-		var spawn_pos = last_checkpoint_transform.origin + (last_checkpoint_transform.basis.z * 5.0) + Vector3(0, 2.0, 0)
+		var target_path = active_path
+		if target_path == null:
+			target_path = track_path
+		if target_path == null:
+			var lvl = get_tree().get_first_node_in_group("level")
+			if lvl and "track_path" in lvl:
+				target_path = lvl.track_path
+
+		var spawn_pos = last_checkpoint_transform.origin
+		var forward_dir = -last_checkpoint_transform.basis.z.normalized() # fallback
+
+		if target_path:
+			var curve = target_path.curve
+			var local_pos = target_path.to_local(spawn_pos)
+			var offset = curve.get_closest_offset(local_pos)
+			
+			var next_offset = fmod(offset + 1.0, curve.get_baked_length())
+			var p1 = curve.sample_baked(offset)
+			var p2 = curve.sample_baked(next_offset)
+			var tangent = (target_path.to_global(p2) - target_path.to_global(p1)).normalized()
+			if tangent.length() > 0.01:
+				forward_dir = tangent
+
+		# Position the spawn 5 meters behind the checkpoint origin along the track tangent
+		spawn_pos = spawn_pos - forward_dir * 5.0 + Vector3(0, 2.0, 0)
 		
-		# Set physics body's position and orientation to face forward towards the checkpoint
-		var look_target = last_checkpoint_transform.origin
-		look_target.y = spawn_pos.y
-		var look_dir = (look_target - spawn_pos).normalized()
-		if look_dir.length() > 0.01:
-			var target_basis = Basis.looking_at(look_dir, Vector3.UP)
-			global_transform = Transform3D(target_basis, spawn_pos)
-		else:
-			global_position = spawn_pos
+		var target_basis = Basis.looking_at(forward_dir, Vector3.UP)
+		global_transform = Transform3D(target_basis, spawn_pos)
 
 		visuals.global_position = global_position
-		if look_dir.length() > 0.01:
-			visuals.look_at(look_target, Vector3.UP)
+		visuals.look_at(global_position + forward_dir * 10.0, Vector3.UP)
 
 func _set_visuals_alpha(alpha: float):
 	_set_alpha_recursive(visuals, alpha)

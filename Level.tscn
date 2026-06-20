@@ -50,14 +50,14 @@ horizonColour = Color(0.0784314, 0.00784314, 0.0156863, 1)
 groundColour = Color(0, 0, 0, 1)
 cloudBrightness = 0.05
 
-[sub_resource type="Resource" id="Resource_kr1e0"]
+[sub_resource type="Resource" id="Resource_jpwbr"]
 script = ExtResource("5_yr3df")
 weather = ExtResource("6_jpwbr")
 
-[sub_resource type="Resource" id="Resource_yr3df"]
+[sub_resource type="Resource" id="Resource_kr1e0"]
 script = ExtResource("3_jpwbr")
 seasonId = "summer"
-weathers = Array[ExtResource("5_yr3df")]([SubResource("Resource_kr1e0")])
+weathers = Array[ExtResource("5_yr3df")]([SubResource("Resource_jpwbr")])
 skyColourDaytime = SubResource("Resource_ext2d")
 skyColourNight = SubResource("Resource_p7jpd")
 dayNightCycleCurve = SubResource("Curve_8bl6p")
@@ -1234,12 +1234,12 @@ point_count = 3
 
 [node name="Level" type="Node3D" unique_id=815155767 node_paths=PackedStringArray("checkpoints")]
 script = ExtResource("1_lev99")
-checkpoints = [NodePath("Checkpoints/Halfway"), NodePath("FinishLine")]
+checkpoints = [NodePath("Checkpoints/Halfway4"), NodePath("FinishLine")]
 
 [node name="WeatherController" parent="." unique_id=1277823175 instance=ExtResource("31_weather")]
 time_of_day_hours = 13.239
 selected_weather = 1
-seasons = Array[ExtResource("3_jpwbr")]([SubResource("Resource_yr3df")])
+seasons = Array[ExtResource("3_jpwbr")]([SubResource("Resource_kr1e0")])
 startTime = 47660.4
 
 [node name="TerrainGenerator" type="Node3D" parent="." unique_id=586341718 node_paths=PackedStringArray("track_path")]
@@ -2017,17 +2017,17 @@ spawn_path = NodePath(".")
 
 [node name="Checkpoints" type="Node3D" parent="." unique_id=342440943]
 
-[node name="Halfway" parent="Checkpoints" unique_id=409562182 instance=ExtResource("2_gate")]
+[node name="Halfway4" parent="Checkpoints" unique_id=409562182 instance=ExtResource("2_gate")]
 transform = Transform3D(0.048228957, 0, 0.9988362, 0, 1, 0, -0.9988362, 0, 0.048228957, -63.533722, 2.7247596, 289.68365)
 
-[node name="Halfway2" parent="Checkpoints" unique_id=1076613409 instance=ExtResource("2_gate")]
-transform = Transform3D(-0.70418113, 0, -0.7100204, 0, 1, 0, 0.7100204, 0, -0.70418113, -318.36288, 6.2574816, 183.93178)
+[node name="Halfway3" parent="Checkpoints" unique_id=1076613409 instance=ExtResource("2_gate")]
+transform = Transform3D(0.7473205, 0, 0.66446364, 0, 1, 0, -0.66446364, 0, 0.7473205, -319.4311, 6.814665, 183.93178)
 
-[node name="Halfway3" parent="Checkpoints" unique_id=760818968 instance=ExtResource("2_gate")]
-transform = Transform3D(-0.6727345, 0, -0.739884, 0, 1, 0, 0.739884, 0, -0.6727345, -558.3348, 7.742751, -258.5559)
+[node name="Halfway2" parent="Checkpoints" unique_id=760818968 instance=ExtResource("2_gate")]
+transform = Transform3D(0.6686981, 0, 0.74353415, 0, 1, 0, -0.74353415, 0, 0.6686981, -558.3348, 7.4307833, -257.71948)
 
-[node name="Halfway4" parent="Checkpoints" unique_id=970429380 instance=ExtResource("2_gate")]
-transform = Transform3D(0.4104177, 0, 0.91189766, 0, 1, 0, -0.91189766, 0, 0.4104177, -175.9742, 12.490519, -518.7479)
+[node name="Halfway1" parent="Checkpoints" unique_id=970429380 instance=ExtResource("2_gate")]
+transform = Transform3D(-0.37505162, 0, -0.927004, 0, 1, 0, 0.927004, 0, -0.37505162, -175.9742, 12.490519, -518.7479)
 
 [node name="VegetationScatterer" type="Node3D" parent="." unique_id=40883185]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 61.321648, 0, -113.239914)
