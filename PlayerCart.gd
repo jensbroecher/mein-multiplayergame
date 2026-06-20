@@ -142,6 +142,11 @@ var ai_lane_offset: float = 0.0
 var ai_target_lane_offset: float = 0.0
 var ai_lane_change_timer: float = 0.0
 var track_path: Path3D = null
+var alternative_paths: Array[Path3D] = []
+var active_path: Path3D = null
+var on_alternative_path: bool = false
+var alt_path_decisions: Dictionary = {} # Path3D -> bool
+
 
 var is_exploding = false
 var boost_time = 0.0
@@ -1472,6 +1477,10 @@ func respawn():
 	last_splash_time = -999.0
 	was_on_ground = true
 	air_time = 0.0
+	on_alternative_path = false
+	active_path = track_path
+	alt_path_decisions.clear()
+
 	ignore_next_landing_sound = true
 	last_respawn_time = Time.get_ticks_msec() / 1000.0
 	# Kill any in-flight drown fade tween so it can't overwrite the restored alpha
@@ -2056,8 +2065,11 @@ func _get_ai_input(delta: float) -> Vector2:
 	
 	if track_path == null:
 		var level = get_tree().get_first_node_in_group("level")
-		if level and "track_path" in level and level.track_path:
-			track_path = level.track_path
+		if level:
+			if "track_path" in level and level.track_path:
+				track_path = level.track_path
+			if "alternative_paths" in level and level.alternative_paths:
+				alternative_paths = level.alternative_paths
 			
 	if track_path == null:
 		var level = get_tree().get_first_node_in_group("level")
@@ -2071,9 +2083,44 @@ func _get_ai_input(delta: float) -> Vector2:
 			input.y = -1.0
 		return input
 		
-	var curve = track_path.curve
-	var local_pos = track_path.to_local(global_position)
+	if active_path == null:
+		active_path = track_path
+
+	# Alternative path detection and decision logic
+	if not on_alternative_path:
+		for alt_path in alternative_paths:
+			if not is_instance_valid(alt_path): continue
+			var alt_curve = alt_path.curve
+			if alt_curve.point_count < 2: continue
+			
+			var start_local = alt_curve.get_point_position(0)
+			var start_global = alt_path.to_global(start_local)
+			
+			var dist = global_position.distance_to(start_global)
+			if dist < 12.0:
+				if not alt_path_decisions.has(alt_path):
+					var take_shortcut = randf() < 0.35
+					alt_path_decisions[alt_path] = take_shortcut
+					if take_shortcut:
+						on_alternative_path = true
+						active_path = alt_path
+						break
+			elif dist > 25.0:
+				alt_path_decisions.erase(alt_path)
+
+	var curve = active_path.curve
+	var local_pos = active_path.to_local(global_position)
 	var current_offset = curve.get_closest_offset(local_pos)
+	
+	# If on an alternative path, check if we've reached the end of it
+	if on_alternative_path:
+		var curve_length = curve.get_baked_length()
+		if curve_length - current_offset < 6.0:
+			on_alternative_path = false
+			active_path = track_path
+			curve = active_path.curve
+			local_pos = active_path.to_local(global_position)
+			current_offset = curve.get_closest_offset(local_pos)
 	
 	# Periodically change target lane offset to simulate realistic lane shifting / overtaking
 	ai_lane_change_timer -= delta
@@ -2098,9 +2145,13 @@ func _get_ai_input(delta: float) -> Vector2:
 	var tangent_local_pos = curve.sample_baked(tangent_offset)
 	var tangent = (tangent_local_pos - target_local_pos).normalized()
 	var right_vec = Vector3(-tangent.z, 0, tangent.x).normalized()
-	target_local_pos += right_vec * ai_lane_offset
 	
-	var target_global_pos = track_path.to_global(target_local_pos)
+	var actual_lane_offset = ai_lane_offset
+	if on_alternative_path:
+		actual_lane_offset *= 0.2
+	target_local_pos += right_vec * actual_lane_offset
+	
+	var target_global_pos = active_path.to_global(target_local_pos)
 	
 	var target_vec = visuals.global_transform.inverse() * target_global_pos
 	var dir_flat = Vector2(target_vec.x, -target_vec.z).normalized()

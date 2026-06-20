@@ -7,6 +7,9 @@ const ITEM_BOX_SCENE = preload("res://ItemBox.tscn")
 
 @export var checkpoints: Array[Area3D] = []
 @export var track_path: Path3D
+@export var alternative_paths: Array[Path3D] = []
+
+
 
 @export_group("Editor Tools")
 @export var redistribute_checkpoints: bool:
@@ -35,6 +38,13 @@ func _ready():
 
 	if not track_path:
 		track_path = get_node_or_null("TrackPath")
+
+	var alt_paths_container = get_node_or_null("AlternativePaths")
+	if alt_paths_container:
+		for child in alt_paths_container.get_children():
+			if child is Path3D and not alternative_paths.has(child):
+				alternative_paths.append(child)
+
 
 	add_to_group("level")
 	player_spawner.spawn_function = _spawn_custom
@@ -123,6 +133,8 @@ func _setup_checkpoints():
 		for i in range(checkpoints.size()):
 			var cp = checkpoints[i]
 			cp.body_entered.connect(_on_checkpoint_entered.bind(i))
+
+
 
 func _on_checkpoint_entered(body: Node3D, cp_idx: int):
 	if race_state != RaceState.RACING: return
@@ -304,6 +316,7 @@ func _process(delta):
 				update_timer_rpc.rpc(int(end_timer))
 				if end_timer <= 0.0:
 					_end_race()
+
 
 func _update_positions():
 	var ranking = []
