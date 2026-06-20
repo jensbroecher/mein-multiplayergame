@@ -67,6 +67,8 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 
 @export_group("Procedural Generation")
 @export var terrain_grass_count: int = 12000
+@export var grass_grid_size: int = 10
+@export var grass_visibility_range: float = 200.0
 
 @export var create_longer_track: bool:
 	set(val):
@@ -135,11 +137,14 @@ func generate_world():
 	if Engine.is_editor_hint():
 		_set_owner_recursive(self)
 
-func _save_resource(res: Resource, res_name: String) -> Resource:
+func _save_resource(res: Resource, res_name: String, sub_dir: String = "") -> Resource:
 	if not save_to_files:
 		return res
 
 	var dir_path = "res://generated/"
+	if sub_dir != "":
+		dir_path += sub_dir + "/"
+
 	if not DirAccess.dir_exists_absolute(dir_path):
 		DirAccess.make_dir_absolute(dir_path)
 
@@ -152,6 +157,19 @@ func _save_resource(res: Resource, res_name: String) -> Resource:
 	ResourceSaver.save(res, file_path)
 	
 	return res
+
+func _clear_grass_directory():
+	var dir_path = "res://generated/grass/"
+	if DirAccess.dir_exists_absolute(dir_path):
+		var dir = DirAccess.open(dir_path)
+		if dir:
+			dir.list_dir_begin()
+			var file_name = dir.get_next()
+			while file_name != "":
+				if not dir.current_is_dir():
+					dir.remove(file_name)
+				file_name = dir.get_next()
+			dir.list_dir_end()
 
 func _set_owner_recursive(node: Node):
 
@@ -817,10 +835,12 @@ func _generate_terrain_grass():
 	var grass_mesh = _create_grass_mesh()
 	# Dynamic grass shader with distance fade-out (collapses far away grass vertices to 0 for maximum performance, no wind sway)
 	var shader = Shader.new()
-	shader.code = "shader_type spatial;\nrender_mode cull_disabled, diffuse_toon, specular_disabled, depth_draw_opaque;\n\nuniform sampler2D albedo_texture : source_color, filter_linear_mipmap_anisotropic;\nuniform vec4 albedo_tint : source_color = vec4(1.0, 1.0, 1.0, 1.0);\n\nvarying float height_val;\n\nvoid vertex() {\n\theight_val = VERTEX.y;\n\tvec3 view_pos = (MODELVIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;\n\tfloat dist = length(view_pos);\n\tfloat max_dist = 100.0;\n\tfloat fade_r = 30.0;\n\tif (dist > max_dist) {\n\t\tVERTEX = vec3(0.0);\n\t\theight_val = 0.0;\n\t} else {\n\t\tif (dist > max_dist - fade_r) {\n\t\t\tfloat fade = (max_dist - dist) / fade_r;\n\t\t\tVERTEX *= fade;\n\t\t}\n\t}\n}\n\nvoid fragment() {\n\tvec4 tex_color = texture(albedo_texture, UV);\n\tALBEDO = tex_color.rgb * albedo_tint.rgb;\n\tALPHA = tex_color.a;\n\tALPHA_SCISSOR_THRESHOLD = 0.4;\n\tROUGHNESS = 1.0;\n\tEMISSION = ALBEDO * 0.12;\n}"
+	shader.code = "shader_type spatial;\nrender_mode cull_disabled, diffuse_toon, specular_disabled, depth_draw_opaque;\n\nuniform sampler2D albedo_texture : source_color, filter_linear_mipmap_anisotropic;\nuniform vec4 albedo_tint : source_color = vec4(1.0, 1.0, 1.0, 1.0);\nuniform float max_dist = 200.0;\nuniform float fade_r = 30.0;\n\nvarying float height_val;\n\nvoid vertex() {\n\theight_val = VERTEX.y;\n\tvec3 view_pos = (MODELVIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;\n\tfloat dist = length(view_pos);\n\tif (dist > max_dist) {\n\t\tVERTEX = vec3(0.0);\n\t\theight_val = 0.0;\n\t} else {\n\t\tif (dist > max_dist - fade_r) {\n\t\t\tfloat fade = (max_dist - dist) / fade_r;\n\t\t\tVERTEX *= fade;\n\t\t}\n\t}\n}\n\nvoid fragment() {\n\tvec4 tex_color = texture(albedo_texture, UV);\n\tALBEDO = tex_color.rgb * albedo_tint.rgb;\n\tALPHA = tex_color.a;\n\tALPHA_SCISSOR_THRESHOLD = 0.4;\n\tROUGHNESS = 1.0;\n\tEMISSION = ALBEDO * 0.12;\n}"
 	
 	var mat = ShaderMaterial.new()
 	mat.shader = shader
+	mat.set_shader_parameter("max_dist", grass_visibility_range)
+	mat.set_shader_parameter("fade_r", 30.0)
 	
 	var tex_path = "res://sprites/grass.png"
 	if ResourceLoader.exists(tex_path):
@@ -845,8 +865,14 @@ func _generate_terrain_grass():
 	# ---------------------------------------------------------------
 	var half_x := terrain_size.x * 0.5
 	var half_z := terrain_size.y * 0.5
+	var chunk_w := terrain_size.x / grass_grid_size
+	var chunk_d := terrain_size.y / grass_grid_size
 	
-	var transforms: Array[Transform3D] = []
+	var chunk_transforms := []
+	chunk_transforms.resize(grass_grid_size * grass_grid_size)
+	for i in range(grass_grid_size * grass_grid_size):
+		chunk_transforms[i] = []
+	
 	var attempts := terrain_grass_count * 3  # upper bound to avoid infinite loop
 	var placed := 0
 	
@@ -896,26 +922,59 @@ func _generate_terrain_grass():
 		var sw := randf_range(0.8, 1.2)
 		basis = basis.scaled(Vector3(sw, sh, sw))
 		
-		transforms.append(Transform3D(basis, pos))
+		var col = clamp(int((px + half_x) / chunk_w), 0, grass_grid_size - 1)
+		var row = clamp(int((pz + half_z) / chunk_d), 0, grass_grid_size - 1)
+		var idx = row * grass_grid_size + col
+		chunk_transforms[idx].append(Transform3D(basis, pos))
 		placed += 1
 		
-	if transforms.is_empty():
-		return
+	# Clean up any existing GrassContainer and rebuild structure
+	var old_container = get_node_or_null("GrassContainer")
+	if old_container:
+		remove_child(old_container)
+		old_container.free()
 		
-	var mmi := MultiMeshInstance3D.new()
-	mmi.name = "Procedural_Terrain_Grass"
-	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(mmi)
+	var grass_container = Node3D.new()
+	grass_container.name = "GrassContainer"
+	add_child(grass_container)
 	
-	var mm := MultiMesh.new()
-	mm.transform_format = MultiMesh.TRANSFORM_3D
-	mm.use_colors = false
-	mm.use_custom_data = false
-	mm.mesh = grass_mesh
-	mm.instance_count = transforms.size()
-	
-	for i in range(transforms.size()):
-		mm.set_instance_transform(i, transforms[i])
+	if save_to_files:
+		_clear_grass_directory()
 		
-	mmi.multimesh = _save_resource(mm, "terrain_grass_multimesh")
-	mmi.material_override = mat
+	var start_x := -half_x
+	var start_z := -half_z
+	
+	for r in range(grass_grid_size):
+		for c in range(grass_grid_size):
+			var idx = r * grass_grid_size + c
+			var list = chunk_transforms[idx]
+			if list.is_empty():
+				continue
+				
+			var chunk_center_x = start_x + (c + 0.5) * chunk_w
+			var chunk_center_z = start_z + (r + 0.5) * chunk_d
+			var center_height = _get_terrain_height(chunk_center_x, chunk_center_z, noise, curve, false)
+			var chunk_center = Vector3(chunk_center_x, center_height, chunk_center_z)
+			
+			var mmi := MultiMeshInstance3D.new()
+			mmi.name = "GrassChunk_%d_%d" % [c, r]
+			mmi.position = chunk_center
+			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			mmi.visibility_range_end = grass_visibility_range
+			mmi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+			grass_container.add_child(mmi)
+			
+			var mm := MultiMesh.new()
+			mm.transform_format = MultiMesh.TRANSFORM_3D
+			mm.use_colors = false
+			mm.use_custom_data = false
+			mm.mesh = grass_mesh
+			mm.instance_count = list.size()
+			
+			for i in range(list.size()):
+				var t = list[i]
+				t.origin -= chunk_center
+				mm.set_instance_transform(i, t)
+				
+			mmi.multimesh = _save_resource(mm, "chunk_%d_%d" % [c, r], "grass")
+			mmi.material_override = mat
