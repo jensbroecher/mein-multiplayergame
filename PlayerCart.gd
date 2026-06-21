@@ -48,7 +48,7 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Apex",
-		"model_path": "res://models/cars/20260505221804_6590f061.fbx",
+		"model_path": "res://models/cars/HIINQjUWAAAZYGR.fbx",
 		"model_y_rotation": PI,
 		"max_speed": 29.0,
 		"acceleration": 55.0,
@@ -57,6 +57,54 @@ const CAR_PRESETS = [
 		"braking": 48.0,
 		"offroad": 5.0,
 		"wheel_parts": {"FL": "part_0", "FR": "part_1", "RL": "part_3", "RR": "part_2"}
+	},
+	{
+		"name": "Interceptor",
+		"model_path": "res://models/cars/20260618044707_89ae4d5d.fbx",
+		"model_y_rotation": PI,
+		"max_speed": 32.0,
+		"acceleration": 45.0,
+		"steer_speed": 2.0,
+		"grip": 4.0,
+		"braking": 35.0,
+		"offroad": 3.0,
+		"wheel_parts": {"FL": "part_5", "FR": "part_4", "RL": "part_3", "RR": "part_2"}
+	},
+	{
+		"name": "Mudrunner",
+		"model_path": "res://models/cars/20260618232844_3429272f.fbx",
+		"model_y_rotation": PI,
+		"max_speed": 27.0,
+		"acceleration": 55.0,
+		"steer_speed": 2.4,
+		"grip": 5.0,
+		"braking": 45.0,
+		"offroad": 9.5,
+		"wheel_parts": {"FL": "part_5", "FR": "part_4", "RL": "part_3", "RR": "part_2"}
+	},
+	{
+		"name": "Phantom",
+		"model_path": "res://models/cars/20260618234038_69b1ff17.fbx",
+		"model_y_rotation": PI,
+		"max_speed": 29.5,
+		"acceleration": 50.0,
+		"steer_speed": 3.5,
+		"grip": 3.5,
+		"braking": 40.0,
+		"offroad": 4.0,
+		"wheel_parts": {"FL": "part_5", "FR": "part_4", "RL": "part_3", "RR": "part_2"}
+	},
+	{
+		"name": "Centurion",
+		"model_path": "res://models/cars/20260618234103_e5456a8f.fbx",
+		"model_y_rotation": PI,
+		"max_speed": 29.5,
+		"acceleration": 60.0,
+		"steer_speed": 2.6,
+		"grip": 5.5,
+		"braking": 50.0,
+		"offroad": 6.5,
+		"wheel_parts": {"FL": "part_5", "FR": "part_4", "RL": "part_3", "RR": "part_2"}
 	}
 ]
 
