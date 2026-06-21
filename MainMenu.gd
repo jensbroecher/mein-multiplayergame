@@ -27,6 +27,15 @@ func _ready():
 	
 	# Show main menu by default
 	show_sub_menu("main")
+	visibility_changed.connect(_on_visibility_changed)
+
+func _on_visibility_changed():
+	if visible and name_edit:
+		var config = ConfigFile.new()
+		var saved_name = "Player"
+		if config.load("user://settings.cfg") == OK:
+			saved_name = config.get_value("player", "name", "Player")
+		name_edit.text = saved_name
 
 func _create_name_input():
 	var label = Label.new()

@@ -8,6 +8,7 @@ signal car_selected(car_index: int)
 @onready var speed_bar = $CenterContainer/VBoxContainer/StatsGrid/SpeedBar
 @onready var accel_bar = $CenterContainer/VBoxContainer/StatsGrid/AccelBar
 @onready var handling_bar = $CenterContainer/VBoxContainer/StatsGrid/HandlingBar
+@onready var offroad_bar = $CenterContainer/VBoxContainer/StatsGrid/OffroadBar
 
 var current_car_index = 0
 var rotating_model: Node3D = null
@@ -20,6 +21,8 @@ const CAR_PRESETS = [
 		"acceleration": 50.0,
 		"steer_speed": 2.5,
 		"grip": 5.0,
+		"braking": 40.0,
+		"offroad": 6.0,
 		"desc": "All-around performer. Great for beginners."
 	},
 	{
@@ -29,6 +32,8 @@ const CAR_PRESETS = [
 		"acceleration": 40.0,
 		"steer_speed": 2.2,
 		"grip": 4.5,
+		"braking": 30.0,
+		"offroad": 4.0,
 		"desc": "High top speed, but slower to accelerate."
 	},
 	{
@@ -38,6 +43,8 @@ const CAR_PRESETS = [
 		"acceleration": 65.0,
 		"steer_speed": 2.7,
 		"grip": 5.5,
+		"braking": 55.0,
+		"offroad": 8.0,
 		"desc": "Explosive acceleration and good handling."
 	},
 	{
@@ -47,6 +54,8 @@ const CAR_PRESETS = [
 		"acceleration": 55.0,
 		"steer_speed": 3.2,
 		"grip": 6.0,
+		"braking": 48.0,
+		"offroad": 5.0,
 		"desc": "Unmatched steering response. Master of drifts."
 	}
 ]
@@ -78,6 +87,7 @@ func update_car_selection():
 	speed_bar.value = (preset.max_speed / 40.0) * 100.0
 	accel_bar.value = (preset.acceleration / 80.0) * 100.0
 	handling_bar.value = (preset.steer_speed / 4.0) * 100.0
+	offroad_bar.value = (preset.get("offroad", 5.0) / 10.0) * 100.0
 	
 	# Instantiate preview model
 	if rotating_model:

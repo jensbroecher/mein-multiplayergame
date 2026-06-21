@@ -1,5 +1,6 @@
 extends Node
 
+
 const DEFAULT_PORT = 10567
 const MAX_CLIENTS = 4
 
@@ -32,7 +33,7 @@ const GP_CUPS = {
 	},
 	"Desert Cup": {
 		"name": "Desert Cup",
-		"stages": ["res://Level.tscn"]
+		"stages": ["res://MountainLevel.tscn"]
 	}
 }
 

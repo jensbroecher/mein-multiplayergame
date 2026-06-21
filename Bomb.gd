@@ -187,7 +187,7 @@ func _explode():
 			if dist <= blast_radius:
 				if p.has_method("on_hit"):
 					var was_shielded = p.is_shielded
-					p.on_hit()
+					p.on_hit(owner_id)
 					if was_shielded:
 						continue
 					

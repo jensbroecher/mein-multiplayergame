@@ -46,6 +46,13 @@ func _ensure_audio_buses():
 
 func _ready():
 	_ensure_audio_buses()
+	
+	if not InputMap.has_action("discard_item"):
+		InputMap.add_action("discard_item")
+		var ev = InputEventKey.new()
+		ev.physical_keycode = KEY_X
+		InputMap.action_add_event("discard_item", ev)
+		
 	load_settings()
 	
 	# Configure two audio players for crossfading
@@ -119,6 +126,7 @@ func load_settings():
 	set_sfx_volume(sfx_volume, false)
 	set_show_fps(show_fps, false)
 	call_deferred("_apply_window_settings")
+	load_input_settings()
 
 func _apply_window_settings():
 	set_resolution(resolution_index, false)
@@ -251,4 +259,37 @@ func set_vsync(enabled: bool, save: bool = true):
 	else:
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 	if save: save_settings()
+
+func load_input_settings():
+	var config = ConfigFile.new()
+	if config.load(SETTINGS_FILE) == OK:
+		for action in ["throttle", "brake", "steer_left", "steer_right", "boost", "discard_item"]:
+			if config.has_section_key("input", action):
+				var keycode = config.get_value("input", action)
+				_apply_action_key(action, keycode)
+
+func save_action_key(action_name: String, keycode: int):
+	var config = ConfigFile.new()
+	config.load(SETTINGS_FILE)
+	config.set_value("input", action_name, keycode)
+	config.save(SETTINGS_FILE)
+	_apply_action_key(action_name, keycode)
+
+func _apply_action_key(action_name: String, keycode: int):
+	var events = InputMap.action_get_events(action_name)
+	for event in events:
+		if event is InputEventKey:
+			InputMap.action_erase_event(action_name, event)
+	
+	var new_event = InputEventKey.new()
+	new_event.physical_keycode = keycode
+	InputMap.action_add_event(action_name, new_event)
+
+func get_action_key_text(action_name: String) -> String:
+	var events = InputMap.action_get_events(action_name)
+	for event in events:
+		if event is InputEventKey:
+			var keycode = event.physical_keycode if event.physical_keycode != KEY_NONE else event.keycode
+			return OS.get_keycode_string(keycode)
+	return "None"
 

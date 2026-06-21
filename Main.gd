@@ -1,23 +1,37 @@
 extends Node
 
 const LEVEL_SCENE = preload("res://Level.tscn")
+const CONFIGURATION_MENU_SCENE = preload("res://ConfigurationMenu.tscn")
+const PAUSE_MENU_SCENE = preload("res://PauseMenu.tscn")
 
 @onready var lobby = $Lobby
 @onready var main_menu = $MainMenu
 @onready var car_selection = $CarSelection
-@onready var options_menu = $OptionsMenu
+
+var configuration_menu
+var pause_menu
 
 func _ready():
 	main_menu.start_pressed.connect(_on_menu_start_pressed)
 	main_menu.options_pressed.connect(_on_menu_options_pressed)
 	car_selection.car_selected.connect(_on_car_selected)
 	NetworkManager.server_disconnected.connect(_on_server_disconnected)
+	
+	configuration_menu = CONFIGURATION_MENU_SCENE.instantiate()
+	configuration_menu.visible = false
+	add_child(configuration_menu)
+	configuration_menu.back_pressed.connect(func(): main_menu.show())
+	
+	pause_menu = PAUSE_MENU_SCENE.instantiate()
+	pause_menu.visible = false
+	add_child(pause_menu)
 
 func _on_menu_start_pressed():
 	car_selection.show()
 
 func _on_menu_options_pressed():
-	options_menu.show()
+	main_menu.hide()
+	configuration_menu.show()
 
 func _on_car_selected(car_index: int):
 	NetworkManager.local_car_index = car_index
@@ -82,9 +96,19 @@ func _on_server_disconnected():
 
 func _unhandled_input(event: InputEvent):
 	if event.is_action_pressed("ui_cancel") or (event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE):
-		if options_menu.visible:
-			options_menu.hide()
-		else:
-			options_menu.show()
-		get_viewport().set_input_as_handled()
+		if has_node("Level"):
+			if pause_menu.visible:
+				pause_menu.hide()
+			else:
+				pause_menu.show_pause_menu()
+			get_viewport().set_input_as_handled()
+
+func restart_race():
+	var level = get_node_or_null("Level")
+	if level:
+		level.name = "OldLevel"
+		level.queue_free()
+		await get_tree().process_frame
+	
+	start_game(true)
 

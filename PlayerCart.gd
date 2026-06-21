@@ -17,6 +17,8 @@ const CAR_PRESETS = [
 		"acceleration": 50.0,
 		"steer_speed": 2.5,
 		"grip": 5.0,
+		"braking": 40.0,
+		"offroad": 6.0,
 		# Wheel part names inside the FBX, keyed by corner
 		"wheel_parts": {"FL": "part_5", "FR": "part_2", "RL": "part_0", "RR": "part_6"}
 	},
@@ -28,6 +30,8 @@ const CAR_PRESETS = [
 		"acceleration": 40.0,
 		"steer_speed": 2.2,
 		"grip": 4.5,
+		"braking": 30.0,
+		"offroad": 4.0,
 		"wheel_parts": {"FL": "part_3", "FR": "part_0", "RL": "part_4", "RR": "part_2"}
 	},
 	{
@@ -38,6 +42,8 @@ const CAR_PRESETS = [
 		"acceleration": 65.0,
 		"steer_speed": 2.7,
 		"grip": 5.5,
+		"braking": 55.0,
+		"offroad": 8.0,
 		"wheel_parts": {"FL": "part_10", "FR": "part_7", "RL": "part_11", "RR": "part_9"}
 	},
 	{
@@ -48,6 +54,8 @@ const CAR_PRESETS = [
 		"acceleration": 55.0,
 		"steer_speed": 3.2,
 		"grip": 6.0,
+		"braking": 48.0,
+		"offroad": 5.0,
 		"wheel_parts": {"FL": "part_0", "FR": "part_1", "RL": "part_3", "RR": "part_2"}
 	}
 ]
@@ -136,6 +144,7 @@ var is_local_player = false
 var can_move = false
 var can_control = true
 @export var is_ai: bool = false
+var smoothed_speed: float = 0.0
 var stuck_timer: float = 0.0
 var ai_item_timer: float = 0.0
 var ai_lane_offset: float = 0.0
@@ -255,6 +264,7 @@ func _ready():
 	acceleration = preset.acceleration
 	steer_speed = preset.steer_speed
 	grip = preset.grip
+	braking = preset.get("braking", 40.0)
 	
 	# Replace default model with selected model
 	var cart_model = get_node_or_null("Visuals/CartModel")
@@ -383,10 +393,25 @@ func _update_authority():
 	else:
 		is_local_player = not is_ai
 	
+	if is_local_player:
+		contact_monitor = true
+		max_contacts_reported = 4
+		if not body_entered.is_connected(_on_body_entered):
+			body_entered.connect(_on_body_entered)
+	
 	var has_physics_authority = has_physics_authority()
 	if not has_physics_authority:
 		freeze = true
 		freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
+
+func _on_body_entered(_body: Node):
+	if not is_local_player:
+		return
+	var speed = linear_velocity.length()
+	if speed > 2.0:
+		var magnitude = clamp(speed / max_speed, 0.15, 0.8)
+		for device in Input.get_connected_joypads():
+			Input.start_joy_vibration(device, magnitude * 0.4, magnitude * 0.7, 0.2)
 
 func _process(delta):
 	_update_visual_states(delta)
@@ -471,7 +496,8 @@ func _process(delta):
 		camera.fov = lerp(camera.fov, target_fov, 8.0 * delta)
 
 		if race_ui:
-			race_ui.update_speed(linear_velocity.length() * 1.8)
+			smoothed_speed = lerp(smoothed_speed, linear_velocity.length() * 1.8, 10.0 * delta)
+			race_ui.update_speed(smoothed_speed)
 
 		var throttle_input = Input.get_axis("throttle", "brake")
 		var wants_to_play = can_move and not is_exploding and abs(throttle_input) > 0.1
@@ -646,8 +672,11 @@ func _physics_process(delta):
 		_move_and_sync()
 		return
 
-	if Input.is_action_just_pressed("boost"):
-		_use_item()
+	if is_local_player:
+		if Input.is_action_just_pressed("boost"):
+			_use_item()
+		if Input.is_action_just_pressed("discard_item"):
+			_discard_item()
 
 	var input_dir = Vector2.ZERO
 	if is_ai:
@@ -680,10 +709,12 @@ func _physics_process(delta):
 		offroad_timer += delta
 		if offroad_timer > 0.15:
 			offroad_timer = 0.0
-			# Slower top-speed cars get lighter offroad penalty, making them faster offroad
-			var speed_factor = clamp((max_speed - 28.0) / (30.5 - 28.0), 0.0, 1.0)
-			var penalty_min = lerp(0.97, 0.85, speed_factor)
-			var penalty_max = lerp(1.00, 0.90, speed_factor)
+			# Offroad capability strength determines offroad penalty
+			var preset = CAR_PRESETS[car_index]
+			var offroad_stat = preset.get("offroad", 5.0)
+			var offroad_factor = clamp((offroad_stat - 1.0) / 9.0, 0.0, 1.0)
+			var penalty_min = lerp(0.55, 0.96, offroad_factor)
+			var penalty_max = lerp(0.65, 1.00, offroad_factor)
 			offroad_target_penalty = randf_range(penalty_min, penalty_max)
 		offroad_penalty = lerp(offroad_penalty, offroad_target_penalty, 5.0 * delta)
 	else:
@@ -1165,6 +1196,18 @@ func _use_item():
 	else:
 		request_use_item.rpc_id(1, item_to_use)
 
+func _discard_item():
+	if current_item == ItemType.NONE: return
+	
+	# Shift backup item to active slot
+	current_item = current_item_2
+	current_item_2 = ItemType.NONE
+	
+	if is_local_player and race_ui:
+		var item1_name = ItemType.keys()[current_item]
+		var item2_name = ItemType.keys()[current_item_2]
+		race_ui.update_items(item1_name, item2_name)
+
 @rpc("any_peer", "call_local", "reliable")
 func request_use_item(item_to_use: int):
 	if multiplayer.multiplayer_peer != null and not multiplayer.is_server(): return
@@ -1331,7 +1374,7 @@ func _update_visual_states(delta):
 		if sfx_rocket_loop.playing:
 			sfx_rocket_loop.stop()
 
-func on_hit():
+func on_hit(attacker_id: int = 0):
 	if is_shielded:
 		is_shielded = false
 		var is_real_peer = name.to_int() > 0 and not get("is_ai")
@@ -1343,20 +1386,43 @@ func on_hit():
 		return
 	# Server triggers the explosion for all clients
 	if multiplayer.multiplayer_peer != null and multiplayer.is_server():
-		explode_rpc.rpc()
+		explode_rpc.rpc(attacker_id)
 	else:
-		explode() # fallback for local-only / single-player
+		explode(attacker_id) # fallback for local-only / single-player
 
 @rpc("any_peer", "call_local", "reliable")
-func explode_rpc():
-	explode()
+func explode_rpc(attacker_id: int = 0):
+	explode(attacker_id)
 
-func explode():
+func explode(attacker_id: int = 0):
 	if is_exploding: return
 	is_exploding = true
 	can_move = false
 	is_drowned = false
 	explosion_time = 0.0
+	
+	if attacker_id > 0:
+		var attacker_name = "Someone"
+		var found_attacker = false
+		for c in get_tree().get_nodes_in_group("player_carts"):
+			if c.name.to_int() == attacker_id:
+				attacker_name = c.player_name
+				found_attacker = true
+				break
+		
+		var msg = ""
+		if attacker_id == name.to_int():
+			msg = "%s blew themselves up!" % player_name
+		else:
+			msg = "%s blew up %s!" % [attacker_name, player_name]
+			
+		var local_cart = null
+		for c in get_tree().get_nodes_in_group("player_carts"):
+			if c.is_local_player:
+				local_cart = c
+				break
+		if local_cart and local_cart.race_ui:
+			local_cart.race_ui.show_message(msg, 2.5)
 	
 	# Play a random bomb explosion sound
 	var selected_bomb_sound = BOMB_EXPLOSION_SOUNDS[randi() % BOMB_EXPLOSION_SOUNDS.size()]
@@ -1382,6 +1448,8 @@ func explode():
 			randf_range(-5.0, 5.0),
 			randf_range(-10.0, 10.0)
 		)
+		for device in Input.get_connected_joypads():
+			Input.start_joy_vibration(device, 0.6, 0.9, 0.5)
 		
 	# Setup disintegrating parts
 	part_velocities.clear()

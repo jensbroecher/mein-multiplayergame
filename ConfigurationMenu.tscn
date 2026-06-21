@@ -1,0 +1,360 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://ConfigurationMenu.gd" id="1_config"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+bg_color = Color(0.0980392, 0.0980392, 0.137255, 0.901961)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.196078, 0.235294, 0.313726, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+shadow_color = Color(0, 0, 0, 0.4)
+shadow_size = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_controller_card"]
+bg_color = Color(0.0588235, 0.0588235, 0.0784314, 0.6)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.137255, 0.176471, 0.254902, 0.8)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="ConfigurationMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_config")
+
+[node name="BackgroundDim" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.0392157, 0.0392157, 0.0588235, 0.6)
+
+[node name="Panel" type="Panel" parent="."]
+custom_minimum_size = Vector2(960, 650)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -480.0
+offset_top = -325.0
+offset_right = 480.0
+offset_bottom = 325.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="MarginContainer" type="MarginContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 35
+theme_override_constants/margin_top = 25
+theme_override_constants/margin_right = 35
+theme_override_constants/margin_bottom = 25
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="TitleLabel" type="Label" parent="Panel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "CONFIGURATION"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="Panel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="ScrollContainer" type="ScrollContainer" parent="Panel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="SettingsList" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 40
+
+[node name="LeftColumn" type="VBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 15
+
+[node name="VideoLabel" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "DISPLAY & VIDEO"
+
+[node name="VideoSettings" type="VBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="FPSBox" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/FPSBox"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+text = "Show FPS Counter"
+
+[node name="CheckFPS" type="CheckButton" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/FPSBox"]
+layout_mode = 2
+
+[node name="WindowModeBox" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/WindowModeBox"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+text = "Window Mode"
+
+[node name="OptionWindowMode" type="OptionButton" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/WindowModeBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ResolutionBox" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/ResolutionBox"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+text = "Resolution"
+
+[node name="OptionResolution" type="OptionButton" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/ResolutionBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="VSyncBox" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/VSyncBox"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+text = "VSync"
+
+[node name="CheckVSync" type="CheckButton" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/VSyncBox"]
+layout_mode = 2
+
+[node name="HSeparator" type="HSeparator" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn"]
+layout_mode = 2
+
+[node name="ControlsLabel" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "KEYBOARD CONTROLS"
+
+[node name="InputSettings" type="VBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="RemapThrottle" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings/RemapThrottle"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+text = "Throttle / Forward"
+
+[node name="BtnThrottle" type="Button" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings/RemapThrottle"]
+custom_minimum_size = Vector2(180, 35)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RemapBrake" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings/RemapBrake"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+text = "Brake / Reverse"
+
+[node name="BtnBrake" type="Button" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings/RemapBrake"]
+custom_minimum_size = Vector2(180, 35)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RemapSteerLeft" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings/RemapSteerLeft"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+text = "Steer Left"
+
+[node name="BtnSteerLeft" type="Button" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings/RemapSteerLeft"]
+custom_minimum_size = Vector2(180, 35)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RemapSteerRight" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings/RemapSteerRight"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+text = "Steer Right"
+
+[node name="BtnSteerRight" type="Button" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings/RemapSteerRight"]
+custom_minimum_size = Vector2(180, 35)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RemapBoost" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings/RemapBoost"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+text = "Use Item / Boost"
+
+[node name="BtnBoost" type="Button" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings/RemapBoost"]
+custom_minimum_size = Vector2(180, 35)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RemapDiscard" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings/RemapDiscard"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+text = "Discard Item"
+
+[node name="BtnDiscard" type="Button" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings/RemapDiscard"]
+custom_minimum_size = Vector2(180, 35)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RightColumn" type="VBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 15
+
+[node name="ControllerLabel" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "GAMEPAD CONFIGURATION"
+
+[node name="ControllerCard" type="Panel" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_controller_card")
+
+[node name="MarginContainer" type="MarginContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn/ControllerCard"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn/ControllerCard/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="HeaderLabel" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn/ControllerCard/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.5, 0, 1)
+theme_override_font_sizes/font_size = 16
+text = "Standard Controller Bindings:"
+horizontal_alignment = 1
+
+[node name="ControlsBox" type="VBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn/ControllerCard/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Steer" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn/ControllerCard/MarginContainer/VBoxContainer/ControlsBox"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn/ControllerCard/MarginContainer/VBoxContainer/ControlsBox/Steer"]
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+text = "Steer Left/Right:"
+
+[node name="Value" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn/ControllerCard/MarginContainer/VBoxContainer/ControlsBox/Steer"]
+layout_mode = 2
+text = "Left Analog Stick / D-Pad"
+
+[node name="Throttle" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn/ControllerCard/MarginContainer/VBoxContainer/ControlsBox"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn/ControllerCard/MarginContainer/VBoxContainer/ControlsBox/Throttle"]
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+text = "Throttle / Forward:"
+
+[node name="Value" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn/ControllerCard/MarginContainer/VBoxContainer/ControlsBox/Throttle"]
+layout_mode = 2
+text = "Right Trigger (RT/R2)"
+
+[node name="Brake" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn/ControllerCard/MarginContainer/VBoxContainer/ControlsBox"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn/ControllerCard/MarginContainer/VBoxContainer/ControlsBox/Brake"]
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+text = "Brake / Reverse:"
+
+[node name="Value" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn/ControllerCard/MarginContainer/VBoxContainer/ControlsBox/Brake"]
+layout_mode = 2
+text = "Left Trigger (LT/L2)"
+
+[node name="Item" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn/ControllerCard/MarginContainer/VBoxContainer/ControlsBox"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn/ControllerCard/MarginContainer/VBoxContainer/ControlsBox/Item"]
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+text = "Use Item / Boost:"
+
+[node name="Value" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn/ControllerCard/MarginContainer/VBoxContainer/ControlsBox/Item"]
+layout_mode = 2
+text = "Button A / Cross"
+
+[node name="HSeparator" type="HSeparator" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn/ControllerCard/MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="RumbleHint" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn/ControllerCard/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+text = "Rumble feedback is enabled for explosions, jumps, and bumps. Connect any compatible Xbox or PlayStation controller."
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="HSeparator2" type="HSeparator" parent="Panel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="BtnBack" type="Button" parent="Panel/MarginContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 45)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "SAVE & BACK"

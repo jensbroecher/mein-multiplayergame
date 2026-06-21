@@ -106,6 +106,15 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 12
 
+[node name="LabelOffroad" type="Label" parent="CenterContainer/VBoxContainer/StatsGrid"]
+layout_mode = 2
+text = "Offroad:"
+
+[node name="OffroadBar" type="ProgressBar" parent="CenterContainer/VBoxContainer/StatsGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+
 [node name="NavButtons" type="HBoxContainer" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
 alignment = 1

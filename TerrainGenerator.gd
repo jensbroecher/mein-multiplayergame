@@ -1,8 +1,36 @@
 @tool
 extends Node3D
 
+enum TrackLayoutType { DEFAULT, MOUNTAIN }
+
+@export var track_layout_type: TrackLayoutType = TrackLayoutType.DEFAULT
+@export var level_prefix: String = ""
+@export var no_water: bool = false
+@export var no_grass: bool = false
+
+func _is_in_gap_pos(pos: Vector3) -> bool:
+	if track_layout_type == TrackLayoutType.MOUNTAIN:
+		if abs(pos.x) < 15.0:
+			if pos.z < -140.0 and pos.z > -170.0:
+				return true
+			if pos.z < -200.0 and pos.z > -230.0:
+				return true
+			if pos.z < -260.0 and pos.z > -285.0:
+				return true
+	return false
+
 func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curve3D, for_collision: bool) -> float:
+	var radial_mountain = 0.0
+	if track_layout_type == TrackLayoutType.MOUNTAIN:
+		var dist_from_center = Vector2(px, pz).length()
+		var mountain_height = 145.0
+		var mountain_base = 350.0
+		var mountain_shape = clamp(1.0 - (dist_from_center / mountain_base), 0.0, 1.0)
+		mountain_shape = mountain_shape * mountain_shape * (3.0 - 2.0 * mountain_shape)
+		radial_mountain = mountain_shape * mountain_height
+
 	var h_noise = noise.get_noise_2d(px, pz) * hill_height
+	var base_terrain_height = radial_mountain + h_noise if track_layout_type == TrackLayoutType.MOUNTAIN else h_noise
 
 	var closest_pos = curve.get_closest_point(Vector3(px, 0.0, pz))
 	var dist = Vector2(px, pz).distance_to(Vector2(closest_pos.x, closest_pos.z))
@@ -12,7 +40,7 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 
 	var clearing_blend = 1.0 - smoothstep(sand_edge - 2.0, sand_edge + blend_dist, dist)
 	var road_h = closest_pos.y
-	var height = lerp(h_noise, road_h, clearing_blend)
+	var height = lerp(base_terrain_height, road_h, clearing_blend)
 
 	var basin_blend = 1.0 - smoothstep(sand_edge - 2.0, sand_edge, dist)
 	if for_collision:
@@ -22,22 +50,48 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 
 	var world_pos = Vector2(px, pz)
 	var noise_val = noise.get_noise_2d(px * 0.1, pz * 0.1) * 200.0
-	var dist_from_center = world_pos.length() + noise_val
+	var dist_from_center_val = world_pos.length() + noise_val
 
 	var falloff_start = terrain_size.x * 0.25
 	var falloff_end = terrain_size.x * 0.45
-	var edge_falloff = 1.0 - clamp((dist_from_center - falloff_start) / (falloff_end - falloff_start), 0.0, 1.0)
-	height = lerp(-20.0, height, edge_falloff)
+	var edge_falloff = 1.0 - clamp((dist_from_center_val - falloff_start) / (falloff_end - falloff_start), 0.0, 1.0)
+	var falloff_y = -60.0 if track_layout_type == TrackLayoutType.MOUNTAIN else -20.0
+	height = lerp(falloff_y, height, edge_falloff)
 
-	var lake_center = Vector2(-450, -500)
-	var lake_radius = 200.0
-	var dist_to_lake = Vector2(px, pz).distance_to(lake_center)
-	if dist_to_lake < lake_radius:
-		var depth = -15.0
-		var lake_blend = clamp((lake_radius - dist_to_lake) / 40.0, 0.0, 1.0)
-		height = lerp(height, depth, lake_blend)
+	if not no_water:
+		var lake_center = Vector2(-450, -500)
+		var lake_radius = 200.0
+		var dist_to_lake = Vector2(px, pz).distance_to(lake_center)
+		if dist_to_lake < lake_radius:
+			var depth = -15.0
+			var lake_blend = clamp((lake_radius - dist_to_lake) / 40.0, 0.0, 1.0)
+			height = lerp(height, depth, lake_blend)
+
+	# Abyss gap carving
+	if track_layout_type == TrackLayoutType.MOUNTAIN:
+		var road_pos = closest_pos
+		if abs(road_pos.x) < 5.0 and road_pos.z < -100.0 and road_pos.z > -300.0:
+			var in_gap = false
+			var gap_blend = 0.0
+			
+			if road_pos.z < -140.0 and road_pos.z > -170.0:
+				in_gap = true
+				var dist_to_edge = min(road_pos.z - (-170.0), -140.0 - road_pos.z)
+				gap_blend = clamp(dist_to_edge / 5.0, 0.0, 1.0)
+			elif road_pos.z < -200.0 and road_pos.z > -230.0:
+				in_gap = true
+				var dist_to_edge = min(road_pos.z - (-230.0), -200.0 - road_pos.z)
+				gap_blend = clamp(dist_to_edge / 5.0, 0.0, 1.0)
+			elif road_pos.z < -260.0 and road_pos.z > -285.0:
+				in_gap = true
+				var dist_to_edge = min(road_pos.z - (-285.0), -260.0 - road_pos.z)
+				gap_blend = clamp(dist_to_edge / 5.0, 0.0, 1.0)
+				
+			if in_gap:
+				height = lerp(height, -60.0, gap_blend * clearing_blend)
 
 	return height
+
 
 
 @export var generate_now: bool:
@@ -77,9 +131,17 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			if Engine.is_editor_hint():
 				_rebuild_longer_track()
 
+@export var rebuild_mountain_track_now: bool:
+	set(val):
+		if val:
+			rebuild_mountain_track_now = false
+			if Engine.is_editor_hint():
+				_rebuild_mountain_track()
+
 @export var grass_material: Material
 @export var road_material: Material
 @export var save_to_files: bool = true
+
 
 
 func _ready():
@@ -129,13 +191,16 @@ func generate_world():
 	_generate_road_and_sand()
 
 	# 5. Water Surface
-	_generate_water()
+	if not no_water:
+		_generate_water()
 
 	# 6. Procedural Hill Grass
-	_generate_terrain_grass()
+	if not no_grass:
+		_generate_terrain_grass()
 
 	if Engine.is_editor_hint():
 		_set_owner_recursive(self)
+
 
 func _save_resource(res: Resource, res_name: String, sub_dir: String = "") -> Resource:
 	if not save_to_files:
@@ -149,7 +214,10 @@ func _save_resource(res: Resource, res_name: String, sub_dir: String = "") -> Re
 		DirAccess.make_dir_absolute(dir_path)
 
 	var extension = ".res"
-	var file_path = dir_path + res_name + extension
+	var actual_name = res_name
+	if not level_prefix.is_empty():
+		actual_name = level_prefix + "_" + res_name
+	var file_path = dir_path + actual_name + extension
 	
 	# Crucial: take over the path in the resource cache so that the editor 
 	# uses this new mesh immediately instead of serving the old cached one.
@@ -157,6 +225,7 @@ func _save_resource(res: Resource, res_name: String, sub_dir: String = "") -> Re
 	ResourceSaver.save(res, file_path)
 	
 	return res
+
 
 func _clear_grass_directory():
 	var dir_path = "res://generated/grass/"
@@ -174,7 +243,7 @@ func _clear_grass_directory():
 func _set_owner_recursive(node: Node):
 
 	if not Engine.is_editor_hint(): return
-	var root = get_tree().edited_scene_root if get_tree() else null
+	var root = get_tree().edited_scene_root if is_inside_tree() else null
 	if not root: return
 	for child in node.get_children():
 		child.owner = root
@@ -355,6 +424,11 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 
 	# INDEX LOOP (CCW - Facing UP)
 	for i in range(point_count):
+		var offset = (float(i) / point_count) * length
+		var pos = curve.sample_baked(offset)
+		if _is_in_gap_pos(pos):
+			continue
+
 		if is_curb:
 			var base = i * 4
 			var nxt = (i + 1) * 4
@@ -395,6 +469,7 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 			# --- ADD UNDERSIDE (Visibility from below) ---
 			st.add_index(v0); st.add_index(v1); st.add_index(v2)
 			st.add_index(v1); st.add_index(v3); st.add_index(v2)
+
 
 
 	st.generate_tangents()
@@ -481,6 +556,11 @@ func _create_track_collision(point_count: int, width: float, node_name: String):
 		st.add_vertex(p_rob) # 8*i + 7
 
 	for i in range(point_count):
+		var offset = (float(i) / point_count) * length
+		var pos = curve.sample_baked(offset)
+		if _is_in_gap_pos(pos):
+			continue
+
 		var base = i * 8
 		var nxt = (i + 1) * 8
 
@@ -517,6 +597,7 @@ func _create_track_collision(point_count: int, width: float, node_name: String):
 		# Right Side Wall
 		st.add_index(base + 3); st.add_index(nxt + 3); st.add_index(base + 7)
 		st.add_index(base + 7); st.add_index(nxt + 3); st.add_index(nxt + 7)
+
 
 	var track_mesh = st.commit()
 	var static_body = StaticBody3D.new()
@@ -708,6 +789,11 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 
 	# 2. INDEX GENERATION
 	for i in range(point_count):
+		var offset = (float(i) / point_count) * length
+		var pos = curve.sample_baked(offset)
+		if _is_in_gap_pos(pos):
+			continue
+
 		var base = i * 4
 		var nxt = (i + 1) * 4
 
@@ -722,6 +808,7 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 		# Bottom Surface
 		st.add_index(base + 1); st.add_index(base + 3); st.add_index(nxt + 3)
 		st.add_index(base + 1); st.add_index(nxt + 3); st.add_index(nxt + 1)
+
 
 	st.generate_normals()
 	var mesh_instance = MeshInstance3D.new()
@@ -978,3 +1065,81 @@ func _generate_terrain_grass():
 				
 			mmi.multimesh = _save_resource(mm, "chunk_%d_%d" % [c, r], "grass")
 			mmi.material_override = mat
+
+
+func _rebuild_mountain_track():
+	if not track_path: return
+	var curve = track_path.curve
+	curve.clear_points()
+	
+	var spiral_steps = 48
+	for i in range(spiral_steps + 1):
+		var t = float(i) / spiral_steps
+		var angle = 1.5 * PI + t * 4.0 * PI
+		var radius = 280.0 - 180.0 * t
+		var px = radius * cos(angle)
+		var pz = radius * sin(angle)
+		var py = 130.0 * t
+		
+		var tangent = Vector3(-radius * sin(angle), 130.0 / (4.0 * PI), radius * cos(angle)).normalized()
+		var h_len = radius * 0.25
+		
+		curve.add_point(
+			Vector3(px, py, pz),
+			-tangent * h_len,
+			tangent * h_len
+		)
+	
+	curve.add_point(
+		Vector3(0, 122, -120),
+		Vector3(0, 2.0, 5.0),
+		Vector3(0, -2.0, -5.0)
+	)
+	
+	curve.add_point(
+		Vector3(0, 110, -140),
+		Vector3(0, 1.0, 5.0),
+		Vector3(0, 6.0, -10.0)
+	)
+	
+	curve.add_point(
+		Vector3(0, 85, -170),
+		Vector3(0, -5.0, 10.0),
+		Vector3(0, -2.0, -5.0)
+	)
+	
+	curve.add_point(
+		Vector3(0, 70, -200),
+		Vector3(0, 1.0, 5.0),
+		Vector3(0, 6.0, -10.0)
+	)
+	
+	curve.add_point(
+		Vector3(0, 45, -230),
+		Vector3(0, -5.0, 10.0),
+		Vector3(0, -2.0, -5.0)
+	)
+	
+	curve.add_point(
+		Vector3(0, 25, -260),
+		Vector3(0, 1.0, 5.0),
+		Vector3(0, 5.0, -10.0)
+	)
+	
+	curve.add_point(
+		Vector3(0, 5, -285),
+		Vector3(0, -3.0, 5.0),
+		Vector3(15, -1.0, -5.0)
+	)
+	
+	curve.add_point(
+		Vector3(30, 1, -295),
+		Vector3(-5, 0.0, 10.0),
+		Vector3(-10, 0.0, -5.0)
+	)
+	
+	print("Mountain track layout points added to curve!")
+	curve.set_point_in(0, Vector3(0, 0, -15.0))
+	curve.set_point_out(0, Vector3(25.0, 0, 0))
+	
+	generate_world()

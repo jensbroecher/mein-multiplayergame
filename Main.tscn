@@ -4,7 +4,7 @@
 [ext_resource type="PackedScene" path="res://Lobby.tscn" id="2_lobby"]
 [ext_resource type="PackedScene" path="res://MainMenu.tscn" id="3_menu"]
 [ext_resource type="PackedScene" path="res://CarSelection.tscn" id="4_car_select"]
-[ext_resource type="PackedScene" path="res://OptionsMenu.tscn" id="5_opts"]
+
 
 [node name="Main" type="Node"]
 script = ExtResource("1_main")
@@ -17,8 +17,7 @@ visible = false
 
 [node name="MainMenu" parent="." instance=ExtResource("3_menu")]
 
-[node name="OptionsMenu" parent="." instance=ExtResource("5_opts")]
-visible = false
+
 
 [node name="LevelSpawner" type="MultiplayerSpawner" parent="."]
 _spawnable_scenes = PackedStringArray("res://Level.tscn")

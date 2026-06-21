@@ -19,6 +19,17 @@ func _ready():
 		var saved_name = config.get_value("player", "name", "")
 		if not saved_name.is_empty():
 			line_edit_name.text = saved_name
+			
+	visibility_changed.connect(_on_visibility_changed)
+	line_edit_name.text_changed.connect(_save_player_name)
+
+func _on_visibility_changed():
+	if visible and line_edit_name:
+		var config = ConfigFile.new()
+		if config.load("user://settings.cfg") == OK:
+			var saved_name = config.get_value("player", "name", "")
+			if not saved_name.is_empty():
+				line_edit_name.text = saved_name
 
 func _save_player_name(p_name: String):
 	var config = ConfigFile.new()
