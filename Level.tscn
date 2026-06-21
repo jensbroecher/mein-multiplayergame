@@ -1295,21 +1295,16 @@ point_count = 3
 [sub_resource type="BoxShape3D" id="BoxShape3D_h1oga"]
 size = Vector3(6, 0.5, 4)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_omek7"]
-transparency = 1
-albedo_color = Color(1, 0.5, 0, 0.86)
-emission_enabled = true
-emission = Color(1, 0.4, 0, 1)
-emission_energy_multiplier = 3.5
-
-[sub_resource type="QuadMesh" id="QuadMesh_0ct4b"]
-material = SubResource("StandardMaterial3D_omek7")
-size = Vector2(6, 4)
-orientation = 1
-
 [node name="Level" type="Node3D" unique_id=815155767 node_paths=PackedStringArray("checkpoints")]
 script = ExtResource("1_lev99")
 checkpoints = [NodePath("Checkpoints/Halfway4"), NodePath("FinishLine")]
+
+[node name="WoodRamp" parent="." unique_id=1457045438 groups=["collision_trimesh"] instance=ExtResource("30_q2vmi")]
+transform = Transform3D(7.1962733, 0, -18.660484, 0, 20, 0, 18.660484, 0, 7.1962733, 22.445913, 0.021007419, -9.015505)
+
+[node name="node_0" parent="WoodRamp" index="0" unique_id=703926265]
+transform = Transform3D(99.99871, 0.5041317, -0.0656662, -0.5068243, 99.86871, -5.097689, 0.039886475, 5.097956, 99.869965, 0, 0.029519366, 0)
+lod_bias = 0.5
 
 [node name="WeatherController" parent="." unique_id=1277823175 instance=ExtResource("31_weather")]
 time_of_day_hours = 13.239
@@ -2542,7 +2537,7 @@ transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -14.
 [node name="Players" type="Node3D" parent="." unique_id=1342420519]
 
 [node name="FinishLine" parent="." unique_id=1647223077 instance=ExtResource("2_gate")]
-transform = Transform3D(-0.95754445, 0, -0.2882855, 0, 1, 0, 0.2882855, 0, -0.95754445, 31.672102, -0.07128334, 141.83398)
+transform = Transform3D(-0.95754445, 0, -0.28828543, 0, 1, 0, 0.28828543, 0, -0.95754445, 31.672102, -0.07128334, 141.83398)
 
 [node name="PlayerSpawner" type="MultiplayerSpawner" parent="." unique_id=642896597]
 _spawnable_scenes = PackedStringArray("uid://cart123")
@@ -2735,13 +2730,6 @@ polygon = PackedVector2Array(0, 0, 8, 2, 8, 0)
 depth = 15.0
 material = SubResource("ShaderMaterial_asphalt")
 
-[node name="WoodRamp" parent="Ramps" unique_id=1457045438 instance=ExtResource("30_q2vmi")]
-transform = Transform3D(7.1962748, 0, -18.660488, 0, 12.650239, 0, 18.660488, 0, 7.1962748, 22.445913, 0.33423603, -9.015505)
-
-[node name="node_0" parent="Ramps/WoodRamp" index="0" unique_id=703926265]
-transform = Transform3D(99.99871, 0.5041317, -0.0656662, -0.5068243, 99.86871, -5.097689, 0.039886475, 5.097956, 99.869965, 0, 0.029519366, 0)
-lod_bias = 0.001
-
 [node name="NewRamp" parent="Ramps" unique_id=966004585 instance=ExtResource("17_dcckh")]
 transform = Transform3D(-30.273119, 0, -33.29471, 0, 44.999985, 0, 33.29471, 0, -30.273119, -507.56146, 6.9816875, -210.87714)
 
@@ -2749,14 +2737,10 @@ transform = Transform3D(-30.273119, 0, -33.29471, 0, 44.999985, 0, 33.29471, 0, 
 lod_bias = 0.5
 
 [node name="RampBoostPad_1" parent="." unique_id=1454562377 instance=ExtResource("93_m7b4a")]
-transform = Transform3D(0.9994108, -0.03432328, 0, 0.03432328, 0.9994108, 0, 0, 0, 1, 153.24869, 6.871254, -70.886894)
+transform = Transform3D(0.852887, -0.029291136, 0.52127314, 0.034323275, 0.99941075, 0, -0.52096605, 0.017891806, 0.85338986, 153.24869, 6.886613, -70.886894)
 
 [node name="CollisionShape3D2" type="CollisionShape3D" parent="RampBoostPad_1" unique_id=1847626239]
 shape = SubResource("BoxShape3D_h1oga")
 
-[node name="MeshInstance3D2" type="MeshInstance3D" parent="RampBoostPad_1" unique_id=968408874]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
-mesh = SubResource("QuadMesh_0ct4b")
-
-[editable path="Ramps/WoodRamp"]
+[editable path="WoodRamp"]
 [editable path="Ramps/NewRamp"]

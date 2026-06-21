@@ -22,6 +22,8 @@ friction = 0.0
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_cart"]
 
+
+
 [sub_resource type="Curve" id="Curve_boost"]
 _data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
 point_count = 2
@@ -296,6 +298,14 @@ center_of_mass = Vector3(0, -0.3, 0)
 script = ExtResource("1_cscript")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=654514439]
+shape = SubResource("SphereShape3D_cart")
+
+[node name="FrontCollisionShape" type="CollisionShape3D" parent="." unique_id=654514440]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.8)
+shape = SubResource("SphereShape3D_cart")
+
+[node name="RearCollisionShape" type="CollisionShape3D" parent="." unique_id=654514441]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.8)
 shape = SubResource("SphereShape3D_cart")
 
 [node name="Visuals" type="Node3D" parent="." unique_id=1001732157]

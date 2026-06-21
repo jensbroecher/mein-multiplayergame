@@ -369,11 +369,14 @@ func _ready():
 		if has_node("Visuals/CameraPivot/Camera3D/AudioListener3D"):
 			get_node("Visuals/CameraPivot/Camera3D/AudioListener3D").current = false
 
-	# Initialize drift/skidmark particles for rear wheels
 	_create_drift_particles("RL")
 	_create_drift_particles("RR")
 	_create_dirt_particles("RL")
 	_create_dirt_particles("RR")
+
+	# Move all car meshes to Visual Layer 2 so they do not receive Decal projections
+	# (Decals are configured to only project onto Visual Layer 1)
+	_set_layers_recursive(visuals, 2)
 
 func _enter_tree():
 	_update_authority()
@@ -503,6 +506,11 @@ func _process(delta):
 		if race_ui:
 			smoothed_speed = lerp(smoothed_speed, linear_velocity.length() * 1.8, 10.0 * delta)
 			race_ui.update_speed(smoothed_speed)
+			
+			var cam_underwater = false
+			if camera and camera.is_inside_tree():
+				cam_underwater = camera.global_position.y < WATER_LEVEL
+			race_ui.set_underwater(cam_underwater)
 
 		var throttle_input = Input.get_axis("throttle", "brake")
 		var wants_to_play = can_move and not is_exploding and abs(throttle_input) > 0.1
@@ -612,8 +620,9 @@ func _physics_process(delta):
 					var ap = AudioStreamPlayer3D.new()
 					ap.stream = splash_stream
 					ap.bus = &"SFX"
-					ap.max_distance = 60.0
-					ap.unit_size = 6.0
+					ap.max_distance = 80.0
+					ap.unit_size = 15.0
+					ap.volume_db = 10.0
 					get_tree().current_scene.add_child(ap)
 					ap.global_position = global_position
 					ap.play()
@@ -1685,8 +1694,12 @@ func _set_alpha_recursive(node: Node, alpha: float):
 		if mat:
 			if alpha >= 0.99:
 				mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+				mat.render_priority = 0
 			else:
 				mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+				# Set a negative render priority so it renders BEFORE the water surface (priority 0)
+				# This ensures transparent/fading carts are still tinted correctly by the transparent water.
+				mat.render_priority = -1
 			mat.albedo_color.a = alpha
 	
 	for child in node.get_children():
@@ -2558,3 +2571,9 @@ func _update_intro_camera(_delta: float):
 	
 	camera_pivot.global_position = intro_orbit_center + offset
 	camera_pivot.look_at(intro_orbit_center, Vector3.UP)
+
+func _set_layers_recursive(node: Node, mask: int):
+	if node is MeshInstance3D:
+		node.layers = mask
+	for child in node.get_children():
+		_set_layers_recursive(child, mask)

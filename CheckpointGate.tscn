@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://c37rrd3b623o5" path="res://CheckpointGate.gd" id="1_gate_script"]
 [ext_resource type="PackedScene" uid="uid://en1x37rpwtgb" path="res://models/checkpoint gate.glb" id="2_3pha7"]
+[ext_resource type="Texture2D" uid="uid://dcr8mhio3fpow" path="res://sprites/decals/start_finish.png" id="3_start_finish_decal"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_checkpoint"]
 size = Vector3(20, 10, 5)
@@ -24,3 +25,10 @@ transform = Transform3D(20, 0, 0, 0, 20, 0, 0, 0, 20, 0.45436096, 0, -0.33356476
 [node name="CSGBox3D" type="CSGBox3D" parent="VisualGate" unique_id=812271756]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9.776642, 5.16473)
 material = SubResource("StandardMaterial3D_y0lb4")
+
+[node name="StartFinishDecal" type="Decal" parent="." unique_id=383702770]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 0, -0.43310404, 0)
+size = Vector3(10, 12, 2.5)
+texture_albedo = ExtResource("3_start_finish_decal")
+cull_mask = 1
+

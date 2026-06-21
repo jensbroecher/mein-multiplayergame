@@ -39,6 +39,11 @@ window/stretch/aspect="expand"
 collision_trimesh=""
 collision_convex=""
 collision_none=""
+collision_box=""
+collision_sphere=""
+collision_cylinder=""
+collision_capsule=""
+collision_decomposition=""
 
 [input]
 

@@ -649,6 +649,33 @@ func _align_checkpoints_to_track():
 
 	print("Checkpoints aligned and oriented to track curve!")
 
+func _create_primitive_shape_from_mesh(mesh: Mesh, type: String) -> Shape3D:
+	if not mesh: return null
+	var aabb = mesh.get_aabb()
+	var size = aabb.size
+	
+	match type:
+		"box":
+			var shape = BoxShape3D.new()
+			shape.size = size
+			return shape
+		"sphere":
+			var shape = SphereShape3D.new()
+			shape.radius = max(size.x, max(size.y, size.z)) * 0.5
+			return shape
+		"cylinder":
+			var shape = CylinderShape3D.new()
+			shape.radius = max(size.x, size.z) * 0.5
+			shape.height = size.y
+			return shape
+		"capsule":
+			var shape = CapsuleShape3D.new()
+			shape.radius = max(size.x, size.z) * 0.5
+			shape.height = size.y
+			return shape
+	return null
+
+
 func _add_collisions_to_node(root_node: Node, use_trimesh: bool = false):
 	if root_node == null: return
 	
@@ -690,65 +717,114 @@ func _add_collisions_to_node(root_node: Node, use_trimesh: bool = false):
 				# Check explicit group collision overrides
 				var force_convex = _is_node_or_ancestor_in_group(root_node, "collision_convex")
 				var force_trimesh = _is_node_or_ancestor_in_group(root_node, "collision_trimesh")
+				var force_box = _is_node_or_ancestor_in_group(root_node, "collision_box")
+				var force_sphere = _is_node_or_ancestor_in_group(root_node, "collision_sphere")
+				var force_cylinder = _is_node_or_ancestor_in_group(root_node, "collision_cylinder")
+				var force_capsule = _is_node_or_ancestor_in_group(root_node, "collision_capsule")
+				var force_decomposition = _is_node_or_ancestor_in_group(root_node, "collision_decomposition")
 				
-				var use_trimesh_actual = use_trimesh
-				if force_convex:
-					use_trimesh_actual = false
-				elif force_trimesh:
-					use_trimesh_actual = true
+				if force_decomposition:
+					var decomp_name = name_key + "_decomp"
+					var already_decomposed = false
+					if target_parent and target_parent.has_node(decomp_name):
+						already_decomposed = true
+					elif not target_parent:
+						var level_root = get_tree().get_first_node_in_group("level")
+						if level_root and level_root.has_node(decomp_name):
+							already_decomposed = true
+							
+					if not already_decomposed:
+						var static_body = StaticBody3D.new()
+						static_body.name = decomp_name
+						if target_parent:
+							print("[COLLISION BUILDER] Performing convex decomposition on ", root_node.name, ", adding static body ", static_body.name, " to parent ", target_parent.name)
+							target_parent.add_child(static_body)
+						else:
+							print("[COLLISION BUILDER] Performing convex decomposition on ", root_node.name, ", adding static body ", static_body.name, " to level root")
+							add_child(static_body)
+						
+						var original_parent = root_node.get_parent()
+						root_node.reparent(static_body)
+						root_node.create_multiple_convex_collisions()
+						root_node.reparent(original_parent)
+						
+						var t = root_node.global_transform
+						t.basis = t.basis.orthonormalized()
+						static_body.global_transform = t
 				else:
-					# High-poly meshes should fallback to convex collision to prevent Jolt failures and lag,
-					# EXCEPT for gates/arches (like checkpoints and finish lines) which need concave trimesh to keep their openings clear.
-					var path_lower = str(root_node.get_path()).to_lower()
-					var is_gate = path_lower.contains("gate") or path_lower.contains("checkpoint") or path_lower.contains("finish")
-					if use_trimesh and vertex_count > 10000 and not is_gate:
-						print("[COLLISION BUILDER] Mesh ", root_node.name, " has high vertex count (", vertex_count, "), falling back to convex shape for stability.")
+					var use_trimesh_actual = use_trimesh
+					if force_convex:
 						use_trimesh_actual = false
-				
-				if use_trimesh_actual:
-					shape = mesh.create_trimesh_shape()
-					if shape is ConcavePolygonShape3D and shape.data.is_empty():
-						print("[COLLISION BUILDER] WARNING: Trimesh shape for ", root_node.name, " has 0 faces/triangles (untriangulated or invalid geometry). Falling back to convex shape for safety.")
-						shape = mesh.create_convex_shape(true, true)
-				else:
-					shape = mesh.create_convex_shape(true, true)
-					
-				if shape:
-					# Bake the global scale into the shape's vertices/points to prevent Jolt degenerate shape failures on scaled models
-					var global_scale = root_node.global_transform.basis.get_scale()
-					if global_scale != Vector3.ONE:
-						if shape is ConcavePolygonShape3D:
-							var scaled_faces = PackedVector3Array()
-							for vertex in shape.data:
-								scaled_faces.append(vertex * global_scale)
-							shape.data = scaled_faces
-						elif shape is ConvexPolygonShape3D:
-							var scaled_points = PackedVector3Array()
-							for pt in shape.points:
-								scaled_points.append(pt * global_scale)
-							shape.points = scaled_points
-
-					var static_body = StaticBody3D.new()
-					static_body.name = name_key
-					var collision_shape = CollisionShape3D.new()
-					collision_shape.shape = shape
-					static_body.add_child(collision_shape)
-					
-					if target_parent:
-						print("[COLLISION BUILDER] Adding collision static body ", static_body.name, " to parent ", target_parent.name)
-						target_parent.add_child(static_body)
+					elif force_trimesh:
+						use_trimesh_actual = true
 					else:
-						print("[COLLISION BUILDER] Adding collision static body ", static_body.name, " to level root")
-						add_child(static_body)
+						# High-poly meshes should fallback to convex collision to prevent Jolt failures and lag,
+						# EXCEPT for gates/arches (like checkpoints and finish lines) which need concave trimesh to keep their openings clear.
+						var path_lower = str(root_node.get_path()).to_lower()
+						var is_gate = path_lower.contains("gate") or path_lower.contains("checkpoint") or path_lower.contains("finish")
+						if use_trimesh and vertex_count > 10000 and not is_gate:
+							print("[COLLISION BUILDER] Mesh ", root_node.name, " has high vertex count (", vertex_count, "), falling back to convex shape for stability.")
+							use_trimesh_actual = false
 					
-					# Align static body exactly to the mesh, but orthonormalize to remove scale (since we baked it into the shape)
-					var t = root_node.global_transform
-					t.basis = t.basis.orthonormalized()
-					static_body.global_transform = t
+					if force_box:
+						shape = _create_primitive_shape_from_mesh(mesh, "box")
+					elif force_sphere:
+						shape = _create_primitive_shape_from_mesh(mesh, "sphere")
+					elif force_cylinder:
+						shape = _create_primitive_shape_from_mesh(mesh, "cylinder")
+					elif force_capsule:
+						shape = _create_primitive_shape_from_mesh(mesh, "capsule")
+					elif use_trimesh_actual:
+						shape = mesh.create_trimesh_shape()
+						if shape is ConcavePolygonShape3D and shape.data.is_empty():
+							print("[COLLISION BUILDER] WARNING: Trimesh shape for ", root_node.name, " has 0 faces/triangles (untriangulated or invalid geometry). Falling back to convex shape for safety.")
+							shape = mesh.create_convex_shape(true, true)
+					else:
+						shape = mesh.create_convex_shape(true, true)
+						
+					if shape:
+						# Bake the global scale into the shape's vertices/points/dimensions to prevent Jolt degenerate shape failures on scaled models
+						var global_scale = root_node.global_transform.basis.get_scale()
+						if global_scale != Vector3.ONE:
+							if shape is BoxShape3D:
+								shape.size = shape.size * global_scale
+							elif shape is SphereShape3D:
+								shape.radius = shape.radius * max(global_scale.x, max(global_scale.y, global_scale.z))
+							elif shape is CylinderShape3D or shape is CapsuleShape3D:
+								shape.radius = shape.radius * max(global_scale.x, global_scale.z)
+								shape.height = shape.height * global_scale.y
+							elif shape is ConcavePolygonShape3D:
+								var scaled_faces = PackedVector3Array()
+								for vertex in shape.data:
+									scaled_faces.append(vertex * global_scale)
+								shape.data = scaled_faces
+							elif shape is ConvexPolygonShape3D:
+								var scaled_points = PackedVector3Array()
+								for pt in shape.points:
+									scaled_points.append(pt * global_scale)
+								shape.points = scaled_points
+	 
+						var static_body = StaticBody3D.new()
+						static_body.name = name_key
+						var collision_shape = CollisionShape3D.new()
+						collision_shape.shape = shape
+						static_body.add_child(collision_shape)
+						
+						if target_parent:
+							print("[COLLISION BUILDER] Adding collision static body ", static_body.name, " to parent ", target_parent.name)
+							target_parent.add_child(static_body)
+						else:
+							print("[COLLISION BUILDER] Adding collision static body ", static_body.name, " to level root")
+							add_child(static_body)
+						
+						# Align static body exactly to the mesh, but orthonormalize to remove scale (since we baked it into the shape)
+						var t = root_node.global_transform
+						t.basis = t.basis.orthonormalized()
+						static_body.global_transform = t
 					
 	for child in root_node.get_children():
 		_add_collisions_to_node(child, use_trimesh)
-
+ 
 func _add_collisions_to_matching_nodes(node: Node):
 	if node == null: return
 	
@@ -761,7 +837,7 @@ func _add_collisions_to_matching_nodes(node: Node):
 		
 	for child in node.get_children():
 		_add_collisions_to_matching_nodes(child)
-
+ 
 func _add_collisions_for_group_nodes(node: Node):
 	if node == null: return
 	
@@ -769,10 +845,12 @@ func _add_collisions_for_group_nodes(node: Node):
 		_add_collisions_to_node(node, true)
 	elif node.is_in_group("collision_convex"):
 		_add_collisions_to_node(node, false)
+	elif node.is_in_group("collision_box") or node.is_in_group("collision_sphere") or node.is_in_group("collision_cylinder") or node.is_in_group("collision_capsule"):
+		_add_collisions_to_node(node, false)
 		
 	for child in node.get_children():
 		_add_collisions_for_group_nodes(child)
-
+ 
 func _is_node_or_ancestor_in_group(node: Node, group_name: String) -> bool:
 	var current = node
 	while current and current != self:
@@ -780,3 +858,4 @@ func _is_node_or_ancestor_in_group(node: Node, group_name: String) -> bool:
 			return true
 		current = current.get_parent()
 	return false
+
