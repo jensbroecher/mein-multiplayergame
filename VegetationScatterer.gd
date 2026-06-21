@@ -173,8 +173,8 @@ func _scatter_group(scene: PackedScene, count: int, is_tree: bool, scale_min: fl
 			container.add_child(instance)
 			instance.owner = root
 			
-			# Position
-			instance.global_position = result.position
+			# Position (sink slightly into the ground to look natural on slopes)
+			instance.global_position = result.position + Vector3(0, -0.8, 0)
 			
 			# Rotation / alignment
 			var basis = Basis()
@@ -215,7 +215,7 @@ func _scatter_group(scene: PackedScene, count: int, is_tree: bool, scale_min: fl
 				collision_shape.name = "CollisionShape3D"
 				var shape = CylinderShape3D.new()
 				shape.radius = 0.35
-				shape.height = 4.0
+				shape.height = 6.0
 				collision_shape.shape = shape
 				collision_shape.position = Vector3(0, 2.0, 0)
 				static_body.add_child(collision_shape)
@@ -242,8 +242,8 @@ func _scatter_group_multi(scenes: Array, count: int, is_tree: bool, scale_min: f
 			container.add_child(instance)
 			instance.owner = root
 			
-			# Position
-			instance.global_position = result.position
+			# Position (sink slightly into the ground to look natural on slopes)
+			instance.global_position = result.position + Vector3(0, -0.8, 0)
 			
 			# Rotation / alignment
 			var basis = Basis()
@@ -283,7 +283,7 @@ func _scatter_group_multi(scenes: Array, count: int, is_tree: bool, scale_min: f
 				collision_shape.name = "CollisionShape3D"
 				var shape = CylinderShape3D.new()
 				shape.radius = 0.35
-				shape.height = 4.0
+				shape.height = 6.0
 				collision_shape.shape = shape
 				collision_shape.position = Vector3(0, 2.0, 0)
 				static_body.add_child(collision_shape)
