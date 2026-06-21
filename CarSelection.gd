@@ -17,6 +17,7 @@ const CAR_PRESETS = [
 	{
 		"name": "Viper",
 		"model_path": "res://models/cars/20260505221030_500312d9.fbx",
+		"model_y_rotation": PI,
 		"max_speed": 30.0,
 		"acceleration": 50.0,
 		"steer_speed": 2.5,
@@ -29,6 +30,7 @@ const CAR_PRESETS = [
 	{
 		"name": "Shadow",
 		"model_path": "res://models/cars/20260505210312_305e4d34.fbx",
+		"model_y_rotation": PI,
 		"max_speed": 30.5,
 		"acceleration": 40.0,
 		"steer_speed": 2.2,
@@ -41,6 +43,7 @@ const CAR_PRESETS = [
 	{
 		"name": "Strikeforce",
 		"model_path": "res://models/cars/20260505211857_6fc2a5d6.fbx",
+		"model_y_rotation": PI * 1.5,
 		"max_speed": 28.0,
 		"acceleration": 65.0,
 		"steer_speed": 2.7,
@@ -53,6 +56,7 @@ const CAR_PRESETS = [
 	{
 		"name": "Apex",
 		"model_path": "res://models/cars/HIINQjUWAAAZYGR.fbx",
+		"model_y_rotation": PI,
 		"max_speed": 29.0,
 		"acceleration": 55.0,
 		"steer_speed": 3.2,
@@ -60,11 +64,12 @@ const CAR_PRESETS = [
 		"braking": 48.0,
 		"offroad": 5.0,
 		"desc": "Unmatched steering response. Master of drifts.",
-		"wheel_parts": {"FL": "part_0", "FR": "part_1", "RL": "part_3", "RR": "part_2"}
+		"wheel_parts": {"FL": "part_0", "FR": "part_1", "RL": "part_4", "RR": "part_2"}
 	},
 	{
 		"name": "Interceptor",
 		"model_path": "res://models/cars/20260618044707_89ae4d5d.fbx",
+		"model_y_rotation": PI,
 		"max_speed": 32.0,
 		"acceleration": 45.0,
 		"steer_speed": 2.0,
@@ -72,11 +77,12 @@ const CAR_PRESETS = [
 		"braking": 35.0,
 		"offroad": 3.0,
 		"desc": "High speed interceptor. Built for straightaways.",
-		"wheel_parts": {"FL": "part_5", "FR": "part_4", "RL": "part_3", "RR": "part_2"}
+		"wheel_parts": {"FL": "part_6", "FR": "part_3", "RL": "part_4", "RR": "part_5"}
 	},
 	{
 		"name": "Mudrunner",
 		"model_path": "res://models/cars/20260618232844_3429272f.fbx",
+		"model_y_rotation": PI,
 		"max_speed": 27.0,
 		"acceleration": 55.0,
 		"steer_speed": 2.4,
@@ -84,11 +90,12 @@ const CAR_PRESETS = [
 		"braking": 45.0,
 		"offroad": 9.5,
 		"desc": "Offroad specialist. Heavy tires maintain full speed off-track.",
-		"wheel_parts": {"FL": "part_5", "FR": "part_4", "RL": "part_3", "RR": "part_2"}
+		"wheel_parts": {"FL": "part_0", "FR": "part_3", "RL": "part_2", "RR": "part_4"}
 	},
 	{
 		"name": "Phantom",
 		"model_path": "res://models/cars/20260618234038_69b1ff17.fbx",
+		"model_y_rotation": PI * 0.5,
 		"max_speed": 29.5,
 		"acceleration": 50.0,
 		"steer_speed": 3.5,
@@ -96,11 +103,12 @@ const CAR_PRESETS = [
 		"braking": 40.0,
 		"offroad": 4.0,
 		"desc": "Super agile drift machine. Slides effortlessly around corners.",
-		"wheel_parts": {"FL": "part_5", "FR": "part_4", "RL": "part_3", "RR": "part_2"}
+		"wheel_parts": {"FL": "part_4", "FR": "part_0", "RL": "part_3", "RR": "part_2"}
 	},
 	{
 		"name": "Centurion",
 		"model_path": "res://models/cars/20260618234103_e5456a8f.fbx",
+		"model_y_rotation": PI,
 		"max_speed": 29.5,
 		"acceleration": 60.0,
 		"steer_speed": 2.6,
@@ -108,7 +116,7 @@ const CAR_PRESETS = [
 		"braking": 50.0,
 		"offroad": 6.5,
 		"desc": "Heavy armored racer. Balanced stats with high durability.",
-		"wheel_parts": {"FL": "part_5", "FR": "part_4", "RL": "part_3", "RR": "part_2"}
+		"wheel_parts": {"FL": "part_0", "FR": "part_5", "RL": "part_2", "RR": "part_3"}
 	}
 ]
 
@@ -151,19 +159,8 @@ func update_car_selection():
 		rotating_model = scene.instantiate()
 		model_pivot.add_child(rotating_model)
 		# Position/orient preview model with larger scale
-		rotating_model.transform = Transform3D(Basis(Vector3(0, 1, 0), PI) * 2.4, Vector3(0, -0.4, 0))
-		# Hide wheels on preview too
-		_hide_preview_wheels(rotating_model)
-
-func _hide_preview_wheels(model: Node3D):
-	var preset = CAR_PRESETS[current_car_index]
-	var wheel_parts: Dictionary = preset.get("wheel_parts", {})
-	for corner in ["FL", "FR", "RL", "RR"]:
-		var part_name: String = wheel_parts.get(corner, "")
-		if not part_name.is_empty():
-			var wheel_part = model.get_node_or_null(part_name)
-			if wheel_part:
-				wheel_part.visible = false
+		var rot = preset.get("model_y_rotation", PI)
+		rotating_model.transform = Transform3D(Basis(Vector3(0, 1, 0), rot) * 2.4, Vector3(0, -0.4, 0))
 
 func _on_prev_pressed():
 	current_car_index = (current_car_index - 1 + CAR_PRESETS.size()) % CAR_PRESETS.size()

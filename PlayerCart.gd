@@ -56,7 +56,7 @@ const CAR_PRESETS = [
 		"grip": 6.0,
 		"braking": 48.0,
 		"offroad": 5.0,
-		"wheel_parts": {"FL": "part_0", "FR": "part_1", "RL": "part_3", "RR": "part_2"}
+		"wheel_parts": {"FL": "part_0", "FR": "part_1", "RL": "part_4", "RR": "part_2"}
 	},
 	{
 		"name": "Interceptor",
@@ -68,7 +68,7 @@ const CAR_PRESETS = [
 		"grip": 4.0,
 		"braking": 35.0,
 		"offroad": 3.0,
-		"wheel_parts": {"FL": "part_5", "FR": "part_4", "RL": "part_3", "RR": "part_2"}
+		"wheel_parts": {"FL": "part_6", "FR": "part_3", "RL": "part_4", "RR": "part_5"}
 	},
 	{
 		"name": "Mudrunner",
@@ -80,19 +80,19 @@ const CAR_PRESETS = [
 		"grip": 5.0,
 		"braking": 45.0,
 		"offroad": 9.5,
-		"wheel_parts": {"FL": "part_5", "FR": "part_4", "RL": "part_3", "RR": "part_2"}
+		"wheel_parts": {"FL": "part_0", "FR": "part_3", "RL": "part_2", "RR": "part_4"}
 	},
 	{
 		"name": "Phantom",
 		"model_path": "res://models/cars/20260618234038_69b1ff17.fbx",
-		"model_y_rotation": PI,
+		"model_y_rotation": PI * 0.5,
 		"max_speed": 29.5,
 		"acceleration": 50.0,
 		"steer_speed": 3.5,
 		"grip": 3.5,
 		"braking": 40.0,
 		"offroad": 4.0,
-		"wheel_parts": {"FL": "part_5", "FR": "part_4", "RL": "part_3", "RR": "part_2"}
+		"wheel_parts": {"FL": "part_4", "FR": "part_0", "RL": "part_3", "RR": "part_2"}
 	},
 	{
 		"name": "Centurion",
@@ -104,7 +104,7 @@ const CAR_PRESETS = [
 		"grip": 5.5,
 		"braking": 50.0,
 		"offroad": 6.5,
-		"wheel_parts": {"FL": "part_5", "FR": "part_4", "RL": "part_3", "RR": "part_2"}
+		"wheel_parts": {"FL": "part_0", "FR": "part_5", "RL": "part_2", "RR": "part_3"}
 	}
 ]
 
@@ -198,6 +198,8 @@ var ai_item_timer: float = 0.0
 var ai_lane_offset: float = 0.0
 var ai_target_lane_offset: float = 0.0
 var ai_lane_change_timer: float = 0.0
+var ai_stuck_position_timer: float = 0.0
+var ai_last_stuck_position: Vector3 = Vector3.ZERO
 var track_path: Path3D = null
 var alternative_paths: Array[Path3D] = []
 var active_path: Path3D = null
@@ -218,6 +220,7 @@ var ignore_next_landing_sound: bool = false
 var wheel_rotation: float = 0.0
 var is_teleporting: bool = false
 var is_shielded: bool = false
+var was_shocked: bool = false
 var camera_look_at: Vector3 = Vector3.ZERO
 var is_isometric: bool = true
 var is_intro_active: bool = false
@@ -260,6 +263,7 @@ enum ItemType { NONE, BOOST, MISSILE, GUIDED_MISSILE, SHIELD, SHOCKWAVE, BOMB, L
 var current_item = ItemType.NONE
 var current_item_2 = ItemType.NONE
 var slow_timer: float = 0.0
+var _original_albedo_colors: Dictionary = {}
 
 var last_checkpoint_transform: Transform3D
 
@@ -614,6 +618,24 @@ func _physics_process(delta):
 			respawn() # single-player / host fallback
 
 	var has_physics_authority = has_physics_authority()
+
+	# AI Stuck Detection (Checks if distance traveled over 4.0 seconds is less than 3.0 meters)
+	if is_ai and can_move and not is_exploding and respawn_indicator_time <= 0.0 and has_physics_authority:
+		ai_stuck_position_timer += delta
+		if ai_stuck_position_timer >= 4.0:
+			ai_stuck_position_timer = 0.0
+			var dist = global_position.distance_to(ai_last_stuck_position)
+			if dist < 3.0:
+				print("AI Cart ", name, " detected stuck (distance traveled in 4s: ", dist, "m). Respawning.")
+				if multiplayer.multiplayer_peer != null and multiplayer.is_server():
+					respawn_rpc.rpc()
+				else:
+					respawn()
+			ai_last_stuck_position = global_position
+	else:
+		ai_stuck_position_timer = 0.0
+		ai_last_stuck_position = global_position
+
 	if is_exploding:
 		if not is_drowned:
 			if has_physics_authority:
@@ -1492,6 +1514,15 @@ func _update_visual_states(delta):
 			var blink_on = int(respawn_indicator_time / 0.06) % 2 == 0
 			_set_visuals_respawn_effect(true, blink_on)
 
+	# Shock blinking / blue tinting indicator
+	if slow_timer > 0.0:
+		was_shocked = true
+		var blink_on = int(slow_timer / 0.1) % 2 == 0
+		_set_visuals_shock_effect(true, blink_on)
+	elif was_shocked:
+		was_shocked = false
+		_set_visuals_shock_effect(false, false)
+
 	# Sync boost particles
 	if boost_particles.emitting != is_boosting:
 		boost_particles.emitting = is_boosting
@@ -1683,6 +1714,8 @@ func respawn():
 
 	ignore_next_landing_sound = true
 	last_respawn_time = Time.get_ticks_msec() / 1000.0
+	ai_stuck_position_timer = 0.0
+	ai_last_stuck_position = global_position
 	# Kill any in-flight drown fade tween so it can't overwrite the restored alpha
 	if _drown_tween:
 		_drown_tween.kill()
@@ -1821,6 +1854,40 @@ func _set_respawn_effect_recursive(node: Node, enabled: bool, blink_on: bool):
 	
 	for child in node.get_children():
 		_set_respawn_effect_recursive(child, enabled, blink_on)
+
+
+func _set_visuals_shock_effect(enabled: bool, blink_on: bool):
+	_set_shock_effect_recursive(visuals, enabled, blink_on)
+
+func _set_shock_effect_recursive(node: Node, enabled: bool, blink_on: bool):
+	if node is MeshInstance3D:
+		if node == shield_mesh or node == shockwave_visual:
+			return
+		var mat = node.material_override as StandardMaterial3D
+		if not mat:
+			var base_mat = node.get_active_material(0)
+			if base_mat:
+				mat = base_mat.duplicate()
+				node.material_override = mat
+		if mat:
+			var node_id = node.get_instance_id()
+			if not _original_albedo_colors.has(node_id):
+				_original_albedo_colors[node_id] = mat.albedo_color
+			
+			if enabled and blink_on:
+				var current_alpha = mat.albedo_color.a
+				mat.albedo_color = Color(0.1, 0.5, 1.0, current_alpha)
+				mat.emission_enabled = true
+				mat.emission = Color(0.1, 0.5, 1.0)
+				mat.emission_energy_multiplier = 4.0
+			else:
+				var current_alpha = mat.albedo_color.a
+				var orig_color = _original_albedo_colors[node_id]
+				mat.albedo_color = Color(orig_color.r, orig_color.g, orig_color.b, current_alpha)
+				mat.emission_enabled = false
+				
+	for child in node.get_children():
+		_set_shock_effect_recursive(child, enabled, blink_on)
 
 
 func give_item(type: int):
@@ -2116,22 +2183,29 @@ func _spawn_sparks(pos: Vector3):
 	
 	var mat = StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.albedo_color = Color(0.2, 0.7, 1.0)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	mat.albedo_texture = load("res://sprites/energy_spark.png")
+	mat.albedo_color = Color(0.3, 0.8, 1.0)
 	mat.emission_enabled = true
-	mat.emission = Color(0.2, 0.7, 1.0)
+	mat.emission = Color(0.3, 0.8, 1.0)
+	mat.emission_texture = load("res://sprites/energy_spark.png")
 	mat.emission_energy_multiplier = 4.0
 	sparks.material_override = mat
 	
-	var sphere = SphereMesh.new()
-	sphere.radius = 0.08
-	sphere.height = 0.16
-	sparks.mesh = sphere
+	var quad = QuadMesh.new()
+	quad.size = Vector2(0.4, 0.4)
+	sparks.mesh = quad
 	
 	sparks.direction = Vector3.UP
 	sparks.spread = 180.0
 	sparks.initial_velocity_min = 3.0
 	sparks.initial_velocity_max = 6.0
 	sparks.gravity = Vector3(0, -6.0, 0)
+	sparks.angle_min = -180.0
+	sparks.angle_max = 180.0
+	sparks.scale_amount_min = 0.5
+	sparks.scale_amount_max = 1.2
 	
 	get_tree().current_scene.add_child(sparks)
 	sparks.global_position = pos
