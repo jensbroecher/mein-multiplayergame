@@ -159,9 +159,13 @@ func _draw() -> void:
 			var pulse_alpha = 0.3 - sin(time_elapsed * 7.0) * 0.1
 			draw_circle(p, pulse_r, Color(0.2, 1.0, 0.2, pulse_alpha))
 			
-		# Draw cart direction indicator (triangle)
-		var fwd_3d = -cart.global_transform.basis.z
-		var dir = Vector2(fwd_3d.x, fwd_3d.z).normalized()
+		# Draw cart direction indicator (triangle pointing in driving/velocity direction)
+		var dir = Vector2.ZERO
+		if cart.linear_velocity.length_squared() > 1.0:
+			dir = Vector2(cart.linear_velocity.x, cart.linear_velocity.z).normalized()
+		else:
+			var fwd_3d = -cart.global_transform.basis.z
+			dir = Vector2(fwd_3d.x, fwd_3d.z).normalized()
 		var right = Vector2(-dir.y, dir.x)
 		
 		var size_factor = 1.2 if is_local else 1.0

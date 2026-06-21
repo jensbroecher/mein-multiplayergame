@@ -45,6 +45,7 @@ func _ensure_audio_buses():
 		AudioServer.set_bus_send(idx, "Master")
 
 func _ready():
+	randomize()
 	_ensure_audio_buses()
 	
 	if not InputMap.has_action("discard_item"):
@@ -299,5 +300,18 @@ func stop_music():
 		active_player.stop()
 	if inactive_player:
 		inactive_player.stop()
+
+func play_sfx(stream_or_path: Variant, volume_db: float = 0.0, pitch_scale: float = 1.0):
+	var ap = AudioStreamPlayer.new()
+	ap.bus = &"SFX"
+	ap.volume_db = volume_db
+	ap.pitch_scale = pitch_scale
+	if stream_or_path is String:
+		ap.stream = load(stream_or_path)
+	else:
+		ap.stream = stream_or_path
+	add_child(ap)
+	ap.play()
+	ap.finished.connect(ap.queue_free)
 
 

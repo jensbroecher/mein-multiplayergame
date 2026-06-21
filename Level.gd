@@ -183,10 +183,16 @@ func _on_checkpoint_entered(body: Node3D, cp_idx: int):
 			# Inform the player cart of its last passed checkpoint for respawn purposes
 			var cp = checkpoints[cp_idx]
 			var cart = players_container.get_node_or_null(str(id))
+			
+			var is_finish_lap = false
+			if cp_idx == checkpoints.size() - 1:
+				if stats["laps"] + 1 >= NetworkManager.max_laps:
+					is_finish_lap = true
+			
 			if cart and cart.get("is_ai"):
 				cart.last_checkpoint_transform = cp.global_transform
 			else:
-				_sync_checkpoint_to_player.rpc_id(id, cp.global_transform)
+				_sync_checkpoint_to_player.rpc_id(id, cp.global_transform, is_finish_lap)
 
 			# If they hit the last checkpoint (Finish Line), complete a lap
 			if stats["next_checkpoint_idx"] >= checkpoints.size():
@@ -215,10 +221,14 @@ func show_player_finished_rpc():
 	_disable_local_cart()
 
 @rpc("authority", "call_local", "reliable")
-func _sync_checkpoint_to_player(checkpoint_transform: Transform3D):
+func _sync_checkpoint_to_player(checkpoint_transform: Transform3D, play_finish_sound: bool = false):
 	var local_cart = get_tree().get_nodes_in_group("player_carts").filter(func(node): return node.is_multiplayer_authority())
 	if local_cart.size() > 0:
 		local_cart[0].last_checkpoint_transform = checkpoint_transform
+		if play_finish_sound:
+			MusicManager.play_sfx("res://sounds/finish.mp3")
+		else:
+			MusicManager.play_sfx("res://sounds/checkpoint.mp3")
 
 func _disable_local_cart():
 	var carts = get_tree().get_nodes_in_group("player_carts")
@@ -324,17 +334,21 @@ func start_race():
 	# Start countdown
 	if race_ui:
 		race_ui.show_message("3", 1.0)
+	MusicManager.play_sfx("res://sounds/3.mp3")
 	await get_tree().create_timer(1.0).timeout
 	if race_ui:
 		race_ui.show_message("2", 1.0)
+	MusicManager.play_sfx("res://sounds/2.mp3")
 	await get_tree().create_timer(1.0).timeout
 	if race_ui:
 		race_ui.show_message("1", 1.0)
+	MusicManager.play_sfx("res://sounds/1.mp3")
 	await get_tree().create_timer(1.0).timeout
 
 	# Now actually start the race and allow movement!
 	if race_ui:
 		race_ui.show_message("GO!", 2.0)
+	MusicManager.play_sfx("res://sounds/Go.mp3")
 	MusicManager.play_race_music()
 	get_tree().call_group("player_carts", "on_race_started")
 

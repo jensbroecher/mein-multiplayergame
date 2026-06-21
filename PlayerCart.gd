@@ -611,6 +611,7 @@ func _physics_process(delta):
 				if splash_stream:
 					var ap = AudioStreamPlayer3D.new()
 					ap.stream = splash_stream
+					ap.bus = &"SFX"
 					ap.max_distance = 60.0
 					ap.unit_size = 6.0
 					get_tree().current_scene.add_child(ap)
@@ -635,7 +636,10 @@ func _physics_process(delta):
 		water_timer = 0.0
 
 	# --- Puddles / Shallow Water periodic small splashes ---
-	if ground_ray.is_colliding() and not is_underwater and global_position.y >= WATER_LEVEL and global_position.y < WATER_LEVEL + 0.6 and linear_velocity.length() > 3.0:
+	var on_flat_ground = false
+	if ground_ray.is_colliding() and ground_ray.get_collision_normal().y >= 0.55:
+		on_flat_ground = true
+	if on_flat_ground and not is_underwater and global_position.y >= WATER_LEVEL and global_position.y < WATER_LEVEL + 0.6 and linear_velocity.length() > 3.0:
 		var current_time = Time.get_ticks_msec() / 1000.0
 		if current_time - last_splash_time > 0.35:
 			last_splash_time = current_time
@@ -696,7 +700,14 @@ func _physics_process(delta):
 		input_dir.x = Input.get_axis("steer_left", "steer_right")
 		input_dir.y = Input.get_axis("throttle", "brake")
 
-	var on_ground = ground_ray.is_colliding()
+	var on_ground = false
+	var ground_normal = Vector3.UP
+	if ground_ray.is_colliding():
+		var norm = ground_ray.get_collision_normal()
+		if norm.y >= 0.55:
+			on_ground = true
+			ground_normal = norm
+
 	if not on_ground:
 		air_time += delta
 	else:
@@ -729,10 +740,6 @@ func _physics_process(delta):
 		offroad_penalty = lerp(offroad_penalty, offroad_target_penalty, 5.0 * delta)
 	else:
 		offroad_penalty = lerp(offroad_penalty, 1.0, 10.0 * delta)
-
-	var ground_normal = Vector3.UP
-	if on_ground:
-		ground_normal = ground_ray.get_collision_normal()
 
 	var fwd = -visuals.global_transform.basis.z
 	var right = visuals.global_transform.basis.x
@@ -910,14 +917,15 @@ func _get_ground_visual_offset() -> float:
 	# Force immediate raycast update to get accurate collision info
 	ground_ray.force_raycast_update()
 	if ground_ray.is_colliding():
-		var contact_pt = ground_ray.get_collision_point()
 		var contact_normal = ground_ray.get_collision_normal()
-		var current_height_normal = (global_position - contact_pt).dot(contact_normal)
-		
-		# Mathematically align wheels to ground: offset visuals relative to body center
-		var target_offset = current_height_normal + (avg_wheel_y - 0.24)
-		# Clamp to prevent extreme visual displacement during severe physics bounces
-		return clamp(target_offset, -0.6, 0.6)
+		if contact_normal.y >= 0.55:
+			var contact_pt = ground_ray.get_collision_point()
+			var current_height_normal = (global_position - contact_pt).dot(contact_normal)
+			
+			# Mathematically align wheels to ground: offset visuals relative to body center
+			var target_offset = current_height_normal + (avg_wheel_y - 0.24)
+			# Clamp to prevent extreme visual displacement during severe physics bounces
+			return clamp(target_offset, -0.6, 0.6)
 	
 	# Default visual offset in air (keeps wheels at their resting position)
 	return COLLISION_RADIUS + (avg_wheel_y - 0.24)
@@ -938,12 +946,16 @@ func _update_visuals_alignment(delta):
 	if is_instance_valid(ground_ray):
 		ground_ray.global_transform.basis = visuals.global_transform.basis
 
-	var on_ground = ground_ray.is_colliding()
+	var on_ground = false
 	var target_up = Vector3.UP
-	if on_ground:
-		target_up = ground_ray.get_collision_normal()
-	else:
-		# If in air, slowly return to global UP instead of snapping
+	if ground_ray.is_colliding():
+		var norm = ground_ray.get_collision_normal()
+		if norm.y >= 0.55:
+			on_ground = true
+			target_up = norm
+			
+	if not on_ground:
+		# If in air or on a steep wall/curb, slowly return to global UP instead of snapping
 		target_up = visuals.global_transform.basis.y.lerp(Vector3.UP, 1.0 - exp(-2.0 * delta)).normalized()
 		
 	# Smoothly align the visual mesh normal
@@ -1902,9 +1914,10 @@ func apply_lightning_slow_multicast():
 @rpc("any_peer", "call_local", "reliable")
 func client_play_lightning(hit_player_names: Array):
 	var sound_player = AudioStreamPlayer3D.new()
-	sound_player.stream = load("res://sounds/missile_explosion_wi_#1-1781728385875.wav")
-	sound_player.pitch_scale = 1.6
+	sound_player.stream = load("res://sounds/electric_lightning_a_#1-1782053835008.wav")
+	sound_player.pitch_scale = 1.0
 	sound_player.volume_db = 2.0
+	sound_player.bus = &"SFX"
 	get_tree().current_scene.add_child(sound_player)
 	sound_player.global_position = global_position
 	sound_player.play()

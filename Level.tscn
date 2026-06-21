@@ -108,14 +108,14 @@ horizonColour = Color(0.0784314, 0.00784314, 0.0156863, 1)
 groundColour = Color(0, 0, 0, 1)
 cloudBrightness = 0.05
 
-[sub_resource type="Resource" id="Resource_17ihm"]
+[sub_resource type="Resource" id="Resource_m7b4a"]
 script = ExtResource("5_yr3df")
 weather = ExtResource("6_jpwbr")
 
-[sub_resource type="Resource" id="Resource_bf5bs"]
+[sub_resource type="Resource" id="Resource_17ihm"]
 script = ExtResource("3_jpwbr")
 seasonId = "summer"
-weathers = Array[ExtResource("5_yr3df")]([SubResource("Resource_17ihm")])
+weathers = Array[ExtResource("5_yr3df")]([SubResource("Resource_m7b4a")])
 skyColourDaytime = SubResource("Resource_ext2d")
 skyColourNight = SubResource("Resource_p7jpd")
 dayNightCycleCurve = SubResource("Curve_8bl6p")
@@ -1314,7 +1314,7 @@ checkpoints = [NodePath("Checkpoints/Halfway4"), NodePath("FinishLine")]
 [node name="WeatherController" parent="." unique_id=1277823175 instance=ExtResource("31_weather")]
 time_of_day_hours = 13.239
 selected_weather = 1
-seasons = Array[ExtResource("3_jpwbr")]([SubResource("Resource_bf5bs")])
+seasons = Array[ExtResource("3_jpwbr")]([SubResource("Resource_17ihm")])
 startTime = 47660.4
 
 [node name="TerrainGenerator" type="Node3D" parent="." unique_id=586341718 node_paths=PackedStringArray("track_path")]
@@ -2739,13 +2739,14 @@ material = SubResource("ShaderMaterial_asphalt")
 transform = Transform3D(7.1962748, 0, -18.660488, 0, 12.650239, 0, 18.660488, 0, 7.1962748, 22.445913, 0.33423603, -9.015505)
 
 [node name="node_0" parent="Ramps/WoodRamp" index="0" unique_id=703926265]
-lod_bias = 0.1
+transform = Transform3D(99.99871, 0.5041317, -0.0656662, -0.5068243, 99.86871, -5.097689, 0.039886475, 5.097956, 99.869965, 0, 0.029519366, 0)
+lod_bias = 0.001
 
 [node name="NewRamp" parent="Ramps" unique_id=966004585 instance=ExtResource("17_dcckh")]
 transform = Transform3D(-30.273119, 0, -33.29471, 0, 44.999985, 0, 33.29471, 0, -30.273119, -507.56146, 6.9816875, -210.87714)
 
 [node name="node_0" parent="Ramps/NewRamp" index="0" unique_id=1515567132]
-lod_bias = 0.1
+lod_bias = 0.5
 
 [node name="RampBoostPad_1" parent="." unique_id=1454562377 instance=ExtResource("93_m7b4a")]
 transform = Transform3D(0.9994108, -0.03432328, 0, 0.03432328, 0.9994108, 0, 0, 0, 1, 153.24869, 6.871254, -70.886894)
