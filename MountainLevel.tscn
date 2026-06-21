@@ -757,7 +757,7 @@ size = Vector3(20, 10, 5)
 [sub_resource type="BoxShape3D" id="BoxShape3D_1"]
 size = Vector3(6, 0.5, 4)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_omek7"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_5rjju"]
 transparency = 1
 albedo_color = Color(1, 0.5, 0, 0.86)
 emission_enabled = true
@@ -765,7 +765,7 @@ emission = Color(1, 0.4, 0, 1)
 emission_energy_multiplier = 3.5
 
 [sub_resource type="QuadMesh" id="QuadMesh_kwq1f"]
-material = SubResource("StandardMaterial3D_omek7")
+material = SubResource("StandardMaterial3D_5rjju")
 size = Vector2(6, 4)
 orientation = 1
 
@@ -1803,7 +1803,7 @@ shape = SubResource("BoxShape3D_checkpoint")
 [node name="Ramps" type="Node3D" parent="." unique_id=1288188222 groups=["collision_trimesh"]]
 
 [node name="RampBoostPad_1" parent="." unique_id=1850672479 instance=ExtResource("29_ct8iu")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 110.05, -140)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 110.67883, -140)
 
 [node name="CollisionShape3D2" type="CollisionShape3D" parent="RampBoostPad_1" unique_id=1903836133]
 shape = SubResource("BoxShape3D_1")

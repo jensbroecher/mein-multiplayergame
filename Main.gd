@@ -93,6 +93,7 @@ func _on_server_disconnected():
 	lobby.hide()
 	car_selection.hide()
 	main_menu.show()
+	MusicManager.stop_music()
 
 func _unhandled_input(event: InputEvent):
 	if event.is_action_pressed("ui_cancel") or (event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE):

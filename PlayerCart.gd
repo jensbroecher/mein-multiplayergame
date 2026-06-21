@@ -208,9 +208,10 @@ var part_on_ground: Dictionary = {}
 # Remote interpolation tuning
 const REMOTE_LERP_SPEED: float = 18.0
 
-enum ItemType { NONE, BOOST, MISSILE, GUIDED_MISSILE, SHIELD, SHOCKWAVE, BOMB }
+enum ItemType { NONE, BOOST, MISSILE, GUIDED_MISSILE, SHIELD, SHOCKWAVE, BOMB, LIGHTNING }
 var current_item = ItemType.NONE
 var current_item_2 = ItemType.NONE
+var slow_timer: float = 0.0
 
 var last_checkpoint_transform: Transform3D
 
@@ -417,6 +418,10 @@ func _process(delta):
 	_update_visual_states(delta)
 	_update_antenna(delta)
 	
+	if slow_timer > 0.0:
+		if randf() < delta * 6.0:
+			_spawn_sparks(global_position + Vector3(randf_range(-0.5, 0.5), randf_range(0.2, 0.8), randf_range(-0.5, 0.5)))
+	
 	var has_physics_authority = has_physics_authority()
 	if has_physics_authority:
 		_update_visuals_alignment(delta)
@@ -543,6 +548,11 @@ func _process(delta):
 				p.global_position = pivot.global_position
 
 func _physics_process(delta):
+	if slow_timer > 0.0:
+		slow_timer -= delta
+		if slow_timer <= 0.0:
+			slow_timer = 0.0
+
 	if hop_cooldown > 0:
 		hop_cooldown -= delta
 
@@ -752,9 +762,13 @@ func _physics_process(delta):
 				apply_central_impulse(Vector3.UP * 4.5 * mass + fwd * 2.0 * mass)
 				hop_cooldown = 0.8 # Cooldown to prevent double jumps
 
+	var slow_mult = 1.0
+	if slow_timer > 0.0:
+		slow_mult = 0.6
+
 	if is_boosting:
-		var max_sp = max_speed * 1.5
-		var accel_force = acceleration * 2.0
+		var max_sp = max_speed * 1.5 * slow_mult
+		var accel_force = acceleration * 2.0 * slow_mult
 		if is_offroad and on_ground and ground_normal.y < 0.85 and fwd.dot(Vector3.UP) > 0.05:
 			accel_force = 0.0
 		if current_speed < max_sp:
@@ -763,10 +777,10 @@ func _physics_process(delta):
 	
 	if input_dir.y < -0.1: # Forward input
 		if not is_boosting:
-			var accel_force = acceleration
+			var accel_force = acceleration * slow_mult
 			if is_offroad and on_ground and ground_normal.y < 0.85 and fwd.dot(Vector3.UP) > 0.05:
 				accel_force = 0.0
-			if current_speed < max_speed * offroad_penalty:
+			if current_speed < max_speed * offroad_penalty * slow_mult:
 				apply_central_force(fwd * accel_force * mass)
 			boost_time += delta
 	elif input_dir.y > 0.1: # Brake / Reverse input
@@ -874,7 +888,7 @@ func _physics_process(delta):
 			sfx_wind_loop.stop()
 
 	# Dampen speed if exceeding offroad max speed
-	var effective_max = max_speed * offroad_penalty
+	var effective_max = max_speed * offroad_penalty * slow_mult
 	if on_ground and not is_boosting and current_speed > effective_max:
 		var excess_ratio = (current_speed - effective_max) / max_speed
 		apply_central_force(-fwd * excess_ratio * acceleration * 8.0 * mass)
@@ -1235,6 +1249,8 @@ func _execute_use_item(type: int):
 			_activate_shockwave()
 		ItemType.BOMB:
 			_drop_bomb()
+		ItemType.LIGHTNING:
+			_activate_lightning()
 
 @rpc("any_peer", "call_local", "unreliable")
 func play_landing_sound_rpc(p_air_time: float):
@@ -1726,7 +1742,8 @@ func _get_random_item_rpc() -> int:
 		ItemType.GUIDED_MISSILE,
 		ItemType.SHIELD,
 		ItemType.SHOCKWAVE,
-		ItemType.BOMB
+		ItemType.BOMB,
+		ItemType.LIGHTNING
 	]
 	return items[randi() % items.size()]
 
@@ -1843,6 +1860,164 @@ func client_play_shockwave():
 		tween.tween_callback(func(): shockwave_visual.visible = false)
 	
 	sfx_release_pop.play()
+
+func _activate_lightning():
+	if multiplayer.multiplayer_peer == null or multiplayer.is_server():
+		var players = get_tree().get_nodes_in_group("player_carts")
+		var hit_players: Array[String] = []
+		
+		for p in players:
+			if p == self: continue
+			var dist = global_position.distance_to(p.global_position)
+			if dist < 25.0:
+				if p.is_shielded:
+					p.is_shielded = false
+					var is_real_peer = p.name.to_int() > 0 and not p.get("is_ai")
+					if multiplayer.multiplayer_peer != null and multiplayer.is_server() and is_real_peer:
+						p.client_break_shield.rpc_id(p.name.to_int())
+					else:
+						p.shield_mesh.visible = false
+						p.shield_mesh.scale = Vector3.ONE
+					continue
+				
+				# Slow down target player
+				if p.has_method("apply_lightning_slow_multicast"):
+					if multiplayer.multiplayer_peer != null:
+						p.apply_lightning_slow_multicast.rpc()
+					else:
+						p.apply_lightning_slow_multicast()
+				
+				hit_players.append(p.name)
+		
+		# Play visual for all clients
+		if multiplayer.multiplayer_peer != null:
+			client_play_lightning.rpc(hit_players)
+		else:
+			client_play_lightning(hit_players)
+
+@rpc("authority", "call_local", "reliable")
+func apply_lightning_slow_multicast():
+	slow_timer = 2.5
+
+@rpc("any_peer", "call_local", "reliable")
+func client_play_lightning(hit_player_names: Array):
+	var sound_player = AudioStreamPlayer3D.new()
+	sound_player.stream = load("res://sounds/missile_explosion_wi_#1-1781728385875.wav")
+	sound_player.pitch_scale = 1.6
+	sound_player.volume_db = 2.0
+	get_tree().current_scene.add_child(sound_player)
+	sound_player.global_position = global_position
+	sound_player.play()
+	get_tree().create_timer(1.5).timeout.connect(sound_player.queue_free)
+
+	for name_str in hit_player_names:
+		var target = null
+		for c in get_tree().get_nodes_in_group("player_carts"):
+			if c.name == name_str:
+				target = c
+				break
+		if target:
+			_create_lightning_arc(global_position + Vector3(0, 0.8, 0), target.global_position + Vector3(0, 0.8, 0))
+			_spawn_sparks(target.global_position + Vector3(0, 0.8, 0))
+
+func _create_lightning_arc(start: Vector3, end: Vector3):
+	var mesh_instance = MeshInstance3D.new()
+	var imm_mesh = ImmediateMesh.new()
+	mesh_instance.mesh = imm_mesh
+	
+	var mat = StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(0.2, 0.8, 1.0)
+	mat.emission_enabled = true
+	mat.emission = Color(0.2, 0.8, 1.0)
+	mat.emission_energy_multiplier = 6.0
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mesh_instance.material_override = mat
+	
+	get_tree().current_scene.add_child(mesh_instance)
+	
+	imm_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+	
+	var steps = 12
+	var points = []
+	points.append(start)
+	
+	var dir = end - start
+	var length = dir.length()
+	var step_vector = dir / steps
+	
+	var perp1 = dir.cross(Vector3.UP).normalized()
+	if perp1.length() < 0.1:
+		perp1 = dir.cross(Vector3.FORWARD).normalized()
+	var perp2 = dir.cross(perp1).normalized()
+	
+	for i in range(1, steps):
+		var base_pt = start + step_vector * i
+		var offset_scale = length * 0.04
+		var offset = perp1 * randf_range(-offset_scale, offset_scale) + perp2 * randf_range(-offset_scale, offset_scale)
+		points.append(base_pt + offset)
+		
+	points.append(end)
+	
+	for i in range(points.size() - 1):
+		var segment_dir = (points[i+1] - points[i]).normalized()
+		var side = segment_dir.cross(Vector3.UP).normalized() * 0.15
+		if side.length() < 0.01:
+			side = segment_dir.cross(Vector3.FORWARD).normalized() * 0.15
+			
+		var p1 = points[i] - side
+		var p2 = points[i] + side
+		var p3 = points[i+1] + side
+		var p4 = points[i+1] - side
+		
+		# Triangle 1
+		imm_mesh.surface_add_vertex(p1)
+		imm_mesh.surface_add_vertex(p2)
+		imm_mesh.surface_add_vertex(p3)
+		
+		# Triangle 2
+		imm_mesh.surface_add_vertex(p1)
+		imm_mesh.surface_add_vertex(p3)
+		imm_mesh.surface_add_vertex(p4)
+		
+	imm_mesh.surface_end()
+	
+	var tween = create_tween()
+	if tween:
+		tween.tween_interval(0.25)
+		tween.tween_callback(mesh_instance.queue_free)
+
+func _spawn_sparks(pos: Vector3):
+	var sparks = CPUParticles3D.new()
+	sparks.amount = 15
+	sparks.lifetime = 0.5
+	sparks.one_shot = true
+	sparks.explosiveness = 0.8
+	sparks.emitting = true
+	
+	var mat = StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(0.2, 0.7, 1.0)
+	mat.emission_enabled = true
+	mat.emission = Color(0.2, 0.7, 1.0)
+	mat.emission_energy_multiplier = 4.0
+	sparks.material_override = mat
+	
+	var sphere = SphereMesh.new()
+	sphere.radius = 0.08
+	sphere.height = 0.16
+	sparks.mesh = sphere
+	
+	sparks.direction = Vector3.UP
+	sparks.spread = 180.0
+	sparks.initial_velocity_min = 3.0
+	sparks.initial_velocity_max = 6.0
+	sparks.gravity = Vector3(0, -6.0, 0)
+	
+	get_tree().current_scene.add_child(sparks)
+	sparks.global_position = pos
+	
+	get_tree().create_timer(0.6).timeout.connect(sparks.queue_free)
 
 func _drop_bomb():
 	# Projectile instantiation now happens only on the server
@@ -2333,6 +2508,13 @@ func _process_ai_items(delta: float):
 					break
 		ItemType.SHIELD:
 			should_use = true
+		ItemType.LIGHTNING:
+			for cart in get_tree().get_nodes_in_group("player_carts"):
+				if cart == self: continue
+				var dist = global_position.distance_to(cart.global_position)
+				if dist < 25.0:
+					should_use = true
+					break
 			
 	if should_use:
 		_use_item()

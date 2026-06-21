@@ -41,7 +41,8 @@ var ITEM_ICONS = {
 	"GUIDED_MISSILE": load("res://sprites/icon_guided_missile.png"),
 	"SHIELD": load("res://sprites/icon_shield.png"),
 	"SHOCKWAVE": load("res://sprites/icon_shockwave.png"),
-	"BOMB": load("res://sprites/icon_bomb.png")
+	"BOMB": load("res://sprites/icon_bomb.png"),
+	"LIGHTNING": load("res://sprites/icon_lightning.png")
 }
 
 var laps_spinbox: SpinBox

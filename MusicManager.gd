@@ -135,6 +135,7 @@ func _apply_window_settings():
 
 func save_settings():
 	var config = ConfigFile.new()
+	config.load(SETTINGS_FILE)
 	config.set_value("audio", "music", music_volume)
 	config.set_value("audio", "sfx", sfx_volume)
 	config.set_value("display", "show_fps", show_fps)
@@ -292,4 +293,11 @@ func get_action_key_text(action_name: String) -> String:
 			var keycode = event.physical_keycode if event.physical_keycode != KEY_NONE else event.keycode
 			return OS.get_keycode_string(keycode)
 	return "None"
+
+func stop_music():
+	if active_player:
+		active_player.stop()
+	if inactive_player:
+		inactive_player.stop()
+
 
