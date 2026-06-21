@@ -957,12 +957,47 @@ func _update_visuals_alignment(delta):
 
 	var on_ground = false
 	var target_up = Vector3.UP
+	
+	# Perform auxiliary front/rear raycasts to handle ramps and uneven terrain
+	var normals: Array[Vector3] = []
+	var res_front = null
+	var res_rear = null
+	var space_state = get_world_3d().direct_space_state
+	if space_state and visuals:
+		var excludes = [self.get_rid()]
+		var fwd_dir = -visuals.global_transform.basis.z.normalized()
+		
+		# Cast from above the cart center to well below to prevent starting inside rising ramp surfaces
+		var front_origin = global_position + fwd_dir * 1.0 + Vector3.UP * 1.5
+		var rear_origin = global_position - fwd_dir * 1.0 + Vector3.UP * 1.5
+		var down_vec = Vector3.DOWN * 3.5
+		
+		var query_front = PhysicsRayQueryParameters3D.create(front_origin, front_origin + down_vec)
+		query_front.exclude = excludes
+		query_front.collision_mask = 1 # road/terrain/ramp
+		res_front = space_state.intersect_ray(query_front)
+		if res_front and res_front.normal.y >= 0.45:
+			normals.append(res_front.normal)
+			
+		var query_rear = PhysicsRayQueryParameters3D.create(rear_origin, rear_origin + down_vec)
+		query_rear.exclude = excludes
+		query_rear.collision_mask = 1
+		res_rear = space_state.intersect_ray(query_rear)
+		if res_rear and res_rear.normal.y >= 0.45:
+			normals.append(res_rear.normal)
+			
 	if ground_ray.is_colliding():
 		var norm = ground_ray.get_collision_normal()
 		if norm.y >= 0.55:
-			on_ground = true
-			target_up = norm
+			normals.append(norm)
 			
+	if not normals.is_empty():
+		on_ground = true
+		var sum = Vector3.ZERO
+		for n in normals:
+			sum += n
+		target_up = (sum / normals.size()).normalized()
+		
 	if not on_ground:
 		# If in air or on a steep wall/curb, slowly return to global UP instead of snapping
 		target_up = visuals.global_transform.basis.y.lerp(Vector3.UP, 1.0 - exp(-2.0 * delta)).normalized()
@@ -972,8 +1007,26 @@ func _update_visuals_alignment(delta):
 	var forward = -current_basis.z
 	var right = current_basis.x
  
-	var target_right = forward.cross(target_up).normalized()
-	var target_forward = target_up.cross(target_right).normalized()
+	var target_right = Vector3.ZERO
+	var target_forward = Vector3.ZERO
+	
+	var has_two_points = false
+	if res_front and res_rear:
+		if res_front.normal.y >= 0.45 and res_rear.normal.y >= 0.45:
+			var front_pt = res_front.position
+			var rear_pt = res_rear.position
+			var slope_fwd = (front_pt - rear_pt).normalized()
+			
+			# Use the slope vector to determine exact pitch
+			target_forward = slope_fwd
+			target_right = target_forward.cross(target_up).normalized()
+			target_up = target_right.cross(target_forward).normalized()
+			has_two_points = true
+			
+	if not has_two_points:
+		# Fallback to normal-only alignment
+		target_right = forward.cross(target_up).normalized()
+		target_forward = target_up.cross(target_right).normalized()
  
 	var target_basis = Basis(target_right, target_up, -target_forward)
 	if is_drifting:

@@ -1207,19 +1207,19 @@ buffer = PackedFloat32Array(0.019779002, -3.256517e-05, -0.00018274004, 5.257751
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_6fscw"]
 height = 6.0
-radius = 0.35
+radius = 1.85
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_mwmot"]
 height = 6.0
-radius = 0.35
+radius = 1.85
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_hvf63"]
 height = 6.0
-radius = 0.35
+radius = 1.85
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_gjxdc"]
 height = 6.0
-radius = 0.35
+radius = 1.85
 
 [sub_resource type="Shader" id="Shader_pmgx0"]
 code = "shader_type spatial;
@@ -1256,35 +1256,35 @@ buffer = PackedFloat32Array(-0.44593257, -0.11552191, -0.021286696, 50.639725, -
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_qc3sj"]
 height = 6.0
-radius = 0.35
+radius = 1.85
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_g57rp"]
 height = 6.0
-radius = 0.35
+radius = 0.36
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_1c4wn"]
 height = 6.0
-radius = 0.35
+radius = 1.85
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_3t1hj"]
 height = 6.0
-radius = 0.35
+radius = 0.36
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_70osc"]
 height = 6.0
-radius = 0.35
+radius = 1.85
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_ttx6x"]
 height = 6.0
-radius = 0.35
+radius = 0.36
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_hfpiu"]
 height = 6.0
-radius = 0.35
+radius = 1.85
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_dqytd"]
 height = 6.0
-radius = 0.35
+radius = 0.36
 
 [sub_resource type="Curve3D" id="Curve3D_shortcut1"]
 _data = {

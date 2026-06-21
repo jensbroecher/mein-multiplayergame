@@ -89,7 +89,16 @@ func scatter():
 	force_update_transform()
 	clear_vegetation()
 	
-	var root = get_tree().edited_scene_root if get_tree() else null
+	var root = null
+	if get_tree() and "edited_scene_root" in get_tree():
+		root = get_tree().edited_scene_root
+	if not root:
+		root = self.owner
+	if not root:
+		var p = self
+		while p.get_parent():
+			p = p.get_parent()
+		root = p
 	if not root:
 		printerr("Cannot scatter: No edited scene root found.")
 		return
@@ -214,7 +223,14 @@ func _scatter_group(scene: PackedScene, count: int, is_tree: bool, scale_min: fl
 				var collision_shape = CollisionShape3D.new()
 				collision_shape.name = "CollisionShape3D"
 				var shape = CylinderShape3D.new()
-				shape.radius = 0.35
+				var base_radius = 0.35
+				if scene:
+					var path_lower = scene.resource_path.to_lower()
+					if "tree_3" in path_lower or "tree_4" in path_lower:
+						base_radius = 0.36
+					elif "tree" in path_lower or "tree_2" in path_lower:
+						base_radius = 1.85
+				shape.radius = base_radius
 				shape.height = 6.0
 				collision_shape.shape = shape
 				collision_shape.position = Vector3(0, 2.0, 0)
@@ -282,7 +298,14 @@ func _scatter_group_multi(scenes: Array, count: int, is_tree: bool, scale_min: f
 				var collision_shape = CollisionShape3D.new()
 				collision_shape.name = "CollisionShape3D"
 				var shape = CylinderShape3D.new()
-				shape.radius = 0.35
+				var base_radius = 0.35
+				if scene:
+					var path_lower = scene.resource_path.to_lower()
+					if "tree_3" in path_lower or "tree_4" in path_lower:
+						base_radius = 0.36
+					elif "tree" in path_lower or "tree_2" in path_lower:
+						base_radius = 1.85
+				shape.radius = base_radius
 				shape.height = 6.0
 				collision_shape.shape = shape
 				collision_shape.position = Vector3(0, 2.0, 0)
