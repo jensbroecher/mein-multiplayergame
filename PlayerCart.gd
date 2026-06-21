@@ -465,15 +465,7 @@ func _process(delta):
 				var iso_offset = Vector3(-20, 20, 20)
 				var target_cam_pos = visuals.global_position + iso_offset
 				
-				# Avoid clipping through bridge/terrain
-				var space_state = get_world_3d().direct_space_state
-				var ray_start = visuals.global_position + Vector3.UP * 1.0
-				var query = PhysicsRayQueryParameters3D.create(ray_start, target_cam_pos)
-				query.exclude = excludes
-				var result = space_state.intersect_ray(query)
-				if result:
-					target_cam_pos = result.position - (target_cam_pos - ray_start).normalized() * 0.5
-					
+				# Stay at a constant distance (no collision raycast zooming for the isometric camera)
 				camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 10.0 * delta)
 				camera_look_at = camera_look_at.lerp(visuals.global_position + visual_forward * look_ahead_dist, 10.0 * delta)
 				camera_pivot.look_at(camera_look_at, Vector3.UP)
