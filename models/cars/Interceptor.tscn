@@ -1,0 +1,12 @@
+[gd_scene format=3 uid="uid://ba2xu8s5wssgf"]
+
+[ext_resource type="PackedScene" uid="uid://biv200q3rgast" path="res://models/cars/20260618044707_89ae4d5d.fbx" id="1_fbx"]
+
+[node name="Interceptor" type="Node3D" unique_id=1431159809]
+
+[node name="Model" parent="." unique_id=735955916 instance=ExtResource("1_fbx")]
+
+[node name="AntennaPlacement" type="Node3D" parent="." unique_id=1924424628]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.05, 0.41282672, -0.16605759)
+
+[editable path="Model"]

@@ -11,7 +11,7 @@ extends RigidBody3D
 const CAR_PRESETS = [
 	{
 		"name": "Viper",
-		"model_path": "res://models/cars/20260505221030_500312d9.fbx",
+		"model_path": "res://models/cars/Viper.tscn",
 		"model_y_rotation": PI,       # native FBX faces backward, flip 180°
 		"max_speed": 30.0,
 		"acceleration": 50.0,
@@ -24,7 +24,7 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Shadow",
-		"model_path": "res://models/cars/20260505210312_305e4d34.fbx",
+		"model_path": "res://models/cars/Shadow.tscn",
 		"model_y_rotation": PI,
 		"max_speed": 30.5,
 		"acceleration": 40.0,
@@ -36,7 +36,7 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Strikeforce",
-		"model_path": "res://models/cars/20260505211857_6fc2a5d6.fbx",
+		"model_path": "res://models/cars/Strikeforce.tscn",
 		"model_y_rotation": PI * 1.5, # FBX native orientation requires 270° rotation
 		"max_speed": 28.0,
 		"acceleration": 65.0,
@@ -48,7 +48,7 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Apex",
-		"model_path": "res://models/cars/HIINQjUWAAAZYGR.fbx",
+		"model_path": "res://models/cars/Apex.tscn",
 		"model_y_rotation": PI,
 		"max_speed": 29.0,
 		"acceleration": 55.0,
@@ -60,7 +60,7 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Interceptor",
-		"model_path": "res://models/cars/20260618044707_89ae4d5d.fbx",
+		"model_path": "res://models/cars/Interceptor.tscn",
 		"model_y_rotation": PI,
 		"max_speed": 32.0,
 		"acceleration": 45.0,
@@ -72,7 +72,7 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Mudrunner",
-		"model_path": "res://models/cars/20260618232844_3429272f.fbx",
+		"model_path": "res://models/cars/Mudrunner.tscn",
 		"model_y_rotation": PI,
 		"max_speed": 27.0,
 		"acceleration": 55.0,
@@ -84,7 +84,7 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Phantom",
-		"model_path": "res://models/cars/20260618234038_69b1ff17.fbx",
+		"model_path": "res://models/cars/Phantom.tscn",
 		"model_y_rotation": PI * 0.5,
 		"max_speed": 29.5,
 		"acceleration": 50.0,
@@ -96,7 +96,7 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Centurion",
-		"model_path": "res://models/cars/20260618234103_e5456a8f.fbx",
+		"model_path": "res://models/cars/Centurion.tscn",
 		"model_y_rotation": PI,
 		"max_speed": 29.5,
 		"acceleration": 60.0,
@@ -332,6 +332,13 @@ func _ready():
 		$Visuals.add_child(new_model)
 		$Visuals.move_child(new_model, 0)
 		new_model.transform = Transform3D(Basis(Vector3(0, 1, 0), preset.get("model_y_rotation", PI)) * 2.0, Vector3(0, -0.6072377, 0))
+		
+		# Look for an AntennaPlacement node to reposition the dynamic antenna
+		var antenna_placement = new_model.get_node_or_null("AntennaPlacement")
+		if not antenna_placement:
+			antenna_placement = _find_node_by_name(new_model, "AntennaPlacement")
+		if antenna_placement:
+			antenna.position = visuals.to_local(antenna_placement.global_position)
 
 	await get_tree().process_frame
 	var level = get_tree().get_first_node_in_group("level")
@@ -1241,6 +1248,8 @@ func _setup_new_car_wheels():
 		# Find the wheel part node inside the loaded FBX model
 		var wheel_part = cart_model.get_node_or_null(part_name)
 		if not wheel_part:
+			wheel_part = _find_node_by_name(cart_model, part_name)
+		if not wheel_part:
 			print("PlayerCart: could not find wheel part '", part_name, "' for corner ", corner)
 			continue
 		
@@ -1633,8 +1642,20 @@ func explode(attacker_id: int = 0):
 			
 	var cart_model = get_node_or_null("Visuals/CartModel")
 	if cart_model:
-		for child in cart_model.get_children():
+		var body_parent = cart_model
+		var preset = CAR_PRESETS[car_index]
+		for corner in ["FL", "FR", "RL", "RR"]:
+			var part_name = preset.wheel_parts.get(corner, "")
+			if not part_name.is_empty():
+				var wheel_part = _find_node_by_name(cart_model, part_name)
+				if wheel_part:
+					body_parent = wheel_part.get_parent()
+					break
+		
+		for child in body_parent.get_children():
 			if child is Node3D:
+				if child.name == "AntennaPlacement":
+					continue
 				original_body_part_transforms[child] = child.transform
 				var dir = Vector3(randf_range(-1.0, 1.0), randf_range(0.2, 1.5), randf_range(-1.0, 1.0)).normalized()
 				part_velocities[child] = dir * randf_range(4.0, 8.0)
@@ -2744,3 +2765,12 @@ func _set_layers_recursive(node: Node, mask: int):
 		node.layers = mask
 	for child in node.get_children():
 		_set_layers_recursive(child, mask)
+
+func _find_node_by_name(root: Node, node_name: String) -> Node:
+	if root.name == node_name:
+		return root
+	for child in root.get_children():
+		var found = _find_node_by_name(child, node_name)
+		if found:
+			return found
+	return null

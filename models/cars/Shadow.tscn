@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://models/cars/20260505210312_305e4d34.fbx" id="1_fbx"]
+
+[node name="Shadow" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_fbx")]
+
+[node name="AntennaPlacement" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.05, 0.45, 0.05)

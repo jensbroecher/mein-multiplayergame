@@ -16,7 +16,7 @@ var rotating_model: Node3D = null
 const CAR_PRESETS = [
 	{
 		"name": "Viper",
-		"model_path": "res://models/cars/20260505221030_500312d9.fbx",
+		"model_path": "res://models/cars/Viper.tscn",
 		"model_y_rotation": PI,
 		"max_speed": 30.0,
 		"acceleration": 50.0,
@@ -29,7 +29,7 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Shadow",
-		"model_path": "res://models/cars/20260505210312_305e4d34.fbx",
+		"model_path": "res://models/cars/Shadow.tscn",
 		"model_y_rotation": PI,
 		"max_speed": 30.5,
 		"acceleration": 40.0,
@@ -42,7 +42,7 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Strikeforce",
-		"model_path": "res://models/cars/20260505211857_6fc2a5d6.fbx",
+		"model_path": "res://models/cars/Strikeforce.tscn",
 		"model_y_rotation": PI * 1.5,
 		"max_speed": 28.0,
 		"acceleration": 65.0,
@@ -55,7 +55,7 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Apex",
-		"model_path": "res://models/cars/HIINQjUWAAAZYGR.fbx",
+		"model_path": "res://models/cars/Apex.tscn",
 		"model_y_rotation": PI,
 		"max_speed": 29.0,
 		"acceleration": 55.0,
@@ -68,7 +68,7 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Interceptor",
-		"model_path": "res://models/cars/20260618044707_89ae4d5d.fbx",
+		"model_path": "res://models/cars/Interceptor.tscn",
 		"model_y_rotation": PI,
 		"max_speed": 32.0,
 		"acceleration": 45.0,
@@ -81,7 +81,7 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Mudrunner",
-		"model_path": "res://models/cars/20260618232844_3429272f.fbx",
+		"model_path": "res://models/cars/Mudrunner.tscn",
 		"model_y_rotation": PI,
 		"max_speed": 27.0,
 		"acceleration": 55.0,
@@ -94,7 +94,7 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Phantom",
-		"model_path": "res://models/cars/20260618234038_69b1ff17.fbx",
+		"model_path": "res://models/cars/Phantom.tscn",
 		"model_y_rotation": PI * 0.5,
 		"max_speed": 29.5,
 		"acceleration": 50.0,
@@ -107,7 +107,7 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Centurion",
-		"model_path": "res://models/cars/20260618234103_e5456a8f.fbx",
+		"model_path": "res://models/cars/Centurion.tscn",
 		"model_y_rotation": PI,
 		"max_speed": 29.5,
 		"acceleration": 60.0,
