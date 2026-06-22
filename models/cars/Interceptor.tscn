@@ -6,7 +6,47 @@
 
 [node name="Model" parent="." unique_id=735955916 instance=ExtResource("1_fbx")]
 
+[node name="part_0" parent="Model" index="0" unique_id=420832850]
+transform = Transform3D(100, 0, 0, 0, 100, 7.54979e-06, 0, -7.54979e-06, 100, 0, 0.026832491, 0)
+
+[node name="part_1" parent="Model" index="1" unique_id=289688742]
+transform = Transform3D(100, 0, 0, 0, 100, 7.54979e-06, 0, -7.54979e-06, 100, 0, 0.026832491, 0)
+
+[node name="part_10" parent="Model" index="2" unique_id=1064796106]
+transform = Transform3D(100, 0, 0, 0, 100, 7.54979e-06, 0, -7.54979e-06, 100, 0, 0.026832491, 0)
+
+[node name="part_11" parent="Model" index="3" unique_id=1437956838]
+transform = Transform3D(100, 0, 0, 0, 100, 7.54979e-06, 0, -7.54979e-06, 100, 0, 0.026832491, 0)
+
+[node name="part_12" parent="Model" index="4" unique_id=666620506]
+transform = Transform3D(100, 0, 0, 0, 100, 7.54979e-06, 0, -7.54979e-06, 100, 0, 0.026832491, 0)
+
+[node name="part_13" parent="Model" index="5" unique_id=1022534905]
+transform = Transform3D(100, 0, 0, 0, 100, 7.54979e-06, 0, -7.54979e-06, 100, 0, 0.026832491, 0)
+
+[node name="part_14" parent="Model" index="6" unique_id=1724358995]
+transform = Transform3D(100, 0, 0, 0, 100, 7.54979e-06, 0, -7.54979e-06, 100, 0, 0.026832491, 0)
+
+[node name="part_15" parent="Model" index="7" unique_id=1864700273]
+transform = Transform3D(100, 0, 0, 0, 100, 7.54979e-06, 0, -7.54979e-06, 100, 0, 0.026832491, 0)
+
+[node name="part_2" parent="Model" index="8" unique_id=1805572046]
+transform = Transform3D(100, 0, 0, 0, 100, 7.54979e-06, 0, -7.54979e-06, 100, 0, 0.026832491, 0)
+
+[node name="part_7" parent="Model" index="13" unique_id=1164256250]
+transform = Transform3D(100, 0, 0, 0, 100, 7.54979e-06, 0, -7.54979e-06, 100, 0, 0.026832491, 0)
+
+[node name="part_8" parent="Model" index="14" unique_id=1324212596]
+transform = Transform3D(100, 0, 0, 0, 100, 7.54979e-06, 0, -7.54979e-06, 100, 0, 0.026832491, 0)
+
+[node name="part_9" parent="Model" index="15" unique_id=698347739]
+transform = Transform3D(100, 0, 0, 0, 100, 7.54979e-06, 0, -7.54979e-06, 100, 0, 0.026832491, 0)
+
 [node name="AntennaPlacement" type="Node3D" parent="." unique_id=1924424628]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.05, 0.41282672, -0.16605759)
+
+[node name="CSGBox3D" type="CSGBox3D" parent="." unique_id=1178446410]
+transform = Transform3D(1, 0, 0, 0, 0.046711095, -0.05660416, 0, 0.0026482884, 0.9983967, -0.0012617409, 0.2192876, -0.030518949)
+size = Vector3(0.17669678, 1, 1)
 
 [editable path="Model"]
