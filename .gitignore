@@ -24,3 +24,6 @@ Thumbs.db
 *.swp
 *.bak
 *.import
+
+# Large asset models
+assets/models/
