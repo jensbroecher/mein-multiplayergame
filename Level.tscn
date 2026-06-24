@@ -2765,10 +2765,6 @@ transform = Transform3D(-0.23368901, 0, 0.6185638, 0, 0.6612349, 0, -0.6185638, 
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
 shape = SubResource("CylinderShape3D_dqytd")
 
-[node name="Decal" type="Decal" parent="LevelDesign" unique_id=1682153026]
-transform = Transform3D(4.916816, 0, 0.5400201, 0, 0.40910727, 0, -1.1099784, 0, 2.3921, 17.778269, 0.6060146, 91.51997)
-texture_albedo = ExtResource("98_ueu0w")
-
 [node name="ConcreteFootbridge" parent="LevelDesign" unique_id=391028000 groups=["collision_trimesh"] instance=ExtResource("99_fsv80")]
 transform = Transform3D(11.069289, 0, 27.883165, 0, 30, 0, -27.883165, 0, 11.069289, 67.77796, 1.7411513, -410.94803)
 
@@ -2783,6 +2779,13 @@ transform = Transform3D(-6.142496, 0, 29.364418, 0, 29.999994, 0, -29.364418, 0,
 
 [node name="node_0" parent="LevelDesign/ConceteRamp2" index="0" unique_id=1682932040]
 lod_bias = 0.1
+
+[node name="Decals" type="Node3D" parent="LevelDesign" unique_id=672293724]
+
+[node name="RC VIBE GP" type="Decal" parent="LevelDesign/Decals" unique_id=1682153026]
+transform = Transform3D(4.916816, 0, 0.5400201, 0, 0.40910727, 0, -1.1099784, 0, 2.3921, 17.778269, 0.6060146, 91.51997)
+texture_albedo = ExtResource("98_ueu0w")
+cull_mask = 1
 
 [editable path="Ramps/WoodRamp"]
 [editable path="Ramps/NewRamp"]

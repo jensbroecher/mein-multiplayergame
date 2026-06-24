@@ -2761,7 +2761,7 @@ func _update_intro_camera(_delta: float):
 	camera_pivot.look_at(intro_orbit_center, Vector3.UP)
 
 func _set_layers_recursive(node: Node, mask: int):
-	if node is MeshInstance3D:
+	if node is VisualInstance3D:
 		node.layers = mask
 	for child in node.get_children():
 		_set_layers_recursive(child, mask)
