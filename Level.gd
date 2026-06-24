@@ -858,4 +858,3 @@ func _is_node_or_ancestor_in_group(node: Node, group_name: String) -> bool:
 			return true
 		current = current.get_parent()
 	return false
-

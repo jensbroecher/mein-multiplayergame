@@ -115,14 +115,14 @@ horizonColour = Color(0.0784314, 0.00784314, 0.0156863, 1)
 groundColour = Color(0, 0, 0, 1)
 cloudBrightness = 0.05
 
-[sub_resource type="Resource" id="Resource_6fscw"]
+[sub_resource type="Resource" id="Resource_su65n"]
 script = ExtResource("5_yr3df")
 weather = ExtResource("6_jpwbr")
 
-[sub_resource type="Resource" id="Resource_mwmot"]
+[sub_resource type="Resource" id="Resource_6fscw"]
 script = ExtResource("3_jpwbr")
 seasonId = "summer"
-weathers = Array[ExtResource("5_yr3df")]([SubResource("Resource_6fscw")])
+weathers = Array[ExtResource("5_yr3df")]([SubResource("Resource_su65n")])
 skyColourDaytime = SubResource("Resource_ext2d")
 skyColourNight = SubResource("Resource_p7jpd")
 dayNightCycleCurve = SubResource("Curve_8bl6p")
@@ -1309,7 +1309,7 @@ checkpoints = [NodePath("Checkpoints/Halfway4"), NodePath("FinishLine")]
 [node name="WeatherController" parent="." unique_id=1277823175 instance=ExtResource("31_weather")]
 time_of_day_hours = 13.239
 selected_weather = 1
-seasons = Array[ExtResource("3_jpwbr")]([SubResource("Resource_mwmot")])
+seasons = Array[ExtResource("3_jpwbr")]([SubResource("Resource_6fscw")])
 startTime = 47660.4
 
 [node name="TerrainGenerator" type="Node3D" parent="." unique_id=586341718 node_paths=PackedStringArray("track_path")]
@@ -2605,7 +2605,7 @@ transform = Transform3D(0.8, 0, 0, 0, 0.8, 0, 0, 0, 0.8, 257.4721, 4.1307807, -1
 transform = Transform3D(-0.32899797, 0, 0.729219, 0, 0.80000025, 0, -0.729219, 0, -0.32899797, 248.52292, 2.7846045, -246.3646)
 
 [node name="jacaranda_tree_1k" parent="LevelDesign/Trees" unique_id=798549070 groups=["collision_convex"] instance=ExtResource("95_bf5bs")]
-transform = Transform3D(2.5, 0, 0, 0, 2.5, 0, 0, 0, 2.5, 28.340328, 1.4501469, 47.964386)
+transform = Transform3D(0.80401117, 0, -2.367185, 0, 2.5000002, 0, 2.367185, 0, 0.80401117, 31.493206, 1.8536284, 47.964386)
 
 [node name="othonna_cerarioides_1k" parent="LevelDesign/Trees" unique_id=956682310 groups=["collision_convex"] instance=ExtResource("96_h1oga")]
 transform = Transform3D(11.359214, 0, 5.217113, 0, 12.5, 0, -5.217113, 0, 11.359214, 107.47364, -0.10661733, -14.685692)
@@ -2773,13 +2773,13 @@ texture_albedo = ExtResource("98_ueu0w")
 transform = Transform3D(11.069289, 0, 27.883165, 0, 30, 0, -27.883165, 0, 11.069289, 67.77796, 1.7411513, -410.94803)
 
 [node name="ConceteRamp" parent="LevelDesign" unique_id=1365247482 groups=["collision_trimesh"] instance=ExtResource("100_su65n")]
-transform = Transform3D(26.66637, 0, -13.744245, 0, 29.999998, 0, 13.744245, 0, 26.66637, -24.5969, 5.4532595, -451.85565)
+transform = Transform3D(6.5280104, 0, -29.281132, 0, 29.999998, 0, 29.281132, 0, 6.5280104, 12.440142, -0.04423809, 59.979614)
 
 [node name="node_0" parent="LevelDesign/ConceteRamp" index="0" unique_id=1682932040]
 lod_bias = 0.1
 
 [node name="ConceteRamp2" parent="LevelDesign" unique_id=1399778524 groups=["collision_trimesh"] instance=ExtResource("100_su65n")]
-transform = Transform3D(-26.483374, 0, 14.093629, 0, 29.999994, 0, -14.093629, 0, -26.483374, -51.37912, 5.4532595, -465.9773)
+transform = Transform3D(-6.142496, 0, 29.364418, 0, 29.999994, 0, -29.364418, 0, -6.142496, 6.127722, -0.04423809, 30.367767)
 
 [node name="node_0" parent="LevelDesign/ConceteRamp2" index="0" unique_id=1682932040]
 lod_bias = 0.1
