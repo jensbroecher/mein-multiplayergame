@@ -19,8 +19,8 @@
 [ext_resource type="ArrayMesh" uid="uid://cyyat43e6ciay" path="res://generated/Visual_Curbs_Sides.res" id="10_dcckh"]
 [ext_resource type="Shape3D" uid="uid://che45yajcufgc" path="res://generated/track_collision_shape.res" id="12_esphl"]
 [ext_resource type="Shader" uid="uid://srampgbp5hcn" path="res://water.gdshader" id="14_5qkpu"]
-[ext_resource type="Texture2D" uid="uid://dcl7r84kxwg6t" path="res://sprites/grass.png" id="14_wesx8"]
-[ext_resource type="PackedScene" uid="uid://dhh7ri67yaupn" path="res://models/ramps/ramp.glb" id="17_dcckh"]
+[ext_resource type="Texture2D" uid="uid://wpot3efnsumr" path="res://sprites/grass.png" id="14_wesx8"]
+[ext_resource type="PackedScene" uid="uid://cs2jnpuhv20rs" path="res://models/ramps/ramp.glb" id="17_dcckh"]
 [ext_resource type="Script" uid="uid://dalgqkvhgl13l" path="res://VegetationScatterer.gd" id="18_jftiw"]
 [ext_resource type="MultiMesh" uid="uid://dpt1tmbhc4fmr" path="res://generated/grass/chunk_5_0.res" id="20_2uhgy"]
 [ext_resource type="MultiMesh" uid="uid://o87elostm604" path="res://generated/grass/chunk_4_0.res" id="20_e1gl5"]
@@ -44,7 +44,7 @@
 [ext_resource type="MultiMesh" uid="uid://dslyqd0om6jp8" path="res://generated/grass/chunk_2_2.res" id="28_fsv80"]
 [ext_resource type="MultiMesh" uid="uid://bb64jdtqxutoc" path="res://generated/grass/chunk_3_2.res" id="29_su65n"]
 [ext_resource type="MultiMesh" uid="uid://bfpw86edrio1r" path="res://generated/grass/chunk_4_2.res" id="30_6fscw"]
-[ext_resource type="PackedScene" uid="uid://bfbyxe68bw0dc" path="res://models/ramps/woodramp.fbx" id="30_q2vmi"]
+[ext_resource type="PackedScene" uid="uid://djmpd2owxd2xm" path="res://models/ramps/woodramp.fbx" id="30_q2vmi"]
 [ext_resource type="MultiMesh" uid="uid://dfxnsyx3i05i6" path="res://generated/grass/chunk_5_2.res" id="31_mwmot"]
 [ext_resource type="PackedScene" uid="uid://da2i62hjyc1cp" path="res://addons/GodotWeatherSystem/weather_controller.tscn" id="31_weather"]
 [ext_resource type="MultiMesh" uid="uid://yjtign1uawqs" path="res://generated/grass/chunk_6_2.res" id="32_hvf63"]
@@ -734,9 +734,6 @@ _data = {
 }
 point_count = 3
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_h1oga"]
-size = Vector3(6, 0.5, 4)
-
 [sub_resource type="Shader" id="Shader_bf5bs"]
 code = "shader_type spatial;
 render_mode cull_disabled;
@@ -1301,6 +1298,9 @@ radius = 1.85
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_dqytd"]
 height = 6.0
 radius = 0.36
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_h1oga"]
+size = Vector3(6, 2, 4)
 
 [node name="Level" type="Node3D" unique_id=815155767 node_paths=PackedStringArray("checkpoints")]
 script = ExtResource("1_lev99")
@@ -2571,7 +2571,7 @@ curve = SubResource("Curve3D_shortcut1")
 [node name="WoodRamp" parent="Ramps" unique_id=1457045438 groups=["collision_trimesh"] instance=ExtResource("30_q2vmi")]
 transform = Transform3D(7.1962733, 0, -18.660484, 0, 20, 0, 18.660484, 0, 7.1962733, 22.445913, 0.021007419, -9.015505)
 
-[node name="node_0" parent="Ramps/WoodRamp" index="0" unique_id=703926265]
+[node name="node_0" parent="Ramps/WoodRamp" index="0" unique_id=1854124921]
 transform = Transform3D(99.99871, 0.5041317, -0.0656662, -0.5068243, 99.86871, -5.097689, 0.039886475, 5.097956, 99.869965, 0, 0.029519366, 0)
 lod_bias = 0.5
 
@@ -2585,14 +2585,8 @@ material = SubResource("ShaderMaterial_asphalt")
 [node name="NewRamp" parent="Ramps" unique_id=966004585 instance=ExtResource("17_dcckh")]
 transform = Transform3D(-30.273119, 0, -33.29471, 0, 44.999985, 0, 33.29471, 0, -30.273119, -507.56146, 6.9816875, -210.87714)
 
-[node name="node_0" parent="Ramps/NewRamp" index="0" unique_id=1515567132]
+[node name="node_0" parent="Ramps/NewRamp" index="0" unique_id=570764269]
 lod_bias = 0.5
-
-[node name="BoostPad1" parent="." unique_id=1454562377 instance=ExtResource("93_m7b4a")]
-transform = Transform3D(0.852887, -0.029291136, 0.52127314, 0.034323275, 0.99941075, 0, -0.52096605, 0.017891806, 0.85338986, 153.24869, 6.886613, -70.886894)
-
-[node name="CollisionShape3D2" type="CollisionShape3D" parent="BoostPad1" unique_id=1847626239]
-shape = SubResource("BoxShape3D_h1oga")
 
 [node name="LevelDesign" type="Node3D" parent="." unique_id=1434977768]
 
@@ -2771,13 +2765,13 @@ transform = Transform3D(11.069289, 0, 27.883165, 0, 30, 0, -27.883165, 0, 11.069
 [node name="ConceteRamp" parent="LevelDesign" unique_id=1365247482 groups=["collision_trimesh"] instance=ExtResource("100_su65n")]
 transform = Transform3D(6.5280104, 0, -29.281132, 0, 29.999998, 0, 29.281132, 0, 6.5280104, 12.440142, -0.04423809, 59.979614)
 
-[node name="node_0" parent="LevelDesign/ConceteRamp" index="0" unique_id=1682932040]
+[node name="node_0" parent="LevelDesign/ConceteRamp" index="0" unique_id=2146402623]
 lod_bias = 0.1
 
 [node name="ConceteRamp2" parent="LevelDesign" unique_id=1399778524 groups=["collision_trimesh"] instance=ExtResource("100_su65n")]
 transform = Transform3D(-6.142496, 0, 29.364418, 0, 29.999994, 0, -29.364418, 0, -6.142496, 6.127722, -0.04423809, 30.367767)
 
-[node name="node_0" parent="LevelDesign/ConceteRamp2" index="0" unique_id=1682932040]
+[node name="node_0" parent="LevelDesign/ConceteRamp2" index="0" unique_id=2146402623]
 lod_bias = 0.1
 
 [node name="Decals" type="Node3D" parent="LevelDesign" unique_id=672293724]
@@ -2786,6 +2780,17 @@ lod_bias = 0.1
 transform = Transform3D(4.916816, 0, 0.5400201, 0, 0.40910727, 0, -1.1099784, 0, 2.3921, 17.778269, 0.6060146, 91.51997)
 texture_albedo = ExtResource("98_ueu0w")
 cull_mask = 1
+
+[node name="BoostPads" type="Node3D" parent="." unique_id=1164637541]
+
+[node name="BoostPad1" parent="BoostPads" unique_id=1454562377 instance=ExtResource("93_m7b4a")]
+transform = Transform3D(0.852887, -0.029291136, 0.52127314, 0.034323275, 0.99941075, 0, -0.52096605, 0.017891806, 0.85338986, 153.24869, 6.886613, -70.886894)
+
+[node name="BoostPad3" parent="BoostPads" unique_id=1838947964 instance=ExtResource("93_m7b4a")]
+transform = Transform3D(0.852887, -0.029291136, 0.52127314, 0.034323275, 0.99941075, 0, -0.52096605, 0.017891806, 0.85338986, 161.95444, 6.6523466, -76.54727)
+
+[node name="BoostPad2" parent="BoostPads" unique_id=1232121474 instance=ExtResource("93_m7b4a")]
+transform = Transform3D(0.38633192, -0.013267997, 0.92226434, 0.034323275, 0.99941075, 0, -0.921721, 0.031655136, 0.38655972, 255.9263, 10.488753, -163.65369)
 
 [editable path="Ramps/WoodRamp"]
 [editable path="Ramps/NewRamp"]

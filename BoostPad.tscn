@@ -4,7 +4,7 @@
 [ext_resource type="Texture2D" path="res://sprites/decals/boost_pad.png" id="2_boost_decal"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_1"]
-size = Vector3(6, 0.5, 4)
+size = Vector3(6, 2.0, 4)
 
 [node name="BoostPad" type="Area3D"]
 collision_layer = 0
@@ -14,9 +14,8 @@ script = ExtResource("1_script")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 shape = SubResource("BoxShape3D_1")
 
-[node name="Decal" type="Decal" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
-size = Vector3(6, 3, 4)
+ [node name="Decal" type="Decal" parent="."]
+size = Vector3(6, 10.0, 4)
 texture_albedo = ExtResource("2_boost_decal")
 cull_mask = 1
 

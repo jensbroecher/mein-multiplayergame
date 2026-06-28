@@ -111,7 +111,7 @@ func scatter():
 	
 	# Create green material for grass using a shader to correctly mask transparency
 	var shader = Shader.new()
-	shader.code = "shader_type spatial;\nrender_mode cull_disabled;\n\nuniform vec4 albedo : source_color = vec4(0.25, 0.72, 0.12, 1.0);\nuniform sampler2D albedo_texture : source_color, filter_nearest_mipmap;\nuniform float alpha_scissor_threshold : hint_range(0.0, 1.0) = 0.1;\n\nvoid fragment() {\n\tvec4 tex_color = texture(albedo_texture, UV);\n\tALBEDO = albedo.rgb * 1.25;\n\tEMISSION = albedo.rgb * 0.15;\n\tfloat alpha = tex_color.a;\n\tif (tex_color.a >= 0.99) {\n\t\talpha = tex_color.r;\n\t}\n\tALPHA = alpha;\n\tALPHA_SCISSOR_THRESHOLD = alpha_scissor_threshold;\n}"
+	shader.code = "shader_type spatial;\nrender_mode cull_disabled;\n\nuniform vec4 albedo : source_color = vec4(0.25, 0.72, 0.12, 1.0);\nuniform sampler2D albedo_texture : source_color, filter_linear_mipmap_anisotropic;\nuniform float alpha_scissor_threshold : hint_range(0.0, 1.0) = 0.1;\n\nvoid fragment() {\n\tvec4 tex_color = texture(albedo_texture, UV);\n\tALBEDO = albedo.rgb * 1.25;\n\tEMISSION = albedo.rgb * 0.15;\n\tfloat alpha = tex_color.a;\n\tif (tex_color.a >= 0.99) {\n\t\talpha = tex_color.r;\n\t}\n\tALPHA = alpha;\n\tALPHA_SCISSOR_THRESHOLD = alpha_scissor_threshold;\n}"
 	
 	var grass_mat = ShaderMaterial.new()
 	grass_mat.shader = shader
@@ -451,7 +451,7 @@ func adjust_vegetation_colors():
 		
 	# Shader for grass
 	var grass_shader = Shader.new()
-	grass_shader.code = "shader_type spatial;\nrender_mode cull_disabled;\n\nuniform vec4 albedo : source_color = vec4(0.25, 0.72, 0.12, 1.0);\nuniform sampler2D albedo_texture : source_color, filter_nearest_mipmap;\nuniform float alpha_scissor_threshold : hint_range(0.0, 1.0) = 0.1;\n\nvoid fragment() {\n\tvec4 tex_color = texture(albedo_texture, UV);\n\tALBEDO = albedo.rgb * 1.25;\n\tEMISSION = albedo.rgb * 0.15;\n\tfloat alpha = tex_color.a;\n\tif (tex_color.a >= 0.99) {\n\t\talpha = tex_color.r;\n\t}\n\tALPHA = alpha;\n\tALPHA_SCISSOR_THRESHOLD = alpha_scissor_threshold;\n}"
+	grass_shader.code = "shader_type spatial;\nrender_mode cull_disabled;\n\nuniform vec4 albedo : source_color = vec4(0.25, 0.72, 0.12, 1.0);\nuniform sampler2D albedo_texture : source_color, filter_linear_mipmap_anisotropic;\nuniform float alpha_scissor_threshold : hint_range(0.0, 1.0) = 0.1;\n\nvoid fragment() {\n\tvec4 tex_color = texture(albedo_texture, UV);\n\tALBEDO = albedo.rgb * 1.25;\n\tEMISSION = albedo.rgb * 0.15;\n\tfloat alpha = tex_color.a;\n\tif (tex_color.a >= 0.99) {\n\t\talpha = tex_color.r;\n\t}\n\tALPHA = alpha;\n\tALPHA_SCISSOR_THRESHOLD = alpha_scissor_threshold;\n}"
 	
 	var grass_mat = ShaderMaterial.new()
 	grass_mat.shader = grass_shader

@@ -112,4 +112,3 @@ func restart_race():
 		await get_tree().process_frame
 	
 	start_game(true)
-

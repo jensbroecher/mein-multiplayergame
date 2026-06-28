@@ -211,6 +211,8 @@ var is_exploding = false
 var boost_time = 0.0
 var boost_timer = 0.0
 var is_boosting = false
+var is_pad_boosting = false
+var pad_boost_timer = 0.0
 
 @onready var sfx_brake_drift = $Visuals/SFX_BrakeDrift
 var is_drifting: bool = false
@@ -548,10 +550,12 @@ func _process(delta):
 				camera_look_at = camera_look_at.lerp(visuals.global_position + visual_forward * (look_ahead_dist + 2.0), 12.0 * delta)
 				camera_pivot.look_at(camera_look_at, Vector3.UP)
 		
-		# Smoothly lerp camera FOV based on is_isometric and is_boosting
+		# Smoothly lerp camera FOV based on is_isometric and is_boosting/is_pad_boosting
 		var target_fov = 35.0 if is_isometric else 75.0
 		if is_boosting:
 			target_fov += 10.0 if is_isometric else 15.0 # Zoom out when boosting!
+		elif is_pad_boosting:
+			target_fov += 6.0 if is_isometric else 9.0 # Zoom out slightly less when pad boosting!
 		camera.fov = lerp(camera.fov, target_fov, 8.0 * delta)
 
 		if race_ui:
@@ -759,6 +763,12 @@ func _physics_process(delta):
 			boost_timer = 0.0
 	is_boosting = boost_timer > 0.0
 
+	if pad_boost_timer > 0.0:
+		pad_boost_timer -= delta
+		if pad_boost_timer <= 0.0:
+			pad_boost_timer = 0.0
+	is_pad_boosting = pad_boost_timer > 0.0
+
 	if not can_move:
 		linear_velocity = linear_velocity.lerp(Vector3.ZERO, 3.0 * delta)
 		_move_and_sync()
@@ -854,6 +864,15 @@ func _physics_process(delta):
 	if is_boosting:
 		var max_sp = max_speed * 1.5 * slow_mult
 		var accel_force = acceleration * 2.0 * slow_mult
+		if is_offroad and on_ground and ground_normal.y < 0.85 and fwd.dot(Vector3.UP) > 0.05:
+			accel_force = 0.0
+		if current_speed < max_sp:
+			apply_central_force(fwd * accel_force * mass)
+		boost_time += delta
+	elif is_pad_boosting:
+		# Pad boost: faster (closer to the boost item)
+		var max_sp = max_speed * 1.4 * slow_mult
+		var accel_force = acceleration * 1.8 * slow_mult
 		if is_offroad and on_ground and ground_normal.y < 0.85 and fwd.dot(Vector3.UP) > 0.05:
 			accel_force = 0.0
 		if current_speed < max_sp:
@@ -1122,6 +1141,7 @@ func _fill_audio_buffer():
 	var fluctuation = sin(Time.get_ticks_msec() * 0.03) * 1.5
 	var freq = 80.0 + linear_velocity.length() * 12.0 + fluctuation
 	if is_boosting: freq *= 1.4
+	elif is_pad_boosting: freq *= 1.25
 
 	# Fade out high harmonics at high speeds to avoid harsh whines
 	var speed_ratio = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
@@ -1413,6 +1433,21 @@ func client_start_boost():
 	is_boosting = true
 	sfx_nitro_start.play()
 	boost_particles.emitting = true
+
+@rpc("any_peer", "call_local", "reliable")
+func client_start_pad_boost():
+	pad_boost_timer = 2.0
+	is_pad_boosting = true
+	
+	# Play swoosh sound (stereogenicstudio-swish-swoosh-woosh-sfx-47-357152.mp3)
+	var ap = AudioStreamPlayer3D.new()
+	ap.stream = preload("res://sounds/stereogenicstudio-swish-swoosh-woosh-sfx-47-357152.mp3")
+	ap.bus = &"SFX"
+	ap.volume_db = 0.0
+	ap.unit_size = 20.0
+	$Visuals.add_child(ap)
+	ap.play()
+	ap.finished.connect(ap.queue_free)
 
 @rpc("any_peer", "call_local", "reliable")
 func client_start_shield():

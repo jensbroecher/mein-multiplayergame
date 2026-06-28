@@ -418,7 +418,7 @@ autoplay = true
 
 [node name="SFX_NitroStart" type="AudioStreamPlayer3D" parent="Visuals" unique_id=1794322746]
 stream = ExtResource("4_nitro")
-volume_db = 5.0
+volume_db = -2.0
 unit_size = 20.0
 
 [node name="SFX_RocketLoop" type="AudioStreamPlayer3D" parent="Visuals" unique_id=1561564001]

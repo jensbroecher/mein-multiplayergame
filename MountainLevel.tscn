@@ -1805,18 +1805,9 @@ shape = SubResource("BoxShape3D_checkpoint")
 [node name="RampBoostPad_1" parent="." unique_id=1850672479 instance=ExtResource("29_ct8iu")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 110.67883, -140)
 
-[node name="CollisionShape3D2" type="CollisionShape3D" parent="RampBoostPad_1" unique_id=1903836133]
-shape = SubResource("BoxShape3D_1")
-
 [node name="RampBoostPad_2" parent="." unique_id=808826910 instance=ExtResource("29_ct8iu")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 70.05, -200)
 
-[node name="CollisionShape3D2" type="CollisionShape3D" parent="RampBoostPad_2" unique_id=2019828947]
-shape = SubResource("BoxShape3D_1")
-
 [node name="RampBoostPad_3" parent="." unique_id=1461258363 instance=ExtResource("29_ct8iu")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 25.05, -260)
-
-[node name="CollisionShape3D2" type="CollisionShape3D" parent="RampBoostPad_3" unique_id=1063627540]
-shape = SubResource("BoxShape3D_1")
 

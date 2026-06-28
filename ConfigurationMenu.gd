@@ -6,6 +6,7 @@ signal back_pressed
 @onready var option_window_mode = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/WindowModeBox/OptionWindowMode
 @onready var option_resolution = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/ResolutionBox/OptionResolution
 @onready var check_vsync = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/VSyncBox/CheckVSync
+@onready var option_anti_aliasing = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/AntiAliasingBox/OptionAntiAliasing
 
 @onready var btn_throttle = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings/RemapThrottle/BtnThrottle
 @onready var btn_brake = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings/RemapBrake/BtnBrake
@@ -34,17 +35,27 @@ func _ready():
 	option_resolution.add_item("2560 x 1440 (2K)")
 	option_resolution.add_item("3840 x 2160 (4K)")
 	
+	# Configure option anti-aliasing items
+	option_anti_aliasing.clear()
+	option_anti_aliasing.add_item("Disabled")
+	option_anti_aliasing.add_item("2x MSAA")
+	option_anti_aliasing.add_item("4x MSAA")
+	option_anti_aliasing.add_item("8x MSAA")
+	option_anti_aliasing.add_item("FXAA")
+	
 	# Load current display values from MusicManager
 	check_fps.button_pressed = MusicManager.show_fps
 	option_window_mode.selected = MusicManager.window_mode
 	option_resolution.selected = MusicManager.resolution_index
 	check_vsync.button_pressed = MusicManager.vsync
+	option_anti_aliasing.selected = MusicManager.anti_aliasing
 	
 	# Connect signals
 	check_fps.toggled.connect(_on_fps_toggled)
 	option_window_mode.item_selected.connect(_on_window_mode_selected)
 	option_resolution.item_selected.connect(_on_resolution_selected)
 	check_vsync.toggled.connect(_on_vsync_toggled)
+	option_anti_aliasing.item_selected.connect(_on_anti_aliasing_selected)
 	btn_back.pressed.connect(_on_back_pressed)
 	
 	# Connect remapping buttons
@@ -94,6 +105,9 @@ func _on_resolution_selected(index: int):
 
 func _on_vsync_toggled(toggled_val: bool):
 	MusicManager.set_vsync(toggled_val)
+
+func _on_anti_aliasing_selected(index: int):
+	MusicManager.set_anti_aliasing(index)
 
 func _on_back_pressed():
 	is_waiting_for_key = false

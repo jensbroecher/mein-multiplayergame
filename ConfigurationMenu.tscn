@@ -158,6 +158,18 @@ text = "VSync"
 [node name="CheckVSync" type="CheckButton" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/VSyncBox"]
 layout_mode = 2
 
+[node name="AntiAliasingBox" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/AntiAliasingBox"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+text = "Anti-Aliasing"
+
+[node name="OptionAntiAliasing" type="OptionButton" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/AntiAliasingBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
 [node name="HSeparator" type="HSeparator" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn"]
 layout_mode = 2
 
