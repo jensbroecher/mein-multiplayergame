@@ -11,6 +11,7 @@ var show_fps: bool = false
 var window_mode: int = 0 # 0: Windowed, 1: Fullscreen
 var resolution_index: int = 1 # Default 1920x1080
 var vsync: bool = false
+var anti_aliasing: int = 0 # 0: Disabled, 1: 2x MSAA, 2: 4x MSAA, 3: 8x MSAA, 4: FXAA
 
 const RESOLUTIONS = [
 	Vector2i(1280, 720),
@@ -121,6 +122,7 @@ func load_settings():
 		window_mode = config.get_value("display", "window_mode", 0)
 		resolution_index = config.get_value("display", "resolution_index", 1)
 		vsync = config.get_value("display", "vsync", false)
+		anti_aliasing = config.get_value("display", "anti_aliasing", 0)
 		
 	# Apply loaded settings
 	set_music_volume(music_volume, false)
@@ -133,6 +135,7 @@ func _apply_window_settings():
 	set_resolution(resolution_index, false)
 	set_window_mode(window_mode, false)
 	set_vsync(vsync, false)
+	set_anti_aliasing(anti_aliasing, false)
 
 func save_settings():
 	var config = ConfigFile.new()
@@ -143,6 +146,7 @@ func save_settings():
 	config.set_value("display", "window_mode", window_mode)
 	config.set_value("display", "resolution_index", resolution_index)
 	config.set_value("display", "vsync", vsync)
+	config.set_value("display", "anti_aliasing", anti_aliasing)
 	config.save(SETTINGS_FILE)
 
 func _load_playlist():
@@ -260,6 +264,28 @@ func set_vsync(enabled: bool, save: bool = true):
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED)
 	else:
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+	if save: save_settings()
+
+func set_anti_aliasing(index: int, save: bool = true):
+	anti_aliasing = index
+	var vp = get_viewport()
+	if vp:
+		match index:
+			0: # Disabled
+				vp.msaa_3d = Viewport.MSAA_DISABLED
+				vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED
+			1: # 2x MSAA
+				vp.msaa_3d = Viewport.MSAA_2X
+				vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED
+			2: # 4x MSAA
+				vp.msaa_3d = Viewport.MSAA_4X
+				vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED
+			3: # 8x MSAA
+				vp.msaa_3d = Viewport.MSAA_8X
+				vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED
+			4: # FXAA
+				vp.msaa_3d = Viewport.MSAA_DISABLED
+				vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA
 	if save: save_settings()
 
 func load_input_settings():

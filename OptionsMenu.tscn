@@ -150,6 +150,18 @@ text = "VSync"
 [node name="CheckVSync" type="CheckButton" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/VSyncBox"]
 layout_mode = 2
 
+[node name="AntiAliasingBox" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/AntiAliasingBox"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+text = "Anti-Aliasing"
+
+[node name="OptionAntiAliasing" type="OptionButton" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/AntiAliasingBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
 [node name="FPSBox" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList"]
 layout_mode = 2
 
