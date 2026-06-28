@@ -236,8 +236,9 @@ func set_resolution(index: int, save: bool = true):
 	var size = RESOLUTIONS[index]
 	
 	var win = get_window()
-	win.size = size
+	win.content_scale_size = size
 	if win.mode != Window.MODE_FULLSCREEN:
+		win.size = size
 		var screen_id = win.current_screen
 		var screen_size = DisplayServer.screen_get_size(screen_id)
 		win.position = (screen_size - size) / 2
@@ -247,15 +248,16 @@ func set_resolution(index: int, save: bool = true):
 func set_window_mode(mode: int, save: bool = true):
 	window_mode = mode
 	var win = get_window()
+	var size = RESOLUTIONS[resolution_index]
 	if mode == 1:
 		win.mode = Window.MODE_FULLSCREEN
 	else:
 		win.mode = Window.MODE_WINDOWED
-		var size = RESOLUTIONS[resolution_index]
 		win.size = size
 		var screen_id = win.current_screen
 		var screen_size = DisplayServer.screen_get_size(screen_id)
 		win.position = (screen_size - size) / 2
+	win.content_scale_size = size
 	if save: save_settings()
 
 func set_vsync(enabled: bool, save: bool = true):

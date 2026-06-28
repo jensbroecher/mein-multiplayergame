@@ -441,6 +441,7 @@ func _ready():
 
 func _enter_tree():
 	_update_authority()
+	call_deferred("_update_all_carts_lod")
 
 func _update_authority():
 	var id = name.to_int()
@@ -881,39 +882,41 @@ func _physics_process(delta):
 	
 	if input_dir.y < -0.1: # Forward input
 		if not is_boosting:
-			var accel_force = acceleration * slow_mult
+			var input_scale = abs(input_dir.y)
+			var accel_force = acceleration * slow_mult * input_scale
 			if is_offroad and on_ground and ground_normal.y < 0.85 and fwd.dot(Vector3.UP) > 0.05:
 				accel_force = 0.0
-			if current_speed < max_speed * offroad_penalty * slow_mult:
+			if current_speed < max_speed * offroad_penalty * slow_mult * input_scale:
 				apply_central_force(fwd * accel_force * mass)
 			boost_time += delta
 	elif input_dir.y > 0.1: # Brake / Reverse input
 		boost_time = 0.0
+		var input_scale = abs(input_dir.y)
 		if not on_ground:
 			# Ignore braking and reversing while airborne
 			pass
 		elif is_boosting:
 			# If boosting, braking just reduces the boost effectiveness a bit
-			apply_central_force(-fwd * braking * 0.5 * mass)
+			apply_central_force(-fwd * braking * 0.5 * mass * input_scale)
 		elif drift_mode:
 			# If drifting, preserve forward momentum by not applying heavy brakes
 			var speed_ratio = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
 			if speed_ratio < 0.85:
-				apply_central_force(fwd * acceleration * 0.8 * mass)
+				apply_central_force(fwd * acceleration * 0.8 * mass * input_scale)
 			else:
-				apply_central_force(fwd * acceleration * 0.3 * mass)
+				apply_central_force(fwd * acceleration * 0.3 * mass * input_scale)
 		else:
 			if current_speed > 1.0:
-				apply_central_force(-fwd * braking * mass)
+				apply_central_force(-fwd * braking * mass * input_scale)
 			elif current_speed < -0.5:
-				if current_speed > -reverse_speed * offroad_penalty:
-					var accel_force = acceleration * 0.5
+				if current_speed > -reverse_speed * offroad_penalty * input_scale:
+					var accel_force = acceleration * 0.5 * input_scale
 					if is_offroad and on_ground and ground_normal.y < 0.85 and (-fwd).dot(Vector3.UP) > 0.05:
 						accel_force = 0.0
 					apply_central_force(-fwd * accel_force * mass)
 			else:
-				if current_speed > -reverse_speed * offroad_penalty:
-					var accel_force = acceleration * 0.7
+				if current_speed > -reverse_speed * offroad_penalty * input_scale:
+					var accel_force = acceleration * 0.7 * input_scale
 					if is_offroad and on_ground and ground_normal.y < 0.85 and (-fwd).dot(Vector3.UP) > 0.05:
 						accel_force = 0.0
 					apply_central_force(-fwd * accel_force * mass)
@@ -2808,4 +2811,47 @@ func _find_node_by_name(root: Node, node_name: String) -> Node:
 		var found = _find_node_by_name(child, node_name)
 		if found:
 			return found
+	return null
+
+func _exit_tree():
+	var tree = get_tree()
+	if tree:
+		tree.call_group("player_carts", "update_lod_bias_deferred")
+
+func update_lod_bias_deferred():
+	call_deferred("update_lod_bias")
+
+func update_lod_bias():
+	if not is_inside_tree():
+		return
+	var carts = get_tree().get_nodes_in_group("player_carts")
+	var active_carts = []
+	for cart in carts:
+		if is_instance_valid(cart) and cart.is_inside_tree():
+			active_carts.append(cart)
+	
+	var cart_count = active_carts.size()
+	
+	# Determine lod bias based on how many carts exist in the scene.
+	# With 500k polygons per car, multiple cars on screen will tank performance.
+	# We dynamically scale lod_bias down to force Godot's auto-generated LODs to kick in much earlier/closer.
+	var bias = 1.0
+	if cart_count >= 6:
+		bias = 0.15
+	elif cart_count >= 4:
+		bias = 0.3
+	elif cart_count >= 2:
+		bias = 0.6
+		
+	_set_lod_bias_recursive(visuals, bias)
+
+func _set_lod_bias_recursive(node: Node, bias: float):
+	if node is GeometryInstance3D:
+		node.lod_bias = bias
+	for child in node.get_children():
+		_set_lod_bias_recursive(child, bias)
+
+func _update_all_carts_lod():
+	if is_inside_tree():
+		get_tree().call_group("player_carts", "update_lod_bias")
 	return null
