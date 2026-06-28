@@ -150,13 +150,13 @@ func _create_stage_select_menu():
 	stage_select_container.add_child(label)
 	
 	var btn_desert = _add_menu_button(stage_select_container, "DESERT COURSE")
-	btn_desert.pressed.connect(func(): _on_stage_selected("res://Level.tscn"))
+	btn_desert.pressed.connect(func(): _on_stage_selected("res://levels/Level.tscn"))
 	
 	var btn_mountain = _add_menu_button(stage_select_container, "MOUNTAIN COURSE")
-	btn_mountain.pressed.connect(func(): _on_stage_selected("res://MountainLevel.tscn"))
+	btn_mountain.pressed.connect(func(): _on_stage_selected("res://levels/MountainLevel.tscn"))
 	
 	var btn_canyon = _add_menu_button(stage_select_container, "CANYON COURSE")
-	btn_canyon.pressed.connect(func(): _on_stage_selected("res://CanyonLevel.tscn"))
+	btn_canyon.pressed.connect(func(): _on_stage_selected("res://levels/CanyonLevel.tscn"))
 	
 	var btn_back = _add_menu_button(stage_select_container, "BACK")
 	btn_back.pressed.connect(func(): show_sub_menu("sp_modes"))

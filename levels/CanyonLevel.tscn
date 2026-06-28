@@ -1,0 +1,984 @@
+[gd_scene format=3 uid="uid://d2nhtkbvng0ga"]
+
+[ext_resource type="Script" uid="uid://d2hujjwkl3s4a" path="res://levels/Level.gd" id="1_lev99"]
+[ext_resource type="PackedScene" uid="uid://gate123" path="res://CheckpointGate.tscn" id="2_gate"]
+[ext_resource type="Texture2D" uid="uid://bsmrfxbh6vqe2" path="res://materials/asphalt.png" id="3_asph"]
+[ext_resource type="Script" uid="uid://cpx88edmwbon1" path="res://addons/GodotWeatherSystem/scripts/SeasonResource.gd" id="3_jpwbr"]
+[ext_resource type="Script" uid="uid://ct8ssg1fuina4" path="res://addons/GodotWeatherSystem/scripts/SkyColourResource.gd" id="4_kr1e0"]
+[ext_resource type="Texture2D" uid="uid://be2aqrbrbrroi" path="res://materials/dark_rock.png" id="5_grass"]
+[ext_resource type="Script" uid="uid://c0bu4su5psbae" path="res://addons/GodotWeatherSystem/scripts/WeatherOccurrenceResource.gd" id="5_yr3df"]
+[ext_resource type="Resource" uid="uid://bbtqdfvkjixub" path="res://addons/GodotWeatherSystem/weather/clouded.tres" id="6_jpwbr"]
+[ext_resource type="Script" uid="uid://b2sbc4x8rba5g" path="res://TerrainGenerator.gd" id="7_gen"]
+[ext_resource type="Shader" uid="uid://cvne02d6iyem5" path="res://curb_stripes.gdshader" id="8_esphl"]
+[ext_resource type="ArrayMesh" uid="uid://c4p347g6hbjme" path="res://generated/canyon_terrain_visual.res" id="10_lbtjd"]
+[ext_resource type="Shape3D" uid="uid://dfll4l7bic4u7" path="res://generated/canyon_terrain_collision_shape.res" id="11_sm0fw"]
+[ext_resource type="ArrayMesh" uid="uid://n1lnm368xwh4" path="res://generated/canyon_Visual_Curbs.res" id="13_rtnao"]
+[ext_resource type="ArrayMesh" uid="uid://bfjl7k82syr2l" path="res://generated/canyon_Visual_Curbs_Sides.res" id="14_q8fmg"]
+[ext_resource type="ArrayMesh" uid="uid://bkv8u4qlfuisu" path="res://generated/canyon_Visual_Road.res" id="15_8vqih"]
+[ext_resource type="ArrayMesh" uid="uid://747dui2jx2s8" path="res://generated/canyon_Visual_Road_Sides.res" id="16_3nnro"]
+[ext_resource type="Shape3D" uid="uid://dpux4ljtxedh3" path="res://generated/canyon_track_collision_shape.res" id="17_r6i1u"]
+[ext_resource type="PackedScene" uid="uid://da2i62hjyc1cp" path="res://addons/GodotWeatherSystem/weather_controller.tscn" id="31_weather"]
+[ext_resource type="PackedScene" uid="uid://boostpad123" path="res://BoostPad.tscn" id="93_m7b4a"]
+
+[sub_resource type="Curve" id="Curve_8bl6p"]
+_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.0464286, 0), 0.0, 0.0, 0, 0, Vector2(0.107143, 0.0367036), 0.303207, 0.303207, 0, 0, Vector2(0.425, 1), 0.0, 0.0, 0, 0, Vector2(0.571429, 1), 0.0, 0.0, 0, 0, Vector2(0.896429, 0.0277009), 0.0, 0.0, 0, 0, Vector2(0.960714, 0), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 8
+
+[sub_resource type="Resource" id="Resource_ext2d"]
+script = ExtResource("4_kr1e0")
+
+[sub_resource type="Resource" id="Resource_p7jpd"]
+script = ExtResource("4_kr1e0")
+skyColour = Color(0, 0.00784314, 0.105882, 1)
+horizonColour = Color(0.0784314, 0.00784314, 0.0156863, 1)
+groundColour = Color(0, 0, 0, 1)
+cloudBrightness = 0.05
+
+[sub_resource type="Resource" id="Resource_lbtjd"]
+script = ExtResource("5_yr3df")
+weather = ExtResource("6_jpwbr")
+
+[sub_resource type="Resource" id="Resource_sm0fw"]
+script = ExtResource("3_jpwbr")
+seasonId = "summer"
+weathers = Array[ExtResource("5_yr3df")]([SubResource("Resource_lbtjd")])
+skyColourDaytime = SubResource("Resource_ext2d")
+skyColourNight = SubResource("Resource_p7jpd")
+dayNightCycleCurve = SubResource("Curve_8bl6p")
+
+[sub_resource type="Shader" id="Shader_stochastic"]
+resource_local_to_scene = true
+code = "shader_type spatial;
+
+uniform sampler2D albedo_texture : source_color, filter_linear_mipmap_anisotropic;
+uniform vec4 albedo : source_color = vec4(1.0, 1.0, 1.0, 1.0);
+uniform float uv_scale = 40.0;
+uniform vec2 uv_scale_v2 = vec2(1.0, 1.0);
+uniform float smoothness : hint_range(0.0, 1.0) = 0.5;
+uniform bool use_world_uv = false;
+
+varying vec3 world_pos;
+
+void vertex() {
+    world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+}
+
+// Hash function for random offsets/rotations
+vec2 hash(vec2 p) {
+    p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+    return fract(sin(p) * 43758.5453);
+}
+
+// Samples a texture stochastically to break tiling
+vec3 stochastic_sample(sampler2D tex, vec2 uv, vec2 dx, vec2 dy) {
+    vec2 p = floor(uv);
+    vec2 f = fract(uv);
+    vec3 res = vec3(0.0);
+    float weight_sum = 0.0;
+    for (int y = 0; y <= 1; y++) {
+        for (int x = 0; x <= 1; x++) {
+            vec2 offset = vec2(float(x), float(y));
+            vec2 cell = p + offset;
+            vec2 rand = hash(cell);
+            float angle = rand.x * 6.2831;
+            mat2 rot = mat2(vec2(cos(angle), -sin(angle)), vec2(sin(angle), cos(angle)));
+            vec2 sampled_uv = rot * (f - vec2(0.5)) + vec2(0.5) + rand.y;
+            float w = pow(1.0 - smoothstep(0.0, 1.414, length(f - offset)), 2.0);
+            
+            // Rotate derivatives to match cell rotation
+            vec2 sampled_dx = rot * dx;
+            vec2 sampled_dy = rot * dy;
+            
+            res += textureGrad(tex, sampled_uv, sampled_dx, sampled_dy).rgb * w;
+            weight_sum += w;
+        }
+    }
+    return res / weight_sum;
+}
+
+void fragment() {
+    vec2 base_uv = use_world_uv ? world_pos.xz : UV;
+    vec2 uv = base_uv * (uv_scale * 0.1) * uv_scale_v2;
+    vec2 dx = dFdx(uv);
+    vec2 dy = dFdy(uv);
+    vec3 color = stochastic_sample(albedo_texture, uv, dx, dy);
+    ALBEDO = color * albedo.rgb;
+    ROUGHNESS = smoothness;
+    SPECULAR = 0.0;
+}
+"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_grass"]
+render_priority = 0
+shader = SubResource("Shader_stochastic")
+shader_parameter/albedo_texture = ExtResource("5_grass")
+shader_parameter/albedo = Color(0.75, 0.75, 0.75, 1)
+shader_parameter/uv_scale = 6.0
+shader_parameter/uv_scale_v2 = Vector2(1, 1)
+shader_parameter/smoothness = 1.0
+shader_parameter/use_world_uv = false
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_asphalt"]
+render_priority = 0
+shader = SubResource("Shader_stochastic")
+shader_parameter/albedo_texture = ExtResource("3_asph")
+shader_parameter/albedo = Color(0.6, 0.6, 0.6, 1)
+shader_parameter/uv_scale = 10.0
+shader_parameter/uv_scale_v2 = Vector2(0.125, 0.125)
+shader_parameter/smoothness = 1.0
+shader_parameter/use_world_uv = true
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_rtnao"]
+render_priority = 2
+shader = ExtResource("8_esphl")
+shader_parameter/color_a = Color(1, 1, 1, 1)
+shader_parameter/color_b = Color(0.8, 0.1, 0.1, 1)
+shader_parameter/stripe_length = 1.5
+shader_parameter/roughness = 0.8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_q8fmg"]
+albedo_color = Color(0.45, 0.45, 0.45, 1)
+roughness = 0.95
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_8vqih"]
+render_priority = 0
+shader = SubResource("Shader_stochastic")
+shader_parameter/albedo_texture = ExtResource("3_asph")
+shader_parameter/albedo = Color(0.6, 0.6, 0.6, 1)
+shader_parameter/uv_scale = 10.0
+shader_parameter/uv_scale_v2 = Vector2(0.125, 0.125)
+shader_parameter/smoothness = 1.0
+shader_parameter/use_world_uv = true
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_3nnro"]
+render_priority = 0
+shader = SubResource("Shader_stochastic")
+shader_parameter/albedo_texture = ExtResource("3_asph")
+shader_parameter/albedo = Color(0.6, 0.6, 0.6, 1)
+shader_parameter/uv_scale = 10.0
+shader_parameter/uv_scale_v2 = Vector2(0.125, 0.125)
+shader_parameter/smoothness = 1.0
+shader_parameter/use_world_uv = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_r6i1u"]
+albedo_color = Color(0.3, 0.3, 0.3, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_buy3e"]
+size = Vector3(4, 35.781975, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_3kfu1"]
+size = Vector3(4, 35.781975, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_h4kqg"]
+size = Vector3(4, 41.02471, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_rdltu"]
+size = Vector3(4, 41.02471, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_crbxu"]
+size = Vector3(4, 46.464664, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_hd532"]
+size = Vector3(4, 46.464664, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_pvhvp"]
+size = Vector3(4, 51.193325, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_us6o4"]
+size = Vector3(4, 51.193325, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_5urai"]
+size = Vector3(4, 54.376896, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_d0hjq"]
+size = Vector3(4, 54.376896, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_2yfso"]
+size = Vector3(4, 54.713554, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_5iern"]
+size = Vector3(4, 54.713554, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_mlcfj"]
+size = Vector3(4, 51.848213, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ksbrd"]
+size = Vector3(4, 51.848213, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_hg2mw"]
+size = Vector3(4, 47.23851, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_4fptb"]
+size = Vector3(4, 47.23851, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_mc5bf"]
+size = Vector3(4, 42.113167, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ksn4u"]
+size = Vector3(4, 42.113167, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_kohkg"]
+size = Vector3(4, 38.406994, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_g8pf8"]
+size = Vector3(4, 38.406994, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_xibic"]
+size = Vector3(4, 38.670437, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_m26ia"]
+size = Vector3(4, 38.670437, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_jeou0"]
+size = Vector3(4, 42.13996, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_od4d1"]
+size = Vector3(4, 42.13996, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_v6qm6"]
+size = Vector3(4, 46.50074, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_pedga"]
+size = Vector3(4, 46.50074, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_rernh"]
+size = Vector3(4, 50.99086, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0mraf"]
+size = Vector3(4, 50.99086, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_6alav"]
+size = Vector3(4, 55.248352, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_jlcsw"]
+size = Vector3(4, 55.248352, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_i88xa"]
+size = Vector3(4, 58.722565, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_uyqu4"]
+size = Vector3(4, 58.722565, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_xx3xf"]
+size = Vector3(4, 59.972855, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_874kx"]
+size = Vector3(4, 59.972855, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_1euk3"]
+size = Vector3(4, 57.56626, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_o4hyd"]
+size = Vector3(4, 57.56626, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_o1bv7"]
+size = Vector3(4, 53.101387, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_3sj2i"]
+size = Vector3(4, 53.101387, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_ammvm"]
+size = Vector3(4, 48.01899, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_eee61"]
+size = Vector3(4, 48.01899, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_iisqb"]
+size = Vector3(4, 42.65217, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_qj245"]
+size = Vector3(4, 42.65217, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_hwg1s"]
+size = Vector3(4, 37.4173, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_qb8kx"]
+size = Vector3(4, 37.4173, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_fihta"]
+size = Vector3(4, 35.247665, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1uiso"]
+size = Vector3(4, 35.247665, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_331pq"]
+size = Vector3(4, 37.261936, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_qhuae"]
+size = Vector3(4, 37.261936, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_jlic5"]
+size = Vector3(4, 39.765823, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_otrsh"]
+size = Vector3(4, 39.765823, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_l4y8j"]
+size = Vector3(4, 42.539177, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_psosb"]
+size = Vector3(4, 42.539177, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_xohjp"]
+size = Vector3(4, 45.44077, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ap7wf"]
+size = Vector3(4, 45.44077, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_3xm1o"]
+size = Vector3(4, 49.279068, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_h83o6"]
+size = Vector3(4, 49.279068, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_olntd"]
+size = Vector3(4, 53.985397, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_rycm3"]
+size = Vector3(4, 53.985397, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_1fh7y"]
+size = Vector3(4, 58.735897, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_stt36"]
+size = Vector3(4, 58.735897, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_23d3l"]
+size = Vector3(4, 62.65046, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_l2vnx"]
+size = Vector3(4, 62.65046, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_unqod"]
+size = Vector3(4, 64.81923, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_6oa4t"]
+size = Vector3(4, 64.81923, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_1fnhb"]
+size = Vector3(4, 64.53127, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_urhoq"]
+size = Vector3(4, 64.53127, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_0korq"]
+size = Vector3(4, 62.552666, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_sdgnf"]
+size = Vector3(4, 62.552666, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_x4ieo"]
+size = Vector3(4, 59.807816, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_oe668"]
+size = Vector3(4, 59.807816, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_lw74i"]
+size = Vector3(4, 56.63308, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_byx2f"]
+size = Vector3(4, 56.63308, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_dt6ln"]
+size = Vector3(4, 53.202152, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_pjtga"]
+size = Vector3(4, 53.202152, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_kyx3x"]
+size = Vector3(4, 49.641037, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1yrui"]
+size = Vector3(4, 49.641037, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_3ei0q"]
+size = Vector3(4, 46.087173, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wx5wx"]
+size = Vector3(4, 46.087173, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_3fec0"]
+size = Vector3(4, 42.777985, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_jxjle"]
+size = Vector3(4, 42.777985, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_cpwtw"]
+size = Vector3(4, 40.023422, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ev72q"]
+size = Vector3(4, 40.023422, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_bc5xs"]
+size = Vector3(4, 37.736088, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_7fhb1"]
+size = Vector3(4, 37.736088, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_dmxfc"]
+size = Vector3(4, 35.95676, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_7x4uo"]
+size = Vector3(4, 35.95676, 4)
+
+[sub_resource type="Curve3D" id="Curve3D_track"]
+bake_interval = 0.25
+_data = {
+"points": PackedVector3Array(-54.520073, -4.822929, 8.387703, 54.520073, 4.822929, -8.387703, 0, 2, -250, -38.45899, -1.048882, -33.21458, 38.45899, 1.048882, 33.21458, 140, 25, -180, 12.324885, -1.027074, -49.29954, -12.324885, 1.027074, 49.29954, 220, 8, -60, 12.840935, 0.642047, -55.644054, -12.840935, -0.642047, 55.644054, 80, 30, 60, 20.285786, 3.803585, -53.250183, -20.285786, -3.803585, 53.250183, 160, 5, 200, 56.681725, -5.485328, -1.828443, -56.681725, 5.485328, 1.828443, 0, 15, 270, 37.851402, 0.473143, 42.58283, -37.851402, -0.473143, -42.58283, -150, 35, 210, -5.495421, 6.044964, 64.11325, 5.495421, -6.044964, -64.11325, -240, 12, 0, -39.44119, 1.643383, 41.08457, 39.44119, -1.643383, -41.08457, -120, 2, -140),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0)
+}
+point_count = 9
+
+[sub_resource type="Curve3D" id="Curve3D_shortcut1"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -294.82968, 4, 201.85834, 0, 0, 0, 0, 0, 0, -196.9154, 4, 249.57867, 0, 0, 0, 0, 0, 0, -120, 3, 295),
+"tilts": PackedFloat32Array(0, 0, 0)
+}
+point_count = 3
+
+[node name="Level" type="Node3D" unique_id=815155767 node_paths=PackedStringArray("checkpoints")]
+script = ExtResource("1_lev99")
+checkpoints = [NodePath("Checkpoints/Halfway4"), NodePath("FinishLine")]
+
+[node name="WeatherController" parent="." unique_id=1277823175 instance=ExtResource("31_weather")]
+time_of_day_hours = 13.239
+selected_weather = 1
+seasons = Array[ExtResource("3_jpwbr")]([SubResource("Resource_sm0fw")])
+startTime = 47660.4
+
+[node name="TerrainGenerator" type="Node3D" parent="." unique_id=586341718 node_paths=PackedStringArray("track_path")]
+script = ExtResource("7_gen")
+track_layout_type = 2
+level_prefix = "canyon"
+no_water = true
+no_grass = true
+track_path = NodePath("../TrackPath")
+terrain_resolution = 500
+noise_frequency = 0.006
+hill_height = 40.0
+road_width = 15.0
+road_y_offset = 0.4
+curb_y_offset = 0.3
+terrain_grass_count = 1000000
+grass_visibility_range = 300.0
+grass_material = SubResource("ShaderMaterial_grass")
+road_material = SubResource("ShaderMaterial_asphalt")
+
+[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=906014890]
+material_override = SubResource("ShaderMaterial_grass")
+lod_bias = 10.0
+mesh = ExtResource("10_lbtjd")
+
+[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1310221657]
+
+[node name="@CollisionShape3D@38092" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=1557361769]
+shape = ExtResource("11_sm0fw")
+
+[node name="Visual_Curbs" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1507017268]
+material_override = SubResource("ShaderMaterial_rtnao")
+mesh = ExtResource("13_rtnao")
+
+[node name="Visual_Curbs_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1610866946]
+material_override = SubResource("StandardMaterial3D_q8fmg")
+mesh = ExtResource("14_q8fmg")
+
+[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1531426854]
+material_override = SubResource("ShaderMaterial_8vqih")
+mesh = ExtResource("15_8vqih")
+
+[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=964309718]
+material_override = SubResource("ShaderMaterial_3nnro")
+mesh = ExtResource("16_3nnro")
+
+[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=478851731]
+
+[node name="@CollisionShape3D@38093" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=1075154189]
+shape = ExtResource("17_r6i1u")
+
+[node name="BridgeSupport_30" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1441142041]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.614244, -12.109013, -249.54703)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_buy3e")
+
+[node name="@StaticBody3D@38094" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_30" unique_id=47676853]
+
+[node name="@CollisionShape3D@38095" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_30/@StaticBody3D@38094" unique_id=1263095001]
+shape = SubResource("BoxShape3D_3kfu1")
+
+[node name="BridgeSupport_60" type="MeshInstance3D" parent="TerrainGenerator" unique_id=473874227]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 57.652008, -9.487642, -240.50885)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_h4kqg")
+
+[node name="@StaticBody3D@38096" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_60" unique_id=1336256890]
+
+[node name="@CollisionShape3D@38097" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_60/@StaticBody3D@38096" unique_id=24136619]
+shape = SubResource("BoxShape3D_rdltu")
+
+[node name="BridgeSupport_90" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1899373546]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 83.26883, -6.767668, -225.93791)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_crbxu")
+
+[node name="@StaticBody3D@38098" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_90" unique_id=775115748]
+
+[node name="@CollisionShape3D@38099" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_90/@StaticBody3D@38098" unique_id=999788063]
+shape = SubResource("BoxShape3D_hd532")
+
+[node name="BridgeSupport_120" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1217606246]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 107.001, -4.4033375, -208.22598)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_pvhvp")
+
+[node name="@StaticBody3D@38100" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_120" unique_id=340843219]
+
+[node name="@CollisionShape3D@38101" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_120/@StaticBody3D@38100" unique_id=2065710222]
+shape = SubResource("BoxShape3D_us6o4")
+
+[node name="BridgeSupport_150" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1949998807]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 129.73647, -2.811552, -188.92531)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_5urai")
+
+[node name="@StaticBody3D@38102" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_150" unique_id=1627489107]
+
+[node name="@CollisionShape3D@38103" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_150/@StaticBody3D@38102" unique_id=1709101546]
+shape = SubResource("BoxShape3D_d0hjq")
+
+[node name="BridgeSupport_180" type="MeshInstance3D" parent="TerrainGenerator" unique_id=632129537]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 152.49646, -2.643221, -169.41527)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_2yfso")
+
+[node name="@StaticBody3D@38104" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_180" unique_id=995405609]
+
+[node name="@CollisionShape3D@38105" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_180/@StaticBody3D@38104" unique_id=798366102]
+shape = SubResource("BoxShape3D_5iern")
+
+[node name="BridgeSupport_210" type="MeshInstance3D" parent="TerrainGenerator" unique_id=705929582]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 175.1765, -4.0758953, -150.00284)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_mlcfj")
+
+[node name="@StaticBody3D@38106" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_210" unique_id=1185967787]
+
+[node name="@CollisionShape3D@38107" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_210/@StaticBody3D@38106" unique_id=217189240]
+shape = SubResource("BoxShape3D_ksbrd")
+
+[node name="BridgeSupport_240" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1257024720]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 196.27686, -6.380745, -129.20616)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_hg2mw")
+
+[node name="@StaticBody3D@38108" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_240" unique_id=1161370415]
+
+[node name="@CollisionShape3D@38109" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_240/@StaticBody3D@38108" unique_id=397697741]
+shape = SubResource("BoxShape3D_4fptb")
+
+[node name="BridgeSupport_270" type="MeshInstance3D" parent="TerrainGenerator" unique_id=537740236]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 213.48665, -8.9434185, -105.26098)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_mc5bf")
+
+[node name="@StaticBody3D@38110" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_270" unique_id=1546824544]
+
+[node name="@CollisionShape3D@38111" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_270/@StaticBody3D@38110" unique_id=871928946]
+shape = SubResource("BoxShape3D_ksn4u")
+
+[node name="BridgeSupport_300" type="MeshInstance3D" parent="TerrainGenerator" unique_id=521883724]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 221.7342, -10.796503, -76.92537)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_kohkg")
+
+[node name="@StaticBody3D@38112" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_300" unique_id=2137020534]
+
+[node name="@CollisionShape3D@38113" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_300/@StaticBody3D@38112" unique_id=1107608063]
+shape = SubResource("BoxShape3D_g8pf8")
+
+[node name="BridgeSupport_330" type="MeshInstance3D" parent="TerrainGenerator" unique_id=170723441]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 214.83734, -10.664782, -48.24441)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_xibic")
+
+[node name="@StaticBody3D@38114" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_330" unique_id=2098659799]
+
+[node name="@CollisionShape3D@38115" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_330/@StaticBody3D@38114" unique_id=1605067823]
+shape = SubResource("BoxShape3D_m26ia")
+
+[node name="BridgeSupport_360" type="MeshInstance3D" parent="TerrainGenerator" unique_id=421033249]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 193.6808, -8.930019, -27.52199)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_jeou0")
+
+[node name="@StaticBody3D@38116" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_360" unique_id=790474167]
+
+[node name="@CollisionShape3D@38117" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_360/@StaticBody3D@38116" unique_id=1186778507]
+shape = SubResource("BoxShape3D_od4d1")
+
+[node name="BridgeSupport_390" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1103787810]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 168.35196, -6.749628, -12.080914)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_v6qm6")
+
+[node name="@StaticBody3D@38118" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_390" unique_id=1010535044]
+
+[node name="@CollisionShape3D@38119" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_390/@StaticBody3D@38118" unique_id=1628786185]
+shape = SubResource("BoxShape3D_pedga")
+
+[node name="BridgeSupport_420" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1584249607]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 142.18794, -4.504572, 1.8931487)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_rernh")
+
+[node name="@StaticBody3D@38120" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_420" unique_id=204051736]
+
+[node name="@CollisionShape3D@38121" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_420/@StaticBody3D@38120" unique_id=1566452811]
+shape = SubResource("BoxShape3D_0mraf")
+
+[node name="BridgeSupport_450" type="MeshInstance3D" parent="TerrainGenerator" unique_id=430814993]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 116.5524, -2.375824, 16.86402)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_6alav")
+
+[node name="@StaticBody3D@38122" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_450" unique_id=2143169962]
+
+[node name="@CollisionShape3D@38123" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_450/@StaticBody3D@38122" unique_id=1895686114]
+shape = SubResource("BoxShape3D_jlcsw")
+
+[node name="BridgeSupport_480" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1754022424]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 93.54473, -0.63871956, 35.677567)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_i88xa")
+
+[node name="@StaticBody3D@38124" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_480" unique_id=1692413120]
+
+[node name="@CollisionShape3D@38125" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_480/@StaticBody3D@38124" unique_id=906162923]
+shape = SubResource("BoxShape3D_uyqu4")
+
+[node name="BridgeSupport_510" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1463911142]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 79.63338, -0.0135707855, 61.76384)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_xx3xf")
+
+[node name="@StaticBody3D@38126" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_510" unique_id=217757559]
+
+[node name="@CollisionShape3D@38127" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_510/@StaticBody3D@38126" unique_id=2040731968]
+shape = SubResource("BoxShape3D_874kx")
+
+[node name="BridgeSupport_540" type="MeshInstance3D" parent="TerrainGenerator" unique_id=2143759936]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 85.155556, -1.2168694, 90.49535)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_1euk3")
+
+[node name="@StaticBody3D@38128" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_540" unique_id=1438012849]
+
+[node name="@CollisionShape3D@38129" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_540/@StaticBody3D@38128" unique_id=1565975044]
+shape = SubResource("BoxShape3D_o4hyd")
+
+[node name="BridgeSupport_570" type="MeshInstance3D" parent="TerrainGenerator" unique_id=2056969379]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 103.758675, -3.4493046, 113.47799)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_o1bv7")
+
+[node name="@StaticBody3D@38130" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_570" unique_id=2077037682]
+
+[node name="@CollisionShape3D@38131" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_570/@StaticBody3D@38130" unique_id=1745867855]
+shape = SubResource("BoxShape3D_3sj2i")
+
+[node name="BridgeSupport_600" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1301139677]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 125.605194, -5.990507, 133.39471)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_ammvm")
+
+[node name="@StaticBody3D@38132" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_600" unique_id=2024497342]
+
+[node name="@CollisionShape3D@38133" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_600/@StaticBody3D@38132" unique_id=1071164625]
+shape = SubResource("BoxShape3D_eee61")
+
+[node name="BridgeSupport_630" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1153839862]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 146.78775, -8.673915, 153.92404)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_iisqb")
+
+[node name="@StaticBody3D@38134" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_630" unique_id=1144611049]
+
+[node name="@CollisionShape3D@38135" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_630/@StaticBody3D@38134" unique_id=482490166]
+shape = SubResource("BoxShape3D_qj245")
+
+[node name="BridgeSupport_660" type="MeshInstance3D" parent="TerrainGenerator" unique_id=779843745]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 161.48471, -11.291349, 179.2092)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_hwg1s")
+
+[node name="@StaticBody3D@38136" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_660" unique_id=2104769448]
+
+[node name="@CollisionShape3D@38137" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_660/@StaticBody3D@38136" unique_id=1296569103]
+shape = SubResource("BoxShape3D_qb8kx")
+
+[node name="BridgeSupport_750" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1459953444]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 112.03932, -12.376169, 246.73662)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_fihta")
+
+[node name="@StaticBody3D@38138" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_750" unique_id=2117228279]
+
+[node name="@CollisionShape3D@38139" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_750/@StaticBody3D@38138" unique_id=1462776082]
+shape = SubResource("BoxShape3D_1uiso")
+
+[node name="BridgeSupport_780" type="MeshInstance3D" parent="TerrainGenerator" unique_id=416144583]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 84.093636, -11.369033, 257.3726)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_331pq")
+
+[node name="@StaticBody3D@38140" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_780" unique_id=266281561]
+
+[node name="@CollisionShape3D@38141" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_780/@StaticBody3D@38140" unique_id=2098425409]
+shape = SubResource("BoxShape3D_qhuae")
+
+[node name="BridgeSupport_810" type="MeshInstance3D" parent="TerrainGenerator" unique_id=892617249]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 55.019638, -10.117087, 264.2675)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_jlic5")
+
+[node name="@StaticBody3D@38142" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_810" unique_id=665238960]
+
+[node name="@CollisionShape3D@38143" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_810/@StaticBody3D@38142" unique_id=1768522051]
+shape = SubResource("BoxShape3D_otrsh")
+
+[node name="BridgeSupport_840" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1231432450]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.438704, -8.730413, 268.36133)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_l4y8j")
+
+[node name="@StaticBody3D@38144" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_840" unique_id=787916933]
+
+[node name="@CollisionShape3D@38145" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_840/@StaticBody3D@38144" unique_id=2130894679]
+shape = SubResource("BoxShape3D_psosb")
+
+[node name="BridgeSupport_870" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1165395077]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.3621626, -7.2796154, 270.0991)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_xohjp")
+
+[node name="@StaticBody3D@38146" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_870" unique_id=3890109]
+
+[node name="@CollisionShape3D@38147" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_870/@StaticBody3D@38146" unique_id=493455779]
+shape = SubResource("BoxShape3D_ap7wf")
+
+[node name="BridgeSupport_900" type="MeshInstance3D" parent="TerrainGenerator" unique_id=479381612]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -34.04848, -5.360468, 268.51166)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_3xm1o")
+
+[node name="@StaticBody3D@38148" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_900" unique_id=90908250]
+
+[node name="@CollisionShape3D@38149" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_900/@StaticBody3D@38148" unique_id=2065680801]
+shape = SubResource("BoxShape3D_h83o6")
+
+[node name="BridgeSupport_930" type="MeshInstance3D" parent="TerrainGenerator" unique_id=568332009]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -63.105526, -3.0073032, 262.85416)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_olntd")
+
+[node name="@StaticBody3D@38150" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_930" unique_id=763579512]
+
+[node name="@CollisionShape3D@38151" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_930/@StaticBody3D@38150" unique_id=898784482]
+shape = SubResource("BoxShape3D_rycm3")
+
+[node name="BridgeSupport_960" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1070693920]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -90.98815, -0.63205147, 252.9436)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_1fh7y")
+
+[node name="@StaticBody3D@38152" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_960" unique_id=1446250386]
+
+[node name="@CollisionShape3D@38153" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_960/@StaticBody3D@38152" unique_id=614990765]
+shape = SubResource("BoxShape3D_stt36")
+
+[node name="BridgeSupport_990" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1396903457]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -117.02129, 1.3252296, 238.63506)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_23d3l")
+
+[node name="@StaticBody3D@38154" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_990" unique_id=1382928361]
+
+[node name="@CollisionShape3D@38155" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_990/@StaticBody3D@38154" unique_id=1632239654]
+shape = SubResource("BoxShape3D_l2vnx")
+
+[node name="BridgeSupport_1020" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1335329395]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -140.36292, 2.4096184, 219.98613)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_unqod")
+
+[node name="@StaticBody3D@38156" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1020" unique_id=430104218]
+
+[node name="@CollisionShape3D@38157" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1020/@StaticBody3D@38156" unique_id=361844208]
+shape = SubResource("BoxShape3D_6oa4t")
+
+[node name="BridgeSupport_1050" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1314671169]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -160.26257, 2.2656364, 197.58765)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_1fnhb")
+
+[node name="@StaticBody3D@38158" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1050" unique_id=1746998354]
+
+[node name="@CollisionShape3D@38159" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1050/@StaticBody3D@38158" unique_id=1818112028]
+shape = SubResource("BoxShape3D_urhoq")
+
+[node name="BridgeSupport_1080" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1184659868]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -177.5967, 1.2763329, 173.19449)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_0korq")
+
+[node name="@StaticBody3D@38160" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1080" unique_id=1848739098]
+
+[node name="@CollisionShape3D@38161" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1080/@StaticBody3D@38160" unique_id=1387311172]
+shape = SubResource("BoxShape3D_sdgnf")
+
+[node name="BridgeSupport_1110" type="MeshInstance3D" parent="TerrainGenerator" unique_id=41643746]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -193.19576, -0.09609413, 147.72308)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_x4ieo")
+
+[node name="@StaticBody3D@38162" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1110" unique_id=287717105]
+
+[node name="@CollisionShape3D@38163" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1110/@StaticBody3D@38162" unique_id=2089617207]
+shape = SubResource("BoxShape3D_oe668")
+
+[node name="BridgeSupport_1140" type="MeshInstance3D" parent="TerrainGenerator" unique_id=724730693]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -207.22923, -1.6834602, 121.403854)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_lw74i")
+
+[node name="@StaticBody3D@38164" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1140" unique_id=652556011]
+
+[node name="@CollisionShape3D@38165" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1140/@StaticBody3D@38164" unique_id=1905145439]
+shape = SubResource("BoxShape3D_byx2f")
+
+[node name="BridgeSupport_1170" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1865541220]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -219.58505, -3.3989239, 94.28905)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_dt6ln")
+
+[node name="@StaticBody3D@38166" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1170" unique_id=187569792]
+
+[node name="@CollisionShape3D@38167" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1170/@StaticBody3D@38166" unique_id=1369065339]
+shape = SubResource("BoxShape3D_pjtga")
+
+[node name="BridgeSupport_1200" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1495955542]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -229.89375, -5.1794834, 66.35089)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_kyx3x")
+
+[node name="@StaticBody3D@38168" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1200" unique_id=252803695]
+
+[node name="@CollisionShape3D@38169" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1200/@StaticBody3D@38168" unique_id=284595071]
+shape = SubResource("BoxShape3D_1yrui")
+
+[node name="BridgeSupport_1230" type="MeshInstance3D" parent="TerrainGenerator" unique_id=914982564]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -237.37454, -6.956415, 37.53459)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_3ei0q")
+
+[node name="@StaticBody3D@38170" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1230" unique_id=410985703]
+
+[node name="@CollisionShape3D@38171" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1230/@StaticBody3D@38170" unique_id=2078276260]
+shape = SubResource("BoxShape3D_wx5wx")
+
+[node name="BridgeSupport_1260" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1290085380]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -240.36201, -8.611009, 7.916334)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_3fec0")
+
+[node name="@StaticBody3D@38172" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1260" unique_id=784389229]
+
+[node name="@CollisionShape3D@38173" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1260/@StaticBody3D@38172" unique_id=36620773]
+shape = SubResource("BoxShape3D_jxjle")
+
+[node name="BridgeSupport_1290" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1801395848]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -235.37015, -9.988287, -21.3925)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_cpwtw")
+
+[node name="@StaticBody3D@38174" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1290" unique_id=892044541]
+
+[node name="@CollisionShape3D@38175" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1290/@StaticBody3D@38174" unique_id=885739686]
+shape = SubResource("BoxShape3D_ev72q")
+
+[node name="BridgeSupport_1320" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1811738476]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -221.35701, -11.131954, -47.705597)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_bc5xs")
+
+[node name="@StaticBody3D@38176" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1320" unique_id=260283428]
+
+[node name="@CollisionShape3D@38177" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1320/@StaticBody3D@38176" unique_id=1632685932]
+shape = SubResource("BoxShape3D_7fhb1")
+
+[node name="BridgeSupport_1350" type="MeshInstance3D" parent="TerrainGenerator" unique_id=64033996]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -201.69951, -12.021621, -70.24844)
+material_override = SubResource("StandardMaterial3D_r6i1u")
+mesh = SubResource("BoxMesh_dmxfc")
+
+[node name="@StaticBody3D@38178" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1350" unique_id=1390784036]
+
+[node name="@CollisionShape3D@38179" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1350/@StaticBody3D@38178" unique_id=729719201]
+shape = SubResource("BoxShape3D_7x4uo")
+
+[node name="TrackPath" type="Path3D" parent="." unique_id=1030670243]
+curve = SubResource("Curve3D_track")
+
+[node name="Players" type="Node3D" parent="." unique_id=1342420519]
+
+[node name="FinishLine" parent="." unique_id=1647223077 instance=ExtResource("2_gate")]
+transform = Transform3D(-0.95754445, 0, -0.28828543, 0, 1, 0, 0.28828543, 0, -0.95754445, 22.291746, 0.44091034, 108.136024)
+
+[node name="PlayerSpawner" type="MultiplayerSpawner" parent="." unique_id=642896597]
+_spawnable_scenes = PackedStringArray("uid://cart123")
+spawn_path = NodePath("../Players")
+spawn_limit = 6
+
+[node name="ProjectileSpawner" type="MultiplayerSpawner" parent="." unique_id=642896598]
+spawn_path = NodePath(".")
+
+[node name="Checkpoints" type="Node3D" parent="." unique_id=342440943]
+
+[node name="Halfway4" parent="Checkpoints" unique_id=409562182 instance=ExtResource("2_gate")]
+transform = Transform3D(0.048228957, 0, 0.9988362, 0, 1, 0, -0.9988362, 0, 0.048228957, -63.533722, 2.7247596, 289.68365)
+
+[node name="Halfway3" parent="Checkpoints" unique_id=1076613409 instance=ExtResource("2_gate")]
+transform = Transform3D(0.7473205, 0, 0.66446364, 0, 1, 0, -0.66446364, 0, 0.7473205, -319.4311, 6.814665, 183.93178)
+
+[node name="Halfway2" parent="Checkpoints" unique_id=760818968 instance=ExtResource("2_gate")]
+transform = Transform3D(0.6686981, 0, 0.74353415, 0, 1, 0, -0.74353415, 0, 0.6686981, -558.3348, 7.4307833, -257.71948)
+
+[node name="Halfway1" parent="Checkpoints" unique_id=970429380 instance=ExtResource("2_gate")]
+transform = Transform3D(-0.37505162, 0, -0.927004, 0, 1, 0, 0.927004, 0, -0.37505162, -175.9742, 12.490519, -518.7479)
+
+[node name="Halfway5" parent="Checkpoints" unique_id=409562185 instance=ExtResource("2_gate")]
+transform = Transform3D(0.048228957, 0, 0.9988362, 0, 1, 0, -0.9988362, 0, 0.048228957, -63.533722, 2.7247596, 289.68365)
+
+[node name="Halfway6" parent="Checkpoints" unique_id=1076613412 instance=ExtResource("2_gate")]
+transform = Transform3D(0.7473205, 0, 0.66446364, 0, 1, 0, -0.66446364, 0, 0.7473205, -319.4311, 6.814665, 183.93178)
+
+[node name="Halfway7" parent="Checkpoints" unique_id=760818971 instance=ExtResource("2_gate")]
+transform = Transform3D(0.6686981, 0, 0.74353415, 0, 1, 0, -0.74353415, 0, 0.6686981, -558.3348, 7.4307833, -257.71948)
+
+[node name="Halfway8" parent="Checkpoints" unique_id=970429383 instance=ExtResource("2_gate")]
+transform = Transform3D(-0.37505162, 0, -0.927004, 0, 1, 0, 0.927004, 0, -0.37505162, -175.9742, 12.490519, -518.7479)
+
+[node name="AlternativePaths" type="Node3D" parent="." unique_id=528788535]
+
+[node name="AlternativePath1" type="Path3D" parent="AlternativePaths" unique_id=447321756]
+curve = SubResource("Curve3D_shortcut1")
+
+[node name="BoostPads" type="Node3D" parent="." unique_id=1164637541]
+
+[node name="BoostPad1" parent="BoostPads" unique_id=1454562377 instance=ExtResource("93_m7b4a")]
+transform = Transform3D(0.852887, -0.029291136, 0.52127314, 0.034323275, 0.99941075, 0, -0.52096605, 0.017891806, 0.85338986, 153.24869, 6.886613, -70.886894)
+
+[node name="BoostPad3" parent="BoostPads" unique_id=1838947964 instance=ExtResource("93_m7b4a")]
+transform = Transform3D(0.852887, -0.029291136, 0.52127314, 0.034323275, 0.99941075, 0, -0.52096605, 0.017891806, 0.85338986, 161.95444, 6.6523466, -76.54727)
+
+[node name="BoostPad2" parent="BoostPads" unique_id=1232121474 instance=ExtResource("93_m7b4a")]
+transform = Transform3D(0.38633192, -0.013267997, 0.92226434, 0.034323275, 0.99941075, 0, -0.921721, 0.031655136, 0.38655972, 255.9263, 10.488753, -163.65369)

@@ -25,16 +25,16 @@ var current_game_mode: int = GameMode.MULTIPLAYER
 var current_gp_name: String = ""
 var current_gp_stage: int = 0
 var gp_standings: Dictionary = {} # racer_name -> points
-var time_trial_stage: String = "res://Level.tscn"
+var time_trial_stage: String = "res://levels/Level.tscn"
 
 const GP_CUPS = {
 	"Starter Cup": {
 		"name": "Starter Cup",
-		"stages": ["res://Level.tscn"]
+		"stages": ["res://levels/Level.tscn"]
 	},
 	"Desert Cup": {
 		"name": "Desert Cup",
-		"stages": ["res://MountainLevel.tscn", "res://CanyonLevel.tscn"]
+		"stages": ["res://levels/MountainLevel.tscn", "res://levels/CanyonLevel.tscn"]
 	}
 }
 

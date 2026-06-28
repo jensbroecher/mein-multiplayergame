@@ -3,7 +3,17 @@ extends Node3D
 
 enum TrackLayoutType { DEFAULT, MOUNTAIN, CANYON }
 
-@export var track_layout_type: TrackLayoutType = TrackLayoutType.DEFAULT
+@export var track_layout_type: TrackLayoutType = TrackLayoutType.DEFAULT:
+	set(val):
+		if track_layout_type != val:
+			track_layout_type = val
+			if Engine.is_editor_hint() and is_inside_tree():
+				if track_layout_type == TrackLayoutType.CANYON:
+					_rebuild_canyon_track()
+				elif track_layout_type == TrackLayoutType.MOUNTAIN:
+					_rebuild_mountain_track()
+				else:
+					_rebuild_longer_track()
 @export var level_prefix: String = ""
 @export var no_water: bool = false
 @export var no_grass: bool = false
@@ -37,7 +47,7 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 		base_terrain_height = radial_offset + h_noise
 	elif track_layout_type == TrackLayoutType.CANYON:
 		# Canyon plateau: high flat ground with gentle noise ripples
-		base_terrain_height = 22.0 + h_noise * 0.4
+		base_terrain_height = 50.0 + h_noise * 0.5
 	else:
 		base_terrain_height = h_noise
 
@@ -53,9 +63,9 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 		# Zone 1: Road surface — flat at road height
 		var road_inner = sand_edge - 2.0
 		# Zone 2: Canyon floor just beyond curb — stays low briefly
-		var floor_edge = sand_edge + 12.0
+		var floor_edge = sand_edge + 4.0
 		# Zone 3: Canyon wall rise — ramps steeply up to plateau
-		var wall_top = sand_edge + 40.0
+		var wall_top = sand_edge + 15.0
 		
 		if dist < road_inner:
 			# On the road itself
@@ -139,12 +149,13 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 
 
 
-@export var generate_now: bool:
+@export var generate_now: bool = false:
 	set(val):
 		if val:
 			generate_now = false
 			if Engine.is_editor_hint():
 				generate_world()
+			notify_property_list_changed()
 
 @export var track_path: Path3D
 @export var terrain_size: Vector2 = Vector2(2000, 2000)
@@ -169,26 +180,29 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 @export var grass_grid_size: int = 10
 @export var grass_visibility_range: float = 200.0
 
-@export var create_longer_track: bool:
+@export var create_longer_track: bool = false:
 	set(val):
 		if val:
 			create_longer_track = false
 			if Engine.is_editor_hint():
 				_rebuild_longer_track()
+			notify_property_list_changed()
 
-@export var rebuild_mountain_track_now: bool:
+@export var rebuild_mountain_track_now: bool = false:
 	set(val):
 		if val:
 			rebuild_mountain_track_now = false
 			if Engine.is_editor_hint():
 				_rebuild_mountain_track()
+			notify_property_list_changed()
 
-@export var rebuild_canyon_track_now: bool:
+@export var rebuild_canyon_track_now: bool = false:
 	set(val):
 		if val:
 			rebuild_canyon_track_now = false
 			if Engine.is_editor_hint():
 				_rebuild_canyon_track()
+			notify_property_list_changed()
 
 @export var grass_material: Material
 @export var road_material: Material
@@ -1098,24 +1112,37 @@ func _rebuild_mountain_track():
 	var curve = track_path.curve
 	curve.clear_points()
 	
-	# Wide, smooth loop climbing the mountain without tight spirals or crossings
-	var pts = [
-		Vector3(0, 2, -260),
-		Vector3(180, 22, -180),
-		Vector3(260, 48, 0),
-		Vector3(180, 72, 180),
-		Vector3(0, 88, 260),
-		Vector3(-180, 70, 180),
-		Vector3(-260, 42, 0),
-		Vector3(-180, 18, -180)
+	# Wide spiral track that climbs the mountain all the way to the summit (130m) and then descents back down
+	var pts = []
+	var spiral_steps = 48
+	for i in range(spiral_steps + 1):
+		var t = float(i) / spiral_steps
+		var angle = 1.5 * PI + t * 4.0 * PI
+		var radius = 280.0 - 180.0 * t
+		var px = radius * cos(angle)
+		var pz = radius * sin(angle)
+		var py = 130.0 * t
+		pts.append(Vector3(px, py, pz))
+
+	var descent_pts = [
+		Vector3(0, 122, -120),
+		Vector3(0, 110, -140),
+		Vector3(0, 85, -170),
+		Vector3(0, 70, -200),
+		Vector3(0, 45, -230),
+		Vector3(0, 25, -260),
+		Vector3(0, 5, -285),
+		Vector3(0, 32.5, -295)
 	]
-	
+	for p in descent_pts:
+		pts.append(p)
+
 	for p in pts:
 		curve.add_point(p)
 		
 	_smooth_curve_handles(curve, true)
 	
-	print("Mountain track rebuilt with simple climbing loop!")
+	print("Mountain track rebuilt with spiral climb to summit and descent!")
 	generate_world()
 
 func _rebuild_canyon_track():
@@ -1123,17 +1150,17 @@ func _rebuild_canyon_track():
 	var curve = track_path.curve
 	curve.clear_points()
 	
-	# Simple, elegant winding canyon track with wide, flowy curves (no tight spaghetti!)
+	# Dynamic winding canyon track with steep curves and vertical elevation changes
 	var pts = [
 		Vector3(0, 2, -250),
-		Vector3(150, 10, -200),
-		Vector3(230, 4, -40),
-		Vector3(120, 12, 120),
-		Vector3(180, 6, 240),
-		Vector3(0, 14, 260),
-		Vector3(-180, 6, 220),
-		Vector3(-230, 12, 0),
-		Vector3(-150, 4, -180)
+		Vector3(140, 25, -180),
+		Vector3(220, 8, -60),
+		Vector3(80, 30, 60),
+		Vector3(160, 5, 200),
+		Vector3(0, 15, 270),
+		Vector3(-150, 35, 210),
+		Vector3(-240, 12, 0),
+		Vector3(-120, 2, -140)
 	]
 	
 	for p in pts:

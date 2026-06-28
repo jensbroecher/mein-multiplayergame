@@ -20,7 +20,7 @@ visible = false
 
 
 [node name="LevelSpawner" type="MultiplayerSpawner" parent="."]
-_spawnable_scenes = PackedStringArray("res://Level.tscn")
+_spawnable_scenes = PackedStringArray("res://levels/Level.tscn", "res://levels/MountainLevel.tscn", "res://levels/CanyonLevel.tscn")
 spawn_path = NodePath("..")
 spawn_limit = 1
 

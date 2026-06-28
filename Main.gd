@@ -1,6 +1,6 @@
 extends Node
 
-const LEVEL_SCENE = preload("res://Level.tscn")
+const LEVEL_SCENE = preload("res://levels/Level.tscn")
 const CONFIGURATION_MENU_SCENE = preload("res://ConfigurationMenu.tscn")
 const PAUSE_MENU_SCENE = preload("res://PauseMenu.tscn")
 
