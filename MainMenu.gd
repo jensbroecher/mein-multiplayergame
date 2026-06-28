@@ -12,6 +12,7 @@ signal options_pressed
 var main_buttons_container: VBoxContainer
 var sp_modes_container: VBoxContainer
 var cup_select_container: VBoxContainer
+var stage_select_container: VBoxContainer
 var name_edit: LineEdit
 
 func _ready():
@@ -24,6 +25,7 @@ func _ready():
 	_create_main_menu()
 	_create_sp_modes_menu()
 	_create_cup_select_menu()
+	_create_stage_select_menu()
 	
 	# Show main menu by default
 	show_sub_menu("main")
@@ -136,10 +138,34 @@ func _add_menu_button(parent: Node, label_text: String) -> Button:
 	parent.add_child(btn)
 	return btn
 
+func _create_stage_select_menu():
+	stage_select_container = VBoxContainer.new()
+	stage_select_container.add_theme_constant_override("separation", 15)
+	vbox_container.add_child(stage_select_container)
+	
+	var label = Label.new()
+	label.text = "SELECT STAGE"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 24)
+	stage_select_container.add_child(label)
+	
+	var btn_desert = _add_menu_button(stage_select_container, "DESERT COURSE")
+	btn_desert.pressed.connect(func(): _on_stage_selected("res://Level.tscn"))
+	
+	var btn_mountain = _add_menu_button(stage_select_container, "MOUNTAIN COURSE")
+	btn_mountain.pressed.connect(func(): _on_stage_selected("res://MountainLevel.tscn"))
+	
+	var btn_canyon = _add_menu_button(stage_select_container, "CANYON COURSE")
+	btn_canyon.pressed.connect(func(): _on_stage_selected("res://CanyonLevel.tscn"))
+	
+	var btn_back = _add_menu_button(stage_select_container, "BACK")
+	btn_back.pressed.connect(func(): show_sub_menu("sp_modes"))
+
 func show_sub_menu(menu_name: String):
 	main_buttons_container.visible = (menu_name == "main")
 	sp_modes_container.visible = (menu_name == "sp_modes")
 	cup_select_container.visible = (menu_name == "cup_select")
+	stage_select_container.visible = (menu_name == "stage_select")
 
 func _on_multiplayer_pressed():
 	NetworkManager.current_game_mode = NetworkManager.GameMode.MULTIPLAYER
@@ -147,7 +173,11 @@ func _on_multiplayer_pressed():
 	hide()
 
 func _on_time_trial_pressed():
+	show_sub_menu("stage_select")
+
+func _on_stage_selected(stage_path: String):
 	NetworkManager.current_game_mode = NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL
+	NetworkManager.time_trial_stage = stage_path
 	start_pressed.emit()
 	hide()
 

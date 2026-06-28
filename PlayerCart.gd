@@ -243,6 +243,7 @@ var offroad_timer: float = 0.0
 var is_offroad: bool = false
 var visual_offset_y: float = 0.0
 
+var stage_has_water: bool = true
 var is_underwater: bool = false
 const WATER_LEVEL = -10.0
 var water_timer: float = 0.0
@@ -344,8 +345,12 @@ func _ready():
 
 	await get_tree().process_frame
 	var level = get_tree().get_first_node_in_group("level")
-	if level and level.has_node("RaceUI"):
-		race_ui = level.get_node("RaceUI")
+	if level:
+		if level.has_node("RaceUI"):
+			race_ui = level.get_node("RaceUI")
+		var tg = level.get_node_or_null("TerrainGenerator")
+		if tg and "no_water" in tg:
+			stage_has_water = not tg.no_water
 
 	ground_ray.add_exception(self)
 
@@ -665,86 +670,87 @@ func _physics_process(delta):
 			_interpolate_remote_physics(delta)
 		return
 
-	# Use hysteresis to prevent rapid underwater state toggling at the boundary
-	var entry_threshold = WATER_LEVEL - 0.25
-	var exit_threshold = WATER_LEVEL + 0.25
-	var currently_underwater = is_underwater
-	if is_underwater:
-		if global_position.y > exit_threshold:
-			currently_underwater = false
-	else:
-		if global_position.y < entry_threshold:
-			currently_underwater = true
-
-	if currently_underwater != is_underwater:
-		if currently_underwater:
-			# --- Water Impact (Big Splash) ---
-			var current_time = Time.get_ticks_msec() / 1000.0
-			if current_time - last_splash_time > 0.2:
-				last_splash_time = current_time
-				
-				var impact_speed = linear_velocity.length()
-				var splash_stream: AudioStream = null
-				if impact_speed > 15.0:
-					splash_stream = DEEP_SPLASH_SOUNDS[randi() % DEEP_SPLASH_SOUNDS.size()]
-				else:
-					splash_stream = REGULAR_SPLASH_SOUNDS[randi() % REGULAR_SPLASH_SOUNDS.size()]
-				
-				if splash_stream:
-					var ap = AudioStreamPlayer3D.new()
-					ap.stream = splash_stream
-					ap.bus = &"SFX"
-					ap.max_distance = 80.0
-					ap.unit_size = 15.0
-					ap.volume_db = 10.0
-					get_tree().current_scene.add_child(ap)
-					ap.global_position = global_position
-					ap.play()
-					get_tree().create_timer(splash_stream.get_length() + 0.5).timeout.connect(ap.queue_free)
-					
-				# Strong velocity kill simulating hitting dense water
-				linear_velocity *= 0.18
-				if linear_velocity.y < 0:
-					linear_velocity.y = 0.0
-				
-				var splash_pos = Vector3(global_position.x, WATER_LEVEL, global_position.z)
-				_spawn_splash(splash_pos, 1.0)
+	if stage_has_water:
+		# Use hysteresis to prevent rapid underwater state toggling at the boundary
+		var entry_threshold = WATER_LEVEL - 0.25
+		var exit_threshold = WATER_LEVEL + 0.25
+		var currently_underwater = is_underwater
+		if is_underwater:
+			if global_position.y > exit_threshold:
+				currently_underwater = false
 		else:
-			# --- Exit Water (Small Splash) ---
+			if global_position.y < entry_threshold:
+				currently_underwater = true
+
+		if currently_underwater != is_underwater:
+			if currently_underwater:
+				# --- Water Impact (Big Splash) ---
+				var current_time = Time.get_ticks_msec() / 1000.0
+				if current_time - last_splash_time > 0.2:
+					last_splash_time = current_time
+					
+					var impact_speed = linear_velocity.length()
+					var splash_stream: AudioStream = null
+					if impact_speed > 15.0:
+						splash_stream = DEEP_SPLASH_SOUNDS[randi() % DEEP_SPLASH_SOUNDS.size()]
+					else:
+						splash_stream = REGULAR_SPLASH_SOUNDS[randi() % REGULAR_SPLASH_SOUNDS.size()]
+					
+					if splash_stream:
+						var ap = AudioStreamPlayer3D.new()
+						ap.stream = splash_stream
+						ap.bus = &"SFX"
+						ap.max_distance = 80.0
+						ap.unit_size = 15.0
+						ap.volume_db = 10.0
+						get_tree().current_scene.add_child(ap)
+						ap.global_position = global_position
+						ap.play()
+						get_tree().create_timer(splash_stream.get_length() + 0.5).timeout.connect(ap.queue_free)
+						
+					# Strong velocity kill simulating hitting dense water
+					linear_velocity *= 0.18
+					if linear_velocity.y < 0:
+						linear_velocity.y = 0.0
+					
+					var splash_pos = Vector3(global_position.x, WATER_LEVEL, global_position.z)
+					_spawn_splash(splash_pos, 1.0)
+			else:
+				# --- Exit Water (Small Splash) ---
+				var current_time = Time.get_ticks_msec() / 1000.0
+				last_splash_time = current_time
+				var splash_pos = Vector3(global_position.x, WATER_LEVEL, global_position.z)
+				_spawn_splash(splash_pos, 0.4) # Spawn a small splash on exit
+			is_underwater = currently_underwater
+			water_timer = 0.0
+
+		# --- Puddles / Shallow Water periodic small splashes ---
+		var on_flat_ground = false
+		if ground_ray.is_colliding() and ground_ray.get_collision_normal().y >= 0.55:
+			on_flat_ground = true
+		if on_flat_ground and not is_underwater and global_position.y >= WATER_LEVEL and global_position.y < WATER_LEVEL + 0.6 and linear_velocity.length() > 3.0:
 			var current_time = Time.get_ticks_msec() / 1000.0
-			last_splash_time = current_time
-			var splash_pos = Vector3(global_position.x, WATER_LEVEL, global_position.z)
-			_spawn_splash(splash_pos, 0.4) # Spawn a small splash on exit
-		is_underwater = currently_underwater
-		water_timer = 0.0
+			if current_time - last_splash_time > 0.35:
+				last_splash_time = current_time
+				var splash_pos = Vector3(global_position.x, WATER_LEVEL, global_position.z)
+				_spawn_splash(splash_pos, 0.35)
 
-	# --- Puddles / Shallow Water periodic small splashes ---
-	var on_flat_ground = false
-	if ground_ray.is_colliding() and ground_ray.get_collision_normal().y >= 0.55:
-		on_flat_ground = true
-	if on_flat_ground and not is_underwater and global_position.y >= WATER_LEVEL and global_position.y < WATER_LEVEL + 0.6 and linear_velocity.length() > 3.0:
-		var current_time = Time.get_ticks_msec() / 1000.0
-		if current_time - last_splash_time > 0.35:
-			last_splash_time = current_time
-			var splash_pos = Vector3(global_position.x, WATER_LEVEL, global_position.z)
-			_spawn_splash(splash_pos, 0.35)
-
-	if is_underwater:
-		water_timer += delta
-		if water_timer > 0.8: # Drown faster (0.8 seconds underwater triggers drown)
-			if multiplayer.multiplayer_peer != null and multiplayer.is_server():
-				drown_rpc.rpc()
-			elif multiplayer.multiplayer_peer == null:
-				drown()
-		# Strong water drag: cap horizontal speed and dampen movement heavily
-		var underwater_max_speed = max_speed * 0.35
-		var h_vel = Vector3(linear_velocity.x, 0, linear_velocity.z)
-		if h_vel.length() > underwater_max_speed:
-			var damped = h_vel.normalized() * underwater_max_speed
-			linear_velocity.x = lerp(linear_velocity.x, damped.x, 8.0 * delta)
-			linear_velocity.z = lerp(linear_velocity.z, damped.z, 8.0 * delta)
-		# Slow sink: upward buoyancy force (weaker than gravity so car still sinks slowly)
-		apply_central_force(Vector3.UP * 15.0)
+		if is_underwater:
+			water_timer += delta
+			if water_timer > 0.8: # Drown faster (0.8 seconds underwater triggers drown)
+				if multiplayer.multiplayer_peer != null and multiplayer.is_server():
+					drown_rpc.rpc()
+				elif multiplayer.multiplayer_peer == null:
+					drown()
+			# Strong water drag: cap horizontal speed and dampen movement heavily
+			var underwater_max_speed = max_speed * 0.35
+			var h_vel = Vector3(linear_velocity.x, 0, linear_velocity.z)
+			if h_vel.length() > underwater_max_speed:
+				var damped = h_vel.normalized() * underwater_max_speed
+				linear_velocity.x = lerp(linear_velocity.x, damped.x, 8.0 * delta)
+				linear_velocity.z = lerp(linear_velocity.z, damped.z, 8.0 * delta)
+			# Slow sink: upward buoyancy force (weaker than gravity so car still sinks slowly)
+			apply_central_force(Vector3.UP * 15.0)
 
 	if not has_physics_authority:
 		_interpolate_remote_physics(delta)

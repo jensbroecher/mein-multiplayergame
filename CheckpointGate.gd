@@ -33,4 +33,3 @@ func _update_visuals():
 	var decal = get_node_or_null("StartFinishDecal")
 	if decal:
 		decal.visible = is_finish_line
-

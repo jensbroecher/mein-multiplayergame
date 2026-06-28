@@ -233,31 +233,45 @@ func set_resolution(index: int, save: bool = true):
 	if index < 0 or index >= RESOLUTIONS.size():
 		return
 	resolution_index = index
-	var size = RESOLUTIONS[index]
+	var target_size = RESOLUTIONS[index]
 	
 	var win = get_window()
-	win.content_scale_size = size
-	if win.mode != Window.MODE_FULLSCREEN:
-		win.size = size
+	# Keep UI design scale size constant at 1080p so UI size doesn't change relative to screen
+	win.content_scale_size = Vector2i(1920, 1080)
+	
+	if win.mode == Window.MODE_FULLSCREEN:
+		# Scale 3D rendering resolution relative to native screen size
+		var screen_size = DisplayServer.screen_get_size(win.current_screen)
+		var render_scale = float(target_size.y) / float(screen_size.y)
+		get_viewport().scaling_3d_scale = clamp(render_scale, 0.25, 2.0)
+	else:
+		win.size = target_size
+		get_viewport().scaling_3d_scale = 1.0
 		var screen_id = win.current_screen
 		var screen_size = DisplayServer.screen_get_size(screen_id)
-		win.position = (screen_size - size) / 2
+		win.position = (screen_size - target_size) / 2
 	
 	if save: save_settings()
 
 func set_window_mode(mode: int, save: bool = true):
 	window_mode = mode
 	var win = get_window()
-	var size = RESOLUTIONS[resolution_index]
+	var target_size = RESOLUTIONS[resolution_index]
+	
+	win.content_scale_size = Vector2i(1920, 1080)
+	
 	if mode == 1:
 		win.mode = Window.MODE_FULLSCREEN
+		var screen_size = DisplayServer.screen_get_size(win.current_screen)
+		var render_scale = float(target_size.y) / float(screen_size.y)
+		get_viewport().scaling_3d_scale = clamp(render_scale, 0.25, 2.0)
 	else:
 		win.mode = Window.MODE_WINDOWED
-		win.size = size
+		win.size = target_size
+		get_viewport().scaling_3d_scale = 1.0
 		var screen_id = win.current_screen
 		var screen_size = DisplayServer.screen_get_size(screen_id)
-		win.position = (screen_size - size) / 2
-	win.content_scale_size = size
+		win.position = (screen_size - target_size) / 2
 	if save: save_settings()
 
 func set_vsync(enabled: bool, save: bool = true):

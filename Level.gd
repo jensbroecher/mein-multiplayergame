@@ -26,10 +26,17 @@ const ITEM_BOX_SCENE = preload("res://ItemBox.tscn")
 			if Engine.is_editor_hint():
 				_align_checkpoints_to_track()
 
+@export var align_spawn_points: bool:
+	set(val):
+		if val:
+			align_spawn_points = false
+			if Engine.is_editor_hint():
+				_align_start_and_spawns_to_track()
+
 enum RaceState {LOBBY, RACING, FINISHED}
 var race_state: int = RaceState.LOBBY
 
-@onready var spawn_points = $SpawnPoints.get_children()
+var spawn_points: Array = []
 @onready var players_container = $Players
 @onready var player_spawner = $PlayerSpawner
 
@@ -61,6 +68,8 @@ func _ready():
 	race_ui = RACE_UI_SCENE.instantiate()
 	add_child(race_ui)
 
+	_rebuild_checkpoints()
+	_align_start_and_spawns_to_track()
 	_align_checkpoints_to_track()
 	_setup_checkpoints()
 	_spawn_item_boxes_deferred()
@@ -95,9 +104,9 @@ func _ready():
 		NetworkManager.player_disconnected.connect(_on_server_player_disconnected)
 
 		if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP:
-			var bot_names = ["Viper Bot", "Shadow Bot", "Apex Bot"]
-			var bot_cars = [1, 2, 3]
-			for i in range(3):
+			var bot_names = ["Viper Bot", "Shadow Bot", "Apex Bot", "Blaze Bot", "Nova Bot"]
+			var bot_cars = [1, 2, 3, 0, 1]
+			for i in range(5):
 				var bot_id = 100 + i
 				NetworkManager.players[bot_id] = {
 					"name": bot_names[i],
@@ -858,3 +867,56 @@ func _is_node_or_ancestor_in_group(node: Node, group_name: String) -> bool:
 			return true
 		current = current.get_parent()
 	return false
+
+func _align_start_and_spawns_to_track():
+	var fl = get_node_or_null("FinishLine")
+	if not fl: return
+	
+	# Delete old root-level SpawnPoints if they exist to clean up the scene tree
+	var old_sp = get_node_or_null("SpawnPoints")
+	if old_sp:
+		old_sp.free()
+		
+	# Find or create a SpawnPoints container under the FinishLine node
+	var spawn_container = fl.get_node_or_null("SpawnPoints")
+	if not spawn_container:
+		spawn_container = Node3D.new()
+		spawn_container.name = "SpawnPoints"
+		fl.add_child(spawn_container)
+		if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
+			spawn_container.owner = get_tree().edited_scene_root
+			
+	# Reset container local transform to align with the FinishLine
+	spawn_container.transform = Transform3D.IDENTITY
+	
+	var spawns = []
+	for i in range(1, 7):
+		var name = "Spawn" + str(i)
+		var sp = spawn_container.get_node_or_null(name)
+		if not sp:
+			sp = Marker3D.new()
+			sp.name = name
+			spawn_container.add_child(sp)
+			if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
+				sp.owner = get_tree().edited_scene_root
+			
+			var indicator = preload("res://SpawnIndicator.tscn").instantiate()
+			sp.add_child(indicator)
+			if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
+				indicator.owner = get_tree().edited_scene_root
+				for child in indicator.get_children():
+					child.owner = get_tree().edited_scene_root
+		spawns.append(sp)
+		
+	# Layout relative to FinishLine: 3 rows of 2 spawns
+	# local Z is positive (behind) in Godot's coordinates
+	var local_zs = [6.0, 6.0, 12.0, 12.0, 18.0, 18.0]
+	var local_xs = [-3.0, 3.0, -3.0, 3.0, -3.0, 3.0]
+	
+	for idx in range(spawns.size()):
+		var spawn = spawns[idx]
+		if spawn:
+			spawn.transform = Transform3D.IDENTITY
+			spawn.position = Vector3(local_xs[idx], 0.5, local_zs[idx])
+			
+	spawn_points = spawns

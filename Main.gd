@@ -59,6 +59,8 @@ func start_game(is_host: bool):
 				var stage_idx = NetworkManager.current_gp_stage
 				if stage_idx < gp_data["stages"].size():
 					level_scene = load(gp_data["stages"][stage_idx])
+		elif NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL:
+			level_scene = load(NetworkManager.time_trial_stage)
 		
 		var level = level_scene.instantiate()
 		add_child(level)

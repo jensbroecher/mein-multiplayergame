@@ -2,7 +2,7 @@ extends Node
 
 
 const DEFAULT_PORT = 10567
-const MAX_CLIENTS = 4
+const MAX_CLIENTS = 6
 
 var peer: ENetMultiplayerPeer
 
@@ -25,6 +25,7 @@ var current_game_mode: int = GameMode.MULTIPLAYER
 var current_gp_name: String = ""
 var current_gp_stage: int = 0
 var gp_standings: Dictionary = {} # racer_name -> points
+var time_trial_stage: String = "res://Level.tscn"
 
 const GP_CUPS = {
 	"Starter Cup": {
@@ -33,7 +34,7 @@ const GP_CUPS = {
 	},
 	"Desert Cup": {
 		"name": "Desert Cup",
-		"stages": ["res://MountainLevel.tscn"]
+		"stages": ["res://MountainLevel.tscn", "res://CanyonLevel.tscn"]
 	}
 }
 

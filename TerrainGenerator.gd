@@ -1,7 +1,7 @@
 @tool
 extends Node3D
 
-enum TrackLayoutType { DEFAULT, MOUNTAIN }
+enum TrackLayoutType { DEFAULT, MOUNTAIN, CANYON }
 
 @export var track_layout_type: TrackLayoutType = TrackLayoutType.DEFAULT
 @export var level_prefix: String = ""
@@ -20,42 +20,86 @@ func _is_in_gap_pos(pos: Vector3) -> bool:
 	return false
 
 func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curve3D, for_collision: bool) -> float:
-	var radial_mountain = 0.0
+	var h_noise = noise.get_noise_2d(px, pz) * hill_height
+	
+	# --- Mountain base shape ---
+	var radial_offset = 0.0
 	if track_layout_type == TrackLayoutType.MOUNTAIN:
 		var dist_from_center = Vector2(px, pz).length()
 		var mountain_height = 145.0
 		var mountain_base = 350.0
 		var mountain_shape = clamp(1.0 - (dist_from_center / mountain_base), 0.0, 1.0)
 		mountain_shape = mountain_shape * mountain_shape * (3.0 - 2.0 * mountain_shape)
-		radial_mountain = mountain_shape * mountain_height
+		radial_offset = mountain_shape * mountain_height
 
-	var h_noise = noise.get_noise_2d(px, pz) * hill_height
-	var base_terrain_height = radial_mountain + h_noise if track_layout_type == TrackLayoutType.MOUNTAIN else h_noise
-
-	var closest_pos = curve.get_closest_point(Vector3(px, 0.0, pz))
-	var dist = Vector2(px, pz).distance_to(Vector2(closest_pos.x, closest_pos.z))
-
-	var sand_edge = sand_width / 2.0
-	var blend_dist = 60.0
-
-	var clearing_blend = 1.0 - smoothstep(sand_edge - 2.0, sand_edge + blend_dist, dist)
-	var road_h = closest_pos.y
-	var height = lerp(base_terrain_height, road_h, clearing_blend)
-
-	var basin_blend = 1.0 - smoothstep(sand_edge - 2.0, sand_edge, dist)
-	if for_collision:
-		height = lerp(height, road_h - terrain_recession_collision, basin_blend)
+	var base_terrain_height: float
+	if track_layout_type == TrackLayoutType.MOUNTAIN:
+		base_terrain_height = radial_offset + h_noise
+	elif track_layout_type == TrackLayoutType.CANYON:
+		# Canyon plateau: high flat ground with gentle noise ripples
+		base_terrain_height = 22.0 + h_noise * 0.4
 	else:
-		height = lerp(height, road_h - terrain_recession_visual, basin_blend)
+		base_terrain_height = h_noise
 
+	var closest_pos = curve.get_closest_point(Vector3(px, base_terrain_height, pz))
+	var dist = Vector2(px, pz).distance_to(Vector2(closest_pos.x, closest_pos.z))
+	var road_h = closest_pos.y
+
+	var height: float
+
+	if track_layout_type == TrackLayoutType.CANYON:
+		var sand_edge = sand_width / 2.0
+		
+		# Zone 1: Road surface — flat at road height
+		var road_inner = sand_edge - 2.0
+		# Zone 2: Canyon floor just beyond curb — stays low briefly
+		var floor_edge = sand_edge + 12.0
+		# Zone 3: Canyon wall rise — ramps steeply up to plateau
+		var wall_top = sand_edge + 40.0
+		
+		if dist < road_inner:
+			# On the road itself
+			height = road_h
+		elif dist < floor_edge:
+			# Canyon floor (still at road level)
+			var t = (dist - road_inner) / (floor_edge - road_inner)
+			height = lerp(road_h, road_h + 1.0, t)
+		elif dist < wall_top:
+			# Steep canyon wall rising to plateau
+			var t = (dist - floor_edge) / (wall_top - floor_edge)
+			var smooth_t = t * t * (3.0 - 2.0 * t)  # smoothstep
+			height = lerp(road_h + 1.0, base_terrain_height, smooth_t)
+		else:
+			# Canyon rim plateau with noise
+			height = base_terrain_height
+		
+		# Basin recession under road for collision mesh
+		var basin_blend = 1.0 - smoothstep(road_inner - 2.0, road_inner, dist)
+		if for_collision:
+			height = lerp(height, road_h - terrain_recession_collision, basin_blend)
+		else:
+			height = lerp(height, road_h - terrain_recession_visual, basin_blend)
+	else:
+		# Original blending for DEFAULT and MOUNTAIN
+		var sand_edge = sand_width / 2.0
+		var blend_dist = 60.0
+		var clearing_blend = 1.0 - smoothstep(sand_edge - 2.0, sand_edge + blend_dist, dist)
+		height = lerp(base_terrain_height, road_h, clearing_blend)
+
+		var basin_blend = 1.0 - smoothstep(sand_edge - 2.0, sand_edge, dist)
+		if for_collision:
+			height = lerp(height, road_h - terrain_recession_collision, basin_blend)
+		else:
+			height = lerp(height, road_h - terrain_recession_visual, basin_blend)
+
+	# Edge falloff (all track types — drops to abyss at map edges)
 	var world_pos = Vector2(px, pz)
 	var noise_val = noise.get_noise_2d(px * 0.1, pz * 0.1) * 200.0
 	var dist_from_center_val = world_pos.length() + noise_val
-
 	var falloff_start = terrain_size.x * 0.25
 	var falloff_end = terrain_size.x * 0.45
 	var edge_falloff = 1.0 - clamp((dist_from_center_val - falloff_start) / (falloff_end - falloff_start), 0.0, 1.0)
-	var falloff_y = -60.0 if track_layout_type == TrackLayoutType.MOUNTAIN else -20.0
+	var falloff_y = -60.0 if (track_layout_type == TrackLayoutType.MOUNTAIN or track_layout_type == TrackLayoutType.CANYON) else -20.0
 	height = lerp(falloff_y, height, edge_falloff)
 
 	if not no_water:
@@ -67,7 +111,7 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			var lake_blend = clamp((lake_radius - dist_to_lake) / 40.0, 0.0, 1.0)
 			height = lerp(height, depth, lake_blend)
 
-	# Abyss gap carving
+	# Abyss gap carving (mountain only)
 	if track_layout_type == TrackLayoutType.MOUNTAIN:
 		var road_pos = closest_pos
 		if abs(road_pos.x) < 5.0 and road_pos.z < -100.0 and road_pos.z > -300.0:
@@ -88,6 +132,7 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 				gap_blend = clamp(dist_to_edge / 5.0, 0.0, 1.0)
 				
 			if in_gap:
+				var clearing_blend = 1.0 - smoothstep(sand_width / 2.0 - 2.0, sand_width / 2.0 + 60.0, dist)
 				height = lerp(height, -60.0, gap_blend * clearing_blend)
 
 	return height
@@ -138,6 +183,13 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			if Engine.is_editor_hint():
 				_rebuild_mountain_track()
 
+@export var rebuild_canyon_track_now: bool:
+	set(val):
+		if val:
+			rebuild_canyon_track_now = false
+			if Engine.is_editor_hint():
+				_rebuild_canyon_track()
+
 @export var grass_material: Material
 @export var road_material: Material
 @export var save_to_files: bool = true
@@ -151,6 +203,9 @@ func _ready():
 
 func generate_world():
 	if not track_path: return
+	
+	# Set high-resolution bake interval to prevent segmented road overlaps
+	track_path.curve.bake_interval = 0.25
 
 	# IMPORTANT: Use free() in editor for immediate cleanup to prevent 'ghost' nodes
 	# queue_free() is too slow for tool scripts and causes scene-save bloat
@@ -437,10 +492,6 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 			st.add_index(base + 0); st.add_index(nxt + 0); st.add_index(base + 1)
 			st.add_index(base + 1); st.add_index(nxt + 0); st.add_index(nxt + 1)
 			
-			# Center flat
-			st.add_index(base + 1); st.add_index(nxt + 1); st.add_index(base + 2)
-			st.add_index(base + 2); st.add_index(nxt + 1); st.add_index(nxt + 2)
-			
 			# Right slope
 			st.add_index(base + 2); st.add_index(nxt + 2); st.add_index(base + 3)
 			st.add_index(base + 3); st.add_index(nxt + 2); st.add_index(nxt + 3)
@@ -449,9 +500,6 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 			# Left slope Underside
 			st.add_index(base + 0); st.add_index(base + 1); st.add_index(nxt + 0)
 			st.add_index(base + 1); st.add_index(nxt + 1); st.add_index(nxt + 0)
-			# Center flat Underside
-			st.add_index(base + 1); st.add_index(base + 2); st.add_index(nxt + 1)
-			st.add_index(base + 2); st.add_index(nxt + 2); st.add_index(nxt + 1)
 			# Right slope Underside
 			st.add_index(base + 2); st.add_index(base + 3); st.add_index(nxt + 2)
 			st.add_index(base + 3); st.add_index(nxt + 3); st.add_index(nxt + 2)
@@ -648,87 +696,37 @@ func _rebuild_longer_track():
 	var curve = track_path.curve
 	curve.clear_points()
 
-	# Create a much more complex "Grand Prix" style track with ELEVATION
-	# Added intermediate points for smoother 90-degree turns
-	# Improved "Grand Prix" track with additional smoothing points for steep corners
-	# Improved "Grand Prix" track with additional smoothing points for steep corners
-	var pts = [
-		Vector3(0, 0, 0),             # Start Line
-		Vector3(60, 2, -25),          # Added intermediate start smoothing
-		Vector3(120, 5, -50),
-		Vector3(250, 10, -150),
-		Vector3(300, 5, -350),
-		Vector3(280, 4, -420),        # Smoothing point for turn
-		Vector3(220, 2, -450),
-		Vector3(150, 2, -420),        # Smoothing point
-		Vector3(100, 2, -400),
-		Vector3(0, 5, -440),          # Early turn start
-		Vector3(-80, 10, -480),
-		Vector3(-250, 15, -550),
-		Vector3(-450, 20, -650),      # BRIDGE OVER LAKE
-		Vector3(-580, 20, -620),      # Gentler bridge turn
-		Vector3(-700, 18, -480),      # Smooth descent
-		Vector3(-650, 12, -350),
-		Vector3(-550, 8, -250),
-		Vector3(-400, 4, -100),
-		Vector3(-450, 12, 10),
-		Vector3(-350, 8, 150),
-		Vector3(-200, 4, 300),
-		Vector3(-100, 3, 290),         # Added intermediate end smoothing
-		Vector3(100, 2, 280),         # Gentle final turn
-		Vector3(50, 1, 200),
-		Vector3(20, 0.5, 100),         # Final approach smoothing
-		Vector3(0, 0, 0) if is_loop else Vector3(0, 0, 50) # Home or Gap
-	]
+	# Smooth figure-eight shaped track with wide radiused turns — no sharp corners.
+	# Uses parametric math with exact Hermite tangent handles to guarantee
+	# the road mesh never self-intersects on bends.
+	
+	var steps = 64
+	for i in range(steps):
+		var t = float(i) / steps
+		var angle = t * 2.0 * PI
+		
+		# Lemniscate-inspired oval loop: elongated on Z axis, with a nice S-bend
+		# Factor: 380x230 ellipse with a gentle lateral sine wave for interest
+		var px = 380.0 * sin(angle) + 60.0 * sin(angle * 2.0)
+		var pz = 230.0 * cos(angle) - 230.0  # offset so start is near (0,0,0)
+		
+		# Gentle elevation: rises and falls twice per lap — max 18m gain
+		var py = 8.0 * sin(angle * 2.0)
+		
+		# Exact derivatives
+		var dpx = 380.0 * cos(angle) + 120.0 * cos(angle * 2.0)
+		var dpz = -230.0 * sin(angle)
+		var dpy = 16.0 * cos(angle * 2.0)
+		
+		var handle = Vector3(dpx, dpy, dpz) / (3.0 * steps)
+		
+		curve.add_point(
+			Vector3(px, py, pz),
+			-handle,
+			handle
+		)
 
-
-
-	# Automatic smoothing
-	for p in pts:
-		curve.add_point(p)
-
-	# Adjust handles for smoothness - Improved for loops
-	for i in range(curve.point_count):
-		var p = curve.get_point_position(i)
-		var prev_idx = (i - 1 + curve.point_count) % curve.point_count
-		var next_idx = (i + 1) % curve.point_count
-
-		# For non-loops, don't wrap handles at ends
-		if not is_loop:
-			if i == 0: prev_idx = 0
-			if i == curve.point_count - 1: next_idx = curve.point_count - 1
-
-		var prev = curve.get_point_position(prev_idx)
-		var next = curve.get_point_position(next_idx)
-
-		# Proportional handles to avoid "broken" sharp geometry
-		var dir: Vector3
-		if is_loop and (i == 0 or i == curve.point_count - 1):
-			# If loop, use the actual circuit points for average tangent
-			var p_start = curve.get_point_position(0)
-			var p_end = curve.get_point_position(curve.point_count - 1)
-			if p_start.distance_to(p_end) < 0.1:
-				dir = (curve.get_point_position(1) - curve.get_point_position(curve.point_count - 2)).normalized()
-			else:
-				dir = (next - prev).normalized()
-		else:
-			dir = (next - prev).normalized()
-
-		var d_prev = p.distance_to(prev)
-		var d_next = p.distance_to(next)
-		var handle_dist = min(d_prev, d_next) * 0.25 # Much shorter handles for safer sharp turns
-
-		if i == 0 and not is_loop:
-			curve.set_point_in(i, Vector3.ZERO)
-			curve.set_point_out(i, dir * handle_dist)
-		elif i == curve.point_count - 1 and not is_loop:
-			curve.set_point_in(i, -dir * handle_dist)
-			curve.set_point_out(i, Vector3.ZERO)
-		else:
-			curve.set_point_in(i, -dir * handle_dist)
-			curve.set_point_out(i, dir * handle_dist)
-
-	print("New longer track generated!")
+	print("Desert track (smooth oval) generated!")
 	generate_world()
 
 func _create_path_sides(point_count: int, width: float, mat: Material, y_offset: float, node_name: String):
@@ -1067,79 +1065,81 @@ func _generate_terrain_grass():
 			mmi.material_override = mat
 
 
+func _smooth_curve_handles(curve: Curve3D, is_loop: bool):
+	for i in range(curve.point_count):
+		var p = curve.get_point_position(i)
+		var prev_idx = (i - 1 + curve.point_count) % curve.point_count
+		var next_idx = (i + 1) % curve.point_count
+
+		if not is_loop:
+			if i == 0: prev_idx = 0
+			if i == curve.point_count - 1: next_idx = curve.point_count - 1
+
+		var prev = curve.get_point_position(prev_idx)
+		var next = curve.get_point_position(next_idx)
+
+		var dir = (next - prev).normalized()
+		var d_prev = p.distance_to(prev)
+		var d_next = p.distance_to(next)
+		var handle_dist = min(d_prev, d_next) * 0.35
+
+		if i == 0 and not is_loop:
+			curve.set_point_in(i, Vector3.ZERO)
+			curve.set_point_out(i, dir * handle_dist)
+		elif i == curve.point_count - 1 and not is_loop:
+			curve.set_point_in(i, -dir * handle_dist)
+			curve.set_point_out(i, Vector3.ZERO)
+		else:
+			curve.set_point_in(i, -dir * handle_dist)
+			curve.set_point_out(i, dir * handle_dist)
+
 func _rebuild_mountain_track():
 	if not track_path: return
 	var curve = track_path.curve
 	curve.clear_points()
 	
-	var spiral_steps = 48
-	for i in range(spiral_steps + 1):
-		var t = float(i) / spiral_steps
-		var angle = 1.5 * PI + t * 4.0 * PI
-		var radius = 280.0 - 180.0 * t
-		var px = radius * cos(angle)
-		var pz = radius * sin(angle)
-		var py = 130.0 * t
+	# Wide, smooth loop climbing the mountain without tight spirals or crossings
+	var pts = [
+		Vector3(0, 2, -260),
+		Vector3(180, 22, -180),
+		Vector3(260, 48, 0),
+		Vector3(180, 72, 180),
+		Vector3(0, 88, 260),
+		Vector3(-180, 70, 180),
+		Vector3(-260, 42, 0),
+		Vector3(-180, 18, -180)
+	]
+	
+	for p in pts:
+		curve.add_point(p)
 		
-		var tangent = Vector3(-radius * sin(angle), 130.0 / (4.0 * PI), radius * cos(angle)).normalized()
-		var h_len = radius * 0.25
+	_smooth_curve_handles(curve, true)
+	
+	print("Mountain track rebuilt with simple climbing loop!")
+	generate_world()
+
+func _rebuild_canyon_track():
+	if not track_path: return
+	var curve = track_path.curve
+	curve.clear_points()
+	
+	# Simple, elegant winding canyon track with wide, flowy curves (no tight spaghetti!)
+	var pts = [
+		Vector3(0, 2, -250),
+		Vector3(150, 10, -200),
+		Vector3(230, 4, -40),
+		Vector3(120, 12, 120),
+		Vector3(180, 6, 240),
+		Vector3(0, 14, 260),
+		Vector3(-180, 6, 220),
+		Vector3(-230, 12, 0),
+		Vector3(-150, 4, -180)
+	]
+	
+	for p in pts:
+		curve.add_point(p)
 		
-		curve.add_point(
-			Vector3(px, py, pz),
-			-tangent * h_len,
-			tangent * h_len
-		)
+	_smooth_curve_handles(curve, true)
 	
-	curve.add_point(
-		Vector3(0, 122, -120),
-		Vector3(0, 2.0, 5.0),
-		Vector3(0, -2.0, -5.0)
-	)
-	
-	curve.add_point(
-		Vector3(0, 110, -140),
-		Vector3(0, 1.0, 5.0),
-		Vector3(0, 6.0, -10.0)
-	)
-	
-	curve.add_point(
-		Vector3(0, 85, -170),
-		Vector3(0, -5.0, 10.0),
-		Vector3(0, -2.0, -5.0)
-	)
-	
-	curve.add_point(
-		Vector3(0, 70, -200),
-		Vector3(0, 1.0, 5.0),
-		Vector3(0, 6.0, -10.0)
-	)
-	
-	curve.add_point(
-		Vector3(0, 45, -230),
-		Vector3(0, -5.0, 10.0),
-		Vector3(0, -2.0, -5.0)
-	)
-	
-	curve.add_point(
-		Vector3(0, 25, -260),
-		Vector3(0, 1.0, 5.0),
-		Vector3(0, 5.0, -10.0)
-	)
-	
-	curve.add_point(
-		Vector3(0, 5, -285),
-		Vector3(0, -3.0, 5.0),
-		Vector3(15, -1.0, -5.0)
-	)
-	
-	curve.add_point(
-		Vector3(30, 1, -295),
-		Vector3(-5, 0.0, 10.0),
-		Vector3(-10, 0.0, -5.0)
-	)
-	
-	print("Mountain track layout points added to curve!")
-	curve.set_point_in(0, Vector3(0, 0, -15.0))
-	curve.set_point_out(0, Vector3(25.0, 0, 0))
-	
+	print("Canyon track rebuilt with simple winding loop!")
 	generate_world()
