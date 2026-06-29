@@ -338,6 +338,8 @@ func _add_player(id: int, p_name: String):
 		# ALIGN SPAWN TO TRACK:
 		# Use the baked spawn point transform directly (already aligned to track slope/tangent by the editor tool)
 		var spawn_transform = spawn_points[idx].global_transform
+		# Safely lift the spawn position along the local Y (up) axis of the spawn point by 5.0m for the drop-landing
+		spawn_transform.origin += spawn_transform.basis.y * 5.0
 
 		var car_idx = 0
 		var is_ai = false

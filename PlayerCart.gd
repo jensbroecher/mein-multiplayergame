@@ -265,6 +265,7 @@ const REMOTE_LERP_SPEED: float = 18.0
 enum ItemType { NONE, BOOST, MISSILE, GUIDED_MISSILE, SHIELD, SHOCKWAVE, BOMB, LIGHTNING }
 var current_item = ItemType.NONE
 var current_item_2 = ItemType.NONE
+var is_landing: bool = false
 var slow_timer: float = 0.0
 var _original_albedo_colors: Dictionary = {}
 
@@ -428,7 +429,7 @@ func _ready():
 
 		# Position camera immediately at start to avoid sliding in
 		if is_isometric:
-			var iso_offset = Vector3(-20, 20, 20)
+			var iso_offset = Vector3(-26, 26, 26)
 			camera_pivot.global_position = visuals.global_position + iso_offset
 			camera_pivot.look_at(visuals.global_position, Vector3.UP)
 	else:
@@ -445,11 +446,10 @@ func _ready():
 	# (Decals are configured to only project onto Visual Layer 1)
 	_set_layers_recursive(visuals, 2)
 
-	# Freeze car at start if countdown is active
+	# Trigger spawn-in drop-landing effect at start
 	if has_physics_authority():
-		if not can_move:
-			freeze = true
-			freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
+		is_landing = true
+		freeze = false
 
 func _enter_tree():
 	_update_authority()
@@ -481,7 +481,7 @@ func _update_authority():
 	if not has_physics_authority:
 		freeze = true
 		freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
-	elif not can_move:
+	elif not can_move and not is_landing:
 		freeze = true
 		freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
 
@@ -538,8 +538,11 @@ func _process(delta):
 				_update_intro_camera(delta)
 		
 		if not is_intro_active:
+			if name_tag:
+				name_tag.pixel_size = 0.00035 if is_isometric else 0.00065
+				
 			if is_isometric:
-				var iso_offset = Vector3(-20, 20, 20)
+				var iso_offset = Vector3(-26, 26, 26)
 				var target_cam_pos = visuals.global_position + iso_offset
 				
 				# Stay at a constant distance (no collision raycast zooming for the isometric camera)
@@ -549,8 +552,8 @@ func _process(delta):
 			else:
 				var cam_dist = lerp(3.5, 6.0, clamp(boost_time / 4.0, 0.0, 1.0))
 				
-				# Smooth camera trailing
-				var target_cam_pos = visuals.global_position - visual_forward * cam_dist + Vector3(0, 1.5, 0)
+				# Smooth camera trailing (steeper and higher)
+				var target_cam_pos = visuals.global_position - visual_forward * cam_dist + Vector3(0, 2.4, 0)
 				
 				# Avoid clipping through bridge/terrain
 				var space_state = get_world_3d().direct_space_state
@@ -563,7 +566,7 @@ func _process(delta):
 					
 				camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 10.0 * delta)
 				
-				camera_look_at = camera_look_at.lerp(visuals.global_position + visual_forward * (look_ahead_dist + 2.0), 12.0 * delta)
+				camera_look_at = camera_look_at.lerp(visuals.global_position + visual_forward * (look_ahead_dist + 0.5), 12.0 * delta)
 				camera_pivot.look_at(camera_look_at, Vector3.UP)
 		
 		# Smoothly lerp camera FOV based on is_isometric and is_boosting/is_pad_boosting
@@ -786,7 +789,19 @@ func _physics_process(delta):
 			pad_boost_timer = 0.0
 	is_pad_boosting = pad_boost_timer > 0.0
 
-	if not can_move:
+	# Landing detection when dropping from spawn/respawn
+	if is_landing and has_physics_authority:
+		if ground_ray.is_colliding() and ground_ray.get_collision_normal().y >= 0.55:
+			is_landing = false
+			# Play landing sound only for gameplay respawns, not during initial start countdown
+			if can_move:
+				play_landing_sound_rpc(1.5)
+			# Freeze if the race hasn't started yet
+			if not can_move:
+				freeze = true
+				freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
+
+	if not can_move and not is_landing:
 		linear_velocity = linear_velocity.lerp(Vector3.ZERO, 3.0 * delta)
 		_move_and_sync()
 		return
@@ -1870,9 +1885,9 @@ func respawn():
 			if tangent.length() > 0.01:
 				forward_dir = tangent
 
-		# Position the spawn 5 meters behind the checkpoint origin along the track tangent, slightly lifted to prevent road clipping
+		# Position the spawn 5 meters behind the checkpoint origin along the track tangent, lifted by 1.5m along local up axis to prevent underground clipping
 		var target_basis = Basis.looking_at(forward_dir, Vector3.UP)
-		spawn_pos = spawn_pos - forward_dir * 5.0 + Vector3(0, 0.2, 0)
+		spawn_pos = spawn_pos - forward_dir * 5.0 + target_basis.y * 1.5
 		global_transform = Transform3D(target_basis, spawn_pos)
 
 		visuals.global_position = global_position
