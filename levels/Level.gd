@@ -75,8 +75,10 @@ func _ready():
 	race_ui = RACE_UI_SCENE.instantiate()
 	add_child(race_ui)
 
-	_align_start_and_spawns_to_track()
-	_align_checkpoints_to_track()
+	# Positions of FinishLine, spawn points and checkpoints are baked into the .tscn
+	# by the editor tools — do NOT re-align them at runtime as that would override
+	# manually placed positions and break signal connections.
+	_load_spawn_points()
 	_setup_checkpoints()
 	_spawn_item_boxes_deferred()
 
@@ -137,6 +139,26 @@ func _ready():
 	if NetworkManager.current_game_mode != NetworkManager.GameMode.MULTIPLAYER:
 		_run_singleplayer_countdown()
 
+func _load_spawn_points():
+	# Read spawn points from the baked scene tree (under FinishLine/SpawnPoints)
+	spawn_points.clear()
+	var fl = get_node_or_null("FinishLine")
+	if fl:
+		var sp_container = fl.get_node_or_null("SpawnPoints")
+		if sp_container:
+			for child in sp_container.get_children():
+				if child is Marker3D:
+					spawn_points.append(child)
+	# Fallback: also check for a legacy root-level SpawnPoints node
+	if spawn_points.is_empty():
+		var sp_root = get_node_or_null("SpawnPoints")
+		if sp_root:
+			for child in sp_root.get_children():
+				if child is Marker3D:
+					spawn_points.append(child)
+	if not spawn_points.is_empty():
+		print("Loaded %d spawn points from scene tree." % spawn_points.size())
+
 func _setup_checkpoints():
 	# Rebuild checkpoints list from scene tree to prevent inspector array desync
 	var cp_container = get_node_or_null("Checkpoints")
@@ -169,6 +191,11 @@ func _setup_checkpoints():
 		var hw = get_node_or_null("Halfway")
 		if hw: checkpoints.append(hw)
 
+	print("[CHECKPOINT SETUP] Total checkpoints: ", checkpoints.size())
+	for i in range(checkpoints.size()):
+		print("  - Checkpoint ", i, ": ", checkpoints[i].name)
+
+	# cp_offsets are only needed server-side for AI position scoring
 	if multiplayer.is_server():
 		if track_path:
 			track_length = track_path.curve.get_baked_length()
@@ -177,21 +204,30 @@ func _setup_checkpoints():
 				var local_pos = track_path.to_local(cp.global_position)
 				cp_offsets.append(track_path.curve.get_closest_offset(local_pos))
 				
-		for i in range(checkpoints.size()):
-			var cp = checkpoints[i]
+	# Connect body_entered signals on EVERY peer (including OfflineMultiplayerPeer in singleplayer).
+	# _on_checkpoint_entered guards its own logic behind race_state checks.
+	for i in range(checkpoints.size()):
+		var cp = checkpoints[i]
+		if not cp.body_entered.is_connected(_on_checkpoint_entered):
 			cp.body_entered.connect(_on_checkpoint_entered.bind(i))
 
 
 
 func _on_checkpoint_entered(body: Node3D, cp_idx: int):
-	if race_state != RaceState.RACING: return
+	print("[CHECKPOINT] body entered: ", body.name, " class: ", body.get_class(), " cp_idx: ", cp_idx, " current race_state: ", race_state)
+	if race_state != RaceState.RACING:
+		print("[CHECKPOINT] Rejected: race_state is ", race_state, " (expected RACING = ", RaceState.RACING, ")")
+		return
 	var id = body.name.to_int()
 	if id > 0 and player_stats.has(id):
 		var stats = player_stats[id]
-		if stats["finished"]: return
+		if stats["finished"]:
+			print("[CHECKPOINT] Rejected: player already finished")
+			return
 
 		# Players must hit checkpoints in order
 		if cp_idx == stats["next_checkpoint_idx"]:
+			print("[CHECKPOINT] Valid checkpoint hit! Next expected index: ", cp_idx + 1)
 			# Progress to next checkpoint
 			stats["next_checkpoint_idx"] += 1
 
@@ -207,7 +243,10 @@ func _on_checkpoint_entered(body: Node3D, cp_idx: int):
 			if cart and cart.get("is_ai"):
 				cart.last_checkpoint_transform = cp.global_transform
 			else:
-				_sync_checkpoint_to_player.rpc_id(id, cp.global_transform, is_finish_lap)
+				if id == multiplayer.get_unique_id():
+					_sync_checkpoint_to_player(cp.global_transform, is_finish_lap)
+				else:
+					_sync_checkpoint_to_player.rpc_id(id, cp.global_transform, is_finish_lap)
 
 			# If they hit the last checkpoint (Finish Line), complete a lap
 			if stats["next_checkpoint_idx"] >= checkpoints.size():
@@ -224,7 +263,10 @@ func _check_finish(id: int):
 		if cart and cart.get("is_ai"):
 			cart.can_move = false
 		else:
-			show_player_finished_rpc.rpc_id(id)
+			if id == multiplayer.get_unique_id():
+				show_player_finished_rpc()
+			else:
+				show_player_finished_rpc.rpc_id(id)
 
 		# Start 30s timer if this is the first finisher
 		if end_timer <= 0.0:
@@ -237,7 +279,7 @@ func show_player_finished_rpc():
 
 @rpc("authority", "call_local", "reliable")
 func _sync_checkpoint_to_player(checkpoint_transform: Transform3D, play_finish_sound: bool = false):
-	var local_cart = get_tree().get_nodes_in_group("player_carts").filter(func(node): return node.is_multiplayer_authority())
+	var local_cart = get_tree().get_nodes_in_group("player_carts").filter(func(node): return node.is_local_player)
 	if local_cart.size() > 0:
 		local_cart[0].last_checkpoint_transform = checkpoint_transform
 		if play_finish_sound:
@@ -284,6 +326,12 @@ func _spawn_custom(data: Variant) -> Node:
 
 func _add_player(id: int, p_name: String):
 	if not player_stats.has(id):
+		if spawn_points.is_empty():
+			push_warning("No spawn points found! Re-loading from scene tree.")
+			_load_spawn_points()
+		if spawn_points.is_empty():
+			push_error("No spawn points available, cannot spawn player %d" % id)
+			return
 		var idx = player_stats.size() % spawn_points.size()
 		player_stats[id] = {"laps": 0, "next_checkpoint_idx": 0, "finished": false, "pos": 0}
 
@@ -295,7 +343,7 @@ func _add_player(id: int, p_name: String):
 			var local_spawn_pos = track_path.to_local(spawn_points[idx].global_position)
 			var offset = curve.get_closest_offset(local_spawn_pos)
 			
-			var next_offset = fmod(offset + 1.0, curve.get_baked_length())
+			var next_offset = fmod(offset + 1.0, max(1.0, curve.get_baked_length()))
 			var p1 = curve.sample_baked(offset)
 			var p2 = curve.sample_baked(next_offset)
 			var global_tangent = (track_path.to_global(p2) - track_path.to_global(p1)).normalized()
@@ -421,7 +469,7 @@ func _update_positions():
 				
 				for i in range(start_i, end_i + 1):
 					var t = float(i) / max(1, num_steps)
-					var sample_off = fmod(start_off + t * segment_length + track_length * 2.0, track_length)
+					var sample_off = fmod(start_off + t * segment_length + track_length * 2.0, max(1.0, track_length))
 					var p = curve.sample_baked(sample_off)
 					var d = p.distance_squared_to(local_pos)
 					if d < min_dist:
@@ -450,7 +498,10 @@ func _update_positions():
 
 		var l = ranking[i]["laps"]
 		if NetworkManager.players.has(id) and not NetworkManager.players[id].get("is_ai", false):
-			update_hud_rpc.rpc_id(id, pos, ranking.size(), mini(l + 1, NetworkManager.max_laps), NetworkManager.max_laps)
+			if id == multiplayer.get_unique_id():
+				update_hud_rpc(pos, ranking.size(), mini(l + 1, NetworkManager.max_laps), NetworkManager.max_laps)
+			else:
+				update_hud_rpc.rpc_id(id, pos, ranking.size(), mini(l + 1, NetworkManager.max_laps), NetworkManager.max_laps)
 
 @rpc("authority", "call_local", "unreliable")
 func update_hud_rpc(pos, total, lap, max_laps):
@@ -564,7 +615,7 @@ func _spawn_random_item_boxes(count: int):
 		var global_pos = track_path.to_global(local_pos)
 		
 		# Compute track tangent and right vector to offset left/right randomly
-		var next_offset = fmod(offset + 1.0, length)
+		var next_offset = fmod(offset + 1.0, max(1.0, length))
 		var p1 = curve.sample_baked(offset)
 		var p2 = curve.sample_baked(next_offset)
 		var tangent = (track_path.to_global(p2) - track_path.to_global(p1)).normalized()
@@ -628,17 +679,21 @@ func _rebuild_checkpoints():
 		if child is Node3D:
 			var offset = (float(i + 1) / (children.size() + 1)) * length
 			# MountainLevel specific adjustment: place the summit checkpoint (Checkpoint 4) slightly earlier
-			if track_path.get_parent().name.contains("Mountain") and i == children.size() - 1:
+			var is_mountain = name.contains("Mountain") or (scene_file_path != "" and scene_file_path.contains("Mountain"))
+			if is_mountain and i == children.size() - 1:
 				offset = 0.74 * length
 				
 			var pos = curve.sample_baked(offset)
-			child.global_position = track_path.to_global(pos)
+			var tp_xform = track_path.transform
+			child.position = tp_xform * pos
 
 			# Orient to track
 			var next_offset = min(offset + 1.0, length)
 			var tangent = (curve.sample_baked(next_offset) - pos).normalized()
 			if tangent.length() > 0.01:
-				child.look_at(child.global_position + tangent, Vector3.UP)
+				var tangent_global = ((tp_xform * (pos + tangent)) - (tp_xform * pos)).normalized()
+				if tangent_global.length() > 0.01:
+					child.basis = Basis.looking_at(tangent_global, Vector3.UP)
 
 	print("Checkpoints redistributed along track!")
 
@@ -656,19 +711,21 @@ func _align_checkpoints_to_track():
 
 	for child in children:
 		if child is Node3D:
-			# Find closest offset along the track curve
-			var local_pos = track_path.to_local(child.global_position)
+			# Find closest offset along the track curve using local transform math (safe for headless)
+			var tp_xform = track_path.transform
+			var local_pos = tp_xform.affine_inverse() * child.position
 			var offset = curve.get_closest_offset(local_pos)
 			var snapped_local_pos = curve.sample_baked(offset)
 			
-			child.global_position = track_path.to_global(snapped_local_pos)
+			child.position = tp_xform * snapped_local_pos
 
 			# Orient to track tangent at this offset
-			var next_offset = fmod(offset + 1.0, length)
+			var next_offset = fmod(offset + 1.0, max(1.0, length))
 			var tangent_local = (curve.sample_baked(next_offset) - snapped_local_pos).normalized()
 			if tangent_local.length() > 0.01:
-				var tangent_global = (track_path.to_global(snapped_local_pos + tangent_local) - child.global_position).normalized()
-				child.look_at(child.global_position + tangent_global, Vector3.UP)
+				var tangent_global = ((tp_xform * (snapped_local_pos + tangent_local)) - (tp_xform * snapped_local_pos)).normalized()
+				if tangent_global.length() > 0.01:
+					child.basis = Basis.looking_at(tangent_global, Vector3.UP)
 
 	print("Checkpoints aligned and oriented to track curve!")
 
@@ -889,26 +946,40 @@ func _align_start_and_spawns_to_track():
 	if not track_path:
 		track_path = get_node_or_null("TrackPath")
 		
-	# Align FinishLine itself to the closest point on the track path (keeping user's manual placement)
+	# Position FinishLine at a fixed offset along the track so it sits on the flat
+	# approach road at the foot of the mountain, a short way past the path start.
 	if track_path:
 		var curve = track_path.curve
-		var local_pos = track_path.to_local(fl.global_position)
-		var offset = curve.get_closest_offset(local_pos)
-		var snapped_local_pos = curve.sample_baked(offset)
-		fl.global_position = track_path.to_global(snapped_local_pos)
+		var tp_xform = track_path.transform
+		var track_len = curve.get_baked_length()
 		
-		var next_offset = fmod(offset + 1.0, curve.get_baked_length())
+		# Use 8% of track length — past the very start of the path but still on the flat run-up
+		var start_ratio = 0.08
+		# For non-mountain levels, snap FinishLine to its current position instead
+		var is_mountain = get_name().contains("Mountain") or (scene_file_path != "" and scene_file_path.contains("Mountain"))
+		if not is_mountain:
+			var tp_inv = tp_xform.affine_inverse()
+			var local_pos = tp_inv * fl.position
+			var offset = curve.get_closest_offset(local_pos)
+			start_ratio = offset / track_len
+		
+		var fl_offset = start_ratio * track_len
+		var snapped_local_pos = curve.sample_baked(fl_offset)
+		fl.position = tp_xform * snapped_local_pos
+		
+		var next_offset = fmod(fl_offset + 1.0, max(1.0, track_len))
 		var tangent_local = (curve.sample_baked(next_offset) - snapped_local_pos).normalized()
 		if tangent_local.length() > 0.01:
-			var tangent_global = (track_path.to_global(snapped_local_pos + tangent_local) - fl.global_position).normalized()
-			fl.look_at(fl.global_position + tangent_global, Vector3.UP)
+			var tangent_global = ((tp_xform * (snapped_local_pos + tangent_local)) - (tp_xform * snapped_local_pos)).normalized()
+			if tangent_global.length() > 0.01:
+				fl.basis = Basis.looking_at(tangent_global, Vector3.UP)
 	
 	# Delete old root-level SpawnPoints if they exist to clean up the scene tree
 	var old_sp = get_node_or_null("SpawnPoints")
 	if old_sp:
 		old_sp.free()
 		
-	# Delete the old SpawnPoints container under the FinishLine to guarantee a 100% clean rebuild with no clashing subscene nodes
+	# Delete the old SpawnPoints container under the FinishLine
 	var spawn_container = fl.get_node_or_null("SpawnPoints")
 	if spawn_container:
 		spawn_container.free()
@@ -919,14 +990,13 @@ func _align_start_and_spawns_to_track():
 	if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
 		spawn_container.owner = get_tree().edited_scene_root
 			
-	# Reset container local transform to align with the FinishLine
 	spawn_container.transform = Transform3D.IDENTITY
 	
 	var spawns = []
 	for i in range(1, 7):
-		var name = "Spawn" + str(i)
+		var sp_name = "Spawn" + str(i)
 		var sp = Marker3D.new()
-		sp.name = name
+		sp.name = sp_name
 		spawn_container.add_child(sp)
 		if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
 			sp.owner = get_tree().edited_scene_root
@@ -936,47 +1006,17 @@ func _align_start_and_spawns_to_track():
 		if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
 			indicator.owner = get_tree().edited_scene_root
 		spawns.append(sp)
-		
-	# Layout relative to FinishLine: 3 rows of 2 spawns on the road surface behind the gate
-	if track_path:
-		var curve = track_path.curve
-		var fl_local = track_path.to_local(fl.global_position)
-		var fl_offset = curve.get_closest_offset(fl_local)
-		var track_len = curve.get_baked_length()
-		
-		# Z offset is negative offset along track (behind)
-		# X offset is lateral offset (left/right)
-		var local_zs = [-6.0, -6.0, -12.0, -12.0, -18.0, -18.0]
-		var local_xs = [-3.0, 3.0, -3.0, 3.0, -3.0, 3.0]
-		
-		for idx in range(spawns.size()):
-			var spawn = spawns[idx]
-			if spawn:
-				var s_offset = fmod(fl_offset + local_zs[idx] + track_len, track_len)
-				var snapped_local = curve.sample_baked(s_offset)
-				
-				# Get tangent at this spawn point to orient it along track
-				var next_s_offset = fmod(s_offset + 1.0, track_len)
-				var tangent_local = (curve.sample_baked(next_s_offset) - snapped_local).normalized()
-				
-				# Calculate lateral offset (X axis is perpendicular to tangent on XZ plane)
-				var right_local = tangent_local.cross(Vector3.UP).normalized()
-				var spawn_local_pos = snapped_local + right_local * local_xs[idx]
-				
-				# Set spawn's global position and basis
-				spawn.global_position = track_path.to_global(spawn_local_pos) + Vector3(0, 0.5, 0)
-				if tangent_local.length() > 0.01:
-					var tangent_global = (track_path.to_global(snapped_local + tangent_local) - track_path.to_global(snapped_local)).normalized()
-					spawn.global_transform.basis = Basis.looking_at(tangent_global, Vector3.UP)
-	else:
-		var local_zs = [6.0, 6.0, 12.0, 12.0, 18.0, 18.0]
-		var local_xs = [-3.0, 3.0, -3.0, 3.0, -3.0, 3.0]
-		for idx in range(spawns.size()):
-			var spawn = spawns[idx]
-			if spawn:
-				spawn.transform = Transform3D.IDENTITY
-				spawn.position = Vector3(local_xs[idx], 0.5, local_zs[idx])
-			
+	
+	# Place spawns as LOCAL offsets behind and to the sides of the FinishLine gate.
+	# Spawns are children of spawn_container (identity transform) which is a child of FinishLine.
+	# In FinishLine local space: +Z = behind gate (opposite track direction since look_at faces -Z forward)
+	var local_zs = [6.0, 6.0, 12.0, 12.0, 18.0, 18.0]
+	var local_xs = [-3.0, 3.0, -3.0, 3.0, -3.0, 3.0]
+	for idx in range(spawns.size()):
+		var spawn = spawns[idx]
+		if spawn:
+			spawn.position = Vector3(local_xs[idx], 0.5, local_zs[idx])
+	
 	spawn_points = spawns
 
 func _build_organic_dune_mesh(width: float, depth: float, resolution: int, peak_height: float, noise: FastNoiseLite) -> ArrayMesh:
@@ -987,8 +1027,9 @@ func _build_organic_dune_mesh(width: float, depth: float, resolution: int, peak_
 	var half_d = depth * 0.5
 	var step_x = width / resolution
 	var step_z = depth / resolution
+	var bottom_y = -1.5  # sink the base slightly underground so the join is invisible
 	
-	# Generate vertices
+	# Generate top surface vertices
 	for r in range(resolution + 1):
 		for c in range(resolution + 1):
 			var lx = -half_w + c * step_x
@@ -996,21 +1037,19 @@ func _build_organic_dune_mesh(width: float, depth: float, resolution: int, peak_
 			var d = sqrt(lx * lx + lz * lz)
 			var radius = min(half_w, half_d)
 			
-			# Radial mask to make sure the heights go to 0 at the boundaries
+			# Radial mask so heights smoothly reach 0 at the boundary
 			var mask = clamp(1.0 - (d / radius), 0.0, 1.0)
 			mask = mask * mask * (3.0 - 2.0 * mask) # Smoothstep
 			
 			var n = noise.get_noise_2d(lx * 2.0, lz * 2.0) * 4.0
 			var ly = mask * (peak_height + n)
 			
-			# Calculate UVs (scaled for visual triplanar texture mapping)
 			var u = float(c) / resolution
 			var v = float(r) / resolution
-			
 			st.set_uv(Vector2(u, v))
 			st.add_vertex(Vector3(lx, ly, lz))
 			
-	# Generate indices
+	# Top surface indices (CCW from above)
 	for r in range(resolution):
 		for c in range(resolution):
 			var i = r * (resolution + 1) + c
@@ -1021,6 +1060,29 @@ func _build_organic_dune_mesh(width: float, depth: float, resolution: int, peak_
 			st.add_index(i + 1)
 			st.add_index(i + resolution + 1)
 			st.add_index(i + resolution + 2)
+	
+	# Generate flat bottom face vertices (same grid at bottom_y)
+	var base_idx = (resolution + 1) * (resolution + 1)  # offset for bottom verts
+	for r in range(resolution + 1):
+		for c in range(resolution + 1):
+			var lx = -half_w + c * step_x
+			var lz = -half_d + r * step_z
+			var u = float(c) / resolution
+			var v = float(r) / resolution
+			st.set_uv(Vector2(u, v))
+			st.add_vertex(Vector3(lx, bottom_y, lz))
+			
+	# Bottom face indices (CW from above = CCW from below, facing downward)
+	for r in range(resolution):
+		for c in range(resolution):
+			var i = base_idx + r * (resolution + 1) + c
+			st.add_index(i)
+			st.add_index(i + 1)
+			st.add_index(i + resolution + 1)
+			
+			st.add_index(i + 1)
+			st.add_index(i + resolution + 2)
+			st.add_index(i + resolution + 1)
 			
 	st.generate_normals()
 	st.generate_tangents()
@@ -1046,6 +1108,8 @@ func _generate_sand_dunes():
 	var ratios = [0.15, 0.35, 0.65, 0.85]
 	var sand_texture = load("res://materials/sand.png")
 	var sand_mat = StandardMaterial3D.new()
+	# Disable backface culling so dunes look solid from any angle
+	sand_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	if sand_texture:
 		sand_mat.albedo_texture = sand_texture
 		sand_mat.uv1_triplanar = true
@@ -1076,6 +1140,8 @@ func _generate_sand_dunes():
 		# Create a StaticBody3D for an organic wind-blown dune shape
 		var dune = StaticBody3D.new()
 		dune.name = "OrganicDune_" + str(i + 1)
+		# Add to collision_trimesh group so runtime _add_collisions_for_group_nodes builds physics for it
+		dune.add_to_group("collision_trimesh")
 		parent_node.add_child(dune)
 		if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
 			dune.owner = get_tree().edited_scene_root
@@ -1090,14 +1156,29 @@ func _generate_sand_dunes():
 			
 		var col_shape = CollisionShape3D.new()
 		col_shape.name = "DuneCollision"
-		col_shape.shape = mesh_inst.mesh.create_trimesh_shape()
+		# Trimesh with backface_collision so cars bounce off from both sides and can't get trapped inside
+		var trimesh = mesh_inst.mesh.create_trimesh_shape()
+		trimesh.backface_collision = true
+		col_shape.shape = trimesh
 		dune.add_child(col_shape)
 		if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
 			col_shape.owner = get_tree().edited_scene_root
 			
-		dune.global_position = track_path.to_global(pos)
+		# Use local transform math (no to_global) — safe both in editor and headless since track_path.transform doesn't require being in scene tree
+		var tp_xform = track_path.transform
+		
+		# Offset the dune laterally to the side of the road (alternating left and right) so it doesn't bury the track
+		var right = tangent.cross(Vector3.UP).normalized()
+		var side_offset = 35.0 * (1.0 if i % 2 == 0 else -1.0)
+		var offset_pos = pos + right * side_offset
+		
+		var world_pos = tp_xform * offset_pos
+		# Sink the dune 3.5m into the ground to hide the flat base and blend it smoothly with terrain
+		dune.position = world_pos - Vector3(0, 3.5, 0)
 		if tangent.length() > 0.01:
-			var global_tangent = (track_path.to_global(pos + tangent) - dune.global_position).normalized()
-			dune.look_at(dune.global_position + global_tangent, Vector3.UP)
+			var world_tangent_pos = tp_xform * (offset_pos + tangent)
+			var global_tangent = (world_tangent_pos - world_pos).normalized()
+			if global_tangent.length() > 0.01:
+				dune.basis = Basis.looking_at(global_tangent, Vector3.UP)
 			
 	print("Organic Sand Dunes generated along track as moveable objects!")
