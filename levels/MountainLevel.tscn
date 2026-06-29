@@ -37,14 +37,14 @@ horizonColour = Color(0.0784314, 0.00784314, 0.0156863, 1)
 groundColour = Color(0, 0, 0, 1)
 cloudBrightness = 0.05
 
-[sub_resource type="Resource" id="Resource_eyost"]
+[sub_resource type="Resource" id="Resource_hecwt"]
 script = ExtResource("6_7fjgh")
 weather = ExtResource("6_01s5b")
 
-[sub_resource type="Resource" id="Resource_nr5ju"]
+[sub_resource type="Resource" id="Resource_01s5b"]
 script = ExtResource("4_7eb0m")
 seasonId = "summer"
-weathers = Array[ExtResource("6_7fjgh")]([SubResource("Resource_eyost")])
+weathers = Array[ExtResource("6_7fjgh")]([SubResource("Resource_hecwt")])
 skyColourDaytime = SubResource("Resource_ext2d")
 skyColourNight = SubResource("Resource_p7jpd")
 dayNightCycleCurve = SubResource("Curve_8bl6p")
@@ -251,7 +251,7 @@ backface_collision = true
 
 [node name="Level" type="Node3D" unique_id=815155767 node_paths=PackedStringArray("checkpoints", "track_path")]
 script = ExtResource("1_gkoi5")
-checkpoints = [NodePath("Checkpoints/Halfway4"), NodePath("FinishLine")]
+checkpoints = [NodePath("Checkpoints/Halfway4"), NodePath("Checkpoints/Halfway3"), NodePath("Checkpoints/Halfway2"), NodePath("Checkpoints/Halfway1"), NodePath("FinishLine")]
 track_path = NodePath("TrackPath")
 
 [node name="WeatherController" type="Node" parent="." unique_id=1277823175 node_paths=PackedStringArray("worldEnvironment", "directionalLight") instance=ExtResource("2_e304n")]
@@ -259,7 +259,7 @@ script = ExtResource("3_hecwt")
 time_of_day_hours = 16.271
 worldEnvironment = NodePath("WorldEnvironment")
 directionalLight = NodePath("DirectionalLight3D")
-seasons = Array[ExtResource("4_7eb0m")]([SubResource("Resource_nr5ju")])
+seasons = Array[ExtResource("4_7eb0m")]([SubResource("Resource_01s5b")])
 timeSpeedMultiplier = 50.0
 startTime = 58575.600000000006
 
@@ -378,38 +378,6 @@ shape = SubResource("BoxShape3D_checkpoint")
 
 [node name="VisualGate2" type="CSGCombiner3D" parent="Checkpoints/Halfway1" unique_id=1223843836]
 
-[node name="SpawnPoints" type="Node3D" parent="." unique_id=917465264]
-
-[node name="Spawn1" type="Marker3D" parent="SpawnPoints" unique_id=209041614]
-transform = Transform3D(-0.7630311, -0.023550184, -0.6459326, 0, 0.9993361, -0.03643499, 0.64636177, -0.027801031, -0.76252455, 195.51457, 15.080077, -194.59052)
-
-[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn1" unique_id=327087158 instance=ExtResource("21_6at7b")]
-
-[node name="Spawn2" type="Marker3D" parent="SpawnPoints" unique_id=1676289241]
-transform = Transform3D(-0.7630311, -0.023550184, -0.6459326, 0, 0.9993361, -0.03643499, 0.64636177, -0.027801031, -0.76252455, 190.93639, 15.080077, -190.71234)
-
-[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn2" unique_id=1191665352 instance=ExtResource("21_6at7b")]
-
-[node name="Spawn3" type="Marker3D" parent="SpawnPoints" unique_id=29793079]
-transform = Transform3D(-0.7460395, -0.025632136, -0.6654082, 0, 0.99925894, -0.03849237, 0.6659017, -0.028716829, -0.7454866, 191.5195, 14.854862, -199.16484)
-
-[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn3" unique_id=1491775777 instance=ExtResource("21_6at7b")]
-
-[node name="Spawn4" type="Marker3D" parent="SpawnPoints" unique_id=1453012973]
-transform = Transform3D(-0.7460395, -0.025632136, -0.6654082, 0, 0.99925894, -0.03849237, 0.6659017, -0.028716829, -0.7454866, 187.04327, 14.854862, -195.16942)
-
-[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn4" unique_id=1128314961 instance=ExtResource("21_6at7b")]
-
-[node name="Spawn5" type="Marker3D" parent="SpawnPoints" unique_id=33811351]
-transform = Transform3D(-0.72799283, -0.027628653, -0.68502784, 0, 0.9991877, -0.0402994, 0.6855847, -0.029337674, -0.7274015, 187.4043, 14.617264, -203.63408)
-
-[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn5" unique_id=121707557 instance=ExtResource("21_6at7b")]
-
-[node name="Spawn6" type="Marker3D" parent="SpawnPoints" unique_id=36208544]
-transform = Transform3D(-0.72799283, -0.027628653, -0.68502784, 0, 0.9991877, -0.0402994, 0.6855847, -0.029337674, -0.7274015, 183.03635, 14.617264, -199.52055)
-
-[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn6" unique_id=1394669544 instance=ExtResource("21_6at7b")]
-
 [node name="SandDunes" type="Node3D" parent="." unique_id=1927638165]
 
 [node name="OrganicDune_1" type="StaticBody3D" parent="SandDunes" unique_id=934357856]
@@ -451,3 +419,35 @@ mesh = SubResource("ArrayMesh_vplu3")
 
 [node name="DuneCollision" type="CollisionShape3D" parent="SandDunes/OrganicDune_4" unique_id=1382817769]
 shape = SubResource("ConcavePolygonShape3D_42wqv")
+
+[node name="SpawnPoints" type="Node3D" parent="." unique_id=271217569]
+
+[node name="Spawn1" type="Marker3D" parent="SpawnPoints" unique_id=1304131979]
+transform = Transform3D(-0.7630311, -0.023550184, -0.6459326, 0, 0.9993361, -0.03643499, 0.64636177, -0.027801031, -0.76252455, 195.51457, 15.080077, -194.59052)
+
+[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn1" unique_id=533025750 instance=ExtResource("21_6at7b")]
+
+[node name="Spawn2" type="Marker3D" parent="SpawnPoints" unique_id=695179956]
+transform = Transform3D(-0.7630311, -0.023550184, -0.6459326, 0, 0.9993361, -0.03643499, 0.64636177, -0.027801031, -0.76252455, 190.93639, 15.080077, -190.71234)
+
+[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn2" unique_id=990333811 instance=ExtResource("21_6at7b")]
+
+[node name="Spawn3" type="Marker3D" parent="SpawnPoints" unique_id=1272601996]
+transform = Transform3D(-0.7460395, -0.025632136, -0.6654082, 0, 0.99925894, -0.03849237, 0.6659017, -0.028716829, -0.7454866, 191.5195, 14.854862, -199.16484)
+
+[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn3" unique_id=1578706826 instance=ExtResource("21_6at7b")]
+
+[node name="Spawn4" type="Marker3D" parent="SpawnPoints" unique_id=382561189]
+transform = Transform3D(-0.7460395, -0.025632136, -0.6654082, 0, 0.99925894, -0.03849237, 0.6659017, -0.028716829, -0.7454866, 187.04327, 14.854862, -195.16942)
+
+[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn4" unique_id=1538752928 instance=ExtResource("21_6at7b")]
+
+[node name="Spawn5" type="Marker3D" parent="SpawnPoints" unique_id=1519390537]
+transform = Transform3D(-0.72799283, -0.027628653, -0.68502784, 0, 0.9991877, -0.0402994, 0.6855847, -0.029337674, -0.7274015, 187.4043, 14.617264, -203.63408)
+
+[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn5" unique_id=1648231466 instance=ExtResource("21_6at7b")]
+
+[node name="Spawn6" type="Marker3D" parent="SpawnPoints" unique_id=2033593120]
+transform = Transform3D(-0.72799283, -0.027628653, -0.68502784, 0, 0.9991877, -0.0402994, 0.6855847, -0.029337674, -0.7274015, 183.03635, 14.617264, -199.52055)
+
+[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn6" unique_id=390622176 instance=ExtResource("21_6at7b")]

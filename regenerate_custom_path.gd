@@ -11,6 +11,7 @@ func _ready():
 		var level = packed_desert.instantiate()
 		if level:
 			print("Instantiated Level.tscn successfully")
+			add_child(level)
 			
 			var tg = level.get_node_or_null("TerrainGenerator")
 			if tg:
@@ -30,12 +31,11 @@ func _ready():
 			var sd = level.get_node_or_null("SandDunes")
 			if sd:
 				set_owner_recursive_target(sd, level)
-			var fl = level.get_node_or_null("FinishLine")
-			if fl:
-				var sp = fl.get_node_or_null("SpawnPoints")
-				if sp:
-					set_owner_recursive_target(sp, level)
+			var sp = level.get_node_or_null("SpawnPoints")
+			if sp:
+				set_owner_recursive_target(sp, level)
 					
+			remove_child(level)
 			var new_packed = PackedScene.new()
 			var err = new_packed.pack(level)
 			if err == OK:
@@ -43,7 +43,6 @@ func _ready():
 				print("Saved Level.tscn: ", err)
 			else:
 				print("Failed to pack Level.tscn: ", err)
-			level.free()
 	
 	# --- 2. MOUNTAIN DESERT TRACK (MountainLevel.tscn) ---
 	var mountain_path = "res://levels/MountainLevel.tscn"
@@ -52,6 +51,7 @@ func _ready():
 		var level = packed_mountain.instantiate()
 		if level:
 			print("Instantiated MountainLevel.tscn successfully")
+			add_child(level)
 			
 			var tg = level.get_node_or_null("TerrainGenerator")
 			if tg:
@@ -71,12 +71,11 @@ func _ready():
 			var sd = level.get_node_or_null("SandDunes")
 			if sd:
 				set_owner_recursive_target(sd, level)
-			var fl = level.get_node_or_null("FinishLine")
-			if fl:
-				var sp = fl.get_node_or_null("SpawnPoints")
-				if sp:
-					set_owner_recursive_target(sp, level)
+			var sp = level.get_node_or_null("SpawnPoints")
+			if sp:
+				set_owner_recursive_target(sp, level)
 					
+			remove_child(level)
 			var new_packed = PackedScene.new()
 			var err = new_packed.pack(level)
 			if err == OK:
@@ -84,7 +83,32 @@ func _ready():
 				print("Saved MountainLevel.tscn: ", err)
 			else:
 				print("Failed to pack MountainLevel.tscn: ", err)
-			level.free()
+
+	# --- 3. CANYON TRACK (CanyonLevel.tscn) ---
+	var canyon_path = "res://levels/CanyonLevel.tscn"
+	var packed_canyon = load(canyon_path)
+	if packed_canyon:
+		var level = packed_canyon.instantiate()
+		if level:
+			print("Instantiated CanyonLevel.tscn successfully")
+			add_child(level)
+			
+			print("Aligning canyon spawn points...")
+			level._align_start_and_spawns_to_track()
+			
+			# Save and clean up ownership
+			var sp = level.get_node_or_null("SpawnPoints")
+			if sp:
+				set_owner_recursive_target(sp, level)
+					
+			remove_child(level)
+			var new_packed = PackedScene.new()
+			var err = new_packed.pack(level)
+			if err == OK:
+				err = ResourceSaver.save(new_packed, canyon_path)
+				print("Saved CanyonLevel.tscn: ", err)
+			else:
+				print("Failed to pack CanyonLevel.tscn: ", err)
 				
 	get_tree().quit(0)
 

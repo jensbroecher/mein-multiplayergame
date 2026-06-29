@@ -149,8 +149,8 @@ func _create_stage_select_menu():
 	label.add_theme_font_size_override("font_size", 24)
 	stage_select_container.add_child(label)
 	
-	var btn_desert = _add_menu_button(stage_select_container, "DESERT COURSE")
-	btn_desert.pressed.connect(func(): _on_stage_selected("res://levels/Level.tscn"))
+	var btn_lakeside = _add_menu_button(stage_select_container, "LAKESIDE COURSE")
+	btn_lakeside.pressed.connect(func(): _on_stage_selected("res://levels/Level.tscn"))
 	
 	var btn_mountain = _add_menu_button(stage_select_container, "MOUNTAIN COURSE")
 	btn_mountain.pressed.connect(func(): _on_stage_selected("res://levels/MountainLevel.tscn"))

@@ -813,12 +813,13 @@ func _physics_process(delta):
 			_discard_item()
 
 	var input_dir = Vector2.ZERO
-	if is_ai:
-		input_dir = _get_ai_input(delta)
-		_process_ai_items(delta)
-	else:
-		input_dir.x = Input.get_axis("steer_left", "steer_right")
-		input_dir.y = Input.get_axis("throttle", "brake")
+	if can_move:
+		if is_ai:
+			input_dir = _get_ai_input(delta)
+			_process_ai_items(delta)
+		else:
+			input_dir.x = Input.get_axis("steer_left", "steer_right")
+			input_dir.y = Input.get_axis("throttle", "brake")
 
 	var on_ground = false
 	var ground_normal = Vector3.UP
