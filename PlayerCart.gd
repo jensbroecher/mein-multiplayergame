@@ -445,6 +445,12 @@ func _ready():
 	# (Decals are configured to only project onto Visual Layer 1)
 	_set_layers_recursive(visuals, 2)
 
+	# Freeze car at start if countdown is active
+	if has_physics_authority():
+		if not can_move:
+			freeze = true
+			freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
+
 func _enter_tree():
 	_update_authority()
 	call_deferred("_update_all_carts_lod")
@@ -1864,10 +1870,9 @@ func respawn():
 			if tangent.length() > 0.01:
 				forward_dir = tangent
 
-		# Position the spawn 5 meters behind the checkpoint origin along the track tangent
-		spawn_pos = spawn_pos - forward_dir * 5.0 + Vector3(0, 2.0, 0)
-		
+		# Position the spawn 5 meters behind the checkpoint origin along the track tangent, slightly lifted to prevent road clipping
 		var target_basis = Basis.looking_at(forward_dir, Vector3.UP)
+		spawn_pos = spawn_pos - forward_dir * 5.0 + Vector3(0, 0.2, 0)
 		global_transform = Transform3D(target_basis, spawn_pos)
 
 		visuals.global_position = global_position

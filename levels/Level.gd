@@ -336,23 +336,8 @@ func _add_player(id: int, p_name: String):
 		player_stats[id] = {"laps": 0, "next_checkpoint_idx": 0, "finished": false, "pos": 0}
 
 		# ALIGN SPAWN TO TRACK:
-		# Use the track tangent to align orientation, fallback to editor placement
+		# Use the baked spawn point transform directly (already aligned to track slope/tangent by the editor tool)
 		var spawn_transform = spawn_points[idx].global_transform
-		if track_path:
-			var curve = track_path.curve
-			var local_spawn_pos = track_path.to_local(spawn_points[idx].global_position)
-			var offset = curve.get_closest_offset(local_spawn_pos)
-			
-			var next_offset = fmod(offset + 1.0, max(1.0, curve.get_baked_length()))
-			var p1 = curve.sample_baked(offset)
-			var p2 = curve.sample_baked(next_offset)
-			var global_tangent = (track_path.to_global(p2) - track_path.to_global(p1)).normalized()
-			
-			if global_tangent.length() > 0.01:
-				spawn_transform.basis = Basis.looking_at(global_tangent, Vector3.UP)
-		
-		# LIFT SLIGHTLY: Prevent spawning stuck in road
-		spawn_transform.origin.y += 1.5
 
 		var car_idx = 0
 		var is_ai = false
