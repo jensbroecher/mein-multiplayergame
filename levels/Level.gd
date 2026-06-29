@@ -759,6 +759,11 @@ func _create_primitive_shape_from_mesh(mesh: Mesh, type: String) -> Shape3D:
 func _add_collisions_to_node(root_node: Node, use_trimesh: bool = false):
 	if root_node == null: return
 	
+	# Skip any spawn points or indicators to prevent cars from colliding/hovering with their visual indicators
+	var path_lower = str(root_node.get_path()).to_lower()
+	if path_lower.contains("spawn"):
+		return
+	
 	if root_node is MeshInstance3D:
 		# Check group overrides
 		var force_none = _is_node_or_ancestor_in_group(root_node, "collision_none")
@@ -838,9 +843,7 @@ func _add_collisions_to_node(root_node: Node, use_trimesh: bool = false):
 					elif force_trimesh:
 						use_trimesh_actual = true
 					else:
-						# High-poly meshes should fallback to convex collision to prevent Jolt failures and lag,
 						# EXCEPT for gates/arches (like checkpoints and finish lines) which need concave trimesh to keep their openings clear.
-						var path_lower = str(root_node.get_path()).to_lower()
 						var is_gate = path_lower.contains("gate") or path_lower.contains("checkpoint") or path_lower.contains("finish")
 						if use_trimesh and vertex_count > 10000 and not is_gate:
 							print("[COLLISION BUILDER] Mesh ", root_node.name, " has high vertex count (", vertex_count, "), falling back to convex shape for stability.")
@@ -979,14 +982,14 @@ func _align_start_and_spawns_to_track():
 	if old_sp:
 		old_sp.free()
 		
-	# Delete the old SpawnPoints container under the FinishLine
-	var spawn_container = fl.get_node_or_null("SpawnPoints")
-	if spawn_container:
-		spawn_container.free()
+	# Delete the old SpawnPoints container under the FinishLine if it exists
+	var old_fl_sp = fl.get_node_or_null("SpawnPoints")
+	if old_fl_sp:
+		old_fl_sp.free()
 		
-	spawn_container = Node3D.new()
+	var spawn_container = Node3D.new()
 	spawn_container.name = "SpawnPoints"
-	fl.add_child(spawn_container)
+	add_child(spawn_container) # Parented to Level root for direct local coordinates!
 	if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
 		spawn_container.owner = get_tree().edited_scene_root
 			
@@ -1007,15 +1010,49 @@ func _align_start_and_spawns_to_track():
 			indicator.owner = get_tree().edited_scene_root
 		spawns.append(sp)
 	
-	# Place spawns as LOCAL offsets behind and to the sides of the FinishLine gate.
-	# Spawns are children of spawn_container (identity transform) which is a child of FinishLine.
-	# In FinishLine local space: +Z = behind gate (opposite track direction since look_at faces -Z forward)
-	var local_zs = [6.0, 6.0, 12.0, 12.0, 18.0, 18.0]
-	var local_xs = [-3.0, 3.0, -3.0, 3.0, -3.0, 3.0]
-	for idx in range(spawns.size()):
-		var spawn = spawns[idx]
-		if spawn:
-			spawn.position = Vector3(local_xs[idx], 0.5, local_zs[idx])
+	# Layout relative to FinishLine: 3 rows of 2 spawns on the road surface behind the gate.
+	# Snapping each spawn point individually along the track curve handles steep slopes beautifully!
+	if track_path:
+		var curve = track_path.curve
+		var tp_xform = track_path.transform
+		var tp_inv = tp_xform.affine_inverse()
+		var fl_local = tp_inv * fl.position
+		var fl_offset = curve.get_closest_offset(fl_local)
+		var track_len = curve.get_baked_length()
+		
+		# Z offset is negative offset along track (behind gate)
+		# X offset is lateral offset (left/right)
+		var local_zs = [-6.0, -6.0, -12.0, -12.0, -18.0, -18.0]
+		var local_xs = [-3.0, 3.0, -3.0, 3.0, -3.0, 3.0]
+		
+		for idx in range(spawns.size()):
+			var spawn = spawns[idx]
+			if spawn:
+				var s_offset = fmod(fl_offset + local_zs[idx] + track_len, track_len)
+				var snapped_local = curve.sample_baked(s_offset)
+				
+				# Get tangent at this spawn point to orient it along track
+				var next_s_offset = fmod(s_offset + 1.0, track_len)
+				var tangent_local = (curve.sample_baked(next_s_offset) - snapped_local).normalized()
+				
+				# Calculate lateral offset (X axis is perpendicular to tangent on XZ plane)
+				var right_local = tangent_local.cross(Vector3.UP).normalized()
+				var spawn_local_pos = snapped_local + right_local * local_xs[idx]
+				
+				# Set spawn's position (spawn_container is at identity parented to Level root)
+				spawn.position = (tp_xform * spawn_local_pos) + Vector3(0, 0.5, 0)
+				if tangent_local.length() > 0.01:
+					var tangent_global = ((tp_xform * (snapped_local + tangent_local)) - (tp_xform * snapped_local)).normalized()
+					if tangent_global.length() > 0.01:
+						spawn.basis = Basis.looking_at(tangent_global, Vector3.UP)
+	else:
+		var local_zs = [6.0, 6.0, 12.0, 12.0, 18.0, 18.0]
+		var local_xs = [-3.0, 3.0, -3.0, 3.0, -3.0, 3.0]
+		for idx in range(spawns.size()):
+			var spawn = spawns[idx]
+			if spawn:
+				spawn.transform = Transform3D.IDENTITY
+				spawn.position = Vector3(local_xs[idx], 0.5, local_zs[idx])
 	
 	spawn_points = spawns
 

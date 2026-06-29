@@ -294,6 +294,7 @@ func on_race_started():
 	var has_physics_authority = has_physics_authority()
 	if has_physics_authority:
 		can_move = true
+		freeze = false
 
 func _ready():
 	# Lock rotation so we handle it manually, preventing physics rolling at start
@@ -472,6 +473,9 @@ func _update_authority():
 	
 	var has_physics_authority = has_physics_authority()
 	if not has_physics_authority:
+		freeze = true
+		freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
+	elif not can_move:
 		freeze = true
 		freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
 
