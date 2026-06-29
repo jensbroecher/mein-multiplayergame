@@ -12,26 +12,33 @@ const ITEM_BOX_SCENE = preload("res://ItemBox.tscn")
 
 
 @export_group("Editor Tools")
-@export var redistribute_checkpoints: bool:
+@export var redistribute_checkpoints: bool = false:
 	set(val):
 		if val:
-			redistribute_checkpoints = false
 			if Engine.is_editor_hint():
 				_rebuild_checkpoints()
+			notify_property_list_changed()
 
-@export var align_checkpoints: bool:
+@export var align_checkpoints: bool = false:
 	set(val):
 		if val:
-			align_checkpoints = false
 			if Engine.is_editor_hint():
 				_align_checkpoints_to_track()
+			notify_property_list_changed()
 
-@export var align_spawn_points: bool:
+@export var align_spawn_points: bool = false:
 	set(val):
 		if val:
-			align_spawn_points = false
 			if Engine.is_editor_hint():
 				_align_start_and_spawns_to_track()
+			notify_property_list_changed()
+
+@export var spawn_sand_dunes: bool = false:
+	set(val):
+		if val:
+			if Engine.is_editor_hint():
+				_generate_sand_dunes()
+			notify_property_list_changed()
 
 enum RaceState {LOBBY, RACING, FINISHED}
 var race_state: int = RaceState.LOBBY
@@ -68,7 +75,6 @@ func _ready():
 	race_ui = RACE_UI_SCENE.instantiate()
 	add_child(race_ui)
 
-	_rebuild_checkpoints()
 	_align_start_and_spawns_to_track()
 	_align_checkpoints_to_track()
 	_setup_checkpoints()
@@ -606,6 +612,8 @@ func _spawn_random_item_boxes(count: int):
 			spawned_count += 1
 
 func _rebuild_checkpoints():
+	if not track_path:
+		track_path = get_node_or_null("TrackPath")
 	if not track_path: return
 	var cp_container = get_node_or_null("Checkpoints")
 	if not cp_container: return
@@ -619,6 +627,10 @@ func _rebuild_checkpoints():
 		var child = children[i]
 		if child is Node3D:
 			var offset = (float(i + 1) / (children.size() + 1)) * length
+			# MountainLevel specific adjustment: place the summit checkpoint (Checkpoint 4) slightly earlier
+			if track_path.get_parent().name.contains("Mountain") and i == children.size() - 1:
+				offset = 0.74 * length
+				
 			var pos = curve.sample_baked(offset)
 			child.global_position = track_path.to_global(pos)
 
@@ -631,6 +643,8 @@ func _rebuild_checkpoints():
 	print("Checkpoints redistributed along track!")
 
 func _align_checkpoints_to_track():
+	if not track_path:
+		track_path = get_node_or_null("TrackPath")
 	if not track_path: return
 	var cp_container = get_node_or_null("Checkpoints")
 	if not cp_container: return
@@ -872,19 +886,38 @@ func _align_start_and_spawns_to_track():
 	var fl = get_node_or_null("FinishLine")
 	if not fl: return
 	
+	if not track_path:
+		track_path = get_node_or_null("TrackPath")
+		
+	# Align FinishLine itself to the closest point on the track path (keeping user's manual placement)
+	if track_path:
+		var curve = track_path.curve
+		var local_pos = track_path.to_local(fl.global_position)
+		var offset = curve.get_closest_offset(local_pos)
+		var snapped_local_pos = curve.sample_baked(offset)
+		fl.global_position = track_path.to_global(snapped_local_pos)
+		
+		var next_offset = fmod(offset + 1.0, curve.get_baked_length())
+		var tangent_local = (curve.sample_baked(next_offset) - snapped_local_pos).normalized()
+		if tangent_local.length() > 0.01:
+			var tangent_global = (track_path.to_global(snapped_local_pos + tangent_local) - fl.global_position).normalized()
+			fl.look_at(fl.global_position + tangent_global, Vector3.UP)
+	
 	# Delete old root-level SpawnPoints if they exist to clean up the scene tree
 	var old_sp = get_node_or_null("SpawnPoints")
 	if old_sp:
 		old_sp.free()
 		
-	# Find or create a SpawnPoints container under the FinishLine node
+	# Delete the old SpawnPoints container under the FinishLine to guarantee a 100% clean rebuild with no clashing subscene nodes
 	var spawn_container = fl.get_node_or_null("SpawnPoints")
-	if not spawn_container:
-		spawn_container = Node3D.new()
-		spawn_container.name = "SpawnPoints"
-		fl.add_child(spawn_container)
-		if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
-			spawn_container.owner = get_tree().edited_scene_root
+	if spawn_container:
+		spawn_container.free()
+		
+	spawn_container = Node3D.new()
+	spawn_container.name = "SpawnPoints"
+	fl.add_child(spawn_container)
+	if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
+		spawn_container.owner = get_tree().edited_scene_root
 			
 	# Reset container local transform to align with the FinishLine
 	spawn_container.transform = Transform3D.IDENTITY
@@ -892,31 +925,179 @@ func _align_start_and_spawns_to_track():
 	var spawns = []
 	for i in range(1, 7):
 		var name = "Spawn" + str(i)
-		var sp = spawn_container.get_node_or_null(name)
-		if not sp:
-			sp = Marker3D.new()
-			sp.name = name
-			spawn_container.add_child(sp)
-			if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
-				sp.owner = get_tree().edited_scene_root
-			
-			var indicator = preload("res://SpawnIndicator.tscn").instantiate()
-			sp.add_child(indicator)
-			if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
-				indicator.owner = get_tree().edited_scene_root
-				for child in indicator.get_children():
-					child.owner = get_tree().edited_scene_root
+		var sp = Marker3D.new()
+		sp.name = name
+		spawn_container.add_child(sp)
+		if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
+			sp.owner = get_tree().edited_scene_root
+		
+		var indicator = preload("res://SpawnIndicator.tscn").instantiate()
+		sp.add_child(indicator)
+		if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
+			indicator.owner = get_tree().edited_scene_root
 		spawns.append(sp)
 		
-	# Layout relative to FinishLine: 3 rows of 2 spawns
-	# local Z is positive (behind) in Godot's coordinates
-	var local_zs = [6.0, 6.0, 12.0, 12.0, 18.0, 18.0]
-	var local_xs = [-3.0, 3.0, -3.0, 3.0, -3.0, 3.0]
-	
-	for idx in range(spawns.size()):
-		var spawn = spawns[idx]
-		if spawn:
-			spawn.transform = Transform3D.IDENTITY
-			spawn.position = Vector3(local_xs[idx], 0.5, local_zs[idx])
+	# Layout relative to FinishLine: 3 rows of 2 spawns on the road surface behind the gate
+	if track_path:
+		var curve = track_path.curve
+		var fl_local = track_path.to_local(fl.global_position)
+		var fl_offset = curve.get_closest_offset(fl_local)
+		var track_len = curve.get_baked_length()
+		
+		# Z offset is negative offset along track (behind)
+		# X offset is lateral offset (left/right)
+		var local_zs = [-6.0, -6.0, -12.0, -12.0, -18.0, -18.0]
+		var local_xs = [-3.0, 3.0, -3.0, 3.0, -3.0, 3.0]
+		
+		for idx in range(spawns.size()):
+			var spawn = spawns[idx]
+			if spawn:
+				var s_offset = fmod(fl_offset + local_zs[idx] + track_len, track_len)
+				var snapped_local = curve.sample_baked(s_offset)
+				
+				# Get tangent at this spawn point to orient it along track
+				var next_s_offset = fmod(s_offset + 1.0, track_len)
+				var tangent_local = (curve.sample_baked(next_s_offset) - snapped_local).normalized()
+				
+				# Calculate lateral offset (X axis is perpendicular to tangent on XZ plane)
+				var right_local = tangent_local.cross(Vector3.UP).normalized()
+				var spawn_local_pos = snapped_local + right_local * local_xs[idx]
+				
+				# Set spawn's global position and basis
+				spawn.global_position = track_path.to_global(spawn_local_pos) + Vector3(0, 0.5, 0)
+				if tangent_local.length() > 0.01:
+					var tangent_global = (track_path.to_global(snapped_local + tangent_local) - track_path.to_global(snapped_local)).normalized()
+					spawn.global_transform.basis = Basis.looking_at(tangent_global, Vector3.UP)
+	else:
+		var local_zs = [6.0, 6.0, 12.0, 12.0, 18.0, 18.0]
+		var local_xs = [-3.0, 3.0, -3.0, 3.0, -3.0, 3.0]
+		for idx in range(spawns.size()):
+			var spawn = spawns[idx]
+			if spawn:
+				spawn.transform = Transform3D.IDENTITY
+				spawn.position = Vector3(local_xs[idx], 0.5, local_zs[idx])
 			
 	spawn_points = spawns
+
+func _build_organic_dune_mesh(width: float, depth: float, resolution: int, peak_height: float, noise: FastNoiseLite) -> ArrayMesh:
+	var st = SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	
+	var half_w = width * 0.5
+	var half_d = depth * 0.5
+	var step_x = width / resolution
+	var step_z = depth / resolution
+	
+	# Generate vertices
+	for r in range(resolution + 1):
+		for c in range(resolution + 1):
+			var lx = -half_w + c * step_x
+			var lz = -half_d + r * step_z
+			var d = sqrt(lx * lx + lz * lz)
+			var radius = min(half_w, half_d)
+			
+			# Radial mask to make sure the heights go to 0 at the boundaries
+			var mask = clamp(1.0 - (d / radius), 0.0, 1.0)
+			mask = mask * mask * (3.0 - 2.0 * mask) # Smoothstep
+			
+			var n = noise.get_noise_2d(lx * 2.0, lz * 2.0) * 4.0
+			var ly = mask * (peak_height + n)
+			
+			# Calculate UVs (scaled for visual triplanar texture mapping)
+			var u = float(c) / resolution
+			var v = float(r) / resolution
+			
+			st.set_uv(Vector2(u, v))
+			st.add_vertex(Vector3(lx, ly, lz))
+			
+	# Generate indices
+	for r in range(resolution):
+		for c in range(resolution):
+			var i = r * (resolution + 1) + c
+			st.add_index(i)
+			st.add_index(i + resolution + 1)
+			st.add_index(i + 1)
+			
+			st.add_index(i + 1)
+			st.add_index(i + resolution + 1)
+			st.add_index(i + resolution + 2)
+			
+	st.generate_normals()
+	st.generate_tangents()
+	return st.commit()
+
+func _generate_sand_dunes():
+	var parent_node = get_node_or_null("SandDunes")
+	if parent_node:
+		parent_node.free()
+	
+	parent_node = Node3D.new()
+	parent_node.name = "SandDunes"
+	add_child(parent_node)
+	if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
+		parent_node.owner = get_tree().edited_scene_root
+		
+	if not track_path:
+		track_path = get_node_or_null("TrackPath")
+	if not track_path: return
+	var curve = track_path.curve
+	var length = curve.get_baked_length()
+	
+	var ratios = [0.15, 0.35, 0.65, 0.85]
+	var sand_texture = load("res://materials/sand.png")
+	var sand_mat = StandardMaterial3D.new()
+	if sand_texture:
+		sand_mat.albedo_texture = sand_texture
+		sand_mat.uv1_triplanar = true
+		sand_mat.uv1_scale = Vector3(0.1, 0.1, 0.1)
+		sand_mat.roughness = 0.9
+	else:
+		sand_mat.albedo_color = Color(0.9, 0.8, 0.6)
+		sand_mat.roughness = 0.9
+		
+	var noise = FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
+	noise.frequency = 0.05
+		
+	for i in range(ratios.size()):
+		var offset = ratios[i] * length
+		var pos = curve.sample_baked(offset)
+		var next_offset = min(offset + 1.0, length)
+		var tangent = (curve.sample_baked(next_offset) - pos).normalized()
+		
+		# Seed the random number generator using the index to keep dune shapes deterministic
+		seed(12345 + i * 987)
+		noise.seed = randi()
+		
+		var dune_w = randf_range(35.0, 50.0)
+		var dune_d = randf_range(35.0, 50.0)
+		var peak_h = randf_range(6.0, 9.0)
+		
+		# Create a StaticBody3D for an organic wind-blown dune shape
+		var dune = StaticBody3D.new()
+		dune.name = "OrganicDune_" + str(i + 1)
+		parent_node.add_child(dune)
+		if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
+			dune.owner = get_tree().edited_scene_root
+			
+		var mesh_inst = MeshInstance3D.new()
+		mesh_inst.name = "DuneMesh"
+		mesh_inst.mesh = _build_organic_dune_mesh(dune_w, dune_d, 24, peak_h, noise)
+		mesh_inst.material_override = sand_mat
+		dune.add_child(mesh_inst)
+		if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
+			mesh_inst.owner = get_tree().edited_scene_root
+			
+		var col_shape = CollisionShape3D.new()
+		col_shape.name = "DuneCollision"
+		col_shape.shape = mesh_inst.mesh.create_trimesh_shape()
+		dune.add_child(col_shape)
+		if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
+			col_shape.owner = get_tree().edited_scene_root
+			
+		dune.global_position = track_path.to_global(pos)
+		if tangent.length() > 0.01:
+			var global_tangent = (track_path.to_global(pos + tangent) - dune.global_position).normalized()
+			dune.look_at(dune.global_position + global_tangent, Vector3.UP)
+			
+	print("Organic Sand Dunes generated along track as moveable objects!")

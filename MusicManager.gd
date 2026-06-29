@@ -11,7 +11,7 @@ var show_fps: bool = false
 var window_mode: int = 0 # 0: Windowed, 1: Fullscreen
 var resolution_index: int = 1 # Default 1920x1080
 var vsync: bool = false
-var anti_aliasing: int = 0 # 0: Disabled, 1: 2x MSAA, 2: 4x MSAA, 3: 8x MSAA, 4: FXAA
+var anti_aliasing: int = 2 # 0: Disabled, 1: 2x MSAA, 2: 4x MSAA, 3: 8x MSAA, 4: FXAA
 
 const RESOLUTIONS = [
 	Vector2i(1280, 720),
@@ -122,7 +122,7 @@ func load_settings():
 		window_mode = config.get_value("display", "window_mode", 0)
 		resolution_index = config.get_value("display", "resolution_index", 1)
 		vsync = config.get_value("display", "vsync", false)
-		anti_aliasing = config.get_value("display", "anti_aliasing", 0)
+		anti_aliasing = config.get_value("display", "anti_aliasing", 2)
 		
 	# Apply loaded settings
 	set_music_volume(music_volume, false)

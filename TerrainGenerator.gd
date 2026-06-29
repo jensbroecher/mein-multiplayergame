@@ -19,14 +19,7 @@ enum TrackLayoutType { DEFAULT, MOUNTAIN, CANYON }
 @export var no_grass: bool = false
 
 func _is_in_gap_pos(pos: Vector3) -> bool:
-	if track_layout_type == TrackLayoutType.MOUNTAIN:
-		if abs(pos.x) < 15.0:
-			if pos.z < -140.0 and pos.z > -170.0:
-				return true
-			if pos.z < -200.0 and pos.z > -230.0:
-				return true
-			if pos.z < -260.0 and pos.z > -285.0:
-				return true
+	# Gaps removed to keep the road continuous
 	return false
 
 func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curve3D, for_collision: bool) -> float:
@@ -45,6 +38,9 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 	var base_terrain_height: float
 	if track_layout_type == TrackLayoutType.MOUNTAIN:
 		base_terrain_height = radial_offset + h_noise
+		# Cap valley floor height near start gate area to prevent hills from blocking the bridge crossover
+		if px > -110.0 and px < 60.0 and pz > -370.0 and pz < -230.0:
+			base_terrain_height = min(base_terrain_height, 10.0)
 	elif track_layout_type == TrackLayoutType.CANYON:
 		# Canyon plateau: high flat ground with gentle noise ripples
 		base_terrain_height = 50.0 + h_noise * 0.5
@@ -120,30 +116,6 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			var depth = -15.0
 			var lake_blend = clamp((lake_radius - dist_to_lake) / 40.0, 0.0, 1.0)
 			height = lerp(height, depth, lake_blend)
-
-	# Abyss gap carving (mountain only)
-	if track_layout_type == TrackLayoutType.MOUNTAIN:
-		var road_pos = closest_pos
-		if abs(road_pos.x) < 5.0 and road_pos.z < -100.0 and road_pos.z > -300.0:
-			var in_gap = false
-			var gap_blend = 0.0
-			
-			if road_pos.z < -140.0 and road_pos.z > -170.0:
-				in_gap = true
-				var dist_to_edge = min(road_pos.z - (-170.0), -140.0 - road_pos.z)
-				gap_blend = clamp(dist_to_edge / 5.0, 0.0, 1.0)
-			elif road_pos.z < -200.0 and road_pos.z > -230.0:
-				in_gap = true
-				var dist_to_edge = min(road_pos.z - (-230.0), -200.0 - road_pos.z)
-				gap_blend = clamp(dist_to_edge / 5.0, 0.0, 1.0)
-			elif road_pos.z < -260.0 and road_pos.z > -285.0:
-				in_gap = true
-				var dist_to_edge = min(road_pos.z - (-285.0), -260.0 - road_pos.z)
-				gap_blend = clamp(dist_to_edge / 5.0, 0.0, 1.0)
-				
-			if in_gap:
-				var clearing_blend = 1.0 - smoothstep(sand_width / 2.0 - 2.0, sand_width / 2.0 + 60.0, dist)
-				height = lerp(height, -60.0, gap_blend * clearing_blend)
 
 	return height
 
@@ -675,6 +647,9 @@ func _create_track_collision(point_count: int, width: float, node_name: String):
 		_generate_bridge_supports(point_count)
 
 func _generate_bridge_supports(point_count: int):
+	if track_layout_type == TrackLayoutType.MOUNTAIN:
+		return
+
 	var curve = track_path.curve
 	var length = curve.get_baked_length()
 	var step = 30.0 # Support every 30m
@@ -1118,21 +1093,35 @@ func _rebuild_mountain_track():
 	for i in range(spiral_steps + 1):
 		var t = float(i) / spiral_steps
 		var angle = 1.5 * PI + t * 4.0 * PI
-		var radius = 280.0 - 180.0 * t
+		
+		# Add winding curves to make climb more interesting, damped at start/end
+		var wiggle = 30.0 * sin(t * 12.0 * PI) * sin(t * PI)
+		var radius = (280.0 - 180.0 * t) + wiggle
+		
 		var px = radius * cos(angle)
 		var pz = radius * sin(angle)
-		var py = 130.0 * t
+		
+		# Flatten the road near the start gate (first 3 points of the spiral climb) raised to 12m to avoid ground clipping
+		var py = 12.0
+		if i > 2:
+			var t_climb = float(i - 2) / (spiral_steps - 2)
+			py = 12.0 + 118.0 * t_climb
+			
 		pts.append(Vector3(px, py, pz))
 
+	# Steep, continuous descent road that loops back over/under the start of the climb
+	# Reaches valley floor at 12.0m height to avoid ground clipping and forms a bridge
 	var descent_pts = [
 		Vector3(0, 122, -120),
 		Vector3(0, 110, -140),
 		Vector3(0, 85, -170),
 		Vector3(0, 70, -200),
-		Vector3(0, 45, -230),
-		Vector3(0, 25, -260),
-		Vector3(0, 5, -285),
-		Vector3(0, 32.5, -295)
+		Vector3(0, 51, -240),
+		Vector3(0, 32, -280),  # Crossover bridge directly above the start gate
+		Vector3(0, 22, -310),  # Descent past the start gate
+		Vector3(-25, 16, -325), # Loop out to the left
+		Vector3(-45, 12, -305), # Turn back
+		Vector3(-25, 12, -280)  # Align and join the start gate
 	]
 	for p in descent_pts:
 		pts.append(p)
