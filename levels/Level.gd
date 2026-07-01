@@ -1137,7 +1137,7 @@ func _generate_sand_dunes():
 	if sand_texture:
 		sand_mat.albedo_texture = sand_texture
 		sand_mat.uv1_triplanar = true
-		sand_mat.uv1_scale = Vector3(0.1, 0.1, 0.1)
+		sand_mat.uv1_scale = Vector3(0.5, 0.5, 0.5)
 		sand_mat.roughness = 0.9
 	else:
 		sand_mat.albedo_color = Color(0.9, 0.8, 0.6)
