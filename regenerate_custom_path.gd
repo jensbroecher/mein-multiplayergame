@@ -62,7 +62,7 @@ func _ready():
 			level._align_start_and_spawns_to_track()
 			
 			print("Spawning mountain desert sand dunes...")
-			level._generate_sand_dunes()
+			# level._generate_sand_dunes() # Commented out to preserve user's manually arranged dunes
 			
 			# Save and clean up ownership
 			if tg:

@@ -1107,15 +1107,24 @@ func _rebuild_mountain_track():
 			var t_climb = float(i - 2) / (spiral_steps - 2)
 			py = 12.0 + 118.0 * t_climb
 			
+			# Lower the climbing road near the crossing (t_climb = 0.5) to provide more clearance under the overpass
+			var center_t = 0.5
+			var dip_width = 0.25
+			var dist_to_center = abs(t_climb - center_t)
+			if dist_to_center < dip_width:
+				var dip_factor = 0.5 + 0.5 * cos((dist_to_center / dip_width) * PI)
+				py -= 12.0 * dip_factor
+			
 		pts.append(Vector3(px, py, pz))
 
 	# Steep, continuous descent road that loops back over/under the start of the climb
 	# Reaches valley floor at 12.0m height to avoid ground clipping and forms a bridge
+	# Points at -170 and -200 are slightly raised to provide better clearance under the overpass
 	var descent_pts = [
 		Vector3(0, 122, -120),
 		Vector3(0, 110, -140),
-		Vector3(0, 85, -170),
-		Vector3(0, 70, -200),
+		Vector3(0, 92, -170),  # Raised from 85 to 92
+		Vector3(0, 78, -200),  # Raised from 70 to 78
 		Vector3(0, 51, -240),
 		Vector3(0, 32, -280),  # Crossover bridge directly above the start gate
 		Vector3(0, 22, -310),  # Descent past the start gate

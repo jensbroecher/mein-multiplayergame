@@ -225,6 +225,7 @@ var is_shielded: bool = false
 var was_shocked: bool = false
 var camera_look_at: Vector3 = Vector3.ZERO
 var camera_clip_distance_mult: float = 1.0
+var camera_clip_distance_mult_iso: float = 1.0
 var is_isometric: bool = true
 var is_intro_active: bool = false
 var intro_time: float = 0.0
@@ -514,6 +515,8 @@ func _process(delta):
 			camera.projection = Camera3D.PROJECTION_PERSPECTIVE
 			if not is_isometric:
 				camera_clip_distance_mult = 1.0
+			else:
+				camera_clip_distance_mult_iso = 1.0
 
 		if Input.is_action_just_pressed("respawn"):
 			respawn_rpc.rpc()
@@ -548,7 +551,28 @@ func _process(delta):
 				var iso_offset = Vector3(-26, 26, 26)
 				var target_cam_pos = visuals.global_position + iso_offset
 				
-				# Stay at a constant distance (no collision raycast zooming for the isometric camera)
+				# Avoid clipping through terrain (ignoring other assets like tunnels/trees)
+				var target_ratio = 1.0
+				var space_state = get_world_3d().direct_space_state
+				var ray_start = visuals.global_position + Vector3.UP * 1.0
+				var query = PhysicsRayQueryParameters3D.create(ray_start, target_cam_pos)
+				query.exclude = excludes
+				var result = space_state.intersect_ray(query)
+				if result and result.collider and (result.collider.name.contains("Unified_World_Collision") or result.collider.name.contains("Terrain")):
+					var hit_pos = result.position
+					var max_dist = ray_start.distance_to(target_cam_pos)
+					if max_dist > 0.01:
+						var hit_dist = ray_start.distance_to(hit_pos)
+						# Keep camera 0.5m in front of terrain collision
+						target_ratio = clamp((hit_dist - 0.5) / max_dist, 0.1, 1.0)
+				
+				# Lerp multiplier: faster to zoom in to avoid clipping, slower to zoom out to prevent jumps
+				var lerp_speed = 15.0 if target_ratio < camera_clip_distance_mult_iso else 3.0
+				camera_clip_distance_mult_iso = lerp(camera_clip_distance_mult_iso, target_ratio, lerp_speed * delta)
+				
+				# Position target_cam_pos at the smoothed distance
+				target_cam_pos = ray_start + (target_cam_pos - ray_start) * camera_clip_distance_mult_iso
+				
 				camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 10.0 * delta)
 				camera_look_at = camera_look_at.lerp(visuals.global_position + visual_forward * look_ahead_dist, 10.0 * delta)
 				camera_pivot.look_at(camera_look_at, Vector3.UP)
