@@ -14,23 +14,21 @@ func _ready():
 			add_child(level)
 			
 			var tg = level.get_node_or_null("TerrainGenerator")
-			if tg:
-				print("Rebuilding default track...")
-				tg._rebuild_longer_track()
 			
 			print("Aligning default spawn points...")
 			level._align_start_and_spawns_to_track()
 			
-			print("Spawning default sand dunes...")
-			level._generate_sand_dunes()
+			# Sand dunes are only for MountainLevel, not Level.tscn
+			var sd = level.get_node_or_null("SandDunes")
+			if sd:
+				sd.free()
+			
+			_strip_grass_container(level, tg, "Level")
 			
 			# Save and clean up ownership
 			if tg:
 				for child in tg.get_children():
 					set_owner_recursive_target(child, level)
-			var sd = level.get_node_or_null("SandDunes")
-			if sd:
-				set_owner_recursive_target(sd, level)
 			var sp = level.get_node_or_null("SpawnPoints")
 			if sp:
 				set_owner_recursive_target(sp, level)
@@ -64,6 +62,8 @@ func _ready():
 			print("Spawning mountain desert sand dunes...")
 			# level._generate_sand_dunes() # Commented out to preserve user's manually arranged dunes
 			
+			_strip_grass_container(level, tg, "MountainLevel")
+			
 			# Save and clean up ownership
 			if tg:
 				for child in tg.get_children():
@@ -93,10 +93,20 @@ func _ready():
 			print("Instantiated CanyonLevel.tscn successfully")
 			add_child(level)
 			
+			var tg = level.get_node_or_null("TerrainGenerator")
+			if tg:
+				print("Rebuilding canyon track...")
+				tg._rebuild_canyon_track()
+			
 			print("Aligning canyon spawn points...")
 			level._align_start_and_spawns_to_track()
 			
+			_strip_grass_container(level, tg, "CanyonLevel")
+			
 			# Save and clean up ownership
+			if tg:
+				for child in tg.get_children():
+					set_owner_recursive_target(child, level)
 			var sp = level.get_node_or_null("SpawnPoints")
 			if sp:
 				set_owner_recursive_target(sp, level)
@@ -119,3 +129,25 @@ func set_owner_recursive_target(node: Node, scene_root: Node):
 		return
 	for child in node.get_children():
 		set_owner_recursive_target(child, scene_root)
+
+func _find_node_by_name(root: Node, target_name: String) -> Node:
+	if root.name == target_name:
+		return root
+	for child in root.get_children():
+		var found = _find_node_by_name(child, target_name)
+		if found:
+			return found
+	return null
+
+func _strip_grass_container(level: Node, tg: Node, label: String):
+	var gc = null
+	if tg:
+		gc = tg.get_node_or_null("GrassContainer")
+	if not gc:
+		gc = _find_node_by_name(level, "GrassContainer")
+	if gc:
+		gc.get_parent().remove_child(gc)
+		gc.free()
+		print("Removed GrassContainer from ", label, " before packing to prevent bloat")
+	else:
+		print("INFO: No GrassContainer in ", label, " to remove")

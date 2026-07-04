@@ -55,9 +55,14 @@ var cp_offsets: Array[float] = []
 var track_length: float = 0.0
 
 func _ready():
-	# @tool makes _ready() run in the editor too; skip all game/multiplayer
-	# setup in that context — editor tools use the export-var setters instead.
-	if Engine.is_editor_hint():
+	# Skip running setup when instantiating the scene inside regeneration scripts to prevent saving runtime-modified nodes
+	var is_regenerating = false
+	if get_tree() and get_tree().root:
+		for child in get_tree().root.get_children():
+			if "regenerate" in child.name.to_lower():
+				is_regenerating = true
+				break
+	if Engine.is_editor_hint() or is_regenerating:
 		return
 
 	if not track_path:

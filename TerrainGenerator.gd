@@ -42,8 +42,8 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 		if px > -110.0 and px < 60.0 and pz > -370.0 and pz < -230.0:
 			base_terrain_height = min(base_terrain_height, 10.0)
 	elif track_layout_type == TrackLayoutType.CANYON:
-		# Canyon plateau: high flat ground with gentle noise ripples
-		base_terrain_height = 50.0 + h_noise * 0.5
+		# Canyon plateau: low flat ground with gentle noise ripples (lowered to 24.0 so camera doesn't clip/occlude in isometric mode)
+		base_terrain_height = 24.0 + h_noise * 0.4
 	else:
 		base_terrain_height = h_noise
 
@@ -59,9 +59,9 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 		# Zone 1: Road surface — flat at road height
 		var road_inner = sand_edge - 2.0
 		# Zone 2: Canyon floor just beyond curb — stays low briefly
-		var floor_edge = sand_edge + 4.0
-		# Zone 3: Canyon wall rise — ramps steeply up to plateau
-		var wall_top = sand_edge + 15.0
+		var floor_edge = sand_edge + 5.0
+		# Zone 3: Canyon wall rise — ramps gently up to low plateau
+		var wall_top = sand_edge + 30.0
 		
 		if dist < road_inner:
 			# On the road itself
@@ -265,7 +265,7 @@ func _save_resource(res: Resource, res_name: String, sub_dir: String = "") -> Re
 	res.take_over_path(file_path)
 	ResourceSaver.save(res, file_path)
 	
-	return res
+	return load(file_path)
 
 
 func _clear_grass_directory():
@@ -685,37 +685,41 @@ func _rebuild_longer_track():
 	var curve = track_path.curve
 	curve.clear_points()
 
-	# Smooth figure-eight shaped track with wide radiused turns — no sharp corners.
-	# Uses parametric math with exact Hermite tangent handles to guarantee
-	# the road mesh never self-intersects on bends.
-	
-	var steps = 64
-	for i in range(steps):
-		var t = float(i) / steps
-		var angle = t * 2.0 * PI
-		
-		# Lemniscate-inspired oval loop: elongated on Z axis, with a nice S-bend
-		# Factor: 380x230 ellipse with a gentle lateral sine wave for interest
-		var px = 380.0 * sin(angle) + 60.0 * sin(angle * 2.0)
-		var pz = 230.0 * cos(angle) - 230.0  # offset so start is near (0,0,0)
-		
-		# Gentle elevation: rises and falls twice per lap — max 18m gain
-		var py = 8.0 * sin(angle * 2.0)
-		
-		# Exact derivatives
-		var dpx = 380.0 * cos(angle) + 120.0 * cos(angle * 2.0)
-		var dpz = -230.0 * sin(angle)
-		var dpy = 16.0 * cos(angle * 2.0)
-		
-		var handle = Vector3(dpx, dpy, dpz) / (3.0 * steps)
-		
-		curve.add_point(
-			Vector3(px, py, pz),
-			-handle,
-			handle
-		)
+	# Custom long course track points with large bridge - matches Level.tscn design
+	var pts = [
+		Vector3(0, 0, 0),
+		Vector3(60, 2, -25),
+		Vector3(120, 5, -50),
+		Vector3(250, 10, -150),
+		Vector3(300, 5, -350),
+		Vector3(280, 4, -420),
+		Vector3(220, 2, -450),
+		Vector3(150, 2, -420),
+		Vector3(100, 2, -400),
+		Vector3(0, 5, -440),
+		Vector3(-80, 10, -480),
+		Vector3(-250, 15, -550),
+		Vector3(-450, 20, -650),
+		Vector3(-580, 20, -620),
+		Vector3(-700, 18, -480),
+		Vector3(-650, 12, -350),
+		Vector3(-550, 8, -250),
+		Vector3(-400, 4, -100),
+		Vector3(-450, 12, 10),
+		Vector3(-350, 8, 150),
+		Vector3(-200, 4, 300),
+		Vector3(-100, 3, 290),
+		Vector3(100, 2, 280),
+		Vector3(50, 1, 200),
+		Vector3(20, 0.5, 100)
+	]
 
-	print("Desert track (smooth oval) generated!")
+	for p in pts:
+		curve.add_point(p)
+
+	_smooth_curve_handles(curve, true)
+
+	print("Desert track rebuilt with custom long course!")
 	generate_world()
 
 func _create_path_sides(point_count: int, width: float, mat: Material, y_offset: float, node_name: String):
@@ -1148,17 +1152,26 @@ func _rebuild_canyon_track():
 	var curve = track_path.curve
 	curve.clear_points()
 	
-	# Dynamic winding canyon track with steep curves and vertical elevation changes
+	# Dynamic winding canyon track with steep curves, interesting S-bends and vertical elevation changes
+	# Loops back smoothly near the start to prevent gaps/walls
 	var pts = [
-		Vector3(0, 2, -250),
-		Vector3(140, 25, -180),
-		Vector3(220, 8, -60),
-		Vector3(80, 30, 60),
-		Vector3(160, 5, 200),
-		Vector3(0, 15, 270),
-		Vector3(-150, 35, 210),
-		Vector3(-240, 12, 0),
-		Vector3(-120, 2, -140)
+		Vector3(0, 2, -250),      # Start gate area
+		Vector3(80, 3, -230),     # Gentle curve right
+		Vector3(160, 4, -170),    # Low valley
+		Vector3(240, 5, -90),     # Curve along the right wall
+		Vector3(180, 6, -10),     # Turning back left
+		Vector3(90, 4, 60),       # S-curve dip
+		Vector3(150, 3, 140),     # Lower canyon floor stretch
+		Vector3(220, 4, 220),     # Far right bend
+		Vector3(110, 5, 280),     # High bend around canyon rim
+		Vector3(0, 7, 210),       # Mid height crossing area
+		Vector3(-100, 8, 260),    # Left canyon wall sweep
+		Vector3(-200, 6, 200),    # Far left bend
+		Vector3(-150, 4, 110),    # Descending into a winding wash
+		Vector3(-240, 3, 20),     # Low left S-bend
+		Vector3(-180, 2, -80),    # Heading back up north
+		Vector3(-100, 2, -160),   # Winding canyon floor heading home
+		Vector3(-40, 2, -220)     # Final alignment to the start gate
 	]
 	
 	for p in pts:
@@ -1166,5 +1179,5 @@ func _rebuild_canyon_track():
 		
 	_smooth_curve_handles(curve, true)
 	
-	print("Canyon track rebuilt with simple winding loop!")
+	print("Canyon track rebuilt with winding loop!")
 	generate_world()

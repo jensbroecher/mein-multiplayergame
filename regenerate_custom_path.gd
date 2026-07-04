@@ -21,16 +21,15 @@ func _ready():
 			print("Aligning default spawn points...")
 			level._align_start_and_spawns_to_track()
 			
-			print("Spawning default sand dunes...")
-			level._generate_sand_dunes()
+			# Sand dunes are only for MountainLevel, not Level.tscn
+			var sd = level.get_node_or_null("SandDunes")
+			if sd:
+				sd.free()
 			
 			# Save and clean up ownership
 			if tg:
 				for child in tg.get_children():
 					set_owner_recursive_target(child, level)
-			var sd = level.get_node_or_null("SandDunes")
-			if sd:
-				set_owner_recursive_target(sd, level)
 			var sp = level.get_node_or_null("SpawnPoints")
 			if sp:
 				set_owner_recursive_target(sp, level)
@@ -93,10 +92,18 @@ func _ready():
 			print("Instantiated CanyonLevel.tscn successfully")
 			add_child(level)
 			
+			var tg = level.get_node_or_null("TerrainGenerator")
+			if tg:
+				print("Regenerating canyon terrain and road from curve...")
+				tg.generate_world()
+			
 			print("Aligning canyon spawn points...")
 			level._align_start_and_spawns_to_track()
 			
 			# Save and clean up ownership
+			if tg:
+				for child in tg.get_children():
+					set_owner_recursive_target(child, level)
 			var sp = level.get_node_or_null("SpawnPoints")
 			if sp:
 				set_owner_recursive_target(sp, level)
