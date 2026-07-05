@@ -3,17 +3,9 @@ extends Node3D
 
 enum TrackLayoutType { DEFAULT, MOUNTAIN, CANYON }
 
-@export var track_layout_type: TrackLayoutType = TrackLayoutType.DEFAULT:
-	set(val):
-		if track_layout_type != val:
-			track_layout_type = val
-			if Engine.is_editor_hint() and is_inside_tree():
-				if track_layout_type == TrackLayoutType.CANYON:
-					_rebuild_canyon_track()
-				elif track_layout_type == TrackLayoutType.MOUNTAIN:
-					_rebuild_mountain_track()
-				else:
-					_rebuild_longer_track()
+# Used to determine terrain shape (canyon walls, mountain slope, flat desert).
+# Change this in the Inspector to match the level — it does NOT overwrite your custom path.
+@export var track_layout_type: TrackLayoutType = TrackLayoutType.DEFAULT
 @export var level_prefix: String = ""
 @export var no_water: bool = false
 @export var no_grass: bool = false
@@ -152,29 +144,11 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 @export var grass_grid_size: int = 10
 @export var grass_visibility_range: float = 200.0
 
-@export var create_longer_track: bool = false:
-	set(val):
-		if val:
-			create_longer_track = false
-			if Engine.is_editor_hint():
-				_rebuild_longer_track()
-			notify_property_list_changed()
-
-@export var rebuild_mountain_track_now: bool = false:
-	set(val):
-		if val:
-			rebuild_mountain_track_now = false
-			if Engine.is_editor_hint():
-				_rebuild_mountain_track()
-			notify_property_list_changed()
-
-@export var rebuild_canyon_track_now: bool = false:
-	set(val):
-		if val:
-			rebuild_canyon_track_now = false
-			if Engine.is_editor_hint():
-				_rebuild_canyon_track()
-			notify_property_list_changed()
+# To regenerate a level, run its dedicated scene:
+#   regenerate_canyon.tscn  — Canyon level only (preserves your custom path)
+#   regenerate_mountain.tscn — Mountain level only
+#   regenerate_desert.tscn  — Desert/oval level only
+#   regenerate_all.tscn     — All three levels at once
 
 @export var grass_material: Material
 @export var road_material: Material
@@ -243,6 +217,25 @@ func generate_world():
 		_set_owner_recursive(self)
 
 
+# Returns a Curve3D whose points are in TerrainGenerator-local space (= world space
+# when TerrainGenerator is at the scene root with no transform offset).
+# This corrects a mismatch that occurred when the Path3D node was moved in the
+# scene: the raw curve points are relative to Path3D's own origin, so sampling
+# them directly produced road/terrain geometry at the wrong world position.
+func _get_world_curve() -> Curve3D:
+	var src: Curve3D = track_path.curve
+	var world_curve := Curve3D.new()
+	world_curve.bake_interval = src.bake_interval
+	# The transform that maps Path3D-local positions into TerrainGenerator-local space
+	var to_local: Transform3D = global_transform.affine_inverse() * track_path.global_transform
+	for i in range(src.point_count):
+		var pos   = to_local * src.get_point_position(i)
+		var p_in  = to_local.basis * src.get_point_in(i)   # tangent handles are direction vectors
+		var p_out = to_local.basis * src.get_point_out(i)
+		world_curve.add_point(pos, p_in, p_out)
+	return world_curve
+
+
 func _save_resource(res: Resource, res_name: String, sub_dir: String = "") -> Resource:
 	if not save_to_files:
 		return res
@@ -306,7 +299,7 @@ func _generate_mesh(for_collision: bool) -> ArrayMesh:
 	var start_x = -terrain_size.x / 2.0
 	var start_y = -terrain_size.y / 2.0
 
-	var curve = track_path.curve
+	var curve = _get_world_curve()
 
 	for y in range(terrain_resolution + 1):
 		for x in range(terrain_resolution + 1):
@@ -346,7 +339,7 @@ func _generate_mesh(for_collision: bool) -> ArrayMesh:
 	return st.commit()
 
 func _generate_road_and_sand():
-	var curve = track_path.curve
+	var curve = _get_world_curve()
 	var length = curve.get_baked_length()
 	var points_count = int(length / 0.2) # Even higher resolution (one segment every 20cm)
 
@@ -372,7 +365,7 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 	var st = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 
-	var curve = track_path.curve
+	var curve = _get_world_curve()
 	var half_w = width / 2.0
 	var length = curve.get_baked_length()
 	
@@ -526,7 +519,7 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 func _create_track_collision(point_count: int, width: float, node_name: String):
 	var st = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var curve = track_path.curve
+	var curve = _get_world_curve()
 	var length = curve.get_baked_length()
 	var half_w = width / 2.0
 	var y_offset = road_y_offset # Match road height exactly
@@ -650,7 +643,7 @@ func _generate_bridge_supports(point_count: int):
 	if track_layout_type == TrackLayoutType.MOUNTAIN:
 		return
 
-	var curve = track_path.curve
+	var curve = _get_world_curve()
 	var length = curve.get_baked_length()
 	var step = 30.0 # Support every 30m
 
@@ -679,53 +672,12 @@ func _generate_bridge_supports(point_count: int):
 			collision_shape.shape = shape
 			static_body.add_child(collision_shape)
 
-func _rebuild_longer_track():
-	if not track_path: return
-
-	var curve = track_path.curve
-	curve.clear_points()
-
-	# Custom long course track points with large bridge - matches Level.tscn design
-	var pts = [
-		Vector3(0, 0, 0),
-		Vector3(60, 2, -25),
-		Vector3(120, 5, -50),
-		Vector3(250, 10, -150),
-		Vector3(300, 5, -350),
-		Vector3(280, 4, -420),
-		Vector3(220, 2, -450),
-		Vector3(150, 2, -420),
-		Vector3(100, 2, -400),
-		Vector3(0, 5, -440),
-		Vector3(-80, 10, -480),
-		Vector3(-250, 15, -550),
-		Vector3(-450, 20, -650),
-		Vector3(-580, 20, -620),
-		Vector3(-700, 18, -480),
-		Vector3(-650, 12, -350),
-		Vector3(-550, 8, -250),
-		Vector3(-400, 4, -100),
-		Vector3(-450, 12, 10),
-		Vector3(-350, 8, 150),
-		Vector3(-200, 4, 300),
-		Vector3(-100, 3, 290),
-		Vector3(100, 2, 280),
-		Vector3(50, 1, 200),
-		Vector3(20, 0.5, 100)
-	]
-
-	for p in pts:
-		curve.add_point(p)
-
-	_smooth_curve_handles(curve, true)
-
-	print("Desert track rebuilt with custom long course!")
-	generate_world()
-
+# (track rebuild functions removed — edit the Path3D curve directly in the scene editor,
+#  then run the dedicated regenerate_*.tscn scene to rebuild terrain/road geometry)
 func _create_path_sides(point_count: int, width: float, mat: Material, y_offset: float, node_name: String):
 	var st = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var curve = track_path.curve
+	var curve = _get_world_curve()
 	var length = curve.get_baked_length()
 	var half_w = width / 2.0
 	var depth = 2.5 # Thickness of the road hull
@@ -901,7 +853,7 @@ func _sq_dist_to_path(px: float, pz: float, baked: PackedVector2Array) -> float:
 func _generate_terrain_grass():
 	if terrain_grass_count <= 0: return
 	
-	var curve = track_path.curve
+	var curve = _get_world_curve()
 	
 	# --- CRITICAL: Match noise settings exactly to the terrain mesh (seed 12345, octaves 4) ---
 	var noise = FastNoiseLite.new()
@@ -1058,126 +1010,3 @@ func _generate_terrain_grass():
 			mmi.material_override = mat
 
 
-func _smooth_curve_handles(curve: Curve3D, is_loop: bool):
-	for i in range(curve.point_count):
-		var p = curve.get_point_position(i)
-		var prev_idx = (i - 1 + curve.point_count) % curve.point_count
-		var next_idx = (i + 1) % curve.point_count
-
-		if not is_loop:
-			if i == 0: prev_idx = 0
-			if i == curve.point_count - 1: next_idx = curve.point_count - 1
-
-		var prev = curve.get_point_position(prev_idx)
-		var next = curve.get_point_position(next_idx)
-
-		var dir = (next - prev).normalized()
-		var d_prev = p.distance_to(prev)
-		var d_next = p.distance_to(next)
-		var handle_dist = min(d_prev, d_next) * 0.35
-
-		if i == 0 and not is_loop:
-			curve.set_point_in(i, Vector3.ZERO)
-			curve.set_point_out(i, dir * handle_dist)
-		elif i == curve.point_count - 1 and not is_loop:
-			curve.set_point_in(i, -dir * handle_dist)
-			curve.set_point_out(i, Vector3.ZERO)
-		else:
-			curve.set_point_in(i, -dir * handle_dist)
-			curve.set_point_out(i, dir * handle_dist)
-
-func _rebuild_mountain_track():
-	if not track_path: return
-	var curve = track_path.curve
-	curve.clear_points()
-	
-	# Wide spiral track that climbs the mountain all the way to the summit (130m) and then descents back down
-	var pts = []
-	var spiral_steps = 48
-	for i in range(spiral_steps + 1):
-		var t = float(i) / spiral_steps
-		var angle = 1.5 * PI + t * 4.0 * PI
-		
-		# Add winding curves to make climb more interesting, damped at start/end
-		var wiggle = 30.0 * sin(t * 12.0 * PI) * sin(t * PI)
-		var radius = (280.0 - 180.0 * t) + wiggle
-		
-		var px = radius * cos(angle)
-		var pz = radius * sin(angle)
-		
-		# Flatten the road near the start gate (first 3 points of the spiral climb) raised to 12m to avoid ground clipping
-		var py = 12.0
-		if i > 2:
-			var t_climb = float(i - 2) / (spiral_steps - 2)
-			py = 12.0 + 118.0 * t_climb
-			
-			# Lower the climbing road near the crossing (t_climb = 0.5) to provide more clearance under the overpass
-			var center_t = 0.5
-			var dip_width = 0.25
-			var dist_to_center = abs(t_climb - center_t)
-			if dist_to_center < dip_width:
-				var dip_factor = 0.5 + 0.5 * cos((dist_to_center / dip_width) * PI)
-				py -= 12.0 * dip_factor
-			
-		pts.append(Vector3(px, py, pz))
-
-	# Steep, continuous descent road that loops back over/under the start of the climb
-	# Reaches valley floor at 12.0m height to avoid ground clipping and forms a bridge
-	# Points at -170 and -200 are slightly raised to provide better clearance under the overpass
-	var descent_pts = [
-		Vector3(0, 122, -120),
-		Vector3(0, 110, -140),
-		Vector3(0, 92, -170),  # Raised from 85 to 92
-		Vector3(0, 78, -200),  # Raised from 70 to 78
-		Vector3(0, 51, -240),
-		Vector3(0, 32, -280),  # Crossover bridge directly above the start gate
-		Vector3(0, 22, -310),  # Descent past the start gate
-		Vector3(-25, 16, -325), # Loop out to the left
-		Vector3(-45, 12, -305), # Turn back
-		Vector3(-25, 12, -280)  # Align and join the start gate
-	]
-	for p in descent_pts:
-		pts.append(p)
-
-	for p in pts:
-		curve.add_point(p)
-		
-	_smooth_curve_handles(curve, true)
-	
-	print("Mountain track rebuilt with spiral climb to summit and descent!")
-	generate_world()
-
-func _rebuild_canyon_track():
-	if not track_path: return
-	var curve = track_path.curve
-	curve.clear_points()
-	
-	# Dynamic winding canyon track with steep curves, interesting S-bends and vertical elevation changes
-	# Loops back smoothly near the start to prevent gaps/walls
-	var pts = [
-		Vector3(0, 2, -250),      # Start gate area
-		Vector3(80, 3, -230),     # Gentle curve right
-		Vector3(160, 4, -170),    # Low valley
-		Vector3(240, 5, -90),     # Curve along the right wall
-		Vector3(180, 6, -10),     # Turning back left
-		Vector3(90, 4, 60),       # S-curve dip
-		Vector3(150, 3, 140),     # Lower canyon floor stretch
-		Vector3(220, 4, 220),     # Far right bend
-		Vector3(110, 5, 280),     # High bend around canyon rim
-		Vector3(0, 7, 210),       # Mid height crossing area
-		Vector3(-100, 8, 260),    # Left canyon wall sweep
-		Vector3(-200, 6, 200),    # Far left bend
-		Vector3(-150, 4, 110),    # Descending into a winding wash
-		Vector3(-240, 3, 20),     # Low left S-bend
-		Vector3(-180, 2, -80),    # Heading back up north
-		Vector3(-100, 2, -160),   # Winding canyon floor heading home
-		Vector3(-40, 2, -220)     # Final alignment to the start gate
-	]
-	
-	for p in pts:
-		curve.add_point(p)
-		
-	_smooth_curve_handles(curve, true)
-	
-	print("Canyon track rebuilt with winding loop!")
-	generate_world()

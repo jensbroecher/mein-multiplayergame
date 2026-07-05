@@ -1,8 +1,10 @@
 # regenerate_both.gd
+# Regenerates ALL three levels at once, preserving custom Path3D curves in each.
+# To regenerate a single level, use regenerate_canyon.tscn / regenerate_mountain.tscn / regenerate_desert.tscn
 extends Node
 
 func _ready():
-	print("Starting track and level regeneration for both levels...")
+	print("Starting regeneration for all levels (preserving custom curves)...")
 	
 	# --- 1. DEFAULT OVAL TRACK (Level.tscn) ---
 	var desert_path = "res://levels/Level.tscn"
@@ -53,8 +55,8 @@ func _ready():
 			
 			var tg = level.get_node_or_null("TerrainGenerator")
 			if tg:
-				print("Rebuilding mountain desert track...")
-				tg._rebuild_mountain_track()
+				print("Regenerating mountain terrain from existing custom curve...")
+				tg.generate_world()
 			
 			print("Aligning mountain desert spawn points...")
 			level._align_start_and_spawns_to_track()
@@ -95,8 +97,8 @@ func _ready():
 			
 			var tg = level.get_node_or_null("TerrainGenerator")
 			if tg:
-				print("Rebuilding canyon track...")
-				tg._rebuild_canyon_track()
+				print("Regenerating canyon terrain from existing custom curve...")
+				tg.generate_world()
 			
 			print("Aligning canyon spawn points...")
 			level._align_start_and_spawns_to_track()

@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://regenerate_desert.gd" id="1_reg_desert"]
+
+[node name="RegenerateDesert" type="Node"]
+script = ExtResource("1_reg_desert")

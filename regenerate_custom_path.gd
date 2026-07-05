@@ -1,8 +1,11 @@
 # regenerate_custom_path.gd
+# Legacy script — same behaviour as regenerate_both.gd (all 3 levels, preserves custom curves).
+# Prefer the per-level scripts for targeted work:
+#   regenerate_canyon.tscn / regenerate_mountain.tscn / regenerate_desert.tscn
 extends Node
 
 func _ready():
-	print("Starting track and level regeneration preserving custom paths...")
+	print("Starting regeneration for all levels (preserving custom curves)...")
 	
 	# --- 1. DEFAULT OVAL TRACK (Level.tscn) ---
 	var desert_path = "res://levels/Level.tscn"
