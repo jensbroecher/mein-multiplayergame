@@ -222,6 +222,9 @@ func generate_world():
 # This corrects a mismatch that occurred when the Path3D node was moved in the
 # scene: the raw curve points are relative to Path3D's own origin, so sampling
 # them directly produced road/terrain geometry at the wrong world position.
+#
+# When is_loop is true, the first control point is also appended at the end so that
+# get_closest_point() covers the closing segment (last → first) for terrain shaping.
 func _get_world_curve() -> Curve3D:
 	var src: Curve3D = track_path.curve
 	var world_curve := Curve3D.new()
@@ -232,6 +235,13 @@ func _get_world_curve() -> Curve3D:
 		var pos   = to_local * src.get_point_position(i)
 		var p_in  = to_local.basis * src.get_point_in(i)   # tangent handles are direction vectors
 		var p_out = to_local.basis * src.get_point_out(i)
+		world_curve.add_point(pos, p_in, p_out)
+	# For loops: append the first point at the end so the closing segment is
+	# included in get_closest_point() queries (used by terrain height sampling).
+	if is_loop and src.point_count > 1:
+		var pos   = to_local * src.get_point_position(0)
+		var p_in  = to_local.basis * src.get_point_in(0)
+		var p_out = to_local.basis * src.get_point_out(0)
 		world_curve.add_point(pos, p_in, p_out)
 	return world_curve
 
@@ -714,8 +724,13 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 
 		var right = tangent.cross(Vector3.UP).normalized() * half_w
 
-		var top_l = pos - right + Vector3(0, side_y_offset, 0)
-		var top_r = pos + right + Vector3(0, side_y_offset, 0)
+		# Snap the closing row to the start position so the loop connects perfectly
+		var final_pos = pos
+		if is_loop and i == point_count:
+			final_pos = curve.sample_baked(0.0)
+
+		var top_l = final_pos - right + Vector3(0, side_y_offset, 0)
+		var top_r = final_pos + right + Vector3(0, side_y_offset, 0)
 		var bot_l = top_l - Vector3(0, depth, 0)
 		var bot_r = top_r - Vector3(0, depth, 0)
 
