@@ -29,6 +29,18 @@
 [ext_resource type="PackedScene" uid="uid://c1ougb5ppnj6a" path="res://models/plants/155b46f430c01d85b690a61ac5be8ae0.fbx" id="27_06wvx"]
 [ext_resource type="PackedScene" uid="uid://bs25mu1mefc5o" path="res://models/plants/3eebbf61beb1fd934d2948b09bc8a97d.fbx" id="28_uayk7"]
 [ext_resource type="PackedScene" uid="uid://brr0dl1hvares" path="res://models/plants/04b2c6e2e49cc272be24d5807fee4ea0.fbx" id="29_vox2v"]
+[ext_resource type="PackedScene" uid="uid://dkj5tjwo3msog" path="res://models/plants/fdf67fbe6bce046595412b61400019fd.fbx" id="30_wmcvr"]
+[ext_resource type="PackedScene" uid="uid://cco2bc4fs2kf0" path="res://models/plants/f71bea208fc48e1bbd8f3270e3ea2138.fbx" id="31_8m3dh"]
+[ext_resource type="PackedScene" uid="uid://dp05rwq48qq34" path="res://models/plants/d885537d14dc17e39be2835fbcf5c93d.fbx" id="32_8m3dh"]
+[ext_resource type="PackedScene" uid="uid://cxyogjy00k714" path="res://models/plants/7c746b3609638bc97eb9642b3b3c9893.fbx" id="33_42wqv"]
+[ext_resource type="PackedScene" uid="uid://ba1funw6vs7ex" path="res://models/plants/08cf22326c18c9e5e00772c91f79ab5e.fbx" id="34_xfrh0"]
+[ext_resource type="PackedScene" uid="uid://cyj1qlvwh4uv2" path="res://models/plants/8b210c185fa7f914a015cd7f29a515f6.fbx" id="35_hax3r"]
+[ext_resource type="PackedScene" uid="uid://cdc8t8xxfvn6" path="res://models/plants/361bcba64776771e1d9624b08d332c66.fbx" id="36_it274"]
+[ext_resource type="PackedScene" uid="uid://csty3nfm4qm0n" path="res://models/plants/1086dae7861d70b10cce6ef246128f58.fbx" id="37_edvol"]
+[ext_resource type="PackedScene" uid="uid://h2t6mmm2s64u" path="res://models/signs/a63e2ffd6a7c0cc4c9d83db2affc656b.fbx" id="38_edvol"]
+[ext_resource type="PackedScene" uid="uid://c2m1b0aaq2yi7" path="res://models/desert/f71825ab70d7b3c7d0ca6770e0f7fc05.fbx" id="39_e4m7v"]
+[ext_resource type="PackedScene" uid="uid://ccvxd1n58q43d" path="res://models/desert/ee5c34395775523473bd5b6cce35d100.fbx" id="40_510r7"]
+[ext_resource type="PackedScene" uid="uid://bpq7q2q2kh6jv" path="res://models/desert/c16e78baf6cd9fe5f065cdd967423cd6.fbx" id="41_as070"]
 
 [sub_resource type="Curve" id="Curve_8bl6p"]
 _data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.0464286, 0), 0.0, 0.0, 0, 0, Vector2(0.107143, 0.0367036), 0.303207, 0.303207, 0, 0, Vector2(0.425, 1), 0.0, 0.0, 0, 0, Vector2(0.571429, 1), 0.0, 0.0, 0, 0, Vector2(0.896429, 0.0277009), 0.0, 0.0, 0, 0, Vector2(0.960714, 0), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
@@ -44,14 +56,14 @@ horizonColour = Color(0.0784314, 0.00784314, 0.0156863, 1)
 groundColour = Color(0, 0, 0, 1)
 cloudBrightness = 0.05
 
-[sub_resource type="Resource" id="Resource_01s5b"]
+[sub_resource type="Resource" id="Resource_vplu3"]
 script = ExtResource("6_7fjgh")
 weather = ExtResource("6_01s5b")
 
-[sub_resource type="Resource" id="Resource_717p5"]
+[sub_resource type="Resource" id="Resource_42wqv"]
 script = ExtResource("4_7eb0m")
 seasonId = "summer"
-weathers = Array[ExtResource("6_7fjgh")]([SubResource("Resource_01s5b")])
+weathers = Array[ExtResource("6_7fjgh")]([SubResource("Resource_vplu3")])
 skyColourDaytime = SubResource("Resource_ext2d")
 skyColourNight = SubResource("Resource_p7jpd")
 dayNightCycleCurve = SubResource("Curve_8bl6p")
@@ -263,7 +275,7 @@ track_path = NodePath("TrackPath")
 
 [node name="WeatherController" parent="." unique_id=1277823175 instance=ExtResource("2_e304n")]
 time_of_day_hours = 16.271
-seasons = Array[ExtResource("4_7eb0m")]([SubResource("Resource_717p5")])
+seasons = Array[ExtResource("4_7eb0m")]([SubResource("Resource_42wqv")])
 startTime = 58575.600000000006
 
 [node name="TerrainGenerator" type="Node3D" parent="." unique_id=586341718 node_paths=PackedStringArray("track_path")]
@@ -471,32 +483,32 @@ transform = Transform3D(-0.5417364, 0, 1.9252342, 0, 2, 0, -1.9252342, 0, -0.541
 [node name="Spawn1" type="Marker3D" parent="SpawnPoints" unique_id=1359042808]
 transform = Transform3D(-0.74921453, -0.025528569, -0.66183525, 0, 0.99925697, -0.03854373, 0.6623274, -0.028877523, -0.7486578, 202.43272, 14.815298, -215.89145)
 
-[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn1" unique_id=1519996363 instance=ExtResource("21_6at7b")]
+[node name="SpawnIndicator" parent="SpawnPoints/Spawn1" unique_id=1519996363 instance=ExtResource("21_6at7b")]
 
 [node name="Spawn2" type="Marker3D" parent="SpawnPoints" unique_id=2123792126]
 transform = Transform3D(-0.74921453, -0.025528569, -0.66183525, 0, 0.99925697, -0.03854373, 0.6623274, -0.028877523, -0.7486578, 197.93742, 14.815298, -211.91748)
 
-[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn2" unique_id=82740481 instance=ExtResource("21_6at7b")]
+[node name="SpawnIndicator" parent="SpawnPoints/Spawn2" unique_id=82740481 instance=ExtResource("21_6at7b")]
 
 [node name="Spawn3" type="Marker3D" parent="SpawnPoints" unique_id=565449116]
 transform = Transform3D(-0.7367768, -0.027027255, -0.6755956, 0, 0.9992007, -0.039973106, 0.67613596, -0.029451258, -0.736188, 198.37682, 14.578743, -220.3819)
 
-[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn3" unique_id=1469521023 instance=ExtResource("21_6at7b")]
+[node name="SpawnIndicator" parent="SpawnPoints/Spawn3" unique_id=1469521023 instance=ExtResource("21_6at7b")]
 
 [node name="Spawn4" type="Marker3D" parent="SpawnPoints" unique_id=276495278]
 transform = Transform3D(-0.7367768, -0.027027255, -0.6755956, 0, 0.9992007, -0.039973106, 0.67613596, -0.029451258, -0.736188, 193.95616, 14.578743, -216.32507)
 
-[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn4" unique_id=1613240315 instance=ExtResource("21_6at7b")]
+[node name="SpawnIndicator" parent="SpawnPoints/Spawn4" unique_id=1613240315 instance=ExtResource("21_6at7b")]
 
 [node name="Spawn5" type="Marker3D" parent="SpawnPoints" unique_id=95641898]
 transform = Transform3D(-0.7228256, -0.028177459, -0.69045585, 0, 0.9991684, -0.040775996, 0.69103056, -0.029473932, -0.7222244, 194.22987, 14.335785, -224.79555)
 
-[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn5" unique_id=1490245565 instance=ExtResource("21_6at7b")]
+[node name="SpawnIndicator" parent="SpawnPoints/Spawn5" unique_id=1490245565 instance=ExtResource("21_6at7b")]
 
 [node name="Spawn6" type="Marker3D" parent="SpawnPoints" unique_id=189523776]
 transform = Transform3D(-0.7228256, -0.028177459, -0.69045585, 0, 0.9991684, -0.040775996, 0.69103056, -0.029473932, -0.7222244, 189.89293, 14.335785, -220.64937)
 
-[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn6" unique_id=772920864 instance=ExtResource("21_6at7b")]
+[node name="SpawnIndicator" parent="SpawnPoints/Spawn6" unique_id=772920864 instance=ExtResource("21_6at7b")]
 
 [node name="0c797c60dd8eef1acae70d532301f210" parent="." unique_id=168545121 groups=["collision_trimesh"] instance=ExtResource("25_1am25")]
 transform = Transform3D(-24.918669, 0, -2.0149148, 0, 25, 0, 2.0149148, 0, -24.918669, 175.04308, 12.7518425, -208.6745)
@@ -510,8 +522,56 @@ transform = Transform3D(48.84805, 0, -25.275843, 0, 55, 0, 25.275843, 0, 48.8480
 [node name="155b46f430c01d85b690a61ac5be8ae0" parent="." unique_id=546077158 groups=["collision_capsule"] instance=ExtResource("27_06wvx")]
 transform = Transform3D(10, 0, 0, 0, 10, 0, 0, 0, 10, 197.068, 13.146051, -241.52686)
 
-[node name="3eebbf61beb1fd934d2948b09bc8a97d" parent="." unique_id=1881190323 groups=["collision_trimesh"] instance=ExtResource("28_uayk7")]
+[node name="JoshuaTree" parent="." unique_id=1881190323 groups=["collision_trimesh"] instance=ExtResource("28_uayk7")]
 transform = Transform3D(17, 0, 0, 0, 17, 0, 0, 0, 17, 266.83914, -0.9560876, -261.76447)
+
+[node name="JoshuaTree2" parent="." unique_id=103665257 groups=["collision_trimesh"] instance=ExtResource("28_uayk7")]
+transform = Transform3D(-4.198797, 0, -16.473314, 0, 17, 0, 16.473314, 0, -4.198797, 328.7245, -2.710668, -143.57214)
 
 [node name="04b2c6e2e49cc272be24d5807fee4ea0" parent="." unique_id=797439357 groups=["collision_capsule"] instance=ExtResource("29_vox2v")]
 transform = Transform3D(10, 0, 0, 0, 10, 0, 0, 0, 10, 113.788895, 10.6426735, -297.59866)
+
+[node name="fdf67fbe6bce046595412b61400019fd" parent="." unique_id=1401732229 groups=["collision_trimesh"] instance=ExtResource("30_wmcvr")]
+transform = Transform3D(6, 0, 0, 0, 6, 0, 0, 0, 6, 248.6776, 14.499319, -162.09547)
+
+[node name="f71bea208fc48e1bbd8f3270e3ea2138" parent="." unique_id=1187742659 groups=["collision_capsule"] instance=ExtResource("31_8m3dh")]
+transform = Transform3D(6, 0, 0, 0, 6, 0, 0, 0, 6, 237.04857, 15.022355, -177.5597)
+
+[node name="d885537d14dc17e39be2835fbcf5c93d" parent="." unique_id=420864007 groups=["collision_trimesh"] instance=ExtResource("32_8m3dh")]
+transform = Transform3D(10, 0, 0, 0, 10, 0, 0, 0, 10, 284.6403, 0.5049515, -233.21173)
+
+[node name="7c746b3609638bc97eb9642b3b3c9893" parent="." unique_id=517615920 groups=["collision_trimesh"] instance=ExtResource("33_42wqv")]
+transform = Transform3D(11, 0, 0, 0, 11, 0, 0, 0, 11, 305.30515, 25.984144, -5.2769246)
+
+[node name="08cf22326c18c9e5e00772c91f79ab5e" parent="." unique_id=1330344448 groups=["collision_trimesh"] instance=ExtResource("34_xfrh0")]
+transform = Transform3D(4.571661, 0, -2.0248249, 0, 5, 0, 2.0248249, 0, 4.571661, 293.30426, 25.027748, -21.995869)
+
+[node name="8b210c185fa7f914a015cd7f29a515f6" parent="." unique_id=885317102 groups=["collision_capsule", "collision_trimesh"] instance=ExtResource("35_hax3r")]
+transform = Transform3D(-5.797114, 0, -1.5470845, 0, 6.000001, 0, 1.5470845, 0, -5.797114, 269.88553, 22.158949, -11.062224)
+
+[node name="8b210c185fa7f914a015cd7f29a515f7" parent="." unique_id=769935992 groups=["collision_capsule", "collision_trimesh"] instance=ExtResource("35_hax3r")]
+transform = Transform3D(-2.6734319, 0, 5.3714767, 0, 6.000002, 0, -5.3714767, 0, -2.6734319, 271.26923, 22.158949, -8.643894)
+
+[node name="361bcba64776771e1d9624b08d332c66" parent="." unique_id=823831877 groups=["collision_trimesh"] instance=ExtResource("36_it274")]
+transform = Transform3D(0.9168268, 0, -9.957883, 0, 10, 0, 9.957883, 0, 0.9168268, 261.55902, 19.243586, -69.40419)
+
+[node name="0c797c60dd8eef1acae70d532301f211" parent="." unique_id=464823545 groups=["collision_trimesh"] instance=ExtResource("25_1am25")]
+transform = Transform3D(-23.100288, 0, -19.140965, 0, 29.999998, 0, 19.140965, 0, -23.100288, 267.489, 20.042442, 24.040483)
+
+[node name="1086dae7861d70b10cce6ef246128f58" parent="." unique_id=1979884759 groups=["collision_trimesh"] instance=ExtResource("37_edvol")]
+transform = Transform3D(10, 0, 0, 0, 10, 0, 0, 0, 10, 234.93422, 22.038307, -29.53458)
+
+[node name="ArrowSign" parent="." unique_id=1701605542 groups=["collision_trimesh"] instance=ExtResource("38_edvol")]
+transform = Transform3D(2.2599978, 0, 11.785262, 0, 12, 0, -11.785262, 0, 2.2599978, -30.265842, 125.82125, -86.93538)
+
+[node name="f71825ab70d7b3c7d0ca6770e0f7fc05" parent="." unique_id=993069818 groups=["collision_trimesh"] instance=ExtResource("39_e4m7v")]
+transform = Transform3D(-39.018093, 0, 8.808422, 0, 40, 0, -8.808422, 0, -39.018093, -13.954269, 121.49113, -62.16372)
+
+[node name="ee5c34395775523473bd5b6cce35d100" parent="." unique_id=903435533 groups=["collision_trimesh"] instance=ExtResource("40_510r7")]
+transform = Transform3D(-22.22425, 0, -20.151493, 0, 30, 0, 20.151493, 0, -22.22425, -81.027466, 115.70616, -47.74707)
+
+[node name="c16e78baf6cd9fe5f065cdd967423cd6" parent="." unique_id=2080114888 groups=["collision_trimesh"] instance=ExtResource("41_as070")]
+transform = Transform3D(30, 0, 0, 0, 30, 0, 0, 0, 30, -54.53153, 57.415375, -186.89833)
+
+[node name="c16e78baf6cd9fe5f065cdd967423cd7" parent="." unique_id=1214765830 groups=["collision_trimesh"] instance=ExtResource("41_as070")]
+transform = Transform3D(-14.370207, 0, -26.334328, 0, 29.999998, 0, 26.334328, 0, -14.370207, -8.766795, 110.6525, -107.27792)
