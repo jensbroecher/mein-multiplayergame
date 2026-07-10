@@ -36,7 +36,7 @@ window/stretch/aspect="expand"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/PolyHavenImport/plugin.cfg", "res://addons/gdgs/plugin.cfg")
+enabled=PackedStringArray("res://addons/PolyHavenImport/plugin.cfg")
 
 [global_group]
 

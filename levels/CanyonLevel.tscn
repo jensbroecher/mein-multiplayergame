@@ -35,14 +35,14 @@ horizonColour = Color(0.0784314, 0.00784314, 0.0156863, 1)
 groundColour = Color(0, 0, 0, 1)
 cloudBrightness = 0.05
 
-[sub_resource type="Resource" id="Resource_urxhk"]
+[sub_resource type="Resource" id="Resource_a7e1k"]
 script = ExtResource("5_yr3df")
 weather = ExtResource("6_jpwbr")
 
-[sub_resource type="Resource" id="Resource_k6srj"]
+[sub_resource type="Resource" id="Resource_qixvg"]
 script = ExtResource("3_jpwbr")
 seasonId = "summer"
-weathers = Array[ExtResource("5_yr3df")]([SubResource("Resource_urxhk")])
+weathers = Array[ExtResource("5_yr3df")]([SubResource("Resource_a7e1k")])
 skyColourDaytime = SubResource("Resource_ext2d")
 skyColourNight = SubResource("Resource_p7jpd")
 dayNightCycleCurve = SubResource("Curve_8bl6p")
@@ -111,7 +111,7 @@ track_path = NodePath("TrackPath")
 [node name="WeatherController" parent="." unique_id=1277823175 instance=ExtResource("31_weather")]
 time_of_day_hours = 13.239
 selected_weather = 1
-seasons = Array[ExtResource("3_jpwbr")]([SubResource("Resource_k6srj")])
+seasons = Array[ExtResource("3_jpwbr")]([SubResource("Resource_qixvg")])
 startTime = 47660.4
 
 [node name="TerrainGenerator" type="Node3D" parent="." unique_id=586341718 node_paths=PackedStringArray("track_path")]
@@ -131,6 +131,8 @@ terrain_grass_count = 1000000
 grass_visibility_range = 300.0
 grass_material = SubResource("ShaderMaterial_grass")
 road_material = SubResource("ShaderMaterial_asphalt")
+metadata/_edit_group_ = true
+metadata/_edit_lock_ = true
 
 [node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=2045948636]
 material_override = SubResource("ShaderMaterial_grass")
