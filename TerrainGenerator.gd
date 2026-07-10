@@ -174,20 +174,9 @@ func generate_world():
 		child.free()
 
 	# 1. Create Data Meshes
-	var visual_mesh: ArrayMesh
-	var trimesh_shape: ConcavePolygonShape3D
-	
-	var actual_prefix = level_prefix + "_" if not level_prefix.is_empty() else ""
-	var terrain_visual_path = "res://generated/" + actual_prefix + "terrain_visual.res"
-	var terrain_collision_path = "res://generated/" + actual_prefix + "terrain_collision_shape.res"
-	
-	if ResourceLoader.exists(terrain_visual_path) and ResourceLoader.exists(terrain_collision_path):
-		visual_mesh = load(terrain_visual_path)
-		trimesh_shape = load(terrain_collision_path)
-	else:
-		var collision_mesh = _generate_mesh(true) # Flat under road for smooth driving
-		visual_mesh = _generate_mesh(false)   # Recessed under road to prevent leaking
-		trimesh_shape = collision_mesh.create_trimesh_shape()
+	var collision_mesh = _generate_mesh(true) # Flat under road for smooth driving
+	var visual_mesh = _generate_mesh(false)   # Recessed under road to prevent leaking
+	var trimesh_shape = collision_mesh.create_trimesh_shape()
 
 	# 2. Visual Terrain
 	var terrain_instance = MeshInstance3D.new()
@@ -796,7 +785,35 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 	var final_side_mat = mat.duplicate()
 	if not node_name.contains("Curbs") and final_side_mat is StandardMaterial3D:
 		final_side_mat.albedo_color = final_side_mat.albedo_color.darkened(0.3)
-	if track_layout_type == TrackLayoutType.CANYON and final_side_mat is ShaderMaterial:
+	
+	if track_layout_type == TrackLayoutType.CANYON and not node_name.contains("Curbs"):
+		# Create a beautiful StandardMaterial3D with triplanar mapping and rock texture for the canyon sides
+		var rock_mat = StandardMaterial3D.new()
+		rock_mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+		var rock_tex = load("res://materials/dark_canyon_rock.png")
+		var rock_normal = load("res://materials/dark_canyon_rock_normal.png")
+		if rock_tex:
+			rock_mat.albedo_texture = rock_tex
+		if rock_normal:
+			rock_mat.roughness = 0.9
+			rock_mat.normal_enabled = true
+			rock_mat.normal_texture = rock_normal
+			rock_mat.normal_scale = 1.5
+		rock_mat.uv1_scale = Vector3(0.08, 0.08, 0.08)
+		rock_mat.uv1_triplanar = true
+		final_side_mat = rock_mat
+		
+		# Also add a StaticBody3D and CollisionShape3D for physics collision on the canyon road sides embankment!
+		var static_body = StaticBody3D.new()
+		static_body.name = node_name + "_Collision"
+		mesh_instance.add_child(static_body)
+		
+		var collision_shape = CollisionShape3D.new()
+		collision_shape.name = "CollisionShape3D"
+		var trimesh_shape = mesh_instance.mesh.create_trimesh_shape()
+		collision_shape.shape = _save_resource(trimesh_shape, node_name + "_collision_shape")
+		static_body.add_child(collision_shape)
+	elif track_layout_type == TrackLayoutType.CANYON and final_side_mat is ShaderMaterial:
 		final_side_mat.set_shader_parameter("use_world_uv", false)
 		final_side_mat.set_shader_parameter("uv_scale", 4.0)
 

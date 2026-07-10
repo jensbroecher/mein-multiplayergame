@@ -576,7 +576,7 @@ func _spawn_item_boxes():
 	# Spawn a row of 3 items across each checkpoint gate and the finish line
 	var cp_idx = 0
 	for cp in checkpoints:
-		if cp_idx == 0:
+		if cp.name == "FinishLine":
 			cp_idx += 1
 			continue # Skip start/finish checkpoint items initially (will spawn after 10s)
 		var right_dir = cp.global_transform.basis.x.normalized()
@@ -595,16 +595,18 @@ func _spawn_item_boxes():
 
 func _spawn_start_finish_items_delayed():
 	await get_tree().create_timer(10.0).timeout
-	if not is_inside_tree() or checkpoints.size() == 0:
+	if not is_inside_tree():
 		return
-	var cp = checkpoints[0]
+	var cp = get_node_or_null("FinishLine")
+	if not cp:
+		return
 	var right_dir = cp.global_transform.basis.x.normalized()
 	var spacing = 3.5
 	var offsets = [-spacing, 0.0, spacing]
 	for offset_idx in range(offsets.size()):
 		var offset = offsets[offset_idx]
 		var box = ITEM_BOX_SCENE.instantiate()
-		box.name = "ItemBox_0_%d" % offset_idx
+		box.name = "ItemBox_FinishLine_%d" % offset_idx
 		add_child(box)
 		box.global_position = cp.global_position + right_dir * offset + Vector3(0, 1.5, 0)
 
