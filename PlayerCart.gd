@@ -523,7 +523,7 @@ func _process(delta):
 
 		var visual_forward = -visuals.global_transform.basis.z
 		var speed_factor = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
-		var look_ahead_dist = 4.0 + speed_factor * 6.0
+		var look_ahead_dist = (8.0 + speed_factor * 8.0) if is_isometric else (4.0 + speed_factor * 6.0)
 
 		var excludes = [self.get_rid()]
 		var level = get_tree().get_first_node_in_group("level")
@@ -555,16 +555,30 @@ func _process(delta):
 				var target_ratio = 1.0
 				var space_state = get_world_3d().direct_space_state
 				var ray_start = visuals.global_position + Vector3.UP * 1.0
-				var query = PhysicsRayQueryParameters3D.create(ray_start, target_cam_pos)
-				query.exclude = excludes
-				var result = space_state.intersect_ray(query)
-				if result and result.collider and (result.collider.name.contains("Unified_World_Collision") or result.collider.name.contains("Terrain")):
-					var hit_pos = result.position
-					var max_dist = ray_start.distance_to(target_cam_pos)
-					if max_dist > 0.01:
-						var hit_dist = ray_start.distance_to(hit_pos)
-						# Keep camera 0.5m in front of terrain collision
-						target_ratio = clamp((hit_dist - 0.5) / max_dist, 0.1, 1.0)
+				
+				# Recursive raycast to step past smaller obstacles/collisions to find actual terrain
+				var query_start = ray_start
+				var current_excludes = excludes.duplicate()
+				var hit_terrain = false
+				var hit_dist = 0.0
+				var max_dist = ray_start.distance_to(target_cam_pos)
+				
+				for attempt in range(5):
+					var query = PhysicsRayQueryParameters3D.create(query_start, target_cam_pos)
+					query.exclude = current_excludes
+					var result = space_state.intersect_ray(query)
+					if not result:
+						break
+					if result.collider and (result.collider.name.contains("Unified_World_Collision") or result.collider.name.contains("Terrain") or result.collider.name.contains("Static")):
+						hit_terrain = true
+						hit_dist = ray_start.distance_to(result.position)
+						break
+					current_excludes.append(result.rid)
+					query_start = result.position + (target_cam_pos - query_start).normalized() * 0.1
+				
+				if hit_terrain and max_dist > 0.01:
+					# Keep camera 0.5m in front of terrain collision
+					target_ratio = clamp((hit_dist - 0.5) / max_dist, 0.1, 1.0)
 				
 				# Lerp multiplier: faster to zoom in to avoid clipping, slower to zoom out to prevent jumps
 				var lerp_speed = 15.0 if target_ratio < camera_clip_distance_mult_iso else 3.0
@@ -574,6 +588,23 @@ func _process(delta):
 				target_cam_pos = ray_start + (target_cam_pos - ray_start) * camera_clip_distance_mult_iso
 				
 				camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 10.0 * delta)
+				
+				# Prevent camera clipping inside/under terrain by checking actual terrain height at camera location
+				var cam_actual_pos = camera_pivot.global_position
+				var vert_query = PhysicsRayQueryParameters3D.create(cam_actual_pos + Vector3(0, 15, 0), cam_actual_pos + Vector3(0, -15, 0))
+				vert_query.exclude = excludes
+				var vert_result = space_state.intersect_ray(vert_query)
+				var cam_below_terrain = false
+				if vert_result and vert_result.collider and (vert_result.collider.name.contains("Unified_World_Collision") or vert_result.collider.name.contains("Terrain")):
+					var terrain_y = vert_result.position.y
+					if cam_actual_pos.y < terrain_y + 0.5:
+						# Push camera up to avoid clipping inside the terrain
+						camera_pivot.global_position.y = terrain_y + 0.5
+						cam_below_terrain = cam_actual_pos.y < terrain_y # Darken screen if camera is fully below terrain surface
+				
+				if race_ui:
+					race_ui.set_terrain_clipped(cam_below_terrain)
+				
 				camera_look_at = camera_look_at.lerp(visuals.global_position + visual_forward * look_ahead_dist, 10.0 * delta)
 				camera_pivot.look_at(camera_look_at, Vector3.UP)
 			else:
@@ -605,6 +636,9 @@ func _process(delta):
 				target_cam_pos = ray_start + (target_cam_pos - ray_start) * camera_clip_distance_mult
 				
 				camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 10.0 * delta)
+				
+				if race_ui:
+					race_ui.set_terrain_clipped(false)
 				
 				camera_look_at = camera_look_at.lerp(visuals.global_position + visual_forward * (look_ahead_dist + 0.5), 12.0 * delta)
 				camera_pivot.look_at(camera_look_at, Vector3.UP)

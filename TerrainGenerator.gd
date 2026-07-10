@@ -174,8 +174,20 @@ func generate_world():
 		child.free()
 
 	# 1. Create Data Meshes
-	var collision_mesh = _generate_mesh(true) # Flat under road for smooth driving
-	var visual_mesh = _generate_mesh(false)   # Recessed under road to prevent leaking
+	var visual_mesh: ArrayMesh
+	var trimesh_shape: ConcavePolygonShape3D
+	
+	var actual_prefix = level_prefix + "_" if not level_prefix.is_empty() else ""
+	var terrain_visual_path = "res://generated/" + actual_prefix + "terrain_visual.res"
+	var terrain_collision_path = "res://generated/" + actual_prefix + "terrain_collision_shape.res"
+	
+	if ResourceLoader.exists(terrain_visual_path) and ResourceLoader.exists(terrain_collision_path):
+		visual_mesh = load(terrain_visual_path)
+		trimesh_shape = load(terrain_collision_path)
+	else:
+		var collision_mesh = _generate_mesh(true) # Flat under road for smooth driving
+		visual_mesh = _generate_mesh(false)   # Recessed under road to prevent leaking
+		trimesh_shape = collision_mesh.create_trimesh_shape()
 
 	# 2. Visual Terrain
 	var terrain_instance = MeshInstance3D.new()
@@ -198,7 +210,6 @@ func generate_world():
 	static_body.name = "Unified_World_Collision"
 	add_child(static_body)
 	var collision_shape = CollisionShape3D.new()
-	var trimesh_shape = collision_mesh.create_trimesh_shape()
 	collision_shape.shape = _save_resource(trimesh_shape, "terrain_collision_shape")
 	static_body.add_child(collision_shape)
 
@@ -365,11 +376,13 @@ func _generate_road_and_sand():
 	concrete_mat.metallic = 0.0
 
 	# 3. Visual Overlays: Curbs and Road
-	_create_path_visual(points_count, sand_width, curb_mat, concrete_mat, curb_y_offset, "Visual_Curbs")
+	if track_layout_type != TrackLayoutType.CANYON:
+		_create_path_visual(points_count, sand_width, curb_mat, concrete_mat, curb_y_offset, "Visual_Curbs")
 	_create_path_visual(points_count, road_width, road_material, null, road_y_offset, "Visual_Road")
 
 	# Create ONE unified collision surface for EVERYTHING (Road + Border)
-	_create_track_collision(points_count, sand_width, "Visual_Road")
+	var col_width = road_width if track_layout_type == TrackLayoutType.CANYON else sand_width
+	_create_track_collision(points_count, col_width, "Visual_Road")
 
 func _create_path_visual(point_count: int, width: float, mat: Material, side_mat: Material, y_offset: float, node_name: String):
 	var st = SurfaceTool.new()
@@ -539,6 +552,10 @@ func _create_track_collision(point_count: int, width: float, node_name: String):
 	var outer_w = half_w
 	var curb_slope = 0.15
 
+	if track_layout_type == TrackLayoutType.CANYON:
+		inner_w = half_w
+		curb_slope = 0.0
+
 	# Create Top and Bottom vertices
 	for i in range(point_count + 1):
 		var offset = (float(i) / point_count) * length
@@ -650,7 +667,7 @@ func _create_track_collision(point_count: int, width: float, node_name: String):
 		_generate_bridge_supports(point_count)
 
 func _generate_bridge_supports(point_count: int):
-	if track_layout_type == TrackLayoutType.MOUNTAIN:
+	if track_layout_type == TrackLayoutType.MOUNTAIN or track_layout_type == TrackLayoutType.CANYON:
 		return
 
 	var curve = _get_world_curve()
@@ -733,6 +750,9 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 		var top_r = final_pos + right + Vector3(0, side_y_offset, 0)
 		var bot_l = top_l - Vector3(0, depth, 0)
 		var bot_r = top_r - Vector3(0, depth, 0)
+		if track_layout_type == TrackLayoutType.CANYON:
+			bot_l = top_l - right * 1.5 - Vector3(0, 60.0, 0)
+			bot_r = top_r + right * 1.5 - Vector3(0, 60.0, 0)
 
 		var uv_y = offset * 0.2
 
@@ -776,6 +796,9 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 	var final_side_mat = mat.duplicate()
 	if not node_name.contains("Curbs") and final_side_mat is StandardMaterial3D:
 		final_side_mat.albedo_color = final_side_mat.albedo_color.darkened(0.3)
+	if track_layout_type == TrackLayoutType.CANYON and final_side_mat is ShaderMaterial:
+		final_side_mat.set_shader_parameter("use_world_uv", false)
+		final_side_mat.set_shader_parameter("uv_scale", 4.0)
 
 	mesh_instance.material_override = final_side_mat
 	add_child(mesh_instance)

@@ -16,10 +16,15 @@ extends CanvasLayer
 @onready var slot2_panel = $HUDPanel/ItemSlots/Slot2
 @onready var slot2_icon = $HUDPanel/ItemSlots/Slot2/Icon
 @onready var underwater_overlay = $UnderwaterOverlay
+@onready var terrain_clip_overlay = $TerrainClipOverlay
 
 func set_underwater(is_underwater: bool):
 	if underwater_overlay:
 		underwater_overlay.visible = is_underwater
+
+func set_terrain_clipped(is_clipped: bool):
+	if terrain_clip_overlay:
+		terrain_clip_overlay.visible = is_clipped
 
 @onready var end_panel = $EndPanel
 @onready var end_timer_label = $EndPanel/VBoxContainer/LabelTimer

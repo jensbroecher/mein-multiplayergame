@@ -406,6 +406,7 @@ func start_race():
 	MusicManager.play_sfx("res://sounds/Go.mp3")
 	MusicManager.play_race_music()
 	get_tree().call_group("player_carts", "on_race_started")
+	_spawn_start_finish_items_delayed()
 
 func _process(delta):
 	if multiplayer.is_server():
@@ -575,6 +576,9 @@ func _spawn_item_boxes():
 	# Spawn a row of 3 items across each checkpoint gate and the finish line
 	var cp_idx = 0
 	for cp in checkpoints:
+		if cp_idx == 0:
+			cp_idx += 1
+			continue # Skip start/finish checkpoint items initially (will spawn after 10s)
 		var right_dir = cp.global_transform.basis.x.normalized()
 		var spacing = 3.5
 		var offsets = [-spacing, 0.0, spacing]
@@ -588,6 +592,21 @@ func _spawn_item_boxes():
 	
 	# Spawn 15 additional random item boxes along the track
 	_spawn_random_item_boxes(15)
+
+func _spawn_start_finish_items_delayed():
+	await get_tree().create_timer(10.0).timeout
+	if not is_inside_tree() or checkpoints.size() == 0:
+		return
+	var cp = checkpoints[0]
+	var right_dir = cp.global_transform.basis.x.normalized()
+	var spacing = 3.5
+	var offsets = [-spacing, 0.0, spacing]
+	for offset_idx in range(offsets.size()):
+		var offset = offsets[offset_idx]
+		var box = ITEM_BOX_SCENE.instantiate()
+		box.name = "ItemBox_0_%d" % offset_idx
+		add_child(box)
+		box.global_position = cp.global_position + right_dir * offset + Vector3(0, 1.5, 0)
 
 func _spawn_random_item_boxes(count: int):
 	if not track_path: return
