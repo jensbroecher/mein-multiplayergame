@@ -309,6 +309,9 @@ transform = Transform3D(24.244986, 0, -17.668625, 0, 29.999994, 0, 17.668625, 0,
 [node name="462b0835dae4689feaf62903546389ee4" parent="." unique_id=956620995 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
 transform = Transform3D(24.244986, 0, -17.668625, 0, 29.999994, 0, 17.668625, 0, 24.244986, 204.57759, -0.7832155, 281.20734)
 
+[node name="462b0835dae4689feaf62903546389ee6" parent="." unique_id=1465697561 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
+transform = Transform3D(-29.824936, 0, -3.2362132, 0, 29.999994, 0, 3.2362132, 0, -29.824936, 252.30257, -1.1570845, 184.71716)
+
 [node name="462b0835dae4689feaf62903546389ee5" parent="." unique_id=1740016918 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
 transform = Transform3D(-27.423973, 0, -12.162459, 0, 29.999994, 0, 12.162459, 0, -27.423973, 204.57759, -0.7832155, 260.20734)
 
@@ -322,7 +325,7 @@ transform = Transform3D(-2.0240371, 0, -9.793022, 0, 10, 0, 9.793022, 0, -2.0240
 transform = Transform3D(8, 0, 0, 0, 8, 0, 0, 0, 8, 241.11154, 0.06895524, 225.63548)
 
 [node name="a0c68129ab868a396612d59572399b8f" type="Node3D" parent="." unique_id=481816827 groups=["collision_trimesh"]]
-transform = Transform3D(17.636442, -0.4111803, -24.264925, -0.57857937, 29.980045, -0.9285529, 24.261513, 1.0138524, 17.616783, 257.76495, 0.17809665, 203.54698)
+transform = Transform3D(17.636442, -0.4111803, -24.264925, -0.57857937, 29.980045, -0.9285529, 24.261513, 1.0138524, 17.616783, 257.76495, -0.249004, 203.54698)
 
 [node name="node_0" type="MeshInstance3D" parent="a0c68129ab868a396612d59572399b8f" unique_id=1260266801]
 transform = Transform3D(100, 0, 0, 0, 100, 7.54979e-06, 0, -7.54979e-06, 100, 0, 0, 0)
@@ -345,7 +348,7 @@ transform = Transform3D(4.6430693, 0, -14.263306, 0, 14.999999, 0, 14.263306, 0,
 transform = Transform3D(15, 0, 0, 0, 14.772116, -2.6047227, 0, 2.6047227, 14.772116, 294.2182, 0.9609355, 150.6189)
 
 [node name="56a04471ee12ebffca9d2fcc9ec969e8" parent="." unique_id=1193622247 groups=["collision_trimesh"] instance=ExtResource("32_vxc05")]
-transform = Transform3D(3.4833562, 0, -7.2018213, 0, 8, 0, 7.2018213, 0, 3.4833562, 308.99692, 0.70123434, 177.85252)
+transform = Transform3D(2.1770976, 0, -4.501138, 0, 5, 0, 4.501138, 0, 2.1770976, 308.99692, 2.3032908, 173.61284)
 
 [node name="0797593737478869dca3e088a7e7ec6c" parent="." unique_id=1663010525 groups=["collision_trimesh"] instance=ExtResource("33_hyofv")]
 transform = Transform3D(8.654013, 0, -12.251859, 0, 14.999999, 0, 12.251859, 0, 8.654013, 328.2307, -0.052932948, 126.92493)
