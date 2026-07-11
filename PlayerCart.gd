@@ -667,9 +667,9 @@ func _process(delta):
 			if not engine_sound.playing:
 				engine_sound.play()
 				playback = engine_sound.get_stream_playback()
-				engine_sound.volume_db = -5.0
+				engine_sound.volume_db = -13.0
 			var speed_ratio = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
-			var target_vol = lerp(-5.0, -12.0, speed_ratio)
+			var target_vol = lerp(-13.0, -20.0, speed_ratio)
 			engine_sound.volume_db = move_toward(engine_sound.volume_db, target_vol, 80.0 * delta)
 			if engine_sound.stream is AudioStreamGenerator and engine_sound.playing:
 				_fill_audio_buffer()
@@ -797,7 +797,7 @@ func _physics_process(delta):
 						ap.bus = &"SFX"
 						ap.max_distance = 80.0
 						ap.unit_size = 15.0
-						ap.volume_db = 10.0
+						ap.volume_db = 2.0
 						get_tree().current_scene.add_child(ap)
 						ap.global_position = global_position
 						ap.play()
@@ -1563,7 +1563,7 @@ func client_start_pad_boost():
 	var ap = AudioStreamPlayer3D.new()
 	ap.stream = preload("res://sounds/stereogenicstudio-swish-swoosh-woosh-sfx-47-357152.mp3")
 	ap.bus = &"SFX"
-	ap.volume_db = 0.0
+	ap.volume_db = -8.0
 	ap.unit_size = 20.0
 	$Visuals.add_child(ap)
 	ap.play()
@@ -2264,7 +2264,7 @@ func client_play_lightning(hit_player_names: Array):
 	var sound_player = AudioStreamPlayer3D.new()
 	sound_player.stream = load("res://sounds/electric_lightning_a_#1-1782053835008.wav")
 	sound_player.pitch_scale = 1.0
-	sound_player.volume_db = 2.0
+	sound_player.volume_db = -6.0
 	sound_player.bus = &"SFX"
 	get_tree().current_scene.add_child(sound_player)
 	sound_player.global_position = global_position
@@ -2681,7 +2681,7 @@ func _spawn_splash(pos: Vector3, size_scale: float = 1.0):
 				ap.bus = &"SFX"
 				ap.max_distance = 50.0
 				ap.unit_size = 5.0
-				ap.volume_db = lerp(-7.0, -1.0, size_scale)
+				ap.volume_db = lerp(-15.0, -9.0, size_scale)
 				ap.pitch_scale = lerp(1.35, 1.0, size_scale)
 				get_tree().current_scene.add_child(ap)
 				ap.global_position = pos
