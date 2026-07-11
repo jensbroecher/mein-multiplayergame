@@ -689,12 +689,20 @@ func _process(delta):
 		if is_instance_valid(p) and p is CPUParticles3D:
 			var pivot = p.get_meta("pivot", null)
 			if is_instance_valid(pivot):
-				p.global_rotation = pivot.global_rotation
 				if p.name.ends_with("_Skid"):
-					var local_offset = Vector3(0, WHEEL_Y_OFFSET + 0.02, 0)
-					p.global_position = pivot.global_position + pivot.global_transform.basis * local_offset
+					# Skidmarks stay flat (no rotation jitter) and snapped to ground surface
+					p.global_rotation = Vector3.ZERO
+					var xz_pos = Vector3(pivot.global_position.x, 0.0, pivot.global_position.z)
+					if ground_ray.is_colliding() and ground_ray.get_collision_normal().y >= 0.55:
+						xz_pos.y = ground_ray.get_collision_point().y + 0.02
+					else:
+						xz_pos.y = pivot.global_position.y + WHEEL_Y_OFFSET + 0.02
+					p.global_position = xz_pos
 				else:
+					# Smoke particles follow wheel orientation and position
+					p.global_rotation = pivot.global_rotation
 					p.global_position = pivot.global_position
+
 
 	for p in dirt_particles:
 		if is_instance_valid(p) and p is CPUParticles3D:
@@ -969,7 +977,9 @@ func _physics_process(delta):
 		slow_mult = 0.6
 
 	if is_boosting:
-		var max_sp = max_speed * 1.5 * slow_mult
+		# Boost cap: fixed absolute speed ceiling (45.0 m/s) so faster cars benefit less
+		var boost_cap = 45.0
+		var max_sp = min(max_speed * 1.5, boost_cap) * slow_mult
 		var accel_force = acceleration * 2.0 * slow_mult
 		if is_offroad and on_ground and ground_normal.y < 0.85 and fwd.dot(Vector3.UP) > 0.05:
 			accel_force = 0.0
@@ -977,8 +987,9 @@ func _physics_process(delta):
 			apply_central_force(fwd * accel_force * mass)
 		boost_time += delta
 	elif is_pad_boosting:
-		# Pad boost: faster (closer to the boost item)
-		var max_sp = max_speed * 1.4 * slow_mult
+		# Pad boost: capped similarly so fast cars don't benefit as much
+		var boost_cap = 42.0
+		var max_sp = min(max_speed * 1.4, boost_cap) * slow_mult
 		var accel_force = acceleration * 1.8 * slow_mult
 		if is_offroad and on_ground and ground_normal.y < 0.85 and fwd.dot(Vector3.UP) > 0.05:
 			accel_force = 0.0
@@ -1087,8 +1098,8 @@ func _physics_process(delta):
 		_set_drift_emitting(false)
 		sync_emit_drift = false
 		
-		# Slight air control
-		visuals.global_rotate(Vector3.UP, -current_steer * steer_speed * 0.5 * delta)
+		# No air steering — car cannot rotate mid-air
+		pass
 
 	# Wind sound (only while airborne)
 	if not on_ground and linear_velocity.length() > 5.0:
