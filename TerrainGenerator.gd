@@ -1171,5 +1171,3 @@ func _generate_terrain_grass():
 				
 			mmi.multimesh = _save_resource(mm, "chunk_%d_%d" % [c, r], "grass")
 			mmi.material_override = mat
-
-
