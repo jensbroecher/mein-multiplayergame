@@ -374,9 +374,6 @@ func _generate_road_and_sand():
 	_create_track_collision(points_count, col_width, "Visual_Road")
 
 func _create_path_visual(point_count: int, width: float, mat: Material, side_mat: Material, y_offset: float, node_name: String):
-	var st = SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-
 	var curve = _get_world_curve()
 	var half_w = width / 2.0
 	var length = curve.get_baked_length()
@@ -394,6 +391,116 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 	else:
 		if mat_dup is ShaderMaterial or mat_dup is StandardMaterial3D:
 			mat_dup.render_priority = 2 # Above terrain
+
+	# --- CANYON ROAD: beveled edges with blended normals ---
+	# For the canyon road surface, add extra bevel vertices at the edges so the flat
+	# top transitions smoothly into the vertical rock walls, giving a rounded kerb look
+	# and a natural texture blend zone.
+	if track_layout_type == TrackLayoutType.CANYON and not is_curb:
+		var st = SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+		const BEVEL_W  := 1.2  # Horizontal bevel width (how wide the rounded edge is)
+		const BEVEL_H  := 0.5  # Vertical drop of the bevel (how far it curves down)
+		# Bevel uses 3 subdivisions (4 rings: flat-center, bevel-start, bevel-mid, bevel-end)
+		# Each ring has 2 vertices (left, right), producing 6 cross-section points per slice.
+		# Layout per slice (6 verts): [L_inner, L_bevel_mid, L_bevel_end, R_bevel_end, R_bevel_mid, R_inner]
+		# L_inner  = flat road surface, outer edge        normal = UP
+		# L_bevel_mid = 45° curve zone                   normal = lerp(UP, -RIGHT, 0.5).normalized()
+		# L_bevel_end = where bevel meets the side wall   normal = -RIGHT (outward)
+		# (mirrored for right side)
+
+		for i in range(point_count + 1):
+			var offset = (float(i) / point_count) * length
+			var pos = curve.sample_baked(offset)
+
+			var tangent: Vector3
+			if i == 0:
+				if is_loop:
+					tangent = (curve.sample_baked(0.2) - curve.sample_baked(max(0.0, length - 0.2))).normalized()
+				else:
+					tangent = (curve.sample_baked(0.2) - pos).normalized()
+			elif i == point_count:
+				if is_loop:
+					tangent = (curve.sample_baked(0.2) - curve.sample_baked(max(0.0, length - 0.2))).normalized()
+				else:
+					tangent = (pos - curve.sample_baked(max(0.0, length - 0.2))).normalized()
+			else:
+				tangent = (curve.sample_baked(min(length, offset + 0.2)) - pos).normalized()
+
+			var right_dir = tangent.cross(Vector3.UP).normalized()
+
+			var final_pos = pos
+			if is_loop and i == point_count:
+				final_pos = curve.sample_baked(0.0)
+
+			# 6 cross-section positions (left to right):
+			# 0 = L flat inner (road center side, normal UP)
+			# 1 = L flat outer edge (bevel start, normal UP blending to outward)
+			# 2 = L bevel end / wall top (normal = -right_dir)
+			# 3 = R bevel end / wall top (normal = +right_dir)
+			# 4 = R flat outer edge (bevel start, normal UP blending to outward)
+			# 5 = R flat inner (road center side, normal UP)
+
+			var p0 = final_pos - right_dir * half_w + Vector3(0, y_offset, 0)           # L flat
+			var p1 = final_pos - right_dir * (half_w - BEVEL_W * 0.5) + Vector3(0, y_offset - BEVEL_H * 0.25, 0)  # L bevel mid
+			var p2 = final_pos - right_dir * (half_w - BEVEL_W) + Vector3(0, y_offset - BEVEL_H, 0)              # L bevel end
+			var p3 = final_pos + right_dir * (half_w - BEVEL_W) + Vector3(0, y_offset - BEVEL_H, 0)              # R bevel end
+			var p4 = final_pos + right_dir * (half_w - BEVEL_W * 0.5) + Vector3(0, y_offset - BEVEL_H * 0.25, 0)  # R bevel mid
+			var p5 = final_pos + right_dir * half_w + Vector3(0, y_offset, 0)            # R flat
+
+			# Normals: smoothly interpolate between UP and outward sideways
+			var n_up     = Vector3.UP
+			var n_left   = -right_dir  # outward left
+			var n_right  = right_dir   # outward right
+			var n_lm = (n_up + n_left).normalized()   # 45° blend
+			var n_rm = (n_up + n_right).normalized()  # 45° blend
+
+			var uv_x_l0 = 0.0
+			var uv_x_l1 = BEVEL_W * 0.5 / width
+			var uv_x_l2 = BEVEL_W / width
+			var uv_x_r3 = 1.0 - BEVEL_W / width
+			var uv_x_r4 = 1.0 - BEVEL_W * 0.5 / width
+			var uv_x_r5 = 1.0
+
+			st.set_normal(n_up);    st.set_uv(Vector2(uv_x_l0 * width, offset)); st.add_vertex(p0)
+			st.set_normal(n_lm);   st.set_uv(Vector2(uv_x_l1 * width, offset)); st.add_vertex(p1)
+			st.set_normal(n_left); st.set_uv(Vector2(uv_x_l2 * width, offset)); st.add_vertex(p2)
+			st.set_normal(n_right);st.set_uv(Vector2(uv_x_r3 * width, offset)); st.add_vertex(p3)
+			st.set_normal(n_rm);   st.set_uv(Vector2(uv_x_r4 * width, offset)); st.add_vertex(p4)
+			st.set_normal(n_up);   st.set_uv(Vector2(uv_x_r5 * width, offset)); st.add_vertex(p5)
+
+		# Index loop: 5 quads per slice (between the 6 cross-section verts)
+		for i in range(point_count):
+			var offset = (float(i) / point_count) * length
+			if _is_in_gap_pos(curve.sample_baked(offset)):
+				continue
+			var base = i * 6
+			var nxt  = (i + 1) * 6
+			# For each pair of adjacent cross-section rows, connect as quads (2 triangles)
+			for k in range(5):
+				var a = base + k;     var b = base + k + 1
+				var c = nxt  + k;     var d = nxt  + k + 1
+				st.add_index(a); st.add_index(c); st.add_index(b)
+				st.add_index(b); st.add_index(c); st.add_index(d)
+				# Underside (reverse winding)
+				st.add_index(a); st.add_index(b); st.add_index(c)
+				st.add_index(b); st.add_index(d); st.add_index(c)
+
+		st.generate_tangents()
+		var mesh_instance = MeshInstance3D.new()
+		mesh_instance.name = node_name
+		mesh_instance.mesh = _save_resource(st.commit(), node_name)
+		mesh_instance.material_override = mat_dup
+		mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		add_child(mesh_instance)
+		# Canyon road sides (the deep rock walls below the bevel)
+		_create_path_sides(point_count, width, side_mat if side_mat else mat_dup, y_offset, node_name + "_Sides")
+		return
+
+	# --- NON-CANYON (Default + Mountain) road: flat top, sharp edges ---
+	var st = SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 
 	# VERTEX LOOP
 	for i in range(point_count + 1):
@@ -527,6 +634,7 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 
 	# REMOVED: Separate collision shapes here as they cause sticking.
 	# We now use the unified _create_track_collision call.
+
 
 func _create_track_collision(point_count: int, width: float, node_name: String):
 	var st = SurfaceTool.new()

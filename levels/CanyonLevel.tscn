@@ -81,7 +81,7 @@ shader_parameter/use_normal_map = true
 shader_parameter/normal_texture = ExtResource("dirt_normal")
 shader_parameter/normal_scale = 1.2
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_urxhk"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_pkpnn"]
 render_priority = 0
 shader = ExtResource("Shader_stochastic_file")
 shader_parameter/albedo_texture = ExtResource("dirt_albedo")
@@ -94,7 +94,7 @@ shader_parameter/use_normal_map = true
 shader_parameter/normal_texture = ExtResource("dirt_normal")
 shader_parameter/normal_scale = 1.2
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_k6srj"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_15d20"]
 albedo_texture = ExtResource("rock_albedo")
 roughness = 0.9
 normal_enabled = true
@@ -117,9 +117,9 @@ checkpoints = [NodePath("Checkpoints/Halfway4"), NodePath("Checkpoints/Halfway3"
 track_path = NodePath("TrackPath")
 
 [node name="WeatherController" parent="." unique_id=1277823175 instance=ExtResource("31_weather")]
-time_of_day_hours = 17.296
+time_of_day_hours = 9.995
 seasons = Array[ExtResource("3_jpwbr")]([SubResource("Resource_pl6wn")])
-startTime = 62265.6
+startTime = 35982.0
 
 [node name="TerrainGenerator" type="Node3D" parent="." unique_id=586341718 node_paths=PackedStringArray("track_path")]
 script = ExtResource("7_gen")
@@ -141,32 +141,32 @@ road_material = SubResource("ShaderMaterial_asphalt")
 metadata/_edit_group_ = true
 metadata/_edit_lock_ = true
 
-[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=2045948636]
+[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1734368595]
 material_override = SubResource("ShaderMaterial_grass")
 lod_bias = 10.0
 mesh = ExtResource("10_lbtjd")
 
-[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1673791463]
+[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1361525414]
 
-[node name="@CollisionShape3D@51112" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=309747779]
+[node name="@CollisionShape3D@28655" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=1727791062]
 shape = ExtResource("11_sm0fw")
 
-[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=795201398]
-material_override = SubResource("ShaderMaterial_urxhk")
+[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1194066458]
+material_override = SubResource("ShaderMaterial_pkpnn")
 mesh = ExtResource("15_8vqih")
 
-[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1263099561]
-material_override = SubResource("StandardMaterial3D_k6srj")
+[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=2044203737]
+material_override = SubResource("StandardMaterial3D_15d20")
 mesh = ExtResource("16_3nnro")
 
-[node name="Visual_Road_Sides_Collision" type="StaticBody3D" parent="TerrainGenerator/Visual_Road_Sides" unique_id=1728285166]
+[node name="Visual_Road_Sides_Collision" type="StaticBody3D" parent="TerrainGenerator/Visual_Road_Sides" unique_id=187472878]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="TerrainGenerator/Visual_Road_Sides/Visual_Road_Sides_Collision" unique_id=2137500828]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TerrainGenerator/Visual_Road_Sides/Visual_Road_Sides_Collision" unique_id=840347691]
 shape = ExtResource("18_623mb")
 
-[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=425148302]
+[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1177903553]
 
-[node name="@CollisionShape3D@51113" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=1979661017]
+[node name="@CollisionShape3D@28656" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=364650226]
 shape = ExtResource("17_r6i1u")
 
 [node name="TrackPath" type="Path3D" parent="." unique_id=1030670243]
