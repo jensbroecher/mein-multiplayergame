@@ -25,12 +25,12 @@ var sync_rotation: Vector3
 @onready var fire_sprite_particles = $FireSpriteParticles
 @onready var fire_sprite_particles_2 = $FireSpriteParticles2
 var target: Node3D = null
-var lifetime = 5.0
+var lifetime = 7.0
 var search_timer = 0.0
-var spawn_safety_timer = 0.3
+var spawn_safety_timer = 0.05
 var start_position: Vector3 = Vector3.ZERO
-@export var max_range: float = 75.0
-var homing_delay: float = 0.5
+@export var max_range: float = 110.0
+var homing_delay: float = 0.15
 
 func _ready():
 	add_to_group("missiles")
@@ -47,8 +47,8 @@ func _ready():
 	
 	start_position = global_position
 	if is_guided:
-		lifetime = 8.0
-		max_range = 100.0
+		lifetime = 10.0
+		max_range = 150.0
 		# Blue/purple tint for the nose cone of guided missiles
 		var nose_cone = get_node_or_null("Visuals/NoseCone")
 		if nose_cone:
@@ -72,8 +72,8 @@ func _ready():
 			nm.emission_energy_multiplier = 3.0
 			nozzle.material_override = nm
 	else:
-		lifetime = 5.0
-		max_range = 75.0
+		lifetime = 7.0
+		max_range = 110.0
 		
 	_find_target()
 	if multiplayer.multiplayer_peer != null and not multiplayer.is_server():
@@ -126,7 +126,7 @@ func _physics_process(delta):
 				if forward.dot(dir) > -0.2:
 					if abs(dir.dot(Vector3.UP)) < 0.99:
 						var target_basis = Basis.looking_at(dir, Vector3.UP)
-						var turn_speed = 3.5 if is_guided else 0.3
+						var turn_speed = 3.5 if is_guided else 0.7
 						global_basis = global_basis.slerp(target_basis, turn_speed * delta).orthonormalized()
 				else:
 					# Target went too far behind, break the lock
@@ -166,12 +166,12 @@ func _process(delta):
 func _on_body_entered(body):
 	if multiplayer.multiplayer_peer != null and not multiplayer.is_server(): return
 	if body.is_in_group("player_carts"):
-		# Trigger explosion. We do NOT check for owner_id here because if the missile directly hits any cart (including the owner if they run into it),
-		# it should detonate. The blast damage loop will handle hitting any nearby carts including the owner.
+		# If it's the shooter, prevent immediate self-detonation for a split second (using spawn_safety_timer)
+		if body.name.to_int() == owner_id and spawn_safety_timer > 0.0:
+			return
 		_explode()
 	elif body is StaticBody3D or body is CSGShape3D or body is GridMap:
-		if spawn_safety_timer <= 0.0:
-			_explode()
+		_explode()
 
 func _explode():
 	if not is_instance_valid(self): return

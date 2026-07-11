@@ -650,104 +650,204 @@ func _create_track_collision(point_count: int, width: float, node_name: String):
 	var curb_slope = 0.15
 
 	if track_layout_type == TrackLayoutType.CANYON:
-		inner_w = half_w
-		curb_slope = 0.0
+		# Dedicated 12-vertex-per-slice canyon road collision mesh that matches the visual bevel
+		const BEVEL_W := 1.2
+		const BEVEL_H := 0.5
 
-	# Create Top and Bottom vertices
-	for i in range(point_count + 1):
-		var offset = (float(i) / point_count) * length
-		var pos = curve.sample_baked(offset)
+		# Create Top and Bottom vertices for Canyon
+		for i in range(point_count + 1):
+			var offset = (float(i) / point_count) * length
+			var pos = curve.sample_baked(offset)
 
-		var tangent: Vector3
-		if i == 0:
-			if is_loop:
-				var p_next = curve.sample_baked(0.2)
-				var p_prev = curve.sample_baked(max(0.0, length - 0.2))
-				tangent = (p_next - p_prev).normalized()
+			var tangent: Vector3
+			if i == 0:
+				if is_loop:
+					var p_next = curve.sample_baked(0.2)
+					var p_prev = curve.sample_baked(max(0.0, length - 0.2))
+					tangent = (p_next - p_prev).normalized()
+				else:
+					tangent = (curve.sample_baked(0.2) - pos).normalized()
+			elif i == point_count:
+				if is_loop:
+					var p_next = curve.sample_baked(0.2)
+					var p_prev = curve.sample_baked(max(0.0, length - 0.2))
+					tangent = (p_next - p_prev).normalized()
+				else:
+					tangent = (pos - curve.sample_baked(max(0.0, length - 0.2))).normalized()
 			else:
-				tangent = (curve.sample_baked(0.2) - pos).normalized()
-		elif i == point_count:
-			if is_loop:
-				var p_next = curve.sample_baked(0.2)
-				var p_prev = curve.sample_baked(max(0.0, length - 0.2))
-				tangent = (p_next - p_prev).normalized()
+				var next_pos = curve.sample_baked(min(offset + 0.5, length))
+				tangent = (next_pos - pos).normalized()
+
+			if tangent.length() < 0.01:
+				tangent = (pos - curve.sample_baked(max(offset - 0.5, 0.0))).normalized()
+			var right_dir = tangent.cross(Vector3.UP).normalized()
+
+			var final_pos = pos
+			if is_loop and i == point_count:
+				final_pos = curve.sample_baked(0.0)
+
+			# 6 Top vertices
+			var p0 = final_pos - right_dir * half_w + Vector3(0, y_offset, 0)
+			var p1 = final_pos - right_dir * (half_w - BEVEL_W * 0.5) + Vector3(0, y_offset - BEVEL_H * 0.25, 0)
+			var p2 = final_pos - right_dir * (half_w - BEVEL_W) + Vector3(0, y_offset - BEVEL_H, 0)
+			var p3 = final_pos + right_dir * (half_w - BEVEL_W) + Vector3(0, y_offset - BEVEL_H, 0)
+			var p4 = final_pos + right_dir * (half_w - BEVEL_W * 0.5) + Vector3(0, y_offset - BEVEL_H * 0.25, 0)
+			var p5 = final_pos + right_dir * half_w + Vector3(0, y_offset, 0)
+
+			# 6 Bottom vertices
+			var p0b = p0 - Vector3(0, thickness, 0)
+			var p1b = p1 - Vector3(0, thickness, 0)
+			var p2b = p2 - Vector3(0, thickness, 0)
+			var p3b = p3 - Vector3(0, thickness, 0)
+			var p4b = p4 - Vector3(0, thickness, 0)
+			var p5b = p5 - Vector3(0, thickness, 0)
+
+			st.add_vertex(p0)  # 12*i + 0
+			st.add_vertex(p1)  # 12*i + 1
+			st.add_vertex(p2)  # 12*i + 2
+			st.add_vertex(p3)  # 12*i + 3
+			st.add_vertex(p4)  # 12*i + 4
+			st.add_vertex(p5)  # 12*i + 5
+			st.add_vertex(p0b) # 12*i + 6
+			st.add_vertex(p1b) # 12*i + 7
+			st.add_vertex(p2b) # 12*i + 8
+			st.add_vertex(p3b) # 12*i + 9
+			st.add_vertex(p4b) # 12*i + 10
+			st.add_vertex(p5b) # 12*i + 11
+
+		for i in range(point_count):
+			var offset = (float(i) / point_count) * length
+			var pos = curve.sample_baked(offset)
+			if _is_in_gap_pos(pos):
+				continue
+
+			var base = i * 12
+			var nxt = (i + 1) * 12
+
+			# Top Faces: 5 quads
+			for k in range(5):
+				var a = base + k
+				var b = base + k + 1
+				var c = nxt + k
+				var d = nxt + k + 1
+				st.add_index(a); st.add_index(c); st.add_index(b)
+				st.add_index(b); st.add_index(c); st.add_index(d)
+
+			# Bottom Faces: 5 quads (reversed winding)
+			for k in range(5):
+				var ab = base + k + 6
+				var bb = base + k + 7
+				var cb = nxt + k + 6
+				var db = nxt + k + 7
+				st.add_index(ab); st.add_index(bb); st.add_index(cb)
+				st.add_index(bb); st.add_index(db); st.add_index(cb)
+
+			# Left Side Wall (0 to 6)
+			st.add_index(base + 0); st.add_index(base + 6); st.add_index(nxt + 0)
+			st.add_index(base + 6); st.add_index(nxt + 6); st.add_index(nxt + 0)
+
+			# Right Side Wall (5 to 11)
+			st.add_index(base + 5); st.add_index(nxt + 5); st.add_index(base + 11)
+			st.add_index(base + 11); st.add_index(nxt + 5); st.add_index(nxt + 11)
+
+	else:
+		# Default / Mountain collision shape generation
+
+		# Create Top and Bottom vertices
+		for i in range(point_count + 1):
+			var offset = (float(i) / point_count) * length
+			var pos = curve.sample_baked(offset)
+
+			var tangent: Vector3
+			if i == 0:
+				if is_loop:
+					var p_next = curve.sample_baked(0.2)
+					var p_prev = curve.sample_baked(max(0.0, length - 0.2))
+					tangent = (p_next - p_prev).normalized()
+				else:
+					tangent = (curve.sample_baked(0.2) - pos).normalized()
+			elif i == point_count:
+				if is_loop:
+					var p_next = curve.sample_baked(0.2)
+					var p_prev = curve.sample_baked(max(0.0, length - 0.2))
+					tangent = (p_next - p_prev).normalized()
+				else:
+					tangent = (pos - curve.sample_baked(max(0.0, length - 0.2))).normalized()
 			else:
-				tangent = (pos - curve.sample_baked(max(0.0, length - 0.2))).normalized()
-		else:
-			var next_pos = curve.sample_baked(min(offset + 0.5, length))
-			tangent = (next_pos - pos).normalized()
+				var next_pos = curve.sample_baked(min(offset + 0.5, length))
+				tangent = (next_pos - pos).normalized()
 
-		if tangent.length() < 0.01:
-			tangent = (pos - curve.sample_baked(max(offset - 0.5, 0.0))).normalized()
-		var right_dir = tangent.cross(Vector3.UP).normalized()
+			if tangent.length() < 0.01:
+				tangent = (pos - curve.sample_baked(max(offset - 0.5, 0.0))).normalized()
+			var right_dir = tangent.cross(Vector3.UP).normalized()
 
-		var final_pos = pos
-		if is_loop and i == point_count:
-			final_pos = curve.sample_baked(0.0)
+			var final_pos = pos
+			if is_loop and i == point_count:
+				final_pos = curve.sample_baked(0.0)
 
-		# Top vertices
-		var p_lo = final_pos - right_dir * outer_w + Vector3(0, y_offset - curb_slope, 0)
-		var p_li = final_pos - right_dir * inner_w + Vector3(0, y_offset, 0)
-		var p_ri = final_pos + right_dir * inner_w + Vector3(0, y_offset, 0)
-		var p_ro = final_pos + right_dir * outer_w + Vector3(0, y_offset - curb_slope, 0)
-		
-		# Bottom vertices
-		var p_lob = p_lo - Vector3(0, thickness, 0)
-		var p_lib = p_li - Vector3(0, thickness, 0)
-		var p_rib = p_ri - Vector3(0, thickness, 0)
-		var p_rob = p_ro - Vector3(0, thickness, 0)
+			# Top vertices
+			var p_lo = final_pos - right_dir * outer_w + Vector3(0, y_offset - curb_slope, 0)
+			var p_li = final_pos - right_dir * inner_w + Vector3(0, y_offset, 0)
+			var p_ri = final_pos + right_dir * inner_w + Vector3(0, y_offset, 0)
+			var p_ro = final_pos + right_dir * outer_w + Vector3(0, y_offset - curb_slope, 0)
+			
+			# Bottom vertices
+			var p_lob = p_lo - Vector3(0, thickness, 0)
+			var p_lib = p_li - Vector3(0, thickness, 0)
+			var p_rib = p_ri - Vector3(0, thickness, 0)
+			var p_rob = p_ro - Vector3(0, thickness, 0)
 
-		st.add_vertex(p_lo)  # 8*i + 0
-		st.add_vertex(p_li)  # 8*i + 1
-		st.add_vertex(p_ri)  # 8*i + 2
-		st.add_vertex(p_ro)  # 8*i + 3
-		st.add_vertex(p_lob) # 8*i + 4
-		st.add_vertex(p_lib) # 8*i + 5
-		st.add_vertex(p_rib) # 8*i + 6
-		st.add_vertex(p_rob) # 8*i + 7
+			st.add_vertex(p_lo)  # 8*i + 0
+			st.add_vertex(p_li)  # 8*i + 1
+			st.add_vertex(p_ri)  # 8*i + 2
+			st.add_vertex(p_ro)  # 8*i + 3
+			st.add_vertex(p_lob) # 8*i + 4
+			st.add_vertex(p_lib) # 8*i + 5
+			st.add_vertex(p_rib) # 8*i + 6
+			st.add_vertex(p_rob) # 8*i + 7
 
-	for i in range(point_count):
-		var offset = (float(i) / point_count) * length
-		var pos = curve.sample_baked(offset)
-		if _is_in_gap_pos(pos):
-			continue
+		for i in range(point_count):
+			var offset = (float(i) / point_count) * length
+			var pos = curve.sample_baked(offset)
+			if _is_in_gap_pos(pos):
+				continue
 
-		var base = i * 8
-		var nxt = (i + 1) * 8
+			var base = i * 8
+			var nxt = (i + 1) * 8
 
-		# Top Faces
-		# Left slope
-		st.add_index(base + 0); st.add_index(nxt + 0); st.add_index(base + 1)
-		st.add_index(base + 1); st.add_index(nxt + 0); st.add_index(nxt + 1)
-		
-		# Center flat
-		st.add_index(base + 1); st.add_index(nxt + 1); st.add_index(base + 2)
-		st.add_index(base + 2); st.add_index(nxt + 1); st.add_index(nxt + 2)
-		
-		# Right slope
-		st.add_index(base + 2); st.add_index(nxt + 2); st.add_index(base + 3)
-		st.add_index(base + 3); st.add_index(nxt + 2); st.add_index(nxt + 3)
+			# Top Faces
+			# Left slope
+			st.add_index(base + 0); st.add_index(nxt + 0); st.add_index(base + 1)
+			st.add_index(base + 1); st.add_index(nxt + 0); st.add_index(nxt + 1)
+			
+			# Center flat
+			st.add_index(base + 1); st.add_index(nxt + 1); st.add_index(base + 2)
+			st.add_index(base + 2); st.add_index(nxt + 1); st.add_index(nxt + 2)
+			
+			# Right slope
+			st.add_index(base + 2); st.add_index(nxt + 2); st.add_index(base + 3)
+			st.add_index(base + 3); st.add_index(nxt + 2); st.add_index(nxt + 3)
 
-		# Bottom Faces (Reverse winding)
-		# Left slope bottom
-		st.add_index(base + 4); st.add_index(base + 5); st.add_index(nxt + 4)
-		st.add_index(base + 5); st.add_index(nxt + 5); st.add_index(nxt + 4)
-		
-		# Center flat bottom
-		st.add_index(base + 5); st.add_index(base + 6); st.add_index(nxt + 5)
-		st.add_index(base + 6); st.add_index(nxt + 6); st.add_index(nxt + 5)
-		
-		# Right slope bottom
-		st.add_index(base + 6); st.add_index(base + 7); st.add_index(nxt + 6)
-		st.add_index(base + 7); st.add_index(nxt + 7); st.add_index(nxt + 6)
+			# Bottom Faces (Reverse winding)
+			# Left slope bottom
+			st.add_index(base + 4); st.add_index(base + 5); st.add_index(nxt + 4)
+			st.add_index(base + 5); st.add_index(nxt + 5); st.add_index(nxt + 4)
+			
+			# Center flat bottom
+			st.add_index(base + 5); st.add_index(base + 6); st.add_index(nxt + 5)
+			st.add_index(base + 6); st.add_index(nxt + 6); st.add_index(nxt + 5)
+			
+			# Right slope bottom
+			st.add_index(base + 6); st.add_index(base + 7); st.add_index(nxt + 6)
+			st.add_index(base + 7); st.add_index(nxt + 7); st.add_index(nxt + 6)
 
-		# Left Side Wall
-		st.add_index(base + 0); st.add_index(base + 4); st.add_index(nxt + 0)
-		st.add_index(base + 4); st.add_index(nxt + 4); st.add_index(nxt + 0)
+			# Left Side Wall
+			st.add_index(base + 0); st.add_index(base + 4); st.add_index(nxt + 0)
+			st.add_index(base + 4); st.add_index(nxt + 4); st.add_index(nxt + 0)
 
-		# Right Side Wall
-		st.add_index(base + 3); st.add_index(nxt + 3); st.add_index(base + 7)
-		st.add_index(base + 7); st.add_index(nxt + 3); st.add_index(nxt + 7)
+			# Right Side Wall
+			st.add_index(base + 3); st.add_index(nxt + 3); st.add_index(base + 7)
+			st.add_index(base + 7); st.add_index(nxt + 3); st.add_index(nxt + 7)
 
 
 	var track_mesh = st.commit()

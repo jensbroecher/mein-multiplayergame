@@ -436,8 +436,8 @@ func _ready():
 			camera_pivot.look_at(visuals.global_position, Vector3.UP)
 	else:
 		camera.current = false
-		if has_node("Visuals/CameraPivot/Camera3D/AudioListener3D"):
-			get_node("Visuals/CameraPivot/Camera3D/AudioListener3D").current = false
+		if has_node("AudioListener3D"):
+			get_node("AudioListener3D").current = false
 
 	_create_drift_particles("RL")
 	_create_drift_particles("RR")
