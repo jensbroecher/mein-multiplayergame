@@ -116,7 +116,6 @@ func _ready():
 					child.position.y = road.position.y
 
 
-
 	if multiplayer.is_server():
 		NetworkManager.player_connected.connect(_on_server_player_connected)
 		NetworkManager.player_disconnected.connect(_on_server_player_disconnected)
@@ -383,6 +382,9 @@ func _setup_splitscreen():
 			race_ui = ui
 		else:
 			race_ui_p2 = ui
+			var minimap = ui.get_node_or_null("HUDPanel/MinimapContainer")
+			if minimap:
+				minimap.hide()
 
 	# Link cameras to carts after they finish _ready (two frames needed for await)
 	_link_splitscreen_cameras_deferred()

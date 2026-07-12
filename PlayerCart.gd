@@ -532,8 +532,9 @@ func _on_body_entered(_body: Node):
 	var speed = linear_velocity.length()
 	if speed > 2.0:
 		var magnitude = clamp(speed / max_speed, 0.15, 0.8)
-		for device in Input.get_connected_joypads():
-			Input.start_joy_vibration(device, magnitude * 0.4, magnitude * 0.7, 0.2)
+		var dev = 1 if input_prefix == "p2_" else 0
+		if dev in Input.get_connected_joypads():
+			Input.start_joy_vibration(dev, magnitude * 0.4, magnitude * 0.7, 0.2)
 
 func _process(delta):
 	_update_visual_states(delta)
@@ -1824,8 +1825,9 @@ func explode(attacker_id: int = 0):
 			randf_range(-5.0, 5.0),
 			randf_range(-10.0, 10.0)
 		)
-		for device in Input.get_connected_joypads():
-			Input.start_joy_vibration(device, 0.6, 0.9, 0.5)
+		var dev = 1 if input_prefix == "p2_" else 0
+		if dev in Input.get_connected_joypads():
+			Input.start_joy_vibration(dev, 0.6, 0.9, 0.5)
 		
 	# Setup disintegrating parts
 	part_velocities.clear()

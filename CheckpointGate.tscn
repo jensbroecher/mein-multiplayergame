@@ -7,6 +7,16 @@
 [sub_resource type="BoxShape3D" id="BoxShape3D_checkpoint"]
 size = Vector3(20, 10, 5)
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_start_finish"]
+transparency = 1
+albedo_texture = ExtResource("3_start_finish_decal")
+emission_enabled = true
+emission = Color(0.15, 0.15, 0.15, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_start_finish"]
+material = SubResource("StandardMaterial3D_start_finish")
+size = Vector2(10, 2.5)
+
 [node name="CheckpointGate" type="Area3D" unique_id=1076613409]
 script = ExtResource("1_gate_script")
 
@@ -20,8 +30,6 @@ transform = Transform3D(0.7092688, 0, 0, 0, 0.7974354, 0, 0, 0, 1, -0.25506878, 
 [node name="Gate" parent="VisualGate" unique_id=34302034 instance=ExtResource("2_3pha7")]
 transform = Transform3D(20, 0, 0, 0, 20, 0, 0, 0, 20, 0.45436096, 0, -0.33356476)
 
-[node name="StartFinishDecal" type="Decal" parent="." unique_id=383702770]
-transform = Transform3D(1, 0, 0, 0, 0.3642754, 0, 0, 0, 1, 0, 0.5639806, 0)
-size = Vector3(10, 12, 2.5)
-texture_albedo = ExtResource("3_start_finish_decal")
-cull_mask = 1
+[node name="StartFinishDecal" type="MeshInstance3D" parent="." unique_id=383702770]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.44473982, 0)
+mesh = SubResource("PlaneMesh_start_finish")
