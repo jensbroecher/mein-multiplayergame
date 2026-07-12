@@ -15,12 +15,13 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 0)
 shape = SubResource("BoxShape3D_checkpoint")
 
 [node name="VisualGate" type="CSGCombiner3D" parent="." unique_id=1069427897]
+transform = Transform3D(0.7092688, 0, 0, 0, 0.7974354, 0, 0, 0, 1, -0.25506878, 0.3308835, 0)
 
 [node name="Gate" parent="VisualGate" unique_id=34302034 instance=ExtResource("2_3pha7")]
 transform = Transform3D(20, 0, 0, 0, 20, 0, 0, 0, 20, 0.45436096, 0, -0.33356476)
 
 [node name="StartFinishDecal" type="Decal" parent="." unique_id=383702770]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.43310404, 0)
+transform = Transform3D(1, 0, 0, 0, 0.3642754, 0, 0, 0, 1, 0, 0.5639806, 0)
 size = Vector3(10, 12, 2.5)
 texture_albedo = ExtResource("3_start_finish_decal")
 cull_mask = 1

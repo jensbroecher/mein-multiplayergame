@@ -91,6 +91,7 @@
 [ext_resource type="MultiMesh" uid="uid://ck5376e2js3ny" path="res://generated/grass/chunk_4_8.res" id="74_cwvwe"]
 [ext_resource type="MultiMesh" uid="uid://cf82moll4fxq8" path="res://generated/grass/chunk_5_8.res" id="75_5tnqe"]
 [ext_resource type="MultiMesh" uid="uid://cvjq76fa7rcdi" path="res://generated/grass/chunk_6_8.res" id="76_2s7yw"]
+[ext_resource type="PackedScene" uid="uid://dccjova18x17d" path="res://models/ramps/1f92b579825d1652d7ab8d760b289672.fbx" id="80_1gvc6"]
 [ext_resource type="PackedScene" uid="uid://bkrlyrhds2d8l" path="res://models/trees/pine_2.glb" id="83_0ct4b"]
 [ext_resource type="PackedScene" uid="uid://b1tokodxtar6i" path="res://models/trees/tree_4.glb" id="91_17ihm"]
 [ext_resource type="PackedScene" uid="uid://boostpad123" path="res://BoostPad.tscn" id="93_m7b4a"]
@@ -1323,6 +1324,8 @@ terrain_grass_count = 2000000
 grass_visibility_range = 300.0
 grass_material = SubResource("ShaderMaterial_grass")
 road_material = SubResource("ShaderMaterial_asphalt")
+metadata/_edit_lock_ = true
+metadata/_edit_group_ = true
 
 [node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=297456474]
 material_override = SubResource("ShaderMaterial_grass")
@@ -2551,15 +2554,11 @@ curve = SubResource("Curve3D_shortcut1")
 [node name="WoodRamp" parent="Ramps" unique_id=1457045438 groups=["collision_trimesh"] instance=ExtResource("30_q2vmi")]
 transform = Transform3D(7.1962733, 0, -18.660484, 0, 20, 0, 18.660484, 0, 7.1962733, 22.445913, 0.021007419, -9.015505)
 
-[node name="JumpRamp" type="CSGPolygon3D" parent="Ramps" unique_id=1126375394]
-transform = Transform3D(2.2809908, 0, 0.5911521, 0, 3.2831545, 0, -1.6633962, 0, 0.810638, 183.29544, 7.7090282, -81.64349)
-use_collision = true
-polygon = PackedVector2Array(0, 0, 8, 2, 8, 0)
-depth = 15.0
-material = SubResource("ShaderMaterial_asphalt")
-
 [node name="NewRamp" parent="Ramps" unique_id=966004585 groups=["collision_trimesh"] instance=ExtResource("17_dcckh")]
 transform = Transform3D(-30.273119, 0, -33.29471, 0, 44.999985, 0, 33.29471, 0, -30.273119, -507.56146, 6.9816875, -210.87714)
+
+[node name="ConcreteRamp" parent="Ramps" unique_id=1495161938 groups=["collision_trimesh"] instance=ExtResource("80_1gvc6")]
+transform = Transform3D(16.444656, 0, 11.383026, 0, 20, 0, -11.383026, 0, 16.444656, 167.59178, 6.9242396, -80.37636)
 
 [node name="LevelDesign" type="Node3D" parent="." unique_id=1434977768]
 
@@ -2574,8 +2573,14 @@ transform = Transform3D(-0.32899797, 0, 0.729219, 0, 0.80000025, 0, -0.729219, 0
 [node name="jacaranda_tree_1k" parent="LevelDesign/Trees" unique_id=798549070 groups=["collision_convex"] instance=ExtResource("95_bf5bs")]
 transform = Transform3D(0.80401117, 0, -2.367185, 0, 2.5000002, 0, 2.367185, 0, 0.80401117, 31.493206, 1.8536284, 47.964386)
 
+[node name="jacaranda_tree_LOD0" parent="LevelDesign/Trees/jacaranda_tree_1k" index="0" unique_id=298453617]
+lod_bias = 0.5
+
 [node name="othonna_cerarioides_1k" parent="LevelDesign/Trees" unique_id=956682310 groups=["collision_convex"] instance=ExtResource("96_h1oga")]
 transform = Transform3D(11.359214, 0, 5.217113, 0, 12.5, 0, -5.217113, 0, 11.359214, 107.47364, -0.10661733, -14.685692)
+
+[node name="othonna_cerarioides_a" parent="LevelDesign/Trees/othonna_cerarioides_1k" index="0" unique_id=1420912029]
+lod_bias = 0.5
 
 [node name="VegetationScatterer" type="Node3D" parent="LevelDesign" unique_id=40883185]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 61.321648, 0, -113.239914)
@@ -2748,7 +2753,7 @@ cull_mask = 1
 transform = Transform3D(0.852887, -0.029291136, 0.52127314, 0.034323275, 0.99941075, 0, -0.52096605, 0.017891806, 0.85338986, 153.24869, 6.886613, -70.886894)
 
 [node name="BoostPad3" parent="BoostPads" unique_id=1838947964 instance=ExtResource("93_m7b4a")]
-transform = Transform3D(0.852887, -0.029291136, 0.52127314, 0.034323275, 0.99941075, 0, -0.52096605, 0.017891806, 0.85338986, 161.95444, 6.6523466, -76.54727)
+transform = Transform3D(0.852887, -0.029291136, 0.52127314, 0.034323275, 0.99941075, 0, -0.52096605, 0.017891806, 0.85338986, 161.95444, 11.434822, -76.54727)
 
 [node name="BoostPad2" parent="BoostPads" unique_id=1232121474 instance=ExtResource("93_m7b4a")]
 transform = Transform3D(0.38633192, -0.013267997, 0.92226434, 0.034323275, 0.99941075, 0, -0.921721, 0.031655136, 0.38655972, 255.9263, 10.488753, -163.65369)
@@ -2784,3 +2789,6 @@ transform = Transform3D(0.9660922, -0.0010870973, 0.25819492, 0, 0.9999912, 0.00
 transform = Transform3D(0.9660922, -0.0010870973, 0.25819492, 0, 0.9999912, 0.0042103375, -0.2581972, -0.004067574, 0.9660837, 29.495537, 1.115636, 124.683784)
 
 [node name="SpawnIndicator" parent="SpawnPoints/Spawn6" unique_id=406332296 instance=ExtResource("8_spawn")]
+
+[editable path="LevelDesign/Trees/jacaranda_tree_1k"]
+[editable path="LevelDesign/Trees/othonna_cerarioides_1k"]
