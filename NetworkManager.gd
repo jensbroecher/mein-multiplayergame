@@ -18,8 +18,11 @@ var max_laps: int = 3
 # format: { id: { "name": "PlayerName", "car_index": 0 } }
 var players = {}
 var local_car_index: int = 0
+var local_p2_car_index: int = 0
+var local_p2_name: String = "Player 2"
+var is_coop_gp: bool = false
 
-enum GameMode { MULTIPLAYER, SINGLE_PLAYER_GP, SINGLE_PLAYER_TIME_TRIAL }
+enum GameMode { MULTIPLAYER, SINGLE_PLAYER_GP, SINGLE_PLAYER_TIME_TRIAL, LOCAL_COOP }
 var current_game_mode: int = GameMode.MULTIPLAYER
 
 var current_gp_name: String = ""
@@ -70,6 +73,15 @@ func start_single_player(player_name: String):
 	players[1] = {"name": player_name, "ready": false, "car_index": local_car_index}
 	LANDiscovery.stop_all()
 	print("NetworkManager: Started single player mode")
+	return OK
+
+func start_local_coop(p1_name: String, p2_name: String):
+	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
+	players.clear()
+	players[1] = {"name": p1_name, "ready": false, "car_index": local_car_index}
+	players[2] = {"name": p2_name, "ready": false, "car_index": local_p2_car_index}
+	LANDiscovery.stop_all()
+	print("NetworkManager: Started local co-op mode")
 	return OK
 
 var local_player_name = ""

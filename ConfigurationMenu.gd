@@ -8,17 +8,24 @@ signal back_pressed
 @onready var check_vsync = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/VSyncBox/CheckVSync
 @onready var option_anti_aliasing = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/AntiAliasingBox/OptionAntiAliasing
 
-@onready var btn_throttle = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings/RemapThrottle/BtnThrottle
-@onready var btn_brake = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings/RemapBrake/BtnBrake
-@onready var btn_steer_left = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings/RemapSteerLeft/BtnSteerLeft
-@onready var btn_steer_right = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings/RemapSteerRight/BtnSteerRight
-@onready var btn_boost = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings/RemapBoost/BtnBoost
-@onready var btn_discard = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/InputSettings/RemapDiscard/BtnDiscard
-
 @onready var btn_back = $Panel/MarginContainer/VBoxContainer/BtnBack
 
 var is_waiting_for_key: bool = false
 var waiting_action: String = ""
+
+var p1_buttons = {}
+var p2_buttons = {}
+
+const ACTION_LABELS = {
+	"throttle": "Throttle / Forward",
+	"brake": "Brake / Reverse",
+	"steer_left": "Steer Left",
+	"steer_right": "Steer Right",
+	"boost": "Use Item / Boost",
+	"discard_item": "Discard Item",
+	"respawn": "Respawn Cart",
+	"toggle_camera": "Change Camera"
+}
 
 func _ready():
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -58,23 +65,77 @@ func _ready():
 	option_anti_aliasing.item_selected.connect(_on_anti_aliasing_selected)
 	btn_back.pressed.connect(_on_back_pressed)
 	
-	# Connect remapping buttons
-	btn_throttle.pressed.connect(func(): start_remapping("throttle", btn_throttle))
-	btn_brake.pressed.connect(func(): start_remapping("brake", btn_brake))
-	btn_steer_left.pressed.connect(func(): start_remapping("steer_left", btn_steer_left))
-	btn_steer_right.pressed.connect(func(): start_remapping("steer_right", btn_steer_right))
-	btn_boost.pressed.connect(func(): start_remapping("boost", btn_boost))
-	btn_discard.pressed.connect(func(): start_remapping("discard_item", btn_discard))
-	
+	_build_input_ui()
 	update_keybind_buttons()
 
+func _build_input_ui():
+	# Hide old keyboard controls from LeftColumn
+	var controls_label = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn.get_node_or_null("ControlsLabel")
+	if controls_label: controls_label.hide()
+	var input_settings = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn.get_node_or_null("InputSettings")
+	if input_settings: input_settings.hide()
+	
+	# Hide old gamepad card from RightColumn
+	var controller_label = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn.get_node_or_null("ControllerLabel")
+	if controller_label: controller_label.hide()
+	var controller_card = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn.get_node_or_null("ControllerCard")
+	if controller_card: controller_card.hide()
+	
+	# Create Player 1 controls in LeftColumn
+	var p1_container = VBoxContainer.new()
+	p1_container.name = "P1InputContainer"
+	p1_container.add_theme_constant_override("separation", 8)
+	$Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn.add_child(p1_container)
+	
+	var p1_title = Label.new()
+	p1_title.text = "PLAYER 1 BINDINGS"
+	p1_title.add_theme_color_override("font_color", Color(0, 0.8, 1, 1))
+	p1_title.add_theme_font_size_override("font_size", 18)
+	p1_container.add_child(p1_title)
+	
+	_add_action_rows("p1_", p1_container, p1_buttons)
+	
+	# Create Player 2 controls in RightColumn
+	var p2_container = VBoxContainer.new()
+	p2_container.name = "P2InputContainer"
+	p2_container.add_theme_constant_override("separation", 8)
+	$Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn.add_child(p2_container)
+	
+	var p2_title = Label.new()
+	p2_title.text = "PLAYER 2 BINDINGS"
+	p2_title.add_theme_color_override("font_color", Color(0, 0.8, 1, 1))
+	p2_title.add_theme_font_size_override("font_size", 18)
+	p2_container.add_child(p2_title)
+	
+	_add_action_rows("p2_", p2_container, p2_buttons)
+
+func _add_action_rows(prefix: String, parent_container: Control, buttons_map: Dictionary):
+	for suffix in ACTION_LABELS:
+		var row = HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		parent_container.add_child(row)
+		
+		var lbl = Label.new()
+		lbl.text = ACTION_LABELS[suffix]
+		lbl.custom_minimum_size = Vector2(160, 0)
+		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(lbl)
+		
+		var btn = Button.new()
+		btn.custom_minimum_size = Vector2(180, 35)
+		btn.add_theme_font_size_override("font_size", 14)
+		
+		var full_action = prefix + suffix
+		btn.pressed.connect(func(): start_remapping(full_action, btn))
+		
+		row.add_child(btn)
+		buttons_map[suffix] = btn
+
 func update_keybind_buttons():
-	btn_throttle.text = MusicManager.get_action_key_text("throttle")
-	btn_brake.text = MusicManager.get_action_key_text("brake")
-	btn_steer_left.text = MusicManager.get_action_key_text("steer_left")
-	btn_steer_right.text = MusicManager.get_action_key_text("steer_right")
-	btn_boost.text = MusicManager.get_action_key_text("boost")
-	btn_discard.text = MusicManager.get_action_key_text("discard_item")
+	for suffix in p1_buttons:
+		p1_buttons[suffix].text = MusicManager.get_action_friendly_text("p1_" + suffix)
+	for suffix in p2_buttons:
+		p2_buttons[suffix].text = MusicManager.get_action_friendly_text("p2_" + suffix)
 
 func start_remapping(action_name: String, button: Button):
 	if is_waiting_for_key:
@@ -82,15 +143,37 @@ func start_remapping(action_name: String, button: Button):
 		
 	is_waiting_for_key = true
 	waiting_action = action_name
-	button.text = "[Press Any Key...]"
+	button.text = "[Press Any Key/Button...]"
 	button.grab_focus()
 
 func _unhandled_input(event: InputEvent):
-	if is_waiting_for_key and event is InputEventKey and event.pressed:
+	if not is_waiting_for_key: return
+	
+	var is_valid_input = false
+	var captured_event = null
+	
+	if event is InputEventKey and event.pressed:
+		if event.physical_keycode != KEY_ESCAPE:
+			captured_event = InputEventKey.new()
+			captured_event.physical_keycode = event.physical_keycode if event.physical_keycode != KEY_NONE else event.keycode
+		is_valid_input = true
+	elif event is InputEventJoypadButton and event.pressed:
+		captured_event = InputEventJoypadButton.new()
+		captured_event.device = event.device
+		captured_event.button_index = event.button_index
+		is_valid_input = true
+	elif event is InputEventJoypadMotion:
+		if abs(event.axis_value) > 0.6:
+			captured_event = InputEventJoypadMotion.new()
+			captured_event.device = event.device
+			captured_event.axis = event.axis
+			captured_event.axis_value = 1.0 if event.axis_value > 0 else -1.0
+			is_valid_input = true
+			
+	if is_valid_input:
 		is_waiting_for_key = false
-		var keycode = event.physical_keycode if event.physical_keycode != KEY_NONE else event.keycode
-		if keycode != KEY_ESCAPE:
-			MusicManager.save_action_key(waiting_action, keycode)
+		if captured_event:
+			MusicManager.save_action_event(waiting_action, captured_event)
 		update_keybind_buttons()
 		get_viewport().set_input_as_handled()
 

@@ -324,38 +324,201 @@ func set_anti_aliasing(index: int, save: bool = true):
 				vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA
 	if save: save_settings()
 
-func load_input_settings():
-	var config = ConfigFile.new()
-	if config.load(SETTINGS_FILE) == OK:
-		for action in ["throttle", "brake", "steer_left", "steer_right", "boost", "discard_item"]:
-			if config.has_section_key("input", action):
-				var keycode = config.get_value("input", action)
-				_apply_action_key(action, keycode)
+const CUSTOM_ACTIONS = [
+	"p1_throttle", "p1_brake", "p1_steer_left", "p1_steer_right", "p1_boost", "p1_discard_item", "p1_respawn", "p1_toggle_camera",
+	"p2_throttle", "p2_brake", "p2_steer_left", "p2_steer_right", "p2_boost", "p2_discard_item", "p2_respawn", "p2_toggle_camera"
+]
 
-func save_action_key(action_name: String, keycode: int):
+func _ensure_custom_actions():
+	for action in CUSTOM_ACTIONS:
+		if not InputMap.has_action(action):
+			InputMap.add_action(action)
+
+func _get_default_action_event(action: String) -> InputEvent:
+	match action:
+		"p1_throttle":
+			var ev = InputEventKey.new()
+			ev.physical_keycode = KEY_W
+			return ev
+		"p1_brake":
+			var ev = InputEventKey.new()
+			ev.physical_keycode = KEY_S
+			return ev
+		"p1_steer_left":
+			var ev = InputEventKey.new()
+			ev.physical_keycode = KEY_A
+			return ev
+		"p1_steer_right":
+			var ev = InputEventKey.new()
+			ev.physical_keycode = KEY_D
+			return ev
+		"p1_boost":
+			var ev = InputEventKey.new()
+			ev.physical_keycode = KEY_SPACE
+			return ev
+		"p1_discard_item":
+			var ev = InputEventKey.new()
+			ev.physical_keycode = KEY_Q
+			return ev
+		"p1_respawn":
+			var ev = InputEventKey.new()
+			ev.physical_keycode = KEY_R
+			return ev
+		"p1_toggle_camera":
+			var ev = InputEventKey.new()
+			ev.physical_keycode = KEY_C
+			return ev
+			
+		"p2_throttle":
+			var ev = InputEventKey.new()
+			ev.physical_keycode = KEY_UP
+			return ev
+		"p2_brake":
+			var ev = InputEventKey.new()
+			ev.physical_keycode = KEY_DOWN
+			return ev
+		"p2_steer_left":
+			var ev = InputEventKey.new()
+			ev.physical_keycode = KEY_LEFT
+			return ev
+		"p2_steer_right":
+			var ev = InputEventKey.new()
+			ev.physical_keycode = KEY_RIGHT
+			return ev
+		"p2_boost":
+			var ev = InputEventKey.new()
+			ev.physical_keycode = KEY_KP_0
+			return ev
+		"p2_discard_item":
+			var ev = InputEventKey.new()
+			ev.physical_keycode = KEY_BACKSPACE
+			return ev
+		"p2_respawn":
+			var ev = InputEventKey.new()
+			ev.physical_keycode = KEY_BACKSLASH
+			return ev
+		"p2_toggle_camera":
+			var ev = InputEventKey.new()
+			ev.physical_keycode = KEY_P
+			return ev
+	return null
+
+func serialize_event(event: InputEvent) -> Dictionary:
+	if event is InputEventKey:
+		return {"type": "key", "keycode": event.physical_keycode}
+	elif event is InputEventJoypadButton:
+		return {"type": "joy_button", "device": event.device, "button_index": event.button_index}
+	elif event is InputEventJoypadMotion:
+		return {"type": "joy_motion", "device": event.device, "axis": event.axis, "axis_value": event.axis_value}
+	return {}
+
+func deserialize_event(dict: Dictionary) -> InputEvent:
+	if not dict or not dict.has("type"): return null
+	match dict["type"]:
+		"key":
+			var ev = InputEventKey.new()
+			ev.physical_keycode = dict["keycode"]
+			return ev
+		"joy_button":
+			var ev = InputEventJoypadButton.new()
+			ev.device = dict.get("device", 0)
+			ev.button_index = dict["button_index"]
+			return ev
+		"joy_motion":
+			var ev = InputEventJoypadMotion.new()
+			ev.device = dict.get("device", 0)
+			ev.axis = dict["axis"]
+			ev.axis_value = dict.get("axis_value", 1.0)
+			return ev
+	return null
+
+func load_input_settings():
+	_ensure_custom_actions()
+	var config = ConfigFile.new()
+	var has_config = config.load(SETTINGS_FILE) == OK
+	
+	for action in CUSTOM_ACTIONS:
+		InputMap.action_erase_events(action)
+		var applied = false
+		if has_config and config.has_section_key("input_v2", action):
+			var data = config.get_value("input_v2", action)
+			var event = deserialize_event(data)
+			if event:
+				InputMap.action_add_event(action, event)
+				applied = true
+		
+		if not applied:
+			var default_event = _get_default_action_event(action)
+			if default_event:
+				InputMap.action_add_event(action, default_event)
+
+func save_action_event(action_name: String, event: InputEvent):
 	var config = ConfigFile.new()
 	config.load(SETTINGS_FILE)
-	config.set_value("input", action_name, keycode)
+	var data = serialize_event(event)
+	config.set_value("input_v2", action_name, data)
 	config.save(SETTINGS_FILE)
-	_apply_action_key(action_name, keycode)
-
-func _apply_action_key(action_name: String, keycode: int):
-	var events = InputMap.action_get_events(action_name)
-	for event in events:
-		if event is InputEventKey:
-			InputMap.action_erase_event(action_name, event)
 	
-	var new_event = InputEventKey.new()
-	new_event.physical_keycode = keycode
-	InputMap.action_add_event(action_name, new_event)
+	InputMap.action_erase_events(action_name)
+	InputMap.action_add_event(action_name, event)
 
-func get_action_key_text(action_name: String) -> String:
-	var events = InputMap.action_get_events(action_name)
-	for event in events:
-		if event is InputEventKey:
-			var keycode = event.physical_keycode if event.physical_keycode != KEY_NONE else event.keycode
-			return OS.get_keycode_string(keycode)
+func get_event_friendly_text(event: InputEvent) -> String:
+	if event is InputEventKey:
+		var keycode = event.physical_keycode if event.physical_keycode != KEY_NONE else event.keycode
+		return OS.get_keycode_string(keycode)
+	elif event is InputEventJoypadButton:
+		var btn_name = "Joy %d Button %d" % [event.device + 1, event.button_index]
+		match event.button_index:
+			JOY_BUTTON_A: btn_name = "Joy %d A/Cross" % (event.device + 1)
+			JOY_BUTTON_B: btn_name = "Joy %d B/Circle" % (event.device + 1)
+			JOY_BUTTON_X: btn_name = "Joy %d Square" % (event.device + 1)
+			JOY_BUTTON_Y: btn_name = "Joy %d Triangle" % (event.device + 1)
+			JOY_BUTTON_LEFT_SHOULDER: btn_name = "Joy %d LB/L1" % (event.device + 1)
+			JOY_BUTTON_RIGHT_SHOULDER: btn_name = "Joy %d RB/R1" % (event.device + 1)
+			JOY_BUTTON_START: btn_name = "Joy %d Start" % (event.device + 1)
+			JOY_BUTTON_BACK: btn_name = "Joy %d Back/Share" % (event.device + 1)
+			JOY_BUTTON_LEFT_STICK: btn_name = "Joy %d L-Stick Press" % (event.device + 1)
+			JOY_BUTTON_RIGHT_STICK: btn_name = "Joy %d R-Stick Press" % (event.device + 1)
+			JOY_BUTTON_DPAD_UP: btn_name = "Joy %d Dpad Up" % (event.device + 1)
+			JOY_BUTTON_DPAD_DOWN: btn_name = "Joy %d Dpad Down" % (event.device + 1)
+			JOY_BUTTON_DPAD_LEFT: btn_name = "Joy %d Dpad Left" % (event.device + 1)
+			JOY_BUTTON_DPAD_RIGHT: btn_name = "Joy %d Dpad Right" % (event.device + 1)
+		return btn_name
+	elif event is InputEventJoypadMotion:
+		var dir = "Pos" if event.axis_value > 0 else "Neg"
+		var motion_name = "Joy %d Axis %d %s" % [event.device + 1, event.axis, dir]
+		match event.axis:
+			JOY_AXIS_LEFT_X:
+				motion_name = ("Joy %d L-Stick Right" if event.axis_value > 0 else "Joy %d L-Stick Left") % (event.device + 1)
+			JOY_AXIS_LEFT_Y:
+				motion_name = ("Joy %d L-Stick Down" if event.axis_value > 0 else "Joy %d L-Stick Up") % (event.device + 1)
+			JOY_AXIS_RIGHT_X:
+				motion_name = ("Joy %d R-Stick Right" if event.axis_value > 0 else "Joy %d R-Stick Left") % (event.device + 1)
+			JOY_AXIS_RIGHT_Y:
+				motion_name = ("Joy %d R-Stick Down" if event.axis_value > 0 else "Joy %d R-Stick Up") % (event.device + 1)
+			JOY_AXIS_TRIGGER_LEFT:
+				motion_name = "Joy %d Left Trigger" % (event.device + 1)
+			JOY_AXIS_TRIGGER_RIGHT:
+				motion_name = "Joy %d Right Trigger" % (event.device + 1)
+		return motion_name
 	return "None"
+
+func get_action_friendly_text(action_name: String) -> String:
+	var events = InputMap.action_get_events(action_name)
+	if events.size() > 0:
+		return get_event_friendly_text(events[0])
+	return "None"
+
+# Stub functions to prevent compilation errors if called elsewhere
+func get_action_key_text(action_name: String) -> String:
+	# Fallback to checking p1 action
+	return get_action_friendly_text("p1_" + action_name)
+
+func save_action_key(action_name: String, keycode: int):
+	# Fallback to saving p1 key
+	var ev = InputEventKey.new()
+	ev.physical_keycode = keycode
+	save_action_event("p1_" + action_name, ev)
 
 func stop_music():
 	if active_player:

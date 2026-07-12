@@ -11,6 +11,9 @@ const PAUSE_MENU_SCENE = preload("res://PauseMenu.tscn")
 var configuration_menu
 var pause_menu
 
+var _coop_p1_car: int = 0
+var _coop_selecting_p2: bool = false
+
 func _ready():
 	main_menu.start_pressed.connect(_on_menu_start_pressed)
 	main_menu.options_pressed.connect(_on_menu_options_pressed)
@@ -34,6 +37,33 @@ func _on_menu_options_pressed():
 	configuration_menu.show()
 
 func _on_car_selected(car_index: int):
+	if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
+		if not _coop_selecting_p2:
+			# P1 just selected — save their car and show selection again for P2
+			_coop_p1_car = car_index
+			_coop_selecting_p2 = true
+			car_selection.show_for_player(2)
+		else:
+			# P2 just selected — finalize both and start
+			_coop_selecting_p2 = false
+			NetworkManager.local_car_index = _coop_p1_car
+			NetworkManager.local_p2_car_index = car_index
+			car_selection.hide()
+			
+			var p_name = "Player 1"
+			var config = ConfigFile.new()
+			if config.load("user://settings.cfg") == OK:
+				var saved_name = config.get_value("player", "name", "")
+				if not saved_name.is_empty():
+					p_name = saved_name
+			
+			var p2_name = NetworkManager.local_p2_name
+			if p2_name.is_empty():
+				p2_name = "Player 2"
+				
+			NetworkManager.start_local_coop(p_name, p2_name)
+			start_game(true)
+		return
 	NetworkManager.local_car_index = car_index
 	if NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER:
 		lobby.show()
@@ -46,20 +76,22 @@ func _on_car_selected(car_index: int):
 			var saved_name = config.get_value("player", "name", "")
 			if not saved_name.is_empty():
 				p_name = saved_name
-				
+			
 		NetworkManager.start_single_player(p_name)
 		start_game(true)
-
+ 
 func start_game(is_host: bool):
 	if is_host:
 		var level_scene = LEVEL_SCENE
-		if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP:
+		if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP \
+				or (NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP and NetworkManager.is_coop_gp):
 			var gp_data = NetworkManager.GP_CUPS.get(NetworkManager.current_gp_name)
 			if gp_data:
 				var stage_idx = NetworkManager.current_gp_stage
 				if stage_idx < gp_data["stages"].size():
 					level_scene = load(gp_data["stages"][stage_idx])
-		elif NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL:
+		elif NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL \
+				or NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
 			level_scene = load(NetworkManager.time_trial_stage)
 		
 		var level = level_scene.instantiate()

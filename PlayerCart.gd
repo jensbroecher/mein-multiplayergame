@@ -163,6 +163,13 @@ const LANDING_SOUNDS = [
 
 
 var race_ui
+var injected_race_ui = null  # set by Level for LOCAL_COOP; overrides scene-tree lookup
+var device_id: int = -1      # -1 = keyboard, 0+ = gamepad joypad index
+var splitscreen_camera: Camera3D = null  # SubViewport camera that mirrors this cart's view
+var input_prefix: String = "p1_"
+var _p2_prev_boost: bool = false
+var _p2_prev_discard: bool = false
+var _p2_prev_respawn: bool = false
 var avg_wheel_y: float = -0.02
 var last_respawn_time: float = -999.0
 
@@ -371,7 +378,9 @@ func _ready():
 	var level = get_tree().get_first_node_in_group("level")
 	if level:
 		_cached_level = level  # Cache for hot-path use in _process
-		if level.has_node("RaceUI"):
+		if injected_race_ui:
+			race_ui = injected_race_ui  # Directly injected (LOCAL_COOP)
+		elif level.has_node("RaceUI"):
 			race_ui = level.get_node("RaceUI")
 		var tg = level.get_node_or_null("TerrainGenerator")
 		if tg and "no_water" in tg:
@@ -429,7 +438,8 @@ func _ready():
 			engine_sound.play()
 
 	if is_local_player:
-		camera.current = true
+		var is_coop = NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP
+		camera.current = not is_coop  # SubViewport cameras handle rendering in co-op
 		camera_pivot.top_level = true
 		
 		# Set initial top-view camera settings
@@ -489,10 +499,18 @@ func _update_authority():
 		set_multiplayer_authority(1)
 		$MultiplayerSynchronizer.set_multiplayer_authority(1)
 		
-	if multiplayer.multiplayer_peer != null:
+	if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
+		is_local_player = not is_ai
+		if id == 2:
+			input_prefix = "p2_"
+		else:
+			input_prefix = "p1_"
+	elif multiplayer.multiplayer_peer != null:
 		is_local_player = (id == multiplayer.get_unique_id())
+		input_prefix = "p1_"
 	else:
 		is_local_player = not is_ai
+		input_prefix = "p1_"
 	
 	if is_local_player:
 		contact_monitor = true
@@ -530,8 +548,8 @@ func _process(delta):
 		_update_visuals_alignment(delta)
 		
 	if is_local_player:
-
-		if Input.is_action_just_pressed("toggle_camera"):
+		# Camera toggle
+		if Input.is_action_just_pressed(input_prefix + "toggle_camera"):
 			is_isometric = not is_isometric
 			camera.projection = Camera3D.PROJECTION_PERSPECTIVE
 			if not is_isometric:
@@ -539,12 +557,15 @@ func _process(delta):
 			else:
 				camera_clip_distance_mult_iso = 1.0
 
-		if Input.is_action_just_pressed("respawn"):
+		# Action buttons
+		if Input.is_action_just_pressed(input_prefix + "respawn"):
 			respawn_rpc.rpc()
 
 		var visual_forward = -visuals.global_transform.basis.z
 		var speed_factor = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
 		var look_ahead_dist = (8.0 + speed_factor * 8.0) if is_isometric else (4.0 + speed_factor * 6.0)
+		if splitscreen_camera != null:
+			look_ahead_dist *= 0.4 # Keep camera closer to car in splitscreen to prevent going off-screen
 
 		# Rebuild the excludes list every ~90 frames instead of every frame.
 		# find_children() is a full tree traversal – doing it 60×/s was a major CPU cost.
@@ -668,6 +689,11 @@ func _process(delta):
 			target_fov += 6.0 if is_isometric else 9.0 # Zoom out slightly less when pad boosting!
 		camera.fov = lerp(camera.fov, target_fov, 8.0 * delta)
 
+		# Mirror camera into SubViewport (LOCAL_COOP splitscreen)
+		if splitscreen_camera and is_instance_valid(splitscreen_camera):
+			splitscreen_camera.global_transform = camera.global_transform
+			splitscreen_camera.fov = camera.fov
+
 		if race_ui:
 			smoothed_speed = lerp(smoothed_speed, linear_velocity.length() * 1.8, 10.0 * delta)
 			race_ui.update_speed(smoothed_speed)
@@ -677,7 +703,14 @@ func _process(delta):
 				cam_underwater = camera.global_position.y < WATER_LEVEL
 			race_ui.set_underwater(cam_underwater)
 
-		var throttle_input = Input.get_axis("throttle", "brake")
+		# Engine sound throttle check — device-specific
+		var throttle_input: float
+		if device_id == -1:
+			throttle_input = Input.get_axis("throttle", "brake")
+		else:
+			var t = Input.get_joy_axis(device_id, JOY_AXIS_TRIGGER_RIGHT)
+			var b = Input.get_joy_axis(device_id, JOY_AXIS_TRIGGER_LEFT)
+			throttle_input = b - t  # matches get_axis("throttle","brake") sign convention
 		var wants_to_play = can_move and not is_exploding and abs(throttle_input) > 0.1
 		
 		if wants_to_play:
@@ -906,9 +939,9 @@ func _physics_process(delta):
 		return
 
 	if is_local_player:
-		if Input.is_action_just_pressed("boost"):
+		if Input.is_action_just_pressed(input_prefix + "boost"):
 			_use_item()
-		if Input.is_action_just_pressed("discard_item"):
+		if Input.is_action_just_pressed(input_prefix + "discard_item"):
 			_discard_item()
 
 	var input_dir = Vector2.ZERO
@@ -917,8 +950,8 @@ func _physics_process(delta):
 			input_dir = _get_ai_input(delta)
 			_process_ai_items(delta)
 		else:
-			input_dir.x = Input.get_axis("steer_left", "steer_right")
-			input_dir.y = Input.get_axis("throttle", "brake")
+			input_dir.x = Input.get_axis(input_prefix + "steer_left", input_prefix + "steer_right")
+			input_dir.y = Input.get_axis(input_prefix + "throttle", input_prefix + "brake")
 
 	var on_ground = false
 	var ground_normal = Vector3.UP

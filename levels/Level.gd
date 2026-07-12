@@ -48,6 +48,8 @@ var spawn_points: Array = []
 @onready var player_spawner = $PlayerSpawner
 
 var race_ui
+var race_ui_p2  # second HUD for LOCAL_COOP
+var _split_cameras: Array = []  # SubViewport cameras for splitscreen
 var player_stats = {} # id -> {"laps": 0, "next_checkpoint_idx": 0, "finished": false, "pos": 0}
 var end_timer = 0.0
 
@@ -77,8 +79,11 @@ func _ready():
 
 	add_to_group("level")
 	player_spawner.spawn_function = _spawn_custom
-	race_ui = RACE_UI_SCENE.instantiate()
-	add_child(race_ui)
+	if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
+		_setup_splitscreen()  # creates race_ui, race_ui_p2 inside SubViewports
+	else:
+		race_ui = RACE_UI_SCENE.instantiate()
+		add_child(race_ui)
 
 	# Positions of FinishLine, spawn points and checkpoints are baked into the .tscn
 	# by the editor tools — do NOT re-align them at runtime as that would override
@@ -116,7 +121,7 @@ func _ready():
 		NetworkManager.player_connected.connect(_on_server_player_connected)
 		NetworkManager.player_disconnected.connect(_on_server_player_disconnected)
 
-		if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP:
+		if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP or (NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP and NetworkManager.is_coop_gp):
 			var bot_names = ["Viper Bot", "Shadow Bot", "Apex Bot", "Blaze Bot", "Nova Bot"]
 			var bot_cars = [1, 2, 3, 0, 1]
 			for i in range(5):
@@ -137,7 +142,8 @@ func _ready():
 	NetworkManager.player_connected.connect(_on_player_list_changed)
 	NetworkManager.player_disconnected.connect(_on_player_list_changed)
 
-	race_ui.update_lobby(NetworkManager.players)
+	for ui in _all_race_uis():
+		ui.update_lobby(NetworkManager.players)
 	race_ui.ready_pressed.connect(_on_local_ready_pressed)
 	race_ui.start_pressed.connect(_on_host_start_pressed)
 	
@@ -267,18 +273,26 @@ func _check_finish(id: int):
 		var cart = players_container.get_node_or_null(str(id))
 		if cart and cart.get("is_ai"):
 			cart.can_move = false
+		elif NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
+			# Direct handling — no RPC needed for local players
+			if cart: cart.can_move = false
+			var ui = race_ui if id == 1 else race_ui_p2
+			if ui: ui.show_message("You Finished!", 5.0)
 		else:
 			if id == multiplayer.get_unique_id():
 				show_player_finished_rpc()
 			else:
 				show_player_finished_rpc.rpc_id(id)
-
+		
 		# Start 30s timer if this is the first finisher
 		if end_timer <= 0.0:
 			end_timer = 30.0
 
 @rpc("authority", "call_local", "reliable")
 func show_player_finished_rpc():
+	if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
+		# In co-op this is handled directly in _check_finish(), skip
+		return
 	race_ui.show_message("You Finished!", 5.0)
 	_disable_local_cart()
 
@@ -299,10 +313,86 @@ func _disable_local_cart():
 			c.can_move = false
 
 func _on_player_list_changed(_id = 0, _info = {}):
-	race_ui.update_lobby(NetworkManager.players)
+	for ui in _all_race_uis():
+		ui.update_lobby(NetworkManager.players)
 
 func _on_player_ready_changed(_id, _is_ready):
-	race_ui.update_lobby(NetworkManager.players)
+	for ui in _all_race_uis():
+		ui.update_lobby(NetworkManager.players)
+
+func _all_race_uis() -> Array:
+	## Returns all active race UI instances (1 in normal modes, 2 in LOCAL_COOP)
+	var uis = []
+	if race_ui: uis.append(race_ui)
+	if race_ui_p2: uis.append(race_ui_p2)
+	return uis
+
+func _setup_splitscreen():
+	## Creates left/right SubViewports, a camera in each, and a RaceUI in each.
+	## The SubViewports share the main Viewport's World3D (own_world_3d=false).
+	var canvas = CanvasLayer.new()
+	canvas.name = "SplitCanvas"
+	canvas.layer = 0
+	add_child(canvas)
+
+	var bg = ColorRect.new()
+	bg.color = Color.BLACK
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	canvas.add_child(bg)
+
+	var hbox = HBoxContainer.new()
+	hbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	hbox.add_theme_constant_override("separation", 2)
+	canvas.add_child(hbox)
+
+	for i in range(2):
+		var svc = SubViewportContainer.new()
+		svc.stretch = true
+		svc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		svc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		hbox.add_child(svc)
+
+		var sv = SubViewport.new()
+		sv.own_world_3d = false   # share main viewport's World3D (where Level lives)
+		sv.handle_input_locally = false
+		sv.audio_listener_enable_3d = (i == 0)  # only P1 viewport has 3D audio listener
+		svc.add_child(sv)
+
+		var cam = Camera3D.new()
+		cam.current = true  # current within this SubViewport
+		sv.add_child(cam)
+		_split_cameras.append(cam)
+
+		# Each player gets their own RaceUI inside their SubViewport
+		var ui = RACE_UI_SCENE.instantiate()
+		ui.name = "RaceUI" if i == 0 else "RaceUI_P2"
+		sv.add_child(ui)
+		if i == 0:
+			race_ui = ui
+		else:
+			race_ui_p2 = ui
+
+	# Link cameras to carts after they finish _ready (two frames needed for await)
+	_link_splitscreen_cameras_deferred()
+
+func _link_splitscreen_cameras_deferred():
+	# Retry every frame until both local non-AI carts have finished their _ready()
+	# (each cart awaits one process frame internally, so 2 frames is not always enough).
+	var max_retries = 30
+	for _i in range(max_retries):
+		await get_tree().process_frame
+		var carts = get_tree().get_nodes_in_group("player_carts")
+		var local_carts = carts.filter(func(c): return c.is_local_player and not c.is_ai)
+		if local_carts.size() >= 2:
+			break
+	_link_splitscreen_cameras()
+
+func _link_splitscreen_cameras():
+	var carts = get_tree().get_nodes_in_group("player_carts")
+	var local_carts = carts.filter(func(c): return c.is_local_player and not c.is_ai)
+	local_carts.sort_custom(func(a, b): return a.name.to_int() < b.name.to_int())
+	for i in range(mini(local_carts.size(), _split_cameras.size())):
+		local_carts[i].splitscreen_camera = _split_cameras[i]
 
 func _on_server_player_connected(id: int, info: Dictionary):
 	if multiplayer.is_server():
@@ -322,6 +412,8 @@ func _spawn_custom(data: Variant) -> Node:
 	cart.car_index = data.get("car_index", 0)
 	cart.global_transform = data["transform"]
 	cart.is_ai = data.get("is_ai", false)
+	cart.device_id = data.get("device_id", -1)
+	cart.injected_race_ui = data.get("injected_race_ui", null)
 
 	# If race is already started (e.g. late join), enable movement if local
 	if race_state == RaceState.RACING:
@@ -352,12 +444,23 @@ func _add_player(id: int, p_name: String):
 			car_idx = NetworkManager.players[id].get("car_index", 0)
 			is_ai = NetworkManager.players[id].get("is_ai", false)
 
+		# LOCAL_COOP: P1 gets race_ui, P2 gets race_ui_p2
+		var device = -1
+		var inj_ui = null
+		if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
+			if id == 1:
+				inj_ui = race_ui
+			elif id == 2:
+				inj_ui = race_ui_p2
+
 		var data = {
 			"id": id,
 			"name": p_name,
 			"transform": spawn_transform,
 			"car_index": car_idx,
-			"is_ai": is_ai
+			"is_ai": is_ai,
+			"device_id": device,
+			"injected_race_ui": inj_ui
 		}
 		player_spawner.spawn(data)
 
@@ -373,11 +476,11 @@ func start_race():
 	if race_state != RaceState.LOBBY:
 		return
 	race_state = RaceState.RACING
-	if race_ui:
-		race_ui.show_hud()
-		var lp = race_ui.get_node_or_null("LobbyPanel")
+	for ui in _all_race_uis():
+		ui.show_hud()
+		var lp = ui.get_node_or_null("LobbyPanel")
 		if lp: lp.hide()
-		var hp = race_ui.get_node_or_null("HUDPanel")
+		var hp = ui.get_node_or_null("HUDPanel")
 		if hp: hp.show()
 
 	# Start camera intro on all carts
@@ -387,22 +490,22 @@ func start_race():
 	await get_tree().create_timer(3.5).timeout
 
 	# Start countdown
-	if race_ui:
-		race_ui.show_message("3", 1.0)
+	for ui in _all_race_uis():
+		ui.show_message("3", 1.0)
 	MusicManager.play_sfx("res://sounds/3.mp3")
 	await get_tree().create_timer(1.0).timeout
-	if race_ui:
-		race_ui.show_message("2", 1.0)
+	for ui in _all_race_uis():
+		ui.show_message("2", 1.0)
 	MusicManager.play_sfx("res://sounds/2.mp3")
 	await get_tree().create_timer(1.0).timeout
-	if race_ui:
-		race_ui.show_message("1", 1.0)
+	for ui in _all_race_uis():
+		ui.show_message("1", 1.0)
 	MusicManager.play_sfx("res://sounds/1.mp3")
 	await get_tree().create_timer(1.0).timeout
 
 	# Now actually start the race and allow movement!
-	if race_ui:
-		race_ui.show_message("GO!", 2.0)
+	for ui in _all_race_uis():
+		ui.show_message("GO!", 2.0)
 	MusicManager.play_sfx("res://sounds/Go.mp3")
 	MusicManager.load_playlist_for_level(scene_file_path)
 	MusicManager.play_race_music()
@@ -492,7 +595,11 @@ func _update_positions():
 
 		var l = ranking[i]["laps"]
 		if NetworkManager.players.has(id) and not NetworkManager.players[id].get("is_ai", false):
-			if id == multiplayer.get_unique_id():
+			if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
+				# Direct HUD update — no RPC routing needed for local co-op
+				var ui = race_ui if id == 1 else race_ui_p2
+				if ui: ui.update_hud(pos, ranking.size(), mini(l + 1, NetworkManager.max_laps), NetworkManager.max_laps)
+			elif id == multiplayer.get_unique_id():
 				update_hud_rpc(pos, ranking.size(), mini(l + 1, NetworkManager.max_laps), NetworkManager.max_laps)
 			else:
 				update_hud_rpc.rpc_id(id, pos, ranking.size(), mini(l + 1, NetworkManager.max_laps), NetworkManager.max_laps)
@@ -503,10 +610,9 @@ func update_hud_rpc(pos, total, lap, max_laps):
 
 @rpc("authority", "call_local", "reliable")
 func update_timer_rpc(t: int):
-	# Don't show end screen for racing players immediately, just update it if they see it
-	# Actually wait, everyone should see the timer.
-	race_ui.show_end_screen()
-	race_ui.update_end_timer(t)
+	for ui in _all_race_uis():
+		ui.show_end_screen()
+		ui.update_end_timer(t)
 
 func _end_race():
 	race_state = RaceState.FINISHED
@@ -539,7 +645,7 @@ func _end_race():
 		var racer = final_rankings[i]
 		var round_pts = points_map[mini(i, points_map.size() - 1)]
 		
-		if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP:
+		if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP or (NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP and NetworkManager.is_coop_gp):
 			var current_total = NetworkManager.gp_standings.get(racer["name"], 0)
 			NetworkManager.gp_standings[racer["name"]] = current_total + round_pts
 			
@@ -554,9 +660,10 @@ func _end_race():
 
 @rpc("authority", "call_local", "reliable")
 func end_race_rpc(results_data: Array):
-	race_ui.show_message("Race Over!", 5.0)
+	for ui in _all_race_uis():
+		ui.show_message("Race Over!", 5.0)
 	_disable_local_cart()
-	if race_ui.has_method("display_race_results"):
+	if race_ui and race_ui.has_method("display_race_results"):
 		race_ui.display_race_results(results_data)
 
 func _run_singleplayer_countdown():

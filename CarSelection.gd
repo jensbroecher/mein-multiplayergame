@@ -171,9 +171,6 @@ func _on_next_pressed():
 	update_car_selection()
 
 func _on_confirm_pressed():
-	NetworkManager.local_car_index = current_car_index
-	car_selected.emit(current_car_index)
-	
 	# Save car selection
 	var config = ConfigFile.new()
 	config.load("user://settings.cfg") # Load existing if it exists
@@ -181,3 +178,23 @@ func _on_confirm_pressed():
 	config.save("user://settings.cfg")
 	
 	hide()
+	
+	NetworkManager.local_car_index = current_car_index
+	car_selected.emit(current_car_index)
+
+## Called by Main.gd during LOCAL_COOP to let a second player pick their car.
+func show_for_player(player_num: int):
+	# Update the header label if it exists
+	var header = get_node_or_null("CenterContainer/VBoxContainer/HeaderLabel")
+	if not header:
+		header = Label.new()
+		header.name = "HeaderLabel"
+		header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		header.add_theme_font_size_override("font_size", 28)
+		$CenterContainer/VBoxContainer.add_child(header)
+		$CenterContainer/VBoxContainer.move_child(header, 0)
+	header.text = "PLAYER %d — SELECT CAR" % player_num
+	# Reset to first car so players don't accidentally duplicate choices
+	current_car_index = 0
+	update_car_selection()
+	show()
