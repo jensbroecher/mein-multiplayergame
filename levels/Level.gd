@@ -1013,6 +1013,7 @@ func _align_start_and_spawns_to_track():
 		var sp_name = "Spawn" + str(i)
 		var sp = Marker3D.new()
 		sp.name = sp_name
+		sp.gizmo_extents = 0.3
 		spawn_container.add_child(sp)
 		if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
 			sp.owner = get_tree().edited_scene_root
@@ -1052,12 +1053,21 @@ func _align_start_and_spawns_to_track():
 				var right_local = tangent_local.cross(Vector3.UP).normalized()
 				var spawn_local_pos = snapped_local + right_local * local_xs[idx]
 				
-				# Set spawn's position (spawn_container is at identity parented to Level root)
+				# Set spawn's world position temporarily; we'll convert to local after centroid is known
 				spawn.position = (tp_xform * spawn_local_pos) + Vector3(0, 0.5, 0)
 				if tangent_local.length() > 0.01:
 					var tangent_global = ((tp_xform * (snapped_local + tangent_local)) - (tp_xform * snapped_local)).normalized()
 					if tangent_global.length() > 0.01:
 						spawn.basis = Basis.looking_at(tangent_global, Vector3.UP)
+		
+		# Move spawn_container to centroid of spawns so its AABB stays tight (not stretched to world origin)
+		var centroid = Vector3.ZERO
+		for sp in spawns:
+			centroid += sp.position
+		centroid /= spawns.size()
+		spawn_container.position = centroid
+		for sp in spawns:
+			sp.position -= centroid
 	else:
 		var local_zs = [6.0, 6.0, 12.0, 12.0, 18.0, 18.0]
 		var local_xs = [-3.0, 3.0, -3.0, 3.0, -3.0, 3.0]
