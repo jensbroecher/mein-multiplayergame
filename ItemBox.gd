@@ -78,7 +78,7 @@ func _server_process_pickup(body):
 		if body.get("is_ai"):
 			body.give_item(item_type)
 		else:
-			if multiplayer.multiplayer_peer != null:
+			if multiplayer.multiplayer_peer != null and NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER:
 				body.give_item_rpc.rpc_id(body.name.to_int(), item_type)
 			else:
 				body.give_item(item_type)

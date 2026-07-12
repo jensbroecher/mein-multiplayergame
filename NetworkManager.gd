@@ -81,7 +81,7 @@ func start_local_coop(p1_name: String, p2_name: String):
 	players[1] = {"name": p1_name, "ready": false, "car_index": local_car_index}
 	players[2] = {"name": p2_name, "ready": false, "car_index": local_p2_car_index}
 	LANDiscovery.stop_all()
-	print("NetworkManager: Started local co-op mode")
+	print("NetworkManager: Started splitscreen mode")
 	return OK
 
 var local_player_name = ""

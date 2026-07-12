@@ -93,6 +93,27 @@ func _build_input_ui():
 	p1_title.add_theme_font_size_override("font_size", 18)
 	p1_container.add_child(p1_title)
 	
+	# P1 Default Quick-Map Buttons
+	var p1_quick = HBoxContainer.new()
+	p1_quick.add_theme_constant_override("separation", 10)
+	p1_container.add_child(p1_quick)
+	
+	var p1_btn_kb = Button.new()
+	p1_btn_kb.text = "Set Keyboard Defaults"
+	p1_btn_kb.pressed.connect(func():
+		MusicManager.set_default_keyboard_bindings(1)
+		update_keybind_buttons()
+	)
+	p1_quick.add_child(p1_btn_kb)
+	
+	var p1_btn_gp = Button.new()
+	p1_btn_gp.text = "Set Gamepad Defaults"
+	p1_btn_gp.pressed.connect(func():
+		MusicManager.set_default_controller_bindings(1)
+		update_keybind_buttons()
+	)
+	p1_quick.add_child(p1_btn_gp)
+	
 	_add_action_rows("p1_", p1_container, p1_buttons)
 	
 	# Create Player 2 controls in RightColumn
@@ -106,6 +127,27 @@ func _build_input_ui():
 	p2_title.add_theme_color_override("font_color", Color(0, 0.8, 1, 1))
 	p2_title.add_theme_font_size_override("font_size", 18)
 	p2_container.add_child(p2_title)
+	
+	# P2 Default Quick-Map Buttons
+	var p2_quick = HBoxContainer.new()
+	p2_quick.add_theme_constant_override("separation", 10)
+	p2_container.add_child(p2_quick)
+	
+	var p2_btn_kb = Button.new()
+	p2_btn_kb.text = "Set Keyboard Defaults"
+	p2_btn_kb.pressed.connect(func():
+		MusicManager.set_default_keyboard_bindings(2)
+		update_keybind_buttons()
+	)
+	p2_quick.add_child(p2_btn_kb)
+	
+	var p2_btn_gp = Button.new()
+	p2_btn_gp.text = "Set Gamepad Defaults"
+	p2_btn_gp.pressed.connect(func():
+		MusicManager.set_default_controller_bindings(2)
+		update_keybind_buttons()
+	)
+	p2_quick.add_child(p2_btn_gp)
 	
 	_add_action_rows("p2_", p2_container, p2_buttons)
 
@@ -144,9 +186,19 @@ func start_remapping(action_name: String, button: Button):
 	is_waiting_for_key = true
 	waiting_action = action_name
 	button.text = "[Press Any Key/Button...]"
-	button.grab_focus()
+	
+	# Release focus so that UI navigation and accept triggers (Space/Enter/Joy A/Dpad)
+	# don't interfere with or double-trigger remapping!
+	button.release_focus()
 
-func _unhandled_input(event: InputEvent):
+func _find_button_for_action(action_name: String) -> Button:
+	var suffix = action_name.substr(3) # remove "p1_" or "p2_"
+	if action_name.begins_with("p1_"):
+		return p1_buttons.get(suffix, null)
+	else:
+		return p2_buttons.get(suffix, null)
+
+func _input(event: InputEvent):
 	if not is_waiting_for_key: return
 	
 	var is_valid_input = false
@@ -176,6 +228,11 @@ func _unhandled_input(event: InputEvent):
 			MusicManager.save_action_event(waiting_action, captured_event)
 		update_keybind_buttons()
 		get_viewport().set_input_as_handled()
+		
+		# Restore focus to the button after remapping is complete
+		var btn = _find_button_for_action(waiting_action)
+		if btn:
+			btn.grab_focus()
 
 func _on_fps_toggled(toggled_val: bool):
 	MusicManager.set_show_fps(toggled_val)

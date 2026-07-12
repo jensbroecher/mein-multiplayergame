@@ -1566,7 +1566,7 @@ func request_use_item(item_to_use: int):
 func _execute_use_item(type: int):
 	match type:
 		ItemType.BOOST:
-			var is_real_peer = name.to_int() > 0 and not is_ai
+			var is_real_peer = name.to_int() > 0 and not is_ai and NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER
 			if is_real_peer:
 				client_start_boost.rpc_id(name.to_int())
 			else:
@@ -1576,7 +1576,7 @@ func _execute_use_item(type: int):
 		ItemType.GUIDED_MISSILE:
 			_fire_missile(true)
 		ItemType.SHIELD:
-			var is_real_peer = name.to_int() > 0 and not is_ai
+			var is_real_peer = name.to_int() > 0 and not is_ai and NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER
 			if is_real_peer:
 				client_start_shield.rpc_id(name.to_int())
 			else:
@@ -1753,7 +1753,7 @@ func _update_visual_states(delta):
 func on_hit(attacker_id: int = 0):
 	if is_shielded:
 		is_shielded = false
-		var is_real_peer = name.to_int() > 0 and not get("is_ai")
+		var is_real_peer = name.to_int() > 0 and not get("is_ai") and NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER
 		if multiplayer.multiplayer_peer != null and multiplayer.is_server() and is_real_peer:
 			client_break_shield.rpc_id(name.to_int())
 		else:
@@ -2223,7 +2223,7 @@ func _activate_shockwave():
 			if dist < 15.0:
 				if p.is_shielded:
 					p.is_shielded = false
-					var is_real_peer = p.name.to_int() > 0 and not p.get("is_ai")
+					var is_real_peer = p.name.to_int() > 0 and not p.get("is_ai") and NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER
 					if multiplayer.multiplayer_peer != null and multiplayer.is_server() and is_real_peer:
 						p.client_break_shield.rpc_id(p.name.to_int())
 					else:
@@ -2283,7 +2283,7 @@ func _activate_lightning():
 			if dist < 25.0:
 				if p.is_shielded:
 					p.is_shielded = false
-					var is_real_peer = p.name.to_int() > 0 and not p.get("is_ai")
+					var is_real_peer = p.name.to_int() > 0 and not p.get("is_ai") and NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER
 					if multiplayer.multiplayer_peer != null and multiplayer.is_server() and is_real_peer:
 						p.client_break_shield.rpc_id(p.name.to_int())
 					else:

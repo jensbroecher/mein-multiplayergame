@@ -20,14 +20,24 @@ func _ready():
 	car_selection.car_selected.connect(_on_car_selected)
 	NetworkManager.server_disconnected.connect(_on_server_disconnected)
 	
+	var config_canvas = CanvasLayer.new()
+	config_canvas.name = "ConfigCanvas"
+	config_canvas.layer = 10
+	add_child(config_canvas)
+	
 	configuration_menu = CONFIGURATION_MENU_SCENE.instantiate()
 	configuration_menu.visible = false
-	add_child(configuration_menu)
+	config_canvas.add_child(configuration_menu)
 	configuration_menu.back_pressed.connect(func(): main_menu.show())
+	
+	var pause_canvas = CanvasLayer.new()
+	pause_canvas.name = "PauseCanvas"
+	pause_canvas.layer = 11
+	add_child(pause_canvas)
 	
 	pause_menu = PAUSE_MENU_SCENE.instantiate()
 	pause_menu.visible = false
-	add_child(pause_menu)
+	pause_canvas.add_child(pause_menu)
 
 func _on_menu_start_pressed():
 	car_selection.show()
@@ -129,7 +139,7 @@ func _on_server_disconnected():
 	main_menu.show()
 	MusicManager.stop_music()
 
-func _unhandled_input(event: InputEvent):
+func _input(event: InputEvent):
 	if event.is_action_pressed("ui_cancel") or (event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE):
 		if has_node("Level"):
 			if pause_menu.visible:

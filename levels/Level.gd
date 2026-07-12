@@ -254,10 +254,13 @@ func _on_checkpoint_entered(body: Node3D, cp_idx: int):
 			if cart and cart.get("is_ai"):
 				cart.last_checkpoint_transform = cp.global_transform
 			else:
-				if id == multiplayer.get_unique_id():
-					_sync_checkpoint_to_player(cp.global_transform, is_finish_lap)
+				if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
+					_sync_checkpoint_to_player_local(id, cp.global_transform, is_finish_lap)
 				else:
-					_sync_checkpoint_to_player.rpc_id(id, cp.global_transform, is_finish_lap)
+					if id == multiplayer.get_unique_id():
+						_sync_checkpoint_to_player(cp.global_transform, is_finish_lap)
+					else:
+						_sync_checkpoint_to_player.rpc_id(id, cp.global_transform, is_finish_lap)
 
 			# If they hit the last checkpoint (Finish Line), complete a lap
 			if stats["next_checkpoint_idx"] >= checkpoints.size():
@@ -298,9 +301,18 @@ func show_player_finished_rpc():
 
 @rpc("authority", "call_local", "reliable")
 func _sync_checkpoint_to_player(checkpoint_transform: Transform3D, play_finish_sound: bool = false):
-	var local_cart = get_tree().get_nodes_in_group("player_carts").filter(func(node): return node.is_local_player)
-	if local_cart.size() > 0:
-		local_cart[0].last_checkpoint_transform = checkpoint_transform
+	var local_carts = get_tree().get_nodes_in_group("player_carts").filter(func(node): return node.is_local_player and not node.is_ai)
+	if local_carts.size() > 0:
+		local_carts[0].last_checkpoint_transform = checkpoint_transform
+		if play_finish_sound:
+			MusicManager.play_sfx("res://sounds/finish.mp3")
+		else:
+			MusicManager.play_sfx("res://sounds/checkpoint.mp3")
+
+func _sync_checkpoint_to_player_local(player_id: int, checkpoint_transform: Transform3D, play_finish_sound: bool = false):
+	var cart = players_container.get_node_or_null(str(player_id))
+	if cart:
+		cart.last_checkpoint_transform = checkpoint_transform
 		if play_finish_sound:
 			MusicManager.play_sfx("res://sounds/finish.mp3")
 		else:

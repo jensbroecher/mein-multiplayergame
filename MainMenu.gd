@@ -89,9 +89,12 @@ func _create_main_menu():
 	vbox_container.add_child(main_buttons_container)
 	
 	var btn_single = _add_menu_button(main_buttons_container, "SINGLE PLAYER")
-	btn_single.pressed.connect(func(): show_sub_menu("sp_modes"))
+	btn_single.pressed.connect(func():
+		NetworkManager.current_game_mode = NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL
+		show_sub_menu("sp_modes")
+	)
 	
-	var btn_coop = _add_menu_button(main_buttons_container, "LOCAL CO-OP")
+	var btn_coop = _add_menu_button(main_buttons_container, "SPLITSCREEN")
 	btn_coop.pressed.connect(func(): show_sub_menu("coop_config"))
 	
 	var btn_multi = _add_menu_button(main_buttons_container, "MULTIPLAYER")
@@ -227,7 +230,7 @@ func _create_coop_config_menu():
 	vbox_container.add_child(coop_config_container)
 	
 	var label = Label.new()
-	label.text = "LOCAL CO-OP CONFIG"
+	label.text = "SPLITSCREEN CONFIG"
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", 24)
 	coop_config_container.add_child(label)

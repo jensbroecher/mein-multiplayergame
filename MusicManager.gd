@@ -520,6 +520,71 @@ func save_action_key(action_name: String, keycode: int):
 	ev.physical_keycode = keycode
 	save_action_event("p1_" + action_name, ev)
 
+func set_default_controller_bindings(player_index: int):
+	var prefix = "p1_" if player_index == 1 else "p2_"
+	var dev = 0 if player_index == 1 else 1
+	
+	# Throttle: Right Trigger (Axis 5, positive)
+	var throttle_ev = InputEventJoypadMotion.new()
+	throttle_ev.device = dev
+	throttle_ev.axis = JOY_AXIS_TRIGGER_RIGHT
+	throttle_ev.axis_value = 1.0
+	save_action_event(prefix + "throttle", throttle_ev)
+	
+	# Brake: Left Trigger (Axis 4, positive)
+	var brake_ev = InputEventJoypadMotion.new()
+	brake_ev.device = dev
+	brake_ev.axis = JOY_AXIS_TRIGGER_LEFT
+	brake_ev.axis_value = 1.0
+	save_action_event(prefix + "brake", brake_ev)
+	
+	# Steer Left: Left Stick Left (Axis 0, negative)
+	var steer_l_ev = InputEventJoypadMotion.new()
+	steer_l_ev.device = dev
+	steer_l_ev.axis = JOY_AXIS_LEFT_X
+	steer_l_ev.axis_value = -1.0
+	save_action_event(prefix + "steer_left", steer_l_ev)
+	
+	# Steer Right: Left Stick Right (Axis 0, positive)
+	var steer_r_ev = InputEventJoypadMotion.new()
+	steer_r_ev.device = dev
+	steer_r_ev.axis = JOY_AXIS_LEFT_X
+	steer_r_ev.axis_value = 1.0
+	save_action_event(prefix + "steer_right", steer_r_ev)
+	
+	# Use Item/Boost: Button A (0)
+	var boost_ev = InputEventJoypadButton.new()
+	boost_ev.device = dev
+	boost_ev.button_index = JOY_BUTTON_A
+	save_action_event(prefix + "boost", boost_ev)
+	
+	# Discard Item: Button B (1)
+	var discard_ev = InputEventJoypadButton.new()
+	discard_ev.device = dev
+	discard_ev.button_index = JOY_BUTTON_B
+	save_action_event(prefix + "discard_item", discard_ev)
+	
+	# Respawn: Button Y (3)
+	var respawn_ev = InputEventJoypadButton.new()
+	respawn_ev.device = dev
+	respawn_ev.button_index = JOY_BUTTON_Y
+	save_action_event(prefix + "respawn", respawn_ev)
+	
+	# Toggle Camera: Button X (2)
+	var cam_ev = InputEventJoypadButton.new()
+	cam_ev.device = dev
+	cam_ev.button_index = JOY_BUTTON_X
+	save_action_event(prefix + "toggle_camera", cam_ev)
+
+func set_default_keyboard_bindings(player_index: int):
+	var prefix = "p1_" if player_index == 1 else "p2_"
+	var keys = ["throttle", "brake", "steer_left", "steer_right", "boost", "discard_item", "respawn", "toggle_camera"]
+	for suffix in keys:
+		var action = prefix + suffix
+		var default_event = _get_default_action_event(action)
+		if default_event:
+			save_action_event(action, default_event)
+
 func stop_music():
 	if active_player:
 		active_player.stop()

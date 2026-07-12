@@ -14,10 +14,7 @@ script = ExtResource("1_script")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 shape = SubResource("BoxShape3D_1")
 
- [node name="Decal" type="Decal" parent="."]
+[node name="Decal" type="Decal" parent="."]
 size = Vector3(6, 10.0, 4)
 texture_albedo = ExtResource("2_boost_decal")
 cull_mask = 1
-
-
-

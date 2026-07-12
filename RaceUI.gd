@@ -315,3 +315,9 @@ func _on_action_button_pressed():
 	if main and main.has_method("_on_server_disconnected"):
 		main._on_server_disconnected()
 
+func _input(event: InputEvent):
+	if event.is_action_pressed("ui_cancel") or (event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE):
+		var main = get_tree().current_scene
+		if main and main.has_method("_input"):
+			main._input(event)
+
