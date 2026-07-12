@@ -290,6 +290,25 @@ var antenna_velocity: Vector3 = Vector3.ZERO
 var antenna_accel_smooth: Vector3 = Vector3.ZERO
 var last_velocity_local: Vector3 = Vector3.ZERO
 
+# ── Performance caches ──────────────────────────────────────────────────────
+# Excludes array for camera / raycast queries — rebuilt every ~90 frames
+var _camera_excludes: Array = []
+var _camera_excludes_counter: int = 0
+const _EXCLUDES_REBUILD_INTERVAL: int = 90
+# Frame counters so expensive raycasts don't run every frame
+var _camera_raycast_frame: int = 0   # camera clip raycasts – every 3 render frames
+var _align_raycast_frame: int = 0    # slope-alignment raycasts – every 2 render frames
+var _ai_obstacle_frame: int = 0      # AI obstacle raycasts – every 3 physics frames
+# Cached results from slope raycasts (reused between frames)
+var _cached_align_res_front = null
+var _cached_align_res_rear = null
+# Cached level node reference (avoids get_first_node_in_group every frame)
+var _cached_level: Node = null
+# Cached camera clip state (reused when raycasts are skipped)
+var _cached_iso_clip_ratio: float = 1.0
+var _cached_cam_below_terrain: bool = false
+var _cached_follow_clip_ratio: float = 1.0
+
 func has_physics_authority() -> bool:
 	return is_local_player or (is_ai and (multiplayer.multiplayer_peer == null or is_multiplayer_authority()))
 
@@ -350,6 +369,7 @@ func _ready():
 	await get_tree().process_frame
 	var level = get_tree().get_first_node_in_group("level")
 	if level:
+		_cached_level = level  # Cache for hot-path use in _process
 		if level.has_node("RaceUI"):
 			race_ui = level.get_node("RaceUI")
 		var tg = level.get_node_or_null("TerrainGenerator")
@@ -525,15 +545,21 @@ func _process(delta):
 		var speed_factor = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
 		var look_ahead_dist = (8.0 + speed_factor * 8.0) if is_isometric else (4.0 + speed_factor * 6.0)
 
-		var excludes = [self.get_rid()]
-		var level = get_tree().get_first_node_in_group("level")
-		if level:
-			for cp in level.checkpoints:
-				excludes.append(cp.get_rid())
-				for sb in cp.find_children("*", "StaticBody3D", true, false):
-					excludes.append(sb.get_rid())
-		for cart in get_tree().get_nodes_in_group("player_carts"):
-			excludes.append(cart.get_rid())
+		# Rebuild the excludes list every ~90 frames instead of every frame.
+		# find_children() is a full tree traversal – doing it 60×/s was a major CPU cost.
+		_camera_excludes_counter += 1
+		if _camera_excludes_counter >= _EXCLUDES_REBUILD_INTERVAL or _camera_excludes.is_empty():
+			_camera_excludes_counter = 0
+			_camera_excludes = [self.get_rid()]
+			var lvl = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
+			if lvl:
+				for cp in lvl.checkpoints:
+					_camera_excludes.append(cp.get_rid())
+					for sb in cp.find_children("*", "StaticBody3D", true, false):
+						_camera_excludes.append(sb.get_rid())
+			for cart in get_tree().get_nodes_in_group("player_carts"):
+				_camera_excludes.append(cart.get_rid())
+		var excludes = _camera_excludes
 
 		if is_intro_active:
 			intro_time -= delta
@@ -551,60 +577,53 @@ func _process(delta):
 				var iso_offset = Vector3(-26, 26, 26)
 				var target_cam_pos = visuals.global_position + iso_offset
 				
-				# Avoid clipping through terrain (ignoring other assets like tunnels/trees)
-				var target_ratio = 1.0
-				var space_state = get_world_3d().direct_space_state
+				# Throttle clip raycasts: run every 3 render frames, reuse cached ratio in between.
+				# This cuts 6 raycasts/frame down to 2 on average with no visible difference.
+				_camera_raycast_frame += 1
 				var ray_start = visuals.global_position + Vector3.UP * 1.0
-				
-				# Recursive raycast to step past smaller obstacles/collisions to find actual terrain
-				var query_start = ray_start
-				var current_excludes = excludes.duplicate()
-				var hit_terrain = false
-				var hit_dist = 0.0
-				var max_dist = ray_start.distance_to(target_cam_pos)
-				
-				for attempt in range(5):
-					var query = PhysicsRayQueryParameters3D.create(query_start, target_cam_pos)
-					query.exclude = current_excludes
-					var result = space_state.intersect_ray(query)
-					if not result:
-						break
-					if result.collider and (result.collider.name.contains("Unified_World_Collision") or result.collider.name.contains("Terrain") or result.collider.name.contains("Static")):
-						hit_terrain = true
-						hit_dist = ray_start.distance_to(result.position)
-						break
-					current_excludes.append(result.rid)
-					query_start = result.position + (target_cam_pos - query_start).normalized() * 0.1
-				
-				if hit_terrain and max_dist > 0.01:
-					# Keep camera 0.5m in front of terrain collision
-					target_ratio = clamp((hit_dist - 0.5) / max_dist, 0.1, 1.0)
-				
-				# Lerp multiplier: faster to zoom in to avoid clipping, slower to zoom out to prevent jumps
-				var lerp_speed = 15.0 if target_ratio < camera_clip_distance_mult_iso else 3.0
-				camera_clip_distance_mult_iso = lerp(camera_clip_distance_mult_iso, target_ratio, lerp_speed * delta)
-				
-				# Position target_cam_pos at the smoothed distance
+				if _camera_raycast_frame >= 3:
+					_camera_raycast_frame = 0
+					var target_ratio = 1.0
+					var space_state = get_world_3d().direct_space_state
+					# Recursive raycast to step past smaller obstacles/collisions to find actual terrain
+					var query_start = ray_start
+					var current_excludes = excludes.duplicate()
+					var hit_terrain = false
+					var hit_dist = 0.0
+					var max_dist = ray_start.distance_to(target_cam_pos)
+					for attempt in range(5):
+						var query = PhysicsRayQueryParameters3D.create(query_start, target_cam_pos)
+						query.exclude = current_excludes
+						var result = space_state.intersect_ray(query)
+						if not result:
+							break
+						if result.collider and (result.collider.name.contains("Unified_World_Collision") or result.collider.name.contains("Terrain") or result.collider.name.contains("Static")):
+							hit_terrain = true
+							hit_dist = ray_start.distance_to(result.position)
+							break
+						current_excludes.append(result.rid)
+						query_start = result.position + (target_cam_pos - query_start).normalized() * 0.1
+					if hit_terrain and max_dist > 0.01:
+						target_ratio = clamp((hit_dist - 0.5) / max_dist, 0.1, 1.0)
+					_cached_iso_clip_ratio = target_ratio
+					# Vertical raycast: check if camera is below terrain surface
+					var cam_pos_check = camera_pivot.global_position
+					var vert_query = PhysicsRayQueryParameters3D.create(cam_pos_check + Vector3(0, 15, 0), cam_pos_check + Vector3(0, -15, 0))
+					vert_query.exclude = excludes
+					var vert_result = space_state.intersect_ray(vert_query)
+					_cached_cam_below_terrain = false
+					if vert_result and vert_result.collider and (vert_result.collider.name.contains("Unified_World_Collision") or vert_result.collider.name.contains("Terrain")):
+						var terrain_y = vert_result.position.y
+						if cam_pos_check.y < terrain_y + 0.5:
+							camera_pivot.global_position.y = terrain_y + 0.5
+							_cached_cam_below_terrain = cam_pos_check.y < terrain_y
+				# Apply cached clip ratio every frame for smooth lerping
+				var lerp_speed = 15.0 if _cached_iso_clip_ratio < camera_clip_distance_mult_iso else 3.0
+				camera_clip_distance_mult_iso = lerp(camera_clip_distance_mult_iso, _cached_iso_clip_ratio, lerp_speed * delta)
 				target_cam_pos = ray_start + (target_cam_pos - ray_start) * camera_clip_distance_mult_iso
-				
 				camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 10.0 * delta)
-				
-				# Prevent camera clipping inside/under terrain by checking actual terrain height at camera location
-				var cam_actual_pos = camera_pivot.global_position
-				var vert_query = PhysicsRayQueryParameters3D.create(cam_actual_pos + Vector3(0, 15, 0), cam_actual_pos + Vector3(0, -15, 0))
-				vert_query.exclude = excludes
-				var vert_result = space_state.intersect_ray(vert_query)
-				var cam_below_terrain = false
-				if vert_result and vert_result.collider and (vert_result.collider.name.contains("Unified_World_Collision") or vert_result.collider.name.contains("Terrain")):
-					var terrain_y = vert_result.position.y
-					if cam_actual_pos.y < terrain_y + 0.5:
-						# Push camera up to avoid clipping inside the terrain
-						camera_pivot.global_position.y = terrain_y + 0.5
-						cam_below_terrain = cam_actual_pos.y < terrain_y # Darken screen if camera is fully below terrain surface
-				
 				if race_ui:
-					race_ui.set_terrain_clipped(cam_below_terrain)
-				
+					race_ui.set_terrain_clipped(_cached_cam_below_terrain)
 				camera_look_at = camera_look_at.lerp(visuals.global_position + visual_forward * look_ahead_dist, 10.0 * delta)
 				camera_pivot.look_at(camera_look_at, Vector3.UP)
 			else:
@@ -613,33 +632,30 @@ func _process(delta):
 				# Smooth camera trailing (steeper and higher)
 				var target_cam_pos = visuals.global_position - visual_forward * cam_dist + Vector3(0, 2.4, 0)
 				
-				# Avoid clipping through terrain (ignoring other assets like tunnels/trees)
-				var target_ratio = 1.0
-				var space_state = get_world_3d().direct_space_state
+				# Throttle clip raycast: run every 3 frames, reuse cached ratio in between.
+				_camera_raycast_frame += 1
 				var ray_start = visuals.global_position + Vector3.UP * 1.0
-				var query = PhysicsRayQueryParameters3D.create(ray_start, target_cam_pos)
-				query.exclude = excludes
-				var result = space_state.intersect_ray(query)
-				if result and result.collider and (result.collider.name.contains("Unified_World_Collision") or result.collider.name.contains("Terrain")):
-					var hit_pos = result.position
-					var max_dist = ray_start.distance_to(target_cam_pos)
-					if max_dist > 0.01:
-						var hit_dist = ray_start.distance_to(hit_pos)
-						# Keep camera 0.5m in front of terrain collision
-						target_ratio = clamp((hit_dist - 0.5) / max_dist, 0.1, 1.0)
-				
-				# Lerp multiplier: faster to zoom in to avoid clipping, slower to zoom out to prevent jumps
-				var lerp_speed = 15.0 if target_ratio < camera_clip_distance_mult else 3.0
-				camera_clip_distance_mult = lerp(camera_clip_distance_mult, target_ratio, lerp_speed * delta)
-				
-				# Position target_cam_pos at the smoothed distance
+				if _camera_raycast_frame >= 3:
+					_camera_raycast_frame = 0
+					var target_ratio = 1.0
+					var space_state = get_world_3d().direct_space_state
+					var query = PhysicsRayQueryParameters3D.create(ray_start, target_cam_pos)
+					query.exclude = excludes
+					var result = space_state.intersect_ray(query)
+					if result and result.collider and (result.collider.name.contains("Unified_World_Collision") or result.collider.name.contains("Terrain")):
+						var hit_pos = result.position
+						var max_dist = ray_start.distance_to(target_cam_pos)
+						if max_dist > 0.01:
+							var hit_dist = ray_start.distance_to(hit_pos)
+							target_ratio = clamp((hit_dist - 0.5) / max_dist, 0.1, 1.0)
+					_cached_follow_clip_ratio = target_ratio
+				# Apply cached clip ratio every frame for smooth lerping
+				var lerp_speed = 15.0 if _cached_follow_clip_ratio < camera_clip_distance_mult else 3.0
+				camera_clip_distance_mult = lerp(camera_clip_distance_mult, _cached_follow_clip_ratio, lerp_speed * delta)
 				target_cam_pos = ray_start + (target_cam_pos - ray_start) * camera_clip_distance_mult
-				
 				camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 10.0 * delta)
-				
 				if race_ui:
 					race_ui.set_terrain_clipped(false)
-				
 				camera_look_at = camera_look_at.lerp(visuals.global_position + visual_forward * (look_ahead_dist + 0.5), 12.0 * delta)
 				camera_pivot.look_at(camera_look_at, Vector3.UP)
 		
@@ -1131,8 +1147,8 @@ func _get_ground_visual_offset() -> float:
 	
 	# Align ground ray with visual orientation so it points along the vehicle's local down axis.
 	ground_ray.global_transform.basis = visuals.global_transform.basis
-	# Force immediate raycast update to get accurate collision info
-	ground_ray.force_raycast_update()
+	# force_raycast_update() removed — RayCast3D auto-updates each physics frame.
+	# Calling it mid-_process() forced an expensive synchronous physics engine sync.
 	if ground_ray.is_colliding():
 		var contact_normal = ground_ray.get_collision_normal()
 		if contact_normal.y >= 0.55:
@@ -1166,33 +1182,34 @@ func _update_visuals_alignment(delta):
 	var on_ground = false
 	var target_up = Vector3.UP
 	
-	# Perform auxiliary front/rear raycasts to handle ramps and uneven terrain
+	# Perform auxiliary front/rear raycasts to handle ramps and uneven terrain.
+	# Throttled: run every 2 frames and reuse cached results in between.
 	var normals: Array[Vector3] = []
-	var res_front = null
-	var res_rear = null
-	var space_state = get_world_3d().direct_space_state
-	if space_state and visuals:
-		var excludes = [self.get_rid()]
-		var fwd_dir = -visuals.global_transform.basis.z.normalized()
-		
-		# Cast from above the cart center to well below to prevent starting inside rising ramp surfaces
-		var front_origin = global_position + fwd_dir * 1.0 + Vector3.UP * 1.5
-		var rear_origin = global_position - fwd_dir * 1.0 + Vector3.UP * 1.5
-		var down_vec = Vector3.DOWN * 3.5
-		
-		var query_front = PhysicsRayQueryParameters3D.create(front_origin, front_origin + down_vec)
-		query_front.exclude = excludes
-		query_front.collision_mask = 1 # road/terrain/ramp
-		res_front = space_state.intersect_ray(query_front)
-		if res_front and res_front.normal.y >= 0.45:
-			normals.append(res_front.normal)
-			
-		var query_rear = PhysicsRayQueryParameters3D.create(rear_origin, rear_origin + down_vec)
-		query_rear.exclude = excludes
-		query_rear.collision_mask = 1
-		res_rear = space_state.intersect_ray(query_rear)
-		if res_rear and res_rear.normal.y >= 0.45:
-			normals.append(res_rear.normal)
+	_align_raycast_frame += 1
+	if _align_raycast_frame >= 2:
+		_align_raycast_frame = 0
+		var space_state = get_world_3d().direct_space_state
+		if space_state and visuals:
+			var excludes = [self.get_rid()]
+			var fwd_dir = -visuals.global_transform.basis.z.normalized()
+			# Cast from above the cart center to well below to prevent starting inside rising ramp surfaces
+			var front_origin = global_position + fwd_dir * 1.0 + Vector3.UP * 1.5
+			var rear_origin = global_position - fwd_dir * 1.0 + Vector3.UP * 1.5
+			var down_vec = Vector3.DOWN * 3.5
+			var query_front = PhysicsRayQueryParameters3D.create(front_origin, front_origin + down_vec)
+			query_front.exclude = excludes
+			query_front.collision_mask = 1 # road/terrain/ramp
+			_cached_align_res_front = space_state.intersect_ray(query_front)
+			var query_rear = PhysicsRayQueryParameters3D.create(rear_origin, rear_origin + down_vec)
+			query_rear.exclude = excludes
+			query_rear.collision_mask = 1
+			_cached_align_res_rear = space_state.intersect_ray(query_rear)
+	var res_front = _cached_align_res_front
+	var res_rear = _cached_align_res_rear
+	if res_front and res_front.normal.y >= 0.45:
+		normals.append(res_front.normal)
+	if res_rear and res_rear.normal.y >= 0.45:
+		normals.append(res_rear.normal)
 			
 	if ground_ray.is_colliding():
 		var norm = ground_ray.get_collision_normal()
@@ -2788,48 +2805,45 @@ func _get_ai_input(delta: float) -> Vector2:
 	input.x = clamp(dir_flat.x * 2.2, -1.0, 1.0)
 	input.y = -1.0 + abs(input.x) * 0.5
 	
-	# 3-Ray Obstacle Avoidance
-	var space_state = get_world_3d().direct_space_state
-	if space_state:
-		var fwd_dir = -visuals.global_transform.basis.z
-		var right_dir = visuals.global_transform.basis.x
-		var my_pos = global_position + Vector3.UP * 0.2
-		
-		# Define three rays: center (12m), left-angled (10m), right-angled (10m)
-		var rays = [
-			{"end": my_pos + fwd_dir * 12.0, "weight": 1.0, "side": 0.0},
-			{"end": my_pos + (fwd_dir - right_dir * 0.25).normalized() * 10.0, "weight": 0.8, "side": -1.0},
-			{"end": my_pos + (fwd_dir + right_dir * 0.25).normalized() * 10.0, "weight": 0.8, "side": 1.0}
-		]
-		
-		var avoid_force = 0.0
-		var obstacle_count = 0
-		
-		for ray in rays:
-			var query = PhysicsRayQueryParameters3D.create(my_pos, ray["end"])
-			query.exclude = [self.get_rid()]
-			var result = space_state.intersect_ray(query)
-			if result:
-				var collider = result.collider
-				var c_name = collider.name.to_lower()
-				# Exclude the road surface, terrain, halfway markers, checkpoints, gates, and ramps
-				var is_road_or_terrain = c_name.contains("road") or c_name.contains("terrain") or c_name.contains("track") or c_name.contains("unified_world") or c_name.contains("gate") or c_name.contains("finishline") or c_name.contains("checkpoint") or c_name.contains("halfway") or c_name.contains("ramp")
-				
-				if not is_road_or_terrain:
-					var dist = my_pos.distance_to(result.position)
-					var intensity = clamp(1.0 - (dist / 12.0), 0.1, 1.0) * ray["weight"]
-					
-					if ray["side"] == 0.0:
-						var local_hit = visuals.global_transform.inverse() * result.position
-						var side = -sign(local_hit.x) if abs(local_hit.x) > 0.05 else -1.0
-						avoid_force += side * 2.0 * intensity
-					else:
-						# Side hit: steer in the opposite direction
-						avoid_force += -ray["side"] * 1.5 * intensity
-					obstacle_count += 1
-					
-		if obstacle_count > 0:
-			input.x = clamp(input.x + avoid_force, -1.0, 1.0)
+	# 3-Ray Obstacle Avoidance — throttled to every 3 physics frames.
+	# With 4 AI carts this was 12 raycasts/tick; now ~4 on average.
+	_ai_obstacle_frame += 1
+	if _ai_obstacle_frame >= 3:
+		_ai_obstacle_frame = 0
+		var space_state = get_world_3d().direct_space_state
+		if space_state:
+			var fwd_dir = -visuals.global_transform.basis.z
+			var right_dir = visuals.global_transform.basis.x
+			var my_pos = global_position + Vector3.UP * 0.2
+			# Define three rays: center (12m), left-angled (10m), right-angled (10m)
+			var rays = [
+				{"end": my_pos + fwd_dir * 12.0, "weight": 1.0, "side": 0.0},
+				{"end": my_pos + (fwd_dir - right_dir * 0.25).normalized() * 10.0, "weight": 0.8, "side": -1.0},
+				{"end": my_pos + (fwd_dir + right_dir * 0.25).normalized() * 10.0, "weight": 0.8, "side": 1.0}
+			]
+			var avoid_force = 0.0
+			var obstacle_count = 0
+			for ray in rays:
+				var query = PhysicsRayQueryParameters3D.create(my_pos, ray["end"])
+				query.exclude = [self.get_rid()]
+				var result = space_state.intersect_ray(query)
+				if result:
+					var collider = result.collider
+					var c_name = collider.name.to_lower()
+					var is_road_or_terrain = c_name.contains("road") or c_name.contains("terrain") or c_name.contains("track") or c_name.contains("unified_world") or c_name.contains("gate") or c_name.contains("finishline") or c_name.contains("checkpoint") or c_name.contains("halfway") or c_name.contains("ramp")
+					if not is_road_or_terrain:
+						var dist = my_pos.distance_to(result.position)
+						var intensity = clamp(1.0 - (dist / 12.0), 0.1, 1.0) * ray["weight"]
+						if ray["side"] == 0.0:
+							var local_hit = visuals.global_transform.inverse() * result.position
+							var side = -sign(local_hit.x) if abs(local_hit.x) > 0.05 else -1.0
+							avoid_force += side * 2.0 * intensity
+						else:
+							# Side hit: steer in the opposite direction
+							avoid_force += -ray["side"] * 1.5 * intensity
+						obstacle_count += 1
+			if obstacle_count > 0:
+				input.x = clamp(input.x + avoid_force, -1.0, 1.0)
 	
 	if speed < 1.5 and can_move and not is_exploding:
 		stuck_timer += delta

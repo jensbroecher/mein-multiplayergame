@@ -10,6 +10,7 @@ var finish_line_pos: Vector2 = Vector2.ZERO
 var has_finish_line: bool = false
 
 var time_elapsed: float = 0.0
+var _redraw_frame: int = 0
 
 func _ready() -> void:
 	# Try to initialize on startup
@@ -105,7 +106,11 @@ func _process(delta: float) -> void:
 	time_elapsed += delta
 	if track_points.is_empty():
 		_initialize_track()
-	queue_redraw()
+	# Throttle redraws to every 5 frames (~12 fps) – cart positions don't need 60 fps updates
+	_redraw_frame += 1
+	if _redraw_frame >= 5:
+		_redraw_frame = 0
+		queue_redraw()
 
 func _draw() -> void:
 	if track_points.is_empty():
