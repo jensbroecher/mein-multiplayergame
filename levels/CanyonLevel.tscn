@@ -328,34 +328,34 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 229.97127, 0.41628897, 345.41
 transform = Transform3D(0.951004, -0.001483278, 0.30917498, 0, 0.9999885, 0.0047974805, -0.30917853, -0.004562423, 0.95099306, -5.1050262, -0.028428435, -4.628601)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn1" unique_id=49578373 instance=ExtResource("21_623mb")]
+[node name="SpawnIndicator" parent="SpawnPoints/Spawn1" unique_id=49578373 instance=ExtResource("21_623mb")]
 
 [node name="Spawn2" type="Marker3D" parent="SpawnPoints" unique_id=347542277]
 transform = Transform3D(0.951004, -0.001483278, 0.30917498, 0, 0.9999885, 0.0047974805, -0.30917853, -0.004562423, 0.95099306, 0.6009979, -0.028428435, -6.483673)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn2" unique_id=1265664181 instance=ExtResource("21_623mb")]
+[node name="SpawnIndicator" parent="SpawnPoints/Spawn2" unique_id=1265664181 instance=ExtResource("21_623mb")]
 
 [node name="Spawn3" type="Marker3D" parent="SpawnPoints" unique_id=1787107144]
 transform = Transform3D(0.9242142, -0.0018070086, 0.38187036, 0, 0.9999889, 0.004731942, -0.38187465, -0.004373328, 0.9242038, -2.9142456, 0.00013291836, 1.2054138)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn3" unique_id=1340940996 instance=ExtResource("21_623mb")]
+[node name="SpawnIndicator" parent="SpawnPoints/Spawn3" unique_id=1340940996 instance=ExtResource("21_623mb")]
 
 [node name="Spawn4" type="Marker3D" parent="SpawnPoints" unique_id=831832442]
 transform = Transform3D(0.9242142, -0.0018070086, 0.38187036, 0, 0.9999889, 0.004731942, -0.38187465, -0.004373328, 0.9242038, 2.631073, 0.00013291836, -1.0857544)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn4" unique_id=1182236219 instance=ExtResource("21_623mb")]
+[node name="SpawnIndicator" parent="SpawnPoints/Spawn4" unique_id=1182236219 instance=ExtResource("21_623mb")]
 
 [node name="Spawn5" type="Marker3D" parent="SpawnPoints" unique_id=2059903935]
 transform = Transform3D(0.8925825, -0.0021044717, 0.45087928, 0, 0.9999892, 0.004667433, -0.45088416, -0.004166069, 0.8925728, -0.28408813, 0.028295398, 6.848938)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn5" unique_id=2012770713 instance=ExtResource("21_623mb")]
+[node name="SpawnIndicator" parent="SpawnPoints/Spawn5" unique_id=2012770713 instance=ExtResource("21_623mb")]
 
 [node name="Spawn6" type="Marker3D" parent="SpawnPoints" unique_id=1913246646]
 transform = Transform3D(0.8925825, -0.0021044717, 0.45087928, 0, 0.9999892, 0.004667433, -0.45088416, -0.004166069, 0.8925728, 5.071396, 0.028295398, 4.1436157)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn6" unique_id=2032820258 instance=ExtResource("21_623mb")]
+[node name="SpawnIndicator" parent="SpawnPoints/Spawn6" unique_id=2032820258 instance=ExtResource("21_623mb")]
