@@ -317,6 +317,7 @@ func on_race_started():
 	if has_physics_authority:
 		can_move = true
 		freeze = false
+		ignore_next_landing_sound = true  # suppress the bump when freeze releases at race start
 
 func _ready():
 	# Lock rotation so we handle it manually, preventing physics rolling at start
@@ -1117,8 +1118,8 @@ func _physics_process(delta):
 		# No air steering — car cannot rotate mid-air
 		pass
 
-	# Wind sound (only while airborne)
-	if not on_ground and linear_velocity.length() > 5.0:
+	# Wind sound (only while airborne and race is running)
+	if can_move and not on_ground and linear_velocity.length() > 5.0:
 		if not sfx_wind_loop.playing:
 			sfx_wind_loop.play()
 		sfx_wind_loop.volume_db = lerp(sfx_wind_loop.volume_db, -10.0, 2.0 * delta)

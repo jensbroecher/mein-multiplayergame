@@ -149,17 +149,17 @@ func save_settings():
 	config.set_value("display", "anti_aliasing", anti_aliasing)
 	config.save(SETTINGS_FILE)
 
-func _load_playlist():
+func _load_playlist(folder: String = music_folder):
 	playlist.clear()
 	loaded_playlist.clear()
-	var dir = DirAccess.open(music_folder)
+	var dir = DirAccess.open(folder)
 	if dir:
 		dir.list_dir_begin()
 		var file_name = dir.get_next()
 		while file_name != "":
 			if not dir.current_is_dir():
 				if file_name.ends_with(".mp3") or file_name.ends_with(".wav") or file_name.ends_with(".ogg"):
-					playlist.append(music_folder + file_name)
+					playlist.append(folder + file_name)
 			file_name = dir.get_next()
 		dir.list_dir_end()
 	
@@ -169,6 +169,26 @@ func _load_playlist():
 			var stream = load(path)
 			if stream:
 				loaded_playlist.append(stream)
+
+func load_playlist_for_level(scene_path: String):
+	# Check for a subfolder matching the level name, e.g. music/mountain/ for MountainLevel
+	var level_folder := ""
+	if scene_path.to_lower().contains("mountain"):
+		level_folder = music_folder + "mountain/"
+	elif scene_path.to_lower().contains("canyon"):
+		level_folder = music_folder + "canyon/"
+	elif scene_path.to_lower().contains("desert"):
+		level_folder = music_folder + "desert/"
+	elif scene_path.to_lower().contains("city"):
+		level_folder = music_folder + "city/"
+	
+	# Use the subfolder if it exists and has tracks, otherwise fall back to root music folder
+	if level_folder != "" and DirAccess.open(level_folder) != null:
+		_load_playlist(level_folder)
+		if not loaded_playlist.is_empty():
+			return
+	# Fallback: load from root music folder
+	_load_playlist(music_folder)
 
 func play_race_music():
 	if not active_player.playing:

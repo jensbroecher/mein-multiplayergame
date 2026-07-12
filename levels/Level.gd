@@ -404,6 +404,7 @@ func start_race():
 	if race_ui:
 		race_ui.show_message("GO!", 2.0)
 	MusicManager.play_sfx("res://sounds/Go.mp3")
+	MusicManager.load_playlist_for_level(scene_file_path)
 	MusicManager.play_race_music()
 	get_tree().call_group("player_carts", "on_race_started")
 	_spawn_start_finish_items_delayed()
