@@ -37,7 +37,7 @@ const GP_CUPS = {
 	},
 	"Desert Cup": {
 		"name": "Desert Cup",
-		"stages": ["res://levels/MountainLevel.tscn", "res://levels/CanyonLevel.tscn"]
+		"stages": ["res://levels/MountainLevel.tscn", "res://levels/CanyonLevel.tscn", "res://levels/CanyonChasmLevel.tscn"]
 	}
 }
 

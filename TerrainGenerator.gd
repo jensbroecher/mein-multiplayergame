@@ -11,7 +11,13 @@ enum TrackLayoutType { DEFAULT, MOUNTAIN, CANYON }
 @export var no_grass: bool = false
 
 func _is_in_gap_pos(pos: Vector3) -> bool:
-	# Gaps removed to keep the road continuous
+	if level_prefix == "canyon_chasm":
+		# Gap 1 (Hill Jump): x around 150, z between -115 and -55, y above 25
+		if pos.x > 135.0 and pos.x < 165.0 and pos.z > -115.0 and pos.z < -55.0 and pos.y > 25.0:
+			return true
+		# Gap 2 (Crossing Jump over lower track): x around 0, z around -100, y around 30
+		if pos.x > -20.0 and pos.x < 20.0 and pos.z > -115.0 and pos.z < -85.0 and pos.y > 30.0:
+			return true
 	return false
 
 func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curve3D, for_collision: bool) -> float:
@@ -39,7 +45,8 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 	else:
 		base_terrain_height = h_noise
 
-	var closest_pos = curve.get_closest_point(Vector3(px, base_terrain_height, pz))
+	var query_y = -200.0 if (track_layout_type == TrackLayoutType.CANYON) else base_terrain_height
+	var closest_pos = curve.get_closest_point(Vector3(px, query_y, pz))
 	var dist = Vector2(px, pz).distance_to(Vector2(closest_pos.x, closest_pos.z))
 	var road_h = closest_pos.y
 

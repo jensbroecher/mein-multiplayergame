@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://regenerate_canyon_chasm.gd" id="1_reg_chasm"]
+
+[node name="RegenerateChasm" type="Node"]
+script = ExtResource("1_reg_chasm")

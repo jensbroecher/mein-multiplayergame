@@ -179,6 +179,9 @@ func _create_stage_select_menu():
 	var btn_canyon = _add_menu_button(stage_select_container, "CANYON COURSE")
 	btn_canyon.pressed.connect(func(): _on_stage_selected("res://levels/CanyonLevel.tscn"))
 	
+	var btn_chasm = _add_menu_button(stage_select_container, "CANYON CHASM")
+	btn_chasm.pressed.connect(func(): _on_stage_selected("res://levels/CanyonChasmLevel.tscn"))
+	
 	var btn_back = _add_menu_button(stage_select_container, "BACK")
 	btn_back.pressed.connect(func():
 		if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
