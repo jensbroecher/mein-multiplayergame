@@ -2590,13 +2590,16 @@ transform = Transform3D(16.444656, 0, 11.383026, 0, 20, 0, -11.383026, 0, 16.444
 transform = Transform3D(0.8, 0, 0, 0, 0.8, 0, 0, 0, 0.8, 257.4721, 4.1307807, -119.08065)
 
 [node name="Pine2" parent="LevelDesign/Trees" unique_id=1616149328 groups=["collision_trimesh"] instance=ExtResource("83_0ct4b")]
-transform = Transform3D(-0.32899797, 0, 0.729219, 0, 0.80000025, 0, -0.729219, 0, -0.32899797, 248.52292, 2.7846045, -246.3646)
+transform = Transform3D(-0.32899797, 0, 0.729219, 0, 0.67888784, 0, -0.729219, 0, -0.32899797, 248.52292, 2.7846045, -246.3646)
+
+[node name="Pine3" parent="LevelDesign/Trees" unique_id=172146906 groups=["collision_trimesh"] instance=ExtResource("83_0ct4b")]
+transform = Transform3D(-0.75461125, 0, 0.265635, 0, 0.6598115, 0, -0.265635, 0, -0.75461125, 329.3288, 8.852588, -282.15042)
 
 [node name="jacaranda_tree_1k" parent="LevelDesign/Trees" unique_id=798549070 groups=["collision_trimesh"] instance=ExtResource("95_bf5bs")]
 transform = Transform3D(0.80401117, 0, -2.367185, 0, 2.5000002, 0, 2.367185, 0, 0.80401117, 31.493206, 1.8536284, 47.964386)
 
 [node name="jacaranda_tree_LOD0" parent="LevelDesign/Trees/jacaranda_tree_1k" index="0" unique_id=1129861700]
-lod_bias = 0.5
+lod_bias = 0.001
 
 [node name="othonna_cerarioides_1k" parent="LevelDesign/Trees" unique_id=956682310 groups=["collision_convex"] instance=ExtResource("96_h1oga")]
 transform = Transform3D(11.359214, 0, 5.217113, 0, 12.5, 0, -5.217113, 0, 11.359214, 107.47364, -0.10661733, -14.685692)
