@@ -1,30 +1,17 @@
 [gd_scene format=3 uid="uid://boostpad123"]
 
-[ext_resource type="Script" path="res://BoostPad.gd" id="1_script"]
-[ext_resource type="Texture2D" path="res://sprites/decals/boost_pad.png" id="2_boost_decal"]
+[ext_resource type="Script" uid="uid://dj82omuygw7gb" path="res://BoostPad.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://donu5uxl4rab7" path="res://models/boostpad.fbx" id="2_oa57w"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_1"]
-size = Vector3(6, 2.0, 4)
+size = Vector3(4, 2, 6)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_boost"]
-transparency = 1
-albedo_texture = ExtResource("2_boost_decal")
-roughness = 1.0
-emission_enabled = true
-emission = Color(0.2, 0.2, 0.2, 1)
-
-[sub_resource type="PlaneMesh" id="PlaneMesh_boost"]
-material = SubResource("StandardMaterial3D_boost")
-size = Vector2(6, 4)
-
-[node name="BoostPad" type="Area3D"]
+[node name="BoostPad" type="Area3D" unique_id=1434937508]
 collision_layer = 0
-collision_mask = 1
 script = ExtResource("1_script")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1132480844]
 shape = SubResource("BoxShape3D_1")
 
-[node name="Decal" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
-mesh = SubResource("PlaneMesh_boost")
+[node name="boostpad" parent="." unique_id=1292453474 instance=ExtResource("2_oa57w")]
+transform = Transform3D(-2.1855695e-07, 6.8845615, 7.134753e-08, 0, -3.0093378e-07, 1.6322411, 5, 3.0093378e-07, 3.1186995e-15, -1.2081627, 0.03176868, -0.1470952)

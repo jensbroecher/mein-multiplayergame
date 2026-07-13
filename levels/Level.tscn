@@ -118,14 +118,14 @@ horizonColour = Color(0.0784314, 0.00784314, 0.0156863, 1)
 groundColour = Color(0, 0, 0, 1)
 cloudBrightness = 0.05
 
-[sub_resource type="Resource" id="Resource_ybx0l"]
+[sub_resource type="Resource" id="Resource_7q3nd"]
 script = ExtResource("5_yr3df")
 weather = ExtResource("6_jpwbr")
 
-[sub_resource type="Resource" id="Resource_may0b"]
+[sub_resource type="Resource" id="Resource_3ll0q"]
 script = ExtResource("3_jpwbr")
 seasonId = "summer"
-weathers = Array[ExtResource("5_yr3df")]([SubResource("Resource_ybx0l")])
+weathers = Array[ExtResource("5_yr3df")]([SubResource("Resource_7q3nd")])
 skyColourDaytime = SubResource("Resource_ext2d")
 skyColourNight = SubResource("Resource_p7jpd")
 dayNightCycleCurve = SubResource("Curve_8bl6p")
@@ -1322,7 +1322,7 @@ alternative_paths = [NodePath("AlternativePaths/AlternativePath1")]
 [node name="WeatherController" parent="." unique_id=1277823175 instance=ExtResource("31_weather")]
 time_of_day_hours = 13.239
 selected_weather = 1
-seasons = Array[ExtResource("3_jpwbr")]([SubResource("Resource_may0b")])
+seasons = Array[ExtResource("3_jpwbr")]([SubResource("Resource_3ll0q")])
 startTime = 47660.4
 
 [node name="TerrainGenerator" type="Node3D" parent="." unique_id=586341718 node_paths=PackedStringArray("track_path")]
@@ -2595,13 +2595,13 @@ transform = Transform3D(-0.32899797, 0, 0.729219, 0, 0.80000025, 0, -0.729219, 0
 [node name="jacaranda_tree_1k" parent="LevelDesign/Trees" unique_id=798549070 groups=["collision_trimesh"] instance=ExtResource("95_bf5bs")]
 transform = Transform3D(0.80401117, 0, -2.367185, 0, 2.5000002, 0, 2.367185, 0, 0.80401117, 31.493206, 1.8536284, 47.964386)
 
-[node name="jacaranda_tree_LOD0" parent="LevelDesign/Trees/jacaranda_tree_1k" index="0" unique_id=298453617]
+[node name="jacaranda_tree_LOD0" parent="LevelDesign/Trees/jacaranda_tree_1k" index="0" unique_id=1129861700]
 lod_bias = 0.5
 
 [node name="othonna_cerarioides_1k" parent="LevelDesign/Trees" unique_id=956682310 groups=["collision_convex"] instance=ExtResource("96_h1oga")]
 transform = Transform3D(11.359214, 0, 5.217113, 0, 12.5, 0, -5.217113, 0, 11.359214, 107.47364, -0.10661733, -14.685692)
 
-[node name="othonna_cerarioides_a" parent="LevelDesign/Trees/othonna_cerarioides_1k" index="0" unique_id=1420912029]
+[node name="othonna_cerarioides_a" parent="LevelDesign/Trees/othonna_cerarioides_1k" index="0" unique_id=1361150694]
 lod_bias = 0.5
 
 [node name="VegetationScatterer" type="Node3D" parent="LevelDesign" unique_id=40883185]
@@ -2778,25 +2778,22 @@ transform = Transform3D(0.6, 0, 0, 0, 0.6, 0, 0, 0, 0.6, 301.0712, 5.3171263, -2
 [node name="BoostPads" type="Node3D" parent="." unique_id=1164637541]
 
 [node name="BoostPad1" parent="BoostPads" unique_id=1454562377 instance=ExtResource("93_m7b4a")]
-transform = Transform3D(0.852887, -0.029291136, 0.52127314, 0.034323275, 0.99941075, 0, -0.52096605, 0.017891806, 0.85338986, 153.24869, 6.886613, -70.886894)
+transform = Transform3D(-0.5339243, 0.01909412, 0.8453166, 0, 0.9997451, -0.022582363, -0.8455323, -0.012057274, -0.5337881, 153.24869, 6.981581, -70.7803)
 
 [node name="BoostPad3" parent="BoostPads" unique_id=1838947964 instance=ExtResource("93_m7b4a")]
-transform = Transform3D(0.852887, -0.029291136, 0.52127314, 0.034323275, 0.99941075, 0, -0.52096605, 0.017891806, 0.85338986, 161.95444, 11.434822, -76.54727)
+transform = Transform3D(-0.5473041, -0.2998625, 0.7813709, -0.037952278, 0.9415432, 0.33474746, -0.83607256, 0.1535539, -0.52669084, 161.95444, 8.960727, -76.54727)
 
 [node name="BoostPad2" parent="BoostPads" unique_id=1232121474 instance=ExtResource("93_m7b4a")]
-transform = Transform3D(0.38633192, -0.013267997, 0.92226434, 0.034323275, 0.99941075, 0, -0.921721, 0.031655136, 0.38655972, 255.9263, 10.488753, -163.65369)
-
-[node name="BoostPad4" parent="BoostPads" unique_id=1826069811 instance=ExtResource("93_m7b4a")]
-transform = Transform3D(0.74742717, -0.025669277, -0.6638477, 0.03432327, 0.9994107, 0, 0.66345656, -0.02278543, 0.7478676, -502.6703, 15.609343, -209.57637)
+transform = Transform3D(-0.93173134, 0.012464427, 0.36293378, 0, 0.9994111, -0.034323003, -0.363148, -0.03197995, -0.93118274, 255.9263, 10.310571, -163.65369)
 
 [node name="BoostPad5" parent="BoostPads" unique_id=2120834706 instance=ExtResource("93_m7b4a")]
-transform = Transform3D(0.74742717, -0.025669277, -0.6638477, 0.03432327, 0.9994107, 0, 0.66345656, -0.02278543, 0.7478676, -505.684, 15.609343, -206.32558)
+transform = Transform3D(0.69825894, -0.4467379, 0.55933946, -0.054129127, 0.74618137, 0.66353893, -0.71379644, -0.49359804, 0.496846, -503.06033, 15.060291, -209.3973)
 
-[node name="BoostPad6" parent="BoostPads" unique_id=107290302 instance=ExtResource("93_m7b4a")]
-transform = Transform3D(0.74742717, -0.025669277, -0.6638477, 0.03432327, 0.9994107, 0, 0.66345656, -0.02278543, 0.7478676, -507.7443, 12.699348, -214.13876)
+[node name="BoostPad6" parent="BoostPads" unique_id=1434937508 instance=ExtResource("93_m7b4a")]
+transform = Transform3D(0.62150073, -0.5278353, 0.5789017, 0.033523567, 0.75618964, 0.6534939, -0.78269625, -0.38673997, 0.48766732, -505.684, 15.1230545, -206.32558)
 
 [node name="BoostPad7" parent="BoostPads" unique_id=7532161 instance=ExtResource("93_m7b4a")]
-transform = Transform3D(0.74742717, -0.025669277, -0.6638477, 0.03432327, 0.9994107, 0, 0.66345656, -0.02278543, 0.7478676, -510.758, 12.699348, -210.88797)
+transform = Transform3D(0.67918503, -0.055971805, 0.7318299, 0, 0.99708784, 0.07625928, -0.7339674, -0.051794134, 0.677207, -516.58276, 8.956961, -219.0685)
 
 [node name="SpawnPoints" type="Node3D" parent="." unique_id=760603834]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.063597, 1.0901914, 119.65803)
