@@ -30,6 +30,6 @@ transform = Transform3D(0.7092688, 0, 0, 0, 0.7974354, 0, 0, 0, 1, -0.25506878, 
 [node name="Gate" parent="VisualGate" unique_id=34302034 instance=ExtResource("2_3pha7")]
 transform = Transform3D(20, 0, 0, 0, 20, 0, 0, 0, 20, 0.45436096, 0, -0.33356476)
 
-[node name="StartFinishDecal" type="MeshInstance3D" parent="." unique_id=383702770]
+[node name="StartFinishDecal" type="MeshInstance3D" parent="." unique_id=383702770 groups=["collision_none"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.44473982, 0)
 mesh = SubResource("PlaneMesh_start_finish")

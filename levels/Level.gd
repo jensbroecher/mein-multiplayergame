@@ -894,9 +894,9 @@ func _create_primitive_shape_from_mesh(mesh: Mesh, type: String) -> Shape3D:
 func _add_collisions_to_node(root_node: Node, use_trimesh: bool = false):
 	if root_node == null: return
 	
-	# Skip any spawn points or indicators to prevent cars from colliding/hovering with their visual indicators
+	# Skip any spawn points, indicators, or decals to prevent cars from colliding/hovering with them
 	var path_lower = str(root_node.get_path()).to_lower()
-	if path_lower.contains("spawn"):
+	if path_lower.contains("spawn") or path_lower.contains("decal"):
 		return
 	
 	if root_node is MeshInstance3D:
