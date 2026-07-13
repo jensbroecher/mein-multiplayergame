@@ -42,6 +42,10 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 	elif track_layout_type == TrackLayoutType.CANYON:
 		# Canyon plateau: low flat ground with gentle noise ripples (lowered to 24.0 so camera doesn't clip/occlude in isometric mode)
 		base_terrain_height = 24.0 + h_noise * 0.4
+		if level_prefix == "canyon_chasm":
+			# Force low terrain between the large ramp takeoff/landing (hill jump gap) to eliminate the weird hump in the chasm
+			if px > 130.0 and px < 170.0 and pz > -130.0 and pz < -40.0:
+				base_terrain_height = 0.0
 	else:
 		base_terrain_height = h_noise
 
@@ -409,6 +413,7 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 
 		const BEVEL_W  := 1.2  # Horizontal bevel width (how wide the rounded edge is)
 		const BEVEL_H  := 0.5  # Vertical drop of the bevel (how far it curves down)
+		const CURB_H   := 0.7  # Raised lip on outer edge of road to close the sides of the ramps (prevents open sheer drop)
 		# Bevel uses 3 subdivisions (4 rings: flat-center, bevel-start, bevel-mid, bevel-end)
 		# Each ring has 2 vertices (left, right), producing 6 cross-section points per slice.
 		# Layout per slice (6 verts): [L_inner, L_bevel_mid, L_bevel_end, R_bevel_end, R_bevel_mid, R_inner]
@@ -449,12 +454,12 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 			# 4 = R flat outer edge (bevel start, normal UP blending to outward)
 			# 5 = R flat inner (road center side, normal UP)
 
-			var p0 = final_pos - right_dir * half_w + Vector3(0, y_offset, 0)           # L flat
-			var p1 = final_pos - right_dir * (half_w - BEVEL_W * 0.5) + Vector3(0, y_offset - BEVEL_H * 0.25, 0)  # L bevel mid
+			var p0 = final_pos - right_dir * half_w + Vector3(0, y_offset + CURB_H, 0)           # L outer with raised curb (closes sides of ramps)
+			var p1 = final_pos - right_dir * (half_w - BEVEL_W * 0.5) + Vector3(0, y_offset + CURB_H * 0.5 - BEVEL_H * 0.25, 0)  # L bevel mid
 			var p2 = final_pos - right_dir * (half_w - BEVEL_W) + Vector3(0, y_offset - BEVEL_H, 0)              # L bevel end
 			var p3 = final_pos + right_dir * (half_w - BEVEL_W) + Vector3(0, y_offset - BEVEL_H, 0)              # R bevel end
-			var p4 = final_pos + right_dir * (half_w - BEVEL_W * 0.5) + Vector3(0, y_offset - BEVEL_H * 0.25, 0)  # R bevel mid
-			var p5 = final_pos + right_dir * half_w + Vector3(0, y_offset, 0)            # R flat
+			var p4 = final_pos + right_dir * (half_w - BEVEL_W * 0.5) + Vector3(0, y_offset + CURB_H * 0.5 - BEVEL_H * 0.25, 0)  # R bevel mid
+			var p5 = final_pos + right_dir * half_w + Vector3(0, y_offset + CURB_H, 0)            # R outer with raised curb
 
 			# Normals: smoothly interpolate between UP and outward sideways
 			var n_up     = Vector3.UP
@@ -955,8 +960,32 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 		var bot_l = top_l - Vector3(0, depth, 0)
 		var bot_r = top_r - Vector3(0, depth, 0)
 		if track_layout_type == TrackLayoutType.CANYON:
-			bot_l = top_l - right * 1.5 - Vector3(0, 60.0, 0)
-			bot_r = top_r + right * 1.5 - Vector3(0, 60.0, 0)
+			# Match bevel end from road visual so sides attach cleanly without seams/gaps (fixes "open sides" on ramps/curves)
+			const BEVEL_W_SIDE := 1.2
+			const BEVEL_H_SIDE := 0.5
+			var bevel_scale = 1.0 - (BEVEL_W_SIDE / half_w if half_w > 0.001 else 0.0)
+			top_l = final_pos - right * bevel_scale + Vector3(0, side_y_offset - BEVEL_H_SIDE, 0)
+			top_r = final_pos + right * bevel_scale + Vector3(0, side_y_offset - BEVEL_H_SIDE, 0)
+
+			var drop = 60.0
+			if level_prefix == "canyon_chasm":
+				var dist_to_crossing = Vector2(final_pos.x, final_pos.z).distance_to(Vector2(0.0, -100.0))
+				if dist_to_crossing < 45.0:
+					# Ramps from 60.0 drop down to a very small drop (e.g. 15.0 Y height)
+					var t = clamp(dist_to_crossing / 45.0, 0.0, 1.0)
+					var smooth_t = t * t * (3.0 - 2.0 * t)
+					var target_y = lerp(15.0, top_l.y - 60.0, smooth_t)
+					var target_flare = lerp(0.0, 1.5, smooth_t)
+					bot_l = top_l - right * target_flare
+					bot_l.y = target_y
+					bot_r = top_r + right * target_flare
+					bot_r.y = target_y
+				else:
+					bot_l = top_l - right * 1.5 - Vector3(0, drop, 0)
+					bot_r = top_r + right * 1.5 - Vector3(0, drop, 0)
+			else:
+				bot_l = top_l - right * 1.5 - Vector3(0, drop, 0)
+				bot_r = top_r + right * 1.5 - Vector3(0, drop, 0)
 
 		var uv_y = offset * 0.2
 
@@ -979,6 +1008,14 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 		var base = i * 4
 		var nxt = (i + 1) * 4
 
+		var next_offset = (float(i + 1) / point_count) * length
+		var next_pos = curve.sample_baked(next_offset)
+		var next_is_gap = _is_in_gap_pos(next_pos)
+
+		var prev_offset = (float((i - 1 + point_count) % point_count) / point_count) * length
+		var prev_pos = curve.sample_baked(prev_offset)
+		var prev_is_gap = _is_in_gap_pos(prev_pos)
+
 		# Left Side
 		st.add_index(base + 0); st.add_index(base + 1); st.add_index(nxt + 1)
 		st.add_index(base + 0); st.add_index(nxt + 1); st.add_index(nxt + 0)
@@ -990,6 +1027,16 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 		# Bottom Surface
 		st.add_index(base + 1); st.add_index(base + 3); st.add_index(nxt + 3)
 		st.add_index(base + 1); st.add_index(nxt + 3); st.add_index(nxt + 1)
+
+		# Seal open ends (takeoff) at nxt if the next segment is in a gap
+		if next_is_gap:
+			st.add_index(nxt + 2); st.add_index(nxt + 3); st.add_index(nxt + 1)
+			st.add_index(nxt + 2); st.add_index(nxt + 1); st.add_index(nxt + 0)
+
+		# Seal open ends (landing) at base if the previous segment was in a gap
+		if prev_is_gap:
+			st.add_index(base + 0); st.add_index(base + 1); st.add_index(base + 3)
+			st.add_index(base + 0); st.add_index(base + 3); st.add_index(base + 2)
 
 
 	st.generate_normals()

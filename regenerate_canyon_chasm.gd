@@ -38,6 +38,8 @@ func _ready():
 	# 3. Locate TerrainGenerator and track path
 	var tg = level.get_node_or_null("TerrainGenerator")
 	var track_path = level.get_node_or_null("TrackPath")
+	if track_path:
+		track_path.transform = Transform3D.IDENTITY
 	
 	if not tg or not track_path:
 		push_error("TerrainGenerator or TrackPath node not found in template")
@@ -62,10 +64,10 @@ func _ready():
 		{"pos": Vector3(50, 15, -280), "in": Vector3(-30, 0, 20), "out": Vector3(30, 0, -20)},
 		{"pos": Vector3(150, 20, -300), "in": Vector3(-30, 0, 0), "out": Vector3(30, 0, 0)},
 		{"pos": Vector3(250, 15, -200), "in": Vector3(-20, 0, -30), "out": Vector3(20, 0, 30)},
-		{"pos": Vector3(200, 10, 0), "in": Vector3(0, 0, -30), "out": Vector3(0, 0, 30)},
-		{"pos": Vector3(150, 10, 100), "in": Vector3(0, 0, -30), "out": Vector3(0, 0, 30)}, # Start of hill
-		{"pos": Vector3(150, 30, 0), "in": Vector3(0, -10, 30), "out": Vector3(0, 10, -30)}, # Steep hill
-		{"pos": Vector3(150, 50, -50), "in": Vector3(0, -5, 20), "out": Vector3(0, 5, -20)}, # Takeoff 1 (Hill Jump)
+		{"pos": Vector3(200, 10, 0), "in": Vector3(0, 0, -30), "out": Vector3(-18, 0, 28)}, # approach, lead toward ramp entry
+		{"pos": Vector3(150, 10, 100), "in": Vector3(18, 0, -28), "out": Vector3(0, 7, -32)}, # Start of hill - smooth lead-in curving onto the ramp
+		{"pos": Vector3(150, 30, 0), "in": Vector3(0, -7, 32), "out": Vector3(0, 8, -23)}, # Steep hill
+		{"pos": Vector3(150, 50, -50), "in": Vector3(0, -8, 23), "out": Vector3(0, 5, -20)}, # Takeoff 1 (Hill Jump)
 		{"pos": Vector3(150, 30, -120), "in": Vector3(0, 5, 20), "out": Vector3(0, -5, -20)}, # Landing 1
 		{"pos": Vector3(100, 20, -180), "in": Vector3(30, 0, 20), "out": Vector3(-30, 0, -20)},
 		{"pos": Vector3(25, 45, -100), "in": Vector3(20, -2, 0), "out": Vector3(-20, 2, 0)}, # Takeoff 2 (Crossing)
@@ -141,6 +143,9 @@ func _ready():
 	
 	# 9. Position FinishLine and spawns along the new track
 	print("Aligning FinishLine and spawn points...")
+	var fl = level.get_node_or_null("FinishLine")
+	if fl:
+		fl.position = Vector3(0, 5, 200)
 	level._align_start_and_spawns_to_track()
 	
 	# 10. Fix ownership of generated nodes so everything gets saved in the .tscn
