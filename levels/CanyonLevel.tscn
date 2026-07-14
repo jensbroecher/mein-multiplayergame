@@ -86,7 +86,7 @@ shader_parameter/use_normal_map = true
 shader_parameter/normal_texture = ExtResource("dirt_normal")
 shader_parameter/normal_scale = 1.2
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_7uf2i"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_hyofv"]
 render_priority = 0
 shader = ExtResource("Shader_stochastic_file")
 shader_parameter/albedo_texture = ExtResource("dirt_albedo")
@@ -99,7 +99,7 @@ shader_parameter/use_normal_map = true
 shader_parameter/normal_texture = ExtResource("dirt_normal")
 shader_parameter/normal_scale = 1.2
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_vxc05"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_v188o"]
 albedo_texture = ExtResource("rock_albedo")
 roughness = 0.9
 normal_enabled = true
@@ -190,32 +190,32 @@ road_material = SubResource("ShaderMaterial_asphalt")
 metadata/_edit_group_ = true
 metadata/_edit_lock_ = true
 
-[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1353422091]
+[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1684428409]
 material_override = SubResource("ShaderMaterial_grass")
 lod_bias = 10.0
 mesh = ExtResource("10_lbtjd")
 
-[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=392882727]
+[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=654998801]
 
-[node name="@CollisionShape3D@36095" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=1147225352]
+[node name="@CollisionShape3D@21289" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=126992336]
 shape = ExtResource("11_sm0fw")
 
-[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=33099637]
-material_override = SubResource("ShaderMaterial_7uf2i")
+[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1918412147]
+material_override = SubResource("ShaderMaterial_hyofv")
 mesh = ExtResource("15_8vqih")
 
-[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1479190968]
-material_override = SubResource("StandardMaterial3D_vxc05")
+[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=611020850]
+material_override = SubResource("StandardMaterial3D_v188o")
 mesh = ExtResource("16_3nnro")
 
-[node name="Visual_Road_Sides_Collision" type="StaticBody3D" parent="TerrainGenerator/Visual_Road_Sides" unique_id=1853188943]
+[node name="Visual_Road_Sides_Collision" type="StaticBody3D" parent="TerrainGenerator/Visual_Road_Sides" unique_id=734759499]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="TerrainGenerator/Visual_Road_Sides/Visual_Road_Sides_Collision" unique_id=1766286426]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TerrainGenerator/Visual_Road_Sides/Visual_Road_Sides_Collision" unique_id=1906045688]
 shape = ExtResource("18_623mb")
 
-[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1252456558]
+[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1650555119]
 
-[node name="@CollisionShape3D@36096" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=2058047486]
+[node name="@CollisionShape3D@21290" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=2079952475]
 shape = ExtResource("17_r6i1u")
 
 [node name="TrackPath" type="Path3D" parent="." unique_id=1030670243]
