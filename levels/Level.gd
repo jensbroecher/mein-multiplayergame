@@ -92,28 +92,9 @@ func _ready():
 	_setup_checkpoints()
 	_spawn_item_boxes_deferred()
 
-	# Automatically add collisions to checkpoints, finish line, and ramps at runtime
-	_add_collisions_to_matching_nodes(self)
-	for cp in checkpoints:
-		_add_collisions_to_node(cp, true)
-
-	# Automatically add collisions to environmental props/assets
-	for prop_node_name in ["Props", "Environment", "Obstacles", "Buildings", "Vegetation"]:
-		var node = get_node_or_null(prop_node_name)
-		if node:
-			_add_collisions_to_node(node, true)
-
-	# Automatically build collisions for any node manually placed in the collision groups
-	_add_collisions_for_group_nodes(self)
-
-	# Align dynamically generated or editor-loaded road collision height to Visual_Road's Y position
-	var tg = get_node_or_null("TerrainGenerator")
-	if tg:
-		var road = tg.get_node_or_null("Visual_Road")
-		if road:
-			for child in tg.get_children():
-				if child is StaticBody3D and child.name != "Unified_World_Collision":
-					child.position.y = road.position.y
+	# Collision baking allocates a lot of RAM — do it after the scene is in the tree
+	# so peak memory during stage swaps is lower (esp. Android OOM on next race).
+	_build_runtime_collisions_deferred()
 
 	# Apply user graphics settings (shadows on lights, etc.) after the level tree exists
 	MusicManager.refresh_level_graphics()
@@ -695,6 +676,38 @@ func _spawn_item_boxes_deferred():
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	_spawn_item_boxes()
+
+
+func _build_runtime_collisions_deferred() -> void:
+	# Let the first frames finish streaming/import so we don't collide-bake on top of load.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if not is_inside_tree():
+		return
+
+	# Automatically add collisions to checkpoints, finish line, and ramps at runtime
+	_add_collisions_to_matching_nodes(self)
+	for cp in checkpoints:
+		if is_instance_valid(cp):
+			_add_collisions_to_node(cp, true)
+
+	# Automatically add collisions to environmental props/assets
+	for prop_node_name in ["Props", "Environment", "Obstacles", "Buildings", "Vegetation"]:
+		var node = get_node_or_null(prop_node_name)
+		if node:
+			_add_collisions_to_node(node, true)
+
+	# Automatically build collisions for any node manually placed in the collision groups
+	_add_collisions_for_group_nodes(self)
+
+	# Align dynamically generated or editor-loaded road collision height to Visual_Road's Y position
+	var tg = get_node_or_null("TerrainGenerator")
+	if tg:
+		var road = tg.get_node_or_null("Visual_Road")
+		if road:
+			for child in tg.get_children():
+				if child is StaticBody3D and child.name != "Unified_World_Collision":
+					child.position.y = road.position.y
 
 func _spawn_item_boxes():
 	# Spawn a row of 3 items across each checkpoint gate and the finish line

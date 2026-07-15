@@ -3,6 +3,7 @@ extends Node
 const LEVEL_SCENE = preload("res://levels/Level.tscn")
 const CONFIGURATION_MENU_SCENE = preload("res://ConfigurationMenu.tscn")
 const PAUSE_MENU_SCENE = preload("res://PauseMenu.tscn")
+const LOADING_SCREEN_SCENE = preload("res://LoadingScreen.tscn")
 
 @onready var lobby = $Lobby
 @onready var main_menu = $MainMenu
@@ -10,9 +11,11 @@ const PAUSE_MENU_SCENE = preload("res://PauseMenu.tscn")
 
 var configuration_menu
 var pause_menu
+var loading_screen
 
 var _coop_p1_car: int = 0
 var _coop_selecting_p2: bool = false
+var _level_swap_in_progress: bool = false
 
 func _ready():
 	_apply_platform_performance()
@@ -39,6 +42,9 @@ func _ready():
 	pause_menu = PAUSE_MENU_SCENE.instantiate()
 	pause_menu.visible = false
 	pause_canvas.add_child(pause_menu)
+
+	loading_screen = LOADING_SCREEN_SCENE.instantiate()
+	add_child(loading_screen)
 
 
 func _apply_platform_performance() -> void:
@@ -80,7 +86,7 @@ func _on_car_selected(car_index: int):
 				p2_name = "Player 2"
 				
 			NetworkManager.start_local_coop(p_name, p2_name)
-			start_game(true)
+			await start_game(true)
 		return
 	NetworkManager.local_car_index = car_index
 	if NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER:
@@ -96,52 +102,181 @@ func _on_car_selected(car_index: int):
 				p_name = saved_name
 			
 		NetworkManager.start_single_player(p_name)
-		start_game(true)
+		await start_game(true)
  
 func start_game(is_host: bool):
-	if is_host:
-		var level_scene = LEVEL_SCENE
-		if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP \
-				or (NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP and NetworkManager.is_coop_gp):
-			var gp_data = NetworkManager.GP_CUPS.get(NetworkManager.current_gp_name)
-			if gp_data:
-				var stage_idx = NetworkManager.current_gp_stage
-				if stage_idx < gp_data["stages"].size():
-					level_scene = load(gp_data["stages"][stage_idx])
-		elif NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL \
-				or NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
-			level_scene = load(NetworkManager.time_trial_stage)
-		
-		var level = level_scene.instantiate()
-		add_child(level)
-		# Apply shadow/quality settings to newly spawned lights & carts
-		MusicManager.refresh_level_graphics()
+	if not is_host:
+		return
+	await _show_loading("Loading race")
+	if loading_screen:
+		loading_screen.set_progress(0.15)
+
+	var level_scene = LEVEL_SCENE
+	var status := "Loading race"
+	if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP \
+			or (NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP and NetworkManager.is_coop_gp):
+		var gp_data = NetworkManager.GP_CUPS.get(NetworkManager.current_gp_name)
+		if gp_data:
+			var stage_idx = NetworkManager.current_gp_stage
+			if stage_idx < gp_data["stages"].size():
+				status = "Loading stage %d" % (stage_idx + 1)
+				if loading_screen:
+					loading_screen.set_status(status)
+				level_scene = load(gp_data["stages"][stage_idx])
+	elif NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL \
+			or NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
+		if loading_screen:
+			loading_screen.set_status("Loading track")
+		level_scene = load(NetworkManager.time_trial_stage)
+
+	if loading_screen:
+		loading_screen.set_progress(0.45)
+	await get_tree().process_frame
+
+	var level = level_scene.instantiate()
+	if loading_screen:
+		loading_screen.set_progress(0.7)
+		loading_screen.set_status("Preparing track")
+	add_child(level)
+	# Apply shadow/quality settings to newly spawned lights & carts
+	MusicManager.refresh_level_graphics()
+	if loading_screen:
+		loading_screen.set_progress(0.95)
+	# Let the level paint a couple frames (collision bake deferred) before hiding overlay.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	await _hide_loading()
 	# Clients will get the level spawned automatically by MultiplayerSpawner
 
-func load_gp_stage(stage_idx: int):
-	var level = get_node_or_null("Level")
-	if level:
-		level.name = "OldLevel"
-		level.queue_free()
-		await get_tree().process_frame
-		
+## Called from RaceUI (child of Level). Must not free Level mid-callback.
+func load_gp_stage(stage_idx: int) -> void:
+	if _level_swap_in_progress:
+		return
+	call_deferred("_load_gp_stage_impl", stage_idx)
+
+func _load_gp_stage_impl(stage_idx: int) -> void:
+	if _level_swap_in_progress:
+		return
+	_level_swap_in_progress = true
+	# Keep this coroutine alive even if something pauses the tree mid-swap.
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	if pause_menu:
+		pause_menu.hide()
+
+	await _show_loading("Loading next stage")
+
+	# Fully drop the previous race before allocating the next (critical on Android).
+	if loading_screen:
+		loading_screen.set_status("Clearing previous race")
+		loading_screen.set_progress(0.2)
+	await _unload_all_levels()
+	if loading_screen:
+		loading_screen.set_status("Loading stage %d" % (stage_idx + 1))
+		loading_screen.set_progress(0.4)
+
 	var gp_data = NetworkManager.GP_CUPS.get(NetworkManager.current_gp_name)
 	if gp_data and stage_idx < gp_data["stages"].size():
 		NetworkManager.current_gp_stage = stage_idx
-		var stage_path = gp_data["stages"][stage_idx]
-		var next_level_scene = load(stage_path)
+		var stage_path: String = gp_data["stages"][stage_idx]
+		if loading_screen:
+			loading_screen.set_status("Loading stage %d" % (stage_idx + 1))
+			loading_screen.set_progress(0.55)
+		var next_level_scene: PackedScene = load(stage_path)
+		if next_level_scene == null:
+			push_error("Failed to load stage: ", stage_path)
+			await _hide_loading()
+			_level_swap_in_progress = false
+			process_mode = Node.PROCESS_MODE_INHERIT
+			_on_server_disconnected()
+			return
+		if loading_screen:
+			loading_screen.set_progress(0.75)
+			loading_screen.set_status("Preparing track")
 		var next_level = next_level_scene.instantiate()
 		add_child(next_level)
 		MusicManager.refresh_level_graphics()
+		if loading_screen:
+			loading_screen.set_progress(0.95)
+		await get_tree().process_frame
+		await get_tree().process_frame
 	else:
 		# GP Finished!
+		await _hide_loading()
+		_level_swap_in_progress = false
+		process_mode = Node.PROCESS_MODE_INHERIT
 		_on_server_disconnected()
+		return
+
+	await _hide_loading()
+	_level_swap_in_progress = false
+	process_mode = Node.PROCESS_MODE_INHERIT
+
+
+func _find_level_nodes() -> Array[Node]:
+	var levels: Array[Node] = []
+	for child in get_children():
+		if child == null or not is_instance_valid(child):
+			continue
+		var n := str(child.name)
+		if child.is_in_group("level") or n == "Level" or n.begins_with("OldLevel"):
+			levels.append(child)
+	return levels
+
+
+## Free every active/leftover race level and yield briefly so RAM/VRAM can drop.
+## Never awaits tree_exited unboundedly — that hangs if the signal already fired
+## (e.g. after remove_child) or never arrives on some Android free paths.
+func _unload_all_levels() -> void:
+	var levels := _find_level_nodes()
+	for level in levels:
+		if not is_instance_valid(level):
+			continue
+		# Stop scripts/physics/render immediately so they don't keep allocating.
+		level.process_mode = Node.PROCESS_MODE_DISABLED
+		if level is Node3D:
+			(level as Node3D).visible = false
+		level.name = "OldLevel_%d" % level.get_instance_id()
+
+		# Detach first so the race UI is out of the tree, then free without
+		# awaiting tree_exited (remove_child already emits it → infinite hang).
+		var parent := level.get_parent()
+		if parent != null:
+			parent.remove_child(level)
+		level.queue_free()
+
+	# Wait until freed or timeout — never block the loading screen forever.
+	const MAX_WAIT_FRAMES := 45
+	for _i in range(MAX_WAIT_FRAMES):
+		var any_alive := false
+		for level in levels:
+			if is_instance_valid(level):
+				any_alive = true
+				break
+		if not any_alive:
+			break
+		await get_tree().process_frame
+
+	# Extra idle frames: Android needs a moment after free before VRAM/RAM drops.
+	# Avoids (old level + new level + runtime collision bake) peak OOM.
+	for _i in range(4):
+		await get_tree().process_frame
+	# Flush pending GPU work from the previous stage (best-effort).
+	RenderingServer.force_sync()
+	await get_tree().process_frame
 
 
 func _on_server_disconnected():
-	var level = get_node_or_null("Level")
-	if level:
-		level.queue_free()
+	# Don't free mid-callback from a level UI without deferring.
+	if _level_swap_in_progress:
+		# Still tear down; swap flag will clear after.
+		pass
+	# Free any race levels (including renamed leftovers).
+	for level in _find_level_nodes():
+		if is_instance_valid(level):
+			level.process_mode = Node.PROCESS_MODE_DISABLED
+			if level.get_parent() == self:
+				remove_child(level)
+			level.queue_free()
 	
 	NetworkManager.disconnect_peer()
 	
@@ -158,7 +293,7 @@ func _input(event: InputEvent):
 		if event.keycode == KEY_ESCAPE or event.physical_keycode == KEY_ESCAPE \
 				or event.keycode == KEY_BACKSPACE or event.physical_keycode == KEY_BACKSPACE:
 			toggle_pause = true
-	if toggle_pause and has_node("Level"):
+	if toggle_pause and (_find_level_nodes().size() > 0):
 		# Don't steal Backspace while typing in a focused LineEdit
 		var focus = get_viewport().gui_get_focus_owner()
 		if focus is LineEdit or focus is TextEdit:
@@ -170,10 +305,35 @@ func _input(event: InputEvent):
 		get_viewport().set_input_as_handled()
 
 func restart_race():
-	var level = get_node_or_null("Level")
-	if level:
-		level.name = "OldLevel"
-		level.queue_free()
-		await get_tree().process_frame
-	
-	start_game(true)
+	if _level_swap_in_progress:
+		return
+	call_deferred("_restart_race_impl")
+
+func _restart_race_impl() -> void:
+	if _level_swap_in_progress:
+		return
+	_level_swap_in_progress = true
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	if pause_menu:
+		pause_menu.hide()
+	await _show_loading("Restarting race")
+	if loading_screen:
+		loading_screen.set_status("Clearing track")
+		loading_screen.set_progress(0.25)
+	await _unload_all_levels()
+	# start_game shows/hides loading itself; keep flag until done
+	_level_swap_in_progress = false
+	process_mode = Node.PROCESS_MODE_INHERIT
+	await start_game(true)
+
+
+func _show_loading(message: String) -> void:
+	if loading_screen == null:
+		return
+	await loading_screen.show_loading(message)
+
+
+func _hide_loading() -> void:
+	if loading_screen == null:
+		return
+	await loading_screen.hide_loading()

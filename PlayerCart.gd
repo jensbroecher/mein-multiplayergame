@@ -336,6 +336,9 @@ func _ready():
 	axis_lock_angular_y = true
 	axis_lock_angular_z = true
 
+	# Prevent rare high-speed floor tunneling at 60 Hz physics without raising tick rate.
+	continuous_cd = true
+
 	# Set initial visuals position/rotation to match spawn point transform
 	# before any process frame runs, preventing wrong starting direction
 	visuals.global_transform = global_transform
@@ -437,17 +440,7 @@ func _ready():
 			child.bus = &"SFX"
 
 	# Looping engine sample (pitch/volume driven by speed — no procedural CPU synthesis)
-	if engine_sound.stream:
-		var engine_stream = engine_sound.stream.duplicate()
-		if engine_stream is AudioStreamMP3:
-			engine_stream.loop = true
-		elif engine_stream is AudioStreamOggVorbis:
-			engine_stream.loop = true
-		elif "loop" in engine_stream:
-			engine_stream.loop = true
-		engine_sound.stream = engine_stream
-	engine_sound.pitch_scale = 1.0
-	engine_sound.volume_db = -13.0
+	_setup_engine_sound()
 
 	if is_local_player:
 		var is_coop = NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP
@@ -715,22 +708,27 @@ func _process(delta):
 				cam_underwater = camera.global_position.y < WATER_LEVEL
 			race_ui.set_underwater(cam_underwater)
 
-		# Engine loop from sample — pitch rises with speed / boost
+		# Engine loop — same input path as driving (p1_/p2_), not the bare "throttle" action
 		var throttle_input: float
 		if device_id == -1:
-			throttle_input = Input.get_axis("throttle", "brake")
+			throttle_input = Input.get_axis(input_prefix + "throttle", input_prefix + "brake")
 		else:
 			var t = Input.get_joy_axis(device_id, JOY_AXIS_TRIGGER_RIGHT)
 			var b = Input.get_joy_axis(device_id, JOY_AXIS_TRIGGER_LEFT)
-			throttle_input = b - t  # matches get_axis("throttle","brake") sign convention
-		var wants_to_play = can_move and not is_exploding and abs(throttle_input) > 0.1
+			throttle_input = b - t
+		# Play when throttling/braking OR moving so coasting still has engine presence
+		var wants_to_play = can_move and not is_exploding and (
+			abs(throttle_input) > 0.08 or linear_velocity.length() > 1.5
+		)
 		
 		if wants_to_play:
+			if engine_sound.stream == null:
+				_setup_engine_sound()
 			if not engine_sound.playing:
 				engine_sound.play()
-				engine_sound.volume_db = -13.0
+				engine_sound.volume_db = -6.0
 			var speed_ratio = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
-			var target_vol = lerp(-13.0, -8.0, speed_ratio)
+			var target_vol = lerp(-8.0, -2.0, speed_ratio)
 			if is_boosting:
 				target_vol += 2.0
 			engine_sound.volume_db = move_toward(engine_sound.volume_db, target_vol, 40.0 * delta)
@@ -795,6 +793,9 @@ func _physics_process(delta):
 			respawn() # single-player / host fallback
 
 	var has_physics_authority = has_physics_authority()
+	# Safety net for discrete physics steps: recover if we punched through terrain while falling.
+	if has_physics_authority and not is_exploding and not is_teleporting:
+		_prevent_floor_tunneling(delta)
 
 	# AI Stuck Detection (Checks if distance traveled over 4.0 seconds is less than 3.0 meters)
 	if is_ai and can_move and not is_exploding and respawn_indicator_time <= 0.0 and has_physics_authority:
@@ -1189,6 +1190,89 @@ func _physics_process(delta):
 
 	sync_steer = current_steer
 	_move_and_sync()
+
+const ENGINE_SOUND_PATH := "res://sounds/freesound_community-engine-6000_edited.wav"
+
+func _setup_engine_sound() -> void:
+	if engine_sound == null:
+		return
+	var base_stream: AudioStream = engine_sound.stream
+	if base_stream == null and ResourceLoader.exists(ENGINE_SOUND_PATH):
+		base_stream = load(ENGINE_SOUND_PATH) as AudioStream
+	if base_stream == null:
+		push_warning("PlayerCart: engine sound missing at ", ENGINE_SOUND_PATH)
+		return
+	var engine_stream: AudioStream = base_stream.duplicate()
+	if engine_stream is AudioStreamWAV:
+		var wav := engine_stream as AudioStreamWAV
+		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		wav.loop_begin = 0
+		# loop_end is in frames; -1 is unreliable after compress/import on some builds
+		var bytes_per_sample := 2
+		match wav.format:
+			AudioStreamWAV.FORMAT_8_BITS:
+				bytes_per_sample = 1
+			AudioStreamWAV.FORMAT_16_BITS:
+				bytes_per_sample = 2
+			_:
+				bytes_per_sample = 2
+		if wav.stereo:
+			bytes_per_sample *= 2
+		if wav.data.size() > 0 and bytes_per_sample > 0:
+			wav.loop_end = int(wav.data.size() / bytes_per_sample)
+	elif engine_stream is AudioStreamMP3:
+		(engine_stream as AudioStreamMP3).loop = true
+	elif engine_stream is AudioStreamOggVorbis:
+		(engine_stream as AudioStreamOggVorbis).loop = true
+	engine_sound.stream = engine_stream
+	engine_sound.pitch_scale = 1.0
+	engine_sound.volume_db = -6.0
+	engine_sound.unit_size = 35.0
+	engine_sound.max_distance = 120.0
+	engine_sound.attenuation_filter_cutoff_hz = 20500.0
+	engine_sound.bus = &"SFX"
+
+
+func _prevent_floor_tunneling(delta: float) -> void:
+	# Soft terminal fall speed so discrete steps (60 Hz) stay within CCD range.
+	const MAX_FALL_SPEED := 48.0
+	if linear_velocity.y < -MAX_FALL_SPEED:
+		linear_velocity.y = -MAX_FALL_SPEED
+
+	# Only run the recovery ray on hard falls — cheap early-out.
+	if linear_velocity.y > -12.0:
+		return
+	var world = get_world_3d()
+	if world == null:
+		return
+	var space = world.direct_space_state
+	if space == null:
+		return
+
+	# Sweep from where we roughly were last step, down through the sphere bottom.
+	var step = maxf(delta, 1.0 / 60.0)
+	var travel = absf(linear_velocity.y) * step
+	var start = global_position + Vector3.UP * (COLLISION_RADIUS + 0.5 + travel)
+	var end = global_position + Vector3.DOWN * (COLLISION_RADIUS + 0.6 + travel * 0.25)
+	var query = PhysicsRayQueryParameters3D.create(start, end)
+	query.exclude = [get_rid()]
+	query.collision_mask = 1
+	var hit = space.intersect_ray(query)
+	if hit.is_empty():
+		return
+	var n: Vector3 = hit.normal
+	if n.y < 0.35:
+		return # steep wall / junk hit — leave alone
+
+	var min_center_y = hit.position.y + COLLISION_RADIUS + 0.04
+	if global_position.y >= min_center_y:
+		return
+
+	# Snap out of penetration and kill residual downward speed.
+	global_position.y = min_center_y
+	if linear_velocity.y < 0.0:
+		linear_velocity.y = 0.0
+
 
 func _get_ground_visual_offset() -> float:
 	if not is_instance_valid(ground_ray):

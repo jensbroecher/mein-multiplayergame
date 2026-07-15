@@ -10,15 +10,43 @@ enum TrackLayoutType { DEFAULT, MOUNTAIN, CANYON }
 @export var no_water: bool = false
 @export var no_grass: bool = false
 
+## True when a baked curve sample sits in a jump gap (airborne / no road mesh).
+## Hill jump is fully between the two large ramps; crossing only removes the high path
+## so the lower road at the same XZ is untouched.
 func _is_in_gap_pos(pos: Vector3) -> bool:
-	if level_prefix == "canyon_chasm":
-		# Gap 1 (Hill Jump): x around 150, z between -115 and -55, y above 25
-		if pos.x > 135.0 and pos.x < 165.0 and pos.z > -115.0 and pos.z < -55.0 and pos.y > 25.0:
-			return true
-		# Gap 2 (Crossing Jump over lower track): x around 0, z around -100, y around 30
-		if pos.x > -20.0 and pos.x < 20.0 and pos.z > -115.0 and pos.z < -85.0 and pos.y > 30.0:
-			return true
+	if level_prefix != "canyon_chasm":
+		return false
+	# Gap 1 — hill jump between large ramp takeoff (~z -50) and landing (~z -120)
+	if absf(pos.x - 150.0) < 22.0 and pos.z < -52.0 and pos.z > -118.0 and pos.y > 28.0:
+		return true
+	# Gap 2 — elevated crossing over the lower track (y check keeps lower road solid)
+	if absf(pos.x) < 28.0 and absf(pos.z + 100.0) < 22.0 and pos.y > 34.0:
+		return true
 	return false
+
+
+## Skip a mesh strip if either end of the segment is in a gap (prevents one-segment
+## "spikes" / glitchy bridges that only checked the start sample).
+func _segment_in_gap(curve: Curve3D, length: float, point_count: int, i: int) -> bool:
+	var o0 := (float(i) / float(point_count)) * length
+	var o1 := (float(i + 1) / float(point_count)) * length
+	return _is_in_gap_pos(curve.sample_baked(o0)) or _is_in_gap_pos(curve.sample_baked(o1))
+
+
+## Stable sideways axis for a path tangent (avoids zero-length on steep ramps).
+func _path_right(tangent: Vector3) -> Vector3:
+	var t := tangent
+	if t.length_squared() < 1e-8:
+		t = Vector3.FORWARD
+	else:
+		t = t.normalized()
+	var right := t.cross(Vector3.UP)
+	if right.length_squared() < 1e-6:
+		right = t.cross(Vector3.RIGHT)
+	if right.length_squared() < 1e-6:
+		right = Vector3.RIGHT
+	return right.normalized()
+
 
 func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curve3D, for_collision: bool) -> float:
 	var h_noise = noise.get_noise_2d(px, pz) * hill_height
@@ -43,9 +71,9 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 		# Canyon plateau: low flat ground with gentle noise ripples (lowered to 24.0 so camera doesn't clip/occlude in isometric mode)
 		base_terrain_height = 24.0 + h_noise * 0.4
 		if level_prefix == "canyon_chasm":
-			# Force low terrain between the large ramp takeoff/landing (hill jump gap) to eliminate the weird hump in the chasm
-			if px > 130.0 and px < 170.0 and pz > -130.0 and pz < -40.0:
-				base_terrain_height = 0.0
+			# Deep chasm floor under the hill jump so nothing fills the gap between ramps
+			if absf(px - 150.0) < 28.0 and pz < -40.0 and pz > -145.0:
+				base_terrain_height = -12.0
 	else:
 		base_terrain_height = h_noise
 
@@ -53,6 +81,11 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 	var closest_pos = curve.get_closest_point(Vector3(px, query_y, pz))
 	var dist = Vector2(px, pz).distance_to(Vector2(closest_pos.x, closest_pos.z))
 	var road_h = closest_pos.y
+
+	# Airborne jump curve must NOT pull terrain up into a glitchy ridge / fake structure.
+	if level_prefix == "canyon_chasm" and _is_in_gap_pos(closest_pos):
+		dist = 1.0e9
+		road_h = base_terrain_height
 
 	var height: float
 
@@ -88,6 +121,10 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			height = lerp(height, road_h - terrain_recession_collision, basin_blend)
 		else:
 			height = lerp(height, road_h - terrain_recession_visual, basin_blend)
+
+		# Final hard carve under hill jump (in case another nearby solid curve still influenced height)
+		if level_prefix == "canyon_chasm" and absf(px - 150.0) < 22.0 and pz < -55.0 and pz > -115.0:
+			height = minf(height, -8.0)
 	else:
 		# Original blending for DEFAULT and MOUNTAIN
 		var sand_edge = sand_width / 2.0
@@ -403,24 +440,18 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 		if mat_dup is ShaderMaterial or mat_dup is StandardMaterial3D:
 			mat_dup.render_priority = 2 # Above terrain
 
-	# --- CANYON ROAD: beveled edges with blended normals ---
-	# For the canyon road surface, add extra bevel vertices at the edges so the flat
-	# top transitions smoothly into the vertical rock walls, giving a rounded kerb look
-	# and a natural texture blend zone.
+	# --- CANYON ROAD: rounded driveable shoulders on both sides ---
+	# Flat deck in the middle; edges curve DOWN and outward (no raised curb) so cars
+	# can leave and climb back on. Wider multi-sample bevel = softer "round" feel.
 	if track_layout_type == TrackLayoutType.CANYON and not is_curb:
 		var st = SurfaceTool.new()
 		st.begin(Mesh.PRIMITIVE_TRIANGLES)
 
-		const BEVEL_W  := 1.2  # Horizontal bevel width (how wide the rounded edge is)
-		const BEVEL_H  := 0.5  # Vertical drop of the bevel (how far it curves down)
-		const CURB_H   := 0.7  # Raised lip on outer edge of road to close the sides of the ramps (prevents open sheer drop)
-		# Bevel uses 3 subdivisions (4 rings: flat-center, bevel-start, bevel-mid, bevel-end)
-		# Each ring has 2 vertices (left, right), producing 6 cross-section points per slice.
-		# Layout per slice (6 verts): [L_inner, L_bevel_mid, L_bevel_end, R_bevel_end, R_bevel_mid, R_inner]
-		# L_inner  = flat road surface, outer edge        normal = UP
-		# L_bevel_mid = 45° curve zone                   normal = lerp(UP, -RIGHT, 0.5).normalized()
-		# L_bevel_end = where bevel meets the side wall   normal = -RIGHT (outward)
-		# (mirrored for right side)
+		# Wide soft shoulder (driveable). Quarter-circle profile: flat at deck, rolls down at lip.
+		const BEVEL_W := 2.6
+		const BEVEL_H := 0.75
+		# 8 verts per slice: L outer → L flat → R flat → R outer (3 samples each shoulder + 2 flats)
+		const SLICE_VERTS := 8
 
 		for i in range(point_count + 1):
 			var offset = (float(i) / point_count) * length
@@ -440,57 +471,55 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 			else:
 				tangent = (curve.sample_baked(min(length, offset + 0.2)) - pos).normalized()
 
-			var right_dir = tangent.cross(Vector3.UP).normalized()
+			var right_dir = _path_right(tangent)
 
 			var final_pos = pos
 			if is_loop and i == point_count:
 				final_pos = curve.sample_baked(0.0)
 
-			# 6 cross-section positions (left to right):
-			# 0 = L flat inner (road center side, normal UP)
-			# 1 = L flat outer edge (bevel start, normal UP blending to outward)
-			# 2 = L bevel end / wall top (normal = -right_dir)
-			# 3 = R bevel end / wall top (normal = +right_dir)
-			# 4 = R flat outer edge (bevel start, normal UP blending to outward)
-			# 5 = R flat inner (road center side, normal UP)
+			# t=0 at flat deck edge, t=1 at outer lip. y drops with cos so the join is smooth (derivative 0).
+			# lateral: flat at (half_w - BEVEL_W), outer at half_w
+			var n_up: Vector3 = Vector3.UP
+			var n_left: Vector3 = -right_dir
+			var n_right: Vector3 = right_dir
 
-			var p0 = final_pos - right_dir * half_w + Vector3(0, y_offset + CURB_H, 0)           # L outer with raised curb (closes sides of ramps)
-			var p1 = final_pos - right_dir * (half_w - BEVEL_W * 0.5) + Vector3(0, y_offset + CURB_H * 0.5 - BEVEL_H * 0.25, 0)  # L bevel mid
-			var p2 = final_pos - right_dir * (half_w - BEVEL_W) + Vector3(0, y_offset - BEVEL_H, 0)              # L bevel end
-			var p3 = final_pos + right_dir * (half_w - BEVEL_W) + Vector3(0, y_offset - BEVEL_H, 0)              # R bevel end
-			var p4 = final_pos + right_dir * (half_w - BEVEL_W * 0.5) + Vector3(0, y_offset + CURB_H * 0.5 - BEVEL_H * 0.25, 0)  # R bevel mid
-			var p5 = final_pos + right_dir * half_w + Vector3(0, y_offset + CURB_H, 0)            # R outer with raised curb
+			# Left shoulder: outer → flat (t 1 → 0). Right: flat → outer (t 0 → 1).
+			var t_samples_l: Array = [1.0, 0.66, 0.33, 0.0]
+			var t_samples_r: Array = [0.0, 0.33, 0.66, 1.0]
+			for ti in range(4):
+				var t: float = float(t_samples_l[ti])
+				var lat: float = half_w - BEVEL_W * (1.0 - t)
+				var drop: float = BEVEL_H * (1.0 - cos(t * PI * 0.5))
+				var p: Vector3 = final_pos - right_dir * lat + Vector3(0, y_offset - drop, 0)
+				# Normal rolls from outward (outer lip) to UP (deck)
+				var n: Vector3 = (n_up * (1.0 - t) + n_left * t).normalized()
+				if t < 0.05:
+					n = n_up
+				st.set_normal(n)
+				# UV: 0 at left outer, increases toward center
+				st.set_uv(Vector2(half_w - lat, offset))
+				st.add_vertex(p)
 
-			# Normals: smoothly interpolate between UP and outward sideways
-			var n_up     = Vector3.UP
-			var n_left   = -right_dir  # outward left
-			var n_right  = right_dir   # outward right
-			var n_lm = (n_up + n_left).normalized()   # 45° blend
-			var n_rm = (n_up + n_right).normalized()  # 45° blend
+			for ti in range(4):
+				var t2: float = float(t_samples_r[ti])
+				var lat2: float = half_w - BEVEL_W * (1.0 - t2)
+				var drop2: float = BEVEL_H * (1.0 - cos(t2 * PI * 0.5))
+				var p2: Vector3 = final_pos + right_dir * lat2 + Vector3(0, y_offset - drop2, 0)
+				var n2: Vector3 = (n_up * (1.0 - t2) + n_right * t2).normalized()
+				if t2 < 0.05:
+					n2 = n_up
+				st.set_normal(n2)
+				# UV continues across: half_w + lat (right flat ≈ width - BEVEL_W, outer = width)
+				st.set_uv(Vector2(half_w + lat2, offset))
+				st.add_vertex(p2)
 
-			var uv_x_l0 = 0.0
-			var uv_x_l1 = BEVEL_W * 0.5 / width
-			var uv_x_l2 = BEVEL_W / width
-			var uv_x_r3 = 1.0 - BEVEL_W / width
-			var uv_x_r4 = 1.0 - BEVEL_W * 0.5 / width
-			var uv_x_r5 = 1.0
-
-			st.set_normal(n_up);    st.set_uv(Vector2(uv_x_l0 * width, offset)); st.add_vertex(p0)
-			st.set_normal(n_lm);   st.set_uv(Vector2(uv_x_l1 * width, offset)); st.add_vertex(p1)
-			st.set_normal(n_left); st.set_uv(Vector2(uv_x_l2 * width, offset)); st.add_vertex(p2)
-			st.set_normal(n_right);st.set_uv(Vector2(uv_x_r3 * width, offset)); st.add_vertex(p3)
-			st.set_normal(n_rm);   st.set_uv(Vector2(uv_x_r4 * width, offset)); st.add_vertex(p4)
-			st.set_normal(n_up);   st.set_uv(Vector2(uv_x_r5 * width, offset)); st.add_vertex(p5)
-
-		# Index loop: 5 quads per slice (between the 6 cross-section verts)
+		# Index loop: 7 quads per slice
 		for i in range(point_count):
-			var offset = (float(i) / point_count) * length
-			if _is_in_gap_pos(curve.sample_baked(offset)):
+			if _segment_in_gap(curve, length, point_count, i):
 				continue
-			var base = i * 6
-			var nxt  = (i + 1) * 6
-			# For each pair of adjacent cross-section rows, connect as quads (2 triangles)
-			for k in range(5):
+			var base = i * SLICE_VERTS
+			var nxt  = (i + 1) * SLICE_VERTS
+			for k in range(SLICE_VERTS - 1):
 				var a = base + k;     var b = base + k + 1
 				var c = nxt  + k;     var d = nxt  + k + 1
 				st.add_index(a); st.add_index(c); st.add_index(b)
@@ -498,6 +527,24 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 				# Underside (reverse winding)
 				st.add_index(a); st.add_index(b); st.add_index(c)
 				st.add_index(b); st.add_index(d); st.add_index(c)
+
+			# Cap open ends at jump takeoff / landing so the deck is not hollow
+			var prev_gap := (
+					(i == 0 and is_loop and _segment_in_gap(curve, length, point_count, point_count - 1))
+					or (i > 0 and _segment_in_gap(curve, length, point_count, i - 1))
+			)
+			var next_gap := false
+			if i + 1 < point_count:
+				next_gap = _segment_in_gap(curve, length, point_count, i + 1)
+			elif is_loop:
+				next_gap = _segment_in_gap(curve, length, point_count, 0)
+			if next_gap:
+				# Cap at nxt: fan from left outer across to right outer
+				st.add_index(nxt + 0); st.add_index(nxt + 3); st.add_index(nxt + 4)
+				st.add_index(nxt + 0); st.add_index(nxt + 4); st.add_index(nxt + 7)
+			if prev_gap:
+				st.add_index(base + 0); st.add_index(base + 4); st.add_index(base + 3)
+				st.add_index(base + 0); st.add_index(base + 7); st.add_index(base + 4)
 
 		st.generate_tangents()
 		var mesh_instance = MeshInstance3D.new()
@@ -589,9 +636,7 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 
 	# INDEX LOOP (CCW - Facing UP)
 	for i in range(point_count):
-		var offset = (float(i) / point_count) * length
-		var pos = curve.sample_baked(offset)
-		if _is_in_gap_pos(pos):
+		if _segment_in_gap(curve, length, point_count, i):
 			continue
 
 		if is_curb:
@@ -662,9 +707,10 @@ func _create_track_collision(point_count: int, width: float, node_name: String):
 	var curb_slope = 0.15
 
 	if track_layout_type == TrackLayoutType.CANYON:
-		# Dedicated 12-vertex-per-slice canyon road collision mesh that matches the visual bevel
-		const BEVEL_W := 1.2
-		const BEVEL_H := 0.5
+		# Collision matches visual: rounded shoulders (8 top verts + 8 bottom).
+		const BEVEL_W := 2.6
+		const BEVEL_H := 0.75
+		const SLICE_TOP := 8
 
 		# Create Top and Bottom vertices for Canyon
 		for i in range(point_count + 1):
@@ -692,52 +738,40 @@ func _create_track_collision(point_count: int, width: float, node_name: String):
 
 			if tangent.length() < 0.01:
 				tangent = (pos - curve.sample_baked(max(offset - 0.5, 0.0))).normalized()
-			var right_dir = tangent.cross(Vector3.UP).normalized()
+			var right_dir = _path_right(tangent)
 
 			var final_pos = pos
 			if is_loop and i == point_count:
 				final_pos = curve.sample_baked(0.0)
 
-			# 6 Top vertices
-			var p0 = final_pos - right_dir * half_w + Vector3(0, y_offset, 0)
-			var p1 = final_pos - right_dir * (half_w - BEVEL_W * 0.5) + Vector3(0, y_offset - BEVEL_H * 0.25, 0)
-			var p2 = final_pos - right_dir * (half_w - BEVEL_W) + Vector3(0, y_offset - BEVEL_H, 0)
-			var p3 = final_pos + right_dir * (half_w - BEVEL_W) + Vector3(0, y_offset - BEVEL_H, 0)
-			var p4 = final_pos + right_dir * (half_w - BEVEL_W * 0.5) + Vector3(0, y_offset - BEVEL_H * 0.25, 0)
-			var p5 = final_pos + right_dir * half_w + Vector3(0, y_offset, 0)
+			var t_samples_l: Array = [1.0, 0.66, 0.33, 0.0]
+			var t_samples_r: Array = [0.0, 0.33, 0.66, 1.0]
+			var tops: Array[Vector3] = []
+			for ti in range(4):
+				var t: float = float(t_samples_l[ti])
+				var lat: float = half_w - BEVEL_W * (1.0 - t)
+				var drop: float = BEVEL_H * (1.0 - cos(t * PI * 0.5))
+				tops.append(final_pos - right_dir * lat + Vector3(0, y_offset - drop, 0))
+			for ti in range(4):
+				var t2: float = float(t_samples_r[ti])
+				var lat2: float = half_w - BEVEL_W * (1.0 - t2)
+				var drop2: float = BEVEL_H * (1.0 - cos(t2 * PI * 0.5))
+				tops.append(final_pos + right_dir * lat2 + Vector3(0, y_offset - drop2, 0))
 
-			# 6 Bottom vertices
-			var p0b = p0 - Vector3(0, thickness, 0)
-			var p1b = p1 - Vector3(0, thickness, 0)
-			var p2b = p2 - Vector3(0, thickness, 0)
-			var p3b = p3 - Vector3(0, thickness, 0)
-			var p4b = p4 - Vector3(0, thickness, 0)
-			var p5b = p5 - Vector3(0, thickness, 0)
-
-			st.add_vertex(p0)  # 12*i + 0
-			st.add_vertex(p1)  # 12*i + 1
-			st.add_vertex(p2)  # 12*i + 2
-			st.add_vertex(p3)  # 12*i + 3
-			st.add_vertex(p4)  # 12*i + 4
-			st.add_vertex(p5)  # 12*i + 5
-			st.add_vertex(p0b) # 12*i + 6
-			st.add_vertex(p1b) # 12*i + 7
-			st.add_vertex(p2b) # 12*i + 8
-			st.add_vertex(p3b) # 12*i + 9
-			st.add_vertex(p4b) # 12*i + 10
-			st.add_vertex(p5b) # 12*i + 11
+			for v in tops:
+				st.add_vertex(v)
+			for v in tops:
+				st.add_vertex(v - Vector3(0, thickness, 0))
 
 		for i in range(point_count):
-			var offset = (float(i) / point_count) * length
-			var pos = curve.sample_baked(offset)
-			if _is_in_gap_pos(pos):
+			if _segment_in_gap(curve, length, point_count, i):
 				continue
 
-			var base = i * 12
-			var nxt = (i + 1) * 12
+			var base = i * (SLICE_TOP * 2)
+			var nxt = (i + 1) * (SLICE_TOP * 2)
 
-			# Top Faces: 5 quads
-			for k in range(5):
+			# Top Faces: 7 quads
+			for k in range(SLICE_TOP - 1):
 				var a = base + k
 				var b = base + k + 1
 				var c = nxt + k
@@ -745,22 +779,22 @@ func _create_track_collision(point_count: int, width: float, node_name: String):
 				st.add_index(a); st.add_index(c); st.add_index(b)
 				st.add_index(b); st.add_index(c); st.add_index(d)
 
-			# Bottom Faces: 5 quads (reversed winding)
-			for k in range(5):
-				var ab = base + k + 6
-				var bb = base + k + 7
-				var cb = nxt + k + 6
-				var db = nxt + k + 7
+			# Bottom Faces: 7 quads (reversed winding)
+			for k in range(SLICE_TOP - 1):
+				var ab = base + k + SLICE_TOP
+				var bb = base + k + 1 + SLICE_TOP
+				var cb = nxt + k + SLICE_TOP
+				var db = nxt + k + 1 + SLICE_TOP
 				st.add_index(ab); st.add_index(bb); st.add_index(cb)
 				st.add_index(bb); st.add_index(db); st.add_index(cb)
 
-			# Left Side Wall (0 to 6)
-			st.add_index(base + 0); st.add_index(base + 6); st.add_index(nxt + 0)
-			st.add_index(base + 6); st.add_index(nxt + 6); st.add_index(nxt + 0)
+			# Left outer wall (top0 / bot0)
+			st.add_index(base + 0); st.add_index(base + SLICE_TOP); st.add_index(nxt + 0)
+			st.add_index(base + SLICE_TOP); st.add_index(nxt + SLICE_TOP); st.add_index(nxt + 0)
 
-			# Right Side Wall (5 to 11)
-			st.add_index(base + 5); st.add_index(nxt + 5); st.add_index(base + 11)
-			st.add_index(base + 11); st.add_index(nxt + 5); st.add_index(nxt + 11)
+			# Right outer wall (top7 / bot7)
+			st.add_index(base + 7); st.add_index(nxt + 7); st.add_index(base + 7 + SLICE_TOP)
+			st.add_index(base + 7 + SLICE_TOP); st.add_index(nxt + 7); st.add_index(nxt + 7 + SLICE_TOP)
 
 	else:
 		# Default / Mountain collision shape generation
@@ -819,9 +853,7 @@ func _create_track_collision(point_count: int, width: float, node_name: String):
 			st.add_vertex(p_rob) # 8*i + 7
 
 		for i in range(point_count):
-			var offset = (float(i) / point_count) * length
-			var pos = curve.sample_baked(offset)
-			if _is_in_gap_pos(pos):
+			if _segment_in_gap(curve, length, point_count, i):
 				continue
 
 			var base = i * 8
@@ -922,6 +954,9 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 	if node_name.contains("Curbs"):
 		side_y_offset = y_offset - 0.15
 
+	# Match canyon road outer lip (rounded shoulder drops BEVEL_H at full half_w).
+	const SIDE_BEVEL_H := 0.75
+
 	# 1. VERTEX GENERATION
 	for i in range(point_count + 1):
 		var offset = (float(i) / point_count) * length
@@ -948,7 +983,8 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 		if tangent.length() < 0.01:
 			tangent = (pos - curve.sample_baked(max(0, offset - 0.1))).normalized()
 
-		var right = tangent.cross(Vector3.UP).normalized() * half_w
+		var right_dir = _path_right(tangent)
+		var right = right_dir * half_w
 
 		# Snap the closing row to the start position so the loop connects perfectly
 		var final_pos = pos
@@ -960,32 +996,37 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 		var bot_l = top_l - Vector3(0, depth, 0)
 		var bot_r = top_r - Vector3(0, depth, 0)
 		if track_layout_type == TrackLayoutType.CANYON:
-			# Match bevel end from road visual so sides attach cleanly without seams/gaps (fixes "open sides" on ramps/curves)
-			const BEVEL_W_SIDE := 1.2
-			const BEVEL_H_SIDE := 0.5
-			var bevel_scale = 1.0 - (BEVEL_W_SIDE / half_w if half_w > 0.001 else 0.0)
-			top_l = final_pos - right * bevel_scale + Vector3(0, side_y_offset - BEVEL_H_SIDE, 0)
-			top_r = final_pos + right * bevel_scale + Vector3(0, side_y_offset - BEVEL_H_SIDE, 0)
+			# Attach embankment at the rounded outer lip (road surface dropped by BEVEL_H).
+			top_l = final_pos - right + Vector3(0, side_y_offset - SIDE_BEVEL_H, 0)
+			top_r = final_pos + right + Vector3(0, side_y_offset - SIDE_BEVEL_H, 0)
 
 			var drop = 60.0
 			if level_prefix == "canyon_chasm":
+				# Keep embankment deep under elevated ramps; only soften near the
+				# figure-8 lower-road crossing so the two paths don't form a solid wall.
 				var dist_to_crossing = Vector2(final_pos.x, final_pos.z).distance_to(Vector2(0.0, -100.0))
-				if dist_to_crossing < 45.0:
-					# Ramps from 60.0 drop down to a very small drop (e.g. 15.0 Y height)
-					var t = clamp(dist_to_crossing / 45.0, 0.0, 1.0)
+				if dist_to_crossing < 45.0 and final_pos.y < 28.0:
+					# Lower road near crossing: shorter skirt so upper jump stays open
+					var t = clampf(dist_to_crossing / 45.0, 0.0, 1.0)
 					var smooth_t = t * t * (3.0 - 2.0 * t)
-					var target_y = lerp(15.0, top_l.y - 60.0, smooth_t)
-					var target_flare = lerp(0.0, 1.5, smooth_t)
-					bot_l = top_l - right * target_flare
+					var target_y = lerpf(top_l.y - 18.0, top_l.y - drop, smooth_t)
+					var target_flare = lerpf(0.8, 2.0, smooth_t)
+					bot_l = top_l - right_dir * target_flare
 					bot_l.y = target_y
-					bot_r = top_r + right * target_flare
+					bot_r = top_r + right_dir * target_flare
 					bot_r.y = target_y
 				else:
-					bot_l = top_l - right * 1.5 - Vector3(0, drop, 0)
-					bot_r = top_r + right * 1.5 - Vector3(0, drop, 0)
+					# Full dam walls under ramps / normal track — closed solid embankment
+					var flare := 2.0
+					bot_l = top_l - right_dir * flare - Vector3(0, drop, 0)
+					bot_r = top_r + right_dir * flare - Vector3(0, drop, 0)
+					# Never let the skirt float above a low chasm floor under hill jump
+					if absf(final_pos.x - 150.0) < 30.0 and final_pos.z < -40.0 and final_pos.z > -145.0:
+						bot_l.y = minf(bot_l.y, -15.0)
+						bot_r.y = minf(bot_r.y, -15.0)
 			else:
-				bot_l = top_l - right * 1.5 - Vector3(0, drop, 0)
-				bot_r = top_r + right * 1.5 - Vector3(0, drop, 0)
+				bot_l = top_l - right_dir * 1.5 - Vector3(0, drop, 0)
+				bot_r = top_r + right_dir * 1.5 - Vector3(0, drop, 0)
 
 		var uv_y = offset * 0.2
 
@@ -1000,43 +1041,47 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 
 	# 2. INDEX GENERATION
 	for i in range(point_count):
-		var offset = (float(i) / point_count) * length
-		var pos = curve.sample_baked(offset)
-		if _is_in_gap_pos(pos):
+		if _segment_in_gap(curve, length, point_count, i):
 			continue
 
 		var base = i * 4
 		var nxt = (i + 1) * 4
 
-		var next_offset = (float(i + 1) / point_count) * length
-		var next_pos = curve.sample_baked(next_offset)
-		var next_is_gap = _is_in_gap_pos(next_pos)
+		var prev_gap := (
+				(i == 0 and is_loop and _segment_in_gap(curve, length, point_count, point_count - 1))
+				or (i > 0 and _segment_in_gap(curve, length, point_count, i - 1))
+		)
+		var next_gap := false
+		if i + 1 < point_count:
+			next_gap = _segment_in_gap(curve, length, point_count, i + 1)
+		elif is_loop:
+			next_gap = _segment_in_gap(curve, length, point_count, 0)
 
-		var prev_offset = (float((i - 1 + point_count) % point_count) / point_count) * length
-		var prev_pos = curve.sample_baked(prev_offset)
-		var prev_is_gap = _is_in_gap_pos(prev_pos)
+		# Side walls must face OUTWARD (visible + collidable from outside the ramp).
+		# Previous winding pointed inward: walls invisible outside, drive-into hollow,
+		# then only visible/collidable once already inside.
+		#
+		# Left wall: outward = -right_dir
+		st.add_index(base + 0); st.add_index(nxt + 0); st.add_index(base + 1)
+		st.add_index(base + 1); st.add_index(nxt + 0); st.add_index(nxt + 1)
 
-		# Left Side
-		st.add_index(base + 0); st.add_index(base + 1); st.add_index(nxt + 1)
-		st.add_index(base + 0); st.add_index(nxt + 1); st.add_index(nxt + 0)
+		# Right wall: outward = +right_dir
+		st.add_index(base + 2); st.add_index(base + 3); st.add_index(nxt + 2)
+		st.add_index(base + 3); st.add_index(nxt + 3); st.add_index(nxt + 2)
 
-		# Right Side
-		st.add_index(base + 2); st.add_index(nxt + 2); st.add_index(base + 3)
-		st.add_index(base + 3); st.add_index(nxt + 2); st.add_index(nxt + 3)
+		# Bottom — normal faces downward (seen from under the dam)
+		st.add_index(base + 1); st.add_index(nxt + 1); st.add_index(base + 3)
+		st.add_index(base + 3); st.add_index(nxt + 1); st.add_index(nxt + 3)
 
-		# Bottom Surface
-		st.add_index(base + 1); st.add_index(base + 3); st.add_index(nxt + 3)
-		st.add_index(base + 1); st.add_index(nxt + 3); st.add_index(nxt + 1)
-
-		# Seal open ends (takeoff) at nxt if the next segment is in a gap
-		if next_is_gap:
-			st.add_index(nxt + 2); st.add_index(nxt + 3); st.add_index(nxt + 1)
-			st.add_index(nxt + 2); st.add_index(nxt + 1); st.add_index(nxt + 0)
-
-		# Seal open ends (landing) at base if the previous segment was in a gap
-		if prev_is_gap:
-			st.add_index(base + 0); st.add_index(base + 1); st.add_index(base + 3)
-			st.add_index(base + 0); st.add_index(base + 3); st.add_index(base + 2)
+		# Seal open ends at jump takeoff / landing (outward toward the gap / approach)
+		if next_gap:
+			# Face points forward along the path (into the jump gap)
+			st.add_index(nxt + 0); st.add_index(nxt + 2); st.add_index(nxt + 1)
+			st.add_index(nxt + 1); st.add_index(nxt + 2); st.add_index(nxt + 3)
+		if prev_gap:
+			# Face points backward (toward previous gap / landing approach)
+			st.add_index(base + 0); st.add_index(base + 1); st.add_index(base + 2)
+			st.add_index(base + 1); st.add_index(base + 3); st.add_index(base + 2)
 
 
 	st.generate_normals()
@@ -1063,6 +1108,8 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 			rock_mat.normal_scale = 1.5
 		rock_mat.uv1_scale = Vector3(0.08, 0.08, 0.08)
 		rock_mat.uv1_triplanar = true
+		# Never hide embankment walls from odd camera angles on steep ramps
+		rock_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 		final_side_mat = rock_mat
 		
 		# Also add a StaticBody3D and CollisionShape3D for physics collision on the canyon road sides embankment!
@@ -1073,6 +1120,9 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 		var collision_shape = CollisionShape3D.new()
 		collision_shape.name = "CollisionShape3D"
 		var trimesh_shape = mesh_instance.mesh.create_trimesh_shape()
+		# Trimesh is one-sided by default — if any face is still inverted, still block cars.
+		if trimesh_shape is ConcavePolygonShape3D:
+			(trimesh_shape as ConcavePolygonShape3D).backface_collision = true
 		collision_shape.shape = _save_resource(trimesh_shape, node_name + "_collision_shape")
 		static_body.add_child(collision_shape)
 	elif track_layout_type == TrackLayoutType.CANYON and final_side_mat is ShaderMaterial:

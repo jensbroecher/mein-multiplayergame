@@ -302,18 +302,24 @@ func display_race_results(results_data: Array):
 		action_button.text = "RETURN TO MENU"
 
 func _on_action_button_pressed():
-	if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP:
+	# Disable so double-taps don't start two loads (especially bad on mobile RAM).
+	if action_button:
+		action_button.disabled = true
+
+	if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP \
+			or (NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP and NetworkManager.is_coop_gp):
 		var gp_data = NetworkManager.GP_CUPS.get(NetworkManager.current_gp_name)
 		var next_stage = NetworkManager.current_gp_stage + 1
 		if gp_data and next_stage < gp_data["stages"].size():
 			var main = get_tree().current_scene
 			if main and main.has_method("load_gp_stage"):
+				# RaceUI lives under Level — never free the level inside this callback.
 				main.load_gp_stage(next_stage)
 				return
 				
 	var main = get_tree().current_scene
 	if main and main.has_method("_on_server_disconnected"):
-		main._on_server_disconnected()
+		main.call_deferred("_on_server_disconnected")
 
 func _input(event: InputEvent):
 	if event.is_action_pressed("ui_cancel") or (event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE):

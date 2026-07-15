@@ -1,10 +1,19 @@
 # regenerate_canyon_chasm.gd
 # Generates CanyonChasmLevel.tscn with a custom track curve, boost pads, and gaps.
-# Run with: Godot --headless res://regenerate_canyon_chasm.tscn
+#
+# How to run (Android / PC Godot editor):
+#   1. Open res://regenerate_canyon_chasm.tscn
+#   2. Press Play (F5 / the play scene button)
+#   3. Wait until the console prints "Saved CanyonChasmLevel.tscn successfully."
+#      then close the running scene.
+#
+# This rebakes terrain + road + embankment sides (fixes hill-jump glitch ridge
+# and open dam walls at ramps). Takes a minute on phone — leave it running.
 extends Node
 
 func _ready():
 	print("=== Canyon Chasm Level Generation (Scene Ready) ===")
+	print("Rebuilding meshes (chasm gap + sealed embankments). Please wait...")
 
 	var template_path = "res://levels/CanyonLevel.tscn"
 	var target_path = "res://levels/CanyonChasmLevel.tscn"
