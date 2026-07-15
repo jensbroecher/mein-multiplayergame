@@ -208,7 +208,9 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 func _ready():
 	# Terrain and Track are now saved in the scene file and external .res files.
 	# We no longer need to regenerate at runtime, preventing the game from hanging on load.
-	pass
+	# Pit water is lightweight — also create in the editor so Canyon Chasm shows it in the viewport.
+	if level_prefix == "canyon_chasm":
+		call_deferred("add_chasm_pit_water")
 
 func generate_world():
 	if not track_path: return
@@ -255,7 +257,10 @@ func generate_world():
 	_generate_road_and_sand()
 
 	# 5. Water Surface
-	if not no_water:
+	if level_prefix == "canyon_chasm":
+		# Local murky water in the hill-jump pit (not a full ocean plane).
+		add_chasm_pit_water()
+	elif not no_water:
 		_generate_water()
 
 	# 6. Procedural Hill Grass
@@ -1166,10 +1171,83 @@ func _generate_water():
 
 	mat.set_shader_parameter("noise_tex", noise_tex)
 	mat.set_shader_parameter("water_color", Color(0.1, 0.3, 0.6))
+	mat.set_shader_parameter("shallow_color", Color(0.15, 0.45, 0.55))
+	mat.set_shader_parameter("sky_tint", Color(0.55, 0.65, 0.75))
+	mat.set_shader_parameter("sky_reflect", 0.45)
 	mat.set_shader_parameter("transparency", 0.7)
+	mat.set_shader_parameter("metallic", 0.55)
+	mat.set_shader_parameter("roughness", 0.12)
 
 	water.material_override = mat
 	add_child(water)
+
+
+## Surface Y of the chasm pit water (PlayerCart uses this for splash / drown).
+const CHASM_PIT_WATER_Y := -3.2
+const CHASM_PIT_CENTER := Vector3(150.0, CHASM_PIT_WATER_Y, -85.0)
+const CHASM_PIT_HALF_EXTENTS := Vector2(28.0, 36.0) # XZ half-size of water volume
+
+
+## Murky green/brown water filling the first hill-jump pit on Canyon Chasm.
+## Pit floor is carved near y=-8..-12; surface sits a few meters above that.
+func add_chasm_pit_water() -> void:
+	if get_node_or_null("ChasmPitWater") != null:
+		return
+
+	var water := MeshInstance3D.new()
+	water.name = "ChasmPitWater"
+	var plane := PlaneMesh.new()
+	# Covers the jump gap between large ramp takeoff (~z -50) and landing (~z -120).
+	plane.size = Vector2(CHASM_PIT_HALF_EXTENTS.x * 2.0, CHASM_PIT_HALF_EXTENTS.y * 2.0)
+	# Dense mesh so large vertex waves read clearly
+	plane.subdivide_width = 48
+	plane.subdivide_depth = 56
+	water.mesh = plane
+	water.position = CHASM_PIT_CENTER
+	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Metadata for carts (splash / drown volume)
+	water.set_meta("water_surface_y", CHASM_PIT_WATER_Y)
+	water.set_meta("water_half_xz", CHASM_PIT_HALF_EXTENTS)
+
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://water.gdshader")
+
+	var noise := FastNoiseLite.new()
+	noise.seed = 42
+	noise.frequency = 0.018 # larger noise features → bigger waves
+	noise.fractal_type = FastNoiseLite.FRACTAL_FBM
+	noise.fractal_octaves = 4
+	var noise_tex := NoiseTexture2D.new()
+	noise_tex.seamless = true
+	noise_tex.as_normal_map = true
+	noise_tex.width = 512
+	noise_tex.height = 512
+	noise_tex.noise = noise
+
+	# Green/brown canyon water — mostly opaque so sky specular shows
+	mat.set_shader_parameter("noise_tex", noise_tex)
+	mat.set_shader_parameter("water_color", Color(0.06, 0.09, 0.04))
+	mat.set_shader_parameter("shallow_color", Color(0.2, 0.26, 0.09))
+	mat.set_shader_parameter("sky_tint", Color(0.62, 0.72, 0.78)) # bright sky mirror
+	mat.set_shader_parameter("sky_reflect", 0.85)
+	mat.set_shader_parameter("transparency", 0.18) # mostly solid
+	mat.set_shader_parameter("metallic", 0.72)
+	mat.set_shader_parameter("roughness", 0.05)
+	mat.set_shader_parameter("wave_speed", 0.03)
+	mat.set_shader_parameter("wave_strength", 0.85)
+	mat.set_shader_parameter("wave_height", 1.15) # large visible swells
+	mat.set_shader_parameter("wave_scale", 0.55) # lower = bigger world waves
+
+	water.material_override = mat
+	add_child(water)
+
+	# Keep visible/savable in the editor scene tree
+	if Engine.is_editor_hint() and get_tree():
+		var root = get_tree().edited_scene_root
+		if root:
+			water.owner = root
+		# NoiseTexture2D often needs a nudge before it shows in the editor viewport
+		noise_tex.changed.emit()
 
 func _create_grass_mesh() -> ArrayMesh:
 	var st = SurfaceTool.new()

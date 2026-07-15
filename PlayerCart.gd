@@ -251,6 +251,12 @@ var visual_offset_y: float = 0.0
 var stage_has_water: bool = true
 var is_underwater: bool = false
 const WATER_LEVEL = -10.0
+## Effective surface Y used for splash/drown (may be chasm pit water, not global ocean).
+var water_surface_y: float = WATER_LEVEL
+## If true, only count as water when inside water_bounds_min/max on XZ.
+var water_bounds_active: bool = false
+var water_bounds_min: Vector2 = Vector2.ZERO # (x, z)
+var water_bounds_max: Vector2 = Vector2.ZERO
 var water_timer: float = 0.0
 var last_splash_time: float = -999.0
 var is_drowned: bool = false
@@ -330,6 +336,58 @@ func on_race_started():
 		freeze = false
 		ignore_next_landing_sound = true  # suppress the bump when freeze releases at race start
 
+
+## Called by Tornado after it spits the cart out.
+func _tornado_restore_control() -> void:
+	# Keep tumbling in the air briefly, then fully reset pose.
+	# If we re-lock angular axes while the body is still tilted, the sphere can
+	# rest permanently "hovered" / off ground for the rest of the race.
+	await get_tree().create_timer(0.55).timeout
+	if not is_instance_valid(self) or is_exploding or is_drowned:
+		return
+	if not has_physics_authority():
+		return
+
+	_reset_post_tornado_pose()
+
+	var level = get_tree().get_first_node_in_group("level") if get_tree() else null
+	var racing := true
+	if level and "race_state" in level:
+		# Level.RaceState.RACING == 1
+		racing = int(level.race_state) == 1
+	can_move = racing
+	freeze = false
+	sleeping = false
+
+
+## Upright rigidbody, restore angular locks, clear visual hover offset.
+func _reset_post_tornado_pose() -> void:
+	var origin := global_position
+	var fwd := -global_transform.basis.z
+	fwd.y = 0.0
+	if fwd.length_squared() < 0.0001:
+		fwd = -Vector3.FORWARD
+	else:
+		fwd = fwd.normalized()
+	# Upright transform (Y-up) before locking angular axes again
+	global_transform = Transform3D(Basis.looking_at(fwd, Vector3.UP), origin)
+
+	axis_lock_angular_x = true
+	axis_lock_angular_y = true
+	axis_lock_angular_z = true
+	angular_velocity = Vector3.ZERO
+
+	# Clear wheel visual hover accumulated while spinning mid-air
+	visual_offset_y = 0.0
+	if is_instance_valid(visuals):
+		visuals.top_level = true
+		visuals.global_transform = global_transform
+
+	# Nudge slightly up so we don't spawn interpenetrating the floor after uprighting
+	global_position = origin + Vector3.UP * 0.15
+	if linear_velocity.y < -2.0:
+		linear_velocity.y = -2.0
+
 func _ready():
 	# Lock rotation so we handle it manually, preventing physics rolling at start
 	axis_lock_angular_x = true
@@ -390,8 +448,26 @@ func _ready():
 		elif level.has_node("RaceUI"):
 			race_ui = level.get_node("RaceUI")
 		var tg = level.get_node_or_null("TerrainGenerator")
-		if tg and "no_water" in tg:
+		if tg and str(tg.get("level_prefix")) == "canyon_chasm":
+			# Local pit water under the first jump (not full-stage ocean).
+			stage_has_water = true
+			water_surface_y = -3.2
+			water_bounds_active = true
+			water_bounds_min = Vector2(150.0 - 28.0, -85.0 - 36.0)
+			water_bounds_max = Vector2(150.0 + 28.0, -85.0 + 36.0)
+			var pit = tg.get_node_or_null("ChasmPitWater")
+			if pit:
+				if pit.has_meta("water_surface_y"):
+					water_surface_y = float(pit.get_meta("water_surface_y"))
+				if pit.has_meta("water_half_xz"):
+					var half: Vector2 = pit.get_meta("water_half_xz")
+					var c: Vector3 = pit.global_position
+					water_bounds_min = Vector2(c.x - half.x, c.z - half.y)
+					water_bounds_max = Vector2(c.x + half.x, c.z + half.y)
+		elif tg and "no_water" in tg:
 			stage_has_water = not tg.no_water
+			water_surface_y = WATER_LEVEL
+			water_bounds_active = false
 
 	ground_ray.add_exception(self)
 
@@ -704,8 +780,13 @@ func _process(delta):
 			race_ui.update_speed(smoothed_speed)
 			
 			var cam_underwater = false
-			if camera and camera.is_inside_tree():
-				cam_underwater = camera.global_position.y < WATER_LEVEL
+			if camera and camera.is_inside_tree() and stage_has_water:
+				var cam_pos: Vector3 = camera.global_position
+				var over_water := true
+				if water_bounds_active:
+					over_water = cam_pos.x >= water_bounds_min.x and cam_pos.x <= water_bounds_max.x \
+							and cam_pos.z >= water_bounds_min.y and cam_pos.z <= water_bounds_max.y
+				cam_underwater = over_water and cam_pos.y < water_surface_y
 			race_ui.set_underwater(cam_underwater)
 
 		# Engine loop — same input path as driving (p1_/p2_), not the bare "throttle" action
@@ -833,14 +914,15 @@ func _physics_process(delta):
 
 	if stage_has_water:
 		# Use hysteresis to prevent rapid underwater state toggling at the boundary
-		var entry_threshold = WATER_LEVEL - 0.25
-		var exit_threshold = WATER_LEVEL + 0.25
+		var entry_threshold = water_surface_y - 0.25
+		var exit_threshold = water_surface_y + 0.25
+		var in_water_xz := _is_over_water_volume()
 		var currently_underwater = is_underwater
 		if is_underwater:
-			if global_position.y > exit_threshold:
+			if global_position.y > exit_threshold or not in_water_xz:
 				currently_underwater = false
 		else:
-			if global_position.y < entry_threshold:
+			if in_water_xz and global_position.y < entry_threshold:
 				currently_underwater = true
 
 		if currently_underwater != is_underwater:
@@ -874,13 +956,13 @@ func _physics_process(delta):
 					if linear_velocity.y < 0:
 						linear_velocity.y = 0.0
 					
-					var splash_pos = Vector3(global_position.x, WATER_LEVEL, global_position.z)
+					var splash_pos = Vector3(global_position.x, water_surface_y, global_position.z)
 					_spawn_splash(splash_pos, 1.0)
 			else:
 				# --- Exit Water (Small Splash) ---
 				var current_time = Time.get_ticks_msec() / 1000.0
 				last_splash_time = current_time
-				var splash_pos = Vector3(global_position.x, WATER_LEVEL, global_position.z)
+				var splash_pos = Vector3(global_position.x, water_surface_y, global_position.z)
 				_spawn_splash(splash_pos, 0.4) # Spawn a small splash on exit
 			is_underwater = currently_underwater
 			water_timer = 0.0
@@ -889,11 +971,13 @@ func _physics_process(delta):
 		var on_flat_ground = false
 		if ground_ray.is_colliding() and ground_ray.get_collision_normal().y >= 0.55:
 			on_flat_ground = true
-		if on_flat_ground and not is_underwater and global_position.y >= WATER_LEVEL and global_position.y < WATER_LEVEL + 0.6 and linear_velocity.length() > 3.0:
+		if on_flat_ground and not is_underwater and in_water_xz \
+				and global_position.y >= water_surface_y and global_position.y < water_surface_y + 0.6 \
+				and linear_velocity.length() > 3.0:
 			var current_time = Time.get_ticks_msec() / 1000.0
 			if current_time - last_splash_time > 0.35:
 				last_splash_time = current_time
-				var splash_pos = Vector3(global_position.x, WATER_LEVEL, global_position.z)
+				var splash_pos = Vector3(global_position.x, water_surface_y, global_position.z)
 				_spawn_splash(splash_pos, 0.35)
 
 		if is_underwater:
@@ -1262,6 +1346,16 @@ func _is_loop_surface(collider: Object) -> bool:
 			return true
 		current = current.get_parent()
 	return false
+
+
+func _is_over_water_volume() -> bool:
+	if not stage_has_water:
+		return false
+	if not water_bounds_active:
+		return true
+	var p := global_position
+	return p.x >= water_bounds_min.x and p.x <= water_bounds_max.x \
+			and p.z >= water_bounds_min.y and p.z <= water_bounds_max.y
 
 
 func _prevent_floor_tunneling(delta: float) -> void:

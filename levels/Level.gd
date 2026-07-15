@@ -99,6 +99,9 @@ func _ready():
 	# Apply user graphics settings (shadows on lights, etc.) after the level tree exists
 	MusicManager.refresh_level_graphics()
 
+	# Canyon Chasm: fill the first hill-jump pit with murky reflective water
+	_setup_chasm_pit_water()
+
 	if multiplayer.is_server():
 		NetworkManager.player_connected.connect(_on_server_player_connected)
 		NetworkManager.player_disconnected.connect(_on_server_player_disconnected)
@@ -681,6 +684,20 @@ func _spawn_item_boxes_deferred():
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	_spawn_item_boxes()
+
+
+func _setup_chasm_pit_water() -> void:
+	var tg = get_node_or_null("TerrainGenerator")
+	if tg == null:
+		return
+	if str(tg.get("level_prefix")) != "canyon_chasm":
+		return
+	if get_node_or_null("ChasmPitWater") != null:
+		return
+	if tg.get_node_or_null("ChasmPitWater") != null:
+		return
+	if tg.has_method("add_chasm_pit_water"):
+		tg.add_chasm_pit_water()
 
 
 func _build_runtime_collisions_deferred() -> void:

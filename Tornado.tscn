@@ -1,0 +1,18 @@
+[gd_scene format=3 uid="uid://dqbb2220q777"]
+
+[ext_resource type="Script" path="res://Tornado.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://c5sqv57vdae" path="res://models/desert2/d4250e86adc7a52ecf39a804e207694e.fbx" id="2_mesh"]
+
+[node name="Tornado" type="Node3D"]
+script = ExtResource("1_script")
+mesh_path = NodePath("Mesh")
+spin_speed_deg = 220.0
+mesh_alpha = 0.48
+wander_radius = 55.0
+wander_speed = 6.0
+pickup_radius = 18.0
+capture_duration = 2.4
+lift_height = 22.0
+
+[node name="Mesh" parent="." instance=ExtResource("2_mesh")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
