@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3 uid="uid://looppiece001"]
+
+[ext_resource type="Script" path="res://LoopPiece.gd" id="1_loop"]
+
+[node name="LoopPiece" type="Node3D" groups=["loop_track", "collision_trimesh"]]
+script = ExtResource("1_loop")
+loop_radius = 10.0
+track_width = 11.0
+wall_height = 1.5
+approach_length = 14.0

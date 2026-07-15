@@ -921,8 +921,18 @@ func _physics_process(delta):
 	if is_instance_valid(ground_ray):
 		ground_ray.global_transform.basis = visuals.global_transform.basis
 
-	# Apply extra gravity
-	apply_central_force(Vector3.DOWN * GRAVITY * mass)
+	# Apply extra gravity (reduced / cancelled while stuck in a loop so inverted sections work)
+	if not (ground_ray.is_colliding() and _is_loop_surface(ground_ray.get_collider())):
+		apply_central_force(Vector3.DOWN * GRAVITY * mass)
+	else:
+		# Stick into the loop surface (centripetal + contact glue)
+		var loop_n: Vector3 = ground_ray.get_collision_normal()
+		var spd: float = linear_velocity.length()
+		var stick: float = mass * (spd * spd / 14.0 + 28.0)
+		apply_central_force(-loop_n * stick)
+		# Soft world-gravity while inverted so cars don't peel off mid-loop
+		var invert: float = clampf(1.0 - loop_n.y, 0.0, 1.0)
+		apply_central_force(Vector3.DOWN * GRAVITY * mass * (1.0 - invert * 0.85))
 
 	# Continuous boost timer check for the local player
 	if boost_timer > 0.0:
@@ -970,10 +980,14 @@ func _physics_process(delta):
 			input_dir.y = Input.get_axis(input_prefix + "throttle", input_prefix + "brake")
 
 	var on_ground = false
+	var on_loop = false
 	var ground_normal = Vector3.UP
 	if ground_ray.is_colliding():
 		var norm = ground_ray.get_collision_normal()
-		if norm.y >= 0.55:
+		var collider = ground_ray.get_collider()
+		on_loop = _is_loop_surface(collider)
+		# Flat ground needs a mostly-up normal; loop track is valid at any bank angle.
+		if norm.y >= 0.55 or on_loop:
 			on_ground = true
 			ground_normal = norm
 
@@ -990,7 +1004,7 @@ func _physics_process(delta):
 	was_on_ground = on_ground
 
 	is_offroad = false
-	if on_ground:
+	if on_ground and not on_loop:
 		var collider = ground_ray.get_collider()
 		if collider and (collider.name.contains("Unified_World_Collision") or collider.name.contains("Terrain")):
 			is_offroad = true
@@ -1233,6 +1247,23 @@ func _setup_engine_sound() -> void:
 	engine_sound.bus = &"SFX"
 
 
+func _is_loop_surface(collider: Object) -> bool:
+	if collider == null:
+		return false
+	if not (collider is Node):
+		return false
+	var n: Node = collider as Node
+	var current: Node = n
+	while current:
+		if current.is_in_group("loop_track"):
+			return true
+		var nm := str(current.name)
+		if nm.contains("LoopPiece") or nm.contains("LoopCSG") or nm.contains("LoopTube"):
+			return true
+		current = current.get_parent()
+	return false
+
+
 func _prevent_floor_tunneling(delta: float) -> void:
 	# Soft terminal fall speed so discrete steps (60 Hz) stay within CCD range.
 	const MAX_FALL_SPEED := 48.0
@@ -1261,7 +1292,7 @@ func _prevent_floor_tunneling(delta: float) -> void:
 	if hit.is_empty():
 		return
 	var n: Vector3 = hit.normal
-	if n.y < 0.35:
+	if n.y < 0.35 and not _is_loop_surface(hit.get("collider")):
 		return # steep wall / junk hit — leave alone
 
 	var min_center_y = hit.position.y + COLLISION_RADIUS + 0.04
@@ -1284,7 +1315,7 @@ func _get_ground_visual_offset() -> float:
 	# Calling it mid-_process() forced an expensive synchronous physics engine sync.
 	if ground_ray.is_colliding():
 		var contact_normal = ground_ray.get_collision_normal()
-		if contact_normal.y >= 0.55:
+		if contact_normal.y >= 0.55 or _is_loop_surface(ground_ray.get_collider()):
 			var contact_pt = ground_ray.get_collision_point()
 			var current_height_normal = (global_position - contact_pt).dot(contact_normal)
 			
@@ -1344,9 +1375,11 @@ func _update_visuals_alignment(delta):
 	if res_rear and res_rear.normal.y >= 0.45:
 		normals.append(res_rear.normal)
 			
+	var on_loop_vis := false
 	if ground_ray.is_colliding():
 		var norm = ground_ray.get_collision_normal()
-		if norm.y >= 0.55:
+		on_loop_vis = _is_loop_surface(ground_ray.get_collider())
+		if norm.y >= 0.55 or on_loop_vis:
 			normals.append(norm)
 			
 	if not normals.is_empty():
@@ -1359,6 +1392,9 @@ func _update_visuals_alignment(delta):
 	if not on_ground:
 		# If in air or on a steep wall/curb, slowly return to global UP instead of snapping
 		target_up = visuals.global_transform.basis.y.lerp(Vector3.UP, 1.0 - exp(-2.0 * delta)).normalized()
+	elif on_loop_vis:
+		# Prefer the contact normal for loop banking (ignore world-down front/rear rays).
+		target_up = ground_ray.get_collision_normal()
 		
 	# Smoothly align the visual mesh normal
 	var current_basis = visuals.global_transform.basis

@@ -486,24 +486,29 @@ func start_race():
 	# Wait for intro animation (3.5 seconds)
 	await get_tree().create_timer(3.5).timeout
 
-	# Start countdown
+	# Start countdown: voice (3/2/1/GO) + one short beep each (4 total).
+	# Uses a generated single tone — the warning.ogg sample is a multi-beep clip.
 	for ui in _all_race_uis():
 		ui.show_message("3", 1.0)
 	MusicManager.play_sfx("res://sounds/3.mp3")
+	MusicManager.play_race_start_beep(false)
 	await get_tree().create_timer(1.0).timeout
 	for ui in _all_race_uis():
 		ui.show_message("2", 1.0)
 	MusicManager.play_sfx("res://sounds/2.mp3")
+	MusicManager.play_race_start_beep(false)
 	await get_tree().create_timer(1.0).timeout
 	for ui in _all_race_uis():
 		ui.show_message("1", 1.0)
 	MusicManager.play_sfx("res://sounds/1.mp3")
+	MusicManager.play_race_start_beep(false)
 	await get_tree().create_timer(1.0).timeout
 
 	# Now actually start the race and allow movement!
 	for ui in _all_race_uis():
 		ui.show_message("GO!", 2.0)
 	MusicManager.play_sfx("res://sounds/Go.mp3")
+	MusicManager.play_race_start_beep(true) # higher/longer 4th beep
 	MusicManager.load_playlist_for_level(scene_file_path)
 	MusicManager.play_race_music()
 	get_tree().call_group("player_carts", "on_race_started")
@@ -1061,9 +1066,10 @@ func _add_collisions_to_node(root_node: Node, use_trimesh: bool = false):
 func _add_collisions_to_matching_nodes(node: Node):
 	if node == null: return
 	
-	if node.name.to_lower().contains("ramp"):
-		print("[COLLISION BUILDER] Matching ramp node found: ", node.name, " (", node.get_class(), ")")
-		if node is CSGPolygon3D or node is CSGPrimitive3D:
+	var lname := node.name.to_lower()
+	if lname.contains("ramp") or lname.contains("loop"):
+		print("[COLLISION BUILDER] Matching ramp/loop node found: ", node.name, " (", node.get_class(), ")")
+		if node is CSGPolygon3D or node is CSGPrimitive3D or node is CSGCombiner3D:
 			if "use_collision" in node:
 				node.use_collision = true
 		_add_collisions_to_node(node, true)

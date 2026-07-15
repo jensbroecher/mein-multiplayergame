@@ -16,11 +16,12 @@ enum TrackLayoutType { DEFAULT, MOUNTAIN, CANYON }
 func _is_in_gap_pos(pos: Vector3) -> bool:
 	if level_prefix != "canyon_chasm":
 		return false
-	# Gap 1 — hill jump between large ramp takeoff (~z -50) and landing (~z -120)
-	if absf(pos.x - 150.0) < 22.0 and pos.z < -52.0 and pos.z > -118.0 and pos.y > 28.0:
+	# Gap 1 — hill jump between large ramp takeoff (~z -50) and landing (~z -120).
+	# Keep a short solid lip past takeoff / before landing so the ramp ends aren't open.
+	if absf(pos.x - 150.0) < 22.0 and pos.z < -56.0 and pos.z > -114.0 and pos.y > 28.0:
 		return true
 	# Gap 2 — elevated crossing over the lower track (y check keeps lower road solid)
-	if absf(pos.x) < 28.0 and absf(pos.z + 100.0) < 22.0 and pos.y > 34.0:
+	if absf(pos.x) < 28.0 and absf(pos.z + 100.0) < 20.0 and pos.y > 34.0:
 		return true
 	return false
 
@@ -122,8 +123,8 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 		else:
 			height = lerp(height, road_h - terrain_recession_visual, basin_blend)
 
-		# Final hard carve under hill jump (in case another nearby solid curve still influenced height)
-		if level_prefix == "canyon_chasm" and absf(px - 150.0) < 22.0 and pz < -55.0 and pz > -115.0:
+		# Final hard carve under hill jump (keep carve inside the airborne gap only)
+		if level_prefix == "canyon_chasm" and absf(px - 150.0) < 22.0 and pz < -56.0 and pz > -114.0:
 			height = minf(height, -8.0)
 	else:
 		# Original blending for DEFAULT and MOUNTAIN
@@ -538,13 +539,19 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 				next_gap = _segment_in_gap(curve, length, point_count, i + 1)
 			elif is_loop:
 				next_gap = _segment_in_gap(curve, length, point_count, 0)
+			# Full end-cap over the rounded 8-vert shoulder (old 2-tri fan left holes
+			# at the lip — "tiny open gap at the top of the large ramp").
 			if next_gap:
-				# Cap at nxt: fan from left outer across to right outer
-				st.add_index(nxt + 0); st.add_index(nxt + 3); st.add_index(nxt + 4)
-				st.add_index(nxt + 0); st.add_index(nxt + 4); st.add_index(nxt + 7)
+				for k in range(1, SLICE_VERTS - 1):
+					st.add_index(nxt + 0); st.add_index(nxt + k + 1); st.add_index(nxt + k)
+				# Reverse for underside visibility
+				for k in range(1, SLICE_VERTS - 1):
+					st.add_index(nxt + 0); st.add_index(nxt + k); st.add_index(nxt + k + 1)
 			if prev_gap:
-				st.add_index(base + 0); st.add_index(base + 4); st.add_index(base + 3)
-				st.add_index(base + 0); st.add_index(base + 7); st.add_index(base + 4)
+				for k in range(1, SLICE_VERTS - 1):
+					st.add_index(base + 0); st.add_index(base + k); st.add_index(base + k + 1)
+				for k in range(1, SLICE_VERTS - 1):
+					st.add_index(base + 0); st.add_index(base + k + 1); st.add_index(base + k)
 
 		st.generate_tangents()
 		var mesh_instance = MeshInstance3D.new()
@@ -1073,15 +1080,19 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 		st.add_index(base + 1); st.add_index(nxt + 1); st.add_index(base + 3)
 		st.add_index(base + 3); st.add_index(nxt + 1); st.add_index(nxt + 3)
 
-		# Seal open ends at jump takeoff / landing (outward toward the gap / approach)
+		# Seal embankment open ends at jump takeoff / landing (both faces so no holes)
 		if next_gap:
-			# Face points forward along the path (into the jump gap)
+			# Outer face (into the jump gap)
 			st.add_index(nxt + 0); st.add_index(nxt + 2); st.add_index(nxt + 1)
 			st.add_index(nxt + 1); st.add_index(nxt + 2); st.add_index(nxt + 3)
+			# Inner face
+			st.add_index(nxt + 0); st.add_index(nxt + 1); st.add_index(nxt + 2)
+			st.add_index(nxt + 1); st.add_index(nxt + 3); st.add_index(nxt + 2)
 		if prev_gap:
-			# Face points backward (toward previous gap / landing approach)
 			st.add_index(base + 0); st.add_index(base + 1); st.add_index(base + 2)
 			st.add_index(base + 1); st.add_index(base + 3); st.add_index(base + 2)
+			st.add_index(base + 0); st.add_index(base + 2); st.add_index(base + 1)
+			st.add_index(base + 1); st.add_index(base + 2); st.add_index(base + 3)
 
 
 	st.generate_normals()

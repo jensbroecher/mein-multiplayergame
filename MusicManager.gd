@@ -693,3 +693,39 @@ func play_sfx(stream_or_path: Variant, volume_db: float = 0.0, pitch_scale: floa
 	add_child(ap)
 	ap.play()
 	ap.finished.connect(ap.queue_free)
+
+
+## Single short race-start beep (not a multi-beep sample). is_go = higher/longer final tone.
+func play_race_start_beep(is_go: bool = false) -> void:
+	var freq: float = 1320.0 if is_go else 880.0
+	var duration: float = 0.28 if is_go else 0.11
+	var volume_db: float = -4.0 if is_go else -8.0
+	play_sfx(_make_beep_stream(freq, duration), volume_db, 1.0)
+
+
+func _make_beep_stream(freq_hz: float, duration_sec: float) -> AudioStreamWAV:
+	var sample_rate := 22050
+	var count := int(sample_rate * duration_sec)
+	if count < 2:
+		count = 2
+	var data := PackedByteArray()
+	data.resize(count * 2)
+	var attack := 0.008
+	var release := 0.025
+	for i in range(count):
+		var t := float(i) / float(sample_rate)
+		var env := 1.0
+		if t < attack:
+			env = t / attack
+		elif t > duration_sec - release:
+			env = maxf(0.0, (duration_sec - t) / release)
+		var sample := int(sin(t * freq_hz * TAU) * 0.35 * env * 32767.0)
+		# little-endian int16
+		data[i * 2] = sample & 0xFF
+		data[i * 2 + 1] = (sample >> 8) & 0xFF
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = sample_rate
+	stream.stereo = false
+	stream.data = data
+	return stream
