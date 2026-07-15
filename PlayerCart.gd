@@ -192,9 +192,6 @@ var last_respawn_time: float = -999.0
 @onready var shield_mesh = $Visuals/ShieldMesh
 @onready var shockwave_visual = $Visuals/ShockwaveVisual
 
-var playback: AudioStreamGeneratorPlayback
-var sample_rate: float
-
 var is_local_player = false
 var can_move = false
 var can_control = true
@@ -238,7 +235,6 @@ var is_intro_active: bool = false
 var intro_time: float = 0.0
 const INTRO_DURATION: float = 3.5
 var intro_orbit_center: Vector3 = Vector3.ZERO
-var engine_phase: float = 0.0
 var hop_cooldown: float = 0.0
 var drift_mode: bool = false
 var drift_right: bool = false
@@ -315,6 +311,14 @@ var _cached_level: Node = null
 var _cached_iso_clip_ratio: float = 1.0
 var _cached_cam_below_terrain: bool = false
 var _cached_follow_clip_ratio: float = 1.0
+# Shared performance tuning (phone + PC — keeps multiplayer physics cadence aligned)
+var _camera_raycast_interval: int = 6
+var _align_raycast_interval: int = 4
+var _camera_ray_attempts: int = 2
+
+# AI closest offset calculation throttling
+var _ai_closest_offset_frame: int = 0
+var _ai_cached_offset: float = -1.0
 
 func has_physics_authority() -> bool:
 	return is_local_player or (is_ai and (multiplayer.multiplayer_peer == null or is_multiplayer_authority()))
@@ -403,7 +407,8 @@ func _ready():
 	
 	_remove_collisions_recursive(visuals)
 	_setup_new_car_wheels()
-	_enable_shadows_recursive(visuals)
+	# Shadows follow options menu (MusicManager.shadows_enabled)
+	apply_shadow_setting(MusicManager.shadows_enabled)
 
 	# Setup unique material for shockwave visual to prevent sharing/crashing
 	if shockwave_visual:
@@ -431,11 +436,18 @@ func _ready():
 		if child is AudioStreamPlayer3D:
 			child.bus = &"SFX"
 
-	if engine_sound.stream is AudioStreamGenerator:
-		sample_rate = engine_sound.stream.mix_rate
-		playback = engine_sound.get_stream_playback()
-		if not engine_sound.playing:
-			engine_sound.play()
+	# Looping engine sample (pitch/volume driven by speed — no procedural CPU synthesis)
+	if engine_sound.stream:
+		var engine_stream = engine_sound.stream.duplicate()
+		if engine_stream is AudioStreamMP3:
+			engine_stream.loop = true
+		elif engine_stream is AudioStreamOggVorbis:
+			engine_stream.loop = true
+		elif "loop" in engine_stream:
+			engine_stream.loop = true
+		engine_sound.stream = engine_stream
+	engine_sound.pitch_scale = 1.0
+	engine_sound.volume_db = -13.0
 
 	if is_local_player:
 		var is_coop = NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP
@@ -600,11 +612,10 @@ func _process(delta):
 				var iso_offset = Vector3(-26, 26, 26)
 				var target_cam_pos = visuals.global_position + iso_offset
 				
-				# Throttle clip raycasts: run every 3 render frames, reuse cached ratio in between.
-				# This cuts 6 raycasts/frame down to 2 on average with no visible difference.
+				# Throttle clip raycasts (mobile uses a longer interval — terrain trimesh is expensive).
 				_camera_raycast_frame += 1
 				var ray_start = visuals.global_position + Vector3.UP * 1.0
-				if _camera_raycast_frame >= 3:
+				if _camera_raycast_frame >= _camera_raycast_interval:
 					_camera_raycast_frame = 0
 					var target_ratio = 1.0
 					var space_state = get_world_3d().direct_space_state
@@ -614,7 +625,7 @@ func _process(delta):
 					var hit_terrain = false
 					var hit_dist = 0.0
 					var max_dist = ray_start.distance_to(target_cam_pos)
-					for attempt in range(5):
+					for attempt in range(_camera_ray_attempts):
 						var query = PhysicsRayQueryParameters3D.create(query_start, target_cam_pos)
 						query.exclude = current_excludes
 						var result = space_state.intersect_ray(query)
@@ -655,10 +666,10 @@ func _process(delta):
 				# Smooth camera trailing (steeper and higher)
 				var target_cam_pos = visuals.global_position - visual_forward * cam_dist + Vector3(0, 2.4, 0)
 				
-				# Throttle clip raycast: run every 3 frames, reuse cached ratio in between.
+				# Throttle clip raycast (longer interval on mobile).
 				_camera_raycast_frame += 1
 				var ray_start = visuals.global_position + Vector3.UP * 1.0
-				if _camera_raycast_frame >= 3:
+				if _camera_raycast_frame >= _camera_raycast_interval:
 					_camera_raycast_frame = 0
 					var target_ratio = 1.0
 					var space_state = get_world_3d().direct_space_state
@@ -704,7 +715,7 @@ func _process(delta):
 				cam_underwater = camera.global_position.y < WATER_LEVEL
 			race_ui.set_underwater(cam_underwater)
 
-		# Engine sound throttle check — device-specific
+		# Engine loop from sample — pitch rises with speed / boost
 		var throttle_input: float
 		if device_id == -1:
 			throttle_input = Input.get_axis("throttle", "brake")
@@ -717,27 +728,30 @@ func _process(delta):
 		if wants_to_play:
 			if not engine_sound.playing:
 				engine_sound.play()
-				playback = engine_sound.get_stream_playback()
 				engine_sound.volume_db = -13.0
 			var speed_ratio = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
-			var target_vol = lerp(-13.0, -20.0, speed_ratio)
-			engine_sound.volume_db = move_toward(engine_sound.volume_db, target_vol, 80.0 * delta)
-			if engine_sound.stream is AudioStreamGenerator and engine_sound.playing:
-				_fill_audio_buffer()
+			var target_vol = lerp(-13.0, -8.0, speed_ratio)
+			if is_boosting:
+				target_vol += 2.0
+			engine_sound.volume_db = move_toward(engine_sound.volume_db, target_vol, 40.0 * delta)
+			var target_pitch = lerp(0.85, 1.4, speed_ratio)
+			if is_boosting:
+				target_pitch *= 1.12
+			elif is_pad_boosting:
+				target_pitch *= 1.06
+			engine_sound.pitch_scale = move_toward(engine_sound.pitch_scale, target_pitch, 2.5 * delta)
 		else:
 			if engine_sound.playing:
 				engine_sound.volume_db = move_toward(engine_sound.volume_db, -45.0, 15.0 * delta)
+				engine_sound.pitch_scale = move_toward(engine_sound.pitch_scale, 0.8, 1.5 * delta)
 				if engine_sound.volume_db <= -44.9:
 					engine_sound.stop()
-					playback = null
-				elif engine_sound.stream is AudioStreamGenerator:
-					_fill_audio_buffer()
 	elif not has_physics_authority:
 		_interpolate_remote_visual(delta)
 
-	# Update top-level drift particle emitters to follow their target wheel pivots
+	# Update top-level drift particle emitters only while emitting
 	for p in drift_particles:
-		if is_instance_valid(p) and p is CPUParticles3D:
+		if is_instance_valid(p) and p is CPUParticles3D and p.emitting:
 			var pivot = p.get_meta("pivot", null)
 			if is_instance_valid(pivot):
 				if p.name.ends_with("_Skid"):
@@ -756,7 +770,7 @@ func _process(delta):
 
 
 	for p in dirt_particles:
-		if is_instance_valid(p) and p is CPUParticles3D:
+		if is_instance_valid(p) and p is CPUParticles3D and p.emitting:
 			var pivot = p.get_meta("pivot", null)
 			if is_instance_valid(pivot):
 				p.global_rotation = pivot.global_rotation
@@ -1218,10 +1232,10 @@ func _update_visuals_alignment(delta):
 	var target_up = Vector3.UP
 	
 	# Perform auxiliary front/rear raycasts to handle ramps and uneven terrain.
-	# Throttled: run every 2 frames and reuse cached results in between.
+	# Throttled (mobile: every 4 frames) and reuse cached results in between.
 	var normals: Array[Vector3] = []
 	_align_raycast_frame += 1
-	if _align_raycast_frame >= 2:
+	if _align_raycast_frame >= _align_raycast_interval:
 		_align_raycast_frame = 0
 		var space_state = get_world_3d().direct_space_state
 		if space_state and visuals:
@@ -1302,34 +1316,6 @@ func _update_visuals_alignment(delta):
 	visuals.global_position = target_pos
 
 	_update_wheel_visuals(delta)
-
-func _fill_audio_buffer():
-	if not playback: return
-	var available = playback.get_frames_available()
-	if available == 0: return
-
-	# Electric RC motor frequency mapping - made less high-pitched (deeper base and slower rise)
-	# Add organic frequency fluctuation (LFO)
-	var fluctuation = sin(Time.get_ticks_msec() * 0.03) * 1.5
-	var freq = 80.0 + linear_velocity.length() * 12.0 + fluctuation
-	if is_boosting: freq *= 1.4
-	elif is_pad_boosting: freq *= 1.25
-
-	# Fade out high harmonics at high speeds to avoid harsh whines
-	var speed_ratio = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
-	var high_harmonic_fade = clamp(1.0 - speed_ratio * 0.85, 0.15, 1.0)
-
-	for i in range(available):
-		engine_phase += freq / sample_rate
-		if engine_phase > 1.0:
-			engine_phase -= 1.0
-		
-		# Electric RC motor sound: high pitch whine + sub-harmonic for deep rumble + harmonics
-		var sample = sin(engine_phase * TAU) * 0.25
-		sample += sin(engine_phase * 0.5 * TAU) * 0.15 # Deep sub-harmonic rumble
-		sample += sin(engine_phase * 2.0 * TAU) * 0.10 * high_harmonic_fade
-		sample += sin(engine_phase * 3.0 * TAU) * 0.05 * high_harmonic_fade
-		playback.push_frame(Vector2(sample, sample))
 
 func _update_wheel_visuals(delta):
 	if is_exploding: return
@@ -2466,12 +2452,16 @@ func _spawn_bomb_rpc(spawn_pos: Vector3, spawn_vel: Vector3, shooter_id: int):
 	if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 		bomb.set_multiplayer_authority(1)
 
-func _enable_shadows_recursive(node: Node):
+func apply_shadow_setting(enabled: bool = true):
+	if is_instance_valid(visuals):
+		_set_shadows_recursive(visuals, enabled)
+
+func _set_shadows_recursive(node: Node, enabled: bool):
 	if node == null: return
 	if node is GeometryInstance3D:
-		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if enabled else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	for child in node.get_children():
-		_enable_shadows_recursive(child)
+		_set_shadows_recursive(child, enabled)
 
 func _update_antenna(delta):
 	if not antenna or not visuals or not visuals.is_inside_tree(): return
@@ -2786,13 +2776,23 @@ func _get_ai_input(delta: float) -> Vector2:
 					if take_shortcut:
 						on_alternative_path = true
 						active_path = alt_path
+						_ai_cached_offset = active_path.curve.get_closest_offset(active_path.to_local(global_position))
 						break
 			elif dist > 25.0:
 				alt_path_decisions.erase(alt_path)
 
 	var curve = active_path.curve
 	var local_pos = active_path.to_local(global_position)
-	var current_offset = curve.get_closest_offset(local_pos)
+	
+	# Throttle get_closest_offset to once every 3 physics frames to save CPU.
+	# For intermediate frames, estimate the offset using speed.
+	_ai_closest_offset_frame += 1
+	if _ai_closest_offset_frame >= 3 or _ai_cached_offset < 0:
+		_ai_closest_offset_frame = 0
+		_ai_cached_offset = curve.get_closest_offset(local_pos)
+	else:
+		_ai_cached_offset = fmod(_ai_cached_offset + linear_velocity.length() * delta, curve.get_baked_length())
+	var current_offset = _ai_cached_offset
 	
 	# If on an alternative path, check if we've reached the end of it
 	if on_alternative_path:
@@ -2802,7 +2802,8 @@ func _get_ai_input(delta: float) -> Vector2:
 			active_path = track_path
 			curve = active_path.curve
 			local_pos = active_path.to_local(global_position)
-			current_offset = curve.get_closest_offset(local_pos)
+			_ai_cached_offset = curve.get_closest_offset(local_pos)
+			current_offset = _ai_cached_offset
 	
 	# Periodically change target lane offset to simulate realistic lane shifting / overtaking
 	ai_lane_change_timer -= delta

@@ -15,6 +15,7 @@ var _coop_p1_car: int = 0
 var _coop_selecting_p2: bool = false
 
 func _ready():
+	_apply_platform_performance()
 	main_menu.start_pressed.connect(_on_menu_start_pressed)
 	main_menu.options_pressed.connect(_on_menu_options_pressed)
 	car_selection.car_selected.connect(_on_car_selected)
@@ -38,6 +39,13 @@ func _ready():
 	pause_menu = PAUSE_MENU_SCENE.instantiate()
 	pause_menu.visible = false
 	pause_canvas.add_child(pause_menu)
+
+
+func _apply_platform_performance() -> void:
+	# Same physics cadence on phone and PC so LAN multiplayer stays in sync.
+	# Graphics (scale, shadows, FPS cap) come from MusicManager settings / options menu.
+	Engine.physics_ticks_per_second = 60
+	Engine.max_physics_steps_per_frame = 4
 
 func _on_menu_start_pressed():
 	car_selection.show()
@@ -106,6 +114,8 @@ func start_game(is_host: bool):
 		
 		var level = level_scene.instantiate()
 		add_child(level)
+		# Apply shadow/quality settings to newly spawned lights & carts
+		MusicManager.refresh_level_graphics()
 	# Clients will get the level spawned automatically by MultiplayerSpawner
 
 func load_gp_stage(stage_idx: int):
@@ -122,6 +132,7 @@ func load_gp_stage(stage_idx: int):
 		var next_level_scene = load(stage_path)
 		var next_level = next_level_scene.instantiate()
 		add_child(next_level)
+		MusicManager.refresh_level_graphics()
 	else:
 		# GP Finished!
 		_on_server_disconnected()
@@ -140,13 +151,23 @@ func _on_server_disconnected():
 	MusicManager.stop_music()
 
 func _input(event: InputEvent):
-	if event.is_action_pressed("ui_cancel") or (event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE):
-		if has_node("Level"):
-			if pause_menu.visible:
-				pause_menu.hide()
-			else:
-				pause_menu.show_pause_menu()
-			get_viewport().set_input_as_handled()
+	var toggle_pause := false
+	if event.is_action_pressed("ui_cancel"):
+		toggle_pause = true
+	elif event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_ESCAPE or event.physical_keycode == KEY_ESCAPE \
+				or event.keycode == KEY_BACKSPACE or event.physical_keycode == KEY_BACKSPACE:
+			toggle_pause = true
+	if toggle_pause and has_node("Level"):
+		# Don't steal Backspace while typing in a focused LineEdit
+		var focus = get_viewport().gui_get_focus_owner()
+		if focus is LineEdit or focus is TextEdit:
+			return
+		if pause_menu.visible:
+			pause_menu.hide()
+		else:
+			pause_menu.show_pause_menu()
+		get_viewport().set_input_as_handled()
 
 func restart_race():
 	var level = get_node_or_null("Level")

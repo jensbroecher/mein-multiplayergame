@@ -115,6 +115,8 @@ func _ready():
 				if child is StaticBody3D and child.name != "Unified_World_Collision":
 					child.position.y = road.position.y
 
+	# Apply user graphics settings (shadows on lights, etc.) after the level tree exists
+	MusicManager.refresh_level_graphics()
 
 	if multiplayer.is_server():
 		NetworkManager.player_connected.connect(_on_server_player_connected)

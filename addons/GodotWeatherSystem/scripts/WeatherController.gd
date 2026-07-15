@@ -58,6 +58,8 @@ var currentWeatherTime: float = 0.0
 var currentSeasonLength: float = 0.0
 var currentSeasonTime: float = 0.0
 var particleSystem: GPUParticles3D
+var _weather_update_accum: float = 0.0
+var _weather_update_interval: float = 0.0
 
 func _ready():
 	if not worldEnvironment:
@@ -68,6 +70,11 @@ func _ready():
 			push_error("WeatherController: directionalLight is not assigned!")
 	
 	_update_season_and_weather_from_enums()
+	# Static weather (typical for races): apply once, stop per-frame work.
+	if not Engine.is_editor_hint() and not time_progression_enabled:
+		timeOfDay = time_of_day_hours * 3600.0
+		_update_weather_system()
+		set_process(false)
 	currentSeasonTime += startTime
 	timeOfDay = startTime
 
@@ -182,9 +189,20 @@ func _process(delta):
 		if currentSeasonTime >= currentSeasonLength:
 			set_season(next_season_index)
 	else:
+		# Static weather already applied in _ready — keep process off.
 		timeOfDay = time_of_day_hours * 3600.0
+		_update_weather_system()
+		if not Engine.is_editor_hint():
+			set_process(false)
+		return
 
-	_update_weather_system()
+	# Full sky/light refresh is overkill every frame (same throttle on all platforms).
+	if _weather_update_interval <= 0.0:
+		_weather_update_interval = 0.1
+	_weather_update_accum += delta
+	if _weather_update_accum >= _weather_update_interval:
+		_weather_update_accum = 0.0
+		_update_weather_system()
 
 func _update_weather_system():
 	if not worldEnvironment or seasons.size() == 0:

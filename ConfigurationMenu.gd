@@ -7,6 +7,7 @@ signal back_pressed
 @onready var option_resolution = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/ResolutionBox/OptionResolution
 @onready var check_vsync = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/VSyncBox/CheckVSync
 @onready var option_anti_aliasing = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/AntiAliasingBox/OptionAntiAliasing
+@onready var video_settings = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings
 
 @onready var btn_back = $Panel/MarginContainer/VBoxContainer/BtnBack
 
@@ -15,6 +16,11 @@ var waiting_action: String = ""
 
 var p1_buttons = {}
 var p2_buttons = {}
+
+var check_shadows: CheckButton
+var option_render_scale: OptionButton
+var option_anisotropic: OptionButton
+var option_max_fps: OptionButton
 
 const ACTION_LABELS = {
 	"throttle": "Throttle / Forward",
@@ -50,12 +56,18 @@ func _ready():
 	option_anti_aliasing.add_item("8x MSAA")
 	option_anti_aliasing.add_item("FXAA")
 	
+	_build_graphics_options()
+	
 	# Load current display values from MusicManager
 	check_fps.button_pressed = MusicManager.show_fps
 	option_window_mode.selected = MusicManager.window_mode
 	option_resolution.selected = MusicManager.resolution_index
 	check_vsync.button_pressed = MusicManager.vsync
 	option_anti_aliasing.selected = MusicManager.anti_aliasing
+	check_shadows.button_pressed = MusicManager.shadows_enabled
+	option_render_scale.selected = MusicManager.render_scale_index
+	option_anisotropic.selected = MusicManager.anisotropic_index
+	option_max_fps.selected = MusicManager.max_fps_index
 	
 	# Connect signals
 	check_fps.toggled.connect(_on_fps_toggled)
@@ -63,10 +75,64 @@ func _ready():
 	option_resolution.item_selected.connect(_on_resolution_selected)
 	check_vsync.toggled.connect(_on_vsync_toggled)
 	option_anti_aliasing.item_selected.connect(_on_anti_aliasing_selected)
+	check_shadows.toggled.connect(_on_shadows_toggled)
+	option_render_scale.item_selected.connect(_on_render_scale_selected)
+	option_anisotropic.item_selected.connect(_on_anisotropic_selected)
+	option_max_fps.item_selected.connect(_on_max_fps_selected)
 	btn_back.pressed.connect(_on_back_pressed)
 	
 	_build_input_ui()
 	update_keybind_buttons()
+
+func _build_graphics_options():
+	# Extra graphics rows under existing Video settings (runtime-built for easy edits)
+	check_shadows = _add_check_row(video_settings, "Shadows", MusicManager.shadows_enabled)
+	
+	option_render_scale = _add_option_row(video_settings, "3D Quality")
+	option_render_scale.clear()
+	option_render_scale.add_item("Low (50%)")
+	option_render_scale.add_item("Medium (75%)")
+	option_render_scale.add_item("High (100%)")
+	option_render_scale.add_item("Ultra (125%)")
+	
+	option_anisotropic = _add_option_row(video_settings, "Anisotropic Filter")
+	option_anisotropic.clear()
+	option_anisotropic.add_item("Off")
+	option_anisotropic.add_item("2x")
+	option_anisotropic.add_item("4x")
+	option_anisotropic.add_item("8x")
+	option_anisotropic.add_item("16x")
+	
+	option_max_fps = _add_option_row(video_settings, "Max FPS")
+	option_max_fps.clear()
+	option_max_fps.add_item("30")
+	option_max_fps.add_item("60")
+	option_max_fps.add_item("120")
+	option_max_fps.add_item("Unlimited")
+
+func _add_check_row(parent: Control, label_text: String, pressed: bool) -> CheckButton:
+	var row = HBoxContainer.new()
+	parent.add_child(row)
+	var lbl = Label.new()
+	lbl.text = label_text
+	lbl.custom_minimum_size = Vector2(160, 0)
+	row.add_child(lbl)
+	var check = CheckButton.new()
+	check.button_pressed = pressed
+	row.add_child(check)
+	return check
+
+func _add_option_row(parent: Control, label_text: String) -> OptionButton:
+	var row = HBoxContainer.new()
+	parent.add_child(row)
+	var lbl = Label.new()
+	lbl.text = label_text
+	lbl.custom_minimum_size = Vector2(160, 0)
+	row.add_child(lbl)
+	var opt = OptionButton.new()
+	opt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(opt)
+	return opt
 
 func _build_input_ui():
 	# Hide old keyboard controls from LeftColumn
@@ -248,6 +314,18 @@ func _on_vsync_toggled(toggled_val: bool):
 
 func _on_anti_aliasing_selected(index: int):
 	MusicManager.set_anti_aliasing(index)
+
+func _on_shadows_toggled(toggled_val: bool):
+	MusicManager.set_shadows_enabled(toggled_val)
+
+func _on_render_scale_selected(index: int):
+	MusicManager.set_render_scale(index)
+
+func _on_anisotropic_selected(index: int):
+	MusicManager.set_anisotropic(index)
+
+func _on_max_fps_selected(index: int):
+	MusicManager.set_max_fps(index)
 
 func _on_back_pressed():
 	is_waiting_for_key = false

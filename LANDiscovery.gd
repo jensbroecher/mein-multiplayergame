@@ -21,6 +21,7 @@ signal server_lost(ip: String)
 
 func _ready():
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	set_process(false) # only needed while listening for LAN servers
 	
 	broadcast_timer = Timer.new()
 	add_child(broadcast_timer)
@@ -52,12 +53,14 @@ func start_listening():
 	var err = listen_peer.bind(LISTEN_PORT)
 	if err == OK:
 		is_listening = true
+		set_process(true)
 		print("LANDiscovery: Started listening on port ", LISTEN_PORT)
 	else:
 		printerr("LANDiscovery: Failed to bind listen port ", LISTEN_PORT, " Error: ", err)
 
 func stop_listening():
 	is_listening = false
+	set_process(false)
 	if listen_peer:
 		listen_peer.close()
 	discovered_servers.clear()

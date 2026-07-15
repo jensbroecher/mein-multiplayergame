@@ -12,6 +12,11 @@ var window_mode: int = 0 # 0: Windowed, 1: Fullscreen
 var resolution_index: int = 1 # Default 1920x1080
 var vsync: bool = false
 var anti_aliasing: int = 2 # 0: Disabled, 1: 2x MSAA, 2: 4x MSAA, 3: 8x MSAA, 4: FXAA
+# Graphics quality
+var shadows_enabled: bool = false
+var render_scale_index: int = 1 # 0:50% 1:75% 2:100% 3:125%
+var anisotropic_index: int = 1 # 0:Off 1:2x 2:4x 3:8x 4:16x
+var max_fps_index: int = 1 # 0:30 1:60 2:120 3:Unlimited
 
 const RESOLUTIONS = [
 	Vector2i(1280, 720),
@@ -19,6 +24,9 @@ const RESOLUTIONS = [
 	Vector2i(2560, 1440),
 	Vector2i(3840, 2160)
 ]
+const RENDER_SCALES = [0.5, 0.75, 1.0, 1.25]
+const ANISOTROPIC_LEVELS = [0, 2, 4, 8, 16]
+const MAX_FPS_VALUES = [30, 60, 120, 0] # 0 = unlimited
 
 
 var current_track_index = -1
@@ -104,9 +112,10 @@ func _ready():
 	fps_label.position = Vector2(0, 10)
 	
 	fps_layer.visible = show_fps
+	set_process(show_fps)
 
 func _process(_delta):
-	if show_fps and fps_label:
+	if fps_label:
 		fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
 		var viewport_width = get_viewport().get_visible_rect().size.x
 		var label_width = fps_label.get_minimum_size().x
@@ -123,6 +132,10 @@ func load_settings():
 		resolution_index = config.get_value("display", "resolution_index", 1)
 		vsync = config.get_value("display", "vsync", false)
 		anti_aliasing = config.get_value("display", "anti_aliasing", 2)
+		shadows_enabled = config.get_value("graphics", "shadows_enabled", false)
+		render_scale_index = config.get_value("graphics", "render_scale_index", 1)
+		anisotropic_index = config.get_value("graphics", "anisotropic_index", 1)
+		max_fps_index = config.get_value("graphics", "max_fps_index", 1)
 		
 	# Apply loaded settings
 	set_music_volume(music_volume, false)
@@ -136,6 +149,9 @@ func _apply_window_settings():
 	set_window_mode(window_mode, false)
 	set_vsync(vsync, false)
 	set_anti_aliasing(anti_aliasing, false)
+	set_anisotropic(anisotropic_index, false)
+	set_max_fps(max_fps_index, false)
+	set_shadows_enabled(shadows_enabled, false)
 
 func save_settings():
 	var config = ConfigFile.new()
@@ -147,6 +163,10 @@ func save_settings():
 	config.set_value("display", "resolution_index", resolution_index)
 	config.set_value("display", "vsync", vsync)
 	config.set_value("display", "anti_aliasing", anti_aliasing)
+	config.set_value("graphics", "shadows_enabled", shadows_enabled)
+	config.set_value("graphics", "render_scale_index", render_scale_index)
+	config.set_value("graphics", "anisotropic_index", anisotropic_index)
+	config.set_value("graphics", "max_fps_index", max_fps_index)
 	config.save(SETTINGS_FILE)
 
 func _load_playlist(folder: String = music_folder):
@@ -247,7 +267,18 @@ func set_show_fps(enabled: bool, save: bool = true):
 	show_fps = enabled
 	if fps_layer:
 		fps_layer.visible = enabled
+	set_process(enabled)
 	if save: save_settings()
+
+func get_render_scale() -> float:
+	if render_scale_index < 0 or render_scale_index >= RENDER_SCALES.size():
+		return 0.75
+	return RENDER_SCALES[render_scale_index]
+
+func _apply_render_scale_to_viewport(base_scale: float = 1.0) -> void:
+	var vp = get_viewport()
+	if vp:
+		vp.scaling_3d_scale = clamp(base_scale * get_render_scale(), 0.25, 2.0)
 
 func set_resolution(index: int, save: bool = true):
 	if index < 0 or index >= RESOLUTIONS.size():
@@ -260,13 +291,13 @@ func set_resolution(index: int, save: bool = true):
 	win.content_scale_size = Vector2i(1920, 1080)
 	
 	if win.mode == Window.MODE_FULLSCREEN:
-		# Scale 3D rendering resolution relative to native screen size
+		# Scale 3D rendering resolution relative to native screen size, then quality scale
 		var screen_size = DisplayServer.screen_get_size(win.current_screen)
 		var render_scale = float(target_size.y) / float(screen_size.y)
-		get_viewport().scaling_3d_scale = clamp(render_scale, 0.25, 2.0)
+		_apply_render_scale_to_viewport(render_scale)
 	else:
 		win.size = target_size
-		get_viewport().scaling_3d_scale = 1.0
+		_apply_render_scale_to_viewport(1.0)
 		var screen_id = win.current_screen
 		var screen_size = DisplayServer.screen_get_size(screen_id)
 		win.position = (screen_size - target_size) / 2
@@ -284,11 +315,11 @@ func set_window_mode(mode: int, save: bool = true):
 		win.mode = Window.MODE_FULLSCREEN
 		var screen_size = DisplayServer.screen_get_size(win.current_screen)
 		var render_scale = float(target_size.y) / float(screen_size.y)
-		get_viewport().scaling_3d_scale = clamp(render_scale, 0.25, 2.0)
+		_apply_render_scale_to_viewport(render_scale)
 	else:
 		win.mode = Window.MODE_WINDOWED
 		win.size = target_size
-		get_viewport().scaling_3d_scale = 1.0
+		_apply_render_scale_to_viewport(1.0)
 		var screen_id = win.current_screen
 		var screen_size = DisplayServer.screen_get_size(screen_id)
 		win.position = (screen_size - target_size) / 2
@@ -323,6 +354,65 @@ func set_anti_aliasing(index: int, save: bool = true):
 				vp.msaa_3d = Viewport.MSAA_DISABLED
 				vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA
 	if save: save_settings()
+
+func set_render_scale(index: int, save: bool = true):
+	if index < 0 or index >= RENDER_SCALES.size():
+		return
+	render_scale_index = index
+	# Re-apply current window/resolution so base scale * quality scale is correct
+	set_resolution(resolution_index, false)
+	if save: save_settings()
+
+func set_anisotropic(index: int, save: bool = true):
+	if index < 0 or index >= ANISOTROPIC_LEVELS.size():
+		return
+	anisotropic_index = index
+	var level = ANISOTROPIC_LEVELS[index]
+	# ProjectSettings keys map to Viewport/texture defaults at runtime via RenderingServer
+	match level:
+		0:
+			ProjectSettings.set_setting("rendering/textures/default_filters/anisotropic_filtering_level", 0)
+		2:
+			ProjectSettings.set_setting("rendering/textures/default_filters/anisotropic_filtering_level", 1)
+		4:
+			ProjectSettings.set_setting("rendering/textures/default_filters/anisotropic_filtering_level", 2)
+		8:
+			ProjectSettings.set_setting("rendering/textures/default_filters/anisotropic_filtering_level", 3)
+		16:
+			ProjectSettings.set_setting("rendering/textures/default_filters/anisotropic_filtering_level", 4)
+		_:
+			ProjectSettings.set_setting("rendering/textures/default_filters/anisotropic_filtering_level", 1)
+	if save: save_settings()
+
+func set_max_fps(index: int, save: bool = true):
+	if index < 0 or index >= MAX_FPS_VALUES.size():
+		return
+	max_fps_index = index
+	Engine.max_fps = MAX_FPS_VALUES[index]
+	if save: save_settings()
+
+func set_shadows_enabled(enabled: bool, save: bool = true):
+	shadows_enabled = enabled
+	_apply_shadows_to_tree(get_tree().root if get_tree() else null, enabled)
+	# Player carts also toggle mesh shadow casting
+	if get_tree():
+		get_tree().call_group("player_carts", "apply_shadow_setting", enabled)
+	if save: save_settings()
+
+func _apply_shadows_to_tree(node: Node, enabled: bool) -> void:
+	if node == null:
+		return
+	if node is DirectionalLight3D or node is OmniLight3D or node is SpotLight3D:
+		node.shadow_enabled = enabled
+	for child in node.get_children():
+		_apply_shadows_to_tree(child, enabled)
+
+## Call after a level is spawned so lights pick up the current shadow setting.
+func refresh_level_graphics() -> void:
+	set_shadows_enabled(shadows_enabled, false)
+	set_anisotropic(anisotropic_index, false)
+	# Re-apply render scale in case a new viewport path was created
+	set_resolution(resolution_index, false)
 
 const CUSTOM_ACTIONS = [
 	"p1_throttle", "p1_brake", "p1_steer_left", "p1_steer_right", "p1_boost", "p1_discard_item", "p1_respawn", "p1_toggle_camera",
@@ -603,5 +693,3 @@ func play_sfx(stream_or_path: Variant, volume_db: float = 0.0, pitch_scale: floa
 	add_child(ap)
 	ap.play()
 	ap.finished.connect(ap.queue_free)
-
-

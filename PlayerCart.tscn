@@ -16,6 +16,7 @@
 [ext_resource type="Texture2D" uid="uid://c6tmb3yh45lja" path="res://materials/fire_particle_2.png" id="15_fire2"]
 
 [ext_resource type="AudioStream" path="res://sounds/force_field_effect_#1-1781728246336.wav" id="19_shield"]
+[ext_resource type="AudioStream" uid="uid://ddbnqq3gd7khm" path="res://sounds/freesound_community-engine-6000.mp3" id="16_engine"]
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_frictionless"]
 friction = 0.0
@@ -185,9 +186,6 @@ radius = 0.04
 height = 0.08
 radial_segments = 8
 rings = 6
-
-[sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_engine"]
-buffer_length = 0.1
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_sync"]
 properties/0/path = NodePath(".:sync_position")
@@ -413,8 +411,9 @@ current = true
 current = true
 
 [node name="EngineSound" type="AudioStreamPlayer3D" parent="Visuals" unique_id=466950016]
-stream = SubResource("AudioStreamGenerator_engine")
-autoplay = true
+stream = ExtResource("16_engine")
+volume_db = -13.0
+unit_size = 20.0
 
 [node name="SFX_NitroStart" type="AudioStreamPlayer3D" parent="Visuals" unique_id=1794322746]
 stream = ExtResource("4_nitro")
