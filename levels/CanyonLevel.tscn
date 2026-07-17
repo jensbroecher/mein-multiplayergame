@@ -30,6 +30,7 @@
 [ext_resource type="PackedScene" uid="uid://u6vysp0gb78x" path="res://models/plants/0797593737478869dca3e088a7e7ec6c.fbx" id="33_hyofv"]
 [ext_resource type="PackedScene" uid="uid://boostpad123" path="res://BoostPad.tscn" id="34_hyofv"]
 [ext_resource type="PackedScene" uid="uid://cd0dsee36c0e" path="res://models/animals/20260717033727_7db23447.fbx" id="35_v188o"]
+[ext_resource type="Script" uid="uid://d17og8u13807t" path="res://Eagle.gd" id="36_eagle"]
 [ext_resource type="Texture2D" uid="uid://0weypvnrwhcd" path="res://materials/dirt.png" id="dirt_albedo"]
 [ext_resource type="Texture2D" uid="uid://bptucrvhefh88" path="res://materials/dirt_normal.png" id="dirt_normal"]
 [ext_resource type="Texture2D" uid="uid://basy1jouttsw2" path="res://materials/dark_canyon_rock.png" id="rock_albedo"]
@@ -50,14 +51,14 @@ horizonColour = Color(0.0784314, 0.00784314, 0.0156863, 1)
 groundColour = Color(0, 0, 0, 1)
 cloudBrightness = 0.05
 
-[sub_resource type="Resource" id="Resource_0sv5c"]
+[sub_resource type="Resource" id="Resource_v188o"]
 script = ExtResource("5_yr3df")
 weather = ExtResource("6_fwawu")
 
-[sub_resource type="Resource" id="Resource_rw4kp"]
+[sub_resource type="Resource" id="Resource_0sv5c"]
 script = ExtResource("3_jpwbr")
 seasonId = "summer"
-weathers = Array[ExtResource("5_yr3df")]([SubResource("Resource_0sv5c")])
+weathers = Array[ExtResource("5_yr3df")]([SubResource("Resource_v188o")])
 skyColourDaytime = SubResource("Resource_ext2d")
 skyColourNight = SubResource("Resource_p7jpd")
 dayNightCycleCurve = SubResource("Curve_8bl6p")
@@ -88,7 +89,7 @@ shader_parameter/use_normal_map = true
 shader_parameter/normal_texture = ExtResource("dirt_normal")
 shader_parameter/normal_scale = 1.2
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_hyofv"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_rw4kp"]
 render_priority = 0
 shader = ExtResource("Shader_stochastic_file")
 shader_parameter/albedo_texture = ExtResource("dirt_albedo")
@@ -101,14 +102,16 @@ shader_parameter/use_normal_map = true
 shader_parameter/normal_texture = ExtResource("dirt_normal")
 shader_parameter/normal_scale = 1.2
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_v188o"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gbt4q"]
+cull_mode = 2
 albedo_texture = ExtResource("rock_albedo")
 roughness = 0.9
 normal_enabled = true
 normal_scale = 1.5
 normal_texture = ExtResource("rock_normal")
-uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_scale = Vector3(0.06, 0.06, 0.06)
 uv1_triplanar = true
+uv1_triplanar_sharpness = 8.0
 
 [sub_resource type="Curve3D" id="Curve3D_track"]
 bake_interval = 0.25
@@ -169,7 +172,7 @@ track_path = NodePath("TrackPath")
 
 [node name="WeatherController" parent="." unique_id=1277823175 instance=ExtResource("31_weather")]
 time_of_day_hours = 9.328
-seasons = Array[ExtResource("3_jpwbr")]([SubResource("Resource_rw4kp")])
+seasons = Array[ExtResource("3_jpwbr")]([SubResource("Resource_0sv5c")])
 startTime = 33580.799999999996
 
 [node name="TerrainGenerator" type="Node3D" parent="." unique_id=586341718 node_paths=PackedStringArray("track_path")]
@@ -192,32 +195,32 @@ road_material = SubResource("ShaderMaterial_asphalt")
 metadata/_edit_group_ = true
 metadata/_edit_lock_ = true
 
-[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1684428409]
+[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=450824845]
 material_override = SubResource("ShaderMaterial_grass")
 lod_bias = 10.0
 mesh = ExtResource("10_lbtjd")
 
-[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=654998801]
+[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=189702626]
 
-[node name="@CollisionShape3D@21289" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=126992336]
+[node name="@CollisionShape3D@21292" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=458470234]
 shape = ExtResource("11_sm0fw")
 
-[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1918412147]
-material_override = SubResource("ShaderMaterial_hyofv")
+[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1224608299]
+material_override = SubResource("ShaderMaterial_rw4kp")
 mesh = ExtResource("15_8vqih")
 
-[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=611020850]
-material_override = SubResource("StandardMaterial3D_v188o")
+[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1657077873]
+material_override = SubResource("StandardMaterial3D_gbt4q")
 mesh = ExtResource("16_3nnro")
 
-[node name="Visual_Road_Sides_Collision" type="StaticBody3D" parent="TerrainGenerator/Visual_Road_Sides" unique_id=734759499]
+[node name="Visual_Road_Sides_Collision" type="StaticBody3D" parent="TerrainGenerator/Visual_Road_Sides" unique_id=1000431564]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="TerrainGenerator/Visual_Road_Sides/Visual_Road_Sides_Collision" unique_id=1906045688]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TerrainGenerator/Visual_Road_Sides/Visual_Road_Sides_Collision" unique_id=1855987579]
 shape = ExtResource("18_623mb")
 
-[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1650555119]
+[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=888250357]
 
-[node name="@CollisionShape3D@21290" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=2079952475]
+[node name="@CollisionShape3D@21293" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=1423514437]
 shape = ExtResource("17_r6i1u")
 
 [node name="TrackPath" type="Path3D" parent="." unique_id=1030670243]
@@ -241,28 +244,28 @@ spawn_path = NodePath(".")
 [node name="Checkpoints" type="Node3D" parent="." unique_id=342440943]
 
 [node name="Halfway4" parent="Checkpoints" unique_id=409562182 instance=ExtResource("2_gate")]
-transform = Transform3D(0.26288474, -0.047196623, -0.9636722, 0, 0.9988029, -0.04891717, 0.9648273, 0.012859577, 0.26257002, 532.7929, 8.600281, 77.42447)
+transform = Transform3D(0.9223507, 0.0027139848, -0.38634416, 0, 0.9999753, 0.0070246127, 0.38635367, -0.0064791567, 0.922328, 559.7837, 9.97629, 55.20677)
 
 [node name="Halfway3" parent="Checkpoints" unique_id=1076613409 instance=ExtResource("2_gate")]
-transform = Transform3D(-0.49634928, 0.003867202, 0.86811435, 0, 0.99999017, -0.004454671, -0.86812294, -0.0022110727, -0.49634436, 397.5913, 1.3895167, -220.12872)
+transform = Transform3D(-0.44620013, -0.0031248908, 0.8949278, 0, 0.999994, 0.0034917586, -0.8949332, 0.0015580232, -0.44619742, 348.25317, 1.8456498, -193.21686)
 
 [node name="Halfway2" parent="Checkpoints" unique_id=760818968 instance=ExtResource("2_gate")]
-transform = Transform3D(0.9392983, -0.016535379, 0.34270304, 0, 0.99883807, 0.04819381, -0.34310174, -0.04526836, 0.9382068, 84.16757, 3.0103002, -409.43314)
+transform = Transform3D(0.9370829, -0.016515853, 0.34871617, 0, 0.9988804, 0.047308847, -0.34910706, -0.04433231, 0.93603367, 103.64182, 6.2511296, -356.35892)
 
 [node name="Halfway1" parent="Checkpoints" unique_id=970429380 instance=ExtResource("2_gate")]
-transform = Transform3D(-0.81421167, 0.05545553, 0.5779135, 0, 0.9954276, -0.09551942, -0.5805681, -0.07777303, -0.8104888, -152.91351, 10.766386, -506.38834)
+transform = Transform3D(-0.8163233, 0.055976186, 0.5748765, 0, 0.9952929, -0.096912466, -0.5775953, -0.079111904, -0.81248075, -130.48932, 9.997998, -538.1626)
 
 [node name="Halfway5" parent="Checkpoints" unique_id=409562185 instance=ExtResource("2_gate")]
-transform = Transform3D(-0.9848683, -0.005533395, 0.17321622, 0, 0.9994902, 0.03192873, -0.17330457, 0.031445593, -0.9843662, -475.64215, 17.266228, -262.79187)
+transform = Transform3D(-0.9113476, -0.034159753, 0.41021776, 0, 0.9965508, 0.08298502, -0.41163757, 0.0756282, -0.9082042, -468.873, 18.967943, -283.5906)
 
 [node name="Halfway6" parent="Checkpoints" unique_id=1076613412 instance=ExtResource("2_gate")]
-transform = Transform3D(-0.23745437, -0.02143317, -0.9711622, 0, 0.9997565, -0.022064239, 0.97139865, -0.00523925, -0.23739657, -142.34232, 17.769388, -61.385883)
+transform = Transform3D(-0.007145292, -0.03447888, -0.9993799, 0, 0.9994054, -0.03447976, 0.9999745, -0.00024636794, -0.0071410434, -200.57513, 15.107484, -66.697296)
 
 [node name="Halfway7" parent="Checkpoints" unique_id=760818971 instance=ExtResource("2_gate")]
-transform = Transform3D(-0.92574716, -0.07452937, -0.37072578, 0, 0.9803848, -0.19709302, 0.37814313, -0.18245831, -0.9075884, -210.858, 18.246603, 262.69354)
+transform = Transform3D(-0.9701614, -0.016753955, -0.2418805, 0, 0.99760973, -0.06909986, 0.24246006, -0.067038015, -0.96784246, -223.41364, 12.1915045, 226.09456)
 
 [node name="Halfway8" parent="Checkpoints" unique_id=970429383 instance=ExtResource("2_gate")]
-transform = Transform3D(0.2830543, 0.0063464027, -0.95908296, 0, 0.99997824, 0.0066170124, 0.95910394, -0.0018729737, 0.2830481, 92.24298, 2.7070556, 508.6863)
+transform = Transform3D(0.25104636, 0.008049029, -0.96794164, 0, 0.9999654, 0.008315328, 0.967975, -0.0020875328, 0.2510377, 73.40485, 3.3621507, 514.0968)
 
 [node name="e963227e4c0f549dc4852c7b2189de15" parent="." unique_id=966673545 groups=["collision_capsule"] instance=ExtResource("22_a7e1k")]
 transform = Transform3D(1.1459306, -1.5730582, 3.4946144, 0.17964509, 3.665537, 1.5910889, -3.8281288, -0.29887187, 1.1207609, 220, -0.58528304, 347.41635)
@@ -374,5 +377,6 @@ flash_brightness = 1.0
 transform = Transform3D(-0.9421159, 0, 0.33528742, 0, 1, 0, -0.33528742, 0, -0.9421159, 334.13046, -1.6298639, 70.42737)
 flash_brightness = 1.0
 
-[node name="20260717033727_7db23447" parent="." unique_id=1789962235 instance=ExtResource("35_v188o")]
+[node name="Eagle" parent="." unique_id=1789962235 instance=ExtResource("35_v188o")]
 transform = Transform3D(-3.5242686, 0, 9.358394, 0, 10, 0, -9.358394, 0, -3.5242686, 218.61864, 11.250163, -102.219666)
+script = ExtResource("36_eagle")

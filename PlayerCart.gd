@@ -1981,6 +1981,12 @@ func explode(attacker_id: int = 0):
 	can_move = false
 	is_drowned = false
 	explosion_time = 0.0
+	# Eagle/tornado must drop us immediately (bomb + missile share this path)
+	_clear_external_captures()
+	# Eagle freeze would block explosion tumble + leave freeze stuck after respawn
+	if has_physics_authority():
+		freeze = false
+		sleeping = false
 	
 	if attacker_id > 0:
 		var attacker_name = "Someone"
@@ -2092,6 +2098,8 @@ func drown():
 	is_drowned = true
 	can_move = false
 	if engine_sound.playing: engine_sound.stop()
+	# Same as explode: drop eagle/tornado so freeze/can_move aren't left stuck
+	_clear_external_captures()
 	
 	# Force-clear the shield — it must not persist into the respawn
 	is_shielded = false
@@ -2192,6 +2200,7 @@ func respawn():
 	can_move = not finished
 	is_boosting = false
 	boost_time = 0.0
+	is_landing = false
 	
 	explosion_particles.emitting = false
 	burning_particles.emitting = false
@@ -2200,10 +2209,20 @@ func respawn():
 	fire_sprite_particles_2.emitting = false
 	sfx_fire_loop.stop()
 
+	# Safety: if eagle/tornado still thinks it owns us, force drop
+	_clear_external_captures()
+
 	var has_physics_authority = has_physics_authority()
 	if has_physics_authority:
+		# Eagle grab leaves freeze=true + unlocked angular axes; always restore drive state
+		freeze = false
+		sleeping = false
+		axis_lock_angular_x = true
+		axis_lock_angular_y = true
+		axis_lock_angular_z = true
 		linear_velocity = Vector3.ZERO
 		angular_velocity = Vector3.ZERO
+		visual_offset_y = 0.0
 
 		var target_path = active_path
 		if target_path == null:
@@ -2235,6 +2254,19 @@ func respawn():
 
 		visuals.global_position = global_position
 		visuals.look_at(global_position + forward_dir * 10.0, Vector3.UP)
+
+
+## Drop eagle grab (and tornado, if present) so freeze/can_move aren't left stuck after death.
+func _clear_external_captures() -> void:
+	if not get_tree():
+		return
+	for eagle in get_tree().get_nodes_in_group("eagles"):
+		if eagle and is_instance_valid(eagle) and eagle.has_method("force_release_cart"):
+			eagle.force_release_cart(self)
+	# Tornado keeps a capture map — release if a helper exists
+	for tornado in get_tree().get_nodes_in_group("tornados"):
+		if tornado and is_instance_valid(tornado) and tornado.has_method("force_release_cart"):
+			tornado.force_release_cart(self)
 
 func _set_visuals_alpha(alpha: float):
 	_set_alpha_recursive(visuals, alpha)
@@ -2447,6 +2479,15 @@ func _activate_shockwave():
 						p.apply_blast_impulse(impulse)
 				else:
 					p.apply_central_impulse(impulse)
+
+		# Knock eagles away (and force them to drop any carried car)
+		var eagles = get_tree().get_nodes_in_group("eagles")
+		for e in eagles:
+			if e == null or not is_instance_valid(e):
+				continue
+			var edist: float = global_position.distance_to(e.global_position)
+			if edist < 22.0 and e.has_method("apply_shockwave_push"):
+				e.apply_shockwave_push(global_position)
 		
 		# Play visual for all clients
 		if multiplayer.multiplayer_peer != null:

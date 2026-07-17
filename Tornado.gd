@@ -32,6 +32,7 @@ var _captured: Dictionary = {} # cart instance_id -> capture state
 var _cooldown: Dictionary = {} # cart instance_id -> time left
 
 func _ready() -> void:
+	add_to_group("tornados")
 	_home = global_position
 	_wander_target = _home
 	_mesh = get_node_or_null(mesh_path)
@@ -44,6 +45,26 @@ func _ready() -> void:
 	_apply_transparency(_mesh if _mesh else self)
 	_pick_new_wander_target()
 	set_physics_process(true)
+
+
+## Called when a cart explodes/drowns/respawns while captured.
+func force_release_cart(cart: Object) -> void:
+	if cart == null or not is_instance_valid(cart):
+		return
+	var id := cart.get_instance_id()
+	if not _captured.has(id):
+		return
+	_captured.erase(id)
+	_cooldown[id] = cooldown_after_spit
+	if cart is RigidBody3D:
+		var rb := cart as RigidBody3D
+		rb.freeze = false
+		rb.sleeping = false
+		if "axis_lock_angular_x" in rb:
+			rb.axis_lock_angular_x = true
+			rb.axis_lock_angular_y = true
+			rb.axis_lock_angular_z = true
+		# Do not restore can_move — explode/respawn owns that flag
 
 
 func _physics_process(delta: float) -> void:
@@ -145,7 +166,32 @@ func _try_capture_nearby() -> void:
 		if flat.length() > pickup_radius:
 			continue
 
+		# Shield blocks tornado grab (consumes the shield like a hit).
+		if cart.get("is_shielded") == true:
+			_break_cart_shield(cart)
+			_cooldown[id] = cooldown_after_spit
+			continue
+
 		_start_capture(cart)
+
+
+func _break_cart_shield(cart: Object) -> void:
+	if cart == null:
+		return
+	cart.set("is_shielded", false)
+	var cart_id: int = str(cart.name).to_int()
+	var is_ai: bool = cart.get("is_ai") == true
+	var is_real_peer: bool = cart_id > 0 and not is_ai
+	if multiplayer.multiplayer_peer != null and multiplayer.is_server() and is_real_peer \
+			and NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER:
+		if cart.has_method("client_break_shield"):
+			cart.client_break_shield.rpc_id(cart_id)
+			return
+	if cart.get("shield_mesh") != null:
+		cart.shield_mesh.visible = false
+		cart.shield_mesh.scale = Vector3.ONE
+	elif cart.has_method("client_break_shield"):
+		cart.client_break_shield()
 
 
 func _start_capture(cart: RigidBody3D) -> void:
@@ -178,6 +224,20 @@ func _update_captures(delta: float) -> void:
 		var state: Dictionary = _captured[id]
 		var cart: RigidBody3D = state["cart"]
 		if cart == null or not is_instance_valid(cart):
+			finished.append(id)
+			continue
+
+		# Bomb/missile/drown while spinning: drop freeze ownership immediately
+		if cart.get("is_exploding") == true or cart.get("is_drowned") == true:
+			if cart is RigidBody3D:
+				var rb := cart as RigidBody3D
+				rb.freeze = false
+				rb.sleeping = false
+				if "axis_lock_angular_x" in rb:
+					rb.axis_lock_angular_x = true
+					rb.axis_lock_angular_y = true
+					rb.axis_lock_angular_z = true
+			_cooldown[id] = cooldown_after_spit
 			finished.append(id)
 			continue
 
