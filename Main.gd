@@ -141,9 +141,16 @@ func start_game(is_host: bool):
 	# Apply shadow/quality settings to newly spawned lights & carts
 	MusicManager.refresh_level_graphics()
 	if loading_screen:
-		loading_screen.set_progress(0.95)
-	# Let the level paint a couple frames (collision bake deferred) before hiding overlay.
-	await get_tree().process_frame
+		loading_screen.set_progress(0.85)
+		loading_screen.set_status("Building collisions")
+	# Finish prop collision bake under the overlay so the first race seconds stay smooth.
+	if level.has_method("wait_for_collisions"):
+		await level.wait_for_collisions()
+	else:
+		await get_tree().process_frame
+		await get_tree().process_frame
+	if loading_screen:
+		loading_screen.set_progress(0.98)
 	await get_tree().process_frame
 	await _hide_loading()
 	# Clients will get the level spawned automatically by MultiplayerSpawner
@@ -196,8 +203,15 @@ func _load_gp_stage_impl(stage_idx: int) -> void:
 		add_child(next_level)
 		MusicManager.refresh_level_graphics()
 		if loading_screen:
-			loading_screen.set_progress(0.95)
-		await get_tree().process_frame
+			loading_screen.set_progress(0.85)
+			loading_screen.set_status("Building collisions")
+		if next_level.has_method("wait_for_collisions"):
+			await next_level.wait_for_collisions()
+		else:
+			await get_tree().process_frame
+			await get_tree().process_frame
+		if loading_screen:
+			loading_screen.set_progress(0.98)
 		await get_tree().process_frame
 	else:
 		# GP Finished!

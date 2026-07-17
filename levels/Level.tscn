@@ -669,6 +669,8 @@ render_priority = 0
 shader = ExtResource("14_5qkpu")
 shader_parameter/water_color = Color(0.1, 0.3, 0.6, 1)
 shader_parameter/shallow_color = Color(0.1, 0.4, 0.6, 1)
+shader_parameter/sky_tint = Color(0.55, 0.62, 0.68, 1)
+shader_parameter/sky_reflect = 0.55
 shader_parameter/transparency = 0.7
 shader_parameter/metallic = 0.6
 shader_parameter/roughness = 0.1
@@ -676,6 +678,7 @@ shader_parameter/noise_tex = SubResource("NoiseTexture2D_g40bl")
 shader_parameter/wave_speed = 0.028
 shader_parameter/wave_strength = 0.55
 shader_parameter/wave_height = 0.0
+shader_parameter/wave_scale = 1.0
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_ovwx5"]
 size = Vector2(4000, 4000)

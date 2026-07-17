@@ -1,6 +1,10 @@
 extends Area3D
 
 @export var flash_brightness: float = 3.0
+## Multiplier for pad boost force / top speed (1.0 = default). Set per pad in the inspector.
+@export_range(0.1, 5.0, 0.05) var boost_strength: float = 1.0
+## How long the boost lasts in seconds.
+@export_range(0.2, 8.0, 0.1) var boost_duration: float = 2.0
 
 var mesh_instances: Array[MeshInstance3D] = []
 var mats: Array[BaseMaterial3D] = []
@@ -38,10 +42,10 @@ func _on_body_entered(body: Node3D):
 		flash_boost_pad()
 		if NetworkManager.current_game_mode != NetworkManager.GameMode.MULTIPLAYER:
 			if body.get("is_local_player") or body.get("is_ai"):
-				body.client_start_pad_boost()
+				body.client_start_pad_boost(boost_strength, boost_duration)
 		else:
 			if body.has_method("is_multiplayer_authority") and body.is_multiplayer_authority():
-				body.client_start_pad_boost.rpc()
+				body.client_start_pad_boost.rpc(boost_strength, boost_duration)
 
 func flash_boost_pad():
 	if flash_tween and flash_tween.is_valid():

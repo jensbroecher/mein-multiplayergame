@@ -12,6 +12,13 @@ const ITEM_BOX_SCENE = preload("res://ItemBox.tscn")
 
 
 @export_group("Editor Tools")
+@export var bake_prop_collisions_to_project: bool = false:
+	set(val):
+		if val:
+			if Engine.is_editor_hint():
+				_bake_prop_collisions_to_project()
+			notify_property_list_changed()
+
 @export var redistribute_checkpoints: bool = false:
 	set(val):
 		if val:
@@ -56,6 +63,13 @@ var end_timer = 0.0
 var cp_offsets: Array[float] = []
 var track_length: float = 0.0
 
+var collisions_ready: bool = false
+signal collisions_built
+const PROJECT_COLLISION_DIR := "res://generated/prop_collisions"
+const COLLISION_CACHE_DIR := "user://collision_cache"
+const COLLISION_CACHE_VERSION := 5
+var _save_shapes_to_project: bool = false
+
 func _ready():
 	# Skip running setup when instantiating the scene inside regeneration scripts to prevent saving runtime-modified nodes
 	var is_regenerating = false
@@ -65,6 +79,7 @@ func _ready():
 				is_regenerating = true
 				break
 	if Engine.is_editor_hint() or is_regenerating:
+		collisions_ready = true
 		return
 
 	if not track_path:
@@ -131,7 +146,7 @@ func _ready():
 		ui.update_lobby(NetworkManager.players)
 	race_ui.ready_pressed.connect(_on_local_ready_pressed)
 	race_ui.start_pressed.connect(_on_host_start_pressed)
-	
+
 	if NetworkManager.current_game_mode != NetworkManager.GameMode.MULTIPLAYER:
 		_run_singleplayer_countdown()
 
@@ -164,7 +179,7 @@ func _setup_checkpoints():
 		for child in cp_container.get_children():
 			if child is Area3D:
 				container_cps.append(child)
-		
+
 		# Sort checkpoints dynamically based on their distance along the track curve
 		if track_path:
 			var curve = track_path.curve
@@ -175,7 +190,7 @@ func _setup_checkpoints():
 				var b_offset = curve.get_closest_offset(b_local)
 				return a_offset < b_offset
 			)
-		
+
 		checkpoints.append_array(container_cps)
 
 	# ALWAYS append the FinishLine as the absolute final checkpoint of the lap
@@ -199,7 +214,7 @@ func _setup_checkpoints():
 			for cp in checkpoints:
 				var local_pos = track_path.to_local(cp.global_position)
 				cp_offsets.append(track_path.curve.get_closest_offset(local_pos))
-				
+
 	# Connect body_entered signals on EVERY peer (including OfflineMultiplayerPeer in singleplayer).
 	# _on_checkpoint_entered guards its own logic behind race_state checks.
 	for i in range(checkpoints.size()):
@@ -230,12 +245,12 @@ func _on_checkpoint_entered(body: Node3D, cp_idx: int):
 			# Inform the player cart of its last passed checkpoint for respawn purposes
 			var cp = checkpoints[cp_idx]
 			var cart = players_container.get_node_or_null(str(id))
-			
+
 			var is_finish_lap = false
 			if cp_idx == checkpoints.size() - 1:
 				if stats["laps"] + 1 >= NetworkManager.max_laps:
 					is_finish_lap = true
-			
+
 			if cart and cart.get("is_ai"):
 				cart.last_checkpoint_transform = cp.global_transform
 			else:
@@ -257,7 +272,7 @@ func _check_finish(id: int):
 	var stats = player_stats[id]
 	if stats["laps"] >= NetworkManager.max_laps and not stats["finished"]:
 		stats["finished"] = true
-		
+
 		var cart = players_container.get_node_or_null(str(id))
 		if cart and cart.get("is_ai"):
 			cart.can_move = false
@@ -271,7 +286,7 @@ func _check_finish(id: int):
 				show_player_finished_rpc()
 			else:
 				show_player_finished_rpc.rpc_id(id)
-		
+
 		# Start 30s timer if this is the first finisher
 		if end_timer <= 0.0:
 			end_timer = 30.0
@@ -545,30 +560,30 @@ func _update_positions():
 			if track_path and cp_offsets.size() > 0:
 				var curve = track_path.curve
 				var local_pos = track_path.to_local(cart.global_position)
-				
+
 				var next_idx = pinfo["next_checkpoint_idx"]
 				var prev_idx = next_idx - 1
 				if prev_idx < 0:
 					prev_idx = cp_offsets.size() - 1
-					
+
 				if next_idx >= cp_offsets.size():
 					next_idx = cp_offsets.size() - 1
-					
+
 				var start_off = cp_offsets[prev_idx]
 				var end_off = cp_offsets[next_idx]
-				
+
 				var segment_length = end_off - start_off
 				if segment_length < 0:
 					segment_length += track_length
-					
+
 				var min_dist = 9999999.0
 				var best_t = 0.0
 				var step = 5.0
 				var num_steps = int(segment_length / step) + 1
-				
+
 				var start_i = -int(num_steps * 0.2)
 				var end_i = num_steps + int(num_steps * 0.2)
-				
+
 				for i in range(start_i, end_i + 1):
 					var t = float(i) / max(1, num_steps)
 					var sample_off = fmod(start_off + t * segment_length + track_length * 2.0, max(1.0, track_length))
@@ -577,7 +592,7 @@ func _update_positions():
 					if d < min_dist:
 						min_dist = d
 						best_t = t
-				
+
 				offset = best_t * segment_length
 
 			# Score = Laps * 1000000 + CheckpointIndex * 50000 + offset
@@ -621,7 +636,7 @@ func update_timer_rpc(t: int):
 
 func _end_race():
 	race_state = RaceState.FINISHED
-	
+
 	# Build results array
 	var results = []
 	var final_rankings = []
@@ -636,7 +651,7 @@ func _end_race():
 			var cart = players_container.get_node_or_null(str(id))
 			if cart:
 				p_name = cart.player_name
-				
+
 		final_rankings.append({
 			"id": id,
 			"name": p_name,
@@ -644,23 +659,23 @@ func _end_race():
 			"is_bot": is_bot
 		})
 	final_rankings.sort_custom(func(a, b): return a["pos"] < b["pos"])
-	
+
 	var points_map = [10, 8, 6, 4]
 	for i in range(final_rankings.size()):
 		var racer = final_rankings[i]
 		var round_pts = points_map[mini(i, points_map.size() - 1)]
-		
+
 		if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP or (NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP and NetworkManager.is_coop_gp):
 			var current_total = NetworkManager.gp_standings.get(racer["name"], 0)
 			NetworkManager.gp_standings[racer["name"]] = current_total + round_pts
-			
+
 		results.append({
 			"name": racer["name"],
 			"pos": racer["pos"],
 			"round_points": round_pts,
 			"total_points": NetworkManager.gp_standings.get(racer["name"], round_pts)
 		})
-		
+
 	end_race_rpc.rpc(results)
 
 @rpc("authority", "call_local", "reliable")
@@ -701,10 +716,13 @@ func _setup_chasm_pit_water() -> void:
 
 
 func _build_runtime_collisions_deferred() -> void:
+	collisions_ready = false
 	# Let the first frames finish streaming/import so we don't collide-bake on top of load.
 	await get_tree().process_frame
 	await get_tree().process_frame
 	if not is_inside_tree():
+		collisions_ready = true
+		collisions_built.emit()
 		return
 
 	# Automatically add collisions to checkpoints, finish line, and ramps at runtime
@@ -731,6 +749,26 @@ func _build_runtime_collisions_deferred() -> void:
 				if child is StaticBody3D and child.name != "Unified_World_Collision":
 					child.position.y = road.position.y
 
+	collisions_ready = true
+	collisions_built.emit()
+	print("[COLLISION BUILDER] runtime collisions ready")
+
+
+func wait_for_collisions(timeout_sec: float = 90.0) -> void:
+	if collisions_ready:
+		return
+	if not is_inside_tree():
+		return
+	var max_frames: int = int(maxf(timeout_sec, 1.0) * 60.0)
+	for _i in range(max_frames):
+		if collisions_ready or not is_inside_tree():
+			break
+		await get_tree().process_frame
+	if not collisions_ready:
+		push_warning("[COLLISION BUILDER] wait_for_collisions timed out")
+		collisions_ready = true
+
+
 func _spawn_item_boxes():
 	# Spawn a row of 3 items across each checkpoint gate and the finish line
 	var cp_idx = 0
@@ -748,7 +786,7 @@ func _spawn_item_boxes():
 			add_child(box)
 			box.global_position = cp.global_position + right_dir * offset + Vector3(0, 1.5, 0)
 		cp_idx += 1
-	
+
 	# Spawn 15 additional random item boxes along the track
 	_spawn_random_item_boxes(15)
 
@@ -779,13 +817,13 @@ func _spawn_random_item_boxes(count: int):
 	var spawned_count = 0
 	var attempts = 0
 	var max_attempts = count * 25
-	
+
 	while spawned_count < count and attempts < max_attempts:
 		attempts += 1
 		var offset = randf_range(10.0, length - 10.0) # Avoid spawning directly on the start line
 		var local_pos = curve.sample_baked(offset)
 		var global_pos = track_path.to_global(local_pos)
-		
+
 		# Compute track tangent and right vector to offset left/right randomly
 		var next_offset = fmod(offset + 1.0, max(1.0, length))
 		var p1 = curve.sample_baked(offset)
@@ -794,20 +832,20 @@ func _spawn_random_item_boxes(count: int):
 		if tangent.length() < 0.01:
 			continue
 		var right_vec = tangent.cross(Vector3.UP).normalized()
-		
+
 		var lateral_offset = randf_range(-4.0, 4.0)
 		var spawn_pos = global_pos + right_vec * lateral_offset + Vector3(0, 10.0, 0)
-		
+
 		# Raycast down to find the road surface
 		var query = PhysicsRayQueryParameters3D.create(spawn_pos, spawn_pos - Vector3(0, 20.0, 0))
 		query.collision_mask = 1 # road/terrain
 		var result = space_state.intersect_ray(query)
 		if not result:
 			continue
-			
+
 		var hit_pos = result.position
 		var final_pos = hit_pos + Vector3(0, 1.2, 0)
-		
+
 		# Perform a sphere shape overlap check to make sure it doesn't intersect obstacles or other objects
 		var shape_query = PhysicsShapeQueryParameters3D.new()
 		var sphere = SphereShape3D.new()
@@ -815,7 +853,7 @@ func _spawn_random_item_boxes(count: int):
 		shape_query.shape = sphere
 		shape_query.transform = Transform3D(Basis.IDENTITY, final_pos)
 		shape_query.collision_mask = 1 | 2 | 4
-		
+
 		var overlaps = space_state.intersect_shape(shape_query)
 		var is_obstructed = false
 		for overlap in overlaps:
@@ -826,7 +864,7 @@ func _spawn_random_item_boxes(count: int):
 				if not is_road_or_terrain or c_name.contains("itembox") or c_name.contains("cart") or c_name.contains("player"):
 					is_obstructed = true
 					break
-		
+
 		if not is_obstructed:
 			var box = ITEM_BOX_SCENE.instantiate()
 			box.name = "RandomItemBox_%d" % spawned_count
@@ -854,7 +892,7 @@ func _rebuild_checkpoints():
 			var is_mountain = name.contains("Mountain") or (scene_file_path != "" and scene_file_path.contains("Mountain"))
 			if is_mountain and i == children.size() - 1:
 				offset = 0.74 * length
-				
+
 			var pos = curve.sample_baked(offset)
 			var tp_xform = track_path.transform
 			child.position = tp_xform * pos
@@ -888,7 +926,7 @@ func _align_checkpoints_to_track():
 			var local_pos = tp_xform.affine_inverse() * child.position
 			var offset = curve.get_closest_offset(local_pos)
 			var snapped_local_pos = curve.sample_baked(offset)
-			
+
 			child.position = tp_xform * snapped_local_pos
 
 			# Orient to track tangent at this offset
@@ -905,7 +943,7 @@ func _create_primitive_shape_from_mesh(mesh: Mesh, type: String) -> Shape3D:
 	if not mesh: return null
 	var aabb = mesh.get_aabb()
 	var size = aabb.size
-	
+
 	match type:
 		"box":
 			var shape = BoxShape3D.new()
@@ -930,27 +968,27 @@ func _create_primitive_shape_from_mesh(mesh: Mesh, type: String) -> Shape3D:
 
 func _add_collisions_to_node(root_node: Node, use_trimesh: bool = false):
 	if root_node == null: return
-	
+
 	# Skip any spawn points, indicators, or decals to prevent cars from colliding/hovering with them
 	var path_lower = str(root_node.get_path()).to_lower()
 	if path_lower.contains("spawn") or path_lower.contains("decal"):
 		return
-	
+
 	if root_node is MeshInstance3D:
 		# Check group overrides
 		var force_none = _is_node_or_ancestor_in_group(root_node, "collision_none")
 		if force_none:
 			return # Skip building collision for this node
-			
+
 		var mesh = root_node.mesh
 		if mesh:
 			var name_key = "Col_" + str(root_node.get_path()).replace("/", "_")
-			
+
 			# Find a parent that is a Node3D but NOT an Area3D to avoid overlapping triggers
 			var target_parent = root_node.get_parent()
 			while target_parent and (target_parent is Area3D or not (target_parent is Node3D)):
 				target_parent = target_parent.get_parent()
-			
+
 			var already_has_collision = false
 			if target_parent and target_parent.has_node(name_key):
 				already_has_collision = true
@@ -958,10 +996,10 @@ func _add_collisions_to_node(root_node: Node, use_trimesh: bool = false):
 				var level_root = get_tree().get_first_node_in_group("level")
 				if level_root and level_root.has_node(name_key):
 					already_has_collision = true
-				
+
 			if not already_has_collision:
 				var shape
-				
+
 				# Get vertex count of the mesh for fallback and performance checks
 				var vertex_count = 0
 				for s in range(mesh.get_surface_count()):
@@ -970,7 +1008,7 @@ func _add_collisions_to_node(root_node: Node, use_trimesh: bool = false):
 						var vertices = arrays[Mesh.ARRAY_VERTEX]
 						if vertices:
 							vertex_count += vertices.size()
-				
+
 				# Check explicit group collision overrides
 				var force_convex = _is_node_or_ancestor_in_group(root_node, "collision_convex")
 				var force_trimesh = _is_node_or_ancestor_in_group(root_node, "collision_trimesh")
@@ -979,7 +1017,7 @@ func _add_collisions_to_node(root_node: Node, use_trimesh: bool = false):
 				var force_cylinder = _is_node_or_ancestor_in_group(root_node, "collision_cylinder")
 				var force_capsule = _is_node_or_ancestor_in_group(root_node, "collision_capsule")
 				var force_decomposition = _is_node_or_ancestor_in_group(root_node, "collision_decomposition")
-				
+
 				if force_decomposition:
 					var decomp_name = name_key + "_decomp"
 					var already_decomposed = false
@@ -989,7 +1027,7 @@ func _add_collisions_to_node(root_node: Node, use_trimesh: bool = false):
 						var level_root = get_tree().get_first_node_in_group("level")
 						if level_root and level_root.has_node(decomp_name):
 							already_decomposed = true
-							
+
 					if not already_decomposed:
 						var static_body = StaticBody3D.new()
 						static_body.name = decomp_name
@@ -999,12 +1037,12 @@ func _add_collisions_to_node(root_node: Node, use_trimesh: bool = false):
 						else:
 							print("[COLLISION BUILDER] Performing convex decomposition on ", root_node.name, ", adding static body ", static_body.name, " to level root")
 							add_child(static_body)
-						
+
 						var original_parent = root_node.get_parent()
 						root_node.reparent(static_body)
 						root_node.create_multiple_convex_collisions()
 						root_node.reparent(original_parent)
-						
+
 						var t = root_node.global_transform
 						t.basis = t.basis.orthonormalized()
 						static_body.global_transform = t
@@ -1016,31 +1054,57 @@ func _add_collisions_to_node(root_node: Node, use_trimesh: bool = false):
 						use_trimesh_actual = true
 					else:
 						# EXCEPT for gates/arches (like checkpoints and finish lines) which need concave trimesh to keep their openings clear.
-						var is_gate = path_lower.contains("gate") or path_lower.contains("checkpoint") or path_lower.contains("finish")
-						if use_trimesh and vertex_count > 10000 and not is_gate:
+						var ncheck: String = (path_lower + " " + str(root_node.name)).to_lower()
+						var is_opening: bool = false
+						for token in ["gate", "checkpoint", "finish", "arch", "arc", "tunnel", "bridge", "loop", "rockarc"]:
+							if token in ncheck:
+								is_opening = true
+								break
+						if is_opening:
+							use_trimesh_actual = true
+						elif use_trimesh and vertex_count > 10000:
 							print("[COLLISION BUILDER] Mesh ", root_node.name, " has high vertex count (", vertex_count, "), falling back to convex shape for stability.")
 							use_trimesh_actual = false
-					
+
+					var kind: String = "convex"
 					if force_box:
-						shape = _create_primitive_shape_from_mesh(mesh, "box")
+						kind = "box"
 					elif force_sphere:
-						shape = _create_primitive_shape_from_mesh(mesh, "sphere")
+						kind = "sphere"
 					elif force_cylinder:
-						shape = _create_primitive_shape_from_mesh(mesh, "cylinder")
+						kind = "cylinder"
 					elif force_capsule:
-						shape = _create_primitive_shape_from_mesh(mesh, "capsule")
+						kind = "capsule"
 					elif use_trimesh_actual:
-						shape = mesh.create_trimesh_shape()
-						if shape is ConcavePolygonShape3D and shape.data.is_empty():
-							print("[COLLISION BUILDER] WARNING: Trimesh shape for ", root_node.name, " has 0 faces/triangles (untriangulated or invalid geometry). Falling back to convex shape for safety.")
-							shape = mesh.create_convex_shape(true, true)
+						kind = "trimesh"
 					else:
-						shape = mesh.create_convex_shape(true, true)
-						
-					if shape:
-						# Bake the global scale into the shape's vertices/points/dimensions to prevent Jolt degenerate shape failures on scaled models
-						var global_scale = root_node.global_transform.basis.get_scale()
-						if global_scale != Vector3.ONE:
+						kind = "convex"
+
+					var global_scale: Vector3 = root_node.global_transform.basis.get_scale()
+					var cache_key: String = _collision_cache_key(mesh, root_node, kind, global_scale, vertex_count)
+					var cached: Shape3D = _try_load_shape_cache(cache_key)
+					if cached:
+						shape = cached
+						if _save_shapes_to_project:
+							_save_shape_cache(cache_key, shape)
+					else:
+						if force_box:
+							shape = _create_primitive_shape_from_mesh(mesh, "box")
+						elif force_sphere:
+							shape = _create_primitive_shape_from_mesh(mesh, "sphere")
+						elif force_cylinder:
+							shape = _create_primitive_shape_from_mesh(mesh, "cylinder")
+						elif force_capsule:
+							shape = _create_primitive_shape_from_mesh(mesh, "capsule")
+						elif use_trimesh_actual:
+							shape = mesh.create_trimesh_shape()
+							if shape is ConcavePolygonShape3D and shape.data.is_empty():
+								print("[COLLISION BUILDER] WARNING: empty trimesh for ", root_node.name, " - skipping (not sealing).")
+								shape = null
+						else:
+							shape = mesh.create_convex_shape(true, true)
+
+						if shape != null and global_scale != Vector3.ONE:
 							if shape is BoxShape3D:
 								shape.size = shape.size * global_scale
 							elif shape is SphereShape3D:
@@ -1058,31 +1122,33 @@ func _add_collisions_to_node(root_node: Node, use_trimesh: bool = false):
 								for pt in shape.points:
 									scaled_points.append(pt * global_scale)
 								shape.points = scaled_points
-	 
+						if shape != null:
+							_save_shape_cache(cache_key, shape)
+					if shape:
 						var static_body = StaticBody3D.new()
 						static_body.name = name_key
 						var collision_shape = CollisionShape3D.new()
 						collision_shape.shape = shape
 						static_body.add_child(collision_shape)
-						
+
 						if target_parent:
 							print("[COLLISION BUILDER] Adding collision static body ", static_body.name, " to parent ", target_parent.name)
 							target_parent.add_child(static_body)
 						else:
 							print("[COLLISION BUILDER] Adding collision static body ", static_body.name, " to level root")
 							add_child(static_body)
-						
+
 						# Align static body exactly to the mesh, but orthonormalize to remove scale (since we baked it into the shape)
 						var t = root_node.global_transform
 						t.basis = t.basis.orthonormalized()
 						static_body.global_transform = t
-					
+
 	for child in root_node.get_children():
 		_add_collisions_to_node(child, use_trimesh)
- 
+
 func _add_collisions_to_matching_nodes(node: Node):
 	if node == null: return
-	
+
 	var lname := node.name.to_lower()
 	if lname.contains("ramp") or lname.contains("loop"):
 		print("[COLLISION BUILDER] Matching ramp/loop node found: ", node.name, " (", node.get_class(), ")")
@@ -1090,23 +1156,23 @@ func _add_collisions_to_matching_nodes(node: Node):
 			if "use_collision" in node:
 				node.use_collision = true
 		_add_collisions_to_node(node, true)
-		
+
 	for child in node.get_children():
 		_add_collisions_to_matching_nodes(child)
- 
+
 func _add_collisions_for_group_nodes(node: Node):
 	if node == null: return
-	
+
 	if node.is_in_group("collision_trimesh"):
 		_add_collisions_to_node(node, true)
 	elif node.is_in_group("collision_convex"):
 		_add_collisions_to_node(node, false)
 	elif node.is_in_group("collision_box") or node.is_in_group("collision_sphere") or node.is_in_group("collision_cylinder") or node.is_in_group("collision_capsule"):
 		_add_collisions_to_node(node, false)
-		
+
 	for child in node.get_children():
 		_add_collisions_for_group_nodes(child)
- 
+
 func _is_node_or_ancestor_in_group(node: Node, group_name: String) -> bool:
 	var current = node
 	while current and current != self:
@@ -1115,20 +1181,72 @@ func _is_node_or_ancestor_in_group(node: Node, group_name: String) -> bool:
 		current = current.get_parent()
 	return false
 
+func _bake_prop_collisions_to_project() -> void:
+	if not Engine.is_editor_hint():
+		push_warning("[COLLISION BAKE] Only works in the editor.")
+		return
+	print("[COLLISION BAKE] Starting -> ", PROJECT_COLLISION_DIR)
+	_save_shapes_to_project = true
+	var abs_dir: String = ProjectSettings.globalize_path(PROJECT_COLLISION_DIR)
+	DirAccess.make_dir_recursive_absolute(abs_dir)
+	_add_collisions_for_group_nodes(self)
+	_add_collisions_to_matching_nodes(self)
+	_save_shapes_to_project = false
+	print("[COLLISION BAKE] Done. Files under ", PROJECT_COLLISION_DIR)
+	print("[COLLISION BAKE] Reload the level scene so temporary Col_* bodies are not saved into the .tscn.")
+
+
+func _collision_cache_key(mesh: Mesh, root_node: Node, kind: String, scale: Vector3, vertex_count: int) -> String:
+	var mesh_id: String = mesh.resource_path if mesh and mesh.resource_path != "" else str(root_node.get_path())
+	var sx: float = snappedf(scale.x, 0.001)
+	var sy: float = snappedf(scale.y, 0.001)
+	var sz: float = snappedf(scale.z, 0.001)
+	var raw: String = "v%d|%s|%s|%d|%.3f,%.3f,%.3f" % [COLLISION_CACHE_VERSION, mesh_id, kind, vertex_count, sx, sy, sz]
+	return str(raw.hash())
+
+
+func _try_load_shape_cache(cache_key: String) -> Shape3D:
+	var bases: Array[String] = [PROJECT_COLLISION_DIR, COLLISION_CACHE_DIR]
+	for base in bases:
+		var path: String = base + "/" + cache_key + ".res"
+		if not FileAccess.file_exists(path):
+			continue
+		var res = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_REUSE)
+		if res is Shape3D:
+			return (res as Shape3D).duplicate(true)
+	return null
+
+
+func _save_shape_cache(cache_key: String, shape: Shape3D) -> void:
+	if shape == null or cache_key.is_empty():
+		return
+	var base: String = PROJECT_COLLISION_DIR if _save_shapes_to_project else COLLISION_CACHE_DIR
+	if base.begins_with("res://"):
+		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(base))
+	else:
+		DirAccess.make_dir_recursive_absolute(base)
+	var path: String = base + "/" + cache_key + ".res"
+	var err: Error = ResourceSaver.save(shape.duplicate(true), path)
+	if err != OK:
+		push_warning("[COLLISION CACHE] save failed %s err=%s" % [path, str(err)])
+	elif _save_shapes_to_project:
+		print("[COLLISION CACHE] wrote ", path)
+
+
 func _align_start_and_spawns_to_track():
 	var fl = get_node_or_null("FinishLine")
 	if not fl: return
-	
+
 	if not track_path:
 		track_path = get_node_or_null("TrackPath")
-		
+
 	# Position FinishLine at a fixed offset along the track so it sits on the flat
 	# approach road at the foot of the mountain, a short way past the path start.
 	if track_path:
 		var curve = track_path.curve
 		var tp_xform = track_path.transform
 		var track_len = curve.get_baked_length()
-		
+
 		# Use 8% of track length — past the very start of the path but still on the flat run-up
 		var start_ratio = 0.08
 		# For non-mountain levels, snap FinishLine to its current position instead
@@ -1138,36 +1256,36 @@ func _align_start_and_spawns_to_track():
 			var local_pos = tp_inv * fl.position
 			var offset = curve.get_closest_offset(local_pos)
 			start_ratio = offset / track_len
-		
+
 		var fl_offset = start_ratio * track_len
 		var snapped_local_pos = curve.sample_baked(fl_offset)
 		fl.position = tp_xform * snapped_local_pos
-		
+
 		var next_offset = fmod(fl_offset + 1.0, max(1.0, track_len))
 		var tangent_local = (curve.sample_baked(next_offset) - snapped_local_pos).normalized()
 		if tangent_local.length() > 0.01:
 			var tangent_global = ((tp_xform * (snapped_local_pos + tangent_local)) - (tp_xform * snapped_local_pos)).normalized()
 			if tangent_global.length() > 0.01:
 				fl.basis = Basis.looking_at(tangent_global, Vector3.UP)
-	
+
 	# Delete old root-level SpawnPoints if they exist to clean up the scene tree
 	var old_sp = get_node_or_null("SpawnPoints")
 	if old_sp:
 		old_sp.free()
-		
+
 	# Delete the old SpawnPoints container under the FinishLine if it exists
 	var old_fl_sp = fl.get_node_or_null("SpawnPoints")
 	if old_fl_sp:
 		old_fl_sp.free()
-		
+
 	var spawn_container = Node3D.new()
 	spawn_container.name = "SpawnPoints"
 	add_child(spawn_container) # Parented to Level root for direct local coordinates!
 	if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
 		spawn_container.owner = get_tree().edited_scene_root
-			
+
 	spawn_container.transform = Transform3D.IDENTITY
-	
+
 	var spawns = []
 	for i in range(1, 7):
 		var sp_name = "Spawn" + str(i)
@@ -1177,13 +1295,13 @@ func _align_start_and_spawns_to_track():
 		spawn_container.add_child(sp)
 		if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
 			sp.owner = get_tree().edited_scene_root
-		
+
 		var indicator = preload("res://SpawnIndicator.tscn").instantiate()
 		sp.add_child(indicator)
 		if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
 			indicator.owner = get_tree().edited_scene_root
 		spawns.append(sp)
-	
+
 	# Layout relative to FinishLine: 3 rows of 2 spawns on the road surface behind the gate.
 	# Snapping each spawn point individually along the track curve handles steep slopes beautifully!
 	if track_path:
@@ -1193,33 +1311,33 @@ func _align_start_and_spawns_to_track():
 		var fl_local = tp_inv * fl.position
 		var fl_offset = curve.get_closest_offset(fl_local)
 		var track_len = curve.get_baked_length()
-		
+
 		# Z offset is negative offset along track (behind gate)
 		# X offset is lateral offset (left/right)
 		var local_zs = [-6.0, -6.0, -12.0, -12.0, -18.0, -18.0]
 		var local_xs = [-3.0, 3.0, -3.0, 3.0, -3.0, 3.0]
-		
+
 		for idx in range(spawns.size()):
 			var spawn = spawns[idx]
 			if spawn:
 				var s_offset = fmod(fl_offset + local_zs[idx] + track_len, track_len)
 				var snapped_local = curve.sample_baked(s_offset)
-				
+
 				# Get tangent at this spawn point to orient it along track
 				var next_s_offset = fmod(s_offset + 1.0, track_len)
 				var tangent_local = (curve.sample_baked(next_s_offset) - snapped_local).normalized()
-				
+
 				# Calculate lateral offset (X axis is perpendicular to tangent on XZ plane)
 				var right_local = tangent_local.cross(Vector3.UP).normalized()
 				var spawn_local_pos = snapped_local + right_local * local_xs[idx]
-				
+
 				# Set spawn's world position temporarily; we'll convert to local after centroid is known
 				spawn.position = (tp_xform * spawn_local_pos) + Vector3(0, 0.5, 0)
 				if tangent_local.length() > 0.01:
 					var tangent_global = ((tp_xform * (snapped_local + tangent_local)) - (tp_xform * snapped_local)).normalized()
 					if tangent_global.length() > 0.01:
 						spawn.basis = Basis.looking_at(tangent_global, Vector3.UP)
-		
+
 		# Move spawn_container to centroid of spawns so its AABB stays tight (not stretched to world origin)
 		var centroid = Vector3.ZERO
 		for sp in spawns:
@@ -1236,19 +1354,19 @@ func _align_start_and_spawns_to_track():
 			if spawn:
 				spawn.transform = Transform3D.IDENTITY
 				spawn.position = Vector3(local_xs[idx], 0.5, local_zs[idx])
-	
+
 	spawn_points = spawns
 
 func _build_organic_dune_mesh(width: float, depth: float, resolution: int, peak_height: float, noise: FastNoiseLite) -> ArrayMesh:
 	var st = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	
+
 	var half_w = width * 0.5
 	var half_d = depth * 0.5
 	var step_x = width / resolution
 	var step_z = depth / resolution
 	var bottom_y = -1.5  # sink the base slightly underground so the join is invisible
-	
+
 	# Generate top surface vertices
 	for r in range(resolution + 1):
 		for c in range(resolution + 1):
@@ -1256,19 +1374,19 @@ func _build_organic_dune_mesh(width: float, depth: float, resolution: int, peak_
 			var lz = -half_d + r * step_z
 			var d = sqrt(lx * lx + lz * lz)
 			var radius = min(half_w, half_d)
-			
+
 			# Radial mask so heights smoothly reach 0 at the boundary
 			var mask = clamp(1.0 - (d / radius), 0.0, 1.0)
 			mask = mask * mask * (3.0 - 2.0 * mask) # Smoothstep
-			
+
 			var n = noise.get_noise_2d(lx * 2.0, lz * 2.0) * 4.0
 			var ly = mask * (peak_height + n)
-			
+
 			var u = float(c) / resolution
 			var v = float(r) / resolution
 			st.set_uv(Vector2(u, v))
 			st.add_vertex(Vector3(lx, ly, lz))
-			
+
 	# Top surface indices (CCW from above)
 	for r in range(resolution):
 		for c in range(resolution):
@@ -1276,11 +1394,11 @@ func _build_organic_dune_mesh(width: float, depth: float, resolution: int, peak_
 			st.add_index(i)
 			st.add_index(i + resolution + 1)
 			st.add_index(i + 1)
-			
+
 			st.add_index(i + 1)
 			st.add_index(i + resolution + 1)
 			st.add_index(i + resolution + 2)
-	
+
 	# Generate flat bottom face vertices (same grid at bottom_y)
 	var base_idx = (resolution + 1) * (resolution + 1)  # offset for bottom verts
 	for r in range(resolution + 1):
@@ -1291,7 +1409,7 @@ func _build_organic_dune_mesh(width: float, depth: float, resolution: int, peak_
 			var v = float(r) / resolution
 			st.set_uv(Vector2(u, v))
 			st.add_vertex(Vector3(lx, bottom_y, lz))
-			
+
 	# Bottom face indices (CW from above = CCW from below, facing downward)
 	for r in range(resolution):
 		for c in range(resolution):
@@ -1299,11 +1417,11 @@ func _build_organic_dune_mesh(width: float, depth: float, resolution: int, peak_
 			st.add_index(i)
 			st.add_index(i + 1)
 			st.add_index(i + resolution + 1)
-			
+
 			st.add_index(i + 1)
 			st.add_index(i + resolution + 2)
 			st.add_index(i + resolution + 1)
-			
+
 	st.generate_normals()
 	st.generate_tangents()
 	return st.commit()
@@ -1312,19 +1430,19 @@ func _generate_sand_dunes():
 	var parent_node = get_node_or_null("SandDunes")
 	if parent_node:
 		parent_node.free()
-	
+
 	parent_node = Node3D.new()
 	parent_node.name = "SandDunes"
 	add_child(parent_node)
 	if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
 		parent_node.owner = get_tree().edited_scene_root
-		
+
 	if not track_path:
 		track_path = get_node_or_null("TrackPath")
 	if not track_path: return
 	var curve = track_path.curve
 	var length = curve.get_baked_length()
-	
+
 	var ratios = [0.15, 0.35, 0.65, 0.85]
 	var sand_texture = load("res://materials/sand.png")
 	var sand_mat = StandardMaterial3D.new()
@@ -1338,25 +1456,25 @@ func _generate_sand_dunes():
 	else:
 		sand_mat.albedo_color = Color(0.9, 0.8, 0.6)
 		sand_mat.roughness = 0.9
-		
+
 	var noise = FastNoiseLite.new()
 	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	noise.frequency = 0.05
-		
+
 	for i in range(ratios.size()):
 		var offset = ratios[i] * length
 		var pos = curve.sample_baked(offset)
 		var next_offset = min(offset + 1.0, length)
 		var tangent = (curve.sample_baked(next_offset) - pos).normalized()
-		
+
 		# Seed the random number generator using the index to keep dune shapes deterministic
 		seed(12345 + i * 987)
 		noise.seed = randi()
-		
+
 		var dune_w = randf_range(35.0, 50.0)
 		var dune_d = randf_range(35.0, 50.0)
 		var peak_h = randf_range(6.0, 9.0)
-		
+
 		# Create a StaticBody3D for an organic wind-blown dune shape
 		var dune = StaticBody3D.new()
 		dune.name = "OrganicDune_" + str(i + 1)
@@ -1365,7 +1483,7 @@ func _generate_sand_dunes():
 		parent_node.add_child(dune)
 		if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
 			dune.owner = get_tree().edited_scene_root
-			
+
 		var mesh_inst = MeshInstance3D.new()
 		mesh_inst.name = "DuneMesh"
 		mesh_inst.mesh = _build_organic_dune_mesh(dune_w, dune_d, 24, peak_h, noise)
@@ -1373,7 +1491,7 @@ func _generate_sand_dunes():
 		dune.add_child(mesh_inst)
 		if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
 			mesh_inst.owner = get_tree().edited_scene_root
-			
+
 		var col_shape = CollisionShape3D.new()
 		col_shape.name = "DuneCollision"
 		# Trimesh with backface_collision so cars bounce off from both sides and can't get trapped inside
@@ -1383,15 +1501,15 @@ func _generate_sand_dunes():
 		dune.add_child(col_shape)
 		if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
 			col_shape.owner = get_tree().edited_scene_root
-			
+
 		# Use local transform math (no to_global) — safe both in editor and headless since track_path.transform doesn't require being in scene tree
 		var tp_xform = track_path.transform
-		
+
 		# Offset the dune laterally to the side of the road (alternating left and right) so it doesn't bury the track
 		var right = tangent.cross(Vector3.UP).normalized()
 		var side_offset = 35.0 * (1.0 if i % 2 == 0 else -1.0)
 		var offset_pos = pos + right * side_offset
-		
+
 		var world_pos = tp_xform * offset_pos
 		# Sink the dune 3.5m into the ground to hide the flat base and blend it smoothly with terrain
 		dune.position = world_pos - Vector3(0, 3.5, 0)
@@ -1400,5 +1518,5 @@ func _generate_sand_dunes():
 			var global_tangent = (world_tangent_pos - world_pos).normalized()
 			if global_tangent.length() > 0.01:
 				dune.basis = Basis.looking_at(global_tangent, Vector3.UP)
-			
+
 	print("Organic Sand Dunes generated along track as moveable objects!")

@@ -217,6 +217,8 @@ var boost_timer = 0.0
 var is_boosting = false
 var is_pad_boosting = false
 var pad_boost_timer = 0.0
+## Active pad boost multiplier (from the pad that last triggered us). 1.0 = default.
+var pad_boost_strength: float = 1.0
 
 @onready var sfx_brake_drift = $Visuals/SFX_BrakeDrift
 var is_drifting: bool = false
@@ -1151,10 +1153,11 @@ func _physics_process(delta):
 			apply_central_force(fwd * accel_force * mass)
 		boost_time += delta
 	elif is_pad_boosting:
-		# Pad boost: capped similarly so fast cars don't benefit as much
-		var boost_cap = 42.0
-		var max_sp = min(max_speed * 1.4, boost_cap) * slow_mult
-		var accel_force = acceleration * 1.8 * slow_mult
+		# Pad boost: strength comes from the BoostPad that triggered us (inspector).
+		var str_m: float = maxf(pad_boost_strength, 0.1)
+		var boost_cap = 42.0 * str_m
+		var max_sp = min(max_speed * (1.0 + 0.4 * str_m), boost_cap) * slow_mult
+		var accel_force = acceleration * 1.8 * str_m * slow_mult
 		if is_offroad and on_ground and ground_normal.y < 0.85 and fwd.dot(Vector3.UP) > 0.05:
 			accel_force = 0.0
 		if current_speed < max_sp:
@@ -1807,8 +1810,9 @@ func client_start_boost():
 	boost_particles.emitting = true
 
 @rpc("any_peer", "call_local", "reliable")
-func client_start_pad_boost():
-	pad_boost_timer = 2.0
+func client_start_pad_boost(strength: float = 1.0, duration: float = 2.0):
+	pad_boost_strength = maxf(strength, 0.1)
+	pad_boost_timer = maxf(duration, 0.1)
 	is_pad_boosting = true
 	
 	# Play swoosh sound (stereogenicstudio-swish-swoosh-woosh-sfx-47-357152.mp3)
