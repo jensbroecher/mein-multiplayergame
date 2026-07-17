@@ -12,9 +12,12 @@ uniform sampler2D normal_texture : hint_normal, filter_linear_mipmap_anisotropic
 uniform float normal_scale : hint_range(-16.0, 16.0) = 1.0;
 
 varying vec3 world_pos;
+varying vec3 world_nrm;
 
 void vertex() {
     world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+    // Used when use_world_uv picks a projection plane (road end-caps are vertical).
+    world_nrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 }
 
 // Hash function for random offsets/rotations
@@ -115,7 +118,21 @@ vec3 stochastic_sample_normal(sampler2D tex, vec2 uv, vec2 dx, vec2 dy) {
 }
 
 void fragment() {
-    vec2 base_uv = use_world_uv ? world_pos.xz : UV;
+    // World UV: project onto the dominant plane from the surface normal.
+    // Plain world_pos.xz stretches badly on vertical faces (ramp end-caps / landings).
+    vec2 base_uv;
+    if (use_world_uv) {
+        vec3 an = abs(normalize(world_nrm));
+        if (an.y >= an.x && an.y >= an.z) {
+            base_uv = world_pos.xz;
+        } else if (an.x >= an.z) {
+            base_uv = world_pos.zy;
+        } else {
+            base_uv = world_pos.xy;
+        }
+    } else {
+        base_uv = UV;
+    }
     vec2 uv = base_uv * (uv_scale * 0.1) * uv_scale_v2;
     vec2 dx = dFdx(uv);
     vec2 dy = dFdy(uv);

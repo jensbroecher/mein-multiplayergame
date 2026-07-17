@@ -10,8 +10,10 @@
 [ext_resource type="ArrayMesh" uid="uid://cn4d8c7yds4s3" path="res://generated/canyon_chasm_terrain_visual.res" id="14_yfrwy"]
 [ext_resource type="Shape3D" uid="uid://d4l4q5865burf" path="res://generated/canyon_chasm_terrain_collision_shape.res" id="15_2is8y"]
 [ext_resource type="ArrayMesh" uid="uid://dlq2ijupst87f" path="res://generated/canyon_chasm_Visual_Road.res" id="16_g1aow"]
+[ext_resource type="ArrayMesh" uid="uid://bdg1f28j1ewro" path="res://generated/canyon_chasm_Visual_Road_Sides_EndCaps.res" id="17_ctbtb"]
 [ext_resource type="ArrayMesh" uid="uid://l722k8umajwn" path="res://generated/canyon_chasm_Visual_Road_Sides.res" id="17_h3cd8"]
 [ext_resource type="Shape3D" uid="uid://ek1jl7r7q4yy" path="res://generated/canyon_chasm_Visual_Road_Sides_collision_shape.res" id="18_uipsh"]
+[ext_resource type="Shape3D" uid="uid://ckyq6l24aho3i" path="res://generated/canyon_chasm_Visual_Road_Sides_endcap_collision_shape.res" id="19_jmhce"]
 [ext_resource type="Shape3D" uid="uid://cfmxaajp0vkf1" path="res://generated/canyon_chasm_track_collision_shape.res" id="19_luqfk"]
 [ext_resource type="Shader" uid="uid://srampgbp5hcn" path="res://water.gdshader" id="19_pt3e8"]
 [ext_resource type="PackedScene" uid="uid://clxv8p6x0y6k2" path="res://SpawnIndicator.tscn" id="21_623mb"]
@@ -59,14 +61,14 @@ horizonColour = Color(0.0784314, 0.00784314, 0.0156863, 1)
 groundColour = Color(0, 0, 0, 1)
 cloudBrightness = 0.05
 
-[sub_resource type="Resource" id="Resource_bqk36"]
+[sub_resource type="Resource" id="Resource_ctbtb"]
 script = ExtResource("5_yr3df")
 weather = ExtResource("6_fwawu")
 
-[sub_resource type="Resource" id="Resource_g7jjn"]
+[sub_resource type="Resource" id="Resource_jmhce"]
 script = ExtResource("3_jpwbr")
 seasonId = "summer"
-weathers = Array[ExtResource("5_yr3df")]([SubResource("Resource_bqk36")])
+weathers = Array[ExtResource("5_yr3df")]([SubResource("Resource_ctbtb")])
 skyColourDaytime = SubResource("Resource_ext2d")
 skyColourNight = SubResource("Resource_p7jpd")
 dayNightCycleCurve = SubResource("Curve_8bl6p")
@@ -97,7 +99,7 @@ shader_parameter/use_normal_map = true
 shader_parameter/normal_texture = ExtResource("dirt_normal")
 shader_parameter/normal_scale = 1.2
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_ifjgq"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_vgigm"]
 render_priority = 0
 shader = ExtResource("Shader_stochastic_file")
 shader_parameter/albedo_texture = ExtResource("dirt_albedo")
@@ -110,27 +112,28 @@ shader_parameter/use_normal_map = true
 shader_parameter/normal_texture = ExtResource("dirt_normal")
 shader_parameter/normal_scale = 1.2
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pt3e8"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ocis7"]
 cull_mode = 2
 albedo_texture = ExtResource("rock_albedo")
 roughness = 0.9
 normal_enabled = true
 normal_scale = 1.5
 normal_texture = ExtResource("rock_normal")
-uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_scale = Vector3(0.06, 0.06, 0.06)
 uv1_triplanar = true
+uv1_triplanar_sharpness = 8.0
 
-[sub_resource type="FastNoiseLite" id="FastNoiseLite_g1aow"]
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_86blt"]
 seed = 42
 frequency = 0.018
 fractal_octaves = 4
 
-[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_h3cd8"]
-noise = SubResource("FastNoiseLite_g1aow")
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_x5oq0"]
+noise = SubResource("FastNoiseLite_86blt")
 seamless = true
 as_normal_map = true
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_uipsh"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_xuout"]
 render_priority = 0
 shader = ExtResource("19_pt3e8")
 shader_parameter/water_color = Color(0.06, 0.09, 0.04, 1)
@@ -140,13 +143,13 @@ shader_parameter/sky_reflect = 0.85
 shader_parameter/transparency = 0.18
 shader_parameter/metallic = 0.72
 shader_parameter/roughness = 0.05
-shader_parameter/noise_tex = SubResource("NoiseTexture2D_h3cd8")
+shader_parameter/noise_tex = SubResource("NoiseTexture2D_x5oq0")
 shader_parameter/wave_speed = 0.03
 shader_parameter/wave_strength = 0.85
 shader_parameter/wave_height = 1.15
 shader_parameter/wave_scale = 0.55
 
-[sub_resource type="PlaneMesh" id="PlaneMesh_luqfk"]
+[sub_resource type="PlaneMesh" id="PlaneMesh_73j01"]
 size = Vector2(56, 72)
 subdivide_width = 48
 subdivide_depth = 56
@@ -210,7 +213,7 @@ track_path = NodePath("TrackPath")
 
 [node name="WeatherController" parent="." unique_id=1277823175 instance=ExtResource("31_weather")]
 time_of_day_hours = 9.328
-seasons = Array[ExtResource("3_jpwbr")]([SubResource("Resource_g7jjn")])
+seasons = Array[ExtResource("3_jpwbr")]([SubResource("Resource_jmhce")])
 startTime = 33580.799999999996
 
 [node name="TerrainGenerator" type="Node3D" parent="." unique_id=586341718 node_paths=PackedStringArray("track_path")]
@@ -233,39 +236,46 @@ road_material = SubResource("ShaderMaterial_asphalt")
 metadata/_edit_lock_ = true
 metadata/_edit_group_ = true
 
-[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1037143389]
+[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=838597470]
 material_override = SubResource("ShaderMaterial_grass")
 lod_bias = 10.0
 mesh = ExtResource("14_yfrwy")
 
-[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1474792507]
+[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1977286544]
 
-[node name="@CollisionShape3D@23547" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=1156132431]
+[node name="@CollisionShape3D@22280" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=1455150203]
 shape = ExtResource("15_2is8y")
 
-[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=719753953]
-material_override = SubResource("ShaderMaterial_ifjgq")
+[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=697522553]
+material_override = SubResource("ShaderMaterial_vgigm")
 mesh = ExtResource("16_g1aow")
 
-[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=448375592]
-material_override = SubResource("StandardMaterial3D_pt3e8")
+[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=590095218]
+material_override = SubResource("StandardMaterial3D_ocis7")
 mesh = ExtResource("17_h3cd8")
 
-[node name="Visual_Road_Sides_Collision" type="StaticBody3D" parent="TerrainGenerator/Visual_Road_Sides" unique_id=658347168]
+[node name="Visual_Road_Sides_EndCaps" type="MeshInstance3D" parent="TerrainGenerator/Visual_Road_Sides" unique_id=1337229055]
+material_override = SubResource("StandardMaterial3D_ocis7")
+mesh = ExtResource("17_ctbtb")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="TerrainGenerator/Visual_Road_Sides/Visual_Road_Sides_Collision" unique_id=1563023467]
+[node name="Visual_Road_Sides_Collision" type="StaticBody3D" parent="TerrainGenerator/Visual_Road_Sides" unique_id=29803676]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TerrainGenerator/Visual_Road_Sides/Visual_Road_Sides_Collision" unique_id=843496944]
 shape = ExtResource("18_uipsh")
 
-[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1888474940]
+[node name="EndCapCollision" type="CollisionShape3D" parent="TerrainGenerator/Visual_Road_Sides/Visual_Road_Sides_Collision" unique_id=501554865]
+shape = ExtResource("19_jmhce")
 
-[node name="@CollisionShape3D@23548" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=487907158]
+[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1766272093]
+
+[node name="@CollisionShape3D@22281" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=1719602028]
 shape = ExtResource("19_luqfk")
 
-[node name="ChasmPitWater" type="MeshInstance3D" parent="TerrainGenerator" unique_id=692339749]
+[node name="ChasmPitWater" type="MeshInstance3D" parent="TerrainGenerator" unique_id=2047959045]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, -3.2, -85)
-material_override = SubResource("ShaderMaterial_uipsh")
+material_override = SubResource("ShaderMaterial_xuout")
 cast_shadow = 0
-mesh = SubResource("PlaneMesh_luqfk")
+mesh = SubResource("PlaneMesh_73j01")
 metadata/water_surface_y = -3.2
 metadata/water_half_xz = Vector2(28, 36)
 
@@ -298,7 +308,7 @@ transform = Transform3D(0.7034232, -0.03789081, -0.7097606, 0, 0.9985781, -0.053
 transform = Transform3D(-0.8008658, 0.021752665, -0.59844863, 0, 0.99934006, 0.036324438, 0.5988438, 0.029091, -0.8003373, 227.73512, 15.926315, -231.53531)
 
 [node name="Halfway1" parent="Checkpoints" unique_id=970429380 instance=ExtResource("2_gate")]
-transform = Transform3D(-0.9727311, -0.0038980497, 0.23190297, 0, 0.9998588, 0.016806595, -0.23193572, 0.016348299, -0.9725938, 201.77481, 10.128015, -11.408478)
+transform = Transform3D(-0.99713314, -0.0012717051, 0.07565631, -4.3201395e-10, 0.99985874, 0.016806591, -0.07566698, 0.016758414, -0.9969923, 191.89163, 8.373985, 30.345997)
 
 [node name="Halfway5" parent="Checkpoints" unique_id=409562185 instance=ExtResource("2_gate")]
 transform = Transform3D(1, 0, 0, 0, 0.93159324, -0.36350262, 0, 0.36350262, 0.93159324, 150, 33.640434, -9.929641)

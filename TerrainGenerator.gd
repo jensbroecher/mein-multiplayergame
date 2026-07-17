@@ -49,6 +49,97 @@ func _path_right(tangent: Vector3) -> Vector3:
 	return right.normalized()
 
 
+## Emit road end-cap at a gap. `vert_base` = index of first vertex this call adds.
+## Returns next free vertex index. pts = cross-section (left outer -> right outer).
+func _emit_canyon_road_end_cap(st: SurfaceTool, pts: PackedVector3Array, tangent: Vector3, face_forward: bool, vert_base: int) -> int:
+	if pts.size() < 3:
+		return vert_base
+	var n: Vector3 = tangent.normalized() if tangent.length_squared() > 1e-8 else Vector3.FORWARD
+	if not face_forward:
+		n = -n
+	var profile_s: float = 0.0
+	var added: int = 0
+	for k in range(pts.size()):
+		if k > 0:
+			profile_s += pts[k].distance_to(pts[k - 1])
+		# U across face (m from left outer), V along profile - no constant-V stretch.
+		var u: float = pts[0].distance_to(pts[k])
+		st.set_normal(n)
+		st.set_uv(Vector2(u, profile_s))
+		st.add_vertex(pts[k])
+		added += 1
+	var b: int = vert_base
+	for k in range(1, added - 1):
+		if face_forward:
+			st.add_index(b); st.add_index(b + k); st.add_index(b + k + 1)
+			st.add_index(b); st.add_index(b + k + 1); st.add_index(b + k)
+		else:
+			st.add_index(b); st.add_index(b + k + 1); st.add_index(b + k)
+			st.add_index(b); st.add_index(b + k); st.add_index(b + k + 1)
+	return vert_base + added
+
+
+## Tall rock face sealing embankment at a jump gap.
+## Single-sided only: opposite faces on the same verts make generate_normals()
+## average to ~zero, which destroys triplanar rock mapping (looks massively stretched).
+## Material uses cull_disabled so one face is visible from both sides.
+func _emit_embankment_end_cap(
+		st: SurfaceTool,
+		top_l: Vector3, top_r: Vector3, bot_l: Vector3, bot_r: Vector3,
+		tangent: Vector3, face_forward: bool, vert_base: int
+) -> int:
+	# Prefer geometric normal of the quad so it matches winding (triplanar needs this).
+	var geo_n: Vector3 = (top_r - top_l).cross(bot_l - top_l)
+	if geo_n.length_squared() < 1e-10:
+		geo_n = (top_r - top_l).cross(bot_r - top_l)
+	if geo_n.length_squared() < 1e-10:
+		geo_n = tangent if tangent.length_squared() > 1e-8 else Vector3.FORWARD
+	else:
+		geo_n = geo_n.normalized()
+	# Face into the gap: align with +/- path tangent when possible
+	var want: Vector3 = tangent.normalized() if tangent.length_squared() > 1e-8 else geo_n
+	if not face_forward:
+		want = -want
+	if geo_n.dot(want) < 0.0:
+		geo_n = -geo_n
+	var n: Vector3 = geo_n
+
+	var width_m: float = top_l.distance_to(top_r)
+	var height_m: float = 0.5 * (top_l.distance_to(bot_l) + top_r.distance_to(bot_r))
+	if width_m < 0.01:
+		width_m = 1.0
+	if height_m < 0.01:
+		height_m = 1.0
+	# UV in meters (triplanar mainly uses world pos; UV is a solid fallback)
+	var us: float = 0.15
+	var vs: float = 0.15
+
+	# Winding: when looking along -n (from outside/gap), want CCW front face.
+	# If n was flipped above to match want, use order that produces +n.
+	var flip_winding: bool = (top_r - top_l).cross(bot_l - top_l).dot(n) < 0.0
+
+	st.set_normal(n)
+	st.set_uv(Vector2(0.0, height_m * vs))
+	st.add_vertex(top_l) # b+0
+	st.set_normal(n)
+	st.set_uv(Vector2(width_m * us, height_m * vs))
+	st.add_vertex(top_r) # b+1
+	st.set_normal(n)
+	st.set_uv(Vector2(0.0, 0.0))
+	st.add_vertex(bot_l) # b+2
+	st.set_normal(n)
+	st.set_uv(Vector2(width_m * us, 0.0))
+	st.add_vertex(bot_r) # b+3
+	var b: int = vert_base
+	if flip_winding:
+		st.add_index(b + 0); st.add_index(b + 2); st.add_index(b + 1)
+		st.add_index(b + 1); st.add_index(b + 2); st.add_index(b + 3)
+	else:
+		st.add_index(b + 0); st.add_index(b + 1); st.add_index(b + 2)
+		st.add_index(b + 1); st.add_index(b + 3); st.add_index(b + 2)
+	return vert_base + 4
+
+
 func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curve3D, for_collision: bool) -> float:
 	var h_noise = noise.get_noise_2d(px, pz) * hill_height
 	
@@ -459,6 +550,10 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 		# 8 verts per slice: L outer → L flat → R flat → R outer (3 samples each shoulder + 2 flats)
 		const SLICE_VERTS := 8
 
+		# Per-slice positions + path tangent (for dedicated end-cap verts / normals).
+		var slice_pts: Array = []
+		var slice_tangents: Array = []
+
 		for i in range(point_count + 1):
 			var offset = (float(i) / point_count) * length
 			var pos = curve.sample_baked(offset)
@@ -492,6 +587,7 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 			# Left shoulder: outer → flat (t 1 → 0). Right: flat → outer (t 0 → 1).
 			var t_samples_l: Array = [1.0, 0.66, 0.33, 0.0]
 			var t_samples_r: Array = [0.0, 0.33, 0.66, 1.0]
+			var pts_this: PackedVector3Array = PackedVector3Array()
 			for ti in range(4):
 				var t: float = float(t_samples_l[ti])
 				var lat: float = half_w - BEVEL_W * (1.0 - t)
@@ -505,6 +601,7 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 				# UV: 0 at left outer, increases toward center
 				st.set_uv(Vector2(half_w - lat, offset))
 				st.add_vertex(p)
+				pts_this.append(p)
 
 			for ti in range(4):
 				var t2: float = float(t_samples_r[ti])
@@ -518,6 +615,10 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 				# UV continues across: half_w + lat (right flat ≈ width - BEVEL_W, outer = width)
 				st.set_uv(Vector2(half_w + lat2, offset))
 				st.add_vertex(p2)
+				pts_this.append(p2)
+
+			slice_pts.append(pts_this)
+			slice_tangents.append(tangent.normalized() if tangent.length_squared() > 1e-8 else Vector3.FORWARD)
 
 		# Index loop: 7 quads per slice
 		for i in range(point_count):
@@ -534,29 +635,25 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 				st.add_index(a); st.add_index(b); st.add_index(c)
 				st.add_index(b); st.add_index(d); st.add_index(c)
 
-			# Cap open ends at jump takeoff / landing so the deck is not hollow
-			var prev_gap := (
+		# Dedicated end-caps after strip verts so UVs/normals match the end face
+		# (reusing strip verts shared path-U and up-normals stretched asphalt).
+		var next_vert: int = (point_count + 1) * SLICE_VERTS
+		for i in range(point_count):
+			if _segment_in_gap(curve, length, point_count, i):
+				continue
+			var prev_gap2 := (
 					(i == 0 and is_loop and _segment_in_gap(curve, length, point_count, point_count - 1))
 					or (i > 0 and _segment_in_gap(curve, length, point_count, i - 1))
 			)
-			var next_gap := false
+			var next_gap2 := false
 			if i + 1 < point_count:
-				next_gap = _segment_in_gap(curve, length, point_count, i + 1)
+				next_gap2 = _segment_in_gap(curve, length, point_count, i + 1)
 			elif is_loop:
-				next_gap = _segment_in_gap(curve, length, point_count, 0)
-			# Full end-cap over the rounded 8-vert shoulder (old 2-tri fan left holes
-			# at the lip — "tiny open gap at the top of the large ramp").
-			if next_gap:
-				for k in range(1, SLICE_VERTS - 1):
-					st.add_index(nxt + 0); st.add_index(nxt + k + 1); st.add_index(nxt + k)
-				# Reverse for underside visibility
-				for k in range(1, SLICE_VERTS - 1):
-					st.add_index(nxt + 0); st.add_index(nxt + k); st.add_index(nxt + k + 1)
-			if prev_gap:
-				for k in range(1, SLICE_VERTS - 1):
-					st.add_index(base + 0); st.add_index(base + k); st.add_index(base + k + 1)
-				for k in range(1, SLICE_VERTS - 1):
-					st.add_index(base + 0); st.add_index(base + k + 1); st.add_index(base + k)
+				next_gap2 = _segment_in_gap(curve, length, point_count, 0)
+			if next_gap2:
+				next_vert = _emit_canyon_road_end_cap(st, slice_pts[i + 1], slice_tangents[i + 1], true, next_vert)
+			if prev_gap2:
+				next_vert = _emit_canyon_road_end_cap(st, slice_pts[i], slice_tangents[i], false, next_vert)
 
 		st.generate_tangents()
 		var mesh_instance = MeshInstance3D.new()
@@ -969,6 +1066,13 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 	# Match canyon road outer lip (rounded shoulder drops BEVEL_H at full half_w).
 	const SIDE_BEVEL_H := 0.75
 
+	# Per-slice corners + tangents for dedicated end-cap faces (correct UVs/normals).
+	var side_top_l: Array = []
+	var side_top_r: Array = []
+	var side_bot_l: Array = []
+	var side_bot_r: Array = []
+	var side_tangents: Array = []
+
 	# 1. VERTEX GENERATION
 	for i in range(point_count + 1):
 		var offset = (float(i) / point_count) * length
@@ -1028,7 +1132,7 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 					bot_r = top_r + right_dir * target_flare
 					bot_r.y = target_y
 				else:
-					# Full dam walls under ramps / normal track — closed solid embankment
+					# Full dam walls under ramps / normal track - closed solid embankment
 					var flare := 2.0
 					bot_l = top_l - right_dir * flare - Vector3(0, drop, 0)
 					bot_r = top_r + right_dir * flare - Vector3(0, drop, 0)
@@ -1042,14 +1146,23 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 
 		var uv_y = offset * 0.2
 
-		st.set_uv(Vector2(0, uv_y))
+		# Side-wall UVs: U runs down the wall (meters), V along the path - no constant-V.
+		var wall_h_l: float = top_l.distance_to(bot_l)
+		var wall_h_r: float = top_r.distance_to(bot_r)
+		st.set_uv(Vector2(0.0, uv_y))
 		st.add_vertex(top_l) # 4*i + 0
-		st.set_uv(Vector2(0.5, uv_y))
+		st.set_uv(Vector2(wall_h_l * 0.15, uv_y))
 		st.add_vertex(bot_l) # 4*i + 1
-		st.set_uv(Vector2(1.0, uv_y))
+		st.set_uv(Vector2(0.0, uv_y))
 		st.add_vertex(top_r) # 4*i + 2
-		st.set_uv(Vector2(1.5, uv_y))
+		st.set_uv(Vector2(wall_h_r * 0.15, uv_y))
 		st.add_vertex(bot_r) # 4*i + 3
+
+		side_top_l.append(top_l)
+		side_top_r.append(top_r)
+		side_bot_l.append(bot_l)
+		side_bot_r.append(bot_r)
+		side_tangents.append(tangent.normalized() if tangent.length_squared() > 1e-8 else Vector3.FORWARD)
 
 	# 2. INDEX GENERATION
 	for i in range(point_count):
@@ -1059,20 +1172,7 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 		var base = i * 4
 		var nxt = (i + 1) * 4
 
-		var prev_gap := (
-				(i == 0 and is_loop and _segment_in_gap(curve, length, point_count, point_count - 1))
-				or (i > 0 and _segment_in_gap(curve, length, point_count, i - 1))
-		)
-		var next_gap := false
-		if i + 1 < point_count:
-			next_gap = _segment_in_gap(curve, length, point_count, i + 1)
-		elif is_loop:
-			next_gap = _segment_in_gap(curve, length, point_count, 0)
-
 		# Side walls must face OUTWARD (visible + collidable from outside the ramp).
-		# Previous winding pointed inward: walls invisible outside, drive-into hollow,
-		# then only visible/collidable once already inside.
-		#
 		# Left wall: outward = -right_dir
 		st.add_index(base + 0); st.add_index(nxt + 0); st.add_index(base + 1)
 		st.add_index(base + 1); st.add_index(nxt + 0); st.add_index(nxt + 1)
@@ -1081,25 +1181,12 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 		st.add_index(base + 2); st.add_index(base + 3); st.add_index(nxt + 2)
 		st.add_index(base + 3); st.add_index(nxt + 3); st.add_index(nxt + 2)
 
-		# Bottom — normal faces downward (seen from under the dam)
+		# Bottom - normal faces downward (seen from under the dam)
 		st.add_index(base + 1); st.add_index(nxt + 1); st.add_index(base + 3)
 		st.add_index(base + 3); st.add_index(nxt + 1); st.add_index(nxt + 3)
 
-		# Seal embankment open ends at jump takeoff / landing (both faces so no holes)
-		if next_gap:
-			# Outer face (into the jump gap)
-			st.add_index(nxt + 0); st.add_index(nxt + 2); st.add_index(nxt + 1)
-			st.add_index(nxt + 1); st.add_index(nxt + 2); st.add_index(nxt + 3)
-			# Inner face
-			st.add_index(nxt + 0); st.add_index(nxt + 1); st.add_index(nxt + 2)
-			st.add_index(nxt + 1); st.add_index(nxt + 3); st.add_index(nxt + 2)
-		if prev_gap:
-			st.add_index(base + 0); st.add_index(base + 1); st.add_index(base + 2)
-			st.add_index(base + 1); st.add_index(base + 3); st.add_index(base + 2)
-			st.add_index(base + 0); st.add_index(base + 2); st.add_index(base + 1)
-			st.add_index(base + 1); st.add_index(base + 2); st.add_index(base + 3)
-
-
+	# Finish side walls as their own mesh. Do NOT inject more verts after generate_normals
+	# (that corrupted indexing and created a giant bogus wall).
 	st.generate_normals()
 	var mesh_instance = MeshInstance3D.new()
 	mesh_instance.name = node_name
@@ -1108,9 +1195,8 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 	var final_side_mat = mat.duplicate()
 	if not node_name.contains("Curbs") and final_side_mat is StandardMaterial3D:
 		final_side_mat.albedo_color = final_side_mat.albedo_color.darkened(0.3)
-	
+
 	if track_layout_type == TrackLayoutType.CANYON and not node_name.contains("Curbs"):
-		# Create a beautiful StandardMaterial3D with triplanar mapping and rock texture for the canyon sides
 		var rock_mat = StandardMaterial3D.new()
 		rock_mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 		var rock_tex = load("res://materials/dark_canyon_rock.png")
@@ -1122,25 +1208,68 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 			rock_mat.normal_enabled = true
 			rock_mat.normal_texture = rock_normal
 			rock_mat.normal_scale = 1.5
-		rock_mat.uv1_scale = Vector3(0.08, 0.08, 0.08)
+		rock_mat.uv1_scale = Vector3(0.06, 0.06, 0.06)
 		rock_mat.uv1_triplanar = true
-		# Never hide embankment walls from odd camera angles on steep ramps
+		rock_mat.uv1_triplanar_sharpness = 8.0
 		rock_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 		final_side_mat = rock_mat
-		
-		# Also add a StaticBody3D and CollisionShape3D for physics collision on the canyon road sides embankment!
+
+		# Separate end-cap mesh (own verts + normals) so triplanar is not warped and
+		# side-wall geometry stays intact.
+		var cap_st := SurfaceTool.new()
+		cap_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		var cap_vert := 0
+		for i in range(point_count):
+			if _segment_in_gap(curve, length, point_count, i):
+				continue
+			var prev_gap := (
+					(i == 0 and is_loop and _segment_in_gap(curve, length, point_count, point_count - 1))
+					or (i > 0 and _segment_in_gap(curve, length, point_count, i - 1))
+			)
+			var next_gap := false
+			if i + 1 < point_count:
+				next_gap = _segment_in_gap(curve, length, point_count, i + 1)
+			elif is_loop:
+				next_gap = _segment_in_gap(curve, length, point_count, 0)
+			if next_gap:
+				cap_vert = _emit_embankment_end_cap(
+						cap_st,
+						side_top_l[i + 1], side_top_r[i + 1], side_bot_l[i + 1], side_bot_r[i + 1],
+						side_tangents[i + 1], true, cap_vert)
+			if prev_gap:
+				cap_vert = _emit_embankment_end_cap(
+						cap_st,
+						side_top_l[i], side_top_r[i], side_bot_l[i], side_bot_r[i],
+						side_tangents[i], false, cap_vert)
+		if cap_vert > 0:
+			var cap_mi := MeshInstance3D.new()
+			cap_mi.name = node_name + "_EndCaps"
+			cap_mi.mesh = _save_resource(cap_st.commit(), node_name + "_EndCaps")
+			cap_mi.material_override = rock_mat
+			mesh_instance.add_child(cap_mi)
+
 		var static_body = StaticBody3D.new()
 		static_body.name = node_name + "_Collision"
 		mesh_instance.add_child(static_body)
-		
+
 		var collision_shape = CollisionShape3D.new()
 		collision_shape.name = "CollisionShape3D"
 		var trimesh_shape = mesh_instance.mesh.create_trimesh_shape()
-		# Trimesh is one-sided by default — if any face is still inverted, still block cars.
 		if trimesh_shape is ConcavePolygonShape3D:
 			(trimesh_shape as ConcavePolygonShape3D).backface_collision = true
 		collision_shape.shape = _save_resource(trimesh_shape, node_name + "_collision_shape")
 		static_body.add_child(collision_shape)
+
+		# Collision for end-cap seals (separate shape, same body)
+		var cap_node2 = mesh_instance.get_node_or_null(node_name + "_EndCaps")
+		if cap_node2 is MeshInstance3D and (cap_node2 as MeshInstance3D).mesh != null:
+			var cap_col := CollisionShape3D.new()
+			cap_col.name = "EndCapCollision"
+			var cap_shape = (cap_node2 as MeshInstance3D).mesh.create_trimesh_shape()
+			if cap_shape is ConcavePolygonShape3D:
+				(cap_shape as ConcavePolygonShape3D).backface_collision = true
+			cap_col.shape = _save_resource(cap_shape, node_name + "_endcap_collision_shape")
+			static_body.add_child(cap_col)
 	elif track_layout_type == TrackLayoutType.CANYON and final_side_mat is ShaderMaterial:
 		final_side_mat.set_shader_parameter("use_world_uv", false)
 		final_side_mat.set_shader_parameter("uv_scale", 4.0)
