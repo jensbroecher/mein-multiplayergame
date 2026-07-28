@@ -232,6 +232,7 @@ var was_shocked: bool = false
 var camera_look_at: Vector3 = Vector3.ZERO
 var camera_clip_distance_mult: float = 1.0
 var camera_clip_distance_mult_iso: float = 1.0
+## Loaded from MusicManager so stage changes keep the player's camera choice.
 var is_isometric: bool = true
 var is_intro_active: bool = false
 var intro_time: float = 0.0
@@ -323,6 +324,12 @@ var _cached_follow_clip_ratio: float = 1.0
 var _camera_raycast_interval: int = 6
 var _align_raycast_interval: int = 4
 var _camera_ray_attempts: int = 2
+## GeometryInstance3D nodes made semi-transparent while occluding the car.
+var _xray_meshes: Dictionary = {} # instance_id -> GeometryInstance3D
+var _xray_target: Dictionary = {} # instance_id -> target transparency 0..1
+const _XRAY_TRANSPARENCY: float = 0.62
+const _XRAY_FADE_SPEED: float = 8.0
+const _ISO_CAM_CLEARANCE: float = 1.25
 
 # AI closest offset calculation throttling
 var _ai_closest_offset_frame: int = 0
@@ -524,10 +531,15 @@ func _ready():
 		var is_coop = NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP
 		camera.current = not is_coop  # SubViewport cameras handle rendering in co-op
 		camera_pivot.top_level = true
+
+		# Restore preferred camera across stages / races
+		is_isometric = MusicManager.use_isometric_camera
+		if not MusicManager.camera_mode_changed.is_connected(_on_camera_mode_setting_changed):
+			MusicManager.camera_mode_changed.connect(_on_camera_mode_setting_changed)
 		
 		# Set initial top-view camera settings
 		camera.projection = Camera3D.PROJECTION_PERSPECTIVE
-		camera.fov = 35.0
+		camera.fov = 35.0 if is_isometric else 75.0
 		
 		# Rotation is already locked globally at startup
 
@@ -548,6 +560,10 @@ func _ready():
 			var iso_offset = Vector3(-26, 26, 26)
 			camera_pivot.global_position = visuals.global_position + iso_offset
 			camera_pivot.look_at(visuals.global_position, Vector3.UP)
+		else:
+			var fwd0 = -visuals.global_transform.basis.z
+			camera_pivot.global_position = visuals.global_position - fwd0 * 4.5 + Vector3(0, 2.4, 0)
+			camera_pivot.look_at(visuals.global_position + fwd0 * 4.0, Vector3.UP)
 	else:
 		camera.current = false
 		if has_node("AudioListener3D"):
@@ -632,14 +648,9 @@ func _process(delta):
 		_update_visuals_alignment(delta)
 		
 	if is_local_player:
-		# Camera toggle
+		# Camera toggle (persists across stages via MusicManager)
 		if Input.is_action_just_pressed(input_prefix + "toggle_camera"):
-			is_isometric = not is_isometric
-			camera.projection = Camera3D.PROJECTION_PERSPECTIVE
-			if not is_isometric:
-				camera_clip_distance_mult = 1.0
-			else:
-				camera_clip_distance_mult_iso = 1.0
+			_set_isometric_camera(not is_isometric, true)
 
 		# Action buttons
 		if Input.is_action_just_pressed(input_prefix + "respawn"):
@@ -681,54 +692,52 @@ func _process(delta):
 				
 			if is_isometric:
 				var iso_offset = Vector3(-26, 26, 26)
-				var target_cam_pos = visuals.global_position + iso_offset
-				
-				# Throttle clip raycasts (mobile uses a longer interval — terrain trimesh is expensive).
-				_camera_raycast_frame += 1
+				var desired_cam_pos = visuals.global_position + iso_offset
 				var ray_start = visuals.global_position + Vector3.UP * 1.0
+				
+				# Throttle expensive clip raycasts
+				_camera_raycast_frame += 1
 				if _camera_raycast_frame >= _camera_raycast_interval:
 					_camera_raycast_frame = 0
 					var target_ratio = 1.0
 					var space_state = get_world_3d().direct_space_state
-					# Recursive raycast to step past smaller obstacles/collisions to find actual terrain
 					var query_start = ray_start
 					var current_excludes = excludes.duplicate()
-					var hit_terrain = false
+					var hit_block = false
 					var hit_dist = 0.0
-					var max_dist = ray_start.distance_to(target_cam_pos)
+					var max_dist = ray_start.distance_to(desired_cam_pos)
 					for attempt in range(_camera_ray_attempts):
-						var query = PhysicsRayQueryParameters3D.create(query_start, target_cam_pos)
+						var query = PhysicsRayQueryParameters3D.create(query_start, desired_cam_pos)
 						query.exclude = current_excludes
 						var result = space_state.intersect_ray(query)
 						if not result:
 							break
-						if result.collider and (result.collider.name.contains("Unified_World_Collision") or result.collider.name.contains("Terrain") or result.collider.name.contains("Static")):
-							hit_terrain = true
+						# Pull in for terrain and solid world geometry (props handled via x-ray)
+						if result.collider and _is_world_collider(result.collider):
+							hit_block = true
 							hit_dist = ray_start.distance_to(result.position)
 							break
 						current_excludes.append(result.rid)
-						query_start = result.position + (target_cam_pos - query_start).normalized() * 0.1
-					if hit_terrain and max_dist > 0.01:
-						target_ratio = clamp((hit_dist - 0.5) / max_dist, 0.1, 1.0)
+						query_start = result.position + (desired_cam_pos - query_start).normalized() * 0.1
+					if hit_block and max_dist > 0.01:
+						target_ratio = clamp((hit_dist - _ISO_CAM_CLEARANCE) / max_dist, 0.12, 1.0)
 					_cached_iso_clip_ratio = target_ratio
-					# Vertical raycast: check if camera is below terrain surface
-					var cam_pos_check = camera_pivot.global_position
-					var vert_query = PhysicsRayQueryParameters3D.create(cam_pos_check + Vector3(0, 15, 0), cam_pos_check + Vector3(0, -15, 0))
-					vert_query.exclude = excludes
-					var vert_result = space_state.intersect_ray(vert_query)
-					_cached_cam_below_terrain = false
-					if vert_result and vert_result.collider and (vert_result.collider.name.contains("Unified_World_Collision") or vert_result.collider.name.contains("Terrain")):
-						var terrain_y = vert_result.position.y
-						if cam_pos_check.y < terrain_y + 0.5:
-							camera_pivot.global_position.y = terrain_y + 0.5
-							_cached_cam_below_terrain = cam_pos_check.y < terrain_y
-				# Apply cached clip ratio every frame for smooth lerping
+
+				# Lerp pull-in, then clamp target above terrain so we never lerp underground
 				var lerp_speed = 15.0 if _cached_iso_clip_ratio < camera_clip_distance_mult_iso else 3.0
 				camera_clip_distance_mult_iso = lerp(camera_clip_distance_mult_iso, _cached_iso_clip_ratio, lerp_speed * delta)
-				target_cam_pos = ray_start + (target_cam_pos - ray_start) * camera_clip_distance_mult_iso
+				var target_cam_pos = ray_start + (desired_cam_pos - ray_start) * camera_clip_distance_mult_iso
+				target_cam_pos = _raise_point_above_terrain(target_cam_pos, excludes)
 				camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 10.0 * delta)
+				# Final safety clamp after lerp (prevents clipping mid-transition)
+				camera_pivot.global_position = _raise_point_above_terrain(camera_pivot.global_position, excludes)
+
+				# Soft x-ray for props / rocks still blocking the car (not a black full-screen flash)
+				_update_camera_xray(camera_pivot.global_position, visuals.global_position + Vector3.UP * 0.8, excludes, delta)
 				if race_ui:
+					# Only a gentle darken if still deeply under surface — smooth, never binary black
 					race_ui.set_terrain_clipped(_cached_cam_below_terrain)
+
 				camera_look_at = camera_look_at.lerp(visuals.global_position + visual_forward * look_ahead_dist, 10.0 * delta)
 				camera_pivot.look_at(camera_look_at, Vector3.UP)
 			else:
@@ -747,7 +756,7 @@ func _process(delta):
 					var query = PhysicsRayQueryParameters3D.create(ray_start, target_cam_pos)
 					query.exclude = excludes
 					var result = space_state.intersect_ray(query)
-					if result and result.collider and (result.collider.name.contains("Unified_World_Collision") or result.collider.name.contains("Terrain")):
+					if result and result.collider and _is_world_collider(result.collider):
 						var hit_pos = result.position
 						var max_dist = ray_start.distance_to(target_cam_pos)
 						if max_dist > 0.01:
@@ -758,11 +767,15 @@ func _process(delta):
 				var lerp_speed = 15.0 if _cached_follow_clip_ratio < camera_clip_distance_mult else 3.0
 				camera_clip_distance_mult = lerp(camera_clip_distance_mult, _cached_follow_clip_ratio, lerp_speed * delta)
 				target_cam_pos = ray_start + (target_cam_pos - ray_start) * camera_clip_distance_mult
+				target_cam_pos = _raise_point_above_terrain(target_cam_pos, excludes)
 				camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 10.0 * delta)
+				_update_camera_xray(camera_pivot.global_position, visuals.global_position + Vector3.UP * 0.8, excludes, delta)
 				if race_ui:
 					race_ui.set_terrain_clipped(false)
 				camera_look_at = camera_look_at.lerp(visuals.global_position + visual_forward * (look_ahead_dist + 0.5), 12.0 * delta)
 				camera_pivot.look_at(camera_look_at, Vector3.UP)
+		else:
+			_fade_out_all_xray(delta)
 		
 		# Smoothly lerp camera FOV based on is_isometric and is_boosting/is_pad_boosting
 		var target_fov = 35.0 if is_isometric else 75.0
@@ -3224,6 +3237,180 @@ func _update_intro_camera(_delta: float):
 	camera_pivot.global_position = intro_orbit_center + offset
 	camera_pivot.look_at(intro_orbit_center, Vector3.UP)
 
+
+func _on_camera_mode_setting_changed(iso: bool) -> void:
+	if not is_local_player:
+		return
+	_set_isometric_camera(iso, false)
+
+
+func _set_isometric_camera(iso: bool, persist: bool) -> void:
+	if is_isometric == iso:
+		if persist:
+			MusicManager.set_use_isometric_camera(iso)
+		return
+	is_isometric = iso
+	if camera:
+		camera.projection = Camera3D.PROJECTION_PERSPECTIVE
+	if not is_isometric:
+		camera_clip_distance_mult = 1.0
+	else:
+		camera_clip_distance_mult_iso = 1.0
+	_clear_camera_xray_immediate()
+	_cached_cam_below_terrain = false
+	if race_ui:
+		race_ui.set_terrain_clipped(false)
+	if persist:
+		MusicManager.set_use_isometric_camera(is_isometric)
+
+
+func _is_world_collider(collider: Object) -> bool:
+	if collider == null:
+		return false
+	var n := str(collider.name)
+	if n.contains("Unified_World_Collision") or n.contains("Terrain") or n.contains("Static"):
+		return true
+	# Generated track/prop collision bodies often sit under level nodes
+	if collider is CollisionObject3D:
+		var p: Node = (collider as Node).get_parent()
+		if p and (str(p.name).contains("Terrain") or str(p.name).contains("Track") or str(p.name).contains("World")):
+			return true
+	return false
+
+
+func _is_terrain_collider(collider: Object) -> bool:
+	if collider == null:
+		return false
+	var n := str(collider.name)
+	return n.contains("Unified_World_Collision") or n.contains("Terrain") or n.contains("track_collision") or n.contains("terrain")
+
+
+func _raise_point_above_terrain(pos: Vector3, excludes: Array) -> Vector3:
+	var space_state = get_world_3d().direct_space_state
+	if space_state == null:
+		return pos
+	# Cast from well above down through the camera point
+	var from := pos + Vector3(0.0, 40.0, 0.0)
+	var to := pos + Vector3(0.0, -25.0, 0.0)
+	var query := PhysicsRayQueryParameters3D.create(from, to)
+	query.exclude = excludes
+	var result = space_state.intersect_ray(query)
+	_cached_cam_below_terrain = false
+	if result and result.collider and _is_terrain_collider(result.collider):
+		var terrain_y: float = result.position.y
+		var min_y: float = terrain_y + _ISO_CAM_CLEARANCE
+		if pos.y < min_y:
+			# Still considered "deep" only if substantially under surface after clamp intent
+			_cached_cam_below_terrain = pos.y < terrain_y - 0.25
+			pos.y = min_y
+	return pos
+
+
+func _find_geometry_for_collider(collider: Object) -> Array:
+	var out: Array = []
+	if collider == null or not (collider is Node):
+		return out
+	var root := collider as Node
+	# Prefer geometry under the collision body; also check siblings under shared parent (FBX)
+	var candidates: Array = [root]
+	if root.get_parent():
+		candidates.append(root.get_parent())
+	for node in candidates:
+		if node is GeometryInstance3D:
+			out.append(node)
+		for c in node.get_children():
+			if c is GeometryInstance3D:
+				out.append(c)
+			elif c is Node3D:
+				for c2 in c.get_children():
+					if c2 is GeometryInstance3D:
+						out.append(c2)
+	return out
+
+
+func _update_camera_xray(cam_pos: Vector3, car_pos: Vector3, excludes: Array, delta: float) -> void:
+	var space_state = get_world_3d().direct_space_state
+	if space_state == null:
+		_fade_out_all_xray(delta)
+		return
+	var seen: Dictionary = {}
+	var dir: Vector3 = car_pos - cam_pos
+	var max_dist: float = dir.length()
+	if max_dist < 0.5:
+		_fade_out_all_xray(delta)
+		return
+	dir /= max_dist
+	var excl: Array = excludes.duplicate()
+	var cursor: Vector3 = cam_pos
+	for _i in range(5):
+		var query := PhysicsRayQueryParameters3D.create(cursor, car_pos)
+		query.exclude = excl
+		var result = space_state.intersect_ray(query)
+		if not result:
+			break
+		excl.append(result.rid)
+		var hit_dist: float = cam_pos.distance_to(result.position)
+		# Ignore the last bit near the car body
+		if hit_dist > max_dist - 0.6:
+			break
+		# Terrain: do not ghost the whole landscape — camera raise handles it
+		if result.collider and _is_terrain_collider(result.collider):
+			cursor = result.position + dir * 0.2
+			continue
+		for gi in _find_geometry_for_collider(result.collider):
+			if gi == null or not is_instance_valid(gi):
+				continue
+			# Never x-ray the player cart visuals
+			if visuals and (gi == visuals or visuals.is_ancestor_of(gi) or gi.is_ancestor_of(visuals)):
+				continue
+			var id: int = gi.get_instance_id()
+			seen[id] = true
+			_xray_meshes[id] = gi
+			_xray_target[id] = _XRAY_TRANSPARENCY
+		cursor = result.position + dir * 0.2
+
+	# Fade targets for meshes no longer occluding
+	for id in _xray_target.keys():
+		if not seen.has(id):
+			_xray_target[id] = 0.0
+
+	_apply_xray_fade(delta)
+
+
+func _fade_out_all_xray(delta: float) -> void:
+	for id in _xray_target.keys():
+		_xray_target[id] = 0.0
+	_apply_xray_fade(delta)
+
+
+func _apply_xray_fade(delta: float) -> void:
+	var to_remove: Array = []
+	for id in _xray_meshes.keys():
+		var gi = _xray_meshes[id]
+		if gi == null or not is_instance_valid(gi):
+			to_remove.append(id)
+			continue
+		var target_t: float = float(_xray_target.get(id, 0.0))
+		var cur: float = gi.transparency
+		var next_t: float = move_toward(cur, target_t, _XRAY_FADE_SPEED * delta)
+		gi.transparency = next_t
+		if target_t <= 0.001 and next_t <= 0.001:
+			gi.transparency = 0.0
+			to_remove.append(id)
+	for id in to_remove:
+		_xray_meshes.erase(id)
+		_xray_target.erase(id)
+
+
+func _clear_camera_xray_immediate() -> void:
+	for id in _xray_meshes.keys():
+		var gi = _xray_meshes[id]
+		if gi != null and is_instance_valid(gi):
+			gi.transparency = 0.0
+	_xray_meshes.clear()
+	_xray_target.clear()
+
+
 func _set_layers_recursive(node: Node, mask: int):
 	if node is VisualInstance3D:
 		node.layers = mask
@@ -3240,6 +3427,9 @@ func _find_node_by_name(root: Node, node_name: String) -> Node:
 	return null
 
 func _exit_tree():
+	_clear_camera_xray_immediate()
+	if MusicManager.camera_mode_changed.is_connected(_on_camera_mode_setting_changed):
+		MusicManager.camera_mode_changed.disconnect(_on_camera_mode_setting_changed)
 	var tree = get_tree()
 	if tree:
 		tree.call_group("player_carts", "update_lod_bias_deferred")

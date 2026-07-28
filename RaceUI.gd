@@ -18,13 +18,36 @@ extends CanvasLayer
 @onready var underwater_overlay = $UnderwaterOverlay
 @onready var terrain_clip_overlay = $TerrainClipOverlay
 
+## Soft darken when camera is deep under terrain — lerped to avoid black-screen flashes.
+var _terrain_clip_target: float = 0.0
+var _terrain_clip_alpha: float = 0.0
+const _TERRAIN_CLIP_MAX_ALPHA: float = 0.35
+const _TERRAIN_CLIP_FADE_SPEED: float = 4.0
+
 func set_underwater(is_underwater: bool):
 	if underwater_overlay:
 		underwater_overlay.visible = is_underwater
 
 func set_terrain_clipped(is_clipped: bool):
-	if terrain_clip_overlay:
-		terrain_clip_overlay.visible = is_clipped
+	_terrain_clip_target = 1.0 if is_clipped else 0.0
+	if terrain_clip_overlay and not is_clipped and _terrain_clip_alpha <= 0.001:
+		terrain_clip_overlay.visible = false
+
+func _process(delta: float) -> void:
+	if terrain_clip_overlay == null:
+		return
+	if absf(_terrain_clip_alpha - _terrain_clip_target) < 0.001 and _terrain_clip_target <= 0.0:
+		if terrain_clip_overlay.visible:
+			terrain_clip_overlay.visible = false
+		return
+	_terrain_clip_alpha = move_toward(_terrain_clip_alpha, _terrain_clip_target, _TERRAIN_CLIP_FADE_SPEED * delta)
+	if _terrain_clip_alpha <= 0.001:
+		_terrain_clip_alpha = 0.0
+		terrain_clip_overlay.visible = false
+	else:
+		terrain_clip_overlay.visible = true
+		# Soft darken, never full opaque black (that caused hard flashes)
+		terrain_clip_overlay.color = Color(0.02, 0.03, 0.04, _terrain_clip_alpha * _TERRAIN_CLIP_MAX_ALPHA)
 
 @onready var end_panel = $EndPanel
 @onready var end_timer_label = $EndPanel/VBoxContainer/LabelTimer

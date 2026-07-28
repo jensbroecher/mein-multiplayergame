@@ -17,6 +17,11 @@ var shadows_enabled: bool = false
 var render_scale_index: int = 1 # 0:50% 1:75% 2:100% 3:125%
 var anisotropic_index: int = 1 # 0:Off 1:2x 2:4x 3:8x 4:16x
 var max_fps_index: int = 1 # 0:30 1:60 2:120 3:Unlimited
+## true = isometric / top-down race cam, false = behind-the-car follower cam.
+## Remembered across stages and sessions.
+var use_isometric_camera: bool = true
+
+signal camera_mode_changed(is_isometric: bool)
 
 const RESOLUTIONS = [
 	Vector2i(1280, 720),
@@ -136,6 +141,7 @@ func load_settings():
 		render_scale_index = config.get_value("graphics", "render_scale_index", 1)
 		anisotropic_index = config.get_value("graphics", "anisotropic_index", 1)
 		max_fps_index = config.get_value("graphics", "max_fps_index", 1)
+		use_isometric_camera = config.get_value("gameplay", "use_isometric_camera", true)
 		
 	# Apply loaded settings
 	set_music_volume(music_volume, false)
@@ -167,6 +173,7 @@ func save_settings():
 	config.set_value("graphics", "render_scale_index", render_scale_index)
 	config.set_value("graphics", "anisotropic_index", anisotropic_index)
 	config.set_value("graphics", "max_fps_index", max_fps_index)
+	config.set_value("gameplay", "use_isometric_camera", use_isometric_camera)
 	config.save(SETTINGS_FILE)
 
 func _load_playlist(folder: String = music_folder):
@@ -390,6 +397,15 @@ func set_max_fps(index: int, save: bool = true):
 	max_fps_index = index
 	Engine.max_fps = MAX_FPS_VALUES[index]
 	if save: save_settings()
+
+func set_use_isometric_camera(enabled: bool, save: bool = true) -> void:
+	if use_isometric_camera == enabled:
+		return
+	use_isometric_camera = enabled
+	camera_mode_changed.emit(use_isometric_camera)
+	if save:
+		save_settings()
+
 
 func set_shadows_enabled(enabled: bool, save: bool = true):
 	shadows_enabled = enabled

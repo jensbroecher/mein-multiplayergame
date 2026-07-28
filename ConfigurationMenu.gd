@@ -21,6 +21,7 @@ var check_shadows: CheckButton
 var option_render_scale: OptionButton
 var option_anisotropic: OptionButton
 var option_max_fps: OptionButton
+var option_camera_mode: OptionButton
 
 const ACTION_LABELS = {
 	"throttle": "Throttle / Forward",
@@ -68,6 +69,7 @@ func _ready():
 	option_render_scale.selected = MusicManager.render_scale_index
 	option_anisotropic.selected = MusicManager.anisotropic_index
 	option_max_fps.selected = MusicManager.max_fps_index
+	option_camera_mode.selected = 0 if MusicManager.use_isometric_camera else 1
 	
 	# Connect signals
 	check_fps.toggled.connect(_on_fps_toggled)
@@ -79,6 +81,7 @@ func _ready():
 	option_render_scale.item_selected.connect(_on_render_scale_selected)
 	option_anisotropic.item_selected.connect(_on_anisotropic_selected)
 	option_max_fps.item_selected.connect(_on_max_fps_selected)
+	option_camera_mode.item_selected.connect(_on_camera_mode_selected)
 	btn_back.pressed.connect(_on_back_pressed)
 	
 	_build_input_ui()
@@ -109,6 +112,11 @@ func _build_graphics_options():
 	option_max_fps.add_item("60")
 	option_max_fps.add_item("120")
 	option_max_fps.add_item("Unlimited")
+
+	option_camera_mode = _add_option_row(video_settings, "Race Camera")
+	option_camera_mode.clear()
+	option_camera_mode.add_item("Isometric")
+	option_camera_mode.add_item("Follower")
 
 func _add_check_row(parent: Control, label_text: String, pressed: bool) -> CheckButton:
 	var row = HBoxContainer.new()
@@ -326,6 +334,9 @@ func _on_anisotropic_selected(index: int):
 
 func _on_max_fps_selected(index: int):
 	MusicManager.set_max_fps(index)
+
+func _on_camera_mode_selected(index: int):
+	MusicManager.set_use_isometric_camera(index == 0)
 
 func _on_back_pressed():
 	is_waiting_for_key = false
