@@ -230,6 +230,17 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 		else:
 			height = lerp(height, road_h - terrain_recession_visual, basin_blend)
 
+		# Desert Wadi: carve a shallow river corridor (banks dip below the water plane).
+		# Road blend above still wins near the path so the ford stays driveable.
+		if level_prefix == "desert_wadi":
+			var river_t: float = _wadi_river_influence(px, pz)
+			if river_t > 0.001:
+				var bed_y: float = WADI_RIVER_BED_Y
+				# Keep the road corridor near road_h; deepen only away from asphalt
+				var away_from_road: float = smoothstep(sand_edge * 0.35, sand_edge + 18.0, dist)
+				var carve: float = river_t * away_from_road
+				height = lerp(height, bed_y, carve)
+
 	# Edge falloff (all track types — drops to abyss at map edges)
 	var world_pos = Vector2(px, pz)
 	var noise_val = noise.get_noise_2d(px * 0.1, pz * 0.1) * 200.0
@@ -302,6 +313,8 @@ func _ready():
 	# Pit water is lightweight — also create in the editor so Canyon Chasm shows it in the viewport.
 	if level_prefix == "canyon_chasm":
 		call_deferred("add_chasm_pit_water")
+	elif level_prefix == "desert_wadi":
+		call_deferred("add_wadi_river_water")
 
 func generate_world():
 	if not track_path: return
@@ -351,6 +364,9 @@ func generate_world():
 	if level_prefix == "canyon_chasm":
 		# Local murky water in the hill-jump pit (not a full ocean plane).
 		add_chasm_pit_water()
+	elif level_prefix == "desert_wadi":
+		# Shallow river ford only (no full-stage ocean plane).
+		add_wadi_river_water()
 	elif not no_water:
 		_generate_water()
 
@@ -1315,6 +1331,108 @@ func _generate_water():
 const CHASM_PIT_WATER_Y := -3.2
 const CHASM_PIT_CENTER := Vector3(150.0, CHASM_PIT_WATER_Y, -85.0)
 const CHASM_PIT_HALF_EXTENTS := Vector2(28.0, 36.0) # XZ half-size of water volume
+
+## Desert Wadi shallow river (ford) — water surface slightly above road bed for splash.
+const WADI_RIVER_WATER_Y := 1.15
+const WADI_RIVER_BED_Y := 0.15
+## River polyline in XZ (world), sampled as a soft ribbon.
+const WADI_RIVER_HALF_WIDTH := 28.0
+const WADI_RIVER_POLY: Array[Vector2] = [
+	Vector2(100.0, -170.0),
+	Vector2(140.0, -195.0),
+	Vector2(180.0, -210.0),
+	Vector2(220.0, -225.0),
+	Vector2(260.0, -240.0),
+]
+
+
+func _wadi_river_influence(px: float, pz: float) -> float:
+	## 1 near river centerline, 0 outside the banks.
+	if level_prefix != "desert_wadi":
+		return 0.0
+	var p := Vector2(px, pz)
+	var best_d := 1.0e9
+	for i in range(WADI_RIVER_POLY.size() - 1):
+		var a: Vector2 = WADI_RIVER_POLY[i]
+		var b: Vector2 = WADI_RIVER_POLY[i + 1]
+		var ab: Vector2 = b - a
+		var len_sq: float = ab.length_squared()
+		var t: float = 0.0 if len_sq < 1e-6 else clampf((p - a).dot(ab) / len_sq, 0.0, 1.0)
+		var closest: Vector2 = a + ab * t
+		best_d = minf(best_d, p.distance_to(closest))
+	if best_d >= WADI_RIVER_HALF_WIDTH:
+		return 0.0
+	# Soft falloff from center to banks
+	var u: float = 1.0 - (best_d / WADI_RIVER_HALF_WIDTH)
+	return u * u * (3.0 - 2.0 * u)
+
+
+func add_wadi_river_water() -> void:
+	if get_node_or_null("WadiRiverWater") != null:
+		return
+	# Bounds from polyline AABB + half width
+	var min_x := 1.0e9
+	var max_x := -1.0e9
+	var min_z := 1.0e9
+	var max_z := -1.0e9
+	for p in WADI_RIVER_POLY:
+		min_x = minf(min_x, p.x)
+		max_x = maxf(max_x, p.x)
+		min_z = minf(min_z, p.y)
+		max_z = maxf(max_z, p.y)
+	min_x -= WADI_RIVER_HALF_WIDTH
+	max_x += WADI_RIVER_HALF_WIDTH
+	min_z -= WADI_RIVER_HALF_WIDTH
+	max_z += WADI_RIVER_HALF_WIDTH
+	var cx: float = (min_x + max_x) * 0.5
+	var cz: float = (min_z + max_z) * 0.5
+	var half := Vector2((max_x - min_x) * 0.5, (max_z - min_z) * 0.5)
+
+	var water := MeshInstance3D.new()
+	water.name = "WadiRiverWater"
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(half.x * 2.0, half.y * 2.0)
+	plane.subdivide_width = 36
+	plane.subdivide_depth = 28
+	water.mesh = plane
+	water.position = Vector3(cx, WADI_RIVER_WATER_Y, cz)
+	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	water.set_meta("water_surface_y", WADI_RIVER_WATER_Y)
+	water.set_meta("water_half_xz", half)
+
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://water.gdshader")
+	var noise := FastNoiseLite.new()
+	noise.seed = 91
+	noise.frequency = 0.03
+	noise.fractal_type = FastNoiseLite.FRACTAL_FBM
+	noise.fractal_octaves = 3
+	var noise_tex := NoiseTexture2D.new()
+	noise_tex.seamless = true
+	noise_tex.as_normal_map = true
+	noise_tex.width = 256
+	noise_tex.height = 256
+	noise_tex.noise = noise
+	# Clear shallow desert river
+	mat.set_shader_parameter("noise_tex", noise_tex)
+	mat.set_shader_parameter("water_color", Color(0.12, 0.32, 0.38))
+	mat.set_shader_parameter("shallow_color", Color(0.28, 0.48, 0.42))
+	mat.set_shader_parameter("sky_tint", Color(0.7, 0.78, 0.85))
+	mat.set_shader_parameter("sky_reflect", 0.55)
+	mat.set_shader_parameter("transparency", 0.45)
+	mat.set_shader_parameter("metallic", 0.45)
+	mat.set_shader_parameter("roughness", 0.14)
+	mat.set_shader_parameter("wave_speed", 0.04)
+	mat.set_shader_parameter("wave_strength", 0.35)
+	mat.set_shader_parameter("wave_height", 0.22)
+	mat.set_shader_parameter("wave_scale", 0.9)
+	water.material_override = mat
+	add_child(water)
+	if Engine.is_editor_hint() and get_tree():
+		var root = get_tree().edited_scene_root
+		if root:
+			water.owner = root
+		noise_tex.changed.emit()
 
 
 ## Murky green/brown water filling the first hill-jump pit on Canyon Chasm.

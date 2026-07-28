@@ -181,6 +181,9 @@ func _create_stage_select_menu():
 	
 	var btn_chasm = _add_menu_button(stage_select_container, "CANYON CHASM")
 	btn_chasm.pressed.connect(func(): _on_stage_selected("res://levels/CanyonChasmLevel.tscn"))
+
+	var btn_wadi = _add_menu_button(stage_select_container, "DESERT WADI")
+	btn_wadi.pressed.connect(func(): _on_stage_selected("res://levels/DesertWadiLevel.tscn"))
 	
 	var btn_back = _add_menu_button(stage_select_container, "BACK")
 	btn_back.pressed.connect(func():

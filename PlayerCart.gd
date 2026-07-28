@@ -473,6 +473,22 @@ func _ready():
 					var c: Vector3 = pit.global_position
 					water_bounds_min = Vector2(c.x - half.x, c.z - half.y)
 					water_bounds_max = Vector2(c.x + half.x, c.z + half.y)
+		elif tg and str(tg.get("level_prefix")) == "desert_wadi":
+			# Local shallow river ford only.
+			stage_has_water = true
+			water_surface_y = 1.15
+			water_bounds_active = true
+			water_bounds_min = Vector2(72.0, -268.0)
+			water_bounds_max = Vector2(288.0, -142.0)
+			var river = tg.get_node_or_null("WadiRiverWater")
+			if river:
+				if river.has_meta("water_surface_y"):
+					water_surface_y = float(river.get_meta("water_surface_y"))
+				if river.has_meta("water_half_xz"):
+					var half_r: Vector2 = river.get_meta("water_half_xz")
+					var cr: Vector3 = river.global_position
+					water_bounds_min = Vector2(cr.x - half_r.x, cr.z - half_r.y)
+					water_bounds_max = Vector2(cr.x + half_r.x, cr.z + half_r.y)
 		elif tg and "no_water" in tg:
 			stage_has_water = not tg.no_water
 			water_surface_y = WATER_LEVEL

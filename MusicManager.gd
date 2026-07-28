@@ -204,7 +204,7 @@ func load_playlist_for_level(scene_path: String):
 		level_folder = music_folder + "mountain/"
 	elif scene_path.to_lower().contains("canyon"):
 		level_folder = music_folder + "canyon/"
-	elif scene_path.to_lower().contains("desert"):
+	elif scene_path.to_lower().contains("desert") or scene_path.to_lower().contains("wadi"):
 		level_folder = music_folder + "desert/"
 	elif scene_path.to_lower().contains("city"):
 		level_folder = music_folder + "city/"
