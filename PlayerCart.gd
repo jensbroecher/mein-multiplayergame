@@ -1185,20 +1185,45 @@ func _physics_process(delta):
 		drift_mode = true
 		drift_right = input_dir.x > 0.0
 
-	# Auto-hop over small obstacles/bumps
-	if on_ground and input_dir.y < -0.1 and linear_velocity.length() < 15.0 and hop_cooldown <= 0.0:
-		var space_state = get_world_3d().direct_space_state
-		var ray_start = global_position + fwd * 0.5 + Vector3.UP * 0.1
-		var ray_end = global_position + fwd * 1.1 - Vector3.UP * 0.1
-		var query = PhysicsRayQueryParameters3D.create(ray_start, ray_end)
-		query.exclude = [self.get_rid()]
-		var result = space_state.intersect_ray(query)
-		if result:
-			var local_hit = global_transform.inverse() * result.position
-			# If obstacle is low (below bumper/axle height), jump over it
-			if local_hit.y > -0.5 and local_hit.y < 0.1:
-				apply_central_impulse(Vector3.UP * 4.5 * mass + fwd * 2.0 * mass)
-				hop_cooldown = 0.8 # Cooldown to prevent double jumps
+	# Auto-hop over small props/steps only when nearly stuck — never on road/ramps.
+	if on_ground and input_dir.y < -0.1 and hop_cooldown <= 0.0:
+		var hop_speed: float = linear_velocity.length()
+		# Only when crawling / blocked (not normal road driving)
+		if hop_speed >= 0.4 and hop_speed <= 8.5:
+			var space_state = get_world_3d().direct_space_state
+			# Short bumper ray, slightly above ground so flat asphalt rarely hits
+			var ray_start = global_position + fwd * 0.55 + Vector3.UP * 0.22
+			var ray_end = global_position + fwd * 1.05 + Vector3.UP * 0.08
+			var query = PhysicsRayQueryParameters3D.create(ray_start, ray_end)
+			query.exclude = [self.get_rid()]
+			var result = space_state.intersect_ray(query)
+			if result:
+				var col = result.collider
+				var col_name := str(col.name) if col else ""
+				# Drive surfaces / ramps must never trigger a hop
+				var is_drive_surface := (
+						col_name.contains("Track_Collision")
+						or col_name.contains("Unified_World")
+						or col_name.contains("Terrain")
+						or col_name.contains("Road")
+						or col_name.contains("Visual_Road")
+						or col_name.contains("Loop")
+						or col_name.contains("Ramp")
+						or col_name.contains("Bridge")
+				)
+				if not is_drive_surface:
+					var hit_n: Vector3 = result.normal
+					# Need a wall-ish face in front of us (not a gentle slope)
+					var faces_us: float = -hit_n.dot(fwd)
+					var upright: float = 1.0 - clampf(hit_n.y, 0.0, 1.0)
+					var local_hit = global_transform.inverse() * result.position
+					# Low curb/prop lip only (wheel/bumper band)
+					var height_ok: bool = local_hit.y > -0.35 and local_hit.y < 0.38
+					if height_ok and faces_us > 0.35 and upright > 0.35 and hit_n.y < 0.72:
+						# Milder hop: clear the lip without launching off ramps
+						var up_kick: float = lerpf(2.2, 3.4, clampf(1.0 - hop_speed / 8.5, 0.0, 1.0))
+						apply_central_impulse(Vector3.UP * up_kick * mass + fwd * 1.1 * mass)
+						hop_cooldown = 1.15
 
 	var slow_mult = 1.0
 	if slow_timer > 0.0:
