@@ -63,6 +63,12 @@ func _ready() -> void:
 	tg.no_grass = true
 	tg.terrain_resolution = 560
 	tg.hill_height = 42.0
+	# Bridge pillars poke the deck on tight curves and cause random jumps
+	tg.generate_bridge_supports = false
+	tg.terrain_recession_collision = 0.12
+	tg.terrain_recession_visual = 0.18
+	tg.road_y_offset = 0.06
+	tg.curb_y_offset = 0.06
 
 	# Technical closed loop: tight hairpins + river ford + elevation changes.
 	# Off-road: cutting the switchbacks means leaving sand onto Unified_World terrain.

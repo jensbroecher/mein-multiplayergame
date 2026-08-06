@@ -1,9 +1,9 @@
 extends Node3D
 
 func _ready():
-	# Performance protection: Limit to 6 active water splashes in the scene
+	# Performance protection: allow denser spray/wake splashes while driving in water
 	var active_splashes = get_tree().get_nodes_in_group("water_splashes")
-	if active_splashes.size() >= 6:
+	if active_splashes.size() >= 14:
 		var oldest = active_splashes[0]
 		if is_instance_valid(oldest) and oldest != self:
 			oldest.queue_free()

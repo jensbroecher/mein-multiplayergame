@@ -35,18 +35,83 @@ func _segment_in_gap(curve: Curve3D, length: float, point_count: int, i: int) ->
 
 
 ## Stable sideways axis for a path tangent (avoids zero-length on steep ramps).
+## Always horizontal so road/curb cross-sections stay level and don't fold on slopes.
 func _path_right(tangent: Vector3) -> Vector3:
 	var t := tangent
+	t.y = 0.0
 	if t.length_squared() < 1e-8:
 		t = Vector3.FORWARD
 	else:
 		t = t.normalized()
 	var right := t.cross(Vector3.UP)
 	if right.length_squared() < 1e-6:
-		right = t.cross(Vector3.RIGHT)
-	if right.length_squared() < 1e-6:
 		right = Vector3.RIGHT
 	return right.normalized()
+
+
+## Build per-slice path frames with flip-free smoothed right vectors.
+## Prevents curb/road mesh self-intersection on sharp hairpins.
+func _build_path_frames(curve: Curve3D, point_count: int) -> Array:
+	var length: float = maxf(curve.get_baked_length(), 0.001)
+	var frames: Array = []
+	for i in range(point_count + 1):
+		var offset: float = (float(i) / float(point_count)) * length
+		var pos: Vector3 = curve.sample_baked(offset)
+		if is_loop and i == point_count:
+			pos = curve.sample_baked(0.0)
+		var tangent: Vector3
+		if i == 0:
+			if is_loop:
+				tangent = curve.sample_baked(0.25) - curve.sample_baked(maxf(0.0, length - 0.25))
+			else:
+				tangent = curve.sample_baked(minf(length, 0.25)) - pos
+		elif i == point_count:
+			if is_loop:
+				tangent = curve.sample_baked(0.25) - curve.sample_baked(maxf(0.0, length - 0.25))
+			else:
+				tangent = pos - curve.sample_baked(maxf(0.0, length - 0.25))
+		else:
+			var o0: float = maxf(0.0, offset - 0.35)
+			var o1: float = minf(length, offset + 0.35)
+			tangent = curve.sample_baked(o1) - curve.sample_baked(o0)
+		var right: Vector3 = _path_right(tangent)
+		frames.append({"pos": pos, "right": right, "offset": offset})
+
+	# Only un-flip rights (no heavy blend — lagging rights cut notches into the road on hairpins)
+	for i in range(1, frames.size()):
+		var prev_r: Vector3 = frames[i - 1]["right"]
+		var r: Vector3 = frames[i]["right"]
+		if r.dot(prev_r) < 0.0:
+			r = -r
+		# Very light smooth only when almost aligned; keep sharp turns accurate
+		if r.dot(prev_r) > 0.85:
+			r = (prev_r * 0.15 + r * 0.85)
+			r.y = 0.0
+			if r.length_squared() > 1e-8:
+				r = r.normalized()
+			else:
+				r = prev_r
+		frames[i]["right"] = r
+	if is_loop and frames.size() > 2:
+		var r0: Vector3 = frames[0]["right"]
+		var rN: Vector3 = frames[frames.size() - 1]["right"]
+		if rN.dot(r0) < 0.0:
+			frames[frames.size() - 1]["right"] = -rN
+	return frames
+
+
+## Extra shoulder width allowed outside the asphalt on this slice (not the asphalt itself).
+## Only trims the sand/curb flare on extreme hairpins — never gouges the road deck.
+func _max_shoulder_extra_at(frames: Array, i: int, length: float, point_count: int) -> float:
+	var i0: int = maxi(0, i - 1)
+	var i1: int = mini(frames.size() - 1, i + 1)
+	var r0: Vector3 = frames[i0]["right"]
+	var r1: Vector3 = frames[i1]["right"]
+	var ang: float = absf(r0.signed_angle_to(r1, Vector3.UP))
+	var seg: float = length / float(maxi(point_count, 1))
+	var radius: float = seg / maxf(ang, 0.001)
+	# Allow normal shoulder (~1–2m) almost always; only shrink on very tight turns
+	return maxf(radius * 0.35, 0.6)
 
 
 ## Emit road end-cap at a gap. `vert_base` = index of first vertex this call adds.
@@ -237,7 +302,7 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			if river_t > 0.001:
 				var bed_y: float = WADI_RIVER_BED_Y
 				# Keep the road corridor near road_h; deepen only away from asphalt
-				var away_from_road: float = smoothstep(sand_edge * 0.35, sand_edge + 18.0, dist)
+				var away_from_road: float = smoothstep(sand_edge * 0.55, sand_edge + 22.0, dist)
 				var carve: float = river_t * away_from_road
 				height = lerp(height, bed_y, carve)
 
@@ -283,12 +348,16 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 
 @export var road_width: float = 14.0
 @export var sand_width: float = 16.0
+## Pillars under elevated road stretches (DEFAULT layout only). Disable for flat technical tracks.
+@export var generate_bridge_supports: bool = true
 
 @export_group("Visual Offsets")
 @export var road_y_offset: float = 0.05
-@export var curb_y_offset: float = 0.10
+## Kept for compatibility; curb top now matches road_y_offset so sand shoulders aren't raised.
+@export var curb_y_offset: float = 0.05
 @export var terrain_recession_visual: float = 0.20
-@export var terrain_recession_collision: float = 0.10
+## How far terrain collision sinks under the road (must stay modest or cars fall into a trench).
+@export var terrain_recession_collision: float = 0.12
 
 @export_group("Procedural Generation")
 @export var terrain_grass_count: int = 12000
@@ -685,79 +754,58 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 	# --- NON-CANYON (Default + Mountain) road: flat top, sharp edges ---
 	var st = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var frames: Array = _build_path_frames(curve, point_count)
+	# Asphalt top height; curbs match this at the road edge (not raised above the road).
+	var deck_y: float = road_y_offset
+	var shoulder_drop: float = maxf(curb_slope, 0.12)
 
-	# VERTEX LOOP
+	# VERTEX LOOP — asphalt always full width (no curvature cuts into the deck)
 	for i in range(point_count + 1):
-		var offset = (float(i) / point_count) * length
-		var pos = curve.sample_baked(offset)
-
-		# Robust Tangent Calculation
-		var tangent: Vector3
-		if i == 0:
-			if is_loop:
-				# Sample forward and backward at the loop point for a perfect average tangent
-				var p_next = curve.sample_baked(0.2)
-				var p_prev = curve.sample_baked(max(0.0, length - 0.2))
-				tangent = (p_next - p_prev).normalized()
-			else:
-				# Simple forward difference at start
-				var p_next = curve.sample_baked(0.2)
-				tangent = (p_next - pos).normalized()
-		elif i == point_count:
-			if is_loop:
-				var p_next = curve.sample_baked(0.2)
-				var p_prev = curve.sample_baked(max(0.0, length - 0.2))
-				tangent = (p_next - p_prev).normalized()
-			else:
-				# Simple backward difference at end
-				var p_prev = curve.sample_baked(max(0.0, length - 0.2))
-				tangent = (pos - p_prev).normalized()
-		else:
-			var p_next = curve.sample_baked(min(length, offset + 0.2))
-			tangent = (p_next - pos).normalized()
-
-		var right_dir = tangent.cross(Vector3.UP).normalized()
-		var right = right_dir * half_w
-
-		# EXPLICIT LOOP SNAPPING:
-		# If this is the last vertex of a loop, force it to match the first vertex exactly
-		var final_pos = pos
-		if is_loop and i == point_count:
-			# Re-calculate first pos for perfect match
-			final_pos = curve.sample_baked(0.0)
+		var final_pos: Vector3 = frames[i]["pos"]
+		var right_dir: Vector3 = frames[i]["right"]
+		var offset: float = float(frames[i]["offset"])
 
 		if is_curb:
-			var p_lo = final_pos - right_dir * outer_w + Vector3(0, y_offset - curb_slope, 0)
-			var p_li = final_pos - right_dir * inner_w + Vector3(0, y_offset, 0)
-			var p_ri = final_pos + right_dir * inner_w + Vector3(0, y_offset, 0)
-			var p_ro = final_pos + right_dir * outer_w + Vector3(0, y_offset - curb_slope, 0)
-			
-			var left_normal = (right_dir * curb_slope + Vector3.UP * (outer_w - inner_w)).normalized()
-			var right_normal = (-right_dir * curb_slope + Vector3.UP * (outer_w - inner_w)).normalized()
-			
+			# Inner edge locked to full asphalt edge; only the outer flare may shrink on hairpins.
+			var use_inner: float = inner_w
+			var want_extra: float = maxf(outer_w - inner_w, 0.35)
+			var max_extra: float = _max_shoulder_extra_at(frames, i, length, point_count)
+			var use_outer: float = use_inner + minf(want_extra, max_extra)
+			# Inner edge flush with road; outer edge drops slightly (drainage shoulder)
+			var p_lo = final_pos - right_dir * use_outer + Vector3(0, deck_y - shoulder_drop, 0)
+			var p_li = final_pos - right_dir * use_inner + Vector3(0, deck_y, 0)
+			var p_ri = final_pos + right_dir * use_inner + Vector3(0, deck_y, 0)
+			var p_ro = final_pos + right_dir * use_outer + Vector3(0, deck_y - shoulder_drop, 0)
+
+			var span: float = maxf(use_outer - use_inner, 0.001)
+			var left_normal = (right_dir * shoulder_drop + Vector3.UP * span).normalized()
+			var right_normal = (-right_dir * shoulder_drop + Vector3.UP * span).normalized()
+
 			st.set_normal(left_normal)
 			st.set_uv(Vector2(0, offset))
 			st.add_vertex(p_lo)
-			
+
 			st.set_normal(left_normal)
 			st.set_uv(Vector2(0.25, offset))
 			st.add_vertex(p_li)
-			
+
 			st.set_normal(right_normal)
 			st.set_uv(Vector2(0.75, offset))
 			st.add_vertex(p_ri)
-			
+
 			st.set_normal(right_normal)
 			st.set_uv(Vector2(1.0, offset))
 			st.add_vertex(p_ro)
 		else:
+			# Full constant road width every slice — prevents "deep cuts" on curves
+			var right: Vector3 = right_dir * half_w
 			st.set_normal(Vector3.UP)
 			st.set_uv(Vector2(0, offset))
-			st.add_vertex(final_pos - right + Vector3(0, y_offset, 0))
+			st.add_vertex(final_pos - right + Vector3(0, deck_y, 0))
 
 			st.set_normal(Vector3.UP)
-			st.set_uv(Vector2(width, offset)) # Use width instead of 1 to prevent texture stretching
-			st.add_vertex(final_pos + right + Vector3(0, y_offset, 0))
+			st.set_uv(Vector2(width, offset))
+			st.add_vertex(final_pos + right + Vector3(0, deck_y, 0))
 
 	# INDEX LOOP (CCW - Facing UP)
 	for i in range(point_count):
@@ -767,20 +815,18 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 		if is_curb:
 			var base = i * 4
 			var nxt = (i + 1) * 4
-			
+
 			# Left slope
 			st.add_index(base + 0); st.add_index(nxt + 0); st.add_index(base + 1)
 			st.add_index(base + 1); st.add_index(nxt + 0); st.add_index(nxt + 1)
-			
+
 			# Right slope
 			st.add_index(base + 2); st.add_index(nxt + 2); st.add_index(base + 3)
 			st.add_index(base + 3); st.add_index(nxt + 2); st.add_index(nxt + 3)
-			
+
 			# --- UNDERSIDE ---
-			# Left slope Underside
 			st.add_index(base + 0); st.add_index(base + 1); st.add_index(nxt + 0)
 			st.add_index(base + 1); st.add_index(nxt + 1); st.add_index(nxt + 0)
-			# Right slope Underside
 			st.add_index(base + 2); st.add_index(base + 3); st.add_index(nxt + 2)
 			st.add_index(base + 3); st.add_index(nxt + 3); st.add_index(nxt + 2)
 		else:
@@ -789,12 +835,9 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 			var v2 = (i + 1) * 2
 			var v3 = v2 + 1
 
-			# T1: Left i, Left i+1, Right i
 			st.add_index(v0); st.add_index(v2); st.add_index(v1)
-			# T2: Right i, Left i+1, Right i+1
 			st.add_index(v1); st.add_index(v2); st.add_index(v3)
 
-			# --- ADD UNDERSIDE (Visibility from below) ---
 			st.add_index(v0); st.add_index(v1); st.add_index(v2)
 			st.add_index(v1); st.add_index(v3); st.add_index(v2)
 
@@ -922,60 +965,38 @@ func _create_track_collision(point_count: int, width: float, node_name: String):
 			st.add_index(base + 7 + SLICE_TOP); st.add_index(nxt + 7); st.add_index(nxt + 7 + SLICE_TOP)
 
 	else:
-		# Default / Mountain collision shape generation
+		# Default / Mountain: FLAT collision deck across full sand width (no curb ramps).
+		# Sloped collision shoulders launch cars on hairpins; visuals can still slope.
+		var frames_col: Array = _build_path_frames(curve, point_count)
+		# Slightly above visual so mesh/terrain seams don't cause micro-jumps
+		var col_y: float = y_offset + 0.02
 
-		# Create Top and Bottom vertices
 		for i in range(point_count + 1):
-			var offset = (float(i) / point_count) * length
-			var pos = curve.sample_baked(offset)
+			var final_pos: Vector3 = frames_col[i]["pos"]
+			var right_dir: Vector3 = frames_col[i]["right"]
+			# Full constant widths — no per-curve notches in the driveable surface
+			var use_outer: float = outer_w
+			var use_inner: float = inner_w
 
-			var tangent: Vector3
-			if i == 0:
-				if is_loop:
-					var p_next = curve.sample_baked(0.2)
-					var p_prev = curve.sample_baked(max(0.0, length - 0.2))
-					tangent = (p_next - p_prev).normalized()
-				else:
-					tangent = (curve.sample_baked(0.2) - pos).normalized()
-			elif i == point_count:
-				if is_loop:
-					var p_next = curve.sample_baked(0.2)
-					var p_prev = curve.sample_baked(max(0.0, length - 0.2))
-					tangent = (p_next - p_prev).normalized()
-				else:
-					tangent = (pos - curve.sample_baked(max(0.0, length - 0.2))).normalized()
-			else:
-				var next_pos = curve.sample_baked(min(offset + 0.5, length))
-				tangent = (next_pos - pos).normalized()
+			# Entire top face at one height — flat driveable sand + road
+			var p_lo = final_pos - right_dir * use_outer + Vector3(0, col_y, 0)
+			var p_li = final_pos - right_dir * use_inner + Vector3(0, col_y, 0)
+			var p_ri = final_pos + right_dir * use_inner + Vector3(0, col_y, 0)
+			var p_ro = final_pos + right_dir * use_outer + Vector3(0, col_y, 0)
 
-			if tangent.length() < 0.01:
-				tangent = (pos - curve.sample_baked(max(offset - 0.5, 0.0))).normalized()
-			var right_dir = tangent.cross(Vector3.UP).normalized()
-
-			var final_pos = pos
-			if is_loop and i == point_count:
-				final_pos = curve.sample_baked(0.0)
-
-			# Top vertices
-			var p_lo = final_pos - right_dir * outer_w + Vector3(0, y_offset - curb_slope, 0)
-			var p_li = final_pos - right_dir * inner_w + Vector3(0, y_offset, 0)
-			var p_ri = final_pos + right_dir * inner_w + Vector3(0, y_offset, 0)
-			var p_ro = final_pos + right_dir * outer_w + Vector3(0, y_offset - curb_slope, 0)
-			
-			# Bottom vertices
 			var p_lob = p_lo - Vector3(0, thickness, 0)
 			var p_lib = p_li - Vector3(0, thickness, 0)
 			var p_rib = p_ri - Vector3(0, thickness, 0)
 			var p_rob = p_ro - Vector3(0, thickness, 0)
 
-			st.add_vertex(p_lo)  # 8*i + 0
-			st.add_vertex(p_li)  # 8*i + 1
-			st.add_vertex(p_ri)  # 8*i + 2
-			st.add_vertex(p_ro)  # 8*i + 3
-			st.add_vertex(p_lob) # 8*i + 4
-			st.add_vertex(p_lib) # 8*i + 5
-			st.add_vertex(p_rib) # 8*i + 6
-			st.add_vertex(p_rob) # 8*i + 7
+			st.add_vertex(p_lo)
+			st.add_vertex(p_li)
+			st.add_vertex(p_ri)
+			st.add_vertex(p_ro)
+			st.add_vertex(p_lob)
+			st.add_vertex(p_lib)
+			st.add_vertex(p_rib)
+			st.add_vertex(p_rob)
 
 		for i in range(point_count):
 			if _segment_in_gap(curve, length, point_count, i):
@@ -984,37 +1005,25 @@ func _create_track_collision(point_count: int, width: float, node_name: String):
 			var base = i * 8
 			var nxt = (i + 1) * 8
 
-			# Top Faces
-			# Left slope
+			# Top Faces (flat)
 			st.add_index(base + 0); st.add_index(nxt + 0); st.add_index(base + 1)
 			st.add_index(base + 1); st.add_index(nxt + 0); st.add_index(nxt + 1)
-			
-			# Center flat
 			st.add_index(base + 1); st.add_index(nxt + 1); st.add_index(base + 2)
 			st.add_index(base + 2); st.add_index(nxt + 1); st.add_index(nxt + 2)
-			
-			# Right slope
 			st.add_index(base + 2); st.add_index(nxt + 2); st.add_index(base + 3)
 			st.add_index(base + 3); st.add_index(nxt + 2); st.add_index(nxt + 3)
 
-			# Bottom Faces (Reverse winding)
-			# Left slope bottom
+			# Bottom Faces
 			st.add_index(base + 4); st.add_index(base + 5); st.add_index(nxt + 4)
 			st.add_index(base + 5); st.add_index(nxt + 5); st.add_index(nxt + 4)
-			
-			# Center flat bottom
 			st.add_index(base + 5); st.add_index(base + 6); st.add_index(nxt + 5)
 			st.add_index(base + 6); st.add_index(nxt + 6); st.add_index(nxt + 5)
-			
-			# Right slope bottom
 			st.add_index(base + 6); st.add_index(base + 7); st.add_index(nxt + 6)
 			st.add_index(base + 7); st.add_index(nxt + 7); st.add_index(nxt + 6)
 
-			# Left Side Wall
+			# Side Walls
 			st.add_index(base + 0); st.add_index(base + 4); st.add_index(nxt + 0)
 			st.add_index(base + 4); st.add_index(nxt + 4); st.add_index(nxt + 0)
-
-			# Right Side Wall
 			st.add_index(base + 3); st.add_index(nxt + 3); st.add_index(base + 7)
 			st.add_index(base + 7); st.add_index(nxt + 3); st.add_index(nxt + 7)
 
@@ -1028,11 +1037,13 @@ func _create_track_collision(point_count: int, width: float, node_name: String):
 	col_shape.shape = _save_resource(trimesh_shape, "track_collision_shape")
 	static_body.add_child(col_shape)
 
-	# If this is the road, generate bridge supports if high above ground
-	if node_name.contains("Road"):
+	# Optional bridge pillars under elevated DEFAULT road stretches
+	if node_name.contains("Road") and generate_bridge_supports:
 		_generate_bridge_supports(point_count)
 
 func _generate_bridge_supports(point_count: int):
+	if not generate_bridge_supports:
+		return
 	if track_layout_type == TrackLayoutType.MOUNTAIN or track_layout_type == TrackLayoutType.CANYON:
 		return
 
@@ -1050,9 +1061,12 @@ func _generate_bridge_supports(point_count: int):
 			var support = MeshInstance3D.new()
 			support.name = "BridgeSupport_" + str(d)
 			var box = BoxMesh.new()
-			box.size = Vector3(4.0, pos.y + 30.0, 4.0) # Tall pillar
+			# Stop pillar slightly below road surface so box tops don't poke the deck on curves
+			var pillar_top_y: float = pos.y + road_y_offset - 0.12
+			var pillar_height: float = maxf(pillar_top_y + 30.0, 4.0)
+			box.size = Vector3(3.2, pillar_height, 3.2)
 			support.mesh = box
-			support.position = pos + Vector3(0, -box.size.y/2.0, 0)
+			support.position = Vector3(pos.x, pillar_top_y - pillar_height * 0.5, pos.z)
 			support.material_override = support_mat
 			add_child(support)
 
@@ -1088,40 +1102,23 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 	var side_bot_l: Array = []
 	var side_bot_r: Array = []
 	var side_tangents: Array = []
+	var frames_side: Array = _build_path_frames(curve, point_count)
 
 	# 1. VERTEX GENERATION
 	for i in range(point_count + 1):
-		var offset = (float(i) / point_count) * length
-		var pos = curve.sample_baked(offset)
-
-		var tangent: Vector3
-		if i == 0:
-			if is_loop:
-				tangent = (curve.sample_baked(0.1) - curve.sample_baked(length - 0.1)).normalized()
-			else:
-				tangent = (curve.sample_baked(0.1) - pos).normalized()
-		elif i == point_count:
-			if is_loop:
-				tangent = (curve.sample_baked(0.1) - curve.sample_baked(length - 0.1)).normalized()
-			else:
-				tangent = (pos - curve.sample_baked(max(0, length - 0.1))).normalized()
+		var offset: float = float(frames_side[i]["offset"])
+		var final_pos: Vector3 = frames_side[i]["pos"]
+		var right_dir: Vector3 = frames_side[i]["right"]
+		var right: Vector3 = right_dir * half_w
+		var tangent: Vector3 = Vector3.FORWARD
+		if i < point_count:
+			tangent = (frames_side[i + 1]["pos"] as Vector3) - final_pos
+		elif point_count > 0:
+			tangent = final_pos - (frames_side[i - 1]["pos"] as Vector3)
+		if tangent.length_squared() < 1e-8:
+			tangent = Vector3.FORWARD
 		else:
-			var next_offset = offset + 0.1
-			if next_offset >= length:
-				next_offset = 0.1
-			var next_pos = curve.sample_baked(next_offset)
-			tangent = (next_pos - pos).normalized()
-
-		if tangent.length() < 0.01:
-			tangent = (pos - curve.sample_baked(max(0, offset - 0.1))).normalized()
-
-		var right_dir = _path_right(tangent)
-		var right = right_dir * half_w
-
-		# Snap the closing row to the start position so the loop connects perfectly
-		var final_pos = pos
-		if is_loop and i == point_count:
-			final_pos = curve.sample_baked(0.0)
+			tangent = tangent.normalized()
 
 		var top_l = final_pos - right + Vector3(0, side_y_offset, 0)
 		var top_r = final_pos + right + Vector3(0, side_y_offset, 0)

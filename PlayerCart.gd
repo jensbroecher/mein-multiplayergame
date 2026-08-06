@@ -262,6 +262,9 @@ var water_bounds_min: Vector2 = Vector2.ZERO # (x, z)
 var water_bounds_max: Vector2 = Vector2.ZERO
 var water_timer: float = 0.0
 var last_splash_time: float = -999.0
+## Tracks wet/dry transitions for entry splash + hit slowdown.
+var _was_in_water_zone: bool = false
+var _wake_particles: GPUParticles3D = null
 var is_drowned: bool = false
 var _drown_tween: Tween = null
 var original_wheel_transforms: Dictionary = {}
@@ -944,89 +947,119 @@ func _physics_process(delta):
 		return
 
 	if stage_has_water:
-		# Use hysteresis to prevent rapid underwater state toggling at the boundary
-		var entry_threshold = water_surface_y - 0.25
-		var exit_threshold = water_surface_y + 0.25
+		# Depth relative to surface: positive = below surface (submerged)
+		var water_depth: float = water_surface_y - global_position.y
 		var in_water_xz := _is_over_water_volume()
+		# Shallow / ford: near or slightly under the surface — slow down hard, never drown
+		var in_shallow_water := in_water_xz and water_depth > -0.85 and water_depth < 1.15
+		# Deep water only (fully submerged): can eventually drown
+		var in_deep_water := in_water_xz and water_depth >= 1.15
+		# Hysteresis for "underwater" VFX / deep state
 		var currently_underwater = is_underwater
 		if is_underwater:
-			if global_position.y > exit_threshold or not in_water_xz:
+			if not in_water_xz or water_depth < 0.85:
 				currently_underwater = false
 		else:
-			if in_water_xz and global_position.y < entry_threshold:
+			if in_deep_water:
 				currently_underwater = true
 
+		var entered_water_zone := false
 		if currently_underwater != is_underwater:
 			if currently_underwater:
-				# --- Water Impact (Big Splash) ---
-				var current_time = Time.get_ticks_msec() / 1000.0
-				if current_time - last_splash_time > 0.2:
-					last_splash_time = current_time
-					
-					var impact_speed = linear_velocity.length()
-					var splash_stream: AudioStream = null
-					if impact_speed > 15.0:
-						splash_stream = DEEP_SPLASH_SOUNDS[randi() % DEEP_SPLASH_SOUNDS.size()]
-					else:
-						splash_stream = REGULAR_SPLASH_SOUNDS[randi() % REGULAR_SPLASH_SOUNDS.size()]
-					
-					if splash_stream:
-						var ap = AudioStreamPlayer3D.new()
-						ap.stream = splash_stream
-						ap.bus = &"SFX"
-						ap.max_distance = 80.0
-						ap.unit_size = 15.0
-						ap.volume_db = 2.0
-						get_tree().current_scene.add_child(ap)
-						ap.global_position = global_position
-						ap.play()
-						get_tree().create_timer(splash_stream.get_length() + 0.5).timeout.connect(ap.queue_free)
-						
-					# Strong velocity kill simulating hitting dense water
-					linear_velocity *= 0.18
-					if linear_velocity.y < 0:
-						linear_velocity.y = 0.0
-					
-					var splash_pos = Vector3(global_position.x, water_surface_y, global_position.z)
-					_spawn_splash(splash_pos, 1.0)
+				entered_water_zone = true
 			else:
-				# --- Exit Water (Small Splash) ---
+				# --- Exit deep water ---
 				var current_time = Time.get_ticks_msec() / 1000.0
 				last_splash_time = current_time
 				var splash_pos = Vector3(global_position.x, water_surface_y, global_position.z)
-				_spawn_splash(splash_pos, 0.4) # Spawn a small splash on exit
+				_spawn_splash(splash_pos, 0.4)
 			is_underwater = currently_underwater
-			water_timer = 0.0
+			if not is_underwater:
+				water_timer = 0.0
 
-		# --- Puddles / Shallow Water periodic small splashes ---
+		var boosting_in_water := boost_timer > 0.0 or pad_boost_timer > 0.0
+
+		# First contact with any water (shallow ford or deep dive) — splash + hit
+		if in_water_xz and not _was_in_water_zone and (in_shallow_water or in_deep_water):
+			entered_water_zone = true
+		if entered_water_zone:
+			var current_time2 = Time.get_ticks_msec() / 1000.0
+			if current_time2 - last_splash_time > 0.15:
+				last_splash_time = current_time2
+				var impact_speed = linear_velocity.length()
+				var splash_stream: AudioStream = null
+				if impact_speed > 12.0 or in_deep_water:
+					splash_stream = DEEP_SPLASH_SOUNDS[randi() % DEEP_SPLASH_SOUNDS.size()]
+				else:
+					splash_stream = REGULAR_SPLASH_SOUNDS[randi() % REGULAR_SPLASH_SOUNDS.size()]
+				if splash_stream:
+					var ap = AudioStreamPlayer3D.new()
+					ap.stream = splash_stream
+					ap.bus = &"SFX"
+					ap.max_distance = 80.0
+					ap.unit_size = 15.0
+					ap.volume_db = 2.0
+					get_tree().current_scene.add_child(ap)
+					ap.global_position = global_position
+					ap.play()
+					get_tree().create_timer(splash_stream.get_length() + 0.5).timeout.connect(ap.queue_free)
+				# Heavy entry slowdown — skipped while boosting so boost pads still work in fords
+				if not boosting_in_water:
+					linear_velocity *= 0.08
+					if linear_velocity.y < 0.0:
+						linear_velocity.y = 0.0
+				var splash_pos2 = Vector3(global_position.x, water_surface_y, global_position.z)
+				_spawn_splash(splash_pos2, 1.15 if in_deep_water else 0.9)
+		_was_in_water_zone = in_water_xz and (in_shallow_water or in_deep_water)
+
+		# --- More frequent spray while moving through water + wake trail ---
 		var on_flat_ground = false
 		if ground_ray.is_colliding() and ground_ray.get_collision_normal().y >= 0.55:
 			on_flat_ground = true
-		if on_flat_ground and not is_underwater and in_water_xz \
-				and global_position.y >= water_surface_y and global_position.y < water_surface_y + 0.6 \
-				and linear_velocity.length() > 3.0:
-			var current_time = Time.get_ticks_msec() / 1000.0
-			if current_time - last_splash_time > 0.35:
-				last_splash_time = current_time
-				var splash_pos = Vector3(global_position.x, water_surface_y, global_position.z)
-				_spawn_splash(splash_pos, 0.35)
+		var wet_moving := (in_shallow_water or in_deep_water) and linear_velocity.length() > 2.5
+		if wet_moving:
+			var spray_interval: float = 0.12 if linear_velocity.length() > 12.0 else 0.22
+			if boosting_in_water:
+				spray_interval *= 0.55
+			var current_time3 = Time.get_ticks_msec() / 1000.0
+			if current_time3 - last_splash_time > spray_interval:
+				last_splash_time = current_time3
+				var splash_scale: float = 0.28 if in_shallow_water and not in_deep_water else 0.42
+				if boosting_in_water:
+					splash_scale *= 1.35
+				# Side sprays from wheel positions
+				var right_vec: Vector3 = visuals.global_transform.basis.x
+				var back_vec: Vector3 = visuals.global_transform.basis.z
+				var base_p: Vector3 = Vector3(global_position.x, water_surface_y, global_position.z)
+				_spawn_splash(base_p - right_vec * 0.55 + back_vec * 0.2, splash_scale)
+				_spawn_splash(base_p + right_vec * 0.55 + back_vec * 0.2, splash_scale * 0.9)
+				if linear_velocity.length() > 10.0 or boosting_in_water:
+					_spawn_splash(base_p + back_vec * 1.1, splash_scale * 0.75)
+		_update_water_wake(wet_moving, delta)
 
-		if is_underwater:
+		# Continuous water drag — not applied while boosting
+		if (in_shallow_water or in_deep_water) and not boosting_in_water:
+			var water_speed_cap: float = max_speed * (0.22 if in_deep_water else 0.38)
+			var h_vel = Vector3(linear_velocity.x, 0.0, linear_velocity.z)
+			if h_vel.length() > water_speed_cap:
+				var damped = h_vel.normalized() * water_speed_cap
+				var drag_lerp: float = 12.0 if in_deep_water else 10.0
+				linear_velocity.x = lerp(linear_velocity.x, damped.x, drag_lerp * delta)
+				linear_velocity.z = lerp(linear_velocity.z, damped.z, drag_lerp * delta)
+			linear_velocity.x *= (1.0 - clampf(2.8 * delta, 0.0, 0.35))
+			linear_velocity.z *= (1.0 - clampf(2.8 * delta, 0.0, 0.35))
+
+		if in_deep_water:
 			water_timer += delta
-			if water_timer > 0.8: # Drown faster (0.8 seconds underwater triggers drown)
+			# Only drown after sustained deep submersion (not quick dips / fords)
+			if water_timer > 2.8:
 				if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 					drown_rpc.rpc()
 				elif multiplayer.multiplayer_peer == null:
 					drown()
-			# Strong water drag: cap horizontal speed and dampen movement heavily
-			var underwater_max_speed = max_speed * 0.35
-			var h_vel = Vector3(linear_velocity.x, 0, linear_velocity.z)
-			if h_vel.length() > underwater_max_speed:
-				var damped = h_vel.normalized() * underwater_max_speed
-				linear_velocity.x = lerp(linear_velocity.x, damped.x, 8.0 * delta)
-				linear_velocity.z = lerp(linear_velocity.z, damped.z, 8.0 * delta)
-			# Slow sink: upward buoyancy force (weaker than gravity so car still sinks slowly)
-			apply_central_force(Vector3.UP * 15.0)
+			apply_central_force(Vector3.UP * 12.0)
+		else:
+			water_timer = maxf(0.0, water_timer - delta * 1.5)
 
 	if not has_physics_authority:
 		_interpolate_remote_physics(delta)
@@ -2175,6 +2208,7 @@ func respawn():
 	is_drowned = false
 	is_underwater = false
 	water_timer = 0.0
+	_was_in_water_zone = false
 	last_splash_time = -999.0
 	was_on_ground = true
 	air_time = 0.0
@@ -3018,6 +3052,68 @@ func _spawn_splash(pos: Vector3, size_scale: float = 1.0):
 				ap.global_position = pos
 				ap.play()
 				get_tree().create_timer(stream.get_length() + 0.5).timeout.connect(ap.queue_free)
+
+
+func _ensure_water_wake() -> void:
+	if _wake_particles != null and is_instance_valid(_wake_particles):
+		return
+	_wake_particles = GPUParticles3D.new()
+	_wake_particles.name = "WaterWake"
+	_wake_particles.amount = 48
+	_wake_particles.lifetime = 0.85
+	_wake_particles.explosiveness = 0.0
+	_wake_particles.randomness = 0.35
+	_wake_particles.visibility_aabb = AABB(Vector3(-4, -1, -6), Vector3(8, 4, 12))
+	_wake_particles.local_coords = false
+	var mat := ParticleProcessMaterial.new()
+	mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	mat.emission_box_extents = Vector3(0.7, 0.04, 0.35)
+	mat.direction = Vector3(0, 0.55, 1)
+	mat.spread = 28.0
+	mat.initial_velocity_min = 1.2
+	mat.initial_velocity_max = 3.8
+	mat.gravity = Vector3(0, -2.5, 0)
+	mat.damping_min = 1.0
+	mat.damping_max = 2.5
+	mat.scale_min = 0.35
+	mat.scale_max = 0.95
+	mat.color = Color(0.75, 0.9, 1.0, 0.55)
+	_wake_particles.process_material = mat
+	var draw := QuadMesh.new()
+	draw.size = Vector2(0.55, 0.55)
+	var draw_mat := StandardMaterial3D.new()
+	draw_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	draw_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	draw_mat.vertex_color_use_as_albedo = true
+	draw_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	draw_mat.albedo_color = Color(0.7, 0.88, 1.0, 0.5)
+	var wake_tex = load("res://materials/water_particle.png")
+	if wake_tex:
+		draw_mat.albedo_texture = wake_tex
+	draw.material = draw_mat
+	_wake_particles.draw_pass_1 = draw
+	_wake_particles.emitting = false
+	if is_instance_valid(visuals):
+		visuals.add_child(_wake_particles)
+		_wake_particles.position = Vector3(0, 0.05, 1.15)
+	else:
+		add_child(_wake_particles)
+
+
+func _update_water_wake(active: bool, _delta: float) -> void:
+	_ensure_water_wake()
+	if _wake_particles == null:
+		return
+	_wake_particles.emitting = active and linear_velocity.length() > 2.0
+	if active:
+		# Keep wake on the water surface behind the car
+		var back: Vector3 = visuals.global_transform.basis.z if is_instance_valid(visuals) else global_transform.basis.z
+		var wake_pos: Vector3 = global_position + back * 1.2
+		wake_pos.y = water_surface_y + 0.05
+		_wake_particles.global_position = wake_pos
+		var speed_ratio: float = clampf(linear_velocity.length() / maxf(max_speed, 1.0), 0.2, 1.0)
+		_wake_particles.amount_ratio = lerpf(0.35, 1.0, speed_ratio)
+
 
 
 func _get_ai_input(delta: float) -> Vector2:
