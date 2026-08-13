@@ -17,7 +17,7 @@ var waiting_action: String = ""
 var p1_buttons = {}
 var p2_buttons = {}
 
-var check_shadows: CheckButton
+var option_shadows: OptionButton
 var option_render_scale: OptionButton
 var option_anisotropic: OptionButton
 var option_max_fps: OptionButton
@@ -65,7 +65,7 @@ func _ready():
 	option_resolution.selected = MusicManager.resolution_index
 	check_vsync.button_pressed = MusicManager.vsync
 	option_anti_aliasing.selected = MusicManager.anti_aliasing
-	check_shadows.button_pressed = MusicManager.shadows_enabled
+	option_shadows.selected = MusicManager.shadow_quality_index
 	option_render_scale.selected = MusicManager.render_scale_index
 	option_anisotropic.selected = MusicManager.anisotropic_index
 	option_max_fps.selected = MusicManager.max_fps_index
@@ -77,7 +77,7 @@ func _ready():
 	option_resolution.item_selected.connect(_on_resolution_selected)
 	check_vsync.toggled.connect(_on_vsync_toggled)
 	option_anti_aliasing.item_selected.connect(_on_anti_aliasing_selected)
-	check_shadows.toggled.connect(_on_shadows_toggled)
+	option_shadows.item_selected.connect(_on_shadow_quality_selected)
 	option_render_scale.item_selected.connect(_on_render_scale_selected)
 	option_anisotropic.item_selected.connect(_on_anisotropic_selected)
 	option_max_fps.item_selected.connect(_on_max_fps_selected)
@@ -89,7 +89,12 @@ func _ready():
 
 func _build_graphics_options():
 	# Extra graphics rows under existing Video settings (runtime-built for easy edits)
-	check_shadows = _add_check_row(video_settings, "Shadows", MusicManager.shadows_enabled)
+	option_shadows = _add_option_row(video_settings, "Shadows")
+	option_shadows.clear()
+	option_shadows.add_item("Off")
+	option_shadows.add_item("Low")
+	option_shadows.add_item("Medium")
+	option_shadows.add_item("High")
 	
 	option_render_scale = _add_option_row(video_settings, "3D Quality")
 	option_render_scale.clear()
@@ -323,8 +328,8 @@ func _on_vsync_toggled(toggled_val: bool):
 func _on_anti_aliasing_selected(index: int):
 	MusicManager.set_anti_aliasing(index)
 
-func _on_shadows_toggled(toggled_val: bool):
-	MusicManager.set_shadows_enabled(toggled_val)
+func _on_shadow_quality_selected(index: int):
+	MusicManager.set_shadow_quality(index)
 
 func _on_render_scale_selected(index: int):
 	MusicManager.set_render_scale(index)

@@ -40,6 +40,15 @@ const ITEM_BOX_SCENE = preload("res://ItemBox.tscn")
 				_align_start_and_spawns_to_track()
 			notify_property_list_changed()
 
+## Drop every BoostPad in this level onto the road/terrain (editor).
+@export_tool_button("Snap All Boost Pads To Ground") var snap_boost_pads_action = _snap_all_boost_pads_to_ground
+@export var snap_boost_pads_to_ground: bool = false:
+	set(val):
+		if val:
+			if Engine.is_editor_hint():
+				_snap_all_boost_pads_to_ground()
+			notify_property_list_changed()
+
 @export var spawn_sand_dunes: bool = false:
 	set(val):
 		if val:
@@ -810,35 +819,83 @@ func _spawn_start_finish_items_delayed():
 func _spawn_random_item_boxes(count: int):
 	if not track_path: return
 	var curve = track_path.curve
+	if curve == null or curve.point_count < 2:
+		return
 	var length = curve.get_baked_length()
+	if length < 40.0:
+		return
 	var space_state = get_world_3d().direct_space_state
 	if not space_state: return
 
+	# Keep extras away from checkpoint gate trios / finish (meters along track path).
+	const GATE_KEEP_AWAY := 28.0
+	const MIN_BOX_SPACING := 18.0
+	var forbidden_offsets: Array[float] = []
+	forbidden_offsets.append(0.0)
+	forbidden_offsets.append(length)
+	for cp in checkpoints:
+		if not is_instance_valid(cp) or not (cp is Node3D):
+			continue
+		var closest: Vector3 = track_path.to_local(cp.global_position)
+		var off: float = curve.get_closest_offset(closest)
+		forbidden_offsets.append(off)
+	var finish_n = get_node_or_null("FinishLine")
+	if finish_n is Node3D:
+		var f_off: float = curve.get_closest_offset(track_path.to_local(finish_n.global_position))
+		forbidden_offsets.append(f_off)
+
+	var placed_offsets: Array[float] = []
 	var spawned_count = 0
 	var attempts = 0
-	var max_attempts = count * 25
+	var max_attempts = count * 40
 
 	while spawned_count < count and attempts < max_attempts:
 		attempts += 1
-		var offset = randf_range(10.0, length - 10.0) # Avoid spawning directly on the start line
+		var slot: float = (float(spawned_count) + 0.5) / float(count)
+		var offset: float
+		if attempts <= count * 3:
+			offset = clampf(slot * length + randf_range(-length / float(count) * 0.35, length / float(count) * 0.35), 12.0, length - 12.0)
+		else:
+			offset = randf_range(12.0, length - 12.0)
+
+		var near_gate := false
+		for fo in forbidden_offsets:
+			var d: float = absf(offset - fo)
+			d = minf(d, length - d)
+			if d < GATE_KEEP_AWAY:
+				near_gate = true
+				break
+		if near_gate:
+			continue
+
+		var near_other := false
+		for po in placed_offsets:
+			var d2: float = absf(offset - po)
+			d2 = minf(d2, length - d2)
+			if d2 < MIN_BOX_SPACING:
+				near_other = true
+				break
+		if near_other:
+			continue
+
 		var local_pos = curve.sample_baked(offset)
 		var global_pos = track_path.to_global(local_pos)
 
-		# Compute track tangent and right vector to offset left/right randomly
-		var next_offset = fmod(offset + 1.0, max(1.0, length))
+		var next_offset = fmod(offset + 1.0, maxf(1.0, length))
 		var p1 = curve.sample_baked(offset)
 		var p2 = curve.sample_baked(next_offset)
 		var tangent = (track_path.to_global(p2) - track_path.to_global(p1)).normalized()
 		if tangent.length() < 0.01:
 			continue
 		var right_vec = tangent.cross(Vector3.UP).normalized()
+		if right_vec.length() < 0.01:
+			continue
 
-		var lateral_offset = randf_range(-4.0, 4.0)
+		var lateral_offset = randf_range(-3.2, 3.2)
 		var spawn_pos = global_pos + right_vec * lateral_offset + Vector3(0, 10.0, 0)
 
-		# Raycast down to find the road surface
 		var query = PhysicsRayQueryParameters3D.create(spawn_pos, spawn_pos - Vector3(0, 20.0, 0))
-		query.collision_mask = 1 # road/terrain
+		query.collision_mask = 1
 		var result = space_state.intersect_ray(query)
 		if not result:
 			continue
@@ -846,10 +903,23 @@ func _spawn_random_item_boxes(count: int):
 		var hit_pos = result.position
 		var final_pos = hit_pos + Vector3(0, 1.2, 0)
 
-		# Perform a sphere shape overlap check to make sure it doesn't intersect obstacles or other objects
+		var near_gate_world := false
+		for cp in checkpoints:
+			if is_instance_valid(cp) and cp is Node3D:
+				var dxz: Vector2 = Vector2(final_pos.x - cp.global_position.x, final_pos.z - cp.global_position.z)
+				if dxz.length() < 14.0:
+					near_gate_world = true
+					break
+		if finish_n is Node3D:
+			var dxz_f: Vector2 = Vector2(final_pos.x - finish_n.global_position.x, final_pos.z - finish_n.global_position.z)
+			if dxz_f.length() < 14.0:
+				near_gate_world = true
+		if near_gate_world:
+			continue
+
 		var shape_query = PhysicsShapeQueryParameters3D.new()
 		var sphere = SphereShape3D.new()
-		sphere.radius = 1.5
+		sphere.radius = 1.6
 		shape_query.shape = sphere
 		shape_query.transform = Transform3D(Basis.IDENTITY, final_pos)
 		shape_query.collision_mask = 1 | 2 | 4
@@ -858,18 +928,38 @@ func _spawn_random_item_boxes(count: int):
 		var is_obstructed = false
 		for overlap in overlaps:
 			var collider = overlap.collider
-			if collider:
-				var c_name = collider.name.to_lower()
-				var is_road_or_terrain = c_name.contains("road") or c_name.contains("terrain") or c_name.contains("track") or c_name.contains("unified_world") or c_name.contains("gate") or c_name.contains("finishline") or c_name.contains("checkpoint") or c_name.contains("halfway") or c_name.contains("ramp")
-				if not is_road_or_terrain or c_name.contains("itembox") or c_name.contains("cart") or c_name.contains("player"):
-					is_obstructed = true
-					break
+			if collider == null:
+				continue
+			var c_name = str(collider.name).to_lower()
+			var is_gate := (
+				c_name.contains("gate")
+				or c_name.contains("finishline")
+				or c_name.contains("finish_line")
+				or c_name.contains("checkpoint")
+				or c_name.contains("halfway")
+			)
+			var is_road_or_terrain = (
+				c_name.contains("road")
+				or c_name.contains("terrain")
+				or c_name.contains("track")
+				or c_name.contains("unified_world")
+				or c_name.contains("ramp")
+				or c_name.contains("sand")
+				or c_name.contains("curb")
+			)
+			if is_gate or c_name.contains("itembox") or c_name.contains("cart") or c_name.contains("player"):
+				is_obstructed = true
+				break
+			if not is_road_or_terrain:
+				is_obstructed = true
+				break
 
 		if not is_obstructed:
 			var box = ITEM_BOX_SCENE.instantiate()
 			box.name = "RandomItemBox_%d" % spawned_count
 			add_child(box)
 			box.global_position = final_pos
+			placed_offsets.append(offset)
 			spawned_count += 1
 
 func _rebuild_checkpoints():
@@ -1231,6 +1321,39 @@ func _save_shape_cache(cache_key: String, shape: Shape3D) -> void:
 		push_warning("[COLLISION CACHE] save failed %s err=%s" % [path, str(err)])
 	elif _save_shapes_to_project:
 		print("[COLLISION CACHE] wrote ", path)
+
+
+## Editor: drop every BoostPad onto the road/terrain under it (works on slopes).
+func _snap_all_boost_pads_to_ground() -> void:
+	print("[Level] Snap-all boost pads starting…")
+	var pads: Array = []
+	if get_tree():
+		pads = get_tree().get_nodes_in_group("boost_pads")
+	if pads.is_empty():
+		_collect_boost_pads(self, pads)
+	print("[Level] Found ", pads.size(), " boost pad(s).")
+	var ok_n := 0
+	var fail_n := 0
+	for pad in pads:
+		if pad == null or not is_instance_valid(pad):
+			continue
+		if pad.has_method("snap_pad_to_ground"):
+			if pad.snap_pad_to_ground():
+				ok_n += 1
+				print("[Level]   OK ", pad.name, " → ", pad.global_position)
+			else:
+				fail_n += 1
+				push_warning("[Level] BoostPad snap failed: ", pad.name)
+	print("[Level] Snapped ", ok_n, " boost pad(s).", (" (" + str(fail_n) + " failed)") if fail_n > 0 else "")
+
+
+func _collect_boost_pads(node: Node, out: Array) -> void:
+	if node.get_script() != null:
+		var path := str(node.get_script().resource_path)
+		if path.ends_with("BoostPad.gd"):
+			out.append(node)
+	for c in node.get_children():
+		_collect_boost_pads(c, out)
 
 
 func _align_start_and_spawns_to_track():

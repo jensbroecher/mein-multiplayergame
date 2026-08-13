@@ -31,6 +31,8 @@
 [ext_resource type="PackedScene" uid="uid://boostpad123" path="res://BoostPad.tscn" id="34_hyofv"]
 [ext_resource type="PackedScene" uid="uid://cd0dsee36c0e" path="res://models/animals/20260717033727_7db23447.fbx" id="35_v188o"]
 [ext_resource type="Script" uid="uid://d17og8u13807t" path="res://Eagle.gd" id="36_eagle"]
+[ext_resource type="PackedScene" uid="uid://f75dsw8i1haf" path="res://models/plants/0e2447e774ad6afc15d3aeb56a0372ea.fbx" id="37_0sv5c"]
+[ext_resource type="PackedScene" uid="uid://b6fi0jh1lqq8q" path="res://models/plants/18d533d36cbe879a50e7c9684591f471.fbx" id="38_rw4kp"]
 [ext_resource type="Texture2D" uid="uid://0weypvnrwhcd" path="res://materials/dirt.png" id="dirt_albedo"]
 [ext_resource type="Texture2D" uid="uid://bptucrvhefh88" path="res://materials/dirt_normal.png" id="dirt_normal"]
 [ext_resource type="Texture2D" uid="uid://basy1jouttsw2" path="res://materials/dark_canyon_rock.png" id="rock_albedo"]
@@ -366,17 +368,26 @@ gizmo_extents = 0.3
 [node name="SpawnIndicator" parent="SpawnPoints/Spawn6" unique_id=2032820258 instance=ExtResource("21_623mb")]
 
 [node name="BoostPad" parent="." unique_id=1434937508 instance=ExtResource("34_hyofv")]
-transform = Transform3D(-0.9421159, 0, 0.33528742, 0, 1, 0, -0.33528742, 0, -0.9421159, 324.22278, -1.6298639, 98.85507)
+transform = Transform3D(0.25368336, -0.060366336, 0.9654018, 0.015341914, 0.9981763, 0.058384247, -0.96716565, 0, 0.25414684, 401.2962, 1.1350136, 64.275665)
 flash_brightness = 1.0
 
 [node name="BoostPad2" parent="." unique_id=1479251552 instance=ExtResource("34_hyofv")]
-transform = Transform3D(-0.9421159, 0, 0.33528742, 0, 1, 0, -0.33528742, 0, -0.9421159, 332.7522, -1.6298639, 85.74786)
+transform = Transform3D(-0.9421159, 0, 0.33528742, 0, 1, 0, -0.33528742, 0, -0.9421159, 332.52573, -1.6298639, 85.74786)
 flash_brightness = 1.0
 
 [node name="BoostPad3" parent="." unique_id=1832253402 instance=ExtResource("34_hyofv")]
-transform = Transform3D(-0.9421159, 0, 0.33528742, 0, 1, 0, -0.33528742, 0, -0.9421159, 334.13046, -1.6298639, 70.42737)
+transform = Transform3D(-0.29712847, -0.04422854, 0.9538126, -0.01315443, 0.9990214, 0.04222706, -0.9547469, 0, -0.29741952, 345.5116, -2.4669733, 59.54415)
 flash_brightness = 1.0
 
 [node name="Eagle" parent="." unique_id=1789962235 instance=ExtResource("35_v188o")]
 transform = Transform3D(-3.5242686, 0, 9.358394, 0, 10, 0, -9.358394, 0, -3.5242686, 218.61864, 11.250163, -102.219666)
 script = ExtResource("36_eagle")
+
+[node name="0e2447e774ad6afc15d3aeb56a0372ea" parent="." unique_id=330628015 groups=["collision_capsule"] instance=ExtResource("37_0sv5c")]
+transform = Transform3D(5, 0, 0, 0, 5, 0, 0, 0, 5, 340.12033, -2.9525812, 50.876705)
+
+[node name="18d533d36cbe879a50e7c9684591f471" parent="." unique_id=788663098 groups=["collision_trimesh"] instance=ExtResource("38_rw4kp")]
+transform = Transform3D(6, 0, 0, 0, 6, 0, 0, 0, 6, 341.93387, -2.0827844, 86.10571)
+
+[node name="155b46f430c01d85b690a61ac5be8ae1" parent="." unique_id=384548494 groups=["collision_trimesh"] instance=ExtResource("26_n0bgs")]
+transform = Transform3D(6, 0, 0, 0, 6, 0, 0, 0, 6, 314.65356, -1.3547175, 99.65201)

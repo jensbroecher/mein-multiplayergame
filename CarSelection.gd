@@ -22,7 +22,7 @@ const CAR_PRESETS = [
 		"acceleration": 50.0,
 		"steer_speed": 2.5,
 		"grip": 5.0,
-		"braking": 40.0,
+		"braking": 31.0,
 		"offroad": 6.0,
 		"desc": "All-around performer. Great for beginners.",
 		"wheel_parts": {"FL": "part_5", "FR": "part_2", "RL": "part_0", "RR": "part_6"}
@@ -35,7 +35,7 @@ const CAR_PRESETS = [
 		"acceleration": 40.0,
 		"steer_speed": 2.2,
 		"grip": 4.5,
-		"braking": 30.0,
+		"braking": 24.0,
 		"offroad": 4.0,
 		"desc": "High top speed, but slower to accelerate.",
 		"wheel_parts": {"FL": "part_3", "FR": "part_0", "RL": "part_4", "RR": "part_2"}
@@ -48,7 +48,7 @@ const CAR_PRESETS = [
 		"acceleration": 65.0,
 		"steer_speed": 2.7,
 		"grip": 5.5,
-		"braking": 55.0,
+		"braking": 42.0,
 		"offroad": 8.0,
 		"desc": "Explosive acceleration and good handling.",
 		"wheel_parts": {"FL": "part_10", "FR": "part_7", "RL": "part_11", "RR": "part_9"}
@@ -61,7 +61,7 @@ const CAR_PRESETS = [
 		"acceleration": 55.0,
 		"steer_speed": 3.2,
 		"grip": 6.0,
-		"braking": 48.0,
+		"braking": 37.0,
 		"offroad": 5.0,
 		"desc": "Unmatched steering response. Master of drifts.",
 		"wheel_parts": {"FL": "part_0", "FR": "part_1", "RL": "part_4", "RR": "part_2"}
@@ -74,7 +74,7 @@ const CAR_PRESETS = [
 		"acceleration": 45.0,
 		"steer_speed": 2.0,
 		"grip": 4.0,
-		"braking": 35.0,
+		"braking": 27.0,
 		"offroad": 3.0,
 		"desc": "High speed interceptor. Built for straightaways.",
 		"wheel_parts": {"FL": "part_6", "FR": "part_3", "RL": "part_4", "RR": "part_5"}
@@ -87,7 +87,7 @@ const CAR_PRESETS = [
 		"acceleration": 55.0,
 		"steer_speed": 2.4,
 		"grip": 5.0,
-		"braking": 45.0,
+		"braking": 35.0,
 		"offroad": 9.5,
 		"desc": "Offroad specialist. Heavy tires maintain full speed off-track.",
 		"wheel_parts": {"FL": "part_0", "FR": "part_3", "RL": "part_2", "RR": "part_4"}
@@ -100,7 +100,7 @@ const CAR_PRESETS = [
 		"acceleration": 50.0,
 		"steer_speed": 3.5,
 		"grip": 3.5,
-		"braking": 40.0,
+		"braking": 31.0,
 		"offroad": 4.0,
 		"desc": "Super agile drift machine. Slides effortlessly around corners.",
 		"wheel_parts": {"FL": "part_4", "FR": "part_0", "RL": "part_3", "RR": "part_2"}
@@ -113,7 +113,7 @@ const CAR_PRESETS = [
 		"acceleration": 60.0,
 		"steer_speed": 2.6,
 		"grip": 5.5,
-		"braking": 50.0,
+		"braking": 38.0,
 		"offroad": 6.5,
 		"desc": "Heavy armored racer. Balanced stats with high durability.",
 		"wheel_parts": {"FL": "part_0", "FR": "part_5", "RL": "part_2", "RR": "part_3"}

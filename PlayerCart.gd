@@ -17,7 +17,7 @@ const CAR_PRESETS = [
 		"acceleration": 50.0,
 		"steer_speed": 2.5,
 		"grip": 5.0,
-		"braking": 40.0,
+		"braking": 31.0,
 		"offroad": 6.0,
 		# Wheel part names inside the FBX, keyed by corner
 		"wheel_parts": {"FL": "part_5", "FR": "part_2", "RL": "part_0", "RR": "part_6"}
@@ -30,7 +30,7 @@ const CAR_PRESETS = [
 		"acceleration": 40.0,
 		"steer_speed": 2.2,
 		"grip": 4.5,
-		"braking": 30.0,
+		"braking": 24.0,
 		"offroad": 4.0,
 		"wheel_parts": {"FL": "part_3", "FR": "part_0", "RL": "part_4", "RR": "part_2"}
 	},
@@ -42,7 +42,7 @@ const CAR_PRESETS = [
 		"acceleration": 65.0,
 		"steer_speed": 2.7,
 		"grip": 5.5,
-		"braking": 55.0,
+		"braking": 42.0,
 		"offroad": 8.0,
 		"wheel_parts": {"FL": "part_10", "FR": "part_7", "RL": "part_11", "RR": "part_9"}
 	},
@@ -54,7 +54,7 @@ const CAR_PRESETS = [
 		"acceleration": 55.0,
 		"steer_speed": 3.2,
 		"grip": 6.0,
-		"braking": 48.0,
+		"braking": 37.0,
 		"offroad": 5.0,
 		"wheel_parts": {"FL": "part_0", "FR": "part_1", "RL": "part_4", "RR": "part_2"}
 	},
@@ -66,7 +66,7 @@ const CAR_PRESETS = [
 		"acceleration": 45.0,
 		"steer_speed": 2.0,
 		"grip": 4.0,
-		"braking": 35.0,
+		"braking": 27.0,
 		"offroad": 3.0,
 		"wheel_parts": {"FL": "part_6", "FR": "part_3", "RL": "part_4", "RR": "part_5"}
 	},
@@ -78,7 +78,7 @@ const CAR_PRESETS = [
 		"acceleration": 55.0,
 		"steer_speed": 2.4,
 		"grip": 5.0,
-		"braking": 45.0,
+		"braking": 35.0,
 		"offroad": 9.5,
 		"wheel_parts": {"FL": "part_0", "FR": "part_3", "RL": "part_2", "RR": "part_4"}
 	},
@@ -90,7 +90,7 @@ const CAR_PRESETS = [
 		"acceleration": 50.0,
 		"steer_speed": 3.5,
 		"grip": 3.5,
-		"braking": 40.0,
+		"braking": 31.0,
 		"offroad": 4.0,
 		"wheel_parts": {"FL": "part_4", "FR": "part_0", "RL": "part_3", "RR": "part_2"}
 	},
@@ -102,7 +102,7 @@ const CAR_PRESETS = [
 		"acceleration": 60.0,
 		"steer_speed": 2.6,
 		"grip": 5.5,
-		"braking": 50.0,
+		"braking": 38.0,
 		"offroad": 6.5,
 		"wheel_parts": {"FL": "part_0", "FR": "part_5", "RL": "part_2", "RR": "part_3"}
 	}
@@ -111,7 +111,7 @@ const CAR_PRESETS = [
 var max_speed = 30.0
 var reverse_speed = 15.0
 var acceleration = 50.0
-var braking = 40.0
+var braking = 31.0
 var steer_speed = 2.5
 var grip = 5.0
 
@@ -260,6 +260,8 @@ var water_surface_y: float = WATER_LEVEL
 var water_bounds_active: bool = false
 var water_bounds_min: Vector2 = Vector2.ZERO # (x, z)
 var water_bounds_max: Vector2 = Vector2.ZERO
+## TerrainGenerator for desert_wadi influence-shaped water (optional).
+var _wadi_water_tg: Node = null
 var water_timer: float = 0.0
 var last_splash_time: float = -999.0
 ## Tracks wet/dry transitions for entry splash + hit slowdown.
@@ -477,21 +479,31 @@ func _ready():
 					water_bounds_min = Vector2(c.x - half.x, c.z - half.y)
 					water_bounds_max = Vector2(c.x + half.x, c.z + half.y)
 		elif tg and str(tg.get("level_prefix")) == "desert_wadi":
-			# Local shallow river ford only.
+			# Local river + valley lake. Mesh verts are world-space with node at TG origin —
+			# use water_center_xz / water_bounds_* meta, not river.global_position (was 0,0,0).
 			stage_has_water = true
-			water_surface_y = 1.15
+			water_surface_y = 1.12
 			water_bounds_active = true
-			water_bounds_min = Vector2(72.0, -268.0)
-			water_bounds_max = Vector2(288.0, -142.0)
+			water_bounds_min = Vector2(30.0, -320.0)
+			water_bounds_max = Vector2(360.0, -100.0)
+			_wadi_water_tg = tg
 			var river = tg.get_node_or_null("WadiRiverWater")
 			if river:
 				if river.has_meta("water_surface_y"):
-					water_surface_y = float(river.get_meta("water_surface_y"))
-				if river.has_meta("water_half_xz"):
+					water_surface_y = float(river.get_meta("water_surface_y")) + river.global_position.y
+				if river.has_meta("water_bounds_min") and river.has_meta("water_bounds_max"):
+					water_bounds_min = river.get_meta("water_bounds_min")
+					water_bounds_max = river.get_meta("water_bounds_max")
+				elif river.has_meta("water_half_xz"):
 					var half_r: Vector2 = river.get_meta("water_half_xz")
-					var cr: Vector3 = river.global_position
-					water_bounds_min = Vector2(cr.x - half_r.x, cr.z - half_r.y)
-					water_bounds_max = Vector2(cr.x + half_r.x, cr.z + half_r.y)
+					var center_xz: Vector2
+					if river.has_meta("water_center_xz"):
+						center_xz = river.get_meta("water_center_xz")
+					else:
+						var cr: Vector3 = river.global_position
+						center_xz = Vector2(cr.x, cr.z)
+					water_bounds_min = Vector2(center_xz.x - half_r.x, center_xz.y - half_r.y)
+					water_bounds_max = Vector2(center_xz.x + half_r.x, center_xz.y + half_r.y)
 		elif tg and "no_water" in tg:
 			stage_has_water = not tg.no_water
 			water_surface_y = WATER_LEVEL
@@ -868,18 +880,32 @@ func _process(delta):
 			var pivot = p.get_meta("pivot", null)
 			if is_instance_valid(pivot):
 				if p.name.ends_with("_Skid"):
-					# Skidmarks stay flat (no rotation jitter) and snapped to ground surface
-					p.global_rotation = Vector3.ZERO
-					var xz_pos = Vector3(pivot.global_position.x, 0.0, pivot.global_position.z)
+					# Flat on ground, yaw-aligned to car so segments follow the tire path
+					var n: Vector3 = Vector3.UP
+					var ground_y: float = pivot.global_position.y + WHEEL_Y_OFFSET + 0.02
 					if ground_ray.is_colliding() and ground_ray.get_collision_normal().y >= 0.55:
-						xz_pos.y = ground_ray.get_collision_point().y + 0.02
+						n = ground_ray.get_collision_normal().normalized()
+						ground_y = ground_ray.get_collision_point().y + 0.025
+					var fwd_sk: Vector3 = -visuals.global_transform.basis.z
+					var fwd_plane: Vector3 = fwd_sk - n * fwd_sk.dot(n)
+					if fwd_plane.length_squared() < 0.0001:
+						fwd_plane = -visuals.global_transform.basis.z
 					else:
-						xz_pos.y = pivot.global_position.y + WHEEL_Y_OFFSET + 0.02
-					p.global_position = xz_pos
+						fwd_plane = fwd_plane.normalized()
+					var right_sk: Vector3 = n.cross(fwd_plane)
+					if right_sk.length_squared() < 0.0001:
+						p.global_rotation = Vector3(0.0, visuals.global_rotation.y, 0.0)
+					else:
+						right_sk = right_sk.normalized()
+						fwd_plane = right_sk.cross(n).normalized()
+						p.global_transform.basis = Basis(right_sk, n, -fwd_plane)
+					var mark_pos: Vector3 = pivot.global_position
+					mark_pos.y = ground_y
+					p.global_position = mark_pos
 				else:
-					# Smoke particles follow wheel orientation and position
+					# Smoke follows wheel; slight lift so it doesn't cake on the tire
 					p.global_rotation = pivot.global_rotation
-					p.global_position = pivot.global_position
+					p.global_position = pivot.global_position + Vector3(0.0, 0.08, 0.0)
 
 
 	for p in dirt_particles:
@@ -951,7 +977,7 @@ func _physics_process(delta):
 		var water_depth: float = water_surface_y - global_position.y
 		var in_water_xz := _is_over_water_volume()
 		# Shallow / ford: near or slightly under the surface — slow down hard, never drown
-		var in_shallow_water := in_water_xz and water_depth > -0.85 and water_depth < 1.15
+		var in_shallow_water := in_water_xz and water_depth > -1.35 and water_depth < 1.15
 		# Deep water only (fully submerged): can eventually drown
 		var in_deep_water := in_water_xz and water_depth >= 1.15
 		# Hysteresis for "underwater" VFX / deep state
@@ -1255,9 +1281,17 @@ func _physics_process(delta):
 		if not is_boosting:
 			var input_scale = abs(input_dir.y)
 			var accel_force = acceleration * slow_mult * input_scale
+			if drift_mode:
+				# Power-slide: keep pushing while rear is loose
+				accel_force *= 1.08
+				var side_sign: float = 1.0 if drift_right else -1.0
+				apply_central_force(right * side_sign * acceleration * 0.18 * mass * input_scale)
 			if is_offroad and on_ground and ground_normal.y < 0.85 and fwd.dot(Vector3.UP) > 0.05:
 				accel_force = 0.0
-			if current_speed < max_speed * offroad_penalty * slow_mult * input_scale:
+			var speed_cap: float = max_speed * offroad_penalty * slow_mult * input_scale
+			if drift_mode:
+				speed_cap *= 0.92
+			if current_speed < speed_cap:
 				apply_central_force(fwd * accel_force * mass)
 			boost_time += delta
 	elif input_dir.y > 0.1: # Brake / Reverse input
@@ -1268,17 +1302,18 @@ func _physics_process(delta):
 			pass
 		elif is_boosting:
 			# If boosting, braking just reduces the boost effectiveness a bit
-			apply_central_force(-fwd * braking * 0.5 * mass * input_scale)
+			apply_central_force(-fwd * braking * 0.4 * mass * input_scale)
 		elif drift_mode:
-			# If drifting, preserve forward momentum by not applying heavy brakes
-			var speed_ratio = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
-			if speed_ratio < 0.85:
-				apply_central_force(fwd * acceleration * 0.8 * mass * input_scale)
-			else:
-				apply_central_force(fwd * acceleration * 0.3 * mass * input_scale)
+			# Brake-hold drift: light scrub only — keep slide momentum
+			apply_central_force(-fwd * braking * 0.18 * mass * input_scale)
+			var side_sign: float = 1.0 if drift_right else -1.0
+			apply_central_force(right * side_sign * acceleration * 0.12 * mass * input_scale)
 		else:
 			if current_speed > 1.0:
-				apply_central_force(-fwd * braking * mass * input_scale)
+				# Softer brakes + progressive (less grab at high speed)
+				var spd_t: float = clampf(current_speed / maxf(max_speed, 1.0), 0.0, 1.0)
+				var brake_mul: float = lerpf(0.78, 0.62, spd_t)
+				apply_central_force(-fwd * braking * brake_mul * mass * input_scale)
 			elif current_speed < -0.5:
 				if current_speed > -reverse_speed * offroad_penalty * input_scale:
 					var accel_force = acceleration * 0.5 * input_scale
@@ -1312,7 +1347,12 @@ func _physics_process(delta):
 			# - they release brake (input_dir.y < 0.1)
 			# - car comes to a stop (current_speed < 3.0)
 			if drift_mode:
-				if input_dir.y < 0.1 or current_speed < 3.0:
+				# Keep power-slide when brake→accel with steer held
+				if current_speed < 2.5:
+					drift_mode = false
+				elif abs(input_dir.x) < 0.12 and input_dir.y < -0.1:
+					drift_mode = false
+				elif abs(input_dir.x) < 0.15 and abs(input_dir.y) <= 0.1:
 					drift_mode = false
 			
 			var turn_speed = steer_speed
@@ -1325,7 +1365,10 @@ func _physics_process(delta):
 				if sfx_brake_drift.playing: sfx_brake_drift.stop()
 			
 			if is_drifting:
-				turn_speed *= 1.8 # Tighter turn
+				if input_dir.y > 0.1:
+					turn_speed *= 1.85
+				else:
+					turn_speed *= 1.55
 			
 			var steer_amount = -current_steer * turn_speed * (min(linear_velocity.length() / 10.0, 1.0)) * delta
 			visuals.global_rotate(ground_normal, steer_amount)
@@ -1333,7 +1376,11 @@ func _physics_process(delta):
 			# Kill lateral velocity (adds grip)
 			var lat_vel = linear_velocity.dot(right)
 			var grip_factor = grip
-			if is_drifting: grip_factor *= 0.22 # Low grip factor for sliding momentum
+			if is_drifting:
+				if input_dir.y < -0.1:
+					grip_factor *= 0.30 # Power-slide
+				else:
+					grip_factor *= 0.20 # Brake drift
 			if is_offroad and on_ground and ground_normal.y < 0.85:
 				# Scale grip down as the slope gets steeper, causing the cart to slide down cliffs/steep hills
 				var slope_factor = clamp((ground_normal.y - 0.5) / (0.85 - 0.5), 0.0, 1.0)
@@ -1444,8 +1491,13 @@ func _is_over_water_volume() -> bool:
 	if not water_bounds_active:
 		return true
 	var p := global_position
-	return p.x >= water_bounds_min.x and p.x <= water_bounds_max.x \
-			and p.z >= water_bounds_min.y and p.z <= water_bounds_max.y
+	if not (p.x >= water_bounds_min.x and p.x <= water_bounds_max.x \
+			and p.z >= water_bounds_min.y and p.z <= water_bounds_max.y):
+		return false
+	# Desert wadi: water is an irregular lake/river, not the full AABB.
+	if is_instance_valid(_wadi_water_tg) and _wadi_water_tg.has_method("is_wadi_water_at"):
+		return bool(_wadi_water_tg.call("is_wadi_water_at", p.x, p.z))
+	return true
 
 
 func _prevent_floor_tunneling(delta: float) -> void:
@@ -2868,108 +2920,138 @@ func _update_antenna(delta):
 func _create_drift_particles(wheel_name: String):
 	var pivot = get_node_or_null("Visuals/WheelPivot" + wheel_name)
 	if not pivot: return
-	
-	# Smoke
+
+	# Brake / drift dust — light and moving so it never cakes into a black disc
 	var smoke = CPUParticles3D.new()
 	smoke.name = wheel_name + "_Smoke"
 	smoke.emitting = false
-	smoke.amount = 30
-	smoke.lifetime = 0.6
+	smoke.amount = 18
+	smoke.lifetime = 0.55
+	smoke.explosiveness = 0.0
+	smoke.randomness = 0.45
 	smoke.mesh = QuadMesh.new()
-	smoke.local_coords = false # Emit in global coordinates so it trails behind the wheel rather than rotating with it
+	smoke.local_coords = false
 	smoke.top_level = true
 	smoke.set_meta("pivot", pivot)
-	
+	smoke.set_meta("kind", "smoke")
+
 	pivot.add_child(smoke)
 	drift_particles.append(smoke)
-	
+
 	if pivot.is_inside_tree():
-		smoke.global_position = pivot.global_position
+		smoke.global_position = pivot.global_position + Vector3(0.0, 0.08, 0.0)
 		smoke.global_rotation = pivot.global_rotation
-	
+
 	var mat_smoke = StandardMaterial3D.new()
 	mat_smoke.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat_smoke.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat_smoke.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
-	mat_smoke.vertex_color_use_as_albedo = true # Crucial for color_ramp to fade out the particles
-	
+	mat_smoke.vertex_color_use_as_albedo = true
+	mat_smoke.cull_mode = BaseMaterial3D.CULL_DISABLED
+
 	var grad_tex = GradientTexture2D.new()
 	grad_tex.fill = GradientTexture2D.FILL_RADIAL
 	grad_tex.fill_from = Vector2(0.5, 0.5)
 	grad_tex.fill_to = Vector2(0.5, 0.0)
-	
+
 	var smoke_grad = Gradient.new()
-	smoke_grad.set_color(0, Color(0.8, 0.8, 0.8, 0.25))
-	smoke_grad.set_color(1, Color(0.8, 0.8, 0.8, 0.0))
+	smoke_grad.set_color(0, Color(0.72, 0.72, 0.72, 0.16))
+	smoke_grad.set_color(1, Color(0.72, 0.72, 0.72, 0.0))
 	grad_tex.gradient = smoke_grad
-	
+
 	mat_smoke.albedo_texture = grad_tex
 	smoke.material_override = mat_smoke
-	
-	smoke.direction = Vector3.UP + Vector3.BACK * 0.5
-	smoke.spread = 30.0
-	smoke.gravity = Vector3(0, 1.0, 0)
-	smoke.initial_velocity_min = 1.0
-	smoke.initial_velocity_max = 3.0
-	smoke.scale_amount_min = 0.2
-	smoke.scale_amount_max = 0.6
-	
+
+	smoke.direction = Vector3(0.0, 1.0, 0.55)
+	smoke.spread = 55.0
+	smoke.gravity = Vector3(0.0, 0.6, 0.0)
+	smoke.initial_velocity_min = 1.8
+	smoke.initial_velocity_max = 4.2
+	smoke.scale_amount_min = 0.12
+	smoke.scale_amount_max = 0.38
+
 	var scale_curve = Curve.new()
-	scale_curve.add_point(Vector2(0.0, 0.2))
-	scale_curve.add_point(Vector2(1.0, 1.0))
+	scale_curve.add_point(Vector2(0.0, 0.25))
+	scale_curve.add_point(Vector2(0.45, 0.85))
+	scale_curve.add_point(Vector2(1.0, 1.15))
 	smoke.scale_amount_curve = scale_curve
-	
+
 	var grad = Gradient.new()
-	grad.set_color(0, Color(0.8, 0.8, 0.8, 0.15))
-	grad.set_color(1, Color(0.8, 0.8, 0.8, 0.0))
+	grad.offsets = PackedFloat32Array([0.0, 0.35, 1.0])
+	grad.colors = PackedColorArray([
+		Color(0.7, 0.7, 0.7, 0.14),
+		Color(0.65, 0.65, 0.65, 0.08),
+		Color(0.6, 0.6, 0.6, 0.0)
+	])
 	smoke.color_ramp = grad
-	
-	# Skidmarks
+
+	# Skidmarks — short segments aligned with car yaw; fade out over lifetime
 	var skid = CPUParticles3D.new()
 	skid.name = wheel_name + "_Skid"
 	skid.emitting = false
-	skid.amount = 4000
-	skid.lifetime = 15.0
+	skid.amount = 280
+	skid.lifetime = 7.5
+	skid.explosiveness = 0.0
+	skid.randomness = 0.0
+	skid.fixed_fps = 30
 	skid.mesh = QuadMesh.new()
-	
 	skid.mesh.orientation = PlaneMesh.FACE_Y
-	skid.mesh.size = Vector2(0.35, 0.35)
-	
+	skid.mesh.size = Vector2(0.28, 0.48)
+
 	var mat_skid = StandardMaterial3D.new()
 	mat_skid.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat_skid.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat_skid.albedo_color = Color(0.1, 0.1, 0.1, 0.35)
+	mat_skid.albedo_color = Color(0.08, 0.08, 0.08, 0.32)
 	mat_skid.vertex_color_use_as_albedo = true
+	mat_skid.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat_skid.render_priority = 1
 	skid.material_override = mat_skid
-	
+
 	var skid_grad = Gradient.new()
-	skid_grad.offsets = PackedFloat32Array([0.0, 0.85, 1.0])
+	skid_grad.offsets = PackedFloat32Array([0.0, 0.35, 0.7, 1.0])
 	skid_grad.colors = PackedColorArray([
-		Color(0.1, 0.1, 0.1, 0.35),
-		Color(0.1, 0.1, 0.1, 0.35),
-		Color(0.1, 0.1, 0.1, 0.0)
+		Color(0.08, 0.08, 0.08, 0.34),
+		Color(0.08, 0.08, 0.08, 0.28),
+		Color(0.08, 0.08, 0.08, 0.12),
+		Color(0.08, 0.08, 0.08, 0.0)
 	])
 	skid.color_ramp = skid_grad
-	
+
 	skid.gravity = Vector3.ZERO
 	skid.direction = Vector3.ZERO
 	skid.spread = 0.0
+	skid.initial_velocity_min = 0.0
+	skid.initial_velocity_max = 0.0
 	skid.local_coords = false
 	skid.top_level = true
 	skid.set_meta("pivot", pivot)
-	
+	skid.set_meta("kind", "skid")
+
 	pivot.add_child(skid)
 	drift_particles.append(skid)
-	
+
 	if pivot.is_inside_tree():
 		var local_offset = Vector3(0, WHEEL_Y_OFFSET + 0.02, 0)
 		skid.global_position = pivot.global_position + pivot.global_transform.basis * local_offset
-		skid.global_rotation = pivot.global_rotation
+		var yaw: float = visuals.global_rotation.y if is_instance_valid(visuals) else 0.0
+		skid.global_rotation = Vector3(0.0, yaw, 0.0)
 
 func _set_drift_emitting(emitting: bool):
+	var speed: float = linear_velocity.length()
 	for p in drift_particles:
-		if is_instance_valid(p) and p is CPUParticles3D:
-			p.emitting = emitting
+		if not is_instance_valid(p) or not (p is CPUParticles3D):
+			continue
+		var kind: String = str(p.get_meta("kind", ""))
+		if kind == "skid" or p.name.ends_with("_Skid"):
+			# No skid stamps while nearly stopped — that made the black disc under the rears
+			var skid_on: bool = emitting and speed > 5.5
+			p.emitting = skid_on
+			if "amount_ratio" in p:
+				p.amount_ratio = clampf((speed - 4.0) / 16.0, 0.12, 1.0) if skid_on else 0.0
+		else:
+			p.emitting = emitting and speed > 2.0
+			if "amount_ratio" in p:
+				p.amount_ratio = clampf(speed / 20.0, 0.15, 0.85) if emitting else 0.0
 
 func _create_dirt_particles(wheel_name: String):
 	var pivot = get_node_or_null("Visuals/WheelPivot" + wheel_name)

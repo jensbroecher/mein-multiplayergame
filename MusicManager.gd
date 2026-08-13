@@ -13,7 +13,10 @@ var resolution_index: int = 1 # Default 1920x1080
 var vsync: bool = false
 var anti_aliasing: int = 2 # 0: Disabled, 1: 2x MSAA, 2: 4x MSAA, 3: 8x MSAA, 4: FXAA
 # Graphics quality
+## Derived from shadow_quality_index > 0 (kept for older code paths).
 var shadows_enabled: bool = false
+## 0=Off 1=Low 2=Medium 3=High — controls map size, soft filter, and light splits.
+var shadow_quality_index: int = 0
 var render_scale_index: int = 1 # 0:50% 1:75% 2:100% 3:125%
 var anisotropic_index: int = 1 # 0:Off 1:2x 2:4x 3:8x 4:16x
 var max_fps_index: int = 1 # 0:30 1:60 2:120 3:Unlimited
@@ -32,6 +35,10 @@ const RESOLUTIONS = [
 const RENDER_SCALES = [0.5, 0.75, 1.0, 1.25]
 const ANISOTROPIC_LEVELS = [0, 2, 4, 8, 16]
 const MAX_FPS_VALUES = [30, 60, 120, 0] # 0 = unlimited
+## Directional shadow atlas size per quality (Off unused).
+const SHADOW_ATLAS_SIZES = [512, 1024, 2048, 4096]
+const SHADOW_MAX_DISTANCES = [70.0, 100.0, 150.0, 220.0]
+const SHADOW_BLURS = [0.4, 0.7, 1.0, 1.25]
 
 
 var current_track_index = -1
@@ -138,6 +145,13 @@ func load_settings():
 		vsync = config.get_value("display", "vsync", false)
 		anti_aliasing = config.get_value("display", "anti_aliasing", 2)
 		shadows_enabled = config.get_value("graphics", "shadows_enabled", false)
+		# Prefer explicit quality; migrate old on/off checkbox (true → Medium)
+		if config.has_section_key("graphics", "shadow_quality_index"):
+			shadow_quality_index = int(config.get_value("graphics", "shadow_quality_index", 2))
+		else:
+			shadow_quality_index = 2 if shadows_enabled else 0
+		shadow_quality_index = clampi(shadow_quality_index, 0, 3)
+		shadows_enabled = shadow_quality_index > 0
 		render_scale_index = config.get_value("graphics", "render_scale_index", 1)
 		anisotropic_index = config.get_value("graphics", "anisotropic_index", 1)
 		max_fps_index = config.get_value("graphics", "max_fps_index", 1)
@@ -157,7 +171,7 @@ func _apply_window_settings():
 	set_anti_aliasing(anti_aliasing, false)
 	set_anisotropic(anisotropic_index, false)
 	set_max_fps(max_fps_index, false)
-	set_shadows_enabled(shadows_enabled, false)
+	set_shadow_quality(shadow_quality_index, false)
 
 func save_settings():
 	var config = ConfigFile.new()
@@ -170,6 +184,7 @@ func save_settings():
 	config.set_value("display", "vsync", vsync)
 	config.set_value("display", "anti_aliasing", anti_aliasing)
 	config.set_value("graphics", "shadows_enabled", shadows_enabled)
+	config.set_value("graphics", "shadow_quality_index", shadow_quality_index)
 	config.set_value("graphics", "render_scale_index", render_scale_index)
 	config.set_value("graphics", "anisotropic_index", anisotropic_index)
 	config.set_value("graphics", "max_fps_index", max_fps_index)
@@ -408,24 +423,72 @@ func set_use_isometric_camera(enabled: bool, save: bool = true) -> void:
 
 
 func set_shadows_enabled(enabled: bool, save: bool = true):
-	shadows_enabled = enabled
-	_apply_shadows_to_tree(get_tree().root if get_tree() else null, enabled)
-	# Player carts also toggle mesh shadow casting
-	if get_tree():
-		get_tree().call_group("player_carts", "apply_shadow_setting", enabled)
-	if save: save_settings()
+	# Back-compat: toggle maps to Off vs Medium
+	set_shadow_quality(2 if enabled else 0, save)
 
-func _apply_shadows_to_tree(node: Node, enabled: bool) -> void:
+
+func set_shadow_quality(index: int, save: bool = true) -> void:
+	shadow_quality_index = clampi(index, 0, 3)
+	shadows_enabled = shadow_quality_index > 0
+	_apply_shadow_quality_global()
+	_apply_shadows_to_tree(get_tree().root if get_tree() else null)
+	if get_tree():
+		get_tree().call_group("player_carts", "apply_shadow_setting", shadows_enabled)
+	if save:
+		save_settings()
+
+
+func _apply_shadow_quality_global() -> void:
+	var q: int = shadow_quality_index
+	var atlas: int = SHADOW_ATLAS_SIZES[q] if q > 0 else SHADOW_ATLAS_SIZES[0]
+	# Runtime atlas + soft filter (mobile renderer respects these)
+	RenderingServer.directional_shadow_atlas_set_size(atlas, true)
+	var soft_q: int = RenderingServer.SHADOW_QUALITY_HARD
+	match q:
+		0, 1:
+			soft_q = RenderingServer.SHADOW_QUALITY_SOFT_VERY_LOW if q == 1 else RenderingServer.SHADOW_QUALITY_HARD
+		2:
+			soft_q = RenderingServer.SHADOW_QUALITY_SOFT_LOW
+		3:
+			soft_q = RenderingServer.SHADOW_QUALITY_SOFT_MEDIUM
+	RenderingServer.directional_soft_shadow_filter_set_quality(soft_q)
+	var vp := get_viewport()
+	if vp:
+		vp.positional_shadow_atlas_size = atlas if q > 0 else 512
+
+
+func _apply_shadows_to_tree(node: Node) -> void:
 	if node == null:
 		return
-	if node is DirectionalLight3D or node is OmniLight3D or node is SpotLight3D:
-		node.shadow_enabled = enabled
+	var enabled: bool = shadows_enabled
+	var q: int = shadow_quality_index
+	if node is DirectionalLight3D:
+		var dl := node as DirectionalLight3D
+		dl.shadow_enabled = enabled
+		if enabled:
+			# Near-field quality for cars: more splits + sane max distance
+			if q >= 3:
+				dl.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+			elif q == 2:
+				dl.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+			else:
+				dl.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+			dl.directional_shadow_max_distance = SHADOW_MAX_DISTANCES[q]
+			dl.shadow_blur = SHADOW_BLURS[q]
+			# Bias tuned so car shadows don't swim / peter-pan on the road
+			dl.shadow_bias = 0.03 if q <= 1 else 0.02
+			dl.shadow_normal_bias = 1.0 if q <= 1 else 0.8
+			dl.directional_shadow_pancake_size = 8.0
+	elif node is OmniLight3D:
+		(node as OmniLight3D).shadow_enabled = enabled and q >= 2
+	elif node is SpotLight3D:
+		(node as SpotLight3D).shadow_enabled = enabled and q >= 2
 	for child in node.get_children():
-		_apply_shadows_to_tree(child, enabled)
+		_apply_shadows_to_tree(child)
 
 ## Call after a level is spawned so lights pick up the current shadow setting.
 func refresh_level_graphics() -> void:
-	set_shadows_enabled(shadows_enabled, false)
+	set_shadow_quality(shadow_quality_index, false)
 	set_anisotropic(anisotropic_index, false)
 	# Re-apply render scale in case a new viewport path was created
 	set_resolution(resolution_index, false)

@@ -1,13 +1,14 @@
 # regenerate_desert_wadi.gd
 # Builds DesertWadiLevel.tscn: technical desert course with sharp hairpins,
-# off-road cuttable dunes, and a shallow river ford.
+# off-road dune cuts, and a wide valley river/lake ford.
 #
 # Run: open res://regenerate_desert_wadi.tscn and Play Current Scene.
+# Does NOT re-import lakeside trees/ramps/props from Level.tscn — those are stripped.
 extends Node
 
 func _ready() -> void:
 	print("=== Desert Wadi Level Generation ===")
-	print("Building technical desert course with river ford. Please wait...")
+	print("Building technical desert course with river valley. Please wait...")
 
 	var template_path := "res://levels/Level.tscn"
 	var target_path := "res://levels/DesertWadiLevel.tscn"
@@ -19,13 +20,11 @@ func _ready() -> void:
 		return
 	if dir.file_exists(target_path.trim_prefix("res://")):
 		dir.remove(target_path.trim_prefix("res://"))
-	# DirAccess.copy needs relative or absolute depending on version
 	var err := DirAccess.copy_absolute(
 		ProjectSettings.globalize_path(template_path),
 		ProjectSettings.globalize_path(target_path)
 	)
 	if err != OK:
-		# Fallback: load template and re-save path later via pack
 		print("copy_absolute failed (", err, "), will pack from template instance")
 	else:
 		print("Copied template to DesertWadiLevel.tscn")
@@ -47,6 +46,9 @@ func _ready() -> void:
 	level.name = "DesertWadiLevel"
 	add_child(level)
 
+	# Strip lakeside trees / ramps / props — keep only track infrastructure
+	_strip_non_essential_props(level)
+
 	var tg = level.get_node_or_null("TerrainGenerator")
 	var track_path = level.get_node_or_null("TrackPath") as Path3D
 	if track_path:
@@ -59,55 +61,91 @@ func _ready() -> void:
 
 	tg.level_prefix = "desert_wadi"
 	tg.track_layout_type = 0 # DEFAULT desert flats
-	tg.no_water = true # use local river plane only
+	tg.no_water = true # local valley lake only
 	tg.no_grass = true
 	tg.terrain_resolution = 560
 	tg.hill_height = 42.0
-	# Bridge pillars poke the deck on tight curves and cause random jumps
 	tg.generate_bridge_supports = false
-	tg.terrain_recession_collision = 0.12
-	tg.terrain_recession_visual = 0.18
+	# Mild recess only — deep trenches under curbs made cars sink beside the road
+	tg.terrain_recession_collision = 0.14
+	tg.terrain_recession_visual = 0.22
 	tg.road_y_offset = 0.06
 	tg.curb_y_offset = 0.06
+	tg.sand_width = 17.0
+	tg.road_width = 14.0
+	tg.terrain_grass_count = 0
 
-	# Technical closed loop: tight hairpins + river ford + elevation changes.
-	# Off-road: cutting the switchbacks means leaving sand onto Unified_World terrain.
+	# Desert look (sand dunes palette) — lakeside template ships green grass
+	var sand_tex: Texture2D = load("res://materials/sand.png") as Texture2D
+	var asphalt_tex: Texture2D = load("res://materials/asphalt.png") as Texture2D
+	var stoch: Shader = load("res://terrain_stochastic.gdshader") as Shader
+	if stoch and sand_tex:
+		var sand_mat := ShaderMaterial.new()
+		sand_mat.shader = stoch
+		sand_mat.set_shader_parameter("albedo_texture", sand_tex)
+		# Let the sand texture drive the look (near-white tint = real dune color).
+		# Mild warm lift only — heavy yellow multiplies read as plastic sand.
+		sand_mat.set_shader_parameter("albedo", Color(1.0, 0.97, 0.90, 1.0))
+		sand_mat.set_shader_parameter("uv_scale", 16.0)
+		sand_mat.set_shader_parameter("smoothness", 0.96)  # roughness (shader maps this to ROUGHNESS)
+		sand_mat.set_shader_parameter("use_world_uv", true)
+		tg.grass_material = sand_mat # field is the terrain visual material
+	if stoch and asphalt_tex:
+		var road_mat := ShaderMaterial.new()
+		road_mat.shader = stoch
+		road_mat.set_shader_parameter("albedo_texture", asphalt_tex)
+		road_mat.set_shader_parameter("albedo", Color(0.65, 0.62, 0.58, 1.0))
+		road_mat.set_shader_parameter("uv_scale", 18.0)
+		tg.road_material = road_mat
+
+	# Prefer clear/fine weather for a desert feel if the resource exists
+	var weather = level.get_node_or_null("WeatherController")
+	if weather:
+		var fine = load("res://addons/GodotWeatherSystem/weather/fine.tres")
+		if fine and "selected_weather" in weather:
+			# selected_weather is often an enum index — try time of day for hot sun instead
+			if "time_of_day_hours" in weather:
+				weather.time_of_day_hours = 14.5
+
+	# Technical closed loop. Start/finish sits on a LONG straight (not a hairpin).
+	# Path order begins mid climb-out straight so the gate faces a calm approach.
 	var curve := Curve3D.new()
 	curve.bake_interval = 0.25
 
-	# {pos, in, out} — sharp corners use short handles
 	var points: Array = [
-		# Start / finish straight
-		{"pos": Vector3(0, 5, 170), "in": Vector3(0, 0, 25), "out": Vector3(0, 0, -25)},
-		{"pos": Vector3(20, 5, 90), "in": Vector3(-5, 0, 25), "out": Vector3(8, 0, -28)},
-		# First tight S
-		{"pos": Vector3(70, 5, 40), "in": Vector3(-25, 0, 15), "out": Vector3(28, 0, -12)},
-		{"pos": Vector3(110, 5, 10), "in": Vector3(-20, 0, 20), "out": Vector3(18, 0, -22)},
-		# Hairpin 1 (left)
-		{"pos": Vector3(130, 5, -50), "in": Vector3(5, 0, 22), "out": Vector3(-8, 0, -18)},
-		{"pos": Vector3(85, 4.5, -85), "in": Vector3(25, 0, 5), "out": Vector3(-22, 0, -5)},
-		{"pos": Vector3(55, 4.5, -120), "in": Vector3(12, 0, 18), "out": Vector3(-10, 0, -20)},
-		# Hairpin 2 (right) — inviting dune cut across the inside
-		{"pos": Vector3(95, 4, -155), "in": Vector3(-22, 0, 8), "out": Vector3(20, 0, -10)},
-		{"pos": Vector3(130, 3, -175), "in": Vector3(-15, 0, 12), "out": Vector3(12, -0.5, -12)},
-		# Drop into river ford
-		{"pos": Vector3(155, 1.5, -195), "in": Vector3(-12, 1, 10), "out": Vector3(14, -0.4, -8)},
-		{"pos": Vector3(185, 1.05, -210), "in": Vector3(-14, 0, 6), "out": Vector3(16, 0, -6)}, # mid-ford
-		{"pos": Vector3(220, 1.05, -222), "in": Vector3(-14, 0, 5), "out": Vector3(14, 0.3, -5)},
-		{"pos": Vector3(250, 2.0, -230), "in": Vector3(-12, -0.5, 4), "out": Vector3(15, 1.0, 8)},
-		# Climb out + long left hairpin uphill
-		{"pos": Vector3(280, 5, -200), "in": Vector3(-10, -2, -18), "out": Vector3(8, 1, 20)},
-		{"pos": Vector3(300, 6, -140), "in": Vector3(-5, -1, -22), "out": Vector3(0, 0, 24)},
-		{"pos": Vector3(270, 6, -90), "in": Vector3(20, 0, -15), "out": Vector3(-22, 0, 12)},
-		# Double apex switchbacks (sharp)
-		{"pos": Vector3(230, 5.5, -50), "in": Vector3(18, 0, -12), "out": Vector3(-16, 0, 14)},
-		{"pos": Vector3(260, 5, -10), "in": Vector3(-16, 0, -14), "out": Vector3(14, 0, 16)},
-		{"pos": Vector3(230, 5, 40), "in": Vector3(18, 0, -12), "out": Vector3(-20, 0, 12)},
-		{"pos": Vector3(180, 4.5, 80), "in": Vector3(22, 0, -8), "out": Vector3(-24, 0, 6)},
-		# Final chicane back to start
-		{"pos": Vector3(110, 4.5, 120), "in": Vector3(25, 0, -10), "out": Vector3(-28, 0, 8)},
-		{"pos": Vector3(40, 5, 150), "in": Vector3(22, 0, -12), "out": Vector3(-20, 0, 10)},
-		{"pos": Vector3(0, 5, 170), "in": Vector3(12, 0, -18), "out": Vector3(0, 0, 25)},
+		# === START / FINISH: long straight after climb (northbound-ish) ===
+		{"pos": Vector3(292, 5.6, -168), "in": Vector3(2, 0, -22), "out": Vector3(-1, 0.1, 24)},
+		{"pos": Vector3(298, 6.0, -125), "in": Vector3(0, -0.1, -20), "out": Vector3(-2, 0, 22)},
+		{"pos": Vector3(285, 6.0, -85), "in": Vector3(8, 0, -18), "out": Vector3(-14, 0, 14)},
+		# Double-apex switchbacks
+		{"pos": Vector3(245, 5.5, -50), "in": Vector3(18, 0, -12), "out": Vector3(-16, 0, 14)},
+		{"pos": Vector3(268, 5.0, -12), "in": Vector3(-14, 0, -14), "out": Vector3(12, 0, 16)},
+		{"pos": Vector3(235, 5.0, 38), "in": Vector3(16, 0, -12), "out": Vector3(-18, 0, 12)},
+		{"pos": Vector3(185, 4.5, 78), "in": Vector3(20, 0, -8), "out": Vector3(-22, 0, 6)},
+		# Chicane into west side
+		{"pos": Vector3(115, 4.5, 115), "in": Vector3(24, 0, -10), "out": Vector3(-26, 0, 8)},
+		{"pos": Vector3(45, 5.0, 145), "in": Vector3(20, 0, -12), "out": Vector3(-18, 0, 10)},
+		{"pos": Vector3(10, 5.0, 155), "in": Vector3(14, 0, -8), "out": Vector3(-8, 0, -20)},
+		# Opening S (south)
+		{"pos": Vector3(25, 5.0, 90), "in": Vector3(-6, 0, 22), "out": Vector3(10, 0, -26)},
+		{"pos": Vector3(72, 5.0, 42), "in": Vector3(-24, 0, 14), "out": Vector3(26, 0, -12)},
+		{"pos": Vector3(112, 5.0, 8), "in": Vector3(-18, 0, 18), "out": Vector3(16, 0, -20)},
+		# Hairpin 1
+		{"pos": Vector3(128, 5.0, -48), "in": Vector3(6, 0, 20), "out": Vector3(-8, 0, -18)},
+		{"pos": Vector3(88, 4.5, -82), "in": Vector3(22, 0, 6), "out": Vector3(-20, 0, -6)},
+		{"pos": Vector3(58, 4.5, -118), "in": Vector3(12, 0, 16), "out": Vector3(-10, 0, -18)},
+		# Hairpin 2 into valley
+		{"pos": Vector3(98, 4.0, -152), "in": Vector3(-20, 0, 8), "out": Vector3(18, 0, -10)},
+		{"pos": Vector3(132, 3.0, -172), "in": Vector3(-14, 0, 12), "out": Vector3(12, -0.4, -12)},
+		# Drop into river ford / valley lake
+		{"pos": Vector3(158, 1.45, -192), "in": Vector3(-12, 0.8, 10), "out": Vector3(14, -0.3, -8)},
+		{"pos": Vector3(188, 1.05, -208), "in": Vector3(-14, 0, 6), "out": Vector3(16, 0, -6)},
+		{"pos": Vector3(222, 1.05, -220), "in": Vector3(-14, 0, 5), "out": Vector3(14, 0.25, -5)},
+		{"pos": Vector3(255, 1.9, -232), "in": Vector3(-12, -0.4, 4), "out": Vector3(14, 0.9, 6)},
+		# Climb out back toward start straight
+		{"pos": Vector3(278, 4.2, -218), "in": Vector3(-10, -1.2, -8), "out": Vector3(8, 0.8, 14)},
+		{"pos": Vector3(288, 5.2, -192), "in": Vector3(-4, -0.6, -14), "out": Vector3(3, 0.3, 16)},
+		{"pos": Vector3(292, 5.6, -168), "in": Vector3(0, -0.2, -18), "out": Vector3(0, 0.1, 22)},
 	]
 
 	for p in points:
@@ -115,16 +153,14 @@ func _ready() -> void:
 
 	track_path.curve = curve
 
-	# Remove sand dunes if present (template may not have them)
 	var sd = level.get_node_or_null("SandDunes")
 	if sd:
 		sd.free()
 
-	# Boost pads: before river entry, after climb, mid-tech section
+	# Clear any leftover boost pads then place only wadi pads
 	var old_boost = level.get_node_or_null("BoostPads")
 	if old_boost:
 		old_boost.free()
-	# Also free any root-level BoostPad instances from template
 	var to_free: Array = []
 	for child in level.get_children():
 		if child is Node and str(child.name).begins_with("BoostPad"):
@@ -139,12 +175,13 @@ func _ready() -> void:
 	boost_container.owner = level
 
 	var track_len: float = curve.get_baked_length()
-	var river_entry_off: float = curve.get_closest_offset(Vector3(155, 1.5, -195))
-	var climb_off: float = curve.get_closest_offset(Vector3(280, 5, -200))
+	var river_entry_off: float = curve.get_closest_offset(Vector3(158, 1.45, -192))
+	var climb_off: float = curve.get_closest_offset(Vector3(278, 4.2, -218))
+	var start_off: float = curve.get_closest_offset(Vector3(292, 5.6, -168))
 	var boost_offsets := {
 		"BoostPad_PreRiver": fmod(river_entry_off - 22.0 + track_len, track_len),
-		"BoostPad_PostClimb": fmod(climb_off + 18.0 + track_len, track_len),
-		"BoostPad_Start": 35.0,
+		"BoostPad_PostClimb": fmod(climb_off + 14.0 + track_len, track_len),
+		"BoostPad_Start": fmod(start_off + 40.0 + track_len, track_len),
 	}
 
 	var bp_scene: PackedScene = load("res://BoostPad.tscn")
@@ -166,7 +203,6 @@ func _ready() -> void:
 		bp.basis = Basis.looking_at(tangent, Vector3.UP)
 		print("Placed ", bp_name, " at offset ", offset)
 
-	# Checkpoints + finish/spawns
 	if level.has_method("_rebuild_checkpoints"):
 		level._rebuild_checkpoints()
 	if level.has_method("_align_checkpoints_to_track"):
@@ -175,13 +211,13 @@ func _ready() -> void:
 	print("Generating desert wadi world meshes...")
 	tg.generate_world()
 
+	# Gate on the long straight (explicit world pos before align snaps to curve)
 	var fl = level.get_node_or_null("FinishLine")
 	if fl:
-		fl.position = Vector3(0, 5, 170)
+		fl.position = Vector3(292, 5.6, -168)
 	if level.has_method("_align_start_and_spawns_to_track"):
 		level._align_start_and_spawns_to_track()
 
-	# Ownership for save
 	for child in tg.get_children():
 		_set_owner_recursive(child, level)
 	var sp = level.get_node_or_null("SpawnPoints")
@@ -190,11 +226,13 @@ func _ready() -> void:
 	_set_owner_recursive(boost_container, level)
 	_set_owner_recursive(track_path, level)
 
-	# Strip grass if any slipped through
 	var gc = tg.get_node_or_null("GrassContainer")
 	if gc:
 		tg.remove_child(gc)
 		gc.free()
+
+	# Final pass: never ship template props
+	_strip_non_essential_props(level)
 
 	remove_child(level)
 	var new_packed := PackedScene.new()
@@ -210,6 +248,74 @@ func _ready() -> void:
 		return
 	print("Saved DesertWadiLevel.tscn successfully.")
 	get_tree().quit(0)
+
+
+## Drop lakeside trees, ramps, and other decorative instances from Level.tscn.
+func _strip_non_essential_props(level: Node) -> void:
+	var keep := {
+		"TerrainGenerator": true,
+		"TrackPath": true,
+		"FinishLine": true,
+		"Checkpoints": true,
+		"AlternativePaths": true,
+		"WeatherController": true,
+		"PlayerSpawner": true,
+		"ProjectileSpawner": true,
+		"SpawnPoints": true,
+		"BoostPads": true,
+		"RaceUI": true,
+		"WorldEnvironment": true,
+		"DirectionalLight3D": true,
+		"Sun": true,
+		"AudioListener3D": true,
+		"Minimap": true,
+		"PauseMenu": true,
+		"Players": true,
+	}
+	var to_free: Array = []
+	for child in level.get_children():
+		var n := str(child.name)
+		if keep.has(n):
+			continue
+		if child is MultiplayerSpawner:
+			continue
+		if n.begins_with("Halfway") or n.begins_with("Checkpoint"):
+			continue
+		if n.contains("Weather") or n.contains("Environment") or n.contains("Light"):
+			continue
+		if n.begins_with("BoostPad"):
+			continue
+		# Everything else from the lakeside template (trees, ramps, FBX props, etc.)
+		to_free.append(child)
+	for node in to_free:
+		print("Stripping prop: ", node.name)
+		level.remove_child(node)
+		node.free()
+	# Remove decorative meshes stuck under Checkpoints (gates only)
+	var cps = level.get_node_or_null("Checkpoints")
+	if cps:
+		var cp_free: Array = []
+		for c in cps.get_children():
+			var cn := str(c.name)
+			if cn.begins_with("Halfway") or cn.begins_with("Checkpoint") or cn == "FinishLine":
+				continue
+			cp_free.append(c)
+		for c in cp_free:
+			print("Stripping checkpoint prop: ", c.name)
+			cps.remove_child(c)
+			c.free()
+	# Empty alternative shortcut paths so lakeside alts don't remain
+	var alts = level.get_node_or_null("AlternativePaths")
+	if alts:
+		for c in alts.get_children():
+			alts.remove_child(c)
+			c.free()
+	# Ensure Players container exists for MultiplayerSpawner
+	if level.get_node_or_null("Players") == null:
+		var players := Node3D.new()
+		players.name = "Players"
+		level.add_child(players)
+		players.owner = level
 
 
 func _set_owner_recursive(node: Node, scene_root: Node) -> void:

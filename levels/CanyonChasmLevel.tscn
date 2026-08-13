@@ -102,7 +102,7 @@ shader_parameter/use_normal_map = true
 shader_parameter/normal_texture = ExtResource("dirt_normal")
 shader_parameter/normal_scale = 1.2
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_vgigm"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_x5oq0"]
 render_priority = 0
 shader = ExtResource("Shader_stochastic_file")
 shader_parameter/albedo_texture = ExtResource("dirt_albedo")
@@ -115,7 +115,7 @@ shader_parameter/use_normal_map = true
 shader_parameter/normal_texture = ExtResource("dirt_normal")
 shader_parameter/normal_scale = 1.2
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ocis7"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_xuout"]
 cull_mode = 2
 albedo_texture = ExtResource("rock_albedo")
 roughness = 0.9
@@ -126,17 +126,17 @@ uv1_scale = Vector3(0.06, 0.06, 0.06)
 uv1_triplanar = true
 uv1_triplanar_sharpness = 8.0
 
-[sub_resource type="FastNoiseLite" id="FastNoiseLite_86blt"]
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_73j01"]
 seed = 42
 frequency = 0.018
 fractal_octaves = 4
 
-[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_x5oq0"]
-noise = SubResource("FastNoiseLite_86blt")
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_vuht3"]
+noise = SubResource("FastNoiseLite_73j01")
 seamless = true
 as_normal_map = true
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_xuout"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_25u65"]
 render_priority = 0
 shader = ExtResource("19_pt3e8")
 shader_parameter/water_color = Color(0.06, 0.09, 0.04, 1)
@@ -146,13 +146,13 @@ shader_parameter/sky_reflect = 0.85
 shader_parameter/transparency = 0.18
 shader_parameter/metallic = 0.72
 shader_parameter/roughness = 0.05
-shader_parameter/noise_tex = SubResource("NoiseTexture2D_x5oq0")
+shader_parameter/noise_tex = SubResource("NoiseTexture2D_vuht3")
 shader_parameter/wave_speed = 0.03
 shader_parameter/wave_strength = 0.85
 shader_parameter/wave_height = 1.15
 shader_parameter/wave_scale = 0.55
 
-[sub_resource type="PlaneMesh" id="PlaneMesh_73j01"]
+[sub_resource type="PlaneMesh" id="PlaneMesh_c4tac"]
 size = Vector2(56, 72)
 subdivide_width = 48
 subdivide_depth = 56
@@ -239,46 +239,46 @@ road_material = SubResource("ShaderMaterial_asphalt")
 metadata/_edit_lock_ = true
 metadata/_edit_group_ = true
 
-[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=838597470]
+[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=609663514]
 material_override = SubResource("ShaderMaterial_grass")
 lod_bias = 10.0
 mesh = ExtResource("14_yfrwy")
 
-[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1977286544]
+[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=806356748]
 
-[node name="@CollisionShape3D@22280" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=1455150203]
+[node name="@CollisionShape3D@22179" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=636444684]
 shape = ExtResource("15_2is8y")
 
-[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=697522553]
-material_override = SubResource("ShaderMaterial_vgigm")
+[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1376259840]
+material_override = SubResource("ShaderMaterial_x5oq0")
 mesh = ExtResource("16_g1aow")
 
-[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=590095218]
-material_override = SubResource("StandardMaterial3D_ocis7")
+[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=393154652]
+material_override = SubResource("StandardMaterial3D_xuout")
 mesh = ExtResource("17_h3cd8")
 
-[node name="Visual_Road_Sides_EndCaps" type="MeshInstance3D" parent="TerrainGenerator/Visual_Road_Sides" unique_id=1337229055]
-material_override = SubResource("StandardMaterial3D_ocis7")
+[node name="Visual_Road_Sides_EndCaps" type="MeshInstance3D" parent="TerrainGenerator/Visual_Road_Sides" unique_id=154229043]
+material_override = SubResource("StandardMaterial3D_xuout")
 mesh = ExtResource("17_ctbtb")
 
-[node name="Visual_Road_Sides_Collision" type="StaticBody3D" parent="TerrainGenerator/Visual_Road_Sides" unique_id=29803676]
+[node name="Visual_Road_Sides_Collision" type="StaticBody3D" parent="TerrainGenerator/Visual_Road_Sides" unique_id=1866278405]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="TerrainGenerator/Visual_Road_Sides/Visual_Road_Sides_Collision" unique_id=843496944]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TerrainGenerator/Visual_Road_Sides/Visual_Road_Sides_Collision" unique_id=1516588465]
 shape = ExtResource("18_uipsh")
 
-[node name="EndCapCollision" type="CollisionShape3D" parent="TerrainGenerator/Visual_Road_Sides/Visual_Road_Sides_Collision" unique_id=501554865]
+[node name="EndCapCollision" type="CollisionShape3D" parent="TerrainGenerator/Visual_Road_Sides/Visual_Road_Sides_Collision" unique_id=2033503791]
 shape = ExtResource("19_jmhce")
 
-[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1766272093]
+[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1271024042]
 
-[node name="@CollisionShape3D@22281" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=1719602028]
+[node name="@CollisionShape3D@22180" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=140906646]
 shape = ExtResource("19_luqfk")
 
-[node name="ChasmPitWater" type="MeshInstance3D" parent="TerrainGenerator" unique_id=2047959045]
+[node name="ChasmPitWater" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1587668679]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, -3.2, -85)
-material_override = SubResource("ShaderMaterial_xuout")
+material_override = SubResource("ShaderMaterial_25u65")
 cast_shadow = 0
-mesh = SubResource("PlaneMesh_73j01")
+mesh = SubResource("PlaneMesh_c4tac")
 metadata/water_surface_y = -3.2
 metadata/water_half_xz = Vector2(28, 36)
 
@@ -358,6 +358,9 @@ skeleton = NodePath("")
 
 [node name="JehovaTree2" parent="." unique_id=2059769729 groups=["collision_trimesh"] instance=ExtResource("31_7uf2i")]
 transform = Transform3D(15, 0, 0, 0, 14.772116, -2.6047227, 0, 2.6047227, 14.772116, -12.926787, 5.085778, 150.6189)
+
+[node name="JehovaTree3" parent="." unique_id=1473767572 groups=["collision_trimesh"] instance=ExtResource("31_7uf2i")]
+transform = Transform3D(-14.93718, -0.23814, -1.3505616, -0.23348524, 14.9980545, -0.062218666, 1.3513732, -0.040935993, -14.938949, 9.146575, 5.329607, -47.16552)
 
 [node name="JehovaTree" parent="." unique_id=1663010525 groups=["collision_trimesh"] instance=ExtResource("33_hyofv")]
 transform = Transform3D(8.654013, 0, -12.251859, 0, 14.999999, 0, 12.251859, 0, 8.654013, 132.94797, 21.049828, -315.17072)

@@ -301,10 +301,13 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			var river_t: float = _wadi_river_influence(px, pz)
 			if river_t > 0.001:
 				var bed_y: float = WADI_RIVER_BED_Y
-				# Keep the road corridor near road_h; deepen only away from asphalt
-				var away_from_road: float = smoothstep(sand_edge * 0.55, sand_edge + 22.0, dist)
+				# Only carve lake/river where we are clearly off the driveable sand strip
+				# (never dig a trench under curbs — that made cars sink beside the road)
+				var away_from_road: float = smoothstep(sand_edge + 1.5, sand_edge + 22.0, dist)
 				var carve: float = river_t * away_from_road
-				height = lerp(height, bed_y, carve)
+				var lake_center_boost: float = river_t * river_t * 0.5
+				var target_bed: float = lerpf(bed_y, bed_y - 0.7, lake_center_boost)
+				height = lerp(height, target_bed, clampf(carve, 0.0, 1.0))
 
 	# Edge falloff (all track types — drops to abyss at map edges)
 	var world_pos = Vector2(px, pz)
@@ -410,8 +413,21 @@ func generate_world():
 		terrain_instance.material_override = grass_material
 	else:
 		var terrain_mat = StandardMaterial3D.new()
-		terrain_mat.albedo_color = Color(0.2, 0.6, 0.2)
-		terrain_mat.roughness = 1.0
+		# Desert-ish default if no material assigned
+		if level_prefix == "desert_wadi" or track_layout_type == TrackLayoutType.MOUNTAIN:
+			var sand_tex: Texture2D = load("res://materials/sand.png") as Texture2D
+			if sand_tex:
+				terrain_mat.albedo_texture = sand_tex
+				# Near-white so the photo texture reads as real sand
+				terrain_mat.albedo_color = Color(1.0, 0.97, 0.90)
+				terrain_mat.uv1_scale = Vector3(0.12, 0.12, 0.12)
+			else:
+				# Muted khaki sand (no texture)
+				terrain_mat.albedo_color = Color(0.78, 0.70, 0.52)
+		else:
+			terrain_mat.albedo_color = Color(0.2, 0.6, 0.2)
+		terrain_mat.roughness = 0.96
+		terrain_mat.metallic = 0.0
 		terrain_instance.material_override = terrain_mat
 	terrain_instance.lod_bias = 10.0
 	terrain_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
@@ -968,14 +984,15 @@ func _create_track_collision(point_count: int, width: float, node_name: String):
 		# Default / Mountain: FLAT collision deck across full sand width (no curb ramps).
 		# Sloped collision shoulders launch cars on hairpins; visuals can still slope.
 		var frames_col: Array = _build_path_frames(curve, point_count)
-		# Slightly above visual so mesh/terrain seams don't cause micro-jumps
+		# Match visual deck closely — large offsets left a gap at curb edges over recessed terrain
 		var col_y: float = y_offset + 0.02
+		# Slightly wider than visual sand so the shoulder always has solid support
+		var col_outer: float = outer_w + 0.6
 
 		for i in range(point_count + 1):
 			var final_pos: Vector3 = frames_col[i]["pos"]
 			var right_dir: Vector3 = frames_col[i]["right"]
-			# Full constant widths — no per-curve notches in the driveable surface
-			var use_outer: float = outer_w
+			var use_outer: float = col_outer
 			var use_inner: float = inner_w
 
 			# Entire top face at one height — flat driveable sand + road
@@ -1329,22 +1346,29 @@ const CHASM_PIT_WATER_Y := -3.2
 const CHASM_PIT_CENTER := Vector3(150.0, CHASM_PIT_WATER_Y, -85.0)
 const CHASM_PIT_HALF_EXTENTS := Vector2(28.0, 36.0) # XZ half-size of water volume
 
-## Desert Wadi shallow river (ford) — water surface slightly above road bed for splash.
-const WADI_RIVER_WATER_Y := 1.15
-const WADI_RIVER_BED_Y := 0.15
-## River polyline in XZ (world), sampled as a soft ribbon.
-const WADI_RIVER_HALF_WIDTH := 28.0
+## Desert Wadi — single valley lake + ford (not a giant rectangle over the map).
+const WADI_RIVER_WATER_Y := 1.12
+const WADI_RIVER_BED_Y := -0.15
+## River ribbon half-width for terrain carve + water shape.
+const WADI_RIVER_HALF_WIDTH := 38.0
+## Main river/ford channel through the low valley.
 const WADI_RIVER_POLY: Array[Vector2] = [
-	Vector2(100.0, -170.0),
-	Vector2(140.0, -195.0),
-	Vector2(180.0, -210.0),
-	Vector2(220.0, -225.0),
-	Vector2(260.0, -240.0),
+	Vector2(95.0, -165.0),
+	Vector2(130.0, -188.0),
+	Vector2(165.0, -205.0),
+	Vector2(200.0, -218.0),
+	Vector2(235.0, -230.0),
+	Vector2(270.0, -242.0),
 ]
+## One oval lake basin (the intended large lake).
+const WADI_LAKE_CENTER := Vector2(185.0, -212.0)
+const WADI_LAKE_RADIUS := Vector2(62.0, 48.0) # X / Z ellipse radii
+## Influence threshold for water mesh cells (keeps hard rectangle edges away).
+const WADI_WATER_MESH_THRESH := 0.12
 
 
 func _wadi_river_influence(px: float, pz: float) -> float:
-	## 1 near river centerline, 0 outside the banks.
+	## 1 near river centerline / lake basin, 0 outside the banks.
 	if level_prefix != "desert_wadi":
 		return 0.0
 	var p := Vector2(px, pz)
@@ -1357,72 +1381,136 @@ func _wadi_river_influence(px: float, pz: float) -> float:
 		var t: float = 0.0 if len_sq < 1e-6 else clampf((p - a).dot(ab) / len_sq, 0.0, 1.0)
 		var closest: Vector2 = a + ab * t
 		best_d = minf(best_d, p.distance_to(closest))
-	if best_d >= WADI_RIVER_HALF_WIDTH:
-		return 0.0
-	# Soft falloff from center to banks
-	var u: float = 1.0 - (best_d / WADI_RIVER_HALF_WIDTH)
-	return u * u * (3.0 - 2.0 * u)
+	var ribbon: float = 0.0
+	if best_d < WADI_RIVER_HALF_WIDTH:
+		var u: float = 1.0 - (best_d / WADI_RIVER_HALF_WIDTH)
+		ribbon = u * u * (3.0 - 2.0 * u)
+	# Ellipse lake basin only (single intended lake)
+	var d_lake := Vector2(
+			(p.x - WADI_LAKE_CENTER.x) / WADI_LAKE_RADIUS.x,
+			(p.y - WADI_LAKE_CENTER.y) / WADI_LAKE_RADIUS.y
+	)
+	var r2: float = d_lake.length_squared()
+	var lake: float = 0.0
+	if r2 < 1.0:
+		var v: float = 1.0 - r2
+		lake = v * v * (3.0 - 2.0 * v)
+	return maxf(ribbon, lake)
+
+
+## True when XZ is inside the visible wadi lake/river water shape.
+func is_wadi_water_at(px: float, pz: float) -> bool:
+	return _wadi_river_influence(px, pz) >= WADI_WATER_MESH_THRESH
 
 
 func add_wadi_river_water() -> void:
 	if get_node_or_null("WadiRiverWater") != null:
 		return
-	# Bounds from polyline AABB + half width
-	var min_x := 1.0e9
-	var max_x := -1.0e9
-	var min_z := 1.0e9
-	var max_z := -1.0e9
+	# Tight bounds around lake + river only (no huge map-wide rectangle)
+	var min_x := WADI_LAKE_CENTER.x - WADI_LAKE_RADIUS.x
+	var max_x := WADI_LAKE_CENTER.x + WADI_LAKE_RADIUS.x
+	var min_z := WADI_LAKE_CENTER.y - WADI_LAKE_RADIUS.y
+	var max_z := WADI_LAKE_CENTER.y + WADI_LAKE_RADIUS.y
 	for p in WADI_RIVER_POLY:
-		min_x = minf(min_x, p.x)
-		max_x = maxf(max_x, p.x)
-		min_z = minf(min_z, p.y)
-		max_z = maxf(max_z, p.y)
-	min_x -= WADI_RIVER_HALF_WIDTH
-	max_x += WADI_RIVER_HALF_WIDTH
-	min_z -= WADI_RIVER_HALF_WIDTH
-	max_z += WADI_RIVER_HALF_WIDTH
-	var cx: float = (min_x + max_x) * 0.5
-	var cz: float = (min_z + max_z) * 0.5
-	var half := Vector2((max_x - min_x) * 0.5, (max_z - min_z) * 0.5)
+		min_x = minf(min_x, p.x - WADI_RIVER_HALF_WIDTH)
+		max_x = maxf(max_x, p.x + WADI_RIVER_HALF_WIDTH)
+		min_z = minf(min_z, p.y - WADI_RIVER_HALF_WIDTH)
+		max_z = maxf(max_z, p.y + WADI_RIVER_HALF_WIDTH)
+	# Small soft pad only
+	min_x -= 6.0
+	max_x += 6.0
+	min_z -= 6.0
+	max_z += 6.0
+
+	# Build a shaped water mesh: only quads where influence is above threshold
+	# so water doesn't appear as a cut-off rectangle over hills.
+	var res_x := 56
+	var res_z := 44
+	var wet: PackedFloat32Array = PackedFloat32Array()
+	wet.resize((res_x + 1) * (res_z + 1))
+	for iz in range(res_z + 1):
+		var z: float = lerpf(min_z, max_z, float(iz) / float(res_z))
+		for ix in range(res_x + 1):
+			var x: float = lerpf(min_x, max_x, float(ix) / float(res_x))
+			wet[iz * (res_x + 1) + ix] = _wadi_river_influence(x, z)
+
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var y: float = WADI_RIVER_WATER_Y
+	for iz in range(res_z):
+		for ix in range(res_x):
+			var i00: int = iz * (res_x + 1) + ix
+			var i10: int = i00 + 1
+			var i01: int = i00 + (res_x + 1)
+			var i11: int = i01 + 1
+			# Cell is water if average influence is strong enough
+			var avg: float = (wet[i00] + wet[i10] + wet[i01] + wet[i11]) * 0.25
+			if avg < WADI_WATER_MESH_THRESH:
+				continue
+			var x0: float = lerpf(min_x, max_x, float(ix) / float(res_x))
+			var x1: float = lerpf(min_x, max_x, float(ix + 1) / float(res_x))
+			var z0: float = lerpf(min_z, max_z, float(iz) / float(res_z))
+			var z1: float = lerpf(min_z, max_z, float(iz + 1) / float(res_z))
+			var v00 := Vector3(x0, y, z0)
+			var v10 := Vector3(x1, y, z0)
+			var v01 := Vector3(x0, y, z1)
+			var v11 := Vector3(x1, y, z1)
+			# Two triangles, normal up
+			st.set_normal(Vector3.UP)
+			st.set_uv(Vector2(0, 0)); st.add_vertex(v00)
+			st.set_uv(Vector2(1, 0)); st.add_vertex(v10)
+			st.set_uv(Vector2(0, 1)); st.add_vertex(v01)
+			st.set_uv(Vector2(1, 0)); st.add_vertex(v10)
+			st.set_uv(Vector2(1, 1)); st.add_vertex(v11)
+			st.set_uv(Vector2(0, 1)); st.add_vertex(v01)
+
+	var mesh: ArrayMesh = st.commit()
+	if mesh.get_surface_count() == 0:
+		push_warning("[Wadi] water mesh empty — check lake/river influence")
+		return
 
 	var water := MeshInstance3D.new()
 	water.name = "WadiRiverWater"
-	var plane := PlaneMesh.new()
-	plane.size = Vector2(half.x * 2.0, half.y * 2.0)
-	plane.subdivide_width = 36
-	plane.subdivide_depth = 28
-	water.mesh = plane
-	water.position = Vector3(cx, WADI_RIVER_WATER_Y, cz)
+	water.mesh = mesh
 	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Gameplay bounds: tight AABB of the lake/river shape
+	var half := Vector2((max_x - min_x) * 0.5, (max_z - min_z) * 0.5)
+	var cx: float = (min_x + max_x) * 0.5
+	var cz: float = (min_z + max_z) * 0.5
 	water.set_meta("water_surface_y", WADI_RIVER_WATER_Y)
 	water.set_meta("water_half_xz", half)
+	water.set_meta("water_center_xz", Vector2(cx, cz))
+	# Explicit world AABB — do not derive from node.global_position (mesh is world-space verts).
+	water.set_meta("water_bounds_min", Vector2(min_x, min_z))
+	water.set_meta("water_bounds_max", Vector2(max_x, max_z))
 
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://water.gdshader")
 	var noise := FastNoiseLite.new()
 	noise.seed = 91
-	noise.frequency = 0.03
+	noise.frequency = 0.022
 	noise.fractal_type = FastNoiseLite.FRACTAL_FBM
-	noise.fractal_octaves = 3
+	noise.fractal_octaves = 4
+	noise.fractal_lacunarity = 2.1
+	noise.fractal_gain = 0.45
 	var noise_tex := NoiseTexture2D.new()
 	noise_tex.seamless = true
 	noise_tex.as_normal_map = true
-	noise_tex.width = 256
-	noise_tex.height = 256
+	noise_tex.width = 512
+	noise_tex.height = 512
 	noise_tex.noise = noise
-	# Clear shallow desert river
 	mat.set_shader_parameter("noise_tex", noise_tex)
-	mat.set_shader_parameter("water_color", Color(0.12, 0.32, 0.38))
-	mat.set_shader_parameter("shallow_color", Color(0.28, 0.48, 0.42))
-	mat.set_shader_parameter("sky_tint", Color(0.7, 0.78, 0.85))
-	mat.set_shader_parameter("sky_reflect", 0.55)
-	mat.set_shader_parameter("transparency", 0.45)
-	mat.set_shader_parameter("metallic", 0.45)
-	mat.set_shader_parameter("roughness", 0.14)
-	mat.set_shader_parameter("wave_speed", 0.04)
-	mat.set_shader_parameter("wave_strength", 0.35)
-	mat.set_shader_parameter("wave_height", 0.22)
-	mat.set_shader_parameter("wave_scale", 0.9)
+	mat.set_shader_parameter("water_color", Color(0.08, 0.18, 0.2))
+	mat.set_shader_parameter("shallow_color", Color(0.32, 0.42, 0.28))
+	mat.set_shader_parameter("sky_tint", Color(0.72, 0.8, 0.88))
+	mat.set_shader_parameter("sky_reflect", 0.62)
+	mat.set_shader_parameter("transparency", 0.32)
+	mat.set_shader_parameter("metallic", 0.58)
+	mat.set_shader_parameter("roughness", 0.1)
+	mat.set_shader_parameter("wave_speed", 0.028)
+	mat.set_shader_parameter("wave_strength", 0.48)
+	mat.set_shader_parameter("wave_height", 0.38)
+	mat.set_shader_parameter("wave_scale", 0.72)
 	water.material_override = mat
 	add_child(water)
 	if Engine.is_editor_hint() and get_tree():
