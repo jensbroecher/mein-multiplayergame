@@ -1312,9 +1312,9 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 		st.add_index(base + 2); st.add_index(base + 3); st.add_index(nxt + 2)
 		st.add_index(base + 3); st.add_index(nxt + 3); st.add_index(nxt + 2)
 
-		# Bottom - normal faces downward (seen from under the dam)
-		st.add_index(base + 1); st.add_index(nxt + 1); st.add_index(base + 3)
-		st.add_index(base + 3); st.add_index(nxt + 1); st.add_index(nxt + 3)
+		# Bottom - normal faces downward (seen from under the bridge/dam)
+		st.add_index(base + 1); st.add_index(base + 3); st.add_index(nxt + 1)
+		st.add_index(base + 3); st.add_index(nxt + 3); st.add_index(nxt + 1)
 
 	# Finish side walls as their own mesh. Do NOT inject more verts after generate_normals
 	# (that corrupted indexing and created a giant bogus wall).
@@ -1326,8 +1326,10 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 	var final_side_mat = mat.duplicate()
 	if not node_name.contains("Curbs") and final_side_mat is StandardMaterial3D:
 		final_side_mat.albedo_color = final_side_mat.albedo_color.darkened(0.3)
+	if final_side_mat is StandardMaterial3D:
+		(final_side_mat as StandardMaterial3D).cull_mode = BaseMaterial3D.CULL_DISABLED
 
-	if track_layout_type == TrackLayoutType.CANYON and not node_name.contains("Curbs"):
+	if (track_layout_type == TrackLayoutType.MOUNTAIN or track_layout_type == TrackLayoutType.CANYON) and not node_name.contains("Curbs"):
 		var rock_mat = StandardMaterial3D.new()
 		rock_mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 		var rock_tex = load("res://materials/dark_canyon_rock.png")
@@ -1339,7 +1341,7 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 			rock_mat.normal_enabled = true
 			rock_mat.normal_texture = rock_normal
 			rock_mat.normal_scale = 1.5
-		rock_mat.uv1_scale = Vector3(0.06, 0.06, 0.06)
+		rock_mat.uv1_scale = Vector3(0.05, 0.05, 0.05)
 		rock_mat.uv1_triplanar = true
 		rock_mat.uv1_triplanar_sharpness = 8.0
 		rock_mat.cull_mode = BaseMaterial3D.CULL_DISABLED

@@ -14,8 +14,12 @@ uniform float normal_scale : hint_range(-16.0, 16.0) = 1.0;
 uniform bool use_slope_cliff_rock = false;
 uniform sampler2D cliff_texture : source_color, filter_linear_mipmap_anisotropic;
 uniform vec4 cliff_albedo : source_color = vec4(1.0, 1.0, 1.0, 1.0);
-uniform float cliff_slope_threshold : hint_range(0.0, 1.0) = 0.50;
-uniform float cliff_blend_sharpness : hint_range(0.01, 0.5) = 0.12;
+uniform float cliff_uv_scale : hint_range(0.005, 0.5) = 0.04;
+uniform float cliff_slope_threshold : hint_range(0.0, 1.0) = 0.65;
+uniform float cliff_blend_sharpness : hint_range(0.01, 0.5) = 0.15;
+uniform bool use_cliff_normal = false;
+uniform sampler2D cliff_normal_texture : hint_normal, filter_linear_mipmap_anisotropic;
+uniform float cliff_normal_scale : hint_range(-16.0, 16.0) = 1.0;
 
 varying vec3 world_pos;
 varying vec3 world_nrm;
@@ -124,8 +128,6 @@ vec3 stochastic_sample_normal(sampler2D tex, vec2 uv, vec2 dx, vec2 dy) {
 }
 
 void fragment() {
-    // World UV: project onto the dominant plane from the surface normal.
-    // Plain world_pos.xz stretches badly on vertical faces (ramp end-caps / landings).
     vec2 base_uv;
     if (use_world_uv) {
         vec3 an = abs(normalize(world_nrm));
@@ -144,22 +146,27 @@ void fragment() {
     vec2 dy = dFdy(uv);
     vec3 color = stochastic_sample(albedo_texture, uv, dx, dy) * albedo.rgb;
     
+    float rock_weight = 0.0;
     if (use_slope_cliff_rock) {
-        // Triplanar / vertical UV for steep cliffs to prevent stretching
-        vec3 an = abs(normalize(world_nrm));
-        vec2 cliff_uv;
-        if (an.x >= an.z) {
-            cliff_uv = world_pos.zy * (uv_scale * 0.1) * uv_scale_v2;
-        } else {
-            cliff_uv = world_pos.xy * (uv_scale * 0.1) * uv_scale_v2;
-        }
-        vec2 c_dx = dFdx(cliff_uv);
-        vec2 c_dy = dFdy(cliff_uv);
-        vec3 rock_color = stochastic_sample(cliff_texture, cliff_uv, c_dx, c_dy) * cliff_albedo.rgb;
+        // Seamless triplanar projection at natural rock scale (25m per tile)
+        vec3 n_abs = abs(normalize(world_nrm));
+        vec3 n_weight = pow(n_abs, vec3(4.0));
+        float total_w = n_weight.x + n_weight.y + n_weight.z;
+        n_weight /= max(total_w, 0.0001);
         
-        // Blend between sand and rock: only very steep / near-vertical cliffs become rock
+        vec2 uv_x = world_pos.zy * cliff_uv_scale;
+        vec2 uv_y = world_pos.xz * cliff_uv_scale;
+        vec2 uv_z = world_pos.xy * cliff_uv_scale;
+        
+        vec3 rock_x = stochastic_sample(cliff_texture, uv_x, dFdx(uv_x), dFdy(uv_x));
+        vec3 rock_y = stochastic_sample(cliff_texture, uv_y, dFdx(uv_y), dFdy(uv_y));
+        vec3 rock_z = stochastic_sample(cliff_texture, uv_z, dFdx(uv_z), dFdy(uv_z));
+        
+        vec3 rock_color = (rock_x * n_weight.x + rock_y * n_weight.y + rock_z * n_weight.z) * cliff_albedo.rgb;
+        
+        // Slope factor: smooth transition between flat sand and steep cliff rock
         float slope_ny = clamp(normalize(world_nrm).y, 0.0, 1.0);
-        float rock_weight = 1.0 - smoothstep(cliff_slope_threshold - cliff_blend_sharpness, cliff_slope_threshold + cliff_blend_sharpness, slope_ny);
+        rock_weight = 1.0 - smoothstep(cliff_slope_threshold - cliff_blend_sharpness, cliff_slope_threshold + cliff_blend_sharpness, slope_ny);
         color = mix(color, rock_color, rock_weight);
     }
     
@@ -167,7 +174,23 @@ void fragment() {
     ROUGHNESS = smoothness;
     SPECULAR = 0.0;
     
-    if (use_normal_map) {
+    if (use_slope_cliff_rock && use_cliff_normal && rock_weight > 0.01) {
+        vec3 n_abs = abs(normalize(world_nrm));
+        vec3 n_weight = pow(n_abs, vec3(4.0));
+        float total_w = n_weight.x + n_weight.y + n_weight.z;
+        n_weight /= max(total_w, 0.0001);
+        
+        vec2 uv_x = world_pos.zy * cliff_uv_scale;
+        vec2 uv_y = world_pos.xz * cliff_uv_scale;
+        vec2 uv_z = world_pos.xy * cliff_uv_scale;
+        
+        vec3 norm_x = stochastic_sample_normal(cliff_normal_texture, uv_x, dFdx(uv_x), dFdy(uv_x));
+        vec3 norm_y = stochastic_sample_normal(cliff_normal_texture, uv_y, dFdx(uv_y), dFdy(uv_y));
+        vec3 norm_z = stochastic_sample_normal(cliff_normal_texture, uv_z, dFdx(uv_z), dFdy(uv_z));
+        
+        NORMAL_MAP = norm_x * n_weight.x + norm_y * n_weight.y + norm_z * n_weight.z;
+        NORMAL_MAP_DEPTH = cliff_normal_scale * rock_weight;
+    } else if (use_normal_map) {
         NORMAL_MAP = stochastic_sample_normal(normal_texture, uv, dx, dy);
         NORMAL_MAP_DEPTH = normal_scale;
     }
