@@ -111,45 +111,49 @@ func _ready() -> void:
 	# Path order begins mid climb-out straight so the gate faces a calm approach.
 	var curve := Curve3D.new()
 	curve.bake_interval = 0.25
+	curve.up_vector_enabled = true
 
 	var points: Array = [
 		# === START / FINISH: long straight after climb (northbound-ish) ===
-		{"pos": Vector3(292, 5.6, -168), "in": Vector3(2, 0, -22), "out": Vector3(-1, 0.1, 24)},
-		{"pos": Vector3(298, 6.0, -125), "in": Vector3(0, -0.1, -20), "out": Vector3(-2, 0, 22)},
-		{"pos": Vector3(285, 6.0, -85), "in": Vector3(8, 0, -18), "out": Vector3(-14, 0, 14)},
+		{"pos": Vector3(292, 5.6, -168), "in": Vector3(0, 0, -22), "out": Vector3(0, 0, 22)},
+		{"pos": Vector3(298, 6.0, -125), "in": Vector3(0, 0, -20), "out": Vector3(0, 0, 20)},
+		{"pos": Vector3(285, 6.0, -85), "in": Vector3(14, 0, -14), "out": Vector3(-14, 0, 14)},
 		# Double-apex switchbacks
-		{"pos": Vector3(245, 5.5, -50), "in": Vector3(18, 0, -12), "out": Vector3(-16, 0, 14)},
-		{"pos": Vector3(268, 5.0, -12), "in": Vector3(-14, 0, -14), "out": Vector3(12, 0, 16)},
-		{"pos": Vector3(235, 5.0, 38), "in": Vector3(16, 0, -12), "out": Vector3(-18, 0, 12)},
-		{"pos": Vector3(185, 4.5, 78), "in": Vector3(20, 0, -8), "out": Vector3(-22, 0, 6)},
-		# Chicane into west side
-		{"pos": Vector3(115, 4.5, 115), "in": Vector3(24, 0, -10), "out": Vector3(-26, 0, 8)},
-		{"pos": Vector3(45, 5.0, 145), "in": Vector3(20, 0, -12), "out": Vector3(-18, 0, 10)},
-		{"pos": Vector3(10, 5.0, 155), "in": Vector3(14, 0, -8), "out": Vector3(-8, 0, -20)},
-		# Opening S (south)
-		{"pos": Vector3(25, 5.0, 90), "in": Vector3(-6, 0, 22), "out": Vector3(10, 0, -26)},
-		{"pos": Vector3(72, 5.0, 42), "in": Vector3(-24, 0, 14), "out": Vector3(26, 0, -12)},
-		{"pos": Vector3(112, 5.0, 8), "in": Vector3(-18, 0, 18), "out": Vector3(16, 0, -20)},
+		{"pos": Vector3(245, 5.5, -50), "in": Vector3(16, 0, -14), "out": Vector3(-16, 0, 14)},
+		{"pos": Vector3(268, 5.0, -12), "in": Vector3(-12, 0, -16), "out": Vector3(12, 0, 16)},
+		{"pos": Vector3(235, 5.0, 38), "in": Vector3(18, 0, -12), "out": Vector3(-18, 0, 12)},
+		{"pos": Vector3(185, 5.0, 78), "in": Vector3(22, 0, -6), "out": Vector3(-22, 0, 6)},
+		# === LONG NASCAR BANKED CURVE (24° High Banked Sweep) ===
+		# For this right-hand turn, negative tilt banks the road: left/outer wall is high (+Y), right/inner apron stays low.
+		{"pos": Vector3(115, 5.0, 115), "in": Vector3(26, 0, -10), "out": Vector3(-26, 0, 10), "tilt": -0.12},
+		{"pos": Vector3(45, 5.5, 145), "in": Vector3(20, 0, -12), "out": Vector3(-20, 0, 12), "tilt": -0.28},
+		{"pos": Vector3(0, 6.0, 125), "in": Vector3(14, 0, 14), "out": Vector3(-14, 0, -14), "tilt": -0.42},
+		{"pos": Vector3(15, 5.5, 75), "in": Vector3(-8, 0, 20), "out": Vector3(8, 0, -20), "tilt": -0.28},
+		{"pos": Vector3(72, 5.0, 42), "in": Vector3(-26, 0, 12), "out": Vector3(26, 0, -12), "tilt": -0.12},
+		{"pos": Vector3(112, 5.0, 8), "in": Vector3(-16, 0, 20), "out": Vector3(16, 0, -20)},
 		# Hairpin 1
-		{"pos": Vector3(128, 5.0, -48), "in": Vector3(6, 0, 20), "out": Vector3(-8, 0, -18)},
-		{"pos": Vector3(88, 4.5, -82), "in": Vector3(22, 0, 6), "out": Vector3(-20, 0, -6)},
-		{"pos": Vector3(58, 4.5, -118), "in": Vector3(12, 0, 16), "out": Vector3(-10, 0, -18)},
+		{"pos": Vector3(128, 5.0, -48), "in": Vector3(8, 0, 18), "out": Vector3(-8, 0, -18)},
+		{"pos": Vector3(88, 4.5, -82), "in": Vector3(20, 0, 6), "out": Vector3(-20, 0, -6)},
+		{"pos": Vector3(58, 4.5, -118), "in": Vector3(10, 0, 18), "out": Vector3(-10, 0, -18)},
 		# Hairpin 2 into valley
-		{"pos": Vector3(98, 4.0, -152), "in": Vector3(-20, 0, 8), "out": Vector3(18, 0, -10)},
-		{"pos": Vector3(132, 3.0, -172), "in": Vector3(-14, 0, 12), "out": Vector3(12, -0.4, -12)},
-		# Drop into river ford / valley lake
-		{"pos": Vector3(158, 1.45, -192), "in": Vector3(-12, 0.8, 10), "out": Vector3(14, -0.3, -8)},
-		{"pos": Vector3(188, 1.05, -208), "in": Vector3(-14, 0, 6), "out": Vector3(16, 0, -6)},
-		{"pos": Vector3(222, 1.05, -220), "in": Vector3(-14, 0, 5), "out": Vector3(14, 0.25, -5)},
-		{"pos": Vector3(255, 1.9, -232), "in": Vector3(-12, -0.4, 4), "out": Vector3(14, 0.9, 6)},
+		{"pos": Vector3(98, 4.2, -152), "in": Vector3(-18, 0, 10), "out": Vector3(18, 0, -10)},
+		{"pos": Vector3(128, 3.0, -172), "in": Vector3(-12, 0.4, 12), "out": Vector3(12, -0.4, -12)},
+		# Drop into river ford / valley lake — completely submerged from bank to bank
+		{"pos": Vector3(155, 1.10, -190), "in": Vector3(-14, 0.5, 8), "out": Vector3(14, -0.5, -8)},
+		{"pos": Vector3(185, 0.70, -206), "in": Vector3(-16, 0.1, 6), "out": Vector3(16, -0.1, -6)},
+		{"pos": Vector3(222, 0.70, -220), "in": Vector3(-14, -0.1, 5), "out": Vector3(14, 0.1, -5)},
+		{"pos": Vector3(255, 1.10, -232), "in": Vector3(-14, -0.6, 6), "out": Vector3(14, 0.6, -6)},
 		# Climb out back toward start straight
-		{"pos": Vector3(278, 4.2, -218), "in": Vector3(-10, -1.2, -8), "out": Vector3(8, 0.8, 14)},
-		{"pos": Vector3(288, 5.2, -192), "in": Vector3(-4, -0.6, -14), "out": Vector3(3, 0.3, 16)},
-		{"pos": Vector3(292, 5.6, -168), "in": Vector3(0, -0.2, -18), "out": Vector3(0, 0.1, 22)},
+		{"pos": Vector3(278, 3.6, -218), "in": Vector3(-8, -0.8, -14), "out": Vector3(8, 0.8, 14)},
+		{"pos": Vector3(288, 5.2, -192), "in": Vector3(-3, -0.3, -16), "out": Vector3(3, 0.3, 16)},
+		{"pos": Vector3(292, 5.6, -168), "in": Vector3(0, -0.1, -22), "out": Vector3(0, 0.1, 22)},
 	]
 
-	for p in points:
+	for idx in range(points.size()):
+		var p = points[idx]
 		curve.add_point(p["pos"], p["in"], p["out"])
+		if p.has("tilt"):
+			curve.set_point_tilt(idx, float(p["tilt"]))
 
 	track_path.curve = curve
 
@@ -175,8 +179,8 @@ func _ready() -> void:
 	boost_container.owner = level
 
 	var track_len: float = curve.get_baked_length()
-	var river_entry_off: float = curve.get_closest_offset(Vector3(158, 1.45, -192))
-	var climb_off: float = curve.get_closest_offset(Vector3(278, 4.2, -218))
+	var river_entry_off: float = curve.get_closest_offset(Vector3(155, 1.10, -190))
+	var climb_off: float = curve.get_closest_offset(Vector3(278, 3.6, -218))
 	var start_off: float = curve.get_closest_offset(Vector3(292, 5.6, -168))
 	var boost_offsets := {
 		"BoostPad_PreRiver": fmod(river_entry_off - 22.0 + track_len, track_len),
@@ -190,17 +194,21 @@ func _ready() -> void:
 		var local_pos: Vector3 = curve.sample_baked(offset)
 		var next_offset: float = fmod(offset + 1.5, track_len)
 		var tangent: Vector3 = (curve.sample_baked(next_offset) - local_pos)
-		tangent.y = 0.0
 		if tangent.length_squared() < 1e-6:
 			tangent = Vector3.FORWARD
 		else:
 			tangent = tangent.normalized()
+		var up_vec: Vector3 = curve.sample_baked_up_vector(offset, true)
+		if up_vec.length_squared() < 1e-6:
+			up_vec = Vector3.UP
+		else:
+			up_vec = up_vec.normalized()
 		var bp = bp_scene.instantiate()
 		bp.name = bp_name
 		boost_container.add_child(bp)
 		bp.owner = level
-		bp.position = local_pos + Vector3.UP * 0.05
-		bp.basis = Basis.looking_at(tangent, Vector3.UP)
+		bp.position = local_pos + up_vec * 0.05
+		bp.basis = Basis.looking_at(tangent, up_vec)
 		print("Placed ", bp_name, " at offset ", offset)
 
 	if level.has_method("_rebuild_checkpoints"):

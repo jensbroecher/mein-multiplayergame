@@ -993,7 +993,11 @@ func _rebuild_checkpoints():
 			if tangent.length() > 0.01:
 				var tangent_global = ((tp_xform * (pos + tangent)) - (tp_xform * pos)).normalized()
 				if tangent_global.length() > 0.01:
-					child.basis = Basis.looking_at(tangent_global, Vector3.UP)
+					var up_local = curve.sample_baked_up_vector(offset, true)
+					if up_local.length_squared() < 1e-6:
+						up_local = Vector3.UP
+					var up_global = (tp_xform.basis * up_local).normalized()
+					child.basis = Basis.looking_at(tangent_global, up_global)
 
 	print("Checkpoints redistributed along track!")
 
@@ -1025,7 +1029,11 @@ func _align_checkpoints_to_track():
 			if tangent_local.length() > 0.01:
 				var tangent_global = ((tp_xform * (snapped_local_pos + tangent_local)) - (tp_xform * snapped_local_pos)).normalized()
 				if tangent_global.length() > 0.01:
-					child.basis = Basis.looking_at(tangent_global, Vector3.UP)
+					var up_local = curve.sample_baked_up_vector(offset, true)
+					if up_local.length_squared() < 1e-6:
+						up_local = Vector3.UP
+					var up_global = (tp_xform.basis * up_local).normalized()
+					child.basis = Basis.looking_at(tangent_global, up_global)
 
 	print("Checkpoints aligned and oriented to track curve!")
 
@@ -1389,7 +1397,11 @@ func _align_start_and_spawns_to_track():
 		if tangent_local.length() > 0.01:
 			var tangent_global = ((tp_xform * (snapped_local_pos + tangent_local)) - (tp_xform * snapped_local_pos)).normalized()
 			if tangent_global.length() > 0.01:
-				fl.basis = Basis.looking_at(tangent_global, Vector3.UP)
+				var up_local = curve.sample_baked_up_vector(fl_offset, true)
+				if up_local.length_squared() < 1e-6:
+					up_local = Vector3.UP
+				var up_global = (tp_xform.basis * up_local).normalized()
+				fl.basis = Basis.looking_at(tangent_global, up_global)
 
 	# Delete old root-level SpawnPoints if they exist to clean up the scene tree
 	var old_sp = get_node_or_null("SpawnPoints")
@@ -1449,17 +1461,21 @@ func _align_start_and_spawns_to_track():
 				# Get tangent at this spawn point to orient it along track
 				var next_s_offset = fmod(s_offset + 1.0, track_len)
 				var tangent_local = (curve.sample_baked(next_s_offset) - snapped_local).normalized()
+				var up_local = curve.sample_baked_up_vector(s_offset, true)
+				if up_local.length_squared() < 1e-6:
+					up_local = Vector3.UP
+				var up_global = (tp_xform.basis * up_local).normalized()
 
-				# Calculate lateral offset (X axis is perpendicular to tangent on XZ plane)
-				var right_local = tangent_local.cross(Vector3.UP).normalized()
-				var spawn_local_pos = snapped_local + right_local * local_xs[idx]
+				# Calculate lateral offset along the tilted right vector
+				var right_local = tangent_local.cross(up_local).normalized()
+				var spawn_local_pos = snapped_local + right_local * local_xs[idx] + up_local * 0.45
 
 				# Set spawn's world position temporarily; we'll convert to local after centroid is known
-				spawn.position = (tp_xform * spawn_local_pos) + Vector3(0, 0.5, 0)
+				spawn.position = tp_xform * spawn_local_pos
 				if tangent_local.length() > 0.01:
 					var tangent_global = ((tp_xform * (snapped_local + tangent_local)) - (tp_xform * snapped_local)).normalized()
 					if tangent_global.length() > 0.01:
-						spawn.basis = Basis.looking_at(tangent_global, Vector3.UP)
+						spawn.basis = Basis.looking_at(tangent_global, up_global)
 
 		# Move spawn_container to centroid of spawns so its AABB stays tight (not stretched to world origin)
 		var centroid = Vector3.ZERO

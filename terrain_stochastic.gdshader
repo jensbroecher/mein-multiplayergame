@@ -11,6 +11,12 @@ uniform bool use_normal_map = false;
 uniform sampler2D normal_texture : hint_normal, filter_linear_mipmap_anisotropic;
 uniform float normal_scale : hint_range(-16.0, 16.0) = 1.0;
 
+uniform bool use_slope_cliff_rock = false;
+uniform sampler2D cliff_texture : source_color, filter_linear_mipmap_anisotropic;
+uniform vec4 cliff_albedo : source_color = vec4(1.0, 1.0, 1.0, 1.0);
+uniform float cliff_slope_threshold : hint_range(0.0, 1.0) = 0.50;
+uniform float cliff_blend_sharpness : hint_range(0.01, 0.5) = 0.12;
+
 varying vec3 world_pos;
 varying vec3 world_nrm;
 
@@ -136,8 +142,28 @@ void fragment() {
     vec2 uv = base_uv * (uv_scale * 0.1) * uv_scale_v2;
     vec2 dx = dFdx(uv);
     vec2 dy = dFdy(uv);
-    vec3 color = stochastic_sample(albedo_texture, uv, dx, dy);
-    ALBEDO = color * albedo.rgb;
+    vec3 color = stochastic_sample(albedo_texture, uv, dx, dy) * albedo.rgb;
+    
+    if (use_slope_cliff_rock) {
+        // Triplanar / vertical UV for steep cliffs to prevent stretching
+        vec3 an = abs(normalize(world_nrm));
+        vec2 cliff_uv;
+        if (an.x >= an.z) {
+            cliff_uv = world_pos.zy * (uv_scale * 0.1) * uv_scale_v2;
+        } else {
+            cliff_uv = world_pos.xy * (uv_scale * 0.1) * uv_scale_v2;
+        }
+        vec2 c_dx = dFdx(cliff_uv);
+        vec2 c_dy = dFdy(cliff_uv);
+        vec3 rock_color = stochastic_sample(cliff_texture, cliff_uv, c_dx, c_dy) * cliff_albedo.rgb;
+        
+        // Blend between sand and rock: only very steep / near-vertical cliffs become rock
+        float slope_ny = clamp(normalize(world_nrm).y, 0.0, 1.0);
+        float rock_weight = 1.0 - smoothstep(cliff_slope_threshold - cliff_blend_sharpness, cliff_slope_threshold + cliff_blend_sharpness, slope_ny);
+        color = mix(color, rock_color, rock_weight);
+    }
+    
+    ALBEDO = color;
     ROUGHNESS = smoothness;
     SPECULAR = 0.0;
     

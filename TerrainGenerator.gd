@@ -49,10 +49,20 @@ func _path_right(tangent: Vector3) -> Vector3:
 	return right.normalized()
 
 
-## Build per-slice path frames with flip-free smoothed right vectors.
-## Prevents curb/road mesh self-intersection on sharp hairpins.
+func _curve_has_tilt(curve: Curve3D) -> bool:
+	if not is_instance_valid(curve):
+		return false
+	for i in range(curve.point_count):
+		if absf(curve.get_point_tilt(i)) > 0.001:
+			return true
+	return false
+
+
+## Build per-slice path frames with flip-free smoothed right vectors and curve tilt support.
+## Prevents curb/road mesh self-intersection on sharp hairpins and enables banked turns.
 func _build_path_frames(curve: Curve3D, point_count: int) -> Array:
 	var length: float = maxf(curve.get_baked_length(), 0.001)
+	var has_tilt: bool = _curve_has_tilt(curve)
 	var frames: Array = []
 	for i in range(point_count + 1):
 		var offset: float = (float(i) / float(point_count)) * length
@@ -62,41 +72,75 @@ func _build_path_frames(curve: Curve3D, point_count: int) -> Array:
 		var tangent: Vector3
 		if i == 0:
 			if is_loop:
-				tangent = curve.sample_baked(0.25) - curve.sample_baked(maxf(0.0, length - 0.25))
+				tangent = curve.sample_baked(0.75) - curve.sample_baked(maxf(0.0, length - 0.75))
 			else:
-				tangent = curve.sample_baked(minf(length, 0.25)) - pos
+				tangent = curve.sample_baked(minf(length, 0.75)) - pos
 		elif i == point_count:
 			if is_loop:
-				tangent = curve.sample_baked(0.25) - curve.sample_baked(maxf(0.0, length - 0.25))
+				tangent = curve.sample_baked(0.75) - curve.sample_baked(maxf(0.0, length - 0.75))
 			else:
-				tangent = pos - curve.sample_baked(maxf(0.0, length - 0.25))
+				tangent = pos - curve.sample_baked(maxf(0.0, length - 0.75))
 		else:
-			var o0: float = maxf(0.0, offset - 0.35)
-			var o1: float = minf(length, offset + 0.35)
+			var o0: float = maxf(0.0, offset - 0.75)
+			var o1: float = minf(length, offset + 0.75)
 			tangent = curve.sample_baked(o1) - curve.sample_baked(o0)
-		var right: Vector3 = _path_right(tangent)
-		frames.append({"pos": pos, "right": right, "offset": offset})
 
-	# Only un-flip rights (no heavy blend — lagging rights cut notches into the road on hairpins)
+		if tangent.length_squared() < 1e-8:
+			tangent = Vector3.FORWARD
+		else:
+			tangent = tangent.normalized()
+
+		var right: Vector3
+		var up_vec: Vector3
+		if has_tilt:
+			up_vec = curve.sample_baked_up_vector(offset, true)
+			if up_vec.length_squared() < 1e-6:
+				up_vec = Vector3.UP
+			else:
+				up_vec = up_vec.normalized()
+			right = tangent.cross(up_vec)
+			if right.length_squared() < 1e-6:
+				right = _path_right(tangent)
+			else:
+				right = right.normalized()
+			up_vec = right.cross(tangent).normalized()
+		else:
+			# Standard tracks: keep right vector strictly horizontal (no sideways roll on climbs!)
+			right = _path_right(tangent)
+			up_vec = right.cross(tangent).normalized()
+
+		frames.append({"pos": pos, "tangent": tangent, "right": right, "up": up_vec, "offset": offset})
+
+	# Forward-Backward 2-pass smooth to eliminate micro-jitter and step discontinuities completely
 	for i in range(1, frames.size()):
 		var prev_r: Vector3 = frames[i - 1]["right"]
 		var r: Vector3 = frames[i]["right"]
 		if r.dot(prev_r) < 0.0:
 			r = -r
-		# Very light smooth only when almost aligned; keep sharp turns accurate
-		if r.dot(prev_r) > 0.85:
-			r = (prev_r * 0.15 + r * 0.85)
-			r.y = 0.0
-			if r.length_squared() > 1e-8:
-				r = r.normalized()
-			else:
-				r = prev_r
+		r = (prev_r * 0.2 + r * 0.8).normalized()
 		frames[i]["right"] = r
+		var t: Vector3 = frames[i]["tangent"]
+		frames[i]["up"] = r.cross(t).normalized()
+
+	for i in range(frames.size() - 2, -1, -1):
+		var next_r: Vector3 = frames[i + 1]["right"]
+		var r: Vector3 = frames[i]["right"]
+		if r.dot(next_r) < 0.0:
+			r = -r
+		r = (next_r * 0.2 + r * 0.8).normalized()
+		frames[i]["right"] = r
+		var t: Vector3 = frames[i]["tangent"]
+		frames[i]["up"] = r.cross(t).normalized()
+
 	if is_loop and frames.size() > 2:
 		var r0: Vector3 = frames[0]["right"]
 		var rN: Vector3 = frames[frames.size() - 1]["right"]
 		if rN.dot(r0) < 0.0:
 			frames[frames.size() - 1]["right"] = -rN
+		var avg_r: Vector3 = (r0 + frames[frames.size() - 1]["right"]).normalized()
+		frames[0]["right"] = avg_r
+		frames[frames.size() - 1]["right"] = avg_r
+
 	return frames
 
 
@@ -206,7 +250,7 @@ func _emit_embankment_end_cap(
 
 
 func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curve3D, for_collision: bool) -> float:
-	var h_noise = noise.get_noise_2d(px, pz) * hill_height
+	var h_noise: float = noise.get_noise_2d(px, pz) * hill_height
 	
 	# --- Mountain base shape ---
 	var radial_offset = 0.0
@@ -231,6 +275,19 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			# Deep chasm floor under the hill jump so nothing fills the gap between ramps
 			if absf(px - 150.0) < 28.0 and pz < -40.0 and pz > -145.0:
 				base_terrain_height = -12.0
+	elif level_prefix == "desert_wadi":
+		# Valley amphitheater: bowl center around lake (195, -208) where terrain is low,
+		# surrounded on all sides by towering desert dunes/hills rising to 18-36m.
+		var valley_c := Vector2(195.0, -208.0)
+		var d_valley := Vector2(
+				(px - valley_c.x) / 135.0,
+				(pz - valley_c.y) / 110.0
+		).length()
+		var bowl_t: float = clampf(d_valley, 0.0, 1.0)
+		var bowl_shape: float = bowl_t * bowl_t * (3.0 - 2.0 * bowl_t)
+		var dune_ring: float = lerpf(0.6, 26.0, bowl_shape)
+		var dune_noise: float = h_noise * lerpf(0.15, 1.0, bowl_shape)
+		base_terrain_height = dune_ring + dune_noise
 	else:
 		base_terrain_height = h_noise
 
@@ -238,6 +295,20 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 	var closest_pos = curve.get_closest_point(Vector3(px, query_y, pz))
 	var dist = Vector2(px, pz).distance_to(Vector2(closest_pos.x, closest_pos.z))
 	var road_h = closest_pos.y
+
+	# Calculate lateral distance and account for curve banking/roll only if tilt is present
+	if _curve_has_tilt(curve):
+		var c_offset = curve.get_closest_offset(closest_pos)
+		var c_length = maxf(curve.get_baked_length(), 0.001)
+		var o0_c = maxf(0.0, c_offset - 0.5)
+		var o1_c = minf(c_length, c_offset + 0.5)
+		var c_tangent = (curve.sample_baked(o1_c) - curve.sample_baked(o0_c)).normalized()
+		if c_tangent.length_squared() > 1e-6:
+			var c_up = curve.sample_baked_up_vector(c_offset, true).normalized()
+			var c_right = c_tangent.cross(c_up).normalized()
+			var rel_p = Vector3(px - closest_pos.x, 0.0, pz - closest_pos.z)
+			var lateral_d = rel_p.dot(Vector3(c_right.x, 0.0, c_right.z).normalized())
+			road_h += lateral_d * c_right.y
 
 	# Airborne jump curve must NOT pull terrain up into a glitchy ridge / fake structure.
 	if level_prefix == "canyon_chasm" and _is_in_gap_pos(closest_pos):
@@ -475,6 +546,7 @@ func _get_world_curve() -> Curve3D:
 	var src: Curve3D = track_path.curve
 	var world_curve := Curve3D.new()
 	world_curve.bake_interval = src.bake_interval
+	world_curve.up_vector_enabled = true
 	# The transform that maps Path3D-local positions into TerrainGenerator-local space
 	var to_local: Transform3D = global_transform.affine_inverse() * track_path.global_transform
 	for i in range(src.point_count):
@@ -482,6 +554,7 @@ func _get_world_curve() -> Curve3D:
 		var p_in  = to_local.basis * src.get_point_in(i)   # tangent handles are direction vectors
 		var p_out = to_local.basis * src.get_point_out(i)
 		world_curve.add_point(pos, p_in, p_out)
+		world_curve.set_point_tilt(i, src.get_point_tilt(i))
 	# For loops: append the first point at the end so the closing segment is
 	# included in get_closest_point() queries (used by terrain height sampling).
 	if is_loop and src.point_count > 1:
@@ -489,6 +562,7 @@ func _get_world_curve() -> Curve3D:
 		var p_in  = to_local.basis * src.get_point_in(0)
 		var p_out = to_local.basis * src.get_point_out(0)
 		world_curve.add_point(pos, p_in, p_out)
+		world_curve.set_point_tilt(src.point_count, src.get_point_tilt(0))
 	return world_curve
 
 
@@ -779,6 +853,7 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 	for i in range(point_count + 1):
 		var final_pos: Vector3 = frames[i]["pos"]
 		var right_dir: Vector3 = frames[i]["right"]
+		var up_dir: Vector3 = frames[i]["up"] if frames[i].has("up") else Vector3.UP
 		var offset: float = float(frames[i]["offset"])
 
 		if is_curb:
@@ -788,14 +863,14 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 			var max_extra: float = _max_shoulder_extra_at(frames, i, length, point_count)
 			var use_outer: float = use_inner + minf(want_extra, max_extra)
 			# Inner edge flush with road; outer edge drops slightly (drainage shoulder)
-			var p_lo = final_pos - right_dir * use_outer + Vector3(0, deck_y - shoulder_drop, 0)
-			var p_li = final_pos - right_dir * use_inner + Vector3(0, deck_y, 0)
-			var p_ri = final_pos + right_dir * use_inner + Vector3(0, deck_y, 0)
-			var p_ro = final_pos + right_dir * use_outer + Vector3(0, deck_y - shoulder_drop, 0)
+			var p_lo = final_pos - right_dir * use_outer + up_dir * (deck_y - shoulder_drop)
+			var p_li = final_pos - right_dir * use_inner + up_dir * deck_y
+			var p_ri = final_pos + right_dir * use_inner + up_dir * deck_y
+			var p_ro = final_pos + right_dir * use_outer + up_dir * (deck_y - shoulder_drop)
 
 			var span: float = maxf(use_outer - use_inner, 0.001)
-			var left_normal = (right_dir * shoulder_drop + Vector3.UP * span).normalized()
-			var right_normal = (-right_dir * shoulder_drop + Vector3.UP * span).normalized()
+			var left_normal = (right_dir * shoulder_drop + up_dir * span).normalized()
+			var right_normal = (-right_dir * shoulder_drop + up_dir * span).normalized()
 
 			st.set_normal(left_normal)
 			st.set_uv(Vector2(0, offset))
@@ -815,13 +890,13 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 		else:
 			# Full constant road width every slice — prevents "deep cuts" on curves
 			var right: Vector3 = right_dir * half_w
-			st.set_normal(Vector3.UP)
+			st.set_normal(up_dir)
 			st.set_uv(Vector2(0, offset))
-			st.add_vertex(final_pos - right + Vector3(0, deck_y, 0))
+			st.add_vertex(final_pos - right + up_dir * deck_y)
 
-			st.set_normal(Vector3.UP)
+			st.set_normal(up_dir)
 			st.set_uv(Vector2(width, offset))
-			st.add_vertex(final_pos + right + Vector3(0, deck_y, 0))
+			st.add_vertex(final_pos + right + up_dir * deck_y)
 
 	# INDEX LOOP (CCW - Facing UP)
 	for i in range(point_count):
@@ -992,19 +1067,20 @@ func _create_track_collision(point_count: int, width: float, node_name: String):
 		for i in range(point_count + 1):
 			var final_pos: Vector3 = frames_col[i]["pos"]
 			var right_dir: Vector3 = frames_col[i]["right"]
+			var up_dir: Vector3 = frames_col[i]["up"] if frames_col[i].has("up") else Vector3.UP
 			var use_outer: float = col_outer
 			var use_inner: float = inner_w
 
-			# Entire top face at one height — flat driveable sand + road
-			var p_lo = final_pos - right_dir * use_outer + Vector3(0, col_y, 0)
-			var p_li = final_pos - right_dir * use_inner + Vector3(0, col_y, 0)
-			var p_ri = final_pos + right_dir * use_inner + Vector3(0, col_y, 0)
-			var p_ro = final_pos + right_dir * use_outer + Vector3(0, col_y, 0)
+			# Driveable sand + road matching banked up vector, with a subtle outer shoulder bevel
+			var p_lo = final_pos - right_dir * use_outer + up_dir * (col_y - 0.12)
+			var p_li = final_pos - right_dir * use_inner + up_dir * col_y
+			var p_ri = final_pos + right_dir * use_inner + up_dir * col_y
+			var p_ro = final_pos + right_dir * use_outer + up_dir * (col_y - 0.12)
 
-			var p_lob = p_lo - Vector3(0, thickness, 0)
-			var p_lib = p_li - Vector3(0, thickness, 0)
-			var p_rib = p_ri - Vector3(0, thickness, 0)
-			var p_rob = p_ro - Vector3(0, thickness, 0)
+			var p_lob = p_lo - up_dir * thickness
+			var p_lib = p_li - up_dir * thickness
+			var p_rib = p_ri - up_dir * thickness
+			var p_rob = p_ro - up_dir * thickness
 
 			st.add_vertex(p_lo)
 			st.add_vertex(p_li)
@@ -1104,7 +1180,7 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 	var curve = _get_world_curve()
 	var length = curve.get_baked_length()
 	var half_w = width / 2.0
-	var depth = 2.5 # Thickness of the road hull
+	var depth = 2.8 # Thickness of the road hull
 
 	var side_y_offset = y_offset
 	if node_name.contains("Curbs"):
@@ -1112,6 +1188,13 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 
 	# Match canyon road outer lip (rounded shoulder drops BEVEL_H at full half_w).
 	const SIDE_BEVEL_H := 0.75
+
+	# Noise sampler for measuring terrain elevation under road sides
+	var noise_terrain = FastNoiseLite.new()
+	noise_terrain.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	noise_terrain.frequency = noise_frequency
+	noise_terrain.seed = 12345
+	noise_terrain.fractal_octaves = 4
 
 	# Per-slice corners + tangents for dedicated end-cap faces (correct UVs/normals).
 	var side_top_l: Array = []
@@ -1137,11 +1220,29 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 		else:
 			tangent = tangent.normalized()
 
-		var top_l = final_pos - right + Vector3(0, side_y_offset, 0)
-		var top_r = final_pos + right + Vector3(0, side_y_offset, 0)
-		var bot_l = top_l - Vector3(0, depth, 0)
-		var bot_r = top_r - Vector3(0, depth, 0)
-		if track_layout_type == TrackLayoutType.CANYON:
+		var up_dir: Vector3 = frames_side[i]["up"] if frames_side[i].has("up") else Vector3.UP
+		var top_l = final_pos - right + up_dir * side_y_offset
+		var top_r = final_pos + right + up_dir * side_y_offset
+		var bot_l = top_l - up_dir * depth
+		var bot_r = top_r - up_dir * depth
+
+		if track_layout_type == TrackLayoutType.MOUNTAIN:
+			# Mountain stage: drop embankment walls down into the terrain so the road is never hollow or floating!
+			var h_l = _get_terrain_height(top_l.x, top_l.z, noise_terrain, curve, false)
+			var h_r = _get_terrain_height(top_r.x, top_r.z, noise_terrain, curve, false)
+			
+			# If elevated bridge span (crossover where road is >12m above terrain), keep a solid bridge hull (2.8m deep)
+			# Otherwise on mountain slopes, drop bottom into the terrain so it seamlessly connects to the ground
+			var is_bridge_span = (top_l.y - h_l > 12.0) and (top_r.y - h_r > 12.0)
+			if not is_bridge_span:
+				bot_l = top_l - right_dir * 0.8
+				bot_l.y = minf(top_l.y - 2.5, h_l - 1.5)
+				bot_r = top_r + right_dir * 0.8
+				bot_r.y = minf(top_r.y - 2.5, h_r - 1.5)
+			else:
+				bot_l = top_l - up_dir * 2.8
+				bot_r = top_r - up_dir * 2.8
+		elif track_layout_type == TrackLayoutType.CANYON:
 			# Attach embankment at the rounded outer lip (road surface dropped by BEVEL_H).
 			top_l = final_pos - right + Vector3(0, side_y_offset - SIDE_BEVEL_H, 0)
 			top_r = final_pos + right + Vector3(0, side_y_offset - SIDE_BEVEL_H, 0)
@@ -1346,25 +1447,26 @@ const CHASM_PIT_WATER_Y := -3.2
 const CHASM_PIT_CENTER := Vector3(150.0, CHASM_PIT_WATER_Y, -85.0)
 const CHASM_PIT_HALF_EXTENTS := Vector2(28.0, 36.0) # XZ half-size of water volume
 
-## Desert Wadi — single valley lake + ford (not a giant rectangle over the map).
-const WADI_RIVER_WATER_Y := 1.12
-const WADI_RIVER_BED_Y := -0.15
+## Desert Wadi — wide valley lake + river ford filling the whole valley basin.
+const WADI_RIVER_WATER_Y := 1.70
+const WADI_RIVER_BED_Y := -0.20
 ## River ribbon half-width for terrain carve + water shape.
-const WADI_RIVER_HALF_WIDTH := 38.0
+const WADI_RIVER_HALF_WIDTH := 65.0
 ## Main river/ford channel through the low valley.
 const WADI_RIVER_POLY: Array[Vector2] = [
-	Vector2(95.0, -165.0),
-	Vector2(130.0, -188.0),
-	Vector2(165.0, -205.0),
-	Vector2(200.0, -218.0),
-	Vector2(235.0, -230.0),
-	Vector2(270.0, -242.0),
+	Vector2(70.0, -150.0),
+	Vector2(110.0, -175.0),
+	Vector2(160.0, -200.0),
+	Vector2(205.0, -215.0),
+	Vector2(250.0, -230.0),
+	Vector2(295.0, -245.0),
+	Vector2(330.0, -260.0),
 ]
-## One oval lake basin (the intended large lake).
-const WADI_LAKE_CENTER := Vector2(185.0, -212.0)
-const WADI_LAKE_RADIUS := Vector2(62.0, 48.0) # X / Z ellipse radii
-## Influence threshold for water mesh cells (keeps hard rectangle edges away).
-const WADI_WATER_MESH_THRESH := 0.12
+## Wide valley lake basin filling the lowlands.
+const WADI_LAKE_CENTER := Vector2(195.0, -208.0)
+const WADI_LAKE_RADIUS := Vector2(130.0, 105.0) # X / Z ellipse radii extending into hills
+## Influence threshold for water mesh cells.
+const WADI_WATER_MESH_THRESH := 0.04
 
 
 func _wadi_river_influence(px: float, pz: float) -> float:
@@ -1385,7 +1487,7 @@ func _wadi_river_influence(px: float, pz: float) -> float:
 	if best_d < WADI_RIVER_HALF_WIDTH:
 		var u: float = 1.0 - (best_d / WADI_RIVER_HALF_WIDTH)
 		ribbon = u * u * (3.0 - 2.0 * u)
-	# Ellipse lake basin only (single intended lake)
+	# Ellipse lake basin filling the low valley
 	var d_lake := Vector2(
 			(p.x - WADI_LAKE_CENTER.x) / WADI_LAKE_RADIUS.x,
 			(p.y - WADI_LAKE_CENTER.y) / WADI_LAKE_RADIUS.y
@@ -1404,8 +1506,9 @@ func is_wadi_water_at(px: float, pz: float) -> bool:
 
 
 func add_wadi_river_water() -> void:
-	if get_node_or_null("WadiRiverWater") != null:
-		return
+	var existing = get_node_or_null("WadiRiverWater")
+	if existing != null:
+		existing.free()
 	# Tight bounds around lake + river only (no huge map-wide rectangle)
 	var min_x := WADI_LAKE_CENTER.x - WADI_LAKE_RADIUS.x
 	var max_x := WADI_LAKE_CENTER.x + WADI_LAKE_RADIUS.x
@@ -1416,16 +1519,16 @@ func add_wadi_river_water() -> void:
 		max_x = maxf(max_x, p.x + WADI_RIVER_HALF_WIDTH)
 		min_z = minf(min_z, p.y - WADI_RIVER_HALF_WIDTH)
 		max_z = maxf(max_z, p.y + WADI_RIVER_HALF_WIDTH)
-	# Small soft pad only
-	min_x -= 6.0
-	max_x += 6.0
-	min_z -= 6.0
-	max_z += 6.0
+	# Soft pad reaching well into the rising hill banks
+	min_x -= 14.0
+	max_x += 14.0
+	min_z -= 14.0
+	max_z += 14.0
 
 	# Build a shaped water mesh: only quads where influence is above threshold
 	# so water doesn't appear as a cut-off rectangle over hills.
-	var res_x := 56
-	var res_z := 44
+	var res_x := 72
+	var res_z := 56
 	var wet: PackedFloat32Array = PackedFloat32Array()
 	wet.resize((res_x + 1) * (res_z + 1))
 	for iz in range(res_z + 1):

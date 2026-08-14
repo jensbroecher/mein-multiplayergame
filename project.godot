@@ -17,8 +17,8 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 config/name="RC Vibe GP"
 run/main_scene="res://Main.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
-config/icon="res://icon.svg"
 boot_splash/image="res://images/Logo_edited.png"
+config/icon="res://icon.svg"
 
 [autoload]
 

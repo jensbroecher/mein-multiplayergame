@@ -9,6 +9,7 @@
 [ext_resource type="Script" uid="uid://b2sbc4x8rba5g" path="res://TerrainGenerator.gd" id="9_odffs"]
 [ext_resource type="Shader" uid="uid://ionm7cyho23g" path="res://terrain_stochastic.gdshader" id="10_t3qkl"]
 [ext_resource type="Texture2D" uid="uid://dh0ue4kmyvxwd" path="res://materials/sand.png" id="11_i1pac"]
+[ext_resource type="Texture2D" uid="uid://be2aqrbrbrroi" path="res://materials/dark_rock.png" id="11_rock_tex"]
 [ext_resource type="Texture2D" uid="uid://bsmrfxbh6vqe2" path="res://materials/asphalt.png" id="12_g5aih"]
 [ext_resource type="ArrayMesh" uid="uid://eqp0dmduusn4" path="res://generated/mountain_terrain_visual.res" id="13_jrwcp"]
 [ext_resource type="Shape3D" uid="uid://dhba5bbledmgb" path="res://generated/mountain_terrain_collision_shape.res" id="14_01bw0"]
@@ -17,30 +18,30 @@
 [ext_resource type="ArrayMesh" uid="uid://dj4h76egqtlmd" path="res://generated/mountain_Visual_Curbs_Sides.res" id="17_hlrbt"]
 [ext_resource type="ArrayMesh" uid="uid://br8dyfxin5x7x" path="res://generated/mountain_Visual_Road.res" id="18_m0x3k"]
 [ext_resource type="ArrayMesh" uid="uid://b0dokbyuamcli" path="res://generated/mountain_Visual_Road_Sides.res" id="19_wfwbe"]
-[ext_resource type="PackedScene" uid="uid://cb4dtdwlg2evy" path="res://models/plants/23748053b325a4fef71b85c3cb4f6c56.fbx" id="20_717p5"]
-[ext_resource type="PackedScene" uid="uid://q8pe2ekbgg5n" path="res://models/desert/7b4c6b35c14804590f71c63e961076cb.fbx" id="20_hecwt"]
+[ext_resource type="PackedScene" uid="uid://csyepoc8k3uqr" path="res://models/plants/23748053b325a4fef71b85c3cb4f6c56.fbx" id="20_717p5"]
+[ext_resource type="PackedScene" uid="uid://dui7hge4elksh" path="res://models/desert/7b4c6b35c14804590f71c63e961076cb.fbx" id="20_hecwt"]
 [ext_resource type="Shape3D" uid="uid://bi10pc32i1ygo" path="res://generated/mountain_track_collision_shape.res" id="20_lprgb"]
-[ext_resource type="PackedScene" uid="uid://blkv38y0vu3f2" path="res://models/desert/9a6dfc30d713e029ced3625b1e3230bd.fbx" id="21_01s5b"]
+[ext_resource type="PackedScene" uid="uid://dilonihknpcv3" path="res://models/desert/9a6dfc30d713e029ced3625b1e3230bd.fbx" id="21_01s5b"]
 [ext_resource type="PackedScene" uid="uid://clxv8p6x0y6k2" path="res://SpawnIndicator.tscn" id="21_6at7b"]
-[ext_resource type="PackedScene" uid="uid://dbd0xg64sofyq" path="res://models/desert/c1e0f742c74c233f2e64bfe3db9c8dd2.fbx" id="23_01s5b"]
+[ext_resource type="PackedScene" uid="uid://bt05lw4wjffvs" path="res://models/desert/c1e0f742c74c233f2e64bfe3db9c8dd2.fbx" id="23_01s5b"]
 [ext_resource type="PackedScene" uid="uid://gate123" path="res://CheckpointGate.tscn" id="23_vwsof"]
-[ext_resource type="PackedScene" uid="uid://qa82rfbpmtbh" path="res://models/desert/0c797c60dd8eef1acae70d532301f210.fbx" id="25_1am25"]
-[ext_resource type="PackedScene" uid="uid://fglvqp80br0k" path="res://models/desert/ca17006894b80e74ff22ac2b6ce24e1d.fbx" id="26_dogun"]
-[ext_resource type="PackedScene" uid="uid://cqewo3t2btu2d" path="res://models/plants/155b46f430c01d85b690a61ac5be8ae0.fbx" id="27_06wvx"]
-[ext_resource type="PackedScene" uid="uid://dkrf6jrnh64bg" path="res://models/plants/3eebbf61beb1fd934d2948b09bc8a97d.fbx" id="28_uayk7"]
-[ext_resource type="PackedScene" uid="uid://ei64dot4fquv" path="res://models/plants/04b2c6e2e49cc272be24d5807fee4ea0.fbx" id="29_vox2v"]
-[ext_resource type="PackedScene" uid="uid://cgo04dpuqp6gr" path="res://models/plants/fdf67fbe6bce046595412b61400019fd.fbx" id="30_wmcvr"]
-[ext_resource type="PackedScene" uid="uid://b65se66232uhd" path="res://models/plants/f71bea208fc48e1bbd8f3270e3ea2138.fbx" id="31_8m3dh"]
-[ext_resource type="PackedScene" uid="uid://dwxso353mloor" path="res://models/plants/d885537d14dc17e39be2835fbcf5c93d.fbx" id="32_8m3dh"]
-[ext_resource type="PackedScene" uid="uid://bvit2ogaf6lpf" path="res://models/plants/7c746b3609638bc97eb9642b3b3c9893.fbx" id="33_42wqv"]
-[ext_resource type="PackedScene" uid="uid://bgtlxw3dpnksu" path="res://models/plants/08cf22326c18c9e5e00772c91f79ab5e.fbx" id="34_xfrh0"]
-[ext_resource type="PackedScene" uid="uid://k6mjvhr26htm" path="res://models/plants/8b210c185fa7f914a015cd7f29a515f6.fbx" id="35_hax3r"]
-[ext_resource type="PackedScene" uid="uid://dhyqor85u36pe" path="res://models/plants/361bcba64776771e1d9624b08d332c66.fbx" id="36_it274"]
-[ext_resource type="PackedScene" uid="uid://deilfxhml1sgt" path="res://models/plants/1086dae7861d70b10cce6ef246128f58.fbx" id="37_edvol"]
-[ext_resource type="PackedScene" uid="uid://sru6dh50d41t" path="res://models/signs/a63e2ffd6a7c0cc4c9d83db2affc656b.fbx" id="38_edvol"]
-[ext_resource type="PackedScene" uid="uid://d3odov848j2wc" path="res://models/desert/f71825ab70d7b3c7d0ca6770e0f7fc05.fbx" id="39_e4m7v"]
-[ext_resource type="PackedScene" uid="uid://c7qhirdcmfatp" path="res://models/desert/ee5c34395775523473bd5b6cce35d100.fbx" id="40_510r7"]
-[ext_resource type="PackedScene" uid="uid://b3u0atj0jwn5w" path="res://models/desert/c16e78baf6cd9fe5f065cdd967423cd6.fbx" id="41_as070"]
+[ext_resource type="PackedScene" uid="uid://d2ebh72m1ayx8" path="res://models/desert/0c797c60dd8eef1acae70d532301f210.fbx" id="25_1am25"]
+[ext_resource type="PackedScene" uid="uid://btngrygejxp67" path="res://models/desert/ca17006894b80e74ff22ac2b6ce24e1d.fbx" id="26_dogun"]
+[ext_resource type="PackedScene" uid="uid://c1ougb5ppnj6a" path="res://models/plants/155b46f430c01d85b690a61ac5be8ae0.fbx" id="27_06wvx"]
+[ext_resource type="PackedScene" uid="uid://bs25mu1mefc5o" path="res://models/plants/3eebbf61beb1fd934d2948b09bc8a97d.fbx" id="28_uayk7"]
+[ext_resource type="PackedScene" uid="uid://brr0dl1hvares" path="res://models/plants/04b2c6e2e49cc272be24d5807fee4ea0.fbx" id="29_vox2v"]
+[ext_resource type="PackedScene" uid="uid://dkj5tjwo3msog" path="res://models/plants/fdf67fbe6bce046595412b61400019fd.fbx" id="30_wmcvr"]
+[ext_resource type="PackedScene" uid="uid://cco2bc4fs2kf0" path="res://models/plants/f71bea208fc48e1bbd8f3270e3ea2138.fbx" id="31_8m3dh"]
+[ext_resource type="PackedScene" uid="uid://dp05rwq48qq34" path="res://models/plants/d885537d14dc17e39be2835fbcf5c93d.fbx" id="32_8m3dh"]
+[ext_resource type="PackedScene" uid="uid://cxyogjy00k714" path="res://models/plants/7c746b3609638bc97eb9642b3b3c9893.fbx" id="33_42wqv"]
+[ext_resource type="PackedScene" uid="uid://ba1funw6vs7ex" path="res://models/plants/08cf22326c18c9e5e00772c91f79ab5e.fbx" id="34_xfrh0"]
+[ext_resource type="PackedScene" uid="uid://cyj1qlvwh4uv2" path="res://models/plants/8b210c185fa7f914a015cd7f29a515f6.fbx" id="35_hax3r"]
+[ext_resource type="PackedScene" uid="uid://cdc8t8xxfvn6" path="res://models/plants/361bcba64776771e1d9624b08d332c66.fbx" id="36_it274"]
+[ext_resource type="PackedScene" uid="uid://csty3nfm4qm0n" path="res://models/plants/1086dae7861d70b10cce6ef246128f58.fbx" id="37_edvol"]
+[ext_resource type="PackedScene" uid="uid://h2t6mmm2s64u" path="res://models/signs/a63e2ffd6a7c0cc4c9d83db2affc656b.fbx" id="38_edvol"]
+[ext_resource type="PackedScene" uid="uid://c2m1b0aaq2yi7" path="res://models/desert/f71825ab70d7b3c7d0ca6770e0f7fc05.fbx" id="39_e4m7v"]
+[ext_resource type="PackedScene" uid="uid://ccvxd1n58q43d" path="res://models/desert/ee5c34395775523473bd5b6cce35d100.fbx" id="40_510r7"]
+[ext_resource type="PackedScene" uid="uid://bpq7q2q2kh6jv" path="res://models/desert/c16e78baf6cd9fe5f065cdd967423cd6.fbx" id="41_as070"]
 [ext_resource type="PackedScene" uid="uid://sd4xrjcrbq3m" path="res://models/desert3/3e2310d9cb6ec14bf505c20229b5b455.fbx" id="42_7nxru"]
 [ext_resource type="PackedScene" uid="uid://c0va0umn6hlrn" path="res://models/desert3/20f2eb03ceb71b545796aa7ac30dc3c9.fbx" id="43_4fl2i"]
 [ext_resource type="PackedScene" uid="uid://bkmim46tangl3" path="res://models/desert3/53c10c3d9fa9611d2814102a41ac722a.fbx" id="44_1mhfp"]
@@ -85,6 +86,11 @@ shader_parameter/smoothness = 1.0
 shader_parameter/use_world_uv = false
 shader_parameter/use_normal_map = false
 shader_parameter/normal_scale = 1.0
+shader_parameter/use_slope_cliff_rock = true
+shader_parameter/cliff_texture = ExtResource("11_rock_tex")
+shader_parameter/cliff_albedo = Color(0.95, 0.95, 0.95, 1)
+shader_parameter/cliff_slope_threshold = 0.48
+shader_parameter/cliff_blend_sharpness = 0.10
 
 [sub_resource type="Shader" id="Shader_stochastic"]
 resource_local_to_scene = true
@@ -158,7 +164,7 @@ shader_parameter/uv_scale_v2 = Vector2(0.125, 0.125)
 shader_parameter/smoothness = 1.0
 shader_parameter/use_world_uv = true
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_k4b6y"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_7nxru"]
 render_priority = 2
 shader = ExtResource("15_bt6n6")
 shader_parameter/color_a = Color(1, 1, 1, 1)
@@ -166,11 +172,11 @@ shader_parameter/color_b = Color(0.8, 0.1, 0.1, 1)
 shader_parameter/stripe_length = 1.5
 shader_parameter/roughness = 0.8
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tgr31"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_4fl2i"]
 albedo_color = Color(0.45, 0.45, 0.45, 1)
 roughness = 0.95
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_jsxm4"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_1mhfp"]
 render_priority = 0
 shader = SubResource("Shader_stochastic")
 shader_parameter/albedo_texture = ExtResource("12_g5aih")
@@ -180,7 +186,7 @@ shader_parameter/uv_scale_v2 = Vector2(0.125, 0.125)
 shader_parameter/smoothness = 1.0
 shader_parameter/use_world_uv = true
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_0sge5"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_c6n7l"]
 render_priority = 0
 shader = SubResource("Shader_stochastic")
 shader_parameter/albedo_texture = ExtResource("12_g5aih")
@@ -293,7 +299,7 @@ level_prefix = "mountain"
 no_water = true
 no_grass = true
 track_path = NodePath("../TrackPath")
-terrain_resolution = 300
+terrain_resolution = 1000
 noise_frequency = 0.006
 hill_height = 40.0
 road_width = 15.0
@@ -306,35 +312,35 @@ road_material = SubResource("ShaderMaterial_asphalt")
 metadata/_edit_group_ = true
 metadata/_edit_lock_ = true
 
-[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1396828933]
+[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1025720111]
 material_override = SubResource("ShaderMaterial_hgpy5")
 lod_bias = 10.0
 mesh = ExtResource("13_jrwcp")
 
-[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=572433305]
+[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=2042286339]
 
-[node name="@CollisionShape3D@24755" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=504798545]
+[node name="@CollisionShape3D@23231" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=1300594257]
 shape = ExtResource("14_01bw0")
 
-[node name="Visual_Curbs" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1909084]
-material_override = SubResource("ShaderMaterial_k4b6y")
+[node name="Visual_Curbs" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1048164942]
+material_override = SubResource("ShaderMaterial_7nxru")
 mesh = ExtResource("16_gx2ty")
 
-[node name="Visual_Curbs_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=2103045049]
-material_override = SubResource("StandardMaterial3D_tgr31")
+[node name="Visual_Curbs_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1907603497]
+material_override = SubResource("StandardMaterial3D_4fl2i")
 mesh = ExtResource("17_hlrbt")
 
-[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=219809456]
-material_override = SubResource("ShaderMaterial_jsxm4")
+[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1427397543]
+material_override = SubResource("ShaderMaterial_1mhfp")
 mesh = ExtResource("18_m0x3k")
 
-[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=261191807]
-material_override = SubResource("ShaderMaterial_0sge5")
+[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1606916636]
+material_override = SubResource("ShaderMaterial_c6n7l")
 mesh = ExtResource("19_wfwbe")
 
-[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=160094204]
+[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=973033010]
 
-[node name="@CollisionShape3D@24756" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=1114714203]
+[node name="@CollisionShape3D@23232" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=1015423833]
 shape = ExtResource("20_lprgb")
 
 [node name="TrackPath" type="Path3D" parent="." unique_id=1030670243]

@@ -37,7 +37,7 @@ const ANISOTROPIC_LEVELS = [0, 2, 4, 8, 16]
 const MAX_FPS_VALUES = [30, 60, 120, 0] # 0 = unlimited
 ## Directional shadow atlas size per quality (Off unused).
 const SHADOW_ATLAS_SIZES = [512, 1024, 2048, 4096]
-const SHADOW_MAX_DISTANCES = [70.0, 100.0, 150.0, 220.0]
+const SHADOW_MAX_DISTANCES = [80.0, 140.0, 200.0, 280.0]
 const SHADOW_BLURS = [0.4, 0.7, 1.0, 1.25]
 
 
@@ -215,11 +215,11 @@ func _load_playlist(folder: String = music_folder):
 func load_playlist_for_level(scene_path: String):
 	# Check for a subfolder matching the level name, e.g. music/mountain/ for MountainLevel
 	var level_folder := ""
-	if scene_path.to_lower().contains("mountain"):
+	if scene_path.to_lower().contains("mountain") or scene_path.to_lower().contains("wadi"):
 		level_folder = music_folder + "mountain/"
 	elif scene_path.to_lower().contains("canyon"):
 		level_folder = music_folder + "canyon/"
-	elif scene_path.to_lower().contains("desert") or scene_path.to_lower().contains("wadi"):
+	elif scene_path.to_lower().contains("desert"):
 		level_folder = music_folder + "desert/"
 	elif scene_path.to_lower().contains("city"):
 		level_folder = music_folder + "city/"
@@ -474,11 +474,13 @@ func _apply_shadows_to_tree(node: Node) -> void:
 			else:
 				dl.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 			dl.directional_shadow_max_distance = SHADOW_MAX_DISTANCES[q]
+			dl.directional_shadow_blend_splits = true
+			dl.directional_shadow_fade_start = 0.7
 			dl.shadow_blur = SHADOW_BLURS[q]
 			# Bias tuned so car shadows don't swim / peter-pan on the road
 			dl.shadow_bias = 0.03 if q <= 1 else 0.02
 			dl.shadow_normal_bias = 1.0 if q <= 1 else 0.8
-			dl.directional_shadow_pancake_size = 8.0
+			dl.directional_shadow_pancake_size = 20.0
 	elif node is OmniLight3D:
 		(node as OmniLight3D).shadow_enabled = enabled and q >= 2
 	elif node is SpotLight3D:
