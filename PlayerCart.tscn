@@ -33,20 +33,20 @@ point_count = 2
 curve = SubResource("Curve_boost")
 
 [sub_resource type="Gradient" id="Gradient_boost_color"]
-offsets = PackedFloat32Array(0, 0.15, 0.4, 0.7, 1)
-colors = PackedColorArray(1, 1, 1, 1, 1, 0.85, 0.1, 1, 0.95, 0.4, 0.05, 1, 0.8, 0.1, 0, 0.6, 0.2, 0.2, 0.2, 0)
+offsets = PackedFloat32Array(0, 0.12, 0.35, 0.65, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 0.88, 0.15, 1, 1, 0.45, 0.04, 0.95, 0.85, 0.12, 0, 0.6, 0.2, 0.2, 0.2, 0)
 
 [sub_resource type="GradientTexture1D" id="GradientTexture1D_boost_color"]
 gradient = SubResource("Gradient_boost_color")
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_boost"]
 direction = Vector3(0, 1, 0)
-spread = 8.0
-initial_velocity_min = 7.0
-initial_velocity_max = 12.0
+spread = 6.0
+initial_velocity_min = 6.0
+initial_velocity_max = 11.0
 gravity = Vector3(0, 0, 0)
-scale_min = 1.0
-scale_max = 2.5
+scale_min = 0.9
+scale_max = 2.2
 scale_curve = SubResource("CurveTexture_scale")
 color_ramp = SubResource("GradientTexture1D_boost_color")
 
@@ -313,11 +313,19 @@ top_level = true
 [node name="CartModel" parent="Visuals" unique_id=768104268 instance=ExtResource("2_cart")]
 transform = Transform3D(-2, 0, -1.74846e-07, 0, 2, 0, 1.74846e-07, 0, -2, 0, -0.6072377, 0)
 
-[node name="BoostParticles" type="GPUParticles3D" parent="Visuals" unique_id=457637679]
-transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0.25, 1.1)
+[node name="BoostParticlesL" type="GPUParticles3D" parent="Visuals" unique_id=457637679]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, 0.52, -0.38, 0.65)
 emitting = false
-amount = 120
-lifetime = 0.4
+amount = 100
+lifetime = 0.45
+process_material = SubResource("ParticleProcessMaterial_boost")
+draw_pass_1 = SubResource("QuadMesh_flame")
+
+[node name="BoostParticlesR" type="GPUParticles3D" parent="Visuals" unique_id=457637680]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, -0.52, -0.38, 0.65)
+emitting = false
+amount = 100
+lifetime = 0.45
 process_material = SubResource("ParticleProcessMaterial_boost")
 draw_pass_1 = SubResource("QuadMesh_flame")
 

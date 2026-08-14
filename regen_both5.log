@@ -1,0 +1,125 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+Starting regeneration for all levels (preserving custom curves)...
+WARNING: res://PlayerCart.tscn:6 - ext_resource, invalid UID: uid://dq2xlrtwb6vl0 - using text path instead: res://sounds/774270__thelittlecrow__rocket-launch-boost-and-burning-version-b.wav
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://PlayerCart.tscn:7 - ext_resource, invalid UID: uid://th125s4xka82 - using text path instead: res://sounds/434430__v-ktor__explosion05.wav
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://PlayerCart.tscn:9 - ext_resource, invalid UID: uid://dt04vn4rjr6in - using text path instead: res://sounds/467882__samsterbirdies__beep-warning.ogg
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://CheckpointGate.tscn:4 - ext_resource, invalid UID: uid://en1x37rpwtgb - using text path instead: res://models/checkpoint_gate.glb
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+SCRIPT ERROR: Parse Error: Cannot infer the type of "attempts" variable because the value doesn't have a set type.
+   at: GDScript::reload (res://TerrainGenerator.gd:1850)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+ERROR: Failed to load script "res://TerrainGenerator.gd" with error "Parse error".
+   at: load (modules/gdscript/gdscript_resource_format.cpp:46)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://levels/Level.tscn:22 - ext_resource, invalid UID: uid://da1pwbpmg7s2f - using text path instead: res://sprites/grass.png
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://levels/Level.tscn:23 - ext_resource, invalid UID: uid://dy1kxo704jw1i - using text path instead: res://models/ramps/ramp.glb
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://levels/Level.tscn:27 - ext_resource, invalid UID: uid://r6nsluyj8xfc - using text path instead: res://models/trees/grass_tall-grass-png-44173_bw.webp
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://levels/Level.tscn:29 - ext_resource, invalid UID: uid://bmbu4rfntyvcr - using text path instead: res://models/trees/flower_blue_png3.png
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://levels/Level.tscn:30 - ext_resource, invalid UID: uid://cd7w0278xspsj - using text path instead: res://models/trees/tree_2.glb
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://levels/Level.tscn:31 - ext_resource, invalid UID: uid://bg1u3c2gs4b3x - using text path instead: res://models/trees/flower_blue_png2.png
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://levels/Level.tscn:34 - ext_resource, invalid UID: uid://b0e3d3au7gnsy - using text path instead: res://models/trees/flower_blue_leef.png
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://levels/Level.tscn:35 - ext_resource, invalid UID: uid://bbcbnosd7fw22 - using text path instead: res://models/trees/flower_white_png3.png
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://levels/Level.tscn:37 - ext_resource, invalid UID: uid://dpes1ncqlcuyr - using text path instead: res://models/trees/tree_3.glb
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://levels/Level.tscn:38 - ext_resource, invalid UID: uid://cgjmnugr0hb0s - using text path instead: res://models/trees/flower_white_png2.png
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://levels/Level.tscn:41 - ext_resource, invalid UID: uid://bbokpgppqs42n - using text path instead: res://models/trees/flower_white_leef.png
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://levels/Level.tscn:46 - ext_resource, invalid UID: uid://cvgn8hkx6h544 - using text path instead: res://models/ramps/woodramp.fbx
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://levels/Level.tscn:94 - ext_resource, invalid UID: uid://cfiwpbo148x8f - using text path instead: res://models/be10e042cec0f40d5041acdc304a0ac3.fbx
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://levels/Level.tscn:95 - ext_resource, invalid UID: uid://cjpn4h2v4pto8 - using text path instead: res://models/ramps/1f92b579825d1652d7ab8d760b289672.fbx
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://levels/Level.tscn:96 - ext_resource, invalid UID: uid://mn4240qr4l7y - using text path instead: res://models/trees/pine_2.glb
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://levels/Level.tscn:97 - ext_resource, invalid UID: uid://dynacuu5oeiat - using text path instead: res://models/trees/tree_4.glb
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://levels/Level.tscn:99 - ext_resource, invalid UID: uid://b58y5qbd77ep7 - using text path instead: res://models/trees/tree.glb
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://levels/Level.tscn:100 - ext_resource, invalid UID: uid://66anh5btfbk6 - using text path instead: res://sprites/decals/rc_vibe_grand_prix.png
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://levels/Level.tscn:101 - ext_resource, invalid UID: uid://ryxres0pimia - using text path instead: res://models/trees/bush.glb
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://levels/Level.tscn:102 - ext_resource, invalid UID: uid://c67jo77pt4rhr - using text path instead: res://models/concrete/8203ec9089a546140a4fa6915ed558b1.fbx
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://levels/Level.tscn:103 - ext_resource, invalid UID: uid://f75dsw8i1haf - using text path instead: res://models/plants/0e2447e774ad6afc15d3aeb56a0372ea.fbx
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://levels/Level.tscn:104 - ext_resource, invalid UID: uid://cl7411khq7u2j - using text path instead: res://models/plants/04bb4902dedc0aa27913075b8fcd3d6b.fbx
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+WARNING: res://levels/Level.tscn:105 - ext_resource, invalid UID: uid://bysya44kwyo86 - using text path instead: res://models/23c38776dfac266dfa5dd2b6ac787812.fbx
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:11)
+Instantiated Level.tscn successfully
+Regenerating default terrain from existing custom curve...
+SCRIPT ERROR: Invalid call. Nonexistent function 'generate_world' in base 'Node3D'.
+   at: _ready (res://regenerate_both.gd:21)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_both.gd:21)

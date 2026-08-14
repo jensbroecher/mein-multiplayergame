@@ -18,15 +18,16 @@ func _ready():
 	var template_path = "res://levels/CanyonLevel.tscn"
 	var target_path = "res://levels/CanyonChasmLevel.tscn"
 
-	# 1. Duplicate standard CanyonLevel to use as target base
 	var dir = DirAccess.open("res://")
-	if dir.file_exists(target_path):
-		dir.remove(target_path)
-	var err = DirAccess.copy_absolute(template_path, target_path)
+	if dir and dir.file_exists(target_path.trim_prefix("res://")):
+		dir.remove(target_path.trim_prefix("res://"))
+	var err = DirAccess.copy_absolute(
+		ProjectSettings.globalize_path(template_path),
+		ProjectSettings.globalize_path(target_path)
+	)
 	if err != OK:
-		push_error("Could not copy template to CanyonChasmLevel.tscn: " + str(err))
-		get_tree().quit(1)
-		return
+		print("copy_absolute failed (" + str(err) + "), will load template directly")
+		target_path = template_path
 
 	# 2. Load and instantiate target scene
 	var packed = load(target_path)
@@ -58,7 +59,7 @@ func _ready():
 	# 4. Set prefix on generator so it uses its own mesh files
 	tg.level_prefix = "canyon_chasm"
 	tg.track_layout_type = 2 # CANYON
-	tg.terrain_resolution = 550 # slightly larger to cover our track comfortably
+	tg.terrain_resolution = 400
 	
 	# 5. Define our custom figure-8 track curve with bridges, steep hill, and gaps
 	var curve = Curve3D.new()

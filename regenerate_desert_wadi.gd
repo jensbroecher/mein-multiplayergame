@@ -63,7 +63,7 @@ func _ready() -> void:
 	tg.track_layout_type = 0 # DEFAULT desert flats
 	tg.no_water = true # local valley lake only
 	tg.no_grass = true
-	tg.terrain_resolution = 560
+	tg.terrain_resolution = 400
 	tg.hill_height = 42.0
 	tg.generate_bridge_supports = false
 	# Mild recess only — deep trenches under curbs made cars sink beside the road
@@ -101,6 +101,10 @@ func _ready() -> void:
 				sand_mat.set_shader_parameter("use_cliff_normal", true)
 				sand_mat.set_shader_parameter("cliff_normal_texture", rock_norm)
 				sand_mat.set_shader_parameter("cliff_normal_scale", 1.2)
+		sand_mat.set_shader_parameter("enable_edge_fade", true)
+		sand_mat.set_shader_parameter("edge_fade_start", 550.0)
+		sand_mat.set_shader_parameter("edge_fade_end", 960.0)
+		sand_mat.set_shader_parameter("edge_fade_color", Color(0.82, 0.76, 0.68, 1.0))
 		tg.grass_material = sand_mat # field is the terrain visual material
 	if stoch and asphalt_tex:
 		var road_mat := ShaderMaterial.new()

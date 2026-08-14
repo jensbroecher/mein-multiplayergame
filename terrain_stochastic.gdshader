@@ -1,4 +1,5 @@
 shader_type spatial;
+render_mode cull_back;
 
 uniform sampler2D albedo_texture : source_color, filter_linear_mipmap_anisotropic;
 uniform vec4 albedo : source_color = vec4(1.0, 1.0, 1.0, 1.0);
@@ -20,6 +21,11 @@ uniform float cliff_blend_sharpness : hint_range(0.01, 0.5) = 0.15;
 uniform bool use_cliff_normal = false;
 uniform sampler2D cliff_normal_texture : hint_normal, filter_linear_mipmap_anisotropic;
 uniform float cliff_normal_scale : hint_range(-16.0, 16.0) = 1.0;
+
+uniform bool enable_edge_fade = true;
+uniform float edge_fade_start = 550.0;
+uniform float edge_fade_end = 960.0;
+uniform vec4 edge_fade_color : source_color = vec4(0.65, 0.75, 0.85, 1.0);
 
 varying vec3 world_pos;
 varying vec3 world_nrm;
@@ -173,8 +179,17 @@ void fragment() {
         color = mix(color, rock_color, rock_weight);
     }
     
+    float rough = smoothness;
+    if (enable_edge_fade) {
+        float d_xz = length(world_pos.xz);
+        float fade_t = clamp((d_xz - edge_fade_start) / max(edge_fade_end - edge_fade_start, 0.001), 0.0, 1.0);
+        fade_t = fade_t * fade_t * (3.0 - 2.0 * fade_t);
+        color = mix(color, edge_fade_color.rgb, fade_t);
+        rough = mix(smoothness, 0.98, fade_t);
+    }
+    
     ALBEDO = color;
-    ROUGHNESS = smoothness;
+    ROUGHNESS = rough;
     SPECULAR = 0.05;
     
     if (use_slope_cliff_rock && use_cliff_normal && rock_weight > 0.01) {

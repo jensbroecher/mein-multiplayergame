@@ -12,17 +12,17 @@
 [ext_resource type="Texture2D" uid="uid://b4j07jck2kec0" path="res://materials/dark_canyon_rock_normal.png" id="11_rock_norm"]
 [ext_resource type="Texture2D" uid="uid://c45b43y4vhj0d" path="res://materials/dark_canyon_rock.png" id="11_rock_tex"]
 [ext_resource type="Texture2D" uid="uid://bsmrfxbh6vqe2" path="res://materials/asphalt.png" id="12_g5aih"]
-[ext_resource type="ArrayMesh" uid="uid://eqp0dmduusn4" path="res://generated/mountain_terrain_visual.res" id="13_jrwcp"]
-[ext_resource type="Shape3D" uid="uid://dhba5bbledmgb" path="res://generated/mountain_terrain_collision_shape.res" id="14_01bw0"]
+[ext_resource type="ArrayMesh" uid="uid://ba31cpvmcws5o" path="res://generated/mountain_terrain_visual.res" id="13_jrwcp"]
+[ext_resource type="Shape3D" uid="uid://di6g1wf0ua6up" path="res://generated/mountain_terrain_collision_shape.res" id="14_01bw0"]
 [ext_resource type="Shader" uid="uid://cvne02d6iyem5" path="res://curb_stripes.gdshader" id="15_bt6n6"]
-[ext_resource type="ArrayMesh" uid="uid://dm155hnq2gq85" path="res://generated/mountain_Visual_Curbs.res" id="16_gx2ty"]
-[ext_resource type="ArrayMesh" uid="uid://dj4h76egqtlmd" path="res://generated/mountain_Visual_Curbs_Sides.res" id="17_hlrbt"]
-[ext_resource type="ArrayMesh" uid="uid://br8dyfxin5x7x" path="res://generated/mountain_Visual_Road.res" id="18_m0x3k"]
-[ext_resource type="ArrayMesh" uid="uid://b0dokbyuamcli" path="res://generated/mountain_Visual_Road_Sides.res" id="19_wfwbe"]
+[ext_resource type="ArrayMesh" uid="uid://baw47b7w2ghw3" path="res://generated/mountain_Visual_Curbs.res" id="16_gx2ty"]
+[ext_resource type="ArrayMesh" uid="uid://b14um6finj7mq" path="res://generated/mountain_Visual_Curbs_Sides.res" id="17_hlrbt"]
+[ext_resource type="ArrayMesh" uid="uid://cb5my8ggt41pe" path="res://generated/mountain_Visual_Road.res" id="18_m0x3k"]
+[ext_resource type="ArrayMesh" uid="uid://kxw6hj08iyji" path="res://generated/mountain_Visual_Road_Sides.res" id="19_wfwbe"]
 [ext_resource type="PackedScene" uid="uid://csyepoc8k3uqr" path="res://models/plants/23748053b325a4fef71b85c3cb4f6c56.fbx" id="20_717p5"]
-[ext_resource type="Shape3D" uid="uid://cn8b7locjbw83" path="res://generated/mountain_Visual_Road_Sides_collision_shape.res" id="20_c6n7l"]
+[ext_resource type="Shape3D" uid="uid://c0hmufwt1w38p" path="res://generated/mountain_Visual_Road_Sides_collision_shape.res" id="20_c6n7l"]
 [ext_resource type="PackedScene" uid="uid://dui7hge4elksh" path="res://models/desert/7b4c6b35c14804590f71c63e961076cb.fbx" id="20_hecwt"]
-[ext_resource type="Shape3D" uid="uid://bi10pc32i1ygo" path="res://generated/mountain_track_collision_shape.res" id="20_lprgb"]
+[ext_resource type="Shape3D" uid="uid://oryv6i4al4g" path="res://generated/mountain_track_collision_shape.res" id="20_lprgb"]
 [ext_resource type="PackedScene" uid="uid://dilonihknpcv3" path="res://models/desert/9a6dfc30d713e029ced3625b1e3230bd.fbx" id="21_01s5b"]
 [ext_resource type="PackedScene" uid="uid://clxv8p6x0y6k2" path="res://SpawnIndicator.tscn" id="21_6at7b"]
 [ext_resource type="PackedScene" uid="uid://bt05lw4wjffvs" path="res://models/desert/c1e0f742c74c233f2e64bfe3db9c8dd2.fbx" id="23_01s5b"]
@@ -97,6 +97,10 @@ shader_parameter/cliff_blend_sharpness = 0.16
 shader_parameter/use_cliff_normal = true
 shader_parameter/cliff_normal_texture = ExtResource("11_rock_norm")
 shader_parameter/cliff_normal_scale = 0.5
+shader_parameter/enable_edge_fade = true
+shader_parameter/edge_fade_start = 550.0
+shader_parameter/edge_fade_end = 960.0
+shader_parameter/edge_fade_color = Color(0.51001614, 0.5682371, 0.64566684, 1)
 
 [sub_resource type="Shader" id="Shader_stochastic"]
 resource_local_to_scene = true
@@ -307,7 +311,7 @@ level_prefix = "mountain"
 no_water = true
 no_grass = true
 track_path = NodePath("../TrackPath")
-terrain_resolution = 300
+terrain_resolution = 2000
 noise_frequency = 0.006
 hill_height = 40.0
 road_width = 15.0
@@ -320,40 +324,40 @@ road_material = SubResource("ShaderMaterial_asphalt")
 metadata/_edit_group_ = true
 metadata/_edit_lock_ = true
 
-[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1314459458]
+[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1404652839]
 material_override = SubResource("ShaderMaterial_hgpy5")
 lod_bias = 10.0
 mesh = ExtResource("13_jrwcp")
 
-[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1961994427]
+[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1655750307]
 
-[node name="@CollisionShape3D@27071" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=1715709735]
+[node name="@CollisionShape3D@30294" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=1694561286]
 shape = ExtResource("14_01bw0")
 
-[node name="Visual_Curbs" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1075589445]
+[node name="Visual_Curbs" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1725696028]
 material_override = SubResource("ShaderMaterial_yb23s")
 mesh = ExtResource("16_gx2ty")
 
-[node name="Visual_Curbs_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1135501983]
+[node name="Visual_Curbs_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=2128988411]
 material_override = SubResource("StandardMaterial3D_kurhb")
 mesh = ExtResource("17_hlrbt")
 
-[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=670445840]
+[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=80362699]
 material_override = SubResource("ShaderMaterial_tvewy")
 mesh = ExtResource("18_m0x3k")
 
-[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1680893990]
+[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1510013283]
 material_override = SubResource("StandardMaterial3D_qw57s")
 mesh = ExtResource("19_wfwbe")
 
-[node name="Visual_Road_Sides_Collision" type="StaticBody3D" parent="TerrainGenerator/Visual_Road_Sides" unique_id=851385439]
+[node name="Visual_Road_Sides_Collision" type="StaticBody3D" parent="TerrainGenerator/Visual_Road_Sides" unique_id=1923169017]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="TerrainGenerator/Visual_Road_Sides/Visual_Road_Sides_Collision" unique_id=143310624]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TerrainGenerator/Visual_Road_Sides/Visual_Road_Sides_Collision" unique_id=1948538641]
 shape = ExtResource("20_c6n7l")
 
-[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1566182238]
+[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1038143625]
 
-[node name="@CollisionShape3D@27072" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=303741812]
+[node name="@CollisionShape3D@30295" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=795764955]
 shape = ExtResource("20_lprgb")
 
 [node name="TrackPath" type="Path3D" parent="." unique_id=1030670243]
@@ -362,7 +366,7 @@ curve = SubResource("Curve3D_track")
 [node name="Players" type="Node3D" parent="." unique_id=1342420519]
 
 [node name="FinishLine" parent="." unique_id=1647223077 instance=ExtResource("23_vwsof")]
-transform = Transform3D(-0.76050544, -0.023734733, -0.64889765, 0, 0.99933183, -0.036552563, 0.64933157, -0.027798424, -0.75999725, 204.12416, 14.5418, -209.38435)
+transform = Transform3D(-0.7598506, -0.03948415, -0.64889765, -0.020701997, 0.9991174, -0.036552563, 0.6497681, -0.014341012, -0.75999725, 204.12416, 14.5418, -209.38435)
 is_finish_line = true
 
 [node name="CollisionShape3D2" type="CollisionShape3D" parent="FinishLine" unique_id=1508901951]
@@ -571,45 +575,6 @@ transform = Transform3D(30, 0, 0, 0, 30, 0, 0, 0, 30, -54.53153, 57.415375, -186
 [node name="Rock" parent="." unique_id=1214765830 groups=["collision_trimesh"] instance=ExtResource("41_as070")]
 transform = Transform3D(-14.370207, 0, -26.334328, 0, 29.999998, 0, 26.334328, 0, -14.370207, -8.766795, 110.6525, -107.27792)
 
-[node name="SpawnPoints" type="Node3D" parent="." unique_id=1980830927]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 196.13765, 14.57661, -218.3268)
-
-[node name="Spawn1" type="Marker3D" parent="SpawnPoints" unique_id=2142481505]
-transform = Transform3D(-0.74921453, -0.025528569, -0.66183525, 0, 0.99925697, -0.03854373, 0.6623274, -0.028877523, -0.7486578, 6.2950745, 0.23868847, 2.4353485)
-gizmo_extents = 0.3
-
-[node name="SpawnIndicator" parent="SpawnPoints/Spawn1" unique_id=426220698 instance=ExtResource("21_6at7b")]
-
-[node name="Spawn2" type="Marker3D" parent="SpawnPoints" unique_id=20291774]
-transform = Transform3D(-0.74921453, -0.025528569, -0.66183525, 0, 0.99925697, -0.03854373, 0.6623274, -0.028877523, -0.7486578, 1.7997742, 0.23868847, 6.409317)
-gizmo_extents = 0.3
-
-[node name="SpawnIndicator" parent="SpawnPoints/Spawn2" unique_id=1085106498 instance=ExtResource("21_6at7b")]
-
-[node name="Spawn3" type="Marker3D" parent="SpawnPoints" unique_id=1621005877]
-transform = Transform3D(-0.7367768, -0.027027255, -0.6755956, 0, 0.9992007, -0.039973106, 0.67613596, -0.029451258, -0.736188, 2.2391663, 0.0021333694, -2.0550995)
-gizmo_extents = 0.3
-
-[node name="SpawnIndicator" parent="SpawnPoints/Spawn3" unique_id=1354972104 instance=ExtResource("21_6at7b")]
-
-[node name="Spawn4" type="Marker3D" parent="SpawnPoints" unique_id=671541188]
-transform = Transform3D(-0.7367768, -0.027027255, -0.6755956, 0, 0.9992007, -0.039973106, 0.67613596, -0.029451258, -0.736188, -2.181488, 0.0021333694, 2.0017242)
-gizmo_extents = 0.3
-
-[node name="SpawnIndicator" parent="SpawnPoints/Spawn4" unique_id=2064229032 instance=ExtResource("21_6at7b")]
-
-[node name="Spawn5" type="Marker3D" parent="SpawnPoints" unique_id=90767162]
-transform = Transform3D(-0.7228256, -0.028177459, -0.69045585, 0, 0.9991684, -0.040775996, 0.69103056, -0.029473932, -0.7222244, -1.9077759, -0.2408247, -6.46875)
-gizmo_extents = 0.3
-
-[node name="SpawnIndicator" parent="SpawnPoints/Spawn5" unique_id=1845160055 instance=ExtResource("21_6at7b")]
-
-[node name="Spawn6" type="Marker3D" parent="SpawnPoints" unique_id=739905250]
-transform = Transform3D(-0.7228256, -0.028177459, -0.69045585, 0, 0.9991684, -0.040775996, 0.69103056, -0.029473932, -0.7222244, -6.2447205, -0.2408247, -2.3225708)
-gizmo_extents = 0.3
-
-[node name="SpawnIndicator" parent="SpawnPoints/Spawn6" unique_id=205272938 instance=ExtResource("21_6at7b")]
-
 [node name="3e2310d9cb6ec14bf505c20229b5b455" parent="." unique_id=554180764 groups=["collision_trimesh"] instance=ExtResource("42_7nxru")]
 transform = Transform3D(10, 0, 0, 0, 10, 0, 0, 0, 10, 117.841644, 32.351944, 211.7244)
 
@@ -630,3 +595,42 @@ transform = Transform3D(20, 0, 0, 0, 19.982397, 0.8389592, 0, -0.8389592, 19.982
 
 [node name="65158171788d74919aa77489f5f8412f" parent="." unique_id=851135176 groups=["collision_trimesh"] instance=ExtResource("47_yb23s")]
 transform = Transform3D(30, 0, 0, 0, 30, 0, 0, 0, 30, 60.876167, 30.781807, 201.60925)
+
+[node name="SpawnPoints" type="Node3D" parent="." unique_id=157234104]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 196.11914, 14.526169, -218.33412)
+
+[node name="Spawn1" type="Marker3D" parent="SpawnPoints" unique_id=901006219]
+transform = Transform3D(-0.7485513, -0.04055946, -0.66183525, -0.020054143, 0.99905574, -0.03854373, 0.6627736, -0.015579421, -0.7486578, 6.2933044, 0.29886532, 2.4342804)
+gizmo_extents = 0.3
+
+[node name="SpawnIndicator" parent="SpawnPoints/Spawn1" unique_id=1853863143 instance=ExtResource("21_6at7b")]
+
+[node name="Spawn2" type="Marker3D" parent="SpawnPoints" unique_id=1199878415]
+transform = Transform3D(-0.7485513, -0.04055946, -0.66183525, -0.020054143, 0.99905574, -0.03854373, 0.6627736, -0.015579421, -0.7486578, 1.802002, 0.17854023, 6.4109344)
+gizmo_extents = 0.3
+
+[node name="SpawnIndicator" parent="SpawnPoints/Spawn2" unique_id=837915154 instance=ExtResource("21_6at7b")]
+
+[node name="Spawn3" type="Marker3D" parent="SpawnPoints" unique_id=440920793]
+transform = Transform3D(-0.73611647, -0.04127028, -0.6755956, -0.019322928, 0.999014, -0.039973106, 0.6765791, -0.016370377, -0.736188, 2.2371216, 0.060098648, -2.056488)
+gizmo_extents = 0.3
+
+[node name="SpawnIndicator" parent="SpawnPoints/Spawn3" unique_id=2050343813 instance=ExtResource("21_6at7b")]
+
+[node name="Spawn4" type="Marker3D" parent="SpawnPoints" unique_id=508787319]
+transform = Transform3D(-0.73611647, -0.04127028, -0.6755956, -0.019322928, 0.999014, -0.039973106, 0.6765791, -0.016370377, -0.736188, -2.179596, -0.05583954, 2.0029907)
+gizmo_extents = 0.3
+
+[node name="SpawnIndicator" parent="SpawnPoints/Spawn4" unique_id=1195551721 instance=ExtResource("21_6at7b")]
+
+[node name="Spawn5" type="Marker3D" parent="SpawnPoints" unique_id=521774969]
+transform = Transform3D(-0.72218, -0.041554518, -0.69045585, -0.018497903, 0.99899715, -0.040775996, 0.6914578, -0.016675625, -0.7222244, -1.9099121, -0.18534184, -6.470215)
+gizmo_extents = 0.3
+
+[node name="SpawnIndicator" parent="SpawnPoints/Spawn5" unique_id=1703894708 instance=ExtResource("21_6at7b")]
+
+[node name="Spawn6" type="Marker3D" parent="SpawnPoints" unique_id=1030805840]
+transform = Transform3D(-0.72218, -0.041554518, -0.69045585, -0.018497903, 0.99899715, -0.040775996, 0.6914578, -0.016675625, -0.7222244, -6.242981, -0.29632854, -2.3214722)
+gizmo_extents = 0.3
+
+[node name="SpawnIndicator" parent="SpawnPoints/Spawn6" unique_id=1057751284 instance=ExtResource("21_6at7b")]

@@ -180,7 +180,8 @@ var last_respawn_time: float = -999.0
 @onready var sfx_beep_warning = $Visuals/SFX_BeepWarning
 @onready var sfx_explosion = $Visuals/SFX_Explosion
 @onready var sfx_fire_loop = $Visuals/SFX_FireLoop
-@onready var boost_particles = $Visuals/BoostParticles
+@onready var boost_particles_l = $Visuals/BoostParticlesL
+@onready var boost_particles_r = $Visuals/BoostParticlesR
 @onready var explosion_particles = $Visuals/ExplosionParticles
 @onready var burning_particles = $Visuals/BurningParticles
 @onready var burning_smoke_particles = $Visuals/BurningSmokeParticles
@@ -254,6 +255,7 @@ var drift_particles = []
 @export var sync_emit_drift: bool = false
 var dirt_particles = []
 @export var sync_emit_dirt: bool = false
+var _current_dust_color: Color = Color(0.60, 0.50, 0.40)
 var offroad_penalty: float = 1.0
 var offroad_target_penalty: float = 1.0
 var offroad_timer: float = 0.0
@@ -628,6 +630,7 @@ func _ready():
 	_create_drift_particles("RR")
 	_create_dirt_particles("RL")
 	_create_dirt_particles("RR")
+	_update_boost_particle_positions()
 
 	# Move all car meshes to Visual Layer 2 so they do not receive Decal projections
 	# (Decals are configured to only project onto Visual Layer 1)
@@ -2051,6 +2054,8 @@ func _setup_new_car_wheels():
 	if cart_model:
 		original_cart_model_transform = cart_model.transform
 
+	_update_boost_particle_positions()
+
 func _apply_wheel_material(node: Node):
 	if node is MeshInstance3D:
 		var mat = StandardMaterial3D.new()
@@ -2164,7 +2169,7 @@ func client_start_boost():
 	boost_timer = 2.0
 	is_boosting = true
 	sfx_nitro_start.play()
-	boost_particles.emitting = true
+	_set_boost_emitting(true)
 
 @rpc("any_peer", "call_local", "reliable")
 func client_start_pad_boost(strength: float = 1.0, duration: float = 2.0):
@@ -2301,8 +2306,7 @@ func _update_visual_states(delta):
 		_set_visuals_shock_effect(false, false)
 
 	# Sync boost particles
-	if boost_particles.emitting != is_boosting:
-		boost_particles.emitting = is_boosting
+	_set_boost_emitting(is_boosting)
 		
 	# Sync rocket sound
 	if is_boosting:
@@ -3277,6 +3281,20 @@ func _set_drift_emitting(emitting: bool):
 			if "amount_ratio" in p:
 				p.amount_ratio = clampf(speed / 20.0, 0.15, 0.85) if emitting else 0.0
 
+func _set_boost_emitting(emitting: bool) -> void:
+	if is_instance_valid(boost_particles_l) and boost_particles_l.emitting != emitting:
+		boost_particles_l.emitting = emitting
+	if is_instance_valid(boost_particles_r) and boost_particles_r.emitting != emitting:
+		boost_particles_r.emitting = emitting
+
+func _update_boost_particle_positions() -> void:
+	var pivot_rl = get_node_or_null("Visuals/WheelPivotRL")
+	var pivot_rr = get_node_or_null("Visuals/WheelPivotRR")
+	if pivot_rl and is_instance_valid(boost_particles_l):
+		boost_particles_l.position = Vector3(pivot_rl.position.x, pivot_rl.position.y + 0.04, pivot_rl.position.z + 0.1)
+	if pivot_rr and is_instance_valid(boost_particles_r):
+		boost_particles_r.position = Vector3(pivot_rr.position.x, pivot_rr.position.y + 0.04, pivot_rr.position.z + 0.1)
+
 func _create_dirt_particles(wheel_name: String):
 	var pivot = get_node_or_null("Visuals/WheelPivot" + wheel_name)
 	if not pivot: return
@@ -3284,8 +3302,13 @@ func _create_dirt_particles(wheel_name: String):
 	var dirt = CPUParticles3D.new()
 	dirt.name = wheel_name + "_Dirt"
 	dirt.emitting = false
-	dirt.amount = 25
-	dirt.lifetime = 0.5
+	dirt.amount = 20
+	dirt.lifetime = 0.45
+	dirt.explosiveness = 0.0
+	dirt.randomness = 0.5
+	dirt.lifetime_randomness = 0.3
+	dirt.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	dirt.emission_sphere_radius = 0.05
 	dirt.mesh = QuadMesh.new()
 	dirt.local_coords = false
 	dirt.top_level = true
@@ -3303,42 +3326,98 @@ func _create_dirt_particles(wheel_name: String):
 	mat_dirt.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat_dirt.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 	mat_dirt.vertex_color_use_as_albedo = true
+	mat_dirt.cull_mode = BaseMaterial3D.CULL_DISABLED
 	
 	var grad_tex = GradientTexture2D.new()
 	grad_tex.fill = GradientTexture2D.FILL_RADIAL
 	grad_tex.fill_from = Vector2(0.5, 0.5)
 	grad_tex.fill_to = Vector2(0.5, 0.0)
 	
-	var dirt_grad = Gradient.new()
-	dirt_grad.set_color(0, Color(0.25, 0.18, 0.1, 0.5))
-	dirt_grad.set_color(1, Color(0.25, 0.18, 0.1, 0.0))
-	grad_tex.gradient = dirt_grad
+	# Pure white radial mask with smooth alpha falloff so material color is not squared/darkened
+	var dirt_mask_grad = Gradient.new()
+	dirt_mask_grad.set_color(0, Color(1.0, 1.0, 1.0, 1.0))
+	dirt_mask_grad.set_color(1, Color(1.0, 1.0, 1.0, 0.0))
+	grad_tex.gradient = dirt_mask_grad
 	
 	mat_dirt.albedo_texture = grad_tex
 	dirt.material_override = mat_dirt
 	
-	dirt.direction = Vector3.UP + Vector3.BACK * 1.5
-	dirt.spread = 45.0
-	dirt.gravity = Vector3(0, -6.0, 0)
-	dirt.initial_velocity_min = 3.0
-	dirt.initial_velocity_max = 6.0
-	dirt.scale_amount_min = 0.15
-	dirt.scale_amount_max = 0.45
+	dirt.direction = Vector3(0.0, 0.8, 1.2).normalized()
+	dirt.spread = 35.0
+	dirt.gravity = Vector3(0, -3.5, 0)
+	dirt.initial_velocity_min = 1.8
+	dirt.initial_velocity_max = 4.2
+	dirt.scale_amount_min = 0.08
+	dirt.scale_amount_max = 0.22
 	
 	var scale_curve = Curve.new()
-	scale_curve.add_point(Vector2(0.0, 0.2))
-	scale_curve.add_point(Vector2(1.0, 0.8))
+	scale_curve.add_point(Vector2(0.0, 0.05)) # Starts small at tire contact
+	scale_curve.add_point(Vector2(0.35, 0.45))
+	scale_curve.add_point(Vector2(1.0, 0.80)) # Expands softly into air
 	dirt.scale_amount_curve = scale_curve
 	
+	# Color gradient: Starts completely transparent (alpha 0.0) to prevent dark pop on spawn
+	var initial_col: Color = _get_current_surface_dust_color()
 	var grad = Gradient.new()
-	grad.set_color(0, Color(0.25, 0.18, 0.1, 0.65))
-	grad.set_color(1, Color(0.25, 0.18, 0.1, 0.0))
+	grad.offsets = PackedFloat32Array([0.0, 0.12, 0.55, 1.0])
+	grad.colors = PackedColorArray([
+		Color(initial_col.r, initial_col.g, initial_col.b, 0.0),    # t=0.0: invisible at birth
+		Color(initial_col.r, initial_col.g, initial_col.b, 0.30),   # t=0.12: smooth fade-in as particle leaves tire
+		Color(initial_col.r * 0.95, initial_col.g * 0.95, initial_col.b * 0.95, 0.16),   # t=0.55: diffuse dusty air
+		Color(initial_col.r * 0.90, initial_col.g * 0.90, initial_col.b * 0.90, 0.0)     # t=1.0: soft fade-out
+	])
 	dirt.color_ramp = grad
 
-func _set_dirt_emitting(emitting: bool):
+
+func _get_current_surface_dust_color() -> Color:
+	var lvl = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
+	var lvl_name = ""
+	if lvl:
+		lvl_name = str(lvl.name).to_lower()
+	
+	if not is_offroad:
+		# Driving on asphalt / pavement
+		return Color(0.65, 0.63, 0.60)
+	
+	# Check steep rock cliffs
+	if ground_ray and ground_ray.is_colliding() and ground_ray.get_collision_normal().y < 0.60:
+		return Color(0.48, 0.44, 0.40) # Rocky cliff grey
+		
+	if lvl_name.contains("canyon"):
+		return Color(0.68, 0.44, 0.30) # Terracotta sandstone
+	elif lvl_name.contains("desert") or lvl_name.contains("wadi"):
+		return Color(0.85, 0.75, 0.52) # Warm golden sand
+	elif lvl_name.contains("mountain"):
+		return Color(0.74, 0.66, 0.50) # Mountain sand & gravel
+	else:
+		return Color(0.40, 0.54, 0.28) # Meadow grass & loam
+
+
+func _apply_dust_particle_colors(base_color: Color) -> void:
 	for p in dirt_particles:
 		if is_instance_valid(p) and p is CPUParticles3D:
-			p.emitting = emitting
+			var grad: Gradient = p.color_ramp
+			if grad:
+				grad.colors = PackedColorArray([
+					Color(base_color.r, base_color.g, base_color.b, 0.0),
+					Color(base_color.r, base_color.g, base_color.b, 0.30),
+					Color(base_color.r * 0.95, base_color.g * 0.95, base_color.b * 0.95, 0.16),
+					Color(base_color.r * 0.90, base_color.g * 0.90, base_color.b * 0.90, 0.0)
+				])
+
+
+func _set_dirt_emitting(emitting: bool):
+	var speed: float = linear_velocity.length()
+	var on: bool = emitting and speed > 2.0
+	if on:
+		var target_col: Color = _get_current_surface_dust_color()
+		_current_dust_color = _current_dust_color.lerp(target_col, 0.25)
+		_apply_dust_particle_colors(_current_dust_color)
+	for p in dirt_particles:
+		if is_instance_valid(p) and p is CPUParticles3D:
+			p.emitting = on
+			if "amount_ratio" in p:
+				p.amount_ratio = clampf((speed - 1.5) / 18.0, 0.15, 0.9) if on else 0.0
 
 func _get_ground_height(global_pos: Vector3) -> float:
 	var space_state = get_world_3d().direct_space_state
@@ -3738,24 +3817,44 @@ func _is_terrain_collider(collider: Object) -> bool:
 	return n.contains("Unified_World_Collision") or n.contains("Terrain") or n.contains("track_collision") or n.contains("terrain")
 
 
+func _get_water_surface_y_at(pos: Vector3) -> float:
+	if not stage_has_water:
+		return -9999.0
+	if water_bounds_active:
+		if not (pos.x >= water_bounds_min.x and pos.x <= water_bounds_max.x \
+				and pos.z >= water_bounds_min.y and pos.z <= water_bounds_max.y):
+			return -9999.0
+	if is_instance_valid(_wadi_water_tg) and _wadi_water_tg.has_method("is_wadi_water_at"):
+		if not bool(_wadi_water_tg.call("is_wadi_water_at", pos.x, pos.z)):
+			return -9999.0
+	return water_surface_y
+
+
 func _raise_point_above_terrain(pos: Vector3, excludes: Array) -> Vector3:
 	var space_state = get_world_3d().direct_space_state
-	if space_state == null:
-		return pos
-	# Cast from well above down through the camera point
-	var from := pos + Vector3(0.0, 40.0, 0.0)
-	var to := pos + Vector3(0.0, -25.0, 0.0)
-	var query := PhysicsRayQueryParameters3D.create(from, to)
-	query.exclude = excludes
-	var result = space_state.intersect_ray(query)
-	_cached_cam_below_terrain = false
-	if result and result.collider and _is_terrain_collider(result.collider):
-		var terrain_y: float = result.position.y
-		var min_y: float = terrain_y + maxf(_ISO_CAM_CLEARANCE, 1.8)
-		if pos.y < min_y:
-			# Still considered "deep" only if substantially under surface after clamp intent
-			_cached_cam_below_terrain = pos.y < terrain_y - 0.25
-			pos.y = min_y
+	if space_state != null:
+		# Cast from well above down through the camera point
+		var from := pos + Vector3(0.0, 40.0, 0.0)
+		var to := pos + Vector3(0.0, -25.0, 0.0)
+		var query := PhysicsRayQueryParameters3D.create(from, to)
+		query.exclude = excludes
+		var result = space_state.intersect_ray(query)
+		_cached_cam_below_terrain = false
+		if result and result.collider and _is_terrain_collider(result.collider):
+			var terrain_y: float = result.position.y
+			var min_y: float = terrain_y + maxf(_ISO_CAM_CLEARANCE, 1.8)
+			if pos.y < min_y:
+				# Still considered "deep" only if substantially under surface after clamp intent
+				_cached_cam_below_terrain = pos.y < terrain_y - 0.25
+				pos.y = min_y
+
+	# Follower camera must never go underwater — clamp safely above water surface
+	var water_y = _get_water_surface_y_at(pos)
+	if water_y > -9000.0:
+		var min_water_cam_y = water_y + 1.3
+		if pos.y < min_water_cam_y:
+			pos.y = min_water_cam_y
+
 	return pos
 
 

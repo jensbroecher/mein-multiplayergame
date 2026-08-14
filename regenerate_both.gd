@@ -16,16 +16,14 @@ func _ready():
 			add_child(level)
 			
 			var tg = level.get_node_or_null("TerrainGenerator")
-			
-			print("Aligning default spawn points...")
-			level._align_start_and_spawns_to_track()
+			if tg:
+				print("Regenerating default terrain from existing custom curve...")
+				tg.generate_world()
 			
 			# Sand dunes are only for MountainLevel, not Level.tscn
 			var sd = level.get_node_or_null("SandDunes")
 			if sd:
 				sd.free()
-			
-			_strip_grass_container(level, tg, "Level")
 			
 			# Save and clean up ownership
 			if tg:

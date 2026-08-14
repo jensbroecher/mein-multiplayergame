@@ -291,6 +291,18 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 	else:
 		base_terrain_height = h_noise
 
+	# Lake basin in Lakeside Meadow (blended before road so bridge ends meet solid shoreline)
+	if not no_water:
+		var lake_center = Vector2(-450, -500)
+		var lake_radius = 220.0
+		var dist_to_lake = Vector2(px, pz).distance_to(lake_center)
+		if dist_to_lake < lake_radius:
+			var depth = -18.0
+			var lake_blend = clampf((lake_radius - dist_to_lake) / 45.0, 0.0, 1.0)
+			lake_blend = lake_blend * lake_blend * (3.0 - 2.0 * lake_blend)
+			base_terrain_height = lerpf(base_terrain_height, depth, lake_blend)
+
+	var height: float
 	var query_y = -200.0 if (track_layout_type == TrackLayoutType.CANYON) else base_terrain_height
 	var closest_pos = curve.get_closest_point(Vector3(px, query_y, pz))
 	var dist = Vector2(px, pz).distance_to(Vector2(closest_pos.x, closest_pos.z))
@@ -314,8 +326,6 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 	if level_prefix == "canyon_chasm" and _is_in_gap_pos(closest_pos):
 		dist = 1.0e9
 		road_h = base_terrain_height
-
-	var height: float
 
 	if track_layout_type == TrackLayoutType.CANYON:
 		var sand_edge = sand_width / 2.0
@@ -372,32 +382,24 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			var river_t: float = _wadi_river_influence(px, pz)
 			if river_t > 0.001:
 				var bed_y: float = WADI_RIVER_BED_Y
-				# Only carve lake/river where we are clearly off the driveable sand strip
-				# (never dig a trench under curbs — that made cars sink beside the road)
 				var away_from_road: float = smoothstep(sand_edge + 1.5, sand_edge + 22.0, dist)
 				var carve: float = river_t * away_from_road
 				var lake_center_boost: float = river_t * river_t * 0.5
 				var target_bed: float = lerpf(bed_y, bed_y - 0.7, lake_center_boost)
 				height = lerp(height, target_bed, clampf(carve, 0.0, 1.0))
 
-	# Edge falloff (all track types — drops to abyss at map edges)
-	var world_pos = Vector2(px, pz)
-	var noise_val = noise.get_noise_2d(px * 0.1, pz * 0.1) * 200.0
-	var dist_from_center_val = world_pos.length() + noise_val
-	var falloff_start = terrain_size.x * 0.25
-	var falloff_end = terrain_size.x * 0.45
-	var edge_falloff = 1.0 - clamp((dist_from_center_val - falloff_start) / (falloff_end - falloff_start), 0.0, 1.0)
-	var falloff_y = -60.0 if (track_layout_type == TrackLayoutType.MOUNTAIN or track_layout_type == TrackLayoutType.CANYON) else -20.0
+	# Edge falloff (all track types — curves down smoothly to abyss / horizon outside all track envelopes)
+	var max_radius: float = terrain_size.x * 0.5
+	var dist_from_center_val: float = Vector2(px, pz).length()
+	var r_noise: float = noise.get_noise_2d(px * 0.015, pz * 0.015) * (max_radius * 0.03)
+	var effective_dist: float = dist_from_center_val + r_noise
+	var falloff_start: float = max_radius * 0.88
+	var falloff_end: float = max_radius * 0.98
+	var edge_t: float = clampf((effective_dist - falloff_start) / maxf(falloff_end - falloff_start, 0.001), 0.0, 1.0)
+	var smooth_edge: float = edge_t * edge_t * (3.0 - 2.0 * edge_t)
+	var edge_falloff: float = 1.0 - smooth_edge
+	var falloff_y: float = -70.0 if (track_layout_type == TrackLayoutType.MOUNTAIN or track_layout_type == TrackLayoutType.CANYON) else -40.0
 	height = lerp(falloff_y, height, edge_falloff)
-
-	if not no_water:
-		var lake_center = Vector2(-450, -500)
-		var lake_radius = 200.0
-		var dist_to_lake = Vector2(px, pz).distance_to(lake_center)
-		if dist_to_lake < lake_radius:
-			var depth = -15.0
-			var lake_blend = clamp((lake_radius - dist_to_lake) / 40.0, 0.0, 1.0)
-			height = lerp(height, depth, lake_blend)
 
 	return height
 
@@ -462,7 +464,7 @@ func _ready():
 func generate_world():
 	if not track_path: return
 	
-	# Set high-resolution bake interval to prevent segmented road overlaps
+	# Keep high-resolution bake interval for exact curve sampling
 	track_path.curve.bake_interval = 0.25
 
 	# IMPORTANT: Use free() in editor for immediate cleanup to prevent 'ghost' nodes
@@ -472,8 +474,10 @@ func generate_world():
 		child.free()
 
 	# 1. Create Data Meshes
-	var collision_mesh = _generate_mesh(true) # Flat under road for smooth driving
-	var visual_mesh = _generate_mesh(false)   # Recessed under road to prevent leaking
+	# Both visual and collision MUST use identical terrain_resolution so collision triangles
+	# align 1:1 with visual hills and valleys, preventing car sinking or hovering.
+	var collision_mesh = _generate_mesh(true)  # Flat under road for smooth driving
+	var visual_mesh = _generate_mesh(false)    # Recessed under road to prevent leaking
 	var trimesh_shape = collision_mesh.create_trimesh_shape()
 
 	# 2. Visual Terrain
@@ -624,48 +628,87 @@ func _generate_mesh(for_collision: bool) -> ArrayMesh:
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	st.set_smooth_group(0) 
 
-	var step_x = terrain_size.x / terrain_resolution
-	var step_y = terrain_size.y / terrain_resolution
+	var res: int = terrain_resolution
+	var step_x = terrain_size.x / res
+	var step_y = terrain_size.y / res
 	var start_x = -terrain_size.x / 2.0
 	var start_y = -terrain_size.y / 2.0
 
+	var max_radius: float = terrain_size.x * 0.5
+	var max_radius_sq: float = max_radius * max_radius
+	var outer_limit_sq: float = (max_radius + 30.0) * (max_radius + 30.0)
+	var falloff_y_out: float = -70.0 if (track_layout_type == TrackLayoutType.MOUNTAIN or track_layout_type == TrackLayoutType.CANYON) else -40.0
 	var curve = _get_world_curve()
 
-	for y in range(terrain_resolution + 1):
-		for x in range(terrain_resolution + 1):
+	var stride = res + 1
+	var total_verts = stride * stride
+	var heights = PackedFloat32Array()
+	heights.resize(total_verts)
+
+	# Pass 1: Compute heights once per grid point (5x faster than 5-tap per vertex)
+	for y in range(res + 1):
+		for x in range(res + 1):
 			var px = start_x + x * step_x
 			var pz = start_y + y * step_y
+			var p_sq = px * px + pz * pz
+			var idx = y * stride + x
 
-			# Get the exact height at this point
-			var height = _get_terrain_height(px, pz, noise, curve, for_collision)
+			if p_sq > outer_limit_sq:
+				heights[idx] = falloff_y_out
+			else:
+				heights[idx] = _get_terrain_height(px, pz, noise, curve, for_collision)
 
-			# Calculate analytical/sampled smooth normal
-			var eps = 1.0
-			var h_L = _get_terrain_height(px - eps, pz, noise, curve, for_collision)
-			var h_R = _get_terrain_height(px + eps, pz, noise, curve, for_collision)
-			var h_D = _get_terrain_height(px, pz - eps, noise, curve, for_collision)
-			var h_U = _get_terrain_height(px, pz + eps, noise, curve, for_collision)
-			var normal = Vector3(h_L - h_R, 2.0 * eps, h_D - h_U).normalized()
+	# Pass 2: Add vertices and analytical smooth normals from adjacent grid samples
+	var span_x: float = step_x * 2.0
+	var span_z: float = step_y * 2.0
 
-			st.set_normal(normal)
+	for y in range(res + 1):
+		for x in range(res + 1):
+			var px = start_x + x * step_x
+			var pz = start_y + y * step_y
+			var idx = y * stride + x
+			var h = heights[idx]
+
+			if for_collision or (px * px + pz * pz) > outer_limit_sq:
+				st.set_normal(Vector3.UP)
+			else:
+				var x_prev = max(0, x - 1)
+				var x_next = min(res, x + 1)
+				var y_prev = max(0, y - 1)
+				var y_next = min(res, y + 1)
+				var h_L = heights[y * stride + x_prev]
+				var h_R = heights[y * stride + x_next]
+				var h_D = heights[y_prev * stride + x]
+				var h_U = heights[y_next * stride + x]
+				var dx_val = (x_next - x_prev) * step_x
+				var dz_val = (y_next - y_prev) * step_y
+				var normal = Vector3(h_L - h_R, dx_val, h_D - h_U).normalized()
+				st.set_normal(normal)
+
 			st.set_uv(Vector2(px, pz))
-			st.add_vertex(Vector3(px, height, pz))
+			st.add_vertex(Vector3(px, h, pz))
 
-	# Winding Order (CCW - Facing UP)
-	for y in range(terrain_resolution):
-		for x in range(terrain_resolution):
-			var i = y * (terrain_resolution + 1) + x
+	# Winding Order (CCW - Facing UP) — Circular terrain disc
+	for y in range(res):
+		for x in range(res):
+			var qx: float = start_x + (float(x) + 0.5) * step_x
+			var qz: float = start_y + (float(y) + 0.5) * step_y
+			if (qx * qx + qz * qz) > max_radius_sq:
+				continue
+
+			var i = y * (res + 1) + x
 			st.add_index(i)
 			st.add_index(i + 1)
-			st.add_index(i + terrain_resolution + 1)
+			st.add_index(i + res + 1)
 			
 			st.add_index(i + 1)
-			st.add_index(i + terrain_resolution + 2)
-			st.add_index(i + terrain_resolution + 1)
+			st.add_index(i + res + 2)
+			st.add_index(i + res + 1)
 
 	# IMPORTANT: We do NOT call st.generate_normals() because we manually calculated 
 	# them above to eliminate the polygon/faceted look.
-	st.generate_tangents()
+	if not for_collision:
+		st.generate_tangents()
 	return st.commit()
 
 func _generate_road_and_sand():
@@ -1416,7 +1459,7 @@ func _generate_water():
 	var water = MeshInstance3D.new()
 	water.name = "Water_Surface"
 	var plane = PlaneMesh.new()
-	plane.size = terrain_size * 2.0
+	plane.size = terrain_size * 2.5
 	water.mesh = plane
 	water.position = Vector3(0, -10.0, 0) # Water level (below terrain base)
 
@@ -1746,7 +1789,8 @@ func _sq_dist_to_path(px: float, pz: float, baked: PackedVector2Array) -> float:
 	return best_sq
 
 func _generate_terrain_grass():
-	if terrain_grass_count <= 0: return
+	var target_count: int = mini(terrain_grass_count, 50000)
+	if target_count <= 0: return
 	
 	var curve = _get_world_curve()
 	
@@ -1798,15 +1842,17 @@ func _generate_terrain_grass():
 	for i in range(grass_grid_size * grass_grid_size):
 		chunk_transforms[i] = []
 	
-	var attempts := terrain_grass_count * 3  # upper bound to avoid infinite loop
+	var attempts: int = target_count * 3  # upper bound to avoid infinite loop
 	var placed := 0
 	
 	for _i in range(attempts):
-		if placed >= terrain_grass_count:
+		if placed >= target_count:
 			break
 		
 		var px := randf_range(-half_x, half_x)
 		var pz := randf_range(-half_z, half_z)
+		if (px * px + pz * pz) > (half_x * 0.85) * (half_x * 0.85):
+			continue
 		
 		# ---------------------------------------------------------------
 		# OPTIMISATION 3: Height check FIRST (just noise math, very fast).

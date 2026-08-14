@@ -248,6 +248,19 @@ func _update_weather_system():
 
 	worldEnvironment.environment.volumetric_fog_enabled = false
 	worldEnvironment.environment.volumetric_fog_density = current_fog_density * 0.5
+	worldEnvironment.environment.fog_enabled = true
+	worldEnvironment.environment.fog_mode = Environment.FOG_MODE_DEPTH
+	worldEnvironment.environment.fog_light_color = current_horizon_colour
+	worldEnvironment.environment.fog_depth_begin = 350.0
+	worldEnvironment.environment.fog_depth_end = 1100.0
+	worldEnvironment.environment.fog_aerial_perspective = 0.65
+	worldEnvironment.environment.fog_sky_affect = 1.0
+
+	var parent_node = get_parent()
+	if parent_node:
+		var terrain_vis = parent_node.get_node_or_null("TerrainGenerator/Terrain_Visual")
+		if terrain_vis and terrain_vis is MeshInstance3D and terrain_vis.material_override is ShaderMaterial:
+			(terrain_vis.material_override as ShaderMaterial).set_shader_parameter("edge_fade_color", current_horizon_colour)
 
 	if particleSystem and is_inside_tree():
 		var amount_ratio = weather.precipitation.amountRatio if weather.precipitation else 0.0
@@ -259,7 +272,7 @@ func _update_weather_system():
 				particleSystem.global_position = cam.global_position + Vector3.UP * 10.0
 
 
-	if directionalLight:
+	if directionalLight and directionalLight.is_inside_tree():
 		var sun_angle = (timeOfDay / dayDuration) * PI * 2.0 + PI * 0.5
 		directionalLight.global_rotation.x = sun_angle
 		directionalLight.light_energy = 1.0 - day_night_factor
