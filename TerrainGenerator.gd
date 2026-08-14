@@ -1231,17 +1231,19 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 			var h_l = _get_terrain_height(top_l.x, top_l.z, noise_terrain, curve, false)
 			var h_r = _get_terrain_height(top_r.x, top_r.z, noise_terrain, curve, false)
 			
-			# If elevated bridge span (crossover where road is >12m above terrain), keep a solid bridge hull (2.8m deep)
-			# Otherwise on mountain slopes, drop bottom into the terrain so it seamlessly connects to the ground
-			var is_bridge_span = (top_l.y - h_l > 12.0) and (top_r.y - h_r > 12.0)
-			if not is_bridge_span:
-				bot_l = top_l - right_dir * 0.8
-				bot_l.y = minf(top_l.y - 2.5, h_l - 1.5)
-				bot_r = top_r + right_dir * 0.8
-				bot_r.y = minf(top_r.y - 2.5, h_r - 1.5)
+			# Bridge overpass crossover check (upper road passes over lower road near x ≈ 0, z from -220 to -330)
+			var is_crossing_span = absf(final_pos.x) < 45.0 and final_pos.z < -220.0 and final_pos.z > -330.0 and final_pos.y > 16.0
+			var is_bridge_span = is_crossing_span or ((top_l.y - h_l > 8.0) and (top_r.y - h_r > 8.0))
+			if is_bridge_span:
+				# Clean elevated bridge deck with zero outward flare so it never cuts into roads beneath
+				bot_l = top_l - up_dir * 2.2
+				bot_r = top_r - up_dir * 2.2
 			else:
-				bot_l = top_l - up_dir * 2.8
-				bot_r = top_r - up_dir * 2.8
+				# Drop bottom into the mountain slope seamlessly
+				bot_l = top_l - right_dir * 0.4
+				bot_l.y = minf(top_l.y - 2.5, h_l - 1.5)
+				bot_r = top_r + right_dir * 0.4
+				bot_r.y = minf(top_r.y - 2.5, h_r - 1.5)
 		elif track_layout_type == TrackLayoutType.CANYON:
 			# Attach embankment at the rounded outer lip (road surface dropped by BEVEL_H).
 			top_l = final_pos - right + Vector3(0, side_y_offset - SIDE_BEVEL_H, 0)

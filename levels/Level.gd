@@ -283,11 +283,9 @@ func _check_finish(id: int):
 		stats["finished"] = true
 
 		var cart = players_container.get_node_or_null(str(id))
-		if cart and cart.get("is_ai"):
-			cart.can_move = false
+		if cart and cart.has_method("set_finished_race"):
+			cart.set_finished_race(true)
 		elif NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
-			# Direct handling — no RPC needed for local players
-			if cart: cart.can_move = false
 			var ui = race_ui if id == 1 else race_ui_p2
 			if ui: ui.show_message("You Finished!", 5.0)
 		else:
@@ -306,7 +304,7 @@ func show_player_finished_rpc():
 		# In co-op this is handled directly in _check_finish(), skip
 		return
 	race_ui.show_message("You Finished!", 5.0)
-	_disable_local_cart()
+	_set_local_cart_finished()
 
 @rpc("authority", "call_local", "reliable")
 func _sync_checkpoint_to_player(checkpoint_transform: Transform3D, play_finish_sound: bool = false):
@@ -327,11 +325,14 @@ func _sync_checkpoint_to_player_local(player_id: int, checkpoint_transform: Tran
 		else:
 			MusicManager.play_sfx("res://sounds/checkpoint.mp3")
 
-func _disable_local_cart():
+func _set_local_cart_finished():
 	var carts = get_tree().get_nodes_in_group("player_carts")
 	for c in carts:
-		if c.is_local_player:
-			c.can_move = false
+		if c.is_local_player and c.has_method("set_finished_race"):
+			c.set_finished_race(true)
+
+func _disable_local_cart():
+	_set_local_cart_finished()
 
 func _on_player_list_changed(_id = 0, _info = {}):
 	for ui in _all_race_uis():

@@ -65,14 +65,14 @@ horizonColour = Color(0.0784314, 0.00784314, 0.0156863, 1)
 groundColour = Color(0, 0, 0, 1)
 cloudBrightness = 0.05
 
-[sub_resource type="Resource" id="Resource_wrrk0"]
+[sub_resource type="Resource" id="Resource_c6n7l"]
 script = ExtResource("6_7fjgh")
 weather = ExtResource("6_01s5b")
 
-[sub_resource type="Resource" id="Resource_yb23s"]
+[sub_resource type="Resource" id="Resource_wrrk0"]
 script = ExtResource("4_7eb0m")
 seasonId = "summer"
-weathers = Array[ExtResource("6_7fjgh")]([SubResource("Resource_wrrk0")])
+weathers = Array[ExtResource("6_7fjgh")]([SubResource("Resource_c6n7l")])
 skyColourDaytime = SubResource("Resource_ext2d")
 skyColourNight = SubResource("Resource_p7jpd")
 dayNightCycleCurve = SubResource("Curve_8bl6p")
@@ -81,22 +81,22 @@ dayNightCycleCurve = SubResource("Curve_8bl6p")
 render_priority = 0
 shader = ExtResource("10_t3qkl")
 shader_parameter/albedo_texture = ExtResource("11_i1pac")
-shader_parameter/albedo = Color(1, 1, 1, 1)
-shader_parameter/uv_scale = 6.0
+shader_parameter/albedo = Color(1, 0.98, 0.94, 1)
+shader_parameter/uv_scale = 12.0
 shader_parameter/uv_scale_v2 = Vector2(1, 1)
-shader_parameter/smoothness = 1.0
-shader_parameter/use_world_uv = false
+shader_parameter/smoothness = 0.96
+shader_parameter/use_world_uv = true
 shader_parameter/use_normal_map = false
 shader_parameter/normal_scale = 1.0
 shader_parameter/use_slope_cliff_rock = true
 shader_parameter/cliff_texture = ExtResource("11_rock_tex")
-shader_parameter/cliff_albedo = Color(0.95, 0.95, 0.95, 1)
-shader_parameter/cliff_uv_scale = 0.04
-shader_parameter/cliff_slope_threshold = 0.65
-shader_parameter/cliff_blend_sharpness = 0.15
+shader_parameter/cliff_albedo = Color(0.86, 0.76, 0.62, 1)
+shader_parameter/cliff_uv_scale = 0.045
+shader_parameter/cliff_slope_threshold = 0.52
+shader_parameter/cliff_blend_sharpness = 0.16
 shader_parameter/use_cliff_normal = true
 shader_parameter/cliff_normal_texture = ExtResource("11_rock_norm")
-shader_parameter/cliff_normal_scale = 1.5
+shader_parameter/cliff_normal_scale = 0.5
 
 [sub_resource type="Shader" id="Shader_stochastic"]
 resource_local_to_scene = true
@@ -170,7 +170,7 @@ shader_parameter/uv_scale_v2 = Vector2(0.125, 0.125)
 shader_parameter/smoothness = 1.0
 shader_parameter/use_world_uv = true
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_kurhb"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_yb23s"]
 render_priority = 2
 shader = ExtResource("15_bt6n6")
 shader_parameter/color_a = Color(1, 1, 1, 1)
@@ -178,12 +178,12 @@ shader_parameter/color_b = Color(0.8, 0.1, 0.1, 1)
 shader_parameter/stripe_length = 1.5
 shader_parameter/roughness = 0.8
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tvewy"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_kurhb"]
 cull_mode = 2
 albedo_color = Color(0.45, 0.45, 0.45, 1)
 roughness = 0.95
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_qw57s"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_tvewy"]
 render_priority = 0
 shader = SubResource("Shader_stochastic")
 shader_parameter/albedo_texture = ExtResource("12_g5aih")
@@ -193,7 +193,7 @@ shader_parameter/uv_scale_v2 = Vector2(0.125, 0.125)
 shader_parameter/smoothness = 1.0
 shader_parameter/use_world_uv = true
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_5bah8"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_qw57s"]
 cull_mode = 2
 albedo_texture = ExtResource("11_rock_tex")
 roughness = 0.9
@@ -297,7 +297,7 @@ track_path = NodePath("TrackPath")
 
 [node name="WeatherController" parent="." unique_id=1277823175 instance=ExtResource("2_e304n")]
 time_of_day_hours = 16.271
-seasons = Array[ExtResource("4_7eb0m")]([SubResource("Resource_yb23s")])
+seasons = Array[ExtResource("4_7eb0m")]([SubResource("Resource_wrrk0")])
 startTime = 58575.600000000006
 
 [node name="TerrainGenerator" type="Node3D" parent="." unique_id=586341718 node_paths=PackedStringArray("track_path")]
@@ -320,40 +320,40 @@ road_material = SubResource("ShaderMaterial_asphalt")
 metadata/_edit_group_ = true
 metadata/_edit_lock_ = true
 
-[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=557836634]
+[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1314459458]
 material_override = SubResource("ShaderMaterial_hgpy5")
 lod_bias = 10.0
 mesh = ExtResource("13_jrwcp")
 
-[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=2066042068]
+[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1961994427]
 
-[node name="@CollisionShape3D@25204" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=1113547895]
+[node name="@CollisionShape3D@27071" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=1715709735]
 shape = ExtResource("14_01bw0")
 
-[node name="Visual_Curbs" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1183930585]
-material_override = SubResource("ShaderMaterial_kurhb")
+[node name="Visual_Curbs" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1075589445]
+material_override = SubResource("ShaderMaterial_yb23s")
 mesh = ExtResource("16_gx2ty")
 
-[node name="Visual_Curbs_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1924475276]
-material_override = SubResource("StandardMaterial3D_tvewy")
+[node name="Visual_Curbs_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1135501983]
+material_override = SubResource("StandardMaterial3D_kurhb")
 mesh = ExtResource("17_hlrbt")
 
-[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1516561219]
-material_override = SubResource("ShaderMaterial_qw57s")
+[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=670445840]
+material_override = SubResource("ShaderMaterial_tvewy")
 mesh = ExtResource("18_m0x3k")
 
-[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1834130938]
-material_override = SubResource("StandardMaterial3D_5bah8")
+[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1680893990]
+material_override = SubResource("StandardMaterial3D_qw57s")
 mesh = ExtResource("19_wfwbe")
 
-[node name="Visual_Road_Sides_Collision" type="StaticBody3D" parent="TerrainGenerator/Visual_Road_Sides" unique_id=235965124]
+[node name="Visual_Road_Sides_Collision" type="StaticBody3D" parent="TerrainGenerator/Visual_Road_Sides" unique_id=851385439]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="TerrainGenerator/Visual_Road_Sides/Visual_Road_Sides_Collision" unique_id=1051252688]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TerrainGenerator/Visual_Road_Sides/Visual_Road_Sides_Collision" unique_id=143310624]
 shape = ExtResource("20_c6n7l")
 
-[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1987276946]
+[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1566182238]
 
-[node name="@CollisionShape3D@25205" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=1438146743]
+[node name="@CollisionShape3D@27072" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=303741812]
 shape = ExtResource("20_lprgb")
 
 [node name="TrackPath" type="Path3D" parent="." unique_id=1030670243]

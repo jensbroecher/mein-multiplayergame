@@ -78,17 +78,29 @@ func _ready() -> void:
 	# Desert look (sand dunes palette) — lakeside template ships green grass
 	var sand_tex: Texture2D = load("res://materials/sand.png") as Texture2D
 	var asphalt_tex: Texture2D = load("res://materials/asphalt.png") as Texture2D
+	var rock_tex: Texture2D = load("res://materials/dark_canyon_rock.png") as Texture2D
+	var rock_norm: Texture2D = load("res://materials/dark_canyon_rock_normal.png") as Texture2D
 	var stoch: Shader = load("res://terrain_stochastic.gdshader") as Shader
 	if stoch and sand_tex:
 		var sand_mat := ShaderMaterial.new()
 		sand_mat.shader = stoch
 		sand_mat.set_shader_parameter("albedo_texture", sand_tex)
 		# Let the sand texture drive the look (near-white tint = real dune color).
-		# Mild warm lift only — heavy yellow multiplies read as plastic sand.
 		sand_mat.set_shader_parameter("albedo", Color(1.0, 0.97, 0.90, 1.0))
 		sand_mat.set_shader_parameter("uv_scale", 16.0)
 		sand_mat.set_shader_parameter("smoothness", 0.96)  # roughness (shader maps this to ROUGHNESS)
 		sand_mat.set_shader_parameter("use_world_uv", true)
+		if rock_tex:
+			sand_mat.set_shader_parameter("use_slope_cliff_rock", true)
+			sand_mat.set_shader_parameter("cliff_texture", rock_tex)
+			sand_mat.set_shader_parameter("cliff_albedo", Color(0.88, 0.78, 0.66, 1.0))
+			sand_mat.set_shader_parameter("cliff_uv_scale", 0.065)
+			sand_mat.set_shader_parameter("cliff_slope_threshold", 0.45)
+			sand_mat.set_shader_parameter("cliff_blend_sharpness", 0.12)
+			if rock_norm:
+				sand_mat.set_shader_parameter("use_cliff_normal", true)
+				sand_mat.set_shader_parameter("cliff_normal_texture", rock_norm)
+				sand_mat.set_shader_parameter("cliff_normal_scale", 1.2)
 		tg.grass_material = sand_mat # field is the terrain visual material
 	if stoch and asphalt_tex:
 		var road_mat := ShaderMaterial.new()

@@ -128,70 +128,78 @@ vec3 stochastic_sample_normal(sampler2D tex, vec2 uv, vec2 dx, vec2 dy) {
 }
 
 void fragment() {
-    vec2 base_uv;
+    vec3 geom_nrm = normalize(world_nrm);
+    vec3 n_abs = abs(geom_nrm);
+    vec3 n_weight = pow(n_abs, vec3(4.0));
+    float total_w = n_weight.x + n_weight.y + n_weight.z;
+    n_weight /= max(total_w, 0.0001);
+    
+    vec3 color;
     if (use_world_uv) {
-        vec3 an = abs(normalize(world_nrm));
-        if (an.y >= an.x && an.y >= an.z) {
-            base_uv = world_pos.xz;
-        } else if (an.x >= an.z) {
-            base_uv = world_pos.zy;
-        } else {
-            base_uv = world_pos.xy;
-        }
+        // Seamless world-space triplanar projection for base texture (sand / grass)
+        vec2 scale_v = (uv_scale * 0.1) * uv_scale_v2;
+        vec2 uv_bx = vec2(world_pos.z, -world_pos.y) * scale_v;
+        vec2 uv_by = world_pos.xz * scale_v;
+        vec2 uv_bz = vec2(-world_pos.x, -world_pos.y) * scale_v;
+        
+        vec3 col_x = stochastic_sample(albedo_texture, uv_bx, dFdx(uv_bx), dFdy(uv_bx));
+        vec3 col_y = stochastic_sample(albedo_texture, uv_by, dFdx(uv_by), dFdy(uv_by));
+        vec3 col_z = stochastic_sample(albedo_texture, uv_bz, dFdx(uv_bz), dFdy(uv_bz));
+        
+        color = (col_x * n_weight.x + col_y * n_weight.y + col_z * n_weight.z) * albedo.rgb;
     } else {
-        base_uv = UV;
+        vec2 uv = UV * (uv_scale * 0.1) * uv_scale_v2;
+        color = stochastic_sample(albedo_texture, uv, dFdx(uv), dFdy(uv)) * albedo.rgb;
     }
-    vec2 uv = base_uv * (uv_scale * 0.1) * uv_scale_v2;
-    vec2 dx = dFdx(uv);
-    vec2 dy = dFdy(uv);
-    vec3 color = stochastic_sample(albedo_texture, uv, dx, dy) * albedo.rgb;
     
     float rock_weight = 0.0;
     if (use_slope_cliff_rock) {
-        // Seamless triplanar projection at natural rock scale (25m per tile)
-        vec3 n_abs = abs(normalize(world_nrm));
-        vec3 n_weight = pow(n_abs, vec3(4.0));
-        float total_w = n_weight.x + n_weight.y + n_weight.z;
-        n_weight /= max(total_w, 0.0001);
+        // High-quality seamless triplanar rock projection
+        vec2 uv_rx = vec2(world_pos.z, world_pos.y) * cliff_uv_scale;
+        vec2 uv_ry = vec2(world_pos.x, world_pos.z) * cliff_uv_scale;
+        vec2 uv_rz = vec2(world_pos.x, world_pos.y) * cliff_uv_scale;
         
-        vec2 uv_x = world_pos.zy * cliff_uv_scale;
-        vec2 uv_y = world_pos.xz * cliff_uv_scale;
-        vec2 uv_z = world_pos.xy * cliff_uv_scale;
+        vec3 rock_x = texture(cliff_texture, uv_rx).rgb;
+        vec3 rock_y = texture(cliff_texture, uv_ry).rgb;
+        vec3 rock_z = texture(cliff_texture, uv_rz).rgb;
         
-        vec3 rock_x = stochastic_sample(cliff_texture, uv_x, dFdx(uv_x), dFdy(uv_x));
-        vec3 rock_y = stochastic_sample(cliff_texture, uv_y, dFdx(uv_y), dFdy(uv_y));
-        vec3 rock_z = stochastic_sample(cliff_texture, uv_z, dFdx(uv_z), dFdy(uv_z));
+        // Subtle natural horizontal sandstone strata banding
+        float strata = 0.96 + 0.04 * sin(world_pos.y * 0.8 + sin(world_pos.y * 0.25) * 1.5);
+        vec3 rock_color = (rock_x * n_weight.x + rock_y * n_weight.y + rock_z * n_weight.z) * cliff_albedo.rgb * strata;
         
-        vec3 rock_color = (rock_x * n_weight.x + rock_y * n_weight.y + rock_z * n_weight.z) * cliff_albedo.rgb;
-        
-        // Slope factor: smooth transition between flat sand and steep cliff rock
-        float slope_ny = clamp(normalize(world_nrm).y, 0.0, 1.0);
-        rock_weight = 1.0 - smoothstep(cliff_slope_threshold - cliff_blend_sharpness, cliff_slope_threshold + cliff_blend_sharpness, slope_ny);
+        // Slope factor: 0 on flat ground (geom_nrm.y == 1), 1 on vertical cliff (geom_nrm.y == 0)
+        float slope = 1.0 - clamp(geom_nrm.y, 0.0, 1.0);
+        rock_weight = smoothstep(cliff_slope_threshold - cliff_blend_sharpness, cliff_slope_threshold + cliff_blend_sharpness, slope);
         color = mix(color, rock_color, rock_weight);
     }
     
     ALBEDO = color;
     ROUGHNESS = smoothness;
-    SPECULAR = 0.0;
+    SPECULAR = 0.05;
     
     if (use_slope_cliff_rock && use_cliff_normal && rock_weight > 0.01) {
-        vec3 n_abs = abs(normalize(world_nrm));
-        vec3 n_weight = pow(n_abs, vec3(4.0));
-        float total_w = n_weight.x + n_weight.y + n_weight.z;
-        n_weight /= max(total_w, 0.0001);
+        // True triplanar normal map reconstruction in world space
+        vec2 uv_rx = vec2(world_pos.z, world_pos.y) * cliff_uv_scale;
+        vec2 uv_ry = vec2(world_pos.x, world_pos.z) * cliff_uv_scale;
+        vec2 uv_rz = vec2(world_pos.x, world_pos.y) * cliff_uv_scale;
         
-        vec2 uv_x = world_pos.zy * cliff_uv_scale;
-        vec2 uv_y = world_pos.xz * cliff_uv_scale;
-        vec2 uv_z = world_pos.xy * cliff_uv_scale;
+        vec3 raw_nx = texture(cliff_normal_texture, uv_rx).rgb * 2.0 - 1.0;
+        vec3 raw_ny = texture(cliff_normal_texture, uv_ry).rgb * 2.0 - 1.0;
+        vec3 raw_nz = texture(cliff_normal_texture, uv_rz).rgb * 2.0 - 1.0;
         
-        vec3 norm_x = stochastic_sample_normal(cliff_normal_texture, uv_x, dFdx(uv_x), dFdy(uv_x));
-        vec3 norm_y = stochastic_sample_normal(cliff_normal_texture, uv_y, dFdx(uv_y), dFdy(uv_y));
-        vec3 norm_z = stochastic_sample_normal(cliff_normal_texture, uv_z, dFdx(uv_z), dFdy(uv_z));
+        // Transform tangent normal samples to world-space per projection plane
+        vec3 wn_x = vec3(raw_nx.z * sign(geom_nrm.x), raw_nx.y, raw_nx.x * sign(geom_nrm.x));
+        vec3 wn_y = vec3(raw_ny.x, raw_ny.z * sign(geom_nrm.y), raw_ny.y * sign(geom_nrm.y));
+        vec3 wn_z = vec3(raw_nz.x * sign(geom_nrm.z), raw_nz.y, raw_nz.z * sign(geom_nrm.z));
         
-        NORMAL_MAP = norm_x * n_weight.x + norm_y * n_weight.y + norm_z * n_weight.z;
-        NORMAL_MAP_DEPTH = cliff_normal_scale * rock_weight;
+        vec3 tri_norm_world = normalize(wn_x * n_weight.x + wn_y * n_weight.y + wn_z * n_weight.z);
+        vec3 final_world_norm = normalize(mix(geom_nrm, tri_norm_world, clamp(cliff_normal_scale * rock_weight, 0.0, 0.75)));
+        
+        // Output in View Space to NORMAL (bypasses broken/degenerate tangent space on vertical triangles)
+        NORMAL = normalize((VIEW_MATRIX * vec4(final_world_norm, 0.0)).xyz);
     } else if (use_normal_map) {
-        NORMAL_MAP = stochastic_sample_normal(normal_texture, uv, dx, dy);
+        vec2 uv = (use_world_uv ? world_pos.xz : UV) * (uv_scale * 0.1) * uv_scale_v2;
+        NORMAL_MAP = stochastic_sample_normal(normal_texture, uv, dFdx(uv), dFdy(uv));
         NORMAL_MAP_DEPTH = normal_scale;
     }
 }

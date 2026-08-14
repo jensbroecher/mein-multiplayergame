@@ -50,6 +50,8 @@ func _on_body_entered(body):
 	if not is_active: return
 	
 	if body.is_in_group("player_carts"):
+		if body.get("is_finished_race") == true:
+			return
 		var is_colliding_racer = body.is_local_player or (body.get("is_ai") and (multiplayer.multiplayer_peer == null or multiplayer.is_server()))
 		if is_colliding_racer:
 			if body.has_method("give_item_rpc"):

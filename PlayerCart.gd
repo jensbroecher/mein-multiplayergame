@@ -196,6 +196,7 @@ var is_local_player = false
 var can_move = false
 var can_control = true
 @export var is_ai: bool = false
+var is_finished_race: bool = false
 var smoothed_speed: float = 0.0
 var stuck_timer: float = 0.0
 var ai_item_timer: float = 0.0
@@ -357,6 +358,21 @@ func on_race_started():
 		can_move = true
 		freeze = false
 		ignore_next_landing_sound = true  # suppress the bump when freeze releases at race start
+
+
+func set_finished_race(finished: bool = true) -> void:
+	is_finished_race = finished
+	can_move = true
+	if finished:
+		current_item = ItemType.NONE
+		current_item_2 = ItemType.NONE
+		if is_local_player and race_ui:
+			race_ui.update_items("NONE", "NONE")
+
+
+@rpc("any_peer", "call_local", "reliable")
+func set_finished_race_rpc(finished: bool = true) -> void:
+	set_finished_race(finished)
 
 
 ## Called by Tornado after it spits the cart out.
@@ -794,12 +810,17 @@ func _process(delta):
 				else:
 					cam_fwd = cam_fwd.normalized()
 				
-				# Smooth camera trailing (steeper and higher)
-				var target_cam_pos = visuals.global_position - cam_fwd * cam_dist + Vector3(0, 2.4, 0)
+				# Downhill pitch compensation: when the car goes down a steep road (nose pointed down),
+				# raise the camera up significantly so the camera is not super close to the uphill road surface behind the car.
+				var downhill_amount: float = clampf(-visual_forward.y, 0.0, 0.85)
+				var cam_height: float = 2.4 + downhill_amount * 3.8
+				
+				# Smooth camera trailing (steeper and higher when heading downhill)
+				var target_cam_pos = visuals.global_position - cam_fwd * cam_dist + Vector3(0, cam_height, 0)
 				
 				# Throttle clip raycast (longer interval on mobile).
 				_camera_raycast_frame += 1
-				var ray_start = visuals.global_position + Vector3.UP * 1.0
+				var ray_start = visuals.global_position + Vector3.UP * (1.0 + downhill_amount * 1.0)
 				if _camera_raycast_frame >= _camera_raycast_interval:
 					_camera_raycast_frame = 0
 					var target_ratio = 1.0
@@ -823,7 +844,7 @@ func _process(delta):
 				_update_camera_xray(camera_pivot.global_position, visuals.global_position + Vector3.UP * 0.8, excludes, delta)
 				if race_ui:
 					race_ui.set_terrain_clipped(false)
-				var target_look = visuals.global_position + cam_fwd * (look_ahead_dist + 0.5) + Vector3(0, 0.6, 0)
+				var target_look = visuals.global_position + cam_fwd * (look_ahead_dist + 0.5) + Vector3(0, 0.6 + downhill_amount * 0.4, 0)
 				camera_look_at = camera_look_at.lerp(target_look, 12.0 * delta)
 				camera_pivot.look_at(camera_look_at, Vector3.UP)
 		else:
@@ -1161,7 +1182,7 @@ func _physics_process(delta):
 		_move_and_sync()
 		return
 
-	if is_local_player:
+	if is_local_player and not is_finished_race:
 		if Input.is_action_just_pressed(input_prefix + "boost"):
 			_use_item()
 		if Input.is_action_just_pressed(input_prefix + "discard_item"):
@@ -1169,9 +1190,10 @@ func _physics_process(delta):
 
 	var input_dir = Vector2.ZERO
 	if can_move:
-		if is_ai:
+		if is_ai or is_finished_race:
 			input_dir = _get_ai_input(delta)
-			_process_ai_items(delta)
+			if not is_finished_race:
+				_process_ai_items(delta)
 		else:
 			input_dir.x = Input.get_axis(input_prefix + "steer_left", input_prefix + "steer_right")
 			input_dir.y = Input.get_axis(input_prefix + "throttle", input_prefix + "brake")
@@ -1288,71 +1310,40 @@ func _physics_process(delta):
 	var uphill_dir = -downhill_dir
 	var heading_uphill: float = fwd.dot(uphill_dir) if downhill_dir != Vector3.ZERO else 0.0
 
-	# Slope gravity slide: smooth slide down steep offroad hills/cliffs
-	if is_offroad and on_ground and not on_loop and ground_normal.y < 0.88 and downhill_dir != Vector3.ZERO:
-		var slope_steepness = clampf((0.88 - ground_normal.y) / 0.88, 0.0, 1.0)
-		var slide_force_mag = GRAVITY * mass * slope_steepness * 1.3
+	# Slope gravity slide: smooth slide down steep offroad hills/cliffs (only when truly offroad and on ground)
+	if is_offroad and on_ground and not on_loop and ground_normal.y < 0.85 and downhill_dir != Vector3.ZERO:
+		var slope_steepness = clampf((0.85 - ground_normal.y) / 0.85, 0.0, 1.0)
+		var slide_force_mag = GRAVITY * mass * slope_steepness * 1.2
 		apply_central_force(downhill_dir * slide_force_mag)
 
-	# Cliff vs Dune classification:
-	# Dunes / drivable slopes: Normal.y >= 0.55 (up to ~56.6° slope) -> Drivable with offroad speed
-	# Steep cliffs / sheer rock walls: Normal.y < 0.55 (slope > 56.6°) -> Cannot be climbed
-	var is_steep_cliff: bool = is_offroad and on_ground and not on_loop and ground_normal.y < 0.55
+	# Offroad steep cliff classification (only offroad, on ground, steep rock face > 65°):
+	# Dunes / drivable slopes: Normal.y >= 0.45 -> Drivable
+	# Sheer vertical cliffs: Normal.y < 0.45 -> Engine power cut when driving straight into it
+	var is_steep_cliff: bool = is_offroad and on_ground and not on_loop and ground_normal.y < 0.45
 	var uphill_power_factor: float = 1.0
 	var uphill_speed_cap_factor: float = 1.0
-	if is_offroad and on_ground and not on_loop and ground_normal.y < 0.82:
-		if ground_normal.y < 0.55:
+	if is_offroad and on_ground and not on_loop and ground_normal.y < 0.78:
+		if ground_normal.y < 0.45:
 			uphill_power_factor = 0.0
 			uphill_speed_cap_factor = 0.0
 		else:
-			var t_slope = (ground_normal.y - 0.55) / (0.82 - 0.55)
-			uphill_power_factor = lerpf(0.15, 1.0, t_slope)
-			uphill_speed_cap_factor = lerpf(0.35, 1.0, t_slope)
+			var t_slope = (ground_normal.y - 0.45) / (0.78 - 0.45)
+			uphill_power_factor = lerpf(0.2, 1.0, t_slope)
+			uphill_speed_cap_factor = lerpf(0.4, 1.0, t_slope)
 
-	# Bumper and perimeter cliff detection (catches vertical walls when steering/zig-zagging)
+	# Short bumper ray for sheer wall detection ahead (only when offroad and on ground, never airborne or on ramps)
 	var wall_ahead: bool = false
-	var touching_cliff: bool = false
-	var cliff_normal: Vector3 = Vector3.UP
-	if not on_loop:
+	if is_offroad and on_ground and not on_loop:
 		var space_state = get_world_3d().direct_space_state
 		if space_state:
 			var b_start = global_position + Vector3.UP * 0.25
-			var b_end = global_position + fwd * 0.95 + Vector3.UP * 0.25
+			var b_end = global_position + fwd * 0.85 + Vector3.UP * 0.25
 			var q = PhysicsRayQueryParameters3D.create(b_start, b_end)
 			q.exclude = [get_rid()]
 			q.collision_mask = 1
 			var hit = space_state.intersect_ray(q)
-			if hit and hit.normal.y < 0.35 and not _is_track_surface(hit.collider):
+			if hit and hit.normal.y < 0.25 and not _is_track_surface(hit.collider):
 				wall_ahead = true
-
-			# Short perimeter checks around the sphere body
-			var check_dirs = [fwd, -fwd, right, -right, (fwd + right).normalized(), (fwd - right).normalized()]
-			var r_len = COLLISION_RADIUS + 0.18
-			for cdir in check_dirs:
-				var q_s = global_position + Vector3.UP * 0.15
-				var q_e = global_position + cdir * r_len + Vector3.UP * 0.15
-				var q2 = PhysicsRayQueryParameters3D.create(q_s, q_e)
-				q2.exclude = [get_rid()]
-				q2.collision_mask = 1
-				var hit2 = space_state.intersect_ray(q2)
-				if hit2 and hit2.normal.y < 0.55 and not _is_track_surface(hit2.collider):
-					touching_cliff = true
-					cliff_normal = hit2.normal
-					break
-
-	# Block upward climbing / momentum when on a steep cliff or pressing into a wall
-	# Strictly kills vertical velocity so zig-zagging or turning cannot climb cliffs
-	if is_steep_cliff or wall_ahead or touching_cliff:
-		if linear_velocity.y > 0.0:
-			linear_velocity.y = 0.0
-		if touching_cliff:
-			var vel_into_cliff = linear_velocity.dot(-cliff_normal)
-			if vel_into_cliff > 0.0:
-				linear_velocity -= (-cliff_normal) * vel_into_cliff
-		if is_steep_cliff and downhill_dir != Vector3.ZERO:
-			var uphill_speed = linear_velocity.dot(uphill_dir)
-			if uphill_speed > 0.0:
-				linear_velocity -= uphill_dir * uphill_speed
 
 	current_steer = lerp(current_steer, input_dir.x, 10.0 * delta)
 
@@ -1397,7 +1388,7 @@ func _physics_process(delta):
 	if slow_timer > 0.0:
 		slow_mult = 0.6
 
-	var cliff_block = (is_steep_cliff and heading_uphill > -0.2) or wall_ahead or (touching_cliff and fwd.dot(-cliff_normal) > -0.2)
+	var cliff_block = is_offroad and on_ground and not on_loop and ((is_steep_cliff and heading_uphill > 0.15) or (wall_ahead and heading_uphill > -0.1))
 
 	if is_boosting:
 		# Boost cap: fixed absolute speed ceiling (45.0 m/s) so faster cars benefit less
@@ -1473,7 +1464,7 @@ func _physics_process(delta):
 				if current_speed > -reverse_speed * offroad_penalty * input_scale:
 					var accel_force = acceleration * 0.5 * input_scale
 					var rev_uphill = (-fwd).dot(uphill_dir)
-					var rev_cliff_block = (is_steep_cliff and rev_uphill > -0.2) or wall_ahead or (touching_cliff and (-fwd).dot(-cliff_normal) > -0.2)
+					var rev_cliff_block = is_offroad and on_ground and not on_loop and ((is_steep_cliff and rev_uphill > 0.15) or (wall_ahead and rev_uphill > -0.1))
 					if rev_cliff_block:
 						accel_force = 0.0
 					elif is_offroad and rev_uphill > 0.05:
@@ -1483,7 +1474,7 @@ func _physics_process(delta):
 				if current_speed > -reverse_speed * offroad_penalty * input_scale:
 					var accel_force = acceleration * 0.7 * input_scale
 					var rev_uphill = (-fwd).dot(uphill_dir)
-					var rev_cliff_block = (is_steep_cliff and rev_uphill > -0.2) or wall_ahead or (touching_cliff and (-fwd).dot(-cliff_normal) > -0.2)
+					var rev_cliff_block = is_offroad and on_ground and not on_loop and ((is_steep_cliff and rev_uphill > 0.15) or (wall_ahead and rev_uphill > -0.1))
 					if rev_cliff_block:
 						accel_force = 0.0
 					elif is_offroad and rev_uphill > 0.05:
@@ -1658,14 +1649,26 @@ func _is_track_surface(collider: Object) -> bool:
 	var n: Node = collider as Node
 	var current: Node = n
 	while current:
-		if current.is_in_group("loop_track") or current.is_in_group("track_surface"):
+		if current.is_in_group("loop_track") or current.is_in_group("track_surface") or current.is_in_group("ramps"):
 			return true
-		var nm := str(current.name)
-		if nm.contains("Track_Collision") or nm.contains("Visual_Road") \
-				or nm.contains("Road") or nm.contains("Ramp") \
-				or nm.contains("Bridge") or nm.contains("Loop"):
+		var nm := str(current.name).to_lower()
+		if nm.contains("track") or nm.contains("road") \
+				or nm.contains("ramp") or nm.contains("bridge") \
+				or nm.contains("loop") or nm.contains("deck") \
+				or nm.contains("jump") or nm.contains("curb"):
 			return true
 		current = current.get_parent()
+	
+	# On unified world / terrain generator, check distance to track path curve
+	if track_path and track_path.curve:
+		var local_p = track_path.to_local(global_position)
+		var offset = track_path.curve.get_closest_offset(local_p)
+		var track_pt = track_path.to_global(track_path.curve.sample_baked(offset))
+		var dist_xz = Vector2(global_position.x - track_pt.x, global_position.z - track_pt.z).length()
+		# Standard road half-width is ~7.5m, with generous 12.0m margin
+		if dist_xz < 12.0:
+			return true
+
 	return false
 
 
@@ -3527,7 +3530,7 @@ func _get_ai_input(delta: float) -> Vector2:
 	ai_lane_offset = lerp(ai_lane_offset, ai_target_lane_offset, 1.5 * delta)
 	
 	var speed = linear_velocity.length()
-	var look_ahead = lerp(8.0, 16.0, speed / max_speed)
+	var look_ahead = 10.0 if is_finished_race else lerp(8.0, 16.0, speed / max_speed)
 	var target_offset = current_offset + look_ahead
 	
 	var curve_length = curve.get_baked_length()
@@ -3541,7 +3544,7 @@ func _get_ai_input(delta: float) -> Vector2:
 	var tangent = (tangent_local_pos - target_local_pos).normalized()
 	var right_vec = Vector3(-tangent.z, 0, tangent.x).normalized()
 	
-	var actual_lane_offset = ai_lane_offset
+	var actual_lane_offset = 0.0 if is_finished_race else ai_lane_offset
 	if on_alternative_path:
 		actual_lane_offset *= 0.2
 	target_local_pos += right_vec * actual_lane_offset
@@ -3552,7 +3555,17 @@ func _get_ai_input(delta: float) -> Vector2:
 	var dir_flat = Vector2(target_vec.x, -target_vec.z).normalized()
 	
 	input.x = clamp(dir_flat.x * 2.2, -1.0, 1.0)
-	input.y = -1.0 + abs(input.x) * 0.5
+	if is_finished_race:
+		# Cruise slowly and smoothly along the track (~13 m/s)
+		var cruise_speed = 13.0
+		if speed > cruise_speed + 2.0:
+			input.y = 0.3 # soft brake if too fast
+		elif speed > cruise_speed:
+			input.y = 0.0 # coast
+		else:
+			input.y = -0.45 # gentle cruise throttle
+	else:
+		input.y = -1.0 + abs(input.x) * 0.5
 	
 	# 3-Ray Obstacle Avoidance — throttled to every 3 physics frames.
 	# With 4 AI carts this was 12 raycasts/tick; now ~4 on average.
@@ -3738,7 +3751,7 @@ func _raise_point_above_terrain(pos: Vector3, excludes: Array) -> Vector3:
 	_cached_cam_below_terrain = false
 	if result and result.collider and _is_terrain_collider(result.collider):
 		var terrain_y: float = result.position.y
-		var min_y: float = terrain_y + _ISO_CAM_CLEARANCE
+		var min_y: float = terrain_y + maxf(_ISO_CAM_CLEARANCE, 1.8)
 		if pos.y < min_y:
 			# Still considered "deep" only if substantially under surface after clamp intent
 			_cached_cam_below_terrain = pos.y < terrain_y - 0.25
