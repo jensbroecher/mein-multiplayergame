@@ -121,7 +121,7 @@ const GRAVITY = 30.0 # extra gravity so it falls faster
 const WHEEL_RADIUS = 0.4
 const WHEEL_Y_OFFSET = -0.021691  # Match the actual WheelPivot Y position to prevent hovering
 const COLLISION_Y_OFFSET = 0.0  # Collision sphere center relative to body center
-const COLLISION_RADIUS = WHEEL_RADIUS + 0.1  # Match wheel contact height to prevent hovering off-road
+var collision_radius: float = 0.75  # Dynamically synced to CollisionShape3D in _ready()
 
 # Preload item scenes
 const MISSILE_SCENE = preload("res://Missile.tscn")
@@ -487,14 +487,16 @@ func _ready():
 	last_checkpoint_transform = global_transform
 	camera_look_at = global_position
 
-	# Setup collision shape to match wheel positions
+	# Dynamically detect collision radius from scene configuration (scale * shape radius)
 	var collision_shape = $CollisionShape3D
 	if collision_shape and collision_shape.shape is SphereShape3D:
-		collision_shape.shape.radius = COLLISION_RADIUS
+		var s_factor: float = collision_shape.scale.y
+		var base_r: float = collision_shape.shape.radius if collision_shape.shape.radius > 0.01 else 0.5
+		collision_radius = base_r * s_factor
 		collision_shape.transform.origin = Vector3(0, COLLISION_Y_OFFSET, 0)
 
 	# Adjust ground ray to reach below collision sphere (with buffer for steep slopes and crests)
-	ground_ray.target_position = Vector3(0, -(COLLISION_RADIUS + 1.2), 0)
+	ground_ray.target_position = Vector3(0, -(collision_radius + 1.2), 0)
 	
 	_remove_collisions_recursive(visuals)
 	_setup_new_car_wheels()
@@ -1274,7 +1276,7 @@ func _physics_process(delta):
 		if space_state:
 			var query = PhysicsRayQueryParameters3D.create(
 				global_position,
-				global_position + Vector3.DOWN * (COLLISION_RADIUS + 0.9)
+				global_position + Vector3.DOWN * (collision_radius + 0.9)
 			)
 			query.exclude = [get_rid()]
 			query.collision_mask = 1
@@ -1383,20 +1385,6 @@ func _physics_process(delta):
 			uphill_power_factor = lerpf(0.2, 1.0, t_slope)
 			uphill_speed_cap_factor = lerpf(0.4, 1.0, t_slope)
 
-	# Short bumper ray for sheer wall detection ahead (only when offroad and on ground, never airborne or on ramps)
-	var wall_ahead: bool = false
-	if is_offroad and on_ground and not on_loop:
-		var space_state = get_world_3d().direct_space_state
-		if space_state:
-			var b_start = global_position + Vector3.UP * 0.25
-			var b_end = global_position + fwd * 0.85 + Vector3.UP * 0.25
-			var q = PhysicsRayQueryParameters3D.create(b_start, b_end)
-			q.exclude = [get_rid()]
-			q.collision_mask = 1
-			var hit = space_state.intersect_ray(q)
-			if hit and hit.normal.y < 0.25 and not _is_track_surface(hit.collider):
-				wall_ahead = true
-
 	current_steer = lerp(current_steer, input_dir.x, 10.0 * delta)
 
 	# Handle acceleration/braking even when slightly airborne for better control
@@ -1407,40 +1395,40 @@ func _physics_process(delta):
 		drift_mode = true
 		drift_right = input_dir.x > 0.0
 
-	# Auto-hop over small props/steps only when nearly stuck — never on road/ramps.
-	if on_ground and input_dir.y < -0.1 and hop_cooldown <= 0.0:
+	# Auto-hop over small props/steps only when nearly stuck offroad — completely disabled on road/track/ramps.
+	if is_offroad and on_ground and not on_loop and input_dir.y < -0.5 and hop_cooldown <= 0.0:
 		var hop_speed: float = linear_velocity.length()
-		# Only when crawling / blocked (not normal road driving)
-		if hop_speed >= 0.4 and hop_speed <= 8.5:
+		# Only when stalled / blocked offroad against an obstacle (never normal road driving)
+		if hop_speed >= 0.1 and hop_speed <= 3.0:
 			var space_state = get_world_3d().direct_space_state
-			# Short bumper ray, slightly above ground so flat asphalt rarely hits
-			var ray_start = global_position + fwd * 0.55 + Vector3.UP * 0.22
-			var ray_end = global_position + fwd * 1.05 + Vector3.UP * 0.08
-			var query = PhysicsRayQueryParameters3D.create(ray_start, ray_end)
-			query.exclude = [self.get_rid()]
-			var result = space_state.intersect_ray(query)
-			if result:
-				var col = result.collider
-				var is_drive_surface := _is_track_surface(col)
-				if not is_drive_surface:
-					var hit_n: Vector3 = result.normal
-					# Need a wall-ish face in front of us (not a gentle slope)
-					var faces_us: float = -hit_n.dot(fwd)
-					var upright: float = 1.0 - clampf(hit_n.y, 0.0, 1.0)
-					var local_hit = global_transform.inverse() * result.position
-					# Low curb/prop lip only (wheel/bumper band)
-					var height_ok: bool = local_hit.y > -0.35 and local_hit.y < 0.38
-					if height_ok and faces_us > 0.35 and upright > 0.35 and hit_n.y < 0.72:
-						# Milder hop: clear the lip without launching off ramps
-						var up_kick: float = lerpf(2.2, 3.4, clampf(1.0 - hop_speed / 8.5, 0.0, 1.0))
-						apply_central_impulse(Vector3.UP * up_kick * mass + fwd * 1.1 * mass)
-						hop_cooldown = 1.15
+			if space_state:
+				# Short bumper ray, slightly above ground so flat terrain rarely hits
+				var ray_start = global_position + fwd * 0.55 + Vector3.UP * 0.22
+				var ray_end = global_position + fwd * 1.05 + Vector3.UP * 0.08
+				var query = PhysicsRayQueryParameters3D.create(ray_start, ray_end)
+				query.exclude = [self.get_rid()]
+				var result = space_state.intersect_ray(query)
+				if result:
+					var col = result.collider
+					var is_drive_surface := _is_track_surface(col)
+					if not is_drive_surface:
+						var hit_n: Vector3 = result.normal
+						# Need a wall-ish face in front of us (not a gentle slope)
+						var faces_us: float = -hit_n.dot(fwd)
+						var upright: float = 1.0 - clampf(hit_n.y, 0.0, 1.0)
+						var local_hit = global_transform.inverse() * result.position
+						# Low curb/prop lip only (wheel/bumper band)
+						var height_ok: bool = local_hit.y > -0.35 and local_hit.y < 0.38
+						if height_ok and faces_us > 0.45 and upright > 0.45 and hit_n.y < 0.60:
+							var up_kick: float = 2.0
+							apply_central_impulse(Vector3.UP * up_kick * mass + fwd * 0.8 * mass)
+							hop_cooldown = 1.5
 
 	var slow_mult = 1.0
 	if slow_timer > 0.0:
 		slow_mult = 0.6
 
-	var cliff_block = is_offroad and on_ground and not on_loop and ((is_steep_cliff and heading_uphill > 0.15) or (wall_ahead and heading_uphill > -0.1))
+	var cliff_block = is_offroad and on_ground and not on_loop and is_steep_cliff and heading_uphill > 0.15
 
 	if is_boosting:
 		# Boost cap: fixed absolute speed ceiling (58.0 m/s) so faster cars benefit less
@@ -1524,7 +1512,7 @@ func _physics_process(delta):
 				if current_speed > -reverse_speed * offroad_penalty * input_scale:
 					var accel_force = acceleration * 0.5 * input_scale
 					var rev_uphill = (-fwd).dot(uphill_dir)
-					var rev_cliff_block = is_offroad and on_ground and not on_loop and ((is_steep_cliff and rev_uphill > 0.15) or (wall_ahead and rev_uphill > -0.1))
+					var rev_cliff_block = is_offroad and on_ground and not on_loop and is_steep_cliff and rev_uphill > 0.15
 					if rev_cliff_block:
 						accel_force = 0.0
 					elif is_offroad and rev_uphill > 0.05:
@@ -1534,7 +1522,7 @@ func _physics_process(delta):
 				if current_speed > -reverse_speed * offroad_penalty * input_scale:
 					var accel_force = acceleration * 0.7 * input_scale
 					var rev_uphill = (-fwd).dot(uphill_dir)
-					var rev_cliff_block = is_offroad and on_ground and not on_loop and ((is_steep_cliff and rev_uphill > 0.15) or (wall_ahead and rev_uphill > -0.1))
+					var rev_cliff_block = is_offroad and on_ground and not on_loop and is_steep_cliff and rev_uphill > 0.15
 					if rev_cliff_block:
 						accel_force = 0.0
 					elif is_offroad and rev_uphill > 0.05:
@@ -1783,8 +1771,8 @@ func _prevent_floor_tunneling(delta: float) -> void:
 	# Sweep from where we roughly were last step, down through the sphere bottom.
 	var step = maxf(delta, 1.0 / 60.0)
 	var travel = absf(linear_velocity.y) * step
-	var start = global_position + Vector3.UP * (COLLISION_RADIUS + 0.5 + travel)
-	var end = global_position + Vector3.DOWN * (COLLISION_RADIUS + 0.6 + travel * 0.25)
+	var start = global_position + Vector3.UP * (collision_radius + 0.5 + travel)
+	var end = global_position + Vector3.DOWN * (collision_radius + 0.6 + travel * 0.25)
 	var query = PhysicsRayQueryParameters3D.create(start, end)
 	query.exclude = [get_rid()]
 	query.collision_mask = 1
@@ -1795,7 +1783,7 @@ func _prevent_floor_tunneling(delta: float) -> void:
 	if n.y < 0.35 and not _is_loop_surface(hit.get("collider")):
 		return # steep wall / junk hit — leave alone
 
-	var min_center_y = hit.position.y + COLLISION_RADIUS + 0.04
+	var min_center_y = hit.position.y + collision_radius + 0.04
 	if global_position.y >= min_center_y:
 		return
 
@@ -1806,153 +1794,64 @@ func _prevent_floor_tunneling(delta: float) -> void:
 
 
 func _get_ground_visual_offset() -> float:
-	if not is_instance_valid(ground_ray):
-		return 0.0
-	
-	# Align ground ray with visual orientation so it points along the vehicle's local down axis.
-	ground_ray.global_transform.basis = visuals.global_transform.basis
-	# force_raycast_update() removed — RayCast3D auto-updates each physics frame.
-	# Calling it mid-_process() forced an expensive synchronous physics engine sync.
-	if ground_ray.is_colliding():
-		var contact_normal = ground_ray.get_collision_normal()
-		if contact_normal.y >= 0.15 or _is_loop_surface(ground_ray.get_collider()):
-			var contact_pt = ground_ray.get_collision_point()
-			var current_height_normal = (global_position - contact_pt).dot(contact_normal)
-			
-			# Mathematically align wheels to ground: offset visuals relative to body center
-			var target_offset = current_height_normal + (avg_wheel_y - 0.24)
-			# Clamp to prevent extreme visual displacement during severe physics bounces
-			return clamp(target_offset, -1.0, 1.5)
-	
-	# Default visual offset in air (keeps wheels at their resting position)
-	return COLLISION_RADIUS + (avg_wheel_y - 0.24)
+	# Fixed visual offset: mathematically anchors wheels to the bottom of the collision sphere
+	return collision_radius + (avg_wheel_y - 0.28)
 
-func _update_visuals_alignment(delta):
+func _update_visuals_alignment(delta: float) -> void:
 	if is_exploding:
 		if is_drowned:
-			# While fading out underwater, keep the visual's current orientation.
-			# (Don't copy the physics body's locked/upright transform, which would snap
-			# the car to a default pose and ignore where it actually landed.)
 			visuals.global_position = global_position
 			return
-		# Normal explosion: body parts fly, so follow the physics transform
 		visuals.global_transform = global_transform
 		return
 
-	# Align ground ray with visual orientation so it points along the vehicle's local down axis.
-	if is_instance_valid(ground_ray):
-		ground_ray.global_transform.basis = visuals.global_transform.basis
+	var fixed_offset = _get_ground_visual_offset()
+	visual_offset_y = fixed_offset
 
+	# Determine ground normal from primary ground ray
 	var on_ground = false
 	var target_up = Vector3.UP
-	
-	# Perform auxiliary front/rear raycasts to handle ramps and uneven terrain.
-	# Throttled (mobile: every 4 frames) and reuse cached results in between.
-	var normals: Array[Vector3] = []
-	_align_raycast_frame += 1
-	if _align_raycast_frame >= _align_raycast_interval:
-		_align_raycast_frame = 0
-		var space_state = get_world_3d().direct_space_state
-		if space_state and visuals:
-			var excludes = [self.get_rid()]
-			var fwd_dir = -visuals.global_transform.basis.z.normalized()
-			# Cast from above the cart center to well below to prevent starting inside rising ramp surfaces
-			var front_origin = global_position + fwd_dir * 1.0 + Vector3.UP * 1.5
-			var rear_origin = global_position - fwd_dir * 1.0 + Vector3.UP * 1.5
-			var down_vec = Vector3.DOWN * 3.5
-			var query_front = PhysicsRayQueryParameters3D.create(front_origin, front_origin + down_vec)
-			query_front.exclude = excludes
-			query_front.collision_mask = 1 # road/terrain/ramp
-			_cached_align_res_front = space_state.intersect_ray(query_front)
-			var query_rear = PhysicsRayQueryParameters3D.create(rear_origin, rear_origin + down_vec)
-			query_rear.exclude = excludes
-			query_rear.collision_mask = 1
-			_cached_align_res_rear = space_state.intersect_ray(query_rear)
-	var res_front = _cached_align_res_front
-	var res_rear = _cached_align_res_rear
-	if res_front and (res_front.normal.y >= 0.15 or _is_loop_surface(res_front.collider)):
-		normals.append(res_front.normal)
-	if res_rear and (res_rear.normal.y >= 0.15 or _is_loop_surface(res_rear.collider)):
-		normals.append(res_rear.normal)
-			
-	var on_loop_vis := false
-	if ground_ray.is_colliding():
-		var norm = ground_ray.get_collision_normal()
-		on_loop_vis = _is_loop_surface(ground_ray.get_collider())
-		if norm.y >= 0.15 or on_loop_vis:
-			normals.append(norm)
-			
-	if not normals.is_empty():
-		on_ground = true
-		var sum = Vector3.ZERO
-		for n in normals:
-			sum += n
-		target_up = (sum / normals.size()).normalized()
-		
+	var on_loop_vis = false
+
+	if is_instance_valid(ground_ray):
+		ground_ray.global_transform.basis = visuals.global_transform.basis
+		if ground_ray.is_colliding():
+			var norm = ground_ray.get_collision_normal()
+			var col = ground_ray.get_collider()
+			on_loop_vis = _is_loop_surface(col)
+			if norm.y >= 0.15 or on_loop_vis:
+				on_ground = true
+				target_up = norm
+
 	if not on_ground:
 		# In air: do not clamp horizontal! Visual orientation is free to tumble / flip.
-		var target_offset_air = _get_ground_visual_offset()
-		visual_offset_y = lerp(visual_offset_y, target_offset_air, 1.0 - exp(-10.0 * delta))
 		var target_pos_air = get_global_transform_interpolated().origin - visuals.global_transform.basis.y * visual_offset_y
 		visuals.global_position = target_pos_air
 		_update_wheel_visuals(delta)
 		return
-	elif on_loop_vis:
-		# Prefer the contact normal for loop banking (ignore world-down front/rear rays).
-		target_up = ground_ray.get_collision_normal()
 
 	# If currently auto-righting from an inverted landing, let the recovery slerp take precedence
 	if is_righting_on_ground:
-		var target_offset_rec = _get_ground_visual_offset()
-		visual_offset_y = lerp(visual_offset_y, target_offset_rec, 1.0 - exp(-12.0 * delta))
 		var target_pos_rec = get_global_transform_interpolated().origin - visuals.global_transform.basis.y * visual_offset_y
 		visuals.global_position = target_pos_rec
 		_update_wheel_visuals(delta)
 		return
-		
+
 	# Smoothly align the visual mesh normal to terrain slope (no horizontal clamp!)
 	var current_basis = visuals.global_transform.basis
 	var forward = -current_basis.z
-	var right = current_basis.x
- 
-	var target_right = Vector3.ZERO
-	var target_forward = Vector3.ZERO
-	
-	var has_two_points = false
-	if res_front and res_rear:
-		if (res_front.normal.y >= 0.15 or _is_loop_surface(res_front.collider)) and (res_rear.normal.y >= 0.15 or _is_loop_surface(res_rear.collider)):
-			var front_pt = res_front.position
-			var rear_pt = res_rear.position
-			var slope_fwd = (front_pt - rear_pt).normalized()
-			
-			# Use the slope vector to determine exact pitch
-			target_forward = slope_fwd
-			target_right = target_forward.cross(target_up).normalized()
-			target_up = target_right.cross(target_forward).normalized()
-			has_two_points = true
-			
-	if not has_two_points:
-		# Fallback to normal-only alignment
-		target_right = forward.cross(target_up).normalized()
-		target_forward = target_up.cross(target_right).normalized()
- 
+
+	var target_forward = (forward - target_up * forward.dot(target_up)).normalized()
+	var target_right = target_forward.cross(target_up).normalized()
+	target_forward = target_up.cross(target_right).normalized()
+
 	var target_basis = Basis(target_right, target_up, -target_forward)
 	if is_drifting:
 		var drift_angle = -0.35 if drift_right else 0.35
 		target_basis = target_basis.rotated(target_up, drift_angle)
-	visuals.global_transform.basis = current_basis.slerp(target_basis, 1.0 - exp(-10.0 * delta))
- 
-	var target_offset = 0.0
-	if has_two_points:
-		var ground_center = (res_front.position + res_rear.position) * 0.5
-		var current_height_normal = (global_position - ground_center).dot(target_up)
-		target_offset = clamp(current_height_normal + (avg_wheel_y - 0.24), -1.0, 1.5)
-	else:
-		target_offset = _get_ground_visual_offset()
-	visual_offset_y = lerp(visual_offset_y, target_offset, 1.0 - exp(-10.0 * delta))
-	var target_pos = get_global_transform_interpolated().origin - target_up * visual_offset_y
+	visuals.global_transform.basis = current_basis.slerp(target_basis, 1.0 - exp(-16.0 * delta))
 
-	# Align visuals position directly to eliminate visual lag/pulsing
+	var target_pos = get_global_transform_interpolated().origin - target_up * visual_offset_y
 	visuals.global_position = target_pos
 
 	_update_wheel_visuals(delta)
@@ -1964,14 +1863,13 @@ func _update_wheel_visuals(delta):
 	var rot_speed = speed * sign(fwd_dot) / 0.4 # approx radius
 	wheel_rotation -= rot_speed * delta
 
-	for wheel in ["FL", "FR", "RL", "RR"]:
-		var pivot = get_node_or_null("Visuals/WheelPivot" + wheel)
+	for corner in ["FL", "FR", "RL", "RR"]:
+		var pivot = get_node_or_null("Visuals/WheelPivot" + corner)
 		if not pivot:
 			continue
 		# Steering: rotate the pivot on its Y axis for front wheels
-		if wheel == "FL" or wheel == "FR":
-			var steer_direction = 1.0 if fwd_dot >= -1.0 else -1.0
-			pivot.rotation.y = -sync_steer * 0.5 * steer_direction
+		if corner == "FL" or corner == "FR":
+			pivot.rotation.y = -current_steer * 0.5
 		# Spin: find the wheel mesh child and rotate on its X axis
 		var mesh_node = pivot.get_node_or_null("WheelMesh")
 		if mesh_node:
@@ -2009,7 +1907,7 @@ func _interpolate_remote_visual(delta: float):
 	visuals.global_transform.basis = Basis(new_visual_quat)
 	var target_up = visuals.global_transform.basis.y.normalized()
 	var target_offset = _get_ground_visual_offset()
-	visual_offset_y = lerp(visual_offset_y, target_offset, 1.0 - exp(-10.0 * delta))
+	visual_offset_y = lerp(visual_offset_y, target_offset, 1.0 - exp(-16.0 * delta))
 	var target_pos = get_global_transform_interpolated().origin - target_up * visual_offset_y
 
 	# Align visuals position directly to eliminate visual lag/pulsing

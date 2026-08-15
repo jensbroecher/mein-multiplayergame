@@ -9,9 +9,9 @@ const MISSILE_EXPLOSION_SOUNDS = [
 
 const FLIGHT_SOUND = preload("res://sounds/774270__thelittlecrow__rocket-launch-boost-and-burning-version-b.wav")
 
-@export var speed: float = 33.0   # Starts slightly above car top speed
-const SPEED_MAX: float = 50.0     # Gradually accelerates to this
-const SPEED_ACCEL: float = 8.0    # m/s² acceleration
+@export var speed: float = 52.0   # Starts well above car top speed (cars reach ~40-43 m/s)
+const SPEED_MAX: float = 75.0     # Accelerates up to 75 m/s
+const SPEED_ACCEL: float = 16.0   # m/s² acceleration
 @export var owner_id: int
 @export var is_guided: bool = false
 var sync_position: Vector3
@@ -25,12 +25,12 @@ var sync_rotation: Vector3
 @onready var fire_sprite_particles = $FireSpriteParticles
 @onready var fire_sprite_particles_2 = $FireSpriteParticles2
 var target: Node3D = null
-var lifetime = 7.0
+var lifetime = 8.0
 var search_timer = 0.0
 var spawn_safety_timer = 0.05
 var start_position: Vector3 = Vector3.ZERO
-@export var max_range: float = 110.0
-var homing_delay: float = 0.15
+@export var max_range: float = 180.0
+var homing_delay: float = 0.12
 
 func _ready():
 	add_to_group("missiles")
@@ -47,8 +47,9 @@ func _ready():
 	
 	start_position = global_position
 	if is_guided:
-		lifetime = 10.0
-		max_range = 150.0
+		speed = 56.0
+		lifetime = 12.0
+		max_range = 240.0
 		# Blue/purple tint for the nose cone of guided missiles
 		var nose_cone = get_node_or_null("Visuals/NoseCone")
 		if nose_cone:
@@ -72,8 +73,8 @@ func _ready():
 			nm.emission_energy_multiplier = 3.0
 			nozzle.material_override = nm
 	else:
-		lifetime = 7.0
-		max_range = 110.0
+		lifetime = 8.0
+		max_range = 180.0
 		
 	_find_target()
 	if multiplayer.multiplayer_peer != null and not multiplayer.is_server():
@@ -126,7 +127,7 @@ func _physics_process(delta):
 				if forward.dot(dir) > -0.2:
 					if abs(dir.dot(Vector3.UP)) < 0.99:
 						var target_basis = Basis.looking_at(dir, Vector3.UP)
-						var turn_speed = 3.5 if is_guided else 0.7
+						var turn_speed = 4.5 if is_guided else 1.2
 						global_basis = global_basis.slerp(target_basis, turn_speed * delta).orthonormalized()
 				else:
 					# Target went too far behind, break the lock
