@@ -341,7 +341,7 @@ var _cached_cam_below_terrain: bool = false
 var _cached_follow_clip_ratio: float = 1.0
 # Shared performance tuning (phone + PC — keeps multiplayer physics cadence aligned)
 var _camera_raycast_interval: int = 6
-var _align_raycast_interval: int = 4
+var _align_raycast_interval: int = 1
 var _camera_ray_attempts: int = 2
 ## GeometryInstance3D nodes made semi-transparent while occluding the car.
 var _xray_meshes: Dictionary = {} # instance_id -> GeometryInstance3D
@@ -482,6 +482,54 @@ func _ready():
 		if antenna_placement:
 			antenna.position = visuals.to_local(antenna_placement.global_position)
 
+	ground_ray.add_exception(self)
+	name_tag.text = player_name
+	last_checkpoint_transform = global_transform
+	camera_look_at = global_position
+
+	# Setup collision shape to match wheel positions
+	var collision_shape = $CollisionShape3D
+	if collision_shape and collision_shape.shape is SphereShape3D:
+		collision_shape.shape.radius = COLLISION_RADIUS
+		collision_shape.transform.origin = Vector3(0, COLLISION_Y_OFFSET, 0)
+
+	# Adjust ground ray to reach below collision sphere (with buffer for steep slopes and crests)
+	ground_ray.target_position = Vector3(0, -(COLLISION_RADIUS + 1.2), 0)
+	
+	_remove_collisions_recursive(visuals)
+	_setup_new_car_wheels()
+	# Shadows follow options menu (MusicManager.shadows_enabled)
+	apply_shadow_setting(MusicManager.shadows_enabled)
+
+	# Setup unique material for shockwave visual to prevent sharing/crashing
+	if shockwave_visual:
+		var mat = StandardMaterial3D.new()
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.albedo_color = Color(1.0, 1.0, 1.0, 0.5)
+		shockwave_visual.material_override = mat
+
+	# Setup unique material for shield visual to allow independent animations
+	if shield_mesh:
+		var mat = shield_mesh.get_active_material(0)
+		if mat:
+			shield_mesh.material_override = mat.duplicate()
+		else:
+			var new_mat = StandardMaterial3D.new()
+			new_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			new_mat.albedo_color = Color(0.0, 0.6, 1.0, 0.4)
+			new_mat.emission_enabled = true
+			new_mat.emission = Color(0.0, 0.4, 1.0, 1.0)
+			shield_mesh.material_override = new_mat
+
+	# Route all sound effects under visuals to the SFX bus
+	for child in visuals.get_children():
+		if child is AudioStreamPlayer3D:
+			child.bus = &"SFX"
+
+	# Looping engine sample (pitch/volume driven by speed — no procedural CPU synthesis)
+	_setup_engine_sound()
+
 	await get_tree().process_frame
 	var level = get_tree().get_first_node_in_group("level")
 	if level:
@@ -540,55 +588,6 @@ func _ready():
 			stage_has_water = not tg.no_water
 			water_surface_y = WATER_LEVEL
 			water_bounds_active = false
-
-	ground_ray.add_exception(self)
-
-	name_tag.text = player_name
-	last_checkpoint_transform = global_transform
-	camera_look_at = global_position
-
-	# Setup collision shape to match wheel positions
-	var collision_shape = $CollisionShape3D
-	if collision_shape and collision_shape.shape is SphereShape3D:
-		collision_shape.shape.radius = COLLISION_RADIUS
-		collision_shape.transform.origin = Vector3(0, COLLISION_Y_OFFSET, 0)
-
-	# Adjust ground ray to reach just below collision sphere (with buffer for steep slopes)
-	ground_ray.target_position = Vector3(0, -(COLLISION_RADIUS + 0.35), 0)
-	
-	_remove_collisions_recursive(visuals)
-	_setup_new_car_wheels()
-	# Shadows follow options menu (MusicManager.shadows_enabled)
-	apply_shadow_setting(MusicManager.shadows_enabled)
-
-	# Setup unique material for shockwave visual to prevent sharing/crashing
-	if shockwave_visual:
-		var mat = StandardMaterial3D.new()
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		mat.albedo_color = Color(1.0, 1.0, 1.0, 0.5)
-		shockwave_visual.material_override = mat
-
-	# Setup unique material for shield visual to allow independent animations
-	if shield_mesh:
-		var mat = shield_mesh.get_active_material(0)
-		if mat:
-			shield_mesh.material_override = mat.duplicate()
-		else:
-			var new_mat = StandardMaterial3D.new()
-			new_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			new_mat.albedo_color = Color(0.0, 0.6, 1.0, 0.4)
-			new_mat.emission_enabled = true
-			new_mat.emission = Color(0.0, 0.4, 1.0, 1.0)
-			shield_mesh.material_override = new_mat
-
-	# Route all sound effects under visuals to the SFX bus
-	for child in visuals.get_children():
-		if child is AudioStreamPlayer3D:
-			child.bus = &"SFX"
-
-	# Looping engine sample (pitch/volume driven by speed — no procedural CPU synthesis)
-	_setup_engine_sound()
 
 	if is_local_player:
 		var is_coop = NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP
@@ -1275,7 +1274,7 @@ func _physics_process(delta):
 		if space_state:
 			var query = PhysicsRayQueryParameters3D.create(
 				global_position,
-				global_position + Vector3.DOWN * (COLLISION_RADIUS + 0.38)
+				global_position + Vector3.DOWN * (COLLISION_RADIUS + 0.9)
 			)
 			query.exclude = [get_rid()]
 			query.collision_mask = 1
@@ -1823,7 +1822,7 @@ func _get_ground_visual_offset() -> float:
 			# Mathematically align wheels to ground: offset visuals relative to body center
 			var target_offset = current_height_normal + (avg_wheel_y - 0.24)
 			# Clamp to prevent extreme visual displacement during severe physics bounces
-			return clamp(target_offset, -0.6, 0.6)
+			return clamp(target_offset, -1.0, 1.5)
 	
 	# Default visual offset in air (keeps wheels at their resting position)
 	return COLLISION_RADIUS + (avg_wheel_y - 0.24)
@@ -1943,10 +1942,16 @@ func _update_visuals_alignment(delta):
 		target_basis = target_basis.rotated(target_up, drift_angle)
 	visuals.global_transform.basis = current_basis.slerp(target_basis, 1.0 - exp(-10.0 * delta))
  
-	var target_offset = _get_ground_visual_offset()
+	var target_offset = 0.0
+	if has_two_points:
+		var ground_center = (res_front.position + res_rear.position) * 0.5
+		var current_height_normal = (global_position - ground_center).dot(target_up)
+		target_offset = clamp(current_height_normal + (avg_wheel_y - 0.24), -1.0, 1.5)
+	else:
+		target_offset = _get_ground_visual_offset()
 	visual_offset_y = lerp(visual_offset_y, target_offset, 1.0 - exp(-10.0 * delta))
 	var target_pos = get_global_transform_interpolated().origin - target_up * visual_offset_y
- 
+
 	# Align visuals position directly to eliminate visual lag/pulsing
 	visuals.global_position = target_pos
 

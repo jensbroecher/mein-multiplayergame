@@ -299,14 +299,6 @@ script = ExtResource("1_cscript")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=654514439]
 shape = SubResource("SphereShape3D_cart")
 
-[node name="FrontCollisionShape" type="CollisionShape3D" parent="." unique_id=654514440]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.8)
-shape = SubResource("SphereShape3D_cart")
-
-[node name="RearCollisionShape" type="CollisionShape3D" parent="." unique_id=654514441]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.8)
-shape = SubResource("SphereShape3D_cart")
-
 [node name="Visuals" type="Node3D" parent="." unique_id=1001732157]
 top_level = true
 
@@ -482,7 +474,7 @@ volume_db = -8.0
 unit_size = 12.0
 
 [node name="GroundRay" type="RayCast3D" parent="." unique_id=1744416628]
-target_position = Vector3(0, -0.7, 0)
+target_position = Vector3(0, -1.7, 0)
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="." unique_id=1093522993]
 replication_config = SubResource("SceneReplicationConfig_sync")
