@@ -198,6 +198,9 @@ var can_move = false
 var can_control = true
 @export var is_ai: bool = false
 var is_finished_race: bool = false
+var spectate_target_cart: Node3D = null
+var spectate_timer: float = 0.0
+var spectate_index: int = 0
 var smoothed_speed: float = 0.0
 var stuck_timer: float = 0.0
 var ai_item_timer: float = 0.0
@@ -752,16 +755,38 @@ func _process(delta):
 				name_tag.pixel_size = 0.00035 if is_isometric or is_finished_race else 0.00065
 				
 			if is_finished_race:
-				# Bird's-eye overview camera: Zoom out high above the track for a panoramic overview of the racing circuit
+				# Bird's-eye overview camera: Follow cars still in the race, cycling every ~10s and moving smoothly between them
+				var all_carts = get_tree().get_nodes_in_group("player_carts")
+				var active_racing_carts: Array[Node3D] = []
+				for c in all_carts:
+					if is_instance_valid(c) and c is Node3D:
+						if not c.get("is_finished_race"):
+							active_racing_carts.append(c)
+				
+				spectate_timer -= delta
+				if active_racing_carts.size() > 0:
+					if spectate_timer <= 0.0 or spectate_target_cart == null or not is_instance_valid(spectate_target_cart) or spectate_target_cart.get("is_finished_race"):
+						spectate_timer = 10.0
+						spectate_index = (spectate_index + 1) % active_racing_carts.size()
+						spectate_target_cart = active_racing_carts[spectate_index]
+				else:
+					# All cars finished — focus on self or winner
+					spectate_target_cart = self
+				
+				var focus_cart: Node3D = spectate_target_cart if (spectate_target_cart and is_instance_valid(spectate_target_cart)) else self
+				var focus_pos: Vector3 = focus_cart.global_position
+				
 				var birds_eye_height = 80.0
 				var birds_eye_offset = Vector3(-20.0, birds_eye_height, 35.0)
-				var desired_cam_pos = visuals.global_position + birds_eye_offset
+				var desired_cam_pos = focus_pos + birds_eye_offset
 				var target_cam_pos = _raise_point_above_terrain(desired_cam_pos, excludes)
-				camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 3.0 * delta)
+				
+				# Smoothly glide camera between cars
+				camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 1.8 * delta)
 				camera_pivot.global_position = _raise_point_above_terrain(camera_pivot.global_position, excludes)
 				
-				var target_look = visuals.global_position + Vector3(0, 0.5, 0)
-				camera_look_at = camera_look_at.lerp(target_look, 6.0 * delta)
+				var target_look = focus_pos + Vector3(0, 0.5, 0)
+				camera_look_at = camera_look_at.lerp(target_look, 3.5 * delta)
 				camera_pivot.look_at(camera_look_at, Vector3.UP)
 				
 				_fade_out_all_xray(delta)
@@ -1483,7 +1508,15 @@ func _physics_process(delta):
 			var side_sign: float = 1.0 if drift_right else -1.0
 			apply_central_force(right * side_sign * acceleration * 0.12 * mass * input_scale)
 		else:
-			if current_speed > 1.0:
+			if is_finished_race:
+				if current_speed > 0.3:
+					apply_central_force(-fwd * braking * 1.25 * mass * input_scale)
+				elif current_speed < -0.3:
+					apply_central_force(fwd * braking * 1.25 * mass * input_scale)
+				else:
+					linear_velocity = Vector3.ZERO
+					angular_velocity = Vector3.ZERO
+			elif current_speed > 1.0:
 				# Softer brakes + progressive (less grab at high speed)
 				var spd_t: float = clampf(current_speed / maxf(max_speed, 1.0), 0.0, 1.0)
 				var brake_mul: float = lerpf(0.78, 0.62, spd_t)
@@ -3660,8 +3693,15 @@ func _get_ai_input(delta: float) -> Vector2:
 	
 	input.x = clamp(dir_flat.x * 2.2, -1.0, 1.0)
 	if is_finished_race:
-		# Continue automatic drive at full speed
-		input.y = -1.0 + abs(input.x) * 0.4
+		# Smoothly brake to a complete halt and stop the car
+		if speed > 0.5:
+			input.x = clamp(dir_flat.x * 1.5, -0.6, 0.6)
+			input.y = 0.95 # brake hard
+		else:
+			input.x = 0.0
+			input.y = 0.0
+			linear_velocity = Vector3.ZERO
+			angular_velocity = Vector3.ZERO
 	else:
 		input.y = -1.0 + abs(input.x) * 0.5
 	

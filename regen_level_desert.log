@@ -1,0 +1,56 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+=== Desert Level Regeneration ===
+SCRIPT ERROR: Parse Error: Identifier "engine_rpm" not declared in the current scope.
+   at: GDScript::reload (res://PlayerCart.gd:3705)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_desert.gd:10)
+ERROR: Failed to load script "res://PlayerCart.gd" with error "Parse error".
+   at: load (modules/gdscript/gdscript_resource_format.cpp:46)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_desert.gd:10)
+WARNING: res://PlayerCart.tscn:6 - ext_resource, invalid UID: uid://dq2xlrtwb6vl0 - using text path instead: res://sounds/774270__thelittlecrow__rocket-launch-boost-and-burning-version-b.wav
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_desert.gd:10)
+WARNING: res://PlayerCart.tscn:7 - ext_resource, invalid UID: uid://th125s4xka82 - using text path instead: res://sounds/434430__v-ktor__explosion05.wav
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_desert.gd:10)
+WARNING: res://PlayerCart.tscn:9 - ext_resource, invalid UID: uid://dt04vn4rjr6in - using text path instead: res://sounds/467882__samsterbirdies__beep-warning.ogg
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_desert.gd:10)
+WARNING: res://CheckpointGate.tscn:4 - ext_resource, invalid UID: uid://en1x37rpwtgb - using text path instead: res://models/checkpoint_gate.glb
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_desert.gd:10)
+WARNING: res://levels/Level.tscn:10 - ext_resource, invalid UID: uid://be75mhwre5ifx - using text path instead: res://generated/terrain_visual.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_desert.gd:10)
+WARNING: res://levels/Level.tscn:12 - ext_resource, invalid UID: uid://c8ef74c67f0r4 - using text path instead: res://generated/terrain_collision_shape.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_desert.gd:10)
+WARNING: res://levels/Level.tscn:16 - ext_resource, invalid UID: uid://dqm3hokkjexly - using text path instead: res://generated/Visual_Curbs.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_desert.gd:10)
+WARNING: res://levels/Level.tscn:17 - ext_resource, invalid UID: uid://dr0maathryfi7 - using text path instead: res://generated/Visual_Road.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_desert.gd:10)
+WARNING: res://levels/Level.tscn:18 - ext_resource, invalid UID: uid://c1spj2aau7e32 - using text path instead: res://generated/Visual_Road_Sides.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_desert.gd:10)
+WARNING: res://levels/Level.tscn:19 - ext_resource, invalid UID: uid://doi20lescjnrn - using text path instead: res://generated/Visual_Curbs_Sides.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_desert.gd:10)
+WARNING: res://levels/Level.tscn:20 - ext_resource, invalid UID: uid://cm7dnsqw0f36l - using text path instead: res://generated/track_collision_shape.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_desert.gd:10)
+Instantiated Level.tscn

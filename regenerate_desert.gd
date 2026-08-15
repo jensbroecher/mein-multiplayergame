@@ -23,7 +23,10 @@ func _ready():
 	add_child(level)
 
 	var tg = level.get_node_or_null("TerrainGenerator")
+	var tp = level.get_node_or_null("TrackPath") as Path3D
 	if tg:
+		if tp:
+			tg.track_path = tp
 		print("Regenerating desert terrain from existing custom curve...")
 		tg.generate_world()
 	else:
@@ -38,12 +41,8 @@ func _ready():
 		sd.free()
 
 	# Fix ownership so all generated nodes are saved into the scene file
-	if tg:
-		for child in tg.get_children():
-			_set_owner_recursive(child, level)
-	var sp = level.get_node_or_null("SpawnPoints")
-	if sp:
-		_set_owner_recursive(sp, level)
+	for child in level.get_children():
+		_set_owner_recursive(child, level)
 
 	remove_child(level)
 	var new_packed = PackedScene.new()

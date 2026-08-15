@@ -1,0 +1,31 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+=== Desert Level Regeneration ===
+WARNING: res://PlayerCart.tscn:6 - ext_resource, invalid UID: uid://dq2xlrtwb6vl0 - using text path instead: res://sounds/774270__thelittlecrow__rocket-launch-boost-and-burning-version-b.wav
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_desert.gd:10)
+WARNING: res://PlayerCart.tscn:7 - ext_resource, invalid UID: uid://th125s4xka82 - using text path instead: res://sounds/434430__v-ktor__explosion05.wav
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_desert.gd:10)
+WARNING: res://PlayerCart.tscn:9 - ext_resource, invalid UID: uid://dt04vn4rjr6in - using text path instead: res://sounds/467882__samsterbirdies__beep-warning.ogg
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_desert.gd:10)
+WARNING: res://CheckpointGate.tscn:4 - ext_resource, invalid UID: uid://en1x37rpwtgb - using text path instead: res://models/checkpoint_gate.glb
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_desert.gd:10)
+ERROR: res://levels/Level.tscn:7 - Parse Error: Missing 'path' in external resource tag.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_desert.gd:10)
+ERROR: Failed loading resource: res://levels/Level.tscn.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_desert.gd:10)
+ERROR: Could not load Level.tscn
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://regenerate_desert.gd:12)

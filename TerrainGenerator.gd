@@ -479,8 +479,8 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 @export var plant_scenes: Array[PackedScene] = []
 @export var terrain_grass_count: int = 500000
 @export var terrain_grass_scenes: Array[PackedScene] = []
-@export var grass_grid_size: int = 10
-@export var grass_visibility_range: float = 200.0
+@export var grass_grid_size: int = 20
+@export var grass_visibility_range: float = 350.0
 @export var flower_blue_mesh: Mesh
 @export var flower_white_mesh: Mesh
 @export var flower_blue_material: Material
@@ -494,6 +494,30 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 @export var road_sides_material: Material
 @export var curb_sides_material: Material
 @export var save_to_files: bool = true
+
+var _visual_heights: PackedFloat32Array = PackedFloat32Array()
+
+func _sample_cached_height(px: float, pz: float) -> float:
+	if _visual_heights.is_empty():
+		return 0.0
+	var res: int = terrain_resolution
+	var stride = res + 1
+	var step_x = terrain_size.x / res
+	var step_z = terrain_size.y / res
+	var start_x = -terrain_size.x / 2.0
+	var start_z = -terrain_size.y / 2.0
+	
+	var gx = (px - start_x) / step_x
+	var gz = (pz - start_z) / step_z
+	var x0 = clampi(int(floor(gx)), 0, res - 1)
+	var z0 = clampi(int(floor(gz)), 0, res - 1)
+	var fx = clampf(gx - float(x0), 0.0, 1.0)
+	var fz = clampf(gz - float(z0), 0.0, 1.0)
+	var h00 = _visual_heights[z0 * stride + x0]
+	var h10 = _visual_heights[z0 * stride + (x0 + 1)]
+	var h01 = _visual_heights[(z0 + 1) * stride + x0]
+	var h11 = _visual_heights[(z0 + 1) * stride + (x0 + 1)]
+	return lerpf(lerpf(h00, h10, fx), lerpf(h01, h11, fx), fz)
 
 
 
@@ -510,7 +534,13 @@ func _ready():
 		call_deferred("add_wadi_river_water")
 
 func generate_world():
-	if not track_path: return
+	if not track_path:
+		track_path = get_node_or_null("../TrackPath") as Path3D
+		if not track_path and get_parent():
+			track_path = get_parent().get_node_or_null("TrackPath") as Path3D
+	if not track_path:
+		push_error("TerrainGenerator: track_path is null, cannot generate world!")
+		return
 	
 	# Keep high-resolution bake interval for exact curve sampling
 	track_path.curve.bake_interval = 0.25
@@ -649,13 +679,16 @@ func _clear_grass_directory():
 	if DirAccess.dir_exists_absolute(dir_path):
 		var dir = DirAccess.open(dir_path)
 		if dir:
+			var files_to_delete: Array[String] = []
 			dir.list_dir_begin()
 			var file_name = dir.get_next()
 			while file_name != "":
 				if not dir.current_is_dir() and file_name.begins_with("chunk_"):
-					dir.remove(file_name)
+					files_to_delete.append(file_name)
 				file_name = dir.get_next()
 			dir.list_dir_end()
+			for f in files_to_delete:
+				dir.remove(f)
 
 func _set_owner_recursive(node: Node):
 
@@ -768,6 +801,7 @@ func _generate_mesh(for_collision: bool) -> ArrayMesh:
 	# IMPORTANT: We do NOT call st.generate_normals() because we manually calculated 
 	# them above to eliminate the polygon/faceted look.
 	if not for_collision:
+		_visual_heights = heights
 		st.generate_tangents()
 	return st.commit()
 
@@ -1800,8 +1834,8 @@ func _create_grass_mesh() -> ArrayMesh:
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 
 	var w := 0.75 # half width
-	var h := 1.1 # height
-	var base_y := -0.1
+	var h := 1.15 # height
+	var base_y := -0.35 # Root firmly sunk into terrain so slopes never expose bottom
 
 	# Plane 1 (along X-axis)
 	var v0 := Vector3(-w, base_y, 0.0)
@@ -1880,7 +1914,7 @@ func _generate_terrain_grass():
 	var shader = load("res://grass_billboard.gdshader") as Shader
 	if not shader:
 		shader = Shader.new()
-		shader.code = "shader_type spatial;\nrender_mode cull_disabled, diffuse_toon, specular_disabled, depth_draw_opaque;\n\nuniform sampler2D albedo_texture : source_color, filter_linear_mipmap_anisotropic;\nuniform vec4 albedo_tint : source_color = vec4(1.0, 1.0, 1.0, 1.0);\nuniform float max_dist = 300.0;\nuniform float fade_r = 50.0;\n\nvarying float height_val;\n\nvoid vertex() {\n\theight_val = VERTEX.y;\n\tvec3 view_pos = (MODELVIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;\n\tfloat dist = length(view_pos);\n\tif (dist > max_dist) {\n\t\tVERTEX = vec3(0.0);\n\t\theight_val = 0.0;\n\t} else {\n\t\tif (dist > max_dist - fade_r) {\n\t\t\tfloat fade = (max_dist - dist) / fade_r;\n\t\t\tVERTEX *= fade;\n\t\t}\n\t}\n}\n\nvoid fragment() {\n\tvec4 tex_color = texture(albedo_texture, UV);\n\tALBEDO = tex_color.rgb * albedo_tint.rgb;\n\tALPHA = tex_color.a;\n\tALPHA_SCISSOR_THRESHOLD = 0.4;\n\tROUGHNESS = 1.0;\n\tEMISSION = ALBEDO * 0.12;\n}"
+		shader.code = "shader_type spatial;\nrender_mode cull_disabled, diffuse_toon, specular_disabled, depth_draw_opaque;\n\nuniform sampler2D albedo_texture : source_color, filter_linear_mipmap_anisotropic;\nuniform vec4 albedo_tint : source_color = vec4(1.0, 1.0, 1.0, 1.0);\nuniform float max_dist = 350.0;\nuniform float fade_r = 60.0;\n\nvarying float height_val;\n\nvoid vertex() {\n\theight_val = VERTEX.y;\n\tvec3 view_pos = (MODELVIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;\n\tfloat dist = length(view_pos);\n\tif (dist > max_dist) {\n\t\tVERTEX = vec3(0.0);\n\t\theight_val = 0.0;\n\t} else {\n\t\tif (dist > max_dist - fade_r) {\n\t\t\tfloat fade = (max_dist - dist) / fade_r;\n\t\t\tVERTEX *= fade;\n\t\t}\n\t}\n}\n\nvoid fragment() {\n\tvec4 tex_color = texture(albedo_texture, UV);\n\tALBEDO = tex_color.rgb * albedo_tint.rgb;\n\tALPHA = tex_color.a;\n\tALPHA_SCISSOR_THRESHOLD = 0.4;\n\tROUGHNESS = 1.0;\n\tEMISSION = ALBEDO * 0.12;\n}"
 	
 	var mat_path = "res://generated/grass/grass_material.res"
 	var saved_mat: Material
@@ -1890,43 +1924,50 @@ func _generate_terrain_grass():
 		var mat = ShaderMaterial.new()
 		mat.shader = shader
 		mat.set_shader_parameter("max_dist", grass_visibility_range)
-		mat.set_shader_parameter("fade_r", 50.0)
+		mat.set_shader_parameter("fade_r", 60.0)
 		var tex_path = "res://sprites/grass.png"
 		if ResourceLoader.exists(tex_path):
 			mat.set_shader_parameter("albedo_texture", load(tex_path))
 		saved_mat = _save_resource(mat, "grass_material", "grass")
-	
-	# ---------------------------------------------------------------
-	# Fast spatial hash grid for O(1) road exclusion
-	# ---------------------------------------------------------------
-	var baked_path := _bake_path_points(curve, 4.0)
-	var min_dist := (sand_width if sand_width > road_width else road_width + 2.0) / 2.0 + 1.5
-	var min_dist_sq := min_dist * min_dist
-	var cell_size := 20.0
-	var road_grid := {}
-	
-	for pt in baked_path:
-		var cx := int(floor(pt.x / cell_size))
-		var cz := int(floor(pt.y / cell_size))
-		var cell_key := Vector2i(cx, cz)
-		if not road_grid.has(cell_key):
-			road_grid[cell_key] = []
-		road_grid[cell_key].append(pt)
+	else:
+		if saved_mat is ShaderMaterial:
+			saved_mat.set_shader_parameter("max_dist", grass_visibility_range)
+			saved_mat.set_shader_parameter("fade_r", 60.0)
 	
 	var half_x := terrain_size.x * 0.5
 	var half_z := terrain_size.y * 0.5
-	var chunk_w := terrain_size.x / grass_grid_size
-	var chunk_d := terrain_size.y / grass_grid_size
+	var start_x := -half_x
+	var start_z := -half_z
+
+	# ---------------------------------------------------------------
+	# Track spatial mask: MUST match _generate_mesh exactly (85.0m margin)
+	# ---------------------------------------------------------------
+	var mask_res: int = 50
+	var cell_size_x: float = terrain_size.x / float(mask_res)
+	var cell_size_z: float = terrain_size.y / float(mask_res)
+	var track_mask: PackedByteArray = _build_track_spatial_mask(curve, mask_res, cell_size_x, cell_size_z, start_x, start_z, 85.0)
+
+	# Fast rasterized bitmask for O(1) road exclusion
+	var min_dist := (sand_width if sand_width > road_width else road_width + 2.0) / 2.0 + 1.5
+	var road_mask_res: int = 200
+	var road_cell_size_x: float = terrain_size.x / float(road_mask_res)
+	var road_cell_size_z: float = terrain_size.y / float(road_mask_res)
+	var road_mask: PackedByteArray = _build_track_spatial_mask(curve, road_mask_res, road_cell_size_x, road_cell_size_z, start_x, start_z, min_dist)
+	
+	var num_chunks: int = grass_grid_size
+	var chunk_w := terrain_size.x / float(num_chunks)
+	var chunk_d := terrain_size.y / float(num_chunks)
 	
 	var chunk_transforms := []
-	chunk_transforms.resize(grass_grid_size * grass_grid_size)
-	for i in range(grass_grid_size * grass_grid_size):
+	chunk_transforms.resize(num_chunks * num_chunks)
+	for i in range(num_chunks * num_chunks):
 		chunk_transforms[i] = []
 	
-	var attempts: int = target_count * 2
+	var attempts: int = int(target_count * 2.5)
 	var placed := 0
 	var max_r_sq := (half_x * 0.85) * (half_x * 0.85)
 	
+	print("Generating grass placements: target %d..." % target_count)
 	for _i in range(attempts):
 		if placed >= target_count:
 			break
@@ -1936,40 +1977,49 @@ func _generate_terrain_grass():
 		if (px * px + pz * pz) > max_r_sq:
 			continue
 		
-		# Fast O(1) road exclusion
-		var near_road := false
-		var pcx := int(floor(px / cell_size))
-		var pcz := int(floor(pz / cell_size))
-		for ox in range(-1, 2):
-			if near_road: break
-			for oz in range(-1, 2):
-				var cell = road_grid.get(Vector2i(pcx + ox, pcz + oz))
-				if cell:
-					for pt in cell:
-						var dx: float = px - pt.x
-						var dz: float = pz - pt.y
-						if dx * dx + dz * dz < min_dist_sq:
-							near_road = true
-							break
-		if near_road:
+		# Instantaneous O(1) road exclusion
+		var rcx = clampi(int((px - start_x) / road_cell_size_x), 0, road_mask_res - 1)
+		var rcz = clampi(int((pz - start_z) / road_cell_size_z), 0, road_mask_res - 1)
+		if road_mask[rcz * road_mask_res + rcx] == 1:
 			continue
 		
-		# Height check
-		var height := _get_terrain_height(px, pz, noise, curve, false)
-		if height < -9.0:
+		# Instantaneous exact height match via bilinear sampling of the terrain mesh
+		var height := _sample_cached_height(px, pz)
+		
+		# Water, lake, and chasm pit exclusions
+		if not no_water:
+			# Default / Lakeside Meadow lake basin centered at (-450, -500)
+			var dist_to_lake = Vector2(px, pz).distance_to(Vector2(-450, -500))
+			if dist_to_lake < 228.0 or height < -9.2:
+				continue
+		elif level_prefix == "canyon_chasm":
+			if absf(px - 150.0) < 48.0 and pz > -150.0 and pz < -30.0:
+				continue
+			if height < -1.5:
+				continue
+		elif level_prefix == "desert_wadi":
+			if is_wadi_water_at(px, pz) or height < 1.8:
+				continue
+		
+		# Skip steep cliffs (> 50 degrees)
+		var h_px := _sample_cached_height(px + 1.5, pz)
+		var h_pz := _sample_cached_height(px, pz + 1.5)
+		if maxf(absf(h_px - height), absf(h_pz - height)) / 1.5 > 1.25:
 			continue
 		
 		var pos := Vector3(px, height, pz)
 		var rot := randf() * TAU
-		var sh := randf_range(0.8, 1.4)
-		var sw := randf_range(0.8, 1.2)
+		var sh := randf_range(0.85, 1.45)
+		var sw := randf_range(0.85, 1.25)
 		var basis := Basis(Vector3.UP, rot).scaled(Vector3(sw, sh, sw))
 		
-		var col = clamp(int((px + half_x) / chunk_w), 0, grass_grid_size - 1)
-		var row = clamp(int((pz + half_z) / chunk_d), 0, grass_grid_size - 1)
-		var idx = row * grass_grid_size + col
+		var col = clamp(int((px + half_x) / chunk_w), 0, num_chunks - 1)
+		var row = clamp(int((pz + half_z) / chunk_d), 0, num_chunks - 1)
+		var idx = row * num_chunks + col
 		chunk_transforms[idx].append(Transform3D(basis, pos))
 		placed += 1
+	
+	print("Grass placed: %d instances across %d chunks. Building multimeshes..." % [placed, num_chunks * num_chunks])
 		
 	# Clean up any existing GrassContainer and rebuild structure
 	var old_container = get_node_or_null("GrassContainer")
@@ -1983,20 +2033,20 @@ func _generate_terrain_grass():
 	
 	if save_to_files:
 		_clear_grass_directory()
-		
-	var start_x := -half_x
-	var start_z := -half_z
 	
-	for r in range(grass_grid_size):
-		for c in range(grass_grid_size):
-			var idx = r * grass_grid_size + c
+	for r in range(num_chunks):
+		for c in range(num_chunks):
+			var idx = r * num_chunks + c
 			var list = chunk_transforms[idx]
 			if list.is_empty():
 				continue
 				
 			var chunk_center_x = start_x + (c + 0.5) * chunk_w
 			var chunk_center_z = start_z + (r + 0.5) * chunk_d
-			var center_height = _get_terrain_height(chunk_center_x, chunk_center_z, noise, curve, false)
+			var cc_cx = clampi(int((chunk_center_x - start_x) / cell_size_x), 0, mask_res - 1)
+			var cc_cz = clampi(int((chunk_center_z - start_z) / cell_size_z), 0, mask_res - 1)
+			var cc_is_near = (track_mask[cc_cz * mask_res + cc_cx] == 1)
+			var center_height = _get_terrain_height(chunk_center_x, chunk_center_z, noise, curve, false, cc_is_near)
 			var chunk_center = Vector3(chunk_center_x, center_height, chunk_center_z)
 			
 			var mmi := MultiMeshInstance3D.new()
@@ -2021,3 +2071,5 @@ func _generate_terrain_grass():
 				
 			mmi.multimesh = _save_resource(mm, "chunk_%d_%d" % [c, r], "grass")
 			mmi.material_override = saved_mat
+	
+	print("Finished generating grass multimeshes.")
