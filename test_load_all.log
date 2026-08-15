@@ -1,0 +1,654 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+--- TEST ALL LEVELS LOAD & TERRAIN ---
+
+Testing level: res://levels/Level.tscn
+WARNING: res://PlayerCart.tscn:6 - ext_resource, invalid UID: uid://dq2xlrtwb6vl0 - using text path instead: res://sounds/774270__thelittlecrow__rocket-launch-boost-and-burning-version-b.wav
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://PlayerCart.tscn:7 - ext_resource, invalid UID: uid://th125s4xka82 - using text path instead: res://sounds/434430__v-ktor__explosion05.wav
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://PlayerCart.tscn:9 - ext_resource, invalid UID: uid://dt04vn4rjr6in - using text path instead: res://sounds/467882__samsterbirdies__beep-warning.ogg
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://CheckpointGate.tscn:4 - ext_resource, invalid UID: uid://en1x37rpwtgb - using text path instead: res://models/checkpoint_gate.glb
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:10 - ext_resource, invalid UID: uid://be75mhwre5ifx - using text path instead: res://generated/terrain_visual.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:12 - ext_resource, invalid UID: uid://c8ef74c67f0r4 - using text path instead: res://generated/terrain_collision_shape.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:16 - ext_resource, invalid UID: uid://dqm3hokkjexly - using text path instead: res://generated/Visual_Curbs.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:19 - ext_resource, invalid UID: uid://doi20lescjnrn - using text path instead: res://generated/Visual_Curbs_Sides.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:20 - ext_resource, invalid UID: uid://cm7dnsqw0f36l - using text path instead: res://generated/track_collision_shape.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:29 - ext_resource, invalid UID: uid://csvpjeh8u5xhp - using text path instead: res://generated/grass/chunk_3_1.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_3_1.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_3_1.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:30 - ext_resource, invalid UID: uid://be6av6h4vf6ke - using text path instead: res://generated/grass/chunk_4_1.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_4_1.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_4_1.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:33 - ext_resource, invalid UID: uid://gid42s05n1wj - using text path instead: res://generated/grass/chunk_5_1.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_5_1.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_5_1.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:36 - ext_resource, invalid UID: uid://yhqsvnd6a4g - using text path instead: res://generated/grass/chunk_6_1.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_6_1.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_6_1.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:38 - ext_resource, invalid UID: uid://cejaf5ndcv0w4 - using text path instead: res://generated/grass/chunk_3_2.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_3_2.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_3_2.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:39 - ext_resource, invalid UID: uid://bq7ex0dwrhs6b - using text path instead: res://generated/grass/chunk_4_2.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_4_2.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_4_2.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:41 - ext_resource, invalid UID: uid://jdvap55p4wu5 - using text path instead: res://generated/grass/chunk_5_2.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_5_2.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_5_2.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:43 - ext_resource, invalid UID: uid://dxfy2752khxxl - using text path instead: res://generated/grass/chunk_6_2.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_6_2.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_6_2.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:44 - ext_resource, invalid UID: uid://dfvsslrai8rt - using text path instead: res://generated/grass/chunk_7_2.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_7_2.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_7_2.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:45 - ext_resource, invalid UID: uid://bkwstl2mdepfs - using text path instead: res://generated/grass/chunk_1_3.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_1_3.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_1_3.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:46 - ext_resource, invalid UID: uid://dfqnkhd41nv7s - using text path instead: res://generated/grass/chunk_2_3.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_2_3.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_2_3.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:47 - ext_resource, invalid UID: uid://dr4neaqwp5mui - using text path instead: res://generated/grass/chunk_3_3.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_3_3.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_3_3.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:48 - ext_resource, invalid UID: uid://bmbq1gs0gcw5c - using text path instead: res://generated/grass/chunk_4_3.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_4_3.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_4_3.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:49 - ext_resource, invalid UID: uid://ddh08g16bysca - using text path instead: res://generated/grass/chunk_5_3.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_5_3.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_5_3.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:50 - ext_resource, invalid UID: uid://cxwsjghcvpda8 - using text path instead: res://generated/grass/chunk_6_3.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_6_3.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_6_3.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:51 - ext_resource, invalid UID: uid://dao2cc07vdeo8 - using text path instead: res://generated/grass/chunk_7_3.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_7_3.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_7_3.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:52 - ext_resource, invalid UID: uid://br1x63x82xpq8 - using text path instead: res://generated/grass/chunk_8_3.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_8_3.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_8_3.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:53 - ext_resource, invalid UID: uid://dgw6pm5quc51o - using text path instead: res://generated/grass/chunk_1_4.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:54 - ext_resource, invalid UID: uid://cmyldog32m66n - using text path instead: res://generated/grass/chunk_2_4.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:55 - ext_resource, invalid UID: uid://21yu5qhy7ugo - using text path instead: res://generated/grass/chunk_3_4.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_3_4.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_3_4.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:56 - ext_resource, invalid UID: uid://wl8isc7lsmql - using text path instead: res://generated/grass/chunk_4_4.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_4_4.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_4_4.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:57 - ext_resource, invalid UID: uid://bj774tye7xc2d - using text path instead: res://generated/grass/chunk_5_4.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_5_4.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_5_4.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:58 - ext_resource, invalid UID: uid://bdgp5ip1ox88u - using text path instead: res://generated/grass/chunk_6_4.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_6_4.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_6_4.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:59 - ext_resource, invalid UID: uid://dcj6qpibcfvml - using text path instead: res://generated/grass/chunk_7_4.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_7_4.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_7_4.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:60 - ext_resource, invalid UID: uid://cdj843mxrotv5 - using text path instead: res://generated/grass/chunk_8_4.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_8_4.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_8_4.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:61 - ext_resource, invalid UID: uid://bwsnc6kxo68np - using text path instead: res://generated/grass/chunk_1_5.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:62 - ext_resource, invalid UID: uid://cx4gl4yetyut4 - using text path instead: res://generated/grass/chunk_2_5.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:63 - ext_resource, invalid UID: uid://bq7w3ivvdn5k3 - using text path instead: res://generated/grass/chunk_3_5.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:64 - ext_resource, invalid UID: uid://bh8o7u26esxwe - using text path instead: res://generated/grass/chunk_4_5.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:65 - ext_resource, invalid UID: uid://c1p1b11tm2qyy - using text path instead: res://generated/grass/chunk_5_5.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:66 - ext_resource, invalid UID: uid://cnvig8uqgdxdr - using text path instead: res://generated/grass/chunk_6_5.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_6_5.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_6_5.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:67 - ext_resource, invalid UID: uid://u11588aaaxan - using text path instead: res://generated/grass/chunk_7_5.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_7_5.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_7_5.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:68 - ext_resource, invalid UID: uid://c3as3cfo6b0b7 - using text path instead: res://generated/grass/chunk_8_5.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_8_5.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_8_5.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:69 - ext_resource, invalid UID: uid://3uan051r2gvp - using text path instead: res://generated/grass/chunk_1_6.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:70 - ext_resource, invalid UID: uid://8wcpsmu3kbg5 - using text path instead: res://generated/grass/chunk_2_6.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:71 - ext_resource, invalid UID: uid://uim2s6iml08f - using text path instead: res://generated/grass/chunk_3_6.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:72 - ext_resource, invalid UID: uid://ymbeajwfj48q - using text path instead: res://generated/grass/chunk_4_6.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:73 - ext_resource, invalid UID: uid://b63l8k8eehwf4 - using text path instead: res://generated/grass/chunk_5_6.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:74 - ext_resource, invalid UID: uid://bcth5bm2j5qj6 - using text path instead: res://generated/grass/chunk_6_6.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:75 - ext_resource, invalid UID: uid://kni0egcnun8m - using text path instead: res://generated/grass/chunk_7_6.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:76 - ext_resource, invalid UID: uid://bb2xcaaxb20fg - using text path instead: res://generated/grass/chunk_8_6.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Cannot open file 'res://generated/grass/chunk_8_6.res'.
+   at: load (core/io/resource_format_binary.cpp:1156)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: Failed loading resource: res://generated/grass/chunk_8_6.res.
+   at: _load (core/io/resource_loader.cpp:317)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:77 - ext_resource, invalid UID: uid://7k833ho1ivrt - using text path instead: res://generated/grass/chunk_2_7.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:78 - ext_resource, invalid UID: uid://b6wd6dpqh0pn3 - using text path instead: res://generated/grass/chunk_3_7.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:79 - ext_resource, invalid UID: uid://d2ykrkbpldld6 - using text path instead: res://generated/grass/chunk_4_7.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:80 - ext_resource, invalid UID: uid://dck2jmkwsvoaa - using text path instead: res://generated/grass/chunk_5_7.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:81 - ext_resource, invalid UID: uid://cjbquo0w0ibqm - using text path instead: res://generated/grass/chunk_6_7.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:82 - ext_resource, invalid UID: uid://bi3ybf68vsni0 - using text path instead: res://generated/grass/chunk_7_7.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:83 - ext_resource, invalid UID: uid://chjav8p0llkkq - using text path instead: res://generated/grass/chunk_3_8.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:84 - ext_resource, invalid UID: uid://ck5376e2js3ny - using text path instead: res://generated/grass/chunk_4_8.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:85 - ext_resource, invalid UID: uid://cf82moll4fxq8 - using text path instead: res://generated/grass/chunk_5_8.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+WARNING: res://levels/Level.tscn:86 - ext_resource, invalid UID: uid://cvjq76fa7rcdi - using text path instead: res://generated/grass/chunk_6_8.res
+   at: load (scene/resources/resource_format_text.cpp:501)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2068 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_3_1.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2076 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_4_1.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2084 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_5_1.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2092 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_6_1.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2100 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_3_2.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2108 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_4_2.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2116 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_5_2.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2124 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_6_2.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2132 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_7_2.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2140 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_1_3.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2148 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_2_3.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2156 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_3_3.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2164 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_4_3.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2172 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_5_3.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2180 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_6_3.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2188 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_7_3.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2196 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_8_3.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2220 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_3_4.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2228 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_4_4.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2236 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_5_4.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2244 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_6_4.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2252 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_7_4.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2260 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_8_4.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2308 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_6_5.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2316 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_7_5.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2324 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_8_5.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+ERROR: res://levels/Level.tscn:2388 - Parse Error: [ext_resource] referenced non-existent resource at: res://generated/grass/chunk_8_6.res.
+   at: _printerr (scene/resources/resource_format_text.cpp:41)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:16)
+Loaded 6 spawn points from scene tree.
+[CHECKPOINT SETUP] Total checkpoints: 9
+  - Checkpoint 0: Halfway4
+  - Checkpoint 1: Halfway3
+  - Checkpoint 2: Halfway2
+  - Checkpoint 3: Halfway1
+  - Checkpoint 4: Halfway5
+  - Checkpoint 5: Halfway6
+  - Checkpoint 6: Halfway7
+  - Checkpoint 7: Halfway8
+  - Checkpoint 8: FinishLine
+Terrain Visual AABB: [P: (-1000.0, -40.0, -1000.0), S: (2000.0, 69.00992, 2000.0)]
+Terrain Visual Surface Count: 1
+Radius X: 1000.0 | Radius Z: 1000.0
+PASSED: res://levels/Level.tscn
+
+Testing level: res://levels/MountainLevel.tscn
+Loaded 6 spawn points from scene tree.
+[CHECKPOINT SETUP] Total checkpoints: 5
+  - Checkpoint 0: Halfway4
+  - Checkpoint 1: Halfway3
+  - Checkpoint 2: Halfway2
+  - Checkpoint 3: Halfway1
+  - Checkpoint 4: FinishLine
+Terrain Visual AABB: [P: (-1000.0, -70.0, -1000.0), S: (2000.0, 233.6157, 2000.0)]
+Terrain Visual Surface Count: 1
+Radius X: 1000.0 | Radius Z: 1000.0
+PASSED: res://levels/MountainLevel.tscn
+
+Testing level: res://levels/CanyonLevel.tscn
+Loaded 6 spawn points from scene tree.
+[CHECKPOINT SETUP] Total checkpoints: 9
+  - Checkpoint 0: Halfway4
+  - Checkpoint 1: Halfway3
+  - Checkpoint 2: Halfway2
+  - Checkpoint 3: Halfway1
+  - Checkpoint 4: Halfway5
+  - Checkpoint 5: Halfway6
+  - Checkpoint 6: Halfway7
+  - Checkpoint 7: Halfway8
+  - Checkpoint 8: FinishLine
+Terrain Visual AABB: [P: (-1000.0, -70.0, -1000.0), S: (2000.0, 105.8731, 2000.0)]
+Terrain Visual Surface Count: 1
+Radius X: 1000.0 | Radius Z: 1000.0
+PASSED: res://levels/CanyonLevel.tscn
+
+Testing level: res://levels/CanyonChasmLevel.tscn
+Loaded 6 spawn points from scene tree.
+[CHECKPOINT SETUP] Total checkpoints: 9
+  - Checkpoint 0: Halfway4
+  - Checkpoint 1: Halfway3
+  - Checkpoint 2: Halfway2
+  - Checkpoint 3: Halfway1
+  - Checkpoint 4: Halfway5
+  - Checkpoint 5: Halfway6
+  - Checkpoint 6: Halfway7
+  - Checkpoint 7: Halfway8
+  - Checkpoint 8: FinishLine
+Terrain Visual AABB: [P: (-1000.0, -70.0, -1000.0), S: (2000.0, 104.1349, 2000.0)]
+Terrain Visual Surface Count: 1
+Radius X: 1000.0 | Radius Z: 1000.0
+ERROR: Parameter "material" is null.
+   at: material_get_instance_shader_parameters (servers/rendering/dummy/storage/material_storage.cpp:264)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://test_load.gd:38)
+PASSED: res://levels/CanyonChasmLevel.tscn
+
+Testing level: res://levels/DesertWadiLevel.tscn
+Loaded 6 spawn points from scene tree.
+[CHECKPOINT SETUP] Total checkpoints: 9
+  - Checkpoint 0: Halfway4
+  - Checkpoint 1: Halfway3
+  - Checkpoint 2: Halfway2
+  - Checkpoint 3: Halfway1
+  - Checkpoint 4: Halfway5
+  - Checkpoint 5: Halfway6
+  - Checkpoint 6: Halfway7
+  - Checkpoint 7: Halfway8
+  - Checkpoint 8: FinishLine
+Terrain Visual AABB: [P: (-1000.0, -40.0, -1000.0), S: (2000.0, 96.46041, 2000.0)]
+Terrain Visual Surface Count: 1
+Radius X: 1000.0 | Radius Z: 1000.0
+PASSED: res://levels/DesertWadiLevel.tscn
+
+--- ALL LEVELS VERIFIED SUCCESSFULLY ---

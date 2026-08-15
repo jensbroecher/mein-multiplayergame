@@ -3,13 +3,6 @@ extends Node3D
 
 enum TrackLayoutType { DEFAULT, MOUNTAIN, CANYON }
 
-# Used to determine terrain shape (canyon walls, mountain slope, flat desert).
-# Change this in the Inspector to match the level — it does NOT overwrite your custom path.
-@export var track_layout_type: TrackLayoutType = TrackLayoutType.DEFAULT
-@export var level_prefix: String = ""
-@export var no_water: bool = false
-@export var no_grass: bool = false
-
 ## True when a baked curve sample sits in a jump gap (airborne / no road mesh).
 ## Hill jump is fully between the two large ramps; crossing only removes the high path
 ## so the lower road at the same XZ is untouched.
@@ -241,15 +234,40 @@ func _emit_embankment_end_cap(
 	st.add_vertex(bot_r) # b+3
 	var b: int = vert_base
 	if flip_winding:
-		st.add_index(b + 0); st.add_index(b + 2); st.add_index(b + 1)
-		st.add_index(b + 1); st.add_index(b + 2); st.add_index(b + 3)
-	else:
 		st.add_index(b + 0); st.add_index(b + 1); st.add_index(b + 2)
 		st.add_index(b + 1); st.add_index(b + 3); st.add_index(b + 2)
+	else:
+		st.add_index(b + 0); st.add_index(b + 2); st.add_index(b + 1)
+		st.add_index(b + 1); st.add_index(b + 2); st.add_index(b + 3)
 	return vert_base + 4
 
+func _build_track_spatial_mask(curve: Curve3D, grid_res: int, cell_size_x: float, cell_size_z: float, start_x: float, start_z: float, margin: float = 85.0) -> PackedByteArray:
+	var mask = PackedByteArray()
+	mask.resize(grid_res * grid_res)
+	if not curve:
+		return mask
+	var length = curve.get_baked_length()
+	var step_dist = 6.0
+	var count = int(length / step_dist) + 1
+	var cell_rad_x = int(ceil(margin / cell_size_x))
+	var cell_rad_z = int(ceil(margin / cell_size_z))
 
-func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curve3D, for_collision: bool) -> float:
+	for i in range(count):
+		var offset = float(i) * step_dist
+		var pt = curve.sample_baked(offset)
+		var cx = int((pt.x - start_x) / cell_size_x)
+		var cz = int((pt.z - start_z) / cell_size_z)
+		var min_x = clampi(cx - cell_rad_x, 0, grid_res - 1)
+		var max_x = clampi(cx + cell_rad_x, 0, grid_res - 1)
+		var min_z = clampi(cz - cell_rad_z, 0, grid_res - 1)
+		var max_z = clampi(cz + cell_rad_z, 0, grid_res - 1)
+		for gz in range(min_z, max_z + 1):
+			var row_offset = gz * grid_res
+			for gx in range(min_x, max_x + 1):
+				mask[row_offset + gx] = 1
+	return mask
+
+func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curve3D, for_collision: bool, is_near_track: bool = true) -> float:
 	var h_noise: float = noise.get_noise_2d(px, pz) * hill_height
 	
 	# --- Mountain base shape ---
@@ -303,90 +321,109 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			base_terrain_height = lerpf(base_terrain_height, depth, lake_blend)
 
 	var height: float
-	var query_y = -200.0 if (track_layout_type == TrackLayoutType.CANYON) else base_terrain_height
-	var closest_pos = curve.get_closest_point(Vector3(px, query_y, pz))
-	var dist = Vector2(px, pz).distance_to(Vector2(closest_pos.x, closest_pos.z))
-	var road_h = closest_pos.y
 
-	# Calculate lateral distance and account for curve banking/roll only if tilt is present
-	if _curve_has_tilt(curve):
-		var c_offset = curve.get_closest_offset(closest_pos)
-		var c_length = maxf(curve.get_baked_length(), 0.001)
-		var o0_c = maxf(0.0, c_offset - 0.5)
-		var o1_c = minf(c_length, c_offset + 0.5)
-		var c_tangent = (curve.sample_baked(o1_c) - curve.sample_baked(o0_c)).normalized()
-		if c_tangent.length_squared() > 1e-6:
-			var c_up = curve.sample_baked_up_vector(c_offset, true).normalized()
-			var c_right = c_tangent.cross(c_up).normalized()
-			var rel_p = Vector3(px - closest_pos.x, 0.0, pz - closest_pos.z)
-			var lateral_d = rel_p.dot(Vector3(c_right.x, 0.0, c_right.z).normalized())
-			road_h += lateral_d * c_right.y
-
-	# Airborne jump curve must NOT pull terrain up into a glitchy ridge / fake structure.
-	if level_prefix == "canyon_chasm" and _is_in_gap_pos(closest_pos):
-		dist = 1.0e9
-		road_h = base_terrain_height
-
-	if track_layout_type == TrackLayoutType.CANYON:
-		var sand_edge = sand_width / 2.0
-		
-		# Zone 1: Road surface — flat at road height
-		var road_inner = sand_edge - 2.0
-		# Zone 2: Canyon floor just beyond curb — stays low briefly
-		var floor_edge = sand_edge + 5.0
-		# Zone 3: Canyon wall rise — ramps gently up to low plateau
-		var wall_top = sand_edge + 30.0
-		
-		if dist < road_inner:
-			# On the road itself
-			height = road_h
-		elif dist < floor_edge:
-			# Canyon floor (still at road level)
-			var t = (dist - road_inner) / (floor_edge - road_inner)
-			height = lerp(road_h, road_h + 1.0, t)
-		elif dist < wall_top:
-			# Steep canyon wall rising to plateau
-			var t = (dist - floor_edge) / (wall_top - floor_edge)
-			var smooth_t = t * t * (3.0 - 2.0 * t)  # smoothstep
-			height = lerp(road_h + 1.0, base_terrain_height, smooth_t)
-		else:
-			# Canyon rim plateau with noise
-			height = base_terrain_height
-		
-		# Basin recession under road for collision mesh
-		var basin_blend = 1.0 - smoothstep(road_inner - 2.0, road_inner, dist)
-		if for_collision:
-			height = lerp(height, road_h - terrain_recession_collision, basin_blend)
-		else:
-			height = lerp(height, road_h - terrain_recession_visual, basin_blend)
-
-		# Final hard carve under hill jump (keep carve inside the airborne gap only)
-		if level_prefix == "canyon_chasm" and absf(px - 150.0) < 22.0 and pz < -56.0 and pz > -114.0:
-			height = minf(height, -8.0)
-	else:
-		# Original blending for DEFAULT and MOUNTAIN
-		var sand_edge = sand_width / 2.0
-		var blend_dist = 60.0
-		var clearing_blend = 1.0 - smoothstep(sand_edge - 2.0, sand_edge + blend_dist, dist)
-		height = lerp(base_terrain_height, road_h, clearing_blend)
-
-		var basin_blend = 1.0 - smoothstep(sand_edge - 2.0, sand_edge, dist)
-		if for_collision:
-			height = lerp(height, road_h - terrain_recession_collision, basin_blend)
-		else:
-			height = lerp(height, road_h - terrain_recession_visual, basin_blend)
-
-		# Desert Wadi: carve a shallow river corridor (banks dip below the water plane).
-		# Road blend above still wins near the path so the ford stays driveable.
+	if not is_near_track:
+		height = base_terrain_height
 		if level_prefix == "desert_wadi":
 			var river_t: float = _wadi_river_influence(px, pz)
 			if river_t > 0.001:
 				var bed_y: float = WADI_RIVER_BED_Y
-				var away_from_road: float = smoothstep(sand_edge + 1.5, sand_edge + 22.0, dist)
-				var carve: float = river_t * away_from_road
-				var lake_center_boost: float = river_t * river_t * 0.5
-				var target_bed: float = lerpf(bed_y, bed_y - 0.7, lake_center_boost)
-				height = lerp(height, target_bed, clampf(carve, 0.0, 1.0))
+				var target_bed: float = lerpf(bed_y, bed_y - 0.7, river_t * river_t * 0.5)
+				height = lerp(height, target_bed, clampf(river_t, 0.0, 1.0))
+	else:
+		var query_y = -200.0 if (track_layout_type == TrackLayoutType.CANYON) else base_terrain_height
+		var closest_pos = curve.get_closest_point(Vector3(px, query_y, pz))
+		var dist = Vector2(px, pz).distance_to(Vector2(closest_pos.x, closest_pos.z))
+		var road_h = closest_pos.y
+
+		# Calculate lateral distance and account for curve banking/roll only if tilt is present
+		if _curve_has_tilt(curve):
+			var c_offset = curve.get_closest_offset(closest_pos)
+			var c_length = maxf(curve.get_baked_length(), 0.001)
+			var o0_c = maxf(0.0, c_offset - 0.5)
+			var o1_c = minf(c_length, c_offset + 0.5)
+			var c_tangent = (curve.sample_baked(o1_c) - curve.sample_baked(o0_c)).normalized()
+			if c_tangent.length_squared() > 1e-6:
+				var c_up = curve.sample_baked_up_vector(c_offset, true).normalized()
+				var c_right = c_tangent.cross(c_up).normalized()
+				var rel_p = Vector3(px - closest_pos.x, 0.0, pz - closest_pos.z)
+				var lateral_d = rel_p.dot(Vector3(c_right.x, 0.0, c_right.z).normalized())
+				road_h += lateral_d * c_right.y
+
+		# Airborne jump curve must NOT pull terrain up into a glitchy ridge / fake structure.
+		if level_prefix == "canyon_chasm" and _is_in_gap_pos(closest_pos):
+			dist = 1.0e9
+			road_h = base_terrain_height
+
+		if track_layout_type == TrackLayoutType.CANYON:
+			var sand_edge = sand_width / 2.0
+			
+			# Zone 1: Road surface — flat at road height
+			var road_inner = sand_edge - 2.0
+			# Zone 2: Canyon floor just beyond curb — stays low briefly
+			var floor_edge = sand_edge + 5.0
+			# Zone 3: Canyon wall rise — ramps gently up to low plateau
+			var wall_top = sand_edge + 30.0
+			
+			if dist < road_inner:
+				# On the road itself
+				height = road_h
+			elif dist < floor_edge:
+				# Canyon floor (still at road level)
+				var t = (dist - road_inner) / (floor_edge - road_inner)
+				height = lerp(road_h, road_h + 1.0, t)
+			elif dist < wall_top:
+				# Steep canyon wall rising to plateau
+				var t = (dist - floor_edge) / (wall_top - floor_edge)
+				var smooth_t = t * t * (3.0 - 2.0 * t)  # smoothstep
+				height = lerp(road_h + 1.0, base_terrain_height, smooth_t)
+			else:
+				# Canyon rim plateau with noise
+				height = base_terrain_height
+			
+			# Basin recession under road for collision mesh
+			var basin_blend = 1.0 - smoothstep(road_inner - 2.0, road_inner, dist)
+			if for_collision:
+				height = lerp(height, road_h - terrain_recession_collision, basin_blend)
+			else:
+				height = lerp(height, road_h - terrain_recession_visual, basin_blend)
+
+			# Final hard carve under hill jump (keep carve inside the airborne gap only)
+			if level_prefix == "canyon_chasm" and absf(px - 150.0) < 22.0 and pz < -56.0 and pz > -114.0:
+				height = minf(height, -8.0)
+		else:
+			# Original blending for DEFAULT and MOUNTAIN
+			var sand_edge = sand_width / 2.0
+			var blend_dist = 60.0
+			var clearing_blend = 1.0 - smoothstep(sand_edge - 2.0, sand_edge + blend_dist, dist)
+
+			# Bridge detection: when road is elevated far above base terrain,
+			# attenuate blending so terrain stays low (preserves bridge gap).
+			# Ramps from 0 (normal road, <4m above ground) to 1 (bridge, >12m above ground).
+			var elevation_diff = road_h - base_terrain_height
+			var bridge_factor = clampf((elevation_diff - 4.0) / 8.0, 0.0, 1.0)
+			clearing_blend *= (1.0 - bridge_factor)
+
+			height = lerp(base_terrain_height, road_h, clearing_blend)
+
+			var basin_blend = 1.0 - smoothstep(sand_edge - 2.0, sand_edge, dist)
+			basin_blend *= (1.0 - bridge_factor)
+			if for_collision:
+				height = lerp(height, road_h - terrain_recession_collision, basin_blend)
+			else:
+				height = lerp(height, road_h - terrain_recession_visual, basin_blend)
+
+			# Desert Wadi: carve a shallow river corridor (banks dip below the water plane).
+			# Road blend above still wins near the path so the ford stays driveable.
+			if level_prefix == "desert_wadi":
+				var river_t: float = _wadi_river_influence(px, pz)
+				if river_t > 0.001:
+					var bed_y: float = WADI_RIVER_BED_Y
+					var away_from_road: float = smoothstep(sand_edge + 1.5, sand_edge + 22.0, dist)
+					var carve: float = river_t * away_from_road
+					var lake_center_boost: float = river_t * river_t * 0.5
+					var target_bed: float = lerpf(bed_y, bed_y - 0.7, lake_center_boost)
+					height = lerp(height, target_bed, clampf(carve, 0.0, 1.0))
 
 	# Edge falloff (all track types — curves down smoothly to abyss / horizon outside all track envelopes)
 	var max_radius: float = terrain_size.x * 0.5
@@ -420,42 +457,53 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 @export var hill_height: float = 50.0 # Taller hills
 
 @export_group("Layout")
-@export var is_loop: bool = true
-
+@export var track_layout_type: TrackLayoutType = TrackLayoutType.DEFAULT
 @export var road_width: float = 14.0
 @export var sand_width: float = 16.0
-## Pillars under elevated road stretches (DEFAULT layout only). Disable for flat technical tracks.
-@export var generate_bridge_supports: bool = true
-
-@export_group("Visual Offsets")
-@export var road_y_offset: float = 0.05
-## Kept for compatibility; curb top now matches road_y_offset so sand shoulders aren't raised.
+@export var road_y_offset: float = 0.3
 @export var curb_y_offset: float = 0.05
-@export var terrain_recession_visual: float = 0.20
-## How far terrain collision sinks under the road (must stay modest or cars fall into a trench).
-@export var terrain_recession_collision: float = 0.12
-
-@export_group("Procedural Generation")
-@export var terrain_grass_count: int = 12000
-@export var grass_grid_size: int = 10
-@export var grass_visibility_range: float = 200.0
-
-# To regenerate a level, run its dedicated scene:
-#   regenerate_canyon.tscn  — Canyon level only (preserves your custom path)
-#   regenerate_mountain.tscn — Mountain level only
-#   regenerate_desert.tscn  — Desert/oval level only
-#   regenerate_all.tscn     — All three levels at once
-
+@export var curb_slope: float = 0.15
 @export var grass_material: Material
 @export var road_material: Material
+@export var terrain_recession_visual: float = 0.4
+@export var terrain_recession_collision: float = 0.0
+@export var level_prefix: String = ""
+@export var no_water: bool = false
+@export var no_grass: bool = false
+@export var generate_bridge_supports: bool = true
+@export var is_loop: bool = true
+
+@export_group("Vegetation")
+@export var tree_count: int = 200
+@export var tree_scenes: Array[PackedScene] = []
+@export var plant_scenes: Array[PackedScene] = []
+@export var terrain_grass_count: int = 500000
+@export var terrain_grass_scenes: Array[PackedScene] = []
+@export var grass_grid_size: int = 10
+@export var grass_visibility_range: float = 200.0
+@export var flower_blue_mesh: Mesh
+@export var flower_white_mesh: Mesh
+@export var flower_blue_material: Material
+@export var flower_white_material: Material
+@export var flowers_per_m2: float = 0.08
+@export var flower_chunk_size: float = 200.0
+
+@export_group("Visual Overlays")
+@export var asphalt_material: Material
+@export var curb_material: Material
+@export var road_sides_material: Material
+@export var curb_sides_material: Material
 @export var save_to_files: bool = true
 
 
 
 func _ready():
-	# Terrain and Track are now saved in the scene file and external .res files.
-	# We no longer need to regenerate at runtime, preventing the game from hanging on load.
-	# Pit water is lightweight — also create in the editor so Canyon Chasm shows it in the viewport.
+	if Engine.is_editor_hint():
+		if get_child_count() == 0 and track_path:
+			generate_world()
+	else:
+		if get_child_count() == 0 and track_path:
+			generate_world()
 	if level_prefix == "canyon_chasm":
 		call_deferred("add_chasm_pit_water")
 	elif level_prefix == "desert_wadi":
@@ -517,15 +565,13 @@ func generate_world():
 	collision_shape.shape = _save_resource(trimesh_shape, "terrain_collision_shape")
 	static_body.add_child(collision_shape)
 
-	# 4. Visual Overlays
+	# 4. Road & Sand Overlays
 	_generate_road_and_sand()
 
 	# 5. Water Surface
 	if level_prefix == "canyon_chasm":
-		# Local murky water in the hill-jump pit (not a full ocean plane).
 		add_chasm_pit_water()
 	elif level_prefix == "desert_wadi":
-		# Shallow river ford only (no full-stage ocean plane).
 		add_wadi_river_water()
 	elif not no_water:
 		_generate_water()
@@ -534,8 +580,11 @@ func generate_world():
 	if not no_grass:
 		_generate_terrain_grass()
 
+	# 7. Editor Ownership
 	if Engine.is_editor_hint():
 		_set_owner_recursive(self)
+
+	print("Procedural map generation complete! Layout: ", TrackLayoutType.keys()[track_layout_type])
 
 
 # Returns a Curve3D whose points are in TerrainGenerator-local space (= world space
@@ -603,7 +652,7 @@ func _clear_grass_directory():
 			dir.list_dir_begin()
 			var file_name = dir.get_next()
 			while file_name != "":
-				if not dir.current_is_dir():
+				if not dir.current_is_dir() and file_name.begins_with("chunk_"):
 					dir.remove(file_name)
 				file_name = dir.get_next()
 			dir.list_dir_end()
@@ -640,6 +689,12 @@ func _generate_mesh(for_collision: bool) -> ArrayMesh:
 	var falloff_y_out: float = -70.0 if (track_layout_type == TrackLayoutType.MOUNTAIN or track_layout_type == TrackLayoutType.CANYON) else -40.0
 	var curve = _get_world_curve()
 
+	# Coarse spatial track mask (50x50 cells) for O(1) road influence checks:
+	var mask_res: int = 50
+	var cell_size_x: float = terrain_size.x / float(mask_res)
+	var cell_size_z: float = terrain_size.y / float(mask_res)
+	var track_mask: PackedByteArray = _build_track_spatial_mask(curve, mask_res, cell_size_x, cell_size_z, start_x, start_y, 85.0)
+
 	var stride = res + 1
 	var total_verts = stride * stride
 	var heights = PackedFloat32Array()
@@ -647,16 +702,21 @@ func _generate_mesh(for_collision: bool) -> ArrayMesh:
 
 	# Pass 1: Compute heights once per grid point (5x faster than 5-tap per vertex)
 	for y in range(res + 1):
+		var pz = start_y + y * step_y
+		var cz = clampi(int((pz - start_y) / cell_size_z), 0, mask_res - 1)
+		var row_mask_offset = cz * mask_res
+
 		for x in range(res + 1):
 			var px = start_x + x * step_x
-			var pz = start_y + y * step_y
 			var p_sq = px * px + pz * pz
 			var idx = y * stride + x
 
 			if p_sq > outer_limit_sq:
 				heights[idx] = falloff_y_out
 			else:
-				heights[idx] = _get_terrain_height(px, pz, noise, curve, for_collision)
+				var cx = clampi(int((px - start_x) / cell_size_x), 0, mask_res - 1)
+				var is_near = (track_mask[row_mask_offset + cx] == 1)
+				heights[idx] = _get_terrain_height(px, pz, noise, curve, for_collision, is_near)
 
 	# Pass 2: Add vertices and analytical smooth normals from adjacent grid samples
 	var span_x: float = step_x * 2.0
@@ -1490,9 +1550,9 @@ func _generate_water():
 
 
 ## Surface Y of the chasm pit water (PlayerCart uses this for splash / drown).
-const CHASM_PIT_WATER_Y := -3.2
-const CHASM_PIT_CENTER := Vector3(150.0, CHASM_PIT_WATER_Y, -85.0)
-const CHASM_PIT_HALF_EXTENTS := Vector2(28.0, 36.0) # XZ half-size of water volume
+const CHASM_PIT_WATER_Y := -1.8
+const CHASM_PIT_CENTER := Vector3(150.0, CHASM_PIT_WATER_Y, -90.0)
+const CHASM_PIT_HALF_EXTENTS := Vector2(45.0, 58.0) # XZ half-size of water volume, seamlessly filling the whole carved pond basin
 
 ## Desert Wadi — wide valley lake + river ford filling the whole valley basin.
 const WADI_RIVER_WATER_Y := 1.70
@@ -1673,23 +1733,27 @@ func add_wadi_river_water() -> void:
 ## Murky green/brown water filling the first hill-jump pit on Canyon Chasm.
 ## Pit floor is carved near y=-8..-12; surface sits a few meters above that.
 func add_chasm_pit_water() -> void:
-	if get_node_or_null("ChasmPitWater") != null:
-		return
+	var existing = get_node_or_null("ChasmPitWater")
+	if existing != null:
+		existing.free()
 
 	var water := MeshInstance3D.new()
 	water.name = "ChasmPitWater"
 	var plane := PlaneMesh.new()
-	# Covers the jump gap between large ramp takeoff (~z -50) and landing (~z -120).
+	# Covers the jump gap between large ramp takeoff (~z -40) and landing (~z -140).
 	plane.size = Vector2(CHASM_PIT_HALF_EXTENTS.x * 2.0, CHASM_PIT_HALF_EXTENTS.y * 2.0)
 	# Dense mesh so large vertex waves read clearly
-	plane.subdivide_width = 48
-	plane.subdivide_depth = 56
+	plane.subdivide_width = 64
+	plane.subdivide_depth = 80
 	water.mesh = plane
 	water.position = CHASM_PIT_CENTER
 	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# Metadata for carts (splash / drown volume)
 	water.set_meta("water_surface_y", CHASM_PIT_WATER_Y)
 	water.set_meta("water_half_xz", CHASM_PIT_HALF_EXTENTS)
+	water.set_meta("water_center_xz", Vector2(CHASM_PIT_CENTER.x, CHASM_PIT_CENTER.z))
+	water.set_meta("water_bounds_min", Vector2(CHASM_PIT_CENTER.x - CHASM_PIT_HALF_EXTENTS.x, CHASM_PIT_CENTER.z - CHASM_PIT_HALF_EXTENTS.y))
+	water.set_meta("water_bounds_max", Vector2(CHASM_PIT_CENTER.x + CHASM_PIT_HALF_EXTENTS.x, CHASM_PIT_CENTER.z + CHASM_PIT_HALF_EXTENTS.y))
 
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://water.gdshader")
@@ -1736,16 +1800,15 @@ func _create_grass_mesh() -> ArrayMesh:
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 
 	var w := 0.75 # half width
-	var h := 0.95 # height
-	var base_y := -0.2
+	var h := 1.1 # height
+	var base_y := -0.1
 
-	# Single Plane (along X-axis)
+	# Plane 1 (along X-axis)
 	var v0 := Vector3(-w, base_y, 0.0)
 	var v1 := Vector3(w, base_y, 0.0)
 	var v2 := Vector3(w, h + base_y, 0.0)
 	var v3 := Vector3(-w, h + base_y, 0.0)
 
-	# Front face
 	st.set_uv(Vector2(0.0, 1.0)); st.add_vertex(v0)
 	st.set_uv(Vector2(1.0, 1.0)); st.add_vertex(v1)
 	st.set_uv(Vector2(1.0, 0.0)); st.add_vertex(v2)
@@ -1754,7 +1817,19 @@ func _create_grass_mesh() -> ArrayMesh:
 	st.set_uv(Vector2(1.0, 0.0)); st.add_vertex(v2)
 	st.set_uv(Vector2(0.0, 0.0)); st.add_vertex(v3)
 
+	# Plane 2 (Crossed along Z-axis)
+	var z0 := Vector3(0.0, base_y, -w)
+	var z1 := Vector3(0.0, base_y, w)
+	var z2 := Vector3(0.0, h + base_y, w)
+	var z3 := Vector3(0.0, h + base_y, -w)
 
+	st.set_uv(Vector2(0.0, 1.0)); st.add_vertex(z0)
+	st.set_uv(Vector2(1.0, 1.0)); st.add_vertex(z1)
+	st.set_uv(Vector2(1.0, 0.0)); st.add_vertex(z2)
+
+	st.set_uv(Vector2(0.0, 1.0)); st.add_vertex(z0)
+	st.set_uv(Vector2(1.0, 0.0)); st.add_vertex(z2)
+	st.set_uv(Vector2(0.0, 0.0)); st.add_vertex(z3)
 
 	st.generate_normals()
 	st.generate_tangents()
@@ -1789,7 +1864,7 @@ func _sq_dist_to_path(px: float, pz: float, baked: PackedVector2Array) -> float:
 	return best_sq
 
 func _generate_terrain_grass():
-	var target_count: int = mini(terrain_grass_count, 50000)
+	var target_count: int = terrain_grass_count
 	if target_count <= 0: return
 	
 	var curve = _get_world_curve()
@@ -1802,36 +1877,42 @@ func _generate_terrain_grass():
 	noise.fractal_octaves = 4
 	
 	var grass_mesh = _create_grass_mesh()
-	# Dynamic grass shader with distance fade-out (collapses far away grass vertices to 0 for maximum performance, no wind sway)
-	var shader = Shader.new()
-	shader.code = "shader_type spatial;\nrender_mode cull_disabled, diffuse_toon, specular_disabled, depth_draw_opaque;\n\nuniform sampler2D albedo_texture : source_color, filter_linear_mipmap_anisotropic;\nuniform vec4 albedo_tint : source_color = vec4(1.0, 1.0, 1.0, 1.0);\nuniform float max_dist = 200.0;\nuniform float fade_r = 30.0;\n\nvarying float height_val;\n\nvoid vertex() {\n\theight_val = VERTEX.y;\n\tvec3 view_pos = (MODELVIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;\n\tfloat dist = length(view_pos);\n\tif (dist > max_dist) {\n\t\tVERTEX = vec3(0.0);\n\t\theight_val = 0.0;\n\t} else {\n\t\tif (dist > max_dist - fade_r) {\n\t\t\tfloat fade = (max_dist - dist) / fade_r;\n\t\t\tVERTEX *= fade;\n\t\t}\n\t}\n}\n\nvoid fragment() {\n\tvec4 tex_color = texture(albedo_texture, UV);\n\tALBEDO = tex_color.rgb * albedo_tint.rgb;\n\tALPHA = tex_color.a;\n\tALPHA_SCISSOR_THRESHOLD = 0.4;\n\tROUGHNESS = 1.0;\n\tEMISSION = ALBEDO * 0.12;\n}"
+	var shader = load("res://grass_billboard.gdshader") as Shader
+	if not shader:
+		shader = Shader.new()
+		shader.code = "shader_type spatial;\nrender_mode cull_disabled, diffuse_toon, specular_disabled, depth_draw_opaque;\n\nuniform sampler2D albedo_texture : source_color, filter_linear_mipmap_anisotropic;\nuniform vec4 albedo_tint : source_color = vec4(1.0, 1.0, 1.0, 1.0);\nuniform float max_dist = 300.0;\nuniform float fade_r = 50.0;\n\nvarying float height_val;\n\nvoid vertex() {\n\theight_val = VERTEX.y;\n\tvec3 view_pos = (MODELVIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;\n\tfloat dist = length(view_pos);\n\tif (dist > max_dist) {\n\t\tVERTEX = vec3(0.0);\n\t\theight_val = 0.0;\n\t} else {\n\t\tif (dist > max_dist - fade_r) {\n\t\t\tfloat fade = (max_dist - dist) / fade_r;\n\t\t\tVERTEX *= fade;\n\t\t}\n\t}\n}\n\nvoid fragment() {\n\tvec4 tex_color = texture(albedo_texture, UV);\n\tALBEDO = tex_color.rgb * albedo_tint.rgb;\n\tALPHA = tex_color.a;\n\tALPHA_SCISSOR_THRESHOLD = 0.4;\n\tROUGHNESS = 1.0;\n\tEMISSION = ALBEDO * 0.12;\n}"
 	
-	var mat = ShaderMaterial.new()
-	mat.shader = shader
-	mat.set_shader_parameter("max_dist", grass_visibility_range)
-	mat.set_shader_parameter("fade_r", 30.0)
-	
-	var tex_path = "res://sprites/grass.png"
-	if ResourceLoader.exists(tex_path):
-		var tex = load(tex_path)
-		mat.set_shader_parameter("albedo_texture", tex)
+	var mat_path = "res://generated/grass/grass_material.res"
+	var saved_mat: Material
+	if ResourceLoader.exists(mat_path):
+		saved_mat = load(mat_path)
+	if not saved_mat:
+		var mat = ShaderMaterial.new()
+		mat.shader = shader
+		mat.set_shader_parameter("max_dist", grass_visibility_range)
+		mat.set_shader_parameter("fade_r", 50.0)
+		var tex_path = "res://sprites/grass.png"
+		if ResourceLoader.exists(tex_path):
+			mat.set_shader_parameter("albedo_texture", load(tex_path))
+		saved_mat = _save_resource(mat, "grass_material", "grass")
 	
 	# ---------------------------------------------------------------
-	# OPTIMISATION 1: Pre-bake the curve once (sample every 4 m).
-	# This replaces the per-blade curve.get_closest_point() call
-	# (which is O(baked_interval_count)) with a simple array scan.
+	# Fast spatial hash grid for O(1) road exclusion
 	# ---------------------------------------------------------------
 	var baked_path := _bake_path_points(curve, 4.0)
-	var min_dist := sand_width / 2.0 + 1.5
+	var min_dist := (sand_width if sand_width > road_width else road_width + 2.0) / 2.0 + 1.5
 	var min_dist_sq := min_dist * min_dist
+	var cell_size := 20.0
+	var road_grid := {}
 	
-	# ---------------------------------------------------------------
-	# OPTIMISATION 2: Scatter uniformly across the whole terrain
-	# instead of being anchored to the track.  We simply reject any
-	# candidate that is underwater or too close to the road.
-	# This gives grass *everywhere* on the map and avoids all the
-	# expensive curve.sample_baked() calls in the old loop.
-	# ---------------------------------------------------------------
+	for pt in baked_path:
+		var cx := int(floor(pt.x / cell_size))
+		var cz := int(floor(pt.y / cell_size))
+		var cell_key := Vector2i(cx, cz)
+		if not road_grid.has(cell_key):
+			road_grid[cell_key] = []
+		road_grid[cell_key].append(pt)
+	
 	var half_x := terrain_size.x * 0.5
 	var half_z := terrain_size.y * 0.5
 	var chunk_w := terrain_size.x / grass_grid_size
@@ -1842,8 +1923,9 @@ func _generate_terrain_grass():
 	for i in range(grass_grid_size * grass_grid_size):
 		chunk_transforms[i] = []
 	
-	var attempts: int = target_count * 3  # upper bound to avoid infinite loop
+	var attempts: int = target_count * 2
 	var placed := 0
+	var max_r_sq := (half_x * 0.85) * (half_x * 0.85)
 	
 	for _i in range(attempts):
 		if placed >= target_count:
@@ -1851,47 +1933,37 @@ func _generate_terrain_grass():
 		
 		var px := randf_range(-half_x, half_x)
 		var pz := randf_range(-half_z, half_z)
-		if (px * px + pz * pz) > (half_x * 0.85) * (half_x * 0.85):
+		if (px * px + pz * pz) > max_r_sq:
 			continue
 		
-		# ---------------------------------------------------------------
-		# OPTIMISATION 3: Height check FIRST (just noise math, very fast).
-		# We still need _get_terrain_height which internally calls
-		# curve.get_closest_point() – but only for the edge-blending.
-		# We avoid the *second* explicit get_closest_point call that
-		# previously followed it by reusing our baked array.
-		# ---------------------------------------------------------------
+		# Fast O(1) road exclusion
+		var near_road := false
+		var pcx := int(floor(px / cell_size))
+		var pcz := int(floor(pz / cell_size))
+		for ox in range(-1, 2):
+			if near_road: break
+			for oz in range(-1, 2):
+				var cell = road_grid.get(Vector2i(pcx + ox, pcz + oz))
+				if cell:
+					for pt in cell:
+						var dx: float = px - pt.x
+						var dz: float = pz - pt.y
+						if dx * dx + dz * dz < min_dist_sq:
+							near_road = true
+							break
+		if near_road:
+			continue
+		
+		# Height check
 		var height := _get_terrain_height(px, pz, noise, curve, false)
 		if height < -9.0:
 			continue
 		
-		# Road-exclusion: fast scan through pre-baked 2-D points
-		if _sq_dist_to_path(px, pz, baked_path) < min_dist_sq:
-			continue
-		
 		var pos := Vector3(px, height, pz)
-		
-		# Calculate analytical normal at the grass position to align it with slopes
-		var eps = 0.5
-		var h_L = _get_terrain_height(px - eps, pz, noise, curve, false)
-		var h_R = _get_terrain_height(px + eps, pz, noise, curve, false)
-		var h_D = _get_terrain_height(px, pz - eps, noise, curve, false)
-		var h_U = _get_terrain_height(px, pz + eps, noise, curve, false)
-		var normal = Vector3(h_L - h_R, 2.0 * eps, h_D - h_U).normalized()
-		
-		var up = normal
-		var fwd_vec = Vector3.FORWARD
-		if abs(up.dot(fwd_vec)) > 0.99:
-			fwd_vec = Vector3.UP
-		var right_vec = fwd_vec.cross(up).normalized()
-		fwd_vec = up.cross(right_vec).normalized()
-		
-		var basis := Basis(right_vec, up, -fwd_vec)
-		basis = basis.rotated(up, randf() * PI * 2.0)
-		
+		var rot := randf() * TAU
 		var sh := randf_range(0.8, 1.4)
 		var sw := randf_range(0.8, 1.2)
-		basis = basis.scaled(Vector3(sw, sh, sw))
+		var basis := Basis(Vector3.UP, rot).scaled(Vector3(sw, sh, sw))
 		
 		var col = clamp(int((px + half_x) / chunk_w), 0, grass_grid_size - 1)
 		var row = clamp(int((pz + half_z) / chunk_d), 0, grass_grid_size - 1)
@@ -1948,4 +2020,4 @@ func _generate_terrain_grass():
 				mm.set_instance_transform(i, t)
 				
 			mmi.multimesh = _save_resource(mm, "chunk_%d_%d" % [c, r], "grass")
-			mmi.material_override = mat
+			mmi.material_override = saved_mat

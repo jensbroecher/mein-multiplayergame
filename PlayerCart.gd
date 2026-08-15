@@ -13,11 +13,11 @@ const CAR_PRESETS = [
 		"name": "Viper",
 		"model_path": "res://models/cars/Viper.tscn",
 		"model_y_rotation": PI,       # native FBX faces backward, flip 180°
-		"max_speed": 30.0,
-		"acceleration": 50.0,
+		"max_speed": 40.0,
+		"acceleration": 65.0,
 		"steer_speed": 2.5,
 		"grip": 5.0,
-		"braking": 31.0,
+		"braking": 40.0,
 		"offroad": 6.0,
 		# Wheel part names inside the FBX, keyed by corner
 		"wheel_parts": {"FL": "part_5", "FR": "part_2", "RL": "part_0", "RR": "part_6"}
@@ -26,11 +26,11 @@ const CAR_PRESETS = [
 		"name": "Shadow",
 		"model_path": "res://models/cars/Shadow.tscn",
 		"model_y_rotation": PI,
-		"max_speed": 30.5,
-		"acceleration": 40.0,
+		"max_speed": 41.0,
+		"acceleration": 52.0,
 		"steer_speed": 2.2,
 		"grip": 4.5,
-		"braking": 24.0,
+		"braking": 32.0,
 		"offroad": 4.0,
 		"wheel_parts": {"FL": "part_3", "FR": "part_0", "RL": "part_4", "RR": "part_2"}
 	},
@@ -38,11 +38,11 @@ const CAR_PRESETS = [
 		"name": "Strikeforce",
 		"model_path": "res://models/cars/Strikeforce.tscn",
 		"model_y_rotation": PI * 1.5, # FBX native orientation requires 270° rotation
-		"max_speed": 28.0,
-		"acceleration": 65.0,
+		"max_speed": 37.5,
+		"acceleration": 82.0,
 		"steer_speed": 2.7,
 		"grip": 5.5,
-		"braking": 42.0,
+		"braking": 52.0,
 		"offroad": 8.0,
 		"wheel_parts": {"FL": "part_10", "FR": "part_7", "RL": "part_11", "RR": "part_9"}
 	},
@@ -50,11 +50,11 @@ const CAR_PRESETS = [
 		"name": "Apex",
 		"model_path": "res://models/cars/Apex.tscn",
 		"model_y_rotation": PI,
-		"max_speed": 29.0,
-		"acceleration": 55.0,
+		"max_speed": 39.0,
+		"acceleration": 70.0,
 		"steer_speed": 3.2,
 		"grip": 6.0,
-		"braking": 37.0,
+		"braking": 46.0,
 		"offroad": 5.0,
 		"wheel_parts": {"FL": "part_0", "FR": "part_1", "RL": "part_4", "RR": "part_2"}
 	},
@@ -62,11 +62,11 @@ const CAR_PRESETS = [
 		"name": "Interceptor",
 		"model_path": "res://models/cars/Interceptor.tscn",
 		"model_y_rotation": PI,
-		"max_speed": 32.0,
-		"acceleration": 45.0,
+		"max_speed": 43.0,
+		"acceleration": 58.0,
 		"steer_speed": 2.0,
 		"grip": 4.0,
-		"braking": 27.0,
+		"braking": 35.0,
 		"offroad": 3.0,
 		"wheel_parts": {"FL": "part_6", "FR": "part_3", "RL": "part_4", "RR": "part_5"}
 	},
@@ -74,11 +74,11 @@ const CAR_PRESETS = [
 		"name": "Mudrunner",
 		"model_path": "res://models/cars/Mudrunner.tscn",
 		"model_y_rotation": PI,
-		"max_speed": 27.0,
-		"acceleration": 55.0,
+		"max_speed": 36.0,
+		"acceleration": 68.0,
 		"steer_speed": 2.4,
 		"grip": 5.0,
-		"braking": 35.0,
+		"braking": 44.0,
 		"offroad": 9.5,
 		"wheel_parts": {"FL": "part_0", "FR": "part_3", "RL": "part_2", "RR": "part_4"}
 	},
@@ -86,11 +86,11 @@ const CAR_PRESETS = [
 		"name": "Phantom",
 		"model_path": "res://models/cars/Phantom.tscn",
 		"model_y_rotation": PI * 0.5,
-		"max_speed": 29.5,
-		"acceleration": 50.0,
+		"max_speed": 39.5,
+		"acceleration": 64.0,
 		"steer_speed": 3.5,
 		"grip": 3.5,
-		"braking": 31.0,
+		"braking": 40.0,
 		"offroad": 4.0,
 		"wheel_parts": {"FL": "part_4", "FR": "part_0", "RL": "part_3", "RR": "part_2"}
 	},
@@ -98,20 +98,20 @@ const CAR_PRESETS = [
 		"name": "Centurion",
 		"model_path": "res://models/cars/Centurion.tscn",
 		"model_y_rotation": PI,
-		"max_speed": 29.5,
-		"acceleration": 60.0,
+		"max_speed": 39.5,
+		"acceleration": 76.0,
 		"steer_speed": 2.6,
 		"grip": 5.5,
-		"braking": 38.0,
+		"braking": 48.0,
 		"offroad": 6.5,
 		"wheel_parts": {"FL": "part_0", "FR": "part_5", "RL": "part_2", "RR": "part_3"}
 	}
 ]
 
-var max_speed = 30.0
-var reverse_speed = 15.0
-var acceleration = 50.0
-var braking = 31.0
+var max_speed = 40.0
+var reverse_speed = 19.0
+var acceleration = 65.0
+var braking = 40.0
 var steer_speed = 2.5
 var grip = 5.0
 
@@ -491,15 +491,18 @@ func _ready():
 		if tg and str(tg.get("level_prefix")) == "canyon_chasm":
 			# Local pit water under the first jump (not full-stage ocean).
 			stage_has_water = true
-			water_surface_y = -3.2
+			water_surface_y = -1.8
 			water_bounds_active = true
-			water_bounds_min = Vector2(150.0 - 28.0, -85.0 - 36.0)
-			water_bounds_max = Vector2(150.0 + 28.0, -85.0 + 36.0)
+			water_bounds_min = Vector2(150.0 - 45.0, -90.0 - 58.0)
+			water_bounds_max = Vector2(150.0 + 45.0, -90.0 + 58.0)
 			var pit = tg.get_node_or_null("ChasmPitWater")
 			if pit:
 				if pit.has_meta("water_surface_y"):
 					water_surface_y = float(pit.get_meta("water_surface_y"))
-				if pit.has_meta("water_half_xz"):
+				if pit.has_meta("water_bounds_min") and pit.has_meta("water_bounds_max"):
+					water_bounds_min = pit.get_meta("water_bounds_min")
+					water_bounds_max = pit.get_meta("water_bounds_max")
+				elif pit.has_meta("water_half_xz"):
 					var half: Vector2 = pit.get_meta("water_half_xz")
 					var c: Vector3 = pit.global_position
 					water_bounds_min = Vector2(c.x - half.x, c.z - half.y)
@@ -746,9 +749,25 @@ func _process(delta):
 		
 		if not is_intro_active:
 			if name_tag:
-				name_tag.pixel_size = 0.00035 if is_isometric else 0.00065
+				name_tag.pixel_size = 0.00035 if is_isometric or is_finished_race else 0.00065
 				
-			if is_isometric:
+			if is_finished_race:
+				# Bird's-eye overview camera: Zoom out high above the track for a panoramic overview of the racing circuit
+				var birds_eye_height = 80.0
+				var birds_eye_offset = Vector3(-20.0, birds_eye_height, 35.0)
+				var desired_cam_pos = visuals.global_position + birds_eye_offset
+				var target_cam_pos = _raise_point_above_terrain(desired_cam_pos, excludes)
+				camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 3.0 * delta)
+				camera_pivot.global_position = _raise_point_above_terrain(camera_pivot.global_position, excludes)
+				
+				var target_look = visuals.global_position + Vector3(0, 0.5, 0)
+				camera_look_at = camera_look_at.lerp(target_look, 6.0 * delta)
+				camera_pivot.look_at(camera_look_at, Vector3.UP)
+				
+				_fade_out_all_xray(delta)
+				if race_ui:
+					race_ui.set_terrain_clipped(false)
+			elif is_isometric:
 				var iso_offset = Vector3(-26, 26, 26)
 				var desired_cam_pos = visuals.global_position + iso_offset
 				var ray_start = visuals.global_position + Vector3.UP * 1.0
@@ -853,12 +872,18 @@ func _process(delta):
 		else:
 			_fade_out_all_xray(delta)
 		
-		# Smoothly lerp camera FOV based on is_isometric and is_boosting/is_pad_boosting
-		var target_fov = 35.0 if is_isometric else 75.0
-		if is_boosting:
-			target_fov += 10.0 if is_isometric else 15.0 # Zoom out when boosting!
-		elif is_pad_boosting:
-			target_fov += 6.0 if is_isometric else 9.0 # Zoom out slightly less when pad boosting!
+		# Smoothly lerp camera FOV based on is_isometric, is_finished_race, and is_boosting/is_pad_boosting
+		var target_fov = 75.0
+		if is_finished_race:
+			target_fov = 65.0
+		elif is_isometric:
+			target_fov = 35.0
+		else:
+			target_fov = 75.0
+			if is_boosting:
+				target_fov += 15.0 # Zoom out when boosting!
+			elif is_pad_boosting:
+				target_fov += 9.0 # Zoom out slightly less when pad boosting!
 		camera.fov = lerp(camera.fov, target_fov, 8.0 * delta)
 
 		# Mirror camera into SubViewport (LOCAL_COOP splitscreen)
@@ -1394,8 +1419,8 @@ func _physics_process(delta):
 	var cliff_block = is_offroad and on_ground and not on_loop and ((is_steep_cliff and heading_uphill > 0.15) or (wall_ahead and heading_uphill > -0.1))
 
 	if is_boosting:
-		# Boost cap: fixed absolute speed ceiling (45.0 m/s) so faster cars benefit less
-		var boost_cap = 45.0
+		# Boost cap: fixed absolute speed ceiling (58.0 m/s) so faster cars benefit less
+		var boost_cap = 58.0
 		var max_sp = min(max_speed * 1.5, boost_cap) * slow_mult
 		var accel_force = acceleration * 2.0 * slow_mult
 		if cliff_block:
@@ -1409,7 +1434,7 @@ func _physics_process(delta):
 	elif is_pad_boosting:
 		# Pad boost: strength comes from the BoostPad that triggered us (inspector).
 		var str_m: float = maxf(pad_boost_strength, 0.1)
-		var boost_cap = 42.0 * str_m
+		var boost_cap = 54.0 * str_m
 		var max_sp = min(max_speed * (1.0 + 0.4 * str_m), boost_cap) * slow_mult
 		var accel_force = acceleration * 1.8 * str_m * slow_mult
 		if cliff_block:
@@ -3609,7 +3634,7 @@ func _get_ai_input(delta: float) -> Vector2:
 	ai_lane_offset = lerp(ai_lane_offset, ai_target_lane_offset, 1.5 * delta)
 	
 	var speed = linear_velocity.length()
-	var look_ahead = 10.0 if is_finished_race else lerp(8.0, 16.0, speed / max_speed)
+	var look_ahead = lerp(8.0, 18.0, clampf(speed / maxf(max_speed, 1.0), 0.0, 1.0))
 	var target_offset = current_offset + look_ahead
 	
 	var curve_length = curve.get_baked_length()
@@ -3635,14 +3660,8 @@ func _get_ai_input(delta: float) -> Vector2:
 	
 	input.x = clamp(dir_flat.x * 2.2, -1.0, 1.0)
 	if is_finished_race:
-		# Cruise slowly and smoothly along the track (~13 m/s)
-		var cruise_speed = 13.0
-		if speed > cruise_speed + 2.0:
-			input.y = 0.3 # soft brake if too fast
-		elif speed > cruise_speed:
-			input.y = 0.0 # coast
-		else:
-			input.y = -0.45 # gentle cruise throttle
+		# Continue automatic drive at full speed
+		input.y = -1.0 + abs(input.x) * 0.4
 	else:
 		input.y = -1.0 + abs(input.x) * 0.5
 	

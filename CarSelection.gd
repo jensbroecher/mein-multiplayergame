@@ -18,11 +18,11 @@ const CAR_PRESETS = [
 		"name": "Viper",
 		"model_path": "res://models/cars/Viper.tscn",
 		"model_y_rotation": PI,
-		"max_speed": 30.0,
-		"acceleration": 50.0,
+		"max_speed": 40.0,
+		"acceleration": 65.0,
 		"steer_speed": 2.5,
 		"grip": 5.0,
-		"braking": 31.0,
+		"braking": 40.0,
 		"offroad": 6.0,
 		"desc": "All-around performer. Great for beginners.",
 		"wheel_parts": {"FL": "part_5", "FR": "part_2", "RL": "part_0", "RR": "part_6"}
@@ -31,11 +31,11 @@ const CAR_PRESETS = [
 		"name": "Shadow",
 		"model_path": "res://models/cars/Shadow.tscn",
 		"model_y_rotation": PI,
-		"max_speed": 30.5,
-		"acceleration": 40.0,
+		"max_speed": 41.0,
+		"acceleration": 52.0,
 		"steer_speed": 2.2,
 		"grip": 4.5,
-		"braking": 24.0,
+		"braking": 32.0,
 		"offroad": 4.0,
 		"desc": "High top speed, but slower to accelerate.",
 		"wheel_parts": {"FL": "part_3", "FR": "part_0", "RL": "part_4", "RR": "part_2"}
@@ -44,11 +44,11 @@ const CAR_PRESETS = [
 		"name": "Strikeforce",
 		"model_path": "res://models/cars/Strikeforce.tscn",
 		"model_y_rotation": PI * 1.5,
-		"max_speed": 28.0,
-		"acceleration": 65.0,
+		"max_speed": 37.5,
+		"acceleration": 82.0,
 		"steer_speed": 2.7,
 		"grip": 5.5,
-		"braking": 42.0,
+		"braking": 52.0,
 		"offroad": 8.0,
 		"desc": "Explosive acceleration and good handling.",
 		"wheel_parts": {"FL": "part_10", "FR": "part_7", "RL": "part_11", "RR": "part_9"}
@@ -57,11 +57,11 @@ const CAR_PRESETS = [
 		"name": "Apex",
 		"model_path": "res://models/cars/Apex.tscn",
 		"model_y_rotation": PI,
-		"max_speed": 29.0,
-		"acceleration": 55.0,
+		"max_speed": 39.0,
+		"acceleration": 70.0,
 		"steer_speed": 3.2,
 		"grip": 6.0,
-		"braking": 37.0,
+		"braking": 46.0,
 		"offroad": 5.0,
 		"desc": "Unmatched steering response. Master of drifts.",
 		"wheel_parts": {"FL": "part_0", "FR": "part_1", "RL": "part_4", "RR": "part_2"}
@@ -70,11 +70,11 @@ const CAR_PRESETS = [
 		"name": "Interceptor",
 		"model_path": "res://models/cars/Interceptor.tscn",
 		"model_y_rotation": PI,
-		"max_speed": 32.0,
-		"acceleration": 45.0,
+		"max_speed": 43.0,
+		"acceleration": 58.0,
 		"steer_speed": 2.0,
 		"grip": 4.0,
-		"braking": 27.0,
+		"braking": 35.0,
 		"offroad": 3.0,
 		"desc": "High speed interceptor. Built for straightaways.",
 		"wheel_parts": {"FL": "part_6", "FR": "part_3", "RL": "part_4", "RR": "part_5"}
@@ -83,11 +83,11 @@ const CAR_PRESETS = [
 		"name": "Mudrunner",
 		"model_path": "res://models/cars/Mudrunner.tscn",
 		"model_y_rotation": PI,
-		"max_speed": 27.0,
-		"acceleration": 55.0,
+		"max_speed": 36.0,
+		"acceleration": 68.0,
 		"steer_speed": 2.4,
 		"grip": 5.0,
-		"braking": 35.0,
+		"braking": 44.0,
 		"offroad": 9.5,
 		"desc": "Offroad specialist. Heavy tires maintain full speed off-track.",
 		"wheel_parts": {"FL": "part_0", "FR": "part_3", "RL": "part_2", "RR": "part_4"}
@@ -96,11 +96,11 @@ const CAR_PRESETS = [
 		"name": "Phantom",
 		"model_path": "res://models/cars/Phantom.tscn",
 		"model_y_rotation": PI * 0.5,
-		"max_speed": 29.5,
-		"acceleration": 50.0,
+		"max_speed": 39.5,
+		"acceleration": 64.0,
 		"steer_speed": 3.5,
 		"grip": 3.5,
-		"braking": 31.0,
+		"braking": 40.0,
 		"offroad": 4.0,
 		"desc": "Super agile drift machine. Slides effortlessly around corners.",
 		"wheel_parts": {"FL": "part_4", "FR": "part_0", "RL": "part_3", "RR": "part_2"}
@@ -109,11 +109,11 @@ const CAR_PRESETS = [
 		"name": "Centurion",
 		"model_path": "res://models/cars/Centurion.tscn",
 		"model_y_rotation": PI,
-		"max_speed": 29.5,
-		"acceleration": 60.0,
+		"max_speed": 39.5,
+		"acceleration": 76.0,
 		"steer_speed": 2.6,
 		"grip": 5.5,
-		"braking": 38.0,
+		"braking": 48.0,
 		"offroad": 6.5,
 		"desc": "Heavy armored racer. Balanced stats with high durability.",
 		"wheel_parts": {"FL": "part_0", "FR": "part_5", "RL": "part_2", "RR": "part_3"}
@@ -144,8 +144,8 @@ func update_car_selection():
 	$CenterContainer/VBoxContainer/Description.text = preset.desc
 	
 	# Update stats UI (maps values to 0-100 range)
-	speed_bar.value = (preset.max_speed / 40.0) * 100.0
-	accel_bar.value = (preset.acceleration / 80.0) * 100.0
+	speed_bar.value = (preset.max_speed / 50.0) * 100.0
+	accel_bar.value = (preset.acceleration / 100.0) * 100.0
 	handling_bar.value = (preset.steer_speed / 4.0) * 100.0
 	offroad_bar.value = (preset.get("offroad", 5.0) / 10.0) * 100.0
 	

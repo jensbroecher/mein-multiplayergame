@@ -120,6 +120,39 @@ func _ready():
 			else:
 				print("Failed to pack CanyonLevel.tscn: ", err)
 				
+	# --- 4. CANYON CHASM TRACK (CanyonChasmLevel.tscn) ---
+	var chasm_path = "res://levels/CanyonChasmLevel.tscn"
+	var packed_chasm = load(chasm_path)
+	if packed_chasm:
+		var level = packed_chasm.instantiate()
+		if level:
+			print("Instantiated CanyonChasmLevel.tscn successfully")
+			add_child(level)
+			
+			var tg = level.get_node_or_null("TerrainGenerator")
+			if tg:
+				print("Regenerating canyon chasm terrain from existing custom curve...")
+				tg.level_prefix = "canyon_chasm"
+				tg.track_layout_type = 2 # CANYON
+				tg.no_water = true
+				tg.no_grass = true
+				tg.generate_world()
+			
+			_strip_grass_container(level, tg, "CanyonChasmLevel")
+			
+			# Save and clean up ownership
+			for child in level.get_children():
+				set_owner_recursive_target(child, level)
+					
+			remove_child(level)
+			var new_packed = PackedScene.new()
+			var err = new_packed.pack(level)
+			if err == OK:
+				err = ResourceSaver.save(new_packed, chasm_path)
+				print("Saved CanyonChasmLevel.tscn: ", err)
+			else:
+				print("Failed to pack CanyonChasmLevel.tscn: ", err)
+				
 	get_tree().quit(0)
 
 func set_owner_recursive_target(node: Node, scene_root: Node):
