@@ -262,6 +262,7 @@ var dirt_particles = []
 @export var sync_emit_dirt: bool = false
 var _current_dust_color: Color = Color(0.92, 0.90, 0.88)
 var _is_dust_active: bool = false
+var _trail_particles_ready: bool = false
 static var _dust_radial_texture: Texture2D = null
 var offroad_penalty: float = 1.0
 var offroad_target_penalty: float = 1.0
@@ -651,6 +652,9 @@ func _ready():
 	if has_physics_authority():
 		is_landing = true
 		freeze = false
+
+	# Flush the first-emit MultiMesh / shader compile puff while the car is still spawning.
+	await _prime_wheel_trail_particles()
 
 func _enter_tree():
 	_update_authority()
@@ -3346,6 +3350,96 @@ func _update_antenna(delta):
 	antenna.rotation.x = antenna_tilt.x
 	antenna.rotation.z = antenna_tilt.z
 
+func _configure_trail_particle_draw(p: CPUParticles3D) -> void:
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	p.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
+	p.visibility_aabb = AABB(Vector3(-10, -6, -10), Vector3(20, 12, 20))
+	if p.mesh is PrimitiveMesh and p.material_override is Material:
+		(p.mesh as PrimitiveMesh).material = p.material_override
+
+
+func _collect_trail_particles() -> Array:
+	var all := []
+	for p in dirt_particles:
+		if is_instance_valid(p) and p is CPUParticles3D:
+			all.append(p)
+	for p in drift_particles:
+		if is_instance_valid(p) and p is CPUParticles3D:
+			all.append(p)
+	return all
+
+
+func _prime_wheel_trail_particles() -> void:
+	var all: Array = _collect_trail_particles()
+	if all.is_empty():
+		_trail_particles_ready = true
+		return
+
+	# Tiny on-screen proxies compile the particle shader variants before gameplay.
+	# The first real emit is otherwise the first draw, which shows a dark MultiMesh puff.
+	var dummies := []
+	var seen_mats := {}
+	for p in all:
+		var mat = p.material_override
+		if mat == null or seen_mats.has(mat):
+			continue
+		seen_mats[mat] = true
+		var dummy := MeshInstance3D.new()
+		dummy.mesh = p.mesh if p.mesh else QuadMesh.new()
+		dummy.material_override = mat
+		dummy.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		dummy.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
+		dummy.layers = p.layers
+		dummy.scale = Vector3(0.001, 0.001, 0.001)
+		visuals.add_child(dummy)
+		dummy.global_position = p.global_position
+		dummies.append(dummy)
+
+	for p in all:
+		# Hide the uninitialized MultiMesh (identity transforms, default black instance colors)
+		# while still allowing the first process/draw to allocate and fill the buffer.
+		p.transparency = 1.0
+		p.emitting = true
+		p.restart()
+		if p.has_method("request_particles_process"):
+			p.request_particles_process(p.lifetime + 0.05, p.lifetime + 0.05)
+		else:
+			p.preprocess = p.lifetime + 0.05
+
+	if is_inside_tree():
+		await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+
+	if not is_inside_tree():
+		return
+
+	# Stop emission and age remaining particles out while still invisible.
+	for p in all:
+		if not is_instance_valid(p):
+			continue
+		p.emitting = false
+		p.preprocess = 0.0
+		if p.has_method("request_particles_process"):
+			p.request_particles_process(0.0, p.lifetime + 0.05)
+
+	if is_inside_tree():
+		await get_tree().process_frame
+
+	if not is_inside_tree():
+		return
+
+	for p in all:
+		if not is_instance_valid(p):
+			continue
+		p.transparency = 0.0
+
+	for dummy in dummies:
+		if is_instance_valid(dummy):
+			dummy.queue_free()
+
+	_trail_particles_ready = true
+
+
 func _create_drift_particles(wheel_name: String):
 	var pivot = get_node_or_null("Visuals/WheelPivot" + wheel_name)
 	if not pivot: return
@@ -3404,6 +3498,7 @@ func _create_drift_particles(wheel_name: String):
 		Color(0.80, 0.80, 0.80, 0.0)
 	])
 	smoke.color_ramp = grad
+	_configure_trail_particle_draw(smoke)
 
 	# Skidmarks — continuous deep dark rubber tire tracks on road surface
 	var skid = CPUParticles3D.new()
@@ -3459,8 +3554,11 @@ func _create_drift_particles(wheel_name: String):
 		skid.global_position = pivot.global_position + pivot.global_transform.basis * local_offset
 		var yaw: float = visuals.global_rotation.y if is_instance_valid(visuals) else 0.0
 		skid.global_rotation = Vector3(0.0, yaw, 0.0)
+	_configure_trail_particle_draw(skid)
 
 func _set_drift_emitting(emitting: bool):
+	if not _trail_particles_ready:
+		return
 	var speed: float = linear_velocity.length()
 	var time_since_respawn = (Time.get_ticks_msec() / 1000.0) - last_respawn_time
 	for p in drift_particles:
@@ -3569,6 +3667,7 @@ func _create_dirt_particles(wheel_name: String):
 		Color(1.0, 1.0, 1.0, 0.0)
 	])
 	dirt.color_ramp = grad
+	_configure_trail_particle_draw(dirt)
 
 
 func _get_current_surface_dust_color() -> Color:
@@ -3604,6 +3703,8 @@ func _apply_dust_particle_colors(base_color: Color) -> void:
 
 
 func _set_dirt_emitting(emitting: bool):
+	if not _trail_particles_ready:
+		return
 	var in_water := stage_has_water and (is_underwater or (water_surface_y - global_position.y >= -0.45 and _is_over_water_volume()))
 	var speed: float = linear_velocity.length()
 	var time_since_respawn = (Time.get_ticks_msec() / 1000.0) - last_respawn_time
