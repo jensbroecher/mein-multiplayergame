@@ -150,9 +150,9 @@ const BOMB_EXPLOSION_SOUNDS = [
 ]
 
 const LANDING_SOUNDS = [
-	preload("res://sounds/freesound_community-bonk-46000.mp3"),
-	preload("res://sounds/crash.mp3")
+	preload("res://sounds/freesound_community-bonk-46000.mp3")
 ]
+const CRASH_SOUND = preload("res://sounds/crash.mp3")
 
 @onready var visuals = $Visuals
 @onready var camera_pivot = $Visuals/CameraPivot
@@ -239,6 +239,7 @@ var is_drifting: bool = false
 var was_on_ground: bool = true
 var air_time: float = 0.0
 var ignore_next_landing_sound: bool = false
+var last_crash_sound_time: float = -999.0
 var wheel_rotation: float = 0.0
 var is_teleporting: bool = false
 var is_shielded: bool = false
@@ -693,7 +694,7 @@ func _update_authority():
 		freeze = true
 		freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
 
-func _on_body_entered(_body: Node):
+func _on_body_entered(body: Node):
 	if not is_local_player:
 		return
 	var speed = linear_velocity.length()
@@ -702,6 +703,24 @@ func _on_body_entered(_body: Node):
 		var dev = 1 if input_prefix == "p2_" else 0
 		if dev in Input.get_connected_joypads():
 			Input.start_joy_vibration(dev, magnitude * 0.4, magnitude * 0.7, 0.2)
+
+func _integrate_forces(state: PhysicsDirectBodyState3D):
+	if not is_local_player or not can_move or is_exploding:
+		return
+	var speed = state.linear_velocity.length()
+	if speed < 8.0:
+		return
+	var now = Time.get_ticks_msec() / 1000.0
+	if now - last_crash_sound_time < 0.6:
+		return
+	# Check contact normals: ground points UP (y~1), walls point sideways (y~0)
+	for i in range(state.get_contact_count()):
+		var normal = state.get_contact_local_normal(i)
+		if abs(normal.y) < 0.5:
+			# This contact is mostly horizontal = wall / obstacle / barrier
+			last_crash_sound_time = now
+			_play_crash_sound()
+			return
 
 func _process(delta):
 	_update_visual_states(delta)
@@ -952,13 +971,13 @@ func _process(delta):
 				_setup_engine_sound()
 			if not engine_sound.playing:
 				engine_sound.play()
-				engine_sound.volume_db = -16.0
+				engine_sound.volume_db = -32.0
 			var speed_ratio = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
-			var target_vol = lerp(-16.0, -9.0, speed_ratio)
+			var target_vol = lerp(-32.0, -22.0, speed_ratio)
 			if is_boosting:
 				target_vol += 2.0
-			engine_sound.volume_db = move_toward(engine_sound.volume_db, target_vol, 30.0 * delta)
-			var target_pitch = lerp(0.85, 1.4, speed_ratio)
+			engine_sound.volume_db = move_toward(engine_sound.volume_db, target_vol, 25.0 * delta)
+			var target_pitch = lerp(0.80, 1.35, speed_ratio)
 			if is_boosting:
 				target_pitch *= 1.12
 			elif is_pad_boosting:
@@ -1378,10 +1397,14 @@ func _physics_process(delta):
 	else:
 		if not was_on_ground:
 			var time_since_respawn = (Time.get_ticks_msec() / 1000.0) - last_respawn_time
-			if not can_move or is_landing or time_since_respawn < 1.0 or ignore_next_landing_sound or air_time < 0.25:
+			var is_descending = linear_velocity.y < -1.0 or linear_velocity.dot(-ground_normal) > 1.0
+			if not can_move or is_landing or time_since_respawn < 0.6 or ignore_next_landing_sound or air_time < 0.15 or not is_descending:
 				ignore_next_landing_sound = false
 			else:
-				play_landing_sound_rpc.rpc(air_time)
+				if multiplayer.multiplayer_peer != null:
+					play_landing_sound_rpc.rpc(air_time)
+				else:
+					play_landing_sound_rpc(air_time)
 		air_time = 0.0
 
 		# Auto-righting: if car lands on its back or heavily tilted, smoothly turn/flip back onto wheels
@@ -1765,10 +1788,10 @@ func _setup_engine_sound() -> void:
 		(engine_stream as AudioStreamOggVorbis).loop = true
 	engine_sound.stream = engine_stream
 	engine_sound.pitch_scale = 1.0
-	engine_sound.volume_db = -16.0
-	engine_sound.unit_size = 18.0
-	engine_sound.max_distance = 90.0
-	engine_sound.attenuation_filter_cutoff_hz = 20500.0
+	engine_sound.volume_db = -32.0
+	engine_sound.unit_size = 6.0
+	engine_sound.max_distance = 45.0
+	engine_sound.attenuation_filter_cutoff_hz = 16000.0
 	engine_sound.bus = &"SFX"
 
 
@@ -2257,15 +2280,23 @@ func _execute_use_item(type: int):
 		ItemType.LIGHTNING:
 			_activate_lightning()
 
+func _play_crash_sound() -> void:
+	if sfx_landing_bonk == null: return
+	sfx_landing_bonk.stream = CRASH_SOUND
+	sfx_landing_bonk.unit_size = 40.0
+	sfx_landing_bonk.max_distance = 180.0
+	sfx_landing_bonk.volume_db = 6.0
+	sfx_landing_bonk.play()
+
 @rpc("any_peer", "call_local", "unreliable")
 func play_landing_sound_rpc(p_air_time: float):
 	if LANDING_SOUNDS.is_empty(): return
-	var sound = LANDING_SOUNDS[randi() % LANDING_SOUNDS.size()]
+	var sound = LANDING_SOUNDS[0]
 	sfx_landing_bonk.stream = sound
-	sfx_landing_bonk.unit_size = 30.0
+	sfx_landing_bonk.unit_size = 35.0
 	sfx_landing_bonk.max_distance = 150.0
-	# Map air_time to punchy volume_db [-2.0, 7.0]
-	var volume = lerpf(-2.0, 7.0, clampf(p_air_time / 0.8, 0.0, 1.0))
+	# Map descent impact to punchy volume_db [2.0, 9.0]
+	var volume = lerpf(2.0, 9.0, clampf(p_air_time / 0.6, 0.0, 1.0))
 	sfx_landing_bonk.volume_db = volume
 	sfx_landing_bonk.play()
 
@@ -2750,9 +2781,11 @@ func respawn():
 		spawn_pos = spawn_pos - forward_dir * 5.0 + target_basis.y * 1.5
 		global_transform = Transform3D(target_basis, spawn_pos)
 
-		visuals.global_position = global_position
-		visuals.look_at(global_position + forward_dir * 10.0, Vector3.UP)
-		
+		# Force visuals upright — must happen AFTER global_transform is set
+		visuals.global_transform = Transform3D(target_basis, spawn_pos)
+		air_angular_velocity = Vector3.ZERO
+		is_righting_on_ground = false
+
 		sync_position = global_position
 		sync_rotation = visuals.global_rotation
 		sync_rotation_quat = target_basis.get_rotation_quaternion()
@@ -3395,8 +3428,12 @@ func _create_drift_particles(wheel_name: String):
 	skid.material_override = mat_skid
 
 	var skid_grad = Gradient.new()
-	skid_grad.offsets = PackedFloat32Array([0.0, 0.55, 0.85, 1.0])
+	# Fade-in from alpha 0 over first 2% of lifetime (~36ms) so the very first
+	# particles spawned when the emitter initialises are invisible, preventing
+	# the dark "disc" artifact that appears on first contact with the surface.
+	skid_grad.offsets = PackedFloat32Array([0.0, 0.02, 0.55, 0.85, 1.0])
 	skid_grad.colors = PackedColorArray([
+		Color(0.03, 0.03, 0.03, 0.0),  # Invisible at birth
 		Color(0.03, 0.03, 0.03, 0.75), # Deep dark black rubber
 		Color(0.03, 0.03, 0.03, 0.50),
 		Color(0.03, 0.03, 0.03, 0.18),
@@ -3434,15 +3471,14 @@ func _set_drift_emitting(emitting: bool):
 			# Skidmarks emit only during active drift or hard braking at speed (> 6.5 m/s) on ground after landing has settled
 			var skid_on: bool = emitting and speed > 6.5 and not is_landing and can_move and air_time < 0.02 and time_since_respawn > 0.5
 			p.emitting = skid_on
-			if "amount_ratio" in p:
-				# Scale emission rate with speed to prevent particle stacking/black discs at lower drift speeds
-				p.amount_ratio = clampf((speed - 5.0) / 16.0, 0.25, 1.0) if skid_on else 0.0
+			if skid_on and "amount_ratio" in p:
+				p.amount_ratio = clampf((speed - 5.0) / 16.0, 0.25, 1.0)
 		else:
 			# Smoke emits during drift or hard braking at speed
 			var smoke_on: bool = emitting and speed > 5.0 and not is_landing and can_move and air_time < 0.02 and time_since_respawn > 0.5
 			p.emitting = smoke_on
-			if "amount_ratio" in p:
-				p.amount_ratio = clampf(speed / 20.0, 0.15, 0.65) if smoke_on else 0.0
+			if smoke_on and "amount_ratio" in p:
+				p.amount_ratio = clampf(speed / 20.0, 0.15, 0.65)
 
 func _set_boost_emitting(emitting: bool) -> void:
 	if is_instance_valid(boost_particles_l) and boost_particles_l.emitting != emitting:
@@ -3588,8 +3624,8 @@ func _set_dirt_emitting(emitting: bool):
 	for p in dirt_particles:
 		if is_instance_valid(p) and p is CPUParticles3D:
 			p.emitting = on
-			if "amount_ratio" in p:
-				p.amount_ratio = clampf((speed - 4.0) / 14.0, 0.15, 1.0) if on else 0.0
+			if on and "amount_ratio" in p:
+				p.amount_ratio = clampf((speed - 4.0) / 14.0, 0.20, 1.0)
 
 func _get_ground_height(global_pos: Vector3) -> float:
 	var space_state = get_world_3d().direct_space_state
