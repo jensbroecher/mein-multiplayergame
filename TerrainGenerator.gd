@@ -1624,7 +1624,7 @@ const WADI_RIVER_POLY: Array[Vector2] = [
 const WADI_LAKE_CENTER := Vector2(195.0, -208.0)
 const WADI_LAKE_RADIUS := Vector2(130.0, 105.0) # X / Z ellipse radii extending into hills
 ## Influence threshold for water mesh cells.
-const WADI_WATER_MESH_THRESH := 0.04
+const WADI_WATER_MESH_THRESH := 0.005
 
 
 func _wadi_river_influence(px: float, pz: float) -> float:

@@ -259,7 +259,9 @@ var drift_particles = []
 @export var sync_emit_drift: bool = false
 var dirt_particles = []
 @export var sync_emit_dirt: bool = false
-var _current_dust_color: Color = Color(0.60, 0.50, 0.40)
+var _current_dust_color: Color = Color(0.92, 0.90, 0.88)
+var _is_dust_active: bool = false
+static var _dust_radial_texture: Texture2D = null
 var offroad_penalty: float = 1.0
 var offroad_target_penalty: float = 1.0
 var offroad_timer: float = 0.0
@@ -278,6 +280,7 @@ var water_bounds_max: Vector2 = Vector2.ZERO
 ## TerrainGenerator for desert_wadi influence-shaped water (optional).
 var _wadi_water_tg: Node = null
 var water_timer: float = 0.0
+var shallow_water_timer: float = 0.0
 var last_splash_time: float = -999.0
 ## Tracks wet/dry transitions for entry splash + hit slowdown.
 var _was_in_water_zone: bool = false
@@ -568,31 +571,22 @@ func _ready():
 					water_bounds_min = Vector2(c.x - half.x, c.z - half.y)
 					water_bounds_max = Vector2(c.x + half.x, c.z + half.y)
 		elif tg and str(tg.get("level_prefix")) == "desert_wadi":
-			# Local river + valley lake. Mesh verts are world-space with node at TG origin —
-			# use water_center_xz / water_bounds_* meta, not river.global_position (was 0,0,0).
+			# Local river + valley lake in desert_wadi.
 			stage_has_water = true
 			water_surface_y = 1.70
 			water_bounds_active = true
-			water_bounds_min = Vector2(30.0, -330.0)
-			water_bounds_max = Vector2(360.0, -90.0)
+			water_bounds_min = Vector2(0.0, -360.0)
+			water_bounds_max = Vector2(400.0, -60.0)
 			_wadi_water_tg = tg
 			var river = tg.get_node_or_null("WadiRiverWater")
 			if river:
 				if river.has_meta("water_surface_y"):
-					water_surface_y = float(river.get_meta("water_surface_y")) + river.global_position.y
+					water_surface_y = float(river.get_meta("water_surface_y"))
 				if river.has_meta("water_bounds_min") and river.has_meta("water_bounds_max"):
-					water_bounds_min = river.get_meta("water_bounds_min")
-					water_bounds_max = river.get_meta("water_bounds_max")
-				elif river.has_meta("water_half_xz"):
-					var half_r: Vector2 = river.get_meta("water_half_xz")
-					var center_xz: Vector2
-					if river.has_meta("water_center_xz"):
-						center_xz = river.get_meta("water_center_xz")
-					else:
-						var cr: Vector3 = river.global_position
-						center_xz = Vector2(cr.x, cr.z)
-					water_bounds_min = Vector2(center_xz.x - half_r.x, center_xz.y - half_r.y)
-					water_bounds_max = Vector2(center_xz.x + half_r.x, center_xz.y + half_r.y)
+					var bmin: Vector2 = river.get_meta("water_bounds_min")
+					var bmax: Vector2 = river.get_meta("water_bounds_max")
+					water_bounds_min = Vector2(minf(bmin.x, 0.0), minf(bmin.y, -360.0))
+					water_bounds_max = Vector2(maxf(bmax.x, 400.0), maxf(bmax.y, -60.0))
 		elif tg and "no_water" in tg:
 			stage_has_water = not tg.no_water
 			water_surface_y = WATER_LEVEL
@@ -644,6 +638,8 @@ func _ready():
 	_create_drift_particles("RR")
 	_create_dirt_particles("RL")
 	_create_dirt_particles("RR")
+	_current_dust_color = _get_current_surface_dust_color()
+	_apply_dust_particle_colors(_current_dust_color)
 	_update_boost_particle_positions()
 
 	# Move all car meshes to Visual Layer 2 so they do not receive Decal projections
@@ -956,12 +952,12 @@ func _process(delta):
 				_setup_engine_sound()
 			if not engine_sound.playing:
 				engine_sound.play()
-				engine_sound.volume_db = -6.0
+				engine_sound.volume_db = -16.0
 			var speed_ratio = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
-			var target_vol = lerp(-8.0, -2.0, speed_ratio)
+			var target_vol = lerp(-16.0, -9.0, speed_ratio)
 			if is_boosting:
 				target_vol += 2.0
-			engine_sound.volume_db = move_toward(engine_sound.volume_db, target_vol, 40.0 * delta)
+			engine_sound.volume_db = move_toward(engine_sound.volume_db, target_vol, 30.0 * delta)
 			var target_pitch = lerp(0.85, 1.4, speed_ratio)
 			if is_boosting:
 				target_pitch *= 1.12
@@ -1121,12 +1117,12 @@ func _physics_process(delta):
 		# Depth relative to surface: positive = below surface (submerged)
 		var water_depth: float = water_surface_y - global_position.y
 		var in_water_xz := _is_over_water_volume()
-		# True contact with water: car's lower hull / wheels reach the water surface (radius ~0.45, contact around -0.35)
-		var in_water_contact := in_water_xz and water_depth >= -0.35
-		# Shallow / ford: touching or wading through water — spray and light drag, never drown
-		var in_shallow_water := in_water_contact and water_depth < 1.10
+		# True contact with water: car's lower hull / wheels reach the water surface (contact around -0.45m)
+		var in_water_contact := in_water_xz and water_depth >= -0.45
+		# Shallow / ford: touching or wading through water — spray and light drag
+		var in_shallow_water := in_water_contact and water_depth < 0.90
 		# Deep water only (fully submerged): can eventually drown
-		var in_deep_water := in_water_contact and water_depth >= 1.10
+		var in_deep_water := in_water_contact and water_depth >= 0.90
 		# Hysteresis for "underwater" VFX / deep state
 		var currently_underwater = is_underwater
 		if is_underwater:
@@ -1224,15 +1220,29 @@ func _physics_process(delta):
 
 		if in_deep_water:
 			water_timer += delta
-			# Only drown after sustained deep submersion (not quick dips / fords)
-			if water_timer > 2.8:
+			shallow_water_timer = 0.0
+			# Drown after sustained deep submersion
+			if water_timer > 2.5:
 				if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 					drown_rpc.rpc()
 				elif multiplayer.multiplayer_peer == null:
 					drown()
 			apply_central_force(Vector3.UP * 12.0)
-		else:
+		elif in_water_contact:
 			water_timer = maxf(0.0, water_timer - delta * 1.5)
+			# If a car stands / is stuck longer than 5 seconds in shallow water, trigger drown respawn
+			if linear_velocity.length() < 2.5:
+				shallow_water_timer += delta
+				if shallow_water_timer > 5.0:
+					if multiplayer.multiplayer_peer != null and multiplayer.is_server():
+						drown_rpc.rpc()
+					elif multiplayer.multiplayer_peer == null:
+						drown()
+			else:
+				shallow_water_timer = maxf(0.0, shallow_water_timer - delta * 1.5)
+		else:
+			water_timer = 0.0
+			shallow_water_timer = 0.0
 
 	if not has_physics_authority:
 		_interpolate_remote_physics(delta)
@@ -1374,10 +1384,13 @@ func _physics_process(delta):
 				play_landing_sound_rpc.rpc(air_time)
 		air_time = 0.0
 
-		# Auto-righting: if car lands on its back or heavily tilted, flip back onto wheels
+		# Auto-righting: if car lands on its back or heavily tilted, smoothly turn/flip back onto wheels
 		var cur_up = visuals.global_transform.basis.y
 		var up_dot = cur_up.dot(ground_normal)
-		if up_dot < 0.85:
+		if up_dot < 0.92:
+			if not is_righting_on_ground and up_dot < 0.2:
+				# Gentle hop when flipped upside down so wheels clear ground to roll over
+				apply_central_impulse(Vector3.UP * mass * 3.5)
 			is_righting_on_ground = true
 			air_angular_velocity = Vector3.ZERO
 			var fwd_cand = -visuals.global_transform.basis.z
@@ -1391,7 +1404,8 @@ func _physics_process(delta):
 			var target_r = proj_fwd.cross(ground_normal).normalized()
 			var target_f = ground_normal.cross(target_r).normalized()
 			var upright_basis = Basis(target_r, ground_normal, -target_f)
-			var recovery_speed: float = 18.0 if up_dot < 0.2 else 12.0
+			# Smooth roll recovery animation over ~0.6s
+			var recovery_speed: float = 3.8
 			visuals.global_transform.basis = visuals.global_transform.basis.slerp(upright_basis, 1.0 - exp(-recovery_speed * delta))
 		else:
 			is_righting_on_ground = false
@@ -1707,8 +1721,9 @@ func _physics_process(delta):
 		var excess_ratio = (current_speed - effective_max) / max_speed
 		apply_central_force(-fwd * excess_ratio * acceleration * 8.0 * mass)
 
-	# Emit dirt particles when offroad and moving
-	var emit_dirt = is_offroad and on_ground and linear_velocity.length() > 2.0
+	# Emit dirt particles when offroad, moving, and NOT in water
+	var in_water_now := stage_has_water and (is_underwater or (water_surface_y - global_position.y >= -0.45 and _is_over_water_volume()))
+	var emit_dirt = is_offroad and on_ground and linear_velocity.length() > 2.0 and not in_water_now
 	_set_dirt_emitting(emit_dirt)
 	sync_emit_dirt = emit_dirt
 
@@ -1750,9 +1765,9 @@ func _setup_engine_sound() -> void:
 		(engine_stream as AudioStreamOggVorbis).loop = true
 	engine_sound.stream = engine_stream
 	engine_sound.pitch_scale = 1.0
-	engine_sound.volume_db = -6.0
-	engine_sound.unit_size = 35.0
-	engine_sound.max_distance = 120.0
+	engine_sound.volume_db = -16.0
+	engine_sound.unit_size = 18.0
+	engine_sound.max_distance = 90.0
 	engine_sound.attenuation_filter_cutoff_hz = 20500.0
 	engine_sound.bus = &"SFX"
 
@@ -1814,9 +1829,15 @@ func _is_over_water_volume() -> bool:
 	if not (p.x >= water_bounds_min.x and p.x <= water_bounds_max.x \
 			and p.z >= water_bounds_min.y and p.z <= water_bounds_max.y):
 		return false
-	# Desert wadi: water is an irregular lake/river, not the full AABB.
-	if is_instance_valid(_wadi_water_tg) and _wadi_water_tg.has_method("is_wadi_water_at"):
-		return bool(_wadi_water_tg.call("is_wadi_water_at", p.x, p.z))
+	# Desert wadi: check if ground is below water surface or influence test
+	if is_instance_valid(_wadi_water_tg):
+		if _wadi_water_tg.has_method("is_wadi_water_at") and _wadi_water_tg.call("is_wadi_water_at", p.x, p.z):
+			return true
+		# Fallback check: terrain height below or near water surface
+		var th: float = _get_ground_height(p)
+		if th > -900.0 and th <= water_surface_y + 0.20:
+			return true
+		return false
 	return true
 
 
@@ -2524,12 +2545,14 @@ func explode(attacker_id: int = 0):
 			part_world_positions[pivot] = pivot.global_position
 
 	if multiplayer.multiplayer_peer != null and multiplayer.is_server():
-		get_tree().create_timer(4.2).timeout.connect(
-			func(): if is_instance_valid(self): respawn_rpc.rpc()
+		get_tree().create_timer(4.2).timeout.connect(func():
+			if is_instance_valid(self):
+				respawn_rpc.rpc()
 		)
 	elif multiplayer.multiplayer_peer == null:
-		get_tree().create_timer(4.2).timeout.connect(
-			func(): if is_instance_valid(self): respawn()
+		get_tree().create_timer(4.2).timeout.connect(func():
+			if is_instance_valid(self):
+				respawn()
 		)
 
 @rpc("any_peer", "call_local", "reliable")
@@ -2570,15 +2593,20 @@ func drown():
 	# Also fade the name tag
 	if name_tag:
 		_drown_tween.parallel().tween_property(name_tag, "modulate:a", 0.0, fade_duration)
-	_drown_tween.tween_callback(func(): visuals.visible = false)
+	_drown_tween.tween_callback(func():
+		if is_instance_valid(visuals):
+			visuals.visible = false
+	)
 	
 	if multiplayer.multiplayer_peer != null and multiplayer.is_server():
-		get_tree().create_timer(1.2).timeout.connect(
-			func(): if is_instance_valid(self): respawn_rpc.rpc()
+		get_tree().create_timer(1.2).timeout.connect(func():
+			if is_instance_valid(self):
+				respawn_rpc.rpc()
 		)
 	elif multiplayer.multiplayer_peer == null:
-		get_tree().create_timer(1.2).timeout.connect(
-			func(): if is_instance_valid(self): respawn()
+		get_tree().create_timer(1.2).timeout.connect(func():
+			if is_instance_valid(self):
+				respawn()
 		)
 
 @rpc("any_peer", "call_local", "reliable")
@@ -2645,8 +2673,22 @@ func respawn():
 	
 	can_move = not finished
 	is_boosting = false
+	is_pad_boosting = false
 	boost_time = 0.0
+	boost_timer = 0.0
+	pad_boost_timer = 0.0
+	pad_boost_strength = 1.0
+	slow_timer = 0.0
 	is_landing = false
+	is_drifting = false
+	drift_mode = false
+	_is_dust_active = false
+	
+	# Clear inventory items and active powerups on respawn
+	current_item = ItemType.NONE
+	current_item_2 = ItemType.NONE
+	if is_local_player and race_ui:
+		race_ui.update_items("NONE", "NONE")
 	
 	explosion_particles.emitting = false
 	burning_particles.emitting = false
@@ -2654,6 +2696,13 @@ func respawn():
 	fire_sprite_particles.emitting = false
 	fire_sprite_particles_2.emitting = false
 	sfx_fire_loop.stop()
+	sfx_rocket_loop.stop()
+	sfx_nitro_start.stop()
+	sfx_brake_drift.stop()
+	
+	_set_drift_emitting(false)
+	_set_dirt_emitting(false)
+	_set_boost_emitting(false)
 
 	# Safety: if eagle/tornado still thinks it owns us, force drop
 	_clear_external_captures()
@@ -2669,6 +2718,9 @@ func respawn():
 		linear_velocity = Vector3.ZERO
 		angular_velocity = Vector3.ZERO
 		visual_offset_y = 0.0
+		
+		# Reset server sync state to zero
+		sync_velocity = Vector3.ZERO
 
 		var target_path = active_path
 		if target_path == null:
@@ -2700,6 +2752,15 @@ func respawn():
 
 		visuals.global_position = global_position
 		visuals.look_at(global_position + forward_dir * 10.0, Vector3.UP)
+		
+		sync_position = global_position
+		sync_rotation = visuals.global_rotation
+		sync_rotation_quat = target_basis.get_rotation_quaternion()
+		
+		# Force physics server to flush any stored momentum immediately
+		PhysicsServer3D.body_set_state(get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM, global_transform)
+		PhysicsServer3D.body_set_state(get_rid(), PhysicsServer3D.BODY_STATE_LINEAR_VELOCITY, Vector3.ZERO)
+		PhysicsServer3D.body_set_state(get_rid(), PhysicsServer3D.BODY_STATE_ANGULAR_VELOCITY, Vector3.ZERO)
 
 
 ## Drop eagle grab (and tornado, if present) so freeze/can_move aren't left stuck after death.
@@ -3283,18 +3344,8 @@ func _create_drift_particles(wheel_name: String):
 	mat_smoke.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 	mat_smoke.vertex_color_use_as_albedo = true
 	mat_smoke.cull_mode = BaseMaterial3D.CULL_DISABLED
-
-	var grad_tex = GradientTexture2D.new()
-	grad_tex.fill = GradientTexture2D.FILL_RADIAL
-	grad_tex.fill_from = Vector2(0.5, 0.5)
-	grad_tex.fill_to = Vector2(0.5, 0.0)
-
-	var smoke_mask_grad = Gradient.new()
-	smoke_mask_grad.set_color(0, Color(1.0, 1.0, 1.0, 1.0))
-	smoke_mask_grad.set_color(1, Color(1.0, 1.0, 1.0, 0.0))
-	grad_tex.gradient = smoke_mask_grad
-
-	mat_smoke.albedo_texture = grad_tex
+	mat_smoke.albedo_texture = _get_radial_dust_texture()
+	mat_smoke.albedo_color = Color(1.0, 1.0, 1.0, 1.0)
 	smoke.material_override = mat_smoke
 
 	smoke.direction = Vector3(0.0, 0.8, 1.0).normalized()
@@ -3321,18 +3372,18 @@ func _create_drift_particles(wheel_name: String):
 	])
 	smoke.color_ramp = grad
 
-	# Skidmarks — single clean dark rubber tire ribbon on road surface
+	# Skidmarks — continuous deep dark rubber tire tracks on road surface
 	var skid = CPUParticles3D.new()
 	skid.name = wheel_name + "_Skid"
 	skid.emitting = false
-	skid.amount = 24
-	skid.lifetime = 1.0
+	skid.amount = 120
+	skid.lifetime = 1.8
 	skid.explosiveness = 0.0
 	skid.randomness = 0.0
-	skid.fixed_fps = 30
+	skid.fixed_fps = 60
 	skid.mesh = QuadMesh.new()
 	skid.mesh.orientation = PlaneMesh.FACE_Y
-	skid.mesh.size = Vector2(0.24, 0.38)
+	skid.mesh.size = Vector2(0.26, 0.58)
 
 	var mat_skid = StandardMaterial3D.new()
 	mat_skid.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -3340,16 +3391,16 @@ func _create_drift_particles(wheel_name: String):
 	mat_skid.albedo_color = Color(1.0, 1.0, 1.0, 1.0)
 	mat_skid.vertex_color_use_as_albedo = true
 	mat_skid.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mat_skid.render_priority = 2
+	mat_skid.render_priority = 3
 	skid.material_override = mat_skid
 
 	var skid_grad = Gradient.new()
-	skid_grad.offsets = PackedFloat32Array([0.0, 0.40, 0.80, 1.0])
+	skid_grad.offsets = PackedFloat32Array([0.0, 0.55, 0.85, 1.0])
 	skid_grad.colors = PackedColorArray([
-		Color(0.04, 0.04, 0.04, 0.65), # Dark rubber tire mark
-		Color(0.04, 0.04, 0.04, 0.45),
-		Color(0.04, 0.04, 0.04, 0.15),
-		Color(0.04, 0.04, 0.04, 0.0)
+		Color(0.03, 0.03, 0.03, 0.75), # Deep dark black rubber
+		Color(0.03, 0.03, 0.03, 0.50),
+		Color(0.03, 0.03, 0.03, 0.18),
+		Color(0.03, 0.03, 0.03, 0.0)
 	])
 	skid.color_ramp = skid_grad
 
@@ -3374,19 +3425,21 @@ func _create_drift_particles(wheel_name: String):
 
 func _set_drift_emitting(emitting: bool):
 	var speed: float = linear_velocity.length()
+	var time_since_respawn = (Time.get_ticks_msec() / 1000.0) - last_respawn_time
 	for p in drift_particles:
 		if not is_instance_valid(p) or not (p is CPUParticles3D):
 			continue
 		var kind: String = str(p.get_meta("kind", ""))
 		if kind == "skid" or p.name.ends_with("_Skid"):
-			# Skidmarks only emit during active high-speed powerslides, never on straight driving or landing
-			var skid_on: bool = emitting and is_drifting and speed > 8.5 and not is_landing and air_time < 0.01
+			# Skidmarks emit only during active drift or hard braking at speed (> 6.5 m/s) on ground after landing has settled
+			var skid_on: bool = emitting and speed > 6.5 and not is_landing and can_move and air_time < 0.02 and time_since_respawn > 0.5
 			p.emitting = skid_on
 			if "amount_ratio" in p:
-				p.amount_ratio = clampf((speed - 7.0) / 13.0, 0.30, 1.0) if skid_on else 0.0
+				# Scale emission rate with speed to prevent particle stacking/black discs at lower drift speeds
+				p.amount_ratio = clampf((speed - 5.0) / 16.0, 0.25, 1.0) if skid_on else 0.0
 		else:
 			# Smoke emits during drift or hard braking at speed
-			var smoke_on: bool = emitting and speed > 5.0 and not is_landing and air_time < 0.01
+			var smoke_on: bool = emitting and speed > 5.0 and not is_landing and can_move and air_time < 0.02 and time_since_respawn > 0.5
 			p.emitting = smoke_on
 			if "amount_ratio" in p:
 				p.amount_ratio = clampf(speed / 20.0, 0.15, 0.65) if smoke_on else 0.0
@@ -3405,6 +3458,21 @@ func _update_boost_particle_positions() -> void:
 		boost_particles_l.position = Vector3(pivot_rl.position.x, under_wheel_y, pivot_rl.position.z + 0.12)
 	if pivot_rr and is_instance_valid(boost_particles_r):
 		boost_particles_r.position = Vector3(pivot_rr.position.x, under_wheel_y, pivot_rr.position.z + 0.12)
+
+func _get_radial_dust_texture() -> Texture2D:
+	if _dust_radial_texture != null:
+		return _dust_radial_texture
+	var img := Image.create(32, 32, false, Image.FORMAT_RGBA8)
+	for y in range(32):
+		for x in range(32):
+			var nx := (x + 0.5) / 32.0 - 0.5
+			var ny := (y + 0.5) / 32.0 - 0.5
+			var dist := sqrt(nx * nx + ny * ny) * 2.0
+			var a := clampf(1.0 - dist, 0.0, 1.0)
+			a = a * a * (3.0 - 2.0 * a) # smoothstep
+			img.set_pixel(x, y, Color(1.0, 1.0, 1.0, a))
+	_dust_radial_texture = ImageTexture.create_from_image(img)
+	return _dust_radial_texture
 
 func _create_dirt_particles(wheel_name: String):
 	var pivot = get_node_or_null("Visuals/WheelPivot" + wheel_name)
@@ -3438,18 +3506,8 @@ func _create_dirt_particles(wheel_name: String):
 	mat_dirt.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 	mat_dirt.vertex_color_use_as_albedo = true
 	mat_dirt.cull_mode = BaseMaterial3D.CULL_DISABLED
-	
-	var grad_tex = GradientTexture2D.new()
-	grad_tex.fill = GradientTexture2D.FILL_RADIAL
-	grad_tex.fill_from = Vector2(0.5, 0.5)
-	grad_tex.fill_to = Vector2(0.5, 0.0)
-	
-	var dirt_mask_grad = Gradient.new()
-	dirt_mask_grad.set_color(0, Color(1.0, 1.0, 1.0, 1.0))
-	dirt_mask_grad.set_color(1, Color(1.0, 1.0, 1.0, 0.0))
-	grad_tex.gradient = dirt_mask_grad
-	
-	mat_dirt.albedo_texture = grad_tex
+	mat_dirt.albedo_texture = _get_radial_dust_texture()
+	mat_dirt.albedo_color = _current_dust_color
 	dirt.material_override = mat_dirt
 	
 	dirt.direction = Vector3(0.0, 0.6, 1.4).normalized()
@@ -3466,14 +3524,13 @@ func _create_dirt_particles(wheel_name: String):
 	scale_curve.add_point(Vector2(1.0, 0.95)) # Expands softly into air
 	dirt.scale_amount_curve = scale_curve
 	
-	var initial_col: Color = _get_current_surface_dust_color()
 	var grad = Gradient.new()
 	grad.offsets = PackedFloat32Array([0.0, 0.15, 0.55, 1.0])
 	grad.colors = PackedColorArray([
-		Color(initial_col.r, initial_col.g, initial_col.b, 0.0),
-		Color(initial_col.r, initial_col.g, initial_col.b, 0.07),
-		Color(initial_col.r, initial_col.g, initial_col.b, 0.03),
-		Color(initial_col.r, initial_col.g, initial_col.b, 0.0)
+		Color(1.0, 1.0, 1.0, 0.0),
+		Color(1.0, 1.0, 1.0, 0.08),
+		Color(1.0, 1.0, 1.0, 0.03),
+		Color(1.0, 1.0, 1.0, 0.0)
 	])
 	dirt.color_ramp = grad
 
@@ -3505,19 +3562,25 @@ func _get_current_surface_dust_color() -> Color:
 func _apply_dust_particle_colors(base_color: Color) -> void:
 	for p in dirt_particles:
 		if is_instance_valid(p) and p is CPUParticles3D:
-			var grad: Gradient = p.color_ramp
-			if grad:
-				grad.colors = PackedColorArray([
-					Color(base_color.r, base_color.g, base_color.b, 0.0),
-					Color(base_color.r, base_color.g, base_color.b, 0.07),
-					Color(base_color.r, base_color.g, base_color.b, 0.03),
-					Color(base_color.r, base_color.g, base_color.b, 0.0)
-				])
+			var mat = p.material_override as StandardMaterial3D
+			if mat:
+				mat.albedo_color = base_color
 
 
 func _set_dirt_emitting(emitting: bool):
+	var in_water := stage_has_water and (is_underwater or (water_surface_y - global_position.y >= -0.45 and _is_over_water_volume()))
 	var speed: float = linear_velocity.length()
-	var on: bool = emitting and speed > 3.0 and not is_landing and air_time < 0.04
+	var time_since_respawn = (Time.get_ticks_msec() / 1000.0) - last_respawn_time
+	
+	# Hysteresis gating to prevent blinking / jittering when speed hovers near cutoff
+	if _is_dust_active:
+		if not emitting or speed < 4.0 or is_landing or not can_move or air_time >= 0.03 or in_water or time_since_respawn < 0.5:
+			_is_dust_active = false
+	else:
+		if emitting and speed > 5.5 and not is_landing and can_move and air_time < 0.03 and not in_water and time_since_respawn > 0.5:
+			_is_dust_active = true
+			
+	var on: bool = _is_dust_active
 	if on:
 		var target_col: Color = _get_current_surface_dust_color()
 		_current_dust_color = _current_dust_color.lerp(target_col, 0.25)
@@ -3526,7 +3589,7 @@ func _set_dirt_emitting(emitting: bool):
 		if is_instance_valid(p) and p is CPUParticles3D:
 			p.emitting = on
 			if "amount_ratio" in p:
-				p.amount_ratio = clampf((speed - 2.5) / 16.0, 0.20, 1.0) if on else 0.0
+				p.amount_ratio = clampf((speed - 4.0) / 14.0, 0.15, 1.0) if on else 0.0
 
 func _get_ground_height(global_pos: Vector3) -> float:
 	var space_state = get_world_3d().direct_space_state
