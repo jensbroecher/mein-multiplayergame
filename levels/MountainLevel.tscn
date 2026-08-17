@@ -8,8 +8,12 @@
 [ext_resource type="Resource" path="res://addons/GodotWeatherSystem/weather/fine.tres" id="6_01s5b"]
 [ext_resource type="Script" path="res://addons/GodotWeatherSystem/scripts/WeatherOccurrenceResource.gd" id="6_7fjgh"]
 [ext_resource type="Script" path="res://TerrainGenerator.gd" id="9_odffs"]
+[ext_resource type="Shader" path="res://addons/surface_painter/shaders/surface_paint.gdshader" id="10_paint_shader"]
 [ext_resource type="Shader" path="res://terrain_stochastic.gdshader" id="10_t3qkl"]
 [ext_resource type="Texture2D" path="res://materials/sand.png" id="11_i1pac"]
+[ext_resource type="Texture2D" path="res://terrain/paint_maps/mountain_splatmap.png" id="11_mountain_splatmap"]
+[ext_resource type="Texture2D" path="res://materials/dirt.png" id="11_dirt_tex"]
+[ext_resource type="Texture2D" path="res://materials/dirt_normal.png" id="11_dirt_norm"]
 [ext_resource type="Texture2D" path="res://materials/dark_canyon_rock_normal.png" id="11_rock_norm"]
 [ext_resource type="Texture2D" path="res://materials/dark_canyon_rock.png" id="11_rock_tex"]
 [ext_resource type="Texture2D" path="res://materials/asphalt.png" id="12_g5aih"]
@@ -81,28 +85,39 @@ dayNightCycleCurve = SubResource("Curve_8bl6p")
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_hgpy5"]
 render_priority = 0
-shader = ExtResource("10_t3qkl")
-shader_parameter/albedo_texture = ExtResource("11_i1pac")
-shader_parameter/albedo = Color(1, 0.98, 0.94, 1)
-shader_parameter/uv_scale = 12.0
-shader_parameter/uv_scale_v2 = Vector2(1, 1)
-shader_parameter/smoothness = 0.96
-shader_parameter/use_world_uv = true
-shader_parameter/use_normal_map = false
-shader_parameter/normal_scale = 1.0
-shader_parameter/use_slope_cliff_rock = true
-shader_parameter/cliff_texture = ExtResource("11_rock_tex")
-shader_parameter/cliff_albedo = Color(0.86, 0.76, 0.62, 1)
-shader_parameter/cliff_uv_scale = 0.045
-shader_parameter/cliff_slope_threshold = 0.52
-shader_parameter/cliff_blend_sharpness = 0.16
-shader_parameter/use_cliff_normal = true
-shader_parameter/cliff_normal_texture = ExtResource("11_rock_norm")
-shader_parameter/cliff_normal_scale = 0.5
+shader = ExtResource("10_paint_shader")
+shader_parameter/splatmap_texture = ExtResource("11_mountain_splatmap")
+shader_parameter/use_world_splatmap = true
+shader_parameter/world_bounds_origin = Vector2(-1000, -1000)
+shader_parameter/world_bounds_size = Vector2(2000, 2000)
+shader_parameter/use_stochastic = true
+shader_parameter/tex_base = ExtResource("11_i1pac")
+shader_parameter/albedo_base = Color(1, 0.98, 0.94, 1)
+shader_parameter/uv_scale_base = 16.0
+shader_parameter/roughness_base = 0.96
+shader_parameter/use_normal_base = false
+shader_parameter/use_triplanar_base = true
+shader_parameter/tex_layer1 = ExtResource("11_rock_tex")
+shader_parameter/albedo_layer1 = Color(0.86, 0.76, 0.62, 1)
+shader_parameter/uv_scale_layer1 = 12.0
+shader_parameter/roughness_layer1 = 0.85
+shader_parameter/use_normal_layer1 = true
+shader_parameter/normal_layer1 = ExtResource("11_rock_norm")
+shader_parameter/normal_scale_layer1 = 0.75
+shader_parameter/use_triplanar_layer1 = true
+shader_parameter/tex_layer2 = ExtResource("11_dirt_tex")
+shader_parameter/albedo_layer2 = Color(0.7, 0.6, 0.5, 1)
+shader_parameter/uv_scale_layer2 = 18.0
+shader_parameter/roughness_layer2 = 0.9
+shader_parameter/use_normal_layer2 = true
+shader_parameter/normal_layer2 = ExtResource("11_dirt_norm")
+shader_parameter/normal_scale_layer2 = 1.0
+shader_parameter/use_triplanar_layer2 = false
 shader_parameter/enable_edge_fade = true
 shader_parameter/edge_fade_start = 550.0
 shader_parameter/edge_fade_end = 960.0
-shader_parameter/edge_fade_color = Color(0.51001614, 0.5682371, 0.64566684, 1)
+shader_parameter/edge_fade_color = Color(0.510016, 0.568237, 0.645667, 1)
+
 
 [sub_resource type="Shader" id="Shader_stochastic"]
 resource_local_to_scene = true

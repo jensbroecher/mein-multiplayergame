@@ -6,10 +6,41 @@ uniform vec4 albedo_tint : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 uniform float max_dist = 350.0;
 uniform float fade_r = 60.0;
 
+uniform vec3 player_positions[8];
+uniform int player_count = 0;
+
 varying float height_val;
 
 void vertex() {
 	height_val = VERTEX.y;
+	
+	// Fast procedural bending away from vehicles passing through
+	float height_factor = clamp(1.0 - UV.y, 0.0, 1.0);
+	if (player_count > 0 && height_factor > 0.05) {
+		vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+		vec3 total_push = vec3(0.0);
+		for (int i = 0; i < player_count; i++) {
+			vec3 p_pos = player_positions[i];
+			vec3 diff = world_pos - p_pos;
+			float d_xz_sq = diff.x * diff.x + diff.z * diff.z;
+			float radius = 2.4;
+			if (d_xz_sq < radius * radius && abs(diff.y) < 2.0) {
+				float d = sqrt(max(d_xz_sq, 0.0001));
+				float push = (1.0 - d / radius);
+				push = push * push * height_factor;
+				vec2 dir = diff.xz / d;
+				total_push.x += dir.x * push * 1.6;
+				total_push.z += dir.y * push * 1.6;
+				total_push.y -= push * 0.45;
+			}
+		}
+		if (dot(total_push, total_push) > 0.0001) {
+			vec3 local_delta = (inverse(MODEL_MATRIX) * vec4(total_push, 0.0)).xyz;
+			VERTEX += local_delta;
+		}
+	}
+	
+	// Distance fade
 	vec3 view_pos = (MODELVIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	float dist = length(view_pos);
 	if (dist > max_dist) {

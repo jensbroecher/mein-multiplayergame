@@ -542,7 +542,39 @@ func start_race():
 	get_tree().call_group("player_carts", "on_race_started")
 	_spawn_start_finish_items_delayed()
 
+var _cached_grass_mat: ShaderMaterial = null
+
+func _update_grass_cart_positions():
+	if not _cached_grass_mat:
+		var tg = get_node_or_null("TerrainGenerator")
+		if tg:
+			var gc = tg.get_node_or_null("GrassContainer")
+			if gc and gc.get_child_count() > 0:
+				var first_chunk = gc.get_child(0)
+				if first_chunk is MultiMeshInstance3D and first_chunk.material_override is ShaderMaterial:
+					_cached_grass_mat = first_chunk.material_override
+		if not _cached_grass_mat:
+			var mat_res = load("res://generated/grass/grass_material.res")
+			if mat_res is ShaderMaterial:
+				_cached_grass_mat = mat_res
+	if not _cached_grass_mat:
+		return
+	
+	var carts = get_tree().get_nodes_in_group("player_carts")
+	var positions: PackedVector3Array = PackedVector3Array()
+	var count: int = 0
+	for cart in carts:
+		if is_instance_valid(cart) and cart is Node3D:
+			positions.append(cart.global_position)
+			count += 1
+			if count >= 8:
+				break
+	_cached_grass_mat.set_shader_parameter("player_count", count)
+	if count > 0:
+		_cached_grass_mat.set_shader_parameter("player_positions", positions)
+
 func _process(delta):
+	_update_grass_cart_positions()
 	if multiplayer.is_server():
 		if race_state == RaceState.RACING:
 			_update_positions()
@@ -963,6 +995,46 @@ func _spawn_random_item_boxes(count: int):
 			placed_offsets.append(offset)
 			spawned_count += 1
 
+func _curve_has_tilt(c: Curve3D) -> bool:
+	if not c: return false
+	var tilts = c.tilts
+	for t in tilts:
+		if absf(t) > 0.001:
+			return true
+	return false
+
+func _get_track_up_vector(c: Curve3D, offset: float, tp_xform: Transform3D, tangent_local: Vector3) -> Vector3:
+	var right_local: Vector3
+	var up_local: Vector3
+	if _curve_has_tilt(c):
+		up_local = c.sample_baked_up_vector(offset, true)
+		if up_local.length_squared() < 1e-6 or up_local.dot(Vector3.UP) < 0.1:
+			up_local = Vector3.UP
+		else:
+			up_local = up_local.normalized()
+		right_local = tangent_local.cross(up_local)
+		if right_local.length_squared() < 1e-6:
+			var t_flat = Vector3(tangent_local.x, 0.0, tangent_local.z)
+			if t_flat.length_squared() < 1e-8:
+				t_flat = Vector3.FORWARD
+			else:
+				t_flat = t_flat.normalized()
+			right_local = t_flat.cross(Vector3.UP)
+		right_local = right_local.normalized()
+		up_local = right_local.cross(tangent_local).normalized()
+	else:
+		# Standard track: keep right vector strictly horizontal on ground plane (no sideways roll/tilt)
+		var t_flat = Vector3(tangent_local.x, 0.0, tangent_local.z)
+		if t_flat.length_squared() < 1e-8:
+			t_flat = Vector3.FORWARD
+		else:
+			t_flat = t_flat.normalized()
+		right_local = t_flat.cross(Vector3.UP).normalized()
+		up_local = right_local.cross(tangent_local).normalized()
+
+	var up_global = (tp_xform.basis * up_local).normalized()
+	return up_global
+
 func _rebuild_checkpoints():
 	if not track_path:
 		track_path = get_node_or_null("TrackPath")
@@ -994,10 +1066,7 @@ func _rebuild_checkpoints():
 			if tangent.length() > 0.01:
 				var tangent_global = ((tp_xform * (pos + tangent)) - (tp_xform * pos)).normalized()
 				if tangent_global.length() > 0.01:
-					var up_local = curve.sample_baked_up_vector(offset, true)
-					if up_local.length_squared() < 1e-6:
-						up_local = Vector3.UP
-					var up_global = (tp_xform.basis * up_local).normalized()
+					var up_global = _get_track_up_vector(curve, offset, tp_xform, tangent)
 					child.basis = Basis.looking_at(tangent_global, up_global)
 
 	print("Checkpoints redistributed along track!")
@@ -1030,10 +1099,7 @@ func _align_checkpoints_to_track():
 			if tangent_local.length() > 0.01:
 				var tangent_global = ((tp_xform * (snapped_local_pos + tangent_local)) - (tp_xform * snapped_local_pos)).normalized()
 				if tangent_global.length() > 0.01:
-					var up_local = curve.sample_baked_up_vector(offset, true)
-					if up_local.length_squared() < 1e-6:
-						up_local = Vector3.UP
-					var up_global = (tp_xform.basis * up_local).normalized()
+					var up_global = _get_track_up_vector(curve, offset, tp_xform, tangent_local)
 					child.basis = Basis.looking_at(tangent_global, up_global)
 
 	print("Checkpoints aligned and oriented to track curve!")
@@ -1398,27 +1464,25 @@ func _align_start_and_spawns_to_track():
 		if tangent_local.length() > 0.01:
 			var tangent_global = ((tp_xform * (snapped_local_pos + tangent_local)) - (tp_xform * snapped_local_pos)).normalized()
 			if tangent_global.length() > 0.01:
-				var up_local = curve.sample_baked_up_vector(fl_offset, true)
-				if up_local.length_squared() < 1e-6:
-					up_local = Vector3.UP
-				var up_global = (tp_xform.basis * up_local).normalized()
+				var up_global = _get_track_up_vector(curve, fl_offset, tp_xform, tangent_local)
 				fl.basis = Basis.looking_at(tangent_global, up_global)
 
-	# Delete old root-level SpawnPoints if they exist to clean up the scene tree
+	# Clean up old root-level SpawnPoints if they exist to keep scene tree clean
 	var old_sp = get_node_or_null("SpawnPoints")
 	if old_sp:
 		old_sp.free()
 
-	# Delete the old SpawnPoints container under the FinishLine if it exists
-	var old_fl_sp = fl.get_node_or_null("SpawnPoints")
-	if old_fl_sp:
-		old_fl_sp.free()
-
-	var spawn_container = Node3D.new()
-	spawn_container.name = "SpawnPoints"
-	add_child(spawn_container) # Parented to Level root for direct local coordinates!
-	if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
-		spawn_container.owner = get_tree().edited_scene_root
+	# Find or create the SpawnPoints container under FinishLine
+	var spawn_container = fl.get_node_or_null("SpawnPoints")
+	if not spawn_container:
+		spawn_container = Node3D.new()
+		spawn_container.name = "SpawnPoints"
+		fl.add_child(spawn_container)
+		if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
+			spawn_container.owner = get_tree().edited_scene_root
+	else:
+		for child in spawn_container.get_children():
+			child.free()
 
 	spawn_container.transform = Transform3D.IDENTITY
 
@@ -1462,30 +1526,14 @@ func _align_start_and_spawns_to_track():
 				# Get tangent at this spawn point to orient it along track
 				var next_s_offset = fmod(s_offset + 1.0, track_len)
 				var tangent_local = (curve.sample_baked(next_s_offset) - snapped_local).normalized()
-				var up_local = curve.sample_baked_up_vector(s_offset, true)
-				if up_local.length_squared() < 1e-6:
-					up_local = Vector3.UP
-				var up_global = (tp_xform.basis * up_local).normalized()
+				var up_global = _get_track_up_vector(curve, s_offset, tp_xform, tangent_local)
+				var tangent_global = ((tp_xform * (snapped_local + tangent_local)) - (tp_xform * snapped_local)).normalized()
+				var right_global = tangent_global.cross(up_global).normalized()
 
-				# Calculate lateral offset along the tilted right vector
-				var right_local = tangent_local.cross(up_local).normalized()
-				var spawn_local_pos = snapped_local + right_local * local_xs[idx] + up_local * 0.45
+				var spawn_world_pos = (tp_xform * snapped_local) + right_global * local_xs[idx] + up_global * 0.45
+				var spawn_basis = Basis.looking_at(tangent_global, up_global)
 
-				# Set spawn's world position temporarily; we'll convert to local after centroid is known
-				spawn.position = tp_xform * spawn_local_pos
-				if tangent_local.length() > 0.01:
-					var tangent_global = ((tp_xform * (snapped_local + tangent_local)) - (tp_xform * snapped_local)).normalized()
-					if tangent_global.length() > 0.01:
-						spawn.basis = Basis.looking_at(tangent_global, up_global)
-
-		# Move spawn_container to centroid of spawns so its AABB stays tight (not stretched to world origin)
-		var centroid = Vector3.ZERO
-		for sp in spawns:
-			centroid += sp.position
-		centroid /= spawns.size()
-		spawn_container.position = centroid
-		for sp in spawns:
-			sp.position -= centroid
+				spawn.global_transform = Transform3D(spawn_basis, spawn_world_pos)
 	else:
 		var local_zs = [6.0, 6.0, 12.0, 12.0, 18.0, 18.0]
 		var local_xs = [-3.0, 3.0, -3.0, 3.0, -3.0, 3.0]

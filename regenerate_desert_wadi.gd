@@ -90,17 +90,6 @@ func _ready() -> void:
 		sand_mat.set_shader_parameter("uv_scale", 16.0)
 		sand_mat.set_shader_parameter("smoothness", 0.96)  # roughness (shader maps this to ROUGHNESS)
 		sand_mat.set_shader_parameter("use_world_uv", true)
-		if rock_tex:
-			sand_mat.set_shader_parameter("use_slope_cliff_rock", true)
-			sand_mat.set_shader_parameter("cliff_texture", rock_tex)
-			sand_mat.set_shader_parameter("cliff_albedo", Color(0.88, 0.78, 0.66, 1.0))
-			sand_mat.set_shader_parameter("cliff_uv_scale", 0.065)
-			sand_mat.set_shader_parameter("cliff_slope_threshold", 0.45)
-			sand_mat.set_shader_parameter("cliff_blend_sharpness", 0.12)
-			if rock_norm:
-				sand_mat.set_shader_parameter("use_cliff_normal", true)
-				sand_mat.set_shader_parameter("cliff_normal_texture", rock_norm)
-				sand_mat.set_shader_parameter("cliff_normal_scale", 1.2)
 		sand_mat.set_shader_parameter("enable_edge_fade", true)
 		sand_mat.set_shader_parameter("edge_fade_start", 550.0)
 		sand_mat.set_shader_parameter("edge_fade_end", 960.0)

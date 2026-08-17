@@ -450,6 +450,15 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 				generate_world()
 			notify_property_list_changed()
 
+@export var generate_grass_only: bool = false:
+	set(val):
+		if val:
+			generate_grass_only = false
+			if Engine.is_editor_hint():
+				_generate_terrain_grass()
+				_set_owner_recursive(self)
+			notify_property_list_changed()
+
 @export var track_path: Path3D
 @export var terrain_size: Vector2 = Vector2(2000, 2000)
 @export var terrain_resolution: int = 800 # Higher resolution for rounder, more organic hills
@@ -499,11 +508,19 @@ var _visual_heights: PackedFloat32Array = PackedFloat32Array()
 
 func _sample_cached_height(px: float, pz: float) -> float:
 	if _visual_heights.is_empty():
-		return 0.0
+		var curve = _get_world_curve() if track_path else null
+		if not curve:
+			return 0.0
+		var noise = FastNoiseLite.new()
+		noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+		noise.frequency = noise_frequency
+		noise.seed = 12345
+		noise.fractal_octaves = 4
+		return _get_terrain_height(px, pz, noise, curve, false, true)
 	var res: int = terrain_resolution
 	var stride = res + 1
-	var step_x = terrain_size.x / res
-	var step_z = terrain_size.y / res
+	var step_x = terrain_size.x / float(res)
+	var step_z = terrain_size.y / float(res)
 	var start_x = -terrain_size.x / 2.0
 	var start_z = -terrain_size.y / 2.0
 	
@@ -1901,6 +1918,14 @@ func _generate_terrain_grass():
 	var target_count: int = terrain_grass_count
 	if target_count <= 0: return
 	
+	if not track_path:
+		track_path = get_node_or_null("../TrackPath")
+	if not track_path:
+		track_path = get_node_or_null("TrackPath")
+	if not track_path:
+		push_error("TerrainGenerator: cannot generate grass without a valid track_path!")
+		return
+	
 	var curve = _get_world_curve()
 	
 	# --- CRITICAL: Match noise settings exactly to the terrain mesh (seed 12345, octaves 4) ---
@@ -1947,12 +1972,26 @@ func _generate_terrain_grass():
 	var cell_size_z: float = terrain_size.y / float(mask_res)
 	var track_mask: PackedByteArray = _build_track_spatial_mask(curve, mask_res, cell_size_x, cell_size_z, start_x, start_z, 85.0)
 
-	# Fast rasterized bitmask for O(1) road exclusion
-	var min_dist := (sand_width if sand_width > road_width else road_width + 2.0) / 2.0 + 1.5
-	var road_mask_res: int = 200
-	var road_cell_size_x: float = terrain_size.x / float(road_mask_res)
-	var road_cell_size_z: float = terrain_size.y / float(road_mask_res)
-	var road_mask: PackedByteArray = _build_track_spatial_mask(curve, road_mask_res, road_cell_size_x, road_cell_size_z, start_x, start_z, min_dist)
+	# Tight road exclusion (road half width + 0.6m curb margin)
+	var min_road_dist := road_width * 0.5 + 0.6
+	
+	# Precalculate visual height grid if running standalone without rebuilding whole mesh
+	if _visual_heights.is_empty():
+		print("Precomputing terrain height grid for grass placement...")
+		var res: int = terrain_resolution
+		var stride: int = res + 1
+		_visual_heights.resize(stride * stride)
+		var step_x: float = terrain_size.x / float(res)
+		var step_z: float = terrain_size.y / float(res)
+		for r in range(stride):
+			var cz: float = start_z + r * step_z
+			var mask_cz: int = clampi(int((cz - start_z) / cell_size_z), 0, mask_res - 1)
+			var row_mask_offset: int = mask_cz * mask_res
+			for c in range(stride):
+				var cx: float = start_x + c * step_x
+				var mask_cx: int = clampi(int((cx - start_x) / cell_size_x), 0, mask_res - 1)
+				var is_near: bool = (track_mask[row_mask_offset + mask_cx] == 1)
+				_visual_heights[r * stride + c] = _get_terrain_height(cx, cz, noise, curve, false, is_near)
 	
 	var num_chunks: int = grass_grid_size
 	var chunk_w := terrain_size.x / float(num_chunks)
@@ -1963,34 +2002,37 @@ func _generate_terrain_grass():
 	for i in range(num_chunks * num_chunks):
 		chunk_transforms[i] = []
 	
-	var attempts: int = int(target_count * 2.5)
+	var attempts: int = int(target_count * 3.5)
 	var placed := 0
-	var max_r_sq := (half_x * 0.85) * (half_x * 0.85)
+	var edge_limit_x := half_x * 0.98
+	var edge_limit_z := half_z * 0.98
 	
 	print("Generating grass placements: target %d..." % target_count)
 	for _i in range(attempts):
 		if placed >= target_count:
 			break
 		
-		var px := randf_range(-half_x, half_x)
-		var pz := randf_range(-half_z, half_z)
-		if (px * px + pz * pz) > max_r_sq:
-			continue
-		
-		# Instantaneous O(1) road exclusion
-		var rcx = clampi(int((px - start_x) / road_cell_size_x), 0, road_mask_res - 1)
-		var rcz = clampi(int((pz - start_z) / road_cell_size_z), 0, road_mask_res - 1)
-		if road_mask[rcz * road_mask_res + rcx] == 1:
-			continue
+		var px := randf_range(-edge_limit_x, edge_limit_x)
+		var pz := randf_range(-edge_limit_z, edge_limit_z)
 		
 		# Instantaneous exact height match via bilinear sampling of the terrain mesh
 		var height := _sample_cached_height(px, pz)
+		
+		# Precise road exclusion with vertical bridge clearance
+		var closest_offset = curve.get_closest_offset(Vector3(px, 0.0, pz))
+		var track_pt = curve.sample_baked(closest_offset)
+		var dist_to_road = Vector2(px - track_pt.x, pz - track_pt.z).length()
+		if dist_to_road < min_road_dist:
+			# If track is at ground level, exclude grass from road surface.
+			# If track is an elevated bridge (> 3.2m above terrain), allow grass to grow underneath the bridge!
+			if (track_pt.y - height) < 3.2:
+				continue
 		
 		# Water, lake, and chasm pit exclusions
 		if not no_water:
 			# Default / Lakeside Meadow lake basin centered at (-450, -500)
 			var dist_to_lake = Vector2(px, pz).distance_to(Vector2(-450, -500))
-			if dist_to_lake < 228.0 or height < -9.2:
+			if dist_to_lake < 235.0 or height < -9.5:
 				continue
 		elif level_prefix == "canyon_chasm":
 			if absf(px - 150.0) < 48.0 and pz > -150.0 and pz < -30.0:
@@ -2001,10 +2043,10 @@ func _generate_terrain_grass():
 			if is_wadi_water_at(px, pz) or height < 1.8:
 				continue
 		
-		# Skip steep cliffs (> 50 degrees)
+		# Skip near-vertical cliffs (> 60 degrees)
 		var h_px := _sample_cached_height(px + 1.5, pz)
 		var h_pz := _sample_cached_height(px, pz + 1.5)
-		if maxf(absf(h_px - height), absf(h_pz - height)) / 1.5 > 1.25:
+		if maxf(absf(h_px - height), absf(h_pz - height)) / 1.5 > 1.65:
 			continue
 		
 		var pos := Vector3(px, height, pz)
@@ -2054,6 +2096,7 @@ func _generate_terrain_grass():
 			mmi.position = chunk_center
 			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			mmi.visibility_range_end = grass_visibility_range
+			mmi.visibility_range_end_margin = 50.0
 			mmi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 			grass_container.add_child(mmi)
 			

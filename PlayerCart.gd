@@ -171,6 +171,7 @@ var _p2_prev_boost: bool = false
 var _p2_prev_discard: bool = false
 var _p2_prev_respawn: bool = false
 var avg_wheel_y: float = -0.02
+var min_wheel_bottom_y: float = -0.73
 var last_respawn_time: float = -999.0
 
 @onready var sfx_nitro_start = $Visuals/SFX_NitroStart
@@ -290,6 +291,7 @@ var part_rotations: Dictionary = {}
 var explosion_time: float = 0.0
 var respawn_indicator_time: float = 0.0
 var original_body_part_transforms: Dictionary = {}
+var part_world_positions: Dictionary = {}
 var part_on_ground: Dictionary = {}
 
 # Remote interpolation tuning
@@ -298,7 +300,7 @@ const REMOTE_LERP_SPEED: float = 18.0
 enum ItemType { NONE, BOOST, MISSILE, GUIDED_MISSILE, SHIELD, SHOCKWAVE, BOMB, LIGHTNING }
 var current_item = ItemType.NONE
 var current_item_2 = ItemType.NONE
-var is_landing: bool = false
+var is_landing: bool = true
 var slow_timer: float = 0.0
 var _original_albedo_colors: Dictionary = {}
 
@@ -436,6 +438,11 @@ func _ready():
 	axis_lock_angular_x = true
 	axis_lock_angular_y = true
 	axis_lock_angular_z = true
+
+	# Trigger spawn-in drop-landing effect at start
+	if has_physics_authority() and not can_move:
+		is_landing = true
+		freeze = false
 
 	# Prevent rare high-speed floor tunneling at 60 Hz physics without raising tick rate.
 	continuous_cd = true
@@ -723,7 +730,7 @@ func _process(delta):
 
 		var visual_forward = -visuals.global_transform.basis.z
 		var speed_factor = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
-		var look_ahead_dist = (8.0 + speed_factor * 8.0) if is_isometric else (4.0 + speed_factor * 6.0)
+		var look_ahead_dist = (8.0 + speed_factor * 8.0) if is_isometric else (6.0 + speed_factor * 5.0)
 		if splitscreen_camera != null:
 			look_ahead_dist *= 0.4 # Keep camera closer to car in splitscreen to prevent going off-screen
 
@@ -849,7 +856,7 @@ func _process(delta):
 				camera_look_at = camera_look_at.lerp(visuals.global_position + cam_fwd * look_ahead_dist, 10.0 * delta)
 				camera_pivot.look_at(camera_look_at, Vector3.UP)
 			else:
-				var cam_dist = lerp(3.5, 6.0, clamp(boost_time / 4.0, 0.0, 1.0))
+				var cam_dist = lerp(5.2, 6.8, clamp(boost_time / 4.0, 0.0, 1.0))
 				
 				# Camera horizontal orientation: ignore mid-air tumble/pitch so camera stays stably behind the car
 				var cam_fwd = Vector3(visual_forward.x, 0.0, visual_forward.z)
@@ -861,7 +868,7 @@ func _process(delta):
 				# Downhill pitch compensation: when the car goes down a steep road (nose pointed down),
 				# raise the camera up significantly so the camera is not super close to the uphill road surface behind the car.
 				var downhill_amount: float = clampf(-visual_forward.y, 0.0, 0.85)
-				var cam_height: float = 2.4 + downhill_amount * 3.8
+				var cam_height: float = 2.2 + downhill_amount * 3.6
 				
 				# Smooth camera trailing (steeper and higher when heading downhill)
 				var target_cam_pos = visuals.global_position - cam_fwd * cam_dist + Vector3(0, cam_height, 0)
@@ -970,18 +977,30 @@ func _process(delta):
 	elif not has_physics_authority:
 		_interpolate_remote_visual(delta)
 
-	# Update top-level drift particle emitters only while emitting
+	# Update top-level drift and dirt particle emitters continuously so transforms are always fresh
 	for p in drift_particles:
-		if is_instance_valid(p) and p is CPUParticles3D and p.emitting:
+		if is_instance_valid(p) and p is CPUParticles3D:
 			var pivot = p.get_meta("pivot", null)
 			if is_instance_valid(pivot):
 				if p.name.ends_with("_Skid"):
-					# Flat on ground, yaw-aligned to car so segments follow the tire path
+					# Raycast directly beneath this specific wheel to get exact road/terrain surface and normal
 					var n: Vector3 = Vector3.UP
-					var ground_y: float = pivot.global_position.y + WHEEL_Y_OFFSET + 0.02
-					if ground_ray.is_colliding() and ground_ray.get_collision_normal().y >= 0.15:
-						n = ground_ray.get_collision_normal().normalized()
-						ground_y = ground_ray.get_collision_point().y + 0.025
+					var mark_pos: Vector3 = pivot.global_position + pivot.global_transform.basis * Vector3(0, 0, 0.12)
+					mark_pos.y = pivot.global_position.y + WHEEL_Y_OFFSET + 0.03
+					
+					var space_state = get_world_3d().direct_space_state
+					if space_state:
+						var query = PhysicsRayQueryParameters3D.create(
+							pivot.global_position + Vector3(0, 0.4, 0),
+							pivot.global_position + Vector3(0, -1.2, 0)
+						)
+						query.exclude = [get_rid()]
+						query.collision_mask = 1
+						var hit = space_state.intersect_ray(query)
+						if hit:
+							n = hit.normal.normalized()
+							mark_pos = hit.position + n * 0.025
+					
 					var fwd_sk: Vector3 = -visuals.global_transform.basis.z
 					var fwd_plane: Vector3 = fwd_sk - n * fwd_sk.dot(n)
 					if fwd_plane.length_squared() < 0.0001:
@@ -995,21 +1014,18 @@ func _process(delta):
 						right_sk = right_sk.normalized()
 						fwd_plane = right_sk.cross(n).normalized()
 						p.global_transform.basis = Basis(right_sk, n, -fwd_plane)
-					var mark_pos: Vector3 = pivot.global_position
-					mark_pos.y = ground_y
 					p.global_position = mark_pos
 				else:
-					# Smoke follows wheel; slight lift so it doesn't cake on the tire
+					# Smoke behind tire contact patch
 					p.global_rotation = pivot.global_rotation
-					p.global_position = pivot.global_position + Vector3(0.0, 0.08, 0.0)
-
+					p.global_position = pivot.global_position + pivot.global_transform.basis * Vector3(0, -0.22, 0.16)
 
 	for p in dirt_particles:
-		if is_instance_valid(p) and p is CPUParticles3D and p.emitting:
+		if is_instance_valid(p) and p is CPUParticles3D:
 			var pivot = p.get_meta("pivot", null)
 			if is_instance_valid(pivot):
 				p.global_rotation = pivot.global_rotation
-				p.global_position = pivot.global_position
+				p.global_position = pivot.global_position + pivot.global_transform.basis * Vector3(0, -0.24, 0.16)
 
 func _physics_process(delta):
 	if slow_timer > 0.0:
@@ -1054,14 +1070,47 @@ func _physics_process(delta):
 	if is_exploding:
 		if not is_drowned:
 			if has_physics_authority:
-				apply_central_force(Vector3.UP * 5.0)
-			
+				# Apply realistic game gravity to bring the tumbling wreck down
+				apply_central_force(Vector3.DOWN * GRAVITY * mass)
+
+				# Ground contact check beneath the tumbling wreck
+				var on_ground = false
+				if is_instance_valid(ground_ray):
+					ground_ray.global_transform.basis = Basis.IDENTITY
+					if ground_ray.is_colliding() and ground_ray.get_collision_normal().y >= 0.15:
+						on_ground = true
+				if not on_ground:
+					var space_state = get_world_3d().direct_space_state
+					if space_state:
+						var query = PhysicsRayQueryParameters3D.create(
+							global_position,
+							global_position + Vector3.DOWN * (collision_radius + 0.6)
+						)
+						query.exclude = [get_rid()]
+						query.collision_mask = 1
+						var hit = space_state.intersect_ray(query)
+						if hit and hit.normal.y >= 0.15:
+							on_ground = true
+
+				# Momentum loss: high ground friction vs moderate air drag
+				if on_ground:
+					linear_velocity.x = move_toward(linear_velocity.x, 0.0, 22.0 * delta)
+					linear_velocity.z = move_toward(linear_velocity.z, 0.0, 22.0 * delta)
+					angular_velocity = angular_velocity.move_toward(Vector3.ZERO, 14.0 * delta)
+					if linear_velocity.length() < 0.2:
+						linear_velocity = Vector3.ZERO
+						angular_velocity = Vector3.ZERO
+				else:
+					linear_velocity.x = move_toward(linear_velocity.x, 0.0, 3.0 * delta)
+					linear_velocity.z = move_toward(linear_velocity.z, 0.0, 3.0 * delta)
+					angular_velocity = angular_velocity.move_toward(Vector3.ZERO, 1.5 * delta)
+
 			if sfx_fire_loop.playing:
 				sfx_fire_loop.volume_db = lerp(sfx_fire_loop.volume_db, -10.0, 2.0 * delta)
 
-			burning_particles.global_position = global_position + Vector3(0, 0.5, 0)
+			burning_particles.global_position = global_position + Vector3(0, 0.4, 0)
 			burning_smoke_particles.global_position = global_position + Vector3(0, 0.5, 0)
-		
+
 		if has_physics_authority:
 			_move_and_sync()
 		else:
@@ -1222,14 +1271,23 @@ func _physics_process(delta):
 	# Landing detection when dropping from spawn/respawn
 	if is_landing and has_physics_authority:
 		if ground_ray.is_colliding() and (ground_ray.get_collision_normal().y >= 0.15 or _is_loop_surface(ground_ray.get_collider())):
-			is_landing = false
-			# Play landing sound only for gameplay respawns, not during initial start countdown
-			if can_move:
-				play_landing_sound_rpc(1.5)
-			# Freeze if the race hasn't started yet
-			if not can_move:
-				freeze = true
-				freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
+			var hit_point: Vector3 = ground_ray.get_collision_point()
+			var dist_to_hit: float = ground_ray.global_position.distance_to(hit_point)
+			# Only consider landed when the collision sphere has actually reached the ground
+			if dist_to_hit <= collision_radius + 0.08:
+				is_landing = false
+				var ground_norm: Vector3 = ground_ray.get_collision_normal()
+				# Snap to exact ground contact level to eliminate floating on start grid
+				global_position = hit_point + ground_norm * collision_radius
+				linear_velocity = Vector3.ZERO
+				angular_velocity = Vector3.ZERO
+				# Play landing sound only for gameplay respawns, not during initial start countdown
+				if can_move:
+					play_landing_sound_rpc(1.5)
+				# Freeze if the race hasn't started yet so car rests firmly on the starting grid
+				if not can_move:
+					freeze = true
+					freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
 
 	if not can_move and not is_landing:
 		linear_velocity = linear_velocity.lerp(Vector3.ZERO, 3.0 * delta)
@@ -1257,13 +1315,15 @@ func _physics_process(delta):
 	var ground_normal = Vector3.UP
 	var ground_collider: Object = null
 
-	# Check ground ray along vehicle local down first
+	# Check ground ray along vehicle local down with strict tire contact distance
 	if ground_ray.is_colliding():
+		var hit_pt = ground_ray.get_collision_point()
+		var dist_to_ground = global_position.distance_to(hit_pt)
 		var norm = ground_ray.get_collision_normal()
 		var col = ground_ray.get_collider()
 		var loop = _is_loop_surface(col)
-		# Any slope where normal is not inverted, or loop
-		if norm.y >= 0.15 or loop:
+		# Only consider on_ground if collision distance is within tire reach (collision_radius + 0.20m)
+		if dist_to_ground <= (collision_radius + 0.20) and (norm.y >= 0.15 or loop):
 			on_ground = true
 			on_loop = loop
 			ground_normal = norm
@@ -1276,16 +1336,18 @@ func _physics_process(delta):
 		if space_state:
 			var query = PhysicsRayQueryParameters3D.create(
 				global_position,
-				global_position + Vector3.DOWN * (collision_radius + 0.9)
+				global_position + Vector3.DOWN * (collision_radius + 0.25)
 			)
 			query.exclude = [get_rid()]
 			query.collision_mask = 1
 			var hit = space_state.intersect_ray(query)
 			if hit:
+				var hit_pos: Vector3 = hit.position
+				var dist_down = global_position.distance_to(hit_pos)
 				var norm: Vector3 = hit.normal
 				var col = hit.get("collider")
 				var loop = _is_loop_surface(col)
-				if norm.y >= 0.15 or loop:
+				if dist_down <= (collision_radius + 0.20) and (norm.y >= 0.15 or loop):
 					on_ground = true
 					on_loop = loop
 					ground_normal = norm
@@ -1293,6 +1355,9 @@ func _physics_process(delta):
 
 	if not on_ground:
 		air_time += delta
+		if was_on_ground:
+			_set_dirt_emitting(false)
+			_set_drift_emitting(false)
 		# Mid-air tumbling / flips (free 3D rotation, never clamped horizontal in air)
 		if air_angular_velocity.length_squared() > 0.001:
 			var rot_axis = air_angular_velocity.normalized()
@@ -1303,7 +1368,7 @@ func _physics_process(delta):
 	else:
 		if not was_on_ground:
 			var time_since_respawn = (Time.get_ticks_msec() / 1000.0) - last_respawn_time
-			if time_since_respawn < 1.0 or ignore_next_landing_sound:
+			if not can_move or is_landing or time_since_respawn < 1.0 or ignore_next_landing_sound or air_time < 0.25:
 				ignore_next_landing_sound = false
 			else:
 				play_landing_sound_rpc.rpc(air_time)
@@ -1537,17 +1602,20 @@ func _physics_process(delta):
 				# Keep forward speed by offsetting friction/drag to preserve momentum
 				apply_central_force(fwd * acceleration * 0.45 * mass)
 			else:
-				if linear_velocity.length() < 0.3:
-					# On steep slopes, allow gravity slide force to slide the car down freely
-					if is_offroad and ground_normal.y < 0.90:
-						pass
-					else:
+				var spd = linear_velocity.length()
+				# Shallow slope threshold (normal.y >= 0.95 = slope angle < ~18 degrees)
+				# Coast naturally with gentle rolling resistance, locking only when nearly stopped
+				if ground_normal.y >= 0.95 or not is_offroad:
+					if spd < 0.12:
 						linear_velocity = Vector3.ZERO
-				else:
-					if is_offroad and ground_normal.y < 0.85:
-						apply_central_force(-linear_velocity * 0.15 * mass)
+					elif spd < 0.6:
+						linear_velocity = linear_velocity.lerp(Vector3.ZERO, 6.0 * delta)
 					else:
-						apply_central_force(-linear_velocity * 0.5 * mass)
+						# Gentle natural rolling resistance for smooth roll-out
+						apply_central_force(-linear_velocity * 0.45 * mass)
+				else:
+					# Steep offroad slopes: allow natural downhill slide with light drag
+					apply_central_force(-linear_velocity * 0.20 * mass)
 
 	# Steering (works on ground and airborne)
 	if on_ground or linear_velocity.length() > 0.5:
@@ -1795,7 +1863,9 @@ func _prevent_floor_tunneling(delta: float) -> void:
 
 func _get_ground_visual_offset() -> float:
 	# Fixed visual offset: mathematically anchors wheels to the bottom of the collision sphere
-	return collision_radius + (avg_wheel_y - 0.28)
+	# with a 1.5cm ground contact planting offset so tires are firmly grounded without gaps
+	const GROUND_PLANT_OFFSET = 0.015
+	return collision_radius + min_wheel_bottom_y + GROUND_PLANT_OFFSET
 
 func _update_visuals_alignment(delta: float) -> void:
 	if is_exploding:
@@ -2012,6 +2082,23 @@ func _setup_new_car_wheels():
 	else:
 		avg_wheel_y = -0.02
 
+	# Compute exact lowest wheel geometry Y in Visuals-local coordinates
+	var lowest_y: float = 999.0
+	var found_lowest: bool = false
+	for corner in ["FL", "FR", "RL", "RR"]:
+		var pivot = get_node_or_null("Visuals/WheelPivot" + corner)
+		if pivot:
+			var mesh_node = pivot.get_node_or_null("WheelMesh")
+			if mesh_node:
+				var wheel_min_y = _get_node_hierarchy_lowest_y(mesh_node, visuals)
+				if not found_lowest or wheel_min_y < lowest_y:
+					lowest_y = wheel_min_y
+					found_lowest = true
+	if found_lowest:
+		min_wheel_bottom_y = lowest_y
+	else:
+		min_wheel_bottom_y = avg_wheel_y - 0.28
+
 	if cart_model:
 		original_cart_model_transform = cart_model.transform
 
@@ -2046,6 +2133,40 @@ func _collect_mesh_world_centers(node: Node, centers: Array):
 		centers.append(node.global_transform * local_center)
 	for child in node.get_children():
 		_collect_mesh_world_centers(child, centers)
+
+# Finds the lowest Y position in ref_node's local space among all meshes under node
+func _get_node_hierarchy_lowest_y(node: Node, ref_node: Node3D) -> float:
+	var lowest_points: Array = []
+	_collect_mesh_lowest_points(node, ref_node, lowest_points)
+	if lowest_points.is_empty():
+		return ref_node.to_local(node.global_position).y
+	var min_val: float = lowest_points[0]
+	for p in lowest_points:
+		if p < min_val:
+			min_val = p
+	return min_val
+
+func _collect_mesh_lowest_points(node: Node, ref_node: Node3D, points: Array):
+	if node is MeshInstance3D and node.mesh:
+		var aabb = node.get_aabb()
+		var pos = aabb.position
+		var sz = aabb.size
+		var corners = [
+			pos,
+			pos + Vector3(sz.x, 0, 0),
+			pos + Vector3(0, sz.y, 0),
+			pos + Vector3(0, 0, sz.z),
+			pos + Vector3(sz.x, sz.y, 0),
+			pos + Vector3(sz.x, 0, sz.z),
+			pos + Vector3(0, sz.y, sz.z),
+			pos + sz
+		]
+		for c in corners:
+			var world_c = node.global_transform * c
+			var ref_c = ref_node.to_local(world_c)
+			points.append(ref_c.y)
+	for child in node.get_children():
+		_collect_mesh_lowest_points(child, ref_node, points)
 
 
 func _move_and_sync():
@@ -2120,8 +2241,10 @@ func play_landing_sound_rpc(p_air_time: float):
 	if LANDING_SOUNDS.is_empty(): return
 	var sound = LANDING_SOUNDS[randi() % LANDING_SOUNDS.size()]
 	sfx_landing_bonk.stream = sound
-	# Map air_time to volume_db [-14.0, 4.0] (cap air_time at 1.0 second)
-	var volume = lerp(-14.0, 4.0, clamp(p_air_time / 1.0, 0.0, 1.0))
+	sfx_landing_bonk.unit_size = 30.0
+	sfx_landing_bonk.max_distance = 150.0
+	# Map air_time to punchy volume_db [-2.0, 7.0]
+	var volume = lerpf(-2.0, 7.0, clampf(p_air_time / 0.8, 0.0, 1.0))
 	sfx_landing_bonk.volume_db = volume
 	sfx_landing_bonk.play()
 
@@ -2194,31 +2317,35 @@ func _update_visual_states(delta):
 	if is_exploding:
 		explosion_time += delta
 		if not is_drowned:
-			# Simulate parts physics locally
+			# Simulate detached wheels in world space
 			for part in part_velocities.keys():
 				if is_instance_valid(part):
 					if part_on_ground.get(part, false):
+						part.global_position = part_world_positions.get(part, part.global_position)
 						continue
-						
-					part_velocities[part].y -= 9.8 * delta # gravity
-					part.position += part_velocities[part] * delta
-					
-					var ground_y = _get_ground_height(part.global_position)
-					if ground_y != -999.0 and part.global_position.y <= ground_y:
+
+					part_velocities[part].y -= GRAVITY * delta
+					part_velocities[part].x = move_toward(part_velocities[part].x, 0.0, 2.0 * delta)
+					part_velocities[part].z = move_toward(part_velocities[part].z, 0.0, 2.0 * delta)
+					var cur_pos: Vector3 = part_world_positions.get(part, part.global_position) + part_velocities[part] * delta
+					part_world_positions[part] = cur_pos
+
+					var ground_y = _get_ground_height(cur_pos)
+					if ground_y != -999.0 and cur_pos.y <= ground_y + 0.15:
 						part_on_ground[part] = true
 						part_velocities[part] = Vector3.ZERO
 						part_rotations[part] = Vector3.ZERO
-						var g_target = part.global_position
-						g_target.y = ground_y
-						part.global_position = g_target
+						cur_pos.y = ground_y + 0.15
+						part_world_positions[part] = cur_pos
 					else:
 						part.rotate_x(part_rotations[part].x * delta)
 						part.rotate_y(part_rotations[part].y * delta)
 						part.rotate_z(part_rotations[part].z * delta)
-			
-			# Fade out in the last second
-			if explosion_time > 2.0:
-				var alpha = clamp(1.0 - (explosion_time - 2.0), 0.0, 1.0)
+					part.global_position = cur_pos
+
+			# Fade out in the last second (3.2s to 4.2s)
+			if explosion_time > 3.2:
+				var alpha = clampf(1.0 - (explosion_time - 3.2), 0.0, 1.0)
 				_set_visuals_alpha(alpha)
 				if name_tag:
 					name_tag.modulate.a = alpha
@@ -2244,6 +2371,7 @@ func _update_visual_states(delta):
 					child.transform = original_body_part_transforms[child]
 			part_velocities.clear()
 			part_rotations.clear()
+			part_world_positions.clear()
 			part_on_ground.clear()
 			original_body_part_transforms.clear()
 
@@ -2350,63 +2478,57 @@ func explode(attacker_id: int = 0):
 	if name_tag:
 		name_tag.modulate.a = 1.0
 		
-	if is_local_player:
-		linear_velocity += Vector3(randf()-0.5, 10.0, randf()-0.5).normalized() * 15.0
+	var has_phys_auth = has_physics_authority()
+	if has_phys_auth:
+		freeze = false
+		sleeping = false
+		axis_lock_angular_x = false
+		axis_lock_angular_y = false
+		axis_lock_angular_z = false
+
+		# Impulse: retain some forward velocity + add upward & tumbling blast impulse
+		var current_speed = linear_velocity.length()
+		var forward_kick = -visuals.global_transform.basis.z * minf(current_speed * 0.35, 10.0)
+		var blast_dir = Vector3(randf_range(-0.6, 0.6), 1.0, randf_range(-0.6, 0.6)).normalized()
+		linear_velocity = forward_kick + blast_dir * randf_range(8.0, 13.0)
 		angular_velocity = Vector3(
-			randf_range(-10.0, 10.0),
+			randf_range(-9.0, 9.0),
 			randf_range(-5.0, 5.0),
-			randf_range(-10.0, 10.0)
+			randf_range(-9.0, 9.0)
 		)
+
+	if is_local_player:
 		var dev = 1 if input_prefix == "p2_" else 0
 		if dev in Input.get_connected_joypads():
 			Input.start_joy_vibration(dev, 0.6, 0.9, 0.5)
-		
-	# Setup disintegrating parts
+
+	# Setup detached wheels in world space
 	part_velocities.clear()
 	part_rotations.clear()
+	part_world_positions.clear()
 	part_on_ground.clear()
 	original_body_part_transforms.clear()
-	
+
 	for corner in ["FL", "FR", "RL", "RR"]:
 		var pivot = get_node_or_null("Visuals/WheelPivot" + corner)
 		if pivot:
-			var dir = Vector3.ZERO
+			var local_dir = Vector3.ZERO
 			match corner:
-				"FL": dir = Vector3(1.0, 1.2, 1.0)
-				"FR": dir = Vector3(-1.0, 1.2, 1.0)
-				"RL": dir = Vector3(1.0, 1.2, -1.0)
-				"RR": dir = Vector3(-1.0, 1.2, -1.0)
-			dir = (dir + Vector3(randf_range(-0.5, 0.5), randf_range(-0.2, 0.4), randf_range(-0.5, 0.5))).normalized()
-			part_velocities[pivot] = dir * randf_range(5.0, 9.0)
-			part_rotations[pivot] = Vector3(randf_range(-12.0, 12.0), randf_range(-12.0, 12.0), randf_range(-12.0, 12.0))
-			
-	var cart_model = get_node_or_null("Visuals/CartModel")
-	if cart_model:
-		var body_parent = cart_model
-		var preset = CAR_PRESETS[car_index]
-		for corner in ["FL", "FR", "RL", "RR"]:
-			var part_name = preset.wheel_parts.get(corner, "")
-			if not part_name.is_empty():
-				var wheel_part = _find_node_by_name(cart_model, part_name)
-				if wheel_part:
-					body_parent = wheel_part.get_parent()
-					break
-		
-		for child in body_parent.get_children():
-			if child is Node3D:
-				if child.name == "AntennaPlacement":
-					continue
-				original_body_part_transforms[child] = child.transform
-				var dir = Vector3(randf_range(-1.0, 1.0), randf_range(0.2, 1.5), randf_range(-1.0, 1.0)).normalized()
-				part_velocities[child] = dir * randf_range(4.0, 8.0)
-				part_rotations[child] = Vector3(randf_range(-15.0, 15.0), randf_range(-15.0, 15.0), randf_range(-15.0, 15.0))
+				"FL": local_dir = Vector3(1.2, 1.1, 0.8)
+				"FR": local_dir = Vector3(-1.2, 1.1, 0.8)
+				"RL": local_dir = Vector3(1.2, 1.1, -0.8)
+				"RR": local_dir = Vector3(-1.2, 1.1, -0.8)
+			var world_dir = (visuals.global_transform.basis * local_dir + Vector3(randf_range(-0.3, 0.3), randf_range(0.2, 0.6), randf_range(-0.3, 0.3))).normalized()
+			part_velocities[pivot] = world_dir * randf_range(6.0, 11.0)
+			part_rotations[pivot] = Vector3(randf_range(-14.0, 14.0), randf_range(-14.0, 14.0), randf_range(-14.0, 14.0))
+			part_world_positions[pivot] = pivot.global_position
 
 	if multiplayer.multiplayer_peer != null and multiplayer.is_server():
-		get_tree().create_timer(3.0).timeout.connect(
+		get_tree().create_timer(4.2).timeout.connect(
 			func(): if is_instance_valid(self): respawn_rpc.rpc()
 		)
 	elif multiplayer.multiplayer_peer == null:
-		get_tree().create_timer(3.0).timeout.connect(
+		get_tree().create_timer(4.2).timeout.connect(
 			func(): if is_instance_valid(self): respawn()
 		)
 
@@ -2504,6 +2626,7 @@ func respawn():
 			
 	part_velocities.clear()
 	part_rotations.clear()
+	part_world_positions.clear()
 	part_on_ground.clear()
 	original_body_part_transforms.clear()
 	
@@ -2876,18 +2999,32 @@ func _activate_lightning():
 				
 				hit_players.append(p.name)
 		
+		var random_target = Vector3.ZERO
+		if hit_players.is_empty():
+			var fwd = -visuals.global_transform.basis.z
+			var right = visuals.global_transform.basis.x
+			var dist = randf_range(14.0, 24.0)
+			var side_offset = randf_range(-12.0, 12.0)
+			var ground_target = global_position + fwd * dist + right * side_offset
+			var ground_y = _get_ground_height(ground_target)
+			if ground_y != -999.0:
+				ground_target.y = ground_y
+			else:
+				ground_target.y = global_position.y
+			random_target = ground_target
+
 		# Play visual for all clients
 		if multiplayer.multiplayer_peer != null:
-			client_play_lightning.rpc(hit_players)
+			client_play_lightning.rpc(hit_players, random_target)
 		else:
-			client_play_lightning(hit_players)
+			client_play_lightning(hit_players, random_target)
 
 @rpc("authority", "call_local", "reliable")
 func apply_lightning_slow_multicast():
 	slow_timer = 2.5
 
 @rpc("any_peer", "call_local", "reliable")
-func client_play_lightning(hit_player_names: Array):
+func client_play_lightning(hit_player_names: Array, random_target: Vector3 = Vector3.ZERO):
 	var sound_player = AudioStreamPlayer3D.new()
 	sound_player.stream = load("res://sounds/electric_lightning_a_#1-1782053835008.wav")
 	sound_player.pitch_scale = 1.0
@@ -2898,15 +3035,24 @@ func client_play_lightning(hit_player_names: Array):
 	sound_player.play()
 	get_tree().create_timer(1.5).timeout.connect(sound_player.queue_free)
 
-	for name_str in hit_player_names:
-		var target = null
-		for c in get_tree().get_nodes_in_group("player_carts"):
-			if c.name == name_str:
-				target = c
-				break
-		if target:
-			_create_lightning_arc(global_position + Vector3(0, 0.8, 0), target.global_position + Vector3(0, 0.8, 0))
-			_spawn_sparks(target.global_position + Vector3(0, 0.8, 0))
+	if not hit_player_names.is_empty():
+		for name_str in hit_player_names:
+			var target = null
+			for c in get_tree().get_nodes_in_group("player_carts"):
+				if c.name == name_str:
+					target = c
+					break
+			if target:
+				_create_lightning_arc(global_position + Vector3(0, 0.8, 0), target.global_position + Vector3(0, 0.8, 0))
+				_spawn_sparks(target.global_position + Vector3(0, 0.8, 0))
+	else:
+		var strike_pos = random_target
+		if strike_pos == Vector3.ZERO:
+			var fwd = -visuals.global_transform.basis.z
+			var right = visuals.global_transform.basis.x
+			strike_pos = global_position + fwd * 18.0 + right * randf_range(-8.0, 8.0)
+		_create_lightning_arc(global_position + Vector3(0, 0.8, 0), strike_pos + Vector3(0, 0.2, 0))
+		_spawn_sparks(strike_pos + Vector3(0, 0.2, 0))
 
 func _create_lightning_arc(start: Vector3, end: Vector3):
 	var mesh_instance = MeshInstance3D.new()
@@ -3110,25 +3256,25 @@ func _create_drift_particles(wheel_name: String):
 	var pivot = get_node_or_null("Visuals/WheelPivot" + wheel_name)
 	if not pivot: return
 
-	# Brake / drift dust — light and moving so it never cakes into a black disc
+	# Brake / drift smoke
 	var smoke = CPUParticles3D.new()
 	smoke.name = wheel_name + "_Smoke"
 	smoke.emitting = false
-	smoke.amount = 18
-	smoke.lifetime = 0.55
+	smoke.amount = 12
+	smoke.lifetime = 0.28
 	smoke.explosiveness = 0.0
-	smoke.randomness = 0.45
+	smoke.randomness = 0.4
 	smoke.mesh = QuadMesh.new()
 	smoke.local_coords = false
 	smoke.top_level = true
 	smoke.set_meta("pivot", pivot)
 	smoke.set_meta("kind", "smoke")
 
-	pivot.add_child(smoke)
+	visuals.add_child(smoke)
 	drift_particles.append(smoke)
 
 	if pivot.is_inside_tree():
-		smoke.global_position = pivot.global_position + Vector3(0.0, 0.08, 0.0)
+		smoke.global_position = pivot.global_position + pivot.global_transform.basis * Vector3(0, -0.22, 0.16)
 		smoke.global_rotation = pivot.global_rotation
 
 	var mat_smoke = StandardMaterial3D.new()
@@ -3143,66 +3289,67 @@ func _create_drift_particles(wheel_name: String):
 	grad_tex.fill_from = Vector2(0.5, 0.5)
 	grad_tex.fill_to = Vector2(0.5, 0.0)
 
-	var smoke_grad = Gradient.new()
-	smoke_grad.set_color(0, Color(0.72, 0.72, 0.72, 0.16))
-	smoke_grad.set_color(1, Color(0.72, 0.72, 0.72, 0.0))
-	grad_tex.gradient = smoke_grad
+	var smoke_mask_grad = Gradient.new()
+	smoke_mask_grad.set_color(0, Color(1.0, 1.0, 1.0, 1.0))
+	smoke_mask_grad.set_color(1, Color(1.0, 1.0, 1.0, 0.0))
+	grad_tex.gradient = smoke_mask_grad
 
 	mat_smoke.albedo_texture = grad_tex
 	smoke.material_override = mat_smoke
 
-	smoke.direction = Vector3(0.0, 1.0, 0.55)
-	smoke.spread = 55.0
-	smoke.gravity = Vector3(0.0, 0.6, 0.0)
-	smoke.initial_velocity_min = 1.8
-	smoke.initial_velocity_max = 4.2
-	smoke.scale_amount_min = 0.12
-	smoke.scale_amount_max = 0.38
+	smoke.direction = Vector3(0.0, 0.8, 1.0).normalized()
+	smoke.spread = 45.0
+	smoke.gravity = Vector3(0.0, 0.4, 0.0)
+	smoke.initial_velocity_min = 1.5
+	smoke.initial_velocity_max = 3.5
+	smoke.scale_amount_min = 0.08
+	smoke.scale_amount_max = 0.26
 
 	var scale_curve = Curve.new()
-	scale_curve.add_point(Vector2(0.0, 0.25))
-	scale_curve.add_point(Vector2(0.45, 0.85))
-	scale_curve.add_point(Vector2(1.0, 1.15))
+	scale_curve.add_point(Vector2(0.0, 0.15))
+	scale_curve.add_point(Vector2(0.40, 0.65))
+	scale_curve.add_point(Vector2(1.0, 1.0))
 	smoke.scale_amount_curve = scale_curve
 
 	var grad = Gradient.new()
-	grad.offsets = PackedFloat32Array([0.0, 0.35, 1.0])
+	grad.offsets = PackedFloat32Array([0.0, 0.15, 0.55, 1.0])
 	grad.colors = PackedColorArray([
-		Color(0.7, 0.7, 0.7, 0.14),
-		Color(0.65, 0.65, 0.65, 0.08),
-		Color(0.6, 0.6, 0.6, 0.0)
+		Color(0.90, 0.90, 0.90, 0.0),
+		Color(0.88, 0.88, 0.88, 0.10),
+		Color(0.85, 0.85, 0.85, 0.04),
+		Color(0.80, 0.80, 0.80, 0.0)
 	])
 	smoke.color_ramp = grad
 
-	# Skidmarks — short segments aligned with car yaw; fade out over lifetime
+	# Skidmarks — single clean dark rubber tire ribbon on road surface
 	var skid = CPUParticles3D.new()
 	skid.name = wheel_name + "_Skid"
 	skid.emitting = false
-	skid.amount = 280
-	skid.lifetime = 7.5
+	skid.amount = 24
+	skid.lifetime = 1.0
 	skid.explosiveness = 0.0
 	skid.randomness = 0.0
 	skid.fixed_fps = 30
 	skid.mesh = QuadMesh.new()
 	skid.mesh.orientation = PlaneMesh.FACE_Y
-	skid.mesh.size = Vector2(0.28, 0.48)
+	skid.mesh.size = Vector2(0.24, 0.38)
 
 	var mat_skid = StandardMaterial3D.new()
 	mat_skid.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat_skid.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat_skid.albedo_color = Color(0.08, 0.08, 0.08, 0.32)
+	mat_skid.albedo_color = Color(1.0, 1.0, 1.0, 1.0)
 	mat_skid.vertex_color_use_as_albedo = true
 	mat_skid.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mat_skid.render_priority = 1
+	mat_skid.render_priority = 2
 	skid.material_override = mat_skid
 
 	var skid_grad = Gradient.new()
-	skid_grad.offsets = PackedFloat32Array([0.0, 0.35, 0.7, 1.0])
+	skid_grad.offsets = PackedFloat32Array([0.0, 0.40, 0.80, 1.0])
 	skid_grad.colors = PackedColorArray([
-		Color(0.08, 0.08, 0.08, 0.34),
-		Color(0.08, 0.08, 0.08, 0.28),
-		Color(0.08, 0.08, 0.08, 0.12),
-		Color(0.08, 0.08, 0.08, 0.0)
+		Color(0.04, 0.04, 0.04, 0.65), # Dark rubber tire mark
+		Color(0.04, 0.04, 0.04, 0.45),
+		Color(0.04, 0.04, 0.04, 0.15),
+		Color(0.04, 0.04, 0.04, 0.0)
 	])
 	skid.color_ramp = skid_grad
 
@@ -3216,7 +3363,7 @@ func _create_drift_particles(wheel_name: String):
 	skid.set_meta("pivot", pivot)
 	skid.set_meta("kind", "skid")
 
-	pivot.add_child(skid)
+	visuals.add_child(skid)
 	drift_particles.append(skid)
 
 	if pivot.is_inside_tree():
@@ -3232,15 +3379,17 @@ func _set_drift_emitting(emitting: bool):
 			continue
 		var kind: String = str(p.get_meta("kind", ""))
 		if kind == "skid" or p.name.ends_with("_Skid"):
-			# No skid stamps while nearly stopped — that made the black disc under the rears
-			var skid_on: bool = emitting and speed > 5.5
+			# Skidmarks only emit during active high-speed powerslides, never on straight driving or landing
+			var skid_on: bool = emitting and is_drifting and speed > 8.5 and not is_landing and air_time < 0.01
 			p.emitting = skid_on
 			if "amount_ratio" in p:
-				p.amount_ratio = clampf((speed - 4.0) / 16.0, 0.12, 1.0) if skid_on else 0.0
+				p.amount_ratio = clampf((speed - 7.0) / 13.0, 0.30, 1.0) if skid_on else 0.0
 		else:
-			p.emitting = emitting and speed > 2.0
+			# Smoke emits during drift or hard braking at speed
+			var smoke_on: bool = emitting and speed > 5.0 and not is_landing and air_time < 0.01
+			p.emitting = smoke_on
 			if "amount_ratio" in p:
-				p.amount_ratio = clampf(speed / 20.0, 0.15, 0.85) if emitting else 0.0
+				p.amount_ratio = clampf(speed / 20.0, 0.15, 0.65) if smoke_on else 0.0
 
 func _set_boost_emitting(emitting: bool) -> void:
 	if is_instance_valid(boost_particles_l) and boost_particles_l.emitting != emitting:
@@ -3251,10 +3400,11 @@ func _set_boost_emitting(emitting: bool) -> void:
 func _update_boost_particle_positions() -> void:
 	var pivot_rl = get_node_or_null("Visuals/WheelPivotRL")
 	var pivot_rr = get_node_or_null("Visuals/WheelPivotRR")
+	var under_wheel_y: float = min_wheel_bottom_y + 0.05
 	if pivot_rl and is_instance_valid(boost_particles_l):
-		boost_particles_l.position = Vector3(pivot_rl.position.x, pivot_rl.position.y + 0.04, pivot_rl.position.z + 0.1)
+		boost_particles_l.position = Vector3(pivot_rl.position.x, under_wheel_y, pivot_rl.position.z + 0.12)
 	if pivot_rr and is_instance_valid(boost_particles_r):
-		boost_particles_r.position = Vector3(pivot_rr.position.x, pivot_rr.position.y + 0.04, pivot_rr.position.z + 0.1)
+		boost_particles_r.position = Vector3(pivot_rr.position.x, under_wheel_y, pivot_rr.position.z + 0.12)
 
 func _create_dirt_particles(wheel_name: String):
 	var pivot = get_node_or_null("Visuals/WheelPivot" + wheel_name)
@@ -3263,23 +3413,23 @@ func _create_dirt_particles(wheel_name: String):
 	var dirt = CPUParticles3D.new()
 	dirt.name = wheel_name + "_Dirt"
 	dirt.emitting = false
-	dirt.amount = 20
-	dirt.lifetime = 0.45
+	dirt.amount = 36
+	dirt.lifetime = 0.35
 	dirt.explosiveness = 0.0
-	dirt.randomness = 0.5
-	dirt.lifetime_randomness = 0.3
+	dirt.randomness = 0.35
+	dirt.lifetime_randomness = 0.2
 	dirt.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
-	dirt.emission_sphere_radius = 0.05
+	dirt.emission_sphere_radius = 0.04
 	dirt.mesh = QuadMesh.new()
 	dirt.local_coords = false
 	dirt.top_level = true
 	dirt.set_meta("pivot", pivot)
 	
-	pivot.add_child(dirt)
+	visuals.add_child(dirt)
 	dirt_particles.append(dirt)
 	
 	if pivot.is_inside_tree():
-		dirt.global_position = pivot.global_position
+		dirt.global_position = pivot.global_position + pivot.global_transform.basis * Vector3(0, -0.24, 0.16)
 		dirt.global_rotation = pivot.global_rotation
 	
 	var mat_dirt = StandardMaterial3D.new()
@@ -3294,7 +3444,6 @@ func _create_dirt_particles(wheel_name: String):
 	grad_tex.fill_from = Vector2(0.5, 0.5)
 	grad_tex.fill_to = Vector2(0.5, 0.0)
 	
-	# Pure white radial mask with smooth alpha falloff so material color is not squared/darkened
 	var dirt_mask_grad = Gradient.new()
 	dirt_mask_grad.set_color(0, Color(1.0, 1.0, 1.0, 1.0))
 	dirt_mask_grad.set_color(1, Color(1.0, 1.0, 1.0, 0.0))
@@ -3303,29 +3452,28 @@ func _create_dirt_particles(wheel_name: String):
 	mat_dirt.albedo_texture = grad_tex
 	dirt.material_override = mat_dirt
 	
-	dirt.direction = Vector3(0.0, 0.8, 1.2).normalized()
-	dirt.spread = 35.0
+	dirt.direction = Vector3(0.0, 0.6, 1.4).normalized()
+	dirt.spread = 22.0
 	dirt.gravity = Vector3(0, -3.5, 0)
-	dirt.initial_velocity_min = 1.8
-	dirt.initial_velocity_max = 4.2
-	dirt.scale_amount_min = 0.08
+	dirt.initial_velocity_min = 1.6
+	dirt.initial_velocity_max = 3.8
+	dirt.scale_amount_min = 0.06
 	dirt.scale_amount_max = 0.22
 	
 	var scale_curve = Curve.new()
-	scale_curve.add_point(Vector2(0.0, 0.05)) # Starts small at tire contact
-	scale_curve.add_point(Vector2(0.35, 0.45))
-	scale_curve.add_point(Vector2(1.0, 0.80)) # Expands softly into air
+	scale_curve.add_point(Vector2(0.0, 0.08)) # Starts small at tire contact
+	scale_curve.add_point(Vector2(0.35, 0.50))
+	scale_curve.add_point(Vector2(1.0, 0.95)) # Expands softly into air
 	dirt.scale_amount_curve = scale_curve
 	
-	# Color gradient: Starts completely transparent (alpha 0.0) to prevent dark pop on spawn
 	var initial_col: Color = _get_current_surface_dust_color()
 	var grad = Gradient.new()
-	grad.offsets = PackedFloat32Array([0.0, 0.12, 0.55, 1.0])
+	grad.offsets = PackedFloat32Array([0.0, 0.15, 0.55, 1.0])
 	grad.colors = PackedColorArray([
-		Color(initial_col.r, initial_col.g, initial_col.b, 0.0),    # t=0.0: invisible at birth
-		Color(initial_col.r, initial_col.g, initial_col.b, 0.30),   # t=0.12: smooth fade-in as particle leaves tire
-		Color(initial_col.r * 0.95, initial_col.g * 0.95, initial_col.b * 0.95, 0.16),   # t=0.55: diffuse dusty air
-		Color(initial_col.r * 0.90, initial_col.g * 0.90, initial_col.b * 0.90, 0.0)     # t=1.0: soft fade-out
+		Color(initial_col.r, initial_col.g, initial_col.b, 0.0),
+		Color(initial_col.r, initial_col.g, initial_col.b, 0.07),
+		Color(initial_col.r, initial_col.g, initial_col.b, 0.03),
+		Color(initial_col.r, initial_col.g, initial_col.b, 0.0)
 	])
 	dirt.color_ramp = grad
 
@@ -3338,20 +3486,20 @@ func _get_current_surface_dust_color() -> Color:
 	
 	if not is_offroad:
 		# Driving on asphalt / pavement
-		return Color(0.65, 0.63, 0.60)
+		return Color(0.92, 0.90, 0.88)
 	
 	# Check steep rock cliffs
 	if ground_ray and ground_ray.is_colliding() and ground_ray.get_collision_normal().y < 0.60:
-		return Color(0.48, 0.44, 0.40) # Rocky cliff grey
+		return Color(0.76, 0.74, 0.70) # Rocky cliff light grey
 		
 	if lvl_name.contains("canyon"):
-		return Color(0.68, 0.44, 0.30) # Terracotta sandstone
+		return Color(0.90, 0.68, 0.50) # Terracotta sandstone
 	elif lvl_name.contains("desert") or lvl_name.contains("wadi"):
-		return Color(0.85, 0.75, 0.52) # Warm golden sand
+		return Color(0.95, 0.88, 0.70) # Warm golden sand
 	elif lvl_name.contains("mountain"):
-		return Color(0.74, 0.66, 0.50) # Mountain sand & gravel
+		return Color(0.88, 0.82, 0.72) # Mountain sand & gravel
 	else:
-		return Color(0.40, 0.54, 0.28) # Meadow grass & loam
+		return Color(0.75, 0.85, 0.60) # Meadow grass & loam
 
 
 func _apply_dust_particle_colors(base_color: Color) -> void:
@@ -3361,15 +3509,15 @@ func _apply_dust_particle_colors(base_color: Color) -> void:
 			if grad:
 				grad.colors = PackedColorArray([
 					Color(base_color.r, base_color.g, base_color.b, 0.0),
-					Color(base_color.r, base_color.g, base_color.b, 0.30),
-					Color(base_color.r * 0.95, base_color.g * 0.95, base_color.b * 0.95, 0.16),
-					Color(base_color.r * 0.90, base_color.g * 0.90, base_color.b * 0.90, 0.0)
+					Color(base_color.r, base_color.g, base_color.b, 0.07),
+					Color(base_color.r, base_color.g, base_color.b, 0.03),
+					Color(base_color.r, base_color.g, base_color.b, 0.0)
 				])
 
 
 func _set_dirt_emitting(emitting: bool):
 	var speed: float = linear_velocity.length()
-	var on: bool = emitting and speed > 2.0
+	var on: bool = emitting and speed > 3.0 and not is_landing and air_time < 0.04
 	if on:
 		var target_col: Color = _get_current_surface_dust_color()
 		_current_dust_color = _current_dust_color.lerp(target_col, 0.25)
@@ -3378,7 +3526,7 @@ func _set_dirt_emitting(emitting: bool):
 		if is_instance_valid(p) and p is CPUParticles3D:
 			p.emitting = on
 			if "amount_ratio" in p:
-				p.amount_ratio = clampf((speed - 1.5) / 18.0, 0.15, 0.9) if on else 0.0
+				p.amount_ratio = clampf((speed - 2.5) / 16.0, 0.20, 1.0) if on else 0.0
 
 func _get_ground_height(global_pos: Vector3) -> float:
 	var space_state = get_world_3d().direct_space_state

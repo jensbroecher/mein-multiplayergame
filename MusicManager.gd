@@ -478,8 +478,8 @@ func _apply_shadows_to_tree(node: Node) -> void:
 			dl.directional_shadow_fade_start = 0.7
 			dl.shadow_blur = SHADOW_BLURS[q]
 			# Bias tuned so car shadows don't swim / peter-pan on the road
-			dl.shadow_bias = 0.03 if q <= 1 else 0.02
-			dl.shadow_normal_bias = 1.0 if q <= 1 else 0.8
+			dl.shadow_bias = 0.008 if q <= 1 else 0.005
+			dl.shadow_normal_bias = 0.3 if q <= 1 else 0.15
 			dl.directional_shadow_pancake_size = 20.0
 	elif node is OmniLight3D:
 		(node as OmniLight3D).shadow_enabled = enabled and q >= 2
