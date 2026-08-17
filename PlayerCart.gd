@@ -2538,15 +2538,15 @@ func explode(attacker_id: int = 0):
 		axis_lock_angular_y = false
 		axis_lock_angular_z = false
 
-		# Impulse: retain some forward velocity + add upward & tumbling blast impulse
+		# Impulse: keep most forward momentum + add a moderate upward tumble
 		var current_speed = linear_velocity.length()
-		var forward_kick = -visuals.global_transform.basis.z * minf(current_speed * 0.35, 10.0)
-		var blast_dir = Vector3(randf_range(-0.6, 0.6), 1.0, randf_range(-0.6, 0.6)).normalized()
-		linear_velocity = forward_kick + blast_dir * randf_range(8.0, 13.0)
+		var forward_component = -visuals.global_transform.basis.z * minf(current_speed * 0.6, 18.0)
+		var blast_dir = Vector3(randf_range(-0.4, 0.4), 1.0, randf_range(-0.4, 0.4)).normalized()
+		linear_velocity = forward_component + blast_dir * randf_range(5.0, 8.0)
 		angular_velocity = Vector3(
-			randf_range(-9.0, 9.0),
-			randf_range(-5.0, 5.0),
-			randf_range(-9.0, 9.0)
+			randf_range(-7.0, 7.0),
+			randf_range(-4.0, 4.0),
+			randf_range(-7.0, 7.0)
 		)
 
 	if is_local_player:
