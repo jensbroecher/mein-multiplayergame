@@ -221,7 +221,7 @@ func load_playlist_for_level(scene_path: String):
 		level_folder = music_folder + "canyon/"
 	elif scene_path.to_lower().contains("desert"):
 		level_folder = music_folder + "desert/"
-	elif scene_path.to_lower().contains("city"):
+	elif scene_path.to_lower().contains("city") or scene_path.to_lower().contains("harbor"):
 		level_folder = music_folder + "city/"
 	
 	# Use the subfolder if it exists and has tracks, otherwise fall back to root music folder

@@ -172,6 +172,9 @@ func _create_stage_select_menu():
 	
 	var btn_lakeside = _add_menu_button(stage_select_container, "LAKESIDE COURSE")
 	btn_lakeside.pressed.connect(func(): _on_stage_selected("res://levels/Level.tscn"))
+
+	var btn_harbor = _add_menu_button(stage_select_container, "HARBOR PIER")
+	btn_harbor.pressed.connect(func(): _on_stage_selected("res://levels/HarborPierLevel.tscn"))
 	
 	var btn_mountain = _add_menu_button(stage_select_container, "MOUNTAIN COURSE")
 	btn_mountain.pressed.connect(func(): _on_stage_selected("res://levels/MountainLevel.tscn"))

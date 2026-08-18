@@ -269,6 +269,17 @@ func _build_track_spatial_mask(curve: Curve3D, grid_res: int, cell_size_x: float
 
 func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curve3D, for_collision: bool, is_near_track: bool = true) -> float:
 	var h_noise: float = noise.get_noise_2d(px, pz) * hill_height
+
+	# Harbor pier: flat seabed only. Never raise hills or pull terrain up to the racing line.
+	if level_prefix == "harbor_pier":
+		var harbor_h: float = HARBOR_SEABED_Y + h_noise * 0.18
+		var max_radius: float = terrain_size.x * 0.5
+		var dist_from_center_val: float = Vector2(px, pz).length()
+		var falloff_start: float = max_radius * 0.88
+		var falloff_end: float = max_radius * 0.98
+		var edge_t: float = clampf((dist_from_center_val - falloff_start) / maxf(falloff_end - falloff_start, 0.001), 0.0, 1.0)
+		var smooth_edge: float = edge_t * edge_t * (3.0 - 2.0 * edge_t)
+		return lerpf(-40.0, harbor_h, 1.0 - smooth_edge)
 	
 	# --- Mountain base shape ---
 	var radial_offset = 0.0
@@ -549,6 +560,9 @@ func _ready():
 		call_deferred("add_chasm_pit_water")
 	elif level_prefix == "desert_wadi":
 		call_deferred("add_wadi_river_water")
+	elif level_prefix == "harbor_pier":
+		if get_node_or_null("HarborWater") == null:
+			call_deferred("add_harbor_water")
 
 func generate_world():
 	if not track_path:
@@ -564,6 +578,13 @@ func generate_world():
 
 	# IMPORTANT: Use free() in editor for immediate cleanup to prevent 'ghost' nodes
 	# queue_free() is too slow for tool scripts and causes scene-save bloat
+	if level_prefix == "harbor_pier":
+		_generate_harbor_world()
+		if Engine.is_editor_hint():
+			_set_owner_recursive(self)
+		print("Procedural map generation complete! Layout: HARBOR_PIER")
+		return
+
 	for child in get_children():
 		remove_child(child)
 		child.free()
@@ -823,6 +844,8 @@ func _generate_mesh(for_collision: bool) -> ArrayMesh:
 	return st.commit()
 
 func _generate_road_and_sand():
+	if level_prefix == "harbor_pier":
+		return
 	var curve = _get_world_curve()
 	var length = curve.get_baked_length()
 	var points_count = int(length / 0.2) # Even higher resolution (one segment every 20cm)
@@ -1308,8 +1331,8 @@ func _generate_bridge_supports(point_count: int):
 			var support = MeshInstance3D.new()
 			support.name = "BridgeSupport_" + str(d)
 			var box = BoxMesh.new()
-			# Stop pillar slightly below road surface so box tops don't poke the deck on curves
-			var pillar_top_y: float = pos.y + road_y_offset - 0.12
+			# Axis-aligned boxes poke through sloped/curved deck; keep a generous gap under the road.
+			var pillar_top_y: float = pos.y + road_y_offset - 0.55
 			var pillar_height: float = maxf(pillar_top_y + 30.0, 4.0)
 			box.size = Vector3(3.2, pillar_height, 3.2)
 			support.mesh = box
@@ -1781,6 +1804,14 @@ func add_wadi_river_water() -> void:
 		noise_tex.changed.emit()
 
 
+## Harbor pier — flat dock circuit over dark water. Used only when level_prefix == "harbor_pier".
+const HARBOR_WATER_Y := 1.55
+const HARBOR_SEABED_Y := -7.5
+const HARBOR_DECK_Y := 3.55
+const HARBOR_PIER_W := 16.0
+const HARBOR_PIER_THICK := 2.55
+
+
 ## Murky green/brown water filling the first hill-jump pit on Canyon Chasm.
 ## Pit floor is carved near y=-8..-12; surface sits a few meters above that.
 func add_chasm_pit_water() -> void:
@@ -2019,20 +2050,23 @@ func _generate_terrain_grass():
 		var height := _sample_cached_height(px, pz)
 		
 		# Precise road exclusion with vertical bridge clearance
-		var closest_offset = curve.get_closest_offset(Vector3(px, 0.0, pz))
+		var closest_offset = curve.get_closest_offset(Vector3(px, height, pz))
 		var track_pt = curve.sample_baked(closest_offset)
 		var dist_to_road = Vector2(px - track_pt.x, pz - track_pt.z).length()
 		if dist_to_road < min_road_dist:
 			# If track is at ground level, exclude grass from road surface.
-			# If track is an elevated bridge (> 3.2m above terrain), allow grass to grow underneath the bridge!
-			if (track_pt.y - height) < 3.2:
+			# If track is an elevated bridge, allow grass on the hillside / under the span.
+			if (track_pt.y - height) < 2.4:
 				continue
 		
 		# Water, lake, and chasm pit exclusions
 		if not no_water:
-			# Default / Lakeside Meadow lake basin centered at (-450, -500)
+			# Lakeside lake basin at (-450, -500). Only skip water / wet beach —
+			# hills around the large bridge must still get grass.
 			var dist_to_lake = Vector2(px, pz).distance_to(Vector2(-450, -500))
-			if dist_to_lake < 235.0 or height < -9.5:
+			if height < -9.0:
+				continue
+			if dist_to_lake < 205.0 and height < 2.2:
 				continue
 		elif level_prefix == "canyon_chasm":
 			if absf(px - 150.0) < 48.0 and pz > -150.0 and pz < -30.0:
@@ -2116,3 +2150,384 @@ func _generate_terrain_grass():
 			mmi.material_override = saved_mat
 	
 	print("Finished generating grass multimeshes.")
+
+
+func _generate_harbor_world() -> void:
+	# Only replace generated harbor nodes so hand-placed children on TerrainGenerator stay.
+	for child_name in ["HarborSeabed", "HarborSeabedCollision", "HarborPiers", "HarborWater"]:
+		var old = get_node_or_null(child_name)
+		if old:
+			remove_child(old)
+			old.free()
+	_add_harbor_seabed()
+	add_harbor_water()
+	_add_harbor_piers()
+
+
+func add_harbor_water() -> void:
+	if level_prefix != "harbor_pier":
+		return
+	var existing = get_node_or_null("HarborWater")
+	if existing != null:
+		existing.free()
+
+	var water := MeshInstance3D.new()
+	water.name = "HarborWater"
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(1400.0, 1400.0)
+	plane.subdivide_width = 48
+	plane.subdivide_depth = 48
+	water.mesh = plane
+	water.position = Vector3(0.0, HARBOR_WATER_Y, 0.0)
+	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	water.set_meta("water_surface_y", HARBOR_WATER_Y)
+	water.set_meta("water_half_xz", Vector2(700.0, 700.0))
+	water.set_meta("water_center_xz", Vector2.ZERO)
+	water.set_meta("water_bounds_min", Vector2(-700.0, -700.0))
+	water.set_meta("water_bounds_max", Vector2(700.0, 700.0))
+
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://water.gdshader")
+	var noise := FastNoiseLite.new()
+	noise.seed = 17
+	noise.frequency = 0.016
+	noise.fractal_type = FastNoiseLite.FRACTAL_FBM
+	noise.fractal_octaves = 4
+	var noise_tex := NoiseTexture2D.new()
+	noise_tex.seamless = true
+	noise_tex.as_normal_map = true
+	noise_tex.width = 512
+	noise_tex.height = 512
+	noise_tex.noise = noise
+	mat.set_shader_parameter("noise_tex", noise_tex)
+	# Dark, oily harbor water — low transparency so it reads almost black-green.
+	mat.set_shader_parameter("water_color", Color(0.018, 0.03, 0.035))
+	mat.set_shader_parameter("shallow_color", Color(0.05, 0.08, 0.075))
+	mat.set_shader_parameter("deep_water_color", Color(0.008, 0.014, 0.018))
+	mat.set_shader_parameter("sky_tint", Color(0.42, 0.48, 0.50))
+	mat.set_shader_parameter("sky_reflect", 0.28)
+	mat.set_shader_parameter("transparency", 0.10)
+	mat.set_shader_parameter("metallic", 0.48)
+	mat.set_shader_parameter("roughness", 0.22)
+	mat.set_shader_parameter("wave_speed", 0.018)
+	mat.set_shader_parameter("wave_strength", 0.42)
+	mat.set_shader_parameter("wave_height", 0.22)
+	mat.set_shader_parameter("wave_scale", 0.85)
+	mat.set_shader_parameter("enable_water_edge_fade", true)
+	mat.set_shader_parameter("water_fade_start", 520.0)
+	mat.set_shader_parameter("water_fade_end", 780.0)
+	water.material_override = mat
+	add_child(water)
+	if Engine.is_editor_hint() and get_tree():
+		var root = get_tree().edited_scene_root
+		if root:
+			water.owner = root
+		noise_tex.changed.emit()
+
+
+func _add_harbor_seabed() -> void:
+	var silt := StandardMaterial3D.new()
+	silt.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	silt.albedo_color = Color(0.10, 0.11, 0.10)
+	var silt_tex: Texture2D = load("res://materials/dirt.png") as Texture2D
+	if silt_tex:
+		silt.albedo_texture = silt_tex
+		silt.uv1_scale = Vector3(0.04, 0.04, 0.04)
+		silt.uv1_triplanar = true
+	silt.roughness = 1.0
+	silt.metallic = 0.0
+
+	var bed := MeshInstance3D.new()
+	bed.name = "HarborSeabed"
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(1600.0, 1600.0)
+	bed.mesh = plane
+	bed.position = Vector3(0.0, HARBOR_SEABED_Y, 0.0)
+	bed.material_override = silt
+	bed.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(bed)
+
+	var body := StaticBody3D.new()
+	body.name = "HarborSeabedCollision"
+	add_child(body)
+	var col := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(1600.0, 2.0, 1600.0)
+	col.shape = shape
+	col.position = Vector3(0.0, HARBOR_SEABED_Y - 1.0, 0.0)
+	body.add_child(col)
+
+
+func _harbor_deck_mat() -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.62, 0.58, 0.50)
+	var tex: Texture2D = load("res://materials/brick.png") as Texture2D
+	if tex:
+		mat.albedo_texture = tex
+		mat.uv1_scale = Vector3(0.35, 0.35, 0.35)
+		mat.uv1_triplanar = true
+	mat.roughness = 0.92
+	mat.metallic = 0.0
+	return mat
+
+
+func _harbor_side_mat() -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.38, 0.36, 0.33)
+	var tex: Texture2D = load("res://materials/brick.png") as Texture2D
+	if tex:
+		mat.albedo_texture = tex
+		mat.uv1_scale = Vector3(0.18, 0.18, 0.18)
+		mat.uv1_triplanar = true
+	mat.roughness = 0.96
+	return mat
+
+
+func _harbor_wood_mat() -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.42, 0.30, 0.20)
+	var tex: Texture2D = load("res://materials/dirt.png") as Texture2D
+	if tex:
+		mat.albedo_texture = tex
+		mat.uv1_scale = Vector3(0.45, 0.45, 0.45)
+		mat.uv1_triplanar = true
+	mat.roughness = 0.88
+	return mat
+
+
+func _harbor_steel_mat() -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.28, 0.30, 0.32)
+	mat.metallic = 0.55
+	mat.roughness = 0.45
+	return mat
+
+
+func _harbor_add_box(parent: Node, box_name: String, center: Vector3, size: Vector3, yaw: float, mat: Material, group: String = "track_surface") -> StaticBody3D:
+	var body := StaticBody3D.new()
+	body.name = box_name
+	if group != "":
+		body.add_to_group(group)
+	parent.add_child(body)
+	body.position = center
+	body.rotation.y = yaw
+	var mesh_i := MeshInstance3D.new()
+	mesh_i.name = "Mesh"
+	var box := BoxMesh.new()
+	box.size = size
+	mesh_i.mesh = box
+	mesh_i.material_override = mat
+	body.add_child(mesh_i)
+	var col := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = size
+	col.shape = shape
+	body.add_child(col)
+	return body
+
+
+func _harbor_add_sloped_box(parent: Node, box_name: String, p0: Vector3, p1: Vector3, width: float, thickness: float, mat: Material, group: String = "ramps") -> StaticBody3D:
+	var mid: Vector3 = (p0 + p1) * 0.5
+	var delta: Vector3 = p1 - p0
+	var length: float = maxf(delta.length(), 0.2)
+	var body := StaticBody3D.new()
+	body.name = box_name
+	if group != "":
+		body.add_to_group(group)
+	parent.add_child(body)
+	body.global_position = mid
+	body.basis = Basis.looking_at(delta / length, Vector3.UP)
+	var mesh_i := MeshInstance3D.new()
+	mesh_i.name = "Mesh"
+	var box := BoxMesh.new()
+	box.size = Vector3(width, thickness, length)
+	mesh_i.mesh = box
+	mesh_i.material_override = mat
+	body.add_child(mesh_i)
+	var col := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(width, thickness, length)
+	col.shape = shape
+	body.add_child(col)
+	return body
+
+
+func _harbor_add_piles(parent: Node, x0: float, x1: float, z0: float, z1: float, along_x: bool) -> void:
+	var pile_mat := StandardMaterial3D.new()
+	pile_mat.albedo_color = Color(0.22, 0.18, 0.14)
+	pile_mat.roughness = 0.95
+	var step := 11.0
+	if along_x:
+		var z_edges := [minf(z0, z1), maxf(z0, z1)]
+		var xa := minf(x0, x1) + 2.0
+		var xb := maxf(x0, x1) - 2.0
+		var x: float = xa
+		var idx := 0
+		while x <= xb:
+			for z_e in z_edges:
+				var cyl := MeshInstance3D.new()
+				cyl.name = "Pile_%d" % idx
+				idx += 1
+				var mesh := CylinderMesh.new()
+				mesh.top_radius = 0.28
+				mesh.bottom_radius = 0.32
+				mesh.height = HARBOR_DECK_Y - HARBOR_SEABED_Y + 0.4
+				cyl.mesh = mesh
+				cyl.material_override = pile_mat
+				cyl.position = Vector3(x, (HARBOR_DECK_Y + HARBOR_SEABED_Y) * 0.5, z_e)
+				parent.add_child(cyl)
+			x += step
+	else:
+		var x_edges := [minf(x0, x1), maxf(x0, x1)]
+		var za := minf(z0, z1) + 2.0
+		var zb := maxf(z0, z1) - 2.0
+		var z: float = za
+		var idx2 := 0
+		while z <= zb:
+			for x_e in x_edges:
+				var cyl := MeshInstance3D.new()
+				cyl.name = "Pile_%d" % idx2
+				idx2 += 1
+				var mesh := CylinderMesh.new()
+				mesh.top_radius = 0.28
+				mesh.bottom_radius = 0.32
+				mesh.height = HARBOR_DECK_Y - HARBOR_SEABED_Y + 0.4
+				cyl.mesh = mesh
+				cyl.material_override = pile_mat
+				cyl.position = Vector3(x_e, (HARBOR_DECK_Y + HARBOR_SEABED_Y) * 0.5, z)
+				parent.add_child(cyl)
+			z += step
+
+
+func _harbor_add_axis_pier(parent: Node, pier_name: String, x0: float, z0: float, x1: float, z1: float, deck_mat: Material, side_mat: Material) -> void:
+	var cx: float = (x0 + x1) * 0.5
+	var cz: float = (z0 + z1) * 0.5
+	var along_x: bool = absf(x1 - x0) >= absf(z1 - z0)
+	var length: float = maxf(absf(x1 - x0), absf(z1 - z0))
+	var yaw: float = 0.0 if along_x else PI * 0.5
+	var deck_y: float = HARBOR_DECK_Y
+	var thick: float = HARBOR_PIER_THICK
+	var size := Vector3(length, thick, HARBOR_PIER_W)
+	_harbor_add_box(parent, pier_name, Vector3(cx, deck_y - thick * 0.5, cz), size, yaw, deck_mat, "track_surface")
+	# Slightly inset skirt so the deck lip stays visible
+	var skirt := Vector3(length - 0.4, thick + 0.15, HARBOR_PIER_W - 0.6)
+	_harbor_add_box(parent, pier_name + "_Hull", Vector3(cx, deck_y - thick * 0.5 - 0.08, cz), skirt, yaw, side_mat, "")
+	var half_w: float = HARBOR_PIER_W * 0.5
+	if along_x:
+		_harbor_add_piles(parent, x0, x1, cz - half_w, cz + half_w, true)
+	else:
+		_harbor_add_piles(parent, cx - half_w, cx + half_w, z0, z1, false)
+
+
+func _add_harbor_piers() -> void:
+	var root := Node3D.new()
+	root.name = "HarborPiers"
+	add_child(root)
+
+	var deck_mat := _harbor_deck_mat()
+	var side_mat := _harbor_side_mat()
+	var wood_mat := _harbor_wood_mat()
+	var steel_mat := _harbor_steel_mat()
+	var warehouse_mat := StandardMaterial3D.new()
+	warehouse_mat.albedo_color = Color(0.45, 0.38, 0.30)
+	warehouse_mat.roughness = 0.9
+
+	# Long rectangular dock boxes. Coordinates are deck-centerline XZ.
+	# North start pier (eastbound)
+	_harbor_add_axis_pier(root, "HarborPier_Start", -175.0, -95.0, 70.0, -95.0, deck_mat, side_mat)
+	# NE pier after jump
+	_harbor_add_axis_pier(root, "HarborPier_NE", 94.0, -95.0, 185.0, -95.0, deck_mat, side_mat)
+	# East north (southbound)
+	_harbor_add_axis_pier(root, "HarborPier_EastN", 185.0, -95.0, 185.0, -5.0, deck_mat, side_mat)
+	# East south after bridge
+	_harbor_add_axis_pier(root, "HarborPier_EastS", 185.0, 17.0, 185.0, 125.0, deck_mat, side_mat)
+	# South-east (westbound)
+	_harbor_add_axis_pier(root, "HarborPier_SE", 185.0, 125.0, 40.0, 125.0, deck_mat, side_mat)
+	# Short south box before jump
+	_harbor_add_axis_pier(root, "HarborPier_South", 40.0, 125.0, 10.0, 125.0, deck_mat, side_mat)
+	# SW after jump
+	_harbor_add_axis_pier(root, "HarborPier_SW", -14.0, 125.0, -175.0, 125.0, deck_mat, side_mat)
+	# West south (northbound)
+	_harbor_add_axis_pier(root, "HarborPier_WestS", -175.0, 125.0, -175.0, 15.0, deck_mat, side_mat)
+	# West north after bridge
+	_harbor_add_axis_pier(root, "HarborPier_WestN", -175.0, -7.0, -175.0, -95.0, deck_mat, side_mat)
+
+	# Jump ramps — takeoff then landing across the water gaps
+	var dy_up := 2.35
+	var ramp_half := 0.32 # box center sits this far below the driving surface
+	_harbor_add_sloped_box(root, "HarborRamp_TakeoffE",
+		Vector3(56.0, HARBOR_DECK_Y - ramp_half, -95.0),
+		Vector3(70.0, HARBOR_DECK_Y + dy_up - ramp_half, -95.0),
+		HARBOR_PIER_W - 0.4, 0.65, wood_mat, "ramps")
+	_harbor_add_sloped_box(root, "HarborRamp_LandingE",
+		Vector3(94.0, HARBOR_DECK_Y + 0.85 - ramp_half, -95.0),
+		Vector3(110.0, HARBOR_DECK_Y - ramp_half, -95.0),
+		HARBOR_PIER_W - 0.4, 0.65, wood_mat, "ramps")
+	_harbor_add_sloped_box(root, "HarborRamp_TakeoffW",
+		Vector3(24.0, HARBOR_DECK_Y - ramp_half, 125.0),
+		Vector3(10.0, HARBOR_DECK_Y + dy_up - ramp_half, 125.0),
+		HARBOR_PIER_W - 0.4, 0.65, wood_mat, "ramps")
+	_harbor_add_sloped_box(root, "HarborRamp_LandingW",
+		Vector3(-14.0, HARBOR_DECK_Y + 0.85 - ramp_half, 125.0),
+		Vector3(-30.0, HARBOR_DECK_Y - ramp_half, 125.0),
+		HARBOR_PIER_W - 0.4, 0.65, wood_mat, "ramps")
+
+	# Bridges spanning the remaining gaps
+	_harbor_add_box(root, "HarborBridge_East",
+		Vector3(185.0, HARBOR_DECK_Y - 0.35, 6.0),
+		Vector3(12.0, 0.70, 24.0), 0.0, steel_mat, "track_surface")
+	_harbor_add_box(root, "HarborBridge_West",
+		Vector3(-175.0, HARBOR_DECK_Y - 0.35, 4.0),
+		Vector3(12.0, 0.70, 24.0), 0.0, steel_mat, "track_surface")
+	# Bridge railings
+	_harbor_add_box(root, "HarborBridge_East_RailL",
+		Vector3(179.4, HARBOR_DECK_Y + 0.55, 6.0),
+		Vector3(0.28, 1.1, 24.0), 0.0, steel_mat, "")
+	_harbor_add_box(root, "HarborBridge_East_RailR",
+		Vector3(190.6, HARBOR_DECK_Y + 0.55, 6.0),
+		Vector3(0.28, 1.1, 24.0), 0.0, steel_mat, "")
+	_harbor_add_box(root, "HarborBridge_West_RailL",
+		Vector3(-180.6, HARBOR_DECK_Y + 0.55, 4.0),
+		Vector3(0.28, 1.1, 24.0), 0.0, steel_mat, "")
+	_harbor_add_box(root, "HarborBridge_West_RailR",
+		Vector3(-169.4, HARBOR_DECK_Y + 0.55, 4.0),
+		Vector3(0.28, 1.1, 24.0), 0.0, steel_mat, "")
+	# Bridge pillars
+	for z_p in [-3.0, 15.0]:
+		_harbor_add_box(root, "HarborBridge_East_Pillar_%d" % int(z_p),
+			Vector3(185.0, (HARBOR_DECK_Y + HARBOR_SEABED_Y) * 0.5, z_p),
+			Vector3(1.4, HARBOR_DECK_Y - HARBOR_SEABED_Y, 1.4), 0.0, steel_mat, "")
+	for z_p2 in [-5.0, 13.0]:
+		_harbor_add_box(root, "HarborBridge_West_Pillar_%d" % int(z_p2),
+			Vector3(-175.0, (HARBOR_DECK_Y + HARBOR_SEABED_Y) * 0.5, z_p2),
+			Vector3(1.4, HARBOR_DECK_Y - HARBOR_SEABED_Y, 1.4), 0.0, steel_mat, "")
+
+	# Decorative warehouses on the OUTER (non-racing) side of the start pier
+	var wh_idx := 0
+	for wx in [-140.0, -90.0, -30.0, 20.0]:
+		_harbor_add_box(root, "HarborWarehouse_%d" % wh_idx,
+			Vector3(wx, HARBOR_DECK_Y + 4.2, -106.0),
+			Vector3(18.0, 8.4, 10.0), 0.0, warehouse_mat, "")
+		wh_idx += 1
+	# Extra unused finger piers so the basin reads as a harbor
+	_harbor_add_axis_pier(root, "HarborFinger_A", -40.0, -40.0, 30.0, -40.0, deck_mat, side_mat)
+	_harbor_add_axis_pier(root, "HarborFinger_B", 40.0, 50.0, 110.0, 50.0, deck_mat, side_mat)
+	_harbor_add_box(root, "HarborWarehouse_FingerA",
+		Vector3(-20.0, HARBOR_DECK_Y + 3.6, -28.0),
+		Vector3(14.0, 7.2, 8.0), 0.0, warehouse_mat, "")
+	_harbor_add_box(root, "HarborWarehouse_FingerB",
+		Vector3(80.0, HARBOR_DECK_Y + 3.6, 62.0),
+		Vector3(16.0, 7.2, 8.0), 0.0, warehouse_mat, "")
+
+	# Low breakwater walls around the basin (not on the racing line)
+	var wall_mat := StandardMaterial3D.new()
+	wall_mat.albedo_color = Color(0.34, 0.35, 0.36)
+	wall_mat.roughness = 0.97
+	_harbor_add_box(root, "HarborBreakwater_N",
+		Vector3(0.0, 2.1, -210.0), Vector3(460.0, 4.2, 6.0), 0.0, wall_mat, "")
+	_harbor_add_box(root, "HarborBreakwater_S",
+		Vector3(0.0, 2.1, 220.0), Vector3(460.0, 4.2, 6.0), 0.0, wall_mat, "")
+	_harbor_add_box(root, "HarborBreakwater_E",
+		Vector3(280.0, 2.1, 5.0), Vector3(6.0, 4.2, 430.0), 0.0, wall_mat, "")
+	_harbor_add_box(root, "HarborBreakwater_W",
+		Vector3(-270.0, 2.1, 5.0), Vector3(6.0, 4.2, 430.0), 0.0, wall_mat, "")

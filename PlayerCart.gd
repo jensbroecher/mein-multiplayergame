@@ -210,6 +210,9 @@ var ai_target_lane_offset: float = 0.0
 var ai_lane_change_timer: float = 0.0
 var ai_stuck_position_timer: float = 0.0
 var ai_last_stuck_position: Vector3 = Vector3.ZERO
+var _ai_want_drift: bool = false
+var _ai_upcoming_turn_angle: float = 0.0
+var _ai_upcoming_turn_dist: float = 40.0
 var track_path: Path3D = null
 var alternative_paths: Array[Path3D] = []
 var active_path: Path3D = null
@@ -572,6 +575,13 @@ func _ready():
 					var c: Vector3 = pit.global_position
 					water_bounds_min = Vector2(c.x - half.x, c.z - half.y)
 					water_bounds_max = Vector2(c.x + half.x, c.z + half.y)
+		elif tg and str(tg.get("level_prefix")) == "harbor_pier":
+			stage_has_water = true
+			water_surface_y = 1.55
+			water_bounds_active = false
+			var harbor_water = tg.get_node_or_null("HarborWater")
+			if harbor_water and harbor_water.has_meta("water_surface_y"):
+				water_surface_y = float(harbor_water.get_meta("water_surface_y"))
 		elif tg and str(tg.get("level_prefix")) == "desert_wadi":
 			# Local river + valley lake in desert_wadi.
 			stage_has_water = true
@@ -1500,6 +1510,9 @@ func _physics_process(delta):
 	if on_ground and Input.is_action_just_pressed("brake") and abs(input_dir.x) > 0.2 and current_speed > 5.0:
 		drift_mode = true
 		drift_right = input_dir.x > 0.0
+	elif is_ai and _ai_want_drift and on_ground and abs(input_dir.x) > 0.22 and current_speed > 6.0:
+		drift_mode = true
+		drift_right = input_dir.x > 0.0
 
 	# Auto-hop over small props/steps only when nearly stuck offroad — completely disabled on road/track/ramps.
 	if is_offroad and on_ground and not on_loop and input_dir.y < -0.5 and hop_cooldown <= 0.0:
@@ -1813,7 +1826,8 @@ func _is_track_surface(collider: Object) -> bool:
 		if nm.contains("track") or nm.contains("road") \
 				or nm.contains("ramp") or nm.contains("bridge") \
 				or nm.contains("loop") or nm.contains("deck") \
-				or nm.contains("jump") or nm.contains("curb"):
+				or nm.contains("jump") or nm.contains("curb") \
+				or nm.contains("pier") or nm.contains("harbor"):
 			return true
 		current = current.get_parent()
 	
@@ -3690,6 +3704,8 @@ func _get_current_surface_dust_color() -> Color:
 		return Color(0.95, 0.88, 0.70) # Warm golden sand
 	elif lvl_name.contains("mountain"):
 		return Color(0.88, 0.82, 0.72) # Mountain sand & gravel
+	elif lvl_name.contains("harbor"):
+		return Color(0.70, 0.68, 0.62) # Dry concrete / dock dust
 	else:
 		return Color(0.75, 0.85, 0.60) # Meadow grass & loam
 
@@ -3918,7 +3934,15 @@ func _get_ai_input(delta: float) -> Vector2:
 	ai_lane_offset = lerp(ai_lane_offset, ai_target_lane_offset, 1.5 * delta)
 	
 	var speed = linear_velocity.length()
-	var look_ahead = lerp(8.0, 18.0, clampf(speed / maxf(max_speed, 1.0), 0.0, 1.0))
+	var turn_info: Dictionary = _ai_measure_upcoming_turn(curve, current_offset, speed)
+	_ai_upcoming_turn_angle = float(turn_info.get("angle", 0.0))
+	_ai_upcoming_turn_dist = float(turn_info.get("dist", 40.0))
+	var corner_factor: float = clampf(_ai_upcoming_turn_angle / 1.15, 0.0, 1.0)
+
+	var look_ahead = lerp(10.0, 22.0, clampf(speed / maxf(max_speed, 1.0), 0.0, 1.0))
+	# In a tight nearby bend, aim closer so the car follows the dock instead of cutting the apex
+	if corner_factor > 0.55 and _ai_upcoming_turn_dist < 16.0:
+		look_ahead = minf(look_ahead, 11.0)
 	var target_offset = current_offset + look_ahead
 	
 	var curve_length = curve.get_baked_length()
@@ -3944,6 +3968,7 @@ func _get_ai_input(delta: float) -> Vector2:
 	
 	input.x = clamp(dir_flat.x * 2.2, -1.0, 1.0)
 	if is_finished_race:
+		_ai_want_drift = false
 		# Smoothly brake to a complete halt and stop the car
 		if speed > 0.5:
 			input.x = clamp(dir_flat.x * 1.5, -0.6, 0.6)
@@ -3954,7 +3979,27 @@ func _get_ai_input(delta: float) -> Vector2:
 			linear_velocity = Vector3.ZERO
 			angular_velocity = Vector3.ZERO
 	else:
-		input.y = -1.0 + abs(input.x) * 0.5
+		_ai_want_drift = false
+		var safe_speed: float = lerpf(max_speed, max_speed * 0.36, corner_factor)
+		if _ai_upcoming_turn_dist < 22.0:
+			safe_speed *= lerpf(1.0, 0.72, clampf((22.0 - _ai_upcoming_turn_dist) / 22.0, 0.0, 1.0))
+		if is_boosting or is_pad_boosting:
+			safe_speed *= 0.88
+
+		if corner_factor > 0.16:
+			if speed > safe_speed + 7.0:
+				input.y = 0.92
+			elif speed > safe_speed + 2.0:
+				input.y = 0.45
+			elif speed > safe_speed - 1.5:
+				input.y = 0.05
+			else:
+				input.y = -0.45
+			if speed > 12.0 and corner_factor > 0.32 and abs(input.x) > 0.28 and _ai_upcoming_turn_dist < 18.0:
+				_ai_want_drift = true
+				input.y = maxf(input.y, 0.55)
+		else:
+			input.y = -1.0 + abs(input.x) * 0.35
 	
 	# 3-Ray Obstacle Avoidance — throttled to every 3 physics frames.
 	# With 4 AI carts this was 12 raycasts/tick; now ~4 on average.
@@ -3981,7 +4026,7 @@ func _get_ai_input(delta: float) -> Vector2:
 				if result:
 					var collider = result.collider
 					var c_name = collider.name.to_lower()
-					var is_road_or_terrain = c_name.contains("road") or c_name.contains("terrain") or c_name.contains("track") or c_name.contains("unified_world") or c_name.contains("gate") or c_name.contains("finishline") or c_name.contains("checkpoint") or c_name.contains("halfway") or c_name.contains("ramp")
+					var is_road_or_terrain = c_name.contains("road") or c_name.contains("terrain") or c_name.contains("track") or c_name.contains("unified_world") or c_name.contains("gate") or c_name.contains("finishline") or c_name.contains("checkpoint") or c_name.contains("halfway") or c_name.contains("ramp") or c_name.contains("pier") or c_name.contains("bridge") or c_name.contains("seabed") or c_name.contains("deck")
 					if not is_road_or_terrain:
 						var dist = my_pos.distance_to(result.position)
 						var intensity = clamp(1.0 - (dist / 12.0), 0.1, 1.0) * ray["weight"]
@@ -4009,6 +4054,39 @@ func _get_ai_input(delta: float) -> Vector2:
 		
 	return input
 
+
+func _ai_measure_upcoming_turn(curve: Curve3D, offset: float, speed: float) -> Dictionary:
+	var length: float = maxf(curve.get_baked_length(), 1.0)
+	var look: float = clampf(speed * 1.2, 18.0, 56.0)
+	var p0: Vector3 = curve.sample_baked(offset)
+	var p0b: Vector3 = curve.sample_baked(fmod(offset + 1.5, length))
+	var h0: Vector3 = p0b - p0
+	h0.y = 0.0
+	if h0.length_squared() < 1e-6:
+		return {"angle": 0.0, "dir": 0.0, "dist": look}
+	h0 = h0.normalized()
+
+	var worst_ang: float = 0.0
+	var worst_dir: float = 0.0
+	var worst_dist: float = look
+	var d: float = 4.0
+	while d <= look:
+		var o1: float = fmod(offset + d, length)
+		var p1: Vector3 = curve.sample_baked(o1)
+		var p1b: Vector3 = curve.sample_baked(fmod(o1 + 1.5, length))
+		var h1: Vector3 = p1b - p1
+		h1.y = 0.0
+		if h1.length_squared() > 1e-6:
+			h1 = h1.normalized()
+			var ang: float = h0.signed_angle_to(h1, Vector3.UP)
+			if absf(ang) > absf(worst_ang):
+				worst_ang = ang
+				worst_dir = signf(ang)
+				worst_dist = d
+		d += 4.0
+	return {"angle": absf(worst_ang), "dir": worst_dir, "dist": worst_dist}
+
+
 func _process_ai_items(delta: float):
 	if current_item == ItemType.NONE:
 		return
@@ -4021,7 +4099,9 @@ func _process_ai_items(delta: float):
 	var should_use = false
 	match current_item:
 		ItemType.BOOST:
-			if abs(sync_steer) < 0.2:
+			# Only fire boosts on a real straight — never into a dock corner or while already turning.
+			var upcoming_ok: bool = _ai_upcoming_turn_angle < 0.32 and _ai_upcoming_turn_dist > 26.0
+			if abs(sync_steer) < 0.16 and upcoming_ok and linear_velocity.length() > 6.0:
 				should_use = true
 		ItemType.MISSILE, ItemType.GUIDED_MISSILE:
 			var fwd = -visuals.global_transform.basis.z

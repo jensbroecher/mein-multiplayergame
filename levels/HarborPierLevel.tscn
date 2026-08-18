@@ -1,0 +1,3281 @@
+[gd_scene format=3 uid="uid://b7oibsi4chxeq"]
+
+[ext_resource type="Script" uid="uid://d2hujjwkl3s4a" path="res://levels/Level.gd" id="1_lev99"]
+[ext_resource type="PackedScene" uid="uid://gate123" path="res://CheckpointGate.tscn" id="2_gate"]
+[ext_resource type="Script" uid="uid://cpx88edmwbon1" path="res://addons/GodotWeatherSystem/scripts/SeasonResource.gd" id="3_nvljv"]
+[ext_resource type="Script" uid="uid://ct8ssg1fuina4" path="res://addons/GodotWeatherSystem/scripts/SkyColourResource.gd" id="4_d0wus"]
+[ext_resource type="Script" uid="uid://c0bu4su5psbae" path="res://addons/GodotWeatherSystem/scripts/WeatherOccurrenceResource.gd" id="5_bw1k6"]
+[ext_resource type="Resource" uid="uid://bbtqdfvkjixub" path="res://addons/GodotWeatherSystem/weather/clouded.tres" id="6_jvicb"]
+[ext_resource type="Script" uid="uid://b2sbc4x8rba5g" path="res://TerrainGenerator.gd" id="7_gen"]
+[ext_resource type="Texture2D" uid="uid://dhsschxi0y6sm" path="res://materials/dirt.png" id="8_k86ik"]
+[ext_resource type="PackedScene" uid="uid://clxv8p6x0y6k2" path="res://SpawnIndicator.tscn" id="8_spawn"]
+[ext_resource type="Texture2D" uid="uid://bdpalxltdtjpv" path="res://materials/brick.png" id="9_x3kmm"]
+[ext_resource type="Shader" uid="uid://srampgbp5hcn" path="res://water.gdshader" id="10_2kc58"]
+[ext_resource type="PackedScene" uid="uid://da2i62hjyc1cp" path="res://addons/GodotWeatherSystem/weather_controller.tscn" id="31_weather"]
+[ext_resource type="PackedScene" uid="uid://boostpad123" path="res://BoostPad.tscn" id="93_m7b4a"]
+
+[sub_resource type="Curve" id="Curve_8bl6p"]
+_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.0464286, 0), 0.0, 0.0, 0, 0, Vector2(0.107143, 0.0367036), 0.303207, 0.303207, 0, 0, Vector2(0.425, 1), 0.0, 0.0, 0, 0, Vector2(0.571429, 1), 0.0, 0.0, 0, 0, Vector2(0.896429, 0.0277009), 0.0, 0.0, 0, 0, Vector2(0.960714, 0), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 8
+
+[sub_resource type="Resource" id="Resource_ext2d"]
+script = ExtResource("4_d0wus")
+
+[sub_resource type="Resource" id="Resource_p7jpd"]
+script = ExtResource("4_d0wus")
+skyColour = Color(0, 0.00784314, 0.105882, 1)
+horizonColour = Color(0.0784314, 0.00784314, 0.0156863, 1)
+groundColour = Color(0, 0, 0, 1)
+cloudBrightness = 0.05
+
+[sub_resource type="Resource" id="Resource_nvljv"]
+script = ExtResource("5_bw1k6")
+weather = ExtResource("6_jvicb")
+
+[sub_resource type="Resource" id="Resource_d0wus"]
+script = ExtResource("3_nvljv")
+seasonId = "summer"
+weathers = Array[ExtResource("5_bw1k6")]([SubResource("Resource_nvljv")])
+skyColourDaytime = SubResource("Resource_ext2d")
+skyColourNight = SubResource("Resource_p7jpd")
+dayNightCycleCurve = SubResource("Curve_8bl6p")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ge7do"]
+albedo_color = Color(0.1, 0.11, 0.1, 1)
+albedo_texture = ExtResource("8_k86ik")
+uv1_scale = Vector3(0.04, 0.04, 0.04)
+uv1_triplanar = true
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_t1g6a"]
+size = Vector2(1600, 1600)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_00rso"]
+size = Vector3(1600, 2, 1600)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_frjof"]
+albedo_color = Color(0.62, 0.58, 0.5, 1)
+albedo_texture = ExtResource("9_x3kmm")
+roughness = 0.92
+uv1_scale = Vector3(0.35, 0.35, 0.35)
+uv1_triplanar = true
+
+[sub_resource type="BoxMesh" id="BoxMesh_76ksq"]
+size = Vector3(245, 2.55, 16)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_dirc7"]
+size = Vector3(245, 2.55, 16)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_lky8o"]
+albedo_color = Color(0.38, 0.36, 0.33, 1)
+albedo_texture = ExtResource("9_x3kmm")
+roughness = 0.96
+uv1_scale = Vector3(0.18, 0.18, 0.18)
+uv1_triplanar = true
+
+[sub_resource type="BoxMesh" id="BoxMesh_ky3wy"]
+size = Vector3(244.6, 2.7, 15.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_508ik"]
+size = Vector3(244.6, 2.7, 15.4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_eb2rb"]
+albedo_color = Color(0.22, 0.18, 0.14, 1)
+roughness = 0.95
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_56kbo"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_viniq"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_7j3u3"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_rvaof"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_l0h3h"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_rtyci"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_qqqxu"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_kld4c"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_cx6ni"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_lcioh"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_cnjyq"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_ojptd"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_xwj7n"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_020sc"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_7efbr"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_1yxrl"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_jvrm7"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_b0l6k"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_ocfw0"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_2seg7"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_m8jl0"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_jgv71"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_dnban"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_aohau"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_xecgo"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_t1oka"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_37biv"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_8wqb7"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_i530a"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_1y7j0"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_csrra"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_2dlq2"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_35m5k"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_w8xrf"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_6y04u"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_eo3ng"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_3ue7y"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_31rf3"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_4r1s3"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_jb1cm"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_2avy5"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_2pb8n"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_g07ft"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_vwcrq"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="BoxMesh" id="BoxMesh_7l0gt"]
+size = Vector3(91, 2.55, 16)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_fnftf"]
+size = Vector3(91, 2.55, 16)
+
+[sub_resource type="BoxMesh" id="BoxMesh_b08cp"]
+size = Vector3(90.6, 2.7, 15.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_hical"]
+size = Vector3(90.6, 2.7, 15.4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_f3tpf"]
+albedo_color = Color(0.22, 0.18, 0.14, 1)
+roughness = 0.95
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_pwryy"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_foodq"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_wjk4h"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_m6mwc"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_77o00"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_s6bpx"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_nkqr2"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_pj3fy"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_mtept"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_c6omo"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_48tid"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_e38op"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_31cr7"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_iyweu"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_2hpup"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_wn2mq"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="BoxMesh" id="BoxMesh_yalkd"]
+size = Vector3(90, 2.55, 16)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1um1o"]
+size = Vector3(90, 2.55, 16)
+
+[sub_resource type="BoxMesh" id="BoxMesh_wjmf2"]
+size = Vector3(89.6, 2.7, 15.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_xsuld"]
+size = Vector3(89.6, 2.7, 15.4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_vd2xs"]
+albedo_color = Color(0.22, 0.18, 0.14, 1)
+roughness = 0.95
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_nwm1w"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_d70sn"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_hf273"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_1nade"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_n6kon"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_cngsc"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_e1wyi"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_vj0a5"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_4w1ya"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_ltjr5"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_nxpsh"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_f75ua"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_65t3w"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_dbel0"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_q5ecu"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_l1wo7"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="BoxMesh" id="BoxMesh_h6pge"]
+size = Vector3(108, 2.55, 16)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_pv43s"]
+size = Vector3(108, 2.55, 16)
+
+[sub_resource type="BoxMesh" id="BoxMesh_4uor6"]
+size = Vector3(107.6, 2.7, 15.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_iqpbr"]
+size = Vector3(107.6, 2.7, 15.4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_m3s82"]
+albedo_color = Color(0.22, 0.18, 0.14, 1)
+roughness = 0.95
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_q702c"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_ekngt"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_jat6b"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_4h80i"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_kaq0m"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_vf3si"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_jkwwo"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_t5ppn"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_xeib2"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_pl63n"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_wtjwv"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_xfiue"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_yd6s6"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_v0j5q"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_dgop8"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_442cn"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_dxwp2"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_tthvw"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_5og7x"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_ylg5r"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="BoxMesh" id="BoxMesh_etuab"]
+size = Vector3(145, 2.55, 16)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_a75ue"]
+size = Vector3(145, 2.55, 16)
+
+[sub_resource type="BoxMesh" id="BoxMesh_pwear"]
+size = Vector3(144.6, 2.7, 15.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_pfmr4"]
+size = Vector3(144.6, 2.7, 15.4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_06vsm"]
+albedo_color = Color(0.22, 0.18, 0.14, 1)
+roughness = 0.95
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_sxkgo"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_6k3cy"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_4nixw"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_qtksm"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_6k7u4"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_ekshl"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_v2qja"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_5b7dl"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_a0b40"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_2x6r2"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_tm8mk"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_6g330"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_sdaix"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_wufyy"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_mfo1t"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_3tqw8"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_0un3f"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_fhk1u"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_35ha8"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_6xp6o"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_mgrhl"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_4iqeg"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_q5ns2"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_tx04u"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_licbf"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_4sggt"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="BoxMesh" id="BoxMesh_b8dj8"]
+size = Vector3(30, 2.55, 16)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ttpi1"]
+size = Vector3(30, 2.55, 16)
+
+[sub_resource type="BoxMesh" id="BoxMesh_b2llb"]
+size = Vector3(29.6, 2.7, 15.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_06bhy"]
+size = Vector3(29.6, 2.7, 15.4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_0wvu8"]
+albedo_color = Color(0.22, 0.18, 0.14, 1)
+roughness = 0.95
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_ikyrf"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_kmjwi"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_diglo"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_sdxev"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_rsfbk"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_esklo"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="BoxMesh" id="BoxMesh_8p00p"]
+size = Vector3(161, 2.55, 16)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_tpva1"]
+size = Vector3(161, 2.55, 16)
+
+[sub_resource type="BoxMesh" id="BoxMesh_rikqs"]
+size = Vector3(160.6, 2.7, 15.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_3b8f6"]
+size = Vector3(160.6, 2.7, 15.4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_82g4o"]
+albedo_color = Color(0.22, 0.18, 0.14, 1)
+roughness = 0.95
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_esigv"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_f4sef"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_y3ret"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_2yj2n"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_bpcc8"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_ape7g"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_o8isd"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_ufafo"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_5ibp5"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_xph7n"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_rralr"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_ng83b"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_mdkji"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_j3xlu"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_a7obh"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_fabw1"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_5gyij"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_4i3ns"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_jypr8"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_yssi5"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_n0hn1"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_lix4l"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_c8qoc"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_28tkr"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_gsfu4"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_4be34"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_wajkl"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_hy1ki"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_rh1ww"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_r3t16"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="BoxMesh" id="BoxMesh_c48tq"]
+size = Vector3(110, 2.55, 16)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_fipem"]
+size = Vector3(110, 2.55, 16)
+
+[sub_resource type="BoxMesh" id="BoxMesh_ldklb"]
+size = Vector3(109.6, 2.7, 15.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_7uqws"]
+size = Vector3(109.6, 2.7, 15.4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_xo7gk"]
+albedo_color = Color(0.22, 0.18, 0.14, 1)
+roughness = 0.95
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_s8kml"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_cj752"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_a6fxf"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_xb65u"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_n5prv"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_21mck"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_dli02"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_gsga8"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_2a8pg"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_btnlg"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_yncn5"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_wux7b"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_y3xs3"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_cf2ej"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_g0mmu"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_a0ar6"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_b02xl"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_wlarl"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_4shbm"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_88en8"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="BoxMesh" id="BoxMesh_b40kj"]
+size = Vector3(88, 2.55, 16)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_7tgkf"]
+size = Vector3(88, 2.55, 16)
+
+[sub_resource type="BoxMesh" id="BoxMesh_ispec"]
+size = Vector3(87.6, 2.7, 15.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_hxmhn"]
+size = Vector3(87.6, 2.7, 15.4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_nwob2"]
+albedo_color = Color(0.22, 0.18, 0.14, 1)
+roughness = 0.95
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_fls0w"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_c6yej"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_q0hx3"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_yba2y"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_7htwl"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_sglqf"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_xsvfw"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_q8e1j"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_w5x7o"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_ifrs3"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_o5fnv"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_tjr3u"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_fje46"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_4qetg"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_wsk08"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_m5xyg"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_chnpe"]
+albedo_color = Color(0.42, 0.3, 0.2, 1)
+albedo_texture = ExtResource("8_k86ik")
+roughness = 0.88
+uv1_scale = Vector3(0.45, 0.45, 0.45)
+uv1_triplanar = true
+
+[sub_resource type="BoxMesh" id="BoxMesh_76vp8"]
+size = Vector3(15.6, 0.65, 14.195863)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_khdjq"]
+size = Vector3(15.6, 0.65, 14.195863)
+
+[sub_resource type="BoxMesh" id="BoxMesh_mcc2w"]
+size = Vector3(15.6, 0.65, 16.022562)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_r36f2"]
+size = Vector3(15.6, 0.65, 16.022562)
+
+[sub_resource type="BoxMesh" id="BoxMesh_frejs"]
+size = Vector3(15.6, 0.65, 14.195863)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_8q81q"]
+size = Vector3(15.6, 0.65, 14.195863)
+
+[sub_resource type="BoxMesh" id="BoxMesh_p6smv"]
+size = Vector3(15.6, 0.65, 16.022562)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_cn85t"]
+size = Vector3(15.6, 0.65, 16.022562)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_y83ig"]
+albedo_color = Color(0.28, 0.3, 0.32, 1)
+metallic = 0.55
+roughness = 0.45
+
+[sub_resource type="BoxMesh" id="BoxMesh_j8qwd"]
+size = Vector3(12, 0.7, 24)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ymd7i"]
+size = Vector3(12, 0.7, 24)
+
+[sub_resource type="BoxMesh" id="BoxMesh_gpj3e"]
+size = Vector3(12, 0.7, 24)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_judri"]
+size = Vector3(12, 0.7, 24)
+
+[sub_resource type="BoxMesh" id="BoxMesh_lf311"]
+size = Vector3(0.28, 1.1, 24)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_4lco1"]
+size = Vector3(0.28, 1.1, 24)
+
+[sub_resource type="BoxMesh" id="BoxMesh_2hs44"]
+size = Vector3(0.28, 1.1, 24)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_bexyv"]
+size = Vector3(0.28, 1.1, 24)
+
+[sub_resource type="BoxMesh" id="BoxMesh_7m5p4"]
+size = Vector3(0.28, 1.1, 24)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_rnypo"]
+size = Vector3(0.28, 1.1, 24)
+
+[sub_resource type="BoxMesh" id="BoxMesh_52nl4"]
+size = Vector3(0.28, 1.1, 24)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_pdtgx"]
+size = Vector3(0.28, 1.1, 24)
+
+[sub_resource type="BoxMesh" id="BoxMesh_1ehkb"]
+size = Vector3(1.4, 11.05, 1.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_y5gms"]
+size = Vector3(1.4, 11.05, 1.4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_42o60"]
+size = Vector3(1.4, 11.05, 1.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_6xrqk"]
+size = Vector3(1.4, 11.05, 1.4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_mip76"]
+size = Vector3(1.4, 11.05, 1.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_uv2ce"]
+size = Vector3(1.4, 11.05, 1.4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_u331c"]
+size = Vector3(1.4, 11.05, 1.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ouaw4"]
+size = Vector3(1.4, 11.05, 1.4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_t475q"]
+albedo_color = Color(0.45, 0.38, 0.3, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="BoxMesh_aj2n1"]
+size = Vector3(18, 8.4, 10)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_5m5k5"]
+size = Vector3(18, 8.4, 10)
+
+[sub_resource type="BoxMesh" id="BoxMesh_1cwxe"]
+size = Vector3(18, 8.4, 10)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_560wm"]
+size = Vector3(18, 8.4, 10)
+
+[sub_resource type="BoxMesh" id="BoxMesh_1t2o8"]
+size = Vector3(18, 8.4, 10)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_bf3oq"]
+size = Vector3(18, 8.4, 10)
+
+[sub_resource type="BoxMesh" id="BoxMesh_kd15r"]
+size = Vector3(18, 8.4, 10)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_4clpo"]
+size = Vector3(18, 8.4, 10)
+
+[sub_resource type="BoxMesh" id="BoxMesh_1auaf"]
+size = Vector3(70, 2.55, 16)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_8g500"]
+size = Vector3(70, 2.55, 16)
+
+[sub_resource type="BoxMesh" id="BoxMesh_lk1p1"]
+size = Vector3(69.6, 2.7, 15.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_dxjsr"]
+size = Vector3(69.6, 2.7, 15.4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_g5dv8"]
+albedo_color = Color(0.22, 0.18, 0.14, 1)
+roughness = 0.95
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_22r58"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_i1am8"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_01wm2"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_2u5lt"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_rtduw"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_2v1lm"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_41syx"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_p1w6i"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_3wcsa"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_iy13j"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_i8sv8"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_hgvk1"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_thwpj"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_lqls5"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="BoxMesh" id="BoxMesh_hdowj"]
+size = Vector3(70, 2.55, 16)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_bngtl"]
+size = Vector3(70, 2.55, 16)
+
+[sub_resource type="BoxMesh" id="BoxMesh_h4616"]
+size = Vector3(69.6, 2.7, 15.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_mtoif"]
+size = Vector3(69.6, 2.7, 15.4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_n1bjd"]
+albedo_color = Color(0.22, 0.18, 0.14, 1)
+roughness = 0.95
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_2ogb2"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_u1p8q"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_ntau0"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_68c2d"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_ghnr2"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_owkyf"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_w6h1p"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_b2jjd"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_0mqwf"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_ap6ac"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_5lncj"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_jpgri"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_17hky"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_cbfd0"]
+top_radius = 0.28
+bottom_radius = 0.32
+height = 11.45
+
+[sub_resource type="BoxMesh" id="BoxMesh_obenr"]
+size = Vector3(14, 7.2, 8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_nsjfq"]
+size = Vector3(14, 7.2, 8)
+
+[sub_resource type="BoxMesh" id="BoxMesh_6w6w4"]
+size = Vector3(16, 7.2, 8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_re8r3"]
+size = Vector3(16, 7.2, 8)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_jhjc6"]
+albedo_color = Color(0.34, 0.35, 0.36, 1)
+roughness = 0.97
+
+[sub_resource type="BoxMesh" id="BoxMesh_ysas2"]
+size = Vector3(460, 4.2, 6)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_qugtb"]
+size = Vector3(460, 4.2, 6)
+
+[sub_resource type="BoxMesh" id="BoxMesh_h01tl"]
+size = Vector3(460, 4.2, 6)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_5sfk2"]
+size = Vector3(460, 4.2, 6)
+
+[sub_resource type="BoxMesh" id="BoxMesh_2yssv"]
+size = Vector3(6, 4.2, 430)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_gauqx"]
+size = Vector3(6, 4.2, 430)
+
+[sub_resource type="BoxMesh" id="BoxMesh_y0y8u"]
+size = Vector3(6, 4.2, 430)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_hyitj"]
+size = Vector3(6, 4.2, 430)
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_vxfih"]
+seed = 17
+frequency = 0.016
+fractal_octaves = 4
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_or4mi"]
+noise = SubResource("FastNoiseLite_vxfih")
+seamless = true
+as_normal_map = true
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_jx3lg"]
+render_priority = 0
+shader = ExtResource("10_2kc58")
+shader_parameter/water_color = Color(0.018, 0.03, 0.035, 1)
+shader_parameter/shallow_color = Color(0.05, 0.08, 0.075, 1)
+shader_parameter/sky_tint = Color(0.42, 0.48, 0.5, 1)
+shader_parameter/sky_reflect = 0.28
+shader_parameter/transparency = 0.1
+shader_parameter/metallic = 0.48
+shader_parameter/roughness = 0.22
+shader_parameter/noise_tex = SubResource("NoiseTexture2D_or4mi")
+shader_parameter/wave_speed = 0.018
+shader_parameter/wave_strength = 0.42
+shader_parameter/wave_height = 0.22
+shader_parameter/wave_scale = 0.85
+shader_parameter/enable_water_edge_fade = true
+shader_parameter/water_fade_start = 520.0
+shader_parameter/water_fade_end = 780.0
+shader_parameter/depth_fade_distance = 6.0
+shader_parameter/deep_water_color = Color(0.008, 0.014, 0.018, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_8r3o0"]
+size = Vector2(1400, 1400)
+subdivide_width = 48
+subdivide_depth = 48
+
+[sub_resource type="Curve3D" id="Curve3D_harbor"]
+bake_interval = 0.25
+_data = {
+"points": PackedVector3Array(-18, 0, 0, 18, 0, 0, -50, 3.55, -95, -16, 0, 0, 16, 0, 0, 40, 3.55, -95, -10, 0, 0, 8, 0.4, 0, 70, 3.55, -95, -6, -0.4, 0, 6, -0.4, 0, 82, 6.2, -95, -8, 0.4, 0, 10, 0, 0, 94, 3.55, -95, -14, 0, 0, 10, 0, 0, 170, 3.55, -95, 0, 0, -12, 0, 0, 12, 185, 3.55, -80, 0, 0, -12, 0, 0, 8, 185, 3.55, -5, 0, 0, -6, 0, 0, 6, 185, 3.55, 6, 0, 0, -8, 0, 0, 12, 185, 3.55, 17, 0, 0, -14, 0, 0, 8, 185, 3.55, 110, 12, 0, 0, -12, 0, 0, 170, 3.55, 125, 14, 0, 0, -12, 0, 0, 40, 3.55, 125, 10, 0, 0, -8, 0.4, 0, 10, 3.55, 125, 6, -0.4, 0, -6, -0.4, 0, -2, 6.2, 125, 8, 0.4, 0, -10, 0, 0, -14, 3.55, 125, 14, 0, 0, -10, 0, 0, -160, 3.55, 125, 0, 0, 12, 0, 0, -12, -175, 3.55, 110, 0, 0, 12, 0, 0, -8, -175, 3.55, 15, 0, 0, 6, 0, 0, -6, -175, 3.55, 4, 0, 0, 8, 0, 0, -12, -175, 3.55, -7, 0, 0, 12, 0, 0, -8, -175, 3.55, -80, -10, 0, 0, 12, 0, 0, -160, 3.55, -95, -18, 0, 0, 18, 0, 0, -50, 3.55, -95),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+}
+point_count = 24
+
+[node name="HarborPierLevel" type="Node3D" unique_id=1861635425 node_paths=PackedStringArray("checkpoints", "track_path")]
+script = ExtResource("1_lev99")
+checkpoints = [NodePath(""), NodePath("Checkpoints/Halfway2"), NodePath("Checkpoints/Halfway3"), NodePath("Checkpoints/Halfway4"), NodePath("Checkpoints/Halfway5"), NodePath("Checkpoints/Halfway6"), NodePath("Checkpoints/Halfway7"), NodePath("Checkpoints/Halfway8"), NodePath("FinishLine")]
+track_path = NodePath("TrackPath")
+
+[node name="WeatherController" parent="." unique_id=1670643935 instance=ExtResource("31_weather")]
+time_of_day_hours = 17.4
+selected_weather = 1
+seasons = Array[ExtResource("3_nvljv")]([SubResource("Resource_d0wus")])
+startTime = 62639.99999999999
+
+[node name="TerrainGenerator" type="Node3D" parent="." unique_id=1398886652 node_paths=PackedStringArray("track_path")]
+script = ExtResource("7_gen")
+track_path = NodePath("../TrackPath")
+terrain_resolution = 80
+hill_height = 0.0
+level_prefix = "harbor_pier"
+no_water = true
+no_grass = true
+generate_bridge_supports = false
+terrain_grass_count = 0
+save_to_files = false
+
+[node name="HarborSeabed" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1996997323]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -7.5, 0)
+material_override = SubResource("StandardMaterial3D_ge7do")
+cast_shadow = 0
+mesh = SubResource("PlaneMesh_t1g6a")
+
+[node name="HarborSeabedCollision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1335714761]
+
+[node name="@CollisionShape3D@22610" type="CollisionShape3D" parent="TerrainGenerator/HarborSeabedCollision" unique_id=2085947375]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -8.5, 0)
+shape = SubResource("BoxShape3D_00rso")
+
+[node name="HarborPiers" type="Node3D" parent="TerrainGenerator" unique_id=286109982]
+
+[node name="HarborPier_Start" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=1135026141]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -52.5, 2.275, -95)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborPier_Start" unique_id=1007748673]
+material_override = SubResource("StandardMaterial3D_frjof")
+mesh = SubResource("BoxMesh_76ksq")
+
+[node name="@CollisionShape3D@22611" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborPier_Start" unique_id=48452228]
+shape = SubResource("BoxShape3D_dirc7")
+
+[node name="HarborPier_Start_Hull" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=266012894]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -52.5, 2.195, -95)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborPier_Start_Hull" unique_id=729025768]
+material_override = SubResource("StandardMaterial3D_lky8o")
+mesh = SubResource("BoxMesh_ky3wy")
+
+[node name="@CollisionShape3D@22612" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborPier_Start_Hull" unique_id=1157530202]
+shape = SubResource("BoxShape3D_508ik")
+
+[node name="Pile_0" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=745347056]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -173, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_56kbo")
+
+[node name="Pile_1" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1500244830]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -173, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_viniq")
+
+[node name="Pile_2" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=45131887]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -162, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_7j3u3")
+
+[node name="Pile_3" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1149820932]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -162, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_rvaof")
+
+[node name="Pile_4" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=159570765]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -151, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_l0h3h")
+
+[node name="Pile_5" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=803831388]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -151, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_rtyci")
+
+[node name="Pile_6" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1377956585]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -140, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_qqqxu")
+
+[node name="Pile_7" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=456224824]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -140, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_kld4c")
+
+[node name="Pile_8" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=174153506]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -129, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_cx6ni")
+
+[node name="Pile_9" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=399144535]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -129, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_lcioh")
+
+[node name="Pile_10" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=676096998]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -118, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_cnjyq")
+
+[node name="Pile_11" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=878184490]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -118, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_ojptd")
+
+[node name="Pile_12" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=448620109]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -107, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_xwj7n")
+
+[node name="Pile_13" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=940541683]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -107, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_020sc")
+
+[node name="Pile_14" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1245159519]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -96, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_7efbr")
+
+[node name="Pile_15" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1857767751]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -96, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_1yxrl")
+
+[node name="Pile_16" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1088515695]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -85, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_jvrm7")
+
+[node name="Pile_17" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=151200655]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -85, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_b0l6k")
+
+[node name="Pile_18" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1039108681]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -74, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_ocfw0")
+
+[node name="Pile_19" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=2069155376]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -74, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_2seg7")
+
+[node name="Pile_20" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1733978657]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -63, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_m8jl0")
+
+[node name="Pile_21" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1824525340]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -63, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_jgv71")
+
+[node name="Pile_22" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=99942357]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -52, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_dnban")
+
+[node name="Pile_23" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1740292756]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -52, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_aohau")
+
+[node name="Pile_24" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=295472893]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -41, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_xecgo")
+
+[node name="Pile_25" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=2129450996]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -41, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_t1oka")
+
+[node name="Pile_26" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=2068351615]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_37biv")
+
+[node name="Pile_27" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1700750614]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_8wqb7")
+
+[node name="Pile_28" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1679219776]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_i530a")
+
+[node name="Pile_29" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1014273840]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_1y7j0")
+
+[node name="Pile_30" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=346609850]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_csrra")
+
+[node name="Pile_31" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=289883765]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_2dlq2")
+
+[node name="Pile_32" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=2026328821]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_35m5k")
+
+[node name="Pile_33" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=820600167]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_w8xrf")
+
+[node name="Pile_34" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1199296165]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_6y04u")
+
+[node name="Pile_35" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=5741405]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_eo3ng")
+
+[node name="Pile_36" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=838622821]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_3ue7y")
+
+[node name="Pile_37" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1012863893]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_31rf3")
+
+[node name="Pile_38" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=410131183]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_4r1s3")
+
+[node name="Pile_39" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=370790613]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_jb1cm")
+
+[node name="Pile_40" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=995207304]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 47, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_2avy5")
+
+[node name="Pile_41" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1827830007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 47, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_2pb8n")
+
+[node name="Pile_42" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=157092923]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 58, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_g07ft")
+
+[node name="Pile_43" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=731819512]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 58, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_eb2rb")
+mesh = SubResource("CylinderMesh_vwcrq")
+
+[node name="HarborPier_NE" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=193549572]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 139.5, 2.275, -95)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborPier_NE" unique_id=198576355]
+material_override = SubResource("StandardMaterial3D_frjof")
+mesh = SubResource("BoxMesh_7l0gt")
+
+[node name="@CollisionShape3D@22613" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborPier_NE" unique_id=2039225603]
+shape = SubResource("BoxShape3D_fnftf")
+
+[node name="HarborPier_NE_Hull" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=2127554536]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 139.5, 2.195, -95)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborPier_NE_Hull" unique_id=1229587919]
+material_override = SubResource("StandardMaterial3D_lky8o")
+mesh = SubResource("BoxMesh_b08cp")
+
+[node name="@CollisionShape3D@22614" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborPier_NE_Hull" unique_id=1769362522]
+shape = SubResource("BoxShape3D_hical")
+
+[node name="@MeshInstance3D@22615" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=93629410]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 96, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_f3tpf")
+mesh = SubResource("CylinderMesh_pwryy")
+
+[node name="@MeshInstance3D@22616" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1634522596]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 96, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_f3tpf")
+mesh = SubResource("CylinderMesh_foodq")
+
+[node name="@MeshInstance3D@22617" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1089693031]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 107, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_f3tpf")
+mesh = SubResource("CylinderMesh_wjk4h")
+
+[node name="@MeshInstance3D@22618" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=598930024]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 107, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_f3tpf")
+mesh = SubResource("CylinderMesh_m6mwc")
+
+[node name="@MeshInstance3D@22619" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1732087337]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 118, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_f3tpf")
+mesh = SubResource("CylinderMesh_77o00")
+
+[node name="@MeshInstance3D@22620" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1707004569]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 118, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_f3tpf")
+mesh = SubResource("CylinderMesh_s6bpx")
+
+[node name="@MeshInstance3D@22621" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=944089049]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 129, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_f3tpf")
+mesh = SubResource("CylinderMesh_nkqr2")
+
+[node name="@MeshInstance3D@22622" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=2076542051]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 129, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_f3tpf")
+mesh = SubResource("CylinderMesh_pj3fy")
+
+[node name="@MeshInstance3D@22623" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=244722940]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 140, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_f3tpf")
+mesh = SubResource("CylinderMesh_mtept")
+
+[node name="@MeshInstance3D@22624" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=221955999]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 140, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_f3tpf")
+mesh = SubResource("CylinderMesh_c6omo")
+
+[node name="@MeshInstance3D@22625" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1296849525]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 151, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_f3tpf")
+mesh = SubResource("CylinderMesh_48tid")
+
+[node name="@MeshInstance3D@22626" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1369985183]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 151, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_f3tpf")
+mesh = SubResource("CylinderMesh_e38op")
+
+[node name="@MeshInstance3D@22627" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=2040009119]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 162, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_f3tpf")
+mesh = SubResource("CylinderMesh_31cr7")
+
+[node name="@MeshInstance3D@22628" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1879468796]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 162, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_f3tpf")
+mesh = SubResource("CylinderMesh_iyweu")
+
+[node name="@MeshInstance3D@22629" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1548194934]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 173, -1.975, -103)
+material_override = SubResource("StandardMaterial3D_f3tpf")
+mesh = SubResource("CylinderMesh_2hpup")
+
+[node name="@MeshInstance3D@22630" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=727000570]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 173, -1.975, -87)
+material_override = SubResource("StandardMaterial3D_f3tpf")
+mesh = SubResource("CylinderMesh_wn2mq")
+
+[node name="HarborPier_EastN" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=681768405]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 185, 2.275, -50)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborPier_EastN" unique_id=1807869549]
+material_override = SubResource("StandardMaterial3D_frjof")
+mesh = SubResource("BoxMesh_yalkd")
+
+[node name="@CollisionShape3D@22631" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborPier_EastN" unique_id=212022240]
+shape = SubResource("BoxShape3D_1um1o")
+
+[node name="HarborPier_EastN_Hull" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=1784480008]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 185, 2.195, -50)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborPier_EastN_Hull" unique_id=1815637441]
+material_override = SubResource("StandardMaterial3D_lky8o")
+mesh = SubResource("BoxMesh_wjmf2")
+
+[node name="@CollisionShape3D@22632" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborPier_EastN_Hull" unique_id=1949446803]
+shape = SubResource("BoxShape3D_xsuld")
+
+[node name="@MeshInstance3D@22633" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1180879462]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 177, -1.975, -93)
+material_override = SubResource("StandardMaterial3D_vd2xs")
+mesh = SubResource("CylinderMesh_nwm1w")
+
+[node name="@MeshInstance3D@22634" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1412402760]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 193, -1.975, -93)
+material_override = SubResource("StandardMaterial3D_vd2xs")
+mesh = SubResource("CylinderMesh_d70sn")
+
+[node name="@MeshInstance3D@22635" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=2012058375]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 177, -1.975, -82)
+material_override = SubResource("StandardMaterial3D_vd2xs")
+mesh = SubResource("CylinderMesh_hf273")
+
+[node name="@MeshInstance3D@22636" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=2007838389]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 193, -1.975, -82)
+material_override = SubResource("StandardMaterial3D_vd2xs")
+mesh = SubResource("CylinderMesh_1nade")
+
+[node name="@MeshInstance3D@22637" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=194558924]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 177, -1.975, -71)
+material_override = SubResource("StandardMaterial3D_vd2xs")
+mesh = SubResource("CylinderMesh_n6kon")
+
+[node name="@MeshInstance3D@22638" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=688782185]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 193, -1.975, -71)
+material_override = SubResource("StandardMaterial3D_vd2xs")
+mesh = SubResource("CylinderMesh_cngsc")
+
+[node name="@MeshInstance3D@22639" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1764538667]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 177, -1.975, -60)
+material_override = SubResource("StandardMaterial3D_vd2xs")
+mesh = SubResource("CylinderMesh_e1wyi")
+
+[node name="@MeshInstance3D@22640" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=101923054]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 193, -1.975, -60)
+material_override = SubResource("StandardMaterial3D_vd2xs")
+mesh = SubResource("CylinderMesh_vj0a5")
+
+[node name="@MeshInstance3D@22641" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=576784844]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 177, -1.975, -49)
+material_override = SubResource("StandardMaterial3D_vd2xs")
+mesh = SubResource("CylinderMesh_4w1ya")
+
+[node name="@MeshInstance3D@22642" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1310500961]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 193, -1.975, -49)
+material_override = SubResource("StandardMaterial3D_vd2xs")
+mesh = SubResource("CylinderMesh_ltjr5")
+
+[node name="@MeshInstance3D@22643" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1041478576]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 177, -1.975, -38)
+material_override = SubResource("StandardMaterial3D_vd2xs")
+mesh = SubResource("CylinderMesh_nxpsh")
+
+[node name="@MeshInstance3D@22644" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=731741267]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 193, -1.975, -38)
+material_override = SubResource("StandardMaterial3D_vd2xs")
+mesh = SubResource("CylinderMesh_f75ua")
+
+[node name="@MeshInstance3D@22645" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=959516340]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 177, -1.975, -27)
+material_override = SubResource("StandardMaterial3D_vd2xs")
+mesh = SubResource("CylinderMesh_65t3w")
+
+[node name="@MeshInstance3D@22646" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1521687829]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 193, -1.975, -27)
+material_override = SubResource("StandardMaterial3D_vd2xs")
+mesh = SubResource("CylinderMesh_dbel0")
+
+[node name="@MeshInstance3D@22647" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=478873813]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 177, -1.975, -16)
+material_override = SubResource("StandardMaterial3D_vd2xs")
+mesh = SubResource("CylinderMesh_q5ecu")
+
+[node name="@MeshInstance3D@22648" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1167211827]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 193, -1.975, -16)
+material_override = SubResource("StandardMaterial3D_vd2xs")
+mesh = SubResource("CylinderMesh_l1wo7")
+
+[node name="HarborPier_EastS" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=465575278]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 185, 2.275, 71)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborPier_EastS" unique_id=579796055]
+material_override = SubResource("StandardMaterial3D_frjof")
+mesh = SubResource("BoxMesh_h6pge")
+
+[node name="@CollisionShape3D@22649" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborPier_EastS" unique_id=1084414747]
+shape = SubResource("BoxShape3D_pv43s")
+
+[node name="HarborPier_EastS_Hull" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=1210373784]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 185, 2.195, 71)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborPier_EastS_Hull" unique_id=3874505]
+material_override = SubResource("StandardMaterial3D_lky8o")
+mesh = SubResource("BoxMesh_4uor6")
+
+[node name="@CollisionShape3D@22650" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborPier_EastS_Hull" unique_id=1428987484]
+shape = SubResource("BoxShape3D_iqpbr")
+
+[node name="@MeshInstance3D@22651" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1763362981]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 177, -1.975, 19)
+material_override = SubResource("StandardMaterial3D_m3s82")
+mesh = SubResource("CylinderMesh_q702c")
+
+[node name="@MeshInstance3D@22652" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=518140909]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 193, -1.975, 19)
+material_override = SubResource("StandardMaterial3D_m3s82")
+mesh = SubResource("CylinderMesh_ekngt")
+
+[node name="@MeshInstance3D@22653" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=2099501314]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 177, -1.975, 30)
+material_override = SubResource("StandardMaterial3D_m3s82")
+mesh = SubResource("CylinderMesh_jat6b")
+
+[node name="@MeshInstance3D@22654" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1631822700]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 193, -1.975, 30)
+material_override = SubResource("StandardMaterial3D_m3s82")
+mesh = SubResource("CylinderMesh_4h80i")
+
+[node name="@MeshInstance3D@22655" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=2024912449]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 177, -1.975, 41)
+material_override = SubResource("StandardMaterial3D_m3s82")
+mesh = SubResource("CylinderMesh_kaq0m")
+
+[node name="@MeshInstance3D@22656" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=123651698]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 193, -1.975, 41)
+material_override = SubResource("StandardMaterial3D_m3s82")
+mesh = SubResource("CylinderMesh_vf3si")
+
+[node name="@MeshInstance3D@22657" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=108016118]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 177, -1.975, 52)
+material_override = SubResource("StandardMaterial3D_m3s82")
+mesh = SubResource("CylinderMesh_jkwwo")
+
+[node name="@MeshInstance3D@22658" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1614485292]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 193, -1.975, 52)
+material_override = SubResource("StandardMaterial3D_m3s82")
+mesh = SubResource("CylinderMesh_t5ppn")
+
+[node name="@MeshInstance3D@22659" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=449136290]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 177, -1.975, 63)
+material_override = SubResource("StandardMaterial3D_m3s82")
+mesh = SubResource("CylinderMesh_xeib2")
+
+[node name="@MeshInstance3D@22660" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=392862692]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 193, -1.975, 63)
+material_override = SubResource("StandardMaterial3D_m3s82")
+mesh = SubResource("CylinderMesh_pl63n")
+
+[node name="@MeshInstance3D@22661" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1976081567]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 177, -1.975, 74)
+material_override = SubResource("StandardMaterial3D_m3s82")
+mesh = SubResource("CylinderMesh_wtjwv")
+
+[node name="@MeshInstance3D@22662" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1628347830]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 193, -1.975, 74)
+material_override = SubResource("StandardMaterial3D_m3s82")
+mesh = SubResource("CylinderMesh_xfiue")
+
+[node name="@MeshInstance3D@22663" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1267264947]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 177, -1.975, 85)
+material_override = SubResource("StandardMaterial3D_m3s82")
+mesh = SubResource("CylinderMesh_yd6s6")
+
+[node name="@MeshInstance3D@22664" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=2025815322]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 193, -1.975, 85)
+material_override = SubResource("StandardMaterial3D_m3s82")
+mesh = SubResource("CylinderMesh_v0j5q")
+
+[node name="@MeshInstance3D@22665" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1296612237]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 177, -1.975, 96)
+material_override = SubResource("StandardMaterial3D_m3s82")
+mesh = SubResource("CylinderMesh_dgop8")
+
+[node name="@MeshInstance3D@22666" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1622691697]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 193, -1.975, 96)
+material_override = SubResource("StandardMaterial3D_m3s82")
+mesh = SubResource("CylinderMesh_442cn")
+
+[node name="@MeshInstance3D@22667" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1447785505]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 177, -1.975, 107)
+material_override = SubResource("StandardMaterial3D_m3s82")
+mesh = SubResource("CylinderMesh_dxwp2")
+
+[node name="@MeshInstance3D@22668" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1444769395]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 193, -1.975, 107)
+material_override = SubResource("StandardMaterial3D_m3s82")
+mesh = SubResource("CylinderMesh_tthvw")
+
+[node name="@MeshInstance3D@22669" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1980920033]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 177, -1.975, 118)
+material_override = SubResource("StandardMaterial3D_m3s82")
+mesh = SubResource("CylinderMesh_5og7x")
+
+[node name="@MeshInstance3D@22670" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=559515412]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 193, -1.975, 118)
+material_override = SubResource("StandardMaterial3D_m3s82")
+mesh = SubResource("CylinderMesh_ylg5r")
+
+[node name="HarborPier_SE" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=1913096261]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 112.5, 2.275, 125)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborPier_SE" unique_id=1796682171]
+material_override = SubResource("StandardMaterial3D_frjof")
+mesh = SubResource("BoxMesh_etuab")
+
+[node name="@CollisionShape3D@22671" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborPier_SE" unique_id=1895756859]
+shape = SubResource("BoxShape3D_a75ue")
+
+[node name="HarborPier_SE_Hull" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=966989963]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 112.5, 2.195, 125)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborPier_SE_Hull" unique_id=564971236]
+material_override = SubResource("StandardMaterial3D_lky8o")
+mesh = SubResource("BoxMesh_pwear")
+
+[node name="@CollisionShape3D@22672" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborPier_SE_Hull" unique_id=624267725]
+shape = SubResource("BoxShape3D_pfmr4")
+
+[node name="@MeshInstance3D@22673" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=593794814]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 42, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_sxkgo")
+
+[node name="@MeshInstance3D@22674" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1495809995]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 42, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_6k3cy")
+
+[node name="@MeshInstance3D@22675" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1342853735]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 53, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_4nixw")
+
+[node name="@MeshInstance3D@22676" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1412764976]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 53, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_qtksm")
+
+[node name="@MeshInstance3D@22677" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=485769394]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 64, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_6k7u4")
+
+[node name="@MeshInstance3D@22678" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1542625650]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 64, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_ekshl")
+
+[node name="@MeshInstance3D@22679" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=833288748]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 75, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_v2qja")
+
+[node name="@MeshInstance3D@22680" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=508148650]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 75, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_5b7dl")
+
+[node name="@MeshInstance3D@22681" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=710137198]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 86, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_a0b40")
+
+[node name="@MeshInstance3D@22682" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1463540747]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 86, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_2x6r2")
+
+[node name="@MeshInstance3D@22683" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=364741929]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 97, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_tm8mk")
+
+[node name="@MeshInstance3D@22684" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=239449127]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 97, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_6g330")
+
+[node name="@MeshInstance3D@22685" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1256732226]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 108, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_sdaix")
+
+[node name="@MeshInstance3D@22686" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1533924379]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 108, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_wufyy")
+
+[node name="@MeshInstance3D@22687" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1672215940]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 119, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_mfo1t")
+
+[node name="@MeshInstance3D@22688" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=786916399]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 119, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_3tqw8")
+
+[node name="@MeshInstance3D@22689" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=158151998]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 130, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_0un3f")
+
+[node name="@MeshInstance3D@22690" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=840872308]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 130, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_fhk1u")
+
+[node name="@MeshInstance3D@22691" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=676097663]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 141, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_35ha8")
+
+[node name="@MeshInstance3D@22692" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=2030848573]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 141, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_6xp6o")
+
+[node name="@MeshInstance3D@22693" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1149149524]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 152, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_mgrhl")
+
+[node name="@MeshInstance3D@22694" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1308822848]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 152, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_4iqeg")
+
+[node name="@MeshInstance3D@22695" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1175592592]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 163, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_q5ns2")
+
+[node name="@MeshInstance3D@22696" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1252782973]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 163, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_tx04u")
+
+[node name="@MeshInstance3D@22697" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=522662293]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 174, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_licbf")
+
+[node name="@MeshInstance3D@22698" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=823107779]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 174, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_06vsm")
+mesh = SubResource("CylinderMesh_4sggt")
+
+[node name="HarborPier_South" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=917462704]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25, 2.275, 125)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborPier_South" unique_id=1185570656]
+material_override = SubResource("StandardMaterial3D_frjof")
+mesh = SubResource("BoxMesh_b8dj8")
+
+[node name="@CollisionShape3D@22699" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborPier_South" unique_id=1434610565]
+shape = SubResource("BoxShape3D_ttpi1")
+
+[node name="HarborPier_South_Hull" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=205759869]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25, 2.195, 125)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborPier_South_Hull" unique_id=1848541971]
+material_override = SubResource("StandardMaterial3D_lky8o")
+mesh = SubResource("BoxMesh_b2llb")
+
+[node name="@CollisionShape3D@22700" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborPier_South_Hull" unique_id=212906391]
+shape = SubResource("BoxShape3D_06bhy")
+
+[node name="@MeshInstance3D@22701" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=771670807]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_0wvu8")
+mesh = SubResource("CylinderMesh_ikyrf")
+
+[node name="@MeshInstance3D@22702" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=193375273]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_0wvu8")
+mesh = SubResource("CylinderMesh_kmjwi")
+
+[node name="@MeshInstance3D@22703" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1537500449]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 23, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_0wvu8")
+mesh = SubResource("CylinderMesh_diglo")
+
+[node name="@MeshInstance3D@22704" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1402996657]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 23, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_0wvu8")
+mesh = SubResource("CylinderMesh_sdxev")
+
+[node name="@MeshInstance3D@22705" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1187092330]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 34, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_0wvu8")
+mesh = SubResource("CylinderMesh_rsfbk")
+
+[node name="@MeshInstance3D@22706" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1878564306]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 34, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_0wvu8")
+mesh = SubResource("CylinderMesh_esklo")
+
+[node name="HarborPier_SW" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=1508794820]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -94.5, 2.275, 125)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborPier_SW" unique_id=1046015102]
+material_override = SubResource("StandardMaterial3D_frjof")
+mesh = SubResource("BoxMesh_8p00p")
+
+[node name="@CollisionShape3D@22707" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborPier_SW" unique_id=736830099]
+shape = SubResource("BoxShape3D_tpva1")
+
+[node name="HarborPier_SW_Hull" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=2062088773]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -94.5, 2.195, 125)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborPier_SW_Hull" unique_id=2085724865]
+material_override = SubResource("StandardMaterial3D_lky8o")
+mesh = SubResource("BoxMesh_rikqs")
+
+[node name="@CollisionShape3D@22708" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborPier_SW_Hull" unique_id=2115352233]
+shape = SubResource("BoxShape3D_3b8f6")
+
+[node name="@MeshInstance3D@22709" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=2076698278]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -173, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_esigv")
+
+[node name="@MeshInstance3D@22710" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=509157138]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -173, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_f4sef")
+
+[node name="@MeshInstance3D@22711" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=254459730]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -162, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_y3ret")
+
+[node name="@MeshInstance3D@22712" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=192633695]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -162, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_2yj2n")
+
+[node name="@MeshInstance3D@22713" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1065220964]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -151, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_bpcc8")
+
+[node name="@MeshInstance3D@22714" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1029051422]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -151, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_ape7g")
+
+[node name="@MeshInstance3D@22715" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=357583010]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -140, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_o8isd")
+
+[node name="@MeshInstance3D@22716" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=165376220]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -140, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_ufafo")
+
+[node name="@MeshInstance3D@22717" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1939861380]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -129, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_5ibp5")
+
+[node name="@MeshInstance3D@22718" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1811371329]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -129, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_xph7n")
+
+[node name="@MeshInstance3D@22719" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=2015722617]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -118, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_rralr")
+
+[node name="@MeshInstance3D@22720" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=784564508]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -118, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_ng83b")
+
+[node name="@MeshInstance3D@22721" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1379509982]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -107, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_mdkji")
+
+[node name="@MeshInstance3D@22722" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=636646664]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -107, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_j3xlu")
+
+[node name="@MeshInstance3D@22723" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=262569060]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -96, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_a7obh")
+
+[node name="@MeshInstance3D@22724" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=2098478848]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -96, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_fabw1")
+
+[node name="@MeshInstance3D@22725" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1194041137]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -85, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_5gyij")
+
+[node name="@MeshInstance3D@22726" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=791227821]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -85, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_4i3ns")
+
+[node name="@MeshInstance3D@22727" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=634719918]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -74, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_jypr8")
+
+[node name="@MeshInstance3D@22728" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=916637586]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -74, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_yssi5")
+
+[node name="@MeshInstance3D@22729" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1092211950]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -63, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_n0hn1")
+
+[node name="@MeshInstance3D@22730" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=340721794]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -63, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_lix4l")
+
+[node name="@MeshInstance3D@22731" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=2122224732]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -52, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_c8qoc")
+
+[node name="@MeshInstance3D@22732" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1373063929]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -52, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_28tkr")
+
+[node name="@MeshInstance3D@22733" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1395985752]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -41, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_gsfu4")
+
+[node name="@MeshInstance3D@22734" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1900192427]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -41, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_4be34")
+
+[node name="@MeshInstance3D@22735" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=860673567]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_wajkl")
+
+[node name="@MeshInstance3D@22736" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1460660430]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_hy1ki")
+
+[node name="@MeshInstance3D@22737" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1094330662]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19, -1.975, 117)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_rh1ww")
+
+[node name="@MeshInstance3D@22738" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1338954670]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19, -1.975, 133)
+material_override = SubResource("StandardMaterial3D_82g4o")
+mesh = SubResource("CylinderMesh_r3t16")
+
+[node name="HarborPier_WestS" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=1515284189]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -175, 2.275, 70)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborPier_WestS" unique_id=676710152]
+material_override = SubResource("StandardMaterial3D_frjof")
+mesh = SubResource("BoxMesh_c48tq")
+
+[node name="@CollisionShape3D@22739" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborPier_WestS" unique_id=1042711742]
+shape = SubResource("BoxShape3D_fipem")
+
+[node name="HarborPier_WestS_Hull" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=1713011045]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -175, 2.195, 70)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborPier_WestS_Hull" unique_id=788600164]
+material_override = SubResource("StandardMaterial3D_lky8o")
+mesh = SubResource("BoxMesh_ldklb")
+
+[node name="@CollisionShape3D@22740" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborPier_WestS_Hull" unique_id=250228642]
+shape = SubResource("BoxShape3D_7uqws")
+
+[node name="@MeshInstance3D@22741" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=894999667]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -183, -1.975, 17)
+material_override = SubResource("StandardMaterial3D_xo7gk")
+mesh = SubResource("CylinderMesh_s8kml")
+
+[node name="@MeshInstance3D@22742" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1411197858]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -167, -1.975, 17)
+material_override = SubResource("StandardMaterial3D_xo7gk")
+mesh = SubResource("CylinderMesh_cj752")
+
+[node name="@MeshInstance3D@22743" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1153143247]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -183, -1.975, 28)
+material_override = SubResource("StandardMaterial3D_xo7gk")
+mesh = SubResource("CylinderMesh_a6fxf")
+
+[node name="@MeshInstance3D@22744" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=312526746]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -167, -1.975, 28)
+material_override = SubResource("StandardMaterial3D_xo7gk")
+mesh = SubResource("CylinderMesh_xb65u")
+
+[node name="@MeshInstance3D@22745" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=864313168]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -183, -1.975, 39)
+material_override = SubResource("StandardMaterial3D_xo7gk")
+mesh = SubResource("CylinderMesh_n5prv")
+
+[node name="@MeshInstance3D@22746" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=746510807]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -167, -1.975, 39)
+material_override = SubResource("StandardMaterial3D_xo7gk")
+mesh = SubResource("CylinderMesh_21mck")
+
+[node name="@MeshInstance3D@22747" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=498602873]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -183, -1.975, 50)
+material_override = SubResource("StandardMaterial3D_xo7gk")
+mesh = SubResource("CylinderMesh_dli02")
+
+[node name="@MeshInstance3D@22748" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=692541618]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -167, -1.975, 50)
+material_override = SubResource("StandardMaterial3D_xo7gk")
+mesh = SubResource("CylinderMesh_gsga8")
+
+[node name="@MeshInstance3D@22749" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1902370157]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -183, -1.975, 61)
+material_override = SubResource("StandardMaterial3D_xo7gk")
+mesh = SubResource("CylinderMesh_2a8pg")
+
+[node name="@MeshInstance3D@22750" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=881547669]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -167, -1.975, 61)
+material_override = SubResource("StandardMaterial3D_xo7gk")
+mesh = SubResource("CylinderMesh_btnlg")
+
+[node name="@MeshInstance3D@22751" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1796368274]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -183, -1.975, 72)
+material_override = SubResource("StandardMaterial3D_xo7gk")
+mesh = SubResource("CylinderMesh_yncn5")
+
+[node name="@MeshInstance3D@22752" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=379272450]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -167, -1.975, 72)
+material_override = SubResource("StandardMaterial3D_xo7gk")
+mesh = SubResource("CylinderMesh_wux7b")
+
+[node name="@MeshInstance3D@22753" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=825218593]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -183, -1.975, 83)
+material_override = SubResource("StandardMaterial3D_xo7gk")
+mesh = SubResource("CylinderMesh_y3xs3")
+
+[node name="@MeshInstance3D@22754" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=756732963]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -167, -1.975, 83)
+material_override = SubResource("StandardMaterial3D_xo7gk")
+mesh = SubResource("CylinderMesh_cf2ej")
+
+[node name="@MeshInstance3D@22755" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=815700147]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -183, -1.975, 94)
+material_override = SubResource("StandardMaterial3D_xo7gk")
+mesh = SubResource("CylinderMesh_g0mmu")
+
+[node name="@MeshInstance3D@22756" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=529915184]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -167, -1.975, 94)
+material_override = SubResource("StandardMaterial3D_xo7gk")
+mesh = SubResource("CylinderMesh_a0ar6")
+
+[node name="@MeshInstance3D@22757" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=679232873]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -183, -1.975, 105)
+material_override = SubResource("StandardMaterial3D_xo7gk")
+mesh = SubResource("CylinderMesh_b02xl")
+
+[node name="@MeshInstance3D@22758" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1634789967]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -167, -1.975, 105)
+material_override = SubResource("StandardMaterial3D_xo7gk")
+mesh = SubResource("CylinderMesh_wlarl")
+
+[node name="@MeshInstance3D@22759" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=427767103]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -183, -1.975, 116)
+material_override = SubResource("StandardMaterial3D_xo7gk")
+mesh = SubResource("CylinderMesh_4shbm")
+
+[node name="@MeshInstance3D@22760" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1685577388]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -167, -1.975, 116)
+material_override = SubResource("StandardMaterial3D_xo7gk")
+mesh = SubResource("CylinderMesh_88en8")
+
+[node name="HarborPier_WestN" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=1870514220]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -175, 2.275, -51)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborPier_WestN" unique_id=130910954]
+material_override = SubResource("StandardMaterial3D_frjof")
+mesh = SubResource("BoxMesh_b40kj")
+
+[node name="@CollisionShape3D@22761" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborPier_WestN" unique_id=742948697]
+shape = SubResource("BoxShape3D_7tgkf")
+
+[node name="HarborPier_WestN_Hull" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=983070554]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -175, 2.195, -51)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborPier_WestN_Hull" unique_id=1475315736]
+material_override = SubResource("StandardMaterial3D_lky8o")
+mesh = SubResource("BoxMesh_ispec")
+
+[node name="@CollisionShape3D@22762" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborPier_WestN_Hull" unique_id=287371666]
+shape = SubResource("BoxShape3D_hxmhn")
+
+[node name="@MeshInstance3D@22763" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=562123973]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -183, -1.975, -93)
+material_override = SubResource("StandardMaterial3D_nwob2")
+mesh = SubResource("CylinderMesh_fls0w")
+
+[node name="@MeshInstance3D@22764" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1860942369]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -167, -1.975, -93)
+material_override = SubResource("StandardMaterial3D_nwob2")
+mesh = SubResource("CylinderMesh_c6yej")
+
+[node name="@MeshInstance3D@22765" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=821992809]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -183, -1.975, -82)
+material_override = SubResource("StandardMaterial3D_nwob2")
+mesh = SubResource("CylinderMesh_q0hx3")
+
+[node name="@MeshInstance3D@22766" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=103811532]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -167, -1.975, -82)
+material_override = SubResource("StandardMaterial3D_nwob2")
+mesh = SubResource("CylinderMesh_yba2y")
+
+[node name="@MeshInstance3D@22767" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=933662591]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -183, -1.975, -71)
+material_override = SubResource("StandardMaterial3D_nwob2")
+mesh = SubResource("CylinderMesh_7htwl")
+
+[node name="@MeshInstance3D@22768" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=502657144]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -167, -1.975, -71)
+material_override = SubResource("StandardMaterial3D_nwob2")
+mesh = SubResource("CylinderMesh_sglqf")
+
+[node name="@MeshInstance3D@22769" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1484562882]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -183, -1.975, -60)
+material_override = SubResource("StandardMaterial3D_nwob2")
+mesh = SubResource("CylinderMesh_xsvfw")
+
+[node name="@MeshInstance3D@22770" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1352630610]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -167, -1.975, -60)
+material_override = SubResource("StandardMaterial3D_nwob2")
+mesh = SubResource("CylinderMesh_q8e1j")
+
+[node name="@MeshInstance3D@22771" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=196820607]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -183, -1.975, -49)
+material_override = SubResource("StandardMaterial3D_nwob2")
+mesh = SubResource("CylinderMesh_w5x7o")
+
+[node name="@MeshInstance3D@22772" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1667686974]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -167, -1.975, -49)
+material_override = SubResource("StandardMaterial3D_nwob2")
+mesh = SubResource("CylinderMesh_ifrs3")
+
+[node name="@MeshInstance3D@22773" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=71608696]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -183, -1.975, -38)
+material_override = SubResource("StandardMaterial3D_nwob2")
+mesh = SubResource("CylinderMesh_o5fnv")
+
+[node name="@MeshInstance3D@22774" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1123153224]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -167, -1.975, -38)
+material_override = SubResource("StandardMaterial3D_nwob2")
+mesh = SubResource("CylinderMesh_tjr3u")
+
+[node name="@MeshInstance3D@22775" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1621978639]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -183, -1.975, -27)
+material_override = SubResource("StandardMaterial3D_nwob2")
+mesh = SubResource("CylinderMesh_fje46")
+
+[node name="@MeshInstance3D@22776" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=332981456]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -167, -1.975, -27)
+material_override = SubResource("StandardMaterial3D_nwob2")
+mesh = SubResource("CylinderMesh_4qetg")
+
+[node name="@MeshInstance3D@22777" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1877998393]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -183, -1.975, -16)
+material_override = SubResource("StandardMaterial3D_nwob2")
+mesh = SubResource("CylinderMesh_wsk08")
+
+[node name="@MeshInstance3D@22778" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=2062390224]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -167, -1.975, -16)
+material_override = SubResource("StandardMaterial3D_nwob2")
+mesh = SubResource("CylinderMesh_m5xyg")
+
+[node name="HarborRamp_TakeoffE" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=308011266]
+transform = Transform3D(0, -0.1655412, -0.9862029, 0, 0.9862029, -0.1655412, 1, 0, 0, 63, 4.4049997, -95)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborRamp_TakeoffE" unique_id=688448814]
+material_override = SubResource("StandardMaterial3D_chnpe")
+mesh = SubResource("BoxMesh_76vp8")
+
+[node name="@CollisionShape3D@22779" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborRamp_TakeoffE" unique_id=1162019956]
+shape = SubResource("BoxShape3D_khdjq")
+
+[node name="HarborRamp_LandingE" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=1595028412]
+transform = Transform3D(0, 0.05305019, -0.9985919, 0, 0.9985919, 0.05305019, 1, 0, 0, 102, 3.655, -95)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborRamp_LandingE" unique_id=1200966929]
+material_override = SubResource("StandardMaterial3D_chnpe")
+mesh = SubResource("BoxMesh_mcc2w")
+
+[node name="@CollisionShape3D@22780" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborRamp_LandingE" unique_id=118258474]
+shape = SubResource("BoxShape3D_r36f2")
+
+[node name="HarborRamp_TakeoffW" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=157509331]
+transform = Transform3D(0, 0.1655412, 0.9862029, 0, 0.9862029, -0.1655412, -1, 0, 0, 17, 4.4049997, 125)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborRamp_TakeoffW" unique_id=1634764305]
+material_override = SubResource("StandardMaterial3D_chnpe")
+mesh = SubResource("BoxMesh_frejs")
+
+[node name="@CollisionShape3D@22781" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborRamp_TakeoffW" unique_id=2126677059]
+shape = SubResource("BoxShape3D_8q81q")
+
+[node name="HarborRamp_LandingW" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=495771655]
+transform = Transform3D(0, -0.05305019, 0.9985919, 0, 0.9985919, 0.05305019, -1, 0, 0, -22, 3.655, 125)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborRamp_LandingW" unique_id=1058333390]
+material_override = SubResource("StandardMaterial3D_chnpe")
+mesh = SubResource("BoxMesh_p6smv")
+
+[node name="@CollisionShape3D@22782" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborRamp_LandingW" unique_id=1167999092]
+shape = SubResource("BoxShape3D_cn85t")
+
+[node name="HarborBridge_East" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=1004338114]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 185, 3.2, 6)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborBridge_East" unique_id=1184407060]
+material_override = SubResource("StandardMaterial3D_y83ig")
+mesh = SubResource("BoxMesh_j8qwd")
+
+[node name="@CollisionShape3D@22783" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborBridge_East" unique_id=1700261816]
+shape = SubResource("BoxShape3D_ymd7i")
+
+[node name="HarborBridge_West" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=403515129]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -175, 3.2, 4)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborBridge_West" unique_id=277664164]
+material_override = SubResource("StandardMaterial3D_y83ig")
+mesh = SubResource("BoxMesh_gpj3e")
+
+[node name="@CollisionShape3D@22784" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborBridge_West" unique_id=1317755430]
+shape = SubResource("BoxShape3D_judri")
+
+[node name="HarborBridge_East_RailL" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=595072523]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 179.4, 4.1, 6)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborBridge_East_RailL" unique_id=1228762335]
+material_override = SubResource("StandardMaterial3D_y83ig")
+mesh = SubResource("BoxMesh_lf311")
+
+[node name="@CollisionShape3D@22785" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborBridge_East_RailL" unique_id=538192433]
+shape = SubResource("BoxShape3D_4lco1")
+
+[node name="HarborBridge_East_RailR" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=662472201]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 190.6, 4.1, 6)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborBridge_East_RailR" unique_id=1997145779]
+material_override = SubResource("StandardMaterial3D_y83ig")
+mesh = SubResource("BoxMesh_2hs44")
+
+[node name="@CollisionShape3D@22786" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborBridge_East_RailR" unique_id=1303389810]
+shape = SubResource("BoxShape3D_bexyv")
+
+[node name="HarborBridge_West_RailL" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=1986073847]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -180.6, 4.1, 4)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborBridge_West_RailL" unique_id=121066914]
+material_override = SubResource("StandardMaterial3D_y83ig")
+mesh = SubResource("BoxMesh_7m5p4")
+
+[node name="@CollisionShape3D@22787" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborBridge_West_RailL" unique_id=555881789]
+shape = SubResource("BoxShape3D_rnypo")
+
+[node name="HarborBridge_West_RailR" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=82143257]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -169.4, 4.1, 4)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborBridge_West_RailR" unique_id=1108720232]
+material_override = SubResource("StandardMaterial3D_y83ig")
+mesh = SubResource("BoxMesh_52nl4")
+
+[node name="@CollisionShape3D@22788" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborBridge_West_RailR" unique_id=231431660]
+shape = SubResource("BoxShape3D_pdtgx")
+
+[node name="HarborBridge_East_Pillar_-3" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=1535460653]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 185, -1.975, -3)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborBridge_East_Pillar_-3" unique_id=659120263]
+material_override = SubResource("StandardMaterial3D_y83ig")
+mesh = SubResource("BoxMesh_1ehkb")
+
+[node name="@CollisionShape3D@22789" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborBridge_East_Pillar_-3" unique_id=194779068]
+shape = SubResource("BoxShape3D_y5gms")
+
+[node name="HarborBridge_East_Pillar_15" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=1529611821]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 185, -1.975, 15)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborBridge_East_Pillar_15" unique_id=1527797254]
+material_override = SubResource("StandardMaterial3D_y83ig")
+mesh = SubResource("BoxMesh_42o60")
+
+[node name="@CollisionShape3D@22790" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborBridge_East_Pillar_15" unique_id=1580851101]
+shape = SubResource("BoxShape3D_6xrqk")
+
+[node name="HarborBridge_West_Pillar_-5" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=1494586062]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -175, -1.975, -5)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborBridge_West_Pillar_-5" unique_id=2005262744]
+material_override = SubResource("StandardMaterial3D_y83ig")
+mesh = SubResource("BoxMesh_mip76")
+
+[node name="@CollisionShape3D@22791" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborBridge_West_Pillar_-5" unique_id=155926226]
+shape = SubResource("BoxShape3D_uv2ce")
+
+[node name="HarborBridge_West_Pillar_13" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=1794628559]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -175, -1.975, 13)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborBridge_West_Pillar_13" unique_id=2020329010]
+material_override = SubResource("StandardMaterial3D_y83ig")
+mesh = SubResource("BoxMesh_u331c")
+
+[node name="@CollisionShape3D@22792" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborBridge_West_Pillar_13" unique_id=1823552483]
+shape = SubResource("BoxShape3D_ouaw4")
+
+[node name="HarborWarehouse_0" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=1846970772]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -140, 7.75, -106)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborWarehouse_0" unique_id=1086307284]
+material_override = SubResource("StandardMaterial3D_t475q")
+mesh = SubResource("BoxMesh_aj2n1")
+
+[node name="@CollisionShape3D@22793" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborWarehouse_0" unique_id=809925622]
+shape = SubResource("BoxShape3D_5m5k5")
+
+[node name="HarborWarehouse_1" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=176348370]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -90, 7.75, -106)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborWarehouse_1" unique_id=540812055]
+material_override = SubResource("StandardMaterial3D_t475q")
+mesh = SubResource("BoxMesh_1cwxe")
+
+[node name="@CollisionShape3D@22794" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborWarehouse_1" unique_id=894969916]
+shape = SubResource("BoxShape3D_560wm")
+
+[node name="HarborWarehouse_2" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=1986236633]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, 7.75, -106)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborWarehouse_2" unique_id=561895559]
+material_override = SubResource("StandardMaterial3D_t475q")
+mesh = SubResource("BoxMesh_1t2o8")
+
+[node name="@CollisionShape3D@22795" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborWarehouse_2" unique_id=1290697307]
+shape = SubResource("BoxShape3D_bf3oq")
+
+[node name="HarborWarehouse_3" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=1204796548]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 7.75, -106)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborWarehouse_3" unique_id=1868380991]
+material_override = SubResource("StandardMaterial3D_t475q")
+mesh = SubResource("BoxMesh_kd15r")
+
+[node name="@CollisionShape3D@22796" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborWarehouse_3" unique_id=1265492937]
+shape = SubResource("BoxShape3D_4clpo")
+
+[node name="HarborFinger_A" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=223383457]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 2.275, -40)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborFinger_A" unique_id=1315388465]
+material_override = SubResource("StandardMaterial3D_frjof")
+mesh = SubResource("BoxMesh_1auaf")
+
+[node name="@CollisionShape3D@22797" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborFinger_A" unique_id=2013758182]
+shape = SubResource("BoxShape3D_8g500")
+
+[node name="HarborFinger_A_Hull" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=854791777]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 2.195, -40)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborFinger_A_Hull" unique_id=1859429604]
+material_override = SubResource("StandardMaterial3D_lky8o")
+mesh = SubResource("BoxMesh_lk1p1")
+
+[node name="@CollisionShape3D@22798" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborFinger_A_Hull" unique_id=1647222585]
+shape = SubResource("BoxShape3D_dxjsr")
+
+[node name="@MeshInstance3D@22799" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=552306917]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -38, -1.975, -48)
+material_override = SubResource("StandardMaterial3D_g5dv8")
+mesh = SubResource("CylinderMesh_22r58")
+
+[node name="@MeshInstance3D@22800" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1760667569]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -38, -1.975, -32)
+material_override = SubResource("StandardMaterial3D_g5dv8")
+mesh = SubResource("CylinderMesh_i1am8")
+
+[node name="@MeshInstance3D@22801" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=547645557]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -27, -1.975, -48)
+material_override = SubResource("StandardMaterial3D_g5dv8")
+mesh = SubResource("CylinderMesh_01wm2")
+
+[node name="@MeshInstance3D@22802" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=832404990]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -27, -1.975, -32)
+material_override = SubResource("StandardMaterial3D_g5dv8")
+mesh = SubResource("CylinderMesh_2u5lt")
+
+[node name="@MeshInstance3D@22803" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1741221176]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16, -1.975, -48)
+material_override = SubResource("StandardMaterial3D_g5dv8")
+mesh = SubResource("CylinderMesh_rtduw")
+
+[node name="@MeshInstance3D@22804" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=968689095]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16, -1.975, -32)
+material_override = SubResource("StandardMaterial3D_g5dv8")
+mesh = SubResource("CylinderMesh_2v1lm")
+
+[node name="@MeshInstance3D@22805" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=430195543]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, -1.975, -48)
+material_override = SubResource("StandardMaterial3D_g5dv8")
+mesh = SubResource("CylinderMesh_41syx")
+
+[node name="@MeshInstance3D@22806" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=2048403743]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, -1.975, -32)
+material_override = SubResource("StandardMaterial3D_g5dv8")
+mesh = SubResource("CylinderMesh_p1w6i")
+
+[node name="@MeshInstance3D@22807" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=913208784]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, -1.975, -48)
+material_override = SubResource("StandardMaterial3D_g5dv8")
+mesh = SubResource("CylinderMesh_3wcsa")
+
+[node name="@MeshInstance3D@22808" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1737773327]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, -1.975, -32)
+material_override = SubResource("StandardMaterial3D_g5dv8")
+mesh = SubResource("CylinderMesh_iy13j")
+
+[node name="@MeshInstance3D@22809" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1752158075]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, -1.975, -48)
+material_override = SubResource("StandardMaterial3D_g5dv8")
+mesh = SubResource("CylinderMesh_i8sv8")
+
+[node name="@MeshInstance3D@22810" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1228106781]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, -1.975, -32)
+material_override = SubResource("StandardMaterial3D_g5dv8")
+mesh = SubResource("CylinderMesh_hgvk1")
+
+[node name="@MeshInstance3D@22811" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1177064818]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28, -1.975, -48)
+material_override = SubResource("StandardMaterial3D_g5dv8")
+mesh = SubResource("CylinderMesh_thwpj")
+
+[node name="@MeshInstance3D@22812" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=87593097]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28, -1.975, -32)
+material_override = SubResource("StandardMaterial3D_g5dv8")
+mesh = SubResource("CylinderMesh_lqls5")
+
+[node name="HarborFinger_B" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=1252942798]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 75, 2.275, 50)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborFinger_B" unique_id=883704569]
+material_override = SubResource("StandardMaterial3D_frjof")
+mesh = SubResource("BoxMesh_hdowj")
+
+[node name="@CollisionShape3D@22813" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborFinger_B" unique_id=1799918306]
+shape = SubResource("BoxShape3D_bngtl")
+
+[node name="HarborFinger_B_Hull" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=1803603557]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 75, 2.195, 50)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborFinger_B_Hull" unique_id=366474142]
+material_override = SubResource("StandardMaterial3D_lky8o")
+mesh = SubResource("BoxMesh_h4616")
+
+[node name="@CollisionShape3D@22814" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborFinger_B_Hull" unique_id=812254285]
+shape = SubResource("BoxShape3D_mtoif")
+
+[node name="@MeshInstance3D@22815" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1037926613]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 42, -1.975, 42)
+material_override = SubResource("StandardMaterial3D_n1bjd")
+mesh = SubResource("CylinderMesh_2ogb2")
+
+[node name="@MeshInstance3D@22816" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1386159701]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 42, -1.975, 58)
+material_override = SubResource("StandardMaterial3D_n1bjd")
+mesh = SubResource("CylinderMesh_u1p8q")
+
+[node name="@MeshInstance3D@22817" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=216373299]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 53, -1.975, 42)
+material_override = SubResource("StandardMaterial3D_n1bjd")
+mesh = SubResource("CylinderMesh_ntau0")
+
+[node name="@MeshInstance3D@22818" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1393675063]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 53, -1.975, 58)
+material_override = SubResource("StandardMaterial3D_n1bjd")
+mesh = SubResource("CylinderMesh_68c2d")
+
+[node name="@MeshInstance3D@22819" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1643520896]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 64, -1.975, 42)
+material_override = SubResource("StandardMaterial3D_n1bjd")
+mesh = SubResource("CylinderMesh_ghnr2")
+
+[node name="@MeshInstance3D@22820" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1847556053]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 64, -1.975, 58)
+material_override = SubResource("StandardMaterial3D_n1bjd")
+mesh = SubResource("CylinderMesh_owkyf")
+
+[node name="@MeshInstance3D@22821" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1715920488]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 75, -1.975, 42)
+material_override = SubResource("StandardMaterial3D_n1bjd")
+mesh = SubResource("CylinderMesh_w6h1p")
+
+[node name="@MeshInstance3D@22822" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=283457846]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 75, -1.975, 58)
+material_override = SubResource("StandardMaterial3D_n1bjd")
+mesh = SubResource("CylinderMesh_b2jjd")
+
+[node name="@MeshInstance3D@22823" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=847839912]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 86, -1.975, 42)
+material_override = SubResource("StandardMaterial3D_n1bjd")
+mesh = SubResource("CylinderMesh_0mqwf")
+
+[node name="@MeshInstance3D@22824" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1325662369]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 86, -1.975, 58)
+material_override = SubResource("StandardMaterial3D_n1bjd")
+mesh = SubResource("CylinderMesh_ap6ac")
+
+[node name="@MeshInstance3D@22825" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=676605619]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 97, -1.975, 42)
+material_override = SubResource("StandardMaterial3D_n1bjd")
+mesh = SubResource("CylinderMesh_5lncj")
+
+[node name="@MeshInstance3D@22826" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=167532778]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 97, -1.975, 58)
+material_override = SubResource("StandardMaterial3D_n1bjd")
+mesh = SubResource("CylinderMesh_jpgri")
+
+[node name="@MeshInstance3D@22827" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=1163394267]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 108, -1.975, 42)
+material_override = SubResource("StandardMaterial3D_n1bjd")
+mesh = SubResource("CylinderMesh_17hky")
+
+[node name="@MeshInstance3D@22828" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers" unique_id=858062330]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 108, -1.975, 58)
+material_override = SubResource("StandardMaterial3D_n1bjd")
+mesh = SubResource("CylinderMesh_cbfd0")
+
+[node name="HarborWarehouse_FingerA" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=681058540]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20, 7.15, -28)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborWarehouse_FingerA" unique_id=657623467]
+material_override = SubResource("StandardMaterial3D_t475q")
+mesh = SubResource("BoxMesh_obenr")
+
+[node name="@CollisionShape3D@22829" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborWarehouse_FingerA" unique_id=1536142538]
+shape = SubResource("BoxShape3D_nsjfq")
+
+[node name="HarborWarehouse_FingerB" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=1427721017]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 80, 7.15, 62)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborWarehouse_FingerB" unique_id=1369276188]
+material_override = SubResource("StandardMaterial3D_t475q")
+mesh = SubResource("BoxMesh_6w6w4")
+
+[node name="@CollisionShape3D@22830" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborWarehouse_FingerB" unique_id=1319886494]
+shape = SubResource("BoxShape3D_re8r3")
+
+[node name="HarborBreakwater_N" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=1589222861]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.1, -210)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborBreakwater_N" unique_id=27672472]
+material_override = SubResource("StandardMaterial3D_jhjc6")
+mesh = SubResource("BoxMesh_ysas2")
+
+[node name="@CollisionShape3D@22831" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborBreakwater_N" unique_id=498658112]
+shape = SubResource("BoxShape3D_qugtb")
+
+[node name="HarborBreakwater_S" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=373100243]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.1, 220)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborBreakwater_S" unique_id=363372330]
+material_override = SubResource("StandardMaterial3D_jhjc6")
+mesh = SubResource("BoxMesh_h01tl")
+
+[node name="@CollisionShape3D@22832" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborBreakwater_S" unique_id=153275160]
+shape = SubResource("BoxShape3D_5sfk2")
+
+[node name="HarborBreakwater_E" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=1327638096]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 280, 2.1, 5)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborBreakwater_E" unique_id=849712714]
+material_override = SubResource("StandardMaterial3D_jhjc6")
+mesh = SubResource("BoxMesh_2yssv")
+
+[node name="@CollisionShape3D@22833" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborBreakwater_E" unique_id=1266327440]
+shape = SubResource("BoxShape3D_gauqx")
+
+[node name="HarborBreakwater_W" type="StaticBody3D" parent="TerrainGenerator/HarborPiers" unique_id=6857571]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -270, 2.1, 5)
+
+[node name="Mesh" type="MeshInstance3D" parent="TerrainGenerator/HarborPiers/HarborBreakwater_W" unique_id=1193034572]
+material_override = SubResource("StandardMaterial3D_jhjc6")
+mesh = SubResource("BoxMesh_y0y8u")
+
+[node name="@CollisionShape3D@22834" type="CollisionShape3D" parent="TerrainGenerator/HarborPiers/HarborBreakwater_W" unique_id=604024840]
+shape = SubResource("BoxShape3D_hyitj")
+
+[node name="HarborWater" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1412046030]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.55, 0)
+material_override = SubResource("ShaderMaterial_jx3lg")
+cast_shadow = 0
+mesh = SubResource("PlaneMesh_8r3o0")
+metadata/water_surface_y = 1.55
+metadata/water_half_xz = Vector2(700, 700)
+metadata/water_center_xz = Vector2(0, 0)
+metadata/water_bounds_min = Vector2(-700, -700)
+metadata/water_bounds_max = Vector2(700, 700)
+
+[node name="TrackPath" type="Path3D" parent="." unique_id=615088298]
+curve = SubResource("Curve3D_harbor")
+
+[node name="Players" type="Node3D" parent="." unique_id=1413739441]
+
+[node name="FinishLine" parent="." unique_id=1981968111 instance=ExtResource("2_gate")]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -50, 3.55, -95)
+is_finish_line = true
+
+[node name="SpawnPoints" type="Node3D" parent="FinishLine" unique_id=210271229]
+
+[node name="Spawn1" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1843727456]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0.45000005, 6.000141)
+gizmo_extents = 0.3
+
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn1" unique_id=1931254230 instance=ExtResource("8_spawn")]
+
+[node name="Spawn2" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=2059175730]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0.45000005, 6.000141)
+gizmo_extents = 0.3
+
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn2" unique_id=1688480654 instance=ExtResource("8_spawn")]
+
+[node name="Spawn3" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=727140013]
+transform = Transform3D(1, 0, 0, 0, 1, 2.3841858e-07, 0, -2.3841858e-07, 1, -3, 0.45000005, 11.999989)
+gizmo_extents = 0.3
+
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn3" unique_id=1659480348 instance=ExtResource("8_spawn")]
+
+[node name="Spawn4" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=629731630]
+transform = Transform3D(1, 0, 0, 0, 1, 2.3841858e-07, 0, -2.3841858e-07, 1, 3, 0.45000005, 11.999989)
+gizmo_extents = 0.3
+
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn4" unique_id=1134199647 instance=ExtResource("8_spawn")]
+
+[node name="Spawn5" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=868382403]
+transform = Transform3D(1, 0, 0, 0, 1, 2.3841858e-07, 0, -2.3841858e-07, 1, -3, 0.45000005, 18.000008)
+gizmo_extents = 0.3
+
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn5" unique_id=1883587306 instance=ExtResource("8_spawn")]
+
+[node name="Spawn6" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=21504332]
+transform = Transform3D(1, 0, 0, 0, 1, 2.3841858e-07, 0, -2.3841858e-07, 1, 3, 0.45000005, 18.000008)
+gizmo_extents = 0.3
+
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn6" unique_id=1825716242 instance=ExtResource("8_spawn")]
+
+[node name="PlayerSpawner" type="MultiplayerSpawner" parent="." unique_id=1609847602]
+_spawnable_scenes = PackedStringArray("uid://cart123")
+spawn_path = NodePath("../Players")
+spawn_limit = 6
+
+[node name="ProjectileSpawner" type="MultiplayerSpawner" parent="." unique_id=711418558]
+spawn_path = NodePath(".")
+
+[node name="Checkpoints" type="Node3D" parent="." unique_id=458265703]
+
+[node name="Halfway2" parent="Checkpoints" unique_id=1996182824 instance=ExtResource("2_gate")]
+transform = Transform3D(-1, 0, 1.5258789e-05, 0, 1, 0, -1.5258789e-05, 0, -1, 185, 3.5499997, -49.999985)
+
+[node name="Halfway3" parent="Checkpoints" unique_id=657952124 instance=ExtResource("2_gate")]
+transform = Transform3D(-1, 0, 0, 0, 1, 2.3841858e-07, 0, 2.3841858e-07, -1, 185, 3.5500002, 69.99997)
+
+[node name="Halfway4" parent="Checkpoints" unique_id=763462754 instance=ExtResource("2_gate")]
+transform = Transform3D(0, 2.3841858e-07, 1, 0, 1, -2.3841858e-07, -1, 0, 0, 80.00001, 3.5499997, 125)
+
+[node name="Halfway5" parent="Checkpoints" unique_id=260178615 instance=ExtResource("2_gate")]
+transform = Transform3D(7.6293945e-06, -2.3841858e-07, 1, -9.7144515e-17, 1, 2.3841858e-07, -1, -1.8190865e-12, 7.6293945e-06, -80.00008, 3.55, 125)
+
+[node name="Halfway6" parent="Checkpoints" unique_id=685837063 instance=ExtResource("2_gate")]
+transform = Transform3D(1, -3.6379233e-12, 1.5258789e-05, -5.551115e-17, 1, 2.3841858e-07, -1.5258789e-05, -2.3841858e-07, 1, -175, 3.5500002, 69.99999)
+
+[node name="Halfway7" parent="Checkpoints" unique_id=1518776782 instance=ExtResource("2_gate")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -175, 3.55, -40.000008)
+
+[node name="Halfway8" parent="Checkpoints" unique_id=1594120288 instance=ExtResource("2_gate")]
+transform = Transform3D(0, 2.3841858e-07, -1, 0, 1, 2.3841858e-07, 1, 0, 0, -120.00002, 3.55, -94.99999)
+
+[node name="AlternativePaths" type="Node3D" parent="." unique_id=1107945994]
+
+[node name="BoostPads" type="Node3D" parent="." unique_id=450539902]
+
+[node name="BoostPad_Start" parent="BoostPads" unique_id=786138903 instance=ExtResource("93_m7b4a")]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 20, 3.6, -95)
+
+[node name="BoostPad_AfterJumpE" parent="BoostPads" unique_id=497154324 instance=ExtResource("93_m7b4a")]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 130, 3.6, -95)
+
+[node name="BoostPad_South" parent="BoostPads" unique_id=1548854334 instance=ExtResource("93_m7b4a")]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 64.06841, 3.6, 125)
+
+[node name="BoostPad_AfterJumpW" parent="BoostPads" unique_id=1874779404 instance=ExtResource("93_m7b4a")]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -50, 3.6, 125)
+
+[node name="Props" type="Node3D" parent="." unique_id=1840529723]
+
+[node name="Environment" type="Node3D" parent="." unique_id=14071484]
+
+[node name="Vegetation" type="Node3D" parent="." unique_id=1720462409]
+
+[node name="Buildings" type="Node3D" parent="." unique_id=1992264757]

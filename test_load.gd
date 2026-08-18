@@ -8,7 +8,8 @@ func _ready():
 		"res://levels/MountainLevel.tscn",
 		"res://levels/CanyonLevel.tscn",
 		"res://levels/CanyonChasmLevel.tscn",
-		"res://levels/DesertWadiLevel.tscn"
+		"res://levels/DesertWadiLevel.tscn",
+		"res://levels/HarborPierLevel.tscn"
 	]
 	
 	for lvl_path in levels:

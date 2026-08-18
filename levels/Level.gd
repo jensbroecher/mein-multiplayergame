@@ -56,6 +56,14 @@ const ITEM_BOX_SCENE = preload("res://ItemBox.tscn")
 				_generate_sand_dunes()
 			notify_property_list_changed()
 
+@export_tool_button("Refresh Sand Dune Meshes") var refresh_sand_dunes_action = _refresh_existing_sand_dune_meshes
+@export var refresh_sand_dune_meshes: bool = false:
+	set(val):
+		if val:
+			if Engine.is_editor_hint():
+				_refresh_existing_sand_dune_meshes()
+			notify_property_list_changed()
+
 enum RaceState {LOBBY, RACING, FINISHED}
 var race_state: int = RaceState.LOBBY
 
@@ -125,6 +133,7 @@ func _ready():
 
 	# Canyon Chasm: fill the first hill-jump pit with murky reflective water
 	_setup_chasm_pit_water()
+	_setup_harbor_water()
 
 	if multiplayer.is_server():
 		NetworkManager.player_connected.connect(_on_server_player_connected)
@@ -142,8 +151,8 @@ func _ready():
 					"is_ai": true
 				}
 
-		# Spawn existing players (host first, then bots if GP)
-		for id in NetworkManager.players:
+		# Spawn existing players. GP uses standings/grid order; other modes keep join order.
+		for id in _spawn_order_ids():
 			var info = NetworkManager.players[id]
 			_add_player(id, info["name"])
 
@@ -445,6 +454,43 @@ func _spawn_custom(data: Variant) -> Node:
 		cart.can_move = true
 
 	return cart
+
+func _is_gp_mode() -> bool:
+	return NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP \
+		or (NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP and NetworkManager.is_coop_gp)
+
+
+## Grid order for spawning. Index 0 is the front row (closest to the start line).
+## First GP race: human players start last. Later races: higher cup points start further forward.
+func _spawn_order_ids() -> Array:
+	var ids: Array = NetworkManager.players.keys()
+	if not _is_gp_mode():
+		return ids
+
+	var first_race: bool = NetworkManager.current_gp_stage <= 0 or NetworkManager.gp_standings.is_empty()
+	if first_race:
+		var bots: Array = []
+		var humans: Array = []
+		for id in ids:
+			if NetworkManager.players[id].get("is_ai", false):
+				bots.append(id)
+			else:
+				humans.append(id)
+		# Front of grid = bots, back of grid = humans
+		return bots + humans
+
+	var scored: Array = ids.duplicate()
+	scored.sort_custom(func(a, b):
+		var na: String = str(NetworkManager.players[a].get("name", ""))
+		var nb: String = str(NetworkManager.players[b].get("name", ""))
+		var pa: int = int(NetworkManager.gp_standings.get(na, 0))
+		var pb: int = int(NetworkManager.gp_standings.get(nb, 0))
+		if pa == pb:
+			return na < nb
+		return pa > pb
+	)
+	return scored
+
 
 func _add_player(id: int, p_name: String):
 	if not player_stats.has(id):
@@ -757,6 +803,18 @@ func _setup_chasm_pit_water() -> void:
 		tg.add_chasm_pit_water()
 
 
+func _setup_harbor_water() -> void:
+	var tg = get_node_or_null("TerrainGenerator")
+	if tg == null:
+		return
+	if str(tg.get("level_prefix")) != "harbor_pier":
+		return
+	if tg.get_node_or_null("HarborWater") != null:
+		return
+	if tg.has_method("add_harbor_water"):
+		tg.add_harbor_water()
+
+
 func _build_runtime_collisions_deferred() -> void:
 	collisions_ready = false
 	# Let the first frames finish streaming/import so we don't collide-bake on top of load.
@@ -979,6 +1037,10 @@ func _spawn_random_item_boxes(count: int):
 				or c_name.contains("ramp")
 				or c_name.contains("sand")
 				or c_name.contains("curb")
+				or c_name.contains("pier")
+				or c_name.contains("harbor")
+				or c_name.contains("bridge")
+				or c_name.contains("deck")
 			)
 			if is_gate or c_name.contains("itembox") or c_name.contains("cart") or c_name.contains("player"):
 				is_obstructed = true
@@ -996,10 +1058,10 @@ func _spawn_random_item_boxes(count: int):
 			spawned_count += 1
 
 func _curve_has_tilt(c: Curve3D) -> bool:
-	if not c: return false
-	var tilts = c.tilts
-	for t in tilts:
-		if absf(t) > 0.001:
+	if not c:
+		return false
+	for i in range(c.point_count):
+		if absf(c.get_point_tilt(i)) > 0.001:
 			return true
 	return false
 
@@ -1545,70 +1607,87 @@ func _align_start_and_spawns_to_track():
 
 	spawn_points = spawns
 
+func _dune_height_at(lx: float, lz: float, half_w: float, half_d: float, peak_height: float, noise: FastNoiseLite) -> float:
+	# Same mound as the original dunes: radial smoothstep + strong simplex lumps.
+	var d: float = sqrt(lx * lx + lz * lz)
+	var radius: float = minf(half_w, half_d)
+	if radius < 0.001:
+		return 0.0
+	var mask: float = clampf(1.0 - (d / radius), 0.0, 1.0)
+	mask = mask * mask * (3.0 - 2.0 * mask)
+	var n: float = noise.get_noise_2d(lx * 2.0, lz * 2.0) * 4.0
+	# Extra fine ripples only — does not change the overall shape
+	n += noise.get_noise_2d(lx * 6.5, lz * 6.5) * 0.7
+	return mask * (peak_height + n)
+
+
 func _build_organic_dune_mesh(width: float, depth: float, resolution: int, peak_height: float, noise: FastNoiseLite) -> ArrayMesh:
 	var st = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 
-	var half_w = width * 0.5
-	var half_d = depth * 0.5
-	var step_x = width / resolution
-	var step_z = depth / resolution
-	var bottom_y = -1.5  # sink the base slightly underground so the join is invisible
+	# Polar topology so the silhouette is round, but heights stay the old organic formula.
+	var rings: int = maxi(resolution, 32)
+	var segs: int = maxi(resolution + 4, 36)
+	var half_w: float = width * 0.5
+	var half_d: float = depth * 0.5
+	var radius: float = minf(half_w, half_d)
+	var bottom_y: float = -1.5
 
-	# Generate top surface vertices
-	for r in range(resolution + 1):
-		for c in range(resolution + 1):
-			var lx = -half_w + c * step_x
-			var lz = -half_d + r * step_z
-			var d = sqrt(lx * lx + lz * lz)
-			var radius = min(half_w, half_d)
+	st.set_uv(Vector2(0.5, 0.5))
+	st.add_vertex(Vector3(0.0, _dune_height_at(0.0, 0.0, half_w, half_d, peak_height, noise), 0.0))
 
-			# Radial mask so heights smoothly reach 0 at the boundary
-			var mask = clamp(1.0 - (d / radius), 0.0, 1.0)
-			mask = mask * mask * (3.0 - 2.0 * mask) # Smoothstep
-
-			var n = noise.get_noise_2d(lx * 2.0, lz * 2.0) * 4.0
-			var ly = mask * (peak_height + n)
-
-			var u = float(c) / resolution
-			var v = float(r) / resolution
-			st.set_uv(Vector2(u, v))
+	for ring in range(1, rings + 1):
+		var t: float = float(ring) / float(rings)
+		for seg in range(segs):
+			var ang: float = TAU * float(seg) / float(segs)
+			var lx: float = cos(ang) * radius * t
+			var lz: float = sin(ang) * radius * t
+			var ly: float = 0.0 if ring == rings else _dune_height_at(lx, lz, half_w, half_d, peak_height, noise)
+			st.set_uv(Vector2(0.5 + 0.5 * cos(ang) * t, 0.5 + 0.5 * sin(ang) * t))
 			st.add_vertex(Vector3(lx, ly, lz))
 
-	# Top surface indices (CCW from above)
-	for r in range(resolution):
-		for c in range(resolution):
-			var i = r * (resolution + 1) + c
-			st.add_index(i)
-			st.add_index(i + resolution + 1)
-			st.add_index(i + 1)
+	for seg in range(segs):
+		st.add_index(0)
+		st.add_index(1 + seg)
+		st.add_index(1 + ((seg + 1) % segs))
 
-			st.add_index(i + 1)
-			st.add_index(i + resolution + 1)
-			st.add_index(i + resolution + 2)
+	for ring in range(rings - 1):
+		var row0: int = 1 + ring * segs
+		var row1: int = 1 + (ring + 1) * segs
+		for seg in range(segs):
+			var s1: int = (seg + 1) % segs
+			st.add_index(row0 + seg)
+			st.add_index(row1 + seg)
+			st.add_index(row0 + s1)
+			st.add_index(row0 + s1)
+			st.add_index(row1 + seg)
+			st.add_index(row1 + s1)
 
-	# Generate flat bottom face vertices (same grid at bottom_y)
-	var base_idx = (resolution + 1) * (resolution + 1)  # offset for bottom verts
-	for r in range(resolution + 1):
-		for c in range(resolution + 1):
-			var lx = -half_w + c * step_x
-			var lz = -half_d + r * step_z
-			var u = float(c) / resolution
-			var v = float(r) / resolution
-			st.set_uv(Vector2(u, v))
-			st.add_vertex(Vector3(lx, bottom_y, lz))
-
-	# Bottom face indices (CW from above = CCW from below, facing downward)
-	for r in range(resolution):
-		for c in range(resolution):
-			var i = base_idx + r * (resolution + 1) + c
-			st.add_index(i)
-			st.add_index(i + 1)
-			st.add_index(i + resolution + 1)
-
-			st.add_index(i + 1)
-			st.add_index(i + resolution + 2)
-			st.add_index(i + resolution + 1)
+	var rim_start: int = 1 + (rings - 1) * segs
+	var bot_center: int = 1 + rings * segs
+	st.set_uv(Vector2(0.5, 0.5))
+	st.add_vertex(Vector3(0.0, bottom_y, 0.0))
+	var bot_rim_start: int = bot_center + 1
+	for seg in range(segs):
+		var ang: float = TAU * float(seg) / float(segs)
+		var lx: float = cos(ang) * radius
+		var lz: float = sin(ang) * radius
+		st.set_uv(Vector2(0.5 + 0.5 * cos(ang), 0.5 + 0.5 * sin(ang)))
+		st.add_vertex(Vector3(lx, bottom_y, lz))
+	for seg in range(segs):
+		var a: int = bot_rim_start + seg
+		var b: int = bot_rim_start + ((seg + 1) % segs)
+		st.add_index(bot_center)
+		st.add_index(b)
+		st.add_index(a)
+		var ta: int = rim_start + seg
+		var tb: int = rim_start + ((seg + 1) % segs)
+		st.add_index(ta)
+		st.add_index(a)
+		st.add_index(tb)
+		st.add_index(tb)
+		st.add_index(a)
+		st.add_index(b)
 
 	st.generate_normals()
 	st.generate_tangents()
@@ -1632,18 +1711,7 @@ func _generate_sand_dunes():
 	var length = curve.get_baked_length()
 
 	var ratios = [0.15, 0.35, 0.65, 0.85]
-	var sand_texture = load("res://materials/sand.png")
-	var sand_mat = StandardMaterial3D.new()
-	# Disable backface culling so dunes look solid from any angle
-	sand_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	if sand_texture:
-		sand_mat.albedo_texture = sand_texture
-		sand_mat.uv1_triplanar = true
-		sand_mat.uv1_scale = Vector3(0.5, 0.5, 0.5)
-		sand_mat.roughness = 0.9
-	else:
-		sand_mat.albedo_color = Color(0.9, 0.8, 0.6)
-		sand_mat.roughness = 0.9
+	var sand_mat = _make_dune_sand_material()
 
 	var noise = FastNoiseLite.new()
 	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
@@ -1674,7 +1742,7 @@ func _generate_sand_dunes():
 
 		var mesh_inst = MeshInstance3D.new()
 		mesh_inst.name = "DuneMesh"
-		mesh_inst.mesh = _build_organic_dune_mesh(dune_w, dune_d, 24, peak_h, noise)
+		mesh_inst.mesh = _build_organic_dune_mesh(dune_w, dune_d, 36, peak_h, noise)
 		mesh_inst.material_override = sand_mat
 		dune.add_child(mesh_inst)
 		if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
@@ -1708,3 +1776,59 @@ func _generate_sand_dunes():
 				dune.basis = Basis.looking_at(global_tangent, Vector3.UP)
 
 	print("Organic Sand Dunes generated along track as moveable objects!")
+
+
+func _make_dune_sand_material() -> StandardMaterial3D:
+	var sand_mat := StandardMaterial3D.new()
+	sand_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var sand_texture = load("res://materials/sand.png")
+	if sand_texture:
+		sand_mat.albedo_texture = sand_texture
+		sand_mat.uv1_triplanar = true
+		sand_mat.uv1_scale = Vector3(0.45, 0.45, 0.45)
+		sand_mat.roughness = 0.92
+	else:
+		sand_mat.albedo_color = Color(0.9, 0.8, 0.6)
+		sand_mat.roughness = 0.92
+	return sand_mat
+
+
+## Rebuild meshes on existing OrganicDune_* nodes. Keeps their placed transforms.
+func _refresh_existing_sand_dune_meshes() -> void:
+	var parent_node = get_node_or_null("SandDunes")
+	if parent_node == null:
+		push_warning("No SandDunes node to refresh")
+		return
+
+	var sand_mat := _make_dune_sand_material()
+	var noise := FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
+	noise.frequency = 0.05
+
+	var idx := 0
+	for child in parent_node.get_children():
+		if not (child is StaticBody3D):
+			continue
+		if not str(child.name).begins_with("OrganicDune"):
+			continue
+		var mesh_inst = child.get_node_or_null("DuneMesh") as MeshInstance3D
+		if mesh_inst == null:
+			continue
+
+		# Same per-dune seeds/sizes as the original generator so shapes stay varied
+		seed(12345 + idx * 987)
+		noise.seed = randi()
+		var dune_w := randf_range(35.0, 50.0)
+		var dune_d := randf_range(35.0, 50.0)
+		var peak_h := randf_range(6.0, 9.0)
+		mesh_inst.mesh = _build_organic_dune_mesh(dune_w, dune_d, 36, peak_h, noise)
+		mesh_inst.material_override = sand_mat
+
+		var col_shape = child.get_node_or_null("DuneCollision") as CollisionShape3D
+		if col_shape:
+			var trimesh = mesh_inst.mesh.create_trimesh_shape()
+			trimesh.backface_collision = true
+			col_shape.shape = trimesh
+		idx += 1
+
+	print("Refreshed ", idx, " sand dune mesh(es) with circular high-detail shapes.")

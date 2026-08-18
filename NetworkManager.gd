@@ -33,7 +33,10 @@ var time_trial_stage: String = "res://levels/Level.tscn"
 const GP_CUPS = {
 	"Starter Cup": {
 		"name": "Starter Cup",
-		"stages": ["res://levels/Level.tscn"]
+		"stages": [
+			"res://levels/Level.tscn",
+			"res://levels/HarborPierLevel.tscn",
+		]
 	},
 	"Desert Cup": {
 		"name": "Desert Cup",
