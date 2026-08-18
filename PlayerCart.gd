@@ -1031,6 +1031,9 @@ func _process(delta):
 	# Update top-level drift and dirt particle emitters continuously so transforms are always fresh
 	for p in drift_particles:
 		if is_instance_valid(p) and p is CPUParticles3D:
+			if not p.emitting:
+				_park_trail_emitter(p)
+				continue
 			var pivot = p.get_meta("pivot", null)
 			if is_instance_valid(pivot):
 				if p.name.ends_with("_Skid"):
@@ -1073,10 +1076,12 @@ func _process(delta):
 
 	for p in dirt_particles:
 		if is_instance_valid(p) and p is CPUParticles3D:
+			if not p.emitting:
+				_park_trail_emitter(p)
+				continue
 			var pivot = p.get_meta("pivot", null)
 			if is_instance_valid(pivot):
-				p.global_rotation = pivot.global_rotation
-				p.global_position = pivot.global_position + pivot.global_transform.basis * Vector3(0, -0.24, 0.16)
+				_attach_dirt_emitter(p, pivot)
 
 func _physics_process(delta):
 	if slow_timer > 0.0:
@@ -3468,6 +3473,7 @@ func _prime_wheel_trail_particles() -> void:
 		if not is_instance_valid(p):
 			continue
 		p.transparency = 0.0
+		_park_trail_emitter(p)
 
 	for dummy in dummies:
 		if is_instance_valid(dummy):
@@ -3740,6 +3746,19 @@ func _apply_dust_particle_colors(base_color: Color) -> void:
 				mat.albedo_color = base_color
 
 
+func _attach_dirt_emitter(p: CPUParticles3D, pivot: Node3D) -> void:
+	p.global_rotation = pivot.global_rotation
+	p.global_position = pivot.global_position + pivot.global_transform.basis * Vector3(0, -0.24, 0.16)
+
+
+func _park_trail_emitter(p: CPUParticles3D) -> void:
+	# Unused MultiMesh slots draw at the emitter origin. Park it far away so a
+	# leftover quad does not ride the tire after the trail has died.
+	# World-space particles already spawned keep their last world positions.
+	if p.global_position.y > -400.0:
+		p.global_position = Vector3(0.0, -500.0, 0.0)
+
+
 func _set_dirt_emitting(emitting: bool):
 	if not _trail_particles_ready:
 		return
@@ -3762,9 +3781,16 @@ func _set_dirt_emitting(emitting: bool):
 		_apply_dust_particle_colors(_current_dust_color)
 	for p in dirt_particles:
 		if is_instance_valid(p) and p is CPUParticles3D:
-			p.emitting = on
-			if on and "amount_ratio" in p:
-				p.amount_ratio = clampf((speed - 4.0) / 14.0, 0.20, 1.0)
+			if on:
+				var pivot = p.get_meta("pivot", null)
+				if is_instance_valid(pivot):
+					_attach_dirt_emitter(p, pivot)
+				p.emitting = true
+				if "amount_ratio" in p:
+					p.amount_ratio = clampf((speed - 4.0) / 14.0, 0.20, 1.0)
+			else:
+				p.emitting = false
+				_park_trail_emitter(p)
 
 func _get_ground_height(global_pos: Vector3) -> float:
 	var space_state = get_world_3d().direct_space_state
