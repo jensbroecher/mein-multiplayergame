@@ -400,10 +400,16 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
 mesh = SubResource("SphereMesh_tip")
 
 [node name="NameTag" type="Label3D" parent="Visuals" unique_id=1335975530]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.35, 0)
 pixel_size = 0.0003
 billboard = 1
 fixed_size = true
+no_depth_test = true
+render_priority = 32
+outline_render_priority = 31
+sorting_offset = 16.0
+outline_size = 12
+outline_modulate = Color(0, 0, 0, 0.82)
 text = "Player"
 
 [node name="CameraPivot" type="Node3D" parent="Visuals" unique_id=473408400]

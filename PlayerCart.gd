@@ -213,6 +213,10 @@ var ai_last_stuck_position: Vector3 = Vector3.ZERO
 var _ai_want_drift: bool = false
 var _ai_upcoming_turn_angle: float = 0.0
 var _ai_upcoming_turn_dist: float = 40.0
+## 0 = cautious (recent safe style), 1 = old full-send. Rolled once per racer.
+var ai_aggression: float = 0.45
+var ai_shortcut_chance: float = 0.35
+var ai_lane_span: float = 2.0
 var track_path: Path3D = null
 var alternative_paths: Array[Path3D] = []
 var active_path: Path3D = null
@@ -274,6 +278,7 @@ var is_offroad: bool = false
 var visual_offset_y: float = 0.0
 
 var stage_has_water: bool = true
+var _harbor_stage: bool = false
 var is_underwater: bool = false
 const WATER_LEVEL = -10.0
 ## Effective surface Y used for splash/drown (may be chasm pit water, not global ocean).
@@ -464,7 +469,8 @@ func _ready():
 	_update_authority()
 
 	if is_ai:
-		ai_lane_offset = randf_range(-2.0, 2.0)
+		_init_ai_personality()
+		ai_lane_offset = randf_range(-ai_lane_span, ai_lane_span)
 		ai_target_lane_offset = ai_lane_offset
 		ai_lane_change_timer = randf_range(3.0, 6.0)
 
@@ -499,6 +505,13 @@ func _ready():
 
 	ground_ray.add_exception(self)
 	name_tag.text = player_name
+	# Always draw names over water / crates / piers (especially spectator 3/4 view).
+	name_tag.no_depth_test = true
+	name_tag.render_priority = 32
+	name_tag.outline_render_priority = 31
+	name_tag.sorting_offset = 16.0
+	name_tag.outline_size = 12
+	name_tag.outline_modulate = Color(0, 0, 0, 0.82)
 	last_checkpoint_transform = global_transform
 	camera_look_at = global_position
 
@@ -577,6 +590,7 @@ func _ready():
 					water_bounds_max = Vector2(c.x + half.x, c.z + half.y)
 		elif tg and str(tg.get("level_prefix")) == "harbor_pier":
 			stage_has_water = true
+			_harbor_stage = true
 			water_surface_y = 1.55
 			water_bounds_active = false
 			var harbor_water = tg.get_node_or_null("HarborWater")
@@ -3859,6 +3873,21 @@ func _update_water_wake(active: bool, _delta: float) -> void:
 
 
 
+func _init_ai_personality() -> void:
+	var rng := RandomNumberGenerator.new()
+	var seed_src: String = player_name if not player_name.is_empty() else str(get_instance_id())
+	rng.seed = hash(seed_src + ":" + str(car_index))
+	var roll: float = rng.randf()
+	if roll < 0.30:
+		ai_aggression = rng.randf_range(0.08, 0.28)
+	elif roll < 0.62:
+		ai_aggression = rng.randf_range(0.36, 0.56)
+	else:
+		ai_aggression = rng.randf_range(0.78, 1.0)
+	ai_shortcut_chance = clampf(lerpf(0.12, 0.70, ai_aggression) * rng.randf_range(0.85, 1.15), 0.08, 0.80)
+	ai_lane_span = clampf(lerpf(1.15, 3.15, ai_aggression) * rng.randf_range(0.9, 1.12), 1.0, 3.4)
+
+
 func _get_ai_input(delta: float) -> Vector2:
 	var input = Vector2.ZERO
 	
@@ -3885,8 +3914,19 @@ func _get_ai_input(delta: float) -> Vector2:
 	if active_path == null:
 		active_path = track_path
 
+	if not _harbor_stage:
+		var tg_ai = null
+		var lvl_ai = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
+		if lvl_ai:
+			tg_ai = lvl_ai.get_node_or_null("TerrainGenerator")
+		if tg_ai and str(tg_ai.get("level_prefix")) == "harbor_pier":
+			_harbor_stage = true
+			ai_target_lane_offset = clampf(ai_target_lane_offset, -0.45, 0.45)
+			ai_lane_offset = clampf(ai_lane_offset, -0.55, 0.55)
+
 	# Alternative path detection and decision logic
-	if not on_alternative_path:
+	# Harbor piers have no safe shortcuts — staying on the racing dock is mandatory.
+	if not on_alternative_path and not _harbor_stage:
 		for alt_path in alternative_paths:
 			if not is_instance_valid(alt_path): continue
 			var alt_curve = alt_path.curve
@@ -3898,7 +3938,7 @@ func _get_ai_input(delta: float) -> Vector2:
 			var dist = global_position.distance_to(start_global)
 			if dist < 12.0:
 				if not alt_path_decisions.has(alt_path):
-					var take_shortcut = randf() < 0.35
+					var take_shortcut = randf() < ai_shortcut_chance
 					alt_path_decisions[alt_path] = take_shortcut
 					if take_shortcut:
 						on_alternative_path = true
@@ -3932,14 +3972,21 @@ func _get_ai_input(delta: float) -> Vector2:
 			_ai_cached_offset = curve.get_closest_offset(local_pos)
 			current_offset = _ai_cached_offset
 	
+	var style: float = 0.0 if _harbor_stage else ai_aggression
+
 	# Periodically change target lane offset to simulate realistic lane shifting / overtaking
 	ai_lane_change_timer -= delta
 	if ai_lane_change_timer <= 0.0:
-		ai_lane_change_timer = randf_range(5.0, 10.0)
-		ai_target_lane_offset = randf_range(-2.0, 2.0)
+		ai_lane_change_timer = randf_range(lerpf(7.0, 3.5, style), lerpf(12.0, 7.0, style))
+		if _harbor_stage:
+			ai_target_lane_offset = randf_range(-0.45, 0.45)
+		else:
+			ai_target_lane_offset = randf_range(-ai_lane_span, ai_lane_span)
 	
 	# Smoothly interpolate to target lane offset
 	ai_lane_offset = lerp(ai_lane_offset, ai_target_lane_offset, 1.5 * delta)
+	if _harbor_stage:
+		ai_lane_offset = clampf(ai_lane_offset, -0.55, 0.55)
 	
 	var speed = linear_velocity.length()
 	var turn_info: Dictionary = _ai_measure_upcoming_turn(curve, current_offset, speed)
@@ -3947,10 +3994,15 @@ func _get_ai_input(delta: float) -> Vector2:
 	_ai_upcoming_turn_dist = float(turn_info.get("dist", 40.0))
 	var corner_factor: float = clampf(_ai_upcoming_turn_angle / 1.15, 0.0, 1.0)
 
-	var look_ahead = lerp(10.0, 22.0, clampf(speed / maxf(max_speed, 1.0), 0.0, 1.0))
+	var look_ahead = lerp(lerpf(10.0, 14.0, style), lerpf(22.0, 26.0, style), clampf(speed / maxf(max_speed, 1.0), 0.0, 1.0))
 	# In a tight nearby bend, aim closer so the car follows the dock instead of cutting the apex
-	if corner_factor > 0.55 and _ai_upcoming_turn_dist < 16.0:
-		look_ahead = minf(look_ahead, 11.0)
+	if corner_factor > lerpf(0.55, 0.78, style) and _ai_upcoming_turn_dist < 16.0:
+		look_ahead = minf(look_ahead, lerpf(11.0, 16.0, style))
+	if _harbor_stage:
+		# Follow the L-shaped dock — long enough to start the 90° turn, short enough not to cut it.
+		look_ahead = lerpf(11.0, 15.0, clampf(speed / maxf(max_speed, 1.0), 0.0, 1.0))
+		if corner_factor > 0.45:
+			look_ahead = minf(look_ahead, 12.0)
 	var target_offset = current_offset + look_ahead
 	
 	var curve_length = curve.get_baked_length()
@@ -3967,10 +4019,12 @@ func _get_ai_input(delta: float) -> Vector2:
 	var actual_lane_offset = 0.0 if is_finished_race else ai_lane_offset
 	if on_alternative_path:
 		actual_lane_offset *= 0.2
+	if _harbor_stage:
+		actual_lane_offset *= 0.25
 	target_local_pos += right_vec * actual_lane_offset
 	
 	var target_global_pos = active_path.to_global(target_local_pos)
-	
+
 	var target_vec = visuals.global_transform.inverse() * target_global_pos
 	var dir_flat = Vector2(target_vec.x, -target_vec.z).normalized()
 	
@@ -3988,13 +4042,24 @@ func _get_ai_input(delta: float) -> Vector2:
 			angular_velocity = Vector3.ZERO
 	else:
 		_ai_want_drift = false
-		var safe_speed: float = lerpf(max_speed, max_speed * 0.36, corner_factor)
-		if _ai_upcoming_turn_dist < 22.0:
-			safe_speed *= lerpf(1.0, 0.72, clampf((22.0 - _ai_upcoming_turn_dist) / 22.0, 0.0, 1.0))
+		var min_corner_speed: float = 0.28 if _harbor_stage else lerpf(0.36, 0.90, style)
+		var safe_speed: float = lerpf(max_speed, max_speed * min_corner_speed, corner_factor)
+		var brake_window: float = 34.0 if _harbor_stage else lerpf(22.0, 9.0, style)
+		if _ai_upcoming_turn_dist < brake_window:
+			safe_speed *= lerpf(1.0, lerpf(0.68, 0.88, style), clampf((brake_window - _ai_upcoming_turn_dist) / brake_window, 0.0, 1.0))
 		if is_boosting or is_pad_boosting:
 			safe_speed *= 0.88
 
-		if corner_factor > 0.16:
+		var react_corner: float = 0.16 if _harbor_stage else lerpf(0.16, 0.52, style)
+		if style >= 0.75 and not _harbor_stage:
+			# Old full-send: stay on the throttle unless the hairpin is right on the nose.
+			if corner_factor > 0.72 and _ai_upcoming_turn_dist < 11.0 and speed > max_speed * 0.82:
+				input.y = 0.2
+			else:
+				input.y = -1.0 + abs(input.x) * 0.28
+			if speed > 14.0 and abs(input.x) > 0.34 and corner_factor > 0.28:
+				_ai_want_drift = true
+		elif corner_factor > react_corner:
 			if speed > safe_speed + 7.0:
 				input.y = 0.92
 			elif speed > safe_speed + 2.0:
@@ -4003,11 +4068,16 @@ func _get_ai_input(delta: float) -> Vector2:
 				input.y = 0.05
 			else:
 				input.y = -0.45
-			if speed > 12.0 and corner_factor > 0.32 and abs(input.x) > 0.28 and _ai_upcoming_turn_dist < 18.0:
+			if (not _harbor_stage) and speed > 12.0 and corner_factor > 0.32 and abs(input.x) > 0.28 and _ai_upcoming_turn_dist < 18.0:
 				_ai_want_drift = true
 				input.y = maxf(input.y, 0.55)
 		else:
 			input.y = -1.0 + abs(input.x) * 0.35
+		if _harbor_stage:
+			_ai_want_drift = false
+			# Keep some throttle through the corner so they don't stall and reverse-unstick.
+			if input.y > 0.55:
+				input.y = 0.55
 	
 	# 3-Ray Obstacle Avoidance — throttled to every 3 physics frames.
 	# With 4 AI carts this was 12 raycasts/tick; now ~4 on average.
@@ -4047,6 +4117,9 @@ func _get_ai_input(delta: float) -> Vector2:
 							avoid_force += -ray["side"] * 1.5 * intensity
 						obstacle_count += 1
 			if obstacle_count > 0:
+				if _harbor_stage:
+					# Small nudge only — a full dodge on a 16m dock drives them into the basin.
+					avoid_force *= 0.2
 				input.x = clamp(input.x + avoid_force, -1.0, 1.0)
 	
 	if speed < 1.5 and can_move and not is_exploding:
@@ -4055,8 +4128,13 @@ func _get_ai_input(delta: float) -> Vector2:
 			stuck_timer = 0.0
 			respawn()
 		elif stuck_timer > 1.2:
-			input.y = 1.0
-			input.x = -sign(input.x) if input.x != 0 else 1.0
+			if _harbor_stage:
+				# Reverse-unstick on a pier sends them backward into the water.
+				input.y = -0.55
+				input.x = clamp(dir_flat.x * 2.0, -1.0, 1.0)
+			else:
+				input.y = 1.0
+				input.x = -sign(input.x) if input.x != 0 else 1.0
 	else:
 		stuck_timer = 0.0
 		
@@ -4108,8 +4186,18 @@ func _process_ai_items(delta: float):
 	match current_item:
 		ItemType.BOOST:
 			# Only fire boosts on a real straight — never into a dock corner or while already turning.
-			var upcoming_ok: bool = _ai_upcoming_turn_angle < 0.32 and _ai_upcoming_turn_dist > 26.0
-			if abs(sync_steer) < 0.16 and upcoming_ok and linear_velocity.length() > 6.0:
+			var boost_ang: float = 0.32
+			var boost_dist: float = 26.0
+			var boost_steer: float = 0.16
+			if _harbor_stage:
+				boost_ang = 0.18
+				boost_dist = 34.0
+			else:
+				boost_ang = lerpf(0.32, 0.60, ai_aggression)
+				boost_dist = lerpf(26.0, 11.0, ai_aggression)
+				boost_steer = lerpf(0.16, 0.34, ai_aggression)
+			var upcoming_ok: bool = _ai_upcoming_turn_angle < boost_ang and _ai_upcoming_turn_dist > boost_dist
+			if abs(sync_steer) < boost_steer and upcoming_ok and linear_velocity.length() > 6.0:
 				should_use = true
 		ItemType.MISSILE, ItemType.GUIDED_MISSILE:
 			var fwd = -visuals.global_transform.basis.z
