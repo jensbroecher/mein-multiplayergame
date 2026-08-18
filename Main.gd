@@ -32,7 +32,7 @@ func _ready():
 	configuration_menu = CONFIGURATION_MENU_SCENE.instantiate()
 	configuration_menu.visible = false
 	config_canvas.add_child(configuration_menu)
-	configuration_menu.back_pressed.connect(func(): main_menu.show())
+	configuration_menu.back_pressed.connect(_on_options_back_pressed)
 	
 	var pause_canvas = CanvasLayer.new()
 	pause_canvas.name = "PauseCanvas"
@@ -59,6 +59,10 @@ func _on_menu_start_pressed():
 func _on_menu_options_pressed():
 	main_menu.hide()
 	configuration_menu.show()
+
+
+func _on_options_back_pressed() -> void:
+	main_menu.show()
 
 func _on_car_selected(car_index: int):
 	if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:

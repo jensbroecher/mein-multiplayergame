@@ -78,6 +78,7 @@
 [ext_resource type="MultiMesh" uid="uid://kdpq012y1b3y" path="res://generated/grass/chunk_4_3.res" id="50_1oa1o"]
 [ext_resource type="MultiMesh" uid="uid://byb80jqu5w0l1" path="res://generated/grass/chunk_8_4.res" id="50_m2w2i"]
 [ext_resource type="MultiMesh" uid="uid://d35xudf03m7i5" path="res://generated/grass/chunk_10_4.res" id="50_vte04"]
+[ext_resource type="MultiMesh" uid="uid://3ju1hbideupb" path="res://generated/grass/chunk_5_3.res" id="51_avj3n"]
 [ext_resource type="MultiMesh" uid="uid://fkqemdl8hyfk" path="res://generated/grass/chunk_11_4.res" id="51_ujhay"]
 [ext_resource type="MultiMesh" uid="uid://y3csb7jybik0" path="res://generated/grass/chunk_12_4.res" id="52_hue4h"]
 [ext_resource type="MultiMesh" uid="uid://drigtx57cvgsc" path="res://generated/grass/chunk_2_5.res" id="52_r88c0"]
@@ -134,6 +135,7 @@
 [ext_resource type="MultiMesh" uid="uid://84po7j48505m" path="res://generated/grass/chunk_8_7.res" id="92_h782c"]
 [ext_resource type="MultiMesh" uid="uid://3s514pc2ig4r" path="res://generated/grass/chunk_9_7.res" id="93_j82va"]
 [ext_resource type="PackedScene" uid="uid://boostpad123" path="res://BoostPad.tscn" id="93_m7b4a"]
+[ext_resource type="MultiMesh" uid="uid://b6dymivqpeh41" path="res://generated/grass/chunk_5_6.res" id="94_3rryt"]
 [ext_resource type="MultiMesh" uid="uid://l5rvda354yg5" path="res://generated/grass/chunk_10_7.res" id="94_oaaeu"]
 [ext_resource type="PackedScene" uid="uid://cso003lyciumg" path="res://models/trees/tree.glb" id="95_bf5bs"]
 [ext_resource type="MultiMesh" uid="uid://ddsynlfk17qdo" path="res://generated/grass/chunk_11_7.res" id="95_qxpn6"]
@@ -336,7 +338,6 @@
 [ext_resource type="MultiMesh" uid="uid://b31mv7gmj1j5j" path="res://generated/grass/chunk_9_19.res" id="310_qf03a"]
 [ext_resource type="MultiMesh" uid="uid://ccw1e7y05hr3i" path="res://generated/grass/chunk_10_19.res" id="311_e6ruf"]
 [ext_resource type="MultiMesh" uid="uid://bdeulycg816fv" path="res://generated/grass/chunk_11_19.res" id="312_bh45d"]
-[ext_resource type="MultiMesh" uid="uid://cmhu80avnll82" path="res://generated/grass/chunk_12_19.res" id="313_5yph5"]
 
 [sub_resource type="Curve" id="Curve_8bl6p"]
 _data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.0464286, 0), 0.0, 0.0, 0, 0, Vector2(0.107143, 0.0367036), 0.303207, 0.303207, 0, 0, Vector2(0.425, 1), 0.0, 0.0, 0, 0, Vector2(0.571429, 1), 0.0, 0.0, 0, 0, Vector2(0.896429, 0.0277009), 0.0, 0.0, 0, 0, Vector2(0.960714, 0), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
@@ -2133,9 +2134,9 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -10, 0)
 material_override = SubResource("ShaderMaterial_tifb6")
 mesh = SubResource("PlaneMesh_gerts")
 
-[node name="GrassContainer" type="Node3D" parent="TerrainGenerator" unique_id=1467251858]
+[node name="GrassContainer" type="Node3D" parent="TerrainGenerator" unique_id=789742373]
 
-[node name="GrassChunk_7_0" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1943229566]
+[node name="GrassChunk_7_0" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1477868429]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -250, -39.774822, -950)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2144,7 +2145,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("20_avj3n")
 
-[node name="GrassChunk_8_0" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=956852597]
+[node name="GrassChunk_8_0" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1166593764]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150, -33.12061, -950)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2153,7 +2154,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("21_3rryt")
 
-[node name="GrassChunk_9_0" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1887407112]
+[node name="GrassChunk_9_0" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1532896504]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, -32.492855, -950)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2162,7 +2163,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("22_6c5wf")
 
-[node name="GrassChunk_10_0" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=376563402]
+[node name="GrassChunk_10_0" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=255314845]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, -31.69793, -950)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2171,7 +2172,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("23_l5pmt")
 
-[node name="GrassChunk_11_0" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=686341769]
+[node name="GrassChunk_11_0" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1284662490]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, -35.549118, -950)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2180,7 +2181,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("24_8j87j")
 
-[node name="GrassChunk_12_0" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=368304649]
+[node name="GrassChunk_12_0" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=493604978]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 250, -39.995205, -950)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2189,7 +2190,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("25_h782c")
 
-[node name="GrassChunk_5_1" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1588925161]
+[node name="GrassChunk_5_1" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=197412569]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -450, -32.52531, -850)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2198,7 +2199,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("26_j82va")
 
-[node name="GrassChunk_6_1" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=696915377]
+[node name="GrassChunk_6_1" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1704653545]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -350, -10.174888, -850)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2207,7 +2208,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("27_oaaeu")
 
-[node name="GrassChunk_7_1" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1184174990]
+[node name="GrassChunk_7_1" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1863648554]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -250, -8.10894, -850)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2216,7 +2217,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("21_yi73l")
 
-[node name="GrassChunk_8_1" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1289803761]
+[node name="GrassChunk_8_1" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=781770654]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150, -12.883129, -850)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2225,7 +2226,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("22_qr5yq")
 
-[node name="GrassChunk_9_1" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=84356544]
+[node name="GrassChunk_9_1" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2115514133]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, 0.10162793, -850)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2234,7 +2235,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("23_ejiig")
 
-[node name="GrassChunk_10_1" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1162843974]
+[node name="GrassChunk_10_1" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1691710913]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, -7.1253176, -850)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2243,7 +2244,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("24_qshkg")
 
-[node name="GrassChunk_11_1" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1144913403]
+[node name="GrassChunk_11_1" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1561927124]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, 8.407848, -850)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2252,7 +2253,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("25_qrd7q")
 
-[node name="GrassChunk_12_1" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1210910925]
+[node name="GrassChunk_12_1" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=544081301]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 250, -5.635114, -850)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2261,7 +2262,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("26_c1qj8")
 
-[node name="GrassChunk_13_1" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2117262953]
+[node name="GrassChunk_13_1" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1373031432]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 350, -1.7009236, -850)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2270,7 +2271,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("34_qxpn6")
 
-[node name="GrassChunk_14_1" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=499378781]
+[node name="GrassChunk_14_1" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=536980972]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 450, -35.61326, -850)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2279,7 +2280,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("35_4dj6u")
 
-[node name="GrassChunk_4_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1073616284]
+[node name="GrassChunk_4_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1793584622]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -550, -9.637588, -750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2288,7 +2289,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("36_monp6")
 
-[node name="GrassChunk_5_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1561711565]
+[node name="GrassChunk_5_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=59685558]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -450, 15.623035, -750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2297,7 +2298,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("31_mwmot")
 
-[node name="GrassChunk_6_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=986491167]
+[node name="GrassChunk_6_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=417398556]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -350, -9.353062, -750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2306,7 +2307,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("32_hvf63")
 
-[node name="GrassChunk_7_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=97706811]
+[node name="GrassChunk_7_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1902308792]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -250, 12.846167, -750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2315,7 +2316,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("33_gjxdc")
 
-[node name="GrassChunk_8_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1502453844]
+[node name="GrassChunk_8_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=228019720]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150, 15.511295, -750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2324,7 +2325,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("30_c0c4f")
 
-[node name="GrassChunk_9_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=986859128]
+[node name="GrassChunk_9_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1584402426]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, -20.694515, -750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2333,7 +2334,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("31_h72at")
 
-[node name="GrassChunk_10_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1957907661]
+[node name="GrassChunk_10_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=641674508]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 14.4601965, -750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2342,7 +2343,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("32_dkesu")
 
-[node name="GrassChunk_11_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1150304260]
+[node name="GrassChunk_11_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=317893657]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, -6.3611927, -750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2351,7 +2352,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("33_tgntg")
 
-[node name="GrassChunk_12_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2025676313]
+[node name="GrassChunk_12_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1458009135]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 250, -3.8989148, -750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2360,7 +2361,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("34_3usri")
 
-[node name="GrassChunk_13_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1412548772]
+[node name="GrassChunk_13_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1665428996]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 350, -4.138319, -750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2369,7 +2370,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("35_qds6u")
 
-[node name="GrassChunk_14_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=441835882]
+[node name="GrassChunk_14_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1605233027]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 450, 4.7904983, -750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2378,7 +2379,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("36_gea77")
 
-[node name="GrassChunk_15_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=271559276]
+[node name="GrassChunk_15_2" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1502735215]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 550, -21.635744, -750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2387,7 +2388,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("47_2xqve")
 
-[node name="GrassChunk_2_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=946985240]
+[node name="GrassChunk_2_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2027587756]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -750, -40, -650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2396,7 +2397,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("48_hmoc4")
 
-[node name="GrassChunk_3_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=999373954]
+[node name="GrassChunk_3_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1060857601]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -650, -6.43394, -650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2405,7 +2406,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("49_5pslb")
 
-[node name="GrassChunk_4_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1707673891]
+[node name="GrassChunk_4_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=349316638]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -550, -17.373566, -650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2414,7 +2415,16 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("50_1oa1o")
 
-[node name="GrassChunk_6_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2013454601]
+[node name="GrassChunk_5_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2112796737]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -450, -18, -650)
+material_override = ExtResource("20_mdb06")
+cast_shadow = 0
+visibility_range_end = 300.0
+visibility_range_end_margin = 50.0
+visibility_range_fade_mode = 1
+multimesh = ExtResource("51_avj3n")
+
+[node name="GrassChunk_6_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=803075197]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -350, -17.804033, -650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2423,7 +2433,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("40_3t1hj")
 
-[node name="GrassChunk_7_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=993402802]
+[node name="GrassChunk_7_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1908434348]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -250, 4.6148324, -650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2432,7 +2442,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("41_70osc")
 
-[node name="GrassChunk_8_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=555951682]
+[node name="GrassChunk_8_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=115546157]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150, 6.2344456, -650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2441,7 +2451,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("42_ttx6x")
 
-[node name="GrassChunk_9_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1359857593]
+[node name="GrassChunk_9_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=394523316]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, -2.8002727, -650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2450,7 +2460,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("40_hhk2s")
 
-[node name="GrassChunk_10_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2039296484]
+[node name="GrassChunk_10_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=725448254]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, -8.863439, -650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2459,7 +2469,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("41_m6qvx")
 
-[node name="GrassChunk_11_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1026714942]
+[node name="GrassChunk_11_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=989323918]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, -9.625185, -650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2468,7 +2478,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("42_6l75o")
 
-[node name="GrassChunk_12_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1764735947]
+[node name="GrassChunk_12_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=118459537]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 250, 2.3180184, -650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2477,7 +2487,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("43_uxa6u")
 
-[node name="GrassChunk_13_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=816529647]
+[node name="GrassChunk_13_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=146099600]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 350, 20.748974, -650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2486,7 +2496,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("44_ortwb")
 
-[node name="GrassChunk_14_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1094386199]
+[node name="GrassChunk_14_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=87590410]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 450, 0.9365971, -650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2495,7 +2505,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("45_dh433")
 
-[node name="GrassChunk_15_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2104304050]
+[node name="GrassChunk_15_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=809712922]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 550, -11.745008, -650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2504,7 +2514,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("46_uj46x")
 
-[node name="GrassChunk_16_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=553015458]
+[node name="GrassChunk_16_3" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=579691983]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 650, -19.041222, -650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2513,7 +2523,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("46_hfa6h")
 
-[node name="GrassChunk_2_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=119209176]
+[node name="GrassChunk_2_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=650607741]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -750, -6.559667, -550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2522,7 +2532,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("62_bthbu")
 
-[node name="GrassChunk_3_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1944670112]
+[node name="GrassChunk_3_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=389646645]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -650, -12.8717785, -550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2531,7 +2541,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("63_qt1ku")
 
-[node name="GrassChunk_7_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1270347985]
+[node name="GrassChunk_7_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=889915580]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -250, -2.9088943, -550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2540,7 +2550,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("49_yd4th")
 
-[node name="GrassChunk_8_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=933844557]
+[node name="GrassChunk_8_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1672987106]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150, 6.8151917, -550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2549,7 +2559,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("50_m2w2i")
 
-[node name="GrassChunk_9_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=181547492]
+[node name="GrassChunk_9_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1560243451]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, 16.11577, -550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2558,7 +2568,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("49_juuf2")
 
-[node name="GrassChunk_10_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=539944503]
+[node name="GrassChunk_10_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=345914086]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 27.240236, -550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2567,7 +2577,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("50_vte04")
 
-[node name="GrassChunk_11_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=536305261]
+[node name="GrassChunk_11_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1595869586]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, -5.242021, -550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2576,7 +2586,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("51_ujhay")
 
-[node name="GrassChunk_12_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=7200698]
+[node name="GrassChunk_12_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=849118939]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 250, -7.283485, -550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2585,7 +2595,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("52_hue4h")
 
-[node name="GrassChunk_13_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=657235166]
+[node name="GrassChunk_13_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=191664755]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 350, 3.131122, -550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2594,7 +2604,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("53_mrhyd")
 
-[node name="GrassChunk_14_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1172825790]
+[node name="GrassChunk_14_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1984574718]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 450, -2.0352178, -550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2603,7 +2613,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("54_efvqu")
 
-[node name="GrassChunk_15_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1602211084]
+[node name="GrassChunk_15_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1724387006]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 550, 2.4783344, -550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2612,7 +2622,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("55_b8kfl")
 
-[node name="GrassChunk_16_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1965771128]
+[node name="GrassChunk_16_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=588775340]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 650, -9.123627, -550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2621,7 +2631,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("56_puadn")
 
-[node name="GrassChunk_17_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1941231797]
+[node name="GrassChunk_17_4" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=40290225]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 750, -28.589346, -550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2630,7 +2640,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("74_j67qc")
 
-[node name="GrassChunk_1_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1513895600]
+[node name="GrassChunk_1_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1725131039]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -850, -33.69458, -450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2639,7 +2649,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("75_ptygx")
 
-[node name="GrassChunk_2_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1374366656]
+[node name="GrassChunk_2_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1045299935]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -750, 9.099595, -450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2648,7 +2658,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("52_r88c0")
 
-[node name="GrassChunk_3_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2022496870]
+[node name="GrassChunk_3_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=799019648]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -650, 3.4958615, -450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2657,7 +2667,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("53_1g8wc")
 
-[node name="GrassChunk_7_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=171722041]
+[node name="GrassChunk_7_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=169377675]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -250, -1.4155446, -450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2666,7 +2676,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("57_pa02e")
 
-[node name="GrassChunk_8_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=29478455]
+[node name="GrassChunk_8_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1764631848]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150, -7.696723, -450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2675,7 +2685,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("58_4b2ny")
 
-[node name="GrassChunk_9_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=65376519]
+[node name="GrassChunk_9_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1712925169]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, 7.7260456, -450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2684,7 +2694,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("61_qaum0")
 
-[node name="GrassChunk_10_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=471626997]
+[node name="GrassChunk_10_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1158945923]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 3.6097145, -450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2693,7 +2703,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("62_s7neb")
 
-[node name="GrassChunk_11_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1961058536]
+[node name="GrassChunk_11_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1982886767]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, -20.660269, -450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2702,7 +2712,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("63_sgyuu")
 
-[node name="GrassChunk_12_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1741169080]
+[node name="GrassChunk_12_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1349875540]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 250, 2.7533872, -450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2711,7 +2721,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("64_qqx8h")
 
-[node name="GrassChunk_13_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1622702042]
+[node name="GrassChunk_13_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=665739907]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 350, -12.637626, -450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2720,7 +2730,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("65_2tg5a")
 
-[node name="GrassChunk_14_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=22989406]
+[node name="GrassChunk_14_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=571660628]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 450, 8.628459, -450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2729,7 +2739,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("66_jfgtv")
 
-[node name="GrassChunk_15_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1341085233]
+[node name="GrassChunk_15_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1476654288]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 550, -13.635855, -450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2738,7 +2748,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("67_vmx6v")
 
-[node name="GrassChunk_16_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1607065025]
+[node name="GrassChunk_16_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1725090796]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 650, -0.24152085, -450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2747,7 +2757,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("68_4htfq")
 
-[node name="GrassChunk_17_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1086841493]
+[node name="GrassChunk_17_5" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=542653588]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 750, -4.160939, -450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2756,7 +2766,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("69_us7mu")
 
-[node name="GrassChunk_1_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1031799255]
+[node name="GrassChunk_1_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=571729428]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -850, 6.734437, -350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2765,7 +2775,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("89_06ow3")
 
-[node name="GrassChunk_2_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2142822025]
+[node name="GrassChunk_2_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1263705603]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -750, -24.244041, -350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2774,7 +2784,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("60_uer4x")
 
-[node name="GrassChunk_3_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=899344953]
+[node name="GrassChunk_3_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=373210876]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -650, 11.598558, -350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2783,7 +2793,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("61_d22gt")
 
-[node name="GrassChunk_4_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1371313609]
+[node name="GrassChunk_4_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1607200559]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -550, -17.38909, -350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2792,7 +2802,16 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("62_d8d0d")
 
-[node name="GrassChunk_6_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1768720823]
+[node name="GrassChunk_5_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=800878207]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -450, -18, -350)
+material_override = ExtResource("20_mdb06")
+cast_shadow = 0
+visibility_range_end = 300.0
+visibility_range_end_margin = 50.0
+visibility_range_fade_mode = 1
+multimesh = ExtResource("94_3rryt")
+
+[node name="GrassChunk_6_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=821568780]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -350, -18.118956, -350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2801,7 +2820,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("64_3c7oo")
 
-[node name="GrassChunk_7_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1894669667]
+[node name="GrassChunk_7_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=413249151]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -250, -21.22276, -350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2810,7 +2829,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("65_ehle5")
 
-[node name="GrassChunk_8_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1869921451]
+[node name="GrassChunk_8_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=371977121]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150, 13.351842, -350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2819,7 +2838,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("66_r3sjg")
 
-[node name="GrassChunk_9_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1454210784]
+[node name="GrassChunk_9_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=495458978]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, -16.397408, -350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2828,7 +2847,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("76_c2uxx")
 
-[node name="GrassChunk_10_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=553831910]
+[node name="GrassChunk_10_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2065742878]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 11.814766, -350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2837,7 +2856,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("77_w1vod")
 
-[node name="GrassChunk_11_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1527079904]
+[node name="GrassChunk_11_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1489236782]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, -17.917091, -350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2846,7 +2865,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("78_6wetd")
 
-[node name="GrassChunk_12_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=293364689]
+[node name="GrassChunk_12_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1468783253]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 250, -19.474583, -350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2855,7 +2874,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("79_v4qgq")
 
-[node name="GrassChunk_13_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=905155893]
+[node name="GrassChunk_13_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1920419282]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 350, -1.8321224, -350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2864,7 +2883,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("80_8nro1")
 
-[node name="GrassChunk_14_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=567447363]
+[node name="GrassChunk_14_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=773913971]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 450, -6.9064374, -350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2873,7 +2892,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("81_avj3n")
 
-[node name="GrassChunk_15_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1466192019]
+[node name="GrassChunk_15_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1928108093]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 550, 13.334557, -350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2882,7 +2901,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("82_3rryt")
 
-[node name="GrassChunk_16_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1325386545]
+[node name="GrassChunk_16_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1459321737]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 650, 16.673334, -350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2891,7 +2910,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("83_6c5wf")
 
-[node name="GrassChunk_17_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=960250565]
+[node name="GrassChunk_17_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=665184297]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 750, 3.906505, -350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2900,7 +2919,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("84_l5pmt")
 
-[node name="GrassChunk_18_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1303524942]
+[node name="GrassChunk_18_6" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1981916192]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 850, -19.704473, -350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2909,7 +2928,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("105_rukkq")
 
-[node name="GrassChunk_1_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1071297631]
+[node name="GrassChunk_1_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=791569335]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -850, 14.762889, -250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2918,7 +2937,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("85_8j87j")
 
-[node name="GrassChunk_2_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2045699328]
+[node name="GrassChunk_2_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1167785312]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -750, 4.489804, -250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2927,7 +2946,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("67_i4bkm")
 
-[node name="GrassChunk_3_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=644033098]
+[node name="GrassChunk_3_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=558262785]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -650, -1.5817803, -250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2936,7 +2955,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("68_mtjok")
 
-[node name="GrassChunk_4_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1564204754]
+[node name="GrassChunk_4_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=72729268]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -550, 7.5998864, -250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2945,7 +2964,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("69_xn04f")
 
-[node name="GrassChunk_5_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1261627009]
+[node name="GrassChunk_5_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=80347501]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -450, 11.580189, -250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2954,7 +2973,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("70_06786")
 
-[node name="GrassChunk_6_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=520789863]
+[node name="GrassChunk_6_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1396173970]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -350, -8.833208, -250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2963,7 +2982,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("71_8rb74")
 
-[node name="GrassChunk_7_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=90057818]
+[node name="GrassChunk_7_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=268318266]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -250, -9.275736, -250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2972,7 +2991,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("72_wm30p")
 
-[node name="GrassChunk_8_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=682569285]
+[node name="GrassChunk_8_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1645828199]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150, -22.103584, -250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2981,7 +3000,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("92_h782c")
 
-[node name="GrassChunk_9_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1613023645]
+[node name="GrassChunk_9_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1288933414]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, 8.0762205, -250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2990,7 +3009,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("93_j82va")
 
-[node name="GrassChunk_10_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1240372762]
+[node name="GrassChunk_10_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1682653298]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, -17.408716, -250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -2999,7 +3018,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("94_oaaeu")
 
-[node name="GrassChunk_11_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=514276131]
+[node name="GrassChunk_11_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1393637827]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, 11.195775, -250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3008,7 +3027,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("95_qxpn6")
 
-[node name="GrassChunk_12_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1555096637]
+[node name="GrassChunk_12_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1310296691]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 250, -2.690355, -250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3017,7 +3036,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("96_4dj6u")
 
-[node name="GrassChunk_13_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1657058152]
+[node name="GrassChunk_13_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=311065192]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 350, 10.119264, -250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3026,7 +3045,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("97_monp6")
 
-[node name="GrassChunk_14_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1491657356]
+[node name="GrassChunk_14_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=956927602]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 450, -2.7865722, -250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3035,7 +3054,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("98_2xqve")
 
-[node name="GrassChunk_15_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=656227746]
+[node name="GrassChunk_15_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=288377711]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 550, -15.613455, -250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3044,7 +3063,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("99_hmoc4")
 
-[node name="GrassChunk_16_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1168105237]
+[node name="GrassChunk_16_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1480042386]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 650, 1.7469491, -250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3053,7 +3072,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("100_5pslb")
 
-[node name="GrassChunk_17_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=967463161]
+[node name="GrassChunk_17_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=722663793]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 750, 8.995643, -250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3062,7 +3081,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("101_1oa1o")
 
-[node name="GrassChunk_18_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1102763670]
+[node name="GrassChunk_18_7" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=811638211]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 850, 0.54626346, -250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3071,7 +3090,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("102_bthbu")
 
-[node name="GrassChunk_0_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2003158092]
+[node name="GrassChunk_0_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1289168293]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -950, -29.854439, -150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3080,7 +3099,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("124_oyaqr")
 
-[node name="GrassChunk_1_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=62989006]
+[node name="GrassChunk_1_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=254140806]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -850, -4.389197, -150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3089,7 +3108,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("103_qt1ku")
 
-[node name="GrassChunk_2_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=223239161]
+[node name="GrassChunk_2_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=295892993]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -750, -7.354489, -150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3098,7 +3117,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("104_j67qc")
 
-[node name="GrassChunk_3_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=689146445]
+[node name="GrassChunk_3_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=366847214]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -650, -7.5823455, -150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3107,7 +3126,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("73_fpp7p")
 
-[node name="GrassChunk_4_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1618507514]
+[node name="GrassChunk_4_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1612211702]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -550, -6.3123946, -150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3116,7 +3135,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("74_cwvwe")
 
-[node name="GrassChunk_5_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1091604410]
+[node name="GrassChunk_5_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=20679402]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -450, 0.03341117, -150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3125,7 +3144,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("75_5tnqe")
 
-[node name="GrassChunk_6_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=52768643]
+[node name="GrassChunk_6_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=141735394]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -350, -1.8720002, -150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3134,7 +3153,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("76_2s7yw")
 
-[node name="GrassChunk_7_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=337437231]
+[node name="GrassChunk_7_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1157707761]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -250, -3.2241564, -150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3143,7 +3162,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("109_ptygx")
 
-[node name="GrassChunk_8_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=64025360]
+[node name="GrassChunk_8_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=96937207]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150, 12.548567, -150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3152,7 +3171,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("110_06ow3")
 
-[node name="GrassChunk_9_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=580165460]
+[node name="GrassChunk_9_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1662629705]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, -18.35621, -150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3161,7 +3180,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("111_rukkq")
 
-[node name="GrassChunk_10_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1751092923]
+[node name="GrassChunk_10_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=176689978]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 5.630669, -150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3170,7 +3189,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("112_oyaqr")
 
-[node name="GrassChunk_11_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1184991775]
+[node name="GrassChunk_11_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=798087363]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, 19.07614, -150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3179,7 +3198,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("113_fp8vp")
 
-[node name="GrassChunk_12_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=865134747]
+[node name="GrassChunk_12_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=491225837]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 250, -12.154845, -150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3188,7 +3207,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("114_hgc74")
 
-[node name="GrassChunk_13_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=757972198]
+[node name="GrassChunk_13_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1913949617]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 350, 1.4119416, -150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3197,7 +3216,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("115_ecd3y")
 
-[node name="GrassChunk_14_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=324042428]
+[node name="GrassChunk_14_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1803526841]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 450, -15.093303, -150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3206,7 +3225,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("116_ianfe")
 
-[node name="GrassChunk_15_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1155572387]
+[node name="GrassChunk_15_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=749146566]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 550, 12.512451, -150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3215,7 +3234,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("117_gefuv")
 
-[node name="GrassChunk_16_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1960739916]
+[node name="GrassChunk_16_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=582397397]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 650, 5.4648027, -150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3224,7 +3243,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("118_65ujk")
 
-[node name="GrassChunk_17_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1688724067]
+[node name="GrassChunk_17_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1003594196]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 750, -12.121185, -150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3233,7 +3252,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("119_4iu63")
 
-[node name="GrassChunk_18_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=89489129]
+[node name="GrassChunk_18_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1913148914]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 850, -21.37873, -150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3242,7 +3261,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("120_22o5o")
 
-[node name="GrassChunk_19_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2014547197]
+[node name="GrassChunk_19_8" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=584611864]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 950, -38.250443, -150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3251,7 +3270,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("143_fp8vp")
 
-[node name="GrassChunk_0_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=69511071]
+[node name="GrassChunk_0_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1871387927]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -950, -34.62346, -50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3260,7 +3279,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("144_hgc74")
 
-[node name="GrassChunk_1_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1831208361]
+[node name="GrassChunk_1_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1375757172]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -850, -14.797582, -50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3269,7 +3288,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("121_e2157")
 
-[node name="GrassChunk_2_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1456707865]
+[node name="GrassChunk_2_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1621440827]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -750, 8.722899, -50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3278,7 +3297,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("122_ho1xc")
 
-[node name="GrassChunk_3_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1110704557]
+[node name="GrassChunk_3_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=311500620]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -650, 2.1933308, -50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3287,7 +3306,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("123_sghpl")
 
-[node name="GrassChunk_4_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=958261520]
+[node name="GrassChunk_4_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1544474312]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -550, -12.167326, -50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3296,7 +3315,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("124_00obq")
 
-[node name="GrassChunk_5_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1482042976]
+[node name="GrassChunk_5_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=465490113]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -450, 3.0922785, -50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3305,7 +3324,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("125_6sjmh")
 
-[node name="GrassChunk_6_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1143693456]
+[node name="GrassChunk_6_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=15729080]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -350, 11.588559, -50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3314,7 +3333,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("126_jnwot")
 
-[node name="GrassChunk_7_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=944926043]
+[node name="GrassChunk_7_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=438758006]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -250, -11.581015, -50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3323,7 +3342,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("127_7rdgx")
 
-[node name="GrassChunk_8_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1870517880]
+[node name="GrassChunk_8_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1976155387]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150, 24.676115, -50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3332,7 +3351,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("128_ly0vg")
 
-[node name="GrassChunk_9_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=670440198]
+[node name="GrassChunk_9_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=373290055]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, -17.076508, -50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3341,7 +3360,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("129_akoue")
 
-[node name="GrassChunk_10_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=631561841]
+[node name="GrassChunk_10_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1525033865]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, -10.592045, -50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3350,7 +3369,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("130_3gs50")
 
-[node name="GrassChunk_11_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=888989884]
+[node name="GrassChunk_11_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1718313484]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, 5.9715366, -50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3359,7 +3378,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("131_mj146")
 
-[node name="GrassChunk_12_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1676893115]
+[node name="GrassChunk_12_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1700971692]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 250, 8.787521, -50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3368,7 +3387,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("132_q3ddf")
 
-[node name="GrassChunk_13_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1472027382]
+[node name="GrassChunk_13_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=663528111]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 350, 9.848043, -50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3377,7 +3396,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("133_cpux2")
 
-[node name="GrassChunk_14_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=272274836]
+[node name="GrassChunk_14_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=117890908]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 450, 17.8363, -50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3386,7 +3405,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("134_qf03a")
 
-[node name="GrassChunk_15_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1964810700]
+[node name="GrassChunk_15_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=297277950]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 550, 4.408823, -50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3395,7 +3414,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("135_e6ruf")
 
-[node name="GrassChunk_16_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1986176417]
+[node name="GrassChunk_16_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1424029260]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 650, -11.370244, -50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3404,7 +3423,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("136_bh45d")
 
-[node name="GrassChunk_17_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=858277071]
+[node name="GrassChunk_17_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=74261417]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 750, 2.1539066, -50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3413,7 +3432,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("137_5yph5")
 
-[node name="GrassChunk_18_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=401736813]
+[node name="GrassChunk_18_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=961891524]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 850, -10.008921, -50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3422,7 +3441,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("138_fn1es")
 
-[node name="GrassChunk_19_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=140672942]
+[node name="GrassChunk_19_9" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1052143079]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 950, -34.013577, -50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3431,7 +3450,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("163_ecd3y")
 
-[node name="GrassChunk_0_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=554885048]
+[node name="GrassChunk_0_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=305675977]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -950, -26.753218, 50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3440,7 +3459,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("164_ianfe")
 
-[node name="GrassChunk_1_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2020779328]
+[node name="GrassChunk_1_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=27594849]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -850, 2.2683527, 50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3449,7 +3468,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("139_7hb5x")
 
-[node name="GrassChunk_2_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1242528326]
+[node name="GrassChunk_2_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1462265726]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -750, -9.584493, 50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3458,7 +3477,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("140_e2ekl")
 
-[node name="GrassChunk_3_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=442631320]
+[node name="GrassChunk_3_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1713079619]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -650, 14.181176, 50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3467,7 +3486,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("141_hikbm")
 
-[node name="GrassChunk_4_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=727971284]
+[node name="GrassChunk_4_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1486994993]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -550, -3.5465357, 50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3476,7 +3495,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("142_84fa2")
 
-[node name="GrassChunk_5_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=371459567]
+[node name="GrassChunk_5_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1188589309]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -450, -12.094239, 50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3485,7 +3504,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("143_m66t4")
 
-[node name="GrassChunk_6_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=833601855]
+[node name="GrassChunk_6_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=153658313]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -350, -0.7443434, 50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3494,7 +3513,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("144_ix5cx")
 
-[node name="GrassChunk_7_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1272909048]
+[node name="GrassChunk_7_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1135125946]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -250, 5.37384, 50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3503,7 +3522,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("145_akibc")
 
-[node name="GrassChunk_8_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1945723506]
+[node name="GrassChunk_8_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2121212263]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150, -8.709124, 50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3512,7 +3531,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("146_ixy6u")
 
-[node name="GrassChunk_9_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1135301684]
+[node name="GrassChunk_9_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1211740795]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, 5.5785217, 50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3521,7 +3540,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("147_olfqj")
 
-[node name="GrassChunk_10_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=556399356]
+[node name="GrassChunk_10_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=238895665]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 9.846081, 50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3530,7 +3549,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("148_aui07")
 
-[node name="GrassChunk_11_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1014720399]
+[node name="GrassChunk_11_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1935199692]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, -15.187373, 50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3539,7 +3558,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("149_620ra")
 
-[node name="GrassChunk_12_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1717422891]
+[node name="GrassChunk_12_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2106030811]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 250, -1.2036729, 50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3548,7 +3567,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("150_u4t1a")
 
-[node name="GrassChunk_13_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1118120399]
+[node name="GrassChunk_13_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1829503149]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 350, -7.215925, 50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3557,7 +3576,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("151_o4k71")
 
-[node name="GrassChunk_14_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=291374381]
+[node name="GrassChunk_14_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1175628798]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 450, 5.937413, 50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3566,7 +3585,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("152_boxeg")
 
-[node name="GrassChunk_15_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1851300174]
+[node name="GrassChunk_15_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=378812731]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 550, 14.724694, 50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3575,7 +3594,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("153_cq21v")
 
-[node name="GrassChunk_16_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=88744580]
+[node name="GrassChunk_16_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1812949556]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 650, -3.4968886, 50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3584,7 +3603,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("154_q8o2t")
 
-[node name="GrassChunk_17_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2106545511]
+[node name="GrassChunk_17_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=487395841]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 750, -0.97225595, 50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3593,7 +3612,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("155_65c6j")
 
-[node name="GrassChunk_18_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=602064047]
+[node name="GrassChunk_18_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1160685992]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 850, 20.005558, 50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3602,7 +3621,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("156_qlh7k")
 
-[node name="GrassChunk_19_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1757847703]
+[node name="GrassChunk_19_10" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=695581461]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 950, -37.44, 50)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3611,7 +3630,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("183_gefuv")
 
-[node name="GrassChunk_0_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=654149131]
+[node name="GrassChunk_0_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=195827863]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -950, -32.555534, 150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3620,7 +3639,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("184_65ujk")
 
-[node name="GrassChunk_1_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=253020626]
+[node name="GrassChunk_1_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1633398515]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -850, 15.421047, 150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3629,7 +3648,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("157_10874")
 
-[node name="GrassChunk_2_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2086295214]
+[node name="GrassChunk_2_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2132909799]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -750, -7.5341964, 150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3638,7 +3657,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("158_yxpoo")
 
-[node name="GrassChunk_3_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1373123969]
+[node name="GrassChunk_3_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=248351189]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -650, 2.3278813, 150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3647,7 +3666,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("159_e0j3b")
 
-[node name="GrassChunk_4_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2022959696]
+[node name="GrassChunk_4_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1081633181]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -550, 1.6702615, 150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3656,7 +3675,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("160_x3xq6")
 
-[node name="GrassChunk_5_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2110294938]
+[node name="GrassChunk_5_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=617989282]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -450, -0.34416562, 150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3665,7 +3684,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("161_gdo1y")
 
-[node name="GrassChunk_6_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=442286757]
+[node name="GrassChunk_6_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=8113277]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -350, 6.6859064, 150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3674,7 +3693,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("162_27sfn")
 
-[node name="GrassChunk_7_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1158584687]
+[node name="GrassChunk_7_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1445815500]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -250, -11.923695, 150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3683,7 +3702,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("163_5ieyw")
 
-[node name="GrassChunk_8_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1372881699]
+[node name="GrassChunk_8_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=211460008]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150, -14.077423, 150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3692,7 +3711,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("164_8su38")
 
-[node name="GrassChunk_9_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=681087795]
+[node name="GrassChunk_9_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=730616911]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, -14.157859, 150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3701,7 +3720,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("165_vgmrc")
 
-[node name="GrassChunk_10_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1231960397]
+[node name="GrassChunk_10_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2052103594]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 0.7665225, 150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3710,7 +3729,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("166_flwq3")
 
-[node name="GrassChunk_11_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1912350912]
+[node name="GrassChunk_11_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1209630515]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, -12.62776, 150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3719,7 +3738,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("167_jl4it")
 
-[node name="GrassChunk_12_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2143104206]
+[node name="GrassChunk_12_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=819492959]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 250, 9.553736, 150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3728,7 +3747,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("168_dp4h6")
 
-[node name="GrassChunk_13_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1933223823]
+[node name="GrassChunk_13_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1975667834]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 350, 0.08124575, 150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3737,7 +3756,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("169_46hvn")
 
-[node name="GrassChunk_14_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2050939778]
+[node name="GrassChunk_14_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1442758372]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 450, -11.6339245, 150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3746,7 +3765,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("170_gs73r")
 
-[node name="GrassChunk_15_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=342288989]
+[node name="GrassChunk_15_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=525007109]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 550, 7.1375685, 150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3755,7 +3774,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("171_ghqi3")
 
-[node name="GrassChunk_16_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=901924941]
+[node name="GrassChunk_16_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1246727939]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 650, 10.1025715, 150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3764,7 +3783,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("172_l574l")
 
-[node name="GrassChunk_17_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=156017518]
+[node name="GrassChunk_17_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1612134590]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 750, -26.242664, 150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3773,7 +3792,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("173_rb6n4")
 
-[node name="GrassChunk_18_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=423595924]
+[node name="GrassChunk_18_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1675314025]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 850, 2.4947565, 150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3782,7 +3801,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("174_7xdpo")
 
-[node name="GrassChunk_19_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1135226031]
+[node name="GrassChunk_19_11" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1869670304]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 950, -39.003426, 150)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3791,7 +3810,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("203_4iu63")
 
-[node name="GrassChunk_1_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1157514466]
+[node name="GrassChunk_1_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=113492207]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -850, 15.966837, 250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3800,7 +3819,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("175_7t1m0")
 
-[node name="GrassChunk_2_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1891914748]
+[node name="GrassChunk_2_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=597055975]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -750, 5.1850243, 250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3809,7 +3828,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("176_xw4st")
 
-[node name="GrassChunk_3_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1128217127]
+[node name="GrassChunk_3_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=101779814]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -650, 3.965476, 250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3818,7 +3837,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("177_sqrkf")
 
-[node name="GrassChunk_4_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=621346943]
+[node name="GrassChunk_4_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2090352350]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -550, -1.1977806, 250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3827,7 +3846,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("178_veirp")
 
-[node name="GrassChunk_5_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1122014873]
+[node name="GrassChunk_5_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=57231981]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -450, 0.14870188, 250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3836,7 +3855,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("179_c2ps5")
 
-[node name="GrassChunk_6_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=818747139]
+[node name="GrassChunk_6_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=657140804]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -350, -4.382795, 250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3845,7 +3864,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("180_uhaya")
 
-[node name="GrassChunk_7_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1317077503]
+[node name="GrassChunk_7_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1766553676]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -250, 4.902529, 250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3854,7 +3873,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("181_23enn")
 
-[node name="GrassChunk_8_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1164070516]
+[node name="GrassChunk_8_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=419967767]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150, -9.109517, 250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3863,7 +3882,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("182_4cow7")
 
-[node name="GrassChunk_9_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1090346617]
+[node name="GrassChunk_9_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=200952976]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, -0.82647437, 250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3872,7 +3891,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("183_s1hk4")
 
-[node name="GrassChunk_10_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1553993460]
+[node name="GrassChunk_10_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1044120412]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 4.3823953, 250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3881,7 +3900,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("184_1yi3i")
 
-[node name="GrassChunk_11_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1069801186]
+[node name="GrassChunk_11_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1188089949]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, 5.4871125, 250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3890,7 +3909,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("185_uh4ns")
 
-[node name="GrassChunk_12_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=66972132]
+[node name="GrassChunk_12_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2085529970]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 250, 9.203575, 250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3899,7 +3918,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("186_73ddq")
 
-[node name="GrassChunk_13_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1943997562]
+[node name="GrassChunk_13_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=460365331]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 350, 1.3235761, 250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3908,7 +3927,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("187_mu687")
 
-[node name="GrassChunk_14_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=125856641]
+[node name="GrassChunk_14_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=922707141]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 450, -1.4275575, 250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3917,7 +3936,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("188_c2t10")
 
-[node name="GrassChunk_15_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=484677843]
+[node name="GrassChunk_15_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=912558445]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 550, -10.5234165, 250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3926,7 +3945,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("189_tifb6")
 
-[node name="GrassChunk_16_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=437012664]
+[node name="GrassChunk_16_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=278140073]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 650, -3.062519, 250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3935,7 +3954,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("190_gerts")
 
-[node name="GrassChunk_17_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=837241895]
+[node name="GrassChunk_17_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=815173687]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 750, -5.5741954, 250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3944,7 +3963,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("191_hm1yl")
 
-[node name="GrassChunk_18_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=935228735]
+[node name="GrassChunk_18_12" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=229581865]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 850, 8.140605, 250)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3953,7 +3972,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("192_6r3ub")
 
-[node name="GrassChunk_1_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1925143513]
+[node name="GrassChunk_1_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=876317921]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -850, -0.28429696, 350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3962,7 +3981,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("222_22o5o")
 
-[node name="GrassChunk_2_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1115903986]
+[node name="GrassChunk_2_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=479144830]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -750, -21.559294, 350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3971,7 +3990,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("193_1rb0x")
 
-[node name="GrassChunk_3_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=642429679]
+[node name="GrassChunk_3_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1164257170]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -650, -3.0295749, 350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3980,7 +3999,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("194_hgpui")
 
-[node name="GrassChunk_4_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=759993053]
+[node name="GrassChunk_4_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=838791649]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -550, -11.281127, 350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3989,7 +4008,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("195_02h46")
 
-[node name="GrassChunk_5_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1110502179]
+[node name="GrassChunk_5_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=51554961]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -450, 0.35929018, 350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -3998,7 +4017,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("196_1scoo")
 
-[node name="GrassChunk_6_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1999195786]
+[node name="GrassChunk_6_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=64813655]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -350, 6.7593718, 350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4007,7 +4026,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("197_hcdbh")
 
-[node name="GrassChunk_7_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1009394817]
+[node name="GrassChunk_7_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1368205535]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -250, 5.053996, 350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4016,7 +4035,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("198_24543")
 
-[node name="GrassChunk_8_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=951147930]
+[node name="GrassChunk_8_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2128490527]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150, -5.8347774, 350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4025,7 +4044,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("199_x2b4i")
 
-[node name="GrassChunk_9_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=834707698]
+[node name="GrassChunk_9_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1963295125]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, -8.810248, 350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4034,7 +4053,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("200_xj77a")
 
-[node name="GrassChunk_10_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1917483056]
+[node name="GrassChunk_10_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1685271526]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 13.650674, 350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4043,7 +4062,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("201_sntd6")
 
-[node name="GrassChunk_11_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1179033849]
+[node name="GrassChunk_11_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=885986350]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, -6.1841817, 350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4052,7 +4071,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("202_q36ue")
 
-[node name="GrassChunk_12_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1951008180]
+[node name="GrassChunk_12_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1288398004]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 250, 10.6798935, 350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4061,7 +4080,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("203_go43x")
 
-[node name="GrassChunk_13_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1310906198]
+[node name="GrassChunk_13_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=658704337]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 350, 20.57224, 350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4070,7 +4089,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("204_x7wcw")
 
-[node name="GrassChunk_14_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=470319487]
+[node name="GrassChunk_14_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1658068645]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 450, 7.8744035, 350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4079,7 +4098,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("205_6nus4")
 
-[node name="GrassChunk_15_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1724901592]
+[node name="GrassChunk_15_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=708372390]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 550, -8.580161, 350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4088,7 +4107,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("206_xpfhn")
 
-[node name="GrassChunk_16_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2138655837]
+[node name="GrassChunk_16_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1648856630]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 650, 1.05837, 350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4097,7 +4116,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("207_dralp")
 
-[node name="GrassChunk_17_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1032985332]
+[node name="GrassChunk_17_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=693869122]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 750, 10.873398, 350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4106,7 +4125,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("208_qqxkl")
 
-[node name="GrassChunk_18_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1519761002]
+[node name="GrassChunk_18_13" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1683345598]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 850, -14.252421, 350)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4115,7 +4134,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("239_e2157")
 
-[node name="GrassChunk_1_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1359628667]
+[node name="GrassChunk_1_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1461594741]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -850, -33.993073, 450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4124,7 +4143,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("240_ho1xc")
 
-[node name="GrassChunk_2_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=768028570]
+[node name="GrassChunk_2_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=391597069]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -750, -3.07938, 450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4133,7 +4152,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("209_c6yf0")
 
-[node name="GrassChunk_3_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1505450747]
+[node name="GrassChunk_3_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=568729545]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -650, -5.9914236, 450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4142,7 +4161,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("210_rrlvi")
 
-[node name="GrassChunk_4_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1942262906]
+[node name="GrassChunk_4_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=777879077]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -550, -5.226729, 450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4151,7 +4170,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("211_42mxo")
 
-[node name="GrassChunk_5_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=252754219]
+[node name="GrassChunk_5_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1380266930]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -450, -6.2253723, 450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4160,7 +4179,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("212_rq7wv")
 
-[node name="GrassChunk_6_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=310932695]
+[node name="GrassChunk_6_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=263116466]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -350, 11.809666, 450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4169,7 +4188,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("213_ut60t")
 
-[node name="GrassChunk_7_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=459592104]
+[node name="GrassChunk_7_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=9397421]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -250, -10.45602, 450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4178,7 +4197,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("214_5e2oo")
 
-[node name="GrassChunk_8_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1841195382]
+[node name="GrassChunk_8_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1400626128]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150, 10.473233, 450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4187,7 +4206,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("215_t4qsh")
 
-[node name="GrassChunk_9_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1213536580]
+[node name="GrassChunk_9_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=605893038]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, 7.3967752, 450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4196,7 +4215,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("216_t05gc")
 
-[node name="GrassChunk_10_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1995362656]
+[node name="GrassChunk_10_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1317681312]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, -8.089679, 450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4205,7 +4224,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("217_qnj6n")
 
-[node name="GrassChunk_11_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=355116541]
+[node name="GrassChunk_11_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=723037980]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, 14.3747425, 450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4214,7 +4233,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("218_2w4nw")
 
-[node name="GrassChunk_12_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1420405599]
+[node name="GrassChunk_12_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1745212028]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 250, 2.6082354, 450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4223,7 +4242,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("219_7jw7r")
 
-[node name="GrassChunk_13_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1435539848]
+[node name="GrassChunk_13_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2114419245]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 350, -3.293911, 450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4232,7 +4251,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("220_03rxu")
 
-[node name="GrassChunk_14_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2134417800]
+[node name="GrassChunk_14_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=604008842]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 450, -12.140583, 450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4241,7 +4260,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("221_pw35b")
 
-[node name="GrassChunk_15_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2038502958]
+[node name="GrassChunk_15_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1518935925]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 550, 8.6216545, 450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4250,7 +4269,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("222_nnka8")
 
-[node name="GrassChunk_16_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=860596190]
+[node name="GrassChunk_16_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1345784751]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 650, -10.508603, 450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4259,7 +4278,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("223_y0a0c")
 
-[node name="GrassChunk_17_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=331359275]
+[node name="GrassChunk_17_14" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=902943247]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 750, -0.74739265, 450)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4268,7 +4287,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("224_56u07")
 
-[node name="GrassChunk_2_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=46270113]
+[node name="GrassChunk_2_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1081138866]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -750, -11.698326, 550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4277,7 +4296,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("257_sghpl")
 
-[node name="GrassChunk_3_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=428153072]
+[node name="GrassChunk_3_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1472202518]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -650, 7.273221, 550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4286,7 +4305,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("225_1k8vm")
 
-[node name="GrassChunk_4_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1704024411]
+[node name="GrassChunk_4_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=518556423]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -550, 9.313139, 550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4295,7 +4314,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("226_ueta1")
 
-[node name="GrassChunk_5_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1705696788]
+[node name="GrassChunk_5_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=272771969]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -450, -13.795809, 550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4304,7 +4323,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("227_whj10")
 
-[node name="GrassChunk_6_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1676603012]
+[node name="GrassChunk_6_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=124261792]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -350, 9.656965, 550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4313,7 +4332,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("228_1mfii")
 
-[node name="GrassChunk_7_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=34817147]
+[node name="GrassChunk_7_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=771363724]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -250, -3.3671303, 550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4322,7 +4341,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("229_arsm8")
 
-[node name="GrassChunk_8_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=521681600]
+[node name="GrassChunk_8_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=421354711]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150, 15.238611, 550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4331,7 +4350,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("230_onap7")
 
-[node name="GrassChunk_9_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=47238916]
+[node name="GrassChunk_9_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=342787449]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, -12.954507, 550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4340,7 +4359,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("231_xjjlo")
 
-[node name="GrassChunk_10_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1106908897]
+[node name="GrassChunk_10_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1951841306]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, -3.3790662, 550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4349,7 +4368,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("232_lvu7o")
 
-[node name="GrassChunk_11_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1882137880]
+[node name="GrassChunk_11_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=784192609]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, 1.7351415, 550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4358,7 +4377,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("233_1uj3p")
 
-[node name="GrassChunk_12_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1855253842]
+[node name="GrassChunk_12_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=369777785]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 250, 7.92645, 550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4367,7 +4386,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("234_gngf8")
 
-[node name="GrassChunk_13_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1999002832]
+[node name="GrassChunk_13_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=660631134]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 350, -16.137613, 550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4376,7 +4395,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("235_1nilw")
 
-[node name="GrassChunk_14_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2119495609]
+[node name="GrassChunk_14_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1097164257]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 450, -1.8821018, 550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4385,7 +4404,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("236_vhtd7")
 
-[node name="GrassChunk_15_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1235097924]
+[node name="GrassChunk_15_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=515524280]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 550, 14.910413, 550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4394,7 +4413,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("237_bkjyi")
 
-[node name="GrassChunk_16_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=89115913]
+[node name="GrassChunk_16_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1730197512]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 650, 0.59439176, 550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4403,7 +4422,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("238_5n8ah")
 
-[node name="GrassChunk_17_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2055032433]
+[node name="GrassChunk_17_15" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1160489616]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 750, -25.173403, 550)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4412,7 +4431,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("272_00obq")
 
-[node name="GrassChunk_2_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=661060080]
+[node name="GrassChunk_2_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=170172973]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -750, -40, 650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4421,7 +4440,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("273_6sjmh")
 
-[node name="GrassChunk_3_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1460527176]
+[node name="GrassChunk_3_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1338186844]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -650, -6.9375443, 650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4430,7 +4449,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("274_jnwot")
 
-[node name="GrassChunk_4_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=288508928]
+[node name="GrassChunk_4_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=956437505]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -550, -1.9149716, 650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4439,7 +4458,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("239_bo3uu")
 
-[node name="GrassChunk_5_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=540588419]
+[node name="GrassChunk_5_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1671529796]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -450, 2.6961222, 650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4448,7 +4467,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("240_m37qr")
 
-[node name="GrassChunk_6_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=774686629]
+[node name="GrassChunk_6_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=599061740]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -350, -8.360519, 650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4457,7 +4476,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("241_3rwa4")
 
-[node name="GrassChunk_7_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=340053234]
+[node name="GrassChunk_7_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1587092973]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -250, -6.95827, 650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4466,7 +4485,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("242_vdnbu")
 
-[node name="GrassChunk_8_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=428192366]
+[node name="GrassChunk_8_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=337003836]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150, 10.215746, 650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4475,7 +4494,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("243_bx4ah")
 
-[node name="GrassChunk_9_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1517895649]
+[node name="GrassChunk_9_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=259412848]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, 6.3877068, 650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4484,7 +4503,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("244_wrhn2")
 
-[node name="GrassChunk_10_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=24829027]
+[node name="GrassChunk_10_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=676084405]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, -7.62156, 650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4493,7 +4512,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("245_8gvv1")
 
-[node name="GrassChunk_11_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2041068442]
+[node name="GrassChunk_11_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1908467889]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, -13.226034, 650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4502,7 +4521,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("246_h3lsw")
 
-[node name="GrassChunk_12_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=483057435]
+[node name="GrassChunk_12_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1205462956]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 250, 13.006685, 650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4511,7 +4530,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("247_pk7oe")
 
-[node name="GrassChunk_13_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2147164939]
+[node name="GrassChunk_13_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1133609532]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 350, -21.646122, 650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4520,7 +4539,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("248_h2txs")
 
-[node name="GrassChunk_14_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=699754114]
+[node name="GrassChunk_14_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1480439]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 450, 0.16844459, 650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4529,7 +4548,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("249_a0jpd")
 
-[node name="GrassChunk_15_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1720369978]
+[node name="GrassChunk_15_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=91968088]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 550, 1.5498958, 650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4538,7 +4557,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("250_exvp7")
 
-[node name="GrassChunk_16_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=998608852]
+[node name="GrassChunk_16_16" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1693287812]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 650, -21.147007, 650)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4547,7 +4566,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("287_7rdgx")
 
-[node name="GrassChunk_4_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=183458775]
+[node name="GrassChunk_4_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1406939378]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -550, -19.205172, 750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4556,7 +4575,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("288_ly0vg")
 
-[node name="GrassChunk_5_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1320661720]
+[node name="GrassChunk_5_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=32316329]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -450, -2.46986, 750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4565,7 +4584,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("251_y5lmj")
 
-[node name="GrassChunk_6_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2033340051]
+[node name="GrassChunk_6_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1544247237]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -350, 6.188807, 750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4574,7 +4593,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("252_l0dgh")
 
-[node name="GrassChunk_7_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1081485441]
+[node name="GrassChunk_7_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1476908325]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -250, 0.37709886, 750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4583,7 +4602,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("253_42b35")
 
-[node name="GrassChunk_8_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1818251070]
+[node name="GrassChunk_8_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2054861677]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150, 11.317877, 750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4592,7 +4611,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("254_xdkqm")
 
-[node name="GrassChunk_9_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2047855635]
+[node name="GrassChunk_9_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1274642879]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, 15.85611, 750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4601,7 +4620,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("255_ge6dp")
 
-[node name="GrassChunk_10_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2113085391]
+[node name="GrassChunk_10_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1531713041]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 8.01655, 750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4610,7 +4629,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("256_do6ap")
 
-[node name="GrassChunk_11_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1142690419]
+[node name="GrassChunk_11_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1677111304]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, 4.8188486, 750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4619,7 +4638,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("257_tqpmk")
 
-[node name="GrassChunk_12_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1799560015]
+[node name="GrassChunk_12_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=238700821]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 250, 9.998745, 750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4628,7 +4647,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("258_42npq")
 
-[node name="GrassChunk_13_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=864600580]
+[node name="GrassChunk_13_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2014590887]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 350, 3.8280616, 750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4637,7 +4656,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("259_wvr3r")
 
-[node name="GrassChunk_14_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=829436444]
+[node name="GrassChunk_14_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=443905356]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 450, -13.847045, 750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4646,7 +4665,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("260_ybp70")
 
-[node name="GrassChunk_15_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=355430468]
+[node name="GrassChunk_15_17" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=833758089]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 550, -32.025864, 750)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4655,7 +4674,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("299_akoue")
 
-[node name="GrassChunk_6_18" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=983655452]
+[node name="GrassChunk_6_18" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=230821973]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -350, -9.620099, 850)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4664,7 +4683,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("300_3gs50")
 
-[node name="GrassChunk_7_18" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1885949388]
+[node name="GrassChunk_7_18" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1719462469]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -250, -2.9391272, 850)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4673,7 +4692,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("261_6ghke")
 
-[node name="GrassChunk_8_18" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1688014230]
+[node name="GrassChunk_8_18" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=304210610]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150, -6.6688156, 850)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4682,7 +4701,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("262_vb0xi")
 
-[node name="GrassChunk_9_18" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=200003483]
+[node name="GrassChunk_9_18" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=970878357]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, -0.1996743, 850)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4691,7 +4710,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("263_n6pde")
 
-[node name="GrassChunk_10_18" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1714316819]
+[node name="GrassChunk_10_18" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1264105425]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 7.7727084, 850)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4700,7 +4719,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("264_ua82n")
 
-[node name="GrassChunk_11_18" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1454262088]
+[node name="GrassChunk_11_18" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1902723658]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, 17.400597, 850)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4709,7 +4728,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("265_i2rr1")
 
-[node name="GrassChunk_12_18" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=549340505]
+[node name="GrassChunk_12_18" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=362231238]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 250, -5.6274014, 850)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4718,7 +4737,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("266_1t67a")
 
-[node name="GrassChunk_13_18" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=2043543172]
+[node name="GrassChunk_13_18" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1411677081]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 350, -19.07518, 850)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4727,7 +4746,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("307_mj146")
 
-[node name="GrassChunk_14_18" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=643606399]
+[node name="GrassChunk_14_18" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1938018669]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 450, -38.440617, 850)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4736,7 +4755,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("308_q3ddf")
 
-[node name="GrassChunk_8_19" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=346998039]
+[node name="GrassChunk_8_19" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=699482226]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150, -37.812103, 950)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4745,7 +4764,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("309_cpux2")
 
-[node name="GrassChunk_9_19" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1929546811]
+[node name="GrassChunk_9_19" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1173151644]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, -34.067753, 950)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4754,7 +4773,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("310_qf03a")
 
-[node name="GrassChunk_10_19" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=63116987]
+[node name="GrassChunk_10_19" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1807372907]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, -35.63315, 950)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4763,7 +4782,7 @@ visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("311_e6ruf")
 
-[node name="GrassChunk_11_19" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1239540388]
+[node name="GrassChunk_11_19" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=319372108]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, -37.688774, 950)
 material_override = ExtResource("20_mdb06")
 cast_shadow = 0
@@ -4771,15 +4790,6 @@ visibility_range_end = 300.0
 visibility_range_end_margin = 50.0
 visibility_range_fade_mode = 1
 multimesh = ExtResource("312_bh45d")
-
-[node name="GrassChunk_12_19" type="MultiMeshInstance3D" parent="TerrainGenerator/GrassContainer" unique_id=1020950607]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 250, -40, 950)
-material_override = ExtResource("20_mdb06")
-cast_shadow = 0
-visibility_range_end = 300.0
-visibility_range_end_margin = 50.0
-visibility_range_fade_mode = 1
-multimesh = ExtResource("313_5yph5")
 
 [node name="TrackPath" type="Path3D" parent="." unique_id=1030670243]
 curve = SubResource("Curve3D_track")
@@ -5037,8 +5047,8 @@ transform = Transform3D(7, 0, 0, 0, 7, 0, 0, 0, 7, 7.32629, 0.61939895, 103.8422
 [node name="04bb4902dedc0aa27913075b8fcd3d6b" parent="." unique_id=1361610939 groups=["collision_capsule"] instance=ExtResource("103_3ll0q")]
 transform = Transform3D(5.7512646, 0, -3.9903572, 0, 7, 0, 3.9903572, 0, 5.7512646, 29.53201, 0.024594069, 84.78279)
 
-[node name="23c38776dfac266dfa5dd2b6ac787812" parent="." unique_id=1815157679 groups=["collision_trimesh"] instance=ExtResource("104_3ll0q")]
-transform = Transform3D(3.0867014, -1.424997, 24.767752, 10.619172, 22.632553, -0.02127445, -22.421091, 10.523151, 3.3996925, 297.30203, 6.054257, -333.9975)
+[node name="WoodenCart" parent="." unique_id=1815157679 groups=["collision_trimesh"] instance=ExtResource("104_3ll0q")]
+transform = Transform3D(-17.195618, 3.0509121, 17.888609, 9.864157, 22.256815, 5.68612, -15.23183, 10.969302, -16.512587, 274.95892, 2.2898998, -380.07974)
 
 [editable path="LevelDesign/Trees/Pine"]
 [editable path="LevelDesign/Trees/Pine2"]

@@ -2,28 +2,11 @@ extends Control
 
 signal back_pressed
 
-@onready var check_fps = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/FPSBox/CheckFPS
-@onready var option_window_mode = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/WindowModeBox/OptionWindowMode
-@onready var option_resolution = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/ResolutionBox/OptionResolution
-@onready var check_vsync = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/VSyncBox/CheckVSync
-@onready var option_anti_aliasing = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings/AntiAliasingBox/OptionAntiAliasing
-@onready var video_settings = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn/VideoSettings
+const COL_TEAL := Color(0.15, 0.75, 0.92)
+const COL_ORANGE := Color(1.0, 0.55, 0.16)
+const COL_GOLD := Color(1.0, 0.78, 0.22)
 
-@onready var btn_back = $Panel/MarginContainer/VBoxContainer/BtnBack
-
-var is_waiting_for_key: bool = false
-var waiting_action: String = ""
-
-var p1_buttons = {}
-var p2_buttons = {}
-
-var option_shadows: OptionButton
-var option_render_scale: OptionButton
-var option_anisotropic: OptionButton
-var option_max_fps: OptionButton
-var option_camera_mode: OptionButton
-
-const ACTION_LABELS = {
+const ACTION_LABELS := {
 	"throttle": "Throttle / Forward",
 	"brake": "Brake / Reverse",
 	"steer_left": "Steer Left",
@@ -34,259 +17,569 @@ const ACTION_LABELS = {
 	"toggle_camera": "Change Camera"
 }
 
-func _ready():
+const CATEGORIES := [
+	{"id": "graphics", "label": "GRAPHICS"},
+	{"id": "sound", "label": "SOUND"},
+	{"id": "input", "label": "INPUT"},
+	{"id": "gameplay", "label": "GAMEPLAY"},
+]
+
+@onready var btn_back: Button = $Root/VBox/Header/BtnBack
+@onready var category_list: VBoxContainer = $Root/VBox/Body/CategoryList
+@onready var pages_host: Control = $Root/VBox/Body/ContentPanel/ContentMargin/Pages
+
+var category_buttons: Dictionary = {}
+var pages: Dictionary = {}
+var current_category: String = "graphics"
+
+var check_fps: CheckButton
+var option_window_mode: OptionButton
+var option_resolution: OptionButton
+var check_vsync: CheckButton
+var option_anti_aliasing: OptionButton
+var option_shadows: OptionButton
+var option_render_scale: OptionButton
+var option_anisotropic: OptionButton
+var option_max_fps: OptionButton
+var option_camera_mode: OptionButton
+var slider_music: HSlider
+var slider_sfx: HSlider
+var label_music_value: Label
+var label_sfx_value: Label
+var remap_banner: Label
+
+var is_waiting_for_key: bool = false
+var waiting_action: String = ""
+var p1_buttons: Dictionary = {}
+var p2_buttons: Dictionary = {}
+
+
+func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	
-	# Configure option window mode items
-	option_window_mode.clear()
+	_style_content_panel()
+	_style_back_button()
+	_build_category_nav()
+	_build_pages()
+	_load_values_from_manager()
+	_connect_setting_signals()
+	btn_back.pressed.connect(_on_back_pressed)
+	visibility_changed.connect(_on_visibility_changed)
+	_show_category("graphics")
+
+
+func _on_visibility_changed() -> void:
+	if visible:
+		is_waiting_for_key = false
+		_load_values_from_manager()
+		update_keybind_buttons()
+		if remap_banner:
+			remap_banner.visible = false
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not visible:
+		return
+	if event.is_action_pressed("ui_cancel"):
+		if is_waiting_for_key:
+			is_waiting_for_key = false
+			update_keybind_buttons()
+			if remap_banner:
+				remap_banner.visible = false
+		else:
+			_on_back_pressed()
+		get_viewport().set_input_as_handled()
+
+
+func _style_content_panel() -> void:
+	var panel: PanelContainer = $Root/VBox/Body/ContentPanel
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.09, 0.1, 0.14, 0.96)
+	sb.set_corner_radius_all(14)
+	sb.set_border_width_all(2)
+	sb.border_color = Color(0.2, 0.24, 0.32, 1)
+	panel.add_theme_stylebox_override("panel", sb)
+
+
+func _style_back_button() -> void:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.12, 0.14, 0.2, 1)
+	sb.set_corner_radius_all(8)
+	sb.set_border_width_all(2)
+	sb.border_color = Color(0.28, 0.34, 0.44, 1)
+	var hover: StyleBoxFlat = sb.duplicate() as StyleBoxFlat
+	hover.border_color = COL_GOLD
+	hover.bg_color = Color(0.16, 0.2, 0.28, 1)
+	btn_back.add_theme_stylebox_override("normal", sb)
+	btn_back.add_theme_stylebox_override("hover", hover)
+	btn_back.add_theme_stylebox_override("pressed", hover)
+	btn_back.add_theme_stylebox_override("focus", hover)
+
+
+func _build_category_nav() -> void:
+	for cat in CATEGORIES:
+		var btn := Button.new()
+		btn.text = cat["label"]
+		btn.custom_minimum_size = Vector2(0, 56)
+		btn.add_theme_font_size_override("font_size", 20)
+		btn.toggle_mode = true
+		btn.focus_mode = Control.FOCUS_ALL
+		_style_category_button(btn, false)
+		var cat_id: String = cat["id"]
+		btn.pressed.connect(_show_category.bind(cat_id))
+		category_list.add_child(btn)
+		category_buttons[cat_id] = btn
+
+
+func _style_category_button(btn: Button, selected: bool) -> void:
+	var sb := StyleBoxFlat.new()
+	sb.set_corner_radius_all(10)
+	sb.set_border_width_all(2)
+	if selected:
+		sb.bg_color = Color(0.16, 0.22, 0.3, 1)
+		sb.border_color = COL_GOLD
+	else:
+		sb.bg_color = Color(0.1, 0.11, 0.16, 1)
+		sb.border_color = Color(0.22, 0.26, 0.34, 1)
+	var hover: StyleBoxFlat = sb.duplicate() as StyleBoxFlat
+	hover.border_color = COL_TEAL
+	btn.add_theme_stylebox_override("normal", sb)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_stylebox_override("pressed", sb)
+	btn.add_theme_stylebox_override("focus", hover)
+	btn.add_theme_color_override("font_color", Color.WHITE if selected else Color(0.78, 0.82, 0.88))
+
+
+func _show_category(cat_id: String) -> void:
+	if is_waiting_for_key:
+		is_waiting_for_key = false
+		update_keybind_buttons()
+		if remap_banner:
+			remap_banner.visible = false
+	current_category = cat_id
+	for id in category_buttons:
+		var selected: bool = (id == cat_id)
+		category_buttons[id].set_pressed_no_signal(selected)
+		_style_category_button(category_buttons[id], selected)
+	for id in pages:
+		pages[id].visible = (id == cat_id)
+
+
+func _build_pages() -> void:
+	pages["graphics"] = _build_graphics_page()
+	pages["sound"] = _build_sound_page()
+	pages["input"] = _build_input_page()
+	pages["gameplay"] = _build_gameplay_page()
+	for id in pages:
+		var page: Control = pages[id]
+		page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		page.visible = false
+		pages_host.add_child(page)
+
+
+func _make_scroll_page() -> ScrollContainer:
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	return scroll
+
+
+func _make_page_body(scroll: ScrollContainer) -> VBoxContainer:
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 14)
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(body)
+	return body
+
+
+func _add_section_title(parent: Control, text: String, color: Color = COL_TEAL) -> void:
+	var lbl := Label.new()
+	lbl.text = text
+	lbl.add_theme_color_override("font_color", color)
+	lbl.add_theme_font_size_override("font_size", 20)
+	parent.add_child(lbl)
+
+
+func _add_hint(parent: Control, text: String) -> Label:
+	var lbl := Label.new()
+	lbl.text = text
+	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lbl.add_theme_color_override("font_color", Color(0.68, 0.72, 0.8, 1))
+	lbl.add_theme_font_size_override("font_size", 15)
+	parent.add_child(lbl)
+	return lbl
+
+
+func _add_check_row(parent: Control, label_text: String) -> CheckButton:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	parent.add_child(row)
+	var lbl := Label.new()
+	lbl.text = label_text
+	lbl.custom_minimum_size = Vector2(240, 0)
+	lbl.add_theme_font_size_override("font_size", 18)
+	row.add_child(lbl)
+	var check := CheckButton.new()
+	row.add_child(check)
+	return check
+
+
+func _add_option_row(parent: Control, label_text: String) -> OptionButton:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	parent.add_child(row)
+	var lbl := Label.new()
+	lbl.text = label_text
+	lbl.custom_minimum_size = Vector2(240, 0)
+	lbl.add_theme_font_size_override("font_size", 18)
+	row.add_child(lbl)
+	var opt := OptionButton.new()
+	opt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	opt.custom_minimum_size = Vector2(0, 40)
+	opt.add_theme_font_size_override("font_size", 16)
+	row.add_child(opt)
+	return opt
+
+
+func _add_slider_row(parent: Control, label_text: String) -> Array:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	parent.add_child(row)
+	var lbl := Label.new()
+	lbl.text = label_text
+	lbl.custom_minimum_size = Vector2(240, 0)
+	lbl.add_theme_font_size_override("font_size", 18)
+	row.add_child(lbl)
+	var slider := HSlider.new()
+	slider.min_value = 0.0
+	slider.max_value = 1.0
+	slider.step = 0.01
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	slider.custom_minimum_size = Vector2(200, 28)
+	row.add_child(slider)
+	var value_lbl := Label.new()
+	value_lbl.custom_minimum_size = Vector2(56, 0)
+	value_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	value_lbl.add_theme_font_size_override("font_size", 16)
+	row.add_child(value_lbl)
+	return [slider, value_lbl]
+
+
+func _build_graphics_page() -> Control:
+	var scroll := _make_scroll_page()
+	var body := _make_page_body(scroll)
+
+	_add_section_title(body, "DISPLAY")
+	option_window_mode = _add_option_row(body, "Window Mode")
 	option_window_mode.add_item("Windowed")
 	option_window_mode.add_item("Fullscreen")
-	
-	# Configure option resolution items
-	option_resolution.clear()
+	option_resolution = _add_option_row(body, "Resolution")
 	option_resolution.add_item("1280 x 720 (720p)")
 	option_resolution.add_item("1920 x 1080 (1080p)")
 	option_resolution.add_item("2560 x 1440 (2K)")
 	option_resolution.add_item("3840 x 2160 (4K)")
-	
-	# Configure option anti-aliasing items
-	option_anti_aliasing.clear()
+	check_vsync = _add_check_row(body, "VSync")
+	option_max_fps = _add_option_row(body, "Max FPS")
+	option_max_fps.add_item("30")
+	option_max_fps.add_item("60")
+	option_max_fps.add_item("120")
+	option_max_fps.add_item("Unlimited")
+	check_fps = _add_check_row(body, "Show FPS Counter")
+
+	body.add_child(HSeparator.new())
+	_add_section_title(body, "QUALITY")
+	option_render_scale = _add_option_row(body, "3D Quality")
+	option_render_scale.add_item("Low (50%)")
+	option_render_scale.add_item("Medium (75%)")
+	option_render_scale.add_item("High (100%)")
+	option_render_scale.add_item("Ultra (125%)")
+	option_shadows = _add_option_row(body, "Shadows")
+	option_shadows.add_item("Off")
+	option_shadows.add_item("Low")
+	option_shadows.add_item("Medium")
+	option_shadows.add_item("High")
+	option_anti_aliasing = _add_option_row(body, "Anti-Aliasing")
 	option_anti_aliasing.add_item("Disabled")
 	option_anti_aliasing.add_item("2x MSAA")
 	option_anti_aliasing.add_item("4x MSAA")
 	option_anti_aliasing.add_item("8x MSAA")
 	option_anti_aliasing.add_item("FXAA")
-	
-	_build_graphics_options()
-	
-	# Load current display values from MusicManager
-	check_fps.button_pressed = MusicManager.show_fps
-	option_window_mode.selected = MusicManager.window_mode
-	option_resolution.selected = MusicManager.resolution_index
-	check_vsync.button_pressed = MusicManager.vsync
-	option_anti_aliasing.selected = MusicManager.anti_aliasing
-	option_shadows.selected = MusicManager.shadow_quality_index
-	option_render_scale.selected = MusicManager.render_scale_index
-	option_anisotropic.selected = MusicManager.anisotropic_index
-	option_max_fps.selected = MusicManager.max_fps_index
-	option_camera_mode.selected = 0 if MusicManager.use_isometric_camera else 1
-	
-	# Connect signals
-	check_fps.toggled.connect(_on_fps_toggled)
-	option_window_mode.item_selected.connect(_on_window_mode_selected)
-	option_resolution.item_selected.connect(_on_resolution_selected)
-	check_vsync.toggled.connect(_on_vsync_toggled)
-	option_anti_aliasing.item_selected.connect(_on_anti_aliasing_selected)
-	option_shadows.item_selected.connect(_on_shadow_quality_selected)
-	option_render_scale.item_selected.connect(_on_render_scale_selected)
-	option_anisotropic.item_selected.connect(_on_anisotropic_selected)
-	option_max_fps.item_selected.connect(_on_max_fps_selected)
-	option_camera_mode.item_selected.connect(_on_camera_mode_selected)
-	btn_back.pressed.connect(_on_back_pressed)
-	
-	_build_input_ui()
-	update_keybind_buttons()
-
-func _build_graphics_options():
-	# Extra graphics rows under existing Video settings (runtime-built for easy edits)
-	option_shadows = _add_option_row(video_settings, "Shadows")
-	option_shadows.clear()
-	option_shadows.add_item("Off")
-	option_shadows.add_item("Low")
-	option_shadows.add_item("Medium")
-	option_shadows.add_item("High")
-	
-	option_render_scale = _add_option_row(video_settings, "3D Quality")
-	option_render_scale.clear()
-	option_render_scale.add_item("Low (50%)")
-	option_render_scale.add_item("Medium (75%)")
-	option_render_scale.add_item("High (100%)")
-	option_render_scale.add_item("Ultra (125%)")
-	
-	option_anisotropic = _add_option_row(video_settings, "Anisotropic Filter")
-	option_anisotropic.clear()
+	option_anisotropic = _add_option_row(body, "Anisotropic Filter")
 	option_anisotropic.add_item("Off")
 	option_anisotropic.add_item("2x")
 	option_anisotropic.add_item("4x")
 	option_anisotropic.add_item("8x")
 	option_anisotropic.add_item("16x")
-	
-	option_max_fps = _add_option_row(video_settings, "Max FPS")
-	option_max_fps.clear()
-	option_max_fps.add_item("30")
-	option_max_fps.add_item("60")
-	option_max_fps.add_item("120")
-	option_max_fps.add_item("Unlimited")
+	return scroll
 
-	option_camera_mode = _add_option_row(video_settings, "Race Camera")
-	option_camera_mode.clear()
+
+func _build_sound_page() -> Control:
+	var scroll := _make_scroll_page()
+	var body := _make_page_body(scroll)
+	_add_section_title(body, "VOLUME")
+	_add_hint(body, "Music is the race playlist. Sound effects are engines, items, and collisions.")
+	var music_row: Array = _add_slider_row(body, "Music Volume")
+	slider_music = music_row[0] as HSlider
+	label_music_value = music_row[1] as Label
+	var sfx_row: Array = _add_slider_row(body, "Sound Effects")
+	slider_sfx = sfx_row[0] as HSlider
+	label_sfx_value = sfx_row[1] as Label
+	return scroll
+
+
+func _build_gameplay_page() -> Control:
+	var scroll := _make_scroll_page()
+	var body := _make_page_body(scroll)
+	_add_section_title(body, "CAMERA")
+	_add_hint(body, "Isometric is the classic top-down view. Follower sits behind the cart.")
+	option_camera_mode = _add_option_row(body, "Race Camera")
 	option_camera_mode.add_item("Isometric")
 	option_camera_mode.add_item("Follower")
+	return scroll
 
-func _add_check_row(parent: Control, label_text: String, pressed: bool) -> CheckButton:
-	var row = HBoxContainer.new()
-	parent.add_child(row)
-	var lbl = Label.new()
-	lbl.text = label_text
-	lbl.custom_minimum_size = Vector2(160, 0)
-	row.add_child(lbl)
-	var check = CheckButton.new()
-	check.button_pressed = pressed
-	row.add_child(check)
-	return check
 
-func _add_option_row(parent: Control, label_text: String) -> OptionButton:
-	var row = HBoxContainer.new()
-	parent.add_child(row)
-	var lbl = Label.new()
-	lbl.text = label_text
-	lbl.custom_minimum_size = Vector2(160, 0)
-	row.add_child(lbl)
-	var opt = OptionButton.new()
-	opt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(opt)
-	return opt
+func _build_input_page() -> Control:
+	var scroll := _make_scroll_page()
+	var body := _make_page_body(scroll)
+	body.add_theme_constant_override("separation", 16)
 
-func _build_input_ui():
-	# Hide old keyboard controls from LeftColumn
-	var controls_label = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn.get_node_or_null("ControlsLabel")
-	if controls_label: controls_label.hide()
-	var input_settings = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn.get_node_or_null("InputSettings")
-	if input_settings: input_settings.hide()
-	
-	# Hide old gamepad card from RightColumn
-	var controller_label = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn.get_node_or_null("ControllerLabel")
-	if controller_label: controller_label.hide()
-	var controller_card = $Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn.get_node_or_null("ControllerCard")
-	if controller_card: controller_card.hide()
-	
-	# Create Player 1 controls in LeftColumn
-	var p1_container = VBoxContainer.new()
-	p1_container.name = "P1InputContainer"
-	p1_container.add_theme_constant_override("separation", 8)
-	$Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/LeftColumn.add_child(p1_container)
-	
-	var p1_title = Label.new()
-	p1_title.text = "PLAYER 1 BINDINGS"
-	p1_title.add_theme_color_override("font_color", Color(0, 0.8, 1, 1))
-	p1_title.add_theme_font_size_override("font_size", 18)
-	p1_container.add_child(p1_title)
-	
-	# P1 Default Quick-Map Buttons
-	var p1_quick = HBoxContainer.new()
-	p1_quick.add_theme_constant_override("separation", 10)
-	p1_container.add_child(p1_quick)
-	
-	var p1_btn_kb = Button.new()
-	p1_btn_kb.text = "Set Keyboard Defaults"
-	p1_btn_kb.pressed.connect(func():
-		MusicManager.set_default_keyboard_bindings(1)
+	_add_section_title(body, "CONTROLS", COL_GOLD)
+	_add_hint(body, "Player 1 is used in every mode (single player, splitscreen, and online). Player 2 is only used in splitscreen. Click a binding, then press a key, button, or stick.")
+
+	remap_banner = Label.new()
+	remap_banner.visible = false
+	remap_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	remap_banner.add_theme_font_size_override("font_size", 18)
+	remap_banner.add_theme_color_override("font_color", COL_GOLD)
+	remap_banner.text = "Waiting for input..."
+	body.add_child(remap_banner)
+
+	var cards := HBoxContainer.new()
+	cards.add_theme_constant_override("separation", 22)
+	cards.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cards.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_child(cards)
+
+	var p1_card := _make_player_card(
+		1,
+		"PLAYER 1",
+		"Used in every game mode",
+		"Keyboard default: WASD  •  Boost: Space",
+		COL_TEAL,
+		"p1_",
+		p1_buttons
+	)
+	var p2_card := _make_player_card(
+		2,
+		"PLAYER 2",
+		"Splitscreen only",
+		"Keyboard default: Arrow keys  •  Boost: Numpad 0",
+		COL_ORANGE,
+		"p2_",
+		p2_buttons
+	)
+	cards.add_child(p1_card)
+	cards.add_child(p2_card)
+	return scroll
+
+
+func _make_player_card(player_index: int, title: String, role: String, defaults_hint: String, accent: Color, prefix: String, buttons_map: Dictionary) -> PanelContainer:
+	var card := PanelContainer.new()
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.06, 0.07, 0.1, 1)
+	sb.set_corner_radius_all(12)
+	sb.border_width_left = 6
+	sb.border_width_top = 2
+	sb.border_width_right = 2
+	sb.border_width_bottom = 2
+	sb.border_color = accent
+	card.add_theme_stylebox_override("panel", sb)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 18)
+	margin.add_theme_constant_override("margin_top", 16)
+	margin.add_theme_constant_override("margin_right", 18)
+	margin.add_theme_constant_override("margin_bottom", 16)
+	card.add_child(margin)
+
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 10)
+	margin.add_child(col)
+
+	var header := Label.new()
+	header.text = title
+	header.add_theme_color_override("font_color", accent)
+	header.add_theme_font_size_override("font_size", 24)
+	col.add_child(header)
+
+	var role_lbl := Label.new()
+	role_lbl.text = role
+	role_lbl.add_theme_color_override("font_color", Color(0.9, 0.92, 0.96, 1))
+	role_lbl.add_theme_font_size_override("font_size", 15)
+	col.add_child(role_lbl)
+
+	var hint := Label.new()
+	hint.text = defaults_hint
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.add_theme_color_override("font_color", Color(0.66, 0.7, 0.78, 1))
+	hint.add_theme_font_size_override("font_size", 13)
+	col.add_child(hint)
+
+	var quick := HBoxContainer.new()
+	quick.add_theme_constant_override("separation", 8)
+	col.add_child(quick)
+
+	var btn_kb := Button.new()
+	btn_kb.text = "Keyboard Defaults"
+	btn_kb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn_kb.custom_minimum_size = Vector2(0, 36)
+	btn_kb.pressed.connect(func():
+		MusicManager.set_default_keyboard_bindings(player_index)
 		update_keybind_buttons()
 	)
-	p1_quick.add_child(p1_btn_kb)
-	
-	var p1_btn_gp = Button.new()
-	p1_btn_gp.text = "Set Gamepad Defaults"
-	p1_btn_gp.pressed.connect(func():
-		MusicManager.set_default_controller_bindings(1)
-		update_keybind_buttons()
-	)
-	p1_quick.add_child(p1_btn_gp)
-	
-	_add_action_rows("p1_", p1_container, p1_buttons)
-	
-	# Create Player 2 controls in RightColumn
-	var p2_container = VBoxContainer.new()
-	p2_container.name = "P2InputContainer"
-	p2_container.add_theme_constant_override("separation", 8)
-	$Panel/MarginContainer/VBoxContainer/ScrollContainer/SettingsList/RightColumn.add_child(p2_container)
-	
-	var p2_title = Label.new()
-	p2_title.text = "PLAYER 2 BINDINGS"
-	p2_title.add_theme_color_override("font_color", Color(0, 0.8, 1, 1))
-	p2_title.add_theme_font_size_override("font_size", 18)
-	p2_container.add_child(p2_title)
-	
-	# P2 Default Quick-Map Buttons
-	var p2_quick = HBoxContainer.new()
-	p2_quick.add_theme_constant_override("separation", 10)
-	p2_container.add_child(p2_quick)
-	
-	var p2_btn_kb = Button.new()
-	p2_btn_kb.text = "Set Keyboard Defaults"
-	p2_btn_kb.pressed.connect(func():
-		MusicManager.set_default_keyboard_bindings(2)
-		update_keybind_buttons()
-	)
-	p2_quick.add_child(p2_btn_kb)
-	
-	var p2_btn_gp = Button.new()
-	p2_btn_gp.text = "Set Gamepad Defaults"
-	p2_btn_gp.pressed.connect(func():
-		MusicManager.set_default_controller_bindings(2)
-		update_keybind_buttons()
-	)
-	p2_quick.add_child(p2_btn_gp)
-	
-	_add_action_rows("p2_", p2_container, p2_buttons)
+	quick.add_child(btn_kb)
 
-func _add_action_rows(prefix: String, parent_container: Control, buttons_map: Dictionary):
-	for suffix in ACTION_LABELS:
-		var row = HBoxContainer.new()
+	var btn_gp := Button.new()
+	btn_gp.text = "Gamepad Defaults"
+	btn_gp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn_gp.custom_minimum_size = Vector2(0, 36)
+	btn_gp.pressed.connect(func():
+		MusicManager.set_default_controller_bindings(player_index)
+		update_keybind_buttons()
+	)
+	quick.add_child(btn_gp)
+
+	col.add_child(HSeparator.new())
+
+	for suffix_key in ACTION_LABELS:
+		var suffix: String = String(suffix_key)
+		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
-		parent_container.add_child(row)
-		
-		var lbl = Label.new()
+		col.add_child(row)
+
+		var lbl := Label.new()
 		lbl.text = ACTION_LABELS[suffix]
-		lbl.custom_minimum_size = Vector2(160, 0)
+		lbl.custom_minimum_size = Vector2(170, 0)
 		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		lbl.add_theme_font_size_override("font_size", 15)
 		row.add_child(lbl)
-		
-		var btn = Button.new()
-		btn.custom_minimum_size = Vector2(180, 35)
+
+		var btn := Button.new()
+		btn.custom_minimum_size = Vector2(200, 36)
 		btn.add_theme_font_size_override("font_size", 14)
-		
-		var full_action = prefix + suffix
+		var full_action: String = prefix + suffix
 		btn.pressed.connect(func(): start_remapping(full_action, btn))
-		
 		row.add_child(btn)
 		buttons_map[suffix] = btn
 
-func update_keybind_buttons():
+	return card
+
+
+func _load_values_from_manager() -> void:
+	if check_fps:
+		check_fps.button_pressed = MusicManager.show_fps
+	if option_window_mode:
+		option_window_mode.selected = MusicManager.window_mode
+	if option_resolution:
+		option_resolution.selected = MusicManager.resolution_index
+	if check_vsync:
+		check_vsync.button_pressed = MusicManager.vsync
+	if option_anti_aliasing:
+		option_anti_aliasing.selected = MusicManager.anti_aliasing
+	if option_shadows:
+		option_shadows.selected = MusicManager.shadow_quality_index
+	if option_render_scale:
+		option_render_scale.selected = MusicManager.render_scale_index
+	if option_anisotropic:
+		option_anisotropic.selected = MusicManager.anisotropic_index
+	if option_max_fps:
+		option_max_fps.selected = MusicManager.max_fps_index
+	if option_camera_mode:
+		option_camera_mode.selected = 0 if MusicManager.use_isometric_camera else 1
+	if slider_music:
+		slider_music.value = MusicManager.music_volume
+		_update_volume_label(label_music_value, MusicManager.music_volume)
+	if slider_sfx:
+		slider_sfx.value = MusicManager.sfx_volume
+		_update_volume_label(label_sfx_value, MusicManager.sfx_volume)
+
+
+func _connect_setting_signals() -> void:
+	check_fps.toggled.connect(func(v): MusicManager.set_show_fps(v))
+	option_window_mode.item_selected.connect(func(i): MusicManager.set_window_mode(i))
+	option_resolution.item_selected.connect(func(i): MusicManager.set_resolution(i))
+	check_vsync.toggled.connect(func(v): MusicManager.set_vsync(v))
+	option_anti_aliasing.item_selected.connect(func(i): MusicManager.set_anti_aliasing(i))
+	option_shadows.item_selected.connect(func(i): MusicManager.set_shadow_quality(i))
+	option_render_scale.item_selected.connect(func(i): MusicManager.set_render_scale(i))
+	option_anisotropic.item_selected.connect(func(i): MusicManager.set_anisotropic(i))
+	option_max_fps.item_selected.connect(func(i): MusicManager.set_max_fps(i))
+	option_camera_mode.item_selected.connect(func(i): MusicManager.set_use_isometric_camera(i == 0))
+	slider_music.value_changed.connect(func(v):
+		MusicManager.set_music_volume(v)
+		_update_volume_label(label_music_value, v)
+	)
+	slider_sfx.value_changed.connect(func(v):
+		MusicManager.set_sfx_volume(v)
+		_update_volume_label(label_sfx_value, v)
+	)
+
+
+func _update_volume_label(lbl: Label, value: float) -> void:
+	if lbl:
+		lbl.text = "%d%%" % int(round(value * 100.0))
+
+
+func update_keybind_buttons() -> void:
 	for suffix in p1_buttons:
 		p1_buttons[suffix].text = MusicManager.get_action_friendly_text("p1_" + suffix)
 	for suffix in p2_buttons:
 		p2_buttons[suffix].text = MusicManager.get_action_friendly_text("p2_" + suffix)
 
-func start_remapping(action_name: String, button: Button):
+
+func start_remapping(action_name: String, button: Button) -> void:
 	if is_waiting_for_key:
 		update_keybind_buttons()
-		
 	is_waiting_for_key = true
 	waiting_action = action_name
-	button.text = "[Press Any Key/Button...]"
-	
-	# Release focus so that UI navigation and accept triggers (Space/Enter/Joy A/Dpad)
-	# don't interfere with or double-trigger remapping!
+	button.text = "Press key or button..."
 	button.release_focus()
+	if remap_banner:
+		var player_label := "PLAYER 1" if action_name.begins_with("p1_") else "PLAYER 2"
+		var suffix := action_name.substr(3)
+		var action_label: String = ACTION_LABELS.get(suffix, suffix)
+		remap_banner.text = "Listening for %s  —  %s   (Esc to cancel)" % [player_label, action_label]
+		remap_banner.add_theme_color_override("font_color", COL_TEAL if action_name.begins_with("p1_") else COL_ORANGE)
+		remap_banner.visible = true
+
 
 func _find_button_for_action(action_name: String) -> Button:
-	var suffix = action_name.substr(3) # remove "p1_" or "p2_"
+	var suffix := action_name.substr(3)
 	if action_name.begins_with("p1_"):
 		return p1_buttons.get(suffix, null)
-	else:
-		return p2_buttons.get(suffix, null)
+	return p2_buttons.get(suffix, null)
 
-func _input(event: InputEvent):
-	if not is_waiting_for_key: return
-	
-	var is_valid_input = false
-	var captured_event = null
-	
+
+func _input(event: InputEvent) -> void:
+	if not visible or not is_waiting_for_key:
+		return
+
+	var is_valid_input := false
+	var captured_event: InputEvent = null
+
 	if event is InputEventKey and event.pressed:
-		if event.physical_keycode != KEY_ESCAPE:
-			captured_event = InputEventKey.new()
-			captured_event.physical_keycode = event.physical_keycode if event.physical_keycode != KEY_NONE else event.keycode
+		if event.physical_keycode == KEY_ESCAPE or event.keycode == KEY_ESCAPE:
+			is_waiting_for_key = false
+			update_keybind_buttons()
+			if remap_banner:
+				remap_banner.visible = false
+			get_viewport().set_input_as_handled()
+			return
+		captured_event = InputEventKey.new()
+		captured_event.physical_keycode = event.physical_keycode if event.physical_keycode != KEY_NONE else event.keycode
 		is_valid_input = true
 	elif event is InputEventJoypadButton and event.pressed:
 		captured_event = InputEventJoypadButton.new()
@@ -300,50 +593,23 @@ func _input(event: InputEvent):
 			captured_event.axis = event.axis
 			captured_event.axis_value = 1.0 if event.axis_value > 0 else -1.0
 			is_valid_input = true
-			
+
 	if is_valid_input:
 		is_waiting_for_key = false
 		if captured_event:
 			MusicManager.save_action_event(waiting_action, captured_event)
 		update_keybind_buttons()
+		if remap_banner:
+			remap_banner.visible = false
 		get_viewport().set_input_as_handled()
-		
-		# Restore focus to the button after remapping is complete
-		var btn = _find_button_for_action(waiting_action)
+		var btn := _find_button_for_action(waiting_action)
 		if btn:
 			btn.grab_focus()
 
-func _on_fps_toggled(toggled_val: bool):
-	MusicManager.set_show_fps(toggled_val)
 
-func _on_window_mode_selected(index: int):
-	MusicManager.set_window_mode(index)
-
-func _on_resolution_selected(index: int):
-	MusicManager.set_resolution(index)
-
-func _on_vsync_toggled(toggled_val: bool):
-	MusicManager.set_vsync(toggled_val)
-
-func _on_anti_aliasing_selected(index: int):
-	MusicManager.set_anti_aliasing(index)
-
-func _on_shadow_quality_selected(index: int):
-	MusicManager.set_shadow_quality(index)
-
-func _on_render_scale_selected(index: int):
-	MusicManager.set_render_scale(index)
-
-func _on_anisotropic_selected(index: int):
-	MusicManager.set_anisotropic(index)
-
-func _on_max_fps_selected(index: int):
-	MusicManager.set_max_fps(index)
-
-func _on_camera_mode_selected(index: int):
-	MusicManager.set_use_isometric_camera(index == 0)
-
-func _on_back_pressed():
+func _on_back_pressed() -> void:
 	is_waiting_for_key = false
+	if remap_banner:
+		remap_banner.visible = false
 	back_pressed.emit()
 	hide()

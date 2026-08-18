@@ -1,7 +1,6 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=2 format=3]
 
 [ext_resource type="Script" path="res://MainMenu.gd" id="1_menu"]
-[ext_resource type="Texture2D" path="res://images/Logo_edited.png" id="2_logo"]
 
 [node name="MainMenu" type="Control"]
 layout_mode = 3
@@ -12,51 +11,117 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_menu")
 
-[node name="ColorRect" type="ColorRect" parent="."]
+[node name="Background" type="ColorRect" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.117647, 0.117647, 0.156863, 1)
+color = Color(0.0705882, 0.0745098, 0.105882, 1)
 
-[node name="CenterContainer" type="CenterContainer" parent="."]
+[node name="AccentBar" type="ColorRect" parent="."]
+custom_minimum_size = Vector2(0, 4)
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 4.0
+grow_horizontal = 2
+color = Color(0.15, 0.72, 0.92, 1)
+
+[node name="Root" type="MarginContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/margin_left = 40
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 40
+theme_override_constants/margin_bottom = 18
 
-[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer"]
-custom_minimum_size = Vector2(450, 0)
+[node name="VBox" type="VBoxContainer" parent="Root"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="TopBar" type="HBoxContainer" parent="Root/VBox"]
 layout_mode = 2
 theme_override_constants/separation = 20
 
-[node name="Logo" type="TextureRect" parent="CenterContainer/VBoxContainer"]
-custom_minimum_size = Vector2(0, 300)
+[node name="TitleRow" type="VBoxContainer" parent="Root/VBox/TopBar"]
 layout_mode = 2
-texture = ExtResource("2_logo")
-expand_mode = 1
-stretch_mode = 5
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
 
-[node name="HSeparator" type="HSeparator" parent="CenterContainer/VBoxContainer"]
+[node name="ScreenTitle" type="Label" parent="Root/VBox/TopBar/TitleRow"]
 layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "SELECT MODE"
 
-[node name="ButtonStart" type="Button" parent="CenterContainer/VBoxContainer"]
-custom_minimum_size = Vector2(0, 50)
+[node name="ScreenSubtitle" type="Label" parent="Root/VBox/TopBar/TitleRow"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
-text = "PLAY GAME"
+theme_override_colors/font_color = Color(0.7, 0.76, 0.84, 1)
+theme_override_font_sizes/font_size = 16
+text = "Choose how you want to race"
 
-[node name="ButtonOptions" type="Button" parent="CenterContainer/VBoxContainer"]
-custom_minimum_size = Vector2(0, 50)
+[node name="NameBox" type="VBoxContainer" parent="Root/VBox/TopBar"]
+custom_minimum_size = Vector2(280, 0)
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
-text = "OPTIONS"
+alignment = 1
+theme_override_constants/separation = 4
 
-[node name="ButtonQuit" type="Button" parent="CenterContainer/VBoxContainer"]
+[node name="NameLabel" type="Label" parent="Root/VBox/TopBar/NameBox"]
 layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.78, 0.9, 1)
+theme_override_font_sizes/font_size = 14
+text = "RACER NAME"
+horizontal_alignment = 2
+
+[node name="NameEdit" type="LineEdit" parent="Root/VBox/TopBar/NameBox"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+placeholder_text = "Enter Name..."
+alignment = 1
+max_length = 16
+
+[node name="ExtraRow" type="HBoxContainer" parent="Root/VBox"]
+visible = false
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 12
+
+[node name="TileScroll" type="ScrollContainer" parent="Root/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="TileGrid" type="GridContainer" parent="Root/VBox/TileScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/h_separation = 22
+theme_override_constants/v_separation = 22
+columns = 2
+
+[node name="Footer" type="HBoxContainer" parent="Root/VBox"]
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="BtnBack" type="Button" parent="Root/VBox/Footer"]
+custom_minimum_size = Vector2(180, 48)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "BACK"
+
+[node name="FooterSpacer" type="Control" parent="Root/VBox/Footer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BtnQuit" type="Button" parent="Root/VBox/Footer"]
+custom_minimum_size = Vector2(180, 48)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
 text = "QUIT"
-
