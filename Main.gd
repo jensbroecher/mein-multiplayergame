@@ -54,6 +54,10 @@ func _apply_platform_performance() -> void:
 	Engine.max_physics_steps_per_frame = 4
 
 func _on_menu_start_pressed():
+	if NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR:
+		NetworkManager.start_spectator()
+		await start_game(true)
+		return
 	car_selection.show()
 
 func _on_menu_options_pressed():
@@ -128,7 +132,8 @@ func start_game(is_host: bool):
 					loading_screen.set_status(status)
 				level_scene = load(gp_data["stages"][stage_idx])
 	elif NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL \
-			or NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
+			or NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP \
+			or NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR:
 		if loading_screen:
 			loading_screen.set_status("Loading track")
 		level_scene = load(NetworkManager.time_trial_stage)

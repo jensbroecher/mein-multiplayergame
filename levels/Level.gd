@@ -74,6 +74,7 @@ var spawn_points: Array = []
 var race_ui
 var race_ui_p2  # second HUD for LOCAL_COOP
 var _split_cameras: Array = []  # SubViewport cameras for splitscreen
+var spectator_camera: Node3D = null
 var player_stats = {} # id -> {"laps": 0, "next_checkpoint_idx": 0, "finished": false, "pos": 0}
 var end_timer = 0.0
 
@@ -165,8 +166,24 @@ func _ready():
 	race_ui.ready_pressed.connect(_on_local_ready_pressed)
 	race_ui.start_pressed.connect(_on_host_start_pressed)
 
+	if NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR:
+		_setup_spectator_camera()
+
 	if NetworkManager.current_game_mode != NetworkManager.GameMode.MULTIPLAYER:
 		_run_singleplayer_countdown()
+
+
+func _setup_spectator_camera() -> void:
+	if spectator_camera != null and is_instance_valid(spectator_camera):
+		return
+	spectator_camera = (load("res://SpectatorCamera.gd") as GDScript).new()
+	spectator_camera.name = "SpectatorCamera"
+	spectator_camera.race_ui = race_ui
+	add_child(spectator_camera)
+	if race_ui:
+		var slots = race_ui.get_node_or_null("HUDPanel/ItemSlots")
+		if slots:
+			slots.hide()
 
 func _load_spawn_points():
 	# Read spawn points from the baked scene tree (under FinishLine/SpawnPoints)
@@ -702,6 +719,12 @@ func _update_positions():
 			pos = player_stats[id]["pos"]
 
 		var l = ranking[i]["laps"]
+		if NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR:
+			if spectator_camera and is_instance_valid(spectator_camera.focus_cart):
+				var focus_id: int = str(spectator_camera.focus_cart.name).to_int()
+				if id == focus_id and race_ui:
+					race_ui.update_hud(pos, ranking.size(), mini(l + 1, NetworkManager.max_laps), NetworkManager.max_laps)
+			continue
 		if NetworkManager.players.has(id) and not NetworkManager.players[id].get("is_ai", false):
 			if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
 				# Direct HUD update — no RPC routing needed for local co-op

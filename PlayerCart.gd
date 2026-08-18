@@ -813,16 +813,24 @@ func _process(delta):
 				var focus_cart: Node3D = spectate_target_cart if (spectate_target_cart and is_instance_valid(spectate_target_cart)) else self
 				var focus_pos: Vector3 = focus_cart.global_position
 				
-				var birds_eye_height = 80.0
-				var birds_eye_offset = Vector3(-20.0, birds_eye_height, 35.0)
-				var desired_cam_pos = focus_pos + birds_eye_offset
+				# 3/4 broadcast angle (same as debug SpectatorCamera) — not looking straight down.
+				var desired_cam_pos = focus_pos + Vector3(-42.0, 28.0, 48.0)
 				var target_cam_pos = _raise_point_above_terrain(desired_cam_pos, excludes)
 				
 				# Smoothly glide camera between cars
 				camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 1.8 * delta)
 				camera_pivot.global_position = _raise_point_above_terrain(camera_pivot.global_position, excludes)
 				
-				var target_look = focus_pos + Vector3(0, 0.5, 0)
+				var look_fwd := Vector3.FORWARD
+				var focus_visuals: Node = focus_cart.get_node_or_null("Visuals")
+				if focus_visuals is Node3D:
+					look_fwd = -(focus_visuals as Node3D).global_transform.basis.z
+					look_fwd.y = 0.0
+					if look_fwd.length_squared() > 0.001:
+						look_fwd = look_fwd.normalized()
+					else:
+						look_fwd = Vector3.FORWARD
+				var target_look = focus_pos + look_fwd * 10.0 + Vector3(0, 0.8, 0)
 				camera_look_at = camera_look_at.lerp(target_look, 3.5 * delta)
 				camera_pivot.look_at(camera_look_at, Vector3.UP)
 				
@@ -937,7 +945,7 @@ func _process(delta):
 		# Smoothly lerp camera FOV based on is_isometric, is_finished_race, and is_boosting/is_pad_boosting
 		var target_fov = 75.0
 		if is_finished_race:
-			target_fov = 65.0
+			target_fov = 52.0
 		elif is_isometric:
 			target_fov = 35.0
 		else:

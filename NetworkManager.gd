@@ -22,7 +22,7 @@ var local_p2_car_index: int = 0
 var local_p2_name: String = "Player 2"
 var is_coop_gp: bool = false
 
-enum GameMode { MULTIPLAYER, SINGLE_PLAYER_GP, SINGLE_PLAYER_TIME_TRIAL, LOCAL_COOP }
+enum GameMode { MULTIPLAYER, SINGLE_PLAYER_GP, SINGLE_PLAYER_TIME_TRIAL, LOCAL_COOP, SPECTATOR }
 var current_game_mode: int = GameMode.MULTIPLAYER
 
 var current_gp_name: String = ""
@@ -81,6 +81,22 @@ func start_single_player(player_name: String):
 	players[1] = {"name": player_name, "ready": false, "car_index": local_car_index}
 	LANDiscovery.stop_all()
 	print("NetworkManager: Started single player mode")
+	return OK
+
+func start_spectator() -> int:
+	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
+	players.clear()
+	var bot_names = ["Viper Bot", "Shadow Bot", "Apex Bot", "Blaze Bot", "Nova Bot", "Storm Bot"]
+	var bot_cars = [0, 1, 2, 3, 1, 2]
+	for i in range(6):
+		players[100 + i] = {
+			"name": bot_names[i],
+			"car_index": bot_cars[i],
+			"ready": true,
+			"is_ai": true
+		}
+	LANDiscovery.stop_all()
+	print("NetworkManager: Started spectator debug race")
 	return OK
 
 func start_local_coop(p1_name: String, p2_name: String):

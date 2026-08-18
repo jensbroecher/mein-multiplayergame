@@ -131,6 +131,10 @@ func show_sub_menu(menu_name: String) -> void:
 				show_sub_menu("coop_config")
 			)
 			_add_tile("MULTIPLAYER", "Host or join a LAN race", "tile_multiplayer.jpg", COL_MAGENTA, _on_multiplayer_pressed)
+			_add_tile("SPECTATOR", "Watch 6 AI racers — pick any course", "tile_grand_prix.jpg", COL_CYAN, func():
+				NetworkManager.current_game_mode = NetworkManager.GameMode.SPECTATOR
+				show_sub_menu("stage_select")
+			)
 			_add_tile("OPTIONS", "Graphics, sound, and controls", "tile_options.jpg", COL_GOLD, _on_options_pressed)
 		"sp_modes":
 			screen_title.text = "SINGLE PLAYER"
@@ -160,8 +164,12 @@ func show_sub_menu(menu_name: String) -> void:
 				_on_cup_selected("Desert Cup")
 			)
 		"stage_select":
-			screen_title.text = "SELECT COURSE"
-			screen_subtitle.text = "Pick a track to race"
+			if NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR:
+				screen_title.text = "SPECTATOR"
+				screen_subtitle.text = "Pick a course to watch — 6 AI racers, you stay off the grid"
+			else:
+				screen_title.text = "SELECT COURSE"
+				screen_subtitle.text = "Pick a track to race"
 			tile_grid.columns = 3
 			_add_tile("LAKESIDE COURSE", "Hills, lake, and the long bridge", "tile_lakeside.jpg", COL_LAKE, func():
 				_on_stage_selected("res://levels/Level.tscn")
@@ -219,6 +227,8 @@ func _on_back_pressed() -> void:
 		"stage_select":
 			if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
 				show_sub_menu("coop_config")
+			elif NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR:
+				show_sub_menu("main")
 			else:
 				show_sub_menu("sp_modes")
 		_:
@@ -363,7 +373,8 @@ func _on_multiplayer_pressed() -> void:
 
 
 func _on_stage_selected(stage_path: String) -> void:
-	if NetworkManager.current_game_mode != NetworkManager.GameMode.LOCAL_COOP:
+	if NetworkManager.current_game_mode != NetworkManager.GameMode.LOCAL_COOP \
+			and NetworkManager.current_game_mode != NetworkManager.GameMode.SPECTATOR:
 		NetworkManager.current_game_mode = NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL
 	NetworkManager.time_trial_stage = stage_path
 	start_pressed.emit()
