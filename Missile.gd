@@ -31,6 +31,8 @@ var spawn_safety_timer = 0.05
 var start_position: Vector3 = Vector3.ZERO
 @export var max_range: float = 180.0
 var homing_delay: float = 0.12
+var is_exploding: bool = false
+var has_exploded: bool = false
 
 func _ready():
 	add_to_group("missiles")
@@ -98,6 +100,9 @@ func _find_target():
 	target = best_target
 
 func _physics_process(delta):
+	if is_exploding or has_exploded:
+		return
+
 	# Decrement lifetime on all peers to prevent stuck/phantom projectiles if RPC is lost
 	lifetime -= delta
 	if lifetime <= 0:
@@ -145,6 +150,9 @@ func _physics_process(delta):
 
 
 func _process(delta):
+	if is_exploding or has_exploded:
+		return
+
 	# If we are a client, smoothly interpolate position and rotation to synced values
 	if multiplayer.multiplayer_peer != null and not multiplayer.is_server():
 		# Client-side dead reckoning prediction
@@ -165,6 +173,7 @@ func _process(delta):
 
 
 func _on_body_entered(body):
+	if is_exploding or has_exploded: return
 	if multiplayer.multiplayer_peer != null and not multiplayer.is_server(): return
 	if body.is_in_group("player_carts"):
 		# If it's the shooter, prevent immediate self-detonation for a split second (using spawn_safety_timer)
@@ -175,7 +184,13 @@ func _on_body_entered(body):
 		_explode()
 
 func _explode():
-	if not is_instance_valid(self): return
+	if is_exploding or has_exploded or not is_instance_valid(self): return
+	is_exploding = true
+
+	# Disable collision area immediately
+	if is_instance_valid(area):
+		area.set_deferred("monitoring", false)
+		area.set_deferred("monitorable", false)
 
 	# Server-side blast radius damage logic (similar to Bomb.gd)
 	if multiplayer.multiplayer_peer == null or multiplayer.is_server():
@@ -211,11 +226,24 @@ func _explode():
 
 @rpc("authority", "call_local", "reliable")
 func _explode_rpc():
+	if has_exploded: return
+	has_exploded = true
+	is_exploding = true
+	
 	# Disable collisions immediately on client
 	var area_col = get_node_or_null("Area3D/CollisionShape3D")
-	if area_col: area_col.disabled = true
+	if area_col: area_col.set_deferred("disabled", true)
+	if is_instance_valid(area):
+		area.set_deferred("monitoring", false)
+		area.set_deferred("monitorable", false)
 	
 	var scene_root = get_tree().current_scene
+	if not scene_root:
+		scene_root = get_parent()
+	if not scene_root:
+		queue_free()
+		return
+
 	var expl_pos = global_position
 	
 	# Play a random missile explosion sound
@@ -231,7 +259,7 @@ func _explode_rpc():
 		get_tree().create_timer(sound_stream.get_length() + 0.5).timeout.connect(ap.queue_free)
 
 	# Stop and detach the fire trail so it fades out naturally
-	if is_instance_valid(fire_trail):
+	if is_instance_valid(fire_trail) and fire_trail.get_parent() == self:
 		var trail_pos = fire_trail.global_position
 		remove_child(fire_trail)
 		scene_root.add_child(fire_trail)
@@ -243,7 +271,7 @@ func _explode_rpc():
 
 	# Detach and fire explosion particles so they outlive the missile node
 	for ps in [explosion_particles, smoke_particles, fire_sprite_particles, fire_sprite_particles_2]:
-		if is_instance_valid(ps):
+		if is_instance_valid(ps) and ps.get_parent() == self:
 			var ps_pos = global_position
 			remove_child(ps)
 			scene_root.add_child(ps)

@@ -27,6 +27,7 @@ var pulse_time = 0.0
 var lifetime = 5.0           # Explodes after 5 seconds
 var owner_safety_timer = 1.0 # Owner immune for the first second
 var is_exploding = false
+var has_exploded = false
 
 var fizzle_player: AudioStreamPlayer3D = null
 var spark_particles: CPUParticles3D = null
@@ -211,6 +212,8 @@ func _explode():
 
 @rpc("authority", "call_local", "reliable")
 func _explode_rpc():
+	if has_exploded: return
+	has_exploded = true
 	is_exploding = true
 	
 	if is_instance_valid(fizzle_player):
@@ -222,13 +225,22 @@ func _explode_rpc():
 		
 	# Disable collisions immediately
 	var col = get_node_or_null("CollisionShape3D")
-	if col: col.disabled = true
+	if col: col.set_deferred("disabled", true)
 	var area_col = get_node_or_null("Area3D/CollisionShape3D")
-	if area_col: area_col.disabled = true
+	if area_col: area_col.set_deferred("disabled", true)
+	if is_instance_valid(area):
+		area.set_deferred("monitoring", false)
+		area.set_deferred("monitorable", false)
 	
 	# CRITICAL: reparent particles to scene root BEFORE freeing the bomb.
 	# top_level=true only affects transform, NOT lifetime — children still die with parent.
 	var scene_root = get_tree().current_scene
+	if not scene_root:
+		scene_root = get_parent()
+	if not scene_root:
+		queue_free()
+		return
+
 	var expl_pos = global_position
 	
 	# Play a random bomb explosion sound
@@ -272,7 +284,7 @@ func _explode_rpc():
 			
 		tween.finished.connect(func(): if is_instance_valid(expl_mesh): expl_mesh.queue_free())
 	
-	if is_instance_valid(explosion_particles):
+	if is_instance_valid(explosion_particles) and explosion_particles.get_parent() == self:
 		var ep = explosion_particles
 		remove_child(ep)
 		scene_root.add_child(ep)
@@ -282,7 +294,7 @@ func _explode_rpc():
 			func(): if is_instance_valid(ep): ep.queue_free()
 		)
 	
-	if is_instance_valid(smoke_particles):
+	if is_instance_valid(smoke_particles) and smoke_particles.get_parent() == self:
 		var sp = smoke_particles
 		remove_child(sp)
 		scene_root.add_child(sp)
@@ -292,7 +304,7 @@ func _explode_rpc():
 			func(): if is_instance_valid(sp): sp.queue_free()
 		)
 	
-	if is_instance_valid(fire_sprite_particles):
+	if is_instance_valid(fire_sprite_particles) and fire_sprite_particles.get_parent() == self:
 		var fsp = fire_sprite_particles
 		remove_child(fsp)
 		scene_root.add_child(fsp)
@@ -302,7 +314,7 @@ func _explode_rpc():
 			func(): if is_instance_valid(fsp): fsp.queue_free()
 		)
 
-	if is_instance_valid(fire_sprite_particles_2):
+	if is_instance_valid(fire_sprite_particles_2) and fire_sprite_particles_2.get_parent() == self:
 		var fsp2 = fire_sprite_particles_2
 		remove_child(fsp2)
 		scene_root.add_child(fsp2)
