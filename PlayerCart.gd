@@ -1032,8 +1032,9 @@ func _process(delta):
 	for p in drift_particles:
 		if is_instance_valid(p) and p is CPUParticles3D:
 			if not p.emitting:
-				_park_trail_emitter(p)
+				_update_idle_trail_emitter(p)
 				continue
+			_clear_trail_stopped_meta(p)
 			var pivot = p.get_meta("pivot", null)
 			if is_instance_valid(pivot):
 				if p.name.ends_with("_Skid"):
@@ -1077,8 +1078,9 @@ func _process(delta):
 	for p in dirt_particles:
 		if is_instance_valid(p) and p is CPUParticles3D:
 			if not p.emitting:
-				_park_trail_emitter(p)
+				_update_idle_trail_emitter(p)
 				continue
+			_clear_trail_stopped_meta(p)
 			var pivot = p.get_meta("pivot", null)
 			if is_instance_valid(pivot):
 				_attach_dirt_emitter(p, pivot)
@@ -3751,10 +3753,25 @@ func _attach_dirt_emitter(p: CPUParticles3D, pivot: Node3D) -> void:
 	p.global_position = pivot.global_position + pivot.global_transform.basis * Vector3(0, -0.24, 0.16)
 
 
+func _clear_trail_stopped_meta(p: CPUParticles3D) -> void:
+	if p.has_meta("trail_stopped_at"):
+		p.remove_meta("trail_stopped_at")
+
+
+func _update_idle_trail_emitter(p: CPUParticles3D) -> void:
+	# Leave the emitter at its last ground pose so already-spawned skid / dust
+	# particles can finish their lifetime. Parking on the same frame as
+	# emitting=false teleports those live quads away (trails vanish on release).
+	if not p.has_meta("trail_stopped_at"):
+		p.set_meta("trail_stopped_at", Time.get_ticks_msec() * 0.001)
+	var stopped_at: float = float(p.get_meta("trail_stopped_at"))
+	if Time.get_ticks_msec() * 0.001 - stopped_at >= p.lifetime + 0.05:
+		_park_trail_emitter(p)
+
+
 func _park_trail_emitter(p: CPUParticles3D) -> void:
-	# Unused MultiMesh slots draw at the emitter origin. Park it far away so a
-	# leftover quad does not ride the tire after the trail has died.
-	# World-space particles already spawned keep their last world positions.
+	# Unused MultiMesh slots draw at the emitter origin. After remaining
+	# particles have died, park far away so a leftover quad does not ride the tire.
 	if p.global_position.y > -400.0:
 		p.global_position = Vector3(0.0, -500.0, 0.0)
 
@@ -3790,7 +3807,6 @@ func _set_dirt_emitting(emitting: bool):
 					p.amount_ratio = clampf((speed - 4.0) / 14.0, 0.20, 1.0)
 			else:
 				p.emitting = false
-				_park_trail_emitter(p)
 
 func _get_ground_height(global_pos: Vector3) -> float:
 	var space_state = get_world_3d().direct_space_state

@@ -39,6 +39,15 @@ var check_vsync: CheckButton
 var option_anti_aliasing: OptionButton
 var option_shadows: OptionButton
 var option_render_scale: OptionButton
+var option_renderer: OptionButton
+var option_fsr_mode: OptionButton
+var slider_fsr_sharpness: HSlider
+var label_fsr_sharpness: Label
+var label_renderer_status: Label
+var btn_renderer_restart: Button
+var fsr_section: Control
+var renderer_restart_dialog: ConfirmationDialog
+var _pending_renderer: String = ""
 var option_anisotropic: OptionButton
 var option_max_fps: OptionButton
 var option_camera_mode: OptionButton
@@ -288,6 +297,37 @@ func _build_graphics_page() -> Control:
 	check_fps = _add_check_row(body, "Show FPS Counter")
 
 	body.add_child(HSeparator.new())
+	_add_section_title(body, "RENDERER")
+	_add_hint(body, "Forward+ enables FSR upscaling. Switching renderer restarts the game.")
+	option_renderer = _add_option_row(body, "3D Renderer")
+	option_renderer.add_item("Mobile")
+	option_renderer.add_item("Forward+")
+	label_renderer_status = _add_hint(body, "Currently running Mobile.")
+	btn_renderer_restart = Button.new()
+	btn_renderer_restart.text = "Restart to apply renderer"
+	btn_renderer_restart.custom_minimum_size = Vector2(280, 40)
+	btn_renderer_restart.add_theme_font_size_override("font_size", 16)
+	btn_renderer_restart.visible = false
+	btn_renderer_restart.pressed.connect(_on_renderer_restart_button_pressed)
+	body.add_child(btn_renderer_restart)
+
+	fsr_section = VBoxContainer.new()
+	fsr_section.add_theme_constant_override("separation", 14)
+	body.add_child(fsr_section)
+	_add_section_title(fsr_section, "FSR UPSCALING")
+	_add_hint(fsr_section, "Available with Forward+. Best when 3D Quality is below 100%. Lower sharpness is sharper.")
+	option_fsr_mode = _add_option_row(fsr_section, "Upscale Method")
+	option_fsr_mode.add_item("Bilinear")
+	option_fsr_mode.add_item("FSR 1.0")
+	option_fsr_mode.add_item("FSR 2.2")
+	var sharpness_row: Array = _add_slider_row(fsr_section, "FSR Sharpness")
+	slider_fsr_sharpness = sharpness_row[0] as HSlider
+	label_fsr_sharpness = sharpness_row[1] as Label
+	slider_fsr_sharpness.min_value = 0.0
+	slider_fsr_sharpness.max_value = 2.0
+	slider_fsr_sharpness.step = 0.05
+
+	body.add_child(HSeparator.new())
 	_add_section_title(body, "QUALITY")
 	option_render_scale = _add_option_row(body, "3D Quality")
 	option_render_scale.add_item("Low (50%)")
@@ -493,6 +533,19 @@ func _load_values_from_manager() -> void:
 		option_shadows.selected = MusicManager.shadow_quality_index
 	if option_render_scale:
 		option_render_scale.selected = MusicManager.render_scale_index
+	if option_renderer:
+		option_renderer.set_block_signals(true)
+		option_renderer.selected = 1 if MusicManager.renderer_method == "forward_plus" else 0
+		option_renderer.set_block_signals(false)
+	if option_fsr_mode:
+		option_fsr_mode.selected = MusicManager.scaling_3d_mode_index
+	if slider_fsr_sharpness:
+		slider_fsr_sharpness.set_block_signals(true)
+		slider_fsr_sharpness.value = MusicManager.fsr_sharpness
+		slider_fsr_sharpness.set_block_signals(false)
+		_update_fsr_sharpness_label(MusicManager.fsr_sharpness)
+	_update_fsr_section_visibility()
+	_update_renderer_status()
 	if option_anisotropic:
 		option_anisotropic.selected = MusicManager.anisotropic_index
 	if option_max_fps:
@@ -515,6 +568,12 @@ func _connect_setting_signals() -> void:
 	option_anti_aliasing.item_selected.connect(func(i): MusicManager.set_anti_aliasing(i))
 	option_shadows.item_selected.connect(func(i): MusicManager.set_shadow_quality(i))
 	option_render_scale.item_selected.connect(func(i): MusicManager.set_render_scale(i))
+	option_renderer.item_selected.connect(_on_renderer_selected)
+	option_fsr_mode.item_selected.connect(_on_fsr_mode_selected)
+	slider_fsr_sharpness.value_changed.connect(func(v):
+		MusicManager.set_fsr_sharpness(v)
+		_update_fsr_sharpness_label(v)
+	)
 	option_anisotropic.item_selected.connect(func(i): MusicManager.set_anisotropic(i))
 	option_max_fps.item_selected.connect(func(i): MusicManager.set_max_fps(i))
 	option_camera_mode.item_selected.connect(func(i): MusicManager.set_use_isometric_camera(i == 0))
@@ -531,6 +590,104 @@ func _connect_setting_signals() -> void:
 func _update_volume_label(lbl: Label, value: float) -> void:
 	if lbl:
 		lbl.text = "%d%%" % int(round(value * 100.0))
+
+
+func _update_fsr_sharpness_label(value: float) -> void:
+	if label_fsr_sharpness:
+		label_fsr_sharpness.text = "%.2f" % value
+
+
+func _update_fsr_section_visibility() -> void:
+	if fsr_section:
+		fsr_section.visible = MusicManager.is_forward_plus()
+	if slider_fsr_sharpness:
+		slider_fsr_sharpness.editable = MusicManager.is_forward_plus() and MusicManager.scaling_3d_mode_index > 0
+
+
+func _renderer_display_name(method: String) -> String:
+	return "Forward+" if method == "forward_plus" else "Mobile"
+
+
+func _update_renderer_status() -> void:
+	var current := MusicManager.get_current_rendering_method()
+	var wanted := MusicManager.renderer_method
+	var mismatch: bool = wanted != current
+	if label_renderer_status:
+		if mismatch:
+			label_renderer_status.text = "Currently running %s. Restart to apply %s." % [
+				_renderer_display_name(current), _renderer_display_name(wanted)
+			]
+		else:
+			label_renderer_status.text = "Currently running %s." % _renderer_display_name(current)
+	if btn_renderer_restart:
+		btn_renderer_restart.visible = mismatch
+		btn_renderer_restart.text = "Restart to apply %s" % _renderer_display_name(wanted)
+
+
+func _on_fsr_mode_selected(index: int) -> void:
+	MusicManager.set_scaling_3d_mode(index)
+	_update_fsr_section_visibility()
+
+
+func _on_renderer_restart_button_pressed() -> void:
+	_pending_renderer = MusicManager.renderer_method
+	_prompt_renderer_restart(_pending_renderer)
+
+
+func _on_renderer_selected(index: int) -> void:
+	var wanted: String = "forward_plus" if index == 1 else "mobile"
+	if wanted == MusicManager.get_current_rendering_method():
+		MusicManager.set_renderer_method(wanted)
+		_update_renderer_status()
+		return
+	_prompt_renderer_restart(wanted)
+
+
+func _prompt_renderer_restart(wanted: String) -> void:
+	_pending_renderer = wanted
+	_ensure_renderer_restart_dialog()
+	var from_name := _renderer_display_name(MusicManager.get_current_rendering_method())
+	var to_name := _renderer_display_name(wanted)
+	renderer_restart_dialog.dialog_text = "Switching from %s to %s requires restarting the game.\nRestart now?" % [from_name, to_name]
+	renderer_restart_dialog.popup_centered()
+
+
+func _ensure_renderer_restart_dialog() -> void:
+	if renderer_restart_dialog:
+		return
+	var dlg := ConfirmationDialog.new()
+	dlg.title = "Restart Required"
+	dlg.dialog_text = "Switching renderer requires restarting the game.\nRestart now?"
+	dlg.ok_button_text = "Restart"
+	dlg.cancel_button_text = "Cancel"
+	dlg.unresizable = true
+	dlg.exclusive = true
+	dlg.confirmed.connect(_on_renderer_restart_confirmed)
+	dlg.canceled.connect(_on_renderer_restart_canceled)
+	add_child(dlg)
+	renderer_restart_dialog = dlg
+
+
+func _on_renderer_restart_confirmed() -> void:
+	if _pending_renderer != "mobile" and _pending_renderer != "forward_plus":
+		_revert_renderer_dropdown()
+		return
+	MusicManager.set_renderer_method(_pending_renderer)
+	MusicManager.restart_with_renderer(_pending_renderer)
+
+
+func _on_renderer_restart_canceled() -> void:
+	_pending_renderer = ""
+	_revert_renderer_dropdown()
+	_update_renderer_status()
+
+
+func _revert_renderer_dropdown() -> void:
+	if option_renderer == null:
+		return
+	option_renderer.set_block_signals(true)
+	option_renderer.selected = 1 if MusicManager.renderer_method == "forward_plus" else 0
+	option_renderer.set_block_signals(false)
 
 
 func update_keybind_buttons() -> void:

@@ -18,6 +18,12 @@ var shadows_enabled: bool = false
 ## 0=Off 1=Low 2=Medium 3=High — controls map size, soft filter, and light splits.
 var shadow_quality_index: int = 0
 var render_scale_index: int = 1 # 0:50% 1:75% 2:100% 3:125%
+## Preferred renderer: "mobile" or "forward_plus". Applied via restart (--rendering-method).
+var renderer_method: String = "mobile"
+## Viewport.scaling_3d_mode: 0 bilinear, 1 FSR 1.0, 2 FSR 2.2 (Forward+ only).
+var scaling_3d_mode_index: int = 0
+## Viewport.fsr_sharpness: 0.0 sharp … 2.0 soft. Default 0.2.
+var fsr_sharpness: float = 0.2
 var anisotropic_index: int = 1 # 0:Off 1:2x 2:4x 3:8x 4:16x
 var max_fps_index: int = 1 # 0:30 1:60 2:120 3:Unlimited
 ## true = isometric / top-down race cam, false = behind-the-car follower cam.
@@ -76,6 +82,12 @@ func _ready():
 		InputMap.action_add_event("discard_item", ev)
 		
 	load_settings()
+	# Exported builds only. Playing from the editor must not quit() to
+	# "apply" the renderer — that looks like a silent crash after the menu
+	# flashes, and copying --editor-pid / --remote-debug kills the relaunch.
+	if _should_restart_for_renderer():
+		restart_with_renderer(renderer_method)
+		return
 	
 	# Configure two audio players for crossfading
 	player1 = AudioStreamPlayer.new()
@@ -136,6 +148,9 @@ func _process(_delta):
 func load_settings():
 	var config = ConfigFile.new()
 	var err = config.load(SETTINGS_FILE)
+	# Default to the renderer this process is already using so first-run
+	# (or a launch with --rendering-method) does not immediately bounce.
+	renderer_method = get_current_rendering_method()
 	if err == OK:
 		music_volume = config.get_value("audio", "music", 0.8)
 		sfx_volume = config.get_value("audio", "sfx", 0.7)
@@ -153,6 +168,12 @@ func load_settings():
 		shadow_quality_index = clampi(shadow_quality_index, 0, 3)
 		shadows_enabled = shadow_quality_index > 0
 		render_scale_index = config.get_value("graphics", "render_scale_index", 1)
+		if config.has_section_key("graphics", "renderer_method"):
+			var saved_renderer := str(config.get_value("graphics", "renderer_method", renderer_method))
+			if saved_renderer == "mobile" or saved_renderer == "forward_plus":
+				renderer_method = saved_renderer
+		scaling_3d_mode_index = clampi(int(config.get_value("graphics", "scaling_3d_mode_index", 0)), 0, 2)
+		fsr_sharpness = clampf(float(config.get_value("graphics", "fsr_sharpness", 0.2)), 0.0, 2.0)
 		anisotropic_index = config.get_value("graphics", "anisotropic_index", 1)
 		max_fps_index = config.get_value("graphics", "max_fps_index", 1)
 		use_isometric_camera = config.get_value("gameplay", "use_isometric_camera", true)
@@ -172,6 +193,7 @@ func _apply_window_settings():
 	set_anisotropic(anisotropic_index, false)
 	set_max_fps(max_fps_index, false)
 	set_shadow_quality(shadow_quality_index, false)
+	apply_fsr_settings()
 
 func save_settings():
 	var config = ConfigFile.new()
@@ -186,6 +208,9 @@ func save_settings():
 	config.set_value("graphics", "shadows_enabled", shadows_enabled)
 	config.set_value("graphics", "shadow_quality_index", shadow_quality_index)
 	config.set_value("graphics", "render_scale_index", render_scale_index)
+	config.set_value("graphics", "renderer_method", renderer_method)
+	config.set_value("graphics", "scaling_3d_mode_index", scaling_3d_mode_index)
+	config.set_value("graphics", "fsr_sharpness", fsr_sharpness)
 	config.set_value("graphics", "anisotropic_index", anisotropic_index)
 	config.set_value("graphics", "max_fps_index", max_fps_index)
 	config.set_value("gameplay", "use_isometric_camera", use_isometric_camera)
@@ -383,7 +408,119 @@ func set_render_scale(index: int, save: bool = true):
 	render_scale_index = index
 	# Re-apply current window/resolution so base scale * quality scale is correct
 	set_resolution(resolution_index, false)
+	apply_fsr_settings()
 	if save: save_settings()
+
+
+func get_current_rendering_method() -> String:
+	var method := ""
+	if RenderingServer.has_method("get_current_rendering_method"):
+		method = str(RenderingServer.call("get_current_rendering_method"))
+	if method.is_empty():
+		method = str(ProjectSettings.get_setting("rendering/renderer/rendering_method", "mobile"))
+	if method != "mobile" and method != "forward_plus":
+		return "mobile"
+	return method
+
+
+func is_forward_plus() -> bool:
+	return get_current_rendering_method() == "forward_plus"
+
+
+func set_renderer_method(method: String, save: bool = true) -> void:
+	if method != "mobile" and method != "forward_plus":
+		return
+	renderer_method = method
+	if save:
+		save_settings()
+
+
+func set_scaling_3d_mode(index: int, save: bool = true) -> void:
+	scaling_3d_mode_index = clampi(index, 0, 2)
+	apply_fsr_settings()
+	if save:
+		save_settings()
+
+
+func set_fsr_sharpness(value: float, save: bool = true) -> void:
+	fsr_sharpness = clampf(value, 0.0, 2.0)
+	apply_fsr_settings()
+	if save:
+		save_settings()
+
+
+func apply_fsr_settings() -> void:
+	var vp := get_viewport()
+	if vp == null:
+		return
+	if is_forward_plus():
+		vp.scaling_3d_mode = scaling_3d_mode_index
+		vp.fsr_sharpness = fsr_sharpness
+	else:
+		vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+
+
+func _cmdline_has_rendering_method() -> bool:
+	for arg in OS.get_cmdline_args():
+		var a := str(arg)
+		if a == "--rendering-method" or a.begins_with("--rendering-method="):
+			return true
+	return false
+
+
+func _should_restart_for_renderer() -> bool:
+	if OS.has_feature("headless"):
+		return false
+	# Editor Play sessions always start with project.godot's renderer.
+	# Quitting here closes the game after the menu appears, with no error.
+	if OS.has_feature("editor"):
+		return false
+	if renderer_method != "mobile" and renderer_method != "forward_plus":
+		return false
+	if renderer_method == get_current_rendering_method():
+		return false
+	# Already launched with an override — do not loop if it failed to apply.
+	if _cmdline_has_rendering_method():
+		return false
+	return true
+
+
+func _project_root_path() -> String:
+	var p := ProjectSettings.globalize_path("res://")
+	while p.ends_with("/") or p.ends_with("\\"):
+		p = p.substr(0, p.length() - 1)
+	return p
+
+
+func _renderer_restart_args(method: String) -> PackedStringArray:
+	var args := PackedStringArray()
+	if OS.has_feature("editor"):
+		# Fresh game process — do not reuse --remote-debug / --editor-pid.
+		args.append("--path")
+		args.append(_project_root_path())
+		args.append("--rendering-method")
+		args.append(method)
+		args.append(str(ProjectSettings.get_setting("application/run/main_scene", "res://Main.tscn")))
+		return args
+	args.append("--rendering-method")
+	args.append(method)
+	return args
+
+
+func restart_with_renderer(method: String) -> void:
+	if method != "mobile" and method != "forward_plus":
+		return
+	var args := _renderer_restart_args(method)
+	print("Restarting with renderer '%s' args=%s" % [method, str(args)])
+	if OS.has_feature("editor"):
+		var pid := OS.create_instance(args)
+		if pid < 0:
+			push_error("Could not start a new game instance with renderer '%s'." % method)
+			return
+		get_tree().quit()
+		return
+	OS.set_restart_on_exit(true, args)
+	get_tree().quit()
 
 func set_anisotropic(index: int, save: bool = true):
 	if index < 0 or index >= ANISOTROPIC_LEVELS.size():
@@ -477,9 +614,10 @@ func _apply_shadows_to_tree(node: Node) -> void:
 			dl.directional_shadow_blend_splits = true
 			dl.directional_shadow_fade_start = 0.7
 			dl.shadow_blur = SHADOW_BLURS[q]
-			# Bias tuned so car shadows don't swim / peter-pan on the road
-			dl.shadow_bias = 0.008 if q <= 1 else 0.005
-			dl.shadow_normal_bias = 0.3 if q <= 1 else 0.15
+			# Road contact stays tight via shadow_bias. Higher normal bias hides the
+			# sun-terminator grid on large hill triangles without lifting car shadows.
+			dl.shadow_bias = 0.01 if q <= 1 else 0.007
+			dl.shadow_normal_bias = 1.6 if q <= 1 else 1.25
 			dl.directional_shadow_pancake_size = 20.0
 	elif node is OmniLight3D:
 		(node as OmniLight3D).shadow_enabled = enabled and q >= 2
@@ -494,6 +632,7 @@ func refresh_level_graphics() -> void:
 	set_anisotropic(anisotropic_index, false)
 	# Re-apply render scale in case a new viewport path was created
 	set_resolution(resolution_index, false)
+	apply_fsr_settings()
 
 const CUSTOM_ACTIONS = [
 	"p1_throttle", "p1_brake", "p1_steer_left", "p1_steer_right", "p1_boost", "p1_discard_item", "p1_respawn", "p1_toggle_camera",

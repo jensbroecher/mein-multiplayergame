@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode cull_back;
+render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 
 // --- Splatmap Settings ---
 uniform sampler2D splatmap_texture : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
@@ -68,73 +68,91 @@ vec2 hash2(vec2 p) {
     return fract(sin(p) * 43758.5453);
 }
 
-// Stochastic sampler to avoid repetitive grid tiling
-vec3 sample_stochastic(sampler2D tex, vec2 uv, vec2 dx, vec2 dy) {
-    vec2 p = floor(uv);
-    vec2 f = fract(uv);
-    vec3 res = vec3(0.0);
-    float weight_sum = 0.0;
-
-    for (int y = 0; y <= 1; y++) {
-        for (int x = 0; x <= 1; x++) {
-            vec2 offset = vec2(float(x), float(y));
-            vec2 cell = p + offset;
-            vec2 rand = hash2(cell);
-
-            #ifdef GL_ES
-            vec2 sampled_uv = f + rand.y;
-            vec2 sampled_dx = dx;
-            vec2 sampled_dy = dy;
-            #else
-            float angle = rand.x * 6.2831853;
-            mat2 rot = mat2(vec2(cos(angle), -sin(angle)), vec2(sin(angle), cos(angle)));
-            vec2 sampled_uv = rot * (f - vec2(0.5)) + vec2(0.5) + rand.y;
-            vec2 sampled_dx = rot * dx;
-            vec2 sampled_dy = rot * dy;
-            #endif
-
-            float w = pow(1.0 - smoothstep(0.0, 1.414, length(f - offset)), 2.0);
-            res += textureGrad(tex, sampled_uv, sampled_dx, sampled_dy).rgb * w;
-            weight_sum += w;
-        }
-    }
-    return res / max(weight_sum, 0.0001);
+void rotated_grad(vec2 vertex_id, vec2 uv, vec2 ddx_uv, vec2 ddy_uv, out vec2 tuv, out vec2 tdx, out vec2 tdy) {
+    vec2 r = hash2(vertex_id);
+    float a = r.x * 6.2831853;
+    float c = cos(a);
+    float s = sin(a);
+    tuv = vec2(c * uv.x - s * uv.y, s * uv.x + c * uv.y) + r.y;
+    tdx = vec2(c * ddx_uv.x - s * ddx_uv.y, s * ddx_uv.x + c * ddx_uv.y) * 1.08;
+    tdy = vec2(c * ddy_uv.x - s * ddy_uv.y, s * ddy_uv.x + c * ddy_uv.y) * 1.08;
 }
 
-// Stochastic normal map sampler
-vec3 sample_stochastic_normal(sampler2D tex, vec2 uv, vec2 dx, vec2 dy) {
-    vec2 p = floor(uv);
-    vec2 f = fract(uv);
-    vec3 res = vec3(0.0);
-    float weight_sum = 0.0;
-
-    for (int y = 0; y <= 1; y++) {
-        for (int x = 0; x <= 1; x++) {
-            vec2 offset = vec2(float(x), float(y));
-            vec2 cell = p + offset;
-            vec2 rand = hash2(cell);
-
-            #ifdef GL_ES
-            vec2 sampled_uv = f + rand.y;
-            vec3 raw_normal = textureGrad(tex, sampled_uv, dx, dy).rgb * 2.0 - 1.0;
-            vec3 rotated_normal = raw_normal;
-            #else
-            float angle = rand.x * 6.2831853;
-            mat2 rot = mat2(vec2(cos(angle), -sin(angle)), vec2(sin(angle), cos(angle)));
-            vec2 sampled_uv = rot * (f - vec2(0.5)) + vec2(0.5) + rand.y;
-            vec2 sampled_dx = rot * dx;
-            vec2 sampled_dy = rot * dy;
-            vec3 raw_normal = textureGrad(tex, sampled_uv, sampled_dx, sampled_dy).rgb * 2.0 - 1.0;
-            vec2 rotated_xy = rot * raw_normal.xy;
-            vec3 rotated_normal = vec3(rotated_xy, raw_normal.z);
-            #endif
-
-            float w = pow(1.0 - smoothstep(0.0, 1.414, length(f - offset)), 2.0);
-            res += rotated_normal * w;
-            weight_sum += w;
-        }
+void triangle_grid(vec2 uv, out vec2 v1, out vec2 v2, out vec2 v3, out vec3 w) {
+    uv *= 3.4641016;
+    vec2 skewed = vec2(uv.x - uv.y * 0.57735027, uv.y * 1.15470054);
+    vec2 base_id = floor(skewed);
+    vec2 f = fract(skewed);
+    float z = 1.0 - f.x - f.y;
+    if (z > 0.0) {
+        w = vec3(z, f.y, f.x);
+        v1 = base_id;
+        v2 = base_id + vec2(0.0, 1.0);
+        v3 = base_id + vec2(1.0, 0.0);
+    } else {
+        w = vec3(-z, 1.0 - f.y, 1.0 - f.x);
+        v1 = base_id + vec2(1.0, 1.0);
+        v2 = base_id + vec2(1.0, 0.0);
+        v3 = base_id + vec2(0.0, 1.0);
     }
-    return (res / max(weight_sum, 0.0001)) * 0.5 + 0.5;
+}
+
+vec3 sample_stochastic(sampler2D tex, vec2 uv, vec2 ddx_uv, vec2 ddy_uv) {
+    vec2 v1;
+    vec2 v2;
+    vec2 v3;
+    vec3 w;
+    triangle_grid(uv, v1, v2, v3, w);
+    w /= max(w.x + w.y + w.z, 1e-5);
+    vec2 tuv;
+    vec2 tdx;
+    vec2 tdy;
+    rotated_grad(v1, uv, ddx_uv, ddy_uv, tuv, tdx, tdy);
+    vec3 c1 = textureGrad(tex, tuv, tdx, tdy).rgb;
+    rotated_grad(v2, uv, ddx_uv, ddy_uv, tuv, tdx, tdy);
+    vec3 c2 = textureGrad(tex, tuv, tdx, tdy).rgb;
+    rotated_grad(v3, uv, ddx_uv, ddy_uv, tuv, tdx, tdy);
+    vec3 c3 = textureGrad(tex, tuv, tdx, tdy).rgb;
+    return c1 * w.x + c2 * w.y + c3 * w.z;
+}
+
+vec3 sample_stochastic_normal(sampler2D tex, vec2 uv, vec2 ddx_uv, vec2 ddy_uv) {
+    vec2 v1;
+    vec2 v2;
+    vec2 v3;
+    vec3 w;
+    triangle_grid(uv, v1, v2, v3, w);
+    w /= max(w.x + w.y + w.z, 1e-5);
+    vec2 tuv;
+    vec2 tdx;
+    vec2 tdy;
+    vec3 n = vec3(0.0);
+
+    rotated_grad(v1, uv, ddx_uv, ddy_uv, tuv, tdx, tdy);
+    vec2 r = hash2(v1);
+    float a = r.x * 6.2831853;
+    float c = cos(a);
+    float s = sin(a);
+    vec3 n1 = textureGrad(tex, tuv, tdx, tdy).rgb * 2.0 - 1.0;
+    n += vec3(c * n1.x - s * n1.y, s * n1.x + c * n1.y, n1.z) * w.x;
+
+    rotated_grad(v2, uv, ddx_uv, ddy_uv, tuv, tdx, tdy);
+    r = hash2(v2);
+    a = r.x * 6.2831853;
+    c = cos(a);
+    s = sin(a);
+    vec3 n2 = textureGrad(tex, tuv, tdx, tdy).rgb * 2.0 - 1.0;
+    n += vec3(c * n2.x - s * n2.y, s * n2.x + c * n2.y, n2.z) * w.y;
+
+    rotated_grad(v3, uv, ddx_uv, ddy_uv, tuv, tdx, tdy);
+    r = hash2(v3);
+    a = r.x * 6.2831853;
+    c = cos(a);
+    s = sin(a);
+    vec3 n3 = textureGrad(tex, tuv, tdx, tdy).rgb * 2.0 - 1.0;
+    n += vec3(c * n3.x - s * n3.y, s * n3.x + c * n3.y, n3.z) * w.z;
+
+    return normalize(n) * 0.5 + 0.5;
 }
 
 // Sample texture with optional stochastic / triplanar mapping
@@ -253,7 +271,7 @@ void fragment() {
 
     ALBEDO = final_color;
     ROUGHNESS = clamp(final_roughness, 0.0, 1.0);
-    SPECULAR = 0.05;
+    SPECULAR = 0.02;
 
     // 4. Normal Maps
     vec3 blended_normal = vec3(0.5, 0.5, 1.0);

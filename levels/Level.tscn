@@ -6,6 +6,7 @@
 [ext_resource type="Script" uid="uid://cpx88edmwbon1" path="res://addons/GodotWeatherSystem/scripts/SeasonResource.gd" id="3_jpwbr"]
 [ext_resource type="Script" uid="uid://ct8ssg1fuina4" path="res://addons/GodotWeatherSystem/scripts/SkyColourResource.gd" id="4_kr1e0"]
 [ext_resource type="Texture2D" uid="uid://ce51lhh2jn4l0" path="res://materials/grass.png" id="5_grass"]
+[ext_resource type="Shader" uid="uid://ionm7cyho23g" path="res://terrain_stochastic.gdshader" id="Shader_stoch_file"]
 [ext_resource type="Script" uid="uid://c0bu4su5psbae" path="res://addons/GodotWeatherSystem/scripts/WeatherOccurrenceResource.gd" id="5_yr3df"]
 [ext_resource type="ArrayMesh" uid="uid://dddcdtjm2fjob" path="res://generated/terrain_visual.res" id="6_d6u53"]
 [ext_resource type="Resource" uid="uid://bbtqdfvkjixub" path="res://addons/GodotWeatherSystem/weather/clouded.tres" id="6_jpwbr"]
@@ -429,17 +430,18 @@ void fragment() {
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_grass"]
 render_priority = 0
-shader = SubResource("Shader_stochastic")
+shader = ExtResource("Shader_stoch_file")
 shader_parameter/albedo_texture = ExtResource("5_grass")
 shader_parameter/albedo = Color(0.75, 0.75, 0.75, 1)
 shader_parameter/uv_scale = 6.0
 shader_parameter/uv_scale_v2 = Vector2(1, 1)
 shader_parameter/smoothness = 1.0
 shader_parameter/use_world_uv = false
+shader_parameter/enable_edge_fade = false
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_asphalt"]
 render_priority = 0
-shader = SubResource("Shader_stochastic")
+shader = ExtResource("Shader_stoch_file")
 shader_parameter/albedo_texture = ExtResource("3_asph")
 shader_parameter/albedo = Color(0.6, 0.6, 0.6, 1)
 shader_parameter/uv_scale = 10.0
@@ -462,7 +464,7 @@ roughness = 0.95
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_mdb06"]
 render_priority = 0
-shader = SubResource("Shader_stochastic")
+shader = ExtResource("Shader_stoch_file")
 shader_parameter/albedo_texture = ExtResource("3_asph")
 shader_parameter/albedo = Color(0.6, 0.6, 0.6, 1)
 shader_parameter/uv_scale = 10.0
@@ -472,7 +474,7 @@ shader_parameter/use_world_uv = true
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_yi73l"]
 render_priority = 0
-shader = SubResource("Shader_stochastic")
+shader = ExtResource("Shader_stoch_file")
 shader_parameter/albedo_texture = ExtResource("3_asph")
 shader_parameter/albedo = Color(0.6, 0.6, 0.6, 1)
 shader_parameter/uv_scale = 10.0
