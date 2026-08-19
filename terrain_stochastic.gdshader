@@ -25,19 +25,34 @@ void vertex() {
 	world_nrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 }
 
+// Robust integer hash that never suffers from float trigonometry precision loss
 vec2 hash2(vec2 p) {
-	p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
-	return fract(sin(p) * 43758.5453);
+	uvec2 u = uvec2(ivec2(floor(p)));
+	u = u * 1664525u + 1013904223u;
+	u.x += u.y * 1664525u;
+	u.y += u.x * 1664525u;
+	u = u ^ (u >> 16u);
+	u.x += u.y * 1664525u;
+	u.y += u.x * 1664525u;
+	u = u ^ (u >> 16u);
+	return vec2(u) * (1.0 / 4294967295.0);
 }
 
-// Rotate UV and its screen derivatives together so anisotropic filtering stays correct.
+// Convert grid vertex (in skewed grid coordinates) back to UV space
+vec2 grid_to_uv(vec2 v) {
+	vec2 v_grid = vec2(v.x + v.y * 0.5, v.y * 0.8660254);
+	return v_grid * 0.28867513;
+}
+
+// Rotate UV relative to grid vertex so large world coordinates don't blow up
 void rotated_grad(vec2 vertex_id, vec2 uv, vec2 ddx_uv, vec2 ddy_uv, out vec2 tuv, out vec2 tdx, out vec2 tdy) {
 	vec2 r = hash2(vertex_id);
 	float a = r.x * 6.2831853;
 	float c = cos(a);
 	float s = sin(a);
-	tuv = vec2(c * uv.x - s * uv.y, s * uv.x + c * uv.y) + r.y;
-	// Slightly larger footprints pick a higher mip and kill sparkle/moiré.
+	vec2 v_uv = grid_to_uv(vertex_id);
+	vec2 local_uv = uv - v_uv;
+	tuv = vec2(c * local_uv.x - s * local_uv.y, s * local_uv.x + c * local_uv.y) + r;
 	tdx = vec2(c * ddx_uv.x - s * ddx_uv.y, s * ddx_uv.x + c * ddx_uv.y) * 1.08;
 	tdy = vec2(c * ddy_uv.x - s * ddy_uv.y, s * ddy_uv.x + c * ddy_uv.y) * 1.08;
 }

@@ -239,7 +239,7 @@ _data = {
 point_count = 59
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_checkpoint"]
-size = Vector3(20, 10, 5)
+size = Vector3(70, 40, 12)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dcivv"]
 cull_mode = 2
@@ -448,7 +448,7 @@ script = ExtResource("24_kurhb")
 is_finish_line = true
 
 [node name="CollisionShape3D2" type="CollisionShape3D" parent="FinishLine" unique_id=1508901951]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 18, 0)
 shape = SubResource("BoxShape3D_checkpoint")
 
 [node name="VisualGate2" type="CSGCombiner3D" parent="FinishLine" unique_id=1069427897]
@@ -468,7 +468,7 @@ transform = Transform3D(-0.90679115, 0.016291894, 0.42126518, 0, 0.99925303, -0.
 script = ExtResource("24_kurhb")
 
 [node name="CollisionShape3D2" type="CollisionShape3D" parent="Checkpoints/Halfway4" unique_id=1625056672]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 18, 0)
 shape = SubResource("BoxShape3D_checkpoint")
 
 [node name="VisualGate2" type="CSGCombiner3D" parent="Checkpoints/Halfway4" unique_id=918183403]
@@ -478,7 +478,7 @@ transform = Transform3D(0.92606395, 0.015585891, 0.37704462, 0, 0.9991467, -0.04
 script = ExtResource("24_kurhb")
 
 [node name="CollisionShape3D2" type="CollisionShape3D" parent="Checkpoints/Halfway3" unique_id=1974676769]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 18, 0)
 shape = SubResource("BoxShape3D_checkpoint")
 
 [node name="VisualGate2" type="CSGCombiner3D" parent="Checkpoints/Halfway3" unique_id=529232085]
@@ -488,7 +488,7 @@ transform = Transform3D(-0.96083504, -0.012795562, -0.2768255, 0, 0.9989335, -0.
 script = ExtResource("24_kurhb")
 
 [node name="CollisionShape3D2" type="CollisionShape3D" parent="Checkpoints/Halfway2" unique_id=619523138]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 18, 0)
 shape = SubResource("BoxShape3D_checkpoint")
 
 [node name="VisualGate2" type="CSGCombiner3D" parent="Checkpoints/Halfway2" unique_id=1589253990]
@@ -498,7 +498,7 @@ transform = Transform3D(0.42980435, 0.054179817, 0.90129507, 0, 0.9981981, -0.06
 script = ExtResource("24_kurhb")
 
 [node name="CollisionShape3D2" type="CollisionShape3D" parent="Checkpoints/Halfway1" unique_id=262423735]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 18, 0)
 shape = SubResource("BoxShape3D_checkpoint")
 
 [node name="VisualGate2" type="CSGCombiner3D" parent="Checkpoints/Halfway1" unique_id=1223843836]

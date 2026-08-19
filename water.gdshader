@@ -1,6 +1,6 @@
 shader_type spatial;
 // Opaque-leaning water so sky specular actually shows (full transparency kills reflections).
-render_mode cull_disabled, depth_draw_opaque, blend_mix, specular_schlick_ggx;
+render_mode cull_back, depth_draw_never, blend_mix, specular_schlick_ggx;
 
 uniform vec3 water_color : source_color = vec3(0.005, 0.015, 0.04);
 uniform vec3 shallow_color : source_color = vec3(0.1, 0.4, 0.6);

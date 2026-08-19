@@ -655,6 +655,12 @@ func _ready():
 			var fwd0 = -visuals.global_transform.basis.z
 			camera_pivot.global_position = visuals.global_position - fwd0 * 4.5 + Vector3(0, 2.4, 0)
 			camera_pivot.look_at(visuals.global_position + fwd0 * 4.0, Vector3.UP)
+		
+		if has_node("AudioListener3D"):
+			var listener = get_node("AudioListener3D")
+			listener.current = true
+			listener.make_current()
+			listener.global_position = global_position
 	else:
 		camera.current = false
 		if has_node("AudioListener3D"):
@@ -713,6 +719,13 @@ func _update_authority():
 		max_contacts_reported = 4
 		if not body_entered.is_connected(_on_body_entered):
 			body_entered.connect(_on_body_entered)
+		if has_node("AudioListener3D"):
+			var listener = get_node("AudioListener3D")
+			listener.current = true
+			listener.make_current()
+	else:
+		if has_node("AudioListener3D"):
+			get_node("AudioListener3D").current = false
 	
 	var has_physics_authority = has_physics_authority()
 	if not has_physics_authority:
@@ -851,6 +864,14 @@ func _process(delta):
 				_fade_out_all_xray(delta)
 				if race_ui:
 					race_ui.set_terrain_clipped(false)
+				
+				# Position audio listener at the spectated car so its 3D audio is heard
+				if has_node("AudioListener3D"):
+					var listener = get_node("AudioListener3D")
+					listener.global_position = focus_pos
+					if not listener.current:
+						listener.current = true
+						listener.make_current()
 			elif is_isometric:
 				var iso_offset = Vector3(-26, 26, 26)
 				var desired_cam_pos = visuals.global_position + iso_offset
@@ -969,6 +990,13 @@ func _process(delta):
 			elif is_pad_boosting:
 				target_fov += 9.0 # Zoom out slightly less when pad boosting!
 		camera.fov = lerp(camera.fov, target_fov, 8.0 * delta)
+
+		if not is_finished_race and has_node("AudioListener3D"):
+			var listener = get_node("AudioListener3D")
+			listener.global_position = global_position
+			if not listener.current:
+				listener.current = true
+				listener.make_current()
 
 		# Mirror camera into SubViewport (LOCAL_COOP splitscreen)
 		if splitscreen_camera and is_instance_valid(splitscreen_camera):
@@ -1179,16 +1207,16 @@ func _physics_process(delta):
 		# Depth relative to surface: positive = below surface (submerged)
 		var water_depth: float = water_surface_y - global_position.y
 		var in_water_xz := _is_over_water_volume()
-		# True contact with water: car's lower hull / wheels reach the water surface (contact around -0.45m)
-		var in_water_contact := in_water_xz and water_depth >= -0.45
+		# True contact with water: car's wheels touch water surface (tires reach down to ~ -0.80m from body origin)
+		var in_water_contact := in_water_xz and water_depth >= -0.80
 		# Shallow / ford: touching or wading through water — spray and light drag
-		var in_shallow_water := in_water_contact and water_depth < 0.90
-		# Deep water only (fully submerged): can eventually drown
-		var in_deep_water := in_water_contact and water_depth >= 0.90
+		var in_shallow_water := in_water_contact and water_depth < 0.75
+		# Deep water only (hull submerged): can eventually drown
+		var in_deep_water := in_water_contact and water_depth >= 0.75
 		# Hysteresis for "underwater" VFX / deep state
 		var currently_underwater = is_underwater
 		if is_underwater:
-			if not in_water_xz or water_depth < 0.85:
+			if not in_water_xz or water_depth < 0.70:
 				currently_underwater = false
 		else:
 			if in_deep_water:
@@ -1243,19 +1271,19 @@ func _physics_process(delta):
 				_spawn_splash(splash_pos2, 1.15 if in_deep_water else 0.55)
 		_was_in_water_zone = in_water_contact
 
-		# --- More frequent spray while moving through water + wake trail ---
+		# --- Spray while moving through water + wake trail ---
 		var on_flat_ground = false
 		if ground_ray.is_colliding() and ground_ray.get_collision_normal().y >= 0.55:
 			on_flat_ground = true
 		var wet_moving := in_water_contact and linear_velocity.length() > 2.5
 		if wet_moving:
-			var spray_interval: float = 0.12 if linear_velocity.length() > 12.0 else 0.22
+			var spray_interval: float = 0.16 if linear_velocity.length() > 12.0 else 0.26
 			if boosting_in_water:
-				spray_interval *= 0.55
+				spray_interval *= 0.65
 			var current_time3 = Time.get_ticks_msec() / 1000.0
 			if current_time3 - last_splash_time > spray_interval:
 				last_splash_time = current_time3
-				var splash_scale: float = 0.28 if in_shallow_water and not in_deep_water else 0.42
+				var splash_scale: float = 0.32 if in_shallow_water and not in_deep_water else 0.45
 				if boosting_in_water:
 					splash_scale *= 1.35
 				# Side sprays from wheel positions
@@ -1264,8 +1292,6 @@ func _physics_process(delta):
 				var base_p: Vector3 = Vector3(global_position.x, water_surface_y, global_position.z)
 				_spawn_splash(base_p - right_vec * 0.55 + back_vec * 0.2, splash_scale)
 				_spawn_splash(base_p + right_vec * 0.55 + back_vec * 0.2, splash_scale * 0.9)
-				if linear_velocity.length() > 10.0 or boosting_in_water:
-					_spawn_splash(base_p + back_vec * 1.1, splash_scale * 0.75)
 		_update_water_wake(wet_moving, delta)
 
 		# Continuous water drag — not applied while boosting
@@ -1791,7 +1817,7 @@ func _physics_process(delta):
 		apply_central_force(-fwd * excess_ratio * acceleration * 8.0 * mass)
 
 	# Emit dirt particles when offroad, moving, and NOT in water
-	var in_water_now := stage_has_water and (is_underwater or (water_surface_y - global_position.y >= -0.45 and _is_over_water_volume()))
+	var in_water_now := stage_has_water and (is_underwater or (water_surface_y - global_position.y >= -0.80 and _is_over_water_volume()))
 	var emit_dirt = is_offroad and on_ground and linear_velocity.length() > 2.0 and not in_water_now
 	_set_dirt_emitting(emit_dirt)
 	sync_emit_dirt = emit_dirt
@@ -3779,7 +3805,7 @@ func _park_trail_emitter(p: CPUParticles3D) -> void:
 func _set_dirt_emitting(emitting: bool):
 	if not _trail_particles_ready:
 		return
-	var in_water := stage_has_water and (is_underwater or (water_surface_y - global_position.y >= -0.45 and _is_over_water_volume()))
+	var in_water := stage_has_water and (is_underwater or (water_surface_y - global_position.y >= -0.80 and _is_over_water_volume()))
 	var speed: float = linear_velocity.length()
 	var time_since_respawn = (Time.get_ticks_msec() / 1000.0) - last_respawn_time
 	
@@ -3836,8 +3862,8 @@ func _spawn_splash(pos: Vector3, size_scale: float = 1.0):
 		get_tree().current_scene.add_child(splash_instance)
 		splash_instance.global_position = pos
 
-		# Play high-pitched, quieter splash sound for tiny splashes (puddles / exits)
-		if size_scale < 1.0 and not REGULAR_SPLASH_SOUNDS.is_empty():
+		# Play high-pitched, quieter splash sound for splashes (rate-limited)
+		if not REGULAR_SPLASH_SOUNDS.is_empty() and randf() < 0.3:
 			var stream = REGULAR_SPLASH_SOUNDS[randi() % REGULAR_SPLASH_SOUNDS.size()]
 			if stream:
 				var ap = AudioStreamPlayer3D.new()
@@ -3845,12 +3871,12 @@ func _spawn_splash(pos: Vector3, size_scale: float = 1.0):
 				ap.bus = &"SFX"
 				ap.max_distance = 50.0
 				ap.unit_size = 5.0
-				ap.volume_db = lerp(-15.0, -9.0, size_scale)
-				ap.pitch_scale = lerp(1.35, 1.0, size_scale)
+				ap.volume_db = lerp(-15.0, -9.0, clampf(size_scale, 0.0, 1.0))
+				ap.pitch_scale = lerp(1.35, 1.0, clampf(size_scale, 0.0, 1.0))
 				get_tree().current_scene.add_child(ap)
 				ap.global_position = pos
 				ap.play()
-				get_tree().create_timer(stream.get_length() + 0.5).timeout.connect(ap.queue_free)
+				get_tree().create_timer(stream.get_length() + 0.3).timeout.connect(ap.queue_free)
 
 
 func _ensure_water_wake() -> void:
