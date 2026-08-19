@@ -43,7 +43,17 @@
 [ext_resource type="PackedScene" path="res://models/desert2/a9540c80c20c1585b38229b13a303bae.fbx" id="35_jlq4o"]
 [ext_resource type="PackedScene" path="res://models/desert2/ad22f65c2bded13744e1378aed38d241.fbx" id="36_jlq4o"]
 [ext_resource type="PackedScene" path="res://Tornado.tscn" id="37_yfrwy"]
+[ext_resource type="PackedScene" path="res://models/signs/300e3a6c1bcdf1aa873e688a8ff387b6.fbx" id="38_yfrwy"]
+[ext_resource type="PackedScene" path="res://models/ramps/3e91b0d4625db724ca9c58b3b1bcabf3.fbx" id="39_2is8y"]
+[ext_resource type="PackedScene" path="res://models/clouds/7de0ccae5a6e93d1c9aaa73423f08f02.fbx" id="40_g1aow"]
+[ext_resource type="PackedScene" path="res://models/desert/2f1728e226824507fc3188405c2c7935.fbx" id="41_bqk36"]
+[ext_resource type="PackedScene" path="res://models/desert/5de45969eb67cee87dc8ebbdd862dc99.fbx" id="42_g7jjn"]
 [ext_resource type="Script" path="res://Tornado.gd" id="42_jmhce"]
+[ext_resource type="PackedScene" path="res://models/desert/7b4c6b35c14804590f71c63e961076cb.fbx" id="43_ctbtb"]
+[ext_resource type="PackedScene" path="res://models/desert/49ac41a0567226438249fc402b0d629c.fbx" id="44_jmhce"]
+[ext_resource type="PackedScene" path="res://models/clouds/9dfd1cceace1d88062d0a36959d52540.fbx" id="47_jmhce"]
+[ext_resource type="PackedScene" path="res://models/desert/20260617011251_4d3f8d7e.fbx" id="48_vgigm"]
+[ext_resource type="Script" path="res://Windmill.gd" id="49_windmill"]
 [ext_resource type="Texture2D" path="res://materials/dirt.png" id="dirt_albedo"]
 [ext_resource type="Texture2D" path="res://materials/dirt_normal.png" id="dirt_normal"]
 [ext_resource type="Texture2D" path="res://materials/dark_canyon_rock.png" id="rock_albedo"]
@@ -379,91 +389,129 @@ script = ExtResource("23_g7jjn")
 transform = Transform3D(-1, 0, 0, 0, 0.99930537, 0.03726767, 0, 0.03726767, -0.99930537, -200, 10.987848, 112.48163)
 script = ExtResource("23_g7jjn")
 
-[node name="e963227e4c0f549dc4852c7b2189de15" type="Node3D" parent="." unique_id=966673545 groups=["collision_capsule"] instance=ExtResource("22_a7e1k")]
+[node name="DesertPlant_Curve1" type="Node3D" parent="." unique_id=966673545 groups=["collision_capsule"] instance=ExtResource("22_a7e1k")]
 transform = Transform3D(1.1459306, -1.5730582, 3.4946144, 0.17964509, 3.665537, 1.5910889, -3.8281288, -0.29887187, 1.1207609, 220, -0.58528304, 347.41635)
 
-[node name="411c0309a5ad518b5594f711a337e50b" type="Node3D" parent="." unique_id=476417688 groups=["collision_trimesh"] instance=ExtResource("23_qixvg")]
+[node name="DesertShrub_Curve1" type="Node3D" parent="." unique_id=476417688 groups=["collision_trimesh"] instance=ExtResource("23_qixvg")]
 transform = Transform3D(5.3299856, 0, -8.461162, 0, 10, 0, 8.461162, 0, 5.3299856, 242.95032, 0.9323518, 343.07593)
 
-[node name="462b0835dae4689feaf62903546389ee" type="Node3D" parent="." unique_id=641434050 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
+[node name="Rock_Curve1" type="Node3D" parent="." unique_id=641434050 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
 transform = Transform3D(27.864042, 0, 11.117328, 0, 29.999998, 0, -11.117328, 0, 27.864042, 253.3669, -2.7205014, 340.88538)
 
-[node name="462b0835dae4689feaf62903546389ee2" type="Node3D" parent="." unique_id=807565828 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
+[node name="Rock_Curve2" type="Node3D" parent="." unique_id=807565828 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
 transform = Transform3D(24.244986, 0, -17.668625, 0, 29.999994, 0, 17.668625, 0, 24.244986, 253.3669, -3.378232, 338.09543)
 
-[node name="462b0835dae4689feaf62903546389ee3" type="Node3D" parent="." unique_id=422975015 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
+[node name="Rock_Curve3" type="Node3D" parent="." unique_id=422975015 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
 transform = Transform3D(5.359399, 0, -29.517393, 0, 29.999994, 0, 29.517393, 0, 5.359399, 213.10631, -3.378232, 350.95847)
 
-[node name="462b0835dae4689feaf62903546389ee4" type="Node3D" parent="." unique_id=956620995 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
+[node name="Rock_Curve4" type="Node3D" parent="." unique_id=956620995 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
 transform = Transform3D(24.244986, 0, -17.668625, 0, 29.999994, 0, 17.668625, 0, 24.244986, 204.57759, -0.7832155, 281.20734)
 
-[node name="462b0835dae4689feaf62903546389ee5" type="Node3D" parent="." unique_id=1740016918 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
+[node name="Rock_Curve5" type="Node3D" parent="." unique_id=1740016918 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
 transform = Transform3D(-27.423973, 0, -12.162459, 0, 29.999994, 0, 12.162459, 0, -27.423973, 204.57759, -0.7832155, 260.20734)
 
-[node name="462b0835dae4689feaf62903546389ee6" type="Node3D" parent="." unique_id=1465697561 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
+[node name="Rock_Curve6" type="Node3D" parent="." unique_id=1465697561 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
 transform = Transform3D(-29.824936, 0, -3.2362132, 0, 29.999994, 0, 3.2362132, 0, -29.824936, 252.30257, -1.1570845, 184.71716)
 
-[node name="aff6cf16c1bc07c2988e5df33874dd37" type="Node3D" parent="." unique_id=1573835 groups=["collision_trimesh"] instance=ExtResource("25_cjhef")]
-transform = Transform3D(-2.0240371, 0, -9.793022, 0, 10, 0, 9.793022, 0, -2.0240371, 238.7632, 0.3787589, 210.87389)
+[node name="Rock5" type="Node3D" parent="." unique_id=641434051 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
+transform = Transform3D(27.864042, 0, 11.117328, 0, 29.999998, 0, -11.117328, 0, 27.864042, 163.87051, 7.458252, 54.920425)
 
-[node name="155b46f430c01d85b690a61ac5be8ae0" type="Node3D" parent="." unique_id=546077158 groups=["collision_trimesh"] instance=ExtResource("26_n0bgs")]
-transform = Transform3D(8, 0, 0, 0, 8, 0, 0, 0, 8, 241.11154, 0.06895524, 225.63548)
+[node name="Rock4" type="Node3D" parent="." unique_id=807565829 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
+transform = Transform3D(7.212676, 0, -29.120045, 0, 29.999994, 0, 29.120045, 0, 7.212676, 13.206236, 5.4254436, 120.170166)
 
-[node name="a0c68129ab868a396612d59572399b8f" type="Node3D" parent="." unique_id=481816827 groups=["collision_trimesh"]]
-transform = Transform3D(17.636442, -0.4111803, -24.264925, -0.57857937, 29.980045, -0.9285529, 24.261513, 1.0138524, 17.616783, 257.76495, -0.249004, 203.54698)
+[node name="Rock3" type="Node3D" parent="." unique_id=956620996 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
+transform = Transform3D(-22.197853, 0, -20.18056, 0, 29.999994, 0, 20.18056, 0, -22.197853, 203.6976, 15.681635, -280.43048)
 
-[node name="node_0" type="MeshInstance3D" parent="a0c68129ab868a396612d59572399b8f" unique_id=1260266801]
+[node name="RockBush" type="Node3D" parent="." unique_id=1573835 groups=["collision_trimesh"] instance=ExtResource("25_cjhef")]
+transform = Transform3D(8.511437, 0, -5.249329, 0, 10, 0, 5.249329, 0, 8.511437, 197.2773, 10.352097, -34.09053)
+
+[node name="AloePlant" type="Node3D" parent="." unique_id=546077158 groups=["collision_trimesh"] instance=ExtResource("26_n0bgs")]
+transform = Transform3D(8, 0, 0, 0, 8, 0, 0, 0, 8, 236.76292, 14.058924, -152.73079)
+
+[node name="DirtRamp" type="Node3D" parent="." unique_id=481816827 groups=["collision_trimesh"]]
+transform = Transform3D(28.188902, 0.22613531, -10.263245, -0.5785793, 29.980045, -0.9285529, 10.249425, 1.0704339, 28.174513, 227.7674, 11.293182, -86.09378)
+
+[node name="node_0" type="MeshInstance3D" parent="DirtRamp" unique_id=1260266801]
 transform = Transform3D(100, 0, 0, 0, 100, 7.54979e-06, 0, -7.54979e-06, 100, 0, 0, 0)
 mesh = SubResource("ArrayMesh_8aovn")
 skeleton = NodePath("")
 
-[node name="4e939b2e8cdcc2962e57e51a0bdc4e71" type="Node3D" parent="." unique_id=1098758255 groups=["collision_trimesh"] instance=ExtResource("27_pl6wn")]
+[node name="DirtRamp2" type="Node3D" parent="." unique_id=1945682634 groups=["collision_trimesh"]]
+transform = Transform3D(-29.991116, -0.6030981, 0.41063133, -0.60307324, 29.99393, 0.0059119477, -0.41067436, -0.0023448393, -29.997177, 0.0026917458, 4.2034845, 48.243607)
+
+[node name="node_0" type="MeshInstance3D" parent="DirtRamp2" unique_id=1935877771]
+transform = Transform3D(100, 0, 0, 0, 100, 7.54979e-06, 0, -7.54979e-06, 100, 0, 0, 0)
+mesh = SubResource("ArrayMesh_8aovn")
+skeleton = NodePath("")
+
+[node name="DesertPlant_Straight1" type="Node3D" parent="." unique_id=1098758255 groups=["collision_trimesh"] instance=ExtResource("27_pl6wn")]
 transform = Transform3D(8, 0, 0, 0, 8, 0, 0, 0, 8, 217.81291, -0.16901779, 244.52638)
 
-[node name="4e939b2e8cdcc2962e57e51a0bdc4e72" type="Node3D" parent="." unique_id=1387960504 groups=["collision_trimesh"] instance=ExtResource("27_pl6wn")]
+[node name="DesertPlant_Straight2" type="Node3D" parent="." unique_id=1387960504 groups=["collision_trimesh"] instance=ExtResource("27_pl6wn")]
 transform = Transform3D(4.921929, 0, 6.306712, 0, 8, 0, -6.306712, 0, 4.921929, 217.81291, -0.16901779, 236.94695)
 
-[node name="04b2c6e2e49cc272be24d5807fee4ea0" type="Node3D" parent="." unique_id=797439357 groups=["collision_capsule"] instance=ExtResource("28_fwawu")]
+[node name="DesertBush_Curve1" type="Node3D" parent="." unique_id=797439357 groups=["collision_capsule"] instance=ExtResource("28_fwawu")]
 transform = Transform3D(8, 0, 0, 0, 8, 0, 0, 0, 8, 233.45787, 0.18954492, 306.06412)
 
-[node name="7c746b3609638bc97eb9642b3b3c9893" type="Node3D" parent="." unique_id=1899823061 groups=["collision_trimesh"] instance=ExtResource("30_pkpnn")]
+[node name="DesertFern_Straight1" type="Node3D" parent="." unique_id=1899823061 groups=["collision_trimesh"] instance=ExtResource("30_pkpnn")]
 transform = Transform3D(4.6430693, 0, -14.263306, 0, 14.999999, 0, 14.263306, 0, 4.6430693, 296.57, 1.4625032, 191.86465)
 
-[node name="33c2bdd34237248948d6d4ca5c4ac8f2" type="Node3D" parent="." unique_id=2059769729 groups=["collision_trimesh"] instance=ExtResource("31_7uf2i")]
-transform = Transform3D(15, 0, 0, 0, 14.772116, -2.6047227, 0, 2.6047227, 14.772116, 294.2182, 0.9609355, 150.6189)
+[node name="JehovaTree2" type="Node3D" parent="." unique_id=2059769729 groups=["collision_trimesh"] instance=ExtResource("31_7uf2i")]
+transform = Transform3D(15, 0, 0, 0, 14.772116, -2.6047227, 0, 2.6047227, 14.772116, -12.926787, 5.085778, 150.6189)
 
-[node name="56a04471ee12ebffca9d2fcc9ec969e8" type="Node3D" parent="." unique_id=1193622247 groups=["collision_trimesh"] instance=ExtResource("32_vxc05")]
+[node name="DesertShrub_Straight2" type="Node3D" parent="." unique_id=1193622247 groups=["collision_trimesh"] instance=ExtResource("32_vxc05")]
 transform = Transform3D(2.1770976, 0, -4.501138, 0, 5, 0, 4.501138, 0, 2.1770976, 308.99692, 2.3032908, 173.61284)
 
-[node name="0797593737478869dca3e088a7e7ec6c" type="Node3D" parent="." unique_id=1663010525 groups=["collision_trimesh"] instance=ExtResource("33_hyofv")]
-transform = Transform3D(8.654013, 0, -12.251859, 0, 14.999999, 0, 12.251859, 0, 8.654013, 328.2307, -0.052932948, 126.92493)
+[node name="JehovaTree" type="Node3D" parent="." unique_id=1663010525 groups=["collision_trimesh"] instance=ExtResource("33_hyofv")]
+transform = Transform3D(8.654013, 0, -12.251859, 0, 14.999999, 0, 12.251859, 0, 8.654013, 132.94797, 21.049828, -315.17072)
 
 [node name="BoostPads" type="Node3D" parent="." unique_id=934022738]
 
 [node name="BoostPad_HillJump" type="Area3D" parent="BoostPads" unique_id=1434937508 instance=ExtResource("35_g7jjn")]
 transform = Transform3D(1, 0, 0, 0, 0.9144843, -0.40462127, 0, 0.40462127, 0.9144843, 150, 41.262352, -26.768576)
-collision_layer = 0
+flash_brightness = 1.0
+boost_strength = 2.0
 script = ExtResource("32_ctbtb")
 
 [node name="BoostPad_HillJump2" type="Area3D" parent="BoostPads" unique_id=368743564 instance=ExtResource("35_g7jjn")]
 transform = Transform3D(1, 0, 0, 0, 0.92547673, -0.37880442, 0, 0.37880442, 0.92547673, 150, 46.859993, -40.1856)
-collision_layer = 0
+flash_brightness = 1.0
+boost_strength = 2.0
+boost_duration = 3.0
 script = ExtResource("32_ctbtb")
 
 [node name="BoostPad_CrossingJump" type="Area3D" parent="BoostPads" unique_id=691590765 instance=ExtResource("35_g7jjn")]
 transform = Transform3D(-0.8322849, 0.12291099, 0.54055035, 0, 0.97510993, -0.2217217, -0.55434805, -0.18453562, -0.81156933, 39.181423, 41.479214, -112.563225)
-collision_layer = 0
+flash_brightness = 1.0
 script = ExtResource("32_ctbtb")
 
 [node name="BoostPad_CrossingJump2" type="Area3D" parent="BoostPads" unique_id=1775387508 instance=ExtResource("35_g7jjn")]
 transform = Transform3D(-0.5490631, 0.18531075, 0.81497836, -6.201006e-09, 0.97510993, -0.2217217, -0.8357809, -0.121739194, -0.5353969, 31.772614, 43.933277, -104.73784)
-collision_layer = 0
+flash_brightness = 1.0
+boost_strength = 2.0
+boost_duration = 3.0
 script = ExtResource("32_ctbtb")
 
 [node name="BoostPad_Start" type="Area3D" parent="BoostPads" unique_id=759228800 instance=ExtResource("35_g7jjn")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.4463267, 160)
-collision_layer = 0
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 5.4463267, 160)
+flash_brightness = 1.0
+boost_duration = 4.0
 script = ExtResource("32_ctbtb")
+
+[node name="BoostPad_Start2" type="Area3D" parent="BoostPads" unique_id=838001487 instance=ExtResource("35_g7jjn")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -3.695167, 5.4463267, 122.07371)
+flash_brightness = 1.0
+boost_duration = 4.0
+script = ExtResource("32_ctbtb")
+
+[node name="BoostPad_Start3" type="Area3D" parent="BoostPads" unique_id=1392837718 instance=ExtResource("35_g7jjn")]
+transform = Transform3D(-0.99857885, 0, -0.053294733, 0, 1, 0, 0.053294733, 0, -0.99857885, -1.5082724, 5.6917453, -58.16087)
+flash_brightness = 1.0
+boost_duration = 4.0
+script = ExtResource("32_ctbtb")
+
+[node name="Cactus_BoostPad" type="Node3D" parent="BoostPads" unique_id=473882448 groups=["collision_trimesh"] instance=ExtResource("43_ctbtb")]
+transform = Transform3D(7.4116917, 0, 3.0111175, 0, 8, 0, -3.0111175, 0, 7.4116917, -10.598718, 5.395865, -10.323456)
 
 [node name="Rock" type="Node3D" parent="." unique_id=392354509 groups=["collision_trimesh"] instance=ExtResource("28_wjk7k")]
 transform = Transform3D(30, 0, 0, 0, 30, 0, 0, 0, 30, 82.71512, 23.312023, -129.08461)
@@ -471,8 +519,8 @@ transform = Transform3D(30, 0, 0, 0, 30, 0, 0, 0, 30, 82.71512, 23.312023, -129.
 [node name="RockArc" type="Node3D" parent="." unique_id=1972210431 groups=["collision_trimesh"] instance=ExtResource("29_imvwc")]
 transform = Transform3D(18.271385, 0, 38.811317, 0, 31.270712, 0, -49.931297, 0, 14.202244, 94.92699, 16.49191, -296.09634)
 
-[node name="fdf67fbe6bce046595412b61400019fd" type="Node3D" parent="." unique_id=1651551431 groups=["collision_trimesh"] instance=ExtResource("33_imvwc")]
-transform = Transform3D(7, 0, 0, 0, 7, 0, 0, 0, 7, 99.7723, 21.038889, -198.21112)
+[node name="SmallCactus" type="Node3D" parent="." unique_id=1651551431 groups=["collision_trimesh"] instance=ExtResource("33_imvwc")]
+transform = Transform3D(7, 0, 0, 0, 7, 0, 0, 0, 7, 147.1193, 20.266645, -289.58734)
 
 [node name="SpawnPoints" type="Node3D" parent="." unique_id=1096302804]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.5, 188.2766)
@@ -513,21 +561,68 @@ gizmo_extents = 0.3
 
 [node name="SpawnIndicator" type="Node3D" parent="SpawnPoints/Spawn6" unique_id=228096706 instance=ExtResource("21_623mb")]
 
-[node name="3947899e2e8ccf226587409e9b0ce96a" type="Node3D" parent="." unique_id=596362896 groups=["collision_box"] instance=ExtResource("32_wjk7k")]
+[node name="Barrier2" type="Node3D" parent="." unique_id=596362896 groups=["collision_box"] instance=ExtResource("32_wjk7k")]
 transform = Transform3D(-6.355286, 1.997225, 7.4579797, 1.172365, 9.797247, -1.6246495, -7.631245, -0.15816393, -6.4605803, 35.728683, 43.564785, -99.03508)
 
-[node name="3947899e2e8ccf226587409e9b0ce96a2" type="Node3D" parent="." unique_id=936574112 groups=["collision_box"] instance=ExtResource("32_wjk7k")]
+[node name="Barrier" type="Node3D" parent="." unique_id=936574112 groups=["collision_box"] instance=ExtResource("32_wjk7k")]
 transform = Transform3D(-8.257235, 2.6043391, 5.003553, 1.6949557, 9.605985, -2.202758, -5.380077, -0.97078836, -8.373312, 44.4134, 40.738453, -110.15776)
 
-[node name="56596d3726aaf247cc16af97e179543d" type="Node3D" parent="." unique_id=825015724 instance=ExtResource("34_dm6xj")]
-transform = Transform3D(8, 0, 0, 0, 8, 0, 0, 0, 8, 139.22684, -2.8940966, -90.76361)
+[node name="WaterLilly2" type="Node3D" parent="." unique_id=825015724 instance=ExtResource("34_dm6xj")]
+transform = Transform3D(5, 0, 0, 0, 5, 0, 0, 0, 5, 139.22684, -2.6442664, -90.76361)
 
-[node name="a9540c80c20c1585b38229b13a303bae" type="Node3D" parent="." unique_id=665414643 groups=["collision_trimesh"] instance=ExtResource("35_jlq4o")]
+[node name="WaterLilly3" type="Node3D" parent="." unique_id=1308769749 instance=ExtResource("34_dm6xj")]
+transform = Transform3D(2.715465, 0, 4.1983624, 0, 5, 0, -4.1983624, 0, 2.715465, 159.43239, -2.6442664, -74.98771)
+
+[node name="WaterLilly" type="Node3D" parent="." unique_id=2089985137 instance=ExtResource("34_dm6xj")]
+transform = Transform3D(3.802534, 0, -3.246649, 0, 5, 0, 3.246649, 0, 3.802534, 153.63899, -2.6442664, -101.18465)
+
+[node name="Cactus2" type="Node3D" parent="." unique_id=665414643 groups=["collision_trimesh"] instance=ExtResource("35_jlq4o")]
 transform = Transform3D(-12.444993, 0, 3.7579427, 0, 12.999999, 0, -3.7579427, 0, -12.444993, 102.28944, 20.489555, -164.30675)
 
-[node name="ad22f65c2bded13744e1378aed38d241" type="Node3D" parent="." unique_id=859400927 groups=["collision_trimesh"] instance=ExtResource("36_jlq4o")]
-transform = Transform3D(14.558575, 0, -10.585268, 0, 18, 0, 10.585268, 0, 14.558575, 67.93663, 24.730265, -171.84764)
+[node name="StonePile2" type="Node3D" parent="." unique_id=859400927 groups=["collision_trimesh"] instance=ExtResource("36_jlq4o")]
+transform = Transform3D(11.323336, 0, -8.232986, 0, 14, 0, 8.232986, 0, 11.323336, -195.18655, 11.279968, 51.420753)
+
+[node name="StonePile" type="Node3D" parent="." unique_id=1508225311 groups=["collision_trimesh"] instance=ExtResource("36_jlq4o")]
+transform = Transform3D(0.42886114, 0, 13.993429, 0, 14, 0, -13.993429, 0, 0.42886114, -205.47336, 12.372435, 33.229164)
 
 [node name="Tornado" type="Node3D" parent="." unique_id=457428002 instance=ExtResource("37_yfrwy")]
 transform = Transform3D(40, 0, 0, 0, 40, 0, 0, 0, 40, -190.73326, 14.531099, -13.189145)
 script = ExtResource("42_jmhce")
+
+[node name="ArrowSign" type="Node3D" parent="." unique_id=1803191181 groups=["collision_trimesh"] instance=ExtResource("38_yfrwy")]
+transform = Transform3D(-9.996108, 0, 0.27896273, 0, 10, 0, -0.27896273, 0, -9.996108, 172.84212, 13.691994, 57.046265)
+
+[node name="StoneRamp" type="Node3D" parent="." unique_id=56019382 groups=["collision_trimesh"] instance=ExtResource("39_2is8y")]
+transform = Transform3D(-15.1788845, 2.5161555, -12.777728, 2.2988522, 19.832695, 1.1745567, 12.8186035, -0.57728004, -15.341118, 73.94879, 23.910437, -171.3945)
+
+[node name="Cloud" type="Node3D" parent="." unique_id=249770628 instance=ExtResource("40_g1aow")]
+transform = Transform3D(40, 0, 0, 0, 40, 0, 0, 0, 40, 41.54222, 69.721954, -155.88416)
+
+[node name="Cloud2" type="Node3D" parent="." unique_id=1420891045 instance=ExtResource("40_g1aow")]
+transform = Transform3D(-35.26255, 0, -18.882597, 0, 40, 0, 18.882597, 0, -35.26255, 212.97697, 69.721954, -118.993835)
+
+[node name="Cloud3" type="Node3D" parent="." unique_id=1977614315 instance=ExtResource("40_g1aow")]
+transform = Transform3D(28.287628, 0, -28.280916, 0, 40.000004, 0, 28.280916, 0, 28.287628, 85.97191, 69.721954, 70.140976)
+
+[node name="LargeHouse" type="Node3D" parent="." unique_id=1836076422 groups=["collision_trimesh"] instance=ExtResource("41_bqk36")]
+transform = Transform3D(45, 0, 0, 0, 45, 0, 0, 0, 45, 92.01698, 22.813381, -226.99994)
+
+[node name="Rock2" type="Node3D" parent="." unique_id=200053900 groups=["collision_trimesh"] instance=ExtResource("42_g7jjn")]
+transform = Transform3D(-18.548613, 0, 7.4799037, 0, 20, 0, -7.4799037, 0, -18.548613, 18.455477, 9.080536, -221.50865)
+
+[node name="Cactus" type="Node3D" parent="." unique_id=1091832397 groups=["collision_trimesh"] instance=ExtResource("43_ctbtb")]
+transform = Transform3D(-5.9097557, 0, 12.6915245, 0, 14, 0, -12.6915245, 0, -5.9097557, -10.751764, 11.38545, -221.50865)
+
+[node name="House" type="Node3D" parent="." unique_id=168986308 groups=["collision_trimesh"] instance=ExtResource("44_jmhce")]
+transform = Transform3D(30.403774, 0, 17.33812, 0, 35, 0, -17.33812, 0, 30.403774, 66.34487, 24.385925, -95.454575)
+
+[node name="NewCloud" type="Node3D" parent="." unique_id=1071866098 instance=ExtResource("47_jmhce")]
+transform = Transform3D(40, 0, 0, 0, 40, 0, 0, 0, 40, -4.315048, 61.000793, 4.0584097)
+
+[node name="NewCloud2" type="Node3D" parent="." unique_id=1013520015 instance=ExtResource("47_jmhce")]
+transform = Transform3D(3.20723, 0, 39.871212, 0, 40, 0, -39.871212, 0, 3.20723, -64.26051, 61.000793, -293.81082)
+
+[node name="Windmill" type="Node3D" parent="." unique_id=1391821853 instance=ExtResource("48_vgigm")]
+transform = Transform3D(12.53887, 0, 27.25393, 0, 29.999998, 0, -27.25393, 0, 12.53887, -92.06942, 18.839483, -127.02689)
+script = ExtResource("49_windmill")
+
