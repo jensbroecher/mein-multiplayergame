@@ -15,6 +15,9 @@
 [ext_resource type="Texture2D" uid="uid://b4j07jck2kec0" path="res://materials/dark_canyon_rock_normal.png" id="11_rock_norm"]
 [ext_resource type="Texture2D" uid="uid://c45b43y4vhj0d" path="res://materials/dark_canyon_rock.png" id="11_rock_tex"]
 [ext_resource type="Texture2D" uid="uid://cm2nsin2ss4ak" path="res://materials/sand_normal.png" id="11_sand_norm"]
+[ext_resource type="Texture2D" uid="uid://bf05h3t4rlqs7" path="res://materials/concrete.png" id="11_concrete_tex"]
+[ext_resource type="Texture2D" uid="uid://j6l2pulbaugj" path="res://materials/concrete_normal.png" id="11_concrete_norm"]
+[ext_resource type="Texture2D" uid="uid://dasndv73breob" path="res://materials/concrete_roughness.png" id="11_concrete_rough"]
 [ext_resource type="Texture2D" uid="uid://bsmrfxbh6vqe2" path="res://materials/asphalt.png" id="12_g5aih"]
 [ext_resource type="ArrayMesh" path="res://generated/mountain_terrain_visual.res" id="13_jrwcp"]
 [ext_resource type="Shape3D" path="res://generated/mountain_terrain_collision_shape.res" id="14_01bw0"]
@@ -206,8 +209,15 @@ shader_parameter/roughness = 0.8
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_qw57s"]
 cull_mode = 2
-albedo_color = Color(0.45, 0.45, 0.45, 1)
-roughness = 0.95
+albedo_texture = ExtResource("11_concrete_tex")
+roughness = 0.9
+roughness_texture = ExtResource("11_concrete_rough")
+normal_enabled = true
+normal_scale = 1.0
+normal_texture = ExtResource("11_concrete_norm")
+uv1_scale = Vector3(0.15, 0.15, 0.15)
+uv1_triplanar = true
+uv1_triplanar_sharpness = 4.0
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_5bah8"]
 render_priority = 0
@@ -221,14 +231,15 @@ shader_parameter/use_world_uv = true
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bfoi6"]
 cull_mode = 2
-albedo_texture = ExtResource("11_rock_tex")
+albedo_texture = ExtResource("11_concrete_tex")
 roughness = 0.9
+roughness_texture = ExtResource("11_concrete_rough")
 normal_enabled = true
-normal_scale = 1.5
-normal_texture = ExtResource("11_rock_norm")
-uv1_scale = Vector3(0.05, 0.05, 0.05)
+normal_scale = 1.0
+normal_texture = ExtResource("11_concrete_norm")
+uv1_scale = Vector3(0.15, 0.15, 0.15)
 uv1_triplanar = true
-uv1_triplanar_sharpness = 8.0
+uv1_triplanar_sharpness = 4.0
 
 [sub_resource type="Curve3D" id="Curve3D_track"]
 bake_interval = 0.25

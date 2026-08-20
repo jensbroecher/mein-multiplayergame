@@ -863,14 +863,23 @@ func _generate_road_and_sand():
 
 	# 2. Create a Concrete Material for the vertical sides
 	var concrete_mat = StandardMaterial3D.new()
-	concrete_mat.albedo_color = Color(0.45, 0.45, 0.45) # Classic concrete grey
-	concrete_mat.roughness = 0.95
-	concrete_mat.metallic = 0.0
+	concrete_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	concrete_mat.albedo_texture = load("res://materials/concrete.png")
+	concrete_mat.roughness = 0.9
+	concrete_mat.roughness_texture = load("res://materials/concrete_roughness.png")
+	concrete_mat.normal_enabled = true
+	concrete_mat.normal_texture = load("res://materials/concrete_normal.png")
+	concrete_mat.normal_scale = 1.0
+	concrete_mat.uv1_triplanar = true
+	concrete_mat.uv1_triplanar_sharpness = 4.0
+	concrete_mat.uv1_scale = Vector3(0.15, 0.15, 0.15)
 
 	# 3. Visual Overlays: Curbs and Road
 	if track_layout_type != TrackLayoutType.CANYON:
 		_create_path_visual(points_count, sand_width, curb_mat, concrete_mat, curb_y_offset, "Visual_Curbs")
-	_create_path_visual(points_count, road_width, road_material, null, road_y_offset, "Visual_Road")
+		_create_path_visual(points_count, road_width, road_material, concrete_mat, road_y_offset, "Visual_Road")
+	else:
+		_create_path_visual(points_count, road_width, road_material, null, road_y_offset, "Visual_Road")
 
 	# Create ONE unified collision surface for EVERYTHING (Road + Border)
 	var col_width = road_width if track_layout_type == TrackLayoutType.CANYON else sand_width
@@ -1328,7 +1337,15 @@ func _generate_bridge_supports(point_count: int):
 	var step = 30.0 # Support every 30m
 
 	var support_mat = StandardMaterial3D.new()
-	support_mat.albedo_color = Color(0.3, 0.3, 0.3)
+	support_mat.albedo_texture = load("res://materials/concrete.png")
+	support_mat.roughness = 0.9
+	support_mat.roughness_texture = load("res://materials/concrete_roughness.png")
+	support_mat.normal_enabled = true
+	support_mat.normal_texture = load("res://materials/concrete_normal.png")
+	support_mat.normal_scale = 1.0
+	support_mat.uv1_triplanar = true
+	support_mat.uv1_triplanar_sharpness = 4.0
+	support_mat.uv1_scale = Vector3(0.15, 0.15, 0.15)
 
 	for d in range(0, int(length), int(step)):
 		var pos = curve.sample_baked(d)
