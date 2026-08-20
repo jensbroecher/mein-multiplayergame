@@ -204,6 +204,10 @@ var spectate_timer: float = 0.0
 var spectate_index: int = 0
 var smoothed_speed: float = 0.0
 var stuck_timer: float = 0.0
+var race_start_time: float = 0.0
+var _ai_avoid_force: float = 0.0
+var _ai_offtrack_timer: float = 0.0
+var _ai_unstuck_dir: float = 0.0
 var ai_item_timer: float = 0.0
 var ai_lane_offset: float = 0.0
 var ai_target_lane_offset: float = 0.0
@@ -213,10 +217,19 @@ var ai_last_stuck_position: Vector3 = Vector3.ZERO
 var _ai_want_drift: bool = false
 var _ai_upcoming_turn_angle: float = 0.0
 var _ai_upcoming_turn_dist: float = 40.0
-## 0 = cautious (recent safe style), 1 = old full-send. Rolled once per racer.
+var _ai_upcoming_turn_dir: float = 0.0
+## AI Personality parameters
 var ai_aggression: float = 0.45
 var ai_shortcut_chance: float = 0.35
 var ai_lane_span: float = 2.0
+var ai_corner_speed_factor: float = 1.0
+var ai_brake_dist_bias: float = 0.0
+var ai_lookahead_mult: float = 1.0
+var ai_racing_line_weight: float = 0.75
+var ai_drift_threshold: float = 0.32
+var ai_overtake_bias: float = 0.0
+var _ai_overtake_lock_timer: float = 0.0
+var _ai_start_grid_lane: float = 0.0
 var track_path: Path3D = null
 var alternative_paths: Array[Path3D] = []
 var active_path: Path3D = null
@@ -373,6 +386,34 @@ func has_physics_authority() -> bool:
 	return is_local_player or (is_ai and (multiplayer.multiplayer_peer == null or is_multiplayer_authority()))
 
 func on_race_started():
+	race_start_time = Time.get_ticks_msec() / 1000.0
+	ai_lane_change_timer = randf_range(3.0, 6.0)
+	_ai_avoid_force = 0.0
+	_ai_overtake_lock_timer = 0.0
+	
+	# Determine initial starting grid lane offset from world position relative to track
+	if is_ai:
+		var path_to_use = active_path if active_path else track_path
+		if path_to_use == null:
+			var lvl = get_tree().get_first_node_in_group("level")
+			if lvl and "track_path" in lvl:
+				path_to_use = lvl.track_path
+		if path_to_use and path_to_use.curve:
+			var curve = path_to_use.curve
+			var local_pos = path_to_use.to_local(global_position)
+			var offset = curve.get_closest_offset(local_pos)
+			var track_center = curve.sample_baked(offset)
+			var next_offset = fmod(offset + 1.0, curve.get_baked_length())
+			var tangent = (curve.sample_baked(next_offset) - track_center).normalized()
+			var right_vec = Vector3(-tangent.z, 0, tangent.x).normalized()
+			var to_car = local_pos - track_center
+			var lat_dist = right_vec.dot(to_car)
+			_ai_start_grid_lane = clampf(lat_dist, -ai_lane_span, ai_lane_span)
+			ai_lane_offset = _ai_start_grid_lane
+			ai_target_lane_offset = _ai_start_grid_lane
+		else:
+			_ai_start_grid_lane = ai_lane_offset
+
 	var has_physics_authority = has_physics_authority()
 	if has_physics_authority:
 		can_move = true
@@ -564,6 +605,12 @@ func _ready():
 	var level = get_tree().get_first_node_in_group("level")
 	if level:
 		_cached_level = level  # Cache for hot-path use in _process
+		if "track_path" in level and level.track_path:
+			track_path = level.track_path
+			if active_path == null:
+				active_path = track_path
+		if "alternative_paths" in level and level.alternative_paths:
+			alternative_paths = level.alternative_paths
 		if injected_race_ui:
 			race_ui = injected_race_ui  # Directly injected (LOCAL_COOP)
 		elif level.has_node("RaceUI"):
@@ -1136,21 +1183,50 @@ func _physics_process(delta):
 	if has_physics_authority and not is_exploding and not is_teleporting:
 		_prevent_floor_tunneling(delta)
 
-	# AI Stuck Detection (Checks if distance traveled over 4.0 seconds is less than 3.0 meters)
+	# AI Stuck & Off-Track Fall Detection
 	if is_ai and can_move and not is_exploding and respawn_indicator_time <= 0.0 and has_physics_authority:
 		ai_stuck_position_timer += delta
-		if ai_stuck_position_timer >= 4.0:
+		if ai_stuck_position_timer >= 4.5:
 			ai_stuck_position_timer = 0.0
 			var dist = global_position.distance_to(ai_last_stuck_position)
-			if dist < 3.0:
-				print("AI Cart ", name, " detected stuck (distance traveled in 4s: ", dist, "m). Respawning.")
+			if dist < 2.5:
+				print("AI Cart ", name, " detected stuck (distance traveled in 4.5s: ", dist, "m). Respawning.")
 				if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 					respawn_rpc.rpc()
 				else:
 					respawn()
 			ai_last_stuck_position = global_position
+		
+		# Check if cart has fallen off track (e.g. fallen down a cliff or ravine)
+		var check_path = active_path if active_path else track_path
+		if check_path == null:
+			var lvl = get_tree().get_first_node_in_group("level")
+			if lvl and "track_path" in lvl:
+				check_path = lvl.track_path
+		if check_path and check_path.curve:
+			var curve = check_path.curve
+			var local_p = check_path.to_local(global_position)
+			var cur_off = curve.get_closest_offset(local_p)
+			var track_pt = check_path.to_global(curve.sample_baked(cur_off))
+			var height_below = track_pt.y - global_position.y
+			var dist_3d = global_position.distance_to(track_pt)
+			
+			# ONLY respawn if cart has genuinely fallen off the course (down a cliff/chasm > 7m below or > 32m away)
+			var is_fallen_off = height_below > 7.0 or dist_3d > 32.0
+			if is_fallen_off:
+				_ai_offtrack_timer += delta
+				if _ai_offtrack_timer > 3.0:
+					print("AI Cart ", name, " fallen off course (height below: ", height_below, "m, dist: ", dist_3d, "m). Respawning.")
+					_ai_offtrack_timer = 0.0
+					if multiplayer.multiplayer_peer != null and multiplayer.is_server():
+						respawn_rpc.rpc()
+					else:
+						respawn()
+			else:
+				_ai_offtrack_timer = 0.0
 	else:
 		ai_stuck_position_timer = 0.0
+		_ai_offtrack_timer = 0.0
 		ai_last_stuck_position = global_position
 
 	if is_exploding:
@@ -1191,11 +1267,27 @@ func _physics_process(delta):
 					linear_velocity.z = move_toward(linear_velocity.z, 0.0, 3.0 * delta)
 					angular_velocity = angular_velocity.move_toward(Vector3.ZERO, 1.5 * delta)
 
-			if sfx_fire_loop.playing:
-				sfx_fire_loop.volume_db = lerp(sfx_fire_loop.volume_db, -10.0, 2.0 * delta)
-
-			burning_particles.global_position = global_position + Vector3(0, 0.4, 0)
-			burning_smoke_particles.global_position = global_position + Vector3(0, 0.5, 0)
+			var under_water_now := false
+			if stage_has_water and _is_over_water_volume():
+				var w_depth: float = water_surface_y - global_position.y
+				if w_depth > 0.2:
+					under_water_now = true
+			if is_underwater or under_water_now:
+				if burning_particles.emitting:
+					burning_particles.emitting = false
+				if burning_smoke_particles.emitting:
+					burning_smoke_particles.emitting = false
+				if fire_sprite_particles.emitting:
+					fire_sprite_particles.emitting = false
+				if fire_sprite_particles_2.emitting:
+					fire_sprite_particles_2.emitting = false
+				if sfx_fire_loop.playing:
+					sfx_fire_loop.stop()
+			else:
+				if sfx_fire_loop.playing:
+					sfx_fire_loop.volume_db = lerp(sfx_fire_loop.volume_db, -10.0, 2.0 * delta)
+				burning_particles.global_position = global_position + Vector3(0, 0.4, 0)
+				burning_smoke_particles.global_position = global_position + Vector3(0, 0.5, 0)
 
 		if has_physics_authority:
 			_move_and_sync()
@@ -1275,7 +1367,7 @@ func _physics_process(delta):
 		var on_flat_ground = false
 		if ground_ray.is_colliding() and ground_ray.get_collision_normal().y >= 0.55:
 			on_flat_ground = true
-		var wet_moving := in_water_contact and linear_velocity.length() > 2.5
+		var wet_moving := in_water_contact and not in_deep_water and water_depth < 0.70 and linear_velocity.length() > 2.5
 		if wet_moving:
 			var spray_interval: float = 0.16 if linear_velocity.length() > 12.0 else 0.26
 			if boosting_in_water:
@@ -1283,7 +1375,7 @@ func _physics_process(delta):
 			var current_time3 = Time.get_ticks_msec() / 1000.0
 			if current_time3 - last_splash_time > spray_interval:
 				last_splash_time = current_time3
-				var splash_scale: float = 0.32 if in_shallow_water and not in_deep_water else 0.45
+				var splash_scale: float = 0.32 if in_shallow_water else 0.45
 				if boosting_in_water:
 					splash_scale *= 1.35
 				# Side sprays from wheel positions
@@ -1882,18 +1974,26 @@ func _is_track_surface(collider: Object) -> bool:
 				or nm.contains("ramp") or nm.contains("bridge") \
 				or nm.contains("loop") or nm.contains("deck") \
 				or nm.contains("jump") or nm.contains("curb") \
-				or nm.contains("pier") or nm.contains("harbor"):
+				or nm.contains("pier") or nm.contains("harbor") \
+				or nm.contains("dune") or nm.contains("checkpoint") \
+				or nm.contains("finishline") or nm.contains("gate"):
 			return true
 		current = current.get_parent()
 	
+	var check_p = active_path if active_path else track_path
+	if check_p == null:
+		var lvl = get_tree().get_first_node_in_group("level")
+		if lvl and "track_path" in lvl:
+			check_p = lvl.track_path
+	
 	# On unified world / terrain generator, check distance to track path curve
-	if track_path and track_path.curve:
-		var local_p = track_path.to_local(global_position)
-		var offset = track_path.curve.get_closest_offset(local_p)
-		var track_pt = track_path.to_global(track_path.curve.sample_baked(offset))
+	if check_p and check_p.curve:
+		var local_p = check_p.to_local(global_position)
+		var offset = check_p.curve.get_closest_offset(local_p)
+		var track_pt = check_p.to_global(check_p.curve.sample_baked(offset))
 		var dist_xz = Vector2(global_position.x - track_pt.x, global_position.z - track_pt.z).length()
-		# Standard road half-width is ~7.5m, with generous 12.0m margin
-		if dist_xz < 12.0:
+		# Standard road half-width is ~7.5m, with generous 15.0m margin for terrain road blends
+		if dist_xz < 15.0:
 			return true
 
 	return false
@@ -2590,12 +2690,26 @@ func explode(attacker_id: int = 0):
 	var selected_bomb_sound = BOMB_EXPLOSION_SOUNDS[randi() % BOMB_EXPLOSION_SOUNDS.size()]
 	sfx_explosion.stream = selected_bomb_sound
 	sfx_explosion.play()
-	sfx_fire_loop.play()
+
+	var in_water_already := is_underwater
+	if stage_has_water and _is_over_water_volume():
+		if water_surface_y - global_position.y > 0.2:
+			in_water_already = true
+
+	if not in_water_already:
+		sfx_fire_loop.play()
+		burning_particles.emitting = true
+		burning_smoke_particles.emitting = true
+		fire_sprite_particles.emitting = true
+		fire_sprite_particles_2.emitting = true
+	else:
+		burning_particles.emitting = false
+		burning_smoke_particles.emitting = false
+		fire_sprite_particles.emitting = false
+		fire_sprite_particles_2.emitting = false
+		sfx_fire_loop.stop()
+
 	explosion_particles.emitting = true
-	burning_particles.emitting = true
-	burning_smoke_particles.emitting = true
-	fire_sprite_particles.emitting = true
-	fire_sprite_particles_2.emitting = true
 	if engine_sound.playing: engine_sound.stop()
 	
 	visuals.visible = true
@@ -2732,8 +2846,17 @@ func respawn():
 
 	ignore_next_landing_sound = true
 	last_respawn_time = Time.get_ticks_msec() / 1000.0
+	stuck_timer = 0.0
+	_ai_avoid_force = 0.0
+	_ai_offtrack_timer = 0.0
+	_ai_unstuck_dir = 0.0
+	ai_lane_offset = 0.0
+	ai_target_lane_offset = 0.0
+	ai_lane_change_timer = randf_range(3.0, 6.0)
 	ai_stuck_position_timer = 0.0
 	ai_last_stuck_position = global_position
+	_ai_start_grid_lane = 0.0
+	_ai_overtake_lock_timer = 0.0
 	# Kill any in-flight drown fade tween so it can't overwrite the restored alpha
 	if _drown_tween:
 		_drown_tween.kill()
@@ -3202,6 +3325,11 @@ func client_play_lightning(hit_player_names: Array, random_target: Vector3 = Vec
 	sound_player.play()
 	get_tree().create_timer(1.5).timeout.connect(sound_player.queue_free)
 
+	var origin_getter = func():
+		if is_instance_valid(self) and is_instance_valid(visuals):
+			return global_position + visuals.global_transform.basis.y * 0.45
+		return global_position
+
 	if not hit_player_names.is_empty():
 		for name_str in hit_player_names:
 			var target = null
@@ -3210,82 +3338,132 @@ func client_play_lightning(hit_player_names: Array, random_target: Vector3 = Vec
 					target = c
 					break
 			if target:
-				_create_lightning_arc(global_position + Vector3(0, 0.8, 0), target.global_position + Vector3(0, 0.8, 0))
-				_spawn_sparks(target.global_position + Vector3(0, 0.8, 0))
+				var target_getter = func():
+					if is_instance_valid(target) and is_instance_valid(target.visuals):
+						return target.global_position + target.visuals.global_transform.basis.y * 0.45
+					return Vector3.ZERO
+				_create_dynamic_lightning_arc(origin_getter, target_getter)
+				_spawn_sparks(target.global_position + target.visuals.global_transform.basis.y * 0.45)
 	else:
 		var strike_pos = random_target
 		if strike_pos == Vector3.ZERO:
 			var fwd = -visuals.global_transform.basis.z
 			var right = visuals.global_transform.basis.x
 			strike_pos = global_position + fwd * 18.0 + right * randf_range(-8.0, 8.0)
-		_create_lightning_arc(global_position + Vector3(0, 0.8, 0), strike_pos + Vector3(0, 0.2, 0))
-		_spawn_sparks(strike_pos + Vector3(0, 0.2, 0))
+		var static_target = strike_pos + Vector3(0, 0.2, 0)
+		var static_getter = func():
+			return static_target
+		_create_dynamic_lightning_arc(origin_getter, static_getter)
+		_spawn_sparks(static_target)
 
-func _create_lightning_arc(start: Vector3, end: Vector3):
+func _create_dynamic_lightning_arc(start_getter: Callable, end_getter: Callable):
 	var mesh_instance = MeshInstance3D.new()
 	var imm_mesh = ImmediateMesh.new()
 	mesh_instance.mesh = imm_mesh
 	
 	var mat = StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.albedo_color = Color(0.2, 0.8, 1.0)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	mat.albedo_color = Color(0.85, 0.95, 1.0, 0.95)
 	mat.emission_enabled = true
-	mat.emission = Color(0.2, 0.8, 1.0)
-	mat.emission_energy_multiplier = 6.0
+	mat.emission = Color(0.2, 0.75, 1.0)
+	mat.emission_energy_multiplier = 14.0
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	mesh_instance.material_override = mat
 	
 	get_tree().current_scene.add_child(mesh_instance)
 	
-	imm_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+	var duration: float = 0.24
 	
-	var steps = 12
-	var points = []
-	points.append(start)
-	
-	var dir = end - start
-	var length = dir.length()
-	var step_vector = dir / steps
-	
-	var perp1 = dir.cross(Vector3.UP).normalized()
-	if perp1.length() < 0.1:
-		perp1 = dir.cross(Vector3.FORWARD).normalized()
-	var perp2 = dir.cross(perp1).normalized()
-	
-	for i in range(1, steps):
-		var base_pt = start + step_vector * i
-		var offset_scale = length * 0.04
-		var offset = perp1 * randf_range(-offset_scale, offset_scale) + perp2 * randf_range(-offset_scale, offset_scale)
-		points.append(base_pt + offset)
+	var redraw_arc = func():
+		if not is_instance_valid(mesh_instance) or not is_instance_valid(imm_mesh):
+			return
+		var start_pt: Vector3 = start_getter.call()
+		var end_pt: Vector3 = end_getter.call()
+		if start_pt == Vector3.ZERO or end_pt == Vector3.ZERO:
+			return
 		
-	points.append(end)
-	
-	for i in range(points.size() - 1):
-		var segment_dir = (points[i+1] - points[i]).normalized()
-		var side = segment_dir.cross(Vector3.UP).normalized() * 0.15
-		if side.length() < 0.01:
-			side = segment_dir.cross(Vector3.FORWARD).normalized() * 0.15
+		imm_mesh.clear_surfaces()
+		imm_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+		
+		var dir = end_pt - start_pt
+		var length = dir.length()
+		if length < 0.1:
+			imm_mesh.surface_end()
+			return
 			
-		var p1 = points[i] - side
-		var p2 = points[i] + side
-		var p3 = points[i+1] + side
-		var p4 = points[i+1] - side
+		var steps = clamp(int(length * 1.4), 14, 32)
+		var perp1 = dir.cross(Vector3.UP).normalized()
+		if perp1.length_squared() < 0.01:
+			perp1 = dir.cross(Vector3.FORWARD).normalized()
+		var perp2 = dir.cross(perp1).normalized()
 		
-		# Triangle 1
-		imm_mesh.surface_add_vertex(p1)
-		imm_mesh.surface_add_vertex(p2)
-		imm_mesh.surface_add_vertex(p3)
+		var points: Array[Vector3] = []
+		for i in range(steps + 1):
+			var t: float = float(i) / float(steps)
+			var base_pt = start_pt.lerp(end_pt, t)
+			var arc_up = sin(t * PI) * (length * 0.18 + 2.2)
+			base_pt.y += arc_up
+			var jitter_strength = sin(t * PI) * (length * 0.04 + 0.25)
+			var offset = perp1 * randf_range(-jitter_strength, jitter_strength) + perp2 * randf_range(-jitter_strength, jitter_strength)
+			points.append(base_pt + offset)
 		
-		# Triangle 2
-		imm_mesh.surface_add_vertex(p1)
-		imm_mesh.surface_add_vertex(p3)
-		imm_mesh.surface_add_vertex(p4)
+		var n_pts = points.size()
+		var width: float = 0.18
 		
-	imm_mesh.surface_end()
+		var left_pts: Array[Vector3] = []
+		var right_pts: Array[Vector3] = []
+		var top_pts: Array[Vector3] = []
+		var bottom_pts: Array[Vector3] = []
+		
+		for i in range(n_pts):
+			var tangent: Vector3
+			if i == 0:
+				tangent = (points[1] - points[0]).normalized()
+			elif i == n_pts - 1:
+				tangent = (points[n_pts - 1] - points[n_pts - 2]).normalized()
+			else:
+				tangent = (points[i + 1] - points[i - 1]).normalized()
+				
+			var side_h = tangent.cross(Vector3.UP).normalized() * width
+			if side_h.length_squared() < 0.001:
+				side_h = tangent.cross(Vector3.FORWARD).normalized() * width
+			var side_v = tangent.cross(side_h).normalized() * width
+			
+			left_pts.append(points[i] - side_h)
+			right_pts.append(points[i] + side_h)
+			top_pts.append(points[i] + side_v)
+			bottom_pts.append(points[i] - side_v)
+		
+		for i in range(n_pts - 1):
+			# Horizontal quad
+			imm_mesh.surface_add_vertex(left_pts[i])
+			imm_mesh.surface_add_vertex(right_pts[i])
+			imm_mesh.surface_add_vertex(right_pts[i + 1])
+			
+			imm_mesh.surface_add_vertex(left_pts[i])
+			imm_mesh.surface_add_vertex(right_pts[i + 1])
+			imm_mesh.surface_add_vertex(left_pts[i + 1])
+			
+			# Vertical quad
+			imm_mesh.surface_add_vertex(top_pts[i])
+			imm_mesh.surface_add_vertex(bottom_pts[i])
+			imm_mesh.surface_add_vertex(bottom_pts[i + 1])
+			
+			imm_mesh.surface_add_vertex(top_pts[i])
+			imm_mesh.surface_add_vertex(bottom_pts[i + 1])
+			imm_mesh.surface_add_vertex(top_pts[i + 1])
+			
+		imm_mesh.surface_end()
+
+	redraw_arc.call()
 	
 	var tween = create_tween()
 	if tween:
-		tween.tween_interval(0.25)
+		tween.tween_method(func(_v: float):
+			redraw_arc.call()
+		, 0.0, 1.0, duration)
 		tween.tween_callback(mesh_instance.queue_free)
 
 func _spawn_sparks(pos: Vector3):
@@ -3330,8 +3508,9 @@ func _spawn_sparks(pos: Vector3):
 func _drop_bomb():
 	# Projectile instantiation now happens only on the server
 	if multiplayer.multiplayer_peer != null and not multiplayer.is_server(): return
-	var spawn_pos = global_position - (visuals.global_transform.basis.z * 2.0) + Vector3(0, 1.0, 0)
-	var spawn_vel = linear_velocity * 0.5
+	var backward_dir = visuals.global_transform.basis.z.normalized()
+	var spawn_pos = global_position + visuals.global_transform.basis.y * 1.35 + backward_dir * 0.4
+	var spawn_vel = linear_velocity * 0.45 + backward_dir * 2.0 + Vector3.UP * 1.5
 	if multiplayer.multiplayer_peer != null:
 		_spawn_bomb_rpc.rpc(spawn_pos, spawn_vel, name.to_int())
 	else:
@@ -3349,6 +3528,12 @@ func _spawn_bomb_rpc(spawn_pos: Vector3, spawn_vel: Vector3, shooter_id: int):
 	
 	bomb.position = spawn_pos
 	bomb.linear_velocity = spawn_vel
+	
+	# Add collision exception so bomb doesn't bump the shooter cart
+	for cart in get_tree().get_nodes_in_group("player_carts"):
+		if cart.name.to_int() == shooter_id:
+			bomb.add_collision_exception_with(cart)
+			break
 	
 	if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 		bomb.set_multiplayer_authority(1)
@@ -3946,14 +4131,123 @@ func _init_ai_personality() -> void:
 	var seed_src: String = player_name if not player_name.is_empty() else str(get_instance_id())
 	rng.seed = hash(seed_src + ":" + str(car_index))
 	var roll: float = rng.randf()
-	if roll < 0.30:
-		ai_aggression = rng.randf_range(0.08, 0.28)
-	elif roll < 0.62:
-		ai_aggression = rng.randf_range(0.36, 0.56)
+	if roll < 0.28:
+		# AGGRESSIVE "Attacker": Late braking, inside apex cuts, frequent drifts, bold passes
+		ai_aggression = rng.randf_range(0.75, 1.0)
+		ai_corner_speed_factor = rng.randf_range(1.02, 1.12)
+		ai_brake_dist_bias = rng.randf_range(-5.0, -2.5) # Brakes later
+		ai_lookahead_mult = rng.randf_range(0.95, 1.08)
+		ai_racing_line_weight = rng.randf_range(0.70, 0.95)
+		ai_drift_threshold = rng.randf_range(0.22, 0.30)
+		ai_lane_span = rng.randf_range(2.2, 3.4)
+	elif roll < 0.65:
+		# PRECISION "Technical": Out-in-out racing line, smooth braking, clean apexes
+		ai_aggression = rng.randf_range(0.45, 0.70)
+		ai_corner_speed_factor = rng.randf_range(0.96, 1.04)
+		ai_brake_dist_bias = rng.randf_range(-2.0, 1.5)
+		ai_lookahead_mult = rng.randf_range(1.0, 1.15)
+		ai_racing_line_weight = rng.randf_range(0.80, 1.0)
+		ai_drift_threshold = rng.randf_range(0.30, 0.40)
+		ai_lane_span = rng.randf_range(1.8, 2.8)
+	elif roll < 0.88:
+		# BALANCED "Competitor": Adaptive lane shifts, balanced corner speeds
+		ai_aggression = rng.randf_range(0.30, 0.50)
+		ai_corner_speed_factor = rng.randf_range(0.92, 1.00)
+		ai_brake_dist_bias = rng.randf_range(0.5, 3.0)
+		ai_lookahead_mult = rng.randf_range(0.90, 1.05)
+		ai_racing_line_weight = rng.randf_range(0.50, 0.75)
+		ai_drift_threshold = rng.randf_range(0.35, 0.45)
+		ai_lane_span = rng.randf_range(1.5, 2.4)
 	else:
-		ai_aggression = rng.randf_range(0.78, 1.0)
-	ai_shortcut_chance = clampf(lerpf(0.12, 0.70, ai_aggression) * rng.randf_range(0.85, 1.15), 0.08, 0.80)
-	ai_lane_span = clampf(lerpf(1.15, 3.15, ai_aggression) * rng.randf_range(0.9, 1.12), 1.0, 3.4)
+		# CAUTIOUS "Rookie": Early braking, stays near comfort zone, patient following
+		ai_aggression = rng.randf_range(0.08, 0.28)
+		ai_corner_speed_factor = rng.randf_range(0.85, 0.93)
+		ai_brake_dist_bias = rng.randf_range(2.5, 5.0) # Brakes earlier
+		ai_lookahead_mult = rng.randf_range(0.85, 0.98)
+		ai_racing_line_weight = rng.randf_range(0.30, 0.55)
+		ai_drift_threshold = rng.randf_range(0.42, 0.55)
+		ai_lane_span = rng.randf_range(1.1, 1.8)
+
+	ai_shortcut_chance = clampf(lerpf(0.10, 0.75, ai_aggression) * rng.randf_range(0.85, 1.15), 0.05, 0.80)
+	ai_overtake_bias = rng.randf_range(-1.0, 1.0)
+
+
+func _ai_evaluate_traffic(_delta: float, fwd_3d: Vector3, right_3d: Vector3) -> Dictionary:
+	var traffic_result = {
+		"throttle_mult": 1.0,
+		"cushion_force": 0.0
+	}
+	
+	if is_finished_race or not can_move:
+		return traffic_result
+		
+	var carts = get_tree().get_nodes_in_group("player_carts")
+	if carts.is_empty():
+		return traffic_result
+
+	var my_pos = global_position
+	var closest_fwd_dist: float = 999.0
+	var closest_cart: Node3D = null
+	var closest_lat_dist: float = 0.0
+	var closest_side: float = 0.0
+	
+	var is_start_phase: bool = (Time.get_ticks_msec() / 1000.0 - race_start_time) < 3.0
+
+	for cart in carts:
+		if cart == self or not is_instance_valid(cart):
+			continue
+		if cart.get("is_exploding") == true:
+			continue
+			
+		var to_cart = cart.global_position - my_pos
+		var fwd_dist = fwd_3d.dot(to_cart)
+		var side_dist = right_3d.dot(to_cart)
+		var abs_side = absf(side_dist)
+		
+		# Side-by-side wheel-to-wheel cushion (applies to cars alongside us)
+		if absf(fwd_dist) < 3.2 and abs_side < 2.4:
+			var push_dir = -signf(side_dist) if abs_side > 0.05 else (1.0 if ai_overtake_bias >= 0.0 else -1.0)
+			var cushion_strength = (1.0 - (abs_side / 2.4)) * 0.35
+			traffic_result["cushion_force"] += push_dir * cushion_strength
+		
+		# Look for carts ahead within a 28m forward corridor
+		if fwd_dist > 0.8 and fwd_dist < 28.0 and abs_side < 4.5:
+			if fwd_dist < closest_fwd_dist:
+				closest_fwd_dist = fwd_dist
+				closest_cart = cart
+				closest_lat_dist = abs_side
+				closest_side = side_dist
+
+	# If a car is ahead of us
+	if closest_cart != null:
+		# If tailgating closely (< 4.0m) and directly behind (lat < 1.6m), slightly modulate throttle to avoid ramming
+		if closest_fwd_dist < 4.0 and closest_lat_dist < 1.6 and not is_start_phase:
+			var other_speed = closest_cart.linear_velocity.length()
+			var my_speed = linear_velocity.length()
+			if my_speed > other_speed:
+				traffic_result["throttle_mult"] = clampf(other_speed / maxf(my_speed, 1.0), 0.75, 0.95)
+
+		# Overtaking decision (when closing in or blocked ahead)
+		if not is_start_phase and closest_fwd_dist < 20.0 and _ai_overtake_lock_timer <= 0.0:
+			_ai_overtake_lock_timer = randf_range(1.5, 3.5) # Don't twitch lane back and forth rapidly
+			var pass_side: float = 0.0
+			if closest_lat_dist > 0.4:
+				# Other car is on one side of our lane -> pass on the other side
+				pass_side = -signf(closest_side)
+			else:
+				# Directly in front -> choose side with more room on track or use overtake bias
+				if absf(ai_lane_offset) > 1.0:
+					pass_side = -signf(ai_lane_offset) # Move toward open center/other side
+				else:
+					pass_side = 1.0 if ai_overtake_bias >= 0.0 else -1.0
+			
+			var pass_offset = pass_side * clampf(ai_lane_span * 0.85, 1.2, 3.2)
+			if _harbor_stage:
+				pass_offset = clampf(pass_offset, -0.45, 0.45)
+			ai_target_lane_offset = pass_offset
+			ai_lane_change_timer = randf_range(3.0, 5.0)
+
+	return traffic_result
 
 
 func _get_ai_input(delta: float) -> Vector2:
@@ -4041,18 +4335,28 @@ func _get_ai_input(delta: float) -> Vector2:
 			current_offset = _ai_cached_offset
 	
 	var style: float = 0.0 if _harbor_stage else ai_aggression
+	var is_airborne := not was_on_ground or air_time > 0.0
+	var is_start_phase: bool = (Time.get_ticks_msec() / 1000.0 - race_start_time) < 3.2
 
-	# Periodically change target lane offset to simulate realistic lane shifting / overtaking
-	ai_lane_change_timer -= delta
-	if ai_lane_change_timer <= 0.0:
-		ai_lane_change_timer = randf_range(lerpf(7.0, 3.5, style), lerpf(12.0, 7.0, style))
-		if _harbor_stage:
-			ai_target_lane_offset = randf_range(-0.45, 0.45)
-		else:
-			ai_target_lane_offset = randf_range(-ai_lane_span, ai_lane_span)
+	# Evaluate traffic (overtaking, drafting, side-by-side cushion, tailgating modulation)
+	var fwd_3d = -visuals.global_transform.basis.z
+	var right_3d = visuals.global_transform.basis.x
+	var traffic_info = _ai_evaluate_traffic(delta, fwd_3d, right_3d)
+
+	# Periodically change target lane offset if not currently locked in an overtake maneuver
+	if _ai_overtake_lock_timer > 0.0:
+		_ai_overtake_lock_timer -= delta
+	else:
+		ai_lane_change_timer -= delta
+		if ai_lane_change_timer <= 0.0 and not is_start_phase:
+			ai_lane_change_timer = randf_range(lerpf(6.0, 3.0, style), lerpf(11.0, 6.0, style))
+			if _harbor_stage:
+				ai_target_lane_offset = randf_range(-0.45, 0.45)
+			else:
+				ai_target_lane_offset = randf_range(-ai_lane_span, ai_lane_span)
 	
 	# Smoothly interpolate to target lane offset
-	ai_lane_offset = lerp(ai_lane_offset, ai_target_lane_offset, 1.5 * delta)
+	ai_lane_offset = lerpf(ai_lane_offset, ai_target_lane_offset, 2.0 * delta)
 	if _harbor_stage:
 		ai_lane_offset = clampf(ai_lane_offset, -0.55, 0.55)
 	
@@ -4060,14 +4364,14 @@ func _get_ai_input(delta: float) -> Vector2:
 	var turn_info: Dictionary = _ai_measure_upcoming_turn(curve, current_offset, speed)
 	_ai_upcoming_turn_angle = float(turn_info.get("angle", 0.0))
 	_ai_upcoming_turn_dist = float(turn_info.get("dist", 40.0))
+	_ai_upcoming_turn_dir = float(turn_info.get("dir", 0.0))
 	var corner_factor: float = clampf(_ai_upcoming_turn_angle / 1.15, 0.0, 1.0)
 
-	var look_ahead = lerp(lerpf(10.0, 14.0, style), lerpf(22.0, 26.0, style), clampf(speed / maxf(max_speed, 1.0), 0.0, 1.0))
-	# In a tight nearby bend, aim closer so the car follows the dock instead of cutting the apex
+	var look_ahead = lerp(lerpf(10.0, 14.0, style), lerpf(22.0, 26.0, style), clampf(speed / maxf(max_speed, 1.0), 0.0, 1.0)) * ai_lookahead_mult
+	# In a tight nearby bend, aim closer so the car follows the road instead of cutting into walls
 	if corner_factor > lerpf(0.55, 0.78, style) and _ai_upcoming_turn_dist < 16.0:
 		look_ahead = minf(look_ahead, lerpf(11.0, 16.0, style))
 	if _harbor_stage:
-		# Follow the L-shaped dock — long enough to start the 90° turn, short enough not to cut it.
 		look_ahead = lerpf(11.0, 15.0, clampf(speed / maxf(max_speed, 1.0), 0.0, 1.0))
 		if corner_factor > 0.45:
 			look_ahead = minf(look_ahead, 12.0)
@@ -4084,19 +4388,71 @@ func _get_ai_input(delta: float) -> Vector2:
 	var tangent = (tangent_local_pos - target_local_pos).normalized()
 	var right_vec = Vector3(-tangent.z, 0, tangent.x).normalized()
 	
-	var actual_lane_offset = 0.0 if is_finished_race else ai_lane_offset
-	if on_alternative_path:
-		actual_lane_offset *= 0.2
-	if _harbor_stage:
+	# Dynamic Racing Line (Out-In-Out Cornering)
+	var racing_line_offset: float = 0.0
+	if not _harbor_stage and not on_alternative_path and not is_start_phase and corner_factor > 0.15:
+		# turn_side: +1.0 for right turn, -1.0 for left turn
+		var turn_side = -_ai_upcoming_turn_dir
+		var max_line_span = clampf(ai_lane_span * 0.9, 1.5, 3.2) * ai_racing_line_weight
+		if _ai_upcoming_turn_dist > 18.0:
+			# Corner entry: position on outside of turn
+			var t_entry = clampf((_ai_upcoming_turn_dist - 18.0) / 20.0, 0.0, 1.0)
+			racing_line_offset = -turn_side * max_line_span * corner_factor * (1.0 - t_entry * 0.3)
+		else:
+			# Apex approach & clipping: dive to inside apex
+			var t_apex = clampf((18.0 - _ai_upcoming_turn_dist) / 18.0, 0.0, 1.0)
+			var entry_target = -turn_side * max_line_span * corner_factor * 0.7
+			var apex_target = turn_side * max_line_span * corner_factor
+			racing_line_offset = lerpf(entry_target, apex_target, t_apex)
+
+	var combined_offset = ai_lane_offset + racing_line_offset
+	var max_safe_span: float = 1.6 if _harbor_stage else 4.8
+	var actual_lane_offset = clampf(combined_offset, -max_safe_span, max_safe_span)
+
+	if is_finished_race:
+		actual_lane_offset = 0.0
+	elif is_airborne:
 		actual_lane_offset *= 0.25
+	elif is_offroad:
+		actual_lane_offset *= 0.20
+	elif on_alternative_path:
+		actual_lane_offset *= 0.20
+	elif _harbor_stage:
+		actual_lane_offset = clampf(actual_lane_offset * 0.35, -0.55, 0.55)
+	
+	# When approaching steep elevation changes (dunes/jumps/crests), center lane offset for straight takeoff
+	var p_now = curve.sample_baked(current_offset)
+	var p_ahead = curve.sample_baked(fmod(current_offset + 8.0, curve_length))
+	var elev_delta = absf(p_ahead.y - p_now.y)
+	if elev_delta > 1.0:
+		actual_lane_offset *= 0.1
 	target_local_pos += right_vec * actual_lane_offset
 	
 	var target_global_pos = active_path.to_global(target_local_pos)
 
+	# Item Box Seeking: If bot has open item slot, find closest active box ahead and steer towards it
+	var wants_item := (current_item == ItemType.NONE or current_item_2 == ItemType.NONE) and not is_finished_race and not is_offroad
+	if wants_item:
+		var best_box: Node3D = null
+		var best_dist: float = 38.0
+		for box in get_tree().get_nodes_in_group("item_boxes"):
+			if not is_instance_valid(box) or not box.get("is_active"):
+				continue
+			var to_box = box.global_position - global_position
+			var fwd_dist = fwd_3d.dot(to_box)
+			if fwd_dist > 4.0 and fwd_dist < best_dist:
+				var side_dist = absf(visuals.global_transform.basis.x.dot(to_box))
+				if side_dist < 6.5: # within track width
+					best_dist = fwd_dist
+					best_box = box
+		if best_box:
+			var blend_factor = clampf(1.0 - (best_dist / 40.0), 0.5, 0.95)
+			target_global_pos = target_global_pos.lerp(best_box.global_position, blend_factor)
+
 	var target_vec = visuals.global_transform.inverse() * target_global_pos
 	var dir_flat = Vector2(target_vec.x, -target_vec.z).normalized()
 	
-	input.x = clamp(dir_flat.x * 2.2, -1.0, 1.0)
+	input.x = clamp(dir_flat.x * (1.8 if is_airborne else 2.2), -1.0, 1.0)
 	if is_finished_race:
 		_ai_want_drift = false
 		# Smoothly brake to a complete halt and stop the car
@@ -4110,102 +4466,148 @@ func _get_ai_input(delta: float) -> Vector2:
 			angular_velocity = Vector3.ZERO
 	else:
 		_ai_want_drift = false
-		var min_corner_speed: float = 0.28 if _harbor_stage else lerpf(0.36, 0.90, style)
+		var min_corner_speed: float = 0.28 if _harbor_stage else lerpf(0.38, 0.82, style)
+		min_corner_speed *= ai_corner_speed_factor
 		var safe_speed: float = lerpf(max_speed, max_speed * min_corner_speed, corner_factor)
-		var brake_window: float = 34.0 if _harbor_stage else lerpf(22.0, 9.0, style)
-		if _ai_upcoming_turn_dist < brake_window:
-			safe_speed *= lerpf(1.0, lerpf(0.68, 0.88, style), clampf((brake_window - _ai_upcoming_turn_dist) / brake_window, 0.0, 1.0))
+		var brake_window: float = (34.0 if _harbor_stage else lerpf(26.0, 12.0, style)) + ai_brake_dist_bias
+		brake_window = maxf(brake_window, 8.0)
+		
 		if is_boosting or is_pad_boosting:
 			safe_speed *= 0.88
 
-		var react_corner: float = 0.16 if _harbor_stage else lerpf(0.16, 0.52, style)
-		if style >= 0.75 and not _harbor_stage:
-			# Old full-send: stay on the throttle unless the hairpin is right on the nose.
-			if corner_factor > 0.72 and _ai_upcoming_turn_dist < 11.0 and speed > max_speed * 0.82:
-				input.y = 0.2
+		var react_corner: float = 0.16 if _harbor_stage else lerpf(0.16, 0.48, style)
+		if _ai_upcoming_turn_dist < brake_window and corner_factor > react_corner:
+			var t_dist = clampf((brake_window - _ai_upcoming_turn_dist) / maxf(brake_window - 6.0, 1.0), 0.0, 1.0)
+			var target_corner_speed = lerpf(max_speed, safe_speed, t_dist)
+			
+			if speed > target_corner_speed + 1.0:
+				var overspeed = speed - target_corner_speed
+				input.y = clampf(overspeed / 6.5, 0.15, 0.85) # Continuous proportional braking
+				
+				# Drift decision
+				if (not _harbor_stage) and speed > 11.0 and corner_factor > ai_drift_threshold and abs(input.x) > 0.24 and _ai_upcoming_turn_dist < 22.0:
+					_ai_want_drift = true
+					input.y = maxf(input.y, 0.40)
 			else:
-				input.y = -1.0 + abs(input.x) * 0.28
-			if speed > 14.0 and abs(input.x) > 0.34 and corner_factor > 0.28:
-				_ai_want_drift = true
-		elif corner_factor > react_corner:
-			if speed > safe_speed + 7.0:
-				input.y = 0.92
-			elif speed > safe_speed + 2.0:
-				input.y = 0.45
-			elif speed > safe_speed - 1.5:
-				input.y = 0.05
-			else:
-				input.y = -0.45
-			if (not _harbor_stage) and speed > 12.0 and corner_factor > 0.32 and abs(input.x) > 0.28 and _ai_upcoming_turn_dist < 18.0:
-				_ai_want_drift = true
-				input.y = maxf(input.y, 0.55)
+				# Smooth throttle through corner
+				input.y = -clampf(1.0 - (corner_factor * 0.22), 0.65, 1.0)
 		else:
-			input.y = -1.0 + abs(input.x) * 0.35
+			# Straight / open road
+			input.y = -1.0 + abs(input.x) * 0.18
+			var th_mult = float(traffic_info.get("throttle_mult", 1.0))
+			if th_mult < 1.0:
+				input.y = maxf(input.y, -th_mult)
+
 		if _harbor_stage:
 			_ai_want_drift = false
 			# Keep some throttle through the corner so they don't stall and reverse-unstick.
 			if input.y > 0.55:
 				input.y = 0.55
-	
-	# 3-Ray Obstacle Avoidance — throttled to every 3 physics frames.
-	# With 4 AI carts this was 12 raycasts/tick; now ~4 on average.
-	_ai_obstacle_frame += 1
-	if _ai_obstacle_frame >= 3:
-		_ai_obstacle_frame = 0
-		var space_state = get_world_3d().direct_space_state
-		if space_state:
-			var fwd_dir = -visuals.global_transform.basis.z
-			var right_dir = visuals.global_transform.basis.x
-			var my_pos = global_position + Vector3.UP * 0.2
-			# Define three rays: center (12m), left-angled (10m), right-angled (10m)
-			var rays = [
-				{"end": my_pos + fwd_dir * 12.0, "weight": 1.0, "side": 0.0},
-				{"end": my_pos + (fwd_dir - right_dir * 0.25).normalized() * 10.0, "weight": 0.8, "side": -1.0},
-				{"end": my_pos + (fwd_dir + right_dir * 0.25).normalized() * 10.0, "weight": 0.8, "side": 1.0}
-			]
-			var avoid_force = 0.0
-			var obstacle_count = 0
-			for ray in rays:
-				var query = PhysicsRayQueryParameters3D.create(my_pos, ray["end"])
-				query.exclude = [self.get_rid()]
-				var result = space_state.intersect_ray(query)
-				if result:
-					var collider = result.collider
-					var c_name = collider.name.to_lower()
-					var is_road_or_terrain = c_name.contains("road") or c_name.contains("terrain") or c_name.contains("track") or c_name.contains("unified_world") or c_name.contains("gate") or c_name.contains("finishline") or c_name.contains("checkpoint") or c_name.contains("halfway") or c_name.contains("ramp") or c_name.contains("pier") or c_name.contains("bridge") or c_name.contains("seabed") or c_name.contains("deck")
-					if not is_road_or_terrain:
-						var dist = my_pos.distance_to(result.position)
-						var intensity = clamp(1.0 - (dist / 12.0), 0.1, 1.0) * ray["weight"]
-						if ray["side"] == 0.0:
-							var local_hit = visuals.global_transform.inverse() * result.position
-							var side = -sign(local_hit.x) if abs(local_hit.x) > 0.05 else -1.0
-							avoid_force += side * 2.0 * intensity
-						else:
-							# Side hit: steer in the opposite direction
-							avoid_force += -ray["side"] * 1.5 * intensity
-						obstacle_count += 1
-			if obstacle_count > 0:
-				if _harbor_stage:
-					# Small nudge only — a full dodge on a 16m dock drives them into the basin.
-					avoid_force *= 0.2
-				input.x = clamp(input.x + avoid_force, -1.0, 1.0)
-	
-	if speed < 1.5 and can_move and not is_exploding:
-		stuck_timer += delta
-		if stuck_timer > 3.5:
-			stuck_timer = 0.0
-			respawn()
-		elif stuck_timer > 1.2:
-			if _harbor_stage:
-				# Reverse-unstick on a pier sends them backward into the water.
-				input.y = -0.55
-				input.x = clamp(dir_flat.x * 2.0, -1.0, 1.0)
-			else:
-				input.y = 1.0
-				input.x = -sign(input.x) if input.x != 0 else 1.0
-	else:
-		stuck_timer = 0.0
 		
+		# Prevent braking from putting the car into reverse gear during forward racing
+		if speed < 4.0 and input.y > -0.2:
+			input.y = -0.80
+	
+	# 5-Ray Obstacle Avoidance
+	var space_state = get_world_3d().direct_space_state
+	var target_avoid_force: float = float(traffic_info.get("cushion_force", 0.0))
+	if space_state:
+		var fwd_dir = -visuals.global_transform.basis.z
+		var right_dir = visuals.global_transform.basis.x
+		var my_pos = global_position + visuals.global_transform.basis.y * 0.55
+		
+		# Define 5 rays: center (14m), mid-left (11m), mid-right (11m), wide-left (8m), wide-right (8m)
+		var rays = [
+			{"end": my_pos + fwd_dir * 14.0, "weight": 1.1, "side": 0.0},
+			{"end": my_pos + (fwd_dir - right_dir * 0.35).normalized() * 11.0, "weight": 0.9, "side": -1.0},
+			{"end": my_pos + (fwd_dir + right_dir * 0.35).normalized() * 11.0, "weight": 0.9, "side": 1.0},
+			{"end": my_pos + (fwd_dir - right_dir * 0.70).normalized() * 8.0, "weight": 0.7, "side": -1.0},
+			{"end": my_pos + (fwd_dir + right_dir * 0.70).normalized() * 8.0, "weight": 0.7, "side": 1.0}
+		]
+		
+		var is_start_grid_phase: bool = (Time.get_ticks_msec() / 1000.0 - race_start_time) < 3.0
+		var obstacle_count = 0
+		for ray in rays:
+			var query = PhysicsRayQueryParameters3D.create(my_pos, ray["end"])
+			query.exclude = [self.get_rid()]
+			query.collision_mask = 1 | 4 # Terrain/props and objects
+			var result = space_state.intersect_ray(query)
+			if result:
+				var collider = result.collider
+				# Floor / road slope check: if normal is mostly pointing up, it's drivable ground/slope
+				if result.normal.y >= 0.55:
+					continue
+				
+				# Track surface check
+				if _is_track_surface(collider):
+					continue
+				
+				var c_name = collider.name.to_lower()
+				var is_pure_surface = c_name.contains("road") or c_name.contains("terrain") or c_name.contains("track") or c_name.contains("unified_world") or c_name.contains("ramp") or c_name.contains("seabed") or c_name.contains("deck") or c_name.contains("dock")
+				if is_pure_surface and not (c_name.contains("tree") or c_name.contains("rock") or c_name.contains("prop") or c_name.contains("fence") or c_name.contains("railing") or c_name.contains("pillar") or c_name.contains("post")):
+					continue
+				
+				var is_other_cart: bool = collider.is_in_group("player_carts") or collider is RigidBody3D
+				if is_other_cart and (is_start_grid_phase or speed < 3.0):
+					# On starting grid or low speeds, traffic cushion handles subtle separation; do not swerve off track
+					continue
+				
+				var dist = my_pos.distance_to(result.position)
+				var max_reach = 14.0 if ray["side"] == 0.0 else 11.0
+				var intensity = clampf(1.0 - (dist / max_reach), 0.1, 1.0) * ray["weight"]
+				
+				if is_other_cart:
+					var side_dir: float = -ray["side"] if ray["side"] != 0.0 else (-signf(dir_flat.x) if absf(dir_flat.x) > 0.05 else (1.0 if ai_overtake_bias >= 0.0 else -1.0))
+					target_avoid_force += side_dir * 0.45 * intensity
+					obstacle_count += 1
+				else:
+					var side_dir: float
+					if ray["side"] == 0.0:
+						var local_hit = visuals.global_transform.inverse() * result.position
+						side_dir = signf(dir_flat.x) if absf(dir_flat.x) > 0.15 else (-signf(local_hit.x) if absf(local_hit.x) > 0.05 else -1.0)
+					else:
+						side_dir = -ray["side"]
+					target_avoid_force += side_dir * 1.6 * intensity
+					obstacle_count += 1
+		
+		if obstacle_count > 0:
+			if _harbor_stage:
+				target_avoid_force *= 0.25 # gentle dodge on narrow pier
+		else:
+			target_avoid_force = float(traffic_info.get("cushion_force", 0.0))
+
+	_ai_avoid_force = lerpf(_ai_avoid_force, target_avoid_force, 12.0 * delta)
+	input.x = clampf(input.x + _ai_avoid_force, -1.0, 1.0)
+	
+	# AI Unstuck Recovery Maneuver (only when actively pushing forward but blocked against an obstacle)
+	var blocked_forward: bool = (input.y < -0.2 and speed < 1.2)
+	if blocked_forward and can_move and not is_exploding and not is_finished_race:
+		stuck_timer += delta
+		if stuck_timer > 1.2 and _ai_unstuck_dir == 0.0:
+			_ai_unstuck_dir = signf(dir_flat.x) if absf(dir_flat.x) > 0.1 else (1.0 if randf() > 0.5 else -1.0)
+		
+		if stuck_timer > 3.6:
+			# Failed to unstick after 3.6s: respawn
+			stuck_timer = 0.0
+			_ai_unstuck_dir = 0.0
+			if multiplayer.multiplayer_peer != null and multiplayer.is_server():
+				respawn_rpc.rpc()
+			else:
+				respawn()
+		elif stuck_timer > 2.2:
+			# Phase 2: Forward drive with steer towards track
+			input.y = -1.0
+			input.x = _ai_unstuck_dir * 0.8
+		elif stuck_timer > 1.2:
+			# Phase 1: Short reverse with slight angle to clear obstacle bumper
+			input.y = 1.0 # Reverse
+			var wiggle = sin(stuck_timer * 8.0) * 0.3
+			input.x = clampf(-_ai_unstuck_dir * 0.6 + wiggle, -0.8, 0.8)
+	else:
+		if speed >= 2.0 or not blocked_forward:
+			stuck_timer = 0.0
+			_ai_unstuck_dir = 0.0
+
 	return input
 
 

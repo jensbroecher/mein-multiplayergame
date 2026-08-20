@@ -27,10 +27,10 @@ var sync_rotation: Vector3
 var target: Node3D = null
 var lifetime = 8.0
 var search_timer = 0.0
-var spawn_safety_timer = 0.05
+var spawn_safety_timer = 0.04
 var start_position: Vector3 = Vector3.ZERO
 @export var max_range: float = 180.0
-var homing_delay: float = 0.12
+var homing_delay: float = 0.0
 var is_exploding: bool = false
 var has_exploded: bool = false
 
@@ -141,9 +141,52 @@ func _physics_process(delta):
 		# Gradually accelerate from start speed to max
 		speed = min(speed + SPEED_ACCEL * delta, SPEED_MAX)
 
-		var forward = -transform.basis.z
+		var forward = -global_transform.basis.z
+
+		# Sweep raycast to prevent tunneling at high velocity (52-75 m/s) and detect cars immediately in front
+		var space_state = get_world_3d().direct_space_state
+		if space_state:
+			var step_dist = maxf(speed * delta + 0.6, 1.2)
+			var query = PhysicsRayQueryParameters3D.create(global_position, global_position + forward * step_dist)
+			query.exclude = [self.get_rid()]
+			query.collision_mask = 1 | 2 # Layer 1 (carts/terrain), Layer 2 (props)
+			var hit = space_state.intersect_ray(query)
+			if hit and hit.collider:
+				var col = hit.collider
+				if col.is_in_group("player_carts"):
+					if not (col.name.to_int() == owner_id and spawn_safety_timer > 0.0):
+						_explode()
+						return
+				elif col is StaticBody3D or col is CSGShape3D or col is GridMap:
+					_explode()
+					return
+
+		# Check overlapping bodies in Area3D in case target was already touching at launch
+		if is_instance_valid(area):
+			for body in area.get_overlapping_bodies():
+				if body.is_in_group("player_carts"):
+					if not (body.name.to_int() == owner_id and spawn_safety_timer > 0.0):
+						_explode()
+						return
+				elif body is StaticBody3D or body is CSGShape3D or body is GridMap:
+					_explode()
+					return
+
 		velocity = forward * speed
 		move_and_slide()
+		
+		# Check slide collisions after movement
+		for i in range(get_slide_collision_count()):
+			var collision = get_slide_collision(i)
+			var col = collision.get_collider()
+			if col:
+				if col.is_in_group("player_carts"):
+					if not (col.name.to_int() == owner_id and spawn_safety_timer > 0.0):
+						_explode()
+						return
+				elif col is StaticBody3D or col is CSGShape3D or col is GridMap:
+					_explode()
+					return
 		
 		sync_position = global_position
 		sync_rotation = global_rotation

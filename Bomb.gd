@@ -22,12 +22,13 @@ const FIRE_PARTICLE_TEXTURE = preload("res://materials/fire_particle.png")
 @onready var fire_sprite_particles = $FireSpriteParticles
 @onready var fire_sprite_particles_2 = $FireSpriteParticles2
 @export var owner_id: int
-
 var pulse_time = 0.0
 var lifetime = 5.0           # Explodes after 5 seconds
 var owner_safety_timer = 1.0 # Owner immune for the first second
 var is_exploding = false
 var has_exploded = false
+var is_settled: bool = false
+var settle_timer: float = 0.0
 
 var fizzle_player: AudioStreamPlayer3D = null
 var spark_particles: CPUParticles3D = null
@@ -39,22 +40,6 @@ func _ready():
 	if multiplayer.multiplayer_peer != null and not multiplayer.is_server():
 		freeze = true
 		freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
-	else:
-		# Freeze after 2 seconds so it settles on the road
-		get_tree().create_timer(2.0).timeout.connect(func(): 
-			if is_instance_valid(self): 
-				freeze = true
-				freeze_mode = RigidBody3D.FREEZE_MODE_STATIC
-				var limit = deg_to_rad(15.0)
-				var target_rot = Vector3(
-					clamp(global_rotation.x, -limit, limit),
-					global_rotation.y,
-					clamp(global_rotation.z, -limit, limit)
-				)
-				var tween = create_tween()
-				if tween:
-					tween.tween_property(self, "global_rotation", target_rot, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		)
 
 	_setup_sparks()
 	_play_fizzle_sound()
@@ -165,6 +150,37 @@ func _physics_process(delta):
 	lifetime -= delta
 	if lifetime <= 0.0:
 		_explode()
+		return
+	
+	# Ground settling check: only freeze once it actually contacts ground / road
+	if not is_settled and not freeze:
+		settle_timer += delta
+		var space_state = get_world_3d().direct_space_state
+		if space_state:
+			var query = PhysicsRayQueryParameters3D.create(global_position, global_position + Vector3.DOWN * 0.70)
+			query.exclude = [get_rid()]
+			query.collision_mask = 1 | 2 # Terrain / Road
+			var hit = space_state.intersect_ray(query)
+			if hit:
+				if linear_velocity.length() < 1.0 or settle_timer > 2.5:
+					_settle_on_ground(hit.normal)
+
+func _settle_on_ground(ground_normal: Vector3 = Vector3.UP):
+	if is_settled: return
+	is_settled = true
+	freeze = true
+	freeze_mode = RigidBody3D.FREEZE_MODE_STATIC
+	linear_velocity = Vector3.ZERO
+	angular_velocity = Vector3.ZERO
+	var limit = deg_to_rad(15.0)
+	var target_rot = Vector3(
+		clamp(global_rotation.x, -limit, limit),
+		global_rotation.y,
+		clamp(global_rotation.z, -limit, limit)
+	)
+	var tween = create_tween()
+	if tween:
+		tween.tween_property(self, "global_rotation", target_rot, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 func _on_body_entered(body):
 	if multiplayer.multiplayer_peer != null and not multiplayer.is_server(): return

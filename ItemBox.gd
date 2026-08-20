@@ -12,6 +12,7 @@ var current_scale: float = 0.0
 const SFX_PICKUP_SOUND = preload("res://sounds/game_bonus_collected_#3-1781737105214.wav")
 
 func _ready():
+	add_to_group("item_boxes")
 	area.body_entered.connect(_on_body_entered)
 	if sfx_pickup:
 		sfx_pickup.bus = &"SFX"
