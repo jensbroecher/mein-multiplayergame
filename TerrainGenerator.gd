@@ -1253,8 +1253,8 @@ func _create_track_collision(point_count: int, width: float, node_name: String):
 		var frames_col: Array = _build_path_frames(curve, point_count)
 		# Match visual deck closely — large offsets left a gap at curb edges over recessed terrain
 		var col_y: float = y_offset + 0.02
-		# Slightly wider than visual sand so the shoulder always has solid support
-		var col_outer: float = outer_w + 0.6
+		# Align track collision deck with visual curb boundary
+		var col_outer: float = outer_w + 0.05
 
 		for i in range(point_count + 1):
 			var final_pos: Vector3 = frames_col[i]["pos"]

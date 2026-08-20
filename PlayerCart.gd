@@ -1677,6 +1677,37 @@ func _physics_process(delta):
 		var slide_force_mag = GRAVITY * mass * slope_steepness * 1.2
 		apply_central_force(downhill_dir * slide_force_mag)
 
+	# Road edge slip & fall-off: if the main body is past the curb edge of an elevated track/bridge,
+	# prevent grinding along the lip by smoothly sliding and rolling the car off into the fall.
+	if on_ground and not on_loop:
+		var check_p = active_path if active_path else track_path
+		if check_p and check_p.curve:
+			var local_p = check_p.to_local(global_position)
+			var offset = check_p.curve.get_closest_offset(local_p)
+			var track_pt = check_p.to_global(check_p.curve.sample_baked(offset))
+			var diff_xz = Vector2(global_position.x - track_pt.x, global_position.z - track_pt.z)
+			var dist_center = diff_xz.length()
+			# Curb outer edge is at ~8.5m. If vehicle center is past 8.2m and over an elevated drop:
+			if dist_center > 8.2 and dist_center < 13.5:
+				var space_state = get_world_3d().direct_space_state
+				if space_state:
+					var out_sign = diff_xz.normalized()
+					var outward_vec = Vector3(out_sign.x, 0.0, out_sign.y)
+					var probe_pos = global_position + outward_vec * 0.8 + Vector3.UP * 0.2
+					var probe_q = PhysicsRayQueryParameters3D.create(probe_pos, probe_pos + Vector3.DOWN * 4.0)
+					probe_q.exclude = [get_rid()]
+					probe_q.collision_mask = 1
+					var probe_hit = space_state.intersect_ray(probe_q)
+					var drop_dist = 4.0
+					if probe_hit:
+						drop_dist = probe_pos.distance_to(probe_hit.position)
+					if drop_dist > 1.6:
+						var edge_over = clampf((dist_center - 8.0) / 2.0, 0.25, 1.0)
+						apply_central_force((outward_vec * 2.5 + Vector3.DOWN * 1.5) * mass * GRAVITY * edge_over * 0.8)
+						var roll_dir = fwd.cross(outward_vec).y
+						var roll_sign = 1.0 if roll_dir > 0.0 else -1.0
+						apply_torque(fwd * roll_sign * mass * 10.0 * edge_over)
+
 	# Offroad steep cliff classification (only offroad, on ground, steep rock face > 65°):
 	# Dunes / drivable slopes: Normal.y >= 0.45 -> Drivable
 	# Sheer vertical cliffs: Normal.y < 0.45 -> Engine power cut when driving straight into it
@@ -2087,8 +2118,9 @@ func _prevent_floor_tunneling(delta: float) -> void:
 	if linear_velocity.y < -MAX_FALL_SPEED:
 		linear_velocity.y = -MAX_FALL_SPEED
 
-	# Only run the recovery ray on hard falls — cheap early-out.
-	if linear_velocity.y > -12.0:
+	# Only run the recovery ray on hard falls while airborne — cheap early-out.
+	# If already on ground driving along a road/slope, never zero downward speed!
+	if linear_velocity.y > -12.0 or was_on_ground or air_time < 0.1:
 		return
 	var world = get_world_3d()
 	if world == null:
@@ -2116,10 +2148,12 @@ func _prevent_floor_tunneling(delta: float) -> void:
 	if global_position.y >= min_center_y:
 		return
 
-	# Snap out of penetration and kill residual downward speed.
+	# Snap out of penetration and cancel only the velocity directed INTO the surface normal,
+	# preserving tangential downhill velocity.
 	global_position.y = min_center_y
-	if linear_velocity.y < 0.0:
-		linear_velocity.y = 0.0
+	var vel_into_normal: float = linear_velocity.dot(n)
+	if vel_into_normal < 0.0:
+		linear_velocity -= n * vel_into_normal
 
 
 func _get_ground_visual_offset() -> float:
@@ -3862,11 +3896,11 @@ func _create_drift_particles(wheel_name: String):
 	# the dark "disc" artifact that appears on first contact with the surface.
 	skid_grad.offsets = PackedFloat32Array([0.0, 0.02, 0.55, 0.85, 1.0])
 	skid_grad.colors = PackedColorArray([
-		Color(0.03, 0.03, 0.03, 0.0),  # Invisible at birth
-		Color(0.03, 0.03, 0.03, 0.75), # Deep dark black rubber
-		Color(0.03, 0.03, 0.03, 0.50),
-		Color(0.03, 0.03, 0.03, 0.18),
-		Color(0.03, 0.03, 0.03, 0.0)
+		Color(0.01, 0.01, 0.01, 0.0),  # Invisible at birth
+		Color(0.01, 0.01, 0.01, 0.95), # Rich deep black rubber
+		Color(0.01, 0.01, 0.01, 0.80),
+		Color(0.01, 0.01, 0.01, 0.35),
+		Color(0.01, 0.01, 0.01, 0.0)
 	])
 	skid.color_ramp = skid_grad
 
@@ -3900,8 +3934,8 @@ func _set_drift_emitting(emitting: bool):
 			continue
 		var kind: String = str(p.get_meta("kind", ""))
 		if kind == "skid" or p.name.ends_with("_Skid"):
-			# Skidmarks emit only during active drift or hard braking at speed (> 6.5 m/s) on ground after landing has settled
-			var skid_on: bool = emitting and speed > 6.5 and not is_landing and can_move and air_time < 0.02 and time_since_respawn > 0.5
+			# Skidmarks emit only during active drift or hard braking on roads (never offroad on terrain)
+			var skid_on: bool = emitting and speed > 6.5 and not is_landing and can_move and air_time < 0.02 and time_since_respawn > 0.5 and not is_offroad
 			p.emitting = skid_on
 			if skid_on and "amount_ratio" in p:
 				p.amount_ratio = clampf((speed - 5.0) / 16.0, 0.25, 1.0)
