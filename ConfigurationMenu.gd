@@ -38,6 +38,7 @@ var option_resolution: OptionButton
 var check_vsync: CheckButton
 var option_anti_aliasing: OptionButton
 var option_shadows: OptionButton
+var option_grass_quality: OptionButton
 var option_render_scale: OptionButton
 var option_renderer: OptionButton
 var option_fsr_mode: OptionButton
@@ -339,6 +340,12 @@ func _build_graphics_page() -> Control:
 	option_shadows.add_item("Low")
 	option_shadows.add_item("Medium")
 	option_shadows.add_item("High")
+	option_grass_quality = _add_option_row(body, "Grass Quality")
+	option_grass_quality.add_item("Off")
+	option_grass_quality.add_item("Low")
+	option_grass_quality.add_item("Medium")
+	option_grass_quality.add_item("High")
+	option_grass_quality.add_item("Ultra")
 	option_anti_aliasing = _add_option_row(body, "Anti-Aliasing")
 	option_anti_aliasing.add_item("Disabled")
 	option_anti_aliasing.add_item("2x MSAA")
@@ -531,6 +538,8 @@ func _load_values_from_manager() -> void:
 		option_anti_aliasing.selected = MusicManager.anti_aliasing
 	if option_shadows:
 		option_shadows.selected = MusicManager.shadow_quality_index
+	if option_grass_quality:
+		option_grass_quality.selected = MusicManager.grass_quality_index
 	if option_render_scale:
 		option_render_scale.selected = MusicManager.render_scale_index
 	if option_renderer:
@@ -567,6 +576,7 @@ func _connect_setting_signals() -> void:
 	check_vsync.toggled.connect(func(v): MusicManager.set_vsync(v))
 	option_anti_aliasing.item_selected.connect(func(i): MusicManager.set_anti_aliasing(i))
 	option_shadows.item_selected.connect(func(i): MusicManager.set_shadow_quality(i))
+	option_grass_quality.item_selected.connect(func(i): MusicManager.set_grass_quality(i))
 	option_render_scale.item_selected.connect(func(i): MusicManager.set_render_scale(i))
 	option_renderer.item_selected.connect(_on_renderer_selected)
 	option_fsr_mode.item_selected.connect(_on_fsr_mode_selected)

@@ -16,6 +16,7 @@
 [ext_resource type="Texture2D" uid="uid://c6tmb3yh45lja" path="res://materials/fire_particle_2.png" id="15_fire2"]
 [ext_resource type="AudioStream" uid="uid://brup0an178gke" path="res://sounds/freesound_community-engine-6000_edited.wav" id="16_engine"]
 [ext_resource type="AudioStream" uid="uid://cd5t8pebax5t3" path="res://sounds/force_field_effect_#1-1781728246336.wav" id="19_shield"]
+[ext_resource type="Texture2D" path="res://materials/blob_shadow.png" id="20_blob_shadow"]
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_frictionless"]
 friction = 0.0
@@ -307,6 +308,19 @@ shape = SubResource("BoxShape3D_body")
 
 [node name="Visuals" type="Node3D" parent="." unique_id=1001732157]
 top_level = true
+
+[node name="BlobShadow" type="Decal" parent="Visuals" unique_id=99887766]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0)
+visible = false
+size = Vector3(1.7, 4.0, 2.7)
+texture_albedo = ExtResource("20_blob_shadow")
+albedo_mix = 0.75
+cull_mask = 1
+upper_fade = 0.2
+lower_fade = 0.7
+distance_fade_enabled = true
+distance_fade_begin = 50.0
+distance_fade_length = 20.0
 
 [node name="CartModel" parent="Visuals" unique_id=768104268 instance=ExtResource("2_cart")]
 transform = Transform3D(-2, 0, -1.74846e-07, 0, 2, 0, 1.74846e-07, 0, -2, 0, -0.6072377, 0)

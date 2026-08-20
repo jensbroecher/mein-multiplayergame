@@ -160,6 +160,7 @@ const CRASH_SOUND = preload("res://sounds/crash.mp3")
 @onready var name_tag = $Visuals/NameTag
 @onready var engine_sound = $Visuals/EngineSound
 @onready var ground_ray = $GroundRay
+@onready var blob_shadow: Decal = $Visuals.get_node_or_null("BlobShadow")
 
 
 var race_ui
@@ -573,6 +574,7 @@ func _ready():
 	
 	_remove_collisions_recursive(visuals)
 	_setup_new_car_wheels()
+	_setup_blob_shadow()
 	# Shadows follow options menu (MusicManager.shadows_enabled)
 	apply_shadow_setting(MusicManager.shadows_enabled)
 
@@ -3571,9 +3573,35 @@ func _spawn_bomb_rpc(spawn_pos: Vector3, spawn_vel: Vector3, shooter_id: int):
 	if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 		bomb.set_multiplayer_authority(1)
 
+func _setup_blob_shadow():
+	if not is_instance_valid(visuals):
+		return
+	if not is_instance_valid(blob_shadow):
+		blob_shadow = visuals.get_node_or_null("BlobShadow")
+	if not blob_shadow:
+		blob_shadow = Decal.new()
+		blob_shadow.name = "BlobShadow"
+		blob_shadow.size = Vector3(1.7, 4.0, 2.7)
+		blob_shadow.transform.origin = Vector3(0, 0.2, 0)
+		var tex_path = "res://materials/blob_shadow.png"
+		if ResourceLoader.exists(tex_path):
+			blob_shadow.texture_albedo = load(tex_path)
+		blob_shadow.albedo_mix = 0.75
+		blob_shadow.cull_mask = 1
+		blob_shadow.upper_fade = 0.2
+		blob_shadow.lower_fade = 0.7
+		blob_shadow.distance_fade_enabled = true
+		blob_shadow.distance_fade_begin = 50.0
+		blob_shadow.distance_fade_length = 20.0
+		visuals.add_child(blob_shadow)
+
 func apply_shadow_setting(enabled: bool = true):
 	if is_instance_valid(visuals):
 		_set_shadows_recursive(visuals, enabled)
+	if not is_instance_valid(blob_shadow) and is_instance_valid(visuals):
+		blob_shadow = visuals.get_node_or_null("BlobShadow")
+	if is_instance_valid(blob_shadow):
+		blob_shadow.visible = not enabled
 
 func _set_shadows_recursive(node: Node, enabled: bool):
 	if node == null: return

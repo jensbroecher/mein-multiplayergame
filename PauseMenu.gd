@@ -7,6 +7,7 @@ extends Control
 @onready var btn_exit = $Panel/MarginContainer/VBoxContainer/BtnExit
 
 var option_camera_mode: OptionButton
+var option_grass_quality: OptionButton
 var option_shadows: OptionButton
 
 func _ready():
@@ -16,6 +17,7 @@ func _ready():
 	music_slider.value = MusicManager.music_volume
 	sfx_slider.value = MusicManager.sfx_volume
 	_build_camera_option()
+	_build_grass_option()
 	_build_shadows_option()
 	
 	# Connect signals
@@ -42,6 +44,26 @@ func _build_camera_option() -> void:
 	option_camera_mode.item_selected.connect(_on_camera_mode_selected)
 	row.add_child(option_camera_mode)
 
+func _build_grass_option() -> void:
+	var settings_list = $Panel/MarginContainer/VBoxContainer/SettingsList
+	var row = HBoxContainer.new()
+	row.name = "GrassQualityBox"
+	settings_list.add_child(row)
+	var lbl = Label.new()
+	lbl.text = "Grass Quality"
+	lbl.custom_minimum_size = Vector2(160, 0)
+	row.add_child(lbl)
+	option_grass_quality = OptionButton.new()
+	option_grass_quality.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	option_grass_quality.add_item("Off")
+	option_grass_quality.add_item("Low")
+	option_grass_quality.add_item("Medium")
+	option_grass_quality.add_item("High")
+	option_grass_quality.add_item("Ultra")
+	option_grass_quality.selected = MusicManager.grass_quality_index
+	option_grass_quality.item_selected.connect(_on_grass_quality_selected)
+	row.add_child(option_grass_quality)
+
 func _build_shadows_option() -> void:
 	var settings_list = $Panel/MarginContainer/VBoxContainer/SettingsList
 	var row = HBoxContainer.new()
@@ -67,6 +89,8 @@ func show_pause_menu():
 	sfx_slider.value = MusicManager.sfx_volume
 	if option_camera_mode:
 		option_camera_mode.selected = 0 if MusicManager.use_isometric_camera else 1
+	if option_grass_quality:
+		option_grass_quality.selected = MusicManager.grass_quality_index
 	if option_shadows:
 		option_shadows.selected = MusicManager.shadow_quality_index
 	
@@ -86,6 +110,9 @@ func _on_sfx_volume_changed(value: float):
 
 func _on_camera_mode_selected(index: int) -> void:
 	MusicManager.set_use_isometric_camera(index == 0)
+
+func _on_grass_quality_selected(index: int) -> void:
+	MusicManager.set_grass_quality(index)
 
 func _on_shadow_quality_selected(index: int) -> void:
 	MusicManager.set_shadow_quality(index)

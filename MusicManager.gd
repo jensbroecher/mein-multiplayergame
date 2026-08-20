@@ -17,6 +17,8 @@ var anti_aliasing: int = 2 # 0: Disabled, 1: 2x MSAA, 2: 4x MSAA, 3: 8x MSAA, 4:
 var shadows_enabled: bool = false
 ## 0=Off 1=Low 2=Medium 3=High — controls map size, soft filter, and light splits.
 var shadow_quality_index: int = 0
+## 0=Off 1=Low 2=Medium 3=High 4=Ultra — controls MultiMesh density, draw distance, and shader culling.
+var grass_quality_index: int = 4
 var render_scale_index: int = 1 # 0:50% 1:75% 2:100% 3:125%
 ## Preferred renderer: "mobile" or "forward_plus". Applied via restart (--rendering-method).
 var renderer_method: String = "mobile"
@@ -45,6 +47,12 @@ const MAX_FPS_VALUES = [30, 60, 120, 0] # 0 = unlimited
 const SHADOW_ATLAS_SIZES = [512, 1024, 2048, 4096]
 const SHADOW_MAX_DISTANCES = [80.0, 140.0, 200.0, 280.0]
 const SHADOW_BLURS = [0.4, 0.7, 1.0, 1.25]
+
+## Grass quality presets: density factor (0..1), draw distance (m), fade range (m)
+const GRASS_QUALITY_NAMES = ["Off", "Low", "Medium", "High", "Ultra"]
+const GRASS_DENSITIES = [0.0, 0.25, 0.50, 0.75, 1.0]
+const GRASS_DISTANCES = [0.0, 130.0, 220.0, 300.0, 350.0]
+const GRASS_FADE_RANGES = [0.0, 35.0, 50.0, 50.0, 60.0]
 
 
 var current_track_index = -1
@@ -167,6 +175,15 @@ func load_settings():
 			shadow_quality_index = 2 if shadows_enabled else 0
 		shadow_quality_index = clampi(shadow_quality_index, 0, 3)
 		shadows_enabled = shadow_quality_index > 0
+		if config.has_section_key("graphics", "grass_quality_index"):
+			grass_quality_index = int(config.get_value("graphics", "grass_quality_index", 4))
+		else:
+			# Smart default: on macOS / mobile default to Medium (2) for stutter-free 60fps, Ultra (4) on PC
+			if OS.get_name() == "macOS" or OS.has_feature("mobile"):
+				grass_quality_index = 2
+			else:
+				grass_quality_index = 4
+		grass_quality_index = clampi(grass_quality_index, 0, 4)
 		render_scale_index = config.get_value("graphics", "render_scale_index", 1)
 		if config.has_section_key("graphics", "renderer_method"):
 			var saved_renderer := str(config.get_value("graphics", "renderer_method", renderer_method))
@@ -193,6 +210,7 @@ func _apply_window_settings():
 	set_anisotropic(anisotropic_index, false)
 	set_max_fps(max_fps_index, false)
 	set_shadow_quality(shadow_quality_index, false)
+	set_grass_quality(grass_quality_index, false)
 	apply_fsr_settings()
 
 func save_settings():
@@ -207,6 +225,7 @@ func save_settings():
 	config.set_value("display", "anti_aliasing", anti_aliasing)
 	config.set_value("graphics", "shadows_enabled", shadows_enabled)
 	config.set_value("graphics", "shadow_quality_index", shadow_quality_index)
+	config.set_value("graphics", "grass_quality_index", grass_quality_index)
 	config.set_value("graphics", "render_scale_index", render_scale_index)
 	config.set_value("graphics", "renderer_method", renderer_method)
 	config.set_value("graphics", "scaling_3d_mode_index", scaling_3d_mode_index)
@@ -626,9 +645,71 @@ func _apply_shadows_to_tree(node: Node) -> void:
 	for child in node.get_children():
 		_apply_shadows_to_tree(child)
 
-## Call after a level is spawned so lights pick up the current shadow setting.
+func set_grass_quality(index: int, save: bool = true) -> void:
+	grass_quality_index = clampi(index, 0, 4)
+	if is_inside_tree() and get_tree():
+		_apply_grass_quality_to_tree(get_tree().root)
+	if save:
+		save_settings()
+
+func _apply_grass_quality_to_tree(node: Node) -> void:
+	if node == null:
+		return
+	var q: int = grass_quality_index
+	var density: float = GRASS_DENSITIES[q]
+	var max_dist: float = GRASS_DISTANCES[q]
+	var fade_r: float = GRASS_FADE_RANGES[q]
+
+	if node.name == "GrassContainer":
+		if node is Node3D:
+			(node as Node3D).visible = (q > 0)
+		if q > 0:
+			for child in node.get_children():
+				if child is MultiMeshInstance3D:
+					var mmi := child as MultiMeshInstance3D
+					mmi.visible = true
+					mmi.visibility_range_end = max_dist
+					mmi.visibility_range_end_margin = 35.0
+					mmi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+					if mmi.multimesh:
+						var total_count: int = mmi.multimesh.instance_count
+						var visible_count: int = int(round(total_count * density))
+						if visible_count >= total_count:
+							mmi.multimesh.visible_instance_count = -1
+						else:
+							mmi.multimesh.visible_instance_count = max(1, visible_count)
+					if mmi.material_override is ShaderMaterial:
+						var sm := mmi.material_override as ShaderMaterial
+						sm.set_shader_parameter("max_dist", max_dist)
+						sm.set_shader_parameter("fade_r", fade_r)
+		return
+
+	if node.name == "VegetationContainer":
+		for child in node.get_children():
+			if child is MultiMeshInstance3D:
+				var mmi := child as MultiMeshInstance3D
+				var nname := mmi.name.to_lower()
+				if "flower" in nname or "grass" in nname:
+					mmi.visible = (q > 0)
+					if q > 0:
+						mmi.visibility_range_end = max_dist
+						mmi.visibility_range_end_margin = 35.0
+						mmi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+						if mmi.multimesh:
+							var total_count: int = mmi.multimesh.instance_count
+							var visible_count: int = int(round(total_count * density))
+							if visible_count >= total_count:
+								mmi.multimesh.visible_instance_count = -1
+							else:
+								mmi.multimesh.visible_instance_count = max(1, visible_count)
+
+	for child in node.get_children():
+		_apply_grass_quality_to_tree(child)
+
+## Call after a level is spawned so lights and grass pick up current settings.
 func refresh_level_graphics() -> void:
 	set_shadow_quality(shadow_quality_index, false)
+	set_grass_quality(grass_quality_index, false)
 	set_anisotropic(anisotropic_index, false)
 	# Re-apply render scale in case a new viewport path was created
 	set_resolution(resolution_index, false)

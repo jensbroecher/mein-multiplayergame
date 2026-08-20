@@ -608,6 +608,8 @@ func start_race():
 var _cached_grass_mat: ShaderMaterial = null
 
 func _update_grass_cart_positions():
+	if MusicManager.grass_quality_index == 0:
+		return
 	if not _cached_grass_mat:
 		var tg = get_node_or_null("TerrainGenerator")
 		if tg:
