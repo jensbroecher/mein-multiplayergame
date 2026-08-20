@@ -1531,7 +1531,7 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 	if final_side_mat is StandardMaterial3D:
 		(final_side_mat as StandardMaterial3D).cull_mode = BaseMaterial3D.CULL_DISABLED
 
-	if (track_layout_type == TrackLayoutType.MOUNTAIN or track_layout_type == TrackLayoutType.CANYON) and not node_name.contains("Curbs"):
+	if track_layout_type == TrackLayoutType.CANYON and not node_name.contains("Curbs"):
 		var rock_mat = StandardMaterial3D.new()
 		rock_mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 		var rock_tex = load("res://materials/dark_canyon_rock.png")
@@ -1583,6 +1583,7 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 			cap_mi.material_override = rock_mat
 			mesh_instance.add_child(cap_mi)
 
+	if track_layout_type == TrackLayoutType.MOUNTAIN or track_layout_type == TrackLayoutType.CANYON:
 		var static_body = StaticBody3D.new()
 		static_body.name = node_name + "_Collision"
 		mesh_instance.add_child(static_body)
