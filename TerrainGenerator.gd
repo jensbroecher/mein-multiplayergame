@@ -607,17 +607,23 @@ func generate_world():
 		# Desert-ish default if no material assigned
 		if level_prefix == "desert_wadi" or track_layout_type == TrackLayoutType.MOUNTAIN:
 			var sand_tex: Texture2D = load("res://materials/sand.png") as Texture2D
+			var sand_norm: Texture2D = load("res://materials/sand_normal.png") as Texture2D
 			if sand_tex:
 				terrain_mat.albedo_texture = sand_tex
 				# Near-white so the photo texture reads as real sand
 				terrain_mat.albedo_color = Color(1.0, 0.97, 0.90)
 				terrain_mat.uv1_scale = Vector3(0.12, 0.12, 0.12)
+				terrain_mat.uv1_triplanar = true
+				if sand_norm:
+					terrain_mat.normal_enabled = true
+					terrain_mat.normal_texture = sand_norm
+					terrain_mat.normal_scale = 0.85
 			else:
 				# Muted khaki sand (no texture)
 				terrain_mat.albedo_color = Color(0.78, 0.70, 0.52)
 		else:
 			terrain_mat.albedo_color = Color(0.2, 0.6, 0.2)
-		terrain_mat.roughness = 0.96
+		terrain_mat.roughness = 0.94
 		terrain_mat.metallic = 0.0
 		terrain_instance.material_override = terrain_mat
 	terrain_instance.lod_bias = 10.0

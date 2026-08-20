@@ -77,6 +77,7 @@ func _ready() -> void:
 
 	# Desert look (sand dunes palette) — lakeside template ships green grass
 	var sand_tex: Texture2D = load("res://materials/sand.png") as Texture2D
+	var sand_norm: Texture2D = load("res://materials/sand_normal.png") as Texture2D
 	var asphalt_tex: Texture2D = load("res://materials/asphalt.png") as Texture2D
 	var rock_tex: Texture2D = load("res://materials/dark_canyon_rock.png") as Texture2D
 	var rock_norm: Texture2D = load("res://materials/dark_canyon_rock_normal.png") as Texture2D
@@ -88,8 +89,12 @@ func _ready() -> void:
 		# Let the sand texture drive the look (near-white tint = real dune color).
 		sand_mat.set_shader_parameter("albedo", Color(1.0, 0.97, 0.90, 1.0))
 		sand_mat.set_shader_parameter("uv_scale", 16.0)
-		sand_mat.set_shader_parameter("smoothness", 0.96)  # roughness (shader maps this to ROUGHNESS)
+		sand_mat.set_shader_parameter("smoothness", 0.94)  # roughness (shader maps this to ROUGHNESS)
 		sand_mat.set_shader_parameter("use_world_uv", true)
+		if sand_norm:
+			sand_mat.set_shader_parameter("use_normal_map", true)
+			sand_mat.set_shader_parameter("normal_texture", sand_norm)
+			sand_mat.set_shader_parameter("normal_scale", 0.85)
 		sand_mat.set_shader_parameter("enable_edge_fade", true)
 		sand_mat.set_shader_parameter("edge_fade_start", 550.0)
 		sand_mat.set_shader_parameter("edge_fade_end", 960.0)

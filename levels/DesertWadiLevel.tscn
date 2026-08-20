@@ -12,6 +12,7 @@
 [ext_resource type="PackedScene" uid="uid://clxv8p6x0y6k2" path="res://SpawnIndicator.tscn" id="8_spawn"]
 [ext_resource type="Shader" uid="uid://ionm7cyho23g" path="res://terrain_stochastic.gdshader" id="9_yfqbs"]
 [ext_resource type="Texture2D" uid="uid://dh0ue4kmyvxwd" path="res://materials/sand.png" id="10_10wt8"]
+[ext_resource type="Texture2D" path="res://materials/sand_normal.png" id="10_sand_norm"]
 [ext_resource type="Shader" uid="uid://srampgbp5hcn" path="res://water.gdshader" id="14_5qkpu"]
 [ext_resource type="ArrayMesh" uid="uid://mrw2ufcinygs" path="res://generated/desert_wadi_terrain_visual.res" id="14_sd1yx"]
 [ext_resource type="Shape3D" uid="uid://b2acevwdanym1" path="res://generated/desert_wadi_terrain_collision_shape.res" id="15_bdq4l"]
@@ -57,10 +58,11 @@ shader_parameter/albedo_texture = ExtResource("10_10wt8")
 shader_parameter/albedo = Color(1, 0.97, 0.9, 1)
 shader_parameter/uv_scale = 16.0
 shader_parameter/uv_scale_v2 = Vector2(1, 1)
-shader_parameter/smoothness = 0.96
+shader_parameter/smoothness = 0.94
 shader_parameter/use_world_uv = true
-shader_parameter/use_normal_map = false
-shader_parameter/normal_scale = 1.0
+shader_parameter/use_normal_map = true
+shader_parameter/normal_texture = ExtResource("10_sand_norm")
+shader_parameter/normal_scale = 0.85
 shader_parameter/enable_edge_fade = true
 shader_parameter/edge_fade_start = 550.0
 shader_parameter/edge_fade_end = 960.0

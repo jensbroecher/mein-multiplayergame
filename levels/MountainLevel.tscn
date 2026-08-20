@@ -14,6 +14,7 @@
 [ext_resource type="Texture2D" uid="uid://jpd013mrw1fc" path="res://terrain/paint_maps/mountain_splatmap.png" id="11_mountain_splatmap"]
 [ext_resource type="Texture2D" uid="uid://b4j07jck2kec0" path="res://materials/dark_canyon_rock_normal.png" id="11_rock_norm"]
 [ext_resource type="Texture2D" uid="uid://c45b43y4vhj0d" path="res://materials/dark_canyon_rock.png" id="11_rock_tex"]
+[ext_resource type="Texture2D" uid="uid://cm2nsin2ss4ak" path="res://materials/sand_normal.png" id="11_sand_norm"]
 [ext_resource type="Texture2D" uid="uid://bsmrfxbh6vqe2" path="res://materials/asphalt.png" id="12_g5aih"]
 [ext_resource type="ArrayMesh" path="res://generated/mountain_terrain_visual.res" id="13_jrwcp"]
 [ext_resource type="Shape3D" path="res://generated/mountain_terrain_collision_shape.res" id="14_01bw0"]
@@ -68,14 +69,14 @@ horizonColour = Color(0.0784314, 0.00784314, 0.0156863, 1)
 groundColour = Color(0, 0, 0, 1)
 cloudBrightness = 0.05
 
-[sub_resource type="Resource" id="Resource_kurhb"]
+[sub_resource type="Resource" id="Resource_tvewy"]
 script = ExtResource("6_7fjgh")
 weather = ExtResource("6_01s5b")
 
-[sub_resource type="Resource" id="Resource_tvewy"]
+[sub_resource type="Resource" id="Resource_qw57s"]
 script = ExtResource("4_7eb0m")
 seasonId = "summer"
-weathers = Array[ExtResource("6_7fjgh")]([SubResource("Resource_kurhb")])
+weathers = Array[ExtResource("6_7fjgh")]([SubResource("Resource_tvewy")])
 skyColourDaytime = SubResource("Resource_ext2d")
 skyColourNight = SubResource("Resource_p7jpd")
 dayNightCycleCurve = SubResource("Curve_8bl6p")
@@ -91,9 +92,10 @@ shader_parameter/use_stochastic = true
 shader_parameter/tex_base = ExtResource("11_i1pac")
 shader_parameter/albedo_base = Color(1, 0.98, 0.94, 1)
 shader_parameter/uv_scale_base = 16.0
-shader_parameter/roughness_base = 0.96
-shader_parameter/use_normal_base = false
-shader_parameter/normal_scale_base = 1.0
+shader_parameter/roughness_base = 0.94
+shader_parameter/use_normal_base = true
+shader_parameter/normal_base = ExtResource("11_sand_norm")
+shader_parameter/normal_scale_base = 0.85
 shader_parameter/use_triplanar_base = true
 shader_parameter/tex_layer1 = ExtResource("11_rock_tex")
 shader_parameter/albedo_layer1 = Color(0.86, 0.76, 0.62, 1)
@@ -243,6 +245,9 @@ size = Vector3(70, 40, 12)
 cull_mode = 2
 albedo_texture = ExtResource("11_i1pac")
 roughness = 0.92
+normal_enabled = true
+normal_scale = 0.85
+normal_texture = ExtResource("11_sand_norm")
 uv1_scale = Vector3(0.45, 0.45, 0.45)
 uv1_triplanar = true
 
@@ -372,7 +377,7 @@ track_path = NodePath("TrackPath")
 
 [node name="WeatherController" parent="." unique_id=1277823175 instance=ExtResource("2_e304n")]
 time_of_day_hours = 16.271
-seasons = Array[ExtResource("4_7eb0m")]([SubResource("Resource_tvewy")])
+seasons = Array[ExtResource("4_7eb0m")]([SubResource("Resource_qw57s")])
 startTime = 58575.600000000006
 
 [node name="TerrainGenerator" type="Node3D" parent="." unique_id=586341718 node_paths=PackedStringArray("track_path")]
@@ -577,7 +582,7 @@ transform = Transform3D(0.3048488, 0, -0.13482712, 0, 0.33333334, 0, 0.13482712,
 transform = Transform3D(0.9952895, 0, -0.0969497, 0, 1, 0, 0.0969497, 0, 0.9952895, -0.12382221, -0.0817554, 0.20513248)
 
 [node name="RockArc" parent="LevelDesign" unique_id=69171181 groups=["collision_trimesh"] instance=ExtResource("23_01s5b")]
-transform = Transform3D(-0.5417364, 0, 1.9252342, 0, 2, 0, -1.9252342, 0, -0.5417364, 1.378013, -1.8861462, -1.9127724)
+transform = Transform3D(-0.5417364, 0, 1.9252342, 0, 2, 0, -1.9252342, 0, -0.5417364, 1.378013, -1.9518981, -1.9127724)
 
 [node name="Flower" parent="LevelDesign" unique_id=439214271 groups=["collision_convex"] instance=ExtResource("20_717p5")]
 transform = Transform3D(0.13256814, 0, 0.014264278, 0, 0.13333334, 0, -0.014264278, 0, 0.13256814, -1.6796858, -2.6294694, 10.76573)
@@ -634,10 +639,10 @@ transform = Transform3D(10, 0, 0, 0, 10, 0, 0, 0, 10, 234.93422, 22.038307, -29.
 transform = Transform3D(2.2599978, 0, 11.785262, 0, 12, 0, -11.785262, 0, 2.2599978, -8.428722, 131.89752, -108.22407)
 
 [node name="Rock4" parent="." unique_id=993069818 groups=["collision_trimesh"] instance=ExtResource("39_e4m7v")]
-transform = Transform3D(-48.772617, 0, 11.010528, 0, 50, 0, -11.010528, 0, -48.772617, 0.19894981, 113.99122, -46.242725)
+transform = Transform3D(-44.279903, 0, -23.22264, 0, 50.000008, 0, 23.22264, 0, -44.279903, 0.19894981, 111.37758, -46.242725)
 
 [node name="Rock3" parent="." unique_id=903435533 groups=["collision_trimesh"] instance=ExtResource("40_510r7")]
-transform = Transform3D(-22.22425, 0, -20.151493, 0, 30, 0, 20.151493, 0, -22.22425, -81.027466, 115.70616, -47.74707)
+transform = Transform3D(-20.505543, 0, -21.898012, 0, 29.999998, 0, 21.898008, 0, -20.505543, -90.219086, 116.61596, -38.868553)
 
 [node name="Rock2" parent="." unique_id=2080114888 groups=["collision_trimesh"] instance=ExtResource("41_as070")]
 transform = Transform3D(30, 0, 0, 0, 30, 0, 0, 0, 30, -54.53153, 45.30479, -186.89833)

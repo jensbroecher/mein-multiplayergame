@@ -302,6 +302,7 @@ func _on_setup_target_requested():
 
 	# Load default textures
 	var sand_tex = load("res://materials/sand.png") as Texture2D
+	var sand_norm = load("res://materials/sand_normal.png") as Texture2D
 	var rock_tex = load("res://materials/dark_canyon_rock.png") as Texture2D
 	var rock_norm = load("res://materials/dark_canyon_rock_normal.png") as Texture2D
 	var dirt_tex = load("res://materials/dirt.png") as Texture2D
@@ -312,7 +313,12 @@ func _on_setup_target_requested():
 		new_mat.set_shader_parameter("tex_base", sand_tex)
 		new_mat.set_shader_parameter("albedo_base", Color(1.0, 0.98, 0.94, 1.0))
 		new_mat.set_shader_parameter("uv_scale_base", 16.0)
+		new_mat.set_shader_parameter("roughness_base", 0.94)
 		new_mat.set_shader_parameter("use_triplanar_base", true)
+		if sand_norm:
+			new_mat.set_shader_parameter("use_normal_base", true)
+			new_mat.set_shader_parameter("normal_base", sand_norm)
+			new_mat.set_shader_parameter("normal_scale_base", 0.85)
 
 	if rock_tex:
 		new_mat.set_shader_parameter("tex_layer1", rock_tex)

@@ -271,7 +271,7 @@ void fragment() {
 
     ALBEDO = final_color;
     ROUGHNESS = clamp(final_roughness, 0.0, 1.0);
-    SPECULAR = 0.02;
+    SPECULAR = 0.05;
 
     // 4. Normal Maps
     vec3 blended_normal = vec3(0.5, 0.5, 1.0);

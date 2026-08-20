@@ -1807,11 +1807,16 @@ func _make_dune_sand_material() -> StandardMaterial3D:
 	var sand_mat := StandardMaterial3D.new()
 	sand_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	var sand_texture = load("res://materials/sand.png")
+	var sand_normal = load("res://materials/sand_normal.png")
 	if sand_texture:
 		sand_mat.albedo_texture = sand_texture
 		sand_mat.uv1_triplanar = true
 		sand_mat.uv1_scale = Vector3(0.45, 0.45, 0.45)
 		sand_mat.roughness = 0.92
+		if sand_normal:
+			sand_mat.normal_enabled = true
+			sand_mat.normal_texture = sand_normal
+			sand_mat.normal_scale = 0.85
 	else:
 		sand_mat.albedo_color = Color(0.9, 0.8, 0.6)
 		sand_mat.roughness = 0.92

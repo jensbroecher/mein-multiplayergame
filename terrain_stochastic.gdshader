@@ -173,12 +173,22 @@ void fragment() {
 
 	ALBEDO = color;
 	ROUGHNESS = rough;
-	SPECULAR = 0.02;
+	SPECULAR = 0.05;
 	METALLIC = 0.0;
 
 	if (use_normal_map) {
-		vec2 uv = (use_world_uv ? world_pos.xz : UV) * scale_v;
-		NORMAL_MAP = stochastic_sample_normal(normal_texture, uv, dFdx(uv), dFdy(uv));
+		if (use_world_uv) {
+			vec2 uv_bx = vec2(world_pos.z, -world_pos.y) * scale_v;
+			vec2 uv_by = world_pos.xz * scale_v;
+			vec2 uv_bz = vec2(-world_pos.x, -world_pos.y) * scale_v;
+			vec3 n_x = stochastic_sample_normal(normal_texture, uv_bx, dFdx(uv_bx), dFdy(uv_bx));
+			vec3 n_y = stochastic_sample_normal(normal_texture, uv_by, dFdx(uv_by), dFdy(uv_by));
+			vec3 n_z = stochastic_sample_normal(normal_texture, uv_bz, dFdx(uv_bz), dFdy(uv_bz));
+			NORMAL_MAP = n_x * n_weight.x + n_y * n_weight.y + n_z * n_weight.z;
+		} else {
+			vec2 uv = UV * scale_v;
+			NORMAL_MAP = stochastic_sample_normal(normal_texture, uv, dFdx(uv), dFdy(uv));
+		}
 		NORMAL_MAP_DEPTH = normal_scale;
 	}
 }
