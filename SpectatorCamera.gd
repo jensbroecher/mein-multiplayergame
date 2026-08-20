@@ -5,8 +5,13 @@ const VIEW_OFFSET := Vector3(-42.0, 28.0, 48.0)
 const VIEW_FOV := 52.0
 const CYCLE_TIME := 10.0
 
+const ZOOM_MIN: float = 0.45
+const ZOOM_MAX: float = 2.2
+const ZOOM_STEP: float = 0.12
+
 var race_ui = null
 var focus_cart: Node3D = null
+var zoom_factor: float = 1.0
 
 var _cam: Camera3D
 var _index: int = 0
@@ -44,7 +49,7 @@ func _ready() -> void:
 	_hint_label.position = Vector2(28, 50)
 	_hint_label.add_theme_font_size_override("font_size", 15)
 	_hint_label.add_theme_color_override("font_color", Color(0.78, 0.84, 0.9, 0.85))
-	_hint_label.text = "[ / ] or 1–6 to switch racer"
+	_hint_label.text = "[ / ] or 1–6 to switch racer | +/- or Mouse Wheel to zoom"
 	layer.add_child(_hint_label)
 
 	call_deferred("_pick_initial")
@@ -117,6 +122,16 @@ func _refresh_label() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			zoom_factor = clampf(zoom_factor - ZOOM_STEP, ZOOM_MIN, ZOOM_MAX)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			zoom_factor = clampf(zoom_factor + ZOOM_STEP, ZOOM_MIN, ZOOM_MAX)
+			get_viewport().set_input_as_handled()
+			return
+
 	if event.is_action_pressed("ui_left"):
 		cycle(-1)
 		get_viewport().set_input_as_handled()
@@ -127,6 +142,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
+			KEY_PLUS, KEY_EQUAL, KEY_KP_ADD:
+				zoom_factor = clampf(zoom_factor - ZOOM_STEP, ZOOM_MIN, ZOOM_MAX)
+				get_viewport().set_input_as_handled()
+				return
+			KEY_MINUS, KEY_UNDERSCORE, KEY_KP_SUBTRACT:
+				zoom_factor = clampf(zoom_factor + ZOOM_STEP, ZOOM_MIN, ZOOM_MAX)
+				get_viewport().set_input_as_handled()
+				return
 			KEY_BRACKETLEFT, KEY_COMMA, KEY_Q:
 				cycle(-1)
 				get_viewport().set_input_as_handled()
@@ -162,9 +185,9 @@ func _process(delta: float) -> void:
 		return
 
 	var focus_pos: Vector3 = focus_cart.global_position
-	var desired: Vector3 = focus_pos + VIEW_OFFSET
+	var desired: Vector3 = focus_pos + VIEW_OFFSET * zoom_factor
 	desired = _raise_above_terrain(desired)
-	global_position = global_position.lerp(desired, 1.8 * delta)
+	global_position = global_position.lerp(desired, 2.4 * delta)
 	global_position = _raise_above_terrain(global_position)
 
 	var look_fwd := Vector3.FORWARD

@@ -202,6 +202,9 @@ var is_finished_race: bool = false
 var spectate_target_cart: Node3D = null
 var spectate_timer: float = 0.0
 var spectate_index: int = 0
+var finish_spectate_delay: float = 0.0
+var spectator_zoom: float = 1.0
+var _kb_brake_amount: float = 0.0
 var smoothed_speed: float = 0.0
 var stuck_timer: float = 0.0
 var race_start_time: float = 0.0
@@ -425,6 +428,7 @@ func set_finished_race(finished: bool = true) -> void:
 	is_finished_race = finished
 	can_move = true
 	if finished:
+		finish_spectate_delay = 4.0
 		current_item = ItemType.NONE
 		current_item_2 = ItemType.NONE
 		if is_local_player and race_ui:
@@ -865,7 +869,7 @@ func _process(delta):
 			if name_tag:
 				name_tag.pixel_size = 0.00035 if is_isometric or is_finished_race else 0.00065
 				
-			if is_finished_race:
+			if is_finished_race and finish_spectate_delay <= 0.0:
 				# Bird's-eye overview camera: Follow cars still in the race, cycling every ~10s and moving smoothly between them
 				var all_carts = get_tree().get_nodes_in_group("player_carts")
 				var active_racing_carts: Array[Node3D] = []
@@ -887,12 +891,12 @@ func _process(delta):
 				var focus_cart: Node3D = spectate_target_cart if (spectate_target_cart and is_instance_valid(spectate_target_cart)) else self
 				var focus_pos: Vector3 = focus_cart.global_position
 				
-				# 3/4 broadcast angle (same as debug SpectatorCamera) — not looking straight down.
-				var desired_cam_pos = focus_pos + Vector3(-42.0, 28.0, 48.0)
+				# 3/4 broadcast angle (same as debug SpectatorCamera) with zoom factor
+				var desired_cam_pos = focus_pos + Vector3(-42.0, 28.0, 48.0) * spectator_zoom
 				var target_cam_pos = _raise_point_above_terrain(desired_cam_pos, excludes)
 				
 				# Smoothly glide camera between cars
-				camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 1.8 * delta)
+				camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 2.2 * delta)
 				camera_pivot.global_position = _raise_point_above_terrain(camera_pivot.global_position, excludes)
 				
 				var look_fwd := Vector3.FORWARD
@@ -1026,7 +1030,7 @@ func _process(delta):
 		
 		# Smoothly lerp camera FOV based on is_isometric, is_finished_race, and is_boosting/is_pad_boosting
 		var target_fov = 75.0
-		if is_finished_race:
+		if is_finished_race and finish_spectate_delay <= 0.0:
 			target_fov = 52.0
 		elif is_isometric:
 			target_fov = 35.0
@@ -1038,7 +1042,7 @@ func _process(delta):
 				target_fov += 9.0 # Zoom out slightly less when pad boosting!
 		camera.fov = lerp(camera.fov, target_fov, 8.0 * delta)
 
-		if not is_finished_race and has_node("AudioListener3D"):
+		if (not is_finished_race or finish_spectate_delay > 0.0) and has_node("AudioListener3D"):
 			var listener = get_node("AudioListener3D")
 			listener.global_position = global_position
 			if not listener.current:
@@ -1479,16 +1483,19 @@ func _physics_process(delta):
 					freeze = true
 					freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
 
-	if not can_move and not is_landing:
-		linear_velocity = linear_velocity.lerp(Vector3.ZERO, 3.0 * delta)
-		_move_and_sync()
-		return
+	if is_finished_race and finish_spectate_delay > 0.0:
+		finish_spectate_delay -= delta
 
 	if is_local_player and not is_finished_race:
 		if Input.is_action_just_pressed(input_prefix + "boost"):
 			_use_item()
 		if Input.is_action_just_pressed(input_prefix + "discard_item"):
 			_discard_item()
+
+	if not can_move and not is_landing:
+		linear_velocity = linear_velocity.lerp(Vector3.ZERO, 3.0 * delta)
+		_move_and_sync()
+		return
 
 	var input_dir = Vector2.ZERO
 	if can_move:
@@ -1498,7 +1505,24 @@ func _physics_process(delta):
 				_process_ai_items(delta)
 		else:
 			input_dir.x = Input.get_axis(input_prefix + "steer_left", input_prefix + "steer_right")
-			input_dir.y = Input.get_axis(input_prefix + "throttle", input_prefix + "brake")
+			
+			var raw_throttle: float = Input.get_action_strength(input_prefix + "throttle")
+			var raw_brake: float = Input.get_action_strength(input_prefix + "brake")
+			
+			# If using gamepad with analog trigger, use raw_brake directly.
+			# If using keyboard (device_id == -1 or digital button), ramp up brake force gradually.
+			if device_id != -1 and raw_brake > 0.0 and raw_brake < 0.99:
+				_kb_brake_amount = raw_brake
+			else:
+				if raw_brake > 0.05:
+					if _kb_brake_amount < 0.20:
+						_kb_brake_amount = 0.20 # gentle initial bite for fine adjustments
+					_kb_brake_amount = move_toward(_kb_brake_amount, 1.0, 1.65 * delta)
+				else:
+					_kb_brake_amount = move_toward(_kb_brake_amount, 0.0, 6.0 * delta)
+			
+			var effective_brake: float = _kb_brake_amount if raw_brake > 0.05 else 0.0
+			input_dir.y = effective_brake - raw_throttle
 
 	var on_ground = false
 	var on_loop = false
@@ -4988,3 +5012,96 @@ func _update_all_carts_lod():
 	if is_inside_tree():
 		get_tree().call_group("player_carts", "update_lod_bias")
 	return null
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not is_local_player or not is_finished_race or finish_spectate_delay > 0.0:
+		return
+		
+	# Spectator zoom controls (+ / - and Mouse Wheel)
+	if event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			spectator_zoom = clampf(spectator_zoom - 0.12, 0.45, 2.2)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			spectator_zoom = clampf(spectator_zoom + 0.12, 0.45, 2.2)
+			get_viewport().set_input_as_handled()
+			return
+			
+	if event is InputEventKey and event.pressed and not event.echo:
+		match event.keycode:
+			KEY_PLUS, KEY_EQUAL, KEY_KP_ADD:
+				spectator_zoom = clampf(spectator_zoom - 0.12, 0.45, 2.2)
+				get_viewport().set_input_as_handled()
+				return
+			KEY_MINUS, KEY_UNDERSCORE, KEY_KP_SUBTRACT:
+				spectator_zoom = clampf(spectator_zoom + 0.12, 0.45, 2.2)
+				get_viewport().set_input_as_handled()
+				return
+			KEY_BRACKETLEFT, KEY_COMMA, KEY_Q:
+				_cycle_spectate(-1)
+				get_viewport().set_input_as_handled()
+				return
+			KEY_BRACKETRIGHT, KEY_PERIOD, KEY_E:
+				_cycle_spectate(1)
+				get_viewport().set_input_as_handled()
+				return
+			KEY_1, KEY_KP_1:
+				_select_spectate_slot(0)
+				get_viewport().set_input_as_handled()
+				return
+			KEY_2, KEY_KP_2:
+				_select_spectate_slot(1)
+				get_viewport().set_input_as_handled()
+				return
+			KEY_3, KEY_KP_3:
+				_select_spectate_slot(2)
+				get_viewport().set_input_as_handled()
+				return
+			KEY_4, KEY_KP_4:
+				_select_spectate_slot(3)
+				get_viewport().set_input_as_handled()
+				return
+			KEY_5, KEY_KP_5:
+				_select_spectate_slot(4)
+				get_viewport().set_input_as_handled()
+				return
+			KEY_6, KEY_KP_6:
+				_select_spectate_slot(5)
+				get_viewport().set_input_as_handled()
+				return
+
+func _cycle_spectate(dir: int) -> void:
+	var all_carts = get_tree().get_nodes_in_group("player_carts")
+	var active_racing_carts: Array[Node3D] = []
+	for c in all_carts:
+		if is_instance_valid(c) and c is Node3D and not c.get("is_finished_race"):
+			active_racing_carts.append(c)
+	if active_racing_carts.is_empty():
+		for c in all_carts:
+			if is_instance_valid(c) and c is Node3D:
+				active_racing_carts.append(c)
+	if active_racing_carts.is_empty():
+		return
+	spectate_index = posmod(spectate_index + dir, active_racing_carts.size())
+	spectate_target_cart = active_racing_carts[spectate_index]
+	spectate_timer = 10.0
+	if race_ui and race_ui.has_method("show_message"):
+		var r_name = str(spectate_target_cart.get("player_name"))
+		if r_name.is_empty(): r_name = spectate_target_cart.name
+		race_ui.show_message("Spectating: %s" % r_name, 1.5)
+
+func _select_spectate_slot(slot: int) -> void:
+	var all_carts: Array[Node3D] = []
+	for c in get_tree().get_nodes_in_group("player_carts"):
+		if is_instance_valid(c) and c is Node3D:
+			all_carts.append(c)
+	if slot < 0 or slot >= all_carts.size():
+		return
+	spectate_target_cart = all_carts[slot]
+	spectate_index = slot
+	spectate_timer = 10.0
+	if race_ui and race_ui.has_method("show_message"):
+		var r_name = str(spectate_target_cart.get("player_name"))
+		if r_name.is_empty(): r_name = spectate_target_cart.name
+		race_ui.show_message("Spectating: %s" % r_name, 1.5)
