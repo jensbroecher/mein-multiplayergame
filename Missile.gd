@@ -84,20 +84,70 @@ func _ready():
 		sync_rotation = global_rotation
 
 func _find_target():
-	var nearest_dist = 500.0
-	var best_target: Node3D = null
+	if not is_guided:
+		target = null
+		return
+
 	var players = get_tree().get_nodes_in_group("player_carts")
-	var forward = -global_transform.basis.z
+	var forward: Vector3 = -global_transform.basis.z
+	var right: Vector3 = global_transform.basis.x
+	
+	# Tier 1: Car directly in front on the course ahead
+	var best_in_front_dist: float = 9999.0
+	var best_in_front_target: Node3D = null
+	
+	# Tier 2: Broader search if no car is directly in front
+	var best_search_score: float = 9999.0
+	var best_search_target: Node3D = null
+	
 	for p in players:
-		if p.name.to_int() == owner_id: continue
-		var dir_to_target = (p.global_position - global_position).normalized()
-		# Only lock target if it is in front of the missile (not behind)
-		if forward.dot(dir_to_target) > 0.1:
-			var dist = global_position.distance_to(p.global_position)
-			if dist < nearest_dist:
-				nearest_dist = dist
-				best_target = p
-	target = best_target
+		if p == null or not is_instance_valid(p):
+			continue
+		if p.name.to_int() == owner_id:
+			continue
+		if p.get("is_exploding") == true or p.get("is_drowned") == true:
+			continue
+			
+		var to_p: Vector3 = p.global_position - global_position
+		var dist: float = to_p.length()
+		if dist < 0.5 or dist > max_range:
+			continue
+			
+		var dir_to_target: Vector3 = to_p / dist
+		var fwd_dot: float = forward.dot(dir_to_target)
+		var fwd_dist: float = forward.dot(to_p)
+		var side_dist: float = absf(right.dot(to_p))
+		var height_dist: float = absf(to_p.y)
+		
+		# Reject carts that are behind or nearly perpendicular (sideways)
+		if fwd_dot < 0.38 or fwd_dist <= 1.5:
+			continue
+			
+		# Reject carts that are very far to the left or right
+		if side_dist > 35.0 or (side_dist > fwd_dist * 1.1):
+			continue
+			
+		# Reject carts that are very far above or below (e.g. overpasses, bridges, or chasms)
+		if height_dist > 14.0 or (height_dist > fwd_dist * 0.75):
+			continue
+			
+		# Tier 1: Directly in front (narrow forward corridor, tight lateral cushion, close height)
+		if fwd_dot >= 0.65 and side_dist <= 18.0 and height_dist <= 9.0:
+			if dist < best_in_front_dist:
+				best_in_front_dist = dist
+				best_in_front_target = p
+		else:
+			# Tier 2: Broader search candidate (penalize off-axis lateral and vertical distances)
+			var score: float = dist + side_dist * 2.5 + height_dist * 3.0
+			if score < best_search_score:
+				best_search_score = score
+				best_search_target = p
+				
+	# Prioritize the car in front; if none, use broader candidate
+	if best_in_front_target:
+		target = best_in_front_target
+	else:
+		target = best_search_target
 
 func _physics_process(delta):
 	if is_exploding or has_exploded:
@@ -119,24 +169,36 @@ func _physics_process(delta):
 			spawn_safety_timer -= delta
 
 		search_timer += delta
-		if search_timer > 0.5:
+		if search_timer > 0.25:
 			_find_target()
 			search_timer = 0.0
 
 		if homing_delay > 0.0:
 			homing_delay -= delta
-		else:
-			if target and is_instance_valid(target):
-				var dir = (target.global_position - global_position).normalized()
-				var forward = -global_transform.basis.z
-				if forward.dot(dir) > -0.2:
-					if abs(dir.dot(Vector3.UP)) < 0.99:
-						var target_basis = Basis.looking_at(dir, Vector3.UP)
-						var turn_speed = 4.5 if is_guided else 1.2
-						global_basis = global_basis.slerp(target_basis, turn_speed * delta).orthonormalized()
-				else:
-					# Target went too far behind, break the lock
-					target = null
+		elif is_guided and target and is_instance_valid(target):
+			var to_target: Vector3 = target.global_position - global_position
+			var dist: float = to_target.length()
+			var forward: Vector3 = -global_transform.basis.z
+			var right: Vector3 = global_transform.basis.x
+			var dir: Vector3 = to_target.normalized()
+			var fwd_dot: float = forward.dot(dir)
+			var side_dist: float = absf(right.dot(to_target))
+			var height_dist: float = absf(to_target.y)
+			
+			# Break lock if target goes behind, or too far sideways/vertically
+			if fwd_dot < 0.25 or side_dist > 45.0 or height_dist > 18.0 or dist > max_range \
+					or target.get("is_exploding") == true or target.get("is_drowned") == true:
+				target = null
+			else:
+				# Clamp vertical pitch so missile does not dive straight down or pitch vertically straight up
+				var clamped_dir: Vector3 = dir
+				clamped_dir.y = clampf(clamped_dir.y, -0.55, 0.55)
+				clamped_dir = clamped_dir.normalized()
+				
+				if absf(clamped_dir.dot(Vector3.UP)) < 0.98:
+					var target_basis: Basis = Basis.looking_at(clamped_dir, Vector3.UP)
+					var turn_speed: float = 4.2
+					global_basis = global_basis.slerp(target_basis, turn_speed * delta).orthonormalized()
 
 		# Gradually accelerate from start speed to max
 		speed = min(speed + SPEED_ACCEL * delta, SPEED_MAX)

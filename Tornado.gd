@@ -67,6 +67,38 @@ func force_release_cart(cart: Object) -> void:
 		# Do not restore can_move — explode/respawn owns that flag
 
 
+## Called when a cart uses boost while inside the tornado to break free.
+func escape_cart_with_boost(cart: Object) -> void:
+	if cart == null or not is_instance_valid(cart):
+		return
+	var id := cart.get_instance_id()
+	if not _captured.has(id):
+		return
+	_captured.erase(id)
+	_cooldown[id] = cooldown_after_spit * 2.0
+
+	if cart is RigidBody3D:
+		var rb := cart as RigidBody3D
+		rb.freeze = false
+		rb.sleeping = false
+		if "axis_lock_angular_x" in rb:
+			rb.axis_lock_angular_x = true
+			rb.axis_lock_angular_y = true
+			rb.axis_lock_angular_z = true
+		if "can_move" in rb:
+			rb.set("can_move", true)
+
+		var fwd := -rb.global_transform.basis.z
+		if "visuals" in rb and is_instance_valid(rb.get("visuals")):
+			fwd = -(rb.get("visuals") as Node3D).global_transform.basis.z
+		fwd.y = 0.12
+		fwd = fwd.normalized()
+		rb.linear_velocity = fwd * 46.0
+		rb.angular_velocity = Vector3.ZERO
+		if rb.has_method("_reset_post_tornado_pose"):
+			rb._reset_post_tornado_pose()
+
+
 func _physics_process(delta: float) -> void:
 	_spin_visual(delta)
 	# Visual spin on all peers; movement + captures driven by host / offline
@@ -238,6 +270,12 @@ func _update_captures(delta: float) -> void:
 					rb.axis_lock_angular_y = true
 					rb.axis_lock_angular_z = true
 			_cooldown[id] = cooldown_after_spit
+			finished.append(id)
+			continue
+
+		# Boost used while spinning: escape immediately
+		if cart.get("is_boosting") == true or cart.get("is_pad_boosting") == true or cart.get("boost_timer") > 0.0:
+			escape_cart_with_boost(cart)
 			finished.append(id)
 			continue
 

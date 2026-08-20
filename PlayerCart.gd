@@ -2436,6 +2436,9 @@ func _execute_use_item(type: int):
 				client_start_boost.rpc_id(name.to_int())
 			else:
 				client_start_boost()
+			for tornado in get_tree().get_nodes_in_group("tornados"):
+				if tornado and is_instance_valid(tornado) and tornado.has_method("escape_cart_with_boost"):
+					tornado.escape_cart_with_boost(self)
 		ItemType.MISSILE:
 			_fire_missile(false)
 		ItemType.GUIDED_MISSILE:
@@ -2479,12 +2482,18 @@ func client_start_boost():
 	is_boosting = true
 	sfx_nitro_start.play()
 	_set_boost_emitting(true)
+	for tornado in get_tree().get_nodes_in_group("tornados"):
+		if tornado and is_instance_valid(tornado) and tornado.has_method("escape_cart_with_boost"):
+			tornado.escape_cart_with_boost(self)
 
 @rpc("any_peer", "call_local", "reliable")
 func client_start_pad_boost(strength: float = 1.0, duration: float = 2.0):
 	pad_boost_strength = maxf(strength, 0.1)
 	pad_boost_timer = maxf(duration, 0.1)
 	is_pad_boosting = true
+	for tornado in get_tree().get_nodes_in_group("tornados"):
+		if tornado and is_instance_valid(tornado) and tornado.has_method("escape_cart_with_boost"):
+			tornado.escape_cart_with_boost(self)
 	
 	# Play swoosh sound (stereogenicstudio-swish-swoosh-woosh-sfx-47-357152.mp3)
 	var ap = AudioStreamPlayer3D.new()
@@ -3327,7 +3336,7 @@ func client_play_lightning(hit_player_names: Array, random_target: Vector3 = Vec
 
 	var origin_getter = func():
 		if is_instance_valid(self) and is_instance_valid(visuals):
-			return global_position + visuals.global_transform.basis.y * 0.45
+			return global_position + visuals.global_transform.basis.y * -0.15
 		return global_position
 
 	if not hit_player_names.is_empty():
@@ -3340,10 +3349,10 @@ func client_play_lightning(hit_player_names: Array, random_target: Vector3 = Vec
 			if target:
 				var target_getter = func():
 					if is_instance_valid(target) and is_instance_valid(target.visuals):
-						return target.global_position + target.visuals.global_transform.basis.y * 0.45
+						return target.global_position + target.visuals.global_transform.basis.y * -0.15
 					return Vector3.ZERO
 				_create_dynamic_lightning_arc(origin_getter, target_getter)
-				_spawn_sparks(target.global_position + target.visuals.global_transform.basis.y * 0.45)
+				_spawn_sparks(target.global_position + target.visuals.global_transform.basis.y * 0.05)
 	else:
 		var strike_pos = random_target
 		if strike_pos == Vector3.ZERO:
