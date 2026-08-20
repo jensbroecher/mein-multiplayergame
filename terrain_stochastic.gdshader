@@ -74,6 +74,8 @@ void triangle_grid(vec2 uv, out vec2 v1, out vec2 v2, out vec2 v3, out vec3 w) {
 		v2 = base_id + vec2(1.0, 0.0);
 		v3 = base_id + vec2(0.0, 1.0);
 	}
+	w = smoothstep(vec3(0.0), vec3(1.0), w);
+	w /= max(w.x + w.y + w.z, 1e-5);
 }
 
 vec3 stochastic_sample(sampler2D tex, vec2 uv, vec2 ddx_uv, vec2 ddy_uv) {

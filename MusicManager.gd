@@ -633,11 +633,11 @@ func _apply_shadows_to_tree(node: Node) -> void:
 			dl.directional_shadow_blend_splits = true
 			dl.directional_shadow_fade_start = 0.7
 			dl.shadow_blur = SHADOW_BLURS[q]
-			# Road contact stays tight via shadow_bias. Higher normal bias hides the
-			# sun-terminator grid on large hill triangles without lifting car shadows.
-			dl.shadow_bias = 0.01 if q <= 1 else 0.007
-			dl.shadow_normal_bias = 1.6 if q <= 1 else 1.25
-			dl.directional_shadow_pancake_size = 20.0
+			# Sane shadow bias + normal bias eliminates self-shadow acne and checkerboard
+			# dither patterns on terrain hills while maintaining tight vehicle contact shadows.
+			dl.shadow_bias = 0.04 if q <= 1 else 0.035
+			dl.shadow_normal_bias = 2.4 if q <= 1 else 2.0
+			dl.directional_shadow_pancake_size = 15.0
 	elif node is OmniLight3D:
 		(node as OmniLight3D).shadow_enabled = enabled and q >= 2
 	elif node is SpotLight3D:
