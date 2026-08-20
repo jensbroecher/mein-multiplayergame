@@ -1137,12 +1137,30 @@ func _process(delta):
 							n = hit.normal.normalized()
 							mark_pos = hit.position + n * 0.025
 					
-					var fwd_sk: Vector3 = -visuals.global_transform.basis.z
-					var fwd_plane: Vector3 = fwd_sk - n * fwd_sk.dot(n)
-					if fwd_plane.length_squared() < 0.0001:
-						fwd_plane = -visuals.global_transform.basis.z
+					# Compute motion velocity of the wheel contact point
+					var vel: Vector3 = linear_velocity
+					if not has_physics_authority and sync_velocity.length_squared() > 0.5:
+						vel = sync_velocity
+					var wheel_offset: Vector3 = mark_pos - global_position
+					var wheel_vel: Vector3 = vel
+					if has_physics_authority and angular_velocity.length_squared() > 0.01:
+						wheel_vel += angular_velocity.cross(wheel_offset)
+					
+					# Project wheel motion onto the ground surface normal
+					var move_on_ground: Vector3 = wheel_vel - n * wheel_vel.dot(n)
+					var fwd_plane: Vector3
+					if move_on_ground.length_squared() >= 0.25:
+						# Align skid mark quad with the wheel's actual path of motion across the ground
+						fwd_plane = move_on_ground.normalized()
 					else:
-						fwd_plane = fwd_plane.normalized()
+						# Fallback for stationary or near-zero speed (e.g. burnout / standing still)
+						var fwd_sk: Vector3 = -visuals.global_transform.basis.z
+						fwd_plane = fwd_sk - n * fwd_sk.dot(n)
+						if fwd_plane.length_squared() < 0.0001:
+							fwd_plane = -visuals.global_transform.basis.z
+						else:
+							fwd_plane = fwd_plane.normalized()
+					
 					var right_sk: Vector3 = n.cross(fwd_plane)
 					if right_sk.length_squared() < 0.0001:
 						p.global_rotation = Vector3(0.0, visuals.global_rotation.y, 0.0)
@@ -3820,14 +3838,14 @@ func _create_drift_particles(wheel_name: String):
 	var skid = CPUParticles3D.new()
 	skid.name = wheel_name + "_Skid"
 	skid.emitting = false
-	skid.amount = 120
+	skid.amount = 140
 	skid.lifetime = 1.8
 	skid.explosiveness = 0.0
 	skid.randomness = 0.0
 	skid.fixed_fps = 60
 	skid.mesh = QuadMesh.new()
 	skid.mesh.orientation = PlaneMesh.FACE_Y
-	skid.mesh.size = Vector2(0.26, 0.58)
+	skid.mesh.size = Vector2(0.26, 0.60)
 
 	var mat_skid = StandardMaterial3D.new()
 	mat_skid.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
