@@ -42,6 +42,36 @@ func _path_right(tangent: Vector3) -> Vector3:
 	return right.normalized()
 
 
+## Banked right vector that cannot fold the road ribbon.
+## Curve3D up-vectors flip on steep kickers when *any* point has tilt; clamp roll
+## so only the intended NASCAR/outward banks lean (~0.42 rad) and hairpins stay flat.
+func _stable_banked_right(tangent: Vector3, baked_up: Vector3) -> Vector3:
+	var horiz := _path_right(tangent)
+	if baked_up.length_squared() < 1e-6:
+		return horiz
+	var t := tangent
+	if t.length_squared() < 1e-8:
+		t = Vector3.FORWARD
+	else:
+		t = t.normalized()
+	var banked := t.cross(baked_up.normalized())
+	if banked.length_squared() < 1e-6:
+		return horiz
+	banked = banked.normalized()
+	if banked.dot(horiz) < 0.0:
+		banked = -banked
+	# ~27 deg — covers Wadi outward-bank tilt 0.42, rejects 90-deg folds
+	const MAX_RIGHT_Y := 0.46
+	if absf(banked.y) <= MAX_RIGHT_Y:
+		return banked
+	var y: float = clampf(banked.y, -MAX_RIGHT_Y, MAX_RIGHT_Y)
+	var xz := Vector3(banked.x, 0.0, banked.z)
+	if xz.length_squared() < 1e-8:
+		return horiz
+	xz = xz.normalized() * sqrt(maxf(0.0, 1.0 - y * y))
+	return Vector3(xz.x, y, xz.z)
+
+
 func _curve_has_tilt(curve: Curve3D) -> bool:
 	if not is_instance_valid(curve):
 		return false
@@ -87,16 +117,10 @@ func _build_path_frames(curve: Curve3D, point_count: int) -> Array:
 		var up_vec: Vector3
 		if has_tilt:
 			up_vec = curve.sample_baked_up_vector(offset, true)
+			right = _stable_banked_right(tangent, up_vec)
+			up_vec = right.cross(tangent).normalized()
 			if up_vec.length_squared() < 1e-6:
 				up_vec = Vector3.UP
-			else:
-				up_vec = up_vec.normalized()
-			right = tangent.cross(up_vec)
-			if right.length_squared() < 1e-6:
-				right = _path_right(tangent)
-			else:
-				right = right.normalized()
-			up_vec = right.cross(tangent).normalized()
 		else:
 			# Standard tracks: keep right vector strictly horizontal (no sideways roll on climbs!)
 			right = _path_right(tangent)
@@ -355,11 +379,13 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			var o1_c = minf(c_length, c_offset + 0.5)
 			var c_tangent = (curve.sample_baked(o1_c) - curve.sample_baked(o0_c)).normalized()
 			if c_tangent.length_squared() > 1e-6:
-				var c_up = curve.sample_baked_up_vector(c_offset, true).normalized()
-				var c_right = c_tangent.cross(c_up).normalized()
+				var c_up = curve.sample_baked_up_vector(c_offset, true)
+				var c_right = _stable_banked_right(c_tangent, c_up)
 				var rel_p = Vector3(px - closest_pos.x, 0.0, pz - closest_pos.z)
-				var lateral_d = rel_p.dot(Vector3(c_right.x, 0.0, c_right.z).normalized())
-				road_h += lateral_d * c_right.y
+				var lat_xz := Vector3(c_right.x, 0.0, c_right.z)
+				if lat_xz.length_squared() > 1e-8:
+					var lateral_d = rel_p.dot(lat_xz.normalized())
+					road_h += lateral_d * c_right.y
 
 		# Airborne jump curve must NOT pull terrain up into a glitchy ridge / fake structure.
 		if level_prefix == "canyon_chasm" and _is_in_gap_pos(closest_pos):
@@ -872,6 +898,10 @@ func _make_concrete_pbr_material() -> StandardMaterial3D:
 
 func _generate_road_and_sand():
 	if level_prefix == "harbor_pier":
+		return
+	# Desert Wadi is a sand wash: keep the carved trough in the terrain, but do
+	# not emit asphalt, curbs, or a separate road collision slab.
+	if level_prefix == "desert_wadi":
 		return
 	var curve = _get_world_curve()
 	var length = curve.get_baked_length()

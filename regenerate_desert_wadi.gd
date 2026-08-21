@@ -119,41 +119,66 @@ func _ready() -> void:
 
 	# Technical closed loop. Start/finish sits on a LONG straight (not a hairpin).
 	# Path order begins mid climb-out straight so the gate faces a calm approach.
+	#
+	# Layout (do NOT recross the original bank — that folded the road mesh):
+	#   start → switchbacks → ORIGINAL outward bank → peel SOUTH-WEST into unused
+	#   desert → NASCAR inward bowl (far west) → south return → mild kicker →
+	#   rejoin original (112, 8) → ORIGINAL hairpins → ORIGINAL river ford.
 	var curve := Curve3D.new()
 	curve.bake_interval = 0.25
 	curve.up_vector_enabled = true
 
 	var points: Array = [
-		# === START / FINISH: long straight after climb (northbound-ish) ===
+		# === START / FINISH: long straight after climb (original) ===
 		{"pos": Vector3(292, 5.6, -168), "in": Vector3(0, 0, -22), "out": Vector3(0, 0, 22)},
 		{"pos": Vector3(298, 6.0, -125), "in": Vector3(0, 0, -20), "out": Vector3(0, 0, 20)},
 		{"pos": Vector3(285, 6.0, -85), "in": Vector3(14, 0, -14), "out": Vector3(-14, 0, 14)},
-		# Double-apex switchbacks
+		# Double-apex switchbacks (original)
 		{"pos": Vector3(245, 5.5, -50), "in": Vector3(16, 0, -14), "out": Vector3(-16, 0, 14)},
 		{"pos": Vector3(268, 5.0, -12), "in": Vector3(-12, 0, -16), "out": Vector3(12, 0, 16)},
 		{"pos": Vector3(235, 5.0, 38), "in": Vector3(18, 0, -12), "out": Vector3(-18, 0, 12)},
 		{"pos": Vector3(185, 5.0, 78), "in": Vector3(22, 0, -6), "out": Vector3(-22, 0, 6)},
-		# === LONG NASCAR BANKED CURVE (24° High Banked Sweep) ===
-		# For this right-hand turn, negative tilt banks the road: left/outer wall is high (+Y), right/inner apron stays low.
+		# === OUTWARD-BANKED SWEEP (right-hander, original) ===
 		{"pos": Vector3(115, 5.0, 115), "in": Vector3(26, 0, -10), "out": Vector3(-26, 0, 10), "tilt": -0.12},
 		{"pos": Vector3(45, 5.5, 145), "in": Vector3(20, 0, -12), "out": Vector3(-20, 0, 12), "tilt": -0.28},
 		{"pos": Vector3(0, 6.0, 125), "in": Vector3(14, 0, 14), "out": Vector3(-14, 0, -14), "tilt": -0.42},
 		{"pos": Vector3(15, 5.5, 75), "in": Vector3(-8, 0, 20), "out": Vector3(8, 0, -20), "tilt": -0.28},
-		{"pos": Vector3(72, 5.0, 42), "in": Vector3(-26, 0, 12), "out": Vector3(26, 0, -12), "tilt": -0.12},
-		{"pos": Vector3(112, 5.0, 8), "in": Vector3(-16, 0, 20), "out": Vector3(16, 0, -20)},
-		# Hairpin 1
+		# Bank exit: original IN handle; OUT peels south then west (south of the bank)
+		{"pos": Vector3(72, 5.0, 42), "in": Vector3(-26, 0, 12), "out": Vector3(-16, 0, -16), "tilt": -0.12},
+		# Westbound SOUTH of the bank, NORTH of the later return (z ≈ 0..12)
+		{"pos": Vector3(45, 5.1, 12), "in": Vector3(16, 0, 16), "out": Vector3(-18, 0, -8)},
+		{"pos": Vector3(-40, 5.2, 0), "in": Vector3(28, 0, 6), "out": Vector3(-28, 0, -4)},
+		{"pos": Vector3(-120, 5.5, 25), "in": Vector3(24, 0, -12), "out": Vector3(-22, 0, 16)},
+		{"pos": Vector3(-155, 5.9, 70), "in": Vector3(10, 0, -24), "out": Vector3(-8, 0, 24)},
+		# === NASCAR 180° INWARD left-hander (enter north on east side, exit south on west) ===
+		{"pos": Vector3(-165, 6.4, 125), "in": Vector3(4, 0, -26), "out": Vector3(-4, 0, 26), "tilt": 0.12},
+		{"pos": Vector3(-200, 7.0, 175), "in": Vector3(16, 0, -22), "out": Vector3(-16, 0, 22), "tilt": 0.28},
+		{"pos": Vector3(-255, 7.4, 175), "in": Vector3(26, 0, 0), "out": Vector3(-26, 0, 0), "tilt": 0.42},
+		{"pos": Vector3(-285, 7.0, 125), "in": Vector3(16, 0, 22), "out": Vector3(-16, 0, -22), "tilt": 0.28},
+		{"pos": Vector3(-270, 6.4, 70), "in": Vector3(-4, 0, 26), "out": Vector3(4, 0, -26), "tilt": 0.12},
+		# South on the WEST of the westbound, then east at z ≈ -50 (never recrosses)
+		{"pos": Vector3(-255, 5.8, 10), "in": Vector3(-6, 0, 24), "out": Vector3(6, 0, -24)},
+		{"pos": Vector3(-210, 5.5, -48), "in": Vector3(-22, 0, 12), "out": Vector3(22, 0, -8)},
+		{"pos": Vector3(-90, 5.5, -58), "in": Vector3(-28, 0, 0), "out": Vector3(28, 0, 0)},
+		{"pos": Vector3(10, 5.5, -50), "in": Vector3(-26, 0, -4), "out": Vector3(24, 0, 6)},
+		{"pos": Vector3(55, 5.8, -28), "in": Vector3(-20, 0, -10), "out": Vector3(18, 0, 12)},
+		# Mild continuous kicker (no mesh gap)
+		{"pos": Vector3(82, 8.8, -10), "in": Vector3(-14, -0.7, -10), "out": Vector3(14, 0.7, 8)},
+		{"pos": Vector3(102, 5.4, 3), "in": Vector3(-12, 0.9, -8), "out": Vector3(12, -0.9, 6)},
+		# Rejoin original (112, 8) — out handle kept so hairpins still drop into the river
+		{"pos": Vector3(112, 5.0, 8), "in": Vector3(-12, 0, -6), "out": Vector3(16, 0, -20)},
+		# === ORIGINAL hairpins into the valley (ford still hits the water) ===
 		{"pos": Vector3(128, 5.0, -48), "in": Vector3(8, 0, 18), "out": Vector3(-8, 0, -18)},
 		{"pos": Vector3(88, 4.5, -82), "in": Vector3(20, 0, 6), "out": Vector3(-20, 0, -6)},
 		{"pos": Vector3(58, 4.5, -118), "in": Vector3(10, 0, 18), "out": Vector3(-10, 0, -18)},
-		# Hairpin 2 into valley
 		{"pos": Vector3(98, 4.2, -152), "in": Vector3(-18, 0, 10), "out": Vector3(18, 0, -10)},
 		{"pos": Vector3(128, 3.0, -172), "in": Vector3(-12, 0.4, 12), "out": Vector3(12, -0.4, -12)},
-		# Drop into river ford / valley lake — completely submerged from bank to bank
+		# Drop into river ford / valley lake (original — road y 0.70, water y 1.70)
 		{"pos": Vector3(155, 1.10, -190), "in": Vector3(-14, 0.5, 8), "out": Vector3(14, -0.5, -8)},
 		{"pos": Vector3(185, 0.70, -206), "in": Vector3(-16, 0.1, 6), "out": Vector3(16, -0.1, -6)},
 		{"pos": Vector3(222, 0.70, -220), "in": Vector3(-14, -0.1, 5), "out": Vector3(14, 0.1, -5)},
 		{"pos": Vector3(255, 1.10, -232), "in": Vector3(-14, -0.6, 6), "out": Vector3(14, 0.6, -6)},
-		# Climb out back toward start straight
+		# Climb out back toward start straight (original)
 		{"pos": Vector3(278, 3.6, -218), "in": Vector3(-8, -0.8, -14), "out": Vector3(8, 0.8, 14)},
 		{"pos": Vector3(288, 5.2, -192), "in": Vector3(-3, -0.3, -16), "out": Vector3(3, 0.3, 16)},
 		{"pos": Vector3(292, 5.6, -168), "in": Vector3(0, -0.1, -22), "out": Vector3(0, 0.1, 22)},
@@ -166,6 +191,7 @@ func _ready() -> void:
 			curve.set_point_tilt(idx, float(p["tilt"]))
 
 	track_path.curve = curve
+	_diagnose_wadi_curve(curve)
 
 	var sd = level.get_node_or_null("SandDunes")
 	if sd:
@@ -192,10 +218,12 @@ func _ready() -> void:
 	var river_entry_off: float = curve.get_closest_offset(Vector3(155, 1.10, -190))
 	var climb_off: float = curve.get_closest_offset(Vector3(278, 3.6, -218))
 	var start_off: float = curve.get_closest_offset(Vector3(292, 5.6, -168))
+	var jump_off: float = curve.get_closest_offset(Vector3(55, 5.8, -28))
 	var boost_offsets := {
 		"BoostPad_PreRiver": fmod(river_entry_off - 22.0 + track_len, track_len),
 		"BoostPad_PostClimb": fmod(climb_off + 14.0 + track_len, track_len),
 		"BoostPad_Start": fmod(start_off + 40.0 + track_len, track_len),
+		"BoostPad_PreJump": fmod(jump_off - 8.0 + track_len, track_len),
 	}
 
 	var bp_scene: PackedScene = load("res://BoostPad.tscn")
@@ -252,6 +280,9 @@ func _ready() -> void:
 	# Final pass: never ship template props
 	_strip_non_essential_props(level)
 
+	_add_movable_csg_props(level)
+	await get_tree().process_frame
+
 	remove_child(level)
 	var new_packed := PackedScene.new()
 	var err_pack := new_packed.pack(level)
@@ -266,6 +297,58 @@ func _ready() -> void:
 		return
 	print("Saved DesertWadiLevel.tscn successfully.")
 	get_tree().quit(0)
+
+
+## Sanity-check the racing line: river ford under water, no near-overlaps.
+func _diagnose_wadi_curve(curve: Curve3D) -> void:
+	var length: float = curve.get_baked_length()
+	print("Wadi baked length: ", length)
+	var step := 2.0
+	var n: int = maxi(int(length / step), 2)
+	var samples: PackedVector3Array = PackedVector3Array()
+	samples.resize(n)
+	for i in range(n):
+		samples[i] = curve.sample_baked(float(i) * step)
+	var close_pairs := 0
+	var min_sep := 9999.0
+	var min_a := Vector3.ZERO
+	var min_b := Vector3.ZERO
+	var skip: int = 14 # ~28 m along the line
+	for i in range(n):
+		var a: Vector3 = samples[i]
+		for j in range(i + skip, n):
+			if i < skip and j > n - skip:
+				continue # loop seam
+			var b: Vector3 = samples[j]
+			var d: float = Vector2(a.x - b.x, a.z - b.z).length()
+			if d < 22.0:
+				close_pairs += 1
+				if d < min_sep:
+					min_sep = d
+					min_a = a
+					min_b = b
+	print("Wadi near-crossings (xz<22m, >28m along): ", close_pairs, " min_sep=", min_sep, " a=", min_a, " b=", min_b)
+	var wet_n := 0
+	var wet_min_y := 999.0
+	var wet_max_y := -999.0
+	for i in range(n):
+		var p: Vector3 = samples[i]
+		var d_lake: float = Vector2((p.x - 195.0) / 130.0, (p.z + 208.0) / 105.0).length()
+		var in_ford: bool = p.z < -165.0 and p.x > 140.0 and p.x < 280.0
+		if d_lake < 1.0 or in_ford:
+			wet_n += 1
+			wet_min_y = minf(wet_min_y, p.y)
+			wet_max_y = maxf(wet_max_y, p.y)
+	print("Wadi valley samples: ", wet_n, " y ", wet_min_y, "..", wet_max_y, " (water y=1.70)")
+	var fords: Array[Vector3] = [
+		Vector3(155, 1.10, -190),
+		Vector3(185, 0.70, -206),
+		Vector3(222, 0.70, -220),
+		Vector3(255, 1.10, -232),
+	]
+	for q in fords:
+		var cp: Vector3 = curve.get_closest_point(q)
+		print("  ford ", q, " -> closest ", cp, " dist=", cp.distance_to(q), " underwater=", cp.y < 1.70)
 
 
 ## Drop lakeside trees, ramps, and other decorative instances from Level.tscn.
@@ -289,6 +372,8 @@ func _strip_non_essential_props(level: Node) -> void:
 		"Minimap": true,
 		"PauseMenu": true,
 		"Players": true,
+		"RockRidges": true,
+		"JumpRamps": true,
 	}
 	var to_free: Array = []
 	for child in level.get_children():
@@ -334,6 +419,136 @@ func _strip_non_essential_props(level: Node) -> void:
 		players.name = "Players"
 		level.add_child(players)
 		players.owner = level
+
+
+func _sandstone_mat() -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	var sand: Texture2D = load("res://materials/sand.png") as Texture2D
+	var sand_n: Texture2D = load("res://materials/sand_normal.png") as Texture2D
+	var rock: Texture2D = load("res://materials/dark_canyon_rock.png") as Texture2D
+	if sand:
+		mat.albedo_texture = sand
+	else:
+		mat.albedo_color = Color(0.86, 0.74, 0.58)
+	if sand_n:
+		mat.normal_enabled = true
+		mat.normal_texture = sand_n
+		mat.normal_scale = 1.1
+	mat.uv1_triplanar = true
+	mat.uv1_world_triplanar = true
+	mat.uv1_scale = Vector3(0.12, 0.12, 0.12)
+	mat.roughness = 0.92
+	return mat
+
+
+func _add_csg_box(parent: Node, size: Vector3, pos: Vector3, rot_deg: Vector3, mat: Material) -> MeshInstance3D:
+	# MeshInstance instead of CSGBox3D — PackedScene.pack() signal-11s on CSG in 4.7.
+	var mi := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	mi.mesh = mesh
+	mi.position = pos
+	mi.rotation_degrees = rot_deg
+	mi.material_override = mat
+	parent.add_child(mi)
+	var body := StaticBody3D.new()
+	mi.add_child(body)
+	var col := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = size
+	col.shape = shape
+	body.add_child(col)
+	return mi
+
+
+func _add_csg_sphere(parent: Node, radius: float, pos: Vector3, mat: Material) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var mesh := SphereMesh.new()
+	mesh.radius = radius
+	mesh.height = radius * 2.0
+	mesh.radial_segments = 8
+	mesh.rings = 5
+	mi.mesh = mesh
+	mi.position = pos
+	mi.material_override = mat
+	parent.add_child(mi)
+	var body := StaticBody3D.new()
+	mi.add_child(body)
+	var col := CollisionShape3D.new()
+	var shape := SphereShape3D.new()
+	shape.radius = radius
+	col.shape = shape
+	body.add_child(col)
+	return mi
+
+
+func _add_rock_ridge(parent: Node, ridge_name: String, origin: Vector3, yaw_deg: float, length: float, height: float, width: float) -> Node3D:
+	var comb := Node3D.new()
+	comb.name = ridge_name
+	comb.position = origin
+	comb.rotation.y = deg_to_rad(yaw_deg)
+	parent.add_child(comb)
+	var mat := _sandstone_mat()
+	# Main sandstone fin
+	_add_csg_box(comb, Vector3(width, height, length), Vector3(0, height * 0.40, 0), Vector3(5, 0, 7), mat)
+	# Offset slab
+	_add_csg_box(comb, Vector3(width * 0.72, height * 0.78, length * 0.52), Vector3(width * 0.42, height * 0.30, -length * 0.10), Vector3(-8, 16, -6), mat)
+	# Low shelf
+	_add_csg_box(comb, Vector3(width * 1.15, height * 0.28, length * 0.7), Vector3(-width * 0.15, height * 0.12, length * 0.08), Vector3(2, -8, 4), mat)
+	# Boulders
+	_add_csg_sphere(comb, width * 0.48, Vector3(-width * 0.22, height * 0.16, length * 0.32), mat)
+	_add_csg_sphere(comb, width * 0.32, Vector3(width * 0.38, height * 0.14, -length * 0.28), mat)
+	return comb
+
+
+func _add_jump_ramp(parent: Node, ramp_name: String, origin: Vector3, yaw_deg: float, length: float, height: float, width: float) -> Node3D:
+	var comb := Node3D.new()
+	comb.name = ramp_name
+	comb.position = origin
+	comb.rotation.y = deg_to_rad(yaw_deg)
+	parent.add_child(comb)
+	var mat := _sandstone_mat()
+	# Wedge: long box pitched as a kicker
+	_add_csg_box(comb, Vector3(width, height, length), Vector3(0, height * 0.35, 0), Vector3(-18, 0, 0), mat)
+	_add_csg_box(comb, Vector3(width * 1.05, height * 0.45, length * 0.55), Vector3(0, height * 0.18, length * 0.12), Vector3(-8, 0, 0), mat)
+	_add_csg_sphere(comb, width * 0.28, Vector3(-width * 0.42, height * 0.12, -length * 0.2), mat)
+	_add_csg_sphere(comb, width * 0.24, Vector3(width * 0.4, height * 0.1, length * 0.18), mat)
+	return comb
+
+
+func _add_movable_csg_props(level: Node) -> void:
+	var old_r = level.get_node_or_null("RockRidges")
+	if old_r:
+		old_r.free()
+	var old_j = level.get_node_or_null("JumpRamps")
+	if old_j:
+		old_j.free()
+
+	var ridges := Node3D.new()
+	ridges.name = "RockRidges"
+	level.add_child(ridges)
+	# Off-track sandstone fins — select and move in the editor.
+	_add_rock_ridge(ridges, "RockRidge_WestBowl", Vector3(-320, 4.0, 120), 18.0, 38.0, 14.0, 7.5)
+	_add_rock_ridge(ridges, "RockRidge_WestOuter", Vector3(-300, 5.0, 210), -32.0, 32.0, 12.0, 6.5)
+	_add_rock_ridge(ridges, "RockRidge_NorthMesa", Vector3(-40, 5.5, -80), 55.0, 26.0, 10.0, 6.0)
+	_add_rock_ridge(ridges, "RockRidge_Switchback", Vector3(210, 4.5, 10), 110.0, 22.0, 9.0, 5.5)
+	_add_rock_ridge(ridges, "RockRidge_BankOutside", Vector3(20, 4.0, 190), 8.0, 30.0, 11.0, 6.2)
+	_add_rock_ridge(ridges, "RockRidge_RiverNorth", Vector3(130, 2.5, -250), -20.0, 24.0, 8.5, 5.8)
+	_add_rock_ridge(ridges, "RockRidge_RiverSouth", Vector3(270, 2.0, -270), 40.0, 20.0, 7.5, 5.2)
+	_add_rock_ridge(ridges, "RockRidge_JumpFlank", Vector3(40, 4.0, -70), 72.0, 18.0, 8.0, 5.0)
+
+	var ramps := Node3D.new()
+	ramps.name = "JumpRamps"
+	level.add_child(ramps)
+	# Wedge local +Z is up-ramp; yaw = atan2(dir.x, dir.z) so +Z follows the racing line.
+	_add_jump_ramp(ramps, "JumpRamp_Takeoff", Vector3(82, 6.0, -10), 58.0, 14.0, 4.8, 12.0)
+	_add_jump_ramp(ramps, "JumpRamp_Landing", Vector3(102, 4.5, 3), 56.0, 12.0, 3.6, 12.5)
+
+	_set_owner_recursive(ridges, level)
+	_set_owner_recursive(ramps, level)
+	print("Added movable RockRidges + JumpRamps (select parent Node3D in the scene tree and translate).")
 
 
 func _set_owner_recursive(node: Node, scene_root: Node) -> void:

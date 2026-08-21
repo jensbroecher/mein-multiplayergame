@@ -3,6 +3,9 @@ extends Control
 signal start_pressed
 signal options_pressed
 
+## Dev jump-in for Grand Prix stages. Set false (or delete the tile) before shipping.
+const SHOW_GP_TEST_MENU := true
+
 const TILE_DIR := "res://images/menu/"
 
 const COL_TEAL := Color(0.15, 0.75, 0.92)
@@ -136,6 +139,15 @@ func show_sub_menu(menu_name: String) -> void:
 				show_sub_menu("stage_select")
 			)
 			_add_tile("OPTIONS", "Graphics, sound, and controls", "tile_options.jpg", COL_GOLD, _on_options_pressed)
+			if SHOW_GP_TEST_MENU:
+				_add_tile("GP TEST", "Dev: play any GP stage with bots", "tile_grand_prix.jpg", COL_GOLD, func():
+					show_sub_menu("gp_test")
+				)
+		"gp_test":
+			screen_title.text = "GP TEST"
+			screen_subtitle.text = "Dev jump-in: full GP rules (bots, grid, next stage). Hide with SHOW_GP_TEST_MENU."
+			tile_grid.columns = 3
+			_fill_gp_test_tiles()
 		"sp_modes":
 			screen_title.text = "SINGLE PLAYER"
 			screen_subtitle.text = "Pick a championship or a single course"
@@ -231,6 +243,8 @@ func _on_back_pressed() -> void:
 				show_sub_menu("main")
 			else:
 				show_sub_menu("sp_modes")
+		"gp_test":
+			show_sub_menu("main")
 		_:
 			show_sub_menu("main")
 
@@ -386,6 +400,40 @@ func _on_cup_selected(cup_name: String) -> void:
 		NetworkManager.current_game_mode = NetworkManager.GameMode.SINGLE_PLAYER_GP
 	NetworkManager.current_gp_name = cup_name
 	NetworkManager.current_gp_stage = 0
+	NetworkManager.gp_standings.clear()
+	start_pressed.emit()
+	hide()
+
+
+func _fill_gp_test_tiles() -> void:
+	var meta := {
+		"res://levels/Level.tscn": {"title": "LAKESIDE", "file": "tile_lakeside.jpg", "color": COL_LAKE},
+		"res://levels/HarborPierLevel.tscn": {"title": "HARBOR PIER", "file": "tile_harbor.jpg", "color": COL_HARBOR},
+		"res://levels/MountainLevel.tscn": {"title": "MOUNTAIN", "file": "tile_mountain.jpg", "color": COL_MOUNTAIN},
+		"res://levels/CanyonLevel.tscn": {"title": "CANYON", "file": "tile_canyon.jpg", "color": COL_CANYON},
+		"res://levels/CanyonChasmLevel.tscn": {"title": "CANYON CHASM", "file": "tile_canyon_chasm.jpg", "color": COL_CHASM},
+		"res://levels/DesertWadiLevel.tscn": {"title": "DESERT WADI", "file": "tile_desert_wadi.jpg", "color": COL_WADI},
+	}
+	for cup_name in NetworkManager.GP_CUPS.keys():
+		var cup: Dictionary = NetworkManager.GP_CUPS[cup_name]
+		var stages: Array = cup.get("stages", [])
+		for i in range(stages.size()):
+			var path: String = str(stages[i])
+			var info: Dictionary = meta.get(path, {"title": path.get_file(), "file": "tile_grand_prix.jpg", "color": COL_GOLD})
+			var title: String = "%s  %d/%d" % [info["title"], i + 1, stages.size()]
+			var subtitle: String = "%s  •  GP stage %d" % [cup_name, i + 1]
+			var cup_n: String = str(cup_name)
+			var stage_i: int = i
+			_add_tile(title, subtitle, str(info["file"]), info["color"], func():
+				_on_gp_test_stage_selected(cup_n, stage_i)
+			)
+
+
+func _on_gp_test_stage_selected(cup_name: String, stage_idx: int) -> void:
+	NetworkManager.current_game_mode = NetworkManager.GameMode.SINGLE_PLAYER_GP
+	NetworkManager.is_coop_gp = false
+	NetworkManager.current_gp_name = cup_name
+	NetworkManager.current_gp_stage = stage_idx
 	NetworkManager.gp_standings.clear()
 	start_pressed.emit()
 	hide()

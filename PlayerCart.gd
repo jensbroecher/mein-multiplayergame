@@ -235,6 +235,12 @@ var ai_drift_threshold: float = 0.32
 var ai_overtake_bias: float = 0.0
 var _ai_overtake_lock_timer: float = 0.0
 var _ai_start_grid_lane: float = 0.0
+var _ai_may_overshoot: bool = false
+var _ai_recovering: bool = false
+var _ai_recover_to_checkpoint: bool = false
+var _ai_recover_goal: Vector3 = Vector3.ZERO
+var _ai_recover_refresh: float = 0.0
+var _ai_last_ontrack_offset: float = 0.0
 var track_path: Path3D = null
 var alternative_paths: Array[Path3D] = []
 var active_path: Path3D = null
@@ -297,6 +303,8 @@ var visual_offset_y: float = 0.0
 
 var stage_has_water: bool = true
 var _harbor_stage: bool = false
+var _mountain_stage: bool = false
+var _wadi_stage: bool = false
 var is_underwater: bool = false
 const WATER_LEVEL = -10.0
 ## Effective surface Y used for splash/drown (may be chasm pit water, not global ocean).
@@ -397,6 +405,10 @@ func on_race_started():
 	_ai_avoid_force = 0.0
 	_ai_overtake_lock_timer = 0.0
 	
+	_ai_cached_offset = -1.0
+	_ai_recovering = false
+	_ai_recover_refresh = 0.0
+	_ai_last_ontrack_offset = 0.0
 	# Determine initial starting grid lane offset from world position relative to track
 	if is_ai:
 		var path_to_use = active_path if active_path else track_path
@@ -641,6 +653,8 @@ func _ready():
 					var c: Vector3 = pit.global_position
 					water_bounds_min = Vector2(c.x - half.x, c.z - half.y)
 					water_bounds_max = Vector2(c.x + half.x, c.z + half.y)
+		elif tg and str(tg.get("level_prefix")) == "mountain":
+			_mountain_stage = true
 		elif tg and str(tg.get("level_prefix")) == "harbor_pier":
 			stage_has_water = true
 			_harbor_stage = true
@@ -651,6 +665,7 @@ func _ready():
 				water_surface_y = float(harbor_water.get_meta("water_surface_y"))
 		elif tg and str(tg.get("level_prefix")) == "desert_wadi":
 			# Local river + valley lake in desert_wadi.
+			_wadi_stage = true
 			stage_has_water = true
 			water_surface_y = 1.70
 			water_bounds_active = true
@@ -866,7 +881,7 @@ func _process(delta):
 			_set_isometric_camera(not is_isometric, true)
 
 		# Action buttons
-		if Input.is_action_just_pressed(input_prefix + "respawn"):
+		if Input.is_action_just_pressed(input_prefix + "respawn") and not is_finished_race:
 			respawn_rpc.rpc()
 
 		var visual_forward = -visuals.global_transform.basis.z
@@ -1228,7 +1243,7 @@ func _physics_process(delta):
 	if is_teleporting:
 		return
 
-	if global_position.y < -50:
+	if global_position.y < -50 and not is_finished_race:
 		if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 			respawn_rpc.rpc()
 		elif is_local_player or (is_ai and multiplayer.multiplayer_peer == null):
@@ -1240,7 +1255,7 @@ func _physics_process(delta):
 		_prevent_floor_tunneling(delta)
 
 	# AI Stuck & Off-Track Fall Detection
-	if is_ai and can_move and not is_exploding and respawn_indicator_time <= 0.0 and has_physics_authority:
+	if is_ai and can_move and not is_exploding and not is_finished_race and respawn_indicator_time <= 0.0 and has_physics_authority:
 		ai_stuck_position_timer += delta
 		if ai_stuck_position_timer >= 4.5:
 			ai_stuck_position_timer = 0.0
@@ -1262,18 +1277,24 @@ func _physics_process(delta):
 		if check_path and check_path.curve:
 			var curve = check_path.curve
 			var local_p = check_path.to_local(global_position)
-			var cur_off = curve.get_closest_offset(local_p)
+			# Use lap-progress offset, not 3D closest — stacked mountain loops
+			# sit above each other and closest-point looks like a cliff fall.
+			var cur_off: float = _ai_cached_offset if _ai_cached_offset >= 0.0 else curve.get_closest_offset(local_p)
 			var track_pt = check_path.to_global(curve.sample_baked(cur_off))
 			var height_below = track_pt.y - global_position.y
-			var dist_3d = global_position.distance_to(track_pt)
-			
-			# ONLY respawn if cart has genuinely fallen off the course (down a cliff/chasm > 7m below or > 32m away)
-			var is_fallen_off = height_below > 7.0 or dist_3d > 32.0
+			var dist_xz = Vector2(global_position.x - track_pt.x, global_position.z - track_pt.z).length()
+			var is_fallen_off: bool
+			if _ai_cached_offset >= 0.0:
+				is_fallen_off = dist_xz > 36.0 or height_below > 12.0
+			else:
+				is_fallen_off = dist_xz > 36.0
 			if is_fallen_off:
 				_ai_offtrack_timer += delta
-				if _ai_offtrack_timer > 3.0:
-					print("AI Cart ", name, " fallen off course (height below: ", height_below, "m, dist: ", dist_3d, "m). Respawning.")
+				var recover_limit: float = 16.0 if _ai_recovering else 3.0
+				if _ai_offtrack_timer > recover_limit:
+					print("AI Cart ", name, " fallen off course (height below: ", height_below, "m, dist xz: ", dist_xz, "m). Respawning.")
 					_ai_offtrack_timer = 0.0
+					_ai_recovering = false
 					if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 						respawn_rpc.rpc()
 					else:
@@ -1458,7 +1479,7 @@ func _physics_process(delta):
 			water_timer += delta
 			shallow_water_timer = 0.0
 			# Drown after sustained deep submersion
-			if water_timer > 2.5:
+			if water_timer > 2.5 and not is_finished_race:
 				if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 					drown_rpc.rpc()
 				elif multiplayer.multiplayer_peer == null:
@@ -1469,7 +1490,7 @@ func _physics_process(delta):
 			# If a car stands / is stuck longer than 5 seconds in shallow water, trigger drown respawn
 			if linear_velocity.length() < 2.5:
 				shallow_water_timer += delta
-				if shallow_water_timer > 5.0:
+				if shallow_water_timer > 5.0 and not is_finished_race:
 					if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 						drown_rpc.rpc()
 					elif multiplayer.multiplayer_peer == null:
@@ -1937,6 +1958,12 @@ func _physics_process(delta):
 			
 			# Lateral grip and steering redirection
 			if on_ground:
+				# On asphalt, cancel gravity's sideways pull so steep roads track straight
+				# instead of sliding downhill until speed builds.
+				if not is_offroad and not on_loop:
+					var g_accel: float = GRAVITY + float(ProjectSettings.get_setting("physics/3d/default_gravity", 9.8))
+					var lat_g: float = Vector3.DOWN.dot(right) * g_accel
+					apply_central_force(-right * lat_g * mass)
 				var lat_vel = linear_velocity.dot(right)
 				var grip_factor = grip
 				if is_drifting:
@@ -2109,7 +2136,10 @@ func _is_track_surface(collider: Object) -> bool:
 
 	# Unified terrain mesh only counts as "on track" near the asphalt.
 	# Do not apply this to rocks/props — that made AI ignore on-road obstacles.
+	# Desert Wadi has no asphalt: the carved trough is sand like the rest of the stage.
 	if _is_world_terrain_collider(n):
+		if _wadi_stage:
+			return false
 		var check_p = active_path if active_path else track_path
 		if check_p == null:
 			var lvl = get_tree().get_first_node_in_group("level")
@@ -2301,6 +2331,11 @@ func _update_visuals_alignment(delta: float) -> void:
 
 	_update_wheel_visuals(delta)
 
+func _wheel_steer_sign(along_fwd: float) -> float:
+	# In reverse the visual turn must flip so wheels point with the path.
+	return -1.0 if along_fwd < -0.35 else 1.0
+
+
 func _update_wheel_visuals(delta):
 	if is_exploding: return
 	var speed = linear_velocity.length()
@@ -2314,7 +2349,7 @@ func _update_wheel_visuals(delta):
 			continue
 		# Steering: rotate the pivot on its Y axis for front wheels
 		if corner == "FL" or corner == "FR":
-			pivot.rotation.y = -current_steer * 0.5
+			pivot.rotation.y = -current_steer * 0.5 * _wheel_steer_sign(fwd_dot)
 		# Spin: find the wheel mesh child and rotate on its X axis
 		var mesh_node = pivot.get_node_or_null("WheelMesh")
 		if mesh_node:
@@ -2363,14 +2398,13 @@ func _interpolate_remote_visual(delta: float):
 	wheel_rotation -= wheel_spin_rate * delta
 
 	var remote_fwd_dot = sync_velocity.dot(-visuals.global_transform.basis.z)
-	var steer_direction = 1.0 if remote_fwd_dot >= -1.0 else -1.0
 
 	for wheel in ["FL", "FR", "RL", "RR"]:
 		var pivot = get_node_or_null("Visuals/WheelPivot" + wheel)
 		if not pivot:
 			continue
 		if wheel == "FL" or wheel == "FR":
-			pivot.rotation.y = -sync_steer * 0.5 * steer_direction
+			pivot.rotation.y = -sync_steer * 0.5 * _wheel_steer_sign(remote_fwd_dot)
 		var mesh_node = pivot.get_node_or_null("WheelMesh")
 		if mesh_node:
 			mesh_node.rotation.x = wheel_rotation
@@ -2931,12 +2965,12 @@ func explode(attacker_id: int = 0):
 
 	if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 		get_tree().create_timer(4.2).timeout.connect(func():
-			if is_instance_valid(self):
+			if is_instance_valid(self) and not is_finished_race:
 				respawn_rpc.rpc()
 		)
 	elif multiplayer.multiplayer_peer == null:
 		get_tree().create_timer(4.2).timeout.connect(func():
-			if is_instance_valid(self):
+			if is_instance_valid(self) and not is_finished_race:
 				respawn()
 		)
 
@@ -2985,12 +3019,12 @@ func drown():
 	
 	if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 		get_tree().create_timer(1.2).timeout.connect(func():
-			if is_instance_valid(self):
+			if is_instance_valid(self) and not is_finished_race:
 				respawn_rpc.rpc()
 		)
 	elif multiplayer.multiplayer_peer == null:
 		get_tree().create_timer(1.2).timeout.connect(func():
-			if is_instance_valid(self):
+			if is_instance_valid(self) and not is_finished_race:
 				respawn()
 		)
 
@@ -2999,6 +3033,9 @@ func respawn_rpc():
 	respawn()
 
 func respawn():
+	# Finished racers must not snap back to the finish gate (last checkpoint).
+	if is_finished_race:
+		return
 	is_exploding = false
 	is_drowned = false
 	is_underwater = false
@@ -3017,6 +3054,10 @@ func respawn():
 	_ai_avoid_force = 0.0
 	_ai_offtrack_timer = 0.0
 	_ai_unstuck_dir = 0.0
+	_ai_recovering = false
+	_ai_recover_refresh = 0.0
+	_ai_cached_offset = -1.0
+	_ai_last_ontrack_offset = 0.0
 	ai_lane_offset = 0.0
 	ai_target_lane_offset = 0.0
 	ai_lane_change_timer = randf_range(3.0, 6.0)
@@ -4363,6 +4404,8 @@ func _init_ai_personality() -> void:
 
 	ai_shortcut_chance = clampf(lerpf(0.10, 0.75, ai_aggression) * rng.randf_range(0.85, 1.15), 0.05, 0.80)
 	ai_overtake_bias = rng.randf_range(-1.0, 1.0)
+	# A minority still fly the summit hairpin; everyone else gets extra braking.
+	_ai_may_overshoot = rng.randf() < (0.07 + ai_aggression * 0.14)
 
 
 func _ai_evaluate_traffic(_delta: float, fwd_3d: Vector3, right_3d: Vector3) -> Dictionary:
@@ -4478,53 +4521,28 @@ func _get_ai_input(delta: float) -> Vector2:
 			_harbor_stage = true
 			ai_target_lane_offset = clampf(ai_target_lane_offset, -0.45, 0.45)
 			ai_lane_offset = clampf(ai_lane_offset, -0.55, 0.55)
+		elif tg_ai and str(tg_ai.get("level_prefix")) == "mountain":
+			_mountain_stage = true
+		elif tg_ai and str(tg_ai.get("level_prefix")) == "desert_wadi":
+			_wadi_stage = true
 
-	# Alternative path detection and decision logic
-	# Harbor piers have no safe shortcuts — staying on the racing dock is mandatory.
-	if not on_alternative_path and not _harbor_stage:
-		for alt_path in alternative_paths:
-			if not is_instance_valid(alt_path): continue
-			var alt_curve = alt_path.curve
-			if alt_curve.point_count < 2: continue
-			
-			var start_local = alt_curve.get_point_position(0)
-			var start_global = alt_path.to_global(start_local)
-			
-			var dist = global_position.distance_to(start_global)
-			if dist < 12.0:
-				if not alt_path_decisions.has(alt_path):
-					var take_shortcut = randf() < ai_shortcut_chance
-					alt_path_decisions[alt_path] = take_shortcut
-					if take_shortcut:
-						on_alternative_path = true
-						active_path = alt_path
-						_ai_cached_offset = active_path.curve.get_closest_offset(active_path.to_local(global_position))
-						break
-			elif dist > 25.0:
-				alt_path_decisions.erase(alt_path)
+	# Off-road shortcuts only — never follow a duplicated / full-lap path across the map.
+	_ai_try_enter_shortcut()
 
 	var curve = active_path.curve
 	var local_pos = active_path.to_local(global_position)
 	
-	# Throttle get_closest_offset to once every 3 physics frames to save CPU.
-	# For intermediate frames, estimate the offset using speed.
-	_ai_closest_offset_frame += 1
-	if _ai_closest_offset_frame >= 3 or _ai_cached_offset < 0:
-		_ai_closest_offset_frame = 0
-		_ai_cached_offset = curve.get_closest_offset(local_pos)
-	else:
-		_ai_cached_offset = fmod(_ai_cached_offset + linear_velocity.length() * delta, curve.get_baked_length())
-	var current_offset = _ai_cached_offset
+	# Follow the lap by progressing along the curve. 3D closest-point snaps to the
+	# wrong stacked loop on the mountain and sends cars in circles.
+	var current_offset = _ai_update_progress_offset(active_path, curve, local_pos, delta)
 	
 	# If on an alternative path, check if we've reached the end of it
 	if on_alternative_path:
 		var curve_length = curve.get_baked_length()
 		if curve_length - current_offset < 6.0:
-			on_alternative_path = false
-			active_path = track_path
+			_ai_exit_shortcut()
 			curve = active_path.curve
 			local_pos = active_path.to_local(global_position)
-			_ai_cached_offset = curve.get_closest_offset(local_pos)
 			current_offset = _ai_cached_offset
 	
 	var style: float = 0.0 if _harbor_stage else ai_aggression
@@ -4545,6 +4563,8 @@ func _get_ai_input(delta: float) -> Vector2:
 			ai_lane_change_timer = randf_range(lerpf(6.0, 3.0, style), lerpf(11.0, 6.0, style))
 			if _harbor_stage:
 				ai_target_lane_offset = randf_range(-0.45, 0.45)
+			elif _mountain_stage:
+				ai_target_lane_offset = randf_range(-1.2, 1.2)
 			else:
 				ai_target_lane_offset = randf_range(-ai_lane_span, ai_lane_span)
 	
@@ -4564,6 +4584,15 @@ func _get_ai_input(delta: float) -> Vector2:
 	# In a tight nearby bend, aim closer so the car follows the road instead of cutting into walls
 	if corner_factor > lerpf(0.55, 0.78, style) and _ai_upcoming_turn_dist < 16.0:
 		look_ahead = minf(look_ahead, lerpf(11.0, 16.0, style))
+	# Only treat a turn as a hairpin when the sharp bend is CLOSE. Measuring 50m
+	# ahead on the mountain spiral made every corner look like a hairpin.
+	var near_ang: float = float(turn_info.get("near_angle", 0.0))
+	var is_hairpin: bool = near_ang > 1.25
+	if is_hairpin and not _ai_may_overshoot:
+		look_ahead = minf(look_ahead, clampf(_ai_upcoming_turn_dist * 0.55, 8.0, 12.0))
+	if _mountain_stage:
+		# Don't cut across stacked switchbacks
+		look_ahead = minf(look_ahead, 16.0)
 	if _harbor_stage:
 		look_ahead = lerpf(11.0, 15.0, clampf(speed / maxf(max_speed, 1.0), 0.0, 1.0))
 		if corner_factor > 0.45:
@@ -4599,7 +4628,7 @@ func _get_ai_input(delta: float) -> Vector2:
 			racing_line_offset = lerpf(entry_target, apex_target, t_apex)
 
 	var combined_offset = ai_lane_offset + racing_line_offset
-	var max_safe_span: float = 1.6 if _harbor_stage else 4.8
+	var max_safe_span: float = 1.6 if _harbor_stage else (2.0 if _mountain_stage else 4.8)
 	var actual_lane_offset = clampf(combined_offset, -max_safe_span, max_safe_span)
 
 	if is_finished_race:
@@ -4617,14 +4646,20 @@ func _get_ai_input(delta: float) -> Vector2:
 	var p_now = curve.sample_baked(current_offset)
 	var p_ahead = curve.sample_baked(fmod(current_offset + 8.0, curve_length))
 	var elev_delta = absf(p_ahead.y - p_now.y)
-	if elev_delta > 1.0:
+	if elev_delta > 1.0 and not is_hairpin:
 		actual_lane_offset *= 0.1
+	if is_hairpin and not _ai_may_overshoot:
+		actual_lane_offset *= 0.4
 	target_local_pos += right_vec * actual_lane_offset
+
+	_ai_update_recovery(delta, current_offset)
 	
 	var target_global_pos = active_path.to_global(target_local_pos)
+	if _ai_recovering:
+		target_global_pos = _ai_recover_goal
 
 	# Item Box Seeking: If bot has open item slot, find closest active box ahead and steer towards it
-	var wants_item := (current_item == ItemType.NONE or current_item_2 == ItemType.NONE) and not is_finished_race and not is_offroad
+	var wants_item := (current_item == ItemType.NONE or current_item_2 == ItemType.NONE) and not is_finished_race and (not is_offroad or _wadi_stage) and not _ai_recovering
 	if wants_item:
 		var best_box: Node3D = null
 		var best_dist: float = 38.0
@@ -4664,12 +4699,21 @@ func _get_ai_input(delta: float) -> Vector2:
 		var safe_speed: float = lerpf(max_speed, max_speed * min_corner_speed, corner_factor)
 		var brake_window: float = (34.0 if _harbor_stage else lerpf(26.0, 12.0, style)) + ai_brake_dist_bias
 		brake_window = maxf(brake_window, 8.0)
+		if _ai_recovering:
+			input.y = -1.0
+			_ai_want_drift = false
+		elif is_hairpin and not _ai_may_overshoot:
+			min_corner_speed = minf(min_corner_speed, 0.34)
+			safe_speed = lerpf(max_speed, max_speed * min_corner_speed, corner_factor)
+			brake_window = maxf(brake_window, 30.0)
 		
 		if is_boosting or is_pad_boosting:
 			safe_speed *= 0.88
 
 		var react_corner: float = 0.16 if _harbor_stage else lerpf(0.16, 0.48, style)
-		if _ai_upcoming_turn_dist < brake_window and corner_factor > react_corner:
+		if is_hairpin and not _ai_may_overshoot:
+			react_corner = minf(react_corner, 0.14)
+		if (not _ai_recovering) and _ai_upcoming_turn_dist < brake_window and corner_factor > react_corner:
 			var t_dist = clampf((brake_window - _ai_upcoming_turn_dist) / maxf(brake_window - 6.0, 1.0), 0.0, 1.0)
 			var target_corner_speed = lerpf(max_speed, safe_speed, t_dist)
 			
@@ -4678,7 +4722,7 @@ func _get_ai_input(delta: float) -> Vector2:
 				input.y = clampf(overspeed / 6.5, 0.15, 0.85) # Continuous proportional braking
 				
 				# Drift decision
-				if (not _harbor_stage) and speed > 11.0 and corner_factor > ai_drift_threshold and abs(input.x) > 0.24 and _ai_upcoming_turn_dist < 22.0:
+				if (not _harbor_stage) and (not is_hairpin or _ai_may_overshoot) and speed > 11.0 and corner_factor > ai_drift_threshold and abs(input.x) > 0.24 and _ai_upcoming_turn_dist < 22.0:
 					_ai_want_drift = true
 					input.y = maxf(input.y, 0.40)
 			else:
@@ -4790,6 +4834,9 @@ func _get_ai_input(delta: float) -> Vector2:
 	
 	# AI Unstuck Recovery Maneuver (only when actively pushing forward but blocked against an obstacle)
 	var blocked_forward: bool = (input.y < -0.2 and speed < 1.2)
+	if _ai_recovering:
+		# Don't reverse-wiggle while trying to rejoin — that is the circling.
+		blocked_forward = false
 	if blocked_forward and can_move and not is_exploding and not is_finished_race:
 		stuck_timer += delta
 		if stuck_timer > 1.2 and _ai_unstuck_dir == 0.0:
@@ -4833,20 +4880,195 @@ func _ai_clearance_ahead(space_state: PhysicsDirectSpaceState3D, origin: Vector3
 	return reach
 
 
+func _ai_try_enter_shortcut() -> void:
+	if _harbor_stage or track_path == null or track_path.curve == null:
+		return
+	if on_alternative_path:
+		if active_path and active_path.curve:
+			var bad_len: float = active_path.curve.get_baked_length()
+			var main_len_now: float = maxf(track_path.curve.get_baked_length(), 1.0)
+			if bad_len > minf(280.0, main_len_now * 0.28):
+				_ai_exit_shortcut()
+		return
+	var main_len: float = maxf(track_path.curve.get_baked_length(), 1.0)
+	var main_off: float = _ai_cached_offset if _ai_cached_offset >= 0.0 else 0.0
+	var main_pt: Vector3 = track_path.to_global(track_path.curve.sample_baked(main_off))
+	for alt_path in alternative_paths:
+		if not is_instance_valid(alt_path) or alt_path.curve == null:
+			continue
+		var alt_curve: Curve3D = alt_path.curve
+		if alt_curve.point_count < 2:
+			continue
+		var alt_len: float = alt_curve.get_baked_length()
+		# Must be a short cut, not a copy of the whole lap.
+		if alt_len < 8.0 or alt_len > minf(280.0, main_len * 0.28):
+			continue
+		var start_global: Vector3 = alt_path.to_global(alt_curve.get_point_position(0))
+		var dist_car: float = global_position.distance_to(start_global)
+		if dist_car > 12.0:
+			if dist_car > 28.0:
+				alt_path_decisions.erase(alt_path)
+			continue
+		# Entrance has to sit on the racing line we're actually on this lap.
+		if start_global.distance_to(main_pt) > 16.0:
+			continue
+		if not alt_path_decisions.has(alt_path):
+			var take_shortcut: bool = randf() < ai_shortcut_chance
+			alt_path_decisions[alt_path] = take_shortcut
+			if take_shortcut:
+				on_alternative_path = true
+				active_path = alt_path
+				_ai_recovering = false
+				_ai_cached_offset = alt_curve.get_closest_offset(alt_path.to_local(global_position))
+				return
+
+
+func _ai_exit_shortcut() -> void:
+	on_alternative_path = false
+	active_path = track_path
+	_ai_recovering = false
+	if track_path == null or track_path.curve == null:
+		_ai_cached_offset = -1.0
+		return
+	var curve: Curve3D = track_path.curve
+	var closest: float = curve.get_closest_offset(track_path.to_local(global_position))
+	var pt: Vector3 = track_path.to_global(curve.sample_baked(closest))
+	var xz: float = Vector2(global_position.x - pt.x, global_position.z - pt.z).length()
+	if xz < 40.0 and absf(pt.y - global_position.y) < 6.0:
+		_ai_cached_offset = closest
+		_ai_last_ontrack_offset = closest
+	else:
+		_ai_cached_offset = _ai_last_ontrack_offset
+
+
+func _ai_update_progress_offset(path: Path3D, curve: Curve3D, local_pos: Vector3, delta: float) -> float:
+	var length: float = maxf(curve.get_baked_length(), 1.0)
+	var closest: float = curve.get_closest_offset(local_pos)
+	if _ai_cached_offset < 0.0:
+		_ai_cached_offset = closest
+		_ai_last_ontrack_offset = closest
+		return closest
+
+	var p0: Vector3 = path.to_global(curve.sample_baked(_ai_cached_offset))
+	var p1: Vector3 = path.to_global(curve.sample_baked(fmod(_ai_cached_offset + 1.5, length)))
+	var tangent: Vector3 = p1 - p0
+	tangent.y = 0.0
+	var along: float = linear_velocity.length()
+	if tangent.length_squared() > 1e-6:
+		along = linear_velocity.dot(tangent.normalized())
+	if _ai_recovering:
+		along = 0.0
+	along = clampf(along, -4.0, 80.0)
+	var expected: float = fmod(_ai_cached_offset + along * delta, length)
+	if expected < 0.0:
+		expected += length
+
+	var d: float = absf(closest - expected)
+	d = minf(d, length - d)
+	var closest_pt: Vector3 = path.to_global(curve.sample_baked(closest))
+	var height_err: float = absf(closest_pt.y - global_position.y)
+	var xz: float = Vector2(global_position.x - closest_pt.x, global_position.z - closest_pt.z).length()
+	# Snap only onto the same stretch of tarmac — reject the stacked loop above/below.
+	if d < 28.0 and height_err < 3.5 and xz < 16.0:
+		_ai_cached_offset = closest
+	else:
+		_ai_cached_offset = expected
+	return _ai_cached_offset
+
+
+func _ai_pick_recover_goal() -> Vector3:
+	# Walk FORWARD along the racing line from where we left it, pick the first
+	# tarmac we can actually drive onto. Never reverse uphill, never bee-line to a CP.
+	var path: Path3D = track_path
+	if path == null or path.curve == null:
+		return global_position
+	var curve: Curve3D = path.curve
+	var length: float = maxf(curve.get_baked_length(), 1.0)
+	var start: float = _ai_last_ontrack_offset
+	if _ai_cached_offset >= 0.0:
+		start = _ai_cached_offset
+	var d: float = 10.0
+	var d_end: float = minf(length * 0.4, 360.0)
+	var fallback: Vector3 = path.to_global(curve.sample_baked(fmod(start + 30.0, length)))
+	while d < d_end:
+		var p: Vector3 = path.to_global(curve.sample_baked(fmod(start + d, length)))
+		if p.y <= global_position.y + 2.8:
+			return p
+		d += 8.0
+	return fallback
+
+
+func _ai_find_rejoin_offset(start: float) -> float:
+	if track_path == null or track_path.curve == null:
+		return -1.0
+	var curve: Curve3D = track_path.curve
+	var length: float = maxf(curve.get_baked_length(), 1.0)
+	var d: float = 0.0
+	while d < minf(length * 0.4, 360.0):
+		var o: float = fmod(start + d, length)
+		var p: Vector3 = track_path.to_global(curve.sample_baked(o))
+		var xz: float = Vector2(global_position.x - p.x, global_position.z - p.z).length()
+		if xz < 12.0 and absf(p.y - global_position.y) < 3.2:
+			return o
+		d += 8.0
+	return -1.0
+
+
+func _ai_update_recovery(delta: float, current_offset: float) -> void:
+	if is_finished_race or on_alternative_path or _harbor_stage or track_path == null or track_path.curve == null:
+		_ai_recovering = false
+		return
+	var track_pt: Vector3 = track_path.to_global(track_path.curve.sample_baked(current_offset))
+	var height_below: float = track_pt.y - global_position.y
+	var dist_xz: float = Vector2(global_position.x - track_pt.x, global_position.z - track_pt.z).length()
+
+	# Still on the intended racing line (progress sample, not 3D closest).
+	if dist_xz < 14.0 and height_below < 5.0 and height_below > -8.0:
+		_ai_last_ontrack_offset = current_offset
+		_ai_recovering = false
+		return
+
+	# After a fall: snap onto later tarmac at our height (valley descent, not the uphill).
+	if _ai_recovering:
+		var rejoin: float = _ai_find_rejoin_offset(current_offset)
+		if rejoin >= 0.0:
+			_ai_cached_offset = rejoin
+			_ai_last_ontrack_offset = rejoin
+			_ai_recovering = false
+			return
+
+	var fallen: bool = dist_xz > 18.0 or height_below > 8.0
+	if not fallen:
+		return
+	if not _ai_recovering:
+		_ai_recovering = true
+		_ai_recover_goal = _ai_pick_recover_goal()
+		_ai_recover_refresh = 2.8
+		return
+	_ai_recover_refresh -= delta
+	var goal_xz: float = Vector2(global_position.x - _ai_recover_goal.x, global_position.z - _ai_recover_goal.z).length()
+	if _ai_recover_refresh <= 0.0 or goal_xz < 7.0:
+		_ai_recover_goal = _ai_pick_recover_goal()
+		_ai_recover_refresh = 2.8
+
+
 func _ai_measure_upcoming_turn(curve: Curve3D, offset: float, speed: float) -> Dictionary:
 	var length: float = maxf(curve.get_baked_length(), 1.0)
 	var look: float = clampf(speed * 1.2, 18.0, 56.0)
+	if _mountain_stage:
+		look = minf(look, 28.0)
 	var p0: Vector3 = curve.sample_baked(offset)
 	var p0b: Vector3 = curve.sample_baked(fmod(offset + 1.5, length))
 	var h0: Vector3 = p0b - p0
 	h0.y = 0.0
 	if h0.length_squared() < 1e-6:
-		return {"angle": 0.0, "dir": 0.0, "dist": look}
+		return {"angle": 0.0, "dir": 0.0, "dist": look, "near_angle": 0.0}
 	h0 = h0.normalized()
 
 	var worst_ang: float = 0.0
 	var worst_dir: float = 0.0
 	var worst_dist: float = look
+	var near_ang: float = 0.0
 	var d: float = 4.0
 	while d <= look:
 		var o1: float = fmod(offset + d, length)
@@ -4861,8 +5083,10 @@ func _ai_measure_upcoming_turn(curve: Curve3D, offset: float, speed: float) -> D
 				worst_ang = ang
 				worst_dir = signf(ang)
 				worst_dist = d
+			if d <= 16.0 and absf(ang) > absf(near_ang):
+				near_ang = ang
 		d += 4.0
-	return {"angle": absf(worst_ang), "dir": worst_dir, "dist": worst_dist}
+	return {"angle": absf(worst_ang), "dir": worst_dir, "dist": worst_dist, "near_angle": absf(near_ang)}
 
 
 func _process_ai_items(delta: float):

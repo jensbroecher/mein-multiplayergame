@@ -261,8 +261,9 @@ func _setup_checkpoints():
 
 func _on_checkpoint_entered(body: Node3D, cp_idx: int):
 	print("[CHECKPOINT] body entered: ", body.name, " class: ", body.get_class(), " cp_idx: ", cp_idx, " current race_state: ", race_state)
-	if race_state != RaceState.RACING:
-		print("[CHECKPOINT] Rejected: race_state is ", race_state, " (expected RACING = ", RaceState.RACING, ")")
+	# Still count unfinished racers after the results timer so trailing cars can finish.
+	if race_state == RaceState.LOBBY:
+		print("[CHECKPOINT] Rejected: race_state is LOBBY")
 		return
 	var id = body.name.to_int()
 	if id > 0 and player_stats.has(id):
@@ -271,11 +272,15 @@ func _on_checkpoint_entered(body: Node3D, cp_idx: int):
 			print("[CHECKPOINT] Rejected: player already finished")
 			return
 
-		# Players must hit checkpoints in order
-		if cp_idx == stats["next_checkpoint_idx"]:
+		# In-order, or skip-ahead if they missed an earlier mid-lap gate.
+		# Finish line only counts after some progress this lap (not while sitting on it at GO).
+		var is_finish_gate: bool = cp_idx == checkpoints.size() - 1
+		var in_order: bool = cp_idx == stats["next_checkpoint_idx"]
+		var skipped_mid: bool = (not is_finish_gate) and cp_idx > stats["next_checkpoint_idx"]
+		var finish_after_progress: bool = is_finish_gate and stats["next_checkpoint_idx"] > 0
+		if in_order or skipped_mid or finish_after_progress:
 			print("[CHECKPOINT] Valid checkpoint hit! Next expected index: ", cp_idx + 1)
-			# Progress to next checkpoint
-			stats["next_checkpoint_idx"] += 1
+			stats["next_checkpoint_idx"] = cp_idx + 1
 
 			# Inform the player cart of its last passed checkpoint for respawn purposes
 			var cp = checkpoints[cp_idx]
@@ -656,9 +661,44 @@ func _process(delta):
 				update_timer_rpc.rpc(int(end_timer))
 				if end_timer <= 0.0:
 					_end_race()
+		elif race_state == RaceState.FINISHED:
+			# Results are up, but stragglers can still complete remaining laps and stop.
+			_tick_unfinished_path_laps()
+
+
+func _cart_path_offset(cart: Node3D) -> float:
+	if track_path == null or track_path.curve == null:
+		return 0.0
+	var cached = cart.get("_ai_cached_offset")
+	if cached != null and float(cached) >= 0.0:
+		return float(cached)
+	return track_path.curve.get_closest_offset(track_path.to_local(cart.global_position))
+
+
+## If a racer missed the finish Area3D but crossed the start/finish along the racing line, count the lap.
+func _tick_unfinished_path_laps() -> void:
+	if track_path == null or track_length < 10.0:
+		return
+	for id in player_stats:
+		var stats = player_stats[id]
+		if stats["finished"]:
+			continue
+		var cart = players_container.get_node_or_null(str(id))
+		if cart == null:
+			continue
+		var off: float = _cart_path_offset(cart)
+		var last: float = float(stats.get("last_path_offset", off))
+		stats["last_path_offset"] = off
+		if int(stats["next_checkpoint_idx"]) <= 0:
+			continue
+		if last > track_length * 0.70 and off < track_length * 0.30:
+			stats["laps"] += 1
+			stats["next_checkpoint_idx"] = 0
+			_check_finish(id)
 
 
 func _update_positions():
+	_tick_unfinished_path_laps()
 	var ranking = []
 	for id in player_stats:
 		var cart = players_container.get_node_or_null(str(id))
