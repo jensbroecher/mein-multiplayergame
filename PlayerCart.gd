@@ -121,7 +121,8 @@ const GRAVITY = 30.0 # extra gravity so it falls faster
 const WHEEL_RADIUS = 0.4
 const WHEEL_Y_OFFSET = -0.021691  # Match the actual WheelPivot Y position to prevent hovering
 const COLLISION_Y_OFFSET = 0.0  # Collision sphere center relative to body center
-var collision_radius: float = 0.75  # Dynamically synced to CollisionShape3D in _ready()
+var collision_radius: float = 0.75
+var _ground_grace: float = 0.0
 
 # Preload item scenes
 const MISSILE_SCENE = preload("res://Missile.tscn")
@@ -345,6 +346,7 @@ var sync_rotation_quat: Quaternion = Quaternion.IDENTITY
 # Visual alignment variables
 var target_mesh_transform := Transform3D.IDENTITY
 var current_steer: float = 0.0
+var _smooth_visual_up: Vector3 = Vector3.UP
 
 # RC Antenna variables
 @onready var antenna = $Visuals/Antenna
@@ -561,15 +563,13 @@ func _ready():
 	last_checkpoint_transform = global_transform
 	camera_look_at = global_position
 
-	# Dynamically detect collision radius from scene configuration (scale * shape radius)
-	var collision_shape = $CollisionShape3D
+	# Ride height from the chassis sphere (rolls over small props; visuals plant on it)
+	var collision_shape = get_node_or_null("CollisionShape3D")
 	if collision_shape and collision_shape.shape is SphereShape3D:
 		var s_factor: float = collision_shape.scale.y
 		var base_r: float = collision_shape.shape.radius if collision_shape.shape.radius > 0.01 else 0.5
 		collision_radius = base_r * s_factor
 		collision_shape.transform.origin = Vector3(0, COLLISION_Y_OFFSET, 0)
-
-	# Adjust ground ray to reach below collision sphere (with buffer for steep slopes and crests)
 	ground_ray.target_position = Vector3(0, -(collision_radius + 1.2), 0)
 	
 	_remove_collisions_recursive(visuals)
@@ -799,7 +799,10 @@ func _on_body_entered(body: Node):
 			Input.start_joy_vibration(dev, magnitude * 0.4, magnitude * 0.7, 0.2)
 
 func _integrate_forces(state: PhysicsDirectBodyState3D):
-	if not is_local_player or not can_move or is_exploding:
+	if is_exploding:
+		return
+	_dampen_ground_bounce(state)
+	if not is_local_player or not can_move:
 		return
 	var speed = state.linear_velocity.length()
 	if speed < 8.0:
@@ -815,6 +818,35 @@ func _integrate_forces(state: PhysicsDirectBodyState3D):
 			last_crash_sound_time = now
 			_play_crash_sound()
 			return
+
+
+func _dampen_ground_bounce(state: PhysicsDirectBodyState3D) -> void:
+	# Multiple sphere colliders on bumpy trimesh inject tiny upward pops.
+	# Kill those so the kart settles instead of buzzing in place.
+	if hop_cooldown > 1.0:
+		return
+	var floor_n := Vector3.ZERO
+	var floors := 0
+	for i in range(state.get_contact_count()):
+		var n_local: Vector3 = state.get_contact_local_normal(i)
+		var n: Vector3 = (state.transform.basis * n_local).normalized()
+		if n.y > 0.45:
+			floor_n += n
+			floors += 1
+	if floors == 0:
+		return
+	floor_n = floor_n.normalized()
+	var v: Vector3 = state.linear_velocity
+	var vn: float = v.dot(floor_n)
+	if vn > 0.04:
+		if vn < 0.45:
+			v -= floor_n * vn
+		elif vn < 3.2:
+			var idle: bool = v.length() < 2.2
+			v -= floor_n * vn * (0.9 if idle else 0.5)
+		state.linear_velocity = v
+	if v.length() < 0.16:
+		state.linear_velocity = Vector3.ZERO
 
 func _process(delta):
 	_update_visual_states(delta)
@@ -1556,8 +1588,8 @@ func _physics_process(delta):
 		var norm = ground_ray.get_collision_normal()
 		var col = ground_ray.get_collider()
 		var loop = _is_loop_surface(col)
-		# Only consider on_ground if collision distance is within tire reach (collision_radius + 0.20m)
-		if dist_to_ground <= (collision_radius + 0.20) and (norm.y >= 0.15 or loop):
+		# Generous slop so crests / steep roads do not flicker to "airborne"
+		if dist_to_ground <= (collision_radius + 0.38) and (norm.y >= 0.12 or loop):
 			on_ground = true
 			on_loop = loop
 			ground_normal = norm
@@ -1570,7 +1602,7 @@ func _physics_process(delta):
 		if space_state:
 			var query = PhysicsRayQueryParameters3D.create(
 				global_position,
-				global_position + Vector3.DOWN * (collision_radius + 0.25)
+				global_position + Vector3.DOWN * (collision_radius + 0.45)
 			)
 			query.exclude = [get_rid()]
 			query.collision_mask = 1
@@ -1581,11 +1613,17 @@ func _physics_process(delta):
 				var norm: Vector3 = hit.normal
 				var col = hit.get("collider")
 				var loop = _is_loop_surface(col)
-				if dist_down <= (collision_radius + 0.20) and (norm.y >= 0.15 or loop):
+				if dist_down <= (collision_radius + 0.38) and (norm.y >= 0.12 or loop):
 					on_ground = true
 					on_loop = loop
 					ground_normal = norm
 					ground_collider = col
+
+	if on_ground:
+		_ground_grace = 0.22
+	else:
+		_ground_grace = maxf(0.0, _ground_grace - delta)
+	var drive_grounded: bool = on_ground or _ground_grace > 0.0
 
 	if not on_ground:
 		air_time += delta
@@ -1677,37 +1715,6 @@ func _physics_process(delta):
 		var slide_force_mag = GRAVITY * mass * slope_steepness * 1.2
 		apply_central_force(downhill_dir * slide_force_mag)
 
-	# Road edge slip & fall-off: if the main body is past the curb edge of an elevated track/bridge,
-	# prevent grinding along the lip by smoothly sliding and rolling the car off into the fall.
-	if on_ground and not on_loop:
-		var check_p = active_path if active_path else track_path
-		if check_p and check_p.curve:
-			var local_p = check_p.to_local(global_position)
-			var offset = check_p.curve.get_closest_offset(local_p)
-			var track_pt = check_p.to_global(check_p.curve.sample_baked(offset))
-			var diff_xz = Vector2(global_position.x - track_pt.x, global_position.z - track_pt.z)
-			var dist_center = diff_xz.length()
-			# Curb outer edge is at ~8.5m. If vehicle center is past 8.2m and over an elevated drop:
-			if dist_center > 8.2 and dist_center < 13.5:
-				var space_state = get_world_3d().direct_space_state
-				if space_state:
-					var out_sign = diff_xz.normalized()
-					var outward_vec = Vector3(out_sign.x, 0.0, out_sign.y)
-					var probe_pos = global_position + outward_vec * 0.8 + Vector3.UP * 0.2
-					var probe_q = PhysicsRayQueryParameters3D.create(probe_pos, probe_pos + Vector3.DOWN * 4.0)
-					probe_q.exclude = [get_rid()]
-					probe_q.collision_mask = 1
-					var probe_hit = space_state.intersect_ray(probe_q)
-					var drop_dist = 4.0
-					if probe_hit:
-						drop_dist = probe_pos.distance_to(probe_hit.position)
-					if drop_dist > 1.6:
-						var edge_over = clampf((dist_center - 8.0) / 2.0, 0.25, 1.0)
-						apply_central_force((outward_vec * 2.5 + Vector3.DOWN * 1.5) * mass * GRAVITY * edge_over * 0.8)
-						var roll_dir = fwd.cross(outward_vec).y
-						var roll_sign = 1.0 if roll_dir > 0.0 else -1.0
-						apply_torque(fwd * roll_sign * mass * 10.0 * edge_over)
-
 	# Offroad steep cliff classification (only offroad, on ground, steep rock face > 65°):
 	# Dunes / drivable slopes: Normal.y >= 0.45 -> Drivable
 	# Sheer vertical cliffs: Normal.y < 0.45 -> Engine power cut when driving straight into it
@@ -1781,7 +1788,7 @@ func _physics_process(delta):
 		elif is_offroad and heading_uphill > 0.05:
 			accel_force *= lerpf(1.0, uphill_power_factor, clampf(heading_uphill * 1.5, 0.0, 1.0))
 		if current_speed < max_sp:
-			var fwd_vec = fwd if on_ground else Vector3(fwd.x, 0.0, fwd.z).normalized()
+			var fwd_vec = fwd if drive_grounded else Vector3(fwd.x, 0.0, fwd.z).normalized()
 			apply_central_force(fwd_vec * accel_force * mass)
 		boost_time += delta
 	elif is_pad_boosting:
@@ -1795,7 +1802,7 @@ func _physics_process(delta):
 		elif is_offroad and heading_uphill > 0.05:
 			accel_force *= lerpf(1.0, uphill_power_factor, clampf(heading_uphill * 1.5, 0.0, 1.0))
 		if current_speed < max_sp:
-			var fwd_vec = fwd if on_ground else Vector3(fwd.x, 0.0, fwd.z).normalized()
+			var fwd_vec = fwd if drive_grounded else Vector3(fwd.x, 0.0, fwd.z).normalized()
 			apply_central_force(fwd_vec * accel_force * mass)
 		boost_time += delta
 	
@@ -1818,7 +1825,7 @@ func _physics_process(delta):
 			if drift_mode:
 				speed_cap *= 0.92
 			if current_speed < speed_cap:
-				var fwd_vec = fwd if on_ground else Vector3(fwd.x, 0.0, fwd.z).normalized()
+				var fwd_vec = fwd if drive_grounded else Vector3(fwd.x, 0.0, fwd.z).normalized()
 				apply_central_force(fwd_vec * accel_force * mass)
 			boost_time += delta
 	elif input_dir.y > 0.1: # Brake / Reverse input
@@ -1882,10 +1889,11 @@ func _physics_process(delta):
 				# Shallow slope threshold (normal.y >= 0.95 = slope angle < ~18 degrees)
 				# Coast naturally with gentle rolling resistance, locking only when nearly stopped
 				if ground_normal.y >= 0.95 or not is_offroad:
-					if spd < 0.12:
+					if spd < 0.15:
 						linear_velocity = Vector3.ZERO
-					elif spd < 0.6:
-						linear_velocity = linear_velocity.lerp(Vector3.ZERO, 6.0 * delta)
+						angular_velocity = Vector3.ZERO
+					elif spd < 0.7:
+						linear_velocity = linear_velocity.move_toward(Vector3.ZERO, 6.0 * delta)
 					else:
 						# Gentle natural rolling resistance for smooth roll-out
 						apply_central_force(-linear_velocity * 0.45 * mass)
@@ -1967,8 +1975,8 @@ func _physics_process(delta):
 		# No air steering — car cannot rotate mid-air
 		pass
 
-	# Wind sound (only while airborne and race is running)
-	if can_move and not on_ground and linear_velocity.length() > 5.0:
+	# Wind sound (only after a real jump — not crest flicker)
+	if can_move and not on_ground and air_time > 0.45 and linear_velocity.length() > 5.0:
 		if not sfx_wind_loop.playing:
 			sfx_wind_loop.play()
 		sfx_wind_loop.volume_db = lerp(sfx_wind_loop.volume_db, -10.0, 2.0 * delta)
@@ -1990,6 +1998,17 @@ func _physics_process(delta):
 	sync_emit_dirt = emit_dirt
 
 	sync_steer = current_steer
+	if on_ground and not on_loop and hop_cooldown <= 1.0:
+		var vn: float = linear_velocity.dot(ground_normal)
+		if vn > 0.04 and vn < 2.2:
+			var idle_drive: bool = absf(input_dir.x) < 0.1 and absf(input_dir.y) < 0.1 and not is_boosting and not is_pad_boosting
+			linear_velocity -= ground_normal * vn * (0.85 if idle_drive else 0.28)
+		if absf(input_dir.x) < 0.08 and absf(input_dir.y) < 0.08 and not is_boosting and not is_pad_boosting:
+			if linear_velocity.length() < 0.85:
+				linear_velocity = linear_velocity.move_toward(Vector3.ZERO, 8.0 * delta)
+			if linear_velocity.length() < 0.18:
+				linear_velocity = Vector3.ZERO
+				angular_velocity = Vector3.ZERO
 	_move_and_sync()
 
 const ENGINE_SOUND_PATH := "res://sounds/freesound_community-engine-6000_edited.wav"
@@ -2034,10 +2053,43 @@ func _setup_engine_sound() -> void:
 	engine_sound.bus = &"SFX"
 
 
+func _is_blocking_prop(collider: Object) -> bool:
+	if collider == null or not (collider is Node):
+		return false
+	if collider.is_in_group("player_carts"):
+		return true
+	var current: Node = collider as Node
+	while current:
+		var nm := str(current.name).to_lower()
+		if nm.contains("rock") or nm.contains("tree") or nm.contains("prop") \
+				or nm.contains("fence") or nm.contains("railing") or nm.contains("pillar") \
+				or nm.contains("post") or nm.contains("crate") or nm.contains("barrel") \
+				or nm.contains("boulder") or nm.contains("log") or nm.contains("statue"):
+			return true
+		current = current.get_parent()
+	return false
+
+
+func _is_world_terrain_collider(collider: Object) -> bool:
+	if collider == null or not (collider is Node):
+		return false
+	var current: Node = collider as Node
+	while current:
+		var nm := str(current.name).to_lower()
+		if nm.contains("unified_world") or nm.contains("terrain_visual") \
+				or nm.contains("terrain_collision") or nm == "terraingenerator":
+			return true
+		current = current.get_parent()
+	return false
+
+
 func _is_track_surface(collider: Object) -> bool:
 	if collider == null:
 		return false
 	if not (collider is Node):
+		return false
+	# Props sitting on the asphalt are not the road — even when the car is on-track.
+	if _is_blocking_prop(collider):
 		return false
 	var n: Node = collider as Node
 	var current: Node = n
@@ -2054,24 +2106,40 @@ func _is_track_surface(collider: Object) -> bool:
 				or nm.contains("finishline") or nm.contains("gate"):
 			return true
 		current = current.get_parent()
-	
-	var check_p = active_path if active_path else track_path
-	if check_p == null:
-		var lvl = get_tree().get_first_node_in_group("level")
-		if lvl and "track_path" in lvl:
-			check_p = lvl.track_path
-	
-	# On unified world / terrain generator, check distance to track path curve
-	if check_p and check_p.curve:
-		var local_p = check_p.to_local(global_position)
-		var offset = check_p.curve.get_closest_offset(local_p)
-		var track_pt = check_p.to_global(check_p.curve.sample_baked(offset))
-		var dist_xz = Vector2(global_position.x - track_pt.x, global_position.z - track_pt.z).length()
-		# Standard road half-width is ~7.5m, with generous 15.0m margin for terrain road blends
-		if dist_xz < 15.0:
-			return true
+
+	# Unified terrain mesh only counts as "on track" near the asphalt.
+	# Do not apply this to rocks/props — that made AI ignore on-road obstacles.
+	if _is_world_terrain_collider(n):
+		var check_p = active_path if active_path else track_path
+		if check_p == null:
+			var lvl = get_tree().get_first_node_in_group("level")
+			if lvl and "track_path" in lvl:
+				check_p = lvl.track_path
+		if check_p and check_p.curve:
+			var local_p = check_p.to_local(global_position)
+			var offset = check_p.curve.get_closest_offset(local_p)
+			var track_pt = check_p.to_global(check_p.curve.sample_baked(offset))
+			var dist_xz = Vector2(global_position.x - track_pt.x, global_position.z - track_pt.z).length()
+			if dist_xz < _get_track_outer_half_width() + 0.6:
+				return true
 
 	return false
+
+
+func _get_track_outer_half_width() -> float:
+	var lvl: Node = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
+	if lvl:
+		var tg = lvl.get_node_or_null("TerrainGenerator")
+		if tg:
+			if "track_layout_type" in tg and int(tg.track_layout_type) == 2:
+				# Canyon: rounded shoulder extends past asphalt.
+				var rw: float = float(tg.road_width) if "road_width" in tg else 15.0
+				return rw * 0.5 + 2.6
+			if "sand_width" in tg:
+				return float(tg.sand_width) * 0.5
+			if "road_width" in tg:
+				return float(tg.road_width) * 0.5
+	return 8.5
 
 
 func _is_loop_surface(collider: Object) -> bool:
@@ -2171,7 +2239,6 @@ func _update_visuals_alignment(delta: float) -> void:
 		return
 
 	var fixed_offset = _get_ground_visual_offset()
-	visual_offset_y = fixed_offset
 
 	# Determine ground normal from primary ground ray
 	var on_ground = false
@@ -2187,6 +2254,19 @@ func _update_visuals_alignment(delta: float) -> void:
 			if norm.y >= 0.15 or on_loop_vis:
 				on_ground = true
 				target_up = norm
+
+	# Soft spring: ease ride height instead of snapping every bump
+	var compress: float = 0.0
+	if on_ground:
+		compress = clampf(linear_velocity.y * -0.035, -0.07, 0.10)
+	visual_offset_y = lerpf(visual_offset_y, fixed_offset + compress, 1.0 - exp(-11.0 * delta))
+
+	if on_ground:
+		_smooth_visual_up = _smooth_visual_up.slerp(target_up, 1.0 - exp(-8.0 * delta))
+		if _smooth_visual_up.length_squared() > 0.001:
+			target_up = _smooth_visual_up.normalized()
+	else:
+		_smooth_visual_up = Vector3.UP
 
 	if not on_ground:
 		# In air: do not clamp horizontal! Visual orientation is free to tumble / flip.
@@ -2214,7 +2294,7 @@ func _update_visuals_alignment(delta: float) -> void:
 	if is_drifting:
 		var drift_angle = -0.35 if drift_right else 0.35
 		target_basis = target_basis.rotated(target_up, drift_angle)
-	visuals.global_transform.basis = current_basis.slerp(target_basis, 1.0 - exp(-16.0 * delta))
+	visuals.global_transform.basis = current_basis.slerp(target_basis, 1.0 - exp(-9.0 * delta))
 
 	var target_pos = get_global_transform_interpolated().origin - target_up * visual_offset_y
 	visuals.global_position = target_pos
@@ -4627,47 +4707,52 @@ func _get_ai_input(delta: float) -> Vector2:
 	if space_state:
 		var fwd_dir = -visuals.global_transform.basis.z
 		var right_dir = visuals.global_transform.basis.x
-		var my_pos = global_position + visuals.global_transform.basis.y * 0.55
+		var my_pos = global_position + visuals.global_transform.basis.y * 0.32
+		var low_pos = global_position + visuals.global_transform.basis.y * 0.16
 		
-		# Define 5 rays: center (14m), mid-left (11m), mid-right (11m), wide-left (8m), wide-right (8m)
+		# Center + flanks, plus a low bumper ray that catches small on-road rocks.
 		var rays = [
-			{"end": my_pos + fwd_dir * 14.0, "weight": 1.1, "side": 0.0},
-			{"end": my_pos + (fwd_dir - right_dir * 0.35).normalized() * 11.0, "weight": 0.9, "side": -1.0},
-			{"end": my_pos + (fwd_dir + right_dir * 0.35).normalized() * 11.0, "weight": 0.9, "side": 1.0},
-			{"end": my_pos + (fwd_dir - right_dir * 0.70).normalized() * 8.0, "weight": 0.7, "side": -1.0},
-			{"end": my_pos + (fwd_dir + right_dir * 0.70).normalized() * 8.0, "weight": 0.7, "side": 1.0}
+			{"start": my_pos, "end": my_pos + fwd_dir * 16.0, "weight": 1.2, "side": 0.0},
+			{"start": low_pos, "end": low_pos + fwd_dir * 8.0, "weight": 1.35, "side": 0.0},
+			{"start": my_pos, "end": my_pos + (fwd_dir - right_dir * 0.40).normalized() * 12.0, "weight": 1.0, "side": -1.0},
+			{"start": my_pos, "end": my_pos + (fwd_dir + right_dir * 0.40).normalized() * 12.0, "weight": 1.0, "side": 1.0},
+			{"start": my_pos, "end": my_pos + (fwd_dir - right_dir * 0.80).normalized() * 9.0, "weight": 0.75, "side": -1.0},
+			{"start": my_pos, "end": my_pos + (fwd_dir + right_dir * 0.80).normalized() * 9.0, "weight": 0.75, "side": 1.0}
 		]
 		
 		var is_start_grid_phase: bool = (Time.get_ticks_msec() / 1000.0 - race_start_time) < 3.0
 		var obstacle_count = 0
+		var closest_prop_dist: float = 99.0
 		for ray in rays:
-			var query = PhysicsRayQueryParameters3D.create(my_pos, ray["end"])
+			var query = PhysicsRayQueryParameters3D.create(ray["start"], ray["end"])
 			query.exclude = [self.get_rid()]
 			query.collision_mask = 1 | 4 # Terrain/props and objects
 			var result = space_state.intersect_ray(query)
 			if result:
 				var collider = result.collider
-				# Floor / road slope check: if normal is mostly pointing up, it's drivable ground/slope
-				if result.normal.y >= 0.55:
-					continue
+				var is_prop: bool = _is_blocking_prop(collider)
+				var is_other_cart: bool = collider.is_in_group("player_carts") or (collider is RigidBody3D and collider != self)
 				
-				# Track surface check
-				if _is_track_surface(collider):
-					continue
+				if not is_prop and not is_other_cart:
+					# Floor / road slope: mostly-up normals are drivable ground.
+					if result.normal.y >= 0.55:
+						continue
+					if _is_track_surface(collider) or _is_world_terrain_collider(collider):
+						continue
+					var c_name = collider.name.to_lower()
+					var is_pure_surface = c_name.contains("road") or c_name.contains("terrain") or c_name.contains("track") or c_name.contains("unified_world") or c_name.contains("ramp") or c_name.contains("seabed") or c_name.contains("deck") or c_name.contains("dock")
+					if is_pure_surface:
+						continue
 				
-				var c_name = collider.name.to_lower()
-				var is_pure_surface = c_name.contains("road") or c_name.contains("terrain") or c_name.contains("track") or c_name.contains("unified_world") or c_name.contains("ramp") or c_name.contains("seabed") or c_name.contains("deck") or c_name.contains("dock")
-				if is_pure_surface and not (c_name.contains("tree") or c_name.contains("rock") or c_name.contains("prop") or c_name.contains("fence") or c_name.contains("railing") or c_name.contains("pillar") or c_name.contains("post")):
-					continue
-				
-				var is_other_cart: bool = collider.is_in_group("player_carts") or collider is RigidBody3D
 				if is_other_cart and (is_start_grid_phase or speed < 3.0):
 					# On starting grid or low speeds, traffic cushion handles subtle separation; do not swerve off track
 					continue
 				
-				var dist = my_pos.distance_to(result.position)
-				var max_reach = 14.0 if ray["side"] == 0.0 else 11.0
-				var intensity = clampf(1.0 - (dist / max_reach), 0.1, 1.0) * ray["weight"]
+				var dist = ray["start"].distance_to(result.position)
+				if is_prop:
+					closest_prop_dist = minf(closest_prop_dist, dist)
+				var max_reach = 16.0 if ray["side"] == 0.0 else 12.0
+				var intensity = clampf(1.0 - (dist / max_reach), 0.15, 1.0) * ray["weight"]
 				
 				if is_other_cart:
 					var side_dir: float = -ray["side"] if ray["side"] != 0.0 else (-signf(dir_flat.x) if absf(dir_flat.x) > 0.05 else (1.0 if ai_overtake_bias >= 0.0 else -1.0))
@@ -4676,16 +4761,27 @@ func _get_ai_input(delta: float) -> Vector2:
 				else:
 					var side_dir: float
 					if ray["side"] == 0.0:
-						var local_hit = visuals.global_transform.inverse() * result.position
-						side_dir = signf(dir_flat.x) if absf(dir_flat.x) > 0.15 else (-signf(local_hit.x) if absf(local_hit.x) > 0.05 else -1.0)
+						# Steer toward the side with more free space, not blindly toward the racing line
+						# (the line often goes through a rock sitting in the lane).
+						var left_clear := _ai_clearance_ahead(space_state, my_pos + (-right_dir) * 2.4, fwd_dir, 10.0)
+						var right_clear := _ai_clearance_ahead(space_state, my_pos + right_dir * 2.4, fwd_dir, 10.0)
+						if absf(left_clear - right_clear) > 0.6:
+							side_dir = -1.0 if left_clear > right_clear else 1.0
+						else:
+							var local_hit = visuals.global_transform.inverse() * result.position
+							side_dir = -signf(local_hit.x) if absf(local_hit.x) > 0.08 else (1.0 if ai_overtake_bias >= 0.0 else -1.0)
 					else:
 						side_dir = -ray["side"]
-					target_avoid_force += side_dir * 1.6 * intensity
+					var prop_boost: float = 2.4 if is_prop else 1.6
+					target_avoid_force += side_dir * prop_boost * intensity
 					obstacle_count += 1
 		
 		if obstacle_count > 0:
 			if _harbor_stage:
 				target_avoid_force *= 0.25 # gentle dodge on narrow pier
+			if closest_prop_dist < 7.0:
+				# Slow down so the steer has time to clear rocks instead of ramming them.
+				input.y = maxf(input.y, lerpf(0.15, 0.7, clampf(1.0 - closest_prop_dist / 7.0, 0.0, 1.0)))
 		else:
 			target_avoid_force = float(traffic_info.get("cushion_force", 0.0))
 
@@ -4722,6 +4818,19 @@ func _get_ai_input(delta: float) -> Vector2:
 			_ai_unstuck_dir = 0.0
 
 	return input
+
+
+func _ai_clearance_ahead(space_state: PhysicsDirectSpaceState3D, origin: Vector3, fwd: Vector3, reach: float) -> float:
+	var query := PhysicsRayQueryParameters3D.create(origin, origin + fwd * reach)
+	query.exclude = [get_rid()]
+	query.collision_mask = 1 | 4
+	var hit = space_state.intersect_ray(query)
+	if hit:
+		if _is_blocking_prop(hit.collider) or hit.collider.is_in_group("player_carts"):
+			return origin.distance_to(hit.position)
+		if hit.normal.y < 0.55 and not _is_track_surface(hit.collider):
+			return origin.distance_to(hit.position)
+	return reach
 
 
 func _ai_measure_upcoming_turn(curve: Curve3D, offset: float, speed: float) -> Dictionary:

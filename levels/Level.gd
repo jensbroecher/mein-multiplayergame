@@ -608,6 +608,10 @@ func start_race():
 var _cached_grass_mat: ShaderMaterial = null
 
 func _update_grass_cart_positions():
+	if Engine.is_editor_hint():
+		return
+	if MusicManager == null or not ("grass_quality_index" in MusicManager):
+		return
 	if MusicManager.grass_quality_index == 0:
 		return
 	if not _cached_grass_mat:
@@ -639,7 +643,10 @@ func _update_grass_cart_positions():
 		_cached_grass_mat.set_shader_parameter("player_positions", positions)
 
 func _process(delta):
-	_update_grass_cart_positions()
+	if not Engine.is_editor_hint():
+		_update_grass_cart_positions()
+	if Engine.is_editor_hint():
+		return
 	if multiplayer.is_server():
 		if race_state == RaceState.RACING:
 			_update_positions()
@@ -1806,13 +1813,24 @@ func _generate_sand_dunes():
 func _make_dune_sand_material() -> StandardMaterial3D:
 	var sand_mat := StandardMaterial3D.new()
 	sand_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	sand_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	var sand_texture = load("res://materials/sand.png")
 	var sand_normal = load("res://materials/sand_normal.png")
+	var sand_rough = load("res://materials/sand_roughness.png")
+	var sand_ao = load("res://materials/sand_ao.png")
 	if sand_texture:
 		sand_mat.albedo_texture = sand_texture
 		sand_mat.uv1_triplanar = true
+		sand_mat.uv1_world_triplanar = true
 		sand_mat.uv1_scale = Vector3(0.45, 0.45, 0.45)
+		sand_mat.uv1_triplanar_sharpness = 4.0
 		sand_mat.roughness = 0.92
+		if sand_rough:
+			sand_mat.roughness_texture = sand_rough
+		if sand_ao:
+			sand_mat.ao_enabled = true
+			sand_mat.ao_texture = sand_ao
+			sand_mat.ao_light_affect = 0.35
 		if sand_normal:
 			sand_mat.normal_enabled = true
 			sand_mat.normal_texture = sand_normal

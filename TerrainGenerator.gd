@@ -849,6 +849,27 @@ func _generate_mesh(for_collision: bool) -> ArrayMesh:
 		st.generate_tangents()
 	return st.commit()
 
+func _configure_triplanar_pbr(mat: StandardMaterial3D, uv_scale: float, sharpness: float = 4.0) -> void:
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	mat.uv1_triplanar = true
+	mat.uv1_world_triplanar = true
+	mat.uv1_scale = Vector3(uv_scale, uv_scale, uv_scale)
+	mat.uv1_triplanar_sharpness = sharpness
+
+
+func _make_concrete_pbr_material() -> StandardMaterial3D:
+	var concrete_mat := StandardMaterial3D.new()
+	concrete_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	concrete_mat.albedo_texture = load("res://materials/concrete.png")
+	concrete_mat.roughness = 0.9
+	concrete_mat.roughness_texture = load("res://materials/concrete_roughness.png")
+	concrete_mat.normal_enabled = true
+	concrete_mat.normal_texture = load("res://materials/concrete_normal.png")
+	concrete_mat.normal_scale = 1.0
+	_configure_triplanar_pbr(concrete_mat, 0.15, 4.0)
+	return concrete_mat
+
+
 func _generate_road_and_sand():
 	if level_prefix == "harbor_pier":
 		return
@@ -862,17 +883,7 @@ func _generate_road_and_sand():
 	curb_mat.set_shader_parameter("stripe_length", 1.5) # 1.5m per color step
 
 	# 2. Create a Concrete Material for the vertical sides
-	var concrete_mat = StandardMaterial3D.new()
-	concrete_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	concrete_mat.albedo_texture = load("res://materials/concrete.png")
-	concrete_mat.roughness = 0.9
-	concrete_mat.roughness_texture = load("res://materials/concrete_roughness.png")
-	concrete_mat.normal_enabled = true
-	concrete_mat.normal_texture = load("res://materials/concrete_normal.png")
-	concrete_mat.normal_scale = 1.0
-	concrete_mat.uv1_triplanar = true
-	concrete_mat.uv1_triplanar_sharpness = 4.0
-	concrete_mat.uv1_scale = Vector3(0.15, 0.15, 0.15)
+	var concrete_mat = _make_concrete_pbr_material()
 
 	# 3. Visual Overlays: Curbs and Road
 	if track_layout_type != TrackLayoutType.CANYON:
@@ -1336,16 +1347,7 @@ func _generate_bridge_supports(point_count: int):
 	var length = curve.get_baked_length()
 	var step = 30.0 # Support every 30m
 
-	var support_mat = StandardMaterial3D.new()
-	support_mat.albedo_texture = load("res://materials/concrete.png")
-	support_mat.roughness = 0.9
-	support_mat.roughness_texture = load("res://materials/concrete_roughness.png")
-	support_mat.normal_enabled = true
-	support_mat.normal_texture = load("res://materials/concrete_normal.png")
-	support_mat.normal_scale = 1.0
-	support_mat.uv1_triplanar = true
-	support_mat.uv1_triplanar_sharpness = 4.0
-	support_mat.uv1_scale = Vector3(0.15, 0.15, 0.15)
+	var support_mat = _make_concrete_pbr_material()
 
 	for d in range(0, int(length), int(step)):
 		var pos = curve.sample_baked(d)
@@ -1543,9 +1545,7 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 			rock_mat.normal_enabled = true
 			rock_mat.normal_texture = rock_normal
 			rock_mat.normal_scale = 1.5
-		rock_mat.uv1_scale = Vector3(0.05, 0.05, 0.05)
-		rock_mat.uv1_triplanar = true
-		rock_mat.uv1_triplanar_sharpness = 8.0
+		_configure_triplanar_pbr(rock_mat, 0.05, 8.0)
 		rock_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 		final_side_mat = rock_mat
 
@@ -1606,7 +1606,7 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 				(cap_shape as ConcavePolygonShape3D).backface_collision = true
 			cap_col.shape = _save_resource(cap_shape, node_name + "_endcap_collision_shape")
 			static_body.add_child(cap_col)
-	elif track_layout_type == TrackLayoutType.CANYON and final_side_mat is ShaderMaterial:
+	if track_layout_type == TrackLayoutType.CANYON and final_side_mat is ShaderMaterial:
 		final_side_mat.set_shader_parameter("use_world_uv", false)
 		final_side_mat.set_shader_parameter("uv_scale", 4.0)
 
