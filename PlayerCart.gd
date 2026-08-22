@@ -3,8 +3,14 @@ extends RigidBody3D
 @export var player_name: String = "Player":
 	set(value):
 		player_name = value
-		if is_inside_tree() and $Visuals/NameTag:
-			$Visuals/NameTag.text = value
+		_refresh_name_tag()
+
+@export var race_place: int = 0:
+	set(value):
+		if race_place == value:
+			return
+		race_place = value
+		_refresh_name_tag()
 
 @export var car_index: int = 0
 
@@ -154,6 +160,8 @@ const LANDING_SOUNDS = [
 	preload("res://sounds/freesound_community-bonk-46000.mp3")
 ]
 const CRASH_SOUND = preload("res://sounds/crash.mp3")
+const LIGHTNING_SOUND = preload("res://sounds/electric_lightning_a_#1-1782053835008.wav")
+const TELEPORT_SPARK = preload("res://sprites/energy_spark.png")
 
 @onready var visuals = $Visuals
 @onready var camera_pivot = $Visuals/CameraPivot
@@ -240,7 +248,16 @@ var _ai_recovering: bool = false
 var _ai_recover_to_checkpoint: bool = false
 var _ai_recover_goal: Vector3 = Vector3.ZERO
 var _ai_recover_refresh: float = 0.0
+var _ai_no_progress_timer: float = 0.0
+var _ai_progress_sample_pos: Vector3 = Vector3.ZERO
+var _ai_fall_origin: Vector3 = Vector3.ZERO
 var _ai_last_ontrack_offset: float = 0.0
+## Obstacle stuck detection — tracks when the bot is pushing against a prop/rock
+var _ai_obstacle_stuck_timer: float = 0.0
+var _ai_obstacle_reverse_timer: float = 0.0
+var _ai_obstacle_steer_dir: float = 0.0
+var _ai_last_speed_sample: float = 0.0
+var _ai_speed_stall_timer: float = 0.0
 var track_path: Path3D = null
 var alternative_paths: Array[Path3D] = []
 var active_path: Path3D = null
@@ -273,6 +290,9 @@ var ignore_next_landing_sound: bool = false
 var last_crash_sound_time: float = -999.0
 var wheel_rotation: float = 0.0
 var is_teleporting: bool = false
+var _teleport_tween: Tween = null
+var _teleport_fx: CPUParticles3D = null
+var _teleport_base_scales: Dictionary = {}
 var is_shielded: bool = false
 var was_shocked: bool = false
 var camera_look_at: Vector3 = Vector3.ZERO
@@ -301,7 +321,7 @@ var offroad_timer: float = 0.0
 var is_offroad: bool = false
 var visual_offset_y: float = 0.0
 
-var stage_has_water: bool = true
+var stage_has_water: bool = false
 var _harbor_stage: bool = false
 var _mountain_stage: bool = false
 var _wadi_stage: bool = false
@@ -396,6 +416,17 @@ const _ISO_CAM_CLEARANCE: float = 1.25
 var _ai_closest_offset_frame: int = 0
 var _ai_cached_offset: float = -1.0
 
+func _refresh_name_tag() -> void:
+	if not is_inside_tree():
+		return
+	var tag: Label3D = name_tag if name_tag != null else get_node_or_null("Visuals/NameTag")
+	if tag == null:
+		return
+	if race_place > 0:
+		tag.text = "%d. %s" % [race_place, player_name]
+	else:
+		tag.text = player_name
+
 func has_physics_authority() -> bool:
 	return is_local_player or (is_ai and (multiplayer.multiplayer_peer == null or is_multiplayer_authority()))
 
@@ -420,6 +451,7 @@ func on_race_started():
 			var curve = path_to_use.curve
 			var local_pos = path_to_use.to_local(global_position)
 			var offset = curve.get_closest_offset(local_pos)
+			_ai_last_ontrack_offset = offset
 			var track_center = curve.sample_baked(offset)
 			var next_offset = fmod(offset + 1.0, curve.get_baked_length())
 			var tangent = (curve.sample_baked(next_offset) - track_center).normalized()
@@ -564,14 +596,15 @@ func _ready():
 			antenna.position = visuals.to_local(antenna_placement.global_position)
 
 	ground_ray.add_exception(self)
-	name_tag.text = player_name
+	_refresh_name_tag()
 	# Always draw names over water / crates / piers (especially spectator 3/4 view).
 	name_tag.no_depth_test = true
 	name_tag.render_priority = 32
 	name_tag.outline_render_priority = 31
 	name_tag.sorting_offset = 16.0
-	name_tag.outline_size = 12
+	name_tag.outline_size = 14
 	name_tag.outline_modulate = Color(0, 0, 0, 0.82)
+	name_tag.font_size = 40
 	last_checkpoint_transform = global_transform
 	camera_look_at = global_position
 
@@ -655,6 +688,8 @@ func _ready():
 					water_bounds_max = Vector2(c.x + half.x, c.z + half.y)
 		elif tg and str(tg.get("level_prefix")) == "mountain":
 			_mountain_stage = true
+			stage_has_water = false
+			water_bounds_active = false
 		elif tg and str(tg.get("level_prefix")) == "harbor_pier":
 			stage_has_water = true
 			_harbor_stage = true
@@ -685,6 +720,8 @@ func _ready():
 			stage_has_water = not tg.no_water
 			water_surface_y = WATER_LEVEL
 			water_bounds_active = false
+		else:
+			stage_has_water = false
 
 	if is_local_player:
 		var is_coop = NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP
@@ -916,7 +953,8 @@ func _process(delta):
 		
 		if not is_intro_active:
 			if name_tag:
-				name_tag.pixel_size = 0.00035 if is_isometric or is_finished_race else 0.00065
+				# Follow cam sits closer; bump size so names stay readable behind the car.
+				name_tag.pixel_size = 0.00035 if is_isometric or is_finished_race else 0.00095
 				
 			if is_finished_race and finish_spectate_delay <= 0.0:
 				# Bird's-eye overview camera: Follow cars still in the race, cycling every ~10s and moving smoothly between them
@@ -1257,18 +1295,19 @@ func _physics_process(delta):
 	# AI Stuck & Off-Track Fall Detection
 	if is_ai and can_move and not is_exploding and not is_finished_race and respawn_indicator_time <= 0.0 and has_physics_authority:
 		ai_stuck_position_timer += delta
-		if ai_stuck_position_timer >= 4.5:
+		if ai_stuck_position_timer >= 2.8:
 			ai_stuck_position_timer = 0.0
 			var dist = global_position.distance_to(ai_last_stuck_position)
-			if dist < 2.5:
-				print("AI Cart ", name, " detected stuck (distance traveled in 4.5s: ", dist, "m). Respawning.")
+			# While recovering, keep circling — don't warp out just for sitting near a pillar.
+			if dist < 2.5 and not _ai_recovering:
+				print("AI Cart ", name, " detected stuck (distance traveled in 2.8s: ", dist, "m). Respawning.")
 				if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 					respawn_rpc.rpc()
 				else:
 					respawn()
 			ai_last_stuck_position = global_position
 		
-		# Check if cart has fallen off track (e.g. fallen down a cliff or ravine)
+		# Check if cart has fallen off track (e.g. fallen down a cliff, bridge or ravine)
 		var check_path = active_path if active_path else track_path
 		if check_path == null:
 			var lvl = get_tree().get_first_node_in_group("level")
@@ -1276,24 +1315,30 @@ func _physics_process(delta):
 				check_path = lvl.track_path
 		if check_path and check_path.curve:
 			var curve = check_path.curve
-			var local_p = check_path.to_local(global_position)
-			# Use lap-progress offset, not 3D closest — stacked mountain loops
-			# sit above each other and closest-point looks like a cliff fall.
-			var cur_off: float = _ai_cached_offset if _ai_cached_offset >= 0.0 else curve.get_closest_offset(local_p)
+			var cur_off: float = _ai_last_ontrack_offset if _ai_last_ontrack_offset >= 0.0 else curve.get_closest_offset(check_path.to_local(global_position))
 			var track_pt = check_path.to_global(curve.sample_baked(cur_off))
 			var height_below = track_pt.y - global_position.y
 			var dist_xz = Vector2(global_position.x - track_pt.x, global_position.z - track_pt.z).length()
-			var is_fallen_off: bool
-			if _ai_cached_offset >= 0.0:
-				is_fallen_off = dist_xz > 36.0 or height_below > 12.0
-			else:
-				is_fallen_off = dist_xz > 36.0
+			var is_fallen_off: bool = height_below > 10.0 and (is_offroad or air_time > 0.8 or dist_xz > 16.0)
 			if is_fallen_off:
+				if _ai_offtrack_timer <= 0.001:
+					_ai_fall_origin = global_position
 				_ai_offtrack_timer += delta
-				var recover_limit: float = 16.0 if _ai_recovering else 3.0
-				if _ai_offtrack_timer > recover_limit:
-					print("AI Cart ", name, " fallen off course (height below: ", height_below, "m, dist xz: ", dist_xz, "m). Respawning.")
+				if global_position.distance_to(_ai_progress_sample_pos) > 4.0:
+					_ai_progress_sample_pos = global_position
+					_ai_no_progress_timer = 0.0
+				else:
+					_ai_no_progress_timer += delta
+				var stray: float = Vector2(global_position.x - _ai_fall_origin.x, global_position.z - _ai_fall_origin.z).length()
+				# Don't tour the hills. If they wandered far from the fall, teleport back.
+				var no_progress: bool = _ai_no_progress_timer > 4.5 and linear_velocity.length() < 2.0
+				# Keep trying toward the next gate; only give up if stuck or truly lost.
+				var too_far: bool = stray > 70.0 and no_progress
+				var recover_limit: float = 14.0 if _ai_recovering else 8.0
+				if too_far or (_ai_offtrack_timer > recover_limit and no_progress):
+					print("AI Cart ", name, " fallen off course (dist xz: ", dist_xz, "m, height below: ", height_below, "m). Respawning.")
 					_ai_offtrack_timer = 0.0
+					_ai_no_progress_timer = 0.0
 					_ai_recovering = false
 					if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 						respawn_rpc.rpc()
@@ -1301,6 +1346,8 @@ func _physics_process(delta):
 						respawn()
 			else:
 				_ai_offtrack_timer = 0.0
+				_ai_no_progress_timer = 0.0
+				_ai_recovering = false
 	else:
 		ai_stuck_position_timer = 0.0
 		_ai_offtrack_timer = 0.0
@@ -1952,7 +1999,18 @@ func _physics_process(delta):
 				else:
 					turn_speed *= 1.55
 			
-			var steer_amount = -current_steer * turn_speed * (min(linear_velocity.length() / 10.0, 1.0)) * delta
+			var steer_speed_factor: float
+			if current_speed < -0.1:
+				# Reversing: invert steering yaw direction so turning right swings rear right & nose left
+				steer_speed_factor = clampf(abs(current_speed) / 3.0, 0.5, 1.0)
+				turn_speed = -turn_speed * 1.2
+			elif current_speed < 3.0:
+				# Low speed forward maneuver (pulling away from stop/obstacle): maintain minimum responsiveness
+				steer_speed_factor = clampf(current_speed / 8.0, 0.4, 1.0)
+			else:
+				steer_speed_factor = minf(current_speed / 10.0, 1.0)
+
+			var steer_amount = -current_steer * turn_speed * steer_speed_factor * delta
 			var rot_axis = ground_normal if on_ground else Vector3.UP
 			visuals.global_rotate(rot_axis, steer_amount)
 			
@@ -2088,10 +2146,19 @@ func _is_blocking_prop(collider: Object) -> bool:
 	var current: Node = collider as Node
 	while current:
 		var nm := str(current.name).to_lower()
-		if nm.contains("rock") or nm.contains("tree") or nm.contains("prop") \
-				or nm.contains("fence") or nm.contains("railing") or nm.contains("pillar") \
-				or nm.contains("post") or nm.contains("crate") or nm.contains("barrel") \
-				or nm.contains("boulder") or nm.contains("log") or nm.contains("statue"):
+		# Track, roads, bridges, ramps, unified terrain and decks are never blocking props!
+		if current.is_in_group("track_surface") or current.is_in_group("loop_track") or current.is_in_group("ramps"):
+			return false
+		if nm.contains("road") or nm.contains("track") or nm.contains("bridge") or nm.contains("ramp") or nm.contains("terrain") or nm.contains("unified_world") or nm.contains("deck") or nm.contains("pier") or nm.contains("dock"):
+			return false
+		if nm.contains("rock") or nm.contains("tree") or nm.contains("cactus") or nm.contains("prop") \
+				or nm.contains("crate") or nm.contains("barrel") or nm.contains("boulder") \
+				or nm.contains("log") or nm.contains("statue") or nm.contains("vegetation") \
+				or nm.contains("foliage") or nm.contains("plant") or nm.contains("bush") \
+				or nm.contains("palm") or nm.contains("pillar") or nm.contains("column") \
+				or nm.contains("wall") or nm.contains("barrier") or nm.contains("fence") \
+				or nm.contains("building") or nm.contains("house") or nm.contains("windmill") \
+				or nm.contains("staticbody"):
 			return true
 		current = current.get_parent()
 	return false
@@ -2134,24 +2201,9 @@ func _is_track_surface(collider: Object) -> bool:
 			return true
 		current = current.get_parent()
 
-	# Unified terrain mesh only counts as "on track" near the asphalt.
-	# Do not apply this to rocks/props — that made AI ignore on-road obstacles.
-	# Desert Wadi has no asphalt: the carved trough is sand like the rest of the stage.
+	# Terrain/dirt on top of a buried road is still off-road (dust, penalty).
 	if _is_world_terrain_collider(n):
-		if _wadi_stage:
-			return false
-		var check_p = active_path if active_path else track_path
-		if check_p == null:
-			var lvl = get_tree().get_first_node_in_group("level")
-			if lvl and "track_path" in lvl:
-				check_p = lvl.track_path
-		if check_p and check_p.curve:
-			var local_p = check_p.to_local(global_position)
-			var offset = check_p.curve.get_closest_offset(local_p)
-			var track_pt = check_p.to_global(check_p.curve.sample_baked(offset))
-			var dist_xz = Vector2(global_position.x - track_pt.x, global_position.z - track_pt.z).length()
-			if dist_xz < _get_track_outer_half_width() + 0.6:
-				return true
+		return false
 
 	return false
 
@@ -2295,8 +2347,11 @@ func _update_visuals_alignment(delta: float) -> void:
 		_smooth_visual_up = _smooth_visual_up.slerp(target_up, 1.0 - exp(-8.0 * delta))
 		if _smooth_visual_up.length_squared() > 0.001:
 			target_up = _smooth_visual_up.normalized()
+		else:
+			target_up = Vector3.UP
 	else:
 		_smooth_visual_up = Vector3.UP
+		target_up = Vector3.UP
 
 	if not on_ground:
 		# In air: do not clamp horizontal! Visual orientation is free to tumble / flip.
@@ -2317,13 +2372,17 @@ func _update_visuals_alignment(delta: float) -> void:
 	var forward = -current_basis.z
 
 	var target_forward = (forward - target_up * forward.dot(target_up)).normalized()
+	if target_forward.length_squared() < 0.001:
+		target_forward = -current_basis.z
 	var target_right = target_forward.cross(target_up).normalized()
 	target_forward = target_up.cross(target_right).normalized()
 
 	var target_basis = Basis(target_right, target_up, -target_forward)
 	if is_drifting:
 		var drift_angle = -0.35 if drift_right else 0.35
-		target_basis = target_basis.rotated(target_up, drift_angle)
+		var up_axis = target_up.normalized()
+		if up_axis.length_squared() > 0.5:
+			target_basis = target_basis.rotated(up_axis, drift_angle)
 	visuals.global_transform.basis = current_basis.slerp(target_basis, 1.0 - exp(-9.0 * delta))
 
 	var target_pos = get_global_transform_interpolated().origin - target_up * visual_offset_y
@@ -2409,6 +2468,7 @@ func _interpolate_remote_visual(delta: float):
 		if mesh_node:
 			mesh_node.rotation.x = wheel_rotation
 
+	_update_blob_shadow()
 	# Visual particle/sound effects for remote player carts
 	_set_drift_emitting(sync_emit_drift)
 	_set_dirt_emitting(sync_emit_dirt)
@@ -2584,6 +2644,7 @@ func _move_and_sync():
 	sync_rotation = visuals.global_rotation
 	sync_velocity = linear_velocity
 	sync_rotation_quat = visuals.global_transform.basis.get_rotation_quaternion()
+	_update_blob_shadow()
 
 func _use_item():
 	if current_item == ItemType.NONE: return
@@ -3034,8 +3095,171 @@ func respawn_rpc():
 
 func respawn():
 	# Finished racers must not snap back to the finish gate (last checkpoint).
-	if is_finished_race:
+	if is_finished_race or is_teleporting:
 		return
+	_start_respawn_teleport()
+
+
+func _start_respawn_teleport() -> void:
+	is_teleporting = true
+	can_move = false
+	if has_physics_authority():
+		freeze = true
+		linear_velocity = Vector3.ZERO
+		angular_velocity = Vector3.ZERO
+	if _teleport_tween:
+		_teleport_tween.kill()
+	_teleport_tween = create_tween()
+	var skip_vanish: bool = is_drowned or not visuals.visible
+	if skip_vanish:
+		_teleport_tween.tween_callback(_teleport_appear)
+	else:
+		_capture_teleport_scales()
+		_burst_teleport_fx(global_position)
+		MusicManager.play_sfx("res://sounds/stereogenicstudio-swish-swoosh-woosh-sfx-47-357152.mp3", -10.0, 1.15)
+		_teleport_tween.tween_method(_teleport_vanish_step, 0.0, 1.0, 0.40)
+		_teleport_tween.tween_callback(_teleport_appear)
+
+
+func _teleport_vanish_step(t: float) -> void:
+	if _teleport_base_scales.is_empty():
+		_capture_teleport_scales()
+	_set_body_visual_scale(lerpf(1.0, 0.05, t * t))
+	_set_teleport_glow(t)
+	_set_visuals_alpha(lerpf(1.0, 0.2, t))
+
+
+func _teleport_appear() -> void:
+	_apply_respawn_pose()
+	# Keep the scales captured before vanish. Recapturing here stored the
+	# already-shrunk chassis and left only the restored wheels at full size.
+	if _teleport_base_scales.is_empty():
+		_capture_teleport_scales()
+	_set_body_visual_scale(0.05)
+	_set_teleport_glow(1.0)
+	_set_visuals_alpha(0.25)
+	visuals.visible = true
+	_burst_teleport_fx(global_position)
+	if _teleport_tween:
+		_teleport_tween.kill()
+	_teleport_tween = create_tween()
+	_teleport_tween.tween_method(_teleport_appear_step, 0.0, 1.0, 0.45)
+	_teleport_tween.tween_callback(_teleport_finish)
+
+
+func _teleport_appear_step(t: float) -> void:
+	var s: float = lerpf(0.05, 1.0, t * t * (3.0 - 2.0 * t))
+	_set_body_visual_scale(s)
+	_set_teleport_glow(1.0 - t)
+	_set_visuals_alpha(lerpf(0.25, 1.0, t))
+
+
+func _teleport_finish() -> void:
+	_set_body_visual_scale(1.0)
+	_set_teleport_glow(0.0)
+	_set_visuals_alpha(1.0)
+	_teleport_base_scales.clear()
+	is_teleporting = false
+	var finished := false
+	var level = get_tree().get_first_node_in_group("level")
+	var id = name.to_int()
+	if level and level.player_stats.has(id):
+		finished = level.player_stats[id]["finished"]
+	can_move = not finished
+	if has_physics_authority():
+		freeze = false
+		sleeping = false
+	respawn_indicator_time = 0.7
+
+
+func _capture_teleport_scales() -> void:
+	_teleport_base_scales.clear()
+	if visuals == null:
+		return
+	for child in visuals.get_children():
+		if child == camera_pivot or child == name_tag or child == blob_shadow or child is Decal or child is AudioStreamPlayer3D or child is AudioStreamPlayer:
+			continue
+		if child is Node3D:
+			_teleport_base_scales[child] = (child as Node3D).scale
+
+
+func _set_body_visual_scale(s: float) -> void:
+	if visuals == null:
+		return
+	if _teleport_base_scales.is_empty():
+		_capture_teleport_scales()
+	var k: float = maxf(s, 0.02)
+	for child in _teleport_base_scales:
+		if not is_instance_valid(child):
+			continue
+		var base: Vector3 = _teleport_base_scales[child]
+		child.scale = base * k
+
+
+func _set_teleport_glow(amount: float) -> void:
+	_set_teleport_glow_recursive(visuals, amount)
+
+
+func _set_teleport_glow_recursive(node: Node, amount: float) -> void:
+	if node is MeshInstance3D:
+		if node == shield_mesh or node == shockwave_visual:
+			pass
+		else:
+			var mat = node.material_override as StandardMaterial3D
+			if not mat:
+				var base_mat = node.get_active_material(0)
+				if base_mat:
+					mat = base_mat.duplicate()
+					node.material_override = mat
+			if mat:
+				if amount > 0.02:
+					mat.emission_enabled = true
+					mat.emission = Color(0.35, 0.85, 1.0)
+					mat.emission_energy_multiplier = lerpf(0.0, 8.0, amount)
+				else:
+					mat.emission_enabled = false
+					mat.emission_energy_multiplier = 1.0
+	for child in node.get_children():
+		_set_teleport_glow_recursive(child, amount)
+
+
+func _burst_teleport_fx(at: Vector3) -> void:
+	if _teleport_fx == null or not is_instance_valid(_teleport_fx):
+		_teleport_fx = CPUParticles3D.new()
+		_teleport_fx.emitting = false
+		_teleport_fx.one_shot = true
+		_teleport_fx.explosiveness = 0.92
+		_teleport_fx.amount = 48
+		_teleport_fx.lifetime = 0.55
+		_teleport_fx.local_coords = false
+		_teleport_fx.direction = Vector3.UP
+		_teleport_fx.spread = 180.0
+		_teleport_fx.initial_velocity_min = 3.0
+		_teleport_fx.initial_velocity_max = 11.0
+		_teleport_fx.gravity = Vector3(0, 2.0, 0)
+		_teleport_fx.scale_amount_min = 0.08
+		_teleport_fx.scale_amount_max = 0.22
+		_teleport_fx.color = Color(0.4, 0.9, 1.0, 0.95)
+		var spark_mat := StandardMaterial3D.new()
+		spark_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		spark_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		spark_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		spark_mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		spark_mat.vertex_color_use_as_albedo = true
+		if TELEPORT_SPARK:
+			spark_mat.albedo_texture = TELEPORT_SPARK
+		spark_mat.albedo_color = Color(0.45, 0.9, 1.0, 1.0)
+		var spark_mesh := QuadMesh.new()
+		spark_mesh.size = Vector2(0.22, 0.22)
+		spark_mesh.material = spark_mat
+		_teleport_fx.mesh = spark_mesh
+		add_child(_teleport_fx)
+	_teleport_fx.global_position = at + Vector3.UP * 0.4
+	_teleport_fx.restart()
+	_teleport_fx.emitting = true
+
+
+func _apply_respawn_pose() -> void:
 	is_exploding = false
 	is_drowned = false
 	is_underwater = false
@@ -3056,8 +3280,20 @@ func respawn():
 	_ai_unstuck_dir = 0.0
 	_ai_recovering = false
 	_ai_recover_refresh = 0.0
+	_ai_no_progress_timer = 0.0
+	_ai_progress_sample_pos = global_position
+	_ai_fall_origin = Vector3.ZERO
 	_ai_cached_offset = -1.0
-	_ai_last_ontrack_offset = 0.0
+	# Initialize offset from actual respawn position instead of hardcoded 0
+	var _resp_path = active_path if active_path else track_path
+	if _resp_path == null:
+		var _resp_lvl = get_tree().get_first_node_in_group("level")
+		if _resp_lvl and "track_path" in _resp_lvl:
+			_resp_path = _resp_lvl.track_path
+	if _resp_path and _resp_path.curve:
+		_ai_last_ontrack_offset = _resp_path.curve.get_closest_offset(_resp_path.to_local(global_position))
+	else:
+		_ai_last_ontrack_offset = 0.0
 	ai_lane_offset = 0.0
 	ai_target_lane_offset = 0.0
 	ai_lane_change_timer = randf_range(3.0, 6.0)
@@ -3097,16 +3333,8 @@ func respawn():
 	if name_tag:
 		name_tag.modulate.a = 1.0
 		
-	# Start blinking respawn indicator
-	respawn_indicator_time = 1.5
-	
-	var level = get_tree().get_first_node_in_group("level")
-	var id = name.to_int()
-	var finished = false
-	if level and level.player_stats.has(id):
-		finished = level.player_stats[id]["finished"]
-	
-	can_move = not finished
+	respawn_indicator_time = 0.0
+	can_move = false
 	is_boosting = false
 	is_pad_boosting = false
 	boost_time = 0.0
@@ -3144,8 +3372,8 @@ func respawn():
 
 	var has_physics_authority = has_physics_authority()
 	if has_physics_authority:
-		# Eagle grab leaves freeze=true + unlocked angular axes; always restore drive state
-		freeze = false
+		# Stay frozen until the grow animation finishes, then drop in.
+		freeze = true
 		sleeping = false
 		axis_lock_angular_x = true
 		axis_lock_angular_y = true
@@ -3153,48 +3381,44 @@ func respawn():
 		linear_velocity = Vector3.ZERO
 		angular_velocity = Vector3.ZERO
 		visual_offset_y = 0.0
-		
-		# Reset server sync state to zero
 		sync_velocity = Vector3.ZERO
 
-		var target_path = active_path
-		if target_path == null:
-			target_path = track_path
-		if target_path == null:
-			var lvl = get_tree().get_first_node_in_group("level")
-			if lvl and "track_path" in lvl:
-				target_path = lvl.track_path
+	var target_path = active_path
+	if target_path == null:
+		target_path = track_path
+	if target_path == null:
+		var lvl = get_tree().get_first_node_in_group("level")
+		if lvl and "track_path" in lvl:
+			target_path = lvl.track_path
 
-		var spawn_pos = last_checkpoint_transform.origin
-		var forward_dir = -last_checkpoint_transform.basis.z.normalized() # fallback
+	var spawn_pos = last_checkpoint_transform.origin
+	var forward_dir = -last_checkpoint_transform.basis.z.normalized() # fallback
 
-		if target_path:
-			var curve = target_path.curve
-			var local_pos = target_path.to_local(spawn_pos)
-			var offset = curve.get_closest_offset(local_pos)
-			
-			var next_offset = fmod(offset + 1.0, curve.get_baked_length())
-			var p1 = curve.sample_baked(offset)
-			var p2 = curve.sample_baked(next_offset)
-			var tangent = (target_path.to_global(p2) - target_path.to_global(p1)).normalized()
-			if tangent.length() > 0.01:
-				forward_dir = tangent
-
-		# Position the spawn 5 meters behind the checkpoint origin along the track tangent, lifted by 1.5m along local up axis to prevent underground clipping
-		var target_basis = Basis.looking_at(forward_dir, Vector3.UP)
-		spawn_pos = spawn_pos - forward_dir * 5.0 + target_basis.y * 1.5
-		global_transform = Transform3D(target_basis, spawn_pos)
-
-		# Force visuals upright — must happen AFTER global_transform is set
-		visuals.global_transform = Transform3D(target_basis, spawn_pos)
-		air_angular_velocity = Vector3.ZERO
-		is_righting_on_ground = false
-
-		sync_position = global_position
-		sync_rotation = visuals.global_rotation
-		sync_rotation_quat = target_basis.get_rotation_quaternion()
+	if target_path:
+		var curve = target_path.curve
+		var local_pos = target_path.to_local(spawn_pos)
+		var offset = curve.get_closest_offset(local_pos)
+		_ai_last_ontrack_offset = offset
 		
-		# Force physics server to flush any stored momentum immediately
+		var next_offset = fmod(offset + 1.0, curve.get_baked_length())
+		var p1 = curve.sample_baked(offset)
+		var p2 = curve.sample_baked(next_offset)
+		var tangent = (target_path.to_global(p2) - target_path.to_global(p1)).normalized()
+		if tangent.length() > 0.01:
+			forward_dir = tangent
+
+	# Behind the gate, lifted so the grow-in can drop onto the road.
+	var target_basis = Basis.looking_at(forward_dir, Vector3.UP)
+	spawn_pos = spawn_pos - forward_dir * 5.0 + target_basis.y * 3.4
+	global_transform = Transform3D(target_basis, spawn_pos)
+	visuals.global_transform = Transform3D(target_basis, spawn_pos)
+	air_angular_velocity = Vector3.ZERO
+	is_righting_on_ground = false
+	sync_position = global_position
+	sync_rotation = visuals.global_rotation
+	sync_rotation_quat = target_basis.get_rotation_quaternion()
+
+	if has_physics_authority:
 		PhysicsServer3D.body_set_state(get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM, global_transform)
 		PhysicsServer3D.body_set_state(get_rid(), PhysicsServer3D.BODY_STATE_LINEAR_VELOCITY, Vector3.ZERO)
 		PhysicsServer3D.body_set_state(get_rid(), PhysicsServer3D.BODY_STATE_ANGULAR_VELOCITY, Vector3.ZERO)
@@ -3524,7 +3748,7 @@ func apply_lightning_slow_multicast():
 @rpc("any_peer", "call_local", "reliable")
 func client_play_lightning(hit_player_names: Array, random_target: Vector3 = Vector3.ZERO):
 	var sound_player = AudioStreamPlayer3D.new()
-	sound_player.stream = load("res://sounds/electric_lightning_a_#1-1782053835008.wav")
+	sound_player.stream = LIGHTNING_SOUND
 	sound_player.pitch_scale = 1.0
 	sound_player.volume_db = -6.0
 	sound_player.bus = &"SFX"
@@ -3767,6 +3991,33 @@ func _setup_blob_shadow():
 		blob_shadow.distance_fade_begin = 50.0
 		blob_shadow.distance_fade_length = 20.0
 		visuals.add_child(blob_shadow)
+
+func _update_blob_shadow() -> void:
+	if not is_instance_valid(blob_shadow) or not blob_shadow.visible or not is_instance_valid(visuals):
+		return
+	var origin: Vector3 = visuals.global_position + Vector3.UP * 0.8
+	var ground_y: float = visuals.global_position.y - 0.65
+	var space = get_world_3d().direct_space_state
+	if space:
+		var q := PhysicsRayQueryParameters3D.create(origin, origin + Vector3.DOWN * 10.0)
+		q.exclude = [get_rid()]
+		q.collision_mask = 1
+		var hit = space.intersect_ray(q)
+		if not hit.is_empty():
+			ground_y = float(hit.position.y)
+	var height: float = clampf(visuals.global_position.y - ground_y, 0.15, 6.0)
+	# Project along world -Y so the blob sits on the ground instead of floating with the chassis.
+	var fwd: Vector3 = -visuals.global_transform.basis.z
+	fwd.y = 0.0
+	if fwd.length_squared() < 0.0001:
+		fwd = Vector3.FORWARD
+	else:
+		fwd = fwd.normalized()
+	var right: Vector3 = Vector3.UP.cross(fwd).normalized()
+	blob_shadow.global_transform = Transform3D(Basis(right, Vector3.UP, -fwd), Vector3(visuals.global_position.x, ground_y + height * 0.5, visuals.global_position.z))
+	blob_shadow.size = Vector3(1.7, maxf(2.4, height + 1.2), 2.7)
+	blob_shadow.upper_fade = 0.08
+	blob_shadow.lower_fade = 0.35
 
 func apply_shadow_setting(enabled: bool = true):
 	if is_instance_valid(visuals):
@@ -4526,28 +4777,62 @@ func _get_ai_input(delta: float) -> Vector2:
 		elif tg_ai and str(tg_ai.get("level_prefix")) == "desert_wadi":
 			_wadi_stage = true
 
-	# Off-road shortcuts only — never follow a duplicated / full-lap path across the map.
-	_ai_try_enter_shortcut()
-
 	var curve = active_path.curve
+	var curve_length = maxf(curve.get_baked_length(), 1.0)
 	var local_pos = active_path.to_local(global_position)
-	
-	# Follow the lap by progressing along the curve. 3D closest-point snaps to the
-	# wrong stacked loop on the mountain and sends cars in circles.
-	var current_offset = _ai_update_progress_offset(active_path, curve, local_pos, delta)
+	var speed = linear_velocity.length()
+	var is_airborne := not was_on_ground or air_time > 0.0
+	var is_start_phase: bool = (Time.get_ticks_msec() / 1000.0 - race_start_time) < 3.2
+
+	# Robust localized offset tracking: searches in a window around _ai_last_ontrack_offset
+	# to prevent snapping to overpass bridges, chasms, or stacked mountain loops.
+	var current_offset: float = _ai_last_ontrack_offset
+	if _ai_recovering:
+		# Frozen offset while in the pit — do not retarget a far stretch of track.
+		current_offset = _ai_last_ontrack_offset
+	elif _ai_last_ontrack_offset < 0.0 or is_start_phase:
+		current_offset = curve.get_closest_offset(local_pos)
+		_ai_last_ontrack_offset = current_offset
+	else:
+		var search_back = 16.0
+		var search_fwd = maxf(38.0, speed * 1.5)
+		var min_d_sq = INF
+		var best_off = current_offset
+		var step = 2.0
+		var num_steps = int((search_back + search_fwd) / step)
+		for s in range(num_steps + 1):
+			var test_off = fmod(_ai_last_ontrack_offset - search_back + s * step + curve_length * 4.0, curve_length)
+			var p = curve.sample_baked(test_off)
+			var d_sq = p.distance_squared_to(local_pos)
+			if d_sq < min_d_sq:
+				min_d_sq = d_sq
+				best_off = test_off
+		
+		if min_d_sq < 900.0:
+			var sample_world: Vector3 = active_path.to_global(curve.sample_baked(best_off))
+			var height_err: float = sample_world.y - global_position.y
+			var xz_err: float = Vector2(global_position.x - sample_world.x, global_position.z - sample_world.z).length()
+			# Don't snap onto a stacked loop / jump road sitting above the pit.
+			if height_err > 7.0 or xz_err > 28.0:
+				current_offset = _ai_last_ontrack_offset
+			else:
+				current_offset = best_off
+				_ai_last_ontrack_offset = current_offset
+		else:
+			current_offset = _ai_last_ontrack_offset
 	
 	# If on an alternative path, check if we've reached the end of it
 	if on_alternative_path:
-		var curve_length = curve.get_baked_length()
 		if curve_length - current_offset < 6.0:
-			_ai_exit_shortcut()
+			on_alternative_path = false
+			active_path = track_path
 			curve = active_path.curve
+			curve_length = maxf(curve.get_baked_length(), 1.0)
 			local_pos = active_path.to_local(global_position)
-			current_offset = _ai_cached_offset
+			current_offset = curve.get_closest_offset(local_pos)
+			_ai_last_ontrack_offset = current_offset
 	
 	var style: float = 0.0 if _harbor_stage else ai_aggression
-	var is_airborne := not was_on_ground or air_time > 0.0
-	var is_start_phase: bool = (Time.get_ticks_msec() / 1000.0 - race_start_time) < 3.2
 
 	# Evaluate traffic (overtaking, drafting, side-by-side cushion, tailgating modulation)
 	var fwd_3d = -visuals.global_transform.basis.z
@@ -4573,7 +4858,6 @@ func _get_ai_input(delta: float) -> Vector2:
 	if _harbor_stage:
 		ai_lane_offset = clampf(ai_lane_offset, -0.55, 0.55)
 	
-	var speed = linear_velocity.length()
 	var turn_info: Dictionary = _ai_measure_upcoming_turn(curve, current_offset, speed)
 	_ai_upcoming_turn_angle = float(turn_info.get("angle", 0.0))
 	_ai_upcoming_turn_dist = float(turn_info.get("dist", 40.0))
@@ -4584,22 +4868,20 @@ func _get_ai_input(delta: float) -> Vector2:
 	# In a tight nearby bend, aim closer so the car follows the road instead of cutting into walls
 	if corner_factor > lerpf(0.55, 0.78, style) and _ai_upcoming_turn_dist < 16.0:
 		look_ahead = minf(look_ahead, lerpf(11.0, 16.0, style))
-	# Only treat a turn as a hairpin when the sharp bend is CLOSE. Measuring 50m
-	# ahead on the mountain spiral made every corner look like a hairpin.
 	var near_ang: float = float(turn_info.get("near_angle", 0.0))
 	var is_hairpin: bool = near_ang > 1.25
 	if is_hairpin and not _ai_may_overshoot:
 		look_ahead = minf(look_ahead, clampf(_ai_upcoming_turn_dist * 0.55, 8.0, 12.0))
 	if _mountain_stage:
-		# Don't cut across stacked switchbacks
 		look_ahead = minf(look_ahead, 16.0)
 	if _harbor_stage:
 		look_ahead = lerpf(11.0, 15.0, clampf(speed / maxf(max_speed, 1.0), 0.0, 1.0))
 		if corner_factor > 0.45:
 			look_ahead = minf(look_ahead, 12.0)
+	# Follow the ribbon through corners instead of cutting the inside (e.g. chasm start/finish).
+	if corner_factor > 0.28:
+		look_ahead = minf(look_ahead, maxf(8.0, _ai_upcoming_turn_dist * 0.42))
 	var target_offset = current_offset + look_ahead
-	
-	var curve_length = curve.get_baked_length()
 	target_offset = fmod(target_offset, curve_length)
 	
 	var target_local_pos = curve.sample_baked(target_offset)
@@ -4613,22 +4895,21 @@ func _get_ai_input(delta: float) -> Vector2:
 	# Dynamic Racing Line (Out-In-Out Cornering)
 	var racing_line_offset: float = 0.0
 	if not _harbor_stage and not on_alternative_path and not is_start_phase and corner_factor > 0.15:
-		# turn_side: +1.0 for right turn, -1.0 for left turn
 		var turn_side = -_ai_upcoming_turn_dir
 		var max_line_span = clampf(ai_lane_span * 0.9, 1.5, 3.2) * ai_racing_line_weight
 		if _ai_upcoming_turn_dist > 18.0:
-			# Corner entry: position on outside of turn
 			var t_entry = clampf((_ai_upcoming_turn_dist - 18.0) / 20.0, 0.0, 1.0)
 			racing_line_offset = -turn_side * max_line_span * corner_factor * (1.0 - t_entry * 0.3)
 		else:
-			# Apex approach & clipping: dive to inside apex
 			var t_apex = clampf((18.0 - _ai_upcoming_turn_dist) / 18.0, 0.0, 1.0)
 			var entry_target = -turn_side * max_line_span * corner_factor * 0.7
 			var apex_target = turn_side * max_line_span * corner_factor
 			racing_line_offset = lerpf(entry_target, apex_target, t_apex)
 
 	var combined_offset = ai_lane_offset + racing_line_offset
-	var max_safe_span: float = 1.6 if _harbor_stage else (2.0 if _mountain_stage else 4.8)
+	var max_safe_span: float = 1.6 if _harbor_stage else (2.0 if _mountain_stage else 3.2)
+	if corner_factor > 0.4:
+		max_safe_span = minf(max_safe_span, 2.2)
 	var actual_lane_offset = clampf(combined_offset, -max_safe_span, max_safe_span)
 
 	if is_finished_race:
@@ -4642,7 +4923,6 @@ func _get_ai_input(delta: float) -> Vector2:
 	elif _harbor_stage:
 		actual_lane_offset = clampf(actual_lane_offset * 0.35, -0.55, 0.55)
 	
-	# When approaching steep elevation changes (dunes/jumps/crests), center lane offset for straight takeoff
 	var p_now = curve.sample_baked(current_offset)
 	var p_ahead = curve.sample_baked(fmod(current_offset + 8.0, curve_length))
 	var elev_delta = absf(p_ahead.y - p_now.y)
@@ -4656,9 +4936,19 @@ func _get_ai_input(delta: float) -> Vector2:
 	
 	var target_global_pos = active_path.to_global(target_local_pos)
 	if _ai_recovering:
-		target_global_pos = _ai_recover_goal
+		# Aim toward the next correct checkpoint, blended with a curve-adjacent point.
+		var cp_goal: Vector3 = _ai_checkpoint_recovery_goal()
+		var alongside_goal: Vector3 = _ai_alongside_goal()
+		if cp_goal != Vector3.ZERO and alongside_goal != Vector3.ZERO:
+			# Blend: mostly aim at the checkpoint gate, but avoid walls via alongside.
+			target_global_pos = alongside_goal.lerp(cp_goal, 0.45)
+		elif cp_goal != Vector3.ZERO:
+			target_global_pos = cp_goal
+		elif alongside_goal != Vector3.ZERO:
+			target_global_pos = alongside_goal
+		# else: keep the default track-following target
 
-	# Item Box Seeking: If bot has open item slot, find closest active box ahead and steer towards it
+	# Item Box Seeking
 	var wants_item := (current_item == ItemType.NONE or current_item_2 == ItemType.NONE) and not is_finished_race and (not is_offroad or _wadi_stage) and not _ai_recovering
 	if wants_item:
 		var best_box: Node3D = null
@@ -4670,7 +4960,7 @@ func _get_ai_input(delta: float) -> Vector2:
 			var fwd_dist = fwd_3d.dot(to_box)
 			if fwd_dist > 4.0 and fwd_dist < best_dist:
 				var side_dist = absf(visuals.global_transform.basis.x.dot(to_box))
-				if side_dist < 6.5: # within track width
+				if side_dist < 6.5:
 					best_dist = fwd_dist
 					best_box = box
 		if best_box:
@@ -4683,10 +4973,9 @@ func _get_ai_input(delta: float) -> Vector2:
 	input.x = clamp(dir_flat.x * (1.8 if is_airborne else 2.2), -1.0, 1.0)
 	if is_finished_race:
 		_ai_want_drift = false
-		# Smoothly brake to a complete halt and stop the car
 		if speed > 0.5:
 			input.x = clamp(dir_flat.x * 1.5, -0.6, 0.6)
-			input.y = 0.95 # brake hard
+			input.y = 0.95
 		else:
 			input.x = 0.0
 			input.y = 0.0
@@ -4699,10 +4988,7 @@ func _get_ai_input(delta: float) -> Vector2:
 		var safe_speed: float = lerpf(max_speed, max_speed * min_corner_speed, corner_factor)
 		var brake_window: float = (34.0 if _harbor_stage else lerpf(26.0, 12.0, style)) + ai_brake_dist_bias
 		brake_window = maxf(brake_window, 8.0)
-		if _ai_recovering:
-			input.y = -1.0
-			_ai_want_drift = false
-		elif is_hairpin and not _ai_may_overshoot:
+		if is_hairpin and not _ai_may_overshoot:
 			min_corner_speed = minf(min_corner_speed, 0.34)
 			safe_speed = lerpf(max_speed, max_speed * min_corner_speed, corner_factor)
 			brake_window = maxf(brake_window, 30.0)
@@ -4713,23 +4999,21 @@ func _get_ai_input(delta: float) -> Vector2:
 		var react_corner: float = 0.16 if _harbor_stage else lerpf(0.16, 0.48, style)
 		if is_hairpin and not _ai_may_overshoot:
 			react_corner = minf(react_corner, 0.14)
-		if (not _ai_recovering) and _ai_upcoming_turn_dist < brake_window and corner_factor > react_corner:
+		if _ai_upcoming_turn_dist < brake_window and corner_factor > react_corner:
 			var t_dist = clampf((brake_window - _ai_upcoming_turn_dist) / maxf(brake_window - 6.0, 1.0), 0.0, 1.0)
 			var target_corner_speed = lerpf(max_speed, safe_speed, t_dist)
 			
 			if speed > target_corner_speed + 1.0:
 				var overspeed = speed - target_corner_speed
-				input.y = clampf(overspeed / 6.5, 0.15, 0.85) # Continuous proportional braking
+				input.y = clampf(overspeed / 6.5, 0.15, 0.85)
 				
 				# Drift decision
 				if (not _harbor_stage) and (not is_hairpin or _ai_may_overshoot) and speed > 11.0 and corner_factor > ai_drift_threshold and abs(input.x) > 0.24 and _ai_upcoming_turn_dist < 22.0:
 					_ai_want_drift = true
 					input.y = maxf(input.y, 0.40)
 			else:
-				# Smooth throttle through corner
 				input.y = -clampf(1.0 - (corner_factor * 0.22), 0.65, 1.0)
 		else:
-			# Straight / open road
 			input.y = -1.0 + abs(input.x) * 0.18
 			var th_mult = float(traffic_info.get("throttle_mult", 1.0))
 			if th_mult < 1.0:
@@ -4737,67 +5021,71 @@ func _get_ai_input(delta: float) -> Vector2:
 
 		if _harbor_stage:
 			_ai_want_drift = false
-			# Keep some throttle through the corner so they don't stall and reverse-unstick.
 			if input.y > 0.55:
 				input.y = 0.55
 		
-		# Prevent braking from putting the car into reverse gear during forward racing
 		if speed < 4.0 and input.y > -0.2:
 			input.y = -0.80
+
+		if _ai_recovering:
+			_ai_want_drift = false
+			input.y = -1.0
 	
-	# 5-Ray Obstacle Avoidance
+	# 9-Ray Obstacle Avoidance — rocks/props/vegetation/barriers
 	var space_state = get_world_3d().direct_space_state
 	var target_avoid_force: float = float(traffic_info.get("cushion_force", 0.0))
+	var fwd_dir = -visuals.global_transform.basis.z
+	var right_dir = visuals.global_transform.basis.x
+	var _prop_directly_ahead: bool = false
+	var _closest_obstacle_side: float = 0.0  # -1 left, +1 right
+	var closest_prop_dist: float = 99.0
 	if space_state:
-		var fwd_dir = -visuals.global_transform.basis.z
-		var right_dir = visuals.global_transform.basis.x
 		var my_pos = global_position + visuals.global_transform.basis.y * 0.32
 		var low_pos = global_position + visuals.global_transform.basis.y * 0.16
-		
-		# Center + flanks, plus a low bumper ray that catches small on-road rocks.
+		var bumper_pos = global_position + visuals.global_transform.basis.y * 0.25 + fwd_dir * 0.5
 		var rays = [
-			{"start": my_pos, "end": my_pos + fwd_dir * 16.0, "weight": 1.2, "side": 0.0},
-			{"start": low_pos, "end": low_pos + fwd_dir * 8.0, "weight": 1.35, "side": 0.0},
-			{"start": my_pos, "end": my_pos + (fwd_dir - right_dir * 0.40).normalized() * 12.0, "weight": 1.0, "side": -1.0},
-			{"start": my_pos, "end": my_pos + (fwd_dir + right_dir * 0.40).normalized() * 12.0, "weight": 1.0, "side": 1.0},
-			{"start": my_pos, "end": my_pos + (fwd_dir - right_dir * 0.80).normalized() * 9.0, "weight": 0.75, "side": -1.0},
-			{"start": my_pos, "end": my_pos + (fwd_dir + right_dir * 0.80).normalized() * 9.0, "weight": 0.75, "side": 1.0}
+			# Forward center — long range early detection
+			{"start": my_pos, "end": my_pos + fwd_dir * 22.0, "weight": 1.5, "side": 0.0},
+			# Forward center low — catches low rocks/stumps
+			{"start": low_pos, "end": low_pos + fwd_dir * 12.0, "weight": 1.6, "side": 0.0},
+			# Bumper feeler — point blank obstacle contact
+			{"start": bumper_pos, "end": bumper_pos + fwd_dir * 2.5, "weight": 2.5, "side": 0.0},
+			# Narrow angled — main steering guidance
+			{"start": my_pos, "end": my_pos + (fwd_dir - right_dir * 0.40).normalized() * 16.0, "weight": 1.2, "side": -1.0},
+			{"start": my_pos, "end": my_pos + (fwd_dir + right_dir * 0.40).normalized() * 16.0, "weight": 1.2, "side": 1.0},
+			# Wide angled — peripheral awareness
+			{"start": my_pos, "end": my_pos + (fwd_dir - right_dir * 0.85).normalized() * 11.0, "weight": 0.9, "side": -1.0},
+			{"start": my_pos, "end": my_pos + (fwd_dir + right_dir * 0.85).normalized() * 11.0, "weight": 0.9, "side": 1.0},
+			# Near-side feelers — very close obstacle detection for last-second dodge
+			{"start": my_pos, "end": my_pos + (fwd_dir - right_dir * 1.3).normalized() * 6.0, "weight": 0.7, "side": -1.0},
+			{"start": my_pos, "end": my_pos + (fwd_dir + right_dir * 1.3).normalized() * 6.0, "weight": 0.7, "side": 1.0}
 		]
-		
 		var is_start_grid_phase: bool = (Time.get_ticks_msec() / 1000.0 - race_start_time) < 3.0
 		var obstacle_count = 0
-		var closest_prop_dist: float = 99.0
 		for ray in rays:
 			var query = PhysicsRayQueryParameters3D.create(ray["start"], ray["end"])
 			query.exclude = [self.get_rid()]
-			query.collision_mask = 1 | 4 # Terrain/props and objects
+			query.collision_mask = 1 | 4
 			var result = space_state.intersect_ray(query)
 			if result:
 				var collider = result.collider
 				var is_prop: bool = _is_blocking_prop(collider)
 				var is_other_cart: bool = collider.is_in_group("player_carts") or (collider is RigidBody3D and collider != self)
-				
 				if not is_prop and not is_other_cart:
-					# Floor / road slope: mostly-up normals are drivable ground.
-					if result.normal.y >= 0.55:
+					# Steep placed ramps have normal.y around 0.4–0.6; don't treat them as walls.
+					if result.normal.y >= 0.32:
 						continue
 					if _is_track_surface(collider) or _is_world_terrain_collider(collider):
 						continue
-					var c_name = collider.name.to_lower()
-					var is_pure_surface = c_name.contains("road") or c_name.contains("terrain") or c_name.contains("track") or c_name.contains("unified_world") or c_name.contains("ramp") or c_name.contains("seabed") or c_name.contains("deck") or c_name.contains("dock")
-					if is_pure_surface:
-						continue
-				
 				if is_other_cart and (is_start_grid_phase or speed < 3.0):
-					# On starting grid or low speeds, traffic cushion handles subtle separation; do not swerve off track
 					continue
-				
 				var dist = ray["start"].distance_to(result.position)
 				if is_prop:
 					closest_prop_dist = minf(closest_prop_dist, dist)
-				var max_reach = 16.0 if ray["side"] == 0.0 else 12.0
+					if ray["side"] == 0.0 and dist < 6.5:
+						_prop_directly_ahead = true
+				var max_reach = 22.0 if ray["side"] == 0.0 else 16.0
 				var intensity = clampf(1.0 - (dist / max_reach), 0.15, 1.0) * ray["weight"]
-				
 				if is_other_cart:
 					var side_dir: float = -ray["side"] if ray["side"] != 0.0 else (-signf(dir_flat.x) if absf(dir_flat.x) > 0.05 else (1.0 if ai_overtake_bias >= 0.0 else -1.0))
 					target_avoid_force += side_dir * 0.45 * intensity
@@ -4805,66 +5093,209 @@ func _get_ai_input(delta: float) -> Vector2:
 				else:
 					var side_dir: float
 					if ray["side"] == 0.0:
-						# Steer toward the side with more free space, not blindly toward the racing line
-						# (the line often goes through a rock sitting in the lane).
-						var left_clear := _ai_clearance_ahead(space_state, my_pos + (-right_dir) * 2.4, fwd_dir, 10.0)
-						var right_clear := _ai_clearance_ahead(space_state, my_pos + right_dir * 2.4, fwd_dir, 10.0)
-						if absf(left_clear - right_clear) > 0.6:
+						var left_clear := _ai_clearance_ahead(space_state, my_pos + (-right_dir) * 3.0, fwd_dir, 14.0)
+						var right_clear := _ai_clearance_ahead(space_state, my_pos + right_dir * 3.0, fwd_dir, 14.0)
+						if absf(left_clear - right_clear) > 0.4:
 							side_dir = -1.0 if left_clear > right_clear else 1.0
 						else:
 							var local_hit = visuals.global_transform.inverse() * result.position
 							side_dir = -signf(local_hit.x) if absf(local_hit.x) > 0.08 else (1.0 if ai_overtake_bias >= 0.0 else -1.0)
 					else:
 						side_dir = -ray["side"]
-					var prop_boost: float = 2.4 if is_prop else 1.6
-					target_avoid_force += side_dir * prop_boost * intensity
+					_closest_obstacle_side = side_dir
+					# Much stronger avoidance for close props — exponentially stronger as distance shrinks
+					var base_boost: float = 3.2 if is_prop else 2.0
+					if dist < 5.0 and is_prop:
+						base_boost = lerpf(6.0, 3.2, dist / 5.0)
+					target_avoid_force += side_dir * base_boost * intensity
 					obstacle_count += 1
-		
 		if obstacle_count > 0:
 			if _harbor_stage:
-				target_avoid_force *= 0.25 # gentle dodge on narrow pier
-			if closest_prop_dist < 7.0:
-				# Slow down so the steer has time to clear rocks instead of ramming them.
-				input.y = maxf(input.y, lerpf(0.15, 0.7, clampf(1.0 - closest_prop_dist / 7.0, 0.0, 1.0)))
+				target_avoid_force *= 0.35
+			# Slow down for close obstacles — brake harder the closer they are
+			if closest_prop_dist < 12.0:
+				var brake_t: float = clampf(1.0 - closest_prop_dist / 12.0, 0.0, 1.0)
+				input.y = maxf(input.y, lerpf(0.05, 0.85, brake_t * brake_t))
 		else:
 			target_avoid_force = float(traffic_info.get("cushion_force", 0.0))
 
-	_ai_avoid_force = lerpf(_ai_avoid_force, target_avoid_force, 12.0 * delta)
-	input.x = clampf(input.x + _ai_avoid_force, -1.0, 1.0)
+	_ai_avoid_force = lerpf(_ai_avoid_force, target_avoid_force, 14.0 * delta)
 	
-	# AI Unstuck Recovery Maneuver (only when actively pushing forward but blocked against an obstacle)
-	var blocked_forward: bool = (input.y < -0.2 and speed < 1.2)
-	if _ai_recovering:
-		# Don't reverse-wiggle while trying to rejoin — that is the circling.
-		blocked_forward = false
-	if blocked_forward and can_move and not is_exploding and not is_finished_race:
-		stuck_timer += delta
-		if stuck_timer > 1.2 and _ai_unstuck_dir == 0.0:
+	# If an obstacle is close (< 7m), let avoidance steering dominate over track-seeking
+	if closest_prop_dist < 7.0 and absf(_closest_obstacle_side) > 0.1:
+		var steer_override = _closest_obstacle_side * clampf(2.0 - closest_prop_dist / 4.0, 0.8, 1.0)
+		input.x = clampf(lerpf(input.x, steer_override, 0.75) + _ai_avoid_force * 0.5, -1.0, 1.0)
+	else:
+		input.x = clampf(input.x + _ai_avoid_force, -1.0, 1.0)
+	
+	# ── AI Obstacle Stuck Detection & Recovery ──────────────────────────────────
+	# Detect when the bot is grinding against an obstacle (throttle on but barely moving)
+	var is_actively_reversing: bool = _ai_obstacle_reverse_timer > 0.0
+	var speed_stalling: bool = speed < 2.8 and input.y < -0.15 and not is_finished_race and can_move and not is_exploding
+	var grinding_obstacle: bool = speed_stalling and (closest_prop_dist < 4.5 or _prop_directly_ahead)
+	
+	if is_actively_reversing:
+		# Currently executing the back-off and drive sideways maneuver
+		_ai_obstacle_reverse_timer -= delta
+		if _ai_obstacle_reverse_timer > 0.0:
+			var total_time: float = 1.5
+			var reverse_phase_time: float = 0.8  # First 0.8s: back up with steering
+			var elapsed: float = total_time - _ai_obstacle_reverse_timer
+			if elapsed < reverse_phase_time:
+				# Phase 1: Back off (reverse) while steering nose away from obstacle
+				input.y = 0.85  # reverse throttle
+				# In reverse physics, steering in _ai_obstacle_steer_dir swings the nose away
+				input.x = _ai_obstacle_steer_dir * 0.95
+			else:
+				# Phase 2: Drive sideways & forward to clear the obstacle
+				input.y = -0.9  # forward throttle
+				input.x = _ai_obstacle_steer_dir * 1.0
+			_ai_want_drift = false
+		else:
+			_ai_obstacle_reverse_timer = 0.0
+			_ai_obstacle_stuck_timer = 0.0
+			_ai_speed_stall_timer = 0.0
+	elif grinding_obstacle:
+		_ai_obstacle_stuck_timer += delta
+		# React quickly after 0.4s of grinding against obstacle
+		if _ai_obstacle_stuck_timer > 0.4:
+			# Pick escape direction: check clearance on left vs right side
+			if space_state:
+				var my_pos = global_position + visuals.global_transform.basis.y * 0.32
+				var left_clear := _ai_clearance_ahead(space_state, my_pos + (-right_dir) * 3.5, fwd_dir, 12.0)
+				var right_clear := _ai_clearance_ahead(space_state, my_pos + right_dir * 3.5, fwd_dir, 12.0)
+				if absf(left_clear - right_clear) > 0.5:
+					_ai_obstacle_steer_dir = -1.0 if left_clear > right_clear else 1.0
+				elif absf(_closest_obstacle_side) > 0.1:
+					_ai_obstacle_steer_dir = _closest_obstacle_side
+				elif absf(dir_flat.x) > 0.1:
+					_ai_obstacle_steer_dir = signf(dir_flat.x)
+				else:
+					_ai_obstacle_steer_dir = 1.0 if randf() > 0.5 else -1.0
+			else:
+				_ai_obstacle_steer_dir = _closest_obstacle_side if absf(_closest_obstacle_side) > 0.1 else 1.0
+			
+			_ai_obstacle_reverse_timer = 1.5
+			_ai_obstacle_stuck_timer = 0.0
+	else:
+		# Not grinding — decay the stuck timer
+		if speed > 4.0:
+			_ai_obstacle_stuck_timer = 0.0
+		else:
+			_ai_obstacle_stuck_timer = maxf(_ai_obstacle_stuck_timer - delta * 2.0, 0.0)
+
+	# Speed stall fallback: if speed stays very low for a while (stuck on geometry the rays don't see)
+	if speed < 1.5 and input.y < -0.1 and can_move and not is_exploding and not is_finished_race and not is_actively_reversing:
+		_ai_speed_stall_timer += delta
+		if _ai_speed_stall_timer > 0.6 and _ai_unstuck_dir == 0.0:
 			_ai_unstuck_dir = signf(dir_flat.x) if absf(dir_flat.x) > 0.1 else (1.0 if randf() > 0.5 else -1.0)
-		
-		if stuck_timer > 3.6:
-			# Failed to unstick after 3.6s: respawn
-			stuck_timer = 0.0
+		if _ai_speed_stall_timer > 3.8:
+			# Really stuck — respawn
+			_ai_speed_stall_timer = 0.0
 			_ai_unstuck_dir = 0.0
+			stuck_timer = 0.0
 			if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 				respawn_rpc.rpc()
 			else:
 				respawn()
-		elif stuck_timer > 2.2:
-			# Phase 2: Forward drive with steer towards track
-			input.y = -1.0
-			input.x = _ai_unstuck_dir * 0.8
-		elif stuck_timer > 1.2:
-			# Phase 1: Short reverse with slight angle to clear obstacle bumper
-			input.y = 1.0 # Reverse
-			var wiggle = sin(stuck_timer * 8.0) * 0.3
-			input.x = clampf(-_ai_unstuck_dir * 0.6 + wiggle, -0.8, 0.8)
+		elif _ai_speed_stall_timer > 1.6:
+			# Reverse with steering
+			input.y = 0.75
+			input.x = _ai_unstuck_dir * 0.9
+		elif _ai_speed_stall_timer > 0.6:
+			# Brake then reverse gently
+			input.y = 0.95
+			input.x = clampf(-_ai_unstuck_dir * 0.6, -0.8, 0.8)
 	else:
-		if speed >= 2.0 or not blocked_forward:
-			stuck_timer = 0.0
+		if speed >= 3.0:
+			_ai_speed_stall_timer = 0.0
 			_ai_unstuck_dir = 0.0
+			stuck_timer = 0.0
 
 	return input
+
+
+func _ai_alongside_goal() -> Vector3:
+	# Aim at the next stretch of tarmac that is actually at our height (the landing),
+	# not the jump heading — that points into the hills.
+	# Biased toward the next checkpoint offset when recovering.
+	if track_path == null or track_path.curve == null:
+		return global_position
+	var curve: Curve3D = track_path.curve
+	var length: float = maxf(curve.get_baked_length(), 1.0)
+	var start: float = _ai_last_ontrack_offset
+
+	# Bias the search toward the next checkpoint's curve offset
+	var next_cp_off: float = -1.0
+	var lvl_ag: Node = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
+	if lvl_ag and "cp_offsets" in lvl_ag and "player_stats" in lvl_ag:
+		var my_id: int = name.to_int()
+		if lvl_ag.player_stats.has(my_id):
+			var ncp: int = int(lvl_ag.player_stats[my_id]["next_checkpoint_idx"])
+			if ncp >= 0 and ncp < lvl_ag.cp_offsets.size():
+				next_cp_off = float(lvl_ag.cp_offsets[ncp])
+
+	var best: Vector3 = Vector3.ZERO
+	var best_score: float = INF
+	var d: float = 8.0
+	while d <= 100.0:
+		var sample_off: float = fmod(start + d, length)
+		var p: Vector3 = track_path.to_global(curve.sample_baked(sample_off))
+		var dy: float = p.y - global_position.y
+		if dy > 6.0:
+			d += 6.0
+			continue
+		var xz: float = Vector2(global_position.x - p.x, global_position.z - p.z).length()
+		if xz > 55.0:
+			d += 6.0
+			continue
+		var score: float = xz + maxf(dy, 0.0) * 2.0
+		# Bonus for being close to the next checkpoint's curve offset
+		if next_cp_off >= 0.0:
+			var cp_dist: float = absf(sample_off - next_cp_off)
+			if cp_dist > length * 0.5:
+				cp_dist = length - cp_dist  # wrap distance
+			score += cp_dist * 0.08  # favor points near the checkpoint
+		if score < best_score:
+			best_score = score
+			best = p
+		d += 6.0
+	if best != Vector3.ZERO:
+		var to: Vector3 = best - global_position
+		to.y = 0.0
+		var space = get_world_3d().direct_space_state
+		if space and to.length() > 1.5:
+			var origin: Vector3 = global_position + Vector3.UP * 0.7
+			var q := PhysicsRayQueryParameters3D.create(origin, origin + to.normalized() * minf(to.length(), 8.0))
+			q.exclude = [get_rid()]
+			q.collision_mask = 1 | 4
+			var hit = space.intersect_ray(q)
+			if not hit.is_empty() and float(hit.normal.y) < 0.45:
+				# Bank in the way: stay put / creep along our current heading, don't climb the wall.
+				return global_position + (-visuals.global_transform.basis.z) * 4.0
+		return best
+	# No reachable tarmac nearby — don't invent a heading into the desert.
+	return global_position
+
+
+## Returns the world-space position of the next expected checkpoint gate.
+## Used during recovery so the bot navigates toward the correct gate.
+func _ai_checkpoint_recovery_goal() -> Vector3:
+	var lvl: Node = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
+	if lvl == null:
+		return Vector3.ZERO
+	if not ("checkpoints" in lvl and "player_stats" in lvl):
+		return Vector3.ZERO
+	var my_id: int = name.to_int()
+	if not lvl.player_stats.has(my_id):
+		return Vector3.ZERO
+	var next_idx: int = int(lvl.player_stats[my_id]["next_checkpoint_idx"])
+	if next_idx < 0 or next_idx >= lvl.checkpoints.size():
+		return Vector3.ZERO
+	var cp: Node3D = lvl.checkpoints[next_idx]
+	if cp == null or not is_instance_valid(cp):
+		return Vector3.ZERO
+	return cp.global_position
 
 
 func _ai_clearance_ahead(space_state: PhysicsDirectSpaceState3D, origin: Vector3, fwd: Vector3, reach: float) -> float:
@@ -4880,176 +5311,52 @@ func _ai_clearance_ahead(space_state: PhysicsDirectSpaceState3D, origin: Vector3
 	return reach
 
 
-func _ai_try_enter_shortcut() -> void:
-	if _harbor_stage or track_path == null or track_path.curve == null:
-		return
-	if on_alternative_path:
-		if active_path and active_path.curve:
-			var bad_len: float = active_path.curve.get_baked_length()
-			var main_len_now: float = maxf(track_path.curve.get_baked_length(), 1.0)
-			if bad_len > minf(280.0, main_len_now * 0.28):
-				_ai_exit_shortcut()
-		return
-	var main_len: float = maxf(track_path.curve.get_baked_length(), 1.0)
-	var main_off: float = _ai_cached_offset if _ai_cached_offset >= 0.0 else 0.0
-	var main_pt: Vector3 = track_path.to_global(track_path.curve.sample_baked(main_off))
-	for alt_path in alternative_paths:
-		if not is_instance_valid(alt_path) or alt_path.curve == null:
-			continue
-		var alt_curve: Curve3D = alt_path.curve
-		if alt_curve.point_count < 2:
-			continue
-		var alt_len: float = alt_curve.get_baked_length()
-		# Must be a short cut, not a copy of the whole lap.
-		if alt_len < 8.0 or alt_len > minf(280.0, main_len * 0.28):
-			continue
-		var start_global: Vector3 = alt_path.to_global(alt_curve.get_point_position(0))
-		var dist_car: float = global_position.distance_to(start_global)
-		if dist_car > 12.0:
-			if dist_car > 28.0:
-				alt_path_decisions.erase(alt_path)
-			continue
-		# Entrance has to sit on the racing line we're actually on this lap.
-		if start_global.distance_to(main_pt) > 16.0:
-			continue
-		if not alt_path_decisions.has(alt_path):
-			var take_shortcut: bool = randf() < ai_shortcut_chance
-			alt_path_decisions[alt_path] = take_shortcut
-			if take_shortcut:
-				on_alternative_path = true
-				active_path = alt_path
-				_ai_recovering = false
-				_ai_cached_offset = alt_curve.get_closest_offset(alt_path.to_local(global_position))
-				return
-
-
-func _ai_exit_shortcut() -> void:
-	on_alternative_path = false
-	active_path = track_path
-	_ai_recovering = false
-	if track_path == null or track_path.curve == null:
-		_ai_cached_offset = -1.0
-		return
-	var curve: Curve3D = track_path.curve
-	var closest: float = curve.get_closest_offset(track_path.to_local(global_position))
-	var pt: Vector3 = track_path.to_global(curve.sample_baked(closest))
-	var xz: float = Vector2(global_position.x - pt.x, global_position.z - pt.z).length()
-	if xz < 40.0 and absf(pt.y - global_position.y) < 6.0:
-		_ai_cached_offset = closest
-		_ai_last_ontrack_offset = closest
-	else:
-		_ai_cached_offset = _ai_last_ontrack_offset
-
-
-func _ai_update_progress_offset(path: Path3D, curve: Curve3D, local_pos: Vector3, delta: float) -> float:
-	var length: float = maxf(curve.get_baked_length(), 1.0)
-	var closest: float = curve.get_closest_offset(local_pos)
-	if _ai_cached_offset < 0.0:
-		_ai_cached_offset = closest
-		_ai_last_ontrack_offset = closest
-		return closest
-
-	var p0: Vector3 = path.to_global(curve.sample_baked(_ai_cached_offset))
-	var p1: Vector3 = path.to_global(curve.sample_baked(fmod(_ai_cached_offset + 1.5, length)))
-	var tangent: Vector3 = p1 - p0
-	tangent.y = 0.0
-	var along: float = linear_velocity.length()
-	if tangent.length_squared() > 1e-6:
-		along = linear_velocity.dot(tangent.normalized())
-	if _ai_recovering:
-		along = 0.0
-	along = clampf(along, -4.0, 80.0)
-	var expected: float = fmod(_ai_cached_offset + along * delta, length)
-	if expected < 0.0:
-		expected += length
-
-	var d: float = absf(closest - expected)
-	d = minf(d, length - d)
-	var closest_pt: Vector3 = path.to_global(curve.sample_baked(closest))
-	var height_err: float = absf(closest_pt.y - global_position.y)
-	var xz: float = Vector2(global_position.x - closest_pt.x, global_position.z - closest_pt.z).length()
-	# Snap only onto the same stretch of tarmac — reject the stacked loop above/below.
-	if d < 28.0 and height_err < 3.5 and xz < 16.0:
-		_ai_cached_offset = closest
-	else:
-		_ai_cached_offset = expected
-	return _ai_cached_offset
-
-
-func _ai_pick_recover_goal() -> Vector3:
-	# Walk FORWARD along the racing line from where we left it, pick the first
-	# tarmac we can actually drive onto. Never reverse uphill, never bee-line to a CP.
-	var path: Path3D = track_path
-	if path == null or path.curve == null:
-		return global_position
-	var curve: Curve3D = path.curve
-	var length: float = maxf(curve.get_baked_length(), 1.0)
-	var start: float = _ai_last_ontrack_offset
-	if _ai_cached_offset >= 0.0:
-		start = _ai_cached_offset
-	var d: float = 10.0
-	var d_end: float = minf(length * 0.4, 360.0)
-	var fallback: Vector3 = path.to_global(curve.sample_baked(fmod(start + 30.0, length)))
-	while d < d_end:
-		var p: Vector3 = path.to_global(curve.sample_baked(fmod(start + d, length)))
-		if p.y <= global_position.y + 2.8:
-			return p
-		d += 8.0
-	return fallback
-
-
-func _ai_find_rejoin_offset(start: float) -> float:
-	if track_path == null or track_path.curve == null:
-		return -1.0
-	var curve: Curve3D = track_path.curve
-	var length: float = maxf(curve.get_baked_length(), 1.0)
-	var d: float = 0.0
-	while d < minf(length * 0.4, 360.0):
-		var o: float = fmod(start + d, length)
-		var p: Vector3 = track_path.to_global(curve.sample_baked(o))
-		var xz: float = Vector2(global_position.x - p.x, global_position.z - p.z).length()
-		if xz < 12.0 and absf(p.y - global_position.y) < 3.2:
-			return o
-		d += 8.0
-	return -1.0
-
-
-func _ai_update_recovery(delta: float, current_offset: float) -> void:
-	if is_finished_race or on_alternative_path or _harbor_stage or track_path == null or track_path.curve == null:
+func _ai_update_recovery(_delta: float, current_offset: float) -> void:
+	if is_finished_race or on_alternative_path or track_path == null or track_path.curve == null:
 		_ai_recovering = false
 		return
 	var track_pt: Vector3 = track_path.to_global(track_path.curve.sample_baked(current_offset))
 	var height_below: float = track_pt.y - global_position.y
 	var dist_xz: float = Vector2(global_position.x - track_pt.x, global_position.z - track_pt.z).length()
 
-	# Still on the intended racing line (progress sample, not 3D closest).
-	if dist_xz < 14.0 and height_below < 5.0 and height_below > -8.0:
+	# Per-stage thresholds: narrow tracks detect off-track sooner
+	var xz_ok_thresh: float = 10.0
+	var height_ok_thresh: float = 4.0
+	var fall_height_thresh: float = 6.0
+	var fall_xz_thresh: float = 12.0
+	if _harbor_stage:
+		xz_ok_thresh = 7.0
+		height_ok_thresh = 3.0
+		fall_height_thresh = 4.0
+		fall_xz_thresh = 8.0
+	elif _wadi_stage:
+		# Wide open desert — be more lenient
+		xz_ok_thresh = 14.0
+		height_ok_thresh = 6.0
+		fall_height_thresh = 10.0
+		fall_xz_thresh = 18.0
+	elif _mountain_stage:
+		xz_ok_thresh = 9.0
+		height_ok_thresh = 4.0
+		fall_height_thresh = 7.0
+		fall_xz_thresh = 12.0
+
+	if dist_xz < xz_ok_thresh and height_below < height_ok_thresh:
 		_ai_last_ontrack_offset = current_offset
 		_ai_recovering = false
 		return
 
-	# After a fall: snap onto later tarmac at our height (valley descent, not the uphill).
-	if _ai_recovering:
-		var rejoin: float = _ai_find_rejoin_offset(current_offset)
-		if rejoin >= 0.0:
-			_ai_cached_offset = rejoin
-			_ai_last_ontrack_offset = rejoin
-			_ai_recovering = false
-			return
-
-	var fallen: bool = dist_xz > 18.0 or height_below > 8.0
+	# Trigger recovery if fallen off (height drop) or strayed too far laterally
+	var fallen: bool = (height_below > fall_height_thresh and (is_offroad or air_time > 0.8 or dist_xz > fall_xz_thresh)) \
+		or (dist_xz > fall_xz_thresh * 1.5 and is_offroad)
 	if not fallen:
+		_ai_recovering = false
 		return
 	if not _ai_recovering:
-		_ai_recovering = true
-		_ai_recover_goal = _ai_pick_recover_goal()
-		_ai_recover_refresh = 2.8
-		return
-	_ai_recover_refresh -= delta
-	var goal_xz: float = Vector2(global_position.x - _ai_recover_goal.x, global_position.z - _ai_recover_goal.z).length()
-	if _ai_recover_refresh <= 0.0 or goal_xz < 7.0:
-		_ai_recover_goal = _ai_pick_recover_goal()
-		_ai_recover_refresh = 2.8
+		_ai_progress_sample_pos = global_position
+		_ai_no_progress_timer = 0.0
+		_ai_fall_origin = global_position
+	_ai_recovering = true
 
 
 func _ai_measure_upcoming_turn(curve: Curve3D, offset: float, speed: float) -> Dictionary:

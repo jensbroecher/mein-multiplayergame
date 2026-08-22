@@ -64,6 +64,22 @@ var inactive_player: AudioStreamPlayer
 var fps_layer: CanvasLayer
 var fps_label: Label
 
+## Cached SFX streams so mid-race play() doesn't hitch on HDD load().
+var _sfx_cache: Dictionary = {}
+const SFX_PRELOAD_PATHS: PackedStringArray = [
+	"res://sounds/checkpoint.mp3",
+	"res://sounds/finish.mp3",
+	"res://sounds/1.mp3",
+	"res://sounds/2.mp3",
+	"res://sounds/3.mp3",
+	"res://sounds/Go.mp3",
+	"res://sounds/crash.mp3",
+	"res://sounds/electric_lightning_a_#1-1782053835008.wav",
+	"res://sounds/stereogenicstudio-swish-swoosh-woosh-sfx-47-357152.mp3",
+	"res://sounds/game_bonus_collected_#3-1781737105214.wav",
+	"res://sounds/force_field_effect_#1-1781728246336.wav",
+]
+
 func _ensure_audio_buses():
 	# Ensure "Music" bus exists
 	if AudioServer.get_bus_index("Music") == -1:
@@ -145,6 +161,7 @@ func _ready():
 	
 	fps_layer.visible = show_fps
 	set_process(show_fps)
+	_preload_sfx()
 
 func _process(_delta):
 	if fps_label:
@@ -982,13 +999,26 @@ func stop_music():
 	if inactive_player:
 		inactive_player.stop()
 
+func _preload_sfx() -> void:
+	for path in SFX_PRELOAD_PATHS:
+		_cached_sfx(path)
+
+
+func _cached_sfx(path: String) -> AudioStream:
+	if _sfx_cache.has(path):
+		return _sfx_cache[path]
+	var stream: AudioStream = load(path)
+	_sfx_cache[path] = stream
+	return stream
+
+
 func play_sfx(stream_or_path: Variant, volume_db: float = 0.0, pitch_scale: float = 1.0):
 	var ap = AudioStreamPlayer.new()
 	ap.bus = &"SFX"
 	ap.volume_db = volume_db
 	ap.pitch_scale = pitch_scale
 	if stream_or_path is String:
-		ap.stream = load(stream_or_path)
+		ap.stream = _cached_sfx(stream_or_path)
 	else:
 		ap.stream = stream_or_path
 	add_child(ap)

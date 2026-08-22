@@ -286,6 +286,9 @@ properties/11/replication_mode = 1
 properties/12/path = NodePath(".:current_item_2")
 properties/12/spawn = true
 properties/12/replication_mode = 1
+properties/13/path = NodePath(".:race_place")
+properties/13/spawn = true
+properties/13/replication_mode = 1
 
 [node name="PlayerCart" type="RigidBody3D" unique_id=1637232811]
 mass = 1200.0

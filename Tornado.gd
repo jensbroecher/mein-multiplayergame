@@ -22,7 +22,7 @@ extends Node3D
 @export var spin_orbit_speed: float = 5.5
 @export var spit_speed: float = 38.0
 @export var spit_up_speed: float = 16.0
-@export var cooldown_after_spit: float = 1.2
+@export var cooldown_after_spit: float = 18.0
 
 var _mesh: Node3D
 var _home: Vector3

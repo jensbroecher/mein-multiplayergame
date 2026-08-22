@@ -52,6 +52,10 @@ func _process(delta: float) -> void:
 @onready var end_panel = $EndPanel
 @onready var end_timer_label = $EndPanel/VBoxContainer/LabelTimer
 
+var standings_panel: PanelContainer
+var standings_list: VBoxContainer
+var _standings_sig: String = ""
+
 signal ready_pressed(is_ready: bool)
 signal start_pressed()
 
@@ -79,6 +83,7 @@ var local_ready = false
 func _ready():
 	_init_styleboxes()
 	_setup_lap_settings()
+	_setup_standings_list()
 	
 	NetworkManager.max_laps_changed.connect(_on_network_max_laps_changed)
 	
@@ -188,6 +193,92 @@ func update_hud(pos: int, total: int, lap: int, max_laps: int):
 	label_pos.text = "%d" % pos
 	label_pos_total.text = "/ %d" % total
 	label_lap.text = "Lap: %d/%d" % [lap, max_laps]
+
+func _setup_standings_list() -> void:
+	if hud_panel == null:
+		return
+	standings_panel = PanelContainer.new()
+	standings_panel.name = "StandingsPanel"
+	standings_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	standings_panel.position = Vector2(16, 126)
+	standings_panel.custom_minimum_size = Vector2(196, 0)
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.04, 0.05, 0.07, 0.58)
+	style.border_color = Color(0.0, 0.8, 1.0, 0.28)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(8)
+	style.content_margin_left = 8
+	style.content_margin_right = 10
+	style.content_margin_top = 6
+	style.content_margin_bottom = 6
+	standings_panel.add_theme_stylebox_override("panel", style)
+
+	standings_list = VBoxContainer.new()
+	standings_list.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	standings_list.add_theme_constant_override("separation", 1)
+	standings_panel.add_child(standings_list)
+	hud_panel.add_child(standings_panel)
+
+func update_standings(rows: Array, highlight_id: int = 0) -> void:
+	if standings_list == null:
+		return
+	var sig := "%d|" % highlight_id
+	for r in rows:
+		sig += "%s:%s:%s|" % [str(r.get("pos", 0)), str(r.get("name", "")), str(r.get("finished", false))]
+	if sig == _standings_sig:
+		return
+	_standings_sig = sig
+
+	var needed: int = rows.size()
+	while standings_list.get_child_count() > needed:
+		var extra = standings_list.get_child(standings_list.get_child_count() - 1)
+		standings_list.remove_child(extra)
+		extra.queue_free()
+	while standings_list.get_child_count() < needed:
+		standings_list.add_child(_make_standings_row())
+
+	for i in range(needed):
+		var r: Dictionary = rows[i]
+		var row: HBoxContainer = standings_list.get_child(i)
+		var pos_lbl: Label = row.get_child(0)
+		var name_lbl: Label = row.get_child(1)
+		var place: int = int(r.get("pos", i + 1))
+		var r_name: String = str(r.get("name", "Racer"))
+		if r_name.length() > 14:
+			r_name = r_name.substr(0, 13) + "."
+		pos_lbl.text = str(place)
+		name_lbl.text = r_name
+
+		var is_you: bool = int(r.get("id", 0)) == highlight_id
+		var finished: bool = bool(r.get("finished", false))
+		var col := Color(0.92, 0.94, 0.96, 0.92)
+		if is_you:
+			col = Color(1.0, 0.82, 0.2, 1.0)
+		elif finished:
+			col = Color(0.7, 0.78, 0.82, 0.7)
+		elif place == 1:
+			col = Color(0.55, 0.92, 1.0, 0.95)
+		pos_lbl.modulate = col
+		name_lbl.modulate = col
+
+func _make_standings_row() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 6)
+
+	var pos_lbl := Label.new()
+	pos_lbl.custom_minimum_size = Vector2(22, 0)
+	pos_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	pos_lbl.add_theme_font_size_override("font_size", 14)
+	row.add_child(pos_lbl)
+
+	var name_lbl := Label.new()
+	name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_lbl.add_theme_font_size_override("font_size", 14)
+	name_lbl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	row.add_child(name_lbl)
+	return row
 
 func show_message(msg: String, duration: float = 0.0):
 	label_msg.text = msg

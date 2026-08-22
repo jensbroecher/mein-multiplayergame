@@ -77,6 +77,7 @@ var _split_cameras: Array = []  # SubViewport cameras for splitscreen
 var spectator_camera: Node3D = null
 var player_stats = {} # id -> {"laps": 0, "next_checkpoint_idx": 0, "finished": false, "pos": 0}
 var end_timer = 0.0
+var next_finish_pos: int = 1
 
 var cp_offsets: Array[float] = []
 var track_length: float = 0.0
@@ -207,6 +208,13 @@ func _load_spawn_points():
 
 func _setup_checkpoints():
 	# Rebuild checkpoints list from scene tree to prevent inspector array desync
+	var fl = get_node_or_null("FinishLine")
+	var fl_off = 0.0
+	if track_path and track_path.curve:
+		track_length = track_path.curve.get_baked_length()
+		if fl:
+			fl_off = track_path.curve.get_closest_offset(track_path.to_local(fl.global_position))
+
 	var cp_container = get_node_or_null("Checkpoints")
 	if cp_container:
 		checkpoints.clear()
@@ -215,21 +223,22 @@ func _setup_checkpoints():
 			if child is Area3D:
 				container_cps.append(child)
 
-		# Sort checkpoints dynamically based on their distance along the track curve
-		if track_path:
+		# Race order: distance along the curve starting at the finish/start line.
+		# Offsets stored below stay absolute curve offsets for the original scorer.
+		if track_path and track_path.curve:
 			var curve = track_path.curve
+			var t_len = maxf(track_length, 1.0)
 			container_cps.sort_custom(func(a, b):
 				var a_local = track_path.to_local(a.global_position)
 				var b_local = track_path.to_local(b.global_position)
-				var a_offset = curve.get_closest_offset(a_local)
-				var b_offset = curve.get_closest_offset(b_local)
+				var a_offset = fmod(curve.get_closest_offset(a_local) - fl_off + t_len, t_len)
+				var b_offset = fmod(curve.get_closest_offset(b_local) - fl_off + t_len, t_len)
 				return a_offset < b_offset
 			)
 
 		checkpoints.append_array(container_cps)
 
 	# ALWAYS append the FinishLine as the absolute final checkpoint of the lap
-	var fl = get_node_or_null("FinishLine")
 	if fl and not checkpoints.has(fl):
 		checkpoints.append(fl)
 	elif not fl and checkpoints.is_empty():
@@ -241,9 +250,9 @@ func _setup_checkpoints():
 	for i in range(checkpoints.size()):
 		print("  - Checkpoint ", i, ": ", checkpoints[i].name)
 
-	# cp_offsets are only needed server-side for AI position scoring
+	# cp_offsets are only needed server-side for position scoring
 	if multiplayer.is_server():
-		if track_path:
+		if track_path and track_path.curve:
 			track_length = track_path.curve.get_baked_length()
 			cp_offsets.clear()
 			for cp in checkpoints:
@@ -267,62 +276,140 @@ func _on_checkpoint_entered(body: Node3D, cp_idx: int):
 		return
 	var id = body.name.to_int()
 	if id > 0 and player_stats.has(id):
-		var stats = player_stats[id]
-		if stats["finished"]:
-			print("[CHECKPOINT] Rejected: player already finished")
-			return
+		_grant_checkpoint(id, cp_idx)
 
-		# In-order, or skip-ahead if they missed an earlier mid-lap gate.
-		# Finish line only counts after some progress this lap (not while sitting on it at GO).
-		var is_finish_gate: bool = cp_idx == checkpoints.size() - 1
-		var in_order: bool = cp_idx == stats["next_checkpoint_idx"]
-		var skipped_mid: bool = (not is_finish_gate) and cp_idx > stats["next_checkpoint_idx"]
-		var finish_after_progress: bool = is_finish_gate and stats["next_checkpoint_idx"] > 0
-		if in_order or skipped_mid or finish_after_progress:
-			print("[CHECKPOINT] Valid checkpoint hit! Next expected index: ", cp_idx + 1)
-			stats["next_checkpoint_idx"] = cp_idx + 1
 
-			# Inform the player cart of its last passed checkpoint for respawn purposes
-			var cp = checkpoints[cp_idx]
-			var cart = players_container.get_node_or_null(str(id))
+func _grant_checkpoint(id: int, cp_idx: int) -> void:
+	if not player_stats.has(id):
+		return
+	var stats = player_stats[id]
+	if stats["finished"]:
+		return
+	if cp_idx != stats["next_checkpoint_idx"]:
+		return
+	if cp_idx < 0 or cp_idx >= checkpoints.size():
+		return
 
-			var is_finish_lap = false
-			if cp_idx == checkpoints.size() - 1:
-				if stats["laps"] + 1 >= NetworkManager.max_laps:
-					is_finish_lap = true
+	print("[CHECKPOINT] Valid checkpoint hit! Next expected index: ", cp_idx + 1)
+	stats["next_checkpoint_idx"] += 1
 
-			if cart and cart.get("is_ai"):
-				cart.last_checkpoint_transform = cp.global_transform
+	var cp = checkpoints[cp_idx]
+	var cart = players_container.get_node_or_null(str(id))
+
+	var is_finish_lap = false
+	if cp_idx == checkpoints.size() - 1:
+		if stats["laps"] + 1 >= NetworkManager.max_laps:
+			is_finish_lap = true
+
+	if cart and cart.get("is_ai"):
+		cart.last_checkpoint_transform = cp.global_transform
+	else:
+		if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
+			_sync_checkpoint_to_player_local(id, cp.global_transform, is_finish_lap)
+		else:
+			if id == multiplayer.get_unique_id():
+				_sync_checkpoint_to_player(cp.global_transform, is_finish_lap)
 			else:
-				if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
-					_sync_checkpoint_to_player_local(id, cp.global_transform, is_finish_lap)
-				else:
-					if id == multiplayer.get_unique_id():
-						_sync_checkpoint_to_player(cp.global_transform, is_finish_lap)
-					else:
-						_sync_checkpoint_to_player.rpc_id(id, cp.global_transform, is_finish_lap)
+				_sync_checkpoint_to_player.rpc_id(id, cp.global_transform, is_finish_lap)
 
-			# If they hit the last checkpoint (Finish Line), complete a lap
-			if stats["next_checkpoint_idx"] >= checkpoints.size():
-				stats["laps"] += 1
-				stats["next_checkpoint_idx"] = 0 # Loop back to first checkpoint
-				_check_finish(id)
+	if stats["next_checkpoint_idx"] >= checkpoints.size():
+		stats["laps"] += 1
+		stats["next_checkpoint_idx"] = 0
+		_check_finish(id)
+
+
+## Forward-only wrap distance along the curve from `from_off` to `to_off`.
+func _forward_curve_delta(from_off: float, to_off: float, t_len: float) -> float:
+	return fmod(to_off - from_off + t_len, t_len)
+
+
+func _crossed_curve_offset(prev_off: float, now_off: float, target_off: float, t_len: float) -> bool:
+	var moved: float = _forward_curve_delta(prev_off, now_off, t_len)
+	if moved < 0.05 or moved > t_len * 0.45:
+		return false
+	var to_target: float = _forward_curve_delta(prev_off, target_off, t_len)
+	return to_target > 0.05 and to_target <= moved + 1.5
+
+
+func _track_cart_curve_offset(cart: Node3D, stats: Dictionary) -> float:
+	if track_path == null or track_path.curve == null:
+		return 0.0
+	var curve: Curve3D = track_path.curve
+	var t_len: float = maxf(track_length, curve.get_baked_length())
+	t_len = maxf(t_len, 1.0)
+	var local_pos: Vector3 = track_path.to_local(cart.global_position)
+	var last: float = float(stats.get("path_off", -1.0))
+	if last < 0.0:
+		last = curve.get_closest_offset(local_pos)
+		stats["path_off"] = last
+		return last
+
+	var speed: float = 0.0
+	if cart is RigidBody3D:
+		speed = (cart as RigidBody3D).linear_velocity.length()
+	var search_back: float = 16.0
+	var search_fwd: float = maxf(36.0, speed * 1.5)
+	var step: float = 2.0
+	var num: int = int((search_back + search_fwd) / step)
+	var min_d_sq: float = INF
+	var best: float = last
+	for s in range(num + 1):
+		var test_off: float = fmod(last - search_back + float(s) * step + t_len * 4.0, t_len)
+		var p: Vector3 = curve.sample_baked(test_off)
+		var d_sq: float = p.distance_squared_to(local_pos)
+		if d_sq < min_d_sq:
+			min_d_sq = d_sq
+			best = test_off
+
+	var world_pt: Vector3 = track_path.to_global(curve.sample_baked(best))
+	var dx: float = cart.global_position.x - world_pt.x
+	var dz: float = cart.global_position.z - world_pt.z
+	# Off in the hills: freeze the racing-line offset so later gates aren't credited.
+	if dx * dx + dz * dz > 28.0 * 28.0:
+		return last
+	stats["path_off"] = best
+	return best
+
+
+func _credit_passed_checkpoints(id: int, cart: Node3D, stats: Dictionary) -> void:
+	# Humans must drive through the actual gate Area3D. AI can miss the thin
+	# volume on jumps, so they also get credit from racing-line progress.
+	if cart == null or not cart.get("is_ai"):
+		return
+	if track_path == null or track_path.curve == null or cp_offsets.is_empty():
+		return
+	var t_len: float = maxf(track_length, 1.0)
+	var prev_off: float = float(stats.get("path_off", -1.0))
+	var now_off: float = _track_cart_curve_offset(cart, stats)
+	if prev_off < 0.0:
+		return
+	for _i in range(3):
+		var next_idx: int = int(stats["next_checkpoint_idx"])
+		if next_idx < 0 or next_idx >= cp_offsets.size():
+			return
+		if not _crossed_curve_offset(prev_off, now_off, cp_offsets[next_idx], t_len):
+			return
+		_grant_checkpoint(id, next_idx)
+		prev_off = cp_offsets[next_idx]
 
 func _check_finish(id: int):
 	var stats = player_stats[id]
 	if stats["laps"] >= NetworkManager.max_laps and not stats["finished"]:
 		stats["finished"] = true
+		stats["pos"] = next_finish_pos
+		next_finish_pos += 1
 
 		var cart = players_container.get_node_or_null(str(id))
 		if cart and cart.has_method("set_finished_race"):
 			cart.set_finished_race(true)
-		elif NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
+
+		if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
 			var ui = race_ui if id == 1 else race_ui_p2
 			if ui: ui.show_message("You Finished!", 5.0)
 		else:
 			if id == multiplayer.get_unique_id():
 				show_player_finished_rpc()
-			else:
+			elif NetworkManager.players.has(id) and not NetworkManager.players[id].get("is_ai", false):
 				show_player_finished_rpc.rpc_id(id)
 
 		# Start 30s timer if this is the first finisher
@@ -569,6 +656,7 @@ func start_race():
 	if race_state != RaceState.LOBBY:
 		return
 	race_state = RaceState.RACING
+	next_finish_pos = 1
 	for ui in _all_race_uis():
 		ui.show_hud()
 		var lp = ui.get_node_or_null("LobbyPanel")
@@ -662,43 +750,10 @@ func _process(delta):
 				if end_timer <= 0.0:
 					_end_race()
 		elif race_state == RaceState.FINISHED:
-			# Results are up, but stragglers can still complete remaining laps and stop.
-			_tick_unfinished_path_laps()
-
-
-func _cart_path_offset(cart: Node3D) -> float:
-	if track_path == null or track_path.curve == null:
-		return 0.0
-	var cached = cart.get("_ai_cached_offset")
-	if cached != null and float(cached) >= 0.0:
-		return float(cached)
-	return track_path.curve.get_closest_offset(track_path.to_local(cart.global_position))
-
-
-## If a racer missed the finish Area3D but crossed the start/finish along the racing line, count the lap.
-func _tick_unfinished_path_laps() -> void:
-	if track_path == null or track_length < 10.0:
-		return
-	for id in player_stats:
-		var stats = player_stats[id]
-		if stats["finished"]:
-			continue
-		var cart = players_container.get_node_or_null(str(id))
-		if cart == null:
-			continue
-		var off: float = _cart_path_offset(cart)
-		var last: float = float(stats.get("last_path_offset", off))
-		stats["last_path_offset"] = off
-		if int(stats["next_checkpoint_idx"]) <= 0:
-			continue
-		if last > track_length * 0.70 and off < track_length * 0.30:
-			stats["laps"] += 1
-			stats["next_checkpoint_idx"] = 0
-			_check_finish(id)
+			_update_positions()
 
 
 func _update_positions():
-	_tick_unfinished_path_laps()
 	var ranking = []
 	for id in player_stats:
 		var cart = players_container.get_node_or_null(str(id))
@@ -708,8 +763,12 @@ func _update_positions():
 		# If they finished, give them a massive score boost so they stay top
 		var score = 0.0
 		if pinfo["finished"]:
-			score = 10000000.0 + (3 - pinfo["pos"]) * 1000 # keep their position
+			# Subtract pos so 1st-place finisher scores highest, works for any racer count
+			score = 10000000.0 - pinfo["pos"] * 1000.0
 		else:
+			# AI (and anyone) can jump over the thin gate Area3D and keep driving.
+			# Credit the next gate if they actually passed it on the racing line.
+			_credit_passed_checkpoints(id, cart, pinfo)
 			var offset = 0.0
 			if track_path and cp_offsets.size() > 0:
 				var curve = track_path.curve
@@ -730,24 +789,17 @@ func _update_positions():
 				if segment_length < 0:
 					segment_length += track_length
 
-				var min_dist = 9999999.0
-				var best_t = 0.0
-				var step = 5.0
-				var num_steps = int(segment_length / step) + 1
-
-				var start_i = -int(num_steps * 0.2)
-				var end_i = num_steps + int(num_steps * 0.2)
-
-				for i in range(start_i, end_i + 1):
-					var t = float(i) / max(1, num_steps)
-					var sample_off = fmod(start_off + t * segment_length + track_length * 2.0, max(1.0, track_length))
-					var p = curve.sample_baked(sample_off)
-					var d = p.distance_squared_to(local_pos)
-					if d < min_dist:
-						min_dist = d
-						best_t = t
-
-				offset = best_t * segment_length
+				# Project car position onto the curve, then clamp within segment
+				var t_len: float = maxf(track_length, 1.0)
+				var car_off: float = curve.get_closest_offset(local_pos)
+				# Unwrap car offset relative to segment start for correct wraparound
+				var car_unwrapped: float = car_off
+				if end_off < start_off:
+					# Segment wraps around the loop (finish line crossing)
+					if car_unwrapped < start_off:
+						car_unwrapped += t_len
+				var progress: float = car_unwrapped - start_off
+				offset = clampf(progress, 0.0, segment_length)
 
 			# Score = Laps * 1000000 + CheckpointIndex * 50000 + offset
 			score = pinfo["laps"] * 1000000.0
@@ -767,6 +819,10 @@ func _update_positions():
 		else:
 			pos = player_stats[id]["pos"]
 
+		var tagged = players_container.get_node_or_null(str(id))
+		if tagged:
+			tagged.race_place = pos
+
 		var l = ranking[i]["laps"]
 		if NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR:
 			if spectator_camera and is_instance_valid(spectator_camera.focus_cart):
@@ -783,6 +839,46 @@ func _update_positions():
 				update_hud_rpc(pos, ranking.size(), mini(l + 1, NetworkManager.max_laps), NetworkManager.max_laps)
 			else:
 				update_hud_rpc.rpc_id(id, pos, ranking.size(), mini(l + 1, NetworkManager.max_laps), NetworkManager.max_laps)
+
+	_push_standings(ranking)
+
+func _push_standings(ranking: Array) -> void:
+	var rows: Array = []
+	for entry in ranking:
+		var id = entry["id"]
+		var p_name := "Bot"
+		if NetworkManager.players.has(id):
+			p_name = str(NetworkManager.players[id].get("name", "Bot"))
+		else:
+			var c = players_container.get_node_or_null(str(id))
+			if c:
+				p_name = str(c.player_name)
+		rows.append({
+			"id": id,
+			"pos": int(player_stats[id]["pos"]),
+			"name": p_name,
+			"finished": entry["finished"]
+		})
+	rows.sort_custom(func(a, b): return int(a["pos"]) < int(b["pos"]))
+
+	if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
+		if race_ui:
+			race_ui.update_standings(rows, 1)
+		if race_ui_p2:
+			race_ui_p2.update_standings(rows, 2)
+	elif NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR:
+		var focus_id := 0
+		if spectator_camera and is_instance_valid(spectator_camera.focus_cart):
+			focus_id = str(spectator_camera.focus_cart.name).to_int()
+		if race_ui:
+			race_ui.update_standings(rows, focus_id)
+	else:
+		update_standings_rpc.rpc(rows)
+
+@rpc("authority", "call_local", "unreliable")
+func update_standings_rpc(rows: Array):
+	if race_ui:
+		race_ui.update_standings(rows, multiplayer.get_unique_id())
 
 @rpc("authority", "call_local", "unreliable")
 func update_hud_rpc(pos, total, lap, max_laps):
