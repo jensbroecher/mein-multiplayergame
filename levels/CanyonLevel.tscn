@@ -14,7 +14,6 @@
 [ext_resource type="Shape3D" path="res://generated/canyon_track_collision_shape.res" id="17_r6i1u"]
 [ext_resource type="Shape3D" path="res://generated/canyon_Visual_Road_Sides_collision_shape.res" id="18_623mb"]
 [ext_resource type="PackedScene" uid="uid://clxv8p6x0y6k2" path="res://SpawnIndicator.tscn" id="21_623mb"]
-[ext_resource type="Texture2D" uid="uid://b0egd6sc57png" path="res://materials/spawn_indicator.png" id="21_gbt4q"]
 [ext_resource type="PackedScene" uid="uid://ddgtf515dekvm" path="res://models/plants/e963227e4c0f549dc4852c7b2189de15.fbx" id="22_a7e1k"]
 [ext_resource type="PackedScene" uid="uid://ba5o50mvnmekc" path="res://models/plants/411c0309a5ad518b5594f711a337e50b.fbx" id="23_qixvg"]
 [ext_resource type="PackedScene" uid="uid://0svgxvl76rcs" path="res://models/desert/462b0835dae4689feaf62903546389ee.fbx" id="24_cjhef"]
@@ -54,14 +53,14 @@ horizonColour = Color(0.0784314, 0.00784314, 0.0156863, 1)
 groundColour = Color(0, 0, 0, 1)
 cloudBrightness = 0.05
 
-[sub_resource type="Resource" id="Resource_o08p8"]
+[sub_resource type="Resource" id="Resource_rw4kp"]
 script = ExtResource("5_yr3df")
 weather = ExtResource("6_fwawu")
 
-[sub_resource type="Resource" id="Resource_lb00d"]
+[sub_resource type="Resource" id="Resource_gbt4q"]
 script = ExtResource("3_jpwbr")
 seasonId = "summer"
-weathers = Array[ExtResource("5_yr3df")]([SubResource("Resource_o08p8")])
+weathers = Array[ExtResource("5_yr3df")]([SubResource("Resource_rw4kp")])
 skyColourDaytime = SubResource("Resource_ext2d")
 skyColourNight = SubResource("Resource_p7jpd")
 dayNightCycleCurve = SubResource("Curve_8bl6p")
@@ -136,15 +135,6 @@ _data = {
 }
 point_count = 29
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1"]
-transparency = 1
-albedo_texture = ExtResource("21_gbt4q")
-
-[sub_resource type="QuadMesh" id="QuadMesh_1"]
-material = SubResource("StandardMaterial3D_1")
-size = Vector2(2, 2)
-orientation = 1
-
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_60bqy"]
 resource_name = "Material.001"
 vertex_color_use_as_albedo = true
@@ -196,7 +186,7 @@ track_path = NodePath("TrackPath")
 
 [node name="WeatherController" parent="." unique_id=1277823175 instance=ExtResource("31_weather")]
 time_of_day_hours = 9.328
-seasons = Array[ExtResource("3_jpwbr")]([SubResource("Resource_lb00d")])
+seasons = Array[ExtResource("3_jpwbr")]([SubResource("Resource_gbt4q")])
 startTime = 33580.799999999996
 
 [node name="TerrainGenerator" type="Node3D" parent="." unique_id=586341718 node_paths=PackedStringArray("track_path")]
@@ -254,46 +244,46 @@ curve = SubResource("Curve3D_track")
 [node name="Players" type="Node3D" parent="." unique_id=1342420519]
 
 [node name="FinishLine" parent="." unique_id=1647223077 instance=ExtResource("2_gate")]
-transform = Transform3D(0.9999989, -7.6052593e-06, 0.0014801264, -2.1087544e-08, 0.99998677, 0.005152428, -0.0014801461, -0.0051524225, 0.99998564, 226.04648, 0.5, 334.09988)
+transform = Transform3D(0.76656276, -0.0035213842, 0.6421598, -1.5832484e-07, 0.999985, 0.0054837633, -0.6421695, -0.0042037503, 0.7665512, 258.391, 0.757127, 385.8507)
 is_finish_line = true
 
 [node name="SpawnPoints" type="Node3D" parent="FinishLine" unique_id=1208367608]
 
-[node name="Spawn1" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=2036678017]
-transform = Transform3D(0.95146066, -0.001476533, 0.30776703, 0.0015857738, 0.99999875, -0.00010485202, -0.30776656, 0.0005878117, 0.9514618, -1.1907959, 0.44448203, 6.686676)
+[node name="Spawn1" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1578375146]
+transform = Transform3D(0.9995712, 0.00017120712, -0.029280543, -0.00016036094, 0.9999999, 0.0003727621, 0.029280603, -0.00036790664, 0.99957114, -3.0941315, 0.4517566, 5.911377)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn1" unique_id=570468783 instance=ExtResource("21_623mb")]
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn1" unique_id=1474941195 instance=ExtResource("21_623mb")]
 
-[node name="Spawn2" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1740356675]
-transform = Transform3D(0.95146066, -0.001476533, 0.30776703, 0.0015857738, 0.99999875, -0.00010485202, -0.30776656, 0.0005878117, 0.9514618, 4.517975, 0.45399648, 4.8401184)
+[node name="Spawn2" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1842611975]
+transform = Transform3D(0.9995712, 0.00017120712, -0.029280543, -0.00016036094, 0.9999999, 0.0003727621, 0.029280603, -0.00036790664, 0.99957114, 2.9032745, 0.45079434, 6.087036)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn2" unique_id=1703838145 instance=ExtResource("21_623mb")]
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn2" unique_id=66192409 instance=ExtResource("21_623mb")]
 
-[node name="Spawn3" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=397381398]
-transform = Transform3D(0.92477834, -0.001800494, 0.380502, 0.001960485, 0.9999981, -3.2913405e-05, -0.3805012, 0.00077640545, 0.9247802, 0.9912262, 0.44296658, 12.5242)
+[node name="Spawn3" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=206955649]
+transform = Transform3D(0.99739045, 0.0004521939, -0.07219353, -0.00039562397, 0.99999946, 0.0007978764, 0.07219383, -0.0007672324, 0.9973903, -3.4069214, 0.45616245, 11.773499)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn3" unique_id=1104868924 instance=ExtResource("21_623mb")]
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn3" unique_id=2044916785 instance=ExtResource("21_623mb")]
 
-[node name="Spawn4" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1962441654]
-transform = Transform3D(0.92477834, -0.001800494, 0.380502, 0.001960485, 0.9999981, -3.2913405e-05, -0.3805012, 0.00077640545, 0.9247802, 6.5399017, 0.45472968, 10.24115)
+[node name="Spawn4" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=189383227]
+transform = Transform3D(0.99739045, 0.0004521939, -0.07219353, -0.00039562397, 0.99999946, 0.0007978764, 0.07219383, -0.0007672324, 0.9973903, 2.5774384, 0.45378888, 12.206604)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn4" unique_id=811333767 instance=ExtResource("21_623mb")]
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn4" unique_id=1964460974 instance=ExtResource("21_623mb")]
 
-[node name="Spawn5" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=2054974339]
-transform = Transform3D(0.8932489, -0.002098336, 0.44955766, 0.0023163704, 0.99999744, 6.50296e-05, -0.4495566, 0.0009832545, 0.8932515, 3.612854, 0.44203055, 18.171722)
+[node name="Spawn5" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1126709892]
+transform = Transform3D(0.99194026, 0.00084899506, -0.12670305, -0.0006947245, 0.999999, 0.0012617565, 0.12670398, -0.0011635628, 0.9919399, -4.0091705, 0.46345508, 17.576569)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn5" unique_id=680079477 instance=ExtResource("21_623mb")]
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn5" unique_id=251529872 instance=ExtResource("21_623mb")]
 
-[node name="Spawn6" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=44562598]
-transform = Transform3D(0.8932489, -0.002098336, 0.44955766, 0.0023163704, 0.99999744, 6.50296e-05, -0.4495566, 0.0009832545, 0.8932515, 8.972351, 0.4559288, 15.474365)
+[node name="Spawn6" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=596390965]
+transform = Transform3D(0.99194026, 0.00084899506, -0.12670305, -0.0006947245, 0.999999, 0.0012617565, 0.12670398, -0.0011635628, 0.9919399, 1.9424896, 0.4592867, 18.336823)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn6" unique_id=1650087156 instance=ExtResource("21_623mb")]
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn6" unique_id=378338834 instance=ExtResource("21_623mb")]
 
 [node name="PlayerSpawner" type="MultiplayerSpawner" parent="." unique_id=642896597]
 _spawnable_scenes = PackedStringArray("uid://cart123")

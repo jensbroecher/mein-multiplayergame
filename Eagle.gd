@@ -13,13 +13,13 @@ enum Phase { PATROL, DIVE, GRAB, CARRY, RELEASE, COOLDOWN }
 @export var wing_hinge_axis: Vector3 = Vector3.RIGHT
 
 @export_group("Flight")
-@export var patrol_height: float = 55.0
-@export var dive_speed: float = 28.0
-@export var carry_speed: float = 20.0
-@export var climb_speed: float = 16.0
-@export var flight_smooth: float = 6.0
-@export var turn_smooth: float = 5.0
-@export var grab_radius: float = 10.0
+@export var patrol_height: float = 75.0
+@export var dive_speed: float = 54.0
+@export var carry_speed: float = 28.0
+@export var climb_speed: float = 24.0
+@export var flight_smooth: float = 7.5
+@export var turn_smooth: float = 6.0
+@export var grab_radius: float = 12.0
 @export var grab_height_above_car: float = 3.5
 ## Meters in WORLD space under the eagle (claws / talons).
 ## Meters under eagle origin for talon hold (smaller = higher / closer to claws).
@@ -319,6 +319,7 @@ func _tick_patrol(delta: float) -> void:
 		_patrol_timer = patrol_retarget_time
 
 	_fly_toward(_patrol_target, climb_speed * 0.85, delta, true)
+	_ensure_terrain_clearance(4.0)
 
 	if _cooldown_left > 0.0:
 		return
@@ -351,8 +352,10 @@ func _tick_dive(delta: float) -> void:
 		_play_random_scream()
 		_scream_played_this_hunt = true
 
+	# High-speed steep dive bomb directly at the target car
 	var aim: Vector3 = _target_cart.global_position + Vector3.UP * grab_height_above_car
 	_fly_toward(aim, dive_speed, delta, true)
+	_ensure_terrain_clearance(2.5)
 
 	var dist: float = global_position.distance_to(_target_cart.global_position)
 	if dist <= grab_radius:
@@ -394,13 +397,10 @@ func _tick_carry(delta: float) -> void:
 	_carry_time += delta
 	# Climb while flying toward the road drop point
 	var road_y: float = _sample_track_world(global_position, 0.0).y
-	var target_y: float = maxf(road_y + 14.0, release_height)
+	var target_y: float = maxf(road_y + 18.0, release_height)
 	var target: Vector3 = Vector3(_drop_world.x, target_y, _drop_world.z)
 	_fly_toward(target, carry_speed, delta, true)
-	# Keep a floor so we don't dip while carrying
-	var floor_y: float = road_y + grab_height_above_car + 1.0
-	if global_position.y < floor_y:
-		global_position.y = floor_y
+	_ensure_terrain_clearance(3.5)
 
 	_attach_cart_under_eagle(_target_cart)
 
@@ -432,6 +432,7 @@ func _tick_cooldown(delta: float) -> void:
 			_face_direction(flat, delta)
 	else:
 		_fly_toward(_patrol_target, climb_speed, delta, true)
+	_ensure_terrain_clearance(4.0)
 	if _cooldown_left <= 0.0:
 		_velocity = Vector3.ZERO
 		_phase = Phase.PATROL
@@ -439,6 +440,25 @@ func _tick_cooldown(delta: float) -> void:
 
 
 # --- Flight helpers ------------------------------------------------------
+
+func _ensure_terrain_clearance(min_clearance: float = 3.5) -> void:
+	if not is_inside_tree():
+		return
+	var space = get_world_3d().direct_space_state if get_world_3d() else null
+	if space == null:
+		return
+	var from_pt = Vector3(global_position.x, global_position.y + 40.0, global_position.z)
+	var to_pt = Vector3(global_position.x, global_position.y - 120.0, global_position.z)
+	var q = PhysicsRayQueryParameters3D.create(from_pt, to_pt)
+	q.collision_mask = 1
+	var hit = space.intersect_ray(q)
+	if not hit.is_empty():
+		var floor_y = float(hit.position.y) + min_clearance
+		if global_position.y < floor_y:
+			global_position.y = floor_y
+			if _velocity.y < 0.0:
+				_velocity.y = 0.0
+
 
 func _fly_toward(target: Vector3, speed: float, delta: float, face: bool) -> void:
 	var to: Vector3 = target - global_position
@@ -610,6 +630,8 @@ func _lock_cart(cart: RigidBody3D) -> void:
 	cart.angular_velocity = Vector3.ZERO
 	if "can_move" in cart:
 		cart.set("can_move", false)
+	if "is_carried_by_eagle" in cart:
+		cart.set("is_carried_by_eagle", true)
 	if "axis_lock_angular_x" in cart:
 		cart.axis_lock_angular_x = false
 		cart.axis_lock_angular_y = false
@@ -696,6 +718,8 @@ func _abort_hunt(was_holding: bool) -> void:
 func _detach_dead_cart(cart: RigidBody3D) -> void:
 	if cart == null or not is_instance_valid(cart):
 		return
+	if "is_carried_by_eagle" in cart:
+		cart.set("is_carried_by_eagle", false)
 	# Eagle had freeze=true + can_move=false. Explode/drown already set can_move false;
 	# leave can_move alone so respawn can re-enable it cleanly.
 	cart.freeze = false
@@ -727,6 +751,8 @@ func _break_cart_shield(cart: Object) -> void:
 
 
 func _release_cart(cart: RigidBody3D) -> void:
+	if "is_carried_by_eagle" in cart:
+		cart.set("is_carried_by_eagle", false)
 	# Drop from current carry pose (already above the road), slight nudge along track
 	var drop: Vector3 = cart.global_position
 	var road_y: float = _sample_track_world(drop, 0.0).y
