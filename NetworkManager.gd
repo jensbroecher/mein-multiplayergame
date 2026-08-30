@@ -35,6 +35,7 @@ const GP_CUPS = {
 		"name": "Starter Cup",
 		"stages": [
 			"res://levels/Level.tscn",
+			"res://levels/PinecrestRidgeLevel.tscn",
 			"res://levels/HarborPierLevel.tscn",
 		]
 	},

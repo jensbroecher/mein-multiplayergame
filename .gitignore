@@ -25,5 +25,14 @@ Thumbs.db
 *.bak
 *.import
 
-# Large asset models
+# Large asset models and raw files
+*.fbx
 assets/models/
+models/cars/*.fbx
+models/desert/*.fbx
+models/plants/*.fbx
+models/ramps/*.fbx
+
+# Oversized generated meshes (>100MB)
+generated/terrain_collision_shape.res
+generated/terrain_visual.res

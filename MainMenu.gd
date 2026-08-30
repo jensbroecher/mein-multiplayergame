@@ -169,7 +169,7 @@ func show_sub_menu(menu_name: String) -> void:
 			screen_title.text = "SELECT CUP"
 			screen_subtitle.text = "Each cup is a series of courses"
 			tile_grid.columns = 2
-			_add_tile("STARTER CUP", "Lakeside Course  •  Harbor Pier", "tile_starter_cup.jpg", COL_GREEN, func():
+			_add_tile("STARTER CUP", "Lakeside  •  Pinecrest  •  Harbor", "tile_starter_cup.jpg", COL_GREEN, func():
 				_on_cup_selected("Starter Cup")
 			)
 			_add_tile("DESERT CUP", "Mountain  •  Canyon  •  Chasm  •  Wadi", "tile_desert_cup.jpg", COL_BRONZE, func():
@@ -185,6 +185,9 @@ func show_sub_menu(menu_name: String) -> void:
 			tile_grid.columns = 3
 			_add_tile("LAKESIDE COURSE", "Hills, lake, and the long bridge", "tile_lakeside.jpg", COL_LAKE, func():
 				_on_stage_selected("res://levels/Level.tscn")
+			)
+			_add_tile("PINECREST RIDGE", "Forest hillclimb, sharp switchbacks, and big jumps", "tile_pinecrest.jpg", COL_GREEN, func():
+				_on_stage_selected("res://levels/PinecrestRidgeLevel.tscn")
 			)
 			_add_tile("HARBOR PIER", "Piers, crates, and dark water", "tile_harbor.jpg", COL_HARBOR, func():
 				_on_stage_selected("res://levels/HarborPierLevel.tscn")
@@ -408,6 +411,7 @@ func _on_cup_selected(cup_name: String) -> void:
 func _fill_gp_test_tiles() -> void:
 	var meta := {
 		"res://levels/Level.tscn": {"title": "LAKESIDE", "file": "tile_lakeside.jpg", "color": COL_LAKE},
+		"res://levels/PinecrestRidgeLevel.tscn": {"title": "PINECREST", "file": "tile_pinecrest.jpg", "color": COL_GREEN},
 		"res://levels/HarborPierLevel.tscn": {"title": "HARBOR PIER", "file": "tile_harbor.jpg", "color": COL_HARBOR},
 		"res://levels/MountainLevel.tscn": {"title": "MOUNTAIN", "file": "tile_mountain.jpg", "color": COL_MOUNTAIN},
 		"res://levels/CanyonLevel.tscn": {"title": "CANYON", "file": "tile_canyon.jpg", "color": COL_CANYON},

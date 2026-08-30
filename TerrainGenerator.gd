@@ -341,19 +341,38 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 		var dune_ring: float = lerpf(0.6, 26.0, bowl_shape)
 		var dune_noise: float = h_noise * lerpf(0.15, 1.0, bowl_shape)
 		base_terrain_height = dune_ring + dune_noise
+	elif level_prefix == "pinecrest_ridge":
+		# Massive single-sided mountain hill on the north flank (rising from Z=80 to Z=-320 up to +90m)
+		var hill_progress: float = clampf((-pz + 80.0) / 380.0, 0.0, 1.0)
+		var hill_shape: float = hill_progress * hill_progress * (3.0 - 2.0 * hill_progress)
+		var x_falloff: float = clampf(1.0 - (absf(px) / 380.0), 0.0, 1.0)
+		x_falloff = x_falloff * x_falloff * (3.0 - 2.0 * x_falloff)
+		var hill_elevation: float = hill_shape * x_falloff * 90.0
+		var valley_noise: float = h_noise * (0.35 + 0.65 * hill_shape)
+		base_terrain_height = hill_elevation + valley_noise
 	else:
 		base_terrain_height = h_noise
 
-	# Lake basin in Lakeside Meadow (blended before road so bridge ends meet solid shoreline)
+	# Lake basin in Lakeside Meadow and Pinecrest Ridge
 	if not no_water:
-		var lake_center = Vector2(-450, -500)
-		var lake_radius = 220.0
-		var dist_to_lake = Vector2(px, pz).distance_to(lake_center)
-		if dist_to_lake < lake_radius:
-			var depth = -18.0
-			var lake_blend = clampf((lake_radius - dist_to_lake) / 45.0, 0.0, 1.0)
-			lake_blend = lake_blend * lake_blend * (3.0 - 2.0 * lake_blend)
-			base_terrain_height = lerpf(base_terrain_height, depth, lake_blend)
+		if level_prefix == "pinecrest_ridge":
+			var lake_center = Vector2(-150.0, 140.0)
+			var lake_radius = 90.0
+			var dist_to_lake = Vector2(px, pz).distance_to(lake_center)
+			if dist_to_lake < lake_radius:
+				var depth = -8.0
+				var lake_blend = clampf((lake_radius - dist_to_lake) / 25.0, 0.0, 1.0)
+				lake_blend = lake_blend * lake_blend * (3.0 - 2.0 * lake_blend)
+				base_terrain_height = lerpf(base_terrain_height, depth, lake_blend)
+		else:
+			var lake_center = Vector2(-450, -500)
+			var lake_radius = 220.0
+			var dist_to_lake = Vector2(px, pz).distance_to(lake_center)
+			if dist_to_lake < lake_radius:
+				var depth = -18.0
+				var lake_blend = clampf((lake_radius - dist_to_lake) / 45.0, 0.0, 1.0)
+				lake_blend = lake_blend * lake_blend * (3.0 - 2.0 * lake_blend)
+				base_terrain_height = lerpf(base_terrain_height, depth, lake_blend)
 
 	var height: float
 
@@ -431,14 +450,16 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 		else:
 			# Original blending for DEFAULT and MOUNTAIN
 			var sand_edge = sand_width / 2.0
-			var blend_dist = 60.0
+			var blend_dist = 45.0 if level_prefix == "pinecrest_ridge" else 60.0
 			var clearing_blend = 1.0 - smoothstep(sand_edge - 2.0, sand_edge + blend_dist, dist)
 
 			# Bridge detection: when road is elevated far above base terrain,
 			# attenuate blending so terrain stays low (preserves bridge gap).
 			# Ramps from 0 (normal road, <4m above ground) to 1 (bridge, >12m above ground).
 			var elevation_diff = road_h - base_terrain_height
-			var bridge_factor = clampf((elevation_diff - 4.0) / 8.0, 0.0, 1.0)
+			var bridge_factor = 0.0
+			if level_prefix != "pinecrest_ridge":
+				bridge_factor = clampf((elevation_diff - 4.0) / 8.0, 0.0, 1.0)
 			clearing_blend *= (1.0 - bridge_factor)
 
 			height = lerp(base_terrain_height, road_h, clearing_blend)
@@ -1647,9 +1668,10 @@ func _generate_water():
 	var water = MeshInstance3D.new()
 	water.name = "Water_Surface"
 	var plane = PlaneMesh.new()
-	plane.size = terrain_size * 2.5
-	water.mesh = plane
-	water.position = Vector3(0, -10.0, 0) # Water level (below terrain base)
+	if level_prefix == "pinecrest_ridge":
+		water.position = Vector3(0, -2.5, 0)
+	else:
+		water.position = Vector3(0, -10.0, 0) # Water level (below terrain base)
 
 	# Create a high-quality water shader material
 	var mat = ShaderMaterial.new()
