@@ -429,11 +429,16 @@ func _refresh_name_tag() -> void:
 	else:
 		tag.text = player_name
 	
-	# Local player in follow cam has a compact tag; other players / bots are large and legible
-	if is_local_player and not is_isometric:
-		tag.pixel_size = 0.00030
-	else:
-		tag.pixel_size = 0.00055
+	var iso: bool = MusicManager.use_isometric_camera if MusicManager != null else is_isometric
+	_update_name_tag_scale(iso)
+
+
+func _update_name_tag_scale(iso: bool) -> void:
+	var tag: Label3D = name_tag if name_tag != null else get_node_or_null("Visuals/NameTag")
+	if tag == null:
+		return
+	# Uniform name tag sizing for all cars: compact in isometric/spectator view, clear & proportional in follower chase cam
+	tag.pixel_size = 0.00022 if iso else 0.00030
 
 func has_physics_authority() -> bool:
 	return is_local_player or (is_ai and (multiplayer.multiplayer_peer == null or is_multiplayer_authority()))
@@ -604,6 +609,8 @@ func _ready():
 			antenna.position = visuals.to_local(antenna_placement.global_position)
 
 	ground_ray.add_exception(self)
+	if MusicManager and not MusicManager.camera_mode_changed.is_connected(_on_camera_mode_setting_changed):
+		MusicManager.camera_mode_changed.connect(_on_camera_mode_setting_changed)
 	_refresh_name_tag()
 	# Always draw names over water / crates / piers (especially spectator 3/4 view).
 	name_tag.no_depth_test = true
@@ -960,9 +967,6 @@ func _process(delta):
 				_update_intro_camera(delta)
 		
 		if not is_intro_active:
-			if name_tag:
-				name_tag.pixel_size = 0.00030 if (is_local_player and not is_isometric and not is_finished_race) else 0.00055
-				
 			if is_finished_race and finish_spectate_delay <= 0.0:
 				# Bird's-eye overview camera: Follow cars still in the race, cycling every ~10s and moving smoothly between them
 				var all_carts = get_tree().get_nodes_in_group("player_carts")
@@ -5653,6 +5657,7 @@ func _update_intro_camera(_delta: float):
 
 
 func _on_camera_mode_setting_changed(iso: bool) -> void:
+	_update_name_tag_scale(iso)
 	if not is_local_player:
 		return
 	_set_isometric_camera(iso, false)
@@ -5664,6 +5669,7 @@ func _set_isometric_camera(iso: bool, persist: bool) -> void:
 			MusicManager.set_use_isometric_camera(iso)
 		return
 	is_isometric = iso
+	_update_name_tag_scale(is_isometric)
 	if camera:
 		camera.projection = Camera3D.PROJECTION_PERSPECTIVE
 	if not is_isometric:
@@ -5862,7 +5868,7 @@ func _find_node_by_name(root: Node, node_name: String) -> Node:
 
 func _exit_tree():
 	_clear_camera_xray_immediate()
-	if MusicManager.camera_mode_changed.is_connected(_on_camera_mode_setting_changed):
+	if MusicManager and MusicManager.camera_mode_changed.is_connected(_on_camera_mode_setting_changed):
 		MusicManager.camera_mode_changed.disconnect(_on_camera_mode_setting_changed)
 	var tree = get_tree()
 	if tree:

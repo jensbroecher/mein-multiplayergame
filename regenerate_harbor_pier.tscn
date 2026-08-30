@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://c8regenerateharbor"]
+
+[ext_resource type="Script" uid="uid://dregenerateharborgd" path="res://regenerate_harbor_pier.gd" id="1_reg"]
+
+[node name="RegenerateHarborPier" type="Node"]
+script = ExtResource("1_reg")
