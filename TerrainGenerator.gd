@@ -2880,4 +2880,3 @@ func _add_harbor_piers() -> void:
 		Vector3(280.0, 2.1, 5.0), Vector3(6.0, 4.2, 430.0), 0.0, wall_mat, "")
 	_harbor_add_box(root, "HarborBreakwater_W",
 		Vector3(-270.0, 2.1, 5.0), Vector3(6.0, 4.2, 430.0), 0.0, wall_mat, "")
-

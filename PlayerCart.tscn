@@ -412,7 +412,7 @@ mesh = SubResource("SphereMesh_tip")
 [node name="NameTag" type="Label3D" parent="Visuals" unique_id=1335975530]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.35, 0)
 sorting_offset = 16.0
-pixel_size = 0.0003
+pixel_size = 0.00048
 billboard = 1
 no_depth_test = true
 fixed_size = true

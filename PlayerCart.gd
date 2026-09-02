@@ -437,8 +437,8 @@ func _update_name_tag_scale(iso: bool) -> void:
 	var tag: Label3D = name_tag if name_tag != null else get_node_or_null("Visuals/NameTag")
 	if tag == null:
 		return
-	# Uniform name tag sizing for all cars: compact in isometric/spectator view, clear & proportional in follower chase cam
-	tag.pixel_size = 0.00022 if iso else 0.00030
+	# Uniform name tag sizing for all cars: compact in isometric/spectator view, clear & legible in follower chase cam
+	tag.pixel_size = 0.00022 if iso else 0.00048
 
 func has_physics_authority() -> bool:
 	return is_local_player or (is_ai and (multiplayer.multiplayer_peer == null or is_multiplayer_authority()))
