@@ -286,6 +286,7 @@ var is_righting_on_ground: bool = false
 @onready var sfx_brake_drift = $Visuals/SFX_BrakeDrift
 var is_drifting: bool = false
 var was_on_ground: bool = true
+var is_on_ground: bool = true
 var air_time: float = 0.0
 var ignore_next_landing_sound: bool = false
 var last_crash_sound_time: float = -999.0
@@ -309,6 +310,9 @@ var intro_orbit_center: Vector3 = Vector3.ZERO
 var hop_cooldown: float = 0.0
 var drift_mode: bool = false
 var drift_right: bool = false
+var _drift_input_buffer: float = 0.0
+var _drift_charge_time: float = 0.0
+var _drift_counter_steer_timer: float = 0.0
 var drift_particles = []
 @export var sync_emit_drift: bool = false
 var dirt_particles = []
@@ -600,6 +604,7 @@ func _ready():
 		$Visuals.add_child(new_model)
 		$Visuals.move_child(new_model, 0)
 		new_model.transform = Transform3D(Basis(Vector3(0, 1, 0), preset.get("model_y_rotation", PI)) * 2.0, Vector3(0, -0.6072377, 0))
+		original_cart_model_transform = new_model.transform
 		
 		# Look for an AntennaPlacement node to reposition the dynamic antenna
 		var antenna_placement = new_model.get_node_or_null("AntennaPlacement")
@@ -731,8 +736,8 @@ func _ready():
 					var bmax: Vector2 = river.get_meta("water_bounds_max")
 					water_bounds_min = Vector2(minf(bmin.x, 0.0), minf(bmin.y, -360.0))
 					water_bounds_max = Vector2(maxf(bmax.x, 400.0), maxf(bmax.y, -60.0))
-		elif tg and "no_water" in tg:
-			stage_has_water = not tg.no_water
+		elif tg and ("no_water" in tg and not tg.no_water) and (tg.get_node_or_null("Water") != null or tg.get_node_or_null("Ocean") != null):
+			stage_has_water = true
 			water_surface_y = WATER_LEVEL
 			water_bounds_active = false
 		else:
@@ -1433,7 +1438,7 @@ func _physics_process(delta):
 			_interpolate_remote_physics(delta)
 		return
 
-	if stage_has_water:
+	if stage_has_water and not is_exploding and not is_drowned and not is_teleporting:
 		# Depth relative to surface: positive = below surface (submerged)
 		var water_depth: float = water_surface_y - global_position.y
 		var in_water_xz := _is_over_water_volume()
@@ -1643,17 +1648,23 @@ func _physics_process(delta):
 			var raw_throttle: float = Input.get_action_strength(input_prefix + "throttle")
 			var raw_brake: float = Input.get_action_strength(input_prefix + "brake")
 			
+			var fwd_approx = -visuals.global_transform.basis.z
+			var cur_spd_approx = linear_velocity.dot(fwd_approx)
+			var is_slow_or_rev = cur_spd_approx < 1.2 or linear_velocity.length() < 1.5
+			
 			# If using gamepad with analog trigger, use raw_brake directly.
-			# If using keyboard (device_id == -1 or digital button), ramp up brake force gradually.
+			# If stationary/reversing or using digital button/keyboard, provide instant responsive reverse.
 			if device_id != -1 and raw_brake > 0.0 and raw_brake < 0.99:
 				_kb_brake_amount = raw_brake
+			elif is_slow_or_rev and raw_brake > 0.05:
+				_kb_brake_amount = raw_brake if device_id != -1 else 1.0
 			else:
 				if raw_brake > 0.05:
-					if _kb_brake_amount < 0.20:
-						_kb_brake_amount = 0.20 # gentle initial bite for fine adjustments
-					_kb_brake_amount = move_toward(_kb_brake_amount, 1.0, 1.65 * delta)
+					if _kb_brake_amount < 0.30:
+						_kb_brake_amount = 0.30 # initial bite for high-speed braking
+					_kb_brake_amount = move_toward(_kb_brake_amount, 1.0, 4.0 * delta)
 				else:
-					_kb_brake_amount = move_toward(_kb_brake_amount, 0.0, 6.0 * delta)
+					_kb_brake_amount = move_toward(_kb_brake_amount, 0.0, 8.0 * delta)
 			
 			var effective_brake: float = _kb_brake_amount if raw_brake > 0.05 else 0.0
 			input_dir.y = effective_brake - raw_throttle
@@ -1701,6 +1712,7 @@ func _physics_process(delta):
 					ground_normal = norm
 					ground_collider = col
 
+	is_on_ground = on_ground
 	if on_ground:
 		_ground_grace = 0.22
 	else:
@@ -1817,13 +1829,26 @@ func _physics_process(delta):
 	# Handle acceleration/braking even when slightly airborne for better control
 	var current_speed = linear_velocity.dot(fwd)
 
-	# Tap-to-drift logic (evaluate early so drift_mode is active during the braking/physics forces block)
-	if on_ground and Input.is_action_just_pressed("brake") and abs(input_dir.x) > 0.2 and current_speed > 5.0:
+	# Drift entry logic (tap-to-drift or brake-hold drift with 0.28s input buffer)
+	var want_drift: bool = false
+	if not is_ai and not is_finished_race:
+		if Input.is_action_just_pressed(input_prefix + "brake"):
+			_drift_input_buffer = 0.28
+		if _drift_input_buffer > 0.0:
+			_drift_input_buffer = maxf(0.0, _drift_input_buffer - delta)
+			if absf(input_dir.x) > 0.20:
+				want_drift = true
+		elif Input.get_action_strength(input_prefix + "brake") > 0.25 and absf(input_dir.x) > 0.30:
+			want_drift = true
+	elif is_ai:
+		want_drift = _ai_want_drift and absf(input_dir.x) > 0.22
+
+	if on_ground and not drift_mode and want_drift and current_speed > 4.5:
 		drift_mode = true
 		drift_right = input_dir.x > 0.0
-	elif is_ai and _ai_want_drift and on_ground and abs(input_dir.x) > 0.22 and current_speed > 6.0:
-		drift_mode = true
-		drift_right = input_dir.x > 0.0
+		_drift_charge_time = 0.0
+		_drift_counter_steer_timer = 0.0
+		_drift_input_buffer = 0.0
 
 	# Auto-hop over small props/steps only when nearly stuck offroad — completely disabled on road/track/ramps.
 	if is_offroad and on_ground and not on_loop and input_dir.y < -0.5 and hop_cooldown <= 0.0:
@@ -1893,10 +1918,10 @@ func _physics_process(delta):
 			var input_scale = abs(input_dir.y)
 			var accel_force = acceleration * slow_mult * input_scale
 			if drift_mode:
-				# Power-slide: keep pushing while rear is loose
-				accel_force *= 1.08
+				# Power-slide: keep pushing forward while carving through turn
+				accel_force *= 1.10
 				var side_sign: float = 1.0 if drift_right else -1.0
-				apply_central_force(right * side_sign * acceleration * 0.18 * mass * input_scale)
+				apply_central_force(right * side_sign * acceleration * 0.22 * mass * input_scale)
 			var speed_cap: float = max_speed * offroad_penalty * slow_mult * input_scale
 			if is_offroad and heading_uphill > 0.05:
 				accel_force *= lerpf(1.0, uphill_power_factor, clampf(heading_uphill * 1.5, 0.0, 1.0))
@@ -1905,7 +1930,7 @@ func _physics_process(delta):
 				accel_force = 0.0
 				speed_cap = 0.0
 			if drift_mode:
-				speed_cap *= 0.92
+				speed_cap *= 0.94
 			if current_speed < speed_cap:
 				var fwd_vec = fwd if drive_grounded else Vector3(fwd.x, 0.0, fwd.z).normalized()
 				apply_central_force(fwd_vec * accel_force * mass)
@@ -1921,9 +1946,9 @@ func _physics_process(delta):
 			apply_central_force(-fwd * braking * 0.4 * mass * input_scale)
 		elif drift_mode:
 			# Brake-hold drift: light scrub only — keep slide momentum
-			apply_central_force(-fwd * braking * 0.18 * mass * input_scale)
+			apply_central_force(-fwd * braking * 0.15 * mass * input_scale)
 			var side_sign: float = 1.0 if drift_right else -1.0
-			apply_central_force(right * side_sign * acceleration * 0.12 * mass * input_scale)
+			apply_central_force(right * side_sign * acceleration * 0.16 * mass * input_scale)
 		else:
 			if is_finished_race:
 				if current_speed > 0.3:
@@ -1936,21 +1961,14 @@ func _physics_process(delta):
 			elif current_speed > 1.0:
 				# Softer brakes + progressive (less grab at high speed)
 				var spd_t: float = clampf(current_speed / maxf(max_speed, 1.0), 0.0, 1.0)
-				var brake_mul: float = lerpf(0.78, 0.62, spd_t)
+				var brake_mul: float = lerpf(0.85, 0.70, spd_t)
 				apply_central_force(-fwd * braking * brake_mul * mass * input_scale)
-			elif current_speed < -0.5:
-				if current_speed > -reverse_speed * offroad_penalty * input_scale:
-					var accel_force = acceleration * 0.5 * input_scale
-					var rev_uphill = (-fwd).dot(uphill_dir)
-					var rev_cliff_block = is_offroad and on_ground and not on_loop and is_steep_cliff and rev_uphill > 0.15
-					if rev_cliff_block:
-						accel_force = 0.0
-					elif is_offroad and rev_uphill > 0.05:
-						accel_force *= lerpf(1.0, uphill_power_factor, clampf(rev_uphill * 1.5, 0.0, 1.0))
-					apply_central_force(-fwd * accel_force * mass)
 			else:
-				if current_speed > -reverse_speed * offroad_penalty * input_scale:
-					var accel_force = acceleration * 0.7 * input_scale
+				# Reverse driving: punchy breakaway torque (1.0 from standstill, 0.85 while rolling)
+				var rev_cap: float = -reverse_speed * offroad_penalty * input_scale
+				if current_speed > rev_cap:
+					var rev_mult: float = 1.0 if current_speed >= -0.5 else 0.85
+					var accel_force = acceleration * rev_mult * input_scale
 					var rev_uphill = (-fwd).dot(uphill_dir)
 					var rev_cliff_block = is_offroad and on_ground and not on_loop and is_steep_cliff and rev_uphill > 0.15
 					if rev_cliff_block:
@@ -1990,15 +2008,25 @@ func _physics_process(delta):
 			# - they release brake (input_dir.y < 0.1)
 			# - car comes to a stop (current_speed < 3.0)
 			if drift_mode:
-				# Keep power-slide when brake→accel with steer held
-				if current_speed < 2.5:
-					drift_mode = false
-				elif abs(input_dir.x) < 0.12 and input_dir.y < -0.1:
-					drift_mode = false
-				elif abs(input_dir.x) < 0.15 and abs(input_dir.y) <= 0.1:
-					drift_mode = false
-			
-			var turn_speed = steer_speed
+				# Accumulate drift charge while sliding at speed on ground
+				if on_ground and current_speed > 5.0:
+					_drift_charge_time += delta
+				
+				# Check counter-steering vs tightening
+				var drift_dir: float = 1.0 if drift_right else -1.0
+				var steer_in: float = current_steer * drift_dir # >0 tightens, <0 counter-steers
+				if steer_in < -0.35:
+					_drift_counter_steer_timer += delta
+				else:
+					_drift_counter_steer_timer = maxf(0.0, _drift_counter_steer_timer - delta * 2.0)
+				
+				# Exit drift if speed dropped, counter-steer held >0.35s, or fully released controls
+				var speed_too_low: bool = current_speed < 3.0
+				var counter_steer_exit: bool = _drift_counter_steer_timer > 0.35
+				var controls_released: bool = absf(input_dir.y) < 0.08 and absf(input_dir.x) < 0.15
+				if speed_too_low or counter_steer_exit or controls_released:
+					_exit_drift()
+
 			is_drifting = drift_mode
 			
 			var play_brake_sfx = on_ground and (is_drifting or (input_dir.y > 0.2 and current_speed > 5.0))
@@ -2007,24 +2035,30 @@ func _physics_process(delta):
 			else:
 				if sfx_brake_drift.playing: sfx_brake_drift.stop()
 			
-			if is_drifting:
-				if input_dir.y > 0.1:
-					turn_speed *= 1.85
-				else:
-					turn_speed *= 1.55
-			
+			var steer_amount: float = 0.0
 			var steer_speed_factor: float
-			if current_speed < -0.1:
-				# Reversing: invert steering yaw direction so turning right swings rear right & nose left
-				steer_speed_factor = clampf(abs(current_speed) / 3.0, 0.5, 1.0)
-				turn_speed = -turn_speed * 1.2
+			if is_drifting:
+				var drift_dir: float = 1.0 if drift_right else -1.0
+				var steer_in: float = current_steer * drift_dir
+				var drift_turn_mult: float = 1.18
+				if steer_in > 0.0:
+					drift_turn_mult += steer_in * 0.72 # Tighten up to 1.9x
+				else:
+					drift_turn_mult += steer_in * 0.65 # Counter-steer down to 0.53x
+				var turn_speed = steer_speed * drift_turn_mult
+				steer_speed_factor = clampf(current_speed / 10.0, 0.7, 1.0)
+				steer_amount = -drift_dir * turn_speed * steer_speed_factor * delta
+			elif current_speed < -0.1:
+				# Arcade reverse steering (Mario Kart style): steering Right turns the nose to the Right (clockwise)
+				steer_speed_factor = clampf(abs(current_speed) / 4.0, 0.35, 1.0)
+				steer_amount = -current_steer * steer_speed * steer_speed_factor * delta
 			elif current_speed < 3.0:
-				# Low speed forward maneuver (pulling away from stop/obstacle): maintain minimum responsiveness
 				steer_speed_factor = clampf(current_speed / 8.0, 0.4, 1.0)
+				steer_amount = -current_steer * steer_speed * steer_speed_factor * delta
 			else:
 				steer_speed_factor = minf(current_speed / 10.0, 1.0)
+				steer_amount = -current_steer * steer_speed * steer_speed_factor * delta
 
-			var steer_amount = -current_steer * turn_speed * steer_speed_factor * delta
 			var rot_axis = ground_normal if on_ground else Vector3.UP
 			visuals.global_rotate(rot_axis, steer_amount)
 			
@@ -2039,10 +2073,9 @@ func _physics_process(delta):
 				var lat_vel = linear_velocity.dot(right)
 				var grip_factor = grip
 				if is_drifting:
-					if input_dir.y < -0.1:
-						grip_factor *= 0.30 # Power-slide
-					else:
-						grip_factor *= 0.20 # Brake drift
+					grip_factor *= 0.28 # Allows tail to break loose and slide smoothly
+				elif current_speed < -0.2:
+					grip_factor *= 0.60 # Soften lateral grip in reverse for smooth, non-snapping movement
 				if is_offroad and ground_normal.y < 0.82:
 					# Scale grip down as the slope gets steeper; drops to 0.15 on cliffs so car slides down
 					if ground_normal.y < 0.55:
@@ -2067,7 +2100,7 @@ func _physics_process(delta):
 		is_boosting = false
 		if sfx_rocket_loop.playing: sfx_rocket_loop.stop()
 		if sfx_brake_drift.playing: sfx_brake_drift.stop()
-		is_drifting = false
+		_exit_drift()
 		_set_drift_emitting(false)
 		sync_emit_drift = false
 		
@@ -2211,6 +2244,10 @@ func _is_track_surface(collider: Object) -> bool:
 
 	# If this is unified terrain collision, check if the car is within the road corridor
 	if _is_world_terrain_collider(n):
+		var lvl_check = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
+		if _wadi_stage or (lvl_check and str(lvl_check.name).to_lower().contains("wadi")):
+			# Desert wadi is an offroad stage with no visible road: all driving on sand is offroad!
+			return false
 		var p_track: Path3D = active_path if (active_path and active_path.curve) else track_path
 		if p_track and p_track.curve:
 			var curve: Curve3D = p_track.curve
@@ -2237,11 +2274,12 @@ func _get_track_outer_half_width() -> float:
 				# Canyon: rounded shoulder extends past asphalt.
 				var rw: float = float(tg.road_width) if "road_width" in tg else 15.0
 				return rw * 0.5 + 2.6
-			if "sand_width" in tg:
-				return float(tg.sand_width) * 0.5
+			# Sand counts as offroad: use visible road_width only, not sand_width
 			if "road_width" in tg:
 				return float(tg.road_width) * 0.5
-	return 8.5
+			if "sand_width" in tg:
+				return float(tg.sand_width) * 0.5
+	return 7.5
 
 
 func _is_loop_surface(collider: Object) -> bool:
@@ -2270,14 +2308,10 @@ func _is_over_water_volume() -> bool:
 	if not (p.x >= water_bounds_min.x and p.x <= water_bounds_max.x \
 			and p.z >= water_bounds_min.y and p.z <= water_bounds_max.y):
 		return false
-	# Desert wadi: check if ground is below water surface or influence test
+	# Desert wadi: only the lake and river shape is water; dry sand dunes are NEVER water
 	if is_instance_valid(_wadi_water_tg):
-		if _wadi_water_tg.has_method("is_wadi_water_at") and _wadi_water_tg.call("is_wadi_water_at", p.x, p.z):
-			return true
-		# Fallback check: terrain height below or near water surface
-		var th: float = _get_ground_height(p)
-		if th > -900.0 and th <= water_surface_y + 0.20:
-			return true
+		if _wadi_water_tg.has_method("is_wadi_water_at"):
+			return bool(_wadi_water_tg.call("is_wadi_water_at", p.x, p.z))
 		return false
 	return true
 
@@ -2357,10 +2391,10 @@ func _update_visuals_alignment(delta: float) -> void:
 				on_ground = true
 				target_up = norm
 
-	# Soft spring: ease ride height instead of snapping every bump
+	# Soft spring: compress slightly on landing impacts, but never lift tires above ground on slopes
 	var compress: float = 0.0
 	if on_ground:
-		compress = clampf(linear_velocity.y * -0.035, -0.07, 0.10)
+		compress = clampf(linear_velocity.y * -0.035, 0.0, 0.08)
 	visual_offset_y = lerpf(visual_offset_y, fixed_offset + compress, 1.0 - exp(-11.0 * delta))
 
 	if on_ground:
@@ -2398,22 +2432,12 @@ func _update_visuals_alignment(delta: float) -> void:
 	target_forward = target_up.cross(target_right).normalized()
 
 	var target_basis = Basis(target_right, target_up, -target_forward)
-	if is_drifting:
-		var drift_angle = -0.35 if drift_right else 0.35
-		var up_axis = target_up.normalized()
-		if up_axis.length_squared() > 0.5:
-			target_basis = target_basis.rotated(up_axis, drift_angle)
 	visuals.global_transform.basis = current_basis.slerp(target_basis, 1.0 - exp(-9.0 * delta))
 
 	var target_pos = get_global_transform_interpolated().origin - target_up * visual_offset_y
 	visuals.global_position = target_pos
 
 	_update_wheel_visuals(delta)
-
-func _wheel_steer_sign(along_fwd: float) -> float:
-	# In reverse the visual turn must flip so wheels point with the path.
-	return -1.0 if along_fwd < -0.35 else 1.0
-
 
 func _update_wheel_visuals(delta):
 	if is_exploding: return
@@ -2422,13 +2446,17 @@ func _update_wheel_visuals(delta):
 	var rot_speed = speed * sign(fwd_dot) / 0.4 # approx radius
 	wheel_rotation -= rot_speed * delta
 
+	# In reverse, invert wheel angle so tires point along the reverse turning arc
+	var is_rev_vis: bool = fwd_dot < -0.15
+	var steer_vis_mult: float = 1.0 if is_rev_vis else -1.0
+
 	for corner in ["FL", "FR", "RL", "RR"]:
 		var pivot = get_node_or_null("Visuals/WheelPivot" + corner)
 		if not pivot:
 			continue
 		# Steering: rotate the pivot on its Y axis for front wheels
 		if corner == "FL" or corner == "FR":
-			pivot.rotation.y = -current_steer * 0.5 * _wheel_steer_sign(fwd_dot)
+			pivot.rotation.y = current_steer * 0.5 * steer_vis_mult
 		# Spin: find the wheel mesh child and rotate on its X axis
 		var mesh_node = pivot.get_node_or_null("WheelMesh")
 		if mesh_node:
@@ -2483,7 +2511,8 @@ func _interpolate_remote_visual(delta: float):
 		if not pivot:
 			continue
 		if wheel == "FL" or wheel == "FR":
-			pivot.rotation.y = -sync_steer * 0.5 * _wheel_steer_sign(remote_fwd_dot)
+			var remote_vis_mult: float = 1.0 if remote_fwd_dot < -0.2 else -1.0
+			pivot.rotation.y = sync_steer * 0.5 * remote_vis_mult
 		var mesh_node = pivot.get_node_or_null("WheelMesh")
 		if mesh_node:
 			mesh_node.rotation.x = wheel_rotation
@@ -2758,6 +2787,37 @@ func client_start_boost():
 	for tornado in get_tree().get_nodes_in_group("tornados"):
 		if tornado and is_instance_valid(tornado) and tornado.has_method("escape_cart_with_boost"):
 			tornado.escape_cart_with_boost(self)
+
+func _exit_drift() -> void:
+	if not drift_mode and not is_drifting:
+		return
+	drift_mode = false
+	is_drifting = false
+	_drift_counter_steer_timer = 0.0
+	if (is_on_ground or was_on_ground or _ground_grace > 0.0) and can_move and not is_finished_race and _drift_charge_time >= 0.70:
+		_trigger_drift_boost(_drift_charge_time)
+	_drift_charge_time = 0.0
+
+func _trigger_drift_boost(charge_time: float) -> void:
+	var boost_str: float = 1.0
+	var boost_dur: float = 0.45
+	if charge_time >= 1.35:
+		boost_str = 1.25
+		boost_dur = 0.75
+	
+	pad_boost_strength = boost_str
+	pad_boost_timer = boost_dur
+	is_pad_boosting = true
+	
+	if sfx_release_pop and is_instance_valid(sfx_release_pop):
+		sfx_release_pop.play()
+	
+	if is_instance_valid(boost_particles_l):
+		boost_particles_l.restart()
+		boost_particles_l.emitting = true
+	if is_instance_valid(boost_particles_r):
+		boost_particles_r.restart()
+		boost_particles_r.emitting = true
 
 @rpc("any_peer", "call_local", "reliable")
 func client_start_pad_boost(strength: float = 1.0, duration: float = 2.0):
@@ -3369,6 +3429,10 @@ func _apply_respawn_pose() -> void:
 	is_landing = false
 	is_drifting = false
 	drift_mode = false
+	is_on_ground = true
+	_drift_input_buffer = 0.0
+	_drift_charge_time = 0.0
+	_drift_counter_steer_timer = 0.0
 	_is_dust_active = false
 	
 	# Clear inventory items and active powerups on respawn
@@ -4321,13 +4385,13 @@ func _create_drift_particles(wheel_name: String):
 	_configure_trail_particle_draw(skid)
 
 func _is_asphalt_road_surface() -> bool:
-	if is_offroad:
+	if is_offroad or _wadi_stage:
 		return false
 	var lvl = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
 	if lvl:
 		var lvl_name: String = str(lvl.name).to_lower()
-		# Canyon stage uses dirt track; offroad dirt sections are not asphalt
-		if lvl_name.contains("canyon"):
+		# Desert Wadi is an offroad sand stage and Canyon is dirt: neither emits asphalt skidmarks
+		if lvl_name.contains("canyon") or lvl_name.contains("wadi") or lvl_name.contains("desert"):
 			return false
 		var tg = lvl.get_node_or_null("TerrainGenerator")
 		if tg and "road_material" in tg and tg.road_material:
@@ -4399,13 +4463,13 @@ func _create_dirt_particles(wheel_name: String):
 	var dirt = CPUParticles3D.new()
 	dirt.name = wheel_name + "_Dirt"
 	dirt.emitting = false
-	dirt.amount = 36
-	dirt.lifetime = 0.35
+	dirt.amount = 60
+	dirt.lifetime = 0.48
 	dirt.explosiveness = 0.0
 	dirt.randomness = 0.35
-	dirt.lifetime_randomness = 0.2
+	dirt.lifetime_randomness = 0.25
 	dirt.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
-	dirt.emission_sphere_radius = 0.04
+	dirt.emission_sphere_radius = 0.05
 	dirt.mesh = QuadMesh.new()
 	dirt.local_coords = false
 	dirt.top_level = true
@@ -4428,26 +4492,26 @@ func _create_dirt_particles(wheel_name: String):
 	mat_dirt.albedo_color = _current_dust_color
 	dirt.material_override = mat_dirt
 	
-	dirt.direction = Vector3(0.0, 0.6, 1.4).normalized()
-	dirt.spread = 22.0
-	dirt.gravity = Vector3(0, -3.5, 0)
-	dirt.initial_velocity_min = 1.6
-	dirt.initial_velocity_max = 3.8
-	dirt.scale_amount_min = 0.06
-	dirt.scale_amount_max = 0.22
+	dirt.direction = Vector3(0.0, 0.8, 1.4).normalized()
+	dirt.spread = 32.0
+	dirt.gravity = Vector3(0, -4.5, 0)
+	dirt.initial_velocity_min = 2.4
+	dirt.initial_velocity_max = 5.6
+	dirt.scale_amount_min = 0.08
+	dirt.scale_amount_max = 0.36
 	
 	var scale_curve = Curve.new()
 	scale_curve.add_point(Vector2(0.0, 0.08)) # Starts small at tire contact
-	scale_curve.add_point(Vector2(0.35, 0.50))
-	scale_curve.add_point(Vector2(1.0, 0.95)) # Expands softly into air
+	scale_curve.add_point(Vector2(0.35, 0.55))
+	scale_curve.add_point(Vector2(1.0, 1.0)) # Expands softly into air
 	dirt.scale_amount_curve = scale_curve
 	
 	var grad = Gradient.new()
 	grad.offsets = PackedFloat32Array([0.0, 0.15, 0.55, 1.0])
 	grad.colors = PackedColorArray([
 		Color(1.0, 1.0, 1.0, 0.0),
-		Color(1.0, 1.0, 1.0, 0.08),
-		Color(1.0, 1.0, 1.0, 0.03),
+		Color(1.0, 1.0, 1.0, 0.26),
+		Color(1.0, 1.0, 1.0, 0.12),
 		Color(1.0, 1.0, 1.0, 0.0)
 	])
 	dirt.color_ramp = grad
@@ -4523,12 +4587,22 @@ func _set_dirt_emitting(emitting: bool):
 	var speed: float = linear_velocity.length()
 	var time_since_respawn = (Time.get_ticks_msec() / 1000.0) - last_respawn_time
 	
+	var is_sand_stage: bool = _wadi_stage or _mountain_stage
+	if not is_sand_stage:
+		var lvl = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
+		if lvl:
+			var lvl_nm = str(lvl.name).to_lower()
+			is_sand_stage = lvl_nm.contains("wadi") or lvl_nm.contains("desert") or lvl_nm.contains("mountain")
+
+	var min_speed: float = 2.2 if is_sand_stage else 4.8
+	var deact_speed: float = 1.4 if is_sand_stage else 3.6
+
 	# Hysteresis gating to prevent blinking / jittering when speed hovers near cutoff
 	if _is_dust_active:
-		if not emitting or speed < 4.0 or is_landing or not can_move or air_time >= 0.03 or in_water or time_since_respawn < 0.5:
+		if not emitting or speed < deact_speed or is_landing or not can_move or air_time >= 0.03 or in_water or time_since_respawn < 0.5:
 			_is_dust_active = false
 	else:
-		if emitting and speed > 5.5 and not is_landing and can_move and air_time < 0.03 and not in_water and time_since_respawn > 0.5:
+		if emitting and speed > min_speed and not is_landing and can_move and air_time < 0.03 and not in_water and time_since_respawn > 0.5:
 			_is_dust_active = true
 			
 	var on: bool = _is_dust_active
@@ -4544,7 +4618,10 @@ func _set_dirt_emitting(emitting: bool):
 					_attach_dirt_emitter(p, pivot)
 				p.emitting = true
 				if "amount_ratio" in p:
-					p.amount_ratio = clampf((speed - 4.0) / 14.0, 0.20, 1.0)
+					if is_sand_stage and is_offroad:
+						p.amount_ratio = clampf((speed - 1.2) / 10.0, 0.45, 1.0)
+					else:
+						p.amount_ratio = clampf((speed - 3.5) / 14.0, 0.20, 1.0)
 			else:
 				p.emitting = false
 

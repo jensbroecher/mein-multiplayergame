@@ -338,6 +338,9 @@
 [ext_resource type="MultiMesh" uid="uid://b31mv7gmj1j5j" path="res://generated/grass/chunk_9_19.res" id="310_qf03a"]
 [ext_resource type="MultiMesh" uid="uid://ccw1e7y05hr3i" path="res://generated/grass/chunk_10_19.res" id="311_e6ruf"]
 [ext_resource type="MultiMesh" uid="uid://bdeulycg816fv" path="res://generated/grass/chunk_11_19.res" id="312_bh45d"]
+[ext_resource type="PackedScene" uid="uid://die0jeswaprm4" path="res://models/4e31009f7a2edfdc2afa3b1bc41d0c88.fbx" id="339_j82va"]
+[ext_resource type="PackedScene" uid="uid://dun7kyshy0l5e" path="res://models/3e5e2cd06e6c9da2b1975573a42dddd0.fbx" id="340_oaaeu"]
+[ext_resource type="PackedScene" uid="uid://bm2lautibw1kd" path="res://models/2bb90f9b26067aec89692598b6a76198.fbx" id="341_oaaeu"]
 [ext_resource type="Texture2D" uid="uid://j6l2pulbaugj" path="res://materials/concrete_normal.png" id="Concrete_Norm"]
 [ext_resource type="Texture2D" uid="uid://dasndv73breob" path="res://materials/concrete_roughness.png" id="Concrete_Rough"]
 [ext_resource type="Texture2D" uid="uid://bf05h3t4rlqs7" path="res://materials/concrete.png" id="Concrete_Tex"]
@@ -357,14 +360,14 @@ horizonColour = Color(0.0784314, 0.00784314, 0.0156863, 1)
 groundColour = Color(0, 0, 0, 1)
 cloudBrightness = 0.05
 
-[sub_resource type="Resource" id="Resource_8j87j"]
+[sub_resource type="Resource" id="Resource_qxpn6"]
 script = ExtResource("5_yr3df")
 weather = ExtResource("6_jpwbr")
 
-[sub_resource type="Resource" id="Resource_h782c"]
+[sub_resource type="Resource" id="Resource_4dj6u"]
 script = ExtResource("3_jpwbr")
 seasonId = "summer"
-weathers = Array[ExtResource("5_yr3df")]([SubResource("Resource_8j87j")])
+weathers = Array[ExtResource("5_yr3df")]([SubResource("Resource_qxpn6")])
 skyColourDaytime = SubResource("Resource_ext2d")
 skyColourNight = SubResource("Resource_p7jpd")
 dayNightCycleCurve = SubResource("Curve_8bl6p")
@@ -1373,6 +1376,9 @@ emission = Color(0.15, 0.15, 0.15, 1)
 material = SubResource("StandardMaterial3D_logo")
 size = Vector2(10.08, 4.9)
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wa883"]
+albedo_texture = ExtResource("Concrete_Tex")
+
 [node name="Level" type="Node3D" unique_id=815155767 node_paths=PackedStringArray("checkpoints", "track_path", "alternative_paths")]
 script = ExtResource("1_lev99")
 checkpoints = [NodePath("Checkpoints/Halfway4"), NodePath("Checkpoints/Halfway3"), NodePath("Checkpoints/Halfway2"), NodePath("Checkpoints/Halfway1"), NodePath("Checkpoints/Halfway5"), NodePath("Checkpoints/Halfway6"), NodePath("Checkpoints/Halfway7"), NodePath("Checkpoints/Halfway8"), NodePath("FinishLine")]
@@ -1382,7 +1388,7 @@ alternative_paths = [NodePath("AlternativePaths/AlternativePath1"), NodePath("Al
 [node name="WeatherController" parent="." unique_id=1277823175 instance=ExtResource("31_weather")]
 time_of_day_hours = 13.239
 selected_weather = 1
-seasons = Array[ExtResource("3_jpwbr")]([SubResource("Resource_h782c")])
+seasons = Array[ExtResource("3_jpwbr")]([SubResource("Resource_4dj6u")])
 startTime = 47660.4
 
 [node name="TerrainGenerator" type="Node3D" parent="." unique_id=586341718 node_paths=PackedStringArray("track_path")]
@@ -1398,6 +1404,8 @@ grass_material = SubResource("ShaderMaterial_grass")
 road_material = SubResource("ShaderMaterial_asphalt")
 terrain_grass_count = 4000000
 grass_visibility_range = 300.0
+metadata/_edit_lock_ = true
+metadata/_edit_group_ = true
 
 [node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1367813535]
 material_override = SubResource("ShaderMaterial_grass")
@@ -5005,8 +5013,28 @@ transform = Transform3D(17.037151, 0, 27.108961, 0, 34, 0, -42.916008, 0, 10.761
 transform = Transform3D(0.97546, 0, 0.2202, 0, 1, 0, -0.2202, 0, 0.97546, 17.778269, 0.8747457, 91.51997)
 mesh = SubResource("PlaneMesh_logo")
 
-[node name="AuxScene" parent="LevelDesign" unique_id=2090644951 groups=["collision_trimesh"] instance=ExtResource("99_7575d")]
-transform = Transform3D(0.6, 0, 0, 0, 0.6, 0, 0, 0, 0.6, 301.0712, 5.3171263, -239.96208)
+[node name="Bush" parent="LevelDesign" unique_id=2090644951 groups=["collision_trimesh"] instance=ExtResource("99_7575d")]
+transform = Transform3D(0.6, 0, 0, 0, 0.6, 0, 0, 0, 0.6, 317.37152, 5.7240515, -239.96208)
+
+[node name="Logs" parent="LevelDesign" unique_id=1918818692 groups=["collision_trimesh"] instance=ExtResource("339_j82va")]
+transform = Transform3D(13.027363, -0.90938514, 7.379756, 1.1036632, 14.958972, -0.10492903, -7.353209, 0.6341144, 13.05864, 275.34253, 4.4887753, -446.8521)
+
+[node name="Boat" parent="LevelDesign" unique_id=1969635757 groups=["collision_trimesh"] instance=ExtResource("79_ybx0l")]
+transform = Transform3D(-1.6994975, -0.12128573, -19.927294, -0.2961476, 19.997574, -0.09645661, 19.925465, 0.28687462, -1.7010875, 175.12502, -10.356844, -496.62048)
+
+[node name="Hay" parent="LevelDesign" unique_id=1900935291 groups=["collision_box"] instance=ExtResource("340_oaaeu")]
+transform = Transform3D(9.906715, -1.3627166, 0, 1.3627166, 9.906715, 0, 0, 0, 10, 160.83614, 6.8446083, -49.507862)
+
+[node name="Hay2" parent="LevelDesign" unique_id=429092922 groups=["collision_box"] instance=ExtResource("340_oaaeu")]
+transform = Transform3D(-8.477924, -0.92626196, 5.221761, -1.0161176, 9.947579, 0.11480665, -5.2050223, -0.4332598, -8.527601, 152.00746, 6.8446083, -39.00565)
+
+[node name="FestivalTent" parent="LevelDesign" unique_id=437974526 groups=["collision_trimesh"] instance=ExtResource("341_oaaeu")]
+transform = Transform3D(32.32939, 0, -17.994732, 0, 37, 0, 17.994732, 0, 32.32939, -83.18033, 8.801015, -511.57874)
+
+[node name="Box" type="CSGBox3D" parent="LevelDesign" unique_id=705381155 groups=["collision_box"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -29.334873, -2.8257809, 89.00723)
+size = Vector3(50, 30, 100)
+material = SubResource("StandardMaterial3D_wa883")
 
 [node name="BoostPads" type="Node3D" parent="." unique_id=1164637541]
 
@@ -5025,10 +5053,10 @@ transform = Transform3D(0.62150073, -0.5278353, 0.5789017, 0.033523567, 0.756189
 [node name="BoostPad7" parent="BoostPads" unique_id=7532161 instance=ExtResource("93_m7b4a")]
 transform = Transform3D(0.67918503, -0.055971805, 0.7318299, 0, 0.99708784, 0.07625928, -0.7339674, -0.051794134, 0.677207, -516.58276, 8.956961, -219.0685)
 
-[node name="0e2447e774ad6afc15d3aeb56a0372ea" parent="." unique_id=137287197 groups=["collision_capsule"] instance=ExtResource("102_7q3nd")]
+[node name="Plant2" parent="." unique_id=137287197 groups=["collision_capsule"] instance=ExtResource("102_7q3nd")]
 transform = Transform3D(7, 0, 0, 0, 7, 0, 0, 0, 7, 7.32629, 0.61939895, 103.84227)
 
-[node name="04bb4902dedc0aa27913075b8fcd3d6b" parent="." unique_id=1361610939 groups=["collision_capsule"] instance=ExtResource("103_3ll0q")]
+[node name="Plant" parent="." unique_id=1361610939 groups=["collision_capsule"] instance=ExtResource("103_3ll0q")]
 transform = Transform3D(5.7512646, 0, -3.9903572, 0, 7, 0, 3.9903572, 0, 5.7512646, 29.53201, 0.024594069, 84.78279)
 
 [node name="WoodenCart" parent="." unique_id=1815157679 groups=["collision_trimesh"] instance=ExtResource("104_3ll0q")]

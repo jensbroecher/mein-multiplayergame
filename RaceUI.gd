@@ -77,22 +77,26 @@ var ITEM_ICONS = {
 	"LIGHTNING": load("res://sprites/icon_lightning.png")
 }
 
-var laps_spinbox: SpinBox
+var voting_panel: PanelContainer = null
+var voting_timer_label: Label = null
+var vote_buttons: Dictionary = {}
+var vote_timer_seconds: int = 15
+var local_vote_choice: String = ""
+var _is_voting_ticking: bool = false
 var local_ready = false
 
 func _ready():
 	_init_styleboxes()
-	_setup_lap_settings()
 	_setup_standings_list()
 	
-	NetworkManager.max_laps_changed.connect(_on_network_max_laps_changed)
+	NetworkManager.stage_votes_updated.connect(_on_stage_votes_updated)
+	NetworkManager.stage_voting_concluded.connect(_on_stage_voting_concluded)
+	NetworkManager.stage_voting_started.connect(_on_stage_voting_started)
 	
-	btn_ready.pressed.connect(_on_ready_pressed)
-	btn_start.pressed.connect(_on_start_pressed)
+	if lobby_panel:
+		lobby_panel.hide()
+	show_hud()
 	
-	if not multiplayer.is_server():
-		btn_start.hide()
-		
 	if slot1_panel: slot1_panel.add_theme_stylebox_override("panel", style_slot_empty)
 	if slot2_panel: slot2_panel.add_theme_stylebox_override("panel", style_slot_empty)
 
@@ -126,33 +130,6 @@ func _init_styleboxes():
 	# Style for backup Slot 2 (cyan border)
 	style_slot_backup.bg_color = Color(0.1, 0.1, 0.1, 0.7)
 	style_slot_backup.border_color = Color(0.0, 0.8, 1.0, 0.8)
-
-func _setup_lap_settings():
-	var laps_container = HBoxContainer.new()
-	var label = Label.new()
-	label.text = "Laps: "
-	laps_container.add_child(label)
-	
-	laps_spinbox = SpinBox.new()
-	laps_spinbox.min_value = 1
-	laps_spinbox.max_value = 20
-	laps_spinbox.value = NetworkManager.max_laps
-	laps_spinbox.editable = multiplayer.is_server()
-	laps_spinbox.value_changed.connect(_on_laps_changed)
-	laps_container.add_child(laps_spinbox)
-	
-	$LobbyPanel/VBoxContainer.add_child(laps_container)
-	# Place it after player list but before buttons
-	# PlayerList is child 2 (0: Title, 1: HSep, 2: PlayerList)
-	$LobbyPanel/VBoxContainer.move_child(laps_container, 3)
-
-func _on_laps_changed(value: float):
-	if multiplayer.is_server():
-		NetworkManager.set_max_laps(int(value))
-
-func _on_network_max_laps_changed(laps: int):
-	if laps_spinbox:
-		laps_spinbox.set_value_no_signal(laps)
 
 func update_lobby(players: Dictionary):
 	# Clear list
@@ -323,9 +300,15 @@ var action_button: Button = null
 func display_race_results(results_data: Array):
 	show_end_screen()
 	
-	if NetworkManager.current_game_mode != NetworkManager.GameMode.MULTIPLAYER:
-		end_timer_label.hide()
+	end_timer_label.hide()
 	
+	var is_gp: bool = NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP \
+			or (NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP and NetworkManager.is_coop_gp) \
+			or (NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER and NetworkManager.multiplayer_mode == NetworkManager.MultiplayerMode.GRAND_PRIX)
+
+	var is_mp_single_stages: bool = NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER \
+			and NetworkManager.multiplayer_mode == NetworkManager.MultiplayerMode.SINGLE_STAGES
+
 	var vbox = $EndPanel/VBoxContainer
 	if results_container == null:
 		results_container = VBoxContainer.new()
@@ -350,7 +333,7 @@ func display_race_results(results_data: Array):
 	h_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(h_name)
 	
-	if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP:
+	if is_gp:
 		var h_pts = Label.new()
 		h_pts.text = "PTS"
 		h_pts.custom_minimum_size = Vector2(80, 0)
@@ -382,57 +365,218 @@ func display_race_results(results_data: Array):
 		r_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(r_name)
 		
-		if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP:
+		if is_gp:
 			var r_pts = Label.new()
-			r_pts.text = "+%d" % r["round_points"]
+			r_pts.text = "+%d" % r.get("round_points", 0)
 			r_pts.custom_minimum_size = Vector2(80, 0)
 			r_pts.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 			row.add_child(r_pts)
 			
 			var r_total = Label.new()
-			r_total.text = "%d" % r["total_points"]
+			r_total.text = "%d" % r.get("total_points", 0)
 			r_total.custom_minimum_size = Vector2(80, 0)
 			r_total.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 			row.add_child(r_total)
 			
 		results_container.add_child(row)
 		
+	# Post-race track voting for multiplayer single stages:
+	if is_mp_single_stages:
+		_setup_track_voting_panel(vbox)
+		
 	if action_button == null:
 		action_button = Button.new()
 		action_button.custom_minimum_size = Vector2(0, 45)
 		vbox.add_child(action_button)
 		action_button.pressed.connect(_on_action_button_pressed)
+	else:
+		action_button.disabled = false
+		vbox.move_child(action_button, vbox.get_child_count() - 1)
 		
-	if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP:
-		var gp_data = NetworkManager.GP_CUPS.get(NetworkManager.current_gp_name)
+	if is_gp:
+		var gp_name = NetworkManager.current_gp_name
+		if gp_name.is_empty():
+			gp_name = NetworkManager.selected_mp_cup
+		var gp_data = NetworkManager.GP_CUPS.get(gp_name)
 		var next_stage = NetworkManager.current_gp_stage + 1
-		if gp_data and next_stage < gp_data["stages"].size():
-			action_button.text = "NEXT STAGE"
+		if multiplayer.is_server():
+			if gp_data and next_stage < gp_data["stages"].size():
+				action_button.text = "NEXT STAGE"
+				action_button.disabled = false
+			else:
+				action_button.text = "FINISH GRAND PRIX"
+				action_button.disabled = false
 		else:
-			action_button.text = "FINISH GRAND PRIX"
+			action_button.text = "WAITING FOR HOST..."
+			action_button.disabled = true
+	elif is_mp_single_stages:
+		action_button.text = "RETURN TO LOBBY"
+		action_button.disabled = false
 	elif NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL:
 		action_button.text = "RETURN TO MENU"
+		action_button.disabled = false
 	else:
 		action_button.text = "RETURN TO MENU"
+		action_button.disabled = false
+
+func _setup_track_voting_panel(vbox: VBoxContainer):
+	if voting_panel != null:
+		voting_panel.queue_free()
+		voting_panel = null
+	vote_buttons.clear()
+	local_vote_choice = ""
+	
+	voting_panel = PanelContainer.new()
+	voting_panel.custom_minimum_size = Vector2(460, 0)
+	
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.06, 0.08, 0.12, 0.95)
+	style.border_color = Color(0.15, 0.72, 0.92, 0.7)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(8)
+	style.content_margin_left = 14
+	style.content_margin_right = 14
+	style.content_margin_top = 10
+	style.content_margin_bottom = 10
+	voting_panel.add_theme_stylebox_override("panel", style)
+	
+	var panel_vbox = VBoxContainer.new()
+	panel_vbox.add_theme_constant_override("separation", 8)
+	voting_panel.add_child(panel_vbox)
+	
+	voting_timer_label = Label.new()
+	voting_timer_label.text = "VOTE FOR NEXT TRACK (15s)"
+	voting_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	voting_timer_label.add_theme_font_size_override("font_size", 16)
+	voting_timer_label.add_theme_color_override("font_color", Color(0.2, 0.85, 0.95))
+	panel_vbox.add_child(voting_timer_label)
+	
+	var grid = GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 6)
+	panel_vbox.add_child(grid)
+	
+	for stage in NetworkManager.ALL_STAGES:
+		var stg_path: String = stage["path"]
+		var stg_name: String = stage["name"]
+		var btn = Button.new()
+		btn.text = "%s (0)" % stg_name
+		btn.custom_minimum_size = Vector2(210, 34)
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.pressed.connect(func(): _on_vote_button_pressed(stg_path))
+		grid.add_child(btn)
+		vote_buttons[stg_path] = btn
+		
+	var btn_rand = Button.new()
+	btn_rand.text = "🎲 Random Track (0)"
+	btn_rand.custom_minimum_size = Vector2(210, 34)
+	btn_rand.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn_rand.pressed.connect(func(): _on_vote_button_pressed("random"))
+	grid.add_child(btn_rand)
+	vote_buttons["random"] = btn_rand
+	
+	vbox.add_child(voting_panel)
+	vbox.move_child(voting_panel, vbox.get_child_count() - 2)
+	
+	if multiplayer.is_server():
+		NetworkManager.start_stage_voting()
+
+func _on_stage_voting_started():
+	vote_timer_seconds = 15
+	if not _is_voting_ticking:
+		_start_voting_countdown()
+
+func _start_voting_countdown():
+	_is_voting_ticking = true
+	_tick_voting_timer()
+
+func _tick_voting_timer():
+	if not is_instance_valid(voting_timer_label):
+		_is_voting_ticking = false
+		return
+	voting_timer_label.text = "VOTE FOR NEXT TRACK (%d s)" % vote_timer_seconds
+	if vote_timer_seconds <= 0:
+		_is_voting_ticking = false
+		if multiplayer.is_server():
+			NetworkManager.resolve_and_launch_voted_stage()
+		return
+	await get_tree().create_timer(1.0).timeout
+	vote_timer_seconds -= 1
+	_tick_voting_timer()
+
+func _on_vote_button_pressed(choice: String):
+	local_vote_choice = choice
+	NetworkManager.vote_stage(choice)
+	_refresh_vote_button_styles()
+
+func _on_stage_votes_updated(votes: Dictionary):
+	var counts: Dictionary = {}
+	for p_id in votes:
+		var c = str(votes[p_id])
+		counts[c] = counts.get(c, 0) + 1
+		
+	for stg_path in vote_buttons:
+		var btn: Button = vote_buttons[stg_path]
+		var count = counts.get(stg_path, 0)
+		var base_title = "🎲 Random Track" if stg_path == "random" else _get_stage_name(stg_path)
+		btn.text = "%s (%d)" % [base_title, count]
+		
+	_refresh_vote_button_styles()
+
+func _get_stage_name(stage_path: String) -> String:
+	for s in NetworkManager.ALL_STAGES:
+		if s["path"] == stage_path:
+			return s["name"]
+	return "Track"
+
+func _refresh_vote_button_styles():
+	for choice in vote_buttons:
+		var btn: Button = vote_buttons[choice]
+		if choice == local_vote_choice:
+			btn.add_theme_color_override("font_color", Color(0.15, 0.9, 1.0))
+		else:
+			btn.remove_theme_color_override("font_color")
+
+func _on_stage_voting_concluded(winning_stage: String):
+	var stage_name = _get_stage_name(winning_stage)
+	if is_instance_valid(voting_timer_label):
+		voting_timer_label.text = "NEXT TRACK: %s! LOADING..." % stage_name.to_upper()
+		voting_timer_label.add_theme_color_override("font_color", Color(0.2, 1.0, 0.4))
+	for choice in vote_buttons:
+		var btn: Button = vote_buttons[choice]
+		btn.disabled = true
 
 func _on_action_button_pressed():
-	# Disable so double-taps don't start two loads (especially bad on mobile RAM).
 	if action_button:
 		action_button.disabled = true
 
-	if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP \
-			or (NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP and NetworkManager.is_coop_gp):
-		var gp_data = NetworkManager.GP_CUPS.get(NetworkManager.current_gp_name)
+	var is_gp = NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP \
+			or (NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP and NetworkManager.is_coop_gp) \
+			or (NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER and NetworkManager.multiplayer_mode == NetworkManager.MultiplayerMode.GRAND_PRIX)
+
+	if is_gp:
+		var gp_name = NetworkManager.current_gp_name
+		if gp_name.is_empty():
+			gp_name = NetworkManager.selected_mp_cup
+		var gp_data = NetworkManager.GP_CUPS.get(gp_name)
 		var next_stage = NetworkManager.current_gp_stage + 1
 		if gp_data and next_stage < gp_data["stages"].size():
 			var main = get_tree().current_scene
 			if main and main.has_method("load_gp_stage"):
-				# RaceUI lives under Level — never free the level inside this callback.
 				main.load_gp_stage(next_stage)
 				return
-				
+		else:
+			# GP Finished: return to lobby
+			var main = get_tree().current_scene
+			if main and main.has_method("return_to_lobby"):
+				main.return_to_lobby()
+				return
+
 	var main = get_tree().current_scene
-	if main and main.has_method("_on_server_disconnected"):
+	if main and main.has_method("return_to_lobby") and NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER:
+		main.call_deferred("return_to_lobby")
+	elif main and main.has_method("_on_server_disconnected"):
 		main.call_deferred("_on_server_disconnected")
 
 func _input(event: InputEvent):

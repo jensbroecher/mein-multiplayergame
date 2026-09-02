@@ -170,8 +170,8 @@ func _ready():
 	if NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR:
 		_setup_spectator_camera()
 
-	if NetworkManager.current_game_mode != NetworkManager.GameMode.MULTIPLAYER:
-		_run_singleplayer_countdown()
+	if multiplayer.is_server():
+		_run_race_countdown()
 
 
 func _setup_spectator_camera() -> void:
@@ -921,7 +921,10 @@ func _end_race():
 		var racer = final_rankings[i]
 		var round_pts = points_map[mini(i, points_map.size() - 1)]
 
-		if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP or (NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP and NetworkManager.is_coop_gp):
+		var is_gp := NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP \
+				or (NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP and NetworkManager.is_coop_gp) \
+				or (NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER and NetworkManager.multiplayer_mode == NetworkManager.MultiplayerMode.GRAND_PRIX)
+		if is_gp:
 			var current_total = NetworkManager.gp_standings.get(racer["name"], 0)
 			NetworkManager.gp_standings[racer["name"]] = current_total + round_pts
 
@@ -942,8 +945,9 @@ func end_race_rpc(results_data: Array):
 	if race_ui and race_ui.has_method("display_race_results"):
 		race_ui.display_race_results(results_data)
 
-func _run_singleplayer_countdown():
+func _run_race_countdown():
 	await get_tree().process_frame
+	await get_tree().create_timer(0.4).timeout
 	if multiplayer.is_server():
 		start_race.rpc()
 

@@ -11,7 +11,25 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_x8abc")
 
-[node name="CenterContainer" type="CenterContainer" parent="."]
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06, 0.07, 0.1, 0.96)
+
+[node name="AccentBar" type="ColorRect" parent="."]
+custom_minimum_size = Vector2(0, 4)
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 4.0
+grow_horizontal = 2
+color = Color(0.15, 0.72, 0.92, 1)
+
+[node name="ConnectionView" type="CenterContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -19,28 +37,225 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer"]
+[node name="Panel" type="PanelContainer" parent="ConnectionView"]
+custom_minimum_size = Vector2(520, 0)
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="ConnectionView/Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 24
+
+[node name="VBox" type="VBoxContainer" parent="ConnectionView/Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="ConnectionView/Panel/Margin/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+text = "MULTIPLAYER LOBBY"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="ConnectionView/Panel/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 0.75, 0.85, 1)
+theme_override_font_sizes/font_size = 13
+text = "Host a LAN match or discover open lobbies on your network"
+horizontal_alignment = 1
+
+[node name="HSep1" type="HSeparator" parent="ConnectionView/Panel/Margin/VBox"]
+layout_mode = 2
+
+[node name="NameRow" type="HBoxContainer" parent="ConnectionView/Panel/Margin/VBox"]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="LabelName" type="Label" parent="CenterContainer/VBoxContainer"]
+[node name="LabelName" type="Label" parent="ConnectionView/Panel/Margin/VBox/NameRow"]
+custom_minimum_size = Vector2(110, 0)
 layout_mode = 2
 text = "Player Name:"
 
-[node name="LineEditName" type="LineEdit" parent="CenterContainer/VBoxContainer"]
+[node name="LineEditName" type="LineEdit" parent="ConnectionView/Panel/Margin/VBox/NameRow"]
 layout_mode = 2
+size_flags_horizontal = 3
 text = "Racer"
+placeholder_text = "Enter your racer name"
 
-[node name="ButtonHost" type="Button" parent="CenterContainer/VBoxContainer"]
+[node name="ButtonHost" type="Button" parent="ConnectionView/Panel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
-text = "Host LAN Game"
+theme_override_font_sizes/font_size = 16
+text = "HOST LAN GAME"
 
-[node name="HSeparator" type="HSeparator" parent="CenterContainer/VBoxContainer"]
+[node name="HSep2" type="HSeparator" parent="ConnectionView/Panel/Margin/VBox"]
 layout_mode = 2
 
-[node name="LabelServers" type="Label" parent="CenterContainer/VBoxContainer"]
+[node name="DirectIPRow" type="HBoxContainer" parent="ConnectionView/Panel/Margin/VBox"]
 layout_mode = 2
-text = "Discovered LAN Games:"
+theme_override_constants/separation = 8
 
-[node name="ServerList" type="VBoxContainer" parent="CenterContainer/VBoxContainer"]
+[node name="LineEditIP" type="LineEdit" parent="ConnectionView/Panel/Margin/VBox/DirectIPRow"]
 layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Direct IP (e.g. 192.168.1.50)"
+
+[node name="ButtonDirectJoin" type="Button" parent="ConnectionView/Panel/Margin/VBox/DirectIPRow"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+text = "Join IP"
+
+[node name="LabelServers" type="Label" parent="ConnectionView/Panel/Margin/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Discovered LAN Lobbies:"
+
+[node name="ScrollServers" type="ScrollContainer" parent="ConnectionView/Panel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 110)
+layout_mode = 2
+
+[node name="ServerList" type="VBoxContainer" parent="ConnectionView/Panel/Margin/VBox/ScrollServers"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="NoServersLabel" type="Label" parent="ConnectionView/Panel/Margin/VBox/ScrollServers/ServerList"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.55, 0.65, 1)
+text = "Searching for LAN servers..."
+horizontal_alignment = 1
+
+[node name="ButtonBackToMenu" type="Button" parent="ConnectionView/Panel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+text = "Back to Main Menu"
+
+[node name="RoomView" type="CenterContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="PanelContainer" parent="RoomView"]
+custom_minimum_size = Vector2(620, 0)
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="RoomView/Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 22
+
+[node name="VBox" type="VBoxContainer" parent="RoomView/Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="HeaderRow" type="HBoxContainer" parent="RoomView/Panel/Margin/VBox"]
+layout_mode = 2
+
+[node name="RoomTitle" type="Label" parent="RoomView/Panel/Margin/VBox/HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 24
+text = "LOBBY ROOM"
+
+[node name="RoomStatus" type="Label" parent="RoomView/Panel/Margin/VBox/HeaderRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.85, 0.4, 1)
+theme_override_font_sizes/font_size = 14
+text = "Waiting for players"
+
+[node name="HSep1" type="HSeparator" parent="RoomView/Panel/Margin/VBox"]
+layout_mode = 2
+
+[node name="ModeSection" type="VBoxContainer" parent="RoomView/Panel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="ModeHeader" type="Label" parent="RoomView/Panel/Margin/VBox/ModeSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Race Mode:"
+
+[node name="HostModeControls" type="HBoxContainer" parent="RoomView/Panel/Margin/VBox/ModeSection"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="OptionMode" type="OptionButton" parent="RoomView/Panel/Margin/VBox/ModeSection/HostModeControls"]
+custom_minimum_size = Vector2(200, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="OptionCup" type="OptionButton" parent="RoomView/Panel/Margin/VBox/ModeSection/HostModeControls"]
+custom_minimum_size = Vector2(180, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ClientModeLabel" type="Label" parent="RoomView/Panel/Margin/VBox/ModeSection"]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.85, 0.4, 1)
+theme_override_font_sizes/font_size = 15
+text = "Mode: Single Stages (Vote Next Track)"
+
+[node name="HSep2" type="HSeparator" parent="RoomView/Panel/Margin/VBox"]
+layout_mode = 2
+
+[node name="PlayersHeader" type="HBoxContainer" parent="RoomView/Panel/Margin/VBox"]
+layout_mode = 2
+
+[node name="LabelRoster" type="Label" parent="RoomView/Panel/Margin/VBox/PlayersHeader"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 14
+text = "Racers In Lobby:"
+
+[node name="LabelCount" type="Label" parent="RoomView/Panel/Margin/VBox/PlayersHeader"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 0.75, 0.85, 1)
+theme_override_font_sizes/font_size = 14
+text = "1 / 6"
+
+[node name="ScrollPlayers" type="ScrollContainer" parent="RoomView/Panel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 160)
+layout_mode = 2
+
+[node name="PlayerList" type="VBoxContainer" parent="RoomView/Panel/Margin/VBox/ScrollPlayers"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="HSep3" type="HSeparator" parent="RoomView/Panel/Margin/VBox"]
+layout_mode = 2
+
+[node name="ActionBar" type="HBoxContainer" parent="RoomView/Panel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="ButtonLeave" type="Button" parent="RoomView/Panel/Margin/VBox/ActionBar"]
+custom_minimum_size = Vector2(110, 42)
+layout_mode = 2
+text = "Leave"
+
+[node name="ButtonChangeCar" type="Button" parent="RoomView/Panel/Margin/VBox/ActionBar"]
+custom_minimum_size = Vector2(120, 42)
+layout_mode = 2
+text = "Change Car"
+
+[node name="ButtonReady" type="Button" parent="RoomView/Panel/Margin/VBox/ActionBar"]
+custom_minimum_size = Vector2(110, 42)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Ready"
+
+[node name="ButtonStart" type="Button" parent="RoomView/Panel/Margin/VBox/ActionBar"]
+custom_minimum_size = Vector2(150, 42)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 16
+text = "START RACE"

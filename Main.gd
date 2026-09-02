@@ -24,6 +24,11 @@ func _ready():
 	car_selection.car_selected.connect(_on_car_selected)
 	NetworkManager.server_disconnected.connect(_on_server_disconnected)
 	
+	lobby.start_race_requested.connect(_on_lobby_start_race_requested)
+	lobby.back_to_menu_requested.connect(_on_lobby_back_to_menu_requested)
+	lobby.change_car_requested.connect(_on_lobby_change_car_requested)
+	NetworkManager.stage_voting_concluded.connect(_on_stage_voting_concluded)
+	
 	var config_canvas = CanvasLayer.new()
 	config_canvas.name = "ConfigCanvas"
 	config_canvas.layer = 10
@@ -69,6 +74,14 @@ func _on_options_back_pressed() -> void:
 	main_menu.show()
 
 func _on_car_selected(car_index: int):
+	# If changing car while already inside the multiplayer lobby room:
+	if lobby.visible or lobby.is_in_room:
+		NetworkManager.set_local_car(car_index)
+		car_selection.hide()
+		lobby.show()
+		lobby.enter_room_view()
+		return
+
 	if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
 		if not _coop_selecting_p2:
 			# P1 just selected — save their car and show selection again for P2
@@ -98,7 +111,9 @@ func _on_car_selected(car_index: int):
 		return
 	NetworkManager.local_car_index = car_index
 	if NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER:
+		car_selection.hide()
 		lobby.show()
+		lobby.show_connection_view()
 	else:
 		car_selection.hide()
 		# Load saved player name
@@ -111,6 +126,25 @@ func _on_car_selected(car_index: int):
 			
 		NetworkManager.start_single_player(p_name)
 		await start_game(true)
+
+func _on_lobby_start_race_requested():
+	if not multiplayer.is_server():
+		return
+	lobby.hide()
+	await start_game(true)
+
+func _on_lobby_back_to_menu_requested():
+	NetworkManager.disconnect_peer()
+	lobby.hide()
+	main_menu.show()
+
+func _on_lobby_change_car_requested():
+	lobby.hide()
+	car_selection.show()
+
+func _on_stage_voting_concluded(winning_stage: String):
+	if multiplayer.is_server():
+		load_stage(winning_stage, "Loading voted track")
  
 func start_game(is_host: bool):
 	if not is_host:
@@ -121,7 +155,19 @@ func start_game(is_host: bool):
 
 	var level_scene = LEVEL_SCENE
 	var status := "Loading race"
-	if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP \
+	if NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER:
+		lobby.hide()
+		if NetworkManager.multiplayer_mode == NetworkManager.MultiplayerMode.GRAND_PRIX:
+			NetworkManager.current_gp_name = NetworkManager.selected_mp_cup
+			NetworkManager.current_gp_stage = 0
+			var gp_data = NetworkManager.GP_CUPS.get(NetworkManager.selected_mp_cup)
+			if gp_data and gp_data["stages"].size() > 0:
+				status = "Loading GP stage 1"
+				level_scene = load(gp_data["stages"][0])
+		else:
+			status = "Loading track"
+			level_scene = load(NetworkManager.current_single_stage)
+	elif NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP \
 			or (NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP and NetworkManager.is_coop_gp):
 		var gp_data = NetworkManager.GP_CUPS.get(NetworkManager.current_gp_name)
 		if gp_data:
@@ -227,12 +273,88 @@ func _load_gp_stage_impl(stage_idx: int) -> void:
 		await _hide_loading()
 		_level_swap_in_progress = false
 		process_mode = Node.PROCESS_MODE_INHERIT
-		_on_server_disconnected()
+		if NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER and multiplayer.multiplayer_peer != null:
+			return_to_lobby()
+		else:
+			_on_server_disconnected()
 		return
 
 	await _hide_loading()
 	_level_swap_in_progress = false
 	process_mode = Node.PROCESS_MODE_INHERIT
+
+func load_stage(stage_path: String, status_title: String = "Loading stage") -> void:
+	if _level_swap_in_progress:
+		return
+	call_deferred("_load_stage_impl", stage_path, status_title)
+
+func _load_stage_impl(stage_path: String, status_title: String) -> void:
+	if _level_swap_in_progress:
+		return
+	_level_swap_in_progress = true
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	if pause_menu:
+		pause_menu.hide()
+
+	await _show_loading(status_title)
+	if loading_screen:
+		loading_screen.set_status("Clearing previous race")
+		loading_screen.set_progress(0.2)
+	await _unload_all_levels()
+	if loading_screen:
+		loading_screen.set_status(status_title)
+		loading_screen.set_progress(0.4)
+
+	var next_level_scene: PackedScene = load(stage_path)
+	if next_level_scene == null:
+		push_error("Failed to load stage: ", stage_path)
+		await _hide_loading()
+		_level_swap_in_progress = false
+		process_mode = Node.PROCESS_MODE_INHERIT
+		_on_server_disconnected()
+		return
+
+	if loading_screen:
+		loading_screen.set_progress(0.65)
+		loading_screen.set_status("Preparing track")
+	var next_level = next_level_scene.instantiate()
+	add_child(next_level)
+	MusicManager.refresh_level_graphics()
+	if loading_screen:
+		loading_screen.set_progress(0.85)
+		loading_screen.set_status("Building collisions")
+	if next_level.has_method("wait_for_collisions"):
+		await next_level.wait_for_collisions()
+	else:
+		await get_tree().process_frame
+		await get_tree().process_frame
+	if loading_screen:
+		loading_screen.set_progress(0.98)
+	await get_tree().process_frame
+	await _hide_loading()
+	_level_swap_in_progress = false
+	process_mode = Node.PROCESS_MODE_INHERIT
+
+func return_to_lobby():
+	call_deferred("_return_to_lobby_impl")
+
+func _return_to_lobby_impl():
+	if _level_swap_in_progress:
+		return
+	_level_swap_in_progress = true
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	if pause_menu:
+		pause_menu.hide()
+	await _show_loading("Returning to lobby")
+	await _unload_all_levels()
+	await _hide_loading()
+	_level_swap_in_progress = false
+	process_mode = Node.PROCESS_MODE_INHERIT
+	if NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER and multiplayer.multiplayer_peer != null:
+		lobby.show()
+		lobby.enter_room_view()
+	else:
+		_on_server_disconnected()
 
 
 func _find_level_nodes() -> Array[Node]:
