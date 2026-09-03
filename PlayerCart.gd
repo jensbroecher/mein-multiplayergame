@@ -287,6 +287,9 @@ var is_righting_on_ground: bool = false
 var is_drifting: bool = false
 var was_on_ground: bool = true
 var is_on_ground: bool = true
+var is_on_loop: bool = false
+var _loop_grace: float = 0.0
+var _loop_last_normal: Vector3 = Vector3.UP
 var air_time: float = 0.0
 var ignore_next_landing_sound: bool = false
 var last_crash_sound_time: float = -999.0
@@ -736,12 +739,40 @@ func _ready():
 					var bmax: Vector2 = river.get_meta("water_bounds_max")
 					water_bounds_min = Vector2(minf(bmin.x, 0.0), minf(bmin.y, -360.0))
 					water_bounds_max = Vector2(maxf(bmax.x, 400.0), maxf(bmax.y, -60.0))
-		elif tg and ("no_water" in tg and not tg.no_water) and (tg.get_node_or_null("Water") != null or tg.get_node_or_null("Ocean") != null):
-			stage_has_water = true
-			water_surface_y = WATER_LEVEL
-			water_bounds_active = false
 		else:
-			stage_has_water = false
+			# General water detection for Lakehill, Pinecrest Ridge, and all other stages
+			var is_no_water: bool = tg and ("no_water" in tg and tg.no_water)
+			if is_no_water:
+				stage_has_water = false
+				water_bounds_active = false
+			else:
+				var water_node: Node3D = null
+				if tg:
+					water_node = tg.get_node_or_null("Water_Surface") as Node3D
+					if not water_node:
+						water_node = tg.get_node_or_null("Water") as Node3D
+					if not water_node:
+						water_node = tg.get_node_or_null("Ocean") as Node3D
+				if not water_node:
+					water_node = level.find_child("*Water*", true, false) as Node3D
+				if not water_node:
+					water_node = level.find_child("*Ocean*", true, false) as Node3D
+
+				if water_node != null:
+					stage_has_water = true
+					if water_node.has_meta("water_surface_y"):
+						water_surface_y = float(water_node.get_meta("water_surface_y"))
+					elif tg and str(tg.get("level_prefix")) == "pinecrest_ridge":
+						water_surface_y = -2.5
+					elif water_node.is_inside_tree() and not is_zero_approx(water_node.global_position.y):
+						water_surface_y = water_node.global_position.y
+					elif not is_zero_approx(water_node.position.y):
+						water_surface_y = water_node.position.y
+					else:
+						water_surface_y = WATER_LEVEL
+					water_bounds_active = false
+				else:
+					stage_has_water = false
 
 	if is_local_player:
 		var is_coop = NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP
@@ -1575,12 +1606,21 @@ func _physics_process(delta):
 	if is_instance_valid(ground_ray):
 		ground_ray.global_transform.basis = visuals.global_transform.basis
 
+	# Update loop detection with grace timer so micro-bounces don't instantly drop cars off ceilings
+	var hitting_loop: bool = is_instance_valid(ground_ray) and ground_ray.is_colliding() and _is_loop_surface(ground_ray.get_collider())
+	if hitting_loop:
+		_loop_grace = 0.28
+		_loop_last_normal = ground_ray.get_collision_normal()
+	else:
+		_loop_grace = maxf(0.0, _loop_grace - delta)
+	is_on_loop = _loop_grace > 0.0
+
 	# Apply extra gravity (reduced / cancelled while stuck in a loop so inverted sections work)
-	if not (ground_ray.is_colliding() and _is_loop_surface(ground_ray.get_collider())):
+	if not is_on_loop:
 		apply_central_force(Vector3.DOWN * GRAVITY * mass)
 	else:
 		# Stick into the loop surface (centripetal + contact glue)
-		var loop_n: Vector3 = ground_ray.get_collision_normal()
+		var loop_n: Vector3 = _loop_last_normal
 		var spd: float = linear_velocity.length()
 		var stick: float = mass * (spd * spd / 14.0 + 28.0)
 		apply_central_force(-loop_n * stick)
@@ -1748,7 +1788,7 @@ func _physics_process(delta):
 		var cur_up = visuals.global_transform.basis.y
 		var up_dot = cur_up.dot(ground_normal)
 		if up_dot < 0.92:
-			if not is_righting_on_ground and up_dot < 0.2:
+			if not is_righting_on_ground and up_dot < 0.2 and not on_loop and not is_on_loop:
 				# Gentle hop when flipped upside down so wheels clear ground to roll over
 				apply_central_impulse(Vector3.UP * mass * 3.5)
 			is_righting_on_ground = true

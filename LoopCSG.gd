@@ -26,19 +26,19 @@ extends Node3D
 		_maybe_rebuild()
 
 ## Height of the outer containment walls/curbs
-@export_range(0.5, 4.0, 0.1) var wall_height: float = 1.8:
+@export_range(0.5, 5.0, 0.1) var wall_height: float = 2.6:
 	set(v):
 		wall_height = maxf(v, 0.3)
 		_maybe_rebuild()
 
 ## Thickness of the outer containment walls
-@export_range(0.1, 2.0, 0.05) var wall_thickness: float = 0.5:
+@export_range(0.1, 3.0, 0.05) var wall_thickness: float = 0.8:
 	set(v):
 		wall_thickness = maxf(v, 0.1)
 		_maybe_rebuild()
 
 ## Road bed slab thickness
-@export_range(0.2, 2.0, 0.05) var road_thickness: float = 0.6:
+@export_range(0.2, 3.0, 0.05) var road_thickness: float = 1.6:
 	set(v):
 		road_thickness = maxf(v, 0.15)
 		_maybe_rebuild()
@@ -50,9 +50,15 @@ extends Node3D
 		_maybe_rebuild()
 
 ## Length of the ground approach and exit ramps
-@export_range(10.0, 60.0, 1.0) var approach_length: float = 22.0:
+@export_range(10.0, 60.0, 1.0) var approach_length: float = 24.0:
 	set(v):
 		approach_length = maxf(v, 6.0)
+		_maybe_rebuild()
+
+## Height of the lead-in and lead-out incline ramp
+@export_range(0.0, 3.0, 0.05) var ramp_height: float = 0.65:
+	set(v):
+		ramp_height = maxf(v, 0.0)
 		_maybe_rebuild()
 
 @export_group("Features")
@@ -139,7 +145,7 @@ func _rebuild() -> void:
 	csg_track.name = "LoopTrack"
 	csg_track.mode = CSGPolygon3D.MODE_PATH
 	csg_track.path_node = NodePath("../../Path3D")
-	csg_track.path_interval = 0.5
+	csg_track.path_interval = 0.35
 	csg_track.path_interval_type = CSGPolygon3D.PATH_INTERVAL_DISTANCE
 	csg_track.path_rotation = CSGPolygon3D.PATH_ROTATION_PATH_FOLLOW
 	csg_track.path_rotation_accurate = true
@@ -176,11 +182,15 @@ func _create_loop_curve() -> Curve3D:
 	var half_shift := spiral_offset * 0.5
 	var z_center := -5.0
 
-	# Entry approach ramp (flat along ground Y=0 heading +Z)
-	var entry_start_z := z_center - approach_length
-	curve.add_point(Vector3(-half_shift, 0.0, entry_start_z))
-	curve.add_point(Vector3(-half_shift, 0.0, z_center - approach_length * 0.5))
-	curve.add_point(Vector3(-half_shift, 0.0, z_center))
+	# Entry approach ramp leading into the loop:
+	# Starts sunken below ground (Y = -0.25) so it emerges seamlessly from the road surface
+	# Then elevates smoothly up to ramp_height before entering the vertical loop
+	var z_entry_start := z_center - approach_length
+	curve.add_point(Vector3(-half_shift, -0.25, z_entry_start))
+	curve.add_point(Vector3(-half_shift, 0.0, z_entry_start + 3.0))
+	curve.add_point(Vector3(-half_shift, ramp_height * 0.5, z_entry_start + 10.0))
+	curve.add_point(Vector3(-half_shift, ramp_height, z_center - 4.0))
+	curve.add_point(Vector3(-half_shift, ramp_height, z_center))
 
 	# Helix roll compensation:
 	# A 3D helical path has non-zero torsion that accumulates rotation along the tangent.
@@ -189,7 +199,7 @@ func _create_loop_curve() -> Curve3D:
 	# and oriented straight towards the loop center during vertical climb and descent.
 	var total_roll_deg: float = 0.0
 	if r > 0.001:
-		total_roll_deg = -rad_to_deg(spiral_offset / r)
+		total_roll_deg = -rad_to_deg((half_shift * 2.0) / r)
 
 	# Full 360 degree vertical loop with smooth S-curve lateral shift
 	for i in range(1, curve_segments + 1):
@@ -197,21 +207,28 @@ func _create_loop_curve() -> Curve3D:
 		var a := t * TAU
 		var s_factor := smoothstep(0.0, 1.0, t)
 		var x := lerpf(-half_shift, half_shift, s_factor)
-		var y := r * (1.0 - cos(a))
+		var y := ramp_height + r * (1.0 - cos(a))
 		var z := z_center + r * sin(a)
 		var pt_idx := curve.point_count
 		curve.add_point(Vector3(x, y, z))
 		curve.set_point_tilt(pt_idx, deg_to_rad(total_roll_deg * s_factor))
 
-	# Exit ramp (flat along ground Y=0 continuing straight ahead +Z)
-	var exit_end_z := z_center + approach_length
+	# Exit ramp: descends from ramp_height back down into the road surface (Y = -0.25)
 	var exit_idx1 := curve.point_count
-	curve.add_point(Vector3(half_shift, 0.0, z_center + approach_length * 0.5))
+	curve.add_point(Vector3(half_shift, ramp_height, z_center + 4.0))
 	curve.set_point_tilt(exit_idx1, deg_to_rad(total_roll_deg))
 
 	var exit_idx2 := curve.point_count
-	curve.add_point(Vector3(half_shift, 0.0, exit_end_z))
+	curve.add_point(Vector3(half_shift, ramp_height * 0.5, z_center + approach_length - 10.0))
 	curve.set_point_tilt(exit_idx2, deg_to_rad(total_roll_deg))
+
+	var exit_idx3 := curve.point_count
+	curve.add_point(Vector3(half_shift, 0.0, z_center + approach_length - 3.0))
+	curve.set_point_tilt(exit_idx3, deg_to_rad(total_roll_deg))
+
+	var exit_idx4 := curve.point_count
+	curve.add_point(Vector3(half_shift, -0.25, z_center + approach_length))
+	curve.set_point_tilt(exit_idx4, deg_to_rad(total_roll_deg))
 
 	return curve
 
@@ -223,16 +240,20 @@ func _create_road_profile() -> PackedVector2Array:
 	var wt := wall_thickness
 	var th := road_thickness
 
-	# Profile points in local extruded space (X = lateral, Y = vertical)
+	# Profile with inward containment overhang lip:
+	# Solid thick foundation underneath (th = 1.6m) to prevent high-speed tunneling.
+	# High side walls (wh = 2.6m) with inward safety hook to catch sliding cars.
 	return PackedVector2Array([
-		Vector2(-hw - wt, wh),       # 0: Left wall top outer
-		Vector2(-hw, wh),            # 1: Left wall top inner
-		Vector2(-hw + 0.35, 0.0),    # 2: Left wall base inner (smooth chamfer)
-		Vector2(hw - 0.35, 0.0),     # 3: Right wall base inner (smooth chamfer)
-		Vector2(hw, wh),             # 4: Right wall top inner
-		Vector2(hw + wt, wh),        # 5: Right wall top outer
-		Vector2(hw + wt, -th),       # 6: Right wall bottom outer
-		Vector2(-hw - wt, -th),      # 7: Left wall bottom outer
+		Vector2(-hw - wt, wh),                # 0: Left wall top outer
+		Vector2(-hw + 0.45, wh + 0.25),       # 1: Left wall containment overhang lip (inward hook)
+		Vector2(-hw, wh),                     # 2: Left wall inner upper
+		Vector2(-hw + 0.35, 0.0),             # 3: Left wall base inner (smooth chamfer)
+		Vector2(hw - 0.35, 0.0),              # 4: Right wall base inner (smooth chamfer)
+		Vector2(hw, wh),                      # 5: Right wall inner upper
+		Vector2(hw - 0.45, wh + 0.25),        # 6: Right wall containment overhang lip (inward hook)
+		Vector2(hw + wt, wh),                 # 7: Right wall top outer
+		Vector2(hw + wt, -th),                # 8: Right wall bottom outer (-th solid thick backing)
+		Vector2(-hw - wt, -th),               # 9: Left wall bottom outer
 	])
 
 
@@ -260,17 +281,18 @@ func _add_support_pylons(combiner: CSGCombiner3D) -> void:
 	var z_center := -5.0
 	var col_radius := 0.65
 	var half_shift := spiral_offset * 0.5
-	var hw := track_width * 0.5 + wall_thickness + 0.4
+	var hw := track_width * 0.5 + wall_thickness
 
 	# Support 1: Ascent tower (under front climb at a = PI/2, y = r, z = z_center + r)
+	# Positioned well outside the left wall and behind the road backing
 	var s_climb := smoothstep(0.0, 1.0, 0.25)
 	var x_climb := lerpf(-half_shift, half_shift, s_climb)
 	var pylon_climb := CSGCylinder3D.new()
 	pylon_climb.name = "Pylon_Ascent"
 	pylon_climb.radius = col_radius
-	pylon_climb.height = r
+	pylon_climb.height = r + ramp_height
 	pylon_climb.sides = 16
-	pylon_climb.position = Vector3(x_climb - hw, r * 0.5, z_center + r)
+	pylon_climb.position = Vector3(x_climb - hw - 2.8, (r + ramp_height) * 0.5, z_center + r + road_thickness + 0.6)
 	pylon_climb.material = mat
 	pylon_climb.use_collision = true
 	pylon_climb.collision_layer = 1
@@ -278,43 +300,50 @@ func _add_support_pylons(combiner: CSGCombiner3D) -> void:
 
 	var pylon_climb_cross := CSGBox3D.new()
 	pylon_climb_cross.name = "Strut_Ascent"
-	pylon_climb_cross.size = Vector3(hw, 0.6, 0.6)
-	pylon_climb_cross.position = Vector3(x_climb - hw * 0.5, r - 0.5, z_center + r)
+	pylon_climb_cross.size = Vector3(3.0, 0.6, 0.6)
+	pylon_climb_cross.position = Vector3(x_climb - hw - 1.4, r + ramp_height - 0.5, z_center + r + road_thickness + 0.6)
 	pylon_climb_cross.material = mat
 	pylon_climb_cross.use_collision = true
 	combiner.add_child(pylon_climb_cross)
 
-	# Support 2: Apex central cross-arch towers (at a = PI, y = 2 * r, z = z_center)
-	var apex_h := 2.0 * r
+	# Support 2: Apex overhead gantry (at a = PI, y = 2 * r + ramp_height, z = z_center)
+	# Pylons stand completely outside the loop footprint:
+	# At ground Z = z_center, the entrance road extends to -half_shift - hw and exit extends to +half_shift + hw.
+	# We place the columns at lateral_span = half_shift + hw + 3.8 so they are 3.5m+ clear of ALL road surfaces!
+	var apex_h := 2.0 * r + ramp_height
+	var tower_h := apex_h + road_thickness + 1.2
+	var lateral_span := half_shift + hw + 3.8
 	for side in [-1.0, 1.0]:
 		var pylon_apex := CSGCylinder3D.new()
 		pylon_apex.name = "Pylon_Apex_" + ("L" if side < 0 else "R")
 		pylon_apex.radius = col_radius * 1.15
-		pylon_apex.height = apex_h
+		pylon_apex.height = tower_h
 		pylon_apex.sides = 16
-		pylon_apex.position = Vector3(side * (hw + 1.2), apex_h * 0.5, z_center)
+		pylon_apex.position = Vector3(side * lateral_span, tower_h * 0.5, z_center)
 		pylon_apex.material = mat
 		pylon_apex.use_collision = true
 		pylon_apex.collision_layer = 1
 		combiner.add_child(pylon_apex)
 
-		var strut_apex := CSGBox3D.new()
-		strut_apex.name = "Strut_Apex_" + ("L" if side < 0 else "R")
-		strut_apex.size = Vector3(hw + 1.2, 0.7, 0.7)
-		strut_apex.position = Vector3(side * (hw + 1.2) * 0.5, apex_h - 0.6, z_center)
-		strut_apex.material = mat
-		strut_apex.use_collision = true
-		combiner.add_child(strut_apex)
+	# Overhead cross-gantry beam spanning across the roof (above the road, outside the loop)
+	var strut_apex := CSGBox3D.new()
+	strut_apex.name = "Strut_Apex_Overhead"
+	strut_apex.size = Vector3(lateral_span * 2.0 + 1.0, 0.7, 0.7)
+	strut_apex.position = Vector3(0.0, apex_h + road_thickness + 0.6, z_center)
+	strut_apex.material = mat
+	strut_apex.use_collision = true
+	combiner.add_child(strut_apex)
 
 	# Support 3: Descent tower (under rear drop at a = 3PI/2, y = r, z = z_center - r)
+	# Positioned well outside the right wall and behind the road backing
 	var s_desc := smoothstep(0.0, 1.0, 0.75)
 	var x_desc := lerpf(-half_shift, half_shift, s_desc)
 	var pylon_descent := CSGCylinder3D.new()
 	pylon_descent.name = "Pylon_Descent"
 	pylon_descent.radius = col_radius
-	pylon_descent.height = r
+	pylon_descent.height = r + ramp_height
 	pylon_descent.sides = 16
-	pylon_descent.position = Vector3(x_desc + hw, r * 0.5, z_center - r)
+	pylon_descent.position = Vector3(x_desc + hw + 2.8, (r + ramp_height) * 0.5, z_center - r - road_thickness - 0.6)
 	pylon_descent.material = mat
 	pylon_descent.use_collision = true
 	pylon_descent.collision_layer = 1
@@ -322,8 +351,8 @@ func _add_support_pylons(combiner: CSGCombiner3D) -> void:
 
 	var pylon_descent_cross := CSGBox3D.new()
 	pylon_descent_cross.name = "Strut_Descent"
-	pylon_descent_cross.size = Vector3(hw, 0.6, 0.6)
-	pylon_descent_cross.position = Vector3(x_desc + hw * 0.5, r - 0.5, z_center - r)
+	pylon_descent_cross.size = Vector3(3.0, 0.6, 0.6)
+	pylon_descent_cross.position = Vector3(x_desc + hw + 1.4, r + ramp_height - 0.5, z_center - r - road_thickness - 0.6)
 	pylon_descent_cross.material = mat
 	pylon_descent_cross.use_collision = true
 	combiner.add_child(pylon_descent_cross)
@@ -335,41 +364,47 @@ func _add_boost_pads() -> void:
 	pads_node.name = "BoostPads"
 	add_child(pads_node)
 
-	var half_shift := spiral_offset * 0.5
-	var z_center := -5.0
+	var path_node: Path3D = get_node_or_null("Path3D")
+	var curve: Curve3D = path_node.curve if path_node else null
+	var total_len: float = curve.get_baked_length() if curve else 140.0
 
-	# Boost Pad 1 on entry ramp
+	# Boost Pad 1: Along the entry ramp incline (launches car onto the ramp)
 	var pad_entry_1 = BOOST_PAD_SCENE.instantiate()
 	pad_entry_1.name = "BoostPad_Entry1"
-	pad_entry_1.position = Vector3(-half_shift, 0.08, z_center - approach_length * 0.7)
-	pad_entry_1.rotation_degrees = Vector3(0, 0, 0) # facing +Z
 	if "boost_strength" in pad_entry_1:
 		pad_entry_1.boost_strength = 1.35
 	if "boost_duration" in pad_entry_1:
 		pad_entry_1.boost_duration = 2.5
 	pads_node.add_child(pad_entry_1)
+	_align_pad_to_curve(pad_entry_1, curve, 8.0)
 
-	# Boost Pad 2 on entry ramp (closer to launch into loop)
+	# Boost Pad 2: Near the loop launch base (guarantees climbing speed)
 	var pad_entry_2 = BOOST_PAD_SCENE.instantiate()
 	pad_entry_2.name = "BoostPad_Entry2"
-	pad_entry_2.position = Vector3(-half_shift, 0.08, z_center - approach_length * 0.25)
-	pad_entry_2.rotation_degrees = Vector3(0, 0, 0) # facing +Z
 	if "boost_strength" in pad_entry_2:
 		pad_entry_2.boost_strength = 1.25
 	if "boost_duration" in pad_entry_2:
 		pad_entry_2.boost_duration = 2.0
 	pads_node.add_child(pad_entry_2)
+	_align_pad_to_curve(pad_entry_2, curve, 20.0)
 
 	# Boost Pad on exit ramp (speed boost shooting out of the loop)
 	var pad_exit = BOOST_PAD_SCENE.instantiate()
 	pad_exit.name = "BoostPad_Exit"
-	pad_exit.position = Vector3(half_shift, 0.08, z_center + approach_length * 0.35)
-	pad_exit.rotation_degrees = Vector3(0, 0, 0) # facing +Z
 	if "boost_strength" in pad_exit:
 		pad_exit.boost_strength = 1.15
 	if "boost_duration" in pad_exit:
 		pad_exit.boost_duration = 1.8
 	pads_node.add_child(pad_exit)
+	_align_pad_to_curve(pad_exit, curve, maxf(total_len - 12.0, 30.0))
+
+
+func _align_pad_to_curve(pad: Node3D, curve: Curve3D, offset: float) -> void:
+	if not curve:
+		return
+	var tf := curve.sample_baked_with_rotation(offset, false, true)
+	pad.transform = tf
+	pad.position += tf.basis.y * 0.08
 
 
 func _set_owner_recursive(node: Node, scene_root: Node) -> void:

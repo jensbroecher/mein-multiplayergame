@@ -1672,6 +1672,7 @@ func _generate_water():
 		water.position = Vector3(0, -2.5, 0)
 	else:
 		water.position = Vector3(0, -10.0, 0) # Water level (below terrain base)
+	water.set_meta("water_surface_y", water.position.y)
 
 	# Create a high-quality water shader material
 	var mat = ShaderMaterial.new()
