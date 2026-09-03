@@ -1,4 +1,4 @@
-[gd_scene format=4 uid="uid://bos1i52omy3pm"]
+[gd_scene format=3 uid="uid://bos1i52omy3pm"]
 
 [ext_resource type="Script" uid="uid://bvq0woltugbyp" path="res://LoopCSG.gd" id="1_arww8"]
 [ext_resource type="Texture2D" uid="uid://bsmrfxbh6vqe2" path="res://materials/asphalt.png" id="2_hbxu5"]
@@ -23,10 +23,6 @@ uv1_triplanar = true
 albedo_color = Color(0.28, 0.3, 0.35, 1)
 metallic = 0.75
 roughness = 0.35
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tka3e"]
-albedo_color = Color(0.88, 0.28, 0.12, 1)
-roughness = 0.6
 
 [node name="LoopCSG" type="Node3D" unique_id=1795395767]
 script = ExtResource("1_arww8")
@@ -54,7 +50,7 @@ path_joined = false
 material = SubResource("StandardMaterial3D_06q5j")
 
 [node name="Pylon_Ascent" type="CSGCylinder3D" parent="LoopCSGCombiner" unique_id=1082780989]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.334375, 8.325, 13.2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.334375, 8.325, 11.189746)
 use_collision = true
 radius = 0.65
 height = 16.65
@@ -62,7 +58,7 @@ sides = 16
 material = SubResource("StandardMaterial3D_12c6q")
 
 [node name="Strut_Ascent" type="CSGBox3D" parent="LoopCSGCombiner" unique_id=2045242114]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.934375, 16.15, 13.2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.934375, 16.15, 11.189746)
 use_collision = true
 size = Vector3(3, 0.6, 0.6)
 material = SubResource("StandardMaterial3D_12c6q")
@@ -84,13 +80,13 @@ sides = 16
 material = SubResource("StandardMaterial3D_12c6q")
 
 [node name="Strut_Apex_Overhead" type="CSGBox3D" parent="LoopCSGCombiner" unique_id=411111447]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 34.85, -5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 34.280426, -5)
 use_collision = true
 size = Vector3(27.7, 0.7, 0.7)
 material = SubResource("StandardMaterial3D_12c6q")
 
 [node name="Pylon_Descent" type="CSGCylinder3D" parent="LoopCSGCombiner" unique_id=1333599910]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.334375, 8.325, -23.2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.334375, 8.325, -21.560644)
 use_collision = true
 radius = 0.65
 height = 16.65
@@ -98,29 +94,25 @@ sides = 16
 material = SubResource("StandardMaterial3D_12c6q")
 
 [node name="Strut_Descent" type="CSGBox3D" parent="LoopCSGCombiner" unique_id=1810231841]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.934375, 16.15, -23.2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.934375, 16.15, -21.560644)
 use_collision = true
 size = Vector3(3, 0.6, 0.6)
 material = SubResource("StandardMaterial3D_12c6q")
 
 [node name="EntryDivider" type="CSGBox3D" parent="LoopCSGCombiner" unique_id=187425820]
-transform = Transform3D(0.9263738, 0, -0.3766054, 0, 1, 0, 0.3766054, 0, 0.9263738, -1.1872511, 0.7, 12.03804)
+transform = Transform3D(0.8713299, 0, -0.49069753, 0, 1, 0, 0.49069753, 0, 0.8713299, 0.05959858, 1.0676696, 10.234287)
 use_collision = true
-size = Vector3(0.55, 1.4, 19.2)
+size = Vector3(0.55, 2.1353393, 11.57118)
 material = SubResource("StandardMaterial3D_06q5j")
 
 [node name="BoostPads" type="Node3D" parent="." unique_id=393256470]
 
-[node name="BoostPad_Entry1" type="Area3D" parent="BoostPads" instance=ExtResource("3_ypmpm")]
-transform = Transform3D(-1, 0, 0, 0, 0.99892396, -0.046378613, 0, -0.046378613, -0.99892396, -6.1932406, 0.31132466, -21.019478)
+[node name="BoostPad_Entry1" parent="BoostPads" unique_id=37569771 instance=ExtResource("3_ypmpm")]
+transform = Transform3D(-1, 0, 0, 0, 0.99892294, -0.04640008, 0, -0.04640008, -0.99892294, -6.0573177, 0.31097767, -21.026901)
 boost_strength = 1.35
 boost_duration = 2.5
 
-[node name="BoostPad_Entry2" type="Area3D" parent="BoostPads" instance=ExtResource("3_ypmpm")]
-transform = Transform3D(-1, 0, 0, 0, 0.9994723, -0.032482848, 0, -0.03248285, -0.99947226, -5.9201097, 0.7292036, -9.0258045)
-boost_strength = 1.25
-
-[node name="BoostPad_Exit" type="Area3D" parent="BoostPads" instance=ExtResource("3_ypmpm")]
-transform = Transform3D(-0.9999997, 0.00070616236, -1.8626451e-09, 0.0007057859, 0.9994721, 0.032482848, 2.2940338e-05, 0.03248284, -0.99947226, 4.8175697, 0.4693399, 14.908037)
+[node name="BoostPad_Exit" parent="BoostPads" unique_id=1871629497 instance=ExtResource("3_ypmpm")]
+transform = Transform3D(-0.9999998, 0.0007062629, 9.800933e-06, 0.0007059581, 0.9989252, 0.046350878, 2.2945498e-05, 0.04635087, -0.9989252, 5.8825417, 0.12932196, 14.915453)
 boost_strength = 1.15
 boost_duration = 1.8

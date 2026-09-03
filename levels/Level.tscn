@@ -45,7 +45,6 @@
 [ext_resource type="Texture2D" uid="uid://dvooxvqtwjnq4" path="res://models/trees/flower_white_leef.png" id="26_jpwbr"]
 [ext_resource type="MultiMesh" uid="uid://djjenuh7w6s6g" path="res://generated/grass/chunk_6_1.res" id="27_oaaeu"]
 [ext_resource type="MultiMesh" uid="uid://cdyxdhowyyij3" path="res://generated/grass/chunk_8_2.res" id="30_c0c4f"]
-[ext_resource type="PackedScene" uid="uid://djmpd2owxd2xm" path="res://models/ramps/woodramp.fbx" id="30_q2vmi"]
 [ext_resource type="MultiMesh" uid="uid://ef5hpftwnn12" path="res://generated/grass/chunk_9_2.res" id="31_h72at"]
 [ext_resource type="MultiMesh" uid="uid://dfxnsyx3i05i6" path="res://generated/grass/chunk_5_2.res" id="31_mwmot"]
 [ext_resource type="PackedScene" uid="uid://da2i62hjyc1cp" path="res://addons/GodotWeatherSystem/weather_controller.tscn" id="31_weather"]
@@ -361,14 +360,14 @@ horizonColour = Color(0.0784314, 0.00784314, 0.0156863, 1)
 groundColour = Color(0, 0, 0, 1)
 cloudBrightness = 0.05
 
-[sub_resource type="Resource" id="Resource_qxpn6"]
+[sub_resource type="Resource" id="Resource_oaaeu"]
 script = ExtResource("5_yr3df")
 weather = ExtResource("6_jpwbr")
 
-[sub_resource type="Resource" id="Resource_4dj6u"]
+[sub_resource type="Resource" id="Resource_qxpn6"]
 script = ExtResource("3_jpwbr")
 seasonId = "summer"
-weathers = Array[ExtResource("5_yr3df")]([SubResource("Resource_qxpn6")])
+weathers = Array[ExtResource("5_yr3df")]([SubResource("Resource_oaaeu")])
 skyColourDaytime = SubResource("Resource_ext2d")
 skyColourNight = SubResource("Resource_p7jpd")
 dayNightCycleCurve = SubResource("Curve_8bl6p")
@@ -912,7 +911,7 @@ point_count = 26
 
 [sub_resource type="Curve3D" id="Curve3D_shortcut1"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 48.294617, 8.271442, 284.861, 0, 0, 0, 0, 0, 0, 43.57193, 14.857462, 260.97174, 0, 0, 0, 0, 0, 0, 67.40282, 3, 223.75745),
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 20.181015, 4.005453, 281.55383, 0, 0, 0, 0, 0, 0, 52.1336, 4.4190316, 254.92352, 0, 0, 0, 0, 0, 0, 73.304504, 3, 230.17091),
 "tilts": PackedFloat32Array(0, 0, 0)
 }
 point_count = 3
@@ -1389,7 +1388,7 @@ alternative_paths = [NodePath("AlternativePaths/AlternativePath1"), NodePath("Al
 [node name="WeatherController" parent="." unique_id=1277823175 instance=ExtResource("31_weather")]
 time_of_day_hours = 13.239
 selected_weather = 1
-seasons = Array[ExtResource("3_jpwbr")]([SubResource("Resource_4dj6u")])
+seasons = Array[ExtResource("3_jpwbr")]([SubResource("Resource_qxpn6")])
 startTime = 47660.4
 
 [node name="TerrainGenerator" type="Node3D" parent="." unique_id=586341718 node_paths=PackedStringArray("track_path")]
@@ -4861,7 +4860,7 @@ transform = Transform3D(-0.9705958, 0.014220705, 0.24029489, -5.4109836e-07, 0.9
 transform = Transform3D(-0.72159106, 0.013014751, -0.6921972, 0, 0.99982333, 0.018798761, 0.6923196, 0.013565018, -0.7214635, -292.59552, 6.3630095, 212.07228)
 
 [node name="Halfway8" parent="Checkpoints" unique_id=970429383 instance=ExtResource("2_gate")]
-transform = Transform3D(0.04254194, 0.0047366563, -0.9990835, 1.5395925e-08, 0.9999888, 0.004740949, 0.99909467, -0.00020170453, 0.042541463, 38.881798, 2.3699303, 287.87805)
+transform = Transform3D(0.04254194, 0.0047366563, -0.9990835, 1.5395925e-08, 0.9999888, 0.004740949, 0.99909467, -0.00020170453, 0.042541463, -84.35418, 2.8974676, 289.7146)
 
 [node name="be10e042cec0f40d5041acdc304a0ac3" parent="Checkpoints" unique_id=51618898 groups=["collision_trimesh"] instance=ExtResource("79_ybx0l")]
 transform = Transform3D(0.408103, 0.018805888, 0.9127422, -3.7811697e-07, 0.99978787, -0.020599183, -0.9129359, 0.008406242, 0.4080164, -424.43256, 19.48409, -640.4886)
@@ -4875,9 +4874,6 @@ curve = SubResource("Curve3D_shortcut1")
 curve = SubResource("Curve3D_shortcut2")
 
 [node name="Ramps" type="Node3D" parent="." unique_id=1288188222]
-
-[node name="WoodRamp" parent="Ramps" unique_id=1457045438 groups=["collision_trimesh"] instance=ExtResource("30_q2vmi")]
-transform = Transform3D(7.1962733, 0, -18.660484, 0, 20, 0, 18.660484, 0, 7.1962733, 22.445913, 0.021007419, -9.015505)
 
 [node name="NewRamp" parent="Ramps" unique_id=966004585 groups=["collision_trimesh"] instance=ExtResource("17_dcckh")]
 transform = Transform3D(-30.273119, 0, -33.29471, 0, 44.999985, 0, 33.29471, 0, -30.273119, -507.56146, 6.9816875, -210.87714)
@@ -4895,29 +4891,11 @@ transform = Transform3D(-0.7686144, 0, -0.63971233, 0, 1, 0, 0.63971233, 0, -0.7
 [node name="Pine" parent="LevelDesign/Trees" unique_id=1943690367 groups=["collision_trimesh"] instance=ExtResource("83_0ct4b")]
 transform = Transform3D(0.8, 0, 0, 0, 0.8, 0, 0, 0, 0.8, 266.80515, -7.0682893, -114.92311)
 
-[node name="Mesh" parent="LevelDesign/Trees/Pine/Tree" parent_id_path=PackedInt32Array(1943690367, 1872935113) index="0" unique_id=1331791924]
-lod_bias = 10.0
-
-[node name="Mesh2" parent="LevelDesign/Trees/Pine/Tree" parent_id_path=PackedInt32Array(1943690367, 1872935113) index="1" unique_id=193366998]
-lod_bias = 10.0
-
 [node name="Pine2" parent="LevelDesign/Trees" unique_id=1616149328 groups=["collision_trimesh"] instance=ExtResource("83_0ct4b")]
 transform = Transform3D(-0.32899797, 0, 0.729219, 0, 0.67888784, 0, -0.729219, 0, -0.32899797, 203.03888, 12.684913, -280.4562)
 
-[node name="Mesh" parent="LevelDesign/Trees/Pine2/Tree" parent_id_path=PackedInt32Array(1616149328, 1872935113) index="0" unique_id=1331791925]
-lod_bias = 10.0
-
-[node name="Mesh2" parent="LevelDesign/Trees/Pine2/Tree" parent_id_path=PackedInt32Array(1616149328, 1872935113) index="1" unique_id=193366999]
-lod_bias = 10.0
-
 [node name="Pine3" parent="LevelDesign/Trees" unique_id=172146906 groups=["collision_trimesh"] instance=ExtResource("83_0ct4b")]
 transform = Transform3D(-0.75461125, 0, 0.265635, 0, 0.6598115, 0, -0.265635, 0, -0.75461125, 329.3288, 8.60202, -282.15042)
-
-[node name="Mesh" parent="LevelDesign/Trees/Pine3/Tree" parent_id_path=PackedInt32Array(172146906, 1872935113) index="0" unique_id=1331791926]
-lod_bias = 10.0
-
-[node name="Mesh2" parent="LevelDesign/Trees/Pine3/Tree" parent_id_path=PackedInt32Array(172146906, 1872935113) index="1" unique_id=193367000]
-lod_bias = 10.0
 
 [node name="VegetationScatterer" type="Node3D" parent="LevelDesign" unique_id=40883185]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 61.321648, 0, -113.239914)
@@ -5066,7 +5044,7 @@ transform = Transform3D(0.62150073, -0.5278353, 0.5789017, 0.033523567, 0.756189
 transform = Transform3D(0.67918503, -0.055971805, 0.7318299, 0, 0.99708784, 0.07625928, -0.7339674, -0.051794134, 0.677207, -516.58276, 8.956961, -219.0685)
 
 [node name="Plant2" parent="." unique_id=137287197 groups=["collision_capsule"] instance=ExtResource("102_7q3nd")]
-transform = Transform3D(7, 0, 0, 0, 7, 0, 0, 0, 7, 7.32629, 0.61939895, 103.84227)
+transform = Transform3D(7.8501353, 1.5412256, 0, -1.5389148, 7.8383656, 0.43790776, 0.084364325, -0.4297044, 7.9880056, 7.32629, 0.39681852, 103.84227)
 
 [node name="Plant" parent="." unique_id=1361610939 groups=["collision_capsule"] instance=ExtResource("103_3ll0q")]
 transform = Transform3D(5.7512646, 0, -3.9903572, 0, 7, 0, 3.9903572, 0, 5.7512646, 29.53201, 0.024594069, 84.78279)

@@ -259,6 +259,10 @@ var _ai_obstacle_steer_dir: float = 0.0
 var _ai_last_speed_sample: float = 0.0
 var _ai_speed_stall_timer: float = 0.0
 var _ai_steep_hill_stuck_timer: float = 0.0
+var _ai_slope_rollback_timer: float = 0.0
+var _ai_offroad_anchor_pos: Vector3 = Vector3.ZERO
+var _ai_offroad_stuck_timer: float = 0.0
+var _ai_offroad_max_dist: float = 0.0
 var track_path: Path3D = null
 var alternative_paths: Array[Path3D] = []
 var active_path: Path3D = null
@@ -346,6 +350,8 @@ var water_bounds_max: Vector2 = Vector2.ZERO
 var _wadi_water_tg: Node = null
 var water_timer: float = 0.0
 var shallow_water_timer: float = 0.0
+var _water_contact_grace: float = 0.0
+var in_water_contact: bool = false
 var last_splash_time: float = -999.0
 ## Tracks wet/dry transitions for entry splash + hit slowdown.
 var _was_in_water_zone: bool = false
@@ -1356,6 +1362,47 @@ func _physics_process(delta):
 				else:
 					respawn()
 			ai_last_stuck_position = global_position
+
+		# Off-road / Pond slope rollback & bounded region stuck detection:
+		# Detects when a car tries to climb up a slope and rolls back repeatedly (e.g. in a pond or ditch)
+		if is_offroad or in_water_contact or _water_contact_grace > 0.0:
+			if _ai_offroad_stuck_timer <= 0.001:
+				_ai_offroad_anchor_pos = global_position
+				_ai_offroad_max_dist = 0.0
+				_ai_offroad_stuck_timer = 0.0
+			_ai_offroad_stuck_timer += delta
+			var cur_disp: float = global_position.distance_to(_ai_offroad_anchor_pos)
+			if cur_disp > _ai_offroad_max_dist:
+				_ai_offroad_max_dist = cur_disp
+
+			var cart_fwd = -visuals.global_transform.basis.z
+			var fwd_v = linear_velocity.dot(cart_fwd)
+			# Rolling backwards downhill while offroad / on pond bank
+			if fwd_v < -0.35:
+				_ai_slope_rollback_timer += delta
+			else:
+				_ai_slope_rollback_timer = maxf(0.0, _ai_slope_rollback_timer - delta * 0.25)
+
+			# Give up and respawn if:
+			# 1. Repeatedly slipping/rolling back down the slope (~1.8s cumulative rollback)
+			# 2. Confined in a small area (under 7m max displacement) for > 4.5s (oscillating in pond/pit)
+			# 3. Off-road without reaching the track for > 7.0s
+			var slope_rollback_stuck: bool = _ai_slope_rollback_timer >= 1.8
+			var confined_no_progress: bool = _ai_offroad_stuck_timer >= 4.5 and _ai_offroad_max_dist < 7.0
+			var offroad_timeout: bool = _ai_offroad_stuck_timer >= 7.0
+			if slope_rollback_stuck or confined_no_progress or offroad_timeout:
+				print("AI Cart ", name, " detected no progress offroad (slope:", slope_rollback_stuck, ", confined:", confined_no_progress, ", time:", _ai_offroad_stuck_timer, "s). Respawning.")
+				_ai_offroad_stuck_timer = 0.0
+				_ai_offroad_max_dist = 0.0
+				_ai_slope_rollback_timer = 0.0
+				if multiplayer.multiplayer_peer != null and multiplayer.is_server():
+					respawn_rpc.rpc(last_checkpoint_transform)
+				else:
+					respawn()
+		else:
+			_ai_offroad_stuck_timer = 0.0
+			_ai_offroad_max_dist = 0.0
+			_ai_slope_rollback_timer = maxf(0.0, _ai_slope_rollback_timer - delta * 0.5)
 		
 		# Check if cart has fallen off track (e.g. fallen down a cliff, bridge or ravine)
 		var check_path = active_path if active_path else track_path
@@ -1369,19 +1416,19 @@ func _physics_process(delta):
 			var track_pt = check_path.to_global(curve.sample_baked(cur_off))
 			var height_below = track_pt.y - global_position.y
 			var dist_xz = Vector2(global_position.x - track_pt.x, global_position.z - track_pt.z).length()
-			var is_fallen_off: bool = height_below > 10.0 and (is_offroad or air_time > 0.8 or dist_xz > 16.0)
+			var is_fallen_off: bool = (height_below > 6.0 or dist_xz > 22.0) and (is_offroad or air_time > 0.8 or dist_xz > 16.0)
 			if is_fallen_off:
 				if _ai_offtrack_timer <= 0.001:
 					_ai_fall_origin = global_position
 				_ai_offtrack_timer += delta
-				if global_position.distance_to(_ai_progress_sample_pos) > 4.0:
+				if global_position.distance_to(_ai_progress_sample_pos) > 12.0:
 					_ai_progress_sample_pos = global_position
 					_ai_no_progress_timer = 0.0
 				else:
 					_ai_no_progress_timer += delta
 				var stray: float = Vector2(global_position.x - _ai_fall_origin.x, global_position.z - _ai_fall_origin.z).length()
 				# Don't tour the hills. If they wandered far from the fall, teleport back.
-				var no_progress: bool = _ai_no_progress_timer > 4.5 and linear_velocity.length() < 2.0
+				var no_progress: bool = _ai_no_progress_timer > 4.0
 				# Keep trying toward the next gate; only give up if stuck or truly lost.
 				var too_far: bool = stray > 70.0 and no_progress
 				var recover_limit: float = 14.0 if _ai_recovering else 8.0
@@ -1401,6 +1448,8 @@ func _physics_process(delta):
 	else:
 		ai_stuck_position_timer = 0.0
 		_ai_offtrack_timer = 0.0
+		_ai_offroad_stuck_timer = 0.0
+		_ai_slope_rollback_timer = 0.0
 		ai_last_stuck_position = global_position
 
 	if is_exploding:
@@ -1474,7 +1523,7 @@ func _physics_process(delta):
 		var water_depth: float = water_surface_y - global_position.y
 		var in_water_xz := _is_over_water_volume()
 		# True contact with water: car's wheels touch water surface (tires reach down to ~ -0.80m from body origin)
-		var in_water_contact := in_water_xz and water_depth >= -0.80
+		in_water_contact = in_water_xz and water_depth >= -0.80
 		# Shallow / ford: touching or wading through water — spray and light drag
 		var in_shallow_water := in_water_contact and water_depth < 0.75
 		# Deep water only (hull submerged): can eventually drown
@@ -1573,6 +1622,12 @@ func _physics_process(delta):
 			linear_velocity.x *= (1.0 - clampf((2.8 if in_deep_water else 1.2) * delta, 0.0, 0.35))
 			linear_velocity.z *= (1.0 - clampf((2.8 if in_deep_water else 1.2) * delta, 0.0, 0.35))
 
+		# Maintain water contact grace timer so brief bounces on banks don't instantly wipe water state
+		if in_water_contact:
+			_water_contact_grace = 1.4
+		else:
+			_water_contact_grace = maxf(0.0, _water_contact_grace - delta)
+
 		if in_deep_water:
 			water_timer += delta
 			shallow_water_timer = 0.0
@@ -1583,12 +1638,14 @@ func _physics_process(delta):
 				elif multiplayer.multiplayer_peer == null:
 					drown()
 			apply_central_force(Vector3.UP * 12.0)
-		elif in_water_contact:
+		elif in_water_contact or (_water_contact_grace > 0.0 and is_offroad):
 			water_timer = maxf(0.0, water_timer - delta * 1.5)
-			# If a car stands / is stuck longer than 5 seconds in shallow water, trigger drown respawn
-			if linear_velocity.length() < 2.5:
+			# If a car is offroad in/near shallow water (pond, swamp, river bank) or stuck longer than 4.8 seconds:
+			# Offroad pond oscillation counts towards drowning even if rolling back and forth!
+			var stuck_in_water: bool = is_offroad or linear_velocity.length() < 2.5
+			if stuck_in_water:
 				shallow_water_timer += delta
-				if shallow_water_timer > 5.0 and not is_finished_race:
+				if shallow_water_timer > 4.8 and not is_finished_race:
 					if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 						drown_rpc.rpc()
 					elif multiplayer.multiplayer_peer == null:
@@ -1609,25 +1666,45 @@ func _physics_process(delta):
 
 	# Update loop detection with grace timer so micro-bounces don't instantly drop cars off ceilings
 	var hitting_loop: bool = is_instance_valid(ground_ray) and ground_ray.is_colliding() and _is_loop_surface(ground_ray.get_collider())
-	if hitting_loop:
+	var spd: float = linear_velocity.length()
+	var loop_col_normal: Vector3 = ground_ray.get_collision_normal() if hitting_loop else _loop_last_normal
+
+	# If the car is inverted / on the upper half of the loop (loop normal pointing downward):
+	# It requires a minimum speed to maintain centripetal adhesion to the ceiling!
+	# Below min speed (~9.5 m/s), gravity pulls it off the ceiling — it CANNOT stay glued!
+	var is_loop_inverted: bool = loop_col_normal.y < 0.25
+	var min_loop_stick_speed: float = 9.5
+	var can_stick_to_loop: bool = (not is_loop_inverted) or (spd >= min_loop_stick_speed)
+
+	if hitting_loop and can_stick_to_loop:
 		_loop_grace = 0.28
-		_loop_last_normal = ground_ray.get_collision_normal()
+		_loop_last_normal = loop_col_normal
 	else:
 		_loop_grace = maxf(0.0, _loop_grace - delta)
+		if is_loop_inverted and not can_stick_to_loop:
+			# Immediately drop off the ceiling when too slow!
+			_loop_grace = 0.0
+
 	is_on_loop = _loop_grace > 0.0
 
 	# Apply extra gravity (reduced / cancelled while stuck in a loop so inverted sections work)
 	if not is_on_loop:
 		apply_central_force(Vector3.DOWN * GRAVITY * mass)
 	else:
-		# Stick into the loop surface (centripetal + contact glue)
 		var loop_n: Vector3 = _loop_last_normal
-		var spd: float = linear_velocity.length()
-		var stick: float = mass * (spd * spd / 14.0 + 28.0)
-		apply_central_force(-loop_n * stick)
-		# Soft world-gravity while inverted so cars don't peel off mid-loop
 		var invert: float = clampf(1.0 - loop_n.y, 0.0, 1.0)
-		apply_central_force(Vector3.DOWN * GRAVITY * mass * (1.0 - invert * 0.85))
+		
+		# Stick into the loop surface (centripetal force scales with speed squared)
+		# Only apply baseline contact glue if car has sufficient speed or is right-side up
+		var speed_stick_ratio: float = clampf((spd - min_loop_stick_speed) / 6.0, 0.0, 1.0) if is_loop_inverted else 1.0
+		var centripetal_force: float = mass * (spd * spd / 14.0)
+		var contact_glue: float = mass * 28.0 * speed_stick_ratio
+		var stick: float = centripetal_force + contact_glue
+		apply_central_force(-loop_n * stick)
+
+		# Soft world-gravity while inverted ONLY when carrying sufficient speed
+		var effective_invert: float = invert * speed_stick_ratio
+		apply_central_force(Vector3.DOWN * GRAVITY * mass * (1.0 - effective_invert * 0.85))
 
 	# Continuous boost timer check for the local player
 	if boost_timer > 0.0:
@@ -2026,10 +2103,11 @@ func _physics_process(delta):
 				# Keep forward speed by offsetting friction/drag to preserve momentum
 				apply_central_force(fwd * acceleration * 0.45 * mass)
 			else:
-				var spd = linear_velocity.length()
-				# Shallow slope threshold (normal.y >= 0.95 = slope angle < ~18 degrees)
-				# Coast naturally with gentle rolling resistance, locking only when nearly stopped
-				if ground_normal.y >= 0.95 or not is_offroad:
+				spd = linear_velocity.length()
+				# Shallow slope threshold (normal.y >= 0.92 = slope angle < ~23 degrees)
+				# Coast naturally with gentle rolling resistance, locking only on gentle upright ground when nearly stopped
+				var is_flat_upright: bool = ground_normal.y >= 0.92 and not on_loop and not is_on_loop
+				if is_flat_upright:
 					if spd < 0.15:
 						linear_velocity = Vector3.ZERO
 						angular_velocity = Vector3.ZERO
@@ -2039,7 +2117,7 @@ func _physics_process(delta):
 						# Gentle natural rolling resistance for smooth roll-out
 						apply_central_force(-linear_velocity * 0.45 * mass)
 				else:
-					# Steep offroad slopes: allow natural downhill slide with light drag
+					# Steep slopes, ramps, and loops: allow natural slide/roll with light drag
 					apply_central_force(-linear_velocity * 0.20 * mass)
 
 	# Steering (works on ground and airborne)
@@ -3408,6 +3486,12 @@ func _apply_respawn_pose() -> void:
 	_ai_fall_origin = Vector3.ZERO
 	_ai_cached_offset = -1.0
 	_ai_steep_hill_stuck_timer = 0.0
+	_ai_slope_rollback_timer = 0.0
+	_ai_offroad_anchor_pos = Vector3.ZERO
+	_ai_offroad_stuck_timer = 0.0
+	_ai_offroad_max_dist = 0.0
+	_water_contact_grace = 0.0
+	in_water_contact = false
 	_ai_obstacle_reverse_timer = 0.0
 	_ai_obstacle_stuck_timer = 0.0
 	_ai_speed_stall_timer = 0.0
@@ -5185,20 +5269,29 @@ func _get_ai_input(delta: float) -> Vector2:
 		else:
 			target_global_pos = active_path.to_global(target_local_pos)
 
-		# Off-road stuck detection (stalled against steep cliff, wall or boulder)
-		if speed < 2.0 and input.y < -0.1:
+		# Off-road stuck detection (stalled against steep cliff, wall or boulder, or rolling backwards)
+		var fwd_speed: float = linear_velocity.dot(fwd_3d)
+		var is_stalled_or_rolling_back: bool = fwd_speed < 1.5
+		if is_stalled_or_rolling_back and input.y < -0.1:
 			_ai_steep_hill_stuck_timer += delta
-			if _ai_steep_hill_stuck_timer > 2.5:
-				print("AI Cart ", name, " stuck offroad. Respawning.")
+			if fwd_speed < -0.3:
+				_ai_slope_rollback_timer += delta
+			else:
+				_ai_slope_rollback_timer = maxf(0.0, _ai_slope_rollback_timer - delta * 0.25)
+			if _ai_steep_hill_stuck_timer > 2.5 or _ai_slope_rollback_timer > 1.8:
+				print("AI Cart ", name, " stuck offroad on slope / rolling back. Respawning.")
 				_ai_steep_hill_stuck_timer = 0.0
+				_ai_slope_rollback_timer = 0.0
 				if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 					respawn_rpc.rpc(last_checkpoint_transform)
 				else:
 					respawn()
 		else:
-			_ai_steep_hill_stuck_timer = maxf(_ai_steep_hill_stuck_timer - delta * 2.0, 0.0)
+			_ai_steep_hill_stuck_timer = maxf(_ai_steep_hill_stuck_timer - delta * 0.5, 0.0)
+			_ai_slope_rollback_timer = maxf(0.0, _ai_slope_rollback_timer - delta * 0.25)
 	else:
 		_ai_steep_hill_stuck_timer = 0.0
+		_ai_slope_rollback_timer = 0.0
 		target_global_pos = active_path.to_global(target_local_pos)
 
 	# Item Box Seeking (strictly within lane on mountain roads so cars never steer off)
@@ -5262,6 +5355,10 @@ func _get_ai_input(delta: float) -> Vector2:
 			input.y = 0.0
 			linear_velocity = Vector3.ZERO
 			angular_velocity = Vector3.ZERO
+	elif is_on_loop or approaching_loop:
+		# Commit full power through stunt loops — never brake or drift mid-loop!
+		_ai_want_drift = false
+		input.y = -1.0
 	elif is_offroad:
 		# When off-road, power forward toward the checkpoint without on-track curve braking
 		_ai_want_drift = false
@@ -5615,7 +5712,7 @@ func _get_ai_input(delta: float) -> Vector2:
 			input.y = 0.95
 			input.x = clampf(-_ai_unstuck_dir * 0.6, -0.8, 0.8)
 	else:
-		if speed >= 3.0:
+		if linear_velocity.dot(-visuals.global_transform.basis.z) >= 2.5:
 			_ai_speed_stall_timer = 0.0
 			_ai_unstuck_dir = 0.0
 			stuck_timer = 0.0
