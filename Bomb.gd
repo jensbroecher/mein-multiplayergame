@@ -266,6 +266,7 @@ func _explode_rpc():
 		ap.stream = sound_stream
 		ap.max_distance = 80.0
 		ap.unit_size = 10.0
+		ap.position = expl_pos
 		scene_root.add_child(ap)
 		ap.global_position = expl_pos
 		ap.play()
@@ -284,6 +285,7 @@ func _explode_rpc():
 	mat.albedo_color = Color(1.0, 0.5, 0.1, 0.8) # Vibrant orange/fire
 	expl_mesh.material_override = mat
 	
+	expl_mesh.position = expl_pos
 	scene_root.add_child(expl_mesh)
 	expl_mesh.global_position = expl_pos
 	expl_mesh.scale = Vector3(0.1, 0.1, 0.1)
@@ -303,6 +305,7 @@ func _explode_rpc():
 	if is_instance_valid(explosion_particles) and explosion_particles.get_parent() == self:
 		var ep = explosion_particles
 		remove_child(ep)
+		ep.position = expl_pos
 		scene_root.add_child(ep)
 		ep.global_position = expl_pos
 		ep.emitting = true
@@ -313,6 +316,7 @@ func _explode_rpc():
 	if is_instance_valid(smoke_particles) and smoke_particles.get_parent() == self:
 		var sp = smoke_particles
 		remove_child(sp)
+		sp.position = expl_pos
 		scene_root.add_child(sp)
 		sp.global_position = expl_pos
 		sp.emitting = true
@@ -323,6 +327,7 @@ func _explode_rpc():
 	if is_instance_valid(fire_sprite_particles) and fire_sprite_particles.get_parent() == self:
 		var fsp = fire_sprite_particles
 		remove_child(fsp)
+		fsp.position = expl_pos
 		scene_root.add_child(fsp)
 		fsp.global_position = expl_pos
 		fsp.emitting = true
@@ -333,6 +338,7 @@ func _explode_rpc():
 	if is_instance_valid(fire_sprite_particles_2) and fire_sprite_particles_2.get_parent() == self:
 		var fsp2 = fire_sprite_particles_2
 		remove_child(fsp2)
+		fsp2.position = expl_pos
 		scene_root.add_child(fsp2)
 		fsp2.global_position = expl_pos
 		fsp2.emitting = true

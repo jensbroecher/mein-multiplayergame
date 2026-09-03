@@ -47,7 +47,10 @@ func _ready():
 	flight_audio.max_distance = 100.0
 	add_child(flight_audio)
 	
-	start_position = global_position
+	if is_instance_valid(fire_trail):
+		fire_trail.emitting = true
+	if start_position == Vector3.ZERO:
+		start_position = global_position
 	if is_guided:
 		speed = 56.0
 		lifetime = 12.0
@@ -358,6 +361,7 @@ func _explode_rpc():
 		ap.stream = sound_stream
 		ap.max_distance = 80.0
 		ap.unit_size = 10.0
+		ap.position = expl_pos
 		scene_root.add_child(ap)
 		ap.global_position = expl_pos
 		ap.play()
@@ -367,6 +371,7 @@ func _explode_rpc():
 	if is_instance_valid(fire_trail) and fire_trail.get_parent() == self:
 		var trail_pos = fire_trail.global_position
 		remove_child(fire_trail)
+		fire_trail.position = trail_pos
 		scene_root.add_child(fire_trail)
 		fire_trail.global_position = trail_pos
 		fire_trail.emitting = false
@@ -379,6 +384,7 @@ func _explode_rpc():
 		if is_instance_valid(ps) and ps.get_parent() == self:
 			var ps_pos = global_position
 			remove_child(ps)
+			ps.position = ps_pos
 			scene_root.add_child(ps)
 			ps.global_position = ps_pos
 			ps.emitting = true
@@ -397,6 +403,7 @@ func _explode_rpc():
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.albedo_color = Color(1.0, 0.75, 0.15, 0.9)
 	expl_mesh.material_override = mat
+	expl_mesh.position = expl_pos
 	scene_root.add_child(expl_mesh)
 	expl_mesh.global_position = expl_pos
 	expl_mesh.scale = Vector3(0.1, 0.1, 0.1)

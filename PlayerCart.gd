@@ -970,7 +970,7 @@ func _process(delta):
 
 		# Action buttons
 		if Input.is_action_just_pressed(input_prefix + "respawn") and not is_finished_race:
-			respawn_rpc.rpc()
+			respawn_rpc.rpc(last_checkpoint_transform)
 
 		var visual_forward = -visuals.global_transform.basis.z
 		var speed_factor = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
@@ -1333,7 +1333,7 @@ func _physics_process(delta):
 
 	if global_position.y < -50 and not is_finished_race:
 		if multiplayer.multiplayer_peer != null and multiplayer.is_server():
-			respawn_rpc.rpc()
+			respawn_rpc.rpc(last_checkpoint_transform)
 		elif is_local_player or (is_ai and multiplayer.multiplayer_peer == null):
 			respawn() # single-player / host fallback
 
@@ -1352,7 +1352,7 @@ func _physics_process(delta):
 			if dist < 2.5:
 				print("AI Cart ", name, " detected stuck (distance traveled in 2.8s: ", dist, "m). Respawning.")
 				if multiplayer.multiplayer_peer != null and multiplayer.is_server():
-					respawn_rpc.rpc()
+					respawn_rpc.rpc(last_checkpoint_transform)
 				else:
 					respawn()
 			ai_last_stuck_position = global_position
@@ -1391,7 +1391,7 @@ func _physics_process(delta):
 					_ai_no_progress_timer = 0.0
 					_ai_recovering = false
 					if multiplayer.multiplayer_peer != null and multiplayer.is_server():
-						respawn_rpc.rpc()
+						respawn_rpc.rpc(last_checkpoint_transform)
 					else:
 						respawn()
 			else:
@@ -1524,6 +1524,7 @@ func _physics_process(delta):
 					ap.max_distance = 80.0
 					ap.unit_size = 15.0
 					ap.volume_db = 2.0
+					ap.position = global_position
 					get_tree().current_scene.add_child(ap)
 					ap.global_position = global_position
 					ap.play()
@@ -3147,7 +3148,7 @@ func explode(attacker_id: int = 0):
 	if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 		get_tree().create_timer(4.2).timeout.connect(func():
 			if is_instance_valid(self) and not is_finished_race:
-				respawn_rpc.rpc()
+				respawn_rpc.rpc(last_checkpoint_transform)
 		)
 	elif multiplayer.multiplayer_peer == null:
 		get_tree().create_timer(4.2).timeout.connect(func():
@@ -3201,7 +3202,7 @@ func drown():
 	if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 		get_tree().create_timer(1.2).timeout.connect(func():
 			if is_instance_valid(self) and not is_finished_race:
-				respawn_rpc.rpc()
+				respawn_rpc.rpc(last_checkpoint_transform)
 		)
 	elif multiplayer.multiplayer_peer == null:
 		get_tree().create_timer(1.2).timeout.connect(func():
@@ -3210,7 +3211,9 @@ func drown():
 		)
 
 @rpc("any_peer", "call_local", "reliable")
-func respawn_rpc():
+func respawn_rpc(custom_checkpoint_transform: Transform3D = Transform3D()):
+	if custom_checkpoint_transform != Transform3D():
+		last_checkpoint_transform = custom_checkpoint_transform
 	respawn()
 
 func respawn():
@@ -3721,6 +3724,9 @@ func _spawn_missile_rpc(spawn_pos: Vector3, spawn_rot: Vector3, shooter_id: int,
 	var missile = MISSILE_SCENE.instantiate()
 	missile.owner_id = shooter_id
 	missile.is_guided = guided
+	missile.position = spawn_pos
+	missile.rotation = spawn_rot
+	missile.start_position = spawn_pos
 	var level = get_tree().get_first_node_in_group("level")
 	if level:
 		level.add_child(missile)
@@ -4080,13 +4086,15 @@ func _drop_bomb():
 func _spawn_bomb_rpc(spawn_pos: Vector3, spawn_vel: Vector3, shooter_id: int):
 	var bomb = BOMB_SCENE.instantiate()
 	bomb.owner_id = shooter_id
+	bomb.position = spawn_pos
+	bomb.linear_velocity = spawn_vel
 	var level = get_tree().get_first_node_in_group("level")
 	if level:
 		level.add_child(bomb)
 	else:
 		get_tree().root.add_child(bomb)
 	
-	bomb.position = spawn_pos
+	bomb.global_position = spawn_pos
 	bomb.linear_velocity = spawn_vel
 	
 	# Add collision exception so bomb doesn't bump the shooter cart
@@ -4690,6 +4698,7 @@ func _spawn_splash(pos: Vector3, size_scale: float = 1.0):
 				if child is GPUParticles3D or child is CPUParticles3D:
 					if "amount_ratio" in child:
 						child.amount_ratio = size_scale
+		splash_instance.position = pos
 		get_tree().current_scene.add_child(splash_instance)
 		splash_instance.global_position = pos
 
@@ -4704,6 +4713,7 @@ func _spawn_splash(pos: Vector3, size_scale: float = 1.0):
 				ap.unit_size = 5.0
 				ap.volume_db = lerp(-15.0, -9.0, clampf(size_scale, 0.0, 1.0))
 				ap.pitch_scale = lerp(1.35, 1.0, clampf(size_scale, 0.0, 1.0))
+				ap.position = pos
 				get_tree().current_scene.add_child(ap)
 				ap.global_position = pos
 				ap.play()
@@ -5151,7 +5161,7 @@ func _get_ai_input(delta: float) -> Vector2:
 				print("AI Cart ", name, " stuck offroad. Respawning.")
 				_ai_steep_hill_stuck_timer = 0.0
 				if multiplayer.multiplayer_peer != null and multiplayer.is_server():
-					respawn_rpc.rpc()
+					respawn_rpc.rpc(last_checkpoint_transform)
 				else:
 					respawn()
 		else:
@@ -5512,7 +5522,7 @@ func _get_ai_input(delta: float) -> Vector2:
 			_ai_unstuck_dir = 0.0
 			stuck_timer = 0.0
 			if multiplayer.multiplayer_peer != null and multiplayer.is_server():
-				respawn_rpc.rpc()
+				respawn_rpc.rpc(last_checkpoint_transform)
 			else:
 				respawn()
 		elif _ai_speed_stall_timer > 1.6:

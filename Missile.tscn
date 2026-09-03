@@ -309,7 +309,7 @@ mesh = SubResource("PrismMesh_fin")
 
 [node name="FireTrail" type="GPUParticles3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.42)
-emitting = true
+emitting = false
 amount = 120
 lifetime = 0.55
 process_material = SubResource("ParticleProcessMaterial_trail")

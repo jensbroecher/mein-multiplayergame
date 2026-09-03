@@ -4886,7 +4886,7 @@ transform = Transform3D(-30.273119, 0, -33.29471, 0, 44.999985, 0, 33.29471, 0, 
 transform = Transform3D(16.444656, 0, 11.383026, 0, 20, 0, -11.383026, 0, 16.444656, 167.59178, 6.9242396, -80.37636)
 
 [node name="LoopCSG" parent="Ramps" unique_id=180241874 groups=["collision_trimesh", "loop_track"] instance=ExtResource("120_loopcsg")]
-transform = Transform3D(-0.95113283, 0, -0.30878204, 0, 1, 0, 0.30878204, 0, -0.95113283, 27.14479, 1.4574401, 139.71402)
+transform = Transform3D(-0.7686144, 0, -0.63971233, 0, 1, 0, 0.63971233, 0, -0.7686144, -267.08026, 6.787854, 236.75302)
 
 [node name="LevelDesign" type="Node3D" parent="." unique_id=1434977768]
 
@@ -5037,9 +5037,15 @@ transform = Transform3D(-8.477924, -0.92626196, 5.221761, -1.0161176, 9.947579, 
 transform = Transform3D(32.32939, 0, -17.994732, 0, 37, 0, 17.994732, 0, 32.32939, -83.18033, 8.801015, -511.57874)
 
 [node name="Box" type="CSGBox3D" parent="LevelDesign" unique_id=705381155 groups=["collision_box"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -29.334873, -2.8257809, 89.00723)
+transform = Transform3D(0.57264173, 0, 0.81980574, 0, 1, 0, -0.81980574, 0, 0.57264173, -233.27498, 0.8232689, 215.93848)
 use_collision = true
-size = Vector3(50, 30, 100)
+size = Vector3(60, 26.870728, 3)
+material = SubResource("StandardMaterial3D_wa883")
+
+[node name="Box2" type="CSGBox3D" parent="LevelDesign" unique_id=479015023 groups=["collision_box"]]
+transform = Transform3D(0.8416361, 0, 0.540045, 0, 1, 0, -0.540045, 0, 0.8416361, -303.66943, -3.4996853, 274.5323)
+use_collision = true
+size = Vector3(85.686035, 33.730713, 3)
 material = SubResource("StandardMaterial3D_wa883")
 
 [node name="BoostPads" type="Node3D" parent="." unique_id=1164637541]

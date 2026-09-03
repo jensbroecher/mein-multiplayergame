@@ -13,6 +13,7 @@ func _ready():
 	var max_lifetime: float = 0.0
 	for child in get_children():
 		if child is CPUParticles3D or child is GPUParticles3D:
+			child.local_coords = true
 			child.emitting = true
 			max_lifetime = maxf(max_lifetime, child.lifetime)
 	

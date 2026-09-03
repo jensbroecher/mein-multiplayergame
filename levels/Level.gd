@@ -303,6 +303,8 @@ func _grant_checkpoint(id: int, cp_idx: int) -> void:
 
 	if cart and cart.get("is_ai"):
 		cart.last_checkpoint_transform = cp.global_transform
+		if multiplayer.is_server() and multiplayer.multiplayer_peer != null and NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER:
+			_sync_ai_checkpoint.rpc(id, cp.global_transform)
 	else:
 		if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
 			_sync_checkpoint_to_player_local(id, cp.global_transform, is_finish_lap)
@@ -442,6 +444,12 @@ func _sync_checkpoint_to_player_local(player_id: int, checkpoint_transform: Tran
 			MusicManager.play_sfx("res://sounds/finish.mp3")
 		else:
 			MusicManager.play_sfx("res://sounds/checkpoint.mp3")
+
+@rpc("authority", "call_local", "reliable")
+func _sync_ai_checkpoint(bot_id: int, checkpoint_transform: Transform3D):
+	var cart = players_container.get_node_or_null(str(bot_id))
+	if cart:
+		cart.last_checkpoint_transform = checkpoint_transform
 
 func _set_local_cart_finished():
 	var carts = get_tree().get_nodes_in_group("player_carts")

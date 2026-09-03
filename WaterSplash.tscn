@@ -109,6 +109,7 @@ size = Vector2(1.8, 1.8)
 script = ExtResource("1_script")
 
 [node name="SplashDrops1" type="CPUParticles3D" parent="."]
+local_coords = true
 emitting = false
 amount = 32
 lifetime = 1.1
@@ -130,6 +131,7 @@ scale_amount_curve = SubResource("Curve_drops_scale")
 color_ramp = SubResource("Gradient_drops")
 
 [node name="SplashDrops2" type="CPUParticles3D" parent="."]
+local_coords = true
 emitting = false
 amount = 26
 lifetime = 1.0
@@ -151,6 +153,7 @@ scale_amount_curve = SubResource("Curve_drops_scale")
 color_ramp = SubResource("Gradient_drops")
 
 [node name="SplashMist" type="CPUParticles3D" parent="."]
+local_coords = true
 emitting = false
 amount = 32
 lifetime = 0.85
@@ -173,6 +176,7 @@ scale_amount_curve = SubResource("Curve_mist_scale")
 color_ramp = SubResource("Gradient_mist")
 
 [node name="SplashBaseFoam" type="CPUParticles3D" parent="."]
+local_coords = true
 emitting = false
 amount = 18
 lifetime = 0.75
@@ -195,6 +199,7 @@ scale_amount_curve = SubResource("Curve_mist_scale")
 color_ramp = SubResource("Gradient_mist")
 
 [node name="SplashRipples" type="CPUParticles3D" parent="."]
+local_coords = true
 emitting = false
 amount = 4
 lifetime = 1.3
