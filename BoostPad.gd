@@ -284,7 +284,11 @@ func _init_materials():
 func _on_body_entered(body: Node3D):
 	if body.has_method("client_start_pad_boost"):
 		flash_boost_pad()
-		if NetworkManager.current_game_mode != NetworkManager.GameMode.MULTIPLAYER:
+		var is_mp: bool = false
+		var nm: Node = get_node_or_null("/root/NetworkManager")
+		if nm and "current_game_mode" in nm and "GameMode" in nm:
+			is_mp = (nm.current_game_mode == nm.GameMode.MULTIPLAYER)
+		if not is_mp:
 			if body.get("is_local_player") or body.get("is_ai"):
 				body.client_start_pad_boost(boost_strength, boost_duration)
 		else:
