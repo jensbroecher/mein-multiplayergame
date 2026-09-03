@@ -1,6 +1,126 @@
-[gd_scene format=3]
+[gd_scene format=4 uid="uid://bos1i52omy3pm"]
 
-[ext_resource type="Script" path="res://LoopCSG.gd" id="1_arww8"]
+[ext_resource type="Script" uid="uid://bvq0woltugbyp" path="res://LoopCSG.gd" id="1_arww8"]
+[ext_resource type="Texture2D" uid="uid://bsmrfxbh6vqe2" path="res://materials/asphalt.png" id="2_hbxu5"]
+[ext_resource type="PackedScene" uid="uid://boostpad123" path="res://BoostPad.tscn" id="3_ypmpm"]
+
+[sub_resource type="Curve3D" id="Curve3D_kpf5s"]
+bake_interval = 0.25
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -3.25, -0.25, -29, 0, 0, 0, 0, 0, 0, -3.25, 0, -26, 0, 0, 0, 0, 0, 0, -3.25, 0.325, -19, 0, 0, 0, 0, 0, 0, -3.25, 0.65, -9, 0, 0, 0, 0, 0, 0, -3.25, 0.65, -5, 0, 0, 0, 0, 0, 0, -3.241654, 0.7868822, -2.911581, 0, 0, 0, 0, 0, 0, -3.2170863, 1.1951867, -0.8588953, 0, 0, 0, 0, 0, 0, -3.177002, 1.8679274, 1.1229349, 0, 0, 0, 0, 0, 0, -3.1221066, 2.7935936, 3, 0, 0, 0, 0, 0, 0, -3.053105, 3.9563465, 4.740183, 0, 0, 0, 0, 0, 0, -2.9707031, 5.3362913, 6.3137083, 0, 0, 0, 0, 0, 0, -2.8756058, 6.909817, 7.6936536, 0, 0, 0, 0, 0, 0, -2.7685184, 8.65, 8.856406, 0, 0, 0, 0, 0, 0, -2.6501465, 10.527065, 9.782072, 0, 0, 0, 0, 0, 0, -2.521195, 12.508895, 10.454813, 0, 0, 0, 0, 0, 0, -2.3823695, 14.561581, 10.863118, 0, 0, 0, 0, 0, 0, -2.234375, 16.65, 11, 0, 0, 0, 0, 0, 0, -2.077917, 18.738419, 10.863118, 0, 0, 0, 0, 0, 0, -1.9137008, 20.791105, 10.454813, 0, 0, 0, 0, 0, 0, -1.7424316, 22.772936, 9.782072, 0, 0, 0, 0, 0, 0, -1.5648148, 24.65, 8.856406, 0, 0, 0, 0, 0, 0, -1.3815557, 26.390182, 7.6936536, 0, 0, 0, 0, 0, 0, -1.1933594, 27.963709, 6.3137083, 0, 0, 0, 0, 0, 0, -1.0009314, 29.343653, 4.740183, 0, 0, 0, 0, 0, 0, -0.8049769, 30.506407, 3, 0, 0, 0, 0, 0, 0, -0.6062012, 31.432072, 1.1229349, 0, 0, 0, 0, 0, 0, -0.40530962, 32.104813, -0.8588953, 0, 0, 0, 0, 0, 0, -0.20300744, 32.51312, -2.911581, 0, 0, 0, 0, 0, 0, 0, 32.65, -5, 0, 0, 0, 0, 0, 0, 0.20300744, 32.51312, -7.088419, 0, 0, 0, 0, 0, 0, 0.40530962, 32.104813, -9.141105, 0, 0, 0, 0, 0, 0, 0.6062012, 31.432072, -11.122935, 0, 0, 0, 0, 0, 0, 0.8049769, 30.506407, -13, 0, 0, 0, 0, 0, 0, 1.0009314, 29.343653, -14.740183, 0, 0, 0, 0, 0, 0, 1.1933594, 27.963709, -16.31371, 0, 0, 0, 0, 0, 0, 1.3815557, 26.390182, -17.693653, 0, 0, 0, 0, 0, 0, 1.5648148, 24.65, -18.856407, 0, 0, 0, 0, 0, 0, 1.7424316, 22.772936, -19.782072, 0, 0, 0, 0, 0, 0, 1.9137008, 20.791105, -20.454813, 0, 0, 0, 0, 0, 0, 2.077917, 18.738419, -20.863117, 0, 0, 0, 0, 0, 0, 2.234375, 16.65, -21, 0, 0, 0, 0, 0, 0, 2.3823695, 14.561581, -20.863117, 0, 0, 0, 0, 0, 0, 2.521195, 12.508895, -20.454813, 0, 0, 0, 0, 0, 0, 2.6501465, 10.527065, -19.782072, 0, 0, 0, 0, 0, 0, 2.7685184, 8.65, -18.856407, 0, 0, 0, 0, 0, 0, 2.8756058, 6.909817, -17.693653, 0, 0, 0, 0, 0, 0, 2.9707031, 5.3362913, -16.31371, 0, 0, 0, 0, 0, 0, 3.053105, 3.9563465, -14.740183, 0, 0, 0, 0, 0, 0, 3.1221066, 2.7935936, -13, 0, 0, 0, 0, 0, 0, 3.177002, 1.8679274, -11.122935, 0, 0, 0, 0, 0, 0, 3.2170863, 1.1951867, -9.141105, 0, 0, 0, 0, 0, 0, 3.241654, 0.7868822, -7.088419, 0, 0, 0, 0, 0, 0, 3.25, 0.65, -5, 0, 0, 0, 0, 0, 0, 3.25, 0.65, -1, 0, 0, 0, 0, 0, 0, 3.25, 0.325, 9, 0, 0, 0, 0, 0, 0, 3.25, 0, 16, 0, 0, 0, 0, 0, 0, 3.25, -0.25, 19),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, -0.0005216245, -0.002057111, -0.004562378, -0.007993345, -0.012305931, -0.017456055, -0.023399636, -0.030092593, -0.037490845, -0.045550313, -0.05422691, -0.06347656, -0.07325519, -0.0835187, -0.09422302, -0.105324075, -0.11677777, -0.12854004, -0.1405668, -0.15281394, -0.16523743, -0.17779315, -0.19043703, -0.203125, -0.21581297, -0.22845685, -0.24101257, -0.25343606, -0.2656832, -0.27770996, -0.28947222, -0.30092594, -0.31202698, -0.3227313, -0.33299482, -0.34277344, -0.3520231, -0.36069968, -0.36875916, -0.3761574, -0.38285038, -0.38879395, -0.39394405, -0.39825666, -0.40168762, -0.4041929, -0.40572837, -0.40625, -0.40625, -0.40625, -0.40625, -0.40625)
+}
+point_count = 57
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_06q5j"]
+albedo_color = Color(0.2, 0.21, 0.24, 1)
+albedo_texture = ExtResource("2_hbxu5")
+roughness = 0.85
+uv1_scale = Vector3(0.1, 0.1, 0.1)
+uv1_triplanar = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_12c6q"]
+albedo_color = Color(0.28, 0.3, 0.35, 1)
+metallic = 0.75
+roughness = 0.35
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tka3e"]
+albedo_color = Color(0.88, 0.28, 0.12, 1)
+roughness = 0.6
 
 [node name="LoopCSG" type="Node3D" unique_id=1795395767]
 script = ExtResource("1_arww8")
+
+[node name="Path3D" type="Path3D" parent="." unique_id=1779618012]
+curve = SubResource("Curve3D_kpf5s")
+
+[node name="LoopCSGCombiner" type="CSGCombiner3D" parent="." unique_id=757769922]
+use_collision = true
+
+[node name="LoopTrack" type="CSGPolygon3D" parent="LoopCSGCombiner" unique_id=1742778058]
+use_collision = true
+polygon = PackedVector2Array(-6.3, 2.6, -5.05, 2.85, -5.5, 2.6, -5.15, 0, 5.15, 0, 5.5, 2.6, 5.05, 2.85, 6.3, 2.6, 6.3, -1.6, -6.3, -1.6)
+mode = 2
+path_node = NodePath("../../Path3D")
+path_interval_type = 0
+path_interval = 0.35
+path_simplify_angle = 0.0
+path_rotation = 2
+path_rotation_accurate = true
+path_local = true
+path_continuous_u = true
+path_u_distance = 1.0
+path_joined = false
+material = SubResource("StandardMaterial3D_06q5j")
+
+[node name="Pylon_Ascent" type="CSGCylinder3D" parent="LoopCSGCombiner" unique_id=1082780989]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.334375, 8.325, 13.2)
+use_collision = true
+radius = 0.65
+height = 16.65
+sides = 16
+material = SubResource("StandardMaterial3D_12c6q")
+
+[node name="Strut_Ascent" type="CSGBox3D" parent="LoopCSGCombiner" unique_id=2045242114]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.934375, 16.15, 13.2)
+use_collision = true
+size = Vector3(3, 0.6, 0.6)
+material = SubResource("StandardMaterial3D_12c6q")
+
+[node name="Pylon_Apex_L" type="CSGCylinder3D" parent="LoopCSGCombiner" unique_id=61508842]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.35, 17.725, -5)
+use_collision = true
+radius = 0.7475
+height = 35.45
+sides = 16
+material = SubResource("StandardMaterial3D_12c6q")
+
+[node name="Pylon_Apex_R" type="CSGCylinder3D" parent="LoopCSGCombiner" unique_id=1914544621]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.35, 17.725, -5)
+use_collision = true
+radius = 0.7475
+height = 35.45
+sides = 16
+material = SubResource("StandardMaterial3D_12c6q")
+
+[node name="Strut_Apex_Overhead" type="CSGBox3D" parent="LoopCSGCombiner" unique_id=411111447]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 34.85, -5)
+use_collision = true
+size = Vector3(27.7, 0.7, 0.7)
+material = SubResource("StandardMaterial3D_12c6q")
+
+[node name="Pylon_Descent" type="CSGCylinder3D" parent="LoopCSGCombiner" unique_id=1333599910]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.334375, 8.325, -23.2)
+use_collision = true
+radius = 0.65
+height = 16.65
+sides = 16
+material = SubResource("StandardMaterial3D_12c6q")
+
+[node name="Strut_Descent" type="CSGBox3D" parent="LoopCSGCombiner" unique_id=1810231841]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.934375, 16.15, -23.2)
+use_collision = true
+size = Vector3(3, 0.6, 0.6)
+material = SubResource("StandardMaterial3D_12c6q")
+
+[node name="EntryDivider" type="CSGBox3D" parent="LoopCSGCombiner" unique_id=187425820]
+transform = Transform3D(0.9263738, 0, -0.3766054, 0, 1, 0, 0.3766054, 0, 0.9263738, -1.1872511, 0.7, 12.03804)
+use_collision = true
+size = Vector3(0.55, 1.4, 19.2)
+material = SubResource("StandardMaterial3D_06q5j")
+
+[node name="BoostPads" type="Node3D" parent="." unique_id=393256470]
+
+[node name="BoostPad_Entry1" type="Area3D" parent="BoostPads" instance=ExtResource("3_ypmpm")]
+transform = Transform3D(-1, 0, 0, 0, 0.99892396, -0.046378613, 0, -0.046378613, -0.99892396, -6.1932406, 0.31132466, -21.019478)
+boost_strength = 1.35
+boost_duration = 2.5
+
+[node name="BoostPad_Entry2" type="Area3D" parent="BoostPads" instance=ExtResource("3_ypmpm")]
+transform = Transform3D(-1, 0, 0, 0, 0.9994723, -0.032482848, 0, -0.03248285, -0.99947226, -5.9201097, 0.7292036, -9.0258045)
+boost_strength = 1.25
+
+[node name="BoostPad_Exit" type="Area3D" parent="BoostPads" instance=ExtResource("3_ypmpm")]
+transform = Transform3D(-0.9999997, 0.00070616236, -1.8626451e-09, 0.0007057859, 0.9994721, 0.032482848, 2.2940338e-05, 0.03248284, -0.99947226, 4.8175697, 0.4693399, 14.908037)
+boost_strength = 1.15
+boost_duration = 1.8

@@ -167,7 +167,7 @@
 [ext_resource type="MultiMesh" uid="uid://go25bnfxgeto" path="res://generated/grass/chunk_16_8.res" id="118_65ujk"]
 [ext_resource type="MultiMesh" uid="uid://bvbas7h6u6uds" path="res://generated/grass/chunk_17_8.res" id="119_4iu63"]
 [ext_resource type="MultiMesh" uid="uid://bsoxxtt3a7w33" path="res://generated/grass/chunk_18_8.res" id="120_22o5o"]
-[ext_resource type="PackedScene" path="res://LoopCSG.tscn" id="120_loopcsg"]
+[ext_resource type="PackedScene" uid="uid://bos1i52omy3pm" path="res://LoopCSG.tscn" id="120_loopcsg"]
 [ext_resource type="MultiMesh" uid="uid://chocqqvm2mrj0" path="res://generated/grass/chunk_1_9.res" id="121_e2157"]
 [ext_resource type="MultiMesh" uid="uid://dndnry52wkykr" path="res://generated/grass/chunk_2_9.res" id="122_ho1xc"]
 [ext_resource type="MultiMesh" uid="uid://nhwrwjhmhofb" path="res://generated/grass/chunk_3_9.res" id="123_sghpl"]
@@ -4904,19 +4904,19 @@ lod_bias = 10.0
 [node name="Pine2" parent="LevelDesign/Trees" unique_id=1616149328 groups=["collision_trimesh"] instance=ExtResource("83_0ct4b")]
 transform = Transform3D(-0.32899797, 0, 0.729219, 0, 0.67888784, 0, -0.729219, 0, -0.32899797, 203.03888, 12.684913, -280.4562)
 
-[node name="Mesh" parent="LevelDesign/Trees/Pine2/Tree" parent_id_path=PackedInt32Array(1616149328, 1872935113) index="0" unique_id=1331791924]
+[node name="Mesh" parent="LevelDesign/Trees/Pine2/Tree" parent_id_path=PackedInt32Array(1616149328, 1872935113) index="0" unique_id=1331791925]
 lod_bias = 10.0
 
-[node name="Mesh2" parent="LevelDesign/Trees/Pine2/Tree" parent_id_path=PackedInt32Array(1616149328, 1872935113) index="1" unique_id=193366998]
+[node name="Mesh2" parent="LevelDesign/Trees/Pine2/Tree" parent_id_path=PackedInt32Array(1616149328, 1872935113) index="1" unique_id=193366999]
 lod_bias = 10.0
 
 [node name="Pine3" parent="LevelDesign/Trees" unique_id=172146906 groups=["collision_trimesh"] instance=ExtResource("83_0ct4b")]
 transform = Transform3D(-0.75461125, 0, 0.265635, 0, 0.6598115, 0, -0.265635, 0, -0.75461125, 329.3288, 8.60202, -282.15042)
 
-[node name="Mesh" parent="LevelDesign/Trees/Pine3/Tree" parent_id_path=PackedInt32Array(172146906, 1872935113) index="0" unique_id=1331791924]
+[node name="Mesh" parent="LevelDesign/Trees/Pine3/Tree" parent_id_path=PackedInt32Array(172146906, 1872935113) index="0" unique_id=1331791926]
 lod_bias = 10.0
 
-[node name="Mesh2" parent="LevelDesign/Trees/Pine3/Tree" parent_id_path=PackedInt32Array(172146906, 1872935113) index="1" unique_id=193366998]
+[node name="Mesh2" parent="LevelDesign/Trees/Pine3/Tree" parent_id_path=PackedInt32Array(172146906, 1872935113) index="1" unique_id=193367000]
 lod_bias = 10.0
 
 [node name="VegetationScatterer" type="Node3D" parent="LevelDesign" unique_id=40883185]

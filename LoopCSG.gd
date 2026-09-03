@@ -119,11 +119,10 @@ func _rebuild() -> void:
 		return
 	_building = true
 
-	# Clear previous generated children
+	# Clear previous generated children immediately to prevent duplicate node warnings
 	for child in get_children():
-		child.name = "_freed_" + str(child.get_instance_id())
 		remove_child(child)
-		child.queue_free()
+		child.free()
 
 	# 1. Build the Path3D with smooth corkscrew curve
 	var path_node := Path3D.new()
@@ -161,7 +160,10 @@ func _rebuild() -> void:
 	if add_supports:
 		_add_support_pylons(combiner)
 
-	# 5. Boost Pads (if enabled)
+	# 5. Entry Safety Divider (separates climb lane from descent track)
+	_add_entry_divider(combiner)
+
+	# 6. Boost Pads (if enabled)
 	if add_boost_pads and BOOST_PAD_SCENE:
 		_add_boost_pads()
 
@@ -170,6 +172,40 @@ func _rebuild() -> void:
 		_set_owner_recursive(self, self)
 
 	_building = false
+
+
+## Returns the world-space entry position where cars start climbing into the loop
+func get_entry_position() -> Vector3:
+	var path_node: Path3D = get_node_or_null("Path3D")
+	if path_node and path_node.curve and path_node.curve.point_count > 0:
+		return path_node.to_global(path_node.curve.get_point_position(0))
+	return global_position
+
+
+## Returns the world-space entry tangent direction
+func get_entry_direction() -> Vector3:
+	var path_node: Path3D = get_node_or_null("Path3D")
+	if path_node and path_node.curve and path_node.curve.point_count > 1:
+		var p0 = path_node.to_global(path_node.curve.get_point_position(0))
+		var p1 = path_node.to_global(path_node.curve.get_point_position(1))
+		return (p1 - p0).normalized()
+	return -global_transform.basis.z
+
+
+## Angled center safety divider separating entry climbing ramp and exit descending road
+func _add_entry_divider(combiner: CSGCombiner3D) -> void:
+	var z_center := -5.0
+	var z_entry_start := z_center - approach_length
+	var divider_len := approach_length * 0.8
+	var divider := CSGBox3D.new()
+	divider.name = "EntryDivider"
+	divider.size = Vector3(0.55, 1.4, divider_len)
+	# Position along the seam between entry (-half_shift) and exit (+half_shift) at X = 0.0
+	divider.position = Vector3(0.0, 0.7, z_entry_start + divider_len * 0.5 + 3.0)
+	divider.material = _create_asphalt_material()
+	divider.use_collision = true
+	divider.collision_layer = 1
+	combiner.add_child(divider)
 
 
 ## Generates the 3D stunt loop curve:
@@ -412,4 +448,6 @@ func _set_owner_recursive(node: Node, scene_root: Node) -> void:
 		return
 	for c in node.get_children():
 		c.owner = scene_root
-		_set_owner_recursive(c, scene_root)
+		# Only recurse into procedural nodes; never into children of an instanced sub-scene
+		if c.scene_file_path.is_empty():
+			_set_owner_recursive(c, scene_root)

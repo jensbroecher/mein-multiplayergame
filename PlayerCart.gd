@@ -21,9 +21,9 @@ const CAR_PRESETS = [
 		"model_y_rotation": PI,       # native FBX faces backward, flip 180°
 		"max_speed": 40.0,
 		"acceleration": 65.0,
-		"steer_speed": 2.5,
-		"grip": 5.0,
-		"braking": 40.0,
+		"steer_speed": 2.8,
+		"grip": 5.4,
+		"braking": 46.0,
 		"offroad": 6.0,
 		# Wheel part names inside the FBX, keyed by corner
 		"wheel_parts": {"FL": "part_5", "FR": "part_2", "RL": "part_0", "RR": "part_6"}
@@ -5075,9 +5075,10 @@ func _get_ai_input(delta: float) -> Vector2:
 		look_ahead = lerpf(11.0, 15.0, clampf(speed / maxf(max_speed, 1.0), 0.0, 1.0))
 		if corner_factor > 0.45:
 			look_ahead = minf(look_ahead, 12.0)
-	# Follow the ribbon through corners instead of cutting the inside (e.g. chasm start/finish).
-	if corner_factor > 0.28:
-		look_ahead = minf(look_ahead, maxf(7.0, _ai_upcoming_turn_dist * 0.38))
+	# Follow the ribbon through corners instead of cutting the inside or overshooting
+	if corner_factor > 0.22:
+		var corner_max_look = lerpf(15.0, 7.5, corner_factor)
+		look_ahead = minf(look_ahead, maxf(corner_max_look, _ai_upcoming_turn_dist * 0.40))
 	var target_offset = current_offset + look_ahead
 	target_offset = fmod(target_offset, curve_length)
 	
@@ -5089,9 +5090,32 @@ func _get_ai_input(delta: float) -> Vector2:
 	var tangent = (tangent_local_pos - target_local_pos).normalized()
 	var right_vec = Vector3(-tangent.z, 0, tangent.x).normalized()
 	
+	# Loop Proximity & Entry Corridor Alignment:
+	# When approaching a stunt loop, funnel firmly into the right-hand entry ramp and avoid the descent wall
+	var approaching_loop: bool = false
+	var loop_entry_lat_target: float = 0.0
+	var loop_dist_factor: float = 0.0
+	for lnode in get_tree().get_nodes_in_group("loop_track"):
+		if lnode is LoopCSG and is_instance_valid(lnode):
+			var entry_pos: Vector3 = lnode.get_entry_position()
+			var to_entry: Vector3 = entry_pos - global_position
+			var d_entry: float = to_entry.length()
+			if d_entry < 58.0 and fwd_3d.dot(to_entry) > 0.0:
+				approaching_loop = true
+				loop_dist_factor = clampf(1.0 - (d_entry / 58.0), 0.0, 1.0)
+				var p_at_car = curve.sample_baked(current_offset)
+				# Calculate exact lateral offset of the loop entrance relative to the road curve
+				loop_entry_lat_target = right_vec.dot(entry_pos - p_at_car)
+				break
+
+	if approaching_loop:
+		# Lock AI target lane offset to the loop entry lane (e.g. +3.2m on right)
+		ai_target_lane_offset = loop_entry_lat_target
+		ai_lane_offset = lerpf(ai_lane_offset, loop_entry_lat_target, 4.0 * delta)
+
 	# Dynamic Racing Line (Out-In-Out Cornering)
 	var racing_line_offset: float = 0.0
-	if not _harbor_stage and not on_alternative_path and not is_start_phase and corner_factor > 0.15:
+	if not approaching_loop and not is_on_loop and not _harbor_stage and not on_alternative_path and not is_start_phase and corner_factor > 0.15:
 		var turn_side = -_ai_upcoming_turn_dir
 		var max_line_span = clampf(ai_lane_span * 0.9, 1.5, 3.2) * ai_racing_line_weight
 		if _mountain_stage:
@@ -5111,7 +5135,14 @@ func _get_ai_input(delta: float) -> Vector2:
 		max_safe_span = minf(max_safe_span, 0.5 if _mountain_stage else 2.0)
 	var actual_lane_offset = clampf(combined_offset, -max_safe_span, max_safe_span)
 
-	if is_finished_race:
+	if approaching_loop:
+		# Funnel firmly into the entry ramp corridor and prevent wandering left into the descent wall
+		actual_lane_offset = lerpf(actual_lane_offset, loop_entry_lat_target, loop_dist_factor)
+		var corridor_half_width: float = lerpf(1.4, 0.65, loop_dist_factor)
+		actual_lane_offset = clampf(actual_lane_offset, loop_entry_lat_target - corridor_half_width, loop_entry_lat_target + corridor_half_width)
+	elif is_on_loop:
+		actual_lane_offset = 0.0
+	elif is_finished_race:
 		actual_lane_offset = 0.0
 	elif is_airborne:
 		actual_lane_offset *= 0.25
@@ -5191,10 +5222,36 @@ func _get_ai_input(delta: float) -> Vector2:
 			var blend_factor = clampf(1.0 - (best_dist / 35.0), 0.10, max_blend)
 			target_global_pos = target_global_pos.lerp(best_box.global_position, blend_factor)
 
+	# Boost Pad Seeking (Attract to speed pads on straights and loop entry ramps)
+	if not is_finished_race and not is_offroad:
+		var max_side_pad: float = 1.6 if _mountain_stage else 3.8
+		var best_pad: Node3D = null
+		var best_pad_dist: float = 34.0
+		for pad in get_tree().get_nodes_in_group("boost_pads"):
+			if not is_instance_valid(pad):
+				continue
+			var to_pad = pad.global_position - global_position
+			var fwd_dist = fwd_3d.dot(to_pad)
+			if fwd_dist > 3.0 and fwd_dist < best_pad_dist:
+				var side_dist = absf(visuals.global_transform.basis.x.dot(to_pad))
+				if side_dist < max_side_pad:
+					best_pad_dist = fwd_dist
+					best_pad = pad
+		if best_pad:
+			var pad_blend = clampf(1.0 - (best_pad_dist / 34.0), 0.15, 0.50)
+			if approaching_loop:
+				pad_blend = clampf(pad_blend * 1.5, 0.25, 0.70)
+			target_global_pos = target_global_pos.lerp(best_pad.global_position, pad_blend)
+
 	var target_vec = visuals.global_transform.inverse() * target_global_pos
 	var dir_flat = Vector2(target_vec.x, -target_vec.z).normalized()
 	
-	input.x = clamp(dir_flat.x * (1.8 if is_airborne else 2.2), -1.0, 1.0)
+	# Speed-sensitive steering gain: responsive at low speed, smooth and stable at high speed
+	var steer_gain: float = lerpf(2.2, 1.45, clampf(speed / 38.0, 0.0, 1.0))
+	if is_airborne:
+		steer_gain = 1.6
+	input.x = clamp(dir_flat.x * steer_gain, -1.0, 1.0)
+
 	if is_finished_race:
 		_ai_want_drift = false
 		if speed > 0.5:
@@ -5211,45 +5268,69 @@ func _get_ai_input(delta: float) -> Vector2:
 		input.y = -1.0
 	else:
 		_ai_want_drift = false
-		var min_corner_speed: float = 0.28 if _harbor_stage else (0.28 if _mountain_stage else lerpf(0.38, 0.82, style))
+		
+		# Physical grip & steering agility speed cap for corners:
+		# Sharp corners require real deceleration; high-speed cars (like Viper) cannot cheat physical tire grip!
+		var grip_mult: float = clampf(grip / 5.0, 0.82, 1.25)
+		var steer_ability: float = clampf(steer_speed / 2.8, 0.80, 1.15)
+		var agility_mult: float = grip_mult * steer_ability
+		var min_corner_speed: float = 0.24 if _harbor_stage else (0.22 if _mountain_stage else lerpf(0.25, 0.38, style))
 		min_corner_speed *= ai_corner_speed_factor
-		var safe_speed: float = lerpf(max_speed, max_speed * min_corner_speed, corner_factor)
-		var brake_window: float = (34.0 if _harbor_stage else (42.0 if _mountain_stage else lerpf(26.0, 12.0, style))) + ai_brake_dist_bias
-		brake_window = maxf(brake_window, 8.0)
+		
+		# Absolute grip-limited speed cap for corners:
+		# 90-degree corner: ~12-15 m/s; hairpin: ~8.5-10.5 m/s
+		var grip_speed_cap: float = lerpf(max_speed, (10.5 if _mountain_stage else 12.8) * agility_mult, pow(corner_factor, 0.60))
+		var safe_speed: float = minf(lerpf(max_speed, max_speed * min_corner_speed, corner_factor), grip_speed_cap)
+		
 		if is_hairpin:
-			min_corner_speed = minf(min_corner_speed, 0.24 if _mountain_stage else 0.32)
-			safe_speed = minf(safe_speed, 9.5 if _mountain_stage else 12.0)
-			brake_window = maxf(brake_window, 44.0)
+			safe_speed = minf(safe_speed, (8.5 if _mountain_stage else 10.0) * agility_mult)
 		
 		if is_boosting or is_pad_boosting:
-			safe_speed *= 0.85
+			safe_speed *= 0.80
 
-		var react_corner: float = 0.20 if _harbor_stage else (0.16 if _mountain_stage else lerpf(0.22, 0.50, style))
+		var react_corner: float = 0.18 if _harbor_stage else (0.15 if _mountain_stage else lerpf(0.18, 0.35, style))
 		if is_hairpin:
-			react_corner = minf(react_corner, 0.14)
+			react_corner = minf(react_corner, 0.12)
+		
+		# Kinematic deceleration-based braking distance:
+		# Computes required braking distance from current speed down to safe_speed:
+		# d_brake = (speed^2 - safe_speed^2) / (2 * decel) + reaction_buffer + high_speed_buffer
+		var decel_rate: float = maxf(braking * 0.75, 22.0)
+		var kinematic_brake_dist: float = maxf(speed * speed - safe_speed * safe_speed, 0.0) / (2.0 * decel_rate)
+		var reaction_dist: float = speed * lerpf(0.72, 0.50, style)
+		var high_speed_buffer: float = maxf(speed - 28.0, 0.0) * 1.3
+		var brake_window: float = maxf(kinematic_brake_dist + reaction_dist + high_speed_buffer + ai_brake_dist_bias, 24.0)
+		
+		if is_hairpin:
+			brake_window = maxf(brake_window, 48.0)
 		
 		# Downhill pitch check on steep descents into valley
 		var fwd_pitch_down: float = fwd_3d.dot(Vector3.DOWN)
 		if fwd_pitch_down > 0.12 and corner_factor > 0.16:
 			safe_speed *= lerpf(1.0, 0.70, clampf(fwd_pitch_down * 2.0, 0.0, 1.0))
-			brake_window = maxf(brake_window, brake_window * (1.0 + fwd_pitch_down * 0.6))
+			brake_window = maxf(brake_window, brake_window * (1.0 + fwd_pitch_down * 0.75))
 		
 		if _ai_upcoming_turn_dist < brake_window and corner_factor > react_corner:
 			var t_dist = clampf((brake_window - _ai_upcoming_turn_dist) / maxf(brake_window - 6.0, 1.0), 0.0, 1.0)
 			var target_corner_speed = lerpf(max_speed, safe_speed, t_dist)
 			
-			if speed > target_corner_speed + 0.8:
+			if speed > target_corner_speed + 0.3:
 				var overspeed = speed - target_corner_speed
-				input.y = clampf(overspeed / 5.5, 0.20, 0.90)
+				# Decisive, firm braking when overspeed (prevents drifting wide)
+				input.y = clampf(overspeed / 2.8, 0.40, 1.0)
 				
 				# Drift decision (never drift on mountain summit hairpin to avoid spinning off)
 				if (not _harbor_stage) and (not _mountain_stage or not is_hairpin) and speed > 11.0 and corner_factor > ai_drift_threshold and abs(input.x) > 0.24 and _ai_upcoming_turn_dist < 22.0:
 					_ai_want_drift = true
-					input.y = maxf(input.y, 0.40)
+					input.y = maxf(input.y, 0.45)
 			else:
-				input.y = -clampf(1.0 - (corner_factor * 0.22), 0.65, 1.0)
+				# In the braking zone or approaching apex:
+				# NEVER full throttle! Only gentle maintenance throttle so high-acceleration cars (like Viper) don't surge forward!
+				var speed_deficit = maxf(target_corner_speed - speed, 0.0)
+				input.y = -clampf(speed_deficit / 5.0, 0.0, 0.22)
 		else:
-			input.y = -1.0 + abs(input.x) * 0.18
+			# On straights: modulate throttle based on current steering to prevent snap oversteer
+			input.y = -clampf(1.0 - abs(input.x) * 0.55, 0.35, 1.0)
 
 		if _harbor_stage:
 			_ai_want_drift = false
@@ -5712,19 +5793,19 @@ func _process_ai_items(delta: float):
 	var should_use = false
 	match current_item:
 		ItemType.BOOST:
-			# Only fire boosts on a real straight — never into a dock corner or while already turning.
-			var boost_ang: float = 0.32
-			var boost_dist: float = 26.0
-			var boost_steer: float = 0.16
-			if _harbor_stage:
-				boost_ang = 0.18
-				boost_dist = 34.0
-			else:
-				boost_ang = lerpf(0.32, 0.60, ai_aggression)
-				boost_dist = lerpf(26.0, 11.0, ai_aggression)
-				boost_steer = lerpf(0.16, 0.34, ai_aggression)
-			var upcoming_ok: bool = _ai_upcoming_turn_angle < boost_ang and _ai_upcoming_turn_dist > boost_dist
-			if abs(sync_steer) < boost_steer and upcoming_ok and linear_velocity.length() > 6.0:
+			# Speed-aware straightaway check:
+			# Fast cars need a long, clean straight proportional to their speed before boosting!
+			var spd: float = linear_velocity.length()
+			var min_straight_dist: float = maxf(55.0, spd * 1.8)
+			var max_boost_ang: float = 0.20 # ~11 degrees max
+			var max_boost_steer: float = 0.12
+			if _harbor_stage or _mountain_stage:
+				min_straight_dist = maxf(65.0, spd * 2.2)
+				max_boost_ang = 0.14
+				max_boost_steer = 0.08
+			
+			var straight_is_clear: bool = _ai_upcoming_turn_angle < max_boost_ang and _ai_upcoming_turn_dist > min_straight_dist
+			if abs(sync_steer) < max_boost_steer and straight_is_clear and spd > 6.0 and not is_offroad and not is_on_loop:
 				should_use = true
 		ItemType.MISSILE, ItemType.GUIDED_MISSILE:
 			var fwd = -visuals.global_transform.basis.z
