@@ -1365,15 +1365,22 @@ func _physics_process(delta):
 
 		# Off-road / Pond slope rollback & bounded region stuck detection:
 		# Detects when a car tries to climb up a slope and rolls back repeatedly (e.g. in a pond or ditch)
-		if is_offroad or in_water_contact or _water_contact_grace > 0.0:
+		var is_on_corridor: bool = _is_car_on_track_corridor()
+		if not is_on_corridor:
 			if _ai_offroad_stuck_timer <= 0.001:
 				_ai_offroad_anchor_pos = global_position
 				_ai_offroad_max_dist = 0.0
 				_ai_offroad_stuck_timer = 0.0
 			_ai_offroad_stuck_timer += delta
 			var cur_disp: float = global_position.distance_to(_ai_offroad_anchor_pos)
-			if cur_disp > _ai_offroad_max_dist:
-				_ai_offroad_max_dist = cur_disp
+			if cur_disp > 14.0:
+				# Making real forward progress through the world: advance the anchor!
+				_ai_offroad_anchor_pos = global_position
+				_ai_offroad_max_dist = 0.0
+				_ai_offroad_stuck_timer = 0.0
+			else:
+				if cur_disp > _ai_offroad_max_dist:
+					_ai_offroad_max_dist = cur_disp
 
 			var cart_fwd = -visuals.global_transform.basis.z
 			var fwd_v = linear_velocity.dot(cart_fwd)
@@ -1385,13 +1392,11 @@ func _physics_process(delta):
 
 			# Give up and respawn if:
 			# 1. Repeatedly slipping/rolling back down the slope (~1.8s cumulative rollback)
-			# 2. Confined in a small area (under 7m max displacement) for > 4.5s (oscillating in pond/pit)
-			# 3. Off-road without reaching the track for > 7.0s
+			# 2. Confined in a small area (under 7m max displacement) for > 5.0s (oscillating in pond/pit)
 			var slope_rollback_stuck: bool = _ai_slope_rollback_timer >= 1.8
-			var confined_no_progress: bool = _ai_offroad_stuck_timer >= 4.5 and _ai_offroad_max_dist < 7.0
-			var offroad_timeout: bool = _ai_offroad_stuck_timer >= 7.0
-			if slope_rollback_stuck or confined_no_progress or offroad_timeout:
-				print("AI Cart ", name, " detected no progress offroad (slope:", slope_rollback_stuck, ", confined:", confined_no_progress, ", time:", _ai_offroad_stuck_timer, "s). Respawning.")
+			var confined_no_progress: bool = _ai_offroad_stuck_timer >= 5.0 and _ai_offroad_max_dist < 7.0
+			if slope_rollback_stuck or confined_no_progress:
+				print("AI Cart ", name, " detected no progress off-track (slope:", slope_rollback_stuck, ", confined:", confined_no_progress, ", time:", _ai_offroad_stuck_timer, "s). Respawning.")
 				_ai_offroad_stuck_timer = 0.0
 				_ai_offroad_max_dist = 0.0
 				_ai_slope_rollback_timer = 0.0
@@ -1400,6 +1405,7 @@ func _physics_process(delta):
 				else:
 					respawn()
 		else:
+			# Within the racing corridor: reset off-track timers
 			_ai_offroad_stuck_timer = 0.0
 			_ai_offroad_max_dist = 0.0
 			_ai_slope_rollback_timer = maxf(0.0, _ai_slope_rollback_timer - delta * 0.5)
@@ -1638,20 +1644,21 @@ func _physics_process(delta):
 				elif multiplayer.multiplayer_peer == null:
 					drown()
 			apply_central_force(Vector3.UP * 12.0)
-		elif in_water_contact or (_water_contact_grace > 0.0 and is_offroad):
+		elif in_water_contact:
 			water_timer = maxf(0.0, water_timer - delta * 1.5)
-			# If a car is offroad in/near shallow water (pond, swamp, river bank) or stuck longer than 4.8 seconds:
-			# Offroad pond oscillation counts towards drowning even if rolling back and forth!
-			var stuck_in_water: bool = is_offroad or linear_velocity.length() < 2.5
-			if stuck_in_water:
+			# Drown in shallow water ONLY if the car is actually stalled or rolling backward in water!
+			# Driving through water (such as the Desert Wadi river ford) at normal speed must NEVER drown!
+			var fwd_v_water: float = linear_velocity.dot(-visuals.global_transform.basis.z)
+			var stalled_in_water: bool = fwd_v_water < 1.5 and linear_velocity.length() < 2.5
+			if stalled_in_water:
 				shallow_water_timer += delta
-				if shallow_water_timer > 4.8 and not is_finished_race:
+				if shallow_water_timer > 5.0 and not is_finished_race:
 					if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 						drown_rpc.rpc()
 					elif multiplayer.multiplayer_peer == null:
 						drown()
 			else:
-				shallow_water_timer = maxf(0.0, shallow_water_timer - delta * 1.5)
+				shallow_water_timer = maxf(0.0, shallow_water_timer - delta * 2.0)
 		else:
 			water_timer = 0.0
 			shallow_water_timer = 0.0
@@ -2365,7 +2372,7 @@ func _is_track_surface(collider: Object) -> bool:
 	if _is_world_terrain_collider(n):
 		var lvl_check = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
 		if _wadi_stage or (lvl_check and str(lvl_check.name).to_lower().contains("wadi")):
-			# Desert wadi is an offroad stage with no visible road: all driving on sand is offroad!
+			# Desert wadi is an offroad stage with no asphalt road: all driving on sand is offroad (applying offroad penalty & sand dust)!
 			return false
 		var p_track: Path3D = active_path if (active_path and active_path.curve) else track_path
 		if p_track and p_track.curve:
@@ -2399,6 +2406,26 @@ func _get_track_outer_half_width() -> float:
 			if "sand_width" in tg:
 				return float(tg.sand_width) * 0.5
 	return 7.5
+
+
+func _is_car_on_track_corridor() -> bool:
+	var check_path: Path3D = active_path if (active_path and active_path.curve) else track_path
+	if check_path == null:
+		var lvl = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
+		if lvl and "track_path" in lvl:
+			check_path = lvl.track_path
+	if check_path == null or check_path.curve == null:
+		return true
+
+	var curve: Curve3D = check_path.curve
+	var cur_off: float = _ai_last_ontrack_offset if _ai_last_ontrack_offset >= 0.0 else curve.get_closest_offset(check_path.to_local(global_position))
+	var track_pt: Vector3 = check_path.to_global(curve.sample_baked(cur_off))
+	var height_diff: float = absf(track_pt.y - global_position.y)
+	var dist_xz: float = Vector2(global_position.x - track_pt.x, global_position.z - track_pt.z).length()
+
+	var max_allowed_width: float = 24.0 if _wadi_stage else 16.0
+	var max_allowed_height: float = 8.0 if _wadi_stage else 5.0
+	return dist_xz <= max_allowed_width and height_diff <= max_allowed_height
 
 
 func _is_loop_surface(collider: Object) -> bool:
@@ -4750,7 +4777,7 @@ func _set_dirt_emitting(emitting: bool):
 					_attach_dirt_emitter(p, pivot)
 				p.emitting = true
 				if "amount_ratio" in p:
-					if is_sand_stage and is_offroad:
+					if is_sand_stage:
 						p.amount_ratio = clampf((speed - 1.2) / 10.0, 0.45, 1.0)
 					else:
 						p.amount_ratio = clampf((speed - 3.5) / 14.0, 0.20, 1.0)
@@ -5218,6 +5245,7 @@ func _get_ai_input(delta: float) -> Vector2:
 	if corner_factor > 0.35:
 		max_safe_span = minf(max_safe_span, 0.5 if _mountain_stage else 2.0)
 	var actual_lane_offset = clampf(combined_offset, -max_safe_span, max_safe_span)
+	var on_course: bool = _is_car_on_track_corridor()
 
 	if approaching_loop:
 		# Funnel firmly into the entry ramp corridor and prevent wandering left into the descent wall
@@ -5230,7 +5258,7 @@ func _get_ai_input(delta: float) -> Vector2:
 		actual_lane_offset = 0.0
 	elif is_airborne:
 		actual_lane_offset *= 0.25
-	elif is_offroad:
+	elif is_offroad and not on_course:
 		actual_lane_offset *= 0.20
 	elif on_alternative_path:
 		actual_lane_offset *= 0.20
@@ -5253,7 +5281,7 @@ func _get_ai_input(delta: float) -> Vector2:
 	var target_global_pos: Vector3
 	
 	# Checkpoint Priority Navigation & Seamless Road Rejoining:
-	if is_offroad:
+	if is_offroad and not on_course:
 		# Update offset to current position so rejoining is instant
 		_ai_last_ontrack_offset = curve.get_closest_offset(local_pos)
 		
@@ -5272,7 +5300,7 @@ func _get_ai_input(delta: float) -> Vector2:
 		# Off-road stuck detection (stalled against steep cliff, wall or boulder, or rolling backwards)
 		var fwd_speed: float = linear_velocity.dot(fwd_3d)
 		var is_stalled_or_rolling_back: bool = fwd_speed < 1.5
-		if is_stalled_or_rolling_back and input.y < -0.1:
+		if not _is_car_on_track_corridor() and is_stalled_or_rolling_back and input.y < -0.1:
 			_ai_steep_hill_stuck_timer += delta
 			if fwd_speed < -0.3:
 				_ai_slope_rollback_timer += delta
@@ -5295,7 +5323,7 @@ func _get_ai_input(delta: float) -> Vector2:
 		target_global_pos = active_path.to_global(target_local_pos)
 
 	# Item Box Seeking (strictly within lane on mountain roads so cars never steer off)
-	var wants_item := (current_item == ItemType.NONE or current_item_2 == ItemType.NONE) and not is_finished_race and not is_offroad
+	var wants_item := (current_item == ItemType.NONE or current_item_2 == ItemType.NONE) and not is_finished_race and (not is_offroad or on_course)
 	if wants_item:
 		var max_side_box = 1.4 if _mountain_stage else 2.4
 		var best_box: Node3D = null
@@ -5316,7 +5344,7 @@ func _get_ai_input(delta: float) -> Vector2:
 			target_global_pos = target_global_pos.lerp(best_box.global_position, blend_factor)
 
 	# Boost Pad Seeking (Attract to speed pads on straights and loop entry ramps)
-	if not is_finished_race and not is_offroad:
+	if not is_finished_race and (not is_offroad or on_course):
 		var max_side_pad: float = 1.6 if _mountain_stage else 3.8
 		var best_pad: Node3D = null
 		var best_pad_dist: float = 34.0
@@ -5359,8 +5387,8 @@ func _get_ai_input(delta: float) -> Vector2:
 		# Commit full power through stunt loops — never brake or drift mid-loop!
 		_ai_want_drift = false
 		input.y = -1.0
-	elif is_offroad:
-		# When off-road, power forward toward the checkpoint without on-track curve braking
+	elif is_offroad and not on_course:
+		# When genuinely off-track, power forward toward the checkpoint without on-track curve braking
 		_ai_want_drift = false
 		input.y = -1.0
 	else:
@@ -5732,8 +5760,10 @@ func _ai_alongside_goal() -> Vector3:
 	var best: Vector3 = Vector3.ZERO
 	var best_score: float = INF
 	
-	# Search forward from where we currently are along the track curve (6m to 65m ahead)
-	var d: float = 6.0
+	# Search forward from where we currently are along the track curve (12m to 65m ahead)
+	# Avoid aiming too close (<12m) to prevent sharp twitching/zig-zagging when merging onto the track
+	var min_look: float = clampf(linear_velocity.length() * 0.70, 12.0, 28.0)
+	var d: float = min_look
 	while d <= 65.0:
 		var sample_off: float = fmod(cur_off + d, length)
 		var p: Vector3 = track_path.to_global(curve.sample_baked(sample_off))
@@ -5793,8 +5823,8 @@ func _ai_update_recovery(_delta: float, current_offset: float) -> void:
 		_ai_recovering = false
 		return
 	
-	# If we are currently touching the road surface, we are definitely NOT lost in recovery
-	if not is_offroad and was_on_ground:
+	# If we are currently touching the road surface or track corridor, we are definitely NOT lost in recovery
+	if (not is_offroad or _is_car_on_track_corridor()) and was_on_ground:
 		_ai_last_ontrack_offset = current_offset
 		_ai_recovering = false
 		return

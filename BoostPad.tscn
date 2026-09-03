@@ -14,4 +14,4 @@ script = ExtResource("1_script")
 shape = SubResource("BoxShape3D_1")
 
 [node name="boostpad" parent="." unique_id=1292453474 instance=ExtResource("2_oa57w")]
-transform = Transform3D(-2.1855695e-07, 6.8845615, 7.134753e-08, 0, -3.0093378e-07, 1.6322411, 5, 3.0093378e-07, 3.1186995e-15, -1.2081627, 0.03176868, -0.1470952)
+transform = Transform3D(-2.1855695e-07, 6.884561, 1.5176737e-07, 0, -3.0093372e-07, 3.4720328, 5, 3.0093372e-07, 6.6339625e-15, -1.2081627, 0.03176868, -0.1470952)
