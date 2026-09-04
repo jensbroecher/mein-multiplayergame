@@ -334,8 +334,10 @@ func _ready() -> void:
 				item_container.add_child(ib)
 				item_idx += 1
 
-	# 11. Pine Forest & Vegetation WITH STRICT CAMERA CLEARANCE
-	# Tall pines placed at least 25m away from the road so the camera and driving view are never blocked!
+	# 11. Pine Forest, Bushes, Wildflowers & Grass WITH STRICT ROAD CLEARANCE
+	# Tall pines placed at least 28m away from the road so the camera and driving view are never blocked!
+	# Roadside bushes placed strictly along the track normal (11.5m to 17.5m out), never encroaching into the road or curbs!
+	# All vegetation heights sampled directly from the terrain generator's cached height grid and seated properly into the ground.
 	var veg_container := Node3D.new()
 	veg_container.name = "Vegetation"
 	level_scene.add_child(veg_container)
@@ -351,6 +353,7 @@ func _ready() -> void:
 		load("res://models/trees/tree_4.glb")
 	]
 	var bush_model = load("res://models/trees/bush.glb")
+	var grass_model = load("res://models/trees/grass.glb")
 	var flower_blue_model = load("res://models/trees/flower_blue.glb")
 	var flower_white_model = load("res://models/trees/flower_white.glb")
 
@@ -366,38 +369,60 @@ func _ready() -> void:
 				min_d = d
 		return min_d
 
-	var get_tree_y = func(px: float, pz: float) -> float:
-		var hill_progress: float = clampf((-pz + 80.0) / 380.0, 0.0, 1.0)
-		var hill_shape: float = hill_progress * hill_progress * (3.0 - 2.0 * hill_progress)
-		var x_falloff: float = clampf(1.0 - (absf(px) / 380.0), 0.0, 1.0)
-		x_falloff = x_falloff * x_falloff * (3.0 - 2.0 * x_falloff)
-		var hill_elevation: float = hill_shape * x_falloff * 90.0
-		var min_d := 1.0e9
-		var best_y := hill_elevation
-		for bp in baked_pts:
-			var d = Vector2(px - bp.x, pz - bp.z).length()
-			if d < min_d:
-				min_d = d
-				best_y = bp.y
-		if min_d < 45.0:
-			var blend = 1.0 - (min_d / 45.0)
-			return lerpf(hill_elevation, best_y, blend * 0.85)
-		return hill_elevation
+	# Exact ground height directly from the terrain generator's cached visual height grid
+	var get_ground_y = func(px: float, pz: float) -> float:
+		return float(tg.call("_sample_cached_height", px, pz))
 
-	# Tall trees placed in dense background forests (MIN 26.0m from road!)
+	# Jump flight trajectories to keep completely clear of tall trees:
+	# Jump 1 (Ravine Leap): (-70, 10, -50) to (-75, 20, -90)
+	# Jump 2 (Summit Super-Jump): (55, 75, -195) to (65, 56, -150)
+	# Jump 3 (Creek Launch): (68, 14, 60) to (62, 1.5, 105)
+	var jump_segments = [
+		[Vector2(-70.0, -50.0), Vector2(-75.0, -90.0), 30.0],
+		[Vector2(55.0, -195.0), Vector2(65.0, -150.0), 35.0],
+		[Vector2(68.0, 60.0), Vector2(62.0, 105.0), 30.0]
+	]
+	var is_in_jump_corridor = func(px: float, pz: float) -> bool:
+		var p = Vector2(px, pz)
+		for seg in jump_segments:
+			var a: Vector2 = seg[0]
+			var b: Vector2 = seg[1]
+			var radius: float = seg[2]
+			var ab = b - a
+			var l2 = ab.length_squared()
+			var t = clampf((p - a).dot(ab) / maxf(l2, 0.001), 0.0, 1.0)
+			var proj = a + ab * t
+			if p.distance_to(proj) < radius:
+				return true
+		return false
+
+	# A. Tall trees placed in dense background forests (MIN 28.0m from road, clear of flight corridors)
 	var tree_count := 0
-	for i in range(160):
+	var tree_attempts := 0
+	while tree_count < 140 and tree_attempts < 600:
+		tree_attempts += 1
 		var px = rng.randf_range(-340.0, 340.0)
 		var pz = rng.randf_range(-340.0, 220.0)
 
-		var dist_to_road = get_2d_road_dist.call(px, pz)
-		# STRICT CLEARANCE: 26.0m clearance ensures camera NEVER collides with or gets blocked by pine trees!
-		if dist_to_road < 26.0:
+		# Strict clearance: 28m ensures trees never block driving line or camera sightlines
+		if get_2d_road_dist.call(px, pz) < 28.0:
+			continue
+		if is_in_jump_corridor.call(px, pz):
 			continue
 
-		var py = get_tree_y.call(px, pz)
-		var is_high_hill = (pz < -40.0)
+		var py = get_ground_y.call(px, pz)
+		# Skip submerged spots in the lake basin
+		if py < -1.8:
+			continue
 
+		# Skip sheer cliff faces (>50 deg slope) so trees only sit on stable ground
+		var h_x = get_ground_y.call(px + 2.0, pz)
+		var h_z = get_ground_y.call(px, pz + 2.0)
+		var max_grad = maxf(absf(h_x - py), absf(h_z - py)) / 2.0
+		if max_grad > 1.20:
+			continue
+
+		var is_high_hill = (pz < -40.0)
 		var chosen_packed = null
 		if is_high_hill or rng.randf() < 0.75:
 			chosen_packed = pine_models[rng.randi() % pine_models.size()]
@@ -408,50 +433,124 @@ func _ready() -> void:
 			var tree_inst = chosen_packed.instantiate()
 			tree_count += 1
 			tree_inst.name = "Tree_%d" % tree_count
-			tree_inst.position = Vector3(px, py, pz)
+			# Sink trunk by 0.25m so base roots sit solidly on slopes with zero floating gaps
+			tree_inst.position = Vector3(px, py - 0.25, pz)
 			var sc = rng.randf_range(1.3, 2.3)
 			tree_inst.scale = Vector3(sc, sc, sc)
 			tree_inst.rotation_degrees = Vector3(0, rng.randf_range(0, 360), 0)
 			veg_container.add_child(tree_inst)
 
-	# Low-profile bushes placed along roadsides (scaled small so view remains unobstructed)
+	# B. Low-profile bushes placed along roadsides (strictly along normal outside curb, min 11.5m, max 17.5m)
 	if bush_model:
 		var bush_count := 0
-		for i in range(50):
-			var t_offset = rng.randf_range(10.0, curve.get_baked_length() - 10.0)
+		var bush_attempts := 0
+		track_len = curve.get_baked_length()
+		while bush_count < 50 and bush_attempts < 400:
+			bush_attempts += 1
+			var t_offset = rng.randf_range(12.0, track_len - 12.0)
 			var path_pt = curve.sample_baked(t_offset)
+			var next_pt = curve.sample_baked(minf(track_len, t_offset + 0.5))
+			var prev_pt = curve.sample_baked(maxf(0.0, t_offset - 0.5))
+			var tangent = (next_pt - prev_pt).normalized()
+			if tangent.length_squared() < 0.001:
+				tangent = Vector3.FORWARD
+			# Horizontal normal perpendicular to tangent
+			var normal = Vector3(-tangent.z, 0.0, tangent.x).normalized()
+
 			var side_sign = -1.0 if rng.randf() < 0.5 else 1.0
-			var side_dist = rng.randf_range(13.0, 20.0)
-			var bush_pos = path_pt + Vector3(side_sign * side_dist, 0.0, rng.randf_range(-2.0, 2.0))
-			bush_pos.y = get_tree_y.call(bush_pos.x, bush_pos.z)
+			var side_dist = rng.randf_range(11.5, 17.5)
+			var bush_pos = path_pt + normal * (side_sign * side_dist)
+
+			# Strict check against ALL points of the road: must never be within 11.0m
+			var min_dist_all = get_2d_road_dist.call(bush_pos.x, bush_pos.z)
+			if min_dist_all < 11.0:
+				continue
+			if is_in_jump_corridor.call(bush_pos.x, bush_pos.z):
+				continue
+
+			var ground_h = get_ground_y.call(bush_pos.x, bush_pos.z)
+			if ground_h < -1.8:
+				continue
+
+			# Reject steep cliff cuts between switchback tiers (slope > 50 deg)
+			var b_hx = get_ground_y.call(bush_pos.x + 1.5, bush_pos.z)
+			var b_hz = get_ground_y.call(bush_pos.x, bush_pos.z + 1.5)
+			var b_grad = maxf(absf(b_hx - ground_h), absf(b_hz - ground_h)) / 1.5
+			if b_grad > 1.15:
+				continue
+
+			bush_pos.y = ground_h - 0.12
 
 			var bush_inst = bush_model.instantiate()
 			bush_count += 1
 			bush_inst.name = "Bush_%d" % bush_count
 			bush_inst.position = bush_pos
-			var sc = rng.randf_range(0.6, 1.0) # Small low-lying bushes
+			var sc = rng.randf_range(0.65, 1.05)
 			bush_inst.scale = Vector3(sc, sc, sc)
 			bush_inst.rotation_degrees = Vector3(0, rng.randf_range(0, 360), 0)
 			veg_container.add_child(bush_inst)
 
-	# Wildflowers in the meadows
+	# C. Wildflowers in the meadows and along gentle slopes
 	var flower_models = [flower_blue_model, flower_white_model]
 	var flower_count := 0
-	for i in range(50):
+	var flower_attempts := 0
+	while flower_count < 50 and flower_attempts < 300:
+		flower_attempts += 1
 		var f_packed = flower_models[rng.randi() % flower_models.size()]
 		if f_packed:
-			var px = rng.randf_range(-160.0, 160.0)
-			var pz = rng.randf_range(30.0, 200.0)
-			if get_2d_road_dist.call(px, pz) < 10.0:
+			var px = rng.randf_range(-180.0, 180.0)
+			var pz = rng.randf_range(20.0, 210.0)
+			if get_2d_road_dist.call(px, pz) < 11.0:
 				continue
-			var py = get_tree_y.call(px, pz)
+			var py = get_ground_y.call(px, pz)
+			if py < -1.8:
+				continue
+
+			# Reject steep slopes for delicate flowers
+			var f_hx = get_ground_y.call(px + 1.5, pz)
+			var f_hz = get_ground_y.call(px, pz + 1.5)
+			var f_grad = maxf(absf(f_hx - py), absf(f_hz - py)) / 1.5
+			if f_grad > 1.15:
+				continue
+
 			var f_inst = f_packed.instantiate()
 			flower_count += 1
 			f_inst.name = "Flowers_%d" % flower_count
-			f_inst.position = Vector3(px, py, pz)
+			f_inst.position = Vector3(px, py - 0.08, pz)
 			var sc = rng.randf_range(1.2, 1.8)
 			f_inst.scale = Vector3(sc, sc, sc)
+			f_inst.rotation_degrees = Vector3(0, rng.randf_range(0, 360), 0)
 			veg_container.add_child(f_inst)
+
+	# D. Grass clumps scattered in meadows and along slopes
+	if grass_model:
+		var grass_count := 0
+		var grass_attempts := 0
+		while grass_count < 60 and grass_attempts < 300:
+			grass_attempts += 1
+			var px = rng.randf_range(-220.0, 220.0)
+			var pz = rng.randf_range(-120.0, 210.0)
+			if get_2d_road_dist.call(px, pz) < 11.0:
+				continue
+			var py = get_ground_y.call(px, pz)
+			if py < -1.8:
+				continue
+
+			# Reject steep cliff cuts for grass clumps
+			var g_hx = get_ground_y.call(px + 1.5, pz)
+			var g_hz = get_ground_y.call(px, pz + 1.5)
+			var g_grad = maxf(absf(g_hx - py), absf(g_hz - py)) / 1.5
+			if g_grad > 1.15:
+				continue
+
+			var g_inst = grass_model.instantiate()
+			grass_count += 1
+			g_inst.name = "Grass_%d" % grass_count
+			g_inst.position = Vector3(px, py - 0.08, pz)
+			var sc = rng.randf_range(0.75, 1.3)
+			g_inst.scale = Vector3(sc, sc, sc)
+			g_inst.rotation_degrees = Vector3(0, rng.randf_range(0, 360), 0)
+			veg_container.add_child(g_inst)
 
 	# 12. Additional Containers
 	for c_name in ["Props", "AlternativePaths"]:
@@ -490,4 +589,7 @@ func _set_owner_recursive(node: Node, scene_root: Node) -> void:
 	if node != scene_root:
 		node.owner = scene_root
 	for child in node.get_children():
+		# If child was already owned by an instantiated sub-scene, preserve its internal encapsulation
+		if child.owner != null and child.owner != scene_root:
+			continue
 		_set_owner_recursive(child, scene_root)

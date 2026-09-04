@@ -49,6 +49,15 @@ const ITEM_BOX_SCENE = preload("res://ItemBox.tscn")
 				_snap_all_boost_pads_to_ground()
 			notify_property_list_changed()
 
+## Drop every vegetation item (trees, bushes, flowers, grass) onto the terrain (editor).
+@export_tool_button("Snap All Vegetation To Ground") var snap_vegetation_action = _snap_all_vegetation_to_ground
+@export var snap_vegetation_to_ground: bool = false:
+	set(val):
+		if val:
+			if Engine.is_editor_hint():
+				_snap_all_vegetation_to_ground()
+			notify_property_list_changed()
+
 @export var spawn_sand_dunes: bool = false:
 	set(val):
 		if val:
@@ -1662,6 +1671,26 @@ func _snap_all_boost_pads_to_ground() -> void:
 				fail_n += 1
 				push_warning("[Level] BoostPad snap failed: ", pad.name)
 	print("[Level] Snapped ", ok_n, " boost pad(s).", (" (" + str(fail_n) + " failed)") if fail_n > 0 else "")
+
+
+## Editor: snap all vegetation children to the terrain ground surface.
+func _snap_all_vegetation_to_ground() -> void:
+	var veg = get_node_or_null("Vegetation")
+	if not veg:
+		push_warning("[Level] No Vegetation container found.")
+		return
+	var tg = get_node_or_null("TerrainGenerator")
+	if not tg:
+		push_warning("[Level] No TerrainGenerator found.")
+		return
+	var count := 0
+	for child in veg.get_children():
+		if child is Node3D:
+			var h: float = float(tg.call("_sample_cached_height", child.position.x, child.position.z))
+			var sink := 0.25 if child.name.begins_with("Tree") else (0.12 if child.name.begins_with("Bush") else 0.08)
+			child.position.y = h - sink
+			count += 1
+	print("[Level] Snapped %d vegetation items to ground." % count)
 
 
 func _collect_boost_pads(node: Node, out: Array) -> void:
