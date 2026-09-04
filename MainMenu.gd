@@ -21,6 +21,7 @@ const COL_MOUNTAIN := Color(0.92, 0.68, 0.32)
 const COL_CANYON := Color(0.92, 0.42, 0.22)
 const COL_CHASM := Color(0.72, 0.28, 0.22)
 const COL_WADI := Color(0.9, 0.74, 0.38)
+const COL_SNOW := Color(0.45, 0.82, 0.98)
 
 @onready var name_edit: LineEdit = $Root/VBox/TopBar/NameBox/NameEdit
 @onready var screen_title: Label = $Root/VBox/TopBar/TitleRow/ScreenTitle
@@ -172,6 +173,9 @@ func show_sub_menu(menu_name: String) -> void:
 			_add_tile("STARTER CUP", "Lakeside  •  Pinecrest  •  Harbor", "tile_starter_cup.jpg", COL_GREEN, func():
 				_on_cup_selected("Starter Cup")
 			)
+			_add_tile("ARCTIC CUP", "Pinecrest  •  Frostpeak Creek", "tile_arctic_cup.jpg", COL_SNOW, func():
+				_on_cup_selected("Arctic Cup")
+			)
 			_add_tile("DESERT CUP", "Mountain  •  Canyon  •  Chasm  •  Wadi", "tile_desert_cup.jpg", COL_BRONZE, func():
 				_on_cup_selected("Desert Cup")
 			)
@@ -188,6 +192,9 @@ func show_sub_menu(menu_name: String) -> void:
 			)
 			_add_tile("PINECREST RIDGE", "Forest hillclimb, sharp switchbacks, and big jumps", "tile_pinecrest.jpg", COL_GREEN, func():
 				_on_stage_selected("res://levels/PinecrestRidgeLevel.tscn")
+			)
+			_add_tile("FROSTPEAK CREEK", "Snow drifts, creek leaps, and the alpine bridge", "tile_frostpeak_creek.jpg", COL_SNOW, func():
+				_on_stage_selected("res://levels/FrostpeakCreekLevel.tscn")
 			)
 			_add_tile("HARBOR PIER", "Piers, crates, and dark water", "tile_harbor.jpg", COL_HARBOR, func():
 				_on_stage_selected("res://levels/HarborPierLevel.tscn")
@@ -412,6 +419,7 @@ func _fill_gp_test_tiles() -> void:
 	var meta := {
 		"res://levels/Level.tscn": {"title": "LAKESIDE", "file": "tile_lakeside.jpg", "color": COL_LAKE},
 		"res://levels/PinecrestRidgeLevel.tscn": {"title": "PINECREST", "file": "tile_pinecrest.jpg", "color": COL_GREEN},
+		"res://levels/FrostpeakCreekLevel.tscn": {"title": "FROSTPEAK CREEK", "file": "tile_frostpeak_creek.jpg", "color": COL_SNOW},
 		"res://levels/HarborPierLevel.tscn": {"title": "HARBOR PIER", "file": "tile_harbor.jpg", "color": COL_HARBOR},
 		"res://levels/MountainLevel.tscn": {"title": "MOUNTAIN", "file": "tile_mountain.jpg", "color": COL_MOUNTAIN},
 		"res://levels/CanyonLevel.tscn": {"title": "CANYON", "file": "tile_canyon.jpg", "color": COL_CANYON},

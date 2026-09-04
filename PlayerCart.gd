@@ -338,6 +338,8 @@ var stage_has_water: bool = false
 var _harbor_stage: bool = false
 var _mountain_stage: bool = false
 var _wadi_stage: bool = false
+var _snow_stage: bool = false
+var is_in_snow: bool = false
 var is_underwater: bool = false
 const WATER_LEVEL = -10.0
 ## Effective surface Y used for splash/drown (may be chasm pit water, not global ocean).
@@ -745,6 +747,14 @@ func _ready():
 					var bmax: Vector2 = river.get_meta("water_bounds_max")
 					water_bounds_min = Vector2(minf(bmin.x, 0.0), minf(bmin.y, -360.0))
 					water_bounds_max = Vector2(maxf(bmax.x, 400.0), maxf(bmax.y, -60.0))
+		elif tg and (str(tg.get("level_prefix")).contains("frost") or str(tg.get("level_prefix")).contains("snow")):
+			_snow_stage = true
+			stage_has_water = true
+			water_surface_y = -1.2
+			water_bounds_active = false
+			var water_node = tg.get_node_or_null("Water_Surface")
+			if water_node and water_node.has_meta("water_surface_y"):
+				water_surface_y = float(water_node.get_meta("water_surface_y"))
 		else:
 			# General water detection for Lakehill, Pinecrest Ridge, and all other stages
 			var is_no_water: bool = tg and ("no_water" in tg and tg.no_water)
@@ -1897,12 +1907,21 @@ func _physics_process(delta):
 	was_on_ground = on_ground
 
 	is_offroad = false
+	var on_snow_surface: bool = false
 	if on_ground and not on_loop:
 		var collider = ground_collider if ground_collider else ground_ray.get_collider()
 		if collider:
 			is_offroad = not _is_track_surface(collider)
+			var cur: Node = collider as Node
+			while cur:
+				if cur.is_in_group("snow") or cur.has_meta("is_snow") or str(cur.name).to_lower().contains("snow"):
+					on_snow_surface = true
+					break
+				cur = cur.get_parent()
 
-	if is_offroad:
+	is_in_snow = on_snow_surface or (is_offroad and _snow_stage)
+
+	if is_offroad or is_in_snow:
 		offroad_timer += delta
 		if offroad_timer > 0.15:
 			offroad_timer = 0.0
@@ -1913,6 +1932,9 @@ func _physics_process(delta):
 			var penalty_min = lerp(0.55, 0.96, offroad_factor)
 			var penalty_max = lerp(0.65, 1.00, offroad_factor)
 			offroad_target_penalty = randf_range(penalty_min, penalty_max)
+			if is_in_snow:
+				# Snow provides drag and slows cars down
+				offroad_target_penalty = minf(offroad_target_penalty, lerp(0.58, 0.78, offroad_factor))
 		offroad_penalty = lerp(offroad_penalty, offroad_target_penalty, 5.0 * delta)
 	else:
 		offroad_penalty = lerp(offroad_penalty, 1.0, 10.0 * delta)
@@ -2249,9 +2271,9 @@ func _physics_process(delta):
 		var excess_ratio = (current_speed - effective_max) / max_speed
 		apply_central_force(-fwd * excess_ratio * acceleration * 8.0 * mass)
 
-	# Emit dirt particles when offroad, moving, and NOT in water
+	# Emit dirt particles when offroad or on snow, moving, and NOT in water
 	var in_water_now := stage_has_water and (is_underwater or (water_surface_y - global_position.y >= -0.80 and _is_over_water_volume()))
-	var emit_dirt = is_offroad and on_ground and linear_velocity.length() > 2.0 and not in_water_now
+	var emit_dirt = (is_offroad or is_in_snow) and on_ground and linear_velocity.length() > 1.8 and not in_water_now
 	_set_dirt_emitting(emit_dirt)
 	sync_emit_dirt = emit_dirt
 
@@ -4683,6 +4705,9 @@ func _get_current_surface_dust_color() -> Color:
 	if lvl:
 		lvl_name = str(lvl.name).to_lower()
 	
+	if is_in_snow or (_snow_stage and is_offroad) or lvl_name.contains("frost") or lvl_name.contains("snow"):
+		return Color(0.96, 0.98, 1.0, 0.95) # Pure snow powder white
+
 	if not is_offroad:
 		# Driving on asphalt / pavement
 		return Color(0.92, 0.90, 0.88)
@@ -4753,8 +4778,9 @@ func _set_dirt_emitting(emitting: bool):
 			var lvl_nm = str(lvl.name).to_lower()
 			is_sand_stage = lvl_nm.contains("wadi") or lvl_nm.contains("desert") or lvl_nm.contains("mountain")
 
-	var min_speed: float = 2.2 if is_sand_stage else 4.8
-	var deact_speed: float = 1.4 if is_sand_stage else 3.6
+	var in_snow_active: bool = is_in_snow or (_snow_stage and is_offroad)
+	var min_speed: float = 1.5 if in_snow_active else (2.2 if is_sand_stage else 4.8)
+	var deact_speed: float = 1.0 if in_snow_active else (1.4 if is_sand_stage else 3.6)
 
 	# Hysteresis gating to prevent blinking / jittering when speed hovers near cutoff
 	if _is_dust_active:
@@ -4776,11 +4802,21 @@ func _set_dirt_emitting(emitting: bool):
 				if is_instance_valid(pivot):
 					_attach_dirt_emitter(p, pivot)
 				p.emitting = true
-				if "amount_ratio" in p:
-					if is_sand_stage:
-						p.amount_ratio = clampf((speed - 1.2) / 10.0, 0.45, 1.0)
-					else:
-						p.amount_ratio = clampf((speed - 3.5) / 14.0, 0.20, 1.0)
+				if in_snow_active:
+					p.scale_amount_max = 0.65
+					p.initial_velocity_max = 7.5
+					p.direction = Vector3(0.0, 1.1, 1.3).normalized()
+					if "amount_ratio" in p:
+						p.amount_ratio = clampf((speed - 0.8) / 7.0, 0.75, 1.0)
+				else:
+					p.scale_amount_max = 0.36
+					p.initial_velocity_max = 5.6
+					p.direction = Vector3(0.0, 0.8, 1.4).normalized()
+					if "amount_ratio" in p:
+						if is_sand_stage:
+							p.amount_ratio = clampf((speed - 1.2) / 10.0, 0.45, 1.0)
+						else:
+							p.amount_ratio = clampf((speed - 3.5) / 14.0, 0.20, 1.0)
 			else:
 				p.emitting = false
 

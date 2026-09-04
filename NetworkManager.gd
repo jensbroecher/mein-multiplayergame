@@ -46,6 +46,7 @@ var is_voting_active: bool = false
 const ALL_STAGES = [
 	{"name": "Meadow Circuit", "path": "res://levels/Level.tscn"},
 	{"name": "Pinecrest Ridge", "path": "res://levels/PinecrestRidgeLevel.tscn"},
+	{"name": "Frostpeak Creek", "path": "res://levels/FrostpeakCreekLevel.tscn"},
 	{"name": "Harbor Pier", "path": "res://levels/HarborPierLevel.tscn"},
 	{"name": "Mountain Pass", "path": "res://levels/MountainLevel.tscn"},
 	{"name": "Canyon Drift", "path": "res://levels/CanyonLevel.tscn"},
@@ -60,6 +61,13 @@ const GP_CUPS = {
 			"res://levels/Level.tscn",
 			"res://levels/PinecrestRidgeLevel.tscn",
 			"res://levels/HarborPierLevel.tscn",
+		]
+	},
+	"Arctic Cup": {
+		"name": "Arctic Cup",
+		"stages": [
+			"res://levels/PinecrestRidgeLevel.tscn",
+			"res://levels/FrostpeakCreekLevel.tscn",
 		]
 	},
 	"Desert Cup": {

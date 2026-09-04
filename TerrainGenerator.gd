@@ -350,6 +350,31 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 		var hill_elevation: float = hill_shape * x_falloff * 90.0
 		var valley_noise: float = h_noise * (0.35 + 0.65 * hill_shape)
 		base_terrain_height = hill_elevation + valley_noise
+	elif level_prefix == "frostpeak_creek":
+		# High alpine valley with rolling snowy hills and a central creek ravine
+		# Creek meanders along Z axis near X=0 from alpine glacier at Z=175m to Z=-370m
+		var creek_x: float = sin(pz * 0.018) * 14.0
+		var dist_to_creek: float = absf(px - creek_x)
+		var creek_ravine_w: float = 24.0
+		var creek_depth: float = -3.8
+		var creek_blend: float = 0.0
+		
+		var z_blend: float = 1.0
+		if pz > 175.0:
+			z_blend = clampf(1.0 - (pz - 175.0) / 25.0, 0.0, 1.0)
+		elif pz < -370.0:
+			z_blend = clampf(1.0 - (-370.0 - pz) / 30.0, 0.0, 1.0)
+			
+		if dist_to_creek < creek_ravine_w and z_blend > 0.0:
+			var t: float = 1.0 - (dist_to_creek / creek_ravine_w)
+			creek_blend = t * t * (3.0 - 2.0 * t) * z_blend
+		
+		# Rolling hills on east and west flanks rising to 16-24m, valley floor at 0-4m
+		var flank_t: float = clampf(absf(px) / 260.0, 0.0, 1.0)
+		var flank_elevation: float = flank_t * flank_t * 22.0
+		var valley_noise: float = h_noise * 0.65
+		base_terrain_height = flank_elevation + valley_noise
+		base_terrain_height = lerpf(base_terrain_height, creek_depth, creek_blend)
 	else:
 		base_terrain_height = h_noise
 
@@ -1668,8 +1693,12 @@ func _generate_water():
 	var water = MeshInstance3D.new()
 	water.name = "Water_Surface"
 	var plane = PlaneMesh.new()
+	plane.size = Vector2(1600.0, 1600.0)
+	water.mesh = plane
 	if level_prefix == "pinecrest_ridge":
 		water.position = Vector3(0, -2.5, 0)
+	elif level_prefix == "frostpeak_creek":
+		water.position = Vector3(0, -1.2, 0)
 	else:
 		water.position = Vector3(0, -10.0, 0) # Water level (below terrain base)
 	water.set_meta("water_surface_y", water.position.y)
@@ -1688,13 +1717,22 @@ func _generate_water():
 	noise_tex.noise = noise
 
 	mat.set_shader_parameter("noise_tex", noise_tex)
-	mat.set_shader_parameter("water_color", Color(0.1, 0.3, 0.6))
-	mat.set_shader_parameter("shallow_color", Color(0.15, 0.45, 0.55))
-	mat.set_shader_parameter("sky_tint", Color(0.55, 0.65, 0.75))
-	mat.set_shader_parameter("sky_reflect", 0.45)
-	mat.set_shader_parameter("transparency", 0.7)
-	mat.set_shader_parameter("metallic", 0.55)
-	mat.set_shader_parameter("roughness", 0.12)
+	if level_prefix == "frostpeak_creek":
+		mat.set_shader_parameter("water_color", Color(0.04, 0.22, 0.38))
+		mat.set_shader_parameter("shallow_color", Color(0.15, 0.52, 0.68))
+		mat.set_shader_parameter("sky_tint", Color(0.65, 0.78, 0.90))
+		mat.set_shader_parameter("sky_reflect", 0.60)
+		mat.set_shader_parameter("transparency", 0.65)
+		mat.set_shader_parameter("metallic", 0.65)
+		mat.set_shader_parameter("roughness", 0.08)
+	else:
+		mat.set_shader_parameter("water_color", Color(0.1, 0.3, 0.6))
+		mat.set_shader_parameter("shallow_color", Color(0.15, 0.45, 0.55))
+		mat.set_shader_parameter("sky_tint", Color(0.55, 0.65, 0.75))
+		mat.set_shader_parameter("sky_reflect", 0.45)
+		mat.set_shader_parameter("transparency", 0.7)
+		mat.set_shader_parameter("metallic", 0.55)
+		mat.set_shader_parameter("roughness", 0.12)
 
 	water.material_override = mat
 	add_child(water)
