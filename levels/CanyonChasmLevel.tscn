@@ -142,17 +142,17 @@ uv1_triplanar_sharpness = 8.0
 uv1_world_triplanar = true
 texture_filter = 5
 
-[sub_resource type="FastNoiseLite" id="FastNoiseLite_25u65"]
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_73j01"]
 seed = 42
 frequency = 0.018
 fractal_octaves = 4
 
-[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_c4tac"]
-noise = SubResource("FastNoiseLite_25u65")
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_vuht3"]
+noise = SubResource("FastNoiseLite_73j01")
 seamless = true
 as_normal_map = true
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_1fvci"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_25u65"]
 render_priority = 0
 shader = ExtResource("22_ocis7")
 shader_parameter/water_color = Color(0.06, 0.09, 0.04, 1)
@@ -162,7 +162,7 @@ shader_parameter/sky_reflect = 0.85
 shader_parameter/transparency = 0.18
 shader_parameter/metallic = 0.72
 shader_parameter/roughness = 0.05
-shader_parameter/noise_tex = SubResource("NoiseTexture2D_c4tac")
+shader_parameter/noise_tex = SubResource("NoiseTexture2D_vuht3")
 shader_parameter/wave_speed = 0.03
 shader_parameter/wave_strength = 0.85
 shader_parameter/wave_height = 1.15
@@ -173,7 +173,7 @@ shader_parameter/water_fade_end = 2200.0
 shader_parameter/depth_fade_distance = 6.0
 shader_parameter/deep_water_color = Color(0.005, 0.025, 0.05, 1)
 
-[sub_resource type="PlaneMesh" id="PlaneMesh_sjn82"]
+[sub_resource type="PlaneMesh" id="PlaneMesh_c4tac"]
 size = Vector2(90, 116)
 subdivide_width = 64
 subdivide_depth = 80
@@ -232,7 +232,7 @@ shadow_mesh = SubResource("ArrayMesh_k1idl")
 
 [node name="Level" type="Node3D" unique_id=815155767 node_paths=PackedStringArray("checkpoints", "track_path")]
 script = ExtResource("1_lev99")
-checkpoints = [NodePath("Checkpoints/Halfway4"), NodePath("Checkpoints/Halfway3"), NodePath("Checkpoints/Halfway2"), NodePath("Checkpoints/Halfway1"), NodePath("Checkpoints/Halfway5"), NodePath("Checkpoints/Halfway6"), NodePath("Checkpoints/Halfway7"), NodePath("Checkpoints/Halfway8"), NodePath("FinishLine")]
+checkpoints = [null, NodePath("Checkpoints/Halfway3"), NodePath("Checkpoints/Halfway2"), null, NodePath("Checkpoints/Halfway5"), null, NodePath("Checkpoints/Halfway7"), NodePath("Checkpoints/Halfway8"), NodePath("FinishLine")]
 track_path = NodePath("TrackPath")
 
 [node name="Cactus3" parent="." unique_id=473882448 groups=["collision_trimesh"] instance=ExtResource("43_ctbtb")]
@@ -297,11 +297,11 @@ shape = ExtResource("20_bqk36")
 [node name="@CollisionShape3D@22529" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=1752221213]
 shape = ExtResource("19_luqfk")
 
-[node name="ChasmPitWater" type="MeshInstance3D" parent="TerrainGenerator" unique_id=694715105]
+[node name="ChasmPitWater" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1406948453]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, -1.8, -90)
-material_override = SubResource("ShaderMaterial_1fvci")
+material_override = SubResource("ShaderMaterial_25u65")
 cast_shadow = 0
-mesh = SubResource("PlaneMesh_sjn82")
+mesh = SubResource("PlaneMesh_c4tac")
 metadata/water_surface_y = -1.8
 metadata/water_half_xz = Vector2(45, 58)
 metadata/water_center_xz = Vector2(150, -90)
@@ -327,23 +327,14 @@ spawn_path = NodePath(".")
 
 [node name="Checkpoints" type="Node3D" parent="." unique_id=342440943]
 
-[node name="Halfway4" parent="Checkpoints" unique_id=409562182 instance=ExtResource("2_gate")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, -36.04143)
-
 [node name="Halfway3" parent="Checkpoints" unique_id=1076613409 instance=ExtResource("2_gate")]
 transform = Transform3D(0.7034232, -0.03789081, -0.7097606, 0, 0.9985781, -0.053309433, 0.7107712, 0.037499093, 0.70242304, 29.643417, 14.227347, -263.39322)
 
 [node name="Halfway2" parent="Checkpoints" unique_id=760818968 instance=ExtResource("2_gate")]
 transform = Transform3D(-0.8008658, 0.021752665, -0.59844863, 0, 0.99934006, 0.036324438, 0.5988438, 0.029091, -0.8003373, 227.73512, 15.926315, -231.53531)
 
-[node name="Halfway1" parent="Checkpoints" unique_id=970429380 instance=ExtResource("2_gate")]
-transform = Transform3D(-0.9727311, -0.0038980497, 0.23190297, 0, 0.9998588, 0.016806595, -0.23193572, 0.016348299, -0.9725938, 201.77481, 10.128015, -11.408478)
-
 [node name="Halfway5" parent="Checkpoints" unique_id=409562185 instance=ExtResource("2_gate")]
 transform = Transform3D(1, 0, 0, 0, 0.93159324, -0.36350262, 0, 0.36350262, 0.93159324, 150, 33.640434, -9.929641)
-
-[node name="Halfway6" parent="Checkpoints" unique_id=1076613412 instance=ExtResource("2_gate")]
-transform = Transform3D(-0.8156207, 0.13242497, 0.56322867, 0, 0.97345555, -0.22887649, -0.578587, -0.1866764, -0.79397047, 64.742165, 28.359362, -157.82936)
 
 [node name="Halfway7" parent="Checkpoints" unique_id=760818971 instance=ExtResource("2_gate")]
 transform = Transform3D(-0.5791548, -0.022928601, 0.8148951, 0, 0.99960434, 0.028125744, -0.81521755, 0.01628916, -0.5789257, -117.44686, 19.64256, -87.999245)
@@ -415,12 +406,7 @@ transform = Transform3D(8.654013, 0, -12.251859, 0, 14.999999, 0, 12.251859, 0, 
 transform = Transform3D(-1, 0, 1.189585e-07, 4.821806e-08, 0.9141682, 0.40533513, -1.08748075e-07, 0.40533513, -0.9141682, 150, 41.215374, -26.638933)
 flash_brightness = 1.0
 boost_strength = 2.0
-
-[node name="BoostPad_HillJump2" parent="BoostPads" unique_id=368743564 instance=ExtResource("35_g7jjn")]
-transform = Transform3D(-1, 3.5527137e-15, 1.1037392e-07, 3.9913743e-08, 0.93232447, 0.361623, -1.0290429e-07, 0.361623, -0.93232447, 150, 46.845184, -40.06995)
-flash_brightness = 1.0
-boost_strength = 2.0
-boost_duration = 3.0
+boost_duration = 1.0
 
 [node name="BoostPad_CrossingJump" parent="BoostPads" unique_id=691590765 instance=ExtResource("35_g7jjn")]
 transform = Transform3D(0.8126078, 0.1168174, -0.57098335, 0.00827531, 0.97729504, 0.21172185, 0.582752, -0.17677191, 0.7931909, 39.21976, 41.459866, -112.62118)
@@ -429,26 +415,21 @@ flash_brightness = 1.0
 [node name="BoostPad_CrossingJump2" parent="BoostPads" unique_id=1775387508 instance=ExtResource("35_g7jjn")]
 transform = Transform3D(0.5586044, 0.12779658, -0.8195299, 0.032546055, 0.983921, 0.17561547, 0.8287955, -0.12477203, 0.54546326, 31.813507, 43.896584, -104.777756)
 flash_brightness = 1.0
-boost_strength = 2.0
-boost_duration = 3.0
 
 [node name="BoostPad_Start" parent="BoostPads" unique_id=759228800 instance=ExtResource("35_g7jjn")]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 5.479994, 160)
 flash_brightness = 1.0
-boost_duration = 4.0
 
 [node name="BoostPad_Start2" parent="BoostPads" unique_id=838001487 instance=ExtResource("35_g7jjn")]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -3.695167, 5.4799786, 122.07371)
 flash_brightness = 1.0
-boost_duration = 4.0
 
 [node name="BoostPad_Start3" parent="BoostPads" unique_id=1392837718 instance=ExtResource("35_g7jjn")]
 transform = Transform3D(-0.99857885, 0.00025839047, -0.053294096, -5.7049823e-05, 0.9999825, 0.005917254, 0.053294692, 0.005911885, -0.9985613, -2.3749793, 5.8449826, -72.75264)
 flash_brightness = 1.0
-boost_duration = 4.0
 
 [node name="Rock" parent="." unique_id=392354509 groups=["collision_trimesh"] instance=ExtResource("28_wjk7k")]
-transform = Transform3D(30, 0, 0, 0, 30, 0, 0, 0, 30, 82.71512, 23.312023, -129.08461)
+transform = Transform3D(-24.610638, 0, 4.395059, 0, 25, 0, -4.395059, 0, -24.610638, 82.71512, 23.312023, -129.08461)
 
 [node name="RockArc" parent="." unique_id=1972210431 groups=["collision_trimesh"] instance=ExtResource("29_imvwc")]
 transform = Transform3D(18.271385, 0, 38.811317, 0, 31.270712, 0, -49.931297, 0, 14.202244, 94.92699, 16.49191, -296.09634)
@@ -536,6 +517,12 @@ transform = Transform3D(-18.548613, 0, 7.4799037, 0, 20, 0, -7.4799037, 0, -18.5
 
 [node name="Rock6" parent="." unique_id=1619642538 groups=["collision_trimesh"] instance=ExtResource("42_g7jjn")]
 transform = Transform3D(-18.548613, 0, 7.4799037, 0, 20, 0, -7.4799037, 0, -18.548613, 68.40123, 18.264492, -174.7418)
+
+[node name="Rock7" parent="." unique_id=640136694 groups=["collision_trimesh"] instance=ExtResource("42_g7jjn")]
+transform = Transform3D(-8.502161, 0, 18.102852, 0, 20, 0, -18.102852, 0, -8.502161, 69.67526, 17.196981, -181.58078)
+
+[node name="Rock8" parent="." unique_id=1152921927 groups=["collision_trimesh"] instance=ExtResource("42_g7jjn")]
+transform = Transform3D(19.675526, 0, 3.5879836, 0, 20, 0, -3.5879836, 0, 19.675526, 69.67526, 16.776197, -192.06033)
 
 [node name="Cactus" parent="." unique_id=1091832397 groups=["collision_trimesh"] instance=ExtResource("43_ctbtb")]
 transform = Transform3D(-5.9097557, 0, 12.6915245, 0, 14, 0, -12.6915245, 0, -5.9097557, -10.751764, 11.38545, -221.50865)
