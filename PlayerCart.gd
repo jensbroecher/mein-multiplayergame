@@ -291,6 +291,7 @@ var is_righting_on_ground: bool = false
 var is_drifting: bool = false
 var was_on_ground: bool = true
 var is_on_ground: bool = true
+var current_ground_normal: Vector3 = Vector3.UP
 var is_on_loop: bool = false
 var _loop_grace: float = 0.0
 var _loop_last_normal: Vector3 = Vector3.UP
@@ -320,6 +321,8 @@ var drift_right: bool = false
 var _drift_input_buffer: float = 0.0
 var _drift_charge_time: float = 0.0
 var _drift_counter_steer_timer: float = 0.0
+var _drift_straight_timer: float = 0.0
+var _is_skid_active: bool = false
 var drift_particles = []
 @export var sync_emit_drift: bool = false
 var dirt_particles = []
@@ -340,6 +343,13 @@ var _mountain_stage: bool = false
 var _wadi_stage: bool = false
 var _snow_stage: bool = false
 var is_in_snow: bool = false
+var _snow_drift_depth: int = 0
+
+func enter_snow_drift() -> void:
+	_snow_drift_depth += 1
+
+func exit_snow_drift() -> void:
+	_snow_drift_depth = maxi(0, _snow_drift_depth - 1)
 var is_underwater: bool = false
 const WATER_LEVEL = -10.0
 ## Effective surface Y used for splash/drown (may be chasm pit water, not global ocean).
@@ -1271,22 +1281,23 @@ func _process(delta):
 			if is_instance_valid(pivot):
 				if p.name.ends_with("_Skid"):
 					# Raycast directly beneath this specific wheel to get exact road/terrain surface and normal
-					var n: Vector3 = Vector3.UP
+					var n: Vector3 = current_ground_normal if is_on_ground else Vector3.UP
+					var down_dir: Vector3 = -n
 					var mark_pos: Vector3 = pivot.global_position + pivot.global_transform.basis * Vector3(0, 0, 0.12)
-					mark_pos.y = pivot.global_position.y + WHEEL_Y_OFFSET + 0.03
+					mark_pos += down_dir * (-WHEEL_Y_OFFSET - 0.03)
 					
 					var space_state = get_world_3d().direct_space_state
 					if space_state:
 						var query = PhysicsRayQueryParameters3D.create(
-							pivot.global_position + Vector3(0, 0.4, 0),
-							pivot.global_position + Vector3(0, -1.2, 0)
+							pivot.global_position - down_dir * 0.35,
+							pivot.global_position + down_dir * 1.10
 						)
 						query.exclude = [get_rid()]
 						query.collision_mask = 1
 						var hit = space_state.intersect_ray(query)
 						if hit:
 							n = hit.normal.normalized()
-							mark_pos = hit.position + n * 0.025
+							mark_pos = hit.position + n * 0.045
 					
 					# Compute motion velocity of the wheel contact point
 					var vel: Vector3 = linear_velocity
@@ -1772,6 +1783,7 @@ func _physics_process(delta):
 		return
 
 	var input_dir = Vector2.ZERO
+	var effective_brake: float = 0.0
 	if can_move:
 		if is_ai or is_finished_race:
 			input_dir = _get_ai_input(delta)
@@ -1795,13 +1807,12 @@ func _physics_process(delta):
 				_kb_brake_amount = raw_brake if device_id != -1 else 1.0
 			else:
 				if raw_brake > 0.05:
-					if _kb_brake_amount < 0.30:
-						_kb_brake_amount = 0.30 # initial bite for high-speed braking
-					_kb_brake_amount = move_toward(_kb_brake_amount, 1.0, 4.0 * delta)
+					# Progressive keyboard brake ramp (~0.55s to 100%), allows fine feathering
+					_kb_brake_amount = move_toward(_kb_brake_amount, 1.0, 1.8 * delta)
 				else:
 					_kb_brake_amount = move_toward(_kb_brake_amount, 0.0, 8.0 * delta)
 			
-			var effective_brake: float = _kb_brake_amount if raw_brake > 0.05 else 0.0
+			effective_brake = _kb_brake_amount if raw_brake > 0.05 else 0.0
 			input_dir.y = effective_brake - raw_throttle
 
 	var on_ground = false
@@ -1848,6 +1859,7 @@ func _physics_process(delta):
 					ground_collider = col
 
 	is_on_ground = on_ground
+	current_ground_normal = ground_normal
 	if on_ground:
 		_ground_grace = 0.22
 	else:
@@ -1919,7 +1931,7 @@ func _physics_process(delta):
 					break
 				cur = cur.get_parent()
 
-	is_in_snow = on_snow_surface or (is_offroad and _snow_stage)
+	is_in_snow = on_snow_surface or (_snow_drift_depth > 0) or (is_offroad and _snow_stage)
 
 	if is_offroad or is_in_snow:
 		offroad_timer += delta
@@ -1976,25 +1988,26 @@ func _physics_process(delta):
 	# Handle acceleration/braking even when slightly airborne for better control
 	var current_speed = linear_velocity.dot(fwd)
 
-	# Drift entry logic (tap-to-drift or brake-hold drift with 0.28s input buffer)
+	# Drift entry logic (tap-to-drift or brake-hold drift with 0.35s input buffer)
 	var want_drift: bool = false
 	if not is_ai and not is_finished_race:
 		if Input.is_action_just_pressed(input_prefix + "brake"):
-			_drift_input_buffer = 0.28
+			_drift_input_buffer = 0.35
 		if _drift_input_buffer > 0.0:
 			_drift_input_buffer = maxf(0.0, _drift_input_buffer - delta)
-			if absf(input_dir.x) > 0.20:
+			if absf(input_dir.x) > 0.22:
 				want_drift = true
-		elif Input.get_action_strength(input_prefix + "brake") > 0.25 and absf(input_dir.x) > 0.30:
+		elif (effective_brake > 0.15 or Input.is_action_pressed(input_prefix + "brake")) and absf(input_dir.x) > 0.22:
 			want_drift = true
 	elif is_ai:
 		want_drift = _ai_want_drift and absf(input_dir.x) > 0.22
 
-	if on_ground and not drift_mode and want_drift and current_speed > 4.5:
+	if on_ground and not drift_mode and want_drift and current_speed > 3.8:
 		drift_mode = true
 		drift_right = input_dir.x > 0.0
 		_drift_charge_time = 0.0
 		_drift_counter_steer_timer = 0.0
+		_drift_straight_timer = 0.0
 		_drift_input_buffer = 0.0
 
 	# Auto-hop over small props/steps only when nearly stuck offroad — completely disabled on road/track/ramps.
@@ -2066,9 +2079,11 @@ func _physics_process(delta):
 			var accel_force = acceleration * slow_mult * input_scale
 			if drift_mode:
 				# Power-slide: keep pushing forward while carving through turn
-				accel_force *= 1.10
-				var side_sign: float = 1.0 if drift_right else -1.0
-				apply_central_force(right * side_sign * acceleration * 0.22 * mass * input_scale)
+				accel_force *= 1.15
+				var drift_dir: float = 1.0 if drift_right else -1.0
+				var steer_in: float = current_steer * drift_dir
+				if steer_in > 0.0:
+					apply_central_force(right * drift_dir * acceleration * 0.08 * steer_in * mass * input_scale)
 			var speed_cap: float = max_speed * offroad_penalty * slow_mult * input_scale
 			if is_offroad and heading_uphill > 0.05:
 				accel_force *= lerpf(1.0, uphill_power_factor, clampf(heading_uphill * 1.5, 0.0, 1.0))
@@ -2093,9 +2108,11 @@ func _physics_process(delta):
 			apply_central_force(-fwd * braking * 0.4 * mass * input_scale)
 		elif drift_mode:
 			# Brake-hold drift: light scrub only — keep slide momentum
-			apply_central_force(-fwd * braking * 0.15 * mass * input_scale)
-			var side_sign: float = 1.0 if drift_right else -1.0
-			apply_central_force(right * side_sign * acceleration * 0.16 * mass * input_scale)
+			apply_central_force(-fwd * braking * 0.12 * mass * input_scale)
+			var drift_dir: float = 1.0 if drift_right else -1.0
+			var steer_in: float = current_steer * drift_dir
+			if steer_in > 0.0:
+				apply_central_force(right * drift_dir * acceleration * 0.06 * steer_in * mass * input_scale)
 		else:
 			if is_finished_race:
 				if current_speed > 0.3:
@@ -2157,22 +2174,35 @@ func _physics_process(delta):
 			# - car comes to a stop (current_speed < 3.0)
 			if drift_mode:
 				# Accumulate drift charge while sliding at speed on ground
-				if on_ground and current_speed > 5.0:
+				if on_ground and current_speed > 4.0:
 					_drift_charge_time += delta
 				
 				# Check counter-steering vs tightening
 				var drift_dir: float = 1.0 if drift_right else -1.0
 				var steer_in: float = current_steer * drift_dir # >0 tightens, <0 counter-steers
-				if steer_in < -0.35:
+				if steer_in < -0.25:
 					_drift_counter_steer_timer += delta
 				else:
 					_drift_counter_steer_timer = maxf(0.0, _drift_counter_steer_timer - delta * 2.0)
 				
-				# Exit drift if speed dropped, counter-steer held >0.35s, or fully released controls
+				# Corner exit: if player straightens steering wheel (held for >0.32s), release drift and boost!
+				if absf(input_dir.x) < 0.20:
+					_drift_straight_timer += delta
+				else:
+					_drift_straight_timer = 0.0
+				
+				# Exit drift conditions:
+				# 1. Speed dropped below sliding threshold
 				var speed_too_low: bool = current_speed < 3.0
-				var counter_steer_exit: bool = _drift_counter_steer_timer > 0.35
+				# 2. Player counter-steered firmly to break drift (0.16s under full opposite lock, 0.30s if moderate)
+				var counter_steer_exit: bool = _drift_counter_steer_timer > (0.16 if steer_in < -0.70 else 0.30)
+				# 3. Player straightened out exiting the corner down the straightaway
+				var straighten_exit: bool = _drift_straight_timer > 0.32
+				# 4. Player tapped brake again to manually pop/release drift
+				var manual_tap_exit: bool = _drift_charge_time > 0.25 and not is_ai and Input.is_action_just_pressed(input_prefix + "brake")
+				# 5. Fully released all controls (hands off keyboard/gamepad)
 				var controls_released: bool = absf(input_dir.y) < 0.08 and absf(input_dir.x) < 0.15
-				if speed_too_low or counter_steer_exit or controls_released:
+				if speed_too_low or counter_steer_exit or straighten_exit or manual_tap_exit or controls_released:
 					_exit_drift()
 
 			is_drifting = drift_mode
@@ -2188,12 +2218,14 @@ func _physics_process(delta):
 			if is_drifting:
 				var drift_dir: float = 1.0 if drift_right else -1.0
 				var steer_in: float = current_steer * drift_dir
-				var drift_turn_mult: float = 1.18
-				if steer_in > 0.0:
-					drift_turn_mult += steer_in * 0.72 # Tighten up to 1.9x
+				var steer_rate: float
+				if steer_in >= 0.0:
+					# 0.65 at neutral up to 1.30 at full inside lock for sharp apex carving
+					steer_rate = lerpf(0.65, 1.30, steer_in)
 				else:
-					drift_turn_mult += steer_in * 0.65 # Counter-steer down to 0.53x
-				var turn_speed = steer_speed * drift_turn_mult
+					# 0.65 at neutral down to -0.40 at full opposite lock to pull away from walls
+					steer_rate = lerpf(0.65, -0.40, -steer_in)
+				var turn_speed = steer_speed * steer_rate
 				steer_speed_factor = clampf(current_speed / 10.0, 0.7, 1.0)
 				steer_amount = -drift_dir * turn_speed * steer_speed_factor * delta
 			elif current_speed < -0.1:
@@ -2221,7 +2253,7 @@ func _physics_process(delta):
 				var lat_vel = linear_velocity.dot(right)
 				var grip_factor = grip
 				if is_drifting:
-					grip_factor *= 0.28 # Allows tail to break loose and slide smoothly
+					grip_factor *= 0.30 # Allows tail to break loose and slide smoothly with authentic kart drift feel
 				elif current_speed < -0.2:
 					grip_factor *= 0.60 # Soften lateral grip in reverse for smooth, non-snapping movement
 				if is_offroad and ground_normal.y < 0.82:
@@ -2241,7 +2273,7 @@ func _physics_process(delta):
 					apply_central_force(-right_h * lat_vel_h * mass * (grip * 0.35))
 			
 			# Emit skidmark and smoke particles when drifting or braking (only on ground)
-			var emit_drift = on_ground and (is_drifting or (input_dir.y > 0.2 and current_speed > 5.0))
+			var emit_drift = (on_ground or _ground_grace > 0.0) and (is_drifting or (input_dir.y > 0.2 and current_speed > 5.0))
 			_set_drift_emitting(emit_drift)
 			sync_emit_drift = emit_drift
 	else:
@@ -2264,6 +2296,11 @@ func _physics_process(delta):
 		sfx_wind_loop.volume_db = lerp(sfx_wind_loop.volume_db, -40.0, 5.0 * delta)
 		if sfx_wind_loop.volume_db < -35.0:
 			sfx_wind_loop.stop()
+
+	# Active snow drift drag: soft powdery resistance that absorbs forward momentum
+	if on_ground and _snow_drift_depth > 0 and not is_boosting and not is_pad_boosting:
+		var snow_drag = linear_velocity * (1.6 * delta)
+		linear_velocity -= snow_drag
 
 	# Dampen speed if exceeding offroad max speed
 	var effective_max = max_speed * offroad_penalty * slow_mult
@@ -2559,10 +2596,12 @@ func _update_visuals_alignment(delta: float) -> void:
 				on_ground = true
 				target_up = norm
 
-	# Soft spring: compress slightly on landing impacts, but never lift tires above ground on slopes
+	# Soft spring: compress slightly on landing impacts, and sink tires into snow drifts
 	var compress: float = 0.0
 	if on_ground:
 		compress = clampf(linear_velocity.y * -0.035, 0.0, 0.08)
+		if _snow_drift_depth > 0:
+			compress += 0.08 # Sinks chassis visually into soft snow
 	visual_offset_y = lerpf(visual_offset_y, fixed_offset + compress, 1.0 - exp(-11.0 * delta))
 
 	if on_ground:
@@ -2962,7 +3001,8 @@ func _exit_drift() -> void:
 	drift_mode = false
 	is_drifting = false
 	_drift_counter_steer_timer = 0.0
-	if (is_on_ground or was_on_ground or _ground_grace > 0.0) and can_move and not is_finished_race and _drift_charge_time >= 0.70:
+	_drift_straight_timer = 0.0
+	if (is_on_ground or was_on_ground or _ground_grace > 0.0) and can_move and not is_finished_race and _drift_charge_time >= 0.55:
 		_trigger_drift_boost(_drift_charge_time)
 	_drift_charge_time = 0.0
 
@@ -3344,6 +3384,7 @@ func respawn_rpc(custom_checkpoint_transform: Transform3D = Transform3D()):
 	respawn()
 
 func respawn():
+	_snow_drift_depth = 0
 	# Finished racers must not snap back to the finish gate (last checkpoint).
 	if is_finished_race or is_teleporting:
 		return
@@ -4528,7 +4569,8 @@ func _create_drift_particles(wheel_name: String):
 	mat_skid.albedo_color = Color(1.0, 1.0, 1.0, 1.0)
 	mat_skid.vertex_color_use_as_albedo = true
 	mat_skid.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mat_skid.render_priority = 3
+	mat_skid.render_priority = 10
+	mat_skid.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
 	skid.material_override = mat_skid
 
 	var skid_grad = Gradient.new()
@@ -4590,19 +4632,28 @@ func _set_drift_emitting(emitting: bool):
 	var speed: float = linear_velocity.length()
 	var time_since_respawn = (Time.get_ticks_msec() / 1000.0) - last_respawn_time
 	var is_asphalt: bool = _is_asphalt_road_surface()
+	var grounded: bool = is_on_ground or _ground_grace > 0.0
+
+	# Hysteresis gating to prevent rapid flickering on small bumps or seams
+	if _is_skid_active:
+		if not emitting or speed < 3.8 or is_landing or not can_move or not grounded or not is_asphalt or time_since_respawn < 0.5:
+			_is_skid_active = false
+	else:
+		if emitting and speed > 5.0 and not is_landing and can_move and grounded and is_asphalt and time_since_respawn > 0.5:
+			_is_skid_active = true
+
 	for p in drift_particles:
 		if not is_instance_valid(p) or not (p is CPUParticles3D):
 			continue
 		var kind: String = str(p.get_meta("kind", ""))
 		if kind == "skid" or p.name.ends_with("_Skid"):
 			# Skidmarks emit only during active drift or hard braking on asphalt roads (never on dirt or terrain)
-			var skid_on: bool = emitting and speed > 6.5 and not is_landing and can_move and air_time < 0.02 and time_since_respawn > 0.5 and is_asphalt
-			p.emitting = skid_on
-			if skid_on and "amount_ratio" in p:
+			p.emitting = _is_skid_active
+			if _is_skid_active and "amount_ratio" in p:
 				p.amount_ratio = clampf((speed - 5.0) / 16.0, 0.25, 1.0)
 		else:
 			# Smoke emits during drift or hard braking at speed
-			var smoke_on: bool = emitting and speed > 5.0 and not is_landing and can_move and air_time < 0.02 and time_since_respawn > 0.5
+			var smoke_on: bool = emitting and speed > 4.8 and not is_landing and can_move and grounded and time_since_respawn > 0.5
 			p.emitting = smoke_on
 			if smoke_on and "amount_ratio" in p:
 				p.amount_ratio = clampf(speed / 20.0, 0.15, 0.65)

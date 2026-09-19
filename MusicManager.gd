@@ -17,8 +17,12 @@ var anti_aliasing: int = 2 # 0: Disabled, 1: 2x MSAA, 2: 4x MSAA, 3: 8x MSAA, 4:
 var shadows_enabled: bool = false
 ## 0=Off 1=Low 2=Medium 3=High — controls map size, soft filter, and light splits.
 var shadow_quality_index: int = 0
-## 0=Off 1=Low 2=Medium 3=High 4=Ultra — controls MultiMesh density, draw distance, and shader culling.
+## 0=Auto (default), 1=Off, 2=Low, 3=Medium, 4=High, 5=Ultra.
+var grass_quality_setting: int = 0
+## 0=Off 1=Low 2=Medium 3=High 4=Ultra — active runtime quality applied to meshes and shaders.
 var grass_quality_index: int = 4
+var _auto_grass_warmup: float = 3.0
+var _low_fps_duration: float = 0.0
 var render_scale_index: int = 1 # 0:50% 1:75% 2:100% 3:125%
 ## Preferred renderer: "mobile" or "forward_plus". Applied via restart (--rendering-method).
 var renderer_method: String = "mobile"
@@ -48,6 +52,7 @@ const SHADOW_ATLAS_SIZES = [512, 1024, 2048, 4096]
 const SHADOW_MAX_DISTANCES = [80.0, 140.0, 200.0, 280.0]
 const SHADOW_BLURS = [0.4, 0.7, 1.0, 1.25]
 
+const GRASS_SETTING_NAMES = ["Auto", "Off", "Low", "Medium", "High", "Ultra"]
 ## Grass quality presets: density factor (0..1), draw distance (m), fade range (m)
 const GRASS_QUALITY_NAMES = ["Off", "Low", "Medium", "High", "Ultra"]
 const GRASS_DENSITIES = [0.0, 0.25, 0.50, 0.75, 1.0]
@@ -160,15 +165,17 @@ func _ready():
 	fps_label.position = Vector2(0, 10)
 	
 	fps_layer.visible = show_fps
-	set_process(show_fps)
+	set_process(show_fps or grass_quality_setting == 0)
 	_preload_sfx()
 
-func _process(_delta):
-	if fps_label:
+func _process(delta):
+	if show_fps and fps_label:
 		fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
 		var viewport_width = get_viewport().get_visible_rect().size.x
 		var label_width = fps_label.get_minimum_size().x
 		fps_label.position = Vector2((viewport_width - label_width) / 2.0, 10)
+	
+	_check_auto_grass_quality(delta)
 
 func load_settings():
 	var config = ConfigFile.new()
@@ -192,15 +199,13 @@ func load_settings():
 			shadow_quality_index = 2 if shadows_enabled else 0
 		shadow_quality_index = clampi(shadow_quality_index, 0, 3)
 		shadows_enabled = shadow_quality_index > 0
-		if config.has_section_key("graphics", "grass_quality_index"):
-			grass_quality_index = int(config.get_value("graphics", "grass_quality_index", 4))
+		if config.has_section_key("graphics", "grass_quality_setting"):
+			grass_quality_setting = clampi(int(config.get_value("graphics", "grass_quality_setting", 0)), 0, 5)
+		elif config.has_section_key("graphics", "grass_quality_index"):
+			grass_quality_setting = 0
 		else:
-			# Smart default: on macOS / mobile default to Medium (2) for stutter-free 60fps, Ultra (4) on PC
-			if OS.get_name() == "macOS" or OS.has_feature("mobile"):
-				grass_quality_index = 2
-			else:
-				grass_quality_index = 4
-		grass_quality_index = clampi(grass_quality_index, 0, 4)
+			grass_quality_setting = 0
+		grass_quality_setting = clampi(grass_quality_setting, 0, 5)
 		render_scale_index = config.get_value("graphics", "render_scale_index", 1)
 		if config.has_section_key("graphics", "renderer_method"):
 			var saved_renderer := str(config.get_value("graphics", "renderer_method", renderer_method))
@@ -227,7 +232,7 @@ func _apply_window_settings():
 	set_anisotropic(anisotropic_index, false)
 	set_max_fps(max_fps_index, false)
 	set_shadow_quality(shadow_quality_index, false)
-	set_grass_quality(grass_quality_index, false)
+	set_grass_setting(grass_quality_setting, false)
 	apply_fsr_settings()
 
 func save_settings():
@@ -242,6 +247,7 @@ func save_settings():
 	config.set_value("display", "anti_aliasing", anti_aliasing)
 	config.set_value("graphics", "shadows_enabled", shadows_enabled)
 	config.set_value("graphics", "shadow_quality_index", shadow_quality_index)
+	config.set_value("graphics", "grass_quality_setting", grass_quality_setting)
 	config.set_value("graphics", "grass_quality_index", grass_quality_index)
 	config.set_value("graphics", "render_scale_index", render_scale_index)
 	config.set_value("graphics", "renderer_method", renderer_method)
@@ -350,7 +356,7 @@ func set_show_fps(enabled: bool, save: bool = true):
 	show_fps = enabled
 	if fps_layer:
 		fps_layer.visible = enabled
-	set_process(enabled)
+	set_process(show_fps or grass_quality_setting == 0)
 	if save: save_settings()
 
 func get_render_scale() -> float:
@@ -662,12 +668,62 @@ func _apply_shadows_to_tree(node: Node) -> void:
 	for child in node.get_children():
 		_apply_shadows_to_tree(child)
 
+func set_grass_setting(setting_idx: int, save: bool = true) -> void:
+	grass_quality_setting = clampi(setting_idx, 0, 5)
+	_low_fps_duration = 0.0
+	_auto_grass_warmup = 3.0
+	if grass_quality_setting == 0:
+		# Auto: start at Ultra (4), will drop to Low (1) if framerate < 60 FPS
+		set_grass_quality(4, false)
+	else:
+		# Manual: 1: Off (0), 2: Low (1), 3: Medium (2), 4: High (3), 5: Ultra (4)
+		set_grass_quality(grass_quality_setting - 1, false)
+	set_process(show_fps or grass_quality_setting == 0)
+	if save:
+		save_settings()
+
 func set_grass_quality(index: int, save: bool = true) -> void:
 	grass_quality_index = clampi(index, 0, 4)
 	if is_inside_tree() and get_tree():
 		_apply_grass_quality_to_tree(get_tree().root)
 	if save:
 		save_settings()
+
+func _check_auto_grass_quality(delta: float) -> void:
+	if grass_quality_setting != 0:
+		return
+	# Already at Low (1) or Off (0); no need to downgrade
+	if grass_quality_index <= 1:
+		return
+	if not is_inside_tree():
+		return
+	var tree := get_tree()
+	if tree == null or tree.paused:
+		return
+	# Only evaluate during active gameplay when carts exist
+	var carts := tree.get_nodes_in_group("player_carts")
+	if carts.is_empty():
+		_low_fps_duration = 0.0
+		return
+	
+	# Wait out initial track loading / scene spawn hitches
+	if _auto_grass_warmup > 0.0:
+		_auto_grass_warmup -= delta
+		return
+	
+	var fps := Engine.get_frames_per_second()
+	if fps < 60:
+		_low_fps_duration += delta
+		if _low_fps_duration >= 1.0:
+			_set_auto_grass_low()
+	else:
+		_low_fps_duration = maxf(0.0, _low_fps_duration - delta)
+
+func _set_auto_grass_low() -> void:
+	if grass_quality_index == 1:
+		return
+	print("[MusicManager] Auto grass: Framerate below 60 FPS (%d FPS). Setting grass shader to Low." % Engine.get_frames_per_second())
+	set_grass_quality(1, false)
 
 func _apply_grass_quality_to_tree(node: Node) -> void:
 	if node == null:
@@ -719,6 +775,10 @@ func _apply_grass_quality_to_tree(node: Node) -> void:
 								mmi.multimesh.visible_instance_count = -1
 							else:
 								mmi.multimesh.visible_instance_count = max(1, visible_count)
+						if mmi.material_override is ShaderMaterial:
+							var sm := mmi.material_override as ShaderMaterial
+							sm.set_shader_parameter("max_dist", max_dist)
+							sm.set_shader_parameter("fade_r", fade_r)
 
 	for child in node.get_children():
 		_apply_grass_quality_to_tree(child)
@@ -726,7 +786,12 @@ func _apply_grass_quality_to_tree(node: Node) -> void:
 ## Call after a level is spawned so lights and grass pick up current settings.
 func refresh_level_graphics() -> void:
 	set_shadow_quality(shadow_quality_index, false)
-	set_grass_quality(grass_quality_index, false)
+	if grass_quality_setting == 0:
+		_low_fps_duration = 0.0
+		_auto_grass_warmup = 3.0
+		set_grass_quality(4, false)
+	else:
+		set_grass_quality(grass_quality_index, false)
 	set_anisotropic(anisotropic_index, false)
 	# Re-apply render scale in case a new viewport path was created
 	set_resolution(resolution_index, false)

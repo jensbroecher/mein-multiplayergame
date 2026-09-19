@@ -341,6 +341,7 @@ func _build_graphics_page() -> Control:
 	option_shadows.add_item("Medium")
 	option_shadows.add_item("High")
 	option_grass_quality = _add_option_row(body, "Grass Quality")
+	option_grass_quality.add_item("Auto")
 	option_grass_quality.add_item("Off")
 	option_grass_quality.add_item("Low")
 	option_grass_quality.add_item("Medium")
@@ -539,7 +540,7 @@ func _load_values_from_manager() -> void:
 	if option_shadows:
 		option_shadows.selected = MusicManager.shadow_quality_index
 	if option_grass_quality:
-		option_grass_quality.selected = MusicManager.grass_quality_index
+		option_grass_quality.selected = MusicManager.grass_quality_setting
 	if option_render_scale:
 		option_render_scale.selected = MusicManager.render_scale_index
 	if option_renderer:
@@ -576,7 +577,7 @@ func _connect_setting_signals() -> void:
 	check_vsync.toggled.connect(func(v): MusicManager.set_vsync(v))
 	option_anti_aliasing.item_selected.connect(func(i): MusicManager.set_anti_aliasing(i))
 	option_shadows.item_selected.connect(func(i): MusicManager.set_shadow_quality(i))
-	option_grass_quality.item_selected.connect(func(i): MusicManager.set_grass_quality(i))
+	option_grass_quality.item_selected.connect(func(i): MusicManager.set_grass_setting(i))
 	option_render_scale.item_selected.connect(func(i): MusicManager.set_render_scale(i))
 	option_renderer.item_selected.connect(_on_renderer_selected)
 	option_fsr_mode.item_selected.connect(_on_fsr_mode_selected)

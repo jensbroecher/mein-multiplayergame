@@ -193,6 +193,8 @@ func _ready() -> void:
 		[Vector3(12, 0.2, 10), Vector3(-10, -0.2, -12), Vector3(-35.0, 1.4, 225.0)],
 		# 25: Aligning smoothly onto Start / Finish straight
 		[Vector3(4, 0.2, 16), Vector3(0, -0.1, -20), Vector3(-45.0, 0.9, 180.0)],
+		# 26: Return to Start / Finish Line (smooth loop closure)
+		[Vector3(0, 0.1, 20), Vector3(0, 0, -25), Vector3(-45.0, 0.8, 120.0)],
 	]
 
 	for pt in curve_pts:
@@ -220,6 +222,7 @@ func _ready() -> void:
 	tg.set("no_water", false)
 	tg.set("no_grass", true)
 	tg.set("terrain_grass_count", 0)
+	tg.set("generate_bridge_supports", false)
 
 	# Snow Terrain Material (Pure crisp alpine snow PBR)
 	var sand_norm: Texture2D = load("res://materials/sand_normal.png") as Texture2D
@@ -277,21 +280,21 @@ func _ready() -> void:
 	# 5. Alpine Timber Bridge across Creek (Crossing 2: X = -24m to +24m at Z = -305, Y = 4.8m)
 	_build_alpine_bridge(level_scene, Vector3(0.0, 4.8, -305.0), 48.0, 14.0)
 
-	# 6. Snow-Covered Sections on the Road (Meshes with group "snow" & meta "is_snow")
+	# 6. Natural Snow-Covered Sections on Road (Organic surface drifts with "snow" group & "is_snow" meta)
 	var snow_sections := Node3D.new()
 	snow_sections.name = "SnowCoveredRoadSections"
 	level_scene.add_child(snow_sections)
 
-	# Section A: Pre-Jump 1 In-run Snowdrift (X=-32, Y=5.8, Z=-52)
-	_create_snow_drift(snow_sections, "SnowDrift_Jump1Approach", Vector3(-32.0, 5.85, -52.0), Vector3(14.0, 0.35, 18.0), 20.0)
-	# Section B: Eastern Flank Glade (X=45, Y=6.8, Z=-145)
-	_create_snow_drift(snow_sections, "SnowDrift_EastGlade", Vector3(45.0, 6.85, -145.0), Vector3(14.0, 0.30, 16.0), -16.0)
-	# Section C: Deep Snow on Alternative Shortcut Route (X=38, Y=6.3, Z=-245)
-	_create_snow_drift(snow_sections, "SnowDrift_AltRouteCut", Vector3(38.0, 6.35, -245.0), Vector3(12.5, 0.38, 22.0), 5.0)
-	# Section D: High Summit Ridge Snowdrift (X=-98, Y=17.6, Z=-80)
-	_create_snow_drift(snow_sections, "SnowDrift_SummitRidge", Vector3(-98.0, 17.65, -80.0), Vector3(14.0, 0.32, 20.0), 0.0)
-	# Section E: Pre-Jump 2 Summit Snowdrift (X=-45, Y=15.6, Z=100)
-	_create_snow_drift(snow_sections, "SnowDrift_Jump2Approach", Vector3(-45.0, 15.65, 100.0), Vector3(14.0, 0.34, 16.0), -35.0)
+	# Section A: Pre-Jump 1 In-run Snowdrift (X=-32, Y=5.68, Z=-52)
+	_create_natural_snow_drift(snow_sections, "SnowDrift_Jump1Approach", Vector3(-32.0, 5.68, -52.0), Vector3(14.0, 0.28, 18.0), 20.0, 0.0)
+	# Section B: Eastern Flank Glade (X=45, Y=6.68, Z=-145)
+	_create_natural_snow_drift(snow_sections, "SnowDrift_EastGlade", Vector3(45.0, 6.68, -145.0), Vector3(14.0, 0.26, 16.0), -16.0, 1.8)
+	# Section C: Deep Snow on Alternative Shortcut Route (X=38, Y=6.18, Z=-245)
+	_create_natural_snow_drift(snow_sections, "SnowDrift_AltRouteCut", Vector3(38.0, 6.18, -245.0), Vector3(12.5, 0.30, 22.0), 5.0, 3.5)
+	# Section D: High Summit Ridge Snowdrift (X=-98, Y=17.56, Z=-80)
+	_create_natural_snow_drift(snow_sections, "SnowDrift_SummitRidge", Vector3(-98.0, 17.56, -80.0), Vector3(14.0, 0.26, 20.0), 0.0, 5.2)
+	# Section E: Pre-Jump 2 Summit Snowdrift (X=-45, Y=15.56, Z=100)
+	_create_natural_snow_drift(snow_sections, "SnowDrift_Jump2Approach", Vector3(-45.0, 15.56, 100.0), Vector3(14.0, 0.28, 16.0), -35.0, 7.1)
 
 	# 7. Players node
 	var players_node := Node3D.new()
@@ -346,28 +349,23 @@ func _ready() -> void:
 	proj_spawner.spawn_path = NodePath(".")
 	level_scene.add_child(proj_spawner)
 
-	# 10. Checkpoints Container (Evenly spaced, clean sequential ordering)
+	# 10. Checkpoints Container (Streamlined 5 sector checkpoints + Finish Line)
 	var checkpoints_container := Node3D.new()
 	checkpoints_container.name = "Checkpoints"
 	level_scene.add_child(checkpoints_container)
 
-	# Sequential checkpoints placed cleanly along the racing line with generous spacing:
-	# Checkpoint 5 is right before the fork, Checkpoint 6 is right after the merge!
+	# 5 carefully positioned checkpoints spaced across the 5 sectors of the track:
+	# Checkpoint 1: Valley floor approach to Jump 1
+	# Checkpoint 2: East bank pre-fork approach (captures both standard route and shortcut)
+	# Checkpoint 3: Post-merge approach before the alpine bridge crossing
+	# Checkpoint 4: High western mountain ridge summit overlook
+	# Checkpoint 5: South meadow return curve heading to finish straight
 	var cp_definitions = [
-		Vector3(-45.0, 1.2, 50.0),    # CP 1: Mid valley straight
-		Vector3(-45.0, 2.0, -10.0),   # CP 2: Approach to Turn 1
-		Vector3(-35.0, 5.5, -50.0),   # CP 3: Jump 1 takeoff approach
-		Vector3(26.0, 4.5, -112.0),   # CP 4: Jump 1 landing terrace
-		Vector3(56.0, 8.5, -175.0),   # CP 5: RIGHT BEFORE FORK
-		Vector3(48.0, 6.0, -280.0),   # CP 6: RIGHT AFTER MERGE
-		Vector3(-24.0, 4.8, -305.0),  # CP 7: Exit of Alpine Bridge
-		Vector3(-82.0, 11.5, -260.0), # CP 8: West mountain ridge climb
-		Vector3(-98.0, 17.5, -80.0),  # CP 9: High summit overlook
-		Vector3(-92.0, 17.0, 10.0),   # CP 10: High ridge south traverse
-		Vector3(-22.0, 15.5, 125.0),  # CP 11: Jump 2 takeoff lip
-		Vector3(30.0, 5.5, 168.0),    # CP 12: Jump 2 landing terrace
-		Vector3(5.0, 2.2, 245.0),     # CP 13: South meadow apex
-		Vector3(-45.0, 0.9, 180.0),   # CP 14: Final home straight entry
+		Vector3(-45.0, 2.0, -10.0),   # CP 1: Northbound valley approach
+		Vector3(56.0, 8.5, -175.0),   # CP 2: East bank pre-fork
+		Vector3(48.0, 6.0, -280.0),   # CP 3: Post-merge approach to bridge
+		Vector3(-98.0, 17.5, -80.0),  # CP 4: High mountain summit
+		Vector3(15.0, 3.5, 210.0),    # CP 5: South meadow sweep
 	]
 
 	for i in range(cp_definitions.size()):
@@ -462,79 +460,10 @@ func _ready() -> void:
 				item_container.add_child(ib)
 				item_idx += 1
 
-	# 14. Alpine Winter Pines & Snowy Boulders
+	# 14. Vegetation Container (Kept empty - ready for manual tree placement)
 	var veg_container := Node3D.new()
 	veg_container.name = "Vegetation"
 	level_scene.add_child(veg_container)
-
-	var pine_models = [
-		load("res://models/trees/pine.glb"),
-		load("res://models/trees/pine_2.glb")
-	]
-
-	var rng = RandomNumberGenerator.new()
-	rng.seed = 112233
-
-	var baked_pts: PackedVector3Array = curve.get_baked_points()
-	var get_2d_road_dist = func(px: float, pz: float) -> float:
-		var min_d := 1.0e9
-		for bp in baked_pts:
-			var d = Vector2(px - bp.x, pz - bp.z).length()
-			if d < min_d:
-				min_d = d
-		return min_d
-
-	var get_ground_y = func(px: float, pz: float) -> float:
-		return float(tg.call("_sample_cached_height", px, pz))
-
-	# Jump flight corridors to strictly keep clear of trees
-	var jump_segments = [
-		[Vector2(-16.0, -72.0), Vector2(26.0, -112.0), 28.0], # Jump 1 corridor
-		[Vector2(-22.0, 125.0), Vector2(30.0, 168.0), 28.0],  # Jump 2 corridor
-		[Vector2(24.0, -305.0), Vector2(-24.0, -305.0), 24.0] # Bridge corridor
-	]
-	var is_in_jump_corridor = func(px: float, pz: float) -> bool:
-		var p = Vector2(px, pz)
-		for seg in jump_segments:
-			var a: Vector2 = seg[0]
-			var b: Vector2 = seg[1]
-			var radius: float = seg[2]
-			var ab = b - a
-			var l2 = ab.length_squared()
-			var t = clampf((p - a).dot(ab) / maxf(l2, 0.001), 0.0, 1.0)
-			var proj = a + ab * t
-			if p.distance_to(proj) < radius:
-				return true
-		return false
-
-	var tree_count := 0
-	var tree_attempts := 0
-	while tree_count < 150 and tree_attempts < 700:
-		tree_attempts += 1
-		var px = rng.randf_range(-340.0, 340.0)
-		var pz = rng.randf_range(-300.0, 300.0)
-
-		# Road clearance: minimum 18m from road
-		if get_2d_road_dist.call(px, pz) < 18.0:
-			continue
-		if is_in_jump_corridor.call(px, pz):
-			continue
-
-		var py = get_ground_y.call(px, pz)
-		# Skip creek gorge floor (keep creek clear)
-		if py < -1.0:
-			continue
-
-		var chosen_packed = pine_models[rng.randi() % pine_models.size()]
-		if chosen_packed:
-			var tree_inst = chosen_packed.instantiate()
-			tree_count += 1
-			tree_inst.name = "Pine_%d" % tree_count
-			tree_inst.position = Vector3(px, py - 0.25, pz)
-			var sc = rng.randf_range(1.4, 2.5)
-			tree_inst.scale = Vector3(sc, sc, sc)
-			tree_inst.rotation_degrees = Vector3(0, rng.randf_range(0, 360), 0)
-			veg_container.add_child(tree_inst)
 
 	# 15. Rebuild Checkpoints Array & Wire up Level
 	level_scene.set("track_path", track_path)
@@ -563,33 +492,169 @@ func _ready() -> void:
 	get_tree().quit(0)
 
 
-func _create_snow_drift(parent: Node, drift_name: String, pos: Vector3, size: Vector3, yaw_deg: float) -> void:
-	var body := StaticBody3D.new()
-	body.name = drift_name
-	body.position = pos
-	body.rotation_degrees = Vector3(0, yaw_deg, 0)
-	body.add_to_group("snow", true)
-	body.set_meta("is_snow", true)
+func _create_natural_snow_drift(parent: Node, drift_name: String, pos: Vector3, size: Vector3, yaw_deg: float, seed_offset: float = 0.0) -> void:
+	var area := Area3D.new()
+	area.name = drift_name
+	area.position = pos
+	area.rotation_degrees = Vector3(0, yaw_deg, 0)
+	area.add_to_group("snow", true)
+	area.set_meta("is_snow", true)
 
-	var cshape := CollisionShape3D.new()
+	var snow_area_script: Script = load("res://SnowDriftArea.gd")
+	if snow_area_script:
+		area.set_script(snow_area_script)
+
+	var w: float = size.x
+	var h: float = size.y
+	var l: float = size.z
+
+	# Non-blocking trigger volume: detects cart entering without any hard collision bump
+	var col := CollisionShape3D.new()
 	var box_shape := BoxShape3D.new()
-	box_shape.size = size
-	cshape.shape = box_shape
-	body.add_child(cshape)
+	box_shape.size = Vector3(w, h + 1.2, l)
+	col.position = Vector3(0, (h + 1.2) * 0.5, 0)
+	col.shape = box_shape
+	area.add_child(col)
+
+	const GRID_X := 22
+	const GRID_Z := 26
+
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	var sand_norm: Texture2D = load("res://materials/sand_normal.png") as Texture2D
+	var drift_mat := StandardMaterial3D.new()
+	drift_mat.albedo_color = Color(0.97, 0.985, 1.0)
+	drift_mat.roughness = 0.88
+	drift_mat.metallic = 0.02
+	if sand_norm:
+		drift_mat.normal_enabled = true
+		drift_mat.normal_texture = sand_norm
+		drift_mat.normal_scale = 0.4
+		drift_mat.uv1_scale = Vector3(0.25, 0.25, 0.25)
+		drift_mat.uv1_triplanar = true
+
+	# Generate Top Surface Vertices
+	var top_verts: Array = []
+	for iz in range(GRID_Z + 1):
+		var v_line: Array = []
+		var v_frac: float = float(iz) / float(GRID_Z)
+		var v: float = v_frac * 2.0 - 1.0
+		for ix in range(GRID_X + 1):
+			var u_frac: float = float(ix) / float(GRID_X)
+			var u: float = u_frac * 2.0 - 1.0
+
+			# Organic boundary curvature
+			var px: float = u * (w * 0.5) * (1.0 + 0.08 * sin(v * PI * 2.0 + seed_offset))
+			var pz: float = v * (l * 0.5) * (1.0 + 0.06 * cos(u * PI * 2.0 + seed_offset * 1.5))
+
+			# Smooth feathered envelope: 0 at border, 1 in interior
+			var dist_u: float = clampf(1.0 - absf(u), 0.0, 1.0)
+			var dist_v: float = clampf(1.0 - absf(v), 0.0, 1.0)
+			var fade_u: float = smoothstep(0.0, 0.35, dist_u)
+			var fade_v: float = smoothstep(0.0, 0.30, dist_v)
+			var env: float = fade_u * fade_v
+			env = env * env * (3.0 - 2.0 * env)
+
+			# Wind-blown natural drift ripples and mounds
+			var bank_bias: float = 0.85 + 0.30 * sin(u * 1.8 + seed_offset)
+			var waves: float = 0.20 * sin(v * 7.0 + u * 2.5 + seed_offset) + 0.10 * cos(v * 13.0 - u * 4.0)
+			var py: float = h * env * maxf(0.05, bank_bias + waves)
+
+			v_line.append(Vector3(px, py, pz))
+		top_verts.append(v_line)
+
+	# Add Vertices: Top layer then Bottom layer
+	var num_verts_per_layer = (GRID_X + 1) * (GRID_Z + 1)
+	for iz in range(GRID_Z + 1):
+		for ix in range(GRID_X + 1):
+			var pt: Vector3 = top_verts[iz][ix]
+			st.set_uv(Vector2(float(ix) / float(GRID_X), float(iz) / float(GRID_Z)))
+			st.add_vertex(pt)
+
+	for iz in range(GRID_Z + 1):
+		for ix in range(GRID_X + 1):
+			var pt: Vector3 = top_verts[iz][ix]
+			st.set_uv(Vector2(float(ix) / float(GRID_X), float(iz) / float(GRID_Z)))
+			st.add_vertex(Vector3(pt.x, -0.04, pt.z))
+
+	# Indices: Top surface (Facing UP)
+	for iz in range(GRID_Z):
+		for ix in range(GRID_X):
+			var i0 = iz * (GRID_X + 1) + ix
+			var i1 = i0 + 1
+			var i2 = (iz + 1) * (GRID_X + 1) + ix
+			var i3 = i2 + 1
+
+			st.add_index(i0)
+			st.add_index(i2)
+			st.add_index(i1)
+
+			st.add_index(i1)
+			st.add_index(i2)
+			st.add_index(i3)
+
+	# Indices: Bottom base (Facing DOWN)
+	var b_offset = num_verts_per_layer
+	for iz in range(GRID_Z):
+		for ix in range(GRID_X):
+			var i0 = b_offset + iz * (GRID_X + 1) + ix
+			var i1 = i0 + 1
+			var i2 = b_offset + (iz + 1) * (GRID_X + 1) + ix
+			var i3 = i2 + 1
+
+			st.add_index(i0)
+			st.add_index(i1)
+			st.add_index(i2)
+
+			st.add_index(i1)
+			st.add_index(i3)
+			st.add_index(i2)
+
+	# Indices: Perimeter Skirt Walls
+	for ix in range(GRID_X):
+		var t0 = ix
+		var t1 = ix + 1
+		var b0 = b_offset + ix
+		var b1 = b_offset + ix + 1
+		st.add_index(t0); st.add_index(t1); st.add_index(b0)
+		st.add_index(t1); st.add_index(b1); st.add_index(b0)
+
+	for ix in range(GRID_X):
+		var t0 = GRID_Z * (GRID_X + 1) + ix
+		var t1 = t0 + 1
+		var b0 = b_offset + t0
+		var b1 = b_offset + t1
+		st.add_index(t0); st.add_index(b0); st.add_index(t1)
+		st.add_index(t1); st.add_index(b0); st.add_index(b1)
+
+	for iz in range(GRID_Z):
+		var t0 = iz * (GRID_X + 1)
+		var t1 = (iz + 1) * (GRID_X + 1)
+		var b0 = b_offset + t0
+		var b1 = b_offset + t1
+		st.add_index(t0); st.add_index(b0); st.add_index(t1)
+		st.add_index(t1); st.add_index(b0); st.add_index(b1)
+
+	for iz in range(GRID_Z):
+		var t0 = iz * (GRID_X + 1) + GRID_X
+		var t1 = (iz + 1) * (GRID_X + 1) + GRID_X
+		var b0 = b_offset + t0
+		var b1 = b_offset + t1
+		st.add_index(t0); st.add_index(t1); st.add_index(b0)
+		st.add_index(t1); st.add_index(b1); st.add_index(b0)
+
+	st.generate_normals()
+	st.generate_tangents()
+	var mesh = st.commit()
 
 	var mesh_inst := MeshInstance3D.new()
 	mesh_inst.name = drift_name + "_Mesh"
-	var box_mesh := BoxMesh.new()
-	box_mesh.size = size
-	mesh_inst.mesh = box_mesh
-
-	var drift_mat := StandardMaterial3D.new()
-	drift_mat.albedo_color = Color(0.96, 0.98, 1.0)
-	drift_mat.roughness = 0.95
+	mesh_inst.mesh = mesh
 	mesh_inst.material_override = drift_mat
+	area.add_child(mesh_inst)
 
-	body.add_child(mesh_inst)
-	parent.add_child(body)
+	parent.add_child(area)
 
 
 func _build_alpine_bridge(parent: Node, center: Vector3, length: float, width: float) -> void:
@@ -597,21 +662,23 @@ func _build_alpine_bridge(parent: Node, center: Vector3, length: float, width: f
 	bridge_root.name = "AlpineTimberBridge"
 	bridge_root.position = center
 
-	# Timber Deck
+	# Timber Deck (top surface flush with road level Y = center.y + 0.08)
 	var deck_body := StaticBody3D.new()
 	deck_body.name = "BridgeDeck"
 	deck_body.add_to_group("track_surface", true)
+	deck_body.position = Vector3(0, -0.12, 0)
 	var deck_col := CollisionShape3D.new()
 	var deck_shape := BoxShape3D.new()
-	deck_shape.size = Vector3(length, 0.6, width)
+	deck_shape.size = Vector3(length, 0.40, width)
 	deck_col.shape = deck_shape
 	deck_body.add_child(deck_col)
 
 	var deck_mesh := MeshInstance3D.new()
 	deck_mesh.name = "BridgeDeck_Mesh"
 	var box_m := BoxMesh.new()
-	box_m.size = deck_shape.size
+	box_m.size = Vector3(length, 0.38, width)
 	deck_mesh.mesh = box_m
+	deck_mesh.position = Vector3(0, -0.01, 0)
 
 	var wood_mat := StandardMaterial3D.new()
 	wood_mat.albedo_color = Color(0.42, 0.28, 0.18)
@@ -619,6 +686,28 @@ func _build_alpine_bridge(parent: Node, center: Vector3, length: float, width: f
 	deck_mesh.material_override = wood_mat
 	deck_body.add_child(deck_mesh)
 	bridge_root.add_child(deck_body)
+
+	# Rustic Timber Abutment Sills (smooth road-to-bridge junction, zero gap/step/clipping)
+	for x_sill in [-24.0, 24.0]:
+		var sill := StaticBody3D.new()
+		sill.name = "AbutmentSill_" + ("W" if x_sill < 0 else "E")
+		sill.position = Vector3(x_sill, -0.12, 0)
+		sill.add_to_group("track_surface", true)
+
+		var s_col := CollisionShape3D.new()
+		var s_shape := BoxShape3D.new()
+		var sill_w: float = 18.6 # Full span covering 14m road and 18m curbs seamlessly
+		s_shape.size = Vector3(0.6, 0.40, sill_w)
+		s_col.shape = s_shape
+		sill.add_child(s_col)
+
+		var s_mesh := MeshInstance3D.new()
+		var sm := BoxMesh.new()
+		sm.size = Vector3(0.6, 0.42, sill_w)
+		s_mesh.mesh = sm
+		s_mesh.material_override = wood_mat
+		sill.add_child(s_mesh)
+		bridge_root.add_child(sill)
 
 	# Side Guardrails (North and South edges)
 	var rail_mat := StandardMaterial3D.new()
@@ -629,7 +718,7 @@ func _build_alpine_bridge(parent: Node, center: Vector3, length: float, width: f
 		var rail_body := StaticBody3D.new()
 		rail_body.name = "Guardrail_" + ("N" if side < 0 else "S")
 		var rail_z: float = side * (width * 0.5 - 0.4)
-		rail_body.position = Vector3(0, 0.75, rail_z)
+		rail_body.position = Vector3(0, 0.65, rail_z)
 
 		var rail_col := CollisionShape3D.new()
 		var rail_shape := BoxShape3D.new()
@@ -645,14 +734,14 @@ func _build_alpine_bridge(parent: Node, center: Vector3, length: float, width: f
 		rail_body.add_child(rail_mesh)
 		bridge_root.add_child(rail_body)
 
-	# Timber Support Piers rooted into creek bed
+	# Timber Support Piers rooted deep into creek bed (down to Y = -5.0m)
 	for x_offset in [-14.0, 0.0, 14.0]:
 		var pier := StaticBody3D.new()
 		pier.name = "Pillar_%d" % int(x_offset)
-		pier.position = Vector3(x_offset, -2.8, 0)
+		pier.position = Vector3(x_offset, -5.0, 0)
 		var p_col := CollisionShape3D.new()
 		var p_shape := BoxShape3D.new()
-		p_shape.size = Vector3(2.4, 6.0, width - 2.0)
+		p_shape.size = Vector3(2.4, 10.0, width - 2.0)
 		p_col.shape = p_shape
 		pier.add_child(p_col)
 
@@ -738,7 +827,10 @@ func _build_ribbon_road(parent: Node, curve: Curve3D, width: float, node_name: S
 	static_body.add_child(mesh_inst)
 
 	var col_shape := CollisionShape3D.new()
-	col_shape.shape = arr_mesh.create_trimesh_shape()
+	var r_trimesh = arr_mesh.create_trimesh_shape()
+	if r_trimesh is ConcavePolygonShape3D:
+		(r_trimesh as ConcavePolygonShape3D).backface_collision = true
+	col_shape.shape = r_trimesh
 	static_body.add_child(col_shape)
 
 	parent.add_child(static_body)

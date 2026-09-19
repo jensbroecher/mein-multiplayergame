@@ -7,6 +7,11 @@ enum TrackLayoutType { DEFAULT, MOUNTAIN, CANYON }
 ## Hill jump is fully between the two large ramps; crossing only removes the high path
 ## so the lower road at the same XZ is untouched.
 func _is_in_gap_pos(pos: Vector3) -> bool:
+	if level_prefix == "frostpeak_creek":
+		# Alpine Timber Bridge crossing over the central creek ravine (exact 48m bridge span)
+		if absf(pos.z - (-305.0)) < 14.0 and absf(pos.x) < 24.0:
+			return true
+		return false
 	if level_prefix != "canyon_chasm":
 		return false
 	# Gap 1 — hill jump between large ramp takeoff (~z -50) and landing (~z -120).
@@ -483,7 +488,9 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			# Ramps from 0 (normal road, <4m above ground) to 1 (bridge, >12m above ground).
 			var elevation_diff = road_h - base_terrain_height
 			var bridge_factor = 0.0
-			if level_prefix != "pinecrest_ridge":
+			if level_prefix == "frostpeak_creek" and absf(pz - (-305.0)) < 22.0 and absf(px) < 24.0:
+				bridge_factor = 1.0
+			elif level_prefix != "pinecrest_ridge":
 				bridge_factor = clampf((elevation_diff - 4.0) / 8.0, 0.0, 1.0)
 			clearing_blend *= (1.0 - bridge_factor)
 
@@ -1498,9 +1505,20 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 		else:
 			tangent = tangent.normalized()
 
+		var is_curb_side: bool = node_name.contains("Curbs")
+		var eff_right: Vector3 = right
+		var eff_side_y_offset: float = side_y_offset
+		if is_curb_side:
+			var use_inner: float = road_width / 2.0
+			var want_extra: float = maxf(half_w - use_inner, 0.35)
+			var max_extra: float = _max_shoulder_extra_at(frames_side, i, length, point_count)
+			var use_outer: float = use_inner + minf(want_extra, max_extra)
+			eff_right = right_dir * use_outer
+			eff_side_y_offset = road_y_offset - maxf(curb_slope, 0.12)
+
 		var up_dir: Vector3 = frames_side[i]["up"] if frames_side[i].has("up") else Vector3.UP
-		var top_l = final_pos - right + up_dir * side_y_offset
-		var top_r = final_pos + right + up_dir * side_y_offset
+		var top_l = final_pos - eff_right + up_dir * eff_side_y_offset
+		var top_r = final_pos + eff_right + up_dir * eff_side_y_offset
 		var bot_l = top_l - up_dir * depth
 		var bot_r = top_r - up_dir * depth
 

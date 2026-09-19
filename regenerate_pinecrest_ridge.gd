@@ -14,6 +14,18 @@ func _ready() -> void:
 
 	var level_script: Script = load("res://levels/Level.gd")
 	level_scene.set_script(level_script)
+
+	var players_node := Node3D.new()
+	players_node.name = "Players"
+	level_scene.add_child(players_node)
+
+	var p_spawner := MultiplayerSpawner.new()
+	p_spawner.name = "PlayerSpawner"
+	p_spawner.set("_spawnable_scenes", PackedStringArray(["uid://cart123"]))
+	p_spawner.spawn_path = NodePath("../Players")
+	p_spawner.spawn_limit = 6
+	level_scene.add_child(p_spawner)
+
 	add_child(level_scene)
 
 	# 1. Environment & Lighting
@@ -58,13 +70,13 @@ func _ready() -> void:
 	var curve := Curve3D.new()
 	curve.bake_interval = 0.25
 
-	# Multi-tiered mountain switchback curve ascending to +78m on the south face and returning down
+	# Multi-tiered mountain switchback curve ascending to +78m and returning down (Zero 2D crossings!)
 	var curve_pts = [
 		# --- TIER 0: VALLEY FLOOR & PADDOCK SPRINT (Y = 0m -> 4m) ---
-		# 0: Start / Finish Line
-		[Vector3(0, 0, 30), Vector3(0, 0, -35), Vector3(0.0, 0.0, 160.0)],
+		# 0: Start / Finish Line (Straight through gate heading North)
+		[Vector3(0, 0, 25), Vector3(0, 0, -25), Vector3(0.0, 0.0, 160.0)],
 		# 1: High-speed valley straight
-		[Vector3(0, 0, 35), Vector3(0, 0, -35), Vector3(0.0, 0.0, 80.0)],
+		[Vector3(0, 0, 30), Vector3(0, 0, -30), Vector3(0.0, 0.0, 80.0)],
 		# 2: Left sweep around the valley lake shore
 		[Vector3(18, 0, 25), Vector3(-20, 0.5, -25), Vector3(-40.0, 1.5, 25.0)],
 		# 3: Foot of the hill - road begins steep incline
@@ -76,55 +88,57 @@ func _ready() -> void:
 		# 5: Jump 1 Landing Terrace Shelf (Z=-90, Y=20m)
 		[Vector3(0, 2.0, 18), Vector3(0, 0.8, -18), Vector3(-75.0, 20.0, -90.0)],
 
-		# --- TIER 2: SERPENTINE SWITCHBACKS (Climbing south mountain face) ---
+		# --- TIER 2: SERPENTINE SWITCHBACKS (Climbing mountain face) ---
 		# 6: Approach to Switchback 1 (Z=-125, Y=25m)
 		[Vector3(0, -0.8, 18), Vector3(2, 1.2, -18), Vector3(-80.0, 25.0, -125.0)],
-		# 7: Switchback 1 Apex (160 deg sharp right hairpin into rocky slope, Z=-155, Y=31m)
-		[Vector3(-16, -1.0, 2), Vector3(22, 1.0, -2), Vector3(-50.0, 31.0, -155.0)],
-		# 8: Ascending traverse across the south mountain face (Z=-145, Y=37m)
-		[Vector3(-25, -1.0, -5), Vector3(25, 1.0, 5), Vector3(5.0, 37.0, -145.0)],
-		# 9: Approach to Switchback 2 on east flank (Z=-140, Y=44m)
-		[Vector3(-20, -1.0, 5), Vector3(18, 1.0, -10), Vector3(65.0, 44.0, -140.0)],
-		# 10: Switchback 2 Apex (155 deg sharp left hairpin climbing higher, Z=-170, Y=52m)
-		[Vector3(12, -1.2, 18), Vector3(-14, 1.2, -20), Vector3(85.0, 52.0, -170.0)],
-		# 11: High traverse climbing west to the upper terrace (Z=-195, Y=60m)
-		[Vector3(25, -1.0, 8), Vector3(-25, 1.0, -8), Vector3(30.0, 60.0, -195.0)],
-		# 12: Approach to Switchback 3 (Z=-205, Y=68m)
-		[Vector3(20, -1.0, 5), Vector3(-18, 1.0, -10), Vector3(-35.0, 68.0, -205.0)],
-		# 13: Switchback 3 Apex (150 deg sharp right hairpin into alpine rock, Z=-235, Y=74m)
-		[Vector3(-15, -1.0, 4), Vector3(20, 0.8, -4), Vector3(-65.0, 74.0, -235.0)],
+		# 7: Switchback 1 Apex (Sharp right hairpin into slope, Z=-160, Y=31m)
+		[Vector3(-16, -1.0, 2), Vector3(20, 1.0, -2), Vector3(-55.0, 31.0, -160.0)],
+		# 8: Ascending traverse across the south mountain face (Z=-155, Y=38m)
+		[Vector3(-20, -1.0, -4), Vector3(20, 1.0, 4), Vector3(-5.0, 38.0, -155.0)],
+		# 9: Approach to Switchback 2 (Inner slope, Z=-150, Y=45m, X=35)
+		[Vector3(-18, -1.0, 4), Vector3(15, 1.0, -6), Vector3(35.0, 45.0, -150.0)],
+		# 10: Switchback 2 Apex (Sharp left hairpin turning west, X=50, Z=-175, Y=53m)
+		[Vector3(10, -1.2, 16), Vector3(-12, 1.2, -18), Vector3(50.0, 53.0, -175.0)],
+		# 11: High traverse climbing west to the upper terrace (Z=-200, Y=61m)
+		[Vector3(22, -1.0, 6), Vector3(-22, 1.0, -6), Vector3(15.0, 61.0, -200.0)],
+		# 12: Approach to Switchback 3 (Z=-210, Y=68m)
+		[Vector3(18, -1.0, 4), Vector3(-16, 1.0, -8), Vector3(-35.0, 68.0, -210.0)],
+		# 13: Switchback 3 Apex (Sharp right hairpin into alpine rock, Z=-240, Y=74m)
+		[Vector3(-15, -1.0, 4), Vector3(20, 0.8, -4), Vector3(-65.0, 74.0, -240.0)],
 
 		# --- TIER 3: SUMMIT RIDGE & JUMP 2 (High Vista Super-Jump, Y = 78m -> 58m) ---
-		# 14: Summit Crest Road (Highest point +78m overlooking all lower tiers & valley)
-		[Vector3(-20, -0.5, 5), Vector3(25, 0.0, -5), Vector3(-15.0, 78.0, -245.0)],
-		# 15: Summit Ridge straightaway leading to Jump 2 takeoff (Z=-225, Y=77m)
-		[Vector3(-18, 0.0, -4), Vector3(18, -0.5, 8), Vector3(35.0, 77.0, -225.0)],
-		# 16: Jump 2 Takeoff Ramp launching south off the summit ridge (Z=-195, Y=75m)
-		[Vector3(-2, 0.8, -14), Vector3(2, -3.5, 22), Vector3(55.0, 75.0, -195.0)],
-		# 17: Jump 2 Landing Terrace (Z=-150, Y=56m)
-		[Vector3(0, 4.0, -20), Vector3(4, -1.2, 20), Vector3(65.0, 56.0, -150.0)],
+		# 14: Summit Crest Road (+78m vista)
+		[Vector3(-20, -0.5, 4), Vector3(25, 0.0, -4), Vector3(-15.0, 78.0, -250.0)],
+		# 15: Summit Ridge heading towards outer east launch (Z=-235, Y=77m, X=45)
+		[Vector3(-18, 0.0, -4), Vector3(18, -0.5, 6), Vector3(45.0, 77.0, -235.0)],
+		# 16: Jump 2 Takeoff Ramp on outer east ridge (X=85, Z=-205, Y=75m)
+		[Vector3(-10, 0.8, -10), Vector3(10, -3.5, 16), Vector3(85.0, 75.0, -205.0)],
+		# 17: Jump 2 Landing Terrace on outer east shelf (X=98, Z=-160, Y=56m)
+		[Vector3(0, 4.0, -18), Vector3(2, -1.2, 18), Vector3(98.0, 56.0, -160.0)],
 
 		# --- TIER 4: DOWNHILL SERPENTINE DESCENT (Y = 54m -> 16m) ---
-		# 18: High-speed downhill sweep (Z=-115, Y=48m)
-		[Vector3(-15, 1.2, -15), Vector3(15, -1.2, 15), Vector3(75.0, 48.0, -115.0)],
-		# 19: Switchback 4 (Sharp Right Downhill Hairpin, Z=-80, Y=40m)
-		[Vector3(15, 1.2, -5), Vector3(-18, -1.2, 5), Vector3(50.0, 40.0, -80.0)],
-		# 20: Technical downhill chicane through mountain wall (Z=-45, Y=32m)
-		[Vector3(14, 1.0, -14), Vector3(-14, -1.0, 14), Vector3(10.0, 32.0, -45.0)],
-		# 21: Switchback 5 (Sharp Left Downhill Hairpin, Z=-15, Y=24m)
-		[Vector3(-15, 1.0, -5), Vector3(18, -1.0, 5), Vector3(30.0, 24.0, -15.0)],
-		# 22: Downhill sprint towards Jump 3 (Z=25, Y=17m)
-		[Vector3(-8, 1.0, -15), Vector3(6, -0.8, 18), Vector3(62.0, 17.0, 25.0)],
+		# 18: High-speed downhill sweep on east ridge (X=105, Z=-120, Y=48m)
+		[Vector3(-8, 1.2, -16), Vector3(8, -1.2, 16), Vector3(105.0, 48.0, -120.0)],
+		# 19: Switchback 4 (Sharp Right Downhill Hairpin, X=75, Z=-80, Y=40m)
+		[Vector3(16, 1.2, -4), Vector3(-18, -1.2, 4), Vector3(75.0, 40.0, -80.0)],
+		# 20: Technical downhill chicane (X=30, Z=-45, Y=32m)
+		[Vector3(16, 1.0, -12), Vector3(-16, -1.0, 12), Vector3(30.0, 32.0, -45.0)],
+		# 21: Switchback 5 (Sharp Left Downhill Hairpin, X=45, Z=-15, Y=24m)
+		[Vector3(-14, 1.0, -6), Vector3(16, -1.0, 6), Vector3(45.0, 24.0, -15.0)],
+		# 22: Downhill sprint towards Jump 3 (X=70, Z=25, Y=17m)
+		[Vector3(-8, 1.0, -15), Vector3(6, -0.8, 16), Vector3(70.0, 17.0, 25.0)],
 
 		# --- TIER 5: JUMP 3 (Forest Creek Launch Ramp & Valley Sprint) ---
-		# 23: Jump 3 Takeoff Ramp launching over valley creek (Z=60, Y=14m)
-		[Vector3(-2, 0.8, -12), Vector3(0, 2.2, 18), Vector3(68.0, 14.0, 60.0)],
-		# 24: Jump 3 Landing Zone in valley meadow (Z=105, Y=1.5m)
-		[Vector3(0, 3.0, -16), Vector3(-6, -0.5, 18), Vector3(62.0, 1.5, 105.0)],
-		# 25: Sweeping right turn around the valley meadow (Z=155, Y=0m)
-		[Vector3(16, 0.0, -18), Vector3(-18, 0.0, 18), Vector3(35.0, 0.0, 155.0)],
-		# 26: Return to Start/Finish Straight (Z=160, Y=0m)
-		[Vector3(20, 0.0, -4), Vector3(-15, 0.0, 4), Vector3(-4.0, 0.0, 160.0)]
+		# 23: Jump 3 Takeoff Ramp launching over valley creek (X=75, Z=60, Y=14m)
+		[Vector3(-2, 0.8, -12), Vector3(0, 2.2, 16), Vector3(75.0, 14.0, 60.0)],
+		# 24: Jump 3 Landing Zone in valley meadow (X=65, Z=105, Y=1.5m)
+		[Vector3(0, 3.0, -16), Vector3(-4, -0.5, 18), Vector3(65.0, 1.5, 105.0)],
+		# 25: Sweeping right turn around meadow (X=50, Z=165, Y=0m)
+		[Vector3(12, 0.0, -16), Vector3(-12, 0.0, 18), Vector3(50.0, 0.0, 165.0)],
+		# 26: Final turn apex lining up start/finish straight (X=22, Z=215, Y=0m)
+		[Vector3(16, 0.0, -8), Vector3(-16, 0.0, 8), Vector3(22.0, 0.0, 215.0)],
+		# 27: Entry to Start/Finish Straight (X=0, Z=205, Y=0m)
+		[Vector3(8, 0.0, 10), Vector3(0, 0.0, -15), Vector3(0.0, 0.0, 205.0)]
 	]
 
 	for pt in curve_pts:
@@ -175,19 +189,14 @@ func _ready() -> void:
 	tg.set("track_path", track_path)
 	tg.call("generate_world")
 
-	# 4. Players node
-	var players_node := Node3D.new()
-	players_node.name = "Players"
-	level_scene.add_child(players_node)
-
-	# 5. Finish Line & Starting Grid
+	# 4. Finish Line & Starting Grid
 	var gate_scene: PackedScene = load("res://CheckpointGate.tscn")
 	var spawn_scene: PackedScene = load("res://SpawnIndicator.tscn")
 
 	var finish_line = gate_scene.instantiate()
 	finish_line.name = "FinishLine"
 	finish_line.position = Vector3(0.0, 0.06, 160.0)
-	finish_line.rotation_degrees = Vector3(0, 180, 0)
+	finish_line.rotation_degrees = Vector3(0, 0, 0)
 	finish_line.set("is_finish_line", true)
 	level_scene.add_child(finish_line)
 
@@ -215,27 +224,13 @@ func _ready() -> void:
 			si.name = "SpawnIndicator"
 			sp.add_child(si)
 
-	# 6. Multiplayer Spawners
-	var p_spawner := MultiplayerSpawner.new()
-	p_spawner.name = "PlayerSpawner"
-	p_spawner.set("_spawnable_scenes", PackedStringArray(["uid://cart123"]))
-	p_spawner.spawn_path = NodePath("../Players")
-	p_spawner.spawn_limit = 6
-	level_scene.add_child(p_spawner)
-
-	var proj_spawner := MultiplayerSpawner.new()
-	proj_spawner.name = "ProjectileSpawner"
-	proj_spawner.spawn_path = NodePath(".")
-	level_scene.add_child(proj_spawner)
-
-	# 7. Checkpoints Container
+	# 5. Checkpoints Container (Reduced to 6 cleanly spaced milestone gates)
 	var checkpoints_container := Node3D.new()
 	checkpoints_container.name = "Checkpoints"
 	level_scene.add_child(checkpoints_container)
 
-	# Place 18 checkpoint gates evenly along the 1650m track
 	var track_len: float = curve.get_baked_length()
-	var cp_count := 18
+	var cp_count := 6
 	var cp_step := track_len / float(cp_count + 1)
 	for i in range(cp_count):
 		var dist_along := cp_step * float(i + 1)
@@ -250,7 +245,7 @@ func _ready() -> void:
 		gate.rotation_degrees = Vector3(0, rot_y, 0)
 		checkpoints_container.add_child(gate)
 
-	# 8. Jumps & Ramps
+	# 6. Jumps & Ramps
 	var ramp_container := Node3D.new()
 	ramp_container.name = "JumpRamps"
 	level_scene.add_child(ramp_container)
@@ -260,12 +255,12 @@ func _ready() -> void:
 		ramp_scene = load("res://models/ramps/woodramp.fbx")
 
 	# Jump 1 (Forest Ravine Leap): (-70, 10, -50)
-	# Jump 2 (Summit Overlook Super-Jump): (55, 75, -195)
-	# Jump 3 (Forest Creek Mega-Launch): (68, 14, 60)
+	# Jump 2 (Summit Overlook Super-Jump on outer east ridge): (85, 75, -205)
+	# Jump 3 (Forest Creek Mega-Launch): (75, 14, 60)
 	var ramp_placements = [
 		[Vector3(-70.0, 10.06, -50.0), Vector3(0, 165, 0), Vector3(2.6, 2.2, 2.6)],
-		[Vector3(55.0, 75.06, -195.0), Vector3(0, 15, 0), Vector3(3.2, 2.8, 3.2)],
-		[Vector3(68.0, 14.06, 60.0), Vector3(0, 0, 0), Vector3(2.8, 2.4, 2.8)]
+		[Vector3(85.0, 75.06, -205.0), Vector3(0, -164.0, 0), Vector3(3.2, 2.8, 3.2)],
+		[Vector3(75.0, 14.06, 60.0), Vector3(0, 167.5, 0), Vector3(2.8, 2.4, 2.8)]
 	]
 
 	if ramp_scene:
@@ -278,7 +273,7 @@ func _ready() -> void:
 			ramp_inst.scale = r_info[2]
 			ramp_container.add_child(ramp_inst)
 
-	# 9. Boost Pads
+	# 7. Boost Pads
 	var boost_scene: PackedScene = load("res://BoostPad.tscn")
 	var boost_container := Node3D.new()
 	boost_container.name = "BoostPads"
@@ -289,17 +284,17 @@ func _ready() -> void:
 			# Jump 1 Takeoff pair
 			["Boost_Jump1_L", Vector3(-67.0, 10.1, -48.0), 165.0],
 			["Boost_Jump1_R", Vector3(-73.0, 10.1, -48.0), 165.0],
-			# Jump 2 Summit Super-Jump trio
-			["Boost_Jump2_L", Vector3(51.0, 75.1, -197.0), 15.0],
-			["Boost_Jump2_M", Vector3(55.0, 75.1, -197.0), 15.0],
-			["Boost_Jump2_R", Vector3(59.0, 75.1, -197.0), 15.0],
-			# Jump 3 Downhill Creek Launch pair
-			["Boost_Jump3_L", Vector3(65.0, 14.1, 58.0), 0.0],
-			["Boost_Jump3_R", Vector3(71.0, 14.1, 58.0), 0.0],
+			# Jump 2 Summit Super-Jump trio (heading -164 deg)
+			["Boost_Jump2_L", Vector3(81.2, 75.1, -205.9), -164.0],
+			["Boost_Jump2_M", Vector3(85.0, 75.1, -207.0), -164.0],
+			["Boost_Jump2_R", Vector3(88.8, 75.1, -208.1), -164.0],
+			# Jump 3 Downhill Creek Launch pair (heading 167.5 deg)
+			["Boost_Jump3_L", Vector3(72.1, 14.1, 57.3), 167.5],
+			["Boost_Jump3_R", Vector3(77.9, 14.1, 58.7), 167.5],
 			# Straightaway Boosters
-			["Boost_StartStraight", Vector3(0.0, 0.08, 110.0), 180.0],
-			["Boost_MidClimb", Vector3(10.0, 37.5, -145.0), -80.0],
-			["Boost_SummitRidge", Vector3(-10.0, 78.1, -245.0), -90.0]
+			["Boost_StartStraight", Vector3(0.0, 0.08, 110.0), 0.0],
+			["Boost_MidClimb", Vector3(-5.0, 38.1, -155.0), -80.0],
+			["Boost_SummitRidge", Vector3(45.0, 77.1, -235.0), -100.0]
 		]
 		for bp_info in bp_defs:
 			var bp = boost_scene.instantiate()
@@ -308,7 +303,7 @@ func _ready() -> void:
 			bp.rotation_degrees = Vector3(0, bp_info[2], 0)
 			boost_container.add_child(bp)
 
-	# 10. Item Boxes
+	# 8. Item Boxes
 	var item_scene: PackedScene = load("res://ItemBox.tscn")
 	var item_container := Node3D.new()
 	item_container.name = "ItemBoxes"
@@ -318,12 +313,12 @@ func _ready() -> void:
 		var item_rows = [
 			# Row 1: Valley Straight (Z = 60)
 			[Vector3(-4.0, 1.2, 60.0), Vector3(0.0, 1.2, 60.0), Vector3(4.0, 1.2, 60.0)],
-			# Row 2: Mid-Mountain Traverse (Z = -145, Y = 38m)
-			[Vector3(2.0, 38.2, -145.0), Vector3(6.0, 38.2, -145.0), Vector3(10.0, 38.2, -145.0)],
-			# Row 3: Summit Vista Ridge before Jump 2 (Z = -235, Y = 78m)
-			[Vector3(15.0, 78.5, -235.0), Vector3(20.0, 78.5, -235.0), Vector3(25.0, 78.5, -235.0)],
-			# Row 4: Downhill sprint before Jump 3 (Z = 20, Y = 18m)
-			[Vector3(58.0, 18.5, 20.0), Vector3(62.0, 18.5, 20.0), Vector3(66.0, 18.5, 20.0)]
+			# Row 2: Mid-Mountain Traverse (Z = -200, Y = 61m)
+			[Vector3(11.0, 61.2, -200.0), Vector3(15.0, 61.2, -200.0), Vector3(19.0, 61.2, -200.0)],
+			# Row 3: Summit Vista Ridge before Jump 2 (Z = -240, Y = 77.5m)
+			[Vector3(16.0, 77.5, -240.0), Vector3(20.0, 77.5, -240.0), Vector3(24.0, 77.5, -240.0)],
+			# Row 4: Downhill sprint before Jump 3 (Z = 25, Y = 17.2m)
+			[Vector3(66.0, 17.2, 25.0), Vector3(70.0, 17.2, 25.0), Vector3(74.0, 17.2, 25.0)]
 		]
 		var item_idx := 1
 		for row in item_rows:
@@ -379,8 +374,8 @@ func _ready() -> void:
 	# Jump 3 (Creek Launch): (68, 14, 60) to (62, 1.5, 105)
 	var jump_segments = [
 		[Vector2(-70.0, -50.0), Vector2(-75.0, -90.0), 30.0],
-		[Vector2(55.0, -195.0), Vector2(65.0, -150.0), 35.0],
-		[Vector2(68.0, 60.0), Vector2(62.0, 105.0), 30.0]
+		[Vector2(85.0, -205.0), Vector2(98.0, -160.0), 35.0],
+		[Vector2(75.0, 60.0), Vector2(65.0, 105.0), 30.0]
 	]
 	var is_in_jump_corridor = func(px: float, pz: float) -> bool:
 		var p = Vector2(px, pz)
@@ -404,8 +399,8 @@ func _ready() -> void:
 		var px = rng.randf_range(-340.0, 340.0)
 		var pz = rng.randf_range(-340.0, 220.0)
 
-		# Strict clearance: 28m ensures trees never block driving line or camera sightlines
-		if get_2d_road_dist.call(px, pz) < 28.0:
+		# Strict clearance: 55m ensures large tree canopies never block road or camera sightlines
+		if get_2d_road_dist.call(px, pz) < 55.0:
 			continue
 		if is_in_jump_corridor.call(px, pz):
 			continue
@@ -461,9 +456,9 @@ func _ready() -> void:
 			var side_dist = rng.randf_range(11.5, 17.5)
 			var bush_pos = path_pt + normal * (side_sign * side_dist)
 
-			# Strict check against ALL points of the road: must never be within 11.0m
+			# Strict check against ALL points of the road: must never be within 12.5m
 			var min_dist_all = get_2d_road_dist.call(bush_pos.x, bush_pos.z)
-			if min_dist_all < 11.0:
+			if min_dist_all < 12.5:
 				continue
 			if is_in_jump_corridor.call(bush_pos.x, bush_pos.z):
 				continue
@@ -485,7 +480,7 @@ func _ready() -> void:
 			bush_count += 1
 			bush_inst.name = "Bush_%d" % bush_count
 			bush_inst.position = bush_pos
-			var sc = rng.randf_range(0.65, 1.05)
+			var sc = rng.randf_range(0.14, 0.18)
 			bush_inst.scale = Vector3(sc, sc, sc)
 			bush_inst.rotation_degrees = Vector3(0, rng.randf_range(0, 360), 0)
 			veg_container.add_child(bush_inst)
@@ -500,7 +495,7 @@ func _ready() -> void:
 		if f_packed:
 			var px = rng.randf_range(-180.0, 180.0)
 			var pz = rng.randf_range(20.0, 210.0)
-			if get_2d_road_dist.call(px, pz) < 11.0:
+			if get_2d_road_dist.call(px, pz) < 15.0:
 				continue
 			var py = get_ground_y.call(px, pz)
 			if py < -1.8:
@@ -517,7 +512,7 @@ func _ready() -> void:
 			flower_count += 1
 			f_inst.name = "Flowers_%d" % flower_count
 			f_inst.position = Vector3(px, py - 0.08, pz)
-			var sc = rng.randf_range(1.2, 1.8)
+			var sc = rng.randf_range(0.04, 0.07)
 			f_inst.scale = Vector3(sc, sc, sc)
 			f_inst.rotation_degrees = Vector3(0, rng.randf_range(0, 360), 0)
 			veg_container.add_child(f_inst)

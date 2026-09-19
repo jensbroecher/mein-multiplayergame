@@ -33,6 +33,7 @@ models/desert/*.fbx
 models/plants/*.fbx
 models/ramps/*.fbx
 
-# Oversized generated meshes (>100MB)
+# Resource files and oversized generated meshes
+*.res
 generated/terrain_collision_shape.res
 generated/terrain_visual.res
