@@ -4579,11 +4579,11 @@ func _create_drift_particles(wheel_name: String):
 	# the dark "disc" artifact that appears on first contact with the surface.
 	skid_grad.offsets = PackedFloat32Array([0.0, 0.02, 0.55, 0.85, 1.0])
 	skid_grad.colors = PackedColorArray([
-		Color(0.01, 0.01, 0.01, 0.0),  # Invisible at birth
-		Color(0.01, 0.01, 0.01, 0.95), # Rich deep black rubber
-		Color(0.01, 0.01, 0.01, 0.80),
-		Color(0.01, 0.01, 0.01, 0.35),
-		Color(0.01, 0.01, 0.01, 0.0)
+		Color(0.08, 0.08, 0.08, 0.0),   # Invisible at birth
+		Color(0.08, 0.08, 0.08, 0.48),  # Semi-transparent dark charcoal rubber
+		Color(0.08, 0.08, 0.08, 0.40),
+		Color(0.08, 0.08, 0.08, 0.18),
+		Color(0.08, 0.08, 0.08, 0.0)
 	])
 	skid.color_ramp = skid_grad
 

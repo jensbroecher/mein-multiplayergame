@@ -213,8 +213,8 @@ func _ready() -> void:
 	tg.set("terrain_resolution", 420)
 	tg.set("terrain_size", Vector2(900.0, 900.0))
 	tg.set("hill_height", 16.0)
-	tg.set("road_width", 14.0)
-	tg.set("sand_width", 18.0)
+	tg.set("road_width", 15.0)
+	tg.set("sand_width", 17.0)
 	tg.set("road_y_offset", 0.06)
 	tg.set("curb_y_offset", 0.06)
 	tg.set("terrain_recession_collision", 0.12)
@@ -278,7 +278,7 @@ func _ready() -> void:
 	_build_ribbon_road(level_scene, alt_curve, 12.0, "AlternativeRoad_Mesh", asphalt_tex)
 
 	# 5. Alpine Timber Bridge across Creek (Crossing 2: X = -24m to +24m at Z = -305, Y = 4.8m)
-	_build_alpine_bridge(level_scene, Vector3(0.0, 4.8, -305.0), 48.0, 14.0)
+	_build_alpine_bridge(level_scene, Vector3(0.0, 4.8, -305.0), 48.0, 15.0)
 
 	# 6. Natural Snow-Covered Sections on Road (Organic surface drifts with "snow" group & "is_snow" meta)
 	var snow_sections := Node3D.new()
@@ -286,15 +286,15 @@ func _ready() -> void:
 	level_scene.add_child(snow_sections)
 
 	# Section A: Pre-Jump 1 In-run Snowdrift (X=-32, Y=5.68, Z=-52)
-	_create_natural_snow_drift(snow_sections, "SnowDrift_Jump1Approach", Vector3(-32.0, 5.68, -52.0), Vector3(14.0, 0.28, 18.0), 20.0, 0.0)
+	_create_natural_snow_drift(snow_sections, "SnowDrift_Jump1Approach", Vector3(-32.0, 5.68, -52.0), Vector3(15.0, 0.28, 18.0), 20.0, 0.0)
 	# Section B: Eastern Flank Glade (X=45, Y=6.68, Z=-145)
-	_create_natural_snow_drift(snow_sections, "SnowDrift_EastGlade", Vector3(45.0, 6.68, -145.0), Vector3(14.0, 0.26, 16.0), -16.0, 1.8)
+	_create_natural_snow_drift(snow_sections, "SnowDrift_EastGlade", Vector3(45.0, 6.68, -145.0), Vector3(15.0, 0.26, 16.0), -16.0, 1.8)
 	# Section C: Deep Snow on Alternative Shortcut Route (X=38, Y=6.18, Z=-245)
 	_create_natural_snow_drift(snow_sections, "SnowDrift_AltRouteCut", Vector3(38.0, 6.18, -245.0), Vector3(12.5, 0.30, 22.0), 5.0, 3.5)
 	# Section D: High Summit Ridge Snowdrift (X=-98, Y=17.56, Z=-80)
-	_create_natural_snow_drift(snow_sections, "SnowDrift_SummitRidge", Vector3(-98.0, 17.56, -80.0), Vector3(14.0, 0.26, 20.0), 0.0, 5.2)
+	_create_natural_snow_drift(snow_sections, "SnowDrift_SummitRidge", Vector3(-98.0, 17.56, -80.0), Vector3(15.0, 0.26, 20.0), 0.0, 5.2)
 	# Section E: Pre-Jump 2 Summit Snowdrift (X=-45, Y=15.56, Z=100)
-	_create_natural_snow_drift(snow_sections, "SnowDrift_Jump2Approach", Vector3(-45.0, 15.56, 100.0), Vector3(14.0, 0.28, 16.0), -35.0, 7.1)
+	_create_natural_snow_drift(snow_sections, "SnowDrift_Jump2Approach", Vector3(-45.0, 15.56, 100.0), Vector3(15.0, 0.28, 16.0), -35.0, 7.1)
 
 	# 7. Players node
 	var players_node := Node3D.new()
@@ -308,7 +308,7 @@ func _ready() -> void:
 	var finish_line = gate_scene.instantiate()
 	finish_line.name = "FinishLine"
 	finish_line.position = Vector3(-45.0, 0.86, 120.0)
-	finish_line.rotation_degrees = Vector3(0, 180, 0)
+	finish_line.rotation_degrees = Vector3(0, 0, 0)
 	finish_line.set("is_finish_line", true)
 	level_scene.add_child(finish_line)
 
@@ -349,34 +349,31 @@ func _ready() -> void:
 	proj_spawner.spawn_path = NodePath(".")
 	level_scene.add_child(proj_spawner)
 
-	# 10. Checkpoints Container (Streamlined 5 sector checkpoints + Finish Line)
+	# 10. Checkpoints Container (6 curve-aligned milestone checkpoints + Finish Line)
 	var checkpoints_container := Node3D.new()
 	checkpoints_container.name = "Checkpoints"
 	level_scene.add_child(checkpoints_container)
 
-	# 5 carefully positioned checkpoints spaced across the 5 sectors of the track:
-	# Checkpoint 1: Valley floor approach to Jump 1
-	# Checkpoint 2: East bank pre-fork approach (captures both standard route and shortcut)
-	# Checkpoint 3: Post-merge approach before the alpine bridge crossing
-	# Checkpoint 4: High western mountain ridge summit overlook
-	# Checkpoint 5: South meadow return curve heading to finish straight
-	var cp_definitions = [
-		Vector3(-45.0, 2.0, -10.0),   # CP 1: Northbound valley approach
-		Vector3(56.0, 8.5, -175.0),   # CP 2: East bank pre-fork
-		Vector3(48.0, 6.0, -280.0),   # CP 3: Post-merge approach to bridge
-		Vector3(-98.0, 17.5, -80.0),  # CP 4: High mountain summit
-		Vector3(15.0, 3.5, 210.0),    # CP 5: South meadow sweep
-	]
+	var track_len: float = curve.get_baked_length()
+	# 6 milestone checkpoints spaced along the 1350m track, avoiding mid-air jump gaps:
+	# CP 1: 130m - Valley floor straight before Jump 1 in-run
+	# CP 2: 330m - East bank climb before the branching fork
+	# CP 3: 490m - Post-merge approach right before the Alpine Timber Bridge
+	# CP 4: 700m - Western mountain climb shelf heading South
+	# CP 5: 900m - High summit ridge overlook before Jump 2 approach
+	# CP 6: 1180m - Southern meadow glade before curve into finish straight
+	var milestone_offsets = [130.0, 330.0, 490.0, 700.0, 900.0, 1180.0]
 
-	for i in range(cp_definitions.size()):
-		var p = cp_definitions[i]
-		var next_p = cp_definitions[(i + 1) % cp_definitions.size()] if i < cp_definitions.size() - 1 else finish_line.position
-		var forward = (next_p - p).normalized()
-		var rot_y = rad_to_deg(atan2(-forward.x, -forward.z))
+	for i in range(milestone_offsets.size()):
+		var dist_along: float = milestone_offsets[i]
+		var cp_pos := curve.sample_baked(dist_along)
+		var next_pos := curve.sample_baked(minf(track_len, dist_along + 1.0))
+		var forward := (next_pos - cp_pos).normalized()
+		var rot_y := rad_to_deg(atan2(-forward.x, -forward.z))
 
 		var gate = gate_scene.instantiate()
 		gate.name = "Checkpoint_%d" % (i + 1)
-		gate.position = p + Vector3(0, 0.1, 0)
+		gate.position = cp_pos + Vector3(0, 0.1, 0)
 		gate.rotation_degrees = Vector3(0, rot_y, 0)
 		checkpoints_container.add_child(gate)
 
@@ -696,7 +693,7 @@ func _build_alpine_bridge(parent: Node, center: Vector3, length: float, width: f
 
 		var s_col := CollisionShape3D.new()
 		var s_shape := BoxShape3D.new()
-		var sill_w: float = 18.6 # Full span covering 14m road and 18m curbs seamlessly
+		var sill_w: float = 17.6 # Full span covering 15m road and 17m curbs seamlessly
 		s_shape.size = Vector3(0.6, 0.40, sill_w)
 		s_col.shape = s_shape
 		sill.add_child(s_col)
