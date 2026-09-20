@@ -2409,6 +2409,7 @@ func _harbor_deck_mat() -> StandardMaterial3D:
 		mat.uv1_triplanar = true
 	mat.roughness = 0.92
 	mat.metallic = 0.0
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	return mat
 
 
@@ -2421,6 +2422,7 @@ func _harbor_side_mat() -> StandardMaterial3D:
 		mat.uv1_scale = Vector3(0.18, 0.18, 0.18)
 		mat.uv1_triplanar = true
 	mat.roughness = 0.96
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	return mat
 
 
@@ -2441,6 +2443,7 @@ func _harbor_steel_mat() -> StandardMaterial3D:
 	mat.albedo_color = Color(0.28, 0.30, 0.32)
 	mat.metallic = 0.65
 	mat.roughness = 0.40
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	return mat
 
 
@@ -2459,11 +2462,19 @@ func _harbor_warehouse_mat() -> StandardMaterial3D:
 	return mat
 
 
+func _harbor_barrier_mat() -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.88, 0.72, 0.16) # Industrial safety amber-yellow
+	mat.metallic = 0.60
+	mat.roughness = 0.35
+	return mat
+
+
 func _harbor_add_box(parent: Node, box_name: String, center: Vector3, size: Vector3, yaw: float, mat: Material, group: String = "track_surface") -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.name = box_name
 	if group != "":
-		body.add_to_group(group)
+		body.add_to_group(group, true)
 	parent.add_child(body)
 	body.position = center
 	body.rotation.y = yaw
@@ -2482,6 +2493,19 @@ func _harbor_add_box(parent: Node, box_name: String, center: Vector3, size: Vect
 	return body
 
 
+func _harbor_add_visual_box(parent: Node, box_name: String, center: Vector3, size: Vector3, yaw: float, mat: Material) -> MeshInstance3D:
+	var mesh_i := MeshInstance3D.new()
+	mesh_i.name = box_name
+	parent.add_child(mesh_i)
+	mesh_i.position = center
+	mesh_i.rotation.y = yaw
+	var box := BoxMesh.new()
+	box.size = size
+	mesh_i.mesh = box
+	mesh_i.material_override = mat
+	return mesh_i
+
+
 func _harbor_add_sloped_box(parent: Node, box_name: String, p0: Vector3, p1: Vector3, width: float, thickness: float, mat: Material, group: String = "ramps") -> StaticBody3D:
 	var mid: Vector3 = (p0 + p1) * 0.5
 	var delta: Vector3 = p1 - p0
@@ -2489,7 +2513,7 @@ func _harbor_add_sloped_box(parent: Node, box_name: String, p0: Vector3, p1: Vec
 	var body := StaticBody3D.new()
 	body.name = box_name
 	if group != "":
-		body.add_to_group(group)
+		body.add_to_group(group, true)
 	parent.add_child(body)
 	body.transform = Transform3D(Basis.looking_at(delta / length, Vector3.UP), mid)
 	var mesh_i := MeshInstance3D.new()
@@ -2507,6 +2531,35 @@ func _harbor_add_sloped_box(parent: Node, box_name: String, p0: Vector3, p1: Vec
 	return body
 
 
+
+
+
+func _harbor_add_railing(parent: Node, rail_name: String, p0: Vector3, p1: Vector3, mat: Material, height: float = 1.3, thickness: float = 0.4) -> StaticBody3D:
+	var mid: Vector3 = (p0 + p1) * 0.5
+	var delta: Vector3 = p1 - p0
+	var length: float = maxf(delta.length(), 0.2)
+	var body := StaticBody3D.new()
+	body.name = rail_name
+	parent.add_child(body)
+	body.position = Vector3(mid.x, mid.y + height * 0.5, mid.z)
+	body.rotation.y = atan2(delta.x, delta.z) if (delta.x != 0.0 or delta.z != 0.0) else 0.0
+	
+	var mesh_i := MeshInstance3D.new()
+	mesh_i.name = "Mesh"
+	var box := BoxMesh.new()
+	box.size = Vector3(thickness, height, length)
+	mesh_i.mesh = box
+	mesh_i.material_override = mat
+	body.add_child(mesh_i)
+	
+	var col := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(thickness, height, length)
+	col.shape = shape
+	body.add_child(col)
+	return body
+
+
 func _harbor_add_piles(parent: Node, x0: float, x1: float, z0: float, z1: float, along_x: bool) -> void:
 	var pile_mat := StandardMaterial3D.new()
 	pile_mat.albedo_color = Color(0.22, 0.18, 0.14)
@@ -2518,6 +2571,10 @@ func _harbor_add_piles(parent: Node, x0: float, x1: float, z0: float, z1: float,
 		var xb := maxf(x0, x1) - 2.0
 		var x: float = xa
 		var idx := 0
+		var pile_top_y: float = HARBOR_DECK_Y - 0.4
+		var pile_bot_y: float = HARBOR_SEABED_Y - 0.5
+		var pile_height: float = pile_top_y - pile_bot_y
+		var pile_center_y: float = (pile_top_y + pile_bot_y) * 0.5
 		while x <= xb:
 			for z_e in z_edges:
 				var cyl := MeshInstance3D.new()
@@ -2526,10 +2583,10 @@ func _harbor_add_piles(parent: Node, x0: float, x1: float, z0: float, z1: float,
 				var mesh := CylinderMesh.new()
 				mesh.top_radius = 0.28
 				mesh.bottom_radius = 0.32
-				mesh.height = HARBOR_DECK_Y - HARBOR_SEABED_Y + 0.4
+				mesh.height = pile_height
 				cyl.mesh = mesh
 				cyl.material_override = pile_mat
-				cyl.position = Vector3(x, (HARBOR_DECK_Y + HARBOR_SEABED_Y) * 0.5, z_e)
+				cyl.position = Vector3(x, pile_center_y, z_e)
 				parent.add_child(cyl)
 			x += step
 	else:
@@ -2538,6 +2595,10 @@ func _harbor_add_piles(parent: Node, x0: float, x1: float, z0: float, z1: float,
 		var zb := maxf(z0, z1) - 2.0
 		var z: float = za
 		var idx2 := 0
+		var pile_top_y: float = HARBOR_DECK_Y - 0.4
+		var pile_bot_y: float = HARBOR_SEABED_Y - 0.5
+		var pile_height: float = pile_top_y - pile_bot_y
+		var pile_center_y: float = (pile_top_y + pile_bot_y) * 0.5
 		while z <= zb:
 			for x_e in x_edges:
 				var cyl := MeshInstance3D.new()
@@ -2546,10 +2607,10 @@ func _harbor_add_piles(parent: Node, x0: float, x1: float, z0: float, z1: float,
 				var mesh := CylinderMesh.new()
 				mesh.top_radius = 0.28
 				mesh.bottom_radius = 0.32
-				mesh.height = HARBOR_DECK_Y - HARBOR_SEABED_Y + 0.4
+				mesh.height = pile_height
 				cyl.mesh = mesh
 				cyl.material_override = pile_mat
-				cyl.position = Vector3(x_e, (HARBOR_DECK_Y + HARBOR_SEABED_Y) * 0.5, z)
+				cyl.position = Vector3(x_e, pile_center_y, z)
 				parent.add_child(cyl)
 			z += step
 
@@ -2564,9 +2625,9 @@ func _harbor_add_axis_pier(parent: Node, pier_name: String, x0: float, z0: float
 	var thick: float = HARBOR_PIER_THICK
 	var size := Vector3(length, thick, HARBOR_PIER_W)
 	_harbor_add_box(parent, pier_name, Vector3(cx, deck_y - thick * 0.5, cz), size, yaw, deck_mat, "track_surface")
-	# Slightly inset skirt so the deck lip stays visible
+	# Slightly inset skirt so the deck lip stays visible (visual only — no collision)
 	var skirt := Vector3(length - 0.4, thick + 0.15, HARBOR_PIER_W - 0.6)
-	_harbor_add_box(parent, pier_name + "_Hull", Vector3(cx, deck_y - thick * 0.5 - 0.08, cz), skirt, yaw, side_mat, "")
+	_harbor_add_visual_box(parent, pier_name + "_Hull", Vector3(cx, deck_y - thick * 0.5 - 0.08, cz), skirt, yaw, side_mat)
 	var half_w: float = HARBOR_PIER_W * 0.5
 	if along_x:
 		_harbor_add_piles(parent, x0, x1, cz - half_w, cz + half_w, true)
@@ -2574,17 +2635,18 @@ func _harbor_add_axis_pier(parent: Node, pier_name: String, x0: float, z0: float
 		_harbor_add_piles(parent, cx - half_w, cx + half_w, z0, z1, false)
 
 
-func _harbor_add_corner_junction(parent: Node, junc_name: String, center: Vector2, width: float, deck_mat: Material, side_mat: Material) -> void:
+func _harbor_add_corner_junction(parent: Node, junc_name: String, center: Vector2, width: float, deck_mat: Material, side_mat: Material, create_deck: bool = true) -> void:
 	var cx: float = center.x
 	var cz: float = center.y
 	var deck_y: float = HARBOR_DECK_Y
 	var thick: float = HARBOR_PIER_THICK
 	var size := Vector3(width, thick, width)
-	# Solid deck block filling the entire corner intersection
-	_harbor_add_box(parent, junc_name, Vector3(cx, deck_y - thick * 0.5, cz), size, 0.0, deck_mat, "track_surface")
-	# Hull skirt
+	# Solid deck block filling the entire corner intersection (unless continuous trimesh deck provides it)
+	if create_deck:
+		_harbor_add_box(parent, junc_name, Vector3(cx, deck_y - thick * 0.5, cz), size, 0.0, deck_mat, "track_surface")
+	# Hull skirt (visual only — no collision beneath road surface)
 	var skirt := Vector3(width - 0.4, thick + 0.15, width - 0.4)
-	_harbor_add_box(parent, junc_name + "_Hull", Vector3(cx, deck_y - thick * 0.5 - 0.08, cz), skirt, 0.0, side_mat, "")
+	_harbor_add_visual_box(parent, junc_name + "_Hull", Vector3(cx, deck_y - thick * 0.5 - 0.08, cz), skirt, 0.0, side_mat)
 	
 	# 4 Corner support piles
 	var h_w: float = width * 0.5 - 1.8
@@ -2595,6 +2657,10 @@ func _harbor_add_corner_junction(parent: Node, junc_name: String, center: Vector
 		Vector2(-h_w, -h_w), Vector2(h_w, -h_w),
 		Vector2(-h_w, h_w), Vector2(h_w, h_w)
 	]
+	var pile_top_y: float = HARBOR_DECK_Y - 0.4
+	var pile_bot_y: float = HARBOR_SEABED_Y - 0.5
+	var pile_height: float = pile_top_y - pile_bot_y
+	var pile_center_y: float = (pile_top_y + pile_bot_y) * 0.5
 	for idx in range(corner_offsets.size()):
 		var off = corner_offsets[idx]
 		var cyl := MeshInstance3D.new()
@@ -2602,10 +2668,10 @@ func _harbor_add_corner_junction(parent: Node, junc_name: String, center: Vector
 		var mesh := CylinderMesh.new()
 		mesh.top_radius = 0.32
 		mesh.bottom_radius = 0.36
-		mesh.height = HARBOR_DECK_Y - HARBOR_SEABED_Y + 0.4
+		mesh.height = pile_height
 		cyl.mesh = mesh
 		cyl.material_override = pile_mat
-		cyl.position = Vector3(cx + off.x, (HARBOR_DECK_Y + HARBOR_SEABED_Y) * 0.5, cz + off.y)
+		cyl.position = Vector3(cx + off.x, pile_center_y, cz + off.y)
 		parent.add_child(cyl)
 
 
@@ -2619,61 +2685,60 @@ func _harbor_add_dock_platform(parent: Node, plat_name: String, x_min: float, x_
 	
 	# Solid platform deck under buildings and containers
 	_harbor_add_box(parent, plat_name, Vector3(cx, deck_y - thick * 0.5, cz), Vector3(len_x, thick, len_z), 0.0, deck_mat, "track_surface")
-	# Platform skirt
-	_harbor_add_box(parent, plat_name + "_Hull", Vector3(cx, deck_y - thick * 0.5 - 0.08, cz), Vector3(len_x - 0.4, thick + 0.15, len_z - 0.4), 0.0, side_mat, "")
+	# Platform skirt (visual only)
+	_harbor_add_visual_box(parent, plat_name + "_Hull", Vector3(cx, deck_y - thick * 0.5 - 0.08, cz), Vector3(len_x - 0.4, thick + 0.15, len_z - 0.4), 0.0, side_mat)
 	
-	# Piles in regular grid along perimeter
+	# Platform support piles on a grid
 	var pile_mat := StandardMaterial3D.new()
 	pile_mat.albedo_color = Color(0.22, 0.18, 0.14)
 	pile_mat.roughness = 0.95
-	var step := 12.0
-	var p_idx := 0
-	for z_edge in [z_min + 1.5, z_max - 1.5]:
-		var x: float = x_min + 2.0
-		while x <= x_max - 2.0:
+	var step_x := 12.0
+	var step_z := 12.0
+	var x: float = x_min + 3.0
+	var idx := 0
+	var plat_pile_top_y: float = HARBOR_DECK_Y - 0.4
+	var plat_pile_bot_y: float = HARBOR_SEABED_Y - 0.5
+	var plat_pile_height: float = plat_pile_top_y - plat_pile_bot_y
+	var plat_pile_center_y: float = (plat_pile_top_y + plat_pile_bot_y) * 0.5
+	while x <= x_max - 3.0:
+		var z: float = z_min + 3.0
+		while z <= z_max - 3.0:
 			var cyl := MeshInstance3D.new()
-			cyl.name = plat_name + "_PileX_%d_%d" % [int(x), p_idx]
-			p_idx += 1
+			cyl.name = plat_name + "_Pile_%d" % idx
+			idx += 1
 			var mesh := CylinderMesh.new()
-			mesh.top_radius = 0.28
-			mesh.bottom_radius = 0.32
-			mesh.height = HARBOR_DECK_Y - HARBOR_SEABED_Y + 0.4
+			mesh.top_radius = 0.3
+			mesh.bottom_radius = 0.35
+			mesh.height = plat_pile_height
 			cyl.mesh = mesh
 			cyl.material_override = pile_mat
-			cyl.position = Vector3(x, (HARBOR_DECK_Y + HARBOR_SEABED_Y) * 0.5, z_edge)
+			cyl.position = Vector3(x, plat_pile_center_y, z)
 			parent.add_child(cyl)
-			x += step
-	for x_edge in [x_min + 1.5, x_max - 1.5]:
-		var z: float = z_min + 2.0
-		while z <= z_max - 2.0:
-			var cyl := MeshInstance3D.new()
-			cyl.name = plat_name + "_PileZ_%d_%d" % [int(z), p_idx]
-			p_idx += 1
-			var mesh := CylinderMesh.new()
-			mesh.top_radius = 0.28
-			mesh.bottom_radius = 0.32
-			mesh.height = HARBOR_DECK_Y - HARBOR_SEABED_Y + 0.4
-			cyl.mesh = mesh
-			cyl.material_override = pile_mat
-			cyl.position = Vector3(x_edge, (HARBOR_DECK_Y + HARBOR_SEABED_Y) * 0.5, z)
-			parent.add_child(cyl)
-			z += step
+			z += step_z
+		x += step_x
 
 
 func _harbor_add_container(parent: Node, c_name: String, center: Vector3, size: Vector3, yaw: float, color: Color) -> void:
-	var mat := _harbor_container_mat(color)
-	var body := _harbor_add_box(parent, c_name, center, size, yaw, mat, "props")
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = color
+	mat.metallic = 0.4
+	mat.roughness = 0.5
+	var body := _harbor_add_box(parent, c_name, center, size, yaw, mat, "")
 	
-	# Dark steel corner posts for authentic shipping container silhouette
-	var frame_mat := _harbor_steel_mat()
-	var post_w := 0.24
-	var h_x := size.x * 0.5 - post_w * 0.5
-	var h_z := size.z * 0.5 - post_w * 0.5
-	var corners := [
-		Vector3(-h_x, 0, -h_z), Vector3(h_x, 0, -h_z),
-		Vector3(-h_x, 0, h_z), Vector3(h_x, 0, h_z)
+	# Corner posts detail
+	var frame_mat := StandardMaterial3D.new()
+	frame_mat.albedo_color = color.darkened(0.35)
+	frame_mat.metallic = 0.7
+	frame_mat.roughness = 0.4
+	var post_w := 0.22
+	var hx: float = size.x * 0.5 - post_w * 0.5
+	var hz: float = size.z * 0.5 - post_w * 0.5
+	var corner_pos := [
+		Vector3(-hx, 0.0, -hz), Vector3(hx, 0.0, -hz),
+		Vector3(-hx, 0.0, hz), Vector3(hx, 0.0, hz)
 	]
-	for c_pos in corners:
+	for idx in range(corner_pos.size()):
+		var c_pos = corner_pos[idx]
 		var post := MeshInstance3D.new()
 		var p_mesh := BoxMesh.new()
 		p_mesh.size = Vector3(post_w, size.y + 0.04, post_w)
@@ -2689,86 +2754,280 @@ func _harbor_add_elevated_viaduct(parent: Node, deck_mat: Material, side_mat: Ma
 	parent.add_child(root)
 	
 	var base_y: float = HARBOR_DECK_Y
-	var peak_y: float = 10.55
+	var peak_y: float = 7.55
 	var w: float = HARBOR_PIER_W
-	var thick: float = 1.2
-	
-	# 1. Incline Ramp: z from -25.0 to 10.0 (35m length, 7m rise)
-	_harbor_add_sloped_box(root, "Viaduct_InclineRamp",
-		Vector3(185.0, base_y - 0.4, -25.0),
-		Vector3(185.0, peak_y - 0.4, 10.0),
-		w, thick, deck_mat, "track_surface")
-	# Incline Side Skirts / Guardrails
-	_harbor_add_sloped_box(root, "Viaduct_Incline_RailL",
-		Vector3(177.3, base_y + 0.4, -25.0),
-		Vector3(177.3, peak_y + 0.4, 10.0),
-		0.4, 1.4, steel_mat, "")
-	_harbor_add_sloped_box(root, "Viaduct_Incline_RailR",
-		Vector3(192.7, base_y + 0.4, -25.0),
-		Vector3(192.7, peak_y + 0.4, 10.0),
-		0.4, 1.4, steel_mat, "")
+	var thick: float = 1.0
+	var hull_thick: float = 0.8
+	var x_center: float = 185.0
+	var hw: float = w * 0.5
+	var rail_w: float = 0.4
+	var rail_h: float = 1.4
 
-	# 2. Level High Skyway Span: z from 10.0 to 65.0 (55m length)
-	_harbor_add_box(root, "Viaduct_HighDeck",
-		Vector3(185.0, peak_y - thick * 0.5, 37.5),
-		Vector3(w, thick, 55.0), 0.0, deck_mat, "track_surface")
-	_harbor_add_box(root, "Viaduct_HighHull",
-		Vector3(185.0, peak_y - thick * 0.5 - 0.1, 37.5),
-		Vector3(w - 0.4, thick + 0.2, 54.6), 0.0, side_mat, "")
+	# Continuous East Pier span across all junctions and viaduct (Z from -103.0 to 133.0 = 236m)
+	var z_start: float = -103.0
+	var z_inc_s: float = -30.0
+	var z_inc_e: float = 10.0
+	var z_desc_s: float = 50.0
+	var z_desc_e: float = 90.0
+	var z_end: float = 133.0
+	var steps: int = 118 # exactly 2.0m per step across 236m
 
-	# High Skyway Guardrails
-	_harbor_add_box(root, "Viaduct_HighRail_L",
-		Vector3(177.3, peak_y + 0.7, 37.5),
-		Vector3(0.4, 1.4, 55.0), 0.0, steel_mat, "")
-	_harbor_add_box(root, "Viaduct_HighRail_R",
-		Vector3(192.7, peak_y + 0.7, 37.5),
-		Vector3(0.4, 1.4, 55.0), 0.0, steel_mat, "")
+	var get_y := func(z: float) -> float:
+		if z <= z_inc_s:
+			return base_y
+		elif z <= z_inc_e:
+			var r := (z - z_inc_s) / (z_inc_e - z_inc_s)
+			return lerpf(base_y, peak_y, 0.5 - 0.5 * cos(PI * r))
+		elif z <= z_desc_s:
+			return peak_y
+		elif z <= z_desc_e:
+			var r := (z - z_desc_s) / (z_desc_e - z_desc_s)
+			return lerpf(peak_y, base_y, 0.5 - 0.5 * cos(PI * r))
+		else:
+			return base_y
 
-	# Overhead Steel Arch Truss Frames on Skyway
-	for z_truss in [18.0, 32.0, 46.0, 58.0]:
+	# 1. Seamless Continuous Road Deck (Single Trimesh: zero seams, zero steps, zero gaps!)
+	# We construct separate vertices for top, bottom, left, right, and end caps so normals
+	# remain sharp and orthogonal, with correct outward counter-clockwise winding.
+	var st_deck := SurfaceTool.new()
+	st_deck.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	# 1a. Top Driving Surface (Normals point +Y UP)
+	for i in range(steps + 1):
+		var u := float(i) / float(steps)
+		var z := lerpf(z_start, z_end, u)
+		var y: float = get_y.call(z)
+		st_deck.set_uv(Vector2(0.0, z * 0.2)); st_deck.add_vertex(Vector3(x_center - hw, y, z))
+		st_deck.set_uv(Vector2(1.0, z * 0.2)); st_deck.add_vertex(Vector3(x_center + hw, y, z))
+	for i in range(steps):
+		var b := i * 2
+		var n := (i + 1) * 2
+		st_deck.add_index(b + 0); st_deck.add_index(b + 1); st_deck.add_index(n + 0)
+		st_deck.add_index(b + 1); st_deck.add_index(n + 1); st_deck.add_index(n + 0)
+
+	# 1b. Bottom Under-Surface (Normals point -Y DOWN)
+	var base_idx := (steps + 1) * 2
+	for i in range(steps + 1):
+		var u := float(i) / float(steps)
+		var z := lerpf(z_start, z_end, u)
+		var y: float = get_y.call(z)
+		st_deck.set_uv(Vector2(0.0, z * 0.2)); st_deck.add_vertex(Vector3(x_center - hw, y - thick, z))
+		st_deck.set_uv(Vector2(1.0, z * 0.2)); st_deck.add_vertex(Vector3(x_center + hw, y - thick, z))
+	for i in range(steps):
+		var b := base_idx + i * 2
+		var n := base_idx + (i + 1) * 2
+		st_deck.add_index(b + 0); st_deck.add_index(n + 0); st_deck.add_index(b + 1)
+		st_deck.add_index(b + 1); st_deck.add_index(n + 0); st_deck.add_index(n + 1)
+
+	# 1c. Left Side Outer Flange (Normals point -X LEFT)
+	var left_idx := base_idx + (steps + 1) * 2
+	for i in range(steps + 1):
+		var u := float(i) / float(steps)
+		var z := lerpf(z_start, z_end, u)
+		var y: float = get_y.call(z)
+		st_deck.set_uv(Vector2(0.0, z * 0.2)); st_deck.add_vertex(Vector3(x_center - hw, y, z))
+		st_deck.set_uv(Vector2(1.0, z * 0.2)); st_deck.add_vertex(Vector3(x_center - hw, y - thick, z))
+	for i in range(steps):
+		var b := left_idx + i * 2
+		var n := left_idx + (i + 1) * 2
+		st_deck.add_index(b + 0); st_deck.add_index(n + 0); st_deck.add_index(b + 1)
+		st_deck.add_index(b + 1); st_deck.add_index(n + 0); st_deck.add_index(n + 1)
+
+	# 1d. Right Side Outer Flange (Normals point +X RIGHT)
+	var right_idx := left_idx + (steps + 1) * 2
+	for i in range(steps + 1):
+		var u := float(i) / float(steps)
+		var z := lerpf(z_start, z_end, u)
+		var y: float = get_y.call(z)
+		st_deck.set_uv(Vector2(0.0, z * 0.2)); st_deck.add_vertex(Vector3(x_center + hw, y, z))
+		st_deck.set_uv(Vector2(1.0, z * 0.2)); st_deck.add_vertex(Vector3(x_center + hw, y - thick, z))
+	for i in range(steps):
+		var b := right_idx + i * 2
+		var n := right_idx + (i + 1) * 2
+		st_deck.add_index(b + 0); st_deck.add_index(b + 1); st_deck.add_index(n + 0)
+		st_deck.add_index(b + 1); st_deck.add_index(n + 1); st_deck.add_index(n + 0)
+
+	# 1e. End Caps (Z start and Z end)
+	var cap_idx := right_idx + (steps + 1) * 2
+	var y_s: float = get_y.call(z_start)
+	st_deck.set_uv(Vector2(0.0, 0.0)); st_deck.add_vertex(Vector3(x_center - hw, y_s, z_start))
+	st_deck.set_uv(Vector2(1.0, 0.0)); st_deck.add_vertex(Vector3(x_center + hw, y_s, z_start))
+	st_deck.set_uv(Vector2(0.0, 1.0)); st_deck.add_vertex(Vector3(x_center - hw, y_s - thick, z_start))
+	st_deck.set_uv(Vector2(1.0, 1.0)); st_deck.add_vertex(Vector3(x_center + hw, y_s - thick, z_start))
+	st_deck.add_index(cap_idx + 0); st_deck.add_index(cap_idx + 2); st_deck.add_index(cap_idx + 1)
+	st_deck.add_index(cap_idx + 1); st_deck.add_index(cap_idx + 2); st_deck.add_index(cap_idx + 3)
+
+	var y_e: float = get_y.call(z_end)
+	st_deck.set_uv(Vector2(0.0, 0.0)); st_deck.add_vertex(Vector3(x_center - hw, y_e, z_end))
+	st_deck.set_uv(Vector2(1.0, 0.0)); st_deck.add_vertex(Vector3(x_center + hw, y_e, z_end))
+	st_deck.set_uv(Vector2(0.0, 1.0)); st_deck.add_vertex(Vector3(x_center - hw, y_e - thick, z_end))
+	st_deck.set_uv(Vector2(1.0, 1.0)); st_deck.add_vertex(Vector3(x_center + hw, y_e - thick, z_end))
+	st_deck.add_index(cap_idx + 4); st_deck.add_index(cap_idx + 5); st_deck.add_index(cap_idx + 6)
+	st_deck.add_index(cap_idx + 5); st_deck.add_index(cap_idx + 7); st_deck.add_index(cap_idx + 6)
+
+	st_deck.generate_normals()
+	var deck_mesh := st_deck.commit()
+	var deck_body := StaticBody3D.new()
+	deck_body.name = "Viaduct_ContinuousDeck"
+	deck_body.add_to_group("track_surface", true)
+	root.add_child(deck_body)
+
+	var deck_mi := MeshInstance3D.new()
+	deck_mi.name = "Mesh"
+	deck_mi.mesh = deck_mesh
+	deck_mi.material_override = deck_mat
+	deck_body.add_child(deck_mi)
+
+	var deck_col := CollisionShape3D.new()
+	deck_col.name = "CollisionShape3D"
+	var deck_trimesh = deck_mesh.create_trimesh_shape()
+	if deck_trimesh is ConcavePolygonShape3D:
+		(deck_trimesh as ConcavePolygonShape3D).backface_collision = true
+	deck_col.shape = deck_trimesh
+	deck_body.add_child(deck_col)
+
+	# 2. Continuous Left Guardrail (along inclined/skyway/descent span)
+	var rail_steps: int = 60
+	var st_rail_l := SurfaceTool.new()
+	st_rail_l.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var xl0 := x_center - hw
+	var xl1 := x_center - hw + rail_w
+	for i in range(rail_steps + 1):
+		var u := float(i) / float(rail_steps)
+		var z := lerpf(z_inc_s, z_desc_e, u)
+		var y: float = get_y.call(z)
+		st_rail_l.add_vertex(Vector3(xl0, y + rail_h, z))
+		st_rail_l.add_vertex(Vector3(xl1, y + rail_h, z))
+		st_rail_l.add_vertex(Vector3(xl0, y, z))
+		st_rail_l.add_vertex(Vector3(xl1, y, z))
+	for i in range(rail_steps):
+		var b := i * 4
+		var n := (i + 1) * 4
+		st_rail_l.add_index(b + 0); st_rail_l.add_index(n + 0); st_rail_l.add_index(b + 1)
+		st_rail_l.add_index(b + 1); st_rail_l.add_index(n + 0); st_rail_l.add_index(n + 1)
+		st_rail_l.add_index(b + 1); st_rail_l.add_index(n + 1); st_rail_l.add_index(b + 3)
+		st_rail_l.add_index(b + 3); st_rail_l.add_index(n + 1); st_rail_l.add_index(n + 3)
+		st_rail_l.add_index(b + 2); st_rail_l.add_index(n + 2); st_rail_l.add_index(b + 0)
+		st_rail_l.add_index(b + 0); st_rail_l.add_index(n + 2); st_rail_l.add_index(n + 0)
+	st_rail_l.generate_normals()
+	var rail_l_mesh := st_rail_l.commit()
+	var rail_l_body := StaticBody3D.new()
+	rail_l_body.name = "Viaduct_Rail_L"
+	root.add_child(rail_l_body)
+	var rail_l_mi := MeshInstance3D.new()
+	rail_l_mi.name = "Mesh"
+	rail_l_mi.mesh = rail_l_mesh
+	rail_l_mi.material_override = steel_mat
+	rail_l_body.add_child(rail_l_mi)
+	var rail_l_col := CollisionShape3D.new()
+	rail_l_col.name = "CollisionShape3D"
+	rail_l_col.shape = rail_l_mesh.create_trimesh_shape()
+	rail_l_body.add_child(rail_l_col)
+
+	# 3. Continuous Right Guardrail (along inclined/skyway/descent span)
+	var st_rail_r := SurfaceTool.new()
+	st_rail_r.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var xr0 := x_center + hw - rail_w
+	var xr1 := x_center + hw
+	for i in range(rail_steps + 1):
+		var u := float(i) / float(rail_steps)
+		var z := lerpf(z_inc_s, z_desc_e, u)
+		var y: float = get_y.call(z)
+		st_rail_r.add_vertex(Vector3(xr0, y + rail_h, z))
+		st_rail_r.add_vertex(Vector3(xr1, y + rail_h, z))
+		st_rail_r.add_vertex(Vector3(xr0, y, z))
+		st_rail_r.add_vertex(Vector3(xr1, y, z))
+	for i in range(rail_steps):
+		var b := i * 4
+		var n := (i + 1) * 4
+		st_rail_r.add_index(b + 0); st_rail_r.add_index(n + 0); st_rail_r.add_index(b + 1)
+		st_rail_r.add_index(b + 1); st_rail_r.add_index(n + 0); st_rail_r.add_index(n + 1)
+		st_rail_r.add_index(b + 2); st_rail_r.add_index(n + 2); st_rail_r.add_index(b + 0)
+		st_rail_r.add_index(b + 0); st_rail_r.add_index(n + 2); st_rail_r.add_index(n + 0)
+		st_rail_r.add_index(b + 1); st_rail_r.add_index(n + 1); st_rail_r.add_index(b + 3)
+		st_rail_r.add_index(b + 3); st_rail_r.add_index(n + 1); st_rail_r.add_index(n + 3)
+	st_rail_r.generate_normals()
+	var rail_r_mesh := st_rail_r.commit()
+	var rail_r_body := StaticBody3D.new()
+	rail_r_body.name = "Viaduct_Rail_R"
+	root.add_child(rail_r_body)
+	var rail_r_mi := MeshInstance3D.new()
+	rail_r_mi.name = "Mesh"
+	rail_r_mi.mesh = rail_r_mesh
+	rail_r_mi.material_override = steel_mat
+	rail_r_body.add_child(rail_r_mi)
+	var rail_r_col := CollisionShape3D.new()
+	rail_r_col.name = "CollisionShape3D"
+	rail_r_col.shape = rail_r_mesh.create_trimesh_shape()
+	rail_r_body.add_child(rail_r_col)
+
+	# 4. Continuous Hull Skirt Strictly Underneath Elevated Deck
+	var st_hull := SurfaceTool.new()
+	st_hull.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var hw_skirt := hw - 0.3
+	for i in range(rail_steps + 1):
+		var u := float(i) / float(rail_steps)
+		var z := lerpf(z_inc_s, z_desc_e, u)
+		var y: float = get_y.call(z)
+		st_hull.add_vertex(Vector3(x_center - hw_skirt, y - thick, z))
+		st_hull.add_vertex(Vector3(x_center + hw_skirt, y - thick, z))
+		st_hull.add_vertex(Vector3(x_center - hw_skirt, y - thick - hull_thick, z))
+		st_hull.add_vertex(Vector3(x_center + hw_skirt, y - thick - hull_thick, z))
+	for i in range(rail_steps):
+		var b := i * 4
+		var n := (i + 1) * 4
+		st_hull.add_index(b + 3); st_hull.add_index(n + 3); st_hull.add_index(b + 2)
+		st_hull.add_index(b + 2); st_hull.add_index(n + 3); st_hull.add_index(n + 2)
+		st_hull.add_index(b + 2); st_hull.add_index(n + 2); st_hull.add_index(b + 0)
+		st_hull.add_index(b + 0); st_hull.add_index(n + 2); st_hull.add_index(n + 0)
+		st_hull.add_index(b + 1); st_hull.add_index(n + 1); st_hull.add_index(b + 3)
+		st_hull.add_index(b + 3); st_hull.add_index(n + 1); st_hull.add_index(n + 3)
+	st_hull.generate_normals()
+	var hull_mesh := st_hull.commit()
+	var hull_mi := MeshInstance3D.new()
+	hull_mi.name = "Viaduct_Hull"
+	hull_mi.mesh = hull_mesh
+	hull_mi.material_override = side_mat
+	root.add_child(hull_mi)
+
+	# 5. Flat Approach Pier Hulls & Seabed Piles (visual only — no collision beneath road)
+	var n_len: float = z_inc_s - z_start
+	_harbor_add_visual_box(root, "Viaduct_ApproachN_Hull",
+		Vector3(x_center, base_y - thick * 0.5 - 0.08, (z_start + z_inc_s) * 0.5),
+		Vector3(w - 0.4, thick + 0.15, n_len - 0.4), 0.0, side_mat)
+	_harbor_add_piles(root, x_center - hw, x_center + hw, z_start, z_inc_s, false)
+
+	var s_len: float = z_end - z_desc_e
+	_harbor_add_visual_box(root, "Viaduct_ApproachS_Hull",
+		Vector3(x_center, base_y - thick * 0.5 - 0.08, (z_desc_e + z_end) * 0.5),
+		Vector3(w - 0.4, thick + 0.15, s_len - 0.4), 0.0, side_mat)
+	_harbor_add_piles(root, x_center - hw, x_center + hw, z_desc_e, z_end, false)
+
+	# 6. Overhead Steel Arch Truss Frames on Skyway
+	for z_truss in [16.0, 26.0, 36.0, 46.0]:
 		_harbor_add_box(root, "Viaduct_Truss_L_%d" % int(z_truss),
-			Vector3(177.3, peak_y + 3.0, z_truss), Vector3(0.6, 6.0, 0.6), 0.0, steel_mat, "")
+			Vector3(177.2, peak_y + 2.5, z_truss), Vector3(0.6, 5.0, 0.6), 0.0, steel_mat, "")
 		_harbor_add_box(root, "Viaduct_Truss_R_%d" % int(z_truss),
-			Vector3(192.7, peak_y + 3.0, z_truss), Vector3(0.6, 6.0, 0.6), 0.0, steel_mat, "")
+			Vector3(192.8, peak_y + 2.5, z_truss), Vector3(0.6, 5.0, 0.6), 0.0, steel_mat, "")
 		_harbor_add_box(root, "Viaduct_Truss_Top_%d" % int(z_truss),
-			Vector3(185.0, peak_y + 6.0, z_truss), Vector3(16.0, 0.6, 0.6), 0.0, steel_mat, "")
+			Vector3(185.0, peak_y + 5.0, z_truss), Vector3(16.2, 0.6, 0.6), 0.0, steel_mat, "")
 
-	# 3. Descent Ramp: z from 65.0 to 95.0 (30m length, 7m drop)
-	_harbor_add_sloped_box(root, "Viaduct_DescentRamp",
-		Vector3(185.0, peak_y - 0.4, 65.0),
-		Vector3(185.0, base_y - 0.4, 95.0),
-		w, thick, deck_mat, "track_surface")
-	_harbor_add_sloped_box(root, "Viaduct_Descent_RailL",
-		Vector3(177.3, peak_y + 0.4, 65.0),
-		Vector3(177.3, base_y + 0.4, 95.0),
-		0.4, 1.4, steel_mat, "")
-	_harbor_add_sloped_box(root, "Viaduct_Descent_RailR",
-		Vector3(192.7, peak_y + 0.4, 65.0),
-		Vector3(192.7, base_y + 0.4, 95.0),
-		0.4, 1.4, steel_mat, "")
+	# 7. Viaduct Support Pylons down to seabed (strictly under High Skyway)
+	var crossbeam_top: float = peak_y - thick - hull_thick
+	var crossbeam_h: float = 1.0
+	var crossbeam_mid_y: float = crossbeam_top - crossbeam_h * 0.5
+	var leg_top: float = crossbeam_top - crossbeam_h
+	var leg_bot: float = HARBOR_SEABED_Y - 0.5
+	var leg_height: float = leg_top - leg_bot
+	var leg_mid_y: float = (leg_top + leg_bot) * 0.5
 
-	# Massive Concrete/Steel Viaduct Support Pylons down to seabed
-	for z_pylon in [-8.0, 10.0, 24.0, 38.0, 52.0, 65.0, 78.0]:
-		var cur_deck_y = peak_y
-		if z_pylon < 10.0:
-			var t = (z_pylon - (-25.0)) / 35.0
-			cur_deck_y = lerpf(base_y, peak_y, clampf(t, 0.0, 1.0))
-		elif z_pylon > 65.0:
-			var t = (z_pylon - 65.0) / 30.0
-			cur_deck_y = lerpf(peak_y, base_y, clampf(t, 0.0, 1.0))
-			
-		var pylon_height = cur_deck_y - HARBOR_SEABED_Y
-		var pylon_mid_y = (cur_deck_y + HARBOR_SEABED_Y) * 0.5
-		
-		# Left leg
+	for z_pylon in [18.0, 30.0, 42.0]:
 		_harbor_add_box(root, "Viaduct_Pylon_L_%d" % int(z_pylon),
-			Vector3(178.5, pylon_mid_y, z_pylon), Vector3(1.6, pylon_height, 1.6), 0.0, side_mat, "")
-		# Right leg
+			Vector3(178.5, leg_mid_y, z_pylon), Vector3(1.6, leg_height, 1.6), 0.0, side_mat, "")
 		_harbor_add_box(root, "Viaduct_Pylon_R_%d" % int(z_pylon),
-			Vector3(191.5, pylon_mid_y, z_pylon), Vector3(1.6, pylon_height, 1.6), 0.0, side_mat, "")
-		# Cross beam
+			Vector3(191.5, leg_mid_y, z_pylon), Vector3(1.6, leg_height, 1.6), 0.0, side_mat, "")
 		_harbor_add_box(root, "Viaduct_Pylon_Cross_%d" % int(z_pylon),
-			Vector3(185.0, cur_deck_y - 1.2, z_pylon), Vector3(15.0, 1.4, 1.8), 0.0, side_mat, "")
+			Vector3(185.0, crossbeam_mid_y, z_pylon), Vector3(15.2, crossbeam_h, 1.8), 0.0, side_mat, "")
 
 
 func _add_harbor_piers() -> void:
@@ -2781,6 +3040,7 @@ func _add_harbor_piers() -> void:
 	var wood_mat := _harbor_wood_mat()
 	var steel_mat := _harbor_steel_mat()
 	var warehouse_mat := _harbor_warehouse_mat()
+	var barrier_mat := _harbor_barrier_mat()
 
 	# Container colors
 	var col_blue := Color(0.12, 0.28, 0.58)
@@ -2790,8 +3050,8 @@ func _add_harbor_piers() -> void:
 	var col_yellow := Color(0.78, 0.65, 0.18)
 
 	# ── 1. Corner Junctions (Gapless 16x16 dock blocks at all turns) ──
-	_harbor_add_corner_junction(root, "Junction_NE", Vector2(185.0, -95.0), HARBOR_PIER_W, deck_mat, side_mat)
-	_harbor_add_corner_junction(root, "Junction_SE", Vector2(185.0, 125.0), HARBOR_PIER_W, deck_mat, side_mat)
+	_harbor_add_corner_junction(root, "Junction_NE", Vector2(185.0, -95.0), HARBOR_PIER_W, deck_mat, side_mat, false)
+	_harbor_add_corner_junction(root, "Junction_SE", Vector2(185.0, 125.0), HARBOR_PIER_W, deck_mat, side_mat, false)
 	_harbor_add_corner_junction(root, "Junction_BasinSouth", Vector2(80.0, 125.0), HARBOR_PIER_W, deck_mat, side_mat)
 	_harbor_add_corner_junction(root, "Junction_BasinNorth", Vector2(80.0, 35.0), HARBOR_PIER_W, deck_mat, side_mat)
 	_harbor_add_corner_junction(root, "Junction_WestBasinNorth", Vector2(-40.0, 35.0), HARBOR_PIER_W, deck_mat, side_mat)
@@ -2804,11 +3064,7 @@ func _add_harbor_piers() -> void:
 	_harbor_add_axis_pier(root, "HarborPier_Start", -167.0, -95.0, 56.0, -95.0, deck_mat, side_mat)
 	# NE pier after jump
 	_harbor_add_axis_pier(root, "HarborPier_NE", 110.0, -95.0, 177.0, -95.0, deck_mat, side_mat)
-	# East pier top approach to viaduct
-	_harbor_add_axis_pier(root, "HarborPier_EastApproachN", 185.0, -87.0, 185.0, -25.0, deck_mat, side_mat)
-	# East pier bottom approach from viaduct to SE corner
-	_harbor_add_axis_pier(root, "HarborPier_EastApproachS", 185.0, 95.0, 185.0, 117.0, deck_mat, side_mat)
-	# South pier East straight
+	# South pier East straight (meets Viaduct_ContinuousDeck at X=177.0)
 	_harbor_add_axis_pier(root, "HarborPier_SouthE", 177.0, 125.0, 88.0, 125.0, deck_mat, side_mat)
 	
 	# Central Basin Finger Pier (Northbound into basin)
@@ -2819,10 +3075,10 @@ func _add_harbor_piers() -> void:
 	# West Central Finger Pier (Southbound to rejoin south pier)
 	_harbor_add_axis_pier(root, "HarborPier_WestCentralFingerS", -40.0, 43.0, -40.0, 117.0, deck_mat, side_mat)
 
-	# South Pier West straight before jump
-	_harbor_add_axis_pier(root, "HarborPier_SouthPreJump", -48.0, 125.0, -70.0, 125.0, deck_mat, side_mat)
+	# South Pier West straight before jump (generous 37m runway after turn)
+	_harbor_add_axis_pier(root, "HarborPier_SouthPreJump", -48.0, 125.0, -85.0, 125.0, deck_mat, side_mat)
 	# South Pier West End after jump to SW corner
-	_harbor_add_axis_pier(root, "HarborPier_SouthPostJump", -124.0, 125.0, -167.0, 125.0, deck_mat, side_mat)
+	_harbor_add_axis_pier(root, "HarborPier_SouthPostJump", -127.0, 125.0, -167.0, 125.0, deck_mat, side_mat)
 
 	# West Pier South straight
 	_harbor_add_axis_pier(root, "HarborPier_WestS", -175.0, 117.0, -175.0, 16.0, deck_mat, side_mat)
@@ -2844,14 +3100,14 @@ func _add_harbor_piers() -> void:
 		Vector3(94.0, HARBOR_DECK_Y + 0.85 - ramp_half, -95.0),
 		Vector3(110.0, HARBOR_DECK_Y - ramp_half, -95.0),
 		HARBOR_PIER_W - 0.4, 0.65, wood_mat, "ramps")
-	# Westbound Jump (South Pier)
+	# Westbound Jump (South Pier - balanced 16m gap with 37m pre-jump runway)
 	_harbor_add_sloped_box(root, "HarborRamp_TakeoffW",
-		Vector3(-70.0, HARBOR_DECK_Y - ramp_half, 125.0),
-		Vector3(-84.0, HARBOR_DECK_Y + dy_up - ramp_half, 125.0),
+		Vector3(-85.0, HARBOR_DECK_Y - ramp_half, 125.0),
+		Vector3(-97.0, HARBOR_DECK_Y + 1.8 - ramp_half, 125.0),
 		HARBOR_PIER_W - 0.4, 0.65, wood_mat, "ramps")
 	_harbor_add_sloped_box(root, "HarborRamp_LandingW",
-		Vector3(-108.0, HARBOR_DECK_Y + 0.85 - ramp_half, 125.0),
-		Vector3(-124.0, HARBOR_DECK_Y - ramp_half, 125.0),
+		Vector3(-113.0, HARBOR_DECK_Y + 0.7 - ramp_half, 125.0),
+		Vector3(-127.0, HARBOR_DECK_Y - ramp_half, 125.0),
 		HARBOR_PIER_W - 0.4, 0.65, wood_mat, "ramps")
 
 	# ── 5. Steel Channel Bridges ──
@@ -2865,10 +3121,14 @@ func _add_harbor_piers() -> void:
 	_harbor_add_box(root, "HarborBridge_Inner_RailS",
 		Vector3(20.0, HARBOR_DECK_Y + 0.55, 41.8),
 		Vector3(24.0, 1.1, 0.28), 0.0, steel_mat, "")
+	var bridge_pillar_top := HARBOR_DECK_Y - 0.4
+	var bridge_pillar_bot := HARBOR_SEABED_Y - 0.5
+	var bridge_pillar_h := bridge_pillar_top - bridge_pillar_bot
+	var bridge_pillar_cy := (bridge_pillar_top + bridge_pillar_bot) * 0.5
 	for x_p in [10.0, 30.0]:
 		_harbor_add_box(root, "HarborBridge_Inner_Pillar_%d" % int(x_p),
-			Vector3(x_p, (HARBOR_DECK_Y + HARBOR_SEABED_Y) * 0.5, 35.0),
-			Vector3(1.4, HARBOR_DECK_Y - HARBOR_SEABED_Y, 1.4), 0.0, steel_mat, "")
+			Vector3(x_p, bridge_pillar_cy, 35.0),
+			Vector3(1.4, bridge_pillar_h, 1.4), 0.0, steel_mat, "")
 
 	# West Pier Channel Bridge
 	_harbor_add_box(root, "HarborBridge_West",
@@ -2882,8 +3142,8 @@ func _add_harbor_piers() -> void:
 		Vector3(0.28, 1.1, 24.0), 0.0, steel_mat, "")
 	for z_p2 in [-5.0, 13.0]:
 		_harbor_add_box(root, "HarborBridge_West_Pillar_%d" % int(z_p2),
-			Vector3(-175.0, (HARBOR_DECK_Y + HARBOR_SEABED_Y) * 0.5, z_p2),
-			Vector3(1.4, HARBOR_DECK_Y - HARBOR_SEABED_Y, 1.4), 0.0, steel_mat, "")
+			Vector3(-175.0, bridge_pillar_cy, z_p2),
+			Vector3(1.4, bridge_pillar_h, 1.4), 0.0, steel_mat, "")
 
 	# ── 6. Grounded Dock Platforms (Solid foundations under all warehouses and containers) ──
 	# A. North Wharf Platform
@@ -2928,11 +3188,6 @@ func _add_harbor_piers() -> void:
 		Vector3(-20.0, HARBOR_DECK_Y + 3.6, -35.0),
 		Vector3(16.0, 7.2, 10.0), 0.0, warehouse_mat, "")
 
-	_harbor_add_dock_platform(root, "Platform_FingerB", 35.0, 115.0, 42.0, 68.0, deck_mat, side_mat)
-	_harbor_add_box(root, "HarborWarehouse_FingerB",
-		Vector3(75.0, HARBOR_DECK_Y + 3.6, 55.0),
-		Vector3(16.0, 7.2, 10.0), 0.0, warehouse_mat, "")
-
 	# ── 7. Perimeter Breakwater Walls ──
 	var wall_mat := StandardMaterial3D.new()
 	wall_mat.albedo_color = Color(0.34, 0.35, 0.36)
@@ -2945,3 +3200,52 @@ func _add_harbor_piers() -> void:
 		Vector3(280.0, 2.1, 5.0), Vector3(6.0, 4.2, 430.0), 0.0, wall_mat, "")
 	_harbor_add_box(root, "HarborBreakwater_W",
 		Vector3(-270.0, 2.1, 5.0), Vector3(6.0, 4.2, 430.0), 0.0, wall_mat, "")
+
+	# ── 8. Safety Crash Railings & Catch Barriers ──
+	# A. South-East Corner Catch Barriers (catches cars off viaduct descent before/at turn)
+	_harbor_add_railing(root, "Rail_SE_OuterEast", Vector3(193.2, HARBOR_DECK_Y, 90.0), Vector3(193.2, HARBOR_DECK_Y, 133.2), barrier_mat)
+	_harbor_add_railing(root, "Rail_SE_OuterSouth", Vector3(193.2, HARBOR_DECK_Y, 133.2), Vector3(155.0, HARBOR_DECK_Y, 133.2), barrier_mat)
+
+	# B. North-East Corner Catch Barriers (catches cars landing from Jump 1)
+	_harbor_add_railing(root, "Rail_NE_OuterNorth", Vector3(110.0, HARBOR_DECK_Y, -103.2), Vector3(193.2, HARBOR_DECK_Y, -103.2), barrier_mat)
+	_harbor_add_railing(root, "Rail_NE_OuterEast", Vector3(193.2, HARBOR_DECK_Y, -103.2), Vector3(193.2, HARBOR_DECK_Y, -30.0), barrier_mat)
+
+	# C. Central Basin Finger Pier & Turns (flush dock boundaries, no overhanging railings)
+	_harbor_add_railing(root, "Rail_BasinS_OuterSouth", Vector3(72.0, HARBOR_DECK_Y, 133.2), Vector3(95.0, HARBOR_DECK_Y, 133.2), barrier_mat)
+	_harbor_add_railing(root, "Rail_BasinS_OuterWest", Vector3(71.8, HARBOR_DECK_Y, 133.2), Vector3(71.8, HARBOR_DECK_Y, 117.0), barrier_mat)
+	_harbor_add_railing(root, "Rail_CentralFinger_East", Vector3(88.2, HARBOR_DECK_Y, 117.0), Vector3(88.2, HARBOR_DECK_Y, 43.0), barrier_mat)
+	_harbor_add_railing(root, "Rail_CentralFinger_West", Vector3(71.8, HARBOR_DECK_Y, 117.0), Vector3(71.8, HARBOR_DECK_Y, 43.0), barrier_mat)
+	_harbor_add_railing(root, "Rail_BasinN_OuterNorth", Vector3(60.0, HARBOR_DECK_Y, 26.8), Vector3(88.2, HARBOR_DECK_Y, 26.8), barrier_mat)
+	_harbor_add_railing(root, "Rail_BasinN_OuterEast", Vector3(88.2, HARBOR_DECK_Y, 26.8), Vector3(88.2, HARBOR_DECK_Y, 43.0), barrier_mat)
+
+	# D. West Basin Finger Pier & Turns (flush dock boundaries, no overhanging railings)
+	_harbor_add_railing(root, "Rail_WestBasinN_OuterNorth", Vector3(-48.2, HARBOR_DECK_Y, 26.8), Vector3(-20.0, HARBOR_DECK_Y, 26.8), barrier_mat)
+	_harbor_add_railing(root, "Rail_WestBasinN_OuterWest", Vector3(-48.2, HARBOR_DECK_Y, 26.8), Vector3(-48.2, HARBOR_DECK_Y, 43.0), barrier_mat)
+	_harbor_add_railing(root, "Rail_WestFinger_West", Vector3(-48.2, HARBOR_DECK_Y, 43.0), Vector3(-48.2, HARBOR_DECK_Y, 117.0), barrier_mat)
+	_harbor_add_railing(root, "Rail_WestFinger_East", Vector3(-31.8, HARBOR_DECK_Y, 43.0), Vector3(-31.8, HARBOR_DECK_Y, 117.0), barrier_mat)
+	_harbor_add_railing(root, "Rail_WestBasinS_OuterEast", Vector3(-31.8, HARBOR_DECK_Y, 117.0), Vector3(-31.8, HARBOR_DECK_Y, 133.2), barrier_mat)
+	_harbor_add_railing(root, "Rail_WestBasinS_OuterSouth", Vector3(-48.0, HARBOR_DECK_Y, 133.2), Vector3(-32.0, HARBOR_DECK_Y, 133.2), barrier_mat)
+
+	# E. South Pier / Jump 2 Guardrails
+	_harbor_add_railing(root, "Rail_Jump2_PreN", Vector3(-48.0, HARBOR_DECK_Y, 116.8), Vector3(-85.0, HARBOR_DECK_Y, 116.8), barrier_mat)
+	_harbor_add_railing(root, "Rail_Jump2_PreS", Vector3(-48.0, HARBOR_DECK_Y, 133.2), Vector3(-85.0, HARBOR_DECK_Y, 133.2), barrier_mat)
+	_harbor_add_sloped_box(root, "Rail_Jump2_Takeoff_N", Vector3(-85.0, HARBOR_DECK_Y + 0.6, 116.8), Vector3(-97.0, HARBOR_DECK_Y + 1.8 + 0.6, 116.8), 0.4, 1.2, barrier_mat, "")
+	_harbor_add_sloped_box(root, "Rail_Jump2_Takeoff_S", Vector3(-85.0, HARBOR_DECK_Y + 0.6, 133.2), Vector3(-97.0, HARBOR_DECK_Y + 1.8 + 0.6, 133.2), 0.4, 1.2, barrier_mat, "")
+	_harbor_add_sloped_box(root, "Rail_Jump2_Landing_N", Vector3(-113.0, HARBOR_DECK_Y + 0.7 + 0.6, 116.8), Vector3(-127.0, HARBOR_DECK_Y + 0.6, 116.8), 0.4, 1.2, barrier_mat, "")
+	_harbor_add_sloped_box(root, "Rail_Jump2_Landing_S", Vector3(-113.0, HARBOR_DECK_Y + 0.7 + 0.6, 133.2), Vector3(-127.0, HARBOR_DECK_Y + 0.6, 133.2), 0.4, 1.2, barrier_mat, "")
+	_harbor_add_railing(root, "Rail_Jump2_PostN", Vector3(-127.0, HARBOR_DECK_Y, 116.8), Vector3(-167.0, HARBOR_DECK_Y, 116.8), barrier_mat)
+	_harbor_add_railing(root, "Rail_Jump2_PostS", Vector3(-127.0, HARBOR_DECK_Y, 133.2), Vector3(-167.0, HARBOR_DECK_Y, 133.2), barrier_mat)
+
+	# F. South-West Corner Catch Barriers (after Jump 2 runout, turning North)
+	_harbor_add_railing(root, "Rail_SW_OuterSouth", Vector3(-167.0, HARBOR_DECK_Y, 133.2), Vector3(-183.2, HARBOR_DECK_Y, 133.2), barrier_mat)
+	_harbor_add_railing(root, "Rail_SW_OuterWest", Vector3(-183.2, HARBOR_DECK_Y, 133.2), Vector3(-183.2, HARBOR_DECK_Y, 95.0), barrier_mat)
+
+	# G. North-West Corner Catch Barriers (turn onto Home Straight)
+	_harbor_add_railing(root, "Rail_NW_OuterWest", Vector3(-183.2, HARBOR_DECK_Y, -65.0), Vector3(-183.2, HARBOR_DECK_Y, -103.2), barrier_mat)
+	_harbor_add_railing(root, "Rail_NW_OuterNorth", Vector3(-183.2, HARBOR_DECK_Y, -103.2), Vector3(-150.0, HARBOR_DECK_Y, -103.2), barrier_mat)
+
+	# H. Jump 1 Flanking Side Rails (North Pier)
+	_harbor_add_sloped_box(root, "Rail_Jump1_Takeoff_N", Vector3(56.0, HARBOR_DECK_Y + 0.6, -103.2), Vector3(70.0, HARBOR_DECK_Y + 2.35 + 0.6, -103.2), 0.4, 1.2, barrier_mat, "")
+	_harbor_add_sloped_box(root, "Rail_Jump1_Takeoff_S", Vector3(56.0, HARBOR_DECK_Y + 0.6, -86.8), Vector3(70.0, HARBOR_DECK_Y + 2.35 + 0.6, -86.8), 0.4, 1.2, barrier_mat, "")
+	_harbor_add_sloped_box(root, "Rail_Jump1_Landing_N", Vector3(94.0, HARBOR_DECK_Y + 0.85 + 0.6, -103.2), Vector3(110.0, HARBOR_DECK_Y + 0.6, -103.2), 0.4, 1.2, barrier_mat, "")
+	_harbor_add_sloped_box(root, "Rail_Jump1_Landing_S", Vector3(94.0, HARBOR_DECK_Y + 0.85 + 0.6, -86.8), Vector3(110.0, HARBOR_DECK_Y + 0.6, -86.8), 0.4, 1.2, barrier_mat, "")

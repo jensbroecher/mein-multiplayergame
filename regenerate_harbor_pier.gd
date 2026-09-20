@@ -50,12 +50,12 @@ func _ready() -> void:
 		[Vector3(-14, 0, 0), Vector3(10, 0, 0), Vector3(165, 3.55, -95)],     # 5 NE corner approach
 		[Vector3(0, 0, -12), Vector3(0, 0, 12), Vector3(185, 3.55, -75)],     # 6 NE corner apex
 		[Vector3(0, 0, -12), Vector3(0, 0, 10), Vector3(185, 3.55, -35)],     # 7 Pre-viaduct straight
-		[Vector3(0, -1.0, -10), Vector3(0, 1.0, 10), Vector3(185, 7.0, -7.5)],# 8 Viaduct Incline mid
-		[Vector3(0, -0.4, -12), Vector3(0, 0, 12), Vector3(185, 10.55, 20)],  # 9 High Skyway entry
-		[Vector3(0, 0, -12), Vector3(0, 0, 12), Vector3(185, 10.55, 37.5)],   # 10 High Skyway midpoint
-		[Vector3(0, 0, -12), Vector3(0, -0.4, 12), Vector3(185, 10.55, 55)],  # 11 High Skyway exit
-		[Vector3(0, 1.0, -10), Vector3(0, -1.0, 10), Vector3(185, 7.0, 80)],  # 12 Viaduct Descent mid
-		[Vector3(0, 0, -10), Vector3(0, 0, 10), Vector3(185, 3.55, 105)],     # 13 Viaduct Landing / SE entry
+		[Vector3(0, -0.6, -10), Vector3(0, 0.6, 10), Vector3(185, 5.55, -10.0)],# 8 Viaduct Incline mid
+		[Vector3(0, -0.2, -10), Vector3(0, 0, 10), Vector3(185, 7.55, 10.0)], # 9 High Skyway entry
+		[Vector3(0, 0, -10), Vector3(0, 0, 10), Vector3(185, 7.55, 30.0)],    # 10 High Skyway midpoint
+		[Vector3(0, 0, -10), Vector3(0, -0.2, 10), Vector3(185, 7.55, 50.0)], # 11 High Skyway exit
+		[Vector3(0, 0.6, -10), Vector3(0, -0.6, 10), Vector3(185, 5.55, 70.0)],# 12 Viaduct Descent mid
+		[Vector3(0, 0.2, -8), Vector3(0, 0, 8), Vector3(185, 3.55, 95.0)],    # 13 Viaduct Landing / SE entry
 		[Vector3(0, 0, -12), Vector3(0, 0, 8), Vector3(185, 3.55, 115)],      # 14 SE corner apex
 		[Vector3(12, 0, 0), Vector3(-12, 0, 0), Vector3(165, 3.55, 125)],     # 15 SE turn exit
 		[Vector3(12, 0, 0), Vector3(-10, 0, 0), Vector3(105, 3.55, 125)],     # 16 South pier approach to basin
@@ -67,9 +67,9 @@ func _ready() -> void:
 		[Vector3(0, 0, -12), Vector3(0, 0, 12), Vector3(-40, 3.55, 65)],      # 22 West Central Finger Southbound
 		[Vector3(0, 0, -12), Vector3(0, 0, 10), Vector3(-40, 3.55, 105)],     # 23 Approach to South Pier
 		[Vector3(0, 0, -10), Vector3(-10, 0, 0), Vector3(-50, 3.55, 125)],    # 24 Turn West onto South Pier
-		[Vector3(10, 0, 0), Vector3(-8, 0.4, 0), Vector3(-70, 3.55, 125)],     # 25 Jump 2 Takeoff ramp
-		[Vector3(6, -0.4, 0), Vector3(-6, -0.4, 0), Vector3(-96, 6.2, 125)],   # 26 Jump 2 Apex in air
-		[Vector3(8, 0.4, 0), Vector3(-10, 0, 0), Vector3(-124, 3.55, 125)],   # 27 Jump 2 Landing ramp
+		[Vector3(8, 0, 0), Vector3(-8, 0.35, 0), Vector3(-85, 3.55, 125)],     # 25 Jump 2 Takeoff ramp
+		[Vector3(5, -0.35, 0), Vector3(-5, -0.35, 0), Vector3(-105, 5.4, 125)],# 26 Jump 2 Apex in air
+		[Vector3(6, 0.35, 0), Vector3(-8, 0, 0), Vector3(-127, 3.55, 125)],   # 27 Jump 2 Landing ramp
 		[Vector3(12, 0, 0), Vector3(-10, 0, 0), Vector3(-155, 3.55, 125)],    # 28 SW corner approach
 		[Vector3(0, 0, 12), Vector3(0, 0, -12), Vector3(-175, 3.55, 105)],    # 29 SW corner apex
 		[Vector3(0, 0, 12), Vector3(0, 0, -12), Vector3(-175, 3.55, 4)],      # 30 West Pier Channel Bridge
@@ -105,7 +105,7 @@ func _ready() -> void:
 	var finish_line = gate_scene.instantiate()
 	finish_line.name = "FinishLine"
 	finish_line.position = Vector3(-50.0, 3.55, -95.0)
-	finish_line.rotation_degrees = Vector3(0, 90, 0)
+	finish_line.rotation_degrees = Vector3(0, -90, 0)
 	finish_line.set("is_finish_line", true)
 	level_scene.add_child(finish_line)
 	finish_line.owner = level_scene
@@ -160,18 +160,13 @@ func _ready() -> void:
 
 	var cp_defs = [
 		# name, pos, rot_y_deg
-		["Halfway2", Vector3(185.0, 3.55, -55.0), 180.0],
-		["Halfway3", Vector3(185.0, 10.55, 37.5), 180.0],  # On Elevated Skyway Viaduct!
-		["Halfway4", Vector3(145.0, 3.55, 125.0), -90.0],
-		["Halfway5", Vector3(80.0, 3.55, 75.0), 0.0],      # Central Basin Finger
-		["Halfway6", Vector3(20.0, 3.55, 35.0), -90.0],    # Inner Basin Bridge
-		["Halfway7", Vector3(-40.0, 3.55, 80.0), 180.0],   # West Central Finger
-		["Halfway8", Vector3(-60.0, 3.55, 125.0), -90.0],  # South Pier before jump
-		["Halfway9", Vector3(-175.0, 3.55, 40.0), 0.0],    # West Pier
-		["Halfway10", Vector3(-110.0, 3.55, -95.0), 90.0]  # Home straight approach
+		["Checkpoint_1", Vector3(185.0, 3.55, -55.0), 180.0],  # East Pier approach to elevated viaduct (traveling South)
+		["Checkpoint_2", Vector3(145.0, 3.55, 125.0), 90.0],   # South Pier after viaduct descent (traveling West)
+		["Checkpoint_3", Vector3(20.0, 3.55, 35.0), 90.0],     # Inner Basin Cross-Channel Bridge (traveling West)
+		["Checkpoint_4", Vector3(-175.0, 3.55, 40.0), 0.0],    # West Pier after Jump 2 runway (traveling North)
 	]
 
-	var cp_node_paths: Array[NodePath] = [NodePath("")] # index 0 is placeholder
+	var cp_node_paths: Array[NodePath] = []
 	for cp_info in cp_defs:
 		var gate = gate_scene.instantiate()
 		gate.name = cp_info[0]
@@ -196,10 +191,11 @@ func _ready() -> void:
 
 	if boost_scene:
 		var bp_defs = [
-			["BoostPad_Start", Vector3(20.0, 3.6, -95.0), 90.0],
+			["BoostPad_Start", Vector3(20.0, 3.6, -95.0), -90.0],
 			["BoostPad_AfterJumpE", Vector3(185.0, 3.6, -78.9), 180.0],
-			["BoostPad_Skyway", Vector3(185.0, 10.6, 37.5), 180.0],
-			["BoostPad_InnerBridge", Vector3(20.0, 3.6, 35.0), -90.0],
+			["BoostPad_Skyway", Vector3(185.0, 7.60, 30.0), 180.0],
+			["BoostPad_InnerBridge", Vector3(20.0, 3.6, 35.0), 90.0],
+			["BoostPad_SouthPier", Vector3(-62.0, 3.6, 125.0), 90.0],
 			["BoostPad_WestPier", Vector3(-175.0, 3.6, 85.0), 0.0]
 		]
 		for bp_info in bp_defs:
