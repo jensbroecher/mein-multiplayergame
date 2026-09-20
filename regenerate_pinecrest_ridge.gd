@@ -158,7 +158,7 @@ func _ready() -> void:
 	tg.set("terrain_size", Vector2(950.0, 950.0))
 	tg.set("hill_height", 14.0)
 	tg.set("road_width", 15.0)
-	tg.set("sand_width", 17.0)
+	tg.set("curb_outer_width", 17.0)
 	tg.set("road_y_offset", 0.06)
 	tg.set("curb_y_offset", 0.06)
 	tg.set("terrain_recession_collision", 0.12)
@@ -245,33 +245,6 @@ func _ready() -> void:
 		gate.rotation_degrees = Vector3(0, rot_y, 0)
 		checkpoints_container.add_child(gate)
 
-	# 6. Jumps & Ramps
-	var ramp_container := Node3D.new()
-	ramp_container.name = "JumpRamps"
-	level_scene.add_child(ramp_container)
-
-	var ramp_scene: PackedScene = load("res://models/ramps/ramp.glb")
-	if not ramp_scene:
-		ramp_scene = load("res://models/ramps/woodramp.fbx")
-
-	# Jump 1 (Forest Ravine Leap): (-70, 10, -50)
-	# Jump 2 (Summit Overlook Super-Jump on outer east ridge): (85, 75, -205)
-	# Jump 3 (Forest Creek Mega-Launch): (75, 14, 60)
-	var ramp_placements = [
-		[Vector3(-70.0, 10.06, -50.0), Vector3(0, 165, 0), Vector3(2.6, 2.2, 2.6)],
-		[Vector3(85.0, 75.06, -205.0), Vector3(0, -164.0, 0), Vector3(3.2, 2.8, 3.2)],
-		[Vector3(75.0, 14.06, 60.0), Vector3(0, 167.5, 0), Vector3(2.8, 2.4, 2.8)]
-	]
-
-	if ramp_scene:
-		for idx in range(ramp_placements.size()):
-			var r_info = ramp_placements[idx]
-			var ramp_inst = ramp_scene.instantiate()
-			ramp_inst.name = "JumpRamp_%d" % (idx + 1)
-			ramp_inst.position = r_info[0]
-			ramp_inst.rotation_degrees = r_info[1]
-			ramp_inst.scale = r_info[2]
-			ramp_container.add_child(ramp_inst)
 
 	# 7. Boost Pads
 	var boost_scene: PackedScene = load("res://BoostPad.tscn")

@@ -214,7 +214,7 @@ func _ready() -> void:
 	tg.set("terrain_size", Vector2(900.0, 900.0))
 	tg.set("hill_height", 16.0)
 	tg.set("road_width", 15.0)
-	tg.set("sand_width", 17.0)
+	tg.set("curb_outer_width", 17.0)
 	tg.set("road_y_offset", 0.06)
 	tg.set("curb_y_offset", 0.06)
 	tg.set("terrain_recession_collision", 0.12)
@@ -262,23 +262,23 @@ func _ready() -> void:
 	var alt_curve := Curve3D.new()
 	alt_curve.bake_interval = 0.25
 
-	# Alternative shortcut branch: splits at (56, 8.5, -175), plunges through inner snow ravine, merges at (48, 6.0, -280)
+	# Alternative shortcut branch: splits at inner curb (47.5, 8.1, -183), plunges through inner snow ravine, merges at inner curb (45.0, 6.2, -272)
 	var alt_pts = [
-		[Vector3(0, 0, 10), Vector3(-4, -0.4, -12), Vector3(56.0, 8.5, -175.0)],   # 0: Fork start
-		[Vector3(4, 0.4, 12), Vector3(-2, -0.3, -14), Vector3(44.0, 7.2, -210.0)], # 1: Inner canyon descent
+		[Vector3(0, 0, 8), Vector3(-2.5, -0.4, -12), Vector3(47.5, 8.1, -183.0)],   # 0: Fork start off inner curb
+		[Vector3(3, 0.3, 12), Vector3(-2, -0.3, -14), Vector3(44.0, 7.2, -210.0)], # 1: Inner canyon descent
 		[Vector3(2, 0.2, 12), Vector3(2, -0.2, -12), Vector3(38.0, 6.2, -245.0)],  # 2: Mid shortcut (Snowdrift zone)
-		[Vector3(-2, -0.2, 10), Vector3(2, 0.2, -10), Vector3(48.0, 6.0, -280.0)], # 3: Merge rejoin
+		[Vector3(-2, -0.2, 10), Vector3(2, 0.2, -8), Vector3(45.0, 6.2, -272.0)],  # 3: Merge rejoin at inner curb
 	]
 	for p in alt_pts:
 		alt_curve.add_point(p[2], p[0], p[1])
 	alt_path.curve = alt_curve
 	alt_container.add_child(alt_path)
 
-	# Generate 3D road mesh & collision for the alternative route
-	_build_ribbon_road(level_scene, alt_curve, 12.0, "AlternativeRoad_Mesh", asphalt_tex)
+	# Generate 3D cobblestone road mesh, curbs, solid stone embankment & collision for the alternative route
+	_build_cobblestone_road(level_scene, alt_curve, 11.5, "AlternativeRoad")
 
-	# 5. Alpine Timber Bridge across Creek (Crossing 2: X = -24m to +24m at Z = -305, Y = 4.8m)
-	_build_alpine_bridge(level_scene, Vector3(0.0, 4.8, -305.0), 48.0, 15.0)
+	# 5. Alpine Timber Bridge across Creek (Crossing 2: X = -27m to +27m at Z = -305, Y = 4.8m)
+	_build_detailed_alpine_bridge(level_scene, Vector3(0.0, 4.8, -305.0), 54.0, 17.6)
 
 	# 6. Natural Snow-Covered Sections on Road (Organic surface drifts with "snow" group & "is_snow" meta)
 	var snow_sections := Node3D.new()
@@ -286,15 +286,15 @@ func _ready() -> void:
 	level_scene.add_child(snow_sections)
 
 	# Section A: Pre-Jump 1 In-run Snowdrift (X=-32, Y=5.68, Z=-52)
-	_create_natural_snow_drift(snow_sections, "SnowDrift_Jump1Approach", Vector3(-32.0, 5.68, -52.0), Vector3(15.0, 0.28, 18.0), 20.0, 0.0)
+	_create_natural_snow_drift(snow_sections, "SnowDrift_Jump1Approach", Vector3(-32.0, 5.68, -52.0), Vector3(15.0, 1.15, 18.0), 20.0, 0.0)
 	# Section B: Eastern Flank Glade (X=45, Y=6.68, Z=-145)
-	_create_natural_snow_drift(snow_sections, "SnowDrift_EastGlade", Vector3(45.0, 6.68, -145.0), Vector3(15.0, 0.26, 16.0), -16.0, 1.8)
+	_create_natural_snow_drift(snow_sections, "SnowDrift_EastGlade", Vector3(45.0, 6.68, -145.0), Vector3(15.0, 1.05, 16.0), -16.0, 1.8)
 	# Section C: Deep Snow on Alternative Shortcut Route (X=38, Y=6.18, Z=-245)
-	_create_natural_snow_drift(snow_sections, "SnowDrift_AltRouteCut", Vector3(38.0, 6.18, -245.0), Vector3(12.5, 0.30, 22.0), 5.0, 3.5)
+	_create_natural_snow_drift(snow_sections, "SnowDrift_AltRouteCut", Vector3(38.0, 6.18, -245.0), Vector3(12.5, 1.30, 22.0), 5.0, 3.5)
 	# Section D: High Summit Ridge Snowdrift (X=-98, Y=17.56, Z=-80)
-	_create_natural_snow_drift(snow_sections, "SnowDrift_SummitRidge", Vector3(-98.0, 17.56, -80.0), Vector3(15.0, 0.26, 20.0), 0.0, 5.2)
+	_create_natural_snow_drift(snow_sections, "SnowDrift_SummitRidge", Vector3(-98.0, 17.56, -80.0), Vector3(15.0, 1.10, 20.0), 0.0, 5.2)
 	# Section E: Pre-Jump 2 Summit Snowdrift (X=-45, Y=15.56, Z=100)
-	_create_natural_snow_drift(snow_sections, "SnowDrift_Jump2Approach", Vector3(-45.0, 15.56, 100.0), Vector3(15.0, 0.28, 16.0), -35.0, 7.1)
+	_create_natural_snow_drift(snow_sections, "SnowDrift_Jump2Approach", Vector3(-45.0, 15.56, 100.0), Vector3(15.0, 1.20, 16.0), -35.0, 7.1)
 
 	# 7. Players node
 	var players_node := Node3D.new()
@@ -377,30 +377,6 @@ func _ready() -> void:
 		gate.rotation_degrees = Vector3(0, rot_y, 0)
 		checkpoints_container.add_child(gate)
 
-	# 11. Jump Launch Ramps (Crossing 1 and Crossing 3)
-	var ramp_container := Node3D.new()
-	ramp_container.name = "JumpRamps"
-	level_scene.add_child(ramp_container)
-
-	var ramp_scene: PackedScene = load("res://models/ramps/ramp.glb")
-	if not ramp_scene:
-		ramp_scene = load("res://models/ramps/woodramp.fbx")
-
-	# Jump 1 (West to East Creek Leap): (-16.0, 8.56, -72.0), launches North-East (314 deg)
-	# Jump 2 (West to East Creek Super-Leap): (-22.0, 15.56, 125.0), launches South-East (220 deg)
-	var ramp_placements = [
-		[Vector3(-16.0, 8.56, -72.0), Vector3(0, 314.0, 0), Vector3(2.8, 2.4, 2.8)],
-		[Vector3(-22.0, 15.56, 125.0), Vector3(0, 220.0, 0), Vector3(3.0, 2.6, 3.0)]
-	]
-	if ramp_scene:
-		for idx in range(ramp_placements.size()):
-			var r_info = ramp_placements[idx]
-			var ramp_inst = ramp_scene.instantiate()
-			ramp_inst.name = "JumpRamp_%d" % (idx + 1)
-			ramp_inst.position = r_info[0]
-			ramp_inst.rotation_degrees = r_info[1]
-			ramp_inst.scale = r_info[2]
-			ramp_container.add_child(ramp_inst)
 
 	# 12. Boost Pads
 	var boost_scene: PackedScene = load("res://BoostPad.tscn")
@@ -490,180 +466,71 @@ func _ready() -> void:
 
 
 func _create_natural_snow_drift(parent: Node, drift_name: String, pos: Vector3, size: Vector3, yaw_deg: float, seed_offset: float = 0.0) -> void:
-	var area := Area3D.new()
-	area.name = drift_name
-	area.position = pos
-	area.rotation_degrees = Vector3(0, yaw_deg, 0)
-	area.add_to_group("snow", true)
-	area.set_meta("is_snow", true)
-
-	var snow_area_script: Script = load("res://SnowDriftArea.gd")
-	if snow_area_script:
-		area.set_script(snow_area_script)
-
-	var w: float = size.x
-	var h: float = size.y
-	var l: float = size.z
-
-	# Non-blocking trigger volume: detects cart entering without any hard collision bump
-	var col := CollisionShape3D.new()
-	var box_shape := BoxShape3D.new()
-	box_shape.size = Vector3(w, h + 1.2, l)
-	col.position = Vector3(0, (h + 1.2) * 0.5, 0)
-	col.shape = box_shape
-	area.add_child(col)
-
-	const GRID_X := 22
-	const GRID_Z := 26
-
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-
-	var sand_norm: Texture2D = load("res://materials/sand_normal.png") as Texture2D
-	var drift_mat := StandardMaterial3D.new()
-	drift_mat.albedo_color = Color(0.97, 0.985, 1.0)
-	drift_mat.roughness = 0.88
-	drift_mat.metallic = 0.02
-	if sand_norm:
-		drift_mat.normal_enabled = true
-		drift_mat.normal_texture = sand_norm
-		drift_mat.normal_scale = 0.4
-		drift_mat.uv1_scale = Vector3(0.25, 0.25, 0.25)
-		drift_mat.uv1_triplanar = true
-
-	# Generate Top Surface Vertices
-	var top_verts: Array = []
-	for iz in range(GRID_Z + 1):
-		var v_line: Array = []
-		var v_frac: float = float(iz) / float(GRID_Z)
-		var v: float = v_frac * 2.0 - 1.0
-		for ix in range(GRID_X + 1):
-			var u_frac: float = float(ix) / float(GRID_X)
-			var u: float = u_frac * 2.0 - 1.0
-
-			# Organic boundary curvature
-			var px: float = u * (w * 0.5) * (1.0 + 0.08 * sin(v * PI * 2.0 + seed_offset))
-			var pz: float = v * (l * 0.5) * (1.0 + 0.06 * cos(u * PI * 2.0 + seed_offset * 1.5))
-
-			# Smooth feathered envelope: 0 at border, 1 in interior
-			var dist_u: float = clampf(1.0 - absf(u), 0.0, 1.0)
-			var dist_v: float = clampf(1.0 - absf(v), 0.0, 1.0)
-			var fade_u: float = smoothstep(0.0, 0.35, dist_u)
-			var fade_v: float = smoothstep(0.0, 0.30, dist_v)
-			var env: float = fade_u * fade_v
-			env = env * env * (3.0 - 2.0 * env)
-
-			# Wind-blown natural drift ripples and mounds
-			var bank_bias: float = 0.85 + 0.30 * sin(u * 1.8 + seed_offset)
-			var waves: float = 0.20 * sin(v * 7.0 + u * 2.5 + seed_offset) + 0.10 * cos(v * 13.0 - u * 4.0)
-			var py: float = h * env * maxf(0.05, bank_bias + waves)
-
-			v_line.append(Vector3(px, py, pz))
-		top_verts.append(v_line)
-
-	# Add Vertices: Top layer then Bottom layer
-	var num_verts_per_layer = (GRID_X + 1) * (GRID_Z + 1)
-	for iz in range(GRID_Z + 1):
-		for ix in range(GRID_X + 1):
-			var pt: Vector3 = top_verts[iz][ix]
-			st.set_uv(Vector2(float(ix) / float(GRID_X), float(iz) / float(GRID_Z)))
-			st.add_vertex(pt)
-
-	for iz in range(GRID_Z + 1):
-		for ix in range(GRID_X + 1):
-			var pt: Vector3 = top_verts[iz][ix]
-			st.set_uv(Vector2(float(ix) / float(GRID_X), float(iz) / float(GRID_Z)))
-			st.add_vertex(Vector3(pt.x, -0.04, pt.z))
-
-	# Indices: Top surface (Facing UP)
-	for iz in range(GRID_Z):
-		for ix in range(GRID_X):
-			var i0 = iz * (GRID_X + 1) + ix
-			var i1 = i0 + 1
-			var i2 = (iz + 1) * (GRID_X + 1) + ix
-			var i3 = i2 + 1
-
-			st.add_index(i0)
-			st.add_index(i2)
-			st.add_index(i1)
-
-			st.add_index(i1)
-			st.add_index(i2)
-			st.add_index(i3)
-
-	# Indices: Bottom base (Facing DOWN)
-	var b_offset = num_verts_per_layer
-	for iz in range(GRID_Z):
-		for ix in range(GRID_X):
-			var i0 = b_offset + iz * (GRID_X + 1) + ix
-			var i1 = i0 + 1
-			var i2 = b_offset + (iz + 1) * (GRID_X + 1) + ix
-			var i3 = i2 + 1
-
-			st.add_index(i0)
-			st.add_index(i1)
-			st.add_index(i2)
-
-			st.add_index(i1)
-			st.add_index(i3)
-			st.add_index(i2)
-
-	# Indices: Perimeter Skirt Walls
-	for ix in range(GRID_X):
-		var t0 = ix
-		var t1 = ix + 1
-		var b0 = b_offset + ix
-		var b1 = b_offset + ix + 1
-		st.add_index(t0); st.add_index(t1); st.add_index(b0)
-		st.add_index(t1); st.add_index(b1); st.add_index(b0)
-
-	for ix in range(GRID_X):
-		var t0 = GRID_Z * (GRID_X + 1) + ix
-		var t1 = t0 + 1
-		var b0 = b_offset + t0
-		var b1 = b_offset + t1
-		st.add_index(t0); st.add_index(b0); st.add_index(t1)
-		st.add_index(t1); st.add_index(b0); st.add_index(b1)
-
-	for iz in range(GRID_Z):
-		var t0 = iz * (GRID_X + 1)
-		var t1 = (iz + 1) * (GRID_X + 1)
-		var b0 = b_offset + t0
-		var b1 = b_offset + t1
-		st.add_index(t0); st.add_index(b0); st.add_index(t1)
-		st.add_index(t1); st.add_index(b0); st.add_index(b1)
-
-	for iz in range(GRID_Z):
-		var t0 = iz * (GRID_X + 1) + GRID_X
-		var t1 = (iz + 1) * (GRID_X + 1) + GRID_X
-		var b0 = b_offset + t0
-		var b1 = b_offset + t1
-		st.add_index(t0); st.add_index(t1); st.add_index(b0)
-		st.add_index(t1); st.add_index(b1); st.add_index(b0)
-
-	st.generate_normals()
-	st.generate_tangents()
-	var mesh = st.commit()
-
-	var mesh_inst := MeshInstance3D.new()
-	mesh_inst.name = drift_name + "_Mesh"
-	mesh_inst.mesh = mesh
-	mesh_inst.material_override = drift_mat
-	area.add_child(mesh_inst)
-
-	parent.add_child(area)
+	var drift_scene: PackedScene = load("res://SnowDrift.tscn")
+	var drift = drift_scene.instantiate()
+	drift.name = drift_name
+	drift.position = pos
+	drift.rotation_degrees = Vector3(0, yaw_deg, 0)
+	drift.set("size", size)
+	drift.set("seed_offset", seed_offset)
+	parent.add_child(drift)
 
 
-func _build_alpine_bridge(parent: Node, center: Vector3, length: float, width: float) -> void:
+func _build_detailed_alpine_bridge(parent: Node, center: Vector3, length: float, width: float) -> void:
 	var bridge_root := Node3D.new()
 	bridge_root.name = "AlpineTimberBridge"
 	bridge_root.position = center
 
-	# Timber Deck (top surface flush with road level Y = center.y + 0.08)
+	# 1. PBR Materials
+	var wood_mat := StandardMaterial3D.new()
+	var wood_tex: Texture2D = load("res://materials/wood_planks.png") as Texture2D
+	var wood_norm: Texture2D = load("res://materials/wood_planks_normal.png") as Texture2D
+	var wood_rough: Texture2D = load("res://materials/wood_planks_roughness.png") as Texture2D
+	if wood_tex:
+		wood_mat.albedo_texture = wood_tex
+	if wood_norm:
+		wood_mat.normal_enabled = true
+		wood_mat.normal_texture = wood_norm
+		wood_mat.normal_scale = 1.0
+	if wood_rough:
+		wood_mat.roughness_texture = wood_rough
+	wood_mat.roughness = 0.82
+	wood_mat.uv1_scale = Vector3(0.35, 0.35, 0.35)
+	wood_mat.uv1_triplanar = true
+
+	# Darker heavy timber for railings, girders & trusses
+	var timber_mat := StandardMaterial3D.new()
+	if wood_tex:
+		timber_mat.albedo_texture = wood_tex
+		timber_mat.albedo_color = Color(0.72, 0.68, 0.65)
+	if wood_norm:
+		timber_mat.normal_enabled = true
+		timber_mat.normal_texture = wood_norm
+		timber_mat.normal_scale = 0.8
+	timber_mat.roughness = 0.88
+	timber_mat.uv1_scale = Vector3(0.5, 0.5, 0.5)
+	timber_mat.uv1_triplanar = true
+
+	# Stone masonry for piers & abutments
+	var stone_mat := StandardMaterial3D.new()
+	var stone_tex: Texture2D = load("res://materials/dark_canyon_rock.png") as Texture2D
+	var stone_norm: Texture2D = load("res://materials/dark_canyon_rock_normal.png") as Texture2D
+	if stone_tex:
+		stone_mat.albedo_texture = stone_tex
+	if stone_norm:
+		stone_mat.normal_enabled = true
+		stone_mat.normal_texture = stone_norm
+		stone_mat.normal_scale = 0.9
+	stone_mat.roughness = 0.90
+	stone_mat.uv1_scale = Vector3(0.25, 0.25, 0.25)
+	stone_mat.uv1_triplanar = true
+
+	# 2. Driving Deck (spanning length=54m from X=-27 to +27, full 17.6m width to cover road and curbs)
 	var deck_body := StaticBody3D.new()
 	deck_body.name = "BridgeDeck"
 	deck_body.add_to_group("track_surface", true)
 	deck_body.position = Vector3(0, -0.12, 0)
+
 	var deck_col := CollisionShape3D.new()
 	var deck_shape := BoxShape3D.new()
 	deck_shape.size = Vector3(length, 0.40, width)
@@ -672,163 +539,397 @@ func _build_alpine_bridge(parent: Node, center: Vector3, length: float, width: f
 
 	var deck_mesh := MeshInstance3D.new()
 	deck_mesh.name = "BridgeDeck_Mesh"
-	var box_m := BoxMesh.new()
-	box_m.size = Vector3(length, 0.38, width)
-	deck_mesh.mesh = box_m
-	deck_mesh.position = Vector3(0, -0.01, 0)
-
-	var wood_mat := StandardMaterial3D.new()
-	wood_mat.albedo_color = Color(0.42, 0.28, 0.18)
-	wood_mat.roughness = 0.85
+	var dm := BoxMesh.new()
+	dm.size = Vector3(length, 0.38, width)
+	deck_mesh.mesh = dm
 	deck_mesh.material_override = wood_mat
 	deck_body.add_child(deck_mesh)
 	bridge_root.add_child(deck_body)
 
-	# Rustic Timber Abutment Sills (smooth road-to-bridge junction, zero gap/step/clipping)
-	for x_sill in [-24.0, 24.0]:
-		var sill := StaticBody3D.new()
-		sill.name = "AbutmentSill_" + ("W" if x_sill < 0 else "E")
-		sill.position = Vector3(x_sill, -0.12, 0)
-		sill.add_to_group("track_surface", true)
+	# 3. Heavy Timber Wheel-Guard Curbs (left & right deck edges)
+	var curb_h := 0.32
+	var curb_w := 0.40
+	for side in [-1.0, 1.0]:
+		var curb_z = side * (width * 0.5 - curb_w * 0.5)
+		var curb_inst := MeshInstance3D.new()
+		curb_inst.name = "WheelGuard_" + ("N" if side < 0 else "S")
+		var cm := BoxMesh.new()
+		cm.size = Vector3(length, curb_h, curb_w)
+		curb_inst.mesh = cm
+		curb_inst.material_override = timber_mat
+		curb_inst.position = Vector3(0, 0.16, curb_z)
+		bridge_root.add_child(curb_inst)
 
-		var s_col := CollisionShape3D.new()
-		var s_shape := BoxShape3D.new()
-		var sill_w: float = 17.6 # Full span covering 15m road and 17m curbs seamlessly
-		s_shape.size = Vector3(0.6, 0.40, sill_w)
-		s_col.shape = s_shape
-		sill.add_child(s_col)
+	# 4. Massive Stone Shore Abutments (East & West banks, sealing ALL gaps)
+	for side in [-1.0, 1.0]:
+		var x_pos = side * 26.0
+		var abut := StaticBody3D.new()
+		abut.name = "StoneAbutment_" + ("E" if side > 0 else "W")
+		abut.add_to_group("track_surface", true)
+		abut.position = Vector3(x_pos, -3.5, 0)
 
-		var s_mesh := MeshInstance3D.new()
-		var sm := BoxMesh.new()
-		sm.size = Vector3(0.6, 0.42, sill_w)
-		s_mesh.mesh = sm
-		s_mesh.material_override = wood_mat
-		sill.add_child(s_mesh)
-		bridge_root.add_child(sill)
+		var a_col := CollisionShape3D.new()
+		var a_shape := BoxShape3D.new()
+		a_shape.size = Vector3(6.5, 7.5, width + 4.0)
+		a_col.shape = a_shape
+		abut.add_child(a_col)
 
-	# Side Guardrails (North and South edges)
-	var rail_mat := StandardMaterial3D.new()
-	rail_mat.albedo_color = Color(0.35, 0.22, 0.14)
-	rail_mat.roughness = 0.9
+		var a_mesh := MeshInstance3D.new()
+		a_mesh.name = "Abutment_Mesh"
+		var am := BoxMesh.new()
+		am.size = a_shape.size
+		a_mesh.mesh = am
+		a_mesh.material_override = stone_mat
+		abut.add_child(a_mesh)
+		bridge_root.add_child(abut)
+
+		# Stone Wing Walls that flare into the mountain bank
+		for wing_side in [-1.0, 1.0]:
+			var wing := MeshInstance3D.new()
+			wing.name = "WingWall_" + ("E" if side > 0 else "W") + ("_N" if wing_side < 0 else "_S")
+			var wm := BoxMesh.new()
+			wm.size = Vector3(5.0, 6.5, 2.5)
+			wing.mesh = wm
+			wing.material_override = stone_mat
+			wing.position = Vector3(x_pos + side * 1.5, -3.0, wing_side * (width * 0.5 + 2.0))
+			wing.rotation_degrees = Vector3(0, side * wing_side * 22.0, 0)
+			bridge_root.add_child(wing)
+
+	# 5. Longitudinal Under-Deck Girders (4 heavy timber stringers)
+	for g_idx in range(4):
+		var gz = -width * 0.40 + g_idx * (width * 0.80 / 3.0)
+		var girder := MeshInstance3D.new()
+		girder.name = "Girder_%d" % g_idx
+		var gm := BoxMesh.new()
+		gm.size = Vector3(length - 4.0, 0.70, 0.50)
+		girder.mesh = gm
+		girder.material_override = timber_mat
+		girder.position = Vector3(0, -0.65, gz)
+		bridge_root.add_child(girder)
+
+	# 6. Detailed Alpine Timber Truss Railings (North and South)
+	var rail_z_dist := width * 0.5 - 0.20
+	var post_spacing := 3.6
+	var post_count := int((length - 4.0) / post_spacing)
+	var start_x := - (post_count * post_spacing) * 0.5
 
 	for side in [-1.0, 1.0]:
-		var rail_body := StaticBody3D.new()
-		rail_body.name = "Guardrail_" + ("N" if side < 0 else "S")
-		var rail_z: float = side * (width * 0.5 - 0.4)
-		rail_body.position = Vector3(0, 0.65, rail_z)
+		var rail_side_name = "N" if side < 0 else "S"
+		var rz = side * rail_z_dist
 
-		var rail_col := CollisionShape3D.new()
-		var rail_shape := BoxShape3D.new()
-		rail_shape.size = Vector3(length, 1.2, 0.5)
-		rail_col.shape = rail_shape
-		rail_body.add_child(rail_col)
+		# Solid Railing Collision Wall
+		var rail_col_body := StaticBody3D.new()
+		rail_col_body.name = "GuardrailCol_" + rail_side_name
+		rail_col_body.position = Vector3(0, 0.80, rz)
+		var r_col := CollisionShape3D.new()
+		var r_shape := BoxShape3D.new()
+		r_shape.size = Vector3(length, 1.60, 0.40)
+		r_col.shape = r_shape
+		rail_col_body.add_child(r_col)
+		bridge_root.add_child(rail_col_body)
 
-		var rail_mesh := MeshInstance3D.new()
-		var rm := BoxMesh.new()
-		rm.size = rail_shape.size
-		rail_mesh.mesh = rm
-		rail_mesh.material_override = rail_mat
-		rail_body.add_child(rail_mesh)
-		bridge_root.add_child(rail_body)
+		# Top Handrail Beam
+		var top_rail := MeshInstance3D.new()
+		top_rail.name = "TopRail_" + rail_side_name
+		var trm := BoxMesh.new()
+		trm.size = Vector3(length, 0.28, 0.40)
+		top_rail.mesh = trm
+		top_rail.material_override = timber_mat
+		top_rail.position = Vector3(0, 1.45, rz)
+		bridge_root.add_child(top_rail)
 
-	# Timber Support Piers rooted deep into creek bed (down to Y = -5.0m)
-	for x_offset in [-14.0, 0.0, 14.0]:
-		var pier := StaticBody3D.new()
-		pier.name = "Pillar_%d" % int(x_offset)
-		pier.position = Vector3(x_offset, -5.0, 0)
-		var p_col := CollisionShape3D.new()
-		var p_shape := BoxShape3D.new()
-		p_shape.size = Vector3(2.4, 10.0, width - 2.0)
-		p_col.shape = p_shape
-		pier.add_child(p_col)
+		# Mid Rail Beam
+		var mid_rail := MeshInstance3D.new()
+		mid_rail.name = "MidRail_" + rail_side_name
+		var mrm := BoxMesh.new()
+		mrm.size = Vector3(length, 0.22, 0.25)
+		mid_rail.mesh = mrm
+		mid_rail.material_override = timber_mat
+		mid_rail.position = Vector3(0, 0.85, rz)
+		bridge_root.add_child(mid_rail)
 
-		var p_mesh := MeshInstance3D.new()
-		var pm := BoxMesh.new()
-		pm.size = p_shape.size
-		p_mesh.mesh = pm
-		p_mesh.material_override = wood_mat
-		pier.add_child(p_mesh)
-		bridge_root.add_child(pier)
+		# Vertical Posts and Diagonal X-Braces
+		for p_idx in range(post_count + 1):
+			var px = start_x + p_idx * post_spacing
+			var post := MeshInstance3D.new()
+			post.name = "Post_" + rail_side_name + "_%d" % p_idx
+			var post_m := BoxMesh.new()
+			post_m.size = Vector3(0.36, 1.55, 0.36)
+			post.mesh = post_m
+			post.material_override = timber_mat
+			post.position = Vector3(px, 0.75, rz)
+			bridge_root.add_child(post)
+
+			# Transverse floor cross-beam under deck at each post
+			if side > 0:
+				var floor_beam := MeshInstance3D.new()
+				floor_beam.name = "FloorBent_%d" % p_idx
+				var fbm := BoxMesh.new()
+				fbm.size = Vector3(0.40, 0.50, width + 0.6)
+				floor_beam.mesh = fbm
+				floor_beam.material_override = timber_mat
+				floor_beam.position = Vector3(px, -0.45, 0)
+				bridge_root.add_child(floor_beam)
+
+			# Diagonal X-Bracing between adjacent posts
+			if p_idx < post_count:
+				var next_px = px + post_spacing
+				var mid_x = (px + next_px) * 0.5
+				var brace_len = sqrt(post_spacing * post_spacing + 0.65 * 0.65)
+				var brace_angle = rad_to_deg(atan2(0.65, post_spacing))
+
+				var b1 := MeshInstance3D.new()
+				b1.name = "XBrace1_" + rail_side_name + "_%d" % p_idx
+				var bm1 := BoxMesh.new()
+				bm1.size = Vector3(brace_len, 0.14, 0.14)
+				b1.mesh = bm1
+				b1.material_override = timber_mat
+				b1.position = Vector3(mid_x, 1.15, rz)
+				b1.rotation_degrees = Vector3(0, 0, brace_angle)
+				bridge_root.add_child(b1)
+
+				var b2 := MeshInstance3D.new()
+				b2.name = "XBrace2_" + rail_side_name + "_%d" % p_idx
+				var bm2 := BoxMesh.new()
+				bm2.size = Vector3(brace_len, 0.14, 0.14)
+				b2.mesh = bm2
+				b2.material_override = timber_mat
+				b2.position = Vector3(mid_x, 1.15, rz)
+				b2.rotation_degrees = Vector3(0, 0, -brace_angle)
+				bridge_root.add_child(b2)
+
+	# 7. Creek Bed Heavy Timber Trestle Bents with Stone Cutwaters
+	for x_bent in [-10.0, 10.0]:
+		var bent_root := Node3D.new()
+		bent_root.name = "TrestleBent_%d" % int(x_bent)
+		bent_root.position = Vector3(x_bent, 0, 0)
+
+		# Stone Pier Base / Cutwater in creek bed
+		var stone_pier := StaticBody3D.new()
+		stone_pier.name = "StonePier"
+		stone_pier.position = Vector3(0, -4.5, 0)
+		var sp_col := CollisionShape3D.new()
+		var sp_shape := BoxShape3D.new()
+		sp_shape.size = Vector3(3.2, 5.0, width - 2.0)
+		sp_col.shape = sp_shape
+		stone_pier.add_child(sp_col)
+
+		var sp_mesh := MeshInstance3D.new()
+		var spm := BoxMesh.new()
+		spm.size = sp_shape.size
+		sp_mesh.mesh = spm
+		sp_mesh.material_override = stone_mat
+		stone_pier.add_child(sp_mesh)
+		bent_root.add_child(stone_pier)
+
+		# 4 Battered Timber Piles
+		for pile_idx in range(4):
+			var pile_z = - (width - 4.0) * 0.5 + pile_idx * ((width - 4.0) / 3.0)
+			var pile := MeshInstance3D.new()
+			pile.name = "Pile_%d" % pile_idx
+			var pm := BoxMesh.new()
+			pm.size = Vector3(0.55, 3.2, 0.55)
+			pile.mesh = pm
+			pile.material_override = timber_mat
+			pile.position = Vector3(0, -1.2, pile_z)
+			bent_root.add_child(pile)
+
+		# Transverse Cap Beam
+		var cap_beam := MeshInstance3D.new()
+		cap_beam.name = "CapBeam"
+		var cbm := BoxMesh.new()
+		cbm.size = Vector3(1.2, 0.65, width - 1.0)
+		cap_beam.mesh = cbm
+		cap_beam.material_override = timber_mat
+		cap_beam.position = Vector3(0, -0.65, 0)
+		bent_root.add_child(cap_beam)
+
+		bridge_root.add_child(bent_root)
 
 	parent.add_child(bridge_root)
 
 
-func _build_ribbon_road(parent: Node, curve: Curve3D, width: float, node_name: String, asphalt_tex: Texture2D) -> void:
+func _build_cobblestone_road(parent: Node, curve: Curve3D, width: float, node_name: String) -> void:
 	var baked = curve.get_baked_points()
 	if baked.size() < 2:
 		return
 
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var total_len: float = curve.get_baked_length()
+	var half_w: float = width * 0.5
+	var curb_w: float = 0.5
+	var max_curb_h: float = 0.22
+	var deck_crown: float = 0.08
+	var max_wall_drop: float = 3.8
 
-	var road_mat := StandardMaterial3D.new()
-	if asphalt_tex:
-		road_mat.albedo_texture = asphalt_tex
-	road_mat.albedo_color = Color(0.85, 0.88, 0.92)
-	road_mat.roughness = 0.8
-	road_mat.uv1_scale = Vector3(0.2, 0.2, 0.2)
+	# 1. Cobblestone Road Deck Material (High-res PBR cobblestone)
+	var cobble_mat := StandardMaterial3D.new()
+	var cobble_tex: Texture2D = load("res://materials/cobblestone.png") as Texture2D
+	var cobble_norm: Texture2D = load("res://materials/cobblestone_normal.png") as Texture2D
+	var cobble_rough: Texture2D = load("res://materials/cobblestone_roughness.png") as Texture2D
+	if cobble_tex:
+		cobble_mat.albedo_texture = cobble_tex
+	if cobble_norm:
+		cobble_mat.normal_enabled = true
+		cobble_mat.normal_texture = cobble_norm
+		cobble_mat.normal_scale = 1.0
+	if cobble_rough:
+		cobble_mat.roughness_texture = cobble_rough
+	cobble_mat.roughness = 0.85
+	cobble_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 
-	var half_w = width * 0.5
+	# 2. Retaining Wall / Embankment Material (Alpine dark canyon rock)
+	var wall_mat := StandardMaterial3D.new()
+	var rock_tex: Texture2D = load("res://materials/dark_canyon_rock.png") as Texture2D
+	var rock_norm: Texture2D = load("res://materials/dark_canyon_rock_normal.png") as Texture2D
+	if rock_tex:
+		wall_mat.albedo_texture = rock_tex
+	if rock_norm:
+		wall_mat.normal_enabled = true
+		wall_mat.normal_texture = rock_norm
+		wall_mat.normal_scale = 0.85
+	wall_mat.roughness = 0.90
+	wall_mat.uv1_scale = Vector3(0.25, 0.25, 0.25)
+	wall_mat.uv1_triplanar = true
+	wall_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+
+	var st_deck := SurfaceTool.new()
+	st_deck.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	var st_wall := SurfaceTool.new()
+	st_wall.begin(Mesh.PRIMITIVE_TRIANGLES)
+
 	var cum_dist: float = 0.0
+	const DECK_VERTS := 7
 
 	for i in range(baked.size()):
 		var p = baked[i]
-		var forward = Vector3.FORWARD
+		var fwd = Vector3.FORWARD
 		if i < baked.size() - 1:
-			forward = (baked[i + 1] - p).normalized()
+			fwd = (baked[i + 1] - p).normalized()
 		elif i > 0:
-			forward = (p - baked[i - 1]).normalized()
+			fwd = (p - baked[i - 1]).normalized()
 
-		var right = Vector3(-forward.z, 0, forward.x).normalized()
+		var right = Vector3(-fwd.z, 0, fwd.x).normalized()
 		var up = Vector3.UP
 
 		if i > 0:
 			cum_dist += p.distance_to(baked[i - 1])
 
-		var v_left = p - right * half_w + up * 0.06
-		var v_right = p + right * half_w + up * 0.06
+		# Taper curbs and embankment smoothly at junctions with main track (first and last 8 meters)
+		var taper_in: float = clampf(cum_dist / 8.0, 0.0, 1.0)
+		var taper_out: float = clampf((total_len - cum_dist) / 8.0, 0.0, 1.0)
+		var taper: float = minf(taper_in, taper_out)
 
-		st.set_normal(up)
-		st.set_uv(Vector2(0.0, cum_dist * 0.1))
-		st.add_vertex(v_left)
+		# Quadratic ease-in so at the junction it is completely flat (0.0 curb, 0.0 drop)
+		var curb_h: float = max_curb_h * (taper * taper)
+		var wall_drop: float = max_wall_drop * (taper * taper)
 
-		st.set_normal(up)
-		st.set_uv(Vector2(1.0, cum_dist * 0.1))
-		st.add_vertex(v_right)
+		var uv_y: float = cum_dist * 0.40
 
+		# --- DECK MESH VERTICES (7 points across road) ---
+		# 0: Left Curb Outer Lip
+		st_deck.set_uv(Vector2(0.0, uv_y))
+		st_deck.add_vertex(p - right * half_w + up * (0.05 + curb_h))
+		# 1: Left Curb Inner Lip
+		st_deck.set_uv(Vector2(0.3, uv_y))
+		st_deck.add_vertex(p - right * (half_w - curb_w) + up * (0.05 + curb_h))
+		# 2: Left Deck Gutter
+		st_deck.set_uv(Vector2(0.4, uv_y))
+		st_deck.add_vertex(p - right * (half_w - curb_w) + up * 0.05)
+		# 3: Center Deck Crown
+		st_deck.set_uv(Vector2(2.5, uv_y))
+		st_deck.add_vertex(p + up * (0.05 + deck_crown * taper))
+		# 4: Right Deck Gutter
+		st_deck.set_uv(Vector2(4.6, uv_y))
+		st_deck.add_vertex(p + right * (half_w - curb_w) + up * 0.05)
+		# 5: Right Curb Inner Lip
+		st_deck.set_uv(Vector2(4.7, uv_y))
+		st_deck.add_vertex(p + right * (half_w - curb_w) + up * (0.05 + curb_h))
+		# 6: Right Curb Outer Lip
+		st_deck.set_uv(Vector2(5.0, uv_y))
+		st_deck.add_vertex(p + right * half_w + up * (0.05 + curb_h))
+
+		# --- WALL MESH VERTICES (4 points: left base/top, right top/base) ---
+		var wall_uv_y: float = cum_dist * 0.25
+		# 0: Left Embankment Base
+		st_wall.set_uv(Vector2(0.0, wall_uv_y))
+		st_wall.add_vertex(p - right * (half_w + 0.35 * taper) - up * wall_drop)
+		# 1: Left Embankment Top
+		st_wall.set_uv(Vector2(1.0, wall_uv_y))
+		st_wall.add_vertex(p - right * half_w + up * (0.05 + curb_h))
+		# 2: Right Embankment Top
+		st_wall.set_uv(Vector2(1.0, wall_uv_y))
+		st_wall.add_vertex(p + right * half_w + up * (0.05 + curb_h))
+		# 3: Right Embankment Base
+		st_wall.set_uv(Vector2(0.0, wall_uv_y))
+		st_wall.add_vertex(p + right * (half_w + 0.35 * taper) - up * wall_drop)
+
+	# Connect Deck Quads
 	for i in range(baked.size() - 1):
-		var i0 = i * 2
-		var i1 = i * 2 + 1
-		var i2 = (i + 1) * 2
-		var i3 = (i + 1) * 2 + 1
+		var r0 = i * DECK_VERTS
+		var r1 = (i + 1) * DECK_VERTS
+		for c in range(DECK_VERTS - 1):
+			var a = r0 + c
+			var b = r0 + c + 1
+			var c_idx = r1 + c
+			var d = r1 + c + 1
+			st_deck.add_index(a); st_deck.add_index(c_idx); st_deck.add_index(b)
+			st_deck.add_index(b); st_deck.add_index(c_idx); st_deck.add_index(d)
 
-		st.add_index(i0)
-		st.add_index(i2)
-		st.add_index(i1)
+	# Connect Left and Right Walls
+	for i in range(baked.size() - 1):
+		var w0 = i * 4
+		var w1 = (i + 1) * 4
+		# Left Wall
+		var lb0 = w0 + 0; var lt0 = w0 + 1
+		var lb1 = w1 + 0; var lt1 = w1 + 1
+		st_wall.add_index(lb0); st_wall.add_index(lt0); st_wall.add_index(lb1)
+		st_wall.add_index(lt0); st_wall.add_index(lt1); st_wall.add_index(lb1)
+		# Right Wall
+		var rt0 = w0 + 2; var rb0 = w0 + 3
+		var rt1 = w1 + 2; var rb1 = w1 + 3
+		st_wall.add_index(rt0); st_wall.add_index(rb0); st_wall.add_index(rt1)
+		st_wall.add_index(rb0); st_wall.add_index(rb1); st_wall.add_index(rt1)
 
-		st.add_index(i1)
-		st.add_index(i2)
-		st.add_index(i3)
+	st_deck.generate_normals()
+	st_deck.generate_tangents()
+	var deck_mesh: ArrayMesh = st_deck.commit()
 
-	st.generate_tangents()
-	var arr_mesh = st.commit()
+	st_wall.generate_normals()
+	st_wall.generate_tangents()
+	var wall_mesh: ArrayMesh = st_wall.commit()
 
 	var static_body := StaticBody3D.new()
 	static_body.name = node_name + "_Collision"
 	static_body.add_to_group("track_surface", true)
 
-	var mesh_inst := MeshInstance3D.new()
-	mesh_inst.name = node_name
-	mesh_inst.mesh = arr_mesh
-	mesh_inst.material_override = road_mat
-	static_body.add_child(mesh_inst)
+	var deck_inst := MeshInstance3D.new()
+	deck_inst.name = node_name + "_Deck"
+	deck_inst.mesh = deck_mesh
+	deck_inst.material_override = cobble_mat
+	static_body.add_child(deck_inst)
+
+	var wall_inst := MeshInstance3D.new()
+	wall_inst.name = node_name + "_Embankment"
+	wall_inst.mesh = wall_mesh
+	wall_inst.material_override = wall_mat
+	static_body.add_child(wall_inst)
 
 	var col_shape := CollisionShape3D.new()
-	var r_trimesh = arr_mesh.create_trimesh_shape()
+	col_shape.name = "CollisionShape3D"
+	var r_trimesh = deck_mesh.create_trimesh_shape()
 	if r_trimesh is ConcavePolygonShape3D:
 		(r_trimesh as ConcavePolygonShape3D).backface_collision = true
 	col_shape.shape = r_trimesh
 	static_body.add_child(col_shape)
+
+	var col_wall_shape := CollisionShape3D.new()
+	col_wall_shape.name = "CollisionShape3D_Embankment"
+	var r_wall_trimesh = wall_mesh.create_trimesh_shape()
+	if r_wall_trimesh is ConcavePolygonShape3D:
+		(r_wall_trimesh as ConcavePolygonShape3D).backface_collision = true
+	col_wall_shape.shape = r_wall_trimesh
+	static_body.add_child(col_wall_shape)
 
 	parent.add_child(static_body)
 

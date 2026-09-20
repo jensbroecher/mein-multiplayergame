@@ -442,7 +442,7 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			road_h = base_terrain_height
 
 		if track_layout_type == TrackLayoutType.CANYON:
-			var sand_edge = sand_width / 2.0
+			var sand_edge = curb_outer_width / 2.0
 			
 			# Zone 1: Road surface — flat at road height
 			var road_inner = sand_edge - 2.0
@@ -479,7 +479,7 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 				height = minf(height, -8.0)
 		else:
 			# Original blending for DEFAULT and MOUNTAIN
-			var sand_edge = sand_width / 2.0
+			var sand_edge = curb_outer_width / 2.0
 			var blend_dist = 45.0 if level_prefix == "pinecrest_ridge" else 60.0
 			var clearing_blend = 1.0 - smoothstep(sand_edge - 2.0, sand_edge + blend_dist, dist)
 
@@ -558,10 +558,18 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 @export_group("Layout")
 @export var track_layout_type: TrackLayoutType = TrackLayoutType.DEFAULT
 @export var road_width: float = 14.0
-@export var sand_width: float = 16.0
+## Total outer width of the track including curbs on both sides (outer curb-to-curb span).
+@export var curb_outer_width: float = 16.0
 @export var road_y_offset: float = 0.3
 @export var curb_y_offset: float = 0.05
 @export var curb_slope: float = 0.15
+
+# Backward-compatibility alias for older scenes and scripts
+var sand_width: float:
+	get:
+		return curb_outer_width
+	set(v):
+		curb_outer_width = v
 @export var grass_material: Material
 @export var road_material: Material
 @export var terrain_recession_visual: float = 0.4
@@ -970,13 +978,13 @@ func _generate_road_and_sand():
 
 	# 3. Visual Overlays: Curbs and Road
 	if track_layout_type != TrackLayoutType.CANYON:
-		_create_path_visual(points_count, sand_width, curb_mat, concrete_mat, curb_y_offset, "Visual_Curbs")
+		_create_path_visual(points_count, curb_outer_width, curb_mat, concrete_mat, curb_y_offset, "Visual_Curbs")
 		_create_path_visual(points_count, road_width, road_material, concrete_mat, road_y_offset, "Visual_Road")
 	else:
 		_create_path_visual(points_count, road_width, road_material, null, road_y_offset, "Visual_Road")
 
 	# Create ONE unified collision surface for EVERYTHING (Road + Border)
-	var col_width = road_width if track_layout_type == TrackLayoutType.CANYON else sand_width
+	var col_width = road_width if track_layout_type == TrackLayoutType.CANYON else curb_outer_width
 	_create_track_collision(points_count, col_width, "Visual_Road")
 
 func _create_path_visual(point_count: int, width: float, mat: Material, side_mat: Material, y_offset: float, node_name: String):

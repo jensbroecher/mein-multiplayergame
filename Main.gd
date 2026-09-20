@@ -408,6 +408,8 @@ func _unload_all_levels() -> void:
 	# Flush pending GPU work from the previous stage (best-effort).
 	RenderingServer.force_sync()
 	await get_tree().process_frame
+	if MusicManager:
+		MusicManager.stop_music()
 
 
 func _on_server_disconnected():

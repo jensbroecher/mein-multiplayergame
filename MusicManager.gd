@@ -261,14 +261,18 @@ func save_settings():
 func _load_playlist(folder: String = music_folder):
 	playlist.clear()
 	loaded_playlist.clear()
+	current_track_index = -1
 	var dir = DirAccess.open(folder)
 	if dir:
 		dir.list_dir_begin()
 		var file_name = dir.get_next()
 		while file_name != "":
 			if not dir.current_is_dir():
-				if file_name.ends_with(".mp3") or file_name.ends_with(".wav") or file_name.ends_with(".ogg"):
-					playlist.append(folder + file_name)
+				var clean_name = file_name.trim_suffix(".import").trim_suffix(".remap")
+				if clean_name.ends_with(".mp3") or clean_name.ends_with(".wav") or clean_name.ends_with(".ogg"):
+					var file_path = folder.path_join(clean_name)
+					if not playlist.has(file_path):
+						playlist.append(file_path)
 			file_name = dir.get_next()
 		dir.list_dir_end()
 	
@@ -280,31 +284,74 @@ func _load_playlist(folder: String = music_folder):
 				loaded_playlist.append(stream)
 
 func load_playlist_for_level(scene_path: String):
-	# Check for a subfolder matching the level name, e.g. music/mountain/ for MountainLevel
+	var path_lower := scene_path.to_lower()
+	if path_lower.is_empty():
+		var level = get_tree().get_first_node_in_group("level")
+		if level:
+			path_lower = (level.scene_file_path + " " + level.name).to_lower()
+
+	# Check for a subfolder matching the level name
 	var level_folder := ""
-	if scene_path.to_lower().contains("mountain") or scene_path.to_lower().contains("wadi"):
+	if path_lower.contains("pinecrest"):
+		level_folder = music_folder + "pinecrest/"
+	elif path_lower.contains("mountain") or path_lower.contains("wadi"):
 		level_folder = music_folder + "mountain/"
-	elif scene_path.to_lower().contains("canyon"):
+	elif path_lower.contains("canyon"):
 		level_folder = music_folder + "canyon/"
-	elif scene_path.to_lower().contains("desert"):
+	elif path_lower.contains("desert"):
 		level_folder = music_folder + "desert/"
-	elif scene_path.to_lower().contains("city") or scene_path.to_lower().contains("harbor"):
+	elif path_lower.contains("city") or path_lower.contains("harbor"):
 		level_folder = music_folder + "city/"
-	
-	# Use the subfolder if it exists and has tracks, otherwise fall back to root music folder
+	elif path_lower.contains("frost") or path_lower.contains("snow"):
+		level_folder = music_folder + "frost/"
+
+	# Use the subfolder if it exists and has tracks
 	if level_folder != "" and DirAccess.open(level_folder) != null:
 		_load_playlist(level_folder)
 		if not loaded_playlist.is_empty():
 			return
+
+	# Pinecrest Ridge: strictly only play the dedicated Pinecrest music track.
+	# Guarantee it loads even if directory listing fails (e.g. exported PCK build).
+	# NEVER fall back to root music for Pinecrest.
+	if path_lower.contains("pinecrest"):
+		var pinecrest_track := "res://music/pinecrest/Where_the_Canopy_Thins.mp3"
+		var stream = load(pinecrest_track)
+		if stream:
+			playlist = [pinecrest_track]
+			loaded_playlist = [stream]
+			current_track_index = -1
+		return
+
+	# Frostpeak Creek: strictly only play music from music/frost/.
+	# NEVER fall back to root music for Frostpeak.
+	if path_lower.contains("frost") or path_lower.contains("snow"):
+		var frost_tracks := [
+			"res://music/frost/Beneath_the_Glacier.mp3",
+			"res://music/frost/First_Light_on_the_Ridge.mp3",
+			"res://music/frost/Summit_Drift.mp3"
+		]
+		for track_path in frost_tracks:
+			var stream = load(track_path)
+			if stream:
+				playlist.append(track_path)
+				loaded_playlist.append(stream)
+		if not loaded_playlist.is_empty():
+			playlist.shuffle()
+			current_track_index = -1
+		return
+
 	# Fallback: load from root music folder
 	_load_playlist(music_folder)
 
 func play_race_music():
-	if not active_player.playing:
+	if active_player == null or not active_player.playing or not loaded_playlist.has(active_player.stream):
 		play_next()
 
 func play_next():
 	if loaded_playlist.is_empty():
+		return
+	if active_player == null or inactive_player == null:
 		return
 		
 	current_track_index = (current_track_index + 1) % loaded_playlist.size()
@@ -321,6 +368,8 @@ func play_next():
 		
 		active_player.stream = stream
 		active_player.volume_db = -80.0
+		if not active_player.is_inside_tree():
+			return
 		active_player.play()
 		
 		# Crossfade tween

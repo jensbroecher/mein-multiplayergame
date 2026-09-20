@@ -1,0 +1,18 @@
+[gd_scene format=3 uid="uid://snowdrift123"]
+
+[ext_resource type="Script" path="res://SnowDrift.gd" id="1_script"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_drift"]
+size = Vector3(15, 3.2, 18)
+
+[node name="SnowDrift" type="Area3D" groups=["snow"]]
+collision_layer = 1
+collision_mask = 1
+script = ExtResource("1_script")
+metadata/is_snow = true
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 0)
+shape = SubResource("BoxShape3D_drift")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]

@@ -1910,10 +1910,14 @@ func _physics_process(delta):
 				proj_fwd = proj_fwd.normalized()
 			var target_r = proj_fwd.cross(ground_normal).normalized()
 			var target_f = ground_normal.cross(target_r).normalized()
-			var upright_basis = Basis(target_r, ground_normal, -target_f)
+			var current_b = visuals.global_transform.basis.orthonormalized()
+			var upright_basis = Basis(target_r, ground_normal, -target_f).orthonormalized()
 			# Smooth roll recovery animation over ~0.6s
 			var recovery_speed: float = 3.8
-			visuals.global_transform.basis = visuals.global_transform.basis.slerp(upright_basis, 1.0 - exp(-recovery_speed * delta))
+			var cur_q: Quaternion = current_b.get_rotation_quaternion().normalized()
+			var tgt_q: Quaternion = upright_basis.get_rotation_quaternion().normalized()
+			var new_q: Quaternion = cur_q.slerp(tgt_q, 1.0 - exp(-recovery_speed * delta)).normalized()
+			visuals.global_transform.basis = Basis(new_q)
 		else:
 			is_righting_on_ground = false
 	was_on_ground = on_ground
@@ -2462,6 +2466,8 @@ func _get_track_outer_half_width() -> float:
 			# Sand counts as offroad: use visible road_width only, not sand_width
 			if "road_width" in tg:
 				return float(tg.road_width) * 0.5
+			if "curb_outer_width" in tg:
+				return float(tg.curb_outer_width) * 0.5
 			if "sand_width" in tg:
 				return float(tg.sand_width) * 0.5
 	return 7.5
@@ -2594,7 +2600,10 @@ func _update_visuals_alignment(delta: float) -> void:
 			on_loop_vis = _is_loop_surface(col)
 			if norm.y >= 0.15 or on_loop_vis:
 				on_ground = true
-				target_up = norm
+				if norm.length_squared() > 0.001:
+					target_up = norm.normalized()
+				else:
+					target_up = Vector3.UP
 
 	# Soft spring: compress slightly on landing impacts, and sink tires into snow drifts
 	var compress: float = 0.0
@@ -2605,11 +2614,23 @@ func _update_visuals_alignment(delta: float) -> void:
 	visual_offset_y = lerpf(visual_offset_y, fixed_offset + compress, 1.0 - exp(-11.0 * delta))
 
 	if on_ground:
-		_smooth_visual_up = _smooth_visual_up.slerp(target_up, 1.0 - exp(-8.0 * delta))
-		if _smooth_visual_up.length_squared() > 0.001:
-			target_up = _smooth_visual_up.normalized()
+		target_up = target_up.normalized()
+		if _smooth_visual_up.length_squared() < 0.001:
+			_smooth_visual_up = target_up
 		else:
-			target_up = Vector3.UP
+			_smooth_visual_up = _smooth_visual_up.normalized()
+
+		var dot_up: float = clampf(_smooth_visual_up.dot(target_up), -1.0, 1.0)
+		var slerp_t: float = 1.0 - exp(-8.0 * delta)
+		if dot_up > 0.9999 or dot_up < -0.9999:
+			_smooth_visual_up = target_up
+		else:
+			var interpolated = _smooth_visual_up.lerp(target_up, slerp_t)
+			if interpolated.length_squared() > 0.001:
+				_smooth_visual_up = interpolated.normalized()
+			else:
+				_smooth_visual_up = target_up
+		target_up = _smooth_visual_up
 	else:
 		_smooth_visual_up = Vector3.UP
 		target_up = Vector3.UP
@@ -2629,7 +2650,7 @@ func _update_visuals_alignment(delta: float) -> void:
 		return
 
 	# Smoothly align the visual mesh normal to terrain slope (no horizontal clamp!)
-	var current_basis = visuals.global_transform.basis
+	var current_basis = visuals.global_transform.basis.orthonormalized()
 	var forward = -current_basis.z
 
 	var target_forward = (forward - target_up * forward.dot(target_up)).normalized()
@@ -2638,8 +2659,11 @@ func _update_visuals_alignment(delta: float) -> void:
 	var target_right = target_forward.cross(target_up).normalized()
 	target_forward = target_up.cross(target_right).normalized()
 
-	var target_basis = Basis(target_right, target_up, -target_forward)
-	visuals.global_transform.basis = current_basis.slerp(target_basis, 1.0 - exp(-9.0 * delta))
+	var target_basis = Basis(target_right, target_up, -target_forward).orthonormalized()
+	var cur_q: Quaternion = current_basis.get_rotation_quaternion().normalized()
+	var tgt_q: Quaternion = target_basis.get_rotation_quaternion().normalized()
+	var new_q: Quaternion = cur_q.slerp(tgt_q, 1.0 - exp(-9.0 * delta)).normalized()
+	visuals.global_transform.basis = Basis(new_q)
 
 	var target_pos = get_global_transform_interpolated().origin - target_up * visual_offset_y
 	visuals.global_position = target_pos
@@ -2694,9 +2718,9 @@ func _interpolate_remote_visual(delta: float):
 		target_quat = Quaternion.from_euler(sync_rotation)
 
 	# Smoothly follow visual rotation to prevent remote visual jittering at high refresh rates
-	var current_visual_quat: Quaternion = visuals.global_transform.basis.get_rotation_quaternion()
+	var current_visual_quat: Quaternion = visuals.global_transform.basis.orthonormalized().get_rotation_quaternion().normalized()
 	var rot_t = 1.0 - exp(-REMOTE_LERP_SPEED * 0.65 * delta)
-	var new_visual_quat: Quaternion = current_visual_quat.slerp(target_quat, rot_t)
+	var new_visual_quat: Quaternion = current_visual_quat.slerp(target_quat.normalized(), rot_t).normalized()
 	
 	visuals.global_transform.basis = Basis(new_visual_quat)
 	var target_up = visuals.global_transform.basis.y.normalized()

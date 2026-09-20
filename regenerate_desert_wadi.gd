@@ -71,7 +71,7 @@ func _ready() -> void:
 	tg.terrain_recession_visual = 0.22
 	tg.road_y_offset = 0.06
 	tg.curb_y_offset = 0.06
-	tg.sand_width = 17.0
+	tg.curb_outer_width = 17.0
 	tg.road_width = 14.0
 	tg.terrain_grass_count = 0
 
