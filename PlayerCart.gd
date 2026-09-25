@@ -341,6 +341,7 @@ var stage_has_water: bool = false
 var _harbor_stage: bool = false
 var _mountain_stage: bool = false
 var _wadi_stage: bool = false
+var _bloombay_stage: bool = false
 var _snow_stage: bool = false
 var is_in_snow: bool = false
 var _snow_drift_depth: int = 0
@@ -757,6 +758,20 @@ func _ready():
 					var bmax: Vector2 = river.get_meta("water_bounds_max")
 					water_bounds_min = Vector2(minf(bmin.x, 0.0), minf(bmin.y, -360.0))
 					water_bounds_max = Vector2(maxf(bmax.x, 400.0), maxf(bmax.y, -60.0))
+		elif tg and str(tg.get("level_prefix")) == "bloombay_dunes":
+			_bloombay_stage = true
+			stage_has_water = true
+			water_surface_y = 0.0
+			water_bounds_active = false
+			water_bounds_min = Vector2(-1050.0, -900.0)
+			water_bounds_max = Vector2(550.0, 900.0)
+			var b_water = tg.get_node_or_null("BloombayWater")
+			if b_water:
+				if b_water.has_meta("water_surface_y"):
+					water_surface_y = float(b_water.get_meta("water_surface_y"))
+				if b_water.has_meta("water_bounds_min") and b_water.has_meta("water_bounds_max"):
+					water_bounds_min = b_water.get_meta("water_bounds_min")
+					water_bounds_max = b_water.get_meta("water_bounds_max")
 		elif tg and (str(tg.get("level_prefix")).contains("frost") or str(tg.get("level_prefix")).contains("snow")):
 			_snow_stage = true
 			stage_has_water = true
@@ -2415,9 +2430,16 @@ func _is_world_terrain_collider(collider: Object) -> bool:
 func _is_track_surface(collider: Object) -> bool:
 	if collider == null or not (collider is Node):
 		return false
+
+	# Bloombay Dunes beach section: pure beach sand driving must count as offroad driving!
+	if (_bloombay_stage or (_cached_level and str(_cached_level.name).to_lower().contains("bloombay"))) and global_position.x < -24.0:
+		return false
+
 	var n: Node = collider as Node
 	var current: Node = n
 	while current:
+		if current == _cached_level or current.is_in_group("level"):
+			break
 		if current.is_in_group("loop_track") or current.is_in_group("track_surface") or current.is_in_group("ramps"):
 			return true
 		var nm := str(current.name).to_lower()
@@ -2426,7 +2448,7 @@ func _is_track_surface(collider: Object) -> bool:
 				or nm.contains("loop") or nm.contains("deck") \
 				or nm.contains("jump") or nm.contains("curb") \
 				or nm.contains("pier") or nm.contains("harbor") \
-				or nm.contains("dune") or nm.contains("checkpoint") \
+				or nm.contains("checkpoint") \
 				or nm.contains("finishline") or nm.contains("gate"):
 			return true
 		current = current.get_parent()
@@ -2436,6 +2458,8 @@ func _is_track_surface(collider: Object) -> bool:
 		var lvl_check = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
 		if _wadi_stage or (lvl_check and str(lvl_check.name).to_lower().contains("wadi")):
 			# Desert wadi is an offroad stage with no asphalt road: all driving on sand is offroad (applying offroad penalty & sand dust)!
+			return false
+		if (_bloombay_stage or (lvl_check and str(lvl_check.name).to_lower().contains("bloombay"))) and global_position.x < -24.0:
 			return false
 		var p_track: Path3D = active_path if (active_path and active_path.curve) else track_path
 		if p_track and p_track.curve:
@@ -2450,6 +2474,8 @@ func _is_track_surface(collider: Object) -> bool:
 			if xz_dist <= outer_hw and y_diff <= 3.2:
 				return true
 		return false
+
+	return false
 
 	return false
 
@@ -4793,7 +4819,7 @@ func _get_current_surface_dust_color() -> Color:
 		
 	if lvl_name.contains("canyon"):
 		return Color(0.90, 0.68, 0.50) # Terracotta sandstone
-	elif lvl_name.contains("desert") or lvl_name.contains("wadi"):
+	elif lvl_name.contains("desert") or lvl_name.contains("wadi") or lvl_name.contains("bloombay") or lvl_name.contains("dune"):
 		return Color(0.95, 0.88, 0.70) # Warm golden sand
 	elif lvl_name.contains("mountain"):
 		return Color(0.88, 0.82, 0.72) # Mountain sand & gravel
@@ -4846,12 +4872,12 @@ func _set_dirt_emitting(emitting: bool):
 	var speed: float = linear_velocity.length()
 	var time_since_respawn = (Time.get_ticks_msec() / 1000.0) - last_respawn_time
 	
-	var is_sand_stage: bool = _wadi_stage or _mountain_stage
+	var is_sand_stage: bool = _wadi_stage or _mountain_stage or _bloombay_stage
 	if not is_sand_stage:
 		var lvl = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
 		if lvl:
 			var lvl_nm = str(lvl.name).to_lower()
-			is_sand_stage = lvl_nm.contains("wadi") or lvl_nm.contains("desert") or lvl_nm.contains("mountain")
+			is_sand_stage = lvl_nm.contains("wadi") or lvl_nm.contains("desert") or lvl_nm.contains("mountain") or lvl_nm.contains("bloombay") or lvl_nm.contains("dune")
 
 	var in_snow_active: bool = is_in_snow or (_snow_stage and is_offroad)
 	var min_speed: float = 1.5 if in_snow_active else (2.2 if is_sand_stage else 4.8)

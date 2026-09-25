@@ -397,7 +397,7 @@ func display_race_results(results_data: Array):
 		var gp_name = NetworkManager.current_gp_name
 		if gp_name.is_empty():
 			gp_name = NetworkManager.selected_mp_cup
-		var gp_data = NetworkManager.GP_CUPS.get(gp_name)
+		var gp_data = NetworkManager.get_gp_cup(gp_name)
 		var next_stage = NetworkManager.current_gp_stage + 1
 		if multiplayer.is_server():
 			if gp_data and next_stage < gp_data["stages"].size():
@@ -559,7 +559,7 @@ func _on_action_button_pressed():
 		var gp_name = NetworkManager.current_gp_name
 		if gp_name.is_empty():
 			gp_name = NetworkManager.selected_mp_cup
-		var gp_data = NetworkManager.GP_CUPS.get(gp_name)
+		var gp_data = NetworkManager.get_gp_cup(gp_name)
 		var next_stage = NetworkManager.current_gp_stage + 1
 		if gp_data and next_stage < gp_data["stages"].size():
 			var main = get_tree().current_scene

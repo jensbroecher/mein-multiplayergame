@@ -160,7 +160,7 @@ func start_game(is_host: bool):
 		if NetworkManager.multiplayer_mode == NetworkManager.MultiplayerMode.GRAND_PRIX:
 			NetworkManager.current_gp_name = NetworkManager.selected_mp_cup
 			NetworkManager.current_gp_stage = 0
-			var gp_data = NetworkManager.GP_CUPS.get(NetworkManager.selected_mp_cup)
+			var gp_data = NetworkManager.get_gp_cup(NetworkManager.selected_mp_cup)
 			if gp_data and gp_data["stages"].size() > 0:
 				status = "Loading GP stage 1"
 				level_scene = load(gp_data["stages"][0])
@@ -169,7 +169,7 @@ func start_game(is_host: bool):
 			level_scene = load(NetworkManager.current_single_stage)
 	elif NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP \
 			or (NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP and NetworkManager.is_coop_gp):
-		var gp_data = NetworkManager.GP_CUPS.get(NetworkManager.current_gp_name)
+		var gp_data = NetworkManager.get_gp_cup(NetworkManager.current_gp_name)
 		if gp_data:
 			var stage_idx = NetworkManager.current_gp_stage
 			if stage_idx < gp_data["stages"].size():
@@ -236,7 +236,7 @@ func _load_gp_stage_impl(stage_idx: int) -> void:
 		loading_screen.set_status("Loading stage %d" % (stage_idx + 1))
 		loading_screen.set_progress(0.4)
 
-	var gp_data = NetworkManager.GP_CUPS.get(NetworkManager.current_gp_name)
+	var gp_data = NetworkManager.get_gp_cup(NetworkManager.current_gp_name)
 	if gp_data and stage_idx < gp_data["stages"].size():
 		NetworkManager.current_gp_stage = stage_idx
 		var stage_path: String = gp_data["stages"][stage_idx]

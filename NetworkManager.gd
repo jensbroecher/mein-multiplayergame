@@ -32,7 +32,7 @@ var current_game_mode: int = GameMode.MULTIPLAYER
 
 enum MultiplayerMode { SINGLE_STAGES, GRAND_PRIX }
 var multiplayer_mode: int = MultiplayerMode.SINGLE_STAGES
-var selected_mp_cup: String = "Starter Cup"
+var selected_mp_cup: String = "Bloombay GP"
 var current_single_stage: String = "res://levels/Level.tscn"
 
 var current_gp_name: String = ""
@@ -52,26 +52,27 @@ const ALL_STAGES = [
 	{"name": "Canyon Drift", "path": "res://levels/CanyonLevel.tscn"},
 	{"name": "Canyon Chasm", "path": "res://levels/CanyonChasmLevel.tscn"},
 	{"name": "Desert Wadi", "path": "res://levels/DesertWadiLevel.tscn"},
+	{"name": "Bloombay Dunes", "path": "res://levels/BloombayDunesLevel.tscn"},
 ]
 
 const GP_CUPS = {
-	"Starter Cup": {
-		"name": "Starter Cup",
+	"Bloombay GP": {
+		"name": "Bloombay GP",
 		"stages": [
 			"res://levels/Level.tscn",
 			"res://levels/PinecrestRidgeLevel.tscn",
 			"res://levels/HarborPierLevel.tscn",
+			"res://levels/BloombayDunesLevel.tscn",
 		]
 	},
 	"Arctic Cup": {
 		"name": "Arctic Cup",
 		"stages": [
-			"res://levels/PinecrestRidgeLevel.tscn",
 			"res://levels/FrostpeakCreekLevel.tscn",
 		]
 	},
-	"Desert Cup": {
-		"name": "Desert Cup",
+	"Al-Raihana GP": {
+		"name": "Al-Raihana GP",
 		"stages": [
 			"res://levels/MountainLevel.tscn",
 			"res://levels/CanyonLevel.tscn",
@@ -80,6 +81,15 @@ const GP_CUPS = {
 		]
 	}
 }
+
+static func get_gp_cup(cup_name: String) -> Dictionary:
+	if GP_CUPS.has(cup_name):
+		return GP_CUPS[cup_name]
+	if cup_name == "Starter Cup":
+		return GP_CUPS["Bloombay GP"]
+	if cup_name == "Desert Cup" or cup_name == "Mountain GP":
+		return GP_CUPS["Al-Raihana GP"]
+	return {}
 
 
 func _ready():
@@ -257,7 +267,7 @@ func sync_player_car(id: int, car_index: int):
 	player_car_changed.emit(id, car_index)
 
 # Mode & Cup Selection
-func set_multiplayer_mode(mode: int, cup_name: String = "Starter Cup"):
+func set_multiplayer_mode(mode: int, cup_name: String = "Bloombay GP"):
 	if multiplayer.is_server():
 		multiplayer_mode = mode
 		selected_mp_cup = cup_name

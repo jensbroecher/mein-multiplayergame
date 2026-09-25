@@ -12,6 +12,11 @@ func _is_in_gap_pos(pos: Vector3) -> bool:
 		if absf(pos.z - (-305.0)) < 14.0 and absf(pos.x) < 24.0:
 			return true
 		return false
+	if level_prefix == "bloombay_dunes":
+		# Beach section: pure beach sand driving, no asphalt road, no curbs!
+		if pos.x < -24.0:
+			return true
+		return false
 	if level_prefix != "canyon_chasm":
 		return false
 	# Gap 1 — hill jump between large ramp takeoff (~z -50) and landing (~z -120).
@@ -380,6 +385,28 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 		var valley_noise: float = h_noise * 0.65
 		base_terrain_height = flank_elevation + valley_noise
 		base_terrain_height = lerpf(base_terrain_height, creek_depth, creek_blend)
+	elif level_prefix == "bloombay_dunes":
+		# Bloombay Dunes: Ocean to the west, smooth beach shoreline, dramatic up-and-down roller-coaster dunes inland
+		var dune_ridges: float = sin(px * 0.022 + cos(pz * 0.016) * 1.5) * 14.0 \
+				+ cos(pz * 0.024 + sin(px * 0.014)) * 11.0 \
+				+ sin((px * 0.035 - pz * 0.025)) * 6.5
+		var dune_base: float = 0.0
+		if px < -46.0:
+			# Open ocean seabed sloping down from the beach shore
+			var ocean_dist = -46.0 - px
+			dune_base = -clampf(ocean_dist * 0.16, 0.0, 16.0)
+		elif px < -24.0:
+			# Gentle sloping sandy beach from water edge (Y=0.0 at X=-46) to inland dunes (Y=1.8 at X=-24)
+			var beach_t = (px - (-46.0)) / 22.0
+			dune_base = lerpf(0.0, 1.8, beach_t)
+		else:
+			# Undulating golden sand dunes with high roller-coaster peaks and valleys
+			var inland_t = clampf((px - (-25.0)) / 45.0, 0.0, 1.0)
+			var inland_shape = inland_t * inland_t * (3.0 - 2.0 * inland_t)
+			# Natural dune ridges with occasional calm oasis hollows dipping into the water plane
+			dune_base = 2.0 + inland_shape * (dune_ridges + 1.0)
+			dune_base = maxf(dune_base, -2.5)
+		base_terrain_height = dune_base + h_noise * 0.50
 	else:
 		base_terrain_height = h_noise
 
@@ -394,6 +421,8 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 				var lake_blend = clampf((lake_radius - dist_to_lake) / 25.0, 0.0, 1.0)
 				lake_blend = lake_blend * lake_blend * (3.0 - 2.0 * lake_blend)
 				base_terrain_height = lerpf(base_terrain_height, depth, lake_blend)
+		elif level_prefix == "bloombay_dunes":
+			pass
 		else:
 			var lake_center = Vector2(-450, -500)
 			var lake_radius = 220.0
@@ -480,7 +509,7 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 		else:
 			# Original blending for DEFAULT and MOUNTAIN
 			var sand_edge = curb_outer_width / 2.0
-			var blend_dist = 45.0 if level_prefix == "pinecrest_ridge" else 60.0
+			var blend_dist = 45.0 if (level_prefix == "pinecrest_ridge" or level_prefix == "bloombay_dunes") else 60.0
 			var clearing_blend = 1.0 - smoothstep(sand_edge - 2.0, sand_edge + blend_dist, dist)
 
 			# Bridge detection: when road is elevated far above base terrain,
@@ -490,7 +519,7 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			var bridge_factor = 0.0
 			if level_prefix == "frostpeak_creek" and absf(pz - (-305.0)) < 22.0 and absf(px) < 24.0:
 				bridge_factor = 1.0
-			elif level_prefix != "pinecrest_ridge":
+			elif level_prefix != "pinecrest_ridge" and level_prefix != "bloombay_dunes":
 				bridge_factor = clampf((elevation_diff - 4.0) / 8.0, 0.0, 1.0)
 			clearing_blend *= (1.0 - bridge_factor)
 
@@ -498,7 +527,10 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 
 			var basin_blend = 1.0 - smoothstep(sand_edge - 2.0, sand_edge, dist)
 			basin_blend *= (1.0 - bridge_factor)
-			if for_collision:
+			if level_prefix == "bloombay_dunes" and closest_pos.x < -24.0:
+				# Beach section has no road or curbs: keep the sand completely smooth without curb ditches
+				pass
+			elif for_collision:
 				height = lerp(height, road_h - terrain_recession_collision, basin_blend)
 			else:
 				height = lerp(height, road_h - terrain_recession_visual, basin_blend)
@@ -647,6 +679,9 @@ func _ready():
 		call_deferred("add_chasm_pit_water")
 	elif level_prefix == "desert_wadi":
 		call_deferred("add_wadi_river_water")
+	elif level_prefix == "bloombay_dunes":
+		if get_node_or_null("BloombayWater") == null:
+			call_deferred("add_bloombay_water")
 	elif level_prefix == "harbor_pier":
 		if get_node_or_null("HarborWater") == null:
 			call_deferred("add_harbor_water")
@@ -734,6 +769,8 @@ func generate_world():
 		add_chasm_pit_water()
 	elif level_prefix == "desert_wadi":
 		add_wadi_river_water()
+	elif level_prefix == "bloombay_dunes":
+		add_bloombay_water()
 	elif not no_water:
 		_generate_water()
 
@@ -2357,6 +2394,67 @@ func add_harbor_water() -> void:
 	mat.set_shader_parameter("enable_water_edge_fade", true)
 	mat.set_shader_parameter("water_fade_start", 520.0)
 	mat.set_shader_parameter("water_fade_end", 780.0)
+	water.material_override = mat
+	add_child(water)
+	if Engine.is_editor_hint() and get_tree():
+		var root = get_tree().edited_scene_root
+		if root:
+			water.owner = root
+		noise_tex.changed.emit()
+
+
+func add_bloombay_water() -> void:
+	if level_prefix != "bloombay_dunes":
+		return
+	var existing = get_node_or_null("BloombayWater")
+	if existing != null:
+		existing.free()
+
+	var water := MeshInstance3D.new()
+	water.name = "BloombayWater"
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(1600.0, 1600.0)
+	plane.subdivide_width = 160
+	plane.subdivide_depth = 160
+	water.mesh = plane
+	water.position = Vector3(-250.0, 0.0, 0.0)
+	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	water.set_meta("water_surface_y", 0.0)
+	water.set_meta("water_half_xz", Vector2(800.0, 800.0))
+	water.set_meta("water_center_xz", Vector2(-250.0, 0.0))
+	water.set_meta("water_bounds_min", Vector2(-1050.0, -800.0))
+	water.set_meta("water_bounds_max", Vector2(550.0, 800.0))
+
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://beach_water.gdshader")
+	var noise := FastNoiseLite.new()
+	noise.seed = 42
+	noise.frequency = 0.02
+	noise.fractal_type = FastNoiseLite.FRACTAL_FBM
+	noise.fractal_octaves = 3
+	var noise_tex := NoiseTexture2D.new()
+	noise_tex.seamless = true
+	noise_tex.as_normal_map = true
+	noise_tex.width = 512
+	noise_tex.height = 512
+	noise_tex.noise = noise
+	mat.set_shader_parameter("noise_tex", noise_tex)
+
+	mat.set_shader_parameter("deep_water_color", Color(0.025, 0.18, 0.38))
+	mat.set_shader_parameter("mid_water_color", Color(0.06, 0.44, 0.58))
+	mat.set_shader_parameter("shallow_color", Color(0.14, 0.68, 0.74))
+	mat.set_shader_parameter("foam_color", Color(0.96, 0.98, 1.0))
+	mat.set_shader_parameter("sky_tint", Color(0.60, 0.74, 0.88))
+	mat.set_shader_parameter("sky_reflect", 0.52)
+	mat.set_shader_parameter("transparency", 0.25)
+	mat.set_shader_parameter("metallic", 0.55)
+	mat.set_shader_parameter("roughness", 0.08)
+	mat.set_shader_parameter("wave_speed", 0.28)
+	mat.set_shader_parameter("wave_amplitude_mult", 1.0)
+	mat.set_shader_parameter("wave_steepness", 1.8)
+	mat.set_shader_parameter("depth_fade_distance", 6.0)
+	mat.set_shader_parameter("shore_foam_threshold", 2.4)
+
 	water.material_override = mat
 	add_child(water)
 	if Engine.is_editor_hint() and get_tree():

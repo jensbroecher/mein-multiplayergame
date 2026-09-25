@@ -22,6 +22,7 @@ const COL_CANYON := Color(0.92, 0.42, 0.22)
 const COL_CHASM := Color(0.72, 0.28, 0.22)
 const COL_WADI := Color(0.9, 0.74, 0.38)
 const COL_SNOW := Color(0.45, 0.82, 0.98)
+const COL_BEACH := Color(0.96, 0.78, 0.40)
 
 @onready var name_edit: LineEdit = $Root/VBox/TopBar/NameBox/NameEdit
 @onready var screen_title: Label = $Root/VBox/TopBar/TitleRow/ScreenTitle
@@ -170,14 +171,14 @@ func show_sub_menu(menu_name: String) -> void:
 			screen_title.text = "SELECT CUP"
 			screen_subtitle.text = "Each cup is a series of courses"
 			tile_grid.columns = 2
-			_add_tile("STARTER CUP", "Lakeside  •  Pinecrest  •  Harbor", "tile_starter_cup.jpg", COL_GREEN, func():
-				_on_cup_selected("Starter Cup")
+			_add_tile("BLOOMBAY GP", "Lakeside  •  Pinecrest  •  Harbor  •  Bloombay Dunes", "tile_bloombay_gp.jpg", COL_GREEN, func():
+				_on_cup_selected("Bloombay GP")
 			)
-			_add_tile("ARCTIC CUP", "Pinecrest  •  Frostpeak Creek", "tile_arctic_cup.jpg", COL_SNOW, func():
+			_add_tile("ARCTIC CUP", "Frostpeak Creek", "tile_arctic_cup.jpg", COL_SNOW, func():
 				_on_cup_selected("Arctic Cup")
 			)
-			_add_tile("DESERT CUP", "Mountain  •  Canyon  •  Chasm  •  Wadi", "tile_desert_cup.jpg", COL_BRONZE, func():
-				_on_cup_selected("Desert Cup")
+			_add_tile("AL-RAIHANA GP", "Mountain  •  Canyon  •  Chasm  •  Wadi", "tile_al_raihana_gp.jpg", COL_BRONZE, func():
+				_on_cup_selected("Al-Raihana GP")
 			)
 		"stage_select":
 			if NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR:
@@ -198,6 +199,9 @@ func show_sub_menu(menu_name: String) -> void:
 			)
 			_add_tile("HARBOR PIER", "Piers, crates, and dark water", "tile_harbor.jpg", COL_HARBOR, func():
 				_on_stage_selected("res://levels/HarborPierLevel.tscn")
+			)
+			_add_tile("BLOOMBAY DUNES", "Ocean coastline, rolling waves, and beach sand dunes", "tile_bloombay_dunes.jpg", COL_BEACH, func():
+				_on_stage_selected("res://levels/BloombayDunesLevel.tscn")
 			)
 			_add_tile("MOUNTAIN COURSE", "Dunes and high desert ridges", "tile_mountain.jpg", COL_MOUNTAIN, func():
 				_on_stage_selected("res://levels/MountainLevel.tscn")
@@ -421,6 +425,7 @@ func _fill_gp_test_tiles() -> void:
 		"res://levels/PinecrestRidgeLevel.tscn": {"title": "PINECREST", "file": "tile_pinecrest.jpg", "color": COL_GREEN},
 		"res://levels/FrostpeakCreekLevel.tscn": {"title": "FROSTPEAK CREEK", "file": "tile_frostpeak_creek.jpg", "color": COL_SNOW},
 		"res://levels/HarborPierLevel.tscn": {"title": "HARBOR PIER", "file": "tile_harbor.jpg", "color": COL_HARBOR},
+		"res://levels/BloombayDunesLevel.tscn": {"title": "BLOOMBAY DUNES", "file": "tile_bloombay_dunes.jpg", "color": COL_BEACH},
 		"res://levels/MountainLevel.tscn": {"title": "MOUNTAIN", "file": "tile_mountain.jpg", "color": COL_MOUNTAIN},
 		"res://levels/CanyonLevel.tscn": {"title": "CANYON", "file": "tile_canyon.jpg", "color": COL_CANYON},
 		"res://levels/CanyonChasmLevel.tscn": {"title": "CANYON CHASM", "file": "tile_canyon_chasm.jpg", "color": COL_CHASM},

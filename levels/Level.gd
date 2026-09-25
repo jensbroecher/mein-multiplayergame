@@ -145,6 +145,7 @@ func _ready():
 	# Canyon Chasm: fill the first hill-jump pit with murky reflective water
 	_setup_chasm_pit_water()
 	_setup_harbor_water()
+	_setup_bloombay_water()
 
 	if multiplayer.is_server():
 		NetworkManager.player_connected.connect(_on_server_player_connected)
@@ -1002,6 +1003,18 @@ func _setup_harbor_water() -> void:
 		return
 	if tg.has_method("add_harbor_water"):
 		tg.add_harbor_water()
+
+
+func _setup_bloombay_water() -> void:
+	var tg = get_node_or_null("TerrainGenerator")
+	if tg == null:
+		return
+	if str(tg.get("level_prefix")) != "bloombay_dunes":
+		return
+	if tg.get_node_or_null("BloombayWater") != null:
+		return
+	if tg.has_method("add_bloombay_water"):
+		tg.add_bloombay_water()
 
 
 func _build_runtime_collisions_deferred() -> void:
@@ -1933,12 +1946,13 @@ func _generate_sand_dunes():
 		var tangent = (curve.sample_baked(next_offset) - pos).normalized()
 
 		# Seed the random number generator using the index to keep dune shapes deterministic
-		seed(12345 + i * 987)
-		noise.seed = randi()
+		var dune_rng := RandomNumberGenerator.new()
+		dune_rng.seed = 12345 + i * 987
+		noise.seed = dune_rng.randi()
 
-		var dune_w = randf_range(35.0, 50.0)
-		var dune_d = randf_range(35.0, 50.0)
-		var peak_h = randf_range(6.0, 9.0)
+		var dune_w = dune_rng.randf_range(35.0, 50.0)
+		var dune_d = dune_rng.randf_range(35.0, 50.0)
+		var peak_h = dune_rng.randf_range(6.0, 9.0)
 
 		# Create a StaticBody3D for an organic wind-blown dune shape
 		var dune = StaticBody3D.new()
@@ -2041,11 +2055,12 @@ func _refresh_existing_sand_dune_meshes() -> void:
 			continue
 
 		# Same per-dune seeds/sizes as the original generator so shapes stay varied
-		seed(12345 + idx * 987)
-		noise.seed = randi()
-		var dune_w := randf_range(35.0, 50.0)
-		var dune_d := randf_range(35.0, 50.0)
-		var peak_h := randf_range(6.0, 9.0)
+		var dune_rng := RandomNumberGenerator.new()
+		dune_rng.seed = 12345 + idx * 987
+		noise.seed = dune_rng.randi()
+		var dune_w := dune_rng.randf_range(35.0, 50.0)
+		var dune_d := dune_rng.randf_range(35.0, 50.0)
+		var peak_h := dune_rng.randf_range(6.0, 9.0)
 		mesh_inst.mesh = _build_organic_dune_mesh(dune_w, dune_d, 36, peak_h, noise)
 		mesh_inst.material_override = sand_mat
 
