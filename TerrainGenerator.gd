@@ -391,22 +391,29 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 				+ cos(pz * 0.024 + sin(px * 0.014)) * 11.0 \
 				+ sin((px * 0.035 - pz * 0.025)) * 6.5
 		var dune_base: float = 0.0
-		if px < -46.0:
-			# Open ocean seabed sloping down from the beach shore
-			var ocean_dist = -46.0 - px
-			dune_base = -clampf(ocean_dist * 0.16, 0.0, 16.0)
-		elif px < -24.0:
-			# Gentle sloping sandy beach from water edge (Y=0.0 at X=-46) to inland dunes (Y=1.8 at X=-24)
-			var beach_t = (px - (-46.0)) / 22.0
-			dune_base = lerpf(0.0, 1.8, beach_t)
+		if px < -56.0:
+			# Open ocean seabed sloping down from the beach shore (Y=0.0 at X=-56.0)
+			var ocean_dist = -56.0 - px
+			dune_base = -clampf(ocean_dist * 0.22, 0.0, 18.0)
+			base_terrain_height = dune_base + h_noise * 0.03
+		elif px < -10.0:
+			# Gentle sloping sandy beach from water edge (Y=0.05 at X=-56) up to dune base (Y=2.8 at X=-10)
+			var beach_t = clampf((px - (-56.0)) / 46.0, 0.0, 1.0)
+			dune_base = lerpf(0.05, 2.8, beach_t)
+			# Small subtle ripples on beach sand (always safely above sea level)
+			base_terrain_height = maxf(dune_base + h_noise * 0.03, 0.05)
 		else:
 			# Undulating golden sand dunes with high roller-coaster peaks and valleys
-			var inland_t = clampf((px - (-25.0)) / 45.0, 0.0, 1.0)
+			var inland_t = clampf((px - (-10.0)) / 40.0, 0.0, 1.0)
 			var inland_shape = inland_t * inland_t * (3.0 - 2.0 * inland_t)
-			# Natural dune ridges with occasional calm oasis hollows dipping into the water plane
-			dune_base = 2.0 + inland_shape * (dune_ridges + 1.0)
-			dune_base = maxf(dune_base, -2.5)
-		base_terrain_height = dune_base + h_noise * 0.50
+			dune_base = lerpf(2.8, 5.0, inland_shape) + inland_shape * dune_ridges
+			var noise_weight = lerpf(0.04, 0.50, inland_shape)
+			base_terrain_height = dune_base + h_noise * noise_weight
+			# In deep inland dunes (px > 50.0), allow occasional calm oasis hollows dipping to water plane
+			if px > 50.0:
+				base_terrain_height = maxf(base_terrain_height, -2.5)
+			else:
+				base_terrain_height = maxf(base_terrain_height, 1.5)
 	else:
 		base_terrain_height = h_noise
 
@@ -509,7 +516,13 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 		else:
 			# Original blending for DEFAULT and MOUNTAIN
 			var sand_edge = curb_outer_width / 2.0
-			var blend_dist = 45.0 if (level_prefix == "pinecrest_ridge" or level_prefix == "bloombay_dunes") else 60.0
+			var blend_dist: float = 60.0
+			if level_prefix == "bloombay_dunes" and closest_pos.x < -24.0:
+				# Beach section: tight blend on the ocean side (west) so terrain drops naturally into water;
+				# wider blend on the inland side (east) toward the dunes.
+				blend_dist = 6.0 if px < closest_pos.x else 30.0
+			elif level_prefix == "pinecrest_ridge" or level_prefix == "bloombay_dunes":
+				blend_dist = 45.0
 			var clearing_blend = 1.0 - smoothstep(sand_edge - 2.0, sand_edge + blend_dist, dist)
 
 			# Bridge detection: when road is elevated far above base terrain,

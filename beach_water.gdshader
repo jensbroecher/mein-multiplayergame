@@ -61,11 +61,11 @@ void vertex() {
 	float t = TIME;
 
 	// Ocean vs Inland mask:
-	// The beach shoreline runs around X = -46 to -34.
-	// Waves roll at full strength across open ocean and right onto the beach sand (up to X = -32.0),
-	// smoothly fading out between X = -32.0 and X = -16.0 as terrain enters the inland dunes.
-	// Inland ponds (X > -16.0) receive 0.0 wave displacement so they remain perfectly calm and flat.
-	float ocean_mask = 1.0 - smoothstep(-32.0, -16.0, v_world_pos.x);
+	// Ocean waves roll across the open sea (X < -56.0), breaking and shoaling towards the shoreline.
+	// Waves smoothly taper down to 0 displacement between X = -72.0 and X = -56.0 so they never
+	// penetrate or clip through the dry beach sand (where the track and cars are).
+	// Dry beach sand (X >= -56.0) and inland ponds stay completely free of wave clipping.
+	float ocean_mask = 1.0 - smoothstep(-72.0, -56.0, v_world_pos.x);
 	v_ocean_mask = ocean_mask;
 
 	// 1. Primary majestic ocean roller (long 52m wavelength, gentle realistic period)
@@ -77,9 +77,9 @@ void vertex() {
 	// 3. Shorter surf breaker ripple (15m wavelength)
 	vec4 w3 = calc_gerstner_wave(vec2(1.0, 0.02), 15.0, 0.12 * wave_amplitude_mult, wave_speed * 1.25, p, t, wave_steepness * 1.1);
 
-	// In shallow beach water (approaching beach line X = -46), wave height amplifies as swells shoal
-	float shore_t = clamp((v_world_pos.x + 95.0) / 50.0, 0.0, 1.0);
-	float shoaling = 1.0 + shore_t * 0.40;
+	// In shallow beach water (approaching beach line X = -56), wave height amplifies as swells shoal
+	float shore_t = clamp((v_world_pos.x + 110.0) / 45.0, 0.0, 1.0);
+	float shoaling = 1.0 + shore_t * 0.35;
 
 	// Total displacements masked by ocean_mask so inland ponds are 100% calm and flat!
 	vec2 total_disp_xz = (vec2(w1.x, w1.z) + vec2(w2.x, w2.z) + vec2(w3.x, w3.z)) * shoaling * ocean_mask;
@@ -132,8 +132,10 @@ void fragment() {
 	vec3 water_col = mix(shallow_color, mid_water_color, clamp(depth_t * 1.5, 0.0, 1.0));
 	water_col = mix(water_col, deep_water_color, clamp((depth_t - 0.3) * 1.4, 0.0, 1.0));
 
-	// 1. Shoreline surf foam wash (where water meets the beach sand, only on ocean/beach)
-	float shore_foam = (1.0 - smoothstep(0.0, shore_foam_threshold, linear_depth)) * v_ocean_mask;
+	// 1. Shoreline surf foam wash (where water meets the beach sand along the coastal shoreline)
+	// Active along the coastal shoreline (X < -46.0). Inland oasis ponds (X > -30.0) stay calm and clear.
+	float ocean_zone = 1.0 - smoothstep(-52.0, -42.0, v_world_pos.x);
+	float shore_foam = (1.0 - smoothstep(0.0, shore_foam_threshold, linear_depth)) * ocean_zone;
 	// Slow, relaxed tidal rhythm
 	float shore_pulse = sin(TIME * wave_speed * 0.8 + v_world_pos.z * 0.12) * 0.5 + 0.5;
 	float shore_foam_total = clamp(shore_foam * (0.65 + 0.35 * shore_pulse), 0.0, 1.0);

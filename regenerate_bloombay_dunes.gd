@@ -78,17 +78,17 @@ func _ready() -> void:
 		# in, out, pos
 		# --- SECTOR 1: BEACHFRONT SURF & START/FINISH STRAIGHT (X < -24.0, pure beach sand, offroad) ---
 		# 0: Start / Finish Line (Heading North, facing -Z)
-		[Vector3(0, 0, 22), Vector3(0, 0, -22), Vector3(-42.0, 0.65, 160.0)],
+		[Vector3(0, 0, 22), Vector3(0, 0, -22), Vector3(-42.0, 0.70, 160.0)],
 		# 1: Coastal beach straight heading North
-		[Vector3(0, 0, 25), Vector3(0, 0, -25), Vector3(-44.0, 0.55, 70.0)],
+		[Vector3(0, 0, 25), Vector3(0, 0, -25), Vector3(-44.0, 0.60, 70.0)],
 
 		# --- SECTOR 2: ALONG THE OCEAN WATER & BREAKING SURF WAVES (X < -24.0) ---
 		# 2: Deep shoreline curve right alongside rolling surf waves
-		[Vector3(1, 0, 25), Vector3(-1, 0, -25), Vector3(-47.0, 0.45, -20.0)],
+		[Vector3(1, 0, 25), Vector3(-1, 0, -25), Vector3(-46.0, 0.55, -20.0)],
 		# 3: Ocean surf shoreline straight with majestic waves rolling in from the west
-		[Vector3(0, 0, 25), Vector3(0, 0, -25), Vector3(-48.0, 0.40, -110.0)],
+		[Vector3(0, 0, 25), Vector3(0, 0, -25), Vector3(-47.0, 0.50, -110.0)],
 		# 4: North tidal beach straight
-		[Vector3(-2, 0, 25), Vector3(2, 0, -25), Vector3(-46.0, 0.50, -200.0)],
+		[Vector3(-2, 0, 25), Vector3(2, 0, -25), Vector3(-45.0, 0.60, -200.0)],
 		# 5: North beach sweeping right turn apex
 		[Vector3(-8, 0, 20), Vector3(8, 0.2, -20), Vector3(-36.0, 0.85, -270.0)],
 
@@ -201,7 +201,7 @@ func _ready() -> void:
 
 	var finish_line = gate_scene.instantiate()
 	finish_line.name = "FinishLine"
-	finish_line.position = Vector3(-42.0, 0.71, 160.0)
+	finish_line.position = Vector3(-42.0, 0.76, 160.0)
 	finish_line.rotation_degrees = Vector3(0, 0, 0)
 	finish_line.set("is_finish_line", true)
 	level_scene.add_child(finish_line)
@@ -267,7 +267,7 @@ func _ready() -> void:
 	if boost_scene:
 		var bp_defs = [
 			# pos, rot_y_deg
-			[Vector3(-48.0, 0.45, -80.0), 0.0],    # Beachfront tidal straight speed boost
+			[Vector3(-47.0, 0.55, -80.0), 0.0],    # Beachfront tidal straight speed boost
 			[Vector3(35.0, 7.80, -310.0), -70.0],  # Dune climb launcher
 			[Vector3(200.0, 9.50, -90.0), -20.0],  # Valley plunge exit into ridge 2
 			[Vector3(180.0, 26.05, 95.0), -22.0],  # Takeoff ramp big jump launch boost
