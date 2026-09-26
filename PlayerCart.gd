@@ -212,6 +212,7 @@ var is_finished_race: bool = false
 var spectate_target_cart: Node3D = null
 var spectate_timer: float = 0.0
 var spectate_index: int = 0
+var spectate_manual_locked: bool = false
 var finish_spectate_delay: float = 0.0
 var spectator_zoom: float = 1.0
 var _kb_brake_amount: float = 0.0
@@ -231,6 +232,8 @@ var _ai_want_drift: bool = false
 var _ai_upcoming_turn_angle: float = 0.0
 var _ai_upcoming_turn_dist: float = 40.0
 var _ai_upcoming_turn_dir: float = 0.0
+var _ai_approaching_loop: bool = false
+var _ai_post_respawn_no_boost_timer: float = 0.0
 ## AI Personality parameters
 var ai_aggression: float = 0.45
 var ai_shortcut_chance: float = 0.35
@@ -1053,10 +1056,14 @@ func _process(delta):
 						if not c.get("is_finished_race"):
 							active_racing_carts.append(c)
 				
-				spectate_timer -= delta
 				if active_racing_carts.size() > 0:
-					if spectate_timer <= 0.0 or spectate_target_cart == null or not is_instance_valid(spectate_target_cart) or spectate_target_cart.get("is_finished_race"):
-						spectate_timer = 10.0
+					if not spectate_manual_locked:
+						spectate_timer -= delta
+						if spectate_timer <= 0.0 or spectate_target_cart == null or not is_instance_valid(spectate_target_cart) or spectate_target_cart.get("is_finished_race"):
+							spectate_timer = 10.0
+							spectate_index = (spectate_index + 1) % active_racing_carts.size()
+							spectate_target_cart = active_racing_carts[spectate_index]
+					elif spectate_target_cart == null or not is_instance_valid(spectate_target_cart):
 						spectate_index = (spectate_index + 1) % active_racing_carts.size()
 						spectate_target_cart = active_racing_carts[spectate_index]
 				else:
@@ -1369,6 +1376,9 @@ func _physics_process(delta):
 
 	if hop_cooldown > 0:
 		hop_cooldown -= delta
+
+	if _ai_post_respawn_no_boost_timer > 0.0:
+		_ai_post_respawn_no_boost_timer = maxf(0.0, _ai_post_respawn_no_boost_timer - delta)
 
 	if is_teleporting:
 		return
@@ -2392,8 +2402,9 @@ func _setup_engine_sound() -> void:
 func _is_blocking_prop(collider: Object) -> bool:
 	if collider == null or not (collider is Node):
 		return false
+	# Other carts are vehicles, not static blocking scenery!
 	if collider.is_in_group("player_carts"):
-		return true
+		return false
 	var current: Node = collider as Node
 	while current:
 		var nm := str(current.name).to_lower()
@@ -2990,6 +3001,8 @@ func request_use_item(item_to_use: int):
 func _execute_use_item(type: int):
 	match type:
 		ItemType.BOOST:
+			if is_ai and _ai_post_respawn_no_boost_timer > 0.0:
+				return
 			var is_real_peer = name.to_int() > 0 and not is_ai and NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER
 			if is_real_peer:
 				client_start_boost.rpc_id(name.to_int())
@@ -3057,6 +3070,8 @@ func _exit_drift() -> void:
 	_drift_charge_time = 0.0
 
 func _trigger_drift_boost(charge_time: float) -> void:
+	if is_ai and _ai_post_respawn_no_boost_timer > 0.0:
+		return
 	var boost_str: float = 1.0
 	var boost_dur: float = 0.45
 	if charge_time >= 1.35:
@@ -3511,6 +3526,8 @@ func _teleport_finish() -> void:
 		freeze = false
 		sleeping = false
 	respawn_indicator_time = 0.7
+	if is_ai:
+		_ai_post_respawn_no_boost_timer = 20.0
 
 
 func _capture_teleport_scales() -> void:
@@ -3615,6 +3632,8 @@ func _apply_respawn_pose() -> void:
 
 	ignore_next_landing_sound = true
 	last_respawn_time = Time.get_ticks_msec() / 1000.0
+	if is_ai:
+		_ai_post_respawn_no_boost_timer = 20.0
 	stuck_timer = 0.0
 	_ai_avoid_force = 0.0
 	_ai_offtrack_timer = 0.0
@@ -5341,6 +5360,7 @@ func _get_ai_input(delta: float) -> Vector2:
 	# Loop Proximity & Entry Corridor Alignment:
 	# When approaching a stunt loop, funnel firmly into the right-hand entry ramp and avoid the descent wall
 	var approaching_loop: bool = false
+	_ai_approaching_loop = false
 	var loop_entry_lat_target: float = 0.0
 	var loop_dist_factor: float = 0.0
 	for lnode in get_tree().get_nodes_in_group("loop_track"):
@@ -5350,6 +5370,7 @@ func _get_ai_input(delta: float) -> Vector2:
 			var d_entry: float = to_entry.length()
 			if d_entry < 58.0 and fwd_3d.dot(to_entry) > 0.0:
 				approaching_loop = true
+				_ai_approaching_loop = true
 				loop_dist_factor = clampf(1.0 - (d_entry / 58.0), 0.0, 1.0)
 				var p_at_car = curve.sample_baked(current_offset)
 				# Calculate exact lateral offset of the loop entrance relative to the road curve
@@ -5481,7 +5502,7 @@ func _get_ai_input(delta: float) -> Vector2:
 			target_global_pos = target_global_pos.lerp(best_box.global_position, blend_factor)
 
 	# Boost Pad Seeking (Attract to speed pads on straights and loop entry ramps)
-	if not is_finished_race and (not is_offroad or on_course):
+	if not is_finished_race and (not is_offroad or on_course) and (not is_ai or _ai_post_respawn_no_boost_timer <= 0.0 or approaching_loop):
 		var max_side_pad: float = 1.6 if _mountain_stage else 3.8
 		var best_pad: Node3D = null
 		var best_pad_dist: float = 34.0
@@ -5546,53 +5567,55 @@ func _get_ai_input(delta: float) -> Vector2:
 		
 		if is_hairpin:
 			safe_speed = minf(safe_speed, (8.5 if _mountain_stage else 10.0) * agility_mult)
-		
-		if is_boosting or is_pad_boosting:
-			safe_speed *= 0.80
 
-		var react_corner: float = 0.18 if _harbor_stage else (0.15 if _mountain_stage else lerpf(0.18, 0.35, style))
+		# Curves gentler than ~20-25 deg are driven flat out; sharp corners trigger braking
+		var react_corner: float = 0.32 if _harbor_stage else (0.28 if _mountain_stage else lerpf(0.35, 0.45, style))
 		if is_hairpin:
-			react_corner = minf(react_corner, 0.12)
+			react_corner = minf(react_corner, 0.22)
 		
 		# Kinematic deceleration-based braking distance:
 		# Computes required braking distance from current speed down to safe_speed:
-		# d_brake = (speed^2 - safe_speed^2) / (2 * decel) + reaction_buffer + high_speed_buffer
-		var decel_rate: float = maxf(braking * 0.75, 22.0)
+		# d_brake = (speed^2 - safe_speed^2) / (2 * decel) + reaction_buffer
+		var decel_rate: float = maxf(braking * 0.85, 26.0)
 		var kinematic_brake_dist: float = maxf(speed * speed - safe_speed * safe_speed, 0.0) / (2.0 * decel_rate)
-		var reaction_dist: float = speed * lerpf(0.72, 0.50, style)
-		var high_speed_buffer: float = maxf(speed - 28.0, 0.0) * 1.3
-		var brake_window: float = maxf(kinematic_brake_dist + reaction_dist + high_speed_buffer + ai_brake_dist_bias, 24.0)
+		# Tighter, realistic braking buffer: allows staying flat out on straights until the actual braking zone
+		var reaction_dist: float = speed * lerpf(0.20, 0.10, style)
+		var brake_window: float = maxf(kinematic_brake_dist * 1.15 + reaction_dist + ai_brake_dist_bias, 14.0)
 		
 		if is_hairpin:
-			brake_window = maxf(brake_window, 48.0)
+			brake_window = maxf(brake_window, 28.0)
 		
-		# Downhill pitch check on steep descents into valley
+		# Downhill pitch check on steep descents into valley with an upcoming sharp turn
 		var fwd_pitch_down: float = fwd_3d.dot(Vector3.DOWN)
-		if fwd_pitch_down > 0.12 and corner_factor > 0.16:
-			safe_speed *= lerpf(1.0, 0.70, clampf(fwd_pitch_down * 2.0, 0.0, 1.0))
-			brake_window = maxf(brake_window, brake_window * (1.0 + fwd_pitch_down * 0.75))
+		if fwd_pitch_down > 0.15 and corner_factor > 0.35:
+			safe_speed *= lerpf(1.0, 0.80, clampf(fwd_pitch_down * 2.0, 0.0, 1.0))
+			brake_window = maxf(brake_window, brake_window * (1.0 + fwd_pitch_down * 0.40))
 		
-		if _ai_upcoming_turn_dist < brake_window and corner_factor > react_corner:
-			var t_dist = clampf((brake_window - _ai_upcoming_turn_dist) / maxf(brake_window - 6.0, 1.0), 0.0, 1.0)
+		var in_braking_zone: bool = _ai_upcoming_turn_dist < brake_window and corner_factor > react_corner
+		# While boosting on a straight, let the boost rip! Only brake if turn is immediately imminent
+		if (is_boosting or is_pad_boosting) and _ai_upcoming_turn_dist > 14.0:
+			in_braking_zone = false
+
+		if in_braking_zone:
+			var t_dist = clampf((brake_window - _ai_upcoming_turn_dist) / maxf(brake_window - 4.0, 1.0), 0.0, 1.0)
 			var target_corner_speed = lerpf(max_speed, safe_speed, t_dist)
 			
-			if speed > target_corner_speed + 0.3:
+			if speed > target_corner_speed + 0.5:
 				var overspeed = speed - target_corner_speed
-				# Decisive, firm braking when overspeed (prevents drifting wide)
-				input.y = clampf(overspeed / 2.8, 0.40, 1.0)
+				# Decisive, firm braking when overspeed
+				input.y = clampf(overspeed / 2.5, 0.40, 1.0)
 				
 				# Drift decision (never drift on mountain summit hairpin to avoid spinning off)
 				if (not _harbor_stage) and (not _mountain_stage or not is_hairpin) and speed > 11.0 and corner_factor > ai_drift_threshold and abs(input.x) > 0.24 and _ai_upcoming_turn_dist < 22.0:
 					_ai_want_drift = true
 					input.y = maxf(input.y, 0.45)
 			else:
-				# In the braking zone or approaching apex:
-				# NEVER full throttle! Only gentle maintenance throttle so high-acceleration cars (like Viper) don't surge forward!
+				# Maintenance / exit throttle approaching or inside the corner
 				var speed_deficit = maxf(target_corner_speed - speed, 0.0)
-				input.y = -clampf(speed_deficit / 5.0, 0.0, 0.22)
+				input.y = -clampf(speed_deficit / 3.0, 0.45, 0.90)
 		else:
-			# On straights: modulate throttle based on current steering to prevent snap oversteer
-			input.y = -clampf(1.0 - abs(input.x) * 0.55, 0.35, 1.0)
+			# On straights and gentle bends: 100% full throttle!
+			input.y = -1.0
 
 		if _harbor_stage:
 			_ai_want_drift = false
@@ -5684,10 +5707,12 @@ func _get_ai_input(delta: float) -> Vector2:
 				if is_other_cart and (is_start_grid_phase or speed < 3.0):
 					continue
 				var dist = ray["start"].distance_to(result.position)
-				if is_prop:
-					closest_prop_dist = minf(closest_prop_dist, dist)
-					if ray["side"] == 0.0 and dist < 6.5:
-						_prop_directly_ahead = true
+				if is_prop and not is_other_cart:
+					# Only obstacles directly ahead in our driving path trigger close distance speed tracking
+					if absf(ray["side"]) <= 0.5:
+						closest_prop_dist = minf(closest_prop_dist, dist)
+						if ray["side"] == 0.0 and dist < 6.5:
+							_prop_directly_ahead = true
 				var max_reach = 20.0 if ray["side"] == 0.0 else 14.0
 				var intensity = clampf(1.0 - (dist / max_reach), 0.15, 1.0) * ray["weight"]
 				if is_other_cart:
@@ -5769,9 +5794,9 @@ func _get_ai_input(delta: float) -> Vector2:
 			elif _mountain_stage:
 				target_avoid_force *= 0.65
 			
-			# Slow down only when approaching an actual close prop ahead (< 12m)
-			if closest_prop_dist < 12.0:
-				var safe_obstacle_speed = lerpf(6.0, max_speed * 0.85, clampf(closest_prop_dist / 12.0, 0.0, 1.0))
+			# Slow down only when approaching an actual close prop directly ahead (< 10m)
+			if _prop_directly_ahead and closest_prop_dist < 10.0 and not is_boosting and not is_pad_boosting:
+				var safe_obstacle_speed = lerpf(8.0, max_speed * 0.85, clampf(closest_prop_dist / 10.0, 0.0, 1.0))
 				if speed > safe_obstacle_speed:
 					var overspd = speed - safe_obstacle_speed
 					input.y = maxf(input.y, clampf(overspd / 5.0, 0.25, 0.85))
@@ -5780,8 +5805,8 @@ func _get_ai_input(delta: float) -> Vector2:
 
 	_ai_avoid_force = lerpf(_ai_avoid_force, target_avoid_force, 14.0 * delta)
 	
-	# If an obstacle is close (< 6m), apply smooth lane nudge within road boundary
-	if closest_prop_dist < 6.0 and absf(_closest_obstacle_side) > 0.1:
+	# If an obstacle is close (< 6m) directly ahead, apply smooth lane nudge within road boundary
+	if _prop_directly_ahead and closest_prop_dist < 6.0 and absf(_closest_obstacle_side) > 0.1:
 		var safe_steer_side = _closest_obstacle_side
 		if safe_steer_side < 0.0 and not left_is_safe:
 			safe_steer_side = 1.0 if right_is_safe else 0.0
@@ -5794,7 +5819,8 @@ func _get_ai_input(delta: float) -> Vector2:
 		else:
 			# Both sides are cliffs / unsafe — stick strictly to track center and brake
 			input.x = clampf(dir_flat.x * 1.2, -1.0, 1.0)
-			input.y = maxf(input.y, 0.65)
+			if not is_boosting and not is_pad_boosting:
+				input.y = maxf(input.y, 0.65)
 	else:
 		input.x = clampf(input.x + _ai_avoid_force * 0.35, -1.0, 1.0)
 	
@@ -6012,7 +6038,7 @@ func _ai_update_recovery(_delta: float, current_offset: float) -> void:
 
 func _ai_measure_upcoming_turn(curve: Curve3D, offset: float, speed: float) -> Dictionary:
 	var length: float = maxf(curve.get_baked_length(), 1.0)
-	var look: float = clampf(speed * 1.6, 26.0, 62.0)
+	var look: float = clampf(speed * 1.8, 30.0, 80.0)
 	var p0: Vector3 = curve.sample_baked(offset)
 	var p0b: Vector3 = curve.sample_baked(fmod(offset + 1.5, length))
 	var h0: Vector3 = p0b - p0
@@ -6024,6 +6050,8 @@ func _ai_measure_upcoming_turn(curve: Curve3D, offset: float, speed: float) -> D
 	var worst_ang: float = 0.0
 	var worst_dir: float = 0.0
 	var worst_dist: float = look
+	var turn_start_dist: float = look
+	var found_turn_start: bool = false
 	var near_ang: float = 0.0
 	var d: float = 3.0
 	while d <= look:
@@ -6039,10 +6067,14 @@ func _ai_measure_upcoming_turn(curve: Curve3D, offset: float, speed: float) -> D
 				worst_ang = ang
 				worst_dir = signf(ang)
 				worst_dist = d
+			if absf(ang) > 0.26 and not found_turn_start:
+				turn_start_dist = d
+				found_turn_start = true
 			if d <= 20.0 and absf(ang) > absf(near_ang):
 				near_ang = ang
 		d += 3.0
-	return {"angle": absf(worst_ang), "dir": worst_dir, "dist": worst_dist, "near_angle": absf(near_ang)}
+	var effective_dist: float = turn_start_dist if found_turn_start else worst_dist
+	return {"angle": absf(worst_ang), "dir": worst_dir, "dist": effective_dist, "near_angle": absf(near_ang)}
 
 
 func _process_ai_items(delta: float):
@@ -6050,27 +6082,33 @@ func _process_ai_items(delta: float):
 		return
 		
 	ai_item_timer += delta
-	if ai_item_timer < 0.6:
+	if ai_item_timer < 0.25:
 		return
 	ai_item_timer = 0.0
 	
 	var should_use = false
 	match current_item:
 		ItemType.BOOST:
-			# Speed-aware straightaway check:
-			# Fast cars need a long, clean straight proportional to their speed before boosting!
-			var spd: float = linear_velocity.length()
-			var min_straight_dist: float = maxf(55.0, spd * 1.8)
-			var max_boost_ang: float = 0.20 # ~11 degrees max
-			var max_boost_steer: float = 0.12
-			if _harbor_stage or _mountain_stage:
-				min_straight_dist = maxf(65.0, spd * 2.2)
-				max_boost_ang = 0.14
-				max_boost_steer = 0.08
-			
-			var straight_is_clear: bool = _ai_upcoming_turn_angle < max_boost_ang and _ai_upcoming_turn_dist > min_straight_dist
-			if abs(sync_steer) < max_boost_steer and straight_is_clear and spd > 6.0 and not is_offroad and not is_on_loop:
-				should_use = true
+			# If recently respawned after falling off, suppress boost for 20s to safely stabilize on track
+			if is_ai and _ai_post_respawn_no_boost_timer > 0.0:
+				should_use = false
+			elif not is_on_loop and not _ai_approaching_loop:
+				# 1. Recovery boost: if slowed down or off-road, boost to immediately regain speed!
+				var spd: float = linear_velocity.length()
+				var recovering: bool = (is_offroad and was_on_ground) or (spd < 14.0 and can_move and not is_exploding)
+				
+				# 2. Straightaway / corner exit boost:
+				# Use boost when on an open section, not heading into a sharp corner
+				var upcoming_sharp_turn: bool = _ai_upcoming_turn_angle > 0.48 and _ai_upcoming_turn_dist < 26.0
+				var road_open_ahead: bool = not upcoming_sharp_turn and _ai_upcoming_turn_dist > 16.0
+				var steer_reasonable: bool = absf(current_steer) < 0.55 and absf(sync_steer) < 0.55
+				
+				if recovering:
+					# Do not boost if facing a sharp turn or cliff ahead
+					if (steer_reasonable or is_offroad) and not upcoming_sharp_turn:
+						should_use = true
+				elif road_open_ahead and steer_reasonable:
+					should_use = true
 		ItemType.MISSILE, ItemType.GUIDED_MISSILE:
 			var fwd = -visuals.global_transform.basis.z
 			for cart in get_tree().get_nodes_in_group("player_carts"):
@@ -6441,6 +6479,13 @@ func _unhandled_input(event: InputEvent) -> void:
 				_select_spectate_slot(5)
 				get_viewport().set_input_as_handled()
 				return
+			KEY_SPACE:
+				spectate_manual_locked = not spectate_manual_locked
+				spectate_timer = 10.0
+				if race_ui and race_ui.has_method("show_message"):
+					race_ui.show_message("Auto-Switch: " + ("OFF (Locked)" if spectate_manual_locked else "ON"), 1.2)
+				get_viewport().set_input_as_handled()
+				return
 
 func _cycle_spectate(dir: int) -> void:
 	var all_carts = get_tree().get_nodes_in_group("player_carts")
@@ -6454,6 +6499,7 @@ func _cycle_spectate(dir: int) -> void:
 				active_racing_carts.append(c)
 	if active_racing_carts.is_empty():
 		return
+	spectate_manual_locked = true
 	spectate_index = posmod(spectate_index + dir, active_racing_carts.size())
 	spectate_target_cart = active_racing_carts[spectate_index]
 	spectate_timer = 10.0
@@ -6469,6 +6515,7 @@ func _select_spectate_slot(slot: int) -> void:
 			all_carts.append(c)
 	if slot < 0 or slot >= all_carts.size():
 		return
+	spectate_manual_locked = true
 	spectate_target_cart = all_carts[slot]
 	spectate_index = slot
 	spectate_timer = 10.0

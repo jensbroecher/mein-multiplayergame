@@ -128,7 +128,7 @@ func start_single_player(player_name: String):
 func start_spectator() -> int:
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 	players.clear()
-	var bot_names = ["Viper Bot", "Shadow Bot", "Apex Bot", "Blaze Bot", "Nova Bot", "Storm Bot"]
+	var bot_names = ["Viper", "Shadow", "Apex", "Blaze", "Nova", "Storm"]
 	var bot_cars = [0, 1, 2, 3, 1, 2]
 	for i in range(6):
 		players[100 + i] = {

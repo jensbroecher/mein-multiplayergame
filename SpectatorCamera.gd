@@ -16,6 +16,7 @@ var zoom_factor: float = 1.0
 var _cam: Camera3D
 var _index: int = 0
 var _timer: float = CYCLE_TIME
+var _manual_control: bool = false
 var _look: Vector3 = Vector3.ZERO
 var _watch_label: Label
 var _hint_label: Label
@@ -49,7 +50,7 @@ func _ready() -> void:
 	_hint_label.position = Vector2(28, 50)
 	_hint_label.add_theme_font_size_override("font_size", 15)
 	_hint_label.add_theme_color_override("font_color", Color(0.78, 0.84, 0.9, 0.85))
-	_hint_label.text = "[ / ] or 1–6 to switch racer | +/- or Mouse Wheel to zoom"
+	_hint_label.text = "[ / ] or 1–6: Select Racer (Locks view) | Space: Auto-Switch | +/-: Zoom"
 	layer.add_child(_hint_label)
 
 	call_deferred("_pick_initial")
@@ -83,7 +84,9 @@ func _watchable_carts() -> Array:
 	return active
 
 
-func cycle(dir: int) -> void:
+func cycle(dir: int, manual: bool = false) -> void:
+	if manual:
+		_manual_control = true
 	var list := _watchable_carts()
 	if list.is_empty():
 		return
@@ -97,7 +100,9 @@ func cycle(dir: int) -> void:
 	_refresh_label()
 
 
-func select_slot(slot: int) -> void:
+func select_slot(slot: int, manual: bool = false) -> void:
+	if manual:
+		_manual_control = true
 	var all_carts: Array = []
 	for c in get_tree().get_nodes_in_group("player_carts"):
 		if is_instance_valid(c) and c is Node3D:
@@ -116,7 +121,8 @@ func _refresh_label() -> void:
 	var racer_name := str(focus_cart.get("player_name"))
 	if racer_name.is_empty():
 		racer_name = focus_cart.name
-	_watch_label.text = "SPECTATING  %s" % racer_name
+	var mode_suffix := " [MANUAL]" if _manual_control else ""
+	_watch_label.text = "SPECTATING  %s%s" % [racer_name, mode_suffix]
 	if race_ui and race_ui.has_method("show_message"):
 		race_ui.show_message(racer_name, 1.4)
 
@@ -133,11 +139,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 
 	if event.is_action_pressed("ui_left"):
-		cycle(-1)
+		cycle(-1, true)
 		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("ui_right"):
-		cycle(1)
+		cycle(1, true)
 		get_viewport().set_input_as_handled()
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -151,35 +157,45 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 			KEY_BRACKETLEFT, KEY_COMMA, KEY_Q:
-				cycle(-1)
+				cycle(-1, true)
 				get_viewport().set_input_as_handled()
 			KEY_BRACKETRIGHT, KEY_PERIOD, KEY_E:
-				cycle(1)
+				cycle(1, true)
 				get_viewport().set_input_as_handled()
 			KEY_1, KEY_KP_1:
-				select_slot(0)
+				select_slot(0, true)
 				get_viewport().set_input_as_handled()
 			KEY_2, KEY_KP_2:
-				select_slot(1)
+				select_slot(1, true)
 				get_viewport().set_input_as_handled()
 			KEY_3, KEY_KP_3:
-				select_slot(2)
+				select_slot(2, true)
 				get_viewport().set_input_as_handled()
 			KEY_4, KEY_KP_4:
-				select_slot(3)
+				select_slot(3, true)
 				get_viewport().set_input_as_handled()
 			KEY_5, KEY_KP_5:
-				select_slot(4)
+				select_slot(4, true)
 				get_viewport().set_input_as_handled()
 			KEY_6, KEY_KP_6:
-				select_slot(5)
+				select_slot(5, true)
+				get_viewport().set_input_as_handled()
+			KEY_SPACE:
+				_manual_control = not _manual_control
+				_timer = CYCLE_TIME
+				_refresh_label()
+				if race_ui and race_ui.has_method("show_message"):
+					race_ui.show_message("Auto-Switch: " + ("OFF (Locked)" if _manual_control else "ON"), 1.2)
 				get_viewport().set_input_as_handled()
 
 
 func _process(delta: float) -> void:
-	_timer -= delta
-	if focus_cart == null or not is_instance_valid(focus_cart) or _timer <= 0.0:
-		cycle(1)
+	if not _manual_control:
+		_timer -= delta
+		if focus_cart == null or not is_instance_valid(focus_cart) or _timer <= 0.0:
+			cycle(1, false)
+	elif focus_cart == null or not is_instance_valid(focus_cart):
+		cycle(1, false)
 
 	if focus_cart == null or not is_instance_valid(focus_cart):
 		return

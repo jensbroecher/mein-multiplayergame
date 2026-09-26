@@ -152,7 +152,7 @@ func _ready():
 		NetworkManager.player_disconnected.connect(_on_server_player_disconnected)
 
 		if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP or (NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP and NetworkManager.is_coop_gp):
-			var bot_names = ["Viper Bot", "Shadow Bot", "Apex Bot", "Blaze Bot", "Nova Bot"]
+			var bot_names = ["Viper", "Shadow", "Apex", "Blaze", "Nova"]
 			var bot_cars = [1, 2, 3, 0, 1]
 			for i in range(5):
 				var bot_id = 100 + i
@@ -864,9 +864,9 @@ func _push_standings(ranking: Array) -> void:
 	var rows: Array = []
 	for entry in ranking:
 		var id = entry["id"]
-		var p_name := "Bot"
+		var p_name := "Racer"
 		if NetworkManager.players.has(id):
-			p_name = str(NetworkManager.players[id].get("name", "Bot"))
+			p_name = str(NetworkManager.players[id].get("name", "Racer"))
 		else:
 			var c = players_container.get_node_or_null(str(id))
 			if c:
@@ -916,7 +916,7 @@ func _end_race():
 	var final_rankings = []
 	for id in player_stats:
 		var stats = player_stats[id]
-		var p_name = "Bot"
+		var p_name = "Racer"
 		var is_bot = true
 		if NetworkManager.players.has(id):
 			p_name = NetworkManager.players[id]["name"]
