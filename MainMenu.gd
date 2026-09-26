@@ -174,7 +174,7 @@ func show_sub_menu(menu_name: String) -> void:
 			_add_tile("BLOOMBAY GP", "Lakeside  •  Pinecrest  •  Harbor  •  Bloombay Dunes", "tile_bloombay_gp.jpg", COL_GREEN, func():
 				_on_cup_selected("Bloombay GP")
 			)
-			_add_tile("ARCTIC CUP", "Frostpeak Creek", "tile_arctic_cup.jpg", COL_SNOW, func():
+			_add_tile("ARCTIC CUP", "Frostpeak Creek  •  Glacier Highway", "tile_arctic_cup.jpg", COL_SNOW, func():
 				_on_cup_selected("Arctic Cup")
 			)
 			_add_tile("AL-RAIHANA GP", "Mountain  •  Canyon  •  Chasm  •  Wadi", "tile_al_raihana_gp.jpg", COL_BRONZE, func():
@@ -196,6 +196,9 @@ func show_sub_menu(menu_name: String) -> void:
 			)
 			_add_tile("FROSTPEAK CREEK", "Snow drifts, creek leaps, and the alpine bridge", "tile_frostpeak_creek.jpg", COL_SNOW, func():
 				_on_stage_selected("res://levels/FrostpeakCreekLevel.tscn")
+			)
+			_add_tile("GLACIER HIGHWAY", "Multi-tier concrete expressway, tunnels, and icy on-ramps", "tile_glacier_highway.jpg", COL_SNOW, func():
+				_on_stage_selected("res://levels/GlacierHighwayLevel.tscn")
 			)
 			_add_tile("HARBOR PIER", "Piers, crates, and dark water", "tile_harbor.jpg", COL_HARBOR, func():
 				_on_stage_selected("res://levels/HarborPierLevel.tscn")
@@ -424,6 +427,7 @@ func _fill_gp_test_tiles() -> void:
 		"res://levels/Level.tscn": {"title": "LAKESIDE", "file": "tile_lakeside.jpg", "color": COL_LAKE},
 		"res://levels/PinecrestRidgeLevel.tscn": {"title": "PINECREST", "file": "tile_pinecrest.jpg", "color": COL_GREEN},
 		"res://levels/FrostpeakCreekLevel.tscn": {"title": "FROSTPEAK CREEK", "file": "tile_frostpeak_creek.jpg", "color": COL_SNOW},
+		"res://levels/GlacierHighwayLevel.tscn": {"title": "GLACIER HIGHWAY", "file": "tile_glacier_highway.jpg", "color": COL_SNOW},
 		"res://levels/HarborPierLevel.tscn": {"title": "HARBOR PIER", "file": "tile_harbor.jpg", "color": COL_HARBOR},
 		"res://levels/BloombayDunesLevel.tscn": {"title": "BLOOMBAY DUNES", "file": "tile_bloombay_dunes.jpg", "color": COL_BEACH},
 		"res://levels/MountainLevel.tscn": {"title": "MOUNTAIN", "file": "tile_mountain.jpg", "color": COL_MOUNTAIN},

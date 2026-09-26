@@ -47,6 +47,7 @@ const ALL_STAGES = [
 	{"name": "Meadow Circuit", "path": "res://levels/Level.tscn"},
 	{"name": "Pinecrest Ridge", "path": "res://levels/PinecrestRidgeLevel.tscn"},
 	{"name": "Frostpeak Creek", "path": "res://levels/FrostpeakCreekLevel.tscn"},
+	{"name": "Glacier Highway", "path": "res://levels/GlacierHighwayLevel.tscn"},
 	{"name": "Harbor Pier", "path": "res://levels/HarborPierLevel.tscn"},
 	{"name": "Mountain Pass", "path": "res://levels/MountainLevel.tscn"},
 	{"name": "Canyon Drift", "path": "res://levels/CanyonLevel.tscn"},
@@ -69,6 +70,7 @@ const GP_CUPS = {
 		"name": "Arctic Cup",
 		"stages": [
 			"res://levels/FrostpeakCreekLevel.tscn",
+			"res://levels/GlacierHighwayLevel.tscn",
 		]
 	},
 	"Al-Raihana GP": {
