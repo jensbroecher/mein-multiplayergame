@@ -8,6 +8,8 @@
 # - Checkpoint sequence, starting grid, boost pads, item boxes, and highway infrastructure
 extends Node
 
+var main_track_curve: Curve3D
+
 func _ready() -> void:
 	print("=== Glacier Highway Grand Prix Level Generation ===")
 	print("Building multi-tier arctic concrete expressway with tunnel underpass and ramps...")
@@ -179,12 +181,12 @@ func _ready() -> void:
 		[Vector3(20, 0, 0), Vector3(-20, 0, 0), Vector3(70.0, 16.5, -180.0)],   # 17 High East viaduct span
 		[Vector3(20, 0, 0), Vector3(-20, 0, 0), Vector3(0.0, 16.5, -180.0)],    # 18 OVERPASS CROSSING APEX (Z = -180, Y = 16.5m directly above Pt 6!)
 		[Vector3(20, 0, 0), Vector3(-20, 0, 0), Vector3(-70.0, 16.5, -180.0)],  # 19 High West viaduct span / Pre-Divergence 3
-		[Vector3(25, 0, 15), Vector3(-25, 0, -15), Vector3(-130.0, 16.5, -160.0)],# 20 West Overpass Abutment
+		[Vector3(24, 0, -5), Vector3(-24, 0, 15), Vector3(-135.0, 16.5, -165.0)],# 20 West Overpass Abutment
 
 		# --- SECTION 6: WEST RIDGE DESCENT & DIVERGENCE 3 REJOIN ---
-		[Vector3(12, 0.8, -24), Vector3(-12, -0.8, 24), Vector3(-155.0, 13.0, -100.0)],# 21 Mountain viaduct descent
-		[Vector3(6, 0.8, -26), Vector3(-6, -0.8, 26), Vector3(-160.0, 9.0, -20.0)],   # 22 Outer shelf sweep
-		[Vector3(-4, 0.8, -25), Vector3(4, -0.6, 25), Vector3(-145.0, 5.5, 60.0)],   # 23 Post-Divergence 3 Rejoin
+		[Vector3(10, 1.2, -26), Vector3(-10, -1.2, 26), Vector3(-170.0, 13.0, -90.0)],# 21 Mountain viaduct descent
+		[Vector3(-2, 1.0, -25), Vector3(2, -1.0, 25), Vector3(-168.0, 9.0, -15.0)],   # 22 Outer shelf sweep
+		[Vector3(-6, 0.8, -25), Vector3(6, -0.6, 25), Vector3(-145.0, 5.5, 60.0)],   # 23 Post-Divergence 3 Rejoin
 		[Vector3(-8, 0.6, -22), Vector3(8, -0.2, 24), Vector3(-120.0, 3.8, 140.0)],  # 24 Valley landing
 
 		# --- SECTION 7: SOUTH GLACIER SWEEPER & HOME STRAIGHT ---
@@ -199,6 +201,7 @@ func _ready() -> void:
 		curve.add_point(pt[2], pt[0], pt[1])
 
 	track_path.curve = curve
+	main_track_curve = curve
 	level_scene.add_child(track_path)
 
 	# 3. Terrain & Mountains
@@ -248,14 +251,14 @@ func _ready() -> void:
 	girder_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 
 	# 5. Build Main Highway Road Mesh & Side Barriers (Full ~2000m circuit)
-	# Barrier gap intervals where alternative routes split off and merge (40m openings with smooth tapers):
+	# Barrier gap intervals where alternative routes split off and merge:
 	var main_left_gaps = [
-		Vector2(425.0, 472.0),   # Alt 1 Merge (Flyover off-ramp rejoins on left)
-		Vector2(1240.0, 1288.0), # Alt 3 Split (Bypass on-ramp splits on left)
-		Vector2(1542.0, 1590.0)  # Alt 3 Merge (Bypass off-ramp rejoins on left)
+		Vector2(1240.0, 1290.0), # Alt 3 Split (Bypass on-ramp splits on left)
+		Vector2(1535.0, 1585.0)  # Alt 3 Merge (Bypass off-ramp rejoins on left)
 	]
 	var main_right_gaps = [
-		Vector2(232.0, 280.0),   # Alt 1 Split (Flyover on-ramp splits on right)
+		Vector2(225.0, 275.0),   # Alt 1 Split (Flyover on-ramp splits on right)
+		Vector2(438.0, 478.0),   # Alt 1 Merge (Flyover off-ramp rejoins on right)
 		Vector2(555.0, 602.0),   # Alt 2 Split (Gorge Cut on-ramp splits on right)
 		Vector2(742.0, 790.0)    # Alt 2 Merge (Gorge Cut off-ramp rejoins on right)
 	]
@@ -278,11 +281,11 @@ func _ready() -> void:
 	var alt1_curve := Curve3D.new()
 	alt1_curve.bake_interval = 0.25
 	var alt1_pts = [
-		[Vector3(0, 0, 12), Vector3(6, 0.8, -20), Vector3(-78.0, 2.8, 25.0)],     # 0: On-ramp split
-		[Vector3(-6, -0.8, 20), Vector3(6, 0.8, -22), Vector3(-58.0, 6.8, -25.0)], # 1: Incline ramp
-		[Vector3(-8, -0.2, 22), Vector3(6, 0.0, -22), Vector3(-40.0, 9.8, -80.0)], # 2: High deck (+7.0m above main road)
-		[Vector3(-6, 0.6, 20), Vector3(4, -0.8, -20), Vector3(-20.0, 6.2, -120.0)],# 3: Off-ramp descent
-		[Vector3(-4, 0.8, 16), Vector3(0, 0, -12), Vector3(-4.0, 2.8, -148.0)]    # 4: Rejoining main road
+		[Vector3(0, 0, 8), Vector3(0, 0, -12), Vector3(-74.0, 2.74, 48.0)],       # 0: On-ramp split (submerged 6cm under right shoulder of main road)
+		[Vector3(-4, -0.6, 16), Vector3(4, 0.8, -18), Vector3(-45.0, 7.5, -20.0)], # 1: Flying out into open arctic valley
+		[Vector3(-6, -0.2, 18), Vector3(6, 0.0, -18), Vector3(-15.0, 10.5, -75.0)],# 2: High scenic viaduct apex (soaring 10.5m in air)
+		[Vector3(-6, 0.6, 16), Vector3(4, -0.6, -16), Vector3(8.0, 6.5, -125.0)],  # 3: Off-ramp descent towards approach straight
+		[Vector3(0, 0, 12), Vector3(0, 0, 0), Vector3(8.0, 2.74, -158.0)]          # 4: Rejoining main road flush on right shoulder (submerged 6cm)
 	]
 	for p in alt1_pts:
 		alt1_curve.add_point(p[2], p[0], p[1])
@@ -296,11 +299,11 @@ func _ready() -> void:
 	var alt2_curve := Curve3D.new()
 	alt2_curve.bake_interval = 0.25
 	var alt2_pts = [
-		[Vector3(0, 0, 12), Vector3(-6, -0.8, -18), Vector3(6.0, 2.8, -276.0)],   # 0: Off-ramp split
-		[Vector3(8, 0.8, 18), Vector3(-4, -0.2, -20), Vector3(18.0, -1.5, -320.0)],# 1: Canyon descent
-		[Vector3(-6, 0.0, 20), Vector3(14, 0.2, -18), Vector3(42.0, -2.0, -375.0)],# 2: Deep canyon floor (Ice cut)
-		[Vector3(-18, -0.4, -6), Vector3(18, 0.8, 6), Vector3(95.0, 2.8, -390.0)], # 3: Ascending on-ramp
-		[Vector3(-18, -0.8, 6), Vector3(12, 0.2, -6), Vector3(140.0, 8.5, -370.0)] # 4: Rejoining highway
+		[Vector3(0, 0, 10), Vector3(6, -0.2, -14), Vector3(6.0, 2.8, -276.0)],       # 0: Off-ramp split on right lane
+		[Vector3(-8, 0.2, 14), Vector3(12, -0.1, -12), Vector3(38.0, 1.8, -305.0)],  # 1: Canyon descent
+		[Vector3(-14, 0.0, 10), Vector3(14, 0.3, -8), Vector3(75.0, 1.6, -335.0)],   # 2: Scenic canyon floor (Ice cut, Y=1.6m safely above floor)
+		[Vector3(-12, -0.4, 6), Vector3(10, 0.7, -4), Vector3(112.0, 6.2, -358.0)],  # 3: Smooth ascending on-ramp (rising flush towards deck)
+		[Vector3(-14, -1.0, 6), Vector3(0, 0, 0), Vector3(140.0, 8.5, -370.0)]       # 4: Rejoining highway flush onto deck
 	]
 	for p in alt2_pts:
 		alt2_curve.add_point(p[2], p[0], p[1])
@@ -314,11 +317,11 @@ func _ready() -> void:
 	var alt3_curve := Curve3D.new()
 	alt3_curve.bake_interval = 0.25
 	var alt3_pts = [
-		[Vector3(12, 0, -4), Vector3(-14, 0.0, 8), Vector3(-75.0, 16.5, -180.0)],   # 0: Split start at Overpass
-		[Vector3(14, 0.2, -15), Vector3(-10, -0.6, 20), Vector3(-130.0, 15.5, -135.0)],# 1: Outer ridge flyover
-		[Vector3(8, 0.6, -22), Vector3(-6, -0.8, 22), Vector3(-160.0, 11.0, -50.0)],  # 2: Outer scenic sweep
-		[Vector3(6, 0.8, -20), Vector3(-4, -0.6, 18), Vector3(-152.0, 7.5, 10.0)],   # 3: Descending ramp
-		[Vector3(-4, 0.6, -15), Vector3(4, -0.2, 12), Vector3(-145.0, 5.5, 60.0)]    # 4: Rejoining highway
+		[Vector3(10, 0, 0), Vector3(-16, 0, 6), Vector3(-75.0, 16.44, -172.0)],      # 0: Split start on left shoulder
+		[Vector3(14, 0.6, -16), Vector3(-14, -0.6, 20), Vector3(-100.0, 15.0, -145.0)],# 1: Elevated viaduct over valley
+		[Vector3(6, 1.0, -24), Vector3(-6, -1.0, 24), Vector3(-115.0, 11.5, -75.0)],  # 2: Panoramic valley descent
+		[Vector3(4, 0.8, -22), Vector3(-4, -0.8, 22), Vector3(-124.0, 8.0, -5.0)],     # 3: Smooth descending grade
+		[Vector3(-5, 0.6, -18), Vector3(0, 0, 0), Vector3(-138.5, 5.44, 52.0)]         # 4: Rejoining highway flush onto left deck
 	]
 	for p in alt3_pts:
 		alt3_curve.add_point(p[2], p[0], p[1])
@@ -374,13 +377,13 @@ func _ready() -> void:
 
 	var track_len: float = curve.get_baked_length()
 	var target_cp_positions = [
-		Vector3(-85.0, 2.8, 160.0),    # CP 1: South Straight
-		Vector3(0.0, 2.8, -135.0),     # CP 2: Pre-Tunnel Highway Approach (45m before tunnel entrance)
-		Vector3(0.0, 2.8, -270.0),     # CP 3: North Basin Runout (30m after tunnel exit - NO CP INSIDE TUNNEL)
-		Vector3(80.0, 5.8, -370.0),    # CP 4: North Rim Curve
+		Vector3(-85.0, 2.8, 160.0),    # CP 1: South Straight (trunk before Alt 1 split)
+		Vector3(0.0, 2.8, -165.0),     # CP 2: Pre-Tunnel Highway Approach (trunk AFTER Alt 1 merge, before tunnel entrance!)
+		Vector3(0.0, 2.8, -265.0),     # CP 3: North Basin Runout (trunk after tunnel, before Alt 2 split)
+		Vector3(165.0, 10.0, -345.0),  # CP 4: East Flank Climb (trunk AFTER Alt 2 merge at 140, 8.5, -370!)
 		Vector3(205.0, 13.5, -270.0),  # CP 5: High East Alpine Climb
-		Vector3(0.0, 16.5, -180.0),    # CP 6: Overpass Viaduct Apex
-		Vector3(-155.0, 11.0, -60.0),  # CP 7: West Ridge Shelf
+		Vector3(0.0, 16.5, -180.0),    # CP 6: Overpass Viaduct Apex (trunk before Alt 3 split)
+		Vector3(-135.0, 4.5, 100.0),   # CP 7: Valley Landing Straight (trunk AFTER Alt 3 merge at -145, 5.5, 60!)
 		Vector3(-110.0, 2.8, 220.0)    # CP 8: South Sweeper before Home Straight
 	]
 
@@ -425,15 +428,17 @@ func _ready() -> void:
 			["Boost_Start_L", Vector3(-87.5, 2.8, 160.0), 0.0],
 			["Boost_Start_R", Vector3(-82.5, 2.8, 160.0), 0.0],
 			# Express Flyover Boosters (Divergence 1 Reward)
-			["Boost_Express_1", Vector3(-52.0, 7.5, -45.0), -22.0],
-			["Boost_Express_2", Vector3(-38.0, 9.8, -90.0), -15.0],
+			["Boost_Express_1", Vector3(-45.0, 7.5, -20.0), -30.0],
+			["Boost_Express_2", Vector3(-15.0, 10.5, -75.0), -22.0],
 			# Gorge Service Cut Incline Booster (Divergence 2)
-			["Boost_Gorge_Launch", Vector3(50.0, -1.8, -365.0), 75.0],
+			["Boost_Gorge_Launch", Vector3(80.0, 1.8, -338.0), -57.0],
 			# High Overpass Viaduct Boosters (Section 5 Crossing)
 			["Boost_Overpass_L", Vector3(5.0, 16.5, -178.0), -90.0],
 			["Boost_Overpass_R", Vector3(5.0, 16.5, -182.0), -90.0],
 			# West Ridge Descent Booster
-			["Boost_RidgeDescent", Vector3(-155.0, 8.5, 0.0), 160.0]
+			["Boost_RidgeDescent", Vector3(-165.3, 8.3, 0.5), -165.0],
+			# Scenic Bypass Viaduct Booster
+			["Boost_BypassViaduct", Vector3(-117.0, 11.1, -65.0), 168.0]
 		]
 		for bp_info in bp_defs:
 			var bp = boost_scene.instantiate()
@@ -454,8 +459,8 @@ func _ready() -> void:
 			[Vector3(-88.0, 3.4, 120.0), Vector3(-85.0, 3.4, 120.0), Vector3(-82.0, 3.4, 120.0)],
 			# Row 2: Pre-Tunnel Highway (Z = -135m)
 			[Vector3(-4.0, 3.4, -135.0), Vector3(0.0, 3.4, -135.0), Vector3(4.0, 3.4, -135.0)],
-			# Row 3: Gorge Cut Secret Cache (Z = -365m)
-			[Vector3(38.0, -1.3, -365.0), Vector3(42.0, -1.3, -365.0)],
+			# Row 3: Gorge Cut Secret Cache (Z = -331m)
+			[Vector3(70.0, 2.2, -331.0), Vector3(73.0, 2.2, -333.0)],
 			# Row 4: High East Ridge Vista (Z = -220m)
 			[Vector3(208.0, 15.6, -220.0), Vector3(205.0, 15.6, -220.0), Vector3(202.0, 15.6, -220.0)],
 			# Row 5: Valley Landing Sweeper (Z = 160m)
@@ -475,7 +480,7 @@ func _ready() -> void:
 	props_container.name = "HighwayProps"
 	level_scene.add_child(props_container)
 	_build_highway_gantries(props_container)
-	_build_highway_streetlights(props_container, curve)
+	_build_highway_streetlights(props_container, curve, main_left_gaps, main_right_gaps)
 
 	# 15. Setup Checkpoints & Level wiring
 	level_scene.set("track_path", track_path)
@@ -555,36 +560,31 @@ func _build_highway_road_mesh(parent: Node, curve: Curve3D, width: float, node_n
 		var right_factor: float = 1.0
 
 		if is_ramp:
-			# General taper at the very ends of the outer barrier:
-			var t_in: float = clampf(cum_dist / 6.0, 0.0, 1.0)
-			var t_out: float = clampf((total_len - cum_dist) / 6.0, 0.0, 1.0)
+			# General taper at the very ends of the outer barrier (smooth 14m grade from 0 to full height):
+			var t_in: float = clampf(cum_dist / 14.0, 0.0, 1.0)
+			var t_out: float = clampf((total_len - cum_dist) / 14.0, 0.0, 1.0)
 			var general_taper: float = minf(t_in, t_out)
 
 			if node_name.contains("Flyover"):
-				# Ramp 1: Starts branching right (Left side touches main road)
-				if cum_dist < 22.0:
+				# Ramp 1: Starts branching right, Ends merging from right (Left side touches main road for both!)
+				if cum_dist < 26.0 or (total_len - cum_dist) < 26.0:
 					left_factor = 0.0
-				elif cum_dist < 42.0:
-					left_factor = minf(general_taper, (cum_dist - 22.0) / 20.0)
+				elif cum_dist < 46.0:
+					left_factor = minf(general_taper, (cum_dist - 26.0) / 20.0)
+				elif (total_len - cum_dist) < 46.0:
+					left_factor = minf(general_taper, ((total_len - cum_dist) - 26.0) / 20.0)
 				else:
 					left_factor = general_taper
-				
-				# Ends merging from left (Right side touches main road)
-				if (total_len - cum_dist) < 22.0:
-					right_factor = 0.0
-				elif (total_len - cum_dist) < 42.0:
-					right_factor = minf(general_taper, ((total_len - cum_dist) - 22.0) / 20.0)
-				else:
-					right_factor = general_taper
+				right_factor = general_taper
 
 			elif node_name.contains("Gorge"):
 				# Ramp 2: Starts branching right, Ends merging from right (Left side touches main road for both)
-				if cum_dist < 22.0 or (total_len - cum_dist) < 22.0:
+				if cum_dist < 26.0 or (total_len - cum_dist) < 26.0:
 					left_factor = 0.0
-				elif cum_dist < 42.0:
-					left_factor = minf(general_taper, (cum_dist - 22.0) / 20.0)
-				elif (total_len - cum_dist) < 42.0:
-					left_factor = minf(general_taper, ((total_len - cum_dist) - 22.0) / 20.0)
+				elif cum_dist < 46.0:
+					left_factor = minf(general_taper, (cum_dist - 26.0) / 20.0)
+				elif (total_len - cum_dist) < 46.0:
+					left_factor = minf(general_taper, ((total_len - cum_dist) - 26.0) / 20.0)
 				else:
 					left_factor = general_taper
 				right_factor = general_taper
@@ -592,12 +592,12 @@ func _build_highway_road_mesh(parent: Node, curve: Curve3D, width: float, node_n
 			elif node_name.contains("Bypass"):
 				# Ramp 3: Starts branching left, Ends merging from left (Right side touches main road)
 				left_factor = general_taper
-				if cum_dist < 22.0 or (total_len - cum_dist) < 22.0:
+				if cum_dist < 26.0 or (total_len - cum_dist) < 26.0:
 					right_factor = 0.0
-				elif cum_dist < 42.0:
-					right_factor = minf(general_taper, (cum_dist - 22.0) / 20.0)
-				elif (total_len - cum_dist) < 42.0:
-					right_factor = minf(general_taper, ((total_len - cum_dist) - 22.0) / 20.0)
+				elif cum_dist < 46.0:
+					right_factor = minf(general_taper, (cum_dist - 26.0) / 20.0)
+				elif (total_len - cum_dist) < 46.0:
+					right_factor = minf(general_taper, ((total_len - cum_dist) - 26.0) / 20.0)
 				else:
 					right_factor = general_taper
 		else:
@@ -631,60 +631,79 @@ func _build_highway_road_mesh(parent: Node, curve: Curve3D, width: float, node_n
 		var cur_rb_h: float = barrier_h * right_factor
 		var uv_y: float = cum_dist
 
+		# Smoothly submerge ramp ends by 0.07m beneath main highway surface so the blunt cut-off edge is 100% invisible!
+		var p_eval := p
+		if is_ramp:
+			var end_dist = minf(cum_dist, total_len - cum_dist)
+			if end_dist < 18.0:
+				var t_submerge = 1.0 - (end_dist / 18.0)
+				p_eval.y -= 0.07 * t_submerge * t_submerge
+
 		# --- 1. ROAD DECK VERTICES (5 points across road: 0=L edge, 1=L lane, 2=center, 3=R lane, 4=R edge) ---
 		st_road.set_uv(Vector2(0.0, uv_y))
-		st_road.add_vertex(p - right * half_w)
+		st_road.add_vertex(p_eval - right * half_w)
 
 		st_road.set_uv(Vector2(0.25, uv_y))
-		st_road.add_vertex(p - right * (half_w * 0.5))
+		st_road.add_vertex(p_eval - right * (half_w * 0.5))
 
 		st_road.set_uv(Vector2(0.50, uv_y))
-		st_road.add_vertex(p + up * 0.04) # subtle center crown
+		st_road.add_vertex(p_eval + up * 0.04) # subtle center crown
 
 		st_road.set_uv(Vector2(0.75, uv_y))
-		st_road.add_vertex(p + right * (half_w * 0.5))
+		st_road.add_vertex(p_eval + right * (half_w * 0.5))
 
 		st_road.set_uv(Vector2(1.0, uv_y))
-		st_road.add_vertex(p + right * half_w)
+		st_road.add_vertex(p_eval + right * half_w)
 
-		# --- 2. JERSEY SAFETY BARRIER VERTICES (8 points: 4 on left, 4 on right) ---
-		# Left barrier profile
-		var lb_base_out := p - right * (half_w + barrier_w * left_factor)
-		var lb_flange := p - right * (half_w + 0.12 * left_factor) + up * (0.35 * left_factor)
-		var lb_stem := p - right * (half_w + 0.08 * left_factor) + up * (1.15 * left_factor)
-		var lb_top := p - right * (half_w + 0.38 * left_factor) + up * cur_lb_h
+		# --- 2. JERSEY SAFETY BARRIER VERTICES (10 points: 5 on left, 5 on right) ---
+		# Left barrier profile (Solid closed 3D prism)
+		var lb_base_in := p_eval - right * half_w - up * 0.10
+		var lb_flange := p_eval - right * (half_w + 0.12 * left_factor) + up * (0.35 * left_factor)
+		var lb_stem := p_eval - right * (half_w + 0.08 * left_factor) + up * (1.15 * left_factor)
+		var lb_top := p_eval - right * (half_w + 0.38 * left_factor) + up * cur_lb_h
+		var lb_back_base := p_eval - right * (half_w + 0.55 * left_factor) - up * 0.10
 
 		st_barrier.set_uv(Vector2(0.0, uv_y * 0.3))
-		st_barrier.add_vertex(lb_base_out)
-		st_barrier.set_uv(Vector2(0.3, uv_y * 0.3))
+		st_barrier.add_vertex(lb_base_in)
+		st_barrier.set_uv(Vector2(0.25, uv_y * 0.3))
 		st_barrier.add_vertex(lb_flange)
-		st_barrier.set_uv(Vector2(0.7, uv_y * 0.3))
+		st_barrier.set_uv(Vector2(0.50, uv_y * 0.3))
 		st_barrier.add_vertex(lb_stem)
-		st_barrier.set_uv(Vector2(1.0, uv_y * 0.3))
+		st_barrier.set_uv(Vector2(0.75, uv_y * 0.3))
 		st_barrier.add_vertex(lb_top)
+		st_barrier.set_uv(Vector2(1.0, uv_y * 0.3))
+		st_barrier.add_vertex(lb_back_base)
 
-		# Right barrier profile
-		var rb_base_out := p + right * (half_w + barrier_w * right_factor)
-		var rb_flange := p + right * (half_w + 0.12 * right_factor) + up * (0.35 * right_factor)
-		var rb_stem := p + right * (half_w + 0.08 * right_factor) + up * (1.15 * right_factor)
-		var rb_top := p + right * (half_w + 0.38 * right_factor) + up * cur_rb_h
+		# Right barrier profile (Solid closed 3D prism)
+		var rb_base_in := p_eval + right * half_w - up * 0.10
+		var rb_flange := p_eval + right * (half_w + 0.12 * right_factor) + up * (0.35 * right_factor)
+		var rb_stem := p_eval + right * (half_w + 0.08 * right_factor) + up * (1.15 * right_factor)
+		var rb_top := p_eval + right * (half_w + 0.38 * right_factor) + up * cur_rb_h
+		var rb_back_base := p_eval + right * (half_w + 0.55 * right_factor) - up * 0.10
 
 		st_barrier.set_uv(Vector2(0.0, uv_y * 0.3))
-		st_barrier.add_vertex(rb_base_out)
-		st_barrier.set_uv(Vector2(0.3, uv_y * 0.3))
+		st_barrier.add_vertex(rb_base_in)
+		st_barrier.set_uv(Vector2(0.25, uv_y * 0.3))
 		st_barrier.add_vertex(rb_flange)
-		st_barrier.set_uv(Vector2(0.7, uv_y * 0.3))
+		st_barrier.set_uv(Vector2(0.50, uv_y * 0.3))
 		st_barrier.add_vertex(rb_stem)
-		st_barrier.set_uv(Vector2(1.0, uv_y * 0.3))
+		st_barrier.set_uv(Vector2(0.75, uv_y * 0.3))
 		st_barrier.add_vertex(rb_top)
+		st_barrier.set_uv(Vector2(1.0, uv_y * 0.3))
+		st_barrier.add_vertex(rb_back_base)
 
-		# --- 3. UNDER-DECK BOX GIRDER (4 points: 0=gt_l, 1=gb_l, 2=gb_r, 3=gt_r) ---
-		# Form an open U-girder strictly BELOW the deck to prevent any Z-fighting with the road surface!
-		var box_drop: float = girder_depth if p.y > 4.5 else clampf(p.y - 0.5, 0.25, girder_depth)
-		var gt_l := p - right * half_w - up * 0.12
-		var gb_l := p - right * (half_w - 0.2) - up * box_drop
-		var gb_r := p + right * (half_w - 0.2) - up * box_drop
-		var gt_r := p + right * half_w - up * 0.12
+		# --- 3. UNDER-DECK BOX GIRDER ---
+		var box_drop: float = 0.0
+		if is_ramp:
+			if p.y > 3.4:
+				box_drop = clampf((p.y - 3.4) * 0.75, 0.0, girder_depth)
+		else:
+			box_drop = girder_depth if p.y > 4.5 else clampf(p.y - 0.5, 0.25, girder_depth)
+
+		var gt_l := p_eval - right * half_w - up * 0.12
+		var gb_l := p_eval - right * (half_w - 0.2) - up * box_drop
+		var gb_r := p_eval + right * (half_w - 0.2) - up * box_drop
+		var gt_r := p_eval + right * half_w - up * 0.12
 
 		st_girder.set_uv(Vector2(0.0, uv_y * 0.2))
 		st_girder.add_vertex(gt_l)
@@ -696,9 +715,19 @@ func _build_highway_road_mesh(parent: Node, curve: Curve3D, width: float, node_n
 		st_girder.add_vertex(gt_r)
 
 		# --- 4. VIADUCT PYLONS & CROSSHEAD BEAMS ---
-		# Exclude piers right in front of or directly above the lower highway corridor
-		var over_lower_road: bool = absf(p.x) < 13.0 and absf(p.z - (-180.0)) < 20.0
-		if has_piers and p.y > 6.0 and not over_lower_road and (cum_dist - last_pier_dist >= 24.0):
+		var near_ramp_ends: bool = is_ramp and (cum_dist < 42.0 or (total_len - cum_dist) < 42.0)
+		var over_lower_road: bool = false
+		if main_track_curve != null and p.y > 4.5:
+			var closest_off = main_track_curve.get_closest_offset(p)
+			var closest_pt = main_track_curve.sample_baked(closest_off)
+			var horiz_dist = Vector2(p.x - closest_pt.x, p.z - closest_pt.z).length()
+			if horiz_dist < 15.0:
+				over_lower_road = true
+
+		if absf(p.x) < 13.0 and absf(p.z - (-180.0)) < 20.0:
+			over_lower_road = true
+
+		if has_piers and p.y > 6.0 and not near_ramp_ends and not over_lower_road and (cum_dist - last_pier_dist >= 24.0):
 			last_pier_dist = cum_dist
 			_build_viaduct_pier(pier_root, p, fwd, right, half_w, p.y, barrier_mat)
 
@@ -721,27 +750,27 @@ func _build_highway_road_mesh(parent: Node, curve: Curve3D, width: float, node_n
 			st_road.add_index(a); st_road.add_index(c_idx); st_road.add_index(b)
 			st_road.add_index(b); st_road.add_index(c_idx); st_road.add_index(d)
 
-	# Connect Barrier Triangles (3 quads left, 3 quads right = 12 tris per segment)
+	# Connect Barrier Triangles (5 quads left, 5 quads right = 20 tris per segment, solid closed prism)
 	# ONLY generate triangles when barrier height > 0.05 to leave wide-open, collision-free openings!
 	for i in range(baked.size() - 1):
-		var b0 = i * 8
-		var b1 = (i + 1) * 8
-		# Left barrier (faces inner toward road)
+		var b0 = i * 10
+		var b1 = (i + 1) * 10
+		# Left barrier (faces inner toward road, outer back wall, and bottom)
 		if left_factors[i] > 0.05 or left_factors[i + 1] > 0.05:
-			for c in range(3):
+			for c in range(5):
 				var a = b0 + c
-				var b = b0 + c + 1
+				var b = b0 + ((c + 1) % 5)
 				var c_idx = b1 + c
-				var d = b1 + c + 1
+				var d = b1 + ((c + 1) % 5)
 				st_barrier.add_index(a); st_barrier.add_index(b); st_barrier.add_index(c_idx)
 				st_barrier.add_index(b); st_barrier.add_index(d); st_barrier.add_index(c_idx)
-		# Right barrier (faces inner toward road)
+		# Right barrier (faces inner toward road, outer back wall, and bottom)
 		if right_factors[i] > 0.05 or right_factors[i + 1] > 0.05:
-			for c in range(3):
-				var a = b0 + 4 + c
-				var b = b0 + 4 + c + 1
-				var c_idx = b1 + 4 + c
-				var d = b1 + 4 + c + 1
+			for c in range(5):
+				var a = b0 + 5 + c
+				var b = b0 + 5 + ((c + 1) % 5)
+				var c_idx = b1 + 5 + c
+				var d = b1 + 5 + ((c + 1) % 5)
 				st_barrier.add_index(a); st_barrier.add_index(c_idx); st_barrier.add_index(b)
 				st_barrier.add_index(b); st_barrier.add_index(c_idx); st_barrier.add_index(d)
 
@@ -760,6 +789,13 @@ func _build_highway_road_mesh(parent: Node, curve: Curve3D, width: float, node_n
 			var d = g1 + c + 1
 			st_girder.add_index(a); st_girder.add_index(c_idx); st_girder.add_index(b)
 			st_girder.add_index(b); st_girder.add_index(c_idx); st_girder.add_index(d)
+
+	# Cap front and rear of the girder so there are zero open hollow holes:
+	st_girder.add_index(0); st_girder.add_index(1); st_girder.add_index(2)
+	st_girder.add_index(0); st_girder.add_index(2); st_girder.add_index(3)
+	var e0 = (baked.size() - 1) * 4
+	st_girder.add_index(e0 + 0); st_girder.add_index(e0 + 2); st_girder.add_index(e0 + 1)
+	st_girder.add_index(e0 + 0); st_girder.add_index(e0 + 3); st_girder.add_index(e0 + 2)
 
 	st_road.generate_normals()
 	st_road.generate_tangents()
@@ -818,7 +854,7 @@ func _build_highway_road_mesh(parent: Node, curve: Curve3D, width: float, node_n
 
 ## Builds a heavy concrete viaduct bent with crosshead beam and dual cylindrical columns.
 func _build_viaduct_pier(parent: Node, pos: Vector3, fwd: Vector3, right: Vector3, half_w: float, height: float, mat: Material) -> void:
-	var pier := Node3D.new()
+	var pier := StaticBody3D.new()
 	pier.name = "Pier_%d_%d" % [int(pos.x), int(pos.z)]
 	pier.position = pos
 
@@ -834,6 +870,14 @@ func _build_viaduct_pier(parent: Node, pos: Vector3, fwd: Vector3, right: Vector
 	beam_inst.material_override = mat
 	beam_inst.position = Vector3(0, -1.1, 0)
 	pier.add_child(beam_inst)
+
+	var beam_col := CollisionShape3D.new()
+	beam_col.name = "CrossheadBeamCol"
+	var beam_shape := BoxShape3D.new()
+	beam_shape.size = bm.size
+	beam_col.shape = beam_shape
+	beam_col.position = beam_inst.position
+	pier.add_child(beam_col)
 
 	# Dual Heavy Concrete Columns extending down to ground level
 	var col_h = maxf(height - 1.2, 1.0)
@@ -852,6 +896,15 @@ func _build_viaduct_pier(parent: Node, pos: Vector3, fwd: Vector3, right: Vector
 		col_inst.position = Vector3(col_x, -1.2 - col_h * 0.5, 0)
 		pier.add_child(col_inst)
 
+		var col_col := CollisionShape3D.new()
+		col_col.name = "ColumnCol_" + ("L" if side < 0 else "R")
+		var col_shape := CylinderShape3D.new()
+		col_shape.radius = col_r * 1.08
+		col_shape.height = col_h
+		col_col.shape = col_shape
+		col_col.position = col_inst.position
+		pier.add_child(col_col)
+
 		# Column Footing
 		var foot_inst := MeshInstance3D.new()
 		foot_inst.name = "Footing_" + ("L" if side < 0 else "R")
@@ -861,6 +914,14 @@ func _build_viaduct_pier(parent: Node, pos: Vector3, fwd: Vector3, right: Vector
 		foot_inst.material_override = mat
 		foot_inst.position = Vector3(col_x, -height + 0.5, 0)
 		pier.add_child(foot_inst)
+
+		var foot_col := CollisionShape3D.new()
+		foot_col.name = "FootingCol_" + ("L" if side < 0 else "R")
+		var foot_shape := BoxShape3D.new()
+		foot_shape.size = fm.size
+		foot_col.shape = foot_shape
+		foot_col.position = foot_inst.position
+		pier.add_child(foot_col)
 
 	parent.add_child(pier)
 
@@ -920,7 +981,7 @@ func _build_tunnel_underpass(parent: Node, center: Vector3, length: float, width
 		var p_z = p_end * half_len
 		var portal_name = "Portal_" + ("North" if p_end < 0 else "South")
 
-		var portal_node := Node3D.new()
+		var portal_node := StaticBody3D.new()
 		portal_node.name = portal_name
 		portal_node.position = Vector3(0, 0, p_z)
 
@@ -931,8 +992,15 @@ func _build_tunnel_underpass(parent: Node, center: Vector3, length: float, width
 		hm.size = Vector3(width + 4.5, 2.8, 3.5)
 		header.mesh = hm
 		header.material_override = mat
-		header.position = Vector3(0, wall_h + 1.2, 0)
+		header.position = Vector3(0, wall_h + 1.4, 0)
 		portal_node.add_child(header)
+
+		var h_col := CollisionShape3D.new()
+		var h_shape := BoxShape3D.new()
+		h_shape.size = hm.size
+		h_col.shape = h_shape
+		h_col.position = header.position
+		portal_node.add_child(h_col)
 
 		# Portal Side Buttresses
 		for side in [-1.0, 1.0]:
@@ -945,6 +1013,13 @@ func _build_tunnel_underpass(parent: Node, center: Vector3, length: float, width
 			buttress.position = Vector3(side * (half_w + 1.8), (wall_h + 2.5) * 0.5, 0)
 			portal_node.add_child(buttress)
 
+			var b_col := CollisionShape3D.new()
+			var b_shape := BoxShape3D.new()
+			b_shape.size = btm.size
+			b_col.shape = b_shape
+			b_col.position = buttress.position
+			portal_node.add_child(b_col)
+
 			# Wing-wall flaring into snow mountain
 			var wing := MeshInstance3D.new()
 			wing.name = "WingWall_" + ("L" if side < 0 else "R")
@@ -955,6 +1030,14 @@ func _build_tunnel_underpass(parent: Node, center: Vector3, length: float, width
 			wing.position = Vector3(side * (half_w + 4.2), (wall_h + 1.5) * 0.5, p_end * 1.5)
 			wing.rotation_degrees = Vector3(0, side * 32.0, 0)
 			portal_node.add_child(wing)
+
+			var w_col := CollisionShape3D.new()
+			var w_shape := BoxShape3D.new()
+			w_shape.size = wm.size
+			w_col.shape = w_shape
+			w_col.position = wing.position
+			w_col.rotation_degrees = wing.rotation_degrees
+			portal_node.add_child(w_col)
 
 		# Overhead Illuminated Portal Sign Board
 		var sign_inst := MeshInstance3D.new()
@@ -1090,13 +1173,13 @@ func _build_arctic_mountain_landscape(parent: Node) -> void:
 	east_bluff.add_child(eb_mesh)
 	terrain_root.add_child(east_bluff)
 
-	# Over-Tunnel Mountain Cap (Connecting East and West above the tunnel ceiling Y = 9.0 to 9.6m)
+	# Over-Tunnel Mountain Cap (Connecting East and West strictly above the tunnel ceiling Y = 9.8 to 11.2m, no flicker!)
 	var roof_body := StaticBody3D.new()
 	roof_body.name = "TunnelMountainRoof"
-	roof_body.position = Vector3(0.0, 9.3, -210.0)
+	roof_body.position = Vector3(0.0, 10.5, -210.0)
 	var r_col := CollisionShape3D.new()
 	var r_shape := BoxShape3D.new()
-	r_shape.size = Vector3(22.0, 0.6, 44.0)
+	r_shape.size = Vector3(22.0, 1.4, 44.0)
 	r_col.shape = r_shape
 	roof_body.add_child(r_col)
 	var r_mesh := MeshInstance3D.new()
@@ -1126,15 +1209,27 @@ func _build_arctic_mountain_landscape(parent: Node) -> void:
 
 	for i in range(peak_defs.size()):
 		var p_info = peak_defs[i]
+		var peak_body := StaticBody3D.new()
+		peak_body.name = "MountainPeak_%d" % (i + 1)
+		peak_body.position = p_info[0]
+		peak_body.rotation_degrees = Vector3(0, p_info[2], 0)
+
 		var peak_inst := MeshInstance3D.new()
-		peak_inst.name = "MountainPeak_%d" % (i + 1)
+		peak_inst.name = "PeakMesh"
 		var p_prism := PrismMesh.new()
 		p_prism.size = p_info[1]
 		peak_inst.mesh = p_prism
 		peak_inst.material_override = snow_mat
-		peak_inst.position = p_info[0]
-		peak_inst.rotation_degrees = Vector3(0, p_info[2], 0)
-		terrain_root.add_child(peak_inst)
+		peak_body.add_child(peak_inst)
+
+		var p_col := CollisionShape3D.new()
+		p_col.name = "PeakCol"
+		var p_shape := BoxShape3D.new()
+		p_shape.size = Vector3(p_info[1].x * 0.75, p_info[1].y, p_info[1].z * 0.75)
+		p_col.shape = p_shape
+		peak_body.add_child(p_col)
+
+		terrain_root.add_child(peak_body)
 
 	parent.add_child(terrain_root)
 
@@ -1145,7 +1240,9 @@ func _build_highway_gantries(parent: Node) -> void:
 		[Vector3(-85.0, 2.8, 220.0), 0.0, "GLACIER HIGHWAY GP • SPEED LIMIT: NONE"],
 		[Vector3(-82.0, 2.8, 50.0), 0.0, "RIGHT LANE: EXPRESS FLYOVER ↗ • ELEVATED BYPASS"],
 		[Vector3(0.0, 2.8, -145.0), 0.0, "TUNNEL APPROACH • CLEARANCE 6.0M • LOW BEAM LIGHTS"],
-		[Vector3(0.0, 16.5, -180.0), -90.0, "GLACIER OVERPASS VIADUCT • HIGH SUMMIT CROSSING"]
+		[Vector3(0.0, 2.8, -265.0), 0.0, "RIGHT LANE: GLACIER GORGE CUT ↘ • CANYON RUN"],
+		[Vector3(0.0, 16.5, -180.0), -90.0, "GLACIER OVERPASS VIADUCT • HIGH SUMMIT CROSSING"],
+		[Vector3(-50.0, 16.5, -180.0), -90.0, "LEFT LANE: RIDGE BYPASS ↖ • SCENIC VIADUCT"]
 	]
 
 	var steel_mat := StandardMaterial3D.new()
@@ -1158,7 +1255,7 @@ func _build_highway_gantries(parent: Node) -> void:
 		var g_pos: Vector3 = g_info[0]
 		var g_yaw: float = g_info[1]
 
-		var gantry := Node3D.new()
+		var gantry := StaticBody3D.new()
 		gantry.name = "HighwayGantry_%d" % (i + 1)
 		gantry.position = g_pos
 		gantry.rotation_degrees = Vector3(0, g_yaw, 0)
@@ -1173,6 +1270,14 @@ func _build_highway_gantries(parent: Node) -> void:
 		span.position = Vector3(0, 6.2, 0)
 		gantry.add_child(span)
 
+		var span_col := CollisionShape3D.new()
+		span_col.name = "SpanCol"
+		var span_shape := BoxShape3D.new()
+		span_shape.size = sm.size
+		span_col.shape = span_shape
+		span_col.position = span.position
+		gantry.add_child(span_col)
+
 		# Left and Right Vertical Support Columns
 		for side in [-1.0, 1.0]:
 			var col := MeshInstance3D.new()
@@ -1185,6 +1290,15 @@ func _build_highway_gantries(parent: Node) -> void:
 			col.material_override = steel_mat
 			col.position = Vector3(side * 9.2, 3.4, 0)
 			gantry.add_child(col)
+
+			var col_col := CollisionShape3D.new()
+			col_col.name = "SupportCol_" + ("L" if side < 0 else "R")
+			var col_shape := CylinderShape3D.new()
+			col_shape.radius = 0.45
+			col_shape.height = 6.8
+			col_col.shape = col_shape
+			col_col.position = col.position
+			gantry.add_child(col_col)
 
 		# Overhead Green Interstate Sign Board
 		var sign_board := MeshInstance3D.new()
@@ -1205,7 +1319,7 @@ func _build_highway_gantries(parent: Node) -> void:
 
 
 ## Builds highway streetlights along the outer barrier edges with illuminating spotlights.
-func _build_highway_streetlights(parent: Node, curve: Curve3D) -> void:
+func _build_highway_streetlights(parent: Node, curve: Curve3D, left_gaps: Array = [], right_gaps: Array = []) -> void:
 	var total_len := curve.get_baked_length()
 	var step_dist := 65.0
 	var count := int(total_len / step_dist)
@@ -1228,14 +1342,25 @@ func _build_highway_streetlights(parent: Node, curve: Curve3D) -> void:
 
 		# Place alternating on left or right barrier
 		var side := 1.0 if (i % 2 == 0) else -1.0
+
+		# Do not place a streetlight inside or near an on-ramp/off-ramp barrier gap on this side
+		var gaps_to_check = right_gaps if side > 0 else left_gaps
+		var in_gap = false
+		for gap in gaps_to_check:
+			if dist >= (gap.x - 8.0) and dist <= (gap.y + 8.0):
+				in_gap = true
+				break
+		if in_gap:
+			continue
+
 		var pole_pos = p + right * (side * 8.8)
 
-		var light_node := Node3D.new()
+		var light_node := StaticBody3D.new()
 		light_node.name = "Streetlight_%d" % i
 		light_node.position = pole_pos
 
 		var rot_y := rad_to_deg(atan2(-fwd.x, -fwd.z))
-		light_node.rotation_degrees = Vector3(0, rot_y + (90.0 if side > 0 else -90.0), 0)
+		light_node.rotation_degrees = Vector3(0, rot_y + (180.0 if side > 0 else 0.0), 0)
 
 		# Vertical Pole (height = 8.5m)
 		var pole := MeshInstance3D.new()
@@ -1248,6 +1373,15 @@ func _build_highway_streetlights(parent: Node, curve: Curve3D) -> void:
 		pole.position = Vector3(0, 4.25, 0)
 		light_node.add_child(pole)
 
+		var pole_col := CollisionShape3D.new()
+		pole_col.name = "PoleCol"
+		var pole_shape := CylinderShape3D.new()
+		pole_shape.radius = 0.22
+		pole_shape.height = 8.5
+		pole_col.shape = pole_shape
+		pole_col.position = pole.position
+		light_node.add_child(pole_col)
+
 		# Horizontal Overhanging Arm
 		var arm := MeshInstance3D.new()
 		var am := CylinderMesh.new()
@@ -1257,7 +1391,7 @@ func _build_highway_streetlights(parent: Node, curve: Curve3D) -> void:
 		arm.mesh = am
 		arm.material_override = pole_mat
 		arm.position = Vector3(1.4, 8.2, 0)
-		arm.rotation_degrees = Vector3(0, 0, 80.0)
+		arm.rotation_degrees = Vector3(0, 0, -80.0)
 		light_node.add_child(arm)
 
 		# LED Luminaire Head
@@ -1276,7 +1410,7 @@ func _build_highway_streetlights(parent: Node, curve: Curve3D) -> void:
 		var spot := SpotLight3D.new()
 		spot.name = "Spot"
 		spot.position = Vector3(2.8, 8.3, 0)
-		spot.rotation_degrees = Vector3(-80, 0, 0)
+		spot.rotation_degrees = Vector3(-90, 0, 0)
 		spot.light_color = Color(0.88, 0.94, 1.0) # Cool winter LED
 		spot.light_energy = 1.6
 		spot.spot_range = 22.0
@@ -1305,14 +1439,18 @@ func _add_junction_arrows(parent: Node, curve: Curve3D, left_gaps: Array, right_
 	arrows_parent.name = "JunctionArrows"
 	parent.add_child(arrows_parent)
 	
-	# Only place at splits, not merges, to guide players into alternative routes
-	# main_left_gaps[1] is Alt 3 Split
-	_spawn_arrow_decal(arrows_parent, curve, left_gaps[1].x + 12.0, arrows_tex, true)
-	
-	# main_right_gaps[0] is Alt 1 Split
-	_spawn_arrow_decal(arrows_parent, curve, right_gaps[0].x + 12.0, arrows_tex, false)
-	# main_right_gaps[1] is Alt 2 Split
-	_spawn_arrow_decal(arrows_parent, curve, right_gaps[1].x + 12.0, arrows_tex, false)
+	# Place 3 staggered guidance chevrons leading up to each of the 3 splits
+	# Alt 1 Split (Right lane, ~225m)
+	for d_step in [-18.0, -8.0, 2.0]:
+		_spawn_arrow_decal(arrows_parent, curve, right_gaps[0].x + 12.0 + d_step, arrows_tex, false)
+
+	# Alt 2 Split (Right lane, ~555m)
+	for d_step in [-18.0, -8.0, 2.0]:
+		_spawn_arrow_decal(arrows_parent, curve, right_gaps[2].x + 12.0 + d_step, arrows_tex, false)
+
+	# Alt 3 Split (Left lane, ~1240m)
+	for d_step in [-18.0, -8.0, 2.0]:
+		_spawn_arrow_decal(arrows_parent, curve, left_gaps[0].x + 12.0 + d_step, arrows_tex, true)
 
 func _spawn_arrow_decal(parent: Node, curve: Curve3D, dist: float, tex: Texture2D, is_left: bool) -> void:
 	var pos = curve.sample_baked(dist)

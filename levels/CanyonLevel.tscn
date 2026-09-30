@@ -7,12 +7,12 @@
 [ext_resource type="Script" uid="uid://c0bu4su5psbae" path="res://addons/GodotWeatherSystem/scripts/WeatherOccurrenceResource.gd" id="5_yr3df"]
 [ext_resource type="Resource" uid="uid://ds2x8q6qhj8b0" path="res://addons/GodotWeatherSystem/weather/fine.tres" id="6_fwawu"]
 [ext_resource type="Script" uid="uid://b2sbc4x8rba5g" path="res://TerrainGenerator.gd" id="7_gen"]
-[ext_resource type="ArrayMesh" path="res://generated/canyon_terrain_visual.res" id="10_lbtjd"]
-[ext_resource type="Shape3D" path="res://generated/canyon_terrain_collision_shape.res" id="11_sm0fw"]
-[ext_resource type="ArrayMesh" path="res://generated/canyon_Visual_Road.res" id="15_8vqih"]
-[ext_resource type="ArrayMesh" path="res://generated/canyon_Visual_Road_Sides.res" id="16_3nnro"]
-[ext_resource type="Shape3D" path="res://generated/canyon_track_collision_shape.res" id="17_r6i1u"]
-[ext_resource type="Shape3D" path="res://generated/canyon_Visual_Road_Sides_collision_shape.res" id="18_623mb"]
+[ext_resource type="ArrayMesh" uid="uid://c4p347g6hbjme" path="res://generated/canyon_terrain_visual.res" id="10_lbtjd"]
+[ext_resource type="Shape3D" uid="uid://dfll4l7bic4u7" path="res://generated/canyon_terrain_collision_shape.res" id="11_sm0fw"]
+[ext_resource type="ArrayMesh" uid="uid://bkv8u4qlfuisu" path="res://generated/canyon_Visual_Road.res" id="15_8vqih"]
+[ext_resource type="ArrayMesh" uid="uid://747dui2jx2s8" path="res://generated/canyon_Visual_Road_Sides.res" id="16_3nnro"]
+[ext_resource type="Shape3D" uid="uid://dpux4ljtxedh3" path="res://generated/canyon_track_collision_shape.res" id="17_r6i1u"]
+[ext_resource type="Shape3D" uid="uid://byk3n03us7trb" path="res://generated/canyon_Visual_Road_Sides_collision_shape.res" id="18_623mb"]
 [ext_resource type="PackedScene" uid="uid://clxv8p6x0y6k2" path="res://SpawnIndicator.tscn" id="21_623mb"]
 [ext_resource type="PackedScene" uid="uid://ddgtf515dekvm" path="res://models/plants/e963227e4c0f549dc4852c7b2189de15.fbx" id="22_a7e1k"]
 [ext_resource type="PackedScene" uid="uid://ba5o50mvnmekc" path="res://models/plants/411c0309a5ad518b5594f711a337e50b.fbx" id="23_qixvg"]
@@ -99,7 +99,7 @@ shader_parameter/edge_fade_start = 550.0
 shader_parameter/edge_fade_end = 960.0
 shader_parameter/edge_fade_color = Color(0.65, 0.75, 0.85, 1)
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_k6kyp"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_o08p8"]
 render_priority = 0
 shader = ExtResource("Shader_stochastic_file")
 shader_parameter/albedo_texture = ExtResource("dirt_albedo")
@@ -116,7 +116,7 @@ shader_parameter/edge_fade_start = 550.0
 shader_parameter/edge_fade_end = 960.0
 shader_parameter/edge_fade_color = Color(0.65, 0.75, 0.85, 1)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_m00bq"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_lb00d"]
 cull_mode = 2
 albedo_texture = ExtResource("rock_albedo")
 roughness = 0.9
@@ -126,6 +126,8 @@ normal_texture = ExtResource("rock_normal")
 uv1_scale = Vector3(0.05, 0.05, 0.05)
 uv1_triplanar = true
 uv1_triplanar_sharpness = 8.0
+uv1_world_triplanar = true
+texture_filter = 5
 
 [sub_resource type="Curve3D" id="Curve3D_track"]
 bake_interval = 0.25
@@ -209,32 +211,32 @@ grass_visibility_range = 300.0
 metadata/_edit_group_ = true
 metadata/_edit_lock_ = true
 
-[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1554459611]
+[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=289238019]
 material_override = SubResource("ShaderMaterial_grass")
 lod_bias = 10.0
 mesh = ExtResource("10_lbtjd")
 
-[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1245360468]
+[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=2124520138]
 
-[node name="@CollisionShape3D@146" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=502141113]
+[node name="@CollisionShape3D@34767" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=1642377554]
 shape = ExtResource("11_sm0fw")
 
-[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=964460776]
-material_override = SubResource("ShaderMaterial_k6kyp")
+[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=356959497]
+material_override = SubResource("ShaderMaterial_o08p8")
 mesh = ExtResource("15_8vqih")
 
-[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=474842707]
-material_override = SubResource("StandardMaterial3D_m00bq")
+[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=614856356]
+material_override = SubResource("StandardMaterial3D_lb00d")
 mesh = ExtResource("16_3nnro")
 
-[node name="Visual_Road_Sides_Collision" type="StaticBody3D" parent="TerrainGenerator/Visual_Road_Sides" unique_id=1429185501]
+[node name="Visual_Road_Sides_Collision" type="StaticBody3D" parent="TerrainGenerator/Visual_Road_Sides" unique_id=1359426204]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="TerrainGenerator/Visual_Road_Sides/Visual_Road_Sides_Collision" unique_id=44227704]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TerrainGenerator/Visual_Road_Sides/Visual_Road_Sides_Collision" unique_id=488002235]
 shape = ExtResource("18_623mb")
 
-[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1395400793]
+[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1771943841]
 
-[node name="@CollisionShape3D@147" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=1420557705]
+[node name="@CollisionShape3D@34768" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=1052565198]
 shape = ExtResource("17_r6i1u")
 
 [node name="TrackPath" type="Path3D" parent="." unique_id=1030670243]
@@ -253,37 +255,37 @@ is_finish_line = true
 transform = Transform3D(0.9995712, 0.00017120712, -0.029280543, -0.00016036094, 0.9999999, 0.0003727621, 0.029280603, -0.00036790664, 0.99957114, -3.0941315, 0.4517566, 5.911377)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn1" unique_id=1474941195 instance=ExtResource("21_623mb")]
+[node name="SpawnIndicator" parent="FinishLine/SpawnPoints/Spawn1" unique_id=1474941195 instance=ExtResource("21_623mb")]
 
 [node name="Spawn2" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1842611975]
 transform = Transform3D(0.9995712, 0.00017120712, -0.029280543, -0.00016036094, 0.9999999, 0.0003727621, 0.029280603, -0.00036790664, 0.99957114, 2.9032745, 0.45079434, 6.087036)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn2" unique_id=66192409 instance=ExtResource("21_623mb")]
+[node name="SpawnIndicator" parent="FinishLine/SpawnPoints/Spawn2" unique_id=66192409 instance=ExtResource("21_623mb")]
 
 [node name="Spawn3" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=206955649]
 transform = Transform3D(0.99739045, 0.0004521939, -0.07219353, -0.00039562397, 0.99999946, 0.0007978764, 0.07219383, -0.0007672324, 0.9973903, -3.4069214, 0.45616245, 11.773499)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn3" unique_id=2044916785 instance=ExtResource("21_623mb")]
+[node name="SpawnIndicator" parent="FinishLine/SpawnPoints/Spawn3" unique_id=2044916785 instance=ExtResource("21_623mb")]
 
 [node name="Spawn4" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=189383227]
 transform = Transform3D(0.99739045, 0.0004521939, -0.07219353, -0.00039562397, 0.99999946, 0.0007978764, 0.07219383, -0.0007672324, 0.9973903, 2.5774384, 0.45378888, 12.206604)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn4" unique_id=1964460974 instance=ExtResource("21_623mb")]
+[node name="SpawnIndicator" parent="FinishLine/SpawnPoints/Spawn4" unique_id=1964460974 instance=ExtResource("21_623mb")]
 
 [node name="Spawn5" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1126709892]
 transform = Transform3D(0.99194026, 0.00084899506, -0.12670305, -0.0006947245, 0.999999, 0.0012617565, 0.12670398, -0.0011635628, 0.9919399, -4.0091705, 0.46345508, 17.576569)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn5" unique_id=251529872 instance=ExtResource("21_623mb")]
+[node name="SpawnIndicator" parent="FinishLine/SpawnPoints/Spawn5" unique_id=251529872 instance=ExtResource("21_623mb")]
 
 [node name="Spawn6" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=596390965]
 transform = Transform3D(0.99194026, 0.00084899506, -0.12670305, -0.0006947245, 0.999999, 0.0012617565, 0.12670398, -0.0011635628, 0.9919399, 1.9424896, 0.4592867, 18.336823)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn6" unique_id=378338834 instance=ExtResource("21_623mb")]
+[node name="SpawnIndicator" parent="FinishLine/SpawnPoints/Spawn6" unique_id=378338834 instance=ExtResource("21_623mb")]
 
 [node name="PlayerSpawner" type="MultiplayerSpawner" parent="." unique_id=642896597]
 _spawnable_scenes = PackedStringArray("uid://cart123")

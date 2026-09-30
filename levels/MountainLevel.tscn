@@ -18,17 +18,17 @@
 [ext_resource type="Texture2D" uid="uid://c45b43y4vhj0d" path="res://materials/dark_canyon_rock.png" id="11_rock_tex"]
 [ext_resource type="Texture2D" uid="uid://cng7ohshvc4to" path="res://materials/sand_normal.png" id="11_sand_norm"]
 [ext_resource type="Texture2D" uid="uid://bsmrfxbh6vqe2" path="res://materials/asphalt.png" id="12_g5aih"]
-[ext_resource type="ArrayMesh" uid="uid://w2aapqdmv7fq" path="res://generated/mountain_terrain_visual.res" id="13_jrwcp"]
-[ext_resource type="Shape3D" uid="uid://cy77bs3nn2q6" path="res://generated/mountain_terrain_collision_shape.res" id="14_01bw0"]
+[ext_resource type="ArrayMesh" uid="uid://1r3hv47h3yih" path="res://generated/mountain_terrain_visual.res" id="13_jrwcp"]
+[ext_resource type="Shape3D" uid="uid://c0bpd5cah5qha" path="res://generated/mountain_terrain_collision_shape.res" id="14_01bw0"]
 [ext_resource type="Shader" uid="uid://cvne02d6iyem5" path="res://curb_stripes.gdshader" id="15_bt6n6"]
-[ext_resource type="ArrayMesh" uid="uid://dmdgq5m2j3mms" path="res://generated/mountain_Visual_Curbs.res" id="16_gx2ty"]
-[ext_resource type="ArrayMesh" uid="uid://of6rrm7h7edu" path="res://generated/mountain_Visual_Curbs_Sides.res" id="17_hlrbt"]
-[ext_resource type="ArrayMesh" uid="uid://ceo81qo4noe3i" path="res://generated/mountain_Visual_Road.res" id="18_m0x3k"]
-[ext_resource type="ArrayMesh" uid="uid://c8d483bo7glc6" path="res://generated/mountain_Visual_Road_Sides.res" id="19_wfwbe"]
+[ext_resource type="ArrayMesh" uid="uid://xiorugiqlm73" path="res://generated/mountain_Visual_Curbs.res" id="16_gx2ty"]
+[ext_resource type="ArrayMesh" uid="uid://bte0whplttacm" path="res://generated/mountain_Visual_Curbs_Sides.res" id="17_hlrbt"]
+[ext_resource type="ArrayMesh" uid="uid://bg6eevyv3hvyu" path="res://generated/mountain_Visual_Road.res" id="18_m0x3k"]
+[ext_resource type="ArrayMesh" uid="uid://wnvu88meihlw" path="res://generated/mountain_Visual_Road_Sides.res" id="19_wfwbe"]
 [ext_resource type="PackedScene" uid="uid://csyepoc8k3uqr" path="res://models/plants/23748053b325a4fef71b85c3cb4f6c56.fbx" id="20_717p5"]
-[ext_resource type="Shape3D" uid="uid://388f2sntfyms" path="res://generated/mountain_Visual_Road_Sides_collision_shape.res" id="20_c6n7l"]
+[ext_resource type="Shape3D" uid="uid://cn8b7locjbw83" path="res://generated/mountain_Visual_Road_Sides_collision_shape.res" id="20_c6n7l"]
 [ext_resource type="PackedScene" uid="uid://dui7hge4elksh" path="res://models/desert/7b4c6b35c14804590f71c63e961076cb.fbx" id="20_hecwt"]
-[ext_resource type="Shape3D" uid="uid://caxd7tojs2yta" path="res://generated/mountain_track_collision_shape.res" id="20_lprgb"]
+[ext_resource type="Shape3D" uid="uid://cy6eajay6fhvw" path="res://generated/mountain_track_collision_shape.res" id="20_lprgb"]
 [ext_resource type="PackedScene" uid="uid://dilonihknpcv3" path="res://models/desert/9a6dfc30d713e029ced3625b1e3230bd.fbx" id="21_01s5b"]
 [ext_resource type="PackedScene" uid="uid://clxv8p6x0y6k2" path="res://SpawnIndicator.tscn" id="21_6at7b"]
 [ext_resource type="PackedScene" uid="uid://bt05lw4wjffvs" path="res://models/desert/c1e0f742c74c233f2e64bfe3db9c8dd2.fbx" id="23_01s5b"]
@@ -413,11 +413,12 @@ startTime = 58575.600000000006
 [node name="TerrainGenerator" type="Node3D" parent="." unique_id=586341718 node_paths=PackedStringArray("track_path")]
 script = ExtResource("9_odffs")
 track_path = NodePath("../TrackPath")
+terrain_resolution = 1000
 noise_frequency = 0.006
 hill_height = 40.0
 track_layout_type = 1
 road_width = 15.0
-sand_width = 17.0
+curb_outer_width = 17.0
 road_y_offset = 0.4
 curb_y_offset = 0.3
 grass_material = SubResource("ShaderMaterial_hgpy5")
@@ -430,45 +431,45 @@ grass_visibility_range = 300.0
 metadata/_edit_group_ = true
 metadata/_edit_lock_ = true
 
-[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=895541079]
+[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=252020219]
 material_override = SubResource("ShaderMaterial_hgpy5")
 lod_bias = 10.0
 mesh = ExtResource("13_jrwcp")
 
-[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=21256152]
+[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1509307773]
 
-[node name="@CollisionShape3D@29124" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=419982861]
+[node name="@CollisionShape3D@25267" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=1574396841]
 shape = ExtResource("14_01bw0")
 
-[node name="Visual_Curbs" type="MeshInstance3D" parent="TerrainGenerator" unique_id=229694625]
+[node name="Visual_Curbs" type="MeshInstance3D" parent="TerrainGenerator" unique_id=762005176]
 material_override = SubResource("ShaderMaterial_opkdv")
 mesh = ExtResource("16_gx2ty")
 
-[node name="Visual_Curbs_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1318696758]
+[node name="Visual_Curbs_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1507609578]
 material_override = SubResource("StandardMaterial3D_k0jf5")
 mesh = ExtResource("17_hlrbt")
 
-[node name="Visual_Curbs_Sides_Collision" type="StaticBody3D" parent="TerrainGenerator/Visual_Curbs_Sides" unique_id=901400407]
+[node name="Visual_Curbs_Sides_Collision" type="StaticBody3D" parent="TerrainGenerator/Visual_Curbs_Sides" unique_id=1949362516]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="TerrainGenerator/Visual_Curbs_Sides/Visual_Curbs_Sides_Collision" unique_id=1846640332]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TerrainGenerator/Visual_Curbs_Sides/Visual_Curbs_Sides_Collision" unique_id=1473973286]
 shape = ExtResource("24_bfoi6")
 
-[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=726546576]
+[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=571348465]
 material_override = SubResource("ShaderMaterial_q7ucn")
 mesh = ExtResource("18_m0x3k")
 
-[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=2130881628]
+[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=65352289]
 material_override = SubResource("StandardMaterial3D_0pgwh")
 mesh = ExtResource("19_wfwbe")
 
-[node name="Visual_Road_Sides_Collision" type="StaticBody3D" parent="TerrainGenerator/Visual_Road_Sides" unique_id=692362908]
+[node name="Visual_Road_Sides_Collision" type="StaticBody3D" parent="TerrainGenerator/Visual_Road_Sides" unique_id=1456851586]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="TerrainGenerator/Visual_Road_Sides/Visual_Road_Sides_Collision" unique_id=1367131830]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TerrainGenerator/Visual_Road_Sides/Visual_Road_Sides_Collision" unique_id=1590660496]
 shape = ExtResource("20_c6n7l")
 
-[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1920484913]
+[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=564933737]
 
-[node name="@CollisionShape3D@29125" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=1348489536]
+[node name="@CollisionShape3D@25268" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=1429497156]
 shape = ExtResource("20_lprgb")
 
 [node name="TrackPath" type="Path3D" parent="." unique_id=1030670243]
@@ -786,17 +787,17 @@ transform = Transform3D(-13.154577, 0, -24.717548, 0, 35.363556, 0, 24.717548, 0
 [node name="YVO3D_71447" parent="Ridges" unique_id=2093471594 groups=["collision_box"] instance=ExtResource("58_6f0x4")]
 transform = Transform3D(-13.154577, 0, -24.717548, 0, 35.363556, 0, 24.717548, 0, -13.154577, -17.636612, 64.69467, -145.58466)
 
-[node name="YVO3D_71431" parent="Ridges" unique_id=396653110 instance=ExtResource("58_dcivv")]
+[node name="YVO3D_71431" parent="Ridges" unique_id=396653110 groups=["collision_box"] instance=ExtResource("58_dcivv")]
 transform = Transform3D(40, 0, 0, 0, 40, 0, 0, 0, 40, 34.80667, 27.35682, -363.7842)
 
-[node name="YVO3D_71432" parent="Ridges" unique_id=1620676364 instance=ExtResource("58_dcivv")]
+[node name="YVO3D_71432" parent="Ridges" unique_id=1620676364 groups=["collision_box"] instance=ExtResource("58_dcivv")]
 transform = Transform3D(19.308254, 0, 35.03129, 0, 40, 0, -35.03129, 0, 19.308254, 10.591915, 17.722786, -363.7842)
 
-[node name="YVO3D_71433" parent="Ridges" unique_id=1694986788 instance=ExtResource("58_dcivv")]
+[node name="YVO3D_71433" parent="Ridges" unique_id=1694986788 groups=["collision_box"] instance=ExtResource("58_dcivv")]
 transform = Transform3D(-28.18224, 0, 28.385931, 0, 40.000004, 0, -28.385931, 0, -28.18224, 61.517693, 9.917782, -349.7682)
 
-[node name="YVO3D_71442" parent="Ridges" unique_id=1692669644 instance=ExtResource("59_guvam")]
+[node name="YVO3D_71442" parent="Ridges" unique_id=1692669644 groups=["collision_trimesh"] instance=ExtResource("59_guvam")]
 transform = Transform3D(-579.0479, 0, -393.3237, 0, 700, 0, 393.3237, 0, -579.0479, -61.631805, 106.087875, -895.8217)
 
-[node name="YVO3D_71441" parent="Ridges" unique_id=53725025 instance=ExtResource("60_wi82l")]
+[node name="YVO3D_71441" parent="Ridges" unique_id=53725025 groups=["collision_trimesh"] instance=ExtResource("60_wi82l")]
 transform = Transform3D(700, 0, 0, 0, 700, 0, 0, 0, 700, -1119.1268, 73.92334, 0)

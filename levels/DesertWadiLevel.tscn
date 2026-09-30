@@ -10,9 +10,9 @@
 [ext_resource type="Script" uid="uid://b2sbc4x8rba5g" path="res://TerrainGenerator.gd" id="7_gen"]
 [ext_resource type="Texture2D" uid="uid://dh0ue4kmyvxwd" path="res://materials/sand.png" id="10_jdk6v"]
 [ext_resource type="Texture2D" uid="uid://cng7ohshvc4to" path="res://materials/sand_normal.png" id="11_p2eu4"]
-[ext_resource type="ArrayMesh" uid="uid://dcblnuoxce46c" path="res://generated/desert_wadi_terrain_visual.res" id="13_rtijl"]
+[ext_resource type="ArrayMesh" uid="uid://bdfep40evuefj" path="res://generated/desert_wadi_terrain_visual.res" id="13_rtijl"]
 [ext_resource type="Shader" uid="uid://srampgbp5hcn" path="res://water.gdshader" id="14_5qkpu"]
-[ext_resource type="Shape3D" uid="uid://dploruqt5asnl" path="res://generated/desert_wadi_terrain_collision_shape.res" id="14_j34pa"]
+[ext_resource type="Shape3D" uid="uid://tbpdih63uj7f" path="res://generated/desert_wadi_terrain_collision_shape.res" id="14_j34pa"]
 [ext_resource type="PackedScene" uid="uid://clxv8p6x0y6k2" path="res://SpawnIndicator.tscn" id="16_po7be"]
 [ext_resource type="PackedScene" uid="uid://da2i62hjyc1cp" path="res://addons/GodotWeatherSystem/weather_controller.tscn" id="31_weather"]
 [ext_resource type="PackedScene" uid="uid://boostpad123" path="res://BoostPad.tscn" id="93_m7b4a"]
@@ -165,7 +165,7 @@ track_path = NodePath("../TrackPath")
 terrain_resolution = 1000
 noise_frequency = 0.006
 hill_height = 42.0
-sand_width = 17.0
+curb_outer_width = 17.0
 road_y_offset = 0.06
 curb_y_offset = 0.06
 grass_material = SubResource("ShaderMaterial_10wt8")
@@ -181,17 +181,17 @@ grass_visibility_range = 300.0
 metadata/_edit_lock_ = true
 metadata/_edit_group_ = true
 
-[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=562019654]
+[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=132698597]
 material_override = SubResource("ShaderMaterial_10wt8")
 lod_bias = 10.0
 mesh = ExtResource("13_rtijl")
 
-[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1236031522]
+[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=335677649]
 
-[node name="@CollisionShape3D@56834" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=199196685]
+[node name="@CollisionShape3D@30931" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=1924552086]
 shape = ExtResource("14_j34pa")
 
-[node name="WadiRiverWater" type="MeshInstance3D" parent="TerrainGenerator" unique_id=588139333]
+[node name="WadiRiverWater" type="MeshInstance3D" parent="TerrainGenerator" unique_id=333587872]
 material_override = SubResource("ShaderMaterial_p2eu4")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_rtijl")

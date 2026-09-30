@@ -252,33 +252,65 @@ func _ready() -> void:
 	tg.set("track_path", track_path)
 	tg.call("generate_world")
 
-	# 4. Alternative Route (Branching Shortcut Path)
+	# 4. Alternative Routes (Branching Shortcut Paths)
 	var alt_container := Node3D.new()
 	alt_container.name = "AlternativePaths"
 	level_scene.add_child(alt_container)
 
-	var alt_path := Path3D.new()
-	alt_path.name = "AlternativePath_CanyonCut"
-	var alt_curve := Curve3D.new()
-	alt_curve.bake_interval = 0.25
+	# --- DIVERGENCE 1: Canyon Cut (Inner Snow Ravine Shortcut) ---
+	var alt1_path := Path3D.new()
+	alt1_path.name = "AlternativePath_CanyonCut"
+	var alt1_curve := Curve3D.new()
+	alt1_curve.bake_interval = 0.25
 
-	# Alternative shortcut branch: splits at inner curb (47.5, 8.1, -183), plunges through inner snow ravine, merges at inner curb (45.0, 6.2, -272)
-	var alt_pts = [
-		[Vector3(0, 0, 8), Vector3(-2.5, -0.4, -12), Vector3(47.5, 8.1, -183.0)],   # 0: Fork start off inner curb
-		[Vector3(3, 0.3, 12), Vector3(-2, -0.3, -14), Vector3(44.0, 7.2, -210.0)], # 1: Inner canyon descent
-		[Vector3(2, 0.2, 12), Vector3(2, -0.2, -12), Vector3(38.0, 6.2, -245.0)],  # 2: Mid shortcut (Snowdrift zone)
-		[Vector3(-2, -0.2, 10), Vector3(2, 0.2, -8), Vector3(45.0, 6.2, -272.0)],  # 3: Merge rejoin at inner curb
+	# Smooth on-ramp branching directly off inner main road lane (53.0, 8.52, -174)
+	# Traversing inner canyon, merging seamlessly directly onto main road (46.0, 6.10, -277)
+	var alt1_pts = [
+		[Vector3(0, 0, 8), Vector3(-1.8, -0.15, -12), Vector3(53.0, 8.52, -174.0)],   # 0: Fork start directly on inner lane
+		[Vector3(1.5, 0.15, 9), Vector3(-1.5, -0.25, -12), Vector3(48.0, 8.20, -192.0)],# 1: Transition off curb
+		[Vector3(2.0, 0.3, 14), Vector3(-2.0, -0.3, -14), Vector3(44.0, 7.30, -220.0)], # 2: Inner canyon descent
+		[Vector3(2.0, 0.2, 14), Vector3(1.5, -0.1, -12), Vector3(38.0, 6.40, -248.0)],  # 3: Mid shortcut (Snowdrift zone)
+		[Vector3(-1.5, 0.1, 10), Vector3(1.2, -0.05, -6), Vector3(43.5, 6.15, -270.0)], # 4: Approaching merge
+		[Vector3(-1.0, 0.05, 7), Vector3(0, 0, -4), Vector3(46.0, 6.10, -277.0)]       # 5: Rejoin directly on main road
 	]
-	for p in alt_pts:
-		alt_curve.add_point(p[2], p[0], p[1])
-	alt_path.curve = alt_curve
-	alt_container.add_child(alt_path)
+	for p in alt1_pts:
+		alt1_curve.add_point(p[2], p[0], p[1])
+	alt1_path.curve = alt1_curve
+	alt_container.add_child(alt1_path)
 
-	# Generate 3D cobblestone road mesh, curbs, solid stone embankment & collision for the alternative route
-	_build_cobblestone_road(level_scene, alt_curve, 11.5, "AlternativeRoad")
+	# Generate 3D cobblestone road mesh, curbs, solid stone embankment & collision for Canyon Cut
+	_build_cobblestone_road(level_scene, alt1_curve, 11.5, "AlternativeRoad")
 
-	# 5. Alpine Timber Bridge across Creek (Crossing 2: X = -27m to +27m at Z = -305, Y = 4.8m)
-	_build_detailed_alpine_bridge(level_scene, Vector3(0.0, 4.8, -305.0), 54.0, 17.6)
+	# --- DIVERGENCE 2: Glade Creek Bridge (Southern Meadow Shortcut) ---
+	var alt2_path := Path3D.new()
+	alt2_path.name = "AlternativePath_GladeBridge"
+	var alt2_curve := Curve3D.new()
+	alt2_curve.bake_interval = 0.25
+
+	# Smooth on-ramp branching off East terrace landing (31.0, 4.85, 184)
+	# Crossing creek via Glade Timber Bridge (0.0, 2.20, 204)
+	# Merging seamlessly onto finish straight approach (-44.0, 0.95, 175)
+	var alt2_pts = [
+		[Vector3(0, 0, 8), Vector3(-3.0, -0.25, 10), Vector3(31.0, 4.85, 184.0)],     # 0: Fork start on inner lane
+		[Vector3(3.5, 0.3, -8), Vector3(-4.0, -0.3, 10), Vector3(18.0, 3.30, 197.0)], # 1: Meadow descent toward creek
+		[Vector3(5.0, 0.0, -2), Vector3(-5.0, 0.0, 2), Vector3(0.0, 2.20, 204.0)],    # 2: Wooden Creek Bridge center
+		[Vector3(4.0, 0.1, 4), Vector3(-4.0, -0.15, -6), Vector3(-18.0, 1.60, 196.0)],# 3: West bank climb out of creek
+		[Vector3(3.0, 0.15, 6), Vector3(-2.0, -0.05, -8), Vector3(-32.0, 1.15, 186.0)],# 4: Meadow approach to straight
+		[Vector3(0.5, 0.05, 6), Vector3(0, 0, -4), Vector3(-44.0, 0.95, 175.0)]       # 5: Rejoin smoothly on finish straight
+	]
+	for p in alt2_pts:
+		alt2_curve.add_point(p[2], p[0], p[1])
+	alt2_path.curve = alt2_curve
+	alt_container.add_child(alt2_path)
+
+	# Generate 3D cobblestone road mesh, curbs, solid stone embankment & collision for Glade Shortcut
+	_build_cobblestone_road(level_scene, alt2_curve, 11.0, "AlternativeRoad_Glade")
+
+	# Detailed Glade Timber Bridge across the creek on Alternative Route 2
+	_build_detailed_alpine_bridge(level_scene, Vector3(0.0, 2.20, 204.0), 28.0, 12.0, "GladeTimberBridge", -21.8)
+
+	# 5. Alpine Timber Bridge across Creek (Crossing 2: X = -30m to +30m at Z = -305, Y = 4.8m)
+	_build_detailed_alpine_bridge(level_scene, Vector3(0.0, 4.8, -305.0), 60.0, 17.6, "AlpineTimberBridge", 0.0)
 
 	# 6. Natural Snow-Covered Sections on Road (Organic surface drifts with "snow" group & "is_snow" meta)
 	var snow_sections := Node3D.new()
@@ -289,12 +321,14 @@ func _ready() -> void:
 	_create_natural_snow_drift(snow_sections, "SnowDrift_Jump1Approach", Vector3(-32.0, 5.68, -52.0), Vector3(15.0, 1.15, 18.0), 20.0, 0.0)
 	# Section B: Eastern Flank Glade (X=45, Y=6.68, Z=-145)
 	_create_natural_snow_drift(snow_sections, "SnowDrift_EastGlade", Vector3(45.0, 6.68, -145.0), Vector3(15.0, 1.05, 16.0), -16.0, 1.8)
-	# Section C: Deep Snow on Alternative Shortcut Route (X=38, Y=6.18, Z=-245)
-	_create_natural_snow_drift(snow_sections, "SnowDrift_AltRouteCut", Vector3(38.0, 6.18, -245.0), Vector3(12.5, 1.30, 22.0), 5.0, 3.5)
+	# Section C: Deep Snow on Alternative Shortcut Route (X=38, Y=6.38, Z=-248)
+	_create_natural_snow_drift(snow_sections, "SnowDrift_AltRouteCut", Vector3(38.0, 6.38, -248.0), Vector3(12.5, 1.30, 22.0), 5.0, 3.5)
 	# Section D: High Summit Ridge Snowdrift (X=-98, Y=17.56, Z=-80)
 	_create_natural_snow_drift(snow_sections, "SnowDrift_SummitRidge", Vector3(-98.0, 17.56, -80.0), Vector3(15.0, 1.10, 20.0), 0.0, 5.2)
 	# Section E: Pre-Jump 2 Summit Snowdrift (X=-45, Y=15.56, Z=100)
 	_create_natural_snow_drift(snow_sections, "SnowDrift_Jump2Approach", Vector3(-45.0, 15.56, 100.0), Vector3(15.0, 1.20, 16.0), -35.0, 7.1)
+	# Section F: Southern Meadow Glade on Alternative Route 2 (X=16, Y=3.28, Z=198)
+	_create_natural_snow_drift(snow_sections, "SnowDrift_GladeMeadow", Vector3(16.0, 3.28, 198.0), Vector3(12.0, 1.15, 16.0), -28.0, 4.2)
 
 	# 7. Players node
 	var players_node := Node3D.new()
@@ -357,12 +391,12 @@ func _ready() -> void:
 	var track_len: float = curve.get_baked_length()
 	# 6 milestone checkpoints spaced along the 1350m track, avoiding mid-air jump gaps:
 	# CP 1: 130m - Valley floor straight before Jump 1 in-run
-	# CP 2: 330m - East bank climb before the branching fork
+	# CP 2: 330m - East bank climb before branching fork 1
 	# CP 3: 490m - Post-merge approach right before the Alpine Timber Bridge
 	# CP 4: 700m - Western mountain climb shelf heading South
 	# CP 5: 900m - High summit ridge overlook before Jump 2 approach
-	# CP 6: 1180m - Southern meadow glade before curve into finish straight
-	var milestone_offsets = [130.0, 330.0, 490.0, 700.0, 900.0, 1180.0]
+	# CP 6: 1105m - Jump 2 landing terrace before branching fork 2
+	var milestone_offsets = [130.0, 330.0, 490.0, 700.0, 900.0, 1105.0]
 
 	for i in range(milestone_offsets.size()):
 		var dist_along: float = milestone_offsets[i]
@@ -394,9 +428,12 @@ func _ready() -> void:
 			["Boost_Jump2_R", Vector3(-26.0, 15.5, 114.0), 220.0],
 			# Valley Straight Booster
 			["Boost_StartStraight", Vector3(-45.0, 1.0, 80.0), 180.0],
-			# Alternative Shortcut Boosters (Reward for taking technical cut)
-			["Boost_AltShortcut_1", Vector3(42.0, 6.8, -225.0), 180.0],
-			["Boost_AltShortcut_2", Vector3(40.0, 6.2, -260.0), 180.0],
+			# Alternative Shortcut 1 Boosters (Canyon Cut)
+			["Boost_AltShortcut_1", Vector3(42.0, 7.1, -225.0), 180.0],
+			["Boost_AltShortcut_2", Vector3(40.0, 6.3, -255.0), 180.0],
+			# Alternative Shortcut 2 Boosters (Glade Creek Bridge)
+			["Boost_AltGlade_1", Vector3(23.0, 3.90, 193.0), 235.0],
+			["Boost_AltGlade_2", Vector3(0.0, 2.25, 204.0), 248.0],
 			# High Summit Ridge Overlook
 			["Boost_SummitStraight", Vector3(-98.0, 17.5, -40.0), 0.0]
 		]
@@ -422,7 +459,9 @@ func _ready() -> void:
 			# Row 3: Approach to Alpine Timber Bridge (Z = -305)
 			[Vector3(16.0, 5.4, -305.0), Vector3(12.0, 5.4, -305.0)],
 			# Row 4: High Summit Ridge before Jump 2 (Z = 40)
-			[Vector3(-94.0, 17.8, 40.0), Vector3(-91.0, 17.8, 40.0), Vector3(-88.0, 17.8, 40.0)]
+			[Vector3(-94.0, 17.8, 40.0), Vector3(-91.0, 17.8, 40.0), Vector3(-88.0, 17.8, 40.0)],
+			# Row 5: Glade Shortcut Approach (Z = 196)
+			[Vector3(19.0, 3.7, 195.0), Vector3(16.0, 3.3, 198.0)]
 		]
 		var item_idx := 1
 		for row in item_rows:
@@ -476,10 +515,11 @@ func _create_natural_snow_drift(parent: Node, drift_name: String, pos: Vector3, 
 	parent.add_child(drift)
 
 
-func _build_detailed_alpine_bridge(parent: Node, center: Vector3, length: float, width: float) -> void:
+func _build_detailed_alpine_bridge(parent: Node, center: Vector3, length: float, width: float, bridge_name: String = "AlpineTimberBridge", yaw_deg: float = 0.0) -> void:
 	var bridge_root := Node3D.new()
-	bridge_root.name = "AlpineTimberBridge"
+	bridge_root.name = bridge_name
 	bridge_root.position = center
+	bridge_root.rotation_degrees = Vector3(0, yaw_deg, 0)
 
 	# 1. PBR Materials
 	var wood_mat := StandardMaterial3D.new()
@@ -562,11 +602,11 @@ func _build_detailed_alpine_bridge(parent: Node, center: Vector3, length: float,
 
 	# 4. Massive Stone Shore Abutments (East & West banks, sealing ALL gaps)
 	for side in [-1.0, 1.0]:
-		var x_pos = side * 26.0
+		var x_pos = side * (length * 0.5 - 1.5)
 		var abut := StaticBody3D.new()
 		abut.name = "StoneAbutment_" + ("E" if side > 0 else "W")
 		abut.add_to_group("track_surface", true)
-		abut.position = Vector3(x_pos, -3.5, 0)
+		abut.position = Vector3(x_pos, -4.0, 0)
 
 		var a_col := CollisionShape3D.new()
 		var a_shape := BoxShape3D.new()
@@ -591,7 +631,7 @@ func _build_detailed_alpine_bridge(parent: Node, center: Vector3, length: float,
 			wm.size = Vector3(5.0, 6.5, 2.5)
 			wing.mesh = wm
 			wing.material_override = stone_mat
-			wing.position = Vector3(x_pos + side * 1.5, -3.0, wing_side * (width * 0.5 + 2.0))
+			wing.position = Vector3(x_pos + side * 1.5, -3.3, wing_side * (width * 0.5 + 2.0))
 			wing.rotation_degrees = Vector3(0, side * wing_side * 22.0, 0)
 			bridge_root.add_child(wing)
 
@@ -699,7 +739,8 @@ func _build_detailed_alpine_bridge(parent: Node, center: Vector3, length: float,
 				bridge_root.add_child(b2)
 
 	# 7. Creek Bed Heavy Timber Trestle Bents with Stone Cutwaters
-	for x_bent in [-10.0, 10.0]:
+	var bent_offset = length * 0.18
+	for x_bent in [-bent_offset, bent_offset]:
 		var bent_root := Node3D.new()
 		bent_root.name = "TrestleBent_%d" % int(x_bent)
 		bent_root.position = Vector3(x_bent, 0, 0)
@@ -759,7 +800,7 @@ func _build_cobblestone_road(parent: Node, curve: Curve3D, width: float, node_na
 	var curb_w: float = 0.5
 	var max_curb_h: float = 0.22
 	var deck_crown: float = 0.08
-	var max_wall_drop: float = 3.8
+	var max_wall_drop: float = 9.0
 
 	# 1. Cobblestone Road Deck Material (High-res PBR cobblestone)
 	var cobble_mat := StandardMaterial3D.new()
