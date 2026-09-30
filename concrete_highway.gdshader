@@ -40,33 +40,74 @@ void fragment() {
 	float py = UV.y;
 	float dx = fwidth(px) * 1.5;
 
-	// 1. Solid White Edge Lines (Left: 0.06, Right: 0.94)
-	float edge_l = 1.0 - smoothstep(0.008, 0.008 + dx, abs(px - 0.06));
-	float edge_r = 1.0 - smoothstep(0.008, 0.008 + dx, abs(px - 0.94));
-	float white_edges = clamp(edge_l + edge_r, 0.0, 1.0);
+	float edge_l_mode = COLOR.r;
+	float edge_r_mode = COLOR.g;
+	float road_type = COLOR.b; // 0.0 = 4-lane main highway, 1.0 = 2-lane ramp
+	float is_gore = COLOR.a;
 
-	// 2. Dashed White Lane Dividers at 0.28 and 0.72 (3m dash, 3m gap)
-	float dash = step(0.50, fract(py / 6.0));
-	float lane_l = (1.0 - smoothstep(0.007, 0.007 + dx, abs(px - 0.28))) * dash;
-	float lane_r = (1.0 - smoothstep(0.007, 0.007 + dx, abs(px - 0.72))) * dash;
-	float white_dashes = clamp(lane_l + lane_r, 0.0, 1.0);
+	float white_edges = 0.0;
+	float white_dashes = 0.0;
+	float yellow_lines = 0.0;
+	float total_wear = 0.0;
 
-	// 3. Double Yellow Center Line at 0.488 and 0.512
-	float y_line1 = 1.0 - smoothstep(0.006, 0.006 + dx, abs(px - 0.490));
-	float y_line2 = 1.0 - smoothstep(0.006, 0.006 + dx, abs(px - 0.510));
-	float yellow_lines = clamp(y_line1 + y_line2, 0.0, 1.0);
+	// Edge line dash pattern for exit/entrance: 1.5m dash, 1.5m gap (period 3m)
+	float edge_dash = step(0.50, fract(py / 3.0));
 
-	// Subtle tire wear in lane centers (0.17, 0.38, 0.62, 0.83)
-	float wear1 = 1.0 - smoothstep(0.0, 0.08, abs(px - 0.17));
-	float wear2 = 1.0 - smoothstep(0.0, 0.08, abs(px - 0.38));
-	float wear3 = 1.0 - smoothstep(0.0, 0.08, abs(px - 0.62));
-	float wear4 = 1.0 - smoothstep(0.0, 0.08, abs(px - 0.83));
-	float total_wear = clamp(wear1 + wear2 + wear3 + wear4, 0.0, 1.0);
+	// Left Edge Line at px = 0.06:
+	// mode >= 0.75: solid; 0.25 <= mode < 0.75: dashed; mode < 0.25: open (no line)
+	float raw_edge_l = 1.0 - smoothstep(0.008, 0.008 + dx, abs(px - 0.06));
+	float active_edge_l = mix(raw_edge_l * edge_dash, raw_edge_l, smoothstep(0.65, 0.85, edge_l_mode));
+	white_edges += active_edge_l * smoothstep(0.20, 0.35, edge_l_mode);
+
+	// Right Edge Line at px = 0.94:
+	float raw_edge_r = 1.0 - smoothstep(0.008, 0.008 + dx, abs(px - 0.94));
+	float active_edge_r = mix(raw_edge_r * edge_dash, raw_edge_r, smoothstep(0.65, 0.85, edge_r_mode));
+	white_edges += active_edge_r * smoothstep(0.20, 0.35, edge_r_mode);
+
+	if (road_type > 0.5) {
+		// --- 2-LANE ONE-WAY RAMP (11.5m width) ---
+		// Center dashed white lane divider at px = 0.50 (3m dash, 3m gap)
+		float dash = step(0.50, fract(py / 6.0));
+		white_dashes = (1.0 - smoothstep(0.008, 0.008 + dx, abs(px - 0.50))) * dash;
+
+		// 2-lane tire wear (centered at 0.28 and 0.72)
+		float wear1 = 1.0 - smoothstep(0.0, 0.09, abs(px - 0.28));
+		float wear2 = 1.0 - smoothstep(0.0, 0.09, abs(px - 0.72));
+		total_wear = clamp(wear1 + wear2, 0.0, 1.0);
+	} else {
+		// --- 4-LANE MAIN HIGHWAY (16m width) ---
+		// 1. Dashed White Lane Dividers at 0.28 and 0.72 (3m dash, 3m gap)
+		float dash = step(0.50, fract(py / 6.0));
+		float lane_l = (1.0 - smoothstep(0.007, 0.007 + dx, abs(px - 0.28))) * dash;
+		float lane_r = (1.0 - smoothstep(0.007, 0.007 + dx, abs(px - 0.72))) * dash;
+		white_dashes = clamp(lane_l + lane_r, 0.0, 1.0);
+
+		// 2. Double Yellow Center Line at 0.490 and 0.510 (Separating northbound/southbound or inner median)
+		float y_line1 = 1.0 - smoothstep(0.006, 0.006 + dx, abs(px - 0.490));
+		float y_line2 = 1.0 - smoothstep(0.006, 0.006 + dx, abs(px - 0.510));
+		yellow_lines = clamp(y_line1 + y_line2, 0.0, 1.0);
+
+		// 4-lane tire wear
+		float wear1 = 1.0 - smoothstep(0.0, 0.08, abs(px - 0.17));
+		float wear2 = 1.0 - smoothstep(0.0, 0.08, abs(px - 0.38));
+		float wear3 = 1.0 - smoothstep(0.0, 0.08, abs(px - 0.62));
+		float wear4 = 1.0 - smoothstep(0.0, 0.08, abs(px - 0.83));
+		total_wear = clamp(wear1 + wear2 + wear3 + wear4, 0.0, 1.0);
+	}
+
+	// Apply tire wear darkening to concrete
 	albedo = mix(albedo, albedo * 0.82, total_wear * 0.40);
 
+	// Gore chevron markings if active (diagonal warning stripes on shoulder)
+	if (is_gore > 0.05) {
+		float chevron = step(0.50, fract((px * 4.0 + py * 0.3) / 1.5));
+		float shoulder_mask = clamp(step(0.88, px) + (1.0 - step(0.12, px)), 0.0, 1.0);
+		yellow_lines = max(yellow_lines, chevron * shoulder_mask * is_gore);
+	}
+
 	// Apply markings
-	albedo = mix(albedo, stripe_color.rgb, white_edges + white_dashes);
-	albedo = mix(albedo, yellow_color.rgb, yellow_lines);
+	albedo = mix(albedo, stripe_color.rgb, clamp(white_edges + white_dashes, 0.0, 1.0));
+	albedo = mix(albedo, yellow_color.rgb, clamp(yellow_lines, 0.0, 1.0));
 
 	ALBEDO = albedo;
 	NORMAL_MAP = tex_norm;
