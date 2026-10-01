@@ -24,6 +24,16 @@ Thumbs.db
 *.swp
 *.bak
 *.import
+!materials/*.import
+!materials/**/*.import
+!sprites/*.import
+!sprites/**/*.import
+!images/*.import
+!images/**/*.import
+!sounds/*.import
+!sounds/**/*.import
+!music/*.import
+!music/**/*.import
 
 # Large asset models and raw files
 *.fbx
@@ -35,5 +45,7 @@ models/ramps/*.fbx
 
 # Resource files and oversized generated meshes
 *.res
+!generated/grass/grass_material.res
 generated/terrain_collision_shape.res
 generated/terrain_visual.res
+
