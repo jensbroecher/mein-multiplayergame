@@ -10,21 +10,33 @@ uniform vec4 stripe_color : source_color = vec4(0.96, 0.97, 1.0, 1.0);
 uniform vec4 yellow_color : source_color = vec4(0.98, 0.82, 0.18, 1.0);
 uniform float uv_scale = 0.20;
 uniform float normal_strength = 0.75;
+// Transverse slab expansion joints: darkened concrete, anti-aliased so they fade out with
+// distance instead of shimmering into a z-fighting looking mess.
+uniform float joint_spacing = 8.0;
+uniform float joint_strength : hint_range(0.0, 1.0) = 0.35;
 
 // UV.x: 0.0 (left barrier) to 1.0 (right barrier)
 // UV.y: distance along track in meters
 void fragment() {
-	vec2 base_uv = vec2(UV.x * 4.0, UV.y * uv_scale);
+	// Keep the concrete isotropic in world space. Stretching UV.x by a fixed factor instead
+	// smears every texture feature along the road into long thin bands.
+	float road_width = mix(16.0, 11.5, step(0.5, COLOR.b));
+	vec2 base_uv = vec2(UV.x * road_width, UV.y) * uv_scale;
 	vec4 tex_albedo = texture(concrete_texture, base_uv);
 	vec3 tex_norm = texture(concrete_normal, base_uv).rgb;
 	float tex_rough = texture(concrete_roughness, base_uv).r;
 
 	vec3 albedo = tex_albedo.rgb * concrete_color.rgb;
 
-	// Transverse concrete slab expansion joints every 8.0 meters
-	float joint_y = fract(UV.y / 8.0);
-	float joint = 1.0 - smoothstep(0.0, 0.02, joint_y) * (1.0 - smoothstep(0.02, 0.04, joint_y));
-	albedo = mix(albedo * 0.65, albedo, joint);
+	// Transverse concrete slab expansion joints. The joint is narrower than a pixel at
+	// distance, so widen its falloff to the texel footprint and let it dissolve rather than
+	// alias into hard stair-stepped bands.
+	float joint_coord = UV.y / max(joint_spacing, 0.5);
+	float joint_footprint = fwidth(joint_coord);
+	float joint_soft = clamp(joint_footprint * 1.5, 0.004, 0.05);
+	float joint = smoothstep(0.0, joint_soft, fract(joint_coord));
+	joint = mix(1.0, joint, clamp(1.0 - joint_footprint * 6.0, 0.0, 1.0));
+	albedo = mix(albedo, albedo * (1.0 - joint_strength), joint);
 
 	// Highway Lane Markings (Clean, crisp, anti-aliased with fwidth):
 	// Road has 4 lanes:
@@ -111,7 +123,9 @@ void fragment() {
 
 	ALBEDO = albedo;
 	NORMAL_MAP = tex_norm;
-	NORMAL_MAP_DEPTH = normal_strength;
+	// Fade the surface detail out with the texel footprint, otherwise the concrete grain
+	// aliases into crawling bands at a grazing angle.
+	NORMAL_MAP_DEPTH = normal_strength * clamp(1.0 - fwidth(UV.y) * 1.2, 0.12, 1.0);
 	ROUGHNESS = tex_rough * 0.88;
 	METALLIC = 0.02;
 }
