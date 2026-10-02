@@ -52,41 +52,40 @@ void fragment() {
 	float py = UV.y;
 	float dx = fwidth(px) * 1.5;
 
-	float edge_l_mode = COLOR.r;
-	float edge_r_mode = COLOR.g;
-	float road_type = COLOR.b; // 0.0 = 4-lane main highway, 1.0 = 2-lane ramp
+	// Alternative routes are plain concrete: no lane lines, no edge lines, no gore hatching.
+	// The main highway keeps its full 4-lane marking set.
+	float road_type = COLOR.b; // 0.0 = 4-lane main highway, 1.0 = unmarked ramp
 	float is_gore = COLOR.a;
+	bool is_ramp = road_type > 0.5;
 
 	float white_edges = 0.0;
 	float white_dashes = 0.0;
 	float yellow_lines = 0.0;
 	float total_wear = 0.0;
 
-	// Edge line dash pattern for exit/entrance: 1.5m dash, 1.5m gap (period 3m)
-	float edge_dash = step(0.50, fract(py / 3.0));
-
-	// Left Edge Line at px = 0.06:
-	// mode >= 0.75: solid; 0.25 <= mode < 0.75: dashed; mode < 0.25: open (no line)
-	float raw_edge_l = 1.0 - smoothstep(0.008, 0.008 + dx, abs(px - 0.06));
-	float active_edge_l = mix(raw_edge_l * edge_dash, raw_edge_l, smoothstep(0.65, 0.85, edge_l_mode));
-	white_edges += active_edge_l * smoothstep(0.20, 0.35, edge_l_mode);
-
-	// Right Edge Line at px = 0.94:
-	float raw_edge_r = 1.0 - smoothstep(0.008, 0.008 + dx, abs(px - 0.94));
-	float active_edge_r = mix(raw_edge_r * edge_dash, raw_edge_r, smoothstep(0.65, 0.85, edge_r_mode));
-	white_edges += active_edge_r * smoothstep(0.20, 0.35, edge_r_mode);
-
-	if (road_type > 0.5) {
-		// --- 2-LANE ONE-WAY RAMP (11.5m width) ---
-		// Center dashed white lane divider at px = 0.50 (3m dash, 3m gap)
-		float dash = step(0.50, fract(py / 6.0));
-		white_dashes = (1.0 - smoothstep(0.008, 0.008 + dx, abs(px - 0.50))) * dash;
-
-		// 2-lane tire wear (centered at 0.28 and 0.72)
-		float wear1 = 1.0 - smoothstep(0.0, 0.09, abs(px - 0.28));
-		float wear2 = 1.0 - smoothstep(0.0, 0.09, abs(px - 0.72));
-		total_wear = clamp(wear1 + wear2, 0.0, 1.0);
+	if (is_ramp) {
+		// --- RAMP: bare concrete, only the wear of two wheel tracks ---
+		float rw1 = 1.0 - smoothstep(0.0, 0.13, abs(px - 0.30));
+		float rw2 = 1.0 - smoothstep(0.0, 0.13, abs(px - 0.70));
+		total_wear = clamp(rw1 + rw2, 0.0, 1.0);
 	} else {
+		float edge_l_mode = COLOR.r;
+		float edge_r_mode = COLOR.g;
+
+		// Edge line dash pattern for exit/entrance: 1.5m dash, 1.5m gap (period 3m)
+		float edge_dash = step(0.50, fract(py / 3.0));
+
+		// Left Edge Line at px = 0.06:
+		// mode >= 0.75: solid; 0.25 <= mode < 0.75: dashed; mode < 0.25: open (no line)
+		float raw_edge_l = 1.0 - smoothstep(0.008, 0.008 + dx, abs(px - 0.06));
+		float active_edge_l = mix(raw_edge_l * edge_dash, raw_edge_l, smoothstep(0.65, 0.85, edge_l_mode));
+		white_edges += active_edge_l * smoothstep(0.20, 0.35, edge_l_mode);
+
+		// Right Edge Line at px = 0.94:
+		float raw_edge_r = 1.0 - smoothstep(0.008, 0.008 + dx, abs(px - 0.94));
+		float active_edge_r = mix(raw_edge_r * edge_dash, raw_edge_r, smoothstep(0.65, 0.85, edge_r_mode));
+		white_edges += active_edge_r * smoothstep(0.20, 0.35, edge_r_mode);
+
 		// --- 4-LANE MAIN HIGHWAY (16m width) ---
 		// 1. Dashed White Lane Dividers at 0.28 and 0.72 (3m dash, 3m gap)
 		float dash = step(0.50, fract(py / 6.0));
@@ -105,16 +104,13 @@ void fragment() {
 		float wear3 = 1.0 - smoothstep(0.0, 0.08, abs(px - 0.62));
 		float wear4 = 1.0 - smoothstep(0.0, 0.08, abs(px - 0.83));
 		total_wear = clamp(wear1 + wear2 + wear3 + wear4, 0.0, 1.0);
-	}
 
-	// Apply tire wear darkening to concrete
-	albedo = mix(albedo, albedo * 0.82, total_wear * 0.40);
-
-	// Gore chevron markings if active (diagonal warning stripes on shoulder)
-	if (is_gore > 0.05) {
-		float chevron = step(0.50, fract((px * 4.0 + py * 0.3) / 1.5));
-		float shoulder_mask = clamp(step(0.88, px) + (1.0 - step(0.12, px)), 0.0, 1.0);
-		yellow_lines = max(yellow_lines, chevron * shoulder_mask * is_gore);
+		// Gore chevron markings if active (diagonal warning stripes on shoulder)
+		if (is_gore > 0.05) {
+			float chevron = step(0.50, fract((px * 4.0 + py * 0.3) / 1.5));
+			float shoulder_mask = clamp(step(0.88, px) + (1.0 - step(0.12, px)), 0.0, 1.0);
+			yellow_lines = max(yellow_lines, chevron * shoulder_mask * is_gore);
+		}
 	}
 
 	// Apply markings

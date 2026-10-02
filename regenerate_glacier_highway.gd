@@ -168,6 +168,25 @@ func _build_closed_loop(points: Array, min_radius: float) -> Curve3D:
 		curve.add_point(points[idx], handles[idx][0], handles[idx][1])
 	return curve
 
+## Fails the build if the trunk barrier would stand across any ramp mouth. Cheap insurance:
+## the gaps are an optional tail argument, so a call site can silently leave them empty and wall
+## every alternative route off without anything else noticing.
+func _verify_barrier_gaps(a: Curve3D, b: Curve3D, c: Curve3D, left_gaps: Array, right_gaps: Array) -> void:
+	var blocked := 0
+	for entry in [[a, "express flyover", 1], [b, "gorge cut", 1], [c, "ridge bypass", -1]]:
+		var rc: Curve3D = entry[0]
+		var length: float = rc.get_baked_length()
+		for end_i in [0, length]:
+			var nose: Vector3 = rc.sample_baked(end_i)
+			var off: float = main_track_curve.get_closest_offset(nose)
+			var gaps: Array = right_gaps if entry[2] > 0 else left_gaps
+			var f: float = _barrier_factor_at(off, gaps)
+			if f > 0.0:
+				blocked += 1
+				push_error("Trunk barrier is %.0f%% up across the %s junction at offset %.0fm" % [f * 100.0, entry[1], off])
+	if blocked == 0:
+		print("  trunk barrier open at all 6 ramp junctions")
+
 ## Trunk curve position / tangent / right vector at `off` metres along the circuit.
 func _trunk_frame(off: float) -> Dictionary:
 	var length: float = main_track_curve.get_baked_length()
@@ -699,9 +718,12 @@ func _ready() -> void:
 	main_right_gaps = _merge_intervals(main_right_gaps)
 	print("  trunk barrier gaps - left: %s  right: %s" % [main_left_gaps, main_right_gaps])
 
-	_build_highway_road_mesh(level_scene, curve, MAIN_WIDTH, "MainHighway", highway_mat, barrier_mat, girder_mat, true, true)
-	_add_junction_arrows(level_scene, curve, [[Vector3(-76.0, 2.8, 60.0), false],
-			[Vector3(2.0, 2.8, -272.0), false], [Vector3(-72.0, 16.5, -176.0), true]])
+	# NOTE the explicit gap arguments: without them the trunk gets no barrier gaps at all and
+	# every ramp entrance is walled off. _verify_barrier_gaps below fails the build if so.
+	_build_highway_road_mesh(level_scene, curve, MAIN_WIDTH, "MainHighway", highway_mat, barrier_mat, girder_mat,
+			true, true, 0, 0.0, main_left_gaps, main_right_gaps)
+	_verify_barrier_gaps(alt1_curve, alt2_curve, alt3_curve, main_left_gaps, main_right_gaps)
+	# (junction guidance decals were removed - the gantry signs mark the splits)
 
 	# 7. Ramp decks (tiled against the trunk shoulder, gore barrier only where they separate)
 	_build_highway_road_mesh(level_scene, alt1_curve, RAMP_WIDTH, "ExpressFlyoverRoad", highway_mat, barrier_mat, girder_mat, true, true, 1, MAIN_HALF_W)
@@ -1007,9 +1029,12 @@ func _build_highway_road_mesh(parent: Node, curve: Curve3D, width: float, node_n
 			if frame.length_squared() < 1e-6:
 				frame = right
 			frame = frame.normalized()
-			# Gore-side barrier only comes up once the ramp has opened a real gap to the
-			# trunk; the outboard barrier grows in with the deck so it ends on the ramp nose.
-			var gore_h: float = clampf((ext.x - main_half_w - 0.5) / 2.0, 0.0, 1.0)
+			# Gore-side barrier only comes up once the ramp deck has opened the same clearance
+			# the trunk barrier uses to close (GORE_CLEARANCE). Tying the two together is what
+			# keeps the whole junction barrier-free: raise the ramp's gore barrier any earlier and
+			# it stands in the middle of the gore, cutting the crossing window down to a few
+			# metres even though the trunk looks open.
+			var gore_h: float = clampf((ext.x - main_half_w - GORE_CLEARANCE) / 3.0, 0.0, 1.0)
 			var outer_w: float = ext.y - ext.x
 			var outer_h: float = clampf((outer_w - 1.3) / 2.2, 0.0, 1.0)
 			if side > 0:
@@ -1545,16 +1570,21 @@ func _build_tunnel_underpass(parent: Node, center: Vector3, length: float, width
 		tunnel_root.add_child(portal_node)
 
 	# 4. Interior Tunnel LED Strip Lights (6 pairs casting warm amber glow)
+	#
+	# These hang from the *underside* of the ceiling liner. That liner is a deep slab running
+	# from the visible ceiling up to the rock roof (so no sky shows through at the portals), so
+	# anything positioned off wall_h alone ends up buried inside the concrete.
+	var lamp_y: float = liner_bot - 0.12
 	var light_z_steps = [-24.0, -15.0, -6.0, 6.0, 15.0, 24.0]
 	for lz in light_z_steps:
 		for side in [-1.0, 1.0]:
 			var lamp_x = side * (half_w - 1.2)
 			var omni := OmniLight3D.new()
 			omni.name = "TunnelLight_%d_%s" % [int(lz), "L" if side < 0 else "R"]
-			omni.position = Vector3(lamp_x, wall_h - 0.3, lz)
+			omni.position = Vector3(lamp_x, lamp_y - 0.45, lz)
 			omni.light_color = Color(1.0, 0.84, 0.55) # warm sodium/amber tunnel glow
-			omni.light_energy = 1.3
-			omni.omni_range = 16.0
+			omni.light_energy = 1.5
+			omni.omni_range = 18.0
 			omni.omni_attenuation = 0.9
 			tunnel_root.add_child(omni)
 
@@ -1568,7 +1598,7 @@ func _build_tunnel_underpass(parent: Node, center: Vector3, length: float, width
 			f_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 			f_mat.albedo_color = Color(1.0, 0.90, 0.65)
 			fixture.material_override = f_mat
-			fixture.position = Vector3(lamp_x, wall_h - 0.1, lz)
+			fixture.position = Vector3(lamp_x, lamp_y, lz)
 			tunnel_root.add_child(fixture)
 
 	parent.add_child(tunnel_root)
@@ -2276,49 +2306,3 @@ func _set_owner_recursive(node: Node, scene_root: Node) -> void:
 		if child.owner != null and child.owner != scene_root:
 			continue
 		_set_owner_recursive(child, scene_root)
-
-
-func _add_junction_arrows(parent: Node, curve: Curve3D, splits: Array) -> void:
-	var arrows_tex = load("res://sprites/decals/arrows.png")
-	if not arrows_tex:
-		return
-	
-	var arrows_parent = Node3D.new()
-	arrows_parent.name = "JunctionArrows"
-	parent.add_child(arrows_parent)
-	
-	# 3 staggered guidance chevrons leading up to each split. `splits` rows are
-	# [world anchor near the split, splits_on_the_left].
-	for split in splits:
-		var off: float = curve.get_closest_offset(split[0])
-		for d_step in [-34.0, -22.0, -10.0]:
-			_spawn_arrow_decal(arrows_parent, curve, maxf(off + d_step, 0.0), arrows_tex, split[1])
-
-func _spawn_arrow_decal(parent: Node, curve: Curve3D, dist: float, tex: Texture2D, is_left: bool) -> void:
-	var pos = curve.sample_baked(dist)
-	var next_pos = curve.sample_baked(dist + 2.0)
-	var fwd = (next_pos - pos).normalized()
-	var right = Vector3(-fwd.z, 0, fwd.x).normalized()
-	
-	# Offset towards the side of the split
-	var offset = -5.5 if is_left else 5.5
-	pos += right * offset
-	pos.y += 0.25 # Slightly above ground to project downwards
-	
-	var decal = Decal.new()
-	decal.texture_albedo = tex
-	decal.size = Vector3(6.0, 4.0, 6.0)
-	decal.position = pos
-	
-	# Point the decal arrow diagonally towards the split
-	var rot_y = rad_to_deg(atan2(-fwd.x, -fwd.z))
-	if is_left:
-		rot_y -= 25.0
-	else:
-		rot_y += 25.0
-		
-	decal.rotation_degrees = Vector3(0, rot_y, 0)
-	decal.albedo_mix = 1.0
-	decal.modulate = Color(1.0, 0.8, 0.1, 0.9) # Bright glowing yellow/orange
-	
-	parent.add_child(decal)

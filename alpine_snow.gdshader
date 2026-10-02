@@ -12,7 +12,7 @@ uniform sampler2D rock_normal : hint_normal, filter_linear_mipmap_anisotropic, r
 uniform vec4 snow_color : source_color = vec4(0.93, 0.96, 1.0, 1.0);
 uniform vec4 rock_tint : source_color = vec4(0.58, 0.61, 0.68, 1.0);
 uniform float rock_scale : hint_range(0.005, 2.0) = 0.34;
-uniform float normal_strength : hint_range(0.0, 4.0) = 0.75;
+uniform float normal_strength : hint_range(0.0, 4.0) = 0.5;
 
 // Shallow slopes hold snow; the snow line rises so high rock reads as bare stone.
 uniform float snow_slope : hint_range(0.0, 1.0) = 0.66;
@@ -87,17 +87,33 @@ void fragment() {
 	float snow = clamp(slope_mask * (0.48 + altitude * 0.5) + breakup, 0.0, 1.0);
 	snow = smoothstep(0.08, 0.72, snow);
 
-	// Two rock octaves blended by a very low frequency mask. The second octave samples a
-	// rotated copy of the world position, otherwise both octaves share the same grid and the
-	// tiling reads as a regular pattern across the whole face.
-	float rock_blend = smoothstep(0.32, 0.68, fbm(w_pos.xz * 0.0035));
-	vec3 rot_p = vec3(w_pos.x * 0.8 - w_pos.z * 0.6, w_pos.y, w_pos.x * 0.6 + w_pos.z * 0.8);
-	vec3 rock = triplanar(rock_albedo, w_pos, n, rock_scale).rgb;
-	rock = mix(rock, triplanar(rock_albedo, rot_p, n, rock_scale * 0.29).rgb, rock_blend);
-	// Broad tonal variation so the rock is not one flat value per face, and so the eye does
-	// not lock onto the texture's own repeat across a big wall.
-	rock *= 0.70 + fbm(w_pos.xz * 0.004) * 0.42 + fbm(w_pos.xz * 0.022) * 0.22;
-	rock *= rock_tint.rgb;
+	// Rock. Tiling a 3m texture over a 300m face always shows its repeat, so:
+	//   - the sample position is domain-warped (capped, because an over-large warp inflates the
+	//     UV derivative and the engine answers with a mip speckle instead of a grid), and
+	//   - the fine octaves are faded out with distance, leaving the large octave and a
+	//     noise-tinted flat colour. A repeat you can only see within ~60m is texture; the
+	//     same repeat across a whole mountain face is a pattern, so that is what gets removed.
+	float warp_amp = clamp(3.0 / max(rock_scale, 0.005), 0.0, 9.0);
+	vec3 wq = w_pos + (vec3(
+			fbm(w_pos.xz * 0.010),
+			fbm(w_pos.xz * 0.010 + 37.1),
+			fbm(w_pos.xz * 0.010 + 91.7)) - 0.5) * warp_amp;
+	vec3 rot1 = vec3(wq.x * 0.80 - wq.z * 0.60, wq.y, wq.x * 0.60 + wq.z * 0.80);
+	vec3 rot2 = vec3(wq.x * 0.36 + wq.z * 0.93, wq.y, -wq.x * 0.93 + wq.z * 0.36);
+
+	// Large tonal variation: this, not the texture, is what keeps far rock believable.
+	float tone = 0.70 + fbm(w_pos.xz * 0.004) * 0.42 + fbm(w_pos.xz * 0.022) * 0.22;
+	float detail = 1.0 - smoothstep(90.0, 520.0, length(w_pos - CAMERA_POSITION_WORLD));
+
+	vec3 rock_far = triplanar(rock_albedo, rot2, n, rock_scale * 0.083).rgb * rock_tint.rgb;
+	vec3 rock_near = triplanar(rock_albedo, wq, n, rock_scale).rgb * rock_tint.rgb;
+	rock_near = mix(rock_near, triplanar(rock_albedo, rot1, n, rock_scale * 0.29).rgb * rock_tint.rgb,
+			smoothstep(0.30, 0.70, fbm(w_pos.xz * 0.0040)));
+	vec3 rock = mix(rock_far, rock_near, detail);
+	// Collapse into a repeat-free flat rock far away. It has to stand in for the texture's
+	// own average (~0.30 luminance), not for the brightened tint - using the tint here washes
+	// distant rock out to the same white as the snow and the alpine banding disappears.
+	rock = mix(vec3(0.30) * tone * rock_tint.rgb, rock, 0.45 + 0.55 * detail);
 	// Snow is not flat white: crests catch the light, hollows go blue and pick up the rock.
 	vec3 snow_col = snow_color.rgb * (0.80 + drift * 0.26 + ripple * 0.10);
 	snow_col = mix(snow_col, snow_col * vec3(0.90, 0.94, 1.04), patch * 0.6);
@@ -109,11 +125,16 @@ void fragment() {
 	ALBEDO = albedo;
 	ROUGHNESS = mix(rock_roughness, snow_roughness, snow);
 
-	NORMAL_MAP = triplanar(rock_normal, rot_p, n, rock_scale * 1.6).rgb;
+	// The bump grid is deliberately at a different scale AND rotation from the albedo grid:
+	// sampling both from the same projection is what makes the relief read as a regular
+	// pattern of scales across a big face.
+	// Same reasoning for the bump: its repeat fades with distance too, otherwise the relief
+	// keeps a grid alive on faces that have lost their texture.
+	NORMAL_MAP = triplanar(rock_normal, rot2, n, rock_scale * 2.2).rgb;
 	// Surface detail has to fade with the texel footprint or it crawls at a distance.
 	float detail_fade = clamp(1.0 - fwidth(w_pos.x) * 0.03 - fwidth(w_pos.z) * 0.03, 0.1, 1.0);
 	// Snow keeps a whisper of relief so the glacier floor is not a mirror-flat sheet.
 	float snow_relief = (1.0 - snow) * 0.9 + snow * 0.12;
-	NORMAL_MAP_DEPTH = normal_strength * snow_relief * detail_fade;
+	NORMAL_MAP_DEPTH = normal_strength * snow_relief * detail_fade * (0.25 + 0.75 * detail);
 	SPECULAR = mix(0.10, 0.28, snow);
 }
