@@ -628,6 +628,7 @@ func _ready() -> void:
 	highway_mat.set_shader_parameter("concrete_color", Color(0.88, 0.90, 0.93))
 	highway_mat.set_shader_parameter("stripe_color", Color(0.97, 0.98, 1.0))
 	highway_mat.set_shader_parameter("uv_scale", 0.22)
+	highway_mat.set_shader_parameter("circuit_length", curve.get_baked_length())
 
 	var barrier_mat := StandardMaterial3D.new()
 	if concrete_tex:
@@ -784,22 +785,22 @@ func _ready() -> void:
 			si.name = "SpawnIndicator"
 			sp.add_child(si)
 
-	# 11. Checkpoints Container (8 curve-aligned checkpoints on trunk sections + Finish Line)
+	# 11. Checkpoints Container (5 curve-aligned checkpoints on trunk sections + Finish Line)
 	# NOTE: NO checkpoints inside the tunnel underpass per user specification!
+	#
+	# Kept deliberately sparse and spread around the lap. Each one is snapped to the nearest
+	# baked point, so they stay in order of travel automatically.
 	var checkpoints_container := Node3D.new()
 	checkpoints_container.name = "Checkpoints"
 	level_scene.add_child(checkpoints_container)
 
 	var track_len: float = curve.get_baked_length()
 	var target_cp_positions = [
-		Vector3(-85.0, 2.8, 160.0),    # CP 1: South Straight (trunk before Alt 1 split)
-		Vector3(0.0, 2.8, -165.0),     # CP 2: Pre-Tunnel Highway Approach (trunk AFTER Alt 1 merge, before tunnel entrance!)
-		Vector3(0.0, 2.8, -265.0),     # CP 3: North Basin Runout (trunk after tunnel, before Alt 2 split)
-		Vector3(165.0, 10.0, -345.0),  # CP 4: East Flank Climb (trunk AFTER Alt 2 merge at 140, 8.5, -370!)
-		Vector3(205.0, 13.5, -270.0),  # CP 5: High East Alpine Climb
-		Vector3(0.0, 16.5, -180.0),    # CP 6: Overpass Viaduct Apex (trunk before Alt 3 split)
-		Vector3(-135.0, 4.5, 100.0),   # CP 7: Valley Landing Straight (trunk AFTER Alt 3 merge at -145, 5.5, 60!)
-		Vector3(-135.0, 2.8, 220.0)    # CP 8: South Sweeper before Home Straight
+		Vector3(-85.0, 2.8, 160.0),  # CP 1: South Straight (trunk, before the first split)
+		Vector3(0.0, 2.8, -265.0),   # CP 2: North Basin Runout (after the tunnel, before the Gorge Cut)
+		Vector3(140.0, 8.5, -370.0), # CP 3: North Rim (Gorge Cut rejoin / east flank entry)
+		Vector3(0.0, 16.5, -180.0),  # CP 4: Overpass Viaduct Apex (high set piece)
+		Vector3(-138.0, 5.5, 60.0),  # CP 5: Valley Landing (Ridge Bypass rejoin)
 	]
 
 	# Find exact baked distance for each checkpoint by closest sample along curve
@@ -896,6 +897,7 @@ func _ready() -> void:
 	level_scene.add_child(props_container)
 	_build_highway_gantries(props_container)
 	_build_highway_streetlights(props_container, curve, main_left_gaps, main_right_gaps)
+	_build_jumbotron(props_container)
 
 	# 15. Setup Checkpoints & Level wiring
 	level_scene.set("track_path", track_path)
@@ -968,6 +970,7 @@ func _build_highway_road_mesh(parent: Node, curve: Curve3D, width: float, node_n
 	## keeps a ramp deck glued to the trunk deck edge while the two diverge.
 	var ring_frame := PackedVector3Array()
 	var ring_lat := PackedFloat32Array()
+	var ring_y_bias := PackedFloat32Array()
 	var deck_left := PackedFloat32Array()
 	var deck_right := PackedFloat32Array()
 	var bar_left := PackedFloat32Array()
@@ -1009,6 +1012,7 @@ func _build_highway_road_mesh(parent: Node, curve: Curve3D, width: float, node_n
 		var b_r: float = 1.0
 		var frame: Vector3 = right
 		var lat_here: float = 0.0
+		var y_bias: float = 0.0
 
 		if is_ramp and trunk != null:
 			var frame_info: Dictionary = _trunk_frame_at(trunk, p)
@@ -1029,6 +1033,15 @@ func _build_highway_road_mesh(parent: Node, curve: Curve3D, width: float, node_n
 			if frame.length_squared() < 1e-6:
 				frame = right
 			frame = frame.normalized()
+			# While tiling, the ramp deck must also sit at exactly the trunk's height. The ramp's
+			# own curve sags a few centimetres there (Catmull-Rom handle overshoot in Y), and the
+			# trunk's slab edge then stands proud of the ramp surface as a lip across the gore.
+			#
+			# Deliberately tight and clamped: the correction belongs to the gore only. Tying it to
+			# the 25m frame blend instead let it reach the viaduct spans, where the ramp is 8m above
+			# the trunk, and it moved those decks bodily out from under their own piers.
+			var seam: float = clampf((absf(lat_here) - (main_half_w + half_w)) / 6.0, 0.0, 1.0)
+			y_bias = clampf(frame_info["pos"].y - p.y, -0.35, 0.35) * (1.0 - seam)
 			# Gore-side barrier only comes up once the ramp deck has opened the same clearance
 			# the trunk barrier uses to close (GORE_CLEARANCE). Tying the two together is what
 			# keeps the whole junction barrier-free: raise the ramp's gore barrier any earlier and
@@ -1056,6 +1069,7 @@ func _build_highway_road_mesh(parent: Node, curve: Curve3D, width: float, node_n
 		ring_right.append(right)
 		ring_frame.append(frame)
 		ring_lat.append(lat_here)
+		ring_y_bias.append(y_bias)
 		deck_left.append(d_l)
 		deck_right.append(d_r)
 		bar_left.append(b_l)
@@ -1082,6 +1096,8 @@ func _build_highway_road_mesh(parent: Node, curve: Curve3D, width: float, node_n
 		# Cross-section offsets are trunk-lateral targets minus the ring's own lateral, so a
 		# vertex lands exactly where the tiling wants it.
 		var shift: float = -ring_lat[i]
+		# Height correction that keeps a tiled ramp deck flush with the trunk it leans on.
+		p += Vector3.UP * ring_y_bias[i]
 		var up := Vector3.UP
 		var d_l: float = deck_left[i]
 		var d_r: float = deck_right[i]
@@ -1241,7 +1257,9 @@ func _build_highway_road_mesh(parent: Node, curve: Curve3D, width: float, node_n
 	if has_piers:
 		var last_pier_dist: float = -100.0
 		for i in range(n_rings):
-			var p: Vector3 = ring_pos[i]
+			# Supports must ride on the *corrected* deck height, otherwise a bent's crosshead ends
+			# up above the road surface wherever the gore seam correction applies.
+			var p: Vector3 = ring_pos[i] + Vector3.UP * ring_y_bias[i]
 			var cum_i: float = dist_along[i]
 			# Never drop a bent under the knife-edge nose of a ramp.
 			var near_ramp_ends: bool = is_ramp and (cum_i < 48.0 or (total_len - cum_i) < 48.0)
@@ -1697,6 +1715,42 @@ func _build_alpine_terrain(parent: Node, gorge_curve: Curve3D) -> void:
 	parent.add_child(terrain_root)
 
 	_verify_tunnel_is_open(massif_mesh, valley_mesh)
+	_audit_portal_closure(massif_mesh)
+
+## Both portals must be closed by rock from the tunnel roof upward. A missing or collapsed
+## lintel leaves the bore open to the sky from outside, which reads as "the mountain above the
+## tunnel has disappeared" from the far side of the circuit.
+func _audit_portal_closure(massif: ArrayMesh) -> void:
+	var arrays: Array = massif.surface_get_arrays(0)
+	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var idx: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+	var probe_lo: float = TUNNEL_ROOF_Y
+	for plane in [[TUNNEL_Z_NORTH, "north"], [TUNNEL_Z_SOUTH, "south"]]:
+		# How far the rock has to reach. The south portal sits in a deliberately low col (the
+		# viaduct crosses 5m above it), so the test is "closed up to the local ridge", not a
+		# fixed height.
+		var ridge: float = _massif_crest(0.0, plane[0])
+		var probe_hi: float = minf(TUNNEL_ROOF_Y + 6.0, ridge - 0.3)
+		var covered := false
+		for t in range(idx.size() / 3):
+			var a: Vector3 = verts[idx[t * 3]]
+			var b: Vector3 = verts[idx[t * 3 + 1]]
+			var c: Vector3 = verts[idx[t * 3 + 2]]
+			var cz: float = (a.z + b.z + c.z) / 3.0
+			if absf(cz - plane[0]) > 1.5:
+				continue
+			var cx: float = (a.x + b.x + c.x) / 3.0
+			if absf(cx) > TUNNEL_BORE_HALF_W - 1.0:
+				continue
+			var lo: float = minf(a.y, minf(b.y, c.y))
+			var hi: float = maxf(a.y, maxf(b.y, c.y))
+			if lo <= probe_lo + 0.3 and hi >= probe_hi:
+				covered = true
+				break
+		if covered:
+			print("  %s portal closed by rock above the bore (roof %.1fm -> ridge %.1fm)" % [plane[1], probe_lo, ridge])
+		else:
+			push_error("The %s portal has no rock above the bore between y=%.1f and %.1f - the mountain reads as a hollow shell from outside" % [plane[1], probe_lo, probe_hi])
 
 ## Guards the one thing a heightfield cannot express: a hole through a rock face. The bore and
 ## both portal approaches are swept for any triangle standing between the deck and the tunnel
@@ -1926,7 +1980,6 @@ func _build_tunnel_massif() -> ArrayMesh:
 		for gx in range(res_x + 1):
 			var px: float = x0 + float(gx) * step_x
 			heights[gz * stride + gx] = _massif_heightfield(px, pz)
-
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for gz in range(res_z + 1):
@@ -1947,11 +2000,16 @@ func _build_tunnel_massif() -> ArrayMesh:
 	for gz in range(res_z):
 		for gx in range(res_x):
 			var cx: float = x0 + (float(gx) + 0.5) * step_x
-			# The bore's width carries no heightfield surface at all: the tunnel liner and the
-			# rock cap form the passage, so nothing may be laid across the opening, the apron in
-			# front of the south portal, or the ground past the north one.
+			# Nothing may stand across the bore's width. The tunnel roof is flat, so any quad in
+			# there that spans a real height difference is a portal wall or the edge of the bored
+			# section - drop those and the passage stays open.
 			if absf(cx) < TUNNEL_BORE_HALF_W:
-				continue
+				var h_lo: float = minf(minf(heights[gz * stride + gx], heights[gz * stride + gx + 1]),
+						minf(heights[(gz + 1) * stride + gx], heights[(gz + 1) * stride + gx + 1]))
+				var h_hi: float = maxf(maxf(heights[gz * stride + gx], heights[gz * stride + gx + 1]),
+						maxf(heights[(gz + 1) * stride + gx], heights[(gz + 1) * stride + gx + 1]))
+				if h_hi - h_lo > 1.5:
+					continue
 			var i: int = gz * stride + gx
 			st.add_index(i)
 			st.add_index(i + 1)
@@ -1960,19 +2018,38 @@ func _build_tunnel_massif() -> ArrayMesh:
 			st.add_index(i + stride + 1)
 			st.add_index(i + stride)
 
-	_emit_rock_cap(st, z0, step_z, step_x, stride * (res_z + 1))
+	# The rock over the tunnel. A heightfield carries only one surface per column, so the bore has
+	# to be left empty and the mass above it supplied separately.
+	#
+	# This started life as a cap surface plus two lintel faces, but a single face either way round
+	# is not something to gamble the look of the level on: a wrong winding there does not look
+	# like a bug, it looks like the mountain has no top. So the plug is a closed solid whose top
+	# follows the ridge, and every face's winding is decided from its own geometry.
+	_emit_bore_plug(st, stride * (res_z + 1))
+
 	st.generate_tangents()
 	return st.commit()
 
+## True while the point is within the stretch of tunnel the bore actually occupies.
+func _in_bore_band(pz: float) -> bool:
+	return pz > TUNNEL_Z_NORTH - 1.0 and pz < TUNNEL_Z_SOUTH + 1.0
+
 ## Surface height of the massif heightfield at (px, pz): the spur's rock, dropped to the tunnel
-## roof inside the bore's width so the passage is open.
+## roof inside the bore's width so the passage is open, and cut away to a narrow trench where
+## the highway approaches either portal from outside the bore.
 func _massif_heightfield(px: float, pz: float) -> float:
-	var crest: float = _massif_crest(px, pz)
-	var in_x: float = 1.0 - smoothstep(TUNNEL_BORE_HALF_W, TUNNEL_BORE_HALF_W + 5.0, absf(px))
-	var in_z: float = 0.0
-	if pz >= TUNNEL_Z_NORTH:
-		in_z = 1.0 - smoothstep(TUNNEL_Z_SOUTH, TUNNEL_Z_SOUTH + 2.0, pz)
-	return lerpf(crest, TUNNEL_ROOF_Y, in_x * in_z)
+	var h: float = _massif_crest(px, pz)
+	if _in_bore_band(pz):
+		var in_x: float = 1.0 - smoothstep(TUNNEL_BORE_HALF_W, TUNNEL_BORE_HALF_W + 5.0, absf(px))
+		return lerpf(h, TUNNEL_ROOF_Y, in_x)
+	# Outside the bore the highway is in the open, so the spur has to get out of its way.
+	# Without this the spur simply stops, leaving a bare open-topped slot beside the portal -
+	# which from the far side of the circuit reads as the mountain having no top at all.
+	var c: Vector3 = main_track_curve.sample_baked(main_track_curve.get_closest_offset(Vector3(px, h, pz)))
+	var d: float = Vector2(px - c.x, pz - c.z).length()
+	if d < 16.0:
+		h = minf(h, lerpf(c.y - 1.2, h, smoothstep(9.0, 16.0, d)))
+	return h
 
 ## The spur's natural rock height: a ridge whose face stands on the south portal plane, with a
 ## skirt at the north end so the footprint never ends on an open edge, a low col where the
@@ -1987,84 +2064,51 @@ func _massif_crest(px: float, pz: float) -> float:
 	var ridge: float = clampf(_ridge_noise.get_noise_2d(px * 1.4, pz * 1.4) * 0.5 + 0.5, 0.0, 1.0)
 	return base + (24.0 + 18.0 * ridge) * x_prof * z_south * z_north * z_amp * x_amp
 
-## Emits the rock that spans the bore.
-##
-## A heightfield can only carry one surface per column, so the bore cannot be a hole *and* have
-## rock above it. This cap bridges the two: its top follows the crest the spur would have had,
-## and its underside drops to just under the tunnel roof, thinning to nothing where it meets the
-## heightfield either side. Result is a solid mountain over the tunnel with the passage open
-## underneath, plus a lintel face at each portal so the rock reads as solid above the opening.
-func _emit_rock_cap(st: SurfaceTool, z0: float, step_z: float, step_x: float, first: int) -> void:
-	var half_cells: int = maxi(int(ceil(20.0 / step_x)), int(round(TUNNEL_BORE_HALF_W / step_x)) + 2)
-	var cols: int = half_cells * 2 + 1
-	var gz_north: int = int(round((TUNNEL_Z_NORTH - z0) / step_z))
-	var gz_south: int = int(round((TUNNEL_Z_SOUTH - z0) / step_z))
-	var rows: int = gz_south - gz_north + 1
-	var under: float = TUNNEL_ROOF_Y - 0.25
-	var top_y := PackedFloat32Array()
-	top_y.resize((rows + 1) * cols)
-
-	for row_i in range(rows + 1):
-		var pz: float = z0 + float(gz_north + row_i) * step_z
+## Closed rock solid filling the bore: a ridge-following top, a flat underside at the tunnel
+## roof, and four walls, so no view direction can see sky through the mountain. Each face is
+## wound from its own geometry so it can never end up invisible.
+func _emit_bore_plug(st: SurfaceTool, first: int) -> void:
+	var bot: float = TUNNEL_ROOF_Y - 0.5
+	var half_w: float = TUNNEL_BORE_HALF_W + 8.0
+	var z_a: float = TUNNEL_Z_NORTH - 0.5
+	var z_b: float = TUNNEL_Z_SOUTH + 0.5
+	var cols: int = 9
+	var rows: int = 25
+	var quads: Array = []
+	var top_y := func(px: float, pz: float) -> float: return _massif_crest(px, pz) - 0.35
+	var at := func(r: int, c: int) -> Vector3:
+		var pz: float = lerpf(z_a, z_b, float(r) / float(rows))
+		var px: float = lerpf(-half_w, half_w, float(c) / float(cols))
+		return Vector3(px, top_y.call(px, pz), pz)
+	var floor_at := func(r: int, c: int) -> Vector3:
+		return Vector3((at.call(r, c) as Vector3).x, bot, (at.call(r, c) as Vector3).z)
+	for r in range(rows):
 		for c in range(cols):
-			var px: float = (float(c) - float(half_cells)) * step_x
-			var crest: float = _massif_crest(px, pz)
-			# Thin the cap out to nothing where the heightfield's own surface already reaches the
-			# crest, so the join is seamless.
-			var bore: float = 1.0 - smoothstep(TUNNEL_BORE_HALF_W - 0.5, TUNNEL_BORE_HALF_W + 8.0, absf(px))
-			var bottom: float = lerpf(crest, under, bore)
-			var top: float = maxf(crest, bottom + 0.05)
-			top_y[row_i * cols + c] = top
-			st.set_normal(Vector3.UP)
-			st.set_uv(Vector2(px, pz))
-			st.add_vertex(Vector3(px, top, pz))
+			quads.append([at.call(r, c), at.call(r, c + 1), at.call(r + 1, c + 1), at.call(r + 1, c), Vector3(0, -1, 0)])
+			quads.append([floor_at.call(r, c), floor_at.call(r, c + 1), floor_at.call(r + 1, c + 1), floor_at.call(r + 1, c), Vector3(0, 1, 0)])
+	for c in range(cols):
+		quads.append([floor_at.call(0, c), floor_at.call(0, c + 1), at.call(0, c + 1), at.call(0, c), Vector3(0, 0, 1)])
+		quads.append([floor_at.call(rows, c + 1), floor_at.call(rows, c), at.call(rows, c), at.call(rows, c + 1), Vector3(0, 0, -1)])
+	for r in range(rows):
+		quads.append([floor_at.call(r + 1, 0), floor_at.call(r, 0), at.call(r, 0), at.call(r + 1, 0), Vector3(1, 0, 0)])
+		quads.append([floor_at.call(r, cols), floor_at.call(r + 1, cols), at.call(r + 1, cols), at.call(r, cols), Vector3(-1, 0, 0)])
 
-	for row_q in range(rows):
-		for c in range(cols - 1):
-			# Same winding as the heightfield above (X first, then row), otherwise the cap's top
-			# faces down and is backface-culled from every viewpoint above ground.
-			var a: int = first + row_q * cols + c
-			st.add_index(a)
-			st.add_index(a + 1)
-			st.add_index(a + cols)
-			st.add_index(a + 1)
-			st.add_index(a + cols + 1)
-			st.add_index(a + cols)
-
-		# Lintel: close the cap's underside at each portal with a face from the rock roof up to the
-		# crest, which is the rock face a driver sees above the tunnel mouth.
-		var verts: int = first + (rows + 1) * cols
-		for end_row in [0, rows]:
-			var r: int = end_row
-			var base: int = first + r * cols
-			var pz: float = z0 + float(gz_north + r) * step_z
-			var face_z: float = pz + (step_z * 0.5 if r == 0 else -step_z * 0.5)
-			var away: float = 1.0 if r == 0 else -1.0
-			for c in range(cols - 1):
-				var x_a: float = (float(c) - float(half_cells)) * step_x
-				var bore_a: float = 1.0 - smoothstep(TUNNEL_BORE_HALF_W - 0.5, TUNNEL_BORE_HALF_W + 8.0, absf(x_a))
-				var bore_b: float = 1.0 - smoothstep(TUNNEL_BORE_HALF_W - 0.5, TUNNEL_BORE_HALF_W + 8.0, absf(x_a + step_x))
-				var y_a: float = maxf(under, lerpf(_massif_crest(x_a, pz), under, bore_a))
-				var y_b: float = maxf(under, lerpf(_massif_crest(x_a + step_x, pz), under, bore_b))
-				# Skip the face where the cap has thinned away entirely.
-				if y_a >= top_y[r * cols + c] - 0.06 and y_b >= top_y[r * cols + c + 1] - 0.06:
-					continue
-				var i0: int = verts
-				verts += 4
-				var n := Vector3(0.0, 0.0, away)
-				for quad_pt in [[x_a, y_a], [x_a + step_x, y_b], [x_a + step_x, under], [x_a, under]]:
-					st.set_normal(n)
-					st.set_uv(Vector2(quad_pt[0], quad_pt[1]))
-					st.add_vertex(Vector3(quad_pt[0], quad_pt[1], face_z))
-				# Winding picked so the face looks away from the spur: the south lintel is seen
-				# from the approach, the north one from the exit side.
-				if away > 0.0:
-					st.add_index(i0); st.add_index(i0 + 2); st.add_index(i0 + 1)
-					st.add_index(i0); st.add_index(i0 + 3); st.add_index(i0 + 2)
-				else:
-					st.add_index(i0); st.add_index(i0 + 1); st.add_index(i0 + 2)
-					st.add_index(i0); st.add_index(i0 + 2); st.add_index(i0 + 3)
-
+	var base: int = first
+	var centre := Vector3(0.0, 20.0, (z_a + z_b) * 0.5)
+	for q in quads:
+		for p in [q[0], q[1], q[2], q[3]]:
+			var v: Vector3 = p
+			st.set_normal((v - centre).normalized())
+			st.set_uv(Vector2(v.x, v.z))
+			st.add_vertex(v)
+		var n: Vector3 = ((q[1] as Vector3) - (q[0] as Vector3)).cross((q[2] as Vector3) - (q[0] as Vector3))
+		if n.dot(q[4] as Vector3) > 0.0:
+			st.add_index(base); st.add_index(base + 1); st.add_index(base + 2)
+			st.add_index(base); st.add_index(base + 2); st.add_index(base + 3)
+		else:
+			st.add_index(base); st.add_index(base + 2); st.add_index(base + 1)
+			st.add_index(base); st.add_index(base + 3); st.add_index(base + 2)
+		base += 4
 
 ## Snow-and-rock material for the alpine terrain.
 func _alpine_material() -> ShaderMaterial:
@@ -2091,6 +2135,114 @@ func _save_baked_resource(res: Resource, res_name: String) -> Resource:
 	ResourceSaver.save(res, file_path)
 	return load(file_path)
 
+
+## Builds a trackside jumbotron beside the start/finish straight: a screen on a steel frame
+## showing the race from a chase camera the players never see. The screen is a live render
+## target, so it is deliberately small and refreshed a few times a second (see Jumbotron.gd).
+func _build_jumbotron(parent: Node) -> void:
+	var screen := Node3D.new()
+	screen.name = "Jumbotron"
+	var board_script: Script = load("res://Jumbotron.gd")
+	if board_script:
+		screen.set_script(board_script)
+	# NOTE: added to the tree at the very end of this function, once the broadcast viewport
+	# exists - entering the tree runs Jumbotron._ready(), which looks the viewport up.
+
+	# Beside the main straight, facing oncoming traffic (the field runs from Z=280 toward Z=160).
+	var yaw: float = deg_to_rad(-18.0)
+	screen.position = Vector3(-56.0, 0.0, 238.0)
+	screen.rotation.y = yaw
+
+	var steel := StandardMaterial3D.new()
+	steel.albedo_color = Color(0.30, 0.33, 0.37)
+	steel.metallic = 0.85
+	steel.roughness = 0.45
+	var dark_steel := StandardMaterial3D.new()
+	dark_steel.albedo_color = Color(0.16, 0.18, 0.21)
+	dark_steel.metallic = 0.7
+	dark_steel.roughness = 0.55
+
+	var panel_size := Vector2(15.0, 8.44)
+	var panel_height: float = 13.0
+	var tilt: float = deg_to_rad(-7.0)
+
+	# Broadcast viewport. Kept deliberately plain and close to the proven jetski VideoScreen:
+	# the render target starts armed (UPDATE_ONCE) and the camera is current from the start, and
+	# `own_world_3d` is left alone - it already defaults to inheriting the parent's World3D, so
+	# the board sees the real race rather than a copy.
+	var viewport := SubViewport.new()
+	viewport.name = "BroadcastViewport"
+	viewport.size = Vector2i(320, 180)
+	viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+	var vp_cam := Camera3D.new()
+	vp_cam.name = "BroadcastCamera"
+	vp_cam.current = true
+	vp_cam.fov = 55.0
+	vp_cam.near = 0.5
+	vp_cam.far = 300.0
+	viewport.add_child(vp_cam)
+	screen.add_child(viewport)
+
+	# The screen face gets its material from Jumbotron.gd at runtime, which binds the
+	# viewport's texture to an albedo.
+	var panel := MeshInstance3D.new()
+	panel.name = "Screen"
+	var quad := QuadMesh.new()
+	quad.size = panel_size
+	panel.mesh = quad
+	panel.position = Vector3(0.0, panel_height, 0.0)
+	panel.rotation.x = tilt
+	screen.add_child(panel)
+
+	# Housing behind the screen
+	var housing := MeshInstance3D.new()
+	housing.name = "Housing"
+	var hb := BoxMesh.new()
+	hb.size = Vector3(panel_size.x + 0.9, panel_size.y + 0.9, 0.8)
+	housing.mesh = hb
+	housing.material_override = dark_steel
+	housing.position = Vector3(0.0, panel_height, -0.55)
+	housing.rotation.x = tilt
+	screen.add_child(housing)
+
+	# Truss frame and legs
+	var frame_top := MeshInstance3D.new()
+	frame_top.name = "FrameTop"
+	var fb := BoxMesh.new()
+	fb.size = Vector3(panel_size.x + 1.6, 0.45, 0.45)
+	frame_top.mesh = fb
+	frame_top.material_override = steel
+	frame_top.position = Vector3(0.0, panel_height + panel_size.y * 0.5 + 0.5, -0.3)
+	screen.add_child(frame_top)
+
+	var frame_bottom := MeshInstance3D.new()
+	frame_bottom.name = "FrameBottom"
+	frame_bottom.mesh = fb
+	frame_bottom.material_override = steel
+	frame_bottom.position = Vector3(0.0, panel_height - panel_size.y * 0.5 - 0.5, -0.3)
+	screen.add_child(frame_bottom)
+
+	var leg_h: float = panel_height - panel_size.y * 0.5 - 0.5
+	for side in [-1.0, 1.0]:
+		var leg := MeshInstance3D.new()
+		leg.name = "Leg_%s" % ("L" if side < 0.0 else "R")
+		var lb := BoxMesh.new()
+		lb.size = Vector3(0.55, leg_h, 0.55)
+		leg.mesh = lb
+		leg.material_override = steel
+		leg.position = Vector3(side * (panel_size.x * 0.5 + 0.55), leg_h * 0.5, -0.3)
+		screen.add_child(leg)
+
+		var brace := MeshInstance3D.new()
+		brace.name = "Brace_%s" % ("L" if side < 0.0 else "R")
+		var bb := BoxMesh.new()
+		bb.size = Vector3(0.3, 0.3, 5.0)
+		brace.mesh = bb
+		brace.material_override = steel
+		brace.position = Vector3(side * (panel_size.x * 0.5 + 0.55), leg_h * 0.35, 2.2)
+		screen.add_child(brace)
+
+	parent.add_child(screen)
 
 ## Builds highway overhead gantry signs spanning across the 4-lane concrete highway.
 func _build_highway_gantries(parent: Node) -> void:

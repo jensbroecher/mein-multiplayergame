@@ -14,6 +14,12 @@ uniform float normal_strength = 0.75;
 // distance instead of shimmering into a z-fighting looking mess.
 uniform float joint_spacing = 8.0;
 uniform float joint_strength : hint_range(0.0, 1.0) = 0.35;
+// Metres from the start/finish line with no lane paint at all, so the starting grid reads
+// against clean concrete. The circuit is closed, so this clears both the run-in and the
+// run-out either side of the line - UV.y is distance along the road and the seam sits at
+// both ends of it.
+uniform float clear_zone : hint_range(0.0, 200.0) = 34.0;
+uniform float circuit_length : hint_range(0.0, 100000.0) = 0.0;
 
 // UV.x: 0.0 (left barrier) to 1.0 (right barrier)
 // UV.y: distance along track in meters
@@ -51,6 +57,11 @@ void fragment() {
 	float px = UV.x;
 	float py = UV.y;
 	float dx = fwidth(px) * 1.5;
+
+	// Paint mask: 0 across the start/finish apron, 1 everywhere else. Measured from the seam
+	// rather than from zero so the closed circuit's end is covered too.
+	float seam = circuit_length > 1.0 ? min(py, circuit_length - py) : py;
+	float painted = smoothstep(clear_zone, clear_zone + 3.0, seam);
 
 	// Alternative routes are plain concrete: no lane lines, no edge lines, no gore hatching.
 	// The main highway keeps its full 4-lane marking set.
@@ -114,8 +125,8 @@ void fragment() {
 	}
 
 	// Apply markings
-	albedo = mix(albedo, stripe_color.rgb, clamp(white_edges + white_dashes, 0.0, 1.0));
-	albedo = mix(albedo, yellow_color.rgb, clamp(yellow_lines, 0.0, 1.0));
+	albedo = mix(albedo, stripe_color.rgb, clamp(white_edges + white_dashes, 0.0, 1.0) * painted);
+	albedo = mix(albedo, yellow_color.rgb, clamp(yellow_lines, 0.0, 1.0) * painted);
 
 	ALBEDO = albedo;
 	NORMAL_MAP = tex_norm;
