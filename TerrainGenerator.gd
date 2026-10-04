@@ -3,6 +3,31 @@ extends Node3D
 
 enum TrackLayoutType { DEFAULT, MOUNTAIN, CANYON }
 
+## Frostpeak Creek: Z where the central creek ravine stops being cut. It has to reach past the
+## Glade Timber Bridge (Z=204) or the bridge spans dry snowfield; 25m of fade afterwards puts
+## the ravine bed back at grade before the trunk road's southern loop (Z=225+).
+const FROSTPEAK_CREEK_SOUTH_Z := 205.0
+
+## Boxes where Frostpeak's creek ravine must be left alone, as
+## [centre_x, half_x, centre_z, half_z].
+##
+## The trunk road grades terrain toward road height out to ~68m, which is what makes a
+## cut-and-fill roadbed. Anywhere a bridge spans the creek that grading has to be suppressed
+## or it simply fills the ravine back in and the bridge ends up standing over flat snow. Each
+## x range deliberately stops short of the trunk carriageway so it can never undercut it.
+const FROSTPEAK_BRIDGE_ZONES := [
+	[0.0, 24.0, -305.0, 22.0],  # Alpine Timber Bridge (trunk road crossing)
+	[-6.0, 18.0, 202.0, 14.0],   # Glade Timber Bridge (Glade Creek shortcut)
+]
+
+
+## True inside a Frostpeak creek bridge keep-out box.
+func _in_frostpeak_bridge_zone(px: float, pz: float) -> bool:
+	for zone in FROSTPEAK_BRIDGE_ZONES:
+		if absf(px - zone[0]) < zone[1] and absf(pz - zone[2]) < zone[3]:
+			return true
+	return false
+
 ## True when a baked curve sample sits in a jump gap (airborne / no road mesh).
 ## Hill jump is fully between the two large ramps; crossing only removes the high path
 ## so the lower road at the same XZ is untouched.
@@ -362,7 +387,10 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 		base_terrain_height = hill_elevation + valley_noise
 	elif level_prefix == "frostpeak_creek":
 		# High alpine valley with rolling snowy hills and a central creek ravine
-		# Creek meanders along Z axis near X=0 from alpine glacier at Z=175m to Z=-370m
+		# Creek meanders along Z axis near X=0 from the alpine glacier head at the south
+		# terminus down to Z=-370m. The south terminus reaches Z=205 so the Glade Timber
+		# Bridge (Z=204) stands over open water instead of flat dry snowfield; the fade
+		# is long enough that it dies out before the trunk road's southern loop at Z=225+.
 		var creek_x: float = sin(pz * 0.018) * 14.0
 		var dist_to_creek: float = absf(px - creek_x)
 		var creek_ravine_w: float = 24.0
@@ -370,8 +398,8 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 		var creek_blend: float = 0.0
 		
 		var z_blend: float = 1.0
-		if pz > 175.0:
-			z_blend = clampf(1.0 - (pz - 175.0) / 25.0, 0.0, 1.0)
+		if pz > FROSTPEAK_CREEK_SOUTH_Z:
+			z_blend = clampf(1.0 - (pz - FROSTPEAK_CREEK_SOUTH_Z) / 25.0, 0.0, 1.0)
 		elif pz < -370.0:
 			z_blend = clampf(1.0 - (-370.0 - pz) / 30.0, 0.0, 1.0)
 			
@@ -530,7 +558,7 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			# Ramps from 0 (normal road, <4m above ground) to 1 (bridge, >12m above ground).
 			var elevation_diff = road_h - base_terrain_height
 			var bridge_factor = 0.0
-			if level_prefix == "frostpeak_creek" and absf(pz - (-305.0)) < 22.0 and absf(px) < 24.0:
+			if level_prefix == "frostpeak_creek" and _in_frostpeak_bridge_zone(px, pz):
 				bridge_factor = 1.0
 			elif level_prefix != "pinecrest_ridge" and level_prefix != "bloombay_dunes":
 				bridge_factor = clampf((elevation_diff - 4.0) / 8.0, 0.0, 1.0)
