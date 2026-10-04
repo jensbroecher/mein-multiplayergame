@@ -280,7 +280,10 @@ func _ready() -> void:
 	tg.set("terrain_size", Vector2(900.0, 900.0))
 	tg.set("hill_height", 16.0)
 	tg.set("road_width", 15.0)
-	tg.set("curb_outer_width", 17.0)
+	# With no curbs the "outer" width IS the road width. Leaving this at 17 would make the terrain
+	# grading flatten and recess out to 8.5m either side while the road surface stops at 7.5m,
+	# leaving a metre of bare graded shoulder that reads as a very low kerb.
+	tg.set("curb_outer_width", 15.0)
 	tg.set("road_y_offset", 0.06)
 	tg.set("curb_y_offset", 0.06)
 	tg.set("terrain_recession_collision", 0.12)
@@ -304,15 +307,13 @@ func _ready() -> void:
 		snow_mat.uv1_triplanar = true
 	tg.set("grass_material", snow_mat)
 
-	# Asphalt road material with subtle cool winter hue
-	var asphalt_tex: Texture2D = load("res://materials/asphalt.png") as Texture2D
-	if asphalt_tex:
-		var road_mat := StandardMaterial3D.new()
-		road_mat.albedo_texture = asphalt_tex
-		road_mat.albedo_color = Color(0.88, 0.90, 0.94)
-		road_mat.uv1_scale = Vector3(0.2, 0.2, 0.2)
-		road_mat.roughness = 0.78
-		tg.set("road_material", road_mat)
+	# The whole circuit is cobbled, and kerbless: an alpine village street, not a highway. The two
+	# shortcuts were already cobbled, so this makes the trunk road match them.
+	#
+	# `no_curbs` is set here and only here. It is an opt-in TerrainGenerator flag, so every other
+	# level keeps its curbs and its wider collision slab.
+	tg.set("no_curbs", true)
+	tg.set("road_material", _cobblestone_material())
 
 	level_scene.add_child(tg)
 	tg.set("track_path", track_path)
@@ -1063,13 +1064,15 @@ func _build_detailed_alpine_bridge(parent: Node, center: Vector3, length: float,
 		abut.add_child(a_mesh)
 		bridge_root.add_child(abut)
 
-		# Stone Wing Walls that flare into the mountain bank
+		# Stone Wing Walls flanking the approach. Kept inboard of the deck end: the bridge ends in
+		# mid-air over the creek, so a wall splayed past the end has nothing to retain and just reads
+		# as a slab hanging off the corner.
 		for wing_side in [-1.0, 1.0]:
 			var wing := MeshInstance3D.new()
 			wing.name = "WingWall_" + ("E" if side > 0 else "W") + ("_N" if wing_side < 0 else "_S")
-			wing.mesh = _tapered_box_mesh(Vector3(5.8, 0.0, 3.2), Vector3(4.4, 0.0, 2.0), 6.5)
+			wing.mesh = _tapered_box_mesh(Vector3(5.0, 0.0, 2.6), Vector3(3.9, 0.0, 1.7), 6.5)
 			wing.material_override = stone_mat
-			wing.position = Vector3(x_pos + side * 1.5, -3.3, wing_side * (width * 0.5 + 2.0))
+			wing.position = Vector3(side * (length * 0.5 - 3.2), -3.3, wing_side * (width * 0.5 + 1.5))
 			wing.rotation_degrees = Vector3(0, side * wing_side * 22.0, 0)
 			bridge_root.add_child(wing)
 
@@ -1392,26 +1395,12 @@ func _dress_bridge_for_winter(bridge_root: Node3D, length: float, width: float, 
 			ice.position = Vector3(ix, -0.33 - drop * 0.5, side * (width * 0.5 - 0.08))
 			bridge_root.add_child(ice)
 
-	# Wind-packed snow banked against the outside of each abutment, in the wedge between the deck
-	# edge and the wing wall.
+	# Deliberately no snow drift banked against the abutments. The deck here is the full carriageway
+	# width and the bridge ends in mid-air over the creek, so a drift either sat across the driving
+	# line as a kerb to climb at both ends, or outboard of it with no deck underneath to sit on --
+	# which is where the pale floating slabs at the bridge ends came from. The winter read comes
+	# from the snow lying on the wheel guards and handrails, plus the coping on the abutments.
 	#
-	# These sit OUTBOARD of the wheel guards, not on the deck. The deck is the full carriageway
-	# width here, so anything drifted across it would be a kerb the cars have to climb at both ends
-	# of the bridge. Outboard they read as snow the wind piled against the stonework, which is what
-	# they are for.
-	for side in [-1.0, 1.0]:
-		var edge_name := "N" if side < 0 else "S"
-		for end_side in [-1.0, 1.0]:
-			var end_name := "W" if end_side < 0 else "E"
-			var drift := MeshInstance3D.new()
-			drift.name = "SnowDrift_%s_%s" % [end_name, edge_name]
-			drift.mesh = _snow_drift_mesh(7.0, 2.2, 0.62, 7)
-			drift.material_override = snow
-			drift.position = Vector3(end_side * (length * 0.5 - 1.2), 0.02, side * (width * 0.5 + 1.1))
-			# The prism runs along +X from its origin; turn it to point inboard along the deck.
-			drift.rotation_degrees = Vector3(0.0, 0.0 if end_side > 0 else 180.0, 0.0)
-			bridge_root.add_child(drift)
-
 	# Snow on the stone abutment copings.
 	for side in [-1.0, 1.0]:
 		var coping := MeshInstance3D.new()
@@ -1472,62 +1461,6 @@ func _add_outward_quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: V
 		st.add_vertex(a); st.add_vertex(c); st.add_vertex(d)
 
 
-## A wind-packed snow drift as a closed prism: `run` long along +X from the origin at the wall it
-## banks against, `span` wide across, tapering from `peak` at the wall to nothing at the far end.
-##
-## Built as real geometry with a curved crest rather than a stack of boxes. Stacked boxes are the
-## obvious shortcut and they read as exactly that -- a flight of steps at the end of a bridge -- and
-## they cannot taper to zero height without leaving a visible ledge where the top box ends.
-func _snow_drift_mesh(run: float, span: float, peak: float, segments: int = 7) -> ArrayMesh:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var half_span: float = span * 0.5
-
-	# Four vertices per ring: outer base, inner base, inner crest, outer crest.
-	for i in range(segments + 1):
-		var t: float = float(i) / float(segments)
-		var x: float = t * run
-		# Crest height: steep where it meets the wall, easing out into a long thin tail.
-		var h: float = peak * pow(1.0 - t, 1.6)
-		# Crest also sags towards the middle of the drift, the way wind actually loads it.
-		var across := 1.0 - 0.28 * sin(t * PI)
-		st.set_uv(Vector2(t, 0.0))
-		st.add_vertex(Vector3(x, 0.0, -half_span * across))
-		st.set_uv(Vector2(t, 1.0))
-		st.add_vertex(Vector3(x, 0.0, half_span * across))
-		st.set_uv(Vector2(t, 0.0))
-		st.add_vertex(Vector3(x, h, half_span * across))
-		st.set_uv(Vector2(t, 1.0))
-		st.add_vertex(Vector3(x, h, -half_span * across))
-
-	const RING := 4
-	for i in range(segments):
-		var a: int = i * RING
-		var b: int = (i + 1) * RING
-		# Crest (2,3 -> 2',3')
-		st.add_index(a + 2); st.add_index(b + 2); st.add_index(a + 3)
-		st.add_index(a + 3); st.add_index(b + 2); st.add_index(b + 3)
-		# Outer flank (0,3 -> 0',3')
-		st.add_index(a + 0); st.add_index(a + 3); st.add_index(b + 0)
-		st.add_index(a + 3); st.add_index(b + 3); st.add_index(b + 0)
-		# Inner flank (1,2 -> 1',2')
-		st.add_index(a + 1); st.add_index(b + 1); st.add_index(a + 2)
-		st.add_index(a + 2); st.add_index(b + 1); st.add_index(b + 2)
-		# Underside
-		st.add_index(a + 0); st.add_index(b + 0); st.add_index(a + 1)
-		st.add_index(a + 1); st.add_index(b + 0); st.add_index(b + 1)
-	# Wall end cap
-	st.add_index(0); st.add_index(3); st.add_index(1)
-	st.add_index(1); st.add_index(3); st.add_index(2)
-	# Far end cap (crest height is ~0 there, but close it anyway)
-	var e: int = segments * RING
-	st.add_index(e + 0); st.add_index(e + 1); st.add_index(e + 3)
-	st.add_index(e + 1); st.add_index(e + 2); st.add_index(e + 3)
-
-	st.generate_normals()
-	return st.commit()
-
-
 ## Icicle material: pale, glassy and slightly translucent, so it reads as ice catching the light
 ## rather than as more of the same white as the snow.
 func _ice_material() -> Material:
@@ -1570,6 +1503,26 @@ func _alpine_snow_material(snow_bias: float = 1.0, tint_r: float = 0.92, tint_g:
 	return mat
 
 
+## The cobbled surface material, shared by the trunk road and both shortcuts so the whole stage
+## reads as one continuous street rather than tarmac with cobbled side roads.
+func _cobblestone_material() -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	var albedo: Texture2D = load("res://materials/cobblestone.png") as Texture2D
+	var normal_tex: Texture2D = load("res://materials/cobblestone_normal.png") as Texture2D
+	var rough_tex: Texture2D = load("res://materials/cobblestone_roughness.png") as Texture2D
+	if albedo:
+		m.albedo_texture = albedo
+	if normal_tex:
+		m.normal_enabled = true
+		m.normal_texture = normal_tex
+		m.normal_scale = 1.0
+	if rough_tex:
+		m.roughness_texture = rough_tex
+	m.roughness = 0.85
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return m
+
+
 ## Builds the cobblestone shortcut deck, its curbs, its rock embankment and collision.
 ##
 ## `half_width` is the FULL gore-clear width. The deck actually tapers to zero at both junctions
@@ -1597,21 +1550,7 @@ func _build_cobblestone_road(parent: Node, curve: Curve3D, half_width: float, no
 	var max_wall_drop: float = 9.0
 	var gap: bool = skip_span.y > skip_span.x
 
-	# 1. Cobblestone Road Deck Material (High-res PBR cobblestone)
-	var cobble_mat := StandardMaterial3D.new()
-	var cobble_tex: Texture2D = load("res://materials/cobblestone.png") as Texture2D
-	var cobble_norm: Texture2D = load("res://materials/cobblestone_normal.png") as Texture2D
-	var cobble_rough: Texture2D = load("res://materials/cobblestone_roughness.png") as Texture2D
-	if cobble_tex:
-		cobble_mat.albedo_texture = cobble_tex
-	if cobble_norm:
-		cobble_mat.normal_enabled = true
-		cobble_mat.normal_texture = cobble_norm
-		cobble_mat.normal_scale = 1.0
-	if cobble_rough:
-		cobble_mat.roughness_texture = cobble_rough
-	cobble_mat.roughness = 0.85
-	cobble_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var cobble_mat := _cobblestone_material()
 
 	# 2. Retaining Wall / Embankment Material (Alpine dark canyon rock)
 	var wall_mat := StandardMaterial3D.new()

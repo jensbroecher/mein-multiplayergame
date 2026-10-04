@@ -645,6 +645,11 @@ var sand_width: float:
 		curb_outer_width = v
 @export var grass_material: Material
 @export var road_material: Material
+## When true the outer curb strip is not emitted at all, and both the road surface and its
+## collision narrow to `road_width` instead of `curb_outer_width`. Off by default; only set it
+## from the generator of a level that actually wants a kerbless road, so other stages are
+## unaffected.
+@export var no_curbs: bool = false
 @export var terrain_recession_visual: float = 0.4
 @export var terrain_recession_collision: float = 0.0
 @export var level_prefix: String = ""
@@ -1055,14 +1060,20 @@ func _generate_road_and_sand():
 	var concrete_mat = _make_concrete_pbr_material()
 
 	# 3. Visual Overlays: Curbs and Road
-	if track_layout_type != TrackLayoutType.CANYON:
+	#
+	# `no_curbs` drops the outer curb strip entirely and narrows both the road surface and its
+	# collision down to `road_width`. It is opt-in per level and defaults off, so no other stage's
+	# road, curb or collision width changes.
+	var with_curbs: bool = track_layout_type != TrackLayoutType.CANYON and not no_curbs
+	var road_side_mat: Material = null if track_layout_type == TrackLayoutType.CANYON else concrete_mat
+	if with_curbs:
 		_create_path_visual(points_count, curb_outer_width, curb_mat, concrete_mat, curb_y_offset, "Visual_Curbs")
-		_create_path_visual(points_count, road_width, road_material, concrete_mat, road_y_offset, "Visual_Road")
+		_create_path_visual(points_count, road_width, road_material, road_side_mat, road_y_offset, "Visual_Road")
 	else:
-		_create_path_visual(points_count, road_width, road_material, null, road_y_offset, "Visual_Road")
+		_create_path_visual(points_count, road_width, road_material, road_side_mat, road_y_offset, "Visual_Road")
 
 	# Create ONE unified collision surface for EVERYTHING (Road + Border)
-	var col_width = road_width if track_layout_type == TrackLayoutType.CANYON else curb_outer_width
+	var col_width: float = curb_outer_width if with_curbs else road_width
 	_create_track_collision(points_count, col_width, "Visual_Road")
 
 func _create_path_visual(point_count: int, width: float, mat: Material, side_mat: Material, y_offset: float, node_name: String):
