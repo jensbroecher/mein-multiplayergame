@@ -174,7 +174,7 @@ func show_sub_menu(menu_name: String) -> void:
 			_add_tile("BLOOMBAY GP", "Lakeside  •  Pinecrest  •  Harbor  •  Bloombay Dunes", "tile_bloombay_gp.jpg", COL_GREEN, func():
 				_on_cup_selected("Bloombay GP")
 			)
-			_add_tile("ARCTIC CUP", "Frostpeak Creek  •  Glacier Highway", "tile_arctic_cup.jpg", COL_SNOW, func():
+			_add_tile("ARCTIC CUP", "Frostpeak Creek  •  Glacier Highway  •  Northlight Caverns", "tile_arctic_cup.jpg", COL_SNOW, func():
 				_on_cup_selected("Arctic Cup")
 			)
 			_add_tile("AL-RAIHANA GP", "Mountain  •  Canyon  •  Chasm  •  Wadi", "tile_al_raihana_gp.jpg", COL_BRONZE, func():
@@ -199,6 +199,9 @@ func show_sub_menu(menu_name: String) -> void:
 			)
 			_add_tile("GLACIER HIGHWAY", "Multi-tier concrete expressway, tunnels, and icy on-ramps", "tile_glacier_highway.jpg", COL_SNOW, func():
 				_on_stage_selected("res://levels/GlacierHighwayLevel.tscn")
+			)
+			_add_tile("NORTHLIGHT CAVERNS", "Night race under the aurora, through a glacier and over an ice arch", "tile_northlight_caverns.jpg", COL_SNOW, func():
+				_on_stage_selected("res://levels/NorthlightCavernsLevel.tscn")
 			)
 			_add_tile("HARBOR PIER", "Piers, crates, and dark water", "tile_harbor.jpg", COL_HARBOR, func():
 				_on_stage_selected("res://levels/HarborPierLevel.tscn")
