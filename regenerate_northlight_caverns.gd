@@ -1223,7 +1223,7 @@ func _build_portal_ring(parent: Node, ice_mat: Material, off: float, dir: float)
 		var h: float = clampf(prof.y * 0.5 + 1.2, 1.4, 6.5)
 		mi.scale = Vector3(w, h, w * rng.randf_range(0.7, 1.2))
 		# Pushed outboard of the shell so nothing can end up over the carriageway.
-		mi.position = Vector3(prof.x + out_dir * (w * 0.9 + 1.2), prof.y * 0.5 + h * 0.5 - 0.8, dir * 1.4)
+		mi.position = Vector3(prof.x + out_dir * (w * 0.9 + 1.2), prof.y * 0.45 - 1.4, dir * 1.4)
 		mi.rotation_degrees = Vector3(
 			rng.randf_range(-12.0, 12.0), rng.randf_range(-30.0, 30.0), -out_dir * rng.randf_range(14.0, 34.0))
 		ring.add_child(mi)
@@ -1731,11 +1731,21 @@ func _make_ice_block_mesh(rng: RandomNumberGenerator, sides: int, taper: float, 
 			tilted.append(Vector3(v.x + v.y * lean, v.y, v.z + v.y * lean * 0.35))
 		rings[ti2] = tilted
 
+	# Recentre on the origin before emitting. The rings run y = 0..1, i.e. the mesh stands ON its
+	# own origin rather than being centred on it - so a caller placing an instance at
+	# "ground + half the height" leaves a block hanging by 0.46 * its height in the air, which is
+	# most of a 20m serac. Everything downstream then has to know the offset, so fix it here.
 	for pts3 in rings:
 		for v in pts3:
 			st.set_uv(Vector2(v.x * 0.5 + 0.5, v.y))
-			st.add_vertex(v)
+			st.add_vertex(Vector3(v.x, v.y - 0.5, v.z))
 
+	# Side quads, split along the a-c diagonal.
+	#
+	# The second triangle has to be (d, c, a), not (b, c, d): the two have to share the DIAGONAL
+	# edge a-c. Sharing b-c instead - which is a perimeter edge of the quad - folds the pair back
+	# on itself and leaves the quad's other diagonal open, so every band of every block ends up
+	# with a 1-edge gap down it. That reads as holes straight through the ice.
 	for r in range(rings.size() - 1):
 		for i in range(sides):
 			var j: int = (i + 1) % sides
@@ -1744,11 +1754,11 @@ func _make_ice_block_mesh(rng: RandomNumberGenerator, sides: int, taper: float, 
 			var c: int = (r + 1) * sides + j
 			var d: int = (r + 1) * sides + i
 			st.add_index(a); st.add_index(c); st.add_index(b)
-			st.add_index(b); st.add_index(c); st.add_index(d)
+			st.add_index(d); st.add_index(c); st.add_index(a)
 
 	# Fracture face on top, fanned from a centre pushed off to one side.
 	var top_row: int = (rings.size() - 1) * sides
-	var centre := Vector3(rng.randf_range(-0.30, 0.30) + lean, 1.04, rng.randf_range(-0.30, 0.30) + lean * 0.35)
+	var centre := Vector3(rng.randf_range(-0.30, 0.30) + lean, 0.54, rng.randf_range(-0.30, 0.30) + lean * 0.35)
 	var centre_idx: int = rings.size() * sides
 	st.set_uv(Vector2(0.5, 1.0))
 	st.add_vertex(centre)
@@ -1760,7 +1770,7 @@ func _make_ice_block_mesh(rng: RandomNumberGenerator, sides: int, taper: float, 
 	# Flat base.
 	var base_idx: int = centre_idx + 1
 	st.set_uv(Vector2(0.5, 0.0))
-	st.add_vertex(Vector3(0.0, -0.04, 0.0))
+	st.add_vertex(Vector3(0.0, -0.54, 0.0))
 	for i in range(sides):
 		var j3: int = (i + 1) % sides
 		st.add_index(base_idx)
@@ -1897,7 +1907,7 @@ func _build_ice_scatter(parent: Node, ice_mat: Material) -> void:
 				mi.material_override = mats[rng.randi_range(0, mats.size() - 1)]
 				var fw: float = rng.randf_range(5.0, 15.0)
 				mi.scale = Vector3(fw, rng.randf_range(0.22, 0.5), fw * rng.randf_range(0.5, 0.95))
-				mi.position = Vector3(cx, LAKE_SURFACE_Y - 0.30, cz)
+				mi.position = Vector3(cx, LAKE_SURFACE_Y - 0.07, cz)
 				mi.rotation_degrees = Vector3(rng.randf_range(-3.0, 3.0), rng.randf_range(0.0, 360.0), rng.randf_range(-3.0, 3.0))
 				mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 				bodies.add_child(mi)
@@ -1981,7 +1991,6 @@ func _build_ice_arches(parent: Node, ice_mat: Material, anchors: Array) -> void:
 		var off: float = main_track_curve.get_closest_offset(anchor)
 		var f: Dictionary = _frame_at_offset(main_track_curve, off)
 		var pos: Vector3 = f["pos"]
-		var right: Vector3 = f["right"]
 		var yaw: float = rad_to_deg(atan2(-f["fwd"].x, -f["fwd"].z))
 
 		var body := StaticBody3D.new()
@@ -2017,9 +2026,12 @@ func _build_ice_arches(parent: Node, ice_mat: Material, anchors: Array) -> void:
 			var lz: float = lerpf(-along_len * 0.5, along_len * 0.5, float(r) / float(rings - 1))
 			for i in range(n):
 				var p2: Vector2 = profile[i]
-				st.set_normal(right * pn[i].x + Vector3.UP * pn[i].y)
+				# Local space, not world: the body's yaw already orients the arch along the road.
+				# Writing world-oriented vertices here as well rotates the arch twice, which on
+				# any corner steeper than a hairpin lands one springing on the carriageway.
+				st.set_normal(Vector3(pn[i].x, pn[i].y, 0.0))
 				st.set_uv(Vector2(p2.x * 0.06, lz * 0.06))
-				st.add_vertex(right * p2.x + Vector3.UP * p2.y + Vector3.BACK * lz)
+				st.add_vertex(Vector3(p2.x, p2.y, lz))
 		for r in range(rings - 1):
 			var r0: int = r * n
 			var r1: int = (r + 1) * n
@@ -2056,7 +2068,7 @@ func _build_ice_arches(parent: Node, ice_mat: Material, anchors: Array) -> void:
 				var bw: float = rng.randf_range(2.4, 5.0)
 				b.scale = Vector3(bw, rng.randf_range(2.0, 4.0), bw * rng.randf_range(0.7, 1.2))
 				b.position = Vector3(float(s) * (half_span + thick * 0.4) + rng.randf_range(-1.5, 1.5),
-						rng.randf_range(-0.4, 1.0), rng.randf_range(-along_len * 0.5, along_len * 0.5))
+						rng.randf_range(0.4, 1.6), rng.randf_range(-along_len * 0.5, along_len * 0.5))
 				b.rotation_degrees = Vector3(rng.randf_range(-12.0, 12.0), rng.randf_range(0.0, 360.0), rng.randf_range(-12.0, 12.0))
 				body.add_child(b)
 
@@ -2999,9 +3011,12 @@ func _ready() -> void:
 	_build_edge_markers(props_container, alt1_curve, "Meltwater", [], [], 40.0)
 	_build_edge_markers(props_container, alt2_curve, "Ledge", [], [], 40.0)
 	_build_ice_scatter(props_container, serac_mat)
+	# Arch anchors are kept well clear of the route gores. An arch over a split is tempting as a
+	# landmark, but the route climbs past the trunk's shoulder there, and the arch's soffit ends up
+	# barely a metre over the route deck - a landmark you cannot drive under.
 	_build_ice_arches(props_container, serac_mat, [
 		[Vector3(-112.0, 3.0, 268.0), 13.0, 12.0, 2.2, 16.0],
-		[Vector3(152.0, 6.40, -368.0), 12.0, 11.0, 2.0, 14.0],
+		[Vector3(26.0, 3.30, -354.0), 12.0, 11.0, 2.0, 14.0],
 	])
 	_build_junction_pylons(props_container, serac_mat, routes)
 	_build_crevasse_lights(props_container)
