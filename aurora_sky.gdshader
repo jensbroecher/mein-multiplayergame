@@ -8,7 +8,7 @@ shader_type sky;
 // light is a dim blue fill whose energy is tuned for the snow, and reading the disc off
 // it would tie the moon's apparent brightness to that tuning.
 
-uniform float star_brightness : hint_range(0.0, 4.0) = 1.0;
+uniform float star_brightness : hint_range(0.0, 4.0) = 0.0;
 uniform float aurora_intensity : hint_range(0.0, 4.0) = 1.25;
 uniform float aurora_center : hint_range(-0.1, 1.2) = 0.34;
 uniform float horizon_glow : hint_range(0.0, 2.0) = 0.35;
@@ -124,6 +124,9 @@ void sky() {
 	// --- Stars --------------------------------------------------------------------------
 	// Drawn after the aurora's veil is known so the curtains wash them out where they are
 	// bright, and added on top of the dome.
+	//
+	// star_brightness is a uniform so this can go to zero without editing the shader: the stage
+	// sets it from the generator, and setting it to 0 is the same as deleting the call.
 	float stars = star_field(d) * star_brightness * (1.0 - 0.80 * clamp(veil * aurora_intensity, 0.0, 1.0));
 	col += vec3(0.86, 0.90, 1.0) * stars;
 

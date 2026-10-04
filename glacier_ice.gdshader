@@ -5,27 +5,42 @@ render_mode blend_mix, depth_draw_opaque, cull_disabled, diffuse_burley, specula
 // frozen lake.
 //
 // cull_disabled is a requirement, not a shortcut. The cavern shell is a single swept arch
-// whose faces all have to be seen from inside the passage, and the ice arches are open
-// rings; authoring every face's winding so both sides come out correct is the kind of
-// thing that silently produces one invisible side. Normals are authored inward for the
-// shell and from the solid's own centre elsewhere, so lighting is right either way.
+// whose faces all have to be seen from inside the passage, and the ice arches are open rings;
+// authoring every face's winding so both sides come out correct is the kind of thing that
+// silently produces one invisible side. Normals are authored inward for the shell and from the
+// solid's own centre elsewhere, so lighting is right either way.
+//
+// An earlier revision of this read as slime rather than ice, and the causes are worth recording
+// because each is individually a plausible-looking choice:
+//   - the veins were emerald and glowed, so the whole surface carried a green cast;
+//   - a constant teal emission was added "so the cavern never goes black", which turned every
+//     face into a self-lit green one regardless of the light hitting it;
+//   - fracture planes were DARKENED, as if they were dirt;
+//   - dark rock was mixed in as "silt suspended in the ice", which is exactly the muddy organic
+//     read we were trying to avoid.
+// Ice is none of those. Its colour is almost entirely depth - a thin edge is nearly white and
+// only thick, shadowed ice goes blue - and what is suspended in it is white air, not dark rock.
 
 uniform sampler2D ice_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
-uniform sampler2D rock_albedo : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 
-uniform vec4 ice_color : source_color = vec4(0.44, 0.68, 0.86, 1.0);
-uniform vec4 deep_color : source_color = vec4(0.10, 0.30, 0.52, 1.0);
-uniform vec4 frosted_color : source_color = vec4(0.86, 0.93, 1.00, 1.0);
-uniform vec4 vein_color : source_color = vec4(0.32, 0.92, 0.78, 1.0);
-uniform vec4 aurora_tint : source_color = vec4(0.20, 0.62, 0.52, 1.0);
+uniform vec4 ice_color : source_color = vec4(0.74, 0.87, 0.96, 1.0);
+uniform vec4 deep_color : source_color = vec4(0.16, 0.36, 0.58, 1.0);
+uniform vec4 frosted_color : source_color = vec4(0.92, 0.96, 1.00, 1.0);
+uniform vec4 bubble_color : source_color = vec4(0.88, 0.95, 1.00, 1.0);
+// Internal fractures scatter light rather than absorb it, so they read as bright threads in the
+// ice. Anything saturated here is what turns a glacier into an aquarium.
+uniform vec4 vein_color : source_color = vec4(0.70, 0.90, 1.00, 1.0);
+uniform vec4 aurora_tint : source_color = vec4(0.30, 0.48, 0.72, 1.0);
 
 uniform float ice_scale : hint_range(0.005, 2.0) = 0.10;
-uniform float normal_strength : hint_range(0.0, 4.0) = 0.10;
-uniform float vein_density : hint_range(0.0, 2.0) = 0.55;
-uniform float vein_glow : hint_range(0.0, 8.0) = 1.5;
+uniform float normal_strength : hint_range(0.0, 4.0) = 0.28;
+uniform float vein_density : hint_range(0.0, 2.0) = 0.30;
+uniform float vein_glow : hint_range(0.0, 8.0) = 0.35;
 uniform float frost_line : hint_range(-80.0, 400.0) = 40.0;
-uniform float roughness : hint_range(0.0, 1.0) = 0.42;
-uniform float horizon_color_mix : hint_range(0.0, 1.0) = 0.35;
+uniform float bubble_density : hint_range(0.0, 2.0) = 0.55;
+uniform float roughness : hint_range(0.0, 1.0) = 0.16;
+uniform float frost_roughness : hint_range(0.0, 1.0) = 0.72;
+uniform float depth_power : hint_range(0.0, 4.0) = 1.0;
 
 varying vec3 w_pos;
 varying vec3 w_nrm;
@@ -79,53 +94,65 @@ void vertex() {
 void fragment() {
 	vec3 n = normalize(w_nrm);
 	vec3 view = normalize(CAMERA_POSITION_WORLD - w_pos);
-	float fres = pow(1.0 - clamp(dot(n, view), 0.0, 1.0), 3.0);
+	float fres = pow(1.0 - clamp(dot(n, view), 0.0, 1.0), 4.0);
 
-	// Distance fade: a tiling ice pattern that has lost its texels still reads as a repeat
-	// across a 200m cavern wall, so the fine octaves are dropped with range and only a
-	// noise-tinted flat colour is left.
-	float detail = 1.0 - smoothstep(60.0, 420.0, length(w_pos - CAMERA_POSITION_WORLD));
+	float dist = length(w_pos - CAMERA_POSITION_WORLD);
+	float detail = 1.0 - smoothstep(70.0, 460.0, dist);
 
-	// Internal strata: ice is laid down in layers, and the banding is what sells it as
-	// glacier rather than as blue plastic.
-	float strata = fbm(vec2(w_pos.y * 0.26, (w_pos.x + w_pos.z) * 0.012));
-	strata = mix(0.5, strata, 0.75);
-	float band = 0.5 + 0.5 * sin(w_pos.y * 0.42 + strata * 6.0);
+	// --- Thickness, which is where ice gets its colour ------------------------------------
+	// A thin edge or an exposed face is almost white; only mass in shadow carries the blue.
+	// Keying the colour to facing and cavity rather than to a fixed tint is the whole difference
+	// between "ice" and "blue plastic".
+	float cavity = 1.0 - smoothstep(0.0, 1.0, n.y * 0.5 + 0.5);
+	float strata = fbm(vec2(w_pos.y * 0.22, (w_pos.x + w_pos.z) * 0.011));
+	float band = 0.5 + 0.5 * sin(w_pos.y * 0.34 + strata * 5.0);
+	float thickness = clamp(cavity * 0.75 + strata * 0.25 + band * 0.15, 0.0, 1.0);
+	thickness = pow(thickness, depth_power);
 
-	// Fracture planes: two ridged noise fields at different scales and rotations. The
-	// second one is what stops the first from reading as a single repeating vein pattern.
-	float f1 = pow(ridge(w_pos.xz * ice_scale * 3.1 + vec2(0.0, w_pos.y * 0.05)), 6.0);
-	float f2 = pow(ridge(w_pos.xy * ice_scale * 1.7 + 21.0), 8.0);
+	// --- Internal structure ---------------------------------------------------------------
+	// Fractures scatter, so they lighten. Dark ridged lines are what read as grime.
+	float f1 = pow(ridge(w_pos.xz * ice_scale * 3.1 + vec2(0.0, w_pos.y * 0.05)), 7.0);
+	float f2 = pow(ridge(w_pos.xy * ice_scale * 1.7 + 21.0), 9.0);
 	float fracture = clamp(f1 + f2 * 0.8, 0.0, 1.0) * detail;
 
-	// Frost settles on upward faces and anything shallow enough to hold it.
-	float up_mask = smoothstep(0.15, 0.75, n.y);
+	// --- Air bubbles ---------------------------------------------------------------------
+	// What is actually suspended in glacier ice is air, and it is white. Sparse, irregular, and
+	// gathered in bands where the ice froze fastest.
+	float band_gate = smoothstep(0.35, 0.75, fbm(vec2(w_pos.y * 0.09, (w_pos.x + w_pos.z) * 0.02)));
+	float bubbles = smoothstep(0.62, 0.80, fbm(w_pos.xz * ice_scale * 9.0 + w_pos.y * 0.31)) * band_gate;
+	bubbles *= bubble_density * detail;
+
+	// --- Frost ----------------------------------------------------------------------------
+	// Rime collects on anything that faces up or catches the wind. The matte white against the
+	// glassy blue is the contrast that makes ice legible at a distance.
+	float up_mask = smoothstep(0.10, 0.70, n.y);
 	float altitude = 1.0 - smoothstep(frost_line - 30.0, frost_line + 60.0, w_pos.y);
-	float frost = clamp(up_mask * (0.35 + altitude * 0.55) + (fbm(w_pos.xz * 0.05) - 0.5) * 0.5, 0.0, 1.0);
-	frost = smoothstep(0.25, 0.85, frost);
+	float frost = clamp(up_mask * (0.30 + altitude * 0.60) + (fbm(w_pos.xz * 0.06) - 0.5) * 0.55, 0.0, 1.0);
+	frost = smoothstep(0.28, 0.82, frost);
 
-	vec3 ice = mix(deep_color.rgb, ice_color.rgb, strata * 0.7 + band * 0.35);
-	ice = mix(ice, ice * vec3(0.72, 0.88, 1.06), fres * 0.7);
-	// Rock and silt suspended in the ice, otherwise it reads as glass.
-	vec3 silt = triplanar(rock_albedo, w_pos, n, ice_scale * 0.35).rgb;
-	ice = mix(ice, ice * 0.55 + silt * 0.22, 0.35);
+	// --- Albedo ---------------------------------------------------------------------------
+	vec3 ice = mix(ice_color.rgb, deep_color.rgb, thickness * 0.85);
+	// Grazing angles show more of whatever is behind the surface, so the rim goes deeper and
+	// brighter at once rather than picking up a hue.
+	ice = mix(ice, deep_color.rgb * 1.15, fres * 0.35);
+	ice = mix(ice, bubble_color.rgb, bubbles * 0.55);
+	ice = mix(ice, vein_color.rgb, fracture * 0.40);
 
-	vec3 albedo = mix(ice, frosted_color.rgb, frost * 0.85);
-	albedo = mix(albedo, albedo * 0.55, fracture * 0.6);
+	vec3 albedo = mix(ice, frosted_color.rgb, frost * 0.9);
 
 	ALBEDO = albedo;
-	ROUGHNESS = clamp(mix(roughness, 0.72, frost) + fracture * 0.12, 0.03, 1.0);
+	ROUGHNESS = clamp(mix(roughness, frost_roughness, frost) + bubbles * 0.10, 0.02, 1.0);
 	METALLIC = 0.0;
-	SPECULAR = mix(0.36, 0.22, frost);
+	// Ice is glassy: a strong, tight highlight is most of what says "ice" rather than "stone".
+	SPECULAR = mix(0.62, 0.16, frost);
 
 	NORMAL_MAP = triplanar(ice_normal, w_pos, n, ice_scale * 0.55).rgb;
 	NORMAL_MAP_DEPTH = normal_strength * (0.35 + 0.65 * detail) * clamp(1.0 - fwidth(w_pos.x) * 0.02 - fwidth(w_pos.z) * 0.02, 0.1, 1.0);
 
-	// The veins glow: air trapped in the fracture planes scatters what little light the
-	// cavern has, and that is the cavern's only real light source. A slow pulse keeps the
-	// walls alive without reading as an effect.
-	float pulse = 0.75 + 0.25 * sin(TIME * 0.6 + w_pos.z * 0.05 + w_pos.x * 0.03);
+	// --- Emission -------------------------------------------------------------------------
+	// Barely there. The cavern's light comes from its lamps; this only stops the deepest
+	// crevices going to pure black, and it is cool and very weak so it cannot tint the ice.
+	float pulse = 0.80 + 0.20 * sin(TIME * 0.5 + w_pos.z * 0.05 + w_pos.x * 0.03);
 	EMISSION = vein_color.rgb * vein_glow * pulse * fracture * vein_density;
-	// A faint standing glow on the ice itself, so the cavern never goes fully black.
-	EMISSION += aurora_tint.rgb * 0.20 * (0.5 + 0.5 * band);
+	EMISSION += aurora_tint.rgb * 0.045 * thickness;
 }

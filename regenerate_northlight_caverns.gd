@@ -107,19 +107,32 @@ const LAKE_SURFACE_Y := 2.66
 ## Glacier ridge built over the cavern stretch. The height along the ridge steps up over a
 ## few metres at each portal, which is what turns the mouth into a near-vertical ice face
 ## instead of a long ramp the tunnel would be buried under.
-const CAVERN_HALF_SPAN := 42.0
-const CAVERN_SPAN_FEATHER := 58.0
-const CAVERN_RIDGE_HEIGHT := 33.0
-## The gallery the corridor cuts inside the glacier, as two widths.
 ##
-## FLAT_W is where the floor is completely graded, HALF_W is where the search gives up. They have
-## to be separate, and FLAT_W has to clear the cavern shell by at least one heightfield cell: the
-## terrain's own grid is coarse (6.25m), so if the wall is allowed to start at the shell's edge the
-## first quad of that wall spans from inside the passage to 55m up, and it slices diagonally
-## through the tube's upper corners. With FLAT_W clear of the shell, the wall is a single quad
-## entirely outside it and the shell stays watertight.
-const GLACIER_GALLERY_FLAT_W := 19.0
-const GLACIER_GALLERY_HALF_W := 20.0
+## The massif the cavern is a hole in. HALF_W is the full-height crest, FEATHER is the long
+## flank beyond it. These have to clear the cavern shell by a wide margin - the shell's crown is
+## 15m over the deck and the ridge here is 60m - so the passage is unambiguously interior.
+const CAVERN_MASS_HALF_W := 48.0
+const CAVERN_MASS_FEATHER := 78.0
+const CAVERN_RIDGE_HEIGHT := 58.0
+## Extra height at the summit, partway along the span, so the ridge has a peak instead of being
+## a slab of constant height.
+const CAVERN_SUMMIT := 26.0
+## Broad low apron tying the massif into the icefield, so it does not read as a dropped lump.
+const CAVERN_APRON := 17.0
+##
+## The corridor that is cut through the massif, as two widths. The road is 15m wide with a
+## 2.1m bank either side, so the floor has to be flat past about 9m; it then climbs steeply to
+## the full massif height by HALF_W. The gap between those two numbers is the tunnel wall, and
+## it is deliberately narrow and tall rather than a broad trench.
+##
+## FLAT_W also has to clear the shell. The shell is CAVERN_HALF_WIDTH across, and if the wall
+## starts at the shell's edge then the first quad of that wall spans from inside the passage to
+## 55m up and slices diagonally through the tube's upper corners.
+const GLACIER_GALLERY_FLAT_W := 13.0
+const GLACIER_GALLERY_HALF_W := 21.0
+## Where the audit samples the tunnel wall: clear of the gallery's falloff, so it measures the
+## massif rather than the cut through it.
+const WALL_PROBE_LAT := 24.0
 
 ## Crevasse crossed by the ice arch, as a slot in the ice: a centre, a direction, and a
 ## half-length that tapers to nothing at both tips so the slot never ends on a flat wall.
@@ -154,7 +167,10 @@ const CAVERN_VERTS := 11
 const CAVERN_HALF_WIDTH := 11.0
 ## How far the shell reaches past each portal, into the rock. The terrain closes the portal
 ## on its own; this only guarantees there is no daylight gap at the exact plane.
-const CAVERN_OVERSHOOT := 4.0
+## The shell ends exactly at the portal planes. Any overshoot here and the arch protrudes from
+## the face as a free-standing hoop; with the ramp starting at the portal the mouth reads as a
+## notch in the cliff instead.
+const CAVERN_OVERSHOOT := 0.0
 
 ## Every carriageway the terrain has to make room for, filled in as the curves are built.
 var ROAD_CURVES: Array = []
@@ -1206,9 +1222,9 @@ func _build_cavern(parent: Node, ice_mat: Material, vein_light_mat: Color) -> vo
 		l.name = "VeinLight_%d" % li
 		l.position = f2["pos"] + f2["right"] * (7.5 * side) + Vector3.UP * 5.0
 		l.light_color = vein_light_mat
-		l.light_energy = 3.6
-		l.omni_range = 30.0
-		l.omni_attenuation = 1.25
+		l.light_energy = 2.6
+		l.omni_range = 34.0
+		l.omni_attenuation = 1.15
 		l.light_specular = 0.6
 		lights.add_child(l)
 		off += 26.0
@@ -1232,7 +1248,7 @@ func _build_light_shafts(parent: Node, start: float, finish: float) -> void:
 
 	var grad := Gradient.new()
 	grad.colors = PackedColorArray([
-		Color(0.55, 1.0, 0.85, 0.20), Color(0.35, 0.95, 0.80, 0.06), Color(0.2, 0.7, 0.7, 0.0)
+		Color(0.80, 0.93, 1.0, 0.16), Color(0.55, 0.80, 1.0, 0.05), Color(0.4, 0.6, 0.9, 0.0)
 	])
 	var grad_tex := GradientTexture2D.new()
 	grad_tex.gradient = grad
@@ -1246,7 +1262,7 @@ func _build_light_shafts(parent: Node, start: float, finish: float) -> void:
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	mat.albedo_texture = grad_tex
-	mat.albedo_color = Color(0.6, 1.0, 0.9, 1.0)
+	mat.albedo_color = Color(0.8, 0.93, 1.0, 1.0)
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	mat.no_depth_test = false
 
@@ -1272,64 +1288,81 @@ func _build_light_shafts(parent: Node, start: float, finish: float) -> void:
 
 ## A ring of tilted ice slabs standing against the cliff face around a cavern mouth, plus the
 ## two lights that make the opening legible from a distance.
+##
+## Two things this got wrong first time, both of which are only visible from a driver's seat:
+##
+##  - The blocks were positioned at `profile.y * 0.45 - 1.4`, which ignores the block's own
+##    half-height. A 6m slab at that formula floats two metres in the air, and the crown points
+##    put them at head height over the middle of the road. Every block is now placed by its BASE,
+##    sunk into the ground.
+##  - The ring used the full shell profile, crown included. The crown sits at lateral 0, i.e.
+##    directly over the carriageway, so those blocks were the ones ending up in the road. Only the
+##    lower shoulders - below the springing - carry blocks at all.
 func _build_portal_ring(parent: Node, ice_mat: Material, off: float, dir: float) -> void:
 	var length: float = main_track_curve.get_baked_length()
 	off = clampf(off, 0.0, length)
 	var f: Dictionary = _frame_at_offset(main_track_curve, off)
-	var pos: Vector3 = f["pos"]
-	var right: Vector3 = f["right"]
 
 	var ring := Node3D.new()
 	ring.name = "PortalRing_%d" % int(off)
-	ring.position = pos
+	ring.position = f["pos"]
 	var yaw: float = rad_to_deg(atan2(-f["fwd"].x, -f["fwd"].z))
 	ring.rotation_degrees = Vector3(0.0, yaw, 0.0)
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 0x504F5254 + int(off)
 	var lib: Array = _serac_library()
-	# Blocks follow the arch: each profile point gets a slab standing just outboard of it, leaning
-	# back against the shell. Mirroring each point about the centreline instead (which is the
-	# obvious way to do this) puts half the ring on the wrong side of the mouth, in the road.
-	# Lower shoulders only. The crown is skipped deliberately: a block sitting over the middle of
-	# the road at head height turns the mouth into a pile of debris rather than an opening, and it
-	# is also the one place on the stage where scenery can end up in a car's way.
-	for i in [0, 1, 2, 3, CAVERN_VERTS - 4, CAVERN_VERTS - 3, CAVERN_VERTS - 2, CAVERN_VERTS - 1]:
-		var prof: Vector2 = CAVERN_PROFILE[i]
-		if prof.y < -1.0:
-			continue
-		var out_dir: float = signf(prof.x) if absf(prof.x) > 0.01 else 1.0
-		var pick: int = rng.randi_range(0, lib.size() - 2)
-		var mi := MeshInstance3D.new()
-		mi.name = "PortalBlock_%d" % i
-		mi.mesh = lib[pick]["mesh"]
-		mi.material_override = ice_mat
-		var w: float = rng.randf_range(2.4, 4.4)
-		var h: float = clampf(prof.y * 0.5 + 1.2, 1.4, 6.5)
-		mi.scale = Vector3(w, h, w * rng.randf_range(0.7, 1.2))
-		# Pushed outboard of the shell so nothing can end up over the carriageway.
-		mi.position = Vector3(prof.x + out_dir * (w * 0.9 + 1.2), prof.y * 0.45 - 1.4, dir * 1.4)
-		mi.rotation_degrees = Vector3(
-			rng.randf_range(-12.0, 12.0), rng.randf_range(-30.0, 30.0), -out_dir * rng.randf_range(14.0, 34.0))
-		ring.add_child(mi)
-		var cs := CollisionShape3D.new()
-		cs.name = "PortalBlockCollision"
-		cs.shape = lib[pick]["shape"]
-		cs.position = mi.position
-		cs.scale = mi.scale
-		cs.rotation_degrees = mi.rotation_degrees
-		ring.add_child(cs)
 
-		# One light per shoulder, aimed into the mouth.
-		if i == 1 or i == CAVERN_VERTS - 2:
-			var l := OmniLight3D.new()
-			l.name = "PortalLight_%d" % i
-			l.position = Vector3(prof.x * 1.15, maxf(prof.y, 2.0), dir * 2.5)
-			l.light_color = Color(0.45, 0.95, 0.85)
-			l.light_energy = 3.0
-			l.omni_range = 30.0
-			l.omni_attenuation = 1.3
-			ring.add_child(l)
+	var spring_y: float = 0.0
+	for prof in CAVERN_PROFILE:
+		spring_y = maxf(spring_y, prof.y)
+
+	for i in range(CAVERN_VERTS):
+		var prof: Vector2 = CAVERN_PROFILE[i]
+		# Below the springing only: above it there is no ground to stand a block on, and the
+		# crown points sit over the carriageway.
+		if prof.y > spring_y - 6.0 or prof.y < -1.0:
+			continue
+		var side: float = signf(prof.x)
+		if side == 0.0:
+			continue
+		for k in range(2):
+			var pick: int = rng.randi_range(0, lib.size() - 2)
+			var w: float = rng.randf_range(2.6, 5.0)
+			var h: float = rng.randf_range(2.0, 5.0)
+			# Outboard of the shell wall, stepped back along the road so the pair frames the
+			# mouth rather than blocking it.
+			var along_off: float = dir * (2.0 + float(k) * 4.5 + rng.randf_range(-1.0, 1.0))
+			var lateral: float = side * (absf(prof.x) + 2.6 + rng.randf_range(0.0, 2.0))
+			var mi := MeshInstance3D.new()
+			mi.name = "PortalBlock_%d_%d" % [i, k]
+			mi.mesh = lib[pick]["mesh"]
+			mi.material_override = ice_mat
+			mi.scale = Vector3(w, h, w * rng.randf_range(0.7, 1.2))
+			# Placed by its BASE: the block mesh is centred on its own origin, so the origin sits
+			# half a block above the ground unless that is added back.
+			mi.position = Vector3(lateral, h * 0.5 - 1.6, along_off)
+			mi.rotation_degrees = Vector3(
+				rng.randf_range(-10.0, 10.0), rng.randf_range(-30.0, 30.0), -side * rng.randf_range(8.0, 26.0))
+			ring.add_child(mi)
+			var cs := CollisionShape3D.new()
+			cs.name = "PortalBlockCollision"
+			cs.shape = lib[pick]["shape"]
+			cs.position = mi.position
+			cs.scale = mi.scale
+			cs.rotation_degrees = mi.rotation_degrees
+			ring.add_child(cs)
+
+	# One light per shoulder, at the springing, aimed into the mouth.
+	for side2 in [-1.0, 1.0]:
+		var l := OmniLight3D.new()
+		l.name = "PortalLight_%s" % ("L" if side2 < 0.0 else "R")
+		l.position = Vector3(side2 * (CAVERN_HALF_WIDTH + 1.0), spring_y * 0.55, dir * 3.0)
+		l.light_color = Color(0.66, 0.86, 1.0)
+		l.light_energy = 2.6
+		l.omni_range = 32.0
+		l.omni_attenuation = 1.25
+		ring.add_child(l)
 
 	parent.add_child(ring)
 
@@ -1386,18 +1419,25 @@ func _grade_blocked(curve_index: int, off: float) -> bool:
 ## The nearest carriageway decides the shelf, so where roads cross the lower deck always wins.
 ## Elevated spans only impose a ceiling: their banks and the ground beneath them must stay
 ## visible.
-## True inside the stretch of glacier the cavern is bored through.
+## True inside the massif the cavern is cut through.
 ##
-## Two things change there. The corridor narrows to the gallery (GLACIER_GALLERY_HALF_W), so the
-## ice either side of the passage is left standing instead of being planed away into a broad
-## trough; and only the trunk's own corridor is allowed in. The second half is not cosmetic: the
-## Meltwater Cut runs past the south mouth inside a corridor radius of it, and a 46m-wide shelf
-## reaching in from outside would saw a trench through the cliff the mouth sits in.
-func _inside_glacier(px: float, pz: float) -> bool:
+## A heightfield has no holes. That is the whole constraint on this stage: the terrain cannot be
+## a mountain AND a tunnel at the same time, because anything above the road deck over the
+## carriageway is a wall the car drives into. So the massif is solid only *beside* the passage,
+## and a narrow corridor is cut through it for the road. The roof is the swept shell, seated in
+## that slot - which is exactly how a real glacier tunnel works.
+##
+## Two consequences, and both are load-bearing:
+##  - Grading is allowed here, but narrowed to GLACIER_GALLERY_* and only for the trunk. Left at
+##    the normal 46m reach it planes the whole massif away into a trench and the cavern reads as
+##    an open cutting.
+##  - The shell has to close overhead on its own, because nothing above it will. It does: its
+##    cross-section is a closed loop, so the crown is continuous from portal to portal.
+func _inside_cavern_mass(px: float, pz: float) -> bool:
 	if _cavern_line.size() < 2:
 		return false
 	var near: Vector2 = _cavern_nearest(px, pz)
-	if near.x > CAVERN_HALF_SPAN + CAVERN_SPAN_FEATHER:
+	if near.x > CAVERN_MASS_HALF_W + CAVERN_MASS_FEATHER:
 		return false
 	return near.y > _cavern_range.x and near.y < _cavern_range.y
 
@@ -1405,7 +1445,7 @@ func _inside_glacier(px: float, pz: float) -> bool:
 func _apply_road_corridors(h: float, px: float, pz: float) -> float:
 	var cx: int = int(floor(px / ROAD_CELL))
 	var cz: int = int(floor(pz / ROAD_CELL))
-	var in_glacier: bool = _inside_glacier(px, pz)
+	var in_glacier: bool = _inside_cavern_mass(px, pz)
 	var reach: float = GLACIER_GALLERY_HALF_W if in_glacier else ROAD_CORRIDOR_RADIUS
 	var flat: float = GLACIER_GALLERY_FLAT_W if in_glacier else 13.0
 	var shelf: float = h
@@ -1417,6 +1457,8 @@ func _apply_road_corridors(h: float, px: float, pz: float) -> float:
 			for s in bucket:
 				if _grade_blocked(_road_ci[s], _road_off[s]):
 					continue
+				# Only the trunk's own corridor cuts the gallery. A route running past the mouth
+				# inside a corridor radius of it would otherwise plane the cliff the mouth is in.
 				if in_glacier and _road_ci[s] != 0:
 					continue
 				var dx: float = px - _road_xz[s].x
@@ -1501,25 +1543,54 @@ func _cavern_nearest(px: float, pz: float) -> Vector2:
 	return Vector2(best_d, best_off)
 
 
-## Height of the glacier the cavern is bored through, returned as (plateau, ridge).
+## Height of the massif the cavern is bored through, above the surrounding icefield.
 ##
-## The plateau is the broad ice mass the whole northern half of the circuit sits on; the ridge
-## is the crest over the passage. Splitting them is what stops the ridge reading as an isolated
-## lump dropped onto a flat plain.
-func _cavern_mass(px: float, pz: float) -> Vector2:
+## An earlier revision cut a *gallery* into the ridge instead - a flat-floored trough with the
+## swept shell as its roof. It worked as geometry and looked wrong from every angle outside: an
+## open trench with a lid, with sky directly above the crown. So the terrain here is now simply
+## solid. The corridor grading switches off completely inside the mass (see
+## _inside_cavern_mass), the shell becomes the interior surface of a tunnel, and the two portal
+## planes are where a 60m face is notched - which is what a cave mouth should be.
+func _cavern_mass(px: float, pz: float) -> float:
 	if _cavern_line.size() < 2:
-		return Vector2.ZERO
+		return 0.0
 	var near: Vector2 = _cavern_nearest(px, pz)
 	var s: float = _cavern_range.x
 	var e: float = _cavern_range.y
-	var perp: float = 1.0 - smoothstep(CAVERN_HALF_SPAN, CAVERN_HALF_SPAN + CAVERN_SPAN_FEATHER, near.x)
-	# Full height right across the portal planes, then a fast ramp down just outside them. A
-	# slow ramp here is what buries the mouths: the terrain would still be climbing where the
-	# tunnel starts, and the shell would end in a hillside.
-	var along: float = smoothstep(s - 44.0, s - 5.0, near.y) * (1.0 - smoothstep(e + 5.0, e + 44.0, near.y))
-	var along_wide: float = smoothstep(s - 190.0, s - 60.0, near.y) * (1.0 - smoothstep(e + 60.0, e + 190.0, near.y))
-	var crest: float = 0.80 + 0.34 * clampf(_ridge_noise.get_noise_2d(px, pz) * 0.5 + 0.5, 0.0, 1.0)
-	return Vector2(15.0 * along_wide * (1.0 - smoothstep(200.0, 330.0, near.x)), CAVERN_RIDGE_HEIGHT * along * perp * crest)
+	# Zero at the portal plane, full height 30m further in. A little inboard of the plane, so the
+	# mouth itself is an opening in the face rather than a fold in the ground.
+	#
+	# The ramp used to start 60m *before* the mouth, which put 45m of rock across the entrance and
+	# the audit still called it "roofed" - it measured rock above the passage and never measured
+	# whether a car could get in. Starting at the plane is what makes it a mouth.
+	var along: float = smoothstep(s + 2.0, s + 30.0, near.y) * (1.0 - smoothstep(e - 30.0, e - 2.0, near.y))
+	if along <= 0.0:
+		return 0.0
+	var perp: float = 1.0 - smoothstep(CAVERN_MASS_HALF_W, CAVERN_MASS_HALF_W + CAVERN_MASS_FEATHER, near.x)
+
+	var rocky: float = clampf(_ridge_noise.get_noise_2d(px, pz) * 0.5 + 0.5, 0.0, 1.0)
+	var crest: float = CAVERN_RIDGE_HEIGHT * (0.80 + 0.34 * rocky)
+	# A summit partway along the span, so the ridge has a peak instead of a constant height.
+	var mid: float = (s + e) * 0.5
+	var peak: float = 1.0 - clampf(absf(near.y - mid) / maxf((e - s) * 0.45, 1.0), 0.0, 1.0)
+	crest += CAVERN_SUMMIT * peak * peak * (0.65 + 0.5 * rocky)
+
+	var massif: float = crest * along * perp
+	# Long ribs down the flanks. Without them a smooth dome reads as a lump of dough rather than
+	# as a mountain, however tall it is.
+	var flute: float = (1.0 - absf(_sastrugi_noise.get_noise_2d(px * 2.6, pz * 0.35) * 2.0 - 1.0)) - 0.55
+	massif += flute * CAVERN_RIDGE_HEIGHT * 0.26 * along * perp * (1.0 - perp * 0.45)
+
+	# Apron tying the base into the icefield over a much longer span than the ridge itself.
+	#
+	# It has to be *ramped in* away from the mouths, not faded out near them. The first version
+	# used smoothstep(18, 60, along - s) as a fade, which evaluates to zero at and before the
+	# portal - so the inverse put the apron at its FULL 17m exactly where the mouth is, and
+	# walled the entrance in. That is the whole reason the mouth needed two attempts.
+	var skirt: float = smoothstep(s - 300.0, s - 120.0, near.y) * (1.0 - smoothstep(e + 120.0, e + 300.0, near.y))
+	var clear_of_mouths: float = smoothstep(s + 4.0, s + 90.0, near.y) * (1.0 - smoothstep(e - 90.0, e - 4.0, near.y))
+	var apron: float = CAVERN_APRON * skirt * clear_of_mouths * (1.0 - smoothstep(150.0, 320.0, near.x))
+	return maxf(massif, 0.0) + apron
 
 
 ## Natural polar ground: a wind-worked icefield, a dead-flat frozen lake on the start straight,
@@ -1544,8 +1615,7 @@ func _icefield_height(px: float, pz: float) -> float:
 	if lake > 0.0:
 		h = lerpf(h, LAKE_SURFACE_Y + _sastrugi_noise.get_noise_2d(px * 2.2, pz * 0.9) * 0.14, lake)
 
-	var mass: Vector2 = _cavern_mass(px, pz)
-	h += mass.x * (1.0 - lake) + mass.y * (1.0 - lake)
+	h += _cavern_mass(px, pz) * (1.0 - lake)
 
 	# Ranges. Suppressed over the lake, so the icefield there really is flat, and held off the
 	# circuit itself so the road never climbs into a cliff.
@@ -1669,6 +1739,134 @@ func _build_icefield(parent: Node, ground_mat: Material) -> void:
 	parent.add_child(body)
 
 
+## Audits the cavern straight off the heightfield that was actually built.
+##
+## The cavern is a gallery cut through a massif, roofed by the swept shell rather than by
+## terrain - a heightfield cannot have a hole in it. So what has to be true is:
+##
+##  - The gallery is clear. Inside the shell's width, the terrain must stay at or below road
+##    level. Anything above the deck there is a wall the car drives into, and that is exactly the
+##    bug that walled this entrance in twice.
+##  - The walls are there. Just outside the gallery's cut there must be solid mass rising well
+##    above the crown, or the shell is a hoop standing on a snowfield.
+##  - Both mouths are notched into that mass rather than opening onto a plain.
+##
+## Note there is deliberately no check for rock overhead. That was one of the two bad audits
+## here: it measured "is there terrain above the passage" and reported PASS on a tunnel whose
+## entrance was a solid 45m wall, because it never measured whether anything could get in.
+func _audit_cavern(heights: PackedFloat32Array, stride: int, res: int,
+		start_x: float, start_z: float, step_x: float, step_z: float) -> void:
+	var z_south: float = maxf(_cavern_portal_z.x, _cavern_portal_z.y)
+	var z_north: float = minf(_cavern_portal_z.x, _cavern_portal_z.y)
+	if _cavern_ys.size() < 2:
+		push_error("Cavern range is empty - cannot audit the cavern")
+		return
+
+	var crown: float = CAVERN_PROFILE[5].y
+	var mouth_margin := 14.0
+	# The massif ramps up over 30m from each portal, so the wall has to be measured well inside
+	# that. Probing 14m in measured the ramp, not the mountain, and reported the walls as absent
+	# while 80m of ice was standing right there.
+	var wall_margin := 46.0
+
+	# Worst thing standing in the driving space, worst wall beside the gallery, cliffs at the
+	# mouths. Each starts at a sentinel and "never updated" has to be distinguishable from
+	# "measured fine", or the check passes without having looked at anything.
+	var obstruction: float = -1e9
+	var obstruction_at := Vector2.ZERO
+	var wall_min: float = 1e9
+	var wall_at := Vector2.ZERO
+	var gallery_cells := 0
+	var wall_cells := 0
+	var ramp_best: float = -1e9
+	var south_best: float = -1e9
+	var north_best: float = -1e9
+
+	for gz in range(res + 1):
+		var pz: float = start_z + float(gz) * step_z
+		var band: int = 0
+		if pz <= z_south - wall_margin and pz >= z_north + wall_margin:
+			band = 1
+		elif pz <= z_south - mouth_margin and pz >= z_north + mouth_margin:
+			band = 4   # the mouth-adjacent apron, where the massif is still rising
+		elif pz <= z_south + step_z * 1.5 and pz > z_south - mouth_margin * 2.0:
+			band = 2
+		elif pz < z_north - step_z * 1.5 and pz >= z_north + mouth_margin * 2.0:
+			band = 3
+		if band == 0:
+			continue
+		for gx in range(res + 1):
+			var px: float = start_x + float(gx) * step_x
+			var lat: float = absf(px)
+			if lat > CAVERN_MASS_HALF_W + 10.0:
+				continue
+			var h: float = heights[gz * stride + gx]
+			var above: float = h - _cavern_deck_at_z(pz)
+
+			if band == 1 and lat <= CAVERN_HALF_WIDTH:
+				gallery_cells += 1
+				if above > obstruction:
+					obstruction = above
+					obstruction_at = Vector2(px, pz)
+			elif band == 4:
+				# Inside the ramp but outside the mouth: the ground here should be climbing, and
+				# if it is still at road level this far in the mouth reads as a cutting, not a
+				# portal. Reported, not fatal - it is a shape judgement, not a collision.
+				if above > ramp_best:
+					ramp_best = above
+			elif band == 1 and lat >= WALL_PROBE_LAT:
+				wall_cells += 1
+				# The LOWEST wall point along the passage: that is what decides whether the shell is
+				# set into a mountain or standing on the snow.
+				#
+				# Measured at a lateral distance clear of the gallery's own falloff. Inside it the
+				# corridor grading is deliberately pulling terrain down toward road level, so a
+				# sample taken at 16m lateral reads the cut and not the mountain - which is how the
+				# first attempt reported the walls as absent while the massif was standing there.
+				if above < wall_min:
+					wall_min = above
+					wall_at = Vector2(px, pz)
+			else:
+				if band == 2 and above > south_best:
+					south_best = above
+				elif band == 3 and above > north_best:
+					north_best = above
+
+	if gallery_cells == 0:
+		push_error("The cavern audit examined no gallery cells - the check passed without looking at anything")
+	elif obstruction <= 0.3:
+		print("  cavern gallery clear: nothing rises more than %.1fm above the road across %d cells under the shell" % [
+			obstruction, gallery_cells])
+	else:
+		push_error("Terrain stands %.1fm above the road inside the cavern at (%.0f, %.0f) - the entrance is walled in and the car cannot get through" % [
+			obstruction, obstruction_at.x, obstruction_at.y])
+
+	if ramp_best > 6.0:
+		print("  massif reaches %.1fm within the apron beyond each mouth" % ramp_best)
+	else:
+		push_error("The ground barely rises beyond the cavern mouths (%.1fm) - the entrances read as cuttings in a plain rather than as portals in a mountain" % ramp_best)
+
+	if wall_cells == 0:
+		push_error("The cavern audit examined no wall cells beside the gallery")
+	elif wall_min >= crown:
+		print("  cavern walls: lowest solid mass beside the gallery is %.1fm above the road, clearing the %.1fm shell crown by %.1fm" % [
+			wall_min, crown, wall_min - crown])
+	else:
+		push_error("The ice beside the cavern is only %.1fm above the road at (%.0f, %.0f) - below the %.1fm shell crown, so the tunnel stands in the open rather than in a mountain" % [
+			wall_min, wall_at.x, wall_at.y, crown])
+
+	for entry in [[south_best, "south"], [north_best, "north"]]:
+		var best: float = entry[0]
+		var label: String = entry[1]
+		if best <= 1e8:
+			continue
+		if best >= 12.0:
+			print("  %s mouth is notched into a %.1fm face" % [label, best])
+		else:
+			push_error("The %s cavern mouth is not in a face - the ice beside it is only %.1fm above the road, so the tunnel opens onto a plain" % [
+				label, best])
+
+
 ## Road height at a world Z on the cavern stretch. The stretch runs due north along X = 0, so the
 ## cached (z, y) profile can be searched directly - no nearest-point query needed.
 func _cavern_deck_at_z(pz: float) -> float:
@@ -1686,87 +1884,6 @@ func _cavern_deck_at_z(pz: float) -> float:
 	return _cavern_ys[0] if pz > _cavern_zs[0] else _cavern_ys[n - 1]
 
 
-## Audits the cavern straight off the heightfield that was actually built.
-##
-## The passage is a gallery cut into the glacier with a swept shell as its roof, so there are
-## exactly three things the terrain has to get right, and all three are measured rather than
-## assumed:
-##
-##  - The gallery floor is clear: nothing inside the shell's own width may stand above the road
-##    deck, or the heightfield pokes up through the carriageway halfway along the passage.
-##  - The ice walls are there: past the narrow gallery reach the terrain has to be a wall, not a
-##    plain. Without them the shell reads as a hoop standing on a snowfield.
-##  - Both mouths are in a cliff rather than on an open apron.
-func _audit_cavern(heights: PackedFloat32Array, stride: int, res: int,
-		start_x: float, start_z: float, step_x: float, step_z: float) -> void:
-	var z_south: float = maxf(_cavern_portal_z.x, _cavern_portal_z.y)
-	var z_north: float = minf(_cavern_portal_z.x, _cavern_portal_z.y)
-	if _cavern_ys.size() < 2:
-		push_error("Cavern range is empty - cannot audit the glacier")
-		return
-
-	var gallery_worst: float = -1e9
-	var gallery_at := Vector2.ZERO
-	var wall_best: float = -1e9
-	var south_best: float = -1e9
-	var north_best: float = -1e9
-	for gz in range(res + 1):
-		var pz: float = start_z + float(gz) * step_z
-		var inside: bool = pz <= z_south + step_z and pz >= z_north - step_z
-		var south_band: bool = pz > z_south + step_z and pz <= z_south + step_z * 3.0
-		var north_band: bool = pz < z_north - step_z and pz >= z_north - step_z * 3.0
-		if not (inside or south_band or north_band):
-			continue
-		for gx in range(res + 1):
-			var px: float = start_x + float(gx) * step_x
-			var h: float = heights[gz * stride + gx]
-			var lat: float = absf(px)
-			var deck_here: float = _cavern_deck_at_z(pz)
-			if lat <= CAVERN_HALF_WIDTH:
-				# Under the shell: this is the gallery floor.
-				if inside and h - deck_here > gallery_worst:
-					gallery_worst = h - deck_here
-					gallery_at = Vector2(px, pz)
-			elif lat <= CAVERN_HALF_SPAN:
-				# Outside the gallery reach: this is glacier, and it is the cavern's walls.
-				if inside:
-					wall_best = maxf(wall_best, h - deck_here)
-				elif south_band:
-					south_best = maxf(south_best, h - deck_here)
-				else:
-					north_best = maxf(north_best, h - deck_here)
-
-	if gallery_worst <= -0.4:
-		print("  cavern gallery clear: floor is at worst %.1fm under the road" % [-gallery_worst])
-	else:
-		push_error("Terrain stands %.1fm above the road deck inside the cavern at (%.0f, %.0f): the gallery is not clear" % [
-			gallery_worst, gallery_at.x, gallery_at.y])
-
-	if wall_best >= 18.0:
-		print("  cavern ice walls %.1fm above the road either side of the gallery" % [wall_best])
-	else:
-		push_error("The ice either side of the cavern only reaches %.1fm above the road - the shell reads as a hoop standing on a snowfield" % [
-			wall_best])
-
-	for entry in [[south_best, "south"], [north_best, "north"]]:
-		var best: float = entry[0]
-		var label: String = entry[1]
-		if best > 1e8:
-			continue
-		if best >= 8.0:
-			print("  %s mouth sits in a %.1fm ice cliff" % [label, best])
-		else:
-			push_error("The %s cavern mouth is not in a cliff - the ice at the portal plane is only %.1fm above the road" % [
-				label, best])
-
-
-# ======================================================================================
-#  Trackside props
-# ======================================================================================
-
-## Smallest horizontal distance from (px, pz) to any carriageway sample, and the distance to
-## the cavern centreline. Both come out of the same neighbourhood scan, because every prop that
-## has to stay off the road needs both numbers.
 func _corridor_distances(px: float, pz: float) -> Vector2:
 	var best := 1e9
 	var cx: int = int(floor(px / ROAD_CELL))
@@ -1969,7 +2086,7 @@ func _build_ice_scatter(parent: Node, ice_mat: Material) -> void:
 			var cx: float = px + rng.randf_range(-cell * 0.48, cell * 0.48)
 			var cz: float = pz + rng.randf_range(-cell * 0.48, cell * 0.48)
 			var dists: Vector2 = _corridor_distances(cx, cz)
-			if dists.x < 15.0 or dists.y < CAVERN_HALF_SPAN + 24.0:
+			if dists.x < 15.0 or dists.y < CAVERN_MASS_HALF_W + 30.0:
 				pz += cell
 				continue
 			var slot: Vector2 = _crevasse_slot(cx, cz)
@@ -2022,7 +2139,7 @@ func _build_ice_scatter(parent: Node, ice_mat: Material) -> void:
 					jx += cos(bearing + spread) * step_len
 					jz += sin(bearing + spread) * step_len
 					var jd: Vector2 = _corridor_distances(jx, jz)
-					if jd.x < 15.0 or jd.y < CAVERN_HALF_SPAN + 24.0:
+					if jd.x < 15.0 or jd.y < CAVERN_MASS_HALF_W + 30.0:
 						continue
 					var jslot: Vector2 = _crevasse_slot(jx, jz)
 					if absf(jslot.x) < 1.0 and jslot.y < 1.3:
@@ -2684,6 +2801,9 @@ func _ready() -> void:
 	sky_mat.set_shader_parameter("moon_dir", -moon.global_transform.basis.z)
 	sky_mat.set_shader_parameter("moon_brightness", 1.0)
 	sky_mat.set_shader_parameter("aurora_intensity", 1.3)
+	# No stars: an aurora at this brightness drowns most of them anyway, and the ones that
+	# survive read as dirt on the lens against the curtains.
+	sky_mat.set_shader_parameter("star_brightness", 0.0)
 
 	# Ambient wind
 	var wind_stream = load("res://sounds/dragon-studio-winter-wind-402331.mp3")
@@ -2857,9 +2977,10 @@ func _ready() -> void:
 
 	var under_mat := ShaderMaterial.new()
 	under_mat.shader = load("res://glacier_ice.gdshader")
-	under_mat.set_shader_parameter("vein_density", 0.18)
-	under_mat.set_shader_parameter("vein_glow", 0.35)
+	under_mat.set_shader_parameter("vein_density", 0.15)
+	under_mat.set_shader_parameter("vein_glow", 0.20)
 	under_mat.set_shader_parameter("frost_line", 8.0)
+	under_mat.set_shader_parameter("normal_strength", 0.22)
 	if rock_tex:
 		under_mat.set_shader_parameter("rock_albedo", rock_tex)
 	if rock_norm:
@@ -2869,11 +2990,10 @@ func _ready() -> void:
 	# source in there.
 	var ice_mat := ShaderMaterial.new()
 	ice_mat.shader = load("res://glacier_ice.gdshader")
-	ice_mat.set_shader_parameter("vein_density", 0.30)
-	ice_mat.set_shader_parameter("vein_glow", 0.55)
+	ice_mat.set_shader_parameter("vein_density", 0.22)
+	ice_mat.set_shader_parameter("vein_glow", 0.30)
 	ice_mat.set_shader_parameter("ice_scale", 0.11)
-	if rock_tex:
-		ice_mat.set_shader_parameter("rock_albedo", rock_tex)
+	ice_mat.set_shader_parameter("normal_strength", 0.32)
 	if rock_norm:
 		ice_mat.set_shader_parameter("ice_normal", rock_norm)
 
@@ -2882,14 +3002,13 @@ func _ready() -> void:
 	# glowing blocks reads as neon scenery rather than as ice catching the aurora.
 	var serac_mat := ShaderMaterial.new()
 	serac_mat.shader = load("res://glacier_ice.gdshader")
-	serac_mat.set_shader_parameter("vein_density", 0.10)
-	serac_mat.set_shader_parameter("vein_glow", 0.12)
+	serac_mat.set_shader_parameter("vein_density", 0.08)
+	serac_mat.set_shader_parameter("vein_glow", 0.06)
 	serac_mat.set_shader_parameter("ice_scale", 0.09)
 	serac_mat.set_shader_parameter("frost_line", 26.0)
-	serac_mat.set_shader_parameter("ice_color", Color(0.60, 0.78, 0.92))
-	serac_mat.set_shader_parameter("deep_color", Color(0.22, 0.44, 0.64))
-	if rock_tex:
-		serac_mat.set_shader_parameter("rock_albedo", rock_tex)
+	serac_mat.set_shader_parameter("ice_color", Color(0.82, 0.91, 0.98))
+	serac_mat.set_shader_parameter("deep_color", Color(0.30, 0.52, 0.70))
+	serac_mat.set_shader_parameter("normal_strength", 0.30)
 	if rock_norm:
 		serac_mat.set_shader_parameter("ice_normal", rock_norm)
 
@@ -2984,7 +3103,7 @@ func _ready() -> void:
 	var cavern_container := Node3D.new()
 	cavern_container.name = "Cavern"
 	level_scene.add_child(cavern_container)
-	_build_cavern(cavern_container, ice_mat, Color(0.34, 0.95, 0.80))
+	_build_cavern(cavern_container, ice_mat, Color(0.62, 0.84, 1.0))
 
 	# 9. Terrain: the icefield has to know where every carriageway runs, so this is built after
 	#    the roads exist and after the crevasse is known.
@@ -3236,10 +3355,10 @@ func _measure_feature_ranges(curve: Curve3D) -> void:
 		_cavern_zs.append(p4.z)
 		_cavern_ys.append(p4.y)
 
-	# The cavern is NOT on this list. Its gallery is cut, like any other road corridor - what makes
-	# it a cavern is the shell's roof over that cut and the ice walls the narrow reach leaves
-	# standing either side of it. Only the crevasse span (open sky underneath) and the frozen lake
-	# (the road is scraped into the ice, not built on it) must be left alone.
+	# The cavern does not need to be on this list: corridor grading switches off over the massif
+	# spatially, in _inside_cavern_mass, so no road sample can reach in and cut a gallery into it.
+	# What is here is the crevasse span (open sky underneath the arch) and the frozen lake (the
+	# road is scraped into the ice, not built on it).
 	_no_grade = {
 		0: _merge_intervals(
 			[_bridge_range if _bridge_range.y > _bridge_range.x else Vector2(-1.0, -1.0)] + spans)
