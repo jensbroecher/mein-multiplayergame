@@ -99,8 +99,8 @@ const ROAD_CELL := 46.0
 ## terrain is not graded there: the corridor would otherwise saw a shallow trough along the
 ## ice. The same ellipse drives the ground shader, so the shoreline can never disagree with
 ## the heightfield about where the water ends.
-const LAKE_CENTER := Vector2(-140.0, 250.0)
-const LAKE_RADIUS := Vector2(152.0, 176.0)
+const LAKE_CENTER := Vector2(-150.0, 250.0)
+const LAKE_RADIUS := Vector2(172.0, 196.0)
 const LAKE_FEATHER := 26.0
 const LAKE_SURFACE_Y := 2.66
 
@@ -356,6 +356,62 @@ func _build_route_curve(split_anchor: Vector3, merge_anchor: Vector3, side: int,
 
 ## Fails the generation if a baked centreline turns tighter than its own deck, which is what
 ## folds a ribbon inside out and makes its surface and banks shimmer.
+## Fails the build if any two non-adjacent parts of the circuit come within a road's width of
+## each other.
+##
+## This is the check the level was missing for three iterations, and it is worth being explicit
+## about why a per-sample sweep missed it: every earlier probe looked for geometry standing *up*
+## off the deck, or it filtered results by collider name and threw away the one thing it was
+## meant to find (the snow banks live inside the road's own StaticBody3D, so a name filter hides
+## them). A crossing is none of those things - both roads are perfectly well-formed, and both are
+## correctly built right on top of each other. The only thing that detects it is comparing the
+## centreline against itself at a distance along the lap, which is what this does.
+##
+## The along-track distance has to wrap. A circuit's offset 0 and its offset (length - 5) are
+## five metres apart on the road and a full lap apart in the parameter; testing only
+## abs(i - j) compares a point with itself across the seam and buries every real overlap under a
+## flood of false positives.
+func _verify_plan(curve: Curve3D, length: float, label: String) -> void:
+	var step := 2.0
+	var n: int = int(length / step)
+	var samples := PackedVector3Array()
+	samples.resize(n)
+	for i in range(n):
+		samples[i] = curve.sample_baked(float(i) * step)
+
+	var min_along := 200.0    # closer than this along the track and it is the same corner
+	var min_across := 26.0    # 15m carriageway + 2.1m bank + shoulder + margin
+	var worst := 1e9
+	var worst_a := 0
+	var worst_b := 0
+	var bad := 0
+	for i in range(n):
+		var a: Vector3 = samples[i]
+		for j in range(i + 1, n):
+			var raw := absi(j - i)
+			# The wrap is the whole point. Offset 0 and offset (length - 5) are five metres apart on
+			# the road and a full lap apart in the parameter; without this line the seam compares a
+			# point with itself and reports a wall of false positives that hide the real overlaps.
+			var along := mini(raw, n - raw)
+			if along * step < min_along:
+				continue
+			var b: Vector3 = samples[j]
+			var d := Vector2(a.x - b.x, a.z - b.z).length()
+			if d < worst:
+				worst = d
+				worst_a = i * int(step)
+				worst_b = j * int(step)
+			if d < min_across:
+				bad += 1
+				if bad <= 8:
+					push_error("%s crosses itself at %.0fm (%.0f, %.0f) and %.0fm (%.0f, %.0f): only %.1fm apart, needs %.0fm" % [
+						label, float(i) * step, a.x, a.z, float(j) * step, b.x, b.z, d, min_across])
+	if bad == 0:
+		print("  %s plan clear: tightest self-approach %.1fm" % [label, worst])
+	else:
+		print("  %s plan has %d overlapping stretches (tightest %.1fm)" % [label, bad, worst])
+
+
 func _verify_min_radius(curve: Curve3D, half_w: float, label: String) -> void:
 	var length: float = curve.get_baked_length()
 	var window: float = 8.0
@@ -503,6 +559,35 @@ func _junction_gap_intervals(route_curve: Curve3D, route_half_w: float, trunk_ha
 	for span in open_spans:
 		padded.append(Vector2(maxf(span.x - 6.0, 0.0), minf(span.y + 6.0, trunk_len)))
 	return _merge_intervals(padded)
+
+
+## A route leaves and rejoins the trunk, so it is *supposed* to touch it - but only at its two
+## noses. Anywhere else the two decks sharing space means a crossing, which is what walls off a
+## junction in a way nothing else in this file would catch.
+func _verify_route_vs_trunk(route: Curve3D, label: String) -> void:
+	var route_len: float = route.get_baked_length()
+	var step := 2.0
+	var trunk_len: float = main_track_curve.get_baked_length()
+	var bad := 0
+	var worst := 1e9
+	var off := route_len * 0.12
+	while off < route_len * 0.88:
+		var p: Vector3 = route.sample_baked(off)
+		var lat: float = absf(_lateral_offset(main_track_curve, p))
+		var ext: Vector2 = _route_deck_extents(lat, ROUTE_HALF_W, MAIN_HALF_W)
+		# The route's deck may reach the trunk edge (that is the gore) but never inside it.
+		var inside: float = MAIN_HALF_W - ext.x
+		if inside > 0.5:
+			bad += 1
+			if bad <= 6:
+				push_error("%s deck reaches %.1fm inside the trunk edge at offset %.0fm" % [label, inside, off])
+		if lat < worst:
+			worst = lat
+		off += step
+	if bad == 0:
+		print("  %s clears the trunk (closest approach %.1fm)" % [label, worst])
+	else:
+		print("  %s overlaps the trunk at %d places" % [label, bad])
 
 
 ## Fails the build if the trunk bank would stand across any route mouth. Cheap insurance: the
@@ -2675,13 +2760,24 @@ func _ready() -> void:
 	# a straight instead of on a hairpin.
 	var track_path := Path3D.new()
 	track_path.name = "TrackPath"
+	#
+	# On plan this is a loop that never touches itself. That is not an aesthetic preference: two
+	# stretches closer than about 26m centre-to-centre put a 15m carriageway and two 2.1m snow banks
+	# in the same space, and the result is a crossing that looks passable from above and is walled
+	# off from the driver's seat. So the plan is checked explicitly by _verify_plan() below.
+	#
+	# Reading it as a shape: the start straight runs south down the east side of the lake, the
+	# circuit goes north through the cavern and out around the shelf, and the way home crosses the
+	# southern ice westward - south of the start straight's own southern end, which is the only
+	# place on the map where that crossing is legal - then climbs the far side of the lake and
+	# hairpins at the north end to join the straight.
 	var curve_pts: Array = [
-		# --- SECTION 0: START / FINISH, frozen lake (heading north) ---
-		Vector3(-112.0, 3.00, 300.0),  # 0  finish line, mid-straight with room for the grid
-		Vector3(-112.0, 2.99, 240.0),  # 1  lake straight
+		# --- SECTION 0: START / FINISH, frozen lake (running south) ---
+		Vector3(-112.0, 3.00, 430.0),  # 0  finish line, with straight road both sides of it
+		Vector3(-112.0, 2.99, 250.0),  # 1  lake straight
 		# --- SECTION 1: lake shore and the Meltwater Cut divergence ---
-		Vector3(-110.0, 2.98, 150.0),  # 2  shoreline
-		Vector3(-100.0, 2.85, 30.0),   # 3  Meltwater Cut splits right
+		Vector3(-110.0, 2.96, 160.0),  # 2  shoreline
+		Vector3(-100.0, 2.85, 40.0),   # 3  Meltwater Cut splits right
 		Vector3(-74.0, 2.75, -34.0),   # 4  shore sweep
 		Vector3(-34.0, 2.65, -78.0),   # 5  cavern apron
 		# --- SECTION 2: THE ICE CAVERN ---
@@ -2697,15 +2793,18 @@ func _ready() -> void:
 		Vector3(214.0, 10.20, -240.0), # 14  crevasse, spanned by the ice arch
 		Vector3(200.0, 10.00, -166.0), # 15
 		Vector3(158.0, 8.20, -108.0),  # 16  shelf exit
-		# --- SECTION 4: serac field and the run home across the lake ---
+		# --- SECTION 4: serac field, and the way home around the south of the lake ---
 		Vector3(104.0, 6.20, -62.0),   # 17
 		Vector3(50.0, 4.40, -30.0),    # 18
-		Vector3(0.0, 3.80, 24.0),      # 19  onto the ice
-		Vector3(-60.0, 3.45, 100.0),   # 20  sweeping west
-		Vector3(-190.0, 3.30, 175.0),  # 21  across the west of the lake
-		Vector3(-235.0, 3.25, 290.0),  # 22  west straight, running south
-		Vector3(-175.0, 3.15, 395.0),  # 23  the far shore, hooking north
-		Vector3(-120.0, 3.04, 372.0),  # 24  swinging onto the main straight
+		Vector3(0.0, 3.85, 20.0),      # 19  back onto the ice
+		Vector3(40.0, 3.70, 120.0),    # 20  turning south, east of the outbound diagonal
+		Vector3(10.0, 3.58, 240.0),    # 21  running back down the middle of the lake
+		Vector3(-30.0, 3.45, 350.0),   # 22  still clear of the start straight
+		Vector3(-10.0, 3.38, 430.0),   # 23  south of the finish line, where the road is open
+		Vector3(20.0, 3.30, 490.0),    # 24  swinging out east, away from the start straight
+		Vector3(-30.0, 3.22, 530.0),   # 25  bottom of the arc
+		Vector3(-90.0, 3.14, 510.0),   # 26  turning back west
+		Vector3(-112.0, 3.06, 470.0),  # 27  onto the line of the start straight, running north
 	]
 
 	# Handles are derived from the geometry rather than hand-picked: see _build_closed_loop.
@@ -2720,6 +2819,7 @@ func _ready() -> void:
 
 	var trunk_len: float = curve.get_baked_length()
 	print("  trunk length %.0fm" % trunk_len)
+	_verify_plan(curve, trunk_len, "trunk")
 
 	# 3. Feature ranges, measured off the curve so they follow it if the layout is retuned.
 	_measure_feature_ranges(curve)
@@ -2817,9 +2917,17 @@ func _ready() -> void:
 	# --- ROUTE 1: Meltwater Cut (splits right, a frozen channel sunk below the icefield) ---
 	var alt1_path := Path3D.new()
 	alt1_path.name = "AlternativePath_MeltwaterCut"
-	var alt1_curve := _build_route_curve(Vector3(-100.0, 2.85, 30.0), Vector3(-10.0, 2.55, -96.0), 1, [
-		Vector3(-56.0, 1.90, -18.0),   # dropping off the shelf into the channel
-		Vector3(-37.0, 1.30, -41.0),   # channel floor, a metre and a bit under the trunk
+	# The waypoints are the trunk's own corners offset to the right by about 30m, so the route
+	# shadows the trunk the whole way instead of trying to cut across it. A route that crosses
+	# the trunk anywhere but its two noses is not a shortcut, it is a second junction - and the
+	# _verify_route_vs_trunk check below fails the build on one.
+	# The waypoints run south in z, the same way the trunk does out of the split. They used to sit
+	# north of the auto-generated entry waypoint, which made the route double back on itself and
+	# fold its own deck - _verify_min_radius caught it at R=6m, which is why the ordering matters
+	# and not just the offsets.
+	var alt1_curve := _build_route_curve(Vector3(-100.0, 2.85, 40.0), Vector3(-17.0, 2.62, -93.0), 1, [
+		Vector3(-62.0, 1.95, 8.0),     # dropping off the shelf into the channel
+		Vector3(-44.0, 1.35, -32.0),    # channel floor, running parallel to the trunk
 	])
 	alt1_path.curve = alt1_curve
 	alt_container.add_child(alt1_path)
@@ -2841,6 +2949,8 @@ func _ready() -> void:
 		if min_lat < MAIN_HALF_W - 0.5:
 			push_error("%s dips to %.2fm from the trunk centreline (needs >= %.2f)" % [entry[2], min_lat, MAIN_HALF_W - 0.5])
 		_verify_min_radius(rc, ROUTE_HALF_W, entry[2])
+		_verify_plan(rc, rc.get_baked_length(), entry[2])
+		_verify_route_vs_trunk(rc, entry[2])
 
 	# 6. Trunk deck and banks
 	#
