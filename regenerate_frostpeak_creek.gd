@@ -402,8 +402,10 @@ func _ready() -> void:
 	# The Canyon Cut shortcut merges onto the trunk road just north of this bridge, so the south
 	# railing is opened over that stretch -- otherwise its collision wall is a kerb across the
 	# junction. The gap is in the bridge's local X, which for yaw 0 is world X about x=0.
+	# It runs all the way to the deck end: stopping it 1m short left a 1m stub of railing
+	# standing on the far side of the opening.
 	_build_detailed_alpine_bridge(level_scene, Vector3(0.0, 4.8, -305.0), 60.0, 17.6,
-		"AlpineTimberBridge", 0.0, true, 5.0, Vector2(17.0, 29.0))
+		"AlpineTimberBridge", 0.0, true, 8.0, Vector2(17.0, 30.0))
 
 	# Baked lengths of the two shortcuts, used below to place their props by fraction rather than
 	# by hard-coded distances so they follow the road when a junction is retuned.
@@ -1064,16 +1066,16 @@ func _build_detailed_alpine_bridge(parent: Node, center: Vector3, length: float,
 		abut.add_child(a_mesh)
 		bridge_root.add_child(abut)
 
-		# Stone Wing Walls flanking the approach. Kept inboard of the deck end: the bridge ends in
-		# mid-air over the creek, so a wall splayed past the end has nothing to retain and just reads
-		# as a slab hanging off the corner.
+		# Stone Wing Walls flanking the approach. Kept fully inboard of the deck end and below
+		# deck height: the bridge ends in mid-air over the creek, so a wall splayed past the end
+		# has nothing to retain and just reads as a slab hanging off the corner.
 		for wing_side in [-1.0, 1.0]:
 			var wing := MeshInstance3D.new()
 			wing.name = "WingWall_" + ("E" if side > 0 else "W") + ("_N" if wing_side < 0 else "_S")
-			wing.mesh = _tapered_box_mesh(Vector3(5.0, 0.0, 2.6), Vector3(3.9, 0.0, 1.7), 6.5)
+			wing.mesh = _tapered_box_mesh(Vector3(4.2, 0.0, 2.2), Vector3(3.4, 0.0, 1.5), 6.0)
 			wing.material_override = stone_mat
-			wing.position = Vector3(side * (length * 0.5 - 3.2), -3.3, wing_side * (width * 0.5 + 1.5))
-			wing.rotation_degrees = Vector3(0, side * wing_side * 22.0, 0)
+			wing.position = Vector3(side * (length * 0.5 - 3.6), -3.0, wing_side * (width * 0.5 + 1.2))
+			wing.rotation_degrees = Vector3(0, side * wing_side * 14.0, 0)
 			bridge_root.add_child(wing)
 
 	# 5. Longitudinal Under-Deck Girders (4 heavy timber stringers)
@@ -1207,6 +1209,28 @@ func _build_detailed_alpine_bridge(parent: Node, center: Vector3, length: float,
 				b2.position = Vector3(mid_x, 1.15, rz)
 				b2.rotation_degrees = Vector3(0, 0, -brace_angle)
 				bridge_root.add_child(b2)
+
+		# Terminal posts where the railing opens: without them the beams just stop mid-bay. Only
+		# added where no regular post already stands within half a spacing.
+		if gap_here:
+			for gx in [rail_gap.x, rail_gap.y]:
+				if gx < -half_len or gx > half_len:
+					continue
+				var covered := false
+				for q_idx in range(post_count + 1):
+					if absf(start_x + q_idx * post_spacing - gx) < post_spacing * 0.5:
+						covered = true
+						break
+				if covered:
+					continue
+				var end_post := MeshInstance3D.new()
+				end_post.name = "Post_" + rail_side_name + "_gap_%d" % int(gx)
+				var ep_m := BoxMesh.new()
+				ep_m.size = Vector3(0.36, 1.55, 0.36)
+				end_post.mesh = ep_m
+				end_post.material_override = timber_mat
+				end_post.position = Vector3(gx, 0.75, rz)
+				bridge_root.add_child(end_post)
 	# 7. Creek Bed Heavy Timber Trestle Bents with Stone Cutwaters
 #
 	# The bent is stacked downward from the deck rather than at fixed offsets: the girders hang
