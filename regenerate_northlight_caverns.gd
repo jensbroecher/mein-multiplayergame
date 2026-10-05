@@ -2204,6 +2204,34 @@ func _build_ice_arches(parent: Node, ice_mat: Material, anchors: Array) -> void:
 				var j: int = (i + 1) % n
 				st.add_index(r0 + i); st.add_index(r0 + j); st.add_index(r1 + j)
 				st.add_index(r0 + i); st.add_index(r1 + j); st.add_index(r1 + i)
+
+		# End caps: the swept tube is open at both z ends, and without them you can see into the
+		# hollow between the inner and outer walls from any angle off straight-on - which reads
+		# as the arch having open sides. The cap is the annulus band itself: one quad per arc
+		# segment joining the inner edge to the matching outer edge, plus the two sole quads at
+		# the springings. (A triangle fan from one vertex would also fill the driving opening,
+		# which is outside the profile loop but inside the fan.)
+		#
+		# Winding is irrelevant here - the ice shader is cull_disabled and every cap vertex gets
+		# an explicit +-Z normal - so only the pairing matters: inner k to outer k.
+		# SurfaceTool cannot be read back, so emitted vertices are counted here for the cap
+		# indices below.
+		var emitted: int = rings * n
+		for end_r in [0, rings - 1]:
+			var nz := Vector3(0.0, 0.0, 1.0 if end_r == rings - 1 else -1.0)
+			var lz: float = lerpf(-along_len * 0.5, along_len * 0.5, float(end_r) / float(rings - 1))
+			for k in range(seg):
+				# Inner arc runs profile[0..seg], outer arc profile[seg+1..2*seg+1]; the outer
+				# index mirrors the inner one because the outer arc was authored back from t=PI
+				# down to 0.
+				for pi in [k, k + 1, n - 2 - k, n - 1 - k]:
+					st.set_normal(nz)
+					st.set_uv(Vector2(0.5, 0.5))
+					st.add_vertex(Vector3(profile[pi].x, profile[pi].y, lz))
+					emitted += 1
+				var cb: int = emitted - 4
+				st.add_index(cb); st.add_index(cb + 1); st.add_index(cb + 2)
+				st.add_index(cb); st.add_index(cb + 2); st.add_index(cb + 3)
 		var arch_mesh: ArrayMesh = _save_baked_resource(st.commit(), "ice_arch_%d" % int(off))
 		var mi := MeshInstance3D.new()
 		mi.name = "ArchMesh"
