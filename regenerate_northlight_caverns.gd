@@ -1164,56 +1164,19 @@ func _build_cavern(parent: Node, ice_mat: Material, vein_light_mat: Color) -> vo
 	props.name = "CavernInterior"
 	parent.add_child(props)
 
+	# No columns and no light shafts. Both were there to make the gallery read as "a cave" and
+	# both made it read as something else: the columns were props against the walls, and the
+	# additive shaft quads read as a flat sheet hanging off the ceiling rather than as light.
+	# The shell, the vein lighting and the portal rings carry it.
+
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 0x4E4C5643  # "NLVC"
-	var columns := Node3D.new()
-	columns.name = "IceColumns"
-	props.add_child(columns)
 
-	var col_mesh := CylinderMesh.new()
-	col_mesh.top_radius = 0.62
-	col_mesh.bottom_radius = 0.42
-	col_mesh.height = 13.0
-	col_mesh.radial_segments = 8
-
-	# Columns hug the wall feet so they frame the passage instead of standing in it. Their radius
-	# matters: the banks carry out to 8.2m and the shell's wall is at 11m, so a fat column would
-	# leave less than a metre of clear road between it and the snowbank.
-	var off: float = start + 12.0
-	var col_i := 0
-	while off < finish - 10.0:
-		var f: Dictionary = _frame_at_offset(main_track_curve, off)
-		for s in [-1.0, 1.0]:
-			if rng.randf() < 0.32:
-				continue
-			var lat: float = 10.35 * s
-			var pos: Vector3 = f["pos"] + f["right"] * lat + Vector3.UP * 4.6
-			var body := StaticBody3D.new()
-			body.name = "IceColumn_%d_%d" % [col_i, int(lat)]
-			body.position = pos
-			body.rotation_degrees = Vector3(rng.randf_range(-5.0, 5.0), 0.0, rng.randf_range(-6.0, 6.0))
-			var mi := MeshInstance3D.new()
-			mi.name = "ColumnMesh"
-			mi.mesh = col_mesh
-			mi.material_override = ice_mat
-			body.add_child(mi)
-			var cs := CollisionShape3D.new()
-			cs.name = "ColumnCollision"
-			var shp := CylinderShape3D.new()
-			shp.radius = 0.7
-			shp.height = 13.0
-			cs.shape = shp
-			body.add_child(cs)
-			columns.add_child(body)
-			col_i += 1
-		off += 17.0
-
-	# Vein lighting. This is the cavern's only real light source, so it is deliberately strong
-	# and deliberately green: the stage is lit by the ice, not by lamps.
+	# Vein lighting, alternating sides down the gallery.
 	var lights := Node3D.new()
 	lights.name = "CavernVeinLights"
 	props.add_child(lights)
-	off = start + 8.0
+	var off: float = start + 8.0
 	var li := 0
 	while off < finish:
 		var f2: Dictionary = _frame_at_offset(main_track_curve, off)
@@ -1230,60 +1193,10 @@ func _build_cavern(parent: Node, ice_mat: Material, vein_light_mat: Color) -> vo
 		off += 26.0
 		li += 1
 
-	# Light shafts hanging off the crown, where the ice above the road is thinnest.
-	_build_light_shafts(props, start + 30.0, finish - 30.0)
-
 	# Block rings around both mouths, so the arch reads as a carved opening in an ice face
 	# rather than as a hole where the terrain happened to stop.
 	_build_portal_ring(props, ice_mat, start, 1.0)
 	_build_portal_ring(props, ice_mat, finish, -1.0)
-
-
-## Additive cone of light hanging from the cavern crown. Unshaded, no shadow, no depth write:
-## it is a suggestion of a shaft, not a real volume.
-func _build_light_shafts(parent: Node, start: float, finish: float) -> void:
-	var shafts := Node3D.new()
-	shafts.name = "LightShafts"
-	parent.add_child(shafts)
-
-	var grad := Gradient.new()
-	grad.colors = PackedColorArray([
-		Color(0.80, 0.93, 1.0, 0.16), Color(0.55, 0.80, 1.0, 0.05), Color(0.4, 0.6, 0.9, 0.0)
-	])
-	var grad_tex := GradientTexture2D.new()
-	grad_tex.gradient = grad
-	grad_tex.width = 16
-	grad_tex.height = 64
-	grad_tex.fill_from = Vector2(0.5, 0.0)
-	grad_tex.fill_to = Vector2(0.5, 1.0)
-
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	mat.albedo_texture = grad_tex
-	mat.albedo_color = Color(0.8, 0.93, 1.0, 1.0)
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mat.no_depth_test = false
-
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 0x53484146
-	var n: int = int((finish - start) / 34.0) + 1
-	for i in range(n):
-		var off: float = start + float(i) * 34.0 + rng.randf_range(-8.0, 8.0)
-		var f: Dictionary = _frame_at_offset(main_track_curve, off)
-		var mi := MeshInstance3D.new()
-		mi.name = "LightShaft_%d" % i
-		var quad := QuadMesh.new()
-		quad.size = Vector2(rng.randf_range(2.4, 4.2), 9.5)
-		mi.mesh = quad
-		mi.material_override = mat
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		# Hanging from the crown, not hanging through the carriageway.
-		mi.position = f["pos"] + Vector3.UP * 11.0 + f["right"] * rng.randf_range(-3.0, 3.0)
-		var yaw: float = rad_to_deg(atan2(-f["fwd"].x, -f["fwd"].z))
-		mi.rotation_degrees = Vector3(0.0, yaw + 90.0, 0.0)
-		shafts.add_child(mi)
 
 
 ## A ring of tilted ice slabs standing against the cliff face around a cavern mouth, plus the
@@ -1994,6 +1907,27 @@ func _serac_library() -> Array:
 	return _serac_lib
 
 
+## Lowest ground under a block of half-width `foot`, rotated by `yaw`, i.e. the height it has to
+## be sunk to before any corner is left hanging.
+##
+## Sampling the centre is not enough on a slope, and the serac field deliberately ends up on the
+## massif flanks, which is where the slope is steepest. The rotation matters too: the instances are
+## yawed, so an axis-aligned corner sample can still miss the corner that is actually in the air.
+func _ground_under_rotated(x: float, z: float, foot: float, yaw: float) -> float:
+	var c := cos(yaw)
+	var s := sin(yaw)
+	var lowest := _graded_height(x, z)
+	for o in [Vector2(foot, foot), Vector2(-foot, foot), Vector2(foot, -foot), Vector2(-foot, -foot)]:
+		lowest = minf(lowest, _graded_height(x + o.x * c - o.y * s, z + o.x * s + o.y * c))
+	return lowest
+
+
+## Ground height with the road corridors applied, which is what a prop standing on the terrain
+## actually sees. The heightfield is built with the same function, so this matches the mesh.
+func _graded_height(x: float, z: float) -> float:
+	return _apply_road_corridors(_icefield_height(x, z), x, z)
+
+
 ## A small library of shared serac shapes, plus one convex collision shape each.
 ##
 ## Sharing matters twice over: 150 instances of seven meshes is seven meshes in memory, and one
@@ -2089,6 +2023,12 @@ func _build_ice_scatter(parent: Node, ice_mat: Material) -> void:
 			if dists.x < 15.0 or dists.y < CAVERN_MASS_HALF_W + 30.0:
 				pz += cell
 				continue
+			# Not on the massif. The flanks are steep enough that a block placed on one reads as
+			# stuck to a cliff at a bad angle rather than as ice standing on the glacier, and the
+			# sampling below cannot sink a block reliably onto a slope this steep.
+			if _cavern_mass(cx, cz) > 6.0:
+				pz += cell
+				continue
 			var slot: Vector2 = _crevasse_slot(cx, cz)
 			if absf(slot.x) < 1.0 and slot.y < 1.3:
 				pz += cell
@@ -2109,6 +2049,8 @@ func _build_ice_scatter(parent: Node, ice_mat: Material) -> void:
 				mi.material_override = mats[rng.randi_range(0, mats.size() - 1)]
 				var fw: float = rng.randf_range(5.0, 15.0)
 				mi.scale = Vector3(fw, rng.randf_range(0.22, 0.5), fw * rng.randf_range(0.5, 0.95))
+				# Same reasoning as the seracs: on the lake plate the surface is flat, but a floe
+				# is wide enough that a single sample still leaves a lip.
 				mi.position = Vector3(cx, LAKE_SURFACE_Y - 0.07, cz)
 				mi.rotation_degrees = Vector3(rng.randf_range(-3.0, 3.0), rng.randf_range(0.0, 360.0), rng.randf_range(-3.0, 3.0))
 				mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -2141,6 +2083,8 @@ func _build_ice_scatter(parent: Node, ice_mat: Material) -> void:
 					var jd: Vector2 = _corridor_distances(jx, jz)
 					if jd.x < 15.0 or jd.y < CAVERN_MASS_HALF_W + 30.0:
 						continue
+					if _cavern_mass(jx, jz) > 6.0:
+						continue
 					var jslot: Vector2 = _crevasse_slot(jx, jz)
 					if absf(jslot.x) < 1.0 and jslot.y < 1.3:
 						continue
@@ -2155,12 +2099,20 @@ func _build_ice_scatter(parent: Node, ice_mat: Material) -> void:
 				mi2.mesh = lib[var_idx]["mesh"]
 				mi2.material_override = mats[var_idx % mats.size()]
 				mi2.scale = Vector3(w, hgt, d)
-				var ground: float = _apply_road_corridors(_icefield_height(jx, jz), jx, jz)
+				# Sit the block on the LOWEST ground under its four corners, not the height at its
+				# centre. On the massif flanks - which is exactly where the field is thickest - a
+				# centre sample is metres above the downhill corner, so the block hangs in the air
+				# with a visible gap under one side.
+				# The block is rotated, so its footprint is not axis-aligned; the corner samples
+				# have to follow the rotation or a steep flank still leaves a corner in the air.
+				var yaw: float = rng.randf_range(0.0, TAU)
+				var foot: float = w * 0.5
+				var ground: float = _ground_under_rotated(jx, jz, foot, yaw)
 				# Sunk well into the snow, or they look dropped on top of it.
-				mi2.position = Vector3(jx, ground + hgt * 0.5 - 2.4, jz)
+				mi2.position = Vector3(jx, ground + hgt * 0.5 - 3.0, jz)
 				mi2.rotation_degrees = Vector3(
 					rng.randf_range(-7.0, 7.0) if standing else rng.randf_range(-20.0, 20.0),
-					rng.randf_range(0.0, 360.0),
+					rad_to_deg(yaw),
 					rng.randf_range(-7.0, 7.0) if standing else rng.randf_range(-20.0, 20.0))
 				bodies.add_child(mi2)
 				var cs2 := CollisionShape3D.new()
@@ -2449,110 +2401,6 @@ func _build_crevasse_lights(parent: Node) -> void:
 		l.omni_range = 52.0
 		l.omni_attenuation = 1.2
 		root.add_child(l)
-
-
-## Builds a trackside jumbotron beside the start/finish straight: a screen on a steel frame
-## showing the race from a chase camera the players never see. The screen is a live render
-## target, so it is deliberately small and refreshed a few times a second (see Jumbotron.gd).
-func _build_jumbotron(parent: Node, anchor: Vector3, yaw_deg: float) -> void:
-	var screen := Node3D.new()
-	screen.name = "Jumbotron"
-	var board_script: Script = load("res://Jumbotron.gd")
-	if board_script:
-		screen.set_script(board_script)
-	# NOTE: added to the tree at the very end of this function, once the broadcast viewport
-	# exists - entering the tree runs Jumbotron._ready(), which looks the viewport up.
-
-	screen.position = anchor
-	screen.rotation.y = deg_to_rad(yaw_deg)
-
-	var steel := StandardMaterial3D.new()
-	steel.albedo_color = Color(0.26, 0.29, 0.34)
-	steel.metallic = 0.85
-	steel.roughness = 0.45
-	var dark_steel := StandardMaterial3D.new()
-	dark_steel.albedo_color = Color(0.14, 0.16, 0.19)
-	dark_steel.metallic = 0.7
-	dark_steel.roughness = 0.55
-
-	var panel_size := Vector2(15.0, 8.44)
-	var panel_height: float = 13.0
-	var tilt: float = deg_to_rad(-7.0)
-
-	# Broadcast viewport. The render target starts armed (UPDATE_ONCE) and the camera is current
-	# from the start, and `own_world_3d` is left alone - it already defaults to inheriting the
-	# parent's World3D, so the board sees the real race rather than a copy.
-	var viewport := SubViewport.new()
-	viewport.name = "BroadcastViewport"
-	viewport.size = Vector2i(320, 180)
-	viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
-	var vp_cam := Camera3D.new()
-	vp_cam.name = "BroadcastCamera"
-	vp_cam.current = true
-	vp_cam.fov = 55.0
-	vp_cam.near = 0.5
-	vp_cam.far = 300.0
-	viewport.add_child(vp_cam)
-	screen.add_child(viewport)
-
-	# The screen face gets its material from Jumbotron.gd at runtime, which binds the viewport's
-	# texture to an albedo.
-	var panel := MeshInstance3D.new()
-	panel.name = "Screen"
-	var quad := QuadMesh.new()
-	quad.size = panel_size
-	panel.mesh = quad
-	panel.position = Vector3(0.0, panel_height, 0.0)
-	panel.rotation.x = tilt
-	screen.add_child(panel)
-
-	var housing := MeshInstance3D.new()
-	housing.name = "Housing"
-	var hb := BoxMesh.new()
-	hb.size = Vector3(panel_size.x + 0.9, panel_size.y + 0.9, 0.8)
-	housing.mesh = hb
-	housing.material_override = dark_steel
-	housing.position = Vector3(0.0, panel_height, -0.55)
-	housing.rotation.x = tilt
-	screen.add_child(housing)
-
-	var frame_top := MeshInstance3D.new()
-	frame_top.name = "FrameTop"
-	var fb := BoxMesh.new()
-	fb.size = Vector3(panel_size.x + 1.6, 0.45, 0.45)
-	frame_top.mesh = fb
-	frame_top.material_override = steel
-	frame_top.position = Vector3(0.0, panel_height + panel_size.y * 0.5 + 0.5, -0.3)
-	screen.add_child(frame_top)
-
-	var frame_bottom := MeshInstance3D.new()
-	frame_bottom.name = "FrameBottom"
-	frame_bottom.mesh = fb
-	frame_bottom.material_override = steel
-	frame_bottom.position = Vector3(0.0, panel_height - panel_size.y * 0.5 - 0.5, -0.3)
-	screen.add_child(frame_bottom)
-
-	var leg_h: float = panel_height - panel_size.y * 0.5 - 0.5
-	for side in [-1.0, 1.0]:
-		var leg := MeshInstance3D.new()
-		leg.name = "Leg_%s" % ("L" if side < 0.0 else "R")
-		var lb := BoxMesh.new()
-		lb.size = Vector3(0.55, leg_h, 0.55)
-		leg.mesh = lb
-		leg.material_override = steel
-		leg.position = Vector3(side * (panel_size.x * 0.5 + 0.55), leg_h * 0.5, -0.3)
-		screen.add_child(leg)
-
-		var brace := MeshInstance3D.new()
-		brace.name = "Brace_%s" % ("L" if side < 0.0 else "R")
-		var bb := BoxMesh.new()
-		bb.size = Vector3(0.3, 0.3, 5.0)
-		brace.mesh = bb
-		brace.material_override = steel
-		brace.position = Vector3(side * (panel_size.x * 0.5 + 0.55), leg_h * 0.35, 2.2)
-		screen.add_child(brace)
-
-	parent.add_child(screen)
 
 
 # ======================================================================================
@@ -3249,12 +3097,8 @@ func _ready() -> void:
 	])
 	_build_junction_pylons(props_container, serac_mat, routes)
 	_build_crevasse_lights(props_container)
-	var board_anchor: Dictionary = _point_on(curve, 0.035 * trunk_len, -26.0, 0.0)
-	var board_pos: Vector3 = board_anchor["pos"]
-	# Stand it on whatever the icefield actually is under it rather than on the road plane, which
-	# is a metre higher on the lake and twenty metres higher on the shelf.
-	board_pos.y = _apply_road_corridors(_icefield_height(board_pos.x, board_pos.z), board_pos.x, board_pos.z)
-	_build_jumbotron(props_container, board_pos, -22.0)
+	# No jumbotron on this stage: it sits on the lake shore, where the lighting is flat and the
+	# board reads as a floating black slab against the snow.
 
 	# 15. Checkpoints & level wiring
 	level_scene.set("track_path", track_path)

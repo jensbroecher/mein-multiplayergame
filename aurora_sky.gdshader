@@ -29,6 +29,33 @@ float hash13(vec3 p) {
 	return fract(q.x * q.y * q.z * (q.x + q.y + q.z));
 }
 
+float vnoise3(vec3 p) {
+	vec3 i = floor(p);
+	vec3 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float n000 = hash13(i);
+	float n100 = hash13(i + vec3(1.0, 0.0, 0.0));
+	float n010 = hash13(i + vec3(0.0, 1.0, 0.0));
+	float n110 = hash13(i + vec3(1.0, 1.0, 0.0));
+	float n001 = hash13(i + vec3(0.0, 0.0, 1.0));
+	float n101 = hash13(i + vec3(1.0, 0.0, 1.0));
+	float n011 = hash13(i + vec3(0.0, 1.0, 1.0));
+	float n111 = hash13(i + vec3(1.0, 1.0, 1.0));
+	return mix(mix(mix(n000, n100, f.x), mix(n010, n110, f.x), f.y),
+			mix(mix(n001, n101, f.x), mix(n011, n111, f.x), f.y), f.z);
+}
+
+float fbm3(vec3 p) {
+	float v = 0.0;
+	float a = 0.5;
+	for (int i = 0; i < 4; i++) {
+		v += a * vnoise3(p);
+		p = p * 2.07 + 11.3;
+		a *= 0.5;
+	}
+	return v;
+}
+
 float hash12(vec2 p) {
 	vec3 q = fract(vec3(p.xyx) * 0.1031);
 	q += dot(q, q.yzx + 33.33);
@@ -75,15 +102,22 @@ float star_field(vec3 d) {
 void sky() {
 	vec3 d = normalize(EYEDIR);
 	float elev = asin(clamp(d.y, -1.0, 1.0));
-	float azim = atan(d.z, d.x);
 
 	// --- Aurora ---------------------------------------------------------------------------
-	// Two curtains at different heights, each a slow travelling wave in azimuth. Their
-	// vertical structure comes from the striation term: without it a gaussian in elevation
-	// reads as a glow around the horizon rather than as a hanging curtain.
-	float az = azim * 2.6;
-	float c1 = aurora_center + 0.085 * sin(az * 0.70 + TIME * 0.050) + 0.050 * sin(az * 1.90 - TIME * 0.031);
-	float c2 = aurora_center - 0.190 + 0.070 * sin(az * 1.10 - TIME * 0.043 + 2.0);
+	// Two curtains at different heights, each a slow travelling wave along the horizon. Their
+	// vertical structure comes from the striation term: without it a gaussian in elevation reads
+	// as a glow around the horizon rather than as a hanging curtain.
+	//
+	// Everything here is sampled on the view DIRECTION `d`, never on an azimuth. atan(d.z, d.x)
+	// wraps from -pi to +pi at one bearing (yaw 90 for a level camera), and every term built on
+	// that angle is discontinuous across it - which is the hard vertical seam that was visible in
+	// the sky. A field sampled on the unit vector has no privileged bearing and so no seam: the
+	// striation noise becomes 3D, and the travelling waves become sin() of the vector's own
+	// components, which wrap with it.
+	vec3 cur = d * 2.6;
+	float c1 = aurora_center + 0.085 * sin(cur.x * 1.3 + cur.z * 0.9 + TIME * 0.050)
+			+ 0.050 * sin(cur.x * 2.1 - cur.z * 1.7 - TIME * 0.031);
+	float c2 = aurora_center - 0.190 + 0.070 * sin(cur.x * 1.1 + cur.y * 0.8 - TIME * 0.043 + 2.0);
 	const float w1 = 0.150;
 	const float w2 = 0.115;
 
@@ -94,11 +128,11 @@ void sky() {
 	float foot1 = smoothstep(0.0, 0.055, elev - (c1 - w1));
 	float foot2 = smoothstep(0.0, 0.045, elev - (c2 - w2));
 
-	float stri1 = 0.40 + 0.80 * fbm(vec2(az * 3.4 + TIME * 0.040, elev * 2.2));
-	float stri2 = 0.40 + 0.80 * fbm(vec2(az * 5.1 - TIME * 0.030 + 9.0, elev * 2.6));
+	float stri1 = 0.40 + 0.80 * fbm3(d * 6.0 + vec3(TIME * 0.030, -TIME * 0.045, 0.0));
+	float stri2 = 0.40 + 0.80 * fbm3(d * 10.5 - vec3(TIME * 0.022, -TIME * 0.033, 0.0) + 9.0);
 	// Slow, very large brightness waves along the curtain: without these the two
 	// curtains read as one continuous band instead of as separate events.
-	float pulse = 0.55 + 0.65 * fbm(vec2(az * 0.85 - TIME * 0.020, 4.7));
+	float pulse = 0.55 + 0.65 * fbm3(d * 2.0 + vec3(-TIME * 0.014, 0.0, TIME * 0.011));
 
 	float veil = (band1 * stri1 * foot1 + band2 * stri2 * foot2) * pulse;
 	veil *= smoothstep(-0.02, 0.10, d.y);
