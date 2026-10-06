@@ -280,10 +280,7 @@ func _ready() -> void:
 	tg.set("terrain_size", Vector2(900.0, 900.0))
 	tg.set("hill_height", 16.0)
 	tg.set("road_width", 15.0)
-	# With no curbs the "outer" width IS the road width. Leaving this at 17 would make the terrain
-	# grading flatten and recess out to 8.5m either side while the road surface stops at 7.5m,
-	# leaving a metre of bare graded shoulder that reads as a very low kerb.
-	tg.set("curb_outer_width", 15.0)
+	tg.set("curb_outer_width", 17.0)
 	tg.set("road_y_offset", 0.06)
 	tg.set("curb_y_offset", 0.06)
 	tg.set("terrain_recession_collision", 0.12)
@@ -307,13 +304,9 @@ func _ready() -> void:
 		snow_mat.uv1_triplanar = true
 	tg.set("grass_material", snow_mat)
 
-	# The whole circuit is cobbled, and kerbless: an alpine village street, not a highway. The two
-	# shortcuts were already cobbled, so this makes the trunk road match them.
-	#
-	# `no_curbs` is set here and only here. It is an opt-in TerrainGenerator flag, so every other
-	# level keeps its curbs and its wider collision slab.
-	tg.set("no_curbs", true)
-	tg.set("road_material", _cobblestone_material())
+	# Alpine mountain circuit: high-contrast dark asphalt tarmac with racing rumble curbs
+	tg.set("no_curbs", false)
+	tg.set("road_material", _alpine_road_material())
 
 	level_scene.add_child(tg)
 	tg.set("track_path", track_path)
@@ -333,11 +326,11 @@ func _ready() -> void:
 	# on curve point 10: that corner swings the trunk through ~50 degrees, so a chord arriving from
 	# the west cannot meet it tangentially and was leaving a 57 degree merge kink.
 	var alt1_curve := _build_ramp_curve(
-		Vector3(53.0, 8.52, -174.0), Vector3(30.0, 5.0, -298.0), -1, [
+		Vector3(53.0, 8.52, -174.0), Vector3(42.0, 5.7, -284.0), -1, [
 			Vector3(45.0, 7.40, -218.0),
 			Vector3(42.0, 6.60, -244.0),
 			Vector3(41.0, 6.00, -258.0),
-		], 22.0)
+		], 20.0, 16.0)
 	alt1_path.curve = alt1_curve
 	alt_container.add_child(alt1_path)
 	_verify_ramp_junction(alt1_curve, RAMP_1_HALF_W, "Canyon Cut shortcut")
@@ -399,13 +392,9 @@ func _ready() -> void:
 		"GladeTimberBridge", glade_yaw, true, 7.6)
 
 	# 5. Alpine Timber Bridge across Creek (Crossing 2: X = -30m to +30m at Z = -305, Y = 4.8m)
-	# The Canyon Cut shortcut merges onto the trunk road just north of this bridge, so the south
-	# railing is opened over that stretch -- otherwise its collision wall is a kerb across the
-	# junction. The gap is in the bridge's local X, which for yaw 0 is world X about x=0.
-	# It runs all the way to the deck end: stopping it 1m short left a 1m stub of railing
-	# standing on the far side of the opening.
+	# Full continuous timber truss railings on both sides of the bridge.
 	_build_detailed_alpine_bridge(level_scene, Vector3(0.0, 4.8, -305.0), 60.0, 17.6,
-		"AlpineTimberBridge", 0.0, true, 8.0, Vector2(17.0, 30.0))
+		"AlpineTimberBridge", 0.0, true, 8.0, Vector2.ZERO)
 
 	# Baked lengths of the two shortcuts, used below to place their props by fraction rather than
 	# by hard-coded distances so they follow the road when a junction is retuned.
@@ -498,11 +487,11 @@ func _ready() -> void:
 	# 6 milestone checkpoints spaced along the 1350m track, avoiding mid-air jump gaps:
 	# CP 1: 130m - Valley floor straight before Jump 1 in-run
 	# CP 2: 330m - East bank climb before branching fork 1
-	# CP 3: 490m - Post-merge approach right before the Alpine Timber Bridge
+	# CP 3: 470m - Post-merge approach on solid ground before Alpine Timber Bridge
 	# CP 4: 700m - Western mountain climb shelf heading South
 	# CP 5: 900m - High summit ridge overlook before Jump 2 approach
 	# CP 6: 1105m - Jump 2 landing terrace before branching fork 2
-	var milestone_offsets = [130.0, 330.0, 490.0, 700.0, 900.0, 1105.0]
+	var milestone_offsets = [130.0, 330.0, 470.0, 700.0, 900.0, 1105.0]
 
 	for i in range(milestone_offsets.size()):
 		var dist_along: float = milestone_offsets[i]
@@ -978,6 +967,7 @@ func _build_detailed_alpine_bridge(parent: Node, center: Vector3, length: float,
 	if wood_rough:
 		wood_mat.roughness_texture = wood_rough
 	wood_mat.roughness = 0.82
+	wood_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	wood_mat.uv1_scale = Vector3(0.35, 0.35, 0.35)
 	wood_mat.uv1_triplanar = true
 
@@ -991,6 +981,7 @@ func _build_detailed_alpine_bridge(parent: Node, center: Vector3, length: float,
 		timber_mat.normal_texture = wood_norm
 		timber_mat.normal_scale = 0.8
 	timber_mat.roughness = 0.88
+	timber_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	timber_mat.uv1_scale = Vector3(0.5, 0.5, 0.5)
 	timber_mat.uv1_triplanar = true
 
@@ -1005,6 +996,7 @@ func _build_detailed_alpine_bridge(parent: Node, center: Vector3, length: float,
 		stone_mat.normal_texture = stone_norm
 		stone_mat.normal_scale = 0.9
 	stone_mat.roughness = 0.90
+	stone_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	stone_mat.uv1_scale = Vector3(0.25, 0.25, 0.25)
 	stone_mat.uv1_triplanar = true
 
@@ -1043,39 +1035,40 @@ func _build_detailed_alpine_bridge(parent: Node, center: Vector3, length: float,
 		curb_inst.position = Vector3(0, 0.16, curb_z)
 		bridge_root.add_child(curb_inst)
 
-	# 4. Massive Stone Shore Abutments (East & West banks, sealing ALL gaps)
+	# 4. Proportional Stone Shore Abutments (embedded into riverbanks)
+	var abut_len: float = 3.2
+	var abut_h: float = 5.2
+	var abut_y: float = -abut_h * 0.5
 	for side in [-1.0, 1.0]:
-		var x_pos = side * (length * 0.5 - 1.5)
+		var x_pos = side * (length * 0.5 - abut_len * 0.5 + 0.4)
 		var abut := StaticBody3D.new()
 		abut.name = "StoneAbutment_" + ("E" if side > 0 else "W")
 		abut.add_to_group("track_surface", true)
-		abut.position = Vector3(x_pos, -4.0, 0)
+		abut.position = Vector3(x_pos, abut_y, 0)
 
 		var a_col := CollisionShape3D.new()
 		var a_shape := BoxShape3D.new()
-		a_shape.size = Vector3(6.5, 7.5, width + 4.0)
+		a_shape.size = Vector3(abut_len, abut_h, width + 0.6)
 		a_col.shape = a_shape
 		abut.add_child(a_col)
 
 		var a_mesh := MeshInstance3D.new()
 		a_mesh.name = "Abutment_Mesh"
 		a_mesh.mesh = _tapered_box_mesh(
-			Vector3(a_shape.size.x + 2.2, 0.0, a_shape.size.z + 2.6),
-			Vector3(a_shape.size.x, 0.0, a_shape.size.z), a_shape.size.y)
+			Vector3(abut_len + 0.8, 0.0, width + 1.2),
+			Vector3(abut_len, 0.0, width + 0.6), abut_h)
 		a_mesh.material_override = stone_mat
 		abut.add_child(a_mesh)
 		bridge_root.add_child(abut)
 
-		# Stone Wing Walls flanking the approach. Kept fully inboard of the deck end and below
-		# deck height: the bridge ends in mid-air over the creek, so a wall splayed past the end
-		# has nothing to retain and just reads as a slab hanging off the corner.
+		# Stone Wing Walls flanking the approach, angled back into the bank embankment
 		for wing_side in [-1.0, 1.0]:
 			var wing := MeshInstance3D.new()
 			wing.name = "WingWall_" + ("E" if side > 0 else "W") + ("_N" if wing_side < 0 else "_S")
-			wing.mesh = _tapered_box_mesh(Vector3(4.2, 0.0, 2.2), Vector3(3.4, 0.0, 1.5), 6.0)
+			wing.mesh = _tapered_box_mesh(Vector3(3.2, 0.0, 0.9), Vector3(2.6, 0.0, 0.7), 4.2)
 			wing.material_override = stone_mat
-			wing.position = Vector3(side * (length * 0.5 - 3.6), -3.0, wing_side * (width * 0.5 + 1.2))
-			wing.rotation_degrees = Vector3(0, side * wing_side * 14.0, 0)
+			wing.position = Vector3(side * (length * 0.5 + 0.8), -2.2, wing_side * (width * 0.5 + 0.5))
+			wing.rotation_degrees = Vector3(0, -side * wing_side * 28.0, 0)
 			bridge_root.add_child(wing)
 
 	# 5. Longitudinal Under-Deck Girders (4 heavy timber stringers)
@@ -1090,16 +1083,11 @@ func _build_detailed_alpine_bridge(parent: Node, center: Vector3, length: float,
 		girder.position = Vector3(0, -0.65, gz)
 		bridge_root.add_child(girder)
 
-# 6. Detailed Alpine Timber Truss Railings (North and South)
-	#
-	# `rail_gap` opens a length of the +Z railing so a road can join the bridge. The guardrail's
-	# collision wall is 1.6m tall and runs the full span, so without a gap a car arriving from the
-	# Canyon Cut shortcut drives straight into it at road level -- a 1.3m kerb across the junction.
-	# The gap is expressed in the bridge's own local X, so it is given in the bridge's frame.
+	# 6. Clean Alpine Timber Truss Railings (North and South)
+	# Spaced across the full span with solid corner posts at deck ends and clean diagonal X-trusses.
 	var rail_z_dist := width * 0.5 - 0.20
-	var post_spacing := 3.6
-	var post_count := int((length - 4.0) / post_spacing)
-	var start_x := - (post_count * post_spacing) * 0.5
+	var num_bays: int = maxi(int(round(length / 3.75)), 2)
+	var bay_w: float = length / float(num_bays)
 	var has_gap: bool = rail_gap.y > rail_gap.x
 	var half_len: float = length * 0.5
 
@@ -1111,8 +1099,8 @@ func _build_detailed_alpine_bridge(parent: Node, center: Vector3, length: float,
 		if gap_here:
 			runs = [Vector2(-half_len, rail_gap.x), Vector2(rail_gap.y, half_len)]
 
-		# In the gap test for posts and braces.
-		var in_gap := func(x: float) -> bool: return gap_here and x > rail_gap.x and x < rail_gap.y
+		var in_gap := func(x: float) -> bool:
+			return gap_here and x > (rail_gap.x + 0.1) and x < (rail_gap.y - 0.1)
 
 		for run_i in range(runs.size()):
 			var run: Vector2 = runs[run_i]
@@ -1137,7 +1125,7 @@ func _build_detailed_alpine_bridge(parent: Node, center: Vector3, length: float,
 			var top_rail := MeshInstance3D.new()
 			top_rail.name = "TopRail_" + rail_side_name + suffix
 			var trm := BoxMesh.new()
-			trm.size = Vector3(run_len, 0.28, 0.40)
+			trm.size = Vector3(run_len, 0.28, 0.38)
 			top_rail.mesh = trm
 			top_rail.material_override = timber_mat
 			top_rail.position = Vector3(run_mid, 1.45, rz)
@@ -1147,18 +1135,17 @@ func _build_detailed_alpine_bridge(parent: Node, center: Vector3, length: float,
 			var mid_rail := MeshInstance3D.new()
 			mid_rail.name = "MidRail_" + rail_side_name + suffix
 			var mrm := BoxMesh.new()
-			mrm.size = Vector3(run_len, 0.22, 0.25)
+			mrm.size = Vector3(run_len, 0.20, 0.22)
 			mid_rail.mesh = mrm
 			mid_rail.material_override = timber_mat
 			mid_rail.position = Vector3(run_mid, 0.85, rz)
 			bridge_root.add_child(mid_rail)
 
 		# Vertical Posts and Diagonal X-Braces
-		for p_idx in range(post_count + 1):
-			var px = start_x + p_idx * post_spacing
+		for p_idx in range(num_bays + 1):
+			var px = -half_len + float(p_idx) * bay_w
 
-			# Transverse floor cross-beam under the deck at each post. These sit below the deck so
-			# they never obstruct the carriageway, and are kept even inside the railing gap.
+			# Transverse floor cross-beam under the deck at each post
 			if side > 0:
 				var floor_beam := MeshInstance3D.new()
 				floor_beam.name = "FloorBent_%d" % p_idx
@@ -1172,23 +1159,24 @@ func _build_detailed_alpine_bridge(parent: Node, center: Vector3, length: float,
 			if in_gap.call(px):
 				continue
 
+			var is_terminal: bool = (p_idx == 0 or p_idx == num_bays)
 			var post := MeshInstance3D.new()
 			post.name = "Post_" + rail_side_name + "_%d" % p_idx
 			var post_m := BoxMesh.new()
-			post_m.size = Vector3(0.36, 1.55, 0.36)
+			post_m.size = Vector3(0.42 if is_terminal else 0.34, 1.60, 0.42 if is_terminal else 0.34)
 			post.mesh = post_m
 			post.material_override = timber_mat
 			post.position = Vector3(px, 0.75, rz)
 			bridge_root.add_child(post)
 
 			# Diagonal X-Bracing between adjacent posts
-			if p_idx < post_count:
-				var next_px = px + post_spacing
+			if p_idx < num_bays:
+				var next_px = px + bay_w
 				var mid_x = (px + next_px) * 0.5
 				if in_gap.call(mid_x):
 					continue
-				var brace_len = sqrt(post_spacing * post_spacing + 0.65 * 0.65)
-				var brace_angle = rad_to_deg(atan2(0.65, post_spacing))
+				var brace_len = sqrt(bay_w * bay_w + 0.70 * 0.70)
+				var brace_angle = rad_to_deg(atan2(0.70, bay_w))
 
 				var b1 := MeshInstance3D.new()
 				b1.name = "XBrace1_" + rail_side_name + "_%d" % p_idx
@@ -1210,140 +1198,181 @@ func _build_detailed_alpine_bridge(parent: Node, center: Vector3, length: float,
 				b2.rotation_degrees = Vector3(0, 0, -brace_angle)
 				bridge_root.add_child(b2)
 
-		# Terminal posts where the railing opens: without them the beams just stop mid-bay. Only
-		# added where no regular post already stands within half a spacing.
-		if gap_here:
-			for gx in [rail_gap.x, rail_gap.y]:
-				if gx < -half_len or gx > half_len:
-					continue
-				var covered := false
-				for q_idx in range(post_count + 1):
-					if absf(start_x + q_idx * post_spacing - gx) < post_spacing * 0.5:
-						covered = true
-						break
-				if covered:
-					continue
+		# Terminal post at the opening (gap start)
+		if gap_here and rail_gap.x > -half_len and rail_gap.x < half_len:
+			var near_post := false
+			for q_idx in range(num_bays + 1):
+				var qx = -half_len + float(q_idx) * bay_w
+				if absf(qx - rail_gap.x) < 0.8:
+					near_post = true
+					break
+			if not near_post:
 				var end_post := MeshInstance3D.new()
-				end_post.name = "Post_" + rail_side_name + "_gap_%d" % int(gx)
+				end_post.name = "Post_" + rail_side_name + "_gap_%d" % int(rail_gap.x)
 				var ep_m := BoxMesh.new()
-				ep_m.size = Vector3(0.36, 1.55, 0.36)
+				ep_m.size = Vector3(0.42, 1.60, 0.42)
 				end_post.mesh = ep_m
 				end_post.material_override = timber_mat
-				end_post.position = Vector3(gx, 0.75, rz)
+				end_post.position = Vector3(rail_gap.x, 0.75, rz)
 				bridge_root.add_child(end_post)
 	# 7. Creek Bed Heavy Timber Trestle Bents with Stone Cutwaters
-#
-	# The bent is stacked downward from the deck rather than at fixed offsets: the girders hang
-	# just under the deck, the cap beam sits under those, the piles bridge the gap between the cap
-	# and the deck, and the stone pier runs from the cap down `pier_depth` into the creek bed. Fixing
-	# those offsets instead assumes one particular deck height, and any taller bridge then has its
-	# piles poking up through the deck and its pier floating above the water.
+	# Open trestle bents with continuous wooden piles extending into the riverbed,
+	# transverse sway X-braces, collar ties, and compact stone footing plinths.
 	const DECK_UNDER := -0.31
-	var cap_h := 0.65
-	var cap_top: float = DECK_UNDER - 0.75
+	var cap_h := 0.60
+	var cap_top: float = DECK_UNDER - 0.70
 	var cap_y: float = cap_top - cap_h * 0.5
-	var pier_top: float = cap_top - cap_h
-	var pier_y: float = pier_top - pier_depth * 0.5
-	var pile_top: float = DECK_UNDER
-	var pile_base: float = cap_top
-	var pile_h: float = pile_top - pile_base
-	var pile_y: float = (pile_top + pile_base) * 0.5
-	var bent_offset: float = length * 0.18
-	for x_bent in [-bent_offset, bent_offset]:
+	var pile_top: float = cap_top - cap_h
+	var pile_bot: float = -pier_depth + 0.8
+	var pile_h: float = pile_top - pile_bot
+	var pile_y: float = (pile_top + pile_bot) * 0.5
+
+	# Bent spacing:
+	# For short bridges (<=35m like Glade Timber Bridge ~24m), use 1 centered bent at x = 0.
+	# For long bridges (>35m like Alpine Timber Bridge 60m), use 2 bents at +/- 13.0m.
+	var bent_xs: Array[float] = []
+	if length > 35.0:
+		bent_xs = [-13.0, 13.0]
+	else:
+		bent_xs = [0.0]
+
+	var num_piles: int = 5 if width >= 15.0 else 4
+
+	for b_idx in range(bent_xs.size()):
+		var x_bent: float = bent_xs[b_idx]
 		var bent_root := Node3D.new()
-		bent_root.name = "TrestleBent_%d" % int(x_bent)
+		bent_root.name = "TrestleBent_%d" % b_idx
 		bent_root.position = Vector3(x_bent, 0, 0)
 
-		# Stone Pier Base / Cutwater in creek bed
-		var stone_pier := StaticBody3D.new()
-		stone_pier.name = "StonePier"
-		stone_pier.position = Vector3(0, pier_y, 0)
-		var sp_col := CollisionShape3D.new()
-		var sp_shape := BoxShape3D.new()
-		sp_shape.size = Vector3(3.2, pier_depth, width - 2.0)
-		sp_col.shape = sp_shape
-		stone_pier.add_child(sp_col)
-
-		var sp_mesh := MeshInstance3D.new()
-		sp_mesh.mesh = _tapered_box_mesh(
-			Vector3(sp_shape.size.x + 1.3, 0.0, sp_shape.size.z + 1.3),
-			Vector3(sp_shape.size.x, 0.0, sp_shape.size.z), sp_shape.size.y)
-		sp_mesh.material_override = stone_mat
-		stone_pier.add_child(sp_mesh)
-
-		# A wider plinth course at the foot of the pier, so it meets the creek bed on a footing
-		# instead of stopping dead at the waterline.
-		var plinth := MeshInstance3D.new()
-		plinth.name = "StonePlinth"
-		plinth.mesh = _tapered_box_mesh(
-			Vector3(sp_shape.size.x + 2.6, 0.0, sp_shape.size.z + 2.6),
-			Vector3(sp_shape.size.x + 1.2, 0.0, sp_shape.size.z + 1.2), 1.1)
-		plinth.material_override = stone_mat
-		plinth.position = Vector3(0, -pier_depth * 0.5 + 0.55, 0)
-		stone_pier.add_child(plinth)
-		bent_root.add_child(stone_pier)
-
-		# 4 Battered Timber Piles
-		for pile_idx in range(4):
-			var pile_z = - (width - 4.0) * 0.5 + pile_idx * ((width - 4.0) / 3.0)
-			var pile := MeshInstance3D.new()
-			pile.name = "Pile_%d" % pile_idx
-			var pile_h2: float = maxf(pile_h, 0.4)
-			pile.mesh = _tapered_box_mesh(Vector3(0.62, 0.0, 0.62), Vector3(0.46, 0.0, 0.46), pile_h2)
-			pile.material_override = timber_mat
-			pile.position = Vector3(0, pile_y, pile_z)
-			bent_root.add_child(pile)
-
-		# Transverse Cap Beam
+		# Transverse Cap Beam under stringers
 		var cap_beam := MeshInstance3D.new()
 		cap_beam.name = "CapBeam"
 		var cbm := BoxMesh.new()
-		cbm.size = Vector3(1.2, cap_h, width - 1.0)
+		cbm.size = Vector3(0.65, cap_h, width - 0.4)
 		cap_beam.mesh = cbm
 		cap_beam.material_override = timber_mat
 		cap_beam.position = Vector3(0, cap_y, 0)
 		bent_root.add_child(cap_beam)
 
+		# Horizontal Collar Ties (mid-height and lower ties)
+		for tie_frac in [0.45, 0.82]:
+			var tie_y: float = lerpf(pile_top, pile_bot, tie_frac)
+			var tie := MeshInstance3D.new()
+			tie.name = "CollarTie_%.0f" % (tie_frac * 100.0)
+			var tm := BoxMesh.new()
+			tm.size = Vector3(0.30, 0.32, width - 0.8)
+			tie.mesh = tm
+			tie.material_override = timber_mat
+			tie.position = Vector3(0, tie_y, 0)
+			bent_root.add_child(tie)
+
+		# Timber Piles & Riverbed Stone Footing Plinths
+		var pile_span: float = width - 2.4
+		var pile_step: float = pile_span / float(num_piles - 1)
+		for p_i in range(num_piles):
+			var pile_z: float = -pile_span * 0.5 + float(p_i) * pile_step
+
+			# Timber Pile running down to riverbed
+			var pile := MeshInstance3D.new()
+			pile.name = "Pile_%d" % p_i
+			pile.mesh = _tapered_box_mesh(
+				Vector3(0.48, 0.0, 0.48),
+				Vector3(0.38, 0.0, 0.38),
+				pile_h)
+			pile.material_override = timber_mat
+			pile.position = Vector3(0, pile_y, pile_z)
+			bent_root.add_child(pile)
+
+			# Individual Stone Footing Plinth / Cutwater in riverbed
+			var plinth := MeshInstance3D.new()
+			plinth.name = "Plinth_%d" % p_i
+			plinth.mesh = _tapered_box_mesh(
+				Vector3(1.10, 0.0, 1.10),
+				Vector3(0.85, 0.0, 0.85),
+				1.2)
+			plinth.material_override = stone_mat
+			plinth.position = Vector3(0, pile_bot - 0.4, pile_z)
+			bent_root.add_child(plinth)
+
+		# Transverse Sway Bracing (X-bracing between piles in the bent plane)
+		for p_i in range(num_piles - 1):
+			var z1: float = -pile_span * 0.5 + float(p_i) * pile_step
+			var z2: float = z1 + pile_step
+			var z_mid: float = (z1 + z2) * 0.5
+			var dz: float = z2 - z1
+			var dy: float = pile_h * 0.65
+			var brace_len: float = sqrt(dz * dz + dy * dy)
+			var brace_ang: float = rad_to_deg(atan2(dy, dz))
+
+			for k in 2:
+				var sway := MeshInstance3D.new()
+				sway.name = "SwayBrace_%d_%d" % [p_i, k]
+				var sm := BoxMesh.new()
+				sm.size = Vector3(0.18, 0.18, brace_len)
+				sway.mesh = sm
+				sway.material_override = timber_mat
+				sway.position = Vector3(0.22 if k == 0 else -0.22, pile_y + 0.3, z_mid)
+				sway.rotation_degrees = Vector3(brace_ang if k == 0 else -brace_ang, 0, 0)
+				bent_root.add_child(sway)
+
+		# Collision shape for the bent base to prevent carts getting wedged
+		var bent_col_body := StaticBody3D.new()
+		bent_col_body.name = "BentCollision"
+		bent_col_body.position = Vector3(0, pile_y, 0)
+		var b_col := CollisionShape3D.new()
+		var b_shape := BoxShape3D.new()
+		b_shape.size = Vector3(1.2, pile_h + 1.2, width - 1.2)
+		b_col.shape = b_shape
+		bent_col_body.add_child(b_col)
+		bent_root.add_child(bent_col_body)
+
 		bridge_root.add_child(bent_root)
 
-	# 8. Longitudinal bracing between the two trestle bents. Without it the bents read as two
-	# unrelated posts standing under the deck rather than as one trestle.
-	if length > 12.0:
-		var span_x := bent_offset * 2.0
-		var brace_dz := sqrt(span_x * span_x + 2.6 * 2.6)
-		var brace_ang := rad_to_deg(atan2(2.6, span_x))
+	# 8. Longitudinal Timber Girts & Bracing between Trestle Bents (multi-bent bridges only)
+	if bent_xs.size() >= 2:
+		var span_x: float = bent_xs[1] - bent_xs[0]
 		for z_side in [-1.0, 1.0]:
-			var bz: float = z_side * (width * 0.5 - 1.6)
+			var bz: float = z_side * (width * 0.5 - 1.2)
 			var z_name := "N" if z_side < 0 else "S"
+
+			# Horizontal longitudinal girt tying bents together
+			var girt := MeshInstance3D.new()
+			girt.name = "TrestleGirt_%s" % z_name
+			var gm := BoxMesh.new()
+			gm.size = Vector3(span_x, 0.30, 0.30)
+			girt.mesh = gm
+			girt.material_override = timber_mat
+			girt.position = Vector3((bent_xs[0] + bent_xs[1]) * 0.5, pile_y + 0.5, bz)
+			bridge_root.add_child(girt)
+
+			# Diagonal longitudinal sway brace
+			var dy_brace: float = pile_h * 0.55
+			var brace_len: float = sqrt(span_x * span_x + dy_brace * dy_brace)
+			var brace_ang: float = rad_to_deg(atan2(dy_brace, span_x))
 			for k in 2:
-				var diag := MeshInstance3D.new()
-				diag.name = "TrestleBrace_%s_%d" % [z_name, k]
-				var dmb := BoxMesh.new()
-				dmb.size = Vector3(brace_dz, 0.28, 0.28)
-				diag.mesh = dmb
-				diag.material_override = timber_mat
-				diag.position = Vector3(0, -1.9, bz)
-				diag.rotation_degrees = Vector3(0, 0, brace_ang if k == 0 else -brace_ang)
-				bridge_root.add_child(diag)
+				var lbrace := MeshInstance3D.new()
+				lbrace.name = "TrestleBrace_%s_%d" % [z_name, k]
+				var lbm := BoxMesh.new()
+				lbm.size = Vector3(brace_len, 0.20, 0.20)
+				lbrace.mesh = lbm
+				lbrace.material_override = timber_mat
+				lbrace.position = Vector3((bent_xs[0] + bent_xs[1]) * 0.5, pile_y + 0.5, bz)
+				lbrace.rotation_degrees = Vector3(0, 0, brace_ang if k == 0 else -brace_ang)
+				bridge_root.add_child(lbrace)
 
 	if winter_dressing:
-		_dress_bridge_for_winter(bridge_root, length, width, timber_mat, post_count, post_spacing,
-			start_x, rail_gap)
+		_dress_bridge_for_winter(bridge_root, length, width, timber_mat, rail_gap)
 
 	parent.add_child(bridge_root)
 
 
-## Packs a timber truss bridge out with winter detail: snow lying on every up-facing member,
-## icicles hanging off the deck edge and handrails, wind-packed drifts banked against the
-## abutments, and close-set balusters so the railing reads as a truss rather than a fence.
+## Packs a timber truss bridge out with winter detail: snow lying on wheel guards and handrails,
+## icicles hanging off the deck edge, and snow coping on the stone abutments.
 ##
-## `rail_gap` mirrors the railing opening, so no snow cap, baluster or icicle is left floating
+## `rail_gap` mirrors the railing opening, so no snow cap or icicle is left floating
 ## across a stretch of railing that is not there.
-##
-## Snow uses the same triplanar alpine shader as the Glacier Highway massif, so it picks up the
-## stage's rock and drift breakup at the same scale instead of reading as clean white plastic.
 func _dress_bridge_for_winter(bridge_root: Node3D, length: float, width: float, timber_mat: Material,
-		post_count: int, post_spacing: float, start_x: float, rail_gap: Vector2) -> void:
+		rail_gap: Vector2) -> void:
 	var snow := _alpine_snow_material(1.10, 1.16, 1.28)
 
 	var curb_h := 0.32
@@ -1388,21 +1417,6 @@ func _dress_bridge_for_winter(bridge_root: Node3D, length: float, width: float, 
 
 		var in_gap := func(x: float) -> bool: return has_gap and side > 0.0 and x > rail_gap.x and x < rail_gap.y
 
-		# Close-set balusters between the main posts, so the railing has a truss rhythm.
-		for p_idx in range(post_count):
-			for b in 2:
-				var bx := start_x + (p_idx + 0.34 + 0.32 * float(b)) * post_spacing
-				if in_gap.call(bx):
-					continue
-				var baluster := MeshInstance3D.new()
-				baluster.name = "Baluster_%s_%d_%d" % [rail_side_name, p_idx, b]
-				var bsm := BoxMesh.new()
-				bsm.size = Vector3(0.16, 1.45, 0.16)
-				baluster.mesh = bsm
-				baluster.material_override = timber_mat
-				baluster.position = Vector3(bx, 0.72, side * rail_z_dist)
-				bridge_root.add_child(baluster)
-
 		# Icicles along the underside of the deck edge, thinning out along the span.
 		var icicle_count := int(length / 1.8)
 		for i in range(icicle_count):
@@ -1425,16 +1439,17 @@ func _dress_bridge_for_winter(bridge_root: Node3D, length: float, width: float, 
 	# which is where the pale floating slabs at the bridge ends came from. The winter read comes
 	# from the snow lying on the wheel guards and handrails, plus the coping on the abutments.
 	#
-	# Snow on the stone abutment copings.
+	# Snow on the outboard stone abutment copings.
 	for side in [-1.0, 1.0]:
-		var coping := MeshInstance3D.new()
-		coping.name = "SnowCap_Abutment_" + ("E" if side > 0 else "W")
-		var cm := BoxMesh.new()
-		cm.size = Vector3(6.5, 0.16, width + 4.0)
-		coping.mesh = cm
-		coping.material_override = snow
-		coping.position = Vector3(side * (length * 0.5 - 1.5), -0.28, 0.0)
-		bridge_root.add_child(coping)
+		for wing_side in [-1.0, 1.0]:
+			var coping := MeshInstance3D.new()
+			coping.name = "SnowCap_Abutment_" + ("E" if side > 0 else "W") + ("_N" if wing_side < 0 else "_S")
+			var cm := BoxMesh.new()
+			cm.size = Vector3(2.6, 0.14, 0.70)
+			coping.mesh = cm
+			coping.material_override = snow
+			coping.position = Vector3(side * (length * 0.5 - 1.2), 0.05, wing_side * (width * 0.5 + 0.15))
+			bridge_root.add_child(coping)
 
 
 ## A box tapered from `bottom` to `top` (X/Z sizes) over `height`, centred on the origin in X/Z and
@@ -1527,40 +1542,41 @@ func _alpine_snow_material(snow_bias: float = 1.0, tint_r: float = 0.92, tint_g:
 	return mat
 
 
-## The cobbled surface material, shared by the trunk road and both shortcuts so the whole stage
-## reads as one continuous street rather than tarmac with cobbled side roads.
-func _cobblestone_material() -> StandardMaterial3D:
+## High quality alpine asphalt material for the main circuit and shortcut routes.
+## Replaces the high-frequency cobblestone pattern with clean mountain asphalt,
+## eliminating moiré aliasing while preserving natural road roughness and grip.
+func _alpine_road_material() -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
-	var albedo: Texture2D = load("res://materials/cobblestone.png") as Texture2D
-	var normal_tex: Texture2D = load("res://materials/cobblestone_normal.png") as Texture2D
-	var rough_tex: Texture2D = load("res://materials/cobblestone_roughness.png") as Texture2D
+	var albedo: Texture2D = load("res://materials/asphalt.png") as Texture2D
+	var normal_tex: Texture2D = load("res://materials/concrete_normal.png") as Texture2D
 	if albedo:
 		m.albedo_texture = albedo
+		m.albedo_color = Color(0.88, 0.90, 0.93)
 	if normal_tex:
 		m.normal_enabled = true
 		m.normal_texture = normal_tex
-		m.normal_scale = 1.0
-	if rough_tex:
-		m.roughness_texture = rough_tex
-	m.roughness = 0.85
+		m.normal_scale = 0.45
+	m.roughness = 0.80
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	m.uv1_scale = Vector3(0.18, 0.18, 0.18)
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
 	return m
 
 
-## Builds the cobblestone shortcut deck, its curbs, its rock embankment and collision.
+func _cobblestone_material() -> StandardMaterial3D:
+	return _alpine_road_material()
+
+
+## Builds the shortcut road deck, its curbs, its rock embankment and collision.
 ##
-## `half_width` is the FULL gore-clear width. The deck actually tapers to zero at both junctions
-## and reaches full width only once the centreline has pulled a half width clear of the trunk deck
-## edge (see _ramp_deck_extents), so the two decks tile instead of overlapping.
+## `half_width` is the FULL road half width.
+## The deck smoothly blends to the trunk road edge only within the junction zones
+## (first 14m and last 14m). Outside of junctions, it is strictly symmetrical with
+## constant half_width to prevent cross-section inversion or inverted geometry.
 ##
 ## `skip_span` is a (start, end) range of metres along the curve to leave empty, used where a
-## bridge takes over the crossing: the deck and embankment have to stop at the abutments or they
-## run straight through the middle of the bridge and wall off the ravine below it.
-##
-## Rings inside `skip_span` emit no vertices at all, so the stitch loops cannot assume ring `i`
-## starts at vertex `i * DECK_VERTS`. They index through `ring_base` instead, which records where
-## each ring's vertices actually landed (-1 for a skipped ring). Assuming the fixed stride instead
-## shifts every ring after the first gap onto the wrong vertices and leaves a hole metres long.
+## bridge takes over the crossing: the deck and embankment stop at the abutments so they
+## never run through the middle of the bridge or wall off the ravine below it.
 func _build_cobblestone_road(parent: Node, curve: Curve3D, half_width: float, node_name: String,
 		skip_span: Vector2 = Vector2.ZERO) -> void:
 	var baked = curve.get_baked_points()
@@ -1571,10 +1587,10 @@ func _build_cobblestone_road(parent: Node, curve: Curve3D, half_width: float, no
 	var curb_w: float = 0.5
 	var max_curb_h: float = 0.22
 	var deck_crown: float = 0.08
-	var max_wall_drop: float = 9.0
+	var max_wall_drop: float = 3.2
 	var gap: bool = skip_span.y > skip_span.x
 
-	var cobble_mat := _cobblestone_material()
+	var road_mat := _alpine_road_material()
 
 	# 2. Retaining Wall / Embankment Material (Alpine dark canyon rock)
 	var wall_mat := StandardMaterial3D.new()
@@ -1589,6 +1605,7 @@ func _build_cobblestone_road(parent: Node, curve: Curve3D, half_width: float, no
 	wall_mat.roughness = 0.90
 	wall_mat.uv1_scale = Vector3(0.25, 0.25, 0.25)
 	wall_mat.uv1_triplanar = true
+	wall_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	wall_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 
 	var st_deck := SurfaceTool.new()
@@ -1622,27 +1639,6 @@ func _build_cobblestone_road(parent: Node, curve: Curve3D, half_width: float, no
 		if i > 0:
 			cum_dist += p.distance_to(baked[i - 1])
 
-		# Deck width comes from _ramp_deck_extents(): at the junction nose it is a one-sided apron
-		# reaching out from the trunk carriageway, and it becomes a full-width road once the route is
-		# a half width clear of the trunk.
-		#
-		# The cross-section is laid out from two offsets relative to the route's own centreline `p`,
-		# NOT from a single half-width. Near the nose the deck is deliberately lopsided, and laying
-		# it out symmetrically would put the outer lip a couple of metres short of where it has to
-		# be -- which is exactly where the trunk road's edge is, so the car still rolls off it.
-		var trunk_frame := _frame_at(main_track_curve, p)
-		var lat: float = trunk_frame["lat"]
-		var d: float = absf(lat)
-		var ext: Vector2 = _ramp_deck_extents(lat, half_width)
-		# Both edges are signed by which side of the trunk this route runs. `lat` is negative on a
-		# left-hand junction, and `p + right * positive` moves *toward* the trunk centreline there --
-		# so without this the gore apron grows inward across the carriageway instead of outward.
-		var sgn: float = signf(lat)
-		if is_zero_approx(sgn):
-			sgn = 1.0
-		var outer: float = sgn * (ext.y - d)   # away from the trunk
-		var inner: float = sgn * (ext.x - d)   # back toward the trunk
-
 		gap_of.append(1 if (gap and cum_dist > skip_span.x and cum_dist < skip_span.y) else 0)
 		if gap_of[i] == 1:
 			ring_base.append(-1)
@@ -1651,14 +1647,63 @@ func _build_cobblestone_road(parent: Node, curve: Curve3D, half_width: float, no
 		ring_base.append(deck_verts)
 		wall_base.append(wall_verts)
 
-		# Taper curbs and embankment smoothly at junctions with main track (first and last 8 meters)
-		var taper_in: float = clampf(cum_dist / 8.0, 0.0, 1.0)
-		var taper_out: float = clampf((total_len - cum_dist) / 8.0, 0.0, 1.0)
-		var taper: float = minf(taper_in, taper_out)
+		# Junction gore apron is strictly confined to the first 14m and last 14m of the shortcut curve.
+		# Outside the junction zone, the shortcut is a clean, symmetric road of width 2 * half_width.
+		var outer: float = half_width
+		var inner: float = -half_width
 
-		# Quadratic ease-in so at the junction it is completely flat (0.0 curb, 0.0 drop)
-		var curb_h: float = max_curb_h * (taper * taper)
-		var wall_drop: float = max_wall_drop * (taper * taper)
+		if cum_dist < 14.0:
+			var trunk_frame := _frame_at(main_track_curve, p)
+			var lat: float = trunk_frame["lat"]
+			var d: float = absf(lat)
+			var ext: Vector2 = _ramp_deck_extents(lat, half_width)
+			var sgn: float = signf(lat)
+			if is_zero_approx(sgn):
+				sgn = 1.0
+			var blend: float = clampf(cum_dist / 14.0, 0.0, 1.0)
+			if sgn > 0.0:
+				outer = lerpf(ext.y - d, half_width, blend)
+				inner = lerpf(ext.x - d, -half_width, blend)
+			else:
+				outer = lerpf(-(ext.x - d), half_width, blend)
+				inner = lerpf(-(ext.y - d), -half_width, blend)
+		elif (total_len - cum_dist) < 14.0:
+			var trunk_frame := _frame_at(main_track_curve, p)
+			var lat: float = trunk_frame["lat"]
+			var d: float = absf(lat)
+			var ext: Vector2 = _ramp_deck_extents(lat, half_width)
+			var sgn: float = signf(lat)
+			if is_zero_approx(sgn):
+				sgn = 1.0
+			var blend_end: float = clampf((total_len - cum_dist) / 14.0, 0.0, 1.0)
+			if sgn > 0.0:
+				outer = lerpf(ext.y - d, half_width, blend_end)
+				inner = lerpf(ext.x - d, -half_width, blend_end)
+			else:
+				outer = lerpf(-(ext.x - d), half_width, blend_end)
+				inner = lerpf(-(ext.y - d), -half_width, blend_end)
+
+		if outer < inner:
+			var tmp := outer
+			outer = inner
+			inner = tmp
+
+		# Taper curbs and embankment smoothly at junctions with main track
+		var junc_dist: float = minf(cum_dist, total_len - cum_dist)
+		var junc_taper: float = clampf(junc_dist / 10.0, 0.0, 1.0)
+		var outer_curb_h: float = max_curb_h * (junc_taper * junc_taper)
+		# Inner edge meets main track carriageway: suppress curb completely near junctions so road merges flush
+		var inner_curb_h: float = max_curb_h * clampf((junc_dist - 10.0) / 6.0, 0.0, 1.0)
+
+		# Taper embankment drop smoothly towards bridge abutments so walls meet the stone foundation flush
+		var bridge_taper: float = 1.0
+		if gap:
+			if cum_dist <= skip_span.x:
+				bridge_taper = clampf((skip_span.x - cum_dist) / 6.0, 0.0, 1.0)
+			elif cum_dist >= skip_span.y:
+				bridge_taper = clampf((cum_dist - skip_span.y) / 6.0, 0.0, 1.0)
+		var total_wall_taper: float = minf(junc_taper * junc_taper, bridge_taper)
+		var wall_drop: float = max_wall_drop * total_wall_taper
 
 		var uv_y: float = cum_dist * 0.40
 		var outer_gut: float = outer - curb_w
@@ -1667,40 +1712,40 @@ func _build_cobblestone_road(parent: Node, curve: Curve3D, half_width: float, no
 		# --- DECK MESH VERTICES (7 points across road) ---
 		# 0: Outer Curb Outer Lip
 		st_deck.set_uv(Vector2(0.0, uv_y))
-		st_deck.add_vertex(p + right * outer + up * (0.05 + curb_h))
+		st_deck.add_vertex(p + right * outer + up * (0.05 + outer_curb_h))
 		# 1: Outer Curb Inner Lip
 		st_deck.set_uv(Vector2(0.3, uv_y))
-		st_deck.add_vertex(p + right * outer_gut + up * (0.05 + curb_h))
+		st_deck.add_vertex(p + right * outer_gut + up * (0.05 + outer_curb_h))
 		# 2: Outer Deck Gutter
 		st_deck.set_uv(Vector2(0.4, uv_y))
 		st_deck.add_vertex(p + right * outer_gut + up * 0.05)
 		# 3: Center Deck Crown
 		st_deck.set_uv(Vector2(2.5, uv_y))
-		st_deck.add_vertex(p + up * (0.05 + deck_crown * taper))
+		st_deck.add_vertex(p + up * (0.05 + deck_crown * junc_taper))
 		# 4: Inner Deck Gutter
 		st_deck.set_uv(Vector2(4.6, uv_y))
 		st_deck.add_vertex(p + right * inner_gut + up * 0.05)
 		# 5: Inner Curb Inner Lip
 		st_deck.set_uv(Vector2(4.7, uv_y))
-		st_deck.add_vertex(p + right * inner_gut + up * (0.05 + curb_h))
+		st_deck.add_vertex(p + right * inner_gut + up * (0.05 + inner_curb_h))
 		# 6: Inner Curb Outer Lip
 		st_deck.set_uv(Vector2(5.0, uv_y))
-		st_deck.add_vertex(p + right * inner + up * (0.05 + curb_h))
+		st_deck.add_vertex(p + right * inner + up * (0.05 + inner_curb_h))
 
 		# --- WALL MESH VERTICES (4 points: outer base/top, inner top/base) ---
 		var wall_uv_y: float = cum_dist * 0.25
 		# 0: Outer Embankment Base
 		st_wall.set_uv(Vector2(0.0, wall_uv_y))
-		st_wall.add_vertex(p + right * (outer + 0.35 * taper) - up * wall_drop)
+		st_wall.add_vertex(p + right * (outer + 0.35 * total_wall_taper) - up * wall_drop)
 		# 1: Outer Embankment Top
 		st_wall.set_uv(Vector2(1.0, wall_uv_y))
-		st_wall.add_vertex(p + right * outer + up * (0.05 + curb_h))
+		st_wall.add_vertex(p + right * outer + up * (0.05 + outer_curb_h))
 		# 2: Inner Embankment Top
 		st_wall.set_uv(Vector2(1.0, wall_uv_y))
-		st_wall.add_vertex(p + right * inner + up * (0.05 + curb_h))
+		st_wall.add_vertex(p + right * inner + up * (0.05 + inner_curb_h))
 		# 3: Inner Embankment Base
 		st_wall.set_uv(Vector2(0.0, wall_uv_y))
-		st_wall.add_vertex(p + right * (inner - 0.35 * taper) - up * wall_drop)
+		st_wall.add_vertex(p + right * (inner - 0.35 * total_wall_taper) - up * wall_drop)
 
 		deck_verts += DECK_VERTS
 		wall_verts += WALL_VERTS
@@ -1725,16 +1770,16 @@ func _build_cobblestone_road(parent: Node, curve: Curve3D, half_width: float, no
 			continue
 		var w0: int = wall_base[i]
 		var w1: int = wall_base[i + 1]
-		# Left Wall
-		var lb0 = w0 + 0; var lt0 = w0 + 1
-		var lb1 = w1 + 0; var lt1 = w1 + 1
-		st_wall.add_index(lb0); st_wall.add_index(lt0); st_wall.add_index(lb1)
-		st_wall.add_index(lt0); st_wall.add_index(lt1); st_wall.add_index(lb1)
-		# Right Wall
-		var rt0 = w0 + 2; var rb0 = w0 + 3
-		var rt1 = w1 + 2; var rb1 = w1 + 3
-		st_wall.add_index(rt0); st_wall.add_index(rb0); st_wall.add_index(rt1)
-		st_wall.add_index(rb0); st_wall.add_index(rb1); st_wall.add_index(rt1)
+		# Outer / Right Wall
+		var rb0 = w0 + 0; var rt0 = w0 + 1
+		var rb1 = w1 + 0; var rt1 = w1 + 1
+		st_wall.add_index(rb0); st_wall.add_index(rt0); st_wall.add_index(rb1)
+		st_wall.add_index(rt0); st_wall.add_index(rt1); st_wall.add_index(rb1)
+		# Inner / Left Wall
+		var rt_in0 = w0 + 2; var rb_in0 = w0 + 3
+		var rt_in1 = w1 + 2; var rb_in1 = w1 + 3
+		st_wall.add_index(rt_in0); st_wall.add_index(rb_in0); st_wall.add_index(rt_in1)
+		st_wall.add_index(rb_in0); st_wall.add_index(rb_in1); st_wall.add_index(rt_in1)
 
 	st_deck.generate_normals()
 	st_deck.generate_tangents()
@@ -1751,7 +1796,7 @@ func _build_cobblestone_road(parent: Node, curve: Curve3D, half_width: float, no
 	var deck_inst := MeshInstance3D.new()
 	deck_inst.name = node_name + "_Deck"
 	deck_inst.mesh = deck_mesh
-	deck_inst.material_override = cobble_mat
+	deck_inst.material_override = road_mat
 	static_body.add_child(deck_inst)
 
 	var wall_inst := MeshInstance3D.new()

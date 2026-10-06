@@ -16,16 +16,45 @@ const FROSTPEAK_CREEK_SOUTH_Z := 205.0
 ## or it simply fills the ravine back in and the bridge ends up standing over flat snow. Each
 ## x range deliberately stops short of the trunk carriageway so it can never undercut it.
 const FROSTPEAK_BRIDGE_ZONES := [
-	[0.0, 24.0, -305.0, 22.0],  # Alpine Timber Bridge (trunk road crossing)
-	[-6.0, 18.0, 202.0, 14.0],   # Glade Timber Bridge (Glade Creek shortcut)
+	[0.0, 28.0, -305.0, 20.0],  # Alpine Timber Bridge (trunk road crossing)
+	[-8.0, 15.0, 203.0, 12.0],  # Glade Timber Bridge (Glade Creek shortcut)
 ]
 
+## Smooth falloff factor (0.0 to 1.0) inside Frostpeak bridge ravine zones.
+func _frostpeak_bridge_factor(px: float, pz: float) -> float:
+	var factor: float = 0.0
+	for zone in FROSTPEAK_BRIDGE_ZONES:
+		var dx: float = absf(px - zone[0])
+		var dz: float = absf(pz - zone[2])
+		var hx: float = zone[1]
+		var hz: float = zone[3]
+		var margin: float = 6.0
+		if dx < (hx + margin) and dz < (hz + margin):
+			var tx: float = clampf((hx + margin - dx) / margin, 0.0, 1.0)
+			var tz: float = clampf((hz + margin - dz) / margin, 0.0, 1.0)
+			factor = maxf(factor, tx * tz)
+	return factor
 
 ## True inside a Frostpeak creek bridge keep-out box.
 func _in_frostpeak_bridge_zone(px: float, pz: float) -> bool:
-	for zone in FROSTPEAK_BRIDGE_ZONES:
-		if absf(px - zone[0]) < zone[1] and absf(pz - zone[2]) < zone[3]:
-			return true
+	return _frostpeak_bridge_factor(px, pz) > 0.01
+
+## Checks whether a main track segment offset falls within a Frostpeak shortcut junction opening.
+func _is_frostpeak_junction_opening(offset: float, is_left_side: bool) -> bool:
+	if level_prefix != "frostpeak_creek":
+		return false
+	# 1. Canyon Cut split (left curb open at ~324..342m)
+	if is_left_side and offset > 324.0 and offset < 342.0:
+		return true
+	# 2. Canyon Cut merge (left curb open at ~454..470m)
+	if is_left_side and offset > 454.0 and offset < 470.0:
+		return true
+	# 3. Glade Creek split (right curb open at ~1112..1130m)
+	if not is_left_side and offset > 1112.0 and offset < 1130.0:
+		return true
+	# 4. Glade Creek merge (right curb open at ~1304..1320m)
+	if not is_left_side and offset > 1304.0 and offset < 1320.0:
+		return true
 	return false
 
 ## True when a baked curve sample sits in a jump gap (airborne / no road mesh).
@@ -33,8 +62,8 @@ func _in_frostpeak_bridge_zone(px: float, pz: float) -> bool:
 ## so the lower road at the same XZ is untouched.
 func _is_in_gap_pos(pos: Vector3) -> bool:
 	if level_prefix == "frostpeak_creek":
-		# Alpine Timber Bridge crossing over the central creek ravine (exact 48m bridge span)
-		if absf(pos.z - (-305.0)) < 14.0 and absf(pos.x) < 24.0:
+		# Alpine Timber Bridge crossing over the central creek ravine (exact 59m bridge span between stone abutments)
+		if absf(pos.z - (-305.0)) < 14.0 and absf(pos.x) < 29.5:
 			return true
 		return false
 	if level_prefix == "bloombay_dunes":
@@ -558,8 +587,8 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			# Ramps from 0 (normal road, <4m above ground) to 1 (bridge, >12m above ground).
 			var elevation_diff = road_h - base_terrain_height
 			var bridge_factor = 0.0
-			if level_prefix == "frostpeak_creek" and _in_frostpeak_bridge_zone(px, pz):
-				bridge_factor = 1.0
+			if level_prefix == "frostpeak_creek":
+				bridge_factor = _frostpeak_bridge_factor(px, pz)
 			elif level_prefix != "pinecrest_ridge" and level_prefix != "bloombay_dunes":
 				bridge_factor = clampf((elevation_diff - 4.0) / 8.0, 0.0, 1.0)
 			clearing_blend *= (1.0 - bridge_factor)
@@ -1289,20 +1318,21 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 		if is_curb:
 			var base = i * 4
 			var nxt = (i + 1) * 4
+			var seg_off = (float(i) / float(point_count)) * length
 
 			# Left slope
-			st.add_index(base + 0); st.add_index(nxt + 0); st.add_index(base + 1)
-			st.add_index(base + 1); st.add_index(nxt + 0); st.add_index(nxt + 1)
+			if not _is_frostpeak_junction_opening(seg_off, true):
+				st.add_index(base + 0); st.add_index(nxt + 0); st.add_index(base + 1)
+				st.add_index(base + 1); st.add_index(nxt + 0); st.add_index(nxt + 1)
+				st.add_index(base + 0); st.add_index(base + 1); st.add_index(nxt + 0)
+				st.add_index(base + 1); st.add_index(nxt + 1); st.add_index(nxt + 0)
 
 			# Right slope
-			st.add_index(base + 2); st.add_index(nxt + 2); st.add_index(base + 3)
-			st.add_index(base + 3); st.add_index(nxt + 2); st.add_index(nxt + 3)
-
-			# --- UNDERSIDE ---
-			st.add_index(base + 0); st.add_index(base + 1); st.add_index(nxt + 0)
-			st.add_index(base + 1); st.add_index(nxt + 1); st.add_index(nxt + 0)
-			st.add_index(base + 2); st.add_index(base + 3); st.add_index(nxt + 2)
-			st.add_index(base + 3); st.add_index(nxt + 3); st.add_index(nxt + 2)
+			if not _is_frostpeak_junction_opening(seg_off, false):
+				st.add_index(base + 2); st.add_index(nxt + 2); st.add_index(base + 3)
+				st.add_index(base + 3); st.add_index(nxt + 2); st.add_index(nxt + 3)
+				st.add_index(base + 2); st.add_index(base + 3); st.add_index(nxt + 2)
+				st.add_index(base + 3); st.add_index(nxt + 3); st.add_index(nxt + 2)
 		else:
 			var v0 = i * 2
 			var v1 = v0 + 1
@@ -1698,18 +1728,24 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 		var base = i * 4
 		var nxt = (i + 1) * 4
 
+		var seg_off = (float(i) / float(point_count)) * length
+		var is_curb_side: bool = node_name.contains("Curbs")
+
 		# Side walls must face OUTWARD (visible + collidable from outside the ramp).
 		# Left wall: outward = -right_dir
-		st.add_index(base + 0); st.add_index(nxt + 0); st.add_index(base + 1)
-		st.add_index(base + 1); st.add_index(nxt + 0); st.add_index(nxt + 1)
+		if not is_curb_side or not _is_frostpeak_junction_opening(seg_off, true):
+			st.add_index(base + 0); st.add_index(nxt + 0); st.add_index(base + 1)
+			st.add_index(base + 1); st.add_index(nxt + 0); st.add_index(nxt + 1)
 
 		# Right wall: outward = +right_dir
-		st.add_index(base + 2); st.add_index(base + 3); st.add_index(nxt + 2)
-		st.add_index(base + 3); st.add_index(nxt + 3); st.add_index(nxt + 2)
+		if not is_curb_side or not _is_frostpeak_junction_opening(seg_off, false):
+			st.add_index(base + 2); st.add_index(base + 3); st.add_index(nxt + 2)
+			st.add_index(base + 3); st.add_index(nxt + 3); st.add_index(nxt + 2)
 
 		# Bottom - normal faces downward (seen from under the bridge/dam)
-		st.add_index(base + 1); st.add_index(base + 3); st.add_index(nxt + 1)
-		st.add_index(base + 3); st.add_index(nxt + 3); st.add_index(nxt + 1)
+		if not is_curb_side or (not _is_frostpeak_junction_opening(seg_off, true) and not _is_frostpeak_junction_opening(seg_off, false)):
+			st.add_index(base + 1); st.add_index(base + 3); st.add_index(nxt + 1)
+			st.add_index(base + 3); st.add_index(nxt + 3); st.add_index(nxt + 1)
 
 	# Finish side walls as their own mesh. Do NOT inject more verts after generate_normals
 	# (that corrupted indexing and created a giant bogus wall).

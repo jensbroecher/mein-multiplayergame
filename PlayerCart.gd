@@ -266,6 +266,10 @@ var _ai_slope_rollback_timer: float = 0.0
 var _ai_offroad_anchor_pos: Vector3 = Vector3.ZERO
 var _ai_offroad_stuck_timer: float = 0.0
 var _ai_offroad_max_dist: float = 0.0
+var _ai_circle_yaw_accum: float = 0.0
+var _ai_circle_prev_yaw: float = 0.0
+var _ai_circle_origin: Vector3 = Vector3.ZERO
+var _ai_circle_break_timer: float = 0.0
 var track_path: Path3D = null
 var alternative_paths: Array[Path3D] = []
 var active_path: Path3D = null
@@ -325,6 +329,8 @@ var _drift_input_buffer: float = 0.0
 var _drift_charge_time: float = 0.0
 var _drift_counter_steer_timer: float = 0.0
 var _drift_straight_timer: float = 0.0
+var _drift_boost_grace_timer: float = 0.0
+var _drift_boost_buffered_charge: float = 0.0
 var _is_skid_active: bool = false
 var drift_particles = []
 @export var sync_emit_drift: bool = false
@@ -607,6 +613,7 @@ func _ready():
 		ai_lane_offset = randf_range(-ai_lane_span, ai_lane_span)
 		ai_target_lane_offset = ai_lane_offset
 		ai_lane_change_timer = randf_range(3.0, 6.0)
+		_ai_circle_prev_yaw = visuals.global_transform.basis.get_euler().y
 
 	# Load the correct model mesh
 	var preset = CAR_PRESETS[car_index]
@@ -1409,6 +1416,58 @@ func _physics_process(delta):
 					respawn()
 			ai_last_stuck_position = global_position
 
+		# AI Circle Detection & Breaker:
+		# Detects when a bot gets trapped driving in endless circles (e.g. orbiting a waypoint, stuck in a drift, or offset oscillation)
+		if not is_on_loop and not _ai_approaching_loop:
+			var cur_yaw: float = visuals.global_transform.basis.get_euler().y
+			var yaw_diff: float = cur_yaw - _ai_circle_prev_yaw
+			while yaw_diff > PI:
+				yaw_diff -= TAU
+			while yaw_diff < -PI:
+				yaw_diff += TAU
+			_ai_circle_prev_yaw = cur_yaw
+			
+			if is_on_ground and air_time <= 0.05 and absf(yaw_diff) > 0.005:
+				if _ai_circle_yaw_accum * yaw_diff >= 0.0:
+					_ai_circle_yaw_accum += yaw_diff
+				else:
+					_ai_circle_yaw_accum = move_toward(_ai_circle_yaw_accum, 0.0, absf(yaw_diff) * 1.5)
+				
+				if absf(_ai_circle_yaw_accum) > 1.5 * PI and _ai_circle_origin == Vector3.ZERO:
+					_ai_circle_origin = global_position
+			else:
+				_ai_circle_yaw_accum = move_toward(_ai_circle_yaw_accum, 0.0, delta * 2.0)
+			
+			# If the bot has traveled far across the world (>28m from origin), it is driving a normal winding road
+			if _ai_circle_origin != Vector3.ZERO and global_position.distance_to(_ai_circle_origin) > 28.0:
+				_ai_circle_yaw_accum = move_toward(_ai_circle_yaw_accum, 0.0, delta * 4.0)
+				_ai_circle_origin = Vector3.ZERO
+			
+			# Level 1: Circle breaker (accumulated ~1.5 full circles = 3.0 * PI within a 28m area)
+			if absf(_ai_circle_yaw_accum) >= 3.0 * PI and _ai_circle_origin != Vector3.ZERO and global_position.distance_to(_ai_circle_origin) <= 28.0:
+				if drift_mode or is_drifting:
+					_exit_drift()
+				if _ai_circle_break_timer <= 0.0:
+					_ai_circle_break_timer = 0.75
+					var cpath = active_path if active_path else track_path
+					if cpath and cpath.curve:
+						_ai_last_ontrack_offset = cpath.curve.get_closest_offset(cpath.to_local(global_position))
+			
+			# Level 2: Failsafe Respawn (accumulated ~2.5 full circles = 5.0 * PI within a 28m area)
+			if absf(_ai_circle_yaw_accum) >= 5.0 * PI and _ai_circle_origin != Vector3.ZERO and global_position.distance_to(_ai_circle_origin) <= 28.0:
+				print("AI Cart ", name, " detected driving in endless circles (accum yaw: ", _ai_circle_yaw_accum, ", disp: ", global_position.distance_to(_ai_circle_origin), "m). Respawning.")
+				_ai_circle_yaw_accum = 0.0
+				_ai_circle_origin = Vector3.ZERO
+				_ai_circle_break_timer = 0.0
+				if multiplayer.multiplayer_peer != null and multiplayer.is_server():
+					respawn_rpc.rpc(last_checkpoint_transform)
+				else:
+					respawn()
+		else:
+			_ai_circle_yaw_accum = 0.0
+			_ai_circle_origin = Vector3.ZERO
+			_ai_circle_prev_yaw = visuals.global_transform.basis.get_euler().y
+
 		# Off-road / Pond slope rollback & bounded region stuck detection:
 		# Detects when a car tries to climb up a slope and rolls back repeatedly (e.g. in a pond or ditch)
 		var is_on_corridor: bool = _is_car_on_track_corridor()
@@ -1484,7 +1543,7 @@ func _physics_process(delta):
 				# Keep trying toward the next gate; only give up if stuck or truly lost.
 				var too_far: bool = stray > 70.0 and no_progress
 				var recover_limit: float = 14.0 if _ai_recovering else 8.0
-				if too_far or (_ai_offtrack_timer > recover_limit and no_progress):
+				if too_far or (_ai_offtrack_timer > recover_limit and no_progress) or _ai_offtrack_timer > 18.0:
 					print("AI Cart ", name, " fallen off course (dist xz: ", dist_xz, "m, height below: ", height_below, "m). Respawning.")
 					_ai_offtrack_timer = 0.0
 					_ai_no_progress_timer = 0.0
@@ -2017,6 +2076,26 @@ func _physics_process(delta):
 	# Handle acceleration/braking even when slightly airborne for better control
 	var current_speed = linear_velocity.dot(fwd)
 
+	# Drift mini-boost grace window: triggers boost if player accelerates out of drift within 0.15s
+	if _drift_boost_grace_timer > 0.0:
+		_drift_boost_grace_timer -= delta
+		var is_accel_now: bool = false
+		if is_ai:
+			is_accel_now = input_dir.y < -0.1
+		else:
+			var raw_th = Input.get_action_strength(input_prefix + "throttle") if not is_finished_race else 0.0
+			is_accel_now = (raw_th > 0.15 or Input.is_action_pressed(input_prefix + "throttle")) and input_dir.y < -0.1
+		
+		if is_accel_now:
+			if (is_on_ground or was_on_ground or _ground_grace > 0.0) and can_move and not is_finished_race and current_speed >= 3.0:
+				_trigger_drift_boost(_drift_boost_buffered_charge)
+			_drift_boost_grace_timer = 0.0
+			_drift_boost_buffered_charge = 0.0
+		elif input_dir.y > 0.1 or not can_move or is_finished_race:
+			# Braking or stopped: cancel buffered boost immediately
+			_drift_boost_grace_timer = 0.0
+			_drift_boost_buffered_charge = 0.0
+
 	# Drift entry logic (tap-to-drift or brake-hold drift with 0.35s input buffer)
 	var want_drift: bool = false
 	if not is_ai and not is_finished_race:
@@ -2038,6 +2117,8 @@ func _physics_process(delta):
 		_drift_counter_steer_timer = 0.0
 		_drift_straight_timer = 0.0
 		_drift_input_buffer = 0.0
+		_drift_boost_grace_timer = 0.0
+		_drift_boost_buffered_charge = 0.0
 
 	# Auto-hop over small props/steps only when nearly stuck offroad — completely disabled on road/track/ramps.
 	if is_offroad and on_ground and not on_loop and input_dir.y < -0.5 and hop_cooldown <= 0.0:
@@ -2231,8 +2312,20 @@ func _physics_process(delta):
 				var manual_tap_exit: bool = _drift_charge_time > 0.25 and not is_ai and Input.is_action_just_pressed(input_prefix + "brake")
 				# 5. Fully released all controls (hands off keyboard/gamepad)
 				var controls_released: bool = absf(input_dir.y) < 0.08 and absf(input_dir.x) < 0.15
-				if speed_too_low or counter_steer_exit or straighten_exit or manual_tap_exit or controls_released:
-					_exit_drift()
+				# 6. AI drift safety exits: corner ended or max duration reached
+				var ai_drift_exit: bool = is_ai and (
+					(_drift_charge_time > 0.35 and not _ai_want_drift) or
+					_drift_charge_time > 2.2
+				)
+				if speed_too_low or counter_steer_exit or straighten_exit or manual_tap_exit or controls_released or ai_drift_exit:
+					var is_accelerating: bool = false
+					if is_ai:
+						is_accelerating = input_dir.y < -0.1
+					else:
+						var raw_th = Input.get_action_strength(input_prefix + "throttle") if not is_finished_race else 0.0
+						var th_pressed = Input.is_action_pressed(input_prefix + "throttle") or raw_th > 0.15
+						is_accelerating = th_pressed and (input_dir.y < -0.1 or manual_tap_exit)
+					_exit_drift(is_accelerating)
 
 			is_drifting = drift_mode
 			
@@ -3058,15 +3151,26 @@ func client_start_boost():
 		if tornado and is_instance_valid(tornado) and tornado.has_method("escape_cart_with_boost"):
 			tornado.escape_cart_with_boost(self)
 
-func _exit_drift() -> void:
+func _exit_drift(was_accelerating: bool = false) -> void:
 	if not drift_mode and not is_drifting:
 		return
 	drift_mode = false
 	is_drifting = false
 	_drift_counter_steer_timer = 0.0
 	_drift_straight_timer = 0.0
-	if (is_on_ground or was_on_ground or _ground_grace > 0.0) and can_move and not is_finished_race and _drift_charge_time >= 0.55:
-		_trigger_drift_boost(_drift_charge_time)
+	var fwd_speed = linear_velocity.dot(-visuals.global_transform.basis.z)
+	if (is_on_ground or was_on_ground or _ground_grace > 0.0) and can_move and not is_finished_race and fwd_speed >= 3.0 and _drift_charge_time >= 0.55:
+		if was_accelerating:
+			_trigger_drift_boost(_drift_charge_time)
+			_drift_boost_grace_timer = 0.0
+			_drift_boost_buffered_charge = 0.0
+		elif not is_ai:
+			# Only allow boost if player accelerates out of the drift within a 0.15s window
+			_drift_boost_buffered_charge = _drift_charge_time
+			_drift_boost_grace_timer = 0.15
+	else:
+		_drift_boost_grace_timer = 0.0
+		_drift_boost_buffered_charge = 0.0
 	_drift_charge_time = 0.0
 
 func _trigger_drift_boost(charge_time: float) -> void:
@@ -3671,6 +3775,10 @@ func _apply_respawn_pose() -> void:
 	ai_last_stuck_position = global_position
 	_ai_start_grid_lane = 0.0
 	_ai_overtake_lock_timer = 0.0
+	_ai_circle_yaw_accum = 0.0
+	_ai_circle_prev_yaw = visuals.global_transform.basis.get_euler().y
+	_ai_circle_origin = Vector3.ZERO
+	_ai_circle_break_timer = 0.0
 	# Kill any in-flight drown fade tween so it can't overwrite the restored alpha
 	if _drown_tween:
 		_drown_tween.kill()
@@ -3719,6 +3827,8 @@ func _apply_respawn_pose() -> void:
 	_drift_input_buffer = 0.0
 	_drift_charge_time = 0.0
 	_drift_counter_steer_timer = 0.0
+	_drift_boost_grace_timer = 0.0
+	_drift_boost_buffered_charge = 0.0
 	_is_dust_active = false
 	
 	# Clear inventory items and active powerups on respawn
@@ -5171,6 +5281,14 @@ func _ai_evaluate_traffic(_delta: float, fwd_3d: Vector3, right_3d: Vector3) -> 
 func _get_ai_input(delta: float) -> Vector2:
 	var input = Vector2.ZERO
 	
+	# Circle breaker intervention: force wheels straight and drive ahead to break circular orbit
+	if _ai_circle_break_timer > 0.0:
+		_ai_circle_break_timer -= delta
+		input.x = 0.0
+		input.y = -0.7
+		_ai_want_drift = false
+		return input
+	
 	if track_path == null:
 		var level = get_tree().get_first_node_in_group("level")
 		if level:
@@ -5523,13 +5641,25 @@ func _get_ai_input(delta: float) -> Vector2:
 			target_global_pos = target_global_pos.lerp(best_pad.global_position, pad_blend)
 
 	var target_vec = visuals.global_transform.inverse() * target_global_pos
-	var dir_flat = Vector2(target_vec.x, -target_vec.z).normalized()
+	var fwd_dist: float = -target_vec.z
+	var side_dist: float = target_vec.x
+	var target_dist: float = target_vec.length()
+	var angle_to_target: float = atan2(side_dist, fwd_dist)
+	var is_target_behind: bool = fwd_dist < 0.0 or absf(angle_to_target) > 1.35
 	
 	# Speed-sensitive steering gain: responsive at low speed, smooth and stable at high speed
 	var steer_gain: float = lerpf(2.2, 1.45, clampf(speed / 38.0, 0.0, 1.0))
 	if is_airborne:
 		steer_gain = 1.6
-	input.x = clamp(dir_flat.x * steer_gain, -1.0, 1.0)
+
+	var dir_flat = Vector2(side_dist, fwd_dist).normalized()
+	if is_target_behind:
+		# Target is behind or sharply off to the flank: steer hard towards the target to turn around!
+		# (dir_flat.x collapses towards 0 when target is behind, which causes slow wide arcs/circles)
+		var turn_sign: float = signf(side_dist) if absf(side_dist) > 0.02 else 1.0
+		input.x = turn_sign * 1.0
+	else:
+		input.x = clamp(dir_flat.x * steer_gain, -1.0, 1.0)
 
 	if is_finished_race:
 		_ai_want_drift = false
@@ -5545,8 +5675,22 @@ func _get_ai_input(delta: float) -> Vector2:
 		# Commit full power through stunt loops — never brake or drift mid-loop!
 		_ai_want_drift = false
 		input.y = -1.0
+	elif is_target_behind:
+		# Target is behind: decelerate firmly so turning radius shrinks (~2.5m) to pivot cleanly towards target!
+		_ai_want_drift = false
+		if speed > 7.5:
+			input.y = clampf((speed - 6.0) / 3.5, 0.45, 0.95)
+		else:
+			input.y = -0.55
+	elif target_dist < speed * 0.85 and absf(angle_to_target) > 0.70 and (is_offroad or not on_course):
+		# Target is close and off to the flank while navigating offroad: ease throttle to avoid orbiting
+		_ai_want_drift = false
+		if speed > 8.5:
+			input.y = clampf((speed - 7.5) / 4.0, 0.30, 0.75)
+		else:
+			input.y = -0.65
 	elif is_offroad and not on_course:
-		# When genuinely off-track, power forward toward the checkpoint without on-track curve braking
+		# When genuinely off-track and facing target, power forward toward the checkpoint/road
 		_ai_want_drift = false
 		input.y = -1.0
 	else:
