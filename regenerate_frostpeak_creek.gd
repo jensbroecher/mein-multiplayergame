@@ -369,10 +369,16 @@ func _ready() -> void:
 	var glade_center := (glade_cross_east + glade_cross_west) * 0.5
 	var glade_length: float = glade_cross_east.distance_to(glade_cross_west)
 	var glade_yaw: float = rad_to_deg(atan2(-glade_axis.z, glade_axis.x))
+	# Catmull-Rom aims the crossing handles at the neighbouring waypoints, which bowed the road 1.6m
+	# off the chord and over the deck edge. Turning both handles of each crossing onto the chord keeps
+	# them collinear (no tangent break) and makes the span straight; the swing either side absorbs it.
+	for ci in [2, 3]:  # nose, entry, then the two crossing waypoints
+		alt2_curve.set_point_in(ci, -glade_axis * alt2_curve.get_point_in(ci).length())
+		alt2_curve.set_point_out(ci, glade_axis * alt2_curve.get_point_out(ci).length())
 	alt2_path.curve = alt2_curve
 	alt_container.add_child(alt2_path)
 	_verify_ramp_junction(alt2_curve, RAMP_2_HALF_W, "Glade Creek shortcut")
-	_verify_bridge_alignment(alt2_curve, glade_cross_east, glade_cross_west, RAMP_2_HALF_W, 12.0,
+	_verify_bridge_alignment(alt2_curve, glade_cross_east, glade_cross_west, RAMP_2_HALF_W, 6.0,
 		"Glade Timber Bridge")
 
 	# The bridge owns the crossing, so the shortcut deck is punched out under it and the ravine
@@ -389,12 +395,12 @@ func _ready() -> void:
 	# The Glade deck stands about 8.5m over a creek bed at -3.8, so its piers need to be long
 	# enough to actually land in the water rather than hovering over it.
 	_build_detailed_alpine_bridge(level_scene, glade_center, glade_length, 12.0,
-		"GladeTimberBridge", glade_yaw, true, 7.6)
+		"GladeTimberBridge", glade_yaw, true, 9.5)
 
 	# 5. Alpine Timber Bridge across Creek (Crossing 2: X = -30m to +30m at Z = -305, Y = 4.8m)
 	# Full continuous timber truss railings on both sides of the bridge.
 	_build_detailed_alpine_bridge(level_scene, Vector3(0.0, 4.8, -305.0), 60.0, 17.6,
-		"AlpineTimberBridge", 0.0, true, 8.0, Vector2.ZERO)
+		"AlpineTimberBridge", 0.0, true, 9.5, Vector2.ZERO)
 
 	# Baked lengths of the two shortcuts, used below to place their props by fraction rather than
 	# by hard-coded distances so they follow the road when a junction is retuned.
@@ -1036,8 +1042,13 @@ func _build_detailed_alpine_bridge(parent: Node, center: Vector3, length: float,
 		bridge_root.add_child(curb_inst)
 
 	# 4. Proportional Stone Shore Abutments (embedded into riverbanks)
+	# Deep enough to reach below the creek bed, not just below the top of the bank. The abutments
+	# sit just inside the deck ends, which is already out over the bank slope: at a fixed 6.6m the
+	# Glade abutments hung in mid-air above the bank (base at world y -1.8 over ground that keeps
+	# falling towards the water), and the hollow end of the shortcut's embankment showed under them
+	# as a dark wedge. Tying the depth to the pier depth buries the base in every case.
 	var abut_len: float = 3.2
-	var abut_h: float = 5.2
+	var abut_h: float = maxf(6.6, pier_depth + 1.0)
 	var abut_y: float = -abut_h * 0.5
 	for side in [-1.0, 1.0]:
 		var x_pos = side * (length * 0.5 - abut_len * 0.5 + 0.4)
@@ -1065,9 +1076,11 @@ func _build_detailed_alpine_bridge(parent: Node, center: Vector3, length: float,
 		for wing_side in [-1.0, 1.0]:
 			var wing := MeshInstance3D.new()
 			wing.name = "WingWall_" + ("E" if side > 0 else "W") + ("_N" if wing_side < 0 else "_S")
-			wing.mesh = _tapered_box_mesh(Vector3(3.2, 0.0, 0.9), Vector3(2.6, 0.0, 0.7), 4.2)
+			# Same reasoning as the abutment: a 4.2m wing wall stopped above the bank and floated.
+			var wing_h: float = abut_h * 0.75
+			wing.mesh = _tapered_box_mesh(Vector3(3.2, 0.0, 0.9), Vector3(2.6, 0.0, 0.7), wing_h)
 			wing.material_override = stone_mat
-			wing.position = Vector3(side * (length * 0.5 + 0.8), -2.2, wing_side * (width * 0.5 + 0.5))
+			wing.position = Vector3(side * (length * 0.5 + 0.8), -0.1 - wing_h * 0.5, wing_side * (width * 0.5 + 0.5))
 			wing.rotation_degrees = Vector3(0, -side * wing_side * 28.0, 0)
 			bridge_root.add_child(wing)
 
@@ -1315,50 +1328,38 @@ func _build_detailed_alpine_bridge(parent: Node, center: Vector3, length: float,
 				sway.rotation_degrees = Vector3(brace_ang if k == 0 else -brace_ang, 0, 0)
 				bent_root.add_child(sway)
 
-		# Collision shape for the bent base to prevent carts getting wedged
+		# Per-pile collision matching the visible piles and their stone plinths. One solid slab
+		# across the bent used to sit here: 8.3m tall, nearly the full bridge width, and entirely
+		# invisible -- it walled off the channel under the deck. Boxes on the piles themselves keep
+		# the carts-out-of-the-timber protection without blocking the waterway.
 		var bent_col_body := StaticBody3D.new()
 		bent_col_body.name = "BentCollision"
-		bent_col_body.position = Vector3(0, pile_y, 0)
-		var b_col := CollisionShape3D.new()
-		var b_shape := BoxShape3D.new()
-		b_shape.size = Vector3(1.2, pile_h + 1.2, width - 1.2)
-		b_col.shape = b_shape
-		bent_col_body.add_child(b_col)
+		for p_i in range(num_piles):
+			var col_z: float = -pile_span * 0.5 + float(p_i) * pile_step
+			var b_col := CollisionShape3D.new()
+			b_col.name = "PileCol_%d" % p_i
+			var b_shape := BoxShape3D.new()
+			b_shape.size = Vector3(0.55, pile_h + 0.6, 0.55)
+			b_col.shape = b_shape
+			b_col.position = Vector3(0, pile_y, col_z)
+			bent_col_body.add_child(b_col)
+
+			var pl_col := CollisionShape3D.new()
+			pl_col.name = "PlinthCol_%d" % p_i
+			var pl_shape := BoxShape3D.new()
+			pl_shape.size = Vector3(1.10, 1.2, 1.10)
+			pl_col.shape = pl_shape
+			pl_col.position = Vector3(0, pile_bot - 0.4, col_z)
+			bent_col_body.add_child(pl_col)
 		bent_root.add_child(bent_col_body)
 
 		bridge_root.add_child(bent_root)
 
-	# 8. Longitudinal Timber Girts & Bracing between Trestle Bents (multi-bent bridges only)
-	if bent_xs.size() >= 2:
-		var span_x: float = bent_xs[1] - bent_xs[0]
-		for z_side in [-1.0, 1.0]:
-			var bz: float = z_side * (width * 0.5 - 1.2)
-			var z_name := "N" if z_side < 0 else "S"
-
-			# Horizontal longitudinal girt tying bents together
-			var girt := MeshInstance3D.new()
-			girt.name = "TrestleGirt_%s" % z_name
-			var gm := BoxMesh.new()
-			gm.size = Vector3(span_x, 0.30, 0.30)
-			girt.mesh = gm
-			girt.material_override = timber_mat
-			girt.position = Vector3((bent_xs[0] + bent_xs[1]) * 0.5, pile_y + 0.5, bz)
-			bridge_root.add_child(girt)
-
-			# Diagonal longitudinal sway brace
-			var dy_brace: float = pile_h * 0.55
-			var brace_len: float = sqrt(span_x * span_x + dy_brace * dy_brace)
-			var brace_ang: float = rad_to_deg(atan2(dy_brace, span_x))
-			for k in 2:
-				var lbrace := MeshInstance3D.new()
-				lbrace.name = "TrestleBrace_%s_%d" % [z_name, k]
-				var lbm := BoxMesh.new()
-				lbm.size = Vector3(brace_len, 0.20, 0.20)
-				lbrace.mesh = lbm
-				lbrace.material_override = timber_mat
-				lbrace.position = Vector3((bent_xs[0] + bent_xs[1]) * 0.5, pile_y + 0.5, bz)
-				lbrace.rotation_degrees = Vector3(0, 0, brace_ang if k == 0 else -brace_ang)
-				bridge_root.add_child(lbrace)
+	# 8. No longitudinal members between the trestle bents. A girt and an X-brace used to run the
+	# full 26m between the Alpine bents at mid-height, straight across the open channel: from the
+	# creek they read as two thin wires strung across the water, not as timberwork. The bents are
+	# already tied together by the four deck girders and the floor beams above them, and each bent
+	# carries its own sway bracing, so the waterway is left open.
 
 	if winter_dressing:
 		_dress_bridge_for_winter(bridge_root, length, width, timber_mat, rail_gap)
@@ -1415,23 +1416,7 @@ func _dress_bridge_for_winter(bridge_root: Node3D, length: float, width: float, 
 			rail_cap.position = Vector3(run_mid, 1.45 + 0.14 + 0.05, side * rail_z_dist)
 			bridge_root.add_child(rail_cap)
 
-		var in_gap := func(x: float) -> bool: return has_gap and side > 0.0 and x > rail_gap.x and x < rail_gap.y
-
-		# Icicles along the underside of the deck edge, thinning out along the span.
-		var icicle_count := int(length / 1.8)
-		for i in range(icicle_count):
-			var ix := -half_len + 0.9 + i * (length - 1.8) / maxf(float(icicle_count - 1), 1.0)
-			if in_gap.call(ix):
-				continue
-			var drop := 0.28 + fmod(float(i) * 0.37, 0.52)
-			var ice := MeshInstance3D.new()
-			ice.name = "Icicle_%s_%d" % [rail_side_name, i]
-			# Tapered to a point, not a square peg. A row of same-size white boxes under a deck edge
-			# reads as teeth rather than as ice.
-			ice.mesh = _tapered_box_mesh(Vector3(0.13, 0.0, 0.13), Vector3(0.02, 0.0, 0.02), drop)
-			ice.material_override = _ice_material()
-			ice.position = Vector3(ix, -0.33 - drop * 0.5, side * (width * 0.5 - 0.08))
-			bridge_root.add_child(ice)
+	_add_bridge_icicles(bridge_root, length, width, rail_gap)
 
 	# Deliberately no snow drift banked against the abutments. The deck here is the full carriageway
 	# width and the bridge ends in mid-air over the creek, so a drift either sat across the driving
@@ -1479,6 +1464,10 @@ func _tapered_box_mesh(bottom: Vector3, top: Vector3, height: float) -> ArrayMes
 
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# Flat shading. With SurfaceTool's default smooth group every corner vertex averaged the normals
+	# of the three faces meeting there, so each face was lit as if it were a rounded pillow and the
+	# triplanar stone/wood projection smeared into the brown streaks seen on the abutments and piles.
+	st.set_smooth_group(-1)
 	for i in range(4):
 		var j: int = (i + 1) % 4
 		_add_outward_quad(st, b[i], b[j], t[j], t[i])
@@ -1489,8 +1478,11 @@ func _tapered_box_mesh(bottom: Vector3, top: Vector3, height: float) -> ArrayMes
 
 
 ## Emits the two triangles of a planar quad, flipping the winding if it faces inward.
+## Godot's front faces wind clockwise, so the face normal is (c - a) x (b - a) -- the same as
+## Plane(a, b, c) and generate_normals(). The right-handed (b - a) x (c - a) points the other way and
+## turned every abutment, wing wall and pile inside-out: near faces culled, far faces seen from inside.
 func _add_outward_quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> void:
-	var n: Vector3 = (b - a).cross(c - a)
+	var n: Vector3 = (c - a).cross(b - a)
 	var centre: Vector3 = (a + b + c + d) * 0.25
 	if n.dot(centre) < 0.0:
 		st.add_vertex(a); st.add_vertex(d); st.add_vertex(c)
@@ -1500,18 +1492,196 @@ func _add_outward_quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: V
 		st.add_vertex(a); st.add_vertex(c); st.add_vertex(d)
 
 
-## Icicle material: pale, glassy and slightly translucent, so it reads as ice catching the light
-## rather than as more of the same white as the snow.
+## Hangs icicles along both deck edges as one MultiMesh per bridge.
+##
+## The old pass placed one icicle every 1.8m at a cycling length, built from _tapered_box_mesh with
+## the wide end at the *bottom* -- so each one was an upside-down square spike standing on its point,
+## and the even spacing read as a row of teeth. Real icicles hang point-down, round, in irregular
+## clusters with long ones among many short ones and bare stretches in between.
+##
+## One MultiMeshInstance3D instead of one MeshInstance3D per icicle: ~150 icicles on the Alpine
+## bridge become a single draw call. The layout is seeded from the bridge name, so regenerating the
+## level gives the same icicles every time.
+func _add_bridge_icicles(bridge_root: Node3D, length: float, width: float, rail_gap: Vector2) -> void:
+	const DECK_UNDERSIDE := -0.29  # deck slab bottom is -0.31; the base sinks 2cm into the timber
+	var half_len: float = length * 0.5
+	var has_gap: bool = rail_gap.y > rail_gap.x
+
+	# Floor beams cross under the deck at every railing post and stick 0.3m out past the deck edge.
+	# Keep icicles off them so none spear through a beam.
+	var num_bays: int = maxi(int(round(length / 3.75)), 2)
+	var bay_w: float = length / float(num_bays)
+	var post_xs: Array[float] = []
+	for p_idx in range(num_bays + 1):
+		post_xs.append(-half_len + float(p_idx) * bay_w)
+
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(String(bridge_root.name))
+
+	var xforms: Array[Transform3D] = []
+	var tints: Array[Color] = []
+	for side in [-1.0, 1.0]:
+		var phase_a: float = rng.randf() * TAU
+		var phase_b: float = rng.randf() * TAU
+		var x: float = -half_len + 0.5 + rng.randf() * 0.4
+		while x < half_len - 0.5:
+			var here: float = x
+			x += rng.randf_range(0.18, 0.75)
+			if has_gap and side > 0.0 and here > rail_gap.x and here < rail_gap.y:
+				continue
+			var on_beam := false
+			for px in post_xs:
+				if absf(here - px) < 0.32:
+					on_beam = true
+					break
+			if on_beam:
+				continue
+			# Slow envelope along the span: heavy dripping patches, sparse ones and bare runs.
+			var env: float = 0.5 + 0.5 * sin(here * 0.42 + phase_a) * sin(here * 0.13 + phase_b)
+			if rng.randf() > 0.25 + env * 0.85:
+				continue
+			# Mostly short, a few long: a power curve, scaled by the envelope.
+			var drop: float = 0.10 + (0.25 + 1.05 * env) * pow(rng.randf(), 2.2)
+			var radius: float = clampf(0.018 + drop * 0.075, 0.022, 0.085)
+			var lean := Vector3(rng.randf_range(-0.05, 0.05), 0.0, rng.randf_range(-0.05, 0.05))
+			var basis := Basis.from_euler(Vector3(lean.x, rng.randf() * TAU, lean.z))
+			basis = basis * Basis.from_scale(Vector3(radius, drop, radius))
+			var z: float = side * (width * 0.5 - 0.06 - rng.randf() * 0.14)
+			xforms.append(Transform3D(basis, Vector3(here, DECK_UNDERSIDE, z)))
+			# Slight per-icicle variation: some milky, some clearer and bluer.
+			var milk: float = rng.randf()
+			tints.append(Color(lerpf(0.86, 1.0, milk), lerpf(0.93, 1.0, milk), 1.0))
+
+	if xforms.is_empty():
+		return
+
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.mesh = _icicle_unit_mesh()
+	mm.instance_count = xforms.size()
+	# Write the raw buffer rather than set_instance_transform/color: the generator runs headless, and
+	# the dummy renderer drops per-instance setters, so the saved MultiMesh had no transforms at all.
+	# Layout per instance: 3x4 row-major transform (basis rows + origin), then RGBA.
+	var buf := PackedFloat32Array()
+	buf.resize(xforms.size() * 16)
+	for i in range(xforms.size()):
+		var t: Transform3D = xforms[i]
+		var c: Color = tints[i]
+		var o := i * 16
+		for r in range(3):
+			buf[o + r * 4 + 0] = t.basis.x[r]
+			buf[o + r * 4 + 1] = t.basis.y[r]
+			buf[o + r * 4 + 2] = t.basis.z[r]
+			buf[o + r * 4 + 3] = t.origin[r]
+		buf[o + 12] = c.r
+		buf[o + 13] = c.g
+		buf[o + 14] = c.b
+		buf[o + 15] = c.a
+	mm.buffer = buf
+
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = "Icicles"
+	mmi.multimesh = mm
+	mmi.material_override = _ice_material()
+	# Thin slivers: their shadows are a few pixels of noise and cost a full shadow pass.
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	bridge_root.add_child(mmi)
+
+
+## A single icicle of unit radius and unit length: base ring at y = 0, point at y = -1.
+## Round (8 sides), with a slight bulge-and-pinch profile so it reads as dripped ice rather than
+## a machined cone. Vertex colour runs from frosty white at the root to clear blue at the tip.
+func _icicle_unit_mesh() -> ArrayMesh:
+	const SIDES := 8
+	const RINGS := 7
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var root_col := Color(0.94, 0.97, 1.0)
+	var tip_col := Color(0.40, 0.60, 0.86)
+
+	var rings: Array = []
+	for r in range(RINGS):
+		var t: float = float(r) / float(RINGS)
+		var radius: float = pow(1.0 - t, 1.5) * (1.0 + 0.10 * sin(t * 15.0))
+		if t < 0.12:
+			radius *= 1.0 + (0.12 - t) * 2.5  # small flare where it freezes onto the edge
+		var ring: Array = []
+		for s in range(SIDES):
+			var a: float = TAU * float(s) / float(SIDES)
+			ring.append(Vector3(cos(a) * radius, -t, sin(a) * radius))
+		rings.append([ring, root_col.lerp(tip_col, t)])
+	var tip := Vector3(0.0, -1.0, 0.0)
+
+	for r in range(RINGS - 1):
+		var ra: Array = rings[r][0]
+		var rb: Array = rings[r + 1][0]
+		var ca: Color = rings[r][1]
+		var cb: Color = rings[r + 1][1]
+		for s in range(SIDES):
+			var n: int = (s + 1) % SIDES
+			st.set_color(ca); st.add_vertex(ra[s])
+			st.set_color(ca); st.add_vertex(ra[n])
+			st.set_color(cb); st.add_vertex(rb[n])
+			st.set_color(ca); st.add_vertex(ra[s])
+			st.set_color(cb); st.add_vertex(rb[n])
+			st.set_color(cb); st.add_vertex(rb[s])
+	var last: Array = rings[RINGS - 1][0]
+	var lc: Color = rings[RINGS - 1][1]
+	for s in range(SIDES):
+		var n: int = (s + 1) % SIDES
+		st.set_color(lc); st.add_vertex(last[s])
+		st.set_color(lc); st.add_vertex(last[n])
+		st.set_color(tip_col); st.add_vertex(tip)
+
+	st.index()
+	st.generate_normals()
+	var mesh := st.commit()
+	# Winding is checked rather than assumed: if the side faces came out facing inward, flip them.
+	var arrays := mesh.surface_get_arrays(0)
+	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var outward := 0.0
+	for i in range(verts.size()):
+		outward += normals[i].dot(Vector3(verts[i].x, 0.0, verts[i].z))
+	if outward < 0.0:
+		var idx: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+		for i in range(0, idx.size(), 3):
+			var tmp := idx[i + 1]
+			idx[i + 1] = idx[i + 2]
+			idx[i + 2] = tmp
+		arrays[Mesh.ARRAY_INDEX] = idx
+		for i in range(normals.size()):
+			normals[i] = -normals[i]
+		arrays[Mesh.ARRAY_NORMAL] = normals
+		mesh = ArrayMesh.new()
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
+
+
+## Icicle material: opaque, glossy, cold-tinted ice. The old one was alpha-blended with backface
+## culling off, which made every icicle sort against the snow and sky behind it and flicker between
+## white and invisible; at this size the transparency was never visible anyway. Rim light, clearcoat
+## and backlight give the glassy edge and the glow when the sun is behind the bridge instead.
 func _ice_material() -> Material:
 	var m := StandardMaterial3D.new()
-	m.albedo_color = Color(0.78, 0.90, 0.98, 0.72)
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.roughness = 0.08
-	m.metallic_specular = 0.85
+	m.vertex_color_use_as_albedo = true
+	# Kept well below snow white: next to the snow caps the ice has to read as cold and glassy,
+	# and on slivers this thin a strong rim or clearcoat lights nearly every pixel at a grazing
+	# angle and clips the whole icicle to a flat white silhouette.
+	m.albedo_color = Color(0.56, 0.73, 0.89)
+	m.roughness = 0.12
+	m.metallic_specular = 0.6
+	m.rim_enabled = true
+	m.rim = 0.2
+	m.rim_tint = 0.6
+	# Glows cold blue when the sun is behind the bridge (Forward+).
+	m.backlight_enabled = true
+	m.backlight = Color(0.30, 0.50, 0.70)
+	# Under a deck the icicles sit in shadow; a faint cold self-glow keeps them from going grey.
 	m.emission_enabled = true
-	m.emission = Color(0.30, 0.46, 0.60)
-	m.emission_energy_multiplier = 0.12
-	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.emission = Color(0.20, 0.34, 0.50)
+	m.emission_energy_multiplier = 0.15
 	return m
 
 
@@ -1589,6 +1759,8 @@ func _build_cobblestone_road(parent: Node, curve: Curve3D, half_width: float, no
 	var deck_crown: float = 0.08
 	var max_wall_drop: float = 3.2
 	var gap: bool = skip_span.y > skip_span.x
+	# The embankment is extended to the cached terrain height below, so it does not float
+	# above the creek bed when the shortcut is far above natural ground.
 
 	var road_mat := _alpine_road_material()
 
@@ -1624,6 +1796,9 @@ func _build_cobblestone_road(parent: Node, curve: Curve3D, half_width: float, no
 	var wall_base := PackedInt32Array()
 	var deck_verts := 0
 	var wall_verts := 0
+	## World positions of each emitted wall ring (outer base, outer top, inner top, inner base),
+	## kept so the cut ends at a bridge gap can be closed off afterwards.
+	var wall_ring_pos: Array[PackedVector3Array] = []
 
 	for i in range(baked.size()):
 		var p = baked[i]
@@ -1703,7 +1878,24 @@ func _build_cobblestone_road(parent: Node, curve: Curve3D, half_width: float, no
 			elif cum_dist >= skip_span.y:
 				bridge_taper = clampf((cum_dist - skip_span.y) / 6.0, 0.0, 1.0)
 		var total_wall_taper: float = minf(junc_taper * junc_taper, bridge_taper)
-		var wall_drop: float = max_wall_drop * total_wall_taper
+		# Ground is sampled under each wall's own base, not under the centreline. On the creek banks
+		# the ground falls away across the road, so a drop measured at the centre left the downhill
+		# wall ending in mid-air as a hanging curtain beside the bridge.
+		var outer_base_xz: Vector3 = p + right * (outer + 0.35 * total_wall_taper)
+		var inner_base_xz: Vector3 = p + right * (inner - 0.35 * total_wall_taper)
+		var outer_ground: float = p.y - max_wall_drop
+		var inner_ground: float = p.y - max_wall_drop
+		var terrain_node: Node3D = parent.get_node_or_null("TerrainGenerator")
+		if terrain_node and terrain_node.has_method("_sample_cached_height"):
+			var cached: PackedFloat32Array = terrain_node.get("_visual_heights")
+			if cached.size() > 0:
+				var centre_h: float = terrain_node._sample_cached_height(p.x, p.z)
+				outer_ground = minf(outer_ground, minf(centre_h,
+					terrain_node._sample_cached_height(outer_base_xz.x, outer_base_xz.z)) - 0.5)
+				inner_ground = minf(inner_ground, minf(centre_h,
+					terrain_node._sample_cached_height(inner_base_xz.x, inner_base_xz.z)) - 0.5)
+		var outer_drop: float = p.y - outer_ground
+		var inner_drop: float = p.y - inner_ground
 
 		var uv_y: float = cum_dist * 0.40
 		var outer_gut: float = outer - curb_w
@@ -1736,7 +1928,7 @@ func _build_cobblestone_road(parent: Node, curve: Curve3D, half_width: float, no
 		var wall_uv_y: float = cum_dist * 0.25
 		# 0: Outer Embankment Base
 		st_wall.set_uv(Vector2(0.0, wall_uv_y))
-		st_wall.add_vertex(p + right * (outer + 0.35 * total_wall_taper) - up * wall_drop)
+		st_wall.add_vertex(p + right * (outer + 0.35 * total_wall_taper) - up * outer_drop)
 		# 1: Outer Embankment Top
 		st_wall.set_uv(Vector2(1.0, wall_uv_y))
 		st_wall.add_vertex(p + right * outer + up * (0.05 + outer_curb_h))
@@ -1745,7 +1937,13 @@ func _build_cobblestone_road(parent: Node, curve: Curve3D, half_width: float, no
 		st_wall.add_vertex(p + right * inner + up * (0.05 + inner_curb_h))
 		# 3: Inner Embankment Base
 		st_wall.set_uv(Vector2(0.0, wall_uv_y))
-		st_wall.add_vertex(p + right * (inner - 0.35 * total_wall_taper) - up * wall_drop)
+		st_wall.add_vertex(p + right * (inner - 0.35 * total_wall_taper) - up * inner_drop)
+		wall_ring_pos.append(PackedVector3Array([
+			p + right * (outer + 0.35 * total_wall_taper) - up * outer_drop,
+			p + right * outer + up * (0.05 + outer_curb_h),
+			p + right * inner + up * (0.05 + inner_curb_h),
+			p + right * (inner - 0.35 * total_wall_taper) - up * inner_drop,
+		]))
 
 		deck_verts += DECK_VERTS
 		wall_verts += WALL_VERTS
@@ -1767,6 +1965,20 @@ func _build_cobblestone_road(parent: Node, curve: Curve3D, half_width: float, no
 	# Connect Left and Right Walls
 	for i in range(baked.size() - 1):
 		if wall_base[i] < 0 or wall_base[i + 1] < 0:
+			# End wall where the road stops at the bridge gap. The embankment is just two side walls
+			# and a deck surface, so without this its cut end was an open, hollow shell: from the creek
+			# you looked straight into it, the deck's underside was back-face culled and invisible,
+			# and the inside of the walls showed as a dark wedge below the abutment.
+			var end_ring: int = i if wall_base[i] >= 0 else i + 1
+			if wall_base[end_ring] >= 0:
+				var q: PackedVector3Array = wall_ring_pos[wall_base[end_ring] / WALL_VERTS]
+				var e0: int = wall_verts
+				for k in range(4):
+					st_wall.set_uv(Vector2(0.0 if (k == 0 or k == 3) else 1.0, float(k) * 0.5))
+					st_wall.add_vertex(q[k])
+				wall_verts += 4
+				st_wall.add_index(e0 + 0); st_wall.add_index(e0 + 1); st_wall.add_index(e0 + 2)
+				st_wall.add_index(e0 + 0); st_wall.add_index(e0 + 2); st_wall.add_index(e0 + 3)
 			continue
 		var w0: int = wall_base[i]
 		var w1: int = wall_base[i + 1]
