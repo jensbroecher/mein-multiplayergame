@@ -51,6 +51,12 @@ current file.
 (`_apply_curb_corner_weights`) when it builds the curbs. To update the saved curb meshes of every level
 without regenerating them, run `res://refresh_curb_corners.tscn` headless.
 
+## Frostpeak sky
+
+`sky_winter_cirrus.gdshader` (sky shader, set by the generator) draws the sky gradient, sun and static cirrus.
+Tune the look with its uniforms (`cloud_coverage`, `cloud_opacity`, `cloud_scale`, `wind_dir`,
+`streak_length`, `cloud_seed`). Keep it free of `TIME`: that makes Godot rebuild the radiance map every frame.
+
 ## Snow drifts
 
 `SnowDrift.gd` is a height field laid over road rows (`row_centres`/`row_rights`, set by the generator).

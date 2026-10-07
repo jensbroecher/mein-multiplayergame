@@ -106,12 +106,9 @@ func _ready() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_SKY
 	var sky := Sky.new()
-	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color(0.28, 0.55, 0.92)
-	sky_mat.sky_horizon_color = Color(0.72, 0.84, 0.94)
-	sky_mat.ground_bottom_color = Color(0.85, 0.90, 0.96)
-	sky_mat.ground_horizon_color = Color(0.78, 0.88, 0.95)
-	sky_mat.sun_angle_max = 28.0
+	# Clear winter sky with high cirrus streaks (same colours as the old procedural sky).
+	var sky_mat := ShaderMaterial.new()
+	sky_mat.shader = load("res://sky_winter_cirrus.gdshader")
 	sky.sky_material = sky_mat
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
