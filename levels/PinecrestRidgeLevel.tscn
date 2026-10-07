@@ -30,6 +30,9 @@
 [ext_resource type="PackedScene" uid="uid://c2bk2f3dha4iv" path="res://models/trees/flower_white.glb" id="31_vthow"]
 [ext_resource type="PackedScene" uid="uid://c700upvsp7ld4" path="res://models/trees/flower_blue.glb" id="32_o6osd"]
 [ext_resource type="PackedScene" uid="uid://brllk1kwohghd" path="res://models/trees/grass.glb" id="33_ddx7p"]
+[ext_resource type="Shader" path="res://terrain_grass_varied.gdshader" id="90_grassvar"]
+[ext_resource type="Texture2D" path="res://materials/dirt.png" id="91_dirt"]
+[ext_resource type="Texture2D" path="res://materials/dirt_normal.png" id="92_dirtn"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_runfn"]
 sky_top_color = Color(0.35, 0.6, 0.95, 1)
@@ -58,12 +61,11 @@ _data = {
 }
 point_count = 28
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_2ua18"]
-albedo_color = Color(0.85, 1.05, 0.85, 1)
-albedo_texture = ExtResource("3_8tnk5")
-roughness = 0.9
-uv1_scale = Vector3(0.12, 0.12, 0.12)
-uv1_triplanar = true
+[sub_resource type="ShaderMaterial" id="StandardMaterial3D_2ua18"]
+shader = ExtResource("90_grassvar")
+shader_parameter/grass_tex = ExtResource("3_8tnk5")
+shader_parameter/dirt_tex = ExtResource("91_dirt")
+shader_parameter/dirt_normal = ExtResource("92_dirtn")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_o3xqp"]
 albedo_color = Color(0.92, 0.92, 0.92, 1)

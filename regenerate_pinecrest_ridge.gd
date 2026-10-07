@@ -170,12 +170,13 @@ func _ready() -> void:
 	var grass_tex: Texture2D = load("res://materials/grass.png") as Texture2D
 	var asphalt_tex: Texture2D = load("res://materials/asphalt.png") as Texture2D
 	if grass_tex:
-		var grass_mat := StandardMaterial3D.new()
-		grass_mat.albedo_texture = grass_tex
-		grass_mat.albedo_color = Color(0.85, 1.05, 0.85)
-		grass_mat.uv1_scale = Vector3(0.12, 0.12, 0.12)
-		grass_mat.uv1_triplanar = true
-		grass_mat.roughness = 0.9
+		# terrain_grass_varied.gdshader breaks up the tiling of the single grass texture (two blended
+		# scales, meadow colour patches) and turns steep banks to dirt.
+		var grass_mat := ShaderMaterial.new()
+		grass_mat.shader = load("res://terrain_grass_varied.gdshader")
+		grass_mat.set_shader_parameter("grass_tex", grass_tex)
+		grass_mat.set_shader_parameter("dirt_tex", load("res://materials/dirt.png"))
+		grass_mat.set_shader_parameter("dirt_normal", load("res://materials/dirt_normal.png"))
 		tg.set("grass_material", grass_mat)
 	if asphalt_tex:
 		var road_mat := StandardMaterial3D.new()
