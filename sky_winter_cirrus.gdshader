@@ -14,6 +14,12 @@ uniform vec3 ground_bottom : source_color = vec3(0.85, 0.90, 0.96);
 // How quickly the horizon haze gives way to the deep blue overhead (higher = thinner haze band).
 uniform float sky_curve : hint_range(0.1, 2.0) = 0.45;
 uniform float sky_energy = 1.0;
+// Cold mist hanging along the horizon, matched to the level's distance fog colour so the far hills
+// and the sky behind them meet without a seam. Only near the horizon: the blue overhead stays clear.
+uniform vec3 horizon_haze : source_color = vec3(0.80, 0.87, 0.95);
+uniform float haze_strength : hint_range(0.0, 1.0) = 0.75;
+// Height of the haze band above the horizon (0..1 of the view direction's y).
+uniform float haze_height : hint_range(0.01, 0.5) = 0.16;
 
 group_uniforms sun;
 uniform vec3 sun_tint : source_color = vec3(1.0, 0.97, 0.92);
@@ -114,5 +120,6 @@ void sky() {
 		col = mix(col, cloud, c * cloud_opacity);
 	}
 
+	col = mix(col, horizon_haze, haze_strength * (1.0 - smoothstep(0.0, haze_height, abs(h))));
 	COLOR = col * sky_energy;
 }

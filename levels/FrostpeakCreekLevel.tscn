@@ -44,6 +44,9 @@ shader_parameter/ground_horizon = null
 shader_parameter/ground_bottom = null
 shader_parameter/sky_curve = null
 shader_parameter/sky_energy = null
+shader_parameter/horizon_haze = null
+shader_parameter/haze_strength = null
+shader_parameter/haze_height = null
 shader_parameter/sun_tint = null
 shader_parameter/sun_disc_degrees = null
 shader_parameter/sun_glow = null
@@ -69,6 +72,16 @@ tonemap_mode = 3
 glow_enabled = true
 glow_intensity = 0.25
 glow_bloom = 0.12
+fog_enabled = true
+fog_mode = 1
+fog_light_color = Color(0.8, 0.87, 0.95, 1)
+fog_sun_scatter = 0.08
+fog_density = 1.0
+fog_aerial_perspective = 0.25
+fog_sky_affect = 0.08
+fog_depth_curve = 1.6
+fog_depth_begin = 60.0
+fog_depth_end = 520.0
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_xgo5e"]
 emission_shape = 3
@@ -185,7 +198,7 @@ uv1_world_triplanar = true
 texture_filter = 5
 
 [sub_resource type="FastNoiseLite" id="FastNoiseLite_fsf7s"]
-seed = 327029903
+seed = -1326120307
 frequency = 0.02
 
 [sub_resource type="NoiseTexture2D" id="NoiseTexture2D_2m71r"]
@@ -1759,15 +1772,15 @@ size = Vector3(2.6, 0.14, 0.7)
 [sub_resource type="BoxMesh" id="BoxMesh_f257t"]
 size = Vector3(2.6, 0.14, 0.7)
 
-[node name="FrostpeakCreekLevel" type="Node3D" unique_id=759188429 node_paths=PackedStringArray("checkpoints", "track_path")]
+[node name="FrostpeakCreekLevel" type="Node3D" unique_id=1918308365 node_paths=PackedStringArray("checkpoints", "track_path")]
 script = ExtResource("1_uejjd")
 checkpoints = [NodePath("Checkpoints/Checkpoint_1"), NodePath("Checkpoints/Checkpoint_2"), NodePath("Checkpoints/Checkpoint_3"), NodePath("Checkpoints/Checkpoint_4"), NodePath("Checkpoints/Checkpoint_5"), NodePath("Checkpoints/Checkpoint_6"), NodePath("FinishLine")]
 track_path = NodePath("TrackPath")
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=2108241783]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1150197018]
 environment = SubResource("Environment_r205r")
 
-[node name="SunLight" type="DirectionalLight3D" parent="." unique_id=2052248712]
+[node name="SunLight" type="DirectionalLight3D" parent="." unique_id=715603385]
 transform = Transform3D(0.7431448, -0.48133227, 0.4648172, 0, 0.6946584, 0.7193398, -0.6691306, -0.5345736, 0.5162318, 0, 0, 0)
 light_color = Color(1, 0.97, 0.92, 1)
 light_energy = 1.3
@@ -1776,13 +1789,13 @@ directional_shadow_split_2 = 0.25
 directional_shadow_split_3 = 0.55
 directional_shadow_max_distance = 480.0
 
-[node name="WinterWindAudio" type="AudioStreamPlayer" parent="." unique_id=1480856276]
+[node name="WinterWindAudio" type="AudioStreamPlayer" parent="." unique_id=1533615440]
 stream = ExtResource("3_p1lr5")
 volume_db = -12.0
 autoplay = true
 stream_paused = true
 
-[node name="FallingSnow" type="GPUParticles3D" parent="." unique_id=1089486815]
+[node name="FallingSnow" type="GPUParticles3D" parent="." unique_id=1478552976]
 top_level = true
 cast_shadow = 0
 amount = 2500
@@ -1794,10 +1807,10 @@ process_material = SubResource("ParticleProcessMaterial_xgo5e")
 draw_pass_1 = SubResource("QuadMesh_6c2n8")
 script = ExtResource("4_a1lhu")
 
-[node name="TrackPath" type="Path3D" parent="." unique_id=1765596236]
+[node name="TrackPath" type="Path3D" parent="." unique_id=869629709]
 curve = SubResource("Curve3D_xsfoo")
 
-[node name="TerrainGenerator" type="Node3D" parent="." unique_id=673185668 node_paths=PackedStringArray("track_path")]
+[node name="TerrainGenerator" type="Node3D" parent="." unique_id=1140444886 node_paths=PackedStringArray("track_path")]
 script = ExtResource("5_k5n1e")
 track_path = NodePath("../TrackPath")
 terrain_size = Vector2(900, 900)
@@ -1816,1670 +1829,1670 @@ no_grass = true
 generate_bridge_supports = false
 terrain_grass_count = 0
 
-[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=674495596]
+[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=820633650]
 material_override = SubResource("StandardMaterial3D_oh87w")
 lod_bias = 10.0
 mesh = ExtResource("9_liwsd")
 
-[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=494369188]
+[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=761408006]
 
-[node name="@CollisionShape3D@6" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=495057504]
+[node name="@CollisionShape3D@6" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=1189207861]
 shape = ExtResource("10_hj557")
 
-[node name="Visual_Curbs" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1098998876]
+[node name="Visual_Curbs" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1552497115]
 material_override = SubResource("ShaderMaterial_5a1s1")
 mesh = ExtResource("12_i27qh")
 
-[node name="Visual_Curbs_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1113702467]
+[node name="Visual_Curbs_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1805848546]
 material_override = SubResource("StandardMaterial3D_x5no1")
 mesh = ExtResource("15_0gfak")
 
-[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=559698677]
+[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=688559812]
 material_override = SubResource("StandardMaterial3D_k8rdm")
 mesh = ExtResource("16_gsxw4")
 
-[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1476950401]
+[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=2089827136]
 material_override = SubResource("StandardMaterial3D_eao25")
 mesh = ExtResource("17_jdfbq")
 
-[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1725020049]
+[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=902346715]
 
-[node name="@CollisionShape3D@7" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=399489824]
+[node name="@CollisionShape3D@7" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=1309879384]
 shape = ExtResource("18_17noa")
 
-[node name="Water_Surface" type="MeshInstance3D" parent="TerrainGenerator" unique_id=762403013]
+[node name="Water_Surface" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1261235276]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.2, 0)
 material_override = SubResource("ShaderMaterial_2ytcl")
 mesh = SubResource("PlaneMesh_igu4d")
 metadata/water_surface_y = -1.2
 
-[node name="AlternativePaths" type="Node3D" parent="." unique_id=453350669]
+[node name="AlternativePaths" type="Node3D" parent="." unique_id=771268788]
 
-[node name="AlternativePath_CanyonCut" type="Path3D" parent="AlternativePaths" unique_id=2058772067]
+[node name="AlternativePath_CanyonCut" type="Path3D" parent="AlternativePaths" unique_id=986869798]
 curve = SubResource("Curve3D_i31dl")
 
-[node name="AlternativePath_GladeBridge" type="Path3D" parent="AlternativePaths" unique_id=1747583202]
+[node name="AlternativePath_GladeBridge" type="Path3D" parent="AlternativePaths" unique_id=2043564561]
 curve = SubResource("Curve3D_jxcow")
 
-[node name="AlternativeRoad_Collision" type="StaticBody3D" parent="." unique_id=1050887193 groups=["track_surface"]]
+[node name="AlternativeRoad_Collision" type="StaticBody3D" parent="." unique_id=1299672641 groups=["track_surface"]]
 
-[node name="AlternativeRoad_Deck" type="MeshInstance3D" parent="AlternativeRoad_Collision" unique_id=1609901799]
+[node name="AlternativeRoad_Deck" type="MeshInstance3D" parent="AlternativeRoad_Collision" unique_id=972552763]
 material_override = SubResource("StandardMaterial3D_fmbmv")
 mesh = SubResource("ArrayMesh_x78mq")
 
-[node name="AlternativeRoad_Embankment" type="MeshInstance3D" parent="AlternativeRoad_Collision" unique_id=624548751]
+[node name="AlternativeRoad_Embankment" type="MeshInstance3D" parent="AlternativeRoad_Collision" unique_id=321980569]
 material_override = SubResource("StandardMaterial3D_d813q")
 mesh = SubResource("ArrayMesh_7isn6")
 
-[node name="AlternativeRoad_NoseCaps" type="MeshInstance3D" parent="AlternativeRoad_Collision" unique_id=1653455670]
+[node name="AlternativeRoad_NoseCaps" type="MeshInstance3D" parent="AlternativeRoad_Collision" unique_id=1566389619]
 material_override = SubResource("StandardMaterial3D_d813q")
 mesh = SubResource("ArrayMesh_q0s8x")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="AlternativeRoad_Collision" unique_id=2132183387]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="AlternativeRoad_Collision" unique_id=1083505546]
 shape = SubResource("ConcavePolygonShape3D_fv8tn")
 
-[node name="CollisionShape3D_Embankment" type="CollisionShape3D" parent="AlternativeRoad_Collision" unique_id=1521392146]
+[node name="CollisionShape3D_Embankment" type="CollisionShape3D" parent="AlternativeRoad_Collision" unique_id=1553261020]
 shape = SubResource("ConcavePolygonShape3D_h3hrf")
 
-[node name="AlternativeRoad_Glade_Collision" type="StaticBody3D" parent="." unique_id=700295996 groups=["track_surface"]]
+[node name="AlternativeRoad_Glade_Collision" type="StaticBody3D" parent="." unique_id=2134232976 groups=["track_surface"]]
 
-[node name="AlternativeRoad_Glade_Deck" type="MeshInstance3D" parent="AlternativeRoad_Glade_Collision" unique_id=1334528879]
+[node name="AlternativeRoad_Glade_Deck" type="MeshInstance3D" parent="AlternativeRoad_Glade_Collision" unique_id=1468914471]
 material_override = SubResource("StandardMaterial3D_2lyfs")
 mesh = SubResource("ArrayMesh_y22qk")
 
-[node name="AlternativeRoad_Glade_Embankment" type="MeshInstance3D" parent="AlternativeRoad_Glade_Collision" unique_id=1578333081]
+[node name="AlternativeRoad_Glade_Embankment" type="MeshInstance3D" parent="AlternativeRoad_Glade_Collision" unique_id=387575318]
 material_override = SubResource("StandardMaterial3D_mxayv")
 mesh = SubResource("ArrayMesh_hcamp")
 
-[node name="AlternativeRoad_Glade_NoseCaps" type="MeshInstance3D" parent="AlternativeRoad_Glade_Collision" unique_id=1514178236]
+[node name="AlternativeRoad_Glade_NoseCaps" type="MeshInstance3D" parent="AlternativeRoad_Glade_Collision" unique_id=562017966]
 material_override = SubResource("StandardMaterial3D_mxayv")
 mesh = SubResource("ArrayMesh_xn645")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="AlternativeRoad_Glade_Collision" unique_id=914731583]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="AlternativeRoad_Glade_Collision" unique_id=1082592446]
 shape = SubResource("ConcavePolygonShape3D_tfp7q")
 
-[node name="CollisionShape3D_Embankment" type="CollisionShape3D" parent="AlternativeRoad_Glade_Collision" unique_id=473253122]
+[node name="CollisionShape3D_Embankment" type="CollisionShape3D" parent="AlternativeRoad_Glade_Collision" unique_id=18033765]
 shape = SubResource("ConcavePolygonShape3D_8t5gw")
 
-[node name="GladeTimberBridge" type="Node3D" parent="." unique_id=1555015696]
+[node name="GladeTimberBridge" type="Node3D" parent="." unique_id=2096258203]
 transform = Transform3D(-0.9883717, 0, 0.15205741, 0, 1, 0, -0.15205741, 0, -0.9883717, -8, 2.17, 203)
 
-[node name="BridgeDeck" type="StaticBody3D" parent="GladeTimberBridge" unique_id=1102969039 groups=["track_surface"]]
+[node name="BridgeDeck" type="StaticBody3D" parent="GladeTimberBridge" unique_id=2091036196 groups=["track_surface"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.12, 0)
 
-[node name="@CollisionShape3D@8" type="CollisionShape3D" parent="GladeTimberBridge/BridgeDeck" unique_id=442807315]
+[node name="@CollisionShape3D@8" type="CollisionShape3D" parent="GladeTimberBridge/BridgeDeck" unique_id=1854482010]
 shape = SubResource("BoxShape3D_e1pfw")
 
-[node name="BridgeDeck_Mesh" type="MeshInstance3D" parent="GladeTimberBridge/BridgeDeck" unique_id=816109540]
+[node name="BridgeDeck_Mesh" type="MeshInstance3D" parent="GladeTimberBridge/BridgeDeck" unique_id=652958831]
 material_override = SubResource("StandardMaterial3D_doejw")
 mesh = SubResource("BoxMesh_uglaw")
 
-[node name="WheelGuard_N" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=975880772]
+[node name="WheelGuard_N" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1452229746]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.16, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_gomc1")
 
-[node name="WheelGuard_S" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=419124133]
+[node name="WheelGuard_S" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=684420805]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.16, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_ec4yo")
 
-[node name="StoneAbutment_W" type="StaticBody3D" parent="GladeTimberBridge" unique_id=1935558084 groups=["track_surface"]]
+[node name="StoneAbutment_W" type="StaticBody3D" parent="GladeTimberBridge" unique_id=907374677 groups=["track_surface"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.952947, -5.19, 0)
 
-[node name="@CollisionShape3D@9" type="CollisionShape3D" parent="GladeTimberBridge/StoneAbutment_W" unique_id=1859164445]
+[node name="@CollisionShape3D@9" type="CollisionShape3D" parent="GladeTimberBridge/StoneAbutment_W" unique_id=1290368032]
 shape = SubResource("BoxShape3D_wtuhq")
 
-[node name="Abutment_Mesh" type="MeshInstance3D" parent="GladeTimberBridge/StoneAbutment_W" unique_id=1672034311]
+[node name="Abutment_Mesh" type="MeshInstance3D" parent="GladeTimberBridge/StoneAbutment_W" unique_id=975080154]
 material_override = SubResource("StandardMaterial3D_f2ony")
 mesh = SubResource("ArrayMesh_4lt0k")
 
-[node name="WingWall_W_N" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=486259882]
+[node name="WingWall_W_N" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1393844029]
 transform = Transform3D(0.88294756, 0, -0.46947157, 0, 1, 0, 0.46947157, 0, 0.88294756, -13.952947, -4.0375, -6.5)
 material_override = SubResource("StandardMaterial3D_f2ony")
 mesh = SubResource("ArrayMesh_h7emi")
 
-[node name="WingWall_W_S" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=793317565]
+[node name="WingWall_W_S" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1495991261]
 transform = Transform3D(0.88294756, 0, 0.46947157, 0, 1, 0, -0.46947157, 0, 0.88294756, -13.952947, -4.0375, 6.5)
 material_override = SubResource("StandardMaterial3D_f2ony")
 mesh = SubResource("ArrayMesh_2052b")
 
-[node name="StoneAbutment_E" type="StaticBody3D" parent="GladeTimberBridge" unique_id=1118231573 groups=["track_surface"]]
+[node name="StoneAbutment_E" type="StaticBody3D" parent="GladeTimberBridge" unique_id=2018162828 groups=["track_surface"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.952947, -5.19, 0)
 
-[node name="@CollisionShape3D@10" type="CollisionShape3D" parent="GladeTimberBridge/StoneAbutment_E" unique_id=769804826]
+[node name="@CollisionShape3D@10" type="CollisionShape3D" parent="GladeTimberBridge/StoneAbutment_E" unique_id=902920945]
 shape = SubResource("BoxShape3D_12r08")
 
-[node name="Abutment_Mesh" type="MeshInstance3D" parent="GladeTimberBridge/StoneAbutment_E" unique_id=736655123]
+[node name="Abutment_Mesh" type="MeshInstance3D" parent="GladeTimberBridge/StoneAbutment_E" unique_id=381860018]
 material_override = SubResource("StandardMaterial3D_f2ony")
 mesh = SubResource("ArrayMesh_qryku")
 
-[node name="WingWall_E_N" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=545708102]
+[node name="WingWall_E_N" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1016609904]
 transform = Transform3D(0.88294756, 0, 0.46947157, 0, 1, 0, -0.46947157, 0, 0.88294756, 13.952947, -4.0375, -6.5)
 material_override = SubResource("StandardMaterial3D_f2ony")
 mesh = SubResource("ArrayMesh_f640c")
 
-[node name="WingWall_E_S" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1775385035]
+[node name="WingWall_E_S" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=963389899]
 transform = Transform3D(0.88294756, 0, -0.46947157, 0, 1, 0, 0.46947157, 0, 0.88294756, 13.952947, -4.0375, 6.5)
 material_override = SubResource("StandardMaterial3D_f2ony")
 mesh = SubResource("ArrayMesh_ksili")
 
-[node name="Girder_0" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=668886218]
+[node name="Girder_0" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=843027440]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.65, -4.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_3gh31")
 
-[node name="Girder_1" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=2101014017]
+[node name="Girder_1" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=513418252]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.65, -1.6)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_j7xug")
 
-[node name="Girder_2" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=983966838]
+[node name="Girder_2" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=774859610]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.65, 1.6)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_qarxh")
 
-[node name="Girder_3" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=256082019]
+[node name="Girder_3" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1093161745]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.65, 4.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_ejtby")
 
-[node name="GuardrailCol_N" type="StaticBody3D" parent="GladeTimberBridge" unique_id=380728969]
+[node name="GuardrailCol_N" type="StaticBody3D" parent="GladeTimberBridge" unique_id=764028859]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, -5.8)
 
-[node name="@CollisionShape3D@11" type="CollisionShape3D" parent="GladeTimberBridge/GuardrailCol_N" unique_id=831359831]
+[node name="@CollisionShape3D@11" type="CollisionShape3D" parent="GladeTimberBridge/GuardrailCol_N" unique_id=558923765]
 shape = SubResource("BoxShape3D_54oml")
 
-[node name="TopRail_N" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=770291071]
+[node name="TopRail_N" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1993575907]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.45, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_48rmc")
 
-[node name="MidRail_N" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=978215383]
+[node name="MidRail_N" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=608497541]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_wdr0y")
 
-[node name="Post_N_0" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=864685126]
+[node name="Post_N_0" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1490335733]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.152946, 0.75, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_8fn5r")
 
-[node name="XBrace1_N_0" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=658998737]
+[node name="XBrace1_N_0" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=601965180]
 transform = Transform3D(0.9830905, -0.18312031, 0, 0.18312031, 0.9830905, 0, 0, 0, 1, -11.273954, 1.15, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_ts5xw")
 
-[node name="XBrace2_N_0" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=395785248]
+[node name="XBrace2_N_0" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=127494303]
 transform = Transform3D(0.9830905, 0.18312031, 0, -0.18312031, 0.9830905, 0, 0, 0, 1, -11.273954, 1.15, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_twdub")
 
-[node name="Post_N_1" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=171145491]
+[node name="Post_N_1" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1099200338]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.394961, 0.75, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_kvpny")
 
-[node name="XBrace1_N_1" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1729259540]
+[node name="XBrace1_N_1" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1109851511]
 transform = Transform3D(0.9830905, -0.18312031, 0, 0.18312031, 0.9830905, 0, 0, 0, 1, -7.5159693, 1.15, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_l52oh")
 
-[node name="XBrace2_N_1" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1431019165]
+[node name="XBrace2_N_1" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1821568870]
 transform = Transform3D(0.9830905, 0.18312031, 0, -0.18312031, 0.9830905, 0, 0, 0, 1, -7.5159693, 1.15, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_6t24x")
 
-[node name="Post_N_2" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1114534690]
+[node name="Post_N_2" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1100436970]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.636977, 0.75, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_3fjyv")
 
-[node name="XBrace1_N_2" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1995831880]
+[node name="XBrace1_N_2" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=736913069]
 transform = Transform3D(0.9830905, -0.18312031, 0, 0.18312031, 0.9830905, 0, 0, 0, 1, -3.7579846, 1.15, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_p2xlt")
 
-[node name="XBrace2_N_2" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=100729997]
+[node name="XBrace2_N_2" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1132061432]
 transform = Transform3D(0.9830905, 0.18312031, 0, -0.18312031, 0.9830905, 0, 0, 0, 1, -3.7579846, 1.15, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_2k5l7")
 
-[node name="Post_N_3" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1522061434]
+[node name="Post_N_3" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=321392102]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.8789923, 0.75, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_01162")
 
-[node name="XBrace1_N_3" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1341028405]
+[node name="XBrace1_N_3" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=672168579]
 transform = Transform3D(0.9830905, -0.18312031, 0, 0.18312031, 0.9830905, 0, 0, 0, 1, 2.220446e-16, 1.15, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_lw8m3")
 
-[node name="XBrace2_N_3" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1994379121]
+[node name="XBrace2_N_3" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=841709887]
 transform = Transform3D(0.9830905, 0.18312031, 0, -0.18312031, 0.9830905, 0, 0, 0, 1, 2.220446e-16, 1.15, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_nfouv")
 
-[node name="Post_N_4" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=777858075]
+[node name="Post_N_4" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=751123210]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.8789923, 0.75, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_st2of")
 
-[node name="XBrace1_N_4" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=795668426]
+[node name="XBrace1_N_4" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=979271434]
 transform = Transform3D(0.9830905, -0.18312031, 0, 0.18312031, 0.9830905, 0, 0, 0, 1, 3.7579846, 1.15, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_2g236")
 
-[node name="XBrace2_N_4" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1141663669]
+[node name="XBrace2_N_4" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=743133244]
 transform = Transform3D(0.9830905, 0.18312031, 0, -0.18312031, 0.9830905, 0, 0, 0, 1, 3.7579846, 1.15, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_2tyob")
 
-[node name="Post_N_5" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=293785422]
+[node name="Post_N_5" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1357906420]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.636977, 0.75, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_oio2k")
 
-[node name="XBrace1_N_5" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=531313843]
+[node name="XBrace1_N_5" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1052925920]
 transform = Transform3D(0.9830905, -0.18312031, 0, 0.18312031, 0.9830905, 0, 0, 0, 1, 7.5159693, 1.15, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_mcskk")
 
-[node name="XBrace2_N_5" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=371562782]
+[node name="XBrace2_N_5" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1920953729]
 transform = Transform3D(0.9830905, 0.18312031, 0, -0.18312031, 0.9830905, 0, 0, 0, 1, 7.5159693, 1.15, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_l2d21")
 
-[node name="Post_N_6" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1561120338]
+[node name="Post_N_6" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=2120218728]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.394961, 0.75, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_n7ymb")
 
-[node name="XBrace1_N_6" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=2001663470]
+[node name="XBrace1_N_6" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1310199865]
 transform = Transform3D(0.9830905, -0.18312031, 0, 0.18312031, 0.9830905, 0, 0, 0, 1, 11.273954, 1.15, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_feah0")
 
-[node name="XBrace2_N_6" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1905060124]
+[node name="XBrace2_N_6" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1488156582]
 transform = Transform3D(0.9830905, 0.18312031, 0, -0.18312031, 0.9830905, 0, 0, 0, 1, 11.273954, 1.15, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_gw8ke")
 
-[node name="Post_N_7" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=180806629]
+[node name="Post_N_7" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1927531896]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.152946, 0.75, -5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_7hwlb")
 
-[node name="GuardrailCol_S" type="StaticBody3D" parent="GladeTimberBridge" unique_id=1265823707]
+[node name="GuardrailCol_S" type="StaticBody3D" parent="GladeTimberBridge" unique_id=2122241697]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 5.8)
 
-[node name="@CollisionShape3D@12" type="CollisionShape3D" parent="GladeTimberBridge/GuardrailCol_S" unique_id=1502970916]
+[node name="@CollisionShape3D@12" type="CollisionShape3D" parent="GladeTimberBridge/GuardrailCol_S" unique_id=943958204]
 shape = SubResource("BoxShape3D_tafkc")
 
-[node name="TopRail_S" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1175292459]
+[node name="TopRail_S" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=779014120]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.45, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_peqqg")
 
-[node name="MidRail_S" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1388103504]
+[node name="MidRail_S" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1001420420]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_wgxi5")
 
-[node name="FloorBent_0" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1401884385]
+[node name="FloorBent_0" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1852752782]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.152946, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_5akw3")
 
-[node name="Post_S_0" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1915874804]
+[node name="Post_S_0" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1988855253]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.152946, 0.75, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_g122a")
 
-[node name="XBrace1_S_0" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1904030168]
+[node name="XBrace1_S_0" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=908058321]
 transform = Transform3D(0.9830905, -0.18312031, 0, 0.18312031, 0.9830905, 0, 0, 0, 1, -11.273954, 1.15, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_3jup4")
 
-[node name="XBrace2_S_0" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1860307620]
+[node name="XBrace2_S_0" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=538918550]
 transform = Transform3D(0.9830905, 0.18312031, 0, -0.18312031, 0.9830905, 0, 0, 0, 1, -11.273954, 1.15, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_gn3gn")
 
-[node name="FloorBent_1" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=2013445056]
+[node name="FloorBent_1" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1109746154]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.394961, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_uvhpr")
 
-[node name="Post_S_1" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=526151022]
+[node name="Post_S_1" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=257712725]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.394961, 0.75, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_c7nsa")
 
-[node name="XBrace1_S_1" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=2041699273]
+[node name="XBrace1_S_1" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1348600545]
 transform = Transform3D(0.9830905, -0.18312031, 0, 0.18312031, 0.9830905, 0, 0, 0, 1, -7.5159693, 1.15, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_7dt83")
 
-[node name="XBrace2_S_1" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1145099126]
+[node name="XBrace2_S_1" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=487377123]
 transform = Transform3D(0.9830905, 0.18312031, 0, -0.18312031, 0.9830905, 0, 0, 0, 1, -7.5159693, 1.15, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_74cwf")
 
-[node name="FloorBent_2" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=509027164]
+[node name="FloorBent_2" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=2128149247]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.636977, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_73hdy")
 
-[node name="Post_S_2" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=537193950]
+[node name="Post_S_2" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=87301735]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.636977, 0.75, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_2ysfh")
 
-[node name="XBrace1_S_2" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=63201178]
+[node name="XBrace1_S_2" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1379216668]
 transform = Transform3D(0.9830905, -0.18312031, 0, 0.18312031, 0.9830905, 0, 0, 0, 1, -3.7579846, 1.15, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_bhsrl")
 
-[node name="XBrace2_S_2" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1752597363]
+[node name="XBrace2_S_2" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=469346077]
 transform = Transform3D(0.9830905, 0.18312031, 0, -0.18312031, 0.9830905, 0, 0, 0, 1, -3.7579846, 1.15, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_yioln")
 
-[node name="FloorBent_3" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=636911742]
+[node name="FloorBent_3" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=877666576]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.8789923, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_4reax")
 
-[node name="Post_S_3" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=637969183]
+[node name="Post_S_3" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1564184650]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.8789923, 0.75, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_0lfc2")
 
-[node name="XBrace1_S_3" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=263294304]
+[node name="XBrace1_S_3" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1472910582]
 transform = Transform3D(0.9830905, -0.18312031, 0, 0.18312031, 0.9830905, 0, 0, 0, 1, 2.220446e-16, 1.15, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_j8xw5")
 
-[node name="XBrace2_S_3" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1893598906]
+[node name="XBrace2_S_3" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=182599078]
 transform = Transform3D(0.9830905, 0.18312031, 0, -0.18312031, 0.9830905, 0, 0, 0, 1, 2.220446e-16, 1.15, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_ub4uy")
 
-[node name="FloorBent_4" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1014310525]
+[node name="FloorBent_4" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=788888137]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.8789923, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_vixf7")
 
-[node name="Post_S_4" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1934009039]
+[node name="Post_S_4" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1352586129]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.8789923, 0.75, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_msn50")
 
-[node name="XBrace1_S_4" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1508380687]
+[node name="XBrace1_S_4" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=771394058]
 transform = Transform3D(0.9830905, -0.18312031, 0, 0.18312031, 0.9830905, 0, 0, 0, 1, 3.7579846, 1.15, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_n0smu")
 
-[node name="XBrace2_S_4" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1122088783]
+[node name="XBrace2_S_4" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=507247553]
 transform = Transform3D(0.9830905, 0.18312031, 0, -0.18312031, 0.9830905, 0, 0, 0, 1, 3.7579846, 1.15, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_dhcae")
 
-[node name="FloorBent_5" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1875378929]
+[node name="FloorBent_5" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1634888729]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.636977, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_i7mht")
 
-[node name="Post_S_5" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=962489162]
+[node name="Post_S_5" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=946837210]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.636977, 0.75, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_k6kjo")
 
-[node name="XBrace1_S_5" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1252222375]
+[node name="XBrace1_S_5" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1070011715]
 transform = Transform3D(0.9830905, -0.18312031, 0, 0.18312031, 0.9830905, 0, 0, 0, 1, 7.5159693, 1.15, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_3lsok")
 
-[node name="XBrace2_S_5" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=651681954]
+[node name="XBrace2_S_5" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1266762063]
 transform = Transform3D(0.9830905, 0.18312031, 0, -0.18312031, 0.9830905, 0, 0, 0, 1, 7.5159693, 1.15, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_mwb8x")
 
-[node name="FloorBent_6" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1229674831]
+[node name="FloorBent_6" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=552251487]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.394961, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_f4ua4")
 
-[node name="Post_S_6" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1785175246]
+[node name="Post_S_6" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=388778674]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.394961, 0.75, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_ut2y3")
 
-[node name="XBrace1_S_6" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=678172652]
+[node name="XBrace1_S_6" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=967503023]
 transform = Transform3D(0.9830905, -0.18312031, 0, 0.18312031, 0.9830905, 0, 0, 0, 1, 11.273954, 1.15, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_abgto")
 
-[node name="XBrace2_S_6" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=464612296]
+[node name="XBrace2_S_6" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=493751495]
 transform = Transform3D(0.9830905, 0.18312031, 0, -0.18312031, 0.9830905, 0, 0, 0, 1, 11.273954, 1.15, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_vvhpq")
 
-[node name="FloorBent_7" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=773949421]
+[node name="FloorBent_7" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=824694064]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.152946, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_8yr6j")
 
-[node name="Post_S_7" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1614203248]
+[node name="Post_S_7" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1601232155]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.152946, 0.75, 5.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_pjojf")
 
-[node name="TrestleBent_0" type="Node3D" parent="GladeTimberBridge" unique_id=905508933]
+[node name="TrestleBent_0" type="Node3D" parent="GladeTimberBridge" unique_id=1795403411]
 
-[node name="CapBeam" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=842866998]
+[node name="CapBeam" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=1337078915]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.31, 0)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_mgyn1")
 
-[node name="CollarTie_45" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=1585377713]
+[node name="CollarTie_45" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=1585526178]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -4.8005, 0)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_5bmwa")
 
-[node name="CollarTie_82" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=217438656]
+[node name="CollarTie_82" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=1980425777]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -7.4238, 0)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_7th48")
 
-[node name="Pile_0" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=1079494109]
+[node name="Pile_0" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=483383363]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, -4.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("ArrayMesh_72jn5")
 
-[node name="Plinth_0" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=673877219]
+[node name="Plinth_0" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=1596336248]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, -4.8)
 material_override = SubResource("StandardMaterial3D_f2ony")
 mesh = SubResource("ArrayMesh_l0dyb")
 
-[node name="Pile_1" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=2073066430]
+[node name="Pile_1" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=486501803]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, -1.6)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("ArrayMesh_qh71t")
 
-[node name="Plinth_1" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=653501549]
+[node name="Plinth_1" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=333620353]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, -1.6)
 material_override = SubResource("StandardMaterial3D_f2ony")
 mesh = SubResource("ArrayMesh_cpdd8")
 
-[node name="Pile_2" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=1393718010]
+[node name="Pile_2" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=728610245]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, 1.6)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("ArrayMesh_1unc5")
 
-[node name="Plinth_2" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=1772470688]
+[node name="Plinth_2" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=82178099]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, 1.6)
 material_override = SubResource("StandardMaterial3D_f2ony")
 mesh = SubResource("ArrayMesh_tlqcl")
 
-[node name="Pile_3" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=1818410910]
+[node name="Pile_3" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=1909870999]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, 4.8)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("ArrayMesh_vgl47")
 
-[node name="Plinth_3" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=110784183]
+[node name="Plinth_3" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=502287920]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, 4.8)
 material_override = SubResource("StandardMaterial3D_f2ony")
 mesh = SubResource("ArrayMesh_quwl3")
 
-[node name="SwayBrace_0_0" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=1701755628]
+[node name="SwayBrace_0_0" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=1203893073]
 transform = Transform3D(1, 0, 0, 0, 0.57035404, -0.821399, 0, 0.821399, 0.57035404, 0.22, -4.855, -3.2)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_cb65j")
 
-[node name="SwayBrace_0_1" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=694378921]
+[node name="SwayBrace_0_1" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=1696961843]
 transform = Transform3D(1, 0, 0, 0, 0.57035404, 0.821399, 0, -0.821399, 0.57035404, -0.22, -4.855, -3.2)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_wb0ua")
 
-[node name="SwayBrace_1_0" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=190436292]
+[node name="SwayBrace_1_0" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=841401222]
 transform = Transform3D(1, 0, 0, 0, 0.57035404, -0.821399, 0, 0.821399, 0.57035404, 0.22, -4.855, -2.220446e-16)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_clbnr")
 
-[node name="SwayBrace_1_1" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=1541440213]
+[node name="SwayBrace_1_1" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=738969133]
 transform = Transform3D(1, 0, 0, 0, 0.57035404, 0.821399, 0, -0.821399, 0.57035404, -0.22, -4.855, -2.220446e-16)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_txggr")
 
-[node name="SwayBrace_2_0" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=1146808566]
+[node name="SwayBrace_2_0" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=322124996]
 transform = Transform3D(1, 0, 0, 0, 0.57035404, -0.821399, 0, 0.821399, 0.57035404, 0.22, -4.855, 3.2)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_0ehj8")
 
-[node name="SwayBrace_2_1" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=1610182967]
+[node name="SwayBrace_2_1" type="MeshInstance3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=928514785]
 transform = Transform3D(1, 0, 0, 0, 0.57035404, 0.821399, 0, -0.821399, 0.57035404, -0.22, -4.855, 3.2)
 material_override = SubResource("StandardMaterial3D_cwffb")
 mesh = SubResource("BoxMesh_r4jev")
 
-[node name="BentCollision" type="StaticBody3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=710892515]
+[node name="BentCollision" type="StaticBody3D" parent="GladeTimberBridge/TrestleBent_0" unique_id=1287565674]
 
-[node name="PileCol_0" type="CollisionShape3D" parent="GladeTimberBridge/TrestleBent_0/BentCollision" unique_id=78928772]
+[node name="PileCol_0" type="CollisionShape3D" parent="GladeTimberBridge/TrestleBent_0/BentCollision" unique_id=1760641043]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, -4.8)
 shape = SubResource("BoxShape3D_xcj4y")
 
-[node name="PlinthCol_0" type="CollisionShape3D" parent="GladeTimberBridge/TrestleBent_0/BentCollision" unique_id=1321383734]
+[node name="PlinthCol_0" type="CollisionShape3D" parent="GladeTimberBridge/TrestleBent_0/BentCollision" unique_id=172809846]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, -4.8)
 shape = SubResource("BoxShape3D_4ah6h")
 
-[node name="PileCol_1" type="CollisionShape3D" parent="GladeTimberBridge/TrestleBent_0/BentCollision" unique_id=800433583]
+[node name="PileCol_1" type="CollisionShape3D" parent="GladeTimberBridge/TrestleBent_0/BentCollision" unique_id=615557253]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, -1.6)
 shape = SubResource("BoxShape3D_b5mqx")
 
-[node name="PlinthCol_1" type="CollisionShape3D" parent="GladeTimberBridge/TrestleBent_0/BentCollision" unique_id=1302283016]
+[node name="PlinthCol_1" type="CollisionShape3D" parent="GladeTimberBridge/TrestleBent_0/BentCollision" unique_id=1093170564]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, -1.6)
 shape = SubResource("BoxShape3D_m4ppa")
 
-[node name="PileCol_2" type="CollisionShape3D" parent="GladeTimberBridge/TrestleBent_0/BentCollision" unique_id=1812012275]
+[node name="PileCol_2" type="CollisionShape3D" parent="GladeTimberBridge/TrestleBent_0/BentCollision" unique_id=1442095577]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, 1.6)
 shape = SubResource("BoxShape3D_enc4d")
 
-[node name="PlinthCol_2" type="CollisionShape3D" parent="GladeTimberBridge/TrestleBent_0/BentCollision" unique_id=832270748]
+[node name="PlinthCol_2" type="CollisionShape3D" parent="GladeTimberBridge/TrestleBent_0/BentCollision" unique_id=1912774183]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, 1.6)
 shape = SubResource("BoxShape3D_87ay2")
 
-[node name="PileCol_3" type="CollisionShape3D" parent="GladeTimberBridge/TrestleBent_0/BentCollision" unique_id=2031235725]
+[node name="PileCol_3" type="CollisionShape3D" parent="GladeTimberBridge/TrestleBent_0/BentCollision" unique_id=779176179]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, 4.8)
 shape = SubResource("BoxShape3D_5d5kf")
 
-[node name="PlinthCol_3" type="CollisionShape3D" parent="GladeTimberBridge/TrestleBent_0/BentCollision" unique_id=1102638844]
+[node name="PlinthCol_3" type="CollisionShape3D" parent="GladeTimberBridge/TrestleBent_0/BentCollision" unique_id=2040184580]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, 4.8)
 shape = SubResource("BoxShape3D_w14wd")
 
-[node name="SnowCap_WheelGuard_N" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1009575212]
+[node name="SnowCap_WheelGuard_N" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=439478396]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.53, -5.8)
 material_override = SubResource("ShaderMaterial_eclbu")
 mesh = SubResource("BoxMesh_vborf")
 
-[node name="SnowCap_TopRail_N" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1194995329]
+[node name="SnowCap_TopRail_N" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1617598319]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.64, -5.8)
 material_override = SubResource("ShaderMaterial_eclbu")
 mesh = SubResource("BoxMesh_1l4ms")
 
-[node name="SnowCap_WheelGuard_S" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=838302522]
+[node name="SnowCap_WheelGuard_S" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1540576726]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.53, 5.8)
 material_override = SubResource("ShaderMaterial_eclbu")
 mesh = SubResource("BoxMesh_bbkgg")
 
-[node name="SnowCap_TopRail_S" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=412499006]
+[node name="SnowCap_TopRail_S" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1607361240]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.64, 5.8)
 material_override = SubResource("ShaderMaterial_eclbu")
 mesh = SubResource("BoxMesh_4dml8")
 
-[node name="Icicles" type="MultiMeshInstance3D" parent="GladeTimberBridge" unique_id=954432269]
+[node name="Icicles" type="MultiMeshInstance3D" parent="GladeTimberBridge" unique_id=1520240177]
 material_override = SubResource("StandardMaterial3D_axhv2")
 cast_shadow = 0
 multimesh = SubResource("MultiMesh_ogbru")
 
-[node name="SnowCap_Abutment_W_N" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=447111782]
+[node name="SnowCap_Abutment_W_N" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=273058135]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.952947, 0.05, -6.15)
 material_override = SubResource("ShaderMaterial_eclbu")
 mesh = SubResource("BoxMesh_py7w1")
 
-[node name="SnowCap_Abutment_W_S" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=119073525]
+[node name="SnowCap_Abutment_W_S" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1464612782]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.952947, 0.05, 6.15)
 material_override = SubResource("ShaderMaterial_eclbu")
 mesh = SubResource("BoxMesh_tdfej")
 
-[node name="SnowCap_Abutment_E_N" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=821850230]
+[node name="SnowCap_Abutment_E_N" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=280752363]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.952947, 0.05, -6.15)
 material_override = SubResource("ShaderMaterial_eclbu")
 mesh = SubResource("BoxMesh_3hofc")
 
-[node name="SnowCap_Abutment_E_S" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=1000580824]
+[node name="SnowCap_Abutment_E_S" type="MeshInstance3D" parent="GladeTimberBridge" unique_id=943877255]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.952947, 0.05, 6.15)
 material_override = SubResource("ShaderMaterial_eclbu")
 mesh = SubResource("BoxMesh_lsbkw")
 
-[node name="AlpineTimberBridge" type="Node3D" parent="." unique_id=868021218]
+[node name="AlpineTimberBridge" type="Node3D" parent="." unique_id=1951417904]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.8, -305)
 
-[node name="BridgeDeck" type="StaticBody3D" parent="AlpineTimberBridge" unique_id=263765137 groups=["track_surface"]]
+[node name="BridgeDeck" type="StaticBody3D" parent="AlpineTimberBridge" unique_id=1715771328 groups=["track_surface"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.12, 0)
 
-[node name="@CollisionShape3D@13" type="CollisionShape3D" parent="AlpineTimberBridge/BridgeDeck" unique_id=1764827024]
+[node name="@CollisionShape3D@13" type="CollisionShape3D" parent="AlpineTimberBridge/BridgeDeck" unique_id=1880841808]
 shape = SubResource("BoxShape3D_kllyv")
 
-[node name="BridgeDeck_Mesh" type="MeshInstance3D" parent="AlpineTimberBridge/BridgeDeck" unique_id=41472406]
+[node name="BridgeDeck_Mesh" type="MeshInstance3D" parent="AlpineTimberBridge/BridgeDeck" unique_id=856991164]
 material_override = SubResource("StandardMaterial3D_lhtro")
 mesh = SubResource("BoxMesh_qxlnk")
 
-[node name="WheelGuard_N" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1563668916]
+[node name="WheelGuard_N" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=176497722]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.16, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_81y83")
 
-[node name="WheelGuard_S" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1903665326]
+[node name="WheelGuard_S" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1374893519]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.16, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_x5cb2")
 
-[node name="StoneAbutment_W" type="StaticBody3D" parent="AlpineTimberBridge" unique_id=1539200402 groups=["track_surface"]]
+[node name="StoneAbutment_W" type="StaticBody3D" parent="AlpineTimberBridge" unique_id=277144788 groups=["track_surface"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -28.8, -5.19, 0)
 
-[node name="@CollisionShape3D@14" type="CollisionShape3D" parent="AlpineTimberBridge/StoneAbutment_W" unique_id=655819489]
+[node name="@CollisionShape3D@14" type="CollisionShape3D" parent="AlpineTimberBridge/StoneAbutment_W" unique_id=244169030]
 shape = SubResource("BoxShape3D_38b4b")
 
-[node name="Abutment_Mesh" type="MeshInstance3D" parent="AlpineTimberBridge/StoneAbutment_W" unique_id=71506046]
+[node name="Abutment_Mesh" type="MeshInstance3D" parent="AlpineTimberBridge/StoneAbutment_W" unique_id=1946280041]
 material_override = SubResource("StandardMaterial3D_6sp46")
 mesh = SubResource("ArrayMesh_o0sxw")
 
-[node name="WingWall_W_N" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=707166952]
+[node name="WingWall_W_N" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1450397238]
 transform = Transform3D(0.88294756, 0, -0.46947157, 0, 1, 0, 0.46947157, 0, 0.88294756, -30.8, -4.0375, -9.3)
 material_override = SubResource("StandardMaterial3D_6sp46")
 mesh = SubResource("ArrayMesh_2rd14")
 
-[node name="WingWall_W_S" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1829538080]
+[node name="WingWall_W_S" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=262790211]
 transform = Transform3D(0.88294756, 0, 0.46947157, 0, 1, 0, -0.46947157, 0, 0.88294756, -30.8, -4.0375, 9.3)
 material_override = SubResource("StandardMaterial3D_6sp46")
 mesh = SubResource("ArrayMesh_q8nib")
 
-[node name="StoneAbutment_E" type="StaticBody3D" parent="AlpineTimberBridge" unique_id=2126214612 groups=["track_surface"]]
+[node name="StoneAbutment_E" type="StaticBody3D" parent="AlpineTimberBridge" unique_id=840203091 groups=["track_surface"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.8, -5.19, 0)
 
-[node name="@CollisionShape3D@15" type="CollisionShape3D" parent="AlpineTimberBridge/StoneAbutment_E" unique_id=1023728547]
+[node name="@CollisionShape3D@15" type="CollisionShape3D" parent="AlpineTimberBridge/StoneAbutment_E" unique_id=309860417]
 shape = SubResource("BoxShape3D_2knxp")
 
-[node name="Abutment_Mesh" type="MeshInstance3D" parent="AlpineTimberBridge/StoneAbutment_E" unique_id=1134716177]
+[node name="Abutment_Mesh" type="MeshInstance3D" parent="AlpineTimberBridge/StoneAbutment_E" unique_id=909744581]
 material_override = SubResource("StandardMaterial3D_6sp46")
 mesh = SubResource("ArrayMesh_t0spc")
 
-[node name="WingWall_E_N" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1509467232]
+[node name="WingWall_E_N" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=56358274]
 transform = Transform3D(0.88294756, 0, 0.46947157, 0, 1, 0, -0.46947157, 0, 0.88294756, 30.8, -4.0375, -9.3)
 material_override = SubResource("StandardMaterial3D_6sp46")
 mesh = SubResource("ArrayMesh_s2uc7")
 
-[node name="WingWall_E_S" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1858148980]
+[node name="WingWall_E_S" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1565099208]
 transform = Transform3D(0.88294756, 0, -0.46947157, 0, 1, 0, 0.46947157, 0, 0.88294756, 30.8, -4.0375, 9.3)
 material_override = SubResource("StandardMaterial3D_6sp46")
 mesh = SubResource("ArrayMesh_tovw3")
 
-[node name="Girder_0" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=297061314]
+[node name="Girder_0" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1672805640]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.65, -7.04)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_x6em3")
 
-[node name="Girder_1" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=853770803]
+[node name="Girder_1" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=480053607]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.65, -2.3466666)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_tg8xv")
 
-[node name="Girder_2" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1288665586]
+[node name="Girder_2" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1774954766]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.65, 2.3466666)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_6f66n")
 
-[node name="Girder_3" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1782140904]
+[node name="Girder_3" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1474110855]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.65, 7.04)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_xhiwq")
 
-[node name="GuardrailCol_N" type="StaticBody3D" parent="AlpineTimberBridge" unique_id=1626888968]
+[node name="GuardrailCol_N" type="StaticBody3D" parent="AlpineTimberBridge" unique_id=36473423]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, -8.6)
 
-[node name="@CollisionShape3D@16" type="CollisionShape3D" parent="AlpineTimberBridge/GuardrailCol_N" unique_id=1374004652]
+[node name="@CollisionShape3D@16" type="CollisionShape3D" parent="AlpineTimberBridge/GuardrailCol_N" unique_id=286679698]
 shape = SubResource("BoxShape3D_8liv5")
 
-[node name="TopRail_N" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2127446671]
+[node name="TopRail_N" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=618699922]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.45, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_chb7h")
 
-[node name="MidRail_N" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=651313293]
+[node name="MidRail_N" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1773076062]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_7nthm")
 
-[node name="Post_N_0" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=412564061]
+[node name="Post_N_0" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2124299193]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, 0.75, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_kccm1")
 
-[node name="XBrace1_N_0" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=826997806]
+[node name="XBrace1_N_0" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=785106260]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, -28.125, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_6p3ec")
 
-[node name="XBrace2_N_0" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=653619984]
+[node name="XBrace2_N_0" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1475763748]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, -28.125, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_n4d76")
 
-[node name="Post_N_1" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=414033457]
+[node name="Post_N_1" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1935480957]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -26.25, 0.75, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_kv55o")
 
-[node name="XBrace1_N_1" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1242257407]
+[node name="XBrace1_N_1" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1320061488]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, -24.375, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_8n7my")
 
-[node name="XBrace2_N_1" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2106098517]
+[node name="XBrace2_N_1" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2008738698]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, -24.375, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_wkvoq")
 
-[node name="Post_N_2" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1830738268]
+[node name="Post_N_2" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=979094225]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22.5, 0.75, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_4kdqj")
 
-[node name="XBrace1_N_2" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=111712714]
+[node name="XBrace1_N_2" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=607879041]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, -20.625, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_y6ysv")
 
-[node name="XBrace2_N_2" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1376360697]
+[node name="XBrace2_N_2" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1137281487]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, -20.625, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_frgqs")
 
-[node name="Post_N_3" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=712993469]
+[node name="Post_N_3" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2139834623]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18.75, 0.75, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_465on")
 
-[node name="XBrace1_N_3" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=494669612]
+[node name="XBrace1_N_3" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2033642316]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, -16.875, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_sxsqp")
 
-[node name="XBrace2_N_3" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=258082520]
+[node name="XBrace2_N_3" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1132218459]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, -16.875, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_1y6nm")
 
-[node name="Post_N_4" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=425236965]
+[node name="Post_N_4" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1520270533]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 0.75, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_njkic")
 
-[node name="XBrace1_N_4" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=562435489]
+[node name="XBrace1_N_4" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1430328356]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, -13.125, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_cuxq4")
 
-[node name="XBrace2_N_4" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=502215813]
+[node name="XBrace2_N_4" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=66768842]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, -13.125, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_ss5tb")
 
-[node name="Post_N_5" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1619329403]
+[node name="Post_N_5" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2091403048]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.25, 0.75, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_3gdax")
 
-[node name="XBrace1_N_5" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2104856223]
+[node name="XBrace1_N_5" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1740808807]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, -9.375, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_14mma")
 
-[node name="XBrace2_N_5" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1243019328]
+[node name="XBrace2_N_5" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=748720976]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, -9.375, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_1cbp4")
 
-[node name="Post_N_6" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1489933155]
+[node name="Post_N_6" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1250840433]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.5, 0.75, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_5dxl6")
 
-[node name="XBrace1_N_6" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2123440306]
+[node name="XBrace1_N_6" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1192180439]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, -5.625, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_4q256")
 
-[node name="XBrace2_N_6" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1354118660]
+[node name="XBrace2_N_6" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=890864766]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, -5.625, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_os4mn")
 
-[node name="Post_N_7" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=852180747]
+[node name="Post_N_7" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=314232153]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.75, 0.75, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_e5gx3")
 
-[node name="XBrace1_N_7" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1091605891]
+[node name="XBrace1_N_7" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1698012948]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, -1.875, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_xtph7")
 
-[node name="XBrace2_N_7" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=585332160]
+[node name="XBrace2_N_7" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=847813960]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, -1.875, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_0qj3i")
 
-[node name="Post_N_8" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2122764573]
+[node name="Post_N_8" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=329746038]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_8v2cx")
 
-[node name="XBrace1_N_8" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1851093731]
+[node name="XBrace1_N_8" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1404354850]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, 1.875, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_b2ypq")
 
-[node name="XBrace2_N_8" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=440889785]
+[node name="XBrace2_N_8" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2097870448]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, 1.875, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_4qf6d")
 
-[node name="Post_N_9" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1501109653]
+[node name="Post_N_9" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1648341028]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.75, 0.75, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_228sa")
 
-[node name="XBrace1_N_9" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1378324680]
+[node name="XBrace1_N_9" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=364291533]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, 5.625, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_opnfv")
 
-[node name="XBrace2_N_9" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1524363465]
+[node name="XBrace2_N_9" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=16905613]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, 5.625, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_jtqpv")
 
-[node name="Post_N_10" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1151252936]
+[node name="Post_N_10" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1740416384]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, 0.75, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_uvkfv")
 
-[node name="XBrace1_N_10" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1104638622]
+[node name="XBrace1_N_10" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1955101005]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, 9.375, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_2k040")
 
-[node name="XBrace2_N_10" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1463266406]
+[node name="XBrace2_N_10" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=60316947]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, 9.375, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_y8pn8")
 
-[node name="Post_N_11" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=299262059]
+[node name="Post_N_11" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=716296928]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.25, 0.75, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_tbdyf")
 
-[node name="XBrace1_N_11" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1786153976]
+[node name="XBrace1_N_11" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1661834513]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, 13.125, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_yk7r6")
 
-[node name="XBrace2_N_11" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1631789181]
+[node name="XBrace2_N_11" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=26639857]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, 13.125, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_h2ops")
 
-[node name="Post_N_12" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=225418512]
+[node name="Post_N_12" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=212915245]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0.75, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_gc3kg")
 
-[node name="XBrace1_N_12" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=933948987]
+[node name="XBrace1_N_12" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2044323308]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, 16.875, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_ewv0h")
 
-[node name="XBrace2_N_12" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=228806138]
+[node name="XBrace2_N_12" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=878482178]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, 16.875, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_vg1hl")
 
-[node name="Post_N_13" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1779791530]
+[node name="Post_N_13" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=697453522]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.75, 0.75, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_6dqho")
 
-[node name="XBrace1_N_13" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1705322427]
+[node name="XBrace1_N_13" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1244408470]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, 20.625, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_73wh0")
 
-[node name="XBrace2_N_13" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=9892645]
+[node name="XBrace2_N_13" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2173698]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, 20.625, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_6rydj")
 
-[node name="Post_N_14" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2000332587]
+[node name="Post_N_14" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1324049720]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22.5, 0.75, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_tc3pc")
 
-[node name="XBrace1_N_14" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1784248615]
+[node name="XBrace1_N_14" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1809792910]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, 24.375, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_41yqt")
 
-[node name="XBrace2_N_14" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2033214735]
+[node name="XBrace2_N_14" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1315744764]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, 24.375, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_cv0e6")
 
-[node name="Post_N_15" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1569890214]
+[node name="Post_N_15" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2136450166]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26.25, 0.75, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_yyoan")
 
-[node name="XBrace1_N_15" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1575832127]
+[node name="XBrace1_N_15" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=935177046]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, 28.125, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_o5pbc")
 
-[node name="XBrace2_N_15" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1530532149]
+[node name="XBrace2_N_15" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=975267823]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, 28.125, 1.15, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_aoofc")
 
-[node name="Post_N_16" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=340606140]
+[node name="Post_N_16" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1472881921]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 0.75, -8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_haso6")
 
-[node name="GuardrailCol_S" type="StaticBody3D" parent="AlpineTimberBridge" unique_id=1534228950]
+[node name="GuardrailCol_S" type="StaticBody3D" parent="AlpineTimberBridge" unique_id=1720109223]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 8.6)
 
-[node name="@CollisionShape3D@17" type="CollisionShape3D" parent="AlpineTimberBridge/GuardrailCol_S" unique_id=1542144143]
+[node name="@CollisionShape3D@17" type="CollisionShape3D" parent="AlpineTimberBridge/GuardrailCol_S" unique_id=1197996559]
 shape = SubResource("BoxShape3D_oxf8m")
 
-[node name="TopRail_S" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1509650791]
+[node name="TopRail_S" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=279368148]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.45, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_45hnq")
 
-[node name="MidRail_S" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=253055372]
+[node name="MidRail_S" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=104611866]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_p0nfk")
 
-[node name="FloorBent_0" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1700561239]
+[node name="FloorBent_0" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=897580044]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_pgh1u")
 
-[node name="Post_S_0" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1115661110]
+[node name="Post_S_0" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=851650660]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, 0.75, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_xjmok")
 
-[node name="XBrace1_S_0" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1530202646]
+[node name="XBrace1_S_0" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1245912228]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, -28.125, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_f8lc1")
 
-[node name="XBrace2_S_0" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=931597270]
+[node name="XBrace2_S_0" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=371054799]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, -28.125, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_ixjx4")
 
-[node name="FloorBent_1" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=684115035]
+[node name="FloorBent_1" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2143161689]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -26.25, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_qpaup")
 
-[node name="Post_S_1" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=528917239]
+[node name="Post_S_1" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1168150559]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -26.25, 0.75, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_jpjn6")
 
-[node name="XBrace1_S_1" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=84102527]
+[node name="XBrace1_S_1" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=424329302]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, -24.375, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_6povi")
 
-[node name="XBrace2_S_1" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=880160828]
+[node name="XBrace2_S_1" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=345532231]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, -24.375, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_bk3mn")
 
-[node name="FloorBent_2" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=837068928]
+[node name="FloorBent_2" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=923013755]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22.5, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_gxj24")
 
-[node name="Post_S_2" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=449733940]
+[node name="Post_S_2" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1820107851]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22.5, 0.75, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_fvwm4")
 
-[node name="XBrace1_S_2" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1793111902]
+[node name="XBrace1_S_2" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2130927073]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, -20.625, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_fs6ve")
 
-[node name="XBrace2_S_2" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1732940556]
+[node name="XBrace2_S_2" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=861131644]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, -20.625, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_uq6gg")
 
-[node name="FloorBent_3" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=290376464]
+[node name="FloorBent_3" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=798916925]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18.75, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_hnvpr")
 
-[node name="Post_S_3" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=285836480]
+[node name="Post_S_3" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1930862544]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18.75, 0.75, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_1nftd")
 
-[node name="XBrace1_S_3" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1489076522]
+[node name="XBrace1_S_3" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1568815850]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, -16.875, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_flh1a")
 
-[node name="XBrace2_S_3" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2064229116]
+[node name="XBrace2_S_3" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1080560238]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, -16.875, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_gkpc3")
 
-[node name="FloorBent_4" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=92405871]
+[node name="FloorBent_4" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=153583005]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_2xroi")
 
-[node name="Post_S_4" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=57484379]
+[node name="Post_S_4" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1168457539]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 0.75, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_rsgld")
 
-[node name="XBrace1_S_4" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1768302095]
+[node name="XBrace1_S_4" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=493854464]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, -13.125, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_mthdy")
 
-[node name="XBrace2_S_4" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=504209374]
+[node name="XBrace2_S_4" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1076681735]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, -13.125, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_ty14e")
 
-[node name="FloorBent_5" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1858728888]
+[node name="FloorBent_5" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1554230502]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.25, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_55qo1")
 
-[node name="Post_S_5" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1205362710]
+[node name="Post_S_5" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=586226683]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.25, 0.75, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_kl3a6")
 
-[node name="XBrace1_S_5" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1352943354]
+[node name="XBrace1_S_5" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=52057290]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, -9.375, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_07cph")
 
-[node name="XBrace2_S_5" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2030820422]
+[node name="XBrace2_S_5" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=964365567]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, -9.375, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_q7mi7")
 
-[node name="FloorBent_6" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=936811801]
+[node name="FloorBent_6" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2146268861]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.5, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_5ord2")
 
-[node name="Post_S_6" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=229237683]
+[node name="Post_S_6" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=538280724]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.5, 0.75, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_nx83w")
 
-[node name="XBrace1_S_6" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1729505187]
+[node name="XBrace1_S_6" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=138393786]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, -5.625, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_6jcnm")
 
-[node name="XBrace2_S_6" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=233628796]
+[node name="XBrace2_S_6" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1528235969]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, -5.625, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_un6kx")
 
-[node name="FloorBent_7" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1501148871]
+[node name="FloorBent_7" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=688412776]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.75, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_le01w")
 
-[node name="Post_S_7" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=415800050]
+[node name="Post_S_7" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=682009057]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.75, 0.75, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_7lvyr")
 
-[node name="XBrace1_S_7" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1841101135]
+[node name="XBrace1_S_7" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1587074502]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, -1.875, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_6ydry")
 
-[node name="XBrace2_S_7" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=553234502]
+[node name="XBrace2_S_7" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1811883237]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, -1.875, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_sbprw")
 
-[node name="FloorBent_8" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=566020777]
+[node name="FloorBent_8" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1757697450]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_rk32l")
 
-[node name="Post_S_8" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1855906448]
+[node name="Post_S_8" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1325584452]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_4hca4")
 
-[node name="XBrace1_S_8" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=216328451]
+[node name="XBrace1_S_8" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2031205320]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, 1.875, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_u4tua")
 
-[node name="XBrace2_S_8" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=206730569]
+[node name="XBrace2_S_8" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1186522293]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, 1.875, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_df15i")
 
-[node name="FloorBent_9" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2030761325]
+[node name="FloorBent_9" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=684903944]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.75, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_vk7sa")
 
-[node name="Post_S_9" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1028005488]
+[node name="Post_S_9" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=710448156]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.75, 0.75, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_cdxk6")
 
-[node name="XBrace1_S_9" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1883985957]
+[node name="XBrace1_S_9" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=666630534]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, 5.625, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_sgnjl")
 
-[node name="XBrace2_S_9" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=380160779]
+[node name="XBrace2_S_9" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=767912990]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, 5.625, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_f8nw6")
 
-[node name="FloorBent_10" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=315877611]
+[node name="FloorBent_10" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=534427644]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_nlw2d")
 
-[node name="Post_S_10" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=501382098]
+[node name="Post_S_10" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=405259711]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, 0.75, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_fxrut")
 
-[node name="XBrace1_S_10" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=203369507]
+[node name="XBrace1_S_10" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=482424698]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, 9.375, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_61jti")
 
-[node name="XBrace2_S_10" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1971890746]
+[node name="XBrace2_S_10" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=448018174]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, 9.375, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_6ky7q")
 
-[node name="FloorBent_11" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1796501247]
+[node name="FloorBent_11" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1338809128]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.25, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_k705d")
 
-[node name="Post_S_11" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2757922]
+[node name="Post_S_11" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2018047332]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.25, 0.75, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_2000p")
 
-[node name="XBrace1_S_11" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1463726373]
+[node name="XBrace1_S_11" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1123701056]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, 13.125, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_ans3q")
 
-[node name="XBrace2_S_11" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=953186540]
+[node name="XBrace2_S_11" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=806298938]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, 13.125, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_iqxvi")
 
-[node name="FloorBent_12" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=220511301]
+[node name="FloorBent_12" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=578464047]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_q7ngi")
 
-[node name="Post_S_12" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=333543463]
+[node name="Post_S_12" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=791659906]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0.75, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_0b0bi")
 
-[node name="XBrace1_S_12" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1775276564]
+[node name="XBrace1_S_12" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=997989547]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, 16.875, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_04bu7")
 
-[node name="XBrace2_S_12" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1554837953]
+[node name="XBrace2_S_12" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=816820481]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, 16.875, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_74sfo")
 
-[node name="FloorBent_13" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1844830222]
+[node name="FloorBent_13" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1670422035]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.75, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_mkt2k")
 
-[node name="Post_S_13" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=141694282]
+[node name="Post_S_13" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=435220904]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.75, 0.75, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_lj0kw")
 
-[node name="XBrace1_S_13" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1640097217]
+[node name="XBrace1_S_13" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1780523406]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, 20.625, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_lkmpb")
 
-[node name="XBrace2_S_13" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1945053559]
+[node name="XBrace2_S_13" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=828145888]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, 20.625, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_5avk7")
 
-[node name="FloorBent_14" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=863036398]
+[node name="FloorBent_14" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2112555371]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22.5, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_cqo75")
 
-[node name="Post_S_14" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1156601603]
+[node name="Post_S_14" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1411663169]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22.5, 0.75, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_2125d")
 
-[node name="XBrace1_S_14" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1139914784]
+[node name="XBrace1_S_14" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=574903814]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, 24.375, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_mv3e1")
 
-[node name="XBrace2_S_14" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1062297193]
+[node name="XBrace2_S_14" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1336994422]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, 24.375, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_qwo13")
 
-[node name="FloorBent_15" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1647221430]
+[node name="FloorBent_15" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1477915612]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26.25, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_0vfjv")
 
-[node name="Post_S_15" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=523769973]
+[node name="Post_S_15" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1908368843]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26.25, 0.75, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_ocyuw")
 
-[node name="XBrace1_S_15" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=856245267]
+[node name="XBrace1_S_15" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1635124994]
 transform = Transform3D(0.98302025, -0.18349712, 0, 0.18349712, 0.98302025, 0, 0, 0, 1, 28.125, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_1joif")
 
-[node name="XBrace2_S_15" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=277180738]
+[node name="XBrace2_S_15" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=929299155]
 transform = Transform3D(0.98302025, 0.18349712, 0, -0.18349712, 0.98302025, 0, 0, 0, 1, 28.125, 1.15, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_mmatg")
 
-[node name="FloorBent_16" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=475499160]
+[node name="FloorBent_16" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=659036837]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, -0.45, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_evkyx")
 
-[node name="Post_S_16" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2016203832]
+[node name="Post_S_16" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1582567431]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 0.75, 8.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_46rjv")
 
-[node name="TrestleBent_0" type="Node3D" parent="AlpineTimberBridge" unique_id=764318954]
+[node name="TrestleBent_0" type="Node3D" parent="AlpineTimberBridge" unique_id=1129050899]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13, 0, 0)
 
-[node name="CapBeam" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=1524807185]
+[node name="CapBeam" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=1618588454]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.31, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_e05va")
 
-[node name="CollarTie_45" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=750914929]
+[node name="CollarTie_45" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=1624398287]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -4.8005, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_xqffl")
 
-[node name="CollarTie_82" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=112760244]
+[node name="CollarTie_82" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=1238509470]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -7.4238, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_myga5")
 
-[node name="Pile_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=623151568]
+[node name="Pile_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=1833821608]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, -7.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("ArrayMesh_48fa6")
 
-[node name="Plinth_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=673348961]
+[node name="Plinth_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=1303607970]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, -7.6)
 material_override = SubResource("StandardMaterial3D_6sp46")
 mesh = SubResource("ArrayMesh_o4br0")
 
-[node name="Pile_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=1694359508]
+[node name="Pile_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=1255522423]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, -3.8)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("ArrayMesh_hqvy8")
 
-[node name="Plinth_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=2855767]
+[node name="Plinth_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=1127854959]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, -3.8)
 material_override = SubResource("StandardMaterial3D_6sp46")
 mesh = SubResource("ArrayMesh_yidfg")
 
-[node name="Pile_2" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=1609657585]
+[node name="Pile_2" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=355084572]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("ArrayMesh_5q030")
 
-[node name="Plinth_2" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=1603982197]
+[node name="Plinth_2" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=469142235]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, 0)
 material_override = SubResource("StandardMaterial3D_6sp46")
 mesh = SubResource("ArrayMesh_kygf4")
 
-[node name="Pile_3" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=1836985163]
+[node name="Pile_3" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=572886588]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, 3.8)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("ArrayMesh_srgcl")
 
-[node name="Plinth_3" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=303285883]
+[node name="Plinth_3" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=1850448622]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, 3.8)
 material_override = SubResource("StandardMaterial3D_6sp46")
 mesh = SubResource("ArrayMesh_xa8tj")
 
-[node name="Pile_4" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=190215829]
+[node name="Pile_4" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=1232403862]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, 7.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("ArrayMesh_6m3qr")
 
-[node name="Plinth_4" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=1457710072]
+[node name="Plinth_4" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=1759497106]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, 7.6)
 material_override = SubResource("StandardMaterial3D_6sp46")
 mesh = SubResource("ArrayMesh_8ta32")
 
-[node name="SwayBrace_0_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=1173761612]
+[node name="SwayBrace_0_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=372411121]
 transform = Transform3D(1, 0, 0, 0, 0.6361825, -0.7715386, 0, 0.7715386, 0.6361825, 0.22, -4.855, -5.7)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_cuk5r")
 
-[node name="SwayBrace_0_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=649817973]
+[node name="SwayBrace_0_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=112144882]
 transform = Transform3D(1, 0, 0, 0, 0.6361825, 0.7715386, 0, -0.7715386, 0.6361825, -0.22, -4.855, -5.7)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_vhnde")
 
-[node name="SwayBrace_1_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=1676141138]
+[node name="SwayBrace_1_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=151104744]
 transform = Transform3D(1, 0, 0, 0, 0.6361825, -0.7715386, 0, 0.7715386, 0.6361825, 0.22, -4.855, -1.9)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_dalth")
 
-[node name="SwayBrace_1_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=818045962]
+[node name="SwayBrace_1_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=1189051744]
 transform = Transform3D(1, 0, 0, 0, 0.6361825, 0.7715386, 0, -0.7715386, 0.6361825, -0.22, -4.855, -1.9)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_jw4oc")
 
-[node name="SwayBrace_2_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=809876847]
+[node name="SwayBrace_2_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=1850595672]
 transform = Transform3D(1, 0, 0, 0, 0.6361825, -0.7715386, 0, 0.7715386, 0.6361825, 0.22, -4.855, 1.9)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_6fuiu")
 
-[node name="SwayBrace_2_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=1365142148]
+[node name="SwayBrace_2_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=175044272]
 transform = Transform3D(1, 0, 0, 0, 0.6361825, 0.7715386, 0, -0.7715386, 0.6361825, -0.22, -4.855, 1.9)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_k8jfx")
 
-[node name="SwayBrace_3_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=1950077510]
+[node name="SwayBrace_3_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=82674941]
 transform = Transform3D(1, 0, 0, 0, 0.6361825, -0.7715386, 0, 0.7715386, 0.6361825, 0.22, -4.855, 5.7)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_8dnyo")
 
-[node name="SwayBrace_3_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=899654722]
+[node name="SwayBrace_3_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=775129747]
 transform = Transform3D(1, 0, 0, 0, 0.6361825, 0.7715386, 0, -0.7715386, 0.6361825, -0.22, -4.855, 5.7)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_frjnt")
 
-[node name="BentCollision" type="StaticBody3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=950490992]
+[node name="BentCollision" type="StaticBody3D" parent="AlpineTimberBridge/TrestleBent_0" unique_id=1893822424]
 
-[node name="PileCol_0" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_0/BentCollision" unique_id=1221163593]
+[node name="PileCol_0" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_0/BentCollision" unique_id=1992677894]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, -7.6)
 shape = SubResource("BoxShape3D_i5xva")
 
-[node name="PlinthCol_0" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_0/BentCollision" unique_id=815518227]
+[node name="PlinthCol_0" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_0/BentCollision" unique_id=2035017225]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, -7.6)
 shape = SubResource("BoxShape3D_nair5")
 
-[node name="PileCol_1" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_0/BentCollision" unique_id=24719912]
+[node name="PileCol_1" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_0/BentCollision" unique_id=1270015453]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, -3.8)
 shape = SubResource("BoxShape3D_cpkkl")
 
-[node name="PlinthCol_1" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_0/BentCollision" unique_id=1373052772]
+[node name="PlinthCol_1" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_0/BentCollision" unique_id=5121033]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, -3.8)
 shape = SubResource("BoxShape3D_uv241")
 
-[node name="PileCol_2" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_0/BentCollision" unique_id=334388795]
+[node name="PileCol_2" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_0/BentCollision" unique_id=1247787140]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, 0)
 shape = SubResource("BoxShape3D_wgldy")
 
-[node name="PlinthCol_2" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_0/BentCollision" unique_id=1465367443]
+[node name="PlinthCol_2" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_0/BentCollision" unique_id=1956956090]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, 0)
 shape = SubResource("BoxShape3D_yl76v")
 
-[node name="PileCol_3" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_0/BentCollision" unique_id=1067602841]
+[node name="PileCol_3" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_0/BentCollision" unique_id=846229691]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, 3.8)
 shape = SubResource("BoxShape3D_i2j68")
 
-[node name="PlinthCol_3" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_0/BentCollision" unique_id=131363078]
+[node name="PlinthCol_3" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_0/BentCollision" unique_id=1632602605]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, 3.8)
 shape = SubResource("BoxShape3D_p8v1o")
 
-[node name="PileCol_4" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_0/BentCollision" unique_id=1212943163]
+[node name="PileCol_4" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_0/BentCollision" unique_id=1763832106]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, 7.6)
 shape = SubResource("BoxShape3D_eb7do")
 
-[node name="PlinthCol_4" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_0/BentCollision" unique_id=1296059958]
+[node name="PlinthCol_4" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_0/BentCollision" unique_id=1152002094]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, 7.6)
 shape = SubResource("BoxShape3D_hyew7")
 
-[node name="TrestleBent_1" type="Node3D" parent="AlpineTimberBridge" unique_id=533308267]
+[node name="TrestleBent_1" type="Node3D" parent="AlpineTimberBridge" unique_id=1786104228]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 0, 0)
 
-[node name="CapBeam" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=1289019528]
+[node name="CapBeam" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=954291967]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.31, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_lve7t")
 
-[node name="CollarTie_45" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=2024511930]
+[node name="CollarTie_45" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=859281080]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -4.8005, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_qmeum")
 
-[node name="CollarTie_82" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=1660607535]
+[node name="CollarTie_82" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=971118134]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -7.4238, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_mboq4")
 
-[node name="Pile_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=372787570]
+[node name="Pile_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=1332520795]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, -7.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("ArrayMesh_imkdj")
 
-[node name="Plinth_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=919430243]
+[node name="Plinth_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=752885547]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, -7.6)
 material_override = SubResource("StandardMaterial3D_6sp46")
 mesh = SubResource("ArrayMesh_xjvtc")
 
-[node name="Pile_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=1781084611]
+[node name="Pile_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=1970413788]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, -3.8)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("ArrayMesh_yamd7")
 
-[node name="Plinth_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=890587726]
+[node name="Plinth_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=2036856925]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, -3.8)
 material_override = SubResource("StandardMaterial3D_6sp46")
 mesh = SubResource("ArrayMesh_5beo1")
 
-[node name="Pile_2" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=307471633]
+[node name="Pile_2" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=1918377483]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, 0)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("ArrayMesh_tgbu8")
 
-[node name="Plinth_2" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=292036979]
+[node name="Plinth_2" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=1690288458]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, 0)
 material_override = SubResource("StandardMaterial3D_6sp46")
 mesh = SubResource("ArrayMesh_naqu0")
 
-[node name="Pile_3" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=495315084]
+[node name="Pile_3" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=1627778350]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, 3.8)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("ArrayMesh_aveph")
 
-[node name="Plinth_3" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=549968573]
+[node name="Plinth_3" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=181073514]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, 3.8)
 material_override = SubResource("StandardMaterial3D_6sp46")
 mesh = SubResource("ArrayMesh_2j6q2")
 
-[node name="Pile_4" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=836863884]
+[node name="Pile_4" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=1853928346]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, 7.6)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("ArrayMesh_ii0yd")
 
-[node name="Plinth_4" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=2016797981]
+[node name="Plinth_4" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=1382490133]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, 7.6)
 material_override = SubResource("StandardMaterial3D_6sp46")
 mesh = SubResource("ArrayMesh_tvbur")
 
-[node name="SwayBrace_0_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=900351564]
+[node name="SwayBrace_0_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=391188604]
 transform = Transform3D(1, 0, 0, 0, 0.6361825, -0.7715386, 0, 0.7715386, 0.6361825, 0.22, -4.855, -5.7)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_v3awr")
 
-[node name="SwayBrace_0_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=1019088838]
+[node name="SwayBrace_0_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=297528660]
 transform = Transform3D(1, 0, 0, 0, 0.6361825, 0.7715386, 0, -0.7715386, 0.6361825, -0.22, -4.855, -5.7)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_jtdcd")
 
-[node name="SwayBrace_1_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=2046543124]
+[node name="SwayBrace_1_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=1736428443]
 transform = Transform3D(1, 0, 0, 0, 0.6361825, -0.7715386, 0, 0.7715386, 0.6361825, 0.22, -4.855, -1.9)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_arwoo")
 
-[node name="SwayBrace_1_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=670021195]
+[node name="SwayBrace_1_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=1640340928]
 transform = Transform3D(1, 0, 0, 0, 0.6361825, 0.7715386, 0, -0.7715386, 0.6361825, -0.22, -4.855, -1.9)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_piwn0")
 
-[node name="SwayBrace_2_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=2079244693]
+[node name="SwayBrace_2_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=901887235]
 transform = Transform3D(1, 0, 0, 0, 0.6361825, -0.7715386, 0, 0.7715386, 0.6361825, 0.22, -4.855, 1.9)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_lnggw")
 
-[node name="SwayBrace_2_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=681023129]
+[node name="SwayBrace_2_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=509532789]
 transform = Transform3D(1, 0, 0, 0, 0.6361825, 0.7715386, 0, -0.7715386, 0.6361825, -0.22, -4.855, 1.9)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_bvjvj")
 
-[node name="SwayBrace_3_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=1851385626]
+[node name="SwayBrace_3_0" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=1357531503]
 transform = Transform3D(1, 0, 0, 0, 0.6361825, -0.7715386, 0, 0.7715386, 0.6361825, 0.22, -4.855, 5.7)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_3ob3o")
 
-[node name="SwayBrace_3_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=469190862]
+[node name="SwayBrace_3_1" type="MeshInstance3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=1011872343]
 transform = Transform3D(1, 0, 0, 0, 0.6361825, 0.7715386, 0, -0.7715386, 0.6361825, -0.22, -4.855, 5.7)
 material_override = SubResource("StandardMaterial3D_rvm3r")
 mesh = SubResource("BoxMesh_v21x6")
 
-[node name="BentCollision" type="StaticBody3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=1716848855]
+[node name="BentCollision" type="StaticBody3D" parent="AlpineTimberBridge/TrestleBent_1" unique_id=1677561550]
 
-[node name="PileCol_0" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_1/BentCollision" unique_id=1169521682]
+[node name="PileCol_0" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_1/BentCollision" unique_id=1679766373]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, -7.6)
 shape = SubResource("BoxShape3D_ogj82")
 
-[node name="PlinthCol_0" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_1/BentCollision" unique_id=1904537889]
+[node name="PlinthCol_0" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_1/BentCollision" unique_id=1439139082]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, -7.6)
 shape = SubResource("BoxShape3D_lq8wj")
 
-[node name="PileCol_1" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_1/BentCollision" unique_id=903692024]
+[node name="PileCol_1" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_1/BentCollision" unique_id=713573210]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, -3.8)
 shape = SubResource("BoxShape3D_qtn3y")
 
-[node name="PlinthCol_1" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_1/BentCollision" unique_id=2002480127]
+[node name="PlinthCol_1" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_1/BentCollision" unique_id=1053513262]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, -3.8)
 shape = SubResource("BoxShape3D_djegy")
 
-[node name="PileCol_2" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_1/BentCollision" unique_id=464779515]
+[node name="PileCol_2" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_1/BentCollision" unique_id=630802174]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, 0)
 shape = SubResource("BoxShape3D_ugtly")
 
-[node name="PlinthCol_2" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_1/BentCollision" unique_id=628928921]
+[node name="PlinthCol_2" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_1/BentCollision" unique_id=623327425]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, 0)
 shape = SubResource("BoxShape3D_nyod8")
 
-[node name="PileCol_3" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_1/BentCollision" unique_id=1323188747]
+[node name="PileCol_3" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_1/BentCollision" unique_id=1926980509]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, 3.8)
 shape = SubResource("BoxShape3D_5wjid")
 
-[node name="PlinthCol_3" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_1/BentCollision" unique_id=1748977123]
+[node name="PlinthCol_3" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_1/BentCollision" unique_id=450790874]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, 3.8)
 shape = SubResource("BoxShape3D_a83oq")
 
-[node name="PileCol_4" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_1/BentCollision" unique_id=347376383]
+[node name="PileCol_4" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_1/BentCollision" unique_id=1310451870]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.155, 7.6)
 shape = SubResource("BoxShape3D_2vigx")
 
-[node name="PlinthCol_4" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_1/BentCollision" unique_id=1256136991]
+[node name="PlinthCol_4" type="CollisionShape3D" parent="AlpineTimberBridge/TrestleBent_1/BentCollision" unique_id=1632293774]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -9.1, 7.6)
 shape = SubResource("BoxShape3D_sogm3")
 
-[node name="SnowCap_WheelGuard_N" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=615131947]
+[node name="SnowCap_WheelGuard_N" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=723067787]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.53, -8.6)
 material_override = SubResource("ShaderMaterial_6336o")
 mesh = SubResource("BoxMesh_qa1rh")
 
-[node name="SnowCap_TopRail_N" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=928291057]
+[node name="SnowCap_TopRail_N" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2113759994]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.64, -8.6)
 material_override = SubResource("ShaderMaterial_6336o")
 mesh = SubResource("BoxMesh_0arll")
 
-[node name="SnowCap_WheelGuard_S" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=905303322]
+[node name="SnowCap_WheelGuard_S" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=71874705]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.53, 8.6)
 material_override = SubResource("ShaderMaterial_6336o")
 mesh = SubResource("BoxMesh_lfsol")
 
-[node name="SnowCap_TopRail_S" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2145497329]
+[node name="SnowCap_TopRail_S" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2119095420]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.64, 8.6)
 material_override = SubResource("ShaderMaterial_6336o")
 mesh = SubResource("BoxMesh_531g2")
 
-[node name="Icicles" type="MultiMeshInstance3D" parent="AlpineTimberBridge" unique_id=1278703246]
+[node name="Icicles" type="MultiMeshInstance3D" parent="AlpineTimberBridge" unique_id=181161479]
 material_override = SubResource("StandardMaterial3D_16bfm")
 cast_shadow = 0
 multimesh = SubResource("MultiMesh_2ty2b")
 
-[node name="SnowCap_Abutment_W_N" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1788952809]
+[node name="SnowCap_Abutment_W_N" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=627381567]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -28.8, 0.05, -8.95)
 material_override = SubResource("ShaderMaterial_6336o")
 mesh = SubResource("BoxMesh_d6l1h")
 
-[node name="SnowCap_Abutment_W_S" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1971390800]
+[node name="SnowCap_Abutment_W_S" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=1898079573]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -28.8, 0.05, 8.95)
 material_override = SubResource("ShaderMaterial_6336o")
 mesh = SubResource("BoxMesh_umcl1")
 
-[node name="SnowCap_Abutment_E_N" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=305206432]
+[node name="SnowCap_Abutment_E_N" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=769391962]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.8, 0.05, -8.95)
 material_override = SubResource("ShaderMaterial_6336o")
 mesh = SubResource("BoxMesh_0lb4d")
 
-[node name="SnowCap_Abutment_E_S" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=2030741858]
+[node name="SnowCap_Abutment_E_S" type="MeshInstance3D" parent="AlpineTimberBridge" unique_id=231106821]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.8, 0.05, 8.95)
 material_override = SubResource("ShaderMaterial_6336o")
 mesh = SubResource("BoxMesh_f257t")
 
-[node name="SnowCoveredRoadSections" type="Node3D" parent="." unique_id=1937934423]
+[node name="SnowCoveredRoadSections" type="Node3D" parent="." unique_id=1428780362]
 
-[node name="SnowDrift_Jump1Approach" type="Area3D" parent="SnowCoveredRoadSections" unique_id=83224212 groups=["snow"] instance=ExtResource("27_j2ycp")]
+[node name="SnowDrift_Jump1Approach" type="Area3D" parent="SnowCoveredRoadSections" unique_id=527645258 groups=["snow"] instance=ExtResource("27_j2ycp")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -33.804764, 5.7883563, -52.81548)
 script = ExtResource("28_24tsa")
 size = Vector3(14.2, 1.15, 18)
@@ -3488,7 +3501,7 @@ row_rights = PackedVector3Array(0.9207717, 0, 0.39010188, 0.9209987, 0, 0.389565
 drift_half_width = 7.1
 metadata/is_snow = true
 
-[node name="SnowDrift_EastGlade" type="Area3D" parent="SnowCoveredRoadSections" unique_id=1969024801 groups=["snow"] instance=ExtResource("27_j2ycp")]
+[node name="SnowDrift_EastGlade" type="Area3D" parent="SnowCoveredRoadSections" unique_id=111263157 groups=["snow"] instance=ExtResource("27_j2ycp")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44.906315, 6.82381, -145.04626)
 script = ExtResource("28_24tsa")
 size = Vector3(14.2, 1.05, 16)
@@ -3498,7 +3511,7 @@ drift_half_width = 7.1
 seed_offset = 1.8
 metadata/is_snow = true
 
-[node name="SnowDrift_SummitRidge" type="Area3D" parent="SnowCoveredRoadSections" unique_id=1917802045 groups=["snow"] instance=ExtResource("27_j2ycp")]
+[node name="SnowDrift_SummitRidge" type="Area3D" parent="SnowCoveredRoadSections" unique_id=2034125499 groups=["snow"] instance=ExtResource("27_j2ycp")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -98, 17.580004, -79.99951)
 script = ExtResource("28_24tsa")
 size = Vector3(14.2, 1.1, 20)
@@ -3508,7 +3521,7 @@ drift_half_width = 7.1
 seed_offset = 5.2
 metadata/is_snow = true
 
-[node name="SnowDrift_Jump2Approach" type="Area3D" parent="SnowCoveredRoadSections" unique_id=518670530 groups=["snow"] instance=ExtResource("27_j2ycp")]
+[node name="SnowDrift_Jump2Approach" type="Area3D" parent="SnowCoveredRoadSections" unique_id=11018193 groups=["snow"] instance=ExtResource("27_j2ycp")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -48.304108, 15.567665, 103.483925)
 script = ExtResource("28_24tsa")
 size = Vector3(14.2, 1.2, 16)
@@ -3518,7 +3531,7 @@ drift_half_width = 7.1
 seed_offset = 7.1
 metadata/is_snow = true
 
-[node name="SnowDrift_AltRouteCut" type="Area3D" parent="SnowCoveredRoadSections" unique_id=934444449 groups=["snow"] instance=ExtResource("27_j2ycp")]
+[node name="SnowDrift_AltRouteCut" type="Area3D" parent="SnowCoveredRoadSections" unique_id=2033720187 groups=["snow"] instance=ExtResource("27_j2ycp")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 41.886898, 6.668416, -242.76044)
 script = ExtResource("28_24tsa")
 size = Vector3(10.4, 1.3, 22)
@@ -3529,7 +3542,7 @@ base_crown = 0.08
 seed_offset = 3.5
 metadata/is_snow = true
 
-[node name="SnowDrift_GladeMeadow" type="Area3D" parent="SnowCoveredRoadSections" unique_id=1265377504 groups=["snow"] instance=ExtResource("27_j2ycp")]
+[node name="SnowDrift_GladeMeadow" type="Area3D" parent="SnowCoveredRoadSections" unique_id=4846260 groups=["snow"] instance=ExtResource("27_j2ycp")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.486689, 3.044684, 201.86932)
 script = ExtResource("28_24tsa")
 size = Vector3(9.9, 1.15, 16)
@@ -3540,209 +3553,209 @@ base_crown = 0.08
 seed_offset = 4.2
 metadata/is_snow = true
 
-[node name="Players" type="Node3D" parent="." unique_id=1390293938]
+[node name="Players" type="Node3D" parent="." unique_id=927358657]
 
 [node name="FinishLine" type="Area3D" parent="." unique_id=1076613409 instance=ExtResource("29_vve6x")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -45, 0.86, 120)
 script = ExtResource("30_rnqyg")
 is_finish_line = true
 
-[node name="SpawnPoints" type="Node3D" parent="FinishLine" unique_id=2127739128]
+[node name="SpawnPoints" type="Node3D" parent="FinishLine" unique_id=745898623]
 
-[node name="Spawn1" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=573215774]
+[node name="Spawn1" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=341071429]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.8, 0.05, 5)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn1" unique_id=1903259501 instance=ExtResource("31_10042")]
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn1" unique_id=494043282 instance=ExtResource("31_10042")]
 
-[node name="Spawn2" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1019071969]
+[node name="Spawn2" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1079243592]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.8, 0.05, 5)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn2" unique_id=972223775 instance=ExtResource("31_10042")]
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn2" unique_id=337909978 instance=ExtResource("31_10042")]
 
-[node name="Spawn3" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1849794896]
+[node name="Spawn3" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1660990872]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.8, 0.05, 12)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn3" unique_id=1692472698 instance=ExtResource("31_10042")]
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn3" unique_id=1950352013 instance=ExtResource("31_10042")]
 
-[node name="Spawn4" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=996774712]
+[node name="Spawn4" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1510871564]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.8, 0.05, 12)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn4" unique_id=162889812 instance=ExtResource("31_10042")]
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn4" unique_id=1298029542 instance=ExtResource("31_10042")]
 
-[node name="Spawn5" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1462016289]
+[node name="Spawn5" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1576869420]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.8, 0.05, 19)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn5" unique_id=506412107 instance=ExtResource("31_10042")]
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn5" unique_id=1739163600 instance=ExtResource("31_10042")]
 
-[node name="Spawn6" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1375809474]
+[node name="Spawn6" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=904106834]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.8, 0.05, 19)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn6" unique_id=1441228308 instance=ExtResource("31_10042")]
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn6" unique_id=778437312 instance=ExtResource("31_10042")]
 
-[node name="PlayerSpawner" type="MultiplayerSpawner" parent="." unique_id=1336514535]
+[node name="PlayerSpawner" type="MultiplayerSpawner" parent="." unique_id=520388108]
 _spawnable_scenes = PackedStringArray("uid://cart123")
 spawn_path = NodePath("../Players")
 spawn_limit = 6
 
-[node name="ProjectileSpawner" type="MultiplayerSpawner" parent="." unique_id=1044872153]
+[node name="ProjectileSpawner" type="MultiplayerSpawner" parent="." unique_id=658493843]
 spawn_path = NodePath(".")
 
-[node name="Checkpoints" type="Node3D" parent="." unique_id=500064484]
+[node name="Checkpoints" type="Node3D" parent="." unique_id=405787504]
 
-[node name="Checkpoint_1" type="Area3D" parent="Checkpoints" unique_id=771354744 instance=ExtResource("29_vve6x")]
+[node name="Checkpoint_1" type="Area3D" parent="Checkpoints" unique_id=513704297 instance=ExtResource("29_vve6x")]
 transform = Transform3D(0.9999943, 0, -0.0033882298, 0, 1, 0, 0.0033882298, 0, 0.9999943, -45, 2.0998366, -9.991838)
 script = ExtResource("30_rnqyg")
 
-[node name="Checkpoint_2" type="Area3D" parent="Checkpoints" unique_id=540910180 instance=ExtResource("29_vve6x")]
+[node name="Checkpoint_2" type="Area3D" parent="Checkpoints" unique_id=1971294454 instance=ExtResource("29_vve6x")]
 transform = Transform3D(0.9259775, 0, -0.37757862, 0, 1, 0, 0.37757862, 0, 0.9259775, 55.96746, 8.597268, -174.9185)
 script = ExtResource("30_rnqyg")
 
-[node name="Checkpoint_3" type="Area3D" parent="Checkpoints" unique_id=1952487848 instance=ExtResource("29_vve6x")]
+[node name="Checkpoint_3" type="Area3D" parent="Checkpoints" unique_id=641948469 instance=ExtResource("29_vve6x")]
 transform = Transform3D(0.66701204, 0, 0.7450469, 0, 1, 0, -0.7450469, 0, 0.66701204, 52.434605, 5.614072, -295.45917)
 script = ExtResource("30_rnqyg")
 
-[node name="Checkpoint_4" type="Area3D" parent="Checkpoints" unique_id=1828212791 instance=ExtResource("29_vve6x")]
+[node name="Checkpoint_4" type="Area3D" parent="Checkpoints" unique_id=328940626 instance=ExtResource("29_vve6x")]
 transform = Transform3D(-0.99283206, 0, 0.11951791, 0, 1, 0, -0.11951791, 0, -0.99283206, -94.93432, 14.790911, -189.692)
 script = ExtResource("30_rnqyg")
 
-[node name="Checkpoint_5" type="Area3D" parent="Checkpoints" unique_id=1929339453 instance=ExtResource("29_vve6x")]
+[node name="Checkpoint_5" type="Area3D" parent="Checkpoints" unique_id=579137682 instance=ExtResource("29_vve6x")]
 transform = Transform3D(-0.9953843, 0, -0.095969245, 0, 1, 0, 0.095969245, 0, -0.9953843, -92.00543, 17.100544, 9.940258)
 script = ExtResource("30_rnqyg")
 
-[node name="Checkpoint_6" type="Area3D" parent="Checkpoints" unique_id=166223130 instance=ExtResource("29_vve6x")]
+[node name="Checkpoint_6" type="Area3D" parent="Checkpoints" unique_id=557917826 instance=ExtResource("29_vve6x")]
 transform = Transform3D(-0.6121121, 0, -0.790771, 0, 1, 0, 0.790771, 0, -0.6121121, 27.828316, 5.915646, 166.33891)
 script = ExtResource("30_rnqyg")
 
-[node name="BoostPads" type="Node3D" parent="." unique_id=666630520]
+[node name="BoostPads" type="Node3D" parent="." unique_id=818478813]
 
 [node name="Boost_Jump1_L" type="Area3D" parent="BoostPads" unique_id=1434937508 instance=ExtResource("32_1d7ih")]
 transform = Transform3D(0.69465834, 0, -0.71933985, 0, 1, 0, 0.71933985, 0, 0.69465834, -24, 7.5, -64)
 collision_layer = 0
 script = ExtResource("33_tb0ul")
 
-[node name="Boost_Jump1_R" type="Area3D" parent="BoostPads" unique_id=1413666574 instance=ExtResource("32_1d7ih")]
+[node name="Boost_Jump1_R" type="Area3D" parent="BoostPads" unique_id=2093006743 instance=ExtResource("32_1d7ih")]
 transform = Transform3D(0.69465834, 0, -0.71933985, 0, 1, 0, 0.71933985, 0, 0.69465834, -20, 7.5, -60)
 collision_layer = 0
 script = ExtResource("33_tb0ul")
 
-[node name="Boost_Jump2_L" type="Area3D" parent="BoostPads" unique_id=1395161952 instance=ExtResource("32_1d7ih")]
+[node name="Boost_Jump2_L" type="Area3D" parent="BoostPads" unique_id=1676574363 instance=ExtResource("32_1d7ih")]
 transform = Transform3D(-0.7660445, 0, -0.6427876, 0, 1, 0, 0.6427876, 0, -0.7660445, -30, 15.5, 118)
 collision_layer = 0
 script = ExtResource("33_tb0ul")
 
-[node name="Boost_Jump2_R" type="Area3D" parent="BoostPads" unique_id=562364560 instance=ExtResource("32_1d7ih")]
+[node name="Boost_Jump2_R" type="Area3D" parent="BoostPads" unique_id=45117378 instance=ExtResource("32_1d7ih")]
 transform = Transform3D(-0.7660445, 0, -0.6427876, 0, 1, 0, 0.6427876, 0, -0.7660445, -26, 15.5, 114)
 collision_layer = 0
 script = ExtResource("33_tb0ul")
 
-[node name="Boost_StartStraight" type="Area3D" parent="BoostPads" unique_id=1434784806 instance=ExtResource("32_1d7ih")]
+[node name="Boost_StartStraight" type="Area3D" parent="BoostPads" unique_id=1764064480 instance=ExtResource("32_1d7ih")]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -45, 1, 80)
 collision_layer = 0
 script = ExtResource("33_tb0ul")
 
-[node name="Boost_SummitStraight" type="Area3D" parent="BoostPads" unique_id=1204992161 instance=ExtResource("32_1d7ih")]
+[node name="Boost_SummitStraight" type="Area3D" parent="BoostPads" unique_id=2011509568 instance=ExtResource("32_1d7ih")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -98, 17.5, -40)
 collision_layer = 0
 script = ExtResource("33_tb0ul")
 
-[node name="Boost_AltShortcut_1" type="Area3D" parent="BoostPads" unique_id=959543071 instance=ExtResource("32_1d7ih")]
+[node name="Boost_AltShortcut_1" type="Area3D" parent="BoostPads" unique_id=755777181 instance=ExtResource("32_1d7ih")]
 transform = Transform3D(-0.48448715, 0, 0.87479836, 0, 1, 0, -0.87479836, 0, -0.48448715, 51.105057, 8.812062, -205.91476)
 collision_layer = 0
 script = ExtResource("33_tb0ul")
 
-[node name="Boost_AltShortcut_2" type="Area3D" parent="BoostPads" unique_id=395769449 instance=ExtResource("32_1d7ih")]
+[node name="Boost_AltShortcut_2" type="Area3D" parent="BoostPads" unique_id=652203211 instance=ExtResource("32_1d7ih")]
 transform = Transform3D(-0.23956546, 0, 0.9708802, 0, 1, 0, -0.9708802, 0, -0.23956546, 44.16395, 7.2680407, -221.1884)
 collision_layer = 0
 script = ExtResource("33_tb0ul")
 
-[node name="Boost_AltGlade_1" type="Area3D" parent="BoostPads" unique_id=1671232938 instance=ExtResource("32_1d7ih")]
+[node name="Boost_AltGlade_1" type="Area3D" parent="BoostPads" unique_id=1575538347 instance=ExtResource("32_1d7ih")]
 transform = Transform3D(-0.73341817, 0, -0.67977774, 0, 1, 0, 0.67977774, 0, -0.73341817, 19.176058, 3.5988674, 198.80232)
 collision_layer = 0
 script = ExtResource("33_tb0ul")
 
-[node name="Boost_AltGlade_2" type="Area3D" parent="BoostPads" unique_id=1898919099 instance=ExtResource("32_1d7ih")]
+[node name="Boost_AltGlade_2" type="Area3D" parent="BoostPads" unique_id=1375721441 instance=ExtResource("32_1d7ih")]
 transform = Transform3D(-0.9784543, 0, 0.20646362, 0, 1, 0, -0.20646362, 0, -0.9784543, -21.493147, 2.2480657, 200.91747)
 collision_layer = 0
 script = ExtResource("33_tb0ul")
 
-[node name="ItemBoxes" type="Node3D" parent="." unique_id=2122696986]
+[node name="ItemBoxes" type="Node3D" parent="." unique_id=1775037810]
 
-[node name="ItemBox_1" type="Node3D" parent="ItemBoxes" unique_id=249428443 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_1" type="Node3D" parent="ItemBoxes" unique_id=1666880574 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -48, 1.4, 90)
 script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_2" type="Node3D" parent="ItemBoxes" unique_id=1985159601 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_2" type="Node3D" parent="ItemBoxes" unique_id=2131707699 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -45, 1.4, 90)
 script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_3" type="Node3D" parent="ItemBoxes" unique_id=771535007 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_3" type="Node3D" parent="ItemBoxes" unique_id=151678262 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42, 1.4, 90)
 script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_4" type="Node3D" parent="ItemBoxes" unique_id=1288020845 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_4" type="Node3D" parent="ItemBoxes" unique_id=2114141211 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 84, 10.8, -235)
 script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_5" type="Node3D" parent="ItemBoxes" unique_id=1088254180 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_5" type="Node3D" parent="ItemBoxes" unique_id=140589812 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 81, 10.8, -235)
 script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_6" type="Node3D" parent="ItemBoxes" unique_id=14359154 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_6" type="Node3D" parent="ItemBoxes" unique_id=1053673345 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 78, 10.8, -235)
 script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_7" type="Node3D" parent="ItemBoxes" unique_id=707973540 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_7" type="Node3D" parent="ItemBoxes" unique_id=2076437694 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 5.4, -305)
 script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_8" type="Node3D" parent="ItemBoxes" unique_id=1467764876 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_8" type="Node3D" parent="ItemBoxes" unique_id=607034796 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 5.4, -305)
 script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_9" type="Node3D" parent="ItemBoxes" unique_id=587888875 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_9" type="Node3D" parent="ItemBoxes" unique_id=1122532804 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -94, 17.8, 40)
 script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_10" type="Node3D" parent="ItemBoxes" unique_id=975203028 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_10" type="Node3D" parent="ItemBoxes" unique_id=55011611 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -91, 17.8, 40)
 script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_11" type="Node3D" parent="ItemBoxes" unique_id=1887076494 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_11" type="Node3D" parent="ItemBoxes" unique_id=1685803099 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -88, 17.8, 40)
 script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_12" type="Node3D" parent="ItemBoxes" unique_id=1097172661 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_12" type="Node3D" parent="ItemBoxes" unique_id=847622352 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 43.61648, 8.610588, -213.08722)
 script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_13" type="Node3D" parent="ItemBoxes" unique_id=1448241764 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_13" type="Node3D" parent="ItemBoxes" unique_id=1641000076 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 46.363132, 8.610588, -214.29382)
 script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_14" type="Node3D" parent="ItemBoxes" unique_id=1414514002 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_14" type="Node3D" parent="ItemBoxes" unique_id=1920126033 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 49.109783, 8.610588, -215.50043)
 script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_15" type="Node3D" parent="ItemBoxes" unique_id=461355259 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_15" type="Node3D" parent="ItemBoxes" unique_id=65557583 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.4571476, 3.120973, 207.62213)
 script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_16" type="Node3D" parent="ItemBoxes" unique_id=276341248 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_16" type="Node3D" parent="ItemBoxes" unique_id=1906449291 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.7153883, 3.120973, 202.62881)
 script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_17" type="Node3D" parent="ItemBoxes" unique_id=1078061583 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_17" type="Node3D" parent="ItemBoxes" unique_id=1301520238 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -35.469467, 1.9305063, 180.78662)
 script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_18" type="Node3D" parent="ItemBoxes" unique_id=433510386 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_18" type="Node3D" parent="ItemBoxes" unique_id=120869669 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30.496506, 1.9305063, 181.30591)
 script = ExtResource("35_r7bqb")
 
-[node name="Vegetation" type="Node3D" parent="." unique_id=1021915952]
+[node name="Vegetation" type="Node3D" parent="." unique_id=1802715583]

@@ -118,6 +118,21 @@ func _ready() -> void:
 	env.glow_enabled = true
 	env.glow_intensity = 0.25
 	env.glow_bloom = 0.12
+	# Cold distance mist: depth fog that leaves the first stretch of road clear and swallows the far
+	# hills in a pale blue-white haze (keep fog_light_color in step with horizon_haze in the sky shader).
+	env.fog_enabled = true
+	env.fog_mode = Environment.FOG_MODE_DEPTH
+	env.fog_light_color = Color(0.80, 0.87, 0.95)
+	env.fog_light_energy = 1.0
+	env.fog_sun_scatter = 0.08
+	env.fog_density = 1.0
+	env.fog_depth_begin = 60.0
+	env.fog_depth_end = 520.0
+	env.fog_depth_curve = 1.6
+	# Barely touches the sky: fog on the sky is uniform in every direction and washed out the blue
+	# overhead. The sky shader adds its own haze band along the horizon in the same colour instead.
+	env.fog_sky_affect = 0.08
+	env.fog_aerial_perspective = 0.25
 	env_node.environment = env
 	level_scene.add_child(env_node)
 

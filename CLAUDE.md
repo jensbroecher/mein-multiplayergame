@@ -56,6 +56,9 @@ without regenerating them, run `res://refresh_curb_corners.tscn` headless.
 `sky_winter_cirrus.gdshader` (sky shader, set by the generator) draws the sky gradient, sun and static cirrus.
 Tune the look with its uniforms (`cloud_coverage`, `cloud_opacity`, `cloud_scale`, `wind_dir`,
 `streak_length`, `cloud_seed`). Keep it free of `TIME`: that makes Godot rebuild the radiance map every frame.
+Distance mist is the Environment's depth fog (set in the generator), and the sky shader adds a matching haze band along
+the horizon (`horizon_haze`, `haze_strength`, `haze_height`). Keep `fog_light_color` and `horizon_haze` the same
+colour. Keep `fog_sky_affect` low: fog on the sky is uniform and washes out the blue overhead.
 
 ## Snow drifts
 
