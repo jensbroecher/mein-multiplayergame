@@ -34,8 +34,17 @@ const MAIN_NOSE_HALF_W := 3.6
 ## - a timber bridge's deck box tops out 0.08 above the bridge origin.
 const TRUNK_DECK_Y := 0.08
 const MAIN_COL_HALF_W := MAIN_CURB_HALF_W + 0.05
+## Drop of the trunk collision deck from the asphalt edge to its outer edge.
+const TRUNK_SHOULDER_DROP := 0.12
+## Deck heights handed to TerrainGenerator per cross-section, evenly from inner to outer edge.
+const DECK_SECTION_SAMPLES := 13
 const SHORTCUT_DECK_Y := 0.05
 const BRIDGE_DECK_TOP := 0.08
+## Gore paving: a shortcut edge closer than GORE_FILL_FULL to the trunk's collision edge is pulled onto
+## the trunk deck; between FULL and END the fill is released quickly, so the unpaved gore starts with
+## a blunt 4m nose instead of narrowing to a sliver of snow a wheel can drop into.
+const GORE_FILL_FULL := 4.0
+const GORE_FILL_END := 4.6
 ## Shortcut deck widths, and the width a shortcut reaches once it is a full gore clear of the trunk.
 const RAMP_1_HALF_W := 5.75        # Canyon Cut is 11.5m wide
 const RAMP_2_HALF_W := 5.50        # Glade Creek is 11.0m wide
@@ -410,7 +419,8 @@ func _ready() -> void:
 	for o in openings:
 		print("  Trunk curb opening %.1f..%.1fm on the %s" % [o.x, o.y, "left" if o.z < 0.0 else "right"])
 	tg.set("junction_openings", openings)
-	tg.set("extra_road_curves", [[alt1_curve, RAMP_1_HALF_W], [alt2_curve, RAMP_2_HALF_W]])
+	tg.set("extra_road_curves", [[alt1_curve, RAMP_1_HALF_W, _deck_sections(alt1_rings)],
+		[alt2_curve, RAMP_2_HALF_W, _deck_sections(alt2_rings)]])
 
 	level_scene.add_child(tg)
 	tg.set("track_path", track_path)
@@ -1859,7 +1869,12 @@ func _build_cobblestone_road(parent: Node, curve: Curve3D, rings: Array, half_wi
 	st_wall.begin(Mesh.PRIMITIVE_TRIANGLES)
 
 	## Vertices emitted per cross-section ring.
-	const DECK_VERTS := 7
+	## Points across the carriageway between the two gutters (crown included). Many, not one: where a
+	## paved gore pulls an edge onto the trunk the deck height bends from trunk height to its own over a
+	## few metres, and a single straight span from gutter to crown dipped under the trunk's asphalt,
+	## which then showed through the shortcut deck as a dark lens.
+	const SPAN_VERTS := 21
+	const DECK_VERTS := SPAN_VERTS + 4
 	const WALL_VERTS := 4
 	var wall_verts := 0
 	## World positions of each wall ring (outer base, outer top, inner top, inner base), kept so the
@@ -1906,9 +1921,24 @@ func _build_cobblestone_road(parent: Node, curve: Curve3D, rings: Array, half_wi
 		# off it, and a curb standing on the trunk's asphalt is a kerb in the middle of a lane.
 		outer_curb_h *= _trunk_curb_factor(p + right * outer)
 		inner_curb_h *= _trunk_curb_factor(p + right * inner)
-		var deck_lats: Array = [outer, outer_gut, outer_gut, 0.0, inner_gut, inner_gut, inner]
-		var deck_lift: Array = [outer_curb_h, outer_curb_h, 0.0, crown, 0.0, inner_curb_h, inner_curb_h]
-		var deck_uvx: Array = [0.0, 0.3, 0.4, 2.5, 4.6, 4.7, 5.0]
+		# Profile: outer curb lip, outer curb top, then the carriageway from outer gutter to inner gutter
+		# (crowned along the centreline, which may sit off-centre in a gore), inner curb top, inner lip.
+		var deck_lats: Array = [outer, outer_gut]
+		var deck_lift: Array = [outer_curb_h, outer_curb_h]
+		var deck_uvx: Array = [0.0, 0.3]
+		for sv in range(SPAN_VERTS):
+			var sl: float = lerpf(outer_gut, inner_gut, float(sv) / float(SPAN_VERTS - 1))
+			var cr: float = 0.0
+			if sl >= 0.0 and outer_gut > 0.0:
+				cr = crown * (1.0 - sl / outer_gut)
+			elif sl < 0.0 and inner_gut < 0.0:
+				cr = crown * (1.0 - sl / inner_gut)
+			deck_lats.append(sl)
+			deck_lift.append(cr)
+			deck_uvx.append(lerpf(0.4, 4.6, float(sv) / float(SPAN_VERTS - 1)))
+		deck_lats.append_array([inner_gut, inner])
+		deck_lift.append_array([inner_curb_h, inner_curb_h])
+		deck_uvx.append_array([4.7, 5.0])
 		var deck_pts: Array[Vector3] = []
 		for k in range(DECK_VERTS):
 			var at: Vector3 = p + right * float(deck_lats[k])
@@ -1921,7 +1951,7 @@ func _build_cobblestone_road(parent: Node, curve: Curve3D, rings: Array, half_wi
 		var outer_base_xz: Vector3 = p + right * (outer + 0.35 * total_wall_taper)
 		var inner_base_xz: Vector3 = p + right * (inner - 0.35 * total_wall_taper)
 		var outer_ground: float = deck_pts[0].y - max_wall_drop
-		var inner_ground: float = deck_pts[6].y - max_wall_drop
+		var inner_ground: float = deck_pts[DECK_VERTS - 1].y - max_wall_drop
 		if has_cache:
 			var centre_h: float = terrain_node._sample_cached_height(p.x, p.z)
 			outer_ground = minf(outer_ground, minf(centre_h,
@@ -1939,7 +1969,7 @@ func _build_cobblestone_road(parent: Node, curve: Curve3D, rings: Array, half_wi
 		var ring_pos := PackedVector3Array([
 			Vector3(outer_base_xz.x, outer_ground, outer_base_xz.z),
 			deck_pts[0],
-			deck_pts[6],
+			deck_pts[DECK_VERTS - 1],
 			Vector3(inner_base_xz.x, inner_ground, inner_base_xz.z),
 		])
 		var wall_uvx: Array = [0.0, 1.0, 1.0, 0.0]
@@ -2024,6 +2054,36 @@ func _build_cobblestone_road(parent: Node, curve: Curve3D, rings: Array, half_wi
 	wall_inst.material_override = wall_mat
 	static_body.add_child(wall_inst)
 
+	# Nose caps: the first and last cross-sections, where the shortcut starts on the trunk, closed from
+	# the deck profile down into the ground. Without them the deck's front edge was an open end, and
+	# from the side you saw a sliver of daylight under it wherever it lay over the trunk's curb, which
+	# drops away towards its outer edge. Visual only: as collision, a vertical face whose top edge is
+	# exactly at road height is something a tyre can catch on.
+	var st_cap := SurfaceTool.new()
+	st_cap.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var cap_verts := 0
+	for end_ring in [0, rings.size() - 1]:
+		var q: PackedVector3Array = wall_ring_pos[end_ring]
+		var top: Array = deck_ring_pos[end_ring]
+		var n: int = top.size()
+		for k in range(n - 1):
+			var t0: float = float(k) / float(n - 1)
+			var t1: float = float(k + 1) / float(n - 1)
+			var sink := Vector3(0.0, 0.01, 0.0)
+			var quad := [q[0].lerp(q[3], t0), top[k] - sink, top[k + 1] - sink, q[0].lerp(q[3], t1)]
+			for vi in range(4):
+				st_cap.set_uv(Vector2(lerpf(t0, t1, 0.0 if vi < 2 else 1.0), 0.0 if (vi == 0 or vi == 3) else 1.0))
+				st_cap.add_vertex(quad[vi])
+			st_cap.add_index(cap_verts + 0); st_cap.add_index(cap_verts + 1); st_cap.add_index(cap_verts + 2)
+			st_cap.add_index(cap_verts + 0); st_cap.add_index(cap_verts + 2); st_cap.add_index(cap_verts + 3)
+			cap_verts += 4
+	st_cap.generate_normals()
+	var cap_inst := MeshInstance3D.new()
+	cap_inst.name = node_name + "_NoseCaps"
+	cap_inst.mesh = st_cap.commit()
+	cap_inst.material_override = wall_mat
+	static_body.add_child(cap_inst)
+
 	var col_shape := CollisionShape3D.new()
 	col_shape.name = "CollisionShape3D"
 	var r_trimesh = deck_mesh.create_trimesh_shape()
@@ -2107,9 +2167,47 @@ func _shortcut_rings(curve: Curve3D, half_width: float, skip_span: Vector2) -> A
 			var tmp := outer
 			outer = inner
 			inner = tmp
+		# Pave the gore. Where the shortcut peels away from the trunk, its near edge runs 0-3m outside
+		# the trunk's collision edge for a few metres, and that wedge was bare, recessed snow: a slot a
+		# wheel drops into. Pull the near edge onto the trunk deck while the gap is small, then let it
+		# go over the next few metres so the gore opens as a normal V once there is room for one.
+		# Not limited to the junction zones: the Glade shortcut first touches the trunk ~46m before its end.
+		if true:
+			var e_near: float = inner if _trunk_lat(p + right * inner) < _trunk_lat(p + right * outer) else outer
+			var lat_e: float = _trunk_lat(p + right * e_near)
+			var gore_gap: float = lat_e - MAIN_COL_HALF_W
+			if gore_gap > -0.3 and gore_gap < GORE_FILL_END:
+				var tp: Vector3 = main_track_curve.get_closest_point(p + right * e_near)
+				if absf(p.y - tp.y) < 1.0:
+					var dl: float = (_trunk_lat(p + right * (e_near + 0.1)) - lat_e) / 0.1
+					if absf(dl) > 0.3:
+						var fill: float = 1.0 - smoothstep(GORE_FILL_FULL, GORE_FILL_END, gore_gap)
+						var moved: float = e_near - (gore_gap + 0.3) * fill / dl
+						if e_near == inner:
+							inner = minf(moved, outer - 1.0)
+						else:
+							outer = maxf(moved, inner + 1.0)
 		rings.append({"p": p, "right": right, "outer": outer, "inner": inner, "cum": off,
 			"gap_after": gap and is_equal_approx(off, skip_span.x)})
 	return rings
+
+
+## The shortcut deck as cross-sections for TerrainGenerator's carving (see _allowed_under_deck): the
+## real edges, and the deck height at each edge and the centre, so the terrain is cut down under a
+## paved gore as well and never stands higher than the deck above it.
+func _deck_sections(rings: Array) -> Dictionary:
+	var offs := PackedFloat32Array()
+	var data := PackedFloat32Array()
+	for r in rings:
+		var p: Vector3 = r["p"]
+		var right: Vector3 = r["right"]
+		var own: float = p.y + SHORTCUT_DECK_Y
+		offs.append(r["cum"])
+		data.append_array([p.x, p.z, right.x, right.z, r["inner"], r["outer"]])
+		for j in range(DECK_SECTION_SAMPLES):
+			var lat: float = lerpf(float(r["inner"]), float(r["outer"]), float(j) / float(DECK_SECTION_SAMPLES - 1))
+			data.append(_deck_height_at(p + right * lat, own))
+	return {"off": offs, "data": data, "samples": DECK_SECTION_SAMPLES}
 
 
 ## Height of a shortcut deck vertex at world position `at` whose own height would be `own_y`.
@@ -2125,8 +2223,17 @@ func _deck_height_at(at: Vector3, own_y: float) -> float:
 	if absf(own_y - trunk_y) > 2.5:
 		return own_y
 	var lat: float = Vector2(at.x - tp.x, at.z - tp.z).length()
+	# The trunk's collision deck is flat across the asphalt and then bevels down 12cm across the curb
+	# strip to its outer edge; following that bevel is what makes the seam over the curb flush.
+	trunk_y -= TRUNK_SHOULDER_DROP * clampf((lat - MAIN_ROAD_HALF_W) / (MAIN_COL_HALF_W - MAIN_ROAD_HALF_W), 0.0, 1.0)
 	var w: float = smoothstep(MAIN_COL_HALF_W, MAIN_COL_HALF_W + 5.0, lat)
 	return lerpf(trunk_y, own_y, w)
+
+
+## Horizontal distance from `at` to the trunk centreline.
+func _trunk_lat(at: Vector3) -> float:
+	var tp: Vector3 = main_track_curve.get_closest_point(at)
+	return Vector2(at.x - tp.x, at.z - tp.z).length()
 
 
 ## 0 where a curb at `at` would stand on the trunk deck, easing to 1 over the 3m beyond its edge.
@@ -2162,15 +2269,20 @@ func _junction_openings(rings: Array, side: float) -> Array:
 	var d := 0.0
 	while d < trunk_len:
 		var f: Dictionary = _frame_at_offset(main_track_curve, d)
-		var covered := false
-		for lat in [MAIN_ROAD_HALF_W + 0.1, (MAIN_ROAD_HALF_W + MAIN_CURB_HALF_W) * 0.5, MAIN_CURB_HALF_W - 0.1]:
+		# The curb only opens where the deck covers the *whole* strip. Opening it as soon as any part was
+		# covered left a wedge of bare snow between the end of the curb and the start of the deck at
+		# every nose; this way the curb runs on under the deck (which sits above it) until it is hidden.
+		var covered := true
+		for lat in [MAIN_ROAD_HALF_W + 0.05, (MAIN_ROAD_HALF_W + MAIN_CURB_HALF_W) * 0.5, MAIN_CURB_HALF_W - 0.02]:
 			var q: Vector3 = f["pos"] + f["right"] * side * float(lat)
 			var q2 := Vector2(q.x, q.z)
+			var hit := false
 			for poly in quads:
 				if Geometry2D.is_point_in_polygon(q2, poly):
-					covered = true
+					hit = true
 					break
-			if covered:
+			if not hit:
+				covered = false
 				break
 		if covered:
 			hit_offs.append(d)
@@ -2186,11 +2298,11 @@ func _junction_openings(rings: Array, side: float) -> Array:
 			run_start = o
 		elif o - run_end > 3.0:
 			if run_end - run_start >= 2.0:
-				out.append(Vector3(run_start - 0.4, run_end + 0.4, side))
+				out.append(Vector3(run_start + 0.1, run_end - 0.1, side))
 			run_start = o
 		run_end = o
 	if run_start >= 0.0 and run_end - run_start >= 2.0:
-		out.append(Vector3(run_start - 0.4, run_end + 0.4, side))
+		out.append(Vector3(run_start + 0.1, run_end - 0.1, side))
 	return out
 
 

@@ -648,6 +648,11 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 ## edge otherwise drags the interpolated surface back up through it) the ground is held at road height
 ## minus the recession. Beyond that it may rise again at a 0.75 cutting slope, which reads as a dug
 ## roadbed rather than a vertical trench.
+##
+## An entry may carry a third element, the deck's actual cross-sections (see extra_road_curves). Then
+## the real edges and edge heights are used instead of a fixed half width at centreline height: a deck
+## that widens over the trunk (a paved gore) or whose edge is pulled up to the trunk's height would
+## otherwise have snow standing up through it.
 func _carve_under_extra_roads(px: float, pz: float, height: float, for_collision: bool) -> float:
 	if extra_road_curves.is_empty():
 		return height
@@ -673,6 +678,10 @@ func _carve_under_extra_roads(px: float, pz: float, height: float, for_collision
 		if px < b[0].x - pad or px > b[1].x + pad or pz < b[0].y - pad or pz > b[1].y + pad:
 			continue
 		var c: Curve3D = extra_road_curves[k][0]
+		if extra_road_curves[k].size() > 2:
+			height = minf(height, _allowed_under_deck(c, extra_road_curves[k][2], px, pz, height, recess,
+				CELL_PAD, BANK_SLOPE, REACH))
+			continue
 		var cp: Vector3 = c.get_closest_point(Vector3(px, height, pz))
 		var dist: float = Vector2(px - cp.x, pz - cp.z).length()
 		var flat: float = half_w + CELL_PAD
@@ -681,6 +690,39 @@ func _carve_under_extra_roads(px: float, pz: float, height: float, for_collision
 		var allowed: float = cp.y - recess + maxf(0.0, dist - flat) * BANK_SLOPE
 		height = minf(height, allowed)
 	return height
+
+
+## Highest the terrain may stand at (px, pz) under or beside a deck given as cross-sections.
+## `sections` is a Dictionary {"off": PackedFloat32Array of offsets along the curve, "samples": N,
+## "data": PackedFloat32Array of 6 + N floats per section: centre x, z, right x, z, inner lateral,
+## outer lateral, then the deck height at N evenly spaced laterals from inner to outer}. Several
+## heights, not just edges and centre, because a deck blended onto the trunk bends across its width.
+## Returns INF where the deck has no say.
+func _allowed_under_deck(c: Curve3D, sections: Dictionary, px: float, pz: float, height: float,
+		recess: float, cell_pad: float, bank_slope: float, reach: float) -> float:
+	var offs: PackedFloat32Array = sections["off"]
+	var data: PackedFloat32Array = sections["data"]
+	var n: int = int(sections.get("samples", 3))
+	if offs.is_empty():
+		return INF
+	var off: float = c.get_closest_offset(Vector3(px, height, pz))
+	var i: int = clampi(offs.bsearch(off), 0, offs.size() - 1)
+	if i > 0 and absf(offs[i - 1] - off) < absf(offs[i] - off):
+		i -= 1
+	# No deck section near this offset: the bridge gap.
+	if absf(offs[i] - off) > 1.0:
+		return INF
+	var b: int = i * (6 + n)
+	var lat: float = (px - data[b]) * data[b + 2] + (pz - data[b + 1]) * data[b + 3]
+	var inner: float = data[b + 4]
+	var outer: float = data[b + 5]
+	var out_dist: float = maxf(inner - lat, lat - outer)
+	var t: float = clampf((lat - inner) / maxf(outer - inner, 0.001), 0.0, 1.0) * float(n - 1)
+	var j: int = mini(int(t), n - 2)
+	var deck_y: float = lerpf(data[b + 6 + j], data[b + 7 + j], t - float(j))
+	if out_dist > cell_pad + reach:
+		return INF
+	return deck_y - recess + maxf(0.0, out_dist - cell_pad) * bank_slope
 
 
 @export var generate_now: bool = false:
@@ -761,7 +803,7 @@ var sand_width: float:
 var _visual_heights: PackedFloat32Array = PackedFloat32Array()
 
 ## Secondary roads (shortcuts) built by a level generator after the trunk, as [Curve3D, half_width]
-## pairs in world space. Terrain is only ever *lowered* under them -- to the road's own height minus
+## or [Curve3D, half_width, sections] in world space (sections: see _allowed_under_deck). Terrain is only ever *lowered* under them -- to the road's own height minus
 ## the usual recession, with a natural cutting bank beyond the deck edge -- because the trunk grading
 ## above knows nothing about them and left snow standing up through the shortcut decks. Where a
 ## shortcut runs on an embankment the ground is already below it and nothing changes.

@@ -37,6 +37,10 @@ current file.
 - The shortcut curves are built *before* `generate_world()`. TerrainGenerator then lowers terrain under
   them (`extra_road_curves`) and opens the trunk curb where a shortcut deck crosses it (`junction_openings`,
   computed from the deck footprint, not hand-entered).
+- Gores are paved: where a shortcut edge runs within 4m of the trunk's collision edge it is pulled onto
+  the trunk deck (`GORE_FILL_FULL/END`), and its height follows the trunk's 12cm shoulder bevel
+  (`TRUNK_SHOULDER_DROP`). The trunk curb only opens where the deck covers the whole curb strip.
+  TerrainGenerator carves under the deck's real outline and heights (`_deck_sections`), not a fixed width.
 - Trunk control-point handles are made collinear after the curve is built, except at the jump lips and
   landings. A non-collinear pair is a corner in the road, and the road ribbon folds on its inside.
 
