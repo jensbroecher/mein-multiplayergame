@@ -354,12 +354,38 @@ var _bloombay_stage: bool = false
 var _snow_stage: bool = false
 var is_in_snow: bool = false
 var _snow_drift_depth: int = 0
+## SnowDrift nodes the car is currently inside.
+var _active_drifts: Array = []
+## Loose snow standing in front of the car, in metres, refreshed every physics tick. 0 on packed
+## snow or in a rut someone has already cut; up to ~0.8 in a fresh drift.
+var snow_plough_depth: float = 0.0
+## Loose snow depth at which a drift costs its full resistance.
+const SNOW_FULL_DEPTH := 0.6
+## Ploughing drag at full depth, as a fraction of horizontal speed lost per second.
+const SNOW_PLOUGH_DRAG := 1.1
 
-func enter_snow_drift() -> void:
+func enter_snow_drift(drift: Node = null) -> void:
 	_snow_drift_depth += 1
+	if drift and not _active_drifts.has(drift):
+		_active_drifts.append(drift)
 
-func exit_snow_drift() -> void:
+func exit_snow_drift(drift: Node = null) -> void:
 	_snow_drift_depth = maxi(0, _snow_drift_depth - 1)
+	_active_drifts.erase(drift)
+	if _snow_drift_depth == 0:
+		_active_drifts.clear()
+
+func _update_snow_plough_depth() -> void:
+	snow_plough_depth = 0.0
+	if _active_drifts.is_empty():
+		return
+	# Sampled at the nose: that is the snow the car is pushing into, not what it is already sitting in.
+	var fwd: Vector3 = -visuals.global_transform.basis.z
+	fwd.y = 0.0
+	fwd = fwd.normalized() if fwd.length() > 0.01 else Vector3.FORWARD
+	for d in _active_drifts:
+		if is_instance_valid(d) and d.has_method("snow_depth_at"):
+			snow_plough_depth = maxf(snow_plough_depth, d.snow_depth_at(global_position + fwd * 0.9))
 var is_underwater: bool = false
 const WATER_LEVEL = -10.0
 ## Effective surface Y used for splash/drown (may be chasm pit water, not global ocean).
@@ -2020,8 +2046,18 @@ func _physics_process(delta):
 				cur = cur.get_parent()
 
 	is_in_snow = on_snow_surface or (_snow_drift_depth > 0) or (is_offroad and _snow_stage)
+	_update_snow_plough_depth()
 
-	if is_offroad or is_in_snow:
+	if _snow_drift_depth > 0 and not is_offroad:
+		# In a drift the cap follows how much loose snow is ahead, not a random roll: ploughing into
+		# fresh powder holds a car to ~55-75% of its top speed (better offroaders suffer less), while
+		# a rut that has already been cut is close to free running.
+		var drift_preset = CAR_PRESETS[car_index]
+		var drift_offroad: float = clamp((drift_preset.get("offroad", 5.0) - 1.0) / 9.0, 0.0, 1.0)
+		var plough: float = clampf(snow_plough_depth / SNOW_FULL_DEPTH, 0.0, 1.0)
+		offroad_target_penalty = lerpf(1.0, lerpf(0.55, 0.75, drift_offroad), plough)
+		offroad_penalty = lerp(offroad_penalty, offroad_target_penalty, 4.0 * delta)
+	elif is_offroad or is_in_snow:
 		offroad_timer += delta
 		if offroad_timer > 0.15:
 			offroad_timer = 0.0
@@ -2419,10 +2455,11 @@ func _physics_process(delta):
 		if sfx_wind_loop.volume_db < -35.0:
 			sfx_wind_loop.stop()
 
-	# Active snow drift drag: soft powdery resistance that absorbs forward momentum
-	if on_ground and _snow_drift_depth > 0 and not is_boosting and not is_pad_boosting:
-		var snow_drag = linear_velocity * (1.6 * delta)
-		linear_velocity -= snow_drag
+	# Ploughing through loose snow: horizontal momentum bleeds away in proportion to how deep the
+	# powder in front of the nose is. A boost punches through without losing speed.
+	if on_ground and snow_plough_depth > 0.02 and not is_boosting and not is_pad_boosting:
+		var plough_drag: float = SNOW_PLOUGH_DRAG * clampf(snow_plough_depth / SNOW_FULL_DEPTH, 0.0, 1.0)
+		linear_velocity -= Vector3(linear_velocity.x, 0.0, linear_velocity.z) * (plough_drag * delta)
 
 	# Dampen speed if exceeding offroad max speed
 	var effective_max = max_speed * offroad_penalty * slow_mult
@@ -2740,7 +2777,9 @@ func _update_visuals_alignment(delta: float) -> void:
 	if on_ground:
 		compress = clampf(linear_velocity.y * -0.035, 0.0, 0.08)
 		if _snow_drift_depth > 0:
-			compress += 0.08 # Sinks chassis visually into soft snow
+			# The car already rides on the drift's packed layer, inside the powder; this is only the
+			# chassis settling a little deeper where the snow ahead is loose.
+			compress += 0.03 + 0.05 * clampf(snow_plough_depth / SNOW_FULL_DEPTH, 0.0, 1.0)
 	visual_offset_y = lerpf(visual_offset_y, fixed_offset + compress, 1.0 - exp(-11.0 * delta))
 
 	if on_ground:
@@ -3554,6 +3593,8 @@ func respawn_rpc(custom_checkpoint_transform: Transform3D = Transform3D()):
 
 func respawn():
 	_snow_drift_depth = 0
+	_active_drifts.clear()
+	snow_plough_depth = 0.0
 	# Finished racers must not snap back to the finish gate (last checkpoint).
 	if is_finished_race or is_teleporting:
 		return

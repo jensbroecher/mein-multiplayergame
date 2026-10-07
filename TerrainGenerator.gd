@@ -41,6 +41,12 @@ func _in_frostpeak_bridge_zone(px: float, pz: float) -> bool:
 
 ## Checks whether a main track segment offset falls within a Frostpeak shortcut junction opening.
 func _is_frostpeak_junction_opening(offset: float, is_left_side: bool) -> bool:
+	if not junction_openings.is_empty():
+		var want_side: float = -1.0 if is_left_side else 1.0
+		for o in junction_openings:
+			if o.z == want_side and offset > o.x and offset < o.y:
+				return true
+		return false
 	if level_prefix != "frostpeak_creek":
 		return false
 	# 1. Canyon Cut split (left curb open at ~324..342m)
@@ -617,6 +623,8 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 					var target_bed: float = lerpf(bed_y, bed_y - 0.7, lake_center_boost)
 					height = lerp(height, target_bed, clampf(carve, 0.0, 1.0))
 
+	height = _carve_under_extra_roads(px, pz, height, for_collision)
+
 	# Edge falloff (all track types — curves down smoothly to abyss / horizon outside all track envelopes)
 	var max_radius: float = terrain_size.x * 0.5
 	var dist_from_center_val: float = Vector2(px, pz).length()
@@ -632,6 +640,47 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 
 	return height
 
+
+
+## Lowers `height` wherever it would stand above one of the extra_road_curves decks.
+##
+## Inside the deck (plus one terrain cell, since the grid is ~2m and a vertex just outside the deck
+## edge otherwise drags the interpolated surface back up through it) the ground is held at road height
+## minus the recession. Beyond that it may rise again at a 0.75 cutting slope, which reads as a dug
+## roadbed rather than a vertical trench.
+func _carve_under_extra_roads(px: float, pz: float, height: float, for_collision: bool) -> float:
+	if extra_road_curves.is_empty():
+		return height
+	if _extra_road_bounds.size() != extra_road_curves.size():
+		_extra_road_bounds.clear()
+		for entry in extra_road_curves:
+			var c: Curve3D = entry[0]
+			var pts: PackedVector3Array = c.get_baked_points()
+			var lo := Vector2(INF, INF)
+			var hi := Vector2(-INF, -INF)
+			for p in pts:
+				lo = Vector2(minf(lo.x, p.x), minf(lo.y, p.z))
+				hi = Vector2(maxf(hi.x, p.x), maxf(hi.y, p.z))
+			_extra_road_bounds.append([lo, hi])
+	const CELL_PAD := 2.6
+	const BANK_SLOPE := 0.75
+	const REACH := 14.0
+	var recess: float = terrain_recession_collision if for_collision else terrain_recession_visual
+	for k in range(extra_road_curves.size()):
+		var half_w: float = float(extra_road_curves[k][1])
+		var b: Array = _extra_road_bounds[k]
+		var pad: float = half_w + CELL_PAD + REACH
+		if px < b[0].x - pad or px > b[1].x + pad or pz < b[0].y - pad or pz > b[1].y + pad:
+			continue
+		var c: Curve3D = extra_road_curves[k][0]
+		var cp: Vector3 = c.get_closest_point(Vector3(px, height, pz))
+		var dist: float = Vector2(px - cp.x, pz - cp.z).length()
+		var flat: float = half_w + CELL_PAD
+		if dist > flat + REACH:
+			continue
+		var allowed: float = cp.y - recess + maxf(0.0, dist - flat) * BANK_SLOPE
+		height = minf(height, allowed)
+	return height
 
 
 @export var generate_now: bool = false:
@@ -710,6 +759,21 @@ var sand_width: float:
 @export var save_to_files: bool = true
 
 var _visual_heights: PackedFloat32Array = PackedFloat32Array()
+
+## Secondary roads (shortcuts) built by a level generator after the trunk, as [Curve3D, half_width]
+## pairs in world space. Terrain is only ever *lowered* under them -- to the road's own height minus
+## the usual recession, with a natural cutting bank beyond the deck edge -- because the trunk grading
+## above knows nothing about them and left snow standing up through the shortcut decks. Where a
+## shortcut runs on an embankment the ground is already below it and nothing changes.
+## Set by the generator before generate_world(); not exported, so it is not saved into the level.
+var extra_road_curves: Array = []
+## Curb openings on the trunk where a shortcut deck crosses the curb strip, as
+## Vector3(start_offset, end_offset, side) with side -1 = left of travel, +1 = right. Computed by the
+## level generator from the real deck footprint. When empty, the old hard-coded Frostpeak ranges apply.
+var junction_openings: Array = []
+## Cached axis-aligned XZ bounds (x0, z0, x1, z1) per extra road curve, for a cheap reject before the
+## nearest-point search.
+var _extra_road_bounds: Array = []
 
 func _sample_cached_height(px: float, pz: float) -> float:
 	if _visual_heights.is_empty():
@@ -890,6 +954,84 @@ func _get_world_curve() -> Curve3D:
 		world_curve.add_point(pos, p_in, p_out)
 		world_curve.set_point_tilt(src.point_count, src.get_point_tilt(0))
 	return world_curve
+
+
+## Curb stripes belong in corners only. Tight corners get the red/white kerb, straights a plain
+## shoulder -- curb_stripes.gdshader reads this weight from the vertex colour's red channel.
+const CURB_CORNER_RADIUS := 70.0     # at or below this radius the curb is fully striped
+const CURB_STRAIGHT_RADIUS := 140.0  # at or above this radius it is plain
+## The kerb starts this far before the corner is measured to begin and runs on past its exit, the
+## way real kerbs cover the braking zone and the exit run-off.
+const CURB_CORNER_LEAD := 12.0
+## Transitions snap to whole stripe pairs (2 x the shader's 1.5m stripe), so a kerb never starts or
+## ends with half a stripe.
+const CURB_STRIPE_PAIR := 3.0
+
+
+## Writes a corner weight (0 = straight, 1 = corner) into the vertex colour of a curb mesh.
+##
+## The weight is looked up from each vertex's own distance along the track, which the curb mesh
+## already carries in UV.y. That makes this independent of vertex order, so it can also be run on
+## curb meshes generated before it existed (see refresh_curb_corners.gd) without regenerating the
+## level. The mesh is rebuilt in place so its resource path and UID stay the same.
+func _apply_curb_corner_weights(mesh: ArrayMesh, curve: Curve3D) -> void:
+	if mesh == null or mesh.get_surface_count() == 0 or curve == null:
+		return
+	var length: float = curve.get_baked_length()
+	if length < 1.0:
+		return
+	# 1. Radius every metre from the heading change across a +-8m window (horizontal plane only, so
+	#    crests and dips do not count as corners).
+	var n: int = int(length) + 1
+	var raw := PackedFloat32Array()
+	raw.resize(n)
+	const WIN := 8.0
+	for i in range(n):
+		var d: float = float(i)
+		var a: Vector3 = _curve_sample_wrapped(curve, d - WIN, length)
+		var b: Vector3 = _curve_sample_wrapped(curve, d, length)
+		var c: Vector3 = _curve_sample_wrapped(curve, d + WIN, length)
+		var v1 := Vector2(b.x - a.x, b.z - a.z)
+		var v2 := Vector2(c.x - b.x, c.z - b.z)
+		var w: float = 0.0
+		if v1.length() > 0.01 and v2.length() > 0.01:
+			var ang: float = absf(v1.angle_to(v2))
+			var radius: float = WIN / maxf(ang, 1e-4)
+			w = 1.0 - smoothstep(CURB_CORNER_RADIUS, CURB_STRAIGHT_RADIUS, radius)
+		raw[i] = w
+	# 2. Spread each corner forward and back by CURB_CORNER_LEAD (a max filter).
+	var spread := PackedFloat32Array()
+	spread.resize(n)
+	var lead: int = int(CURB_CORNER_LEAD)
+	for i in range(n):
+		var m: float = 0.0
+		for k in range(-lead, lead + 1):
+			var j: int = i + k
+			if is_loop:
+				j = posmod(j, n)
+			elif j < 0 or j >= n:
+				continue
+			m = maxf(m, raw[j])
+		spread[i] = m
+	# 3. Decide per stripe pair, so the kerb begins and ends on a whole stripe.
+	var arrays: Array = mesh.surface_get_arrays(0)
+	var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
+	var colors := PackedColorArray()
+	colors.resize(uvs.size())
+	for vi in range(uvs.size()):
+		var cell_mid: float = (floorf(uvs[vi].y / CURB_STRIPE_PAIR) + 0.5) * CURB_STRIPE_PAIR
+		var idx: int = clampi(int(cell_mid), 0, n - 1)
+		var w: float = 1.0 if spread[idx] >= 0.5 else 0.0
+		colors[vi] = Color(w, w, w, 1.0)
+	arrays[Mesh.ARRAY_COLOR] = colors
+	mesh.clear_surfaces()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+
+
+func _curve_sample_wrapped(curve: Curve3D, d: float, length: float) -> Vector3:
+	if is_loop:
+		return curve.sample_baked(fposmod(d, length))
+	return curve.sample_baked(clampf(d, 0.0, length))
 
 
 func _save_resource(res: Resource, res_name: String, sub_dir: String = "") -> Resource:
@@ -1348,9 +1490,12 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 
 
 	st.generate_tangents()
+	var path_mesh: ArrayMesh = st.commit()
+	if is_curb:
+		_apply_curb_corner_weights(path_mesh, curve)
 	var mesh_instance = MeshInstance3D.new()
 	mesh_instance.name = node_name
-	mesh_instance.mesh = _save_resource(st.commit(), node_name)
+	mesh_instance.mesh = _save_resource(path_mesh, node_name)
 	mesh_instance.material_override = mat_dup
 	mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON # Enable shadows to prevent shadow leaking under bridges
 	add_child(mesh_instance)

@@ -25,6 +25,35 @@ self-checks (`_verify_ramp_junction`, `_verify_bridge_alignment`) that `push_err
 still save the level. You can ignore these at exit: "Node not found: Players/PlayerSpawner" (`Level.gd` runs
 outside a game), "Leaked instance dependency", and RID/ObjectDB leak messages.
 
+`Level.tscn` and `MountainLevel.tscn` can each be written by several generators (`regenerate_both`,
+`regenerate_custom_path`, `regenerate_desert`, ...). Don't regenerate them unless you know which one made the
+current file.
+
+## Frostpeak Creek road joints
+
+- Surfaces that meet are built to shared heights above their centrelines: trunk collision deck +0.08
+  (`TRUNK_DECK_Y`), shortcut deck +0.05 (`SHORTCUT_DECK_Y`), timber bridge deck top +0.08 above the bridge
+  origin (`BRIDGE_DECK_TOP`). Change one and the joints step.
+- The shortcut curves are built *before* `generate_world()`. TerrainGenerator then lowers terrain under
+  them (`extra_road_curves`) and opens the trunk curb where a shortcut deck crosses it (`junction_openings`,
+  computed from the deck footprint, not hand-entered).
+- Trunk control-point handles are made collinear after the curve is built, except at the jump lips and
+  landings. A non-collinear pair is a corner in the road, and the road ribbon folds on its inside.
+
+## Curbs
+
+`curb_stripes.gdshader` draws the red/white kerb only where the curb mesh's vertex colour red channel is
+1 (corners), and a plain shoulder with a white edge line elsewhere. TerrainGenerator writes that weight
+(`_apply_curb_corner_weights`) when it builds the curbs. To update the saved curb meshes of every level
+without regenerating them, run `res://refresh_curb_corners.tscn` headless.
+
+## Snow drifts
+
+`SnowDrift.gd` is a height field laid over road rows (`row_centres`/`row_rights`, set by the generator).
+Cars ride on its packed layer and carve the loose powder at runtime. The mesh and packed collider are
+internal children rebuilt on load, so the level file only stores the row data. PlayerCart reads
+`snow_depth_at()` at its nose for drag and the speed cap (`snow_plough_depth`).
+
 ## Procedural mesh winding
 
 Godot front faces wind **clockwise**, and `generate_normals()` gives a face normal of `(c - a) x (b - a)`.
