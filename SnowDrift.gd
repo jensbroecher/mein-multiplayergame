@@ -128,7 +128,7 @@ var _half_w: float = 0.0
 var _rebuild_queued := false
 var _dirty := false
 var _since_rebuild := 0.0
-## Cars currently inside, each with its spray emitter: {body: CPUParticles3D}.
+## Cars currently inside, each with its spray emitter: {body: GPUParticles3D}.
 var _bodies: Dictionary = {}
 
 
@@ -439,7 +439,7 @@ func _physics_process(delta: float) -> void:
 			_drop_body(body)
 			continue
 		_carve_for(body as Node3D)
-		_update_spray(body as Node3D, _bodies[body] as CPUParticles3D)
+		_update_spray(body as Node3D, _bodies[body] as GPUParticles3D)
 	_since_rebuild += delta
 	if _dirty and _since_rebuild >= REBUILD_INTERVAL:
 		_since_rebuild = 0.0
@@ -506,39 +506,49 @@ func _carve_disc(lp: Vector3, radius: float, clearance: float) -> void:
 			_cur[k] = minf(_cur[k] + add, _top[k] * 1.25 + 0.05)
 
 
-func _make_spray() -> CPUParticles3D:
-	var p := CPUParticles3D.new()
+## The spray is GPUParticles3D, not CPUParticles3D: with world-space particles the CPU version draws
+## its unused particle slots at the emitter origin, which showed as a dark puff hovering in front of
+## the car's nose whenever it ploughed into a drift.
+func _make_spray() -> GPUParticles3D:
+	var p := GPUParticles3D.new()
 	p.name = "SnowSpray"
 	p.emitting = false
 	p.amount = 90
 	p.lifetime = 0.9
 	p.explosiveness = 0.0
 	p.randomness = 0.5
-	p.lifetime_randomness = 0.35
 	p.local_coords = false
-	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
-	p.emission_box_extents = Vector3(0.6, 0.1, 0.2)
-	p.direction = Vector3(0.0, 1.0, -0.6)
-	p.spread = 55.0
-	p.gravity = Vector3(0.0, -9.0, 0.0)
-	p.initial_velocity_min = 1.5
-	p.initial_velocity_max = 4.5
-	p.damping_min = 1.0
-	p.damping_max = 2.5
-	p.scale_amount_min = 0.25
-	p.scale_amount_max = 0.7
+	# The emitter follows the car, so the bounds have to cover the whole plume around it.
+	p.visibility_aabb = AABB(Vector3(-8, -3, -8), Vector3(16, 9, 16))
+	var pm := ParticleProcessMaterial.new()
+	pm.lifetime_randomness = 0.35
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	pm.emission_box_extents = Vector3(0.6, 0.1, 0.2)
+	pm.direction = Vector3(0.0, 1.0, -0.6)
+	pm.spread = 55.0
+	pm.gravity = Vector3(0.0, -9.0, 0.0)
+	pm.initial_velocity_min = 1.5
+	pm.initial_velocity_max = 4.5
+	pm.damping_min = 1.0
+	pm.damping_max = 2.5
+	pm.scale_min = 0.25
+	pm.scale_max = 0.7
 	var sc := Curve.new()
 	sc.add_point(Vector2(0.0, 0.35))
 	sc.add_point(Vector2(0.4, 1.0))
-	sc.add_point(Vector2(1.0, 1.3))
-	p.scale_amount_curve = sc
+	sc.add_point(Vector2(1.0, 1.0))
+	var sct := CurveTexture.new()
+	sct.curve = sc
+	pm.scale_curve = sct
 	var grad := Gradient.new()
 	grad.offsets = PackedFloat32Array([0.0, 0.12, 0.6, 1.0])
 	grad.colors = PackedColorArray([Color(1, 1, 1, 0.0), Color(1, 1, 1, 0.85), Color(1, 1, 1, 0.45), Color(1, 1, 1, 0.0)])
-	p.color_ramp = grad
+	var gt := GradientTexture1D.new()
+	gt.gradient = grad
+	pm.color_ramp = gt
+	p.process_material = pm
 	var quad := QuadMesh.new()
 	quad.size = Vector2(0.5, 0.5)
-	p.mesh = quad
 	var mat := StandardMaterial3D.new()
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -546,7 +556,8 @@ func _make_spray() -> CPUParticles3D:
 	mat.vertex_color_use_as_albedo = true
 	mat.albedo_color = Color(0.97, 0.98, 1.0)
 	mat.albedo_texture = _puff_texture()
-	p.material_override = mat
+	quad.material = mat
+	p.draw_pass_1 = quad
 	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return p
 
@@ -565,7 +576,7 @@ static func _puff_texture() -> Texture2D:
 	return _puff_tex
 
 
-func _update_spray(body: Node3D, spray: CPUParticles3D) -> void:
+func _update_spray(body: Node3D, spray: GPUParticles3D) -> void:
 	if spray == null:
 		return
 	var vel: Vector3 = body.get("linear_velocity") if "linear_velocity" in body else Vector3.ZERO
@@ -584,9 +595,10 @@ func _update_spray(body: Node3D, spray: CPUParticles3D) -> void:
 		# Emitter -Z along the car's heading, so the local (0, 1, -0.6) direction is up and ahead.
 		spray.global_transform = Transform3D(Basis.looking_at(flat_fwd, Vector3.UP), front + Vector3.UP * 0.1)
 		var strength: float = clampf(speed / 20.0, 0.2, 1.0) * clampf(depth / 0.5, 0.3, 1.0)
-		spray.initial_velocity_min = 1.0 + 3.0 * strength
-		spray.initial_velocity_max = 2.5 + 7.0 * strength
-		spray.scale_amount_max = 0.4 + 0.5 * strength
+		var pm := spray.process_material as ParticleProcessMaterial
+		pm.initial_velocity_min = 1.0 + 3.0 * strength
+		pm.initial_velocity_max = 2.5 + 7.0 * strength
+		pm.scale_max = 0.4 + 0.5 * strength
 	spray.emitting = on
 
 
@@ -616,7 +628,7 @@ func _on_body_exited(body: Node3D) -> void:
 func _drop_body(body: Object) -> void:
 	if not _bodies.has(body):
 		return
-	var spray := _bodies[body] as CPUParticles3D
+	var spray := _bodies[body] as GPUParticles3D
 	_bodies.erase(body)
 	if is_instance_valid(spray):
 		spray.emitting = false
