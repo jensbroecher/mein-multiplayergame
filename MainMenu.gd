@@ -24,6 +24,26 @@ const COL_WADI := Color(0.9, 0.74, 0.38)
 const COL_SNOW := Color(0.45, 0.82, 0.98)
 const COL_BEACH := Color(0.96, 0.78, 0.40)
 
+## Every course's tile: title, one-line description, picture and accent colour.
+const STAGE_INFO := {
+	"res://levels/Level.tscn": {"title": "LAKESIDE COURSE", "subtitle": "Hills, lake, and the long bridge", "file": "tile_lakeside.jpg", "color": COL_LAKE},
+	"res://levels/PinecrestRidgeLevel.tscn": {"title": "PINECREST RIDGE", "subtitle": "Forest hillclimb, sharp switchbacks, and big jumps", "file": "tile_pinecrest.jpg", "color": COL_GREEN},
+	"res://levels/HarborPierLevel.tscn": {"title": "HARBOR PIER", "subtitle": "Piers, crates, and dark water", "file": "tile_harbor.jpg", "color": COL_HARBOR},
+	"res://levels/BloombayDunesLevel.tscn": {"title": "BLOOMBAY DUNES", "subtitle": "Ocean coastline, rolling waves, and beach sand dunes", "file": "tile_bloombay_dunes.jpg", "color": COL_BEACH},
+	"res://levels/FrostpeakCreekLevel.tscn": {"title": "FROSTPEAK CREEK", "subtitle": "Snow drifts, creek leaps, and the alpine bridge", "file": "tile_frostpeak_creek.jpg", "color": COL_SNOW},
+	"res://levels/GlacierHighwayLevel.tscn": {"title": "GLACIER HIGHWAY", "subtitle": "Multi-tier concrete expressway, tunnels, and icy on-ramps", "file": "tile_glacier_highway.jpg", "color": COL_SNOW},
+	"res://levels/NorthlightCavernsLevel.tscn": {"title": "NORTHLIGHT CAVERNS", "subtitle": "Night race under the aurora, through a glacier and over an ice arch", "file": "tile_northlight_caverns.jpg", "color": COL_SNOW},
+	"res://levels/FrostfallGorgeLevel.tscn": {"title": "FROSTFALL GORGE", "subtitle": "Off-road along a river gorge: gully jumps, a frozen waterfall, and a mega-jump", "file": "tile_frostfall_gorge.jpg", "color": COL_SNOW},
+	"res://levels/MountainLevel.tscn": {"title": "MOUNTAIN COURSE", "subtitle": "Dunes and high desert ridges", "file": "tile_mountain.jpg", "color": COL_MOUNTAIN},
+	"res://levels/CanyonLevel.tscn": {"title": "CANYON COURSE", "subtitle": "Red rock walls and mesa turns", "file": "tile_canyon.jpg", "color": COL_CANYON},
+	"res://levels/CanyonChasmLevel.tscn": {"title": "CANYON CHASM", "subtitle": "A narrow run over the drop", "file": "tile_canyon_chasm.jpg", "color": COL_CHASM},
+	"res://levels/DesertWadiLevel.tscn": {"title": "DESERT WADI", "subtitle": "Dry riverbed sand and heat", "file": "tile_desert_wadi.jpg", "color": COL_WADI},
+}
+## Section header colour per cup on the course lists (same accents as the cup tiles).
+const CUP_COLORS := {"Bloombay GP": COL_GREEN, "Arctic Cup": COL_SNOW, "Al-Raihana GP": COL_BRONZE}
+## Tiles per row in a cup section: one cup per row.
+const SECTION_COLUMNS := 4
+
 @onready var name_edit: LineEdit = $Root/VBox/TopBar/NameBox/NameEdit
 @onready var screen_title: Label = $Root/VBox/TopBar/TitleRow/ScreenTitle
 @onready var screen_subtitle: Label = $Root/VBox/TopBar/TitleRow/ScreenSubtitle
@@ -34,6 +54,9 @@ const COL_BEACH := Color(0.96, 0.78, 0.40)
 
 var name_edit_p2: LineEdit
 var current_screen: String = "main"
+## Holds tile_grid on ordinary screens, and the per-cup sections on the course lists.
+var tile_sections: VBoxContainer
+var section_grids: Array[GridContainer] = []
 
 
 func _ready() -> void:
@@ -43,9 +66,90 @@ func _ready() -> void:
 	btn_back.pressed.connect(_on_back_pressed)
 	btn_quit.pressed.connect(_on_quit_pressed)
 	_create_coop_name_row()
+	_create_tile_sections()
 	visibility_changed.connect(_on_visibility_changed)
 	resized.connect(_relayout_tiles)
 	show_sub_menu("main")
+
+
+## A ScrollContainer takes a single child, so tile_grid moves into a VBox that can also hold
+## section headers and their grids.
+func _create_tile_sections() -> void:
+	var scroll: Control = tile_grid.get_parent()
+	tile_sections = VBoxContainer.new()
+	tile_sections.name = "TileSections"
+	tile_sections.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tile_sections.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tile_sections.add_theme_constant_override("separation", 14)
+	scroll.remove_child(tile_grid)
+	scroll.add_child(tile_sections)
+	tile_sections.add_child(tile_grid)
+
+
+## Adds a titled section (header line plus its own tile grid) and returns the grid to fill.
+func _add_section(title: String, accent: Color) -> GridContainer:
+	tile_grid.visible = false
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 14)
+	if not section_grids.is_empty():
+		header.custom_minimum_size.y = 52
+	header.alignment = BoxContainer.ALIGNMENT_BEGIN
+	var lbl := Label.new()
+	lbl.text = title.to_upper()
+	lbl.add_theme_font_size_override("font_size", 24)
+	lbl.add_theme_color_override("font_color", accent)
+	lbl.size_flags_vertical = Control.SIZE_SHRINK_END
+	header.add_child(lbl)
+	var line := ColorRect.new()
+	line.color = Color(accent.r, accent.g, accent.b, 0.45)
+	line.custom_minimum_size = Vector2(0, 3)
+	line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	line.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	header.add_child(line)
+	tile_sections.add_child(header)
+	var grid := GridContainer.new()
+	grid.columns = SECTION_COLUMNS
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 22)
+	grid.add_theme_constant_override("v_separation", 22)
+	tile_sections.add_child(grid)
+	section_grids.append(grid)
+	return grid
+
+
+## Course list grouped by Grand Prix, in cup order, with any course outside a cup at the end.
+## `on_pick` is called with the cup name ("" outside a cup), stage index and scene path.
+func _fill_stages_by_cup(on_pick: Callable, numbered: bool) -> void:
+	var listed := {}
+	for cup_name in NetworkManager.GP_CUPS.keys():
+		var stages: Array = NetworkManager.GP_CUPS[cup_name].get("stages", [])
+		var grid := _add_section(str(cup_name), CUP_COLORS.get(cup_name, COL_GOLD))
+		for i in range(stages.size()):
+			var path: String = str(stages[i])
+			listed[path] = true
+			_add_stage_tile(grid, path, str(cup_name), i, stages.size(), on_pick, numbered)
+	var others: Array = []
+	for st in NetworkManager.ALL_STAGES:
+		if not listed.has(st["path"]):
+			others.append(st["path"])
+	if not others.is_empty():
+		var grid2 := _add_section("Other Courses", COL_GOLD)
+		for path in others:
+			_add_stage_tile(grid2, path, "", 0, 0, on_pick, false)
+
+
+func _add_stage_tile(grid: GridContainer, path: String, cup_name: String, index: int, count: int,
+		on_pick: Callable, numbered: bool) -> void:
+	var info: Dictionary = STAGE_INFO.get(path, {"title": path.get_file().get_basename().to_upper(),
+			"subtitle": "", "file": "tile_grand_prix.jpg", "color": COL_GOLD})
+	var title: String = info["title"]
+	var subtitle: String = info["subtitle"]
+	if numbered:
+		title = "%s  %d/%d" % [title, index + 1, count]
+		subtitle = "%s  •  GP stage %d" % [cup_name, index + 1]
+	_add_tile(title, subtitle, str(info["file"]), info["color"], func():
+		on_pick.call(cup_name, index, path)
+	, grid)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -148,8 +252,9 @@ func show_sub_menu(menu_name: String) -> void:
 		"gp_test":
 			screen_title.text = "GP TEST"
 			screen_subtitle.text = "Dev jump-in: full GP rules (bots, grid, next stage). Hide with SHOW_GP_TEST_MENU."
-			tile_grid.columns = 3
-			_fill_gp_test_tiles()
+			_fill_stages_by_cup(func(cup_name: String, stage_i: int, _path: String):
+				_on_gp_test_stage_selected(cup_name, stage_i)
+			, true)
 		"sp_modes":
 			screen_title.text = "SINGLE PLAYER"
 			screen_subtitle.text = "Pick a championship or a single course"
@@ -187,52 +292,26 @@ func show_sub_menu(menu_name: String) -> void:
 			else:
 				screen_title.text = "SELECT COURSE"
 				screen_subtitle.text = "Pick a track to race"
-			tile_grid.columns = 3
-			_add_tile("LAKESIDE COURSE", "Hills, lake, and the long bridge", "tile_lakeside.jpg", COL_LAKE, func():
-				_on_stage_selected("res://levels/Level.tscn")
-			)
-			_add_tile("PINECREST RIDGE", "Forest hillclimb, sharp switchbacks, and big jumps", "tile_pinecrest.jpg", COL_GREEN, func():
-				_on_stage_selected("res://levels/PinecrestRidgeLevel.tscn")
-			)
-			_add_tile("FROSTPEAK CREEK", "Snow drifts, creek leaps, and the alpine bridge", "tile_frostpeak_creek.jpg", COL_SNOW, func():
-				_on_stage_selected("res://levels/FrostpeakCreekLevel.tscn")
-			)
-			_add_tile("GLACIER HIGHWAY", "Multi-tier concrete expressway, tunnels, and icy on-ramps", "tile_glacier_highway.jpg", COL_SNOW, func():
-				_on_stage_selected("res://levels/GlacierHighwayLevel.tscn")
-			)
-			_add_tile("NORTHLIGHT CAVERNS", "Night race under the aurora, through a glacier and over an ice arch", "tile_northlight_caverns.jpg", COL_SNOW, func():
-				_on_stage_selected("res://levels/NorthlightCavernsLevel.tscn")
-			)
-			_add_tile("FROSTFALL GORGE", "Off-road along a river gorge: gully jumps, a frozen waterfall, and a mega-jump", "tile_frostfall_gorge.jpg", COL_SNOW, func():
-				_on_stage_selected("res://levels/FrostfallGorgeLevel.tscn")
-			)
-			_add_tile("HARBOR PIER", "Piers, crates, and dark water", "tile_harbor.jpg", COL_HARBOR, func():
-				_on_stage_selected("res://levels/HarborPierLevel.tscn")
-			)
-			_add_tile("BLOOMBAY DUNES", "Ocean coastline, rolling waves, and beach sand dunes", "tile_bloombay_dunes.jpg", COL_BEACH, func():
-				_on_stage_selected("res://levels/BloombayDunesLevel.tscn")
-			)
-			_add_tile("MOUNTAIN COURSE", "Dunes and high desert ridges", "tile_mountain.jpg", COL_MOUNTAIN, func():
-				_on_stage_selected("res://levels/MountainLevel.tscn")
-			)
-			_add_tile("CANYON COURSE", "Red rock walls and mesa turns", "tile_canyon.jpg", COL_CANYON, func():
-				_on_stage_selected("res://levels/CanyonLevel.tscn")
-			)
-			_add_tile("CANYON CHASM", "A narrow run over the drop", "tile_canyon_chasm.jpg", COL_CHASM, func():
-				_on_stage_selected("res://levels/CanyonChasmLevel.tscn")
-			)
-			_add_tile("DESERT WADI", "Dry riverbed sand and heat", "tile_desert_wadi.jpg", COL_WADI, func():
-				_on_stage_selected("res://levels/DesertWadiLevel.tscn")
-			)
+			_fill_stages_by_cup(func(_cup: String, _i: int, path: String):
+				_on_stage_selected(path)
+			, false)
 	call_deferred("_relayout_tiles")
 
 
 func _relayout_tiles() -> void:
-	if tile_grid == null or tile_grid.get_child_count() == 0:
+	if tile_grid == null or (tile_grid.get_child_count() == 0 and section_grids.is_empty()):
 		return
 	var scroll: Control = tile_grid.get_parent()
 	var area: Vector2 = scroll.size
 	if area.x < 8.0 or area.y < 8.0:
+		return
+	if not section_grids.is_empty():
+		# Course lists: fixed-width rows, one cup per row, scrolling if they do not all fit.
+		var sw: float = (area.x - 22.0 * float(SECTION_COLUMNS - 1) - 12.0) / float(SECTION_COLUMNS)
+		var tile_size := Vector2(maxf(sw, 220.0), maxf(sw * 0.6, 170.0))
+		for grid in section_grids:
+			for tile in grid.get_children():
+				(tile as Control).custom_minimum_size = tile_size
 		return
 	var cols: int = max(tile_grid.columns, 1)
 	var count: int = tile_grid.get_child_count()
@@ -276,9 +355,17 @@ func _clear_tiles() -> void:
 	for child in tile_grid.get_children():
 		tile_grid.remove_child(child)
 		child.queue_free()
+	if tile_sections:
+		for child in tile_sections.get_children():
+			if child != tile_grid:
+				tile_sections.remove_child(child)
+				child.queue_free()
+	section_grids.clear()
+	tile_grid.visible = true
 
 
-func _add_tile(title: String, subtitle: String, file_name: String, accent: Color, on_press: Callable) -> void:
+func _add_tile(title: String, subtitle: String, file_name: String, accent: Color, on_press: Callable,
+		grid: GridContainer = null) -> void:
 	var btn := Button.new()
 	btn.custom_minimum_size = Vector2(320, 220)
 	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -351,7 +438,7 @@ func _add_tile(title: String, subtitle: String, file_name: String, accent: Color
 	caption.add_child(sub_lbl)
 
 	btn.pressed.connect(on_press)
-	tile_grid.add_child(btn)
+	(grid if grid else tile_grid).add_child(btn)
 
 
 func _apply_tile_styles(btn: Button, accent: Color) -> void:
@@ -426,35 +513,6 @@ func _on_cup_selected(cup_name: String) -> void:
 	NetworkManager.gp_standings.clear()
 	start_pressed.emit()
 	hide()
-
-
-func _fill_gp_test_tiles() -> void:
-	var meta := {
-		"res://levels/Level.tscn": {"title": "LAKESIDE", "file": "tile_lakeside.jpg", "color": COL_LAKE},
-		"res://levels/PinecrestRidgeLevel.tscn": {"title": "PINECREST", "file": "tile_pinecrest.jpg", "color": COL_GREEN},
-		"res://levels/FrostpeakCreekLevel.tscn": {"title": "FROSTPEAK CREEK", "file": "tile_frostpeak_creek.jpg", "color": COL_SNOW},
-		"res://levels/GlacierHighwayLevel.tscn": {"title": "GLACIER HIGHWAY", "file": "tile_glacier_highway.jpg", "color": COL_SNOW},
-		"res://levels/FrostfallGorgeLevel.tscn": {"title": "FROSTFALL GORGE", "file": "tile_frostfall_gorge.jpg", "color": COL_SNOW},
-		"res://levels/HarborPierLevel.tscn": {"title": "HARBOR PIER", "file": "tile_harbor.jpg", "color": COL_HARBOR},
-		"res://levels/BloombayDunesLevel.tscn": {"title": "BLOOMBAY DUNES", "file": "tile_bloombay_dunes.jpg", "color": COL_BEACH},
-		"res://levels/MountainLevel.tscn": {"title": "MOUNTAIN", "file": "tile_mountain.jpg", "color": COL_MOUNTAIN},
-		"res://levels/CanyonLevel.tscn": {"title": "CANYON", "file": "tile_canyon.jpg", "color": COL_CANYON},
-		"res://levels/CanyonChasmLevel.tscn": {"title": "CANYON CHASM", "file": "tile_canyon_chasm.jpg", "color": COL_CHASM},
-		"res://levels/DesertWadiLevel.tscn": {"title": "DESERT WADI", "file": "tile_desert_wadi.jpg", "color": COL_WADI},
-	}
-	for cup_name in NetworkManager.GP_CUPS.keys():
-		var cup: Dictionary = NetworkManager.GP_CUPS[cup_name]
-		var stages: Array = cup.get("stages", [])
-		for i in range(stages.size()):
-			var path: String = str(stages[i])
-			var info: Dictionary = meta.get(path, {"title": path.get_file(), "file": "tile_grand_prix.jpg", "color": COL_GOLD})
-			var title: String = "%s  %d/%d" % [info["title"], i + 1, stages.size()]
-			var subtitle: String = "%s  •  GP stage %d" % [cup_name, i + 1]
-			var cup_n: String = str(cup_name)
-			var stage_i: int = i
-			_add_tile(title, subtitle, str(info["file"]), info["color"], func():
-				_on_gp_test_stage_selected(cup_n, stage_i)
-			)
 
 
 func _on_gp_test_stage_selected(cup_name: String, stage_idx: int) -> void:

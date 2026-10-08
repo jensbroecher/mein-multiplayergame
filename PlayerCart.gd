@@ -1020,6 +1020,10 @@ func _integrate_forces(state: PhysicsDirectBodyState3D):
 	for i in range(state.get_contact_count()):
 		var normal = state.get_contact_local_normal(i)
 		if abs(normal.y) < 0.5:
+			# Light props a cart knocks aside (snow poles) make their own sound, not a crash.
+			var other = state.get_contact_collider_object(i)
+			if other is Node and (other as Node).is_in_group("knockable_props"):
+				continue
 			# This contact is mostly horizontal = wall / obstacle / barrier
 			last_crash_sound_time = now
 			_play_crash_sound()

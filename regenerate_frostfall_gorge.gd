@@ -151,6 +151,11 @@ const COARSE_GROWTH := 1.22
 const COARSE_MAX := 32.0
 ## Spatial hash for the trail samples.
 const CELL := 40.0
+## Forest layout: detailed trees within FOREST_NEAR of the camera, grouped in FOREST_CELL squares;
+## low-detail stand-ins beyond, grouped in bigger squares.
+const FOREST_NEAR := 240.0
+const FOREST_CELL := 160.0
+const FOREST_FAR_CELL := 400.0
 
 var main_curve: Curve3D
 var _base_noise := FastNoiseLite.new()
@@ -903,17 +908,12 @@ func _build_terrain(parent: Node, mat: Material) -> void:
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	mesh.surface_set_material(0, mat)
 
-	# Collision only where carts can get to: the fine band plus a margin. The coarse ring
-	# beyond is scenery.
+	# Collision over the whole map. This is an off-road stage: carts can and do drive up any slope
+	# they can climb, and a collision sheet that stopped short of the visible ground (it once
+	# ended 90m east of the finish line, halfway up the valley wall) drops them through it.
 	var cfaces := PackedVector3Array()
 	for iz in range(nz - 1):
-		var z: float = _grid_z[iz]
-		if z < FINE_Z.x - 60.0 or z > FINE_Z.y + 60.0:
-			continue
 		for ix in range(nx - 1):
-			var x: float = _grid_x[ix]
-			if x < FINE_X.x - 60.0 or x > FINE_X.y + 60.0:
-				continue
 			var i: int = iz * nx + ix
 			cfaces.append(verts[i])
 			cfaces.append(verts[i + 1])
@@ -1647,7 +1647,7 @@ func _snow_kicker_material() -> StandardMaterial3D:
 
 ## Orange-tipped snow poles, the way mountain roads are marked for ploughs. They run along the
 ## river side wherever the trail is on a ledge, and both sides elsewhere, and leave the gaps
-## and the mega-jump hill clear.
+## and the mega-jump hill clear. Carts knock them over (KnockablePoles.gd).
 func _build_snow_poles(parent: Node) -> void:
 	var length: float = main_curve.get_baked_length()
 	var pole := CylinderMesh.new()
@@ -1696,8 +1696,14 @@ void fragment() {
 	mm.instance_count = transforms.size()
 	# The dummy renderer drops set_instance_transform(); write the buffer itself (CLAUDE.md).
 	mm.buffer = _transform_buffer(transforms)
+	# Carts knock them over: KnockablePoles.gd gives each pole a sleeping rigid body at runtime.
 	var mmi := MultiMeshInstance3D.new()
 	mmi.name = "SnowPoles"
+	mmi.set_script(load("res://KnockablePoles.gd"))
+	var typed: Array[Transform3D] = []
+	for t in transforms:
+		typed.append(t)
+	mmi.set("pole_transforms", typed)
 	mmi.multimesh = mm
 	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(mmi)
@@ -1779,69 +1785,202 @@ func _build_jump_flags(parent: Node) -> void:
 				root.add_child(flag)
 
 
-## Procedural snowy spruce: stacked cones, white on top, dark green at the drooping rims.
-func _spruce_mesh() -> ArrayMesh:
+## Procedural snowy spruce: a tapered trunk carrying drooping, star-shaped branch whorls that get
+## smaller toward a pointed top, so the outline is ragged like a real spruce instead of a stack
+## of smooth cones. Shaded by spruce.gdshader (vertex colour = needle colour, alpha = snow weight,
+## UV = metres out along the branch and around the whorl, for the needle texture).
+##
+## Every whorl's apex is raised until it reaches above the drooping rim of the whorl over it, and
+## the top whorl closes in a point at the full height. Without that, sparse whorls (the far mesh
+## has only four) leave a gap where only the thin trunk shows and the crown appears to float.
+##
+## `variant` 0 is a tall mature tree, 1 a younger, bushier one. `lod` 0 is the near mesh (~330
+## triangles), 1 the distant stand-in (~110) with the same outline in fewer whorls and points.
+func _spruce_mesh(variant: int, lod: int) -> ArrayMesh:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 9100 + variant * 31
+	var height: float = 11.0 if variant == 0 else 7.6
+	var base_r: float = 3.0 if variant == 0 else 2.8
+	var whorls: int = (9 if variant == 0 else 7) if lod == 0 else 4
+	var points: int = 9 if lod == 0 else 6
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var sides := 7
-	var bark := Color(0.22, 0.15, 0.10)
-	var needles := Color(0.10, 0.22, 0.15)
-	var snow := Color(0.90, 0.94, 1.0)
-	var emit := func(tri: Array, cols: Array, hint: Vector3) -> void:
-		var a: Vector3 = tri[0]
-		var b: Vector3 = tri[1]
-		var c: Vector3 = tri[2]
-		var ca: Color = cols[0]
-		var cb: Color = cols[1]
-		var cc: Color = cols[2]
-		if (c - a).cross(b - a).dot(hint) < 0.0:
-			var t: Vector3 = b
+	# Vertices as [position, normal, colour, uv].
+	var emit := func(a: Array, b: Array, c: Array, hint: Vector3) -> void:
+		# Front face toward `hint` (Godot winds clockwise; face normal (c - a) x (b - a)).
+		if (c[0] - a[0]).cross(b[0] - a[0]).dot(hint) < 0.0:
+			var t: Array = b
 			b = c
 			c = t
-			var tc: Color = cb
-			cb = cc
-			cc = tc
-		var nrm: Vector3 = (c - a).cross(b - a).normalized()
-		st.set_normal(nrm)
-		st.set_color(ca)
-		st.add_vertex(a)
-		st.set_normal(nrm)
-		st.set_color(cb)
-		st.add_vertex(b)
-		st.set_normal(nrm)
-		st.set_color(cc)
-		st.add_vertex(c)
+		for v in [a, b, c]:
+			st.set_normal(v[1])
+			st.set_color(v[2])
+			st.set_uv(v[3])
+			st.add_vertex(v[0])
+
+	# Whorl layout first, so each one can be sized against the one above it.
+	var layers: Array = []
+	for w in range(whorls):
+		var t: float = float(w) / float(maxi(whorls - 1, 1))
+		var y_base: float = lerpf(1.3, height * 0.80, pow(t, 0.92))
+		var r: float = base_r * pow(1.0 - t * 0.9, 0.95) * rng.randf_range(0.92, 1.08) + 0.3
+		layers.append({"y": y_base, "r": r, "droop": r * 0.42, "rot": rng.randf() * TAU})
+	for w in range(whorls):
+		var L: Dictionary = layers[w]
+		var apex_y: float
+		if w == whorls - 1:
+			apex_y = height
+		else:
+			var above: Dictionary = layers[w + 1]
+			apex_y = maxf(L["y"] + lerpf(1.7, 1.0, float(w) / float(whorls)), above["y"] - above["droop"] * 0.35 + 0.5)
+		L["apex"] = apex_y
+
+	# Trunk: visible under the lowest whorl, tapering up into the top whorl.
+	var bark := Color(0.12, 0.085, 0.06, 0.0)
+	var sides: int = 6 if lod == 0 else 4
+	var trunk_top: float = height - 0.8
 	for k in range(sides):
 		var a0: float = TAU * float(k) / float(sides)
 		var a1: float = TAU * float(k + 1) / float(sides)
-		var b0 := Vector3(cos(a0) * 0.28, -0.6, sin(a0) * 0.28)
-		var b1 := Vector3(cos(a1) * 0.28, -0.6, sin(a1) * 0.28)
-		var t0 := Vector3(cos(a0) * 0.2, 1.2, sin(a0) * 0.2)
-		var t1 := Vector3(cos(a1) * 0.2, 1.2, sin(a1) * 0.2)
-		var out := Vector3(cos((a0 + a1) * 0.5), 0.0, sin((a0 + a1) * 0.5))
-		emit.call([b0, t0, b1], [bark, bark, bark], out)
-		emit.call([b1, t0, t1], [bark, bark, bark], out)
-	for tier in [[0.0, 2.6, 4.2], [2.2, 2.1, 3.6], [4.1, 1.6, 3.2], [5.8, 1.1, 2.8], [7.3, 0.6, 2.2]]:
-		var base_y: float = tier[0] + 1.0
-		var r: float = tier[1]
-		var h: float = tier[2]
-		var apex := Vector3(0, base_y + h, 0)
-		var under := Vector3(0, base_y + h * 0.25, 0)
-		for k in range(sides):
-			var a0: float = TAU * float(k) / float(sides)
-			var a1: float = TAU * float(k + 1) / float(sides)
-			var p0 := Vector3(cos(a0) * r, base_y, sin(a0) * r)
-			var p1 := Vector3(cos(a1) * r, base_y, sin(a1) * r)
-			var out := Vector3(cos((a0 + a1) * 0.5), 0.6, sin((a0 + a1) * 0.5))
-			emit.call([p0, apex, p1], [needles, snow, needles], out)
-			# Underside, so a tier is not see-through from below on the hill.
-			emit.call([p0, under, p1], [needles * 0.6, needles * 0.6, needles * 0.6], Vector3.DOWN)
+		var d0 := Vector3(cos(a0), 0.0, sin(a0))
+		var d1 := Vector3(cos(a1), 0.0, sin(a1))
+		var b0: Vector3 = d0 * 0.34 + Vector3(0, -0.6, 0)
+		var b1: Vector3 = d1 * 0.34 + Vector3(0, -0.6, 0)
+		var t0: Vector3 = d0 * 0.06 + Vector3(0, trunk_top, 0)
+		var t1: Vector3 = d1 * 0.06 + Vector3(0, trunk_top, 0)
+		var out: Vector3 = (d0 + d1).normalized()
+		var u0: float = float(k) / float(sides)
+		var u1: float = float(k + 1) / float(sides)
+		emit.call([b0, d0, bark, Vector2(u0, 0)], [t0, d0, bark * 0.8, Vector2(u0, trunk_top)], [b1, d1, bark, Vector2(u1, 0)], out)
+		emit.call([b1, d1, bark, Vector2(u1, 0)], [t0, d0, bark * 0.8, Vector2(u0, trunk_top)], [t1, d1, bark * 0.8, Vector2(u1, trunk_top)], out)
+
+	# The shaded core of the crown is darker than the sunlit tips.
+	var core := Color(0.035, 0.075, 0.055, 0.9)
+	var mid := Color(0.075, 0.150, 0.105, 1.0)
+	var tip_col := Color(0.105, 0.195, 0.130, 0.75)
+	for L in layers:
+		var y_base: float = L["y"]
+		var r: float = L["r"]
+		var droop: float = L["droop"]
+		var apex := Vector3(0, L["apex"], 0)
+		var under := Vector3(0, lerpf(y_base, L["apex"], 0.15), 0)
+		var ring: Array = []
+		for k in range(points * 2):
+			var ang: float = L["rot"] + PI * float(k) / float(points)
+			var tip: bool = k % 2 == 0
+			var rr: float = r * (rng.randf_range(0.9, 1.12) if tip else rng.randf_range(0.5, 0.62))
+			var yy: float = y_base - (droop * rng.randf_range(0.85, 1.15) if tip else droop * 0.35)
+			ring.append({"p": Vector3(cos(ang) * rr, yy, sin(ang) * rr), "ang": ang, "tip": tip})
+		# Rounded normals: from a point below the whorl's centre, so the crown shades as a mass.
+		var centre := Vector3(0, y_base - r * 0.9, 0)
+		for k in range(points * 2):
+			var e0: Dictionary = ring[k]
+			var e1: Dictionary = ring[(k + 1) % (points * 2)]
+			var p0: Vector3 = e0["p"]
+			var p1: Vector3 = e1["p"]
+			var c0: Color = tip_col if e0["tip"] else mid
+			var c1: Color = tip_col if e1["tip"] else mid
+			# UV: u runs out along the branch (metres from the trunk), v around the whorl (metres of
+			# arc at the rim), so the needle texture lies along each branch at the same scale on every tree.
+			var a1: float = e1["ang"] if k + 1 < points * 2 else float(e1["ang"]) + TAU
+			var v0: float = float(e0["ang"]) * r
+			var v1: float = a1 * r
+			var uv0 := Vector2(Vector2(p0.x, p0.z).length(), v0)
+			var uv1 := Vector2(Vector2(p1.x, p1.z).length(), v1)
+			var uva := Vector2(0.0, (v0 + v1) * 0.5)
+			var out: Vector3 = Vector3(p0.x + p1.x, 0.0, p0.z + p1.z).normalized() + Vector3.UP * 0.8
+			emit.call([apex, Vector3.UP, core, uva], [p0, (p0 - centre).normalized(), c0, uv0],
+					[p1, (p1 - centre).normalized(), c1, uv1], out)
+			# Underside: dark, holds no snow, faces down and out.
+			var dn0: Vector3 = (Vector3(p0.x, 0.0, p0.z).normalized() + Vector3.DOWN).normalized()
+			var dn1: Vector3 = (Vector3(p1.x, 0.0, p1.z).normalized() + Vector3.DOWN).normalized()
+			var dark := Color(core.r * 0.8, core.g * 0.8, core.b * 0.8, 0.0)
+			emit.call([under, Vector3.DOWN, dark, uva],
+					[p0, dn0, Color(c0.r * 0.6, c0.g * 0.6, c0.b * 0.6, 0.0), uv0],
+					[p1, dn1, Color(c1.r * 0.6, c1.g * 0.6, c1.b * 0.6, 0.0), uv1],
+					Vector3.DOWN + out * 0.1)
+
 	var mesh: ArrayMesh = st.commit()
-	var mat := StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mat.roughness = 0.85
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://spruce.gdshader")
+	mat.set_shader_parameter("needle_albedo", _needle_textures()[0])
+	mat.set_shader_parameter("needle_normal", _needle_textures()[1])
 	mesh.surface_set_material(0, mat)
 	return mesh
+
+
+var _needle_tex_cache: Array = []
+
+## A tiling spruce-twig texture, generated: twigs run along U (out along the branch), each with
+## short needles angled forward on both sides, with light and dark needles mixed and a height map
+## turned into a normal map so the needles catch the light. Returns [albedo, normal], both saved
+## under res://generated/ with mipmaps.
+func _needle_textures() -> Array:
+	if not _needle_tex_cache.is_empty():
+		return _needle_tex_cache
+	const SIZE := 256
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4242
+	var hgt := PackedFloat32Array()
+	hgt.resize(SIZE * SIZE)
+	var lum := PackedFloat32Array()
+	lum.resize(SIZE * SIZE)
+	for i in range(SIZE * SIZE):
+		lum[i] = 0.18
+	# Twigs: horizontal rows across V, each wobbling a little; needles fan off them toward +U.
+	var twigs := 7
+	for tw in range(twigs):
+		var v_base: float = (float(tw) + rng.randf_range(0.2, 0.8)) / float(twigs) * SIZE
+		var wobble: float = rng.randf_range(2.0, 5.0)
+		var phase: float = rng.randf() * TAU
+		var x := 0.0
+		while x < SIZE:
+			var vy: float = v_base + sin(x / SIZE * TAU * 2.0 + phase) * wobble
+			for side in [-1.0, 1.0]:
+				var ang: float = deg_to_rad(rng.randf_range(35.0, 60.0)) * side
+				var length: float = rng.randf_range(9.0, 15.0)
+				var bright: float = rng.randf_range(0.55, 1.0)
+				var steps: int = int(length * 2.0)
+				for s2 in range(steps):
+					var f: float = float(s2) / float(steps)
+					var px: float = x + cos(ang) * length * f
+					var py: float = vy + sin(ang) * length * f
+					# Needles are 2px wide, taper at the tip, and wrap so the texture tiles.
+					for wv in [0.0, 0.7]:
+						var ix: int = posmod(int(px), SIZE)
+						var iy: int = posmod(int(py + wv), SIZE)
+						var idx: int = iy * SIZE + ix
+						var h: float = (1.0 - f * 0.6) * bright
+						if h > hgt[idx]:
+							hgt[idx] = h
+							lum[idx] = lerpf(0.45, 1.0, bright) * (1.0 - f * 0.25)
+			x += rng.randf_range(2.2, 3.4)
+		# The twig itself: a thin brown-dark ridge.
+		for xi in range(SIZE):
+			var vy2: float = v_base + sin(float(xi) / SIZE * TAU * 2.0 + phase) * wobble
+			var idx2: int = posmod(int(vy2), SIZE) * SIZE + xi
+			hgt[idx2] = maxf(hgt[idx2], 0.7)
+			lum[idx2] = 0.32
+	var albedo := Image.create(SIZE, SIZE, false, Image.FORMAT_RGB8)
+	var normal := Image.create(SIZE, SIZE, false, Image.FORMAT_RGB8)
+	for y in range(SIZE):
+		for x in range(SIZE):
+			var i: int = y * SIZE + x
+			var l: float = lum[i]
+			albedo.set_pixel(x, y, Color(l, l, l))
+			var hl: float = hgt[y * SIZE + posmod(x - 1, SIZE)]
+			var hr: float = hgt[y * SIZE + posmod(x + 1, SIZE)]
+			var hd: float = hgt[posmod(y - 1, SIZE) * SIZE + x]
+			var hu: float = hgt[posmod(y + 1, SIZE) * SIZE + x]
+			var n := Vector3((hl - hr) * 2.5, (hd - hu) * 2.5, 1.0).normalized()
+			normal.set_pixel(x, y, Color(n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, n.z * 0.5 + 0.5))
+	albedo.generate_mipmaps()
+	normal.generate_mipmaps()
+	_needle_tex_cache = [
+		_save_baked_resource(ImageTexture.create_from_image(albedo), "spruce_needles_albedo"),
+		_save_baked_resource(ImageTexture.create_from_image(normal), "spruce_needles_normal"),
+	]
+	return _needle_tex_cache
 
 
 ## Spruce stands on the gentle ground away from the trail, and rocks along the gorge rims. Tree
@@ -1850,7 +1989,7 @@ func _build_forest(parent: Node) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 60411
 	var trees: Array = []
-	var colliders: Array = []
+	var variants: Array = []
 	var tries := 0
 	while trees.size() < 1400 and tries < 60000:
 		tries += 1
@@ -1875,33 +2014,89 @@ func _build_forest(parent: Node) -> void:
 		var nz: float = _ground_at(x, z + 2.0) - _ground_at(x, z - 2.0)
 		if Vector2(nx, nz).length() / 4.0 > 0.7:
 			continue
-		var s: float = rng.randf_range(0.75, 1.45)
-		var basis := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s, s * rng.randf_range(0.9, 1.15), s))
+		var s: float = rng.randf_range(0.8, 1.45)
+		# A slight lean, the way trees on a slope grow.
+		var lean := Basis(Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1)).normalized(), rng.randf_range(0.0, 0.05))
+		var basis: Basis = lean * Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s, s * rng.randf_range(0.9, 1.2), s))
 		trees.append(Transform3D(basis, Vector3(x, y - 0.3, z)))
-		if trail_d < 45.0:
-			colliders.append(Vector3(x, y, z))
+		# Mostly mature trees, with younger ones mixed in.
+		variants.append(0 if rng.randf() < 0.65 else 1)
+	_build_forest_cells(parent, trees, variants)
+	print("  spruces: %d" % trees.size())
+
+
+## Lays the forest out as MultiMeshes per map cell and per detail level, so cameras and shadow
+## passes only draw the cells they can see, and the detailed trees only within FOREST_NEAR. Past
+## that every tree is the low-detail stand-in, which casts no shadow.
+func _build_forest_cells(parent: Node, trees: Array, variants: Array) -> void:
+	var meshes := {}
+	for v in [0, 1]:
+		meshes[v] = _save_baked_resource(_spruce_mesh(v, 0), "spruce_near_%d" % v)
+	var far_mesh: Mesh = _save_baked_resource(_spruce_mesh(0, 1), "spruce_far")
+	# Near cells: per variant. Far cells: bigger, one mesh for both variants (the young trees are
+	# simply scaled down), so the distant forest costs a handful of draw calls.
+	var near := {}
+	var far := {}
+	for i in range(trees.size()):
+		var xf: Transform3D = trees[i]
+		var v: int = variants[i]
+		var nk := Vector3i(floori(xf.origin.x / FOREST_CELL), floori(xf.origin.z / FOREST_CELL), v)
+		if not near.has(nk):
+			near[nk] = []
+		near[nk].append(xf)
+		var fk := Vector2i(floori(xf.origin.x / FOREST_FAR_CELL), floori(xf.origin.z / FOREST_FAR_CELL))
+		if not far.has(fk):
+			far[fk] = []
+		far[fk].append(xf if v == 0 else xf.scaled_local(Vector3(0.75, 0.69, 0.75)))
+	var root := Node3D.new()
+	root.name = "SpruceForest"
+	parent.add_child(root)
+	for k in near.keys():
+		var mmi := _forest_multimesh(meshes[k.z], near[k], "Near_%d_%d_%d" % [k.x, k.y, k.z])
+		mmi.visibility_range_end = FOREST_NEAR
+		mmi.visibility_range_end_margin = 20.0
+		root.add_child(mmi)
+	for k in far.keys():
+		var mmi := _forest_multimesh(far_mesh, far[k], "Far_%d_%d" % [k.x, k.y])
+		mmi.visibility_range_begin = FOREST_NEAR
+		mmi.visibility_range_begin_margin = 20.0
+		mmi.visibility_range_end = 1100.0
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		root.add_child(mmi)
+	# Every tree is solid, in one static body per cell. The collider is the trunk plus the dense
+	# inner branches (about a third of the lowest whorl), so a cart stops in the branches rather
+	# than passing through them to a pencil-thin trunk.
+	var bodies := {}
+	for i in range(trees.size()):
+		var xf2: Transform3D = trees[i]
+		var bk := Vector2i(floori(xf2.origin.x / FOREST_CELL), floori(xf2.origin.z / FOREST_CELL))
+		if not bodies.has(bk):
+			var body := StaticBody3D.new()
+			body.name = "TreeTrunks_%d_%d" % [bk.x, bk.y]
+			root.add_child(body)
+			bodies[bk] = body
+		var s: float = xf2.basis.get_scale().x * (1.0 if variants[i] == 0 else 0.85)
+		var col := CollisionShape3D.new()
+		var cyl := CylinderShape3D.new()
+		cyl.radius = 1.0 * s
+		cyl.height = 7.0 * s
+		col.shape = cyl
+		col.position = xf2.origin + Vector3(0, cyl.height * 0.5 - 0.5, 0)
+		bodies[bk].add_child(col)
+	print("  forest: %d near cells, %d far cells, %d collision cells" % [near.size(), far.size(), bodies.size()])
+
+
+func _forest_multimesh(mesh: Mesh, transforms: Array, node_name: String) -> MultiMeshInstance3D:
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
-	mm.mesh = _save_baked_resource(_spruce_mesh(), "spruce_mesh")
-	mm.instance_count = trees.size()
-	mm.buffer = _transform_buffer(trees)
+	mm.mesh = mesh
+	mm.instance_count = transforms.size()
+	# The dummy renderer drops set_instance_transform(); write the buffer itself (CLAUDE.md).
+	mm.buffer = _transform_buffer(transforms)
 	var mmi := MultiMeshInstance3D.new()
-	mmi.name = "SpruceForest"
-	mmi.multimesh = _save_baked_resource(mm, "spruce_multimesh")
-	mmi.visibility_range_end = 900.0
-	parent.add_child(mmi)
-	var trunks := StaticBody3D.new()
-	trunks.name = "TreeTrunks"
-	parent.add_child(trunks)
-	for i in range(colliders.size()):
-		var c := CollisionShape3D.new()
-		var cyl := CylinderShape3D.new()
-		cyl.radius = 0.45
-		cyl.height = 5.0
-		c.shape = cyl
-		c.position = colliders[i] + Vector3(0, 2.0, 0)
-		trunks.add_child(c)
-	print("  spruces: %d (%d with trunk collision)" % [trees.size(), colliders.size()])
+	mmi.name = node_name
+	mmi.multimesh = mm
+	return mmi
 
 
 func _trail_distance(x: float, z: float) -> float:
