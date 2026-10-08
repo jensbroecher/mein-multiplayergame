@@ -2,7 +2,9 @@ extends Node
 
 
 const DEFAULT_PORT = 10567
-const MAX_CLIENTS = 6
+## Six carts per race (the level grids have six slots): the host plus five clients.
+const MAX_PLAYERS = 6
+const MAX_CLIENTS = MAX_PLAYERS - 1
 
 var peer: ENetMultiplayerPeer
 
@@ -56,6 +58,7 @@ const ALL_STAGES = [
 	{"name": "Canyon Chasm", "path": "res://levels/CanyonChasmLevel.tscn"},
 	{"name": "Desert Wadi", "path": "res://levels/DesertWadiLevel.tscn"},
 	{"name": "Bloombay Dunes", "path": "res://levels/BloombayDunesLevel.tscn"},
+	{"name": "Mara Crossing", "path": "res://levels/MaraCrossingLevel.tscn"},
 ]
 
 const GP_CUPS = {
@@ -68,8 +71,8 @@ const GP_CUPS = {
 			"res://levels/BloombayDunesLevel.tscn",
 		]
 	},
-	"Arctic Cup": {
-		"name": "Arctic Cup",
+	"Svartfjell GP": {
+		"name": "Svartfjell GP",
 		"stages": [
 			"res://levels/FrostpeakCreekLevel.tscn",
 			"res://levels/GlacierHighwayLevel.tscn",
@@ -85,6 +88,12 @@ const GP_CUPS = {
 			"res://levels/CanyonChasmLevel.tscn",
 			"res://levels/DesertWadiLevel.tscn",
 		]
+	},
+	"Matumaini GP": {
+		"name": "Matumaini GP",
+		"stages": [
+			"res://levels/MaraCrossingLevel.tscn",
+		]
 	}
 }
 
@@ -93,9 +102,25 @@ static func get_gp_cup(cup_name: String) -> Dictionary:
 		return GP_CUPS[cup_name]
 	if cup_name == "Starter Cup":
 		return GP_CUPS["Bloombay GP"]
+	if cup_name == "Arctic Cup":
+		return GP_CUPS["Svartfjell GP"]
 	if cup_name == "Desert Cup" or cup_name == "Mountain GP":
 		return GP_CUPS["Al-Raihana GP"]
 	return {}
+
+## Course after `stage_path` in the course menu's order (cups in order, then the courses outside
+## a cup), wrapping round to the first.
+static func get_next_course(stage_path: String) -> String:
+	var order: Array = []
+	for cup_name in GP_CUPS:
+		for path in GP_CUPS[cup_name]["stages"]:
+			if not order.has(path):
+				order.append(path)
+	for st in ALL_STAGES:
+		if not order.has(st["path"]):
+			order.append(st["path"])
+	var idx := order.find(stage_path)
+	return order[(idx + 1) % order.size()]
 
 
 func _ready():

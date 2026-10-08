@@ -154,7 +154,14 @@ func _ready():
 		if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP or (NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP and NetworkManager.is_coop_gp):
 			var bot_names = ["Viper", "Shadow", "Apex", "Blaze", "Nova"]
 			var bot_cars = [1, 2, 3, 0, 1]
-			for i in range(5):
+			# Bots fill the grid up to MAX_PLAYERS, so splitscreen GP gets one bot fewer.
+			var humans := 0
+			for pid in NetworkManager.players.keys():
+				if NetworkManager.players[pid].get("is_ai", false):
+					NetworkManager.players.erase(pid)
+				else:
+					humans += 1
+			for i in range(clampi(NetworkManager.MAX_PLAYERS - humans, 0, bot_names.size())):
 				var bot_id = 100 + i
 				NetworkManager.players[bot_id] = {
 					"name": bot_names[i],

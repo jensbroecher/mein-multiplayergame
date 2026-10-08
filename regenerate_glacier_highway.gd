@@ -1,5 +1,5 @@
 # regenerate_glacier_highway.gd
-# Generates levels/GlacierHighwayLevel.tscn for the Arctic Cup:
+# Generates levels/GlacierHighwayLevel.tscn for the Svartfjell GP:
 # - Concrete highway design with PBR concrete road deck, highway lane striping shader
 # - Continuous concrete Jersey side barriers along all roads, ramps, and viaducts
 # - 3 Multi-divergence zones with on- and off-ramps (Express Flyover, Gorge Service Cut, Twin Overpass).

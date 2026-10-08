@@ -1,6 +1,6 @@
 # regenerate_northlight_caverns.gd
 #
-# Builds levels/NorthlightCavernsLevel.tscn - the third Arctic Cup stage. A night race under
+# Builds levels/NorthlightCavernsLevel.tscn - the third Svartfjell GP stage. A night race under
 # the northern lights.
 #
 # Theme: the circuit is cut into a glacier on a polar night. The start/finish straight runs
@@ -2963,7 +2963,7 @@ func _build_menu_tile() -> void:
 # ======================================================================================
 
 func _ready() -> void:
-	print("=== Northlight Caverns Arctic Cup Level Generation ===")
+	print("=== Northlight Caverns Svartfjell GP Level Generation ===")
 	print("Building polar night icefield: glacier cavern, crevasse ice arch, frozen lake, aurora sky...")
 
 	var level_scene := Node3D.new()

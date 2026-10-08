@@ -1,6 +1,6 @@
 # regenerate_frostfall_gorge.gd
 #
-# Builds levels/FrostfallGorgeLevel.tscn - an Arctic Cup off-road stage. There is no road: the
+# Builds levels/FrostfallGorgeLevel.tscn - a Svartfjell GP off-road stage. There is no road: the
 # whole lap is driven on snow, rock and lake ice, so every metre counts as off-road and cars
 # with a good off-road stat have the edge.
 #
@@ -2511,7 +2511,7 @@ func _resolve_jumps() -> void:
 # ======================================================================================
 
 func _ready() -> void:
-	print("=== Frostfall Gorge Arctic Cup Level Generation ===")
+	print("=== Frostfall Gorge Svartfjell GP Level Generation ===")
 	var t_start: int = Time.get_ticks_msec()
 
 	var level_scene := Node3D.new()

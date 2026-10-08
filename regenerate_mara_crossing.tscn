@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://regenerate_mara_crossing.gd" id="1_reg_mara"]
+
+[node name="RegenerateMaraCrossing" type="Node"]
+script = ExtResource("1_reg_mara")

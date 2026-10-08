@@ -296,6 +296,8 @@ func update_speed(val_kmh: float):
 
 var results_container: VBoxContainer = null
 var action_button: Button = null
+## Second end-screen button, shown under NEXT RACE outside multiplayer.
+var menu_button: Button = null
 
 func display_race_results(results_data: Array):
 	show_end_screen()
@@ -412,12 +414,40 @@ func display_race_results(results_data: Array):
 	elif is_mp_single_stages:
 		action_button.text = "RETURN TO LOBBY"
 		action_button.disabled = false
-	elif NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL:
-		action_button.text = "RETURN TO MENU"
+	elif _is_offline_single_race():
+		action_button.text = "NEXT RACE"
 		action_button.disabled = false
 	else:
 		action_button.text = "RETURN TO MENU"
 		action_button.disabled = false
+
+	if _is_offline_single_race():
+		if menu_button == null:
+			menu_button = Button.new()
+			menu_button.custom_minimum_size = Vector2(0, 45)
+			menu_button.text = "RETURN TO MENU"
+			vbox.add_child(menu_button)
+			menu_button.pressed.connect(_on_menu_button_pressed)
+		menu_button.disabled = false
+		menu_button.show()
+		vbox.move_child(menu_button, vbox.get_child_count() - 1)
+	elif menu_button != null:
+		menu_button.hide()
+
+## A one-course race outside multiplayer (time trial, splitscreen VS, spectator): the end screen
+## offers the next course.
+func _is_offline_single_race() -> bool:
+	var mode: int = NetworkManager.current_game_mode
+	return mode == NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL \
+			or mode == NetworkManager.GameMode.SPECTATOR \
+			or (mode == NetworkManager.GameMode.LOCAL_COOP and not NetworkManager.is_coop_gp)
+
+func _on_menu_button_pressed():
+	action_button.disabled = true
+	menu_button.disabled = true
+	var main = get_tree().current_scene
+	if main and main.has_method("_on_server_disconnected"):
+		main.call_deferred("_on_server_disconnected")
 
 func _setup_track_voting_panel(vbox: VBoxContainer):
 	if voting_panel != null:
@@ -572,6 +602,15 @@ func _on_action_button_pressed():
 			if main and main.has_method("return_to_lobby"):
 				main.return_to_lobby()
 				return
+
+	if _is_offline_single_race():
+		if menu_button:
+			menu_button.disabled = true
+		var main_scene = get_tree().current_scene
+		if main_scene and main_scene.has_method("restart_race"):
+			NetworkManager.time_trial_stage = NetworkManager.get_next_course(NetworkManager.time_trial_stage)
+			main_scene.restart_race()
+			return
 
 	var main = get_tree().current_scene
 	if main and main.has_method("return_to_lobby") and NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER:

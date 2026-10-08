@@ -239,7 +239,7 @@ func update_roster():
 		child.queue_free()
 		
 	var players = NetworkManager.players
-	label_count.text = "%d / %d" % [players.size(), NetworkManager.MAX_CLIENTS]
+	label_count.text = "%d / %d" % [players.size(), NetworkManager.MAX_PLAYERS]
 	
 	for id in players:
 		var p = players[id]

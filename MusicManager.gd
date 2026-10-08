@@ -324,7 +324,7 @@ func load_playlist_for_level(scene_path: String):
 	elif path_lower.contains("frost") or path_lower.contains("snow") or path_lower.contains("glacier") or path_lower.contains("arctic") \
 			or path_lower.contains("northlight") or path_lower.contains("cavern"):
 		level_key = "frost"
-	elif path_lower.contains("mountain") or path_lower.contains("wadi"):
+	elif path_lower.contains("mountain") or path_lower.contains("wadi") or path_lower.contains("mara"):
 		level_key = "mountain"
 	elif path_lower.contains("canyon"):
 		level_key = "canyon"

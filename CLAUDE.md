@@ -116,3 +116,22 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 - `res://scratch/ai_race_test.tscn -- res://levels/X.tscn seconds=330 speed=4` races 6 AI carts
   headless and lists every respawn with where it happened. `res://scratch/water_drop_test.tscn` drops a
   cart at given points and reports whether it drowns.
+
+## Mara Crossing (Matumaini GP, stage 1)
+
+- `regenerate_mara_crossing.gd` builds its own heightfield. There is no road mesh: the ground is
+  graded flat under both roads (main lap and the `CrocJumpPath` alternative), and
+  `savanna_ground.gdshader` paints the murram road from the signed distance across it, baked into vertex alpha.
+  The ground's collision is split into `MurramRoad` (track) and `SavannaGround` (off-road) bodies.
+- Write the real lateral distance into vertex alpha wherever it's known, not 0 off the road band.
+  A 0 there interpolates a ghost strip of road across the triangles next to the band.
+- `WildebeestHerd.gd` moves the migration on the wall clock (`Time.get_unix_time_from_system()`),
+  so LAN peers agree without syncing. It bumps only carts with `has_physics_authority()`. The animals'
+  kinematic bodies sit on layer value 4, which carts don't collide with but AI obstacle rays see.
+- Kicker names must contain "jump", not "ramp": Level.gd bakes a second trimesh collider under any node
+  named "ramp". Keep "Props", "Vegetation" and "Environment" out of dressing node names for the same reason.
+- `StandardMaterial3D` with `vertex_color_use_as_albedo` needs `vertex_color_is_srgb = true` for the
+  generator's palettes. Shaders that read `COLOR` as a colour convert it with `pow(c, 2.2)`.
+- `res://scratch/mara_test.tscn -- [seconds=200] [speed=4] [croc=1.0]` sends the AI over the croc jump
+  and reports take-off speeds, drownings and herd bumps. `res://scratch/mara_shots.tscn` renders the menu
+  tiles (windowed, into a fixed-size SubViewport).

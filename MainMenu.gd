@@ -23,6 +23,7 @@ const COL_CHASM := Color(0.72, 0.28, 0.22)
 const COL_WADI := Color(0.9, 0.74, 0.38)
 const COL_SNOW := Color(0.45, 0.82, 0.98)
 const COL_BEACH := Color(0.96, 0.78, 0.40)
+const COL_SAVANNA := Color(0.95, 0.47, 0.22)
 
 ## Every course's tile: title, one-line description, picture and accent colour.
 const STAGE_INFO := {
@@ -38,9 +39,10 @@ const STAGE_INFO := {
 	"res://levels/CanyonLevel.tscn": {"title": "CANYON COURSE", "subtitle": "Red rock walls and mesa turns", "file": "tile_canyon.jpg", "color": COL_CANYON},
 	"res://levels/CanyonChasmLevel.tscn": {"title": "CANYON CHASM", "subtitle": "A narrow run over the drop", "file": "tile_canyon_chasm.jpg", "color": COL_CHASM},
 	"res://levels/DesertWadiLevel.tscn": {"title": "DESERT WADI", "subtitle": "Dry riverbed sand and heat", "file": "tile_desert_wadi.jpg", "color": COL_WADI},
+	"res://levels/MaraCrossingLevel.tscn": {"title": "MARA CROSSING", "subtitle": "Murram road across the savanna: the migration, Pride Rock, and the croc jump", "file": "tile_mara_crossing.jpg", "color": COL_SAVANNA},
 }
 ## Section header colour per cup on the course lists (same accents as the cup tiles).
-const CUP_COLORS := {"Bloombay GP": COL_GREEN, "Arctic Cup": COL_SNOW, "Al-Raihana GP": COL_BRONZE}
+const CUP_COLORS := {"Bloombay GP": COL_GREEN, "Svartfjell GP": COL_SNOW, "Al-Raihana GP": COL_BRONZE, "Matumaini GP": COL_SAVANNA}
 ## Tiles per row in a cup section: one cup per row.
 const SECTION_COLUMNS := 4
 
@@ -279,11 +281,14 @@ func show_sub_menu(menu_name: String) -> void:
 			_add_tile("BLOOMBAY GP", "Lakeside  •  Pinecrest  •  Harbor  •  Bloombay Dunes", "tile_bloombay_gp.jpg", COL_GREEN, func():
 				_on_cup_selected("Bloombay GP")
 			)
-			_add_tile("ARCTIC CUP", "Frostpeak  •  Glacier Highway  •  Northlight  •  Frostfall Gorge", "tile_arctic_cup.jpg", COL_SNOW, func():
-				_on_cup_selected("Arctic Cup")
+			_add_tile("SVARTFJELL GP", "Frostpeak  •  Glacier Highway  •  Northlight  •  Frostfall Gorge", "tile_arctic_cup.jpg", COL_SNOW, func():
+				_on_cup_selected("Svartfjell GP")
 			)
 			_add_tile("AL-RAIHANA GP", "Mountain  •  Canyon  •  Chasm  •  Wadi", "tile_al_raihana_gp.jpg", COL_BRONZE, func():
 				_on_cup_selected("Al-Raihana GP")
+			)
+			_add_tile("MATUMAINI GP", "Mara Crossing", "tile_matumaini_gp.jpg", COL_SAVANNA, func():
+				_on_cup_selected("Matumaini GP")
 			)
 		"stage_select":
 			if NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR:
