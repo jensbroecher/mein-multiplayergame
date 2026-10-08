@@ -14,6 +14,14 @@ const SPEED_MAX: float = 75.0     # Accelerates up to 75 m/s
 const SPEED_ACCEL: float = 16.0   # m/s² acceleration
 @export var owner_id: int
 @export var is_guided: bool = false
+## The regular missile is not guided, but it does nudge toward a cart that is already nearly in
+## its path: it only locks inside a narrow cone ahead and turns at a fraction of the guided
+## missile's rate, so it forgives a slightly-off aim without chasing anyone round a corner.
+const NUDGE_CONE_DOT := 0.87      # ~30 degrees either side of straight ahead
+const NUDGE_KEEP_DOT := 0.75      # lock is dropped once the target is ~41 degrees off the nose
+const NUDGE_RANGE := 100.0
+const NUDGE_TURN := 1.1           # vs 4.2 for the guided missile
+const GUIDED_TURN := 4.2
 var sync_position: Vector3
 var sync_rotation: Vector3
 
@@ -88,7 +96,7 @@ func _ready():
 
 func _find_target():
 	if not is_guided:
-		target = null
+		_find_nudge_target()
 		return
 
 	var players = get_tree().get_nodes_in_group("player_carts")
@@ -152,6 +160,27 @@ func _find_target():
 	else:
 		target = best_search_target
 
+## Regular missile: the nearest cart well inside the cone ahead, if any.
+func _find_nudge_target() -> void:
+	target = null
+	var forward: Vector3 = -global_transform.basis.z
+	var best: float = NUDGE_RANGE
+	for p in get_tree().get_nodes_in_group("player_carts"):
+		if p == null or not is_instance_valid(p) or p.name.to_int() == owner_id:
+			continue
+		if p.get("is_exploding") == true or p.get("is_drowned") == true:
+			continue
+		var to_p: Vector3 = p.global_position - global_position
+		var dist: float = to_p.length()
+		if dist < 2.0 or dist > best:
+			continue
+		# Not across a height difference either: no diving off a bridge onto the road below.
+		if absf(to_p.y) > 6.0 or forward.dot(to_p / dist) < NUDGE_CONE_DOT:
+			continue
+		best = dist
+		target = p
+
+
 func _physics_process(delta):
 	if is_exploding or has_exploded:
 		return
@@ -178,7 +207,7 @@ func _physics_process(delta):
 
 		if homing_delay > 0.0:
 			homing_delay -= delta
-		elif is_guided and target and is_instance_valid(target):
+		elif target and is_instance_valid(target):
 			var to_target: Vector3 = target.global_position - global_position
 			var dist: float = to_target.length()
 			var forward: Vector3 = -global_transform.basis.z
@@ -188,8 +217,10 @@ func _physics_process(delta):
 			var side_dist: float = absf(right.dot(to_target))
 			var height_dist: float = absf(to_target.y)
 			
-			# Break lock if target goes behind, or too far sideways/vertically
-			if fwd_dot < 0.25 or side_dist > 45.0 or height_dist > 18.0 or dist > max_range \
+			# Break lock if target goes behind, or too far sideways/vertically. The regular missile
+			# lets go much sooner: it only ever corrects, it never hunts.
+			var keep_dot: float = 0.25 if is_guided else NUDGE_KEEP_DOT
+			if fwd_dot < keep_dot or side_dist > 45.0 or height_dist > 18.0 or dist > max_range \
 					or target.get("is_exploding") == true or target.get("is_drowned") == true:
 				target = null
 			else:
@@ -200,7 +231,7 @@ func _physics_process(delta):
 				
 				if absf(clamped_dir.dot(Vector3.UP)) < 0.98:
 					var target_basis: Basis = Basis.looking_at(clamped_dir, Vector3.UP)
-					var turn_speed: float = 4.2
+					var turn_speed: float = GUIDED_TURN if is_guided else NUDGE_TURN
 					global_basis = global_basis.slerp(target_basis, turn_speed * delta).orthonormalized()
 
 		# Gradually accelerate from start speed to max
