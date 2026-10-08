@@ -68,7 +68,7 @@ const RIVER_UPPER := [
 	Vector4(-6.0, 33.30, -530.0, 8.0),
 	Vector4(6.0, 32.60, -460.0, 9.0),
 	Vector4(0.0, 31.90, -392.0, 10.0),
-	Vector4(0.0, 31.60, -350.0, 10.0),
+	Vector4(0.0, 31.60, -351.0, 10.0),
 ]
 ## Lower river: plunge pool down to the frozen lake, where it runs out under the ice.
 const RIVER_LOWER := [
@@ -83,9 +83,14 @@ const RIVER_LOWER := [
 	Vector4(38.0, 1.00, 160.0, 15.0),
 	Vector4(44.0, 0.70, 214.0, 16.0),
 ]
-## The falls drop off a lip running east-west at this z. Everything north of it is the upper
-## river, everything south the pool and lower river.
-const FALLS_LIP_Z := -350.0
+## The falls drop off a lip running east-west at this z. Everything north of it (and on it) is
+## the upper river, everything south the pool and lower river. It sits exactly on a terrain grid
+## row (FINE_Z.x + 3 * 123), so the rock brink is where the water leaves: between rows the
+## heightfield can only slope, and the brink would end up a cell behind and below the falls.
+const FALLS_LIP_Z := -351.0
+## Over the last stretch above the falls the river bed rises into a rock sill just under the
+## water, so the river visibly runs up to the brink instead of ending over a deep channel.
+const FALLS_SILL_LEN := 26.0
 const FALLS_HALF_W := 10.0
 ## (x, water y, z, radius).
 const POOL := Vector4(0.0, 7.0, -330.0, 22.0)
@@ -184,6 +189,8 @@ var _mega: Dictionary = {}
 var _grid_x := PackedFloat32Array()
 var _grid_z := PackedFloat32Array()
 var _heights := PackedFloat32Array()
+## 1 where the gorge or a gully carve set the height: those faces are rock, however gentle.
+var _carved := PackedByteArray()
 
 
 # ======================================================================================
@@ -529,7 +536,7 @@ func _build_river_segments() -> void:
 ## Nearest river element to (x, z): {d, y, hw}. `side` restricts to the upper river (north of the
 ## falls lip) or lower (south), so the two never carve into each other across the falls.
 func _river_at(x: float, z: float) -> Dictionary:
-	var upper_side: bool = z < FALLS_LIP_Z
+	var upper_side: bool = z <= FALLS_LIP_Z + 0.01
 	var best := {"d": 1e9, "y": 0.0, "hw": 1.0}
 	var p := Vector2(x, z)
 	for s in _river_segs:
@@ -680,6 +687,11 @@ func _apply_trail(h: float, x: float, z: float) -> float:
 	var lower := -1e9
 	var touched := false
 	var n: int = _ts_pos.size()
+	# The lowest a river-side ledge may cut here: just above the water of the river at this spot.
+	# Without it, the trail climbing past the plunge pool (at ~12m) planed the bank of the river
+	# above the falls (water at 31.6m) down to its own height, leaving that river perched 20m over
+	# a pit. Looked up lazily: most points never meet a ledge bound.
+	var ledge_floor := NAN
 	for gz in range(cz - 2, cz + 3):
 		for gx in range(cx - 2, cx + 3):
 			var bucket: PackedInt32Array = _ts_cells.get(Vector2i(gx, gz), PackedInt32Array())
@@ -712,7 +724,9 @@ func _apply_trail(h: float, x: float, z: float) -> float:
 					# River side: a ledge, but only as far as the river - past it the other bank's own
 					# trail decides.
 					if lateral < _ts_river_dist[i]:
-						upper = minf(upper, foot_y - soft * LEDGE_SLOPE + excess * CUT_SLOPE)
+						if is_nan(ledge_floor):
+							ledge_floor = float(_river_at(x, z)["y"]) + 1.5
+						upper = minf(upper, maxf(foot_y - soft * LEDGE_SLOPE + excess * CUT_SLOPE, ledge_floor))
 				else:
 					upper = minf(upper, foot_y + soft * CUT_SLOPE + excess * CUT_SLOPE)
 				lower = maxf(lower, foot_y - soft * FILL_SLOPE - excess * FILL_SLOPE)
@@ -732,7 +746,10 @@ func _gorge_height(x: float, z: float) -> float:
 	var y: float = r["y"]
 	if d < hw:
 		var t: float = d / hw
-		return y - RIVER_DEPTH * (1.0 - t * t) - 0.6
+		var depth: float = RIVER_DEPTH
+		if z <= FALLS_LIP_Z + 0.01 and absf(x) < 40.0:
+			depth *= lerpf(0.35, 1.0, smoothstep(0.0, FALLS_SILL_LEN, FALLS_LIP_Z - z))
+		return y - depth * (1.0 - t * t) - lerpf(0.05, 0.6, smoothstep(0.0, FALLS_SILL_LEN, FALLS_LIP_Z - z) if z <= FALLS_LIP_Z + 0.01 else 1.0)
 	# Ragged walls: the rise rate varies along the gorge, and blocky cellular noise breaks the
 	# face into buttresses and ledges.
 	var wall: float = GORGE_WALL * (0.8 + 0.4 * (_detail_noise.get_noise_2d(x * 0.3, z * 0.3) * 0.5 + 0.5))
@@ -797,14 +814,18 @@ func _build_heights() -> void:
 	print("  terrain grid %d x %d = %d vertices" % [nx, nz, nx * nz])
 	_heights = PackedFloat32Array()
 	_heights.resize(nx * nz)
+	_carved = PackedByteArray()
+	_carved.resize(nx * nz)
 	for iz in range(nz):
 		var z: float = _grid_z[iz]
 		for ix in range(nx):
 			var x: float = _grid_x[ix]
 			var h: float = _base_height(x, z)
 			h = _apply_trail(h, x, z)
+			var uncut: float = h
 			h = minf(h, _gorge_height(x, z))
 			h = _gully_height(h, x, z)
+			_carved[iz * nx + ix] = 1 if h < uncut - 0.3 else 0
 			var ice: float = _ice_mask(x, z)
 			if ice > 0.0:
 				var ice_y: float = LAKE_ICE_Y if z > 0.0 else TARN_ICE_Y
@@ -883,7 +904,7 @@ func _build_terrain(parent: Node, mat: Material) -> void:
 			var dhdx: float = (_heights[iz * nx + ixr] - _heights[iz * nx + ixl]) / maxf(_grid_x[ixr] - _grid_x[ixl], 0.01)
 			var dhdz: float = (_heights[izu * nx + ix] - _heights[izd * nx + ix]) / maxf(_grid_z[izu] - _grid_z[izd], 0.01)
 			normals[i] = Vector3(-dhdx, 1.0, -dhdz).normalized()
-			colors[i] = _terrain_masks(x, z, h)
+			colors[i] = _terrain_masks(x, z, h, _carved[i] == 1)
 	var indices := PackedInt32Array()
 	indices.resize((nx - 1) * (nz - 1) * 6)
 	var w := 0
@@ -940,8 +961,9 @@ func _build_terrain(parent: Node, mat: Material) -> void:
 	body.add_child(col)
 
 
-## Vertex-colour masks for frostfall_ground.gdshader: ice, racing line, spray zone, lateral.
-func _terrain_masks(x: float, z: float, h: float) -> Color:
+## Vertex-colour masks for frostfall_ground.gdshader: ice, racing line, spray zone, and alpha:
+## lateral across the racing line on it, carved-rock flag off it.
+func _terrain_masks(x: float, z: float, h: float, carved: bool) -> Color:
 	var ice_y: float = LAKE_ICE_Y if z > 0.0 else TARN_ICE_Y
 	var ice: float = _ice_mask(x, z) * (1.0 - smoothstep(0.3, 1.5, h - ice_y))
 	var line := 0.0
@@ -968,14 +990,24 @@ func _terrain_masks(x: float, z: float, h: float) -> Color:
 	var r: Dictionary = _river_at(x, z)
 	if r["d"] < r["hw"] + 26.0 and ice < 0.5:
 		var above: float = h - r["y"]
-		spray = (1.0 - smoothstep(0.5, 7.0, above)) * (1.0 - smoothstep(r["hw"] + 6.0, r["hw"] + 26.0, r["d"]))
+		# A narrow band at the waterline only. Reaching tens of metres out, it glazed whole low
+		# benches (the shelf beside the plunge pool) into one glossy blue expanse.
+		spray = (1.0 - smoothstep(0.3, 3.0, above)) * (1.0 - smoothstep(r["hw"] + 2.0, r["hw"] + 8.0, r["d"]))
 		# The falls soak everything around the pool.
 		var pd: float = Vector2(x - POOL.x, z - POOL.z).length()
-		spray = maxf(spray, (1.0 - smoothstep(POOL.w, POOL.w + 30.0, pd)) * (1.0 - smoothstep(4.0, 26.0, above)))
+		# Only low down, near the waterline: soaked all the way up, a whole cliff face turns into
+		# one glossy blue sheet.
+		spray = maxf(spray, (1.0 - smoothstep(POOL.w, POOL.w + 14.0, pd)) * (1.0 - smoothstep(2.0, 10.0, above)) * 0.6)
+		# Above water the glaze tops out below 0.9: the shader reads 0.92+ as submerged river bed
+		# and paints it flat dark stone, which on a dry cliff is a featureless blue sheet.
+		spray = minf(spray, 0.85)
 		# The river bed under the water: wet dark stone, never snow showing through the surface.
 		if above < 0.2:
 			spray = 1.0
-	return Color(ice, line, clampf(spray, 0.0, 1.0), clampf(lat / 24.0 + 0.5, 0.0, 1.0))
+	# Alpha carries the lateral across the racing line; off the line it is free, and marks the
+	# faces the gorge and gully carves cut (0 there), which the shader keeps as bare rock.
+	var alpha: float = clampf(lat / 24.0 + 0.5, 0.0, 1.0) if line > 0.0 else (0.0 if carved else 1.0)
+	return Color(ice, line, clampf(spray, 0.0, 1.0), alpha)
 
 
 # ======================================================================================
@@ -1091,15 +1123,20 @@ func _build_river_meshes(parent: Node, mat: Material) -> void:
 			var turb: float = clampf(drop * 18.0, 0.0, 0.85)
 			# The last 25m above the falls lip accelerate into white water.
 			if s[2]:
-				turb = maxf(turb, smoothstep(along - 26.0, along, samples[i][2]) * 0.95)
+				turb = maxf(turb, smoothstep(along - 22.0, along, samples[i][2]) * 0.6)
 			# Below the falls, the pool's outflow is churned for the first stretch.
 			if not s[2]:
 				turb = maxf(turb, (1.0 - smoothstep(0.0, 40.0, samples[i][2])) * 0.7)
 			var current: float = clampf(0.3 + drop * 25.0, 0.3, 1.4)
+			# The lower river starts under the plunge pool; fade its first metres so its square
+			# end never shows through the pool.
+			var fade: float = 0.0
+			if not s[2]:
+				fade = 1.0 - smoothstep(0.0, 14.0, samples[i][2])
 			for k in range(across + 1):
 				var u: float = float(k) / float(across)
 				var q: Vector3 = p + right * lerpf(-hw, hw, u)
-				st.set_color(Color(turb, current, 0.0, 1.0))
+				st.set_color(Color(turb, current, fade, 1.0))
 				st.set_uv(Vector2(u, samples[i][2]))
 				st.set_normal(Vector3.UP)
 				st.add_vertex(q)
@@ -1135,7 +1172,9 @@ func _build_river_meshes(parent: Node, mat: Material) -> void:
 			var q := Vector3(POOL.x + cos(a) * rr, POOL.y, POOL.z + sin(a) * rr)
 			var di: float = Vector2(q.x, q.z).distance_to(impact)
 			var turb: float = 1.0 - smoothstep(4.0, 24.0, di)
-			st2.set_color(Color(clampf(turb, 0.12, 1.0), 0.6, 0.0, 1.0))
+			# The rim melts into the river ribbon running out of the pool.
+			var rim: float = smoothstep(POOL.w - 7.0, POOL.w + 1.5, rr)
+			st2.set_color(Color(clampf(turb, 0.12, 1.0), 0.6, rim, 1.0))
 			# Pool UVs: around the rim, and outward from the falls for the flow direction.
 			st2.set_uv(Vector2(float(si) / float(segs), di * 1.0))
 			st2.set_normal(Vector3.UP)
@@ -1159,37 +1198,60 @@ func _build_river_meshes(parent: Node, mat: Material) -> void:
 	pool_mi.position.y = 0.02
 	root.add_child(pool_mi)
 
-	# Gully inlets: calm flat water in each slot, at river level. Built with vertex colours: a
-	# mesh without them reads as COLOR = 1 in the shader, which is full white-water foam.
+	# Gully inlets: calm flat water in each slot, at river level. Each starts well inside the
+	# river and fades in over its first metres there (vertex blue = edge fade), so the river and
+	# the inlet melt into each other instead of meeting along a line. Built with vertex colours:
+	# a mesh without them reads as COLOR = 1 in the shader, which is full white-water foam.
 	for g in _gaps:
-		# Start just inside the river's bank, not at mid-river: the river ribbon covers the overlap,
-		# and a calm rectangle laid over half the river reads as a dark slab beside the rapids.
 		var gaxis: Vector3 = g["axis"]
 		var mouth: Vector3 = g["center"]
 		for k in range(200):
 			var q: Vector3 = g["center"] - gaxis * float(k)
 			var rq: Dictionary = _river_at(q.x, q.z)
-			if rq["d"] < rq["hw"] - 1.5:
+			if rq["d"] < maxf(rq["hw"] - 6.0, 1.0):
 				mouth = q
 				break
 		var head: Vector3 = g["head"] + gaxis * 8.0
-		var axis: Vector3 = (head - mouth).normalized()
-		var side := Vector3(-axis.z, 0.0, axis.x) * (GAP_LEN * 0.5 + 3.0)
+		var length_g: float = Vector2(head.x - mouth.x, head.z - mouth.z).length()
+		var side := Vector3(-gaxis.z, 0.0, gaxis.x) * (GAP_LEN * 0.5 + 3.0)
 		# A few centimetres under the river surface, so where they overlap the river draws on top.
 		var y: float = g["water_y"] - 0.04
-		var corners := [mouth - side, mouth + side, head + side, head - side]
-		var uvs := [Vector2(0, 0), Vector2(1, 0), Vector2(1, (head - mouth).length()), Vector2(0, (head - mouth).length())]
 		var st3 := SurfaceTool.new()
 		st3.begin(Mesh.PRIMITIVE_TRIANGLES)
-		var faces: Array = []
-		_quad_out(faces, corners[0], corners[1], corners[2], corners[3], Vector3.UP)
-		for v in faces:
-			var k: int = corners.find(v)
-			# Same calm-water look as the river's pools (turbulence, current) so the join does not show.
-			st3.set_color(Color(0.12, 0.3, 0.0, 1.0))
-			st3.set_uv(uvs[k])
-			st3.set_normal(Vector3.UP)
-			st3.add_vertex(Vector3(v.x, y, v.z))
+		var rows := 12
+		for ri in range(rows + 1):
+			# Rows bunched toward the mouth, where the fade happens.
+			var f: float = pow(float(ri) / float(rows), 1.6)
+			var along: float = f * length_g
+			var c: Vector3 = mouth + gaxis * along
+			var fade: float = 1.0 - smoothstep(0.0, 8.0, along)
+			for k in range(2):
+				var q2: Vector3 = c + side * (-1.0 if k == 0 else 1.0)
+				st3.set_color(Color(0.12, 0.3, fade, 1.0))
+				st3.set_uv(Vector2(float(k), along))
+				st3.set_normal(Vector3.UP)
+				st3.add_vertex(Vector3(q2.x, y, q2.z))
+		for ri in range(rows):
+			var p00: int = ri * 2
+			var p01: int = p00 + 1
+			var p10: int = p00 + 2
+			var p11: int = p00 + 3
+			# Front face up: (c - a) x (b - a) must point +Y. With a = p00, b = p10, c = p01 that is
+			# side x axis, so the order flips when that cross product points down.
+			if side.cross(gaxis).y > 0.0:
+				st3.add_index(p00)
+				st3.add_index(p10)
+				st3.add_index(p01)
+				st3.add_index(p01)
+				st3.add_index(p10)
+				st3.add_index(p11)
+			else:
+				st3.add_index(p00)
+				st3.add_index(p01)
+				st3.add_index(p10)
+				st3.add_index(p01)
+				st3.add_index(p11)
+				st3.add_index(p10)
 		var pm := MeshInstance3D.new()
 		pm.name = "GullyWater_" + str(g["name"])
 		pm.mesh = st3.commit()
@@ -1225,13 +1287,26 @@ func _build_waterfall(parent: Node) -> void:
 	for layer in [["Curtain", 0.0, 1.0, 0.0], ["Veil", 0.9, 1.18, 1.0]]:
 		var st := SurfaceTool.new()
 		st.begin(Mesh.PRIMITIVE_TRIANGLES)
-		var rows := 28
 		var cols := 20
+		# Row profile as (z, y, v): the main curtain first runs along the river surface for the
+		# last metres before the brink and rolls over it, so the falls visibly pour out of the
+		# river instead of starting in mid-air. Then the free-fall parabola down to the pool.
+		var profile: Array = []
+		if layer[3] == 0.0:
+			for b in [[-2.4, 0.03], [-1.4, 0.03], [-0.6, 0.0], [-0.15, -0.12]]:
+				profile.append(Vector3(FALLS_LIP_Z + b[0], lip_y + b[1], 0.0))
+		var rows := 28
 		for ri in range(rows + 1):
 			var tt: float = float(ri) / float(rows)
 			var t: float = tt * t_end
-			var zz: float = FALLS_LIP_Z + v0 * t + layer[1]
-			var yy: float = lip_y + 0.15 - 4.9 * t * t
+			# The roll over the brink: the first fraction of a second starts below the surface
+			# line and curves down, rather than shooting out level.
+			profile.append(Vector3(FALLS_LIP_Z + v0 * t + layer[1], lip_y - 0.25 - 4.9 * t * t - 0.4 * sin(minf(tt * 8.0, 1.0) * PI * 0.5) * (1.0 - tt), maxf(tt, 0.004)))
+		for ri in range(profile.size()):
+			var pr: Vector3 = profile[ri]
+			var tt: float = pr.z
+			var zz: float = pr.x
+			var yy: float = pr.y
 			# The curtain spreads a little as it falls.
 			var spread: float = lerpf(1.0, layer[2], tt) * (1.0 + tt * 0.12)
 			for ci in range(cols + 1):
@@ -1242,7 +1317,7 @@ func _build_waterfall(parent: Node) -> void:
 				st.set_uv(Vector2(u, tt))
 				st.set_normal(Vector3(0, 0.3, 1).normalized())
 				st.add_vertex(Vector3(xx, yy, zz + bulge))
-		for ri in range(rows):
+		for ri in range(profile.size() - 1):
 			for ci in range(cols):
 				var a0: int = ri * (cols + 1) + ci
 				var b0: int = a0 + cols + 1
@@ -1267,6 +1342,7 @@ func _build_waterfall(parent: Node) -> void:
 
 	var impact := Vector3(0.0, POOL.y + 0.2, FALLS_LIP_Z + v0 * t_end + 0.5)
 	root.add_child(_mist_particles(impact))
+	root.add_child(_pool_fog_particles(Vector3(POOL.x, POOL.y + 1.6, POOL.z + 4.0)))
 	root.add_child(_spray_particles(impact))
 	root.add_child(_lip_spray_particles(Vector3(0.0, lip_y + 0.2, FALLS_LIP_Z + 0.4)))
 	root.add_child(_rainbow(impact + Vector3(0.0, 5.0, 10.0)))
@@ -1325,45 +1401,137 @@ func _soft_particle_material(color: Color, tex_size: int) -> StandardMaterial3D:
 	return m
 
 
-## Big slow puffs rolling up and out from where the falls land.
+## A soft, irregular cloud sprite for the mist: noise shaped by a radial falloff, so every puff
+## is a ragged wisp rather than a perfect disc. Generated once and saved under res://generated/.
+var _mist_tex: Texture2D
+
+func _mist_texture() -> Texture2D:
+	if _mist_tex:
+		return _mist_tex
+	const SIZE := 128
+	var n := FastNoiseLite.new()
+	n.seed = 6604
+	n.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n.frequency = 0.035
+	n.fractal_octaves = 4
+	var img := Image.create(SIZE, SIZE, false, Image.FORMAT_RGBA8)
+	for y in range(SIZE):
+		for x in range(SIZE):
+			var d: float = Vector2(x - SIZE * 0.5, y - SIZE * 0.5).length() / (SIZE * 0.5)
+			var cloud: float = n.get_noise_2d(x, y) * 0.5 + 0.5
+			var a: float = clampf((1.0 - smoothstep(0.25, 1.0, d)) * smoothstep(0.25, 0.75, cloud + (1.0 - d) * 0.35), 0.0, 1.0)
+			img.set_pixel(x, y, Color(1, 1, 1, a))
+	img.generate_mipmaps()
+	_mist_tex = _save_baked_resource(ImageTexture.create_from_image(img), "mist_puff")
+	return _mist_tex
+
+
+func _mist_material() -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.billboard_keep_scale = true
+	m.vertex_color_use_as_albedo = true
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	# Soft where a puff cuts into rock or water, and thinning out when the camera is inside it.
+	m.proximity_fade_enabled = true
+	m.proximity_fade_distance = 3.0
+	m.distance_fade_mode = BaseMaterial3D.DISTANCE_FADE_PIXEL_ALPHA
+	m.distance_fade_min_distance = 1.0
+	m.distance_fade_max_distance = 7.0
+	m.albedo_texture = _mist_texture()
+	m.albedo_color = Color(0.94, 0.97, 1.0, 1.0)
+	return m
+
+
+## Spray mist from where the falls land: ragged puffs that billow up, spin slowly, grow and
+## drift downstream with the air the falls drag along, densest at the impact line.
 func _mist_particles(at: Vector3) -> GPUParticles3D:
 	var p := GPUParticles3D.new()
 	p.name = "FallsMist"
 	p.position = at
-	p.amount = 140
-	p.lifetime = 5.5
-	p.preprocess = 6.0
-	p.randomness = 0.6
+	p.amount = 260
+	p.lifetime = 6.0
+	p.preprocess = 8.0
+	p.randomness = 0.7
+	p.draw_order = GPUParticles3D.DRAW_ORDER_VIEW_DEPTH
 	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	p.visibility_aabb = AABB(Vector3(-40, -6, -30), Vector3(80, 50, 70))
+	p.visibility_aabb = AABB(Vector3(-45, -8, -30), Vector3(90, 60, 80))
 	var pm := ParticleProcessMaterial.new()
 	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
-	pm.emission_box_extents = Vector3(FALLS_HALF_W, 0.8, 2.5)
-	pm.direction = Vector3(0, 1, 0.6)
-	pm.spread = 40.0
-	pm.initial_velocity_min = 1.5
-	pm.initial_velocity_max = 4.5
-	pm.gravity = Vector3(0, 0.35, 0.25)
-	pm.damping_min = 0.4
-	pm.damping_max = 0.9
-	pm.scale_min = 0.7
-	pm.scale_max = 1.3
+	pm.emission_box_extents = Vector3(FALLS_HALF_W * 1.05, 1.2, 2.0)
+	pm.direction = Vector3(0, 1, 0.9)
+	pm.spread = 50.0
+	pm.initial_velocity_min = 2.0
+	pm.initial_velocity_max = 6.5
+	# Rising warm-ish spray, carried downstream.
+	pm.gravity = Vector3(0, 0.25, 0.55)
+	pm.damping_min = 0.6
+	pm.damping_max = 1.2
+	pm.angle_min = 0.0
+	pm.angle_max = 360.0
+	pm.angular_velocity_min = -14.0
+	pm.angular_velocity_max = 14.0
+	pm.scale_min = 0.6
+	pm.scale_max = 1.5
 	var sc := Curve.new()
-	sc.add_point(Vector2(0, 0.35))
-	sc.add_point(Vector2(1, 1.0))
+	sc.add_point(Vector2(0, 0.3))
+	sc.add_point(Vector2(0.4, 0.8))
+	sc.add_point(Vector2(1, 1.25))
 	var sct := CurveTexture.new()
 	sct.curve = sc
 	pm.scale_curve = sct
 	var cr := Gradient.new()
-	cr.offsets = PackedFloat32Array([0.0, 0.2, 1.0])
-	cr.colors = PackedColorArray([Color(1, 1, 1, 0), Color(1, 1, 1, 0.16), Color(1, 1, 1, 0)])
+	cr.offsets = PackedFloat32Array([0.0, 0.12, 0.55, 1.0])
+	cr.colors = PackedColorArray([Color(1, 1, 1, 0), Color(1, 1, 1, 0.42), Color(0.95, 0.97, 1.0, 0.22), Color(0.92, 0.95, 1, 0)])
 	var crt := GradientTexture1D.new()
 	crt.gradient = cr
 	pm.color_ramp = crt
 	p.process_material = pm
 	var q := QuadMesh.new()
-	q.size = Vector2(7.0, 7.0)
-	q.material = _soft_particle_material(Color(0.93, 0.97, 1.0, 1.0), 64)
+	q.size = Vector2(7.5, 7.5)
+	q.material = _mist_material()
+	p.draw_pass_1 = q
+	return p
+
+
+## A low bank of fog lying on the plunge pool and rolling a little way down the river.
+func _pool_fog_particles(at: Vector3) -> GPUParticles3D:
+	var p := GPUParticles3D.new()
+	p.name = "PoolFog"
+	p.position = at
+	p.amount = 70
+	p.lifetime = 9.0
+	p.preprocess = 10.0
+	p.randomness = 0.5
+	p.draw_order = GPUParticles3D.DRAW_ORDER_VIEW_DEPTH
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	p.visibility_aabb = AABB(Vector3(-40, -4, -30), Vector3(80, 20, 90))
+	var pm := ParticleProcessMaterial.new()
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	pm.emission_box_extents = Vector3(POOL.w * 0.7, 0.4, POOL.w * 0.6)
+	pm.direction = Vector3(0, 0.1, 1)
+	pm.spread = 30.0
+	pm.initial_velocity_min = 0.4
+	pm.initial_velocity_max = 1.4
+	pm.gravity = Vector3(0, 0.05, 0.25)
+	pm.angle_min = 0.0
+	pm.angle_max = 360.0
+	pm.angular_velocity_min = -5.0
+	pm.angular_velocity_max = 5.0
+	pm.scale_min = 0.8
+	pm.scale_max = 1.6
+	var cr := Gradient.new()
+	cr.offsets = PackedFloat32Array([0.0, 0.25, 0.7, 1.0])
+	cr.colors = PackedColorArray([Color(1, 1, 1, 0), Color(1, 1, 1, 0.24), Color(1, 1, 1, 0.16), Color(1, 1, 1, 0)])
+	var crt := GradientTexture1D.new()
+	crt.gradient = cr
+	pm.color_ramp = crt
+	p.process_material = pm
+	var q := QuadMesh.new()
+	q.size = Vector2(11.0, 11.0)
+	q.material = _mist_material()
 	p.draw_pass_1 = q
 	return p
 
@@ -1479,32 +1647,53 @@ void fragment() {
 	return mi
 
 
-## Frozen columns hanging off the cliff either side of the falls, where the spray freezes.
+## Frozen columns either side of the falls, where the spray freezes on the rock.
+##
+## Every column is fitted to the built cliff: its top and tip are each placed just in front of
+## where the face actually is at that height (_falls_face_z), so the ice lies on the rock instead
+## of hanging on a straight line in front of a face that is a few metres further back. The ones
+## nearest the falls are long and thick, running most of the way to the pool.
 func _falls_icicles(lip_y: float) -> MeshInstance3D:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 8812
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var placed := 0
 	for side in [-1.0, 1.0]:
-		for i in range(26):
-			var x: float = side * (FALLS_HALF_W + 0.8 + rng.randf() * 9.0)
-			var top: float = lip_y + rng.randf_range(-1.5, 0.6)
-			var length: float = rng.randf_range(4.0, 17.0) * (1.0 - absf(x) / 30.0)
-			var r: float = rng.randf_range(0.35, 1.0) * (0.4 + length / 17.0)
-			var zc: float = FALLS_LIP_Z + rng.randf_range(0.2, 1.4)
-			var sides := 6
+		for i in range(30):
+			var off: float = rng.randf() * 9.5
+			var x: float = side * (FALLS_HALF_W + 0.6 + off)
+			var near_falls: float = 1.0 - off / 9.5
+			var top: float = lip_y + rng.randf_range(-1.2, 0.8)
+			var length: float = lerpf(rng.randf_range(3.0, 8.0), rng.randf_range(10.0, 20.0), near_falls * near_falls)
+			length = minf(length, top - POOL.y - 1.0)
+			var r: float = rng.randf_range(0.25, 0.5) + near_falls * 0.3 + length * 0.02
+			var tip_y: float = top - length
+			var z_top: float = _falls_face_z(x, top)
+			var z_tip: float = _falls_face_z(x, tip_y)
+			if is_nan(z_top) or is_nan(z_tip):
+				continue
+			# Just proud of the rock, by the column's own radius at each end.
+			var top_c := Vector3(x, top, z_top + r * 0.7)
+			var tip_c := Vector3(x + rng.randf_range(-0.2, 0.2), tip_y, z_tip + 0.25)
+			var sides := 7
 			for k in range(sides):
 				var a0: float = TAU * float(k) / float(sides)
 				var a1: float = TAU * float(k + 1) / float(sides)
-				var p0 := Vector3(x + cos(a0) * r, top, zc + sin(a0) * r)
-				var p1 := Vector3(x + cos(a1) * r, top, zc + sin(a1) * r)
-				var tip := Vector3(x + rng.randf_range(-0.2, 0.2), top - length, zc + 0.2)
-				var faces: Array = []
-				_tri_out(faces, p0, tip, p1, (p0 + p1) * 0.5 - Vector3(x, top, zc))
-				var nrm: Vector3 = (faces[2] - faces[0]).cross(faces[1] - faces[0]).normalized()
-				for v in faces:
-					st.set_normal(nrm)
-					st.add_vertex(v)
+				var p0: Vector3 = top_c + Vector3(cos(a0) * r, 0.0, sin(a0) * r)
+				var p1: Vector3 = top_c + Vector3(cos(a1) * r, 0.0, sin(a1) * r)
+				# A frozen bulge at the top, where the column grows out of the rock.
+				var cap: Vector3 = top_c + Vector3(0.0, r * 0.9, -r * 0.4)
+				for tri in [[p0, tip_c, p1], [p0, p1, cap]]:
+					var faces: Array = []
+					var mid: Vector3 = (tri[0] + tri[1] + tri[2]) / 3.0
+					var axis_pt := Vector3(x, mid.y, lerpf(top_c.z, tip_c.z, clampf((top - mid.y) / maxf(length, 0.1), 0.0, 1.0)))
+					_tri_out(faces, tri[0], tri[1], tri[2], mid - axis_pt)
+					var nrm: Vector3 = (faces[2] - faces[0]).cross(faces[1] - faces[0]).normalized()
+					for v in faces:
+						st.set_normal(nrm)
+						st.add_vertex(v)
+			placed += 1
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://glacier_ice.gdshader")
 	mat.set_shader_parameter("vein_density", 0.05)
@@ -1515,7 +1704,22 @@ func _falls_icicles(lip_y: float) -> MeshInstance3D:
 	mi.name = "FallsIcicles"
 	mi.mesh = st.commit()
 	mi.material_override = mat
+	print("  falls icicles: %d on the cliff" % placed)
 	return mi
+
+
+## Where the cliff face beside the falls is at height `y`: scanning south across the lip, the
+## first z at which the built ground drops below `y`. NAN if the ground never rises that high.
+func _falls_face_z(x: float, y: float) -> float:
+	var z: float = FALLS_LIP_Z - 8.0
+	if _ground_at(x, z) < y:
+		return NAN
+	while z < FALLS_LIP_Z + 12.0:
+		var z2: float = z + 0.1
+		if _ground_at(x, z2) < y:
+			return z2
+		z = z2
+	return NAN
 
 
 ## A seamless loop of falling-water noise: brown noise for the roar, a little white for the hiss.

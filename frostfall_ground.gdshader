@@ -9,7 +9,9 @@ render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 //   r - frozen lake ice (1 on the ice sheet, feathered at the shore)
 //   g - packed snow on the racing line (1 on the line, 0 a few metres outside it)
 //   b - spray zone: rock and snow near open water, glazed with ice and darker
-//   a - signed distance across the racing line, so the ruts can follow it
+//   a - on the racing line (g > 0): signed distance across it, so the ruts can follow it.
+//       Off it: 0 where the gorge or a gully carve cut the face, which stays bare rock even where
+//       it is gentle enough to hold snow (in shadow such a slope reads as a flat blue sheet).
 
 uniform sampler2D rock_albedo : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D rock_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
@@ -94,9 +96,17 @@ void fragment() {
 	float ripple = fbm(w_pos.xz * vec2(0.10, 0.016));
 
 	// --- Snow cover: shallow ground holds it, steep rock sheds it ---------------------------
-	float slope_mask = smoothstep(snow_slope - 0.20, snow_slope + 0.18, n.y);
+	// Slope from the steeper of the vertex normal and the triangle's own face. The vertex normals
+	// are averaged over two grid cells, so on a cliff step (25m over one 3m cell, beside the falls)
+	// they come out gentle enough to hold snow, and that snow in shadow reads as a flat blue sheet.
+	float face_ny = abs(normalize(cross(dFdx(w_pos), dFdy(w_pos))).y);
+	float slope_ny = min(n.y, face_ny);
+	float slope_mask = smoothstep(snow_slope - 0.20, snow_slope + 0.18, slope_ny);
 	float breakup = (fbm(w_pos.xz * 0.013) - 0.5) * 0.7 + (drift - 0.5) * 0.35;
 	float snow = smoothstep(0.10, 0.70, clamp(slope_mask * 0.98 + breakup * (1.0 - slope_mask * 0.6), 0.0, 1.0));
+	float carved_rock = masks.g < 0.01 ? 1.0 - masks.a : 0.0;
+	// Carved faces shed their snow; only near-flat ledges on them keep a dusting.
+	snow *= 1.0 - carved_rock * (1.0 - smoothstep(0.82, 0.96, slope_ny));
 
 	// --- Rock -------------------------------------------------------------------------------
 	float warp_amp = clamp(3.0 / max(rock_scale, 0.005), 0.0, 9.0);
@@ -143,10 +153,12 @@ void fragment() {
 
 	// --- Spray zone: glazed, dark, wet-looking near open water -----------------------------
 	float spray = masks.b;
-	albedo = mix(albedo, albedo * spray_color.rgb * 1.6, spray * 0.75);
+	// On sheer faces the glaze is only a darkening: tinted blue it reads as a painted sheet.
+	float face_glaze = smoothstep(0.25, 0.65, slope_ny);
+	albedo = mix(albedo, mix(albedo * 0.7, albedo * spray_color.rgb * 1.6, face_glaze), spray * 0.5);
 	// The generator marks the submerged river bed as full spray: dark wet stone under the water.
 	albedo = mix(albedo, spray_color.rgb * 0.45, smoothstep(0.92, 1.0, spray));
-	rough = mix(rough, 0.25, spray * 0.8);
+	rough = mix(rough, 0.4, spray * 0.6);
 
 	// --- Frozen lakes ----------------------------------------------------------------------
 	float ice = masks.r;

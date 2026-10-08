@@ -6,6 +6,8 @@ render_mode cull_back, depth_draw_never, blend_mix, specular_schlick_ggx;
 //   UV.y   - metres downstream, so the ripples flow with the current however the river bends
 //   COLOR.r - turbulence: 0 in a calm pool, 1 in white rapids and at the falls
 //   COLOR.g - current speed, scaling how fast the surface pattern runs downstream
+//   COLOR.b - edge fade: 1 where this surface lies over another water surface and should melt
+//             into it (pool rim over the river, a gully inlet's mouth), 0 everywhere else
 
 uniform sampler2D noise_tex : hint_normal, filter_linear_mipmap, repeat_enable;
 uniform sampler2D foam_noise : filter_linear_mipmap, repeat_enable;
@@ -24,11 +26,13 @@ uniform float clarity_depth = 2.4;
 varying vec3 w_pos;
 varying float turbulence;
 varying float current;
+varying float edge_fade;
 
 void vertex() {
 	w_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	turbulence = COLOR.r;
 	current = COLOR.g;
+	edge_fade = COLOR.b;
 	// Standing waves in the rapids: a small bob that drifts slowly, never a flat sheet over rocks.
 	float bob = sin(UV.y * 0.9 + TIME * 1.7) * sin(UV.x * 17.0 + UV.y * 0.31);
 	VERTEX.y += bob * 0.10 * turbulence;
@@ -70,6 +74,8 @@ void fragment() {
 	METALLIC = 0.0;
 	// Clear at the very edge so the bank shows through, opaque once there is depth or foam.
 	ALPHA = clamp(mix(0.7, 0.97, smoothstep(0.0, 0.8, water_depth)) + foam, 0.0, 1.0);
+	// Where two water surfaces overlap, the upper one fades out so they meet without a seam.
+	ALPHA *= 1.0 - edge_fade * edge_fade * (3.0 - 2.0 * edge_fade);
 	// Foam stays readable in the gorge's shade.
 	EMISSION = foam_color * foam * 0.08;
 }
