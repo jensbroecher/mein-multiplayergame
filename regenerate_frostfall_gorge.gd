@@ -1162,11 +1162,21 @@ func _build_river_meshes(parent: Node, mat: Material) -> void:
 	# Gully inlets: calm flat water in each slot, at river level. Built with vertex colours: a
 	# mesh without them reads as COLOR = 1 in the shader, which is full white-water foam.
 	for g in _gaps:
-		var mouth: Vector3 = g["mouth"]
-		var head: Vector3 = g["head"] + (g["head"] - g["mouth"]).normalized() * 8.0
+		# Start just inside the river's bank, not at mid-river: the river ribbon covers the overlap,
+		# and a calm rectangle laid over half the river reads as a dark slab beside the rapids.
+		var gaxis: Vector3 = g["axis"]
+		var mouth: Vector3 = g["center"]
+		for k in range(200):
+			var q: Vector3 = g["center"] - gaxis * float(k)
+			var rq: Dictionary = _river_at(q.x, q.z)
+			if rq["d"] < rq["hw"] - 1.5:
+				mouth = q
+				break
+		var head: Vector3 = g["head"] + gaxis * 8.0
 		var axis: Vector3 = (head - mouth).normalized()
 		var side := Vector3(-axis.z, 0.0, axis.x) * (GAP_LEN * 0.5 + 3.0)
-		var y: float = g["water_y"] + 0.01
+		# A few centimetres under the river surface, so where they overlap the river draws on top.
+		var y: float = g["water_y"] - 0.04
 		var corners := [mouth - side, mouth + side, head + side, head - side]
 		var uvs := [Vector2(0, 0), Vector2(1, 0), Vector2(1, (head - mouth).length()), Vector2(0, (head - mouth).length())]
 		var st3 := SurfaceTool.new()
@@ -1175,7 +1185,8 @@ func _build_river_meshes(parent: Node, mat: Material) -> void:
 		_quad_out(faces, corners[0], corners[1], corners[2], corners[3], Vector3.UP)
 		for v in faces:
 			var k: int = corners.find(v)
-			st3.set_color(Color(0.08, 0.2, 0.0, 1.0))
+			# Same calm-water look as the river's pools (turbulence, current) so the join does not show.
+			st3.set_color(Color(0.12, 0.3, 0.0, 1.0))
 			st3.set_uv(uvs[k])
 			st3.set_normal(Vector3.UP)
 			st3.add_vertex(Vector3(v.x, y, v.z))
@@ -1739,25 +1750,44 @@ func _transform_buffer(transforms: Array) -> PackedFloat32Array:
 	return buf
 
 
-## Pennant lines either side of each kicker, so a jump reads from a long way up the trail.
+## Waving pennants either side of each kicker, so a jump reads from a long way up the trail. The
+## cloth is animated by flag_cloth.gdshader; every flag streams with the same wind, which blows
+## across the gorge so the flags show their face to carts running up or down it.
 func _build_jump_flags(parent: Node) -> void:
+	const POST_H := 4.6
+	const WIND := Vector3(1.0, 0.0, 0.3)
 	var root := Node3D.new()
 	root.name = "JumpFlags"
 	parent.add_child(root)
 	var post := CylinderMesh.new()
-	post.top_radius = 0.09
-	post.bottom_radius = 0.11
-	post.height = 5.0
-	post.radial_segments = 6
+	post.top_radius = 0.05
+	post.bottom_radius = 0.07
+	post.height = POST_H
+	post.radial_segments = 8
 	var post_mat := StandardMaterial3D.new()
-	post_mat.albedo_color = Color(0.12, 0.12, 0.14)
+	post_mat.albedo_color = Color(0.85, 0.86, 0.88)
+	post_mat.metallic = 0.6
+	post_mat.roughness = 0.35
 	post.material = post_mat
-	var flag_mat := StandardMaterial3D.new()
-	flag_mat.albedo_color = Color(1.0, 0.25, 0.08)
-	flag_mat.emission_enabled = true
-	flag_mat.emission = Color(1.0, 0.25, 0.08)
-	flag_mat.emission_energy_multiplier = 0.3
-	flag_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var cap := SphereMesh.new()
+	cap.radius = 0.08
+	cap.height = 0.16
+	cap.radial_segments = 8
+	cap.rings = 4
+	cap.material = post_mat
+	var cloth := PlaneMesh.new()
+	cloth.orientation = PlaneMesh.FACE_Z
+	cloth.size = Vector2(1.6, 1.0)
+	cloth.subdivide_width = 16
+	cloth.subdivide_depth = 4
+	# Hoist on the pole: the flag extends from x = 0 to 1.6.
+	cloth.center_offset = Vector3(0.8, 0.0, 0.0)
+	var cloth_mat := ShaderMaterial.new()
+	cloth_mat.shader = load("res://flag_cloth.gdshader")
+	cloth.material = cloth_mat
+	var wind: Vector3 = WIND.normalized()
+	# Local +X (out from the pole) along the wind.
+	var flag_basis := Basis(Vector3.UP, atan2(-wind.z, wind.x))
 	var jumps: Array = []
 	for g in _gaps:
 		jumps.append([g["lip"], g["dir"], 10.5, str(g["name"])])
@@ -1769,19 +1799,32 @@ func _build_jump_flags(parent: Node) -> void:
 		for s in [-1.0, 1.0]:
 			for k in range(2):
 				var p: Vector3 = lip - dir * (2.0 + k * 9.0) + right * s * j[2]
-				p.y = _ground_at(p.x, p.z) + 2.5
+				p.y = _ground_at(p.x, p.z) - 0.2
 				var mi := MeshInstance3D.new()
 				mi.name = "%s_Post_%d_%d" % [j[3], int(s), k]
 				mi.mesh = post
-				mi.position = p
+				mi.position = p + Vector3(0, POST_H * 0.5, 0)
 				root.add_child(mi)
+				var body := StaticBody3D.new()
+				body.name = "%s_PostBody_%d_%d" % [j[3], int(s), k]
+				var cs := CollisionShape3D.new()
+				var cyl := CylinderShape3D.new()
+				# Fatter than the drawn post, so a fast cart cannot slip past it between physics steps.
+				cyl.radius = 0.15
+				cyl.height = POST_H
+				cs.shape = cyl
+				body.add_child(cs)
+				body.position = p + Vector3(0, POST_H * 0.5, 0)
+				root.add_child(body)
+				var top := MeshInstance3D.new()
+				top.mesh = cap
+				top.position = p + Vector3(0, POST_H, 0)
+				root.add_child(top)
 				var flag := MeshInstance3D.new()
-				var fm := PrismMesh.new()
-				fm.size = Vector3(1.4, 0.9, 0.04)
-				fm.material = flag_mat
-				flag.mesh = fm
-				flag.position = p + Vector3(0, 2.0, 0) + dir * 0.7
-				flag.rotation = Vector3(0, atan2(dir.x, dir.z) + PI * 0.5, -PI * 0.5)
+				flag.name = "%s_Flag_%d_%d" % [j[3], int(s), k]
+				flag.mesh = cloth
+				flag.transform = Transform3D(flag_basis, p + Vector3(0, POST_H - 0.55, 0) + wind * 0.05)
+				flag.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 				root.add_child(flag)
 
 
