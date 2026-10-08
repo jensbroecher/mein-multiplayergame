@@ -405,6 +405,9 @@ var water_bounds_min: Vector2 = Vector2.ZERO # (x, z)
 var water_bounds_max: Vector2 = Vector2.ZERO
 ## TerrainGenerator for desert_wadi influence-shaped water (optional).
 var _wadi_water_tg: Node = null
+## A level's RiverWater node: water whose height varies with position (rivers, falls, pools).
+## While set, water_surface_y follows the water under the car every physics frame.
+var _river_water: Node = null
 var water_timer: float = 0.0
 var shallow_water_timer: float = 0.0
 var _water_contact_grace: float = 0.0
@@ -754,7 +757,16 @@ func _ready():
 		elif level.has_node("RaceUI"):
 			race_ui = level.get_node("RaceUI")
 		var tg = level.get_node_or_null("TerrainGenerator")
-		if tg and str(tg.get("level_prefix")) == "canyon_chasm":
+		var river_water = level.get_node_or_null("RiverWater")
+		if river_water and river_water.has_method("surface_at"):
+			stage_has_water = true
+			water_bounds_active = true
+			_river_water = river_water
+			var wb: Rect2 = river_water.get("water_bounds")
+			water_bounds_min = wb.position
+			water_bounds_max = wb.end
+			_update_river_water_surface()
+		elif tg and str(tg.get("level_prefix")) == "canyon_chasm":
 			# Local pit water under the first jump (not full-stage ocean).
 			stage_has_water = true
 			water_surface_y = -1.8
@@ -1342,7 +1354,11 @@ func _process(delta):
 				if water_bounds_active:
 					over_water = cam_pos.x >= water_bounds_min.x and cam_pos.x <= water_bounds_max.x \
 							and cam_pos.z >= water_bounds_min.y and cam_pos.z <= water_bounds_max.y
-				cam_underwater = over_water and cam_pos.y < water_surface_y
+				if is_instance_valid(_river_water):
+					# A falling river: the camera can be over different water than the car.
+					cam_underwater = cam_pos.y < _get_water_surface_y_at(cam_pos)
+				else:
+					cam_underwater = over_water and cam_pos.y < water_surface_y
 			race_ui.set_underwater(cam_underwater)
 
 		# Engine loop — same input path as driving (p1_/p2_), not the bare "throttle" action
@@ -1471,6 +1487,8 @@ func _physics_process(delta):
 
 	if _ai_post_respawn_no_boost_timer > 0.0:
 		_ai_post_respawn_no_boost_timer = maxf(0.0, _ai_post_respawn_no_boost_timer - delta)
+
+	_update_river_water_surface()
 
 	if is_teleporting:
 		return
@@ -2745,12 +2763,24 @@ func _is_over_water_volume() -> bool:
 	if not (p.x >= water_bounds_min.x and p.x <= water_bounds_max.x \
 			and p.z >= water_bounds_min.y and p.z <= water_bounds_max.y):
 		return false
+	if is_instance_valid(_river_water):
+		return not is_nan(float(_river_water.call("surface_at", p.x, p.z)))
 	# Desert wadi: only the lake and river shape is water; dry sand dunes are NEVER water
 	if is_instance_valid(_wadi_water_tg):
 		if _wadi_water_tg.has_method("is_wadi_water_at"):
 			return bool(_wadi_water_tg.call("is_wadi_water_at", p.x, p.z))
 		return false
 	return true
+
+
+## Points water_surface_y at the river under the car. Away from the river it drops far below the
+## stage, so code that reads water_surface_y without asking _is_over_water_volume() first still
+## sees no water there.
+func _update_river_water_surface() -> void:
+	if not is_instance_valid(_river_water):
+		return
+	var y: float = float(_river_water.call("surface_at", global_position.x, global_position.z))
+	water_surface_y = -9999.0 if is_nan(y) else y
 
 
 func _prevent_floor_tunneling(delta: float) -> void:
@@ -6469,6 +6499,9 @@ func _get_water_surface_y_at(pos: Vector3) -> float:
 	if is_instance_valid(_wadi_water_tg) and _wadi_water_tg.has_method("is_wadi_water_at"):
 		if not bool(_wadi_water_tg.call("is_wadi_water_at", pos.x, pos.z)):
 			return -9999.0
+	if is_instance_valid(_river_water):
+		var river_y: float = float(_river_water.call("surface_at", pos.x, pos.z))
+		return -9999.0 if is_nan(river_y) else river_y
 	return water_surface_y
 
 

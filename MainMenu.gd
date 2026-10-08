@@ -174,7 +174,7 @@ func show_sub_menu(menu_name: String) -> void:
 			_add_tile("BLOOMBAY GP", "Lakeside  •  Pinecrest  •  Harbor  •  Bloombay Dunes", "tile_bloombay_gp.jpg", COL_GREEN, func():
 				_on_cup_selected("Bloombay GP")
 			)
-			_add_tile("ARCTIC CUP", "Frostpeak Creek  •  Glacier Highway  •  Northlight Caverns", "tile_arctic_cup.jpg", COL_SNOW, func():
+			_add_tile("ARCTIC CUP", "Frostpeak  •  Glacier Highway  •  Northlight  •  Frostfall Gorge", "tile_arctic_cup.jpg", COL_SNOW, func():
 				_on_cup_selected("Arctic Cup")
 			)
 			_add_tile("AL-RAIHANA GP", "Mountain  •  Canyon  •  Chasm  •  Wadi", "tile_al_raihana_gp.jpg", COL_BRONZE, func():
@@ -202,6 +202,9 @@ func show_sub_menu(menu_name: String) -> void:
 			)
 			_add_tile("NORTHLIGHT CAVERNS", "Night race under the aurora, through a glacier and over an ice arch", "tile_northlight_caverns.jpg", COL_SNOW, func():
 				_on_stage_selected("res://levels/NorthlightCavernsLevel.tscn")
+			)
+			_add_tile("FROSTFALL GORGE", "Off-road along a river gorge: gully jumps, a frozen waterfall, and a mega-jump", "tile_frostfall_gorge.jpg", COL_SNOW, func():
+				_on_stage_selected("res://levels/FrostfallGorgeLevel.tscn")
 			)
 			_add_tile("HARBOR PIER", "Piers, crates, and dark water", "tile_harbor.jpg", COL_HARBOR, func():
 				_on_stage_selected("res://levels/HarborPierLevel.tscn")
@@ -431,6 +434,7 @@ func _fill_gp_test_tiles() -> void:
 		"res://levels/PinecrestRidgeLevel.tscn": {"title": "PINECREST", "file": "tile_pinecrest.jpg", "color": COL_GREEN},
 		"res://levels/FrostpeakCreekLevel.tscn": {"title": "FROSTPEAK CREEK", "file": "tile_frostpeak_creek.jpg", "color": COL_SNOW},
 		"res://levels/GlacierHighwayLevel.tscn": {"title": "GLACIER HIGHWAY", "file": "tile_glacier_highway.jpg", "color": COL_SNOW},
+		"res://levels/FrostfallGorgeLevel.tscn": {"title": "FROSTFALL GORGE", "file": "tile_frostfall_gorge.jpg", "color": COL_SNOW},
 		"res://levels/HarborPierLevel.tscn": {"title": "HARBOR PIER", "file": "tile_harbor.jpg", "color": COL_HARBOR},
 		"res://levels/BloombayDunesLevel.tscn": {"title": "BLOOMBAY DUNES", "file": "tile_bloombay_dunes.jpg", "color": COL_BEACH},
 		"res://levels/MountainLevel.tscn": {"title": "MOUNTAIN", "file": "tile_mountain.jpg", "color": COL_MOUNTAIN},

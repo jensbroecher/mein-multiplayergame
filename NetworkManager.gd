@@ -49,6 +49,7 @@ const ALL_STAGES = [
 	{"name": "Frostpeak Creek", "path": "res://levels/FrostpeakCreekLevel.tscn"},
 	{"name": "Glacier Highway", "path": "res://levels/GlacierHighwayLevel.tscn"},
 	{"name": "Northlight Caverns", "path": "res://levels/NorthlightCavernsLevel.tscn"},
+	{"name": "Frostfall Gorge", "path": "res://levels/FrostfallGorgeLevel.tscn"},
 	{"name": "Harbor Pier", "path": "res://levels/HarborPierLevel.tscn"},
 	{"name": "Mountain Pass", "path": "res://levels/MountainLevel.tscn"},
 	{"name": "Canyon Drift", "path": "res://levels/CanyonLevel.tscn"},
@@ -73,6 +74,7 @@ const GP_CUPS = {
 			"res://levels/FrostpeakCreekLevel.tscn",
 			"res://levels/GlacierHighwayLevel.tscn",
 			"res://levels/NorthlightCavernsLevel.tscn",
+			"res://levels/FrostfallGorgeLevel.tscn",
 		]
 	},
 	"Al-Raihana GP": {

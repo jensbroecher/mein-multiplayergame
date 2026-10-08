@@ -102,3 +102,17 @@ threw it about 1m into the air. `PlayerCart._soften_edge_pops` tells edges from 
 toward the contact and compares normals). For edges up to `STEP_SMOOTH_MAX_HEIGHT` it caps the upward speed
 at what's needed to reach the top. Ramps and jump lips are untouched. `res://scratch/hop_test.tscn`
 (headless) drives a cart over steps and a ramp and prints the hop heights.
+
+## Frostfall Gorge (off-road stage)
+
+- No road mesh: the whole lap is the heightfield `GorgeGround`, so PlayerCart counts every metre as
+  off-road. Keep "road", "track", "ramp", "bridge", "deck" and "snow" out of node names on this level:
+  `_is_track_surface` treats the first five as road, and a "snow" ancestor turns on snow drag.
+- The river falls 34m, so its water is a `RiverWater` node (`RiverWater.gd`, strips and pools), not a
+  flat plane. PlayerCart picks it up by name and updates `water_surface_y` from `surface_at()` every
+  physics frame. The same strip data in the generator carves the gorge and builds the water meshes.
+- `_verify_jumps()` flies carts over the gully gaps and the mega-jump at 30 m/s^2 gravity and prints
+  landing distance and impact; `_verify_trail_ground()` checks grade and cross slope along the trail.
+- `res://scratch/ai_race_test.tscn -- res://levels/X.tscn seconds=330 speed=4` races 6 AI carts
+  headless and lists every respawn with where it happened. `res://scratch/water_drop_test.tscn` drops a
+  cart at given points and reports whether it drowns.

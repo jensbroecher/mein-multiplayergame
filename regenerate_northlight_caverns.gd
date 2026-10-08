@@ -197,6 +197,12 @@ var _cavern_off := PackedFloat32Array()
 var _cavern_zs := PackedFloat32Array()
 var _cavern_ys := PackedFloat32Array()
 
+## The finished icefield heights, kept so meshes laid over the terrain afterwards (the cavern
+## cap) can sit on the ground that was actually built.
+var _terrain_heights := PackedFloat32Array()
+var _terrain_origin := Vector2.ZERO
+var _terrain_step := 1.0
+
 var _base_noise := FastNoiseLite.new()
 var _detail_noise := FastNoiseLite.new()
 var _ridge_noise := FastNoiseLite.new()
@@ -1203,6 +1209,190 @@ func _build_cavern(parent: Node, ice_mat: Material, vein_light_mat: Color) -> vo
 	_build_portal_ring(props, ice_mat, finish, -1.0)
 
 
+## Half width of the cap laid over the cavern shell; its edges sink into the massif's flanks.
+const CAP_HALF_W := 36.0
+## Depth of snow and rock over the shell's crown.
+const CAP_COVER := 6.0
+## How far the cap starts behind each portal plane. The portal face leans back across this gap,
+## from the arch outline to the cap, so the mouth is a sloped face rather than a sheer cut.
+const CAP_FACE_SETBACK := 8.0
+const CAP_LAT_SAMPLES := 29
+const CAP_FACE_ROWS := 5
+
+
+## Icefield height at a world point, bilinear over the heightfield that was actually built.
+func _terrain_height_at(x: float, z: float) -> float:
+	var stride: int = TERRAIN_RES + 1
+	var gx: float = clampf((x - _terrain_origin.x) / _terrain_step, 0.0, float(TERRAIN_RES) - 0.001)
+	var gz: float = clampf((z - _terrain_origin.y) / _terrain_step, 0.0, float(TERRAIN_RES) - 0.001)
+	var ix: int = int(gx)
+	var iz: int = int(gz)
+	var fx: float = gx - float(ix)
+	var fz: float = gz - float(iz)
+	var h00: float = _terrain_heights[iz * stride + ix]
+	var h10: float = _terrain_heights[iz * stride + ix + 1]
+	var h01: float = _terrain_heights[(iz + 1) * stride + ix]
+	var h11: float = _terrain_heights[(iz + 1) * stride + ix + 1]
+	return lerpf(lerpf(h00, h10, fx), lerpf(h01, h11, fx), fz)
+
+
+## Height of the shell's outer surface above the deck at lateral `u`, from the upper half of
+## CAVERN_PROFILE (the walls are vertical below the springing).
+func _shell_top_at(u: float) -> float:
+	var a: float = absf(u)
+	var best: float = -INF
+	for i in range(CAVERN_VERTS - 1):
+		var p: Vector2 = CAVERN_PROFILE[i]
+		var q: Vector2 = CAVERN_PROFILE[i + 1]
+		var lo: float = minf(absf(p.x), absf(q.x))
+		var hi: float = maxf(absf(p.x), absf(q.x))
+		if a < lo or a > hi or hi - lo < 1e-4:
+			continue
+		var t: float = (a - absf(p.x)) / (absf(q.x) - absf(p.x))
+		best = maxf(best, lerpf(p.y, q.y, t))
+	return best
+
+
+## Cross-section of the cap at one trunk offset, left to right, in world space.
+func _cap_section(off: float) -> PackedVector3Array:
+	var f: Dictionary = _frame_at_offset(main_track_curve, off)
+	var p: Vector3 = f["pos"]
+	var right: Vector3 = f["right"]
+	# Near the mouths the cap is a low hood over the arch; further in it fills the saddle up toward
+	# the flanks' height, so the two flanks and the cap read as one mountain, not two peaks with a
+	# trench between them.
+	var inward: float = minf(off - _cavern_range.x, _cavern_range.y - off)
+	var edge_l: Vector3 = p - right * CAP_HALF_W
+	var edge_r: Vector3 = p + right * CAP_HALF_W
+	var flank: float = minf(_terrain_height_at(edge_l.x, edge_l.z), _terrain_height_at(edge_r.x, edge_r.z)) - p.y
+	var hood: float = 15.4 + CAP_COVER
+	var crown_base: float = maxf(hood, lerpf(hood, flank * 0.9, smoothstep(12.0, 75.0, inward)))
+	var out := PackedVector3Array()
+	for k in range(CAP_LAT_SAMPLES):
+		var u: float = lerpf(-CAP_HALF_W, CAP_HALF_W, float(k) / float(CAP_LAT_SAMPLES - 1))
+		var q: Vector3 = p + right * u
+		var ground: float = _terrain_height_at(q.x, q.z) - p.y
+		var t: float = absf(u) / CAP_HALF_W
+		var crown: float = crown_base + _detail_noise.get_noise_2d(q.x * 0.7, q.z * 0.7) * 2.5
+		var arch: float = crown * pow(maxf(1.0 - t * t, 0.0), 0.6)
+		if absf(u) <= CAVERN_HALF_WIDTH:
+			arch = maxf(arch, _shell_top_at(u) + 1.5)
+		# Out at the edges the cap dives under the flank, so there is no seam to see between them.
+		var y: float = lerpf(ground - 2.5, arch, 1.0 - smoothstep(0.6, 1.0, t))
+		out.append(q + Vector3.UP * y)
+	return out
+
+
+## Resamples a polyline to `n` points evenly spaced along its length.
+func _resample_polyline(pts: PackedVector3Array, n: int) -> PackedVector3Array:
+	var cum := PackedFloat32Array([0.0])
+	for i in range(1, pts.size()):
+		cum.append(cum[i - 1] + pts[i].distance_to(pts[i - 1]))
+	var total: float = cum[cum.size() - 1]
+	var out := PackedVector3Array()
+	var j := 0
+	for k in range(n):
+		var d: float = total * float(k) / float(n - 1)
+		while j < pts.size() - 2 and cum[j + 1] < d:
+			j += 1
+		var seg: float = maxf(cum[j + 1] - cum[j], 1e-5)
+		out.append(pts[j].lerp(pts[j + 1], clampf((d - cum[j]) / seg, 0.0, 1.0)))
+	return out
+
+
+## Snow and rock laid over the cavern shell, joining the massif's two flanks into one mountain,
+## with a sloped portal face around each arch.
+##
+## The heightfield can't roof the passage (anything above the deck over the carriageway would be
+## a wall), so on its own the massif is two mounds with the glass shell lying in the gap between
+## them, which from outside reads as a pipe in a trench rather than a tunnel. This cap is a
+## separate mesh over the shell. It casts no shadow, so the gallery is lit as before, and it's
+## single-sided, so from inside the cavern you still see through the shell to the sky.
+func _build_cavern_cap(parent: Node, ground_mat: Material) -> void:
+	var start: float = _cavern_range.x
+	var finish: float = _cavern_range.y
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# In an array so the lambda below shares it: GDScript lambdas capture locals by value.
+	var vcount := [0]
+
+	# Godot's front faces wind clockwise: generate_normals() gives (c - a) x (b - a), so each quad
+	# is wound to make that point along `facing`.
+	var add_grid := func(rows: Array, facing_of: Callable) -> void:
+		var cols: int = (rows[0] as PackedVector3Array).size()
+		var base: int = vcount[0]
+		for row in rows:
+			for v in row:
+				st.set_uv(Vector2(v.x, v.z))
+				st.add_vertex(v)
+				vcount[0] += 1
+		for r in range(rows.size() - 1):
+			for c in range(cols - 1):
+				var a: int = base + r * cols + c
+				var b: int = a + 1
+				var d: int = a + cols
+				var e: int = d + 1
+				var pa: Vector3 = rows[r][c]
+				var pb: Vector3 = rows[r][c + 1]
+				var pd: Vector3 = rows[r + 1][c]
+				var facing: Vector3 = facing_of.call(pa)
+				if (pd - pa).cross(pb - pa).dot(facing) > 0.0:
+					st.add_index(a); st.add_index(b); st.add_index(d)
+					st.add_index(b); st.add_index(e); st.add_index(d)
+				else:
+					st.add_index(a); st.add_index(d); st.add_index(b)
+					st.add_index(b); st.add_index(d); st.add_index(e)
+
+	# The cap proper.
+	var rows: Array = []
+	var off: float = start + CAP_FACE_SETBACK
+	while off < finish - CAP_FACE_SETBACK:
+		rows.append(_cap_section(off))
+		off += 3.0
+	rows.append(_cap_section(finish - CAP_FACE_SETBACK))
+	add_grid.call(rows, func(_p: Vector3) -> Vector3: return Vector3.UP)
+
+	# Portal faces: from the shell's outline at the portal plane back to the first cap section,
+	# with the middle rows pushed about by noise so the face is broken rock, not a ruled surface.
+	for end in [[start, start + CAP_FACE_SETBACK, -1.0], [finish, finish - CAP_FACE_SETBACK, 1.0]]:
+		var f: Dictionary = _frame_at_offset(main_track_curve, end[0])
+		var outline := PackedVector3Array()
+		for prof in CAVERN_PROFILE:
+			outline.append(f["pos"] + f["right"] * prof.x + Vector3.UP * prof.y)
+		var inner: PackedVector3Array = _resample_polyline(outline, CAP_LAT_SAMPLES)
+		var outer: PackedVector3Array = _cap_section(end[1])
+		var outward: Vector3 = f["fwd"] * end[2]
+		var face_rows: Array = []
+		for r in range(CAP_FACE_ROWS):
+			var t: float = float(r) / float(CAP_FACE_ROWS - 1)
+			var row := PackedVector3Array()
+			for k in range(CAP_LAT_SAMPLES):
+				var v: Vector3 = inner[k].lerp(outer[k], t)
+				var bulge: float = sin(t * PI) * (_detail_noise.get_noise_2d(v.x * 1.3 + v.y, v.z * 1.3) * 2.2 + 0.8)
+				row.append(v + outward * bulge)
+			face_rows.append(row)
+		add_grid.call(face_rows, func(_p: Vector3) -> Vector3: return outward + Vector3.UP * 0.3)
+
+	st.generate_normals()
+	st.generate_tangents()
+	var mesh: ArrayMesh = _save_baked_resource(st.commit(), "cavern_cap")
+	var body := StaticBody3D.new()
+	body.name = "CavernCap"
+	var inst := MeshInstance3D.new()
+	inst.name = "CavernCapMesh"
+	inst.mesh = mesh
+	inst.material_override = ground_mat
+	inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	body.add_child(inst)
+	var col := CollisionShape3D.new()
+	col.name = "CavernCapCollision"
+	var shape: ConcavePolygonShape3D = mesh.create_trimesh_shape()
+	shape.backface_collision = true
+	col.shape = _save_baked_resource(shape, "cavern_cap_collision")
+	body.add_child(col)
+	parent.add_child(body)
+
+
 ## A ring of tilted ice slabs standing against the cliff face around a cavern mouth, plus the
 ## two lights that make the opening legible from a distance.
 ##
@@ -1472,25 +1662,33 @@ func _cavern_nearest(px: float, pz: float) -> Vector2:
 func _cavern_mass(px: float, pz: float) -> float:
 	if _cavern_line.size() < 2:
 		return 0.0
-	var near: Vector2 = _cavern_nearest(px, pz)
-	var s: float = _cavern_range.x
-	var e: float = _cavern_range.y
-	# Zero at the portal plane, full height 30m further in, so the mouth is an opening in the face
-	# rather than a fold in the ground.
-	var along: float = smoothstep(s + 2.0, s + 30.0, near.y) * (1.0 - smoothstep(e - 30.0, e - 2.0, near.y))
+	# The massif is measured off the cavern's own axis (due north along X = 0, between the portal
+	# planes), not off the nearest point of the trunk. The trunk bends away right outside both
+	# mouths, and beside the end faces the nearest segment flipped between the straight and the
+	# bend, so the distance-along jumped and the end faces came out as a row of 10m sawteeth.
+	var lat: float = absf(px)
+	var z_s: float = maxf(_cavern_portal_z.x, _cavern_portal_z.y)
+	var z_n: float = minf(_cavern_portal_z.x, _cavern_portal_z.y)
+	var inward: float = minf(z_s - pz, pz - z_n)
+	# Zero at the portal plane and steep beside the mouth, so the arch is an opening in a face.
+	# Further out the ramp lengthens, so the massif's ends round off into the icefield instead
+	# of standing as a straight cliff the full width of the mountain; the jitter keeps that edge
+	# from being a ruled line.
+	var ramp: float = 28.0 + 0.55 * maxf(lat - 18.0, 0.0)
+	var ragged: float = _detail_noise.get_noise_2d(px * 0.9, pz * 0.9) * 5.0 * smoothstep(20.0, 45.0, lat)
+	var along: float = smoothstep(2.0 + maxf(ragged, 0.0), 2.0 + ramp + ragged, inward)
 	if along <= 0.0:
 		return 0.0
 
 	# A plain dome rather than a flat-topped plateau. The shoulders roll off over the feather,
 	# which is what stops the whole massif reading as a wall with a lid.
-	var perp: float = 1.0 - smoothstep(CAVERN_MASS_HALF_W, CAVERN_MASS_HALF_W + CAVERN_MASS_FEATHER, near.x)
+	var perp: float = 1.0 - smoothstep(CAVERN_MASS_HALF_W, CAVERN_MASS_HALF_W + CAVERN_MASS_FEATHER, lat)
 	var dome: float = perp * perp * (3.0 - 2.0 * perp)
 
 	var rocky: float = clampf(_ridge_noise.get_noise_2d(px * 0.35, pz * 0.35) * 0.5 + 0.5, 0.0, 1.0)
 	var crest: float = CAVERN_RIDGE_HEIGHT * (0.86 + 0.28 * rocky)
 	# A summit partway along the span, so the ridge has a peak instead of a constant height.
-	var mid: float = (s + e) * 0.5
-	var peak: float = 1.0 - clampf(absf(near.y - mid) / maxf((e - s) * 0.55, 1.0), 0.0, 1.0)
+	var peak: float = 1.0 - clampf(absf(pz - (z_s + z_n) * 0.5) / maxf((z_s - z_n) * 0.55, 1.0), 0.0, 1.0)
 	crest += CAVERN_SUMMIT * peak * peak * (0.75 + 0.35 * rocky)
 
 	# Zero at the gallery edge, full height across the inner flank. A single smoothstep over
@@ -1502,7 +1700,7 @@ func _cavern_mass(px: float, pz: float) -> float:
 	# reach (85-degree facets, the chevrons), and the opposite - spreading it over 15-70m with a
 	# double smoothing, which left the wall at 8% height where it is measured and reported the
 	# mountain as absent while standing in front of it.
-	var rise: float = smoothstep(GLACIER_GALLERY_HALF_W, CAVERN_MASS_HALF_W, near.x)
+	var rise: float = smoothstep(GLACIER_GALLERY_HALF_W, CAVERN_MASS_HALF_W, lat)
 	var massif: float = crest * along * dome * rise
 
 	# Ribbing, as a bounded undulation rather than a crease. The previous form used
@@ -1517,9 +1715,8 @@ func _cavern_mass(px: float, pz: float) -> float:
 	# to be *ramped in* away from the mouths: the first version used a fade that evaluated to
 	# zero at the portal, so its inverse put the apron at full height exactly on the mouth and
 	# walled the entrance in.
-	var skirt: float = smoothstep(s - 300.0, s - 140.0, near.y) * (1.0 - smoothstep(e + 140.0, e + 300.0, near.y))
-	var clear_of_mouths: float = smoothstep(s + 4.0, s + 90.0, near.y) * (1.0 - smoothstep(e - 90.0, e - 4.0, near.y))
-	var apron: float = CAVERN_APRON * skirt * clear_of_mouths * rise * (1.0 - smoothstep(150.0, 340.0, near.x))
+	var clear_of_mouths: float = smoothstep(4.0, 90.0, inward)
+	var apron: float = CAVERN_APRON * clear_of_mouths * rise * (1.0 - smoothstep(150.0, 340.0, lat))
 	return maxf(massif, 0.0) + apron
 
 
@@ -1648,6 +1845,9 @@ func _build_icefield(parent: Node, ground_mat: Material) -> void:
 			heights[idx] = h
 
 	_audit_cavern(heights, stride, res, start_x, start_z, step_x, step_z)
+	_terrain_heights = heights
+	_terrain_origin = Vector2(start_x, start_z)
+	_terrain_step = step_x
 
 	var mesh := _build_heightfield_mesh(heights, stride, res, start_x, start_z, step_x, step_z)
 	var shape: ConcavePolygonShape3D = mesh.create_trimesh_shape()
@@ -2298,22 +2498,42 @@ func _build_edge_markers(parent: Node, curve: Curve3D, label: String,
 	root.name = "EdgeMarkers_" + label
 	parent.add_child(root)
 
+	# Ice lamp posts: a frosted hexagonal post, a dark collar, and a cluster of glowing crystals.
 	var pole_mat := StandardMaterial3D.new()
-	pole_mat.albedo_color = Color(0.30, 0.36, 0.44)
-	pole_mat.metallic = 0.55
-	pole_mat.roughness = 0.5
+	pole_mat.albedo_color = Color(0.62, 0.78, 0.92)
+	pole_mat.metallic = 0.15
+	pole_mat.roughness = 0.28
+	pole_mat.rim_enabled = true
+	pole_mat.rim = 0.45
+	pole_mat.rim_tint = 0.6
+
+	var collar_mat := StandardMaterial3D.new()
+	collar_mat.albedo_color = Color(0.16, 0.22, 0.32)
+	collar_mat.metallic = 0.6
+	collar_mat.roughness = 0.4
 
 	var head_mat := StandardMaterial3D.new()
-	head_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	head_mat.albedo_color = Color(0.85, 0.97, 1.0)
+	head_mat.albedo_color = Color(0.70, 0.95, 1.0)
+	head_mat.roughness = 0.12
+	head_mat.emission_enabled = true
+	head_mat.emission = Color(0.38, 0.82, 1.0)
+	head_mat.emission_energy_multiplier = 1.5
+	head_mat.rim_enabled = true
+	head_mat.rim = 0.6
 
 	var pole_mesh := CylinderMesh.new()
-	pole_mesh.top_radius = 0.10
-	pole_mesh.bottom_radius = 0.16
+	pole_mesh.top_radius = 0.09
+	pole_mesh.bottom_radius = 0.17
 	pole_mesh.height = 5.2
-	pole_mesh.radial_segments = 8
-	var head_mesh := BoxMesh.new()
-	head_mesh.size = Vector3(0.42, 0.30, 0.42)
+	pole_mesh.radial_segments = 6
+	pole_mesh.rings = 1
+	var collar_mesh := CylinderMesh.new()
+	collar_mesh.top_radius = 0.24
+	collar_mesh.bottom_radius = 0.13
+	collar_mesh.height = 0.22
+	collar_mesh.radial_segments = 6
+	collar_mesh.rings = 1
+	var head_mesh := _make_lamp_crystal_mesh()
 
 	var count := int(length / spacing)
 	for i in range(count):
@@ -2348,11 +2568,21 @@ func _build_edge_markers(parent: Node, curve: Curve3D, label: String,
 		pole.material_override = pole_mat
 		pole.position = Vector3(0.0, 2.6, 0.0)
 		node.add_child(pole)
+		var collar := MeshInstance3D.new()
+		collar.name = "Collar"
+		collar.mesh = collar_mesh
+		collar.material_override = collar_mat
+		collar.position = Vector3(0.0, 5.25, 0.0)
+		node.add_child(collar)
 		var head := MeshInstance3D.new()
 		head.name = "Head"
 		head.mesh = head_mesh
 		head.material_override = head_mat
-		head.position = Vector3(0.0, 5.2, 0.0)
+		head.position = Vector3(0.0, 5.3, 0.0)
+		# Each lamp's cluster turned differently, so a row of them doesn't read as copies.
+		head.rotation_degrees = Vector3(0.0, float(i * 47 % 360), 0.0)
+		# The glow is the light; a shadow from it would sit on the road under its own lamp.
+		head.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		node.add_child(head)
 		var cs := CollisionShape3D.new()
 		cs.name = "PoleCollision"
@@ -2381,6 +2611,53 @@ func _build_edge_markers(parent: Node, curve: Curve3D, label: String,
 			spot.spot_angle = 52.0
 			spot.spot_attenuation = 1.0
 			node.add_child(spot)
+
+
+## The lamp head: a tall hexagonal ice crystal with three smaller ones leaning out around its base,
+## merged into one mesh so each lamp costs a single draw. Origin at the base of the cluster.
+func _make_lamp_crystal_mesh() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# Main crystal, then three satellites: [radius, body height, tip height, lean (deg), yaw (deg)].
+	var parts := [[0.17, 0.62, 0.34, 0.0, 0.0], [0.09, 0.30, 0.18, 34.0, 20.0],
+		[0.08, 0.26, 0.16, 38.0, 140.0], [0.10, 0.34, 0.20, 30.0, 260.0]]
+	for part in parts:
+		var r: float = part[0]
+		var body: float = part[1]
+		var tip: float = part[2]
+		var basis := Basis(Vector3.UP, deg_to_rad(part[4])) * Basis(Vector3.RIGHT, deg_to_rad(part[3]))
+		var origin := Vector3(0.0, 0.0, 0.0) if part[3] == 0.0 else basis * Vector3(0.0, 0.05, 0.0)
+		var bottom := Vector3(0.0, -tip * 0.5, 0.0)
+		var top := Vector3(0.0, body + tip, 0.0)
+		var ring_lo: Array = []
+		var ring_hi: Array = []
+		for k in range(6):
+			var a: float = TAU * float(k) / 6.0
+			ring_lo.append(Vector3(cos(a) * r, 0.0, sin(a) * r))
+			ring_hi.append(Vector3(cos(a) * r * 0.92, body, sin(a) * r * 0.92))
+		var tris: Array = []
+		for k in range(6):
+			var j: int = (k + 1) % 6
+			tris.append([ring_lo[k], ring_lo[j], ring_hi[j]])
+			tris.append([ring_lo[k], ring_hi[j], ring_hi[k]])
+			tris.append([ring_hi[k], ring_hi[j], top])
+			tris.append([ring_lo[j], ring_lo[k], bottom])
+		var centre := Vector3(0.0, body * 0.5, 0.0)
+		for t in tris:
+			var a3: Vector3 = basis * t[0] + origin
+			var b3: Vector3 = basis * t[1] + origin
+			var c3: Vector3 = basis * t[2] + origin
+			var outward: Vector3 = (a3 + b3 + c3) / 3.0 - (basis * centre + origin)
+			# Front faces: (c - a) x (b - a) along the outward direction (see _build_cavern_cap).
+			if (c3 - a3).cross(b3 - a3).dot(outward) < 0.0:
+				var tmp: Vector3 = b3
+				b3 = c3
+				c3 = tmp
+			st.add_vertex(a3)
+			st.add_vertex(b3)
+			st.add_vertex(c3)
+	st.generate_normals()
+	return st.commit()
 
 
 ## Deck half width of a road, so the marker stakes are driven into the crown of the bank and
@@ -3088,6 +3365,7 @@ func _ready() -> void:
 	terrain_container.name = "TerrainEnvironment"
 	level_scene.add_child(terrain_container)
 	_build_icefield(terrain_container, ground_mat)
+	_build_cavern_cap(cavern_container, ground_mat)
 
 	# 10. Finish line & starting grid
 	var gate_scene: PackedScene = load("res://CheckpointGate.tscn")
