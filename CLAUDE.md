@@ -82,3 +82,23 @@ faces get culled and you see the far faces from the inside. To confirm, render i
 - Headless can't render screenshots. To look at a level, run a `SceneTree` script (`-s`) with the
   windowed console exe and `--resolution 1600x900`, place a `Camera3D`, and save
   `root.get_texture().get_image()`.
+
+## Large meshes are chunked
+
+`MeshChunker.gd` splits level-spanning visual meshes (road ribbons, barriers, terrain) into an XZ grid
+so cameras and shadow passes only draw nearby cells. This matters because at Medium/High shadow quality
+`MusicManager._apply_shadows_to_tree` turns on shadows for every light, and each streetlight's shadow
+pass used to redraw the whole track. Glacier Highway and Northlight Caverns call
+`MeshChunker.chunk_scene()` just before setting ownership (`MESH_CHUNK_CELL`). Chunks go to
+`generated/<level>_chunks/`, and the whole-mesh visual `.res` files they replace are deleted. Collision
+shapes stay whole. To measure a level, run `res://scratch/bench.tscn` windowed:
+`-- res://levels/X.tscn samples=12 [chunk=80] [omni=0] [spot=0] [shadows=N] [hide=<path>] [shot=<dir>]`.
+In zsh, split a variable that holds several args with `${=args}`.
+
+## Cars climbing small edges
+
+The cart is one sphere, so the solver deflects it upward off any lip, and at racing speed a 1cm seam
+threw it about 1m into the air. `PlayerCart._soften_edge_pops` tells edges from sloped faces (it casts a ray
+toward the contact and compares normals). For edges up to `STEP_SMOOTH_MAX_HEIGHT` it caps the upward speed
+at what's needed to reach the top. Ramps and jump lips are untouched. `res://scratch/hop_test.tscn`
+(headless) drives a cart over steps and a ramp and prints the hop heights.

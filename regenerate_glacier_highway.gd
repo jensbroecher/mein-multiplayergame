@@ -19,6 +19,12 @@ var main_track_curve: Curve3D
 # u = metres inward from the deck edge, v = metres relative to the deck surface.
 # The toe and back foot sit 6cm BELOW the deck so the barrier is embedded in the
 # road slab and no coplanar surface fights with the road mesh.
+const MeshChunker = preload("res://MeshChunker.gd")
+## Level-spanning visual meshes (road ribbons, barriers, terrain) are split into cells this size
+## before saving, so cameras and shadow passes (every streetlight's included) draw only the cells
+## they can see instead of the whole track. Geometry is unchanged.
+const MESH_CHUNK_CELL := 80.0
+
 const BARRIER_PROFILE := [
 	Vector2(0.60, -0.06), # road-side toe
 	Vector2(0.52, 0.075), # lower slope break (the "kick")
@@ -902,6 +908,10 @@ func _ready() -> void:
 	# 15. Setup Checkpoints & Level wiring
 	level_scene.set("track_path", track_path)
 	level_scene._setup_checkpoints()
+
+	# Split the big visual meshes into cells (collision shapes are separate and stay whole).
+	var chunked: int = MeshChunker.chunk_scene(level_scene, "res://generated/glacier_highway_", "res://generated/glacier_highway_chunks", MESH_CHUNK_CELL)
+	print("Chunked %d large meshes" % chunked)
 
 	# 16. Scene Ownership
 	_set_owner_recursive(level_scene, level_scene)

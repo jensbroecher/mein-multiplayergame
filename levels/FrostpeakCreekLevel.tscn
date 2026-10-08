@@ -1,63 +1,59 @@
-[gd_scene format=4]
+[gd_scene format=4 uid="uid://bdrv2l61c5u1n"]
 
-[ext_resource type="Script" path="res://levels/Level.gd" id="1_uejjd"]
-[ext_resource type="Shader" path="res://sky_winter_cirrus.gdshader" id="2_ymmgn"]
-[ext_resource type="AudioStream" path="res://sounds/dragon-studio-winter-wind-402331.mp3" id="3_p1lr5"]
-[ext_resource type="Script" path="res://FallingSnow.gd" id="4_a1lhu"]
-[ext_resource type="Script" path="res://TerrainGenerator.gd" id="5_k5n1e"]
-[ext_resource type="Texture2D" path="res://materials/sand_normal.png" id="6_5ab5i"]
-[ext_resource type="Texture2D" path="res://materials/asphalt.png" id="7_xbd6x"]
-[ext_resource type="Texture2D" path="res://materials/concrete_normal.png" id="8_akq2m"]
-[ext_resource type="ArrayMesh" path="res://generated/frostpeak_creek_terrain_visual.res" id="9_liwsd"]
-[ext_resource type="Shape3D" path="res://generated/frostpeak_creek_terrain_collision_shape.res" id="10_hj557"]
-[ext_resource type="Shader" path="res://curb_stripes.gdshader" id="11_srrsg"]
-[ext_resource type="ArrayMesh" path="res://generated/frostpeak_creek_Visual_Curbs.res" id="12_i27qh"]
-[ext_resource type="Texture2D" path="res://materials/concrete.png" id="13_7uc55"]
-[ext_resource type="Texture2D" path="res://materials/concrete_roughness.png" id="14_tbbds"]
-[ext_resource type="ArrayMesh" path="res://generated/frostpeak_creek_Visual_Curbs_Sides.res" id="15_0gfak"]
-[ext_resource type="ArrayMesh" path="res://generated/frostpeak_creek_Visual_Road.res" id="16_gsxw4"]
-[ext_resource type="ArrayMesh" path="res://generated/frostpeak_creek_Visual_Road_Sides.res" id="17_jdfbq"]
-[ext_resource type="Shape3D" path="res://generated/frostpeak_creek_track_collision_shape.res" id="18_17noa"]
-[ext_resource type="Shader" path="res://water.gdshader" id="19_tji1l"]
-[ext_resource type="Texture2D" path="res://materials/dark_canyon_rock.png" id="20_yqebx"]
-[ext_resource type="Texture2D" path="res://materials/dark_canyon_rock_normal.png" id="21_tamoj"]
-[ext_resource type="Texture2D" path="res://materials/wood_planks.png" id="22_myilf"]
-[ext_resource type="Texture2D" path="res://materials/wood_planks_normal.png" id="23_401or"]
-[ext_resource type="Texture2D" path="res://materials/wood_planks_roughness.png" id="24_h34pr"]
-[ext_resource type="Shader" path="res://alpine_snow.gdshader" id="25_imuc1"]
-[ext_resource type="Texture2D" path="res://materials/dark_rock.png" id="26_iniac"]
-[ext_resource type="PackedScene" path="res://SnowDrift.tscn" id="27_j2ycp"]
-[ext_resource type="Script" path="res://SnowDrift.gd" id="28_24tsa"]
-[ext_resource type="PackedScene" path="res://CheckpointGate.tscn" id="29_vve6x"]
-[ext_resource type="Script" path="res://CheckpointGate.gd" id="30_rnqyg"]
-[ext_resource type="PackedScene" path="res://SpawnIndicator.tscn" id="31_10042"]
-[ext_resource type="PackedScene" path="res://BoostPad.tscn" id="32_1d7ih"]
-[ext_resource type="Script" path="res://BoostPad.gd" id="33_tb0ul"]
-[ext_resource type="PackedScene" path="res://ItemBox.tscn" id="34_rdsrc"]
-[ext_resource type="Script" path="res://ItemBox.gd" id="35_r7bqb"]
+[ext_resource type="Script" uid="uid://d2hujjwkl3s4a" path="res://levels/Level.gd" id="1_uejjd"]
+[ext_resource type="Shader" uid="uid://cmo5hjsvx5eq1" path="res://sky_winter_cirrus.gdshader" id="2_ymmgn"]
+[ext_resource type="AudioStream" uid="uid://c5oedqihaf3kp" path="res://sounds/dragon-studio-winter-wind-402331.mp3" id="3_p1lr5"]
+[ext_resource type="Script" uid="uid://883hwtuwsutm" path="res://FallingSnow.gd" id="4_a1lhu"]
+[ext_resource type="Script" uid="uid://b2sbc4x8rba5g" path="res://TerrainGenerator.gd" id="5_k5n1e"]
+[ext_resource type="Texture2D" uid="uid://cng7ohshvc4to" path="res://materials/sand_normal.png" id="6_5ab5i"]
+[ext_resource type="Texture2D" uid="uid://bsmrfxbh6vqe2" path="res://materials/asphalt.png" id="7_xbd6x"]
+[ext_resource type="Texture2D" uid="uid://j6l2pulbaugj" path="res://materials/concrete_normal.png" id="8_akq2m"]
+[ext_resource type="ArrayMesh" uid="uid://bdhlqvyo37vgq" path="res://generated/frostpeak_creek_terrain_visual.res" id="9_liwsd"]
+[ext_resource type="Shape3D" uid="uid://blup6xlnmn1dn" path="res://generated/frostpeak_creek_terrain_collision_shape.res" id="10_hj557"]
+[ext_resource type="Shader" uid="uid://cvne02d6iyem5" path="res://curb_stripes.gdshader" id="11_srrsg"]
+[ext_resource type="ArrayMesh" uid="uid://bkski1tb1gvj0" path="res://generated/frostpeak_creek_Visual_Curbs.res" id="12_i27qh"]
+[ext_resource type="Texture2D" uid="uid://bf05h3t4rlqs7" path="res://materials/concrete.png" id="13_7uc55"]
+[ext_resource type="Texture2D" uid="uid://dasndv73breob" path="res://materials/concrete_roughness.png" id="14_tbbds"]
+[ext_resource type="ArrayMesh" uid="uid://cv3j6kytmcvcd" path="res://generated/frostpeak_creek_Visual_Curbs_Sides.res" id="15_0gfak"]
+[ext_resource type="ArrayMesh" uid="uid://byjhqmpba881j" path="res://generated/frostpeak_creek_Visual_Road.res" id="16_gsxw4"]
+[ext_resource type="ArrayMesh" uid="uid://64swt06bu52n" path="res://generated/frostpeak_creek_Visual_Road_Sides.res" id="17_jdfbq"]
+[ext_resource type="Shape3D" uid="uid://bm1oc3dyuhavm" path="res://generated/frostpeak_creek_track_collision_shape.res" id="18_17noa"]
+[ext_resource type="Shader" uid="uid://srampgbp5hcn" path="res://water.gdshader" id="19_tji1l"]
+[ext_resource type="Texture2D" uid="uid://c45b43y4vhj0d" path="res://materials/dark_canyon_rock.png" id="20_yqebx"]
+[ext_resource type="Texture2D" uid="uid://b4j07jck2kec0" path="res://materials/dark_canyon_rock_normal.png" id="21_tamoj"]
+[ext_resource type="Texture2D" uid="uid://cjmw4itopv0xw" path="res://materials/wood_planks.png" id="22_myilf"]
+[ext_resource type="Texture2D" uid="uid://c1hwrdwcff67k" path="res://materials/wood_planks_normal.png" id="23_401or"]
+[ext_resource type="Texture2D" uid="uid://cn5oxefdjunbq" path="res://materials/wood_planks_roughness.png" id="24_h34pr"]
+[ext_resource type="Shader" uid="uid://taj1suww5pux" path="res://alpine_snow.gdshader" id="25_imuc1"]
+[ext_resource type="Texture2D" uid="uid://be2aqrbrbrroi" path="res://materials/dark_rock.png" id="26_iniac"]
+[ext_resource type="PackedScene" uid="uid://snowdrift123" path="res://SnowDrift.tscn" id="27_j2ycp"]
+[ext_resource type="PackedScene" uid="uid://gate123" path="res://CheckpointGate.tscn" id="29_vve6x"]
+[ext_resource type="PackedScene" uid="uid://clxv8p6x0y6k2" path="res://SpawnIndicator.tscn" id="31_10042"]
+[ext_resource type="PackedScene" uid="uid://boostpad123" path="res://BoostPad.tscn" id="32_1d7ih"]
+[ext_resource type="PackedScene" uid="uid://itembox123" path="res://ItemBox.tscn" id="34_rdsrc"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_7qx7s"]
 shader = ExtResource("2_ymmgn")
-shader_parameter/sky_top = null
-shader_parameter/sky_horizon = null
-shader_parameter/ground_horizon = null
-shader_parameter/ground_bottom = null
-shader_parameter/sky_curve = null
-shader_parameter/sky_energy = null
-shader_parameter/horizon_haze = null
-shader_parameter/haze_strength = null
-shader_parameter/haze_height = null
-shader_parameter/sun_tint = null
-shader_parameter/sun_disc_degrees = null
-shader_parameter/sun_glow = null
-shader_parameter/cloud_lit = null
-shader_parameter/cloud_shade = null
-shader_parameter/cloud_coverage = null
-shader_parameter/cloud_opacity = null
-shader_parameter/cloud_scale = null
-shader_parameter/wind_dir = null
-shader_parameter/streak_length = null
-shader_parameter/cloud_seed = null
+shader_parameter/sky_top = Color(0.28, 0.55, 0.92, 1)
+shader_parameter/sky_horizon = Color(0.72, 0.84, 0.94, 1)
+shader_parameter/ground_horizon = Color(0.78, 0.88, 0.95, 1)
+shader_parameter/ground_bottom = Color(0.85, 0.9, 0.96, 1)
+shader_parameter/sky_curve = 0.45
+shader_parameter/sky_energy = 1.0
+shader_parameter/horizon_haze = Color(0.8, 0.87, 0.95, 1)
+shader_parameter/haze_strength = 0.75
+shader_parameter/haze_height = 0.16
+shader_parameter/sun_tint = Color(1, 0.97, 0.92, 1)
+shader_parameter/sun_disc_degrees = 0.8
+shader_parameter/sun_glow = 0.35
+shader_parameter/cloud_lit = Color(1, 1, 1, 1)
+shader_parameter/cloud_shade = Color(0.78, 0.85, 0.95, 1)
+shader_parameter/cloud_coverage = 0.46
+shader_parameter/cloud_opacity = 0.75
+shader_parameter/cloud_scale = 3.2
+shader_parameter/wind_dir = Vector2(0.82, 0.57)
+shader_parameter/streak_length = 6.0
+shader_parameter/cloud_seed = 3.7
 
 [sub_resource type="Sky" id="Sky_2hxuk"]
 sky_material = SubResource("ShaderMaterial_7qx7s")
@@ -147,18 +143,18 @@ normal_texture = ExtResource("8_akq2m")
 uv1_scale = Vector3(0.18, 0.18, 0.18)
 texture_filter = 5
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_5a1s1"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_qiioc"]
 render_priority = 2
 shader = ExtResource("11_srrsg")
-shader_parameter/color_a = null
-shader_parameter/color_b = null
+shader_parameter/color_a = Color(1, 1, 1, 1)
+shader_parameter/color_b = Color(0.8, 0.1, 0.1, 1)
 shader_parameter/stripe_length = 1.5
-shader_parameter/roughness = null
-shader_parameter/shoulder_color = null
-shader_parameter/line_color = null
-shader_parameter/line_width = null
+shader_parameter/roughness = 0.8
+shader_parameter/shoulder_color = Color(0.3, 0.31, 0.33, 1)
+shader_parameter/line_color = Color(0.92, 0.92, 0.9, 1)
+shader_parameter/line_width = 0.04
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_x5no1"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hlejn"]
 cull_mode = 2
 albedo_texture = ExtResource("13_7uc55")
 roughness = 0.9
@@ -171,7 +167,7 @@ uv1_triplanar_sharpness = 4.0
 uv1_world_triplanar = true
 texture_filter = 5
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_k8rdm"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_qendj"]
 render_priority = 5
 cull_mode = 2
 albedo_color = Color(0.88, 0.9, 0.93, 1)
@@ -183,7 +179,7 @@ normal_texture = ExtResource("8_akq2m")
 uv1_scale = Vector3(0.18, 0.18, 0.18)
 texture_filter = 5
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_eao25"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_npkkf"]
 cull_mode = 2
 albedo_color = Color(0.7, 0.7, 0.7, 1)
 albedo_texture = ExtResource("13_7uc55")
@@ -197,16 +193,16 @@ uv1_triplanar_sharpness = 4.0
 uv1_world_triplanar = true
 texture_filter = 5
 
-[sub_resource type="FastNoiseLite" id="FastNoiseLite_fsf7s"]
-seed = -1326120307
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_uejjd"]
+seed = -607189166
 frequency = 0.02
 
-[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_2m71r"]
-noise = SubResource("FastNoiseLite_fsf7s")
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_ymmgn"]
+noise = SubResource("FastNoiseLite_uejjd")
 seamless = true
 as_normal_map = true
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_2ytcl"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_p1lr5"]
 render_priority = 0
 shader = ExtResource("19_tji1l")
 shader_parameter/water_color = Color(0.04, 0.22, 0.38, 1)
@@ -216,18 +212,18 @@ shader_parameter/sky_reflect = 0.6
 shader_parameter/transparency = 0.65
 shader_parameter/metallic = 0.65
 shader_parameter/roughness = 0.08
-shader_parameter/noise_tex = SubResource("NoiseTexture2D_2m71r")
-shader_parameter/wave_speed = null
-shader_parameter/wave_strength = null
-shader_parameter/wave_height = null
-shader_parameter/wave_scale = null
-shader_parameter/enable_water_edge_fade = null
-shader_parameter/water_fade_start = null
-shader_parameter/water_fade_end = null
-shader_parameter/depth_fade_distance = null
-shader_parameter/deep_water_color = null
+shader_parameter/noise_tex = SubResource("NoiseTexture2D_ymmgn")
+shader_parameter/wave_speed = 0.028
+shader_parameter/wave_strength = 0.65
+shader_parameter/wave_height = 0.0
+shader_parameter/wave_scale = 1.0
+shader_parameter/enable_water_edge_fade = true
+shader_parameter/water_fade_start = 800.0
+shader_parameter/water_fade_end = 2200.0
+shader_parameter/depth_fade_distance = 6.0
+shader_parameter/deep_water_color = Color(0.005, 0.025, 0.05, 1)
 
-[sub_resource type="PlaneMesh" id="PlaneMesh_igu4d"]
+[sub_resource type="PlaneMesh" id="PlaneMesh_a1lhu"]
 size = Vector2(1600, 1600)
 
 [sub_resource type="Curve3D" id="Curve3D_i31dl"]
@@ -817,16 +813,16 @@ shader_parameter/rock_albedo = ExtResource("26_iniac")
 shader_parameter/rock_normal = ExtResource("21_tamoj")
 shader_parameter/snow_color = Color(1.0439999, 1.2032, 1.0811999, 1)
 shader_parameter/rock_tint = Color(0.95, 0.98, 1.1, 1)
-shader_parameter/rock_scale = null
+shader_parameter/rock_scale = 0.34
 shader_parameter/normal_strength = 0.35
 shader_parameter/snow_slope = 0.36000000000000004
 shader_parameter/snow_line = 400.0
-shader_parameter/snow_line_falloff = null
-shader_parameter/snow_roughness = null
-shader_parameter/rock_roughness = null
-shader_parameter/horizon_color = null
-shader_parameter/horizon_start = null
-shader_parameter/horizon_end = null
+shader_parameter/snow_line_falloff = 34.0
+shader_parameter/snow_roughness = 0.74
+shader_parameter/rock_roughness = 0.95
+shader_parameter/horizon_color = Color(0.74, 0.83, 0.93, 1)
+shader_parameter/horizon_start = 700.0
+shader_parameter/horizon_end = 1400.0
 
 [sub_resource type="BoxMesh" id="BoxMesh_vborf"]
 size = Vector3(26.305893, 0.14, 0.52)
@@ -1703,16 +1699,16 @@ shader_parameter/rock_albedo = ExtResource("26_iniac")
 shader_parameter/rock_normal = ExtResource("21_tamoj")
 shader_parameter/snow_color = Color(1.0439999, 1.2032, 1.0811999, 1)
 shader_parameter/rock_tint = Color(0.95, 0.98, 1.1, 1)
-shader_parameter/rock_scale = null
+shader_parameter/rock_scale = 0.34
 shader_parameter/normal_strength = 0.35
 shader_parameter/snow_slope = 0.36000000000000004
 shader_parameter/snow_line = 400.0
-shader_parameter/snow_line_falloff = null
-shader_parameter/snow_roughness = null
-shader_parameter/rock_roughness = null
-shader_parameter/horizon_color = null
-shader_parameter/horizon_start = null
-shader_parameter/horizon_end = null
+shader_parameter/snow_line_falloff = 34.0
+shader_parameter/snow_roughness = 0.74
+shader_parameter/rock_roughness = 0.95
+shader_parameter/horizon_color = Color(0.74, 0.83, 0.93, 1)
+shader_parameter/horizon_start = 700.0
+shader_parameter/horizon_end = 1400.0
 
 [sub_resource type="BoxMesh" id="BoxMesh_qa1rh"]
 size = Vector3(60, 0.14, 0.52)
@@ -1793,7 +1789,6 @@ directional_shadow_max_distance = 480.0
 stream = ExtResource("3_p1lr5")
 volume_db = -12.0
 autoplay = true
-stream_paused = true
 
 [node name="FallingSnow" type="GPUParticles3D" parent="." unique_id=1478552976]
 top_level = true
@@ -1829,41 +1824,41 @@ no_grass = true
 generate_bridge_supports = false
 terrain_grass_count = 0
 
-[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=820633650]
+[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=932225304]
 material_override = SubResource("StandardMaterial3D_oh87w")
 lod_bias = 10.0
 mesh = ExtResource("9_liwsd")
 
-[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=761408006]
+[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1108122728]
 
-[node name="@CollisionShape3D@6" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=1189207861]
+[node name="@CollisionShape3D@22552" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=193079718]
 shape = ExtResource("10_hj557")
 
-[node name="Visual_Curbs" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1552497115]
-material_override = SubResource("ShaderMaterial_5a1s1")
+[node name="Visual_Curbs" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1994479459]
+material_override = SubResource("ShaderMaterial_qiioc")
 mesh = ExtResource("12_i27qh")
 
-[node name="Visual_Curbs_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1805848546]
-material_override = SubResource("StandardMaterial3D_x5no1")
+[node name="Visual_Curbs_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=599024129]
+material_override = SubResource("StandardMaterial3D_hlejn")
 mesh = ExtResource("15_0gfak")
 
-[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=688559812]
-material_override = SubResource("StandardMaterial3D_k8rdm")
+[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1687618283]
+material_override = SubResource("StandardMaterial3D_qendj")
 mesh = ExtResource("16_gsxw4")
 
-[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=2089827136]
-material_override = SubResource("StandardMaterial3D_eao25")
+[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1201637666]
+material_override = SubResource("StandardMaterial3D_npkkf")
 mesh = ExtResource("17_jdfbq")
 
-[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=902346715]
+[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=846833394]
 
-[node name="@CollisionShape3D@7" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=1309879384]
+[node name="@CollisionShape3D@22553" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=1513202244]
 shape = ExtResource("18_17noa")
 
-[node name="Water_Surface" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1261235276]
+[node name="Water_Surface" type="MeshInstance3D" parent="TerrainGenerator" unique_id=19549964]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.2, 0)
-material_override = SubResource("ShaderMaterial_2ytcl")
-mesh = SubResource("PlaneMesh_igu4d")
+material_override = SubResource("ShaderMaterial_p1lr5")
+mesh = SubResource("PlaneMesh_a1lhu")
 metadata/water_surface_y = -1.2
 
 [node name="AlternativePaths" type="Node3D" parent="." unique_id=771268788]
@@ -3492,72 +3487,59 @@ mesh = SubResource("BoxMesh_f257t")
 
 [node name="SnowCoveredRoadSections" type="Node3D" parent="." unique_id=1428780362]
 
-[node name="SnowDrift_Jump1Approach" type="Area3D" parent="SnowCoveredRoadSections" unique_id=527645258 groups=["snow"] instance=ExtResource("27_j2ycp")]
+[node name="SnowDrift_Jump1Approach" parent="SnowCoveredRoadSections" unique_id=527645258 instance=ExtResource("27_j2ycp")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -33.804764, 5.7883563, -52.81548)
-script = ExtResource("28_24tsa")
 size = Vector3(14.2, 1.15, 18)
 row_centres = PackedVector3Array(-3.4587135, -0.65465355, 8.282192, -3.3613815, -0.63256836, 8.052982, -3.2641602, -0.6107769, 7.8237, -3.167057, -0.58926964, 7.5943413, -3.0700836, -0.5680599, 7.364895, -2.9732475, -0.5471344, 7.1353683, -2.876564, -0.526505, 6.9057503, -2.780037, -0.5061641, 6.676029, -2.6836739, -0.48611116, 6.4462204, -2.5874977, -0.46635818, 6.216316, -2.491497, -0.4468789, 5.986313, -2.3956985, -0.4277115, 5.7561836, -2.3000832, -0.4088068, 5.525963, -2.2047005, -0.39021778, 5.2956276, -2.1095161, -0.3718996, 5.0651855, -2.014553, -0.353868, 4.8346214, -1.9198265, -0.336133, 4.6039467, -1.8253136, -0.31866074, 4.3731613, -1.7310638, -0.30149603, 4.14225, -1.6370468, -0.28460217, 3.9112244, -1.5432625, -0.267972, 3.6800766, -1.4497604, -0.25165272, 3.4487953, -1.3564987, -0.23559284, 3.2174034, -1.263485, -0.21979523, 2.9858856, -1.1706734, -0.20425177, 2.75428, -1.0774803, -0.18863392, 2.5228233, -0.98360825, -0.17279434, 2.2916527, -0.8889313, -0.15669155, 2.0608406, -0.7935562, -0.14036083, 1.8303299, -0.6973877, -0.12377739, 1.6001663, -0.600399, -0.106925964, 1.3703766, -0.5026283, -0.089829445, 1.1409264, -0.4039154, -0.07243061, 0.91189957, -0.30439758, -0.05477953, 0.683239, -0.20386505, -0.036809444, 0.45505524, -0.10247803, -0.018573284, 0.22726822, 0, 0, 0, 0.10342407, 0.018865585, -0.22682571, 0.20795822, 0.03806925, -0.45310593, 0.31357956, 0.057602882, -0.6788635, 0.42028427, 0.0774641, -0.9040642, 0.5282707, 0.09770775, -1.1286354, 0.6374321, 0.118302345, -1.3526039, 0.74783325, 0.13926125, -1.5759315, 0.85959625, 0.16062069, -1.7985306, 0.9727402, 0.1823802, -2.0203934, 1.0872841, 0.20454311, -2.2415009, 1.2032928, 0.22712374, -2.4617996, 1.3208237, 0.25013685, -2.681244, 1.4399452, 0.27359533, -2.899784, 1.5607147, 0.29751348, -3.1173668, 1.6832085, 0.32190466, -3.3339272, 1.8074837, 0.3467822, -3.5494156, 1.933609, 0.37215757, -3.7637672, 2.0616531, 0.39804506, -3.9769096, 2.1916866, 0.42445564, -4.188797, 2.3237572, 0.45139647, -4.399338, 2.4579315, 0.4788761, -4.6084824, 2.5942688, 0.50690365, -4.8161507, 2.7328186, 0.5354819, -5.0222664, 2.8736362, 0.56461716, -5.2267685, 3.0167656, 0.5943103, -5.429573, 3.162592, 0.6246424, -5.6303635, 3.3108616, 0.65554047, -5.829258, 3.4615803, 0.6869936, -6.0262184, 3.6147747, 0.71899605, -6.221161, 3.7709064, 0.75163174, -6.413662, 3.9295902, 0.7848005, -6.603981, 4.090786, 0.8184786, -6.7920837, 4.2549534, 0.8527365, -6.9774857, 4.4216633, 0.88746834, -7.160511, 4.5909977, 0.922668, -7.3410187, 4.7631187, 0.9583354, -7.5187798)
 row_rights = PackedVector3Array(0.9207717, 0, 0.39010188, 0.9209987, 0, 0.38956565, 0.92124337, 0, 0.38898686, 0.9215052, 0, 0.38836586, 0.92177904, 0, 0.3877156, 0.9220724, 0, 0.3870175, 0.9223745, 0, 0.38629705, 0.92269564, 0, 0.3855292, 0.92302346, 0, 0.38474363, 0.9233697, 0, 0.38391194, 0.92372435, 0, 0.38305786, 0.92408437, 0, 0.3821886, 0.9244651, 0, 0.38126665, 0.9248376, 0, 0.38036218, 0.92523474, 0, 0.37939513, 0.9256337, 0, 0.37842065, 0.92603195, 0, 0.37744516, 0.9264563, 0, 0.37640238, 0.9268693, 0, 0.37538427, 0.927288, 0, 0.3743488, 0.92769015, 0, 0.37335122, 0.92782176, 0, 0.37302378, 0.9275791, 0, 0.37362695, 0.9269013, 0, 0.3753053, 0.9258495, 0, 0.3778924, 0.92461634, 0, 0.3808998, 0.9233101, 0, 0.3840553, 0.922004, 0, 0.38718048, 0.92058045, 0, 0.390553, 0.91913736, 0, 0.3939373, 0.9175941, 0, 0.39751858, 0.91600084, 0, 0.40117633, 0.91432184, 0, 0.40498835, 0.9125611, 0, 0.40894037, 0.9107353, 0, 0.41299057, 0.90878075, 0, 0.4172739, 0.90680194, 0, 0.421557, 0.9046387, 0, 0.42617938, 0.9024155, 0, 0.43086684, 0.9000851, 0, 0.4357142, 0.89758414, 0, 0.44084325, 0.89499235, 0, 0.44608155, 0.8922471, 0, 0.4515474, 0.88934076, 0, 0.457245, 0.88630414, 0, 0.46310362, 0.8831038, 0, 0.46917772, 0.8797109, 0, 0.47550893, 0.87611175, 0, 0.48210806, 0.87229866, 0, 0.4889734, 0.86826086, 0, 0.496108, 0.8639807, 0, 0.5035248, 0.8594576, 0, 0.511207, 0.8546763, 0, 0.51916134, 0.8496327, 0, 0.5273749, 0.8443201, 0, 0.535839, 0.83873, 0, 0.5445475, 0.8328584, 0, 0.5534861, 0.8266959, 0, 0.562649, 0.82000035, 0, 0.5723629, 0.8129606, 0, 0.5823186, 0.8055966, 0, 0.5924645, 0.79790586, 0, 0.60278213, 0.7898004, 0, 0.613364, 0.78138506, 0, 0.62404925, 0.77267575, 0, 0.6348009, 0.763281, 0, 0.64606667, 0.7539439, 0, 0.6569388, 0.7442606, 0, 0.66788924, 0.7340295, 0, 0.67911756, 0.72408843, 0, 0.6897071, 0.7135662, 0, 0.7005878, 0.7031734, 0, 0.7110184, 0.69270855, 0, 0.7212177)
 drift_half_width = 7.1
-metadata/is_snow = true
 
-[node name="SnowDrift_EastGlade" type="Area3D" parent="SnowCoveredRoadSections" unique_id=111263157 groups=["snow"] instance=ExtResource("27_j2ycp")]
+[node name="SnowDrift_EastGlade" parent="SnowCoveredRoadSections" unique_id=111263157 instance=ExtResource("27_j2ycp")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44.906315, 6.82381, -145.04626)
-script = ExtResource("28_24tsa")
 size = Vector3(14.2, 1.05, 16)
 row_centres = PackedVector3Array(-4.03566, -0.33629513, 6.8975067, -3.906742, -0.32412672, 6.683655, -3.7775192, -0.31236172, 6.4699707, -3.647976, -0.30100727, 6.256439, -3.5181427, -0.2900262, 6.0430756, -3.3879929, -0.27946615, 5.8298798, -3.257576, -0.26925802, 5.6168365, -3.1268349, -0.25947237, 5.4039764, -2.9958305, -0.25002575, 5.1912384, -2.864605, -0.24093866, 4.9786377, -2.7336617, -0.2318592, 4.765869, -2.6032295, -0.22266197, 4.55278, -2.473381, -0.21333599, 4.3393555, -2.344017, -0.20389652, 4.125641, -2.2151947, -0.19433117, 3.9115906, -2.0869637, -0.18463898, 3.6972046, -1.9592476, -0.17483091, 3.4825287, -1.8321419, -0.16488552, 3.2674713, -1.7056046, -0.15481997, 3.0521088, -1.5796356, -0.14462614, 2.8363953, -1.4542885, -0.13429785, 2.6203156, -1.3294945, -0.12384939, 2.403946, -1.2054024, -0.11325693, 2.1871796, -1.0818748, -0.10254574, 1.970108, -0.95903015, -0.09168959, 1.7526398, -0.8367691, -0.08070898, 1.5348511, -0.71520615, -0.06958437, 1.3166656, -0.5942726, -0.058333397, 1.0981445, -0.4740448, -0.046937943, 0.87924194, -0.3544693, -0.03541565, 0.6599884, -0.23563004, -0.023745537, 0.44036865, -0.11741638, -0.0119485855, 0.22038269, 0, 0, 0, 0.11676407, 0.012076855, -0.22073364, 0.23274612, 0.024298668, -0.441864, 0.34802246, 0.036658764, -0.66337585, 0.46256256, 0.04915476, -0.8852539, 0.57631683, 0.061798573, -1.1075134, 0.6893463, 0.07457304, -1.3301392, 0.8015671, 0.08749342, -1.5531921, 0.9130058, 0.10055208, -1.7765961, 1.0236969, 0.11374378, -2.0003662, 1.1335526, 0.12708426, -2.2245483, 1.2426033, 0.14055777, -2.4490967, 1.3508644, 0.15416336, -2.6740112, 1.4582939, 0.16791248, -2.8993378, 1.564888, 0.18179703, -3.1250305, 1.670681, 0.19581223, -3.3510895, 1.77565, 0.20996046, -3.5775452, 1.879734, 0.22424603, -3.8043823, 1.9830017, 0.23866081, -4.031601, 2.0854378, 0.25320148, -4.259186, 2.1870346, 0.26786757, -4.487137, 2.2877388, 0.28266478, -4.7154694, 2.3876038, 0.29758358, -4.9441833, 2.4866333, 0.31262255, -5.1732483, 2.5848122, 0.32777643, -5.402664, 2.6821518, 0.3430462, -5.6324463, 2.7785988, 0.35842848, -5.8625793, 2.8742104, 0.37392378, -6.0930634, 2.9689713, 0.3895216, -6.323868, 3.0629082, 0.40522385, -6.555023, 3.156002, 0.42102242, -6.7865143, 3.2482834, 0.4369173, -7.018341, 3.3397408, 0.4529047, -7.250458)
 row_rights = PackedVector3Array(0.8553398, 0, 0.5180674, 0.8546161, 0, 0.5192603, 0.853912, 0, 0.52041733, 0.8531965, 0, 0.52158964, 0.85250384, 0, 0.52272093, 0.85186076, 0, 0.52376837, 0.85155016, 0, 0.5242731, 0.8517511, 0, 0.52394664, 0.85245514, 0, 0.52280045, 0.853588, 0, 0.5209487, 0.85487723, 0, 0.5188303, 0.8562008, 0, 0.51664317, 0.8574765, 0, 0.51452327, 0.85882634, 0, 0.5122669, 0.86017406, 0, 0.5100006, 0.8615098, 0, 0.5077409, 0.86290586, 0, 0.5053648, 0.86424714, 0, 0.50306755, 0.8656633, 0, 0.50062674, 0.8670595, 0, 0.49820456, 0.86848295, 0, 0.49571908, 0.86991984, 0, 0.4931931, 0.87134784, 0, 0.4906658, 0.8728034, 0, 0.48807192, 0.87425745, 0, 0.48546264, 0.8757398, 0, 0.48278335, 0.8772231, 0, 0.48008296, 0.8787036, 0, 0.47736785, 0.8802174, 0, 0.47457072, 0.8817224, 0, 0.4717686, 0.8832443, 0, 0.46891323, 0.8847932, 0, 0.4659838, 0.886301, 0, 0.46310967, 0.8878605, 0, 0.46011284, 0.8893802, 0, 0.45716825, 0.8909415, 0, 0.45411816, 0.8925077, 0, 0.45103225, 0.8940449, 0, 0.4479774, 0.8956249, 0, 0.44481003, 0.8971804, 0, 0.4416643, 0.8987309, 0, 0.43850055, 0.900312, 0, 0.43524507, 0.9018728, 0, 0.4320016, 0.9034206, 0, 0.42875537, 0.9049756, 0, 0.4254634, 0.90653366, 0, 0.42213354, 0.9080749, 0, 0.41880763, 0.9096157, 0, 0.4154507, 0.9111445, 0, 0.4120869, 0.9126639, 0, 0.40871093, 0.91417927, 0, 0.40531006, 0.91568094, 0, 0.4019059, 0.91717184, 0, 0.39849204, 0.9186281, 0, 0.3951232, 0.9200867, 0, 0.3917148, 0.92153263, 0, 0.3883008, 0.92296153, 0, 0.3848922, 0.9243703, 0, 0.38149652, 0.92574704, 0, 0.37814346, 0.9271015, 0, 0.37481037, 0.92843056, 0, 0.371506, 0.9297482, 0, 0.36819607, 0.93103987, 0, 0.3649176, 0.9323094, 0, 0.3616617, 0.93355626, 0, 0.3584308)
 drift_half_width = 7.1
 seed_offset = 1.8
-metadata/is_snow = true
 
-[node name="SnowDrift_SummitRidge" type="Area3D" parent="SnowCoveredRoadSections" unique_id=2034125499 groups=["snow"] instance=ExtResource("27_j2ycp")]
+[node name="SnowDrift_SummitRidge" parent="SnowCoveredRoadSections" unique_id=2034125499 instance=ExtResource("27_j2ycp")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -98, 17.580004, -79.99951)
-script = ExtResource("28_24tsa")
 size = Vector3(14.2, 1.1, 20)
 row_centres = PackedVector3Array(-0.00032806396, -0.13122177, -9.999046, -0.0004043579, -0.12699318, -9.7491, -0.00046539307, -0.122802734, -9.4991455, -0.0005187988, -0.11865044, -9.249184, -0.0005645752, -0.11453819, -8.999237, -0.00061035156, -0.110464096, -8.749298, -0.00064849854, -0.10643196, -8.4993515, -0.0006713867, -0.10243797, -8.249374, -0.0006942749, -0.09848976, -7.99942, -0.0007171631, -0.094581604, -7.749443, -0.0007247925, -0.090717316, -7.499443, -0.0007324219, -0.0868969, -7.249481, -0.0007324219, -0.083120346, -6.999527, -0.0007324219, -0.07939339, -6.74955, -0.0007171631, -0.07570839, -6.4995804, -0.0007095337, -0.07207489, -6.2495728, -0.0007019043, -0.06848526, -5.9996033, -0.0006713867, -0.06495094, -5.749649, -0.00065612793, -0.061460495, -5.499687, -0.00062561035, -0.058029175, -5.2497177, -0.0005950928, -0.054641724, -4.999756, -0.0005645752, -0.051315308, -4.7497787, -0.0005340576, -0.048038483, -4.499771, -0.00050354004, -0.044822693, -4.2498016, -0.00046539307, -0.0416584, -3.9998016, -0.0004196167, -0.038555145, -3.7498016, -0.00038146973, -0.035511017, -3.4998016, -0.00034332275, -0.032527924, -3.2498398, -0.00030517578, -0.029607773, -2.9998398, -0.0002670288, -0.026748657, -2.749855, -0.00022888184, -0.023958206, -2.4998627, -0.00019836426, -0.021232605, -2.2499008, -0.00015258789, -0.018575668, -1.9999237, -0.0001296997, -0.015989304, -1.7499313, -9.1552734e-05, -0.013471603, -1.499939, -6.866455e-05, -0.011034012, -1.2499619, -3.8146973e-05, -0.008670807, -0.99998474, -2.2888184e-05, -0.006378174, -0.74996185, -1.5258789e-05, -0.004173279, -0.49999237, 0, -0.002046585, -0.25, 0, 0, 0, 0.0001449585, 0.0019702911, 0.25003052, 0.0005340576, 0.0038852692, 0.5, 0.0011825562, 0.005748749, 0.74998474, 0.002090454, 0.0075588226, 0.99998474, 0.003250122, 0.009315491, 1.2499847, 0.0046310425, 0.011022568, 1.4999847, 0.006263733, 0.012678146, 1.7499924, 0.008132935, 0.014284134, 1.9999771, 0.010215759, 0.015844345, 2.2499619, 0.012550354, 0.017353058, 2.4999466, 0.015090942, 0.018815994, 2.7499237, 0.017845154, 0.020235062, 2.9999313, 0.020828247, 0.021606445, 3.249878, 0.024024963, 0.02293396, 3.4998474, 0.027412415, 0.02422142, 3.749817, 0.031013489, 0.025461197, 3.9998016, 0.034805298, 0.02666092, 4.2497864, 0.03881836, 0.027816772, 4.499756, 0.042999268, 0.028932571, 4.7497253, 0.0473938, 0.030008316, 4.9996643, 0.051971436, 0.031045914, 5.2495956, 0.05672455, 0.032043457, 5.4995728, 0.061668396, 0.033000946, 5.7495346, 0.06679535, 0.03392601, 5.999504, 0.07209778, 0.034805298, 6.249443, 0.077568054, 0.035654068, 6.499382, 0.083221436, 0.036462784, 6.7493057, 0.089035034, 0.037239075, 6.9992447, 0.09502411, 0.03797722, 7.249176, 0.1011734, 0.038684845, 7.4990997, 0.10749054, 0.039354324, 7.749008, 0.113960266, 0.03999138, 7.9989395, 0.12059784, 0.0405941, 8.248833, 0.127388, 0.041166306, 8.498764, 0.13433075, 0.041706085, 8.7486725, 0.14142609, 0.04221344, 8.998566, 0.14867401, 0.042686462, 9.2484665, 0.1560669, 0.043132782, 9.498383, 0.16361237, 0.04354477, 9.748306, 0.17129517, 0.043930054, 9.998222)
 row_rights = PackedVector3Array(-1, 0, -0.00023655634, -1, 0, -0.00020603451, -1, 0, -0.00018314319, -1, 0, -0.000152617, -1, 0, -0.00012972346, -1, 0, -0.000106827014, -1, 0, -7.630093e-05, -1, 0, -6.1041676e-05, -1, 0, -3.8151047e-05, -1, 0, -1.5260419e-05, -1, 0, 7.630443e-06, -1, 0, 2.289028e-05, -1, 0, 3.0519906e-05, -1, 0, 6.104121e-05, -1, 0, 6.104168e-05, -1, 0, 8.3935505e-05, -1, 0, 0.00010682782, -1, 0, 0.00010682538, -1, 0, 0.00012208056, -1, 0, 0.00012208056, -1, 0, 0.00012970564, -1, 0, 0.00014496181, -1, 0, 0.00015259256, -1, 0, 0.0001602234, -1, 0, 0.0001602234, -1, 0, 0.00015259604, -1, 0, 0.0001525972, -1, 0, 0.00014496734, -1, 0, 0.0001526007, -1, 0, 0.00013733958, -1, 0, 0.00013733958, -1, 0, 0.00012970762, -1, 0, 0.0001144479, -1, 0, 0.00010681478, -1, 0, 7.629802e-05, -1, 0, 6.866717e-05, -1, 0, 3.8147555e-05, -1, 0, 0.00016784797, -0.9999999, 0, 0.00054932054, -0.99999934, 0, 0.0011825734, -0.99999785, 0, 0.0020904816, -0.9999952, 0, 0.0031052907, -0.9999916, 0, 0.004097013, -0.9999871, 0, 0.0050810724, -0.99998176, 0, 0.006042416, -0.99997574, 0, 0.0069656274, -0.99996865, 0, 0.007919365, -0.9999611, 0, 0.008827472, -0.99995285, 0, 0.009712206, -0.9999437, 0, 0.010612781, -0.9999342, 0, 0.011474992, -0.9999241, 0, 0.012321853, -0.99991333, 0, 0.013168901, -0.99990237, 0, 0.013976965, -0.9998906, 0, 0.014793132, -0.9998785, 0, 0.015586387, -0.99986583, 0, 0.016380362, -0.99985266, 0, 0.01716688, -0.9998397, 0, 0.017906599, -0.9998257, 0, 0.018669436, -0.99981177, 0, 0.019401006, -0.99979746, 0, 0.020125337, -0.9997828, 0, 0.020842953, -0.9997677, 0, 0.021552967, -0.9997527, 0, 0.022239953, -0.9997372, 0, 0.022926427, -0.9997214, 0, 0.023605434, -0.9997055, 0, 0.024269179, -0.99968934, 0, 0.024925096, -0.99967295, 0, 0.025574148, -0.9996564, 0, 0.026214393, -0.99963975, 0, 0.026839552, -0.99962276, 0, 0.027465727, -0.99960583, 0, 0.028075386, -0.9995887, 0, 0.02867804, -0.99957126, 0, 0.029279785, -0.9995539, 0, 0.02986601, -0.9995362, 0, 0.030452639, -0.9995189, 0, 0.031017078, -0.99950093, 0, 0.03159009, -0.9994834, 0, 0.032140747)
 drift_half_width = 7.1
 seed_offset = 5.2
-metadata/is_snow = true
 
-[node name="SnowDrift_Jump2Approach" type="Area3D" parent="SnowCoveredRoadSections" unique_id=11018193 groups=["snow"] instance=ExtResource("27_j2ycp")]
+[node name="SnowDrift_Jump2Approach" parent="SnowCoveredRoadSections" unique_id=11018193 instance=ExtResource("27_j2ycp")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -48.304108, 15.567665, 103.483925)
-script = ExtResource("28_24tsa")
 size = Vector3(14.2, 1.2, 16)
 row_centres = PackedVector3Array(-5.676834, -0.03060913, -5.6355667, -5.503605, -0.02981472, -5.4553223, -5.330059, -0.029006958, -5.27536, -5.156246, -0.028185844, -5.095688, -4.9821396, -0.027350426, -4.9162903, -4.807743, -0.026503563, -4.7371674, -4.633068, -0.025644302, -4.5583115, -4.4581146, -0.02477169, -4.379738, -4.2828865, -0.023887634, -4.2014236, -4.1073914, -0.022992134, -4.0233994, -3.9315872, -0.022086143, -3.8456192, -3.7555313, -0.021169662, -3.6681213, -3.5792122, -0.020241737, -3.4908829, -3.4026299, -0.019303322, -3.3139114, -3.2258072, -0.01835537, -3.1372223, -3.0487213, -0.017399788, -2.9607773, -2.8713493, -0.016433716, -2.784607, -2.693737, -0.015458107, -2.6086884, -2.5158615, -0.014475822, -2.4330215, -2.337761, -0.013484001, -2.257637, -2.1593819, -0.0124845505, -2.0824738, -1.980732, -0.011478424, -1.9075394, -1.8018494, -0.010462761, -1.7328949, -1.6227455, -0.009443283, -1.5585098, -1.4433861, -0.008416176, -1.3843613, -1.2637825, -0.007381439, -1.2104568, -1.0839348, -0.006342888, -1.036789, -0.90385056, -0.005297661, -0.8633728, -0.7235298, -0.0042467117, -0.6901932, -0.5429764, -0.003191948, -0.51727295, -0.3622017, -0.0021305084, -0.34461212, -0.18120956, -0.0010681152, -0.17218018, 0, 0, 0, 0.18148422, 0.0010738373, 0.17198944, 0.36317444, 0.0021486282, 0.34371948, 0.5450592, 0.0032262802, 0.51517487, 0.7272072, 0.004306793, 0.6864319, 0.9095535, 0.0053920746, 0.85743713, 1.0921364, 0.006477356, 1.0282288, 1.2749138, 0.0075645447, 1.1987839, 1.457943, 0.008653641, 1.369133, 1.6411705, 0.009744644, 1.5392227, 1.824604, 0.010834694, 1.7090836, 2.0082588, 0.011927605, 1.8787308, 2.1920853, 0.013018608, 2.0481186, 2.376133, 0.0141096115, 2.2172852, 2.5603867, 0.015201569, 2.3862457, 2.744854, 0.016292572, 2.5549774, 2.9295273, 0.017381668, 2.7234726, 3.1143951, 0.01846981, 2.8917618, 3.2994614, 0.019556046, 3.0598145, 3.4847221, 0.020640373, 3.2276382, 3.6701813, 0.02172184, 3.3952637, 3.8558655, 0.0228014, 3.562683, 4.0417213, 0.023878098, 3.7298813, 4.227783, 0.024950981, 3.896843, 4.414036, 0.02602005, 4.0635986, 4.6004944, 0.027086258, 4.2301483, 4.7871246, 0.028146744, 4.3964767, 4.9739685, 0.029203415, 4.5626144, 5.160984, 0.030255318, 4.728508, 5.348175, 0.0313015, 4.894211, 5.535572, 0.032341957, 5.0596924, 5.7231445, 0.033376694, 5.2249527, 5.9109, 0.034404755, 5.3900146)
 row_rights = PackedVector3Array(-0.7192912, 0, 0.69470876, -0.7181656, 0, 0.6958722, -0.7170647, 0, 0.6970066, -0.71596, 0, 0.69814134, -0.7148705, 0, 0.6992569, -0.71378326, 0, 0.7003667, -0.71269023, 0, 0.7014789, -0.71160895, 0, 0.70257586, -0.71053165, 0, 0.70366526, -0.7094659, 0, 0.7047397, -0.7084141, 0, 0.70579714, -0.7073738, 0, 0.7068397, -0.70631284, 0, 0.7078998, -0.7052694, 0, 0.7089394, -0.70422834, 0, 0.7099735, -0.7031857, 0, 0.7110063, -0.7021723, 0, 0.7120071, -0.7011539, 0, 0.71301, -0.70013, 0, 0.7140155, -0.6991182, 0, 0.7150062, -0.6981086, 0, 0.71599185, -0.69710326, 0, 0.71697074, -0.69611824, 0, 0.7179272, -0.6951282, 0, 0.71888584, -0.6941464, 0, 0.7198338, -0.6931613, 0, 0.7207826, -0.69217426, 0, 0.7217304, -0.6912074, 0, 0.7226564, -0.6902408, 0, 0.72357976, -0.68928796, 0, 0.7244875, -0.6883416, 0, 0.7253867, -0.68738145, 0, 0.72629666, -0.6864253, 0, 0.7272003, -0.6854739, 0, 0.7280972, -0.6845303, 0, 0.72898436, -0.68360597, 0, 0.7298513, -0.68268216, 0, 0.73071545, -0.68175316, 0, 0.7315822, -0.68083024, 0, 0.7324412, -0.6799052, 0, 0.7333001, -0.67899024, 0, 0.7341473, -0.67808324, 0, 0.7349851, -0.6771877, 0, 0.73581034, -0.6762866, 0, 0.73663867, -0.67537975, 0, 0.73747015, -0.6744936, 0, 0.7382807, -0.6735936, 0, 0.739102, -0.672702, 0, 0.73991346, -0.67183423, 0, 0.74070156, -0.6709503, 0, 0.74150234, -0.67008716, 0, 0.74228245, -0.6692132, 0, 0.74307054, -0.66833794, 0, 0.7438578, -0.6674712, 0, 0.7446356, -0.66660357, 0, 0.74541235, -0.66575676, 0, 0.74616885, -0.6648973, 0, 0.7469348, -0.6640607, 0, 0.74767864, -0.66320616, 0, 0.74843675, -0.6623526, 0, 0.74919224, -0.66151816, 0, 0.74992913, -0.6606667, 0, 0.7506793, -0.6598424, 0, 0.7514041, -0.65902144, 0, 0.7521242, -0.6581937, 0, 0.7528487)
 drift_half_width = 7.1
 seed_offset = 7.1
-metadata/is_snow = true
 
-[node name="SnowDrift_AltRouteCut" type="Area3D" parent="SnowCoveredRoadSections" unique_id=2033720187 groups=["snow"] instance=ExtResource("27_j2ycp")]
+[node name="SnowDrift_AltRouteCut" parent="SnowCoveredRoadSections" unique_id=2033720187 instance=ExtResource("27_j2ycp")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 41.886898, 6.668416, -242.76044)
-script = ExtResource("28_24tsa")
 size = Vector3(10.4, 1.3, 22)
 row_centres = PackedVector3Array(0.2515297, 0.21160507, 10.977142, 0.22264862, 0.20532131, 10.728897, 0.19483185, 0.19913769, 10.480515, 0.16796494, 0.19304085, 10.23204, 0.14205933, 0.18702888, 9.983459, 0.11713028, 0.18110037, 9.734787, 0.09318161, 0.17525434, 9.486008, 0.07036209, 0.16949844, 9.237106, 0.048534393, 0.1638217, 8.988129, 0.02771759, 0.1582222, 8.739059, 0.007911682, 0.15269756, 8.489914, -0.0108680725, 0.14724684, 8.240677, -0.02853012, 0.14187431, 7.9913635, -0.04510498, 0.13657618, 7.741974, -0.060634613, 0.13134766, 7.492508, -0.075107574, 0.12618637, 7.242981, -0.088523865, 0.12109089, 6.993393, -0.100868225, 0.1160593, 6.743744, -0.11203003, 0.11109877, 6.494049, -0.12207794, 0.106200695, 6.244293, -0.13104248, 0.10136318, 5.994507, -0.1389122, 0.09658432, 5.74469, -0.14567566, 0.09186268, 5.494812, -0.15133286, 0.087197304, 5.244934, -0.15581512, 0.08258867, 4.9950104, -0.15910721, 0.07803774, 4.7450714, -0.16127014, 0.07353783, 4.495117, -0.16230392, 0.06908846, 4.245163, -0.16220474, 0.064688206, 3.9952087, -0.16095734, 0.060336113, 3.7452393, -0.15856934, 0.05602932, 3.4953003, -0.15497208, 0.051770687, 3.2453613, -0.1501503, 0.04755926, 2.9954376, -0.14416504, 0.04338932, 2.7455444, -0.13701248, 0.039260864, 2.4956818, -0.12869263, 0.035173416, 2.2458649, -0.119197845, 0.031123638, 1.9960785, -0.10852814, 0.027112007, 1.7463379, -0.09667206, 0.023136616, 1.4966431, -0.083602905, 0.01919794, 1.2470245, -0.06926727, 0.015295029, 0.99746704, -0.053741455, 0.0114245415, 0.7479706, -0.03702545, 0.007586479, 0.49856567, -0.019111633, 0.0037784576, 0.24923706, 0, 0, 0, 0.020313263, -0.0037503242, -0.24914551, 0.04183197, -0.007473469, -0.49819946, 0.06455231, -0.011170864, -0.74713135, 0.0884819, -0.01484251, -0.9959564, 0.11366272, -0.018487453, -1.2446594, 0.14121628, -0.021959782, -1.493103, 0.17189789, -0.025148869, -1.7411957, 0.20557785, -0.02806282, -1.9888916, 0.24212265, -0.030714989, -2.2361908, 0.28142166, -0.03311491, -2.483078, 0.323349, -0.035273552, -2.7295227, 0.36779785, -0.037200928, -2.975525, 0.41466522, -0.038906097, -3.2210846, 0.46384048, -0.04039812, -3.4661865, 0.5152359, -0.04168558, -3.710846, 0.56853485, -0.04279852, -3.9550934, 0.62410355, -0.043701172, -4.1988373, 0.681633, -0.04442358, -4.4421234, 0.7410469, -0.044972897, -4.684967, 0.8022537, -0.04535532, -4.927353, 0.8651962, -0.045578957, -5.1693115, 0.9297981, -0.04564953, -5.4108124, 0.99599457, -0.045572758, -5.651886, 1.0637131, -0.045356274, -5.8925476, 1.1329117, -0.04500389, -6.1327667, 1.2035217, -0.04452181, -6.372589, 1.275486, -0.04391527, -6.612015, 1.3487854, -0.043186665, -6.8510284, 1.4233513, -0.042341232, -7.0896454, 1.4991341, -0.041386127, -7.3278656, 1.5760765, -0.04032612, -7.565735, 1.654129, -0.039164543, -7.803238, 1.7332458, -0.03790474, -8.04039, 1.8134346, -0.03655052, -8.277176, 1.8946381, -0.035104275, -8.513626, 1.9767876, -0.033572197, -8.749725, 2.0598679, -0.03195858, -8.985519, 2.143814, -0.030266285, -9.220993, 2.2286568, -0.028496265, -9.456146, 2.3143234, -0.026652336, -9.6910095, 2.400776, -0.024739742, -9.925583, 2.4879723, -0.022761822, -10.159882, 2.5759163, -0.020720959, -10.39389, 2.6645813, -0.0186162, -10.6276245)
 row_rights = PackedVector3Array(0.9939864, 0, -0.109503806, 0.994414, 0, -0.10555059, 0.99481696, 0, -0.10168193, 0.9952227, 0, -0.09763116, 0.99561447, 0, -0.09355158, 0.9959925, 0, -0.08943648, 0.99635595, 0, -0.08529238, 0.9966936, 0, -0.081251696, 0.99702454, 0, -0.07708457, 0.99734354, 0, -0.07284141, 0.9976468, 0, -0.06856284, 0.9979335, 0, -0.064254805, 0.9981979, 0, -0.060007412, 0.99844337, 0, -0.05577516, 0.9986778, 0, -0.051406685, 0.99889576, 0, -0.04698015, 0.9990953, 0, -0.042527523, 0.99927574, 0, -0.03805242, 0.9994336, 0, -0.033652246, 0.9995718, 0, -0.029261138, 0.999693, 0, -0.024777515, 0.999796, 0, -0.020198593, 0.9998784, 0, -0.015597345, 0.9999398, 0, -0.01097292, 0.99997956, 0, -0.006390755, 0.99999833, 0, -0.0018504357, 0.99999636, 0, 0.0027012907, 0.9999731, 0, 0.007333106, 0.99992734, 0, 0.0120563265, 0.999859, 0, 0.016795054, 0.99976754, 0, 0.02156007, 0.99965453, 0, 0.026283607, 0.9995207, 0, 0.030957459, 0.9993646, 0, 0.03564254, 0.99918574, 0, 0.04034636, 0.99898267, 0, 0.045096148, 0.9987523, 0, 0.049937617, 0.9984977, 0, 0.054793835, 0.998219, 0, 0.059655074, 0.9979178, 0, 0.06449969, 0.9975975, 0, 0.06927634, 0.9972535, 0, 0.074064925, 0.9968852, 0, 0.07886692, 0.9964931, 0, 0.08367441, 0.9960769, 0, 0.0884926, 0.99563235, 0, 0.093360566, 0.9950477, 0, 0.09939871, 0.99421996, 0, 0.10736239, 0.99311805, 0, 0.11711751, 0.99171174, 0, 0.1284833, 0.9901196, 0, 0.14022587, 0.9884616, 0, 0.15147175, 0.98675144, 0, 0.16223942, 0.9849989, 0, 0.17256097, 0.98321724, 0, 0.18243898, 0.98141366, 0, 0.19190457, 0.9796421, 0, 0.20075206, 0.97781885, 0, 0.2094525, 0.9759924, 0, 0.2178049, 0.9741686, 0, 0.22582202, 0.9723018, 0, 0.23372903, 0.97050047, 0, 0.24109921, 0.968716, 0, 0.24817206, 0.96695256, 0, 0.25495654, 0.9652132, 0, 0.26146436, 0.96349496, 0, 0.26772648, 0.96180606, 0, 0.27373195, 0.96014667, 0, 0.27949664, 0.95850396, 0, 0.2850792, 0.9568921, 0, 0.2904437, 0.9553052, 0, 0.29562125, 0.9537503, 0, 0.30060005, 0.9522392, 0, 0.30535316, 0.9507684, 0, 0.3099023, 0.9493222, 0, 0.31430447, 0.94790107, 0, 0.31856486, 0.9465125, 0, 0.3226671, 0.94515234, 0, 0.32662994, 0.9438448, 0, 0.33038917, 0.94256127, 0, 0.3340333, 0.9413094, 0, 0.33754492, 0.9400928, 0, 0.3409187, 0.93890893, 0, 0.34416565, 0.9377661, 0, 0.34726766, 0.9366486, 0, 0.35027045, 0.93556637, 0, 0.35315108, 0.9345088, 0, 0.35593995, 0.9334981, 0, 0.3585823, 0.9325128, 0, 0.36113697)
 drift_half_width = 5.2
 base_crown = 0.08
 seed_offset = 3.5
-metadata/is_snow = true
 
-[node name="SnowDrift_GladeMeadow" type="Area3D" parent="SnowCoveredRoadSections" unique_id=4846260 groups=["snow"] instance=ExtResource("27_j2ycp")]
+[node name="SnowDrift_GladeMeadow" parent="SnowCoveredRoadSections" unique_id=4846260 instance=ExtResource("27_j2ycp")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.486689, 3.044684, 201.86932)
-script = ExtResource("28_24tsa")
 size = Vector3(9.9, 1.15, 16)
 row_centres = PackedVector3Array(5.9007034, 0.9072349, -5.3047943, 5.73069, 0.8804662, -5.123474, 5.559952, 0.85344124, -4.942871, 5.3885555, 0.8262048, -4.762924, 5.2163067, 0.79872775, -4.583832, 5.04335, 0.77107215, -4.4054413, 4.869587, 0.74323535, -4.2278748, 4.694971, 0.7152269, -4.0511627, 4.5195827, 0.6870818, -3.8752594, 4.3432693, 0.65879273, -3.7002869, 4.166069, 0.63038254, -3.526245, 3.9880276, 0.60187244, -3.3530731, 3.80896, 0.57325816, -3.1809692, 3.6289864, 0.5445678, -3.009842, 3.4480896, 0.5158107, -2.8396912, 3.2661076, 0.48699164, -2.6707306, 3.0831394, 0.45812988, -2.5028229, 2.899191, 0.42923617, -2.3360138, 2.7141, 0.40032125, -2.1704712, 2.5279446, 0.37139726, -2.0061188, 2.340746, 0.3424754, -1.8429718, 2.1523762, 0.31356978, -1.6811676, 1.9628296, 0.2846899, -1.5207367, 1.7721806, 0.2558465, -1.3616028, 1.5803471, 0.2270534, -1.2039032, 1.3872108, 0.19832587, -1.0477905, 1.192915, 0.16966963, -0.8931122, 0.9974289, 0.14109397, -0.73991394, 0.80051804, 0.11263037, -0.5885315, 0.6023712, 0.084272146, -0.43875122, 0.4029913, 0.056032658, -0.29060364, 0.20216942, 0.027940035, -0.14437866, 0, 0, 0, -0.20346355, -0.02778244, 0.14257813, -0.4083662, -0.055383682, 0.28312683, -0.6147499, -0.08278108, 0.42152405, -0.82247734, -0.10997939, 0.5579376, -1.0316343, -0.13695931, 0.69218445, -1.2423801, -0.16367602, 0.82398987, -1.4545336, -0.19015098, 0.9535675, -1.668086, -0.21636605, 1.0808716, -1.8833456, -0.24225616, 1.2053375, -2.1000261, -0.26785278, 1.3273773, -2.3181477, -0.29314256, 1.4468994, -2.5379715, -0.318048, 1.563324, -2.7592793, -0.34260225, 1.6769867, -2.982026, -0.3667934, 1.7878723, -3.206481, -0.39053607, 1.8953705, -3.4324217, -0.41386533, 1.9998016, -3.6598024, -0.43677306, 2.1011505, -3.8888826, -0.45915508, 2.1987152, -4.119404, -0.48106337, 2.2929382, -4.3513365, -0.50248265, 2.3837585, -4.584921, -0.52329063, 2.4703674, -4.819866, -0.5435662, 2.55336, -5.0561934, -0.56326294, 2.6324768, -5.2940216, -0.5822849, 2.707138, -5.533101, -0.6007035, 2.777832, -5.7734985, -0.618438, 2.844101, -6.015188, -0.63544416, 2.9057007, -6.2579727, -0.65177464, 2.963028, -6.5019445, -0.6673014, 3.0153046, -6.7469416, -0.6820581, 3.06279, -6.9928284, -0.6960683, 3.1056824, -7.2396965, -0.7091446, 3.142868)
 row_rights = PackedVector3Array(-0.7252594, 0, -0.6884757, -0.7223776, 0, -0.6914988, -0.7193896, 0, -0.6946068, -0.7161927, 0, -0.69790256, -0.7130433, 0, -0.70112, -0.7096551, 0, -0.7045492, -0.7061559, 0, -0.7080564, -0.70263696, 0, -0.71154857, -0.6988392, 0, -0.71527886, -0.6950072, 0, -0.7190027, -0.6911128, 0, -0.72274697, -0.6869051, 0, -0.7267472, -0.68270224, 0, -0.7306967, -0.6783729, 0, -0.7347177, -0.6737506, 0, -0.73895884, -0.6691122, 0, -0.7431614, -0.66433334, 0, -0.7474364, -0.65929306, 0, -0.7518861, -0.6541446, 0, -0.75636953, -0.64888465, 0, -0.7608868, -0.6433889, 0, -0.76553947, -0.6376494, 0, -0.7703267, -0.63184637, 0, -0.7750937, -0.625853, 0, -0.7799411, -0.61946887, 0, -0.7850212, -0.6130675, 0, -0.79003054, -0.60646474, 0, -0.7951104, -0.59941405, 0, -0.8004391, -0.5923351, 0, -0.80569166, -0.5850523, 0, -0.8109956, -0.5773597, 0, -0.81648993, -0.5694434, 0, -0.82203054, -0.5613829, 0, -0.8275562, -0.55295247, 0, -0.83321285, -0.5441069, 0, -0.83901596, -0.53518164, 0, -0.844737, -0.52596325, 0, -0.8505073, -0.5160672, 0, -0.856548, -0.50619054, 0, -0.8624217, -0.49601626, 0, -0.86831325, -0.48501492, 0, -0.8745058, -0.47409406, 0, -0.8804742, -0.46281967, 0, -0.8864525, -0.45067066, 0, -0.8926903, -0.4385539, 0, -0.89870495, -0.42611632, 0, -0.9046684, -0.41266662, 0, -0.9108821, -0.39927062, 0, -0.91683316, -0.38553557, 0, -0.92269295, -0.3706718, 0, -0.9287639, -0.35598165, 0, -0.93449295, -0.3407571, 0, -0.9401514, -0.32447982, 0, -0.94589263, -0.30845633, 0, -0.9512385, -0.2916252, 0, -0.95653266, -0.27400282, 0, -0.9617289, -0.2565731, 0, -0.96652484, -0.23806237, 0, -0.9712499, -0.2191919, 0, -0.9756817, -0.2004057, 0, -0.979713, -0.18018962, 0, -0.98363185, -0.16022559, 0, -0.98708045, -0.13987228, 0, -0.9901695, -0.118364, 0, -0.9929702, -0.09752262, 0, -0.9952333)
 drift_half_width = 4.95
 base_crown = 0.08
 seed_offset = 4.2
-metadata/is_snow = true
 
 [node name="Players" type="Node3D" parent="." unique_id=927358657]
 
-[node name="FinishLine" type="Area3D" parent="." unique_id=1076613409 instance=ExtResource("29_vve6x")]
+[node name="FinishLine" parent="." unique_id=1076613409 instance=ExtResource("29_vve6x")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -45, 0.86, 120)
-script = ExtResource("30_rnqyg")
 is_finish_line = true
 
 [node name="SpawnPoints" type="Node3D" parent="FinishLine" unique_id=745898623]
@@ -3566,37 +3548,37 @@ is_finish_line = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.8, 0.05, 5)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn1" unique_id=494043282 instance=ExtResource("31_10042")]
+[node name="SpawnIndicator" parent="FinishLine/SpawnPoints/Spawn1" unique_id=494043282 instance=ExtResource("31_10042")]
 
 [node name="Spawn2" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1079243592]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.8, 0.05, 5)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn2" unique_id=337909978 instance=ExtResource("31_10042")]
+[node name="SpawnIndicator" parent="FinishLine/SpawnPoints/Spawn2" unique_id=337909978 instance=ExtResource("31_10042")]
 
 [node name="Spawn3" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1660990872]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.8, 0.05, 12)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn3" unique_id=1950352013 instance=ExtResource("31_10042")]
+[node name="SpawnIndicator" parent="FinishLine/SpawnPoints/Spawn3" unique_id=1950352013 instance=ExtResource("31_10042")]
 
 [node name="Spawn4" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1510871564]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.8, 0.05, 12)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn4" unique_id=1298029542 instance=ExtResource("31_10042")]
+[node name="SpawnIndicator" parent="FinishLine/SpawnPoints/Spawn4" unique_id=1298029542 instance=ExtResource("31_10042")]
 
 [node name="Spawn5" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1576869420]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.8, 0.05, 19)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn5" unique_id=1739163600 instance=ExtResource("31_10042")]
+[node name="SpawnIndicator" parent="FinishLine/SpawnPoints/Spawn5" unique_id=1739163600 instance=ExtResource("31_10042")]
 
 [node name="Spawn6" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=904106834]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.8, 0.05, 19)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn6" unique_id=778437312 instance=ExtResource("31_10042")]
+[node name="SpawnIndicator" parent="FinishLine/SpawnPoints/Spawn6" unique_id=778437312 instance=ExtResource("31_10042")]
 
 [node name="PlayerSpawner" type="MultiplayerSpawner" parent="." unique_id=520388108]
 _spawnable_scenes = PackedStringArray("uid://cart123")
@@ -3608,154 +3590,110 @@ spawn_path = NodePath(".")
 
 [node name="Checkpoints" type="Node3D" parent="." unique_id=405787504]
 
-[node name="Checkpoint_1" type="Area3D" parent="Checkpoints" unique_id=513704297 instance=ExtResource("29_vve6x")]
+[node name="Checkpoint_1" parent="Checkpoints" unique_id=513704297 instance=ExtResource("29_vve6x")]
 transform = Transform3D(0.9999943, 0, -0.0033882298, 0, 1, 0, 0.0033882298, 0, 0.9999943, -45, 2.0998366, -9.991838)
-script = ExtResource("30_rnqyg")
 
-[node name="Checkpoint_2" type="Area3D" parent="Checkpoints" unique_id=1971294454 instance=ExtResource("29_vve6x")]
+[node name="Checkpoint_2" parent="Checkpoints" unique_id=1971294454 instance=ExtResource("29_vve6x")]
 transform = Transform3D(0.9259775, 0, -0.37757862, 0, 1, 0, 0.37757862, 0, 0.9259775, 55.96746, 8.597268, -174.9185)
-script = ExtResource("30_rnqyg")
 
-[node name="Checkpoint_3" type="Area3D" parent="Checkpoints" unique_id=641948469 instance=ExtResource("29_vve6x")]
+[node name="Checkpoint_3" parent="Checkpoints" unique_id=641948469 instance=ExtResource("29_vve6x")]
 transform = Transform3D(0.66701204, 0, 0.7450469, 0, 1, 0, -0.7450469, 0, 0.66701204, 52.434605, 5.614072, -295.45917)
-script = ExtResource("30_rnqyg")
 
-[node name="Checkpoint_4" type="Area3D" parent="Checkpoints" unique_id=328940626 instance=ExtResource("29_vve6x")]
+[node name="Checkpoint_4" parent="Checkpoints" unique_id=328940626 instance=ExtResource("29_vve6x")]
 transform = Transform3D(-0.99283206, 0, 0.11951791, 0, 1, 0, -0.11951791, 0, -0.99283206, -94.93432, 14.790911, -189.692)
-script = ExtResource("30_rnqyg")
 
-[node name="Checkpoint_5" type="Area3D" parent="Checkpoints" unique_id=579137682 instance=ExtResource("29_vve6x")]
+[node name="Checkpoint_5" parent="Checkpoints" unique_id=579137682 instance=ExtResource("29_vve6x")]
 transform = Transform3D(-0.9953843, 0, -0.095969245, 0, 1, 0, 0.095969245, 0, -0.9953843, -92.00543, 17.100544, 9.940258)
-script = ExtResource("30_rnqyg")
 
-[node name="Checkpoint_6" type="Area3D" parent="Checkpoints" unique_id=557917826 instance=ExtResource("29_vve6x")]
+[node name="Checkpoint_6" parent="Checkpoints" unique_id=557917826 instance=ExtResource("29_vve6x")]
 transform = Transform3D(-0.6121121, 0, -0.790771, 0, 1, 0, 0.790771, 0, -0.6121121, 27.828316, 5.915646, 166.33891)
-script = ExtResource("30_rnqyg")
 
 [node name="BoostPads" type="Node3D" parent="." unique_id=818478813]
 
-[node name="Boost_Jump1_L" type="Area3D" parent="BoostPads" unique_id=1434937508 instance=ExtResource("32_1d7ih")]
+[node name="Boost_Jump1_L" parent="BoostPads" unique_id=1434937508 instance=ExtResource("32_1d7ih")]
 transform = Transform3D(0.69465834, 0, -0.71933985, 0, 1, 0, 0.71933985, 0, 0.69465834, -24, 7.5, -64)
-collision_layer = 0
-script = ExtResource("33_tb0ul")
 
-[node name="Boost_Jump1_R" type="Area3D" parent="BoostPads" unique_id=2093006743 instance=ExtResource("32_1d7ih")]
+[node name="Boost_Jump1_R" parent="BoostPads" unique_id=2093006743 instance=ExtResource("32_1d7ih")]
 transform = Transform3D(0.69465834, 0, -0.71933985, 0, 1, 0, 0.71933985, 0, 0.69465834, -20, 7.5, -60)
-collision_layer = 0
-script = ExtResource("33_tb0ul")
 
-[node name="Boost_Jump2_L" type="Area3D" parent="BoostPads" unique_id=1676574363 instance=ExtResource("32_1d7ih")]
+[node name="Boost_Jump2_L" parent="BoostPads" unique_id=1676574363 instance=ExtResource("32_1d7ih")]
 transform = Transform3D(-0.7660445, 0, -0.6427876, 0, 1, 0, 0.6427876, 0, -0.7660445, -30, 15.5, 118)
-collision_layer = 0
-script = ExtResource("33_tb0ul")
 
-[node name="Boost_Jump2_R" type="Area3D" parent="BoostPads" unique_id=45117378 instance=ExtResource("32_1d7ih")]
+[node name="Boost_Jump2_R" parent="BoostPads" unique_id=45117378 instance=ExtResource("32_1d7ih")]
 transform = Transform3D(-0.7660445, 0, -0.6427876, 0, 1, 0, 0.6427876, 0, -0.7660445, -26, 15.5, 114)
-collision_layer = 0
-script = ExtResource("33_tb0ul")
 
-[node name="Boost_StartStraight" type="Area3D" parent="BoostPads" unique_id=1764064480 instance=ExtResource("32_1d7ih")]
+[node name="Boost_StartStraight" parent="BoostPads" unique_id=1764064480 instance=ExtResource("32_1d7ih")]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -45, 1, 80)
-collision_layer = 0
-script = ExtResource("33_tb0ul")
 
-[node name="Boost_SummitStraight" type="Area3D" parent="BoostPads" unique_id=2011509568 instance=ExtResource("32_1d7ih")]
+[node name="Boost_SummitStraight" parent="BoostPads" unique_id=2011509568 instance=ExtResource("32_1d7ih")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -98, 17.5, -40)
-collision_layer = 0
-script = ExtResource("33_tb0ul")
 
-[node name="Boost_AltShortcut_1" type="Area3D" parent="BoostPads" unique_id=755777181 instance=ExtResource("32_1d7ih")]
+[node name="Boost_AltShortcut_1" parent="BoostPads" unique_id=755777181 instance=ExtResource("32_1d7ih")]
 transform = Transform3D(-0.48448715, 0, 0.87479836, 0, 1, 0, -0.87479836, 0, -0.48448715, 51.105057, 8.812062, -205.91476)
-collision_layer = 0
-script = ExtResource("33_tb0ul")
 
-[node name="Boost_AltShortcut_2" type="Area3D" parent="BoostPads" unique_id=652203211 instance=ExtResource("32_1d7ih")]
+[node name="Boost_AltShortcut_2" parent="BoostPads" unique_id=652203211 instance=ExtResource("32_1d7ih")]
 transform = Transform3D(-0.23956546, 0, 0.9708802, 0, 1, 0, -0.9708802, 0, -0.23956546, 44.16395, 7.2680407, -221.1884)
-collision_layer = 0
-script = ExtResource("33_tb0ul")
 
-[node name="Boost_AltGlade_1" type="Area3D" parent="BoostPads" unique_id=1575538347 instance=ExtResource("32_1d7ih")]
+[node name="Boost_AltGlade_1" parent="BoostPads" unique_id=1575538347 instance=ExtResource("32_1d7ih")]
 transform = Transform3D(-0.73341817, 0, -0.67977774, 0, 1, 0, 0.67977774, 0, -0.73341817, 19.176058, 3.5988674, 198.80232)
-collision_layer = 0
-script = ExtResource("33_tb0ul")
 
-[node name="Boost_AltGlade_2" type="Area3D" parent="BoostPads" unique_id=1375721441 instance=ExtResource("32_1d7ih")]
+[node name="Boost_AltGlade_2" parent="BoostPads" unique_id=1375721441 instance=ExtResource("32_1d7ih")]
 transform = Transform3D(-0.9784543, 0, 0.20646362, 0, 1, 0, -0.20646362, 0, -0.9784543, -21.493147, 2.2480657, 200.91747)
-collision_layer = 0
-script = ExtResource("33_tb0ul")
 
 [node name="ItemBoxes" type="Node3D" parent="." unique_id=1775037810]
 
-[node name="ItemBox_1" type="Node3D" parent="ItemBoxes" unique_id=1666880574 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_1" parent="ItemBoxes" unique_id=1666880574 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -48, 1.4, 90)
-script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_2" type="Node3D" parent="ItemBoxes" unique_id=2131707699 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_2" parent="ItemBoxes" unique_id=2131707699 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -45, 1.4, 90)
-script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_3" type="Node3D" parent="ItemBoxes" unique_id=151678262 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_3" parent="ItemBoxes" unique_id=151678262 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42, 1.4, 90)
-script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_4" type="Node3D" parent="ItemBoxes" unique_id=2114141211 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_4" parent="ItemBoxes" unique_id=2114141211 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 84, 10.8, -235)
-script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_5" type="Node3D" parent="ItemBoxes" unique_id=140589812 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_5" parent="ItemBoxes" unique_id=140589812 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 81, 10.8, -235)
-script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_6" type="Node3D" parent="ItemBoxes" unique_id=1053673345 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_6" parent="ItemBoxes" unique_id=1053673345 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 78, 10.8, -235)
-script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_7" type="Node3D" parent="ItemBoxes" unique_id=2076437694 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_7" parent="ItemBoxes" unique_id=2076437694 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 5.4, -305)
-script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_8" type="Node3D" parent="ItemBoxes" unique_id=607034796 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_8" parent="ItemBoxes" unique_id=607034796 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 5.4, -305)
-script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_9" type="Node3D" parent="ItemBoxes" unique_id=1122532804 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_9" parent="ItemBoxes" unique_id=1122532804 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -94, 17.8, 40)
-script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_10" type="Node3D" parent="ItemBoxes" unique_id=55011611 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_10" parent="ItemBoxes" unique_id=55011611 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -91, 17.8, 40)
-script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_11" type="Node3D" parent="ItemBoxes" unique_id=1685803099 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_11" parent="ItemBoxes" unique_id=1685803099 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -88, 17.8, 40)
-script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_12" type="Node3D" parent="ItemBoxes" unique_id=847622352 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_12" parent="ItemBoxes" unique_id=847622352 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 43.61648, 8.610588, -213.08722)
-script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_13" type="Node3D" parent="ItemBoxes" unique_id=1641000076 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_13" parent="ItemBoxes" unique_id=1641000076 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 46.363132, 8.610588, -214.29382)
-script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_14" type="Node3D" parent="ItemBoxes" unique_id=1920126033 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_14" parent="ItemBoxes" unique_id=1920126033 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 49.109783, 8.610588, -215.50043)
-script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_15" type="Node3D" parent="ItemBoxes" unique_id=65557583 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_15" parent="ItemBoxes" unique_id=65557583 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.4571476, 3.120973, 207.62213)
-script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_16" type="Node3D" parent="ItemBoxes" unique_id=1906449291 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_16" parent="ItemBoxes" unique_id=1906449291 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.7153883, 3.120973, 202.62881)
-script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_17" type="Node3D" parent="ItemBoxes" unique_id=1301520238 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_17" parent="ItemBoxes" unique_id=1301520238 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -35.469467, 1.9305063, 180.78662)
-script = ExtResource("35_r7bqb")
 
-[node name="ItemBox_18" type="Node3D" parent="ItemBoxes" unique_id=120869669 instance=ExtResource("34_rdsrc")]
+[node name="ItemBox_18" parent="ItemBoxes" unique_id=120869669 instance=ExtResource("34_rdsrc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30.496506, 1.9305063, 181.30591)
-script = ExtResource("35_r7bqb")
 
 [node name="Vegetation" type="Node3D" parent="." unique_id=1802715583]

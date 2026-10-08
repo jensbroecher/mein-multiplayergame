@@ -39,6 +39,12 @@ var main_track_curve: Curve3D
 # --- Road geometry --------------------------------------------------------------------
 ## Trunk carriageway and route widths. A route nose sits exactly one trunk half width off
 ## the centreline, which is what lets the two decks tile without overlapping.
+const MeshChunker = preload("res://MeshChunker.gd")
+## Level-spanning visual meshes (road ribbons, barriers, terrain) are split into cells this size
+## before saving, so cameras and shadow passes (every streetlight's included) draw only the cells
+## they can see instead of the whole track. Geometry is unchanged.
+const MESH_CHUNK_CELL := 80.0
+
 const MAIN_WIDTH := 15.0
 const MAIN_HALF_W := 7.5
 const ROUTE_WIDTH := 11.0
@@ -3224,6 +3230,10 @@ func _ready() -> void:
 	# 15. Checkpoints & level wiring
 	level_scene.set("track_path", track_path)
 	level_scene._setup_checkpoints()
+
+	# Split the big visual meshes into cells (collision shapes are separate and stay whole).
+	var chunked: int = MeshChunker.chunk_scene(level_scene, "res://generated/" + RES_PREFIX, "res://generated/northlight_chunks", MESH_CHUNK_CELL)
+	print("Chunked %d large meshes" % chunked)
 
 	# 16. Scene ownership
 	_set_owner_recursive(level_scene, level_scene)

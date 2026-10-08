@@ -129,6 +129,15 @@ const WHEEL_Y_OFFSET = -0.021691  # Match the actual WheelPivot Y position to pr
 const COLLISION_Y_OFFSET = 0.0  # Collision sphere center relative to body center
 var collision_radius: float = 0.75
 var _ground_grace: float = 0.0
+## Edges up to this height (m) are climbed smoothly: the chassis sphere gets only the upward speed it
+## needs to reach the top, instead of the solver's deflection (a 1cm lip at 40 m/s used to throw the
+## car ~1m into the air). Taller obstacles keep the full physics response.
+const STEP_SMOOTH_MAX_HEIGHT := 0.3
+## Upward speed allowed on top of the climb speed, so the car still settles onto the step naturally.
+const STEP_SMOOTH_SPEED_MARGIN := 0.4
+var _step_climb_time: float = 0.0
+var _step_climb_top: float = 0.0
+var _step_climb_up: Vector3 = Vector3.UP
 
 # Preload item scenes
 const MISSILE_SCENE = preload("res://Missile.tscn")
@@ -961,6 +970,10 @@ func _update_authority():
 			get_node("AudioListener3D").current = false
 	
 	var has_physics_authority = has_physics_authority()
+	if has_physics_authority:
+		# AI carts need contacts too: _soften_edge_pops and _dampen_ground_bounce read them.
+		contact_monitor = true
+		max_contacts_reported = 4
 	if not has_physics_authority:
 		freeze = true
 		freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
@@ -981,6 +994,7 @@ func _on_body_entered(body: Node):
 func _integrate_forces(state: PhysicsDirectBodyState3D):
 	if is_exploding:
 		return
+	_soften_edge_pops(state)
 	_dampen_ground_bounce(state)
 	if not is_local_player or not can_move:
 		return
@@ -998,6 +1012,51 @@ func _integrate_forces(state: PhysicsDirectBodyState3D):
 			last_crash_sound_time = now
 			_play_crash_sound()
 			return
+
+
+func _soften_edge_pops(state: PhysicsDirectBodyState3D) -> void:
+	# The chassis is one sphere, so running into any lip (a curb, a seam between two road meshes, a
+	# 1cm step) deflects it upward by speed * sin * cos of the contact angle, which at racing speed
+	# is a launch. For low edges, keep only the upward speed needed to lift the sphere onto the top.
+	var dt: float = state.step
+	_step_climb_time = maxf(_step_climb_time - dt, 0.0)
+	var center: Vector3 = state.transform.origin + state.transform.basis * Vector3(0, COLLISION_Y_OFFSET, 0)
+	if (is_on_ground or _ground_grace > 0.0) and not is_on_loop:
+		var up: Vector3 = current_ground_normal if current_ground_normal.length_squared() > 0.5 else Vector3.UP
+		for i in range(state.get_contact_count()):
+			var n: Vector3 = (state.transform.basis * state.get_contact_local_normal(i)).normalized()
+			# Height of the touched point above the bottom of the sphere, along the ground normal.
+			var edge_h: float = collision_radius * (1.0 - n.dot(up))
+			if edge_h < 0.002 or edge_h > STEP_SMOOTH_MAX_HEIGHT:
+				continue
+			# A sloped face (ramp, hill) touches the sphere along its own normal; an edge doesn't.
+			# Ray toward the contact and compare, so ramps and jump lips keep their launch. A miss
+			# means the step already carried the sphere off the edge, which a face can't do.
+			var query := PhysicsRayQueryParameters3D.create(center, center - n * (collision_radius + 0.3))
+			query.exclude = [get_rid()]
+			var hit := state.get_space_state().intersect_ray(query)
+			if not hit.is_empty() and (hit.normal as Vector3).dot(n) > 0.995:
+				continue
+			# The sphere's centre has to end up one radius above the edge.
+			var top: float = state.get_contact_collider_position(i).dot(up) + collision_radius
+			if _step_climb_time <= 0.0 or top > _step_climb_top:
+				_step_climb_top = top
+			_step_climb_up = up
+			_step_climb_time = 0.3
+	if _step_climb_time <= 0.0:
+		return
+	# The solver keeps re-deflecting the sphere for a few steps while it's over the edge, and the
+	# car leaves contact with whatever speed is left; cap it on every step of the climb.
+	var v: Vector3 = state.linear_velocity
+	var v_up: float = v.dot(_step_climb_up)
+	var rise_left: float = maxf(_step_climb_top - center.dot(_step_climb_up), 0.0)
+	var g: float = state.total_gravity.length() + GRAVITY
+	var allowed: float = sqrt(2.0 * g * rise_left) + STEP_SMOOTH_SPEED_MARGIN
+	if v_up > allowed:
+		state.linear_velocity = v - _step_climb_up * (v_up - allowed)
+	if rise_left <= 0.0:
+		# On top: stop here, so a ramp just past the edge still launches normally.
+		_step_climb_time = 0.0
 
 
 func _dampen_ground_bounce(state: PhysicsDirectBodyState3D) -> void:
