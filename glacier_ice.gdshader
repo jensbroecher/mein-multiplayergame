@@ -45,9 +45,18 @@ uniform float depth_power : hint_range(0.0, 4.0) = 1.0;
 // They are what tells a block of glacier ice from a lump of glass. Off by default.
 uniform float strata_strength : hint_range(0.0, 1.0) = 0.0;
 uniform float strata_spacing : hint_range(0.2, 8.0) = 1.6;
+// Lay the pattern out on the mesh itself instead of in the world. For ice that moves (the loose
+// chunks carts knock about, KnockableIce.gd): a pattern read from the world position stays where it
+// is while the chunk slides and tumbles through it, which looks like parallax. Off, the pattern
+// runs on unbroken across neighbouring blocks, which is what static ice wants.
+uniform bool object_space = false;
 
 varying vec3 w_pos;
 varying vec3 w_nrm;
+// Where the pattern is read: the world position and normal, or with object_space the chunk's own
+// (scaled to metres, and shifted per instance so the chunks don't all wear the same pattern).
+varying vec3 p_pos;
+varying vec3 p_nrm;
 
 float hash12(vec2 p) {
 	vec3 q = fract(vec3(p.xyx) * 0.1031);
@@ -96,12 +105,24 @@ void vertex() {
 	// scales (a floe is 25m across and 0.4m thick), and MODEL_MATRIX tipped their sloped tops over
 	// to near-vertical, which painted them with side-wall streaks instead of frost.
 	w_nrm = normalize(MODEL_NORMAL_MATRIX * NORMAL);
+	if (object_space) {
+		vec3 scl = vec3(length(MODEL_MATRIX[0].xyz), length(MODEL_MATRIX[1].xyz), length(MODEL_MATRIX[2].xyz));
+		float id = float(INSTANCE_ID);
+		p_pos = VERTEX * scl + vec3(fract(id * 0.6180339), fract(id * 0.7548777), fract(id * 0.5698403)) * 97.0;
+		p_nrm = normalize(NORMAL / max(scl, vec3(0.0001)));
+	} else {
+		p_pos = w_pos;
+		p_nrm = w_nrm;
+	}
 }
 
 void fragment() {
-	vec3 n = normalize(w_nrm);
+	vec3 wn = normalize(w_nrm);
 	vec3 view = normalize(CAMERA_POSITION_WORLD - w_pos);
-	float fres = pow(1.0 - clamp(dot(n, view), 0.0, 1.0), 4.0);
+	float fres = pow(1.0 - clamp(dot(wn, view), 0.0, 1.0), 4.0);
+	// Everything below that is part of the ice rather than of the view reads p and n.
+	vec3 p = p_pos;
+	vec3 n = normalize(p_nrm);
 
 	float dist = length(w_pos - CAMERA_POSITION_WORLD);
 	float detail = 1.0 - smoothstep(70.0, 460.0, dist);
@@ -111,22 +132,22 @@ void fragment() {
 	// Keying the colour to facing and cavity rather than to a fixed tint is the whole difference
 	// between "ice" and "blue plastic".
 	float cavity = 1.0 - smoothstep(0.0, 1.0, n.y * 0.5 + 0.5);
-	float strata = fbm(vec2(w_pos.y * 0.22, (w_pos.x + w_pos.z) * 0.011));
-	float band = 0.5 + 0.5 * sin(w_pos.y * 0.34 + strata * 5.0);
+	float strata = fbm(vec2(p.y * 0.22, (p.x + p.z) * 0.011));
+	float band = 0.5 + 0.5 * sin(p.y * 0.34 + strata * 5.0);
 	float thickness = clamp(cavity * 0.75 + strata * 0.25 + band * 0.15, 0.0, 1.0);
 	thickness = pow(thickness, depth_power);
 
 	// --- Internal structure ---------------------------------------------------------------
 	// Fractures scatter, so they lighten. Dark ridged lines are what read as grime.
-	float f1 = pow(ridge(w_pos.xz * ice_scale * 3.1 + vec2(0.0, w_pos.y * 0.05)), 7.0);
-	float f2 = pow(ridge(w_pos.xy * ice_scale * 1.7 + 21.0), 9.0);
+	float f1 = pow(ridge(p.xz * ice_scale * 3.1 + vec2(0.0, p.y * 0.05)), 7.0);
+	float f2 = pow(ridge(p.xy * ice_scale * 1.7 + 21.0), 9.0);
 	float fracture = clamp(f1 + f2 * 0.8, 0.0, 1.0) * detail;
 
 	// --- Air bubbles ---------------------------------------------------------------------
 	// What is actually suspended in glacier ice is air, and it is white. Sparse, irregular, and
 	// gathered in bands where the ice froze fastest.
-	float band_gate = smoothstep(0.35, 0.75, fbm(vec2(w_pos.y * 0.09, (w_pos.x + w_pos.z) * 0.02)));
-	float bubbles = smoothstep(0.62, 0.80, fbm(w_pos.xz * ice_scale * 9.0 + w_pos.y * 0.31)) * band_gate;
+	float band_gate = smoothstep(0.35, 0.75, fbm(vec2(p.y * 0.09, (p.x + p.z) * 0.02)));
+	float bubbles = smoothstep(0.62, 0.80, fbm(p.xz * ice_scale * 9.0 + p.y * 0.31)) * band_gate;
 	bubbles *= bubble_density * detail;
 
 	// --- Frost ----------------------------------------------------------------------------
@@ -134,7 +155,7 @@ void fragment() {
 	// glassy blue is the contrast that makes ice legible at a distance.
 	float up_mask = smoothstep(0.10, 0.70, n.y);
 	float altitude = 1.0 - smoothstep(frost_line - 30.0, frost_line + 60.0, w_pos.y);
-	float frost = clamp(up_mask * (0.30 + altitude * 0.60) + (fbm(w_pos.xz * 0.06) - 0.5) * 0.55, 0.0, 1.0);
+	float frost = clamp(up_mask * (0.30 + altitude * 0.60) + (fbm(p.xz * 0.06) - 0.5) * 0.55, 0.0, 1.0);
 	frost = smoothstep(0.28, 0.82, frost);
 
 	// --- Albedo ---------------------------------------------------------------------------
@@ -146,8 +167,8 @@ void fragment() {
 	ice = mix(ice, vein_color.rgb, fracture * 0.40);
 
 	if (strata_strength > 0.0) {
-		float wave = (fbm(w_pos.xz * 0.045) - 0.5) * 3.0 + (fbm(w_pos.xz * 0.21 + 3.0) - 0.5) * 0.6;
-		float phase = fract((w_pos.y + wave) / strata_spacing);
+		float wave = (fbm(p.xz * 0.045) - 0.5) * 3.0 + (fbm(p.xz * 0.21 + 3.0) - 0.5) * 0.6;
+		float phase = fract((p.y + wave) / strata_spacing);
 		float layer = smoothstep(0.80, 0.90, phase) * (1.0 - smoothstep(0.92, 1.0, phase));
 		float faint = smoothstep(0.35, 0.42, phase) * (1.0 - smoothstep(0.44, 0.50, phase)) * 0.45;
 		// Layers are seen on the faces a block broke along, not on its top, where they would only
@@ -164,13 +185,13 @@ void fragment() {
 	// Ice is glassy: a strong, tight highlight is most of what says "ice" rather than "stone".
 	SPECULAR = mix(0.62, 0.16, frost);
 
-	NORMAL_MAP = triplanar(ice_normal, w_pos, n, ice_scale * 0.55).rgb;
+	NORMAL_MAP = triplanar(ice_normal, p, n, ice_scale * 0.55).rgb;
 	NORMAL_MAP_DEPTH = normal_strength * (0.35 + 0.65 * detail) * clamp(1.0 - fwidth(w_pos.x) * 0.02 - fwidth(w_pos.z) * 0.02, 0.1, 1.0);
 
 	// --- Emission -------------------------------------------------------------------------
 	// Barely there. The cavern's light comes from its lamps; this only stops the deepest
 	// crevices going to pure black, and it is cool and very weak so it cannot tint the ice.
-	float pulse = 0.80 + 0.20 * sin(TIME * 0.5 + w_pos.z * 0.05 + w_pos.x * 0.03);
+	float pulse = 0.80 + 0.20 * sin(TIME * 0.5 + p.z * 0.05 + p.x * 0.03);
 	EMISSION = vein_color.rgb * vein_glow * pulse * fracture * vein_density;
 	EMISSION += aurora_tint.rgb * 0.045 * thickness;
 }

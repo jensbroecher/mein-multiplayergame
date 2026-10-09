@@ -222,18 +222,28 @@ const THIN_ICE_HALF_W := 9.0
 const THIN_ICE_GRIP := 0.4
 ## Height of the road where it meets the lake, so it runs flush onto the ice sheet.
 const THIN_ICE_DECK_Y := 2.74
-const THIN_ICE_WATER_Y := LAKE_SURFACE_Y - 0.3
+## Water stands this far under the lowest ice round each hole. The lake's natural surface is not
+## flat (it dips to 2.1m near the shore), so one water level for the whole crossing stood above the
+## ice in the dips: it showed through along every contour where the two crossed, and a cart on the
+## ice there counted as driving through water.
+const HOLE_WATER_DROP := 0.3
 ## The lead: a channel cut under the crossing, LEAD_HALF_W either side of it at LEAD_BED_Y,
 ## shelving back up over LEAD_FEATHER, and tapering out over LEAD_TAPER at both ends.
 const LEAD_BED_Y := -3.0
-const LEAD_HALF_W := 22.0
-const LEAD_FEATHER := 6.0
-const LEAD_TAPER := 10.0
+const LEAD_HALF_W := 18.0
+const LEAD_FEATHER := 4.0
+## The lead starts LEAD_TAPER_IN inside each end of the crossing and reaches full depth over
+## LEAD_TAPER. It has to stay a whole terrain cell (6.25m) inside the ice sheet at every edge: the
+## heightfield's triangles slope down into it from a cell away, and anywhere that slope reached
+## past the sheet's edge it opened a black gap under the ice with the water showing in it.
+const LEAD_TAPER_IN := 8.0
+const LEAD_TAPER := 8.0
 ## The sheet of lake ice over the lead reaches this far out from its centreline: past the lead's
 ## edge, so the water only shows through the holes. Built at 0.75m, fine enough to cut round holes
 ## in, where the terrain's 6.25m grid can't.
 const SHEET_REACH := 31.0
 const SHEET_CELL := 0.75
+const SHEET_OVERLAP := 1.5
 ## Ridges of piled ice either side of the crossing: RIDGE_START_LAT out where the road ends,
 ## opening to RIDGE_LAT, so the holes can't simply be driven round on the open lake.
 const RIDGE_LAT := 23.0
@@ -342,6 +352,8 @@ var _thin_curve: Curve3D
 var _thin_ai_curve: Curve3D
 var _thin_holes: Array = []
 var _thin_hole_offs := PackedFloat32Array()
+## Water level in each hole (HOLE_WATER_DROP under the lowest ice round it).
+var _thin_hole_water := PackedFloat32Array()
 var _thin_plate := Vector2(-1.0, -1.0)
 var _thin_lake_from := 0.0
 var _lead_line := PackedVector2Array()
@@ -606,6 +618,7 @@ func _shape_spire_handles(curve: Curve3D) -> void:
 
 ## Rim radius of a hole (Vector4(x, z, radius, seed)) towards angle `ang`: round, with the
 ## wobble of broken ice. Never more than 14% over the radius, which the AI's line allows for.
+## NorthlightWater._rim() is the same function, for the water carts sink in.
 func _hole_rim(h: Vector4, ang: float) -> float:
 	return h.z * (1.0 + 0.09 * sin(3.0 * ang + h.w) + 0.05 * sin(7.0 * ang + 2.3 * h.w))
 
@@ -727,7 +740,9 @@ func _apply_lead(h: float, px: float, pz: float) -> float:
 		return h
 	var near: Vector2 = _lead_nearest(px, pz)
 	var cut: float = 1.0 - smoothstep(LEAD_HALF_W, LEAD_HALF_W + LEAD_FEATHER, near.x)
-	cut *= smoothstep(0.0, LEAD_TAPER, near.y) * smoothstep(0.0, LEAD_TAPER, _thin_plate.y - _thin_plate.x - near.y)
+	var span: float = _thin_plate.y - _thin_plate.x
+	cut *= smoothstep(LEAD_TAPER_IN, LEAD_TAPER_IN + LEAD_TAPER, near.y) \
+			* smoothstep(LEAD_TAPER_IN, LEAD_TAPER_IN + LEAD_TAPER, span - near.y)
 	return lerpf(h, minf(h, LEAD_BED_Y), cut)
 
 
@@ -3617,7 +3632,7 @@ func _dark_water_material(lead: bool = false) -> ShaderMaterial:
 
 
 ## The water carts can sink in: one node, named "RiverWater" so PlayerCart finds it, answering
-## surface_at() for the crevasse pool and the lead (NorthlightWater.gd). It has to sit directly
+## surface_at() for the crevasse pool and the holes in the Thin Ice (NorthlightWater.gd). It has to sit directly
 ## under the level root.
 func _build_water_zones(level_root: Node) -> void:
 	var node := Node3D.new()
@@ -3629,9 +3644,16 @@ func _build_water_zones(level_root: Node) -> void:
 	node.set("crevasse_half_len", CREVASSE_POOL_HALF_LEN)
 	node.set("crevasse_half_w", CREVASSE_POOL_HALF_W)
 	node.set("crevasse_y", CREVASSE_POOL_Y)
+	node.set("holes", PackedVector4Array(_thin_holes))
+	node.set("hole_y", _thin_hole_water)
+	# Under the sheet: below a cart on the ice by more than PlayerCart's 0.8m water contact, wherever
+	# the lake dips, and above a cart on the lead's bed by metres.
+	var lowest: float = INF
+	for y in _thin_hole_water:
+		lowest = minf(lowest, y)
 	node.set("lead_line", _lead_line)
-	node.set("lead_half_w", LEAD_HALF_W)
-	node.set("lead_y", THIN_ICE_WATER_Y)
+	node.set("lead_half_w", LEAD_HALF_W + LEAD_FEATHER * 0.5)
+	node.set("under_ice_y", lowest - 1.6)
 	var ex: float = absf(CREVASSE_DIR.x) * CREVASSE_POOL_HALF_LEN + absf(CREVASSE_DIR.y) * CREVASSE_POOL_HALF_W
 	var ez: float = absf(CREVASSE_DIR.y) * CREVASSE_POOL_HALF_LEN + absf(CREVASSE_DIR.x) * CREVASSE_POOL_HALF_W
 	var bounds := Rect2(center - Vector2(ex, ez), Vector2(ex, ez) * 2.0)
@@ -3648,6 +3670,7 @@ func _build_thin_ice(parent: Node, ground_mat: Material, edge_mat: Material, rub
 	var root := Node3D.new()
 	root.name = "ThinIceCrossing"
 	parent.add_child(root)
+	_plan_hole_water()
 	_build_thin_ice_sheet(root, ground_mat)
 	_build_thin_ice_water(root)
 	_build_thin_ice_holes(root, edge_mat, rubble_mat)
@@ -3682,16 +3705,22 @@ func _lead_frame(px: float, pz: float) -> Vector3:
 
 ## Height of the ice sheet at a point with lead frame `fr` (see _lead_frame): the lake surface as
 ## the terrain would have had it, just above it; flush with the road where the road runs onto the
-## ice; and sunk just under the lake round its edges, so its border never shows as a lip.
+## ice, and tucked just under the road's end past it; and sunk just under the lake round its other
+## edges, so its border never shows as a lip.
 func _sheet_y(x: float, z: float, fr: Vector3) -> float:
 	var span: float = _thin_plate.y - _thin_plate.x
 	var h: float = _icefield_natural(x, z) + 0.08
 	var road_zone: float = 1.0 - smoothstep(THIN_ICE_HALF_W + 0.5, THIN_ICE_HALF_W + 4.0, fr.x)
 	h = lerpf(h, _thin_curve.sample_baked(_thin_plate.x).y, (1.0 - smoothstep(0.0, 6.0, fr.y)) * road_zone)
 	h = lerpf(h, _thin_curve.sample_baked(_thin_plate.y).y, (1.0 - smoothstep(0.0, 6.0, span - fr.y)) * road_zone)
+	var to_end: float = minf(fr.y, span - fr.y)
+	# Past the end, under the road: just below its surface, so the two never fight for the pixels.
+	h -= (1.0 - smoothstep(-0.2, 0.0, to_end)) * 0.06 * road_zone
 	var edge: float = smoothstep(SHEET_REACH - 2.5, SHEET_REACH, fr.x)
-	var ends: float = (1.0 - smoothstep(0.0, 3.0, minf(fr.y, span - fr.y))) * (1.0 - road_zone)
-	return h - maxf(edge, ends) * 0.4
+	var ends: float = (1.0 - smoothstep(0.0, 3.0, to_end)) * (1.0 - road_zone)
+	# 0.9m: the terrain's 6.25m triangles sag up to half a metre under the lake's real surface where
+	# it dips, and a border only 0.4m down poked up through them as a sawtooth line.
+	return h - maxf(edge, ends) * 0.9
 
 
 ## The sheet of thin ice across the lead: a 0.75m grid in plan over the crossing, out to
@@ -3716,7 +3745,9 @@ func _build_thin_ice_sheet(parent: Node, ground_mat: Material) -> void:
 			var x: float = box.position.x + float(ix) * SHEET_CELL
 			var z: float = box.position.y + float(iz) * SHEET_CELL
 			var fr: Vector3 = _lead_frame(x, z)
-			if fr.y < -0.01 or fr.y > span + 0.01 or fr.x > SHEET_REACH:
+			# Out past each end by SHEET_OVERLAP, so it runs on under the end of the road with no
+			# gap between them.
+			if fr.y < -SHEET_OVERLAP or fr.y > span + SHEET_OVERLAP or fr.x > SHEET_REACH:
 				continue
 			var ins := 0
 			for h in _thin_holes:
@@ -3773,33 +3804,54 @@ func _build_thin_ice_sheet(parent: Node, ground_mat: Material) -> void:
 	print("  thin ice sheet: %d vertices" % count)
 
 
-## The lead's water, a ribbon down the crossing out past the lead's edge, so wherever the lead is
-## cut there is water over its floor. Only the holes ever show it.
+## Water level in each hole: HOLE_WATER_DROP under the lowest ice over its pool (see
+## _build_thin_ice_water), so the pool never stands above the sheet anywhere it reaches.
+func _plan_hole_water() -> void:
+	_thin_hole_water = PackedFloat32Array()
+	for h in _thin_holes:
+		var low: float = INF
+		var reach: float = _hole_pool_radius(h)
+		for ring in range(1, 7):
+			var r: float = reach * float(ring) / 6.0
+			for k in range(36):
+				var ang: float = TAU * float(k) / 36.0
+				var x: float = h.x + cos(ang) * r
+				var z: float = h.y + sin(ang) * r
+				low = minf(low, _sheet_y(x, z, _lead_frame(x, z)))
+		_thin_hole_water.append(low - HOLE_WATER_DROP)
+
+
+## How far each hole's pool reaches: under the sheet past the widest point of its rim.
+func _hole_pool_radius(h: Vector4) -> float:
+	return h.z * 1.14 + 0.8
+
+
+## The water in the holes: a flat pool under each, reaching a little way under the sheet past its
+## rim. Only the holes show water, so there is no water anywhere else under the ice to stand above
+## it where the lake dips.
 func _build_thin_ice_water(parent: Node) -> void:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var half: float = LEAD_HALF_W + LEAD_FEATHER + 1.0
-	var rows := 0
-	var off: float = _thin_plate.x
-	while true:
-		var f: Dictionary = _frame_at_offset(_thin_curve, minf(off, _thin_plate.y))
-		for s in [-1.0, 1.0]:
-			var v: Vector3 = f["pos"] + f["right"] * (half * s)
-			v.y = THIN_ICE_WATER_Y
-			st.set_uv(Vector2(v.x * 0.05, v.z * 0.05))
+	var segs := 40
+	var base := 0
+	for i in range(_thin_holes.size()):
+		var h: Vector4 = _thin_holes[i]
+		var y: float = _thin_hole_water[i]
+		var reach: float = _hole_pool_radius(h)
+		st.set_uv(Vector2(h.x, h.y) * 0.05)
+		st.add_vertex(Vector3(h.x, y, h.y))
+		for k in range(segs):
+			var ang: float = TAU * float(k) / float(segs)
+			var v := Vector3(h.x + cos(ang) * reach, y, h.y + sin(ang) * reach)
+			st.set_uv(Vector2(v.x, v.z) * 0.05)
 			st.add_vertex(v)
-		rows += 1
-		if off >= _thin_plate.y:
-			break
-		off += 3.0
-	for r in range(rows - 1):
-		var a: int = r * 2
-		# Front faces up: (c - a) x (b - a) along +Y (see _build_cavern_cap).
-		st.add_index(a); st.add_index(a + 2); st.add_index(a + 1)
-		st.add_index(a + 1); st.add_index(a + 2); st.add_index(a + 3)
+		for k in range(segs):
+			# Front faces up: (c - a) x (b - a) along +Y with the angle increasing from b to c.
+			st.add_index(base); st.add_index(base + 1 + k); st.add_index(base + 1 + (k + 1) % segs)
+		base += segs + 1
 	st.generate_normals()
 	var water := MeshInstance3D.new()
-	water.name = "ThinIceLeadWater"
+	water.name = "ThinIceHoleWater"
 	water.mesh = _save_baked_resource(st.commit(), "thin_ice_lead_water")
 	water.material_override = _dark_water_material(true)
 	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -3837,7 +3889,7 @@ func _build_thin_ice_holes(parent: Node, edge_mat: Material, rubble_mat: Materia
 			es.add_vertex(Vector3(x, top + 0.02, z))
 			es.set_normal(n)
 			es.set_uv(Vector2(float(k) / float(segs), 1.0))
-			es.add_vertex(Vector3(x, THIN_ICE_WATER_Y - 0.6, z))
+			es.add_vertex(Vector3(x, _thin_hole_water[i] - 0.6, z))
 		for k in range(segs):
 			var a: int = base + k * 2
 			es.add_index(a); es.add_index(a + 2); es.add_index(a + 1)
@@ -3851,7 +3903,7 @@ func _build_thin_ice_holes(parent: Node, edge_mat: Material, rubble_mat: Materia
 			var b := Basis.from_euler(Vector3(deg_to_rad(rng.randf_range(-8.0, 8.0)), rng.randf_range(0.0, TAU),
 					deg_to_rad(rng.randf_range(-8.0, 8.0)))) * Basis.from_scale(
 					Vector3(sw, rng.randf_range(0.10, 0.18), sw * rng.randf_range(0.6, 1.0)))
-			shard_xf.append(Transform3D(b, Vector3(h.x + cos(ang2) * dist2, THIN_ICE_WATER_Y + 0.02, h.y + sin(ang2) * dist2)))
+			shard_xf.append(Transform3D(b, Vector3(h.x + cos(ang2) * dist2, _thin_hole_water[i] + 0.02, h.y + sin(ang2) * dist2)))
 		var n_chunks: int = int(h.z * 6.0)
 		for k in range(n_chunks):
 			var ang3: float = TAU * (float(k) + rng.randf_range(-0.3, 0.3)) / float(n_chunks)
@@ -3860,10 +3912,11 @@ func _build_thin_ice_holes(parent: Node, edge_mat: Material, rubble_mat: Materia
 			var cz: float = h.y + sin(ang3) * at
 			var cw: float = rng.randf_range(0.22, 0.55)
 			var ch: float = rng.randf_range(0.25, 0.6)
-			var b2 := Basis.from_euler(Vector3(deg_to_rad(rng.randf_range(-25.0, 25.0)), rng.randf_range(0.0, TAU),
-					deg_to_rad(rng.randf_range(-25.0, 25.0)))) * Basis.from_scale(Vector3(cw, ch, cw * rng.randf_range(0.6, 1.1)))
-			# Half sunk into the ice, so they read as heaped slush rather than dropped blocks.
-			chunk_xf.append(Transform3D(b2, Vector3(cx, _sheet_y(cx, cz, _lead_frame(cx, cz)) + ch * 0.18, cz)))
+			var b2 := Basis.from_euler(Vector3(deg_to_rad(rng.randf_range(-10.0, 10.0)), rng.randf_range(0.0, TAU),
+					deg_to_rad(rng.randf_range(-10.0, 10.0)))) * Basis.from_scale(Vector3(cw, ch, cw * rng.randf_range(0.6, 1.1)))
+			# Resting on the ice, only just bedded in: they are loose (KnockableIce.gd), and one
+			# sunk deeper would pop out of the sheet when a cart sets it free.
+			chunk_xf.append(Transform3D(b2, Vector3(cx, _sheet_y(cx, cz, _lead_frame(cx, cz)) + ch * 0.45, cz)))
 
 		# Seen by the AI's obstacle feelers (they look at layer value 4) but not by the carts, the
 		# same trick as the herd on Mara Crossing. Low, so a bomb that lands on one rests at about
@@ -3889,7 +3942,24 @@ func _build_thin_ice_holes(parent: Node, edge_mat: Material, rubble_mat: Materia
 	edges.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(edges)
 	parent.add_child(_multimesh_of("HoleShards", floe["mesh"], shard_xf, edge_mat))
-	parent.add_child(_multimesh_of("HoleRubble", chunk["mesh"], chunk_xf, rubble_mat))
+	# Carts knock the rubble about: KnockableIce.gd gives each chunk a rigid body at runtime.
+	var rubble: MultiMeshInstance3D = _multimesh_of("HoleRubble", chunk["mesh"], chunk_xf, rubble_mat)
+	rubble.set_script(load("res://KnockableIce.gd"))
+	# The pattern rides on each chunk (object_space): read from the world, it stayed put while a
+	# knocked chunk slid and tumbled through it.
+	var loose_mat: ShaderMaterial = (rubble_mat as ShaderMaterial).duplicate()
+	loose_mat.set_shader_parameter("object_space", true)
+	rubble.material_override = loose_mat
+	var typed: Array[Transform3D] = []
+	for t in chunk_xf:
+		typed.append(t)
+	rubble.set("chunk_transforms", typed)
+	rubble.set("chunk_points", chunk["points"])
+	var lowest: float = INF
+	for y in _thin_hole_water:
+		lowest = minf(lowest, y)
+	rubble.set("sink_y", lowest - 1.5)
+	parent.add_child(rubble)
 
 
 ## Ridges of ice piled up along both sides of the crossing, where the lead's ice has pressed

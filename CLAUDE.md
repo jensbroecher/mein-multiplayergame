@@ -133,11 +133,18 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   grid can't hold a round hole. Pressure ridges either side stop the holes being driven round. The AI
   follows its own S between the holes (the route's Path3D, held to it by the `ai_lane_limit` meta) and also
   sees the holes as layer-4 markers. `_verify_thin_ice_line` checks that line's clearance from each hole.
+  Only the holes hold water: a pool under each, `HOLE_WATER_DROP` under the lowest ice round it
+  (`_plan_hole_water`). The lake's natural surface dips to 2.1m, so one water level under the whole
+  sheet stood above the ice in the dips, showed through it, and splashed carts driving on it. The rubble
+  round the holes is loose (`KnockableIce.gd`, like `KnockablePoles.gd`). `res://scratch/thin_ice_leak_probe.tscn`
+  raycasts the crossing for gaps in the sheet.
 - Water is the `RiverWater` node (`NorthlightWater.gd`): `surface_at()` answers for the crevasse pool and
-  the lead. No checkpoint may sit on trunk a route bypasses (`_verify_checkpoints_clear_routes`), or a car
+  the Thin Ice holes (its `_rim()` copies the generator's `_hole_rim()`). Both draw with `still_water.gdshader` (ripples sized in world metres), not the ocean shader,
+  whose fine chop tiled across the mesh reads as a far-off sea from close by. No checkpoint may sit on trunk a route bypasses (`_verify_checkpoints_clear_routes`), or a car
   that takes the route never drives through it and its lap never counts.
 - `glacier_ice.gdshader` takes world normals through `MODEL_NORMAL_MATRIX`: the floes and seracs are
-  scaled very unevenly. `polar_night_ground.gdshader` samples its noise on the vertical planes on steep
+  scaled very unevenly. It reads its pattern from the world position; anything that moves (the loose
+  rubble) needs `object_space` on, or the pattern stays put while the mesh slides through it. `polar_night_ground.gdshader` samples its noise on the vertical planes on steep
   faces (`surf_fbm`); sampled from above it is constant down a cliff and paints streaks and V shapes.
   The heightfield splits each cell along the diagonal joining the closer heights
   (`_build_heightfield_mesh`); one fixed diagonal saws steep slopes that cross it into teeth.
