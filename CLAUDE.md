@@ -6,6 +6,7 @@ Portable install, not on PATH:
 
 - `D:\Godot\Godot_v4.8-dev6_win64_console.exe`: use this one from the shell, because it prints to stdout/stderr
 - `D:\Godot\Godot_v4.8-dev6_win64.exe`: GUI editor
+- On macOS: `/Applications/Godot.app/Contents/MacOS/Godot` (prints to stdout as well)
 
 ## Levels are generated, not hand-edited
 
@@ -102,6 +103,32 @@ threw it about 1m into the air. `PlayerCart._soften_edge_pops` tells edges from 
 toward the contact and compares normals). For edges up to `STEP_SMOOTH_MAX_HEIGHT` it caps the upward speed
 at what's needed to reach the top. Ramps and jump lips are untouched. `res://scratch/hop_test.tscn`
 (headless) drives a cart over steps and a ramp and prints the hop heights.
+
+## Northlight Caverns (Svartfjell GP, night stage)
+
+- The aurora sky reads the `aurora_clock` global shader uniform (`[shader_globals]` in project.godot,
+  advanced by `AuroraClock.gd`), never `TIME`. A sky shader that uses `TIME` rebuilds the radiance
+  cubemap every frame (2.5ms here); a global float moves the visible sky without touching it.
+- `MusicManager._apply_shadows_to_tree` leaves lights with the meta `no_shadow` unshadowed. Every lamp,
+  cavern, crevasse and spire light has it, and so does the fill DirectionalLight: shadowed, those cost 5ms.
+- The road bodies carry the meta `ice_grip`. PlayerCart reads it into `surface_grip`, which scales lateral
+  grip fully and braking, traction and rolling resistance in part (`ICE_*_SHARE`); the AI brakes earlier
+  for it. The banks' collision is a separate `...SnowBank` body: under the road body, a bank face counted
+  as road, which cancels lateral gravity, so a car sliding wide on the ice rode up the bank and over it.
+- Road meshes keep only the rings their shape needs (`_select_rings`, 2cm tolerance, rings up to 4m
+  apart), which cut the trunk by 92%. Slab edges are chamfered below the graded ground
+  (`SLAB_CHAMFER`/`SLAB_FOOT`), or a cart that slid into a gore could wedge under a deck and fall through.
+- The Northlight Spire: the trunk climbs a 285-degree spiral (`SPIRE_*`), crosses its own run-in on an
+  ice arch, and jumps off a lip onto a landing hill (`LAND_*`). Spans more than `ELEVATED_MIN` over the
+  ground get ice walls down to it (`_wall_profile`), the jump gap has no deck (`voids`), and neither is
+  graded. `_verify_spire_arch` checks the clearance over the run-in and `_verify_spire_jump` flies carts
+  off the lip. Checkpoint 4 sits on top, or the snowfield inside the spiral skips the climb.
+- Blizzards: `NorthlightWeather.gd` schedules storms on the wall clock (like WildebeestHerd), drives the
+  fog, sky, moon, wind audio and streaking snow, and pushes carts it has physics authority over; the
+  cavern is sheltered. `force_intensity` pins it; `look_shots` and `ai_race_test` take `weather=0..1`.
+- `res://scratch/ab_bench.tscn -- res://levels/X.tscn [samples=6] variant ...` switches variants
+  (`storm`, `nolightshadow`, `nomoonshadow`, `unshadow=`, `sky=`, `hide=`, `cheapmat=`) back and forth
+  within one run. On macOS, separate `bench.tscn` runs differ by up to 2x with the GPU's clock.
 
 ## Frostfall Gorge (off-road stage)
 

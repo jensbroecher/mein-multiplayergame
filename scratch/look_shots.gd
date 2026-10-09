@@ -2,7 +2,7 @@ extends Node
 
 # Look-dev shots of a level with RC carts standing in for scale. Run windowed:
 #   Godot --path . res://scratch/look_shots.tscn -- <level.tscn> <out_dir> [car=x,z,yaw_deg ...]
-#       name:x,y,z:tx,ty,tz ...
+#       [weather=0..1] name:x,y,z:tx,ty,tz ...
 # A cart is dropped onto the ground at each car= spot. A shot named herd* first waits until the
 # Mara Crossing herd is streaming across the road.
 
@@ -45,9 +45,13 @@ func _ready() -> void:
 		vp.add_child(car)
 		car.global_transform = Transform3D(Basis(Vector3.UP, deg_to_rad(float(c[2]) + 180.0)).scaled(Vector3.ONE * 2.0), Vector3(x, y, z))
 		print("CAR at ", car.global_position)
+	# weather=<0..1> pins Northlight Caverns' blizzard instead of following the wall clock.
+	for a in args.slice(2):
+		if a.begins_with("weather=") and level.get_node_or_null("NorthlightWeather"):
+			level.get_node("NorthlightWeather").force_intensity = float(a.substr(8))
 	var herd: Node = level.get_node_or_null("MigrationHerd")
 	for a in args.slice(2):
-		if a.begins_with("car="):
+		if a.begins_with("car=") or a.begins_with("weather="):
 			continue
 		var parts := a.split(":")
 		var p := parts[1].split(",")

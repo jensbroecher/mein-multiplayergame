@@ -41,6 +41,10 @@ uniform float bubble_density : hint_range(0.0, 2.0) = 0.55;
 uniform float roughness : hint_range(0.0, 1.0) = 0.16;
 uniform float frost_roughness : hint_range(0.0, 1.0) = 0.72;
 uniform float depth_power : hint_range(0.0, 4.0) = 1.0;
+// Annual layers: thin, slightly wavy bands of bluer ice across every face that isn't frosted over.
+// They are what tells a block of glacier ice from a lump of glass. Off by default.
+uniform float strata_strength : hint_range(0.0, 1.0) = 0.0;
+uniform float strata_spacing : hint_range(0.2, 8.0) = 1.6;
 
 varying vec3 w_pos;
 varying vec3 w_nrm;
@@ -137,6 +141,14 @@ void fragment() {
 	ice = mix(ice, deep_color.rgb * 1.15, fres * 0.35);
 	ice = mix(ice, bubble_color.rgb, bubbles * 0.55);
 	ice = mix(ice, vein_color.rgb, fracture * 0.40);
+
+	if (strata_strength > 0.0) {
+		float wave = (fbm(w_pos.xz * 0.045) - 0.5) * 3.0 + (fbm(w_pos.xz * 0.21 + 3.0) - 0.5) * 0.6;
+		float phase = fract((w_pos.y + wave) / strata_spacing);
+		float layer = smoothstep(0.80, 0.90, phase) * (1.0 - smoothstep(0.92, 1.0, phase));
+		float faint = smoothstep(0.35, 0.42, phase) * (1.0 - smoothstep(0.44, 0.50, phase)) * 0.45;
+		ice = mix(ice, deep_color.rgb * 0.85, (layer + faint) * strata_strength * detail);
+	}
 
 	vec3 albedo = mix(ice, frosted_color.rgb, frost * 0.9);
 

@@ -5,7 +5,7 @@ const MeshChunker = preload("res://MeshChunker.gd")
 # Frame-time benchmark for one level, with the game's autoloads and the player's shadow settings.
 # Run windowed (not headless):
 #   Godot --path . res://scratch/bench.tscn -- res://levels/X.tscn [samples=24] [scale=1.0] [shadows=3]
-#        [hide=<path substring>]... [shot=<dir>] [omni=0] [spot=0] [sky=<process mode>] [snow=0]
+#        [hide=<path substring>]... [shot=<dir>] [omni=0] [spot=0] [sky=<process mode>] [skyshader=<path>] [snow=0]
 # Prints per-sample GPU ms / CPU ms / primitives / draw calls, then the averages.
 
 var level_path := ""
@@ -17,6 +17,7 @@ var shot_dir := ""
 var omni_on := true
 var spot_on := true
 var sky_mode := -1
+var sky_shader := ""
 var snow_on := true
 var chunk_cell := 0.0
 var probe := Vector2(-1, -1)
@@ -35,6 +36,7 @@ func _ready() -> void:
 		elif a == "omni=0": omni_on = false
 		elif a == "spot=0": spot_on = false
 		elif a.begins_with("sky="): sky_mode = int(a.substr(4))
+		elif a.begins_with("skyshader="): sky_shader = a.substr(10)
 		elif a == "snow=0": snow_on = false
 		elif a.begins_with("chunk="): chunk_cell = float(a.substr(6))
 		elif a.begins_with("probe="):
@@ -149,3 +151,5 @@ func _apply_experiments(level: Node) -> void:
 		if n is GPUParticles3D and not snow_on and n.name == "FallingSnow": n.visible = false
 		if n is WorldEnvironment and sky_mode >= 0 and n.environment.sky:
 			n.environment.sky.process_mode = sky_mode
+		if n is WorldEnvironment and sky_shader != "" and n.environment.sky:
+			(n.environment.sky.sky_material as ShaderMaterial).shader = load(sky_shader)

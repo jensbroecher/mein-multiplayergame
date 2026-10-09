@@ -7,6 +7,13 @@ shader_type sky;
 // The moon is a uniform direction rather than LIGHT0_DIRECTION: the stage's directional
 // light is a dim blue fill whose energy is tuned for the snow, and reading the disc off
 // it would tie the moon's apparent brightness to that tuning.
+//
+// The aurora is animated by the `aurora_clock` global (advanced by AuroraClock.gd), never by
+// TIME. A sky shader that reads TIME makes Godot re-render and re-filter the radiance cubemap
+// every frame, which cost this stage ~2.5ms a frame. A global float doesn't invalidate the
+// radiance, so the reflections keep the aurora from the first frame while the visible sky moves.
+
+global uniform float aurora_clock;
 
 uniform float star_brightness : hint_range(0.0, 4.0) = 0.0;
 uniform float aurora_intensity : hint_range(0.0, 4.0) = 1.25;
@@ -95,7 +102,7 @@ float star_field(vec3 d) {
 	float dist = length(f - jitter * 0.55);
 	float present = step(0.955, h);
 	float bright = 0.22 + 0.78 * fract(h * 137.31);
-	float twinkle = 0.70 + 0.30 * sin(TIME * (1.1 + 3.0 * fract(h * 51.7)) + h * 40.0);
+	float twinkle = 0.70 + 0.30 * sin(aurora_clock * (1.1 + 3.0 * fract(h * 51.7)) + h * 40.0);
 	return present * smoothstep(0.30, 0.02, dist) * bright * twinkle;
 }
 
@@ -115,9 +122,9 @@ void sky() {
 	// striation noise becomes 3D, and the travelling waves become sin() of the vector's own
 	// components, which wrap with it.
 	vec3 cur = d * 2.6;
-	float c1 = aurora_center + 0.085 * sin(cur.x * 1.3 + cur.z * 0.9 + TIME * 0.050)
-			+ 0.050 * sin(cur.x * 2.1 - cur.z * 1.7 - TIME * 0.031);
-	float c2 = aurora_center - 0.190 + 0.070 * sin(cur.x * 1.1 + cur.y * 0.8 - TIME * 0.043 + 2.0);
+	float c1 = aurora_center + 0.085 * sin(cur.x * 1.3 + cur.z * 0.9 + aurora_clock * 0.050)
+			+ 0.050 * sin(cur.x * 2.1 - cur.z * 1.7 - aurora_clock * 0.031);
+	float c2 = aurora_center - 0.190 + 0.070 * sin(cur.x * 1.1 + cur.y * 0.8 - aurora_clock * 0.043 + 2.0);
 	const float w1 = 0.150;
 	const float w2 = 0.115;
 
@@ -128,11 +135,11 @@ void sky() {
 	float foot1 = smoothstep(0.0, 0.055, elev - (c1 - w1));
 	float foot2 = smoothstep(0.0, 0.045, elev - (c2 - w2));
 
-	float stri1 = 0.40 + 0.80 * fbm3(d * 6.0 + vec3(TIME * 0.030, -TIME * 0.045, 0.0));
-	float stri2 = 0.40 + 0.80 * fbm3(d * 10.5 - vec3(TIME * 0.022, -TIME * 0.033, 0.0) + 9.0);
+	float stri1 = 0.40 + 0.80 * fbm3(d * 6.0 + vec3(aurora_clock * 0.030, -aurora_clock * 0.045, 0.0));
+	float stri2 = 0.40 + 0.80 * fbm3(d * 10.5 - vec3(aurora_clock * 0.022, -aurora_clock * 0.033, 0.0) + 9.0);
 	// Slow, very large brightness waves along the curtain: without these the two
 	// curtains read as one continuous band instead of as separate events.
-	float pulse = 0.55 + 0.65 * fbm3(d * 2.0 + vec3(-TIME * 0.014, 0.0, TIME * 0.011));
+	float pulse = 0.55 + 0.65 * fbm3(d * 2.0 + vec3(-aurora_clock * 0.014, 0.0, aurora_clock * 0.011));
 
 	float veil = (band1 * stri1 * foot1 + band2 * stri2 * foot2) * pulse;
 	veil *= smoothstep(-0.02, 0.10, d.y);

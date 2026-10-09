@@ -372,6 +372,14 @@ var snow_plough_depth: float = 0.0
 const SNOW_FULL_DEPTH := 0.6
 ## Ploughing drag at full depth, as a fraction of horizontal speed lost per second.
 const SNOW_PLOUGH_DRAG := 1.1
+## Grip of the surface under the wheels, from an "ice_grip" meta on the collider or one of its
+## ancestors (1.0 when there is none). Scales lateral grip in full, and braking, traction and
+## rolling resistance in part, so a car on glare ice slides wide and coasts on. Kept while airborne.
+var surface_grip: float = 1.0
+## How much of the surface grip loss reaches braking, traction and rolling resistance.
+const ICE_BRAKE_SHARE := 0.75
+const ICE_TRACTION_SHARE := 0.35
+const ICE_ROLL_SHARE := 0.8
 
 func enter_snow_drift(drift: Node = null) -> void:
 	_snow_drift_depth += 1
@@ -2125,6 +2133,7 @@ func _physics_process(delta):
 					on_snow_surface = true
 					break
 				cur = cur.get_parent()
+			surface_grip = _surface_grip_of(collider)
 
 	is_in_snow = on_snow_surface or (_snow_drift_depth > 0) or (is_offroad and _snow_stage)
 	_update_snow_plough_depth()
@@ -2303,7 +2312,7 @@ func _physics_process(delta):
 	if input_dir.y < -0.1: # Forward input
 		if not is_boosting:
 			var input_scale = abs(input_dir.y)
-			var accel_force = acceleration * slow_mult * input_scale
+			var accel_force = acceleration * slow_mult * input_scale * lerpf(1.0, surface_grip, ICE_TRACTION_SHARE)
 			if drift_mode:
 				# Power-slide: keep pushing forward while carving through turn
 				accel_force *= 1.15
@@ -2352,7 +2361,7 @@ func _physics_process(delta):
 			elif current_speed > 1.0:
 				# Softer brakes + progressive (less grab at high speed)
 				var spd_t: float = clampf(current_speed / maxf(max_speed, 1.0), 0.0, 1.0)
-				var brake_mul: float = lerpf(0.85, 0.70, spd_t)
+				var brake_mul: float = lerpf(0.85, 0.70, spd_t) * lerpf(1.0, surface_grip, ICE_BRAKE_SHARE)
 				apply_central_force(-fwd * braking * brake_mul * mass * input_scale)
 			else:
 				# Reverse driving: punchy breakaway torque (1.0 from standstill, 0.85 while rolling)
@@ -2387,8 +2396,8 @@ func _physics_process(delta):
 					elif spd < 0.7:
 						linear_velocity = linear_velocity.move_toward(Vector3.ZERO, 6.0 * delta)
 					else:
-						# Gentle natural rolling resistance for smooth roll-out
-						apply_central_force(-linear_velocity * 0.45 * mass)
+						# Gentle natural rolling resistance for smooth roll-out (ice lets a car coast on)
+						apply_central_force(-linear_velocity * 0.45 * lerpf(1.0, surface_grip, ICE_ROLL_SHARE) * mass)
 				else:
 					# Steep slopes, ramps, and loops: allow natural slide/roll with light drag
 					apply_central_force(-linear_velocity * 0.20 * mass)
@@ -2495,6 +2504,8 @@ func _physics_process(delta):
 					grip_factor *= 0.30 # Allows tail to break loose and slide smoothly with authentic kart drift feel
 				elif current_speed < -0.2:
 					grip_factor *= 0.60 # Soften lateral grip in reverse for smooth, non-snapping movement
+				# Ice: the tyres hold the line far less well, so the car slides wide through corners.
+				grip_factor *= surface_grip
 				if is_offroad and ground_normal.y < 0.82:
 					# Scale grip down as the slope gets steeper; drops to 0.15 on cliffs so car slides down
 					if ground_normal.y < 0.55:
@@ -2739,6 +2750,17 @@ func _is_car_on_track_corridor() -> bool:
 	var max_allowed_width: float = 24.0 if _wadi_stage else 16.0
 	var max_allowed_height: float = 8.0 if _wadi_stage else 5.0
 	return dist_xz <= max_allowed_width and height_diff <= max_allowed_height
+
+
+## Grip multiplier of the surface `collider` belongs to: the nearest "ice_grip" meta on it or an
+## ancestor, else 1.0.
+func _surface_grip_of(collider: Object) -> float:
+	var cur: Node = collider as Node
+	while cur and cur != _cached_level:
+		if cur.has_meta(&"ice_grip"):
+			return float(cur.get_meta(&"ice_grip"))
+		cur = cur.get_parent()
+	return 1.0
 
 
 func _is_loop_surface(collider: Object) -> bool:
@@ -5832,7 +5854,7 @@ func _get_ai_input(delta: float) -> Vector2:
 		
 		# Physical grip & steering agility speed cap for corners:
 		# Sharp corners require real deceleration; high-speed cars (like Viper) cannot cheat physical tire grip!
-		var grip_mult: float = clampf(grip / 5.0, 0.82, 1.25)
+		var grip_mult: float = clampf(grip / 5.0, 0.82, 1.25) * lerpf(1.0, sqrt(surface_grip), 0.8)
 		var steer_ability: float = clampf(steer_speed / 2.8, 0.80, 1.15)
 		var agility_mult: float = grip_mult * steer_ability
 		var min_corner_speed: float = 0.24 if _harbor_stage else (0.22 if _mountain_stage else lerpf(0.25, 0.38, style))
@@ -5854,7 +5876,7 @@ func _get_ai_input(delta: float) -> Vector2:
 		# Kinematic deceleration-based braking distance:
 		# Computes required braking distance from current speed down to safe_speed:
 		# d_brake = (speed^2 - safe_speed^2) / (2 * decel) + reaction_buffer
-		var decel_rate: float = maxf(braking * 0.85, 26.0)
+		var decel_rate: float = maxf(braking * 0.85, 26.0) * lerpf(1.0, surface_grip, ICE_BRAKE_SHARE)
 		var kinematic_brake_dist: float = maxf(speed * speed - safe_speed * safe_speed, 0.0) / (2.0 * decel_rate)
 		# Tighter, realistic braking buffer: allows staying flat out on straights until the actual braking zone
 		var reaction_dist: float = speed * lerpf(0.20, 0.10, style)

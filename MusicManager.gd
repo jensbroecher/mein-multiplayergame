@@ -876,7 +876,12 @@ func _apply_shadows_to_tree(node: Node) -> void:
 		return
 	var enabled: bool = shadows_enabled
 	var q: int = shadow_quality_index
-	if node is DirectionalLight3D:
+	# Fill and accent lights a level marks with "no_shadow" stay unshadowed at every quality. Each
+	# shadowed light re-renders the scene around it, which on a night stage with dozens of lamps
+	# cost more than the rest of the frame.
+	if node is Light3D and node.get_meta(&"no_shadow", false):
+		(node as Light3D).shadow_enabled = false
+	elif node is DirectionalLight3D:
 		var dl := node as DirectionalLight3D
 		dl.shadow_enabled = enabled
 		if enabled:

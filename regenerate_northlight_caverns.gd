@@ -6,11 +6,13 @@
 # Theme: the circuit is cut into a glacier on a polar night. The start/finish straight runs
 # across a frozen lake under the aurora, the road then dives into a glacier ice cavern (a
 # 190m translucent gallery with glowing veins and light shafts), comes out onto a high ice
-# shelf, crosses a 50m crevasse on a natural ice arch, and sweeps home through a field of
-# seracs. Two alternative routes: the Meltwater Cut, a sunken frozen channel, and the Serac
-# Ledge, a narrow shelf between ice towers.
+# shelf, crosses a 50m crevasse on a natural ice arch, sweeps through a field of seracs, and
+# climbs the Northlight Spire: a 285-degree spiral of ice that crosses back over its own run-in
+# and launches the cars off a lip, down a landing hill onto the lake. Two alternative routes: the
+# Meltwater Cut, a sunken frozen channel, and the Serac Ledge, a narrow shelf between ice towers.
+# Blizzards blow through at runtime (NorthlightWeather.gd).
 #
-# Three things are worth knowing before editing this file, because none of them are obvious
+# Four things are worth knowing before editing this file, because none of them are obvious
 # from the geometry:
 #
 # 1. The cavern does NOT bore a hole through the terrain heightfield. The heightfield is
@@ -26,7 +28,13 @@
 #
 # 3. Road edges are ploughed snow banks, not crash barriers. Alternative-route decks are
 #    tiled onto the trunk deck edge exactly like the highway ramps (see _ramp_deck_extents),
-#    and the trunk bank opens itself wherever a route runs alongside it.
+#    and the trunk bank opens itself wherever a route runs alongside it. The banks' collision
+#    is a separate "...SnowBank" body, so PlayerCart treats a bank face as snow, not road.
+#
+# 4. The spire section is the road mesh too. Where the deck stands ELEVATED_MIN over the
+#    ground its underside becomes ice walls down to the ground (_wall_profile), the jump gap is
+#    a span with no deck at all, and the arch over the run-in is the walls stopping short of a
+#    soffit. The terrain is not graded under any of it (_no_grade).
 extends Node
 
 const LEVEL_NAME := "NorthlightCavernsLevel"
@@ -88,7 +96,17 @@ const ARCH_DEPTH := 22.0
 ## Where the underside's parabola puts its vertices across the deck. 0 at the edges, 1 in the
 ## middle: that is the shape that makes an arch read as an arch instead of as a hanging slab.
 const UNDER_DIP := [0.0, 0.58, 1.0, 1.0, 0.58, 0.0]
-const UNDER_VERTS := 6
+## Vertices across the underside. The slab samples UNDER_DIP at these; on the elevated spire
+## section the same ring becomes two ice walls (deck edge, three wall points, foot) either side.
+const UNDER_VERTS := 10
+## Height fractions of the wall points between the deck edge and the foot.
+const WALL_POINTS := [0.25, 0.55, 0.82]
+## The slab's edges are chamfered down past the graded ground (which sits DECK_SLAB + 0.12 under
+## the deck): SLAB_CHAMFER out from the deck edge, SLAB_FOOT down. With a knife edge there, a cart
+## that slid off the ice into a gore could wedge itself under the deck and be pushed through the
+## terrain; the chamfer is a short ramp it can drive back up instead.
+const SLAB_CHAMFER := 0.9
+const SLAB_FOOT := 0.75
 
 # --- Terrain --------------------------------------------------------------------------
 ## Icefield heightfield extent / resolution. 6.25m cells over 1.4km: coarse enough to stay
@@ -134,6 +152,57 @@ const CREVASSE_HALF_W := 26.0
 const CREVASSE_DEPTH := 26.0
 ## Extra corridor radius either side of the slot that the road bridges rather than crosses.
 const CREVASSE_ABUTMENT := 10.0
+
+## Northlight Spire: the return leg climbs a 285-degree spiral of ice around a tower of ice,
+## crosses back over its own run-in on an ice arch, and launches off a lip onto a landing hill
+## that runs down to the lake. The spiral turns clockwise seen from above, i.e. with its angle
+## (measured from +X towards +Z) decreasing.
+##
+## A spiral of more than 180 degrees always crosses its own approach: the tangents at entry and
+## exit meet on the far side. That crossing is the ice arch, and it is why the exit runs
+## SPIRE_TOP_Y - SPIRE_BASE_Y above the run-in rather than beside it.
+const SPIRE_CENTER := Vector2(112.0, 172.0)
+const SPIRE_RADIUS := 44.0
+const SPIRE_ENTRY_DEG := 135.0
+const SPIRE_SWEEP_DEG := 285.0
+const SPIRE_BASE_Y := 5.0
+const SPIRE_TOP_Y := 24.0
+## Straight run-in along the entry tangent. Long enough that the exit arch crosses it on the straight.
+const SPIRE_APPROACH := 70.0
+## Exit straight, in metres from the top of the spiral along its tangent: the kicker starts at
+## SPIRE_KICK_START and the deck ends at SPIRE_LIP, tilted up SPIRE_KICK_DEG.
+const SPIRE_KICK_START := 64.0
+const SPIRE_LIP := 72.0
+const SPIRE_KICK_DEG := 10.0
+## Open air between the lip and the top of the landing hill.
+const SPIRE_GAP := 14.0
+## Landing hill: its top sits LAND_TOP_DROP under the lip, it runs LAND_LEN out to the lake at
+## LAND_BOTTOM_Y, and LAND_SHAPE sets how steep the top is (slope there is
+## (drop * LAND_SHAPE) / LAND_LEN). Tuned by flying carts at 20..54 m/s, see _verify_spire_jump.
+const LAND_TOP_DROP := 6.0
+const LAND_LEN := 70.0
+const LAND_SHAPE := 2.6
+const LAND_BOTTOM_Y := 3.5
+## Half length of the opening under the exit, along it, where it bridges the run-in. The
+## soffit is a flat-topped curve (cubic in the distance from the middle) that meets the ground
+## at the ends, so the opening stays tall across the run-in's banks.
+const SPIRE_ARCH_HALF := 24.0
+## Where the road stands this far above the ground it is an ice structure with walls down to the
+## ground instead of a slab on graded terrain.
+const ELEVATED_MIN := 1.8
+## How far the structure's walls sink below the ground, so corridor grading nearby can't leave a
+## gap under them, and how far they lean out per metre of height.
+const WALL_SINK := 3.0
+const WALL_SPLAY := 0.16
+## Ice towers in the middle of the spiral stay inside this radius at every height, so the walls
+## of the ramp (inner deck edge at SPIRE_RADIUS - MAIN_HALF_W) always clear them.
+const SPIRE_CORE_RADIUS := 27.0
+## Lateral grip of the ice roads, read by PlayerCart from the "ice_grip" meta.
+const ICE_GRIP := 0.5
+## Ring spacing limit for the road meshes. Rings are dropped wherever the ones either side
+## already describe the road to within RING_TOLERANCE, which on straights is most of them.
+const RING_MAX_STEP := 4.0
+const RING_TOLERANCE := 0.02
 
 ## The cavern shell: a closed cross-section swept along the road. Ordering runs from the
 ## left wall foot, up and over the crown, down to the right wall foot, and the loop closes
@@ -196,6 +265,23 @@ var _cavern_off := PackedFloat32Array()
 ## stretch that dips 30cm along the way.
 var _cavern_zs := PackedFloat32Array()
 var _cavern_ys := PackedFloat32Array()
+
+## Spire section, filled in by _append_spire_section / _measure_feature_ranges: the exit tangent,
+## the curve control-point indices of the lip and the landing top, and trunk offsets of the
+## features along it.
+var _spire_exit := Vector2.ZERO
+var _spire_dir := Vector2.ZERO
+var _spire_lip_index := -1
+var _spire_land_index := -1
+var _spire_first_index := -1
+var _spire_last_index := -1
+var _spire_range := Vector2(-1.0, -1.0)
+var _lip_off := -1.0
+var _land_off := -1.0
+var _arch_off := -1.0
+## Where the road stands on ice walls instead of graded ground, and where it has no deck at all.
+var _elevated_spans: Array = []
+var _void_spans: Array = []
 
 ## The finished icefield heights, kept so meshes laid over the terrain afterwards (the cavern
 ## cap) can sit on the ground that was actually built.
@@ -294,8 +380,9 @@ func _handles_for(seg_in: Vector3, seg_out: Vector3, min_radius: float) -> Array
 ## that the tangent at each point matches the actual approach and exit directions, and the
 ## turn is wide enough for the deck.
 ##
-## `points` are positions; the returned curve appends a closing copy of the first point.
-func _build_closed_loop(points: Array, min_radius: float) -> Curve3D:
+## `points` are positions; the returned curve appends a closing copy of the first point. Indices
+## in `shaped` are reshaped by the caller afterwards and are not warned about.
+func _build_closed_loop(points: Array, min_radius: float, shaped: Array = []) -> Curve3D:
 	var n: int = points.size()
 	var handles: Array = []
 	for i in range(n):
@@ -304,7 +391,8 @@ func _build_closed_loop(points: Array, min_radius: float) -> Curve3D:
 		var nxt: Vector3 = points[(i + 1) % n]
 		var h: Array = _handles_for(cur - prev, nxt - cur, min_radius)
 		handles.append(h)
-		if h[2]:
+		# `shaped` points get their handles set afterwards (the jump), so their fit doesn't matter.
+		if h[2] and not shaped.has(i):
 			push_warning("Control point %d wants a %.0fm radius but its %.0fm chord only allows it; insert a point there" % [
 				i, min_radius, (nxt - prev).length() * 0.5])
 
@@ -380,6 +468,78 @@ func _build_route_curve(split_anchor: Vector3, merge_anchor: Vector3, side: int,
 	return c
 
 
+## Height of the landing hill `x` metres past its top, relative to the lip. Steep at the top so a
+## cart coming down from the lip meets it at a glancing angle, flattening out onto the lake.
+func _land_hill(x: float, lip_y: float) -> float:
+	var u: float = clampf(x / LAND_LEN, 0.0, 1.0)
+	var top: float = lip_y - LAND_TOP_DROP
+	return top - (top - LAND_BOTTOM_Y) * (1.0 - pow(1.0 - u, LAND_SHAPE))
+
+
+func _spire_lip_y() -> float:
+	# The exit climbs 2% from the top of the spiral to the kicker, which then curls up to
+	# SPIRE_KICK_DEG over the last few metres (mean slope halfway between the two).
+	var kick_rise: float = (SPIRE_LIP - SPIRE_KICK_START) * (0.02 + tan(deg_to_rad(SPIRE_KICK_DEG))) * 0.5
+	return SPIRE_TOP_Y + SPIRE_KICK_START * 0.02 + kick_rise
+
+
+## Appends the Northlight Spire section to the trunk's control points: the run-in, the spiral,
+## the exit straight over the arch, the lip, and the landing hill. Records the indices of the lip
+## and the landing top, whose handles are set afterwards (see _shape_spire_handles).
+func _append_spire_section(pts: Array) -> void:
+	var c: Vector2 = SPIRE_CENTER
+	var r: float = SPIRE_RADIUS
+	var a0: float = deg_to_rad(SPIRE_ENTRY_DEG)
+	var sweep: float = deg_to_rad(SPIRE_SWEEP_DEG)
+	var entry := Vector2(c.x + r * cos(a0), c.y + r * sin(a0))
+	# Clockwise travel (angle decreasing): the tangent at angle a is (sin a, -cos a).
+	var in_dir := Vector2(sin(a0), -cos(a0))
+	_spire_first_index = pts.size()
+	pts.append(Vector3(entry.x - in_dir.x * SPIRE_APPROACH, 4.55, entry.y - in_dir.y * SPIRE_APPROACH))
+
+	# The spiral, a control point every ~41 degrees. The cubic handles _handles_for derives for a
+	# regular polygon are within 4% of a true arc, so the radius stays put.
+	var steps := 7
+	for k in range(steps + 1):
+		var f: float = float(k) / float(steps)
+		var a: float = a0 - sweep * f
+		pts.append(Vector3(c.x + r * cos(a), lerpf(SPIRE_BASE_Y, SPIRE_TOP_Y, f), c.y + r * sin(a)))
+
+	var a1: float = a0 - sweep
+	_spire_exit = Vector2(c.x + r * cos(a1), c.y + r * sin(a1))
+	_spire_dir = Vector2(sin(a1), -cos(a1))
+	var at := func(t: float, y: float) -> Vector3:
+		return Vector3(_spire_exit.x + _spire_dir.x * t, y, _spire_exit.y + _spire_dir.y * t)
+
+	# Exit straight: over the arch, onto the kicker, off the lip.
+	var lip_y: float = _spire_lip_y()
+	pts.append(at.call(30.0, SPIRE_TOP_Y + 0.6))
+	pts.append(at.call(SPIRE_KICK_START, SPIRE_TOP_Y + SPIRE_KICK_START * 0.02))
+	_spire_lip_index = pts.size()
+	pts.append(at.call(SPIRE_LIP, lip_y))
+	# Landing hill. Points are dense near the top, where the shape matters most.
+	_spire_land_index = pts.size()
+	var hill_x0: float = SPIRE_LIP + SPIRE_GAP
+	for u in [0.0, 0.12, 0.27, 0.45, 0.70, 1.0]:
+		var x: float = LAND_LEN * u
+		pts.append(at.call(hill_x0 + x, _land_hill(x, lip_y)))
+	_spire_last_index = pts.size() - 1
+
+
+## The lip and the landing top get their handles from the jump, not from their neighbours: the
+## kicker has to leave the deck at SPIRE_KICK_DEG, and the hill has to start at its own slope. The
+## pairs stay collinear, or the deck would fold at the point.
+func _shape_spire_handles(curve: Curve3D) -> void:
+	var kd: float = deg_to_rad(SPIRE_KICK_DEG)
+	var kick := Vector3(_spire_dir.x * cos(kd), sin(kd), _spire_dir.y * cos(kd)).normalized()
+	curve.set_point_in(_spire_lip_index, -kick * 3.0)
+	curve.set_point_out(_spire_lip_index, kick * 5.0)
+	var top_slope: float = (_spire_lip_y() - LAND_TOP_DROP - LAND_BOTTOM_Y) * LAND_SHAPE / LAND_LEN
+	var down := Vector3(_spire_dir.x, -top_slope, _spire_dir.y).normalized()
+	curve.set_point_in(_spire_land_index, -down * 5.0)
+	curve.set_point_out(_spire_land_index, down * 5.0)
+
+
 ## Fails the generation if a baked centreline turns tighter than its own deck, which is what
 ## folds a ribbon inside out and makes its surface and banks shimmer.
 ## Fails the build if any two non-adjacent parts of the circuit come within a road's width of
@@ -422,6 +582,10 @@ func _verify_plan(curve: Curve3D, length: float, label: String) -> void:
 			if along * step < min_along:
 				continue
 			var b: Vector3 = samples[j]
+			# Grade-separated: the spire exit passes over its own run-in on purpose, and the walls of
+			# that arch are checked on their own by _verify_spire_arch.
+			if absf(a.y - b.y) > 9.0:
+				continue
 			var d := Vector2(a.x - b.x, a.z - b.z).length()
 			if d < worst:
 				worst = d
@@ -438,6 +602,100 @@ func _verify_plan(curve: Curve3D, length: float, label: String) -> void:
 		print("  %s plan has %d overlapping stretches (tightest %.1fm)" % [label, bad, worst])
 
 
+## Fails the build if the arch carrying the spire exit comes down within reach of the run-in
+## underneath it. Walks the exit ring by ring, takes the real wall profile (_wall_profile, the one
+## the mesh is built from) and measures it against the run-in's deck across its full width plus
+## the banks.
+func _verify_spire_arch(curve: Curve3D) -> void:
+	var below: Vector3 = curve.sample_baked(_arch_off)
+	var run_in_off: float = curve.get_closest_offset(Vector3(below.x, SPIRE_BASE_Y, below.z))
+	var openings: Array = [Vector2(_arch_off, SPIRE_ARCH_HALF)]
+	var worst: float = 1e9
+	var worst_at := Vector3.ZERO
+	var off: float = _arch_off - SPIRE_ARCH_HALF - 8.0
+	while off <= _arch_off + SPIRE_ARCH_HALF + 8.0:
+		var f: Dictionary = _frame_at_offset(curve, off)
+		var prof: Array = _wall_profile(f["pos"], f["right"], 0.0, -MAIN_HALF_W, MAIN_HALF_W, off, openings)
+		var foot_l: Vector2 = prof[4]
+		var foot_r: Vector2 = prof[5]
+		var o2: float = run_in_off - 30.0
+		while o2 <= run_in_off + 30.0:
+			var g: Dictionary = _frame_at_offset(curve, o2)
+			for lat in [-9.6, -6.0, -3.0, 0.0, 3.0, 6.0, 9.6]:
+				var q: Vector3 = g["pos"] + g["right"] * lat
+				var rel: Vector3 = q - f["pos"]
+				var fwd_h := Vector3(f["fwd"].x, 0.0, f["fwd"].z).normalized()
+				if absf(rel.dot(fwd_h)) > 0.3:
+					continue
+				var l: float = rel.dot(f["right"])
+				if l < foot_l.x - 0.5 or l > foot_r.x + 0.5:
+					continue
+				var soffit: float = f["pos"].y - maxf(foot_l.y, foot_r.y)
+				var clear: float = soffit - q.y
+				if clear < worst:
+					worst = clear
+					worst_at = q
+			o2 += 1.0
+		off += 0.5
+	if worst > 1e8:
+		push_error("The spire exit never passes over its run-in - the arch has nothing to span")
+	elif worst < 5.0:
+		push_error("The spire arch comes down to %.1fm over the run-in at (%.0f, %.0f) - cars on the run-in hit it" % [
+			worst, worst_at.x, worst_at.z])
+	else:
+		print("  spire arch clears the run-in by %.1fm" % worst)
+
+
+## Flies carts off the spire lip at a range of speeds over the deck that was actually built, and
+## reports where each lands and how hard (the speed into the slope). Fails the build if a cart at
+## a sensible speed falls into the gap.
+func _verify_spire_jump(curve: Curve3D) -> void:
+	const G := 39.8      # PlayerCart.GRAVITY plus the engine's 9.8
+	const VCAP := 48.0   # PlayerCart MAX_FALL_SPEED
+	const RIDE := 0.45   # sphere centre over the deck
+	var lip: Vector3 = curve.sample_baked(_lip_off)
+	var d := Vector3(_spire_dir.x, 0.0, _spire_dir.y)
+	var kd: float = deg_to_rad(SPIRE_KICK_DEG)
+	# The landing deck as (distance along the jump line from the lip, height).
+	var prof := PackedVector2Array()
+	var off: float = _land_off
+	while off < minf(_land_off + LAND_LEN + 40.0, curve.get_baked_length()):
+		var p: Vector3 = curve.sample_baked(off)
+		prof.append(Vector2(Vector2(p.x - lip.x, p.z - lip.z).dot(_spire_dir), p.y))
+		off += 0.5
+	var line := ""
+	for v in [20.0, 24.0, 28.0, 32.0, 36.0, 40.0, 45.0, 50.0, 54.0]:
+		var pos: Vector3 = lip + Vector3.UP * RIDE
+		var vel: Vector3 = d * (v * cos(kd)) + Vector3.UP * (v * sin(kd))
+		var dt := 1.0 / 120.0
+		var t := 0.0
+		var result := "?"
+		while t < 6.0:
+			vel.y = maxf(vel.y - G * dt, -VCAP)
+			pos += vel * dt
+			t += dt
+			var x: float = Vector2(pos.x - lip.x, pos.z - lip.z).dot(_spire_dir)
+			if x < prof[0].x:
+				if pos.y - RIDE <= _final_ground(pos.x, pos.z):
+					result = "%.0fm SHORT" % x
+					if v >= 24.0:
+						push_error("Spire jump: a cart at %d m/s drops into the gap %.0fm out" % [int(v), x])
+					break
+				continue
+			var k: int = clampi(int((x - prof[0].x) / maxf(prof[1].x - prof[0].x, 0.01)), 0, prof.size() - 2)
+			var a: Vector2 = prof[k]
+			var b: Vector2 = prof[k + 1]
+			var deck: float = lerpf(a.y, b.y, clampf((x - a.x) / maxf(b.x - a.x, 0.01), 0.0, 1.0))
+			if pos.y - RIDE <= deck:
+				var slope: float = atan2(b.y - a.y, maxf(b.x - a.x, 0.01))
+				var vh: float = Vector2(vel.x, vel.z).length()
+				var impact: float = vel.length() * sin(absf(atan2(vel.y, vh) - slope))
+				result = "%.0fm (impact %.0f)" % [x, impact]
+				break
+		line += "  %d m/s -> %s" % [int(v), result]
+	print("  spire jump:%s" % line)
+
+
 func _verify_min_radius(curve: Curve3D, half_w: float, label: String) -> void:
 	var length: float = curve.get_baked_length()
 	var window: float = 8.0
@@ -445,6 +703,9 @@ func _verify_min_radius(curve: Curve3D, half_w: float, label: String) -> void:
 	var worst_at: float = 0.0
 	for i in range(int(length) + 1):
 		var d: float = float(i)
+		# The jump gap is a flight path, not a road: its curvature is the trajectory's.
+		if curve == main_track_curve and _in_any_gap(d, _void_spans):
+			continue
 		var a: Vector3 = curve.sample_baked(maxf(0.0, d - window))
 		var b: Vector3 = curve.sample_baked(d)
 		var c: Vector3 = curve.sample_baked(minf(length, d + window))
@@ -672,16 +933,17 @@ func _emit_cap(st: SurfaceTool, first_index: int, profile: PackedVector3Array, w
 ## Depth of the underside at `t` across the deck, from the dip profile. Returns 1 in the
 ## middle of the deck and 0 at its edges.
 func _under_dip_at(t: float) -> float:
-	var f: float = clampf(t, 0.0, 1.0) * float(UNDER_VERTS - 1)
-	var i: int = clampi(int(f), 0, UNDER_VERTS - 2)
+	var f: float = clampf(t, 0.0, 1.0) * float(UNDER_DIP.size() - 1)
+	var i: int = clampi(int(f), 0, UNDER_DIP.size() - 2)
 	var frac: float = f - float(i)
 	var a: float = UNDER_DIP[i]
 	var b: float = UNDER_DIP[i + 1]
 	return lerpf(a, b, frac)
 
 
-## Builds the road deck, the ploughed snow banks along both edges, and the ice shelf (or the
-## crevasse arch) under the carriageway.
+## Builds the road deck, the ploughed snow banks along both edges, and the ice under the
+## carriageway: a slab, the arch over the crevasse, or ice walls down to the ground where the
+## road is up in the air.
 ##
 ## Trunk (`route_side` = 0): pass the bank gap intervals in metres along the curve, normally
 ## produced by _junction_gap_intervals() so a bank can never be left standing across the mouth
@@ -695,10 +957,14 @@ func _under_dip_at(t: float) -> float:
 ##
 ## `arch_range` is the span over which the underside leaves the deck and becomes the ice arch
 ## over the crevasse; pass Vector2(-1.0, -1.0) for an ordinary slab.
+##
+## `structure` describes the spire section, as distance-along spans: "elevated" stands on ice
+## walls that reach the ground, "voids" have no road at all (the jump gap), and "openings" are
+## Vector2(centre, half length) where an elevated span arches over another road.
 func _build_road_mesh(parent: Node, curve: Curve3D, width: float, node_name: String,
 		road_mat: Material, bank_mat: Material, under_mat: Material,
 		route_side: int, trunk_half_w: float,
-		left_gaps: Array, right_gaps: Array, arch_range: Vector2) -> void:
+		left_gaps: Array, right_gaps: Array, arch_range: Vector2, structure: Dictionary = {}) -> void:
 	var baked := curve.get_baked_points()
 	if baked.size() < 2:
 		return
@@ -707,6 +973,9 @@ func _build_road_mesh(parent: Node, curve: Curve3D, width: float, node_name: Str
 	var total_len: float = curve.get_baked_length()
 	var is_route: bool = route_side != 0
 	var trunk: Curve3D = main_track_curve if is_route else null
+	var elevated: Array = structure.get("elevated", [])
+	var voids: Array = structure.get("voids", [])
+	var openings: Array = structure.get("openings", [])
 
 	# Which side of the trunk the route really sits on, measured off the curve itself so the
 	# deck tiling follows the geometry rather than the node name.
@@ -714,7 +983,6 @@ func _build_road_mesh(parent: Node, curve: Curve3D, width: float, node_name: Str
 	if trunk != null:
 		var lat_a: float = _lateral_offset(trunk, curve.sample_baked(total_len * 0.15))
 		var lat_b: float = _lateral_offset(trunk, curve.sample_baked(total_len * 0.85))
-		var strongest: float = absf(lat_a) if absf(lat_a) >= absf(lat_b) else absf(lat_b)
 		side = signi(lat_a if absf(lat_a) >= absf(lat_b) else lat_b)
 		if side == 0:
 			side = signi(route_side)
@@ -723,28 +991,28 @@ func _build_road_mesh(parent: Node, curve: Curve3D, width: float, node_name: Str
 	var n_rings: int = baked.size()
 	var ring_frame := PackedVector3Array()
 	var ring_lat := PackedFloat32Array()
-	var ring_y_bias := PackedFloat32Array()
+	var ring_pos := PackedVector3Array()
 	var deck_left := PackedFloat32Array()
 	var deck_right := PackedFloat32Array()
 	var bank_left := PackedFloat32Array()
 	var bank_right := PackedFloat32Array()
 	var ring_depth := PackedFloat32Array()
+	var ring_struct := PackedFloat32Array()
+	var ring_void := PackedByteArray()
 	var dist_along := PackedFloat32Array()
+	var edge_l := PackedVector3Array()
+	var edge_r := PackedVector3Array()
 
 	# Outward 2D normals of the bank profile, averaged per vertex. Profiles are authored
 	# counter-clockwise in (u, v), so the outward normal of edge P->Q is (dy, -dx).
 	var prof_nrm := PackedVector2Array()
-	var acc := Vector2.ZERO
 	for i in range(BANK_VERTS):
 		var prev: Vector2 = BANK_PROFILE[(i + BANK_VERTS - 1) % BANK_VERTS]
 		var here: Vector2 = BANK_PROFILE[i]
 		var nxt: Vector2 = BANK_PROFILE[(i + 1) % BANK_VERTS]
 		var e_in: Vector2 = (here - prev).normalized()
 		var e_out: Vector2 = (nxt - here).normalized()
-		acc += Vector2(e_in.y, -e_in.x)
-		acc += Vector2(e_out.y, -e_out.x)
-		prof_nrm.append(acc.normalized())
-		acc = Vector2.ZERO
+		prof_nrm.append((Vector2(e_in.y, -e_in.x) + Vector2(e_out.y, -e_out.x)).normalized())
 
 	var cum: float = 0.0
 	for i in range(n_rings):
@@ -817,15 +1085,51 @@ func _build_road_mesh(parent: Node, curve: Curve3D, width: float, node_name: Str
 			var t: float = (cum - arch_range.x) / maxf(arch_range.y - arch_range.x, 0.001)
 			depth += ARCH_DEPTH * 4.0 * t * (1.0 - t)
 
+		# The jump: no deck, no banks, nothing.
+		var in_void: bool = _in_any_gap(cum, voids)
+		if in_void:
+			b_l = 0.0
+			b_r = 0.0
+		# Up in the air: the slab becomes walls of ice down to the ground, faded in over the first
+		# metres of height so the structure grows out of the snow instead of starting as a step.
+		var s_wall: float = 0.0
+		if not in_void and _in_any_gap(cum, elevated):
+			s_wall = smoothstep(1.2, 3.0, p.y - _final_ground(p.x, p.z))
+
+		var pos: Vector3 = p + Vector3.UP * y_bias
 		ring_frame.append(frame)
 		ring_lat.append(lat_here)
-		ring_y_bias.append(y_bias)
+		ring_pos.append(pos)
 		deck_left.append(d_l)
 		deck_right.append(d_r)
 		bank_left.append(b_l)
 		bank_right.append(b_r)
 		ring_depth.append(depth)
+		ring_struct.append(s_wall)
+		ring_void.append(1 if in_void else 0)
 		dist_along.append(cum)
+		edge_l.append(pos + frame * (d_l - lat_here))
+		edge_r.append(pos + frame * (d_r - lat_here))
+
+	# --- Pass 1b: keep only the rings the shape needs -----------------------------------
+	# The rings either side of a jump gap are pinned, so the lip and the landing edge are exact.
+	var forced := PackedByteArray()
+	forced.resize(n_rings)
+	forced[0] = 1
+	forced[n_rings - 1] = 1
+	for i in range(1, n_rings):
+		if ring_void[i] != ring_void[i - 1]:
+			forced[i] = 1
+			forced[i - 1] = 1
+	var keep: PackedInt32Array = _select_rings(ring_pos, edge_l, edge_r, dist_along,
+			bank_left, bank_right, ring_depth, ring_struct, forced)
+	var n_keep: int = keep.size()
+	# A segment between two kept rings is part of the gap if its middle is.
+	var seg_void := PackedByteArray()
+	seg_void.resize(maxi(n_keep - 1, 0))
+	for r in range(n_keep - 1):
+		var mid: float = (dist_along[keep[r]] + dist_along[keep[r + 1]]) * 0.5
+		seg_void[r] = 1 if _in_any_gap(mid, voids) else 0
 
 	# --- Pass 2: vertices -------------------------------------------------------------
 	var st_road := SurfaceTool.new()
@@ -837,14 +1141,18 @@ func _build_road_mesh(parent: Node, curve: Curve3D, width: float, node_name: Str
 
 	var prof_left: Array = []
 	var prof_right: Array = []
+	var under_rings: Array = []
+	var ring_fwd := PackedVector3Array()
 
-	for i in range(n_rings):
-		var p: Vector3 = baked[i] + Vector3.UP * ring_y_bias[i]
+	for r in range(n_keep):
+		var i: int = keep[r]
+		var p: Vector3 = ring_pos[i]
 		var fwd: Vector3 = Vector3.FORWARD
 		if i < n_rings - 1:
 			fwd = (baked[i + 1] - baked[i]).normalized()
 		elif i > 0:
 			fwd = (baked[i] - baked[i - 1]).normalized()
+		ring_fwd.append(fwd)
 		var right := Vector3(-fwd.z, 0.0, fwd.x).normalized()
 		var frame: Vector3 = ring_frame[i]
 		var up := Vector3.UP
@@ -899,8 +1207,7 @@ func _build_road_mesh(parent: Node, curve: Curve3D, width: float, node_name: Str
 			var n2: Vector2 = prof_nrm[k]
 			# Left edge: profile u runs toward the road (+lateral). Right edge: mirrored.
 			var v_l := p + frame * (d_l + shift + prof.x) + up * (prof.y * bank_left[i])
-			var n_l := (right * n2.x + up * n2.y).normalized()
-			st_bank.set_normal(n_l)
+			st_bank.set_normal((right * n2.x + up * n2.y).normalized())
 			st_bank.set_uv(Vector2(0.0, uv_y * 0.3))
 			st_bank.add_vertex(v_l)
 			pl.append(v_l)
@@ -908,26 +1215,48 @@ func _build_road_mesh(parent: Node, curve: Curve3D, width: float, node_name: Str
 			var prof: Vector2 = BANK_PROFILE[k]
 			var n2: Vector2 = prof_nrm[k]
 			var v_r := p + frame * (d_r + shift - prof.x) + up * (prof.y * bank_right[i])
-			var n_r := (-right * n2.x + up * n2.y).normalized()
-			st_bank.set_normal(n_r)
+			st_bank.set_normal((-right * n2.x + up * n2.y).normalized())
 			st_bank.set_uv(Vector2(1.0, uv_y * 0.3))
 			st_bank.add_vertex(v_r)
 			pr.append(v_r)
 		prof_left.append(pl)
 		prof_right.append(pr)
 
-		# --- 3. UNDERSIDE: ice shelf, deepening into the arch across the crevasse span ---
+		# --- 3. UNDERSIDE: ice shelf, the crevasse arch, or walls down to the ground ---
+		var s_wall: float = ring_struct[i]
+		var wall: Array = []
+		if s_wall > 0.0:
+			wall = _wall_profile(p, frame, shift, d_l, d_r, dist_along[i], openings)
+		var ur := PackedVector3Array()
 		for k in range(UNDER_VERTS):
 			var t2: float = float(k) / float(UNDER_VERTS - 1)
-			var lat2: float = lerpf(d_l, d_r, t2)
-			var v2: Vector3 = p + frame * (lat2 + shift) - up * (ring_depth[i] * _under_dip_at(t2))
+			# Slab: deck edge, chamfer foot, the dip profile across the middle (never shallower than
+			# the foot), chamfer foot, deck edge.
+			var lat2: float = d_l if k == 0 else d_r
+			var dip: float = 0.0
+			if k == 1 or k == UNDER_VERTS - 2:
+				lat2 = d_l - SLAB_CHAMFER if k == 1 else d_r + SLAB_CHAMFER
+				dip = SLAB_FOOT
+			elif k > 1 and k < UNDER_VERTS - 2:
+				var f: float = float(k - 1) / float(UNDER_VERTS - 3)
+				lat2 = lerpf(d_l, d_r, f)
+				dip = maxf(ring_depth[i] * _under_dip_at(f), SLAB_FOOT)
+			if s_wall > 0.0:
+				var wv: Vector2 = wall[k]
+				lat2 = lerpf(lat2, wv.x, s_wall)
+				dip = lerpf(dip, wv.y, s_wall)
+			var v2: Vector3 = p + frame * (lat2 + shift) - up * dip
 			st_under.set_uv(Vector2(t2, uv_y * 0.2))
 			st_under.add_vertex(v2)
+			ur.append(v2)
+		under_rings.append(ur)
 
 	# --- Pass 3: road deck triangles (4 quads per segment) ---------------------------
-	for i in range(n_rings - 1):
-		var r0: int = i * 5
-		var r1: int = (i + 1) * 5
+	for r in range(n_keep - 1):
+		if seg_void[r]:
+			continue
+		var r0: int = r * 5
+		var r1: int = (r + 1) * 5
 		for c in range(4):
 			var a: int = r0 + c
 			var b: int = r0 + c + 1
@@ -939,22 +1268,20 @@ func _build_road_mesh(parent: Node, curve: Curve3D, width: float, node_name: Str
 	# --- Pass 4: bank side quads + solid caps at every start/end ----------------------
 	# Each ring is 2 * BANK_VERTS vertices: the left profile then the right profile.
 	var ring_stride: int = BANK_VERTS * 2
-	var cap_base: int = n_rings * ring_stride
-	for i in range(n_rings - 1):
+	var cap_base: int = n_keep * ring_stride
+	for r in range(n_keep - 1):
+		var i0: int = keep[r]
+		var i1: int = keep[r + 1]
+		var fwd: Vector3 = ring_fwd[r]
+		var nxt_fwd: Vector3 = ring_fwd[r + 1]
 		for s in range(2): # 0 = left, 1 = right
-			var base: int = i * ring_stride + BANK_VERTS * s
+			var base: int = r * ring_stride + BANK_VERTS * s
 			var nxt_base: int = base + ring_stride
-			var h0: float = bank_left[i] if s == 0 else bank_right[i]
-			var h1: float = bank_left[i + 1] if s == 0 else bank_right[i + 1]
+			var h0: float = bank_left[i0] if s == 0 else bank_right[i0]
+			var h1: float = bank_left[i1] if s == 0 else bank_right[i1]
 			var profiles: Array = prof_left if s == 0 else prof_right
-			var fwd: Vector3 = Vector3.FORWARD
-			if i < n_rings - 1:
-				fwd = (baked[i + 1] - baked[i]).normalized()
-			var nxt_fwd: Vector3 = fwd
-			if i + 2 < n_rings:
-				nxt_fwd = (baked[i + 2] - baked[i + 1]).normalized()
 
-			if h0 > 0.06 or h1 > 0.06:
+			if (h0 > 0.06 or h1 > 0.06) and not seg_void[r]:
 				# Right-hand profiles are mirrored, so their quads wind the other way to keep
 				# every face normal pointing out of the snow.
 				for c in range(BANK_VERTS):
@@ -969,19 +1296,21 @@ func _build_road_mesh(parent: Node, curve: Curve3D, width: float, node_name: Str
 						st_bank.add_index(a); st_bank.add_index(b); st_bank.add_index(c_idx)
 						st_bank.add_index(b); st_bank.add_index(d); st_bank.add_index(c_idx)
 
-			var starts: bool = (i == 0 and h0 > 0.06) or (h0 <= 0.06 and h1 > 0.06)
-			var ends: bool = (i == n_rings - 2 and h1 > 0.06) or (h0 > 0.06 and h1 <= 0.06)
+			var starts: bool = (r == 0 and h0 > 0.06) or (h0 <= 0.06 and h1 > 0.06)
+			var ends: bool = (r == n_keep - 2 and h1 > 0.06) or (h0 > 0.06 and h1 <= 0.06)
 			if starts:
-				var ring: int = i if i == 0 else i + 1
-				cap_base = _emit_cap(st_bank, cap_base, profiles[ring], -fwd if i == 0 else -nxt_fwd)
+				var ring: int = r if r == 0 else r + 1
+				cap_base = _emit_cap(st_bank, cap_base, profiles[ring], -fwd if r == 0 else -nxt_fwd)
 			if ends:
-				var ring2: int = i + 1 if i == n_rings - 2 else i
-				cap_base = _emit_cap(st_bank, cap_base, profiles[ring2], nxt_fwd if i == n_rings - 2 else fwd)
+				var ring2: int = r + 1 if r == n_keep - 2 else r
+				cap_base = _emit_cap(st_bank, cap_base, profiles[ring2], nxt_fwd if r == n_keep - 2 else fwd)
 
-	# --- Pass 5: underside (5 quads per segment, ends capped) -------------------------
-	for i in range(n_rings - 1):
-		var u0: int = i * UNDER_VERTS
-		var u1: int = (i + 1) * UNDER_VERTS
+	# --- Pass 5: underside quads, capped wherever the slab starts or stops ------------
+	for r in range(n_keep - 1):
+		if seg_void[r]:
+			continue
+		var u0: int = r * UNDER_VERTS
+		var u1: int = (r + 1) * UNDER_VERTS
 		for c in range(UNDER_VERTS - 1):
 			var a: int = u0 + c
 			var b: int = u0 + c + 1
@@ -989,15 +1318,16 @@ func _build_road_mesh(parent: Node, curve: Curve3D, width: float, node_name: Str
 			var d: int = u1 + c + 1
 			st_under.add_index(a); st_under.add_index(b); st_under.add_index(c_idx)
 			st_under.add_index(b); st_under.add_index(d); st_under.add_index(c_idx)
-	# Cap the two ends so the shelf is not an open hollow tube.
-	for c in range(1, UNDER_VERTS - 1):
-		st_under.add_index(0)
-		st_under.add_index(c)
-		st_under.add_index(c + 1)
-		var e0: int = (n_rings - 1) * UNDER_VERTS
-		st_under.add_index(e0)
-		st_under.add_index(e0 + c + 1)
-		st_under.add_index(e0 + c)
+	# Caps: both ends of the road, and both faces of every jump gap (the lip face is the one
+	# every driver sees on the way in, so it gets a proper face rather than an open shell).
+	var under_base: int = n_keep * UNDER_VERTS
+	for r in range(n_keep):
+		var before_open: bool = r > 0 and not seg_void[r - 1]
+		var after_open: bool = r < n_keep - 1 and not seg_void[r]
+		if after_open and not before_open:
+			under_base = _emit_ring_cap(st_under, under_base, under_rings[r], -ring_fwd[r])
+		elif before_open and not after_open:
+			under_base = _emit_ring_cap(st_under, under_base, under_rings[r], ring_fwd[r])
 
 	# --- Pass 6: commit meshes, collision --------------------------------------------
 	# Meshes and collision shapes go to res://generated/ as binary resources, the same way the
@@ -1014,10 +1344,13 @@ func _build_road_mesh(parent: Node, curve: Curve3D, width: float, node_name: Str
 	st_under.generate_normals()
 	st_under.generate_tangents()
 	var under_mesh: ArrayMesh = _save_baked_resource(st_under.commit(), "%s_underside" % node_name)
+	print("  %s: %d of %d rings kept" % [node_name, n_keep, n_rings])
 
 	var static_body := StaticBody3D.new()
 	static_body.name = node_name + "_Collision"
 	static_body.add_to_group("track_surface", true)
+	# The whole carriageway is ice: PlayerCart reads this and loosens the grip.
+	static_body.set_meta("ice_grip", ICE_GRIP)
 
 	var road_inst := MeshInstance3D.new()
 	road_inst.name = node_name + "_DeckMesh"
@@ -1054,15 +1387,147 @@ func _build_road_mesh(parent: Node, curve: Curve3D, width: float, node_name: Str
 	col_under.shape = _save_baked_resource(u_trimesh, "%s_underside_collision" % node_name)
 	static_body.add_child(col_under)
 
+	parent.add_child(static_body)
+
+	# The banks get a body of their own, named as snow and not as road. PlayerCart treats anything
+	# under a "road" body as carriageway: on a bank face it then cancelled the gravity pulling the
+	# car back down and skipped its off-road cliff rules, so a car sliding wide on the ice rode up
+	# the 2m bank and over it. As snow they are off-road (the slope and cliff rules hold the car
+	# in) and drag like snow, and they keep their grip rather than the deck's ice.
+	var bank_body := StaticBody3D.new()
+	bank_body.name = node_name.replace("Road", "") + "SnowBank"
 	var col_bank := CollisionShape3D.new()
 	col_bank.name = "BankCollision"
 	var b_trimesh: Shape3D = bank_mesh.create_trimesh_shape()
 	if b_trimesh is ConcavePolygonShape3D:
 		(b_trimesh as ConcavePolygonShape3D).backface_collision = true
 	col_bank.shape = _save_baked_resource(b_trimesh, "%s_bank_collision" % node_name)
-	static_body.add_child(col_bank)
+	bank_body.add_child(col_bank)
+	parent.add_child(bank_body)
 
-	parent.add_child(static_body)
+
+## Picks the baked rings a road mesh keeps. From each kept ring it reaches as far ahead as it can
+## while every ring it skips is reproduced by interpolating the two ends to within RING_TOLERANCE:
+## centreline, both deck edges (which catches the frame turning and the width changing), bank
+## heights and the underside. Straights end up at RING_MAX_STEP spacing, the tightest corners
+## keep their 0.4m baking. `forced` rings are always kept.
+func _select_rings(pos: PackedVector3Array, edge_l: PackedVector3Array, edge_r: PackedVector3Array,
+		dist: PackedFloat32Array, bank_l: PackedFloat32Array, bank_r: PackedFloat32Array,
+		depth: PackedFloat32Array, strc: PackedFloat32Array, forced: PackedByteArray) -> PackedInt32Array:
+	var n: int = pos.size()
+	var keep := PackedInt32Array([0])
+	var k := 0
+	while k < n - 1:
+		var j: int = k + 1
+		while j + 1 < n and forced[j] == 0 and dist[j + 1] - dist[k] <= RING_MAX_STEP:
+			var b: int = j + 1
+			var span: float = maxf(dist[b] - dist[k], 1e-4)
+			var fits := true
+			for m in range(k + 1, b):
+				var f: float = (dist[m] - dist[k]) / span
+				if pos[k].lerp(pos[b], f).distance_to(pos[m]) > RING_TOLERANCE \
+						or edge_l[k].lerp(edge_l[b], f).distance_to(edge_l[m]) > RING_TOLERANCE \
+						or edge_r[k].lerp(edge_r[b], f).distance_to(edge_r[m]) > RING_TOLERANCE \
+						or absf(lerpf(bank_l[k], bank_l[b], f) - bank_l[m]) > 0.04 \
+						or absf(lerpf(bank_r[k], bank_r[b], f) - bank_r[m]) > 0.04 \
+						or absf(lerpf(depth[k], depth[b], f) - depth[m]) > 0.05 \
+						or absf(lerpf(strc[k], strc[b], f) - strc[m]) > 0.04:
+					fits = false
+					break
+			if not fits:
+				break
+			j = b
+		keep.append(j)
+		k = j
+	return keep
+
+
+## Cross-section of the ice walls under an elevated ring, as (lateral, depth below the deck) for
+## each of the UNDER_VERTS underside vertices: the left deck edge, three points down the left
+## wall, the left foot, the right foot, three points up the right wall, the right deck edge.
+##
+## Each foot reaches WALL_SINK below the ground under it, and the walls lean out WALL_SPLAY per
+## metre of height, so the structure is broader at the base like a pier of ice rather than a
+## cut-out slab. The wall points bulge in and out with noise sampled in world space, which keeps
+## neighbouring rings consistent and stops 20m faces reading as flat sheets. Inside an opening
+## the walls stop short at a parabolic soffit instead: that is the arch over the run-in.
+func _wall_profile(p: Vector3, frame: Vector3, shift: float, d_l: float, d_r: float,
+		dist: float, openings: Array) -> Array:
+	var limit: float = INF
+	for op in openings:
+		var u: float = (dist - op.x) / op.y
+		if absf(u) < 1.0:
+			var full: float = p.y - _final_ground(p.x, p.z) + WALL_SINK
+			limit = minf(limit, DECK_SLAB + 1.5 + (full - DECK_SLAB - 1.5) * absf(u * u * u))
+	var out: Array = []
+	out.resize(UNDER_VERTS)
+	for s in [-1.0, 1.0]:
+		var edge: float = d_l if s < 0.0 else d_r
+		# The foot first: its depth sets the lean, and the lean moves the foot, so one refinement.
+		var depth: float = p.y - _final_ground(p.x, p.z) + WALL_SINK
+		for _it in range(2):
+			var foot: Vector3 = p + frame * (edge + s * WALL_SPLAY * depth + shift)
+			depth = minf(p.y - _final_ground(foot.x, foot.z) + WALL_SINK, limit)
+		depth = maxf(depth, DECK_SLAB)
+		var foot_lat: float = edge + s * WALL_SPLAY * depth
+		var top_k: int = 0 if s < 0.0 else UNDER_VERTS - 1
+		var foot_k: int = 4 if s < 0.0 else 5
+		out[top_k] = Vector2(edge, 0.0)
+		out[foot_k] = Vector2(foot_lat, depth)
+		for w in range(WALL_POINTS.size()):
+			var h: float = WALL_POINTS[w]
+			var lat: float = lerpf(edge, foot_lat, h)
+			var at: Vector3 = p + frame * (lat + shift) - Vector3.UP * (depth * h)
+			var bulge: float = _detail_noise.get_noise_3d(at.x * 1.6, at.y * 1.6, at.z * 1.6) * 1.3 * sin(h * PI)
+			var k: int = (1 + w) if s < 0.0 else (UNDER_VERTS - 2 - w)
+			out[k] = Vector2(lat + s * bulge, depth * h)
+	return out
+
+
+## Closes a ring of underside vertices with a fan around its centroid, facing `want_normal`. The
+## wall profile bulges, so a fan from one corner could fold over itself; from the centroid it
+## cannot, because the outline is star-shaped about it.
+func _emit_ring_cap(st: SurfaceTool, first_index: int, ring: PackedVector3Array, want_normal: Vector3) -> int:
+	var n: int = ring.size()
+	if n < 3:
+		return first_index
+	var centre := Vector3.ZERO
+	for v in ring:
+		centre += v
+	centre /= float(n)
+	st.set_uv(Vector2(0.5, 0.5))
+	st.add_vertex(centre)
+	for v in ring:
+		st.set_uv(Vector2(0.5, 0.5))
+		st.add_vertex(v)
+	# Front faces: (c - a) x (b - a) along the wanted normal (see _build_cavern_cap).
+	var a0: Vector3 = centre
+	var b0: Vector3 = ring[0]
+	var c0: Vector3 = ring[1]
+	var flip: bool = (c0 - a0).cross(b0 - a0).dot(want_normal) < 0.0
+	for k in range(n - 1):
+		st.add_index(first_index)
+		if flip:
+			st.add_index(first_index + 2 + k)
+			st.add_index(first_index + 1 + k)
+		else:
+			st.add_index(first_index + 1 + k)
+			st.add_index(first_index + 2 + k)
+	# Close the loop from the last edge vertex back to the first (the deck-edge pair).
+	st.add_index(first_index)
+	if flip:
+		st.add_index(first_index + 1)
+		st.add_index(first_index + n)
+	else:
+		st.add_index(first_index + n)
+		st.add_index(first_index + 1)
+	return first_index + n + 1
+
+
+## Ground height the finished heightfield will have at a point, before it is sampled onto the
+## grid: the icefield, the crevasse, and every road corridor's grading.
+func _final_ground(x: float, z: float) -> float:
+	return _apply_road_corridors(_apply_crevasse(_icefield_height(x, z), x, z), x, z)
 
 
 ## True when `dist` metres along a curve falls inside one of the [start, end] intervals.
@@ -1071,6 +1536,12 @@ func _in_any_gap(dist: float, gaps: Array) -> bool:
 		if dist >= gap.x and dist <= gap.y:
 			return true
 	return false
+
+
+## Distance along `curve` of its nearest point to `p`. Placements are anchored to where they sit
+## on the circuit with this, so a longer lap elsewhere does not slide them.
+func _off_near(curve: Curve3D, p: Vector3) -> float:
+	return curve.get_closest_offset(p)
 
 
 ## World point `lat` metres to the side of `curve`, `off` metres along it.
@@ -1199,6 +1670,8 @@ func _build_cavern(parent: Node, ice_mat: Material, vein_light_mat: Color) -> vo
 		l.omni_range = 34.0
 		l.omni_attenuation = 1.15
 		l.light_specular = 0.6
+		# Fill, not a shadow caster: see the note on "no_shadow" in MusicManager.
+		l.set_meta("no_shadow", true)
 		lights.add_child(l)
 		off += 26.0
 		li += 1
@@ -1469,6 +1942,7 @@ func _build_portal_ring(parent: Node, ice_mat: Material, off: float, dir: float)
 		l.light_energy = 2.6
 		l.omni_range = 32.0
 		l.omni_attenuation = 1.25
+		l.set_meta("no_shadow", true)
 		ring.add_child(l)
 
 	parent.add_child(ring)
@@ -2031,90 +2505,91 @@ func _corridor_distances(px: float, pz: float) -> Vector2:
 	return Vector2(best, cave)
 
 
-## Builds one irregular ice block for the serac field and the floes.
+## Builds one fractured block of glacier ice, for the serac field, the floes, the portal rings,
+## the arch footings and the spire.
 ##
-## A serac is a fractured slab of glacier ice: it tapers towards the top, it leans, and its faces
-## are flat fractures meeting at odd angles. Scaling a BoxMesh gives you a box, and a hundred
-## identically sized boxes scattered over a snowfield read as a hundred identically sized boxes -
-## they look like scenery props, not like ice. So the shapes are generated once, from a jittered
-## prism whose top closes on a tilted plane (a fracture face, not a lid), and the scatter instances
-## those. The jitter is per-ring as well as per-side, so the facets do not line up vertically
-## either.
-func _make_ice_block_mesh(rng: RandomNumberGenerator, sides: int, taper: float, lean: float) -> ArrayMesh:
+## A serac is what is left standing when a glacier breaks along fracture planes: flat faces
+## meeting at hard edges, a top sheared off at an angle, corners chipped away. The first version
+## of this was a jittered prism with smooth normals, and a field of those read as blue crystals,
+## not as ice. So the block is now built the way the ice breaks, as the intersection of
+## half-spaces: a flat base, a ring of side planes leaning in a little (the taper), two or three
+## tilted planes shearing the top, and a few chips off the corners. Every face is flat-shaded,
+## which is what makes the fracture edges read.
+##
+## The block spans -0.5..0.5 in Y around its own origin and about -1..1 across. Returns the mesh
+## and its convex collision shape (the hull IS the block, so the shape is exact).
+func _make_fractured_block(rng: RandomNumberGenerator, sides: int, taper: float, shear: float, chips: int) -> Dictionary:
+	var planes: Array[Plane] = [Plane(Vector3.DOWN, 0.5), Plane(Vector3.UP, 0.5)]
+	var a0: float = rng.randf_range(0.0, TAU)
+	for i in range(sides):
+		var a: float = a0 + TAU * float(i) / float(sides) + rng.randf_range(-0.28, 0.28)
+		var n := Vector3(cos(a), taper * rng.randf_range(0.5, 1.5), sin(a)).normalized()
+		# Distance chosen so the face sits r out at mid-height, whatever its lean.
+		var r: float = rng.randf_range(0.78, 1.0)
+		planes.append(Plane(n, r * Vector2(n.x, n.z).length()))
+	# The top: one fracture across the whole block at a modest tilt, and a steeper one taking an
+	# edge off. More than that and the top closes into a ridge, which reads as a tent, not a block.
+	var b0: float = rng.randf_range(0.0, TAU)
+	var h0: float = shear * rng.randf_range(0.25, 0.5)
+	var top := Vector3(cos(b0) * h0, 1.0, sin(b0) * h0).normalized()
+	planes.append(Plane(top, top.y * rng.randf_range(0.36, 0.48)))
+	var b1: float = b0 + PI + rng.randf_range(-1.2, 1.2)
+	var edge := Vector3(cos(b1) * shear * 1.2, 1.0, sin(b1) * shear * 1.2).normalized()
+	planes.append(Plane(edge, edge.dot(Vector3(cos(b1) * 0.55, 0.42, sin(b1) * 0.55))))
+	# Chips: cut a few corners, each a fraction of the way in from the hull's extreme point.
+	for i in range(chips):
+		var pts0: PackedVector3Array = Geometry3D.compute_convex_mesh_points(planes)
+		var c := Vector3(rng.randf_range(-1.0, 1.0), rng.randf_range(-0.1, 0.9), rng.randf_range(-1.0, 1.0))
+		if c.length_squared() < 0.01:
+			continue
+		c = c.normalized()
+		var reach: float = -INF
+		for p in pts0:
+			reach = maxf(reach, c.dot(p))
+		planes.append(Plane(c, reach * rng.randf_range(0.72, 0.88)))
+
+	var pts: PackedVector3Array = Geometry3D.compute_convex_mesh_points(planes)
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var ring_t := [0.0, 0.30, 0.68, 1.0]
-	var rings: Array = []
-	for ti in ring_t:
-		var t: float = ti
-		var r: float = lerpf(1.0, taper, t)
-		var pts := PackedVector3Array()
-		for i in range(sides):
-			var a: float = TAU * float(i) / float(sides)
-			var jr: float = r * rng.randf_range(0.80, 1.20)
-			var ang: float = a + rng.randf_range(-0.10, 0.10)
-			pts.append(Vector3(cos(ang) * jr, t + rng.randf_range(-0.05, 0.05), sin(ang) * jr))
-		rings.append(pts)
-	# Lean: shear the whole block sideways with height, the way a calved slab tips.
-	for ti2 in range(rings.size()):
-		var pts2: PackedVector3Array = rings[ti2]
-		var tilted := PackedVector3Array()
-		for v in pts2:
-			tilted.append(Vector3(v.x + v.y * lean, v.y, v.z + v.y * lean * 0.35))
-		rings[ti2] = tilted
-
-	# Recentre on the origin before emitting. The rings run y = 0..1, i.e. the mesh stands ON its
-	# own origin rather than being centred on it - so a caller placing an instance at
-	# "ground + half the height" leaves a block hanging by 0.46 * its height in the air, which is
-	# most of a 20m serac. Everything downstream then has to know the offset, so fix it here.
-	for pts3 in rings:
-		for v in pts3:
-			st.set_uv(Vector2(v.x * 0.5 + 0.5, v.y))
-			st.add_vertex(Vector3(v.x, v.y - 0.5, v.z))
-
-	# Side quads, split along the a-c diagonal.
-	#
-	# The second triangle has to be (d, c, a), not (b, c, d): the two have to share the DIAGONAL
-	# edge a-c. Sharing b-c instead - which is a perimeter edge of the quad - folds the pair back
-	# on itself and leaves the quad's other diagonal open, so every band of every block ends up
-	# with a 1-edge gap down it. That reads as holes straight through the ice.
-	for r in range(rings.size() - 1):
-		for i in range(sides):
-			var j: int = (i + 1) % sides
-			var a: int = r * sides + i
-			var b: int = r * sides + j
-			var c: int = (r + 1) * sides + j
-			var d: int = (r + 1) * sides + i
-			st.add_index(a); st.add_index(c); st.add_index(b)
-			st.add_index(d); st.add_index(c); st.add_index(a)
-
-	# Fracture face on top, fanned from a centre pushed off to one side.
-	var top_row: int = (rings.size() - 1) * sides
-	var centre := Vector3(rng.randf_range(-0.30, 0.30) + lean, 0.54, rng.randf_range(-0.30, 0.30) + lean * 0.35)
-	var centre_idx: int = rings.size() * sides
-	st.set_uv(Vector2(0.5, 1.0))
-	st.add_vertex(centre)
-	for i in range(sides):
-		var j2: int = (i + 1) % sides
-		st.add_index(centre_idx)
-		st.add_index(top_row + j2)
-		st.add_index(top_row + i)
-	# Flat base.
-	var base_idx: int = centre_idx + 1
-	st.set_uv(Vector2(0.5, 0.0))
-	st.add_vertex(Vector3(0.0, -0.54, 0.0))
-	for i in range(sides):
-		var j3: int = (i + 1) % sides
-		st.add_index(base_idx)
-		st.add_index(i)
-		st.add_index(j3)
-
-	st.generate_normals()
-	return st.commit()
+	for pl in planes:
+		# The face of this plane: the hull points lying on it, in order around their centroid.
+		var face := PackedVector3Array()
+		for p in pts:
+			if absf(pl.distance_to(p)) < 1e-3:
+				face.append(p)
+		if face.size() < 3:
+			continue
+		var centre := Vector3.ZERO
+		for p in face:
+			centre += p
+		centre /= float(face.size())
+		var u: Vector3 = (face[0] - centre).normalized()
+		var w: Vector3 = pl.normal.cross(u)
+		var order: Array = []
+		for p in face:
+			var q: Vector3 = p - centre
+			order.append([atan2(q.dot(w), q.dot(u)), p])
+		order.sort_custom(func(x, y): return x[0] < y[0])
+		for k in range(1, order.size() - 1):
+			var a: Vector3 = order[0][1]
+			var b: Vector3 = order[k][1]
+			var c: Vector3 = order[k + 1][1]
+			# Front faces: (c - a) x (b - a) along the outward normal (see _build_cavern_cap).
+			if (c - a).cross(b - a).dot(pl.normal) < 0.0:
+				var tmp: Vector3 = b
+				b = c
+				c = tmp
+			for v in [a, b, c]:
+				st.set_normal(pl.normal)
+				st.set_uv(Vector2(v.x + v.z, v.y))
+				st.add_vertex(v)
+	var shape := ConvexPolygonShape3D.new()
+	shape.points = pts
+	return {"mesh": st.commit(), "shape": shape, "points": pts}
 
 
-## Cached copy of the block library, so the serac field, the portal rings and the arch footings
-## all instance the same seven meshes instead of each building its own.
+## Cached copy of the block library, so the serac field, the portal rings, the arch footings and
+## the spire all instance the same handful of meshes instead of each building its own.
 var _serac_lib: Array = []
 
 
@@ -2124,19 +2599,23 @@ func _serac_library() -> Array:
 	return _serac_lib
 
 
-## Lowest ground under a block of half-width `foot`, rotated by `yaw`, i.e. the height it has to
-## be sunk to before any corner is left hanging.
+## Lowest and highest ground under the centre and four corners of a rotated square footprint of
+## half-width `foot`. The lowest is the height a block has to be sunk to before any corner is left
+## hanging; the spread says whether the ground is too steep to stand it on at all.
 ##
 ## Sampling the centre is not enough on a slope, and the serac field deliberately ends up on the
 ## massif flanks, which is where the slope is steepest. The rotation matters too: the instances are
 ## yawed, so an axis-aligned corner sample can still miss the corner that is actually in the air.
-func _ground_under_rotated(x: float, z: float, foot: float, yaw: float) -> float:
+func _ground_span_rotated(x: float, z: float, foot: float, yaw: float) -> Vector2:
 	var c := cos(yaw)
 	var s := sin(yaw)
 	var lowest := _graded_height(x, z)
+	var highest := lowest
 	for o in [Vector2(foot, foot), Vector2(-foot, foot), Vector2(foot, -foot), Vector2(-foot, -foot)]:
-		lowest = minf(lowest, _graded_height(x + o.x * c - o.y * s, z + o.x * s + o.y * c))
-	return lowest
+		var g: float = _graded_height(x + o.x * c - o.y * s, z + o.x * s + o.y * c)
+		lowest = minf(lowest, g)
+		highest = maxf(highest, g)
+	return Vector2(lowest, highest)
 
 
 ## Ground height with the road corridors applied, which is what a prop standing on the terrain
@@ -2145,29 +2624,31 @@ func _graded_height(x: float, z: float) -> float:
 	return _apply_road_corridors(_icefield_height(x, z), x, z)
 
 
-## A small library of shared serac shapes, plus one convex collision shape each.
+## A small library of fractured blocks with their convex collision shapes. The LAST entry is the
+## flat floe for the lake; everything that wants a standing block picks from the others.
 ##
-## Sharing matters twice over: 150 instances of seven meshes is seven meshes in memory, and one
+## Sharing matters twice over: 150 instances of ten meshes is ten meshes in memory, and one
 ## convex shape per variant instead of 150 is the difference between the field being cheap and the
 ## field costing more than the terrain.
 func _build_serac_library() -> Array:
 	var lib: Array = []
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 0x53455242  # "SERB"
-	# sides, taper, lean
+	rng.seed = 0x53455243  # "SERC"
 	var specs := [
-		# sides, taper, lean
-		[6, 0.42, 0.12],
-		[5, 0.55, -0.10],
-		[7, 0.34, 0.06],
-		[6, 0.68, -0.16],
-		[5, 0.28, 0.18],
-		[8, 0.50, 0.02],
-		[6, 0.80, -0.06],
+		# sides, taper, shear, chips
+		[5, 0.06, 0.6, 3],
+		[6, 0.10, 0.9, 3],
+		[4, 0.04, 0.5, 2],
+		[6, 0.12, 1.1, 4],
+		[5, 0.22, 1.3, 2],    # leaning, the pinnacle shape
+		[6, 0.08, 0.4, 4],
+		[5, 0.03, 0.8, 2],
+		[5, 0.14, 1.0, 3],
+		[4, 0.10, 0.7, 3],
+		[7, 0.02, 0.15, 2],   # floe
 	]
-	for i in range(specs.size()):
-		var mesh: ArrayMesh = _make_ice_block_mesh(rng, specs[i][0], specs[i][1], specs[i][2])
-		lib.append({"mesh": mesh, "shape": mesh.create_convex_shape()})
+	for spec in specs:
+		lib.append(_make_fractured_block(rng, spec[0], spec[1], spec[2], spec[3]))
 	return lib
 
 
@@ -2192,6 +2673,11 @@ func _tint_variants(base: Material) -> Array:
 		m.set_shader_parameter("aurora_tint", Color(0.20, 0.62, 0.52) * tints[i])
 		out.append(m)
 	return out
+
+
+## True inside the spiral and just outside it: the spire owns that ground.
+func _in_spire_ring(x: float, z: float) -> bool:
+	return Vector2(x, z).distance_to(SPIRE_CENTER) < SPIRE_RADIUS + 22.0
 
 
 ## Scatters ice: a field of seracs across the whole circuit, and flat floes on the frozen lake.
@@ -2237,7 +2723,7 @@ func _build_ice_scatter(parent: Node, ice_mat: Material) -> void:
 			var cx: float = px + rng.randf_range(-cell * 0.48, cell * 0.48)
 			var cz: float = pz + rng.randf_range(-cell * 0.48, cell * 0.48)
 			var dists: Vector2 = _corridor_distances(cx, cz)
-			if dists.x < 15.0 or dists.y < CAVERN_MASS_HALF_W + 30.0:
+			if dists.x < 15.0 or dists.y < CAVERN_MASS_HALF_W + 30.0 or _in_spire_ring(cx, cz):
 				pz += cell
 				continue
 			# Not on the massif. The flanks are steep enough that a block placed on one reads as
@@ -2298,19 +2784,29 @@ func _build_ice_scatter(parent: Node, ice_mat: Material) -> void:
 					jx += cos(bearing + spread) * step_len
 					jz += sin(bearing + spread) * step_len
 					var jd: Vector2 = _corridor_distances(jx, jz)
-					if jd.x < 15.0 or jd.y < CAVERN_MASS_HALF_W + 30.0:
+					if jd.x < 15.0 or jd.y < CAVERN_MASS_HALF_W + 30.0 or _in_spire_ring(jx, jz):
 						continue
 					if _cavern_mass(jx, jz) > 6.0:
 						continue
 					var jslot: Vector2 = _crevasse_slot(jx, jz)
 					if absf(jslot.x) < 1.0 and jslot.y < 1.3:
 						continue
-				# Tall, narrow, heavily tapered: an ice tower, not a block. The occasional one
-				# has toppled and lies as a low slab.
-				var standing: bool = rng.randf() < 0.84
-				var w: float = rng.randf_range(2.6, 6.0)
-				var d: float = rng.randf_range(2.6, 6.0)
-				var hgt: float = rng.randf_range(8.0, 22.0) if standing else rng.randf_range(3.0, 5.5)
+				# Mostly chunky blocks about as tall as they are wide, which is how a glacier
+				# breaks up; one in seven is a slender pinnacle, and one in six has toppled and
+				# lies as a low slab. Scale is half-width, the block mesh being about 2 across.
+				var roll: float = rng.randf()
+				var standing: bool = roll < 0.84
+				var w: float = rng.randf_range(2.6, 5.4)
+				var d: float = w * rng.randf_range(0.7, 1.15)
+				var hgt: float = rng.randf_range(5.0, 12.0)
+				if roll < 0.14:
+					w = rng.randf_range(2.0, 3.0)
+					d = w * rng.randf_range(0.8, 1.1)
+					hgt = rng.randf_range(13.0, 19.0)
+				elif not standing:
+					w = rng.randf_range(4.5, 7.5)
+					d = w * rng.randf_range(0.6, 0.9)
+					hgt = rng.randf_range(2.5, 4.0)
 				var mi2 := MeshInstance3D.new()
 				mi2.name = "Serac_%d" % seracs
 				mi2.mesh = lib[var_idx]["mesh"]
@@ -2323,10 +2819,16 @@ func _build_ice_scatter(parent: Node, ice_mat: Material) -> void:
 				# The block is rotated, so its footprint is not axis-aligned; the corner samples
 				# have to follow the rotation or a steep flank still leaves a corner in the air.
 				var yaw: float = rng.randf_range(0.0, TAU)
-				var foot: float = w * 0.5
-				var ground: float = _ground_under_rotated(jx, jz, foot, yaw)
-				# Sunk well into the snow, or they look dropped on top of it.
-				mi2.position = Vector3(jx, ground + hgt * 0.5 - 3.0, jz)
+				# The block mesh is about 2 across, so its corners are a full half-width out.
+				var span: Vector2 = _ground_span_rotated(jx, jz, maxf(w, d), yaw)
+				# Nothing on ground steeper than the block can sit on: on a mountain face a serac
+				# reads as stuck to the slope, and the downhill side hangs in the air.
+				if span.y - span.x > maxf(2.0, 0.6 * maxf(w, d)):
+					mi2.free()
+					continue
+				# Sunk well into the snow, or they look dropped on top of it (a toppled slab less
+				# so, or there would be nothing left showing).
+				mi2.position = Vector3(jx, span.x + hgt * 0.5 - minf(3.0, hgt * 0.3), jz)
 				mi2.rotation_degrees = Vector3(
 					rng.randf_range(-7.0, 7.0) if standing else rng.randf_range(-20.0, 20.0),
 					rad_to_deg(yaw),
@@ -2345,8 +2847,15 @@ func _build_ice_scatter(parent: Node, ice_mat: Material) -> void:
 	print("  ice scatter: %d seracs, %d lake floes" % [seracs, floes])
 
 
-## A natural ice arch straddling the road, built as a swept half-annulus so it has real
-## thickness and its own collision. Two of them, at anchors on the circuit.
+## A natural ice arch straddling the road, with real thickness and its own collision. Two of them,
+## at anchors on the circuit.
+##
+## The first version was a swept half-annulus: a perfect semicircle of constant section, which
+## read as a manufactured hoop. An arch the melt has carved out of a serac is none of that. Its legs
+## are massive and its crown thin, its section is a rounded slab rather than a ring, and every
+## surface is lumpy. So the arch is swept along the old inner curve (which keeps the clearance
+## over the road that the old one had) with a section that thins towards the crown, and every
+## vertex is pushed about by noise. Clearance over the carriageway is checked off the mesh itself.
 func _build_ice_arches(parent: Node, ice_mat: Material, anchors: Array) -> void:
 	var root := Node3D.new()
 	root.name = "IceArches"
@@ -2369,76 +2878,20 @@ func _build_ice_arches(parent: Node, ice_mat: Material, anchors: Array) -> void:
 		body.position = pos + Vector3.UP * -1.0
 		body.rotation_degrees = Vector3(0.0, yaw, 0.0)
 
-		var st := SurfaceTool.new()
-		st.begin(Mesh.PRIMITIVE_TRIANGLES)
-		var seg := 18
-		var rings := 5
-		# Closed cross-section: inner arc out, outer arc back. Same winding convention as the
-		# cavern shell, so one normal routine covers both.
-		var profile := PackedVector2Array()
-		for i in range(seg + 1):
-			var t: float = PI * float(i) / float(seg)
-			profile.append(Vector2(half_span * cos(t), (height + 1.0) * sin(t)))
-		for i in range(seg + 1):
-			var t2: float = PI * (1.0 - float(i) / float(seg))
-			profile.append(Vector2((half_span + thick) * cos(t2), (height + 1.0 + thick) * sin(t2)))
-		var pn := PackedVector2Array()
-		var n := profile.size()
-		for i in range(n):
-			var prev: Vector2 = profile[(i - 1 + n) % n]
-			var here: Vector2 = profile[i]
-			var nxt: Vector2 = profile[(i + 1) % n]
-			var e_in: Vector2 = (here - prev).normalized()
-			var e_out: Vector2 = (nxt - here).normalized()
-			var nn: Vector2 = Vector2(e_in.y, -e_in.x) + Vector2(e_out.y, -e_out.x)
-			pn.append(nn.normalized() if nn.length_squared() > 1e-6 else Vector2(0.0, 1.0))
-
-		for r in range(rings):
-			var lz: float = lerpf(-along_len * 0.5, along_len * 0.5, float(r) / float(rings - 1))
-			for i in range(n):
-				var p2: Vector2 = profile[i]
-				# Local space, not world: the body's yaw already orients the arch along the road.
-				# Writing world-oriented vertices here as well rotates the arch twice, which on
-				# any corner steeper than a hairpin lands one springing on the carriageway.
-				st.set_normal(Vector3(pn[i].x, pn[i].y, 0.0))
-				st.set_uv(Vector2(p2.x * 0.06, lz * 0.06))
-				st.add_vertex(Vector3(p2.x, p2.y, lz))
-		for r in range(rings - 1):
-			var r0: int = r * n
-			var r1: int = (r + 1) * n
-			for i in range(n):
-				var j: int = (i + 1) % n
-				st.add_index(r0 + i); st.add_index(r0 + j); st.add_index(r1 + j)
-				st.add_index(r0 + i); st.add_index(r1 + j); st.add_index(r1 + i)
-
-		# End caps: the swept tube is open at both z ends, and without them you can see into the
-		# hollow between the inner and outer walls from any angle off straight-on - which reads
-		# as the arch having open sides. The cap is the annulus band itself: one quad per arc
-		# segment joining the inner edge to the matching outer edge, plus the two sole quads at
-		# the springings. (A triangle fan from one vertex would also fill the driving opening,
-		# which is outside the profile loop but inside the fan.)
-		#
-		# Winding is irrelevant here - the ice shader is cull_disabled and every cap vertex gets
-		# an explicit +-Z normal - so only the pairing matters: inner k to outer k.
-		# SurfaceTool cannot be read back, so emitted vertices are counted here for the cap
-		# indices below.
-		var emitted: int = rings * n
-		for end_r in [0, rings - 1]:
-			var nz := Vector3(0.0, 0.0, 1.0 if end_r == rings - 1 else -1.0)
-			var lz: float = lerpf(-along_len * 0.5, along_len * 0.5, float(end_r) / float(rings - 1))
-			for k in range(seg):
-				# Inner arc runs profile[0..seg], outer arc profile[seg+1..2*seg+1]; the outer
-				# index mirrors the inner one because the outer arc was authored back from t=PI
-				# down to 0.
-				for pi in [k, k + 1, n - 2 - k, n - 1 - k]:
-					st.set_normal(nz)
-					st.set_uv(Vector2(0.5, 0.5))
-					st.add_vertex(Vector3(profile[pi].x, profile[pi].y, lz))
-					emitted += 1
-				var cb: int = emitted - 4
-				st.add_index(cb); st.add_index(cb + 1); st.add_index(cb + 2)
-				st.add_index(cb); st.add_index(cb + 2); st.add_index(cb + 3)
-		var arch_mesh: ArrayMesh = _save_baked_resource(st.commit(), "ice_arch_%d" % int(off))
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 0x41524348 + int(off)
+		var arch_mesh: ArrayMesh = _save_baked_resource(
+				_make_natural_arch_mesh(rng, half_span, height, thick, along_len), "ice_arch_%d" % int(off))
+		# The road runs 1m above the body origin; nothing within the deck and banks may come lower
+		# than a cart and its antenna need.
+		var lowest: float = INF
+		for v in arch_mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+			if absf(v.x) < MAIN_HALF_W + 2.3:
+				lowest = minf(lowest, v.y - 1.0)
+		if lowest < 4.5:
+			push_error("Ice arch at %.0fm comes down to %.1fm over the road" % [off, lowest])
+		else:
+			print("  ice arch at %.0fm clears the road by %.1fm" % [off, lowest])
 		var mi := MeshInstance3D.new()
 		mi.name = "ArchMesh"
 		mi.mesh = arch_mesh
@@ -2454,8 +2907,7 @@ func _build_ice_arches(parent: Node, ice_mat: Material, anchors: Array) -> void:
 		root.add_child(body)
 
 		# A cluster of blocks at each springing, so the arch looks founded rather than placed.
-		var rng := RandomNumberGenerator.new()
-		rng.seed = 0x41524348 + int(off)
+		rng.seed = 0x46544E47 + int(off)
 		var lib: Array = _serac_library()
 		for s in [-1.0, 1.0]:
 			for i in range(5):
@@ -2464,9 +2916,10 @@ func _build_ice_arches(parent: Node, ice_mat: Material, anchors: Array) -> void:
 				b.name = "Footing_%s_%d" % ["L" if s < 0.0 else "R", i]
 				b.mesh = lib[pick]["mesh"]
 				b.material_override = ice_mat
-				var bw: float = rng.randf_range(2.4, 5.0)
+				# Outboard of the leg: a block's inner face stays past the snow bank whatever its yaw.
+				var bw: float = rng.randf_range(2.0, 3.6)
 				b.scale = Vector3(bw, rng.randf_range(2.0, 4.0), bw * rng.randf_range(0.7, 1.2))
-				b.position = Vector3(float(s) * (half_span + thick * 0.4) + rng.randf_range(-1.5, 1.5),
+				b.position = Vector3(float(s) * (half_span + thick * 0.6 + bw * 0.5 + rng.randf_range(0.0, 1.2)),
 						rng.randf_range(0.4, 1.6), rng.randf_range(-along_len * 0.5, along_len * 0.5))
 				b.rotation_degrees = Vector3(rng.randf_range(-12.0, 12.0), rng.randf_range(0.0, 360.0), rng.randf_range(-12.0, 12.0))
 				body.add_child(b)
@@ -2480,6 +2933,101 @@ func _build_ice_arches(parent: Node, ice_mat: Material, anchors: Array) -> void:
 				bcs.scale = b.scale
 				bcs.rotation_degrees = b.rotation_degrees
 				body.add_child(bcs)
+
+
+## The arch itself, in the arch body's space: X across the road, Y up, Z along the road, with the
+## road surface at Y = 1.
+##
+## Swept along the inner half-ellipse (half_span wide, height + 1 tall) in rings. Each ring is a
+## rounded slab: `thick` deep radially at the crown and getting on for twice that at the legs,
+## along_len long down the road and narrower at the crown. Both legs carry on 3m straight down
+## so they end underground rather than in an open tube.
+func _make_natural_arch_mesh(rng: RandomNumberGenerator, half_span: float, height: float,
+		thick: float, along_len: float) -> ArrayMesh:
+	var a: float = half_span
+	var b: float = height + 1.0
+	var seg := 26
+	var sec := 10
+	var phase := Vector3(rng.randf_range(0.0, 100.0), rng.randf_range(0.0, 100.0), rng.randf_range(0.0, 100.0))
+	var noise := FastNoiseLite.new()
+	noise.seed = rng.randi()
+	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	noise.frequency = 0.16
+	noise.fractal_octaves = 3
+	var lean: float = rng.randf_range(-0.08, 0.08)
+	# One leg heavier than the other, so it doesn't read as a symmetric hoop.
+	var skew: float = rng.randf_range(0.15, 0.35) * (1.0 if rng.randf() < 0.5 else -1.0)
+
+	var rings: Array = []
+	for k in range(-1, seg + 2):
+		var th: float = PI * clampf(float(k) / float(seg), 0.0, 1.0)
+		var inner := Vector2(-a * cos(th), b * sin(th))
+		# The legs carry on straight down past the springing.
+		if k < 0 or k > seg:
+			inner.y = -3.0
+		var nrm := Vector2(-b * cos(th), a * sin(th)).normalized()
+		var crown: float = sin(th)
+		var depth: float = thick * (1.75 - 0.8 * crown) * (1.0 + skew * -cos(th))
+		var half_len: float = along_len * 0.5 * (1.0 - 0.28 * crown)
+		# The whole arch leans a little along the road, as if it had settled.
+		var z_shift: float = lean * inner.y
+		var ring := PackedVector3Array()
+		for j in range(sec):
+			var psi: float = TAU * float(j) / float(sec)
+			var cu: float = cos(psi)
+			var cv: float = sin(psi)
+			# A squarish rounded section: a slab, not a tube.
+			var su: float = signf(cu) * pow(absf(cu), 0.55)
+			var sv: float = signf(cv) * pow(absf(cv), 0.55)
+			var base := Vector3(inner.x + nrm.x * depth * (0.5 + 0.5 * su),
+					inner.y + nrm.y * depth * (0.5 + 0.5 * su), half_len * sv + z_shift)
+			# Lumps, larger on the outside and the faces than on the soffit over the road.
+			var amp: float = 0.55 if su > -0.5 else 0.22
+			var q: Vector3 = base + phase
+			base += Vector3(noise.get_noise_3d(q.x, q.y, q.z), noise.get_noise_3d(q.y + 31.0, q.z, q.x),
+					noise.get_noise_3d(q.z, q.x + 57.0, q.y)) * amp * 2.0
+			ring.append(base)
+		rings.append(ring)
+
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for ring in rings:
+		for v in ring:
+			st.set_uv(Vector2(v.x * 0.06, v.z * 0.06))
+			st.add_vertex(v)
+	# Wind every quad the same way, then check one face on top of the crown and flip the lot if
+	# it points into the arch (front faces: (c - a) x (b - a), see _build_cavern_cap).
+	var tris := PackedInt32Array()
+	for r in range(rings.size() - 1):
+		for j in range(sec):
+			var j2: int = (j + 1) % sec
+			var i0: int = r * sec + j
+			var i1: int = r * sec + j2
+			var i2: int = (r + 1) * sec + j
+			var i3: int = (r + 1) * sec + j2
+			tris.append_array([i0, i1, i2, i1, i3, i2])
+	var mid: int = (rings.size() >> 1) * 6 * sec
+	var all: Array = []
+	for ring in rings:
+		all.append_array(Array(ring))
+	var top_tri := -1
+	var best_y := -INF
+	for t in range(mid, mid + 6 * sec, 3):
+		var cy: float = (all[tris[t]].y + all[tris[t + 1]].y + all[tris[t + 2]].y) / 3.0
+		if cy > best_y:
+			best_y = cy
+			top_tri = t
+	var pa: Vector3 = all[tris[top_tri]]
+	var pb: Vector3 = all[tris[top_tri + 1]]
+	var pc: Vector3 = all[tris[top_tri + 2]]
+	var flip: bool = (pc - pa).cross(pb - pa).y < 0.0
+	for t in range(0, tris.size(), 3):
+		st.add_index(tris[t])
+		st.add_index(tris[t + 2] if flip else tris[t + 1])
+		st.add_index(tris[t + 1] if flip else tris[t + 2])
+	st.generate_normals()
+	st.generate_tangents()
+	return st.commit()
 
 
 ## Trackside lamps along both road edges, alternating sides, with a spotlight on every other
@@ -2547,6 +3095,10 @@ func _build_edge_markers(parent: Node, curve: Curve3D, label: String,
 		if main_track_curve and curve == main_track_curve:
 			if off > _cavern_range.x - 30.0 and off < _cavern_range.y + 30.0:
 				continue
+			# Up on the spire's ice walls there is no ground beside the road to stand a lamp on;
+			# the spire's own light covers that stretch.
+			if _in_any_gap(off, _elevated_spans):
+				continue
 		var side: float = 1.0 if (i % 2 == 0) else -1.0
 		var gaps: Array = right_gaps if side > 0 else left_gaps
 		if not gaps.is_empty() and _bank_factor_at(off, gaps) < 0.6:
@@ -2610,6 +3162,9 @@ func _build_edge_markers(parent: Node, curve: Curve3D, label: String,
 			spot.spot_range = 42.0
 			spot.spot_angle = 52.0
 			spot.spot_attenuation = 1.0
+			# Thirty shadowed spots re-rendered the track around every lamp each frame; the moon
+			# already gives the cars their shadows.
+			spot.set_meta("no_shadow", true)
 			node.add_child(spot)
 
 
@@ -2803,7 +3358,81 @@ func _build_crevasse_lights(parent: Node) -> void:
 		l.light_energy = 6.5
 		l.omni_range = 52.0
 		l.omni_attenuation = 1.2
+		l.set_meta("no_shadow", true)
 		root.add_child(l)
+
+
+## The Northlight Spire: a stack of fractured ice columns in the middle of the spiral, the stage's
+## landmark from across the lake, with a light inside so the ramp around it is lit.
+##
+## Every column is placed, then measured against SPIRE_CORE_RADIUS through its real hull points
+## and shrunk until it fits, so no lean or yaw can push a corner into the ramp's walls.
+func _build_spire(parent: Node, mat: Material) -> void:
+	var lib: Array = _serac_library()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 0x5350_4952  # "SPIR"
+	var c: Vector2 = SPIRE_CENTER
+	var ground: float = _final_ground(c.x, c.y)
+	var body := StaticBody3D.new()
+	body.name = "NorthlightSpire"
+	body.position = Vector3(c.x, ground, c.y)
+	parent.add_child(body)
+
+	# [distance out, height, half width]; the tallest in the middle, a ring of shoulders around it,
+	# rubble at the foot.
+	var cols: Array = [[0.0, 64.0, 8.5], [10.0, 44.0, 6.5], [11.0, 36.0, 6.0], [9.0, 50.0, 5.5],
+			[13.0, 28.0, 6.5], [12.0, 24.0, 5.0], [8.0, 32.0, 4.5]]
+	for k in range(8):
+		cols.append([rng.randf_range(17.0, 22.0), rng.randf_range(4.0, 9.0), rng.randf_range(2.5, 3.8)])
+	var placed := 0
+	for i in range(cols.size()):
+		var spec: Array = cols[i]
+		var pick: int = [4, 7, 1, 3, 0, 8, 2][i] if i < 7 else rng.randi_range(0, lib.size() - 2)
+		var ang: float = TAU * float(i) / 7.0 + rng.randf_range(-0.3, 0.3) if i < 7 else rng.randf_range(0.0, TAU)
+		var xf := Transform3D()
+		var hw: float = spec[2]
+		var h: float = spec[1]
+		var out_dir := Vector3(cos(ang), 0.0, sin(ang))
+		var tilt: float = deg_to_rad(rng.randf_range(1.0, 5.0)) if spec[0] > 0.0 else 0.0
+		var yaw: float = rng.randf_range(0.0, TAU)
+		for _try in range(8):
+			var basis := Basis(out_dir.cross(Vector3.UP).normalized(), -tilt) if tilt > 0.0 else Basis()
+			basis = basis * Basis(Vector3.UP, yaw) * Basis.from_scale(Vector3(hw, h, hw * 0.9))
+			# Sunk a fifth of its height, so it rises out of the snow.
+			xf = Transform3D(basis, out_dir * spec[0] + Vector3.UP * (h * 0.5 - h * 0.2))
+			var reach := 0.0
+			for p in lib[pick]["points"]:
+				var w: Vector3 = xf * p
+				reach = maxf(reach, Vector2(w.x, w.z).length())
+			if reach <= SPIRE_CORE_RADIUS:
+				break
+			hw *= 0.88
+		var mi := MeshInstance3D.new()
+		mi.name = "SpireIce_%d" % i
+		mi.mesh = lib[pick]["mesh"]
+		mi.material_override = mat
+		mi.transform = xf
+		body.add_child(mi)
+		var cs := CollisionShape3D.new()
+		cs.name = "SpireIceCollision_%d" % i
+		cs.shape = lib[pick]["shape"]
+		cs.transform = xf
+		body.add_child(cs)
+		placed += 1
+
+	# Lit from inside: the ramp winds through this light all the way up, and the spire glows
+	# across the lake. Fill only, like every other accent light on the stage.
+	for spec2 in [[14.0, 3.0], [34.0, 2.4], [56.0, 1.6]]:
+		var l := OmniLight3D.new()
+		l.name = "SpireLight_%d" % int(spec2[0])
+		l.position = Vector3(0.0, spec2[0], 0.0)
+		l.light_color = Color(0.56, 0.93, 1.0)
+		l.light_energy = spec2[1]
+		l.omni_range = 72.0
+		l.omni_attenuation = 1.1
+		l.set_meta("no_shadow", true)
+		body.add_child(l)
+	print("  northlight spire: %d ice columns" % placed)
 
 
 # ======================================================================================
@@ -3046,6 +3675,9 @@ func _ready() -> void:
 	fill.light_color = Color(0.42, 0.62, 0.78)
 	fill.light_energy = 0.45
 	fill.shadow_enabled = false
+	# MusicManager switches on shadows for every directional light unless told otherwise, and a
+	# second set of four cascades for a fill light nobody can see the shadows of cost ~1ms.
+	fill.set_meta("no_shadow", true)
 	level_scene.add_child(fill)
 
 	# Hand the sky shader the moon's direction so the disc in the sky sits where the light is.
@@ -3055,6 +3687,11 @@ func _ready() -> void:
 	# No stars: an aurora at this brightness drowns most of them anyway, and the ones that
 	# survive read as dirt on the lens against the curtains.
 	sky_mat.set_shader_parameter("star_brightness", 0.0)
+	# Animates the aurora through the aurora_clock global instead of TIME (see aurora_sky.gdshader).
+	var aurora_clock := Node.new()
+	aurora_clock.name = "AuroraClock"
+	aurora_clock.set_script(load("res://AuroraClock.gd"))
+	level_scene.add_child(aurora_clock)
 
 	# Ambient wind
 	var wind_stream = load("res://sounds/dragon-studio-winter-wind-402331.mp3")
@@ -3115,7 +3752,7 @@ func _ready() -> void:
 	snow_particles.draw_pass_1 = snow_quad
 	level_scene.add_child(snow_particles)
 
-	# 2. Main TrackPath & Curve3D (~2km closed circuit)
+	# 2. Main TrackPath & Curve3D (~2.5km closed circuit)
 	#
 	# Clockwise circuit, starting on the frozen lake:
 	#  - Start/finish straight across the lake, under the aurora
@@ -3123,19 +3760,22 @@ func _ready() -> void:
 	#  - The Ice Cavern: a 190m gallery through the glacier, entered and left through ice cliffs
 	#  - North basin onto the high ice shelf, and the Serac Ledge divergence
 	#  - The crevasse, crossed on the ice arch
-	#  - Serac field, then home across the shelf and back over the lake on the west straight
+	#  - Serac field, then home across the shelf
+	#  - The Northlight Spire: up the spiral, over the arch, off the lip and down onto the lake
+	#  - Back over the lake on the west straight
 	#
-	# The closing complex (points 20-24) exists because a closed lap cannot simply run the start
+	# The closing complex (the last five points) exists because a closed lap cannot simply run the start
 	# straight one way and come back along it the other: the return has to travel *past* the line
 	# and hook back onto the straight through the ice, which is what makes the finish line sit on
 	# a straight instead of on a hairpin.
 	var track_path := Path3D.new()
 	track_path.name = "TrackPath"
 	#
-	# On plan this is a loop that never touches itself. That is not an aesthetic preference: two
-	# stretches closer than about 26m centre-to-centre put a 15m carriageway and two 2.1m snow banks
-	# in the same space, and the result is a crossing that looks passable from above and is walled
-	# off from the driver's seat. So the plan is checked explicitly by _verify_plan() below.
+	# On plan this is a loop that never touches itself at road level. That is not an aesthetic
+	# preference: two stretches closer than about 26m centre-to-centre put a 15m carriageway and two
+	# 2.1m snow banks in the same space, and the result is a crossing that looks passable from above
+	# and is walled off from the driver's seat. So the plan is checked explicitly by _verify_plan()
+	# below. The one exception is the spire exit, which crosses its run-in 20m up on an arch.
 	#
 	# Reading it as a shape: the start straight runs south down the east side of the lake, the
 	# circuit goes north through the cavern and out around the shelf, and the way home crosses the
@@ -3168,19 +3808,22 @@ func _ready() -> void:
 		Vector3(104.0, 6.20, -62.0),   # 17
 		Vector3(50.0, 4.40, -30.0),    # 18
 		Vector3(0.0, 3.85, 20.0),      # 19  back onto the ice
-		Vector3(40.0, 3.70, 120.0),    # 20  turning south, east of the outbound diagonal
-		Vector3(10.0, 3.58, 240.0),    # 21  running back down the middle of the lake
-		Vector3(-30.0, 3.45, 350.0),   # 22  still clear of the start straight
-		Vector3(-10.0, 3.38, 430.0),   # 23  south of the finish line, where the road is open
-		Vector3(20.0, 3.30, 490.0),    # 24  swinging out east, away from the start straight
-		Vector3(-30.0, 3.22, 530.0),   # 25  bottom of the arc
-		Vector3(-90.0, 3.14, 510.0),   # 26  turning back west
-		Vector3(-112.0, 3.06, 470.0),  # 27  onto the line of the start straight, running north
 	]
+	# --- SECTION 5: the Northlight Spire. Run-in, a 285-degree climb round the spire, back over
+	# the run-in on an ice arch, off the lip and down the landing hill onto the lake.
+	_append_spire_section(curve_pts)
+	curve_pts.append_array([
+		Vector3(-30.0, 3.45, 350.0),   # still clear of the start straight
+		Vector3(-10.0, 3.38, 430.0),   # south of the finish line, where the road is open
+		Vector3(20.0, 3.30, 490.0),    # swinging out east, away from the start straight
+		Vector3(-30.0, 3.22, 530.0),   # bottom of the arc
+		Vector3(-90.0, 3.14, 510.0),   # turning back west
+		Vector3(-112.0, 3.06, 470.0),  # onto the line of the start straight, running north
+	])
 
 	# Handles are derived from the geometry rather than hand-picked: see _build_closed_loop.
-	var curve := _build_closed_loop(curve_pts, TRUNK_MIN_RADIUS)
-	_verify_min_radius(curve, MAIN_HALF_W, "trunk")
+	var curve := _build_closed_loop(curve_pts, TRUNK_MIN_RADIUS, [_spire_lip_index, _spire_land_index])
+	_shape_spire_handles(curve)
 
 	track_path.curve = curve
 	main_track_curve = curve
@@ -3194,6 +3837,8 @@ func _ready() -> void:
 
 	# 3. Feature ranges, measured off the curve so they follow it if the layout is retuned.
 	_measure_feature_ranges(curve)
+	# After the ranges: the jump gap is skipped, its curvature is the flight path's, not a road's.
+	_verify_min_radius(curve, MAIN_HALF_W, "trunk")
 
 	# 4. Materials
 	var concrete_tex: Texture2D = load("res://materials/concrete.png") as Texture2D
@@ -3209,8 +3854,6 @@ func _ready() -> void:
 		road_mat.set_shader_parameter("grain_normal", concrete_norm)
 	road_mat.set_shader_parameter("trunk_width", MAIN_WIDTH)
 	road_mat.set_shader_parameter("ramp_width", ROUTE_WIDTH)
-	road_mat.set_shader_parameter("circuit_length", trunk_len)
-	road_mat.set_shader_parameter("clear_zone", 30.0)
 	road_mat.set_shader_parameter("aurora_amount", 0.14)
 
 	var bank_mat := StandardMaterial3D.new()
@@ -3232,6 +3875,10 @@ func _ready() -> void:
 	under_mat.set_shader_parameter("vein_glow", 0.20)
 	under_mat.set_shader_parameter("frost_line", 8.0)
 	under_mat.set_shader_parameter("normal_strength", 0.22)
+	# The spire's ramp stands on this ice, 20m of wall in places: the layering is what stops it
+	# reading as poured concrete.
+	under_mat.set_shader_parameter("strata_strength", 0.40)
+	under_mat.set_shader_parameter("strata_spacing", 2.2)
 	if rock_tex:
 		under_mat.set_shader_parameter("rock_albedo", rock_tex)
 	if rock_norm:
@@ -3260,8 +3907,23 @@ func _ready() -> void:
 	serac_mat.set_shader_parameter("ice_color", Color(0.82, 0.91, 0.98))
 	serac_mat.set_shader_parameter("deep_color", Color(0.30, 0.52, 0.70))
 	serac_mat.set_shader_parameter("normal_strength", 0.30)
+	serac_mat.set_shader_parameter("strata_strength", 0.45)
 	if rock_norm:
 		serac_mat.set_shader_parameter("ice_normal", rock_norm)
+
+	# The spire glows more than the field around it: it is the stage's landmark at night.
+	var spire_mat := ShaderMaterial.new()
+	spire_mat.shader = load("res://glacier_ice.gdshader")
+	spire_mat.set_shader_parameter("vein_density", 0.30)
+	spire_mat.set_shader_parameter("vein_glow", 0.55)
+	spire_mat.set_shader_parameter("ice_scale", 0.06)
+	spire_mat.set_shader_parameter("frost_line", 40.0)
+	spire_mat.set_shader_parameter("ice_color", Color(0.80, 0.92, 1.0))
+	spire_mat.set_shader_parameter("deep_color", Color(0.18, 0.42, 0.68))
+	spire_mat.set_shader_parameter("normal_strength", 0.30)
+	spire_mat.set_shader_parameter("strata_strength", 0.55)
+	if rock_norm:
+		spire_mat.set_shader_parameter("ice_normal", rock_norm)
 
 	var ground_mat := ShaderMaterial.new()
 	ground_mat.shader = load("res://polar_night_ground.gdshader")
@@ -3338,11 +4000,23 @@ func _ready() -> void:
 	main_right_gaps = _merge_intervals(main_right_gaps)
 	print("  trunk bank gaps - left: %s  right: %s" % [main_left_gaps, main_right_gaps])
 
+	# Every carriageway is indexed before any deck is built: the spire's ice walls reach down to
+	# the ground the terrain will have, and that ground depends on all the corridors.
+	ROAD_CURVES.append(alt1_curve)
+	ROAD_CURVES.append(alt2_curve)
+	_build_road_index()
+
 	# NOTE the explicit gap arguments: without them the trunk gets no bank gaps at all and every
 	# route entrance is walled off. _verify_gaps below fails the build if so.
 	_build_road_mesh(level_scene, curve, MAIN_WIDTH, "MainIceRoad", road_mat, bank_mat, under_mat,
-			0, 0.0, main_left_gaps, main_right_gaps, _bridge_range)
+			0, 0.0, main_left_gaps, main_right_gaps, _bridge_range, {
+				"elevated": _elevated_spans,
+				"voids": _void_spans,
+				"openings": [Vector2(_arch_off, SPIRE_ARCH_HALF)],
+			})
 	_verify_gaps(routes, main_left_gaps, main_right_gaps)
+	_verify_spire_arch(curve)
+	_verify_spire_jump(curve)
 
 	# 7. Route decks (tiled against the trunk shoulder, gore bank only where they separate)
 	_build_road_mesh(level_scene, alt1_curve, ROUTE_WIDTH, "MeltwaterCutRoad", road_mat, bank_mat, under_mat,
@@ -3358,9 +4032,6 @@ func _ready() -> void:
 
 	# 9. Terrain: the icefield has to know where every carriageway runs, so this is built after
 	#    the roads exist and after the crevasse is known.
-	ROAD_CURVES.append(alt1_curve)
-	ROAD_CURVES.append(alt2_curve)
-	_build_road_index()
 	var terrain_container := Node3D.new()
 	terrain_container.name = "TerrainEnvironment"
 	level_scene.add_child(terrain_container)
@@ -3406,15 +4077,23 @@ func _ready() -> void:
 			si.name = "SpawnIndicator"
 			sp.add_child(si)
 
-	# 11. Checkpoints. Placed by fraction of the lap rather than by hand-picked coordinates, so
-	#     they stay spread out and in order of travel however the layout is retuned.
+	# 11. Checkpoints, anchored to the stretch of circuit they guard rather than to a fraction of
+	#     the lap, so lengthening one part of the lap doesn't slide the others.
 	var checkpoints_container := Node3D.new()
 	checkpoints_container.name = "Checkpoints"
 	level_scene.add_child(checkpoints_container)
 
-	var cp_fractions := [0.11, 0.24, 0.47, 0.70, 0.87]
-	for i in range(cp_fractions.size()):
-		var dist_along: float = float(cp_fractions[i]) * trunk_len
+	#     One gate sits on top of the spire, just past the arch: the snowfield inside the spiral is
+	#     drivable, and without a gate up there the whole climb could be skipped across it.
+	var cp_offsets: Array = [
+		_off_near(curve, Vector3(-111.2, 2.98, 189.2)),   # lake straight
+		_off_near(curve, Vector3(-36.5, 2.66, -75.5)),    # cavern apron
+		_off_near(curve, Vector3(195.1, 8.42, -319.7)),   # shelf, before the crevasse
+		_arch_off + 10.0,                                  # top of the spire
+		_off_near(curve, Vector3(-8.7, 3.38, 433.1)),     # back across the lake
+	]
+	for i in range(cp_offsets.size()):
+		var dist_along: float = cp_offsets[i]
 		var cp_pos := curve.sample_baked(dist_along)
 		var next_pos := curve.sample_baked(minf(trunk_len, dist_along + 1.0))
 		var forward := (next_pos - cp_pos).normalized()
@@ -3424,7 +4103,7 @@ func _ready() -> void:
 		gate.position = cp_pos + Vector3(0, 0.1, 0)
 		gate.rotation_degrees = Vector3(0, rot_y, 0)
 		checkpoints_container.add_child(gate)
-		print("  checkpoint %d at %.0fm (%.0f%%)" % [i + 1, dist_along, cp_fractions[i] * 100.0])
+		print("  checkpoint %d at %.0fm (%.0f%%)" % [i + 1, dist_along, dist_along / trunk_len * 100.0])
 
 	# 12. Boost pads, placed on the curves rather than as world coordinates.
 	var boost_scene: PackedScene = load("res://BoostPad.tscn")
@@ -3435,14 +4114,17 @@ func _ready() -> void:
 	if boost_scene:
 		# [label, curve, distance along, lateral, height]
 		var bp_defs = [
-			["Boost_Lake_L", curve, 0.06 * trunk_len, -4.6, 0.1],
-			["Boost_Lake_R", curve, 0.06 * trunk_len, 4.6, 0.1],
-			["Boost_Shore", curve, 0.20 * trunk_len, 0.0, 0.1],
+			["Boost_Lake_L", curve, _off_near(curve, Vector3(-112.2, 3.0, 298.6)), -4.6, 0.1],
+			["Boost_Lake_R", curve, _off_near(curve, Vector3(-112.2, 3.0, 298.6)), 4.6, 0.1],
+			["Boost_Shore", curve, _off_near(curve, Vector3(-87.4, 2.79, -5.6)), 0.0, 0.1],
 			["Boost_Cavern_Entry", curve, _cavern_range.x - 40.0, 3.8, 0.1],
 			["Boost_Cavern_Mid", curve, (_cavern_range.x + _cavern_range.y) * 0.5, -4.2, 0.1],
 			["Boost_Arch", curve, (_bridge_range.x + _bridge_range.y) * 0.5, 4.4, 0.1],
-			["Boost_Shelf_Exit", curve, 0.68 * trunk_len, -4.4, 0.1],
-			["Boost_Home_Run", curve, 0.84 * trunk_len, 3.0, 0.1],
+			["Boost_Shelf_Exit", curve, _off_near(curve, Vector3(3.0, 3.77, 41.7)), -4.4, 0.1],
+			["Boost_Home_Run", curve, _off_near(curve, Vector3(-29.2, 3.43, 370.9)), 3.0, 0.1],
+			# On the exit straight past the arch, so a cart that has scrubbed speed on the
+			# spiral still has the legs to clear the gap.
+			["Boost_Spire_Launch", curve, _lip_off - 24.0, 0.0, 0.1],
 			# Route rewards: one on the channel floor, one at the top of the ledge.
 			["Boost_Meltwater", alt1_curve, alt1_curve.get_baked_length() * 0.5, 0.0, 0.1],
 			["Boost_Meltwater_Exit", alt1_curve, alt1_curve.get_baked_length() - 22.0, 0.0, 0.1],
@@ -3465,12 +4147,15 @@ func _ready() -> void:
 	if item_scene:
 		# [curve, distance along, laterals]
 		var item_rows = [
-			[curve, 0.05 * trunk_len, [-5.2, 0.0, 5.2]],
-			[curve, 0.19 * trunk_len, [-4.6, 0.0, 4.6]],
+			[curve, _off_near(curve, Vector3(-112.2, 2.99, 320.5)), [-5.2, 0.0, 5.2]],
+			[curve, _off_near(curve, Vector3(-94.1, 2.82, 15.2)), [-4.6, 0.0, 4.6]],
 			[curve, _cavern_range.x - 70.0, [-4.0, 4.0]],
 			[curve, _cavern_range.y + 45.0, [-4.0, 0.0, 4.0]],
-			[curve, 0.62 * trunk_len, [-4.4, 4.4]],
-			[curve, 0.80 * trunk_len, [-4.6, 0.0, 4.6]],
+			[curve, _off_near(curve, Vector3(81.0, 5.36, -48.4)), [-4.4, 4.4]],
+			# On the lake once the landing hill has run out.
+			[curve, _land_off + LAND_LEN + 35.0, [-4.6, 0.0, 4.6]],
+			# On the run-in to the spire, before the climb.
+			[curve, _spire_range.x + 30.0, [-4.4, 0.0, 4.4]],
 			[alt1_curve, alt1_curve.get_baked_length() * 0.45, [0.0]],
 		]
 		var item_idx := 1
@@ -3502,6 +4187,18 @@ func _ready() -> void:
 	_build_junction_pylons(props_container, serac_mat, routes)
 	_build_crevasse_lights(props_container)
 	_build_crevasse_water(props_container)
+	_build_spire(props_container, spire_mat)
+
+	# Blizzards: scheduled off the wall clock at runtime (see NorthlightWeather.gd). The cavern is
+	# the one place out of the wind.
+	var weather := Node3D.new()
+	weather.name = "NorthlightWeather"
+	weather.set_script(load("res://NorthlightWeather.gd"))
+	weather.set("wind_audio_path", NodePath("../WinterWindAudio"))
+	weather.set("moon_path", NodePath("../MoonLight"))
+	var shelters: Array[Vector4] = [Vector4(0.0, _cavern_portal_z.x, 0.0, _cavern_portal_z.y)]
+	weather.set("shelters", shelters)
+	level_scene.add_child(weather)
 	# No jumbotron on this stage: it sits on the lake shore, where the lighting is flat and the
 	# board reads as a floating black slab against the snow.
 
@@ -3608,11 +4305,56 @@ func _measure_feature_ranges(curve: Curve3D) -> void:
 		_cavern_zs.append(p4.z)
 		_cavern_ys.append(p4.y)
 
+	_measure_spire(curve)
+
 	# The cavern does not need to be on this list: corridor grading switches off over the massif
 	# spatially, in _inside_cavern_mass, so no road sample can reach in and cut a gallery into it.
-	# What is here is the crevasse span (open sky underneath the arch) and the frozen lake (the
-	# road is scraped into the ice, not built on it).
+	# What is here is the crevasse span (open sky underneath the arch), the frozen lake (the
+	# road is scraped into the ice, not built on it), and the spire section wherever it stands on
+	# ice walls or flies (grading there would heap the snow up into a ramp under it).
 	_no_grade = {
 		0: _merge_intervals(
-			[_bridge_range if _bridge_range.y > _bridge_range.x else Vector2(-1.0, -1.0)] + spans)
+			[_bridge_range if _bridge_range.y > _bridge_range.x else Vector2(-1.0, -1.0)] + spans
+			+ _elevated_spans + _void_spans)
 	}
+
+
+## Trunk offsets of the spire section's features, and the spans where it is up in the air.
+func _measure_spire(curve: Curve3D) -> void:
+	_spire_range = Vector2(
+		curve.get_closest_offset(curve.get_point_position(_spire_first_index)),
+		curve.get_closest_offset(curve.get_point_position(_spire_last_index)))
+	_lip_off = curve.get_closest_offset(curve.get_point_position(_spire_lip_index))
+	_land_off = curve.get_closest_offset(curve.get_point_position(_spire_land_index))
+	_void_spans = [Vector2(_lip_off + 0.05, _land_off - 0.05)]
+
+	# Where the exit crosses the run-in: E + t*D meets entry - s*in_dir.
+	var a0: float = deg_to_rad(SPIRE_ENTRY_DEG)
+	var entry := Vector2(SPIRE_CENTER.x + SPIRE_RADIUS * cos(a0), SPIRE_CENTER.y + SPIRE_RADIUS * sin(a0))
+	var in_dir := Vector2(sin(a0), -cos(a0))
+	var den: float = _spire_dir.x * in_dir.y - _spire_dir.y * in_dir.x
+	var rel: Vector2 = entry - _spire_exit
+	var t_cross: float = (rel.x * in_dir.y - rel.y * in_dir.x) / den
+	var cross_pt: Vector2 = _spire_exit + _spire_dir * t_cross
+	_arch_off = curve.get_closest_offset(Vector3(cross_pt.x, SPIRE_TOP_Y + t_cross * 0.02, cross_pt.y))
+
+	# Elevated wherever the deck stands ELEVATED_MIN over the natural ground, padded so the walls
+	# fade in on graded ground rather than starting at the edge of a corridor cut.
+	var runs: Array = []
+	var start := -1.0
+	var off: float = _spire_range.x
+	while off <= _spire_range.y:
+		var p: Vector3 = curve.sample_baked(off)
+		var high: bool = p.y - _apply_crevasse(_icefield_height(p.x, p.z), p.x, p.z) > ELEVATED_MIN
+		if high and start < 0.0:
+			start = off
+		elif not high and start >= 0.0:
+			runs.append(Vector2(start - 3.0, off + 3.0))
+			start = -1.0
+		off += 1.0
+	if start >= 0.0:
+		runs.append(Vector2(start - 3.0, _spire_range.y))
+	_elevated_spans = _merge_intervals(runs)
+	print("  spire section %.0fm to %.0fm: arch over the run-in at %.0fm, lip at %.0fm, landing at %.0fm" % [
+		_spire_range.x, _spire_range.y, _arch_off, _lip_off, _land_off])
+	print("  spire on ice walls over %s" % [_elevated_spans])
