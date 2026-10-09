@@ -13,13 +13,16 @@ extends Node3D
 ## bodies, but only on ANIMAL_LAYER, which carts do not collide with and the AI's obstacle rays
 ## do see, so bots steer round them.
 ##
-## The generator stores the stream, the ground under it (rows of heights across the stream), the
-## animal mesh's MultiMesh and the dust emitters. The bodies and the audio are built on load.
+## The animals are instances of `animal_scene`, a rigged model with a looping run cycle (the
+## wildebeest in models/animals/wildebeest), scaled up to the RC carts' world. Each plays the run
+## cycle at the pace that keeps its hooves with the ground.
+##
+## The generator stores the stream, the ground under it (rows of heights across the stream) and
+## the dust emitters. The animals, their bodies and the audio are built on load.
 
 const ANIMAL_LAYER := 1 << 2
-## Half extents of an animal in its own frame (x across, z along), plus the cart's sphere.
-const HIT_HALF_X := 1.45
-const HIT_HALF_Z := 2.05
+## The cart's collision sphere, added to an animal's half extents for the bump test.
+const CART_REACH := 1.0
 const HIT_COOLDOWN := 0.9
 ## Speed a cart keeps after hitting an animal, and how hard it is shoved.
 const HIT_KEEP := 0.38
@@ -27,6 +30,11 @@ const HIT_SHOVE := 7.0
 const HIT_HOP := 4.0
 ## Metres at either end of the stream over which animals fade in and out of view.
 const EDGE_FADE := 18.0
+## Model half width, half length and back height at scale 1 (the wildebeest model's body; its
+## legs and horns stick out a little further).
+const MODEL_HALF_X := 0.15
+const MODEL_HALF_Z := 0.5
+const MODEL_BACK_Y := 0.62
 
 @export var path_start := Vector3.ZERO
 @export var path_end := Vector3(0, 0, -300)
@@ -38,6 +46,14 @@ const EDGE_FADE := 18.0
 ## Distance along the stream after which the pattern repeats; at least the stream's length.
 @export var loop_length := 330.0
 @export var rng_seed := 1977
+## A rigged animal facing +Z with its hooves at y = 0, and its looping run animation.
+@export var animal_scene: PackedScene
+@export var run_animation := &"Run"
+@export var animal_scale := 5.0
+## Ground a hoof covers per run cycle at scale 1, so the gait keeps pace with `speed`.
+@export var run_stride := 1.0
+## Two animals' centres stay at least this far apart (x across, y along the stream).
+@export var spacing := Vector2(2.8, 7.0)
 ## Ground under the stream: `ground_cols` heights across it per row, one row every
 ## `ground_step` metres along it. Column 0 is at -half_width - ground_step.
 @export var ground_rows := PackedFloat32Array()
@@ -52,6 +68,7 @@ var _count := 0
 var _s_off := PackedFloat32Array()
 var _lat := PackedFloat32Array()
 var _wob_amp := PackedFloat32Array()
+## Each cluster weaves as one, so neighbours keep their spacing.
 var _wob_phase := PackedFloat32Array()
 var _gait := PackedFloat32Array()
 var _scale := PackedFloat32Array()
@@ -60,7 +77,9 @@ var _knock: Array[Vector3] = []
 var _xforms: Array[Transform3D] = []
 var _visible := PackedByteArray()
 var _bodies: Array[AnimatableBody3D] = []
-var _mmi: MultiMeshInstance3D
+var _animals: Array[Node3D] = []
+var _players: Array[AnimationPlayer] = []
+var _hit_half := Vector3.ONE
 var _dust: Array[GPUParticles3D] = []
 var _rumble: Array[AudioStreamPlayer3D] = []
 var _cooldown := {}
@@ -77,33 +96,61 @@ func _ready() -> void:
 	_count = clusters * per_cluster
 	var rng := RandomNumberGenerator.new()
 	rng.seed = rng_seed
-	for i in range(_count):
-		# Denser toward the middle of each cluster, ragged at its ends.
-		var u: float = (rng.randf() + rng.randf()) * 0.5
-		_s_off.append(u * cluster_length)
-		_lat.append(rng.randf_range(-1.0, 1.0) * (half_width - 1.2))
-		_wob_amp.append(rng.randf_range(0.3, 1.4))
-		_wob_phase.append(rng.randf() * TAU)
-		_gait.append(rng.randf())
-		_scale.append(rng.randf_range(0.88, 1.1))
-		_knock.append(Vector3.ZERO)
-		_xforms.append(Transform3D())
+	var lat_room: float = half_width - MODEL_HALF_X * animal_scale - 1.4
+	for k in range(clusters):
+		var phase: float = rng.randf() * TAU
+		var placed: Array[Vector2] = []
+		for j in range(per_cluster):
+			# Denser toward the middle of each cluster, ragged at its ends; never on top of a
+			# neighbour (the closest of a few tries wins if the cluster is crowded).
+			var best := Vector2.ZERO
+			var best_d := -1.0
+			for attempt in range(40):
+				var u: float = (rng.randf() + rng.randf()) * 0.5
+				var c := Vector2(rng.randf_range(-1.0, 1.0) * lat_room, u * cluster_length)
+				var nearest := 1e9
+				for q in placed:
+					nearest = minf(nearest, ((c - q) / spacing).length())
+				if nearest > best_d:
+					best_d = nearest
+					best = c
+				if nearest >= 1.0:
+					break
+			placed.append(best)
+			_s_off.append(best.y)
+			_lat.append(best.x)
+			_wob_amp.append(rng.randf_range(0.9, 1.25))
+			_wob_phase.append(phase)
+			_gait.append(rng.randf())
+			_scale.append(rng.randf_range(0.9, 1.08))
+			_knock.append(Vector3.ZERO)
+			_xforms.append(Transform3D())
 	_visible.resize(_count)
 	# Marked visible so the first update parks every animal that starts off the stream.
 	_visible.fill(1)
-	_mmi = get_node_or_null("Animals") as MultiMeshInstance3D
-	if _mmi and _mmi.multimesh:
-		_mmi.multimesh.instance_count = _count
-		for i in range(_count):
-			_mmi.multimesh.set_instance_custom_data(i, Color(_gait[i] * 4.0, 1.0, 0.0, 0.0))
+	_hit_half = Vector3(MODEL_HALF_X, MODEL_BACK_Y, MODEL_HALF_Z) * animal_scale + Vector3(CART_REACH, 1.0, CART_REACH)
 	for c in get_children():
 		if c is GPUParticles3D:
 			_dust.append(c)
 	if Engine.is_editor_hint():
 		return
+	if animal_scene:
+		for i in range(_count):
+			var a: Node3D = animal_scene.instantiate()
+			add_child(a, false, Node.INTERNAL_MODE_BACK)
+			_animals.append(a)
+			var players: Array[Node] = a.find_children("*", "AnimationPlayer", true, false)
+			var ap: AnimationPlayer = players[0] if not players.is_empty() else null
+			_players.append(ap)
+			if ap and ap.has_animation(run_animation):
+				ap.play(run_animation)
+				var anim_len: float = ap.get_animation(run_animation).length
+				ap.seek(_gait[i] * anim_len, true)
+				# Cycles per second that keep the hooves with the ground, times the cycle's length.
+				ap.speed_scale = speed / maxf(run_stride * animal_scale * _scale[i], 0.01) * anim_len
 	var shape := CapsuleShape3D.new()
-	shape.radius = 0.6
-	shape.height = 2.3
+	shape.radius = MODEL_HALF_X * animal_scale * 1.2
+	shape.height = MODEL_HALF_Z * animal_scale * 2.0
 	for i in range(_count):
 		var b := AnimatableBody3D.new()
 		b.sync_to_physics = false
@@ -112,7 +159,7 @@ func _ready() -> void:
 		var cs := CollisionShape3D.new()
 		cs.shape = shape
 		# Capsule along the body (Z), at shoulder height.
-		cs.transform = Transform3D(Basis(Vector3.RIGHT, PI * 0.5), Vector3(0, 1.0, 0))
+		cs.transform = Transform3D(Basis(Vector3.RIGHT, PI * 0.5), Vector3(0, MODEL_BACK_Y * animal_scale * 0.7, 0))
 		b.add_child(cs)
 		add_child(b, false, Node.INTERNAL_MODE_BACK)
 		_bodies.append(b)
@@ -162,29 +209,34 @@ func _physics_process(delta: float) -> void:
 
 func _update_herd(delta: float) -> void:
 	var t: float = _clock()
-	var spacing: float = loop_length / float(maxi(clusters, 1))
+	var gap: float = loop_length / float(maxi(clusters, 1))
 	var centre_sum: Array[Vector3] = []
 	var centre_n: Array[int] = []
 	for k in range(clusters):
 		centre_sum.append(Vector3.ZERO)
 		centre_n.append(0)
-	var mm: MultiMesh = _mmi.multimesh if _mmi else null
 	for i in range(_count):
 		var k: int = floori(float(i) / float(per_cluster))
-		var s: float = fposmod(t * speed + float(k) * spacing + _s_off[i], loop_length)
+		var s: float = fposmod(t * speed + float(k) * gap + _s_off[i], loop_length)
 		var fade: float = smoothstep(0.0, EDGE_FADE, s) * smoothstep(_length, _length - EDGE_FADE, s)
 		if s > _length or fade <= 0.001:
 			if _visible[i] == 1:
 				_visible[i] = 0
-				if mm:
-					mm.set_instance_transform(i, Transform3D(Basis().scaled(Vector3.ONE * 0.001), path_start + Vector3.DOWN * 50.0))
+				if i < _animals.size():
+					_animals[i].visible = false
+					if _players[i]:
+						_players[i].pause()
 				if i < _bodies.size():
 					_bodies[i].global_transform = Transform3D(Basis(), path_start + Vector3.DOWN * 50.0)
 			continue
+		if _visible[i] == 0 and i < _animals.size():
+			_animals[i].visible = true
+			if _players[i]:
+				_players[i].play()
 		_visible[i] = 1
-		# Each animal weaves a little across the stream as it runs.
+		# Each cluster weaves a little across the stream as it runs.
 		var w: float = sin(t * 0.7 + _wob_phase[i]) * _wob_amp[i]
-		var lat: float = clampf(_lat[i] + w, -half_width + 0.8, half_width - 0.8)
+		var lat: float = clampf(_lat[i] + w, -half_width + 1.0, half_width - 1.0)
 		var dlat: float = cos(t * 0.7 + _wob_phase[i]) * _wob_amp[i] * 0.7 / maxf(speed, 0.1)
 		if _knock[i].length_squared() > 0.0001:
 			_knock[i] = _knock[i].lerp(Vector3.ZERO, clampf(delta * 1.6, 0.0, 1.0))
@@ -194,11 +246,12 @@ func _update_herd(delta: float) -> void:
 		# Pitch with the slope under it.
 		var ahead: float = _ground(s + 1.5, lat) - _ground(s - 1.5, lat)
 		var fwd: Vector3 = (heading + Vector3.UP * ahead / 3.0).normalized()
-		var basis := Basis.looking_at(fwd, Vector3.UP).scaled(Vector3.ONE * _scale[i] * maxf(fade, 0.05))
-		var xf := Transform3D(basis, p - Vector3.UP * (1.0 - fade) * 1.2)
+		# The model faces +Z.
+		var basis := Basis.looking_at(fwd, Vector3.UP, true).scaled(Vector3.ONE * animal_scale * _scale[i] * maxf(fade, 0.05))
+		var xf := Transform3D(basis, p - Vector3.UP * (1.0 - fade) * MODEL_BACK_Y * animal_scale)
 		_xforms[i] = xf
-		if mm:
-			mm.set_instance_transform(i, xf)
+		if i < _animals.size():
+			_animals[i].global_transform = xf
 		if i < _bodies.size():
 			_bodies[i].global_transform = Transform3D(Basis.looking_at(heading, Vector3.UP), p)
 		centre_sum[k] += p
@@ -241,7 +294,7 @@ func _check_carts() -> void:
 				continue
 			var xf: Transform3D = _xforms[i]
 			var local: Vector3 = xf.basis.orthonormalized().inverse() * (cp - xf.origin)
-			if absf(local.x) > HIT_HALF_X or absf(local.z) > HIT_HALF_Z or local.y < -1.5 or local.y > 3.0:
+			if absf(local.x) > _hit_half.x or absf(local.z) > _hit_half.z or local.y < -1.5 or local.y > _hit_half.y:
 				continue
 			_bump(cart, i, xf)
 			_cooldown[id] = now + HIT_COOLDOWN

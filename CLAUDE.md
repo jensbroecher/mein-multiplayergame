@@ -116,6 +116,9 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 - `res://scratch/ai_race_test.tscn -- res://levels/X.tscn seconds=330 speed=4` races 6 AI carts
   headless and lists every respawn with where it happened. `res://scratch/water_drop_test.tscn` drops a
   cart at given points and reports whether it drowns.
+- Spruces swap to their far mesh one tree at a time: `spruce.gdshader` dithers each tree between LODs
+  (`lod_mode`). The cells' visibility ranges are padded by half a cell diagonal, so a whole cell never
+  pops in or out.
 
 ## Mara Crossing (Matumaini GP, stage 1)
 
@@ -132,6 +135,20 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   named "ramp". Keep "Props", "Vegetation" and "Environment" out of dressing node names for the same reason.
 - `StandardMaterial3D` with `vertex_color_use_as_albedo` needs `vertex_color_is_srgb = true` for the
   generator's palettes. Shaders that read `COLOR` as a colour convert it with `pow(c, 2.2)`.
+- Wildlife and trees are about twice life size, to suit the RC carts. The herd instances the rigged
+  `models/animals/wildebeest/Wildebeest_Animated.glb` (faces +Z, "Run" cycle) at `WILDEBEEST_SCALE`.
+  `run_stride` matches the gait to the herd's speed, and the hit box scales with `animal_scale`.
+  The model's texture imports are capped at 2048.
+- Acacias are branch tubes (`tree_bark.gdshader`) under pads of alpha-tested leaf cards
+  (`acacia_leaves.gdshader`). The generator draws the leaf texture with coverage-preserving mipmaps
+  (`_acacia_leaf_texture`). Each tree crossfades to its far mesh around `ACACIA_NEAR`
+  (`tree_lod.gdshaderinc`). The far meshes cast no shadow, because the shadow pass can't tell which LOD a
+  tree is showing.
+- Kopje tors are granite meshes (`_build_kopje_rocks`): a half-buried dome with boulders resting on or
+  against it, never piled into towers, which read as cairns. `granite.gdshaderinc` is shared with the
+  ground shader. Keep the kopje heightfield smooth: a coarse grid heaped with lumps reads as gravel.
+  `_verify_rocks_bedded` reports any block that floats.
 - `res://scratch/mara_test.tscn -- [seconds=200] [speed=4] [croc=1.0]` sends the AI over the croc jump
   and reports take-off speeds, drownings and herd bumps. `res://scratch/mara_shots.tscn` renders the menu
-  tiles (windowed, into a fixed-size SubViewport).
+  tiles (windowed, into a fixed-size SubViewport). `res://scratch/look_shots.tscn -- <level> <dir>
+  [car=x,z,yaw] name:x,y,z:tx,ty,tz ...` renders look-dev shots with carts dropped in for scale.

@@ -20,10 +20,19 @@ uniform sampler2D needle_normal : hint_normal, filter_linear_mipmap_anisotropic,
 // Metres per texture repeat.
 uniform float needle_tile = 1.1;
 uniform float needle_normal_depth : hint_range(0.0, 3.0) = 1.1;
+// Near/far crossfade, per tree: 0 = always drawn, 1 = the detailed tree (dithers out between
+// lod_fade_begin and lod_fade_end), 2 = the far stand-in (dithers in over the same band). The two
+// use the same dither, so together they always cover exactly one tree.
+uniform int lod_mode = 0;
+uniform float lod_fade_begin = 215.0;
+uniform float lod_fade_end = 265.0;
+// Each tree's band is shifted by up to this much, so the swap isn't a sharp ring.
+uniform float lod_jitter = 15.0;
 
 varying vec3 local_pos;
 varying vec3 w_nrm;
 varying float tree_seed;
+varying float cam_dist;
 
 float hash31(vec3 p) {
 	p = fract(p * 0.3183099 + vec3(0.71, 0.113, 0.419));
@@ -45,6 +54,7 @@ void vertex() {
 	local_pos = VERTEX;
 	vec3 origin = MODEL_MATRIX[3].xyz;
 	tree_seed = hash31(floor(origin * 0.37) + 0.5);
+	cam_dist = distance(origin, CAMERA_POSITION_WORLD) + (tree_seed - 0.5) * 2.0 * lod_jitter;
 	// Sway grows with height and with distance from the trunk: tips move, the trunk does not.
 	float bend = pow(max(VERTEX.y, 0.0) / 11.0, 2.0) + length(VERTEX.xz) * 0.04;
 	float phase = TIME * (0.9 + tree_seed * 0.4) + tree_seed * 6.28;
@@ -53,6 +63,15 @@ void vertex() {
 }
 
 void fragment() {
+	// Shadow passes for the sun are orthographic; their "camera" is the light, so don't fade there.
+	if (lod_mode != 0 && PROJECTION_MATRIX[3][3] < 0.5) {
+		float t = clamp((cam_dist - lod_fade_begin) / max(lod_fade_end - lod_fade_begin, 0.001), 0.0, 1.0);
+		// Interleaved gradient noise: a fine, even screen-space dither.
+		float d = fract(52.9829189 * fract(dot(FRAGCOORD.xy, vec2(0.06711056, 0.00583715))));
+		if ((lod_mode == 1 && t > d) || (lod_mode == 2 && t <= d)) {
+			discard;
+		}
+	}
 	vec3 base = COLOR.rgb;
 	// Per-tree tint: some trees bluer, some more olive, some darker.
 	base *= mix(vec3(0.86, 0.96, 1.04), vec3(1.10, 1.04, 0.86), tree_seed) * (0.85 + tree_seed * 0.3);

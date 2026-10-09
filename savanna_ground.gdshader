@@ -7,7 +7,7 @@ render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 // The road is not a separate mesh. The generator grades the heightfield flat under it and bakes
 // the signed distance across the road into the vertex colour; distance across a road is linear
 // over a triangle, so the edge drawn here stays sharp however coarse the grid is. The masks:
-//   r - granite: exposed rock on the kopje and its boulder aprons
+//   r - granite: exposed rock on the kopje (granite.gdshaderinc), in sheets between grassy hollows
 //   g - road band: 1 within reach of a road centreline, so `a` is valid there
 //   b - wet: mud on the river banks and lake shore, 1 on the submerged bed
 //   a - on the road band: signed metres across the road, as a / 24 + 0.5
@@ -15,8 +15,6 @@ render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 uniform sampler2D grass_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D dirt_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D dirt_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
-uniform sampler2D rock_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
-uniform sampler2D rock_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 
 uniform vec4 straw_color : source_color = vec4(0.80, 0.64, 0.36, 1.0);
 uniform vec4 pale_straw_color : source_color = vec4(0.88, 0.77, 0.52, 1.0);
@@ -28,8 +26,6 @@ uniform vec4 murram_tint : source_color = vec4(1.30, 0.74, 0.52, 1.0);
 uniform vec4 rut_tint : source_color = vec4(0.78, 0.66, 0.60, 1.0);
 uniform float road_half_width = 7.0;
 
-uniform vec4 granite_color : source_color = vec4(0.64, 0.57, 0.52, 1.0);
-uniform vec4 lichen_color : source_color = vec4(0.86, 0.62, 0.30, 1.0);
 uniform vec4 mud_color : source_color = vec4(0.25, 0.18, 0.12, 1.0);
 
 uniform vec4 horizon_color : source_color = vec4(0.90, 0.76, 0.58, 1.0);
@@ -40,6 +36,9 @@ uniform float horizon_end = 2600.0;
 varying vec3 w_pos;
 varying vec3 w_nrm;
 varying vec4 masks;
+
+// The kopjes' granite, shared with the boulders (granite_rock.gdshader).
+#include "res://granite.gdshaderinc"
 
 void vertex() {
 	w_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
@@ -73,12 +72,6 @@ float fbm(vec2 p) {
 		a *= 0.5;
 	}
 	return v;
-}
-
-vec4 triplanar(sampler2D tex, vec3 p, vec3 w, float s) {
-	vec3 bw = pow(abs(w), vec3(6.0));
-	bw /= max(bw.x + bw.y + bw.z, 0.0001);
-	return texture(tex, p.zy * s) * bw.x + texture(tex, p.xz * s) * bw.y + texture(tex, p.xy * s) * bw.z;
 }
 
 void fragment() {
@@ -135,19 +128,18 @@ void fragment() {
 	}
 
 	// --- Granite ----------------------------------------------------------------------------
-	float rock_w = masks.r;
+	float rock_w = smoothstep(0.0, 0.6, masks.r);
+	float rock_h = 0.0;
 	if (rock_w > 0.01) {
-		// dark_rock.png only lends its detail: pale weathered granite, grey with a pink cast.
-		float r_lum = dot(triplanar(rock_tex, w_pos, n, 0.09).rgb, vec3(0.33));
-		float r_lum2 = dot(triplanar(rock_tex, w_pos * 0.31, n, 0.09).rgb, vec3(0.33));
-		vec3 granite = granite_color.rgb * (0.55 + 1.6 * mix(r_lum, r_lum2, 0.45));
-		granite *= 0.85 + fbm(xz * 0.03 + w_pos.y * 0.05) * 0.3;
-		// Streaks of dark weathering down the faces, and soft orange lichen on the tops.
-		granite *= 1.0 - smoothstep(0.55, 0.8, fbm(vec2(xz.x + xz.y, w_pos.y * 0.15) * 0.5)) * 0.35 * (1.0 - slope_ny);
-		float lichen = smoothstep(0.66, 0.82, fbm(xz * 0.25 + w_pos.y * 0.2)) * smoothstep(0.7, 0.95, slope_ny);
-		granite = mix(granite, lichen_color.rgb, lichen * 0.25);
-		albedo = mix(albedo, granite, smoothstep(0.0, 0.6, rock_w));
-		rough = mix(rough, 0.82, rock_w);
+		float g_rough;
+		float g_h;
+		vec3 granite = granite_albedo(w_pos, n, detail, g_rough, g_h);
+		// Red dust and dry grass blown into the hollows of the sheets.
+		float soil = smoothstep(0.35, 0.75, fbm(xz * 0.11 + 9.0)) * (1.0 - smoothstep(0.3, 0.9, masks.r));
+		granite = mix(granite, mix(earth, grass, 0.4) * 0.85, soil * 0.45);
+		albedo = mix(albedo, granite, rock_w);
+		rough = mix(rough, g_rough, rock_w);
+		rock_h = g_h * rock_w;
 	}
 
 	// --- River mud --------------------------------------------------------------------------
@@ -161,9 +153,9 @@ void fragment() {
 
 	ALBEDO = albedo;
 	ROUGHNESS = rough;
-	vec3 nm_dirt = texture(dirt_normal, xz * 0.16).rgb;
-	vec3 nm_rock = triplanar(rock_normal, w_pos, n, 0.09).rgb;
-	NORMAL_MAP = mix(nm_dirt, nm_rock, smoothstep(0.0, 0.6, rock_w));
-	NORMAL_MAP_DEPTH = mix(0.35, 0.9, rock_w) * detail;
+	// Outside the branch: screen-space derivatives need every pixel of the quad.
+	NORMAL = gr_bump(NORMAL, VERTEX, rock_h, detail);
+	NORMAL_MAP = texture(dirt_normal, xz * 0.16).rgb;
+	NORMAL_MAP_DEPTH = 0.35 * (1.0 - rock_w) * detail;
 	SPECULAR = mix(0.22, 0.45, smoothstep(0.3, 0.9, wet));
 }

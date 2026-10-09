@@ -60,6 +60,16 @@ const GRADE_REACH := 70.0
 ## Road samples are bucketed in CELL x CELL squares for the lookups.
 const CELL := 40.0
 const SAMPLE_STEP := 2.0
+## Acacias crossfade from the detailed mesh to the stand-in over ACACIA_NEAR +- ACACIA_FADE/2,
+## shifted per tree by up to ACACIA_FADE_JITTER (tree_lod.gdshaderinc).
+const ACACIA_NEAR := 300.0
+const ACACIA_FADE := 60.0
+const ACACIA_FADE_JITTER := 15.0
+const ACACIA_COUNT := 240
+const ACACIA_HORIZON := 450
+## Baobabs: trunk height and radius per variant.
+const BAOBAB_HEIGHT := [15.5, 12.0]
+const BAOBAB_RADIUS := [3.9, 3.0]
 
 const PLAIN_Y := 6.2
 const WATER_Y := 0.0
@@ -121,6 +131,9 @@ const HERD_DIR := Vector2(-0.42, -0.91)
 const HERD_BEFORE := 150.0
 const HERD_AFTER := 140.0
 const HERD_HALF_W := 11.0
+const WILDEBEEST_MODEL := "res://models/animals/wildebeest/Wildebeest_Animated.glb"
+## The model is 1.1m nose to tail.
+const WILDEBEEST_SCALE := 5.0
 
 ## Terrain grid: fine around the lap, cells growing outward to the horizon.
 const FINE_X := Vector2(-340.0, 480.0)
@@ -150,6 +163,9 @@ var _rs_next := PackedInt32Array()
 ## 1 inside a jump's flight: not graded, not road.
 var _rs_gap := PackedByteArray()
 var _rs_cells := {}
+## Directions for measuring a granite block's extent (_granite_probe_dirs).
+var _probe_dirs := PackedVector3Array()
+var _leaf_tex: Texture2D
 
 var _grid_x := PackedFloat32Array()
 var _grid_z := PackedFloat32Array()
@@ -674,7 +690,9 @@ func _in_water(x: float, z: float) -> bool:
 	return r["d"] < r["hw"] + 1.0 or _lake_e(x, z) < 1.02
 
 
-## Kopje lift and rockiness at (x, z): tors with a flat top and steep granite flanks.
+## Kopje lift and rockiness at (x, z): a granite whaleback with a flat top and steep flanks,
+## bare rock in sheets with soil and grass in the hollows between. The tors on top are meshes
+## (_build_kopje_rocks).
 func _kopje(x: float, z: float) -> Vector2:
 	var lift := 0.0
 	var rock := 0.0
@@ -686,11 +704,25 @@ func _kopje(x: float, z: float) -> Vector2:
 			continue
 		var kk: float = clampf(1.0 - pow(dd / r, 2.0), 0.0, 1.0)
 		var top: float = smoothstep(0.0, 0.6, kk)
-		# Rounded boulders heaped on the top and flanks.
+		# Gentle swells and a few low lumps, no more: a heightfield this coarse heaped with
+		# boulders reads as a gravel pile.
+		var swell: float = _detail_noise.get_noise_2d(x * 0.35 + 50.0, z * 0.35)
 		var lumps: float = (1.0 - _lump_noise.get_noise_2d(x, z)) * 0.5
-		lift = maxf(lift, float(k[2]) * top + lumps * lumps * 4.5 * smoothstep(0.0, 0.3, kk))
-		rock = maxf(rock, smoothstep(0.02, 0.22, kk))
+		lift = maxf(lift, float(k[2]) * top * (1.0 + swell * 0.12) + lumps * lumps * 1.0 * smoothstep(0.0, 0.3, kk))
+		# Patchy on the gentle top only: the steep flank is rock right down to its foot, where a
+		# coarse heightfield striped with grass and bare earth shows its facets.
+		var sheet: float = smoothstep(-0.15, 0.25, _detail_noise.get_noise_2d(x * 0.8 - 30.0, z * 0.8))
+		sheet = maxf(sheet, 1.0 - smoothstep(0.3, 0.6, kk))
+		rock = maxf(rock, smoothstep(0.0, 0.07, kk) * lerpf(0.3, 1.0, sheet))
 	return Vector2(lift, rock)
+
+
+## Is (x, z) on a kopje, or within `margin` metres of one?
+func _on_kopje(x: float, z: float, margin: float) -> bool:
+	for k in KOPJES:
+		if Vector2(x, z).distance_to(k[0]) < float(k[1]) * 1.15 + margin:
+			return true
+	return false
 
 
 ## The landscape before any road or water: a gently rolling plain, kopjes, the floodplain of the
@@ -1427,47 +1459,6 @@ func _place_kicker(parent: Node, kname: String, lip: Vector3, dir: Vector3, heig
 #  Wildlife
 # ======================================================================================
 
-## Wildebeest, facing -Z, hooves at y = 0, rigged for wildebeest.gdshader.
-func _wildebeest_mesh() -> ArrayMesh:
-	var mb := MeshBuilder.new()
-	var body_attr := func(_k: int) -> Array: return [Color(0, 0, 0, 1), Vector2(0.0, 0.0), Vector2.ZERO]
-	# Body: rump to shoulder hump, sloping down to the rear like a real gnu.
-	mb.tube([Vector3(0, 1.02, 0.95), Vector3(0, 1.08, 0.45), Vector3(0, 1.16, -0.1), Vector3(0, 1.28, -0.55), Vector3(0, 1.22, -0.8)],
-			[0.22, 0.36, 0.42, 0.44, 0.3], 7, body_attr)
-	# Neck and head: dark, nodding with the stride about the withers.
-	var neck_pivot := Vector2(1.25, -0.7)
-	var head_attr := func(_k: int) -> Array: return [Color(0, 0, 1, 1), Vector2(0.5, 0.0), neck_pivot]
-	mb.tube([Vector3(0, 1.3, -0.7), Vector3(0, 1.22, -1.0), Vector3(0, 1.0, -1.22), Vector3(0, 0.74, -1.36), Vector3(0, 0.6, -1.42)],
-			[0.26, 0.21, 0.17, 0.13, 0.1], 6, head_attr)
-	# Mane along the top of the neck.
-	mb.tube([Vector3(0, 1.48, -0.55), Vector3(0, 1.42, -0.85), Vector3(0, 1.25, -1.05)], [0.07, 0.08, 0.05], 4, head_attr)
-	# Beard under the throat.
-	mb.tube([Vector3(0, 1.02, -1.0), Vector3(0, 0.82, -1.08), Vector3(0, 0.66, -1.06)], [0.06, 0.07, 0.03], 4, head_attr)
-	# Horns: out sideways, then up and in.
-	var horn_attr := func(_k: int) -> Array: return [Color(0, 0, 1, 1), Vector2(1.0, 0.0), neck_pivot]
-	for sx in [-1.0, 1.0]:
-		mb.tube([Vector3(sx * 0.06, 1.12, -1.18), Vector3(sx * 0.22, 1.15, -1.16), Vector3(sx * 0.3, 1.28, -1.12), Vector3(sx * 0.24, 1.38, -1.14)],
-				[0.05, 0.045, 0.035, 0.015], 4, horn_attr)
-	# Legs: hip to hoof, the swing weight growing toward the hoof. Gallop phases per leg.
-	var legs := [[-0.17, -0.55, 0.0], [0.17, -0.55, 0.12], [-0.15, 0.7, 0.5], [0.15, 0.7, 0.62]]
-	for leg in legs:
-		var lx: float = leg[0]
-		var lz: float = leg[1]
-		var ph: float = leg[2]
-		var hip: float = 1.02
-		var pivot := Vector2(hip, lz)
-		var ys := [hip, 0.62, 0.3, 0.02]
-		var leg_attr := func(k: int) -> Array:
-			var wgt: float = clampf((hip - float(ys[k])) / hip, 0.0, 1.0)
-			return [Color(wgt, ph, 0, 1), Vector2(0.0 if k < 2 else 0.5, 0.0), pivot]
-		mb.tube([Vector3(lx, ys[0], lz), Vector3(lx, ys[1], lz + 0.03), Vector3(lx, ys[2], lz - 0.02), Vector3(lx, ys[3], lz)],
-				[0.11, 0.07, 0.05, 0.05], 5, leg_attr)
-	# Tail: swings like a leg.
-	var tail_attr := func(k: int) -> Array: return [Color(0.25 * k, 0.3, 0, 1), Vector2(0.5, 0.0), Vector2(1.05, 0.98)]
-	mb.tube([Vector3(0, 1.05, 0.98), Vector3(0, 0.85, 1.08), Vector3(0, 0.6, 1.1)], [0.04, 0.035, 0.06], 4, tail_attr)
-	return mb.commit(true)
-
-
 ## Giraffe, facing -Z, hooves at y = 0. Vertex colour b weights the neck's slow browse sway
 ## (pivot at the withers in UV2), which the inline shader animates; the coat is drawn by the
 ## shader's reticulated patches.
@@ -1625,21 +1616,13 @@ func _build_herd(parent: Node) -> void:
 	herd.set("ground_cols", cols)
 	herd.set("ground_step", step)
 	herd.set("rumble_stream", _rumble_stream())
+	# The rigged wildebeest (a run cycle at 0.71s), about 5.5m nose to tail at this scale: twice
+	# life size, so they tower over the RC carts.
+	herd.set("animal_scene", load(WILDEBEEST_MODEL))
+	herd.set("animal_scale", WILDEBEEST_SCALE)
+	herd.set("run_stride", 1.0)
+	herd.set("cluster_length", 48.0)
 	parent.add_child(herd)
-	var mm := MultiMesh.new()
-	mm.transform_format = MultiMesh.TRANSFORM_3D
-	mm.use_custom_data = true
-	mm.mesh = _save_baked_resource(_wildebeest_mesh(), "wildebeest")
-	mm.instance_count = 0
-	var mmi := MultiMeshInstance3D.new()
-	mmi.name = "Animals"
-	mmi.multimesh = mm
-	var mat := ShaderMaterial.new()
-	mat.shader = load("res://wildebeest.gdshader")
-	mmi.material_override = mat
-	# Instances move every frame across a wide band; give the culler the whole stream.
-	mmi.custom_aabb = AABB(Vector3(-400, -50, -400), Vector3(800, 120, 800))
-	herd.add_child(mmi)
 	for k in range(3):
 		var dust := GPUParticles3D.new()
 		dust.name = "Dust_%d" % k
@@ -1651,7 +1634,7 @@ func _build_herd(parent: Node) -> void:
 		dust.visibility_aabb = AABB(Vector3(-40, -5, -40), Vector3(80, 30, 80))
 		var pm := ParticleProcessMaterial.new()
 		pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
-		pm.emission_box_extents = Vector3(HERD_HALF_W, 0.4, 16.0)
+		pm.emission_box_extents = Vector3(HERD_HALF_W, 0.6, 20.0)
 		pm.direction = Vector3(0, 1, 0)
 		pm.spread = 50.0
 		pm.initial_velocity_min = 0.6
@@ -1659,8 +1642,8 @@ func _build_herd(parent: Node) -> void:
 		pm.gravity = Vector3(0, 0.25, 0)
 		pm.damping_min = 0.4
 		pm.damping_max = 0.8
-		pm.scale_min = 3.0
-		pm.scale_max = 6.5
+		pm.scale_min = 4.5
+		pm.scale_max = 9.0
 		var alpha := Gradient.new()
 		alpha.colors = PackedColorArray([Color(1, 1, 1, 0), Color(1, 1, 1, 1), Color(1, 1, 1, 0)])
 		alpha.offsets = PackedFloat32Array([0.0, 0.2, 1.0])
@@ -1676,7 +1659,7 @@ func _build_herd(parent: Node) -> void:
 
 
 ## Hippos wallowing in the lake and crocodiles lying in the croc pool: low shapes at the
-## waterline, there to be seen from the road.
+## waterline, there to be seen from the road. Twice life size, like the herd.
 func _build_water_wildlife(parent: Node) -> void:
 	var root := Node3D.new()
 	root.name = "WaterWildlife"
@@ -1702,7 +1685,7 @@ func _build_water_wildlife(parent: Node) -> void:
 		var p := Vector3(LAKE_CENTER.x + cos(a) * LAKE_RADIUS.x * rr, WATER_Y - 0.15, LAKE_CENTER.y + sin(a) * LAKE_RADIUS.y * rr)
 		var ok := true
 		for q in placed:
-			if p.distance_to(q) < 5.0:
+			if p.distance_to(q) < 11.0:
 				ok = false
 		if not ok:
 			continue
@@ -1711,7 +1694,7 @@ func _build_water_wildlife(parent: Node) -> void:
 		mi.name = "Hippo_%d" % placed.size()
 		mi.mesh = hippo_mesh
 		mi.material_override = mat
-		mi.transform = Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * rng.randf_range(1.3, 1.6)), p)
+		mi.transform = Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * rng.randf_range(2.4, 2.8)), p)
 		root.add_child(mi)
 	var croc := MeshBuilder.new()
 	var cc := Color(0.20, 0.23, 0.13)
@@ -1729,7 +1712,7 @@ func _build_water_wildlife(parent: Node) -> void:
 		mi2.name = "Croc_%d" % k
 		mi2.mesh = croc_mesh
 		mi2.material_override = mat
-		mi2.transform = Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p)
+		mi2.transform = Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * 2.0), p)
 		root.add_child(mi2)
 
 
@@ -1742,7 +1725,7 @@ func _build_giraffes(parent: Node) -> void:
 	var transforms: Array = []
 	for s in spots:
 		var p: Vector2 = s[0]
-		transforms.append(Transform3D(Basis(Vector3.UP, s[1]).scaled(Vector3.ONE * 1.1), Vector3(p.x, _ground_at(p.x, p.y) - 0.05, p.y)))
+		transforms.append(Transform3D(Basis(Vector3.UP, s[1]).scaled(Vector3.ONE * 2.2), Vector3(p.x, _ground_at(p.x, p.y) - 0.05, p.y)))
 	var mmi := _multimesh(mesh, transforms, "Giraffes")
 	mmi.material_override = _giraffe_material()
 	parent.add_child(mmi)
@@ -1752,64 +1735,528 @@ func _build_giraffes(parent: Node) -> void:
 #  Vegetation and rocks
 # ======================================================================================
 
-## Umbrella-thorn acacia: a short forked trunk under a wide, flat-topped crown.
-func _acacia_mesh(variant: int, lod: int) -> ArrayMesh:
-	var mb := MeshBuilder.new()
+# ======================================================================================
+#  Acacias and baobabs
+# ======================================================================================
+
+## Umbrella-thorn acacia (Vachellia tortilis), twice life size like the wildlife: a short trunk
+## forking low into crooked limbs that fan out under a broad, flat-topped canopy of thin foliage
+## pads. 0 a mature tree, 1 a younger one, 2 a low-forked, lopsided one. In metres: canopy top,
+## crown radius, canopy underside, fork height and trunk radius; then limbs and foliage pads.
+const ACACIA_SHAPES := [
+	{"top": 17.0, "r": 15.0, "under": 12.4, "fork": 3.4, "trunk": 0.72, "limbs": 4, "pads": 15, "lean": 0.05},
+	{"top": 12.5, "r": 9.5, "under": 8.8, "fork": 2.6, "trunk": 0.5, "limbs": 3, "pads": 9, "lean": 0.04},
+	{"top": 14.5, "r": 13.0, "under": 10.2, "fork": 1.4, "trunk": 0.62, "limbs": 5, "pads": 13, "lean": 0.14},
+]
+
+
+## A float RGB + alpha canvas for drawing the leaf texture (members, so drawing edits in place).
+class LeafCanvas:
+	var w := 0
+	var rgb := PackedFloat32Array()
+	var alpha := PackedFloat32Array()
+
+	func _init(size: int, bg: Color) -> void:
+		w = size
+		rgb.resize(size * size * 3)
+		alpha.resize(size * size)
+		for i in range(size * size):
+			rgb[i * 3] = bg.r
+			rgb[i * 3 + 1] = bg.g
+			rgb[i * 3 + 2] = bg.b
+
+	## An antialiased dot.
+	func dot(c: Vector2, r: float, col: Color) -> void:
+		var x0: int = maxi(0, int(c.x - r - 1.0))
+		var x1: int = mini(w - 1, int(c.x + r + 1.0))
+		var y0: int = maxi(0, int(c.y - r - 1.0))
+		var y1: int = mini(w - 1, int(c.y + r + 1.0))
+		for y in range(y0, y1 + 1):
+			for x in range(x0, x1 + 1):
+				var a: float = clampf(r + 0.5 - Vector2(x + 0.5, y + 0.5).distance_to(c), 0.0, 1.0)
+				if a <= 0.0:
+					continue
+				var i: int = y * w + x
+				var k: float = a if alpha[i] > 0.0 else 1.0
+				rgb[i * 3] = lerpf(rgb[i * 3], col.r, k)
+				rgb[i * 3 + 1] = lerpf(rgb[i * 3 + 1], col.g, k)
+				rgb[i * 3 + 2] = lerpf(rgb[i * 3 + 2], col.b, k)
+				alpha[i] = maxf(alpha[i], a)
+
+	## A stroke of dots from `a` to `b`, `r` tapering to `r2`.
+	func line(a: Vector2, b: Vector2, r: float, r2: float, col: Color) -> void:
+		var n: int = maxi(1, int(a.distance_to(b) / 0.7))
+		for k in range(n + 1):
+			var t: float = float(k) / float(n)
+			dot(a.lerp(b, t), lerpf(r, r2, t), col)
+
+
+## Leaf sprays for the acacia cards: a 2 x 2 atlas of round sprays, each a few zigzag twigs with
+## paired pale thorns and tufts of tiny bipinnate leaves at every node, sky showing between. The
+## mipmaps keep the full-size image's alpha coverage: alpha tested foliage otherwise thins out to
+## nothing with distance.
+func _acacia_leaf_texture() -> Texture2D:
+	if _leaf_tex:
+		return _leaf_tex
+	const W := 1024
+	const CELL := 512
+	var cv := LeafCanvas.new(W, Color(0.34, 0.38, 0.17))
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 501 + variant * 37
+	rng.seed = 5150
+	for cell in range(4):
+		var centre := Vector2(float(cell % 2) * CELL + CELL * 0.5, float(cell / 2) * CELL + CELL * 0.5)
+		var twigs: int = rng.randi_range(6, 8)
+		for t in range(twigs):
+			var a: float = TAU * float(t) / float(twigs) + rng.randf_range(-0.3, 0.3)
+			var from: Vector2 = centre + Vector2(cos(a), sin(a)) * rng.randf_range(0.0, 50.0)
+			_leaf_twig(cv, from, a, rng.randf_range(150.0, 215.0), 2.6, centre, CELL * 0.45, rng, 0)
+	var img := _coverage_mipmaps(cv, 0.5)
+	_leaf_tex = _save_baked_resource(ImageTexture.create_from_image(img), "acacia_leaves")
+	return _leaf_tex
+
+
+## One zigzag twig of the leaf texture, with leaf tufts and thorns at its nodes and side twigs.
+func _leaf_twig(cv: LeafCanvas, p: Vector2, ang: float, length: float, width: float, centre: Vector2, limit: float, rng: RandomNumberGenerator, depth: int) -> void:
+	var twig_col := Color(0.20, 0.16, 0.13)
+	var thorn_col := Color(0.80, 0.77, 0.70)
+	var travelled := 0.0
+	var zig := 1.0 if rng.randf() < 0.5 else -1.0
+	while travelled < length:
+		var seg: float = rng.randf_range(11.0, 18.0)
+		var a: float = ang + zig * rng.randf_range(0.2, 0.42)
+		zig = -zig
+		var q: Vector2 = p + Vector2(cos(a), sin(a)) * seg
+		if q.distance_to(centre) > limit:
+			break
+		var w: float = width * (1.0 - travelled / length * 0.6)
+		cv.line(p, q, w * 0.5, w * 0.45, twig_col)
+		# Paired thorns, pointing back along the twig.
+		for side in [-1.0, 1.0]:
+			var ta: float = a + PI + side * rng.randf_range(0.7, 1.0)
+			cv.line(q, q + Vector2(cos(ta), sin(ta)) * rng.randf_range(4.0, 7.0), 0.6, 0.3, thorn_col)
+		# A tuft of bipinnate leaves: short stalks, each lined with leaflets on both sides.
+		var leaves: int = rng.randi_range(4, 7)
+		for l in range(leaves):
+			var la: float = a + (1.0 if l % 2 == 0 else -1.0) * rng.randf_range(0.5, 1.6) + rng.randf_range(-0.3, 0.3)
+			var ll: float = rng.randf_range(7.0, 15.0)
+			# Dusty olive: some leaves yellower, some greyer.
+			var col := Color(0.36, 0.40, 0.20).lerp(Color(0.46, 0.47, 0.24), rng.randf()).lerp(Color(0.37, 0.41, 0.31), rng.randf() * 0.6)
+			col = col * rng.randf_range(0.8, 1.15)
+			var steps: int = int(ll / 2.2)
+			var dir := Vector2(cos(la), sin(la))
+			var perp := Vector2(-dir.y, dir.x)
+			for k in range(1, steps + 1):
+				var at: Vector2 = q + dir * (float(k) * 2.2)
+				for side2 in [-1.0, 1.0]:
+					cv.dot(at + perp * side2 * rng.randf_range(1.4, 2.4), rng.randf_range(1.0, 1.7), col * rng.randf_range(0.9, 1.1))
+		if depth < 2 and rng.randf() < 0.38:
+			var side3: float = 1.0 if rng.randf() < 0.5 else -1.0
+			_leaf_twig(cv, q, a + side3 * rng.randf_range(0.5, 1.0), length * 0.45, width * 0.65, centre, limit, rng, depth + 1)
+		p = q
+		travelled += seg
+
+
+## Mipmapped RGBA8 image of the canvas whose every mip keeps level 0's coverage at alpha
+## `cutoff` (each level's alpha scaled up until as many texels pass the test).
+func _coverage_mipmaps(cv: LeafCanvas, cutoff: float) -> Image:
+	var size: int = cv.w
+	var rgb: PackedFloat32Array = cv.rgb
+	var alpha: PackedFloat32Array = cv.alpha
+	var target := 0.0
+	for a in alpha:
+		if a >= cutoff:
+			target += 1.0
+	target /= float(alpha.size())
+	var data := PackedByteArray()
+	var scale := 1.0
+	while true:
+		var n: int = size * size
+		var level := PackedByteArray()
+		level.resize(n * 4)
+		for i in range(n):
+			level[i * 4] = int(clampf(rgb[i * 3], 0.0, 1.0) * 255.0 + 0.5)
+			level[i * 4 + 1] = int(clampf(rgb[i * 3 + 1], 0.0, 1.0) * 255.0 + 0.5)
+			level[i * 4 + 2] = int(clampf(rgb[i * 3 + 2], 0.0, 1.0) * 255.0 + 0.5)
+			level[i * 4 + 3] = int(clampf(alpha[i] * scale, 0.0, 1.0) * 255.0 + 0.5)
+		data.append_array(level)
+		if size == 1:
+			break
+		# Next level: a 2 x 2 box, colour weighted by alpha so the leaves don't darken at the edges.
+		var half: int = size / 2
+		var rgb2 := PackedFloat32Array()
+		rgb2.resize(half * half * 3)
+		var alpha2 := PackedFloat32Array()
+		alpha2.resize(half * half)
+		for y in range(half):
+			for x in range(half):
+				var sa := 0.0
+				var sr := 0.0
+				var sg := 0.0
+				var sb := 0.0
+				for dy in range(2):
+					for dx in range(2):
+						var i2: int = (y * 2 + dy) * size + x * 2 + dx
+						var wgt: float = alpha[i2] + 0.001
+						sa += alpha[i2]
+						sr += rgb[i2 * 3] * wgt
+						sg += rgb[i2 * 3 + 1] * wgt
+						sb += rgb[i2 * 3 + 2] * wgt
+				var j: int = y * half + x
+				var wsum: float = sa + 0.004
+				alpha2[j] = sa * 0.25
+				rgb2[j * 3] = sr / wsum
+				rgb2[j * 3 + 1] = sg / wsum
+				rgb2[j * 3 + 2] = sb / wsum
+		size = half
+		rgb = rgb2
+		alpha = alpha2
+		# The scale that brings this level's coverage back to the target.
+		var lo := 1.0
+		var hi := 16.0
+		for it in range(14):
+			var mid: float = (lo + hi) * 0.5
+			var covered := 0
+			var need: float = cutoff / mid
+			for a2 in alpha:
+				if a2 >= need:
+					covered += 1
+			if float(covered) / float(alpha.size()) < target:
+				lo = mid
+			else:
+				hi = mid
+		scale = hi
+	return Image.create_from_data(cv.w, cv.w, true, Image.FORMAT_RGBA8, data)
+
+
+## Branches and foliage pads of one acacia in metres, the trunk's foot at the origin:
+## {"tubes": [[points, radii, order]], "pads": [[centre, radius, thickness]]}, a pad's centre at
+## its middle height; order 0 the trunk, 1 limbs, 2 the branches up into the pads, 3 twigs.
+func _acacia_plan(variant: int) -> Dictionary:
+	var sh: Dictionary = ACACIA_SHAPES[variant]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7301 + variant * 101
+	var top: float = sh["top"]
+	var cr: float = sh["r"]
+	var under: float = sh["under"]
+	var fork: float = sh["fork"]
+	var r0: float = sh["trunk"]
+	# Foliage pads: one over the middle, the rest spread over the crown's disc.
+	var pads: Array = []
+	pads.append([Vector3(rng.randf_range(-0.08, 0.08) * cr, 0.0, rng.randf_range(-0.08, 0.08) * cr), cr * 0.4])
+	var tries := 0
+	while pads.size() < int(sh["pads"]) and tries < 3000:
+		tries += 1
+		var a: float = rng.randf() * TAU
+		var d: float = cr * lerpf(0.3, 0.74, sqrt(rng.randf()))
+		var pr: float = cr * rng.randf_range(0.24, 0.34) * (1.0 - 0.2 * d / cr)
+		var c := Vector3(cos(a) * d, 0.0, sin(a) * d)
+		var ok := true
+		for q in pads:
+			var qc: Vector3 = q[0]
+			if Vector2(c.x - qc.x, c.z - qc.z).length() < (pr + float(q[1])) * 0.6:
+				ok = false
+				break
+		if ok:
+			pads.append([c, pr])
+	for q in pads:
+		var qc: Vector3 = q[0]
+		var d2: float = Vector2(qc.x, qc.z).length() / cr
+		var thick: float = lerpf(2.4, 1.4, d2) * sqrt(cr / 15.0) * rng.randf_range(0.85, 1.15)
+		# A flat top, drooping a little toward the rim.
+		var ptop: float = top - d2 * d2 * 2.4 - rng.randf_range(0.0, 0.7)
+		qc.y = ptop - thick * 0.5
+		q[0] = qc
+		q.append(thick)
+	var tubes: Array = []
+	var lean_a: float = rng.randf() * TAU
+	var lean := Vector3(cos(lean_a), 0.0, sin(lean_a)) * float(sh["lean"])
+	var fork_p := Vector3(0.0, fork, 0.0) + lean * fork * 2.0
+	tubes.append([[Vector3(0, -0.8, 0), Vector3(0, 0.25, 0), Vector3(0, 0.9, 0) + lean * 0.6, fork_p * 0.6 + Vector3(rng.randf_range(-0.1, 0.1), 0, rng.randf_range(-0.1, 0.1)), fork_p],
+			[r0 * 1.5, r0 * 1.22, r0 * 1.05, r0 * 0.95, r0 * 0.85], 0])
+	# Limbs: from the fork up and out to heads under the canopy, rising steeply and then
+	# spreading, crooked at every joint.
+	var limbs: Array = []
+	var nl: int = sh["limbs"]
+	for i in range(nl):
+		var a: float = TAU * float(i) / float(nl) + rng.randf_range(-0.35, 0.35)
+		var reach: float = cr * rng.randf_range(0.3, 0.48)
+		var head := Vector3(cos(a) * reach, under - rng.randf_range(0.6, 2.0), sin(a) * reach)
+		var start: Vector3 = fork_p + Vector3(cos(a), 0.0, sin(a)) * r0 * 0.3 - Vector3(0, 0.3, 0)
+		var side := Vector3(-sin(a), 0.0, cos(a))
+		var pts: Array = [start]
+		var radii: Array = [r0 * 0.62]
+		var segs := 4
+		for k in range(1, segs + 1):
+			var t: float = float(k) / float(segs)
+			var hp: Vector3 = start + (head - start) * Vector3(pow(t, 1.35), pow(t, 0.8), pow(t, 1.35))
+			if k < segs:
+				hp += side * rng.randf_range(-0.7, 0.7) * (r0 / 0.7) + Vector3(0, rng.randf_range(-0.3, 0.3), 0)
+			pts.append(hp)
+			radii.append(lerpf(r0 * 0.62, r0 * 0.3, t))
+		tubes.append([pts, radii, 1])
+		limbs.append([pts, a])
+	# Each pad is carried by a branch off the limb heading its way, and spread by twigs.
+	for q in pads:
+		var c: Vector3 = q[0]
+		var pr: float = q[1]
+		var th: float = q[2]
+		var pa: float = atan2(c.z, c.x)
+		var best: Array = limbs[0]
+		var bd := 1e9
+		for lb in limbs:
+			var dd: float = absf(wrapf(pa - float(lb[1]), -PI, PI))
+			if dd < bd:
+				bd = dd
+				best = lb
+		var lpts: Array = best[0]
+		var fi: float = rng.randf_range(0.5, 0.85) * float(lpts.size() - 1)
+		var i0: int = int(fi)
+		var start2: Vector3 = (lpts[i0] as Vector3).lerp(lpts[mini(i0 + 1, lpts.size() - 1)], fi - float(i0))
+		var end2: Vector3 = c - Vector3(0, th * 0.35, 0)
+		var mid2: Vector3 = start2.lerp(end2, 0.5) + Vector3(rng.randf_range(-0.5, 0.5), 0.7, rng.randf_range(-0.5, 0.5))
+		tubes.append([[start2, mid2, end2], [r0 * 0.26, r0 * 0.17, r0 * 0.1], 2])
+		var tw: int = rng.randi_range(4, 6)
+		for k in range(tw):
+			var ta: float = TAU * float(k) / float(tw) + rng.randf_range(-0.4, 0.4)
+			var reach2: float = pr * rng.randf_range(0.55, 0.85)
+			var tip: Vector3 = end2 + Vector3(cos(ta) * reach2, rng.randf_range(0.15, 0.5) * th, sin(ta) * reach2)
+			var mid3: Vector3 = end2.lerp(tip, 0.5) + Vector3(0, rng.randf_range(-0.1, 0.3), 0)
+			tubes.append([[end2, mid3, tip], [r0 * 0.09, r0 * 0.06, 0.035], 3])
+	return {"tubes": tubes, "pads": pads}
+
+
+## Appends a bark tube along `pts` (a radius per point) to `st`, as `sides` faces round plus a
+## seam column so the UVs can wrap (tree_bark.gdshader): UV x round in bark cells of `cell`
+## metres, repeating after UV2.x of them; y along in the same cells. Normals come from the
+## surface (the trunk's flutes from `wobble` included). Colour `col`, its alpha the shade
+## inside the canopy, darkening between heights `shade.x` and `shade.y`. Returns the next
+## free vertex index.
+func _bark_tube(st: SurfaceTool, base: int, pts: Array, radii: Array, sides: int, col: Color, cell: float, wobble: float, noise: FastNoiseLite, shade: Vector2) -> int:
+	var n: int = pts.size()
+	var period: float = maxf(3.0, roundf(TAU * float(radii[0]) / cell))
+	var grid: Array = []
+	var vs := PackedFloat32Array()
+	var along := 0.0
+	var t0: Vector3 = ((pts[1] as Vector3) - (pts[0] as Vector3)).normalized()
+	var u: Vector3 = t0.cross(Vector3.UP if absf(t0.y) < 0.95 else Vector3.RIGHT).normalized()
+	for k in range(n):
+		var t: Vector3 = ((pts[mini(k + 1, n - 1)] as Vector3) - (pts[maxi(k - 1, 0)] as Vector3)).normalized()
+		# Parallel transport: the frame turns with the tube and never twists.
+		u = (u - t * u.dot(t)).normalized()
+		var w: Vector3 = t.cross(u)
+		if k > 0:
+			along += (pts[k] as Vector3).distance_to(pts[k - 1])
+		vs.append(along / cell)
+		var ring := PackedVector3Array()
+		for s in range(sides + 1):
+			var ang: float = TAU * float(s % sides) / float(sides)
+			var r: float = radii[k]
+			if wobble > 0.0:
+				r *= 1.0 + noise.get_noise_3d(cos(ang) * 2.0, sin(ang) * 2.0, along * 0.35) * wobble
+			ring.append((pts[k] as Vector3) + (u * cos(ang) + w * sin(ang)) * r)
+		grid.append(ring)
+	for k in range(n):
+		var c: Vector3 = pts[k]
+		var a_sh: float = 1.0 - 0.55 * smoothstep(shade.x, shade.y, c.y)
+		for s in range(sides + 1):
+			var si: int = s % sides
+			var around: Vector3 = (grid[k][(si + 1) % sides] as Vector3) - (grid[k][(si - 1 + sides) % sides] as Vector3)
+			var length_dir: Vector3 = (grid[mini(k + 1, n - 1)][si] as Vector3) - (grid[maxi(k - 1, 0)][si] as Vector3)
+			var nrm: Vector3 = around.cross(length_dir).normalized()
+			var p: Vector3 = grid[k][s]
+			if nrm.dot(p - c) < 0.0:
+				nrm = -nrm
+			st.set_normal(nrm)
+			st.set_color(Color(col.r, col.g, col.b, a_sh))
+			st.set_uv(Vector2(float(s) / float(sides) * period, vs[k]))
+			st.set_uv2(Vector2(period, 0.0))
+			st.add_vertex(p)
+	# Front faces outward: clockwise, face normal (c - a) x (b - a).
+	var p0: Vector3 = grid[0][0]
+	var p1: Vector3 = grid[0][1]
+	var p2: Vector3 = grid[1][1]
+	var flip: bool = (p2 - p0).cross(p1 - p0).dot(p0 - (pts[0] as Vector3)) < 0.0
+	for k in range(n - 1):
+		for s in range(sides):
+			var a: int = base + k * (sides + 1) + s
+			var b: int = a + 1
+			var c2: int = a + sides + 2
+			var d: int = a + sides + 1
+			if flip:
+				st.add_index(a)
+				st.add_index(c2)
+				st.add_index(b)
+				st.add_index(a)
+				st.add_index(d)
+				st.add_index(c2)
+			else:
+				st.add_index(a)
+				st.add_index(b)
+				st.add_index(c2)
+				st.add_index(a)
+				st.add_index(c2)
+				st.add_index(d)
+	return base + n * (sides + 1)
+
+
+## Foliage cards filling the pads (acacia_leaves.gdshader): about one card per `area` square
+## metres of pad, `size` metres across (x to y), lying mostly flat with some steep ones so the
+## canopy has body seen from the side; more of them near a pad's top. Normals are the crown's,
+## colour a tint per pad and the shade inside the canopy.
+func _acacia_cards(st: SurfaceTool, pads: Array, cr: float, top: float, under: float, area: float, size: Vector2, rng: RandomNumberGenerator) -> void:
+	var crown_c := Vector3(0.0, under + (top - under) * 0.3, 0.0)
+	var crown_h: float = (top - under) * 1.3
+	var base := 0
+	for q in pads:
+		var c: Vector3 = q[0]
+		var pr: float = q[1]
+		var th: float = q[2]
+		var tint := Color(rng.randf_range(0.74, 0.8), rng.randf_range(0.77, 0.8), rng.randf_range(0.68, 0.78))
+		var n: int = maxi(2, int(PI * pr * pr / area))
+		for k in range(n):
+			var a: float = rng.randf() * TAU
+			var rr: float = pr * sqrt(rng.randf()) * 0.9
+			var up: float = rng.randf()
+			var p := Vector3(c.x + cos(a) * rr, c.y + th * (0.5 - up * up), c.z + sin(a) * rr)
+			var tilt: float = rng.randf_range(0.0, 0.45) if rng.randf() < 0.7 else rng.randf_range(0.75, 1.3)
+			var az: float = rng.randf() * TAU
+			var nrm := Vector3(sin(tilt) * cos(az), cos(tilt), sin(tilt) * sin(az))
+			var t1: Vector3 = nrm.cross(Vector3.RIGHT if absf(nrm.x) < 0.9 else Vector3.FORWARD).normalized()
+			t1 = t1.rotated(nrm, rng.randf() * TAU)
+			var t2: Vector3 = nrm.cross(t1)
+			var h: float = rng.randf_range(size.x, size.y) * 0.5
+			var corners: Array = [p - t1 * h - t2 * h, p + t1 * h - t2 * h, p + t1 * h + t2 * h, p - t1 * h + t2 * h]
+			var cell := Vector2(float(rng.randi() % 2), float(rng.randi() % 2)) * 0.5
+			var uvs: Array = [cell, cell + Vector2(0.5, 0.0), cell + Vector2(0.5, 0.5), cell + Vector2(0.0, 0.5)]
+			var bright: float = rng.randf_range(0.93, 1.07)
+			for j in range(4):
+				var v: Vector3 = corners[j]
+				var cn := Vector3((v.x - crown_c.x) / cr, (v.y - crown_c.y) / crown_h, (v.z - crown_c.z) / cr).normalized()
+				var shade: float = clampf(0.3 + 0.7 * smoothstep(under - 0.5, top - 0.3, v.y), 0.25, 1.0)
+				shade *= lerpf(0.8, 1.0, clampf(Vector2(v.x, v.z).length() / cr, 0.0, 1.0))
+				st.set_normal((cn + Vector3.UP * 0.6).normalized())
+				st.set_color(Color(tint.r * bright, tint.g * bright, tint.b * bright, shade))
+				st.set_uv(uvs[j])
+				st.add_vertex(v)
+			for idx in [0, 1, 2, 0, 2, 3]:
+				st.add_index(base + idx)
+			base += 4
+
+
+## An acacia's mesh: surface 0 the bark, 1 the foliage. `lod` 1 is the far stand-in: trunk and
+## limbs only, and a few big cards.
+func _acacia_mesh(variant: int, lod: int, bark_mat: Material, leaf_mat: Material) -> ArrayMesh:
+	var sh: Dictionary = ACACIA_SHAPES[variant]
+	var plan: Dictionary = _acacia_plan(variant)
 	var noise := FastNoiseLite.new()
-	noise.seed = 77 + variant
-	noise.frequency = 0.9
-	var bark := Color(0.30, 0.24, 0.19)
-	var leaf := Color(0.34, 0.38, 0.15) if variant == 0 else Color(0.40, 0.40, 0.17)
-	var sides: int = 6 if lod == 0 else 4
-	var bark_attr := func(_k: int) -> Array: return [bark, Vector2.ZERO, Vector2.ZERO]
-	var fork_y: float = 2.2 if variant == 0 else 1.6
-	var crown_y: float = 5.6 if variant == 0 else 4.6
-	var crown_r: float = 5.0 if variant == 0 else 3.8
-	mb.tube([Vector3(0, -0.3, 0), Vector3(0.15, fork_y * 0.5, 0.05), Vector3(0.1, fork_y, 0)], [0.32, 0.24, 0.2], sides, bark_attr)
-	var limbs: int = 4 if variant == 0 else 3
-	var pads: Array = [Vector3(0, crown_y + 0.2, 0)]
-	for i in range(limbs):
-		var a: float = TAU * float(i) / float(limbs) + rng.randf_range(-0.3, 0.3)
-		var reach: float = crown_r * rng.randf_range(0.55, 0.8)
-		var tip := Vector3(cos(a) * reach, crown_y - rng.randf_range(0.0, 0.5), sin(a) * reach)
-		var mid := Vector3(cos(a) * reach * 0.4, (fork_y + crown_y) * 0.5, sin(a) * reach * 0.4)
-		mb.tube([Vector3(0.1, fork_y - 0.2, 0), mid, tip], [0.16, 0.11, 0.06], maxi(sides - 2, 3), bark_attr, false, true)
-		pads.append(tip + Vector3(0, 0.3, 0))
+	noise.seed = 31 + variant
+	noise.frequency = 0.5
+	var under: float = sh["under"]
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var sides: Array = [10, 7, 5, 3] if lod == 0 else [5, 4, 0, 0]
+	var tints: Array = [Color(0.80, 0.78, 0.78), Color(0.82, 0.78, 0.76), Color(0.86, 0.76, 0.70), Color(0.90, 0.74, 0.62)]
+	var base := 0
+	for tb in plan["tubes"]:
+		var order: int = tb[2]
+		if sides[order] == 0:
+			continue
+		base = _bark_tube(st, base, tb[0], tb[1], sides[order], tints[order], 0.35, 0.07 if order == 0 else 0.0, noise, Vector2(under - 3.0, under + 1.0))
+	var mesh: ArrayMesh = st.commit()
+	mesh.surface_set_material(0, bark_mat)
+	var st2 := SurfaceTool.new()
+	st2.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 911 + variant * 7 + lod * 1000
 	if lod == 0:
-		for i in range(limbs):
-			var a2: float = TAU * (float(i) + 0.5) / float(limbs)
-			pads.append(Vector3(cos(a2) * crown_r * 0.5, crown_y + 0.25, sin(a2) * crown_r * 0.5))
-	for p in pads:
-		var pr: float = crown_r * (0.42 if p.x == 0.0 and p.z == 0.0 else rng.randf_range(0.34, 0.46))
-		mb.blob(p, Vector3(pr, 0.55 if variant == 0 else 0.6, pr), 9 if lod == 0 else 6, 4 if lod == 0 else 3, leaf, noise, 0.22, true)
-	return mb.commit()
+		_acacia_cards(st2, plan["pads"], sh["r"], sh["top"], under, 1.6, Vector2(2.2, 3.4), rng)
+	else:
+		_acacia_cards(st2, plan["pads"], sh["r"], sh["top"], under, 7.0, Vector2(4.0, 6.0), rng)
+	st2.commit(mesh)
+	mesh.surface_set_material(1, leaf_mat)
+	return mesh
 
 
-## Baobab in the dry season: a bottle-shaped trunk and bare, root-like branches.
-func _baobab_mesh(variant: int) -> ArrayMesh:
-	var mb := MeshBuilder.new()
+## Bark material (tree_bark.gdshader); `lod_mode` as in tree_lod.gdshaderinc.
+func _bark_material(lod_mode: int) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = load("res://tree_bark.gdshader")
+	_set_tree_lod(m, lod_mode)
+	return m
+
+
+func _leaf_material(lod_mode: int) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = load("res://acacia_leaves.gdshader")
+	m.set_shader_parameter("leaf_tex", _acacia_leaf_texture())
+	_set_tree_lod(m, lod_mode)
+	return m
+
+
+func _set_tree_lod(m: ShaderMaterial, lod_mode: int) -> void:
+	m.set_shader_parameter("lod_mode", lod_mode)
+	m.set_shader_parameter("lod_fade_begin", ACACIA_NEAR - ACACIA_FADE * 0.5)
+	m.set_shader_parameter("lod_fade_end", ACACIA_NEAR + ACACIA_FADE * 0.5)
+	m.set_shader_parameter("lod_jitter", ACACIA_FADE_JITTER)
+
+
+## Baobab in the dry season, twice life size: a massive, fluted trunk, barely tapering until
+## its shoulders, and a spreading crown of bare, crooked branches like roots in the air.
+func _baobab_mesh(variant: int, mat: Material) -> ArrayMesh:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 9091 + variant * 13
-	var bark := Color(0.52, 0.45, 0.42)
-	var attr := func(_k: int) -> Array: return [bark, Vector2.ZERO, Vector2.ZERO]
-	var h: float = 9.5 if variant == 0 else 7.5
-	mb.tube([Vector3(0, -0.4, 0), Vector3(0, h * 0.15, 0), Vector3(0, h * 0.45, 0), Vector3(0, h * 0.8, 0), Vector3(0, h, 0)],
-			[2.3, 2.5, 2.3, 1.6, 1.0], 12, attr, true, false)
-	var branches: int = 7 if variant == 0 else 5
+	var noise := FastNoiseLite.new()
+	noise.seed = 77 + variant
+	noise.frequency = 0.6
+	var h: float = BAOBAB_HEIGHT[variant]
+	var rb: float = BAOBAB_RADIUS[variant]
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var col := Color(0.8, 0.8, 0.8)
+	var trunk_pts: Array = []
+	var trunk_r: Array = []
+	for k in range(11):
+		var t: float = float(k) / 10.0
+		trunk_pts.append(Vector3(0.0, lerpf(-0.6, h, t), 0.0))
+		trunk_r.append(rb * (1.1 - 0.1 * smoothstep(0.0, 0.15, t)) * (1.0 - 0.42 * smoothstep(0.55, 1.0, t)))
+	# A low dome closes the top between the branches.
+	trunk_pts.append(Vector3(0.0, h + rb * 0.3, 0.0))
+	trunk_r.append(rb * 0.12)
+	var base: int = _bark_tube(st, 0, trunk_pts, trunk_r, 22, col, 0.6, 0.12, noise, Vector2(1000.0, 1001.0))
+	var branches: int = 9 if variant == 0 else 6
 	for i in range(branches):
 		var a: float = TAU * float(i) / float(branches) + rng.randf_range(-0.25, 0.25)
-		var out: float = rng.randf_range(2.2, 4.0)
-		var base := Vector3(cos(a) * 0.7, h - 0.3, sin(a) * 0.7)
-		var mid := Vector3(cos(a) * out * 0.6, h + rng.randf_range(1.4, 2.2), sin(a) * out * 0.6)
-		var tip := Vector3(cos(a) * out, h + rng.randf_range(2.4, 3.6), sin(a) * out)
-		mb.tube([base, mid, tip], [0.45, 0.28, 0.08], 5, attr, false, true)
-		for k in range(2):
-			var b2: float = a + (0.5 if k == 0 else -0.5)
-			var twig := mid + Vector3(cos(b2) * 1.2, rng.randf_range(0.8, 1.6), sin(b2) * 1.2)
-			mb.tube([mid, twig], [0.18, 0.04], 4, attr, false, true)
-	return mb.commit()
+		var elev: float = rng.randf_range(0.12, 0.45)
+		var start := Vector3(cos(a) * rb * 0.32, h * rng.randf_range(0.93, 1.0), sin(a) * rb * 0.32)
+		var dir := Vector3(cos(a) * cos(elev), sin(elev), sin(a) * cos(elev))
+		base = _bare_branch(st, base, start, dir, rb * rng.randf_range(1.3, 1.9), rb * rng.randf_range(0.22, 0.3), 0, rng, noise, col)
+	var mesh: ArrayMesh = st.commit()
+	mesh.surface_set_material(0, mat)
+	return mesh
+
+
+## A bare, crooked branch of `length` metres from `start` toward `dir`, wandering and only
+## slowly turning upward, and its side branches down to the twigs (depth 2). Returns the next
+## free vertex index.
+func _bare_branch(st: SurfaceTool, base: int, start: Vector3, dir: Vector3, length: float, radius: float, depth: int, rng: RandomNumberGenerator, noise: FastNoiseLite, col: Color) -> int:
+	var pts: Array = [start]
+	var radii: Array = [radius]
+	var d: Vector3 = dir
+	var p: Vector3 = start
+	var segs := 3
+	for k in range(1, segs + 1):
+		d = (d + Vector3(rng.randf_range(-0.45, 0.45), rng.randf_range(-0.12, 0.2), rng.randf_range(-0.45, 0.45))).normalized()
+		p += d * length / float(segs)
+		pts.append(p)
+		radii.append(lerpf(radius, radius * 0.45, float(k) / float(segs)))
+	base = _bark_tube(st, base, pts, radii, [8, 6, 4][depth], col, 0.6, 0.0, noise, Vector2(1000.0, 1001.0))
+	if depth < 2:
+		var children: int = 2 if depth == 0 else rng.randi_range(2, 3)
+		for c in range(children):
+			var from_k: int = segs if c == 0 else segs - 1
+			var cd: Vector3 = (d + Vector3(rng.randf_range(-0.9, 0.9), rng.randf_range(-0.05, 0.4), rng.randf_range(-0.9, 0.9))).normalized()
+			base = _bare_branch(st, base, pts[from_k], cd, length * 0.6, float(radii[from_k]) * 0.75, depth + 1, rng, noise, col)
+	return base
 
 
 ## A termite mound: a lumpy red-earth spire with a couple of smaller chimneys.
@@ -1826,16 +2273,6 @@ func _termite_mesh(variant: int) -> ArrayMesh:
 		var p := Vector3(cos(a) * 0.6, 0, sin(a) * 0.6)
 		var hh: float = h * rng.randf_range(0.35, 0.55)
 		mb.tube([p + Vector3(0, -0.2, 0), p + Vector3(0, hh * 0.6, 0), p + Vector3(0.05, hh, 0)], [0.45, 0.25, 0.05], 5, attr, true, false)
-	return mb.commit()
-
-
-## A rounded granite boulder, vertex colour set so savanna_ground.gdshader draws it as granite.
-func _boulder_mesh(variant: int) -> ArrayMesh:
-	var mb := MeshBuilder.new()
-	var noise := FastNoiseLite.new()
-	noise.seed = 600 + variant
-	noise.frequency = 0.25
-	mb.blob(Vector3.ZERO, Vector3(1.0, 0.75, 0.9), 12, 8, Color(1, 0, 0, 0.5), noise, 0.22)
 	return mb.commit()
 
 
@@ -1910,47 +2347,70 @@ func _build_trees(parent: Node) -> void:
 	var root := Node3D.new()
 	root.name = "SavannaTrees"
 	parent.add_child(root)
-	var bark_mat := _vertex_color_material(0.9)
-	var near_meshes: Array = [_save_baked_resource(_acacia_mesh(0, 0), "acacia_0"), _save_baked_resource(_acacia_mesh(1, 0), "acacia_1")]
-	var far_mesh: Mesh = _save_baked_resource(_acacia_mesh(0, 1), "acacia_far")
+	var bark_near := _bark_material(1)
+	var bark_far := _bark_material(2)
+	var leaf_near := _leaf_material(1)
+	var leaf_far := _leaf_material(2)
+	var near_meshes: Array = []
+	var far_meshes: Array = []
+	for v in range(ACACIA_SHAPES.size()):
+		near_meshes.append(_save_baked_resource(_acacia_mesh(v, 0, bark_near, leaf_near), "acacia_%d" % v))
+		far_meshes.append(_save_baked_resource(_acacia_mesh(v, 1, bark_far, leaf_far), "acacia_far_%d" % v))
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 2468
 	var near := {}
 	var far := {}
 	var trunks: Array = []
+	# Placed trees by 40m cell: [x, z, crown radius].
+	var placed := {}
 	var count := 0
 	var tries := 0
-	# Acacias in loose groves across the plain, a few standing alone by the road.
-	while count < 420 and tries < 40000:
+	# Acacias in loose groves across the plain, a few standing alone by the road. Crowns may
+	# touch in a grove but not swallow one another.
+	while count < ACACIA_COUNT and tries < 60000:
 		tries += 1
 		var x: float = rng.randf_range(-650.0, 800.0)
 		var z: float = rng.randf_range(-800.0, 650.0)
 		var grove: float = _base_noise.get_noise_2d(x * 3.0 + 400.0, z * 3.0)
 		if grove < 0.08 and rng.randf() > 0.12:
 			continue
-		if _kopje(x, z).y > 0.3:
+		if _on_kopje(x, z, 6.0):
 			continue
 		if not _clear_spot(x, z, 17.0):
 			continue
-		var v: int = 0 if rng.randf() < 0.6 else 1
-		var s: float = rng.randf_range(0.8, 1.3)
+		var pick: float = rng.randf()
+		var v: int = 0 if pick < 0.55 else (1 if pick < 0.8 else 2)
+		var s: float = rng.randf_range(0.85, 1.15)
+		var crown: float = float(ACACIA_SHAPES[v]["r"]) * s
+		var cell := Vector2i(floori(x / 40.0), floori(z / 40.0))
+		var crowded := false
+		for gx in range(cell.x - 1, cell.x + 2):
+			for gz in range(cell.y - 1, cell.y + 2):
+				for o in placed.get(Vector2i(gx, gz), []):
+					if Vector2(x - o[0], z - o[1]).length() < (crown + float(o[2])) * 0.62:
+						crowded = true
+		if crowded:
+			continue
+		if not placed.has(cell):
+			placed[cell] = []
+		placed[cell].append([x, z, crown])
 		var y: float = _ground_at(x, z)
-		var xf := Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s, s * rng.randf_range(0.85, 1.1), s)), Vector3(x, y, z))
+		var xf := Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s, s * rng.randf_range(0.92, 1.08), s)), Vector3(x, y, z))
 		var key := Vector3i(floori(x / 160.0), floori(z / 160.0), v)
 		if not near.has(key):
 			near[key] = []
 		near[key].append(xf)
-		var fk := Vector2i(floori(x / 400.0), floori(z / 400.0))
+		var fk := Vector3i(floori(x / 400.0), floori(z / 400.0), v)
 		if not far.has(fk):
 			far[fk] = []
 		far[fk].append(xf)
-		if _road_distance(x, z) < 60.0:
-			trunks.append([Vector3(x, y, z), 0.45 * s, 3.0 * s])
+		if _road_distance(x, z) < 70.0:
+			trunks.append([Vector3(x, y, z), float(ACACIA_SHAPES[v]["trunk"]) * 1.2 * s, float(ACACIA_SHAPES[v]["fork"]) * s + 2.0])
 		count += 1
 	# The horizon: sparse acacias out to the hills, far mesh only.
 	var horizon := 0
 	tries = 0
-	while horizon < 700 and tries < 20000:
+	while horizon < ACACIA_HORIZON and tries < 20000:
 		tries += 1
 		var x2: float = rng.randf_range(-2200.0, 2400.0)
 		var z2: float = rng.randf_range(-2400.0, 2200.0)
@@ -1960,46 +2420,58 @@ func _build_trees(parent: Node) -> void:
 			continue
 		if _in_water(x2, z2):
 			continue
-		var s2: float = rng.randf_range(0.9, 1.4)
+		var v2: int = rng.randi() % ACACIA_SHAPES.size()
+		var s2: float = rng.randf_range(0.85, 1.2)
 		var xf2 := Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * s2), Vector3(x2, _ground_at(x2, z2), z2))
-		var fk2 := Vector2i(floori(x2 / 400.0), floori(z2 / 400.0))
+		var fk2 := Vector3i(floori(x2 / 400.0), floori(z2 / 400.0), v2)
 		if not far.has(fk2):
 			far[fk2] = []
 		far[fk2].append(xf2)
 		horizon += 1
+	# Each tree crossfades from its detailed mesh to the stand-in around ACACIA_NEAR
+	# (tree_lod.gdshaderinc). Cell ranges are measured to the cell's centre, so they're padded by
+	# half a cell diagonal: a cell only switches off once every tree in it has faded, and the
+	# shader does the visible swap. The stand-ins cast no shadow: they would fill the near trees'
+	# dappled shade, since the shadow pass can't tell which of the two a tree is showing.
 	for k in near.keys():
 		var mmi := _multimesh(near_meshes[k.z], near[k], "Acacia_%d_%d_%d" % [k.x, k.y, k.z])
-		mmi.material_override = bark_mat
-		mmi.visibility_range_end = 420.0
-		mmi.visibility_range_end_margin = 30.0
+		mmi.visibility_range_end = ACACIA_NEAR + ACACIA_FADE * 0.5 + ACACIA_FADE_JITTER + 160.0 * 0.72
+		mmi.visibility_range_end_margin = 10.0
 		root.add_child(mmi)
 	for k in far.keys():
-		var mmi2 := _multimesh(far_mesh, far[k], "AcaciaFar_%d_%d" % [k.x, k.y])
-		mmi2.material_override = bark_mat
-		mmi2.visibility_range_begin = 420.0
-		mmi2.visibility_range_begin_margin = 30.0
+		var mmi2 := _multimesh(far_meshes[k.z], far[k], "AcaciaFar_%d_%d_%d" % [k.x, k.y, k.z])
+		mmi2.visibility_range_begin = maxf(0.0, ACACIA_NEAR - ACACIA_FADE * 0.5 - ACACIA_FADE_JITTER - 400.0 * 0.72)
 		mmi2.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(mmi2)
 	# Baobabs: Baobab Bend's giant on the inside of the corner, more across the south.
-	var baobab_meshes: Array = [_save_baked_resource(_baobab_mesh(0), "baobab_0"), _save_baked_resource(_baobab_mesh(1), "baobab_1")]
-	var baobabs: Array = [[Vector2(-212.0, 185.0), 1.35, 0], [Vector2(-300.0, 250.0), 1.0, 1], [Vector2(-160.0, 330.0), 1.1, 0],
-			[Vector2(-345.0, 60.0), 1.0, 1], [Vector2(60.0, 280.0), 1.15, 0], [Vector2(-60.0, 120.0), 0.9, 1],
-			[Vector2(300.0, 130.0), 1.0, 0], [Vector2(460.0, -260.0), 1.05, 1], [Vector2(-390.0, -260.0), 1.1, 0]]
+	var baobab_bark := ShaderMaterial.new()
+	baobab_bark.shader = load("res://tree_bark.gdshader")
+	baobab_bark.set_shader_parameter("bark_color", Color(0.60, 0.53, 0.49))
+	baobab_bark.set_shader_parameter("fissure_color", Color(0.49, 0.42, 0.39))
+	baobab_bark.set_shader_parameter("fissure_width", 0.22)
+	baobab_bark.set_shader_parameter("fissure_depth", 0.02)
+	# Shallow folds that run round the trunk, not along it.
+	baobab_bark.set_shader_parameter("plate_stretch", 0.3)
+	baobab_bark.set_shader_parameter("roughness_value", 0.85)
+	var baobab_meshes: Array = [_save_baked_resource(_baobab_mesh(0, baobab_bark), "baobab_0"), _save_baked_resource(_baobab_mesh(1, baobab_bark), "baobab_1")]
+	var baobabs: Array = [[Vector2(-212.0, 185.0), 1.15, 0], [Vector2(-300.0, 250.0), 1.0, 1], [Vector2(-160.0, 330.0), 1.0, 0],
+			[Vector2(-345.0, 60.0), 1.0, 1], [Vector2(60.0, 280.0), 1.05, 0], [Vector2(-60.0, 120.0), 0.9, 1],
+			[Vector2(300.0, 130.0), 1.0, 0], [Vector2(460.0, -260.0), 1.0, 1], [Vector2(-390.0, -260.0), 1.05, 0]]
 	var bt := {0: [], 1: []}
 	for b in baobabs:
 		var p: Vector2 = b[0]
-		if _road_distance(p.x, p.y) < 20.0 or _herd_corridor_distance(p.x, p.y) < HERD_HALF_W + 6.0:
+		var s3: float = b[1]
+		var trunk_r: float = float(BAOBAB_RADIUS[b[2]]) * 1.1 * s3
+		if _road_distance(p.x, p.y) < ROAD_FLAT + 6.0 + trunk_r or _herd_corridor_distance(p.x, p.y) < HERD_HALF_W + 4.0 + trunk_r:
 			push_warning("Baobab at (%.0f, %.0f) is too close to the road or the herd" % [p.x, p.y])
 			continue
 		var y2: float = _ground_at(p.x, p.y)
-		var s3: float = b[1]
 		bt[b[2]].append(Transform3D(Basis(Vector3.UP, p.x * 0.37).scaled(Vector3.ONE * s3), Vector3(p.x, y2, p.y)))
-		trunks.append([Vector3(p.x, y2, p.y), 2.4 * s3, 9.0 * s3])
-	for v2 in bt.keys():
-		if bt[v2].is_empty():
+		trunks.append([Vector3(p.x, y2, p.y), trunk_r, float(BAOBAB_HEIGHT[b[2]]) * s3])
+	for v3 in bt.keys():
+		if bt[v3].is_empty():
 			continue
-		var mmi3 := _multimesh(baobab_meshes[v2], bt[v2], "Baobabs_%d" % v2)
-		mmi3.material_override = bark_mat
+		var mmi3 := _multimesh(baobab_meshes[v3], bt[v3], "Baobabs_%d" % v3)
 		root.add_child(mmi3)
 	# Termite mounds, some close enough to the verge to punish a cut corner.
 	var mound_meshes: Array = [_save_baked_resource(_termite_mesh(0), "termite_0"), _save_baked_resource(_termite_mesh(1), "termite_1")]
@@ -2010,7 +2482,7 @@ func _build_trees(parent: Node) -> void:
 		tries += 1
 		var x3: float = rng.randf_range(FINE_X.x, FINE_X.y)
 		var z3: float = rng.randf_range(FINE_Z.x, FINE_Z.y)
-		if not _clear_spot(x3, z3, 11.0) or _kopje(x3, z3).y > 0.2:
+		if not _clear_spot(x3, z3, 11.0) or _on_kopje(x3, z3, 2.0):
 			continue
 		var y3: float = _ground_at(x3, z3)
 		var v3: int = rng.randi() % 2
@@ -2042,64 +2514,521 @@ func _build_trees(parent: Node) -> void:
 	print("  trees: %d acacias, %d on the horizon, %d baobabs, %d termite mounds, %d colliders" % [count, horizon, baobabs.size(), mounds, trunks.size()])
 
 
-## Granite boulders on the kopjes, and the two great boulders that make the gate on the run-up
-## to Pride Rock.
-func _build_boulders(parent: Node, mat: Material) -> void:
+# ======================================================================================
+#  Granite tors
+# ======================================================================================
+
+## One granite block: a rounded box (superellipsoid) cut by joint planes, the cut edges rounded
+## off by weathering, with broad bulges. Radius about 1 in its own frame; `xf` places and sizes
+## it (rotation and a uniform scale). Kept after placing so later blocks can rest on it and the
+## occlusion bake can see it.
+class Granite:
+	var axes := Vector3.ONE
+	var power := 3.0
+	## Joint planes: [unit normal, distance from the centre].
+	var cuts: Array = []
+	var bulge := 0.05
+	var noise := FastNoiseLite.new()
+	var xf := Transform3D()
+	var size := 1.0
+	## Horizontal reach from the centre in metres, and the top and bottom relative to the
+	## centre, once shaped.
+	var reach := 1.0
+	var top := 1.0
+	var bottom := -1.0
+
+	func radius(d: Vector3) -> float:
+		var q: float = pow(absf(d.x) / axes.x, power) + pow(absf(d.y) / axes.y, power) + pow(absf(d.z) / axes.z, power)
+		var r: float = pow(q, -1.0 / power)
+		for c in cuts:
+			var dn: float = d.dot(c[0])
+			if dn > 0.0001:
+				r = Granite.smin(r, float(c[1]) / dn, 0.07)
+		return r * (1.0 + noise.get_noise_3dv(d * 1.3) * bulge + noise.get_noise_3dv(d * 3.6 + Vector3(5, 9, 2)) * bulge * 0.35)
+
+	static func smin(a: float, b: float, k: float) -> float:
+		var h: float = maxf(k - absf(a - b), 0.0) / k
+		return minf(a, b) - h * h * k * 0.25
+
+	## Roughly the distance in metres from world point `p` to the surface, negative inside.
+	func distance_to(p: Vector3) -> float:
+		var local: Vector3 = xf.affine_inverse() * p
+		var l: float = local.length()
+		if l < 0.0001:
+			return -size
+		return (l - radius(local / l)) * size
+
+	## Height of the top (or the underside) of the rock above world (x, z), or NAN if the vertical
+	## line there misses it.
+	func surface_y(x: float, z: float, top: bool) -> float:
+		var c: Vector3 = xf.origin
+		var h: float = size * 1.7
+		if Vector2(x - c.x, z - c.z).length() > reach + 0.05:
+			return NAN
+		var steps := 48
+		var outside := c.y + (h if top else -h)
+		var inside := NAN
+		for i in range(1, steps + 1):
+			var y: float = c.y + (h if top else -h) * (1.0 - 2.0 * float(i) / float(steps))
+			if distance_to(Vector3(x, y, z)) < 0.0:
+				inside = y
+				break
+			outside = y
+		if is_nan(inside):
+			return NAN
+		for i in range(8):
+			var m: float = (inside + outside) * 0.5
+			if distance_to(Vector3(x, m, z)) < 0.0:
+				inside = m
+			else:
+				outside = m
+		return (inside + outside) * 0.5
+
+
+## Unit directions over a cube-sphere, `n` x `n` cells a face, shared along the cube's edges, and
+## the triangles between them as index triples.
+func _cube_sphere(n: int) -> Array:
+	var dirs := PackedVector3Array()
+	var tris := PackedInt32Array()
+	var index := {}
+	var faces := [[Vector3.RIGHT, Vector3.UP, Vector3.BACK], [Vector3.LEFT, Vector3.UP, Vector3.FORWARD],
+			[Vector3.UP, Vector3.BACK, Vector3.RIGHT], [Vector3.DOWN, Vector3.FORWARD, Vector3.RIGHT],
+			[Vector3.BACK, Vector3.UP, Vector3.LEFT], [Vector3.FORWARD, Vector3.UP, Vector3.RIGHT]]
+	for f in faces:
+		var fn: Vector3 = f[0]
+		var fu: Vector3 = f[1]
+		var fv: Vector3 = f[2]
+		var ids := PackedInt32Array()
+		for j in range(n + 1):
+			for i in range(n + 1):
+				var gi: int = 2 * i - n
+				var gj: int = 2 * j - n
+				var key := Vector3i(roundi(fn.x) * n + roundi(fu.x) * gj + roundi(fv.x) * gi,
+						roundi(fn.y) * n + roundi(fu.y) * gj + roundi(fv.y) * gi,
+						roundi(fn.z) * n + roundi(fu.z) * gj + roundi(fv.z) * gi)
+				if not index.has(key):
+					# tan() spreads the cells evenly over the sphere instead of bunching at the corners.
+					var a: float = tan(float(gi) / float(n) * PI * 0.25)
+					var b: float = tan(float(gj) / float(n) * PI * 0.25)
+					index[key] = dirs.size()
+					dirs.append((fn + fv * a + fu * b).normalized())
+				ids.append(index[key])
+		for j in range(n):
+			for i in range(n):
+				var a0: int = ids[j * (n + 1) + i]
+				var a1: int = ids[j * (n + 1) + i + 1]
+				var b0: int = ids[(j + 1) * (n + 1) + i]
+				var b1: int = ids[(j + 1) * (n + 1) + i + 1]
+				tris.append_array([a0, a1, b1, a0, b1, b0])
+	return [dirs, tris]
+
+
+## A granite block of the given shape, unplaced.
+func _new_granite(rng: RandomNumberGenerator, power: float, axes: Vector3, joints: int, bulge := 0.05) -> Granite:
+	var g := Granite.new()
+	g.power = power
+	g.axes = axes
+	g.bulge = bulge
+	g.noise.seed = rng.randi()
+	g.noise.frequency = 1.0
+	g.noise.fractal_octaves = 2
+	for j in range(joints):
+		# Granite splits along near-vertical joints, and sheets off parallel to the ground.
+		var a: float = rng.randf() * TAU
+		var nrm := Vector3(cos(a), rng.randf_range(-0.25, 0.35), sin(a)).normalized()
+		if j == 2:
+			nrm = Vector3(rng.randf_range(-0.2, 0.2), 1.0, rng.randf_range(-0.2, 0.2)).normalized()
+		g.cuts.append([nrm, rng.randf_range(0.56, 0.82)])
+	# A flat underside, so a block sits on what it rests on rather than balancing on a point.
+	g.cuts.append([Vector3.DOWN, axes.y * 0.72])
+	return g
+
+
+## Sizes and orients `g`: a yaw (random unless given), its up tipped part of the way toward
+## `ground_up` (the slope it will rest on) and a slight random tilt. Measures its reach.
+func _shape_granite(g: Granite, size: float, rng: RandomNumberGenerator, ground_up := Vector3.UP, yaw := NAN) -> void:
+	var y_rot: float = rng.randf() * TAU if is_nan(yaw) else yaw
+	var tilt_axis := Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1)).normalized()
+	var basis := Basis(Vector3.UP, y_rot) * Basis(tilt_axis, rng.randf_range(0.0, 0.08))
+	var up: Vector3 = Vector3.UP.slerp(ground_up.normalized(), 0.6)
+	var axis: Vector3 = Vector3.UP.cross(up)
+	if axis.length() > 0.001:
+		basis = Basis(axis.normalized(), Vector3.UP.angle_to(up)) * basis
+	g.size = size
+	g.xf = Transform3D(basis.scaled(Vector3.ONE * size), Vector3.ZERO)
+	var reach := 0.0
+	g.top = -1e9
+	g.bottom = 1e9
+	for d in _granite_probe_dirs():
+		var p: Vector3 = g.xf.basis * (d * g.radius(d))
+		reach = maxf(reach, Vector2(p.x, p.z).length())
+		g.top = maxf(g.top, p.y)
+		g.bottom = minf(g.bottom, p.y)
+	g.reach = reach
+
+
+## Height of what a rock would rest on at (x, z): the ground or the top of a rock in `support`.
+func _support_y(x: float, z: float, support: Array) -> float:
+	var y: float = _ground_at(x, z)
+	for o in support:
+		var top: float = o.surface_y(x, z, true)
+		if not is_nan(top):
+			y = maxf(y, top)
+	return y
+
+
+## Up direction of the surface a rock would rest on at (x, z), over `span` metres.
+func _support_up(x: float, z: float, support: Array, span: float) -> Vector3:
+	var dx: float = _support_y(x + span, z, support) - _support_y(x - span, z, support)
+	var dz: float = _support_y(x, z + span, support) - _support_y(x, z - span, support)
+	return Vector3(-dx, 2.0 * span, -dz).normalized()
+
+
+## Sets the height of a shaped rock centred over (x, z) so it rests on the ground and the rocks
+## in `support`: on the lower side of its footprint (on a slope a boulder beds into the hill
+## rather than bridging it), then sunk by `sink` of its height.
+func _settle_granite(g: Granite, x: float, z: float, support: Array, sink: float) -> void:
+	g.xf.origin = Vector3(x, 0.0, z)
+	var lo := 1e9
+	var hi := -1e9
+	for k in range(13):
+		var px: float = x
+		var pz: float = z
+		if k > 0:
+			var a: float = TAU * float(k) / 12.0
+			px += cos(a) * g.reach * 0.6
+			pz += sin(a) * g.reach * 0.6
+		var under: float = g.surface_y(px, pz, false)
+		if is_nan(under):
+			continue
+		var need: float = _support_y(px, pz, support) - under
+		lo = minf(lo, need)
+		hi = maxf(hi, need)
+	var y: float = lo + (hi - lo) * 0.25 if lo < 1e8 else _ground_at(x, z)
+	g.xf.origin.y = y - (g.top - g.bottom) * sink
+
+
+## Shapes `g` at `size` metres, rests it over (x, z) on the ground and the rocks in `support`
+## (tipped to their slope), sunk by `sink` of its height, and adds it to `rocks`. With `check`, a
+## block whose reach would cross a road, a jump or the herd's path is not placed (false).
+func _rest_granite(g: Granite, x: float, z: float, size: float, rocks: Array, support: Array, sink: float, rng: RandomNumberGenerator, yaw := NAN, check := true) -> bool:
+	_shape_granite(g, size, rng, _support_up(x, z, support, maxf(size * 0.5, 1.0)), yaw)
+	if check and not _rock_clear(x, z, g.reach):
+		return false
+	_settle_granite(g, x, z, support, sink)
+	rocks.append(g)
+	return true
+
+
+## A coarse set of directions for measuring a rock's extent.
+func _granite_probe_dirs() -> PackedVector3Array:
+	if _probe_dirs.is_empty():
+		_probe_dirs = _cube_sphere(6)[0]
+	return _probe_dirs
+
+
+## Can a rock reaching `reach` metres stand at (x, z)? Off the roads, the jumps, the water and
+## the herd's path.
+func _rock_clear(x: float, z: float, reach: float) -> bool:
+	if _road_distance(x, z) < ROAD_FLAT + 2.0 + reach:
+		return false
+	if _jump_corridor_distance(x, z) < 16.0 + reach:
+		return false
+	if _herd_corridor_distance(x, z) < HERD_HALF_W + 4.0 + reach:
+		return false
+	return not _in_water(x, z)
+
+
+## A tor: a broad, low dome of granite half buried in the hill, two to four boulders resting on
+## its back or leaning on its flanks (never piled on one another: towers of blocks read as
+## cairns), often a block split in two along a joint beside it, the odd boulder balanced on the
+## highest of them, and a scree of smaller boulders round its foot.
+func _build_tor(tc: Vector2, rt: float, rng: RandomNumberGenerator, rocks: Array, scree: Array) -> void:
+	var base := _new_granite(rng, rng.randf_range(2.1, 2.6), Vector3(1.0, rng.randf_range(0.36, 0.48), rng.randf_range(0.65, 0.85)), rng.randi_range(0, 1))
+	if not _rest_granite(base, tc.x, tc.y, rt * 1.35, rocks, [], 0.3, rng):
+		return
+	var boulders: Array = []
+	var want: int = rng.randi_range(2, 4)
+	var tries := 0
+	while boulders.size() < want and tries < 40:
+		tries += 1
+		var a: float = rng.randf() * TAU
+		var on_top: bool = rng.randf() < 0.55
+		var off: float = base.reach * (rng.randf_range(0.0, 0.45) if on_top else rng.randf_range(0.8, 1.0))
+		var x: float = tc.x + cos(a) * off
+		var z: float = tc.y + sin(a) * off
+		var g := _new_granite(rng, rng.randf_range(2.5, 3.2), Vector3(1.0, rng.randf_range(0.62, 0.9), rng.randf_range(0.75, 1.0)), rng.randi_range(1, 3))
+		_shape_granite(g, rt * rng.randf_range(0.38, 0.6), rng, _support_up(x, z, [base], 2.0))
+		var crowded := false
+		for o in boulders:
+			if Vector2(x, z).distance_to(Vector2(o.xf.origin.x, o.xf.origin.z)) < (g.reach + o.reach) * 0.85:
+				crowded = true
+				break
+		if crowded or not _rock_clear(x, z, g.reach):
+			continue
+		_settle_granite(g, x, z, [base], 0.14)
+		rocks.append(g)
+		boulders.append(g)
+	if rng.randf() < 0.6:
+		# Split along a joint: two halves of one block, leaning apart across the crack.
+		var a2: float = rng.randf() * TAU
+		var off2: float = base.reach * rng.randf_range(0.95, 1.25)
+		var cx: float = tc.x + cos(a2) * off2
+		var cz: float = tc.y + sin(a2) * off2
+		var size: float = rt * rng.randf_range(0.4, 0.55)
+		var seed_noise: int = rng.randi()
+		var power: float = rng.randf_range(2.3, 2.9)
+		var axes := Vector3(1.0, rng.randf_range(0.7, 0.95), rng.randf_range(0.8, 1.0))
+		var yaw: float = rng.randf() * TAU
+		var split := Vector3(cos(yaw), 0.0, -sin(yaw))
+		var gap: float = rng.randf_range(0.5, 1.2)
+		for side in [-1.0, 1.0]:
+			var h := Granite.new()
+			h.power = power
+			h.axes = axes
+			h.noise.seed = seed_noise
+			h.noise.frequency = 1.0
+			h.noise.fractal_octaves = 2
+			# The half on this side: the cut keeps the part away from the crack.
+			h.cuts = [[Vector3(-side, 0.0, 0.0), 0.04], [Vector3.DOWN, axes.y * 0.72]]
+			var at: Vector3 = Vector3(cx, 0.0, cz) + split * side * (gap * 0.5 + size * 0.04)
+			if not _rest_granite(h, at.x, at.z, size, rocks, [base], 0.14, rng, yaw):
+				continue
+			# Lean away from the crack.
+			var o: Vector3 = h.xf.origin
+			h.xf = Transform3D(Basis(Vector3(-split.z, 0.0, split.x), -side * 0.07) * h.xf.basis, o)
+	if rng.randf() < 0.45 and not boulders.is_empty():
+		# A rounder boulder balanced on the highest of them.
+		var perch: Granite = boulders[0]
+		for o in boulders:
+			if o.xf.origin.y + o.top > perch.xf.origin.y + perch.top:
+				perch = o
+		var p: Vector3 = perch.xf.origin
+		var ball := _new_granite(rng, rng.randf_range(2.0, 2.4), Vector3(1.0, rng.randf_range(0.75, 0.92), rng.randf_range(0.85, 1.0)), 0, 0.07)
+		_shape_granite(ball, perch.size * rng.randf_range(0.4, 0.55), rng)
+		_settle_granite(ball, p.x, p.z, [perch], 0.06)
+		rocks.append(ball)
+	for i in range(rng.randi_range(5, 10)):
+		var a4: float = rng.randf() * TAU
+		var rr2: float = base.reach * rng.randf_range(1.0, 1.5)
+		scree.append([Vector2(tc.x + cos(a4) * rr2, tc.y + sin(a4) * rr2), rng.randf_range(0.9, 2.6)])
+
+
+## Mesh for a placed block in its own frame, with occlusion baked into vertex colour r against
+## the ground and every rock in `rocks`, and the height above the ground in g (granite_rock.gdshader).
+## Without `placed` (a shape shared by many small boulders), both come from the block's own
+## height instead. Mesh LODs are generated so distant tors cost little.
+func _granite_mesh(g: Granite, rocks: Array, sphere: Array, placed := true) -> ArrayMesh:
+	var dirs: PackedVector3Array = sphere[0]
+	var tris: PackedInt32Array = sphere[1].duplicate()
+	var pos := PackedVector3Array()
+	pos.resize(dirs.size())
+	for i in range(dirs.size()):
+		pos[i] = dirs[i] * g.radius(dirs[i])
+	var near: Array = []
+	for o in rocks:
+		if o != g and o.xf.origin.distance_to(g.xf.origin) < (o.reach + g.reach) * 1.3 + 3.0:
+			near.append(o)
+	var cols := PackedColorArray()
+	cols.resize(dirs.size())
+	var low := 0.0
+	for q in pos:
+		low = minf(low, q.y)
+	for i in range(dirs.size()):
+		var w: Vector3 = g.xf * pos[i]
+		# Scree boulders are about 2m across and sunk a third of their height.
+		var above: float = w.y - _ground_at(w.x, w.z) if placed else (pos[i].y - low) * 2.0 - 0.5
+		var occ: float = lerpf(0.3, 1.0, smoothstep(-0.4, 2.4, above))
+		for o in near:
+			occ = minf(occ, lerpf(0.22, 1.0, smoothstep(-0.3, 2.0, o.distance_to(w))))
+		# Undersides see less sky.
+		var wd: Vector3 = (g.xf.basis * dirs[i]).normalized()
+		occ *= 0.7 + 0.3 * clampf(wd.y * 0.5 + 0.5, 0.0, 1.0)
+		cols[i] = Color(occ, clampf(above / 1.5, 0.0, 1.0), 0.0, 1.0)
+	# Wind every triangle outward: front faces are clockwise, normal (c - a) x (b - a).
+	var nrm := PackedVector3Array()
+	nrm.resize(pos.size())
+	for t in range(0, tris.size(), 3):
+		var a: Vector3 = pos[tris[t]]
+		var b: Vector3 = pos[tris[t + 1]]
+		var c: Vector3 = pos[tris[t + 2]]
+		var fn: Vector3 = (c - a).cross(b - a)
+		if fn.dot(a + b + c) < 0.0:
+			var tmp: int = tris[t + 1]
+			tris[t + 1] = tris[t + 2]
+			tris[t + 2] = tmp
+			fn = -fn
+		for k in range(3):
+			nrm[tris[t + k]] += fn
+	for i in range(nrm.size()):
+		nrm[i] = nrm[i].normalized()
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = pos
+	arrays[Mesh.ARRAY_NORMAL] = nrm
+	arrays[Mesh.ARRAY_COLOR] = cols
+	arrays[Mesh.ARRAY_INDEX] = tris
+	var im := ImporterMesh.new()
+	im.add_surface(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	im.generate_lods(25.0, 60.0, [])
+	return im.get_mesh()
+
+
+## Every block must touch what it rests on: its lowest point no more than 15cm above the ground
+## or another block.
+func _verify_rocks_bedded(rocks: Array) -> void:
+	var floating := 0
+	for g in rocks:
+		var gap := 1e9
+		var others: Array = []
+		for o in rocks:
+			if o != g and o.xf.origin.distance_to(g.xf.origin) < (o.reach + g.reach) * 1.5 + 2.0:
+				others.append(o)
+		for d in _granite_probe_dirs():
+			var w: Vector3 = g.xf * (d * g.radius(d))
+			gap = minf(gap, w.y - _support_y(w.x, w.z, others))
+			if gap < 0.15:
+				break
+		if gap >= 0.15:
+			floating += 1
+			push_error("Granite block at (%.0f, %.0f, %.0f) floats %.2fm above its bed" % [g.xf.origin.x, g.xf.origin.y, g.xf.origin.z, gap])
+	print("  granite: %d blocks checked, %d floating" % [rocks.size(), floating])
+
+
+## The kopjes' tors, the two great blocks that make the gate on the run-up to Pride Rock and the
+## pair at its lip, and boulders scattered over the hills. The big blocks are single meshes with
+## convex colliders; the scree is a MultiMesh of a few small boulder shapes.
+func _build_kopje_rocks(parent: Node) -> void:
 	var root := Node3D.new()
-	root.name = "KopjeBoulders"
+	root.name = "KopjeGranite"
 	parent.add_child(root)
-	var meshes: Array = []
-	for v in range(3):
-		meshes.append(_save_baked_resource(_boulder_mesh(v), "boulder_%d" % v))
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://granite_rock.gdshader")
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 1357
-	var sets := {0: [], 1: [], 2: []}
-	var shapes: Array = []
-	# The gate: two tall boulders either side of the run-up, and a pair at the lip.
+	var rocks: Array = []
+	var scree: Array = []
+	# The gate: two tall blocks either side of the run-up, and a pair at the lip. Pushed out from
+	# the road until they clear it.
 	var pd: Vector3 = _pr_dir3()
 	var pr_right := Vector3(-pd.z, 0, pd.x)
-	var gate: Array = [
-		[PR_LIP - pd * 40.0 + pr_right * 15.0, 5.5], [PR_LIP - pd * 46.0 - pr_right * 15.5, 6.0],
-		[PR_LIP - pd * 4.0 + pr_right * 13.5, 3.6], [PR_LIP - pd * 6.0 - pr_right * 14.0, 4.0],
-	]
-	for g in gate:
-		var p: Vector3 = g[0]
-		p.y = _ground_at(p.x, p.z)
-		sets[rng.randi() % 3].append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * g[1]), p + Vector3(0, g[1] * 0.35, 0)))
-		shapes.append([p + Vector3(0, g[1] * 0.35, 0), g[1] * 0.8])
-	var n := 0
-	var tries := 0
-	while n < 160 and tries < 20000:
-		tries += 1
-		var k: Array = KOPJES[rng.randi() % KOPJES.size()]
+	var gate: Array = [[40.0, 1.0, 8.0], [46.0, -1.0, 8.5], [4.0, 1.0, 5.5], [6.0, -1.0, 6.0]]
+	for gd in gate:
+		var g := _new_granite(rng, rng.randf_range(2.6, 3.2), Vector3(1.0, rng.randf_range(0.85, 1.0), rng.randf_range(0.8, 0.95)), 2)
+		var lat := 10.0
+		while lat < 40.0:
+			var p: Vector3 = PR_LIP - pd * float(gd[0]) + pr_right * float(gd[1]) * lat
+			_rest_granite(g, p.x, p.z, gd[2], [], [], 0.2, rng, NAN, false)
+			if _road_distance(p.x, p.z) > ROAD_FLAT + 1.0 + g.reach:
+				break
+			lat += 0.5
+		rocks.append(g)
+	var tors := 0
+	for k in KOPJES:
 		var c: Vector2 = k[0]
-		var a: float = rng.randf() * TAU
-		var rr: float = float(k[1]) * sqrt(rng.randf()) * 1.05
-		var x: float = c.x + cos(a) * rr
-		var z: float = c.y + sin(a) * rr
-		if _road_distance(x, z) < 12.0 or _jump_corridor_distance(x, z) < 18.0:
+		var r: float = k[1]
+		var want: int = clampi(roundi(r / 17.0), 1, 4)
+		var placed: Array = []
+		var tries := 0
+		while placed.size() < want and tries < 300:
+			tries += 1
+			var a: float = rng.randf() * TAU
+			var tc: Vector2 = c + Vector2(cos(a), sin(a)) * r * 0.62 * sqrt(rng.randf())
+			var rt: float = rng.randf_range(7.0, 10.5) * clampf(r / 45.0, 0.8, 1.25)
+			if not _rock_clear(tc.x, tc.y, rt * 1.5):
+				continue
+			var ok := true
+			for q in placed:
+				if tc.distance_to(q[0]) < (rt + float(q[1])) * 1.35:
+					ok = false
+					break
+			if not ok:
+				continue
+			placed.append([tc, rt])
+			_build_tor(tc, rt, rng, rocks, scree)
+			tors += 1
+		# Boulders strewn over the rest of the hill.
+		for i in range(roundi(r / 3.0)):
+			var a2: float = rng.randf() * TAU
+			var rr: float = r * 1.05 * sqrt(rng.randf())
+			scree.append([c + Vector2(cos(a2), sin(a2)) * rr, rng.randf_range(0.8, 3.2)])
+	_verify_rocks_bedded(rocks)
+	var sphere: Array = _cube_sphere(16)
+	var body := StaticBody3D.new()
+	body.name = "GraniteRocks"
+	root.add_child(body)
+	for i in range(rocks.size()):
+		var g: Granite = rocks[i]
+		var mesh: ArrayMesh = _save_baked_resource(_granite_mesh(g, rocks, sphere), "granite_%d" % i)
+		var mi := MeshInstance3D.new()
+		mi.name = "Granite_%d" % i
+		mi.mesh = mesh
+		mi.material_override = mat
+		mi.transform = g.xf
+		root.add_child(mi)
+		# Collision: the block's convex hull, with its rotation and size baked into the points
+		# (Jolt takes no scaled shapes).
+		var hull: ConvexPolygonShape3D = mesh.create_convex_shape(true, true)
+		var pts := PackedVector3Array()
+		for p in hull.points:
+			pts.append(g.xf.basis * p)
+		hull.points = pts
+		var cs := CollisionShape3D.new()
+		cs.shape = hull
+		cs.position = g.xf.origin
+		body.add_child(cs)
+	# Scree: small boulders of a few shapes, resting on the ground and the blocks.
+	var small_sphere: Array = _cube_sphere(8)
+	var variants: Array = []
+	var vrng := RandomNumberGenerator.new()
+	vrng.seed = 2468
+	for v in range(5):
+		var g := _new_granite(vrng, vrng.randf_range(2.2, 3.2), Vector3(1.0, vrng.randf_range(0.55, 0.85), vrng.randf_range(0.75, 1.0)), vrng.randi_range(0, 2), 0.07)
+		g.xf = Transform3D()
+		g.reach = 1.0
+		variants.append(g)
+	var sets: Array = [[], [], [], [], []]
+	var shapes: Array = []
+	for sc in scree:
+		var p2: Vector2 = sc[0]
+		var size: float = sc[1]
+		if not _rock_clear(p2.x, p2.y, size * 1.2):
 			continue
-		var s: float = rng.randf_range(1.0, 3.8)
-		var y: float = _ground_at(x, z)
-		sets[rng.randi() % 3].append(Transform3D(Basis(Vector3(rng.randf(), 1, rng.randf()).normalized(), rng.randf() * TAU).scaled(Vector3.ONE * s), Vector3(x, y + s * 0.2, z)))
-		if _road_distance(x, z) < 50.0:
-			shapes.append([Vector3(x, y + s * 0.2, z), s * 0.78])
-		n += 1
-	for v2 in sets.keys():
-		var mmi := _multimesh(meshes[v2], sets[v2], "Boulders_%d" % v2)
+		var v2: int = rng.randi() % variants.size()
+		var proto: Granite = variants[v2]
+		var g := Granite.new()
+		g.axes = proto.axes
+		g.power = proto.power
+		g.cuts = proto.cuts
+		g.bulge = proto.bulge
+		g.noise = proto.noise
+		# Scree rests on the ground and the blocks, but is not kept for others to rest on.
+		var bed: Array = []
+		if not _rest_granite(g, p2.x, p2.y, size, bed, rocks, 0.25, rng):
+			continue
+		sets[v2].append(g.xf)
+		if _road_distance(p2.x, p2.y) < 60.0:
+			shapes.append([g.xf.origin + Vector3(0, size * 0.15, 0), size * 0.8])
+	for v3 in range(variants.size()):
+		if sets[v3].is_empty():
+			continue
+		var proto2: Granite = variants[v3]
+		proto2.size = 1.0
+		var mesh2: ArrayMesh = _save_baked_resource(_granite_mesh(proto2, [], small_sphere, false), "scree_%d" % v3)
+		var mmi := _multimesh(mesh2, sets[v3], "Scree_%d" % v3)
 		mmi.material_override = mat
 		root.add_child(mmi)
-	var body := StaticBody3D.new()
-	body.name = "BoulderRocks"
-	root.add_child(body)
 	for sh in shapes:
-		var cs := CollisionShape3D.new()
-		var sphere := SphereShape3D.new()
-		sphere.radius = sh[1]
-		cs.shape = sphere
-		cs.position = sh[0]
-		body.add_child(cs)
-	print("  boulders: %d (+%d at the gate), %d solid" % [n, gate.size(), shapes.size()])
+		var cs2 := CollisionShape3D.new()
+		var sphere_shape := SphereShape3D.new()
+		sphere_shape.radius = sh[1]
+		cs2.shape = sphere_shape
+		cs2.position = sh[0]
+		body.add_child(cs2)
+	var scree_n := 0
+	for st in sets:
+		scree_n += st.size()
+	print("  granite: %d blocks in %d tors (+%d at the gate), %d scree boulders" % [rocks.size(), tors, gate.size(), scree_n])
 
 
 ## Dry grass tussocks near the roads, in MultiMesh cells that fade out with distance.
@@ -2676,8 +3605,6 @@ func _ready() -> void:
 	ground_mat.set_shader_parameter("grass_tex", load("res://materials/grass.png"))
 	ground_mat.set_shader_parameter("dirt_tex", load("res://materials/dirt.png"))
 	ground_mat.set_shader_parameter("dirt_normal", load("res://materials/dirt_normal.png"))
-	ground_mat.set_shader_parameter("rock_tex", load("res://materials/dark_rock.png"))
-	ground_mat.set_shader_parameter("rock_normal", load("res://materials/dark_canyon_rock_normal.png"))
 	ground_mat.set_shader_parameter("road_half_width", ROAD_HALF)
 	ground_mat.set_shader_parameter("horizon_color", haze)
 	var terrain_root := Node3D.new()
@@ -2806,12 +3733,8 @@ func _ready() -> void:
 	var dressing := Node3D.new()
 	dressing.name = "SavannaDressing"
 	level_scene.add_child(dressing)
-	var boulder_mat := ShaderMaterial.new()
-	boulder_mat.shader = ground_mat.shader
-	for p in ["grass_tex", "dirt_tex", "dirt_normal", "rock_tex", "rock_normal"]:
-		boulder_mat.set_shader_parameter(p, ground_mat.get_shader_parameter(p))
 	_build_trees(dressing)
-	_build_boulders(dressing, boulder_mat)
+	_build_kopje_rocks(dressing)
 	_build_grass(dressing)
 	_build_marker_posts(dressing)
 	_build_jump_flags(dressing)

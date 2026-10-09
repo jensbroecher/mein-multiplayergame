@@ -161,6 +161,10 @@ const CELL := 40.0
 const FOREST_NEAR := 240.0
 const FOREST_CELL := 160.0
 const FOREST_FAR_CELL := 400.0
+## Each tree crossfades from its detailed mesh to its stand-in over FOREST_NEAR +- FOREST_FADE/2,
+## shifted per tree by up to FOREST_FADE_JITTER (spruce.gdshader).
+const FOREST_FADE := 50.0
+const FOREST_FADE_JITTER := 15.0
 
 var main_curve: Curve3D
 var _base_noise := FastNoiseLite.new()
@@ -2278,8 +2282,8 @@ func _build_forest(parent: Node) -> void:
 func _build_forest_cells(parent: Node, trees: Array, variants: Array) -> void:
 	var meshes := {}
 	for v in [0, 1]:
-		meshes[v] = _save_baked_resource(_spruce_mesh(v, 0), "spruce_near_%d" % v)
-	var far_mesh: Mesh = _save_baked_resource(_spruce_mesh(0, 1), "spruce_far")
+		meshes[v] = _save_baked_resource(_spruce_lod(_spruce_mesh(v, 0), 1), "spruce_near_%d" % v)
+	var far_mesh: Mesh = _save_baked_resource(_spruce_lod(_spruce_mesh(0, 1), 2), "spruce_far")
 	# Near cells: per variant. Far cells: bigger, one mesh for both variants (the young trees are
 	# simply scaled down), so the distant forest costs a handful of draw calls.
 	var near := {}
@@ -2300,13 +2304,14 @@ func _build_forest_cells(parent: Node, trees: Array, variants: Array) -> void:
 	parent.add_child(root)
 	for k in near.keys():
 		var mmi := _forest_multimesh(meshes[k.z], near[k], "Near_%d_%d_%d" % [k.x, k.y, k.z])
-		mmi.visibility_range_end = FOREST_NEAR
-		mmi.visibility_range_end_margin = 20.0
+		# The range is measured to the cell's centre, so a cell stays on until its nearest tree has
+		# faded out, and the per-tree fade in the shader does the visible swap.
+		mmi.visibility_range_end = FOREST_NEAR + FOREST_FADE * 0.5 + FOREST_FADE_JITTER + FOREST_CELL * 0.72
+		mmi.visibility_range_end_margin = 10.0
 		root.add_child(mmi)
 	for k in far.keys():
 		var mmi := _forest_multimesh(far_mesh, far[k], "Far_%d_%d" % [k.x, k.y])
-		mmi.visibility_range_begin = FOREST_NEAR
-		mmi.visibility_range_begin_margin = 20.0
+		mmi.visibility_range_begin = maxf(0.0, FOREST_NEAR - FOREST_FADE * 0.5 - FOREST_FADE_JITTER - FOREST_FAR_CELL * 0.72)
 		mmi.visibility_range_end = 1100.0
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(mmi)
@@ -2331,6 +2336,16 @@ func _build_forest_cells(parent: Node, trees: Array, variants: Array) -> void:
 		col.position = xf2.origin + Vector3(0, cyl.height * 0.5 - 0.5, 0)
 		bodies[bk].add_child(col)
 	print("  forest: %d near cells, %d far cells, %d collision cells" % [near.size(), far.size(), bodies.size()])
+
+
+## Sets up a spruce mesh's material for the near/far crossfade (lod_mode in spruce.gdshader).
+func _spruce_lod(mesh: ArrayMesh, mode: int) -> ArrayMesh:
+	var mat: ShaderMaterial = mesh.surface_get_material(0)
+	mat.set_shader_parameter("lod_mode", mode)
+	mat.set_shader_parameter("lod_fade_begin", FOREST_NEAR - FOREST_FADE * 0.5)
+	mat.set_shader_parameter("lod_fade_end", FOREST_NEAR + FOREST_FADE * 0.5)
+	mat.set_shader_parameter("lod_jitter", FOREST_FADE_JITTER)
+	return mesh
 
 
 func _forest_multimesh(mesh: Mesh, transforms: Array, node_name: String) -> MultiMeshInstance3D:
