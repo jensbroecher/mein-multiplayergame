@@ -142,10 +142,13 @@ void fragment() {
 	albedo = mix(albedo, vec3(0.10, 0.22, 0.34), clamp(cracks * crack_strength + cracks2 * crack_strength * 0.6, 0.0, 0.6));
 	albedo = mix(albedo, marker_color.rgb, clamp(white, 0.0, 1.0) * (1.0 - exposed * 0.55));
 
+	float rough = mix(snow_roughness, ice_roughness, smoothstep(0.10, 0.65, exposed));
+	float spec = mix(0.25, 0.62, smoothstep(0.10, 0.65, exposed));
+
 	ALBEDO = albedo;
-	ROUGHNESS = mix(snow_roughness, ice_roughness, smoothstep(0.10, 0.65, exposed));
+	ROUGHNESS = rough;
 	METALLIC = 0.0;
-	SPECULAR = mix(0.25, 0.62, smoothstep(0.10, 0.65, exposed));
+	SPECULAR = spec;
 
 	NORMAL_MAP = grain_n;
 	// Fade the surface detail out with the texel footprint, otherwise the grain aliases

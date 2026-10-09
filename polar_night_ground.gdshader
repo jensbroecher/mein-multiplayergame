@@ -31,6 +31,10 @@ uniform float horizon_start : hint_range(100.0, 4000.0) = 520.0;
 uniform float horizon_end : hint_range(200.0, 6000.0) = 1150.0;
 uniform float normal_strength : hint_range(0.0, 4.0) = 0.7;
 uniform float aurora_amount : hint_range(0.0, 2.0) = 0.22;
+// Holes broken through the lake ice (xz centre, radius, seed): radial cracks running out from each
+// and a dark, wet rim. Only the Thin Ice's sheet sets hole_count; elsewhere the loop never runs.
+uniform vec4 holes[12];
+uniform int hole_count = 0;
 
 varying vec3 w_pos;
 varying vec3 w_nrm;
@@ -63,6 +67,28 @@ float fbm(vec2 p) {
 	return v;
 }
 
+float fbm_lo(vec2 p) {
+	return vnoise(p) * 0.66 + vnoise(p * 2.09 + 17.1) * 0.34;
+}
+
+// Noise that follows the surface. Flat ground samples it from above as before; steep faces sample
+// it on the two vertical planes, blended by which way the face looks. Sampled from above, a value
+// is constant all the way down a cliff, which is what painted the mountain walls with vertical
+// streaks and V-shaped flames where the face folds. Cliffs are seen from far off, so their side
+// samples get the cheaper two-octave noise.
+float surf_fbm(vec3 p, vec3 n, float s) {
+	float flat_w = smoothstep(0.55, 0.80, n.y);
+	if (flat_w > 0.995) {
+		return fbm(p.xz * s);
+	}
+	vec2 w = vec2(n.x * n.x, n.z * n.z) + 1e-4;
+	float side = (fbm_lo(p.zy * s) * w.x + fbm_lo(p.xy * s + 23.0) * w.y) / (w.x + w.y);
+	if (flat_w < 0.005) {
+		return side;
+	}
+	return mix(side, fbm(p.xz * s), flat_w);
+}
+
 vec4 triplanar(sampler2D tex, vec3 p, vec3 w, float s) {
 	vec3 bw = pow(abs(w), vec3(6.0));
 	bw /= max(bw.x + bw.y + bw.z, 0.0001);
@@ -90,13 +116,14 @@ void fragment() {
 	// Macro drifts, medium hollows, and sastrugi: wind-carved ridges stretched along the
 	// prevailing direction so the icefield is not a featureless white sheet.
 	float patch = fbm(w_pos.xz * 0.0075);
-	float drift = fbm(w_pos.xz * 0.024);
-	float sastrugi = fbm(w_pos.xz * vec2(0.32, 0.055));
-	float hollow = fbm(w_pos.xz * 0.09 + 3.7);
-
+	float drift = surf_fbm(w_pos, n, 0.024);
 	float slope_mask = smoothstep(0.42, 0.82, n.y);
+	// Sastrugi are wind ridges lying on flat snow; on a slope the stretched pattern only streaks.
+	float sastrugi = mix(0.5, fbm(w_pos.xz * vec2(0.32, 0.055)), slope_mask);
+	float hollow = surf_fbm(w_pos + 3.7, n, 0.09);
+
 	float altitude = 1.0 - smoothstep(snow_line - 26.0, snow_line + 34.0, w_pos.y);
-	float breakup = (fbm(w_pos.xz * 0.012) - 0.5) * 0.9 + (drift - 0.5) * 0.4;
+	float breakup = (surf_fbm(w_pos, n, 0.012) - 0.5) * 0.9 + (drift - 0.5) * 0.4;
 	float snow = clamp(slope_mask * (0.5 + altitude * 0.45) + breakup, 0.0, 1.0);
 	snow = smoothstep(0.06, 0.70, snow);
 
@@ -109,13 +136,15 @@ void fragment() {
 	// Domain-warp the rock sample position, capped because an over-large warp inflates the
 	// UV derivative and the engine answers with mip speckle instead of a grid.
 	const float rock_scale = 0.085;
-	float warp_amp = clamp(2.0 / rock_scale, 0.0, 8.0);
+	// No warp on steep faces: it is sampled from above, so down a cliff it is a constant shift
+	// that changes only sideways, and shears the rock into vertical bands.
+	float warp_amp = clamp(2.0 / rock_scale, 0.0, 8.0) * smoothstep(0.30, 0.70, n.y);
 	vec3 wq = w_pos + (vec3(
 			fbm(w_pos.xz * 0.011),
 			fbm(w_pos.xz * 0.011 + 41.3),
 			fbm(w_pos.xz * 0.011 + 87.9)) - 0.5) * warp_amp;
 	vec3 rot = vec3(wq.x * 0.82 - wq.z * 0.57, wq.y, wq.x * 0.57 + wq.z * 0.82);
-	float tone = 0.70 + fbm(w_pos.xz * 0.004) * 0.44 + fbm(w_pos.xz * 0.023) * 0.22;
+	float tone = 0.70 + fbm(w_pos.xz * 0.004) * 0.44 + surf_fbm(w_pos, n, 0.023) * 0.22;
 	vec3 rock_far = vec3(0.34) * tone * rock_tint.rgb;
 	// Half of the tiled rock is collapsed toward its own mean: a single 12m texture repeated
 	// across a 50m ice face reads as a honeycomb, and no amount of domain warping hides a repeat
@@ -126,8 +155,8 @@ void fragment() {
 	rock = mix(rock, rock_near * 0.9, smoothstep(0.35, 0.75, fbm(w_pos.xz * 0.0042)) * detail);
 	// Collapse the tiling on the steepest faces. On a near-vertical wall the triplanar projection
 	// degenerates towards a single axis and the texture smears into long vertical streaks, which
-	// is worse than having no texture at all - so the cliffs get the flat tone and the snow, which
-	// is noise-based and directionless, keeps the detail.
+	// is worse than having no texture at all - so the cliffs get the flat tone, and the snow on them
+	// (from surf_fbm, which follows the face) keeps the detail.
 	rock = mix(rock, vec3(0.34) * tone * rock_tint.rgb, smoothstep(0.42, 0.86, 1.0 - n.y) * 0.75);
 
 	vec3 albedo = mix(rock, snow_col, snow);
@@ -150,6 +179,23 @@ void fragment() {
 
 	albedo = mix(albedo, lake_col, lake);
 	rough = mix(rough, mix(lake_roughness, snow_roughness, clamp(lake_snow, 0.0, 1.0)), lake);
+
+	float radial = 0.0;
+	float rim = 0.0;
+	for (int i = 0; i < hole_count; i++) {
+		vec2 d = w_pos.xz - holes[i].xy;
+		float dist = length(d);
+		float edge = dist - holes[i].z;
+		// Sampled on the direction, not the angle: an angle wraps at one bearing and would leave a
+		// seam running out of every hole.
+		vec2 dir = d / max(dist, 0.001);
+		float spoke = pow(1.0 - abs(vnoise(dir * 3.2 + holes[i].w + vec2(dist * 0.05)) * 2.0 - 1.0), 18.0);
+		radial += spoke * (1.0 - smoothstep(0.0, holes[i].z * 2.2, edge));
+		rim = max(rim, 1.0 - smoothstep(0.0, 2.2, edge));
+	}
+	albedo = mix(albedo, vec3(0.80, 0.90, 0.97), clamp(radial, 0.0, 0.85));
+	albedo = mix(albedo, vec3(0.03, 0.08, 0.12), rim * 0.6);
+	rough = mix(rough, 0.08, rim);
 
 	// Distant terrain melts into the polar night so the range reads as endless rather than
 	// as a 1.4km plate with a visible edge.

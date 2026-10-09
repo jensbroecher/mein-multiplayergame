@@ -5591,6 +5591,10 @@ func _get_ai_input(delta: float) -> Vector2:
 	
 	# Smoothly interpolate to target lane offset
 	ai_lane_offset = lerpf(ai_lane_offset, ai_target_lane_offset, 2.0 * delta)
+	# A route can hold the AI to its line (Northlight's Thin Ice threads between holes).
+	if on_alternative_path and active_path and active_path.has_meta(&"ai_lane_limit"):
+		var lane_limit: float = float(active_path.get_meta(&"ai_lane_limit"))
+		ai_lane_offset = clampf(ai_lane_offset, -lane_limit, lane_limit)
 	if _harbor_stage:
 		ai_lane_offset = clampf(ai_lane_offset, -0.55, 0.55)
 	elif _mountain_stage:

@@ -24,8 +24,9 @@ extends Node3D
 @export var storm_fog_color := Color(0.20, 0.25, 0.33)
 ## How much of the sky the storm hides; at 1 the aurora is gone entirely.
 @export_range(0.0, 1.0) var storm_sky_affect := 0.85
-## Peak sideways push of a gust, in m/s^2.
-@export var gust_accel := 7.0
+## Peak sideways push of a gust, in m/s^2. On the ice (half grip) a full gust walks a car about
+## 5m/s sideways until it steers into it.
+@export var gust_accel := 13.0
 ## Moon brightness kept at the height of a storm.
 @export_range(0.0, 1.0) var storm_moonlight := 0.55
 ## Wind loop turned up by this many dB at the height of a storm.
@@ -103,20 +104,35 @@ func _build_snow() -> void:
 	_snow.process_material = _snow_mat
 
 	var streak := QuadMesh.new()
-	streak.size = Vector2(0.07, 0.7)
+	streak.size = Vector2(0.18, 0.95)
 	var mat := StandardMaterial3D.new()
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.vertex_color_use_as_albedo = true
+	# A soft blob stretched along the streak: bright in the middle, gone well before the quad's
+	# edges. Hard-edged quads read as confetti, not snow.
+	var soft := Gradient.new()
+	soft.offsets = PackedFloat32Array([0.0, 0.3, 0.7, 1.0])
+	soft.colors = PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0.55), Color(1, 1, 1, 0.12), Color(1, 1, 1, 0)])
+	var soft_tex := GradientTexture2D.new()
+	soft_tex.gradient = soft
+	soft_tex.width = 32
+	soft_tex.height = 64
+	soft_tex.fill = GradientTexture2D.FILL_RADIAL
+	soft_tex.fill_from = Vector2(0.5, 0.5)
+	soft_tex.fill_to = Vector2(0.5, 0.0)
+	mat.albedo_texture = soft_tex
 	# Streaks right in front of the lens would cover half the screen: fade them out up close.
 	mat.distance_fade_mode = BaseMaterial3D.DISTANCE_FADE_PIXEL_ALPHA
 	mat.distance_fade_min_distance = 1.5
 	mat.distance_fade_max_distance = 5.0
-	mat.albedo_color = Color(0.88, 0.94, 1.0, 0.7)
+	mat.albedo_color = Color(0.88, 0.94, 1.0, 0.55)
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	streak.material = mat
 	_snow.draw_pass_1 = streak
-	add_child(_snow)
+	# Internal: the generator runs this _ready too, and an ordinary child would be saved into the
+	# level and turn up twice at runtime.
+	add_child(_snow, false, Node.INTERNAL_MODE_BACK)
 	_snow.top_level = true
 
 

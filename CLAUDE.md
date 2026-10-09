@@ -126,6 +126,21 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 - Blizzards: `NorthlightWeather.gd` schedules storms on the wall clock (like WildebeestHerd), drives the
   fog, sky, moon, wind audio and streaking snow, and pushes carts it has physics authority over; the
   cavern is sheltered. `force_intensity` pins it; `look_shots` and `ai_race_test` take `weather=0..1`.
+- The Thin Ice (`THIN_ICE_*`, `_plan_thin_ice`) skips the spire across the lake. It has road only to and
+  from the lake; across it (`_thin_plate`, a `voids` span in the road mesh) it is open ice: a 0.75m-grid
+  sheet (`_build_thin_ice_sheet`) copying the natural lake surface (`_icefield_natural`) over a lead cut
+  into the lake (`_apply_lead`), with the holes cut out of the sheet itself, since the terrain's 6.25m
+  grid can't hold a round hole. Pressure ridges either side stop the holes being driven round. The AI
+  follows its own S between the holes (the route's Path3D, held to it by the `ai_lane_limit` meta) and also
+  sees the holes as layer-4 markers. `_verify_thin_ice_line` checks that line's clearance from each hole.
+- Water is the `RiverWater` node (`NorthlightWater.gd`): `surface_at()` answers for the crevasse pool and
+  the lead. No checkpoint may sit on trunk a route bypasses (`_verify_checkpoints_clear_routes`), or a car
+  that takes the route never drives through it and its lap never counts.
+- `glacier_ice.gdshader` takes world normals through `MODEL_NORMAL_MATRIX`: the floes and seracs are
+  scaled very unevenly. `polar_night_ground.gdshader` samples its noise on the vertical planes on steep
+  faces (`surf_fbm`); sampled from above it is constant down a cliff and paints streaks and V shapes.
+  The heightfield splits each cell along the diagonal joining the closer heights
+  (`_build_heightfield_mesh`); one fixed diagonal saws steep slopes that cross it into teeth.
 - `res://scratch/ab_bench.tscn -- res://levels/X.tscn [samples=6] variant ...` switches variants
   (`storm`, `nolightshadow`, `nomoonshadow`, `unshadow=`, `sky=`, `hide=`, `cheapmat=`) back and forth
   within one run. On macOS, separate `bench.tscn` runs differ by up to 2x with the GPU's clock.

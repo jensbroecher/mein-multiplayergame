@@ -92,7 +92,10 @@ vec4 triplanar(sampler2D tex, vec3 p, vec3 w, float s) {
 
 void vertex() {
 	w_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	w_nrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
+	// The normal matrix, not MODEL_MATRIX: the floes and seracs are instanced with very uneven
+	// scales (a floe is 25m across and 0.4m thick), and MODEL_MATRIX tipped their sloped tops over
+	// to near-vertical, which painted them with side-wall streaks instead of frost.
+	w_nrm = normalize(MODEL_NORMAL_MATRIX * NORMAL);
 }
 
 void fragment() {
@@ -147,7 +150,10 @@ void fragment() {
 		float phase = fract((w_pos.y + wave) / strata_spacing);
 		float layer = smoothstep(0.80, 0.90, phase) * (1.0 - smoothstep(0.92, 1.0, phase));
 		float faint = smoothstep(0.35, 0.42, phase) * (1.0 - smoothstep(0.44, 0.50, phase)) * 0.45;
-		ice = mix(ice, deep_color.rgb * 0.85, (layer + faint) * strata_strength * detail);
+		// Layers are seen on the faces a block broke along, not on its top, where they would only
+		// trace the contours of the wobble noise.
+		float steep = 1.0 - smoothstep(0.35, 0.80, n.y);
+		ice = mix(ice, deep_color.rgb * 0.85, (layer + faint) * strata_strength * detail * steep);
 	}
 
 	vec3 albedo = mix(ice, frosted_color.rgb, frost * 0.9);

@@ -35,6 +35,7 @@ func _ready() -> void:
 	var best_prog := {}
 	var trail := {}
 	var under := {}
+	var on_route := {}
 	var t := 0.0
 	var next_report := 20.0
 	while t < seconds:
@@ -49,6 +50,11 @@ func _ready() -> void:
 		for c in carts:
 			if not is_instance_valid(c):
 				continue
+			var route: String = str(c.active_path.name) if c.on_alternative_path and c.active_path else ""
+			if route != str(on_route.get(c, "")):
+				if route != "":
+					print("ROUTE %s takes %s" % [c.name, route])
+				on_route[c] = route
 			var tele: bool = c.is_teleporting
 			if tele and not was_tele[c]:
 				var p: Vector3 = last_pos.get(c, c.global_position)

@@ -8,8 +8,9 @@
 # 190m translucent gallery with glowing veins and light shafts), comes out onto a high ice
 # shelf, crosses a 50m crevasse on a natural ice arch, sweeps through a field of seracs, and
 # climbs the Northlight Spire: a 285-degree spiral of ice that crosses back over its own run-in
-# and launches the cars off a lip, down a landing hill onto the lake. Two alternative routes: the
-# Meltwater Cut, a sunken frozen channel, and the Serac Ledge, a narrow shelf between ice towers.
+# and launches the cars off a lip, down a landing hill onto the lake. Three alternative routes: the
+# Meltwater Cut, a sunken frozen channel; the Serac Ledge, a narrow shelf between ice towers; and
+# the Thin Ice, which skips the spire across the lake on a plate of ice with holes broken in it.
 # Blizzards blow through at runtime (NorthlightWeather.gd).
 #
 # Four things are worth knowing before editing this file, because none of them are obvious
@@ -86,6 +87,8 @@ const BANK_PROFILE := [
 	Vector2(-0.70, -0.12),  # outer foot, spread onto the shoulder
 ]
 const BANK_VERTS := 6
+## How far below the deck a bank has sunk when its height factor reaches 0.
+const BANK_SINK := 0.65
 ## Metres over which a bank run tapers down to deck level at an open end, so a gap reads as
 ## a real sloped terminal instead of a sliver poking out of the road.
 const BANK_TERMINAL := 2.6
@@ -127,6 +130,8 @@ const LAKE_CENTER := Vector2(-150.0, 250.0)
 const LAKE_RADIUS := Vector2(172.0, 196.0)
 const LAKE_FEATHER := 26.0
 const LAKE_SURFACE_Y := 2.66
+## How far beyond the shore the surrounding ranges take to rise.
+const RANGE_SHORE_FADE := 140.0
 
 ## Glacier ridge built over the cavern stretch. The height along the ridge steps up over a
 ## few metres at each portal, which is what turns the mouth into a near-vertical ice face
@@ -152,6 +157,13 @@ const CREVASSE_HALF_W := 26.0
 const CREVASSE_DEPTH := 26.0
 ## Extra corridor radius either side of the slot that the road bridges rather than crosses.
 const CREVASSE_ABUTMENT := 10.0
+## The pool in the crevasse: a strip along the slot, shifted along it from the slot's centre. It
+## spans the whole slot and then some, so its edges are always buried in the slot walls; a pool
+## that stopped short of them left a gap you could see under the water through.
+const CREVASSE_POOL_Y := -6.0
+const CREVASSE_POOL_SHIFT := 0.0
+const CREVASSE_POOL_HALF_LEN := CREVASSE_HALF_LEN + 8.0
+const CREVASSE_POOL_HALF_W := CREVASSE_HALF_W + 9.0
 
 ## Northlight Spire: the return leg climbs a 285-degree spiral of ice around a tower of ice,
 ## crosses back over its own run-in on an ice arch, and launches off a lip onto a landing hill
@@ -199,6 +211,45 @@ const WALL_SPLAY := 0.16
 const SPIRE_CORE_RADIUS := 27.0
 ## Lateral grip of the ice roads, read by PlayerCart from the "ice_grip" meta.
 const ICE_GRIP := 0.5
+
+## The Thin Ice: a shortcut off the spire run-in, straight across the lake to the landing
+## run-out. Off the shore there is no road: it crosses the open lake on a sheet of thin ice over a
+## lead of water, between ridges of piled ice, and the ice is broken through in big holes. A cart
+## that drops through sinks, and comes back at the checkpoint before the split. It skips the whole
+## spire, and the holes are what it costs.
+const THIN_ICE_WIDTH := 18.0
+const THIN_ICE_HALF_W := 9.0
+const THIN_ICE_GRIP := 0.4
+## Height of the road where it meets the lake, so it runs flush onto the ice sheet.
+const THIN_ICE_DECK_Y := 2.74
+const THIN_ICE_WATER_Y := LAKE_SURFACE_Y - 0.3
+## The lead: a channel cut under the crossing, LEAD_HALF_W either side of it at LEAD_BED_Y,
+## shelving back up over LEAD_FEATHER, and tapering out over LEAD_TAPER at both ends.
+const LEAD_BED_Y := -3.0
+const LEAD_HALF_W := 22.0
+const LEAD_FEATHER := 6.0
+const LEAD_TAPER := 10.0
+## The sheet of lake ice over the lead reaches this far out from its centreline: past the lead's
+## edge, so the water only shows through the holes. Built at 0.75m, fine enough to cut round holes
+## in, where the terrain's 6.25m grid can't.
+const SHEET_REACH := 31.0
+const SHEET_CELL := 0.75
+## Ridges of piled ice either side of the crossing: RIDGE_START_LAT out where the road ends,
+## opening to RIDGE_LAT, so the holes can't simply be driven round on the open lake.
+const RIDGE_LAT := 23.0
+const RIDGE_START_LAT := THIN_ICE_HALF_W + 1.5
+## The AI's line: one slow S across the crossing, THIN_ICE_AI_WEAVE either side of the centreline.
+const THIN_ICE_AI_WEAVE := 5.0
+## Holes: [fraction of the crossing, lateral, radius]. Where the S swings out, one hole covers the
+## straight line and another the outside, so the way through is between them; at its middle a hole
+## either side leaves a gap down the centre.
+const THIN_ICE_HOLES := [
+	[0.25, -3.6, 5.0], [0.25, 12.5, 4.0],
+	[0.50, -8.0, 4.5], [0.50, 8.0, 4.5],
+	[0.75, 3.6, 5.0], [0.75, -12.5, 4.0],
+]
+## How far the AI's line may wander off its S (PlayerCart reads the path's "ai_lane_limit" meta).
+const THIN_ICE_AI_LANE := 0.6
 ## Ring spacing limit for the road meshes. Rings are dropped wherever the ones either side
 ## already describe the road to within RING_TOLERANCE, which on straights is most of them.
 const RING_MAX_STEP := 4.0
@@ -282,6 +333,19 @@ var _arch_off := -1.0
 ## Where the road stands on ice walls instead of graded ground, and where it has no deck at all.
 var _elevated_spans: Array = []
 var _void_spans: Array = []
+
+## The Thin Ice, filled in by _plan_thin_ice: the route's curve, the AI's line through the holes,
+## the holes (Vector4(x, z, radius, seed)) and their offsets along the route, the crossing (where
+## there is no road), where the route reaches the lake, and the lead's centreline for the terrain,
+## the ice sheet and the water.
+var _thin_curve: Curve3D
+var _thin_ai_curve: Curve3D
+var _thin_holes: Array = []
+var _thin_hole_offs := PackedFloat32Array()
+var _thin_plate := Vector2(-1.0, -1.0)
+var _thin_lake_from := 0.0
+var _lead_line := PackedVector2Array()
+var _lead_box := Rect2()
 
 ## The finished icefield heights, kept so meshes laid over the terrain afterwards (the cavern
 ## cap) can sit on the ground that was actually built.
@@ -413,7 +477,7 @@ func _build_closed_loop(points: Array, min_radius: float, shaped: Array = []) ->
 ## positions between the two noses; interior handles are derived against the trunk direction at
 ## each end, so the tangent stays continuous across the junction.
 func _build_route_curve(split_anchor: Vector3, merge_anchor: Vector3, side: int,
-		waypoints: Array) -> Curve3D:
+		waypoints: Array, nose_lateral: float = ROUTE_NOSE_LATERAL) -> Curve3D:
 	var split: Dictionary = _frame_at(main_track_curve, split_anchor)
 	var merge: Dictionary = _frame_at(main_track_curve, merge_anchor)
 	var s_fwd: Vector3 = split["fwd"]
@@ -430,8 +494,8 @@ func _build_route_curve(split_anchor: Vector3, merge_anchor: Vector3, side: int,
 	var length: float = main_track_curve.get_baked_length()
 	var fa: Dictionary = _frame_at_offset(main_track_curve, clampf(split["off"] + lead, 0.0, length))
 	var fb: Dictionary = _frame_at_offset(main_track_curve, clampf(merge["off"] - lead, 0.0, length))
-	var entry: Vector3 = fa["pos"] + fa["right"] * (float(side) * ROUTE_NOSE_LATERAL)
-	var exit_pt: Vector3 = fb["pos"] + fb["right"] * (float(side) * ROUTE_NOSE_LATERAL)
+	var entry: Vector3 = fa["pos"] + fa["right"] * (float(side) * nose_lateral)
+	var exit_pt: Vector3 = fb["pos"] + fb["right"] * (float(side) * nose_lateral)
 	var pts: Array = [nose_a, entry]
 	pts.append_array(waypoints)
 	pts.append(exit_pt)
@@ -538,6 +602,150 @@ func _shape_spire_handles(curve: Curve3D) -> void:
 	var down := Vector3(_spire_dir.x, -top_slope, _spire_dir.y).normalized()
 	curve.set_point_in(_spire_land_index, -down * 5.0)
 	curve.set_point_out(_spire_land_index, down * 5.0)
+
+
+## Rim radius of a hole (Vector4(x, z, radius, seed)) towards angle `ang`: round, with the
+## wobble of broken ice. Never more than 14% over the radius, which the AI's line allows for.
+func _hole_rim(h: Vector4, ang: float) -> float:
+	return h.z * (1.0 + 0.09 * sin(3.0 * ang + h.w) + 0.05 * sin(7.0 * ang + 2.3 * h.w))
+
+
+## Lays out the Thin Ice: the route's curve (on the trunk's right, which is west here, from the
+## spire run-in to the landing run-out), the crossing where it has no road, the holes in it, and
+## the AI's line between them.
+##
+## The AI follows its own curve across rather than the route's: an S between the holes, with
+## THIN_ICE_AI_LANE keeping it there. Drivers see the holes; the AI only knows its line.
+func _plan_thin_ice(curve: Curve3D) -> void:
+	var split_anchor: Vector3 = curve.sample_baked(_spire_range.x - 60.0)
+	var merge_anchor: Vector3 = curve.sample_baked(_spire_range.y + 65.0)
+	# The last waypoint is where the crossing ends: past it the route turns in for the merge, and
+	# the lead under it would undercut the trunk.
+	var y: float = THIN_ICE_DECK_Y
+	var last_wp := Vector3(-46.0, y, 262.0)
+	_thin_curve = _build_route_curve(split_anchor, merge_anchor, 1, [
+		Vector3(-6.0, y, 175.0),       # out onto the lake
+		Vector3(-30.0, y, 220.0),
+		last_wp,                       # the far end of the crossing
+	], MAIN_HALF_W + THIN_ICE_HALF_W + 0.5)
+	var length: float = _thin_curve.get_baked_length()
+
+	var start := -1.0
+	var off := 0.0
+	while off < length and start < 0.0:
+		var p: Vector3 = _thin_curve.sample_baked(off)
+		if ((Vector2(p.x, p.z) - LAKE_CENTER) / LAKE_RADIUS).length() < 0.9:
+			start = off
+		off += 1.0
+	_thin_lake_from = start
+	_thin_plate = Vector2(start + 8.0, _thin_curve.get_closest_offset(last_wp) + 6.0)
+
+	var plate_len: float = _thin_plate.y - _thin_plate.x
+	for i in range(THIN_ICE_HOLES.size()):
+		var spec: Array = THIN_ICE_HOLES[i]
+		var o: float = _thin_plate.x + plate_len * spec[0]
+		var spot: Dictionary = _point_on(_thin_curve, o, spec[1])
+		_thin_holes.append(Vector4(spot["pos"].x, spot["pos"].z, spec[2], 0.4 + 1.7 * float(i)))
+		_thin_hole_offs.append(o)
+
+	# The lead's centreline, ending exactly at both ends of the crossing so distance along it is
+	# distance along the crossing.
+	_lead_line = PackedVector2Array()
+	off = _thin_plate.x
+	while off < _thin_plate.y:
+		var q: Vector3 = _thin_curve.sample_baked(off)
+		_lead_line.append(Vector2(q.x, q.z))
+		off += 2.0
+	var q_end: Vector3 = _thin_curve.sample_baked(_thin_plate.y)
+	_lead_line.append(Vector2(q_end.x, q_end.z))
+	_lead_box = Rect2(_lead_line[0], Vector2.ZERO)
+	for q in _lead_line:
+		_lead_box = _lead_box.expand(q)
+	_lead_box = _lead_box.grow(SHEET_REACH + 2.0)
+
+	_thin_ai_curve = _thin_ai_line(length)
+	print("  thin ice: %.0fm route, open ice from %.0fm to %.0fm, %d holes" % [
+		length, _thin_plate.x, _thin_plate.y, _thin_holes.size()])
+
+
+## Lateral the AI's line keeps at `off` along the Thin Ice: one S across the crossing, and the
+## centreline on the road either side of it.
+func _thin_ai_lateral(off: float) -> float:
+	if off <= _thin_plate.x or off >= _thin_plate.y:
+		return 0.0
+	return THIN_ICE_AI_WEAVE * sin(TAU * (off - _thin_plate.x) / (_thin_plate.y - _thin_plate.x))
+
+
+## The AI's curve through the holes, a point every 3m, ending exactly on the deck's noses so the AI
+## joins and leaves it where the deck does.
+func _thin_ai_line(length: float) -> Curve3D:
+	var pts := PackedVector3Array()
+	var off := 0.0
+	while off < length:
+		var f: Dictionary = _frame_at_offset(_thin_curve, off)
+		pts.append(f["pos"] + f["right"] * _thin_ai_lateral(off))
+		off += 3.0
+	pts.append(_thin_curve.sample_baked(length))
+	var c := Curve3D.new()
+	c.bake_interval = BAKE_INTERVAL
+	for i in range(pts.size()):
+		var prev: Vector3 = pts[maxi(i - 1, 0)]
+		var nxt: Vector3 = pts[mini(i + 1, pts.size() - 1)]
+		var h: Vector3 = (nxt - prev) / 6.0
+		c.add_point(pts[i], -h, h)
+	return c
+
+
+## Fails the build if the AI's line comes within a car's width (plus its lane allowance) of any
+## hole's rim.
+func _verify_thin_ice_line() -> void:
+	var worst: float = INF
+	var worst_i := -1
+	for i in range(_thin_holes.size()):
+		var h: Vector4 = _thin_holes[i]
+		var off: float = _thin_hole_offs[i] - h.z - 4.0
+		while off <= _thin_hole_offs[i] + h.z + 4.0:
+			var f: Dictionary = _frame_at_offset(_thin_curve, off)
+			var p: Vector3 = f["pos"] + f["right"] * _thin_ai_lateral(off)
+			var gap: float = Vector2(p.x - h.x, p.z - h.y).length() - h.z * 1.14
+			if gap < worst:
+				worst = gap
+				worst_i = i
+			off += 0.5
+	var need: float = 1.0 + THIN_ICE_AI_LANE + 0.5
+	if worst < need:
+		push_error("The AI's line over the Thin Ice passes %.1fm from hole %d (needs %.1fm)" % [worst, worst_i, need])
+	else:
+		print("  thin ice AI line clears every hole by %.1fm" % worst)
+
+
+## Cuts the lead under the Thin Ice into the lake: LEAD_BED_Y within LEAD_HALF_W of the plate's
+## centreline, shelving back up to the lake ice over LEAD_FEATHER, and tapering out over
+## LEAD_TAPER at both ends of the plate.
+func _apply_lead(h: float, px: float, pz: float) -> float:
+	if _lead_line.size() < 2 or not _lead_box.has_point(Vector2(px, pz)):
+		return h
+	var near: Vector2 = _lead_nearest(px, pz)
+	var cut: float = 1.0 - smoothstep(LEAD_HALF_W, LEAD_HALF_W + LEAD_FEATHER, near.x)
+	cut *= smoothstep(0.0, LEAD_TAPER, near.y) * smoothstep(0.0, LEAD_TAPER, _thin_plate.y - _thin_plate.x - near.y)
+	return lerpf(h, minf(h, LEAD_BED_Y), cut)
+
+
+## Nearest point of the lead's centreline: (plan distance, metres along the plate from its start).
+func _lead_nearest(px: float, pz: float) -> Vector2:
+	var q := Vector2(px, pz)
+	var best := Vector2(INF, 0.0)
+	var along := 0.0
+	for i in range(_lead_line.size() - 1):
+		var a: Vector2 = _lead_line[i]
+		var ab: Vector2 = _lead_line[i + 1] - a
+		var seg: float = ab.length()
+		var t: float = clampf((q - a).dot(ab) / maxf(seg * seg, 1e-6), 0.0, 1.0)
+		var d: float = q.distance_to(a + ab * t)
+		if d < best.x:
+			best = Vector2(d, along + seg * t)
+		along += seg
+	return best
 
 
 ## Fails the generation if a baked centreline turns tighter than its own deck, which is what
@@ -851,7 +1059,7 @@ func _junction_gap_intervals(route_curve: Curve3D, route_half_w: float, trunk_ha
 ## A route leaves and rejoins the trunk, so it is *supposed* to touch it - but only at its two
 ## noses. Anywhere else the two decks sharing space means a crossing, which is what walls off a
 ## junction in a way nothing else in this file would catch.
-func _verify_route_vs_trunk(route: Curve3D, label: String) -> void:
+func _verify_route_vs_trunk(route: Curve3D, label: String, half_w: float = ROUTE_HALF_W) -> void:
 	var route_len: float = route.get_baked_length()
 	var step := 2.0
 	var trunk_len: float = main_track_curve.get_baked_length()
@@ -861,7 +1069,7 @@ func _verify_route_vs_trunk(route: Curve3D, label: String) -> void:
 	while off < route_len * 0.88:
 		var p: Vector3 = route.sample_baked(off)
 		var lat: float = absf(_lateral_offset(main_track_curve, p))
-		var ext: Vector2 = _route_deck_extents(lat, ROUTE_HALF_W, MAIN_HALF_W)
+		var ext: Vector2 = _route_deck_extents(lat, half_w, MAIN_HALF_W)
 		# The route's deck may reach the trunk edge (that is the gore) but never inside it.
 		var inside: float = MAIN_HALF_W - ext.x
 		if inside > 0.5:
@@ -960,7 +1168,8 @@ func _under_dip_at(t: float) -> float:
 ##
 ## `structure` describes the spire section, as distance-along spans: "elevated" stands on ice
 ## walls that reach the ground, "voids" have no road at all (the jump gap), and "openings" are
-## Vector2(centre, half length) where an elevated span arches over another road.
+## Vector2(centre, half length) where an elevated span arches over another road. The Thin Ice uses
+## "voids" too: across the lake it has no road at all.
 func _build_road_mesh(parent: Node, curve: Curve3D, width: float, node_name: String,
 		road_mat: Material, bank_mat: Material, under_mat: Material,
 		route_side: int, trunk_half_w: float,
@@ -1206,7 +1415,8 @@ func _build_road_mesh(parent: Node, curve: Curve3D, width: float, node_name: Str
 			var prof: Vector2 = BANK_PROFILE[k]
 			var n2: Vector2 = prof_nrm[k]
 			# Left edge: profile u runs toward the road (+lateral). Right edge: mirrored.
-			var v_l := p + frame * (d_l + shift + prof.x) + up * (prof.y * bank_left[i])
+			var bl: Vector2 = _bank_point(prof, bank_left[i], width_now)
+			var v_l := p + frame * (d_l + shift + bl.x) + up * bl.y
 			st_bank.set_normal((right * n2.x + up * n2.y).normalized())
 			st_bank.set_uv(Vector2(0.0, uv_y * 0.3))
 			st_bank.add_vertex(v_l)
@@ -1214,7 +1424,8 @@ func _build_road_mesh(parent: Node, curve: Curve3D, width: float, node_name: Str
 		for k in range(BANK_VERTS):
 			var prof: Vector2 = BANK_PROFILE[k]
 			var n2: Vector2 = prof_nrm[k]
-			var v_r := p + frame * (d_r + shift - prof.x) + up * (prof.y * bank_right[i])
+			var br: Vector2 = _bank_point(prof, bank_right[i], width_now)
+			var v_r := p + frame * (d_r + shift - br.x) + up * br.y
 			st_bank.set_normal((-right * n2.x + up * n2.y).normalized())
 			st_bank.set_uv(Vector2(1.0, uv_y * 0.3))
 			st_bank.add_vertex(v_r)
@@ -1406,6 +1617,20 @@ func _build_road_mesh(parent: Node, curve: Curve3D, width: float, node_name: Str
 	parent.add_child(bank_body)
 
 
+## Where a bank profile point goes at bank height factor `h` (0..1), as (inward from the deck edge,
+## up from the deck), on a deck `width` wide.
+##
+## A bank on its way out sinks into the deck rather than flattening onto it: squashed flat, its
+## faces lay a few millimetres off the road surface and fought it for the pixels, which is the
+## flicker at every bank end. Its road-side toe also never reaches further in than half the deck,
+## or at a route's nose, where the deck is a sliver, the bank lay across the trunk's lane.
+func _bank_point(prof: Vector2, h: float, width: float) -> Vector2:
+	var x: float = prof.x
+	if x > 0.0:
+		x = minf(x, maxf(width * 0.5, 0.2))
+	return Vector2(x, prof.y * h - BANK_SINK * (1.0 - h))
+
+
 ## Picks the baked rings a road mesh keeps. From each kept ring it reaches as far ahead as it can
 ## while every ring it skips is reproduced by interpolating the two ends to within RING_TOLERANCE:
 ## centreline, both deck edges (which catches the frame turning and the width changing), bank
@@ -1536,6 +1761,23 @@ func _in_any_gap(dist: float, gaps: Array) -> bool:
 		if dist >= gap.x and dist <= gap.y:
 			return true
 	return false
+
+
+## Fails the build if a checkpoint sits on the stretch of trunk a route bypasses. The gate is on
+## the trunk, so a car that takes the route never passes through it and its lap never counts.
+func _verify_checkpoints_clear_routes(cp_offsets: Array, routes: Array) -> void:
+	var bad := 0
+	for entry in routes:
+		var rc: Curve3D = entry[0]
+		var a: float = main_track_curve.get_closest_offset(rc.sample_baked(0.0))
+		var b: float = main_track_curve.get_closest_offset(rc.sample_baked(rc.get_baked_length()))
+		for i in range(cp_offsets.size()):
+			if cp_offsets[i] > a - 15.0 and cp_offsets[i] < b + 15.0:
+				bad += 1
+				push_error("Checkpoint %d at %.0fm is on the trunk the %s bypasses (%.0fm to %.0fm)" % [
+					i + 1, cp_offsets[i], entry[2], a, b])
+	if bad == 0:
+		print("  every checkpoint is on the way round for every route")
 
 
 ## Distance along `curve` of its nearest point to `p`. Placements are anchored to where they sit
@@ -1689,7 +1931,7 @@ const CAP_COVER := 6.0
 ## How far the cap starts behind each portal plane. The portal face leans back across this gap,
 ## from the arch outline to the cap, so the mouth is a sloped face rather than a sheer cut.
 const CAP_FACE_SETBACK := 8.0
-const CAP_LAT_SAMPLES := 29
+const CAP_LAT_SAMPLES := 45
 const CAP_FACE_ROWS := 5
 
 
@@ -1829,9 +2071,22 @@ func _build_cavern_cap(parent: Node, ground_mat: Material) -> void:
 	# with the middle rows pushed about by noise so the face is broken rock, not a ruled surface.
 	for end in [[start, start + CAP_FACE_SETBACK, -1.0], [finish, finish - CAP_FACE_SETBACK, 1.0]]:
 		var f: Dictionary = _frame_at_offset(main_track_curve, end[0])
+		# The face's inner edge is the arch AND the ground either side of it out to the cap's edge.
+		# Joined to the arch alone, the face left a slot under itself beside the shell at car height,
+		# and a cart could drive in under the mountain.
 		var outline := PackedVector3Array()
-		for prof in CAVERN_PROFILE:
-			outline.append(f["pos"] + f["right"] * prof.x + Vector3.UP * prof.y)
+		for s2 in [-1.0, 1.0]:
+			if s2 > 0.0:
+				for prof in CAVERN_PROFILE:
+					outline.append(f["pos"] + f["right"] * prof.x + Vector3.UP * prof.y)
+			for k in range(4):
+				var u: float = lerpf(CAVERN_HALF_WIDTH + 1.0, CAP_HALF_W, float(k) / 3.0) * s2
+				var q: Vector3 = f["pos"] + f["right"] * u
+				q.y = _terrain_height_at(q.x, q.z) - 2.5
+				if s2 < 0.0:
+					outline.insert(0, q)
+				else:
+					outline.append(q)
 		var inner: PackedVector3Array = _resample_polyline(outline, CAP_LAT_SAMPLES)
 		var outer: PackedVector3Array = _cap_section(end[1])
 		var outward: Vector3 = f["fwd"] * end[2]
@@ -1883,7 +2138,8 @@ func _build_portal_ring(parent: Node, ice_mat: Material, off: float, dir: float)
 	off = clampf(off, 0.0, length)
 	var f: Dictionary = _frame_at_offset(main_track_curve, off)
 
-	var ring := Node3D.new()
+	# A body, not a plain Node3D: the blocks' collision shapes only collide under one.
+	var ring := StaticBody3D.new()
 	ring.name = "PortalRing_%d" % int(off)
 	ring.position = f["pos"]
 	var yaw: float = rad_to_deg(atan2(-f["fwd"].x, -f["fwd"].z))
@@ -2195,8 +2451,15 @@ func _cavern_mass(px: float, pz: float) -> float:
 
 
 ## Natural polar ground: a wind-worked icefield, a dead-flat frozen lake on the start straight,
-## the glacier mass over the cavern, and ridged ranges closing in beyond the valley shoulder.
+## the glacier mass over the cavern, and ridged ranges closing in beyond the valley shoulder, with
+## the lead cut under the Thin Ice.
 func _icefield_height(px: float, pz: float) -> float:
+	return _apply_lead(_icefield_natural(px, pz), px, pz)
+
+
+## The icefield as nature made it, before the lead is cut under the Thin Ice: the ice sheet laid
+## over the lead copies this surface.
+func _icefield_natural(px: float, pz: float) -> float:
 	# The lake mask is needed first so the ground *approaching* the shore can be calmed as well.
 	# Snow noise that survives right up to the water's edge is what turns a shoreline into a 2m
 	# ice cliff instead of a beach of drifted ice.
@@ -2224,7 +2487,10 @@ func _icefield_height(px: float, pz: float) -> float:
 	var flank: float = smoothstep(140.0, 400.0, absf(px - axis_x))
 	var north: float = smoothstep(400.0, 700.0, -(pz + 20.0))
 	var south: float = smoothstep(440.0, 720.0, pz + 20.0)
-	var mask: float = maxf(maxf(flank, north), south) * (1.0 - lake)
+	# The ranges stay down for a good way past the shore as well. Suppressed over the lake alone,
+	# they rose 150m inside its 26m feather, and the west shore was a sheer wall.
+	var shore: float = 1.0 - smoothstep(1.0, 1.0 + RANGE_SHORE_FADE / LAKE_RADIUS.x, lp.length())
+	var mask: float = maxf(maxf(flank, north), south) * (1.0 - shore)
 	var ridge: float = clampf(_ridge_noise.get_noise_2d(px, pz) * 0.5 + 0.5, 0.0, 1.0)
 	h += mask * 16.0 + pow(mask, 2.2) * 130.0 + mask * 40.0 * ridge
 
@@ -2257,15 +2523,28 @@ func _build_heightfield_mesh(heights: PackedFloat32Array, stride: int, res: int,
 			st.set_normal(Vector3(h_l - h_r, dx, h_d - h_u).normalized())
 			st.set_uv(Vector2(px, pz))
 			st.add_vertex(Vector3(px, h, pz))
+	# Each cell is split along whichever diagonal joins the closer heights. Splitting every cell
+	# the same way turns a steep slope running across the grid's diagonal (the crevasse walls, the
+	# range faces) into a row of sawteeth.
 	for gz in range(res):
 		for gx in range(res):
 			var i: int = gz * stride + gx
-			st.add_index(i)
-			st.add_index(i + 1)
-			st.add_index(i + stride)
-			st.add_index(i + 1)
-			st.add_index(i + stride + 1)
-			st.add_index(i + stride)
+			var d_main: float = absf(heights[i] - heights[i + stride + 1])
+			var d_anti: float = absf(heights[i + 1] - heights[i + stride])
+			if d_anti <= d_main:
+				st.add_index(i)
+				st.add_index(i + 1)
+				st.add_index(i + stride)
+				st.add_index(i + 1)
+				st.add_index(i + stride + 1)
+				st.add_index(i + stride)
+			else:
+				st.add_index(i)
+				st.add_index(i + stride + 1)
+				st.add_index(i + stride)
+				st.add_index(i)
+				st.add_index(i + 1)
+				st.add_index(i + stride + 1)
 	st.generate_tangents()
 	return st.commit()
 
@@ -2583,6 +2862,8 @@ func _make_fractured_block(rng: RandomNumberGenerator, sides: int, taper: float,
 				st.set_normal(pl.normal)
 				st.set_uv(Vector2(v.x + v.z, v.y))
 				st.add_vertex(v)
+	# Tangents for the shader's normal map; without them it is applied in a garbage frame.
+	st.generate_tangents()
 	var shape := ConvexPolygonShape3D.new()
 	shape.points = pts
 	return {"mesh": st.commit(), "shape": shape, "points": pts}
@@ -3099,6 +3380,9 @@ func _build_edge_markers(parent: Node, curve: Curve3D, label: String,
 			# the spire's own light covers that stretch.
 			if _in_any_gap(off, _elevated_spans):
 				continue
+		# Beside the Thin Ice the "ground" is the bed of the lead.
+		if curve == _thin_curve and off > _thin_plate.x - 25.0 and off < _thin_plate.y + 25.0:
+			continue
 		var side: float = 1.0 if (i % 2 == 0) else -1.0
 		var gaps: Array = right_gaps if side > 0 else left_gaps
 		if not gaps.is_empty() and _bank_factor_at(off, gaps) < 0.6:
@@ -3107,7 +3391,11 @@ func _build_edge_markers(parent: Node, curve: Curve3D, label: String,
 		# so 10.2m is clear of both with room for the pole.
 		var lat: float = side * (_road_half_width(curve) + 2.7)
 		var foot_xz: Vector3 = p + f["right"] * lat
-		var ground: float = _graded_height(foot_xz.x, foot_xz.z)
+		# The ground that is really there, crevasse and lead included. Where it falls away well
+		# below the road (the crevasse, the spire, water) there is nothing to stand a lamp on.
+		var ground: float = _final_ground(foot_xz.x, foot_xz.z)
+		if ground < p.y - 2.5:
+			continue
 
 		var node := StaticBody3D.new()
 		node.name = "Marker_%d_%d" % [i, int(side)]
@@ -3218,7 +3506,9 @@ func _make_lamp_crystal_mesh() -> ArrayMesh:
 ## Deck half width of a road, so the marker stakes are driven into the crown of the bank and
 ## cannot drift off it if a road width is ever retuned.
 func _road_half_width(curve: Curve3D) -> float:
-	return ROUTE_HALF_W if curve != main_track_curve else MAIN_HALF_W
+	if curve == main_track_curve:
+		return MAIN_HALF_W
+	return THIN_ICE_HALF_W if curve == _thin_curve else ROUTE_HALF_W
 
 
 ## A pair of tall ice pylons flanking the trunk at each route split, with glowing caps. These
@@ -3288,27 +3578,27 @@ func _build_junction_pylons(parent: Node, ice_mat: Material, routes: Array) -> v
 ## The slot floor drops to -22m mid-span while the bridge deck crosses at +10m, so a plane at -6m
 ## sits 16m under the cars and 16m over the deepest floor: deep, still, black water that catches
 ## the arch lights. Shaped as a strip along the slot rather than a disc, so it cannot disagree
-## with the slot about where the water ends.
-##
-## The node name has to contain "Water": PlayerCart has no TerrainGenerator to ask on this stage,
-## so it falls back to level.find_child("*Water*") and reads water_surface_y and the bounds off
-## its metadata. Miss either and cars drive through the slot without a splash.
+## with the slot about where the water ends. Carts find it through the "RiverWater" node
+## (_build_water_zones), which uses the same CREVASSE_POOL_* figures.
 func _build_crevasse_water(parent: Node) -> void:
-	var water_y := -6.0
 	var dir := CREVASSE_DIR
-	var half_len := 75.0
-	var half_w := 20.0
-	var center := CREVASSE_CENTER + dir * -35.0
-
+	var center: Vector2 = CREVASSE_CENTER + dir * CREVASSE_POOL_SHIFT
 	var node := MeshInstance3D.new()
 	node.name = "CrevasseWater"
 	var plane := PlaneMesh.new()
-	plane.size = Vector2(half_w * 2.0, half_len * 2.0)
+	plane.size = Vector2(CREVASSE_POOL_HALF_W * 2.0, CREVASSE_POOL_HALF_LEN * 2.0)
 	node.mesh = plane
-	node.position = Vector3(center.x, water_y, center.y)
+	node.position = Vector3(center.x, CREVASSE_POOL_Y, center.y)
 	# PlaneMesh's long axis is Z: yaw it onto the slot direction.
 	node.rotation_degrees = Vector3(0.0, rad_to_deg(atan2(dir.x, dir.y)), 0.0)
+	node.material_override = _dark_water_material()
+	parent.add_child(node)
 
+
+## The still black water of the crevasse and the lead. The lead's is darker and duller still: it
+## is seen from a car's height through holes in pale ice, and at that angle a glossy surface
+## mirrors the sky as brightly as the ice around it and the hole stops reading as a hole.
+func _dark_water_material(lead: bool = false) -> ShaderMaterial:
 	var noise := FastNoiseLite.new()
 	noise.seed = 77031
 	noise.frequency = 0.02
@@ -3316,7 +3606,6 @@ func _build_crevasse_water(parent: Node) -> void:
 	noise_tex.seamless = true
 	noise_tex.as_normal_map = true
 	noise_tex.noise = noise
-
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://water.gdshader")
 	mat.set_shader_parameter("noise_tex", noise_tex)
@@ -3327,15 +3616,367 @@ func _build_crevasse_water(parent: Node) -> void:
 	mat.set_shader_parameter("transparency", 0.45)
 	mat.set_shader_parameter("metallic", 0.60)
 	mat.set_shader_parameter("roughness", 0.10)
-	node.material_override = mat
+	if lead:
+		mat.set_shader_parameter("water_color", Color(0.003, 0.010, 0.022))
+		mat.set_shader_parameter("shallow_color", Color(0.01, 0.035, 0.06))
+		mat.set_shader_parameter("sky_reflect", 0.22)
+		mat.set_shader_parameter("transparency", 0.15)
+		mat.set_shader_parameter("metallic", 0.3)
+		mat.set_shader_parameter("roughness", 0.22)
+	return mat
 
-	# Bounds the cart checks against, as the strip's own AABB.
-	var ex := absf(dir.x) * half_len + absf(dir.y) * half_w
-	var ez := absf(dir.y) * half_len + absf(dir.x) * half_w
-	node.set_meta("water_surface_y", water_y)
-	node.set_meta("water_bounds_min", Vector2(center.x - ex, center.y - ez))
-	node.set_meta("water_bounds_max", Vector2(center.x + ex, center.y + ez))
-	parent.add_child(node)
+
+## The water carts can sink in: one node, named "RiverWater" so PlayerCart finds it, answering
+## surface_at() for the crevasse pool and the lead (NorthlightWater.gd). It has to sit directly
+## under the level root.
+func _build_water_zones(level_root: Node) -> void:
+	var node := Node3D.new()
+	node.name = "RiverWater"
+	node.set_script(load("res://NorthlightWater.gd"))
+	var center: Vector2 = CREVASSE_CENTER + CREVASSE_DIR * CREVASSE_POOL_SHIFT
+	node.set("crevasse_center", center)
+	node.set("crevasse_dir", CREVASSE_DIR)
+	node.set("crevasse_half_len", CREVASSE_POOL_HALF_LEN)
+	node.set("crevasse_half_w", CREVASSE_POOL_HALF_W)
+	node.set("crevasse_y", CREVASSE_POOL_Y)
+	node.set("lead_line", _lead_line)
+	node.set("lead_half_w", LEAD_HALF_W)
+	node.set("lead_y", THIN_ICE_WATER_Y)
+	var ex: float = absf(CREVASSE_DIR.x) * CREVASSE_POOL_HALF_LEN + absf(CREVASSE_DIR.y) * CREVASSE_POOL_HALF_W
+	var ez: float = absf(CREVASSE_DIR.y) * CREVASSE_POOL_HALF_LEN + absf(CREVASSE_DIR.x) * CREVASSE_POOL_HALF_W
+	var bounds := Rect2(center - Vector2(ex, ez), Vector2(ex, ez) * 2.0)
+	bounds = bounds.merge(_lead_box)
+	node.set("water_bounds", bounds)
+	level_root.add_child(node)
+
+
+## Everything on the Thin Ice crossing, where the route has no road: the sheet of lake ice with the
+## holes broken through it, the water under it, the broken edges of the holes and the shards
+## floating in them, the slush heaped round them, the ridges of piled ice either side, and the
+## markers the AI steers round.
+func _build_thin_ice(parent: Node, ground_mat: Material, edge_mat: Material, rubble_mat: Material) -> void:
+	var root := Node3D.new()
+	root.name = "ThinIceCrossing"
+	parent.add_child(root)
+	_build_thin_ice_sheet(root, ground_mat)
+	_build_thin_ice_water(root)
+	_build_thin_ice_holes(root, edge_mat, rubble_mat)
+	_build_pressure_ridges(root, rubble_mat)
+
+
+## Where a point sits relative to the lead's centreline: (distance from it, metres along the
+## crossing, signed lateral). Past either end the distance along carries on along the end segment,
+## so the sheet can be cut off square at both ends of the crossing.
+func _lead_frame(px: float, pz: float) -> Vector3:
+	var q := Vector2(px, pz)
+	var best := Vector3(INF, 0.0, 0.0)
+	var along := 0.0
+	var last: int = _lead_line.size() - 2
+	for i in range(last + 1):
+		var a: Vector2 = _lead_line[i]
+		var ab: Vector2 = _lead_line[i + 1] - a
+		var seg: float = maxf(ab.length(), 1e-4)
+		var t: float = (q - a).dot(ab) / (seg * seg)
+		if i > 0:
+			t = maxf(t, 0.0)
+		if i < last:
+			t = minf(t, 1.0)
+		var on: Vector2 = a + ab * t
+		var d: float = q.distance_to(on)
+		if d < best.x:
+			var side: float = signf(ab.x * (q.y - a.y) - ab.y * (q.x - a.x))
+			best = Vector3(d, along + seg * t, d * side)
+		along += seg
+	return best
+
+
+## Height of the ice sheet at a point with lead frame `fr` (see _lead_frame): the lake surface as
+## the terrain would have had it, just above it; flush with the road where the road runs onto the
+## ice; and sunk just under the lake round its edges, so its border never shows as a lip.
+func _sheet_y(x: float, z: float, fr: Vector3) -> float:
+	var span: float = _thin_plate.y - _thin_plate.x
+	var h: float = _icefield_natural(x, z) + 0.08
+	var road_zone: float = 1.0 - smoothstep(THIN_ICE_HALF_W + 0.5, THIN_ICE_HALF_W + 4.0, fr.x)
+	h = lerpf(h, _thin_curve.sample_baked(_thin_plate.x).y, (1.0 - smoothstep(0.0, 6.0, fr.y)) * road_zone)
+	h = lerpf(h, _thin_curve.sample_baked(_thin_plate.y).y, (1.0 - smoothstep(0.0, 6.0, span - fr.y)) * road_zone)
+	var edge: float = smoothstep(SHEET_REACH - 2.5, SHEET_REACH, fr.x)
+	var ends: float = (1.0 - smoothstep(0.0, 3.0, minf(fr.y, span - fr.y))) * (1.0 - road_zone)
+	return h - maxf(edge, ends) * 0.4
+
+
+## The sheet of thin ice across the lead: a 0.75m grid in plan over the crossing, out to
+## SHEET_REACH and cut off square at both ends, with the holes broken through it. A grid vertex
+## inside a hole moves out onto the hole's rim, and a triangle whose corners all started inside is
+## part of the hole and is left out. Drawn with the ground's own material (which paints by world
+## position, so it is the lake carrying on) and part of the track like the lake, but slippery.
+func _build_thin_ice_sheet(parent: Node, ground_mat: Material) -> void:
+	var span: float = _thin_plate.y - _thin_plate.x
+	var box: Rect2 = _lead_box
+	var nx: int = int(ceil(box.size.x / SHEET_CELL)) + 1
+	var nz: int = int(ceil(box.size.y / SHEET_CELL)) + 1
+	var idx := PackedInt32Array()
+	idx.resize(nx * nz)
+	idx.fill(-1)
+	var inside := PackedByteArray()
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var count := 0
+	for iz in range(nz):
+		for ix in range(nx):
+			var x: float = box.position.x + float(ix) * SHEET_CELL
+			var z: float = box.position.y + float(iz) * SHEET_CELL
+			var fr: Vector3 = _lead_frame(x, z)
+			if fr.y < -0.01 or fr.y > span + 0.01 or fr.x > SHEET_REACH:
+				continue
+			var ins := 0
+			for h in _thin_holes:
+				var rel := Vector2(x - h.x, z - h.y)
+				var rim: float = _hole_rim(h, atan2(rel.y, rel.x))
+				if rel.length() < rim:
+					var dir: Vector2 = rel.normalized() if rel.length() > 0.001 else Vector2(1.0, 0.0)
+					x = h.x + dir.x * rim
+					z = h.y + dir.y * rim
+					fr = _lead_frame(x, z)
+					ins = 1
+					break
+			st.set_uv(Vector2(x, z))
+			st.add_vertex(Vector3(x, _sheet_y(x, z, fr), z))
+			idx[iz * nx + ix] = count
+			inside.append(ins)
+			count += 1
+	for iz in range(nz - 1):
+		for ix in range(nx - 1):
+			var a: int = idx[iz * nx + ix]
+			var b: int = idx[iz * nx + ix + 1]
+			var c: int = idx[(iz + 1) * nx + ix]
+			var d: int = idx[(iz + 1) * nx + ix + 1]
+			if a < 0 or b < 0 or c < 0 or d < 0:
+				continue
+			# Same winding as the terrain grid (_build_heightfield_mesh), which faces up.
+			if not (inside[a] and inside[b] and inside[c]):
+				st.add_index(a); st.add_index(b); st.add_index(c)
+			if not (inside[b] and inside[d] and inside[c]):
+				st.add_index(b); st.add_index(d); st.add_index(c)
+	st.generate_normals()
+	st.generate_tangents()
+	var mesh: ArrayMesh = _save_baked_resource(st.commit(), "thin_ice_sheet")
+
+	var mat: ShaderMaterial = (ground_mat as ShaderMaterial).duplicate()
+	mat.set_shader_parameter("holes", PackedVector4Array(_thin_holes))
+	mat.set_shader_parameter("hole_count", _thin_holes.size())
+	var body := StaticBody3D.new()
+	body.name = "ThinIceSheet"
+	body.add_to_group("track_surface", true)
+	body.set_meta("ice_grip", THIN_ICE_GRIP)
+	var mi := MeshInstance3D.new()
+	mi.name = "SheetMesh"
+	mi.mesh = mesh
+	mi.material_override = mat
+	body.add_child(mi)
+	var cs := CollisionShape3D.new()
+	cs.name = "SheetCollision"
+	var shape: ConcavePolygonShape3D = mesh.create_trimesh_shape()
+	shape.backface_collision = true
+	cs.shape = _save_baked_resource(shape, "thin_ice_sheet_collision")
+	body.add_child(cs)
+	parent.add_child(body)
+	print("  thin ice sheet: %d vertices" % count)
+
+
+## The lead's water, a ribbon down the crossing out past the lead's edge, so wherever the lead is
+## cut there is water over its floor. Only the holes ever show it.
+func _build_thin_ice_water(parent: Node) -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var half: float = LEAD_HALF_W + LEAD_FEATHER + 1.0
+	var rows := 0
+	var off: float = _thin_plate.x
+	while true:
+		var f: Dictionary = _frame_at_offset(_thin_curve, minf(off, _thin_plate.y))
+		for s in [-1.0, 1.0]:
+			var v: Vector3 = f["pos"] + f["right"] * (half * s)
+			v.y = THIN_ICE_WATER_Y
+			st.set_uv(Vector2(v.x * 0.05, v.z * 0.05))
+			st.add_vertex(v)
+		rows += 1
+		if off >= _thin_plate.y:
+			break
+		off += 3.0
+	for r in range(rows - 1):
+		var a: int = r * 2
+		# Front faces up: (c - a) x (b - a) along +Y (see _build_cavern_cap).
+		st.add_index(a); st.add_index(a + 2); st.add_index(a + 1)
+		st.add_index(a + 1); st.add_index(a + 2); st.add_index(a + 3)
+	st.generate_normals()
+	var water := MeshInstance3D.new()
+	water.name = "ThinIceLeadWater"
+	water.mesh = _save_baked_resource(st.commit(), "thin_ice_lead_water")
+	water.material_override = _dark_water_material(true)
+	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(water)
+
+
+## Each hole: a broken edge of ice from the sheet down into the water, so a hole shows the ice's
+## thickness instead of a paper edge; shards of the ice that went through, afloat; a ring of
+## broken chunks heaped round the rim, which is what makes a hole readable from a car at speed;
+## and a marker the AI's obstacle feelers see.
+func _build_thin_ice_holes(parent: Node, edge_mat: Material, rubble_mat: Material) -> void:
+	var lib: Array = _serac_library()
+	var floe: Dictionary = lib[lib.size() - 1]
+	var chunk: Dictionary = lib[2]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 0x5448494E  # "THIN"
+	var shard_xf: Array = []
+	var chunk_xf: Array = []
+	var es := SurfaceTool.new()
+	es.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var base := 0
+	for i in range(_thin_holes.size()):
+		var h: Vector4 = _thin_holes[i]
+		var segs := 56
+		for k in range(segs + 1):
+			var ang: float = TAU * float(k) / float(segs)
+			var rim: float = _hole_rim(h, ang)
+			var x: float = h.x + cos(ang) * rim
+			var z: float = h.y + sin(ang) * rim
+			var top: float = _sheet_y(x, z, _lead_frame(x, z))
+			# Normals point into the hole: that is the face anyone looking down into it sees.
+			var n := Vector3(-cos(ang), 0.0, -sin(ang))
+			es.set_normal(n)
+			es.set_uv(Vector2(float(k) / float(segs), 0.0))
+			es.add_vertex(Vector3(x, top + 0.02, z))
+			es.set_normal(n)
+			es.set_uv(Vector2(float(k) / float(segs), 1.0))
+			es.add_vertex(Vector3(x, THIN_ICE_WATER_Y - 0.6, z))
+		for k in range(segs):
+			var a: int = base + k * 2
+			es.add_index(a); es.add_index(a + 2); es.add_index(a + 1)
+			es.add_index(a + 1); es.add_index(a + 2); es.add_index(a + 3)
+		base += (segs + 1) * 2
+
+		for k in range(rng.randi_range(4, 7)):
+			var sw: float = h.z * rng.randf_range(0.10, 0.22)
+			var ang2: float = rng.randf_range(0.0, TAU)
+			var dist2: float = h.z * rng.randf_range(0.15, 0.7)
+			var b := Basis.from_euler(Vector3(deg_to_rad(rng.randf_range(-8.0, 8.0)), rng.randf_range(0.0, TAU),
+					deg_to_rad(rng.randf_range(-8.0, 8.0)))) * Basis.from_scale(
+					Vector3(sw, rng.randf_range(0.10, 0.18), sw * rng.randf_range(0.6, 1.0)))
+			shard_xf.append(Transform3D(b, Vector3(h.x + cos(ang2) * dist2, THIN_ICE_WATER_Y + 0.02, h.y + sin(ang2) * dist2)))
+		var n_chunks: int = int(h.z * 6.0)
+		for k in range(n_chunks):
+			var ang3: float = TAU * (float(k) + rng.randf_range(-0.3, 0.3)) / float(n_chunks)
+			var at: float = _hole_rim(h, ang3) + rng.randf_range(0.15, 0.9)
+			var cx: float = h.x + cos(ang3) * at
+			var cz: float = h.y + sin(ang3) * at
+			var cw: float = rng.randf_range(0.22, 0.55)
+			var ch: float = rng.randf_range(0.25, 0.6)
+			var b2 := Basis.from_euler(Vector3(deg_to_rad(rng.randf_range(-25.0, 25.0)), rng.randf_range(0.0, TAU),
+					deg_to_rad(rng.randf_range(-25.0, 25.0)))) * Basis.from_scale(Vector3(cw, ch, cw * rng.randf_range(0.6, 1.1)))
+			# Half sunk into the ice, so they read as heaped slush rather than dropped blocks.
+			chunk_xf.append(Transform3D(b2, Vector3(cx, _sheet_y(cx, cz, _lead_frame(cx, cz)) + ch * 0.18, cz)))
+
+		# Seen by the AI's obstacle feelers (they look at layer value 4) but not by the carts, the
+		# same trick as the herd on Mara Crossing. Low, so a bomb that lands on one rests at about
+		# the height of the ice.
+		var marker := StaticBody3D.new()
+		marker.name = "ThinIceHoleBarrier_%d" % i
+		marker.collision_layer = 4
+		marker.collision_mask = 0
+		marker.position = Vector3(h.x, _sheet_y(h.x, h.y, _lead_frame(h.x, h.y)) + 0.5, h.y)
+		var cs := CollisionShape3D.new()
+		cs.name = "HoleMarker"
+		var cyl := CylinderShape3D.new()
+		cyl.radius = h.z * 0.9
+		cyl.height = 0.6
+		cs.shape = cyl
+		marker.add_child(cs)
+		parent.add_child(marker)
+	es.generate_tangents()
+	var edges := MeshInstance3D.new()
+	edges.name = "ThinIceHoleEdges"
+	edges.mesh = _save_baked_resource(es.commit(), "thin_ice_hole_edges")
+	edges.material_override = edge_mat
+	edges.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(edges)
+	parent.add_child(_multimesh_of("HoleShards", floe["mesh"], shard_xf, edge_mat))
+	parent.add_child(_multimesh_of("HoleRubble", chunk["mesh"], chunk_xf, rubble_mat))
+
+
+## Ridges of ice piled up along both sides of the crossing, where the lead's ice has pressed
+## against the lake's: from just outside the road's banks where the road ends, opening out to
+## RIDGE_LAT. Without them the holes could simply be driven round on the open lake. One body with
+## a convex shape per block, drawn as a MultiMesh per block shape.
+func _build_pressure_ridges(parent: Node, mat: Material) -> void:
+	var lib: Array = _serac_library()
+	var picks: Array = [0, 1, 3, 5, 6]
+	var xforms: Dictionary = {}
+	for pk in picks:
+		xforms[pk] = []
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 0x52494447  # "RIDG"
+	var body := StaticBody3D.new()
+	body.name = "ThinIcePressureRidges"
+	var span: float = _thin_plate.y - _thin_plate.x
+	var blocks := 0
+	for side in [-1.0, 1.0]:
+		var along := 0.8
+		while along < span - 0.8:
+			var open_t: float = smoothstep(0.0, 16.0, along) * smoothstep(0.0, 16.0, span - along)
+			var f: Dictionary = _frame_at_offset(_thin_curve, _thin_plate.x + along)
+			for row in range(2):
+				# The second row heaps lower, further out, and only now and then.
+				if row == 1 and rng.randf() < 0.45:
+					continue
+				var lat: float = lerpf(RIDGE_START_LAT, RIDGE_LAT, open_t) + rng.randf_range(-0.6, 0.6) + float(row) * 1.8
+				var pos: Vector3 = f["pos"] + f["right"] * (lat * side)
+				var pk: int = picks[rng.randi_range(0, picks.size() - 1)]
+				var w: float = rng.randf_range(1.1, 1.9) * (0.75 if row == 1 else 1.0)
+				var hgt: float = rng.randf_range(1.2, 2.4) * (0.7 if row == 1 else 1.0)
+				var basis := Basis.from_euler(Vector3(deg_to_rad(rng.randf_range(-12.0, 12.0)), rng.randf_range(0.0, TAU),
+						deg_to_rad(rng.randf_range(-12.0, 12.0)))) * Basis.from_scale(Vector3(w, hgt, w * rng.randf_range(0.8, 1.2)))
+				pos.y = _sheet_y(pos.x, pos.z, _lead_frame(pos.x, pos.z)) + hgt * 0.5 - hgt * 0.3
+				var xf := Transform3D(basis, pos)
+				xforms[pk].append(xf)
+				var cs := CollisionShape3D.new()
+				cs.name = "RidgeBlock_%d" % blocks
+				cs.shape = lib[pk]["shape"]
+				cs.transform = xf
+				body.add_child(cs)
+				blocks += 1
+			along += 2.3
+	parent.add_child(body)
+	for pk in picks:
+		if not xforms[pk].is_empty():
+			parent.add_child(_multimesh_of("RidgeBlocks_%d" % pk, lib[pk]["mesh"], xforms[pk], mat))
+	print("  thin ice pressure ridges: %d blocks" % blocks)
+
+
+## One MultiMeshInstance3D drawing `mesh` at every transform, with no collision.
+##
+## The buffer is written directly: the generator runs on the dummy renderer, which ignores
+## set_instance_transform() and would save the instances without transforms (see CLAUDE.md).
+## Layout per instance: the 3x4 transform, row-major (basis rows, then origin).
+func _multimesh_of(node_name: String, mesh: Mesh, xforms: Array, mat: Material) -> MultiMeshInstance3D:
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = mesh
+	mm.instance_count = xforms.size()
+	var buf := PackedFloat32Array()
+	buf.resize(xforms.size() * 12)
+	for i in range(xforms.size()):
+		var t: Transform3D = xforms[i]
+		for r in range(3):
+			buf[i * 12 + r * 4 + 0] = t.basis.x[r]
+			buf[i * 12 + r * 4 + 1] = t.basis.y[r]
+			buf[i * 12 + r * 4 + 2] = t.basis.z[r]
+			buf[i * 12 + r * 4 + 3] = t.origin[r]
+	mm.buffer = buf
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = node_name
+	mmi.multimesh = mm
+	mmi.material_override = mat
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return mmi
 
 
 ## A pair of lights under the crevasse arch, so the bridge reads from the shelf above and the
@@ -3856,6 +4497,15 @@ func _ready() -> void:
 	road_mat.set_shader_parameter("ramp_width", ROUTE_WIDTH)
 	road_mat.set_shader_parameter("aurora_amount", 0.14)
 
+	# The broken edges of the holes and the shards in them: clear, dark ice.
+	var thin_edge_mat := ShaderMaterial.new()
+	thin_edge_mat.shader = load("res://glacier_ice.gdshader")
+	thin_edge_mat.set_shader_parameter("ice_color", Color(0.46, 0.66, 0.80))
+	thin_edge_mat.set_shader_parameter("deep_color", Color(0.06, 0.16, 0.28))
+	thin_edge_mat.set_shader_parameter("vein_glow", 0.0)
+	thin_edge_mat.set_shader_parameter("frost_line", -20.0)
+	thin_edge_mat.set_shader_parameter("bubble_density", 1.0)
+
 	var bank_mat := StandardMaterial3D.new()
 	bank_mat.albedo_color = Color(0.87, 0.92, 1.00)
 	bank_mat.roughness = 0.84
@@ -3974,15 +4624,27 @@ func _ready() -> void:
 	alt2_path.curve = alt2_curve
 	alt_container.add_child(alt2_path)
 
-	var routes: Array = [[alt1_curve, 1, "MeltwaterCut"], [alt2_curve, -1, "SeracLedge"]]
+	# --- ROUTE 3: the Thin Ice (splits right off the spire run-in, across the lake) ---
+	# The deck follows _thin_curve; the Path3D the AI follows is its line through the holes.
+	_plan_thin_ice(curve)
+	_verify_thin_ice_line()
+	var alt3_path := Path3D.new()
+	alt3_path.name = "AlternativePath_ThinIce"
+	alt3_path.curve = _thin_ai_curve
+	alt3_path.set_meta("ai_lane_limit", THIN_ICE_AI_LANE)
+	alt_container.add_child(alt3_path)
+
+	# [curve, side, label, half width]
+	var routes: Array = [[alt1_curve, 1, "MeltwaterCut", ROUTE_HALF_W], [alt2_curve, -1, "SeracLedge", ROUTE_HALF_W],
+			[_thin_curve, 1, "ThinIce", THIN_ICE_HALF_W]]
 	for entry in routes:
 		var rc: Curve3D = entry[0]
 		var min_lat: float = _min_route_lateral(rc)
 		if min_lat < MAIN_HALF_W - 0.5:
 			push_error("%s dips to %.2fm from the trunk centreline (needs >= %.2f)" % [entry[2], min_lat, MAIN_HALF_W - 0.5])
-		_verify_min_radius(rc, ROUTE_HALF_W, entry[2])
+		_verify_min_radius(rc, entry[3], entry[2])
 		_verify_plan(rc, rc.get_baked_length(), entry[2])
-		_verify_route_vs_trunk(rc, entry[2])
+		_verify_route_vs_trunk(rc, entry[2], entry[3])
 
 	# 6. Trunk deck and banks
 	#
@@ -3991,7 +4653,7 @@ func _ready() -> void:
 	var main_left_gaps: Array = []
 	var main_right_gaps: Array = []
 	for entry in routes:
-		var spans: Array = _junction_gap_intervals(entry[0], ROUTE_HALF_W, MAIN_HALF_W)
+		var spans: Array = _junction_gap_intervals(entry[0], entry[3], MAIN_HALF_W)
 		if entry[1] > 0:
 			main_right_gaps.append_array(spans)
 		else:
@@ -4004,6 +4666,10 @@ func _ready() -> void:
 	# the ground the terrain will have, and that ground depends on all the corridors.
 	ROAD_CURVES.append(alt1_curve)
 	ROAD_CURVES.append(alt2_curve)
+	ROAD_CURVES.append(_thin_curve)
+	# The Thin Ice's road lies on the lake like the trunk's does, and across the crossing there is
+	# no road at all: grading the lake to it would trench the lake and fill the lead in.
+	_no_grade[3] = [Vector2(_thin_lake_from - 4.0, _thin_curve.get_baked_length())]
 	_build_road_index()
 
 	# NOTE the explicit gap arguments: without them the trunk gets no bank gaps at all and every
@@ -4023,6 +4689,10 @@ func _ready() -> void:
 			1, MAIN_HALF_W, [], [], Vector2(-1.0, -1.0))
 	_build_road_mesh(level_scene, alt2_curve, ROUTE_WIDTH, "SeracLedgeRoad", road_mat, bank_mat, under_mat,
 			-1, MAIN_HALF_W, [], [], Vector2(-1.0, -1.0))
+	# The Thin Ice has road only on its way to and from the lake: across it, the crossing is open
+	# ice (_build_thin_ice).
+	_build_road_mesh(level_scene, _thin_curve, THIN_ICE_WIDTH, "ThinIceRoad", road_mat, bank_mat, under_mat,
+			1, MAIN_HALF_W, [], [], Vector2(-1.0, -1.0), {"voids": [_thin_plate]})
 
 	# 8. The glacier cavern
 	var cavern_container := Node3D.new()
@@ -4083,15 +4753,18 @@ func _ready() -> void:
 	checkpoints_container.name = "Checkpoints"
 	level_scene.add_child(checkpoints_container)
 
-	#     One gate sits on top of the spire, just past the arch: the snowfield inside the spiral is
-	#     drivable, and without a gate up there the whole climb could be skipped across it.
+	#     The fourth sits on the spire run-in before the Thin Ice splits off, so it covers both ways
+	#     home, and a cart that goes through the ice comes back just before the split.
+	#     None may sit on the trunk between a route's split and merge: a car on the route never
+	#     drives through it, and its lap never counts (_verify_checkpoints_clear_routes).
 	var cp_offsets: Array = [
 		_off_near(curve, Vector3(-111.2, 2.98, 189.2)),   # lake straight
-		_off_near(curve, Vector3(-36.5, 2.66, -75.5)),    # cavern apron
-		_off_near(curve, Vector3(195.1, 8.42, -319.7)),   # shelf, before the crevasse
-		_arch_off + 10.0,                                  # top of the spire
+		_cavern_range.x + 40.0,                            # in the cavern, past the Meltwater merge
+		_off_near(curve, Vector3(26.0, 3.3, -354.0)) + 32.0,  # past the north arch, before the Serac Ledge
+		_spire_range.x - 110.0,                            # spire run-in, before the Thin Ice
 		_off_near(curve, Vector3(-8.7, 3.38, 433.1)),     # back across the lake
 	]
+	_verify_checkpoints_clear_routes(cp_offsets, routes)
 	for i in range(cp_offsets.size()):
 		var dist_along: float = cp_offsets[i]
 		var cp_pos := curve.sample_baked(dist_along)
@@ -4176,6 +4849,7 @@ func _ready() -> void:
 	_build_edge_markers(props_container, curve, "Trunk", main_left_gaps, main_right_gaps, 40.0)
 	_build_edge_markers(props_container, alt1_curve, "Meltwater", [], [], 40.0)
 	_build_edge_markers(props_container, alt2_curve, "Ledge", [], [], 40.0)
+	_build_edge_markers(props_container, _thin_curve, "ThinIce", [], [], 40.0)
 	_build_ice_scatter(props_container, serac_mat)
 	# Arch anchors are kept well clear of the route gores. An arch over a split is tempting as a
 	# landmark, but the route climbs past the trunk's shoulder there, and the arch's soffit ends up
@@ -4187,6 +4861,8 @@ func _ready() -> void:
 	_build_junction_pylons(props_container, serac_mat, routes)
 	_build_crevasse_lights(props_container)
 	_build_crevasse_water(props_container)
+	_build_thin_ice(props_container, ground_mat, thin_edge_mat, serac_mat)
+	_build_water_zones(level_scene)
 	_build_spire(props_container, spire_mat)
 
 	# Blizzards: scheduled off the wall clock at runtime (see NorthlightWeather.gd). The cavern is
