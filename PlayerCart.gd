@@ -228,6 +228,8 @@ var _kb_brake_amount: float = 0.0
 var smoothed_speed: float = 0.0
 var stuck_timer: float = 0.0
 var race_start_time: float = 0.0
+## Item boxes hand out only boosts for this long after the start.
+const START_BOOST_ONLY_SECONDS := 10.0
 var _ai_avoid_force: float = 0.0
 var _ai_offtrack_timer: float = 0.0
 var _ai_unstuck_dir: float = 0.0
@@ -4184,6 +4186,10 @@ func give_item_rpc(type: int):
 	give_item(type)
 
 func _get_random_item_rpc() -> int:
+	# Boosts only for the first seconds after the start: the grid is still bunched up, and one
+	# bomb or missile could take out half of it.
+	if race_start_time > 0.0 and Time.get_ticks_msec() / 1000.0 - race_start_time < START_BOOST_ONLY_SECONDS:
+		return ItemType.BOOST
 	var id = name.to_int()
 	var level = get_tree().get_first_node_in_group("level")
 	if level and level.get("player_stats") and level.player_stats.has(id):

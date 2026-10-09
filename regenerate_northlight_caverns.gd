@@ -3595,33 +3595,23 @@ func _build_crevasse_water(parent: Node) -> void:
 	parent.add_child(node)
 
 
-## The still black water of the crevasse and the lead. The lead's is darker and duller still: it
-## is seen from a car's height through holes in pale ice, and at that angle a glossy surface
-## mirrors the sky as brightly as the ice around it and the hole stops reading as a hole.
+## The still black water of the crevasse and the lead (still_water.gdshader): ripples a couple of
+## metres long, drifting slowly, because it is only ever seen from close by. The lead's mirrors less
+## of the sky: it is seen from a car's height through holes in pale ice, and at that angle a glossy
+## surface is as bright as the ice around it and the hole stops reading as a hole.
 func _dark_water_material(lead: bool = false) -> ShaderMaterial:
 	var noise := FastNoiseLite.new()
 	noise.seed = 77031
-	noise.frequency = 0.02
+	noise.frequency = 0.015
 	var noise_tex := NoiseTexture2D.new()
 	noise_tex.seamless = true
 	noise_tex.as_normal_map = true
 	noise_tex.noise = noise
 	var mat := ShaderMaterial.new()
-	mat.shader = load("res://water.gdshader")
+	mat.shader = load("res://still_water.gdshader")
 	mat.set_shader_parameter("noise_tex", noise_tex)
-	mat.set_shader_parameter("water_color", Color(0.008, 0.030, 0.060))
-	mat.set_shader_parameter("shallow_color", Color(0.05, 0.16, 0.24))
-	mat.set_shader_parameter("sky_tint", Color(0.35, 0.55, 0.75))
-	mat.set_shader_parameter("sky_reflect", 0.65)
-	mat.set_shader_parameter("transparency", 0.45)
-	mat.set_shader_parameter("metallic", 0.60)
-	mat.set_shader_parameter("roughness", 0.10)
 	if lead:
-		mat.set_shader_parameter("water_color", Color(0.003, 0.010, 0.022))
-		mat.set_shader_parameter("shallow_color", Color(0.01, 0.035, 0.06))
 		mat.set_shader_parameter("sky_reflect", 0.22)
-		mat.set_shader_parameter("transparency", 0.15)
-		mat.set_shader_parameter("metallic", 0.3)
 		mat.set_shader_parameter("roughness", 0.22)
 	return mat
 
