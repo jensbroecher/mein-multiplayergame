@@ -201,3 +201,59 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   and reports take-off speeds, drownings and herd bumps. `res://scratch/mara_shots.tscn` renders the menu
   tiles (windowed, into a fixed-size SubViewport). `res://scratch/look_shots.tscn -- <level> <dir>
   [car=x,z,yaw] name:x,y,z:tx,ty,tz ...` renders look-dev shots with carts dropped in for scale.
+
+## Nyota Stadium (Matumaini GP, stage 2)
+
+- `regenerate_nyota_stadium.gd` plans the lap as turtle moves (`PLAN`: straights and circular arcs), so
+  the lanes are exactly straight and the hairpins exactly round, and places everything by arc length `s`
+  (`_plan_at`). The jumps are pieces of one height profile along `s` (`_plan_profile`, `_add_run`,
+  `_add_double`). One ribbon (`_build_track`) carries dirt in the bowl and tarmac outside (vertex colour,
+  `stadium_track.gdshader`), with the hairpin berms (`_berm_lift`) and shoulders down into the floor.
+  Collision: `StadiumTrack` and `StreetTrack` (track), `ArenaInfield` (off-road).
+- The floor is `STREET_Y` (7m) below the streets. The four stands stop short of the corners, where
+  retaining walls hold up the corner yards. The lap leaves up a ramp in a cutting through the north-east
+  yard and drops back in off the south-east one (the Drop-In: a kicker on the yard, a `voids` gap over the
+  wall, a landing hill). The corner walls' collision stops at street level and the parapets have their
+  own: a full-height box once blocked the Drop-In's corridor for slow carts and clipped fast ones.
+- Tune jumps with `res://scratch/nyota_jump_test.tscn` (headless), which drives a real cart over every lip
+  (TrackPath meta `jump_lips`) at capped speeds. Real carts fly 30-45% further than `_verify_jumps()`'s
+  ballistic estimate: they leave the lip steeper and drive themselves back to top speed in the air. The
+  landings are tuned to the real test: at 40 m/s, the speed carts carry in the lanes, every landing is on
+  its landing face.
+- Berm backs run 1:3.2 (`BERM_BACK_RUN`). PlayerCart won't climb off-road slopes past about 35 degrees,
+  and a cart that went over a steeper berm was stuck behind it.
+- Sponsor artwork can't be drawn headless, so `StadiumAds.gd` draws it into an atlas at load (fictional
+  sponsors only). `stadium_boards.gdshader` reads it: `COLOR.r` picks the advert, `COLOR.g` marks LED
+  boards that cycle. `_sign()` builds a panel whose text reads left to right from its front.
+- The crowd is one card per spectator (`stadium_crowd.gdshader` draws the figure; pose, shirt and skin
+  are in `INSTANCE_CUSTOM`), in a MultiMesh per 60m cell, casting no shadow.
+- `city_ground.gdshader` paints the street grid that `_build_city` fills with blocks (`STREET_X0`,
+  `BLOCK_X`, ... must match). `city_building.gdshader` draws the facades; `COLOR.a` is 0 for a block,
+  0.25 for a low block with a painted iron roof, 1 for a glass tower. The jacarandas reuse Mara
+  Crossing's acacia build (`_tree_plan`, `acacia_leaves.gdshader` with a blossom atlas).
+- `scratch/ai_race_test` at `speed=4` steps physics at 1/15s: a cart at 60 m/s moves 4m a step, tunnels
+  into barriers and wedges. Check suspicious respawns at `speed=1`. Respawns tagged "boom" are item
+  explosions, not the track.
+- `res://scratch/nyota_shots.tscn` renders the menu tile with carts posed anywhere, mid-air included.
+  `res://scratch/nyota_live_shot.tscn -- <dir> [wait=25] [level=...] name:x,y,z:tx,ty,tz` takes shots
+  during a live spectator race, for what only renders in a real game.
+
+## Bloombay Dunes (beach stage)
+
+- The surf is `beach_water.gdshader` on the `BloombayWater` node, which `regenerate_bloombay_dunes.gd` builds
+  (`_build_ocean`) after `generate_world()` replaces TerrainGenerator's flat plane. The generator bakes a shore
+  field (`_bake_shore_field`, one texel per terrain vertex from `SHORE_X0` to `SHORE_X1`): ground height,
+  wave travel time to the waterline (an eikonal solve with the shallow-water speed, so crests bend round the
+  bay and close up as they shoal), surf weight, and the shallowest depth seaward. The shader numbers waves by
+  phase, breaks them where they get taller than 0.78 of the depth, and runs their swash up the sand. Change
+  the terrain and the field follows on the next regeneration.
+- The water mesh is a grid on the terrain's grid lines (thirds of a cell across the surf zone `SURF_X0..X1`),
+  so the swash sheet lies parallel to the sand, then wider out to `OCEAN_REACH`. It is chunked for culling.
+- The waterline is `TerrainGenerator.bloombay_shore_x(z)`, the seabed `bloombay_sea_depth()` (1:25 foreshore,
+  sandbar about 40m out). Keep the waterline 10m+ off the beach straight's outer edge.
+- The water draws the sand under it from the screen texture as emission. Clamp any screen UV you offset:
+  past the frame edge the copy holds stale pixels (it showed up as a strip of text along the bottom).
+- Structures are under `Seafront` (`_build_seafront`), named to avoid Level.gd's "Props"/"Environment"
+  trimesh baking. `_verify_seafront_clear` errors on any footprint too close to the racing line.
+- `res://scratch/bloombay_shots.tscn -- <dir> name:x,y,z:tx,ty,tz[:frames[:gap]]` renders into the window
+  (not a SubViewport) and can save a time sequence to watch the surf.

@@ -59,8 +59,8 @@ func _ready() -> void:
 			if tele and not was_tele[c]:
 				var p: Vector3 = last_pos.get(c, c.global_position)
 				var off: float = track.curve.get_closest_offset(track.to_local(p))
-				respawns[c].append("%.0fm(%s y%.0f)" % [off, "drown" if c.is_drowned else "fall", p.y])
-				print("RESPAWN %s from %.0fm; last moments:" % [c.name, off])
+				respawns[c].append("%.0fm(%s y%.0f)" % [off, "drown" if c.is_drowned else ("boom" if c.is_exploding else "fall"), p.y])
+				print("RESPAWN %s from %.0fm%s; last moments:" % [c.name, off, " (blown up)" if c.is_exploding else ""])
 				var tr0: Array = trail.get(c, [])
 				for k in range(maxi(0, tr0.size() - 90), tr0.size(), 10):
 					print("    ", tr0[k])

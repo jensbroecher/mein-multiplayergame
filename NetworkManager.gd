@@ -59,6 +59,7 @@ const ALL_STAGES = [
 	{"name": "Desert Wadi", "path": "res://levels/DesertWadiLevel.tscn"},
 	{"name": "Bloombay Dunes", "path": "res://levels/BloombayDunesLevel.tscn"},
 	{"name": "Mara Crossing", "path": "res://levels/MaraCrossingLevel.tscn"},
+	{"name": "Nyota Stadium", "path": "res://levels/NyotaStadiumLevel.tscn"},
 ]
 
 const GP_CUPS = {
@@ -93,6 +94,7 @@ const GP_CUPS = {
 		"name": "Matumaini GP",
 		"stages": [
 			"res://levels/MaraCrossingLevel.tscn",
+			"res://levels/NyotaStadiumLevel.tscn",
 		]
 	}
 }

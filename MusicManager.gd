@@ -330,7 +330,7 @@ func load_playlist_for_level(scene_path: String):
 		level_key = "canyon"
 	elif path_lower.contains("city") or path_lower.contains("harbor"):
 		level_key = "city"
-	elif path_lower.contains("festival") or path_lower.contains("meadow") or path_lower.ends_with("/level.tscn"):
+	elif path_lower.contains("festival") or path_lower.contains("meadow") or path_lower.contains("stadium") or path_lower.ends_with("/level.tscn"):
 		level_key = "festival"
 
 	# If the same stage/playlist category is already loaded and active, don't re-read files from disk;

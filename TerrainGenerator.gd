@@ -361,6 +361,22 @@ func _build_track_spatial_mask(curve: Curve3D, grid_res: int, cell_size_x: float
 				mask[row_offset + gx] = 1
 	return mask
 
+## Bloombay Dunes waterline (sea level 0) at a given z: a shallow bay with two gentle curves, kept
+## 10m or more off the beach straight's outer edge.
+static func bloombay_shore_x(pz: float) -> float:
+	return -63.0 + 4.0 * sin(pz * 0.011 + 0.9) + 2.0 * sin(pz * 0.029 + 2.0)
+
+
+## Still-water depth at a distance offshore of the Bloombay waterline: a 1:25 foreshore, a sandbar
+## about 40m out (waves break on it, reform in the trough and break again on the beach), then the
+## shelf dropping to 18m.
+static func bloombay_sea_depth(offshore: float) -> float:
+	var o: float = maxf(offshore, 0.0)
+	var d: float = 0.04 * o + maxf(o - 42.0, 0.0) * 0.10
+	d -= 0.75 * exp(-pow((o - 40.0) / 8.0, 2.0))
+	return clampf(d, 0.0, 18.0)
+
+
 func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curve3D, for_collision: bool, is_near_track: bool = true) -> float:
 	var h_noise: float = noise.get_noise_2d(px, pz) * hill_height
 
@@ -454,17 +470,15 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 				+ cos(pz * 0.024 + sin(px * 0.014)) * 11.0 \
 				+ sin((px * 0.035 - pz * 0.025)) * 6.5
 		var dune_base: float = 0.0
-		if px < -56.0:
-			# Open ocean seabed sloping down from the beach shore (Y=0.0 at X=-56.0)
-			var ocean_dist = -56.0 - px
-			dune_base = -clampf(ocean_dist * 0.22, 0.0, 18.0)
-			base_terrain_height = dune_base + h_noise * 0.03
+		var shore_x: float = bloombay_shore_x(pz)
+		if px < shore_x:
+			base_terrain_height = -bloombay_sea_depth(shore_x - px) + h_noise * 0.02
 		elif px < -10.0:
-			# Gentle sloping sandy beach from water edge (Y=0.05 at X=-56) up to dune base (Y=2.8 at X=-10)
-			var beach_t = clampf((px - (-56.0)) / 46.0, 0.0, 1.0)
-			dune_base = lerpf(0.05, 2.8, beach_t)
-			# Small subtle ripples on beach sand (always safely above sea level)
-			base_terrain_height = maxf(dune_base + h_noise * 0.03, 0.05)
+			# Beach from the waterline up to the dune foot (2.8m at X=-10), flattest at the water so the
+			# swash runs a long way up it.
+			var beach_t: float = clampf((px - shore_x) / (-10.0 - shore_x), 0.0, 1.0)
+			dune_base = 2.8 * (0.55 * beach_t + 0.45 * beach_t * beach_t)
+			base_terrain_height = dune_base + h_noise * 0.02 * beach_t
 		else:
 			# Undulating golden sand dunes with high roller-coaster peaks and valleys
 			var inland_t = clampf((px - (-10.0)) / 40.0, 0.0, 1.0)

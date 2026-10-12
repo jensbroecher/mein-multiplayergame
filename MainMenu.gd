@@ -40,6 +40,7 @@ const STAGE_INFO := {
 	"res://levels/CanyonChasmLevel.tscn": {"title": "CANYON CHASM", "subtitle": "A narrow run over the drop", "file": "tile_canyon_chasm.jpg", "color": COL_CHASM},
 	"res://levels/DesertWadiLevel.tscn": {"title": "DESERT WADI", "subtitle": "Dry riverbed sand and heat", "file": "tile_desert_wadi.jpg", "color": COL_WADI},
 	"res://levels/MaraCrossingLevel.tscn": {"title": "MARA CROSSING", "subtitle": "Murram road across the savanna: the migration, Pride Rock, and the croc jump", "file": "tile_mara_crossing.jpg", "color": COL_SAVANNA},
+	"res://levels/NyotaStadiumLevel.tscn": {"title": "NYOTA STADIUM", "subtitle": "Stadium supercross: doubles, whoops and a triple, a lap of the streets, and the Drop-In", "file": "tile_nyota_stadium.jpg", "color": COL_SAVANNA},
 }
 ## Section header colour per cup on the course lists (same accents as the cup tiles).
 const CUP_COLORS := {"Bloombay GP": COL_GREEN, "Svartfjell GP": COL_SNOW, "Al-Raihana GP": COL_BRONZE, "Matumaini GP": COL_SAVANNA}
@@ -287,7 +288,7 @@ func show_sub_menu(menu_name: String) -> void:
 			_add_tile("AL-RAIHANA GP", "Mountain  •  Canyon  •  Chasm  •  Wadi", "tile_al_raihana_gp.jpg", COL_BRONZE, func():
 				_on_cup_selected("Al-Raihana GP")
 			)
-			_add_tile("MATUMAINI GP", "Mara Crossing", "tile_matumaini_gp.jpg", COL_SAVANNA, func():
+			_add_tile("MATUMAINI GP", "Mara Crossing  •  Nyota Stadium", "tile_matumaini_gp.jpg", COL_SAVANNA, func():
 				_on_cup_selected("Matumaini GP")
 			)
 		"stage_select":
