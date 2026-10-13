@@ -22,6 +22,10 @@ uniform float ripple_scale = 0.11;
 uniform float normal_depth = 0.75;
 uniform float shore_foam_depth = 0.9;
 uniform float clarity_depth = 2.4;
+// How glassy calm water is, and how strongly it mirrors the sky. With no screen-space reflection
+// the only thing to mirror is the sky, so water deep in a forest is better dull (Msitu Falls).
+uniform float roughness_min = 0.04;
+uniform float specular_max = 0.75;
 
 varying vec3 w_pos;
 varying float turbulence;
@@ -69,8 +73,8 @@ void fragment() {
 	col = mix(col, foam_color, foam);
 
 	ALBEDO = col;
-	ROUGHNESS = mix(0.04, 0.55, foam);
-	SPECULAR = mix(0.75, 0.3, foam);
+	ROUGHNESS = mix(roughness_min, 0.55, foam);
+	SPECULAR = mix(specular_max, 0.3, foam);
 	METALLIC = 0.0;
 	// Clear at the very edge so the bank shows through, opaque once there is depth or foam.
 	ALPHA = clamp(mix(0.7, 0.97, smoothstep(0.0, 0.8, water_depth)) + foam, 0.0, 1.0);

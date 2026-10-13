@@ -6,7 +6,8 @@ extends Node
 #   Godot --path . res://scratch/ab_bench.tscn -- res://levels/X.tscn [samples=6] [shadows=3]
 #        variant ...
 # Variants: base, storm (Northlight blizzard at full strength), noshadow, nolightshadow, noomni, nospot, nomoonshadow, sky=<shader path>,
-#           hide=<path substring>, unshadow=<path substring> (shadow off on matching lights), cheapmat=<path substring> (unshaded grey on matching meshes).
+#           hide=<path substring>, unshadow=<path substring> (shadow off on matching lights), cheapmat=<path substring> (unshaded grey on matching meshes),
+#           quality=<0..4> (vegetation detail, MusicManager's Off..Ultra; the base runs at the level's default).
 # Several toggles can be combined into one variant with '+', e.g. nolightshadow+sky=res://x.gdshader.
 
 var level_path := ""
@@ -115,6 +116,11 @@ func _apply(variant: String) -> void:
 
 func _apply_one(v: String) -> void:
 	if v == "base":
+		return
+	if v.begins_with("quality="):
+		var before: int = MusicManager.grass_quality_setting
+		MusicManager.set_grass_setting(int(v.substr(8)) + 1, false)
+		_undo.append(func(): MusicManager.set_grass_setting(before, false))
 		return
 	if v == "storm":
 		var w: Node = level.get_node_or_null("NorthlightWeather")

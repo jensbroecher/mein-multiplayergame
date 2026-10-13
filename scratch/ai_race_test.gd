@@ -23,8 +23,9 @@ func _ready() -> void:
 	NetworkManager.start_spectator()
 	var level: Node = load(level_path).instantiate()
 	add_child(level)
-	if weather >= 0.0 and level.get_node_or_null("NorthlightWeather"):
-		level.get_node("NorthlightWeather").force_intensity = weather
+	for wname in ["NorthlightWeather", "JungleRain"]:
+		if weather >= 0.0 and level.get_node_or_null(wname):
+			level.get_node(wname).force_intensity = weather
 	Engine.time_scale = speed
 	var track: Path3D = level.track_path
 	var length: float = track.curve.get_baked_length()

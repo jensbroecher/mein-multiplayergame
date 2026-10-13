@@ -340,7 +340,7 @@ func _build_graphics_page() -> Control:
 	option_shadows.add_item("Low")
 	option_shadows.add_item("Medium")
 	option_shadows.add_item("High")
-	option_grass_quality = _add_option_row(body, "Grass Quality")
+	option_grass_quality = _add_option_row(body, "Vegetation Detail")
 	option_grass_quality.add_item("Auto")
 	option_grass_quality.add_item("Off")
 	option_grass_quality.add_item("Low")

@@ -4,12 +4,14 @@ const MeshChunker = preload("res://MeshChunker.gd")
 
 # Frame-time benchmark for one level, with the game's autoloads and the player's shadow settings.
 # Run windowed (not headless):
-#   Godot --path . res://scratch/bench.tscn -- res://levels/X.tscn [samples=24] [scale=1.0] [shadows=3]
+#   Godot --path . res://scratch/bench.tscn -- res://levels/X.tscn [samples=24] [scale=1.0] [shadows=3] [quality=0..4]
 #        [hide=<path substring>]... [shot=<dir>] [omni=0] [spot=0] [sky=<process mode>] [skyshader=<path>] [snow=0]
 # Prints per-sample GPU ms / CPU ms / primitives / draw calls, then the averages.
 
 var level_path := ""
 var samples := 24
+## Vegetation detail pinned to MusicManager's Off..Ultra (0..4); -1 leaves the player's setting.
+var quality := -1
 var render_scale := 1.0
 var shadow_q := 3
 var hides: Array[String] = []
@@ -29,6 +31,7 @@ func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("res://"): level_path = a
 		elif a.begins_with("samples="): samples = int(a.substr(8))
+		elif a.begins_with("quality="): quality = int(a.substr(8))
 		elif a.begins_with("scale="): render_scale = float(a.substr(6))
 		elif a.begins_with("shadows="): shadow_q = int(a.substr(8))
 		elif a.begins_with("hide="): hides.append(a.substr(5))
@@ -64,6 +67,8 @@ func _ready() -> void:
 	var level: Node3D = load(level_path).instantiate()
 	add_child(level)
 	MusicManager.set_shadow_quality(shadow_q, false)
+	if quality >= 0:
+		MusicManager.set_grass_setting(quality + 1, false)
 	_apply_experiments(level)
 
 	var cam := Camera3D.new()

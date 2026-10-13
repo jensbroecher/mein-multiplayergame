@@ -4,7 +4,8 @@ extends Node
 #   Godot --path . res://scratch/look_shots.tscn -- <level.tscn> <out_dir> [car=x,z,yaw_deg ...]
 #       [weather=0..1] name:x,y,z:tx,ty,tz ...
 # A cart is dropped onto the ground at each car= spot. A shot named herd* first waits until the
-# Mara Crossing herd is streaming across the road.
+# Mara Crossing herd is streaming across the road. weather= pins Northlight Caverns' blizzard or
+# Msitu Falls' rain.
 
 const SIZE := Vector2i(1376, 768)
 const HERD_CROSS := Vector3(190.0, 7.0, -55.0)
@@ -47,11 +48,17 @@ func _ready() -> void:
 		print("CAR at ", car.global_position)
 	# weather=<0..1> pins Northlight Caverns' blizzard instead of following the wall clock.
 	for a in args.slice(2):
-		if a.begins_with("weather=") and level.get_node_or_null("NorthlightWeather"):
-			level.get_node("NorthlightWeather").force_intensity = float(a.substr(8))
+		if a.begins_with("weather="):
+			for wname in ["NorthlightWeather", "JungleRain"]:
+				if level.get_node_or_null(wname):
+					level.get_node(wname).force_intensity = float(a.substr(8))
+	# quality=<0..4> pins the vegetation detail (MusicManager's Off..Ultra) instead of Auto.
+	for a in args.slice(2):
+		if a.begins_with("quality="):
+			MusicManager.set_grass_setting(int(a.substr(8)) + 1, false)
 	var herd: Node = level.get_node_or_null("MigrationHerd")
 	for a in args.slice(2):
-		if a.begins_with("car=") or a.begins_with("weather="):
+		if a.begins_with("car=") or a.begins_with("weather=") or a.begins_with("quality="):
 			continue
 		var parts := a.split(":")
 		var p := parts[1].split(",")

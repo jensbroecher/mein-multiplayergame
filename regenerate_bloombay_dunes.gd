@@ -711,6 +711,13 @@ func _mat(key: String) -> Material:
 			m.roughness = 0.05
 			m.albedo_color = Color(1, 1, 1, 0.45)
 			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		# One-sided, so the thatch's top and underside are separate faces with their own shading.
+		"thatch":
+			m.roughness = 1.0
+		# Resin-coated boards, bottles: painted but shiny.
+		"gloss":
+			m.roughness = 0.22
+			m.metallic_specular = 0.6
 	_materials[key] = m
 	return m
 
@@ -1262,48 +1269,527 @@ func _build_shipwreck(root: Node3D) -> void:
 	_note("Shipwreck", Vector2(at.x, at.z), 9.0, CLEAR_BUILDING)
 
 
-## Surf shack bar under a thatch, boards leaning on the rail.
+const STRAW := Color(0.80, 0.68, 0.42)
+const BAMBOO := Color(0.78, 0.66, 0.42)
+
+
+## Beach bar under a shaggy thatch. The board rack is on its north side, which the road comes in
+## facing; the counter, the sign and the tables face the sea.
 func _build_surf_shack(root: Node3D) -> void:
 	var kit := {}
 	var c := Vector3(-14.0, 0.0, 236.0)
 	var g := _ground_min(c.x, c.z, 5.0, 4.0)
 	var fl := maxf(g, _ground(c.x - 5.0, c.z)) + 0.7
-	_block(kit, "wood", Vector3(c.x - 5.0, g - 0.3, c.z - 4.0), Vector3(c.x + 5.0, fl, c.z + 4.0), WOOD)
-	for cx in [-4.6, 4.6]:
-		for cz in [-3.6, 3.6]:
-			_tube(kit, "wood", Vector3(c.x + cx, fl, c.z + cz), Vector3(c.x + cx, fl + 3.0, c.z + cz), 0.16, 0.14, 6, OLD_WOOD)
-	# Bar counter facing the sea and a back wall of shelves.
-	_block(kit, "wood", Vector3(c.x - 3.2, fl, c.z - 3.0), Vector3(c.x - 2.4, fl + 1.1, c.z + 3.0), Color(0.30, 0.62, 0.66))
-	_block(kit, "wood", Vector3(c.x - 3.5, fl + 1.1, c.z - 3.2), Vector3(c.x - 2.2, fl + 1.2, c.z + 3.2), WOOD)
-	_block(kit, "wood", Vector3(c.x + 3.6, fl, c.z - 3.4), Vector3(c.x + 4.4, fl + 2.6, c.z + 3.4), OLD_WOOD)
-	for sy in [0.9, 1.6]:
-		_block(kit, "paint", Vector3(c.x + 3.3, fl + sy, c.z - 3.0), Vector3(c.x + 3.6, fl + sy + 0.06, c.z + 3.0), WOOD)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 236
+	var teak := Color(0.46, 0.29, 0.17)
+	var teal := Color(0.16, 0.56, 0.60)
+
+	# Deck: a dark skirt into the sand, planks across it, two steps up from the sea side.
+	_block(kit, "wood", Vector3(c.x - 5.0, g - 0.3, c.z - 4.0), Vector3(c.x + 5.0, fl - 0.08, c.z + 4.0), OLD_WOOD.darkened(0.1))
+	var px := c.x - 5.0
+	while px < c.x + 5.0 - 0.01:
+		_block(kit, "wood", Vector3(px + 0.015, fl - 0.08, c.z - 4.05), Vector3(px + 0.235, fl, c.z + 4.05), WOOD.darkened(rng.randf_range(-0.08, 0.14)))
+		px += 0.25
+	for s in range(2):
+		var sy := fl - 0.25 * (s + 1)
+		_block(kit, "wood", Vector3(c.x - 5.35 - 0.35 * s, g - 0.2, c.z - 1.5), Vector3(c.x - 5.0 - 0.35 * s, sy, c.z + 1.5), WOOD.darkened(0.06 * (s + 1)))
+
+	# Bamboo posts up to a ring beam just under the thatch.
+	var beam_y := fl + 3.23
+	var post_pts := [Vector3(c.x - 4.6, 0, c.z - 3.6), Vector3(c.x + 4.6, 0, c.z - 3.6), Vector3(c.x + 4.6, 0, c.z + 3.6), Vector3(c.x - 4.6, 0, c.z + 3.6)]
+	for pp in post_pts:
+		var p: Vector3 = pp
+		_bamboo(kit, Vector3(p.x, fl - 0.1, p.z), Vector3(p.x, beam_y + 0.05, p.z), 0.13, BAMBOO)
+	for i in range(4):
+		var a: Vector3 = post_pts[i]
+		var b: Vector3 = post_pts[(i + 1) % 4]
+		_bamboo(kit, Vector3(a.x, beam_y, a.z), Vector3(b.x, beam_y, b.z), 0.09, BAMBOO.darkened(0.1))
+
+	# Counter: bamboo-clad front, lashed, under a teak top with short returns.
+	_block(kit, "wood", Vector3(c.x - 3.1, fl, c.z - 3.0), Vector3(c.x - 2.4, fl + 1.1, c.z + 3.0), OLD_WOOD.darkened(0.2))
+	var pz := c.z - 2.97
+	var k := 0
+	while pz < c.z + 3.0:
+		_tube(kit, "wood", Vector3(c.x - 3.15, fl, pz), Vector3(c.x - 3.15, fl + 1.1, pz), 0.048, 0.048, 6, BAMBOO.darkened(0.12 * (k % 3)), false)
+		pz += 0.1
+		k += 1
+	for ry in [0.22, 0.92]:
+		_tube(kit, "wood", Vector3(c.x - 3.21, fl + ry, c.z - 3.0), Vector3(c.x - 3.21, fl + ry, c.z + 3.0), 0.018, 0.018, 4, Color(0.36, 0.26, 0.16), false)
+	for zs in [-1.0, 1.0]:
+		_block(kit, "wood", Vector3(c.x - 3.1, fl, c.z + zs * 3.0 - 0.06), Vector3(c.x - 1.9, fl + 1.1, c.z + zs * 3.0 + 0.06), teal)
+	_block(kit, "wood", Vector3(c.x - 3.55, fl + 1.1, c.z - 3.25), Vector3(c.x - 2.2, fl + 1.18, c.z + 3.25), teak)
+	# Beer tap, glasses and a jar of straws on the counter.
+	var tap := Vector3(c.x - 2.75, fl + 1.18, c.z - 1.4)
+	_tube(kit, "metal", tap, tap + Vector3(0, 0.38, 0), 0.04, 0.04, 8, Color(0.85, 0.86, 0.88))
+	_tube(kit, "metal", tap + Vector3(0, 0.38, -0.22), tap + Vector3(0, 0.38, 0.22), 0.035, 0.035, 8, Color(0.85, 0.86, 0.88))
+	for ti in range(3):
+		var hz := -0.18 + ti * 0.18
+		_tube(kit, "gloss", tap + Vector3(-0.04, 0.38, hz), tap + Vector3(-0.07, 0.56, hz), 0.016, 0.022, 6, [Color(0.9, 0.3, 0.2), Color(0.98, 0.78, 0.2), Color(0.2, 0.55, 0.85)][ti])
+	for gi in range(4):
+		var gp := Vector3(c.x - 3.2 + rng.randf_range(-0.12, 0.12), fl + 1.18, c.z + 0.2 + gi * 0.55)
+		_tube(kit, "gloss", gp, gp + Vector3(0, 0.15, 0), 0.035, 0.042, 8, [Color(0.98, 0.6, 0.2), Color(0.95, 0.4, 0.55), Color(0.4, 0.8, 0.9), Color(0.98, 0.85, 0.35)][gi])
+		_tube(kit, "paint", gp + Vector3(0.01, 0.1, 0), gp + Vector3(0.03, 0.24, 0.01), 0.005, 0.005, 3, WHITE, false)
+
+	# Back bar: cupboard with teal doors, shelves of bottles, a cooler.
+	_block(kit, "wood", Vector3(c.x + 4.3, fl, c.z - 3.4), Vector3(c.x + 4.4, fl + 2.6, c.z + 3.4), OLD_WOOD)
+	_block(kit, "wood", Vector3(c.x + 3.5, fl, c.z - 3.2), Vector3(c.x + 4.3, fl + 0.95, c.z + 3.2), OLD_WOOD.darkened(0.1))
+	_block(kit, "wood", Vector3(c.x + 3.45, fl + 0.95, c.z - 3.25), Vector3(c.x + 4.3, fl + 1.0, c.z + 3.25), teak)
+	var dz := c.z - 3.1
+	while dz < c.z + 3.0:
+		_block(kit, "paint", Vector3(c.x + 3.47, fl + 0.08, dz), Vector3(c.x + 3.5, fl + 0.87, dz + 0.72), teal.lightened(0.08))
+		_block(kit, "metal", Vector3(c.x + 3.44, fl + 0.6, dz + 0.6), Vector3(c.x + 3.47, fl + 0.68, dz + 0.64), Color(0.8, 0.8, 0.75))
+		dz += 0.78
+	var bottle_cols := [Color(0.12, 0.42, 0.18), Color(0.55, 0.30, 0.08), Color(0.62, 0.80, 0.86), Color(0.70, 0.12, 0.12), Color(0.10, 0.25, 0.50)]
+	for shelf_y in [1.0, 1.55, 2.05]:
+		if shelf_y > 1.0:
+			_block(kit, "wood", Vector3(c.x + 3.92, fl + shelf_y - 0.05, c.z - 3.2), Vector3(c.x + 4.3, fl + shelf_y, c.z + 3.2), teak)
+		var bz := c.z - 3.05
+		while bz < c.z + 3.05:
+			if rng.randf() > 0.15:
+				_bottle(kit, Vector3(c.x + 4.1 + rng.randf_range(-0.05, 0.05), fl + shelf_y, bz), rng.randf_range(0.2, 0.3), bottle_cols[rng.randi() % bottle_cols.size()])
+			bz += rng.randf_range(0.13, 0.2)
+	_block(kit, "paint", Vector3(c.x + 2.4, fl, c.z + 2.3), Vector3(c.x + 3.2, fl + 0.5, c.z + 3.1), Color(0.95, 0.95, 0.93))
+	_block(kit, "paint", Vector3(c.x + 2.37, fl + 0.5, c.z + 2.27), Vector3(c.x + 3.23, fl + 0.6, c.z + 3.13), Color(0.15, 0.45, 0.8))
+
+	# Bar stools along the counter.
 	for i in range(5):
 		var stool := Vector3(c.x - 4.1, fl, c.z - 2.4 + i * 1.2)
-		_tube(kit, "metal", stool, stool + Vector3(0, 0.75, 0), 0.05, 0.05, 5, Color(0.3, 0.3, 0.3))
-		_tube(kit, "paint", stool + Vector3(0, 0.75, 0), stool + Vector3(0, 0.82, 0), 0.22, 0.22, 8, HUT_COLOURS[i % 6])
-	# Thatch: a low hipped pyramid with a deep overhang.
-	var straw := Color(0.80, 0.68, 0.42)
-	var apex := Vector3(c.x, fl + 5.2, c.z)
-	var corners := [Vector3(c.x - 6.2, fl + 2.7, c.z - 5.2), Vector3(c.x + 6.2, fl + 2.7, c.z - 5.2), Vector3(c.x + 6.2, fl + 2.7, c.z + 5.2), Vector3(c.x - 6.2, fl + 2.7, c.z + 5.2)]
-	var st := _st(kit, "canvas")
+		for lg in range(3):
+			var la := TAU * lg / 3.0
+			_tube(kit, "wood", stool + Vector3(cos(la) * 0.2, 0, sin(la) * 0.2), stool + Vector3(0, 0.74, 0), 0.025, 0.025, 4, BAMBOO.darkened(0.15))
+		_tube(kit, "wood", stool + Vector3(0, 0.3, 0) + Vector3(0.12, 0, 0), stool + Vector3(0, 0.3, 0) + Vector3(-0.06, 0, 0.1), 0.015, 0.015, 3, BAMBOO, false)
+		_tube(kit, "paint", stool + Vector3(0, 0.74, 0), stool + Vector3(0, 0.82, 0), 0.22, 0.2, 10, HUT_COLOURS[i % 6])
+
+	_thatch(kit, rng, Vector3(c.x, fl + 2.7, c.z), 6.2, 5.2, 2.3)
+
+	# String lights round the eaves, sagging between the corners.
+	var eave_y := fl + 2.7
+	var corners := [Vector3(c.x - 6.0, 0, c.z - 5.0), Vector3(c.x + 6.0, 0, c.z - 5.0), Vector3(c.x + 6.0, 0, c.z + 5.0), Vector3(c.x - 6.0, 0, c.z + 5.0)]
+	var bulb_cols := [Color(1.0, 0.85, 0.55), Color(1.0, 0.55, 0.35), Color(0.6, 0.9, 0.8), Color(1.0, 0.75, 0.9)]
 	for i in range(4):
 		var a: Vector3 = corners[i]
 		var b: Vector3 = corners[(i + 1) % 4]
-		var n := (b - a).cross(apex - a).normalized()
-		if n.y < 0.0:
-			n = -n
-		_tri(st, a, b, apex, n, n, n, straw.darkened(0.05 * i), n)
-	# Surfboards leaning on the south rail.
-	var board_cols := [Color(0.95, 0.40, 0.30), Color(0.25, 0.65, 0.85), Color(0.98, 0.85, 0.30), Color(0.95, 0.95, 0.92)]
-	for i in range(4):
-		var foot := Vector3(c.x - 3.0 + i * 1.6, g, c.z + 4.6)
-		var b_xf := Transform3D(Basis(Vector3.RIGHT, -0.28) * Basis(Vector3.FORWARD, 0.05 * (i - 1.5)), foot + Vector3(0, 1.15, 0))
-		_box(kit, "paint", b_xf, Vector3(0.55, 2.3, 0.07), board_cols[i])
-		_box(kit, "paint", b_xf, Vector3(0.08, 2.32, 0.09), WHITE)
+		var segs := int(a.distance_to(b) / 0.55)
+		var prev := Vector3.ZERO
+		for s in range(segs + 1):
+			var t := float(s) / segs
+			var p := a.lerp(b, t)
+			p.y = eave_y - 0.42 - 0.35 * 4.0 * t * (1.0 - t)
+			if s > 0:
+				_tube(kit, "metal", prev, p, 0.008, 0.008, 3, Color(0.1, 0.1, 0.1), false)
+			if s > 0 and s < segs:
+				_block(kit, "glow", p + Vector3(-0.035, -0.11, -0.035), p + Vector3(0.035, -0.03, 0.035), bulb_cols[s % 4])
+			prev = p
+
+	# Sign hung from the sea-side eave: a sun rising out of the waves.
+	_beach_bar_sign(kit, Vector3(c.x - 5.75, eave_y - 0.95, c.z))
+	for zs in [-0.9, 0.9]:
+		_tube(kit, "metal", Vector3(c.x - 5.75, eave_y - 0.6, c.z + zs), Vector3(c.x - 5.75, eave_y + 0.15, c.z + zs), 0.01, 0.01, 3, Color(0.25, 0.25, 0.25), false)
+
+	# Lifebuoy on the north-west post.
+	_lifebuoy(kit, Vector3(c.x - 4.6, fl + 1.7, c.z + 3.78), Vector3(0, 0, 1), 0.3, 0.075)
+
+	# Chalkboard menu out on the sand.
+	_menu_board(kit, Vector3(c.x - 6.7, _ground(c.x - 6.7, c.z - 2.4), c.z - 2.4))
+
+	# Cable-spool tables and log stools in front, one under a parasol.
+	for ti in range(2):
+		var tp := Vector3([c.x - 8.3, c.x - 8.8][ti], 0.0, [c.z + 1.8, c.z - 2.2][ti])
+		tp.y = _ground(tp.x, tp.z)
+		_tube(kit, "wood", tp + Vector3(0, -0.1, 0), tp + Vector3(0, 0.06, 0), 0.55, 0.55, 14, WOOD.darkened(0.15))
+		_tube(kit, "wood", tp + Vector3(0, 0.06, 0), tp + Vector3(0, 0.66, 0), 0.24, 0.24, 10, OLD_WOOD)
+		_tube(kit, "wood", tp + Vector3(0, 0.66, 0), tp + Vector3(0, 0.74, 0), 0.6, 0.6, 14, WOOD)
+		for si in range(3):
+			var sa := TAU * si / 3.0 + ti * 0.7
+			var sp := tp + Vector3(cos(sa) * 0.95, 0, sin(sa) * 0.95)
+			sp.y = _ground(sp.x, sp.z)
+			_tube(kit, "wood", sp + Vector3(0, -0.1, 0), sp + Vector3(0, 0.45, 0), 0.19, 0.18, 9, OLD_WOOD.lightened(0.1))
+		for gi in range(2):
+			var gp := tp + Vector3(0.2 - gi * 0.35, 0.74, 0.15 * gi)
+			_tube(kit, "gloss", gp, gp + Vector3(0, 0.15, 0), 0.035, 0.042, 8, [Color(0.98, 0.6, 0.2), Color(0.4, 0.8, 0.9)][gi])
+		if ti == 0:
+			_umbrella(kit, tp, Vector3.ZERO, [teal, WHITE])
+		_note("ShackTable%d" % ti, Vector2(tp.x, tp.z), 1.2, CLEAR_DECOR)
+
+	# Board rack on the north side: boards stand on their tails against a bamboo rail, decks out.
+	var rack_z := c.z + 5.7
+	for rx in [c.x - 4.4, c.x - 1.0, c.x + 2.4]:
+		var rg := _ground(rx, rack_z)
+		_bamboo(kit, Vector3(rx, rg - 0.3, rack_z), Vector3(rx, rg + 1.6, rack_z), 0.07, BAMBOO)
+	var rg0 := _ground(c.x - 1.0, rack_z)
+	_bamboo(kit, Vector3(c.x - 4.5, rg0 + 1.45, rack_z), Vector3(c.x + 2.5, rg0 + 1.45, rack_z), 0.05, BAMBOO.darkened(0.08))
+	_bamboo(kit, Vector3(c.x - 4.5, rg0 + 0.3, rack_z), Vector3(c.x + 2.5, rg0 + 0.3, rack_z), 0.05, BAMBOO.darkened(0.08))
+	var rack_boards := [
+		[0, 0, 2.05, Color(0.98, 0.45, 0.32), WHITE, Color(0.98, 0.45, 0.32)],
+		[1, 1, 2.75, Color(0.98, 0.93, 0.80), Color(0.20, 0.58, 0.80), Color(0.20, 0.58, 0.80)],
+		[2, 2, 1.80, Color(0.98, 0.85, 0.30), Color(0.12, 0.45, 0.55), Color(0.98, 0.85, 0.30)],
+		[0, 2, 1.95, WHITE, Color(0.90, 0.25, 0.30), Color(0.90, 0.25, 0.30)],
+		[1, 0, 2.85, Color(0.35, 0.75, 0.70), WHITE, Color(0.98, 0.93, 0.80)],
+		[0, 1, 2.0, Color(0.55, 0.45, 0.85), Color(0.98, 0.85, 0.30), Color(0.55, 0.45, 0.85)],
+	]
+	for i in range(rack_boards.size()):
+		var bd: Array = rack_boards[i]
+		var bx := c.x - 3.9 + i * 1.1 + rng.randf_range(-0.08, 0.08)
+		var lean := deg_to_rad(-11.0 - rng.randf_range(0.0, 3.0))
+		var foot := Vector3(bx, _ground(bx, rack_z + 0.4) - 0.04, rack_z + 0.09 + 1.45 * tan(-lean))
+		var bb := Basis(Vector3.UP, rng.randf_range(-0.06, 0.06)) * Basis(Vector3.RIGHT, lean) * Basis(Vector3.UP, rng.randf_range(-0.05, 0.05))
+		_surfboard(kit, Transform3D(bb, foot), bd[2], bd[0], bd[1], bd[3], bd[4], bd[5])
+	_box_collider(root, "BoardRack", Vector3(c.x - 4.6, rg0 - 0.3, rack_z - 0.15), Vector3(c.x + 2.6, rg0 + 1.6, rack_z + 0.45))
+	_note("BoardRack", Vector2(c.x - 1.0, rack_z), 3.6, CLEAR_BUILDING)
+
+	# A longboard on two sawhorses, being waxed.
+	var hz := c.z + 6.7
+	var hg := _ground(c.x + 4.0, hz)
+	for sx in [c.x + 3.1, c.x + 4.9]:
+		_sawhorse(kit, Vector3(sx, hg, hz))
+	var lb_basis := Basis(Vector3(0, 0, 1), Vector3(1, 0, 0), Vector3(0, 1, 0))
+	_surfboard(kit, Transform3D(lb_basis, Vector3(c.x + 2.6, hg + 0.80, hz)), 2.8, 1, 0, Color(0.98, 0.93, 0.80), Color(0.95, 0.40, 0.30), Color(0.95, 0.40, 0.30))
+	_block(kit, "paint", Vector3(c.x + 4.5, hg + 0.84, hz - 0.08), Vector3(c.x + 4.62, hg + 0.88, hz + 0.02), Color(0.98, 0.75, 0.82))
+	_box_collider(root, "Sawhorses", Vector3(c.x + 2.5, hg - 0.2, hz - 0.45), Vector3(c.x + 5.5, hg + 0.9, hz + 0.45))
+	_note("Sawhorses", Vector2(c.x + 4.0, hz), 1.6, CLEAR_BUILDING)
+
+	# One short board stuck nose-up in the sand by the tables.
+	var sp2 := Vector3(c.x - 7.2, 0.0, c.z + 4.3)
+	sp2.y = _ground(sp2.x, sp2.z)
+	var stuck := Basis(Vector3.UP, 0.9) * Basis(Vector3.FORWARD, 0.12) * Basis(Vector3.RIGHT, PI)
+	_surfboard(kit, Transform3D(stuck, sp2 + Vector3(0, 1.75, 0)), 1.95, 0, 2, Color(0.20, 0.58, 0.80), WHITE, Color(0.98, 0.85, 0.30))
+	_note("StuckBoard", Vector2(sp2.x, sp2.z), 0.5, CLEAR_DECOR)
+
 	_commit(root, kit, "SurfShack")
-	_box_collider(root, "SurfShack", Vector3(c.x - 5.0, g - 0.3, c.z - 4.0), Vector3(c.x + 5.0, fl + 3.0, c.z + 4.8))
+	_box_collider(root, "SurfShack", Vector3(c.x - 5.7, g - 0.3, c.z - 4.0), Vector3(c.x + 5.0, fl + 3.0, c.z + 4.0))
 	_note("SurfShack", Vector2(c.x, c.z), 6.4, CLEAR_BUILDING)
+
+
+## A bamboo cane: a tube with a raised node every 45cm.
+func _bamboo(kit: Dictionary, a: Vector3, b: Vector3, r: float, col: Color) -> void:
+	_tube(kit, "wood", a, b, r, r * 0.92, 8, col)
+	var dir := (b - a).normalized()
+	var nodes := int(a.distance_to(b) / 0.45)
+	for i in range(1, nodes + 1):
+		var p := a.lerp(b, float(i) / (nodes + 1))
+		_tube(kit, "wood", p - dir * 0.025, p + dir * 0.025, r * 1.14, r * 1.14, 8, col.lightened(0.18))
+
+
+func _bottle(kit: Dictionary, base: Vector3, h: float, col: Color) -> void:
+	var up := Vector3.UP
+	_tube(kit, "gloss", base, base + up * h * 0.66, 0.034, 0.034, 8, col)
+	_tube(kit, "paint", base + up * h * 0.22, base + up * h * 0.48, 0.0355, 0.0355, 8, Color(0.95, 0.92, 0.82), false)
+	_tube(kit, "gloss", base + up * h * 0.66, base + up * h * 0.8, 0.034, 0.013, 8, col, false)
+	_tube(kit, "gloss", base + up * h * 0.8, base + up * h, 0.013, 0.013, 6, col, false)
+	_tube(kit, "metal", base + up * h, base + up * (h + 0.015), 0.015, 0.015, 6, Color(0.8, 0.7, 0.3))
+
+
+## A hipped thatch: the eave rectangle (half sizes hx by hz) at `eave`, the ridge `rise` above, laid in
+## four courses that each end in a shaggy fringe, with bamboo rafters showing underneath.
+func _thatch(kit: Dictionary, rng: RandomNumberGenerator, eave: Vector3, hx: float, hz: float, rise: float) -> void:
+	var st := _st(kit, "thatch")
+	var straw := STRAW
+	var ridge_hx := hx - hz
+	var level := func(v: float) -> Array:
+		var ax := hx - v * hz
+		var az := hz * (1.0 - v)
+		var y := eave.y + v * rise
+		return [Vector3(eave.x - ax, y, eave.z - az), Vector3(eave.x + ax, y, eave.z - az), Vector3(eave.x + ax, y, eave.z + az), Vector3(eave.x - ax, y, eave.z + az)]
+	var outs := [Vector3(0, 0, -1), Vector3(1, 0, 0), Vector3(0, 0, 1), Vector3(-1, 0, 0)]
+	# Base surface, top and underside.
+	var lo: Array = level.call(0.0)
+	var hi: Array = level.call(1.0)
+	for i in range(4):
+		var o: Vector3 = outs[i]
+		var n := (o * rise + Vector3.UP * hz).normalized()
+		var a: Vector3 = lo[i]
+		var b: Vector3 = lo[(i + 1) % 4]
+		var ha: Vector3 = hi[i]
+		var hb: Vector3 = hi[(i + 1) % 4]
+		_tri(st, a, b, hb, n, n, n, straw.darkened(0.08), n)
+		_tri(st, a, hb, ha, n, n, n, straw.darkened(0.08), n)
+		_tri(st, a, b, hb, -n, -n, -n, straw.lightened(0.05), -n)
+		_tri(st, a, hb, ha, -n, -n, -n, straw.lightened(0.05), -n)
+	# Courses: a fringe of straw tufts along each level, hanging down the slope (straight down at the eave).
+	var courses := 4
+	for kc in range(courses):
+		var v := float(kc) / courses
+		var ring: Array = level.call(v + 0.02)
+		for i in range(4):
+			var o: Vector3 = outs[i]
+			var n := (o * rise + Vector3.UP * hz).normalized()
+			var down := (o * hz - Vector3.UP * rise).normalized()
+			if kc == 0:
+				down = (o * 0.35 - Vector3.UP).normalized()
+			var a: Vector3 = ring[i]
+			var b: Vector3 = ring[(i + 1) % 4]
+			var along := (b - a).normalized()
+			var edge_len := a.distance_to(b)
+			var fn := n if kc > 0 else (o + Vector3.UP * 0.3).normalized()
+			# Narrow overlapping blades of uneven length, so the edge reads as straw, not bunting.
+			for layer in range(2 if kc == 0 else 1):
+				var spacing := 0.13
+				var u := -0.05 + layer * spacing * 0.5
+				while u < edge_len + 0.05:
+					var wdt := rng.randf_range(0.10, 0.2)
+					var lift := n * (0.07 + 0.02 * kc + 0.035 * layer) + Vector3.UP * (0.04 * layer)
+					var p0 := a + along * (u - wdt * 0.5) + lift
+					var p1 := a + along * (u + wdt * 0.5) + lift
+					var drop := rng.randf_range(0.35, 0.75) * (0.8 if layer == 1 else 1.0)
+					var tip := (p0 + p1) * 0.5 + down * drop + along * rng.randf_range(-0.07, 0.07)
+					var col := straw.darkened(rng.randf_range(-0.10, 0.2))
+					_tri(st, p0, p1, tip, fn, fn, fn, col, fn)
+					_tri(st, p0, p1, tip, -fn, -fn, -fn, col.darkened(0.15), -fn)
+					u += spacing
+	# Ridge and hips capped with darker bundles.
+	var cap := straw.darkened(0.25)
+	_tube(kit, "thatch", hi[0] + Vector3(-0.15, 0.08, 0), hi[1] + Vector3(0.15, 0.08, 0), 0.16, 0.16, 8, cap)
+	var hip_tops := [hi[0], hi[1], hi[1], hi[0]]
+	for i in range(4):
+		_tube(kit, "thatch", lo[i] + Vector3(0, 0.06, 0), hip_tops[i] + Vector3(0, 0.08, 0), 0.1, 0.12, 6, cap)
+	# Rafters under the thatch, from the eaves up to the ridge.
+	var ridge_a: Vector3 = hi[0]
+	var ridge_b: Vector3 = hi[1]
+	for i in [0, 2]:
+		var a: Vector3 = lo[i]
+		var b: Vector3 = lo[(i + 1) % 4]
+		var n := ((outs[i] as Vector3) * rise + Vector3.UP * hz).normalized()
+		var steps := int(a.distance_to(b) / 1.1)
+		for s in range(steps + 1):
+			var p := a.lerp(b, float(s) / steps)
+			var top := Vector3(clampf(p.x, ridge_a.x, ridge_b.x), ridge_a.y, eave.z)
+			_tube(kit, "wood", p - n * 0.1, top - n * 0.1, 0.045, 0.04, 5, BAMBOO.darkened(0.2), false)
+	for i in [1, 3]:
+		var mid: Vector3 = (lo[i] + lo[(i + 1) % 4]) * 0.5
+		var n2 := ((outs[i] as Vector3) * rise + Vector3.UP * hz).normalized()
+		var top2: Vector3 = ridge_b if i == 1 else ridge_a
+		_tube(kit, "wood", mid - n2 * 0.1, top2 - n2 * 0.1, 0.045, 0.04, 5, BAMBOO.darkened(0.2), false)
+
+
+## A surfboard in its own frame: tail at the origin, nose up +y, deck facing +z.
+## style 0 shortboard (pointed nose, squash tail, three fins), 1 longboard (round nose, one big fin),
+## 2 fish (wide full tail, twin keels). design 0 stripes near the nose, 1 two-tone, 2 centre stripe.
+func _surfboard(kit: Dictionary, xf: Transform3D, length: float, style: int, design: int, deck: Color, accent: Color, rail: Color) -> void:
+	var p := {
+		"len": length,
+		"w": [0.50, 0.57, 0.56][style],
+		"thick": [0.062, 0.078, 0.066][style],
+		"tail": [0.56, 0.60, 0.80][style],
+		"nose": [0.80, 0.40, 0.62][style],
+		"rocker": [0.13, 0.10, 0.08][style],
+	}
+	var ts: Array = []
+	for i in range(31):
+		ts.append(float(i) / 30.0)
+	# A ring on each stripe edge keeps the colour edges crisp.
+	var edges: Array = [[0.60, 0.635, 0.66, 0.68], [0.42], []][design]
+	ts.append_array(edges)
+	ts.sort()
+	var around := 16
+	var st := _st(kit, "gloss")
+	var nb := xf.basis.inverse().transposed()
+	for i in range(ts.size() - 1):
+		var t0: float = ts[i]
+		var t1: float = ts[i + 1]
+		if t1 - t0 < 1e-4:
+			continue
+		var tm := (t0 + t1) * 0.5
+		for j in range(around):
+			# Offset by half a step so a quad sits on the deck's centre line and on each rail.
+			var a0 := TAU * (j - 0.5) / around
+			var a1 := TAU * (j + 0.5) / around
+			var am := TAU * j / around
+			var col := _board_colour(tm, am, design, deck, accent, rail)
+			var q00 := xf * _board_point(p, t0, a0)
+			var q01 := xf * _board_point(p, t0, a1)
+			var q10 := xf * _board_point(p, t1, a0)
+			var q11 := xf * _board_point(p, t1, a1)
+			var n00 := (nb * _board_normal(p, t0, a0)).normalized()
+			var n01 := (nb * _board_normal(p, t0, a1)).normalized()
+			var n10 := (nb * _board_normal(p, t1, a0)).normalized()
+			var n11 := (nb * _board_normal(p, t1, a1)).normalized()
+			var out := (nb * Vector3(cos(am), 0.0, sin(am))).normalized()
+			_tri(st, q00, q01, q11, n00, n01, n11, col, out)
+			_tri(st, q00, q11, q10, n00, n11, n10, col, out)
+	# Tail cap.
+	var tail_c := xf * Vector3(0.0, 0.0, _board_point(p, 0.0, 0.0).z)
+	var down := (nb * Vector3.DOWN).normalized()
+	for j in range(around):
+		var a0 := TAU * (j - 0.5) / around
+		var a1 := TAU * (j + 0.5) / around
+		_tri(st, tail_c, xf * _board_point(p, 0.0, a0), xf * _board_point(p, 0.0, a1), down, down, down, rail, down)
+	# Stringer down the deck of the painted designs.
+	if design != 2:
+		var sc := Color(0.55, 0.40, 0.25)
+		for i in range(1, 29):
+			var t0 := float(i) / 30.0
+			var t1 := float(i + 1) / 30.0
+			var d0 := _board_point(p, t0, PI * 0.5) + Vector3(0, 0, 0.0015)
+			var d1 := _board_point(p, t1, PI * 0.5) + Vector3(0, 0, 0.0015)
+			var up := (nb * _board_normal(p, t0, PI * 0.5)).normalized()
+			_quad(kit, "gloss", [xf * (d0 + Vector3(-0.005, 0, 0)), xf * (d0 + Vector3(0.005, 0, 0)), xf * (d1 + Vector3(0.005, 0, 0)), xf * (d1 + Vector3(-0.005, 0, 0))], up, sc)
+	# Fins under the tail.
+	var fin_col := Color(0.20, 0.22, 0.25) if style != 1 else accent
+	var half_at := func(y: float) -> float:
+		return absf(_board_point(p, y / length, 0.0).x)
+	var fins: Array = []
+	match style:
+		0:
+			fins = [[0.0, 0.05, 0.17, 0.11], [0.62 * half_at.call(0.28), 0.22, 0.33, 0.10], [-0.62 * half_at.call(0.28), 0.22, 0.33, 0.10]]
+		1:
+			fins = [[0.0, 0.08, 0.30, 0.2]]
+		2:
+			fins = [[0.6 * half_at.call(0.15), 0.05, 0.26, 0.09], [-0.6 * half_at.call(0.15), 0.05, 0.26, 0.09]]
+	for f in fins:
+		var fx: float = f[0]
+		var y0: float = f[1]
+		var y1: float = f[2]
+		var depth: float = f[3]
+		var bz0 := _board_point(p, y0 / length, -PI * 0.5).z + 0.004
+		var bz1 := _board_point(p, y1 / length, -PI * 0.5).z + 0.004
+		var tip := Vector3(fx, y0 - 0.03, bz0 - depth)
+		var b0 := Vector3(fx, y0, bz0)
+		var b1 := Vector3(fx, y1, bz1)
+		for side in [-1.0, 1.0]:
+			var o := Vector3(0.004 * side, 0, 0)
+			var fn := (nb * Vector3(side, 0, 0)).normalized()
+			_tri(st, xf * (b0 + o), xf * (b1 + o), xf * (tip + o), fn, fn, fn, fin_col, fn)
+		var edge_n := (nb * Vector3(0, 1, -0.3)).normalized()
+		_quad(kit, "gloss", [xf * (b1 + Vector3(-0.004, 0, 0)), xf * (b1 + Vector3(0.004, 0, 0)), xf * (tip + Vector3(0.004, 0, 0)), xf * (tip + Vector3(-0.004, 0, 0))], edge_n, fin_col)
+
+
+## A point on a board's skin: t along it (0 tail, 1 nose), a round its cross-section (0 the +x rail,
+## PI/2 the middle of the deck, 3PI/2 the bottom).
+func _board_point(p: Dictionary, t: float, a: float) -> Vector3:
+	var tail: float = p["tail"]
+	var f := tail + (1.0 - tail) * sin(PI * 0.5 * minf(t / 0.42, 1.0))
+	if t > 0.5:
+		f *= pow(clampf((1.0 - t) / 0.5, 0.0, 1.0), float(p["nose"]))
+	var half := 0.5 * float(p["w"]) * f
+	var th := 0.5 * float(p["thick"]) * (0.3 + 0.7 * sin(PI * clampf(t, 0.0, 1.0)))
+	var c := cos(a)
+	var s := sin(a)
+	var x := half * signf(c) * pow(absf(c), 0.55)
+	var z := th * signf(s) * pow(absf(s), 0.85)
+	if s < 0.0:
+		z *= 0.55
+	var rk: float = p["rocker"]
+	var lift := rk * pow(smoothstep(0.55, 1.0, t), 2.0) + rk * 0.35 * pow(1.0 - minf(t / 0.3, 1.0), 2.0)
+	return Vector3(x, t * float(p["len"]), z + lift)
+
+
+func _board_normal(p: Dictionary, t: float, a: float) -> Vector3:
+	var along := _board_point(p, minf(t + 0.004, 1.0), a) - _board_point(p, maxf(t - 0.004, 0.0), a)
+	var round_ := _board_point(p, t, a + 0.02) - _board_point(p, t, a - 0.02)
+	var n := along.cross(round_)
+	var guess := Vector3(cos(a), 0.0, sin(a))
+	if n.length_squared() < 1e-12:
+		return (guess + Vector3(0, 0.4 if t > 0.5 else -0.4, 0)).normalized()
+	n = n.normalized()
+	return n if n.dot(guess) > 0.0 else -n
+
+
+func _board_colour(t: float, a: float, design: int, deck: Color, accent: Color, rail: Color) -> Color:
+	var s := sin(a)
+	if absf(s) < 0.45:
+		return rail
+	if s < 0.0:
+		return Color(0.96, 0.96, 0.93)
+	match design:
+		0:
+			if (t > 0.60 and t < 0.635) or (t > 0.66 and t < 0.68):
+				return accent
+		1:
+			if t < 0.42:
+				return accent
+		2:
+			if absf(cos(a)) < 0.2:
+				return accent
+	return deck
+
+
+func _sawhorse(kit: Dictionary, at: Vector3) -> void:
+	var top := at + Vector3(0, 0.72, 0)
+	_block(kit, "wood", top + Vector3(-0.06, 0.0, -0.45), top + Vector3(0.06, 0.06, 0.45), WOOD)
+	for zs in [-0.35, 0.35]:
+		for xs in [-1.0, 1.0]:
+			_tube(kit, "wood", at + Vector3(xs * 0.22, -0.1, zs), top + Vector3(0, 0, zs), 0.03, 0.03, 4, OLD_WOOD)
+
+
+func _lifebuoy(kit: Dictionary, centre: Vector3, axis: Vector3, radius: float, tube_r: float) -> void:
+	var side := axis.cross(Vector3.UP).normalized()
+	var up := side.cross(axis).normalized()
+	var segs := 16
+	for i in range(segs):
+		var a0 := TAU * i / segs
+		var a1 := TAU * (i + 1) / segs
+		var p0 := centre + (side * cos(a0) + up * sin(a0)) * radius
+		var p1 := centre + (side * cos(a1) + up * sin(a1)) * radius
+		var col := Color(0.92, 0.22, 0.18) if (i / 2) % 2 == 0 else WHITE
+		_tube(kit, "gloss", p0, p1, tube_r, tube_r, 8, col, false)
+	# Grab line looped round it.
+	for i in range(4):
+		var a := TAU * (i + 0.5) / 4.0
+		var p := centre + (side * cos(a) + up * sin(a)) * (radius + tube_r)
+		_tube(kit, "paint", p - axis * 0.02, p + axis * 0.02, 0.012, 0.012, 4, Color(0.85, 0.8, 0.6), false)
+
+
+## A-frame chalkboard with a menu chalked on the sea side.
+func _menu_board(kit: Dictionary, at: Vector3) -> void:
+	var slate := Color(0.13, 0.19, 0.16)
+	var chalk := [Color(0.95, 0.95, 0.9), Color(0.98, 0.75, 0.82), Color(0.98, 0.88, 0.5)]
+	for side in [-1.0, 1.0]:
+		var b := Basis(Vector3.BACK, side * 0.22)
+		var centre := at + Vector3(side * 0.13, 0.5, 0)
+		_box(kit, "wood", Transform3D(b, centre), Vector3(0.04, 1.0, 0.7), OLD_WOOD)
+		_box(kit, "paint", Transform3D(b, centre + b * Vector3(side * 0.005, 0, 0)), Vector3(0.045, 0.86, 0.58), slate)
+		if side < 0.0:
+			var face := b * Vector3(-1, 0, 0)
+			var y := 0.3
+			var line := 0
+			while y > -0.34:
+				var w := 0.42 if line == 0 else 0.2 + 0.22 * fposmod(line * 0.618, 1.0)
+				var col: Color = chalk[1] if line == 0 else chalk[0]
+				var lc := centre + b * Vector3(-0.033, y, -0.2 + w * 0.5)
+				var lx := b * Vector3(0, 0, w * 0.5)
+				var ly := b * Vector3(0, 0.012 if line > 0 else 0.022, 0)
+				_quad(kit, "paint", [lc - lx - ly, lc + lx - ly, lc + lx + ly, lc - lx + ly], face, col)
+				if line > 0:
+					var pc := centre + b * Vector3(-0.033, y, 0.21)
+					var px2 := b * Vector3(0, 0, 0.03)
+					_quad(kit, "paint", [pc - px2 - ly, pc + px2 - ly, pc + px2 + ly, pc - px2 + ly], face, chalk[2])
+				y -= 0.095 if line > 0 else 0.13
+				line += 1
+
+
+## The bar's sign: a plank board with a sun rising out of two waves, facing the sea (-x).
+func _beach_bar_sign(kit: Dictionary, centre: Vector3) -> void:
+	var w := 1.0     # half width along z
+	var h := 0.36    # half height
+	_block(kit, "wood", centre + Vector3(0.0, -h - 0.05, -w - 0.05), centre + Vector3(0.06, h + 0.05, w + 0.05), OLD_WOOD)
+	var face := Vector3(-1, 0, 0)
+	var fx := centre.x - 0.004
+	var sky := [Color(0.98, 0.62, 0.38), Color(0.98, 0.78, 0.45), Color(0.98, 0.9, 0.62)]
+	for bnd in range(3):
+		var y0 := centre.y + h - (bnd + 1) * (h * 2.0 / 3.0)
+		var y1 := centre.y + h - bnd * (h * 2.0 / 3.0)
+		_quad(kit, "paint", [Vector3(fx, y0, centre.z - w), Vector3(fx, y0, centre.z + w), Vector3(fx, y1, centre.z + w), Vector3(fx, y1, centre.z - w)], face, sky[2 - bnd])
+	# Sun: a half disc on the horizon.
+	var st := _st(kit, "paint")
+	var sun_c := Vector3(fx - 0.004, centre.y - 0.08, centre.z)
+	for i in range(12):
+		var a0 := PI * i / 12.0
+		var a1 := PI * (i + 1) / 12.0
+		_tri(st, sun_c, sun_c + Vector3(0, sin(a0), cos(a0)) * 0.3, sun_c + Vector3(0, sin(a1), cos(a1)) * 0.3, face, face, face, Color(0.98, 0.42, 0.22), face)
+	# Two waves across the bottom, white crest lines over blue.
+	for wv in range(2):
+		var base_y := centre.y - h + 0.02 + wv * 0.13
+		var col: Color = [Color(0.12, 0.42, 0.68), Color(0.2, 0.62, 0.78)][wv]
+		var segs := 20
+		for s in range(segs):
+			var z0 := centre.z - w + 2.0 * w * s / segs
+			var z1 := centre.z - w + 2.0 * w * (s + 1) / segs
+			var c0 := base_y + 0.12 + 0.05 * sin(z0 * 7.0 + wv * 1.8)
+			var c1 := base_y + 0.12 + 0.05 * sin(z1 * 7.0 + wv * 1.8)
+			var lx := fx - 0.008 - wv * 0.003
+			_quad(kit, "paint", [Vector3(lx, centre.y - h, z0), Vector3(lx, centre.y - h, z1), Vector3(lx, c1, z1), Vector3(lx, c0, z0)], face, col)
+			_quad(kit, "paint", [Vector3(lx - 0.002, c0 - 0.02, z0), Vector3(lx - 0.002, c1 - 0.02, z1), Vector3(lx - 0.002, c1 + 0.01, z1), Vector3(lx - 0.002, c0 + 0.01, z0)], face, WHITE)
 
 
 func _umbrella(kit: Dictionary, at: Vector3, tilt: Vector3, cols: Array) -> void:

@@ -378,6 +378,12 @@ const SNOW_PLOUGH_DRAG := 1.1
 ## ancestors (1.0 when there is none). Scales lateral grip in full, and braking, traction and
 ## rolling resistance in part, so a car on glare ice slides wide and coasts on. Kept while airborne.
 var surface_grip: float = 1.0
+## Dust and spray colour of the surface under the wheels, from a "dust_color" meta on the collider
+## or an ancestor (alpha 0 when there is none, and the stage's default colour applies).
+var _surface_dust := Color(0, 0, 0, 0)
+## True on a surface with a "surface_spray" meta: it throws dirt like off-road ground although it
+## counts as track (Msitu Falls' mud).
+var _surface_spray := false
 ## How much of the surface grip loss reaches braking, traction and rolling resistance.
 const ICE_BRAKE_SHARE := 0.75
 const ICE_TRACTION_SHARE := 0.35
@@ -2136,6 +2142,8 @@ func _physics_process(delta):
 					break
 				cur = cur.get_parent()
 			surface_grip = _surface_grip_of(collider)
+			_surface_dust = _surface_meta_of(collider, &"dust_color", Color(0, 0, 0, 0))
+			_surface_spray = bool(_surface_meta_of(collider, &"surface_spray", false))
 
 	is_in_snow = on_snow_surface or (_snow_drift_depth > 0) or (is_offroad and _snow_stage)
 	_update_snow_plough_depth()
@@ -2563,7 +2571,7 @@ func _physics_process(delta):
 
 	# Emit dirt particles when offroad or on snow, moving, and NOT in water
 	var in_water_now := stage_has_water and (is_underwater or (water_surface_y - global_position.y >= -0.80 and _is_over_water_volume()))
-	var emit_dirt = (is_offroad or is_in_snow) and on_ground and linear_velocity.length() > 1.8 and not in_water_now
+	var emit_dirt = (is_offroad or is_in_snow or _surface_spray) and on_ground and linear_velocity.length() > 1.8 and not in_water_now
 	_set_dirt_emitting(emit_dirt)
 	sync_emit_dirt = emit_dirt
 
@@ -2763,6 +2771,16 @@ func _surface_grip_of(collider: Object) -> float:
 			return float(cur.get_meta(&"ice_grip"))
 		cur = cur.get_parent()
 	return 1.0
+
+
+## The nearest `key` meta on `collider` or an ancestor below the level, else `fallback`.
+func _surface_meta_of(collider: Object, key: StringName, fallback: Variant) -> Variant:
+	var cur: Node = collider as Node
+	while cur and cur != _cached_level:
+		if cur.has_meta(key):
+			return cur.get_meta(key)
+		cur = cur.get_parent()
+	return fallback
 
 
 func _is_loop_surface(collider: Object) -> bool:
@@ -5092,6 +5110,8 @@ func _create_dirt_particles(wheel_name: String):
 
 
 func _get_current_surface_dust_color() -> Color:
+	if _surface_dust.a > 0.0:
+		return _surface_dust
 	var lvl = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
 	var lvl_name = ""
 	if lvl:

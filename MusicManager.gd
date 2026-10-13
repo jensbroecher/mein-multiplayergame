@@ -21,12 +21,24 @@ var anti_aliasing: int = 2 # 0: Disabled, 1: 2x MSAA, 2: 4x MSAA, 3: 8x MSAA, 4:
 var shadows_enabled: bool = false
 ## 0=Off 1=Low 2=Medium 3=High — controls map size, soft filter, and light splits.
 var shadow_quality_index: int = 0
-## 0=Auto (default), 1=Off, 2=Low, 3=Medium, 4=High, 5=Ultra.
+## 0=Auto (default), 1=Off, 2=Low, 3=Medium, 4=High, 5=Ultra. Covers all vegetation detail:
+## the grass, and on stages with more (Msitu Falls' rainforest) whatever listens in the
+## "vegetation_detail" group.
 var grass_quality_setting: int = 0
 ## 0=Off 1=Low 2=Medium 3=High 4=Ultra — active runtime quality applied to meshes and shaders.
 var grass_quality_index: int = 4
 var _auto_grass_warmup: float = 3.0
 var _low_fps_duration: float = 0.0
+## Auto vegetation detail: GPU time and frames gathered since the last evaluation, how long the
+## frame has run over budget / with room to spare, and how long upgrades stay blocked after a
+## downgrade (so the detail does not see-saw).
+var _auto_gpu_sum: float = 0.0
+var _auto_frames: int = 0
+var _auto_window: float = 0.0
+var _auto_over: float = 0.0
+var _auto_spare: float = 0.0
+var _auto_block_up: float = 0.0
+var _auto_measuring_rid: RID = RID()
 var render_scale_index: int = 1 # 0:50% 1:75% 2:100% 3:125%
 ## Preferred renderer: "mobile" or "forward_plus". Applied via restart (--rendering-method).
 var renderer_method: String = "mobile"
@@ -62,6 +74,19 @@ const GRASS_QUALITY_NAMES = ["Off", "Low", "Medium", "High", "Ultra"]
 const GRASS_DENSITIES = [0.0, 0.25, 0.50, 0.75, 1.0]
 const GRASS_DISTANCES = [0.0, 130.0, 220.0, 300.0, 350.0]
 const GRASS_FADE_RANGES = [0.0, 35.0, 50.0, 50.0, 60.0]
+## Auto starts here on every stage and moves one step at a time between AUTO_MIN and AUTO_MAX.
+const AUTO_START_QUALITY := 3
+const AUTO_MIN_QUALITY := 1
+const AUTO_MAX_QUALITY := 4
+## Over budget: the GPU needs more than this share of the frame (or the frame rate drops).
+## Room to spare: the GPU needs less than AUTO_SPARE_SHARE of it.
+const AUTO_OVER_SHARE := 0.92
+const AUTO_SPARE_SHARE := 0.5
+## Seconds over budget before stepping down, with room to spare before stepping up, and that
+## upgrades stay blocked after a step down.
+const AUTO_DOWN_AFTER := 1.5
+const AUTO_UP_AFTER := 6.0
+const AUTO_UP_BLOCK := 30.0
 
 
 var current_track_index = -1
@@ -326,6 +351,8 @@ func load_playlist_for_level(scene_path: String):
 		level_key = "frost"
 	elif path_lower.contains("mountain") or path_lower.contains("wadi") or path_lower.contains("mara"):
 		level_key = "mountain"
+	elif path_lower.contains("msitu") or path_lower.contains("jungle"):
+		level_key = "forest"
 	elif path_lower.contains("canyon"):
 		level_key = "canyon"
 	elif path_lower.contains("city") or path_lower.contains("harbor"):
@@ -518,6 +545,8 @@ func load_playlist_for_level(scene_path: String):
 		subfolder = music_folder + "canyon/"
 	elif level_key == "city":
 		subfolder = music_folder + "city/"
+	elif level_key == "forest":
+		subfolder = music_folder + "forrest/"
 
 	if subfolder != "" and DirAccess.open(subfolder) != null:
 		_load_playlist(subfolder)
@@ -913,8 +942,9 @@ func set_grass_setting(setting_idx: int, save: bool = true) -> void:
 	_low_fps_duration = 0.0
 	_auto_grass_warmup = 3.0
 	if grass_quality_setting == 0:
-		# Auto: start at Ultra (4), will drop to Low (1) if framerate < 60 FPS
-		set_grass_quality(4, false)
+		# Auto: start at High and follow the machine (_check_auto_grass_quality).
+		_reset_auto_quality()
+		set_grass_quality(AUTO_START_QUALITY, false)
 	else:
 		# Manual: 1: Off (0), 2: Low (1), 3: Medium (2), 4: High (3), 5: Ultra (4)
 		set_grass_quality(grass_quality_setting - 1, false)
@@ -926,14 +956,16 @@ func set_grass_quality(index: int, save: bool = true) -> void:
 	grass_quality_index = clampi(index, 0, 4)
 	if is_inside_tree() and get_tree():
 		_apply_grass_quality_to_tree(get_tree().root)
+		get_tree().call_group(&"vegetation_detail", &"apply_vegetation_quality", grass_quality_index)
 	if save:
 		save_settings()
 
+## Auto vegetation detail. Steps down one level when the frame runs over budget for a moment,
+## and back up when the GPU has had plenty of room to spare for a while. Headroom is read from
+## the main viewport's measured GPU time, so it shows even when the frame rate is capped; where
+## the renderer can't measure it, only an uncapped frame rate well over the target counts.
 func _check_auto_grass_quality(delta: float) -> void:
 	if grass_quality_setting != 0:
-		return
-	# Already at Low (1) or Off (0); no need to downgrade
-	if grass_quality_index <= 1:
 		return
 	if not is_inside_tree():
 		return
@@ -945,25 +977,74 @@ func _check_auto_grass_quality(delta: float) -> void:
 	if carts.is_empty():
 		_low_fps_duration = 0.0
 		return
-	
-	# Wait out initial track loading / scene spawn hitches
+	var vp := get_viewport()
+	if vp == null:
+		return
+	var rid: RID = vp.get_viewport_rid()
+	if rid != _auto_measuring_rid:
+		RenderingServer.viewport_set_measure_render_time(rid, true)
+		_auto_measuring_rid = rid
+		return
+	_auto_block_up = maxf(0.0, _auto_block_up - delta)
+	# Wait out initial track loading / scene spawn hitches, and the hitch a change makes.
 	if _auto_grass_warmup > 0.0:
 		_auto_grass_warmup -= delta
 		return
-	
-	var fps := Engine.get_frames_per_second()
-	if fps < 60:
-		_low_fps_duration += delta
-		if _low_fps_duration >= 1.0:
-			_set_auto_grass_low()
-	else:
-		_low_fps_duration = maxf(0.0, _low_fps_duration - delta)
-
-func _set_auto_grass_low() -> void:
-	if grass_quality_index == 1:
+	_auto_gpu_sum += RenderingServer.viewport_get_measured_render_time_gpu(rid)
+	_auto_frames += 1
+	_auto_window += delta
+	if _auto_window < 0.5:
 		return
-	print("[MusicManager] Auto grass: Framerate below 60 FPS (%d FPS). Setting grass shader to Low." % Engine.get_frames_per_second())
-	set_grass_quality(1, false)
+	var gpu_ms: float = _auto_gpu_sum / float(maxi(_auto_frames, 1))
+	var window: float = _auto_window
+	_auto_gpu_sum = 0.0
+	_auto_frames = 0
+	_auto_window = 0.0
+	var fps: float = Engine.get_frames_per_second()
+	var target: float = _auto_target_fps()
+	var budget_ms: float = 1000.0 / target
+	var over: bool = fps < target - 6.0 or (gpu_ms > 0.01 and gpu_ms > budget_ms * AUTO_OVER_SHARE)
+	var spare: bool = fps >= target - 2.0 and (gpu_ms < budget_ms * AUTO_SPARE_SHARE if gpu_ms > 0.01 else fps > target * 1.25)
+	if over:
+		_auto_over += window
+		_auto_spare = 0.0
+		if _auto_over >= AUTO_DOWN_AFTER and grass_quality_index > AUTO_MIN_QUALITY:
+			print("[MusicManager] Auto vegetation detail: %d FPS, GPU %.1fms of %.1fms. Down to %s." % [
+				int(fps), gpu_ms, budget_ms, GRASS_QUALITY_NAMES[grass_quality_index - 1]])
+			set_grass_quality(grass_quality_index - 1, false)
+			_auto_over = 0.0
+			_auto_block_up = AUTO_UP_BLOCK
+			_auto_grass_warmup = 1.0
+	elif spare:
+		_auto_spare += window
+		_auto_over = 0.0
+		if _auto_spare >= AUTO_UP_AFTER and _auto_block_up <= 0.0 and grass_quality_index < AUTO_MAX_QUALITY:
+			print("[MusicManager] Auto vegetation detail: %d FPS, GPU %.1fms of %.1fms. Up to %s." % [
+				int(fps), gpu_ms, budget_ms, GRASS_QUALITY_NAMES[grass_quality_index + 1]])
+			set_grass_quality(grass_quality_index + 1, false)
+			_auto_spare = 0.0
+			_auto_grass_warmup = 2.0
+	else:
+		_auto_over = maxf(0.0, _auto_over - window)
+		_auto_spare = maxf(0.0, _auto_spare - window)
+
+
+## The frame rate Auto holds detail to: 60, or the player's cap when it is lower (never below 30).
+func _auto_target_fps() -> float:
+	var cap: int = MAX_FPS_VALUES[clampi(max_fps_index, 0, MAX_FPS_VALUES.size() - 1)]
+	return float(clampi(cap, 30, 60)) if cap > 0 else 60.0
+
+
+func _reset_auto_quality() -> void:
+	_low_fps_duration = 0.0
+	_auto_grass_warmup = 3.0
+	_auto_gpu_sum = 0.0
+	_auto_frames = 0
+	_auto_window = 0.0
+	_auto_over = 0.0
+	_auto_spare = 0.0
+	_auto_block_up = 0.0
+
 
 func _apply_grass_quality_to_tree(node: Node) -> void:
 	if node == null:
@@ -1027,9 +1108,8 @@ func _apply_grass_quality_to_tree(node: Node) -> void:
 func refresh_level_graphics() -> void:
 	set_shadow_quality(shadow_quality_index, false)
 	if grass_quality_setting == 0:
-		_low_fps_duration = 0.0
-		_auto_grass_warmup = 3.0
-		set_grass_quality(4, false)
+		_reset_auto_quality()
+		set_grass_quality(AUTO_START_QUALITY, false)
 	else:
 		set_grass_quality(grass_quality_index, false)
 	set_anisotropic(anisotropic_index, false)
