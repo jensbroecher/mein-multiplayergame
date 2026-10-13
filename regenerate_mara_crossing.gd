@@ -166,6 +166,7 @@ var _rs_cells := {}
 ## Directions for measuring a granite block's extent (_granite_probe_dirs).
 var _probe_dirs := PackedVector3Array()
 var _leaf_tex: Texture2D
+var _baobab_leaf_tex: Texture2D
 
 var _grid_x := PackedFloat32Array()
 var _grid_z := PackedFloat32Array()
@@ -1856,6 +1857,71 @@ func _leaf_twig(cv: LeafCanvas, p: Vector2, ang: float, length: float, width: fl
 		travelled += seg
 
 
+## Leaf sprays for the baobab cards, a 2 x 2 atlas like the acacias': in each, a few stout grey
+## twigs radiate from the middle, with hand-shaped leaves along their outer half and a rosette of
+## them at the end, sky showing between.
+func _baobab_leaf_texture() -> Texture2D:
+	if _baobab_leaf_tex:
+		return _baobab_leaf_tex
+	const W := 1024
+	const CELL := 512
+	var cv := LeafCanvas.new(W, Color(0.24, 0.36, 0.13))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 6161
+	var twig_col := Color(0.46, 0.40, 0.36)
+	for cell in range(4):
+		var centre := Vector2(float(cell % 2) * CELL + CELL * 0.5, float(cell / 2) * CELL + CELL * 0.5)
+		var twigs: int = rng.randi_range(5, 7)
+		# Twigs first: leaves are drawn over them.
+		var ends: Array = []
+		for t in range(twigs):
+			var a: float = TAU * float(t) / float(twigs) + rng.randf_range(-0.35, 0.35)
+			var from: Vector2 = centre + Vector2(cos(a), sin(a)) * rng.randf_range(0.0, 30.0)
+			var to: Vector2 = from + Vector2(cos(a), sin(a)) * rng.randf_range(80.0, 130.0)
+			cv.line(from, to, 4.2, 2.4, twig_col)
+			ends.append([from, to, a])
+		for e in ends:
+			var from2: Vector2 = e[0]
+			var to2: Vector2 = e[1]
+			var a2: float = e[2]
+			for n in range(rng.randi_range(2, 4)):
+				var side: float = 1.0 if n % 2 == 0 else -1.0
+				_palmate_leaf(cv, from2.lerp(to2, rng.randf_range(0.45, 0.85)), a2 + side * rng.randf_range(0.6, 1.3), rng.randf_range(24.0, 34.0), rng)
+			var rosette: int = rng.randi_range(5, 7)
+			for n in range(rosette):
+				var la: float = a2 + lerpf(-2.0, 2.0, float(n) / float(rosette - 1)) + rng.randf_range(-0.2, 0.2)
+				_palmate_leaf(cv, to2, la, rng.randf_range(28.0, 40.0), rng)
+	var img := _coverage_mipmaps(cv, 0.5)
+	_baobab_leaf_tex = _save_baked_resource(ImageTexture.create_from_image(img), "baobab_leaves")
+	return _baobab_leaf_tex
+
+
+## One baobab leaf on the canvas: a stalk from `p` toward `ang` and five to seven leaflets
+## fanned out from its end, the middle ones longest at `size` pixels, widest past halfway.
+func _palmate_leaf(cv: LeafCanvas, p: Vector2, ang: float, size: float, rng: RandomNumberGenerator) -> void:
+	var hub: Vector2 = p + Vector2(cos(ang), sin(ang)) * size * rng.randf_range(0.45, 0.65)
+	cv.line(p, hub, 0.9, 0.7, Color(0.30, 0.36, 0.16))
+	# Mid green, the young leaves fresher and yellower.
+	var col := Color(0.23, 0.33, 0.14).lerp(Color(0.33, 0.42, 0.19), rng.randf())
+	if rng.randf() < 0.2:
+		col = col.lerp(Color(0.44, 0.50, 0.22), 0.6)
+	var n: int = rng.randi_range(5, 7)
+	var spread: float = rng.randf_range(2.6, 3.6)
+	for k in range(n):
+		var t: float = float(k) / float(n - 1) - 0.5
+		var la: float = ang + t * spread + rng.randf_range(-0.08, 0.08)
+		var ll: float = size * lerpf(1.0, 0.55, 4.0 * t * t) * rng.randf_range(0.9, 1.05)
+		var dir := Vector2(cos(la), sin(la))
+		var mid: Vector2 = hub + dir * ll * 0.58
+		var tip: Vector2 = hub + dir * ll
+		var wdt: float = ll * 0.17
+		var c: Color = col * rng.randf_range(0.88, 1.12)
+		cv.line(hub + dir * 1.5, mid, 0.8, wdt, c)
+		cv.line(mid, tip, wdt, 0.6, c)
+		# The midrib, a little paler.
+		cv.line(hub + dir * 1.5, tip - dir * ll * 0.12, 0.45, 0.3, c.lerp(Color(0.55, 0.60, 0.32), 0.35))
+
+
 ## Mipmapped RGBA8 image of the canvas whose every mip keeps level 0's coverage at alpha
 ## `cutoff` (each level's alpha scaled up until as many texels pass the test).
 func _coverage_mipmaps(cv: LeafCanvas, cutoff: float) -> Image:
@@ -2200,9 +2266,10 @@ func _set_tree_lod(m: ShaderMaterial, lod_mode: int) -> void:
 	m.set_shader_parameter("lod_jitter", ACACIA_FADE_JITTER)
 
 
-## Baobab in the dry season, twice life size: a massive, fluted trunk, barely tapering until
-## its shoulders, and a spreading crown of bare, crooked branches like roots in the air.
-func _baobab_mesh(variant: int, mat: Material) -> ArrayMesh:
+## Baobab in leaf, twice life size: a massive, fluted trunk, barely tapering until its
+## shoulders, and a spreading crown of crooked branches like roots in the air, the leaves in
+## loose clusters at their twigs' ends. Surface 0 the bark, 1 the foliage.
+func _baobab_mesh(variant: int, bark_mat: Material, leaf_mat: Material) -> ArrayMesh:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 9091 + variant * 13
 	var noise := FastNoiseLite.new()
@@ -2224,21 +2291,48 @@ func _baobab_mesh(variant: int, mat: Material) -> ArrayMesh:
 	trunk_r.append(rb * 0.12)
 	var base: int = _bark_tube(st, 0, trunk_pts, trunk_r, 22, col, 0.6, 0.12, noise, Vector2(1000.0, 1001.0))
 	var branches: int = 9 if variant == 0 else 6
+	var twigs: Array = []
 	for i in range(branches):
 		var a: float = TAU * float(i) / float(branches) + rng.randf_range(-0.25, 0.25)
 		var elev: float = rng.randf_range(0.12, 0.45)
 		var start := Vector3(cos(a) * rb * 0.32, h * rng.randf_range(0.93, 1.0), sin(a) * rb * 0.32)
 		var dir := Vector3(cos(a) * cos(elev), sin(elev), sin(a) * cos(elev))
-		base = _bare_branch(st, base, start, dir, rb * rng.randf_range(1.3, 1.9), rb * rng.randf_range(0.22, 0.3), 0, rng, noise, col)
+		base = _bare_branch(st, base, start, dir, rb * rng.randf_range(1.3, 1.9), rb * rng.randf_range(0.22, 0.3), 0, rng, noise, col, twigs)
 	var mesh: ArrayMesh = st.commit()
-	mesh.surface_set_material(0, mat)
+	mesh.surface_set_material(0, bark_mat)
+	# A leaf cluster round each twig's end and smaller ones back along it, held a little above
+	# the twig: pads for _acacia_cards, [centre, radius, thickness].
+	var leaf_rng := RandomNumberGenerator.new()
+	leaf_rng.seed = 5353 + variant * 17
+	var pads: Array = []
+	var under := 1e9
+	var top := -1e9
+	var cr := 0.0
+	for tw in twigs:
+		var pts: Array = tw
+		var tip: Vector3 = pts[pts.size() - 1]
+		var tip_dir: Vector3 = (tip - (pts[pts.size() - 2] as Vector3)).normalized()
+		for k in range(1, pts.size()):
+			var big: bool = k == pts.size() - 1
+			var pr: float = rb * [0.0, 0.24, 0.34, 0.48][k] * leaf_rng.randf_range(0.85, 1.15)
+			var c: Vector3 = (pts[k] as Vector3) + (tip_dir * pr * 0.35 if big else Vector3.ZERO) + Vector3(0.0, pr * 0.25, 0.0)
+			var th: float = pr * leaf_rng.randf_range(0.8, 1.0)
+			pads.append([c, pr, th])
+			under = minf(under, c.y - th * 0.5)
+			top = maxf(top, c.y + th * 0.5)
+			cr = maxf(cr, Vector2(c.x, c.z).length() + pr)
+	var st2 := SurfaceTool.new()
+	st2.begin(Mesh.PRIMITIVE_TRIANGLES)
+	_acacia_cards(st2, pads, cr, top, under, 1.1, Vector2(1.8, 2.8), leaf_rng)
+	st2.commit(mesh)
+	mesh.surface_set_material(1, leaf_mat)
 	return mesh
 
 
-## A bare, crooked branch of `length` metres from `start` toward `dir`, wandering and only
-## slowly turning upward, and its side branches down to the twigs (depth 2). Returns the next
-## free vertex index.
-func _bare_branch(st: SurfaceTool, base: int, start: Vector3, dir: Vector3, length: float, radius: float, depth: int, rng: RandomNumberGenerator, noise: FastNoiseLite, col: Color) -> int:
+## A crooked branch of `length` metres from `start` toward `dir`, wandering and only slowly
+## turning upward, and its side branches down to the twigs (depth 2), whose points it appends
+## to `twigs`. Returns the next free vertex index.
+func _bare_branch(st: SurfaceTool, base: int, start: Vector3, dir: Vector3, length: float, radius: float, depth: int, rng: RandomNumberGenerator, noise: FastNoiseLite, col: Color, twigs: Array) -> int:
 	var pts: Array = [start]
 	var radii: Array = [radius]
 	var d: Vector3 = dir
@@ -2255,7 +2349,9 @@ func _bare_branch(st: SurfaceTool, base: int, start: Vector3, dir: Vector3, leng
 		for c in range(children):
 			var from_k: int = segs if c == 0 else segs - 1
 			var cd: Vector3 = (d + Vector3(rng.randf_range(-0.9, 0.9), rng.randf_range(-0.05, 0.4), rng.randf_range(-0.9, 0.9))).normalized()
-			base = _bare_branch(st, base, pts[from_k], cd, length * 0.6, float(radii[from_k]) * 0.75, depth + 1, rng, noise, col)
+			base = _bare_branch(st, base, pts[from_k], cd, length * 0.6, float(radii[from_k]) * 0.75, depth + 1, rng, noise, col, twigs)
+	else:
+		twigs.append(pts)
 	return base
 
 
@@ -2453,7 +2549,13 @@ func _build_trees(parent: Node) -> void:
 	# Shallow folds that run round the trunk, not along it.
 	baobab_bark.set_shader_parameter("plate_stretch", 0.3)
 	baobab_bark.set_shader_parameter("roughness_value", 0.85)
-	var baobab_meshes: Array = [_save_baked_resource(_baobab_mesh(0, baobab_bark), "baobab_0"), _save_baked_resource(_baobab_mesh(1, baobab_bark), "baobab_1")]
+	var baobab_leaves := ShaderMaterial.new()
+	baobab_leaves.shader = load("res://acacia_leaves.gdshader")
+	baobab_leaves.set_shader_parameter("leaf_tex", _baobab_leaf_texture())
+	baobab_leaves.set_shader_parameter("backlight_color", Color(0.48, 0.66, 0.26))
+	# The clusters hang off stiff twigs that don't sway.
+	baobab_leaves.set_shader_parameter("sway", 0.06)
+	var baobab_meshes: Array = [_save_baked_resource(_baobab_mesh(0, baobab_bark, baobab_leaves), "baobab_0"), _save_baked_resource(_baobab_mesh(1, baobab_bark, baobab_leaves), "baobab_1")]
 	var baobabs: Array = [[Vector2(-212.0, 185.0), 1.15, 0], [Vector2(-300.0, 250.0), 1.0, 1], [Vector2(-160.0, 330.0), 1.0, 0],
 			[Vector2(-345.0, 60.0), 1.0, 1], [Vector2(60.0, 280.0), 1.05, 0], [Vector2(-60.0, 120.0), 0.9, 1],
 			[Vector2(300.0, 130.0), 1.0, 0], [Vector2(460.0, -260.0), 1.0, 1], [Vector2(-390.0, -260.0), 1.05, 0]]

@@ -7,7 +7,8 @@ render_mode cull_disabled, diffuse_burley, specular_schlick_ggx;
 //   NORMAL - the crown's, not the card's: a flattened sphere round the canopy, tipped up, so
 //            the canopy shades as one lacy mass, bright on top and on the sun's side
 //   COLOR  - rgb a tint per pad and card, a the shade inside the canopy (dark underneath)
-// The texture's mipmaps keep their coverage, so distant canopies don't thin out.
+// The texture's mipmaps keep their coverage, so distant canopies don't thin out. The baobabs'
+// leaf clusters use it too, with a texture of their own (_baobab_leaf_texture).
 
 #include "res://tree_lod.gdshaderinc"
 
