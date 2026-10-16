@@ -1,7 +1,6 @@
 [gd_scene format=3 uid="uid://boostpad123"]
 
 [ext_resource type="Script" uid="uid://dj82omuygw7gb" path="res://BoostPad.gd" id="1_script"]
-[ext_resource type="PackedScene" uid="uid://donu5uxl4rab7" path="res://models/boostpad.fbx" id="2_oa57w"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_1"]
 size = Vector3(4, 2, 6)
@@ -12,6 +11,3 @@ script = ExtResource("1_script")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1132480844]
 shape = SubResource("BoxShape3D_1")
-
-[node name="boostpad" parent="." unique_id=1292453474 instance=ExtResource("2_oa57w")]
-transform = Transform3D(-2.1855695e-07, 6.884561, 1.5176737e-07, 0, -3.0093372e-07, 3.4720328, 5, 3.0093372e-07, 6.6339625e-15, -1.2081627, 0.03176868, -0.1470952)

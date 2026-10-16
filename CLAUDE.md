@@ -78,6 +78,15 @@ without regenerating them, run `res://refresh_curb_corners.tscn` headless.
   name:gate:x,y,z:tx,ty,tz[:step]` renders gates from cameras in gate space (X across the road, grid on
   +Z), with any start-light step.
 
+## Boost pads
+
+`BoostPad.gd` builds the pad itself as an internal child: a flat bevelled slab (4x6m, 8cm), one mesh
+shared by every pad, drawn by `boost_pad.gdshader` with chevrons streaming toward the pad's front (-z).
+The trigger flash is the per-instance shader parameter `flash`. Level files only store the transform,
+so a change to the pad shows on every level. With `settle_on_track`, a pad drops onto the surface
+under it at runtime (after `wait_for_collisions`), tilts with it and faces along the TrackPath.
+Bloombay sets it on.
+
 ## Frostpeak sky
 
 `sky_winter_cirrus.gdshader` (sky shader, set by the generator) draws the sky gradient, sun and static cirrus.
@@ -294,6 +303,11 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   parasol sets and the fence. The pier and the lighthouse grow seaward from their landward ends.
 - Parasol sets are rejection-sampled per zone (`PARASOL_ZONES`): `PARASOL_GAP` apart, on dry level sand,
   clear of the track and of every footprint noted before them. The fence is built first for that reason.
+- Loungers and cool boxes are knockable (`KnockableProps.gd`). Each design is one MultiMesh, and each
+  prop a frozen rigid body that a cart faster than `push_speed` frees as it nears. At 22 m/s a cart
+  keeps ~88% of its speed and flings a lounger clear; a slower cart stops against it. `_knock_add`
+  records them in the parasol sets, and `_build_knockables` builds the meshes at the origin.
+  Towels have no collision.
 - Sign lettering is block capitals from `GLYPHS` (`_pixel_text`), since text can't be drawn headless. Add
   any letter you need to the table.
 - Flags (`_flag`) wave in `flag_wave.gdshader`. The shader reads the hoist-to-fly position from UV.x

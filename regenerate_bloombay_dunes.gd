@@ -281,22 +281,27 @@ func _ready() -> void:
 	level_scene.add_child(boost_container)
 
 	if boost_scene:
-		var bp_defs = [
-			# pos, rot_y_deg
-			[Vector3(-47.0, 0.55, -80.0), 0.0],    # Beachfront tidal straight speed boost
-			[Vector3(35.0, 7.80, -310.0), -70.0],  # Dune climb launcher
-			[Vector3(200.0, 9.50, -90.0), -20.0],  # Valley plunge exit into ridge 2
-			[Vector3(180.0, 26.05, 95.0), -22.0],  # Takeoff ramp big jump launch boost
-			# Out of the last corner onto the finish straight. It stood on the crest at point 19, at the
-			# start of the sweep: a pad pushes for 2s whatever the brakes do, and the AI doesn't brake
-			# while boosting, so carts ran wide there and off the map's edge.
-			[Vector3(-40.0, 0.75, 205.0), 0.0]
+		# Each pad sits on the racing line at its distance along the lap (nearest to the spot it was
+		# placed at by hand), facing the way the lap runs; at runtime it settles onto the surface.
+		var bp_spots := [
+			Vector3(-47.0, 0.55, -80.0),    # Beachfront tidal straight speed boost
+			Vector3(35.0, 7.80, -310.0),    # Dune climb launcher
+			Vector3(200.0, 9.50, -90.0),    # Valley plunge exit into ridge 2
+			Vector3(180.0, 26.05, 95.0),    # Takeoff ramp big jump launch boost
+			# Out of the last corner onto the finish straight. It stood on the crest at point 19, at
+			# the start of the sweep: a pad pushes for 2s whatever the brakes do, and the AI doesn't
+			# brake while boosting, so carts ran wide there and off the map's edge.
+			Vector3(-40.0, 0.75, 205.0),
 		]
-		for i in range(bp_defs.size()):
+		for i in range(bp_spots.size()):
+			var off: float = curve.get_closest_offset(bp_spots[i])
+			var at: Vector3 = curve.sample_baked(off)
+			var ahead: Vector3 = curve.sample_baked(minf(off + 2.0, curve.get_baked_length())) - curve.sample_baked(maxf(off - 2.0, 0.0))
+			ahead.y = 0.0
 			var bp = boost_scene.instantiate()
 			bp.name = "BoostPad_%d" % (i + 1)
-			bp.position = bp_defs[i][0]
-			bp.rotation_degrees = Vector3(0, bp_defs[i][1], 0)
+			bp.transform = Transform3D(Basis.looking_at(ahead.normalized(), Vector3.UP), at + Vector3(0, 0.1, 0))
+			bp.set("settle_on_track", true)
 			boost_container.add_child(bp)
 
 	# 7. Scenery Props & Vegetation Containers (empty so user can add custom trees/plants)
@@ -1190,12 +1195,17 @@ func _rock(kit: Dictionary, centre: Vector3, size: Vector3, seed_v: int, col: Co
 	return pts
 
 
-func _commit(parent: Node3D, kit: Dictionary, name: String) -> MeshInstance3D:
+func _kit_mesh(kit: Dictionary) -> ArrayMesh:
 	var mesh := ArrayMesh.new()
 	for key in kit.keys():
 		var st: SurfaceTool = kit[key]
 		st.commit(mesh)
 		mesh.surface_set_material(mesh.get_surface_count() - 1, _mat(key))
+	return mesh
+
+
+func _commit(parent: Node3D, kit: Dictionary, name: String) -> MeshInstance3D:
+	var mesh := _kit_mesh(kit)
 	var mi := MeshInstance3D.new()
 	mi.name = name
 	mi.mesh = _tg.call("_save_resource", mesh, "seafront_" + name.to_snake_case())
@@ -3738,13 +3748,211 @@ func _umbrella(kit: Dictionary, at: Vector3, tilt: Vector3, cols: Array) -> void
 		_tri(st, r0, r1, apex, n, n, n, cols[i % cols.size()], n)
 
 
-func _lounger(kit: Dictionary, at: Vector3, yaw: float, col: Color) -> void:
+# --- Loungers, cool boxes, towels ---------------------------------------------------------------
+# Loungers and cool boxes are knockable: _knock_add records where each stands, and _build_knockables
+# makes one KnockableProps node per design, drawn from a mesh built at the origin at PROP_SCALE (its
+# head end at -z, its feet at +z). Towels lie on the sand with no collision: carts drive over them.
+
+const LOUNGER_STYLES := 4
+
+var _knock: Dictionary = {}
+
+
+func _knock_add(key: String, xf: Transform3D) -> void:
+	if not _knock.has(key):
+		_knock[key] = []
+	_knock[key].append(xf)
+
+
+func _build_knockables(root: Node3D) -> void:
+	var k := PROP_SCALE
+	for key in _knock.keys():
+		var kit := {}
+		_scale_about(Vector3.ZERO, k)
+		var boxes: Array = []
+		var mass := 120.0
+		if key == "coolbox":
+			_cool_box(kit)
+			boxes = [[Vector3(0, 0.21, 0) * k, Vector3(0.6, 0.42, 0.4) * k]]
+			mass = 40.0
+		else:
+			_lounger(kit, int(key.substr(8)))
+			# The seat and the backrest.
+			boxes = [[Vector3(0, 0.22, 0.38) * k, Vector3(0.68, 0.44, 1.3) * k],
+				[Vector3(0, 0.55, -0.55) * k, Vector3(0.68, 0.5, 0.6) * k]]
+		_end_scale()
+		var mesh: Mesh = _tg.call("_save_resource", _kit_mesh(kit), "seafront_" + key)
+		var transforms: Array = _knock[key]
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.mesh = mesh
+		mm.instance_count = transforms.size()
+		# The dummy renderer drops set_instance_transform(); write the buffer itself (CLAUDE.md).
+		mm.buffer = _transform_buffer(transforms)
+		var mmi := MultiMeshInstance3D.new()
+		mmi.name = key.to_pascal_case() + "s"
+		mmi.set_script(load("res://KnockableProps.gd"))
+		var typed: Array[Transform3D] = []
+		for t in transforms:
+			typed.append(t)
+		mmi.set("prop_transforms", typed)
+		mmi.set("boxes", boxes)
+		mmi.set("prop_mass", mass)
+		mmi.multimesh = mm
+		root.add_child(mmi)
+
+
+## A sun lounger at life size: rails on four legs (wheels at the head end), a slatted or slung seat,
+## the backrest hinged up on a strut, a cushion and a head roll. `style` picks teak or white
+## aluminium and the cushion.
+func _lounger(kit: Dictionary, style: int) -> void:
+	var teak := style < 2
+	var frame := Color(0.55, 0.36, 0.22) if teak else Color(0.93, 0.93, 0.91)
+	var fkey := "wood" if teak else "metal"
+	var cush: Array = [[Color(0.12, 0.22, 0.42), WHITE], [Color(0.20, 0.62, 0.66)], [Color(0.95, 0.48, 0.40)], [Color(0.98, 0.82, 0.30), WHITE]][style]
+	var seat_y := 0.34
+	var hinge_z := -0.22
+	var back_len := 0.78
+	var back_a := deg_to_rad(42.0)
+	var back_dir := Vector3(0, sin(back_a), -cos(back_a))
+	var back_n := Vector3(0, cos(back_a), sin(back_a))
+	# Rails, the foot bar and the legs.
+	for sx in [-0.31, 0.31]:
+		if teak:
+			_block(kit, fkey, Vector3(sx - 0.025, seat_y - 0.09, hinge_z - 0.05), Vector3(sx + 0.025, seat_y, 0.98), frame.darkened(0.08))
+		else:
+			_tube(kit, fkey, Vector3(sx, seat_y - 0.03, hinge_z - 0.05), Vector3(sx, seat_y - 0.03, 0.96), 0.022, 0.022, 8, frame)
+		for lz in [hinge_z + 0.02, 0.86]:
+			if teak:
+				_block(kit, fkey, Vector3(sx - 0.025, 0.0, lz - 0.025), Vector3(sx + 0.025, seat_y - 0.09, lz + 0.025), frame.darkened(0.12))
+			else:
+				_tube(kit, fkey, Vector3(sx, 0.0, lz), Vector3(sx, seat_y - 0.03, lz), 0.02, 0.02, 8, frame)
+		# A wheel on the outside of each head-end leg.
+		var wc := Vector3(sx + signf(sx) * 0.05, 0.06, hinge_z + 0.02)
+		_tube(kit, "metal", wc - Vector3(0.02, 0, 0), wc + Vector3(0.02, 0, 0), 0.06, 0.06, 12, Color(0.18, 0.18, 0.2))
+	if teak:
+		_block(kit, fkey, Vector3(-0.335, seat_y - 0.09, 0.93), Vector3(0.335, seat_y, 0.98), frame.darkened(0.08))
+	else:
+		_tube(kit, fkey, Vector3(-0.31, seat_y - 0.03, 0.96), Vector3(0.31, seat_y - 0.03, 0.96), 0.022, 0.022, 8, frame)
+	# Seat: slats across the rails, or a sling stretched between them.
+	if teak:
+		var z := hinge_z + 0.02
+		while z < 0.9:
+			_block(kit, fkey, Vector3(-0.3, seat_y, z), Vector3(0.3, seat_y + 0.025, z + 0.065), frame.lightened(0.05 * (int(z * 20.0) % 2)))
+			z += 0.085
+	else:
+		_block(kit, "canvas", Vector3(-0.29, seat_y - 0.04, hinge_z), Vector3(0.29, seat_y - 0.02, 0.94), cush[0].darkened(0.15))
+	# Backrest frame and its strut.
+	var h0 := Vector3(0, seat_y + 0.02, hinge_z)
+	for sx in [-0.29, 0.29]:
+		var a := h0 + Vector3(sx, 0, 0)
+		if teak:
+			_box(kit, fkey, Transform3D(Basis(Vector3.RIGHT, back_a), a + back_dir * back_len * 0.5 - back_n * 0.03), Vector3(0.04, 0.05, back_len), frame.darkened(0.08))
+		else:
+			_tube(kit, fkey, a, a + back_dir * back_len, 0.02, 0.02, 8, frame)
+		_tube(kit, "metal", Vector3(sx * 0.9, seat_y - 0.05, hinge_z + 0.12), a + back_dir * back_len * 0.55 - back_n * 0.03, 0.012, 0.012, 6, Color(0.6, 0.6, 0.62))
+	if teak:
+		var t := 0.03
+		while t < back_len - 0.04:
+			var c := h0 + back_dir * (t + 0.03)
+			_box(kit, fkey, Transform3D(Basis(Vector3.RIGHT, back_a), c), Vector3(0.6, 0.025, 0.06), frame.lightened(0.04))
+			t += 0.085
+	# Cushions: the seat and the back, each in bands across, with piping, and a roll at the head.
+	var bands: int = 5 if cush.size() > 1 else 1
+	for bi in bands:
+		var x0 := -0.28 + 0.56 * bi / bands
+		var x1 := -0.28 + 0.56 * (bi + 1) / bands
+		var col: Color = cush[bi % cush.size()]
+		_block(kit, "canvas", Vector3(x0, seat_y + (0.025 if teak else -0.02), hinge_z + 0.04), Vector3(x1, seat_y + 0.09, 0.9), col)
+		var bc := h0 + back_dir * (back_len * 0.5) + back_n * 0.055
+		_box(kit, "canvas", Transform3D(Basis(Vector3.RIGHT, back_a), bc + Vector3((x0 + x1) * 0.5, 0, 0)), Vector3(x1 - x0, 0.065, back_len - 0.08), col)
+	for sx in [-0.285, 0.285]:
+		_tube(kit, "canvas", Vector3(sx, seat_y + 0.09, hinge_z + 0.04), Vector3(sx, seat_y + 0.09, 0.9), 0.012, 0.012, 6, cush[0].darkened(0.3), false)
+	var roll := h0 + back_dir * (back_len - 0.08) + back_n * 0.12
+	_tube(kit, "canvas", roll - Vector3(0.24, 0, 0), roll + Vector3(0.24, 0, 0), 0.06, 0.06, 12, cush[cush.size() - 1])
+
+
+## A cool box: a blue tub, a white lid with a hinge line and a swing handle.
+func _cool_box(kit: Dictionary) -> void:
+	var blue := Color(0.18, 0.46, 0.78)
+	_block(kit, "gloss", Vector3(-0.28, 0.0, -0.18), Vector3(0.28, 0.32, 0.18), blue)
+	_block(kit, "gloss", Vector3(-0.3, 0.32, -0.2), Vector3(0.3, 0.4, 0.2), WHITE)
+	_block(kit, "paint", Vector3(-0.3, 0.33, 0.2), Vector3(0.3, 0.345, 0.215), WHITE.darkened(0.25))
+	_block(kit, "paint", Vector3(-0.2, 0.06, -0.205), Vector3(0.2, 0.09, -0.18), blue.darkened(0.3))
+	for sx in [-0.3, 0.3]:
+		_tube(kit, "metal", Vector3(sx, 0.28, 0), Vector3(sx * 0.6, 0.47, 0), 0.012, 0.012, 6, Color(0.85, 0.85, 0.85))
+	_tube(kit, "metal", Vector3(-0.18, 0.47, 0), Vector3(0.18, 0.47, 0), 0.02, 0.02, 8, Color(0.2, 0.2, 0.22))
+
+
+## A beach towel spread on the sand at `centre` (layout space): a cloth following the ground with a
+## few rucks, woven in stripes, fringed at both ends, one corner folded back. Sometimes flip-flops or
+## a sun hat lie beside it.
+func _towel(kit: Dictionary, rng: RandomNumberGenerator, centre: Vector3, yaw: float) -> void:
 	var b := Basis(Vector3.UP, yaw)
-	_box(kit, "paint", Transform3D(b, at + Vector3(0, 0.28, 0)), Vector3(0.65, 0.08, 1.4), col)
-	_box(kit, "paint", Transform3D(b * Basis(Vector3.RIGHT, 0.9), at + b * Vector3(0, 0.55, -0.85)), Vector3(0.65, 0.08, 0.7), col)
-	for cx in [-0.28, 0.28]:
-		for cz in [-0.6, 0.6]:
-			_box(kit, "metal", Transform3D(b, at + b * Vector3(cx, 0.12, cz)), Vector3(0.04, 0.28, 0.04), WHITE)
+	var hl := 0.95
+	var hw := 0.48
+	var pal: Array = [[Color(0.95, 0.45, 0.38), WHITE, Color(0.98, 0.78, 0.3)], [Color(0.2, 0.55, 0.8), WHITE],
+		[Color(0.35, 0.75, 0.62), Color(0.98, 0.9, 0.6)], [Color(0.78, 0.5, 0.85), WHITE, Color(0.4, 0.7, 0.9)]][rng.randi() % 4]
+	var stripes := rng.randi_range(5, 9)
+	var nu := 16
+	var nv := 6
+	var ph := rng.randf_range(0.0, TAU)
+	var point := func(u: float, v: float) -> Vector3:
+		var lp := centre + b * Vector3((v - 0.5) * 2.0 * hw, 0, (u - 0.5) * 2.0 * hl)
+		var ruck := 0.012 * sin(u * 11.0 + ph) * sin(v * 5.0 + ph * 0.7)
+		return Vector3(lp.x, _ground(lp.x, lp.z) + 0.04 + ruck, lp.z)
+	var st := _st(kit, "canvas")
+	for i in nu:
+		for j in nv:
+			var u0 := float(i) / nu
+			var u1 := float(i + 1) / nu
+			var v0 := float(j) / nv
+			var v1 := float(j + 1) / nv
+			var col: Color = pal[int(floor((u0 + u1) * 0.5 * stripes)) % pal.size()]
+			var q00: Vector3 = point.call(u0, v0)
+			var q10: Vector3 = point.call(u1, v0)
+			var q11: Vector3 = point.call(u1, v1)
+			var q01: Vector3 = point.call(u0, v1)
+			var n := (q10 - q00).cross(q01 - q00).normalized()
+			if n.y < 0.0:
+				n = -n
+			_tri(st, q00, q10, q11, n, n, n, col, n)
+			_tri(st, q00, q11, q01, n, n, n, col, n)
+	# Fringes: short tassels off both ends.
+	for end in [0.0, 1.0]:
+		var j := 0
+		while j <= 12:
+			var v := float(j) / 12.0
+			var root_p: Vector3 = point.call(end, v)
+			var out := b * Vector3(0, 0, (end - 0.5) * 2.0)
+			var tip := root_p + out * rng.randf_range(0.05, 0.09) + Vector3(0, -0.015, 0)
+			_tube(kit, "canvas", root_p, tip, 0.008, 0.006, 3, WHITE.darkened(0.05), false)
+			j += 1
+	# A corner folded back over the cloth, showing its paler underside.
+	var c0: Vector3 = point.call(1.0, 1.0)
+	var c1: Vector3 = point.call(0.82, 1.0)
+	var c2: Vector3 = point.call(1.0, 0.62)
+	var up := Vector3(0, 0.03, 0)
+	_tri(st, c1 + up, c2 + up, (c1 + c2) * 0.5 - (c0 - (c1 + c2) * 0.5) * 0.8 + up, Vector3.UP, Vector3.UP, Vector3.UP, (pal[0] as Color).lightened(0.35), Vector3.UP)
+	var extra := rng.randf()
+	if extra < 0.35:
+		# Flip-flops.
+		var fp := centre + b * Vector3(hw + 0.25, 0, rng.randf_range(-0.4, 0.4))
+		var fc: Color = [Color(0.95, 0.3, 0.45), Color(0.2, 0.7, 0.9), Color(0.98, 0.85, 0.2)][rng.randi() % 3]
+		for side in [-0.07, 0.07]:
+			var sp := fp + b * Vector3(side, 0, side * 0.6)
+			sp.y = _ground(sp.x, sp.z) + 0.01
+			var sb := b * Basis(Vector3.UP, rng.randf_range(-0.3, 0.3))
+			_box(kit, "gloss", Transform3D(sb, sp + Vector3(0, 0.012, 0)), Vector3(0.1, 0.024, 0.26), fc)
+			_tube(kit, "paint", sp + sb * Vector3(-0.045, 0.025, 0.02), sp + sb * Vector3(0, 0.05, -0.07), 0.007, 0.007, 4, WHITE, false)
+			_tube(kit, "paint", sp + sb * Vector3(0.045, 0.025, 0.02), sp + sb * Vector3(0, 0.05, -0.07), 0.007, 0.007, 4, WHITE, false)
+	elif extra < 0.6:
+		# A straw sun hat.
+		var hp := centre + b * Vector3(rng.randf_range(-0.2, 0.2), 0, hl * 0.55)
+		hp.y = _ground(hp.x, hp.z) + 0.05
+		_tube(kit, "thatch", hp, hp + Vector3(0, 0.02, 0), 0.24, 0.24, 16, STRAW)
+		_tube(kit, "thatch", hp + Vector3(0, 0.02, 0), hp + Vector3(0, 0.11, 0), 0.11, 0.09, 14, STRAW.darkened(0.05))
+		_tube(kit, "paint", hp + Vector3(0, 0.025, 0), hp + Vector3(0, 0.05, 0), 0.112, 0.11, 14, pal[0])
 
 
 ## Parasol sets spread over the dry sand between the racing line and the dune fence, and round the
@@ -3758,7 +3966,7 @@ const PARASOL_ZONES := [
 	[-64.0, -26.0, 296.0, 352.0, 4],
 ]
 const PARASOL_GAP := 11.0
-const PARASOL_SET_R := 1.9     # a set's footprint at life size
+const PARASOL_SET_R := 2.6     # a set's footprint at life size, towel included
 
 
 func _build_umbrellas(root: Node3D) -> void:
@@ -3778,6 +3986,7 @@ func _build_umbrellas(root: Node3D) -> void:
 			placed.append(p)
 			got += 1
 	_commit(root, kit, "Umbrellas")
+	_build_knockables(root)
 	print("Seafront: %d parasol sets" % placed.size())
 
 
@@ -3815,32 +4024,24 @@ func _parasol_set(root: Node3D, kit: Dictionary, rng: RandomNumberGenerator, p: 
 	canopy.radius = 1.3
 	canopy.height = 0.3
 	_collider(root, "Parasols", canopy, Transform3D(Basis(), top - Vector3(0, 0.35, 0)))
-	# Backrests to the land: the loungers face the sea, side by side either side of the pole.
+	# Backrests to the land: the loungers face the sea, side by side either side of the pole. They
+	# and the cool box are knockable (KnockableProps.gd), drawn from shared meshes: here they only
+	# record where they stand.
 	var yaw := -PI * 0.5 + rng.randf_range(-0.35, 0.35)
 	var b := Basis(Vector3.UP, yaw)
 	var count := 1 if rng.randf() < 0.3 else 2
-	var lounger_col: Color = [Color(0.95, 0.95, 0.92), Color(0.25, 0.55, 0.75), HUT_COLOURS[rng.randi() % 6]][rng.randi() % 3]
+	var style := rng.randi() % LOUNGER_STYLES
 	for i in count:
-		var off := 0.55 if count == 1 else (i - 0.5) * 0.95
-		var lp := at + b * Vector3(off, 0, 0.2)
+		var off := 0.6 if count == 1 else (i - 0.5) * 0.98
+		var lp := at + b * Vector3(off, 0, 0.25)
 		lp.y = _ground(lp.x, lp.z)
-		_lounger(kit, lp, yaw, lounger_col)
-		var box := BoxShape3D.new()
-		box.size = Vector3(0.7, 0.62, 1.55)
-		_collider(root, "Loungers", box, Transform3D(b, lp + b * Vector3(0, 0.31, -0.05)))
-	if rng.randf() < 0.6:
-		var tp := at + Vector3(-2.3, 0, rng.randf_range(-1.0, 1.0))
-		tp.y = _ground(tp.x, tp.z) + 0.02
-		_box(kit, "canvas", Transform3D(Basis(Vector3.UP, rng.randf_range(-0.5, 0.5)), tp), Vector3(1.8, 0.03, 0.9), HUT_COLOURS[rng.randi() % 6])
+		_knock_add("lounger_%d" % style, Transform3D(Basis(Vector3.UP, yaw + rng.randf_range(-0.06, 0.06)), _frame * lp))
+	if rng.randf() < 0.65:
+		_towel(kit, rng, at + Vector3(-2.5, 0, rng.randf_range(-1.0, 1.0)), rng.randf_range(-0.5, 0.5))
 	if rng.randf() < 0.4:
-		var cp := at + b * Vector3(1.4 if count == 2 else -0.6, 0, 0.6)
+		var cp := at + b * Vector3(1.45 if count == 2 else -0.65, 0, 0.7)
 		cp.y = _ground(cp.x, cp.z)
-		var cb := Basis(Vector3.UP, rng.randf_range(0.0, PI))
-		_box(kit, "gloss", Transform3D(cb, cp + Vector3(0, 0.17, 0)), Vector3(0.55, 0.34, 0.36), Color(0.20, 0.50, 0.80))
-		_box(kit, "paint", Transform3D(cb, cp + Vector3(0, 0.37, 0)), Vector3(0.57, 0.06, 0.38), WHITE)
-		var cool := BoxShape3D.new()
-		cool.size = Vector3(0.57, 0.4, 0.38)
-		_collider(root, "Loungers", cool, Transform3D(cb, cp + Vector3(0, 0.2, 0)))
+		_knock_add("coolbox", Transform3D(Basis(Vector3.UP, rng.randf_range(0.0, PI)), _frame * cp))
 	_note("Parasol%d" % n, p, PARASOL_SET_R, CLEAR_DECOR, 2.6)
 	_end_scale()
 

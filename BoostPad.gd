@@ -1,6 +1,20 @@
 @tool
 class_name BoostPad
 extends Area3D
+## A boost pad. Its look is built here, not imported: a flat bevelled slab, one mesh shared by every
+## pad, drawn by boost_pad.gdshader with chevrons streaming toward the pad's front (-z). It is an
+## internal child, rebuilt on load, so level files only store the pad's transform.
+## With `settle_on_track`, the pad drops onto whatever is under it once the level's collision is
+## built, tilts with the slope and turns to face along the TrackPath.
+
+const PAD_WIDTH := 4.0
+const PAD_LENGTH := 6.0
+const PAD_HEIGHT := 0.08
+const PAD_BEVEL := 0.14
+const SHADER := preload("res://boost_pad.gdshader")
+
+static var _mesh: ArrayMesh
+static var _material: ShaderMaterial
 
 @export var flash_brightness: float = 3.0
 ## Multiplier for pad boost force / top speed (1.0 = default). Set per pad in the inspector.
@@ -22,9 +36,12 @@ extends Area3D
 @export_range(0.0, 1.0, 0.01) var ground_snap_lift: float = 0.08
 ## Align pad to the slope (keeps forward direction projected on the surface).
 @export var align_to_slope: bool = true
+## At runtime, once the level's collision exists: lie on the surface under the pad, tilted with it,
+## facing the way the lap runs there.
+@export var settle_on_track: bool = false
 
-var mesh_instances: Array[MeshInstance3D] = []
-var mats: Array[BaseMaterial3D] = []
+var _visual: MeshInstance3D
+var _flash := 0.0
 var flash_tween: Tween
 
 
@@ -33,11 +50,130 @@ func _enter_tree() -> void:
 
 
 func _ready() -> void:
+	_build_visual()
 	if Engine.is_editor_hint():
 		return
 	body_entered.connect(_on_body_entered)
-	_find_mesh_instances(self)
-	_init_materials()
+	if settle_on_track:
+		_settle()
+
+
+func _build_visual() -> void:
+	if _visual:
+		return
+	if _mesh == null:
+		_mesh = _pad_mesh()
+		_material = ShaderMaterial.new()
+		_material.shader = SHADER
+	_visual = MeshInstance3D.new()
+	_visual.name = "PadVisual"
+	_visual.mesh = _mesh
+	_visual.material_override = _material
+	_visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_visual, false, Node.INTERNAL_MODE_BACK)
+
+
+## The slab: a top face with UVs for the shader, bevelled down to the ground on all four sides. Vertex
+## colour red marks the top; green runs down the bevel, for the shader's groove.
+static func _pad_mesh() -> ArrayMesh:
+	var hw := PAD_WIDTH * 0.5
+	var hl := PAD_LENGTH * 0.5
+	var b := PAD_BEVEL
+	var h := PAD_HEIGHT
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# Top, split into a grid so it can follow a gently curved surface if ever bent.
+	var nx := 4
+	var nz := 6
+	var corner := func(i: int, j: int) -> Array:
+		var u := float(i) / nx
+		var v := float(j) / nz
+		return [Vector3(lerpf(-hw + b, hw - b, u), h, lerpf(hl - b, -hl + b, v)), Vector2(u, v)]
+	for j in nz:
+		for i in nx:
+			var q := [corner.call(i, j), corner.call(i + 1, j), corner.call(i + 1, j + 1), corner.call(i, j + 1)]
+			for k in [0, 2, 1, 0, 3, 2]:
+				st.set_color(Color(1, 0.5, 0))
+				st.set_normal(Vector3.UP)
+				st.set_uv(q[k][1])
+				st.add_vertex(q[k][0])
+	# Bevels: top edge to ground edge, in two bands so the groove has a vertex row.
+	var top_ring := [Vector3(-hw + b, h, hl - b), Vector3(hw - b, h, hl - b), Vector3(hw - b, h, -hl + b), Vector3(-hw + b, h, -hl + b)]
+	var low_ring := [Vector3(-hw, 0, hl), Vector3(hw, 0, hl), Vector3(hw, 0, -hl), Vector3(-hw, 0, -hl)]
+	for e in 4:
+		var a0: Vector3 = top_ring[e]
+		var a1: Vector3 = top_ring[(e + 1) % 4]
+		var b0: Vector3 = low_ring[e]
+		var b1: Vector3 = low_ring[(e + 1) % 4]
+		var n := (b1 - b0).cross(a0 - b0).normalized()
+		if n.y < 0.0:
+			n = -n
+		for band in 2:
+			var t0 := band * 0.5
+			var t1 := t0 + 0.5
+			var q := [a0.lerp(b0, t0), a1.lerp(b1, t0), a1.lerp(b1, t1), a0.lerp(b0, t1)]
+			var g := [t0, t0, t1, t1]
+			var order := [0, 1, 2, 0, 2, 3]
+			# Front faces wind clockwise seen from outside: (c - a) x (b - a) along n.
+			if (q[2] - q[0]).cross(q[1] - q[0]).dot(n) < 0.0:
+				order = [0, 2, 1, 0, 3, 2]
+			for k in order:
+				st.set_color(Color(0, g[k], 0))
+				st.set_normal(n)
+				st.set_uv(Vector2(0, 0))
+				st.add_vertex(q[k])
+	return st.commit()
+
+
+## Lie on the surface under the pad once the level's collision exists, tilted with it and facing along
+## the lap. Checkpoint gates settle the same way (CheckpointGate._settle_on_ground).
+func _settle() -> void:
+	await get_tree().physics_frame
+	var level: Node = get_parent()
+	while level and not level.is_in_group("level"):
+		level = level.get_parent()
+	if level and level.has_method("wait_for_collisions"):
+		await level.wait_for_collisions()
+	if not is_inside_tree():
+		return
+	var space := get_world_3d().direct_space_state
+	var up := Vector3.UP
+	var centre := global_position
+	# Four corners and the middle: the lowest of them sets the height, so no edge floats.
+	var hits: Array[Vector3] = []
+	var normal_sum := Vector3.ZERO
+	for o in [Vector3.ZERO, Vector3(1.6, 0, 2.6), Vector3(-1.6, 0, 2.6), Vector3(1.6, 0, -2.6), Vector3(-1.6, 0, -2.6)]:
+		var p: Vector3 = centre + global_transform.basis.orthonormalized() * o + Vector3(0.031, 0.0, 0.017)
+		var q := PhysicsRayQueryParameters3D.create(p + up * 4.0, p - up * 6.0, 1)
+		q.hit_back_faces = false
+		var hit := space.intersect_ray(q)
+		if not hit.is_empty():
+			hits.append(hit.position)
+			normal_sum += hit.normal
+	if hits.is_empty():
+		return
+	var y := INF
+	var mid_y := 0.0
+	for hp in hits:
+		y = minf(y, hp.y)
+		mid_y += hp.y
+	mid_y /= hits.size()
+	var normal := normal_sum.normalized() if normal_sum.length() > 0.01 else Vector3.UP
+	if normal.y < 0.5:
+		normal = Vector3.UP
+	var fwd := -global_transform.basis.z
+	var path := _find_track_path()
+	if path and path.curve:
+		var off := path.curve.get_closest_offset(path.to_local(centre))
+		var a := path.to_global(path.curve.sample_baked(off - 2.0))
+		var b := path.to_global(path.curve.sample_baked(off + 2.0))
+		if a.distance_squared_to(b) > 0.01:
+			fwd = b - a
+	fwd = (fwd - normal * fwd.dot(normal)).normalized()
+	var sc := global_transform.basis.get_scale()
+	# Half sunk between the lowest corner and the mean, so it neither floats nor vanishes on a crest.
+	var settle_y := lerpf(y, mid_y, 0.5)
+	global_transform = Transform3D(Basis.looking_at(fwd, normal).scaled(sc), Vector3(centre.x, settle_y, centre.z) + normal * 0.01)
 
 
 func _on_snap_button_pressed() -> void:
@@ -257,30 +393,6 @@ func _scene_root() -> Node:
 	return get_tree().root
 
 
-func _find_mesh_instances(node: Node):
-	if node is MeshInstance3D:
-		mesh_instances.append(node)
-	for child in node.get_children():
-		_find_mesh_instances(child)
-
-
-func _init_materials():
-	for mesh_instance in mesh_instances:
-		if mesh_instance.mesh:
-			for i in range(mesh_instance.mesh.get_surface_count()):
-				var active_mat = mesh_instance.get_active_material(i)
-				if active_mat is BaseMaterial3D:
-					var duplicated_mat = active_mat.duplicate()
-					mesh_instance.set_surface_override_material(i, duplicated_mat)
-					duplicated_mat.emission_enabled = true
-					if duplicated_mat.emission_texture == null:
-						duplicated_mat.emission_texture = duplicated_mat.albedo_texture
-					if duplicated_mat.emission == Color.BLACK:
-						duplicated_mat.emission = Color.WHITE
-					duplicated_mat.emission_energy_multiplier = 0.0
-					mats.append(duplicated_mat)
-
-
 func _on_body_entered(body: Node3D):
 	if body.has_method("client_start_pad_boost"):
 		flash_boost_pad()
@@ -299,8 +411,12 @@ func _on_body_entered(body: Node3D):
 func flash_boost_pad():
 	if flash_tween and flash_tween.is_valid():
 		flash_tween.kill()
-	for mat in mats:
-		mat.emission_energy_multiplier = flash_brightness
-	flash_tween = create_tween().set_parallel(true)
-	for mat in mats:
-		flash_tween.tween_property(mat, "emission_energy_multiplier", 0.0, 0.7).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_set_flash(flash_brightness / 3.0)
+	flash_tween = create_tween()
+	flash_tween.tween_method(_set_flash, flash_brightness / 3.0, 0.0, 0.7).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
+func _set_flash(v: float) -> void:
+	_flash = v
+	if _visual:
+		_visual.set_instance_shader_parameter(&"flash", v)
