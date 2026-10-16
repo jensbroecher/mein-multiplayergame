@@ -280,7 +280,22 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 - The water draws the sand under it from the screen texture as emission. Clamp any screen UV you offset:
   past the frame edge the copy holds stale pixels (it showed up as a strip of text along the bottom).
 - Structures are under `Seafront` (`_build_seafront`), named to avoid Level.gd's "Props"/"Environment"
-  trimesh baking. `_verify_seafront_clear` errors on any footprint too close to the racing line.
+  trimesh baking (and no "ramp" either). `_verify_seafront_clear` errors on any footprint too close to the
+  racing line.
+- Every seafront part a cart can touch has collision: boxes, cylinders and hulls (`_box_in`, `_box_along`,
+  `_rod_collider`, `_hull_collider`). `_collider` adds each shape to one body per structure (`<name>Body`).
+  Carts can wade the shallow sea out to the lighthouse, so it has collision too. Flat things on the sand
+  (towels, planks, nets) have none.
+- People-sized things are about 1.6x life size (`PROP_SCALE`), because at life size a lounger is shorter
+  than a cart. Builders lay them out at life size inside `_scale_about(pivot, s)` ... `_end_scale()`.
+  `_tri`, `_ground`, `_collider` and `_note` all work through that frame: things placed with `_ground()`
+  in the life-size layout land on the real sand. Pick the pivot on the sea side so the structure grows
+  inland, away from the racing line. This applies to the huts, the bar, the lifeguard towers, the
+  parasol sets and the fence.
+- Parasol sets are rejection-sampled per zone (`PARASOL_ZONES`): `PARASOL_GAP` apart, on dry level sand,
+  clear of the track and of every footprint noted before them. The fence is built first for that reason.
+- Sign lettering is block capitals from `GLYPHS` (`_pixel_text`), since text can't be drawn headless. Add
+  any letter you need to the table.
 - The shipwreck is a trawler built from a hull function, `_wreck_point(s, a, side)`, in its own frame
   (`WRECK_*`), and is heeled toward the dunes so the dune descent sees its deck. The stove-in side faces
   the sea. Missing planks are keyed per station and strake (`_wreck_plan_damage`), and frames are built

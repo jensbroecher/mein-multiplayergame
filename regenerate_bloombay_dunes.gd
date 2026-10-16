@@ -606,13 +606,19 @@ func _ripple_texture() -> NoiseTexture2D:
 
 # --- Seafront structures ---------------------------------------------------------------------------
 # Everything lives under "Seafront" (not "Props"/"Environment": Level.gd bakes trimesh colliders
-# under those). Each structure is one mesh with a surface per material, plus simple box/cylinder
-# collision where a cart can reach it. _verify_seafront_clear() checks every footprint against the
-# racing line.
+# under those, and no "ramp" either). Each structure is one mesh with a surface per material, plus
+# box/cylinder/hull collision for every part a cart can touch, all of a structure's shapes in one
+# body. _verify_seafront_clear() checks every footprint against the racing line.
+#
+# People-sized things (the huts, the bar and its furniture, the lifeguard towers, parasols and
+# loungers) are laid out at life size and built inside a scale frame (_scale_about): at life size a
+# lounger is shorter than a cart. _tri, _ground, _collider and _note all work through the frame, so a
+# builder places things on the sand in its life-size layout and they land on the real sand scaled up.
 
 const TRACK_HALF := 7.5
 const CLEAR_BUILDING := 5.0   # metres past the track edge for anything solid
 const CLEAR_DECOR := 3.0      # umbrellas, loungers, the fence
+const PROP_SCALE := 1.6
 
 const HUT_COLOURS := [Color(0.95, 0.52, 0.45), Color(0.55, 0.85, 0.72), Color(0.52, 0.74, 0.95),
 		Color(0.98, 0.86, 0.45), Color(0.78, 0.66, 0.92), Color(0.35, 0.78, 0.80)]
@@ -624,6 +630,8 @@ var _tg: Node3D
 var _curve: Curve3D
 var _footprints: Array = []   # [name, centre Vector2, radius, clearance]
 var _materials: Dictionary = {}
+var _frame := Transform3D.IDENTITY       # layout space -> world, see _scale_about
+var _frame_inv := Transform3D.IDENTITY
 
 
 func _build_seafront(level: Node3D, tg: Node3D, curve: Curve3D) -> void:
@@ -635,20 +643,40 @@ func _build_seafront(level: Node3D, tg: Node3D, curve: Curve3D) -> void:
 	_build_grandstand(root)
 	_build_beach_huts(root)
 	_build_pier(root)
-	_build_lifeguard_tower(root, "LifeguardTowerNorth", Vector3(-56.0, 0.0, -340.0), 0.0)
-	_build_lifeguard_tower(root, "LifeguardTowerMid", Vector3(-63.5, 0.0, -125.0), 0.0)
-	_build_lifeguard_tower(root, "LifeguardTowerSouth", Vector3(-58.0, 0.0, 292.0), 15.0)
+	# The middle tower stands on the land side: between the racing line and the sea there's no room.
+	_build_lifeguard_tower(root, "LifeguardTowerNorth", Vector3(-56.0, 0.0, -340.0), 0.0,
+			[Color(0.98, 0.80, 0.20), WHITE, Color(0.88, 0.22, 0.18)])
+	_build_lifeguard_tower(root, "LifeguardTowerMid", Vector3(-27.0, 0.0, -118.0), 0.0,
+			[Color(0.30, 0.74, 0.78), WHITE, Color(0.96, 0.50, 0.42)])
+	_build_lifeguard_tower(root, "LifeguardTowerSouth", Vector3(-58.0, 0.0, 292.0), 15.0,
+			[Color(0.96, 0.62, 0.70), WHITE, Color(0.20, 0.55, 0.75)])
 	_build_lighthouse(root)
 	_build_shipwreck(root)
 	_build_surf_shack(root)
-	_build_umbrellas(root)
+	# The fence before the parasols, which keep clear of it.
 	_build_sand_fence(root)
+	_build_umbrellas(root)
 	_build_boats(root)
 	_verify_seafront_clear()
 
 
+## Builds what follows at `s` times its layout size, grown out from `pivot` (layout and world agree
+## there). Call _end_scale() when the structure is done.
+func _scale_about(pivot: Vector3, s: float) -> void:
+	_frame = Transform3D(Basis.from_scale(Vector3.ONE * s), pivot * (1.0 - s))
+	_frame_inv = _frame.affine_inverse()
+
+
+func _end_scale() -> void:
+	_frame = Transform3D.IDENTITY
+	_frame_inv = Transform3D.IDENTITY
+
+
+## Ground height under a layout point, in layout space: whatever stands on it lands on the real sand.
 func _ground(x: float, z: float) -> float:
-	return float(_tg.call("_sample_cached_height", x, z))
+	var w := _frame * Vector3(x, 0.0, z)
+	var h := float(_tg.call("_sample_cached_height", w.x, w.z))
+	return (_frame_inv * Vector3(w.x, h, w.z)).y
 
 
 ## Lowest ground under a rectangle (for foundations that must not float).
@@ -661,7 +689,8 @@ func _ground_min(cx: float, cz: float, hx: float, hz: float) -> float:
 
 
 func _note(name: String, centre: Vector2, radius: float, clearance: float) -> void:
-	_footprints.append([name, centre, radius, clearance])
+	var w := _frame * Vector3(centre.x, 0.0, centre.y)
+	_footprints.append([name, Vector2(w.x, w.z), radius * _frame.basis.get_scale().x, clearance])
 
 
 func _verify_seafront_clear() -> void:
@@ -713,6 +742,12 @@ func _mat(key: String) -> Material:
 			m.emission = Color(1.0, 0.85, 0.55)
 			m.emission_energy_multiplier = 2.5
 			m.roughness = 0.1
+		# The lifeguard towers' rotating beacons, at rest.
+		"beacon":
+			m.emission_enabled = true
+			m.emission = Color(1.0, 0.42, 0.08)
+			m.emission_energy_multiplier = 1.4
+			m.roughness = 0.15
 		"glass":
 			m.metallic = 0.3
 			m.roughness = 0.05
@@ -738,15 +773,17 @@ func _st(kit: Dictionary, key: String) -> SurfaceTool:
 
 
 ## One triangle facing `out` (Godot's front faces wind clockwise: front normal = (c - a) x (b - a)).
+## Vertices go through the scale frame; it keeps the winding, being a uniform scale.
 func _tri(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, na: Vector3, nb: Vector3, nc: Vector3, col: Color, out: Vector3) -> void:
 	st.set_color(col)
 	var flip := (b - a).cross(c - a).dot(out) > 0.0
-	st.set_normal(na)
-	st.add_vertex(a)
-	st.set_normal(nc if flip else nb)
-	st.add_vertex(c if flip else b)
-	st.set_normal(nb if flip else nc)
-	st.add_vertex(b if flip else c)
+	var fb := _frame.basis.orthonormalized()
+	st.set_normal(fb * na)
+	st.add_vertex(_frame * a)
+	st.set_normal(fb * (nc if flip else nb))
+	st.add_vertex(_frame * (c if flip else b))
+	st.set_normal(fb * (nb if flip else nc))
+	st.add_vertex(_frame * (b if flip else c))
 
 
 func _quad(kit: Dictionary, key: String, p: Array, n: Vector3, col: Color) -> void:
@@ -826,8 +863,125 @@ func _gable_roof(kit: Dictionary, key: String, xf: Transform3D, w: float, d: flo
 	_quad(kit, key, [l0, r0, r1, l1], nd, col.darkened(0.3))
 
 
+## A surface of revolution about the vertical through `c`: `profile` holds (radius, height above c)
+## from the bottom up, walking the outside. Smooth round the axis, or faceted with `flat` (a lantern's
+## panes). Returns its points, for a hull collider.
+func _lathe(kit: Dictionary, key: String, c: Vector3, profile: Array, segs: int, col: Color, flat: bool = false) -> PackedVector3Array:
+	var st := _st(kit, key)
+	var pts := PackedVector3Array()
+	for k in profile.size():
+		var pk: Vector2 = profile[k]
+		for j in segs:
+			var a := TAU * j / segs
+			pts.append(c + Vector3(cos(a) * pk.x, pk.y, sin(a) * pk.x))
+	for k in profile.size() - 1:
+		var p0: Vector2 = profile[k]
+		var p1: Vector2 = profile[k + 1]
+		var d := p1 - p0
+		if d.length_squared() < 1e-10:
+			continue
+		var n2 := Vector2(d.y, -d.x).normalized()
+		for j in segs:
+			var t0 := TAU * j / segs
+			var t1 := TAU * (j + 1) / segs
+			var u0 := Vector3(cos(t0), 0.0, sin(t0))
+			var u1 := Vector3(cos(t1), 0.0, sin(t1))
+			var um := (u0 + u1).normalized()
+			var out := um * n2.x + Vector3.UP * n2.y
+			var n0 := out if flat else u0 * n2.x + Vector3.UP * n2.y
+			var n1 := out if flat else u1 * n2.x + Vector3.UP * n2.y
+			var q00 := c + u0 * p0.x + Vector3.UP * p0.y
+			var q01 := c + u1 * p0.x + Vector3.UP * p0.y
+			var q10 := c + u0 * p1.x + Vector3.UP * p1.y
+			var q11 := c + u1 * p1.x + Vector3.UP * p1.y
+			_tri(st, q00, q01, q11, n0, n1, n1, col, out)
+			_tri(st, q00, q11, q10, n0, n1, n0, col, out)
+	return pts
+
+
+## A hipped roof over the rectangle x0..x1, z0..z1 at y = 0 of `xf`, its ridge `rise` above along the
+## longer side, with an underside. Returns its corners, for a hull collider.
+func _hip_roof(kit: Dictionary, key: String, xf: Transform3D, x0: float, x1: float, z0: float, z1: float, rise: float, col: Color) -> PackedVector3Array:
+	var xm := (x0 + x1) * 0.5
+	var zm := (z0 + z1) * 0.5
+	var hx := (x1 - x0) * 0.5
+	var hz := (z1 - z0) * 0.5
+	var c00 := xf * Vector3(x0, 0, z0)
+	var c10 := xf * Vector3(x1, 0, z0)
+	var c01 := xf * Vector3(x0, 0, z1)
+	var c11 := xf * Vector3(x1, 0, z1)
+	var faces := []
+	var r0: Vector3
+	var r1: Vector3
+	if hx >= hz:
+		r0 = xf * Vector3(xm - (hx - hz), rise, zm)
+		r1 = xf * Vector3(xm + (hx - hz), rise, zm)
+		faces = [[c00, c10, r1, r0], [c01, c11, r1, r0], [c00, c01, r0], [c10, c11, r1]]
+	else:
+		r0 = xf * Vector3(xm, rise, zm - (hz - hx))
+		r1 = xf * Vector3(xm, rise, zm + (hz - hx))
+		faces = [[c00, c01, r1, r0], [c10, c11, r1, r0], [c00, c10, r0], [c01, c11, r1]]
+	var up := xf.basis * Vector3.UP
+	var st := _st(kit, key)
+	for f in faces:
+		var a: Vector3 = f[0]
+		var b: Vector3 = f[1]
+		var c: Vector3 = f[2]
+		var n := (b - a).cross(c - a).normalized()
+		if n.dot(up) < 0.0:
+			n = -n
+		_tri(st, a, b, c, n, n, n, col, n)
+		if f.size() == 4:
+			_tri(st, a, c, f[3], n, n, n, col, n)
+	_quad(kit, key, [c00, c10, c11, c01], -up, col.darkened(0.35))
+	return PackedVector3Array([c00, c10, c01, c11, r0, r1])
+
+
+## Block capitals for painted signs, five cells high.
+const GLYPHS := {
+	"A": [".XX.", "X..X", "XXXX", "X..X", "X..X"],
+	"D": ["XXX.", "X..X", "X..X", "X..X", "XXX."],
+	"E": ["XXXX", "X...", "XXX.", "X...", "XXXX"],
+	"F": ["XXXX", "X...", "XXX.", "X...", "X..."],
+	"G": [".XXX", "X...", "X.XX", "X..X", ".XXX"],
+	"I": ["XXX", ".X.", ".X.", ".X.", "XXX"],
+	"L": ["X...", "X...", "X...", "X...", "XXXX"],
+	"R": ["XXX.", "X..X", "XXX.", "X.X.", "X..X"],
+	"U": ["X..X", "X..X", "X..X", "X..X", "XXXX"],
+}
+
+
+## `text` in GLYPHS, `cell` metres a cell, centred on `centre` and reading along `right`. It faces
+## right x up, so a reader sees it the right way round.
+func _pixel_text(kit: Dictionary, key: String, centre: Vector3, right: Vector3, up: Vector3, cell: float, text: String, col: Color) -> void:
+	var width := -1
+	for ch in text:
+		width += (GLYPHS[ch][0] as String).length() + 1
+	var face := right.cross(up).normalized()
+	var origin := centre - right * (width * cell * 0.5) - up * (2.5 * cell)
+	var x := 0
+	for ch in text:
+		var rows: Array = GLYPHS[ch]
+		for r in 5:
+			var row: String = rows[r]
+			var i := 0
+			while i < row.length():
+				if row[i] != "X":
+					i += 1
+					continue
+				var j := i
+				while j < row.length() and row[j] == "X":
+					j += 1
+				var lo := origin + right * ((x + i) * cell) + up * ((4 - r) * cell)
+				var span := right * ((j - i) * cell)
+				_quad(kit, key, [lo, lo + span, lo + span + up * cell, lo + up * cell], face, col)
+				i = j
+		x += (rows[0] as String).length() + 1
+
+
 ## A low-poly rock: an icosphere pushed about by noise, flat shaded. The wreck's net heaps use it too.
-func _rock(kit: Dictionary, centre: Vector3, size: Vector3, seed_v: int, col: Color, key: String = "rock") -> void:
+## Returns its points (layout space), for a hull collider.
+func _rock(kit: Dictionary, centre: Vector3, size: Vector3, seed_v: int, col: Color, key: String = "rock") -> PackedVector3Array:
 	var noise := FastNoiseLite.new()
 	noise.seed = seed_v
 	noise.frequency = 0.9
@@ -856,7 +1010,7 @@ func _rock(kit: Dictionary, centre: Vector3, size: Vector3, seed_v: int, col: Co
 			nf.append([f[2], m[2], m[1]])
 			nf.append([m[0], m[1], m[2]])
 		faces = nf
-	var pts := []
+	var pts := PackedVector3Array()
 	for v in verts:
 		var d: Vector3 = v
 		var r := 1.0 + 0.28 * noise.get_noise_3dv(d * 1.3) + 0.08 * noise.get_noise_3dv(d * 4.0)
@@ -875,6 +1029,7 @@ func _rock(kit: Dictionary, centre: Vector3, size: Vector3, seed_v: int, col: Co
 			n = -n
 		var shade := col.lightened(clampf(n.y, 0.0, 1.0) * 0.12)
 		_tri(st, a, b, c, n, n, n, shade, out)
+	return pts
 
 
 func _commit(parent: Node3D, kit: Dictionary, name: String) -> MeshInstance3D:
@@ -890,20 +1045,86 @@ func _commit(parent: Node3D, kit: Dictionary, name: String) -> MeshInstance3D:
 	return mi
 
 
+## Adds a shape at `xf` (layout space) to the body `name`Body under `parent` (at the origin), making
+## the body on first use: one body holds all of a structure's shapes.
 func _collider(parent: Node3D, name: String, shape: Shape3D, xf: Transform3D) -> void:
-	var body := StaticBody3D.new()
-	body.name = name + "Body"
+	var body := parent.get_node_or_null(name + "Body") as StaticBody3D
+	if body == null:
+		body = StaticBody3D.new()
+		body.name = name + "Body"
+		parent.add_child(body)
+	_scale_shape(shape, _frame.basis.get_scale().x)
 	var cs := CollisionShape3D.new()
 	cs.shape = shape
+	cs.transform = Transform3D(_frame.basis.orthonormalized() * xf.basis, _frame * xf.origin)
 	body.add_child(cs)
-	parent.add_child(body)
-	body.global_transform = xf
+
+
+func _scale_shape(shape: Shape3D, s: float) -> void:
+	if is_equal_approx(s, 1.0):
+		return
+	if shape is BoxShape3D:
+		(shape as BoxShape3D).size *= s
+	elif shape is CylinderShape3D:
+		(shape as CylinderShape3D).radius *= s
+		(shape as CylinderShape3D).height *= s
+	elif shape is SphereShape3D:
+		(shape as SphereShape3D).radius *= s
+	elif shape is ConvexPolygonShape3D:
+		var pts := (shape as ConvexPolygonShape3D).points
+		for i in pts.size():
+			pts[i] *= s
+		(shape as ConvexPolygonShape3D).points = pts
 
 
 func _box_collider(parent: Node3D, name: String, lo: Vector3, hi: Vector3, yaw_deg: float = 0.0) -> void:
 	var shape := BoxShape3D.new()
 	shape.size = hi - lo
 	_collider(parent, name, shape, Transform3D(Basis(Vector3.UP, deg_to_rad(yaw_deg)), (lo + hi) * 0.5))
+
+
+## A box between two corners given in the frame `xf` (a structure's own axes).
+func _box_in(parent: Node3D, name: String, xf: Transform3D, lo: Vector3, hi: Vector3) -> void:
+	var shape := BoxShape3D.new()
+	shape.size = hi - lo
+	_collider(parent, name, shape, xf * Transform3D(Basis(), (lo + hi) * 0.5))
+
+
+## A box of `size` centred on `centre`, its long (z) axis along `dir` and its y axis up.
+func _box_along(parent: Node3D, name: String, centre: Vector3, dir: Vector3, size: Vector3) -> void:
+	var shape := BoxShape3D.new()
+	shape.size = size
+	var z := dir.normalized()
+	var x := Vector3.UP.cross(z)
+	if x.length_squared() < 1e-6:
+		x = Vector3.RIGHT
+	x = x.normalized()
+	_collider(parent, name, shape, Transform3D(Basis(x, z.cross(x), z), centre))
+
+
+## A cylinder from a to b.
+func _rod_collider(parent: Node3D, name: String, a: Vector3, b: Vector3, r: float) -> void:
+	var shape := CylinderShape3D.new()
+	shape.radius = r
+	shape.height = a.distance_to(b)
+	var axis := (b - a).normalized()
+	if axis.y < 0.0:
+		axis = -axis
+	var basis := Basis() if axis.is_equal_approx(Vector3.UP) else Basis(Quaternion(Vector3.UP, axis))
+	_collider(parent, name, shape, Transform3D(basis, (a + b) * 0.5))
+
+
+func _hull_collider(parent: Node3D, name: String, pts: PackedVector3Array) -> void:
+	var centre := Vector3.ZERO
+	for p in pts:
+		centre += p
+	centre /= maxf(pts.size(), 1)
+	var local := PackedVector3Array()
+	for p in pts:
+		local.append(p - centre)
+	var shape := ConvexPolygonShape3D.new()
+	shape.points = local
+	_collider(parent, name, shape, Transform3D(Basis(), centre))
 
 
 # --- Structures -----------------------------------------------------------------------------------
@@ -961,19 +1182,27 @@ func _build_grandstand(root: Node3D) -> void:
 		stripe += 1
 	_commit(root, kit, "Grandstand")
 	_box_collider(root, "Grandstand", Vector3(x0 - 0.4, base, z0 - 0.4), Vector3(back_x + 0.5, top + 1.0, z1 + 0.4))
+	var roof_shape := BoxShape3D.new()
+	roof_shape.size = Vector3(back_x - x0 + 1.6, 0.3, z1 - z0 + 0.8)
+	_collider(root, "Grandstand", roof_shape, roof_xf)
+	_box_collider(root, "Grandstand", Vector3(x0 - 1.3, roof_y - 1.3, z0 - 0.4), Vector3(x0 - 1.05, roof_y - 0.4, z1 + 0.4))
+	_box_collider(root, "Grandstand", Vector3(back_x, top + 1.0, z0 - 0.4), Vector3(back_x + 0.5, roof_y + 0.3, z1 + 0.4))
 	for zc in [152.0, 162.0, 172.0, 182.0, 190.0]:
 		_note("Grandstand", Vector2(x0, zc), 0.5, CLEAR_BUILDING)
 
 
-## A row of striped bathing huts with their doors to the sea.
+## A row of striped bathing huts with their doors to the sea. Each is laid out at life size round the
+## sea edge of its floor and built at PROP_SCALE.
 func _build_beach_huts(root: Node3D) -> void:
 	var kit := {}
-	var z := 24.0
+	var w := 2.6
+	var d := 2.8
+	var front := -25.4
+	var z := 26.0
 	var i := 0
-	while z < 74.0:
-		var x := -23.5
-		var w := 2.6
-		var d := 2.8
+	while z < 72.0:
+		_scale_about(Vector3(front, 0.0, z), PROP_SCALE)
+		var x := front + 0.5 + d * 0.5
 		var g := _ground_min(x, z, d * 0.5, w * 0.5)
 		var floor_y := maxf(_ground(x - d * 0.5, z), g) + 0.35
 		var col: Color = HUT_COLOURS[i % HUT_COLOURS.size()]
@@ -1000,9 +1229,14 @@ func _build_beach_huts(root: Node3D) -> void:
 		# Door on the sea side.
 		_block(kit, "paint", Vector3(x - d * 0.5 - 0.04, floor_y + 0.05, z - 0.55), Vector3(x - d * 0.5, floor_y + 1.95, z + 0.55), col.darkened(0.35))
 		_gable_roof(kit, "paint", Transform3D(Basis(Vector3.UP, PI * 0.5), Vector3(x, floor_y + wall_h, z)), w + 0.4, d + 0.5, 1.0, WHITE.darkened(0.05), col)
-		_box_collider(root, "Hut%d" % i, Vector3(x - d * 0.5 - 0.5, g - 0.3, z - w * 0.5), Vector3(x + d * 0.5, floor_y + wall_h + 0.8, z + w * 0.5))
+		_box_collider(root, "Hut%d" % i, Vector3(x - d * 0.5 - 0.5, g - 0.3, z - w * 0.5), Vector3(x + d * 0.5, floor_y + wall_h, z + w * 0.5))
+		_hull_collider(root, "Hut%d" % i, PackedVector3Array([
+			Vector3(x - d * 0.5 - 0.25, floor_y + wall_h, z - w * 0.5 - 0.2), Vector3(x + d * 0.5 + 0.25, floor_y + wall_h, z - w * 0.5 - 0.2),
+			Vector3(x - d * 0.5 - 0.25, floor_y + wall_h, z + w * 0.5 + 0.2), Vector3(x + d * 0.5 + 0.25, floor_y + wall_h, z + w * 0.5 + 0.2),
+			Vector3(x - d * 0.5 - 0.25, floor_y + wall_h + 1.0, z), Vector3(x + d * 0.5 + 0.25, floor_y + wall_h + 1.0, z)]))
 		_note("Hut%d" % i, Vector2(x - d * 0.5 - 0.5, z), 0.2, CLEAR_BUILDING)
-		z += 3.6
+		_end_scale()
+		z += (w + 0.9) * PROP_SCALE
 		i += 1
 	_commit(root, kit, "BeachHuts")
 
@@ -1030,25 +1264,25 @@ func _build_pier(root: Node3D) -> void:
 	_block(kit, "wood", Vector3(x_end, top - 0.22, z - head_half), Vector3(head_x + 6.0, top, z + head_half), WOOD)
 	for zz in [z - half + 0.3, z + half - 0.3]:
 		_block(kit, "wood", Vector3(x_end, top - 0.6, zz - 0.15), Vector3(x_land - 1.0, top - 0.22, zz + 0.15), OLD_WOOD)
-	# Piles in pairs every 6m, braced; the shallow ones get colliders.
+	_box_collider(root, "Pier", Vector3(x_end, top - 0.6, z - half), Vector3(x_land - 1.0, top, z + half))
+	_box_collider(root, "Pier", Vector3(x_end, top - 0.22, z - head_half), Vector3(head_x + 6.0, top, z + head_half))
+	# Piles in pairs every 6m, braced.
 	var x := x_land - 4.0
 	while x > x_end - 0.1:
 		var bed := _ground(x, z)
 		for zz2 in [z - half + 0.2, z + half - 0.2]:
 			_tube(kit, "wood", Vector3(x, bed - 0.8, zz2), Vector3(x, top - 0.22, zz2), 0.24, 0.22, 8, OLD_WOOD)
-			if bed > -1.0:
-				var shape := CylinderShape3D.new()
-				shape.radius = 0.26
-				shape.height = top - bed + 0.8
-				_collider(root, "PierPile", shape, Transform3D(Basis(), Vector3(x, (bed - 0.8 + top) * 0.5, zz2)))
+			_rod_collider(root, "Pier", Vector3(x, bed - 0.8, zz2), Vector3(x, top - 0.22, zz2), 0.26)
 		_tube(kit, "wood", Vector3(x, bed + 0.2, z - half + 0.2), Vector3(x, top - 0.7, z + half - 0.2), 0.08, 0.08, 5, OLD_WOOD)
 		_tube(kit, "wood", Vector3(x, top - 0.7, z - half + 0.2), Vector3(x, bed + 0.2, z + half - 0.2), 0.08, 0.08, 5, OLD_WOOD)
+		_box_collider(root, "Pier", Vector3(x - 0.1, bed + 0.1, z - half + 0.2), Vector3(x + 0.1, top - 0.6, z + half - 0.2))
 		x -= 6.0
 	# Extra piles under the T-head.
 	for hx in [x_end + 1.0, head_x, head_x + 5.0]:
 		for hz in [z - head_half + 0.5, z - 4.0, z + 4.0, z + head_half - 0.5]:
 			var b2 := _ground(hx, hz)
 			_tube(kit, "wood", Vector3(hx, b2 - 0.8, hz), Vector3(hx, top - 0.22, hz), 0.26, 0.24, 8, OLD_WOOD)
+			_rod_collider(root, "Pier", Vector3(hx, b2 - 0.8, hz), Vector3(hx, top - 0.22, hz), 0.27)
 	# Railings: posts and two rails down each side and round the head.
 	var rail_col := Color(0.92, 0.92, 0.88)
 	var runs := [
@@ -1070,6 +1304,7 @@ func _build_pier(root: Node3D) -> void:
 			_block(kit, "paint", pp + Vector3(-0.06, 0.0, -0.06), pp + Vector3(0.06, 1.05, 0.06), rail_col)
 		_tube(kit, "paint", a + Vector3(0, 1.0, 0), b + Vector3(0, 1.0, 0), 0.05, 0.05, 5, rail_col)
 		_tube(kit, "paint", a + Vector3(0, 0.55, 0), b + Vector3(0, 0.55, 0), 0.035, 0.035, 5, rail_col)
+		_box_along(root, "Pier", (a + b) * 0.5 + Vector3(0, 0.53, 0), b - a, Vector3(0.14, 1.06, run_len + 0.1))
 	# Lamp posts.
 	var lx := x_land - 8.0
 	while lx > head_x + 6.0:
@@ -1077,12 +1312,14 @@ func _build_pier(root: Node3D) -> void:
 			_tube(kit, "metal", Vector3(lx, top, zz3), Vector3(lx, top + 3.2, zz3), 0.07, 0.05, 6, Color(0.15, 0.25, 0.30))
 			_block(kit, "glow", Vector3(lx - 0.16, top + 3.2, zz3 - 0.16), Vector3(lx + 0.16, top + 3.6, zz3 + 0.16), Color(1, 1, 1))
 			_tube(kit, "metal", Vector3(lx, top + 3.6, zz3), Vector3(lx, top + 3.85, zz3), 0.26, 0.0, 6, Color(0.15, 0.25, 0.30))
+			_rod_collider(root, "Pier", Vector3(lx, top, zz3), Vector3(lx, top + 3.85, zz3), 0.18)
 		lx -= 18.0
 	# Pavilion on the head.
 	var pc := Vector3(head_x + 0.5, top, z)
 	for cx in [-1, 1]:
 		for cz in [-1, 1]:
 			_tube(kit, "paint", pc + Vector3(cx * 3.0, 0, cz * 3.0), pc + Vector3(cx * 3.0, 3.2, cz * 3.0), 0.14, 0.14, 8, WHITE)
+			_rod_collider(root, "Pier", pc + Vector3(cx * 3.0, 0, cz * 3.0), pc + Vector3(cx * 3.0, 3.2, cz * 3.0), 0.16)
 	_block(kit, "paint", pc + Vector3(-3.4, 3.2, -3.4), pc + Vector3(3.4, 3.45, 3.4), WHITE)
 	var apex := pc + Vector3(0, 5.6, 0)
 	var eaves := [Vector3(-4.0, 3.45, -4.0), Vector3(4.0, 3.45, -4.0), Vector3(4.0, 3.45, 4.0), Vector3(-4.0, 3.45, 4.0)]
@@ -1096,125 +1333,596 @@ func _build_pier(root: Node3D) -> void:
 			nn = -nn
 		_tri(pst, e1, e2, apex, nn, nn, nn, ncol, nn)
 		_tri(pst, e1, e2, pc + Vector3(0, 3.45, 0), Vector3.DOWN, Vector3.DOWN, Vector3.DOWN, ncol.darkened(0.3), Vector3.DOWN)
+	var roof_hull := PackedVector3Array([apex, pc + Vector3(0, 3.2, 0) + Vector3(-4.0, 0, -4.0), pc + Vector3(0, 3.2, 0) + Vector3(4.0, 0, -4.0)])
+	for e in eaves:
+		roof_hull.append(pc + (e as Vector3))
+	roof_hull.append(pc + Vector3(-4.0, 3.2, 4.0))
+	roof_hull.append(pc + Vector3(4.0, 3.2, 4.0))
+	_hull_collider(root, "Pier", roof_hull)
 	_commit(root, kit, "Pier")
 
 
-## A lifeguard hut up on stilts, with a ramp of slats and a flag.
-func _build_lifeguard_tower(root: Node3D, name: String, at: Vector3, yaw_deg: float) -> void:
+## A lifeguard tower on braced stilts, in its own frame with the sea at -x: a cabin with a counter
+## and a propped-up shutter to the sea, a railed balcony round it, a hipped roof with a loudspeaker
+## and a beacon, LIFEGUARD boards over the front and back eaves, stairs down the back and a rescue
+## board leaning on the stilts. Laid out at life size, built at PROP_SCALE. `paint` is the body, the
+## trim and the roof colour.
+func _build_lifeguard_tower(root: Node3D, name: String, at: Vector3, yaw_deg: float, paint: Array) -> void:
+	_scale_about(Vector3(at.x, 0.0, at.z), PROP_SCALE)
 	var kit := {}
 	var g := _ground_min(at.x, at.z, 1.6, 1.6)
 	var xf := Transform3D(Basis(Vector3.UP, deg_to_rad(yaw_deg)), Vector3(at.x, g, at.z))
-	var yellow := Color(0.98, 0.80, 0.20)
-	var red := Color(0.88, 0.22, 0.18)
-	var legs_h := 2.8
-	for cx in [-1, 1]:
-		for cz in [-1, 1]:
-			_tube(kit, "wood", xf * Vector3(cx * 1.3, -0.6, cz * 1.3), xf * Vector3(cx * 1.1, legs_h, cz * 1.1), 0.12, 0.1, 6, WHITE)
-	_tube(kit, "wood", xf * Vector3(-1.25, 0.8, -1.25), xf * Vector3(1.25, 0.8, 1.25), 0.06, 0.06, 5, WHITE)
-	_tube(kit, "wood", xf * Vector3(-1.25, 0.8, 1.25), xf * Vector3(1.25, 0.8, -1.25), 0.06, 0.06, 5, WHITE)
-	_box(kit, "wood", xf * Transform3D(Basis(), Vector3(-0.3, legs_h, 0)), Vector3(3.4, 0.15, 3.0), WOOD)
-	# Cabin: back and sides painted, front open with a counter facing the sea (-x locally).
-	_box(kit, "paint", xf * Transform3D(Basis(), Vector3(0.95, legs_h + 1.05, 0)), Vector3(0.1, 2.1, 2.6), yellow)
-	for sz in [-1, 1]:
-		_box(kit, "paint", xf * Transform3D(Basis(), Vector3(0.1, legs_h + 1.05, sz * 1.25)), Vector3(1.8, 2.1, 0.1), yellow)
-	_box(kit, "paint", xf * Transform3D(Basis(), Vector3(-0.75, legs_h + 0.5, 0)), Vector3(0.1, 1.0, 2.6), red)
-	_box(kit, "paint", xf * Transform3D(Basis(Vector3.BACK, 0.12), Vector3(0.0, legs_h + 2.25, 0)), Vector3(2.6, 0.12, 3.2), red)
-	# Ramp down the back.
-	var ramp_from := xf * Vector3(1.1, legs_h, 0)
-	var ramp_to := xf * Vector3(4.6, 0.0, 0)
-	var steps := 9
-	for s in range(steps):
-		var p := ramp_from.lerp(ramp_to, (s + 0.5) / steps)
-		_box(kit, "wood", Transform3D(xf.basis, p), Vector3(0.28, 0.06, 1.0), WOOD)
-	_tube(kit, "wood", xf * Vector3(1.1, legs_h, -0.5), xf * Vector3(4.6, 0.0, -0.5), 0.06, 0.06, 5, OLD_WOOD)
-	_tube(kit, "wood", xf * Vector3(1.1, legs_h, 0.5), xf * Vector3(4.6, 0.0, 0.5), 0.06, 0.06, 5, OLD_WOOD)
-	# Flag.
-	var pole_top := xf * Vector3(0.9, legs_h + 5.2, 1.2)
-	_tube(kit, "metal", xf * Vector3(0.9, legs_h + 2.2, 1.2), pole_top, 0.04, 0.03, 5, Color(0.8, 0.8, 0.82))
-	var fl := xf.basis * Vector3(0, 0, 1)
-	var st := _st(kit, "canvas")
-	var f0 := pole_top + Vector3(0, -0.05, 0)
-	var f1 := pole_top + Vector3(0, -0.85, 0)
-	var f2 := f1 + fl * 1.3 + Vector3(0, 0.1, 0)
-	var f3 := f0 + fl * 1.3 + Vector3(0, -0.1, 0)
-	var fn := xf.basis * Vector3.RIGHT
-	_tri(st, f0, f1, f2, fn, fn, fn, red, fn)
-	_tri(st, f0, f2, f3, fn, fn, fn, yellow, fn)
+	var body: Color = paint[0]
+	var trim: Color = paint[1]
+	var roof: Color = paint[2]
+	var red := Color(0.86, 0.15, 0.13)
+	var yellow := Color(0.98, 0.82, 0.18)
+	var glass := Color(0.12, 0.18, 0.24)
+	var deck_y := 3.05
+	var top := deck_y + 2.2
+	# Cabin (cx0..cx1 by +-cz) and balcony (bx0..bx1 by +-bz).
+	var cx0 := -1.0
+	var cx1 := 1.4
+	var cz := 1.3
+	var bx0 := -2.3
+	var bx1 := 1.6
+	var bz := 1.6
+
+	# Stilts on concrete footings, X-braced on every side, a ring beam under the deck.
+	var stilt := func(sx: float, sz: float, y: float) -> Vector3:
+		var k := lerpf(1.35, 1.2, clampf(y / (deck_y - 0.2), 0.0, 1.0))
+		return Vector3(sx * k, y, sz * k)
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			_box(kit, "paint", xf * Transform3D(Basis(), Vector3(sx * 1.35, -0.12, sz * 1.35)), Vector3(0.5, 0.42, 0.5), Color(0.74, 0.72, 0.68))
+			_tube(kit, "wood", xf * (stilt.call(sx, sz, 0.08) as Vector3), xf * (stilt.call(sx, sz, deck_y - 0.2) as Vector3), 0.1, 0.085, 8, trim)
+	var sides := [[Vector2(-1, -1), Vector2(-1, 1)], [Vector2(1, -1), Vector2(1, 1)], [Vector2(-1, -1), Vector2(1, -1)], [Vector2(-1, 1), Vector2(1, 1)]]
+	for sd in sides:
+		var a: Vector2 = sd[0]
+		var b: Vector2 = sd[1]
+		var a0: Vector3 = stilt.call(a.x, a.y, 0.45)
+		var b0: Vector3 = stilt.call(b.x, b.y, 0.45)
+		var a1: Vector3 = stilt.call(a.x, a.y, deck_y - 0.45)
+		var b1: Vector3 = stilt.call(b.x, b.y, deck_y - 0.45)
+		_tube(kit, "wood", xf * a0, xf * b1, 0.045, 0.045, 5, trim)
+		_tube(kit, "wood", xf * b0, xf * a1, 0.045, 0.045, 5, trim)
+		_tube(kit, "wood", xf * a0, xf * b0, 0.05, 0.05, 5, trim)
+		_tube(kit, "wood", xf * (stilt.call(a.x, a.y, deck_y - 0.2) as Vector3), xf * (stilt.call(b.x, b.y, deck_y - 0.2) as Vector3), 0.08, 0.08, 6, trim)
+
+	# Balcony: a painted edge beam under planks.
+	_box(kit, "paint", xf * Transform3D(Basis(), Vector3((bx0 + bx1) * 0.5, deck_y - 0.17, 0)), Vector3(bx1 - bx0, 0.18, bz * 2.0), body.darkened(0.25))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(name)
+	var pz := -bz
+	while pz < bz - 0.01:
+		_box(kit, "wood", xf * Transform3D(Basis(), Vector3((bx0 + bx1) * 0.5, deck_y - 0.04, pz + 0.1)), Vector3(bx1 - bx0 + 0.06, 0.08, 0.18), WOOD.lightened(rng.randf_range(-0.08, 0.1)))
+		pz += 0.2
+
+	# Cabin walls. The back has the door; the front is open above a counter.
+	var wall := func(lo: Vector3, hi: Vector3, col: Color) -> void:
+		_box(kit, "paint", xf * Transform3D(Basis(), (lo + hi) * 0.5), hi - lo, col)
+	wall.call(Vector3(cx1 - 0.08, deck_y, -cz), Vector3(cx1, top, -0.45), body)
+	wall.call(Vector3(cx1 - 0.08, deck_y, 0.45), Vector3(cx1, top, cz), body)
+	wall.call(Vector3(cx1 - 0.08, deck_y + 2.0, -0.45), Vector3(cx1, top, 0.45), body)
+	wall.call(Vector3(cx1 - 0.05, deck_y, -0.44), Vector3(cx1 - 0.02, deck_y + 2.0, 0.44), roof.darkened(0.2))
+	wall.call(Vector3(cx1 - 0.02, deck_y + 1.35, -0.16), Vector3(cx1 + 0.005, deck_y + 1.7, 0.16), glass)
+	for sz in [-1.0, 1.0]:
+		wall.call(Vector3(cx0, deck_y, sz * cz - 0.04), Vector3(cx1, top, sz * cz + 0.04), body)
+		# Window toward the sea and the lifeguard cross toward the back.
+		var zf: float = sz * (cz + 0.04)
+		wall.call(Vector3(-0.9, deck_y + 1.2, zf - 0.015), Vector3(-0.2, deck_y + 1.9, zf + 0.015), trim)
+		wall.call(Vector3(-0.84, deck_y + 1.26, zf + sz * 0.012 - 0.01), Vector3(-0.26, deck_y + 1.84, zf + sz * 0.012 + 0.01), glass)
+		wall.call(Vector3(0.12, deck_y + 1.1, zf - 0.015), Vector3(1.02, deck_y + 2.0, zf + 0.015), WHITE)
+		wall.call(Vector3(0.27, deck_y + 1.47, zf + sz * 0.012 - 0.01), Vector3(0.87, deck_y + 1.63, zf + sz * 0.012 + 0.01), red)
+		wall.call(Vector3(0.49, deck_y + 1.25, zf + sz * 0.012 - 0.01), Vector3(0.65, deck_y + 1.85, zf + sz * 0.012 + 0.01), red)
+	wall.call(Vector3(cx0, deck_y, -cz), Vector3(cx0 + 0.08, deck_y + 1.0, cz), body)
+	wall.call(Vector3(cx0, top - 0.25, -cz), Vector3(cx0 + 0.08, top, cz), body)
+	for sz in [-1.0, 1.0]:
+		wall.call(Vector3(cx0, deck_y, minf(sz * cz, sz * 1.1)), Vector3(cx0 + 0.08, top, maxf(sz * cz, sz * 1.1)), body)
+	# A white band round the cabin at the counter, corner boards, the counter top.
+	wall.call(Vector3(cx1, deck_y + 0.88, -cz), Vector3(cx1 + 0.015, deck_y + 1.0, -0.45), trim)
+	wall.call(Vector3(cx1, deck_y + 0.88, 0.45), Vector3(cx1 + 0.015, deck_y + 1.0, cz), trim)
+	wall.call(Vector3(cx0 - 0.015, deck_y + 0.88, -cz), Vector3(cx0, deck_y + 1.0, cz), trim)
+	for sz in [-1.0, 1.0]:
+		wall.call(Vector3(cx0, deck_y + 0.88, sz * (cz + 0.04) - 0.015), Vector3(cx1, deck_y + 1.0, sz * (cz + 0.04) + 0.015), trim)
+	for sx in [cx0, cx1]:
+		for sz in [-1.0, 1.0]:
+			wall.call(Vector3(sx - 0.07, deck_y, sz * cz - 0.07), Vector3(sx + 0.07, top, sz * cz + 0.07), trim)
+	wall.call(Vector3(cx0 - 0.28, deck_y + 1.0, -1.12), Vector3(cx0 + 0.3, deck_y + 1.06, 1.12), WOOD)
+	# First-aid box by the door.
+	wall.call(Vector3(cx1, deck_y + 1.1, 0.62), Vector3(cx1 + 0.12, deck_y + 1.45, 1.02), WHITE)
+	wall.call(Vector3(cx1 + 0.12, deck_y + 1.25, 0.76), Vector3(cx1 + 0.125, deck_y + 1.3, 0.88), red)
+	wall.call(Vector3(cx1 + 0.12, deck_y + 1.21, 0.8), Vector3(cx1 + 0.125, deck_y + 1.34, 0.84), red)
+	# Shutter hinged under the header, propped out over the counter as an awning.
+	var hinge := Vector3(cx0 - 0.04, top - 0.25, 0)
+	var tilt := deg_to_rad(18.0)
+	var out_dir := Vector3(-cos(tilt), -sin(tilt), 0)
+	_box(kit, "paint", xf * Transform3D(Basis(Vector3.BACK, tilt), hinge + out_dir * 0.48), Vector3(0.96, 0.05, 2.3), roof)
+	for sz in [-0.95, 0.95]:
+		_tube(kit, "metal", xf * Vector3(cx0 - 0.02, deck_y + 1.06, sz), xf * (hinge + out_dir * 0.9 + Vector3(0, -0.03, sz)), 0.018, 0.018, 4, Color(0.75, 0.75, 0.78))
+	# Inside: a high chair, binoculars on the counter.
+	var seat := Vector3(-0.35, deck_y, 0.2)
+	for lx in [-0.2, 0.2]:
+		for lz in [-0.2, 0.2]:
+			_tube(kit, "wood", xf * (seat + Vector3(lx, 0, lz)), xf * (seat + Vector3(lx * 0.8, 0.8, lz * 0.8)), 0.025, 0.025, 4, trim)
+	_box(kit, "paint", xf * Transform3D(Basis(), seat + Vector3(0, 0.82, 0)), Vector3(0.45, 0.05, 0.45), roof)
+	_box(kit, "paint", xf * Transform3D(Basis(), seat + Vector3(0.22, 1.12, 0)), Vector3(0.05, 0.55, 0.45), roof)
+	for bzz in [0.45, 0.53]:
+		_tube(kit, "metal", xf * Vector3(cx0 - 0.08, deck_y + 1.1, bzz), xf * Vector3(cx0 - 0.24, deck_y + 1.1, bzz), 0.035, 0.04, 8, Color(0.1, 0.1, 0.11))
+
+	# Hipped roof with a fascia, a beacon and a loudspeaker on a short mast.
+	var rx0 := cx0 - 0.95
+	var rx1 := cx1 + 0.45
+	var rz := cz + 0.45
+	var roof_pts := _hip_roof(kit, "paint", xf * Transform3D(Basis(), Vector3(0, top, 0)), rx0, rx1, -rz, rz, 0.95, roof)
+	for e in [[Vector3(rx0, top - 0.18, -rz), Vector3(rx1, top, -rz + 0.06)], [Vector3(rx0, top - 0.18, rz - 0.06), Vector3(rx1, top, rz)],
+			[Vector3(rx0, top - 0.18, -rz), Vector3(rx0 + 0.06, top, rz)], [Vector3(rx1 - 0.06, top - 0.18, -rz), Vector3(rx1, top, rz)]]:
+		wall.call(e[0], e[1], trim)
+	var apex := Vector3((rx0 + rx1) * 0.5, top + 0.95, 0)
+	_tube(kit, "metal", xf * (apex - Vector3(0, 0.1, 0)), xf * (apex + Vector3(0, 0.95, 0)), 0.04, 0.035, 6, Color(0.8, 0.8, 0.82))
+	_tube(kit, "beacon", xf * (apex + Vector3(0, 0.95, 0)), xf * (apex + Vector3(0, 1.18, 0)), 0.11, 0.11, 10, Color(1.0, 0.55, 0.2))
+	_tube(kit, "metal", xf * (apex + Vector3(0, 1.18, 0)), xf * (apex + Vector3(0, 1.24, 0)), 0.12, 0.06, 10, Color(0.2, 0.2, 0.22))
+	var horn := apex + Vector3(0, 0.62, 0)
+	_tube(kit, "paint", xf * horn, xf * (horn + Vector3(-0.45, -0.1, 0)), 0.06, 0.2, 10, WHITE)
+	_tube(kit, "paint", xf * (horn + Vector3(-0.44, -0.098, 0)), xf * (horn + Vector3(-0.46, -0.102, 0)), 0.17, 0.17, 10, Color(0.15, 0.15, 0.16), false)
+
+	# LIFEGUARD boards standing on the front and back eaves.
+	for side in [-1.0, 1.0]:
+		var ex := rx0 + 0.03 if side < 0.0 else rx1 - 0.03
+		var face := Vector3(side, 0, 0)
+		var right := Vector3(0, 0, -side)
+		var bc := Vector3(ex, top + 0.28, 0)
+		_box(kit, "paint", xf * Transform3D(Basis(), bc), Vector3(0.06, 0.6, 2.7), WHITE)
+		_box(kit, "paint", xf * Transform3D(Basis(), bc + face * 0.02), Vector3(0.04, 0.5, 2.6), red)
+		_pixel_text(kit, "paint", xf * (bc + face * 0.045), xf.basis * right, xf.basis * Vector3.UP, 0.056, "LIFEGUARD", yellow)
+
+	# Railing round the balcony, open at the head of the stairs.
+	var runs := [[Vector3(bx0, 0, -bz), Vector3(bx0, 0, bz)], [Vector3(bx0, 0, -bz), Vector3(bx1, 0, -bz)], [Vector3(bx0, 0, bz), Vector3(bx1, 0, bz)],
+		[Vector3(bx1, 0, -bz), Vector3(bx1, 0, -0.55)], [Vector3(bx1, 0, 0.55), Vector3(bx1, 0, bz)]]
+	for r in runs:
+		var a: Vector3 = (r[0] as Vector3) + Vector3(0, deck_y, 0)
+		var b: Vector3 = (r[1] as Vector3) + Vector3(0, deck_y, 0)
+		var posts := maxi(1, ceili(a.distance_to(b) / 0.8))
+		for p in range(posts + 1):
+			var pp := a.lerp(b, float(p) / posts)
+			_box(kit, "paint", xf * Transform3D(Basis(), pp + Vector3(0, 0.5, 0)), Vector3(0.07, 1.0, 0.07), trim)
+		_tube(kit, "paint", xf * (a + Vector3(0, 1.0, 0)), xf * (b + Vector3(0, 1.0, 0)), 0.04, 0.04, 6, trim)
+		_tube(kit, "paint", xf * (a + Vector3(0, 0.5, 0)), xf * (b + Vector3(0, 0.5, 0)), 0.025, 0.025, 5, trim)
+		_box_along(root, name, xf * ((a + b) * 0.5 + Vector3(0, 0.52, 0)), xf.basis * (b - a), Vector3(0.1, 1.05, a.distance_to(b) + 0.08))
+	_lifebuoy(kit, xf * Vector3(bx0 - 0.09, deck_y + 0.55, -0.7), xf.basis * Vector3.LEFT, 0.32, 0.07)
+	# Rescue tube clipped to the side rail.
+	var rt0 := Vector3(-1.7, deck_y + 0.42, bz + 0.1)
+	_tube(kit, "gloss", xf * rt0, xf * (rt0 + Vector3(0.75, 0, 0)), 0.09, 0.09, 8, red)
+	_tube(kit, "gloss", xf * (rt0 + Vector3(0.75, 0, 0)), xf * (rt0 + Vector3(0.87, 0, 0)), 0.09, 0.03, 8, red)
+	_tube(kit, "gloss", xf * rt0, xf * (rt0 - Vector3(0.12, 0, 0)), 0.09, 0.03, 8, red)
+	_tube(kit, "paint", xf * (rt0 - Vector3(0.1, 0, 0)), xf * Vector3(-2.0, deck_y + 1.0, bz), 0.012, 0.012, 3, yellow, false)
+
+	# Stairs down the back: stringers, treads, handrails.
+	var foot_x := 5.4
+	var fw := xf * Vector3(foot_x, 0, 0)
+	var foot_y := _ground(fw.x, fw.z) - g
+	var s_top := Vector3(bx1, deck_y, 0)
+	var s_foot := Vector3(foot_x, foot_y, 0)
+	var run := s_foot - s_top
+	var slope := atan2(-run.y, run.x)
+	var steps := maxi(4, roundi(-run.y / 0.19))
+	for i in steps:
+		var p := s_top.lerp(s_foot, (i + 1.0) / (steps + 1.0)) - Vector3(0, 0.025, 0)
+		_box(kit, "wood", xf * Transform3D(Basis(), p), Vector3(run.x / (steps + 1.0) + 0.05, 0.05, 1.0), WOOD.lightened(0.05))
+	var smid := (s_top + s_foot) * 0.5
+	for sz in [-0.55, 0.55]:
+		_box(kit, "paint", xf * Transform3D(Basis(Vector3.BACK, -slope), smid + Vector3(0, -0.12, sz)), Vector3(run.length() + 0.1, 0.24, 0.06), trim)
+		var h0 := s_top + Vector3(0, 0.95, sz + signf(sz) * 0.04)
+		var h1 := s_foot + Vector3(0, 0.95, sz + signf(sz) * 0.04)
+		_tube(kit, "paint", xf * h0, xf * h1, 0.035, 0.035, 6, trim)
+		for t in [0.0, 0.5, 1.0]:
+			var hp := h0.lerp(h1, t)
+			_tube(kit, "paint", xf * (hp - Vector3(0, 0.95, 0)), xf * hp, 0.03, 0.03, 5, trim)
+		_box_along(root, name, xf * (smid + Vector3(0, 0.45, sz + signf(sz) * 0.04)), xf.basis * run, Vector3(0.08, 1.0, run.length()))
+	_box(kit, "paint", xf * Transform3D(Basis(), s_foot + Vector3(0.35, -0.08, 0)), Vector3(0.9, 0.2, 1.4), Color(0.74, 0.72, 0.68))
+	_box_along(root, name, xf * (smid + Vector3(0, -0.15, 0)), xf.basis * run, Vector3(1.2, 0.3, run.length()))
+
+	# Rescue board leaning on the stilts, the flag on the balcony's front corner.
+	var bf := xf * Vector3(0.25, 0, -2.25)
+	var board_foot := Vector3(0.25, _ground(bf.x, bf.z) - g - 0.03, -2.25)
+	var board_top := Vector3(0.25, deck_y - 0.75, -1.42)
+	var along := (board_top - board_foot).normalized()
+	var bx := Vector3(-1, 0, 0)
+	var board_basis := Basis(bx, along, bx.cross(along))
+	_surfboard(kit, xf * Transform3D(board_basis, board_foot), board_foot.distance_to(board_top) + 0.3, 1, 1, red, yellow, WHITE)
+	_box_along(root, name, xf * board_foot.lerp(board_top, 0.55), xf.basis * along, Vector3(0.6, 0.15, board_foot.distance_to(board_top) + 0.3))
+	var pole_foot := Vector3(bx0 + 0.08, deck_y, bz - 0.08)
+	var pole_top := pole_foot + Vector3(0, 4.3, 0)
+	_tube(kit, "metal", xf * pole_foot, xf * pole_top, 0.04, 0.03, 6, Color(0.82, 0.82, 0.84))
+	_rod_collider(root, name, xf * pole_foot, xf * pole_top, 0.06)
+	# Red over yellow, streaming inland in the sea breeze.
+	var fst := _st(kit, "canvas")
+	var fcols := [red, yellow]
+	for row in 2:
+		for col_i in 4:
+			var u0 := col_i / 4.0
+			var u1 := (col_i + 1) / 4.0
+			var v0 := row * 0.36
+			var v1 := (row + 1) * 0.36
+			var q := func(u: float, v: float) -> Vector3:
+				return xf * (pole_top + Vector3(0.05 + u * 1.1, -0.05 - v, 0.09 * sin(u * PI * 1.6)))
+			var fnn := xf.basis * Vector3(0, 0, 1)
+			_tri(fst, q.call(u0, v0), q.call(u1, v0), q.call(u1, v1), fnn, fnn, fnn, fcols[row], fnn)
+			_tri(fst, q.call(u0, v0), q.call(u1, v1), q.call(u0, v1), fnn, fnn, fnn, fcols[row], fnn)
+
 	_commit(root, kit, name)
-	_box_collider(root, name, Vector3(at.x - 1.5, g - 0.5, at.z - 1.5), Vector3(at.x + 1.5, g + legs_h + 2.4, at.z + 1.5), yaw_deg)
-	_note(name, Vector2(at.x, at.z), 2.0, CLEAR_BUILDING)
+	# Collision: the braced stilts, the balcony, the cabin, the roof and its boards.
+	_box_in(root, name, xf, Vector3(-1.45, -0.4, -1.45), Vector3(1.45, deck_y - 0.26, 1.45))
+	_box_in(root, name, xf, Vector3(bx0, deck_y - 0.26, -bz), Vector3(bx1, deck_y, bz))
+	_box_in(root, name, xf, Vector3(cx0, deck_y, -cz - 0.07), Vector3(cx1 + 0.12, top, cz + 0.07))
+	_hull_collider(root, name, roof_pts)
+	_box_in(root, name, xf, Vector3(rx0 - 0.05, top - 0.2, -1.35), Vector3(rx0 + 0.1, top + 0.58, 1.35))
+	_box_in(root, name, xf, Vector3(rx1 - 0.1, top - 0.2, -1.35), Vector3(rx1 + 0.05, top + 0.58, 1.35))
+	_note(name, Vector2(at.x, at.z), 3.2, CLEAR_BUILDING)
+	var sf := xf * Vector3(4.2, 0, 0)
+	_note(name + "Stairs", Vector2(sf.x, sf.z), 1.6, CLEAR_BUILDING)
+	_end_scale()
 
 
-## Red and white lighthouse on a rock islet off the north end of the bay, with the keeper's cottage.
+# --- Lighthouse -----------------------------------------------------------------------------------
+# A banded tower on a masonry terrace on a rock islet off the north end of the bay: a granite plinth
+# and door, staircase windows spiralling up, a corbelled gallery with a railing, the watch room, a
+# twelve-sided lantern round a brass-ringed lens, a red dome with a ventilator ball and a vane. The
+# keeper's cottage stands in a walled yard on the landward side, with steps down to a jetty. The sea
+# round the islet is shallow enough to wade, so every part has collision.
+
+const LIGHTHOUSE_AT := Vector3(-100.0, 0.0, -394.0)
+const LH_TERRACE := 3.4      # terrace and yard paving above the sea
+const LH_SHAFT := 26.0       # terrace to the gallery floor
+const LH_R_FOOT := 3.8
+const LH_R_TOP := 2.35
+
+
+## The shaft's radius at height t (0..1) up it: a straight taper flaring out at the foot.
+func _lh_radius(t: float) -> float:
+	return LH_R_TOP + 1.0 * (1.0 - t) + 0.45 * pow(1.0 - t, 4.0)
+
+
 func _build_lighthouse(root: Node3D) -> void:
 	var kit := {}
-	var c := Vector3(-100.0, 0.0, -394.0)
+	var name := "Lighthouse"
+	var c := LIGHTHOUSE_AT
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 2207
-	var sand_rock := Color(0.70, 0.64, 0.56)
-	_rock(kit, c + Vector3(0, 0.6, 0), Vector3(9.0, 3.4, 8.0), 11, sand_rock)
-	for i in range(11):
-		var a := TAU * i / 11.0 + rng.randf_range(-0.2, 0.2)
-		var r := rng.randf_range(7.5, 12.0)
-		var s := rng.randf_range(1.6, 3.6)
-		var bed := _ground(c.x + cos(a) * r, c.z + sin(a) * r)
-		_rock(kit, Vector3(c.x + cos(a) * r, maxf(bed, -2.0) + s * 0.25, c.z + sin(a) * r), Vector3(s * 1.2, s * 0.8, s), 100 + i, sand_rock.darkened(rng.randf_range(0.0, 0.2)))
-	var base_y := 2.5
-	var red := Color(0.82, 0.16, 0.14)
+	var ty := LH_TERRACE
+	var red := Color(0.80, 0.14, 0.12)
+	var iron := Color(0.15, 0.16, 0.18)
+	var granite := Color(0.62, 0.60, 0.56)
+	var stone := Color(0.84, 0.80, 0.72)
+	var masonry := Color(0.68, 0.61, 0.50)
+	var brass := Color(0.78, 0.62, 0.30)
+	var dark_glass := Color(0.10, 0.14, 0.18)
+	var shutter_green := Color(0.16, 0.40, 0.30)
+	var yard_x0 := 4.5
+	var yard_x1 := 16.0
+	var yard_hz := 6.0
+
+	# The islet: rock heaped under the terraces, boulders round its foot.
+	var sand_rock := Color(0.74, 0.68, 0.60)
+	var masses := [[Vector3(0, -0.6, 0), Vector3(10.5, 4.4, 9.5), 11], [Vector3(10.5, -0.7, 0.5), Vector3(9.0, 4.0, 8.0), 12],
+		[Vector3(3.0, -0.9, -6.5), Vector3(7.0, 3.4, 4.5), 13], [Vector3(5.0, -0.9, 7.0), Vector3(7.5, 3.4, 4.5), 14]]
+	for m in masses:
+		_hull_collider(root, name, _rock(kit, c + (m[0] as Vector3), m[1], m[2], sand_rock))
+	for i in range(16):
+		var a := TAU * i / 16.0 + rng.randf_range(-0.12, 0.12)
+		# Leave the landing on the landward side clear.
+		if absf(wrapf(a, -PI, PI)) < 0.3:
+			continue
+		var r := Vector2(19.0 * cos(a), 13.0 * sin(a)) * rng.randf_range(0.92, 1.08)
+		var bp := c + Vector3(6.0 + r.x, 0, r.y)
+		var s := rng.randf_range(1.6, 3.4)
+		var bed := maxf(_ground(bp.x, bp.z), -2.0)
+		var rock_pts := _rock(kit, Vector3(bp.x, bed + s * 0.3, bp.z), Vector3(s * 1.25, s * 0.8, s), 100 + i, sand_rock.darkened(rng.randf_range(0.0, 0.22)))
+		_hull_collider(root, name, rock_pts)
+
+	# Round terrace in coursed masonry, the yard beside it on the landward side.
+	var course := 0.62
+	var y := -1.6
+	var k := 0
+	while y < ty - 0.25:
+		var y1 := minf(y + course, ty - 0.25)
+		var col := masonry.darkened(0.1 * (k % 2) + rng.randf_range(0.0, 0.04))
+		var r0 := 8.0 - 0.4 * (y + 1.6) / (ty + 1.35)
+		var r1 := 8.0 - 0.4 * (y1 + 1.6) / (ty + 1.35)
+		_lathe(kit, "paint", c, [Vector2(r0, y), Vector2(r1, y1)], 40, col)
+		_block(kit, "paint", Vector3(c.x + yard_x0, y, c.z - yard_hz), Vector3(c.x + yard_x1, y1, c.z + yard_hz), col)
+		y = y1
+		k += 1
+	_lathe(kit, "paint", c, [Vector2(7.6, ty - 0.25), Vector2(7.75, ty - 0.25), Vector2(7.85, ty - 0.2), Vector2(7.85, ty), Vector2(0.0, ty)], 40, stone)
+	_block(kit, "paint", Vector3(c.x + yard_x0, ty - 0.25, c.z - yard_hz - 0.1), Vector3(c.x + yard_x1 + 0.1, ty, c.z + yard_hz + 0.1), stone)
+	var terrace := CylinderShape3D.new()
+	terrace.radius = 7.9
+	terrace.height = ty + 2.0
+	_collider(root, name, terrace, Transform3D(Basis(), c + Vector3(0, (ty - 2.0) * 0.5, 0)))
+	_box_collider(root, name, Vector3(c.x + yard_x0, -2.0, c.z - yard_hz - 0.1), Vector3(c.x + yard_x1 + 0.1, ty, c.z + yard_hz + 0.1))
+
+	# Parapet: whitewashed with a stone coping, round the terrace (but where it opens into the yard)
+	# and round the yard, open at the landing steps.
+	var walls := []
+	var arc_from := asin(yard_hz / 7.6)
+	var segs := 18
+	for i in segs:
+		var a0 := lerpf(arc_from, TAU - arc_from, float(i) / segs)
+		var a1 := lerpf(arc_from, TAU - arc_from, float(i + 1) / segs)
+		walls.append([c + Vector3(cos(a0) * 7.6, 0, sin(a0) * 7.6), c + Vector3(cos(a1) * 7.6, 0, sin(a1) * 7.6)])
+	var yx0 := c.x + 7.6 * cos(arc_from)
+	walls.append([Vector3(yx0, 0, c.z - yard_hz + 0.1), Vector3(c.x + yard_x1 - 0.1, 0, c.z - yard_hz + 0.1)])
+	walls.append([Vector3(yx0, 0, c.z + yard_hz - 0.1), Vector3(c.x + yard_x1 - 0.1, 0, c.z + yard_hz - 0.1)])
+	walls.append([Vector3(c.x + yard_x1 - 0.1, 0, c.z - yard_hz + 0.1), Vector3(c.x + yard_x1 - 0.1, 0, c.z - 1.3)])
+	walls.append([Vector3(c.x + yard_x1 - 0.1, 0, c.z + 1.3), Vector3(c.x + yard_x1 - 0.1, 0, c.z + yard_hz - 0.1)])
+	for wl in walls:
+		var a: Vector3 = wl[0]
+		var b: Vector3 = wl[1]
+		var mid := (a + b) * 0.5
+		var dir := b - a
+		var bas := Basis(Vector3.UP, atan2(dir.x, dir.z))
+		_box(kit, "paint", Transform3D(bas, Vector3(mid.x, ty + 0.4, mid.z)), Vector3(0.36, 0.8, dir.length() + 0.12), WHITE)
+		_box(kit, "paint", Transform3D(bas, Vector3(mid.x, ty + 0.86, mid.z)), Vector3(0.48, 0.12, dir.length() + 0.2), stone)
+		_box_along(root, name, Vector3(mid.x, ty + 0.46, mid.z), dir, Vector3(0.48, 0.92, dir.length() + 0.2))
+
+	# Granite plinth with steps up to the door.
+	var base := c + Vector3(0, ty, 0)
+	_lathe(kit, "paint", base, [Vector2(4.45, 0.0), Vector2(4.45, 1.25), Vector2(4.6, 1.3), Vector2(4.6, 1.5), Vector2(LH_R_FOOT + 0.05, 1.5)], 32, granite)
+	var plinth := CylinderShape3D.new()
+	plinth.radius = 4.6
+	plinth.height = 1.5
+	_collider(root, name, plinth, Transform3D(Basis(), base + Vector3(0, 0.75, 0)))
+	for s in 5:
+		var sx := 4.45 + (5 - s) * 0.36
+		_block(kit, "paint", base + Vector3(4.2, 0, -0.95), base + Vector3(sx, 0.3 * (s + 1), 0.95), granite.lightened(0.04 * (s % 2)))
+	_box_along(root, name, base + Vector3(5.25, 0.55, 0), Vector3(1.8, -1.5, 0), Vector3(2.2, 0.4, 2.4))
+
+	# The shaft, banded red and white, with the flare at its foot.
+	var y0 := ty + 1.5
+	var top := ty + LH_SHAFT
 	var bands := 6
-	var h := 19.0
-	for b in range(bands):
-		var y0 := base_y + h * b / bands
-		var y1 := base_y + h * (b + 1) / bands
-		var r0 := lerpf(2.9, 1.9, float(b) / bands)
-		var r1 := lerpf(2.9, 1.9, float(b + 1) / bands)
-		_tube(kit, "paint", c + Vector3(0, y0, 0), c + Vector3(0, y1, 0), r0, r1, 20, WHITE if b % 2 == 0 else red, false)
-	_tube(kit, "paint", c + Vector3(0, base_y - 1.5, 0), c + Vector3(0, base_y + 0.4, 0), 3.4, 3.2, 20, Color(0.55, 0.52, 0.48))
-	# Door and little windows up the tower.
-	_box(kit, "paint", Transform3D(Basis(), c + Vector3(2.85, base_y + 1.1, 0)), Vector3(0.2, 2.0, 1.1), Color(0.18, 0.32, 0.42))
-	for wy in [7.5, 12.5, 17.0]:
-		var rr := lerpf(2.9, 1.9, (wy - base_y) / h)
-		_box(kit, "paint", Transform3D(Basis(Vector3.UP, 0.4), c + Vector3(cos(0.4) * rr, wy, -sin(0.4) * rr)), Vector3(0.2, 0.9, 0.6), Color(0.12, 0.16, 0.2))
-	# Gallery, lantern room, dome.
-	var top := base_y + h
-	_tube(kit, "paint", c + Vector3(0, top, 0), c + Vector3(0, top + 0.35, 0), 3.0, 3.0, 24, Color(0.2, 0.22, 0.24))
-	for i in range(24):
-		var a := TAU * i / 24.0
-		var p := c + Vector3(cos(a) * 2.9, top + 0.35, sin(a) * 2.9)
-		_block(kit, "metal", p + Vector3(-0.04, 0, -0.04), p + Vector3(0.04, 1.0, 0.04), Color(0.2, 0.22, 0.24))
-	for i in range(24):
-		var a0 := TAU * i / 24.0
-		var a1 := TAU * (i + 1) / 24.0
-		_tube(kit, "metal", c + Vector3(cos(a0) * 2.9, top + 1.3, sin(a0) * 2.9), c + Vector3(cos(a1) * 2.9, top + 1.3, sin(a1) * 2.9), 0.04, 0.04, 4, Color(0.2, 0.22, 0.24), false)
-	_tube(kit, "glow", c + Vector3(0, top + 0.35, 0), c + Vector3(0, top + 2.6, 0), 1.0, 1.0, 12, Color(1, 1, 1))
-	_tube(kit, "glass", c + Vector3(0, top + 0.35, 0), c + Vector3(0, top + 2.6, 0), 1.6, 1.6, 8, Color(0.8, 0.9, 0.95), false)
-	for i in range(8):
-		var a := TAU * (i + 0.5) / 8.0
-		_tube(kit, "metal", c + Vector3(cos(a) * 1.62, top + 0.35, sin(a) * 1.62), c + Vector3(cos(a) * 1.62, top + 2.6, sin(a) * 1.62), 0.05, 0.05, 4, Color(0.15, 0.15, 0.17))
-	_tube(kit, "paint", c + Vector3(0, top + 2.6, 0), c + Vector3(0, top + 4.2, 0), 1.9, 0.25, 16, red)
-	_tube(kit, "metal", c + Vector3(0, top + 4.2, 0), c + Vector3(0, top + 5.0, 0), 0.08, 0.02, 6, Color(0.2, 0.2, 0.2))
-	# Keeper's cottage on the landward side of the rock.
-	var hc := c + Vector3(6.0, 1.6, 2.0)
-	_block(kit, "paint", hc + Vector3(-2.5, -1.2, -3.0), hc + Vector3(2.5, 2.2, 3.0), WHITE)
-	_gable_roof(kit, "paint", Transform3D(Basis(), hc + Vector3(0, 2.2, 0)), 5.8, 6.8, 1.8, red, WHITE)
-	_block(kit, "paint", hc + Vector3(-2.56, 0.2, -0.5), hc + Vector3(-2.5, 1.4, 0.5), Color(0.18, 0.32, 0.42))
-	_block(kit, "paint", hc + Vector3(-0.7, 2.4, -2.0), hc + Vector3(0.2, 4.3, -1.3), Color(0.6, 0.55, 0.5))
+	var shaft_pts := PackedVector3Array()
+	for b in bands:
+		var prof := []
+		for q in 5:
+			var t := (b + q / 4.0) / bands
+			prof.append(Vector2(_lh_radius(t), lerpf(y0, top, t) - c.y))
+		_lathe(kit, "paint", c, prof, 32, WHITE if b % 2 == 0 else red)
+	for q in 9:
+		var t := q / 8.0
+		for j in 12:
+			var a := TAU * j / 12.0
+			shaft_pts.append(c + Vector3(cos(a), 0, sin(a)) * _lh_radius(t) + Vector3(0, lerpf(y0, top, t), 0))
+	_hull_collider(root, name, shaft_pts)
+
+	# Door: a granite surround and a pediment, facing the yard.
+	var rd := _lh_radius(0.03)
+	_box(kit, "paint", Transform3D(Basis(), c + Vector3(rd - 0.05, y0 + 1.35, 0)), Vector3(0.4, 2.7, 1.8), granite.lightened(0.08))
+	_box(kit, "paint", Transform3D(Basis(), c + Vector3(rd + 0.08, y0 + 1.15, 0)), Vector3(0.2, 2.3, 1.2), Color(0.12, 0.30, 0.36))
+	_box(kit, "metal", Transform3D(Basis(), c + Vector3(rd + 0.2, y0 + 1.1, 0.4)), Vector3(0.06, 0.12, 0.06), brass)
+	_gable_roof(kit, "paint", Transform3D(Basis(Vector3.UP, PI * 0.5), c + Vector3(rd + 0.15, y0 + 2.7, 0)), 2.2, 0.75, 0.55, granite.lightened(0.08), granite.lightened(0.12))
+	# Staircase windows spiralling up, in stone surrounds with sills.
+	for i in 6:
+		var a := 1.0 + i * 1.05
+		var wy := y0 + 4.2 + i * 3.45
+		var r := _lh_radius((wy - y0) / (top - y0))
+		var u := Vector3(cos(a), 0, sin(a))
+		var bas := Basis(Vector3.UP, -a)
+		var wc := c + Vector3(0, wy, 0)
+		_box(kit, "paint", Transform3D(bas, wc + u * (r - 0.02)), Vector3(0.24, 1.45, 0.95), stone)
+		_box(kit, "paint", Transform3D(bas, wc + u * (r + 0.03)), Vector3(0.24, 1.15, 0.62), dark_glass)
+		_box(kit, "paint", Transform3D(bas, wc + u * (r + 0.1) - Vector3(0, 0.66, 0)), Vector3(0.3, 0.09, 1.05), stone)
+
+	# Corbelled cornice under the gallery, the gallery and its railing.
+	_lathe(kit, "paint", c, [Vector2(LH_R_TOP - 0.02, top - 1.4), Vector2(LH_R_TOP + 0.25, top - 1.0), Vector2(LH_R_TOP + 0.75, top - 0.55), Vector2(LH_R_TOP + 1.2, top - 0.15)], 32, WHITE)
+	for i in 20:
+		var a := TAU * (i + 0.5) / 20.0
+		var u := Vector3(cos(a), 0, sin(a))
+		_box(kit, "paint", Transform3D(Basis(Vector3.UP, -a) * Basis(Vector3.BACK, 0.75), c + u * (LH_R_TOP + 0.55) + Vector3(0, top - 0.75, 0)), Vector3(1.05, 0.2, 0.22), stone)
+	var gal_r := LH_R_TOP + 1.35
+	_lathe(kit, "paint", c, [Vector2(LH_R_TOP + 1.2, top - 0.15), Vector2(gal_r, top - 0.15), Vector2(gal_r, top + 0.15), Vector2(0.0, top + 0.15)], 32, iron)
+	var rail_r := gal_r - 0.12
+	for i in 28:
+		var a := TAU * i / 28.0
+		var p := c + Vector3(cos(a) * rail_r, top + 0.15, sin(a) * rail_r)
+		_block(kit, "metal", p + Vector3(-0.03, 0, -0.03), p + Vector3(0.03, 1.1, 0.03), iron)
+		var a1 := TAU * (i + 1) / 28.0
+		var p1 := c + Vector3(cos(a1) * rail_r, top + 0.15, sin(a1) * rail_r)
+		_tube(kit, "metal", p + Vector3(0, 1.1, 0), p1 + Vector3(0, 1.1, 0), 0.04, 0.04, 5, iron, false)
+		_tube(kit, "metal", p + Vector3(0, 0.6, 0), p1 + Vector3(0, 0.6, 0), 0.022, 0.022, 4, iron, false)
+		_tube(kit, "metal", p + Vector3(0, 0.12, 0), p1 + Vector3(0, 0.12, 0), 0.022, 0.022, 4, iron, false)
+	var gallery := CylinderShape3D.new()
+	gallery.radius = gal_r
+	gallery.height = 1.6
+	_collider(root, name, gallery, Transform3D(Basis(), c + Vector3(0, top + 0.5, 0)))
+
+	# Watch room with portholes and a door onto the gallery.
+	var wr := LH_R_TOP - 0.2
+	_lathe(kit, "paint", c, [Vector2(wr, top + 0.15), Vector2(wr, top + 2.3)], 32, WHITE)
+	_lathe(kit, "paint", c, [Vector2(wr, top + 2.3), Vector2(wr + 0.4, top + 2.4), Vector2(wr + 0.4, top + 2.55), Vector2(1.9, top + 2.55)], 32, iron)
+	for i in 3:
+		var a := PI * 0.5 + i * PI * 0.5
+		var u := Vector3(cos(a), 0, sin(a))
+		var pc := c + Vector3(0, top + 1.3, 0)
+		_tube(kit, "metal", pc + u * (wr - 0.05), pc + u * (wr + 0.07), 0.36, 0.36, 14, brass)
+		_tube(kit, "paint", pc + u * (wr - 0.04), pc + u * (wr + 0.09), 0.28, 0.28, 14, dark_glass)
+	_box(kit, "paint", Transform3D(Basis(), c + Vector3(wr + 0.02, top + 1.15, 0)), Vector3(0.1, 1.9, 0.8), Color(0.12, 0.30, 0.36))
+
+	# Lantern: a dark parapet, twelve panes between mullions, the lens inside on its pedestal.
+	var l0 := top + 2.55
+	_lathe(kit, "paint", c, [Vector2(1.85, l0), Vector2(1.85, l0 + 0.75)], 12, iron, true)
+	_lathe(kit, "glass", c, [Vector2(1.8, l0 + 0.75), Vector2(1.8, l0 + 3.0)], 12, Color(0.85, 0.93, 0.95), true)
+	for j in 12:
+		var a := TAU * j / 12.0
+		var p := c + Vector3(cos(a) * 1.81, 0, sin(a) * 1.81)
+		_block(kit, "metal", p + Vector3(-0.04, l0 + 0.75, -0.04), p + Vector3(0.04, l0 + 3.0, 0.04), iron)
+		var a1 := TAU * (j + 1) / 12.0
+		var p1 := c + Vector3(cos(a1) * 1.81, 0, sin(a1) * 1.81)
+		for hy in [0.75, 1.9, 3.0]:
+			_tube(kit, "metal", p + Vector3(0, l0 + hy, 0), p1 + Vector3(0, l0 + hy, 0), 0.035, 0.035, 4, iron, false)
+	_tube(kit, "metal", c + Vector3(0, l0 + 0.75, 0), c + Vector3(0, l0 + 1.1, 0), 0.45, 0.35, 10, iron)
+	_tube(kit, "glow", c + Vector3(0, l0 + 1.25, 0), c + Vector3(0, l0 + 2.45, 0), 0.32, 0.32, 12, Color(1, 1, 1))
+	var lens := []
+	for q in 9:
+		var t := q / 8.0
+		lens.append(Vector2(0.55 + 0.28 * sin(PI * t), l0 + 1.1 + t * 1.55 - c.y))
+	_lathe(kit, "glass", c, lens, 16, Color(0.75, 0.95, 0.85))
+	for q in range(0, 9, 2):
+		var lp: Vector2 = lens[q]
+		_lathe(kit, "metal", c, [Vector2(lp.x - 0.01, lp.y - 0.03), Vector2(lp.x + 0.04, lp.y), Vector2(lp.x - 0.01, lp.y + 0.03)], 16, brass)
+	for j in 6:
+		var a := TAU * j / 6.0
+		var prev := Vector3.ZERO
+		for q in 9:
+			var lp: Vector2 = lens[q]
+			var p := c + Vector3(cos(a) * (lp.x + 0.02), lp.y, sin(a) * (lp.x + 0.02))
+			if q > 0:
+				_tube(kit, "metal", prev, p, 0.018, 0.018, 4, brass, false)
+			prev = p
+
+	# Dome: an overhanging rim, red plates between ribs, a ventilator ball, the spike and a vane.
+	var d0 := l0 + 3.0
+	_lathe(kit, "paint", c, [Vector2(1.8, d0), Vector2(2.1, d0 + 0.1), Vector2(2.1, d0 + 0.2), Vector2(1.95, d0 + 0.25)], 24, iron)
+	var dome := []
+	for q in 11:
+		var phi := PI * 0.5 * q / 10.0
+		dome.append(Vector2(1.95 * cos(phi), d0 + 0.25 + 1.65 * sin(phi) - c.y))
+	_lathe(kit, "paint", c, dome, 24, red)
+	for j in 12:
+		var a := TAU * j / 12.0
+		var prev := Vector3.ZERO
+		for q in 10:
+			var dp: Vector2 = dome[q]
+			var p := c + Vector3(cos(a) * (dp.x + 0.03), dp.y, sin(a) * (dp.x + 0.03))
+			if q > 0:
+				_tube(kit, "metal", prev, p, 0.035, 0.035, 4, iron, false)
+			prev = p
+	var dtop := d0 + 1.9
+	_tube(kit, "metal", c + Vector3(0, dtop - 0.05, 0), c + Vector3(0, dtop + 0.3, 0), 0.18, 0.14, 10, iron)
+	var ball := []
+	for q in 9:
+		var phi := -PI * 0.5 + PI * q / 8.0
+		ball.append(Vector2(0.4 * cos(phi), dtop + 0.68 + 0.4 * sin(phi) - c.y))
+	_lathe(kit, "metal", c, ball, 16, iron)
+	var spike := c + Vector3(0, dtop + 1.08, 0)
+	_tube(kit, "metal", spike, spike + Vector3(0, 1.5, 0), 0.05, 0.0, 6, iron)
+	var vane := spike + Vector3(0, 0.75, 0)
+	_tube(kit, "metal", vane + Vector3(-0.45, -0.3, 0), vane + Vector3(0.45, -0.3, 0), 0.015, 0.015, 4, iron, false)
+	_tube(kit, "metal", vane + Vector3(0, -0.3, -0.45), vane + Vector3(0, -0.3, 0.45), 0.015, 0.015, 4, iron, false)
+	_box(kit, "metal", Transform3D(Basis(), vane + Vector3(0.05, 0, 0)), Vector3(1.2, 0.03, 0.03), iron)
+	_box(kit, "metal", Transform3D(Basis(), vane + Vector3(0.55, 0.08, 0)), Vector3(0.32, 0.26, 0.02), iron)
+	var lantern := CylinderShape3D.new()
+	lantern.radius = 2.1
+	lantern.height = dtop + 1.1 - top
+	_collider(root, name, lantern, Transform3D(Basis(), c + Vector3(0, (top + dtop + 1.1) * 0.5, 0)))
+
+	# Keeper's cottage: whitewashed, a red tiled roof with chimneys at both gables, shuttered
+	# windows and a porch facing the landing.
+	var hx0 := c.x + 7.6
+	var hx1 := c.x + 14.0
+	var hz := 3.6
+	var wall_top := ty + 3.3
+	_block(kit, "paint", Vector3(hx0, ty, c.z - hz), Vector3(hx1, wall_top, c.z + hz), WHITE)
+	_block(kit, "paint", Vector3(hx0 - 0.05, ty, c.z - hz - 0.05), Vector3(hx1 + 0.05, ty + 0.45, c.z + hz + 0.05), granite)
+	var hxm := (hx0 + hx1) * 0.5
+	_gable_roof(kit, "paint", Transform3D(Basis(), Vector3(hxm, wall_top, c.z)), hx1 - hx0 + 0.8, hz * 2.0 + 0.3, 2.0, red, WHITE)
+	_block(kit, "paint", Vector3(hxm - 0.14, wall_top + 1.96, c.z - hz - 0.2), Vector3(hxm + 0.14, wall_top + 2.1, c.z + hz + 0.2), red.darkened(0.3))
+	for sz in [-1.0, 1.0]:
+		var cz: float = c.z + sz * (hz - 0.45)
+		_block(kit, "paint", Vector3(hxm - 0.4, wall_top + 1.0, cz - 0.38), Vector3(hxm + 0.4, wall_top + 2.95, cz + 0.38), Color(0.60, 0.34, 0.26))
+		_block(kit, "paint", Vector3(hxm - 0.5, wall_top + 2.95, cz - 0.48), Vector3(hxm + 0.5, wall_top + 3.08, cz + 0.48), stone)
+		for px in [-0.17, 0.17]:
+			_tube(kit, "paint", Vector3(hxm + px, wall_top + 3.08, cz), Vector3(hxm + px, wall_top + 3.45, cz), 0.11, 0.09, 8, Color(0.72, 0.40, 0.26))
+	# Windows: [centre on the wall, outward normal, along the wall].
+	var wins := [
+		[Vector3(hx1, ty + 1.75, c.z - 2.2), Vector3.RIGHT, Vector3.BACK], [Vector3(hx1, ty + 1.75, c.z + 2.2), Vector3.RIGHT, Vector3.BACK],
+		[Vector3(hx0, ty + 1.75, c.z - 1.7), Vector3.LEFT, Vector3.BACK], [Vector3(hx0, ty + 1.75, c.z + 1.7), Vector3.LEFT, Vector3.BACK],
+		[Vector3(hxm, ty + 1.75, c.z - hz), Vector3.FORWARD, Vector3.RIGHT], [Vector3(hxm, ty + 1.75, c.z + hz), Vector3.BACK, Vector3.RIGHT],
+	]
+	for wi in wins:
+		var wc: Vector3 = wi[0]
+		var n: Vector3 = wi[1]
+		var along: Vector3 = wi[2]
+		var size := func(w: float, h: float, d: float) -> Vector3:
+			return Vector3(absf(along.x) * w + absf(n.x) * d, h, absf(along.z) * w + absf(n.z) * d)
+		_box(kit, "paint", Transform3D(Basis(), wc + n * 0.03), size.call(1.15, 1.45, 0.08), stone)
+		_box(kit, "paint", Transform3D(Basis(), wc + n * 0.06), size.call(0.9, 1.2, 0.04), dark_glass)
+		_box(kit, "paint", Transform3D(Basis(), wc + n * 0.08), size.call(0.06, 1.2, 0.04), WHITE)
+		_box(kit, "paint", Transform3D(Basis(), wc + n * 0.08), size.call(0.9, 0.06, 0.04), WHITE)
+		_box(kit, "paint", Transform3D(Basis(), wc + n * 0.1 - Vector3(0, 0.76, 0)), size.call(1.3, 0.08, 0.2), stone)
+		for sd in [-1.0, 1.0]:
+			_box(kit, "paint", Transform3D(Basis(), wc + along * sd * 0.92 + n * 0.05), size.call(0.5, 1.35, 0.06), shutter_green)
+	# Door and porch on the landward front.
+	_block(kit, "paint", Vector3(hx1, ty, c.z - 0.62), Vector3(hx1 + 0.08, ty + 2.35, c.z + 0.62), stone)
+	_block(kit, "paint", Vector3(hx1 + 0.08, ty, c.z - 0.5), Vector3(hx1 + 0.12, ty + 2.2, c.z + 0.5), shutter_green)
+	_gable_roof(kit, "paint", Transform3D(Basis(Vector3.UP, PI * 0.5), Vector3(hx1 + 0.55, ty + 2.55, c.z)), 1.8, 1.1, 0.5, red, WHITE)
+	for sz in [-0.8, 0.8]:
+		_tube(kit, "paint", Vector3(hx1 + 0.95, ty, c.z + sz), Vector3(hx1 + 0.95, ty + 2.55, c.z + sz), 0.06, 0.06, 6, WHITE)
+	_box_collider(root, name, Vector3(hx0 - 0.1, ty, c.z - hz - 0.1), Vector3(hx1 + 0.15, wall_top, c.z + hz + 0.1))
+	_hull_collider(root, name, PackedVector3Array([
+		Vector3(hx0 - 0.4, wall_top, c.z - hz - 0.15), Vector3(hx1 + 0.4, wall_top, c.z - hz - 0.15),
+		Vector3(hx0 - 0.4, wall_top, c.z + hz + 0.15), Vector3(hx1 + 0.4, wall_top, c.z + hz + 0.15),
+		Vector3(hxm, wall_top + 2.0, c.z - hz - 0.15), Vector3(hxm, wall_top + 2.0, c.z + hz + 0.15)]))
+	for sz in [-1.0, 1.0]:
+		_box_collider(root, name, Vector3(hxm - 0.5, wall_top + 1.0, c.z + sz * (hz - 0.45) - 0.48), Vector3(hxm + 0.5, wall_top + 3.45, c.z + sz * (hz - 0.45) + 0.48))
+	_box_collider(root, name, Vector3(hx1, ty, c.z - 0.9), Vector3(hx1 + 1.1, ty + 2.8, c.z + 0.9))
+
+	# Oil drums by the cottage, a bench at the door, the flagstaff on the yard's corner.
+	for i in 3:
+		var dp := Vector3(hx1 + 0.6 + i * 0.7, ty, c.z - hz - 1.1 + (i % 2) * 0.25)
+		_tube(kit, "paint", dp, dp + Vector3(0, 0.9, 0), 0.3, 0.3, 12, [Color(0.25, 0.42, 0.55), Color(0.7, 0.2, 0.15), Color(0.25, 0.42, 0.55)][i])
+		_tube(kit, "rust", dp + Vector3(0, 0.3, 0), dp + Vector3(0, 0.34, 0), 0.31, 0.31, 12, RUST, false)
+		_rod_collider(root, name, dp, dp + Vector3(0, 0.9, 0), 0.3)
+	var bench := Vector3(hx1 + 0.45, ty, c.z + 1.9)
+	_block(kit, "wood", bench + Vector3(-0.25, 0.45, -0.8), bench + Vector3(0.25, 0.5, 0.8), WOOD)
+	for bz in [-0.65, 0.65]:
+		_block(kit, "wood", bench + Vector3(-0.2, 0, bz - 0.04), bench + Vector3(0.2, 0.45, bz + 0.04), OLD_WOOD)
+	_box_collider(root, name, bench + Vector3(-0.25, 0, -0.8), bench + Vector3(0.25, 0.5, 0.8))
+	var staff := Vector3(c.x + yard_x1 - 1.0, ty, c.z + yard_hz - 1.0)
+	_tube(kit, "paint", staff, staff + Vector3(0, 9.0, 0), 0.09, 0.05, 8, WHITE)
+	_tube(kit, "metal", staff + Vector3(0, 9.0, 0), staff + Vector3(0, 9.15, 0), 0.09, 0.09, 8, brass)
+	var pst := _st(kit, "canvas")
+	var pn := Vector3(0, 0, 1)
+	_tri(pst, staff + Vector3(0.06, 8.9, 0), staff + Vector3(0.06, 8.2, 0), staff + Vector3(2.4, 8.62, 0.15), pn, pn, pn, red, pn)
+	_rod_collider(root, name, staff, staff + Vector3(0, 9.0, 0), 0.12)
+
+	# Landing steps down to a timber jetty, bollards and a lifebuoy at its end.
+	var steps := 11
+	var sx0 := c.x + yard_x1 + 0.1
+	for s in steps:
+		var st_y := ty - (s + 1) * (ty - 0.95) / steps
+		_block(kit, "paint", Vector3(sx0 + s * 0.34, -1.2, c.z - 1.1), Vector3(sx0 + (s + 1) * 0.34, st_y, c.z + 1.1), masonry.lightened(0.08 * (s % 2)))
+	var sx1 := sx0 + steps * 0.34
+	_box_along(root, name, Vector3((sx0 + sx1) * 0.5, (ty + 0.95) * 0.5 - 0.35, c.z), Vector3(sx1 - sx0, 0.95 - ty, 0), Vector3(2.8, 0.7, Vector2(sx1 - sx0, ty - 0.95).length()))
+	var jy := 0.95
+	var jx1 := sx1 + 8.0
+	_block(kit, "wood", Vector3(sx1, jy - 0.2, c.z - 1.3), Vector3(jx1, jy, c.z + 1.3), WOOD.darkened(0.08))
+	var jx := sx1 + 0.4
+	while jx < jx1:
+		for sz in [-1.15, 1.15]:
+			var bed := _ground(jx, c.z + sz)
+			_tube(kit, "wood", Vector3(jx, bed - 0.6, c.z + sz), Vector3(jx, jy + 0.35, c.z + sz), 0.13, 0.12, 8, OLD_WOOD)
+			_rod_collider(root, name, Vector3(jx, bed - 0.6, c.z + sz), Vector3(jx, jy + 0.35, c.z + sz), 0.14)
+		jx += 2.4
+	_box_collider(root, name, Vector3(sx1, jy - 0.25, c.z - 1.3), Vector3(jx1, jy, c.z + 1.3))
+	for sz in [-0.9, 0.9]:
+		_tube(kit, "metal", Vector3(jx1 - 0.4, jy, c.z + sz), Vector3(jx1 - 0.4, jy + 0.45, c.z + sz), 0.13, 0.11, 10, iron)
+	_tube(kit, "wood", Vector3(jx1 - 0.15, jy, c.z), Vector3(jx1 - 0.15, jy + 1.3, c.z), 0.06, 0.06, 6, WHITE)
+	_lifebuoy(kit, Vector3(jx1, jy + 0.85, c.z), Vector3.RIGHT, 0.33, 0.07)
+	_rod_collider(root, name, Vector3(jx1 - 0.15, jy, c.z), Vector3(jx1 - 0.15, jy + 1.3, c.z), 0.35)
+
 	var mi := _commit(root, kit, "Lighthouse")
 	mi.lod_bias = 4.0
 	var lamp := OmniLight3D.new()
 	lamp.name = "LighthouseLamp"
 	lamp.light_color = Color(1.0, 0.85, 0.55)
 	lamp.light_energy = 1.2
-	lamp.omni_range = 12.0
+	lamp.omni_range = 14.0
 	lamp.shadow_enabled = false
 	lamp.set_meta("no_shadow", true)
 	root.add_child(lamp)
-	lamp.position = c + Vector3(0, top + 1.5, 0)
-	var shape := CylinderShape3D.new()
-	shape.radius = 9.0
-	shape.height = 6.0
-	_collider(root, "LighthouseRock", shape, Transform3D(Basis(), c + Vector3(0, 0.0, 0)))
-	_note("Lighthouse", Vector2(c.x, c.z), 12.0, CLEAR_BUILDING)
+	lamp.position = c + Vector3(0, l0 + 1.8, 0)
+	_note("Lighthouse", Vector2(c.x + 6.0, c.z), 22.0, CLEAR_BUILDING)
 
 
 # --- Shipwreck ------------------------------------------------------------------------------------
@@ -1268,8 +1976,8 @@ func _build_shipwreck(root: Node3D) -> void:
 	var house := _wreck_wheelhouse(kit, rng)
 	_wreck_rig(kit)
 	_wreck_stern_gear(kit, rng)
-	_wreck_ground_tackle(kit)
-	_wreck_debris(kit, rng)
+	_wreck_ground_tackle(root, kit)
+	_wreck_debris(root, kit, rng)
 	_commit(root, kit, "Shipwreck")
 
 	# Collision: the hull's convex outline above the sand, and the wheelhouse.
@@ -1286,6 +1994,19 @@ func _build_shipwreck(root: Node3D) -> void:
 	var house_shape := BoxShape3D.new()
 	house_shape.size = house.size
 	_collider(root, "ShipwreckHouse", house_shape, _wreck_xf * Transform3D(Basis(), house.get_center()))
+	# Above the bulwarks: the mast, the stern gantry and the net drum.
+	var xf := _wreck_xf
+	var me := _wreck_deck_edge(0.665)
+	var mast_foot := Vector3(0, me.y - 0.05, me.z)
+	_rod_collider(root, "Shipwreck", xf * mast_foot, xf * (mast_foot + Vector3(0, 7.2, 0)), 0.16)
+	var ge := _wreck_deck_edge(0.03)
+	var bar := _wreck_gantry_top()
+	for sx in [-1.0, 1.0]:
+		_rod_collider(root, "Shipwreck", xf * _wreck_deck_point(ge, sx * 2.05 / ge.x), xf * Vector3(sx * 2.05, bar.y, bar.z), 0.12)
+	_rod_collider(root, "Shipwreck", xf * Vector3(-2.15, bar.y, bar.z), xf * Vector3(2.15, bar.y, bar.z), 0.13)
+	var de := _wreck_deck_edge(0.068)
+	var axle := Vector3(0, de.y + 0.95, de.z)
+	_rod_collider(root, "Shipwreck", xf * (axle + Vector3(-1.25, 0, 0)), xf * (axle + Vector3(1.25, 0, 0)), 0.64)
 	_note("Shipwreck", WRECK_AT, 12.0, CLEAR_BUILDING)
 	_verify_wreck_bedded()
 
@@ -1986,7 +2707,7 @@ func _wreck_stern_gear(kit: Dictionary, rng: RandomNumberGenerator) -> void:
 
 ## Windlass and bitts on the foredeck; the cable runs out of the landward hawse and up the beach
 ## to the anchor, which the salvors dragged clear and left.
-func _wreck_ground_tackle(kit: Dictionary) -> void:
+func _wreck_ground_tackle(root: Node3D, kit: Dictionary) -> void:
 	var xf := _wreck_xf
 	var e := _wreck_deck_edge(0.86)
 	var wl := _wreck_deck_point(e, 0.0) + Vector3(0, 0.38, 0)
@@ -2030,7 +2751,7 @@ func _wreck_ground_tackle(kit: Dictionary) -> void:
 		p.y = _ground(p.x, p.z) + 0.02
 		path.append(p)
 	_wreck_chain(kit, path)
-	_wreck_anchor(kit, ring, span.normalized())
+	_wreck_anchor(root, kit, ring, span.normalized())
 
 
 ## Chain links along a world polyline, alternately flat and upright.
@@ -2060,7 +2781,7 @@ func _wreck_chain(kit: Dictionary, path: Array) -> void:
 
 
 ## An admiralty anchor lying on its side: stock flat on the sand, one arm buried, one in the air.
-func _wreck_anchor(kit: Dictionary, ring: Vector3, dir: Vector3) -> void:
+func _wreck_anchor(root: Node3D, kit: Dictionary, ring: Vector3, dir: Vector3) -> void:
 	var d := Vector3(dir.x, 0, dir.z).normalized()
 	var across := d.cross(Vector3.UP).normalized()
 	var iron := RUST.darkened(0.15)
@@ -2082,10 +2803,14 @@ func _wreck_anchor(kit: Dictionary, ring: Vector3, dir: Vector3) -> void:
 	var palm := Basis(across, (tip - elbow).normalized().cross(across).normalized(), (tip - elbow).normalized()).orthonormalized()
 	_box(kit, "rust", Transform3D(Basis(across, palm.y, palm.z), elbow.lerp(tip, 0.45) - palm.y * 0.04), Vector3(0.55, 0.06, 0.5), iron.lightened(0.05))
 	_tube(kit, "rust", crown, crown - Vector3.UP * 0.5 - d * 0.2, 0.1, 0.09, 8, iron)
+	_rod_collider(root, "Shipwreck", r0, crown, 0.14)
+	_rod_collider(root, "Shipwreck", stock - across * 1.1, stock + across * 1.1, 0.09)
+	_rod_collider(root, "Shipwreck", crown, elbow, 0.13)
+	_rod_collider(root, "Shipwreck", elbow, tip, 0.13)
 
 
 ## Planks torn out of the side and washed up, and a few things washed off the deck.
-func _wreck_debris(kit: Dictionary, rng: RandomNumberGenerator) -> void:
+func _wreck_debris(root: Node3D, kit: Dictionary, rng: RandomNumberGenerator) -> void:
 	var sea := _wreck_xf.basis * Vector3.LEFT
 	sea = Vector3(sea.x, 0, sea.z).normalized()
 	var fwd := _wreck_xf.basis * Vector3.BACK
@@ -2115,9 +2840,14 @@ func _wreck_debris(kit: Dictionary, rng: RandomNumberGenerator) -> void:
 	_tube(kit, "paint", drum - drum_dir * 0.45, drum + drum_dir * 0.45, 0.3, 0.3, 12, Color(0.30, 0.40, 0.50))
 	for k in [-0.2, 0.2]:
 		_tube(kit, "rust", drum + drum_dir * (k - 0.02), drum + drum_dir * (k + 0.02), 0.315, 0.315, 12, RUST, false)
+	_rod_collider(root, "Shipwreck", drum - drum_dir * 0.45, drum + drum_dir * 0.45, 0.3)
 	var crate := at - sea * 5.0 - fwd * 4.0
 	crate.y = _ground(crate.x, crate.z) + 0.1
-	_box(kit, "gloss", Transform3D(Basis(Vector3.UP, 0.7) * Basis(Vector3.RIGHT, 0.2), crate), Vector3(0.6, 0.32, 0.4), Color(0.95, 0.75, 0.15))
+	var crate_b := Basis(Vector3.UP, 0.7) * Basis(Vector3.RIGHT, 0.2)
+	_box(kit, "gloss", Transform3D(crate_b, crate), Vector3(0.6, 0.32, 0.4), Color(0.95, 0.75, 0.15))
+	var crate_shape := BoxShape3D.new()
+	crate_shape.size = Vector3(0.6, 0.32, 0.4)
+	_collider(root, "Shipwreck", crate_shape, Transform3D(crate_b, crate))
 	var ed := _wreck_deck_edge(0.36)
 	var deck_box := _wreck_deck_point(ed, 0.8)
 	_wbox(kit, "gloss", deck_box + Vector3(-0.3, 0.17, 0), Vector3(0.6, 0.32, 0.4), Color(0.20, 0.50, 0.75), Basis(Vector3.UP, 0.25))
@@ -2147,10 +2877,12 @@ const BAMBOO := Color(0.78, 0.66, 0.42)
 
 
 ## Beach bar under a shaggy thatch. The board rack is on its north side, which the road comes in
-## facing; the counter, the sign and the tables face the sea.
+## facing; the counter, the sign and the tables face the sea. Laid out at life size round `c` and
+## built at PROP_SCALE, grown landward from the tables.
 func _build_surf_shack(root: Node3D) -> void:
 	var kit := {}
 	var c := Vector3(-14.0, 0.0, 236.0)
+	_scale_about(Vector3(c.x - 7.5, 0.0, c.z), PROP_SCALE)
 	var g := _ground_min(c.x, c.z, 5.0, 4.0)
 	var fl := maxf(g, _ground(c.x - 5.0, c.z)) + 0.7
 	var rng := RandomNumberGenerator.new()
@@ -2265,6 +2997,7 @@ func _build_surf_shack(root: Node3D) -> void:
 
 	# Chalkboard menu out on the sand.
 	_menu_board(kit, Vector3(c.x - 6.7, _ground(c.x - 6.7, c.z - 2.4), c.z - 2.4))
+	_box_collider(root, "SurfShack", Vector3(c.x - 7.0, _ground(c.x - 6.7, c.z - 2.4) - 0.1, c.z - 2.8), Vector3(c.x - 6.4, _ground(c.x - 6.7, c.z - 2.4) + 1.0, c.z - 2.0))
 
 	# Cable-spool tables and log stools in front, one under a parasol.
 	for ti in range(2):
@@ -2273,16 +3006,22 @@ func _build_surf_shack(root: Node3D) -> void:
 		_tube(kit, "wood", tp + Vector3(0, -0.1, 0), tp + Vector3(0, 0.06, 0), 0.55, 0.55, 14, WOOD.darkened(0.15))
 		_tube(kit, "wood", tp + Vector3(0, 0.06, 0), tp + Vector3(0, 0.66, 0), 0.24, 0.24, 10, OLD_WOOD)
 		_tube(kit, "wood", tp + Vector3(0, 0.66, 0), tp + Vector3(0, 0.74, 0), 0.6, 0.6, 14, WOOD)
+		_rod_collider(root, "SurfShack", tp + Vector3(0, -0.1, 0), tp + Vector3(0, 0.74, 0), 0.6)
 		for si in range(3):
 			var sa := TAU * si / 3.0 + ti * 0.7
 			var sp := tp + Vector3(cos(sa) * 0.95, 0, sin(sa) * 0.95)
 			sp.y = _ground(sp.x, sp.z)
 			_tube(kit, "wood", sp + Vector3(0, -0.1, 0), sp + Vector3(0, 0.45, 0), 0.19, 0.18, 9, OLD_WOOD.lightened(0.1))
+			_rod_collider(root, "SurfShack", sp + Vector3(0, -0.1, 0), sp + Vector3(0, 0.45, 0), 0.19)
 		for gi in range(2):
 			var gp := tp + Vector3(0.2 - gi * 0.35, 0.74, 0.15 * gi)
 			_tube(kit, "gloss", gp, gp + Vector3(0, 0.15, 0), 0.035, 0.042, 8, [Color(0.98, 0.6, 0.2), Color(0.4, 0.8, 0.9)][gi])
 		if ti == 0:
 			_umbrella(kit, tp, Vector3.ZERO, [teal, WHITE])
+			var canopy := CylinderShape3D.new()
+			canopy.radius = 1.3
+			canopy.height = 0.3
+			_collider(root, "SurfShack", canopy, Transform3D(Basis(), tp + Vector3(0, 2.05, 0)))
 		_note("ShackTable%d" % ti, Vector2(tp.x, tp.z), 1.2, CLEAR_DECOR)
 
 	# Board rack on the north side: boards stand on their tails against a bamboo rail, decks out.
@@ -2327,11 +3066,19 @@ func _build_surf_shack(root: Node3D) -> void:
 	sp2.y = _ground(sp2.x, sp2.z)
 	var stuck := Basis(Vector3.UP, 0.9) * Basis(Vector3.FORWARD, 0.12) * Basis(Vector3.RIGHT, PI)
 	_surfboard(kit, Transform3D(stuck, sp2 + Vector3(0, 1.75, 0)), 1.95, 0, 2, Color(0.20, 0.58, 0.80), WHITE, Color(0.98, 0.85, 0.30))
+	var stuck_axis := stuck * Vector3.UP
+	_box_along(root, "SurfShack", sp2 + Vector3(0, 0.8, 0), stuck_axis, Vector3(0.55, 0.12, 1.9))
 	_note("StuckBoard", Vector2(sp2.x, sp2.z), 0.5, CLEAR_DECOR)
 
 	_commit(root, kit, "SurfShack")
-	_box_collider(root, "SurfShack", Vector3(c.x - 5.7, g - 0.3, c.z - 4.0), Vector3(c.x + 5.0, fl + 3.0, c.z + 4.0))
+	_box_collider(root, "SurfShack", Vector3(c.x - 5.7, g - 0.3, c.z - 4.0), Vector3(c.x + 5.0, fl + 2.7, c.z + 4.0))
+	# The thatch overhangs the deck on every side.
+	var ey := fl + 2.7
+	_hull_collider(root, "SurfShack", PackedVector3Array([
+		Vector3(c.x - 6.2, ey - 0.4, c.z - 5.2), Vector3(c.x + 6.2, ey - 0.4, c.z - 5.2), Vector3(c.x - 6.2, ey - 0.4, c.z + 5.2),
+		Vector3(c.x + 6.2, ey - 0.4, c.z + 5.2), Vector3(c.x - 1.0, ey + 2.3, c.z), Vector3(c.x + 1.0, ey + 2.3, c.z)]))
 	_note("SurfShack", Vector2(c.x, c.z), 6.4, CLEAR_BUILDING)
+	_end_scale()
 
 
 ## A bamboo cane: a tube with a raised node every 45cm.
@@ -2694,68 +3441,140 @@ func _lounger(kit: Dictionary, at: Vector3, yaw: float, col: Color) -> void:
 			_box(kit, "metal", Transform3D(b, at + b * Vector3(cx, 0.12, cz)), Vector3(0.04, 0.28, 0.04), WHITE)
 
 
-## Umbrellas, loungers and towels in groups along the dune side of the beach and round the far ends.
+## Parasol sets spread over the dry sand between the racing line and the dune fence, and round the
+## beach's far ends: rejection-sampled per zone, PARASOL_GAP apart and clear of everything noted so far.
+const PARASOL_ZONES := [
+	# x from, x to, z from, z to, sets
+	[-32.0, -16.0, -246.0, -104.0, 10],
+	[-32.0, -16.0, -96.0, 20.0, 8],
+	[-32.0, -16.0, 76.0, 138.0, 5],
+	[-64.0, -30.0, -352.0, -292.0, 5],
+	[-64.0, -26.0, 296.0, 352.0, 4],
+]
+const PARASOL_GAP := 11.0
+const PARASOL_SET_R := 1.9     # a set's footprint at life size
+
+
 func _build_umbrellas(root: Node3D) -> void:
 	var kit := {}
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 404
-	var groups := [
-		[Vector2(-23.0, 92.0), 9.0, 7], [Vector2(-23.0, 118.0), 7.0, 5], [Vector2(-23.0, 8.0), 8.0, 5],
-		[Vector2(-23.0, -60.0), 9.0, 6], [Vector2(-24.0, -150.0), 8.0, 5],
-		[Vector2(-50.0, -320.0), 10.0, 6], [Vector2(-48.0, 318.0), 9.0, 6],
-	]
-	var n := 0
-	for gdef in groups:
-		var centre: Vector2 = gdef[0]
-		for i in range(int(gdef[2])):
-			# Spread along the beach, not across it toward the racing line.
-			var p := centre + Vector2(rng.randf_range(-3.5, 3.5), rng.randf_range(-1.0, 1.0) * float(gdef[1]))
-			var y := _ground(p.x, p.y)
-			var cols := [HUT_COLOURS[rng.randi() % 6], WHITE]
-			_umbrella(kit, Vector3(p.x, y, p.y), Vector3(rng.randf_range(-0.12, 0.12), 0, rng.randf_range(-0.12, 0.12)), cols)
-			var yaw := rng.randf_range(-0.4, 0.4) + PI * 0.5
-			for side in [-0.9, 0.9]:
-				if rng.randf() < 0.75:
-					var lp := Vector3(p.x + side * 0.3, 0, p.y + side)
-					lp.y = _ground(lp.x, lp.z)
-					_lounger(kit, lp, yaw, [Color(0.95, 0.95, 0.92), Color(0.25, 0.55, 0.75)][rng.randi() % 2])
-			if rng.randf() < 0.6:
-				var tp := Vector3(p.x - 2.0, 0, p.y + rng.randf_range(-1.5, 1.5))
-				tp.y = _ground(tp.x, tp.z) + 0.02
-				_box(kit, "canvas", Transform3D(Basis(Vector3.UP, rng.randf_range(-0.5, 0.5)), tp), Vector3(1.8, 0.03, 0.9), HUT_COLOURS[rng.randi() % 6])
-			_note("Umbrella%d" % n, p, 1.6, CLEAR_DECOR)
-			n += 1
+	var placed: Array = []
+	for zone in PARASOL_ZONES:
+		var got := 0
+		var tries := 0
+		while got < int(zone[4]) and tries < 600:
+			tries += 1
+			var p := Vector2(rng.randf_range(zone[0], zone[1]), rng.randf_range(zone[2], zone[3]))
+			if not _parasol_spot_ok(p, placed):
+				continue
+			_parasol_set(root, kit, rng, p, placed.size())
+			placed.append(p)
+			got += 1
 	_commit(root, kit, "Umbrellas")
+	print("Seafront: %d parasol sets" % placed.size())
 
 
-## Weathered slatted sand fence along the dune foot, half buried in places.
+func _parasol_spot_ok(p: Vector2, placed: Array) -> bool:
+	for o in placed:
+		if p.distance_to(o) < PARASOL_GAP:
+			return false
+	var y := _ground(p.x, p.y)
+	# Dry sand above the swash, nearly level.
+	if y < 0.8:
+		return false
+	var slope := maxf(absf(_ground(p.x + 2.0, p.y) - _ground(p.x - 2.0, p.y)), absf(_ground(p.x, p.y + 2.0) - _ground(p.x, p.y - 2.0))) / 4.0
+	if slope > 0.2:
+		return false
+	var r := PARASOL_SET_R * PROP_SCALE
+	var q := _curve.get_closest_point(Vector3(p.x, y, p.y))
+	if Vector2(q.x, q.z).distance_to(p) - r - TRACK_HALF < CLEAR_DECOR + 0.5:
+		return false
+	for f in _footprints:
+		if p.distance_to(f[1]) < float(f[2]) + r + 1.5:
+			return false
+	return true
+
+
+## One parasol with loungers under it facing the sea, sometimes a towel spread in front and a cool
+## box, laid out at life size round the parasol's foot and built at PROP_SCALE.
+func _parasol_set(root: Node3D, kit: Dictionary, rng: RandomNumberGenerator, p: Vector2, n: int) -> void:
+	_scale_about(Vector3(p.x, 0.0, p.y), PROP_SCALE)
+	var at := Vector3(p.x, _ground(p.x, p.y), p.y)
+	var tilt := Vector3(rng.randf_range(-0.1, 0.1), 0, rng.randf_range(-0.1, 0.1))
+	_umbrella(kit, at, tilt, [HUT_COLOURS[rng.randi() % 6], WHITE])
+	var top := at + (Vector3.UP + tilt).normalized() * 2.4
+	_rod_collider(root, "Parasols", at + Vector3(0, -0.3, 0), top, 0.06)
+	var canopy := CylinderShape3D.new()
+	canopy.radius = 1.3
+	canopy.height = 0.3
+	_collider(root, "Parasols", canopy, Transform3D(Basis(), top - Vector3(0, 0.35, 0)))
+	# Backrests to the land: the loungers face the sea, side by side either side of the pole.
+	var yaw := -PI * 0.5 + rng.randf_range(-0.35, 0.35)
+	var b := Basis(Vector3.UP, yaw)
+	var count := 1 if rng.randf() < 0.3 else 2
+	var lounger_col: Color = [Color(0.95, 0.95, 0.92), Color(0.25, 0.55, 0.75), HUT_COLOURS[rng.randi() % 6]][rng.randi() % 3]
+	for i in count:
+		var off := 0.55 if count == 1 else (i - 0.5) * 0.95
+		var lp := at + b * Vector3(off, 0, 0.2)
+		lp.y = _ground(lp.x, lp.z)
+		_lounger(kit, lp, yaw, lounger_col)
+		var box := BoxShape3D.new()
+		box.size = Vector3(0.7, 0.62, 1.55)
+		_collider(root, "Loungers", box, Transform3D(b, lp + b * Vector3(0, 0.31, -0.05)))
+	if rng.randf() < 0.6:
+		var tp := at + Vector3(-2.3, 0, rng.randf_range(-1.0, 1.0))
+		tp.y = _ground(tp.x, tp.z) + 0.02
+		_box(kit, "canvas", Transform3D(Basis(Vector3.UP, rng.randf_range(-0.5, 0.5)), tp), Vector3(1.8, 0.03, 0.9), HUT_COLOURS[rng.randi() % 6])
+	if rng.randf() < 0.4:
+		var cp := at + b * Vector3(1.4 if count == 2 else -0.6, 0, 0.6)
+		cp.y = _ground(cp.x, cp.z)
+		var cb := Basis(Vector3.UP, rng.randf_range(0.0, PI))
+		_box(kit, "gloss", Transform3D(cb, cp + Vector3(0, 0.17, 0)), Vector3(0.55, 0.34, 0.36), Color(0.20, 0.50, 0.80))
+		_box(kit, "paint", Transform3D(cb, cp + Vector3(0, 0.37, 0)), Vector3(0.57, 0.06, 0.38), WHITE)
+		var cool := BoxShape3D.new()
+		cool.size = Vector3(0.57, 0.4, 0.38)
+		_collider(root, "Loungers", cool, Transform3D(cb, cp + Vector3(0, 0.2, 0)))
+	_note("Parasol%d" % n, p, PARASOL_SET_R, CLEAR_DECOR)
+	_end_scale()
+
+
+## Weathered slatted sand fence along the dune foot, half buried in places: posts at the ends of each
+## bay, slats between, two wires. Built at PROP_SCALE (a bay is 2m at life size); each bay is one
+## thin box of collision.
 func _build_sand_fence(root: Node3D) -> void:
 	var kit := {}
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 91
+	var k := PROP_SCALE
+	var bay := 2.0 * k
 	var z := -248.0
 	var grey := Color(0.60, 0.56, 0.50)
 	while z < 128.0:
-		# Gaps where the huts, the grandstand and the beach paths are.
-		if (z > 140.0 and z < 200.0) or (absf(z - 0.0) < 4.0) or (absf(z + 100.0) < 4.0):
-			z += 2.0
+		# Gaps where the beach paths come down from the dunes.
+		if absf(z - 0.0) < 5.0 or absf(z + 100.0) < 5.0:
+			z += bay
 			continue
 		var x := -12.5 + 1.2 * sin(z * 0.05) + 0.6 * sin(z * 0.17)
-		var x2 := -12.5 + 1.2 * sin((z + 2.0) * 0.05) + 0.6 * sin((z + 2.0) * 0.17)
+		var x2 := -12.5 + 1.2 * sin((z + bay) * 0.05) + 0.6 * sin((z + bay) * 0.17)
 		var y := _ground(x, z)
-		var y2 := _ground(x2, z + 2.0)
-		var bury := rng.randf_range(0.0, 0.5)
-		_tube(kit, "wood", Vector3(x, y - 0.4, z), Vector3(x, y + 1.3 - bury, z), 0.06, 0.05, 5, grey.darkened(0.1))
+		var y2 := _ground(x2, z + bay)
+		var bury := rng.randf_range(0.0, 0.5) * k
+		_tube(kit, "wood", Vector3(x, y - 0.4 * k, z), Vector3(x, y + 1.3 * k - bury, z), 0.06 * k, 0.05 * k, 6, grey.darkened(0.1))
 		for s in range(7):
 			var t := (s + 0.5) / 7.0
 			var sx := lerpf(x, x2, t)
-			var sz := lerpf(z, z + 2.0, t)
+			var sz := lerpf(z, z + bay, t)
 			var sy := lerpf(y, y2, t)
-			var lean := Vector3(rng.randf_range(-0.08, 0.08), 0, 0)
-			_tube(kit, "wood", Vector3(sx, sy - 0.3, sz), Vector3(sx, sy + 1.1 - bury, sz) + lean, 0.035, 0.03, 3, grey.lightened(rng.randf_range(-0.1, 0.1)), false)
-		_tube(kit, "wood", Vector3(x, y + 0.85 - bury, z), Vector3(x2, y2 + 0.85 - bury, z + 2.0), 0.015, 0.015, 3, Color(0.3, 0.3, 0.3), false)
+			var lean := Vector3(rng.randf_range(-0.08, 0.08) * k, 0, 0)
+			_tube(kit, "wood", Vector3(sx, sy - 0.3 * k, sz), Vector3(sx, sy + 1.1 * k - bury, sz) + lean, 0.035 * k, 0.03 * k, 4, grey.lightened(rng.randf_range(-0.1, 0.1)), false)
+		for wy in [0.35, 0.85]:
+			_tube(kit, "wood", Vector3(x, y + wy * k - bury, z), Vector3(x2, y2 + wy * k - bury, z + bay), 0.015 * k, 0.015 * k, 3, Color(0.3, 0.3, 0.3), false)
+		var lo := minf(y, y2) - 0.3 * k
+		var hi := maxf(y, y2) + 1.2 * k - bury
+		_box_along(root, "SandFence", Vector3((x + x2) * 0.5, (lo + hi) * 0.5, z + bay * 0.5), Vector3(x2 - x, 0, bay), Vector3(0.2, hi - lo, Vector2(x2 - x, bay).length() + 0.1))
 		_note("Fence", Vector2(x, z), 0.2, CLEAR_DECOR)
-		z += 2.0
+		z += bay
 	_commit(root, kit, "SandFence")
 
 
@@ -2765,6 +3584,18 @@ func _build_boats(root: Node3D) -> void:
 	yacht.name = "AnchoredYacht"
 	root.add_child(yacht)
 	yacht.transform = Transform3D(Basis(Vector3.UP, deg_to_rad(-70.0)).scaled(Vector3.ONE * 0.08), Vector3(-360.0, 0.25, -60.0))
+	# Its box, from the model's own bounds.
+	var bounds := AABB()
+	var first := true
+	for m in yacht.find_children("*", "MeshInstance3D", true, false):
+		var mi := m as MeshInstance3D
+		var local := yacht.global_transform.affine_inverse() * mi.global_transform * mi.get_aabb()
+		bounds = local if first else bounds.merge(local)
+		first = false
+	if not first:
+		var hull := BoxShape3D.new()
+		hull.size = bounds.size * 0.08
+		_collider(root, "AnchoredYacht", hull, Transform3D(yacht.global_transform.basis.orthonormalized(), yacht.global_transform * bounds.get_center()))
 	for b in range(2):
 		var kit := {}
 		var at: Vector3 = [Vector3(-620.0, 0.0, 180.0), Vector3(-900.0, 0.0, -320.0)][b]
@@ -2779,6 +3610,10 @@ func _build_boats(root: Node3D) -> void:
 		_tri(st, at + Vector3(0, 1.4, 0), at + Vector3(0, 11.8, 0), at + Vector3(0, 1.4, 0) - fwd * 4.5, sail_n, sail_n, sail_n, Color(0.97, 0.96, 0.92), sail_n)
 		_tri(st, at + Vector3(0, 1.6, 0) + fwd * 0.3, at + Vector3(0, 10.5, 0), at + Vector3(0, 1.4, 0) + fwd * 4.2, sail_n, sail_n, sail_n, [Color(0.85, 0.3, 0.25), Color(0.25, 0.5, 0.8)][b], sail_n)
 		_commit(root, kit, "Sailboat%d" % b)
+		var sail_hull := BoxShape3D.new()
+		sail_hull.size = Vector3(2.4, 1.6, 9.0)
+		_collider(root, "Sailboat%d" % b, sail_hull, Transform3D(bs, at + Vector3(0, 0.4, 0)))
+		_rod_collider(root, "Sailboat%d" % b, at + Vector3(0, 0.9, 0), at + Vector3(0, 12.0, 0), 0.1)
 
 
 # --- Palms ---------------------------------------------------------------------------------------
