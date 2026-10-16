@@ -288,5 +288,16 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   aft of the forefoot.
 - FastNoiseLite defaults to 5-octave FBM. For paint or sand patches sampled per mesh cell, set
   `fractal_type = FRACTAL_NONE`, or the patches break up into a checkerboard of single cells.
+- Coconut palms (`_build_palms`) are instanced from four shapes (`PALM_SHAPES`, `_palm_mesh`).
+  - Each palm has a ringed trunk that leans and curves back up (`palm_trunk.gdshader`), fronds and
+    coconuts. A frond is two leaflet cards hung in a V from its midrib (`palm_fronds.gdshader`, atlas
+    drawn by `_palm_frond_texture`).
+  - Palms crossfade to a stand-in round `PALM_NEAR` (`tree_lod.gdshaderinc`).
+  - They grow in groves on the land side of the beach, and a few metres up the banks of the water
+    (`PALM_BANK`), leaning toward it.
+  - `_palm_ok` keeps them clear of the racing line, the gates and the seafront footprints, so they're
+    built after the gates.
+  - The root is "Palms", not "Vegetation", which Level.gd would bake trimesh colliders under.
+  - Each trunk's collider is a cylinder over its first 4m, tilted with its lean.
 - `res://scratch/bloombay_shots.tscn -- <dir> name:x,y,z:tx,ty,tz[:frames[:gap]]` renders into the window
   (not a SubViewport) and can save a time sequence to watch the surf.

@@ -267,6 +267,9 @@ func _ready() -> void:
 		gate.rotation_degrees = Vector3(0, rot_y, 0)
 		checkpoints_container.add_child(gate)
 
+	# Palm groves, kept clear of the gates placed above.
+	_build_palms(level_scene)
+
 	# 6. Boost Pads
 	var boost_scene: PackedScene = load("res://BoostPad.tscn")
 	var boost_container := Node3D.new()
@@ -2776,6 +2779,668 @@ func _build_boats(root: Node3D) -> void:
 		_tri(st, at + Vector3(0, 1.4, 0), at + Vector3(0, 11.8, 0), at + Vector3(0, 1.4, 0) - fwd * 4.5, sail_n, sail_n, sail_n, Color(0.97, 0.96, 0.92), sail_n)
 		_tri(st, at + Vector3(0, 1.6, 0) + fwd * 0.3, at + Vector3(0, 10.5, 0), at + Vector3(0, 1.4, 0) + fwd * 4.2, sail_n, sail_n, sail_n, [Color(0.85, 0.3, 0.25), Color(0.25, 0.5, 0.8)][b], sail_n)
 		_commit(root, kit, "Sailboat%d" % b)
+
+
+# --- Palms ---------------------------------------------------------------------------------------
+# Coconut palms in groves along the land side of the beach and round the water in the dunes,
+# instanced from a few shapes (_palm_mesh): a slender ringed trunk that leans and curves back up
+# (palm_trunk.gdshader), a crown of arching fronds, each two leaflet cards hung in a V from its midrib
+# (palm_fronds.gdshader, atlas drawn by _palm_frond_texture), and coconuts. They lean toward open
+# water. Each palm crossfades to a coarse stand-in round PALM_NEAR (tree_lod.gdshaderinc), and every
+# trunk has a collider. The root is "Palms", not "Vegetation": Level.gd bakes trimesh colliders under
+# that.
+
+## Trunk height and base lean (radians), the share of the lean the trunk curves back out of by the
+## top, the frond count and length, coconuts, and dead fronds hanging under the crown.
+const PALM_SHAPES := [
+	{"h": 11.0, "lean": 0.32, "curve": 0.75, "fronds": 26, "len": 5.4, "nuts": 7, "dead": 2},
+	{"h": 13.5, "lean": 0.16, "curve": 0.8, "fronds": 28, "len": 5.8, "nuts": 8, "dead": 1},
+	{"h": 8.5, "lean": 0.52, "curve": 0.62, "fronds": 22, "len": 4.9, "nuts": 5, "dead": 2},
+	{"h": 15.5, "lean": 0.08, "curve": 0.9, "fronds": 26, "len": 5.6, "nuts": 4, "dead": 0},
+]
+const PALM_BEACH := 95
+const PALM_SHORE := 170
+const PALM_DRY := 0.45          # lowest ground a palm stands on (the water is at 0)
+const PALM_BANK := 0.8          # by the water, the foot stays a few metres up the bank
+const PALM_CLEAR_BEACH := 5.0   # trunk to track edge on the beach
+const PALM_CLEAR_DUNES := 9.0   # and in the dunes, where carts fly over the crests
+const PALM_GATE_CLEAR := 16.0
+## Detailed palms crossfade to the stand-in over PALM_NEAR +- PALM_FADE/2 (tree_lod.gdshaderinc).
+const PALM_NEAR := 160.0
+const PALM_FADE := 50.0
+const PALM_FADE_JITTER := 15.0
+const PALM_CELL := 120.0
+const PALM_FAR_CELL := 320.0
+const FROND_ROWS := 4           # atlas rows: three green fronds and a dead one
+## Trunk bases stay out of these (x0, z0, x1, z1): the hut row, and the grandstand with room for
+## the crowns of palms leaning over it from behind.
+const PALM_KEEP_OUT := [Rect2(-28.0, 19.0, 9.0, 60.0), Rect2(-33.0, 140.0, 25.0, 60.0)]
+
+var _frond_tex: Texture2D
+
+
+## A float RGB + alpha canvas for drawing the frond atlas (members, so drawing edits in place).
+class LeafCanvas:
+	var w := 0
+	var rgb := PackedFloat32Array()
+	var alpha := PackedFloat32Array()
+
+	func _init(size: int, bg: Color) -> void:
+		w = size
+		rgb.resize(size * size * 3)
+		alpha.resize(size * size)
+		for i in range(size * size):
+			rgb[i * 3] = bg.r
+			rgb[i * 3 + 1] = bg.g
+			rgb[i * 3 + 2] = bg.b
+
+	func _put(i: int, a: float, col: Color) -> void:
+		var k: float = a if alpha[i] > 0.0 else 1.0
+		rgb[i * 3] = lerpf(rgb[i * 3], col.r, k)
+		rgb[i * 3 + 1] = lerpf(rgb[i * 3 + 1], col.g, k)
+		rgb[i * 3 + 2] = lerpf(rgb[i * 3 + 2], col.b, k)
+		alpha[i] = maxf(alpha[i], a)
+
+	## An antialiased dot.
+	func dot(c: Vector2, r: float, col: Color) -> void:
+		var x0: int = maxi(0, int(c.x - r - 1.0))
+		var x1: int = mini(w - 1, int(c.x + r + 1.0))
+		var y0: int = maxi(0, int(c.y - r - 1.0))
+		var y1: int = mini(w - 1, int(c.y + r + 1.0))
+		for y in range(y0, y1 + 1):
+			for x in range(x0, x1 + 1):
+				var a: float = clampf(r + 0.5 - Vector2(x + 0.5, y + 0.5).distance_to(c), 0.0, 1.0)
+				if a > 0.0:
+					_put(y * w + x, a, col)
+
+	## A stroke of dots from `a` to `b`, `r` tapering to `r2`.
+	func line(a: Vector2, b: Vector2, r: float, r2: float, col: Color) -> void:
+		var n: int = maxi(1, int(a.distance_to(b) / 0.7))
+		for k in range(n + 1):
+			var t: float = float(k) / float(n)
+			dot(a.lerp(b, t), lerpf(r, r2, t), col)
+
+	## A leaflet from `base` along `dir`: pointed, widest a third of the way out, lighter along its
+	## midrib, and turning `tip` toward its point (a dry or sun-scorched end).
+	func leaflet(base: Vector2, dir: Vector2, length: float, width: float, col: Color, rib: Color, tip: Color) -> void:
+		var d: Vector2 = dir.normalized()
+		var perp := Vector2(-d.y, d.x)
+		var ends: Array = [base, base + d * length, base + perp * width, base - perp * width, base + d * length * 0.4 + perp * width, base + d * length * 0.4 - perp * width]
+		var lo := Vector2(1e9, 1e9)
+		var hi := Vector2(-1e9, -1e9)
+		for e in ends:
+			lo = Vector2(minf(lo.x, e.x), minf(lo.y, e.y))
+			hi = Vector2(maxf(hi.x, e.x), maxf(hi.y, e.y))
+		for y in range(maxi(0, int(lo.y) - 1), mini(w - 1, int(hi.y) + 2)):
+			for x in range(maxi(0, int(lo.x) - 1), mini(w - 1, int(hi.x) + 2)):
+				var q := Vector2(x + 0.5, y + 0.5) - base
+				var along: float = q.dot(d) / length
+				if along < 0.0 or along > 1.0:
+					continue
+				var across: float = q.dot(perp)
+				var half: float = width * pow(sin(PI * clampf(pow(along, 0.75), 0.0, 1.0)), 0.7)
+				var a: float = clampf(half - absf(across) + 0.5, 0.0, 1.0)
+				if a <= 0.0:
+					continue
+				var c: Color = col.lerp(col.lightened(0.15), along * 0.6)
+				c = c.lerp(tip, smoothstep(0.7, 1.0, along))
+				var r: float = clampf(1.2 - absf(across) / maxf(width * 0.12, 0.6), 0.0, 1.0)
+				c = c.lerp(rib, r * 0.5)
+				_put(y * w + x, a, c)
+
+
+## Mipmapped RGBA8 image of the canvas whose every mip keeps level 0's coverage at alpha
+## `cutoff` (each level's alpha scaled up until as many texels pass the test), so fronds do not
+## thin out to nothing with distance.
+func _coverage_mipmaps(cv: LeafCanvas, cutoff: float) -> Image:
+	var size: int = cv.w
+	var rgb: PackedFloat32Array = cv.rgb
+	var alpha: PackedFloat32Array = cv.alpha
+	var target := 0.0
+	for a in alpha:
+		if a >= cutoff:
+			target += 1.0
+	target /= float(alpha.size())
+	var data := PackedByteArray()
+	var scale := 1.0
+	while true:
+		var n: int = size * size
+		var level := PackedByteArray()
+		level.resize(n * 4)
+		for i in range(n):
+			level[i * 4] = int(clampf(rgb[i * 3], 0.0, 1.0) * 255.0 + 0.5)
+			level[i * 4 + 1] = int(clampf(rgb[i * 3 + 1], 0.0, 1.0) * 255.0 + 0.5)
+			level[i * 4 + 2] = int(clampf(rgb[i * 3 + 2], 0.0, 1.0) * 255.0 + 0.5)
+			level[i * 4 + 3] = int(clampf(alpha[i] * scale, 0.0, 1.0) * 255.0 + 0.5)
+		data.append_array(level)
+		if size == 1:
+			break
+		var half: int = size / 2
+		var rgb2 := PackedFloat32Array()
+		rgb2.resize(half * half * 3)
+		var alpha2 := PackedFloat32Array()
+		alpha2.resize(half * half)
+		for y in range(half):
+			for x in range(half):
+				var sa := 0.0
+				var sr := 0.0
+				var sg := 0.0
+				var sb := 0.0
+				for dy in range(2):
+					for dx in range(2):
+						var i2: int = (y * 2 + dy) * size + x * 2 + dx
+						var wgt: float = alpha[i2] + 0.001
+						sa += alpha[i2]
+						sr += rgb[i2 * 3] * wgt
+						sg += rgb[i2 * 3 + 1] * wgt
+						sb += rgb[i2 * 3 + 2] * wgt
+				var j: int = y * half + x
+				var wsum: float = sa + 0.004
+				alpha2[j] = sa * 0.25
+				rgb2[j * 3] = sr / wsum
+				rgb2[j * 3 + 1] = sg / wsum
+				rgb2[j * 3 + 2] = sb / wsum
+		size = half
+		rgb = rgb2
+		alpha = alpha2
+		var lo := 1.0
+		var hi := 16.0
+		for it in range(14):
+			var mid: float = (lo + hi) * 0.5
+			var covered := 0
+			var need: float = cutoff / mid
+			for a2 in alpha:
+				if a2 >= need:
+					covered += 1
+			if float(covered) / float(alpha.size()) < target:
+				lo = mid
+			else:
+				hi = mid
+		scale = hi
+	return Image.create_from_data(cv.w, cv.w, true, Image.FORMAT_RGBA8, data)
+
+
+## The frond atlas: FROND_ROWS rows, each one side of a frond laid flat with its base at the left
+## and its tip at the right, the midrib along the row's top edge and the leaflets sweeping down and
+## out toward the tip, longest a third of the way along. Rows 0-2 are green, row 3 a dead frond.
+func _palm_frond_texture() -> Texture2D:
+	if _frond_tex:
+		return _frond_tex
+	const W := 1024
+	const ROW := 256
+	var cv := LeafCanvas.new(W, Color(0.30, 0.44, 0.12))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3141
+	var greens := [[Color(0.23, 0.41, 0.08), Color(0.37, 0.53, 0.12)], [Color(0.31, 0.45, 0.09), Color(0.46, 0.55, 0.14)],
+			[Color(0.18, 0.35, 0.07), Color(0.29, 0.47, 0.10)]]
+	for row in range(FROND_ROWS):
+		var dead := row == FROND_ROWS - 1
+		var y0: float = float(row * ROW) + 5.0
+		var n := 76
+		for k in range(n):
+			# Dead fronds have lost leaflets; a few go missing from green ones too.
+			if rng.randf() < (0.2 if dead else 0.04):
+				continue
+			var u: float = lerpf(0.14, 0.975, float(k) / float(n - 1)) + rng.randf_range(-0.002, 0.002)
+			var s: float = (u - 0.14) / 0.835
+			var prof: float = (0.42 + 0.58 * smoothstep(0.0, 0.32, s)) * (1.0 - 0.72 * smoothstep(0.45, 1.0, s))
+			var ang: float = deg_to_rad(lerpf(60.0, 34.0, s) + rng.randf_range(-3.0, 3.0) + (14.0 if dead else 0.0))
+			var dir := Vector2(cos(ang), sin(ang))
+			var base := Vector2(u * W, y0)
+			# Fits the row, and ends before the tip.
+			var length: float = minf((ROW - 16.0) * prof / dir.y, (W - 6.0 - base.x) / dir.x) * rng.randf_range(0.93, 1.0)
+			if length < 12.0:
+				continue
+			var col: Color
+			var tip: Color
+			if dead:
+				col = Color(0.50, 0.38, 0.22).lerp(Color(0.64, 0.52, 0.32), rng.randf())
+				tip = col.darkened(0.2)
+			else:
+				var pair: Array = greens[row]
+				col = (pair[0] as Color).lerp(pair[1], rng.randf())
+				# Sun-scorched tips on some.
+				tip = col.lerp(Color(0.62, 0.55, 0.26), 0.6) if rng.randf() < 0.3 else col.lightened(0.08)
+			cv.leaflet(base, dir, length, 4.6 + rng.randf() * 0.8, col, col.lightened(0.3), tip)
+		var rib := Color(0.55, 0.43, 0.27) if dead else Color(0.68, 0.66, 0.36)
+		cv.line(Vector2(0.0, y0 - 1.0), Vector2(W - 6.0, y0 - 1.0), 3.4, 1.2, rib)
+	var img := _coverage_mipmaps(cv, 0.5)
+	_frond_tex = _tg.call("_save_resource", ImageTexture.create_from_image(img), "palm_fronds")
+	return _frond_tex
+
+
+func _palm_materials(lod_mode: int) -> Array:
+	var trunk := ShaderMaterial.new()
+	trunk.shader = load("res://palm_trunk.gdshader")
+	var fronds := ShaderMaterial.new()
+	fronds.shader = load("res://palm_fronds.gdshader")
+	fronds.set_shader_parameter("frond_tex", _palm_frond_texture())
+	for m in [trunk, fronds]:
+		m.set_shader_parameter("lod_mode", lod_mode)
+		m.set_shader_parameter("lod_fade_begin", PALM_NEAR - PALM_FADE * 0.5)
+		m.set_shader_parameter("lod_fade_end", PALM_NEAR + PALM_FADE * 0.5)
+		m.set_shader_parameter("lod_jitter", PALM_FADE_JITTER)
+	var nuts := StandardMaterial3D.new()
+	nuts.vertex_color_use_as_albedo = true
+	nuts.vertex_color_is_srgb = true
+	nuts.roughness = 0.55
+	return [trunk, fronds, nuts]
+
+
+## One vertex of a palm surface.
+func _pv(st: SurfaceTool, c: Array) -> void:
+	st.set_normal(c[1])
+	st.set_uv(c[2])
+	st.set_uv2(c[3])
+	st.set_color(c[4])
+	st.add_vertex(c[0])
+
+
+## A quad of four [position, normal, uv, uv2, colour] corners, wound so its front faces the normals.
+func _pquad(st: SurfaceTool, c: Array) -> void:
+	var n: Vector3 = (c[0][1] as Vector3) + c[1][1] + c[2][1] + c[3][1]
+	var order := [0, 1, 2, 0, 2, 3]
+	if ((c[2][0] as Vector3) - c[0][0]).cross((c[1][0] as Vector3) - c[0][0]).dot(n) < 0.0:
+		order = [0, 2, 1, 0, 3, 2]
+	for i in order:
+		_pv(st, c[i])
+
+
+## A tube along `pts` with `radii`, round it UV.x 0..1 and along it UV.y in metres from the first
+## point, COLOR rgb `tint` and a `boot` per point.
+func _palm_tube(st: SurfaceTool, pts: Array, radii: Array, boot: Array, sides: int, tint: Color) -> void:
+	var lens: Array = [0.0]
+	for k in range(1, pts.size()):
+		lens.append(float(lens[k - 1]) + (pts[k] as Vector3).distance_to(pts[k - 1]))
+	var rings: Array = []
+	var side := Vector3.FORWARD
+	for k in range(pts.size()):
+		var tan: Vector3 = ((pts[mini(k + 1, pts.size() - 1)] as Vector3) - pts[maxi(k - 1, 0)]).normalized()
+		# Carried along the trunk, so the tube doesn't twist where it bends.
+		side = (side - tan * side.dot(tan)).normalized()
+		var up := tan.cross(side)
+		var ring: Array = []
+		for j in range(sides + 1):
+			var a: float = TAU * float(j) / float(sides)
+			var n: Vector3 = side * cos(a) + up * sin(a)
+			ring.append([(pts[k] as Vector3) + n * float(radii[k]), n, Vector2(float(j) / float(sides), lens[k]), Vector2.ZERO, Color(tint.r, tint.g, tint.b, boot[k])])
+		rings.append(ring)
+	for k in range(pts.size() - 1):
+		for j in range(sides):
+			_pquad(st, [rings[k][j], rings[k][j + 1], rings[k + 1][j + 1], rings[k + 1][j]])
+
+
+## A frond: the two leaflet cards hung from the midrib in a V, and in the detailed palm a stalk
+## where it leaves the crown. `az` is its direction round the trunk, `elev` its angle at the root
+## (up positive), `bend` how far it has arched down by the tip, `keel` how far the leaflets hang below
+## the midrib's plane and `twist` how far it rolls toward the tip.
+func _palm_frond(st: SurfaceTool, root: Vector3, az: float, elev: float, bend: float, length: float, width: float,
+		keel: float, twist: float, segs: int, row: int, tint: Color, phase: float, stalk: bool) -> void:
+	var horiz := Vector3(cos(az), 0.0, sin(az))
+	var s0 := Vector3(-horiz.z, 0.0, horiz.x)
+	var pts: Array = [root]
+	var p := root
+	for k in range(segs):
+		var t: float = (float(k) + 0.5) / float(segs)
+		var e: float = elev - bend * pow(t, 1.6)
+		p += (horiz * cos(e) + Vector3.UP * sin(e)) * (length / float(segs))
+		pts.append(p)
+	var v0: float = (float(row) + 0.01) / float(FROND_ROWS)
+	var v1: float = (float(row) + 0.99) / float(FROND_ROWS)
+	var rows: Array = []   # per sample: [inner corner, outer corner] for each side
+	for k in range(segs + 1):
+		var t: float = float(k) / float(segs)
+		var tan: Vector3 = ((pts[mini(k + 1, segs)] as Vector3) - pts[maxi(k - 1, 0)]).normalized()
+		var up: Vector3 = tan.cross(s0).normalized()
+		if up.y < 0.0:
+			up = -up
+		var roll: float = twist * t
+		var sd: Vector3 = s0 * cos(roll) + up * sin(roll)
+		var ud: Vector3 = up * cos(roll) - s0 * sin(roll)
+		var hang: float = keel * (0.6 + 0.4 * t)
+		var shade: float = lerpf(0.55, 1.0, sqrt(t))
+		var col := Color(tint.r, tint.g, tint.b, shade)
+		var u: float = lerpf(0.004, 0.996, t)
+		var pair: Array = []
+		for side in [-1.0, 1.0]:
+			var d: Vector3 = sd * side * cos(hang) - ud * sin(hang)
+			var n: Vector3 = d.cross(tan).normalized()
+			if n.dot(ud) < 0.0:
+				n = -n
+			n = (n + Vector3.UP * 0.25).normalized()
+			pair.append([[pts[k], n, Vector2(u, v0), Vector2(t, phase), col], [(pts[k] as Vector3) + d * width, n, Vector2(u, v1), Vector2(t, phase), col]])
+		rows.append(pair)
+	for k in range(segs):
+		for s in range(2):
+			_pquad(st, [rows[k][s][0], rows[k][s][1], rows[k + 1][s][1], rows[k + 1][s][0]])
+	if not stalk:
+		return
+	# The stalk out to the first leaflets, textured with the atlas's midrib.
+	var rib_v: float = (float(row) + 4.0 / 256.0) / float(FROND_ROWS)
+	var rings: Array = []
+	for k in range(3):
+		var t: float = 0.075 * float(k)
+		var f: float = t * float(segs)
+		var c: Vector3 = (pts[int(f)] as Vector3).lerp(pts[int(f) + 1], f - floorf(f))
+		var tan: Vector3 = ((pts[int(f) + 1] as Vector3) - pts[int(f)]).normalized()
+		var up: Vector3 = tan.cross(s0).normalized()
+		var ring: Array = []
+		for j in range(5):
+			var a: float = TAU * float(j) / 4.0
+			var n: Vector3 = s0 * cos(a) + up * sin(a)
+			ring.append([c + n * lerpf(0.07, 0.04, t / 0.15) * length / 5.2, n, Vector2(lerpf(0.004, 0.996, t), rib_v), Vector2(t, phase), Color(tint.r, tint.g, tint.b, 0.7)])
+		rings.append(ring)
+	for k in range(2):
+		for j in range(4):
+			_pquad(st, [rings[k][j], rings[k][j + 1], rings[k + 1][j + 1], rings[k + 1][j]])
+
+
+## A rough ball for a coconut.
+func _palm_nut(st: SurfaceTool, c: Vector3, r: float, col: Color) -> void:
+	var lat := 4
+	var lon := 6
+	var ring: Array = []
+	for i in range(lat + 1):
+		var row: Array = []
+		var th: float = PI * float(i) / float(lat)
+		for j in range(lon + 1):
+			var ph: float = TAU * float(j) / float(lon)
+			var n := Vector3(sin(th) * cos(ph), cos(th), sin(th) * sin(ph))
+			row.append([c + n * Vector3(r, r * 1.1, r), n, Vector2.ZERO, Vector2.ZERO, col])
+		ring.append(row)
+	for i in range(lat):
+		for j in range(lon):
+			_pquad(st, [ring[i][j], ring[i][j + 1], ring[i + 1][j + 1], ring[i + 1][j]])
+
+
+## Palm shape `variant` leaning toward +X, its foot at the origin. Surfaces: the trunk, the fronds,
+## and in the detailed palm (`lod` 0) the coconuts. `lod` 1 is the stand-in: fewer rings and sides,
+## two fronds in three, coarser cards, no stalks.
+func _palm_mesh(variant: int, lod: int, mats: Array) -> ArrayMesh:
+	var sh: Dictionary = PALM_SHAPES[variant]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5501 + variant * 37
+	var h: float = sh["h"]
+	var lean: float = sh["lean"]
+	var tint := Color(rng.randf_range(0.94, 1.04), rng.randf_range(0.95, 1.02), rng.randf_range(0.92, 1.0))
+	# Trunk: leaning at the foot and curving back up toward the crown, with a little wander.
+	var segs: int = 14 if lod == 0 else 5
+	var pts: Array = [Vector3(0.0, -0.8, 0.0)]
+	var p := Vector3.ZERO
+	var wander: float = rng.randf_range(0.0, TAU)
+	for k in range(segs + 1):
+		var t: float = float(k) / float(segs)
+		if k > 0:
+			var th: float = lean * (1.0 - float(sh["curve"]) * pow(t, 1.3))
+			p += Vector3(sin(th), cos(th), 0.0) * (h / float(segs))
+		pts.append(p + Vector3(0.0, 0.0, sin(t * 4.0 + wander) * 0.12 * t))
+	var radii: Array = [0.46]
+	var boot: Array = [0.0]
+	for k in range(segs + 1):
+		var t: float = float(k) / float(segs)
+		radii.append(0.27 * (1.0 - 0.3 * t) + 0.17 * (1.0 - smoothstep(0.0, 0.1, t)))
+		boot.append(smoothstep(h - 0.9, h, t * h))
+	# The boot: a bulge of old frond bases the crown sits in.
+	var top: Vector3 = pts[pts.size() - 1]
+	var tdir: Vector3 = (top - (pts[pts.size() - 2] as Vector3)).normalized()
+	for b in [[0.35, 0.27], [0.7, 0.25], [0.95, 0.15]]:
+		pts.append(top + tdir * float(b[0]))
+		radii.append(b[1])
+		boot.append(1.0)
+	var mesh := ArrayMesh.new()
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	_palm_tube(st, pts, radii, boot, 9 if lod == 0 else 5, tint)
+	var crown: Vector3 = top + tdir * 0.6
+	# Fronds round the crown on the golden angle, youngest at the top pointing up, oldest drooping
+	# below, the dead ones hanging down the trunk.
+	var st2 := SurfaceTool.new()
+	st2.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var n: int = sh["fronds"]
+	var dead: int = sh["dead"]
+	for i in range(n):
+		var age: float = float(i) / float(n - 1)
+		var az: float = float(i) * 2.39996 + rng.randf_range(-0.2, 0.2)
+		var is_dead: bool = i >= n - dead
+		var spear: bool = i < 2
+		# Every frond draws its numbers, so the stand-in's fronds match the detailed palm's.
+		var flen: float = float(sh["len"]) * lerpf(0.78, 1.0, smoothstep(0.0, 0.35, age)) * rng.randf_range(0.92, 1.08)
+		var elev: float = lerpf(1.05, -0.3, age) + rng.randf_range(-0.12, 0.12)
+		var bend: float = lerpf(0.7, 1.5, age) + rng.randf_range(-0.15, 0.15)
+		var twist: float = rng.randf_range(-0.35, 0.35)
+		var phase: float = rng.randf()
+		var row: int = rng.randi() % (FROND_ROWS - 1)
+		var spear_elev: float = 1.35 + rng.randf_range(-0.1, 0.1)
+		var dead_elev: float = -1.15 + rng.randf_range(-0.15, 0.15)
+		if lod == 1 and (i % 3 == 2 or is_dead or spear):
+			continue
+		var keel: float = lerpf(0.6, 1.0, age)
+		var width: float = flen * 0.19
+		var ftint := tint * Color(1.0, 1.0, 1.0).lerp(Color(1.08, 1.02, 0.78), age * 0.6)
+		if spear:
+			flen *= 0.6
+			elev = spear_elev
+			bend = 0.2
+			keel = 1.2
+			width *= 0.45
+		if is_dead:
+			flen *= 0.85
+			elev = dead_elev
+			bend = 0.25
+			keel = 1.1
+			row = FROND_ROWS - 1
+			ftint = Color(1.0, 1.0, 1.0)
+		var root: Vector3 = crown + Vector3(cos(az), 0.0, sin(az)) * 0.12 - Vector3(0.0, 0.5 * age, 0.0)
+		if lod == 1:
+			width *= 1.15
+		_palm_frond(st2, root, az, elev, bend, flen, width, keel, twist, 10 if lod == 0 else 3, row, ftint, phase, lod == 0)
+	st.index()
+	st.commit(mesh)
+	mesh.surface_set_material(0, mats[0])
+	st2.index()
+	st2.commit(mesh)
+	mesh.surface_set_material(1, mats[1])
+	if lod == 0 and int(sh["nuts"]) > 0:
+		var st3 := SurfaceTool.new()
+		st3.begin(Mesh.PRIMITIVE_TRIANGLES)
+		for b in range(2):
+			var ba: float = rng.randf_range(0.0, TAU)
+			var bc: Vector3 = crown + Vector3(cos(ba), 0.0, sin(ba)) * 0.3 - Vector3(0.0, 0.45, 0.0)
+			for k in range(int(float(sh["nuts"]) * 0.5) + b):
+				var nc: Vector3 = bc + Vector3(rng.randf_range(-0.16, 0.16), rng.randf_range(-0.14, 0.08), rng.randf_range(-0.16, 0.16))
+				var ripe: float = rng.randf()
+				_palm_nut(st3, nc, rng.randf_range(0.12, 0.15), Color(0.36, 0.44, 0.14).lerp(Color(0.62, 0.44, 0.18), ripe * ripe))
+		st3.index()
+		st3.commit(mesh)
+		mesh.surface_set_material(2, mats[2])
+	return mesh
+
+
+## Simplex noise for where the palms grow thick (no fractal: one even scale of groves).
+var _grove_noise: FastNoiseLite
+
+
+## Can a palm stand here: dry, not too steep, clear of the racing line, the gates, the beach
+## structures and the other palms (trunk bases `gap` apart)?
+func _palm_ok(x: float, z: float, gates: Array, taken: Array, gap: float) -> bool:
+	var y := _ground(x, z)
+	if y < PALM_DRY:
+		return false
+	var slope := maxf(absf(_ground(x + 1.5, z) - _ground(x - 1.5, z)), absf(_ground(x, z + 1.5) - _ground(x, z - 1.5))) / 3.0
+	if slope > 0.45:
+		return false
+	var c := Vector2(x, z)
+	var p := _curve.get_closest_point(Vector3(x, y, z))
+	if Vector2(p.x, p.z).distance_to(c) - TRACK_HALF < (PALM_CLEAR_BEACH if x < -15.0 else PALM_CLEAR_DUNES):
+		return false
+	for g in gates:
+		if c.distance_to(g) < PALM_GATE_CLEAR:
+			return false
+	for r in PALM_KEEP_OUT:
+		if (r as Rect2).has_point(c):
+			return false
+	for f in _footprints:
+		if c.distance_to(f[1]) < float(f[2]) + 2.5:
+			return false
+	for o in taken:
+		if c.distance_to(o) < gap:
+			return false
+	return true
+
+
+## Direction to the nearest water within 14m (ground below the surface), or zero.
+func _water_dir(x: float, z: float) -> Vector2:
+	for r in [5.0, 9.0, 14.0]:
+		for i in range(12):
+			var a: float = TAU * float(i) / 12.0
+			var d := Vector2(cos(a), sin(a))
+			if _ground(x + d.x * r, z + d.y * r) < -0.1:
+				return d
+	return Vector2.ZERO
+
+
+func _build_palms(level: Node3D) -> void:
+	var root := Node3D.new()
+	root.name = "Palms"
+	level.add_child(root)
+	_grove_noise = FastNoiseLite.new()
+	_grove_noise.seed = 77
+	_grove_noise.frequency = 0.02
+	_grove_noise.fractal_type = FastNoiseLite.FRACTAL_NONE
+	var gates: Array = []
+	for g in [level.get_node("FinishLine")] + level.get_node("Checkpoints").get_children():
+		gates.append(Vector2((g as Node3D).position.x, (g as Node3D).position.z))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7023
+	var taken: Array = []
+	var spots: Array = []   # [foot, lean direction, variant, scale]
+	# The beach: groves along its land side, leaning out to sea, the strongest leaners nearest it.
+	var tries := 0
+	var beach := 0
+	while beach < PALM_BEACH and tries < 40000:
+		tries += 1
+		var x: float = rng.randf_range(-34.0, 6.0)
+		var z: float = rng.randf_range(-390.0, 390.0)
+		if _grove_noise.get_noise_2d(x, z) < 0.0 and rng.randf() > 0.12:
+			continue
+		if not _palm_ok(x, z, gates, taken, 3.4):
+			continue
+		var pick: float = rng.randf() * (1.0 - clampf((x + 34.0) / 40.0, 0.0, 1.0) * 0.5)
+		var v: int = 2 if pick > 0.62 else (0 if pick > 0.3 else (1 if rng.randf() < 0.6 else 3))
+		taken.append(Vector2(x, z))
+		spots.append([Vector3(x, _ground(x, z), z), Vector2(-1.0, 0.0).rotated(rng.randf_range(-0.6, 0.6)), v, rng.randf_range(0.85, 1.15)])
+		beach += 1
+	# Round the water in the dunes and along the island's far shore, leaning over it; thickest near
+	# the track, where they are seen.
+	tries = 0
+	var shore := 0
+	while shore < PALM_SHORE and tries < 120000:
+		tries += 1
+		var x2: float = rng.randf_range(-12.0, 470.0)
+		var z2: float = rng.randf_range(-470.0, 470.0)
+		var y2 := _ground(x2, z2)
+		if y2 < PALM_BANK or y2 > 3.2:
+			continue
+		var p := _curve.get_closest_point(Vector3(x2, y2, z2))
+		if rng.randf() > exp(-Vector2(p.x - x2, p.z - z2).length() / 220.0):
+			continue
+		var wet := _water_dir(x2, z2)
+		if wet == Vector2.ZERO or not _palm_ok(x2, z2, gates, taken, 3.8):
+			continue
+		var v2: int = [0, 0, 1, 1, 2, 3][rng.randi() % 6]
+		taken.append(Vector2(x2, z2))
+		spots.append([Vector3(x2, y2, z2), wet.rotated(rng.randf_range(-0.45, 0.45)), v2, rng.randf_range(0.85, 1.15)])
+		shore += 1
+	# Meshes, then the palms in cells: the detailed ones near, the stand-ins far, and the trunks.
+	var near_mats := _palm_materials(1)
+	var far_mats := _palm_materials(2)
+	var near_meshes: Array = []
+	var far_meshes: Array = []
+	for v3 in range(PALM_SHAPES.size()):
+		near_meshes.append(_tg.call("_save_resource", _palm_mesh(v3, 0, near_mats), "palm_%d" % v3))
+		far_meshes.append(_tg.call("_save_resource", _palm_mesh(v3, 1, far_mats), "palm_far_%d" % v3))
+	var near := {}
+	var far := {}
+	var bodies := {}
+	for s in spots:
+		var foot: Vector3 = s[0]
+		var d: Vector2 = s[1]
+		var sc: float = s[3]
+		var yaw: float = atan2(-d.y, d.x)
+		var xf := Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * sc), foot)
+		var nk := Vector3i(floori(foot.x / PALM_CELL), floori(foot.z / PALM_CELL), s[2])
+		var fk := Vector3i(floori(foot.x / PALM_FAR_CELL), floori(foot.z / PALM_FAR_CELL), s[2])
+		if not near.has(nk):
+			near[nk] = []
+		near[nk].append(xf)
+		if not far.has(fk):
+			far[fk] = []
+		far[fk].append(xf)
+		# The trunk's foot, tipped with its lean: carts only reach the first few metres.
+		var bk := Vector2i(nk.x, nk.y)
+		if not bodies.has(bk):
+			var body := StaticBody3D.new()
+			body.name = "PalmTrunks_%d_%d" % [bk.x, bk.y]
+			root.add_child(body)
+			bodies[bk] = body
+		var lean: float = PALM_SHAPES[s[2]]["lean"]
+		var axis := (Vector3(sin(lean) * d.x, cos(lean), sin(lean) * d.y)).normalized()
+		var cyl := CylinderShape3D.new()
+		cyl.radius = 0.36 * sc
+		cyl.height = 4.0 * sc
+		var cs := CollisionShape3D.new()
+		cs.shape = cyl
+		cs.transform = Transform3D(Basis(Quaternion(Vector3.UP, axis)), foot + axis * cyl.height * 0.5 - Vector3(0.0, 0.6, 0.0))
+		bodies[bk].add_child(cs)
+	# Ranges are measured to a cell's centre, so they're padded by half a cell's diagonal: a cell
+	# only switches off once every palm in it has faded, and the shader does the visible swap. The
+	# stand-ins cast no shadow (the shadow pass can't tell which of the two a palm is showing).
+	for k in near.keys():
+		var mmi := _multimesh(near_meshes[k.z], near[k], "Palms_%d_%d_%d" % [k.x, k.y, k.z])
+		mmi.visibility_range_end = PALM_NEAR + PALM_FADE * 0.5 + PALM_FADE_JITTER + PALM_CELL * 0.72
+		mmi.visibility_range_end_margin = 10.0
+		root.add_child(mmi)
+	for k in far.keys():
+		var mmi2 := _multimesh(far_meshes[k.z], far[k], "PalmsFar_%d_%d_%d" % [k.x, k.y, k.z])
+		mmi2.visibility_range_begin = maxf(0.0, PALM_NEAR - PALM_FADE * 0.5 - PALM_FADE_JITTER - PALM_FAR_CELL * 0.72)
+		mmi2.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		root.add_child(mmi2)
+	print("Palms: %d on the beach, %d by the water" % [beach, shore])
+
+
+func _transform_buffer(transforms: Array) -> PackedFloat32Array:
+	var buf := PackedFloat32Array()
+	buf.resize(transforms.size() * 12)
+	for i in range(transforms.size()):
+		var t: Transform3D = transforms[i]
+		var b: Basis = t.basis
+		var o: int = i * 12
+		buf[o] = b.x.x
+		buf[o + 1] = b.y.x
+		buf[o + 2] = b.z.x
+		buf[o + 3] = t.origin.x
+		buf[o + 4] = b.x.y
+		buf[o + 5] = b.y.y
+		buf[o + 6] = b.z.y
+		buf[o + 7] = t.origin.y
+		buf[o + 8] = b.x.z
+		buf[o + 9] = b.y.z
+		buf[o + 10] = b.z.z
+		buf[o + 11] = t.origin.z
+	return buf
+
+
+func _multimesh(mesh: Mesh, transforms: Array, node_name: String) -> MultiMeshInstance3D:
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = mesh
+	mm.instance_count = transforms.size()
+	# The dummy renderer drops set_instance_transform(); write the buffer itself (CLAUDE.md).
+	mm.buffer = _transform_buffer(transforms)
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = node_name
+	mmi.multimesh = mm
+	return mmi
 
 
 func _set_owner_recursive(node: Node, scene_root: Node) -> void:
