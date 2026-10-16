@@ -206,6 +206,7 @@ func _ready() -> void:
 	tg.call("generate_world")
 	_build_ocean(tg)
 	_build_seafront(level_scene, tg, curve)
+	_build_surf_sound(level_scene, tg)
 
 	# 4. Finish Line & Starting Grid
 	var gate_scene: PackedScene = load("res://CheckpointGate.tscn")
@@ -610,6 +611,109 @@ func _ripple_texture() -> NoiseTexture2D:
 	return tex
 
 
+# --- Surf sound ------------------------------------------------------------------------------------
+# The surf's roar, baked into looping clips like the other levels' ambiences: each wave a rising curl,
+# the crash as it breaks and the long hiss of the swash running up the sand and back, on the waves'
+# period (SEA_PERIOD), over the sea's low rumble. Emitters stand along the surf line, alternating two
+# clips of different lengths so neighbours never fall into step.
+
+const SURF_RATE := 22050
+const SURF_SPACING := 65.0
+
+
+func _build_surf_sound(level: Node3D, tg: Node3D) -> void:
+	var root := Node3D.new()
+	root.name = "SurfSound"
+	level.add_child(root)
+	var clips := [_surf_stream(tg, 4401, 3, "surf_a"), _surf_stream(tg, 5502, 4, "surf_b")]
+	var k := 0
+	var z := -390.0
+	while z <= 390.0:
+		var ap := AudioStreamPlayer3D.new()
+		ap.name = "Surf%d" % k
+		ap.stream = clips[k % 2]
+		# Just seaward of the waterline, where the waves break last.
+		ap.position = Vector3(float(tg.call("bloombay_shore_x", z)) - 10.0, 1.0, z)
+		ap.volume_db = -3.0
+		ap.unit_size = 22.0
+		ap.max_distance = 170.0
+		ap.attenuation_filter_cutoff_hz = 5000.0
+		ap.autoplay = true
+		ap.bus = &"SFX"
+		root.add_child(ap)
+		z += SURF_SPACING
+		k += 1
+
+
+## `waves` waves of surf as a seamless loop. The envelopes repeat with the loop's length, and the
+## tail is crossfaded into the head so the noise has no seam either.
+func _surf_stream(tg: Node3D, seed_v: int, waves: int, res_name: String) -> AudioStreamWAV:
+	var loop_s := SEA_PERIOD * waves
+	var n := int(SURF_RATE * loop_s)
+	var fade := int(SURF_RATE * 0.6)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_v
+	# Each wave: when it breaks (seconds into the loop) and how big it is.
+	var breaks := []
+	for k in waves:
+		breaks.append([(k + rng.randf_range(0.1, 0.4)) * SEA_PERIOD, rng.randf_range(0.6, 1.0)])
+	var samples := PackedFloat32Array()
+	samples.resize(n + fade)
+	var brown := 0.0
+	var mid := 0.0
+	var low := 0.0
+	var soft := 0.0
+	var sea := 0.0
+	for i in n + fade:
+		var t := float(i) / SURF_RATE
+		var white := rng.randf_range(-1.0, 1.0)
+		brown = clampf(brown * 0.996 + white * 0.05, -1.0, 1.0)
+		sea += (brown - sea) * 0.02
+		low += (white - low) * 0.06
+		mid += (white - mid) * 0.3
+		soft += ((white - mid) - soft) * 0.45
+		var curl := 0.0
+		var crash := 0.0
+		var wash := 0.0
+		for b in breaks:
+			for wrap in [-loop_s, 0.0, loop_s]:
+				var dt: float = t - float(b[0]) - wrap
+				if dt < -2.0 or dt > 7.5:
+					continue
+				var a: float = b[1]
+				# The face steepening, then the lip coming over.
+				curl += a * smoothstep(-2.0, 0.0, dt) * (1.0 if dt < 0.0 else exp(-dt * 3.0))
+				# The crash: a fast attack and a second's decay.
+				if dt >= 0.0:
+					crash += a * minf(dt / 0.05, 1.0) * exp(-dt * 2.2)
+				# The swash running up and draining back with a fainter hiss.
+				if dt > 0.15:
+					var u := dt - 0.15
+					wash += a * (1.0 - exp(-u * 3.0)) * exp(-u * 0.6)
+					wash += a * 0.3 * exp(-pow((u - 4.0) / 1.2, 2.0))
+		# The rumble stays under the breakers: between waves the beach goes quiet.
+		samples[i] = sea * 0.4 + low * curl * 3.0 + (mid * 1.8 + white * 0.3) * crash + soft * wash * 1.6
+	for i in fade:
+		var f := float(i) / fade
+		samples[i] = samples[i] * f + samples[n + i] * (1.0 - f)
+	var peak := 0.001
+	for i in n:
+		peak = maxf(peak, absf(samples[i]))
+	var data := PackedByteArray()
+	data.resize(n * 2)
+	for i in n:
+		data.encode_s16(i * 2, int(clampf(samples[i] / peak * 0.85, -1.0, 1.0) * 32767.0))
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = SURF_RATE
+	wav.stereo = false
+	wav.data = data
+	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	wav.loop_begin = 0
+	wav.loop_end = n
+	return tg.call("_save_resource", wav, res_name) as AudioStreamWAV
+
+
 # --- Seafront structures ---------------------------------------------------------------------------
 # Everything lives under "Seafront" (not "Props"/"Environment": Level.gd bakes trimesh colliders
 # under those, and no "ramp" either). Each structure is one mesh with a surface per material, plus
@@ -634,7 +738,7 @@ const OLD_WOOD := Color(0.48, 0.42, 0.36)
 
 var _tg: Node3D
 var _curve: Curve3D
-var _footprints: Array = []   # [name, centre Vector2, radius, clearance]
+var _footprints: Array = []   # [name, centre Vector2, radius, clearance, height above the sand]
 var _materials: Dictionary = {}
 var _frame := Transform3D.IDENTITY       # layout space -> world, see _scale_about
 var _frame_inv := Transform3D.IDENTITY
@@ -694,9 +798,12 @@ func _ground_min(cx: float, cz: float, hx: float, hz: float) -> float:
 	return lo
 
 
-func _note(name: String, centre: Vector2, radius: float, clearance: float) -> void:
+## Records a footprint for the track clearance check and for the palms, which keep their trunks and
+## crowns clear of anything taller than the part of them passing over it.
+func _note(name: String, centre: Vector2, radius: float, clearance: float, height: float = 1000.0) -> void:
 	var w := _frame * Vector3(centre.x, 0.0, centre.y)
-	_footprints.append([name, Vector2(w.x, w.z), radius * _frame.basis.get_scale().x, clearance])
+	var s := _frame.basis.get_scale().x
+	_footprints.append([name, Vector2(w.x, w.z), radius * s, clearance, height * s])
 
 
 func _verify_seafront_clear() -> void:
@@ -1141,6 +1248,47 @@ func _box_in(parent: Node3D, name: String, xf: Transform3D, lo: Vector3, hi: Vec
 	_collider(parent, name, shape, xf * Transform3D(Basis(), (lo + hi) * 0.5))
 
 
+## A block of coursed sandstone from `lo` to `hi`: a dark mortar core faced with stones of random
+## length in courses, bonded at the corners. The stones stand 4cm proud of the core, 2cm apart, so
+## the joints read as recessed mortar and no two faces share a plane.
+func _masonry(kit: Dictionary, rng: RandomNumberGenerator, lo: Vector3, hi: Vector3, course: float = 0.42) -> void:
+	var inset := 0.04
+	var depth := 0.06
+	_block(kit, "paint", lo + Vector3(inset, 0, inset), hi - Vector3(inset, 0, inset), Color(0.40, 0.36, 0.31))
+	var stone := Color(0.70, 0.63, 0.52)
+	var faces := [[Vector3(lo.x, 0, lo.z), Vector3(hi.x, 0, lo.z), Vector3(0, 0, -1)], [Vector3(hi.x, 0, lo.z), Vector3(hi.x, 0, hi.z), Vector3(1, 0, 0)],
+		[Vector3(hi.x, 0, hi.z), Vector3(lo.x, 0, hi.z), Vector3(0, 0, 1)], [Vector3(lo.x, 0, hi.z), Vector3(lo.x, 0, lo.z), Vector3(-1, 0, 0)]]
+	var y := lo.y
+	var k := 0
+	while y < hi.y - 0.02:
+		var y0 := y + (0.01 if k > 0 else 0.0)
+		var y1 := minf(y + course, hi.y) - 0.01
+		for fi in 4:
+			var a: Vector3 = faces[fi][0]
+			var b: Vector3 = faces[fi][1]
+			var n: Vector3 = faces[fi][2]
+			var dir := (b - a).normalized()
+			var length := a.distance_to(b)
+			# Faces along x take the corners on even courses, faces along z on odd ones.
+			var owns := (fi % 2 == 0) == (k % 2 == 0)
+			var u0 := 0.0 if owns else depth + 0.02
+			var u1 := length if owns else length - depth - 0.02
+			var u := u0
+			while u < u1 - 0.05:
+				var ue := minf(u + rng.randf_range(0.6, 1.3), u1)
+				if u1 - ue < 0.35:
+					ue = u1
+				var ua := u + (0.01 if u > u0 else 0.0)
+				var ub := ue - (0.01 if ue < u1 else 0.0)
+				var p0 := a + dir * ua
+				var p1 := a + dir * ub - n * depth
+				_block(kit, "paint", Vector3(minf(p0.x, p1.x), y0, minf(p0.z, p1.z)), Vector3(maxf(p0.x, p1.x), y1, maxf(p0.z, p1.z)),
+						stone.darkened(rng.randf_range(-0.04, 0.14)))
+				u = ue
+		y += course
+		k += 1
+
+
 ## A box of `size` centred on `centre`, its long (z) axis along `dir` and its y axis up.
 func _box_along(parent: Node3D, name: String, centre: Vector3, dir: Vector3, size: Vector3) -> void:
 	var shape := BoxShape3D.new()
@@ -1287,36 +1435,81 @@ func _build_beach_huts(root: Node3D) -> void:
 			Vector3(x - d * 0.5 - 0.25, floor_y + wall_h, z - w * 0.5 - 0.2), Vector3(x + d * 0.5 + 0.25, floor_y + wall_h, z - w * 0.5 - 0.2),
 			Vector3(x - d * 0.5 - 0.25, floor_y + wall_h, z + w * 0.5 + 0.2), Vector3(x + d * 0.5 + 0.25, floor_y + wall_h, z + w * 0.5 + 0.2),
 			Vector3(x - d * 0.5 - 0.25, floor_y + wall_h + 1.0, z), Vector3(x + d * 0.5 + 0.25, floor_y + wall_h + 1.0, z)]))
-		_note("Hut%d" % i, Vector2(x - d * 0.5 - 0.5, z), 0.2, CLEAR_BUILDING)
+		_note("Hut%d" % i, Vector2(x - 0.25, z), 2.3, CLEAR_BUILDING, floor_y + wall_h + 1.0 - g)
 		_end_scale()
 		z += (w + 0.9) * PROP_SCALE
 		i += 1
 	_commit(root, kit, "BeachHuts")
 
 
-## A timber pier from the beach out past the sandbar, a pavilion on its T-head.
+## A timber pier from the beach out past the sandbar, a pavilion on its T-head. Laid out at life size
+## and built at PROP_SCALE, grown out to sea from the land end of its stone abutment.
 func _build_pier(root: Node3D) -> void:
 	var kit := {}
 	var z := 100.0
 	var x_land := -61.5
-	var x_end := -176.0
+	var x_end := -132.0
 	var top := 2.6
 	var half := 2.2
 	var head_x := x_end + 10.0
 	var head_half := 9.0
-	# Stone abutment on the sand, with steps up its south side.
-	var ab_g := _ground_min(x_land + 2.0, z, 3.0, half + 1.0) - 0.4
-	_block(kit, "rock", Vector3(x_land - 1.0, ab_g, z - half - 0.6), Vector3(x_land + 4.0, top, z + half + 0.6), Color(0.78, 0.74, 0.66))
-	for s in range(6):
-		var sy := top - 0.43 * (s + 1)
-		_block(kit, "rock", Vector3(x_land - 1.0, ab_g, z + half + 0.6 + s * 0.45), Vector3(x_land + 4.0, sy, z + half + 1.05 + s * 0.45), Color(0.80, 0.76, 0.68))
-	_box_collider(root, "PierAbutment", Vector3(x_land - 1.0, ab_g, z - half - 0.6), Vector3(x_land + 4.0, top, z + half + 3.4))
+	_scale_about(Vector3(x_land + 4.0, 0.0, z), PROP_SCALE)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 100
+	var rail_col := Color(0.92, 0.92, 0.88)
+	# Stone abutment on the sand: coursed sandstone under a coping, which overhangs all but the
+	# seaward side, where the decking starts.
+	var ab_lo := Vector3(x_land - 1.0, _ground_min(x_land + 1.5, z, 2.5, half + 0.6) - 0.5, z - half - 0.6)
+	var ab_hi := Vector3(x_land + 4.0, top - 0.14, z + half + 0.6)
+	_masonry(kit, rng, ab_lo, ab_hi)
+	_block(kit, "paint", Vector3(ab_lo.x, ab_hi.y, ab_lo.z - 0.06), Vector3(ab_hi.x + 0.06, top, ab_hi.z + 0.06), Color(0.80, 0.75, 0.66))
+	_box_collider(root, "PierAbutment", ab_lo, Vector3(ab_hi.x + 0.06, top, ab_hi.z + 0.06))
 	_note("PierAbutment", Vector2(x_land + 4.0, z), 0.5, CLEAR_BUILDING)
-	# Deck boards over joists.
-	_block(kit, "wood", Vector3(x_end, top - 0.22, z - half), Vector3(x_land - 1.0, top, z + half), WOOD)
-	_block(kit, "wood", Vector3(x_end, top - 0.22, z - head_half), Vector3(head_x + 6.0, top, z + head_half), WOOD)
+	# Timber stairs down the abutment's south face to the sand: stringers, open treads, a handrail
+	# each side like the pier's railing, and a landing on the sand.
+	var sx0 := x_land + 0.3
+	var sx1 := x_land + 2.7
+	var sz0 := ab_hi.z + 0.06
+	var gy := _ground((sx0 + sx1) * 0.5, sz0 + 3.2)
+	var rise := top - gy
+	var steps := maxi(4, roundi(rise / 0.19))
+	var run := (steps + 1) * 0.27
+	var s_top := Vector3((sx0 + sx1) * 0.5, top, sz0)
+	var s_foot := Vector3((sx0 + sx1) * 0.5, gy, sz0 + run)
+	var sdir := (s_foot - s_top).normalized()
+	var sb := Basis(Vector3.RIGHT, sdir.cross(Vector3.RIGHT), sdir)
+	var slen := s_top.distance_to(s_foot)
+	for sx in [sx0, sx1]:
+		var mid := Vector3(sx, (top + gy) * 0.5, sz0 + run * 0.5)
+		_box(kit, "wood", Transform3D(sb, mid - sb.y * 0.14), Vector3(0.08, 0.3, slen + 0.2), OLD_WOOD)
+	for i in steps:
+		var f := (i + 1.0) / (steps + 1.0)
+		var ty := top - rise * f
+		var tz := sz0 + run * f
+		_block(kit, "wood", Vector3(sx0 + 0.04, ty - 0.06, tz - 0.15), Vector3(sx1 - 0.04, ty, tz + 0.15), WOOD.darkened(rng.randf_range(-0.05, 0.1)))
+	_block(kit, "wood", Vector3(sx0 - 0.3, gy - 0.3, sz0 + run - 0.05), Vector3(sx1 + 0.3, gy + 0.06, sz0 + run + 1.2), WOOD.darkened(0.08))
+	for sx in [sx0 - 0.05, sx1 + 0.05]:
+		var h0 := Vector3(sx, top + 1.0, sz0)
+		var h1 := Vector3(sx, gy + 1.0, sz0 + run)
+		for t in [0.0, 0.33, 0.66, 1.0]:
+			var hp: Vector3 = h0.lerp(h1, t)
+			_block(kit, "paint", hp + Vector3(-0.06, -1.05, -0.06), hp + Vector3(0.06, 0.05, 0.06), rail_col)
+		_tube(kit, "paint", h0, h1, 0.05, 0.05, 6, rail_col)
+		_tube(kit, "paint", h0 - Vector3(0, 0.45, 0), h1 - Vector3(0, 0.45, 0), 0.035, 0.035, 5, rail_col)
+		_box_along(root, "PierAbutment", Vector3(sx, (top + gy) * 0.5 + 0.5, sz0 + run * 0.5), s_foot - s_top, Vector3(0.12, 1.05, slen))
+	_box_along(root, "PierAbutment", (s_top + s_foot) * 0.5 - sb.y * 0.2, s_foot - s_top, Vector3(sx1 - sx0, 0.4, slen))
+	_note("PierStairs", Vector2((sx0 + sx1) * 0.5, sz0 + run), 1.6, CLEAR_BUILDING)
+	# Deck: planks across the joists, their dark underside showing between them.
+	var under := OLD_WOOD.darkened(0.4)
+	_block(kit, "wood", Vector3(head_x + 6.0, top - 0.3, z - half), Vector3(x_land - 1.0, top - 0.07, z + half), under)
+	_block(kit, "wood", Vector3(x_end, top - 0.3, z - head_half), Vector3(head_x + 6.0, top - 0.07, z + head_half), under)
+	var px := x_land - 1.0
+	while px > x_end + 0.05:
+		var hw := head_half if px - 0.12 < head_x + 6.0 else half
+		_block(kit, "wood", Vector3(maxf(px - 0.22, x_end), top - 0.07, z - hw), Vector3(px - 0.02, top, z + hw), WOOD.darkened(rng.randf_range(-0.06, 0.12)))
+		px -= 0.24
 	for zz in [z - half + 0.3, z + half - 0.3]:
-		_block(kit, "wood", Vector3(x_end, top - 0.6, zz - 0.15), Vector3(x_land - 1.0, top - 0.22, zz + 0.15), OLD_WOOD)
+		_block(kit, "wood", Vector3(x_end, top - 0.6, zz - 0.15), Vector3(x_land - 1.0, top - 0.3, zz + 0.15), OLD_WOOD)
 	_box_collider(root, "Pier", Vector3(x_end, top - 0.6, z - half), Vector3(x_land - 1.0, top, z + half))
 	_box_collider(root, "Pier", Vector3(x_end, top - 0.22, z - head_half), Vector3(head_x + 6.0, top, z + head_half))
 	# Piles in pairs every 6m, braced.
@@ -1337,10 +1530,16 @@ func _build_pier(root: Node3D) -> void:
 			_tube(kit, "wood", Vector3(hx, b2 - 0.8, hz), Vector3(hx, top - 0.22, hz), 0.26, 0.24, 8, OLD_WOOD)
 			_rod_collider(root, "Pier", Vector3(hx, b2 - 0.8, hz), Vector3(hx, top - 0.22, hz), 0.27)
 	# Railings: posts and two rails down each side and round the head.
-	var rail_col := Color(0.92, 0.92, 0.88)
 	var runs := [
 		[Vector3(x_land - 1.0, top, z - half), Vector3(head_x + 6.0, top, z - half)],
 		[Vector3(x_land - 1.0, top, z + half), Vector3(head_x + 6.0, top, z + half)],
+		# Round the abutment, open at the head of the stairs.
+		[Vector3(x_land - 1.0, top, z - half), Vector3(x_land - 1.0, top, ab_lo.z + 0.1)],
+		[Vector3(x_land - 1.0, top, z + half), Vector3(x_land - 1.0, top, ab_hi.z - 0.1)],
+		[Vector3(x_land - 1.0, top, ab_lo.z + 0.1), Vector3(ab_hi.x - 0.1, top, ab_lo.z + 0.1)],
+		[Vector3(ab_hi.x - 0.1, top, ab_lo.z + 0.1), Vector3(ab_hi.x - 0.1, top, ab_hi.z - 0.1)],
+		[Vector3(x_land - 1.0, top, ab_hi.z - 0.1), Vector3(sx0 - 0.05, top, ab_hi.z - 0.1)],
+		[Vector3(sx1 + 0.05, top, ab_hi.z - 0.1), Vector3(ab_hi.x - 0.1, top, ab_hi.z - 0.1)],
 		[Vector3(head_x + 6.0, top, z - head_half), Vector3(head_x + 6.0, top, z - half)],
 		[Vector3(head_x + 6.0, top, z + half), Vector3(head_x + 6.0, top, z + head_half)],
 		[Vector3(x_end, top, z - head_half), Vector3(head_x + 6.0, top, z - head_half)],
@@ -1393,6 +1592,7 @@ func _build_pier(root: Node3D) -> void:
 	roof_hull.append(pc + Vector3(4.0, 3.2, 4.0))
 	_hull_collider(root, "Pier", roof_hull)
 	_commit(root, kit, "Pier")
+	_end_scale()
 
 
 ## A lifeguard tower on braced stilts, in its own frame with the sea at -x: a cabin with a counter
@@ -1610,11 +1810,14 @@ func _build_lifeguard_tower(root: Node3D, name: String, at: Vector3, yaw_deg: fl
 # and door, staircase windows spiralling up, a corbelled gallery with a railing, the watch room, a
 # twelve-sided lantern round a brass-ringed lens, a red dome with a ventilator ball and a vane. The
 # keeper's cottage stands in a walled yard on the landward side, with steps down to a jetty. The sea
-# round the islet is shallow enough to wade, so every part has collision.
+# round the islet is shallow enough to wade, so every part has collision. It's laid out at life size
+# round LIGHTHOUSE_AT and built at PROP_SCALE, like the huts and towers, grown out to sea from the
+# islet's landward edge (LH_PIVOT_X metres east of it) so it keeps its distance from the beach.
 
 const LIGHTHOUSE_AT := Vector3(-100.0, 0.0, -394.0)
+const LH_PIVOT_X := 31.0
 const LH_TERRACE := 3.4      # terrace and yard paving above the sea
-const LH_SHAFT := 26.0       # terrace to the gallery floor
+const LH_SHAFT := 22.0       # terrace to the gallery floor
 const LH_R_FOOT := 3.8
 const LH_R_TOP := 2.35
 
@@ -1628,6 +1831,7 @@ func _build_lighthouse(root: Node3D) -> void:
 	var kit := {}
 	var name := "Lighthouse"
 	var c := LIGHTHOUSE_AT
+	_scale_about(c + Vector3(LH_PIVOT_X, 0.0, 0.0), PROP_SCALE)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 2207
 	var ty := LH_TERRACE
@@ -1745,7 +1949,7 @@ func _build_lighthouse(root: Node3D) -> void:
 	# Staircase windows spiralling up, in stone surrounds with sills.
 	for i in 6:
 		var a := 1.0 + i * 1.05
-		var wy := y0 + 4.2 + i * 3.45
+		var wy := y0 + 4.2 + i * (top - y0 - 6.0) / 5.0
 		var r := _lh_radius((wy - y0) / (top - y0))
 		var u := Vector3(cos(a), 0, sin(a))
 		var bas := Basis(Vector3.UP, -a)
@@ -1947,7 +2151,7 @@ func _build_lighthouse(root: Node3D) -> void:
 	for sz in [-0.9, 0.9]:
 		_tube(kit, "metal", Vector3(jx1 - 0.4, jy, c.z + sz), Vector3(jx1 - 0.4, jy + 0.45, c.z + sz), 0.13, 0.11, 10, iron)
 	_tube(kit, "wood", Vector3(jx1 - 0.15, jy, c.z), Vector3(jx1 - 0.15, jy + 1.3, c.z), 0.06, 0.06, 6, WHITE)
-	_lifebuoy(kit, Vector3(jx1, jy + 0.85, c.z), Vector3.RIGHT, 0.33, 0.07)
+	_lifebuoy(kit, Vector3(jx1, jy + 0.85, c.z), Vector3.RIGHT, 0.32, 0.07)
 	_rod_collider(root, name, Vector3(jx1 - 0.15, jy, c.z), Vector3(jx1 - 0.15, jy + 1.3, c.z), 0.35)
 
 	var mi := _commit(root, kit, "Lighthouse")
@@ -1956,12 +2160,13 @@ func _build_lighthouse(root: Node3D) -> void:
 	lamp.name = "LighthouseLamp"
 	lamp.light_color = Color(1.0, 0.85, 0.55)
 	lamp.light_energy = 1.2
-	lamp.omni_range = 14.0
+	lamp.omni_range = 14.0 * PROP_SCALE
 	lamp.shadow_enabled = false
 	lamp.set_meta("no_shadow", true)
 	root.add_child(lamp)
-	lamp.position = c + Vector3(0, l0 + 1.8, 0)
+	lamp.position = _frame * (c + Vector3(0, l0 + 1.8, 0))
 	_note("Lighthouse", Vector2(c.x + 6.0, c.z), 22.0, CLEAR_BUILDING)
+	_end_scale()
 
 
 # --- Shipwreck ------------------------------------------------------------------------------------
@@ -3057,7 +3262,7 @@ func _build_surf_shack(root: Node3D) -> void:
 		_tube(kit, "metal", Vector3(c.x - 5.75, eave_y - 0.6, c.z + zs), Vector3(c.x - 5.75, eave_y + 0.15, c.z + zs), 0.01, 0.01, 3, Color(0.25, 0.25, 0.25), false)
 
 	# Lifebuoy on the north-west post.
-	_lifebuoy(kit, Vector3(c.x - 4.6, fl + 1.7, c.z + 3.78), Vector3(0, 0, 1), 0.3, 0.075)
+	_lifebuoy(kit, Vector3(c.x - 4.6, fl + 1.7, c.z + 3.78), Vector3(0, 0, 1), 0.32, 0.07)
 
 	# Chalkboard menu out on the sand.
 	_menu_board(kit, Vector3(c.x - 6.7, _ground(c.x - 6.7, c.z - 2.4), c.z - 2.4))
@@ -3636,7 +3841,7 @@ func _parasol_set(root: Node3D, kit: Dictionary, rng: RandomNumberGenerator, p: 
 		var cool := BoxShape3D.new()
 		cool.size = Vector3(0.57, 0.4, 0.38)
 		_collider(root, "Loungers", cool, Transform3D(cb, cp + Vector3(0, 0.2, 0)))
-	_note("Parasol%d" % n, p, PARASOL_SET_R, CLEAR_DECOR)
+	_note("Parasol%d" % n, p, PARASOL_SET_R, CLEAR_DECOR, 2.6)
 	_end_scale()
 
 
@@ -3674,7 +3879,7 @@ func _build_sand_fence(root: Node3D) -> void:
 		var lo := minf(y, y2) - 0.3 * k
 		var hi := maxf(y, y2) + 1.2 * k - bury
 		_box_along(root, "SandFence", Vector3((x + x2) * 0.5, (lo + hi) * 0.5, z + bay * 0.5), Vector3(x2 - x, 0, bay), Vector3(0.2, hi - lo, Vector2(x2 - x, bay).length() + 0.1))
-		_note("Fence", Vector2(x, z), 0.2, CLEAR_DECOR)
+		_note("Fence", Vector2(x, z), 0.2, CLEAR_DECOR, 1.3 * k)
 		z += bay
 	_commit(root, kit, "SandFence")
 
@@ -4224,6 +4429,30 @@ func _palm_ok(x: float, z: float, gates: Array, taken: Array, gap: float) -> boo
 	return true
 
 
+## Whether a palm rooted at `foot`, leaning along `d`, keeps clear of the seafront: its trunk (traced
+## as _palm_mesh bends it) of every footprint taller than where it passes, its crown and drooping
+## fronds by a few metres more. _palm_ok only checks the foot, and a palm leaning seaward from behind
+## the huts went through their roofs.
+func _palm_lean_clear(foot: Vector2, d: Vector2, variant: int, sc: float) -> bool:
+	var sh: Dictionary = PALM_SHAPES[variant]
+	var h: float = sh["h"]
+	var lean: float = sh["lean"]
+	var segs := 8
+	var p := Vector2.ZERO   # along the lean, up
+	for k in range(segs + 1):
+		if k > 0:
+			var th: float = lean * (1.0 - float(sh["curve"]) * pow(float(k) / segs, 1.3))
+			p += Vector2(sin(th), cos(th)) * (h / segs)
+		var at := foot + d * (p.x * sc)
+		var crown := k == segs
+		var low := p.y * sc - (3.0 if crown else 0.0)
+		var reach := 4.0 if crown else 1.0
+		for f in _footprints:
+			if low < float(f[4]) and at.distance_to(f[1]) < float(f[2]) + reach:
+				return false
+	return true
+
+
 ## Direction to the nearest water within 14m (ground below the surface), or zero.
 func _water_dir(x: float, z: float) -> Vector2:
 	for r in [5.0, 9.0, 14.0]:
@@ -4263,8 +4492,12 @@ func _build_palms(level: Node3D) -> void:
 			continue
 		var pick: float = rng.randf() * (1.0 - clampf((x + 34.0) / 40.0, 0.0, 1.0) * 0.5)
 		var v: int = 2 if pick > 0.62 else (0 if pick > 0.3 else (1 if rng.randf() < 0.6 else 3))
+		var lean_dir := Vector2(-1.0, 0.0).rotated(rng.randf_range(-0.6, 0.6))
+		var psc := rng.randf_range(0.85, 1.15)
+		if not _palm_lean_clear(Vector2(x, z), lean_dir, v, psc):
+			continue
 		taken.append(Vector2(x, z))
-		spots.append([Vector3(x, _ground(x, z), z), Vector2(-1.0, 0.0).rotated(rng.randf_range(-0.6, 0.6)), v, rng.randf_range(0.85, 1.15)])
+		spots.append([Vector3(x, _ground(x, z), z), lean_dir, v, psc])
 		beach += 1
 	# Round the water in the dunes and along the island's far shore, leaning over it; thickest near
 	# the track, where they are seen.
@@ -4284,8 +4517,12 @@ func _build_palms(level: Node3D) -> void:
 		if wet == Vector2.ZERO or not _palm_ok(x2, z2, gates, taken, 3.8):
 			continue
 		var v2: int = [0, 0, 1, 1, 2, 3][rng.randi() % 6]
+		var lean2 := wet.rotated(rng.randf_range(-0.45, 0.45))
+		var psc2 := rng.randf_range(0.85, 1.15)
+		if not _palm_lean_clear(Vector2(x2, z2), lean2, v2, psc2):
+			continue
 		taken.append(Vector2(x2, z2))
-		spots.append([Vector3(x2, y2, z2), wet.rotated(rng.randf_range(-0.45, 0.45)), v2, rng.randf_range(0.85, 1.15)])
+		spots.append([Vector3(x2, y2, z2), lean2, v2, psc2])
 		shore += 1
 	# Meshes, then the palms in cells: the detailed ones near, the stand-ins far, and the trunks.
 	var near_mats := _palm_materials(1)

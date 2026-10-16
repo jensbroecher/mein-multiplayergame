@@ -291,7 +291,7 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   `_tri`, `_ground`, `_collider` and `_note` all work through that frame: things placed with `_ground()`
   in the life-size layout land on the real sand. Pick the pivot on the sea side so the structure grows
   inland, away from the racing line. This applies to the huts, the bar, the lifeguard towers, the
-  parasol sets and the fence.
+  parasol sets and the fence. The pier and the lighthouse grow seaward from their landward ends.
 - Parasol sets are rejection-sampled per zone (`PARASOL_ZONES`): `PARASOL_GAP` apart, on dry level sand,
   clear of the track and of every footprint noted before them. The fence is built first for that reason.
 - Sign lettering is block capitals from `GLYPHS` (`_pixel_text`), since text can't be drawn headless. Add
@@ -328,8 +328,13 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   - They grow in groves on the land side of the beach, and a few metres up the banks of the water
     (`PALM_BANK`), leaning toward it.
   - `_palm_ok` keeps them clear of the racing line, the gates and the seafront footprints, so they're
-    built after the gates.
+    built after the gates. `_palm_lean_clear` follows each trunk's lean and the crown's droop past
+    every footprint taller than they are there (`_note`'s `height`). A palm behind the huts once
+    leaned seaward through their roofs.
   - The root is "Palms", not "Vegetation", which Level.gd would bake trimesh colliders under.
   - Each trunk's collider is a cylinder over its first 4m, tilted with its lean.
+- The surf is heard from `SurfSound`, AudioStreamPlayer3Ds 10m seaward of the waterline every
+  `SURF_SPACING`. They alternate two clips baked by `_surf_stream`: rumble, curl, crash and swash
+  on `SEA_PERIOD`, three waves in one clip and four in the other, so neighbours never fall into step.
 - `res://scratch/bloombay_shots.tscn -- <dir> name:x,y,z:tx,ty,tz[:frames[:gap]]` renders into the window
   (not a SubViewport) and can save a time sequence to watch the surf.
