@@ -130,12 +130,15 @@ func _ready() -> void:
 		[Vector3(12, -0.4, -14), Vector3(-12, 0.4, 14), Vector3(90.0, 11.0, 240.0)],
 		# 18: DUNE CREST 3 — Overlook ridge (+21.0m)
 		[Vector3(-10, -1.0, -14), Vector3(10, 1.0, 14), Vector3(125.0, 21.0, 285.0)],
-		# 19: High dune crest sweeping towards coastal horizon (+19.5m)
-		[Vector3(-8, 0.2, -14), Vector3(8, -0.2, 14), Vector3(150.0, 19.5, 340.0)],
+		# 19: High dune crest sweeping towards coastal horizon (+19.5m). From 18 to 20 the lap turns ~95
+		# degrees left; the handles here point north so that is one sweep (35m radius at its tightest).
+		# Pointed north-east, the curve overshot toward the map's edge falloff and hooked back in an 8m
+		# radius right on the crest, where fast carts went airborne and flew off the edge.
+		[Vector3(7, 0.3, -27), Vector3(-7, -0.3, 27), Vector3(150.0, 19.5, 340.0)],
 
 		# --- SECTOR 6: DOWNHILL ROLLER-COASTER RETURN TO BEACH ---
 		# 20: Sweeping downhill curve carving through dune pass
-		[Vector3(14, 1.0, -8), Vector3(-14, -1.0, 8), Vector3(100.0, 12.0, 375.0)],
+		[Vector3(18, 1.0, -2), Vector3(-18, -1.0, 2), Vector3(100.0, 12.0, 375.0)],
 		# 21: Plunging descent through dune valley cut
 		[Vector3(18, 1.0, 2), Vector3(-18, -1.0, -2), Vector3(35.0, 5.5, 360.0)],
 		# 22: Coastal approach curve re-entering beach (X < -24.0)
@@ -283,7 +286,10 @@ func _ready() -> void:
 			[Vector3(35.0, 7.80, -310.0), -70.0],  # Dune climb launcher
 			[Vector3(200.0, 9.50, -90.0), -20.0],  # Valley plunge exit into ridge 2
 			[Vector3(180.0, 26.05, 95.0), -22.0],  # Takeoff ramp big jump launch boost
-			[Vector3(145.0, 20.20, 320.0), 35.0]   # Basin exit towards coastal descent
+			# Out of the last corner onto the finish straight. It stood on the crest at point 19, at the
+			# start of the sweep: a pad pushes for 2s whatever the brakes do, and the AI doesn't brake
+			# while boosting, so carts ran wide there and off the map's edge.
+			[Vector3(-40.0, 0.75, 205.0), 0.0]
 		]
 		for i in range(bp_defs.size()):
 			var bp = boost_scene.instantiate()
@@ -710,6 +716,12 @@ func _verify_seafront_clear() -> void:
 func _mat(key: String) -> Material:
 	if _materials.has(key):
 		return _materials[key]
+	# Flags, waved by their shader (see _flag).
+	if key == "flag":
+		var fm := ShaderMaterial.new()
+		fm.shader = load("res://flag_wave.gdshader")
+		_materials[key] = fm
+		return fm
 	var m := StandardMaterial3D.new()
 	m.vertex_color_use_as_albedo = true
 	m.vertex_color_is_srgb = true
@@ -979,6 +991,45 @@ func _pixel_text(kit: Dictionary, key: String, centre: Vector3, right: Vector3, 
 		x += (rows[0] as String).length() + 1
 
 
+## A flag flying from the pole at `hoist_top`, streaming along `along` with its face toward `face`:
+## `length` by `height`, in horizontal bands of `rows` from the top down. `taper` 1 draws a pennant
+## narrowing to a point. flag_wave.gdshader waves it, reading the hoist-to-fly position from UV.x and
+## this flag's phase and length from UV2, so it's written here rather than through _tri.
+func _flag(kit: Dictionary, hoist_top: Vector3, along: Vector3, face: Vector3, length: float, height: float, rows: Array, phase: float, taper: float = 0.0) -> void:
+	var st := _st(kit, "flag")
+	var down := along.cross(face).normalized()
+	var fb := _frame.basis.orthonormalized()
+	var world_len := length * _frame.basis.get_scale().x
+	var cols := 14
+	var per_row := 2
+	var point := func(u: float, v: float) -> Vector3:
+		var vv := 0.5 + (v - 0.5) * (1.0 - taper * u)
+		return hoist_top + along * (u * length) + down * (vv * height)
+	var emit := func(u: float, v: float, col: Color) -> void:
+		st.set_color(col)
+		st.set_normal(fb * face)
+		st.set_uv(Vector2(u, v))
+		st.set_uv2(Vector2(phase, world_len))
+		st.add_vertex(_frame * (point.call(u, v) as Vector3))
+	var bands := rows.size() * per_row
+	for r in bands:
+		var col: Color = rows[floori(float(r) / per_row)]
+		var v0 := float(r) / bands
+		var v1 := float(r + 1) / bands
+		for c in cols:
+			var u0 := float(c) / cols
+			var u1 := float(c + 1) / cols
+			# Godot's front faces wind clockwise seen from the front: (c - a) x (b - a) along `face`.
+			var tri := [[u0, v0], [u1, v0], [u1, v1], [u0, v0], [u1, v1], [u0, v1]]
+			var a: Vector3 = point.call(u0, v0)
+			var b: Vector3 = point.call(u1, v0)
+			var cc: Vector3 = point.call(u1, v1)
+			if (cc - a).cross(b - a).dot(face) < 0.0:
+				tri = [[u0, v0], [u1, v1], [u1, v0], [u0, v0], [u0, v1], [u1, v1]]
+			for q in tri:
+				emit.call(q[0], q[1], col)
+
+
 ## A low-poly rock: an icosphere pushed about by noise, flat shaded. The wreck's net heaps use it too.
 ## Returns its points (layout space), for a hull collider.
 func _rock(kit: Dictionary, centre: Vector3, size: Vector3, seed_v: int, col: Color, key: String = "rock") -> PackedVector3Array:
@@ -1220,10 +1271,12 @@ func _build_beach_huts(root: Node3D) -> void:
 			var zb := z - w * 0.5 + w * (s + 1) / n
 			_block(kit, "paint", Vector3(x - d * 0.5, floor_y, za), Vector3(x - d * 0.5 + 0.08, floor_y + wall_h, zb), sc)
 			_block(kit, "paint", Vector3(x + d * 0.5 - 0.08, floor_y, za), Vector3(x + d * 0.5, floor_y + wall_h, zb), sc)
+		# The side walls run between the front and back walls: overlapping them at the corners, the
+		# stripes of both lay in the same planes and flickered.
 		for s in range(n):
 			var sc2: Color = col if s % 2 == 0 else WHITE
-			var xa := x - d * 0.5 + d * s / n
-			var xb := x - d * 0.5 + d * (s + 1) / n
+			var xa := maxf(x - d * 0.5 + d * s / n, x - d * 0.5 + 0.08)
+			var xb := minf(x - d * 0.5 + d * (s + 1) / n, x + d * 0.5 - 0.08)
 			_block(kit, "paint", Vector3(xa, floor_y, z - w * 0.5), Vector3(xb, floor_y + wall_h, z - w * 0.5 + 0.08), sc2)
 			_block(kit, "paint", Vector3(xa, floor_y, z + w * 0.5 - 0.08), Vector3(xb, floor_y + wall_h, z + w * 0.5), sc2)
 		# Door on the sea side.
@@ -1411,10 +1464,10 @@ func _build_lifeguard_tower(root: Node3D, name: String, at: Vector3, yaw_deg: fl
 		# Window toward the sea and the lifeguard cross toward the back.
 		var zf: float = sz * (cz + 0.04)
 		wall.call(Vector3(-0.9, deck_y + 1.2, zf - 0.015), Vector3(-0.2, deck_y + 1.9, zf + 0.015), trim)
-		wall.call(Vector3(-0.84, deck_y + 1.26, zf + sz * 0.012 - 0.01), Vector3(-0.26, deck_y + 1.84, zf + sz * 0.012 + 0.01), glass)
+		wall.call(Vector3(-0.84, deck_y + 1.26, zf + sz * 0.03 - 0.01), Vector3(-0.26, deck_y + 1.84, zf + sz * 0.03 + 0.01), glass)
 		wall.call(Vector3(0.12, deck_y + 1.1, zf - 0.015), Vector3(1.02, deck_y + 2.0, zf + 0.015), WHITE)
-		wall.call(Vector3(0.27, deck_y + 1.47, zf + sz * 0.012 - 0.01), Vector3(0.87, deck_y + 1.63, zf + sz * 0.012 + 0.01), red)
-		wall.call(Vector3(0.49, deck_y + 1.25, zf + sz * 0.012 - 0.01), Vector3(0.65, deck_y + 1.85, zf + sz * 0.012 + 0.01), red)
+		wall.call(Vector3(0.27, deck_y + 1.47, zf + sz * 0.03 - 0.01), Vector3(0.87, deck_y + 1.63, zf + sz * 0.03 + 0.01), red)
+		wall.call(Vector3(0.49, deck_y + 1.25, zf + sz * 0.03 - 0.01), Vector3(0.65, deck_y + 1.85, zf + sz * 0.03 + 0.01), red)
 	wall.call(Vector3(cx0, deck_y, -cz), Vector3(cx0 + 0.08, deck_y + 1.0, cz), body)
 	wall.call(Vector3(cx0, top - 0.25, -cz), Vector3(cx0 + 0.08, top, cz), body)
 	for sz in [-1.0, 1.0]:
@@ -1431,8 +1484,8 @@ func _build_lifeguard_tower(root: Node3D, name: String, at: Vector3, yaw_deg: fl
 	wall.call(Vector3(cx0 - 0.28, deck_y + 1.0, -1.12), Vector3(cx0 + 0.3, deck_y + 1.06, 1.12), WOOD)
 	# First-aid box by the door.
 	wall.call(Vector3(cx1, deck_y + 1.1, 0.62), Vector3(cx1 + 0.12, deck_y + 1.45, 1.02), WHITE)
-	wall.call(Vector3(cx1 + 0.12, deck_y + 1.25, 0.76), Vector3(cx1 + 0.125, deck_y + 1.3, 0.88), red)
-	wall.call(Vector3(cx1 + 0.12, deck_y + 1.21, 0.8), Vector3(cx1 + 0.125, deck_y + 1.34, 0.84), red)
+	wall.call(Vector3(cx1 + 0.12, deck_y + 1.25, 0.76), Vector3(cx1 + 0.14, deck_y + 1.3, 0.88), red)
+	wall.call(Vector3(cx1 + 0.12, deck_y + 1.21, 0.8), Vector3(cx1 + 0.14, deck_y + 1.34, 0.84), red)
 	# Shutter hinged under the header, propped out over the counter as an awning.
 	var hinge := Vector3(cx0 - 0.04, top - 0.25, 0)
 	var tilt := deg_to_rad(18.0)
@@ -1473,8 +1526,8 @@ func _build_lifeguard_tower(root: Node3D, name: String, at: Vector3, yaw_deg: fl
 		var right := Vector3(0, 0, -side)
 		var bc := Vector3(ex, top + 0.28, 0)
 		_box(kit, "paint", xf * Transform3D(Basis(), bc), Vector3(0.06, 0.6, 2.7), WHITE)
-		_box(kit, "paint", xf * Transform3D(Basis(), bc + face * 0.02), Vector3(0.04, 0.5, 2.6), red)
-		_pixel_text(kit, "paint", xf * (bc + face * 0.045), xf.basis * right, xf.basis * Vector3.UP, 0.056, "LIFEGUARD", yellow)
+		_box(kit, "paint", xf * Transform3D(Basis(), bc + face * 0.035), Vector3(0.04, 0.5, 2.6), red)
+		_pixel_text(kit, "paint", xf * (bc + face * 0.07), xf.basis * right, xf.basis * Vector3.UP, 0.056, "LIFEGUARD", yellow)
 
 	# Railing round the balcony, open at the head of the stairs.
 	var runs := [[Vector3(bx0, 0, -bz), Vector3(bx0, 0, bz)], [Vector3(bx0, 0, -bz), Vector3(bx1, 0, -bz)], [Vector3(bx0, 0, bz), Vector3(bx1, 0, bz)],
@@ -1536,19 +1589,7 @@ func _build_lifeguard_tower(root: Node3D, name: String, at: Vector3, yaw_deg: fl
 	_tube(kit, "metal", xf * pole_foot, xf * pole_top, 0.04, 0.03, 6, Color(0.82, 0.82, 0.84))
 	_rod_collider(root, name, xf * pole_foot, xf * pole_top, 0.06)
 	# Red over yellow, streaming inland in the sea breeze.
-	var fst := _st(kit, "canvas")
-	var fcols := [red, yellow]
-	for row in 2:
-		for col_i in 4:
-			var u0 := col_i / 4.0
-			var u1 := (col_i + 1) / 4.0
-			var v0 := row * 0.36
-			var v1 := (row + 1) * 0.36
-			var q := func(u: float, v: float) -> Vector3:
-				return xf * (pole_top + Vector3(0.05 + u * 1.1, -0.05 - v, 0.09 * sin(u * PI * 1.6)))
-			var fnn := xf.basis * Vector3(0, 0, 1)
-			_tri(fst, q.call(u0, v0), q.call(u1, v0), q.call(u1, v1), fnn, fnn, fnn, fcols[row], fnn)
-			_tri(fst, q.call(u0, v0), q.call(u1, v1), q.call(u0, v1), fnn, fnn, fnn, fcols[row], fnn)
+	_flag(kit, xf * (pole_top + Vector3(0.04, -0.05, 0)), xf.basis * Vector3.RIGHT, xf.basis * Vector3.BACK, 1.1, 0.72, [red, yellow], float(absi(hash(name)) % 628) / 100.0)
 
 	_commit(root, kit, name)
 	# Collision: the braced stilts, the balcony, the cabin, the roof and its boards.
@@ -1674,7 +1715,7 @@ func _build_lighthouse(root: Node3D) -> void:
 	_collider(root, name, plinth, Transform3D(Basis(), base + Vector3(0, 0.75, 0)))
 	for s in 5:
 		var sx := 4.45 + (5 - s) * 0.36
-		_block(kit, "paint", base + Vector3(4.2, 0, -0.95), base + Vector3(sx, 0.3 * (s + 1), 0.95), granite.lightened(0.04 * (s % 2)))
+		_block(kit, "paint", base + Vector3(4.2, 0.3 * s, -0.95), base + Vector3(sx, 0.3 * (s + 1), 0.95), granite.lightened(0.04 * (s % 2)))
 	_box_along(root, name, base + Vector3(5.25, 0.55, 0), Vector3(1.8, -1.5, 0), Vector3(2.2, 0.4, 2.4))
 
 	# The shaft, banded red and white, with the flare at its foot.
@@ -1846,10 +1887,10 @@ func _build_lighthouse(root: Node3D) -> void:
 		var size := func(w: float, h: float, d: float) -> Vector3:
 			return Vector3(absf(along.x) * w + absf(n.x) * d, h, absf(along.z) * w + absf(n.z) * d)
 		_box(kit, "paint", Transform3D(Basis(), wc + n * 0.03), size.call(1.15, 1.45, 0.08), stone)
-		_box(kit, "paint", Transform3D(Basis(), wc + n * 0.06), size.call(0.9, 1.2, 0.04), dark_glass)
-		_box(kit, "paint", Transform3D(Basis(), wc + n * 0.08), size.call(0.06, 1.2, 0.04), WHITE)
-		_box(kit, "paint", Transform3D(Basis(), wc + n * 0.08), size.call(0.9, 0.06, 0.04), WHITE)
-		_box(kit, "paint", Transform3D(Basis(), wc + n * 0.1 - Vector3(0, 0.76, 0)), size.call(1.3, 0.08, 0.2), stone)
+		_box(kit, "paint", Transform3D(Basis(), wc + n * 0.08), size.call(0.9, 1.2, 0.04), dark_glass)
+		_box(kit, "paint", Transform3D(Basis(), wc + n * 0.11), size.call(0.06, 1.16, 0.04), WHITE)
+		_box(kit, "paint", Transform3D(Basis(), wc + n * 0.11), size.call(0.86, 0.06, 0.04), WHITE)
+		_box(kit, "paint", Transform3D(Basis(), wc + n * 0.12 - Vector3(0, 0.76, 0)), size.call(1.3, 0.08, 0.24), stone)
 		for sd in [-1.0, 1.0]:
 			_box(kit, "paint", Transform3D(Basis(), wc + along * sd * 0.92 + n * 0.05), size.call(0.5, 1.35, 0.06), shutter_green)
 	# Door and porch on the landward front.
@@ -1881,9 +1922,7 @@ func _build_lighthouse(root: Node3D) -> void:
 	var staff := Vector3(c.x + yard_x1 - 1.0, ty, c.z + yard_hz - 1.0)
 	_tube(kit, "paint", staff, staff + Vector3(0, 9.0, 0), 0.09, 0.05, 8, WHITE)
 	_tube(kit, "metal", staff + Vector3(0, 9.0, 0), staff + Vector3(0, 9.15, 0), 0.09, 0.09, 8, brass)
-	var pst := _st(kit, "canvas")
-	var pn := Vector3(0, 0, 1)
-	_tri(pst, staff + Vector3(0.06, 8.9, 0), staff + Vector3(0.06, 8.2, 0), staff + Vector3(2.4, 8.62, 0.15), pn, pn, pn, red, pn)
+	_flag(kit, staff + Vector3(0.06, 8.95, 0), Vector3.RIGHT, Vector3.BACK, 2.35, 0.75, [red], 2.1, 1.0)
 	_rod_collider(root, name, staff, staff + Vector3(0, 9.0, 0), 0.12)
 
 	# Landing steps down to a timber jetty, bollards and a lifebuoy at its end.
@@ -2278,11 +2317,26 @@ func _wreck_hull(kit: Dictionary, gone: Dictionary, rng: RandomNumberGenerator) 
 				var md1 := lo1.lerp(p11, 0.16)
 				var nm0 := n00.lerp(n01, 0.16)
 				var nm1 := n10.lerp(n11, 0.16)
-				_wquad(kit, "wreck", [lo0, lo1, md1, md0], [n00, n10, nm1, nm0], col.darkened(0.28))
-				_wquad(kit, "wreck", [md0, md1, p11, p01], [nm0, nm1, n11, n01], col)
+				# A butt joint is a dark strip across the start of a plank, cut out of the plank's own
+				# faces: a strip laid a few millimetres over it flickers at a distance.
+				var f_lo := lo0
+				var f_md := md0
+				var f_top := p01
+				var fn_lo := n00
+				var fn_md := nm0
+				var fn_top := n01
 				if (i + k * 3) % 9 == 0 and i > 0 and not gone.has(Vector3i(i - 1, k, side_i)):
-					var f := (p10 - p00).normalized() * 0.015
-					_wquad(kit, "wreck", [lo0 - f + n00 * 0.004, lo0 + f + n00 * 0.004, p01 + f + n01 * 0.004, p01 - f + n01 * 0.004], [n00, n00, n01, n01], col.darkened(0.45))
+					var t := minf(0.03 / maxf(p00.distance_to(p10), 0.01), 0.3)
+					f_lo = lo0.lerp(lo1, t)
+					f_md = md0.lerp(md1, t)
+					f_top = p01.lerp(p11, t)
+					fn_lo = n00.lerp(n10, t).normalized()
+					fn_md = nm0.lerp(nm1, t).normalized()
+					fn_top = n01.lerp(n11, t).normalized()
+					_wquad(kit, "wreck", [lo0, f_lo, f_md, md0], [n00, fn_lo, fn_md, nm0], col.darkened(0.45))
+					_wquad(kit, "wreck", [md0, f_md, f_top, p01], [nm0, fn_md, fn_top, n01], col.darkened(0.45))
+				_wquad(kit, "wreck", [f_lo, lo1, md1, f_md], [fn_lo, n10, nm1, fn_md], col.darkened(0.28))
+				_wquad(kit, "wreck", [f_md, md1, p11, f_top], [fn_md, nm1, n11, fn_top], col)
 
 				var in00 := p00 - n00 * WRECK_PLANK
 				var in10 := p10 - n10 * WRECK_PLANK
@@ -2307,15 +2361,17 @@ func _wreck_hull(kit: Dictionary, gone: Dictionary, rng: RandomNumberGenerator) 
 					_wquad(kit, "wreck", [lo1, p11, in11, in10], [fwd, fwd, fwd, fwd], cut)
 
 
-## The transom: flat and raked, planked across in the strakes' colours.
+## The transom: flat and raked, planked across in the strakes' colours. It stands 2cm proud of the
+## strakes' ends: in their plane, the two flickered.
 func _wreck_transom(kit: Dictionary, rng: RandomNumberGenerator) -> void:
 	var aft := Vector3(0.0, -1.1, -(_wreck_sheer(0.0) - _wreck_keel(0.0))).normalized()
+	var proud := aft * 0.02
 	var deck_y := _wreck_sheer(0.0) - WRECK_BULWARK
 	for k in WRECK_STRAKES:
-		var p0 := _wreck_point(0.0, _wreck_edges[k], -1.0)
-		var p1 := _wreck_point(0.0, _wreck_edges[k], 1.0)
-		var p2 := _wreck_point(0.0, _wreck_edges[k + 1], 1.0)
-		var p3 := _wreck_point(0.0, _wreck_edges[k + 1], -1.0)
+		var p0 := _wreck_point(0.0, _wreck_edges[k], -1.0) + proud
+		var p1 := _wreck_point(0.0, _wreck_edges[k], 1.0) + proud
+		var p2 := _wreck_point(0.0, _wreck_edges[k + 1], 1.0) + proud
+		var p3 := _wreck_point(0.0, _wreck_edges[k + 1], -1.0) + proud
 		var top := _wreck_xf * ((p2 + p3) * 0.5)
 		if top.y < _ground(top.x, top.z) - 0.3:
 			continue
@@ -2329,6 +2385,12 @@ func _wreck_transom(kit: Dictionary, rng: RandomNumberGenerator) -> void:
 		var t := -aft * WRECK_PLANK
 		var inside := HULL_WHITE.darkened(0.15) if p2.y > deck_y else HOLD_WOOD
 		_wquad(kit, "wreck", [p0 + t, p1 + t, p2 + t, p3 + t], [-aft, -aft, -aft, -aft], inside)
+		# The plank's ends, closing the step between it and the strakes.
+		for e in [[p0, p3, Vector3.LEFT], [p1, p2, Vector3.RIGHT]]:
+			var ea: Vector3 = e[0]
+			var eb: Vector3 = e[1]
+			var en: Vector3 = e[2]
+			_wquad(kit, "wreck", [ea, eb, eb + t, ea + t], [en, en, en, en], BARE_WOOD.darkened(0.15))
 
 
 ## Deck planks run fore and aft; amidships the hold has fallen in, and sand has drifted down the
@@ -2417,7 +2479,8 @@ func _wreck_deck(kit: Dictionary, rng: RandomNumberGenerator) -> void:
 
 
 ## Frames stand bare where planks or deck are gone, some snapped off; elsewhere only the bulwark
-## stanchions show above the deck.
+## stanchions show above the deck. Both are sunk a centimetre into the planking: the material is
+## double-sided, and a face lying on the planking's inner face flickers.
 func _wreck_frames(kit: Dictionary, gone: Dictionary, rng: RandomNumberGenerator) -> void:
 	var n := WRECK_STATIONS
 	var ns := WRECK_STRAKES
@@ -2446,7 +2509,7 @@ func _wreck_frames(kit: Dictionary, gone: Dictionary, rng: RandomNumberGenerator
 				for k in ns + 1:
 					var a: float = minf(float(_wreck_edges[k]), top)
 					var nn := _wreck_normal(s, a, side)
-					path.append(_wreck_xf * (_wreck_point(s, a, side) - nn * (WRECK_PLANK + 0.075) + Vector3(0, 0, lean * a * a)))
+					path.append(_wreck_xf * (_wreck_point(s, a, side) - nn * (WRECK_PLANK + 0.065) + Vector3(0, 0, lean * a * a)))
 					ups.append(_wreck_xf.basis * nn)
 					if a >= top:
 						break
@@ -2462,13 +2525,13 @@ func _wreck_frames(kit: Dictionary, gone: Dictionary, rng: RandomNumberGenerator
 				var ad := _wreck_deck_a(s)
 				var n0 := _wreck_normal(s, ad, side)
 				var n1 := _wreck_normal(s, 1.0, side)
-				var b0 := _wreck_xf * (_wreck_point(s, ad, side) - n0 * (WRECK_PLANK + 0.06))
-				var b1 := _wreck_xf * (_wreck_point(s, 1.0, side) - n1 * (WRECK_PLANK + 0.06))
+				var b0 := _wreck_xf * (_wreck_point(s, ad, side) - n0 * (WRECK_PLANK + 0.05))
+				var b1 := _wreck_xf * (_wreck_point(s, 1.0, side) - n1 * (WRECK_PLANK + 0.05))
 				_sweep(kit, "wreck", [b0, b1], [_wreck_xf.basis * n0, _wreck_xf.basis * n1], 0.11, 0.12, HULL_WHITE.darkened(0.2))
 
 
 ## Cap rails along the sheer and across the transom, rubbing strakes at deck level, and the keel
-## running up into the stem.
+## running up into the stem, each sunk a centimetre into the planking it sits on.
 func _wreck_rails(kit: Dictionary, gone: Dictionary) -> void:
 	var b := _wreck_xf.basis
 	var cap_col := HULL_WHITE.darkened(0.25)
@@ -2480,7 +2543,7 @@ func _wreck_rails(kit: Dictionary, gone: Dictionary) -> void:
 			var pts := []
 			var ups := []
 			for s in run:
-				var p := _wreck_point(s, 1.0, side) - _wreck_normal(s, 1.0, side) * (WRECK_PLANK * 0.5) + Vector3(0, 0.045, 0)
+				var p := _wreck_point(s, 1.0, side) - _wreck_normal(s, 1.0, side) * (WRECK_PLANK * 0.5) + Vector3(0, 0.035, 0)
 				pts.append(_wreck_xf * p)
 				ups.append(b * Vector3.UP)
 			_sweep(kit, "wreck", pts, ups, 0.22, 0.09, cap_col)
@@ -2496,10 +2559,10 @@ func _wreck_rails(kit: Dictionary, gone: Dictionary) -> void:
 			for s in run:
 				var ad := _wreck_deck_a(s)
 				var nn := _wreck_normal(s, ad, side)
-				pts.append(_wreck_xf * (_wreck_point(s, ad, side) + nn * 0.045))
+				pts.append(_wreck_xf * (_wreck_point(s, ad, side) + nn * 0.035))
 				ups.append(b * nn)
 			_sweep(kit, "wreck", pts, ups, 0.14, 0.09, Color(0.20, 0.18, 0.16))
-	var t := Vector3(0, 0.045, WRECK_PLANK * 0.5)
+	var t := Vector3(0, 0.035, WRECK_PLANK * 0.5)
 	_sweep(kit, "wreck", [_wreck_xf * (_wreck_point(0.0, 1.0, -1.0) + t), _wreck_xf * (_wreck_point(0.0, 1.0, 1.0) + t)], [b * Vector3.UP, b * Vector3.UP], 0.22, 0.09, cap_col)
 
 	# Keel and stem: one timber from the transom along the bottom and up to the stem head.
@@ -2535,7 +2598,7 @@ func _wreck_wheelhouse(kit: Dictionary, rng: RandomNumberGenerator) -> AABB:
 	var lz := z1 - z0
 	var paint := HULL_WHITE.darkened(0.03)
 	_wbox(kit, "paint", Vector3(0, base + h * 0.5, zc), Vector3(hw * 2.0, h, lz), paint)
-	_wbox(kit, "paint", Vector3(0, base + 0.2, zc), Vector3(hw * 2.0 + 0.04, 0.4, lz + 0.04), HULL_BLUE)
+	_wbox(kit, "paint", Vector3(0, base + 0.21, zc), Vector3(hw * 2.0 + 0.04, 0.38, lz + 0.04), HULL_BLUE)
 	_wbox(kit, "paint", Vector3(0, base + h + 0.06, zc + 0.15), Vector3(hw * 2.0 + 0.3, 0.12, lz + 0.5), paint.darkened(0.1))
 	_wbox(kit, "paint", Vector3(0, base + h - 0.02, z1 + 0.38), Vector3(hw * 2.0 + 0.3, 0.1, 0.06), HULL_BLUE)
 
@@ -2556,19 +2619,20 @@ func _wreck_wheelhouse(kit: Dictionary, rng: RandomNumberGenerator) -> AABB:
 			return Vector3(d if nn.x != 0.0 else ww, wh, d if nn.z != 0.0 else ww)
 		_wbox(kit, "paint", c + nn * 0.01, flat.call(0.02) + Vector3(0.12, 0.12, 0.12) * Vector3(1.0 - absf(nn.x), 1.0, 1.0 - absf(nn.z)), HULL_BLUE)
 		if rng.randf() < 0.65:
-			_wbox(kit, "paint", c + nn * 0.02, flat.call(0.02), Color(0.05, 0.06, 0.07))
+			_wbox(kit, "paint", c + nn * 0.03, flat.call(0.02), Color(0.05, 0.06, 0.07))
 		else:
-			_wbox(kit, "gloss", c + nn * 0.02, flat.call(0.02), Color(0.10, 0.16, 0.20))
+			_wbox(kit, "gloss", c + nn * 0.03, flat.call(0.02), Color(0.10, 0.16, 0.20))
 		# Rust weeping from the frame's lower corners.
 		var along := Vector3(nn.z, 0, nn.x)
 		for sx in [-1.0, 1.0]:
-			var ln := rng.randf_range(0.35, 0.9)
-			var sc: Vector3 = c + along * sx * (ww * 0.5 - 0.04) + Vector3(0, -wh * 0.5 - 0.06 - ln * 0.5, 0) + nn * 0.006
+			# Down to the blue band at most, and clear of the wall.
+			var ln := minf(rng.randf_range(0.35, 0.9), c.y - wh * 0.5 - 0.06 - (base + 0.42))
+			var sc: Vector3 = c + along * sx * (ww * 0.5 - 0.04) + Vector3(0, -wh * 0.5 - 0.06 - ln * 0.5, 0) + nn * 0.015
 			_wbox(kit, "paint", sc, Vector3(0.01 if nn.x != 0.0 else 0.05, ln, 0.01 if nn.z != 0.0 else 0.05), RUST.lerp(paint, rng.randf_range(0.3, 0.55)))
 
 	# The landward door, hanging open, and the lifebuoy beside it.
 	var hinge := Vector3(hw, base + 0.05, z0 + 0.25)
-	_wbox(kit, "paint", Vector3(hw + 0.012, base + 1.0, z0 + 0.65), Vector3(0.02, 1.85, 0.75), Color(0.05, 0.06, 0.07))
+	_wbox(kit, "paint", Vector3(hw + 0.035, base + 1.0, z0 + 0.65), Vector3(0.02, 1.85, 0.75), Color(0.05, 0.06, 0.07))
 	var door := Basis(Vector3.UP, deg_to_rad(105.0))
 	_wbox(kit, "paint", hinge + door * Vector3(0.03, 0.95, 0.38), Vector3(0.05, 1.85, 0.75), HULL_BLUE.darkened(0.1), door)
 	_lifebuoy(kit, _wreck_xf * Vector3(hw + 0.09, base + 1.35, z0 + 1.7), _wreck_xf.basis * Vector3.RIGHT, 0.32, 0.075)
@@ -2601,7 +2665,7 @@ func _wreck_rig(kit: Dictionary) -> void:
 	_wtube(kit, "wreck", foot, top, 0.15, 0.09, 10, spar)
 	var tree := foot + Vector3(0, 5.5, 0)
 	_wbox(kit, "wreck", tree, Vector3(1.9, 0.09, 0.12), spar.darkened(0.1))
-	_wbox(kit, "gloss", top + Vector3(0, 0.08, 0), Vector3(0.14, 0.18, 0.14), HULL_WHITE)
+	_wbox(kit, "gloss", top + Vector3(0, 0.1, 0), Vector3(0.14, 0.18, 0.14), HULL_WHITE)
 	# Derrick topped up aft over the hold, its hook hanging.
 	var boom_end := Vector3(0.3, foot.y + 3.0, -0.6)
 	_wtube(kit, "wreck", foot + Vector3(0, 1.1, -0.15), boom_end, 0.1, 0.07, 8, spar)
@@ -2922,7 +2986,7 @@ func _build_surf_shack(root: Node3D) -> void:
 	for ry in [0.22, 0.92]:
 		_tube(kit, "wood", Vector3(c.x - 3.21, fl + ry, c.z - 3.0), Vector3(c.x - 3.21, fl + ry, c.z + 3.0), 0.018, 0.018, 4, Color(0.36, 0.26, 0.16), false)
 	for zs in [-1.0, 1.0]:
-		_block(kit, "wood", Vector3(c.x - 3.1, fl, c.z + zs * 3.0 - 0.06), Vector3(c.x - 1.9, fl + 1.1, c.z + zs * 3.0 + 0.06), teal)
+		_block(kit, "wood", Vector3(c.x - 3.13, fl, c.z + zs * 3.0 - 0.06), Vector3(c.x - 1.9, fl + 1.1, c.z + zs * 3.0 + 0.06), teal)
 	_block(kit, "wood", Vector3(c.x - 3.55, fl + 1.1, c.z - 3.25), Vector3(c.x - 2.2, fl + 1.18, c.z + 3.25), teak)
 	# Beer tap, glasses and a jar of straws on the counter.
 	var tap := Vector3(c.x - 2.75, fl + 1.18, c.z - 1.4)
@@ -3143,12 +3207,16 @@ func _thatch(kit: Dictionary, rng: RandomNumberGenerator, eave: Vector3, hx: flo
 			var edge_len := a.distance_to(b)
 			var fn := n if kc > 0 else (o + Vector3.UP * 0.3).normalized()
 			# Narrow overlapping blades of uneven length, so the edge reads as straw, not bunting.
+			# Neighbouring blades overlap, so each stands a little off the last one's plane: in one
+			# plane they flickered.
+			var blade := 0
 			for layer in range(2 if kc == 0 else 1):
 				var spacing := 0.13
 				var u := -0.05 + layer * spacing * 0.5
 				while u < edge_len + 0.05:
 					var wdt := rng.randf_range(0.10, 0.2)
-					var lift := n * (0.07 + 0.02 * kc + 0.035 * layer) + Vector3.UP * (0.04 * layer)
+					var lift := n * (0.07 + 0.02 * kc + 0.035 * layer) + Vector3.UP * (0.04 * layer) + fn * (0.012 * (blade % 3))
+					blade += 1
 					var p0 := a + along * (u - wdt * 0.5) + lift
 					var p1 := a + along * (u + wdt * 0.5) + lift
 					var drop := rng.randf_range(0.35, 0.75) * (0.8 if layer == 1 else 1.0)
@@ -3234,16 +3302,14 @@ func _surfboard(kit: Dictionary, xf: Transform3D, length: float, style: int, des
 		var a0 := TAU * (j - 0.5) / around
 		var a1 := TAU * (j + 0.5) / around
 		_tri(st, tail_c, xf * _board_point(p, 0.0, a0), xf * _board_point(p, 0.0, a1), down, down, down, rail, down)
-	# Stringer down the deck of the painted designs.
+	# Stringer down the deck of the painted designs: a thin rod half sunk in the deck. A strip laid on
+	# the deck flickered at a distance.
 	if design != 2:
 		var sc := Color(0.55, 0.40, 0.25)
 		for i in range(1, 29):
-			var t0 := float(i) / 30.0
-			var t1 := float(i + 1) / 30.0
-			var d0 := _board_point(p, t0, PI * 0.5) + Vector3(0, 0, 0.0015)
-			var d1 := _board_point(p, t1, PI * 0.5) + Vector3(0, 0, 0.0015)
-			var up := (nb * _board_normal(p, t0, PI * 0.5)).normalized()
-			_quad(kit, "gloss", [xf * (d0 + Vector3(-0.005, 0, 0)), xf * (d0 + Vector3(0.005, 0, 0)), xf * (d1 + Vector3(0.005, 0, 0)), xf * (d1 + Vector3(-0.005, 0, 0))], up, sc)
+			var d0 := _board_point(p, float(i) / 30.0, PI * 0.5)
+			var d1 := _board_point(p, float(i + 1) / 30.0, PI * 0.5)
+			_tube(kit, "gloss", xf * d0, xf * d1, 0.005, 0.005, 6, sc, false)
 	# Fins under the tail.
 	var fin_col := Color(0.20, 0.22, 0.25) if style != 1 else accent
 	var half_at := func(y: float) -> float:
@@ -3332,22 +3398,56 @@ func _sawhorse(kit: Dictionary, at: Vector3) -> void:
 			_tube(kit, "wood", at + Vector3(xs * 0.22, -0.1, zs), top + Vector3(0, 0, zs), 0.03, 0.03, 4, OLD_WOOD)
 
 
+## A lifebuoy facing along `axis`: a smooth torus in eight red and white sections, and a grab line
+## lashed round it at four points that runs along its rim between them.
 func _lifebuoy(kit: Dictionary, centre: Vector3, axis: Vector3, radius: float, tube_r: float) -> void:
 	var side := axis.cross(Vector3.UP).normalized()
 	var up := side.cross(axis).normalized()
-	var segs := 16
-	for i in range(segs):
+	var st := _st(kit, "gloss")
+	var segs := 32
+	var sides := 12
+	for i in segs:
 		var a0 := TAU * i / segs
 		var a1 := TAU * (i + 1) / segs
-		var p0 := centre + (side * cos(a0) + up * sin(a0)) * radius
-		var p1 := centre + (side * cos(a1) + up * sin(a1)) * radius
-		var col := Color(0.92, 0.22, 0.18) if (i / 2) % 2 == 0 else WHITE
-		_tube(kit, "gloss", p0, p1, tube_r, tube_r, 8, col, false)
-	# Grab line looped round it.
-	for i in range(4):
-		var a := TAU * (i + 0.5) / 4.0
-		var p := centre + (side * cos(a) + up * sin(a)) * (radius + tube_r)
-		_tube(kit, "paint", p - axis * 0.02, p + axis * 0.02, 0.012, 0.012, 4, Color(0.85, 0.8, 0.6), false)
+		var col := Color(0.92, 0.22, 0.18) if int(i * 8.0 / segs) % 2 == 0 else WHITE
+		var r0 := side * cos(a0) + up * sin(a0)
+		var r1 := side * cos(a1) + up * sin(a1)
+		for j in sides:
+			var b0 := TAU * j / sides
+			var b1 := TAU * (j + 1) / sides
+			var n00 := r0 * cos(b0) + axis * sin(b0)
+			var n01 := r0 * cos(b1) + axis * sin(b1)
+			var n10 := r1 * cos(b0) + axis * sin(b0)
+			var n11 := r1 * cos(b1) + axis * sin(b1)
+			var q00 := centre + r0 * radius + n00 * tube_r
+			var q01 := centre + r0 * radius + n01 * tube_r
+			var q10 := centre + r1 * radius + n10 * tube_r
+			var q11 := centre + r1 * radius + n11 * tube_r
+			var out := (n00 + n11).normalized()
+			_tri(st, q00, q10, q11, n00, n10, n11, col, out)
+			_tri(st, q00, q11, q01, n00, n11, n01, col, out)
+	var rope := Color(0.88, 0.82, 0.62)
+	var rr := 0.011 * tube_r / 0.07
+	# The line rides the outer rim, slack between the lashings.
+	var prev := Vector3.ZERO
+	for i in range(segs + 1):
+		var a := TAU * i / segs
+		var slack := absf(sin(a * 2.0 - PI * 0.25))
+		var p := centre + (side * cos(a) + up * sin(a)) * (radius + tube_r + rr + 0.02 * slack * tube_r / 0.07)
+		if i > 0:
+			_tube(kit, "paint", prev, p, rr, rr, 5, rope, false)
+		prev = p
+	# Lashings: the line wrapped round the tube where it's tied on.
+	for k in 4:
+		var a := TAU * (k + 0.125) / 4.0
+		var r := side * cos(a) + up * sin(a)
+		var lp := Vector3.ZERO
+		for j in range(sides + 1):
+			var b := TAU * j / sides
+			var p := centre + r * radius + (r * cos(b) + axis * sin(b)) * (tube_r + rr)
+			if j > 0:
+				_tube(kit, "paint", lp, p, rr * 1.2, rr * 1.2, 5, rope, false)
+			lp = p
 
 
 ## A-frame chalkboard with a menu chalked on the sea side.
@@ -3358,7 +3458,7 @@ func _menu_board(kit: Dictionary, at: Vector3) -> void:
 		var b := Basis(Vector3.BACK, side * 0.22)
 		var centre := at + Vector3(side * 0.13, 0.5, 0)
 		_box(kit, "wood", Transform3D(b, centre), Vector3(0.04, 1.0, 0.7), OLD_WOOD)
-		_box(kit, "paint", Transform3D(b, centre + b * Vector3(side * 0.005, 0, 0)), Vector3(0.045, 0.86, 0.58), slate)
+		_box(kit, "paint", Transform3D(b, centre + b * Vector3(side * 0.015, 0, 0)), Vector3(0.045, 0.86, 0.58), slate)
 		if side < 0.0:
 			var face := b * Vector3(-1, 0, 0)
 			var y := 0.3
@@ -3366,12 +3466,12 @@ func _menu_board(kit: Dictionary, at: Vector3) -> void:
 			while y > -0.34:
 				var w := 0.42 if line == 0 else 0.2 + 0.22 * fposmod(line * 0.618, 1.0)
 				var col: Color = chalk[1] if line == 0 else chalk[0]
-				var lc := centre + b * Vector3(-0.033, y, -0.2 + w * 0.5)
+				var lc := centre + b * Vector3(-0.05, y, -0.2 + w * 0.5)
 				var lx := b * Vector3(0, 0, w * 0.5)
 				var ly := b * Vector3(0, 0.012 if line > 0 else 0.022, 0)
 				_quad(kit, "paint", [lc - lx - ly, lc + lx - ly, lc + lx + ly, lc - lx + ly], face, col)
 				if line > 0:
-					var pc := centre + b * Vector3(-0.033, y, 0.21)
+					var pc := centre + b * Vector3(-0.05, y, 0.21)
 					var px2 := b * Vector3(0, 0, 0.03)
 					_quad(kit, "paint", [pc - px2 - ly, pc + px2 - ly, pc + px2 + ly, pc - px2 + ly], face, chalk[2])
 				y -= 0.095 if line > 0 else 0.13
@@ -3384,7 +3484,8 @@ func _beach_bar_sign(kit: Dictionary, centre: Vector3) -> void:
 	var h := 0.36    # half height
 	_block(kit, "wood", centre + Vector3(0.0, -h - 0.05, -w - 0.05), centre + Vector3(0.06, h + 0.05, w + 0.05), OLD_WOOD)
 	var face := Vector3(-1, 0, 0)
-	var fx := centre.x - 0.004
+	# The painted layers stand 12mm apart: closer, they flicker at a distance.
+	var fx := centre.x - 0.012
 	var sky := [Color(0.98, 0.62, 0.38), Color(0.98, 0.78, 0.45), Color(0.98, 0.9, 0.62)]
 	for bnd in range(3):
 		var y0 := centre.y + h - (bnd + 1) * (h * 2.0 / 3.0)
@@ -3392,7 +3493,7 @@ func _beach_bar_sign(kit: Dictionary, centre: Vector3) -> void:
 		_quad(kit, "paint", [Vector3(fx, y0, centre.z - w), Vector3(fx, y0, centre.z + w), Vector3(fx, y1, centre.z + w), Vector3(fx, y1, centre.z - w)], face, sky[2 - bnd])
 	# Sun: a half disc on the horizon.
 	var st := _st(kit, "paint")
-	var sun_c := Vector3(fx - 0.004, centre.y - 0.08, centre.z)
+	var sun_c := Vector3(fx - 0.012, centre.y - 0.08, centre.z)
 	for i in range(12):
 		var a0 := PI * i / 12.0
 		var a1 := PI * (i + 1) / 12.0
@@ -3407,9 +3508,9 @@ func _beach_bar_sign(kit: Dictionary, centre: Vector3) -> void:
 			var z1 := centre.z - w + 2.0 * w * (s + 1) / segs
 			var c0 := base_y + 0.12 + 0.05 * sin(z0 * 7.0 + wv * 1.8)
 			var c1 := base_y + 0.12 + 0.05 * sin(z1 * 7.0 + wv * 1.8)
-			var lx := fx - 0.008 - wv * 0.003
+			var lx := fx - 0.024 - wv * 0.024
 			_quad(kit, "paint", [Vector3(lx, centre.y - h, z0), Vector3(lx, centre.y - h, z1), Vector3(lx, c1, z1), Vector3(lx, c0, z0)], face, col)
-			_quad(kit, "paint", [Vector3(lx - 0.002, c0 - 0.02, z0), Vector3(lx - 0.002, c1 - 0.02, z1), Vector3(lx - 0.002, c1 + 0.01, z1), Vector3(lx - 0.002, c0 + 0.01, z0)], face, WHITE)
+			_quad(kit, "paint", [Vector3(lx - 0.012, c0 - 0.02, z0), Vector3(lx - 0.012, c1 - 0.02, z1), Vector3(lx - 0.012, c1 + 0.01, z1), Vector3(lx - 0.012, c0 + 0.01, z0)], face, WHITE)
 
 
 func _umbrella(kit: Dictionary, at: Vector3, tilt: Vector3, cols: Array) -> void:

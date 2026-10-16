@@ -296,6 +296,23 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   clear of the track and of every footprint noted before them. The fence is built first for that reason.
 - Sign lettering is block capitals from `GLYPHS` (`_pixel_text`), since text can't be drawn headless. Add
   any letter you need to the table.
+- Flags (`_flag`) wave in `flag_wave.gdshader`. The shader reads the hoist-to-fly position from UV.x
+  and the flag's phase and length from UV2, so `_flag` writes its vertices itself instead of going
+  through `_tri`.
+- Flicker: the project renders with the mobile renderer. At racing distances its depth buffer can't
+  separate faces a few millimetres apart, so decals, glass, lettering and paint layers stand 2-3cm
+  proud of what's behind them. No two faces may overlap in one plane: hut walls run between their
+  corner posts, not through them. On the wreck's double-sided "wreck" material, timbers are sunk a
+  centimetre into the planking rather than laid on it. `res://scratch/zfight_scan.gd -- <mesh.res> ...
+  [tol=0.002]` lists overlapping coplanar triangles in saved meshes. Ignore same-colour pairs and
+  faces hidden on the ground or under roofs.
+- Point 19 (the third dune crest) is close to the map's edge falloff: past 0.88 of the terrain radius,
+  the ground drops to -40, below the respawn height. Pointed north-east, its handles hooked the lap
+  back in an 8m radius on the crest, and AI carts flew off it into the drop again on every lap.
+  Keep corners near the edge wide. `scratch/ai_race_test` at `speed=2` finds such loops.
+- Don't put a boost pad within ~100m before a real corner. A pad pushes for 2s whatever the brakes do,
+  and the AI doesn't brake while boosting until a turn is 14m away (`PlayerCart._get_ai_input`, "let
+  the boost rip"). BoostPad_5 moved from the point 19 crest to the run onto the finish straight.
 - The shipwreck is a trawler built from a hull function, `_wreck_point(s, a, side)`, in its own frame
   (`WRECK_*`), and is heeled toward the dunes so the dune descent sees its deck. The stove-in side faces
   the sea. Missing planks are keyed per station and strake (`_wreck_plan_damage`), and frames are built
