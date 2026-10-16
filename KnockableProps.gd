@@ -1,5 +1,5 @@
 extends MultiMeshInstance3D
-## Loose props carts can shove out of the way: beach loungers, cool boxes.
+## Loose props carts can shove out of the way: beach loungers, cool boxes, parasols.
 ##
 ## Drawn as one MultiMesh. At runtime each prop gets a rigid body made of `boxes`, frozen where it
 ## stands. A cart that comes within RELEASE_RADIUS faster than `push_speed` frees it, so the hit
@@ -7,8 +7,11 @@ extends MultiMeshInstance3D
 ## The MultiMesh follows the bodies that move. The level stores only `prop_transforms`: the dummy
 ## renderer used to generate levels can't be read back from a MultiMesh.
 ##
-## Like KnockablePoles.gd, the props sit on their own physics layer, which carts collide with but AI
-## obstacle rays don't see, and they're local scenery: nothing is synced over the network.
+## Frozen, a prop is on layer 1 like any wall: Jolt's static bodies don't look for contacts themselves,
+## so on a layer outside the carts' mask a slow cart drove straight through it. Knocked loose, it moves
+## to its own layer, which carts still collide with (its mask has layer 1) but AI obstacle rays and
+## the carts' ground probes don't see. Like KnockablePoles.gd, they're local scenery: nothing is
+## synced over the network.
 
 const PROP_LAYER := 1 << 4
 const BONK := preload("res://sounds/box-crash-106687.mp3")
@@ -22,6 +25,9 @@ const BONK := preload("res://sounds/box-crash-106687.mp3")
 @export var prop_friction := 0.35
 @export var push_speed := 9.0
 @export var release_radius := 5.0
+## Height of the centre of mass above the prop's origin, or below zero to work it out from the shapes.
+## Parasols keep theirs in the weighted base so they stand until hit.
+@export var centre_of_mass_y := -1.0
 
 var _bodies: Array[RigidBody3D] = []
 var _state: PackedByteArray = PackedByteArray()   # 0 frozen, 1 released, 2 knocked (sound played)
@@ -41,8 +47,11 @@ func _ready() -> void:
 		var body := RigidBody3D.new()
 		body.name = "Prop_%d" % i
 		body.add_to_group("knockable_props")
-		body.collision_layer = PROP_LAYER
+		body.collision_layer = 1 | PROP_LAYER
 		body.collision_mask = 1 | PROP_LAYER
+		if centre_of_mass_y >= 0.0:
+			body.center_of_mass_mode = RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM
+			body.center_of_mass = Vector3(0.0, centre_of_mass_y, 0.0)
 		body.mass = prop_mass
 		var pm := PhysicsMaterial.new()
 		pm.friction = prop_friction
@@ -90,6 +99,7 @@ func _physics_process(_delta: float) -> void:
 			for c in carts:
 				if (c[0] as Vector3).distance_squared_to(o) < r2 and float(c[1]) > push_speed:
 					b.freeze = false
+					b.collision_layer = PROP_LAYER
 					_state[i] = 1
 					break
 			continue

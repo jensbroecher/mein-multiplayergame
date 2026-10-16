@@ -3728,9 +3728,10 @@ func _beach_bar_sign(kit: Dictionary, centre: Vector3) -> void:
 			_quad(kit, "paint", [Vector3(lx - 0.012, c0 - 0.02, z0), Vector3(lx - 0.012, c1 - 0.02, z1), Vector3(lx - 0.012, c1 + 0.01, z1), Vector3(lx - 0.012, c0 + 0.01, z0)], face, WHITE)
 
 
-func _umbrella(kit: Dictionary, at: Vector3, tilt: Vector3, cols: Array) -> void:
+## A parasol's pole and canopy. `foot` is where the pole starts: sunk in the sand, or on a base.
+func _umbrella(kit: Dictionary, at: Vector3, tilt: Vector3, cols: Array, foot: float = -0.3) -> void:
 	var top := at + (Vector3.UP + tilt).normalized() * 2.4
-	_tube(kit, "paint", at + Vector3(0, -0.3, 0), top, 0.035, 0.03, 5, WHITE)
+	_tube(kit, "paint", at + Vector3(0, foot, 0), top, 0.035, 0.03, 8, WHITE)
 	var axis := (top - at).normalized()
 	var side := axis.cross(Vector3.RIGHT).normalized()
 	var up := side.cross(axis).normalized()
@@ -3771,10 +3772,23 @@ func _build_knockables(root: Node3D) -> void:
 		_scale_about(Vector3.ZERO, k)
 		var boxes: Array = []
 		var mass := 120.0
+		var push := 9.0
+		var reach := 5.0
+		var com := -1.0
 		if key == "coolbox":
 			_cool_box(kit)
 			boxes = [[Vector3(0, 0.21, 0) * k, Vector3(0.6, 0.42, 0.4) * k]]
 			mass = 40.0
+		elif key.begins_with("parasol_"):
+			_parasol(kit, HUT_COLOURS[int(key.substr(8))])
+			# Base, pole and canopy. Light, and freed by any cart that isn't crawling: it topples
+			# over from the bump, its weight low in the base so it stands until then.
+			boxes = [[Vector3(0, 0.06, 0) * k, Vector3(0.5, 0.12, 0.5) * k], [Vector3(0, 1.2, 0) * k, Vector3(0.08, 2.2, 0.08) * k],
+				[Vector3(0, 2.0, 0) * k, Vector3(1.9, 0.3, 1.9) * k]]
+			mass = 18.0
+			push = 2.5
+			reach = 3.6
+			com = 0.1 * k
 		else:
 			_lounger(kit, int(key.substr(8)))
 			# The seat and the backrest.
@@ -3798,6 +3812,9 @@ func _build_knockables(root: Node3D) -> void:
 		mmi.set("prop_transforms", typed)
 		mmi.set("boxes", boxes)
 		mmi.set("prop_mass", mass)
+		mmi.set("push_speed", push)
+		mmi.set("release_radius", reach)
+		mmi.set("centre_of_mass_y", com)
 		mmi.multimesh = mm
 		root.add_child(mmi)
 
@@ -3870,6 +3887,18 @@ func _lounger(kit: Dictionary, style: int) -> void:
 		_tube(kit, "canvas", Vector3(sx, seat_y + 0.09, hinge_z + 0.04), Vector3(sx, seat_y + 0.09, 0.9), 0.012, 0.012, 6, cush[0].darkened(0.3), false)
 	var roll := h0 + back_dir * (back_len - 0.08) + back_n * 0.12
 	_tube(kit, "canvas", roll - Vector3(0.24, 0, 0), roll + Vector3(0.24, 0, 0), 0.06, 0.06, 12, cush[cush.size() - 1])
+
+
+## A parasol on a weighted base (a ribbed disc with a collar) at the origin.
+func _parasol(kit: Dictionary, col: Color) -> void:
+	var grey := Color(0.82, 0.82, 0.8)
+	_tube(kit, "paint", Vector3.ZERO, Vector3(0, 0.1, 0), 0.25, 0.23, 18, grey)
+	_tube(kit, "paint", Vector3(0, 0.1, 0), Vector3(0, 0.18, 0), 0.07, 0.05, 10, grey.darkened(0.15))
+	for r in 8:
+		var a := TAU * r / 8.0
+		var d := Vector3(cos(a), 0, sin(a))
+		_tube(kit, "paint", d * 0.07 + Vector3(0, 0.1, 0), d * 0.22 + Vector3(0, 0.1, 0), 0.012, 0.012, 4, grey.darkened(0.1), false)
+	_umbrella(kit, Vector3.ZERO, Vector3.ZERO, [col, WHITE], 0.1)
 
 
 ## A cool box: a blue tub, a white lid with a hinge line and a swing handle.
@@ -4016,14 +4045,10 @@ func _parasol_spot_ok(p: Vector2, placed: Array) -> bool:
 func _parasol_set(root: Node3D, kit: Dictionary, rng: RandomNumberGenerator, p: Vector2, n: int) -> void:
 	_scale_about(Vector3(p.x, 0.0, p.y), PROP_SCALE)
 	var at := Vector3(p.x, _ground(p.x, p.y), p.y)
-	var tilt := Vector3(rng.randf_range(-0.1, 0.1), 0, rng.randf_range(-0.1, 0.1))
-	_umbrella(kit, at, tilt, [HUT_COLOURS[rng.randi() % 6], WHITE])
-	var top := at + (Vector3.UP + tilt).normalized() * 2.4
-	_rod_collider(root, "Parasols", at + Vector3(0, -0.3, 0), top, 0.06)
-	var canopy := CylinderShape3D.new()
-	canopy.radius = 1.3
-	canopy.height = 0.3
-	_collider(root, "Parasols", canopy, Transform3D(Basis(), top - Vector3(0, 0.35, 0)))
+	# The parasol is knockable too: it stands on a weighted base, leaning a little.
+	var tilt := Vector3(rng.randf_range(-0.06, 0.06), 0, rng.randf_range(-0.06, 0.06))
+	var lean := Basis(Quaternion(Vector3.UP, (Vector3.UP + tilt).normalized())) * Basis(Vector3.UP, rng.randf_range(0.0, TAU))
+	_knock_add("parasol_%d" % (rng.randi() % 6), Transform3D(lean, _frame * at))
 	# Backrests to the land: the loungers face the sea, side by side either side of the pole. They
 	# and the cool box are knockable (KnockableProps.gd), drawn from shared meshes: here they only
 	# record where they stand.

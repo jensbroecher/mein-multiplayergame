@@ -303,11 +303,15 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   parasol sets and the fence. The pier and the lighthouse grow seaward from their landward ends.
 - Parasol sets are rejection-sampled per zone (`PARASOL_ZONES`): `PARASOL_GAP` apart, on dry level sand,
   clear of the track and of every footprint noted before them. The fence is built first for that reason.
-- Loungers and cool boxes are knockable (`KnockableProps.gd`). Each design is one MultiMesh, and each
-  prop a frozen rigid body that a cart faster than `push_speed` frees as it nears. At 22 m/s a cart
-  keeps ~88% of its speed and flings a lounger clear; a slower cart stops against it. `_knock_add`
-  records them in the parasol sets, and `_build_knockables` builds the meshes at the origin.
-  Towels have no collision.
+- Loungers, cool boxes and parasols are knockable (`KnockableProps.gd`). Each design is one MultiMesh,
+  and each prop a frozen rigid body that a cart faster than `push_speed` frees as it nears. At 22 m/s
+  a cart keeps ~88% of its speed and flings a lounger clear; a slower cart stops against it.
+  - Parasols free at 2.5 m/s, so a bump topples them. Their weighted base holds the centre of mass
+    low (`centre_of_mass_y`), so they don't fall over when a cart just passes.
+  - Frozen props must be on layer 1: Jolt's static bodies don't look for contacts, so on a layer
+    outside the carts' mask a slow cart drove through them. A freed prop moves to its own layer.
+  - `_knock_add` records them in the parasol sets, and `_build_knockables` builds the meshes at the
+    origin. Towels have no collision.
 - Sign lettering is block capitals from `GLYPHS` (`_pixel_text`), since text can't be drawn headless. Add
   any letter you need to the table.
 - Flags (`_flag`) wave in `flag_wave.gdshader`. The shader reads the hoist-to-fly position from UV.x
