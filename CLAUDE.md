@@ -52,6 +52,32 @@ current file.
 (`_apply_curb_corner_weights`) when it builds the curbs. To update the saved curb meshes of every level
 without regenerating them, run `res://refresh_curb_corners.tscn` headless.
 
+## Race gates
+
+- Every level's FinishLine and checkpoints are instances of `CheckpointGate.tscn`. `CheckpointGate.gd`
+  builds the gate in code as internal children: shared meshes, box collision and the banner text. Level
+  files only store the gate's transform, so a change to the gate shows on every level without
+  regenerating any of them.
+- The finish line (`is_finish_line`, or a node named FinishLine) is the start gantry. Its LED screen
+  (`start_lights.gdshader`) waves a chequered flag. `Level.start_race()` calls `show_start_lights(step)` at
+  each countdown beat: 0 = lamps up and dark, 1..3 = that many red, 4 = green. The screen hangs under
+  the beam because the front row's chase camera sees nothing above about 7.7m at the gantry. Keep the
+  lamp energy low: brighter, ACES bleaches the red to coral and the green to mint.
+- Checkpoints are an aluminium truss with a CHECKPOINT banner. `gate_color` colours the banner's bands and
+  the ballast blocks. The truss is 8m tall, because carts cresting a rise pass through at up to 5.7m
+  (Pinecrest's checkpoint 5).
+- Levels put the gate origin anywhere from on the road to 0.4m under it (the older levels), or 3m under
+  it (Canyon's Halfway1). Once the level has built its runtime collision, `_settle_on_ground()` stands
+  the gate on the road under its centre and puts the feet and the START/FINISH decal on the ground.
+  It also lowers a checkpoint (down to 4.6m) under anything more than 3m above the road, such as
+  Glacier Highway's sign gantries. Lower hits come from props' collision hulls reaching over the road.
+  The rays are nudged off the gate line because a ray straight down a terrain grid line can miss.
+- The feet's colliders are 2.5m walls. A cart that clips the top edge of a low block gets launched,
+  because PlayerCart only smooths edges up to `STEP_SMOOTH_MAX_HEIGHT`.
+- `res://scratch/gate_shots.tscn -- <level> <dir> [carts=N] [fov=75] [all=x,y,z:tx,ty,tz]
+  name:gate:x,y,z:tx,ty,tz[:step]` renders gates from cameras in gate space (X across the road, grid on
+  +Z), with any start-light step.
+
 ## Frostpeak sky
 
 `sky_winter_cirrus.gdshader` (sky shader, set by the generator) draws the sky gradient, sun and static cirrus.
@@ -255,5 +281,12 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   past the frame edge the copy holds stale pixels (it showed up as a strip of text along the bottom).
 - Structures are under `Seafront` (`_build_seafront`), named to avoid Level.gd's "Props"/"Environment"
   trimesh baking. `_verify_seafront_clear` errors on any footprint too close to the racing line.
+- The shipwreck is a trawler built from a hull function, `_wreck_point(s, a, side)`, in its own frame
+  (`WRECK_*`), and is heeled toward the dunes so the dune descent sees its deck. The stove-in side faces
+  the sea. Missing planks are keyed per station and strake (`_wreck_plan_damage`), and frames are built
+  only where planks or deck are gone. `_verify_wreck_bedded` errors if the hull clears the sand anywhere
+  aft of the forefoot.
+- FastNoiseLite defaults to 5-octave FBM. For paint or sand patches sampled per mesh cell, set
+  `fractal_type = FRACTAL_NONE`, or the patches break up into a checkerboard of single cells.
 - `res://scratch/bloombay_shots.tscn -- <dir> name:x,y,z:tx,ty,tz[:frames[:gap]]` renders into the window
   (not a SubViewport) and can save a time sequence to watch the surf.

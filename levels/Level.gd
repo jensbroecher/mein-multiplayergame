@@ -691,6 +691,7 @@ func start_race():
 
 	# Start camera intro on all carts
 	get_tree().call_group("player_carts", "start_intro_animation")
+	_show_start_lights(0)
 
 	# Wait for intro animation (3.5 seconds)
 	await get_tree().create_timer(3.5).timeout
@@ -699,16 +700,19 @@ func start_race():
 	# Uses a generated single tone — the warning.ogg sample is a multi-beep clip.
 	for ui in _all_race_uis():
 		ui.show_message("3", 1.0)
+	_show_start_lights(1)
 	MusicManager.play_sfx("res://sounds/3.mp3")
 	MusicManager.play_race_start_beep(false)
 	await get_tree().create_timer(1.0).timeout
 	for ui in _all_race_uis():
 		ui.show_message("2", 1.0)
+	_show_start_lights(2)
 	MusicManager.play_sfx("res://sounds/2.mp3")
 	MusicManager.play_race_start_beep(false)
 	await get_tree().create_timer(1.0).timeout
 	for ui in _all_race_uis():
 		ui.show_message("1", 1.0)
+	_show_start_lights(3)
 	MusicManager.play_sfx("res://sounds/1.mp3")
 	MusicManager.play_race_start_beep(false)
 	await get_tree().create_timer(1.0).timeout
@@ -716,12 +720,21 @@ func start_race():
 	# Now actually start the race and allow movement!
 	for ui in _all_race_uis():
 		ui.show_message("GO!", 2.0)
+	_show_start_lights(4)
 	MusicManager.play_sfx("res://sounds/Go.mp3")
 	MusicManager.play_race_start_beep(true) # higher/longer 4th beep
 	MusicManager.load_playlist_for_level(scene_file_path)
 	MusicManager.play_race_music()
 	get_tree().call_group("player_carts", "on_race_started")
 	_spawn_start_finish_items_delayed()
+
+
+## The start gantry's screen (CheckpointGate.show_start_lights): 0 = lamps up and dark,
+## 1..3 = that many red, 4 = green.
+func _show_start_lights(step: int) -> void:
+	var fl = get_node_or_null("FinishLine")
+	if fl and fl.has_method("show_start_lights"):
+		fl.show_start_lights(step)
 
 var _cached_grass_mat: ShaderMaterial = null
 

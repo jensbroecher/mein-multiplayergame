@@ -508,37 +508,40 @@ size = Vector3(3, 5.7, 3)
 height = 6.0
 radius = 9.0
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_tallp"]
-size = Vector3(5, 3.5, 17)
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_tallp"]
+points = PackedVector3Array(-6.9572754, 1.0273944, -7.4268494, -7.5640793, 1.9424036, -7.3833313, -4.3423004, 0.71268874, -9.805023, -7.8439407, 2.8808053, -7.6750183, -4.132553, 1.4642098, -10.464722, -7.9168625, 3.6793752, -8.085541, -4.124611, 2.231917, -10.936035, -6.128708, 0.9222826, -6.0420227, -6.685486, 1.8877442, -5.8816833, -6.875061, 2.8880682, -6.057373, -2.871605, 1.359997, -9.06662, -6.852379, 3.776318, -6.381958, -2.7642975, 2.2159457, -9.454803, -5.41037, 0.6943258, -4.6984863, -5.877846, 1.7192833, -4.4205933, -5.9373856, 2.813467, -4.468872, -1.6675262, 1.1837125, -7.6783447, -5.7700195, 3.8828268, -4.693054, -1.415657, 2.220816, -7.9660645, -4.336624, 0.6916565, -3.0224915, -4.8035736, 1.7083089, -2.7365723, -4.8518524, 2.8155575, -2.78479, -0.3702469, 1.1049843, -6.1534424, -4.655014, 4.001142, -3.0306091, -0.09049225, 2.2589166, -6.4615784, -3.1804657, 0.8234149, -1.393219, -3.6525497, 1.8150407, -1.1013489, -3.70195, 2.90384, -1.1472778, 0.9137039, 1.1420965, -4.6166687, -3.495369, 4.1345725, -1.4042053, 1.2021866, 2.3415682, -4.9351807, -1.9669495, 0.9544099, 0.19128418, -2.442276, 1.9499354, 0.48538208, -2.4919434, 3.044039, 0.43927002, 2.1658478, 1.2662156, -3.0618286, -2.282898, 4.2878747, 0.17938232, 2.4571762, 2.478644, -3.383545, -0.69441223, 1.0707817, 1.7308044, -1.1562881, 2.085314, 2.0129395, -1.1980133, 3.2033093, 1.9587402, 3.353386, 1.4660933, -1.4623718, -0.9864807, 4.4570584, 1.696167, 3.6463394, 2.6887646, -1.7861328, 0.68814087, 1.2236527, 3.144043, 0.25470734, 2.3283658, 3.4075623, 0.22499084, 3.493622, 3.3533936, 4.4678726, 1.8741639, 0.16418457, 0.42028046, 4.639927, 3.1256714, 4.7462463, 2.9887564, -0.12597656, 2.047821, 1.4283292, 4.280609, 1.7219849, 2.708429, 4.561035, 4.925556, 1.4856625, 2.1530457, 1.7540054, 3.9206495, 4.574585, 5.4729996, 2.5011525, 1.7791748, 1.9463959, 4.8409286, 4.4605103, 5.750885, 3.3888001, 1.6008301, 3.426918, 1.7208564, 5.2600403, 4.8107796, 1.1926527, 4.2198486, 3.3128738, 3.1950855, 5.5823975, 5.771225, 2.256761, 3.734558, 3.441162, 4.413898, 5.6956787, 6.392952, 3.2872348, 3.4769287, 3.6099396, 5.0610466, 5.6865234, 6.6451416, 3.9025445, 3.4050598, 4.9419136, 2.5246408, 6.1381836, 5.6849365, 2.2410383, 5.5796814, 5.1019897, 3.9006486, 6.511383, 6.599865, 3.3289275, 5.385498, 5.3266144, 4.9161787, 6.7207336, 7.199024, 4.201503, 5.313324, 5.452881, 5.2921453, 6.7714844, 7.390045, 4.552752, 5.315399, 6.5966873, 3.2152874, 7.143463, 6.5966873, 3.2152874, 7.143463, 7.1761017, 4.352905, 7.336609, 7.1761017, 4.352905, 7.336609, 7.5961227, 5.177571, 7.476654, 7.5961227, 5.177571, 7.476654, 7.731888, 5.4441395, 7.5219116, 7.731888, 5.4441395, 7.5219116)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_i16cw"]
-size = Vector3(7.200001, 1.9, 0.59999084)
+size = Vector3(3.1, 2.3, 3.52)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_jxg1a"]
-size = Vector3(3, 1.1, 0.8999939)
+size = Vector3(7.200001, 1.9, 0.59999084)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_4x1qn"]
+size = Vector3(3, 1.1, 0.8999939)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wimop"]
 size = Vector3(10.700001, 4.051453, 8)
 
-[node name="BloombayDunesLevel" type="Node3D" unique_id=268177849 node_paths=PackedStringArray("checkpoints", "track_path")]
+[node name="BloombayDunesLevel" type="Node3D" unique_id=1367379032 node_paths=PackedStringArray("checkpoints", "track_path")]
 script = ExtResource("1_8gnm6")
 checkpoints = [NodePath("Checkpoints/Checkpoint_1"), NodePath("Checkpoints/Checkpoint_2"), NodePath("Checkpoints/Checkpoint_3"), NodePath("Checkpoints/Checkpoint_4"), NodePath("Checkpoints/Checkpoint_5"), NodePath("FinishLine")]
 track_path = NodePath("TrackPath")
 
-[node name="Players" type="Node3D" parent="." unique_id=56721633]
+[node name="Players" type="Node3D" parent="." unique_id=1109625362]
 
-[node name="PlayerSpawner" type="MultiplayerSpawner" parent="." unique_id=86153417]
+[node name="PlayerSpawner" type="MultiplayerSpawner" parent="." unique_id=882864891]
 _spawnable_scenes = PackedStringArray("uid://cart123")
 spawn_path = NodePath("../Players")
 spawn_limit = 6
 
-[node name="ProjectileSpawner" type="MultiplayerSpawner" parent="." unique_id=2000378387]
+[node name="ProjectileSpawner" type="MultiplayerSpawner" parent="." unique_id=1791141142]
 spawn_path = NodePath(".")
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=987492072]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=220274951]
 environment = SubResource("Environment_500t2")
 
-[node name="SunLight" type="DirectionalLight3D" parent="." unique_id=956948303]
+[node name="SunLight" type="DirectionalLight3D" parent="." unique_id=498547672]
 transform = Transform3D(0.57357645, -0.5043204, 0.64550066, 0, 0.7880108, 0.6156615, -0.81915206, -0.35312894, 0.45198444, 0, 0, 0)
 light_color = Color(1, 0.96, 0.88, 1)
 light_energy = 1.3
@@ -547,10 +550,10 @@ directional_shadow_split_2 = 0.25
 directional_shadow_split_3 = 0.55
 directional_shadow_max_distance = 500.0
 
-[node name="TrackPath" type="Path3D" parent="." unique_id=569133251]
+[node name="TrackPath" type="Path3D" parent="." unique_id=817577809]
 curve = SubResource("Curve3D_isae7")
 
-[node name="TerrainGenerator" type="Node3D" parent="." unique_id=1220601916 node_paths=PackedStringArray("track_path")]
+[node name="TerrainGenerator" type="Node3D" parent="." unique_id=662612942 node_paths=PackedStringArray("track_path")]
 script = ExtResource("2_8j8y2")
 track_path = NodePath("../TrackPath")
 terrain_size = Vector2(950, 950)
@@ -568,764 +571,770 @@ level_prefix = "bloombay_dunes"
 no_grass = true
 terrain_grass_count = 0
 
-[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=281423564]
+[node name="Terrain_Visual" type="MeshInstance3D" parent="TerrainGenerator" unique_id=153563297]
 material_override = SubResource("StandardMaterial3D_f5u5e")
 lod_bias = 10.0
 mesh = ExtResource("6_sj4ts")
 
-[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=240623412]
+[node name="Unified_World_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=2017562644]
 
-[node name="@CollisionShape3D@6" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=871620523]
+[node name="@CollisionShape3D@6" type="CollisionShape3D" parent="TerrainGenerator/Unified_World_Collision" unique_id=802423181]
 shape = ExtResource("7_5nxbr")
 
-[node name="Visual_Curbs" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1474248899]
+[node name="Visual_Curbs" type="MeshInstance3D" parent="TerrainGenerator" unique_id=98083131]
 material_override = SubResource("ShaderMaterial_l2pt6")
 mesh = ExtResource("9_7j6nr")
 
-[node name="Visual_Curbs_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=2009213729]
+[node name="Visual_Curbs_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=828056343]
 material_override = SubResource("StandardMaterial3D_yex5o")
 mesh = ExtResource("13_snbga")
 
-[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1617571286]
+[node name="Visual_Road" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1385174691]
 material_override = SubResource("StandardMaterial3D_quros")
 mesh = ExtResource("14_dmfbe")
 
-[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1096311279]
+[node name="Visual_Road_Sides" type="MeshInstance3D" parent="TerrainGenerator" unique_id=929545550]
 material_override = SubResource("StandardMaterial3D_jfbbm")
 mesh = ExtResource("15_5pydn")
 
-[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=1604906431]
+[node name="Track_Collision" type="StaticBody3D" parent="TerrainGenerator" unique_id=946407]
 
-[node name="@CollisionShape3D@7" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=1080915187]
+[node name="@CollisionShape3D@7" type="CollisionShape3D" parent="TerrainGenerator/Track_Collision" unique_id=1909817167]
 shape = ExtResource("16_pmnsm")
 
-[node name="BridgeSupport_510" type="MeshInstance3D" parent="TerrainGenerator" unique_id=335018203]
+[node name="BridgeSupport_510" type="MeshInstance3D" parent="TerrainGenerator" unique_id=218968025]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 19.149008, -12.18098, -316.14432)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_au3y2")
 
-[node name="@StaticBody3D@8" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_510" unique_id=2036529747]
+[node name="@StaticBody3D@8" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_510" unique_id=611740748]
 
-[node name="@CollisionShape3D@9" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_510/@StaticBody3D@8" unique_id=1929270817]
+[node name="@CollisionShape3D@9" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_510/@StaticBody3D@8" unique_id=1234691856]
 shape = SubResource("BoxShape3D_4e365")
 
-[node name="BridgeSupport_540" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1316971686]
+[node name="BridgeSupport_540" type="MeshInstance3D" parent="TerrainGenerator" unique_id=927696024]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 47.701923, -10.35323, -307.9661)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_v4irl")
 
-[node name="@StaticBody3D@10" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_540" unique_id=1613491244]
+[node name="@StaticBody3D@10" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_540" unique_id=171172180]
 
-[node name="@CollisionShape3D@11" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_540/@StaticBody3D@10" unique_id=1918149372]
+[node name="@CollisionShape3D@11" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_540/@StaticBody3D@10" unique_id=1969572893]
 shape = SubResource("BoxShape3D_t2vrk")
 
-[node name="BridgeSupport_570" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1217044686]
+[node name="BridgeSupport_570" type="MeshInstance3D" parent="TerrainGenerator" unique_id=2067950104]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 75.22418, -7.9392767, -297.0918)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_qb23g")
 
-[node name="@StaticBody3D@12" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_570" unique_id=351213132]
+[node name="@StaticBody3D@12" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_570" unique_id=1881395587]
 
-[node name="@CollisionShape3D@13" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_570/@StaticBody3D@12" unique_id=1239362966]
+[node name="@CollisionShape3D@13" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_570/@StaticBody3D@12" unique_id=982286326]
 shape = SubResource("BoxShape3D_us4hj")
 
-[node name="BridgeSupport_600" type="MeshInstance3D" parent="TerrainGenerator" unique_id=701192439]
+[node name="BridgeSupport_600" type="MeshInstance3D" parent="TerrainGenerator" unique_id=521468182]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 100.44468, -6.2724295, -281.4739)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_6e7wq")
 
-[node name="@StaticBody3D@14" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_600" unique_id=331843723]
+[node name="@StaticBody3D@14" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_600" unique_id=1580161085]
 
-[node name="@CollisionShape3D@15" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_600/@StaticBody3D@14" unique_id=2080077928]
+[node name="@CollisionShape3D@15" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_600/@StaticBody3D@14" unique_id=1654911800]
 shape = SubResource("BoxShape3D_gbuq4")
 
-[node name="BridgeSupport_630" type="MeshInstance3D" parent="TerrainGenerator" unique_id=534355299]
+[node name="BridgeSupport_630" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1310967612]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 122.43478, -4.0245857, -261.57898)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_fdcbx")
 
-[node name="@StaticBody3D@16" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_630" unique_id=997422907]
+[node name="@StaticBody3D@16" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_630" unique_id=1035968114]
 
-[node name="@CollisionShape3D@17" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_630/@StaticBody3D@16" unique_id=1962471463]
+[node name="@CollisionShape3D@17" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_630/@StaticBody3D@16" unique_id=1033346113]
 shape = SubResource("BoxShape3D_c80ud")
 
-[node name="BridgeSupport_660" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1403657998]
+[node name="BridgeSupport_660" type="MeshInstance3D" parent="TerrainGenerator" unique_id=836159548]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 143.44989, -3.4129333, -240.38925)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_pp7xc")
 
-[node name="@StaticBody3D@18" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_660" unique_id=695765411]
+[node name="@StaticBody3D@18" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_660" unique_id=2132009747]
 
-[node name="@CollisionShape3D@19" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_660/@StaticBody3D@18" unique_id=1328936825]
+[node name="@CollisionShape3D@19" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_660/@StaticBody3D@18" unique_id=446851132]
 shape = SubResource("BoxShape3D_pudat")
 
-[node name="BridgeSupport_690" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1372771009]
+[node name="BridgeSupport_690" type="MeshInstance3D" parent="TerrainGenerator" unique_id=2079641886]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 158.36177, -5.1946516, -214.64137)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_0k3hn")
 
-[node name="@StaticBody3D@20" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_690" unique_id=1343743254]
+[node name="@StaticBody3D@20" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_690" unique_id=1361426166]
 
-[node name="@CollisionShape3D@21" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_690/@StaticBody3D@20" unique_id=1113668969]
+[node name="@CollisionShape3D@21" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_690/@StaticBody3D@20" unique_id=977903725]
 shape = SubResource("BoxShape3D_7e3pe")
 
-[node name="BridgeSupport_720" type="MeshInstance3D" parent="TerrainGenerator" unique_id=90111896]
+[node name="BridgeSupport_720" type="MeshInstance3D" parent="TerrainGenerator" unique_id=728650334]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 172.55577, -7.0986366, -188.50734)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_s2pfu")
 
-[node name="@StaticBody3D@22" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_720" unique_id=1211995402]
+[node name="@StaticBody3D@22" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_720" unique_id=931099116]
 
-[node name="@CollisionShape3D@23" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_720/@StaticBody3D@22" unique_id=2017320010]
+[node name="@CollisionShape3D@23" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_720/@StaticBody3D@22" unique_id=1869466966]
 shape = SubResource("BoxShape3D_80fro")
 
-[node name="BridgeSupport_750" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1446661670]
+[node name="BridgeSupport_750" type="MeshInstance3D" parent="TerrainGenerator" unique_id=480041867]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 184.76732, -8.658397, -161.55424)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_un52o")
 
-[node name="@StaticBody3D@24" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_750" unique_id=1762634840]
+[node name="@StaticBody3D@24" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_750" unique_id=935576416]
 
-[node name="@CollisionShape3D@25" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_750/@StaticBody3D@24" unique_id=643877292]
+[node name="@CollisionShape3D@25" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_750/@StaticBody3D@24" unique_id=632752612]
 shape = SubResource("BoxShape3D_3b15r")
 
-[node name="BridgeSupport_780" type="MeshInstance3D" parent="TerrainGenerator" unique_id=415487900]
+[node name="BridgeSupport_780" type="MeshInstance3D" parent="TerrainGenerator" unique_id=791246030]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 190.79584, -10.778527, -132.4785)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_56rkh")
 
-[node name="@StaticBody3D@26" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_780" unique_id=165997789]
+[node name="@StaticBody3D@26" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_780" unique_id=1424273098]
 
-[node name="@CollisionShape3D@27" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_780/@StaticBody3D@26" unique_id=1531986207]
+[node name="@CollisionShape3D@27" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_780/@StaticBody3D@26" unique_id=135893838]
 shape = SubResource("BoxShape3D_wn0al")
 
-[node name="BridgeSupport_810" type="MeshInstance3D" parent="TerrainGenerator" unique_id=596463205]
+[node name="BridgeSupport_810" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1091653854]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 198.64098, -11.549942, -103.68616)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_itqpn")
 
-[node name="@StaticBody3D@28" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_810" unique_id=1430312924]
+[node name="@StaticBody3D@28" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_810" unique_id=1130744604]
 
-[node name="@CollisionShape3D@29" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_810/@StaticBody3D@28" unique_id=1975436275]
+[node name="@CollisionShape3D@29" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_810/@StaticBody3D@28" unique_id=1652416541]
 shape = SubResource("BoxShape3D_6x51w")
 
-[node name="BridgeSupport_840" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1119779674]
+[node name="BridgeSupport_840" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1001724882]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 207.08513, -9.093979, -75.33364)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_osnkg")
 
-[node name="@StaticBody3D@30" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_840" unique_id=1611632031]
+[node name="@StaticBody3D@30" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_840" unique_id=1577740435]
 
-[node name="@CollisionShape3D@31" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_840/@StaticBody3D@30" unique_id=1695425758]
+[node name="@CollisionShape3D@31" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_840/@StaticBody3D@30" unique_id=1866958345]
 shape = SubResource("BoxShape3D_lcalh")
 
-[node name="BridgeSupport_870" type="MeshInstance3D" parent="TerrainGenerator" unique_id=528178232]
+[node name="BridgeSupport_870" type="MeshInstance3D" parent="TerrainGenerator" unique_id=622075879]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 214.60367, -6.565382, -46.750988)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_37xdn")
 
-[node name="@StaticBody3D@32" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_870" unique_id=548939940]
+[node name="@StaticBody3D@32" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_870" unique_id=312194765]
 
-[node name="@CollisionShape3D@33" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_870/@StaticBody3D@32" unique_id=1464894109]
+[node name="@CollisionShape3D@33" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_870/@StaticBody3D@32" unique_id=816214604]
 shape = SubResource("BoxShape3D_ulwvt")
 
-[node name="BridgeSupport_900" type="MeshInstance3D" parent="TerrainGenerator" unique_id=377872681]
+[node name="BridgeSupport_900" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1767530666]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 211.82336, -4.8515043, -17.377275)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_78lrs")
 
-[node name="@StaticBody3D@34" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_900" unique_id=219536515]
+[node name="@StaticBody3D@34" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_900" unique_id=1666829837]
 
-[node name="@CollisionShape3D@35" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_900/@StaticBody3D@34" unique_id=1082458589]
+[node name="@CollisionShape3D@35" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_900/@StaticBody3D@34" unique_id=1570670993]
 shape = SubResource("BoxShape3D_ca8rk")
 
-[node name="BridgeSupport_930" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1916198839]
+[node name="BridgeSupport_930" type="MeshInstance3D" parent="TerrainGenerator" unique_id=2082076597]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 204.85538, -2.8109016, 11.511588)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_lib00")
 
-[node name="@StaticBody3D@36" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_930" unique_id=1686744434]
+[node name="@StaticBody3D@36" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_930" unique_id=76750544]
 
-[node name="@CollisionShape3D@37" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_930/@StaticBody3D@36" unique_id=1842339166]
+[node name="@CollisionShape3D@37" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_930/@StaticBody3D@36" unique_id=1408787455]
 shape = SubResource("BoxShape3D_77tsl")
 
-[node name="BridgeSupport_960" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1196440525]
+[node name="BridgeSupport_960" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1388544139]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 206.12018, -1.4221107, 40.824295)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_k4rwr")
 
-[node name="@StaticBody3D@38" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_960" unique_id=1353490799]
+[node name="@StaticBody3D@38" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_960" unique_id=1051004592]
 
-[node name="@CollisionShape3D@39" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_960/@StaticBody3D@38" unique_id=1844342629]
+[node name="@CollisionShape3D@39" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_960/@StaticBody3D@38" unique_id=1157742612]
 shape = SubResource("BoxShape3D_vwtx1")
 
-[node name="BridgeSupport_990" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1587287611]
+[node name="BridgeSupport_990" type="MeshInstance3D" parent="TerrainGenerator" unique_id=674386684]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 193.27782, -1.8194839, 67.56839)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_jmnhf")
 
-[node name="@StaticBody3D@40" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_990" unique_id=1103169794]
+[node name="@StaticBody3D@40" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_990" unique_id=1427066488]
 
-[node name="@CollisionShape3D@41" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_990/@StaticBody3D@40" unique_id=1894770450]
+[node name="@CollisionShape3D@41" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_990/@StaticBody3D@40" unique_id=1795945598]
 shape = SubResource("BoxShape3D_4ke84")
 
-[node name="BridgeSupport_1020" type="MeshInstance3D" parent="TerrainGenerator" unique_id=751637160]
+[node name="BridgeSupport_1020" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1738577235]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 179.74721, -2.2589931, 93.854614)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_bhtss")
 
-[node name="@StaticBody3D@42" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1020" unique_id=807051313]
+[node name="@StaticBody3D@42" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1020" unique_id=513540449]
 
-[node name="@CollisionShape3D@43" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1020/@StaticBody3D@42" unique_id=859840358]
+[node name="@CollisionShape3D@43" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1020/@StaticBody3D@42" unique_id=1453285187]
 shape = SubResource("BoxShape3D_bstsl")
 
-[node name="BridgeSupport_1050" type="MeshInstance3D" parent="TerrainGenerator" unique_id=272720922]
+[node name="BridgeSupport_1050" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1968217618]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 167.77766, -4.63527, 119.63615)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_m517x")
 
-[node name="@StaticBody3D@44" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1050" unique_id=426259284]
+[node name="@StaticBody3D@44" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1050" unique_id=244348343]
 
-[node name="@CollisionShape3D@45" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1050/@StaticBody3D@44" unique_id=803996596]
+[node name="@CollisionShape3D@45" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1050/@StaticBody3D@44" unique_id=1968281386]
 shape = SubResource("BoxShape3D_6ubup")
 
-[node name="BridgeSupport_1080" type="MeshInstance3D" parent="TerrainGenerator" unique_id=2136855599]
+[node name="BridgeSupport_1080" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1266188477]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 154.93535, -8.47896, 144.79239)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_08uhw")
 
-[node name="@StaticBody3D@46" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1080" unique_id=1029456989]
+[node name="@StaticBody3D@46" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1080" unique_id=1481797583]
 
-[node name="@CollisionShape3D@47" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1080/@StaticBody3D@46" unique_id=1460195767]
+[node name="@CollisionShape3D@47" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1080/@StaticBody3D@46" unique_id=2084609957]
 shape = SubResource("BoxShape3D_qmllp")
 
-[node name="BridgeSupport_1110" type="MeshInstance3D" parent="TerrainGenerator" unique_id=220789581]
+[node name="BridgeSupport_1110" type="MeshInstance3D" parent="TerrainGenerator" unique_id=809747704]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 137.65709, -10.524521, 167.07655)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_pbjwr")
 
-[node name="@StaticBody3D@48" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1110" unique_id=1906538591]
+[node name="@StaticBody3D@48" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1110" unique_id=2097280989]
 
-[node name="@CollisionShape3D@49" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1110/@StaticBody3D@48" unique_id=1308960887]
+[node name="@CollisionShape3D@49" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1110/@StaticBody3D@48" unique_id=344788484]
 shape = SubResource("BoxShape3D_osing")
 
-[node name="BridgeSupport_1140" type="MeshInstance3D" parent="TerrainGenerator" unique_id=827228437]
+[node name="BridgeSupport_1140" type="MeshInstance3D" parent="TerrainGenerator" unique_id=318459333]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 118.23938, -12.015117, 189.07509)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_wsnr8")
 
-[node name="@StaticBody3D@50" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1140" unique_id=234262456]
+[node name="@StaticBody3D@50" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1140" unique_id=300168704]
 
-[node name="@CollisionShape3D@51" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1140/@StaticBody3D@50" unique_id=461465336]
+[node name="@CollisionShape3D@51" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1140/@StaticBody3D@50" unique_id=1358116127]
 shape = SubResource("BoxShape3D_jhpnc")
 
-[node name="BridgeSupport_1170" type="MeshInstance3D" parent="TerrainGenerator" unique_id=769217303]
+[node name="BridgeSupport_1170" type="MeshInstance3D" parent="TerrainGenerator" unique_id=210779093]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 105.390816, -10.855484, 216.0677)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_n4ydf")
 
-[node name="@StaticBody3D@52" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1170" unique_id=707247163]
+[node name="@StaticBody3D@52" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1170" unique_id=646924473]
 
-[node name="@CollisionShape3D@53" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1170/@StaticBody3D@52" unique_id=1373128279]
+[node name="@CollisionShape3D@53" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1170/@StaticBody3D@52" unique_id=126473119]
 shape = SubResource("BoxShape3D_0he8v")
 
-[node name="BridgeSupport_1200" type="MeshInstance3D" parent="TerrainGenerator" unique_id=2043247527]
+[node name="BridgeSupport_1200" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1338293641]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 89.15307, -9.720785, 241.112)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_l1gxj")
 
-[node name="@StaticBody3D@54" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1200" unique_id=2139977760]
+[node name="@StaticBody3D@54" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1200" unique_id=509202048]
 
-[node name="@CollisionShape3D@55" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1200/@StaticBody3D@54" unique_id=996032363]
+[node name="@CollisionShape3D@55" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1200/@StaticBody3D@54" unique_id=663302538]
 shape = SubResource("BoxShape3D_qn26b")
 
-[node name="BridgeSupport_1230" type="MeshInstance3D" parent="TerrainGenerator" unique_id=2005612783]
+[node name="BridgeSupport_1230" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1610156385]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 101.983925, -7.0134115, 264.79224)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_m7jl0")
 
-[node name="@StaticBody3D@56" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1230" unique_id=1929178512]
+[node name="@StaticBody3D@56" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1230" unique_id=1819466285]
 
-[node name="@CollisionShape3D@57" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1230/@StaticBody3D@56" unique_id=1878143745]
+[node name="@CollisionShape3D@57" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1230/@StaticBody3D@56" unique_id=258475575]
 shape = SubResource("BoxShape3D_6pmry")
 
-[node name="BridgeSupport_1260" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1660732117]
+[node name="BridgeSupport_1260" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1156700684]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 124.36678, -4.7795916, 284.1548)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_62m1a")
 
-[node name="@StaticBody3D@58" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1260" unique_id=802215886]
+[node name="@StaticBody3D@58" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1260" unique_id=2010012250]
 
-[node name="@CollisionShape3D@59" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1260/@StaticBody3D@58" unique_id=831547020]
+[node name="@CollisionShape3D@59" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1260/@StaticBody3D@58" unique_id=832616343]
 shape = SubResource("BoxShape3D_saw2y")
 
-[node name="BridgeSupport_1290" type="MeshInstance3D" parent="TerrainGenerator" unique_id=388652469]
+[node name="BridgeSupport_1290" type="MeshInstance3D" parent="TerrainGenerator" unique_id=835393815]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 137.64175, -4.859621, 310.9468)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_um7it")
 
-[node name="@StaticBody3D@60" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1290" unique_id=1532962262]
+[node name="@StaticBody3D@60" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1290" unique_id=331401841]
 
-[node name="@CollisionShape3D@61" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1290/@StaticBody3D@60" unique_id=954287708]
+[node name="@CollisionShape3D@61" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1290/@StaticBody3D@60" unique_id=1281192708]
 shape = SubResource("BoxShape3D_0iw4x")
 
-[node name="BridgeSupport_1320" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1144344682]
+[node name="BridgeSupport_1320" type="MeshInstance3D" parent="TerrainGenerator" unique_id=206007046]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 149.21428, -5.481821, 338.5782)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_u0nhj")
 
-[node name="@StaticBody3D@62" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1320" unique_id=356399712]
+[node name="@StaticBody3D@62" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1320" unique_id=1588847562]
 
-[node name="@CollisionShape3D@63" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1320/@StaticBody3D@62" unique_id=2058297501]
+[node name="@CollisionShape3D@63" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1320/@StaticBody3D@62" unique_id=2082823936]
 shape = SubResource("BoxShape3D_puq2o")
 
-[node name="BridgeSupport_1350" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1151704608]
+[node name="BridgeSupport_1350" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1428567756]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 133.69002, -7.1876297, 359.5243)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_6qbce")
 
-[node name="@StaticBody3D@64" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1350" unique_id=1335792712]
+[node name="@StaticBody3D@64" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1350" unique_id=2093971482]
 
-[node name="@CollisionShape3D@65" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1350/@StaticBody3D@64" unique_id=1390827851]
+[node name="@CollisionShape3D@65" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1350/@StaticBody3D@64" unique_id=77577044]
 shape = SubResource("BoxShape3D_nomtj")
 
-[node name="BridgeSupport_1380" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1677561344]
+[node name="BridgeSupport_1380" type="MeshInstance3D" parent="TerrainGenerator" unique_id=501682901]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 106.531494, -8.942532, 371.75735)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_05hk0")
 
-[node name="@StaticBody3D@66" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1380" unique_id=1651708299]
+[node name="@StaticBody3D@66" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1380" unique_id=31748953]
 
-[node name="@CollisionShape3D@67" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1380/@StaticBody3D@66" unique_id=795182478]
+[node name="@CollisionShape3D@67" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1380/@StaticBody3D@66" unique_id=2107510054]
 shape = SubResource("BoxShape3D_jud1n")
 
-[node name="BridgeSupport_1410" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1041874187]
+[node name="BridgeSupport_1410" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1248936581]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 78.00048, -10.362722, 374.28885)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_iwqlc")
 
-[node name="@StaticBody3D@68" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1410" unique_id=33180412]
+[node name="@StaticBody3D@68" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1410" unique_id=225679513]
 
-[node name="@CollisionShape3D@69" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1410/@StaticBody3D@68" unique_id=1126334419]
+[node name="@CollisionShape3D@69" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1410/@StaticBody3D@68" unique_id=2008849967]
 shape = SubResource("BoxShape3D_4ovwl")
 
-[node name="BridgeSupport_1440" type="MeshInstance3D" parent="TerrainGenerator" unique_id=1374402565]
+[node name="BridgeSupport_1440" type="MeshInstance3D" parent="TerrainGenerator" unique_id=361344614]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 49.98302, -11.885827, 364.0241)
 material_override = SubResource("StandardMaterial3D_h167i")
 mesh = SubResource("BoxMesh_ymjqi")
 
-[node name="@StaticBody3D@70" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1440" unique_id=1525634643]
+[node name="@StaticBody3D@70" type="StaticBody3D" parent="TerrainGenerator/BridgeSupport_1440" unique_id=1703540872]
 
-[node name="@CollisionShape3D@71" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1440/@StaticBody3D@70" unique_id=2033390968]
+[node name="@CollisionShape3D@71" type="CollisionShape3D" parent="TerrainGenerator/BridgeSupport_1440/@StaticBody3D@70" unique_id=503161453]
 shape = SubResource("BoxShape3D_j0ysj")
 
-[node name="BloombayWater" type="Node3D" parent="TerrainGenerator" unique_id=424604665]
+[node name="BloombayWater" type="Node3D" parent="TerrainGenerator" unique_id=1332712219]
 metadata/water_surface_y = 0.0
 metadata/water_bounds_min = Vector2(-4000, -4000)
 metadata/water_bounds_max = Vector2(4000, 4000)
 
-[node name="Ocean_0" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=495449021]
+[node name="Ocean_0" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=742653650]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("19_mr02e")
 
-[node name="Ocean_1" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1037417048]
+[node name="Ocean_1" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1387280267]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("20_r463u")
 
-[node name="Ocean_2" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=337460745]
+[node name="Ocean_2" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1417230647]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("21_7dnkl")
 
-[node name="Ocean_3" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1974756293]
+[node name="Ocean_3" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=678291329]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("22_6ir6w")
 
-[node name="Ocean_4" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1318018373]
+[node name="Ocean_4" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1548061059]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("23_lpn6k")
 
-[node name="Ocean_5" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=966711780]
+[node name="Ocean_5" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=145269368]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("24_wck3w")
 
-[node name="Ocean_6" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1909873924]
+[node name="Ocean_6" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1854126055]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("25_p6xlu")
 
-[node name="Ocean_7" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1828576307]
+[node name="Ocean_7" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1102545155]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("26_bfumk")
 
-[node name="Ocean_8" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=201348320]
+[node name="Ocean_8" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1512933388]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("27_7o3fe")
 
-[node name="Ocean_9" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=73383494]
+[node name="Ocean_9" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=288625274]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("28_lkuc5")
 
-[node name="Ocean_10" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1243889939]
+[node name="Ocean_10" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=16268391]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("29_4en82")
 
-[node name="Ocean_11" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1269401635]
+[node name="Ocean_11" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1088964354]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("30_2wgir")
 
-[node name="Ocean_12" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=266667801]
+[node name="Ocean_12" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1829026737]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("31_2mti3")
 
-[node name="Ocean_13" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=2147416229]
+[node name="Ocean_13" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=647324530]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("32_biib0")
 
-[node name="Ocean_14" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=534559498]
+[node name="Ocean_14" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=55713565]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("33_sfeai")
 
-[node name="Ocean_15" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=378293577]
+[node name="Ocean_15" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=2106240095]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("34_e4ww5")
 
-[node name="Ocean_16" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=547663067]
+[node name="Ocean_16" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=972990221]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("35_ted0i")
 
-[node name="Ocean_17" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=23831956]
+[node name="Ocean_17" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1440549704]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("36_4pg7n")
 
-[node name="Ocean_18" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1887751435]
+[node name="Ocean_18" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1515390984]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("37_vo7g3")
 
-[node name="Ocean_19" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=425958772]
+[node name="Ocean_19" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1821801331]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("38_s7woo")
 
-[node name="Ocean_20" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=163564434]
+[node name="Ocean_20" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=474373665]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("39_umigo")
 
-[node name="Ocean_21" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=648956121]
+[node name="Ocean_21" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1278442817]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("40_b0xdm")
 
-[node name="Ocean_22" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=177080776]
+[node name="Ocean_22" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=271112824]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("41_50igb")
 
-[node name="Ocean_23" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1860468643]
+[node name="Ocean_23" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=475139756]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("42_sugsj")
 
-[node name="Ocean_24" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=177516619]
+[node name="Ocean_24" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1665927984]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("43_mms8x")
 
-[node name="Ocean_25" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=961949493]
+[node name="Ocean_25" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=638936045]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("44_bl47u")
 
-[node name="Ocean_26" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1753804139]
+[node name="Ocean_26" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=215987768]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("45_5wy54")
 
-[node name="Ocean_27" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=574620802]
+[node name="Ocean_27" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1087889304]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("46_32rdt")
 
-[node name="Ocean_28" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=569051586]
+[node name="Ocean_28" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=219820061]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("47_l2qfm")
 
-[node name="Ocean_29" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=2077232107]
+[node name="Ocean_29" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=1633016197]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("48_xxeep")
 
-[node name="Ocean_30" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=893829862]
+[node name="Ocean_30" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=773618861]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("49_un7g7")
 
-[node name="Ocean_31" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=546703889]
+[node name="Ocean_31" type="MeshInstance3D" parent="TerrainGenerator/BloombayWater" unique_id=288004238]
 material_override = SubResource("ShaderMaterial_cixow")
 cast_shadow = 0
 mesh = ExtResource("50_picwu")
 
-[node name="Seafront" type="Node3D" parent="." unique_id=472821257]
+[node name="Seafront" type="Node3D" parent="." unique_id=1705952325]
 
-[node name="Grandstand" type="MeshInstance3D" parent="Seafront" unique_id=1843340770]
+[node name="Grandstand" type="MeshInstance3D" parent="Seafront" unique_id=796234942]
 mesh = ExtResource("51_54tdc")
 
-[node name="GrandstandBody" type="StaticBody3D" parent="Seafront" unique_id=1465286480]
+[node name="GrandstandBody" type="StaticBody3D" parent="Seafront" unique_id=1054325066]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23.275, 3.366038, 170)
 
-[node name="@CollisionShape3D@72" type="CollisionShape3D" parent="Seafront/GrandstandBody" unique_id=209379013]
+[node name="@CollisionShape3D@72" type="CollisionShape3D" parent="Seafront/GrandstandBody" unique_id=968227367]
 shape = SubResource("BoxShape3D_c5r4q")
 
-[node name="Hut0Body" type="StaticBody3D" parent="Seafront" unique_id=1895204144]
+[node name="Hut0Body" type="StaticBody3D" parent="Seafront" unique_id=1832756753]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23.75, 2.6118867, 24)
 
-[node name="@CollisionShape3D@73" type="CollisionShape3D" parent="Seafront/Hut0Body" unique_id=1679182148]
+[node name="@CollisionShape3D@73" type="CollisionShape3D" parent="Seafront/Hut0Body" unique_id=308656022]
 shape = SubResource("BoxShape3D_7li12")
 
-[node name="Hut1Body" type="StaticBody3D" parent="Seafront" unique_id=415968554]
+[node name="Hut1Body" type="StaticBody3D" parent="Seafront" unique_id=659274000]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23.75, 2.6117609, 27.599998)
 
-[node name="@CollisionShape3D@74" type="CollisionShape3D" parent="Seafront/Hut1Body" unique_id=864265095]
+[node name="@CollisionShape3D@74" type="CollisionShape3D" parent="Seafront/Hut1Body" unique_id=1840830175]
 shape = SubResource("BoxShape3D_jpnel")
 
-[node name="Hut2Body" type="StaticBody3D" parent="Seafront" unique_id=1083010926]
+[node name="Hut2Body" type="StaticBody3D" parent="Seafront" unique_id=96351089]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23.75, 2.6138, 31.2)
 
-[node name="@CollisionShape3D@75" type="CollisionShape3D" parent="Seafront/Hut2Body" unique_id=508035056]
+[node name="@CollisionShape3D@75" type="CollisionShape3D" parent="Seafront/Hut2Body" unique_id=1758142625]
 shape = SubResource("BoxShape3D_awl33")
 
-[node name="Hut3Body" type="StaticBody3D" parent="Seafront" unique_id=1669729105]
+[node name="Hut3Body" type="StaticBody3D" parent="Seafront" unique_id=419020602]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23.75, 2.6142766, 34.8)
 
-[node name="@CollisionShape3D@76" type="CollisionShape3D" parent="Seafront/Hut3Body" unique_id=132171829]
+[node name="@CollisionShape3D@76" type="CollisionShape3D" parent="Seafront/Hut3Body" unique_id=1461347280]
 shape = SubResource("BoxShape3D_aoblp")
 
-[node name="Hut4Body" type="StaticBody3D" parent="Seafront" unique_id=1113409273]
+[node name="Hut4Body" type="StaticBody3D" parent="Seafront" unique_id=2016224346]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23.75, 2.6109614, 38.4)
 
-[node name="@CollisionShape3D@77" type="CollisionShape3D" parent="Seafront/Hut4Body" unique_id=406327277]
+[node name="@CollisionShape3D@77" type="CollisionShape3D" parent="Seafront/Hut4Body" unique_id=49639580]
 shape = SubResource("BoxShape3D_4d733")
 
-[node name="Hut5Body" type="StaticBody3D" parent="Seafront" unique_id=957446784]
+[node name="Hut5Body" type="StaticBody3D" parent="Seafront" unique_id=809095345]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23.75, 2.607407, 42)
 
-[node name="@CollisionShape3D@78" type="CollisionShape3D" parent="Seafront/Hut5Body" unique_id=356097382]
+[node name="@CollisionShape3D@78" type="CollisionShape3D" parent="Seafront/Hut5Body" unique_id=1039194130]
 shape = SubResource("BoxShape3D_g54vl")
 
-[node name="Hut6Body" type="StaticBody3D" parent="Seafront" unique_id=2093407824]
+[node name="Hut6Body" type="StaticBody3D" parent="Seafront" unique_id=865876557]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23.75, 2.6043057, 45.6)
 
-[node name="@CollisionShape3D@79" type="CollisionShape3D" parent="Seafront/Hut6Body" unique_id=1954984609]
+[node name="@CollisionShape3D@79" type="CollisionShape3D" parent="Seafront/Hut6Body" unique_id=1142875247]
 shape = SubResource("BoxShape3D_foxdq")
 
-[node name="Hut7Body" type="StaticBody3D" parent="Seafront" unique_id=483835639]
+[node name="Hut7Body" type="StaticBody3D" parent="Seafront" unique_id=1425576544]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23.75, 2.6027997, 49.2)
 
-[node name="@CollisionShape3D@80" type="CollisionShape3D" parent="Seafront/Hut7Body" unique_id=1496701924]
+[node name="@CollisionShape3D@80" type="CollisionShape3D" parent="Seafront/Hut7Body" unique_id=314334026]
 shape = SubResource("BoxShape3D_jdryj")
 
-[node name="Hut8Body" type="StaticBody3D" parent="Seafront" unique_id=1598869639]
+[node name="Hut8Body" type="StaticBody3D" parent="Seafront" unique_id=1945111229]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23.75, 2.6030219, 52.8)
 
-[node name="@CollisionShape3D@81" type="CollisionShape3D" parent="Seafront/Hut8Body" unique_id=443746997]
+[node name="@CollisionShape3D@81" type="CollisionShape3D" parent="Seafront/Hut8Body" unique_id=876792148]
 shape = SubResource("BoxShape3D_ffa2m")
 
-[node name="Hut9Body" type="StaticBody3D" parent="Seafront" unique_id=1485837081]
+[node name="Hut9Body" type="StaticBody3D" parent="Seafront" unique_id=235100750]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23.75, 2.6039443, 56.4)
 
-[node name="@CollisionShape3D@82" type="CollisionShape3D" parent="Seafront/Hut9Body" unique_id=1964057588]
+[node name="@CollisionShape3D@82" type="CollisionShape3D" parent="Seafront/Hut9Body" unique_id=505437732]
 shape = SubResource("BoxShape3D_lapox")
 
-[node name="Hut10Body" type="StaticBody3D" parent="Seafront" unique_id=1074384865]
+[node name="Hut10Body" type="StaticBody3D" parent="Seafront" unique_id=1348111061]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23.75, 2.602419, 60)
 
-[node name="@CollisionShape3D@83" type="CollisionShape3D" parent="Seafront/Hut10Body" unique_id=1067217363]
+[node name="@CollisionShape3D@83" type="CollisionShape3D" parent="Seafront/Hut10Body" unique_id=2041550367]
 shape = SubResource("BoxShape3D_3fnt1")
 
-[node name="Hut11Body" type="StaticBody3D" parent="Seafront" unique_id=1991437564]
+[node name="Hut11Body" type="StaticBody3D" parent="Seafront" unique_id=1397420370]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23.75, 2.6019905, 63.6)
 
-[node name="@CollisionShape3D@84" type="CollisionShape3D" parent="Seafront/Hut11Body" unique_id=1657412562]
+[node name="@CollisionShape3D@84" type="CollisionShape3D" parent="Seafront/Hut11Body" unique_id=1338626102]
 shape = SubResource("BoxShape3D_tily0")
 
-[node name="Hut12Body" type="StaticBody3D" parent="Seafront" unique_id=1639791612]
+[node name="Hut12Body" type="StaticBody3D" parent="Seafront" unique_id=914096048]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23.75, 2.604564, 67.2)
 
-[node name="@CollisionShape3D@85" type="CollisionShape3D" parent="Seafront/Hut12Body" unique_id=2003587645]
+[node name="@CollisionShape3D@85" type="CollisionShape3D" parent="Seafront/Hut12Body" unique_id=1528807033]
 shape = SubResource("BoxShape3D_rue2q")
 
-[node name="Hut13Body" type="StaticBody3D" parent="Seafront" unique_id=516666533]
+[node name="Hut13Body" type="StaticBody3D" parent="Seafront" unique_id=1851451346]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23.75, 2.6106327, 70.8)
 
-[node name="@CollisionShape3D@86" type="CollisionShape3D" parent="Seafront/Hut13Body" unique_id=213049447]
+[node name="@CollisionShape3D@86" type="CollisionShape3D" parent="Seafront/Hut13Body" unique_id=1012373321]
 shape = SubResource("BoxShape3D_5bfnf")
 
-[node name="BeachHuts" type="MeshInstance3D" parent="Seafront" unique_id=493171476]
+[node name="BeachHuts" type="MeshInstance3D" parent="Seafront" unique_id=339985724]
 mesh = ExtResource("52_7olly")
 
-[node name="PierAbutmentBody" type="StaticBody3D" parent="Seafront" unique_id=2062464634]
+[node name="PierAbutmentBody" type="StaticBody3D" parent="Seafront" unique_id=1826202961]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -60, 1.0241961, 101.399994)
 
-[node name="@CollisionShape3D@87" type="CollisionShape3D" parent="Seafront/PierAbutmentBody" unique_id=268962684]
+[node name="@CollisionShape3D@87" type="CollisionShape3D" parent="Seafront/PierAbutmentBody" unique_id=1058377310]
 shape = SubResource("BoxShape3D_fvod1")
 
-[node name="PierPileBody" type="StaticBody3D" parent="Seafront" unique_id=556677392]
+[node name="PierPileBody" type="StaticBody3D" parent="Seafront" unique_id=1840778425]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -65.5, 0.73722374, 98)
 
-[node name="@CollisionShape3D@88" type="CollisionShape3D" parent="Seafront/PierPileBody" unique_id=315309739]
+[node name="@CollisionShape3D@88" type="CollisionShape3D" parent="Seafront/PierPileBody" unique_id=32184977]
 shape = SubResource("CylinderShape3D_drrrh")
 
-[node name="@StaticBody3D@90" type="StaticBody3D" parent="Seafront" unique_id=59491508]
+[node name="@StaticBody3D@90" type="StaticBody3D" parent="Seafront" unique_id=1993737625]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -65.5, 0.73722374, 102)
 
-[node name="@CollisionShape3D@89" type="CollisionShape3D" parent="Seafront/@StaticBody3D@90" unique_id=1359360704]
+[node name="@CollisionShape3D@89" type="CollisionShape3D" parent="Seafront/@StaticBody3D@90" unique_id=59427095]
 shape = SubResource("CylinderShape3D_ut07w")
 
-[node name="@StaticBody3D@92" type="StaticBody3D" parent="Seafront" unique_id=715419041]
+[node name="@StaticBody3D@92" type="StaticBody3D" parent="Seafront" unique_id=855332569]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -71.5, 0.60724795, 98)
 
-[node name="@CollisionShape3D@91" type="CollisionShape3D" parent="Seafront/@StaticBody3D@92" unique_id=223408465]
+[node name="@CollisionShape3D@91" type="CollisionShape3D" parent="Seafront/@StaticBody3D@92" unique_id=103895695]
 shape = SubResource("CylinderShape3D_af14k")
 
-[node name="@StaticBody3D@94" type="StaticBody3D" parent="Seafront" unique_id=1118530149]
+[node name="@StaticBody3D@94" type="StaticBody3D" parent="Seafront" unique_id=1808965904]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -71.5, 0.60724795, 102)
 
-[node name="@CollisionShape3D@93" type="CollisionShape3D" parent="Seafront/@StaticBody3D@94" unique_id=616479167]
+[node name="@CollisionShape3D@93" type="CollisionShape3D" parent="Seafront/@StaticBody3D@94" unique_id=804432441]
 shape = SubResource("CylinderShape3D_aphgr")
 
-[node name="@StaticBody3D@96" type="StaticBody3D" parent="Seafront" unique_id=1692564258]
+[node name="@StaticBody3D@96" type="StaticBody3D" parent="Seafront" unique_id=1806755063]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -77.5, 0.47784102, 98)
 
-[node name="@CollisionShape3D@95" type="CollisionShape3D" parent="Seafront/@StaticBody3D@96" unique_id=820287134]
+[node name="@CollisionShape3D@95" type="CollisionShape3D" parent="Seafront/@StaticBody3D@96" unique_id=561825562]
 shape = SubResource("CylinderShape3D_qn4ax")
 
-[node name="@StaticBody3D@98" type="StaticBody3D" parent="Seafront" unique_id=1923137462]
+[node name="@StaticBody3D@98" type="StaticBody3D" parent="Seafront" unique_id=1284687455]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -77.5, 0.47784102, 102)
 
-[node name="@CollisionShape3D@97" type="CollisionShape3D" parent="Seafront/@StaticBody3D@98" unique_id=1923385403]
+[node name="@CollisionShape3D@97" type="CollisionShape3D" parent="Seafront/@StaticBody3D@98" unique_id=1643057214]
 shape = SubResource("CylinderShape3D_4ludy")
 
-[node name="@StaticBody3D@100" type="StaticBody3D" parent="Seafront" unique_id=53258017]
+[node name="@StaticBody3D@100" type="StaticBody3D" parent="Seafront" unique_id=1601747946]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -101.5, 0.40127686, 98)
 
-[node name="@CollisionShape3D@99" type="CollisionShape3D" parent="Seafront/@StaticBody3D@100" unique_id=1683797666]
+[node name="@CollisionShape3D@99" type="CollisionShape3D" parent="Seafront/@StaticBody3D@100" unique_id=1290511720]
 shape = SubResource("CylinderShape3D_kx53e")
 
-[node name="@StaticBody3D@102" type="StaticBody3D" parent="Seafront" unique_id=454466988]
+[node name="@StaticBody3D@102" type="StaticBody3D" parent="Seafront" unique_id=2084958115]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -101.5, 0.40127686, 102)
 
-[node name="@CollisionShape3D@101" type="CollisionShape3D" parent="Seafront/@StaticBody3D@102" unique_id=2032551736]
+[node name="@CollisionShape3D@101" type="CollisionShape3D" parent="Seafront/@StaticBody3D@102" unique_id=2052408815]
 shape = SubResource("CylinderShape3D_skfjj")
 
-[node name="Pier" type="MeshInstance3D" parent="Seafront" unique_id=205079776]
+[node name="Pier" type="MeshInstance3D" parent="Seafront" unique_id=1277976741]
 mesh = ExtResource("53_nvfmk")
 
-[node name="LifeguardTowerNorth" type="MeshInstance3D" parent="Seafront" unique_id=815291866]
+[node name="LifeguardTowerNorth" type="MeshInstance3D" parent="Seafront" unique_id=1676718052]
 mesh = ExtResource("54_g524o")
 
-[node name="LifeguardTowerNorthBody" type="StaticBody3D" parent="Seafront" unique_id=178846878]
+[node name="LifeguardTowerNorthBody" type="StaticBody3D" parent="Seafront" unique_id=90311283]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -56, 2.6161287, -340)
 
-[node name="@CollisionShape3D@103" type="CollisionShape3D" parent="Seafront/LifeguardTowerNorthBody" unique_id=1744256737]
+[node name="@CollisionShape3D@103" type="CollisionShape3D" parent="Seafront/LifeguardTowerNorthBody" unique_id=36960752]
 shape = SubResource("BoxShape3D_t1aku")
 
-[node name="LifeguardTowerMid" type="MeshInstance3D" parent="Seafront" unique_id=1603702469]
+[node name="LifeguardTowerMid" type="MeshInstance3D" parent="Seafront" unique_id=841973786]
 mesh = ExtResource("55_srdks")
 
-[node name="LifeguardTowerMidBody" type="StaticBody3D" parent="Seafront" unique_id=1051330886]
+[node name="LifeguardTowerMidBody" type="StaticBody3D" parent="Seafront" unique_id=1855314534]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -63.5, 2.3943346, -125)
 
-[node name="@CollisionShape3D@104" type="CollisionShape3D" parent="Seafront/LifeguardTowerMidBody" unique_id=1001973046]
+[node name="@CollisionShape3D@104" type="CollisionShape3D" parent="Seafront/LifeguardTowerMidBody" unique_id=888844806]
 shape = SubResource("BoxShape3D_2symn")
 
-[node name="LifeguardTowerSouth" type="MeshInstance3D" parent="Seafront" unique_id=1422321558]
+[node name="LifeguardTowerSouth" type="MeshInstance3D" parent="Seafront" unique_id=954996023]
 mesh = ExtResource("56_4nbt5")
 
-[node name="LifeguardTowerSouthBody" type="StaticBody3D" parent="Seafront" unique_id=946621738]
+[node name="LifeguardTowerSouthBody" type="StaticBody3D" parent="Seafront" unique_id=1797819671]
 transform = Transform3D(0.9659258, 0, 0.25881904, 0, 1, 0, -0.25881904, 0, 0.9659258, -58, 2.591947, 292)
 
-[node name="@CollisionShape3D@105" type="CollisionShape3D" parent="Seafront/LifeguardTowerSouthBody" unique_id=708701767]
+[node name="@CollisionShape3D@105" type="CollisionShape3D" parent="Seafront/LifeguardTowerSouthBody" unique_id=2051949703]
 shape = SubResource("BoxShape3D_ej347")
 
-[node name="Lighthouse" type="MeshInstance3D" parent="Seafront" unique_id=393553800]
+[node name="Lighthouse" type="MeshInstance3D" parent="Seafront" unique_id=1160605649]
 lod_bias = 4.0
 mesh = ExtResource("57_kt32f")
 
-[node name="LighthouseLamp" type="OmniLight3D" parent="Seafront" unique_id=1514935874]
+[node name="LighthouseLamp" type="OmniLight3D" parent="Seafront" unique_id=627823914]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -100, 23, -394)
 light_color = Color(1, 0.85, 0.55, 1)
 light_energy = 1.2
 omni_range = 12.0
 metadata/no_shadow = true
 
-[node name="LighthouseRockBody" type="StaticBody3D" parent="Seafront" unique_id=2067050612]
+[node name="LighthouseRockBody" type="StaticBody3D" parent="Seafront" unique_id=1980151754]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -100, 0, -394)
 
-[node name="@CollisionShape3D@106" type="CollisionShape3D" parent="Seafront/LighthouseRockBody" unique_id=757684259]
+[node name="@CollisionShape3D@106" type="CollisionShape3D" parent="Seafront/LighthouseRockBody" unique_id=432596661]
 shape = SubResource("CylinderShape3D_avcow")
 
-[node name="Shipwreck" type="MeshInstance3D" parent="Seafront" unique_id=1455905625]
+[node name="Shipwreck" type="MeshInstance3D" parent="Seafront" unique_id=1202107733]
 mesh = ExtResource("58_3n0yw")
 
-[node name="ShipwreckBody" type="StaticBody3D" parent="Seafront" unique_id=1534423277]
-transform = Transform3D(0.7880108, 0, 0.6156615, 0, 1, 0, -0.6156615, 0, 0.7880108, -68.5, 1.75, 370)
+[node name="ShipwreckBody" type="StaticBody3D" parent="Seafront" unique_id=717853023]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -68, -1.5140697, 370)
 
-[node name="@CollisionShape3D@107" type="CollisionShape3D" parent="Seafront/ShipwreckBody" unique_id=417611365]
-shape = SubResource("BoxShape3D_tallp")
+[node name="@CollisionShape3D@107" type="CollisionShape3D" parent="Seafront/ShipwreckBody" unique_id=1150081129]
+shape = SubResource("ConvexPolygonShape3D_tallp")
 
-[node name="BoardRackBody" type="StaticBody3D" parent="Seafront" unique_id=1928271005]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 2.1625519, 241.85)
+[node name="ShipwreckHouseBody" type="StaticBody3D" parent="Seafront" unique_id=660194898]
+transform = Transform3D(0.7645673, 0.1944491, 0.61451316, -0.29182637, 0.95452106, 0.06104854, -0.57469493, -0.22600687, 0.786541, -71.29228, 1.8309547, 363.92142)
 
-[node name="@CollisionShape3D@108" type="CollisionShape3D" parent="Seafront/BoardRackBody" unique_id=948938790]
+[node name="@CollisionShape3D@108" type="CollisionShape3D" parent="Seafront/ShipwreckHouseBody" unique_id=1503682754]
 shape = SubResource("BoxShape3D_i16cw")
 
-[node name="SawhorsesBody" type="StaticBody3D" parent="Seafront" unique_id=1365583921]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 2.3538806, 242.7)
+[node name="BoardRackBody" type="StaticBody3D" parent="Seafront" unique_id=551006155]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 2.1625519, 241.85)
 
-[node name="@CollisionShape3D@109" type="CollisionShape3D" parent="Seafront/SawhorsesBody" unique_id=227390882]
+[node name="@CollisionShape3D@109" type="CollisionShape3D" parent="Seafront/BoardRackBody" unique_id=1270023903]
 shape = SubResource("BoxShape3D_jxg1a")
 
-[node name="SurfShack" type="MeshInstance3D" parent="Seafront" unique_id=1312227498]
-mesh = ExtResource("59_47ndc")
+[node name="SawhorsesBody" type="StaticBody3D" parent="Seafront" unique_id=1540821814]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 2.3538806, 242.7)
 
-[node name="SurfShackBody" type="StaticBody3D" parent="Seafront" unique_id=127535895]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.35, 2.9552767, 236)
-
-[node name="@CollisionShape3D@110" type="CollisionShape3D" parent="Seafront/SurfShackBody" unique_id=252277477]
+[node name="@CollisionShape3D@110" type="CollisionShape3D" parent="Seafront/SawhorsesBody" unique_id=1264213604]
 shape = SubResource("BoxShape3D_4x1qn")
 
-[node name="Umbrellas" type="MeshInstance3D" parent="Seafront" unique_id=950177275]
+[node name="SurfShack" type="MeshInstance3D" parent="Seafront" unique_id=1540382255]
+mesh = ExtResource("59_47ndc")
+
+[node name="SurfShackBody" type="StaticBody3D" parent="Seafront" unique_id=1043326948]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.35, 2.9552767, 236)
+
+[node name="@CollisionShape3D@111" type="CollisionShape3D" parent="Seafront/SurfShackBody" unique_id=174902191]
+shape = SubResource("BoxShape3D_wimop")
+
+[node name="Umbrellas" type="MeshInstance3D" parent="Seafront" unique_id=677808422]
 mesh = ExtResource("60_ya2to")
 
-[node name="SandFence" type="MeshInstance3D" parent="Seafront" unique_id=857588050]
+[node name="SandFence" type="MeshInstance3D" parent="Seafront" unique_id=1375507697]
 mesh = ExtResource("61_rtsjm")
 
 [node name="AnchoredYacht" type="Node3D" parent="Seafront" unique_id=1045695303 instance=ExtResource("62_ieara")]
 transform = Transform3D(0.02736161, 0, -0.075175405, 0, 0.08, 0, 0.075175405, 0, 0.02736161, -360, 0.25, -60)
 
-[node name="Sailboat0" type="MeshInstance3D" parent="Seafront" unique_id=843720777]
+[node name="Sailboat0" type="MeshInstance3D" parent="Seafront" unique_id=1771163131]
 mesh = ExtResource("63_vhl7l")
 
-[node name="Sailboat1" type="MeshInstance3D" parent="Seafront" unique_id=1521910736]
+[node name="Sailboat1" type="MeshInstance3D" parent="Seafront" unique_id=355702476]
 mesh = ExtResource("64_kw3q0")
 
 [node name="FinishLine" type="Area3D" parent="." unique_id=1076613409 instance=ExtResource("65_1wrcf")]
@@ -1333,97 +1342,97 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42, 0.76, 160)
 script = ExtResource("66_ynsrk")
 is_finish_line = true
 
-[node name="SpawnPoints" type="Node3D" parent="FinishLine" unique_id=881592113]
+[node name="SpawnPoints" type="Node3D" parent="FinishLine" unique_id=1195193342]
 
-[node name="Spawn1" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=2014729649]
+[node name="Spawn1" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1218258237]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.8, 0.05, 5)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn1" unique_id=555710876 instance=ExtResource("67_unjbr")]
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn1" unique_id=1110844468 instance=ExtResource("67_unjbr")]
 
-[node name="Spawn2" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1326905351]
+[node name="Spawn2" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1765098318]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.8, 0.05, 5)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn2" unique_id=745181964 instance=ExtResource("67_unjbr")]
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn2" unique_id=950978279 instance=ExtResource("67_unjbr")]
 
-[node name="Spawn3" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=389368199]
+[node name="Spawn3" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1898892756]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.8, 0.05, 12)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn3" unique_id=1705555387 instance=ExtResource("67_unjbr")]
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn3" unique_id=178088995 instance=ExtResource("67_unjbr")]
 
-[node name="Spawn4" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1134307542]
+[node name="Spawn4" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1539871396]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.8, 0.05, 12)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn4" unique_id=2026902504 instance=ExtResource("67_unjbr")]
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn4" unique_id=1976964447 instance=ExtResource("67_unjbr")]
 
-[node name="Spawn5" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1432020706]
+[node name="Spawn5" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=2119103570]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.8, 0.05, 19)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn5" unique_id=1978013082 instance=ExtResource("67_unjbr")]
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn5" unique_id=409763164 instance=ExtResource("67_unjbr")]
 
-[node name="Spawn6" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1966130177]
+[node name="Spawn6" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=207536133]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.8, 0.05, 19)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn6" unique_id=1812625558 instance=ExtResource("67_unjbr")]
+[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn6" unique_id=1412066356 instance=ExtResource("67_unjbr")]
 
-[node name="Checkpoints" type="Node3D" parent="." unique_id=659661832]
+[node name="Checkpoints" type="Node3D" parent="." unique_id=1930784439]
 
-[node name="Checkpoint_1" type="Area3D" parent="Checkpoints" unique_id=412138894 instance=ExtResource("65_1wrcf")]
+[node name="Checkpoint_1" type="Area3D" parent="Checkpoints" unique_id=1319747297 instance=ExtResource("65_1wrcf")]
 transform = Transform3D(1, 0, 2.5430925e-06, 0, 1, 0, -2.5430925e-06, 0, 1, -46.999996, 0.6000278, -108.96673)
 script = ExtResource("66_ynsrk")
 
-[node name="Checkpoint_2" type="Area3D" parent="Checkpoints" unique_id=1859229987 instance=ExtResource("65_1wrcf")]
+[node name="Checkpoint_2" type="Area3D" parent="Checkpoints" unique_id=2136876705 instance=ExtResource("65_1wrcf")]
 transform = Transform3D(-0.36933443, 0, -0.92929655, 0, 1, 0, 0.92929655, 0, -0.36933443, 61.387386, 12.60222, -302.81583)
 script = ExtResource("66_ynsrk")
 
-[node name="Checkpoint_3" type="Area3D" parent="Checkpoints" unique_id=67564127 instance=ExtResource("65_1wrcf")]
+[node name="Checkpoint_3" type="Area3D" parent="Checkpoints" unique_id=366278941 instance=ExtResource("65_1wrcf")]
 transform = Transform3D(-0.96240103, 0, -0.27163252, 0, 1, 0, 0.27163252, 0, -0.96240103, 207.27722, 12.541383, -74.655785)
 script = ExtResource("66_ynsrk")
 
-[node name="Checkpoint_4" type="Area3D" parent="Checkpoints" unique_id=344619963 instance=ExtResource("65_1wrcf")]
+[node name="Checkpoint_4" type="Area3D" parent="Checkpoints" unique_id=518573948 instance=ExtResource("65_1wrcf")]
 transform = Transform3D(-0.73199224, 0, 0.6813129, 0, 1, 0, -0.6813129, 0, -0.73199224, 125.192276, 7.44919, 177.75963)
 script = ExtResource("66_ynsrk")
 
-[node name="Checkpoint_5" type="Area3D" parent="Checkpoints" unique_id=1120224811 instance=ExtResource("65_1wrcf")]
+[node name="Checkpoint_5" type="Area3D" parent="Checkpoints" unique_id=1639440720 instance=ExtResource("65_1wrcf")]
 transform = Transform3D(0.02632226, 0, 0.9996535, 0, 1, 0, -0.9996535, 0, 0.02632226, 92.05476, 11.389421, 376.80927)
 script = ExtResource("66_ynsrk")
 
-[node name="BoostPads" type="Node3D" parent="." unique_id=14238164]
+[node name="BoostPads" type="Node3D" parent="." unique_id=34467282]
 
 [node name="BoostPad_1" type="Area3D" parent="BoostPads" unique_id=1434937508 instance=ExtResource("68_1k0mx")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -47, 0.55, -80)
 collision_layer = 0
 script = ExtResource("69_kt15r")
 
-[node name="BoostPad_2" type="Area3D" parent="BoostPads" unique_id=1079819232 instance=ExtResource("68_1k0mx")]
+[node name="BoostPad_2" type="Area3D" parent="BoostPads" unique_id=1667246500 instance=ExtResource("68_1k0mx")]
 transform = Transform3D(0.34202015, 0, -0.9396926, 0, 1, 0, 0.9396926, 0, 0.34202015, 35, 7.8, -310)
 collision_layer = 0
 script = ExtResource("69_kt15r")
 
-[node name="BoostPad_3" type="Area3D" parent="BoostPads" unique_id=1456635036 instance=ExtResource("68_1k0mx")]
+[node name="BoostPad_3" type="Area3D" parent="BoostPads" unique_id=453915445 instance=ExtResource("68_1k0mx")]
 transform = Transform3D(0.9396926, 0, -0.34202012, 0, 1, 0, 0.34202012, 0, 0.9396926, 200, 9.5, -90)
 collision_layer = 0
 script = ExtResource("69_kt15r")
 
-[node name="BoostPad_4" type="Area3D" parent="BoostPads" unique_id=1032855566 instance=ExtResource("68_1k0mx")]
+[node name="BoostPad_4" type="Area3D" parent="BoostPads" unique_id=430725674 instance=ExtResource("68_1k0mx")]
 transform = Transform3D(0.92718387, 0, -0.37460658, 0, 1, 0, 0.37460658, 0, 0.92718387, 180, 26.05, 95)
 collision_layer = 0
 script = ExtResource("69_kt15r")
 
-[node name="BoostPad_5" type="Area3D" parent="BoostPads" unique_id=1731210824 instance=ExtResource("68_1k0mx")]
+[node name="BoostPad_5" type="Area3D" parent="BoostPads" unique_id=575185599 instance=ExtResource("68_1k0mx")]
 transform = Transform3D(0.81915206, 0, 0.57357645, 0, 1, 0, -0.57357645, 0, 0.81915206, 145, 20.2, 320)
 collision_layer = 0
 script = ExtResource("69_kt15r")
 
-[node name="Vegetation" type="Node3D" parent="." unique_id=1384232005]
+[node name="Vegetation" type="Node3D" parent="." unique_id=1411580903]
 
-[node name="Props" type="Node3D" parent="." unique_id=681975277]
+[node name="Props" type="Node3D" parent="." unique_id=1225732159]
 
-[node name="AlternativePaths" type="Node3D" parent="." unique_id=1549085480]
+[node name="AlternativePaths" type="Node3D" parent="." unique_id=786794182]
 
-[node name="Environment" type="Node3D" parent="." unique_id=320467835]
+[node name="Environment" type="Node3D" parent="." unique_id=303877960]

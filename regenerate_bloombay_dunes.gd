@@ -698,6 +698,10 @@ func _mat(key: String) -> Material:
 		"metal":
 			m.metallic = 0.6
 			m.roughness = 0.4
+		# Rusted steel: dull, barely metallic.
+		"rust":
+			m.metallic = 0.2
+			m.roughness = 0.85
 		"canvas":
 			m.roughness = 0.95
 			m.cull_mode = BaseMaterial3D.CULL_DISABLED
@@ -819,8 +823,8 @@ func _gable_roof(kit: Dictionary, key: String, xf: Transform3D, w: float, d: flo
 	_quad(kit, key, [l0, r0, r1, l1], nd, col.darkened(0.3))
 
 
-## A low-poly rock: an icosphere pushed about by noise, flat shaded.
-func _rock(kit: Dictionary, centre: Vector3, size: Vector3, seed_v: int, col: Color) -> void:
+## A low-poly rock: an icosphere pushed about by noise, flat shaded. The wreck's net heaps use it too.
+func _rock(kit: Dictionary, centre: Vector3, size: Vector3, seed_v: int, col: Color, key: String = "rock") -> void:
 	var noise := FastNoiseLite.new()
 	noise.seed = seed_v
 	noise.frequency = 0.9
@@ -857,7 +861,7 @@ func _rock(kit: Dictionary, centre: Vector3, size: Vector3, seed_v: int, col: Co
 		# Flatten the tops and the bed a little: weathered, not round.
 		p.y = clampf(p.y, -0.85, 0.7)
 		pts.append(centre + p * size)
-	var st := _st(kit, "rock")
+	var st := _st(kit, key)
 	for f in faces:
 		var a: Vector3 = pts[f[0]]
 		var b: Vector3 = pts[f[1]]
@@ -1210,63 +1214,929 @@ func _build_lighthouse(root: Node3D) -> void:
 	_note("Lighthouse", Vector2(c.x, c.z), 12.0, CLEAR_BUILDING)
 
 
-## An old fishing boat, broken-backed and half sunk in the swash at the south end of the beach.
+# --- Shipwreck ------------------------------------------------------------------------------------
+# A wooden trawler driven ashore bow first at the south end of the beach and heeled toward the dunes,
+# so its deck faces the dune descent, where the lap comes down toward it. The hull is a function of
+# s (0 transom, 1 stem) and a (0 keel, 1 sheer) in its own frame: +z forward, +y up from the
+# baseline amidships, +x the landward (low) side. The planking runs in strakes between fixed a.
+
+const WRECK_AT := Vector2(-68.0, 370.0)
+const WRECK_YAW := 38.0        # degrees; the bow points up the beach, to the south-east
+const WRECK_HEEL := 17.0       # degrees, toward the dunes
+const WRECK_TRIM := 3.5        # degrees, bow up
+const WRECK_BURY := 1.35       # the baseline amidships, below the sand
+const WRECK_LEN := 22.0
+const WRECK_BEAM := 6.2
+const WRECK_DEPTH := 3.3       # baseline to the lowest point of the sheer
+const WRECK_BULWARK := 0.85    # sheer above the deck
+const WRECK_PLANK := 0.07
+const WRECK_LAP := 0.025       # each strake's lower edge stands proud of the one below
+const WRECK_STRAKES := 16
+const WRECK_STATIONS := 44
+const WRECK_DECK_STRIPS := 16
+const HULL_RED := Color(0.56, 0.20, 0.15)
+const HULL_BLUE := Color(0.15, 0.40, 0.55)
+const HULL_WHITE := Color(0.86, 0.84, 0.78)
+const HULL_YELLOW := Color(0.90, 0.68, 0.22)
+const BARE_WOOD := Color(0.56, 0.53, 0.48)
+const HOLD_WOOD := Color(0.32, 0.27, 0.22)
+const DECK_WOOD := Color(0.52, 0.47, 0.40)
+const RUST := Color(0.42, 0.22, 0.12)
+const NET_GREEN := Color(0.20, 0.42, 0.30)
+const BEACH_SAND := Color(0.88, 0.80, 0.62)
+
+var _wreck_xf: Transform3D
+var _wreck_edges: Array = []   # a at each strake edge, keel to sheer
+
+
 func _build_shipwreck(root: Node3D) -> void:
 	var kit := {}
-	var at := Vector3(-68.5, 0.5, 370.0)
-	var xf := Transform3D(Basis(Vector3.UP, deg_to_rad(38.0)) * Basis(Vector3.FORWARD, deg_to_rad(-16.0)) * Basis(Vector3.RIGHT, deg_to_rad(4.0)), at)
-	var length := 18.0
-	var beam := 5.2
-	var depth := 3.4
-	var stations := 18
-	var arc := 12
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 77
-	var hull := func(s: float, a: float) -> Vector3:
-		# s along the keel (0 stern, 1 bow), a round the hull from port gunwale (0) to starboard (1).
-		var taper := sqrt(maxf(0.0, 1.0 - pow(absf(2.0 * s - 1.0) * (1.0 if s > 0.5 else 0.85), 3.0)))
-		var w := beam * 0.5 * maxf(taper, 0.06)
-		var phi := PI * a
-		var sheer := depth * (0.15 * pow(2.0 * s - 1.0, 2.0))
-		return Vector3(-cos(phi) * w, -sin(phi) * depth * (0.55 + 0.45 * taper) + sheer, (s - 0.5) * length)
-	var red_bottom := Color(0.55, 0.22, 0.18)
-	var plank := Color(0.42, 0.36, 0.30)
-	for i in range(stations):
-		var s0 := float(i) / stations
-		var s1 := float(i + 1) / stations
-		for j in range(arc):
-			var a0 := float(j) / arc
-			var a1 := float(j + 1) / arc
-			# The bow half has lost most of its planking.
-			var lost := s0 > 0.55 and rng.randf() < lerpf(0.35, 0.85, (s0 - 0.55) / 0.45)
-			if lost:
-				continue
-			var p00: Vector3 = xf * hull.call(s0, a0)
-			var p01: Vector3 = xf * hull.call(s0, a1)
-			var p10: Vector3 = xf * hull.call(s1, a0)
-			var p11: Vector3 = xf * hull.call(s1, a1)
-			var centre: Vector3 = xf * Vector3(0, -depth * 0.3, (lerpf(s0, s1, 0.5) - 0.5) * length)
-			var out := ((p00 + p11) * 0.5 - centre).normalized()
-			var col := red_bottom if absf(a0 - 0.5) < 0.3 else plank
-			_quad(kit, "wreck", [p00, p01, p11, p10], out, col.darkened(rng.randf_range(0.0, 0.18)))
-	# Ribs, standing clear where the planks are gone.
-	for i in range(1, stations, 2):
-		var s := float(i) / stations
-		for j in range(arc):
-			var a: Vector3 = xf * hull.call(s, float(j) / arc)
-			var b: Vector3 = xf * hull.call(s, float(j + 1) / arc)
-			var inward: Vector3 = (xf.basis * Vector3(0, 0.25, 0))
-			_tube(kit, "wreck", a + inward * 0.4, b + inward * 0.4, 0.13, 0.13, 4, OLD_WOOD.darkened(0.2))
-	# Keel, stem and a snapped mast.
-	_tube(kit, "wreck", xf * Vector3(0, -depth, -length * 0.5), xf * Vector3(0, -depth * 0.6, length * 0.5), 0.25, 0.2, 6, OLD_WOOD.darkened(0.3))
-	_tube(kit, "wreck", xf * Vector3(0, -depth * 0.6, length * 0.5), xf * Vector3(0, depth * 0.4, length * 0.5 + 0.8), 0.2, 0.15, 6, OLD_WOOD.darkened(0.3))
-	_tube(kit, "wreck", xf * Vector3(0, -depth * 0.8, -1.0), xf * Vector3(0.8, 3.8, -0.4), 0.22, 0.16, 8, OLD_WOOD)
-	# Wheelhouse, tipped over the stern.
-	_box(kit, "wreck", xf * Transform3D(Basis(Vector3.RIGHT, 0.1), Vector3(0, 0.6, -length * 0.3)), Vector3(3.0, 2.2, 3.2), Color(0.62, 0.66, 0.62))
-	_box(kit, "wreck", xf * Transform3D(Basis(Vector3.RIGHT, 0.1), Vector3(0, 1.8, -length * 0.3)), Vector3(3.4, 0.2, 3.6), Color(0.40, 0.35, 0.30))
+	var basis := Basis(Vector3.UP, deg_to_rad(WRECK_YAW)) * Basis(Vector3.RIGHT, deg_to_rad(-WRECK_TRIM)) * Basis(Vector3.BACK, deg_to_rad(-WRECK_HEEL))
+	_wreck_xf = Transform3D(basis, Vector3(WRECK_AT.x, _ground(WRECK_AT.x, WRECK_AT.y) - WRECK_BURY, WRECK_AT.y))
+	_wreck_edges = _wreck_strake_edges()
+	var gone := _wreck_plan_damage(rng)
+	_wreck_hull(kit, gone, rng)
+	_wreck_transom(kit, rng)
+	_wreck_deck(kit, rng)
+	_wreck_frames(kit, gone, rng)
+	_wreck_rails(kit, gone)
+	var house := _wreck_wheelhouse(kit, rng)
+	_wreck_rig(kit)
+	_wreck_stern_gear(kit, rng)
+	_wreck_ground_tackle(kit)
+	_wreck_debris(kit, rng)
 	_commit(root, kit, "Shipwreck")
-	_box_collider(root, "Shipwreck", at + Vector3(-2.5, -0.5, -8.5), at + Vector3(2.5, 3.0, 8.5), 38.0)
-	_note("Shipwreck", Vector2(at.x, at.z), 9.0, CLEAR_BUILDING)
+
+	# Collision: the hull's convex outline above the sand, and the wheelhouse.
+	var pts := PackedVector3Array()
+	for i in 12:
+		for a in [0.3, 0.6, 0.85, 1.0]:
+			for side in [-1.0, 1.0]:
+				var w := _wreck_xf * _wreck_point(i / 11.0, a, side)
+				if w.y > _ground(w.x, w.z) - 0.6:
+					pts.append(w - _wreck_xf.origin)
+	var hull_shape := ConvexPolygonShape3D.new()
+	hull_shape.points = pts
+	_collider(root, "Shipwreck", hull_shape, Transform3D(Basis(), _wreck_xf.origin))
+	var house_shape := BoxShape3D.new()
+	house_shape.size = house.size
+	_collider(root, "ShipwreckHouse", house_shape, _wreck_xf * Transform3D(Basis(), house.get_center()))
+	_note("Shipwreck", WRECK_AT, 12.0, CLEAR_BUILDING)
+	_verify_wreck_bedded()
+
+
+## Top of the bulwark above the baseline: low aft of amidships, sweeping up to a high bow.
+func _wreck_sheer(s: float) -> float:
+	return WRECK_DEPTH + 0.5 * pow(1.0 - s, 2.0) + 1.7 * pow(s, 3.0)
+
+
+## Bottom of the section: the buttocks rise to the transom, the forefoot sweeps up into the stem.
+func _wreck_keel(s: float) -> float:
+	return 0.9 * pow(1.0 - smoothstep(0.0, 0.35, s), 2.0) + 2.0 * pow(smoothstep(0.72, 1.0, s), 2.0)
+
+
+## Half-breadth at the sheer: a wide transom, full amidships, a fine bow.
+func _wreck_half_beam(s: float) -> float:
+	if s < 0.45:
+		return WRECK_BEAM * 0.5 * lerpf(0.8, 1.0, sin(PI * 0.5 * s / 0.45))
+	var t := (s - 0.45) / 0.55
+	return WRECK_BEAM * 0.5 * pow(maxf(1.0 - t * t, 0.0), 0.75)
+
+
+## A point on the outside of the planking (side -1 seaward, +1 landward). The sections go from a
+## round bilge amidships to a V at the bow; the stem rakes forward and the transom aft.
+func _wreck_point(s: float, a: float, side: float) -> Vector3:
+	var n := lerpf(lerpf(2.6, 3.2, smoothstep(0.0, 0.4, s)), 1.5, smoothstep(0.5, 1.0, s))
+	var th := clampf(a, 0.0, 1.0) * PI * 0.5
+	var x := pow(sin(th), 2.0 / n)
+	var h := lerpf(1.0 - pow(cos(th), 2.0 / n), x, lerpf(0.12, 0.5, smoothstep(0.55, 1.0, s)))
+	var z := (s - 0.5) * WRECK_LEN - 1.5 * (1.0 - h) * smoothstep(0.6, 1.0, s) + 1.1 * (1.0 - h) * (1.0 - smoothstep(0.0, 0.2, s))
+	return Vector3(side * x * _wreck_half_beam(s), lerpf(_wreck_keel(s), _wreck_sheer(s), h), z)
+
+
+func _wreck_normal(s: float, a: float, side: float) -> Vector3:
+	var s0 := clampf(s - 0.004, 0.0, 0.992)
+	var a0 := clampf(a - 0.004, 0.0, 0.992)
+	var along := _wreck_point(s0 + 0.008, a, side) - _wreck_point(s0, a, side)
+	var round_ := _wreck_point(s, a0 + 0.008, side) - _wreck_point(s, a0, side)
+	var n := along.cross(round_).normalized()
+	var th := clampf(a, 0.0, 1.0) * PI * 0.5
+	return -n if n.dot(Vector3(side * sin(th), -cos(th), 0.0)) < 0.0 else n
+
+
+## Strake edges spaced evenly round the girth amidships; the planks taper toward the ends.
+func _wreck_strake_edges() -> Array:
+	var acc: Array = [0.0]
+	var prev := _wreck_point(0.45, 0.0, 1.0)
+	for i in range(1, 401):
+		var p := _wreck_point(0.45, i / 400.0, 1.0)
+		acc.append(float(acc[-1]) + p.distance_to(prev))
+		prev = p
+	var edges: Array = [0.0]
+	var j := 0
+	for k in range(1, WRECK_STRAKES):
+		var target: float = float(acc[-1]) * k / WRECK_STRAKES
+		while float(acc[j + 1]) < target:
+			j += 1
+		edges.append((j + (target - float(acc[j])) / (float(acc[j + 1]) - float(acc[j]))) / 400.0)
+	edges.append(1.0)
+	return edges
+
+
+## a where the outside of the planking reaches the deck's edge.
+func _wreck_deck_a(s: float) -> float:
+	var y := _wreck_sheer(s) - WRECK_BULWARK
+	var lo := 0.0
+	var hi := 1.0
+	for _i in 22:
+		var m := (lo + hi) * 0.5
+		if _wreck_point(s, m, 1.0).y < y:
+			lo = m
+		else:
+			hi = m
+	return lo
+
+
+## The deck's edge inside the planking at s: half-width, height and z.
+func _wreck_deck_edge(s: float) -> Vector3:
+	var a := _wreck_deck_a(s)
+	var p := _wreck_point(s, a, 1.0) - _wreck_normal(s, a, 1.0) * WRECK_PLANK
+	return Vector3(maxf(p.x, 0.0), _wreck_sheer(s) - WRECK_BULWARK, p.z)
+
+
+## A point on the deck (u -1 seaward edge, +1 landward edge), with 10cm of camber amidships.
+func _wreck_deck_point(e: Vector3, u: float) -> Vector3:
+	return Vector3(u * e.x, e.y + 0.035 * e.x * (1.0 - u * u), e.z)
+
+
+## Paint by strake, as on a Mediterranean trawler: red bottom, a white boot-top, blue topsides, a
+## yellow band and a white sheer strake.
+func _wreck_strake_paint(k: int) -> Color:
+	if k == WRECK_STRAKES - 1 or k == 7:
+		return HULL_WHITE
+	if k == WRECK_STRAKES - 2:
+		return HULL_YELLOW
+	return HULL_BLUE if k > 7 else HULL_RED
+
+
+## Which planks are gone, keyed Vector3i(station, strake, side) with side 0 seaward, 1 landward.
+## The seaward side is stove in amidships, a ragged oval in which each strake ends at its own frame;
+## the landward bulwark is broken in one bay, and a few planks have sprung at either end.
+func _wreck_plan_damage(rng: RandomNumberGenerator) -> Dictionary:
+	var spans := []   # [side, strake, s0, s1]
+	for k in WRECK_STRAKES - 1:
+		var e := ((k + 0.5) / WRECK_STRAKES - 0.6) / 0.36
+		if absf(e) < 1.0:
+			var half := 0.105 * sqrt(1.0 - e * e) * rng.randf_range(0.7, 1.1)
+			spans.append([0, k, 0.585 - half + rng.randf_range(-0.04, 0.04), 0.585 + half + rng.randf_range(-0.04, 0.04)])
+	# The sheer strake still spans the hole but for one bay.
+	spans.append([0, WRECK_STRAKES - 1, 0.60, 0.645])
+	spans.append([0, 11, 0.86, 0.92])
+	spans.append([0, 12, 0.875, 0.90])
+	spans.append([0, 9, 0.18, 0.23])
+	for k in range(WRECK_STRAKES - 3, WRECK_STRAKES):
+		spans.append([1, k, 0.47 + rng.randf_range(-0.02, 0.02), 0.555 + rng.randf_range(-0.02, 0.02)])
+	spans.append([1, 10, 0.30, 0.34])
+	var gone := {}
+	for sp in spans:
+		for i in WRECK_STATIONS:
+			var sm := (i + 0.5) / WRECK_STATIONS
+			if sm > float(sp[2]) and sm < float(sp[3]):
+				gone[Vector3i(i, int(sp[1]), int(sp[0]))] = true
+	return gone
+
+
+## A quad in the wreck's frame, with a normal per corner.
+func _wquad(kit: Dictionary, key: String, p: Array, n: Array, col: Color) -> void:
+	var st := _st(kit, key)
+	var w := []
+	var wn := []
+	for i in 4:
+		w.append(_wreck_xf * (p[i] as Vector3))
+		wn.append((_wreck_xf.basis * (n[i] as Vector3)).normalized())
+	var out: Vector3 = ((wn[0] as Vector3) + (wn[1] as Vector3) + (wn[2] as Vector3) + (wn[3] as Vector3)).normalized()
+	_tri(st, w[0], w[1], w[2], wn[0], wn[1], wn[2], col, out)
+	_tri(st, w[0], w[2], w[3], wn[0], wn[2], wn[3], col, out)
+
+
+func _wbox(kit: Dictionary, key: String, c: Vector3, size: Vector3, col: Color, b: Basis = Basis()) -> void:
+	_box(kit, key, _wreck_xf * Transform3D(b, c), size, col)
+
+
+func _wtube(kit: Dictionary, key: String, a: Vector3, b: Vector3, ra: float, rb: float, segs: int, col: Color, caps: bool = true) -> void:
+	_tube(kit, key, _wreck_xf * a, _wreck_xf * b, ra, rb, segs, col, caps)
+
+
+## A rectangular bar along a polyline (world space): w across it, h along each point's `up`.
+func _sweep(kit: Dictionary, key: String, pts: Array, ups: Array, w: float, h: float, col: Color) -> void:
+	var count := pts.size()
+	if count < 2:
+		return
+	var rings := []
+	var dirs := []
+	for i in count:
+		var t: Vector3 = ((pts[mini(i + 1, count - 1)] as Vector3) - (pts[maxi(i - 1, 0)] as Vector3)).normalized()
+		var up: Vector3 = ups[i]
+		up = (up - t * up.dot(t)).normalized()
+		var side := t.cross(up)
+		var c: Vector3 = pts[i]
+		rings.append([c - side * w * 0.5 - up * h * 0.5, c + side * w * 0.5 - up * h * 0.5, c + side * w * 0.5 + up * h * 0.5, c - side * w * 0.5 + up * h * 0.5])
+		dirs.append([-up, side, up, -side])
+	for i in count - 1:
+		var r0: Array = rings[i]
+		var r1: Array = rings[i + 1]
+		for f in 4:
+			var g := (f + 1) % 4
+			var out: Vector3 = ((dirs[i][f] as Vector3) + (dirs[i + 1][f] as Vector3)).normalized()
+			_quad(kit, key, [r0[f], r0[g], r1[g], r1[f]], out, col)
+	_quad(kit, key, rings[0], ((pts[0] as Vector3) - (pts[1] as Vector3)).normalized(), col)
+	_quad(kit, key, rings[count - 1], ((pts[count - 1] as Vector3) - (pts[count - 2] as Vector3)).normalized(), col)
+
+
+## A rope or wire between two world points, sagging `sag` metres at its middle.
+func _rope(kit: Dictionary, key: String, a: Vector3, b: Vector3, sag: float, r: float, col: Color) -> void:
+	var segs := 6 if sag > 0.0 else 1
+	var prev := a
+	for i in range(1, segs + 1):
+		var t := float(i) / segs
+		var p := a.lerp(b, t) + Vector3(0, -4.0 * sag * t * (1.0 - t), 0)
+		_tube(kit, key, prev, p, r, r, 4, col, false)
+		prev = p
+
+
+## Runs of stations along which present.call(i) holds for every cell i between them.
+func _wreck_runs(present: Callable) -> Array:
+	var runs := []
+	var cur := []
+	for i in WRECK_STATIONS:
+		if present.call(i):
+			if cur.is_empty():
+				cur.append(float(i) / WRECK_STATIONS)
+			cur.append(float(i + 1) / WRECK_STATIONS)
+		elif not cur.is_empty():
+			runs.append(cur)
+			cur = []
+	if not cur.is_empty():
+		runs.append(cur)
+	return runs
+
+
+## The planking: each strake a plank per station with a dark seam along its lower edge, its inside
+## face (painted above the deck, bare in the hold) and its cut ends where its neighbours are gone.
+## Planks wholly under the sand are left out.
+func _wreck_hull(kit: Dictionary, gone: Dictionary, rng: RandomNumberGenerator) -> void:
+	var n := WRECK_STATIONS
+	var ns := WRECK_STRAKES
+	var peel := FastNoiseLite.new()
+	peel.seed = 31
+	peel.frequency = 0.16
+	peel.fractal_type = FastNoiseLite.FRACTAL_NONE
+	# Rust runs down from the chainplates (both sides) and the hawse pipe (landward).
+	var fittings := [[0.64, -1], [0.70, -1], [0.935, 1]]
+	for side_i in 2:
+		var side := -1.0 if side_i == 0 else 1.0
+		var pts := []
+		var nrm := []
+		var above := []
+		for i in n + 1:
+			var s := float(i) / n
+			var pr := []
+			var nr := []
+			var hr := []
+			for k in ns + 1:
+				var p := _wreck_point(s, _wreck_edges[k], side)
+				var w := _wreck_xf * p
+				pr.append(p)
+				nr.append(_wreck_normal(s, _wreck_edges[k], side))
+				hr.append(w.y - _ground(w.x, w.z))
+			pts.append(pr)
+			nrm.append(nr)
+			above.append(hr)
+		for i in n:
+			var sm := (i + 0.5) / n
+			for k in ns:
+				if gone.has(Vector3i(i, k, side_i)):
+					continue
+				var clear := maxf(maxf(above[i][k], above[i][k + 1]), maxf(above[i + 1][k], above[i + 1][k + 1]))
+				if clear < -0.25:
+					continue
+				var p00: Vector3 = pts[i][k]
+				var p10: Vector3 = pts[i + 1][k]
+				var p01: Vector3 = pts[i][k + 1]
+				var p11: Vector3 = pts[i + 1][k + 1]
+				var n00: Vector3 = nrm[i][k]
+				var n10: Vector3 = nrm[i + 1][k]
+				var n01: Vector3 = nrm[i][k + 1]
+				var n11: Vector3 = nrm[i + 1][k + 1]
+
+				var col := _wreck_strake_paint(k)
+				# Paint goes first round the hole and toward the bow.
+				var bare := 0.36 - 0.35 * (1.0 - smoothstep(0.0, 0.14, absf(sm - 0.585))) * (1.0 - side_i) - 0.15 * smoothstep(0.8, 1.0, sm)
+				if peel.get_noise_2d((p00.z + p11.z) * 0.5, k * 1.9 + side_i * 50.0) > bare:
+					col = BARE_WOOD
+				else:
+					col = col.lerp(Color(0.82, 0.82, 0.78), 0.12)
+				col = col.darkened(0.07 * peel.get_noise_2d(p00.z * 3.0 + 400.0, k * 5.0) + 0.03 * (k % 2))
+				for f in fittings:
+					if (int(f[1]) < 0 or int(f[1]) == side_i) and absf(sm - float(f[0])) < 0.6 / n and k > ns - 8:
+						col = col.lerp(RUST, 0.55 * float(k - (ns - 8)) / 7.0)
+				# Dark and wet at the sand, weedy where the swash reaches.
+				var hc := (float(above[i][k]) + float(above[i + 1][k + 1])) * 0.5
+				col = col.lerp(Color(0.30, 0.27, 0.20), (1.0 - smoothstep(0.0, 0.5, hc)) * 0.5)
+				var wy := (_wreck_xf * ((p00 + p11) * 0.5)).y
+				col = col.lerp(Color(0.22, 0.28, 0.14), (1.0 - smoothstep(0.05, 0.5, wy)) * 0.55)
+
+				var lo0 := p00 + n00 * WRECK_LAP
+				var lo1 := p10 + n10 * WRECK_LAP
+				var md0 := lo0.lerp(p01, 0.16)
+				var md1 := lo1.lerp(p11, 0.16)
+				var nm0 := n00.lerp(n01, 0.16)
+				var nm1 := n10.lerp(n11, 0.16)
+				_wquad(kit, "wreck", [lo0, lo1, md1, md0], [n00, n10, nm1, nm0], col.darkened(0.28))
+				_wquad(kit, "wreck", [md0, md1, p11, p01], [nm0, nm1, n11, n01], col)
+				if (i + k * 3) % 9 == 0 and i > 0 and not gone.has(Vector3i(i - 1, k, side_i)):
+					var f := (p10 - p00).normalized() * 0.015
+					_wquad(kit, "wreck", [lo0 - f + n00 * 0.004, lo0 + f + n00 * 0.004, p01 + f + n01 * 0.004, p01 - f + n01 * 0.004], [n00, n00, n01, n01], col.darkened(0.45))
+
+				var in00 := p00 - n00 * WRECK_PLANK
+				var in10 := p10 - n10 * WRECK_PLANK
+				var in01 := p01 - n01 * WRECK_PLANK
+				var in11 := p11 - n11 * WRECK_PLANK
+				var inside := HULL_WHITE.darkened(0.15) if (p00.y + p11.y) * 0.5 > _wreck_sheer(sm) - WRECK_BULWARK else HOLD_WOOD
+				_wquad(kit, "wreck", [in00, in10, in11, in01], [-n00, -n10, -n11, -n01], inside.darkened(rng.randf_range(0.0, 0.08)))
+
+				var cut := BARE_WOOD.darkened(0.15)
+				var down := (p00 - p01).normalized()
+				var fwd := (p10 - p00).normalized()
+				if k > 0:
+					if gone.has(Vector3i(i, k - 1, side_i)):
+						_wquad(kit, "wreck", [lo0, lo1, in10, in00], [down, down, down, down], cut)
+					else:
+						_wquad(kit, "wreck", [lo0, lo1, p10, p00], [down, down, down, down], col.darkened(0.45))
+				if k == ns - 1 or gone.has(Vector3i(i, k + 1, side_i)):
+					_wquad(kit, "wreck", [p01, p11, in11, in01], [-down, -down, -down, -down], cut)
+				if i == 0 or gone.has(Vector3i(i - 1, k, side_i)):
+					_wquad(kit, "wreck", [lo0, p01, in01, in00], [-fwd, -fwd, -fwd, -fwd], cut)
+				if i + 1 < n and gone.has(Vector3i(i + 1, k, side_i)):
+					_wquad(kit, "wreck", [lo1, p11, in11, in10], [fwd, fwd, fwd, fwd], cut)
+
+
+## The transom: flat and raked, planked across in the strakes' colours.
+func _wreck_transom(kit: Dictionary, rng: RandomNumberGenerator) -> void:
+	var aft := Vector3(0.0, -1.1, -(_wreck_sheer(0.0) - _wreck_keel(0.0))).normalized()
+	var deck_y := _wreck_sheer(0.0) - WRECK_BULWARK
+	for k in WRECK_STRAKES:
+		var p0 := _wreck_point(0.0, _wreck_edges[k], -1.0)
+		var p1 := _wreck_point(0.0, _wreck_edges[k], 1.0)
+		var p2 := _wreck_point(0.0, _wreck_edges[k + 1], 1.0)
+		var p3 := _wreck_point(0.0, _wreck_edges[k + 1], -1.0)
+		var top := _wreck_xf * ((p2 + p3) * 0.5)
+		if top.y < _ground(top.x, top.z) - 0.3:
+			continue
+		var col := _wreck_strake_paint(k).lerp(BARE_WOOD, 0.25).darkened(rng.randf_range(0.0, 0.1))
+		var wy := (_wreck_xf * ((p0 + p2) * 0.5)).y
+		col = col.lerp(Color(0.22, 0.28, 0.14), (1.0 - smoothstep(0.05, 0.5, wy)) * 0.55)
+		var m0 := p0.lerp(p3, 0.16)
+		var m1 := p1.lerp(p2, 0.16)
+		_wquad(kit, "wreck", [p0, p1, m1, m0], [aft, aft, aft, aft], col.darkened(0.28))
+		_wquad(kit, "wreck", [m0, m1, p2, p3], [aft, aft, aft, aft], col)
+		var t := -aft * WRECK_PLANK
+		var inside := HULL_WHITE.darkened(0.15) if p2.y > deck_y else HOLD_WOOD
+		_wquad(kit, "wreck", [p0 + t, p1 + t, p2 + t, p3 + t], [-aft, -aft, -aft, -aft], inside)
+
+
+## Deck planks run fore and aft; amidships the hold has fallen in, and sand has drifted down the
+## heeled deck against the low bulwark.
+func _wreck_deck(kit: Dictionary, rng: RandomNumberGenerator) -> void:
+	var n := WRECK_STATIONS
+	var nd := WRECK_DECK_STRIPS
+	var hole := {}
+	for j in nd:
+		var u := -1.0 + 2.0 * (j + 0.5) / nd
+		if absf(u) < 0.62:
+			var half := 0.09 * sqrt(1.0 - pow(u / 0.62, 2.0))
+			var s0 := 0.515 - half + rng.randf_range(-0.03, 0.03)
+			var s1 := 0.515 + half + rng.randf_range(-0.03, 0.03)
+			for i in n:
+				var sm := (i + 0.5) / n
+				if sm > s0 and sm < s1:
+					hole[Vector2i(i, j)] = true
+	var drift := FastNoiseLite.new()
+	drift.seed = 8
+	drift.frequency = 0.3
+	drift.fractal_type = FastNoiseLite.FRACTAL_NONE
+	var edges := []
+	for i in n + 1:
+		edges.append(_wreck_deck_edge(float(i) / n))
+	var tone := []
+	for j in nd:
+		tone.append(rng.randf_range(-0.06, 0.10))
+	var thick := Vector3(0, 0.09, 0)
+	var cut := DECK_WOOD.darkened(0.3)
+	for i in n:
+		var sm := (i + 0.5) / n
+		var e0: Vector3 = edges[i]
+		var e1: Vector3 = edges[i + 1]
+		for j in nd:
+			if hole.has(Vector2i(i, j)):
+				continue
+			var u0 := -1.0 + 2.0 * j / nd
+			var u1 := -1.0 + 2.0 * (j + 1) / nd
+			var q00 := _wreck_deck_point(e0, u0)
+			var q01 := _wreck_deck_point(e0, u1)
+			var q10 := _wreck_deck_point(e1, u0)
+			var q11 := _wreck_deck_point(e1, u1)
+			var fwd := (q10 - q00).normalized()
+			var across := (q01 - q00).normalized()
+			var up := fwd.cross(across).normalized()
+			if up.y < 0.0:
+				up = -up
+			var um := (u0 + u1) * 0.5
+			var col := DECK_WOOD.darkened(float(tone[j]) + rng.randf_range(-0.03, 0.03))
+			var sand := clampf(smoothstep(0.1, 0.85, um) * (0.75 + 0.7 * drift.get_noise_2d(sm * WRECK_LEN, um * 4.0)), 0.0, 1.0)
+			col = col.lerp(BEACH_SAND, sand * 0.9)
+			var qm0 := q00.lerp(q01, 0.1)
+			var qm1 := q10.lerp(q11, 0.1)
+			_wquad(kit, "wreck", [q00, q10, qm1, qm0], [up, up, up, up], col.darkened(0.3 * (1.0 - sand)))
+			_wquad(kit, "wreck", [qm0, qm1, q11, q01], [up, up, up, up], col)
+			# Underneath and the broken ends show only round the hold.
+			if sm > 0.36 and sm < 0.7:
+				_wquad(kit, "wreck", [q00 - thick, q10 - thick, q11 - thick, q01 - thick], [-up, -up, -up, -up], HOLD_WOOD)
+			if hole.has(Vector2i(i - 1, j)):
+				_wquad(kit, "wreck", [q00, q01, q01 - thick, q00 - thick], [-fwd, -fwd, -fwd, -fwd], cut)
+			if hole.has(Vector2i(i + 1, j)):
+				_wquad(kit, "wreck", [q10, q11, q11 - thick, q10 - thick], [fwd, fwd, fwd, fwd], cut)
+			if hole.has(Vector2i(i, j - 1)):
+				_wquad(kit, "wreck", [q00, q10, q10 - thick, q00 - thick], [-across, -across, -across, -across], cut)
+			if hole.has(Vector2i(i, j + 1)):
+				_wquad(kit, "wreck", [q01, q11, q11 - thick, q01 - thick], [across, across, across, across], cut)
+
+	# Deck beams across the hold, the middle one broken and hanging.
+	var up_w := _wreck_xf.basis * Vector3.UP
+	for bs in [0.455, 0.515, 0.575]:
+		var e := _wreck_deck_edge(bs)
+		var y: float = e.y - 0.17
+		if bs == 0.515:
+			for sgn in [-1.0, 1.0]:
+				_sweep(kit, "wreck", [_wreck_xf * Vector3(sgn * e.x, y, e.z), _wreck_xf * Vector3(sgn * 0.15, y - 0.6, e.z + 0.12 * sgn)], [up_w, up_w], 0.14, 0.16, HOLD_WOOD.lightened(0.12))
+		else:
+			_sweep(kit, "wreck", [_wreck_xf * Vector3(-e.x, y, e.z), _wreck_xf * Vector3(e.x, y, e.z)], [up_w, up_w], 0.14, 0.16, HOLD_WOOD.lightened(0.12))
+	# The hatch cover fell in with it and lies propped on the sand in the hold.
+	var hold := _wreck_xf * Vector3(0.2, 0.0, (0.51 - 0.5) * WRECK_LEN)
+	hold.y = _ground(hold.x, hold.z)
+	var hb := _wreck_xf.basis * Basis(Vector3.UP, 0.3) * Basis(Vector3.RIGHT, -0.55)
+	for p in range(5):
+		var off := hb * Vector3(0, 0, -0.6 + p * 0.3)
+		_box(kit, "wreck", Transform3D(hb, hold + Vector3(0, 0.45, 0) + off), Vector3(1.6, 0.07, 0.28), DECK_WOOD.darkened(0.1 + 0.05 * (p % 2)))
+
+
+## Frames stand bare where planks or deck are gone, some snapped off; elsewhere only the bulwark
+## stanchions show above the deck.
+func _wreck_frames(kit: Dictionary, gone: Dictionary, rng: RandomNumberGenerator) -> void:
+	var n := WRECK_STATIONS
+	var ns := WRECK_STRAKES
+	var timber := HOLD_WOOD.lightened(0.18)
+	for side_i in 2:
+		var side := -1.0 if side_i == 0 else 1.0
+		for i in range(1, n):
+			var s := float(i) / n
+			var open := false
+			for k in ns:
+				if gone.has(Vector3i(i - 1, k, side_i)) or gone.has(Vector3i(i, k, side_i)):
+					open = true
+			if open or (s > 0.42 and s < 0.62):
+				if open and rng.randf() < 0.2:
+					continue
+				var lean := rng.randf_range(-0.15, 0.15) if open else 0.0
+				var top := 1.0
+				if open and rng.randf() < 0.4:
+					top = rng.randf_range(0.6, 0.92)
+					# Snapped only where nothing above the break is still planked.
+					for k in ns:
+						if float(_wreck_edges[k + 1]) > top and not (gone.has(Vector3i(i - 1, k, side_i)) and gone.has(Vector3i(i, k, side_i))):
+							top = 1.0
+				var path := []
+				var ups := []
+				for k in ns + 1:
+					var a: float = minf(float(_wreck_edges[k]), top)
+					var nn := _wreck_normal(s, a, side)
+					path.append(_wreck_xf * (_wreck_point(s, a, side) - nn * (WRECK_PLANK + 0.075) + Vector3(0, 0, lean * a * a)))
+					ups.append(_wreck_xf.basis * nn)
+					if a >= top:
+						break
+				# Drop the frame's buried foot, keeping one point in the sand.
+				while path.size() > 2:
+					var q: Vector3 = path[1]
+					if q.y > _ground(q.x, q.z) - 0.3:
+						break
+					path.pop_front()
+					ups.pop_front()
+				_sweep(kit, "wreck", path, ups, 0.12, 0.15, timber.darkened(rng.randf_range(0.0, 0.12)))
+			elif i % 2 == 0 and s > 0.03 and s < 0.95:
+				var ad := _wreck_deck_a(s)
+				var n0 := _wreck_normal(s, ad, side)
+				var n1 := _wreck_normal(s, 1.0, side)
+				var b0 := _wreck_xf * (_wreck_point(s, ad, side) - n0 * (WRECK_PLANK + 0.06))
+				var b1 := _wreck_xf * (_wreck_point(s, 1.0, side) - n1 * (WRECK_PLANK + 0.06))
+				_sweep(kit, "wreck", [b0, b1], [_wreck_xf.basis * n0, _wreck_xf.basis * n1], 0.11, 0.12, HULL_WHITE.darkened(0.2))
+
+
+## Cap rails along the sheer and across the transom, rubbing strakes at deck level, and the keel
+## running up into the stem.
+func _wreck_rails(kit: Dictionary, gone: Dictionary) -> void:
+	var b := _wreck_xf.basis
+	var cap_col := HULL_WHITE.darkened(0.25)
+	for side_i in 2:
+		var side := -1.0 if side_i == 0 else 1.0
+		var cap_ok := func(i: int) -> bool:
+			return not gone.has(Vector3i(i, WRECK_STRAKES - 1, side_i))
+		for run in _wreck_runs(cap_ok):
+			var pts := []
+			var ups := []
+			for s in run:
+				var p := _wreck_point(s, 1.0, side) - _wreck_normal(s, 1.0, side) * (WRECK_PLANK * 0.5) + Vector3(0, 0.045, 0)
+				pts.append(_wreck_xf * p)
+				ups.append(b * Vector3.UP)
+			_sweep(kit, "wreck", pts, ups, 0.22, 0.09, cap_col)
+		var rub_ok := func(i: int) -> bool:
+			var ad := _wreck_deck_a((i + 0.5) / WRECK_STATIONS)
+			for k in WRECK_STRAKES:
+				if float(_wreck_edges[k + 1]) > ad:
+					return not gone.has(Vector3i(i, k, side_i))
+			return true
+		for run in _wreck_runs(rub_ok):
+			var pts := []
+			var ups := []
+			for s in run:
+				var ad := _wreck_deck_a(s)
+				var nn := _wreck_normal(s, ad, side)
+				pts.append(_wreck_xf * (_wreck_point(s, ad, side) + nn * 0.045))
+				ups.append(b * nn)
+			_sweep(kit, "wreck", pts, ups, 0.14, 0.09, Color(0.20, 0.18, 0.16))
+	var t := Vector3(0, 0.045, WRECK_PLANK * 0.5)
+	_sweep(kit, "wreck", [_wreck_xf * (_wreck_point(0.0, 1.0, -1.0) + t), _wreck_xf * (_wreck_point(0.0, 1.0, 1.0) + t)], [b * Vector3.UP, b * Vector3.UP], 0.22, 0.09, cap_col)
+
+	# Keel and stem: one timber from the transom along the bottom and up to the stem head.
+	var line := []
+	for i in WRECK_STATIONS + 1:
+		line.append(_wreck_point(float(i) / WRECK_STATIONS, 0.0, 0.0))
+	for k in range(1, WRECK_STRAKES + 1):
+		line.append(_wreck_point(1.0, _wreck_edges[k], 0.0))
+	line.append(_wreck_point(1.0, 1.0, 0.0) + Vector3(0, 0.22, 0.08))
+	var pts := []
+	var ups := []
+	for i in line.size():
+		var tng: Vector3 = (line[mini(i + 1, line.size() - 1)] as Vector3) - (line[maxi(i - 1, 0)] as Vector3)
+		var outward := Vector3(0, -tng.z, tng.y).normalized()
+		var w := _wreck_xf * ((line[i] as Vector3) + outward * 0.03)
+		if w.y < _ground(w.x, w.z) - 0.5 and pts.size() < 2:
+			pts.clear()
+			ups.clear()
+		pts.append(w)
+		ups.append(b * outward)
+	_sweep(kit, "wreck", pts, ups, 0.17, 0.2, Color(0.40, 0.36, 0.31))
+
+
+## The wheelhouse aft: white with blue trim, most of its windows out, the door hanging open, with
+## the stack, radar, lights and a lifebuoy still on it. Returns its box in the wreck's frame.
+func _wreck_wheelhouse(kit: Dictionary, rng: RandomNumberGenerator) -> AABB:
+	var z0 := (0.12 - 0.5) * WRECK_LEN
+	var z1 := (0.28 - 0.5) * WRECK_LEN
+	var base := _wreck_sheer(0.28) - WRECK_BULWARK + 0.03
+	var hw := 1.55
+	var h := 2.3
+	var zc := (z0 + z1) * 0.5
+	var lz := z1 - z0
+	var paint := HULL_WHITE.darkened(0.03)
+	_wbox(kit, "paint", Vector3(0, base + h * 0.5, zc), Vector3(hw * 2.0, h, lz), paint)
+	_wbox(kit, "paint", Vector3(0, base + 0.2, zc), Vector3(hw * 2.0 + 0.04, 0.4, lz + 0.04), HULL_BLUE)
+	_wbox(kit, "paint", Vector3(0, base + h + 0.06, zc + 0.15), Vector3(hw * 2.0 + 0.3, 0.12, lz + 0.5), paint.darkened(0.1))
+	_wbox(kit, "paint", Vector3(0, base + h - 0.02, z1 + 0.38), Vector3(hw * 2.0 + 0.3, 0.1, 0.06), HULL_BLUE)
+
+	# Windows: centre on the wall, the wall's outward normal, width, height.
+	var wins := []
+	for x in [-0.95, 0.0, 0.95]:
+		wins.append([Vector3(x, base + 1.55, z1), Vector3(0, 0, 1), 0.78, 0.7])
+	for z in [z1 - 0.75, z1 - 2.0]:
+		wins.append([Vector3(-hw, base + 1.5, z), Vector3(-1, 0, 0), 0.9, 0.62])
+	wins.append([Vector3(hw, base + 1.5, z1 - 0.75), Vector3(1, 0, 0), 0.9, 0.62])
+	wins.append([Vector3(-0.6, base + 1.6, z0), Vector3(0, 0, -1), 0.6, 0.5])
+	for wi in wins:
+		var c: Vector3 = wi[0]
+		var nn: Vector3 = wi[1]
+		var ww: float = wi[2]
+		var wh: float = wi[3]
+		var flat := func(d: float) -> Vector3:
+			return Vector3(d if nn.x != 0.0 else ww, wh, d if nn.z != 0.0 else ww)
+		_wbox(kit, "paint", c + nn * 0.01, flat.call(0.02) + Vector3(0.12, 0.12, 0.12) * Vector3(1.0 - absf(nn.x), 1.0, 1.0 - absf(nn.z)), HULL_BLUE)
+		if rng.randf() < 0.65:
+			_wbox(kit, "paint", c + nn * 0.02, flat.call(0.02), Color(0.05, 0.06, 0.07))
+		else:
+			_wbox(kit, "gloss", c + nn * 0.02, flat.call(0.02), Color(0.10, 0.16, 0.20))
+		# Rust weeping from the frame's lower corners.
+		var along := Vector3(nn.z, 0, nn.x)
+		for sx in [-1.0, 1.0]:
+			var ln := rng.randf_range(0.35, 0.9)
+			var sc: Vector3 = c + along * sx * (ww * 0.5 - 0.04) + Vector3(0, -wh * 0.5 - 0.06 - ln * 0.5, 0) + nn * 0.006
+			_wbox(kit, "paint", sc, Vector3(0.01 if nn.x != 0.0 else 0.05, ln, 0.01 if nn.z != 0.0 else 0.05), RUST.lerp(paint, rng.randf_range(0.3, 0.55)))
+
+	# The landward door, hanging open, and the lifebuoy beside it.
+	var hinge := Vector3(hw, base + 0.05, z0 + 0.25)
+	_wbox(kit, "paint", Vector3(hw + 0.012, base + 1.0, z0 + 0.65), Vector3(0.02, 1.85, 0.75), Color(0.05, 0.06, 0.07))
+	var door := Basis(Vector3.UP, deg_to_rad(105.0))
+	_wbox(kit, "paint", hinge + door * Vector3(0.03, 0.95, 0.38), Vector3(0.05, 1.85, 0.75), HULL_BLUE.darkened(0.1), door)
+	_lifebuoy(kit, _wreck_xf * Vector3(hw + 0.09, base + 1.35, z0 + 1.7), _wreck_xf.basis * Vector3.RIGHT, 0.32, 0.075)
+
+	# On the roof: stack, radar, searchlight, whips, and the side lights.
+	var roof := base + h + 0.12
+	_wtube(kit, "rust", Vector3(-0.95, roof - 0.1, z0 + 0.55), Vector3(-0.95, roof + 1.3, z0 + 0.4), 0.17, 0.17, 10, RUST.darkened(0.2))
+	_wtube(kit, "rust", Vector3(-0.95, roof + 1.3, z0 + 0.4), Vector3(-0.95, roof + 1.55, z0 + 0.37), 0.185, 0.185, 10, Color(0.08, 0.08, 0.08))
+	_wtube(kit, "metal", Vector3(0.3, roof, zc - 0.4), Vector3(0.3, roof + 0.75, zc - 0.4), 0.05, 0.05, 6, HULL_WHITE)
+	_wbox(kit, "paint", Vector3(0.3, roof + 0.8, zc - 0.4), Vector3(1.5, 0.1, 0.18), HULL_WHITE.darkened(0.1), Basis(Vector3.UP, 0.6))
+	_wtube(kit, "metal", Vector3(0.6, roof, z1 - 0.2), Vector3(0.6, roof + 0.3, z1 - 0.2), 0.04, 0.04, 6, Color(0.3, 0.3, 0.32))
+	_wtube(kit, "metal", Vector3(0.6, roof + 0.35, z1 - 0.35), Vector3(0.6, roof + 0.35, z1 - 0.02), 0.12, 0.13, 10, Color(0.3, 0.3, 0.32))
+	_wtube(kit, "metal", Vector3(1.4, roof, z0 + 0.1), Vector3(1.4, roof + 2.6, z0 + 0.1), 0.025, 0.012, 4, HULL_WHITE)
+	_wtube(kit, "metal", Vector3(-1.4, roof, z0 + 0.1), Vector3(-1.4, roof + 1.1, z0 + 0.1), 0.025, 0.02, 4, HULL_WHITE)
+	_wtube(kit, "metal", Vector3(-1.4, roof + 1.1, z0 + 0.1), Vector3(-2.1, roof + 2.0, z0 - 0.3), 0.02, 0.012, 4, HULL_WHITE)
+	for sl in [[-1.0, Color(0.15, 0.7, 0.3)], [1.0, Color(0.85, 0.15, 0.12)]]:
+		var sx: float = sl[0]
+		_wbox(kit, "paint", Vector3(sx * (hw + 0.1), roof - 0.35, z1 - 0.3), Vector3(0.04, 0.3, 0.5), paint)
+		_wbox(kit, "gloss", Vector3(sx * (hw + 0.16), roof - 0.35, z1 - 0.2), Vector3(0.1, 0.16, 0.22), sl[1])
+	return AABB(Vector3(-hw, base, z0), Vector3(hw * 2.0, h, lz))
+
+
+## The mast forward of the hold with its crosstree, derrick and rigging; one shroud has parted.
+func _wreck_rig(kit: Dictionary) -> void:
+	var e := _wreck_deck_edge(0.665)
+	var foot := Vector3(0, e.y - 0.05, e.z)
+	var top := foot + Vector3(0, 7.2, 0)
+	var spar := Color(0.42, 0.36, 0.30)
+	var wire := Color(0.18, 0.17, 0.16)
+	_wtube(kit, "wreck", foot, top, 0.15, 0.09, 10, spar)
+	var tree := foot + Vector3(0, 5.5, 0)
+	_wbox(kit, "wreck", tree, Vector3(1.9, 0.09, 0.12), spar.darkened(0.1))
+	_wbox(kit, "gloss", top + Vector3(0, 0.08, 0), Vector3(0.14, 0.18, 0.14), HULL_WHITE)
+	# Derrick topped up aft over the hold, its hook hanging.
+	var boom_end := Vector3(0.3, foot.y + 3.0, -0.6)
+	_wtube(kit, "wreck", foot + Vector3(0, 1.1, -0.15), boom_end, 0.1, 0.07, 8, spar)
+	var xf := _wreck_xf
+	_rope(kit, "metal", xf * (top - Vector3(0, 0.1, 0)), xf * boom_end, 0.05, 0.018, wire)
+	var hook := xf * boom_end + Vector3(0, -1.3, 0)
+	_rope(kit, "metal", xf * boom_end, hook, 0.0, 0.015, wire)
+	_box(kit, "rust", Transform3D(xf.basis, hook + Vector3(0, -0.12, 0)), Vector3(0.2, 0.28, 0.14), RUST)
+	# Forestay to the stem head, shrouds to the chainplates, backstay to the gantry.
+	_rope(kit, "metal", xf * (top - Vector3(0, 0.15, 0)), xf * (_wreck_point(1.0, 1.0, 0.0) + Vector3(0, 0.3, 0.05)), 0.1, 0.02, wire)
+	for side in [-1.0, 1.0]:
+		var from := xf * (tree + Vector3(side * 0.9, 0, 0))
+		_rope(kit, "metal", from, xf * (_wreck_point(0.64, 1.0, side) + Vector3(0, 0.08, 0)), 0.0, 0.02, wire)
+		if side > 0.0:
+			_rope(kit, "metal", from, xf * (_wreck_point(0.70, 1.0, side) + Vector3(0, 0.08, 0)), 0.0, 0.02, wire)
+		else:
+			# Parted: it hangs from the crosstree and trails across the deck.
+			var loose := xf * Vector3(-1.4, _wreck_sheer(0.6) - WRECK_BULWARK + 0.05, 2.2)
+			_rope(kit, "metal", from, loose, 0.6, 0.02, wire)
+	_rope(kit, "metal", xf * (top - Vector3(0, 0.15, 0)), xf * _wreck_gantry_top(), 0.15, 0.02, wire)
+
+
+## Middle of the stern gantry's crossbar.
+func _wreck_gantry_top() -> Vector3:
+	var e := _wreck_deck_edge(0.03)
+	return Vector3(0, e.y + 3.4, e.z - 0.45)
+
+
+## The stern gantry, the net drum behind the wheelhouse, and the net run off it over the transom
+## and heaped on the sand.
+func _wreck_stern_gear(kit: Dictionary, rng: RandomNumberGenerator) -> void:
+	var xf := _wreck_xf
+	var e := _wreck_deck_edge(0.03)
+	var orange := Color(0.78, 0.42, 0.18)
+	var crossbar := _wreck_gantry_top()
+	for sx in [-1.0, 1.0]:
+		var footp := _wreck_deck_point(e, sx * 2.05 / e.x)
+		var topp := Vector3(sx * 2.05, crossbar.y, crossbar.z)
+		_wtube(kit, "rust", footp, topp, 0.11, 0.1, 8, orange.lerp(RUST, rng.randf_range(0.2, 0.6)))
+		_wtube(kit, "rust", footp.lerp(topp, 0.5), footp + Vector3(0, 0.05, 1.3), 0.07, 0.07, 6, orange.lerp(RUST, 0.5))
+	_wtube(kit, "rust", Vector3(-2.15, crossbar.y, crossbar.z), Vector3(2.15, crossbar.y, crossbar.z), 0.12, 0.12, 8, orange.lerp(RUST, 0.35))
+	_rope(kit, "metal", xf * crossbar, xf * (crossbar + Vector3(0, -0.7, 0)), 0.0, 0.02, Color(0.18, 0.17, 0.16))
+	_wbox(kit, "rust", crossbar + Vector3(0, -0.9, 0), Vector3(0.18, 0.4, 0.3), RUST)
+
+	var ed := _wreck_deck_edge(0.068)
+	var axle := Vector3(0, ed.y + 0.95, ed.z)
+	_wtube(kit, "rust", axle + Vector3(-1.25, 0, 0), axle + Vector3(1.25, 0, 0), 0.3, 0.3, 12, RUST)
+	_wtube(kit, "canvas", axle + Vector3(-1.12, 0, 0), axle + Vector3(1.12, 0, 0), 0.52, 0.52, 14, NET_GREEN)
+	for sx in [-1.0, 1.0]:
+		_wtube(kit, "rust", axle + Vector3(sx * 1.15, 0, 0), axle + Vector3(sx * 1.21, 0, 0), 0.64, 0.64, 16, RUST.lightened(0.08))
+		_wbox(kit, "rust", Vector3(sx * 1.32, (axle.y + ed.y) * 0.5, axle.z), Vector3(0.1, axle.y - ed.y + 0.1, 0.5), orange.lerp(RUST, 0.6))
+
+	# Net: off the bottom of the drum, along the deck, over the transom and down onto the sand.
+	var hull_rows := [
+		axle + Vector3(0, -0.45, -0.25),
+		Vector3(0, ed.y + 0.18, -10.3),
+		_wreck_point(0.0, 1.0, 0.0) + Vector3(0, 0.15, -0.08),
+		_wreck_point(0.0, 0.8, 0.0) + Vector3(0, 0.0, -0.35),
+	]
+	var rows := []
+	var widths := [0.3, 0.35, 0.25, 0.3, 0.9, 1.4]
+	for r in hull_rows:
+		rows.append(xf * (r as Vector3))
+	var side_w := xf.basis * Vector3.RIGHT
+	side_w = Vector3(side_w.x, 0, side_w.z).normalized()
+	var back := xf.basis * Vector3.BACK
+	back = -Vector3(back.x, 0, back.z).normalized()
+	var last: Vector3 = rows[-1]
+	for d in [1.3, 3.0]:
+		var p: Vector3 = last + back * d + side_w * 0.4 * d
+		p.y = _ground(p.x, p.z) + 0.06
+		rows.append(p)
+	for i in 2:
+		var hp := xf * (axle + Vector3(0.5 - 0.9 * i, -0.55, -0.75 - 0.2 * i))
+		_rock(kit, hp, Vector3(0.75, 0.38, 0.6), 310 + i, NET_GREEN.darkened(0.08 * i), "canvas")
+	var strands := 4
+	for k in strands:
+		var u := -1.0 + 2.0 * k / (strands - 1) + rng.randf_range(-0.25, 0.25)
+		var r := rng.randf_range(0.07, 0.11)
+		var col := NET_GREEN.lerp(Color(0.25, 0.45, 0.48), rng.randf_range(0.0, 0.5)).darkened(rng.randf_range(0.0, 0.2))
+		var prev: Vector3 = (rows[0] as Vector3) + side_w * u * float(widths[0])
+		for row in rows.size() - 1:
+			for step in range(1, 5):
+				var t := step / 4.0
+				var w := lerpf(float(widths[row]), float(widths[row + 1]), t) * rng.randf_range(0.8, 1.0)
+				var p: Vector3 = (rows[row] as Vector3).lerp(rows[row + 1], t) + side_w * (u * w + rng.randf_range(-0.08, 0.08)) + Vector3(0, rng.randf_range(-0.03, 0.06), 0)
+				_tube(kit, "canvas", prev, p, r, r, 6, col, false)
+				# Floats strung along the head rope.
+				if k == strands - 1 and step % 2 == 0:
+					var fd := (p - prev).normalized()
+					_tube(kit, "gloss", p - fd * 0.1, p + fd * 0.1, 0.11, 0.11, 8, Color(0.95, 0.45, 0.10))
+				prev = p
+	var heap: Vector3 = rows[-1]
+	for i in 3:
+		var hp: Vector3 = heap + back * (0.4 * i - 0.2) + side_w * (0.9 * i - 0.9)
+		hp.y = _ground(hp.x, hp.z) + 0.05
+		_rock(kit, hp, Vector3(1.1, 0.45, 0.9) * (1.0 - 0.15 * i), 300 + i, NET_GREEN.darkened(0.05 * i), "canvas")
+	for i in 4:
+		var fp: Vector3 = heap + back * rng.randf_range(-1.0, 1.0) + side_w * rng.randf_range(-1.5, 1.5)
+		fp.y = _ground(fp.x, fp.z) + 0.25
+		_tube(kit, "gloss", fp, fp + side_w.rotated(Vector3.UP, rng.randf_range(0.0, PI)) * 0.2, 0.11, 0.11, 8, Color(0.95, 0.45, 0.10))
+
+
+## Windlass and bitts on the foredeck; the cable runs out of the landward hawse and up the beach
+## to the anchor, which the salvors dragged clear and left.
+func _wreck_ground_tackle(kit: Dictionary) -> void:
+	var xf := _wreck_xf
+	var e := _wreck_deck_edge(0.86)
+	var wl := _wreck_deck_point(e, 0.0) + Vector3(0, 0.38, 0)
+	_wtube(kit, "rust", wl + Vector3(-0.55, 0, 0), wl + Vector3(0.55, 0, 0), 0.17, 0.17, 10, RUST)
+	for sx in [-0.62, 0.0, 0.62]:
+		_wbox(kit, "rust", wl + Vector3(sx, -0.2, 0), Vector3(0.08, 0.5, 0.45), RUST.darkened(0.15))
+	var eb := _wreck_deck_edge(0.80)
+	for sx in [-0.45, 0.45]:
+		var bp := _wreck_deck_point(eb, sx / eb.x)
+		_wtube(kit, "wreck", bp - Vector3(0, 0.1, 0), bp + Vector3(0, 0.55, 0), 0.11, 0.11, 8, Color(0.30, 0.26, 0.22))
+	var bp0 := _wreck_deck_point(eb, -0.45 / eb.x)
+	var bp1 := _wreck_deck_point(eb, 0.45 / eb.x)
+	_wtube(kit, "wreck", bp0 + Vector3(-0.15, 0.42, 0), bp1 + Vector3(0.15, 0.42, 0), 0.045, 0.045, 6, Color(0.30, 0.26, 0.22))
+
+	var hs := 0.935
+	var ha := 0.84
+	var hn := _wreck_normal(hs, ha, 1.0)
+	var hp := _wreck_point(hs, ha, 1.0)
+	_wtube(kit, "rust", hp - hn * 0.15, hp + hn * 0.06, 0.13, 0.15, 10, RUST)
+	# Cable on deck from the windlass to the hawse.
+	var path := [xf * (wl + Vector3(0.45, -0.1, 0)), xf * (hp - hn * 0.25 + Vector3(0, 0.05, 0))]
+	var mouth := xf * (hp + hn * 0.08)
+	var out_w := xf.basis * hn
+	out_w = Vector3(out_w.x, 0, out_w.z).normalized()
+	var bow_w := xf.basis * Vector3.BACK
+	bow_w = Vector3(bow_w.x, 0, bow_w.z).normalized()
+	var touch := mouth + out_w * 1.3 + bow_w * 0.6
+	touch.y = _ground(touch.x, touch.z)
+	var hang_ctrl := Vector3(mouth.x + out_w.x * 0.3, touch.y + 0.2, mouth.z + out_w.z * 0.3)
+	path.append(mouth)
+	for i in range(1, 9):
+		var t := i / 8.0
+		path.append(mouth.lerp(hang_ctrl, t).lerp(hang_ctrl.lerp(touch, t), t))
+	# Slack across the sand to the anchor's ring.
+	var ring := touch + out_w * 2.5 + bow_w * 4.0
+	var span := ring - touch
+	var lateral := span.cross(Vector3.UP).normalized()
+	for i in range(1, 11):
+		var t := i / 10.0
+		var p := touch + span * t + lateral * sin(t * PI * 1.5) * 0.8
+		p.y = _ground(p.x, p.z) + 0.02
+		path.append(p)
+	_wreck_chain(kit, path)
+	_wreck_anchor(kit, ring, span.normalized())
+
+
+## Chain links along a world polyline, alternately flat and upright.
+func _wreck_chain(kit: Dictionary, path: Array) -> void:
+	var pitch := 0.24
+	var idx := 0
+	for seg in path.size() - 1:
+		var a: Vector3 = path[seg]
+		var b: Vector3 = path[seg + 1]
+		var len_ := a.distance_to(b)
+		var t := (b - a).normalized()
+		var d := 0.0
+		while d < len_:
+			var c := a + t * d
+			var w0 := t.cross(Vector3.UP if absf(t.y) < 0.9 else Vector3.RIGHT).normalized()
+			var w := w0 if idx % 2 == 0 else t.cross(w0).normalized()
+			var col := RUST.darkened(0.1 * (idx % 3))
+			var prev := Vector3.ZERO
+			for i in 9:
+				var ang := TAU * i / 8.0
+				var p := c + t * cos(ang) * 0.16 + w * sin(ang) * 0.09
+				if i > 0:
+					_tube(kit, "rust", prev, p, 0.03, 0.03, 4, col, false)
+				prev = p
+			d += pitch
+			idx += 1
+
+
+## An admiralty anchor lying on its side: stock flat on the sand, one arm buried, one in the air.
+func _wreck_anchor(kit: Dictionary, ring: Vector3, dir: Vector3) -> void:
+	var d := Vector3(dir.x, 0, dir.z).normalized()
+	var across := d.cross(Vector3.UP).normalized()
+	var iron := RUST.darkened(0.15)
+	var r0 := ring
+	r0.y = _ground(r0.x, r0.z) + 0.12
+	var crown := ring + d * 2.3
+	crown.y = _ground(crown.x, crown.z) + 0.1
+	_tube(kit, "rust", r0 + d * 0.15, crown, 0.08, 0.11, 8, iron)
+	for i in 10:
+		var a0 := TAU * i / 10.0
+		var a1 := TAU * (i + 1) / 10.0
+		_tube(kit, "rust", r0 + (d * cos(a0) + Vector3.UP * sin(a0)) * 0.18 - d * 0.05, r0 + (d * cos(a1) + Vector3.UP * sin(a1)) * 0.18 - d * 0.05, 0.035, 0.035, 4, iron, false)
+	var stock := r0 + d * 0.4 + Vector3(0, -0.04, 0)
+	_tube(kit, "rust", stock - across * 1.1, stock + across * 1.1, 0.05, 0.05, 6, iron)
+	var elbow := crown + Vector3.UP * 0.7 - d * 0.15
+	var tip := crown + Vector3.UP * 1.25 - d * 0.55
+	_tube(kit, "rust", crown, elbow, 0.1, 0.09, 8, iron)
+	_tube(kit, "rust", elbow, tip, 0.09, 0.06, 8, iron)
+	var palm := Basis(across, (tip - elbow).normalized().cross(across).normalized(), (tip - elbow).normalized()).orthonormalized()
+	_box(kit, "rust", Transform3D(Basis(across, palm.y, palm.z), elbow.lerp(tip, 0.45) - palm.y * 0.04), Vector3(0.55, 0.06, 0.5), iron.lightened(0.05))
+	_tube(kit, "rust", crown, crown - Vector3.UP * 0.5 - d * 0.2, 0.1, 0.09, 8, iron)
+
+
+## Planks torn out of the side and washed up, and a few things washed off the deck.
+func _wreck_debris(kit: Dictionary, rng: RandomNumberGenerator) -> void:
+	var sea := _wreck_xf.basis * Vector3.LEFT
+	sea = Vector3(sea.x, 0, sea.z).normalized()
+	var fwd := _wreck_xf.basis * Vector3.BACK
+	fwd = Vector3(fwd.x, 0, fwd.z).normalized()
+	var at := Vector3(WRECK_AT.x, 0, WRECK_AT.y)
+	# [seaward, forward, length, yaw, colour]
+	var planks := [
+		[5.0, 1.5, 3.2, 0.3, HULL_BLUE], [6.5, -1.0, 2.4, 1.2, BARE_WOOD], [5.5, 4.0, 2.8, -0.5, HULL_RED],
+		[-6.0, 7.0, 2.6, 0.8, HULL_BLUE], [-7.5, 2.0, 1.8, -1.1, HULL_YELLOW], [4.0, -6.5, 2.0, 0.6, HULL_BLUE],
+	]
+	for pl in planks:
+		var c: Vector3 = at + sea * float(pl[0]) + fwd * float(pl[1])
+		var dir := fwd.rotated(Vector3.UP, float(pl[3]))
+		var half := float(pl[2]) * 0.5
+		var e0 := c - dir * half
+		var e1 := c + dir * half
+		e0.y = _ground(e0.x, e0.z) + 0.01
+		e1.y = _ground(e1.x, e1.z) + 0.01
+		var b := Basis.looking_at(e1 - e0, Vector3.UP)
+		b = b * Basis(Vector3.BACK, rng.randf_range(-0.15, 0.15))
+		var col: Color = (pl[4] as Color).lerp(BARE_WOOD, 0.35).darkened(rng.randf_range(0.0, 0.12))
+		_box(kit, "wreck", Transform3D(b, (e0 + e1) * 0.5), Vector3(0.32, 0.06, half * 2.0), col)
+	# An oil drum and a fish box washed up the beach, another box wedged against the low bulwark.
+	var drum := at - sea * 7.0 + fwd * 9.5
+	drum.y = _ground(drum.x, drum.z) + 0.16
+	var drum_dir := (fwd.rotated(Vector3.UP, 1.1) + Vector3(0, 0.12, 0)).normalized()
+	_tube(kit, "paint", drum - drum_dir * 0.45, drum + drum_dir * 0.45, 0.3, 0.3, 12, Color(0.30, 0.40, 0.50))
+	for k in [-0.2, 0.2]:
+		_tube(kit, "rust", drum + drum_dir * (k - 0.02), drum + drum_dir * (k + 0.02), 0.315, 0.315, 12, RUST, false)
+	var crate := at - sea * 5.0 - fwd * 4.0
+	crate.y = _ground(crate.x, crate.z) + 0.1
+	_box(kit, "gloss", Transform3D(Basis(Vector3.UP, 0.7) * Basis(Vector3.RIGHT, 0.2), crate), Vector3(0.6, 0.32, 0.4), Color(0.95, 0.75, 0.15))
+	var ed := _wreck_deck_edge(0.36)
+	var deck_box := _wreck_deck_point(ed, 0.8)
+	_wbox(kit, "gloss", deck_box + Vector3(-0.3, 0.17, 0), Vector3(0.6, 0.32, 0.4), Color(0.20, 0.50, 0.75), Basis(Vector3.UP, 0.25))
+
+
+## Every section aft of the forefoot must reach into the sand: a gap under the hull reads as floating.
+func _verify_wreck_bedded() -> void:
+	var worst := -INF
+	var at := 0.0
+	for i in 45:
+		var s := 0.88 * i / 44.0
+		var low := INF
+		for j in 17:
+			for side in [-1.0, 1.0]:
+				var w := _wreck_xf * _wreck_point(s, j / 16.0, side)
+				low = minf(low, w.y - _ground(w.x, w.z))
+		if low > worst:
+			worst = low
+			at = s
+	if worst > 0.0:
+		push_error("Shipwreck: the hull clears the sand by %.2fm at s=%.2f" % [worst, at])
+	print("Shipwreck: every section reaches the sand (worst %.2fm at s=%.2f)" % [worst, at])
 
 
 const STRAW := Color(0.80, 0.68, 0.42)
