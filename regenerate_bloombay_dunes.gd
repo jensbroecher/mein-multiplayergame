@@ -719,6 +719,480 @@ func _surf_stream(tg: Node3D, seed_v: int, waves: int, res_name: String) -> Audi
 	return tg.call("_save_resource", wav, res_name) as AudioStreamWAV
 
 
+# --- Monorail --------------------------------------------------------------------------------------
+# A monorail runs behind the beach: a white beam on flared pylons along the landward edge of the sand
+# (MONO_X). To the south it curves out over a dune lagoon to a buffer. To the north it runs on over
+# the lap, off the map and out to sea toward the horizon, as if to somewhere else (MONO_FAR_Z). A
+# three-car train (Monorail.gd) shuttles from the far end to the station and the south end on the
+# wall clock, with a chime as it pulls in. South Beach station stands at the beach path: a glass
+# vault over the platform, a glazed hall under it and stairs down to the sand facing the track.
+# Everything on the map has collision; palms keep out of the line's corridor (its footprints).
+
+const MONO_X := -7.0
+const MONO_Y := 9.0          # top of the beam
+const MONO_FAR_Z := -1200.0  # the north end, far out to sea
+const MONO_S_Z := 130.0      # and to the south one
+const MONO_TURN_R := 30.0
+const MONO_TURN := 1.22      # radians each end curves through
+const MONO_TAIL := 10.0      # straight run from the curve to the buffer
+const MONO_STATION_Z := 0.0
+const MONO_PYLONS := 16.0
+const BEAM_W := 1.2
+const BEAM_H := 1.8
+const CAR_LEN := 12.0
+const CAR_PITCH := 12.6
+const CAR_W := 3.0
+const MONO_WHITE := Color(0.93, 0.95, 0.96)
+const MONO_BLUE := Color(0.16, 0.36, 0.64)
+const MONO_GLASS := Color(0.10, 0.17, 0.26)
+const MONO_LIME := Color(0.76, 0.87, 0.30)
+const MONO_CONCRETE := Color(0.86, 0.87, 0.88)
+
+
+## The beam's top line from the far north end to the south buffer, a point every 2m or so.
+func _mono_path() -> PackedVector3Array:
+	var pts := PackedVector3Array()
+	var cs := Vector2(MONO_X + MONO_TURN_R, MONO_S_Z)
+	var arc_n := 20
+	var z := MONO_FAR_Z
+	while z < MONO_S_Z - 1.0:
+		pts.append(Vector3(MONO_X, MONO_Y, z))
+		z += 2.0
+	for k in range(0, arc_n + 1):
+		var a := PI - MONO_TURN * k / arc_n
+		pts.append(Vector3(cs.x + cos(a) * MONO_TURN_R, MONO_Y, cs.y + sin(a) * MONO_TURN_R))
+	var a_s := PI - MONO_TURN
+	var ps := cs + Vector2(cos(a_s), sin(a_s)) * MONO_TURN_R
+	var ds := Vector2(sin(a_s), -cos(a_s))
+	for k in range(1, 6):
+		var q := ps + ds * MONO_TAIL * k / 5.0
+		pts.append(Vector3(q.x, MONO_Y, q.y))
+	return pts
+
+
+func _build_monorail(root: Node3D) -> void:
+	var kit := {}
+	var name := "Monorail"
+	var pts := _mono_path()
+	var curve := Curve3D.new()
+	curve.bake_interval = 0.5
+	for p in pts:
+		curve.add_point(p)
+	var length := curve.get_baked_length()
+	_beam(kit, pts)
+	for i in range(0, pts.size() - 1):
+		var a: Vector3 = pts[i]
+		var b: Vector3 = pts[i + 1]
+		if Vector2(a.x, a.z).length() > 470.0:
+			continue
+		_box_along(root, name, (a + b) * 0.5 - Vector3(0, BEAM_H * 0.5, 0), b - a, Vector3(BEAM_W, BEAM_H, a.distance_to(b) + 0.05))
+		# Up in the air: palms keep clear, the racing line passes under it.
+		if i % 3 == 0:
+			_note(name, Vector2(a.x, a.z), 2.5, -1000.0)
+	# Pylons: a tapered column, flaring into a head under the beam, on a round footing. None on the
+	# lap where the line crosses it; off the map they stand in the sea.
+	var s := 6.0
+	while s < length - 2.0:
+		var p := curve.sample_baked(s)
+		var ahead := curve.sample_baked(minf(s + 1.0, length)) - curve.sample_baked(maxf(s - 1.0, 0.0))
+		ahead.y = 0.0
+		var on_map := Vector2(p.x, p.z).length() < 470.0
+		if on_map:
+			var lap := _curve.get_closest_point(Vector3(p.x, _ground(p.x, p.z), p.z))
+			if Vector2(lap.x - p.x, lap.z - p.z).length() < TRACK_HALF + CLEAR_BUILDING + 1.2:
+				s += 4.0
+				continue
+		var g := maxf(_ground(p.x, p.z), -3.0) if on_map else -3.0
+		var head_y := MONO_Y - BEAM_H
+		_tube(kit, "paint", Vector3(p.x, g - 0.3, p.z), Vector3(p.x, g + 0.25, p.z), 1.0, 0.95, 16, MONO_CONCRETE.darkened(0.08))
+		_tube(kit, "paint", Vector3(p.x, g, p.z), Vector3(p.x, head_y - 0.9, p.z), 0.55, 0.42, 16, MONO_CONCRETE)
+		_tube(kit, "paint", Vector3(p.x, head_y - 0.9, p.z), Vector3(p.x, head_y - 0.12, p.z), 0.42, 0.95, 16, MONO_CONCRETE)
+		_box(kit, "paint", Transform3D(Basis.looking_at(ahead.normalized(), Vector3.UP), Vector3(p.x, head_y - 0.06, p.z)), Vector3(1.5, 0.12, 1.2), MONO_CONCRETE.darkened(0.15))
+		if on_map:
+			_rod_collider(root, name, Vector3(p.x, g - 0.3, p.z), Vector3(p.x, head_y, p.z), 0.6)
+			_rod_collider(root, name, Vector3(p.x, g - 0.3, p.z), Vector3(p.x, g + 0.25, p.z), 1.0)
+			_note(name + "Pylon", Vector2(p.x, p.z), 1.2, CLEAR_BUILDING)
+		s += MONO_PYLONS if on_map else MONO_PYLONS * 1.5
+	# Buffers at both ends: striped blocks with a red lamp.
+	for e in [[pts[pts.size() - 1], pts[pts.size() - 2]]]:
+		var tip: Vector3 = e[0]
+		var back: Vector3 = (e[1] as Vector3) - tip
+		back.y = 0.0
+		var bb := Basis.looking_at(back.normalized(), Vector3.UP)
+		var bp := tip + back.normalized() * 0.6 + Vector3(0, 0.45, 0)
+		_box(kit, "paint", Transform3D(bb, bp), Vector3(1.6, 0.9, 0.8), Color(0.95, 0.78, 0.12))
+		for k in 3:
+			_box(kit, "paint", Transform3D(bb, bp + bb * Vector3(-0.45 + k * 0.45, 0, -0.42)), Vector3(0.2, 0.92, 0.04), Color(0.1, 0.1, 0.1))
+		_box(kit, "glow", Transform3D(bb, bp + Vector3(0, 0.55, 0)), Vector3(0.2, 0.2, 0.2), Color(1.0, 0.2, 0.15))
+		_box_along(root, name, bp, back, Vector3(1.6, 0.9, 0.8))
+	_build_mono_station(root, kit, curve)
+	_commit(root, kit, name)
+	# The train.
+	var s_station := curve.get_closest_offset(Vector3(MONO_X, MONO_Y, MONO_STATION_Z))
+	var half_train := CAR_PITCH + CAR_LEN * 0.5 + 0.9
+	var train := Node3D.new()
+	train.name = "MonorailTrain"
+	train.set_script(load("res://Monorail.gd"))
+	train.set("path", curve)
+	train.set("end_car", _tg.call("_save_resource", _car_mesh(true), "monorail_end_car"))
+	train.set("mid_car", _tg.call("_save_resource", _car_mesh(false), "monorail_mid_car"))
+	train.set("stops", PackedFloat32Array([s_station, half_train, s_station, length - half_train]))
+	train.set("dwells", PackedFloat32Array([14.0, 8.0, 14.0, 6.0]))
+	train.set("car_pitch", CAR_PITCH)
+	train.set("cruise", 22.0)
+	train.set("accel", 1.2)
+	train.set("chime", _station_chime())
+	train.set("chime_stops", PackedInt32Array([0, 2]))
+	train.set("chime_at", Vector3(-12.0, MONO_Y + 3.0, MONO_STATION_Z))
+	root.add_child(train)
+
+
+## The beam along `pts` (its top line): concrete, a darker running surface on top and the dark
+## conductor rail as a band of the sides themselves. Laid over the sides as a strip, it flickered.
+func _beam(kit: Dictionary, pts: PackedVector3Array) -> void:
+	var hw := BEAM_W * 0.5
+	# Cross-section from the top-left corner round to the top-right: [x, y, colour of the face to the next].
+	var dark := Color(0.24, 0.26, 0.3)
+	var top_col := MONO_CONCRETE.darkened(0.1)
+	var sec := [[-hw, 0.0, MONO_CONCRETE], [-hw, -0.25, dark], [-hw, -0.39, MONO_CONCRETE], [-hw, -BEAM_H, MONO_CONCRETE.darkened(0.12)],
+		[hw, -BEAM_H, MONO_CONCRETE], [hw, -0.39, dark], [hw, -0.25, MONO_CONCRETE], [hw, 0.0, top_col]]
+	var st := _st(kit, "paint")
+	var frames := []
+	for i in pts.size():
+		var t := (pts[mini(i + 1, pts.size() - 1)] - pts[maxi(i - 1, 0)])
+		t.y = 0.0
+		frames.append(t.normalized().cross(Vector3.UP).normalized())
+	for i in pts.size() - 1:
+		var r0: Vector3 = frames[i]
+		var r1: Vector3 = frames[i + 1]
+		for k in sec.size():
+			var a: Array = sec[k]
+			var b: Array = sec[(k + 1) % sec.size()]
+			var a0: Vector3 = pts[i] + r0 * float(a[0]) + Vector3(0, a[1], 0)
+			var b0: Vector3 = pts[i] + r0 * float(b[0]) + Vector3(0, b[1], 0)
+			var a1: Vector3 = pts[i + 1] + r1 * float(a[0]) + Vector3(0, a[1], 0)
+			var b1: Vector3 = pts[i + 1] + r1 * float(b[0]) + Vector3(0, b[1], 0)
+			var centre := (pts[i] + pts[i + 1]) * 0.5 - Vector3(0, BEAM_H * 0.5, 0)
+			var out := ((a0 + b0 + a1 + b1) * 0.25 - centre).normalized()
+			var n := (b0 - a0).cross(a1 - a0).normalized()
+			if n.dot(out) < 0.0:
+				n = -n
+			_tri(st, a0, b0, b1, n, n, n, a[2], out)
+			_tri(st, a0, b1, a1, n, n, n, a[2], out)
+	# End caps.
+	for e in [[0, 1], [pts.size() - 1, pts.size() - 2]]:
+		var p: Vector3 = pts[e[0]]
+		var outward := (p - pts[e[1]]).normalized()
+		var r: Vector3 = frames[e[0]]
+		var c0 := p + r * -hw
+		var c1 := p + r * hw
+		_quad(kit, "paint", [c0, c1, c1 - Vector3(0, BEAM_H, 0), c0 - Vector3(0, BEAM_H, 0)], outward, MONO_CONCRETE)
+
+
+## The station chime: an arpeggio rising on a vibraphone-like bell, then the top note again with its
+## octave, as at Japanese stations. Baked like the surf.
+func _station_chime() -> AudioStreamWAV:
+	var rate := 22050
+	var notes := [[523.25, 0.0], [659.25, 0.26], [783.99, 0.52], [1046.5, 0.78], [783.99, 1.3], [1046.5, 1.3]]
+	var n := int(rate * 3.4)
+	var samples := PackedFloat32Array()
+	samples.resize(n)
+	for i in n:
+		var t := float(i) / rate
+		var v := 0.0
+		for nt in notes:
+			var dt: float = t - float(nt[1])
+			if dt < 0.0:
+				continue
+			var f: float = nt[0]
+			var env := minf(dt / 0.004, 1.0) * exp(-dt * 1.6)
+			var trem := 1.0 + 0.12 * sin(TAU * 5.5 * dt)
+			v += env * trem * (sin(TAU * f * dt) + 0.3 * sin(TAU * f * 4.0 * dt) * exp(-dt * 6.0) + 0.12 * sin(TAU * f * 10.0 * dt) * exp(-dt * 14.0))
+		samples[i] = v
+	var peak := 0.001
+	for i in n:
+		peak = maxf(peak, absf(samples[i]))
+	var data := PackedByteArray()
+	data.resize(n * 2)
+	for i in n:
+		data.encode_s16(i * 2, int(clampf(samples[i] / peak * 0.8, -1.0, 1.0) * 32767.0))
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = rate
+	wav.stereo = false
+	wav.data = data
+	return _tg.call("_save_resource", wav, "monorail_chime") as AudioStreamWAV
+
+
+## The station: platform level with the cars' floor on the beach side of the beam, under a glass
+## barrel vault; a glazed hall beneath it; stairs down to the sand facing the track, with a landing;
+## glass balustrades, benches, planters and the BLOOMBAY sign.
+func _build_mono_station(root: Node3D, kit: Dictionary, curve: Curve3D) -> void:
+	var name := "MonorailStation"
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 909
+	var zc := MONO_STATION_Z
+	var sz0 := zc - 21.0
+	var sz1 := zc + 21.0
+	var py := MONO_Y + 0.35
+	var px0 := MONO_X - CAR_W * 0.5 - 0.2
+	var px1 := -15.5
+	var g := _ground_min((px0 + px1) * 0.5, zc, 4.0, 21.0)
+	var stone := Color(0.88, 0.87, 0.84)
+	var yellow := Color(0.98, 0.82, 0.18)
+	var green := Color(0.36, 0.62, 0.28)
+	# Platform deck, its yellow edge line, a white fascia.
+	_block(kit, "paint", Vector3(px1, py - 0.55, sz0), Vector3(px0, py, sz1), MONO_WHITE)
+	_block(kit, "paint", Vector3(px0 - 0.55, py, sz0 + 0.4), Vector3(px0 - 0.2, py + 0.05, sz1 - 0.4), yellow)
+	_block(kit, "paint", Vector3(px1 - 0.06, py - 0.95, sz0 - 0.06), Vector3(px1 + 0.3, py - 0.5, sz1 + 0.06), MONO_BLUE)
+	_box_collider(root, name, Vector3(px1, py - 0.55, sz0), Vector3(px0, py, sz1))
+	# The hall under it: a pale plinth, white posts, glass walls, doors to the beach.
+	var hx0 := px1 + 0.6
+	var hx1 := px0 - 0.6
+	var hz0 := sz0 + 4.0
+	var hz1 := sz1 - 4.0
+	_block(kit, "paint", Vector3(hx0 - 0.8, g - 0.4, hz0 - 0.8), Vector3(hx1 + 0.8, g + 0.15, hz1 + 0.8), stone)
+	var top := py - 0.55
+	var zz := hz0
+	while zz <= hz1 + 0.01:
+		for xx in [hx0, hx1]:
+			_tube(kit, "paint", Vector3(xx, g + 0.15, zz), Vector3(xx, top, zz), 0.16, 0.16, 10, MONO_WHITE)
+		zz += (hz1 - hz0) / 6.0
+	for xx in [hx0, hx1]:
+		_box(kit, "glass", Transform3D(Basis(), Vector3(xx, (g + 0.2 + top - 0.06) * 0.5, (hz0 + hz1) * 0.5)), Vector3(0.06, top - g - 0.26, hz1 - hz0), Color(0.7, 0.9, 0.95))
+	for zw in [hz0, hz1]:
+		_box(kit, "glass", Transform3D(Basis(), Vector3((hx0 + hx1) * 0.5, (g + 0.2 + top - 0.06) * 0.5, zw)), Vector3(hx1 - hx0 - 0.08, top - g - 0.26, 0.06), Color(0.7, 0.9, 0.95))
+	for dz in [-1.2, 1.2]:
+		_block(kit, "paint", Vector3(hx0 - 0.12, g + 0.15, zc + dz - 0.9), Vector3(hx0 - 0.06, g + 2.6, zc + dz + 0.9), MONO_BLUE.darkened(0.2))
+	_block(kit, "paint", Vector3(hx0 - 0.2, g + 2.6, zc - 2.3), Vector3(hx0 - 0.06, g + 2.8, zc + 2.3), MONO_WHITE)
+	_box_collider(root, name, Vector3(hx0 - 0.2, g - 0.4, hz0), Vector3(hx1, top, hz1))
+	# Glass vault over platform and train: ribs, panels banded pale blue and yellow, purlins, eaves.
+	var rx0 := px1 - 0.3
+	var rx1 := MONO_X + CAR_W * 0.5 + 1.0
+	var spring := py + 4.2
+	var rise := 2.8
+	var cx := (rx0 + rx1) * 0.5
+	var hw := (rx1 - rx0) * 0.5
+	var segs := 14
+	var arc := func(k: int, zv: float) -> Vector3:
+		var phi := PI * float(k) / segs
+		return Vector3(cx - cos(phi) * hw, spring + sin(phi) * rise, zv)
+	var ribs := 13
+	var hull := PackedVector3Array()
+	for r in ribs:
+		var zr := lerpf(sz0, sz1, float(r) / (ribs - 1))
+		var rr := 0.17 if r == 0 or r == ribs - 1 else 0.1
+		for k in segs:
+			_tube(kit, "paint", arc.call(k, zr), arc.call(k + 1, zr), rr, rr, 8, MONO_WHITE, false)
+		if r < ribs - 1:
+			var zn := lerpf(sz0, sz1, float(r + 1) / (ribs - 1))
+			for k in segs:
+				var tint := Color(0.98, 0.92, 0.55) if (k >= 5 and k <= 8) else Color(0.72, 0.9, 0.96)
+				var a0: Vector3 = arc.call(k, zr)
+				var a1: Vector3 = arc.call(k + 1, zr)
+				var b0: Vector3 = arc.call(k, zn)
+				var b1: Vector3 = arc.call(k + 1, zn)
+				# Both faces: the vault is seen from the platform under it as well as from outside.
+				var pn := (a1 - a0).cross(b0 - a0).normalized()
+				if pn.y < 0.0:
+					pn = -pn
+				_quad(kit, "glass", [a0, a1, b1, b0], pn, tint)
+				_quad(kit, "glass", [a0, a1, b1, b0], -pn, tint)
+		hull.append(arc.call(0, zr))
+		hull.append(arc.call(7, zr))
+		hull.append(arc.call(segs, zr))
+	for k in [0, 3, 7, 11, 14]:
+		_tube(kit, "paint", arc.call(k, sz0), arc.call(k, sz1), 0.15 if k == 0 or k == 14 else 0.06, 0.15 if k == 0 or k == 14 else 0.06, 8, MONO_WHITE, false)
+	_hull_collider(root, name, hull)
+	# Columns: west ones stand on the platform, east ones on the sand beside the beam.
+	var cz := sz0
+	while cz <= sz1 + 0.01:
+		_tube(kit, "paint", Vector3(rx0, py, cz), Vector3(rx0, spring, cz), 0.16, 0.14, 10, MONO_WHITE)
+		var ge := _ground(rx1, cz)
+		_tube(kit, "paint", Vector3(rx1, ge - 0.3, cz), Vector3(rx1, spring, cz), 0.24, 0.18, 10, MONO_WHITE)
+		_rod_collider(root, name, Vector3(rx1, ge - 0.3, cz), Vector3(rx1, spring, cz), 0.26)
+		cz += 7.0
+	# Glass balustrade round the platform, open at the head of the stairs.
+	var st_hw := 2.2
+	var runs := [[Vector3(px1, py, sz0), Vector3(px1, py, zc - st_hw)], [Vector3(px1, py, zc + st_hw), Vector3(px1, py, sz1)],
+		[Vector3(px1, py, sz0), Vector3(px0 - 0.6, py, sz0)], [Vector3(px1, py, sz1), Vector3(px0 - 0.6, py, sz1)]]
+	for rn in runs:
+		_balustrade(root, kit, name, rn[0], rn[1])
+	# Stairs down to the beach: two flights with a landing between.
+	var gs := _ground(px1 - 12.0, zc)
+	var total := py - gs
+	var n := ceili(total * 0.5 / 0.19)
+	var step := total * 0.5 / n
+	var run := n * 0.27
+	var x_land0 := px1 - run
+	var x_land1 := x_land0 - 1.6
+	var y_land := py - total * 0.5
+	var x_foot := x_land1 - run
+	_stair_flight(root, kit, name, Vector3(px1, py, zc), Vector3(x_land0, y_land, zc), n, step, st_hw)
+	_stair_flight(root, kit, name, Vector3(x_land1, y_land, zc), Vector3(x_foot, gs, zc), n, step, st_hw)
+	_block(kit, "paint", Vector3(x_land1, y_land - 0.35, zc - st_hw), Vector3(x_land0, y_land, zc + st_hw), stone)
+	for lz in [-st_hw + 0.3, st_hw - 0.3]:
+		for lx in [x_land1 + 0.3, x_land0 - 0.3]:
+			_tube(kit, "paint", Vector3(lx, _ground(lx, zc + lz) - 0.3, zc + lz), Vector3(lx, y_land - 0.35, zc + lz), 0.14, 0.14, 8, MONO_WHITE)
+	_box_collider(root, name, Vector3(x_land1, y_land - 0.35, zc - st_hw), Vector3(x_land0, y_land, zc + st_hw))
+	_balustrade(root, kit, name, Vector3(x_land1, y_land, zc - st_hw), Vector3(x_land1, y_land, zc + st_hw))
+	for sd in [-1.0, 1.0]:
+		_balustrade(root, kit, name, Vector3(x_land0, y_land, zc + sd * st_hw), Vector3(x_land1, y_land, zc + sd * st_hw))
+	# Planters either side of the stair foot, and along the hall's beach side.
+	for sd in [-1.0, 1.0]:
+		var pc := Vector3(x_foot + 3.0, _ground(x_foot + 3.0, zc + sd * (st_hw + 1.2)), zc + sd * (st_hw + 1.2))
+		_block(kit, "paint", pc + Vector3(-1.0, -0.2, -0.9), pc + Vector3(1.0, 0.7, 0.9), stone.darkened(0.08))
+		for b in 3:
+			_rock(kit, pc + Vector3(rng.randf_range(-0.6, 0.6), 0.95, rng.randf_range(-0.5, 0.5)), Vector3(0.7, 0.45 + 0.12 * b, 0.6), 700 + b + int(sd * 10.0), green.darkened(rng.randf_range(0.0, 0.2)), "paint")
+		_box_collider(root, name, pc + Vector3(-1.0, -0.2, -0.9), pc + Vector3(1.0, 0.7, 0.9))
+	for pz in [hz0 + 2.0, hz1 - 2.0]:
+		var pp := Vector3(hx0 - 1.3, _ground(hx0 - 1.3, pz), pz)
+		_block(kit, "paint", pp + Vector3(-0.6, -0.2, -3.5), pp + Vector3(0.6, 0.6, 3.5), stone.darkened(0.08))
+		for b in 5:
+			_rock(kit, pp + Vector3(rng.randf_range(-0.2, 0.2), 0.85, -2.8 + b * 1.4), Vector3(0.65, 0.42 + 0.07 * b, 0.75), 720 + b + int(pz), green.darkened(rng.randf_range(0.0, 0.2)), "paint")
+		_box_collider(root, name, pp + Vector3(-0.6, -0.2, -3.5), pp + Vector3(0.6, 0.6, 3.5))
+	# Benches on the platform, the sign over the stairs.
+	for bz in [zc - 12.0, zc + 8.0, zc + 15.0]:
+		var bc := Vector3(px1 + 1.2, py, bz)
+		_block(kit, "wood", bc + Vector3(-0.3, 0.45, -1.2), bc + Vector3(0.3, 0.52, 1.2), WOOD)
+		_block(kit, "wood", bc + Vector3(-0.32, 0.55, -1.2), bc + Vector3(-0.26, 0.95, 1.2), WOOD)
+		for lz in [-1.0, 1.0]:
+			_block(kit, "metal", bc + Vector3(-0.28, 0.0, lz - 0.04), bc + Vector3(0.28, 0.45, lz + 0.04), Color(0.3, 0.32, 0.35))
+	var sign_c := Vector3(rx0 - 0.25, spring - 0.75, zc)
+	_box(kit, "paint", Transform3D(Basis(), sign_c), Vector3(0.12, 1.1, 7.6), MONO_WHITE)
+	_box(kit, "paint", Transform3D(Basis(), sign_c + Vector3(-0.07, 0, 0)), Vector3(0.04, 0.9, 7.3), MONO_BLUE)
+	_pixel_text(kit, "paint", sign_c + Vector3(-0.12, 0, 0), Vector3(0, 0, 1), Vector3.UP, 0.13, "SOUTH BEACH", Color(1, 1, 1))
+	for sz in [-3.0, 3.0]:
+		_tube(kit, "metal", sign_c + Vector3(0, 0.55, sz), Vector3(sign_c.x, spring + 0.05, zc + sz), 0.03, 0.03, 6, Color(0.6, 0.62, 0.65))
+	_note(name, Vector2(-14.0, zc), 14.0, CLEAR_BUILDING)
+	_note(name + "Stairs", Vector2(x_foot + 2.5, zc), 3.6, CLEAR_BUILDING)
+
+
+## A glass balustrade between two points at deck level: panels, posts and a white rail on top.
+func _balustrade(root: Node3D, kit: Dictionary, name: String, a: Vector3, b: Vector3) -> void:
+	var d := b - a
+	var length := d.length()
+	if length < 0.1:
+		return
+	var bas := Basis.looking_at(d.normalized(), Vector3.UP)
+	var posts := maxi(1, ceili(length / 2.0))
+	for k in range(posts + 1):
+		var pp := a.lerp(b, float(k) / posts)
+		_tube(kit, "paint", pp, pp + Vector3(0, 1.1, 0), 0.04, 0.04, 6, MONO_WHITE)
+	# The panes stand just inboard of the posts: through them, they flickered.
+	var inboard := d.normalized().cross(Vector3.UP) * 0.07
+	_box(kit, "glass", Transform3D(bas, (a + b) * 0.5 + inboard + Vector3(0, 0.55, 0)), Vector3(0.04, 0.95, length), Color(0.75, 0.92, 0.96))
+	_tube(kit, "paint", a + Vector3(0, 1.12, 0), b + Vector3(0, 1.12, 0), 0.05, 0.05, 8, MONO_WHITE)
+	_box_along(root, name, (a + b) * 0.5 + Vector3(0, 0.6, 0), d, Vector3(0.12, 1.2, length))
+
+
+## A flight of stairs from `top` down to `foot` (both on the centre line): white stringers with glass
+## balustrades, pale treads, and a sloped collider.
+func _stair_flight(root: Node3D, kit: Dictionary, name: String, top: Vector3, foot: Vector3, n: int, step: float, hw: float) -> void:
+	var run := foot - top
+	var horiz := Vector3(run.x, 0, run.z)
+	var dir := horiz.normalized()
+	var across := dir.cross(Vector3.UP).normalized()
+	var tread := horiz.length() / n
+	for i in n:
+		var y1 := top.y - step * (i + 1)
+		var c := top + dir * (tread * (i + 0.5))
+		c.y = y1
+		_box(kit, "paint", Transform3D(Basis.looking_at(dir, Vector3.UP), c + Vector3(0, -0.06, 0)), Vector3(hw * 2.0 - 0.3, 0.12, tread + 0.02), Color(0.9, 0.9, 0.88))
+		_box(kit, "paint", Transform3D(Basis.looking_at(dir, Vector3.UP), c + Vector3(0, step * 0.5 - 0.06, 0) - dir * (tread * 0.5 - 0.03)), Vector3(hw * 2.0 - 0.36, step, 0.05), Color(0.8, 0.8, 0.78))
+	var slope := (foot - top).normalized()
+	var sb := Basis.looking_at(slope, Vector3.UP)
+	var mid := (top + foot) * 0.5
+	for sd in [-1.0, 1.0]:
+		# Stringers stand 4cm proud of the landing's sides: flush, they flickered.
+		var sm: Vector3 = mid + across * sd * (hw - 0.04) - sb.y * 0.25
+		_box(kit, "paint", Transform3D(sb, sm), Vector3(0.16, 0.6, top.distance_to(foot) + 0.3), MONO_WHITE)
+		var a: Vector3 = top + across * sd * (hw - 0.08)
+		var b: Vector3 = foot + across * sd * (hw - 0.08)
+		_box(kit, "glass", Transform3D(sb, (a + b) * 0.5 + Vector3(0, 0.6, 0)), Vector3(0.04, 0.95, a.distance_to(b)), Color(0.75, 0.92, 0.96))
+		_tube(kit, "paint", a + Vector3(0, 1.12, 0), b + Vector3(0, 1.12, 0), 0.05, 0.05, 8, MONO_WHITE)
+		_box_along(root, name, (a + b) * 0.5 + Vector3(0, 0.6, 0), b - a, Vector3(0.12, 1.2, a.distance_to(b)))
+	_box_along(root, name, mid - sb.y * 0.2, foot - top, Vector3(hw * 2.0, 0.4, top.distance_to(foot)))
+
+
+## A monorail car in its own frame: y = 0 on the beam's top, nose (if any) at -z. A rounded white body
+## with a lime stripe and a dark window band, doors both sides, skirts hugging the beam, bellows at
+## the coupled ends; the end car's nose tapers into a wraparound windscreen with headlights.
+func _car_mesh(nose: bool) -> ArrayMesh:
+	var kit := {}
+	var hl := CAR_LEN * 0.5
+	var prof := [Vector2(0.0, 0.25), Vector2(1.3, 0.25), Vector2(1.5, 0.5), Vector2(1.5, 1.25), Vector2(1.5, 1.4), Vector2(1.5, 1.55),
+		Vector2(1.5, 2.6), Vector2(1.47, 2.85), Vector2(1.32, 3.12), Vector2(0.95, 3.32), Vector2(0.0, 3.42)]
+	var cols := [Color(0.55, 0.58, 0.62), Color(0.55, 0.58, 0.62), MONO_WHITE, MONO_LIME, MONO_WHITE, MONO_GLASS, MONO_WHITE, MONO_WHITE, MONO_WHITE, MONO_WHITE]
+	var nose_from := -hl + 3.6
+	# Rings along the car: (z, taper t). The nose tapers over its last 3.6m.
+	var rings: Array = [[hl, 0.0]]
+	if nose:
+		for t in [0.0, 0.15, 0.3, 0.45, 0.6, 0.72, 0.84, 0.93, 1.0]:
+			rings.append([nose_from - t * 3.6, t])
+	else:
+		rings.append([-hl, 0.0])
+	var ring_pt := func(p: Vector2, side: float, ring: Array) -> Vector3:
+		var t: float = ring[1]
+		var sx := 1.0 - 0.3 * t * t
+		var sy := 1.0 - 0.4 * pow(t, 1.8)
+		return Vector3(p.x * sx * side, 0.25 + (p.y - 0.25) * sy, ring[0])
+	var st := _st(kit, "gloss")
+	for r in rings.size() - 1:
+		var r0: Array = rings[r]
+		var r1: Array = rings[r + 1]
+		for side in [-1.0, 1.0]:
+			for k in prof.size() - 1:
+				var col: Color = cols[k]
+				var tm := (float(r0[1]) + float(r1[1])) * 0.5
+				if nose and tm > 0.2 and tm < 0.97 and k >= 5 and k <= 8:
+					col = MONO_GLASS
+				var a0: Vector3 = ring_pt.call(prof[k], side, r0)
+				var a1: Vector3 = ring_pt.call(prof[k + 1], side, r0)
+				var b0: Vector3 = ring_pt.call(prof[k], side, r1)
+				var b1: Vector3 = ring_pt.call(prof[k + 1], side, r1)
+				var mid_p := (a0 + a1 + b0 + b1) * 0.25
+				var out := (mid_p - Vector3(0, 1.8, mid_p.z)).normalized()
+				var n := (a1 - a0).cross(b0 - a0).normalized()
+				if n.dot(out) < 0.0:
+					n = -n
+				_tri(st, a0, a1, b1, n, n, n, col, out)
+				_tri(st, a0, b1, b0, n, n, n, col, out)
+	# Ends: the nose cap, bulging a little, or a dark coupled end with bellows.
+	var ends: Array = [[rings[0], false], [rings[rings.size() - 1], nose]]
+	for e in ends:
+		var ring: Array = e[0]
+		var is_nose: bool = e[1]
+		var zf: float = ring[0]
+		var outward := Vector3(0, 0, signf(zf))
+		var centre := Vector3(0, 1.6, zf + outward.z * (0.25 if is_nose else 0.0))
+		for side in [-1.0, 1.0]:
+			for k in prof.size() - 1:
+				var a: Vector3 = ring_pt.call(prof[k], side, ring)
+				var b: Vector3 = ring_pt.call(prof[k + 1], side, ring)
+				var col: Color = MONO_WHITE if is_nose else Color(0.3, 0.32, 0.35)
+				if is_nose and k == 3:
+					col = MONO_LIME
+				_tri(st, a, b, centre, outward, outward, outward, col, outward)
+		if not is_nose:
+			_box(kit, "paint", Transform3D(Basis(), Vector3(0, 1.7, zf + outward.z * 0.15)), Vector3(2.3, 2.7, 0.3), Color(0.2, 0.2, 0.22))
+	if nose:
+		for sx in [-0.62, 0.62]:
+			_box(kit, "glow", Transform3D(Basis(), Vector3(sx, 0.62, -hl - 0.05)), Vector3(0.38, 0.14, 0.12), Color(1, 1, 1))
+	# Doors: two a side, each with a window.
+	var door_z := [hl - 2.4, hl - 6.0] if nose else [-3.0, 3.0]
+	for dz in door_z:
+		for side in [-1.0, 1.0]:
+			_box(kit, "gloss", Transform3D(Basis(), Vector3(side * 1.53, 1.45, dz)), Vector3(0.06, 2.1, 1.3), Color(0.86, 0.88, 0.9))
+			_box(kit, "gloss", Transform3D(Basis(), Vector3(side * 1.57, 2.0, dz)), Vector3(0.04, 0.9, 0.8), MONO_GLASS)
+	# Skirts hugging the beam, and a roof unit on the middle car.
+	for side in [-1.0, 1.0]:
+		_block(kit, "paint", Vector3(side * 0.72 - 0.07, -1.1, -hl + 1.2), Vector3(side * 0.72 + 0.07, 0.26, hl - 1.2), Color(0.45, 0.48, 0.52))
+	if not nose:
+		_block(kit, "paint", Vector3(-0.8, 3.3, -2.0), Vector3(0.8, 3.62, 2.0), Color(0.82, 0.84, 0.86))
+	return _kit_mesh(kit)
+
+
 # --- Seafront structures ---------------------------------------------------------------------------
 # Everything lives under "Seafront" (not "Props"/"Environment": Level.gd bakes trimesh colliders
 # under those, and no "ramp" either). Each structure is one mesh with a surface per material, plus
@@ -768,6 +1242,7 @@ func _build_seafront(level: Node3D, tg: Node3D, curve: Curve3D) -> void:
 	_build_lighthouse(root)
 	_build_shipwreck(root)
 	_build_surf_shack(root)
+	_build_monorail(root)
 	# The fence before the parasols, which keep clear of it.
 	_build_sand_fence(root)
 	_build_umbrellas(root)
@@ -1063,7 +1538,16 @@ func _hip_roof(kit: Dictionary, key: String, xf: Transform3D, x0: float, x1: flo
 
 ## Block capitals for painted signs, five cells high.
 const GLYPHS := {
+	" ": ["..", "..", "..", "..", ".."],
 	"A": [".XX.", "X..X", "XXXX", "X..X", "X..X"],
+	"C": [".XXX", "X...", "X...", "X...", ".XXX"],
+	"H": ["X..X", "X..X", "XXXX", "X..X", "X..X"],
+	"S": [".XXX", "X...", ".XX.", "...X", "XXX."],
+	"T": ["XXX", ".X.", ".X.", ".X.", ".X."],
+	"B": ["XXX.", "X..X", "XXX.", "X..X", "XXX."],
+	"M": ["X...X", "XX.XX", "X.X.X", "X...X", "X...X"],
+	"O": [".XX.", "X..X", "X..X", "X..X", ".XX."],
+	"Y": ["X...X", ".X.X.", "..X..", "..X..", "..X.."],
 	"D": ["XXX.", "X..X", "X..X", "X..X", "XXX."],
 	"E": ["XXXX", "X...", "XXX.", "X...", "XXXX"],
 	"F": ["XXXX", "X...", "XXX.", "X...", "X..."],
@@ -4083,8 +4567,8 @@ func _build_sand_fence(root: Node3D) -> void:
 	var z := -248.0
 	var grey := Color(0.60, 0.56, 0.50)
 	while z < 128.0:
-		# Gaps where the beach paths come down from the dunes.
-		if absf(z - 0.0) < 5.0 or absf(z + 100.0) < 5.0:
+		# Gaps where the beach paths come down from the dunes, the wider one at the monorail station.
+		if absf(z - MONO_STATION_Z) < 24.0 or absf(z + 100.0) < 5.0:
 			z += bay
 			continue
 		var x := -12.5 + 1.2 * sin(z * 0.05) + 0.6 * sin(z * 0.17)

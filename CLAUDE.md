@@ -351,6 +351,21 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
     leaned seaward through their roofs.
   - The root is "Palms", not "Vegetation", which Level.gd would bake trimesh colliders under.
   - Each trunk's collider is a cylinder over its first 4m, tilted with its lean.
+- The monorail (`_build_monorail`, `MONO_*`) runs on a beam 9m up along the landward edge of the
+  beach.
+  - To the south it curves over a dune lagoon to a buffer. To the north it crosses the lap, with no
+    pylon in the road corridor, and runs on off the map and out to sea (`MONO_FAR_Z`), as if it went
+    somewhere. Off the map it has no collision or footprints.
+  - The beam's dark conductor band is part of its side faces (`_beam`): laid on as a strip, it
+    flickered.
+  - South Beach station (`_build_mono_station`) stands at the beach path, so the dune fence's gap
+    there is wide. It has a glass vault, a glazed hall and stairs toward the track, kept 5m+ off its
+    edge.
+  - `Monorail.gd` shuttles a three-car train between the far end, the station and the south end on
+    the wall clock, like `WildebeestHerd.gd`, so LAN peers agree without syncing. It plays the baked
+    station chime (`_station_chime`) 3s before each stop at the station. The cars are internal
+    children, each with an AnimatableBody3D box.
+  - The line's footprints keep palms out of its corridor.
 - The surf is heard from `SurfSound`, AudioStreamPlayer3Ds 10m seaward of the waterline every
   `SURF_SPACING`. They alternate two clips baked by `_surf_stream`: rumble, curl, crash and swash
   on `SEA_PERIOD`, three waves in one clip and four in the other, so neighbours never fall into step.
