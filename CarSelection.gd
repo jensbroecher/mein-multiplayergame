@@ -105,13 +105,13 @@ const CAR_PRESETS = [
 		"steer_speed": 3.5,
 		"grip": 3.5,
 		"braking": 40.0,
-		"offroad": 4.0,
-		"desc": "Super agile drift machine. Slides effortlessly around corners.",
+		"offroad": 8.0,
+		"desc": "Agile drifter on crawler tyres. Slides through corners, keeps its pace off-road.",
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
 		"name": "Centurion",
-		"model_path": "res://models/cars/Centurion.tscn",
+		"model_path": "res://generated/cars/Centurion.tscn",
 		"model_y_rotation": PI,
 		"max_speed": 39.5,
 		"acceleration": 76.0,
@@ -120,7 +120,7 @@ const CAR_PRESETS = [
 		"braking": 48.0,
 		"offroad": 6.5,
 		"desc": "Heavy armored racer. Balanced stats with high durability.",
-		"wheel_parts": {"FL": "part_0", "FR": "part_5", "RL": "part_2", "RR": "part_3"}
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 
@@ -129,7 +129,7 @@ const CAR_PRESETS = [
 const CAR_ACCENTS := {
 	"Viper": Color(0.36, 0.92, 0.40), "Shadow": Color(0.72, 0.40, 1.0), "Strikeforce": Color(0.70, 0.88, 0.20),
 	"Apex": Color(1.0, 0.60, 0.16), "Interceptor": Color(0.30, 0.52, 1.0), "Mudrunner": Color(0.22, 0.80, 0.66),
-	"Phantom": Color(1.0, 0.78, 0.14), "Centurion": Color(1.0, 0.38, 0.20),
+	"Phantom": Color(1.0, 0.78, 0.14), "Centurion": Color(0.98, 0.46, 0.12),
 }
 ## Stat bars: caption, preset key, and the values at an empty and a full bar (spanning the fleet).
 const STATS := [

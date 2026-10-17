@@ -430,13 +430,13 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   what's visible at each step. `scratch/menu_shot` takes `size=<w>x<h>` (the window can't exceed the
   screen, so on a 16:10 Mac it stays 16:10).
 
-## Procedural cars (Mudrunner, Phantom, Strikeforce)
+## Procedural cars (Mudrunner, Phantom, Strikeforce, Centurion)
 
 - Cars can be built in code instead of imported from Hunyuan. `CarBuilder.gd` is the geometry toolkit (lofts,
   lathes, tubes, rounded boxes into one indexed mesh, the material id per vertex in UV2.x). `CarDesign.gd` is
   what the cars share: the lofted shell, fender sweeps, wheel parts, a coil-over, the detail map. Each car
-  extends it (`MudrunnerBuilder.gd`, `PhantomBuilder.gd`, `StrikeforceBuilder.gd`) with its shape and its own
-  parts. `regenerate_cars.gd` saves each as `generated/cars/<Name>.tscn` with its meshes, material and detail
+  extends it (`MudrunnerBuilder.gd`, `PhantomBuilder.gd`, `StrikeforceBuilder.gd`, `CenturionBuilder.gd`) with
+  its shape and its own parts. `regenerate_cars.gd` saves each as `generated/cars/<Name>.tscn` with its meshes, material and detail
   map; run `res://regenerate_cars.tscn` headless. PlayerCart and CarSelection load it through the preset's
   `model_path` like an FBX car, with `model_y_rotation` PI and `wheel_parts` `Wheel_FL` ... `Wheel_RR`.
 - Builders work in the cart frame (metres, front at -Z, ground at y = 0); the scene's `Model` node undoes
@@ -450,9 +450,14 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   `_upper_segments()`, so every feature sits on the same ring points at every station; resampled as
   one curve, the points slid between features and the loft folded into creases.
 - A section whose shape changes along the car (the Strikeforce: hardtop over the cab, a bed sunk into the
-  tub, a flat bonnet and tailgate) keyframes all its upper profiles in one table (`KEYS`), so they change
-  together and each region boundary (windscreen, cab back, tailgate inside) is a clean wall, not a fold.
-  Where two segments meet, match their slopes, or the clearcoat shows the crease.
+  tub, a flat bonnet and tailgate; the Centurion: a deck over nose and engine, its cockpit sunk between the
+  side armour) keyframes all its upper profiles in one table (`KEYS`, `CarDesign.keyed_knots()`), so they
+  change together and each region boundary (windscreen, cab back, dash, firewall) is a clean wall, not a
+  fold. Where two segments meet, match their slopes, or the clearcoat shows the crease.
+- The Centurion's Hunyuan model stood on narrow front wheels like a dragster; the rebuild has the same paddle
+  tyre at all four corners. Its paddles follow the carcass and taper into the shoulders (`_paddle`):
+  full height to the edge, they stood out from the sidewalls like fins. Its cage is in the accent colour
+  (`M_ANODISED`), so the paint job's accent recolours it.
 - Stations are doubles. A flat cap (exponent 8) closes only at the exact tip: the tip rounded to a
   float32 (1.025 -> 1.0249999) left a hole a quarter of the face across.
 - Wheel arches through a body (the Phantom) are cut by lifting the shell's bottom over each wheel

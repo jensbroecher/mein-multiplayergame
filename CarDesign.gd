@@ -47,6 +47,18 @@ var _u_z := PackedFloat32Array()          # u(z) table: arc length along the cap
 var _u_val := PackedFloat32Array()
 
 
+## Profile knots from a keyframe table, rows of [z, one value per name]: every profile gets the same
+## knot z's, so a section's features change together between regions (cab, bed, bonnet...).
+static func keyed_knots(keys: Array, names: Array) -> Dictionary:
+	var knots := {}
+	for key_name in names:
+		knots[key_name] = []
+	for key in keys:
+		for k in names.size():
+			(knots[names[k]] as Array).append([key[0], key[k + 1]])
+	return knots
+
+
 ## Builds the section profiles from {name: [[z, value], ...]} and the u table.
 func setup_shell(knots: Dictionary) -> void:
 	for key in knots:
@@ -543,6 +555,21 @@ func lens(b, c: Vector3, fwd: Vector3, r: float, bulge: float, segs: int) -> voi
 	for k in range(vb, b.vertex_count()):
 		var d: Vector3 = b._v[k] - c
 		b._uv[k] = Vector2(d.dot(e1), d.dot(e2))
+
+
+## A polyline with its corners rounded off (a quadratic Bézier over `r` either side of each), for
+## tube work: cages, sport bars, bumpers.
+static func _rounded(pts: Array, r: float, steps := 4) -> PackedVector3Array:
+	var out := PackedVector3Array([pts[0]])
+	for k in range(1, pts.size() - 1):
+		var p: Vector3 = pts[k]
+		var a: Vector3 = p + (pts[k - 1] - p).normalized() * minf(r, (pts[k - 1] - p).length() * 0.45)
+		var c: Vector3 = p + (pts[k + 1] - p).normalized() * minf(r, (pts[k + 1] - p).length() * 0.45)
+		for s in steps + 1:
+			var t: float = float(s) / steps
+			out.append(a.lerp(p, t).lerp(p.lerp(c, t), t))
+	out.append(pts[pts.size() - 1])
+	return out
 
 
 ## A flat-shaded quad facing `hint`.

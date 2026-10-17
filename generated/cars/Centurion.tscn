@@ -1,0 +1,38 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://generated/cars/centurion_body.res" id="1_3o2we"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/centurion_wheel_l.res" id="2_7yb8v"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/centurion_wheel_r.res" id="3_87xbn"]
+
+[node name="Centurion" type="Node3D" unique_id=904416629]
+metadata/procedural_car = true
+
+[node name="Model" type="Node3D" parent="." unique_id=1053931782]
+transform = Transform3D(-0.5, 0, -4.371139e-08, 0, 0.5, 0, 4.371139e-08, 0, -0.5, 0, 0, 0)
+
+[node name="Body" type="MeshInstance3D" parent="Model" unique_id=1049495254]
+mesh = ExtResource("1_3o2we")
+metadata/car_shader = true
+
+[node name="Wheel_FL" type="MeshInstance3D" parent="Model" unique_id=1577320191]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.61, 0.254, -0.9)
+mesh = ExtResource("2_7yb8v")
+metadata/car_shader = true
+
+[node name="Wheel_FR" type="MeshInstance3D" parent="Model" unique_id=1017730623]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.61, 0.254, -0.9)
+mesh = ExtResource("3_87xbn")
+metadata/car_shader = true
+
+[node name="Wheel_RL" type="MeshInstance3D" parent="Model" unique_id=955530894]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.61, 0.254, 0.48)
+mesh = ExtResource("2_7yb8v")
+metadata/car_shader = true
+
+[node name="Wheel_RR" type="MeshInstance3D" parent="Model" unique_id=1870800739]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.61, 0.254, 0.48)
+mesh = ExtResource("3_87xbn")
+metadata/car_shader = true
+
+[node name="AntennaPlacement" type="Node3D" parent="Model" unique_id=1574114702]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.29, 0.715, 0.25)

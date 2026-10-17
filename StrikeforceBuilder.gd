@@ -102,12 +102,11 @@ func _init() -> void:
 	bottom_radius = 0.02
 	fender_mat = CB.M_DARK
 	fender_col = C_FLARE
-	var knots := {"w": W_KNOTS, "bot": BOT_KNOTS, "top": []}
-	for key_name in KEY_NAMES:
-		knots[key_name] = []
+	var knots: Dictionary = keyed_knots(KEYS, KEY_NAMES)
+	knots["w"] = W_KNOTS
+	knots["bot"] = BOT_KNOTS
+	knots["top"] = []
 	for key in KEYS:
-		for k in KEY_NAMES.size():
-			(knots[KEY_NAMES[k]] as Array).append([key[0], key[k + 1]])
 		(knots["top"] as Array).append([key[0], key[4] + key[7] + key[9]])
 	setup_shell(knots)
 
@@ -198,20 +197,6 @@ func _flare_bolts(b, lip: Array, hub_z: float, xo: float) -> void:
 		var h: float = FLARE_DEPTH * 0.52
 		bar(b, Vector3(xo + 0.004, spine[k].y + n2.y * h, spine[k].x + n2.x * h), Vector3(0.003, 0.0045, 0.0045),
 				CB.M_ALLOY, C_ALLOY_DARK)
-
-
-## A polyline with its corners rounded off (a quadratic Bézier over `r` either side of each).
-static func _rounded(pts: Array, r: float, steps := 4) -> PackedVector3Array:
-	var out := PackedVector3Array([pts[0]])
-	for k in range(1, pts.size() - 1):
-		var p: Vector3 = pts[k]
-		var a: Vector3 = p + (pts[k - 1] - p).normalized() * minf(r, (pts[k - 1] - p).length() * 0.45)
-		var c: Vector3 = p + (pts[k + 1] - p).normalized() * minf(r, (pts[k + 1] - p).length() * 0.45)
-		for s in steps + 1:
-			var t: float = float(s) / steps
-			out.append(a.lerp(p, t).lerp(p.lerp(c, t), t))
-	out.append(pts[pts.size() - 1])
-	return out
 
 
 ## Body mesh: shell, flares, lamps, grille and bumpers, the bed's sport bar and spare, the light

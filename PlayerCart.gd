@@ -107,12 +107,13 @@ const CAR_PRESETS = [
 		"steer_speed": 3.5,
 		"grip": 3.5,
 		"braking": 40.0,
-		"offroad": 4.0,
+		"offroad": 8.0,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
 		"name": "Centurion",
-		"model_path": "res://models/cars/Centurion.tscn",
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Centurion.tscn",
 		"model_y_rotation": PI,
 		"max_speed": 39.5,
 		"acceleration": 76.0,
@@ -120,7 +121,7 @@ const CAR_PRESETS = [
 		"grip": 5.5,
 		"braking": 48.0,
 		"offroad": 6.5,
-		"wheel_parts": {"FL": "part_0", "FR": "part_5", "RL": "part_2", "RR": "part_3"}
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 

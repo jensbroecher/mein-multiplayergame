@@ -25,13 +25,13 @@ const PALETTE := [
 	["Silver", Color(0.70, 0.72, 0.74)], ["Gunmetal", Color(0.23, 0.25, 0.27)],
 	["Jet Black", Color(0.03, 0.03, 0.035)], ["Sand", Color(0.82, 0.70, 0.48)],
 	["Olive", Color(0.36, 0.40, 0.20)], ["Chocolate", Color(0.32, 0.18, 0.10)],
-	["Strikeforce Lime", Color(0.62, 0.78, 0.24)],
+	["Strikeforce Lime", Color(0.62, 0.78, 0.24)], ["Graphite", Color(0.36, 0.38, 0.41)],
 ]
 const RIMS := [
 	["Silver", Color(0.76, 0.77, 0.79)], ["Titanium", Color(0.46, 0.47, 0.49)], ["Gunmetal", Color(0.22, 0.23, 0.25)],
 	["Black", Color(0.05, 0.05, 0.055)], ["White", Color(0.92, 0.92, 0.90)],
 	["Gold", Color(0.86, 0.63, 0.24)], ["Bronze", Color(0.55, 0.35, 0.18)],
-	["Red", Color(0.75, 0.08, 0.06)], ["Blue", Color(0.10, 0.30, 0.78)],
+	["Red", Color(0.75, 0.08, 0.06)], ["Blue", Color(0.10, 0.30, 0.78)], ["Orange", Color(0.96, 0.45, 0.08)],
 ]
 
 ## Each model's factory paint; the Hunyuan model's colours for the rebuilt ones.
@@ -45,6 +45,9 @@ const FACTORY := {
 	"Strikeforce": {"pattern": 0, "finish": 0, "primary": Color(0.62, 0.78, 0.24),
 		"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.80, 0.07, 0.05),
 		"rim": Color(0.05, 0.05, 0.055), "number": 24},
+	"Centurion": {"pattern": 2, "finish": 1, "primary": Color(0.36, 0.38, 0.41),
+		"secondary": Color(0.70, 0.72, 0.74), "accent": Color(0.96, 0.42, 0.06),
+		"rim": Color(0.96, 0.45, 0.08), "number": 10},
 }
 const FALLBACK := {"pattern": 0, "finish": 0, "primary": Color(0.80, 0.07, 0.05),
 	"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.98, 0.78, 0.07),
