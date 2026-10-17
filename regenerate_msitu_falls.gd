@@ -44,6 +44,7 @@ const LEVEL_PATH := "res://levels/MsituFallsLevel.tscn"
 const RES_PREFIX := "msitu_"
 const MeshChunker = preload("res://MeshChunker.gd")
 const RiverWaterScript = preload("res://RiverWater.gd")
+const RangerPostBuilder = preload("res://RangerPostBuilder.gd")
 
 const MESH_CHUNK_CELL := 80.0
 
@@ -186,6 +187,15 @@ const RF_W0 := 1.0
 const RF_STEP := 6.0
 
 const FINISH_OFF := 22.0
+
+## The ranger post's yard: a level pad graded into the lowland west of the start straight, past
+## the line, where the ground was already gentle. The buildings used to stand wherever the old
+## clearing happened to fall, and two of them hung over the hillside. Flat to POST_HALF round
+## POST_CENTRE (x, z) at POST_Y, easing into the natural ground over POST_BLEND metres.
+const POST_CENTRE := Vector2(-121.0, -34.0)
+const POST_HALF := Vector2(15.0, 28.0)
+const POST_BLEND := 12.0
+const POST_Y := 3.95
 
 var _segs: Array = []
 var _lap_len := 0.0
@@ -1083,13 +1093,48 @@ func _build_heights() -> void:
 			if not is_nan(g.y):
 				h = g.y
 			h = minf(h, _under_bridge_cap(x, z))
+			h = lerpf(h, POST_Y, _pad_weight(x, z))
 			_heights[i] = h
 			var rl: Vector3 = _road_lat(x, z, 20.0)
 			_road_d[i] = rl.x
 			_road_mud[i] = 1 if rl.x < 30.0 and _in_mud(rl.z) else 0
 
 
-## Ground height at any (x, z) from the built heightfield, interpolated like the triangles.
+## Distance from (x, z) to the ranger post's level yard: negative inside it.
+func _yard_distance(x: float, z: float) -> float:
+	var q := Vector2(absf(x - POST_CENTRE.x) - POST_HALF.x, absf(z - POST_CENTRE.y) - POST_HALF.y)
+	return Vector2(maxf(q.x, 0.0), maxf(q.y, 0.0)).length() + minf(maxf(q.x, q.y), 0.0)
+
+
+## How much the ranger post's pad levels the ground at (x, z): 1 on the yard, easing to 0 beyond.
+func _pad_weight(x: float, z: float) -> float:
+	return 1.0 - smoothstep(0.0, POST_BLEND, _yard_distance(x, z))
+
+
+## True within `margin` metres of the yard (square-cornered).
+func _in_ranger_yard(x: float, z: float, margin: float) -> bool:
+	return absf(x - POST_CENTRE.x) < POST_HALF.x + margin and absf(z - POST_CENTRE.y) < POST_HALF.y + margin
+
+
+## The yard is bare trampled earth. jungle_ground.gdshader paints laterite where the vertex colour
+## says "road" (band mask on, signed distance across it under the road's half width), so the yard
+## is written in as a patch of road, its edge where the yard's is, with the verge's green outside.
+func _yard_paint(x: float, z: float, m: Color) -> Color:
+	var d: float = _yard_distance(x, z)
+	if d > 10.0:
+		return m
+	var lat: float = clampf(ROAD_HALF + d * 4.0, 3.2, 12.0)
+	var road_lat: float = absf((m.a - 0.5) * 24.0) if m.g > 0.01 else 99.0
+	# The band mask is the road's share of the paint: a little under 1 inside the yard, so the earth
+	# there is worn through to the litter in places rather than a second road.
+	var band: float = 0.8 * (1.0 - smoothstep(0.0, 4.0, d)) + 0.2 * (1.0 - smoothstep(4.0, 10.0, d))
+	return Color(m.r * smoothstep(-1.0, 1.0, d), maxf(m.g, band), m.b, 0.5 + minf(lat, road_lat) / 24.0)
+
+
+## Ground height at any (x, z) from the built heightfield, on the same triangles as the mesh:
+## _build_terrain splits each cell along the diagonal joining its closer heights, so this must too.
+## (With the one fixed diagonal it used to, plants, posts and signs on a cell the other way round
+## stood up to half a metre off the real surface, and floated or sank on the road's banks.)
 func _ground_at(x: float, z: float) -> float:
 	var ix: int = _bsearch(_grid_x, x)
 	var iz: int = _bsearch(_grid_z, z)
@@ -1104,9 +1149,55 @@ func _ground_at(x: float, z: float) -> float:
 	var h10: float = _heights[iz * nx + ix + 1]
 	var h01: float = _heights[(iz + 1) * nx + ix]
 	var h11: float = _heights[(iz + 1) * nx + ix + 1]
+	if absf(h00 - h11) <= absf(h10 - h01):
+		# Split along a-d (the (0,0)-(1,1) diagonal).
+		if tx >= tz:
+			return h00 + (h10 - h00) * tx + (h11 - h10) * tz
+		return h00 + (h11 - h01) * tx + (h01 - h00) * tz
+	# Split along b-c.
 	if tx + tz <= 1.0:
 		return h00 + (h10 - h00) * tx + (h01 - h00) * tz
 	return h11 + (h01 - h11) * (1.0 - tx) + (h10 - h11) * (1.0 - tz)
+
+
+## Checks _ground_at against the terrain mesh's own triangles (read back from the index buffer, so
+## it shares no code with either), over random points of the fine grid.
+func _verify_ground_at(verts: PackedVector3Array, indices: PackedInt32Array, nx: int) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 77
+	var worst := 0.0
+	var worst_at := Vector2.ZERO
+	var checked := 0
+	for _k in range(6000):
+		var x: float = rng.randf_range(FINE_X.x + 20.0, FINE_X.y - 20.0)
+		var z: float = rng.randf_range(FINE_Z.x + 20.0, FINE_Z.y - 20.0)
+		var ix: int = _bsearch(_grid_x, x)
+		var iz: int = _bsearch(_grid_z, z)
+		var cell: int = (iz * (_grid_x.size() - 1) + ix) * 6
+		var mesh_y := NAN
+		for t in range(2):
+			var a: Vector3 = verts[indices[cell + t * 3]]
+			var b: Vector3 = verts[indices[cell + t * 3 + 1]]
+			var c: Vector3 = verts[indices[cell + t * 3 + 2]]
+			var den: float = (b.z - c.z) * (a.x - c.x) + (c.x - b.x) * (a.z - c.z)
+			if absf(den) < 1e-9:
+				continue
+			var wa: float = ((b.z - c.z) * (x - c.x) + (c.x - b.x) * (z - c.z)) / den
+			var wb: float = ((c.z - a.z) * (x - c.x) + (a.x - c.x) * (z - c.z)) / den
+			var wc: float = 1.0 - wa - wb
+			if wa >= -1e-6 and wb >= -1e-6 and wc >= -1e-6:
+				mesh_y = wa * a.y + wb * b.y + wc * c.y
+				break
+		if is_nan(mesh_y):
+			continue
+		checked += 1
+		var err: float = absf(_ground_at(x, z) - mesh_y)
+		if err > worst:
+			worst = err
+			worst_at = Vector2(x, z)
+	if worst > 0.01:
+		push_error("_ground_at is %.3fm off the terrain mesh at (%.1f, %.1f)" % [worst, worst_at.x, worst_at.y])
+	print("  ground lookup vs mesh: %d points, worst %.4fm" % [checked, worst])
 
 
 func _bsearch(arr: PackedFloat32Array, v: float) -> int:
@@ -1202,7 +1293,7 @@ func _build_terrain(parent: Node, mat: Material) -> Array:
 			var nrm := Vector3(-dhdx, 1.0, -dhdz).normalized()
 			normals[i] = nrm
 			if _road_d[i] < 80.0 or _near_detail(x, z):
-				colors[i] = _terrain_masks(x, z, h, nrm.y, _road_mud[i] == 1)
+				colors[i] = _yard_paint(x, z, _terrain_masks(x, z, h, nrm.y, _road_mud[i] == 1))
 			else:
 				colors[i] = Color(1.0 - smoothstep(0.55, 0.72, nrm.y), 0.0, 0.0, 0.5)
 	# Each cell is split along the diagonal joining its closer heights, so steep slopes that run
@@ -1243,6 +1334,7 @@ func _build_terrain(parent: Node, mat: Material) -> Array:
 						road_faces.append_array([p0, p1, p2])
 				else:
 					ground_faces.append_array([p0, p1, p2])
+	_verify_ground_at(verts, indices, nx)
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = verts
@@ -2984,8 +3076,11 @@ func _cluster_cards(st: SurfaceTool, base: int, c: Vector3, r: float, n: int, si
 
 ## A curved leaf strip (a frond or a banana leaf): from `root` along `dir` rising at `rise` and
 ## drooping by `droop` toward its tip, `length` by `width`, in `segs` quads, mapped onto `cell`.
+## With `fold` > 0 the strip is a shallow V (each half lifted `fold` radians off the midrib), which
+## is how it stays a leaf from the side: a flat ribbon seen along its width is a thin line, and a
+## fern of them looks like a spider.
 func _frond(st: SurfaceTool, base: int, root: Vector3, dir: Vector3, rise: float, droop: float, length: float, width: float,
-		segs: int, cell: int, tint: Color, shade0: float, twist: float = 0.0) -> int:
+		segs: int, cell: int, tint: Color, shade0: float, twist: float = 0.0, fold: float = 0.0) -> int:
 	var uvr: Rect2 = _cell_uv(cell)
 	var flat := Vector3(dir.x, 0.0, dir.z).normalized()
 	var side := Vector3(-flat.z, 0.0, flat.x)
@@ -2996,6 +3091,10 @@ func _frond(st: SurfaceTool, base: int, root: Vector3, dir: Vector3, rise: float
 		var ang: float = rise - (rise + droop) * t * t
 		p += (flat * cos(ang) + Vector3.UP * sin(ang)) * (length / float(segs))
 		pts.append(p)
+	var folds: Array = [-1.0, 0.0, 1.0] if fold > 0.0 else [-1.0, 1.0]
+	var per: int = folds.size()
+	var cf: float = cos(fold)
+	var sf: float = sin(fold)
 	for k in range(segs + 1):
 		var t: float = float(k) / float(segs)
 		var q: Vector3 = pts[k]
@@ -3008,16 +3107,26 @@ func _frond(st: SurfaceTool, base: int, root: Vector3, dir: Vector3, rise: float
 			up = -up
 		var v: float = uvr.position.y + uvr.size.y * (1.0 - t)
 		var shade: float = lerpf(shade0, 1.0, t)
-		for e in [-1.0, 1.0]:
-			st.set_normal((up + Vector3.UP * 0.3).normalized())
+		for e in folds:
+			var pos: Vector3 = q + tw * w * e
+			var nrm: Vector3 = up
+			if fold > 0.0:
+				# The edges lifted off the midrib and drawn in a little; their normals lean inward.
+				pos = q + tw * (w * cf * e) + up * (w * sf * absf(e))
+				nrm = (up * cf - tw * (sf * e)).normalized()
+			st.set_normal((nrm + Vector3.UP * 0.3).normalized())
 			st.set_color(Color(tint.r, tint.g, tint.b, shade))
 			st.set_uv(Vector2(uvr.position.x + uvr.size.x * (0.5 + e * 0.5), v))
-			st.add_vertex(q + tw * w * e)
+			st.add_vertex(pos)
 	for k in range(segs):
-		var a0: int = base + k * 2
-		for idx in [a0, a0 + 2, a0 + 1, a0 + 1, a0 + 2, a0 + 3]:
-			st.add_index(idx)
-	return base + (segs + 1) * 2
+		var a0: int = base + k * per
+		if fold > 0.0:
+			for idx in [a0, a0 + 3, a0 + 1, a0 + 1, a0 + 3, a0 + 4, a0 + 1, a0 + 4, a0 + 2, a0 + 2, a0 + 4, a0 + 5]:
+				st.add_index(idx)
+		else:
+			for idx in [a0, a0 + 2, a0 + 1, a0 + 1, a0 + 2, a0 + 3]:
+				st.add_index(idx)
+	return base + (segs + 1) * per
 
 
 ## A rainforest tree: a straight pale trunk on buttress roots, limbs only near the top, and a
@@ -3178,19 +3287,23 @@ func _banana_mesh(variant: int, bark_mat: Material, leaf_mat: Material) -> Array
 	return mesh
 
 
-## A ground fern: a rosette of fronds arching out of the leaf litter.
-func _fern_mesh(variant: int, leaf_mat: Material) -> ArrayMesh:
+## A ground fern: a rosette of folded fronds that rise out of the leaf litter, arch over and bring
+## their tips back down to it (a frond that stays up in the air reads as a leaf hanging there).
+func _fern_mesh(variant: int, leaf_mat: Material, light := false) -> ArrayMesh:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 1212 + variant
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var b := 0
-	var n: int = 9 + variant * 3
+	# `light` is the ground cover's: thousands of small ferns drawn at a distance, with fewer, coarser fronds.
+	var n: int = (7 + variant * 2) if light else (11 + variant * 4)
 	for i in range(n):
 		var a: float = TAU * float(i) / float(n) + rng.randf_range(-0.25, 0.25)
 		var dir := Vector3(cos(a), 0.0, sin(a))
 		var tint := Color(rng.randf_range(0.82, 0.95), rng.randf_range(0.88, 1.0), rng.randf_range(0.72, 0.85))
-		b = _frond(st, b, Vector3(0, -0.05, 0) + dir * 0.1, dir, rng.randf_range(0.9, 1.3), rng.randf_range(1.0, 1.6), rng.randf_range(1.4, 2.2) * (1.0 + variant * 0.3), 0.45, 3, CELL_FERN, tint, 0.6)
+		var length: float = rng.randf_range(1.3, 2.0) * (1.0 + variant * 0.3)
+		b = _frond(st, b, Vector3(0, -0.05, 0) + dir * 0.08, dir, rng.randf_range(0.75, 1.0), rng.randf_range(0.9, 1.3), length, 0.55 if light else 0.5,
+				3 if light else 4, CELL_FERN, tint, 0.55, rng.randf_range(-0.5, 0.5), rng.randf_range(0.45, 0.7))
 	var mesh: ArrayMesh = st.commit()
 	mesh.surface_set_material(0, leaf_mat)
 	return mesh
@@ -3316,6 +3429,34 @@ func _multimesh(mesh: Mesh, transforms: Array, node_name: String) -> MultiMeshIn
 	return mmi
 
 
+## How far a ground plant's leaves spread from its foot (metres at scale 1) by plant kind, for
+## _relief_under: ferns and shrubs spread right over the ground; a banana's leaves are high up on
+## its stem, so only the stem's foot matters.
+const PLANT_REACH := {20: 1.3, 21: 1.7, 30: 1.3, 31: 1.8, 40: 0.6, 41: 0.6}
+## How far a buttressed canopy tree's roots reach (metres at scale 1, to where they meet the ground)
+## by TREE_SHAPES index, and how much of the fall under them a tree sinks by (to at most
+## TREE_SINK_MAX); more than MAX_TREE_RELIEF and it doesn't grow there.
+const TREE_REACH := {0: 4.1, 1: 3.0}
+const TREE_SINK := 0.55
+const TREE_SINK_MAX := 1.0
+const MAX_TREE_RELIEF := 2.4
+## Ground more than this lower under a plant's leaves than at its foot is too much of a lip to grow on.
+const MAX_PLANT_RELIEF := 0.9
+## Share of that fall a plant sinks by.
+const PLANT_SINK := 0.6
+
+
+## How far the ground falls from (x, z) to the lowest point on a ring of radius `reach` round it:
+## on a slope, the height the downhill leaves of a plant standing there would hang above the soil.
+func _relief_under(x: float, z: float, reach: float) -> float:
+	var h0: float = _ground_at(x, z)
+	var low: float = h0
+	for k in range(8):
+		var a: float = TAU * float(k) / 8.0
+		low = minf(low, _ground_at(x + cos(a) * reach, z + sin(a) * reach))
+	return h0 - low
+
+
 ## Where nothing may grow: the road and its verge (`clear` metres from the centreline), water,
 ## the cliff round the falls and the floor under the falls, the bridge's ends, the start's
 ## clearing, and anything too steep.
@@ -3337,6 +3478,9 @@ func _plant_ok(x: float, z: float, clear: float, max_slope: float, tall: bool = 
 		return false
 	if _in_start_clearing(x, z):
 		return false
+	# Tall things keep their crowns off the post's roofs.
+	if _in_ranger_yard(x, z, 14.0 if tall else 3.0):
+		return false
 	if _near_mugumo(x, z, 20.0):
 		return false
 	return true
@@ -3357,11 +3501,12 @@ func _in_spray_zone(x: float, z: float) -> bool:
 	return false
 
 
-## The clearing by the start: the ranger post west of the straight, and the grid itself.
+## The clearing by the start: the grid, the reserve's sign and the banner over the road. (The ranger
+## post has its own yard, _in_ranger_yard.)
 func _in_start_clearing(x: float, z: float) -> bool:
 	var fl: Dictionary = _spot(_seg_s(SEG_START, 0.0) + FINISH_OFF, 0.0, 0.0)
 	var p: Vector3 = fl["pos"]
-	return x > p.x - 60.0 and x < p.x + 14.0 and z > p.z - 30.0 and z < p.z + 70.0
+	return x > p.x - 24.0 and x < p.x + 14.0 and z > p.z - 30.0 and z < p.z + 70.0
 
 
 ## Jittered grid points over the fine region, every `step` metres.
@@ -3419,6 +3564,7 @@ func _build_forest(parent: Node) -> void:
 	var tree_fern: Mesh = _save_baked_resource(_tree_fern_mesh(fern_bark, under_leaf), "tree_fern")
 	var bananas: Array = [_save_baked_resource(_banana_mesh(0, stem_mat, under_leaf), "banana_0"), _save_baked_resource(_banana_mesh(1, stem_mat, under_leaf), "banana_1")]
 	var ferns: Array = [_save_baked_resource(_fern_mesh(0, ground_leaf), "fern_0"), _save_baked_resource(_fern_mesh(1, ground_leaf), "fern_1")]
+	var cover_ferns: Array = [_save_baked_resource(_fern_mesh(0, ground_leaf, true), "fern_cover_0"), _save_baked_resource(_fern_mesh(1, ground_leaf, true), "fern_cover_1")]
 	var shrubs: Array = [_save_baked_resource(_shrub_mesh(0, under_leaf), "shrub_0"), _save_baked_resource(_shrub_mesh(1, under_leaf), "shrub_1")]
 	var liana: Mesh = _save_baked_resource(_liana_mesh(fern_bark), "liana")
 	print("  plant meshes built (%.1fs)" % ((Time.get_ticks_msec() - t0) / 1000.0))
@@ -3460,6 +3606,14 @@ func _build_forest(parent: Node) -> void:
 		if not _plant_ok(x, z, clear, 0.75, true):
 			continue
 		var y: float = _ground_at(x, z)
+		if v < 2:
+			# The buttress roots fan out over the slope and end just under the foot, so on a hillside
+			# the downhill ones hang in the air: sink the tree, and skip the very steepest spots.
+			var relief_t: float = _relief_under(x, z, float(TREE_REACH[v]) * sc)
+			if relief_t > MAX_TREE_RELIEF:
+				counts["lip"] = int(counts.get("lip", 0)) + 1
+				continue
+			y -= minf(relief_t * TREE_SINK, TREE_SINK_MAX)
 		var xf := Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(sc, sc * rng.randf_range(0.92, 1.1), sc)), Vector3(x, y, z))
 		if in_deep:
 			_add_to_cells(deep_near, _cell_key(xf.origin, v), xf)
@@ -3506,7 +3660,6 @@ func _build_forest(parent: Node) -> void:
 			continue
 		if not _plant_ok(x, z, ROAD_FLAT + 1.2, 0.9):
 			continue
-		var y: float = _ground_at(x, z)
 		var pick2: float = rng.randf()
 		var kind: int
 		if rd2 < ROAD_FLAT + 3.0:
@@ -3518,6 +3671,13 @@ func _build_forest(parent: Node) -> void:
 		else:
 			kind = 40 + (rng.randi() % 2)
 		var sc3: float = rng.randf_range(0.8, 1.25)
+		# On a slope the leaves on the downhill side would hang in the air: not on a lip, and sunk
+		# so the lowest leaves meet the ground (the uphill ones are buried, which hides them).
+		var relief: float = _relief_under(x, z, float(PLANT_REACH[kind]) * sc3)
+		if relief > MAX_PLANT_RELIEF:
+			counts["lip"] = int(counts.get("lip", 0)) + 1
+			continue
+		var y: float = _ground_at(x, z) - relief * PLANT_SINK
 		var xf3 := Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * sc3), Vector3(x, y - 0.05, z))
 		_add_to_cells(other, _cell_key(xf3.origin, kind), xf3)
 		if kind >= 40:
@@ -3538,7 +3698,10 @@ func _build_forest(parent: Node) -> void:
 		if not _plant_ok(x, z, ROAD_FLAT + 0.6, 0.95):
 			continue
 		var sc4: float = rng.randf_range(0.45, 0.8)
-		var xf4 := Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * sc4), Vector3(x, _ground_at(x, z) - 0.04, z))
+		var relief4: float = _relief_under(x, z, 1.4 * sc4)
+		if relief4 > MAX_PLANT_RELIEF:
+			continue
+		var xf4 := Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * sc4), Vector3(x, _ground_at(x, z) - relief4 * PLANT_SINK - 0.04, z))
 		_add_to_cells(cover, _cell_key(xf4.origin, rng.randi() % 3), xf4)
 		counts["cover"] = int(counts.get("cover", 0)) + 1
 
@@ -3574,7 +3737,7 @@ func _build_forest(parent: Node) -> void:
 		var mmi5 := _multimesh(far_meshes[k.z], deep_far[k], "TreeDeepFar_%d_%d_%d" % [k.x, k.y, k.z])
 		mmi5.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(mmi5)
-	var cover_mesh: Array = [ferns[0], ferns[1], shrubs[0]]
+	var cover_mesh: Array = [cover_ferns[0], cover_ferns[1], shrubs[0]]
 	for k in cover.keys():
 		var mmi6 := _multimesh(cover_mesh[k.z], cover[k], "GroundCover_%d_%d_%d" % [k.x, k.y, k.z])
 		mmi6.visibility_range_end = 70.0 + FOREST_CELL * 0.72
@@ -3775,7 +3938,8 @@ void fragment() {
 		vec2 uv = UV;
 		float x = fract(uv.x * 2.0);
 		float d = abs(uv.y - 0.5);
-		float arrow = step(abs(x - 0.35 - d * 0.6), 0.13);
+		// Each arrow's tip is at d = 0 (x = 0.65) and its arms trail back toward lower x.
+		float arrow = step(abs(x - 0.65 + d * 0.6), 0.13);
 		float border = step(0.42, d) + step(abs(uv.x - 0.5), 0.0) ;
 		col = mix(vec3(0.78, 0.07, 0.05), vec3(0.95, 0.94, 0.90), clamp(arrow + border, 0.0, 1.0));
 		EMISSION = col * 0.12;
@@ -3972,8 +4136,32 @@ void fragment() {
 	print("  marker posts: %d" % transforms.size())
 
 
-## The ranger post in its clearing beside the start: a timber office on stilts and a store with
-## rusty iron roofs, a flagpole, the reserve's sign, and the Matumaini GP banner over the road.
+## Every building's footprint must stand on the level pad (every sample within 12cm of the base
+## the builder used, so the stone base's 15cm of skirt hides the seam), clear of the road and the
+## water.
+func _verify_ranger_post(post) -> void:
+	var worst := 0.0
+	var worst_name := ""
+	for fp in post.footprints:
+		for pt in fp["pts"]:
+			var v: Vector2 = pt
+			var dy: float = absf(_ground_at(v.x, v.y) - float(fp["base_y"]))
+			if dy > worst:
+				worst = dy
+				worst_name = String(fp["name"])
+			if _road_distance(v.x, v.y) < ROAD_FLAT + 4.0:
+				push_error("Ranger post: the %s stands within %.1fm of the road" % [fp["name"], _road_distance(v.x, v.y)])
+			if _in_water(v.x, v.y, 2.0):
+				push_error("Ranger post: the %s stands in the water" % fp["name"])
+	if worst > 0.12:
+		push_error("Ranger post: the %s is %.2fm off the pad it was built on" % [worst_name, worst])
+	print("  ranger post footprints: worst %.3fm off the pad (%s)" % [worst, worst_name])
+
+
+## The ranger post beside the start straight (RangerPostBuilder.gd): a forest office with a
+## veranda, a thatched rondavel, a store and woodshed, a water tank and a fenced yard on the level
+## pad _build_heights grades for it; then the reserve's sign by the road, the flag and the Matumaini
+## GP banner over the straight.
 func _build_start_area(parent: Node) -> void:
 	var root := Node3D.new()
 	root.name = "RangerPost"
@@ -3988,68 +4176,44 @@ func _build_start_area(parent: Node) -> void:
 	wood.uv1_triplanar = true
 	wood.uv1_scale = Vector3(0.5, 0.5, 0.5)
 	wood.roughness = 0.9
-	var roof_mat := ShaderMaterial.new()
-	var rsh := Shader.new()
-	rsh.code = """shader_type spatial;
-// Corrugated iron, painted green and gone to rust in streaks.
-varying vec3 w_pos;
-void vertex() { w_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
-float h(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
-void fragment() {
-	float rib = 0.5 + 0.5 * sin((w_pos.x + w_pos.z) * 9.0);
-	float rust = smoothstep(0.55, 0.9, h(floor(vec2(w_pos.x + w_pos.z, w_pos.y * 0.4) * 1.3)) * 0.6 + sin(w_pos.x * 2.1) * 0.2 + 0.3);
-	vec3 col = mix(vec3(0.22, 0.38, 0.26), vec3(0.45, 0.22, 0.10), rust);
-	ALBEDO = col * (0.8 + rib * 0.25);
-	ROUGHNESS = mix(0.45, 0.85, rust);
-	METALLIC = mix(0.5, 0.1, rust);
-}
-"""
-	roof_mat.shader = rsh
 	var body := StaticBody3D.new()
 	body.name = "RangerPostBuildings"
 	root.add_child(body)
-	# Buildings west of the straight (left, heading south, is east: the straight runs south, its
-	# right is west).
-	var bdefs: Array = [[30.0, -18.0, Vector3(12.0, 4.0, 8.0), true], [48.0, 14.0, Vector3(8.0, 3.2, 6.0), false], [32.0, 36.0, Vector3(6.0, 3.0, 6.0), false]]
-	for bd in bdefs:
-		var pos: Vector3 = c + right * float(bd[0]) + fwd * float(bd[1])
-		pos.y = _ground_at(pos.x, pos.z)
-		var size: Vector3 = bd[2]
-		var yaw: float = atan2(-fwd.x, -fwd.z)
-		var stilts: float = 1.2 if bd[3] else 0.3
-		var walls := MeshInstance3D.new()
-		var wm := BoxMesh.new()
-		wm.size = size
-		walls.mesh = wm
-		walls.material_override = wood
-		walls.transform = Transform3D(Basis(Vector3.UP, yaw), pos + Vector3(0, stilts + size.y * 0.5, 0))
-		root.add_child(walls)
-		var roof := MeshInstance3D.new()
-		var pm := PrismMesh.new()
-		pm.size = Vector3(size.x + 1.6, 1.6, size.z + 1.4)
-		roof.mesh = pm
-		roof.material_override = roof_mat
-		roof.transform = Transform3D(Basis(Vector3.UP, yaw), pos + Vector3(0, stilts + size.y + 0.8, 0))
-		root.add_child(roof)
-		if bd[3]:
-			for sx in [-1.0, 1.0]:
-				for sz in [-1.0, 1.0]:
-					var leg := MeshInstance3D.new()
-					var lm := CylinderMesh.new()
-					lm.top_radius = 0.18
-					lm.bottom_radius = 0.2
-					lm.height = stilts + 0.6
-					leg.mesh = lm
-					leg.material_override = wood
-					var lp: Vector3 = pos + Basis(Vector3.UP, yaw) * Vector3(sx * (size.x * 0.5 - 0.3), 0, sz * (size.z * 0.5 - 0.3))
-					leg.position = lp + Vector3(0, (stilts + 0.6) * 0.5 - 0.4, 0)
-					root.add_child(leg)
+
+	var post = RangerPostBuilder.new()
+	post.build_all(POST_CENTRE, POST_Y, Callable(self, "_ground_at"))
+	_verify_ranger_post(post)
+	var post_mesh: ArrayMesh = post.commit(RangerPostBuilder.make_materials())
+	var post_mi := MeshInstance3D.new()
+	post_mi.name = "RangerPostMesh"
+	post_mi.mesh = _save_baked_resource(post_mesh, "ranger_post")
+	root.add_child(post_mi)
+	for col in post.colliders:
 		var cs := CollisionShape3D.new()
-		var box := BoxShape3D.new()
-		box.size = size + Vector3(0, stilts + 1.6, 0)
-		cs.shape = box
-		cs.transform = Transform3D(Basis(Vector3.UP, yaw), pos + Vector3(0, (size.y + stilts + 1.6) * 0.5, 0))
+		if col["kind"] == "box":
+			var box := BoxShape3D.new()
+			box.size = col["size"]
+			cs.shape = box
+		else:
+			var cyl := CylinderShape3D.new()
+			cyl.radius = col["radius"]
+			cyl.height = col["height"]
+			cs.shape = cyl
+		cs.transform = col["xf"]
 		body.add_child(cs)
+	for l in post.labels:
+		var lab := Label3D.new()
+		lab.text = l["text"]
+		lab.font_size = l["font_size"]
+		lab.pixel_size = l["pixel_size"]
+		lab.outline_size = 5
+		lab.modulate = l["color"]
+		lab.outline_modulate = Color(0.05, 0.10, 0.06)
+		lab.double_sided = false
+		lab.transform = l["xf"]
+		root.add_child(lab)
+	print("  ranger post: %d colliders, %d labels" % [post.colliders.size(), post.labels.size()])
+
 	# The reserve's sign, by the road at the start of the straight.
 	var sign_pos: Vector3 = c + right * (ROAD_FLAT + 4.0) - fwd * 26.0
 	sign_pos.y = _ground_at(sign_pos.x, sign_pos.z)
@@ -4081,8 +4245,8 @@ void fragment() {
 	label.outline_modulate = Color(0.16, 0.10, 0.04)
 	label.transform = Transform3D(Basis(Vector3.UP, face_yaw), sign_pos + Vector3(0, 3.2, 0) + (-fwd) * 0.12)
 	root.add_child(label)
-	# The flagpole.
-	var fp_pos: Vector3 = c + right * 22.0 + fwd * 4.0
+	# The flagpole, in the yard.
+	var fp_pos: Vector3 = post.flag_world
 	fp_pos.y = _ground_at(fp_pos.x, fp_pos.z)
 	var fpole := MeshInstance3D.new()
 	var fpm := CylinderMesh.new()

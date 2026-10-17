@@ -371,3 +371,43 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   on `SEA_PERIOD`, three waves in one clip and four in the other, so neighbours never fall into step.
 - `res://scratch/bloombay_shots.tscn -- <dir> name:x,y,z:tx,ty,tz[:frames[:gap]]` renders into the window
   (not a SubViewport) and can save a time sequence to watch the surf.
+
+## Msitu Falls (Matumaini GP, stage 3)
+
+- The sky is `sky_tropical_cumulus.gdshader`, static like the others (no `TIME`). It keeps
+  `sky_winter_cirrus.gdshader`'s uniform names, because `JungleRain.gd` drives `sky_top`, `sky_horizon`,
+  `cloud_*`, `sun_glow` and `sky_energy` to cloud the sky over in a storm. `cloud_coverage` past ~0.65 closes
+  it into a dark overcast deck on its own.
+- `_ground_at()` must split each cell on the same diagonal as `_build_terrain` (the one joining the closer
+  heights). With one fixed diagonal it stood up to a metre off the real surface on some cells, and plants,
+  posts and signs floated or sank there. `_verify_ground_at` reads the mesh's index buffer back and
+  errors on any difference. Everything the generator stands on the ground goes through it.
+- Ground plants and canopy trees are placed with `_relief_under()`: the fall from the foot to the lowest
+  ground under the leaves (or buttress roots). Ferns and shrubs sink by `PLANT_SINK` of it and skip a lip
+  steeper than `MAX_PLANT_RELIEF`; buttressed trees do the same (`TREE_*`). Without it the downhill
+  leaves hung in the air over the road's banks. `res://scratch/msitu_forest_audit.gd` (run with `-s`, windowed,
+  since the dummy renderer returns zeroed multimesh transforms) measures every instance's root against
+  the terrain mesh.
+- Fern fronds are folded (`_frond`'s `fold`): a flat ribbon seen along its width is a thin line, and a ring of
+  them from the side looked like spider legs. Their tips droop to the ground.
+- Chevron boards draw their arrows toward +UV.x (`_build_chevrons`' shader, tip at x = 0.65) and the
+  generator mirrors the UVs for a left-hander, so they point into the bend. The shader once drew
+  `<`, which put every board backwards. `res://scratch/msitu_chevron_check.gd` (headless) reads the
+  saved level and lists any board whose arrows disagree with the road's turn.
+- The ranger post is `RangerPostBuilder.gd`, laid out by `build_all()` and baked to
+  `generated/msitu_ranger_post.res`: an office with a veranda, a thatched rondavel, a store with a
+  woodshed, a tank, a signboard, fence and flag. Buildings are modelled at life size in their own frame
+  (X along the front, Y up, Z out of the front) and grown by `SCALE` (1.6); anything laid on a surface
+  stands 2.5cm+ proud of it. Its shaders (`hut_wood`, `hut_roof_iron`, `hut_thatch`, `hut_masonry`)
+  take UV in world metres and the vertex colour as the tint (they linearise it); the mesh carries
+  generated tangents for the corrugation and straw normal maps.
+- The post stands on a level pad graded into the lowland west of the straight (`POST_*`,
+  `_pad_weight` in `_build_heights`). The yard is written into the vertex-colour masks as a patch of road
+  (`_yard_paint`), so the ground shader paints worn laterite there. `_in_ranger_yard` keeps trees
+  and understory out of it, and `_verify_ranger_post` checks every footprint is within 12cm of the pad
+  and well clear of the road. The old buildings sat where the start clearing happened to fall, and two of them
+  hung over the hillside.
+- Don't put "road", "track", "ramp", "bridge", "deck", "jump", "curb", "pier", "gate" or "checkpoint" in the
+  name of anything with collision: `PlayerCart._is_track_surface` treats it as drivable.
+- `res://scratch/ranger_post_preview.gd` (run with `-s`, windowed, `-- <dir> name:x,y,z:tx,ty,tz ...`) renders the post
+  on flat ground in a few seconds, without generating the level.
