@@ -1,0 +1,19 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://car_body.gdshader" id="1_ny0av"]
+[ext_resource type="Texture2D" path="res://generated/cars/phantom_detail.res" id="2_1ak5k"]
+
+[resource]
+render_priority = -1
+shader = ExtResource("1_ny0av")
+shader_parameter/detail_map = ExtResource("2_1ak5k")
+shader_parameter/nose_z = -1.04
+shader_parameter/tail_z = 1.095
+shader_parameter/belt_y = 0.79
+shader_parameter/side_x = 0.47
+shader_parameter/door_roundel = Vector2(-0.04, 0.58)
+shader_parameter/roundel_r = 0.12
+shader_parameter/hood_z = -0.62
+shader_parameter/hood_r = 0.1
+shader_parameter/stripe_w = 0.085
+shader_parameter/stripe_gap = 0.035

@@ -27,7 +27,7 @@ const PALETTE := [
 	["Olive", Color(0.36, 0.40, 0.20)], ["Chocolate", Color(0.32, 0.18, 0.10)],
 ]
 const RIMS := [
-	["Silver", Color(0.76, 0.77, 0.79)], ["Gunmetal", Color(0.22, 0.23, 0.25)],
+	["Silver", Color(0.76, 0.77, 0.79)], ["Titanium", Color(0.46, 0.47, 0.49)], ["Gunmetal", Color(0.22, 0.23, 0.25)],
 	["Black", Color(0.05, 0.05, 0.055)], ["White", Color(0.92, 0.92, 0.90)],
 	["Gold", Color(0.86, 0.63, 0.24)], ["Bronze", Color(0.55, 0.35, 0.18)],
 	["Red", Color(0.75, 0.08, 0.06)], ["Blue", Color(0.10, 0.30, 0.78)],
@@ -38,6 +38,9 @@ const FACTORY := {
 	"Mudrunner": {"pattern": 0, "finish": 0, "primary": Color(0.19, 0.44, 0.38),
 		"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.80, 0.07, 0.05),
 		"rim": Color(0.76, 0.77, 0.79), "number": 53},
+	"Phantom": {"pattern": 0, "finish": 0, "primary": Color(0.97, 0.74, 0.10),
+		"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.03, 0.03, 0.035),
+		"rim": Color(0.46, 0.47, 0.49), "number": 7},
 }
 const FALLBACK := {"pattern": 0, "finish": 0, "primary": Color(0.80, 0.07, 0.05),
 	"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.98, 0.78, 0.07),

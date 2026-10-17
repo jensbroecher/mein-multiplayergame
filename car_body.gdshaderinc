@@ -315,10 +315,11 @@ void fragment() {
 		spec = 0.8;
 		emit = vec3(0.05, 0.05, 0.045);
 	} else if (v_mat == M_TAILLAMP) {
-		alb = vec3(0.50, 0.025, 0.02);
+		// Lamp lens in its vertex colour (red tail, amber marker), glowing a little.
+		alb = base * 0.6;
 		rough = 0.1;
 		spec = 0.7;
-		emit = vec3(0.22, 0.008, 0.004);
+		emit = base * 0.3;
 	}
 	alb = mix(alb, fx_tint.rgb, fx_tint.a);
 	ALBEDO = alb;

@@ -43,9 +43,7 @@ models/desert/*.fbx
 models/plants/*.fbx
 models/ramps/*.fbx
 
-# Resource files and oversized generated meshes
-*.res
-!generated/grass/grass_material.res
+# Oversized generated meshes
 generated/terrain_collision_shape.res
 generated/terrain_visual.res
 

@@ -15,6 +15,7 @@ const DETAIL_SIZE := Vector2i(1024, 512)
 ## The procedural cars: scene name, file prefix and builder.
 const CARS := [
 	{"name": "Mudrunner", "prefix": "mudrunner", "builder": preload("res://MudrunnerBuilder.gd")},
+	{"name": "Phantom", "prefix": "phantom", "builder": preload("res://PhantomBuilder.gd")},
 ]
 
 

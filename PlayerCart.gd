@@ -98,15 +98,16 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Phantom",
-		"model_path": "res://models/cars/Phantom.tscn",
-		"model_y_rotation": PI * 0.5,
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Phantom.tscn",
+		"model_y_rotation": PI,
 		"max_speed": 39.5,
 		"acceleration": 64.0,
 		"steer_speed": 3.5,
 		"grip": 3.5,
 		"braking": 40.0,
 		"offroad": 4.0,
-		"wheel_parts": {"FL": "part_4", "FR": "part_0", "RL": "part_3", "RR": "part_2"}
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
 		"name": "Centurion",

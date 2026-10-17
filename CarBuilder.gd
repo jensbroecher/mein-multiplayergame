@@ -24,7 +24,7 @@ const M_ALLOY := 5      # brushed aluminium: bumpers, nerf bars, skid plates, da
 const M_DARK := 6       # black plastic, chassis, wheel wells (vertex colour is the shade)
 const M_ANODISED := 7   # springs and diff covers: the player's accent colour
 const M_HEADLAMP := 8
-const M_TAILLAMP := 9
+const M_TAILLAMP := 9   # lamp lens in its vertex colour (red tail, amber marker)
 
 var _v := PackedVector3Array()
 var _n := PackedVector3Array()

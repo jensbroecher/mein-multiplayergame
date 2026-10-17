@@ -412,20 +412,34 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 - `res://scratch/ranger_post_preview.gd` (run with `-s`, windowed, `-- <dir> name:x,y,z:tx,ty,tz ...`) renders the post
   on flat ground in a few seconds, without generating the level.
 
-## Procedural cars (Mudrunner so far)
+## Procedural cars (Mudrunner, Phantom)
 
-- Cars can be built in code instead of imported from Hunyuan: `CarBuilder.gd` (lofts, lathes, tubes,
-  rounded boxes into one indexed mesh, the material id per vertex in UV2.x) and one `<Name>Builder.gd` per
-  car (`MudrunnerBuilder.gd`). `regenerate_cars.gd` saves each as `generated/cars/<Name>.tscn` with its
-  meshes, material and detail map; run `res://regenerate_cars.tscn` headless. PlayerCart and CarSelection
-  load it through the preset's `model_path` like an FBX car, with `wheel_parts` `Wheel_FL` ... `Wheel_RR`.
+- Cars can be built in code instead of imported from Hunyuan. `CarBuilder.gd` is the geometry toolkit (lofts,
+  lathes, tubes, rounded boxes into one indexed mesh, the material id per vertex in UV2.x). `CarDesign.gd` is
+  what the cars share: the lofted shell, fender sweeps, wheel parts, a coil-over, the detail map. Each car
+  extends it (`MudrunnerBuilder.gd`, `PhantomBuilder.gd`) with its shape and its own parts. `regenerate_cars.gd`
+  saves each as `generated/cars/<Name>.tscn` with its meshes, material and detail map; run
+  `res://regenerate_cars.tscn` headless. PlayerCart and CarSelection load it through the preset's
+  `model_path` like an FBX car, with `model_y_rotation` PI and `wheel_parts` `Wheel_FL` ... `Wheel_RR`.
 - Builders work in the cart frame (metres, front at -Z, ground at y = 0); the scene's `Model` node undoes
-  PlayerCart's x2 scale and half turn. The Mudrunner keeps the Hunyuan model's wheel positions, so it sits
-  where the old one did. Its proportions were measured off the FBX (body slices per z, fender probes).
+  PlayerCart's x2 scale and half turn. Each car keeps its Hunyuan model's wheel positions, so it sits
+  where the old one did. Proportions are measured off the FBX: slice the body per z for its top, bottom
+  and widths, probe the fenders.
+- The shell is one cross-section per station (bottom, corner, vertical side to the beltline, then the
+  car's `_upper()`), each parameter a curve of knots along the car; caps close the ends (`*_cap_exp`:
+  high exponents for a flat face). Stations are refined where neighbouring sections differ. A section
+  with features (a tight roof corner, the Phantom's bonnet dome) must use `segment_counts` /
+  `_upper_segments()`, so every feature sits on the same ring points at every station; resampled as
+  one curve, the points slid between features and the loft folded into creases.
+- Wheel arches through a body (the Phantom) are cut by lifting the shell's bottom over each wheel
+  (`BOT_KNOTS`), with dark liner walls inside so the arch doesn't look through the car; the flares
+  sweep along the same outline (`_arch_lip()`).
 - One shader draws the whole car: `car_body.gdshader` (code in `car_body.gdshaderinc`). Paint patterns are
-  drawn in the car's frame from the builder's `PAINT_LAYOUT` uniforms. The body's detail map, in its loft
-  UVs (R glass, G panel gaps, B chrome, A black), draws windows, seals and panel lines; it's saved as a
-  lossless `PortableCompressedTexture2D`, which needs `keep_compressed_buffer` or it saves empty.
+  drawn in the car's frame from the builder's `PAINT_LAYOUT` uniforms. The body's detail map (R glass,
+  G panel gaps, B chrome, A black) draws windows, seals and panel lines over the shell's UVs: u by arc
+  length along the top of the centre line, so a windscreen gets its share. The caps squeeze a flat front
+  or rear face into few texels, so details there (grille, lamps) are parts. The map is saved as a lossless
+  `PortableCompressedTexture2D`, which needs `keep_compressed_buffer` or it saves empty.
 - Paint jobs (`CarPaint.gd`: pattern, finish, four colours, racing number) are per-instance shader
   parameters (`CarPaint.apply`), so all cars of a model share one material. Only models whose root has the
   `procedural_car` meta are paintable, and the paint shop in CarSelection hides for the others. It saves
@@ -441,11 +455,12 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   frames before the first shot.
 - `res://scratch/car_preview.gd` (`-s`, windowed) builds a car in memory and renders it from named cameras:
   `-- <dir> [car=Mudrunner] [paint=<pattern>,<finish>,<hex primary>,<hex secondary>,<hex accent>,<hex rim>,<number>]
-  [orig=<imported car .tscn>] [scene=<saved car .tscn>] [sun=<pitch>,<yaw>] name:x,y,z:tx,ty,tz[:up]`.
+  [orig=<imported car .tscn>] [yaw=<deg>] [scene=<saved car .tscn>] [sun=<pitch>,<yaw>] name:x,y,z:tx,ty,tz[:up]`
+  (`orig` with the old preset's turn: `yaw=-90` for a model that had `model_y_rotation` PI/2).
   `res://scratch/car_live_shot.tscn -- <dir> [level=...] [cars=5,5,0,1,2,3] [carts=100,101]
   [fx=shock,respawn,teleport,fade]` shoots carts in a live race. `scratch/ai_race_test` takes `cars=`, and
   `scratch/menu_shot` takes `car:<index>[:<pattern>]` for the paint shop (it saves nothing).
-- To rebuild another car: write `<Name>Builder.gd` with the Mudrunner's interface (`build_body`,
-  `build_wheel`, `build_detail_map`, `PAINT_LAYOUT`, `WHEEL_POSITIONS`, `ANTENNA_POS`), add it to
-  `regenerate_cars.gd`'s `CARS` and its factory paint to `CarPaint.FACTORY`, then point the preset in both
-  PlayerCart and CarSelection at `generated/cars/<Name>.tscn`.
+- To rebuild another car: write `<Name>Builder.gd` extending `CarDesign.gd` (set the shell in `_init()`;
+  `build_body`, `build_wheel`, `_detail_shapes`/`_detail_at`, `PAINT_LAYOUT`, `WHEEL_POSITIONS`,
+  `ANTENNA_POS`), add it to `regenerate_cars.gd`'s `CARS` and its factory paint to `CarPaint.FACTORY`, then
+  point the preset in both PlayerCart and CarSelection at `generated/cars/<Name>.tscn`.
