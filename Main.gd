@@ -22,6 +22,7 @@ func _ready():
 	main_menu.start_pressed.connect(_on_menu_start_pressed)
 	main_menu.options_pressed.connect(_on_menu_options_pressed)
 	car_selection.car_selected.connect(_on_car_selected)
+	car_selection.back_requested.connect(_on_car_selection_back)
 	NetworkManager.server_disconnected.connect(_on_server_disconnected)
 	
 	lobby.start_race_requested.connect(_on_lobby_start_race_requested)
@@ -126,6 +127,20 @@ func _on_car_selected(car_index: int):
 			
 		NetworkManager.start_single_player(p_name)
 		await start_game(true)
+
+## Back out of the car select screen: to player 1's pick from player 2's, to the lobby room when
+## changing car there, otherwise to the menu screen it came from.
+func _on_car_selection_back() -> void:
+	if _coop_selecting_p2:
+		_coop_selecting_p2 = false
+		car_selection.show_for_player(1)
+		return
+	car_selection.hide()
+	if lobby.is_in_room:
+		lobby.show()
+		lobby.enter_room_view()
+	else:
+		main_menu.show()
 
 func _on_lobby_start_race_requested():
 	if not multiplayer.is_server():

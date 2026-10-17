@@ -2,7 +2,7 @@ extends Node
 
 # Screenshots main-menu screens, and the car selection with its paint shop (car:<index>[:<pattern>],
 # shown without saving anything to the player's settings).
-#   Godot --path . res://scratch/menu_shot.tscn -- <out_dir> <screen> [<screen>...] [scroll=<px>]
+#   Godot --path . res://scratch/menu_shot.tscn -- <out_dir> <screen> [<screen>...] [scroll=<px>] [size=<w>x<h>]
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
@@ -16,9 +16,12 @@ func _ready() -> void:
 	for a in args:
 		if a.begins_with("scroll="):
 			scroll_px = int(a.substr(7))
+		elif a.begins_with("size="):
+			var wh := a.substr(5).split("x")
+			win.size = Vector2i(int(wh[0]), int(wh[1]))
 	var cars: Control = null
 	for screen in args.slice(1):
-		if screen.begins_with("scroll="):
+		if screen.begins_with("scroll=") or screen.begins_with("size="):
 			continue
 		if screen.begins_with("car:"):
 			var f := screen.split(":")

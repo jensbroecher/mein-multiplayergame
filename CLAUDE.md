@@ -412,6 +412,24 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 - `res://scratch/ranger_post_preview.gd` (run with `-s`, windowed, `-- <dir> name:x,y,z:tx,ty,tz ...`) renders the post
   on flat ground in a few seconds, without generating the level.
 
+## Car select screen
+
+- `CarSelection.gd` builds the whole screen in code (`CarSelection.tscn` is only the root): a showroom
+  SubViewport behind the UI (the car on a turntable, `showroom_sky.gdshader` for studio reflections,
+  `showroom_floor.gdshader`'s fading grid, over a gradient drawn by the Control), the car's card and stats
+  on the left, the paint shop on the right, Back / the line-up / Confirm along the bottom. Each car has an
+  accent colour (`CAR_ACCENTS`) for its stat bars, the turntable's ring and Confirm.
+- The camera is a long lens (`CAMERA_FOV` 26) from far back; the old 75-degree lens from 2m stretched the
+  car. The turntable turns once every ~24s, and the car can be dragged round (or turned with the right stick).
+- The showroom renders only while the screen is up (`UPDATE_WHEN_PARENT_VISIBLE`); the old preview
+  rendered through every race.
+- Left/right, Q/E or the shoulder buttons change car, except while the paint shop has the focus: its
+  rows are single buttons that take left/right. Back, Esc and the pad's B emit `back_requested`; Main.gd
+  returns to the menu, the lobby room, or player 1's pick from player 2's.
+- `res://scratch/car_select_flow_test.tscn` (headless) walks Main's flow through the screen and prints
+  what's visible at each step. `scratch/menu_shot` takes `size=<w>x<h>` (the window can't exceed the
+  screen, so on a 16:10 Mac it stays 16:10).
+
 ## Procedural cars (Mudrunner, Phantom, Strikeforce)
 
 - Cars can be built in code instead of imported from Hunyuan. `CarBuilder.gd` is the geometry toolkit (lofts,
