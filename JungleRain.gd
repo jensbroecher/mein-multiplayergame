@@ -28,7 +28,7 @@ extends Node3D
 ## The ground's material: its `wetness` follows the road's.
 @export var ground_material: ShaderMaterial
 @export var sun_path: NodePath
-## The sky (sky_winter_cirrus.gdshader): it clouds over and darkens with the storm. Changed in
+## The sky (sky_tropical_cumulus.gdshader): it clouds over and darkens with the storm. Changed in
 ## steps of a tenth of the storm, since every change re-renders the sky's radiance map.
 @export var sky_material: ShaderMaterial
 @export var storm_sky_top := Color(0.30, 0.34, 0.38)

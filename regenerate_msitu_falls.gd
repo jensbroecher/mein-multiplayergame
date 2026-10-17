@@ -4457,9 +4457,9 @@ func _build_environment(level_scene: Node3D) -> void:
 	env.background_mode = Environment.BG_SKY
 	var sky := Sky.new()
 	var sky_mat := ShaderMaterial.new()
-	sky_mat.shader = load("res://sky_winter_cirrus.gdshader")
-	sky_mat.set_shader_parameter("sky_top", Color(0.22, 0.46, 0.76))
-	sky_mat.set_shader_parameter("sky_horizon", Color(0.78, 0.85, 0.84))
+	sky_mat.shader = load("res://sky_tropical_cumulus.gdshader")
+	sky_mat.set_shader_parameter("sky_top", Color(0.16, 0.40, 0.78))
+	sky_mat.set_shader_parameter("sky_horizon", Color(0.74, 0.84, 0.84))
 	sky_mat.set_shader_parameter("ground_horizon", HAZE)
 	sky_mat.set_shader_parameter("ground_bottom", Color(0.36, 0.42, 0.36))
 	sky_mat.set_shader_parameter("sky_curve", 0.3)
@@ -4470,9 +4470,9 @@ func _build_environment(level_scene: Node3D) -> void:
 	sky_mat.set_shader_parameter("sun_disc_degrees", 1.0)
 	sky_mat.set_shader_parameter("sun_glow", 0.55)
 	sky_mat.set_shader_parameter("cloud_lit", Color(1.0, 0.98, 0.94))
-	sky_mat.set_shader_parameter("cloud_shade", Color(0.62, 0.66, 0.70))
-	sky_mat.set_shader_parameter("cloud_coverage", 0.48)
-	sky_mat.set_shader_parameter("cloud_opacity", 0.7)
+	sky_mat.set_shader_parameter("cloud_shade", Color(0.42, 0.50, 0.62))
+	sky_mat.set_shader_parameter("cloud_coverage", 0.55)
+	sky_mat.set_shader_parameter("cloud_opacity", 0.95)
 	sky_mat.set_shader_parameter("cloud_seed", 41.7)
 	sky.sky_material = sky_mat
 	env.sky = sky
