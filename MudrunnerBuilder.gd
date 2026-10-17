@@ -126,11 +126,7 @@ func build_details(b) -> void:
 	b.lathe(lamp_c, fwd, PackedVector2Array([Vector2(-0.03, 0.060), Vector2(0.010, 0.060),
 			Vector2(0.016, 0.057), Vector2(0.017, 0.052)]), 24, CB.M_CHROME, C_CHROME)
 	b.orient_away_from(vb, ib, lamp_c - fwd * 0.05)
-	vb = b.vertex_count()
-	ib = b.index_count()
-	b.lathe(lamp_c + fwd * 0.012, fwd, PackedVector2Array([Vector2(0.0, 0.0525), Vector2(0.006, 0.047),
-			Vector2(0.011, 0.033), Vector2(0.014, 0.0)]), 24, CB.M_HEADLAMP, Color(1, 1, 1))
-	b.orient_away_from(vb, ib, lamp_c - fwd * 0.03)
+	lens(b, lamp_c + fwd * 0.012, fwd, 0.0525, 0.014, 24)
 	# Mirror on a short stalk at the base of the A-pillar.
 	b.tube(PackedVector3Array([Vector3(0.355, 0.655, -0.212), Vector3(0.398, 0.688, -0.214)]), 0.0065, 6,
 			CB.M_CHROME, C_CHROME, false, true)

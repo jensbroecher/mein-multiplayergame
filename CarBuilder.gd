@@ -311,6 +311,14 @@ func mirror_x(from_vertex: int, from_index: int) -> void:
 		_i.append(_i[k + 1] + off)
 
 
+## Moves everything added since `from_vertex` by `xf`, whose basis is a rotation (uniformly
+## scaled at most): a part built round the origin, put in place.
+func transform_from(from_vertex: int, xf: Transform3D) -> void:
+	for k in range(from_vertex, _v.size()):
+		_v[k] = xf * _v[k]
+		_n[k] = (xf.basis * _n[k]).normalized()
+
+
 ## Mirrors everything built so far across x = 0, in place (a left wheel from a right one).
 func mirror_in_place() -> void:
 	for k in _v.size():

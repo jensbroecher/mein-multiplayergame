@@ -52,8 +52,8 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Strikeforce",
-		"model_path": "res://models/cars/Strikeforce.tscn",
-		"model_y_rotation": PI * 1.5,
+		"model_path": "res://generated/cars/Strikeforce.tscn",
+		"model_y_rotation": PI,
 		"max_speed": 37.5,
 		"acceleration": 82.0,
 		"steer_speed": 2.7,
@@ -61,7 +61,7 @@ const CAR_PRESETS = [
 		"braking": 52.0,
 		"offroad": 8.0,
 		"desc": "Explosive acceleration and good handling.",
-		"wheel_parts": {"FL": "part_10", "FR": "part_7", "RL": "part_11", "RR": "part_9"}
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
 		"name": "Apex",

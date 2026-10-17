@@ -39,6 +39,9 @@ var refine_tol := 0.02
 ## Empty: the half-section is resampled as one curve (by arc length, weighted toward bends).
 var segment_counts: Array = []
 var prof := {}                            # name -> CB.Profile: "top", "bot", "w", "belt" and the car's own
+## The fenders' skin and end caps: painted, or black plastic flares (M_DARK in fender_col).
+var fender_mat := CB.M_PAINT
+var fender_col := Color(1, 1, 1)
 
 var _u_z := PackedFloat32Array()          # u(z) table: arc length along the capped top of the centre line
 var _u_val := PackedFloat32Array()
@@ -172,9 +175,11 @@ func z_of_u(u: float) -> float:
 
 
 ## Stations along the car: dense through the caps, every station_step between, and halved again
-## (up to three times) wherever neighbouring sections differ by more than refine_tol.
-func stations() -> PackedFloat32Array:
-	var zs := PackedFloat32Array()
+## (up to three times) wherever neighbouring sections differ by more than refine_tol. In doubles:
+## a flat cap (high exponents) only closes at the very tip, and the tip rounded to a float32
+## (1.025 -> 1.0249999) left a quarter-size hole in it.
+func stations() -> PackedFloat64Array:
+	var zs := PackedFloat64Array()
 	for k in 9:
 		zs.append(nose_tip + nose_cap * (1.0 - cos(PI * 0.5 * k / 9.0)))
 	var z0: float = nose_tip + nose_cap
@@ -186,7 +191,7 @@ func stations() -> PackedFloat32Array:
 		zs.append(tail_tip - tail_cap * (1.0 - cos(PI * 0.5 * k / 9.0)))
 	zs[0] = nose_tip
 	zs[zs.size() - 1] = tail_tip
-	var out := PackedFloat32Array()
+	var out := PackedFloat64Array()
 	for k in zs.size() - 1:
 		out.append(zs[k])
 		_refine(zs[k], zs[k + 1], section(zs[k]), section(zs[k + 1]), 3, out)
@@ -194,7 +199,7 @@ func stations() -> PackedFloat32Array:
 	return out
 
 
-func _refine(z0: float, z1: float, s0: PackedVector2Array, s1: PackedVector2Array, depth: int, out: PackedFloat32Array) -> void:
+func _refine(z0: float, z1: float, s0: PackedVector2Array, s1: PackedVector2Array, depth: int, out: PackedFloat64Array) -> void:
 	if depth == 0 or z1 - z0 < 0.003:
 		return
 	var worst := 0.0
@@ -378,7 +383,7 @@ func build_fender(b, lip: Array, hub_z: float, hub_y: float, x_out: float, depth
 				Vector3(0.0, n2.y, n2.x), Vector3(0.0, t2.y, t2.x)]
 	var base: int = b.vertex_count()
 	var ibase: int = b.index_count()
-	b.grid(outer_rows, CB.M_PAINT, Color(1, 1, 1), false, false)
+	b.grid(outer_rows, fender_mat, fender_col, false, false)
 	# The skin faces outward: at its outermost point (the door end's), the normal points along +x.
 	var row0: PackedVector3Array = outer_rows[0]
 	var far := 0
@@ -398,7 +403,7 @@ func build_fender(b, lip: Array, hub_z: float, hub_y: float, x_out: float, depth
 		var lr: PackedVector3Array = e[1]
 		for k in range(lr.size() - 1, 0, -1):
 			cap.append(lr[k])
-		b.poly(cap, e[2], CB.M_PAINT, Color(1, 1, 1))
+		b.poly(cap, e[2], fender_mat, fender_col)
 	return mark
 
 
@@ -522,6 +527,22 @@ func spoke(b, a: float, twist: float, r0: float, r1: float, x0: float, x1: float
 	face(b, [front_in[0], front_out[0], back_out[0], back_in[0]], (tg0 + tg1).normalized(), mat, col)
 	face(b, [front_in[1], front_out[1], back_out[1], back_in[1]], -(tg0 + tg1).normalized(), mat, col)
 	face(b, [back_in[0], back_in[1], back_out[1], back_out[0]], -Vector3.RIGHT, mat, col)
+
+
+## A headlamp's lens (M_HEADLAMP): a shallow dome of radius r, `bulge` proud, facing `fwd`. Its
+## UVs are the offset from its centre in metres: car_body.gdshader draws the reflector's rings
+## round that.
+func lens(b, c: Vector3, fwd: Vector3, r: float, bulge: float, segs: int) -> void:
+	var vb: int = b.vertex_count()
+	var ib: int = b.index_count()
+	b.lathe(c, fwd, PackedVector2Array([Vector2(0.0, r), Vector2(bulge * 0.43, r * 0.9), Vector2(bulge * 0.79, r * 0.63),
+			Vector2(bulge, 0.0)]), segs, CB.M_HEADLAMP, Color(1, 1, 1))
+	b.orient_away_from(vb, ib, c - fwd * r)
+	var e1: Vector3 = CB._perp(fwd)
+	var e2: Vector3 = fwd.cross(e1).normalized()
+	for k in range(vb, b.vertex_count()):
+		var d: Vector3 = b._v[k] - c
+		b._uv[k] = Vector2(d.dot(e1), d.dot(e2))
 
 
 ## A flat-shaded quad facing `hint`.

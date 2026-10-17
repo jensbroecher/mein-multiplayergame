@@ -412,14 +412,14 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 - `res://scratch/ranger_post_preview.gd` (run with `-s`, windowed, `-- <dir> name:x,y,z:tx,ty,tz ...`) renders the post
   on flat ground in a few seconds, without generating the level.
 
-## Procedural cars (Mudrunner, Phantom)
+## Procedural cars (Mudrunner, Phantom, Strikeforce)
 
 - Cars can be built in code instead of imported from Hunyuan. `CarBuilder.gd` is the geometry toolkit (lofts,
   lathes, tubes, rounded boxes into one indexed mesh, the material id per vertex in UV2.x). `CarDesign.gd` is
   what the cars share: the lofted shell, fender sweeps, wheel parts, a coil-over, the detail map. Each car
-  extends it (`MudrunnerBuilder.gd`, `PhantomBuilder.gd`) with its shape and its own parts. `regenerate_cars.gd`
-  saves each as `generated/cars/<Name>.tscn` with its meshes, material and detail map; run
-  `res://regenerate_cars.tscn` headless. PlayerCart and CarSelection load it through the preset's
+  extends it (`MudrunnerBuilder.gd`, `PhantomBuilder.gd`, `StrikeforceBuilder.gd`) with its shape and its own
+  parts. `regenerate_cars.gd` saves each as `generated/cars/<Name>.tscn` with its meshes, material and detail
+  map; run `res://regenerate_cars.tscn` headless. PlayerCart and CarSelection load it through the preset's
   `model_path` like an FBX car, with `model_y_rotation` PI and `wheel_parts` `Wheel_FL` ... `Wheel_RR`.
 - Builders work in the cart frame (metres, front at -Z, ground at y = 0); the scene's `Model` node undoes
   PlayerCart's x2 scale and half turn. Each car keeps its Hunyuan model's wheel positions, so it sits
@@ -431,6 +431,12 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   with features (a tight roof corner, the Phantom's bonnet dome) must use `segment_counts` /
   `_upper_segments()`, so every feature sits on the same ring points at every station; resampled as
   one curve, the points slid between features and the loft folded into creases.
+- A section whose shape changes along the car (the Strikeforce: hardtop over the cab, a bed sunk into the
+  tub, a flat bonnet and tailgate) keyframes all its upper profiles in one table (`KEYS`), so they change
+  together and each region boundary (windscreen, cab back, tailgate inside) is a clean wall, not a fold.
+  Where two segments meet, match their slopes, or the clearcoat shows the crease.
+- Stations are doubles. A flat cap (exponent 8) closes only at the exact tip: the tip rounded to a
+  float32 (1.025 -> 1.0249999) left a hole a quarter of the face across.
 - Wheel arches through a body (the Phantom) are cut by lifting the shell's bottom over each wheel
   (`BOT_KNOTS`), with dark liner walls inside so the arch doesn't look through the car; the flares
   sweep along the same outline (`_arch_lip()`).
@@ -438,8 +444,12 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   drawn in the car's frame from the builder's `PAINT_LAYOUT` uniforms. The body's detail map (R glass,
   G panel gaps, B chrome, A black) draws windows, seals and panel lines over the shell's UVs: u by arc
   length along the top of the centre line, so a windscreen gets its share. The caps squeeze a flat front
-  or rear face into few texels, so details there (grille, lamps) are parts. The map is saved as a lossless
-  `PortableCompressedTexture2D`, which needs `keep_compressed_buffer` or it saves empty.
+  or rear face into few texels, so details there (grille, lamps, the Strikeforce's tailgate frame) are
+  parts. The map is saved as a lossless `PortableCompressedTexture2D`, which needs `keep_compressed_buffer`
+  or it saves empty.
+- Headlamp lenses go through `CarDesign.lens()`, whose UVs centre the reflector rings the shader draws.
+  Black plastic flares: set `fender_mat`/`fender_col`. A part built round the origin (the Strikeforce's
+  spare, its own `build_wheel()`) is put in place with `CarBuilder.transform_from()`.
 - Paint jobs (`CarPaint.gd`: pattern, finish, four colours, racing number) are per-instance shader
   parameters (`CarPaint.apply`), so all cars of a model share one material. Only models whose root has the
   `procedural_car` meta are paintable, and the paint shop in CarSelection hides for the others. It saves

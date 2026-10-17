@@ -25,6 +25,7 @@ const PALETTE := [
 	["Silver", Color(0.70, 0.72, 0.74)], ["Gunmetal", Color(0.23, 0.25, 0.27)],
 	["Jet Black", Color(0.03, 0.03, 0.035)], ["Sand", Color(0.82, 0.70, 0.48)],
 	["Olive", Color(0.36, 0.40, 0.20)], ["Chocolate", Color(0.32, 0.18, 0.10)],
+	["Strikeforce Lime", Color(0.62, 0.78, 0.24)],
 ]
 const RIMS := [
 	["Silver", Color(0.76, 0.77, 0.79)], ["Titanium", Color(0.46, 0.47, 0.49)], ["Gunmetal", Color(0.22, 0.23, 0.25)],
@@ -41,6 +42,9 @@ const FACTORY := {
 	"Phantom": {"pattern": 0, "finish": 0, "primary": Color(0.97, 0.74, 0.10),
 		"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.03, 0.03, 0.035),
 		"rim": Color(0.46, 0.47, 0.49), "number": 7},
+	"Strikeforce": {"pattern": 0, "finish": 0, "primary": Color(0.62, 0.78, 0.24),
+		"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.80, 0.07, 0.05),
+		"rim": Color(0.05, 0.05, 0.055), "number": 24},
 }
 const FALLBACK := {"pattern": 0, "finish": 0, "primary": Color(0.80, 0.07, 0.05),
 	"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.98, 0.78, 0.07),

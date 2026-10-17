@@ -182,11 +182,7 @@ func _side_parts(b) -> void:
 	b.lathe(lamp_c, Vector3.FORWARD, PackedVector2Array([Vector2(-0.012, 0.064), Vector2(0.008, 0.064),
 			Vector2(0.013, 0.060), Vector2(0.014, 0.054)]), 24, CB.M_CHROME, C_CHROME)
 	b.orient_away_from(vb, ib, lamp_c + Vector3.BACK * 0.05)
-	vb = b.vertex_count()
-	ib = b.index_count()
-	b.lathe(lamp_c + Vector3.FORWARD * 0.008, Vector3.FORWARD, PackedVector2Array([Vector2(0.0, 0.055),
-			Vector2(0.005, 0.050), Vector2(0.009, 0.035), Vector2(0.011, 0.0)]), 24, CB.M_HEADLAMP, Color(1, 1, 1))
-	b.orient_away_from(vb, ib, lamp_c + Vector3.BACK * 0.03)
+	lens(b, lamp_c + Vector3.FORWARD * 0.008, Vector3.FORWARD, 0.055, 0.011, 24)
 	# Taillamps: two stacked red lenses at each rear corner; an amber side marker up front.
 	for y in [0.611, 0.678]:
 		b.rbox(Transform3D(Basis(), Vector3(0.414, y, tail_tip + 0.004)), Vector3(0.062, 0.030, 0.010), 0.005, 1,

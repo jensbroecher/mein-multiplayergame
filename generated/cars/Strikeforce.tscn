@@ -1,0 +1,38 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://generated/cars/strikeforce_body.res" id="1_skhn4"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/strikeforce_wheel_l.res" id="2_4pn5v"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/strikeforce_wheel_r.res" id="3_phk1h"]
+
+[node name="Strikeforce" type="Node3D" unique_id=641791935]
+metadata/procedural_car = true
+
+[node name="Model" type="Node3D" parent="." unique_id=1481128069]
+transform = Transform3D(-0.5, 0, -4.371139e-08, 0, 0.5, 0, 4.371139e-08, 0, -0.5, 0, 0, 0)
+
+[node name="Body" type="MeshInstance3D" parent="Model" unique_id=123556782]
+mesh = ExtResource("1_skhn4")
+metadata/car_shader = true
+
+[node name="Wheel_FL" type="MeshInstance3D" parent="Model" unique_id=2043392333]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.481, 0.281, -0.718)
+mesh = ExtResource("2_4pn5v")
+metadata/car_shader = true
+
+[node name="Wheel_FR" type="MeshInstance3D" parent="Model" unique_id=1529140575]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.481, 0.281, -0.718)
+mesh = ExtResource("3_phk1h")
+metadata/car_shader = true
+
+[node name="Wheel_RL" type="MeshInstance3D" parent="Model" unique_id=1338060373]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.481, 0.281, 0.632)
+mesh = ExtResource("2_4pn5v")
+metadata/car_shader = true
+
+[node name="Wheel_RR" type="MeshInstance3D" parent="Model" unique_id=1710151153]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.481, 0.281, 0.632)
+mesh = ExtResource("3_phk1h")
+metadata/car_shader = true
+
+[node name="AntennaPlacement" type="Node3D" parent="Model" unique_id=1585936606]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.364, 0.782, 0.94)

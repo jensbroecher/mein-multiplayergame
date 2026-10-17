@@ -308,8 +308,9 @@ void fragment() {
 		metal = 0.6;
 		rough = 0.3;
 	} else if (v_mat == M_HEADLAMP) {
-		// Clear lens over a reflector: faint rings, a little glow.
-		float rr = length(v_pos.xy - vec2(sign(v_pos.x) * 0.138, 0.54));
+		// Clear lens over a reflector: faint rings round the lens's centre (its UV is the offset from
+		// there in metres, CarDesign.lens), a little glow.
+		float rr = length(UV);
 		alb = vec3(0.70, 0.72, 0.74) * (0.85 + 0.15 * sin(rr * 260.0));
 		rough = 0.08;
 		spec = 0.8;

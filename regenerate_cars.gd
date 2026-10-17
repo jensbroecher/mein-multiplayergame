@@ -16,6 +16,7 @@ const DETAIL_SIZE := Vector2i(1024, 512)
 const CARS := [
 	{"name": "Mudrunner", "prefix": "mudrunner", "builder": preload("res://MudrunnerBuilder.gd")},
 	{"name": "Phantom", "prefix": "phantom", "builder": preload("res://PhantomBuilder.gd")},
+	{"name": "Strikeforce", "prefix": "strikeforce", "builder": preload("res://StrikeforceBuilder.gd")},
 ]
 
 

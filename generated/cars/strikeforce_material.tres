@@ -1,0 +1,19 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://car_body.gdshader" id="1_tckam"]
+[ext_resource type="Texture2D" path="res://generated/cars/strikeforce_detail.res" id="2_fb3on"]
+
+[resource]
+render_priority = -1
+shader = ExtResource("1_tckam")
+shader_parameter/detail_map = ExtResource("2_fb3on")
+shader_parameter/nose_z = -1.07
+shader_parameter/tail_z = 1.025
+shader_parameter/belt_y = 0.75
+shader_parameter/side_x = 0.39
+shader_parameter/door_roundel = Vector2(-0.05, 0.575)
+shader_parameter/roundel_r = 0.112
+shader_parameter/hood_z = -0.72
+shader_parameter/hood_r = 0.1
+shader_parameter/stripe_w = 0.075
+shader_parameter/stripe_gap = 0.03
