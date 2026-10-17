@@ -4,6 +4,7 @@ extends Node3D
 const PLAYER_CART = preload("res://PlayerCart.tscn")
 const RACE_UI_SCENE = preload("res://RaceUI.tscn")
 const ITEM_BOX_SCENE = preload("res://ItemBox.tscn")
+const CarPaint = preload("res://CarPaint.gd")
 
 @export var checkpoints: Array[Area3D] = []
 @export var track_path: Path3D
@@ -161,11 +162,15 @@ func _ready():
 					NetworkManager.players.erase(pid)
 				else:
 					humans += 1
+			# Bots get a fresh paint job each race (it only shows on the procedural cars).
+			var paint_rng := RandomNumberGenerator.new()
+			paint_rng.randomize()
 			for i in range(clampi(NetworkManager.MAX_PLAYERS - humans, 0, bot_names.size())):
 				var bot_id = 100 + i
 				NetworkManager.players[bot_id] = {
 					"name": bot_names[i],
 					"car_index": bot_cars[i],
+					"paint": CarPaint.random(paint_rng, ""),
 					"ready": true,
 					"is_ai": true
 				}
@@ -578,6 +583,7 @@ func _spawn_custom(data: Variant) -> Node:
 	cart.name = str(data["id"])
 	cart.player_name = data["name"]
 	cart.car_index = data.get("car_index", 0)
+	cart.paint = CarPaint.clean(data.get("paint", {}))
 	cart.global_transform = data["transform"]
 	cart.is_ai = data.get("is_ai", false)
 	cart.device_id = data.get("device_id", -1)
@@ -645,9 +651,11 @@ func _add_player(id: int, p_name: String):
 
 		var car_idx = 0
 		var is_ai = false
+		var car_paint: Dictionary = {}
 		if NetworkManager.players.has(id):
 			car_idx = NetworkManager.players[id].get("car_index", 0)
 			is_ai = NetworkManager.players[id].get("is_ai", false)
+			car_paint = CarPaint.clean(NetworkManager.players[id].get("paint", {}))
 
 		# LOCAL_COOP: P1 gets race_ui, P2 gets race_ui_p2
 		var device = -1
@@ -663,6 +671,7 @@ func _add_player(id: int, p_name: String):
 			"name": p_name,
 			"transform": spawn_transform,
 			"car_index": car_idx,
+			"paint": car_paint,
 			"is_ai": is_ai,
 			"device_id": device,
 			"injected_race_ui": inj_ui

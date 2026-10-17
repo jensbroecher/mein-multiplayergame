@@ -411,3 +411,41 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   name of anything with collision: `PlayerCart._is_track_surface` treats it as drivable.
 - `res://scratch/ranger_post_preview.gd` (run with `-s`, windowed, `-- <dir> name:x,y,z:tx,ty,tz ...`) renders the post
   on flat ground in a few seconds, without generating the level.
+
+## Procedural cars (Mudrunner so far)
+
+- Cars can be built in code instead of imported from Hunyuan: `CarBuilder.gd` (lofts, lathes, tubes,
+  rounded boxes into one indexed mesh, the material id per vertex in UV2.x) and one `<Name>Builder.gd` per
+  car (`MudrunnerBuilder.gd`). `regenerate_cars.gd` saves each as `generated/cars/<Name>.tscn` with its
+  meshes, material and detail map; run `res://regenerate_cars.tscn` headless. PlayerCart and CarSelection
+  load it through the preset's `model_path` like an FBX car, with `wheel_parts` `Wheel_FL` ... `Wheel_RR`.
+- Builders work in the cart frame (metres, front at -Z, ground at y = 0); the scene's `Model` node undoes
+  PlayerCart's x2 scale and half turn. The Mudrunner keeps the Hunyuan model's wheel positions, so it sits
+  where the old one did. Its proportions were measured off the FBX (body slices per z, fender probes).
+- One shader draws the whole car: `car_body.gdshader` (code in `car_body.gdshaderinc`). Paint patterns are
+  drawn in the car's frame from the builder's `PAINT_LAYOUT` uniforms. The body's detail map, in its loft
+  UVs (R glass, G panel gaps, B chrome, A black), draws windows, seals and panel lines; it's saved as a
+  lossless `PortableCompressedTexture2D`, which needs `keep_compressed_buffer` or it saves empty.
+- Paint jobs (`CarPaint.gd`: pattern, finish, four colours, racing number) are per-instance shader
+  parameters (`CarPaint.apply`), so all cars of a model share one material. Only models whose root has the
+  `procedural_car` meta are paintable, and the paint shop in CarSelection hides for the others. It saves
+  per car in `user://settings.cfg` (`[paint]`, `[paint_p2]` for split-screen's second player).
+  NetworkManager carries the paint job in the player info and with car changes (`CarPaint.clean` on
+  receipt), Level passes it in the spawn data, and bots get `CarPaint.random`.
+- PlayerCart's flashes on meshes tagged `car_shader` go through instance uniforms (`fx_glow`, `fx_tint`).
+  Fading swaps in `car_body_fade.gdshader` (`fx_alpha`) as the material override: the Mobile renderer
+  ignores `GeometryInstance3D.transparency`, and a shader that writes ALPHA always draws as transparent.
+- Turn a built surface around with `CarBuilder.flip()` or `orient_*()`, which rewind the triangles too.
+  Negating only the normals leaves the faces pointing inward, and they get culled.
+- New shaders compile in the background and draw nothing until they're ready, so look-dev tools wait ~40
+  frames before the first shot.
+- `res://scratch/car_preview.gd` (`-s`, windowed) builds a car in memory and renders it from named cameras:
+  `-- <dir> [car=Mudrunner] [paint=<pattern>,<finish>,<hex primary>,<hex secondary>,<hex accent>,<hex rim>,<number>]
+  [orig=<imported car .tscn>] [scene=<saved car .tscn>] [sun=<pitch>,<yaw>] name:x,y,z:tx,ty,tz[:up]`.
+  `res://scratch/car_live_shot.tscn -- <dir> [level=...] [cars=5,5,0,1,2,3] [carts=100,101]
+  [fx=shock,respawn,teleport,fade]` shoots carts in a live race. `scratch/ai_race_test` takes `cars=`, and
+  `scratch/menu_shot` takes `car:<index>[:<pattern>]` for the paint shop (it saves nothing).
+- To rebuild another car: write `<Name>Builder.gd` with the Mudrunner's interface (`build_body`,
+  `build_wheel`, `build_detail_map`, `PAINT_LAYOUT`, `WHEEL_POSITIONS`, `ANTENNA_POS`), add it to
+  `regenerate_cars.gd`'s `CARS` and its factory paint to `CarPaint.FACTORY`, then point the preset in both
+  PlayerCart and CarSelection at `generated/cars/<Name>.tscn`.

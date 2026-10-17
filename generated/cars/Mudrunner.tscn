@@ -1,0 +1,38 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://generated/cars/mudrunner_body.res" id="1_tym26"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/mudrunner_wheel_l.res" id="2_8mruq"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/mudrunner_wheel_r.res" id="3_7qh6r"]
+
+[node name="Mudrunner" type="Node3D" unique_id=419701942]
+metadata/procedural_car = true
+
+[node name="Model" type="Node3D" parent="." unique_id=681418598]
+transform = Transform3D(-0.5, 0, -4.371139e-08, 0, 0.5, 0, 4.371139e-08, 0, -0.5, 0, 0, 0)
+
+[node name="Body" type="MeshInstance3D" parent="Model" unique_id=716866929]
+mesh = ExtResource("1_tym26")
+metadata/car_shader = true
+
+[node name="Wheel_FL" type="MeshInstance3D" parent="Model" unique_id=1176310257]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.603, 0.252, -0.654)
+mesh = ExtResource("2_8mruq")
+metadata/car_shader = true
+
+[node name="Wheel_FR" type="MeshInstance3D" parent="Model" unique_id=811446452]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.603, 0.252, -0.654)
+mesh = ExtResource("3_7qh6r")
+metadata/car_shader = true
+
+[node name="Wheel_RL" type="MeshInstance3D" parent="Model" unique_id=601944407]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.603, 0.252, 0.717)
+mesh = ExtResource("2_8mruq")
+metadata/car_shader = true
+
+[node name="Wheel_RR" type="MeshInstance3D" parent="Model" unique_id=598098473]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.603, 0.252, 0.717)
+mesh = ExtResource("3_7qh6r")
+metadata/car_shader = true
+
+[node name="AntennaPlacement" type="Node3D" parent="Model" unique_id=498475015]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.1, 0.905, -0.1)

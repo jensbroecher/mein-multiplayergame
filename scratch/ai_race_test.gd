@@ -1,12 +1,14 @@
 extends Node
 
 # Races 6 AI carts around a level headless and reports lap times, respawns (with where they
-# happened) and how far each cart got.
-#   Godot --headless --path . res://scratch/ai_race_test.tscn -- res://levels/X.tscn [seconds=300] [speed=4] [weather=0..1]
+# happened) and how far each cart got. cars= picks each bot's car (CAR_PRESETS indices).
+#   Godot --headless --path . res://scratch/ai_race_test.tscn -- res://levels/X.tscn [seconds=300] [speed=4]
+#       [weather=0..1] [cars=5,5,0,1,2,3]
 
 var seconds := 300.0
 var speed := 4.0
 var weather := -1.0
+var cars: PackedStringArray = []
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
@@ -18,9 +20,13 @@ func _ready() -> void:
 			speed = float(a.substr(6))
 		elif a.begins_with("weather="):
 			weather = float(a.substr(8))
+		elif a.begins_with("cars="):
+			cars = a.substr(5).split(",")
 	AudioServer.set_bus_mute(0, true)
 	NetworkManager.current_game_mode = NetworkManager.GameMode.SPECTATOR
 	NetworkManager.start_spectator()
+	for i in mini(cars.size(), 6):
+		NetworkManager.players[100 + i]["car_index"] = int(cars[i])
 	var level: Node = load(level_path).instantiate()
 	add_child(level)
 	for wname in ["NorthlightWeather", "JungleRain"]:

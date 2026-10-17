@@ -13,6 +13,13 @@ extends RigidBody3D
 		_refresh_name_tag()
 
 @export var car_index: int = 0
+## The player's paint job (CarPaint.gd), for the procedural cars; set at spawn like car_index.
+var paint: Dictionary = {}
+
+const CarPaint = preload("res://CarPaint.gd")
+const CAR_FADE_SHADER = preload("res://car_body_fade.gdshader")
+## Transparent twins of the procedural cars' materials, by the opaque one's instance id.
+static var _car_fade_materials := {}
 
 const CAR_PRESETS = [
 	{
@@ -78,7 +85,8 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Mudrunner",
-		"model_path": "res://models/cars/Mudrunner.tscn",
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Mudrunner.tscn",
 		"model_y_rotation": PI,
 		"max_speed": 36.0,
 		"acceleration": 68.0,
@@ -86,7 +94,7 @@ const CAR_PRESETS = [
 		"grip": 5.0,
 		"braking": 44.0,
 		"offroad": 9.5,
-		"wheel_parts": {"FL": "part_0", "FR": "part_3", "RL": "part_2", "RR": "part_4"}
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
 		"name": "Phantom",
@@ -691,6 +699,8 @@ func _ready():
 		$Visuals.move_child(new_model, 0)
 		new_model.transform = Transform3D(Basis(Vector3(0, 1, 0), preset.get("model_y_rotation", PI)) * 2.0, Vector3(0, -0.6072377, 0))
 		original_cart_model_transform = new_model.transform
+		if CarPaint.is_paintable(new_model):
+			CarPaint.apply(new_model, CarPaint.sanitize(paint, preset.name))
 		
 		# Look for an AntennaPlacement node to reposition the dynamic antenna
 		var antenna_placement = new_model.get_node_or_null("AntennaPlacement")
@@ -3113,8 +3123,10 @@ func _setup_new_car_wheels():
 		# Reparent the actual FBX wheel part into WheelMesh, keeping world transform.
 		wheel_part.reparent(wheel_mesh_node, true)
 		
-		# Override the wheel material to remove baked lighting from the rubber texture.
-		_apply_wheel_material(wheel_part)
+		# Override the wheel material to remove baked lighting from the rubber texture
+		# (Hunyuan models; the procedural ones have their own rubber and rims).
+		if not CarPaint.is_paintable(cart_model):
+			_apply_wheel_material(wheel_part)
 
 	original_wheel_transforms.clear()
 	for corner in ["FL", "FR", "RL", "RR"]:
@@ -3842,6 +3854,8 @@ func _set_teleport_glow_recursive(node: Node, amount: float) -> void:
 	if node is MeshInstance3D:
 		if node == shield_mesh or node == shockwave_visual:
 			pass
+		elif node.has_meta("car_shader"):
+			_set_car_shader_glow(node, Color(0.35, 0.85, 1.0), lerpf(0.0, 8.0, amount) if amount > 0.02 else 0.0)
 		else:
 			var mat = node.material_override as StandardMaterial3D
 			if not mat:
@@ -4099,9 +4113,36 @@ func _clear_external_captures() -> void:
 func _set_visuals_alpha(alpha: float):
 	_set_alpha_recursive(visuals, alpha)
 
+## The transparent twin (car_body_fade.gdshader) of a procedural car's material, same parameters.
+static func _car_fade_material(base: Material) -> Material:
+	var key: int = base.get_instance_id()
+	if not _car_fade_materials.has(key):
+		var m: ShaderMaterial = base.duplicate()
+		m.shader = CAR_FADE_SHADER
+		_car_fade_materials[key] = m
+	return _car_fade_materials[key]
+
+
+## A procedural car's mesh (car_body.gdshader, tagged "car_shader") glows through its per-instance
+## fx_glow parameter: `color` is sRGB like the StandardMaterial3D emission it stands in for.
+func _set_car_shader_glow(node: GeometryInstance3D, color: Color, energy: float) -> void:
+	var c: Color = color.srgb_to_linear()
+	node.set_instance_shader_parameter("fx_glow", Color(c.r, c.g, c.b, energy))
+
 func _set_alpha_recursive(node: Node, alpha: float):
 	if node is MeshInstance3D:
 		if node == shield_mesh or node == shockwave_visual:
+			return
+		if node.has_meta("car_shader"):
+			# One material per model: fading swaps in its transparent twin for the duration. (The
+			# Mobile renderer ignores GeometryInstance3D.transparency.)
+			if alpha >= 0.99:
+				node.material_override = null
+			else:
+				node.material_override = _car_fade_material(node.mesh.surface_get_material(0))
+				node.set_instance_shader_parameter("fx_alpha", alpha)
+			for child in node.get_children():
+				_set_alpha_recursive(child, alpha)
 			return
 		var mat = node.material_override as StandardMaterial3D
 		if not mat:
@@ -4130,6 +4171,11 @@ func _set_respawn_effect_recursive(node: Node, enabled: bool, blink_on: bool):
 	if node is MeshInstance3D:
 		if node == shield_mesh or node == shockwave_visual:
 			return
+		if node.has_meta("car_shader"):
+			_set_car_shader_glow(node, Color(1.0, 1.0, 1.0), 6.0 if enabled and blink_on else 0.0)
+			for child in node.get_children():
+				_set_respawn_effect_recursive(child, enabled, blink_on)
+			return
 		var mat = node.material_override as StandardMaterial3D
 		if not mat:
 			var base_mat = node.get_active_material(0)
@@ -4154,6 +4200,14 @@ func _set_visuals_shock_effect(enabled: bool, blink_on: bool):
 func _set_shock_effect_recursive(node: Node, enabled: bool, blink_on: bool):
 	if node is MeshInstance3D:
 		if node == shield_mesh or node == shockwave_visual:
+			return
+		if node.has_meta("car_shader"):
+			var on: bool = enabled and blink_on
+			_set_car_shader_glow(node, Color(0.1, 0.5, 1.0), 4.0 if on else 0.0)
+			var tint: Color = Color(0.1, 0.5, 1.0).srgb_to_linear()
+			node.set_instance_shader_parameter("fx_tint", Color(tint.r, tint.g, tint.b, 1.0 if on else 0.0))
+			for child in node.get_children():
+				_set_shock_effect_recursive(child, enabled, blink_on)
 			return
 		var mat = node.material_override as StandardMaterial3D
 		if not mat:

@@ -22,10 +22,15 @@ signal stage_voting_concluded(winning_stage: String)
 # Fixed to 3 laps always
 const max_laps: int = 3
 
-# format: { id: { "name": "PlayerName", "car_index": 0, "ready": false } }
+const CarPaint = preload("res://CarPaint.gd")
+
+# format: { id: { "name": "PlayerName", "car_index": 0, "paint": {...}, "ready": false } }
+# "paint" is the player's paint job for their car (CarPaint.gd), empty for the factory paint.
 var players = {}
 var local_car_index: int = 0
 var local_p2_car_index: int = 0
+var local_paint: Dictionary = {}
+var local_p2_paint: Dictionary = {}
 var local_p2_name: String = "Player 2"
 var is_coop_gp: bool = false
 
@@ -143,7 +148,7 @@ func create_server(player_name: String):
 	
 	multiplayer.multiplayer_peer = peer
 	players.clear()
-	players[1] = {"name": player_name, "car_index": local_car_index, "ready": true}
+	players[1] = {"name": player_name, "car_index": local_car_index, "paint": local_paint, "ready": true}
 	gp_standings.clear()
 	stage_votes.clear()
 	is_voting_active = false
@@ -155,7 +160,7 @@ func create_server(player_name: String):
 func start_single_player(player_name: String):
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 	players.clear()
-	players[1] = {"name": player_name, "ready": false, "car_index": local_car_index}
+	players[1] = {"name": player_name, "ready": false, "car_index": local_car_index, "paint": local_paint}
 	LANDiscovery.stop_all()
 	print("NetworkManager: Started single player mode")
 	return OK
@@ -165,10 +170,13 @@ func start_spectator() -> int:
 	players.clear()
 	var bot_names = ["Viper", "Shadow", "Apex", "Blaze", "Nova", "Storm"]
 	var bot_cars = [0, 1, 2, 3, 1, 2]
+	var paint_rng := RandomNumberGenerator.new()
+	paint_rng.randomize()
 	for i in range(6):
 		players[100 + i] = {
 			"name": bot_names[i],
 			"car_index": bot_cars[i],
+			"paint": CarPaint.random(paint_rng, ""),
 			"ready": true,
 			"is_ai": true
 		}
@@ -179,8 +187,8 @@ func start_spectator() -> int:
 func start_local_coop(p1_name: String, p2_name: String):
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 	players.clear()
-	players[1] = {"name": p1_name, "ready": false, "car_index": local_car_index}
-	players[2] = {"name": p2_name, "ready": false, "car_index": local_p2_car_index}
+	players[1] = {"name": p1_name, "ready": false, "car_index": local_car_index, "paint": local_paint}
+	players[2] = {"name": p2_name, "ready": false, "car_index": local_p2_car_index, "paint": local_p2_paint}
 	LANDiscovery.stop_all()
 	print("NetworkManager: Started splitscreen mode")
 	return OK
@@ -204,7 +212,7 @@ func join_server(ip: String, port: int, player_name: String):
 
 func _on_connected_to_server():
 	print("NetworkManager: Connected to server!")
-	register_player.rpc_id(1, {"name": local_player_name, "car_index": local_car_index, "ready": false})
+	register_player.rpc_id(1, {"name": local_player_name, "car_index": local_car_index, "paint": local_paint, "ready": false})
 
 func disconnect_peer():
 	if peer:
@@ -248,6 +256,7 @@ func register_player(info: Dictionary):
 		
 	# Broadcast the new player to everyone
 	info["ready"] = false
+	info["paint"] = CarPaint.clean(info.get("paint", {}))
 	register_player_on_client.rpc(id, info)
 	
 	# Also send current multiplayer mode & cup to the new client
@@ -277,28 +286,32 @@ func sync_player_ready(id: int, is_ready: bool):
 		players[id]["ready"] = is_ready
 	player_ready_changed.emit(id, is_ready)
 
-# Car Change
+# Car Change (the car and its paint job travel together; set local_paint first)
 func set_local_car(car_index: int):
 	local_car_index = car_index
 	var my_id = multiplayer.get_unique_id() if multiplayer.multiplayer_peer else 1
 	if players.has(my_id):
 		players[my_id]["car_index"] = car_index
-	cmd_update_player_car.rpc(car_index)
+		players[my_id]["paint"] = local_paint
+	cmd_update_player_car.rpc(car_index, local_paint)
 
 @rpc("any_peer", "call_local", "reliable")
-func cmd_update_player_car(car_index: int):
+func cmd_update_player_car(car_index: int, paint: Dictionary):
 	var sender_id = multiplayer.get_remote_sender_id()
 	if sender_id == 0:
 		sender_id = multiplayer.get_unique_id() if multiplayer.multiplayer_peer else 1
+	var clean_paint: Dictionary = CarPaint.clean(paint)
 	if players.has(sender_id):
 		players[sender_id]["car_index"] = car_index
+		players[sender_id]["paint"] = clean_paint
 	if multiplayer.is_server():
-		sync_player_car.rpc(sender_id, car_index)
+		sync_player_car.rpc(sender_id, car_index, clean_paint)
 
 @rpc("authority", "call_local", "reliable")
-func sync_player_car(id: int, car_index: int):
+func sync_player_car(id: int, car_index: int, paint: Dictionary):
 	if players.has(id):
 		players[id]["car_index"] = car_index
+		players[id]["paint"] = CarPaint.clean(paint)
 	player_car_changed.emit(id, car_index)
 
 # Mode & Cup Selection
