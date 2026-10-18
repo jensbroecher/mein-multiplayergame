@@ -519,6 +519,7 @@ func _on_cup_selected(cup_name: String) -> void:
 	NetworkManager.current_gp_name = cup_name
 	NetworkManager.current_gp_stage = 0
 	NetworkManager.gp_standings.clear()
+	NetworkManager.gp_last_pos.clear()
 	start_pressed.emit()
 	hide()
 
@@ -529,6 +530,7 @@ func _on_gp_test_stage_selected(cup_name: String, stage_idx: int) -> void:
 	NetworkManager.current_gp_name = cup_name
 	NetworkManager.current_gp_stage = stage_idx
 	NetworkManager.gp_standings.clear()
+	NetworkManager.gp_last_pos.clear()
 	start_pressed.emit()
 	hide()
 

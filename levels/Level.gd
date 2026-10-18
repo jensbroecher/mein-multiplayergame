@@ -974,6 +974,7 @@ func _end_race():
 		if is_gp:
 			var current_total = NetworkManager.gp_standings.get(racer["name"], 0)
 			NetworkManager.gp_standings[racer["name"]] = current_total + round_pts
+			NetworkManager.gp_last_pos[racer["name"]] = i + 1
 
 		results.append({
 			"name": racer["name"],

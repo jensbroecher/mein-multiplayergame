@@ -333,6 +333,22 @@ func _load_playlist(folder: String = music_folder):
 	
 	_refill_and_shuffle_queue()
 
+## Stages that play one fixed track instead of a folder's shuffle.
+const STAGE_TRACKS := {
+	"mara": "res://music/africa/Sunrise_on_the_Mara.mp3",
+	"nyota": "res://music/africa/Clay_and_Chrome.mp3",
+	"msitu": "res://music/africa/Msitu_Unaita.mp3",
+}
+
+static func _stage_track_key(path_lower: String) -> String:
+	if path_lower.contains("mara"):
+		return "mara"
+	if path_lower.contains("nyota"):
+		return "nyota"
+	if path_lower.contains("msitu"):
+		return "msitu"
+	return ""
+
 func load_playlist_for_level(scene_path: String):
 	var path_lower := scene_path.to_lower()
 	if path_lower.is_empty():
@@ -342,7 +358,9 @@ func load_playlist_for_level(scene_path: String):
 
 	# Determine the category / level key
 	var level_key := "root"
-	if path_lower.contains("bloombay") or path_lower.contains("dune") or path_lower.contains("beach"):
+	if STAGE_TRACKS.has(_stage_track_key(path_lower)):
+		level_key = _stage_track_key(path_lower)
+	elif path_lower.contains("bloombay") or path_lower.contains("dune") or path_lower.contains("beach"):
 		level_key = "beach"
 	elif path_lower.contains("pinecrest"):
 		level_key = "pinecrest"
@@ -370,6 +388,16 @@ func load_playlist_for_level(scene_path: String):
 	loaded_playlist.clear()
 	_playback_queue.clear()
 	current_track_index = -1
+
+	# Matumaini GP stages each have their own single track.
+	if STAGE_TRACKS.has(level_key):
+		var stream: AudioStream = load(STAGE_TRACKS[level_key])
+		if stream:
+			playlist.append(STAGE_TRACKS[level_key])
+			loaded_playlist.append(stream)
+		_refill_and_shuffle_queue()
+		if not loaded_playlist.is_empty():
+			return
 
 	# Bloombay Dunes: strictly only play music from music/beach/.
 	if level_key == "beach":

@@ -45,6 +45,7 @@ var current_single_stage: String = "res://levels/Level.tscn"
 var current_gp_name: String = ""
 var current_gp_stage: int = 0
 var gp_standings: Dictionary = {} # racer_name -> points
+var gp_last_pos: Dictionary = {} # racer_name -> finishing place in the latest race (breaks ties on points)
 var time_trial_stage: String = "res://levels/Level.tscn"
 
 var stage_votes: Dictionary = {} # peer_id -> stage_path or "random"
@@ -106,6 +107,47 @@ const GP_CUPS = {
 	}
 }
 
+## The final order of the Grand Prix, best first: points, then the latest race's finishing place. Each
+## entry has what the podium needs to stand the car up (name, points, car_index, paint, is_bot).
+func build_gp_ranking() -> Array:
+	var rows: Array = []
+	for racer_name in gp_standings:
+		var info: Dictionary = {}
+		for id in players:
+			if str(players[id].get("name", "")) == racer_name:
+				info = players[id]
+				break
+		rows.append({
+			"name": racer_name,
+			"points": int(gp_standings[racer_name]),
+			"car_index": int(info.get("car_index", 0)),
+			"paint": info.get("paint", {}),
+			"is_bot": bool(info.get("is_ai", false)),
+		})
+	rows.sort_custom(func(a, b):
+		if a["points"] != b["points"]:
+			return a["points"] > b["points"]
+		var pa: int = int(gp_last_pos.get(a["name"], 99))
+		var pb: int = int(gp_last_pos.get(b["name"], 99))
+		if pa != pb:
+			return pa < pb
+		return str(a["name"]) < str(b["name"]))
+	return rows
+
+
+## Host only: everyone, the host included, goes to the podium. Main.show_gp_podium unloads the race.
+func announce_gp_podium() -> void:
+	var cup_name: String = current_gp_name if not current_gp_name.is_empty() else selected_mp_cup
+	gp_show_podium.rpc(cup_name, build_gp_ranking())
+
+
+@rpc("authority", "call_local", "reliable")
+func gp_show_podium(cup_name: String, ranking: Array) -> void:
+	var main := get_tree().current_scene
+	if main and main.has_method("show_gp_podium"):
+		main.show_gp_podium(cup_name, ranking)
+
+
 static func get_gp_cup(cup_name: String) -> Dictionary:
 	if GP_CUPS.has(cup_name):
 		return GP_CUPS[cup_name]
@@ -150,6 +192,7 @@ func create_server(player_name: String):
 	players.clear()
 	players[1] = {"name": player_name, "car_index": local_car_index, "paint": local_paint, "ready": true}
 	gp_standings.clear()
+	gp_last_pos.clear()
 	stage_votes.clear()
 	is_voting_active = false
 	

@@ -406,7 +406,7 @@ func display_race_results(results_data: Array):
 				action_button.text = "NEXT STAGE"
 				action_button.disabled = false
 			else:
-				action_button.text = "FINISH GRAND PRIX"
+				action_button.text = "TO THE PODIUM"
 				action_button.disabled = false
 		else:
 			action_button.text = "WAITING FOR HOST..."
@@ -596,12 +596,11 @@ func _on_action_button_pressed():
 			if main and main.has_method("load_gp_stage"):
 				main.load_gp_stage(next_stage)
 				return
-		else:
-			# GP Finished: return to lobby
-			var main = get_tree().current_scene
-			if main and main.has_method("return_to_lobby"):
-				main.return_to_lobby()
-				return
+		elif multiplayer.is_server():
+			# GP finished: the podium ceremony, on every peer. Its Continue button goes on to the
+			# lobby or the menu.
+			NetworkManager.announce_gp_podium()
+			return
 
 	if _is_offline_single_race():
 		if menu_button:

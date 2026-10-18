@@ -4,6 +4,7 @@ const LEVEL_SCENE = preload("res://levels/Level.tscn")
 const CONFIGURATION_MENU_SCENE = preload("res://ConfigurationMenu.tscn")
 const PAUSE_MENU_SCENE = preload("res://PauseMenu.tscn")
 const LOADING_SCREEN_SCENE = preload("res://LoadingScreen.tscn")
+const PODIUM_SCENE = preload("res://Podium.tscn")
 
 @onready var lobby = $Lobby
 @onready var main_menu = $MainMenu
@@ -12,6 +13,7 @@ const LOADING_SCREEN_SCENE = preload("res://LoadingScreen.tscn")
 var configuration_menu
 var pause_menu
 var loading_screen
+var podium: Control
 
 var _coop_p1_car: int = 0
 var _coop_selecting_p2: bool = false
@@ -298,6 +300,48 @@ func _load_gp_stage_impl(stage_idx: int) -> void:
 	_level_swap_in_progress = false
 	process_mode = Node.PROCESS_MODE_INHERIT
 
+## The Grand Prix is over: swap the last race for the podium (every peer gets this from
+## NetworkManager.gp_show_podium). `ranking` is NetworkManager.build_gp_ranking(), best first.
+func show_gp_podium(cup_name: String, ranking: Array) -> void:
+	call_deferred("_show_gp_podium_impl", cup_name, ranking)
+
+func _show_gp_podium_impl(cup_name: String, ranking: Array) -> void:
+	if _level_swap_in_progress or podium != null:
+		return
+	_level_swap_in_progress = true
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	if pause_menu:
+		pause_menu.hide()
+	await _show_loading("Preparing the podium")
+	await _unload_all_levels()
+	podium = PODIUM_SCENE.instantiate()
+	podium.setup(cup_name, ranking)
+	podium.finished.connect(_on_podium_finished)
+	add_child(podium)
+	# New shaders compile in the background and draw nothing until they are ready: let that happen
+	# under the loading screen.
+	for _i in range(45):
+		await get_tree().process_frame
+	await _hide_loading()
+	_level_swap_in_progress = false
+	process_mode = Node.PROCESS_MODE_INHERIT
+	if podium != null:
+		podium.start()
+
+func _on_podium_finished() -> void:
+	_free_podium()
+	MusicManager.stop_music()
+	if NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER and multiplayer.multiplayer_peer != null:
+		return_to_lobby()
+	else:
+		_on_server_disconnected()
+
+func _free_podium() -> void:
+	if podium != null and is_instance_valid(podium):
+		podium.queue_free()
+	podium = null
+
+
 func load_stage(stage_path: String, status_title: String = "Loading stage") -> void:
 	if _level_swap_in_progress:
 		return
@@ -428,6 +472,7 @@ func _unload_all_levels() -> void:
 
 
 func _on_server_disconnected():
+	_free_podium()
 	# Don't free mid-callback from a level UI without deferring.
 	if _level_swap_in_progress:
 		# Still tear down; swap flag will clear after.
