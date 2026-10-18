@@ -189,13 +189,13 @@ func _side_parts(b) -> void:
 	# Wing: endplate (hex, black) with an accent flash, its strut from the cage's rear bar.
 	var plate := PackedVector2Array([Vector2(0.700, 0.800), Vector2(0.735, 0.745), Vector2(0.930, 0.755),
 			Vector2(1.035, 0.860), Vector2(1.030, 0.930), Vector2(0.860, 0.920)])
-	_slab(b, plate, 0.415, 0.012, CB.M_DARK, C_DARK)
-	_slab(b, PackedVector2Array([Vector2(0.870, 0.888), Vector2(1.000, 0.893), Vector2(1.020, 0.908),
+	slab(b, plate, 0.415, 0.012, CB.M_DARK, C_DARK)
+	slab(b, PackedVector2Array([Vector2(0.870, 0.888), Vector2(1.000, 0.893), Vector2(1.020, 0.908),
 			Vector2(0.885, 0.903)]), 0.4225, 0.003, CB.M_ANODISED, Color(1, 1, 1))
 	b.rbox(Transform3D(Basis(Vector3.RIGHT, 0.12), Vector3(0.09, 0.735, 0.842)), Vector3(0.006, 0.072, 0.03), 0.004, 1,
 			CB.M_DARK, C_DARK)
 	# Taillamp: a round red lens in a chrome bezel on the bumper's back face.
-	_round_lamp(b, Vector3(0.150, 0.345, 0.926), Vector3.BACK, 0.026, CB.M_TAILLAMP, C_TAILLAMP)
+	round_lamp(b, Vector3(0.150, 0.345, 0.926), Vector3.BACK, 0.026, CB.M_TAILLAMP, C_TAILLAMP)
 	# Exhaust: from the engine's flank back over the gearbox, out above the bumper.
 	b.tube(_rounded([Vector3(0.095, 0.400, 0.68), Vector3(0.13, 0.42, 0.74), Vector3(0.07, 0.49, 0.85),
 			Vector3(0.07, 0.535, 0.95)], 0.04), 0.017, 12, CB.M_CHROME, C_CHROME, false, false)
@@ -243,7 +243,7 @@ func _centre_parts(b) -> void:
 	var roof := PackedVector3Array()
 	for p in ROOF_PATH:
 		roof.append(Vector3(0.0, p[1], p[0]))
-	_sweep(b, roof, Vector3.RIGHT, Vector3.UP, PackedVector2Array([Vector2(-0.205, -0.020), Vector2(0.205, -0.020),
+	sweep(b, roof, Vector3.RIGHT, Vector3.UP, PackedVector2Array([Vector2(-0.205, -0.020), Vector2(0.205, -0.020),
 			Vector2(0.205, -0.012), Vector2(0.150, 0.008), Vector2(-0.150, 0.008), Vector2(-0.205, -0.012)]),
 			CB.M_PAINT, Color(1, 1, 1))
 	# Light bar under the roof's front edge: housing, accent trim, three lamps.
@@ -251,12 +251,12 @@ func _centre_parts(b) -> void:
 	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.811, -0.262)), Vector3(0.128, 0.003, 0.004), 0.002, 1, CB.M_ANODISED,
 			Color(1, 1, 1))
 	for x in [-0.082, 0.0, 0.082]:
-		_round_lamp(b, Vector3(x, 0.836, -0.268), Vector3.FORWARD, 0.019, CB.M_HEADLAMP, Color(1, 1, 1))
+		round_lamp(b, Vector3(x, 0.836, -0.268), Vector3.FORWARD, 0.019, CB.M_HEADLAMP, Color(1, 1, 1))
 	# Front skid plate, curving under the nose to the chassis plate; bolts and a tow hook.
 	var skid := PackedVector3Array()
 	for p in [[-1.030, 0.505], [-1.045, 0.440], [-1.043, 0.360], [-1.022, 0.295], [-0.985, 0.255], [-0.940, 0.240]]:
 		skid.append(Vector3(0.0, p[1], p[0]))
-	_sweep(b, skid, Vector3.RIGHT, Vector3.FORWARD, PackedVector2Array([Vector2(-0.200, -0.006), Vector2(0.200, -0.006),
+	sweep(b, skid, Vector3.RIGHT, Vector3.FORWARD, PackedVector2Array([Vector2(-0.200, -0.006), Vector2(0.200, -0.006),
 			Vector2(0.200, 0.006), Vector2(-0.200, 0.006)]), CB.M_DARK, C_STEEL)
 	for x in [-0.13, 0.13]:
 		bar(b, Vector3(x, 0.46, -1.049), Vector3(0.006, 0.006, 0.003), CB.M_ALLOY, C_ALLOY)
@@ -267,14 +267,14 @@ func _centre_parts(b) -> void:
 	for p in [[-0.960, 0.262], [-0.900, 0.240], [-0.800, 0.230], [0.100, 0.255], [0.450, 0.245], [0.620, 0.232],
 			[0.780, 0.236], [0.840, 0.262]]:
 		chassis.append(Vector3(0.0, p[1], p[0]))
-	_sweep(b, chassis, Vector3.RIGHT, Vector3.UP, PackedVector2Array([Vector2(-0.205, -0.005), Vector2(0.205, -0.005),
+	sweep(b, chassis, Vector3.RIGHT, Vector3.UP, PackedVector2Array([Vector2(-0.205, -0.005), Vector2(0.205, -0.005),
 			Vector2(0.212, 0.0), Vector2(0.205, 0.005), Vector2(-0.205, 0.005), Vector2(-0.212, 0.0)]), CB.M_ALLOY,
 			C_ALLOY_DARK)
 	# Wing: the plane (in the paint), kinked up outboard, its trailing edge kicked up.
 	var span := PackedVector3Array()
 	for p in [[-0.410, 0.030], [-0.255, 0.030], [-0.170, 0.0], [0.170, 0.0], [0.255, 0.030], [0.410, 0.030]]:
 		span.append(Vector3(p[0], 0.795 + p[1], 0.0))
-	_sweep(b, span, Vector3.BACK, Vector3.UP, PackedVector2Array([Vector2(0.735, 0.000), Vector2(0.750, -0.008),
+	sweep(b, span, Vector3.BACK, Vector3.UP, PackedVector2Array([Vector2(0.735, 0.000), Vector2(0.750, -0.008),
 			Vector2(0.890, -0.006), Vector2(0.990, 0.048), Vector2(0.985, 0.060), Vector2(0.880, 0.010),
 			Vector2(0.750, 0.010)]), CB.M_PAINT, Color(1, 1, 1))
 	b.rbox(Transform3D(Basis(Vector3.RIGHT, -0.48), Vector3(0.0, 0.854, 0.991)), Vector3(0.405, 0.011, 0.003), 0.002, 1,
@@ -305,24 +305,6 @@ func _centre_parts(b) -> void:
 	for k in 5:
 		b.rbox(Transform3D(Basis(), Vector3(-0.16 + 0.08 * k, 0.262, 0.885)), Vector3(0.004, 0.012, 0.045), 0.002, 1,
 				CB.M_DARK, C_DARKER)
-
-
-## A round lamp facing `fwd`: a chrome bezel round a lens (a headlamp's reflector lens, or a
-## coloured one).
-func _round_lamp(b, c: Vector3, fwd: Vector3, r: float, mat: int, col: Color) -> void:
-	var vb: int = b.vertex_count()
-	var ib: int = b.index_count()
-	b.lathe(c, fwd, PackedVector2Array([Vector2(-0.012, r + 0.004), Vector2(0.002, r + 0.004), Vector2(0.005, r + 0.001),
-			Vector2(0.004, r - 0.002)]), 18, CB.M_CHROME, C_CHROME)
-	b.orient_away_from(vb, ib, c - fwd * 0.01)
-	if mat == CB.M_HEADLAMP:
-		lens(b, c + fwd * 0.001, fwd, r, r * 0.25, 18)
-	else:
-		vb = b.vertex_count()
-		ib = b.index_count()
-		b.lathe(c, fwd, PackedVector2Array([Vector2(0.0, r), Vector2(r * 0.15, r * 0.8), Vector2(r * 0.25, 0.0)]), 18,
-				mat, col)
-		b.orient_away_from(vb, ib, c - fwd * r)
 
 
 ## A single bucket seat on the cockpit floor: cushion, raked back with bolsters and a head
@@ -357,69 +339,6 @@ func _steering(b) -> void:
 	b.tube(PackedVector3Array([c, c + Vector3(0.0, 0.03, -0.07)]), 0.012, 8, CB.M_DARK, C_DARK, true, false)
 
 
-## A profile (across, out) swept along a path, flat-shaded round the profile and smooth along the
-## path: plates, the roof panel, the wing. `across` is the profile's first axis (constant), the
-## second is across x tangent, turned toward `up_hint`. The profile is convex; both ends capped.
-func _sweep(b, path: PackedVector3Array, across: Vector3, up_hint: Vector3, profile: PackedVector2Array, mat: int,
-		col: Color) -> void:
-	var n: int = path.size()
-	var m: int = profile.size()
-	# The profile's winding, so each edge knows its outward side (a centroid test fails on a thin
-	# bent plate such as the wing, whose centroid lies off the plate).
-	var area := 0.0
-	for k in m:
-		area += profile[k].cross(profile[(k + 1) % m])
-	var rings := []
-	var normals := []
-	var tangents := []
-	for i in n:
-		var t: Vector3 = (path[mini(i + 1, n - 1)] - path[maxi(i - 1, 0)]).normalized()
-		var nrm: Vector3 = across.cross(t).normalized()
-		if nrm.dot(up_hint) < 0.0:
-			nrm = -nrm
-		var ring := PackedVector3Array()
-		for p in profile:
-			ring.append(path[i] + across * p.x + nrm * p.y)
-		rings.append(ring)
-		normals.append(nrm)
-		tangents.append(t)
-	for k in m:
-		var k2: int = (k + 1) % m
-		var e: Vector2 = profile[k2] - profile[k]
-		var out2: Vector2 = Vector2(e.y, -e.x) * (1.0 if area > 0.0 else -1.0)
-		var rows := []
-		for i in n:
-			rows.append(PackedVector3Array([rings[i][k], rings[i][k2]]))
-		var vb: int = b.vertex_count()
-		var ib: int = b.index_count()
-		b.grid(rows, mat, col, false, false)
-		var s := 0.0
-		for v in range(vb, b.vertex_count()):
-			s += b._n[v].dot(across * out2.x + (normals[(v - vb) / 2] as Vector3) * out2.y)
-		if s < 0.0:
-			b.flip(vb, ib)
-	b.poly(rings[0], -(tangents[0] as Vector3), mat, col)
-	b.poly(rings[n - 1], tangents[n - 1], mat, col)
-
-
-## A flat plate across x: a convex outline in side view (z, y), `th` thick, centred on x.
-func _slab(b, outline: PackedVector2Array, x: float, th: float, mat: int, col: Color) -> void:
-	var outer := PackedVector3Array()
-	var inner := PackedVector3Array()
-	var c := Vector2.ZERO
-	for p in outline:
-		outer.append(Vector3(x + th * 0.5, p.y, p.x))
-		inner.append(Vector3(x - th * 0.5, p.y, p.x))
-		c += p
-	c /= outline.size()
-	b.poly(outer, Vector3.RIGHT, mat, col)
-	b.poly(inner, Vector3.LEFT, mat, col)
-	for k in outline.size():
-		var k2: int = (k + 1) % outline.size()
-		var mid: Vector2 = (outline[k] + outline[k2]) * 0.5 - c
-		face(b, [outer[k], outer[k2], inner[k2], inner[k]], Vector3(0.0, mid.y, mid.x), mat, col)
-
-
 ## A wheel centred on the origin, axle along X, its face toward +X (side = 1) or -X (side = -1):
 ## a wide balloon tyre with diamond blocks, round a rim sunk deep in it with twelve turbine spokes.
 func build_wheel(b, side: float) -> void:
@@ -434,7 +353,7 @@ func build_wheel(b, side: float) -> void:
 		var a1: Vector3 = (Vector3.RIGHT + t_dir) * diag
 		var a2: Vector3 = (Vector3.RIGHT - t_dir) * diag
 		for x in xs:
-			var rc: float = _carcass_r(x) - 0.002
+			var rc: float = carcass_r(TYRE_HALF, x) - 0.002
 			block(b, r_dir * (rc + 0.4 * BLOCK_H) + Vector3(x, 0.0, 0.0), a1, a2, r_dir, 0.017, BLOCK_H, 0.017, 0.8,
 					CB.M_RUBBER, C_RUBBER)
 		if odd:
@@ -463,18 +382,6 @@ func build_wheel(b, side: float) -> void:
 	if side < 0.0:
 		# Built facing +X; the left wheels face -X.
 		b.mirror_in_place()
-
-
-## The carcass's radius at x across the tread (from TYRE_HALF, walked out from the centre, so the
-## tread's side of the shoulder answers, not the sidewall's).
-static func _carcass_r(x: float) -> float:
-	var ax: float = absf(x)
-	for k in range(TYRE_HALF.size() - 1, 0, -1):
-		var xa: float = -float(TYRE_HALF[k][0])
-		var xc: float = -float(TYRE_HALF[k - 1][0])
-		if ax >= xa and ax <= xc:
-			return lerpf(TYRE_HALF[k][1], TYRE_HALF[k - 1][1], (ax - xa) / (xc - xa))
-	return TYRE_HALF[0][1]
 
 
 # ============================================================================================

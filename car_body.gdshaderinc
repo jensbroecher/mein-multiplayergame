@@ -26,6 +26,7 @@
 #define PAT_FADE 8
 #define PAT_SPLINTER 9
 #define PAT_TIGER 10
+#define PAT_RALLY 11
 
 #define FIN_GLOSS 0
 #define FIN_METALLIC 1
@@ -243,6 +244,29 @@ vec3 tiger(vec3 col, vec3 p, vec3 n) {
 	return col;
 }
 
+// Rally: a swoosh rising along each side from the front wheel to the rear quarter, edged with an
+// accent pinstripe, and a door plate with the racing number.
+vec3 rally(vec3 col, vec3 p, vec3 n) {
+	if (abs(n.x) < 0.3) {
+		return col;
+	}
+	float s = clamp((p.z - nose_z) / (tail_z - nose_z), 0.0, 1.0);
+	float yc = belt_y - 0.22 + 0.17 * smoothstep(0.05, 0.95, s);
+	float hw = mix(0.010, 0.070, smoothstep(0.0, 0.85, s));
+	float d = abs(p.y - yc) - hw;
+	col = mix(col, paint_accent.rgb, cover(abs(d - 0.016) - 0.006));
+	col = mix(col, paint_secondary.rgb, cover(d));
+	if (abs(n.x) > 0.55) {
+		vec2 q = vec2(-sign(p.x) * (p.z - door_roundel.x), p.y - door_roundel.y);
+		vec2 e = abs(q) - vec2(roundel_r * 1.2, roundel_r * 0.75);
+		float plate = length(max(e, 0.0)) + min(max(e.x, e.y), 0.0) - 0.008;
+		col = mix(col, paint_accent.rgb, cover(plate - 0.006));
+		col = mix(col, vec3(0.80, 0.80, 0.77), cover(plate));
+		col = mix(col, vec3(0.012), cover(sd_number(q, roundel_r)));
+	}
+	return col;
+}
+
 vec3 paint_albedo(vec3 p, vec3 n) {
 	vec3 col = paint_primary.rgb;
 	if (paint_pattern == PAT_STRIPES) {
@@ -293,6 +317,8 @@ vec3 paint_albedo(vec3 p, vec3 n) {
 		col = splinter(p);
 	} else if (paint_pattern == PAT_TIGER) {
 		col = tiger(col, p, n);
+	} else if (paint_pattern == PAT_RALLY) {
+		col = rally(col, p, n);
 	}
 	return col;
 }

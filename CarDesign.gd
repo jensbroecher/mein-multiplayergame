@@ -601,6 +601,104 @@ func coilover(b, lo: Vector3, hi: Vector3, body_r: float, coil_r: float, turns: 
 
 
 # ============================================================================================
+#  Plates and lamps
+# ============================================================================================
+
+## A round lamp facing `fwd`: a chrome bezel round a lens (a headlamp's reflector lens, or a
+## coloured one).
+func round_lamp(b, c: Vector3, fwd: Vector3, r: float, mat: int, col: Color) -> void:
+	var vb: int = b.vertex_count()
+	var ib: int = b.index_count()
+	b.lathe(c, fwd, PackedVector2Array([Vector2(-0.012, r + 0.004), Vector2(0.002, r + 0.004), Vector2(0.005, r + 0.001),
+			Vector2(0.004, r - 0.002)]), 18, CB.M_CHROME, Color(0.92, 0.93, 0.95))
+	b.orient_away_from(vb, ib, c - fwd * 0.01)
+	if mat == CB.M_HEADLAMP:
+		lens(b, c + fwd * 0.001, fwd, r, r * 0.25, 18)
+	else:
+		vb = b.vertex_count()
+		ib = b.index_count()
+		b.lathe(c, fwd, PackedVector2Array([Vector2(0.0, r), Vector2(r * 0.15, r * 0.8), Vector2(r * 0.25, 0.0)]), 18,
+				mat, col)
+		b.orient_away_from(vb, ib, c - fwd * r)
+
+
+## A profile (across, out) swept along a path, flat-shaded round the profile and smooth along the
+## path: plates, roof panels, wings. `across` is the profile's first axis (constant), the
+## second is across x tangent, turned toward `up_hint`. Both ends are capped; the caps need a convex
+## profile (a bent plate's end hides under its endplate).
+func sweep(b, path: PackedVector3Array, across: Vector3, up_hint: Vector3, profile: PackedVector2Array, mat: int,
+		col: Color) -> void:
+	var n: int = path.size()
+	var m: int = profile.size()
+	# The profile's winding, so each edge knows its outward side (a centroid test fails on a thin
+	# bent plate such as the wing, whose centroid lies off the plate).
+	var area := 0.0
+	for k in m:
+		area += profile[k].cross(profile[(k + 1) % m])
+	var rings := []
+	var normals := []
+	var tangents := []
+	for i in n:
+		var t: Vector3 = (path[mini(i + 1, n - 1)] - path[maxi(i - 1, 0)]).normalized()
+		var nrm: Vector3 = across.cross(t).normalized()
+		if nrm.dot(up_hint) < 0.0:
+			nrm = -nrm
+		var ring := PackedVector3Array()
+		for p in profile:
+			ring.append(path[i] + across * p.x + nrm * p.y)
+		rings.append(ring)
+		normals.append(nrm)
+		tangents.append(t)
+	for k in m:
+		var k2: int = (k + 1) % m
+		var e: Vector2 = profile[k2] - profile[k]
+		var out2: Vector2 = Vector2(e.y, -e.x) * (1.0 if area > 0.0 else -1.0)
+		var rows := []
+		for i in n:
+			rows.append(PackedVector3Array([rings[i][k], rings[i][k2]]))
+		var vb: int = b.vertex_count()
+		var ib: int = b.index_count()
+		b.grid(rows, mat, col, false, false)
+		var s := 0.0
+		for v in range(vb, b.vertex_count()):
+			s += b._n[v].dot(across * out2.x + (normals[(v - vb) / 2] as Vector3) * out2.y)
+		if s < 0.0:
+			b.flip(vb, ib)
+	b.poly(rings[0], -(tangents[0] as Vector3), mat, col)
+	b.poly(rings[n - 1], tangents[n - 1], mat, col)
+
+
+## A flat plate across x: a convex outline in side view (z, y), `th` thick, centred on x.
+func slab(b, outline: PackedVector2Array, x: float, th: float, mat: int, col: Color) -> void:
+	var outer := PackedVector3Array()
+	var inner := PackedVector3Array()
+	var c := Vector2.ZERO
+	for p in outline:
+		outer.append(Vector3(x + th * 0.5, p.y, p.x))
+		inner.append(Vector3(x - th * 0.5, p.y, p.x))
+		c += p
+	c /= outline.size()
+	b.poly(outer, Vector3.RIGHT, mat, col)
+	b.poly(inner, Vector3.LEFT, mat, col)
+	for k in outline.size():
+		var k2: int = (k + 1) % outline.size()
+		var mid: Vector2 = (outline[k] + outline[k2]) * 0.5 - c
+		face(b, [outer[k], outer[k2], inner[k2], inner[k]], Vector3(0.0, mid.y, mid.x), mat, col)
+
+
+## The radius of a tyre carcass at x across the tread, from its half profile (CarDesign.tyre()):
+## walked out from the centre, so the tread's side of the shoulder answers, not the sidewall's.
+static func carcass_r(half: Array, x: float) -> float:
+	var ax: float = absf(x)
+	for k in range(half.size() - 1, 0, -1):
+		var xa: float = -float(half[k][0])
+		var xc: float = -float(half[k - 1][0])
+		if ax >= xa and ax <= xc:
+			return lerpf(half[k][1], half[k - 1][1], (ax - xa) / (xc - xa))
+	return half[0][1]
+
+
+# ============================================================================================
 #  Detail map
 # ============================================================================================
 

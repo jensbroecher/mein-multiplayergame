@@ -430,12 +430,12 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   what's visible at each step. `scratch/menu_shot` takes `size=<w>x<h>` (the window can't exceed the
   screen, so on a 16:10 Mac it stays 16:10).
 
-## Procedural cars (Mudrunner, Phantom, Strikeforce, Centurion, Shadow)
+## Procedural cars (Mudrunner, Phantom, Strikeforce, Centurion, Shadow, Interceptor)
 
 - Cars can be built in code instead of imported from Hunyuan. `CarBuilder.gd` is the geometry toolkit (lofts,
   lathes, tubes, rounded boxes into one indexed mesh, the material id per vertex in UV2.x). `CarDesign.gd` is
   what the cars share: the lofted shell, fender sweeps, wheel parts, a coil-over, the detail map. Each car
-  extends it (`MudrunnerBuilder.gd`, `PhantomBuilder.gd`, `StrikeforceBuilder.gd`, `CenturionBuilder.gd`, `ShadowBuilder.gd`) with
+  extends it (`MudrunnerBuilder.gd`, `PhantomBuilder.gd`, `StrikeforceBuilder.gd`, `CenturionBuilder.gd`, `ShadowBuilder.gd`, `InterceptorBuilder.gd`) with
   its shape and its own parts. `regenerate_cars.gd` saves each as `generated/cars/<Name>.tscn` with its meshes, material and detail
   map; run `res://regenerate_cars.tscn` headless. PlayerCart and CarSelection load it through the preset's
   `model_path` like an FBX car, with `model_y_rotation` PI and `wheel_parts` `Wheel_FL` ... `Wheel_RR`.
@@ -461,9 +461,21 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   (`M_ANODISED`), so the paint job's accent recolours it.
 - The Shadow's section is faceted: straight runs between corners with small fillets (`_upper_segments`),
   every corner keyed in `KEYS`. Its pods grow out from under the bonnet's side, which stays the same wall
-  (on the nose the pod is a 1cm ledge), so the ring points never jump between regions. Its plates, roof
-  and wing are profiles swept along a path (`_sweep`), each strip turned outward by its profile edge's
-  normal: a centroid test flipped the wing's top, whose centroid lies off the bent plate.
+  (on the nose the pod is a 1cm ledge), so the ring points never jump between regions.
+- Plates, roof panels and wings are profiles swept along a path (`CarDesign.sweep()`), each strip turned
+  outward by its profile edge's normal: a centroid test flipped the Shadow's wing top, whose centroid
+  lies off the bent plate. `slab()` extrudes a side-view outline across x (endplates, swan necks),
+  `round_lamp()` is a bezelled lamp.
+- The Interceptor cuts its arches by lifting the shell's bottom in a squared superellipse over each wheel
+  (`_bot_knots`) and sweeps its flares along that outline; its bumpers are as wide as the flares, or the
+  flares' ends stood out past them like fins. Its nose and tail parts (lamps, intakes, valance) sit on the
+  shell via `_face_frame()`, which finds the surface and its normal with `shell_z()`.
+- A greenhouse needs a real corner in the section. On one smooth dome (`CarDesign._upper`'s cubic) the
+  windscreen had nowhere to stop: it wrapped round into the side glass, and a pillar painted onto the
+  dome read as a wedge. The Interceptor's section has the corner (`_upper_segments`: the glass leaning
+  in, its rounding, the crowned top), and the detail map puts the A-, roof-rail and D-pillars on that
+  rounding by arc length along the section (`_upper_s`, `PILLAR_PAD`). A threshold on the detail
+  map's normals gave ragged edges instead, since they step from one ring point to the next.
 - Stations are doubles. A flat cap (exponent 8) closes only at the exact tip: the tip rounded to a
   float32 (1.025 -> 1.0249999) left a hole a quarter of the face across.
 - Wheel arches through a body (the Phantom) are cut by lifting the shell's bottom over each wheel

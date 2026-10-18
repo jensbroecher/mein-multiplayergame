@@ -73,7 +73,8 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Interceptor",
-		"model_path": "res://models/cars/Interceptor.tscn",
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Interceptor.tscn",
 		"model_y_rotation": PI,
 		"max_speed": 43.0,
 		"acceleration": 58.0,
@@ -82,7 +83,7 @@ const CAR_PRESETS = [
 		"braking": 35.0,
 		"offroad": 3.0,
 		"desc": "High speed interceptor. Built for straightaways.",
-		"wheel_parts": {"FL": "part_6", "FR": "part_3", "RL": "part_4", "RR": "part_5"}
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
 		"name": "Mudrunner",
@@ -934,8 +935,8 @@ func _paint_changed(save := true) -> void:
 		var list: Array = CarPaint.RIMS if key == "rim" else CarPaint.PALETTE
 		_paint_values[key].text = list[_nearest(list, c)][0]
 	_paint_values["number"].text = str(current_paint["number"])
-	# Only the Racer pattern shows a number.
-	_number_row.visible = current_paint["pattern"] == CarPaint.PATTERNS.find("Racer")
+	# Only the Racer and Rally patterns show a number.
+	_number_row.visible = CarPaint.PATTERNS[current_paint["pattern"]] in ["Racer", "Rally"]
 	if save:
 		_save_paint()
 
