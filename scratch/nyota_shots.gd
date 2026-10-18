@@ -5,9 +5,11 @@ extends Node
 #   Godot --path . res://scratch/nyota_shots.tscn -- <out_dir> [cart=Model,x,y,z,heading_deg,pitch_deg ...]
 #       name:x,y,z:tx,ty,tz ...
 # A cart's y of "g" puts it on the ground there. Heading 0 faces -z (north), 90 faces -x (west).
-# Models are res://models/cars/<Model>.tscn (Viper, Shadow, Apex, ...).
+# Models are the procedural cars, res://generated/cars/<Model>.tscn (Viper, Shadow, Apex, ...), in
+# their factory paint.
 
 const SIZE := Vector2i(1376, 768)
+const CarPaint = preload("res://CarPaint.gd")
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
@@ -43,7 +45,8 @@ func _ready() -> void:
 			y = (hit.position.y if hit else 0.0) + 0.75
 		else:
 			y = float(c[2])
-		var model: Node3D = load("res://models/cars/%s.tscn" % c[0]).instantiate()
+		var model: Node3D = load("res://generated/cars/%s.tscn" % c[0]).instantiate()
+		CarPaint.apply(model, CarPaint.factory(c[0]))
 		vp.add_child(model)
 		var heading := deg_to_rad(float(c[4]))
 		var pitch := deg_to_rad(float(c[5])) if c.size() > 5 else 0.0

@@ -61,7 +61,8 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Apex",
-		"model_path": "res://models/cars/Apex.tscn",
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Apex.tscn",
 		"model_y_rotation": PI,
 		"max_speed": 39.0,
 		"acceleration": 70.0,
@@ -70,7 +71,7 @@ const CAR_PRESETS = [
 		"braking": 46.0,
 		"offroad": 5.0,
 		"desc": "Unmatched steering response. Master of drifts.",
-		"wheel_parts": {"FL": "part_0", "FR": "part_1", "RL": "part_4", "RR": "part_2"}
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
 		"name": "Interceptor",

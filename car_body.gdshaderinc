@@ -28,6 +28,7 @@
 #define PAT_TIGER 10
 #define PAT_RALLY 11
 #define PAT_STREAKS 12
+#define PAT_CLAW 13
 
 #define FIN_GLOSS 0
 #define FIN_METALLIC 1
@@ -285,6 +286,30 @@ vec3 streaks(vec3 col, vec3 p, vec3 n) {
 	return mix(col, paint_secondary.rgb, cover(d));
 }
 
+// Claw: the tops (bonnet, roof, rails) in the secondary colour, and three claw slashes across each
+// door in the accent, raked back, curved a little and tapering to points at both ends.
+vec3 claw(vec3 col, vec3 p, vec3 n) {
+	col = mix(col, paint_secondary.rgb, smoothstep(0.45, 0.65, n.y));
+	if (abs(n.x) < 0.4) {
+		return col;
+	}
+	// Along the car toward the tail and up, from the door's centre: the same rake on both sides.
+	vec2 q = vec2(p.z - door_roundel.x, p.y - door_roundel.y);
+	float len = roundel_r * 3.2;
+	float hw = roundel_r * 0.17;
+	vec2 u = normalize(vec2(0.42, 1.0));
+	vec2 v = vec2(u.y, -u.x);
+	float d = 1e3;
+	for (int k = 0; k < 3; k++) {
+		vec2 r = q - vec2(float(k - 1) * roundel_r * 0.85, 0.0);
+		float t = dot(r, u) / (len * 0.5);
+		float s = dot(r, v) - roundel_r * 0.30 * (1.0 - t * t);
+		float taper = max(1.0 - t * t, 0.0);
+		d = min(d, max(abs(s) - hw * taper, abs(t) * len * 0.5 - len * 0.5));
+	}
+	return mix(col, paint_accent.rgb, cover(d));
+}
+
 vec3 paint_albedo(vec3 p, vec3 n) {
 	vec3 col = paint_primary.rgb;
 	if (paint_pattern == PAT_STRIPES) {
@@ -339,6 +364,8 @@ vec3 paint_albedo(vec3 p, vec3 n) {
 		col = rally(col, p, n);
 	} else if (paint_pattern == PAT_STREAKS) {
 		col = streaks(col, p, n);
+	} else if (paint_pattern == PAT_CLAW) {
+		col = claw(col, p, n);
 	}
 	return col;
 }

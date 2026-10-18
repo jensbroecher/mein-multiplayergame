@@ -11,7 +11,7 @@ extends RefCounted
 
 ## Keep in step with car_body.gdshader's PAT_* and FIN_*.
 const PATTERNS := ["Solid", "Racing Stripes", "Two-Tone", "Side Stripe", "Flames", "Checkered", "Camo",
-	"Racer", "Fade", "Splinter", "Tiger", "Rally", "Streaks"]
+	"Racer", "Fade", "Splinter", "Tiger", "Rally", "Streaks", "Claw"]
 const FINISHES := ["Gloss", "Metallic", "Matte", "Pearl", "Chrome"]
 
 ## The paint shop's colours (sRGB).
@@ -58,6 +58,9 @@ const FACTORY := {
 	"Viper": {"pattern": 12, "finish": 0, "primary": Color(0.52, 0.82, 0.12),
 		"secondary": Color(0.23, 0.25, 0.27), "accent": Color(0.52, 0.82, 0.12),
 		"rim": Color(0.05, 0.05, 0.055), "number": 3},
+	"Apex": {"pattern": 13, "finish": 0, "primary": Color(0.94, 0.94, 0.92),
+		"secondary": Color(0.96, 0.42, 0.06), "accent": Color(0.03, 0.03, 0.035),
+		"rim": Color(0.46, 0.47, 0.49), "number": 21},
 }
 const FALLBACK := {"pattern": 0, "finish": 0, "primary": Color(0.80, 0.07, 0.05),
 	"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.98, 0.78, 0.07),
@@ -121,7 +124,7 @@ static func is_paintable(model_root: Node) -> bool:
 static func random(rng: RandomNumberGenerator, car_name: String) -> Dictionary:
 	var p: Dictionary = factory(car_name)
 	# Weighted toward the patterns that read best from a chase camera.
-	var bag := [0, 0, 1, 1, 2, 3, 4, 5, 6, 7, 7, 8, 9, 10, 11, 11, 12]
+	var bag := [0, 0, 1, 1, 2, 3, 4, 5, 6, 7, 7, 8, 9, 10, 11, 11, 12, 13]
 	p["pattern"] = bag[rng.randi() % bag.size()]
 	p["finish"] = [0, 0, 1, 1, 1, 2, 3][rng.randi() % 7]
 	var primary: Color = PALETTE[rng.randi() % PALETTE.size()][1]

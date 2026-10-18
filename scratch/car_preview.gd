@@ -4,7 +4,7 @@ extends SceneTree
 # renders it on a grey yard from named cameras in the cart frame (metres, front at -Z).
 # Run windowed:
 #   Godot --path . --resolution 1400x900 -s res://scratch/car_preview.gd -- <out_dir> [car=Mudrunner]
-#       [orig=res://models/cars/Apex.tscn] [scene=res://generated/cars/Mudrunner.tscn]
+#       [orig=<imported car .tscn>] [scene=res://generated/cars/Mudrunner.tscn]
 #       [paint=<pattern>,<finish>,<primary>,<secondary>,<accent>,<rim>,<number>] [fov=40] [yaw=0]
 #       [sun=<pitch>,<yaw>] name:x,y,z:tx,ty,tz[:ux,uy,uz] ...
 # orig renders an imported model instead, placed the way PlayerCart places it (x2, half turn);
