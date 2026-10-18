@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://cart123"]
 
 [ext_resource type="Script" uid="uid://cgxoltdv3a2ap" path="res://PlayerCart.gd" id="1_cscript"]
-[ext_resource type="PackedScene" uid="uid://dwxqyemil5s53" path="res://models/cars/20260505221030_500312d9.fbx" id="2_cart"]
+[ext_resource type="PackedScene" path="res://generated/cars/Viper.tscn" id="2_cart"]
 [ext_resource type="AudioStream" uid="uid://bblp15g61n0br" path="res://sounds/404333__strexet__nitro-activation.mp3" id="4_nitro"]
 [ext_resource type="AudioStream" uid="uid://cjace5lfxnac4" path="res://sounds/774270__thelittlecrow__rocket-launch-boost-and-burning-version-b.wav" id="5_rocket"]
 [ext_resource type="AudioStream" uid="uid://cdk3hgsnfy0wt" path="res://sounds/434430__v-ktor__explosion05.wav" id="6_release"]

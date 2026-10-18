@@ -24,16 +24,16 @@ static var _car_fade_materials := {}
 const CAR_PRESETS = [
 	{
 		"name": "Viper",
-		"model_path": "res://models/cars/Viper.tscn",
-		"model_y_rotation": PI,       # native FBX faces backward, flip 180°
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Viper.tscn",
+		"model_y_rotation": PI,
 		"max_speed": 40.0,
 		"acceleration": 65.0,
 		"steer_speed": 2.8,
 		"grip": 5.4,
 		"braking": 46.0,
 		"offroad": 6.0,
-		# Wheel part names inside the FBX, keyed by corner
-		"wheel_parts": {"FL": "part_5", "FR": "part_2", "RL": "part_0", "RR": "part_6"}
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
 		"name": "Shadow",

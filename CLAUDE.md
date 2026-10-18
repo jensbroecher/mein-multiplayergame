@@ -430,12 +430,13 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   what's visible at each step. `scratch/menu_shot` takes `size=<w>x<h>` (the window can't exceed the
   screen, so on a 16:10 Mac it stays 16:10).
 
-## Procedural cars (Mudrunner, Phantom, Strikeforce, Centurion, Shadow, Interceptor)
+## Procedural cars (Mudrunner, Phantom, Strikeforce, Centurion, Shadow, Interceptor, Viper)
 
 - Cars can be built in code instead of imported from Hunyuan. `CarBuilder.gd` is the geometry toolkit (lofts,
   lathes, tubes, rounded boxes into one indexed mesh, the material id per vertex in UV2.x). `CarDesign.gd` is
   what the cars share: the lofted shell, fender sweeps, wheel parts, a coil-over, the detail map. Each car
-  extends it (`MudrunnerBuilder.gd`, `PhantomBuilder.gd`, `StrikeforceBuilder.gd`, `CenturionBuilder.gd`, `ShadowBuilder.gd`, `InterceptorBuilder.gd`) with
+  extends it (`MudrunnerBuilder.gd`, `PhantomBuilder.gd`, `StrikeforceBuilder.gd`, `CenturionBuilder.gd`, `ShadowBuilder.gd`, `InterceptorBuilder.gd`,
+  `ViperBuilder.gd`) with
   its shape and its own parts. `regenerate_cars.gd` saves each as `generated/cars/<Name>.tscn` with its meshes, material and detail
   map; run `res://regenerate_cars.tscn` headless. PlayerCart and CarSelection load it through the preset's
   `model_path` like an FBX car, with `model_y_rotation` PI and `wheel_parts` `Wheel_FL` ... `Wheel_RR`.
@@ -468,8 +469,8 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   `round_lamp()` is a bezelled lamp.
 - The Interceptor cuts its arches by lifting the shell's bottom in a squared superellipse over each wheel
   (`_bot_knots`) and sweeps its flares along that outline; its bumpers are as wide as the flares, or the
-  flares' ends stood out past them like fins. Its nose and tail parts (lamps, intakes, valance) sit on the
-  shell via `_face_frame()`, which finds the surface and its normal with `shell_z()`.
+  flares' ends stood out past them like fins. Nose and tail parts (lamps, intakes, grilles) sit on the
+  shell via `CarDesign.face_frame()`, which finds the surface and its normal with `shell_z()`.
 - A greenhouse needs a real corner in the section. On one smooth dome (`CarDesign._upper`'s cubic) the
   windscreen had nowhere to stop: it wrapped round into the side glass, and a pillar painted onto the
   dome read as a wedge. The Interceptor's section has the corner (`_upper_segments`: the glass leaning
@@ -514,4 +515,7 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 - To rebuild another car: write `<Name>Builder.gd` extending `CarDesign.gd` (set the shell in `_init()`;
   `build_body`, `build_wheel`, `_detail_shapes`/`_detail_at`, `PAINT_LAYOUT`, `WHEEL_POSITIONS`,
   `ANTENNA_POS`), add it to `regenerate_cars.gd`'s `CARS` and its factory paint to `CarPaint.FACTORY`, then
-  point the preset in both PlayerCart and CarSelection at `generated/cars/<Name>.tscn`.
+  point the preset in both PlayerCart and CarSelection at `generated/cars/<Name>.tscn`. Grep for the old
+  FBX before deleting it: `PlayerCart.tscn`'s `CartModel` placeholder (swapped for the preset's model at
+  spawn) and the look-dev tools' stand-in cart (`gate_shots`, `look_shots`, `msitu_shots`,
+  `bloombay_shots`) used the Viper's, and are now the procedural Viper.

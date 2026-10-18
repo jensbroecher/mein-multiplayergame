@@ -6,7 +6,8 @@ extends Node
 #       [level=res://levels/BloombayDunesLevel.tscn] [car=x,z,yaw ...] name:x,y,z:tx,ty,tz[:frames[:gap]] ...
 # frames>1 saves name_0..name_N, gap seconds apart (default 1), to watch the surf move.
 
-const CART_MODEL := "res://models/cars/20260505221030_500312d9.fbx"
+const CART_MODEL := "res://generated/cars/Viper.tscn"
+const CarPaint = preload("res://CarPaint.gd")
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
@@ -40,6 +41,7 @@ func _ready() -> void:
 		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(x, 400, z), Vector3(x, -400, z)))
 		var y: float = hit.position.y if hit else 0.0
 		var car: Node3D = load(CART_MODEL).instantiate()
+		CarPaint.apply(car, CarPaint.factory("Viper"))
 		add_child(car)
 		car.global_transform = Transform3D(Basis(Vector3.UP, deg_to_rad(float(c[2]) + 180.0)).scaled(Vector3.ONE * 2.0), Vector3(x, y, z))
 	for a in args.slice(1):

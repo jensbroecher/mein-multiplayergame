@@ -224,25 +224,6 @@ func _arch_lip(z_door: float, z_end: float) -> Array:
 	return lip
 
 
-## A point on the nose (or tail) at (x, y) and the shell's outward normal there: [point, normal].
-func _face_frame(x: float, y: float, front: bool) -> Array:
-	var z: float = shell_z(x, y, front)
-	var e := 0.01
-	var dzdx: float = (shell_z(x + e, y, front) - shell_z(x - e, y, front)) / (2.0 * e)
-	var dzdy: float = (shell_z(x, y + e, front) - shell_z(x, y - e, front)) / (2.0 * e)
-	var nrm := Vector3(dzdx, dzdy, -1.0 if front else 1.0).normalized()
-	if (nrm.z < 0.0) != front:
-		nrm = -nrm
-	return [Vector3(x, y, z), nrm]
-
-
-## A basis whose z axis is `fwd` and y axis as near to up as it allows.
-static func _facing(fwd: Vector3) -> Basis:
-	var zb: Vector3 = fwd.normalized()
-	var xb: Vector3 = Vector3.UP.cross(zb).normalized()
-	return Basis(xb, zb.cross(xb).normalized(), zb)
-
-
 ## Body mesh: shell, flares, liners, lamps, aero, bumpers and the running gear seen in the arches.
 func build_body(b) -> void:
 	build_shell(b)
@@ -264,25 +245,25 @@ func _side_parts(b) -> void:
 		b.rbox(Transform3D(Basis(), Vector3(arch[1], 0.35, arch[0])), Vector3(0.004, 0.14, ARCH_RZ), 0.003, 1, CB.M_DARK,
 				C_DARKER)
 	# Headlamp at the nose's corner: a dark housing on the surface, twin projector lenses.
-	var hl: Array = _face_frame(0.33, 0.425, true)
-	var hb: Basis = _facing(hl[1])
+	var hl: Array = face_frame(0.33, 0.425, true)
+	var hb: Basis = facing(hl[1])
 	b.rbox(Transform3D(hb, hl[0]), Vector3(0.095, 0.036, 0.012), 0.014, 2, CB.M_DARK, C_DARK)
 	for dx in [-0.045, 0.045]:
 		lens(b, hl[0] + hb.x * dx + hb.z * 0.010, hl[1], 0.027, 0.008, 18)
 	b.rbox(Transform3D(hb, hl[0] + hb.y * -0.030 + hb.z * 0.006), Vector3(0.085, 0.004, 0.006), 0.002, 1,
 			CB.M_TAILLAMP, C_AMBER)
 	# Side intake in the bumper's corner.
-	var si: Array = _face_frame(0.36, 0.235, true)
-	b.rbox(Transform3D(_facing(si[1]), si[0]), Vector3(0.075, 0.045, 0.012), 0.012, 2, CB.M_DARK, C_MESH)
+	var si: Array = face_frame(0.36, 0.235, true)
+	b.rbox(Transform3D(facing(si[1]), si[0]), Vector3(0.075, 0.045, 0.012), 0.012, 2, CB.M_DARK, C_MESH)
 	# Taillamps: a long red bar across the tail's corner, an amber block at its outer end, a
 	# reversing lamp low on the valance.
 	for k in 4:
-		var tl: Array = _face_frame(0.25 + 0.06 * k, 0.575 - 0.008 * k, false)
-		var tb: Basis = _facing(tl[1])
+		var tl: Array = face_frame(0.25 + 0.06 * k, 0.575 - 0.008 * k, false)
+		var tb: Basis = facing(tl[1])
 		b.rbox(Transform3D(tb, tl[0]), Vector3(0.034, 0.034, 0.010), 0.008, 2, CB.M_TAILLAMP,
 				C_AMBER if k == 3 else C_TAILLAMP)
-	var rv: Array = _face_frame(0.30, 0.275, false)
-	b.rbox(Transform3D(_facing(rv[1]), rv[0]), Vector3(0.03, 0.012, 0.012), 0.006, 1, CB.M_TAILLAMP, Color(0.85, 0.85, 0.82))
+	var rv: Array = face_frame(0.30, 0.275, false)
+	b.rbox(Transform3D(facing(rv[1]), rv[0]), Vector3(0.03, 0.012, 0.012), 0.006, 1, CB.M_TAILLAMP, Color(0.85, 0.85, 0.82))
 	# Mirror on a stalk from the panel ahead of the side glass, the glass at its back.
 	b.tube(PackedVector3Array([Vector3(0.508, 0.570, -0.375), Vector3(0.585, 0.600, -0.355)]), 0.008, 6, CB.M_DARK, C_DARK,
 			false, false)
@@ -339,25 +320,25 @@ func _centre_parts(b) -> void:
 	# Splitter under the nose; a diffuser with fins under the tail.
 	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.130, -1.095)), Vector3(0.52, 0.007, 0.06), 0.005, 1, CB.M_DARK, C_DARK)
 	# Rear valance in black.
-	var va: Array = _face_frame(0.0, 0.27, false)
-	b.rbox(Transform3D(_facing(va[1]), va[0]), Vector3(0.34, 0.045, 0.012), 0.012, 2, CB.M_DARK, C_DARK)
+	var va: Array = face_frame(0.0, 0.27, false)
+	b.rbox(Transform3D(facing(va[1]), va[0]), Vector3(0.34, 0.045, 0.012), 0.012, 2, CB.M_DARK, C_DARK)
 	b.rbox(Transform3D(Basis(Vector3.RIGHT, -0.18), Vector3(0.0, 0.200, 1.080)), Vector3(0.36, 0.006, 0.075), 0.004, 1,
 			CB.M_DARK, C_DARK)
 	for k in 5:
 		b.rbox(Transform3D(Basis(), Vector3(-0.16 + 0.08 * k, 0.215, 1.085)), Vector3(0.004, 0.025, 0.065), 0.002, 1,
 				CB.M_DARK, C_DARKER)
 	# Main intake: a mesh panel with a grid of bars across the nose's lower face.
-	var mi: Array = _face_frame(0.0, 0.245, true)
-	var mb: Basis = _facing(mi[1])
+	var mi: Array = face_frame(0.0, 0.245, true)
+	var mb: Basis = facing(mi[1])
 	b.rbox(Transform3D(mb, mi[0]), Vector3(0.235, 0.060, 0.014), 0.016, 2, CB.M_DARK, C_DARKER)
 	for k in 4:
 		bar(b, mi[0] + mb.y * (-0.036 + 0.024 * k) + mb.z * 0.012, Vector3(0.22, 0.003, 0.003), CB.M_DARK, C_MESH)
 	for k in 13:
 		bar(b, mi[0] + mb.x * (-0.198 + 0.033 * k) + mb.z * 0.012, Vector3(0.003, 0.052, 0.003), CB.M_DARK, C_MESH)
 	# Upper grille slot, and the rally pod over it: four lamps in a dark bar.
-	var ug: Array = _face_frame(0.0, 0.345, true)
-	b.rbox(Transform3D(_facing(ug[1]), ug[0]), Vector3(0.20, 0.022, 0.012), 0.010, 2, CB.M_DARK, C_DARKER)
-	var pod: Array = _face_frame(0.0, 0.385, true)
+	var ug: Array = face_frame(0.0, 0.345, true)
+	b.rbox(Transform3D(facing(ug[1]), ug[0]), Vector3(0.20, 0.022, 0.012), 0.010, 2, CB.M_DARK, C_DARKER)
+	var pod: Array = face_frame(0.0, 0.385, true)
 	var pc: Vector3 = pod[0] + Vector3(0.0, 0.0, -0.035)
 	b.rbox(Transform3D(Basis(), pc), Vector3(0.31, 0.040, 0.026), 0.014, 2, CB.M_DARK, C_DARK)
 	b.rbox(Transform3D(Basis(), pc + Vector3(0.0, -0.042, 0.0)), Vector3(0.29, 0.003, 0.02), 0.002, 1, CB.M_ANODISED,
@@ -378,8 +359,8 @@ func _centre_parts(b) -> void:
 			Color(1, 1, 1))
 	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.896, 1.141)), Vector3(0.465, 0.012, 0.003), 0.002, 1, CB.M_DARK, C_DARK)
 	# High brake light under the wing; a tow hook at the back.
-	var bl: Array = _face_frame(0.0, 0.745, false)
-	b.rbox(Transform3D(_facing(bl[1]), bl[0]), Vector3(0.09, 0.006, 0.005), 0.003, 1, CB.M_TAILLAMP, C_TAILLAMP)
+	var bl: Array = face_frame(0.0, 0.745, false)
+	b.rbox(Transform3D(facing(bl[1]), bl[0]), Vector3(0.09, 0.006, 0.005), 0.003, 1, CB.M_TAILLAMP, C_TAILLAMP)
 	b.tube(_rounded([Vector3(-0.025, 0.215, 1.10), Vector3(-0.025, 0.215, 1.16), Vector3(0.025, 0.215, 1.16),
 			Vector3(0.025, 0.215, 1.10)], 0.018), 0.008, 8, CB.M_ANODISED, Color(1, 1, 1), false, false)
 

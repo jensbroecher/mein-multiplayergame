@@ -1,0 +1,19 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://car_body.gdshader" id="1_g6jqk"]
+[ext_resource type="Texture2D" path="res://generated/cars/viper_detail.res" id="2_voq4c"]
+
+[resource]
+render_priority = -1
+shader = ExtResource("1_g6jqk")
+shader_parameter/detail_map = ExtResource("2_voq4c")
+shader_parameter/nose_z = -1.04
+shader_parameter/tail_z = 0.99
+shader_parameter/belt_y = 0.6
+shader_parameter/side_x = 0.385
+shader_parameter/door_roundel = Vector2(-0.1, 0.42)
+shader_parameter/roundel_r = 0.085
+shader_parameter/hood_z = -0.8
+shader_parameter/hood_r = 0.065
+shader_parameter/stripe_w = 0.06
+shader_parameter/stripe_gap = 0.02

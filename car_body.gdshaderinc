@@ -27,6 +27,7 @@
 #define PAT_SPLINTER 9
 #define PAT_TIGER 10
 #define PAT_RALLY 11
+#define PAT_STREAKS 12
 
 #define FIN_GLOSS 0
 #define FIN_METALLIC 1
@@ -267,6 +268,23 @@ vec3 rally(vec3 col, vec3 p, vec3 n) {
 	return col;
 }
 
+// Streaks: a panel in the secondary colour along each side (the doors), its ends broken into
+// horizontal brush strokes of random length that taper to points.
+vec3 streaks(vec3 col, vec3 p, vec3 n) {
+	if (abs(n.x) < 0.35 || p.y > belt_y + 0.015) {
+		return col;
+	}
+	float mid = mix(nose_z, tail_z, 0.47);
+	float half_len = (tail_z - nose_z) * 0.17;
+	float band = 0.026;
+	float k = floor(p.y / band);
+	float f = fract(p.y / band) * 2.0 - 1.0;
+	float ahead = p.z < mid ? 1.0 : 0.0;
+	float reach = half_len * (0.8 + 0.7 * hash13(vec3(k, 2.1 + ahead * 5.0, 5.3)));
+	float d = abs(p.z - mid) - reach + 0.12 * f * f;
+	return mix(col, paint_secondary.rgb, cover(d));
+}
+
 vec3 paint_albedo(vec3 p, vec3 n) {
 	vec3 col = paint_primary.rgb;
 	if (paint_pattern == PAT_STRIPES) {
@@ -319,6 +337,8 @@ vec3 paint_albedo(vec3 p, vec3 n) {
 		col = tiger(col, p, n);
 	} else if (paint_pattern == PAT_RALLY) {
 		col = rally(col, p, n);
+	} else if (paint_pattern == PAT_STREAKS) {
+		col = streaks(col, p, n);
 	}
 	return col;
 }

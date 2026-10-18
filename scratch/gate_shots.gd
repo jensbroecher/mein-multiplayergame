@@ -9,7 +9,8 @@ extends Node
 # fov=75 matches the chase camera. all= shoots every gate in the level from that camera.
 
 const SIZE := Vector2i(1376, 768)
-const CART_MODEL := "res://models/cars/20260505221030_500312d9.fbx"
+const CART_MODEL := "res://generated/cars/Viper.tscn"
+const CarPaint = preload("res://CarPaint.gd")
 
 
 func _ready() -> void:
@@ -43,6 +44,7 @@ func _ready() -> void:
 			var slots := fl.get_node("SpawnPoints").get_children()
 			for i in mini(int(a.substr(6)), slots.size()):
 				var car: Node3D = load(CART_MODEL).instantiate()
+				CarPaint.apply(car, CarPaint.factory("Viper"))
 				vp.add_child(car)
 				var slot: Node3D = slots[i]
 				car.global_transform = Transform3D(slot.global_basis.rotated(Vector3.UP, PI).scaled(Vector3.ONE * 2.0), slot.global_position)

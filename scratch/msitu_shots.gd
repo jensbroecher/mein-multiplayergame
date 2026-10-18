@@ -11,7 +11,8 @@ extends Node
 
 const SIZE := Vector2i(1376, 768)
 const HERD_CROSS := Vector3(190.0, 7.0, -55.0)
-const CART_MODEL := "res://models/cars/20260505221030_500312d9.fbx"
+const CART_MODEL := "res://generated/cars/Viper.tscn"
+const CarPaint = preload("res://CarPaint.gd")
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
@@ -45,6 +46,7 @@ func _ready() -> void:
 		var hit := space.intersect_ray(q)
 		var y: float = hit.position.y if hit else 0.0
 		var car: Node3D = load(CART_MODEL).instantiate()
+		CarPaint.apply(car, CarPaint.factory("Viper"))
 		vp.add_child(car)
 		car.global_transform = Transform3D(Basis(Vector3.UP, deg_to_rad(float(c[2]) + 180.0)).scaled(Vector3.ONE * 2.0), Vector3(x, y, z))
 		print("CAR at ", car.global_position)

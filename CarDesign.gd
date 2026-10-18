@@ -259,6 +259,26 @@ func shell_z(x: float, y: float, from_front: bool) -> float:
 	return z
 
 
+## A point on the shell's nose (or tail) at (x, y) and its outward normal there: [point, normal],
+## for parts set on those faces (lamps, grilles, plates).
+func face_frame(x: float, y: float, front: bool) -> Array:
+	var z: float = shell_z(x, y, front)
+	var e := 0.01
+	var dzdx: float = (shell_z(x + e, y, front) - shell_z(x - e, y, front)) / (2.0 * e)
+	var dzdy: float = (shell_z(x, y + e, front) - shell_z(x, y - e, front)) / (2.0 * e)
+	var nrm := Vector3(dzdx, dzdy, -1.0 if front else 1.0).normalized()
+	if (nrm.z < 0.0) != front:
+		nrm = -nrm
+	return [Vector3(x, y, z), nrm]
+
+
+## A basis whose z axis is `fwd` and y axis as near to up as it allows.
+static func facing(fwd: Vector3) -> Basis:
+	var zb: Vector3 = fwd.normalized()
+	var xb: Vector3 = Vector3.UP.cross(zb).normalized()
+	return Basis(xb, zb.cross(xb).normalized(), zb)
+
+
 ## Height of the shell's top surface at (x, z) (for parts sitting on a roof or bonnet).
 func top_y(x: float, z: float) -> float:
 	var sec: PackedVector2Array = section(z)

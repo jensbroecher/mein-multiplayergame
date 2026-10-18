@@ -20,7 +20,8 @@ const FLOOR_SHADER = preload("res://showroom_floor.gdshader")
 const CAR_PRESETS = [
 	{
 		"name": "Viper",
-		"model_path": "res://models/cars/Viper.tscn",
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Viper.tscn",
 		"model_y_rotation": PI,
 		"max_speed": 40.0,
 		"acceleration": 65.0,
@@ -29,7 +30,7 @@ const CAR_PRESETS = [
 		"braking": 40.0,
 		"offroad": 6.0,
 		"desc": "All-around performer. Great for beginners.",
-		"wheel_parts": {"FL": "part_5", "FR": "part_2", "RL": "part_0", "RR": "part_6"}
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
 		"name": "Shadow",
