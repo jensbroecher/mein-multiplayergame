@@ -20,6 +20,11 @@ const CarPaint = preload("res://CarPaint.gd")
 const CAR_FADE_SHADER = preload("res://car_body_fade.gdshader")
 ## Transparent twins of the procedural cars' materials, by the opaque one's instance id.
 static var _car_fade_materials := {}
+## The lightning's arc and spark materials and the sparks' quad, shared by every strike. FxWarmup
+## compiles them while the stage loads; made new on each strike, the first one froze the race.
+static var _lightning_arc_mat: StandardMaterial3D
+static var _lightning_spark_mat: StandardMaterial3D
+static var _lightning_spark_quad: QuadMesh
 
 const CAR_PRESETS = [
 	{
@@ -466,7 +471,8 @@ var current_item = ItemType.NONE
 var current_item_2 = ItemType.NONE
 var is_landing: bool = true
 var slow_timer: float = 0.0
-var _original_albedo_colors: Dictionary = {}
+## Plain meshes' flash materials (_fx_material): what to go back to, by the mesh's instance id.
+var _fx_base: Dictionary = {}
 
 var last_checkpoint_transform: Transform3D
 
@@ -742,6 +748,7 @@ func _ready():
 	_remove_collisions_recursive(visuals)
 	_setup_new_car_wheels()
 	_setup_blob_shadow()
+	_add_fx_twins()
 	# Shadows follow options menu (MusicManager.shadows_enabled)
 	apply_shadow_setting(MusicManager.shadows_enabled)
 
@@ -3863,20 +3870,13 @@ func _set_teleport_glow_recursive(node: Node, amount: float) -> void:
 		elif node.has_meta("car_shader"):
 			_set_car_shader_glow(node, Color(0.35, 0.85, 1.0), lerpf(0.0, 8.0, amount) if amount > 0.02 else 0.0)
 		else:
-			var mat = node.material_override as StandardMaterial3D
-			if not mat:
-				var base_mat = node.get_active_material(0)
-				if base_mat:
-					mat = base_mat.duplicate()
-					node.material_override = mat
+			var mat := _fx_material(node)
 			if mat:
 				if amount > 0.02:
-					mat.emission_enabled = true
 					mat.emission = Color(0.35, 0.85, 1.0)
 					mat.emission_energy_multiplier = lerpf(0.0, 8.0, amount)
 				else:
-					mat.emission_enabled = false
-					mat.emission_energy_multiplier = 1.0
+					_fx_restore_emission(node, mat)
 	for child in node.get_children():
 		_set_teleport_glow_recursive(child, amount)
 
@@ -4129,6 +4129,74 @@ static func _car_fade_material(base: Material) -> Material:
 	return _car_fade_materials[key]
 
 
+## What the flashes and fades change on a plain mesh (the antenna; the car's own meshes go through
+## car_body.gdshader's instance uniforms): the mesh's material, copied once, with emission on from
+## the start, black if it had none. A flash then only changes values. Switching emission or
+## transparency on and off swaps the material's shader, and the first swap compiled it mid-race.
+func _fx_material(node: MeshInstance3D) -> StandardMaterial3D:
+	if _fx_base.has(node.get_instance_id()):
+		return node.material_override as StandardMaterial3D
+	var base := node.get_active_material(0) as StandardMaterial3D
+	if base == null:
+		return null
+	var mat := base.duplicate() as StandardMaterial3D
+	if not mat.emission_enabled:
+		mat.emission_enabled = true
+		mat.emission = Color.BLACK
+	node.material_override = mat
+	_fx_base[node.get_instance_id()] = {
+		"albedo": mat.albedo_color,
+		"emission": mat.emission,
+		"energy": mat.emission_energy_multiplier,
+	}
+	return mat
+
+
+func _fx_restore_emission(node: MeshInstance3D, mat: StandardMaterial3D) -> void:
+	var base: Dictionary = _fx_base[node.get_instance_id()]
+	mat.emission = base["emission"]
+	mat.emission_energy_multiplier = base["energy"]
+
+
+## Hidden twins of the car's meshes in the materials a fade switches them to (the car's transparent
+## shader, the plain meshes' alpha variant), so those compile as the cart spawns, behind the loading
+## screen, not on the first respawn mid-race. They never draw.
+func _add_fx_twins() -> void:
+	var twins := Node3D.new()
+	twins.name = "FxTwins"
+	twins.visible = false
+	add_child(twins)
+	var meshes: Array = []
+	_collect_fx_meshes(visuals, meshes)
+	for mi: MeshInstance3D in meshes:
+		var twin_mat: Material = null
+		if mi.has_meta("car_shader"):
+			twin_mat = _car_fade_material(mi.mesh.surface_get_material(0))
+		else:
+			var mat := _fx_material(mi)
+			if mat:
+				var faded := mat.duplicate() as StandardMaterial3D
+				faded.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+				twin_mat = faded
+		if twin_mat:
+			var twin := MeshInstance3D.new()
+			twin.mesh = mi.mesh
+			twin.material_override = twin_mat
+			twin.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			twins.add_child(twin)
+
+
+## The meshes the fades and flashes change: everything under `node` but the shield, the shockwave
+## and the placeholder model on its way out.
+func _collect_fx_meshes(node: Node, out: Array) -> void:
+	if node.is_queued_for_deletion() or node == shield_mesh or node == shockwave_visual:
+		return
+	if node is MeshInstance3D and (node as MeshInstance3D).mesh != null:
+		out.append(node)
+	for child in node.get_children():
+		_collect_fx_meshes(child, out)
+
+
 ## A procedural car's mesh (car_body.gdshader, tagged "car_shader") glows through its per-instance
 ## fx_glow parameter: `color` is sRGB like the StandardMaterial3D emission it stands in for.
 func _set_car_shader_glow(node: GeometryInstance3D, color: Color, energy: float) -> void:
@@ -4150,12 +4218,7 @@ func _set_alpha_recursive(node: Node, alpha: float):
 			for child in node.get_children():
 				_set_alpha_recursive(child, alpha)
 			return
-		var mat = node.material_override as StandardMaterial3D
-		if not mat:
-			var base_mat = node.get_active_material(0)
-			if base_mat:
-				mat = base_mat.duplicate()
-				node.material_override = mat
+		var mat := _fx_material(node)
 		if mat:
 			if alpha >= 0.99:
 				mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
@@ -4182,19 +4245,13 @@ func _set_respawn_effect_recursive(node: Node, enabled: bool, blink_on: bool):
 			for child in node.get_children():
 				_set_respawn_effect_recursive(child, enabled, blink_on)
 			return
-		var mat = node.material_override as StandardMaterial3D
-		if not mat:
-			var base_mat = node.get_active_material(0)
-			if base_mat:
-				mat = base_mat.duplicate()
-				node.material_override = mat
+		var mat := _fx_material(node)
 		if mat:
 			if enabled and blink_on:
-				mat.emission_enabled = true
 				mat.emission = Color(1.0, 1.0, 1.0, 1.0)
 				mat.emission_energy_multiplier = 6.0
 			else:
-				mat.emission_enabled = false
+				_fx_restore_emission(node, mat)
 	
 	for child in node.get_children():
 		_set_respawn_effect_recursive(child, enabled, blink_on)
@@ -4215,28 +4272,17 @@ func _set_shock_effect_recursive(node: Node, enabled: bool, blink_on: bool):
 			for child in node.get_children():
 				_set_shock_effect_recursive(child, enabled, blink_on)
 			return
-		var mat = node.material_override as StandardMaterial3D
-		if not mat:
-			var base_mat = node.get_active_material(0)
-			if base_mat:
-				mat = base_mat.duplicate()
-				node.material_override = mat
+		var mat := _fx_material(node)
 		if mat:
-			var node_id = node.get_instance_id()
-			if not _original_albedo_colors.has(node_id):
-				_original_albedo_colors[node_id] = mat.albedo_color
-			
+			var current_alpha = mat.albedo_color.a
 			if enabled and blink_on:
-				var current_alpha = mat.albedo_color.a
 				mat.albedo_color = Color(0.1, 0.5, 1.0, current_alpha)
-				mat.emission_enabled = true
 				mat.emission = Color(0.1, 0.5, 1.0)
 				mat.emission_energy_multiplier = 4.0
 			else:
-				var current_alpha = mat.albedo_color.a
-				var orig_color = _original_albedo_colors[node_id]
+				var orig_color: Color = _fx_base[node.get_instance_id()]["albedo"]
 				mat.albedo_color = Color(orig_color.r, orig_color.g, orig_color.b, current_alpha)
-				mat.emission_enabled = false
+				_fx_restore_emission(node, mat)
 				
 	for child in node.get_children():
 		_set_shock_effect_recursive(child, enabled, blink_on)
@@ -4515,21 +4561,49 @@ func client_play_lightning(hit_player_names: Array, random_target: Vector3 = Vec
 		_create_dynamic_lightning_arc(origin_getter, static_getter)
 		_spawn_sparks(static_target)
 
+static func lightning_arc_material() -> StandardMaterial3D:
+	if _lightning_arc_mat == null:
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		mat.albedo_color = Color(0.85, 0.95, 1.0, 0.95)
+		mat.emission_enabled = true
+		mat.emission = Color(0.2, 0.75, 1.0)
+		mat.emission_energy_multiplier = 14.0
+		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		_lightning_arc_mat = mat
+	return _lightning_arc_mat
+
+
+static func lightning_spark_material() -> StandardMaterial3D:
+	if _lightning_spark_mat == null:
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		mat.albedo_texture = TELEPORT_SPARK
+		mat.albedo_color = Color(0.3, 0.8, 1.0)
+		mat.emission_enabled = true
+		mat.emission = Color(0.3, 0.8, 1.0)
+		mat.emission_texture = TELEPORT_SPARK
+		mat.emission_energy_multiplier = 4.0
+		_lightning_spark_mat = mat
+	return _lightning_spark_mat
+
+
+static func lightning_spark_mesh() -> QuadMesh:
+	if _lightning_spark_quad == null:
+		_lightning_spark_quad = QuadMesh.new()
+		_lightning_spark_quad.size = Vector2(0.4, 0.4)
+	return _lightning_spark_quad
+
+
 func _create_dynamic_lightning_arc(start_getter: Callable, end_getter: Callable):
 	var mesh_instance = MeshInstance3D.new()
 	var imm_mesh = ImmediateMesh.new()
 	mesh_instance.mesh = imm_mesh
-	
-	var mat = StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	mat.albedo_color = Color(0.85, 0.95, 1.0, 0.95)
-	mat.emission_enabled = true
-	mat.emission = Color(0.2, 0.75, 1.0)
-	mat.emission_energy_multiplier = 14.0
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mesh_instance.material_override = mat
+	mesh_instance.material_override = lightning_arc_material()
 	
 	get_tree().current_scene.add_child(mesh_instance)
 	
@@ -4632,22 +4706,8 @@ func _spawn_sparks(pos: Vector3):
 	sparks.one_shot = true
 	sparks.explosiveness = 0.8
 	sparks.emitting = true
-	
-	var mat = StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
-	mat.albedo_texture = load("res://sprites/energy_spark.png")
-	mat.albedo_color = Color(0.3, 0.8, 1.0)
-	mat.emission_enabled = true
-	mat.emission = Color(0.3, 0.8, 1.0)
-	mat.emission_texture = load("res://sprites/energy_spark.png")
-	mat.emission_energy_multiplier = 4.0
-	sparks.material_override = mat
-	
-	var quad = QuadMesh.new()
-	quad.size = Vector2(0.4, 0.4)
-	sparks.mesh = quad
+	sparks.material_override = lightning_spark_material()
+	sparks.mesh = lightning_spark_mesh()
 	
 	sparks.direction = Vector3.UP
 	sparks.spread = 180.0

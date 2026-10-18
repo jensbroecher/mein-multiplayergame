@@ -1,11 +1,15 @@
 extends Node
 
 var music_folder = "res://music/"
+## The current playlist's track paths. Only the playing track and the next are loaded
+## (_music_streams); the next loads on a background thread while the current one plays. Loading a
+## stage's whole folder when the race started froze the game for about a second at GO.
 var playlist = []
-var loaded_playlist = []
+var _music_streams: Dictionary = {}
+var _music_loading: Dictionary = {}
 var _music_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _playback_queue: Array = []
-var _last_played_stream: AudioStream = null
+var _last_played_path: String = ""
 var _current_level_key: String = ""
 const SETTINGS_FILE = "user://settings.cfg"
 
@@ -102,17 +106,28 @@ var fps_label: Label
 var _sfx_cache: Dictionary = {}
 const SFX_PRELOAD_PATHS: PackedStringArray = [
 	"res://sounds/checkpoint.mp3",
-	"res://sounds/finish.mp3",
-	"res://sounds/1.mp3",
-	"res://sounds/2.mp3",
-	"res://sounds/3.mp3",
-	"res://sounds/Go.mp3",
 	"res://sounds/crash.mp3",
 	"res://sounds/electric_lightning_a_#1-1782053835008.wav",
 	"res://sounds/stereogenicstudio-swish-swoosh-woosh-sfx-47-357152.mp3",
 	"res://sounds/game_bonus_collected_#3-1781737105214.wav",
 	"res://sounds/force_field_effect_#1-1781728246336.wav",
 ]
+
+## The announcer, voice/lola/: each line's takes. play_voice() picks one at random.
+const VOICE_LINES := {
+	"3": ["res://voice/lola/3.mp3"],
+	"2": ["res://voice/lola/2.mp3"],
+	"1": ["res://voice/lola/1.mp3"],
+	"go": ["res://voice/lola/go.mp3", "res://voice/lola/go-2.mp3", "res://voice/lola/go-3.mp3",
+			"res://voice/lola/go-4.mp3", "res://voice/lola/go-5.mp3"],
+	"final_lap": ["res://voice/lola/finallap.mp3", "res://voice/lola/finallap-2.mp3", "res://voice/lola/finallap-3.mp3"],
+	"finish": ["res://voice/lola/finish.mp3", "res://voice/lola/finish-2.mp3"],
+	"first_place": ["res://voice/lola/firstplace.mp3"],
+	"second_place": ["res://voice/lola/secondplace.mp3"],
+	"third_place": ["res://voice/lola/thirdplace.mp3"],
+}
+## The line for finishing (or standing on the podium) in each of the first three places.
+const PLACE_LINES := ["first_place", "second_place", "third_place"]
 
 func _ensure_audio_buses():
 	# Ensure "Music" bus exists
@@ -298,39 +313,54 @@ func _shuffle_array(arr: Array) -> void:
 		arr[j] = temp
 
 func _refill_and_shuffle_queue() -> void:
-	if loaded_playlist.is_empty():
-		_playback_queue.clear()
-		return
-	_playback_queue = loaded_playlist.duplicate()
+	_playback_queue = playlist.duplicate()
 	_shuffle_array(_playback_queue)
-	if _last_played_stream != null and _playback_queue.size() > 1 and _playback_queue[0] == _last_played_stream:
+	if _last_played_path != "" and _playback_queue.size() > 1 and _playback_queue[0] == _last_played_path:
 		var swap_idx = _music_rng.randi_range(1, _playback_queue.size() - 1)
 		var temp = _playback_queue[0]
 		_playback_queue[0] = _playback_queue[swap_idx]
 		_playback_queue[swap_idx] = temp
+	_prefetch_next_track()
 
-func _load_playlist(folder: String = music_folder):
+## The audio files in `folder`, as resource paths. An exported build lists only the .import
+## stubs, hence the suffixes.
+func _list_tracks(folder: String) -> Array:
+	var tracks: Array = []
+	var dir = DirAccess.open(folder)
+	if dir == null:
+		return tracks
+	dir.list_dir_begin()
+	var file_name = dir.get_next()
+	while file_name != "":
+		if not dir.current_is_dir():
+			var clean_name = file_name.trim_suffix(".import").trim_suffix(".remap")
+			if clean_name.ends_with(".mp3") or clean_name.ends_with(".wav") or clean_name.ends_with(".ogg"):
+				var file_path = folder.path_join(clean_name)
+				if not tracks.has(file_path):
+					tracks.append(file_path)
+		file_name = dir.get_next()
+	dir.list_dir_end()
+	return tracks
+
+func _add_tracks(paths: Array) -> void:
+	for path in paths:
+		if not playlist.has(path) and ResourceLoader.exists(path):
+			playlist.append(path)
+
+## `folder`'s tracks, or `fallback` if the folder lists none.
+func _add_folder(folder: String, fallback: Array = []) -> void:
+	var tracks := _list_tracks(folder)
+	_add_tracks(tracks if not tracks.is_empty() else fallback)
+
+func _clear_playlist() -> void:
 	playlist.clear()
-	loaded_playlist.clear()
 	_playback_queue.clear()
 	current_track_index = -1
-	var dir = DirAccess.open(folder)
-	if dir:
-		dir.list_dir_begin()
-		var file_name = dir.get_next()
-		while file_name != "":
-			if not dir.current_is_dir():
-				var clean_name = file_name.trim_suffix(".import").trim_suffix(".remap")
-				if clean_name.ends_with(".mp3") or clean_name.ends_with(".wav") or clean_name.ends_with(".ogg"):
-					var file_path = folder.path_join(clean_name)
-					if not playlist.has(file_path):
-						var stream = load(file_path)
-						if stream:
-							playlist.append(file_path)
-							loaded_playlist.append(stream)
-			file_name = dir.get_next()
-		dir.list_dir_end()
-	
+
+func _load_playlist(folder: String = music_folder):
+	_clear_playlist()
+	_current_level_key = ""
+	_add_folder(folder)
 	_refill_and_shuffle_queue()
 
 ## Stages that play one fixed track instead of a folder's shuffle.
@@ -338,6 +368,14 @@ const STAGE_TRACKS := {
 	"mara": "res://music/africa/Sunrise_on_the_Mara.mp3",
 	"nyota": "res://music/africa/Clay_and_Chrome.mp3",
 	"msitu": "res://music/africa/Msitu_Unaita.mp3",
+}
+
+## Stage categories that shuffle their own folder (and the root folder if it's empty).
+const STAGE_FOLDERS := {
+	"mountain": "mountain/",
+	"canyon": "canyon/",
+	"city": "city/",
+	"forest": "forrest/",
 }
 
 static func _stage_track_key(path_lower: String) -> String:
@@ -349,6 +387,8 @@ static func _stage_track_key(path_lower: String) -> String:
 		return "msitu"
 	return ""
 
+## Picks the stage's tracks and starts loading the first one in the background. Level calls it when
+## the stage loads, so the track is ready at GO, and again at GO (which keeps the same shuffle).
 func load_playlist_for_level(scene_path: String):
 	var path_lower := scene_path.to_lower()
 	if path_lower.is_empty():
@@ -378,250 +418,142 @@ func load_playlist_for_level(scene_path: String):
 	elif path_lower.contains("festival") or path_lower.contains("meadow") or path_lower.contains("stadium") or path_lower.ends_with("/level.tscn"):
 		level_key = "festival"
 
-	# If the same stage/playlist category is already loaded and active, don't re-read files from disk;
-	# keep playing from the remaining non-repeating shuffle bag!
-	if level_key == _current_level_key and not loaded_playlist.is_empty():
+	# The same stage category as before: keep playing from the remaining non-repeating shuffle bag.
+	if level_key == _current_level_key and not playlist.is_empty():
 		return
 
+	_clear_playlist()
 	_current_level_key = level_key
-	playlist.clear()
-	loaded_playlist.clear()
-	_playback_queue.clear()
-	current_track_index = -1
-
-	# Matumaini GP stages each have their own single track.
 	if STAGE_TRACKS.has(level_key):
-		var stream: AudioStream = load(STAGE_TRACKS[level_key])
-		if stream:
-			playlist.append(STAGE_TRACKS[level_key])
-			loaded_playlist.append(stream)
-		_refill_and_shuffle_queue()
-		if not loaded_playlist.is_empty():
-			return
-
-	# Bloombay Dunes: strictly only play music from music/beach/.
-	if level_key == "beach":
-		var level_folder = music_folder + "beach/"
-		var dir = DirAccess.open(level_folder)
-		if dir:
-			dir.list_dir_begin()
-			var file_name = dir.get_next()
-			while file_name != "":
-				if not dir.current_is_dir():
-					var clean_name = file_name.trim_suffix(".import").trim_suffix(".remap")
-					if clean_name.ends_with(".mp3") or clean_name.ends_with(".wav") or clean_name.ends_with(".ogg"):
-						var file_path = level_folder.path_join(clean_name)
-						if not playlist.has(file_path):
-							var stream = load(file_path)
-							if stream:
-								playlist.append(file_path)
-								loaded_playlist.append(stream)
-				file_name = dir.get_next()
-			dir.list_dir_end()
-		if loaded_playlist.is_empty():
-			var beach_tracks := [
-				"res://music/beach/High_Tide_Chase.mp3",
-				"res://music/beach/Salt_Spray_Sprint.mp3",
-				"res://music/beach/Sun_Baked_Drift.mp3"
-			]
-			for track_path in beach_tracks:
-				var stream = load(track_path)
-				if stream and not playlist.has(track_path):
-					playlist.append(track_path)
-					loaded_playlist.append(stream)
-		_refill_and_shuffle_queue()
-		return
-
-	# Pinecrest Ridge: strictly only play dedicated Pinecrest music track.
-	if level_key == "pinecrest":
-		var level_folder = music_folder + "pinecrest/"
-		var dir = DirAccess.open(level_folder)
-		if dir:
-			dir.list_dir_begin()
-			var file_name = dir.get_next()
-			while file_name != "":
-				if not dir.current_is_dir():
-					var clean_name = file_name.trim_suffix(".import").trim_suffix(".remap")
-					if clean_name.ends_with(".mp3") or clean_name.ends_with(".wav") or clean_name.ends_with(".ogg"):
-						var file_path = level_folder.path_join(clean_name)
-						if not playlist.has(file_path):
-							var stream = load(file_path)
-							if stream:
-								playlist.append(file_path)
-								loaded_playlist.append(stream)
-				file_name = dir.get_next()
-			dir.list_dir_end()
-		if loaded_playlist.is_empty():
-			var pinecrest_track := "res://music/pinecrest/Where_the_Canopy_Thins.mp3"
-			var stream = load(pinecrest_track)
-			if stream:
-				playlist.append(pinecrest_track)
-				loaded_playlist.append(stream)
-		_refill_and_shuffle_queue()
-		return
-
-	# Frostpeak Creek: strictly only play music from music/frost/.
-	if level_key == "frost":
-		var level_folder = music_folder + "frost/"
-		var dir = DirAccess.open(level_folder)
-		if dir:
-			dir.list_dir_begin()
-			var file_name = dir.get_next()
-			while file_name != "":
-				if not dir.current_is_dir():
-					var clean_name = file_name.trim_suffix(".import").trim_suffix(".remap")
-					if clean_name.ends_with(".mp3") or clean_name.ends_with(".wav") or clean_name.ends_with(".ogg"):
-						var file_path = level_folder.path_join(clean_name)
-						if not playlist.has(file_path):
-							var stream = load(file_path)
-							if stream:
-								playlist.append(file_path)
-								loaded_playlist.append(stream)
-				file_name = dir.get_next()
-			dir.list_dir_end()
-		if loaded_playlist.is_empty():
-			var frost_tracks := [
-				"res://music/frost/Beneath_the_Glacier.mp3",
-				"res://music/frost/First_Light_on_the_Ridge.mp3",
-				"res://music/frost/Summit_Drift.mp3"
-			]
-			for track_path in frost_tracks:
-				var stream = load(track_path)
-				if stream and not playlist.has(track_path):
-					playlist.append(track_path)
-					loaded_playlist.append(stream)
-		_refill_and_shuffle_queue()
-		return
-
-	# Lakeside Meadow / Lakehill: combine festival tracks with original root stage tracks!
-	if level_key == "festival":
-		# 1. Festival tracks
-		var fest_folder = music_folder + "festival/"
-		var dir_fest = DirAccess.open(fest_folder)
-		if dir_fest:
-			dir_fest.list_dir_begin()
-			var file_name = dir_fest.get_next()
-			while file_name != "":
-				if not dir_fest.current_is_dir():
-					var clean_name = file_name.trim_suffix(".import").trim_suffix(".remap")
-					if clean_name.ends_with(".mp3") or clean_name.ends_with(".wav") or clean_name.ends_with(".ogg"):
-						var file_path = fest_folder.path_join(clean_name)
-						if not playlist.has(file_path):
-							var stream = load(file_path)
-							if stream:
-								playlist.append(file_path)
-								loaded_playlist.append(stream)
-				file_name = dir_fest.get_next()
-			dir_fest.list_dir_end()
-		if loaded_playlist.is_empty():
-			var festival_tracks := [
-				"res://music/festival/Gold_on_the_Cobblestone.mp3",
-				"res://music/festival/Main_Stage_Sunset.mp3",
-				"res://music/festival/Midday_Main_Stage.mp3"
-			]
-			for track_path in festival_tracks:
-				var stream = load(track_path)
-				if stream and not playlist.has(track_path):
-					playlist.append(track_path)
-					loaded_playlist.append(stream)
-
-		# 2. Original root tracks from music/
-		var dir_root = DirAccess.open(music_folder)
-		var added_root_count := 0
-		if dir_root:
-			dir_root.list_dir_begin()
-			var file_name = dir_root.get_next()
-			while file_name != "":
-				if not dir_root.current_is_dir():
-					var clean_name = file_name.trim_suffix(".import").trim_suffix(".remap")
-					if clean_name.ends_with(".mp3") or clean_name.ends_with(".wav") or clean_name.ends_with(".ogg"):
-						var file_path = music_folder.path_join(clean_name)
-						if not playlist.has(file_path):
-							var stream = load(file_path)
-							if stream:
-								playlist.append(file_path)
-								loaded_playlist.append(stream)
-								added_root_count += 1
-				file_name = dir_root.get_next()
-			dir_root.list_dir_end()
-		if added_root_count == 0:
-			var root_tracks := [
-				"res://music/ComfyUI_00006_.mp3",
-				"res://music/ComfyUI_00012_.mp3",
-				"res://music/ComfyUI_00016_.mp3",
-				"res://music/ComfyUI_00022_.mp3",
-				"res://music/ComfyUI_00023_.mp3",
-				"res://music/ComfyUI_00041_.mp3",
-				"res://music/ComfyUI_00042_.mp3",
-				"res://music/ComfyUI_00044_.mp3"
-			]
-			for track_path in root_tracks:
-				if not playlist.has(track_path):
-					var stream = load(track_path)
-					if stream:
-						playlist.append(track_path)
-						loaded_playlist.append(stream)
-
-		_refill_and_shuffle_queue()
-		return
-
-	# Level subfolders for mountain, canyon, city
-	var subfolder := ""
-	if level_key == "mountain":
-		subfolder = music_folder + "mountain/"
-	elif level_key == "canyon":
-		subfolder = music_folder + "canyon/"
-	elif level_key == "city":
-		subfolder = music_folder + "city/"
-	elif level_key == "forest":
-		subfolder = music_folder + "forrest/"
-
-	if subfolder != "" and DirAccess.open(subfolder) != null:
-		_load_playlist(subfolder)
-		if not loaded_playlist.is_empty():
-			return
-
-	# Fallback: load from root music folder
-	_load_playlist(music_folder)
+		# Matumaini GP stages each have their own single track.
+		_add_tracks([STAGE_TRACKS[level_key]])
+	elif level_key == "beach":
+		# Bloombay Dunes: only music/beach/.
+		_add_folder(music_folder + "beach/", [
+			"res://music/beach/High_Tide_Chase.mp3",
+			"res://music/beach/Salt_Spray_Sprint.mp3",
+			"res://music/beach/Sun_Baked_Drift.mp3",
+		])
+	elif level_key == "pinecrest":
+		# Pinecrest Ridge: only its own track.
+		_add_folder(music_folder + "pinecrest/", ["res://music/pinecrest/Where_the_Canopy_Thins.mp3"])
+	elif level_key == "frost":
+		# The snow stages: only music/frost/.
+		_add_folder(music_folder + "frost/", [
+			"res://music/frost/Beneath_the_Glacier.mp3",
+			"res://music/frost/First_Light_on_the_Ridge.mp3",
+			"res://music/frost/Summit_Drift.mp3",
+		])
+	elif level_key == "festival":
+		# Lakeside Meadow / Lakehill: the festival tracks and the original root stage tracks.
+		_add_folder(music_folder + "festival/", [
+			"res://music/festival/Gold_on_the_Cobblestone.mp3",
+			"res://music/festival/Main_Stage_Sunset.mp3",
+			"res://music/festival/Midday_Main_Stage.mp3",
+		])
+		_add_folder(music_folder, [
+			"res://music/ComfyUI_00006_.mp3",
+			"res://music/ComfyUI_00012_.mp3",
+			"res://music/ComfyUI_00016_.mp3",
+			"res://music/ComfyUI_00022_.mp3",
+			"res://music/ComfyUI_00023_.mp3",
+			"res://music/ComfyUI_00041_.mp3",
+			"res://music/ComfyUI_00042_.mp3",
+			"res://music/ComfyUI_00044_.mp3",
+		])
+	elif STAGE_FOLDERS.has(level_key):
+		_add_folder(music_folder + STAGE_FOLDERS[level_key])
+	if playlist.is_empty():
+		_add_folder(music_folder)
+	_refill_and_shuffle_queue()
 
 func play_race_music(force_new: bool = false):
-	if force_new or active_player == null or not active_player.playing or not loaded_playlist.has(active_player.stream):
+	var current: AudioStream = active_player.stream if active_player else null
+	if force_new or active_player == null or not active_player.playing or current == null or not playlist.has(current.resource_path):
 		play_next()
 
 func play_next():
-	if loaded_playlist.is_empty():
+	if playlist.is_empty():
 		return
 	if active_player == null or inactive_player == null:
 		return
-		
+
 	if _playback_queue.is_empty():
 		_refill_and_shuffle_queue()
-		
+
 	if _playback_queue.is_empty():
 		return
-		
-	var stream: AudioStream = _playback_queue.pop_front()
-	_last_played_stream = stream
-	current_track_index = loaded_playlist.find(stream)
-	
-	if stream:
-		var prev_active = active_player
-		active_player = inactive_player
-		inactive_player = prev_active
-		
-		active_player.stream = stream
-		active_player.volume_db = -80.0
-		if not active_player.is_inside_tree():
-			return
-		active_player.play()
-		
-		# Crossfade tween
-		var tween = create_tween()
-		tween.tween_property(inactive_player, "volume_db", -80.0, 2.0)
-		tween.parallel().tween_property(active_player, "volume_db", -10.0, 2.0)
-		tween.tween_callback(inactive_player.stop)
-	else:
+
+	var path: String = _playback_queue.pop_front()
+	_last_played_path = path
+	current_track_index = playlist.find(path)
+	var stream: AudioStream = _music_stream(path)
+	if _playback_queue.is_empty():
+		_refill_and_shuffle_queue()
+	# Hold on to this track and the next only; the next starts loading now.
+	var keep: Array = [path]
+	if not _playback_queue.is_empty():
+		keep.append(_playback_queue[0])
+	for cached in _music_streams.keys():
+		if not keep.has(cached):
+			_music_streams.erase(cached)
+	_prefetch_next_track()
+
+	if stream == null:
+		# Unloadable: drop it, so a playlist of broken files can't loop forever.
+		playlist.erase(path)
+		_playback_queue.erase(path)
 		play_next()
+		return
+
+	var prev_active = active_player
+	active_player = inactive_player
+	inactive_player = prev_active
+
+	active_player.stream = stream
+	active_player.volume_db = -80.0
+	if not active_player.is_inside_tree():
+		return
+	active_player.play()
+
+	# Crossfade tween
+	var tween = create_tween()
+	tween.tween_property(inactive_player, "volume_db", -80.0, 2.0)
+	tween.parallel().tween_property(active_player, "volume_db", -10.0, 2.0)
+	tween.tween_callback(inactive_player.stop)
+
+func _prefetch_next_track() -> void:
+	if not _playback_queue.is_empty():
+		_prefetch_track(_playback_queue[0])
+
+## Loads a track on a background thread, so it's ready when play_next() wants it.
+func _prefetch_track(path: String) -> void:
+	if _music_streams.has(path) or _music_loading.has(path):
+		return
+	if ResourceLoader.load_threaded_request(path) != OK:
+		return
+	_music_loading[path] = true
+	while ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+		await get_tree().process_frame
+	_take_loaded_track(path)
+
+## The stream at `path`: already loaded, from its background load (waiting for the rest of it), or
+## loaded now if nothing asked for it in time.
+func _music_stream(path: String) -> AudioStream:
+	if not _music_streams.has(path):
+		if _music_loading.has(path):
+			_take_loaded_track(path)
+		else:
+			_music_streams[path] = load(path) as AudioStream
+	return _music_streams.get(path)
+
+func _take_loaded_track(path: String) -> void:
+	if not _music_loading.has(path):
+		return
+	_music_loading.erase(path)
+	var stream = ResourceLoader.load_threaded_get(path)
+	if stream is AudioStream:
+		_music_streams[path] = stream
 
 func _on_track_finished():
 	if not active_player.playing:
@@ -1415,6 +1347,22 @@ func stop_music():
 func _preload_sfx() -> void:
 	for path in SFX_PRELOAD_PATHS:
 		_cached_sfx(path)
+	for line in VOICE_LINES:
+		for path in VOICE_LINES[line]:
+			_cached_sfx(path)
+
+
+## Says an announcer line (a VOICE_LINES key), in a random take.
+func play_voice(line: String, volume_db: float = 0.0) -> void:
+	var takes: Array = VOICE_LINES.get(line, [])
+	if not takes.is_empty():
+		play_sfx(takes[randi() % takes.size()], volume_db)
+
+
+## The announcer calls a finishing place: first to third have a line, the rest nothing.
+func play_place_voice(place: int, volume_db: float = 0.0) -> void:
+	if place >= 1 and place <= PLACE_LINES.size():
+		play_voice(PLACE_LINES[place - 1], volume_db)
 
 
 func _cached_sfx(path: String) -> AudioStream:

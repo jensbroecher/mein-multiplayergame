@@ -158,7 +158,8 @@ func _reveal(place: int) -> void:
 	tw.tween_property(plate, "scale", Vector3.ONE, 0.4).set_delay(0.9).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	var light: SpotLight3D = p["light"]
 	light.visible = true
-	MusicManager.play_sfx("res://sounds/checkpoint.mp3", -4.0, 0.9 + 0.1 * (2 - place))
+	# The announcer calls each place as it is revealed.
+	MusicManager.play_place_voice(place + 1)
 
 
 func _celebrate() -> void:
@@ -167,7 +168,6 @@ func _celebrate() -> void:
 	_burst.restart()
 	_burst.emitting = true
 	_confetti.emitting = true
-	MusicManager.play_sfx("res://sounds/finish.mp3", -2.0)
 	create_tween().tween_method(func(v: float): _glow.set_meta("fade", v), 0.0, 1.0, 1.2)
 	create_tween().tween_property(_result_label, "modulate:a", 1.0, 0.8)
 

@@ -5,6 +5,7 @@ const PLAYER_CART = preload("res://PlayerCart.tscn")
 const RACE_UI_SCENE = preload("res://RaceUI.tscn")
 const ITEM_BOX_SCENE = preload("res://ItemBox.tscn")
 const CarPaint = preload("res://CarPaint.gd")
+const FX_WARMUP = preload("res://FxWarmup.gd")
 
 @export var checkpoints: Array[Area3D] = []
 @export var track_path: Path3D
@@ -76,6 +77,11 @@ const CarPaint = preload("res://CarPaint.gd")
 
 enum RaceState {LOBBY, RACING, FINISHED}
 var race_state: int = RaceState.LOBBY
+## What a cart crossing a gate hears: the checkpoint chime, the final-lap call (crossing the line
+## onto the last lap) or the finish call.
+enum LapCue {CHECKPOINT, FINAL_LAP, FINISH}
+## The start gantry (CheckpointGate's finish line), fed the standings for its ticker.
+var _gantry: Node = null
 
 var spawn_points: Array = []
 @onready var players_container = $Players
@@ -142,6 +148,12 @@ func _ready():
 
 	# Apply user graphics settings (shadows on lights, etc.) after the level tree exists
 	MusicManager.refresh_level_graphics()
+	# Pick the stage's music now, so its first track loads in the background before GO.
+	MusicManager.load_playlist_for_level(scene_file_path)
+	# Compile the shaders of effects that first show up mid-race (lightning, missiles, splashes)
+	# while the stage loads, instead of freezing the race when they first appear.
+	add_child(FX_WARMUP.new())
+	_setup_gantry_ticker()
 
 	# Canyon Chasm: fill the first hill-jump pit with murky reflective water
 	_setup_chasm_pit_water()
@@ -318,10 +330,12 @@ func _grant_checkpoint(id: int, cp_idx: int) -> void:
 	var cp = checkpoints[cp_idx]
 	var cart = players_container.get_node_or_null(str(id))
 
-	var is_finish_lap = false
+	var cue := LapCue.CHECKPOINT
 	if cp_idx == checkpoints.size() - 1:
 		if stats["laps"] + 1 >= NetworkManager.max_laps:
-			is_finish_lap = true
+			cue = LapCue.FINISH
+		elif stats["laps"] + 2 == NetworkManager.max_laps:
+			cue = LapCue.FINAL_LAP
 
 	if cart and cart.get("is_ai"):
 		cart.last_checkpoint_transform = cp.global_transform
@@ -329,12 +343,12 @@ func _grant_checkpoint(id: int, cp_idx: int) -> void:
 			_sync_ai_checkpoint.rpc(id, cp.global_transform)
 	else:
 		if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
-			_sync_checkpoint_to_player_local(id, cp.global_transform, is_finish_lap)
+			_sync_checkpoint_to_player_local(id, cp.global_transform, cue)
 		else:
 			if id == multiplayer.get_unique_id():
-				_sync_checkpoint_to_player(cp.global_transform, is_finish_lap)
+				_sync_checkpoint_to_player(cp.global_transform, cue)
 			else:
-				_sync_checkpoint_to_player.rpc_id(id, cp.global_transform, is_finish_lap)
+				_sync_checkpoint_to_player.rpc_id(id, cp.global_transform, cue)
 
 	if stats["next_checkpoint_idx"] >= checkpoints.size():
 		stats["laps"] += 1
@@ -430,41 +444,53 @@ func _check_finish(id: int):
 		if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
 			var ui = race_ui if id == 1 else race_ui_p2
 			if ui: ui.show_message("You Finished!", 5.0)
+			_announce_place(stats["pos"])
 		else:
 			if id == multiplayer.get_unique_id():
-				show_player_finished_rpc()
+				show_player_finished_rpc(stats["pos"])
 			elif NetworkManager.players.has(id) and not NetworkManager.players[id].get("is_ai", false):
-				show_player_finished_rpc.rpc_id(id)
+				show_player_finished_rpc.rpc_id(id, stats["pos"])
 
 		# Start 30s timer if this is the first finisher
 		if end_timer <= 0.0:
 			end_timer = 30.0
 
 @rpc("authority", "call_local", "reliable")
-func show_player_finished_rpc():
+func show_player_finished_rpc(place: int = 0):
 	if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
 		# In co-op this is handled directly in _check_finish(), skip
 		return
 	race_ui.show_message("You Finished!", 5.0)
 	_set_local_cart_finished()
+	_announce_place(place)
+
+## After the finish call, the announcer gives the place if it's on the podium.
+func _announce_place(place: int) -> void:
+	if place >= 1 and place <= MusicManager.PLACE_LINES.size():
+		get_tree().create_timer(1.15).timeout.connect(MusicManager.play_place_voice.bind(place))
 
 @rpc("authority", "call_local", "reliable")
-func _sync_checkpoint_to_player(checkpoint_transform: Transform3D, play_finish_sound: bool = false):
+func _sync_checkpoint_to_player(checkpoint_transform: Transform3D, cue: int = LapCue.CHECKPOINT):
 	var local_carts = get_tree().get_nodes_in_group("player_carts").filter(func(node): return node.is_local_player and not node.is_ai)
 	if local_carts.size() > 0:
 		local_carts[0].last_checkpoint_transform = checkpoint_transform
-		if play_finish_sound:
-			MusicManager.play_sfx("res://sounds/finish.mp3")
-		else:
-			MusicManager.play_sfx("res://sounds/checkpoint.mp3")
+		_play_lap_cue(cue, race_ui)
 
-func _sync_checkpoint_to_player_local(player_id: int, checkpoint_transform: Transform3D, play_finish_sound: bool = false):
+func _sync_checkpoint_to_player_local(player_id: int, checkpoint_transform: Transform3D, cue: int = LapCue.CHECKPOINT):
 	var cart = players_container.get_node_or_null(str(player_id))
 	if cart:
 		cart.last_checkpoint_transform = checkpoint_transform
-		if play_finish_sound:
-			MusicManager.play_sfx("res://sounds/finish.mp3")
-		else:
+		_play_lap_cue(cue, race_ui if player_id == 1 else race_ui_p2)
+
+func _play_lap_cue(cue: int, ui) -> void:
+	match cue:
+		LapCue.FINISH:
+			MusicManager.play_voice("finish")
+		LapCue.FINAL_LAP:
+			MusicManager.play_voice("final_lap")
+			if ui:
+				ui.show_message("Final Lap!", 2.0)
+		_:
 			MusicManager.play_sfx("res://sounds/checkpoint.mp3")
 
 @rpc("authority", "call_local", "reliable")
@@ -710,19 +736,19 @@ func start_race():
 	for ui in _all_race_uis():
 		ui.show_message("3", 1.0)
 	_show_start_lights(1)
-	MusicManager.play_sfx("res://sounds/3.mp3")
+	MusicManager.play_voice("3")
 	MusicManager.play_race_start_beep(false)
 	await get_tree().create_timer(1.0).timeout
 	for ui in _all_race_uis():
 		ui.show_message("2", 1.0)
 	_show_start_lights(2)
-	MusicManager.play_sfx("res://sounds/2.mp3")
+	MusicManager.play_voice("2")
 	MusicManager.play_race_start_beep(false)
 	await get_tree().create_timer(1.0).timeout
 	for ui in _all_race_uis():
 		ui.show_message("1", 1.0)
 	_show_start_lights(3)
-	MusicManager.play_sfx("res://sounds/1.mp3")
+	MusicManager.play_voice("1")
 	MusicManager.play_race_start_beep(false)
 	await get_tree().create_timer(1.0).timeout
 
@@ -730,7 +756,7 @@ func start_race():
 	for ui in _all_race_uis():
 		ui.show_message("GO!", 2.0)
 	_show_start_lights(4)
-	MusicManager.play_sfx("res://sounds/Go.mp3")
+	MusicManager.play_voice("go")
 	MusicManager.play_race_start_beep(true) # higher/longer 4th beep
 	MusicManager.load_playlist_for_level(scene_file_path)
 	MusicManager.play_race_music()
@@ -741,9 +767,39 @@ func start_race():
 ## The start gantry's screen (CheckpointGate.show_start_lights): 0 = lamps up and dark,
 ## 1..3 = that many red, 4 = green.
 func _show_start_lights(step: int) -> void:
-	var fl = get_node_or_null("FinishLine")
-	if fl and fl.has_method("show_start_lights"):
-		fl.show_start_lights(step)
+	if _gantry:
+		_gantry.show_start_lights(step)
+
+
+## Gives the start gantry's ticker its title: the Grand Prix (and which race of it, in a GP) and
+## the stage.
+func _setup_gantry_ticker() -> void:
+	var fl := get_node_or_null("FinishLine")
+	if fl == null or not fl.has_method("set_ticker_title"):
+		return
+	_gantry = fl
+	var stage := ""
+	for st in NetworkManager.ALL_STAGES:
+		if st["path"] == scene_file_path:
+			stage = st["name"]
+	var cup := ""
+	var race := ""
+	if _is_gp_mode() and NetworkManager.current_gp_name != "":
+		var gp := NetworkManager.get_gp_cup(NetworkManager.current_gp_name)
+		cup = str(gp.get("name", NetworkManager.current_gp_name))
+		if gp.has("stages"):
+			race = "Race %d/%d" % [NetworkManager.current_gp_stage + 1, gp["stages"].size()]
+	else:
+		for cup_name in NetworkManager.GP_CUPS:
+			if NetworkManager.GP_CUPS[cup_name]["stages"].has(scene_file_path):
+				cup = cup_name
+	_gantry.set_ticker_title(cup, stage, race, NetworkManager.max_laps)
+
+
+## The standings rows (_push_standings) go to the gantry's ticker on every peer.
+func _feed_gantry(rows: Array) -> void:
+	if _gantry:
+		_gantry.update_standings(rows)
 
 var _cached_grass_mat: ShaderMaterial = null
 
@@ -904,7 +960,8 @@ func _push_standings(ranking: Array) -> void:
 			"id": id,
 			"pos": int(player_stats[id]["pos"]),
 			"name": p_name,
-			"finished": entry["finished"]
+			"finished": entry["finished"],
+			"lap": mini(int(entry["laps"]) + 1, NetworkManager.max_laps),
 		})
 	rows.sort_custom(func(a, b): return int(a["pos"]) < int(b["pos"]))
 
@@ -913,12 +970,14 @@ func _push_standings(ranking: Array) -> void:
 			race_ui.update_standings(rows, 1)
 		if race_ui_p2:
 			race_ui_p2.update_standings(rows, 2)
+		_feed_gantry(rows)
 	elif NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR:
 		var focus_id := 0
 		if spectator_camera and is_instance_valid(spectator_camera.focus_cart):
 			focus_id = str(spectator_camera.focus_cart.name).to_int()
 		if race_ui:
 			race_ui.update_standings(rows, focus_id)
+		_feed_gantry(rows)
 	else:
 		update_standings_rpc.rpc(rows)
 
@@ -926,6 +985,7 @@ func _push_standings(ranking: Array) -> void:
 func update_standings_rpc(rows: Array):
 	if race_ui:
 		race_ui.update_standings(rows, multiplayer.get_unique_id())
+	_feed_gantry(rows)
 
 @rpc("authority", "call_local", "unreliable")
 func update_hud_rpc(pos, total, lap, max_laps):

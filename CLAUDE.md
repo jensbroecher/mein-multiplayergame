@@ -59,8 +59,12 @@ without regenerating them, run `res://refresh_curb_corners.tscn` headless.
   files only store the gate's transform, so a change to the gate shows on every level without
   regenerating any of them.
 - The finish line (`is_finish_line`, or a node named FinishLine) is the start gantry. Its LED screen
-  (`start_lights.gdshader`) waves a chequered flag. `Level.start_race()` calls `show_start_lights(step)` at
-  each countdown beat: 0 = lamps up and dark, 1..3 = that many red, 4 = green. The screen hangs under
+  (`start_lights.gdshader`, a slim panel) runs a ticker: the GP, the stage, the leader's lap and the
+  standings. Level sets the title (`set_ticker_title`) and feeds it its standings rows on every peer
+  (`_feed_gantry`). The text is drawn into a SubViewport strip that renders only when the text changes.
+  New standings wait until the strip wraps round to the title, so the swap doesn't show. The screen waves
+  a chequered flag once the leader is on the last lap. `Level.start_race()` calls `show_start_lights(step)`
+  at each countdown beat: 0 = lamps up and dark, 1..3 = that many red, 4 = green. The screen hangs under
   the beam because the front row's chase camera sees nothing above about 7.7m at the gantry. Keep the
   lamp energy low: brighter, ACES bleaches the red to coral and the green to mint.
 - Checkpoints are an aluminium truss with a CHECKPOINT banner. `gate_color` colours the banner's bands and
@@ -68,15 +72,43 @@ without regenerating them, run `res://refresh_curb_corners.tscn` headless.
   (Pinecrest's checkpoint 5).
 - Levels put the gate origin anywhere from on the road to 0.4m under it (the older levels), or 3m under
   it (Canyon's Halfway1). Once the level has built its runtime collision, `_settle_on_ground()` stands
-  the gate on the road under its centre and puts the feet and the START/FINISH decal on the ground.
+  the gate on the road under its centre and puts the feet on the ground.
   It also lowers a checkpoint (down to 4.6m) under anything more than 3m above the road, such as
   Glacier Highway's sign gantries. Lower hits come from props' collision hulls reaching over the road.
   The rays are nudged off the gate line because a ray straight down a terrain grid line can miss.
 - The feet's colliders are 2.5m walls. A cart that clips the top edge of a low block gets launched,
   because PlayerCart only smooths edges up to `STEP_SMOOTH_MAX_HEIGHT`.
-- `res://scratch/gate_shots.tscn -- <level> <dir> [carts=N] [fov=75] [all=x,y,z:tx,ty,tz]
-  name:gate:x,y,z:tx,ty,tz[:step]` renders gates from cameras in gate space (X across the road, grid on
-  +Z), with any start-light step.
+- `res://scratch/gate_shots.tscn -- <level> <dir> [carts=N] [fov=75] [lap=N] [all=x,y,z:tx,ty,tz]
+  name:gate:x,y,z:tx,ty,tz[:step[:scroll]]` renders gates from cameras in gate space (X across the road,
+  grid on +Z), with any start-light step (-1 for none) and the ticker `scroll` LEDs along. `lap=` feeds
+  the ticker six racers with the leader on that lap.
+
+## Announcer
+
+The race calls are `voice/lola/` clips, listed per line with their takes in `MusicManager.VOICE_LINES`.
+`play_voice(line)` picks a take at random. Level calls 3/2/1/go in the countdown, "final lap" when a
+local player crosses the line onto the last lap, "finish" at the line, and then the place if it's first
+to third (`_announce_place`). The podium calls each place as it's revealed. Gates still play the old
+`sounds/checkpoint.mp3`, which is a different voice saying "checkpoint". `res://scratch/announcer_test.tscn`
+(headless) walks a player through every gate and lists what was said.
+
+## First-use freezes
+
+- A shader compiles when the first thing using it enters the scene, so an effect whose material
+  nothing else uses froze the race the first time it went off (the lightning: 85-130ms on a cold cache).
+  `FxWarmup.gd`, added by Level, holds hidden copies of the effects' meshes, particles and materials
+  (missiles, bombs, splashes, the lightning's arc and sparks) for the level's lifetime. Hidden instances
+  never draw but still compile. Each PlayerCart adds hidden twins of its meshes in their fade materials
+  (`_add_fx_twins`). Give a new effect a shared material and a stand-in there.
+- Flashes on plain meshes (the antenna) only change values on a copy with emission always on
+  (`_fx_material`). Turning `emission_enabled` or transparency on and off swaps the shader.
+- Music: MusicManager keeps track paths and loads only the playing track and the next one, on a
+  background thread. Level picks the playlist in `_ready`, so the first track is loaded by GO.
+  `load()`ing a stage's whole folder at GO froze the game for about a second.
+- `res://scratch/hitch_probe.tscn -- [level=...] [items=lightning,missile,...,fade,shocked,splash]
+  [repeats=2] [gap=2.0]` (windowed) uses each item or cart effect in turn in a spectator race. It prints
+  the longest frames and the pipeline compilations after each use. A `surface` compilation on a first
+  use is a stall.
 
 ## Boost pads
 

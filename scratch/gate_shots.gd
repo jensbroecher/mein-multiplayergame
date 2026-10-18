@@ -2,11 +2,13 @@ extends Node
 
 # Shots of a level's race gates (CheckpointGate.gd). Run windowed:
 #   Godot --path . res://scratch/gate_shots.tscn -- <level.tscn> <out_dir> [carts=N]
-#       [fov=deg] [all=x,y,z:tx,ty,tz] name:gate:x,y,z:tx,ty,tz[:step] ...
+#       [fov=deg] [lap=N] [all=x,y,z:tx,ty,tz] name:gate:x,y,z:tx,ty,tz[:step[:scroll]] ...
 # Camera and target are in the named gate's space (FinishLine, Checkpoints/Checkpoint_2, ...): X
 # across the road, the grid on +Z. step (0..4) is the start-light step the finish gantry shows
-# for that shot, as Level.start_race() would set it. carts= drops carts on the first grid slots;
-# fov=75 matches the chase camera. all= shoots every gate in the level from that camera.
+# for that shot, as Level.start_race() would set it (-1: none, the ticker or the flag). scroll puts
+# the ticker that many LEDs along. lap= feeds the ticker six racers with the leader on lap N (the
+# last lap waves the flag). carts= drops carts on the first grid slots; fov=75 matches the chase
+# camera. all= shoots every gate in the level from that camera.
 
 const SIZE := Vector2i(1376, 768)
 const CART_MODEL := "res://generated/cars/Viper.tscn"
@@ -24,6 +26,8 @@ func _ready() -> void:
 	add_child(vp)
 	var level: Node3D = load(args[0]).instantiate()
 	vp.add_child(level)
+	# No race countdown: the shots set the start lights themselves.
+	level.race_state = level.RaceState.RACING
 	MusicManager.set_shadow_quality(3, false)
 	var cam := Camera3D.new()
 	cam.fov = 62.0
@@ -49,7 +53,16 @@ func _ready() -> void:
 				var slot: Node3D = slots[i]
 				car.global_transform = Transform3D(slot.global_basis.rotated(Vector3.UP, PI).scaled(Vector3.ONE * 2.0), slot.global_position)
 	for a in args.slice(2):
-		if a.begins_with("carts=") or a.begins_with("fov="):
+		if a.begins_with("lap=") and fl:
+			var rows: Array = []
+			for i in 6:
+				rows.append({"id": 100 + i, "pos": i + 1, "lap": int(a.substr(4)), "finished": false,
+						"name": ["Viper", "Shadow", "Apex", "Blaze", "Nova", "Storm"][i]})
+			fl.update_standings(rows)
+			if not fl._ticker_next.is_empty():
+				fl._show_ticker(fl._ticker_next)
+	for a in args.slice(2):
+		if a.begins_with("carts=") or a.begins_with("fov=") or a.begins_with("lap="):
 			continue
 		if a.begins_with("all="):
 			var gates: Array[Node] = []
@@ -62,8 +75,10 @@ func _ready() -> void:
 			continue
 		var parts := a.split(":")
 		var gate: Node3D = level.get_node(parts[1])
-		if parts.size() > 4 and fl:
+		if parts.size() > 4 and fl and int(parts[4]) >= 0:
 			fl.show_start_lights(int(parts[4]))
+		if parts.size() > 5 and fl:
+			fl._ticker_scroll = float(parts[5])
 		await _shoot(vp, cam, gate, parts[2] + ":" + parts[3], "%s/%s.png" % [out_dir, parts[0]])
 	get_tree().quit()
 

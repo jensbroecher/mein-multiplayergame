@@ -1,20 +1,9 @@
 [gd_scene format=3 uid="uid://gate123"]
 
 [ext_resource type="Script" uid="uid://c37rrd3b623o5" path="res://CheckpointGate.gd" id="1_gate_script"]
-[ext_resource type="Texture2D" uid="uid://dnn7p7utekg3a" path="res://sprites/decals/start_finish.png" id="3_start_finish_decal"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_checkpoint"]
 size = Vector3(22, 16, 8)
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_start_finish"]
-transparency = 1
-albedo_texture = ExtResource("3_start_finish_decal")
-emission_enabled = true
-emission = Color(0.15, 0.15, 0.15, 1)
-
-[sub_resource type="PlaneMesh" id="PlaneMesh_start_finish"]
-material = SubResource("StandardMaterial3D_start_finish")
-size = Vector2(10, 2.5)
 
 [node name="CheckpointGate" type="Area3D" unique_id=1076613409]
 script = ExtResource("1_gate_script")
@@ -22,7 +11,3 @@ script = ExtResource("1_gate_script")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1508901951]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 7, 0)
 shape = SubResource("BoxShape3D_checkpoint")
-
-[node name="StartFinishDecal" type="MeshInstance3D" parent="." unique_id=383702770 groups=["collision_none"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.44473982, 0)
-mesh = SubResource("PlaneMesh_start_finish")

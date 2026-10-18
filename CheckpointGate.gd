@@ -1,10 +1,11 @@
 @tool
 extends Area3D
 ## A race gate. The finish line (`is_finish_line`, or a node named FinishLine) is the start/finish
-## gantry: a navy arch with silver trim and an LED screen hung under the beam, which waves a
-## chequered flag and shows the start lights during the countdown (Level.start_race() calls
-## show_start_lights()). Every other gate is a checkpoint: a light aluminium truss arch with a
-## CHECKPOINT banner hung from it.
+## gantry: a navy arch with silver trim and a slim LED screen hung under the beam. The screen runs a
+## ticker (the Grand Prix, the stage, the lap and the standings, fed by Level), shows the start
+## lights during the countdown (Level.start_race() calls show_start_lights()) and waves a chequered
+## flag once the leader is on the last lap. Every other gate is a checkpoint: a light aluminium
+## truss arch with a CHECKPOINT banner hung from it.
 ##
 ## The gate builds its meshes, collision and text as internal children when it enters the tree, so
 ## a level file only stores where a gate stands and regenerating a level never saves them. Gates
@@ -37,18 +38,36 @@ const CHAMFER := 0.06
 const TRIM_H := 0.03 # how far the silver trim stands proud of the paint
 const FOOT_Y := -1.5 # the posts run this far down, into the ground
 const ARC_STEPS := 10
-# The screen hangs in a pod under the beam, low enough for the front row to see it: their chase
-# camera (5.2m back, 2.2m up, 75 degree FOV) sees nothing higher than about 7.7m at the gantry.
+# The screen is a slim panel hung under the middle of the beam, low enough for the front row to see
+# it: their chase camera (5.2m back, 2.2m up, 75 degree FOV) sees nothing higher than about 7.7m at
+# the gantry.
 const POD_HALF_W := 2.75
 const POD_Y0 := 5.2
-const POD_Z0 := -0.55
-const POD_Z1 := 0.95
+const POD_Z0 := -0.12
+const POD_Z1 := 0.14
 const SCREEN_SIZE := Vector2(5.26, 1.76)
 const LED_PITCH := 0.05
 const CHEQUER := 0.42 # squares in the band across the beam
 const CHEQUER_COLS := 22
-const GREEN_HOLD := 4.0 # seconds the lamps stay green before the screen goes back to the flag
+const GREEN_HOLD := 4.0 # seconds the lamps stay green before the screen goes back to the ticker
 const GLOW_ENERGY := 1.6 # the light the lit lamps throw onto the grid
+# The ticker: one line of text drawn into a strip (a SubViewport, redrawn only when the text
+# changes) that start_lights.gdshader scrolls across the middle of the screen, TICKER_SS texels to
+# an LED.
+const TICKER_SS := 2
+const TICKER_ROWS := 18 # LED rows the text band covers
+# The strip's width; the text uses as much of it as it needs. Six racers with 14-letter names and a
+# long title come to about 3600. Phones' GPUs may not take wider.
+const TICKER_TEX_W := 4096
+const TICKER_NAME_MAX := 14
+const TICKER_FONT_SIZE := 32 # in strip texels: capitals about 11 LEDs tall
+const TICKER_SPEED := 28.0 # LEDs a second
+const TICKER_SPACE := 20.0 # strip texels round a separator and between racers
+const TICKER_GOLD := Color(1.0, 0.74, 0.2)
+const TICKER_WHITE := Color(0.94, 0.95, 1.0)
+const TICKER_CYAN := Color(0.3, 0.86, 1.0)
+const TICKER_GREEN := Color(0.45, 1.0, 0.5)
+const TICKER_RED := Color(1.0, 0.24, 0.18)
 
 # Checkpoint truss.
 const TRUSS_X := 6.85
@@ -83,6 +102,7 @@ const START_LIGHTS := preload("res://start_lights.gdshader")
 static var _meshes: Dictionary = {}
 static var _mats: Dictionary = {}
 static var _font: Font
+static var _plain_font: Font
 
 var _build_root: Node3D
 var _feet: Array[Node3D] = []
@@ -90,6 +110,21 @@ var _truss_top := TRUSS_TOP
 var _screen_mat: ShaderMaterial
 var _glow: OmniLight3D
 var _lights_tween: Tween
+var _flag_tween: Tween
+var _flag_on := false
+
+# The ticker's text: the title (set_ticker_title) and the standings (update_standings). The strip
+# shows `_ticker_shown`; new text waits in `_ticker_next` until the strip wraps round to its start,
+# where old and new both begin with the same title, so the swap doesn't show.
+var _ticker_vp: SubViewport
+var _ticker_canvas: Control
+var _ticker_title: Array = [] # [[text, colour], ...]
+var _ticker_laps := 0
+var _ticker_rows_sig := ""
+var _ticker_shown: Array = [] # laid-out tokens: {text, colour, x} or {sep, x}
+var _ticker_next: Array = []
+var _ticker_len := 0.0 # strip length in LEDs
+var _ticker_scroll := 0.0
 
 
 func _ready() -> void:
@@ -97,13 +132,144 @@ func _ready() -> void:
 		is_finish_line = true
 	if _build_root == null:
 		_build()
+	set_process(is_finish_line and not Engine.is_editor_hint())
 	if not Engine.is_editor_hint():
 		_settle_on_ground()
 
 
+func _process(delta: float) -> void:
+	if _screen_mat == null or _ticker_len <= 0.0:
+		return
+	_ticker_scroll += TICKER_SPEED * delta
+	if _ticker_scroll >= _ticker_len:
+		_ticker_scroll = fmod(_ticker_scroll, _ticker_len)
+		if not _ticker_next.is_empty():
+			_show_ticker(_ticker_next)
+	# Whole LEDs, as a real board steps; a fraction blurs the text across two columns.
+	_screen_mat.set_shader_parameter("ticker_scroll", floorf(_ticker_scroll))
+
+
+## The ticker's title, from Level: the Grand Prix, the stage, which race of the GP it is ("" outside
+## one) and the race's laps.
+func set_ticker_title(cup: String, stage: String, race: String, laps: int) -> void:
+	_ticker_title.clear()
+	_ticker_title.append([cup if cup != "" else "RC Vibe GP", TICKER_GOLD])
+	if stage != "":
+		_ticker_title.append([stage, TICKER_WHITE])
+	if race != "":
+		_ticker_title.append([race, TICKER_CYAN])
+	_ticker_laps = laps
+	_ticker_rows_sig = ""
+	_queue_ticker(_ticker_tokens([_ticker_group("%d Laps" % laps, TICKER_CYAN)]))
+
+
+## The standings, from Level (its _push_standings rows: pos, name, finished, lap), as often as every
+## frame. The ticker takes the new order in when it next comes round to its start; the screen waves
+## the chequered flag once the leader is on the last lap.
+func update_standings(rows: Array) -> void:
+	if rows.is_empty() or _ticker_title.is_empty():
+		return
+	var lap := int(rows[0].get("lap", 1))
+	_set_flag(lap >= _ticker_laps or bool(rows[0].get("finished", false)))
+	var sig := str(lap)
+	for r in rows:
+		sig += "|%s:%s:%s" % [r.get("pos", 0), r.get("name", ""), r.get("finished", false)]
+	if sig == _ticker_rows_sig:
+		return
+	_ticker_rows_sig = sig
+	var order: Array = []
+	for r in rows:
+		var racer_name := str(r.get("name", "Racer"))
+		if racer_name.length() > TICKER_NAME_MAX:
+			racer_name = racer_name.substr(0, TICKER_NAME_MAX - 1) + "."
+		var racer: Array = [[str(r.get("pos", 0)), TICKER_GOLD],
+				[racer_name, TICKER_GREEN if r.get("finished", false) else TICKER_WHITE]]
+		order.append(racer)
+	_queue_ticker(_ticker_tokens([_ticker_group("Lap %d/%d" % [mini(lap, _ticker_laps), _ticker_laps], TICKER_CYAN), order]))
+
+
+## A ticker group holding one piece of text.
+static func _ticker_group(text: String, colour: Color) -> Array:
+	return [[[text, colour]]]
+
+
+## The title, then each group in `groups`, laid out along the strip. A group is a list of runs spaced
+## apart (a racer's place and name is a run), a run a list of [text, colour] pieces, and separators
+## split the groups. One closes the line too, so it runs on into the title as it loops.
+func _ticker_tokens(groups: Array) -> Array:
+	var font := _ticker_font()
+	var tokens: Array = []
+	var x := 0.0
+	var all: Array = []
+	for piece in _ticker_title:
+		all.append(_ticker_group(piece[0], piece[1]))
+	all.append_array(groups)
+	for group in all:
+		for run_i in group.size():
+			if run_i > 0:
+				x += TICKER_SPACE
+			for piece_i in group[run_i].size():
+				var piece: Array = group[run_i][piece_i]
+				if piece_i > 0:
+					x += TICKER_SPACE * 0.4
+				var text: String = str(piece[0]).to_upper()
+				tokens.append({"text": text, "colour": piece[1], "x": x})
+				x += font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, TICKER_FONT_SIZE).x
+		x += TICKER_SPACE
+		tokens.append({"sep": true, "x": x})
+		x += TICKER_SPACE
+	tokens.append({"end": true, "x": minf(x, TICKER_TEX_W)})
+	return tokens
+
+
+func _queue_ticker(tokens: Array) -> void:
+	if _ticker_len <= 0.0:
+		_show_ticker(tokens)
+	else:
+		_ticker_next = tokens
+
+
+func _show_ticker(tokens: Array) -> void:
+	_ticker_shown = tokens
+	_ticker_next = []
+	_ticker_len = float(tokens[-1]["x"]) / TICKER_SS
+	if _ticker_vp:
+		_ticker_canvas.queue_redraw()
+		_ticker_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+	if _screen_mat:
+		_screen_mat.set_shader_parameter("ticker_len", _ticker_len)
+
+
+func _draw_ticker() -> void:
+	var h := float(TICKER_ROWS * TICKER_SS)
+	_ticker_canvas.draw_rect(Rect2(0.0, 0.0, TICKER_TEX_W, h), Color.BLACK)
+	var font := _ticker_font()
+	# Capitals centred in the band: a heavy sans' capitals stand about 0.72 of the font size.
+	var baseline := (h + TICKER_FONT_SIZE * 0.72) * 0.5
+	for t in _ticker_shown:
+		if t.has("text"):
+			_ticker_canvas.draw_string(font, Vector2(t["x"], baseline), t["text"], HORIZONTAL_ALIGNMENT_LEFT, -1, TICKER_FONT_SIZE, t["colour"])
+		elif t.has("sep"):
+			# A diamond, centred on the capitals.
+			var c := Vector2(float(t["x"]), h * 0.5)
+			var r := TICKER_SS * 2.6
+			_ticker_canvas.draw_colored_polygon(PackedVector2Array([c + Vector2(0, -r), c + Vector2(r, 0), c + Vector2(0, r), c + Vector2(-r, 0)]), TICKER_RED)
+
+
+## Fades the chequered flag in over the ticker (the last lap) or out again.
+func _set_flag(on: bool) -> void:
+	if on == _flag_on or _screen_mat == null:
+		return
+	_flag_on = on
+	if _flag_tween:
+		_flag_tween.kill()
+	_flag_tween = create_tween()
+	_flag_tween.tween_property(_screen_mat, "shader_parameter/flag_mix", 1.0 if on else 0.0, 0.6)
+
+
 ## Start lights, called by Level.start_race() as the countdown runs: 0 puts the lamps on the screen,
 ## all dark; 1..3 lights that many red; 4 turns them all green. GREEN_HOLD seconds after green the
-## screen goes back to the flag.
+## screen goes back to the ticker.
 func show_start_lights(step: int) -> void:
 	if _screen_mat == null:
 		return
@@ -136,6 +302,8 @@ func _build() -> void:
 	_feet.clear()
 	_screen_mat = null
 	_glow = null
+	_ticker_vp = null
+	_ticker_canvas = null
 	_build_root = Node3D.new()
 	_build_root.name = "GateBuild"
 	add_child(_build_root, false, Node.INTERNAL_MODE_BACK)
@@ -143,9 +311,6 @@ func _build() -> void:
 		_build_gantry()
 	else:
 		_build_checkpoint()
-	var decal := get_node_or_null("StartFinishDecal") as Node3D
-	if decal:
-		decal.visible = is_finish_line
 
 
 func _build_gantry() -> void:
@@ -160,10 +325,27 @@ func _build_gantry() -> void:
 	_screen_mat.set_shader_parameter("board", 0.0)
 	_screen_mat.set_shader_parameter("lamps_red", Vector3.ZERO)
 	_screen_mat.set_shader_parameter("lamps_green", 0.0)
+	_screen_mat.set_shader_parameter("flag_mix", 1.0 if _flag_on else 0.0)
 	screen.material_override = _screen_mat
 	screen.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	screen.position = Vector3(0.0, (POD_Y0 + SOFFIT_Y) * 0.5, POD_Z1 + 0.004)
 	_build_root.add_child(screen)
+
+	# The ticker's strip, rendered only when its text changes.
+	_ticker_vp = SubViewport.new()
+	_ticker_vp.size = Vector2i(TICKER_TEX_W, TICKER_ROWS * TICKER_SS)
+	_ticker_vp.disable_3d = true
+	_ticker_vp.transparent_bg = false
+	_ticker_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+	_ticker_canvas = Control.new()
+	_ticker_canvas.size = Vector2(_ticker_vp.size)
+	_ticker_canvas.draw.connect(_draw_ticker)
+	_ticker_vp.add_child(_ticker_canvas)
+	_build_root.add_child(_ticker_vp)
+	_screen_mat.set_shader_parameter("ticker_tex", _ticker_vp.get_texture())
+	_screen_mat.set_shader_parameter("ticker_ss", float(TICKER_SS))
+	_screen_mat.set_shader_parameter("ticker_rows", float(TICKER_ROWS))
+	_screen_mat.set_shader_parameter("ticker_len", _ticker_len)
 
 	# The lit lamps throw their colour over the grid. Unshadowed, and only on during the countdown.
 	_glow = OmniLight3D.new()
@@ -254,9 +436,8 @@ func _add_foot(at: Vector3, size: Vector3, center: Vector3, mat: Material) -> vo
 
 
 ## In a race: stands the gate on the road under its middle, brings a checkpoint down to fit under
-## anything over the road (Glacier Highway's sign gantries), and puts the feet and the road decal on
-## the ground. Waits for the level to be racing, so a generator saving the level never stores a
-## moved decal, and for its runtime collision, so the rays see every prop.
+## anything over the road (Glacier Highway's sign gantries), and puts the feet on the ground. Waits
+## for the level's runtime collision, so the rays see every prop.
 func _settle_on_ground() -> void:
 	await get_tree().physics_frame
 	var level := get_parent()
@@ -282,12 +463,6 @@ func _settle_on_ground() -> void:
 		var hit := _cast(space, Vector3(x, road_y + 2.0, 0.0), Vector3(x, road_y - 2.5, 0.0))
 		if not hit.is_empty():
 			foot.position.y = hit["y"] - road_y
-	var decal := get_node_or_null("StartFinishDecal") as Node3D
-	if decal and is_finish_line and not road.is_empty():
-		# Lie on the road, tilted with it, just clear of it.
-		var up: Vector3 = road["normal"]
-		decal.basis = Basis(Quaternion(Vector3.UP, up)) * Basis(Vector3.UP, decal.basis.get_euler().y)
-		decal.position.y = road_y + 0.03
 
 
 ## Free height over the road at the gate: the lowest underside above the middle or the towers, or
@@ -373,6 +548,16 @@ static func _accent_mat(c: Color) -> Material:
 		m.roughness = 0.55
 		_mats[key] = m
 	return _mats[key]
+
+
+## The ticker's font: plain coverage, not MSDF, since the strip is sampled once per LED.
+static func _ticker_font() -> Font:
+	if _plain_font == null:
+		var f := SystemFont.new()
+		f.font_names = PackedStringArray(["Arial Black", "Impact", "Helvetica Neue", "Arial", "sans-serif"])
+		f.font_weight = 900
+		_plain_font = f
+	return _plain_font
 
 
 static func _banner_font() -> Font:
