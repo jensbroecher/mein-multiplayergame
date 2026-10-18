@@ -24,6 +24,8 @@
 #define PAT_CAMO 6
 #define PAT_RACER 7
 #define PAT_FADE 8
+#define PAT_SPLINTER 9
+#define PAT_TIGER 10
 
 #define FIN_GLOSS 0
 #define FIN_METALLIC 1
@@ -182,6 +184,65 @@ vec3 flames(vec3 col, vec3 p, vec3 n) {
 	return col;
 }
 
+// Splinter camo: hard-edged shards in the three paint colours, from a 3D Voronoi sheared and
+// stretched along the car, so the cells' straight borders run back and slant like broken glass.
+vec3 pattern_colour(vec3 cell) {
+	float h = hash13(cell + vec3(5.3, 1.7, 8.9));
+	return h < 0.45 ? paint_primary.rgb : (h < 0.8 ? paint_secondary.rgb : paint_accent.rgb);
+}
+
+vec3 splinter(vec3 p) {
+	vec3 q = vec3(p.x * 7.0, (p.y + p.z * 0.55) * 7.0, p.z * 3.2);
+	vec3 i = floor(q);
+	vec3 f = fract(q);
+	float f1 = 8.0;
+	float f2 = 8.0;
+	vec3 c1 = i;
+	vec3 c2 = i;
+	for (int z = -1; z <= 1; z++) {
+		for (int y = -1; y <= 1; y++) {
+			for (int x = -1; x <= 1; x++) {
+				vec3 g = vec3(float(x), float(y), float(z));
+				vec3 o = vec3(hash13(i + g), hash13(i + g + 17.1), hash13(i + g + 31.7));
+				vec3 r = g + o - f;
+				float d = dot(r, r);
+				if (d < f1) {
+					f2 = f1;
+					c2 = c1;
+					f1 = d;
+					c1 = i + g;
+				} else if (d < f2) {
+					f2 = d;
+					c2 = i + g;
+				}
+			}
+		}
+	}
+	// Half way between the two nearest sites is the border: blend across it over a pixel.
+	return mix(pattern_colour(c2), pattern_colour(c1), cover(sqrt(f1) - sqrt(f2)));
+}
+
+// Tiger stripes: bands across the top that sweep back and taper to points down the flanks.
+vec3 tiger(vec3 col, vec3 p, vec3 n) {
+	if (n.y < -0.4) {
+		return col;
+	}
+	// Distance down from the top's centre line, roughly over the body.
+	float c = abs(p.x) + max(belt_y + 0.2 - p.y, 0.0);
+	float period = 0.13;
+	float u = p.z / period + c * 3.2;
+	float k = floor(u);
+	float len = 0.34 + 0.30 * hash13(vec3(k, 1.3, 9.1));
+	float t = clamp(c / len, 0.0, 1.0);
+	float half_w = 0.30 * (1.0 - t * t) + 0.02;
+	float q = fract(u) - 0.5 + 0.10 * sin(c * 23.0 + k * 2.3);
+	float d = (abs(q) - half_w) * period;
+	d = max(d, c - len);
+	col = mix(col, paint_accent.rgb, cover(d - 0.004));
+	col = mix(col, paint_secondary.rgb, cover(d));
+	return col;
+}
+
 vec3 paint_albedo(vec3 p, vec3 n) {
 	vec3 col = paint_primary.rgb;
 	if (paint_pattern == PAT_STRIPES) {
@@ -228,6 +289,10 @@ vec3 paint_albedo(vec3 p, vec3 n) {
 	} else if (paint_pattern == PAT_FADE) {
 		float t = smoothstep(nose_z + 0.25, tail_z - 0.25, p.z + 0.05 * (vnoise(p * 9.0) - 0.5));
 		col = mix(paint_primary.rgb, paint_secondary.rgb, t);
+	} else if (paint_pattern == PAT_SPLINTER) {
+		col = splinter(p);
+	} else if (paint_pattern == PAT_TIGER) {
+		col = tiger(col, p, n);
 	}
 	return col;
 }

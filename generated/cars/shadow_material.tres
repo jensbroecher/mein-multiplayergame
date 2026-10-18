@@ -1,0 +1,19 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://car_body.gdshader" id="1_hkdg0"]
+[ext_resource type="Texture2D" path="res://generated/cars/shadow_detail.res" id="2_wg1bf"]
+
+[resource]
+render_priority = -1
+shader = ExtResource("1_hkdg0")
+shader_parameter/detail_map = ExtResource("2_wg1bf")
+shader_parameter/nose_z = -1.0
+shader_parameter/tail_z = 0.98
+shader_parameter/belt_y = 0.5
+shader_parameter/side_x = 0.4
+shader_parameter/door_roundel = Vector2(-0.06, 0.39)
+shader_parameter/roundel_r = 0.075
+shader_parameter/hood_z = -0.62
+shader_parameter/hood_r = 0.065
+shader_parameter/stripe_w = 0.045
+shader_parameter/stripe_gap = 0.018

@@ -11,7 +11,7 @@ extends RefCounted
 
 ## Keep in step with car_body.gdshader's PAT_* and FIN_*.
 const PATTERNS := ["Solid", "Racing Stripes", "Two-Tone", "Side Stripe", "Flames", "Checkered", "Camo",
-	"Racer", "Fade"]
+	"Racer", "Fade", "Splinter", "Tiger"]
 const FINISHES := ["Gloss", "Metallic", "Matte", "Pearl", "Chrome"]
 
 ## The paint shop's colours (sRGB).
@@ -26,6 +26,7 @@ const PALETTE := [
 	["Jet Black", Color(0.03, 0.03, 0.035)], ["Sand", Color(0.82, 0.70, 0.48)],
 	["Olive", Color(0.36, 0.40, 0.20)], ["Chocolate", Color(0.32, 0.18, 0.10)],
 	["Strikeforce Lime", Color(0.62, 0.78, 0.24)], ["Graphite", Color(0.36, 0.38, 0.41)],
+	["Shadow Violet", Color(0.46, 0.20, 0.82)],
 ]
 const RIMS := [
 	["Silver", Color(0.76, 0.77, 0.79)], ["Titanium", Color(0.46, 0.47, 0.49)], ["Gunmetal", Color(0.22, 0.23, 0.25)],
@@ -48,6 +49,9 @@ const FACTORY := {
 	"Centurion": {"pattern": 2, "finish": 1, "primary": Color(0.36, 0.38, 0.41),
 		"secondary": Color(0.70, 0.72, 0.74), "accent": Color(0.96, 0.42, 0.06),
 		"rim": Color(0.96, 0.45, 0.08), "number": 10},
+	"Shadow": {"pattern": 9, "finish": 2, "primary": Color(0.23, 0.25, 0.27),
+		"secondary": Color(0.03, 0.03, 0.035), "accent": Color(0.46, 0.20, 0.82),
+		"rim": Color(0.22, 0.23, 0.25), "number": 13},
 }
 const FALLBACK := {"pattern": 0, "finish": 0, "primary": Color(0.80, 0.07, 0.05),
 	"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.98, 0.78, 0.07),
@@ -111,7 +115,7 @@ static func is_paintable(model_root: Node) -> bool:
 static func random(rng: RandomNumberGenerator, car_name: String) -> Dictionary:
 	var p: Dictionary = factory(car_name)
 	# Weighted toward the patterns that read best from a chase camera.
-	var bag := [0, 0, 1, 1, 2, 3, 4, 5, 6, 7, 7, 8]
+	var bag := [0, 0, 1, 1, 2, 3, 4, 5, 6, 7, 7, 8, 9, 10]
 	p["pattern"] = bag[rng.randi() % bag.size()]
 	p["finish"] = [0, 0, 1, 1, 1, 2, 3][rng.randi() % 7]
 	var primary: Color = PALETTE[rng.randi() % PALETTE.size()][1]

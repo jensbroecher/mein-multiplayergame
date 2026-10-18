@@ -430,19 +430,20 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   what's visible at each step. `scratch/menu_shot` takes `size=<w>x<h>` (the window can't exceed the
   screen, so on a 16:10 Mac it stays 16:10).
 
-## Procedural cars (Mudrunner, Phantom, Strikeforce, Centurion)
+## Procedural cars (Mudrunner, Phantom, Strikeforce, Centurion, Shadow)
 
 - Cars can be built in code instead of imported from Hunyuan. `CarBuilder.gd` is the geometry toolkit (lofts,
   lathes, tubes, rounded boxes into one indexed mesh, the material id per vertex in UV2.x). `CarDesign.gd` is
   what the cars share: the lofted shell, fender sweeps, wheel parts, a coil-over, the detail map. Each car
-  extends it (`MudrunnerBuilder.gd`, `PhantomBuilder.gd`, `StrikeforceBuilder.gd`, `CenturionBuilder.gd`) with
+  extends it (`MudrunnerBuilder.gd`, `PhantomBuilder.gd`, `StrikeforceBuilder.gd`, `CenturionBuilder.gd`, `ShadowBuilder.gd`) with
   its shape and its own parts. `regenerate_cars.gd` saves each as `generated/cars/<Name>.tscn` with its meshes, material and detail
   map; run `res://regenerate_cars.tscn` headless. PlayerCart and CarSelection load it through the preset's
   `model_path` like an FBX car, with `model_y_rotation` PI and `wheel_parts` `Wheel_FL` ... `Wheel_RR`.
 - Builders work in the cart frame (metres, front at -Z, ground at y = 0); the scene's `Model` node undoes
   PlayerCart's x2 scale and half turn. Each car keeps its Hunyuan model's wheel positions, so it sits
   where the old one did. Proportions are measured off the FBX: slice the body per z for its top, bottom
-  and widths, probe the fenders.
+  and widths, probe the fenders. `res://scratch/car_dump.gd` (`-s`, headless, `-- <car.tscn> <dir>`) writes an
+  imported car's triangles in the cart frame, per part, for slicing.
 - The shell is one cross-section per station (bottom, corner, vertical side to the beltline, then the
   car's `_upper()`), each parameter a curve of knots along the car; caps close the ends (`*_cap_exp`:
   high exponents for a flat face). Stations are refined where neighbouring sections differ. A section
@@ -458,6 +459,11 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   tyre at all four corners. Its paddles follow the carcass and taper into the shoulders (`_paddle`):
   full height to the edge, they stood out from the sidewalls like fins. Its cage is in the accent colour
   (`M_ANODISED`), so the paint job's accent recolours it.
+- The Shadow's section is faceted: straight runs between corners with small fillets (`_upper_segments`),
+  every corner keyed in `KEYS`. Its pods grow out from under the bonnet's side, which stays the same wall
+  (on the nose the pod is a 1cm ledge), so the ring points never jump between regions. Its plates, roof
+  and wing are profiles swept along a path (`_sweep`), each strip turned outward by its profile edge's
+  normal: a centroid test flipped the wing's top, whose centroid lies off the bent plate.
 - Stations are doubles. A flat cap (exponent 8) closes only at the exact tip: the tip rounded to a
   float32 (1.025 -> 1.0249999) left a hole a quarter of the face across.
 - Wheel arches through a body (the Phantom) are cut by lifting the shell's bottom over each wheel

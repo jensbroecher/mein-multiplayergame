@@ -37,7 +37,8 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Shadow",
-		"model_path": "res://models/cars/Shadow.tscn",
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Shadow.tscn",
 		"model_y_rotation": PI,
 		"max_speed": 41.0,
 		"acceleration": 52.0,
@@ -45,7 +46,7 @@ const CAR_PRESETS = [
 		"grip": 4.5,
 		"braking": 32.0,
 		"offroad": 4.0,
-		"wheel_parts": {"FL": "part_3", "FR": "part_0", "RL": "part_4", "RR": "part_2"}
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
 		"name": "Strikeforce",
