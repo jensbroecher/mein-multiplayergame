@@ -13,10 +13,11 @@
 # to the well's inner wall and up under the arch, so the wells are openings under the fenders instead
 # of the whole bottom lifting over the wheel, and the bed's floor can sit low between the rear wells.
 # Above the side it is keyed like the Strikeforce's (KEYS): a roll over the side's top edge, a wall
-# (the cab's side glass, the bed's inner wall, flat on the bonnet), a corner (the A-pillar and roof
-# rail; the bed floor's fillet) and a crowned top (the bonnet, dipped between the fenders; the
-# windscreen; the roof; the bed floor). The glass sits on the wall and on the top either side of the
-# corner, so the A-pillars are that corner (_upper_s).
+# (the cab's side glass, the bed's inner wall, the fender tops lying flat beside the bonnet), a corner
+# (the A-pillar and roof rail; the bed floor's fillet) and a crowned top (the bonnet, dished between
+# the fender tops; the windscreen; the roof; the bed floor). The glass sits on the wall and on the
+# top either side of the corner, so the A-pillars are that corner (_upper_s), and they run on down
+# into the bonnet's shut lines.
 extends "res://CarDesign.gd"
 
 # Wheels: the Hunyuan model's positions (tyres 0.245 wide).
@@ -36,29 +37,36 @@ const BOT_KNOTS := [[-1.090, 0.380], [-1.040, 0.350], [-0.990, 0.310], [-0.900, 
 
 # The section above the side, keyframed along the car. Per row: z; belt (the top of the vertical
 # side); rr (the roll over its top edge); rim_w (from the side in to A, where the wall starts: the
-# roll, or the roll and the bed rail); wall_dx (how far the wall leans in); edge (the top beside the
-# crown: bonnet, windscreen, roof, bed floor, tailgate); cx, cy (the corner from the wall onto the
-# top: cy > 0 the roof's corner, < 0 the bed floor's fillet, 0 flat); crown (< 0 dips the bonnet
-# between the fenders).
+# roll, or the roll and the bed rail); bx (B's x, where the wall ends: on the bonnet the fender tops'
+# inner edge); edge (the top beside the crown: bonnet, windscreen, roof, bed floor, tailgate); cx, cy
+# (the corner from B onto the top at C: cy > 0 the roof's corner, < 0 the bed floor's fillet, 0
+# flat); crown (< 0 dishes the bonnet between the fender tops).
+# Where the bonnet turns up into the windscreen, B and C keep their x (the bonnet's crowned panel ends
+# at its shut lines, x 0.392, which run on into the A-pillars) and the crown is 0, growing only slowly
+# up the glass, so the windscreen's base is a straight line across the car. A crown that turned from
+# the bonnet's dish to the windscreen's dome within 3cm stood a steep triangular prow under the glass,
+# and the bonnet's wider panel narrowing there flared the A-pillars' feet.
 const KEYS := [
-	# z       belt   rr     rim_w  wall_dx edge   cx     cy      crown
-	[-1.090, 0.600, 0.040, 0.045, 0.015, 0.640, 0.020, 0.000, -0.010],
-	[-1.040, 0.615, 0.045, 0.050, 0.015, 0.660, 0.020, 0.000, -0.012],
-	[-0.950, 0.630, 0.045, 0.050, 0.015, 0.675, 0.020, 0.000, -0.018],
-	[-0.800, 0.640, 0.045, 0.050, 0.015, 0.685, 0.020, 0.000, -0.020],
-	[-0.470, 0.640, 0.045, 0.050, 0.015, 0.685, 0.020, 0.000, -0.020],
-	[-0.440, 0.640, 0.045, 0.050, 0.030, 0.692, 0.022, 0.002, 0.012],
-	[-0.400, 0.620, 0.012, 0.020, 0.040, 0.728, 0.026, 0.014, 0.018],
-	[-0.300, 0.620, 0.012, 0.020, 0.046, 0.812, 0.030, 0.026, 0.020],
-	[-0.220, 0.620, 0.012, 0.020, 0.050, 0.875, 0.030, 0.030, 0.020],
-	[0.240, 0.620, 0.012, 0.020, 0.050, 0.875, 0.030, 0.030, 0.020],
-	[0.258, 0.620, 0.012, 0.020, 0.050, 0.875, 0.030, 0.030, 0.020],
-	[0.285, 0.640, 0.040, 0.205, 0.005, 0.440, 0.020, -0.020, 0.000],
-	[1.075, 0.640, 0.040, 0.205, 0.005, 0.440, 0.020, -0.020, 0.000],
-	[1.098, 0.640, 0.040, 0.205, 0.005, 0.680, 0.020, 0.000, 0.000],
-	[1.150, 0.620, 0.040, 0.205, 0.005, 0.680, 0.020, 0.000, 0.000],
+	# z       belt   rr     rim_w  bx     edge   cx     cy      crown
+	[-1.090, 0.600, 0.040, 0.045, 0.412, 0.640, 0.020, 0.000, -0.008],
+	[-1.040, 0.615, 0.045, 0.050, 0.412, 0.660, 0.020, 0.000, -0.010],
+	[-0.950, 0.630, 0.045, 0.050, 0.412, 0.675, 0.020, 0.000, -0.014],
+	[-0.800, 0.640, 0.045, 0.050, 0.412, 0.685, 0.020, 0.000, -0.016],
+	[-0.650, 0.640, 0.045, 0.050, 0.412, 0.685, 0.020, 0.000, -0.010],
+	[-0.550, 0.640, 0.045, 0.050, 0.412, 0.685, 0.020, 0.000, 0.000],
+	[-0.470, 0.640, 0.045, 0.050, 0.412, 0.685, 0.020, 0.000, 0.000],
+	[-0.440, 0.640, 0.045, 0.050, 0.414, 0.696, 0.022, 0.002, 0.000],
+	[-0.400, 0.620, 0.012, 0.020, 0.414, 0.728, 0.026, 0.014, 0.002],
+	[-0.300, 0.620, 0.012, 0.020, 0.409, 0.812, 0.030, 0.026, 0.008],
+	[-0.220, 0.620, 0.012, 0.020, 0.405, 0.875, 0.030, 0.030, 0.012],
+	[0.240, 0.620, 0.012, 0.020, 0.405, 0.875, 0.030, 0.030, 0.012],
+	[0.258, 0.620, 0.012, 0.020, 0.405, 0.875, 0.030, 0.030, 0.012],
+	[0.285, 0.640, 0.040, 0.205, 0.375, 0.440, 0.020, -0.020, 0.000],
+	[1.075, 0.640, 0.040, 0.205, 0.375, 0.440, 0.020, -0.020, 0.000],
+	[1.098, 0.640, 0.040, 0.205, 0.375, 0.680, 0.020, 0.000, 0.000],
+	[1.150, 0.620, 0.040, 0.205, 0.350, 0.680, 0.020, 0.000, 0.000],
 ]
-const KEY_NAMES := ["belt", "rr", "rim_w", "wall_dx", "edge", "cx", "cy", "crown"]
+const KEY_NAMES := ["belt", "rr", "rim_w", "bx", "edge", "cx", "cy", "crown"]
 
 # The wheel wells: per axle, its z, the arch's half-length, its base and rise (a superellipse of
 # exponent e), and the well's inner wall. Long and high enough for the front tyres at full lock
@@ -75,9 +83,11 @@ const SEGMENTS := [3, 2, 3, 2, 4, 3, 4, 4, 2, 6, 5, 10]
 
 # Glass: the side windows stop PILLAR_PAD short of the corner (the A-pillar and roof rail), the
 # windscreen starts PILLAR_PAD inboard of it; the windscreen runs from the cowl to the header (WS_Z),
-# the side window back to SIDE_BACK.
+# the side window from SIDE_FRONT, where the cab's side has turned up out of the fender top, back to
+# SIDE_BACK.
 const PILLAR_PAD := 0.004
 const WS_Z := Vector2(-0.428, -0.236)
+const SIDE_FRONT := -0.400
 const SIDE_BACK := 0.195
 
 # Tyres: an all-terrain carcass (half its profile, bead to tread centre) under staggered blocks.
@@ -213,7 +223,9 @@ func _upper_segments(z: float, w: float, belt: float, _top: float) -> Array:
 		var a: float = PI * 0.5 * k / 8.0
 		roll.append(Vector2(w - rr + rr * cos(a), belt + rr * sin(a)))
 	var a_pt := Vector2(w - rim_w, belt + rr)
-	var b_pt := Vector2(a_pt.x - prof["wall_dx"].at(z), edge - cy)
+	# B is keyed by its own x, not off A, so it holds steady while the side steps in from the fender to
+	# the cab; it never passes A, or the wall would lean outward.
+	var b_pt := Vector2(minf(prof["bx"].at(z), a_pt.x - 0.002), edge - cy)
 	var c_pt := Vector2(b_pt.x - cx, edge)
 	var corner := PackedVector2Array()
 	for k in 9:
@@ -365,21 +377,31 @@ func _centre_parts(b) -> void:
 	var mouth_y: float = top_y(0.0, -0.880)
 	b.rbox(Transform3D(Basis(), Vector3(0.0, mouth_y + 0.017, -0.881)), Vector3(0.088, 0.013, 0.003), 0.003, 1, CB.M_DARK,
 			C_DARKER)
-	# Roof: a visor over the windscreen's top with an LED bar under it, a vent, a lip at the back.
+	# Roof: a visor over the windscreen's top with an LED bar under it, a vent, a lip at the back. The
+	# roof is crowned, so the visor, the bar and the lip follow its curve across the car (straight, the
+	# bar's ends came up through the visor and the lip's ends stood off the roof).
 	var visor := PackedVector3Array()
+	var bar_path := PackedVector3Array()
+	var lip := PackedVector3Array()
 	for k in 9:
-		var x: float = lerpf(-0.372, 0.372, k / 8.0)
-		visor.append(Vector3(x, top_y(x, -0.19) + 0.004, 0.0))
+		var f: float = k / 8.0
+		visor.append(Vector3(lerpf(-0.372, 0.372, f), top_y(lerpf(-0.372, 0.372, f), -0.19) + 0.004, 0.0))
+		bar_path.append(Vector3(lerpf(-0.300, 0.300, f), top_y(lerpf(-0.300, 0.300, f), -0.19) + 0.004, 0.0))
+		lip.append(Vector3(lerpf(-0.330, 0.330, f), top_y(lerpf(-0.330, 0.330, f), 0.24), 0.0))
 	sweep(b, visor, Vector3.BACK, Vector3.UP, PackedVector2Array([Vector2(-0.312, 0.000), Vector2(-0.298, -0.008),
 			Vector2(-0.180, -0.004), Vector2(-0.168, 0.004), Vector2(-0.298, 0.010)]), CB.M_PAINT, Color(1, 1, 1))
-	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.881, -0.283)), Vector3(0.300, 0.014, 0.012), 0.006, 1, CB.M_DARK, C_DARK)
+	sweep(b, bar_path, Vector3.BACK, Vector3.UP, PackedVector2Array([Vector2(-0.295, -0.036), Vector2(-0.271, -0.036),
+			Vector2(-0.271, -0.006), Vector2(-0.295, -0.006)]), CB.M_DARK, C_DARK)
 	for k in 8:
-		round_lamp(b, Vector3(-0.262 + 0.075 * k, 0.881, -0.296), Vector3.FORWARD, 0.0115, CB.M_HEADLAMP, Color(1, 1, 1))
-	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.900, -0.02)), Vector3(0.065, 0.012, 0.075), 0.010, 2, CB.M_PAINT,
+		var x: float = -0.262 + 0.075 * k
+		round_lamp(b, Vector3(x, top_y(x, -0.19) - 0.017, -0.296), Vector3.FORWARD, 0.0115, CB.M_HEADLAMP, Color(1, 1, 1))
+	var vent_y: float = top_y(0.0, -0.02)
+	b.rbox(Transform3D(Basis(), Vector3(0.0, vent_y + 0.008, -0.02)), Vector3(0.065, 0.012, 0.075), 0.010, 2, CB.M_PAINT,
 			Color(1, 1, 1))
-	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.902, -0.096)), Vector3(0.050, 0.007, 0.003), 0.002, 1, CB.M_DARK, C_DARKER)
-	b.rbox(Transform3D(Basis(Vector3.RIGHT, 0.30), Vector3(0.0, 0.894, 0.252)), Vector3(0.330, 0.004, 0.018), 0.003, 1,
-			CB.M_DARK, C_DARK)
+	b.rbox(Transform3D(Basis(), Vector3(0.0, vent_y + 0.010, -0.096)), Vector3(0.050, 0.007, 0.003), 0.002, 1, CB.M_DARK,
+			C_DARKER)
+	sweep(b, lip, Vector3.BACK, Vector3.UP, PackedVector2Array([Vector2(0.228, -0.002), Vector2(0.262, -0.002),
+			Vector2(0.272, 0.014), Vector2(0.262, 0.016), Vector2(0.232, 0.004)]), CB.M_DARK, C_DARK)
 	# The bed cage across the car: the back bar with the chase lights; the shock hoop.
 	b.tube(PackedVector3Array([Vector3(-0.310, 0.780, 0.920), Vector3(0.310, 0.780, 0.920)]), tube_r, 10, CB.M_DARK, C_CAGE,
 			false, false)
@@ -583,7 +605,7 @@ func _detail_at(p: Vector3, n: Vector3, fp: float, sh: Dictionary) -> Color:
 		var u: Vector3 = _upper_s(p)
 		var below_rail: float = u.x - (u.y - PILLAR_PAD)
 		var above_belt: float = 0.010 - u.x
-		var side_d: float = _round_and(maxf(below_rail, above_belt), maxf(WS_Z.x - 0.004 - p.z, p.z - SIDE_BACK), 0.025)
+		var side_d: float = _round_and(maxf(below_rail, above_belt), maxf(SIDE_FRONT - p.z, p.z - SIDE_BACK), 0.025)
 		if n.x > 0.2:
 			glass = maxf(glass, _cover(side_d, fp))
 			black = maxf(black, _cover(side_d - 0.008, fp))

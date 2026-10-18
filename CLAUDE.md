@@ -524,3 +524,10 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   each wheel like the other cars. That lets its open bed's floor sit below the arches, between the rear
   wells. Where there's no wheel the notch has no height and the section is the usual one. The front
   wells reach in to x 0.285 and 0.33 along the car either side of the axle, for the tyres at full lock.
+- Where a bonnet turns up into the windscreen (the cowl), keep the section's crown and the top's
+  width (C's x) steady, or the windscreen's base bends: the Apex's crown turned from the bonnet's dish
+  to the windscreen's dome within 3cm, which stood a steep triangular prow under the glass, and its
+  bonnet's wider top narrowing there flared the A-pillars' feet. Its crown is 0 across the cowl and
+  grows slowly up the glass, and B is keyed by its own x (`bx`), so the bonnet's shut lines run on
+  into the A-pillars. To check a cowl, print `top_y()`'s slope along z at a few x: it should rise
+  the same at every x. Parts lying across a crowned roof (visor, light bar, lip) follow `top_y()`.
