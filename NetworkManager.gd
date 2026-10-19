@@ -208,6 +208,16 @@ func start_single_player(player_name: String):
 	print("NetworkManager: Started single player mode")
 	return OK
 
+## SPECTATOR mode with no racers at all: Level flies a free camera round the empty course.
+var inspect_mode := false
+
+func start_inspect() -> int:
+	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
+	players.clear()
+	LANDiscovery.stop_all()
+	print("NetworkManager: Started inspection mode")
+	return OK
+
 func start_spectator() -> int:
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 	players.clear()

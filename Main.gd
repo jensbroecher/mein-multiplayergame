@@ -78,7 +78,10 @@ func _swipe(change: Callable) -> void:
 
 func _on_menu_start_pressed():
 	if NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR:
-		NetworkManager.start_spectator()
+		if NetworkManager.inspect_mode:
+			NetworkManager.start_inspect()
+		else:
+			NetworkManager.start_spectator()
 		await start_game(true)
 		return
 	await _swipe(func():

@@ -248,6 +248,12 @@ func show_sub_menu(menu_name: String) -> void:
 			_add_tile("MULTIPLAYER", "Host or join a LAN race", "tile_multiplayer.jpg", COL_MAGENTA, _on_multiplayer_pressed)
 			_add_tile("SPECTATOR", "Watch 6 AI racers — pick any course", "tile_grand_prix.jpg", COL_CYAN, func():
 				NetworkManager.current_game_mode = NetworkManager.GameMode.SPECTATOR
+				NetworkManager.inspect_mode = false
+				show_sub_menu("stage_select")
+			)
+			_add_tile("INSPECT", "No cars — fly a free camera round any course", "tile_grand_prix.jpg", COL_TEAL, func():
+				NetworkManager.current_game_mode = NetworkManager.GameMode.SPECTATOR
+				NetworkManager.inspect_mode = true
 				show_sub_menu("stage_select")
 			)
 			_add_tile("OPTIONS", "Graphics, sound, and controls", "tile_options.jpg", COL_GOLD, _on_options_pressed)
@@ -296,8 +302,12 @@ func show_sub_menu(menu_name: String) -> void:
 			)
 		"stage_select":
 			if NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR:
-				screen_title.text = "SPECTATOR"
-				screen_subtitle.text = "Pick a course to watch — 6 AI racers, you stay off the grid"
+				if NetworkManager.inspect_mode:
+					screen_title.text = "INSPECT"
+					screen_subtitle.text = "Pick a course to explore — no cars, fly anywhere"
+				else:
+					screen_title.text = "SPECTATOR"
+					screen_subtitle.text = "Pick a course to watch — 6 AI racers, you stay off the grid"
 			else:
 				screen_title.text = "SELECT COURSE"
 				screen_subtitle.text = "Pick a track to race"

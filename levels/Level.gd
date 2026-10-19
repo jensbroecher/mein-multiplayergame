@@ -207,11 +207,31 @@ func _ready():
 	race_ui.ready_pressed.connect(_on_local_ready_pressed)
 	race_ui.start_pressed.connect(_on_host_start_pressed)
 
+	if NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR and NetworkManager.inspect_mode:
+		_setup_inspect_camera()
+		return
 	if NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR:
 		_setup_spectator_camera()
 
 	if multiplayer.is_server():
 		_run_race_countdown()
+
+
+## Inspection mode: nobody is on the course, a free camera starts above the finish line looking
+## along the first straight. The race never starts, so there are no lights, HUD or lap logic.
+func _setup_inspect_camera() -> void:
+	race_ui.hide()
+	var cam: Node3D = (load("res://FreeFlyCamera.gd") as GDScript).new()
+	cam.name = "FreeFlyCamera"
+	add_child(cam)
+	var finish := get_node_or_null("FinishLine") as Node3D
+	var from := Vector3(0.0, 30.0, 0.0)
+	var to := Vector3(0.0, 0.0, -60.0)
+	if finish:
+		var fwd := -finish.global_basis.z
+		from = finish.global_position + Vector3(0.0, 12.0, 0.0) - fwd * 25.0
+		to = finish.global_position + fwd * 60.0
+	cam.place(from, to)
 
 
 func _setup_spectator_camera() -> void:

@@ -30,7 +30,7 @@ const BROADLEAF := {
 		"clusters": 34, "cl_r": 1.25, "shell": 0.45, "cards": 7, "card": Vector2(1.7, 2.3), "cell": CELL_BIRCH,
 		"tint": Color(0.86, 0.90, 0.76), "droop": 0.22, "bark": "birch"},
 }
-const SPRUCE := {"h": 22.0, "r": 0.36, "base_r": 4.4, "whorls": 18, "per_whorl": 8}
+const SPRUCE := {"h": 22.0, "r": 0.36, "base_r": 4.4, "whorls": 26, "per_whorl": 8}
 
 ## Bark per kind: [bark colour, fissure colour, fissure width, depth, plate stretch, vertex tint].
 const BARKS := {
@@ -684,14 +684,16 @@ func spruce_mesh(variant: int, lod: int, bark_mat: Material, leaf_mat: Material)
 	var lb := 0
 	var whorls: int = SPRUCE["whorls"]
 	if lod == 1:
-		whorls = 10
+		whorls = 14
 	var per: int = SPRUCE["per_whorl"]
 	var y0: float = 1.6
 	var tint := Color(0.92, 0.96, 0.92)
 	for w in range(whorls):
 		var t: float = float(w) / float(whorls - 1)
-		var y: float = lerpf(y0, h - 1.4, pow(t, 0.9)) + rng.randf_range(-0.25, 0.25) * (1.0 - t)
-		var reach: float = base_r * pow(1.0 - t * 0.93, 0.95) + 0.35
+		# Whorls close up toward the leader, so the tip is a dense cone and not a bare stem with a few
+		# fronds spaced a metre apart.
+		var y: float = lerpf(y0, h - 1.0, 1.0 - pow(1.0 - t, 1.35)) + rng.randf_range(-0.2, 0.2) * (1.0 - t)
+		var reach: float = base_r * (1.0 - t * 0.94) + 0.6
 		var n: int = per if lod == 0 else 7
 		var rot: float = rng.randf() * TAU
 		for b in range(n):
@@ -701,7 +703,7 @@ func spruce_mesh(variant: int, lod: int, bark_mat: Material, leaf_mat: Material)
 			var width: float = length * (0.6 if lod == 0 else 0.75)
 			var sh0: float = lerpf(0.45, 0.8, t)
 			var by: float = y + rng.randf_range(-0.2, 0.2)
-			lb = frond(leaf_st, lb, Vector3(0, by, 0) + dir * 0.1, dir, rng.randf_range(0.15, 0.4), rng.randf_range(0.7, 1.05) * (1.0 - t * 0.45),
+			lb = frond(leaf_st, lb, Vector3(0, by, 0) + dir * 0.1, dir, rng.randf_range(0.15, 0.4) + t * t * 0.5, rng.randf_range(0.7, 1.05) * (1.0 - t * 0.55),
 					length, width, 4 if lod == 0 else 2, CELL_SPRUCE, tint, sh0, minf(sh0 + 0.35, 1.0), 0.32, dir)
 			if t < 0.88:
 				# A shorter frond hanging under each branch, between them, so the tree is solid from
@@ -709,11 +711,15 @@ func spruce_mesh(variant: int, lod: int, bark_mat: Material, leaf_mat: Material)
 				var d2: Vector3 = dir.rotated(Vector3.UP, PI / float(n))
 				lb = frond(leaf_st, lb, Vector3(0, y - 0.5, 0) + d2 * 0.1, d2, -0.1, 0.75,
 						length * 0.72, width * 0.85, 3 if lod == 0 else 2, CELL_SPRUCE, tint.darkened(0.1), sh0 * 0.8, sh0 + 0.15, 0.3, d2)
-	# The spire: three fronds pointing up round the leader's tip.
-	for k in range(3):
-		var a2: float = TAU * k / 3.0
-		var dir2 := Vector3(cos(a2), 0.0, sin(a2))
-		lb = frond(leaf_st, lb, Vector3(0, h - 2.2, 0), dir2, 1.25, -0.2, 2.6, 0.9, 2, CELL_SPRUCE, tint, 0.8, 1.0, 0.3, dir2)
+	# The spire: rings of fronds standing up round the leader, shorter and steeper toward the tip, so
+	# the crown ends in a narrow cone.
+	var spire := [[h - 2.6, 5, 1.5, 0.95, -0.1, 2.2], [h - 1.8, 5, 1.1, 1.15, -0.2, 1.7], [h - 1.0, 4, 0.8, 1.3, -0.15, 1.2], [h - 0.45, 3, 0.45, 1.4, -0.1, 0.8]]
+	for ring in spire:
+		var rot2: float = rng.randf() * TAU
+		for k in range(int(ring[1])):
+			var a2: float = rot2 + TAU * k / float(ring[1])
+			var dir2 := Vector3(cos(a2), 0.0, sin(a2))
+			lb = frond(leaf_st, lb, Vector3(0, ring[0], 0) + dir2 * 0.05, dir2, ring[3], ring[4], ring[5], ring[2], 3 if lod == 0 else 2, CELL_SPRUCE, tint, 0.8, 1.0, 0.3, dir2)
 	var mesh: ArrayMesh = st.commit()
 	mesh.surface_set_material(0, bark_mat)
 	leaf_st.commit(mesh)
