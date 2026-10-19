@@ -56,6 +56,9 @@ var slider_music: HSlider
 var slider_sfx: HSlider
 var label_music_value: Label
 var label_sfx_value: Label
+var check_commentary: CheckButton
+var slider_commentary: HSlider
+var label_commentary_value: Label
 var remap_banner: Label
 
 var is_waiting_for_key: bool = false
@@ -373,6 +376,14 @@ func _build_sound_page() -> Control:
 	var sfx_row: Array = _add_slider_row(body, "Sound Effects")
 	slider_sfx = sfx_row[0] as HSlider
 	label_sfx_value = sfx_row[1] as Label
+
+	body.add_child(HSeparator.new())
+	_add_section_title(body, "RACE COMMENTATOR")
+	_add_hint(body, "Calls the race by name (who takes the lead, who wins) with your system's text-to-speech voice. Its volume is separate from the sliders above.")
+	check_commentary = _add_check_row(body, "Race Commentator")
+	var commentary_row: Array = _add_slider_row(body, "Commentator Volume")
+	slider_commentary = commentary_row[0] as HSlider
+	label_commentary_value = commentary_row[1] as Label
 	return scroll
 
 
@@ -568,6 +579,11 @@ func _load_values_from_manager() -> void:
 	if slider_sfx:
 		slider_sfx.value = MusicManager.sfx_volume
 		_update_volume_label(label_sfx_value, MusicManager.sfx_volume)
+	if check_commentary:
+		check_commentary.button_pressed = MusicManager.commentary_enabled
+	if slider_commentary:
+		slider_commentary.value = MusicManager.commentary_volume
+		_update_volume_label(label_commentary_value, MusicManager.commentary_volume)
 
 
 func _connect_setting_signals() -> void:
@@ -595,6 +611,11 @@ func _connect_setting_signals() -> void:
 	slider_sfx.value_changed.connect(func(v):
 		MusicManager.set_sfx_volume(v)
 		_update_volume_label(label_sfx_value, v)
+	)
+	check_commentary.toggled.connect(func(v): MusicManager.set_commentary_enabled(v))
+	slider_commentary.value_changed.connect(func(v):
+		MusicManager.set_commentary_volume(v)
+		_update_volume_label(label_commentary_value, v)
 	)
 
 

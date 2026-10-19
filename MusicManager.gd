@@ -15,6 +15,10 @@ const SETTINGS_FILE = "user://settings.cfg"
 
 var music_volume: float = 0.8
 var sfx_volume: float = 0.7
+## The race commentator (RaceCommentator.gd, spoken through the OS text-to-speech): on or off, and
+## its volume (0..1, the speech engine's own scale; it doesn't go through the SFX bus).
+var commentary_enabled: bool = true
+var commentary_volume: float = 0.8
 var show_fps: bool = false
 var window_mode: int = 0 # 0: Windowed, 1: Fullscreen
 var resolution_index: int = 1 # Default 1920x1080
@@ -246,6 +250,8 @@ func load_settings():
 	if err == OK:
 		music_volume = config.get_value("audio", "music", 0.8)
 		sfx_volume = config.get_value("audio", "sfx", 0.7)
+		commentary_enabled = bool(config.get_value("audio", "commentary_enabled", true))
+		commentary_volume = clampf(float(config.get_value("audio", "commentary_volume", 0.8)), 0.0, 1.0)
 		show_fps = config.get_value("display", "show_fps", false)
 		window_mode = config.get_value("display", "window_mode", 0)
 		resolution_index = config.get_value("display", "resolution_index", 1)
@@ -300,6 +306,8 @@ func save_settings():
 	config.load(SETTINGS_FILE)
 	config.set_value("audio", "music", music_volume)
 	config.set_value("audio", "sfx", sfx_volume)
+	config.set_value("audio", "commentary_enabled", commentary_enabled)
+	config.set_value("audio", "commentary_volume", commentary_volume)
 	config.set_value("display", "show_fps", show_fps)
 	config.set_value("display", "window_mode", window_mode)
 	config.set_value("display", "resolution_index", resolution_index)
@@ -589,6 +597,16 @@ func set_sfx_volume(linear_val: float, save: bool = true):
 	var bus_idx = AudioServer.get_bus_index("SFX")
 	if bus_idx == -1: bus_idx = AudioServer.get_bus_index("Master")
 	AudioServer.set_bus_volume_db(bus_idx, linear_to_db(linear_val))
+	if save: save_settings()
+
+func set_commentary_enabled(enabled: bool, save: bool = true):
+	commentary_enabled = enabled
+	if not enabled and DisplayServer.has_feature(DisplayServer.FEATURE_TEXT_TO_SPEECH):
+		DisplayServer.tts_stop()
+	if save: save_settings()
+
+func set_commentary_volume(linear_val: float, save: bool = true):
+	commentary_volume = clampf(linear_val, 0.0, 1.0)
 	if save: save_settings()
 
 func set_show_fps(enabled: bool, save: bool = true):

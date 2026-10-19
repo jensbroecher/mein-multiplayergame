@@ -88,6 +88,8 @@ const MISS_DISTANCE := 14.0
 const MISS_MAX_STEP := 40.0
 ## The start gantry (CheckpointGate's finish line), fed the standings for its ticker.
 var _gantry: Node = null
+## Speaks the race calls by racer name (RaceCommentator.gd); fed the standings on every peer.
+var _commentator: Node = null
 
 var spawn_points: Array = []
 @onready var players_container = $Players
@@ -759,6 +761,10 @@ func start_race():
 		return
 	race_state = RaceState.RACING
 	next_finish_pos = 1
+	if _commentator == null:
+		_commentator = preload("res://RaceCommentator.gd").new()
+		_commentator.name = "RaceCommentator"
+		add_child(_commentator)
 	for ui in _all_race_uis():
 		ui.show_hud()
 		var lp = ui.get_node_or_null("LobbyPanel")
@@ -799,6 +805,7 @@ func start_race():
 		ui.show_message("GO!", 2.0)
 	_show_start_lights(4)
 	MusicManager.play_voice("go")
+	_commentator.begin()
 	MusicManager.play_race_start_beep(true) # higher/longer 4th beep
 	MusicManager.load_playlist_for_level(scene_file_path)
 	MusicManager.play_race_music()
@@ -844,6 +851,8 @@ func _feed_gantry(rows: Array) -> void:
 		_gantry.update_standings(rows)
 	# Trackside lap boards (LapBoard.gd) show the leader's lap.
 	get_tree().call_group(&"lap_boards", &"show_standings", rows)
+	if _commentator:
+		_commentator.update(rows, NetworkManager.max_laps)
 
 var _cached_grass_mat: ShaderMaterial = null
 
