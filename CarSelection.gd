@@ -437,10 +437,10 @@ func _add_showroom_antenna() -> void:
 	rod.position.y = 0.4
 	_showroom_antenna.add_child(rod)
 	var tip_mat := StandardMaterial3D.new()
-	tip_mat.albedo_color = Color(1, 0.2, 0)
+	tip_mat.albedo_color = current_paint.get("accent", Color(1, 0.2, 0))
 	tip_mat.roughness = 0.2
 	tip_mat.emission_enabled = true
-	tip_mat.emission = Color(1, 0.2, 0)
+	tip_mat.emission = current_paint.get("accent", Color(1, 0.2, 0))
 	tip_mat.emission_energy_multiplier = 1.5
 	var tip_mesh := SphereMesh.new()
 	tip_mesh.radius = 0.04
@@ -994,6 +994,10 @@ func _paint_changed(save := true) -> void:
 	_paint_values["antenna"].text = "ON" if CarPaint.has_antenna(current_paint) else "OFF"
 	if _showroom_antenna:
 		_showroom_antenna.visible = CarPaint.has_antenna(current_paint)
+		var tip := _showroom_antenna.get_child(1) as MeshInstance3D
+		var tip_mat := (tip.mesh as SphereMesh).material as StandardMaterial3D
+		tip_mat.albedo_color = current_paint.get("accent", Color(1, 0.2, 0))
+		tip_mat.emission = current_paint.get("accent", Color(1, 0.2, 0))
 	if save:
 		_save_paint()
 
