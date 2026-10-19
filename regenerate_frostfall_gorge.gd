@@ -39,6 +39,7 @@ const LEVEL_NAME := "FrostfallGorgeLevel"
 const LEVEL_PATH := "res://levels/FrostfallGorgeLevel.tscn"
 const RES_PREFIX := "frostfall_"
 const MeshChunker = preload("res://MeshChunker.gd")
+const WoodlandBuilder = preload("res://WoodlandBuilder.gd")
 const RiverWaterScript = preload("res://RiverWater.gd")
 ## See CLAUDE.md, "Large meshes are chunked".
 const MESH_CHUNK_CELL := 80.0
@@ -2036,202 +2037,174 @@ func _build_jump_flags(parent: Node) -> void:
 				root.add_child(flag)
 
 
-## Procedural snowy spruce: a tapered trunk carrying drooping, star-shaped branch whorls that get
-## smaller toward a pointed top, so the outline is ragged like a real spruce instead of a stack
-## of smooth cones. Shaded by spruce.gdshader (vertex colour = needle colour, alpha = snow weight,
-## UV = metres out along the branch and around the whorl, for the needle texture).
+## Procedural snowy spruce: a trunk under whorls of separate drooping branches, each a curved card
+## of drawn needle spray (WoodlandBuilder's spruce atlas cell, alpha-tested by spruce_fronds.gdshader),
+## so the outline is ragged and the light gets in between the branches. Every branch has a shorter
+## frond hanging under it, which fills the crown from the side and from below.
 ##
-## Every whorl's apex is raised until it reaches above the drooping rim of the whorl over it, and
-## the top whorl closes in a point at the full height. Without that, sparse whorls (the far mesh
-## has only four) leave a gap where only the thin trunk shows and the crown appears to float.
+## Two surfaces: 0 is the trunk (spruce.gdshader: vertex colour = bark, alpha 0), 1 the fronds
+## (vertex colour = tint, alpha = snow weight; UV = the atlas cell).
 ##
-## `variant` 0 is a tall mature tree, 1 a younger, bushier one. `lod` 0 is the near mesh (~330
-## triangles), 1 the distant stand-in (~110) with the same outline in fewer whorls and points.
+## Whorls close up toward the top and the leader ends in rings of upright fronds, so there is no gap
+## where only the thin trunk shows and the crown appears to float. Whorls alternate their angles and
+## every frond is jittered, so no two layers line up.
+##
+## `variant` 0 is a tall mature tree, 1 a younger, bushier one. `lod` 0 is the near mesh, 1 the
+## distant stand-in with the same outline in fewer whorls and fronds.
 func _spruce_mesh(variant: int, lod: int) -> ArrayMesh:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 9100 + variant * 31
 	var height: float = 11.0 if variant == 0 else 7.6
-	var base_r: float = 3.0 if variant == 0 else 2.8
-	var whorls: int = (9 if variant == 0 else 7) if lod == 0 else 4
-	var points: int = 9 if lod == 0 else 6
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	# Vertices as [position, normal, colour, uv].
-	var emit := func(a: Array, b: Array, c: Array, hint: Vector3) -> void:
-		# Front face toward `hint` (Godot winds clockwise; face normal (c - a) x (b - a)).
-		if (c[0] - a[0]).cross(b[0] - a[0]).dot(hint) < 0.0:
-			var t: Array = b
-			b = c
-			c = t
-		for v in [a, b, c]:
-			st.set_normal(v[1])
-			st.set_color(v[2])
-			st.set_uv(v[3])
-			st.add_vertex(v[0])
+	var base_r: float = 3.2 if variant == 0 else 3.0
+	var whorls: int = (17 if variant == 0 else 12) if lod == 0 else 9
+	var per: int = (9 if variant == 0 else 8) if lod == 0 else 6
+	var segs: int = 2
 
-	# Whorl layout first, so each one can be sized against the one above it.
-	var layers: Array = []
-	for w in range(whorls):
-		var t: float = float(w) / float(maxi(whorls - 1, 1))
-		var y_base: float = lerpf(1.3, height * 0.80, pow(t, 0.92))
-		var r: float = base_r * pow(1.0 - t * 0.9, 0.95) * rng.randf_range(0.92, 1.08) + 0.3
-		layers.append({"y": y_base, "r": r, "droop": r * 0.42, "rot": rng.randf() * TAU})
-	for w in range(whorls):
-		var L: Dictionary = layers[w]
-		var apex_y: float
-		if w == whorls - 1:
-			apex_y = height
-		else:
-			var above: Dictionary = layers[w + 1]
-			apex_y = maxf(L["y"] + lerpf(1.7, 1.0, float(w) / float(whorls)), above["y"] - above["droop"] * 0.35 + 0.5)
-		L["apex"] = apex_y
-
-	# Trunk: visible under the lowest whorl, tapering up into the top whorl.
+	# --- The trunk: a tapered 8-sided tube, thick at the foot, with a swelling at the root.
+	var bark_st := SurfaceTool.new()
+	bark_st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var bark := Color(0.12, 0.085, 0.06, 0.0)
-	var sides: int = 6 if lod == 0 else 4
-	var trunk_top: float = height - 0.8
-	for k in range(sides):
-		var a0: float = TAU * float(k) / float(sides)
-		var a1: float = TAU * float(k + 1) / float(sides)
-		var d0 := Vector3(cos(a0), 0.0, sin(a0))
-		var d1 := Vector3(cos(a1), 0.0, sin(a1))
-		var b0: Vector3 = d0 * 0.34 + Vector3(0, -0.6, 0)
-		var b1: Vector3 = d1 * 0.34 + Vector3(0, -0.6, 0)
-		var t0: Vector3 = d0 * 0.06 + Vector3(0, trunk_top, 0)
-		var t1: Vector3 = d1 * 0.06 + Vector3(0, trunk_top, 0)
-		var out: Vector3 = (d0 + d1).normalized()
-		var u0: float = float(k) / float(sides)
-		var u1: float = float(k + 1) / float(sides)
-		emit.call([b0, d0, bark, Vector2(u0, 0)], [t0, d0, bark * 0.8, Vector2(u0, trunk_top)], [b1, d1, bark, Vector2(u1, 0)], out)
-		emit.call([b1, d1, bark, Vector2(u1, 0)], [t0, d0, bark * 0.8, Vector2(u0, trunk_top)], [t1, d1, bark * 0.8, Vector2(u1, trunk_top)], out)
+	var sides: int = 8 if lod == 0 else 5
+	var rings := 6
+	var trunk_top: float = height - 0.5
+	for ri in range(rings):
+		var t0: float = float(ri) / float(rings)
+		var t1: float = float(ri + 1) / float(rings)
+		var y0: float = lerpf(-0.6, trunk_top, t0)
+		var y1: float = lerpf(-0.6, trunk_top, t1)
+		var r0: float = 0.36 * lerpf(1.0, 0.16, t0) * (1.0 + 0.3 * (1.0 - smoothstep(0.0, 0.1, t0)))
+		var r1: float = 0.36 * lerpf(1.0, 0.16, t1) * (1.0 + 0.3 * (1.0 - smoothstep(0.0, 0.1, t1)))
+		for k in range(sides):
+			var a0: float = TAU * float(k) / float(sides)
+			var a1: float = TAU * float(k + 1) / float(sides)
+			var d0 := Vector3(cos(a0), 0.0, sin(a0))
+			var d1 := Vector3(cos(a1), 0.0, sin(a1))
+			var v: Array = [
+				[d0 * r0 + Vector3(0, y0, 0), d0, Vector2(float(k) / sides, y0)],
+				[d1 * r0 + Vector3(0, y0, 0), d1, Vector2(float(k + 1) / sides, y0)],
+				[d0 * r1 + Vector3(0, y1, 0), d0, Vector2(float(k) / sides, y1)],
+				[d1 * r1 + Vector3(0, y1, 0), d1, Vector2(float(k + 1) / sides, y1)],
+			]
+			var shade: float = lerpf(1.0, 0.8, t1)
+			for tri in [[0, 2, 1], [1, 2, 3]]:
+				for vi in tri:
+					bark_st.set_normal(v[vi][1])
+					bark_st.set_color(Color(bark.r * shade, bark.g * shade, bark.b * shade, 0.0))
+					bark_st.set_uv(v[vi][2])
+					bark_st.add_vertex(v[vi][0])
 
-	# The shaded core of the crown is darker than the sunlit tips.
-	var core := Color(0.035, 0.075, 0.055, 0.9)
-	var mid := Color(0.075, 0.150, 0.105, 1.0)
-	var tip_col := Color(0.105, 0.195, 0.130, 0.75)
-	for L in layers:
-		var y_base: float = L["y"]
-		var r: float = L["r"]
-		var droop: float = L["droop"]
-		var apex := Vector3(0, L["apex"], 0)
-		var under := Vector3(0, lerpf(y_base, L["apex"], 0.15), 0)
-		var ring: Array = []
-		for k in range(points * 2):
-			var ang: float = L["rot"] + PI * float(k) / float(points)
-			var tip: bool = k % 2 == 0
-			var rr: float = r * (rng.randf_range(0.9, 1.12) if tip else rng.randf_range(0.5, 0.62))
-			var yy: float = y_base - (droop * rng.randf_range(0.85, 1.15) if tip else droop * 0.35)
-			ring.append({"p": Vector3(cos(ang) * rr, yy, sin(ang) * rr), "ang": ang, "tip": tip})
-		# Rounded normals: from a point below the whorl's centre, so the crown shades as a mass.
-		var centre := Vector3(0, y_base - r * 0.9, 0)
-		for k in range(points * 2):
-			var e0: Dictionary = ring[k]
-			var e1: Dictionary = ring[(k + 1) % (points * 2)]
-			var p0: Vector3 = e0["p"]
-			var p1: Vector3 = e1["p"]
-			var c0: Color = tip_col if e0["tip"] else mid
-			var c1: Color = tip_col if e1["tip"] else mid
-			# UV: u runs out along the branch (metres from the trunk), v around the whorl (metres of
-			# arc at the rim), so the needle texture lies along each branch at the same scale on every tree.
-			var a1: float = e1["ang"] if k + 1 < points * 2 else float(e1["ang"]) + TAU
-			var v0: float = float(e0["ang"]) * r
-			var v1: float = a1 * r
-			var uv0 := Vector2(Vector2(p0.x, p0.z).length(), v0)
-			var uv1 := Vector2(Vector2(p1.x, p1.z).length(), v1)
-			var uva := Vector2(0.0, (v0 + v1) * 0.5)
-			var out: Vector3 = Vector3(p0.x + p1.x, 0.0, p0.z + p1.z).normalized() + Vector3.UP * 0.8
-			emit.call([apex, Vector3.UP, core, uva], [p0, (p0 - centre).normalized(), c0, uv0],
-					[p1, (p1 - centre).normalized(), c1, uv1], out)
-			# Underside: dark, holds no snow, faces down and out.
-			var dn0: Vector3 = (Vector3(p0.x, 0.0, p0.z).normalized() + Vector3.DOWN).normalized()
-			var dn1: Vector3 = (Vector3(p1.x, 0.0, p1.z).normalized() + Vector3.DOWN).normalized()
-			var dark := Color(core.r * 0.8, core.g * 0.8, core.b * 0.8, 0.0)
-			emit.call([under, Vector3.DOWN, dark, uva],
-					[p0, dn0, Color(c0.r * 0.6, c0.g * 0.6, c0.b * 0.6, 0.0), uv0],
-					[p1, dn1, Color(c1.r * 0.6, c1.g * 0.6, c1.b * 0.6, 0.0), uv1],
-					Vector3.DOWN + out * 0.1)
+	# --- The fronds.
+	var fr := SurfaceTool.new()
+	fr.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var vbase := 0
+	var y_lo := 1.5
+	var tint := Color(0.80, 1.0, 0.78)
+	var rot := rng.randf() * TAU
+	for w in range(whorls):
+		var t: float = float(w) / float(whorls - 1)
+		# Whorls close up toward the leader.
+		var y: float = lerpf(y_lo, height - 1.6, 1.0 - pow(1.0 - t, 1.25)) + rng.randf_range(-0.12, 0.12)
+		var reach: float = base_r * pow(1.0 - t * 0.93, 0.92) + 0.55
+		var n: int = maxi(per - int(t * 3.0), 5 if lod == 0 else 4)
+		rot += rng.randf_range(0.5, 1.4)
+		var shade0: float = lerpf(0.62, 0.92, t)
+		for b in range(n):
+			var a: float = rot + TAU * float(b) / float(n) + rng.randf_range(-0.22, 0.22)
+			var dir := Vector3(cos(a), 0.0, sin(a))
+			var length: float = reach * rng.randf_range(0.82, 1.12) * (1.0 if lod == 0 else 1.1)
+			var by: float = y + rng.randf_range(-0.28, 0.28)
+			# A sunlit upper frond, drooping at the tip; lower branches droop more.
+			vbase = _spruce_frond(fr, vbase, Vector3(0, by, 0) + dir * 0.18, dir, rng.randf_range(0.06, 0.30) + t * t * 0.45,
+					rng.randf_range(0.9, 1.4) * (1.0 - t * 0.5), length, length * (0.62 if lod == 0 else 0.8), segs, tint, shade0, minf(shade0 + 0.3, 1.0),
+					0.30 + rng.randf_range(-0.08, 0.08), 0.55 + t * 0.2, rng.randf())
+			if t < 0.9 and (lod == 0 or b % 2 == 0):
+				# A shorter frond under the branch, between the upper ones: it holds no snow and sits
+				# in the crown's shade.
+				var d2: Vector3 = dir.rotated(Vector3.UP, PI / float(n) + rng.randf_range(-0.2, 0.2))
+				vbase = _spruce_frond(fr, vbase, Vector3(0, by - 0.42, 0) + d2 * 0.18, d2, -0.12, rng.randf_range(0.7, 1.0),
+						length * 0.74, length * 0.46, 2, tint.darkened(0.08), shade0 * 0.85, shade0,
+						0.28, 0.0, rng.randf())
+	# The spire: rings of fronds standing up round the leader, shorter and steeper toward the tip.
+	var spire := [[height - 2.9, 5, 1.7, 0.85, -0.15, 2.2], [height - 2.1, 5, 1.3, 1.0, -0.2, 1.8], [height - 1.35, 4, 1.0, 1.15, -0.2, 1.4], [height - 0.75, 4, 0.7, 1.3, -0.15, 1.0], [height - 0.3, 3, 0.45, 1.4, -0.1, 0.7]]
+	for ring in spire:
+		var rot2: float = rng.randf() * TAU
+		for k in range(int(ring[1])):
+			var a2: float = rot2 + TAU * float(k) / float(ring[1])
+			var dir2 := Vector3(cos(a2), 0.0, sin(a2))
+			vbase = _spruce_frond(fr, vbase, Vector3(0, ring[0], 0) + dir2 * 0.05, dir2, ring[3], ring[4], ring[5], ring[2] * 0.7,
+					2, tint, 0.85, 1.0, 0.28, 0.75, rng.randf())
 
-	var mesh: ArrayMesh = st.commit()
-	var mat := ShaderMaterial.new()
-	mat.shader = load("res://spruce.gdshader")
-	mat.set_shader_parameter("needle_albedo", _needle_textures()[0])
-	mat.set_shader_parameter("needle_normal", _needle_textures()[1])
-	mesh.surface_set_material(0, mat)
+	var mesh: ArrayMesh = bark_st.commit()
+	var bmat := ShaderMaterial.new()
+	bmat.shader = load("res://spruce.gdshader")
+	mesh.surface_set_material(0, bmat)
+	fr.commit(mesh)
+	var fmat := ShaderMaterial.new()
+	fmat.shader = load("res://spruce_fronds.gdshader")
+	fmat.set_shader_parameter("leaf_tex", _spray_atlas())
+	mesh.surface_set_material(1, fmat)
 	return mesh
 
 
-var _needle_tex_cache: Array = []
+var _spray_atlas_cache: Texture2D
 
-## A tiling spruce-twig texture, generated: twigs run along U (out along the branch), each with
-## short needles angled forward on both sides, with light and dark needles mixed and a height map
-## turned into a normal map so the needles catch the light. Returns [albedo, normal], both saved
-## under res://generated/ with mipmaps.
-func _needle_textures() -> Array:
-	if not _needle_tex_cache.is_empty():
-		return _needle_tex_cache
-	const SIZE := 256
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 4242
-	var hgt := PackedFloat32Array()
-	hgt.resize(SIZE * SIZE)
-	var lum := PackedFloat32Array()
-	lum.resize(SIZE * SIZE)
-	for i in range(SIZE * SIZE):
-		lum[i] = 0.18
-	# Twigs: horizontal rows across V, each wobbling a little; needles fan off them toward +U.
-	var twigs := 7
-	for tw in range(twigs):
-		var v_base: float = (float(tw) + rng.randf_range(0.2, 0.8)) / float(twigs) * SIZE
-		var wobble: float = rng.randf_range(2.0, 5.0)
-		var phase: float = rng.randf() * TAU
-		var x := 0.0
-		while x < SIZE:
-			var vy: float = v_base + sin(x / SIZE * TAU * 2.0 + phase) * wobble
-			for side in [-1.0, 1.0]:
-				var ang: float = deg_to_rad(rng.randf_range(35.0, 60.0)) * side
-				var length: float = rng.randf_range(9.0, 15.0)
-				var bright: float = rng.randf_range(0.55, 1.0)
-				var steps: int = int(length * 2.0)
-				for s2 in range(steps):
-					var f: float = float(s2) / float(steps)
-					var px: float = x + cos(ang) * length * f
-					var py: float = vy + sin(ang) * length * f
-					# Needles are 2px wide, taper at the tip, and wrap so the texture tiles.
-					for wv in [0.0, 0.7]:
-						var ix: int = posmod(int(px), SIZE)
-						var iy: int = posmod(int(py + wv), SIZE)
-						var idx: int = iy * SIZE + ix
-						var h: float = (1.0 - f * 0.6) * bright
-						if h > hgt[idx]:
-							hgt[idx] = h
-							lum[idx] = lerpf(0.45, 1.0, bright) * (1.0 - f * 0.25)
-			x += rng.randf_range(2.2, 3.4)
-		# The twig itself: a thin brown-dark ridge.
-		for xi in range(SIZE):
-			var vy2: float = v_base + sin(float(xi) / SIZE * TAU * 2.0 + phase) * wobble
-			var idx2: int = posmod(int(vy2), SIZE) * SIZE + xi
-			hgt[idx2] = maxf(hgt[idx2], 0.7)
-			lum[idx2] = 0.32
-	var albedo := Image.create(SIZE, SIZE, false, Image.FORMAT_RGB8)
-	var normal := Image.create(SIZE, SIZE, false, Image.FORMAT_RGB8)
-	for y in range(SIZE):
-		for x in range(SIZE):
-			var i: int = y * SIZE + x
-			var l: float = lum[i]
-			albedo.set_pixel(x, y, Color(l, l, l))
-			var hl: float = hgt[y * SIZE + posmod(x - 1, SIZE)]
-			var hr: float = hgt[y * SIZE + posmod(x + 1, SIZE)]
-			var hd: float = hgt[posmod(y - 1, SIZE) * SIZE + x]
-			var hu: float = hgt[posmod(y + 1, SIZE) * SIZE + x]
-			var n := Vector3((hl - hr) * 2.5, (hd - hu) * 2.5, 1.0).normalized()
-			normal.set_pixel(x, y, Color(n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, n.z * 0.5 + 0.5))
-	albedo.generate_mipmaps()
-	normal.generate_mipmaps()
-	_needle_tex_cache = [
-		_save_baked_resource(ImageTexture.create_from_image(albedo), "spruce_needles_albedo"),
-		_save_baked_resource(ImageTexture.create_from_image(normal), "spruce_needles_normal"),
-	]
-	return _needle_tex_cache
+## WoodlandBuilder's leaf atlas, whose cell 3 (u and v from 0.5) is a spruce spray drawn upright with
+## its base at the cell's foot, saved with coverage-preserving mipmaps so distant crowns keep their mass.
+func _spray_atlas() -> Texture2D:
+	if _spray_atlas_cache == null:
+		var w := WoodlandBuilder.new()
+		w.save_res = func(res: Resource, _n: String) -> Resource: return _save_baked_resource(res, "spruce_spray_atlas")
+		_spray_atlas_cache = w.atlas()
+	return _spray_atlas_cache
+
+
+## One spruce frond: a card strip from `root` along `dir`, rising at `rise` and drooping by `droop`
+## toward the tip, `length` long and `width` out to each side, in `segs` quads, folded into a shallow
+## V (`fold` radians each side) so a branch seen edge-on is not a thin line. Normals are the crown's:
+## rounded out from the trunk and tipped up by `lift` (or down for an under frond, `lift` 0). The
+## vertex colour is the tint shaded from `shade0` at the root to `shade1` at the tip, with `snow` in
+## alpha. Returns the next vertex index. (After WoodlandBuilder.frond.)
+func _spruce_frond(st: SurfaceTool, base: int, root: Vector3, dir: Vector3, rise: float, droop: float, length: float,
+		width: float, segs: int, tint: Color, shade0: float, shade1: float, fold: float, snow: float, jitter: float) -> int:
+	# Cell 3 of the atlas.
+	var cell := Rect2(0.5, 0.5, 0.5, 0.5)
+	var flat := Vector3(dir.x, 0.0, dir.z).normalized()
+	var side := Vector3(-flat.z, 0.0, flat.x)
+	var p := root
+	var pts: Array = [p]
+	for k in range(segs):
+		var t: float = (float(k) + 0.5) / float(segs)
+		var ang: float = rise - (rise + droop) * t * t
+		p += (flat * cos(ang) + Vector3.UP * sin(ang)) * (length / float(segs))
+		pts.append(p)
+	var cf: float = cos(fold)
+	var sf: float = sin(fold)
+	var under: bool = snow <= 0.0
+	# Each frond shows its own part of the spray's width, so neighbours are not copies.
+	var u0: float = cell.position.x + cell.size.x * (0.02 + jitter * 0.04)
+	var u1: float = cell.position.x + cell.size.x * (0.98 - (1.0 - jitter) * 0.04)
+	for k in range(segs + 1):
+		var t: float = float(k) / float(segs)
+		var q: Vector3 = pts[k]
+		var w: float = width * (0.45 + 0.55 * sin(PI * clampf(0.15 + t * 0.85, 0.0, 1.0)))
+		var fwd: Vector3 = ((pts[mini(k + 1, segs)] as Vector3) - (pts[maxi(k - 1, 0)] as Vector3)).normalized()
+		var up: Vector3 = side.cross(fwd).normalized()
+		if up.y < 0.0:
+			up = -up
+		var v: float = cell.position.y + cell.size.y * (1.0 - t)
+		var shade: float = lerpf(shade0, shade1, t)
+		var out_n: Vector3 = (flat * 0.9 + (Vector3.DOWN * 0.5 if under else Vector3.UP * (0.5 + 0.4 * (1.0 - t)))).normalized()
+		for e in [-1.0, 0.0, 1.0]:
+			var pos: Vector3 = q + side * (w * cf * e) + up * (w * sf * absf(e))
+			st.set_normal(out_n)
+			st.set_color(Color(tint.r * shade, tint.g * shade, tint.b * shade, snow * (0.5 + 0.5 * t) if not under else 0.0))
+			st.set_uv(Vector2(lerpf(u0, u1, 0.5 + e * 0.5), v))
+			st.add_vertex(pos)
+	for k in range(segs):
+		var a0: int = base + k * 3
+		for idx in [a0, a0 + 3, a0 + 1, a0 + 1, a0 + 3, a0 + 4, a0 + 1, a0 + 4, a0 + 2, a0 + 2, a0 + 4, a0 + 5]:
+			st.add_index(idx)
+	return base + (segs + 1) * 3
 
 
 ## Spruce stands on the gentle ground away from the trail, and rocks along the gorge rims. Tree
@@ -2340,11 +2313,12 @@ func _build_forest_cells(parent: Node, trees: Array, variants: Array) -> void:
 
 ## Sets up a spruce mesh's material for the near/far crossfade (lod_mode in spruce.gdshader).
 func _spruce_lod(mesh: ArrayMesh, mode: int) -> ArrayMesh:
-	var mat: ShaderMaterial = mesh.surface_get_material(0)
-	mat.set_shader_parameter("lod_mode", mode)
-	mat.set_shader_parameter("lod_fade_begin", FOREST_NEAR - FOREST_FADE * 0.5)
-	mat.set_shader_parameter("lod_fade_end", FOREST_NEAR + FOREST_FADE * 0.5)
-	mat.set_shader_parameter("lod_jitter", FOREST_FADE_JITTER)
+	for i in range(mesh.get_surface_count()):
+		var mat: ShaderMaterial = mesh.surface_get_material(i)
+		mat.set_shader_parameter("lod_mode", mode)
+		mat.set_shader_parameter("lod_fade_begin", FOREST_NEAR - FOREST_FADE * 0.5)
+		mat.set_shader_parameter("lod_fade_end", FOREST_NEAR + FOREST_FADE * 0.5)
+		mat.set_shader_parameter("lod_jitter", FOREST_FADE_JITTER)
 	return mesh
 
 

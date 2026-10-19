@@ -1,7 +1,9 @@
 shader_type spatial;
 render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 
-// Snowy spruce for Frostfall Gorge. The generator builds each tree as drooping star-shaped branch
+// Trunks of Frostfall Gorge's spruces (the needle fronds are spruce_fronds.gdshader, which supersedes the
+// whorl-cone crown this shader was written for; its needle and snow code is unused now, bark only).
+// The original notes follow. Snowy spruce for Frostfall Gorge. The generator builds each tree as drooping star-shaped branch
 // whorls and bakes into the vertex colour:
 //   rgb - needle (or bark) colour, already darkened toward the shaded core of the tree
 //   a   - how much snow that surface can hold: 1 on the upper side of a branch, 0 underneath
