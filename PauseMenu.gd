@@ -24,6 +24,8 @@ func _ready():
 	btn_resume.pressed.connect(_on_resume_pressed)
 	btn_restart.pressed.connect(_on_restart_pressed)
 	btn_exit.pressed.connect(_on_exit_pressed)
+	btn_restart.set_meta(&"ui_important", true)
+	btn_exit.set_meta(&"ui_important", true)
 
 func _build_camera_option() -> void:
 	var settings_list = $Panel/MarginContainer/VBoxContainer/SettingsList

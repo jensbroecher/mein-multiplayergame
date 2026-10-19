@@ -17,6 +17,7 @@ extends RigidBody3D
 var paint: Dictionary = {}
 
 const CarPaint = preload("res://CarPaint.gd")
+const CarDebris = preload("res://CarDebris.gd")
 const CAR_FADE_SHADER = preload("res://car_body_fade.gdshader")
 ## Transparent twins of the procedural cars' materials, by the opaque one's instance id.
 static var _car_fade_materials := {}
@@ -29,6 +30,8 @@ static var _lightning_spark_quad: QuadMesh
 const CAR_PRESETS = [
 	{
 		"name": "Viper",
+		"engine_sound": "res://sounds/enginesounds/Seamless_loop_of_a_h_#2-1792363041756.wav",
+		"engine_gain_db": 0.0,
 		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
 		"model_path": "res://generated/cars/Viper.tscn",
 		"model_y_rotation": PI,
@@ -42,6 +45,8 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Shadow",
+		"engine_sound": "res://sounds/enginesounds/electric_motor_#4-1792362886066.wav",
+		"engine_gain_db": 10.8,
 		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
 		"model_path": "res://generated/cars/Shadow.tscn",
 		"model_y_rotation": PI,
@@ -55,6 +60,8 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Strikeforce",
+		"engine_sound": "res://sounds/enginesounds/Seamless_loop_of_a_h_#4-1792363022411.wav",
+		"engine_gain_db": -3.1,
 		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
 		"model_path": "res://generated/cars/Strikeforce.tscn",
 		"model_y_rotation": PI,
@@ -68,6 +75,8 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Apex",
+		"engine_sound": "res://sounds/enginesounds/Seamless_loop_of_a_h_#3-1792363081295.wav",
+		"engine_gain_db": -2.8,
 		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
 		"model_path": "res://generated/cars/Apex.tscn",
 		"model_y_rotation": PI,
@@ -81,6 +90,8 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Interceptor",
+		"engine_sound": "res://sounds/enginesounds/Seamless_loop_of_a_h_#3-1792363107864.wav",
+		"engine_gain_db": -3.2,
 		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
 		"model_path": "res://generated/cars/Interceptor.tscn",
 		"model_y_rotation": PI,
@@ -94,6 +105,8 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Mudrunner",
+		"engine_sound": "res://sounds/enginesounds/freesound_community-engine-6000_edited.wav",
+		"engine_gain_db": 0.0,
 		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
 		"model_path": "res://generated/cars/Mudrunner.tscn",
 		"model_y_rotation": PI,
@@ -107,6 +120,8 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Phantom",
+		"engine_sound": "res://sounds/enginesounds/hum_of_an_electric_m_#2-1792362808545.wav",
+		"engine_gain_db": 17.8,
 		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
 		"model_path": "res://generated/cars/Phantom.tscn",
 		"model_y_rotation": PI,
@@ -120,6 +135,8 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Centurion",
+		"engine_sound": "res://sounds/enginesounds/Seamless_loop_of_a_h_#4-1792363055231.wav",
+		"engine_gain_db": -3.6,
 		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
 		"model_path": "res://generated/cars/Centurion.tscn",
 		"model_y_rotation": PI,
@@ -455,6 +472,19 @@ var is_drowned: bool = false
 var _drown_tween: Tween = null
 var original_wheel_transforms: Dictionary = {}
 var original_cart_model_transform: Transform3D
+## The explosion's damage ({wheels: [corners], parts: int, disintegrate: bool}, see CarDebris.roll()),
+## instead of a random roll. For tests.
+var damage_override: Dictionary = {}
+## This car's engine loop's loudness trim (its preset's engine_gain_db).
+var _engine_gain_db := 0.0
+## The car's body mesh node, the key its pieces are cached under (CarDebris.prepare()) and the paint
+## its pieces are given.
+var _debris_body: MeshInstance3D
+var _debris_key := ""
+var _debris_paint: Dictionary = {}
+## What the body drew before an explosion tore pieces off it, and the pieces now flying.
+var _debris_body_mesh: Mesh
+var _debris: Array = []
 var part_velocities: Dictionary = {}
 var part_rotations: Dictionary = {}
 var explosion_time: float = 0.0
@@ -712,7 +742,12 @@ func _ready():
 		new_model.transform = Transform3D(Basis(Vector3(0, 1, 0), preset.get("model_y_rotation", PI)) * 2.0, Vector3(0, -0.6072377, 0))
 		original_cart_model_transform = new_model.transform
 		if CarPaint.is_paintable(new_model):
-			CarPaint.apply(new_model, CarPaint.sanitize(paint, preset.name))
+			_debris_paint = CarPaint.sanitize(paint, preset.name)
+			CarPaint.apply(new_model, _debris_paint)
+			_debris_body = new_model.find_child("Body", true, false) as MeshInstance3D
+			_debris_key = preset.model_path
+			# Worker thread: splits the body into the pieces an explosion tears off.
+			CarDebris.prepare(_debris_key, _debris_body)
 		
 		# Look for an AntennaPlacement node to reposition the dynamic antenna
 		var antenna_placement = new_model.get_node_or_null("AntennaPlacement")
@@ -1422,9 +1457,9 @@ func _process(delta):
 				_setup_engine_sound()
 			if not engine_sound.playing:
 				engine_sound.play()
-				engine_sound.volume_db = -32.0
+				engine_sound.volume_db = -32.0 + _engine_gain_db
 			var speed_ratio = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
-			var target_vol = lerp(-32.0, -22.0, speed_ratio)
+			var target_vol = lerp(-32.0, -22.0, speed_ratio) + _engine_gain_db
 			if is_boosting:
 				target_vol += 2.0
 			engine_sound.volume_db = move_toward(engine_sound.volume_db, target_vol, 25.0 * delta)
@@ -2612,16 +2647,24 @@ func _physics_process(delta):
 				angular_velocity = Vector3.ZERO
 	_move_and_sync()
 
-const ENGINE_SOUND_PATH := "res://sounds/freesound_community-engine-6000_edited.wav"
+## The engine loop a preset without its own uses. Each car has one (`engine_sound`), and
+## `engine_gain_db` brings it to the loudness of this one, the Mudrunner's: the loops were made at
+## very different levels (the electric ones far quieter).
+const ENGINE_SOUND_PATH := "res://sounds/enginesounds/freesound_community-engine-6000_edited.wav"
 
 func _setup_engine_sound() -> void:
 	if engine_sound == null:
 		return
-	var base_stream: AudioStream = engine_sound.stream
-	if base_stream == null and ResourceLoader.exists(ENGINE_SOUND_PATH):
-		base_stream = load(ENGINE_SOUND_PATH) as AudioStream
+	var preset: Dictionary = CAR_PRESETS[car_index]
+	var path: String = preset.get("engine_sound", ENGINE_SOUND_PATH)
+	_engine_gain_db = float(preset.get("engine_gain_db", 0.0))
+	var base_stream: AudioStream = null
+	if ResourceLoader.exists(path):
+		base_stream = load(path) as AudioStream
 	if base_stream == null:
-		push_warning("PlayerCart: engine sound missing at ", ENGINE_SOUND_PATH)
+		base_stream = engine_sound.stream
+	if base_stream == null:
+		push_warning("PlayerCart: engine sound missing at ", path)
 		return
 	var engine_stream: AudioStream = base_stream.duplicate()
 	if engine_stream is AudioStreamWAV:
@@ -2647,7 +2690,7 @@ func _setup_engine_sound() -> void:
 		(engine_stream as AudioStreamOggVorbis).loop = true
 	engine_sound.stream = engine_stream
 	engine_sound.pitch_scale = 1.0
-	engine_sound.volume_db = -32.0
+	engine_sound.volume_db = -32.0 + _engine_gain_db
 	engine_sound.unit_size = 6.0
 	engine_sound.max_distance = 45.0
 	engine_sound.attenuation_filter_cutoff_hz = 16000.0
@@ -3486,6 +3529,8 @@ func _update_visual_states(delta):
 						part.rotate_z(part_rotations[part].z * delta)
 					part.global_position = cur_pos
 
+			_update_debris(delta)
+
 			# Fade out in the last second (3.2s to 4.2s)
 			if explosion_time > 3.2:
 				var alpha = clampf(1.0 - (explosion_time - 3.2), 0.0, 1.0)
@@ -3517,6 +3562,7 @@ func _update_visual_states(delta):
 			part_world_positions.clear()
 			part_on_ground.clear()
 			original_body_part_transforms.clear()
+			_clear_debris()
 
 	# Respawn blinking indicator
 	if respawn_indicator_time > 0.0:
@@ -3666,7 +3712,11 @@ func explode(attacker_id: int = 0):
 	part_on_ground.clear()
 	original_body_part_transforms.clear()
 
-	for corner in ["FL", "FR", "RL", "RR"]:
+	# What this blast takes off: some of the wheels, and body pieces or all of it.
+	var damage: Dictionary = damage_override
+	if damage.is_empty():
+		damage = CarDebris.roll(RandomNumberGenerator.new())
+	for corner in damage["wheels"]:
 		var pivot = get_node_or_null("Visuals/WheelPivot" + corner)
 		if pivot:
 			var local_dir = Vector3.ZERO
@@ -3680,6 +3730,8 @@ func explode(attacker_id: int = 0):
 			part_rotations[pivot] = Vector3(randf_range(-14.0, 14.0), randf_range(-14.0, 14.0), randf_range(-14.0, 14.0))
 			part_world_positions[pivot] = pivot.global_position
 
+	_tear_car(damage)
+
 	if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 		get_tree().create_timer(4.2).timeout.connect(func():
 			if is_instance_valid(self) and not is_finished_race:
@@ -3690,6 +3742,109 @@ func explode(attacker_id: int = 0):
 			if is_instance_valid(self) and not is_finished_race:
 				respawn()
 		)
+
+## The explosion tears the body: the pieces `damage` takes off (CarDebris) leave the car and fly. The
+## body mesh is swapped for one without them, or hidden when the whole car comes apart.
+func _tear_car(damage: Dictionary) -> void:
+	_clear_debris()
+	if _debris_body == null or not is_instance_valid(_debris_body):
+		return
+	var plan := CarDebris.get_plan(_debris_key)
+	if plan.is_empty():
+		return
+	var torn := CarDebris.tear(plan, damage, RandomNumberGenerator.new())
+	var body := _debris_body
+	_debris_body_mesh = body.mesh
+	if torn["stay"] != null:
+		body.mesh = torn["stay"]
+	if torn["hide_body"]:
+		body.visible = false
+
+	var from := body.global_transform
+	var start_rotation := from.basis.get_rotation_quaternion()
+	var scale_factor := from.basis.get_scale().x
+	var blast_centre := from * body.get_aabb().get_center()
+	for piece in torn["pieces"]:
+		var node := MeshInstance3D.new()
+		node.mesh = piece["mesh"]
+		node.set_meta("car_shader", true)
+		node.cast_shadow = body.cast_shadow
+		body.get_parent().add_child(node)
+		CarPaint.apply(node, _debris_paint)
+		var centre: Vector3 = piece["center"]
+		var size: Vector3 = piece["size"]
+		var pos := from * centre
+		var away := pos - blast_centre
+		var push := away.normalized() if away.length() > 0.05 else Vector3.UP
+		var dir := (push + Vector3(randf_range(-0.35, 0.35), randf_range(0.35, 0.9), randf_range(-0.35, 0.35))).normalized()
+		var spin_axis := Vector3(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)).normalized()
+		_debris.append({
+			"node": node,
+			"centre": centre,
+			"pos": pos,
+			"vel": dir * randf_range(4.0, 10.0) + linear_velocity * 0.7,
+			"rotation": start_rotation,
+			"scale": scale_factor,
+			"spin": spin_axis * randf_range(3.0, 13.0),
+			# How far its middle rides above the ground once it lands.
+			"radius": clampf(size.length() * 0.25, 0.05, 0.4) * scale_factor,
+			"settled": false,
+		})
+	_place_debris()
+
+
+## Flies the pieces: thrown, falling, bouncing once or twice and coming to rest.
+func _update_debris(delta: float) -> void:
+	for d in _debris:
+		if d["settled"] or not is_instance_valid(d["node"]):
+			continue
+		var vel: Vector3 = d["vel"]
+		vel.y -= GRAVITY * delta
+		vel.x = move_toward(vel.x, 0.0, 1.5 * delta)
+		vel.z = move_toward(vel.z, 0.0, 1.5 * delta)
+		var pos: Vector3 = d["pos"] + vel * delta
+		var spin: Vector3 = d["spin"]
+		var angle := spin.length() * delta
+		if angle > 0.0:
+			d["rotation"] = (Quaternion(spin.normalized(), angle) * (d["rotation"] as Quaternion)).normalized()
+		if vel.y < 0.0:
+			var ground_y := _get_ground_height(pos)
+			if ground_y != -999.0 and pos.y - d["radius"] <= ground_y:
+				pos.y = ground_y + d["radius"]
+				if vel.y < -3.0:
+					vel = Vector3(vel.x * 0.55, -vel.y * 0.3, vel.z * 0.55)
+					spin *= 0.6
+				else:
+					vel = Vector3.ZERO
+					spin = Vector3.ZERO
+					d["settled"] = true
+		d["vel"] = vel
+		d["spin"] = spin
+		d["pos"] = pos
+	_place_debris()
+
+
+## Puts each piece's node where its simulation has it: its middle at `pos`, turned by `rotation`.
+func _place_debris() -> void:
+	for d in _debris:
+		var node: Node3D = d["node"]
+		if not is_instance_valid(node):
+			continue
+		var piece_basis := Basis(d["rotation"] as Quaternion).scaled(Vector3.ONE * float(d["scale"]))
+		node.global_transform = Transform3D(piece_basis, (d["pos"] as Vector3) - piece_basis * (d["centre"] as Vector3))
+
+
+## Puts the body back as it was and removes the flying pieces.
+func _clear_debris() -> void:
+	for d in _debris:
+		if is_instance_valid(d["node"]):
+			(d["node"] as Node).queue_free()
+	_debris.clear()
+	if _debris_body_mesh != null and _debris_body != null and is_instance_valid(_debris_body):
+		_debris_body.mesh = _debris_body_mesh
+		_debris_body.visible = true
+	_debris_body_mesh = null
+
 
 @rpc("any_peer", "call_local", "reliable")
 func drown_rpc():
@@ -4002,6 +4157,7 @@ func _apply_respawn_pose() -> void:
 	part_world_positions.clear()
 	part_on_ground.clear()
 	original_body_part_transforms.clear()
+	_clear_debris()
 	
 	_set_visuals_alpha(1.0)
 	if name_tag:
@@ -4184,6 +4340,12 @@ func _add_fx_twins() -> void:
 			twin.material_override = twin_mat
 			twin.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			twins.add_child(twin)
+	# The blast's fire and smoke compile as they first burn: copies of them, not emitting, do it now.
+	for particles: Node3D in [explosion_particles, burning_particles, burning_smoke_particles, fire_sprite_particles, fire_sprite_particles_2]:
+		if particles != null:
+			var copy := particles.duplicate(0) as Node3D
+			copy.set("emitting", false)
+			twins.add_child(copy)
 
 
 ## The meshes the fades and flashes change: everything under `node` but the shield, the shockwave

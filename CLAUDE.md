@@ -86,11 +86,42 @@ without regenerating them, run `res://refresh_curb_corners.tscn` headless.
 ## Announcer
 
 The race calls are `voice/lola/` clips, listed per line with their takes in `MusicManager.VOICE_LINES`.
-`play_voice(line)` picks a take at random. Level calls 3/2/1/go in the countdown, "final lap" when a
-local player crosses the line onto the last lap, "finish" at the line, and then the place if it's first
-to third (`_announce_place`). The podium calls each place as it's revealed. Gates still play the old
-`sounds/checkpoint.mp3`, which is a different voice saying "checkpoint". `res://scratch/announcer_test.tscn`
-(headless) walks a player through every gate and lists what was said.
+`play_voice(line)` picks a take at random. Level calls 3/2/1/go in the countdown, and at each gate the
+player is counted for (`_play_lap_cue`) the chime `sounds/checkpointpassed.wav` plus a call: "checkpoint",
+"final lap" when they cross the line onto the last lap, "finish" at the line, and then the place if it's
+first to third (`_announce_place`). The podium calls each place as it's revealed.
+- A human who drives on past the gate they need without being counted gets "checkpoint missed"
+  (`_watch_missed_checkpoints`, server). It follows the cart along the racing line like the AI's gate
+  credit does, and fires once as the cart passes `MISS_DISTANCE` (14m; a gate's area is 8m deep) beyond
+  the gate, until a gate counts. A step along the line over `MISS_MAX_STEP` is a re-sync, not driving
+  (a respawn resets the line). Bots don't hear it: they are credited by progress.
+- `res://scratch/announcer_test.tscn` (headless) walks a player through every gate and lists what was
+  said. `res://scratch/missed_checkpoint_test.tscn -- [level] [skip=N]` drives a cart along the line past
+  all gates but one (16m wide of its area) and reports when the call comes; `skip=-1` is a clean lap,
+  which must say nothing (checked on Meadow, Northlight, Frostpeak, Nyota and Glacier).
+
+## Button sounds and the screen swipe
+
+- MusicManager hooks every `BaseButton` that enters the tree (`node_added`): pressing one plays
+  `confirmbutton.wav`. A button with the meta `ui_important` (Confirm on car select, Host/Ready/Start in
+  the lobby, the podium's Continue, the end-of-race action button, the pause menu's Restart/Exit) plays
+  `confirmbuttonimportant.wav` instead; `ui_silent` keeps one quiet. New buttons need nothing. Both
+  sound files are 3s long with silence after about a second. `res://scratch/ui_sound_test.tscn`.
+- `ScreenTransition.gd` (a CanvasLayer built in code, a child of Main, `screen_swipe.gdshader`) sweeps a
+  navy panel across the screen: `cover()`, `set_covered()`, `reveal()` (sweeps away and fades),
+  `fade_out()`. Its colour is the loading screen's, which is opaque, so one hands over to the other
+  unseen. `Main._swipe(change)` covers, runs `change`, reveals, and drops a second request while one is
+  under way (`busy`): use it for every screen change a player causes. `_show_loading` covers and then
+  fades off the loading screen; `_hide_loading` snaps the panel over it and reveals; a restart loads
+  twice and the second `_show_loading` just changes the text. `_on_server_disconnected` (back to the
+  menu) swipes unless a swipe or the loading screen already covers it.
+- MainMenu and ConfigurationMenu no longer hide themselves after emitting (`start_pressed`,
+  `back_pressed`): the swipe would have shown an empty screen first, so Main hides them inside the swipe.
+  `start_game` hides every menu behind the loading cover. MainMenu's own pages (mode, cup, course) change
+  without a swipe.
+- `res://scratch/screen_swipe_test.tscn` (headless) walks the flows and checks the timing (about 0.9s
+  for cover and reveal, `COVER_TIME`/`REVEAL_TIME`); `res://scratch/swipe_shots.tscn -- <dir>` renders
+  the swipe over the menu.
 
 ## First-use freezes
 
@@ -102,6 +133,9 @@ to third (`_announce_place`). The podium calls each place as it's revealed. Gate
   (`_add_fx_twins`). Give a new effect a shared material and a stand-in there.
 - Flashes on plain meshes (the antenna) only change values on a copy with emission always on
   (`_fx_material`). Turning `emission_enabled` or transparency on and off swaps the shader.
+- The blast's fire and smoke (the cart's own particle nodes) compile when they first burn: each cart adds
+  hidden copies of them to its `FxTwins` (`_add_fx_twins`). That took the first explosion of a race from
+  up to 56ms to under 25.
 - Music: MusicManager keeps track paths and loads only the playing track and the next one, on a
   background thread. Level picks the playlist in `_ready`, so the first track is loaded by GO.
   `load()`ing a stage's whole folder at GO froze the game for about a second.
@@ -461,6 +495,41 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 - `res://scratch/car_select_flow_test.tscn` (headless) walks Main's flow through the screen and prints
   what's visible at each step. `scratch/menu_shot` takes `size=<w>x<h>` (the window can't exceed the
   screen, so on a 16:10 Mac it stays 16:10).
+
+## Explosions tear the cars apart
+
+- `CarDebris.gd`. A procedural car is one `Body` mesh plus four wheels, with every part merged into the
+  body, so the pieces are found in the mesh: triangles that share vertices are one piece (union-find).
+  The biggest is the shell; pieces of 60+ triangles (shocks, bumpers, wings, mirrors, lamps, exhausts,
+  cage tubes: 26-61 on the six cars measured) can tear off alone, and smaller fittings stay on the shell.
+- `PlayerCart._ready` calls `CarDebris.prepare()`: a worker thread splits the body and builds the piece
+  meshes (centred on their own middle, same vertex layout and material as the body, so they take the paint
+  and the fade) and the shell in 11 shards, keyed by model path and shared by every cart of that model.
+  The main thread only reads the mesh arrays first. Nothing is analysed at the explosion.
+- `roll()` picks the damage: about 12% scorched (0-1 wheel, 2-4 parts), 30% the wheels go (2-4 wheels,
+  1-3 parts), 38% stripped (0-2 wheels, 5-10 parts), 20% disintegrates (the shell comes apart in shards
+  and the 22 biggest parts fly singly, 2-4 wheels). Parts are picked weighted toward the big and the
+  outlying. `tear()` assembles it: one new body mesh at most (the index buffer without what came off).
+  Each peer rolls its own, as the wheels always did, so the debris differs between machines.
+- `PlayerCart._tear_car` / `_update_debris` / `_clear_debris` fly each piece with its own simulation
+  (thrown, spinning about its middle, a bounce or two, at rest), not the `part_*` dictionaries the
+  wheels use. The piece keeps the body's vertices because `car_body.gdshader` paints from model-space
+  positions: moving the vertices to recentre them would slide the stripes and the number. The pieces are
+  `car_shader` meshes under the model, so the fade-out and flashes reach them. Respawn restores the body
+  mesh and frees them.
+- Tools: `damage_override` on a cart forces the damage. `res://scratch/explosion_shots.tscn -- <dir>
+  [cars=...] [dmg=name:wheels:parts:dis] [nofire]` blows carts up on the grid and shoots them (`nofire`
+  shows what is left of the car); `res://scratch/car_parts_dump.gd` (`-s`, headless) lists a car's pieces.
+  `hitch_probe` takes `explode_wheels`, `explode_parts` and `explode_shatter`.
+
+## Engine sounds
+
+Each car has its own loop: `engine_sound` and `engine_gain_db` in its PlayerCart preset (the loops are in
+`sounds/enginesounds/`). The gain brings every loop to the Mudrunner's loudness, the original engine, which
+keeps it: the loops were made at very different levels (the electric motor needs +10.8dB, the hum +17.8dB,
+the rest -3dB). `_setup_engine_sound` loads the preset's file; speed moves its pitch from 0.8 to 1.35 and
+its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set the gain to
+20*log10(0.328/rms). `res://scratch/engine_sound_test.tscn -- cars=0,1,...` lists each car's loop.
 
 ## Procedural cars (all eight)
 

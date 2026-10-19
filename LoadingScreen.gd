@@ -23,7 +23,7 @@ func _ready() -> void:
 	var dim := ColorRect.new()
 	dim.name = "Dim"
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	dim.color = Color(0.04, 0.05, 0.08, 0.94)
+	dim.color = Color(0.04, 0.05, 0.08, 1.0) # the colour of ScreenTransition's panel
 	dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	root.add_child(dim)
 

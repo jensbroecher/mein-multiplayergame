@@ -777,6 +777,7 @@ func _build_ui() -> void:
 	_continue.add_theme_color_override("font_hover_color", Color.BLACK)
 	_continue.add_theme_color_override("font_focus_color", Color.BLACK)
 	_continue.pressed.connect(_on_continue_pressed)
+	_continue.set_meta(&"ui_important", true)
 	add_child(_continue)
 
 

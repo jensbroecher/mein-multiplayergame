@@ -391,6 +391,7 @@ func display_race_results(results_data: Array):
 		action_button.custom_minimum_size = Vector2(0, 45)
 		vbox.add_child(action_button)
 		action_button.pressed.connect(_on_action_button_pressed)
+		action_button.set_meta(&"ui_important", true)
 	else:
 		action_button.disabled = false
 		vbox.move_child(action_button, vbox.get_child_count() - 1)

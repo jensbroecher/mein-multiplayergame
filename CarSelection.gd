@@ -805,6 +805,7 @@ func _build_bottom_bar() -> void:
 	_confirm_btn.offset_bottom = -46
 	_confirm_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_confirm_btn.pressed.connect(_on_confirm_pressed)
+	_confirm_btn.set_meta(&"ui_important", true)
 	add_child(_confirm_btn)
 
 	var mid := VBoxContainer.new()

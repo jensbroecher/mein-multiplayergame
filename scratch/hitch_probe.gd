@@ -7,7 +7,8 @@ extends Node
 #   Godot --path . --resolution 1280x720 res://scratch/hitch_probe.tscn -- [level=res://levels/Level.tscn]
 #       [items=lightning,shockwave,missile,guided,bomb,boost,shield] [repeats=2] [gap=2.0] [cart=100]
 # items= also takes cart effects: respawn, explode, splash, fade, unfade, shocked (the lightning's
-# slow and blue blink on the cart itself).
+# slow and blue blink on the cart itself), and explode_wheels / explode_parts / explode_shatter
+# (an explosion with that damage forced).
 
 const ITEMS := {"boost": 1, "missile": 2, "guided": 3, "shield": 4, "shockwave": 5, "bomb": 6, "lightning": 7}
 const COMPILES := {
@@ -78,6 +79,15 @@ func _ready() -> void:
 				"respawn":
 					cart.respawn()
 				"explode":
+					cart.explode(0)
+				"explode_wheels":
+					cart.damage_override = {"wheels": ["FL", "RR"], "parts": 0, "disintegrate": false}
+					cart.explode(0)
+				"explode_parts":
+					cart.damage_override = {"wheels": [], "parts": 8, "disintegrate": false}
+					cart.explode(0)
+				"explode_shatter":
+					cart.damage_override = {"wheels": ["FL"], "parts": 0, "disintegrate": true}
 					cart.explode(0)
 				"splash":
 					cart._spawn_splash(cart.global_position)

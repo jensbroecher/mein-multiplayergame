@@ -77,9 +77,15 @@ const FX_WARMUP = preload("res://FxWarmup.gd")
 
 enum RaceState {LOBBY, RACING, FINISHED}
 var race_state: int = RaceState.LOBBY
-## What a cart crossing a gate hears: the checkpoint chime, the final-lap call (crossing the line
-## onto the last lap) or the finish call.
+## What a cart crossing a gate hears: the checkpoint call, the final-lap call (crossing the line
+## onto the last lap) or the finish call, each over the passed chime.
 enum LapCue {CHECKPOINT, FINAL_LAP, FINISH}
+## A player is told they missed a gate once they are this far along the racing line past it (the
+## gate's area is 8m deep, and it counts the moment a cart is inside).
+const MISS_DISTANCE := 14.0
+## A step along the racing line longer than this in one frame is a re-sync (a respawn, a jump
+## back onto the track), not driving.
+const MISS_MAX_STEP := 40.0
 ## The start gantry (CheckpointGate's finish line), fed the standings for its ticker.
 var _gantry: Node = null
 
@@ -326,6 +332,7 @@ func _grant_checkpoint(id: int, cp_idx: int) -> void:
 
 	print("[CHECKPOINT] Valid checkpoint hit! Next expected index: ", cp_idx + 1)
 	stats["next_checkpoint_idx"] += 1
+	stats["missed_idx"] = -1
 
 	var cp = checkpoints[cp_idx]
 	var cart = players_container.get_node_or_null(str(id))
@@ -482,7 +489,9 @@ func _sync_checkpoint_to_player_local(player_id: int, checkpoint_transform: Tran
 		cart.last_checkpoint_transform = checkpoint_transform
 		_play_lap_cue(cue, race_ui if player_id == 1 else race_ui_p2)
 
+## The chime of a gate that counted, and the announcer's call over it.
 func _play_lap_cue(cue: int, ui) -> void:
+	MusicManager.play_sfx(MusicManager.CHECKPOINT_PASSED_SOUND, -4.0)
 	match cue:
 		LapCue.FINISH:
 			MusicManager.play_voice("finish")
@@ -491,7 +500,20 @@ func _play_lap_cue(cue: int, ui) -> void:
 			if ui:
 				ui.show_message("Final Lap!", 2.0)
 		_:
-			MusicManager.play_sfx("res://sounds/checkpoint.mp3")
+			MusicManager.play_voice("checkpoint")
+
+
+## A human drove on past a gate without being counted for it (server): the announcer tells them.
+## Every peer's own player hears it (split screen has one speaker for both).
+func _announce_missed_checkpoint(id: int) -> void:
+	if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP or id == multiplayer.get_unique_id():
+		_play_checkpoint_missed()
+	else:
+		_play_checkpoint_missed.rpc_id(id)
+
+@rpc("authority", "call_local", "reliable")
+func _play_checkpoint_missed():
+	MusicManager.play_voice("checkpoint_missed")
 
 @rpc("authority", "call_local", "reliable")
 func _sync_ai_checkpoint(bot_id: int, checkpoint_transform: Transform3D):
@@ -846,6 +868,7 @@ func _process(delta):
 	if multiplayer.is_server():
 		if race_state == RaceState.RACING:
 			_update_positions()
+			_watch_missed_checkpoints()
 
 			if end_timer > 0.0:
 				end_timer -= delta
@@ -854,6 +877,34 @@ func _process(delta):
 					_end_race()
 		elif race_state == RaceState.FINISHED:
 			_update_positions()
+
+
+## Tells a human they missed a checkpoint: they drove on along the racing line past the next gate
+## they need, without having been counted for it. They have to go back for it, and nothing says so
+## otherwise. It fires once as they pass the gate, then not again until a gate has counted.
+func _watch_missed_checkpoints() -> void:
+	if track_path == null or track_path.curve == null or cp_offsets.is_empty():
+		return
+	var t_len := maxf(track_length, 1.0)
+	for id in player_stats:
+		var stats: Dictionary = player_stats[id]
+		var cart = players_container.get_node_or_null(str(id))
+		if stats["finished"] or cart == null or cart.get("is_ai"):
+			continue
+		if cart.get("is_teleporting") or cart.get("is_exploding"):
+			# Respawning moves the cart back; find the racing line again afterwards.
+			stats["path_off"] = -1.0
+			continue
+		var prev_off: float = float(stats.get("path_off", -1.0))
+		var now_off := _track_cart_curve_offset(cart, stats)
+		var next_idx: int = stats["next_checkpoint_idx"]
+		if prev_off < 0.0 or next_idx >= cp_offsets.size() or int(stats.get("missed_idx", -1)) == next_idx:
+			continue
+		if _forward_curve_delta(prev_off, now_off, t_len) > MISS_MAX_STEP:
+			continue
+		if _crossed_curve_offset(prev_off, now_off, fmod(cp_offsets[next_idx] + MISS_DISTANCE, t_len), t_len):
+			stats["missed_idx"] = next_idx
+			_announce_missed_checkpoint(id)
 
 
 func _update_positions():

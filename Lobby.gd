@@ -37,6 +37,9 @@ var is_in_room = false
 var is_local_ready = false
 
 func _ready():
+	# The buttons that commit get the louder button sound (MusicManager.UI_IMPORTANT_SOUND).
+	for important in [button_host, button_ready, button_start]:
+		important.set_meta(&"ui_important", true)
 	# Connection view connections
 	button_host.pressed.connect(_on_host_pressed)
 	button_direct_join.pressed.connect(_on_direct_join_pressed)

@@ -779,5 +779,5 @@ func _on_back_pressed() -> void:
 	is_waiting_for_key = false
 	if remap_banner:
 		remap_banner.visible = false
+	# Main swipes back to the menu and hides this behind it.
 	back_pressed.emit()
-	hide()

@@ -1,5 +1,6 @@
 extends Control
 
+## Both leave the menu on screen: Main swipes to the next screen and hides this one behind it.
 signal start_pressed
 signal options_pressed
 
@@ -501,7 +502,6 @@ func _style_chrome_buttons() -> void:
 func _on_multiplayer_pressed() -> void:
 	NetworkManager.current_game_mode = NetworkManager.GameMode.MULTIPLAYER
 	start_pressed.emit()
-	hide()
 
 
 func _on_stage_selected(stage_path: String) -> void:
@@ -510,7 +510,6 @@ func _on_stage_selected(stage_path: String) -> void:
 		NetworkManager.current_game_mode = NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL
 	NetworkManager.time_trial_stage = stage_path
 	start_pressed.emit()
-	hide()
 
 
 func _on_cup_selected(cup_name: String) -> void:
@@ -521,7 +520,6 @@ func _on_cup_selected(cup_name: String) -> void:
 	NetworkManager.gp_standings.clear()
 	NetworkManager.gp_last_pos.clear()
 	start_pressed.emit()
-	hide()
 
 
 func _on_gp_test_stage_selected(cup_name: String, stage_idx: int) -> void:
@@ -532,7 +530,6 @@ func _on_gp_test_stage_selected(cup_name: String, stage_idx: int) -> void:
 	NetworkManager.gp_standings.clear()
 	NetworkManager.gp_last_pos.clear()
 	start_pressed.emit()
-	hide()
 
 
 func _on_coop_gp_pressed() -> void:

@@ -5,6 +5,7 @@ const CONFIGURATION_MENU_SCENE = preload("res://ConfigurationMenu.tscn")
 const PAUSE_MENU_SCENE = preload("res://PauseMenu.tscn")
 const LOADING_SCREEN_SCENE = preload("res://LoadingScreen.tscn")
 const PODIUM_SCENE = preload("res://Podium.tscn")
+const SCREEN_TRANSITION_SCRIPT = preload("res://ScreenTransition.gd")
 
 @onready var lobby = $Lobby
 @onready var main_menu = $MainMenu
@@ -13,6 +14,7 @@ const PODIUM_SCENE = preload("res://Podium.tscn")
 var configuration_menu
 var pause_menu
 var loading_screen
+var screen_transition: CanvasLayer
 var podium: Control
 
 var _coop_p1_car: int = 0
@@ -54,6 +56,10 @@ func _ready():
 	loading_screen = LOADING_SCREEN_SCENE.instantiate()
 	add_child(loading_screen)
 
+	screen_transition = SCREEN_TRANSITION_SCRIPT.new()
+	screen_transition.name = "ScreenTransition"
+	add_child(screen_transition)
+
 
 func _apply_platform_performance() -> void:
 	# Same physics cadence on phone and PC so LAN multiplayer stays in sync.
@@ -61,28 +67,46 @@ func _apply_platform_performance() -> void:
 	Engine.physics_ticks_per_second = 60
 	Engine.max_physics_steps_per_frame = 4
 
+## Changes screens behind a swipe: the panel covers the screen, `change` runs, the panel sweeps away.
+## A swipe asked for while another is under way is dropped (a double click).
+func _swipe(change: Callable) -> void:
+	if screen_transition.busy:
+		return
+	await screen_transition.cover()
+	await change.call()
+	await screen_transition.reveal()
+
 func _on_menu_start_pressed():
 	if NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR:
 		NetworkManager.start_spectator()
 		await start_game(true)
 		return
-	car_selection.show()
+	await _swipe(func():
+		main_menu.hide()
+		car_selection.show())
 
 func _on_menu_options_pressed():
-	main_menu.hide()
-	configuration_menu.show()
+	await _swipe(func():
+		main_menu.hide()
+		configuration_menu.show())
 
 
 func _on_options_back_pressed() -> void:
-	main_menu.show()
+	await _swipe(func():
+		configuration_menu.hide()
+		main_menu.show())
 
 func _on_car_selected(car_index: int):
+	# Confirm pressed again while the screen is swiping away.
+	if screen_transition.busy:
+		return
 	# If changing car while already inside the multiplayer lobby room:
 	if lobby.visible or lobby.is_in_room:
 		NetworkManager.set_local_car(car_index)
-		car_selection.hide()
-		lobby.show()
-		lobby.enter_room_view()
+		await _swipe(func():
+			car_selection.hide()
+			lobby.show()
+			lobby.enter_room_view())
 		return
 
 	if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
@@ -90,13 +114,12 @@ func _on_car_selected(car_index: int):
 			# P1 just selected — save their car and show selection again for P2
 			_coop_p1_car = car_index
 			_coop_selecting_p2 = true
-			car_selection.show_for_player(2)
+			await _swipe(func(): car_selection.show_for_player(2))
 		else:
 			# P2 just selected — finalize both and start
 			_coop_selecting_p2 = false
 			NetworkManager.local_car_index = _coop_p1_car
 			NetworkManager.local_p2_car_index = car_index
-			car_selection.hide()
 			
 			var p_name = "Player 1"
 			var config = ConfigFile.new()
@@ -114,11 +137,11 @@ func _on_car_selected(car_index: int):
 		return
 	NetworkManager.local_car_index = car_index
 	if NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER:
-		car_selection.hide()
-		lobby.show()
-		lobby.show_connection_view()
+		await _swipe(func():
+			car_selection.hide()
+			lobby.show()
+			lobby.show_connection_view())
 	else:
-		car_selection.hide()
 		# Load saved player name
 		var p_name = "SoloRacer"
 		var config = ConfigFile.new()
@@ -133,31 +156,37 @@ func _on_car_selected(car_index: int):
 ## Back out of the car select screen: to player 1's pick from player 2's, to the lobby room when
 ## changing car there, otherwise to the menu screen it came from.
 func _on_car_selection_back() -> void:
+	if screen_transition.busy:
+		return
 	if _coop_selecting_p2:
 		_coop_selecting_p2 = false
-		car_selection.show_for_player(1)
+		await _swipe(func(): car_selection.show_for_player(1))
 		return
-	car_selection.hide()
-	if lobby.is_in_room:
-		lobby.show()
-		lobby.enter_room_view()
-	else:
-		main_menu.show()
+	await _swipe(func():
+		car_selection.hide()
+		if lobby.is_in_room:
+			lobby.show()
+			lobby.enter_room_view()
+		else:
+			main_menu.show())
 
 func _on_lobby_start_race_requested():
 	if not multiplayer.is_server():
 		return
-	lobby.hide()
 	await start_game(true)
 
 func _on_lobby_back_to_menu_requested():
+	if screen_transition.busy:
+		return
 	NetworkManager.disconnect_peer()
-	lobby.hide()
-	main_menu.show()
+	await _swipe(func():
+		lobby.hide()
+		main_menu.show())
 
 func _on_lobby_change_car_requested():
-	lobby.hide()
-	car_selection.show()
+	await _swipe(func():
+		lobby.hide()
+		car_selection.show())
 
 func _on_stage_voting_concluded(winning_stage: String):
 	if multiplayer.is_server():
@@ -167,6 +196,10 @@ func start_game(is_host: bool):
 	if not is_host:
 		return
 	await _show_loading("Loading race")
+	# Whichever screen the race starts from is done with, behind the loading screen.
+	main_menu.hide()
+	car_selection.hide()
+	lobby.hide()
 	if loading_screen:
 		loading_screen.set_progress(0.15)
 
@@ -471,7 +504,17 @@ func _unload_all_levels() -> void:
 		MusicManager.stop_music()
 
 
+## Back to the main menu from a race or the podium. Swipes round the change, unless a swipe or the
+## loading screen already covers it.
 func _on_server_disconnected():
+	if screen_transition.busy or (loading_screen != null and loading_screen.visible):
+		_return_to_menu_now()
+		return
+	await screen_transition.cover()
+	_return_to_menu_now()
+	await screen_transition.reveal()
+
+func _return_to_menu_now():
 	_free_podium()
 	# Don't free mid-callback from a level UI without deferring.
 	if _level_swap_in_progress:
@@ -534,13 +577,23 @@ func _restart_race_impl() -> void:
 	await start_game(true)
 
 
+## The loading screen comes in behind the swipe's panel, which is its colour, then fades off it.
 func _show_loading(message: String) -> void:
 	if loading_screen == null:
 		return
+	if loading_screen.visible:
+		# Already up (a restart loads twice): just say what's next.
+		loading_screen.set_status(message)
+		return
+	await screen_transition.cover()
 	await loading_screen.show_loading(message)
+	screen_transition.fade_out()
 
 
+## The panel takes over from the loading screen at once, then sweeps away to show what's under it.
 func _hide_loading() -> void:
 	if loading_screen == null:
 		return
+	await screen_transition.set_covered()
 	await loading_screen.hide_loading()
+	screen_transition.reveal()

@@ -105,7 +105,9 @@ var fps_label: Label
 ## Cached SFX streams so mid-race play() doesn't hitch on HDD load().
 var _sfx_cache: Dictionary = {}
 const SFX_PRELOAD_PATHS: PackedStringArray = [
-	"res://sounds/checkpoint.mp3",
+	"res://sounds/checkpointpassed.wav",
+	"res://sounds/confirmbutton.wav",
+	"res://sounds/confirmbuttonimportant.wav",
 	"res://sounds/crash.mp3",
 	"res://sounds/electric_lightning_a_#1-1782053835008.wav",
 	"res://sounds/stereogenicstudio-swish-swoosh-woosh-sfx-47-357152.mp3",
@@ -121,6 +123,8 @@ const VOICE_LINES := {
 	"go": ["res://voice/lola/go.mp3", "res://voice/lola/go-2.mp3", "res://voice/lola/go-3.mp3",
 			"res://voice/lola/go-4.mp3", "res://voice/lola/go-5.mp3"],
 	"final_lap": ["res://voice/lola/finallap.mp3", "res://voice/lola/finallap-2.mp3", "res://voice/lola/finallap-3.mp3"],
+	"checkpoint": ["res://voice/lola/checkpoint.mp3", "res://voice/lola/checkpoint-2.mp3"],
+	"checkpoint_missed": ["res://voice/lola/checkpointmissed.mp3"],
 	"finish": ["res://voice/lola/finish.mp3", "res://voice/lola/finish-2.mp3"],
 	"first_place": ["res://voice/lola/firstplace.mp3"],
 	"second_place": ["res://voice/lola/secondplace.mp3"],
@@ -128,6 +132,14 @@ const VOICE_LINES := {
 }
 ## The line for finishing (or standing on the podium) in each of the first three places.
 const PLACE_LINES := ["first_place", "second_place", "third_place"]
+## The chime a gate gives when it counts, played with the announcer's call.
+const CHECKPOINT_PASSED_SOUND := "res://sounds/checkpointpassed.wav"
+## Button sounds. Every BaseButton that enters the tree plays UI_CONFIRM_SOUND when pressed
+## (_on_node_added); one carrying the meta `ui_important` (the commit: Confirm, Start, Host...) plays
+## UI_IMPORTANT_SOUND instead, and `ui_silent` keeps a button quiet.
+const UI_CONFIRM_SOUND := "res://sounds/confirmbutton.wav"
+const UI_IMPORTANT_SOUND := "res://sounds/confirmbuttonimportant.wav"
+const UI_SOUND_DB := -4.0
 
 func _ensure_audio_buses():
 	# Ensure "Music" bus exists
@@ -180,6 +192,9 @@ func _ready():
 	player1.finished.connect(_on_track_finished)
 	player2.finished.connect(_on_track_finished)
 	_load_playlist()
+	get_tree().node_added.connect(_on_node_added)
+	for button in get_tree().root.find_children("*", "BaseButton", true, false):
+		_hook_button(button)
 	
 	# Create FPS layer and label
 	fps_layer = CanvasLayer.new()
@@ -1350,6 +1365,23 @@ func _preload_sfx() -> void:
 	for line in VOICE_LINES:
 		for path in VOICE_LINES[line]:
 			_cached_sfx(path)
+
+
+func _on_node_added(node: Node) -> void:
+	if node is BaseButton:
+		_hook_button(node)
+
+
+func _hook_button(button: BaseButton) -> void:
+	var on_pressed := _on_ui_button_pressed.bind(button)
+	if not button.pressed.is_connected(on_pressed):
+		button.pressed.connect(on_pressed)
+
+
+func _on_ui_button_pressed(button: BaseButton) -> void:
+	if button.has_meta(&"ui_silent"):
+		return
+	play_sfx(UI_IMPORTANT_SOUND if button.has_meta(&"ui_important") else UI_CONFIRM_SOUND, UI_SOUND_DB)
 
 
 ## Says an announcer line (a VOICE_LINES key), in a random take.
