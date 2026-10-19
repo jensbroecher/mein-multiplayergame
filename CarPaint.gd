@@ -2,7 +2,7 @@
 #
 # Paint jobs for the procedural cars (regenerate_cars.gd). A paint job is a small Dictionary:
 #   {"pattern": int, "finish": int, "primary": Color, "secondary": Color, "accent": Color,
-#    "rim": Color, "number": int}
+#    "rim": Color, "number": int, "antenna": bool}
 # The player picks it in CarSelection (saved per car in user://settings.cfg), NetworkManager
 # carries it in the player's info, Level passes it to the spawned cart, and apply() writes it as
 # per-instance parameters of car_body.gdshader on every mesh tagged "car_shader". Anything that
@@ -68,7 +68,9 @@ const FALLBACK := {"pattern": 0, "finish": 0, "primary": Color(0.80, 0.07, 0.05)
 
 
 static func factory(car_name: String) -> Dictionary:
-	return (FACTORY.get(car_name, FALLBACK) as Dictionary).duplicate()
+	var out: Dictionary = (FACTORY.get(car_name, FALLBACK) as Dictionary).duplicate()
+	out["antenna"] = true
+	return out
 
 
 ## Only the valid fields of a paint job (anything else dropped, values clamped). What
@@ -84,6 +86,8 @@ static func clean(value: Variant) -> Dictionary:
 		out["finish"] = clampi(d["finish"], 0, FINISHES.size() - 1)
 	if d.get("number") is int:
 		out["number"] = clampi(d["number"], 0, 99)
+	if d.get("antenna") is bool:
+		out["antenna"] = d["antenna"]
 	for key in ["primary", "secondary", "accent", "rim"]:
 		if d.get(key) is Color:
 			var c: Color = d[key]
@@ -112,6 +116,11 @@ static func apply(root: Node, paint: Dictionary) -> void:
 		g.set_instance_shader_parameter("paint_number", paint["number"])
 	for c in root.get_children():
 		apply(c, paint)
+
+
+## Does the paint job give the cart its RC antenna? (On unless the player turned it off.)
+static func has_antenna(paint: Dictionary) -> bool:
+	return bool(paint.get("antenna", true))
 
 
 ## Is this model paintable (a procedural car)?
@@ -143,6 +152,8 @@ static func random(rng: RandomNumberGenerator, car_name: String) -> Dictionary:
 	p["accent"] = accent
 	p["rim"] = RIMS[rng.randi() % RIMS.size()][1]
 	p["number"] = rng.randi_range(1, 99)
+	# AI carts (and the paint shop's dice, which keeps the player's own choice) run without one.
+	p["antenna"] = false
 	return p
 
 

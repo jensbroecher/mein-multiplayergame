@@ -755,6 +755,8 @@ func _ready():
 			antenna_placement = _find_node_by_name(new_model, "AntennaPlacement")
 		if antenna_placement:
 			antenna.position = visuals.to_local(antenna_placement.global_position)
+		# The antenna is an option in the paint shop (procedural cars only).
+		antenna.visible = CarPaint.has_antenna(_debris_paint) if CarPaint.is_paintable(new_model) else true
 
 	ground_ray.add_exception(self)
 	if MusicManager and not MusicManager.camera_mode_changed.is_connected(_on_camera_mode_setting_changed):
