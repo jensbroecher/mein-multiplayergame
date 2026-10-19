@@ -130,7 +130,7 @@ without regenerating them, run `res://refresh_curb_corners.tscn` headless.
 
 The race calls are `voice/lola/` clips, listed per line with their takes in `MusicManager.VOICE_LINES`.
 `play_voice(line)` picks a take at random. Level calls 3/2/1/go in the countdown, and at each gate the
-player is counted for (`_play_lap_cue`) the chime `sounds/checkpointpassed.wav` plus a call: "checkpoint",
+player is counted for (`_play_lap_cue`) the chime `sounds/checkpoint_passed.wav` plus a call: "checkpoint",
 "final lap" when they cross the line onto the last lap, "finish" at the line, and then the place if it's
 first to third (`_announce_place`). The podium calls each place as it's revealed.
 - A human who drives on past the gate they need without being counted gets "checkpoint missed"
@@ -146,9 +146,9 @@ first to third (`_announce_place`). The podium calls each place as it's revealed
 ## Button sounds and the screen swipe
 
 - MusicManager hooks every `BaseButton` that enters the tree (`node_added`): pressing one plays
-  `confirmbutton.wav`. A button with the meta `ui_important` (Confirm on car select, Host/Ready/Start in
+  `ui_confirm.wav`. A button with the meta `ui_important` (Confirm on car select, Host/Ready/Start in
   the lobby, the podium's Continue, the end-of-race action button, the pause menu's Restart/Exit) plays
-  `confirmbuttonimportant.wav` instead; `ui_silent` keeps one quiet. New buttons need nothing. Both
+  `ui_confirm_important.wav` instead; `ui_silent` keeps one quiet. New buttons need nothing. Both
   sound files are 3s long with silence after about a second. `res://scratch/ui_sound_test.tscn`.
 - `ScreenTransition.gd` (a CanvasLayer built in code, a child of Main, `screen_swipe.gdshader`) sweeps a
   navy panel across the screen: `cover()`, `set_covered()`, `reveal()` (sweeps away and fades),

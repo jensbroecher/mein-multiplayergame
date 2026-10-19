@@ -26,7 +26,7 @@ const DENSITY := 260.0
 const KICK_REACH := 1.5
 ## Slowest a cart can be going and still kick a chunk.
 const KICK_MIN_SPEED := 3.0
-const BONK := preload("res://sounds/freesound_community-bonk-46000.mp3")
+const BONK := preload("res://sounds/collision_bonk.mp3")
 
 @export var chunk_transforms: Array[Transform3D] = []
 ## The unit chunk's convex hull, before each chunk's scale.

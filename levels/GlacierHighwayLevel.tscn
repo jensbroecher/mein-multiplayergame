@@ -1,7 +1,7 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://levels/Level.gd" id="1_7wxar"]
-[ext_resource type="AudioStream" path="res://sounds/dragon-studio-winter-wind-402331.mp3" id="2_qo3c8"]
+[ext_resource type="AudioStream" path="res://sounds/winter_wind_loop.mp3" id="2_qo3c8"]
 [ext_resource type="Script" path="res://FallingSnow.gd" id="3_7tth6"]
 [ext_resource type="Texture2D" path="res://materials/concrete.png" id="4_ev1cy"]
 [ext_resource type="Texture2D" path="res://materials/concrete_normal.png" id="5_aq124"]

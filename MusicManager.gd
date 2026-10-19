@@ -109,14 +109,15 @@ var fps_label: Label
 ## Cached SFX streams so mid-race play() doesn't hitch on HDD load().
 var _sfx_cache: Dictionary = {}
 const SFX_PRELOAD_PATHS: PackedStringArray = [
-	"res://sounds/checkpointpassed.wav",
-	"res://sounds/confirmbutton.wav",
-	"res://sounds/confirmbuttonimportant.wav",
-	"res://sounds/crash.mp3",
-	"res://sounds/electric_lightning_a_#1-1782053835008.wav",
-	"res://sounds/stereogenicstudio-swish-swoosh-woosh-sfx-47-357152.mp3",
-	"res://sounds/game_bonus_collected_#3-1781737105214.wav",
-	"res://sounds/force_field_effect_#1-1781728246336.wav",
+	"res://sounds/checkpoint_passed.wav",
+	"res://sounds/ui_confirm.wav",
+	"res://sounds/ui_confirm_important.wav",
+	"res://sounds/cart_crash.mp3",
+	"res://sounds/lightning_strike.wav",
+	"res://sounds/boost_pad.wav",
+	"res://sounds/teleport_swoosh.mp3",
+	"res://sounds/item_box_pickup.wav",
+	"res://sounds/shield_loop.wav",
 ]
 
 ## The announcer, voice/lola/: each line's takes. play_voice() picks one at random.
@@ -137,12 +138,12 @@ const VOICE_LINES := {
 ## The line for finishing (or standing on the podium) in each of the first three places.
 const PLACE_LINES := ["first_place", "second_place", "third_place"]
 ## The chime a gate gives when it counts, played with the announcer's call.
-const CHECKPOINT_PASSED_SOUND := "res://sounds/checkpointpassed.wav"
+const CHECKPOINT_PASSED_SOUND := "res://sounds/checkpoint_passed.wav"
 ## Button sounds. Every BaseButton that enters the tree plays UI_CONFIRM_SOUND when pressed
 ## (_on_node_added); one carrying the meta `ui_important` (the commit: Confirm, Start, Host...) plays
 ## UI_IMPORTANT_SOUND instead, and `ui_silent` keeps a button quiet.
-const UI_CONFIRM_SOUND := "res://sounds/confirmbutton.wav"
-const UI_IMPORTANT_SOUND := "res://sounds/confirmbuttonimportant.wav"
+const UI_CONFIRM_SOUND := "res://sounds/ui_confirm.wav"
+const UI_IMPORTANT_SOUND := "res://sounds/ui_confirm_important.wav"
 const UI_SOUND_DB := -4.0
 
 func _ensure_audio_buses():

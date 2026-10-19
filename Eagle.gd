@@ -99,11 +99,11 @@ func _ready() -> void:
 
 func _setup_audio() -> void:
 	scream_streams = [
-		load("res://sounds/eagle/u_jfkxueyart-eagle-281163.mp3") as AudioStream,
-		load("res://sounds/eagle/koiroylers-eagle-355831.mp3") as AudioStream,
-		load("res://sounds/eagle/u_tmwllo5zur-an-eagle-squawking-overhead-226774.mp3") as AudioStream,
+		load("res://sounds/eagle/eagle_scream_1.mp3") as AudioStream,
+		load("res://sounds/eagle/eagle_scream_2.mp3") as AudioStream,
+		load("res://sounds/eagle/eagle_scream_3.mp3") as AudioStream,
 	]
-	flap_stream = load("res://sounds/eagle/freesound_community-wing-flap-1-6434.mp3") as AudioStream
+	flap_stream = load("res://sounds/eagle/eagle_wing_flap.mp3") as AudioStream
 
 	_sfx_scream = AudioStreamPlayer3D.new()
 	_sfx_scream.name = "SFX_Scream"

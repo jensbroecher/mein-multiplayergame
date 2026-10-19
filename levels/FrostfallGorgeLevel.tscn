@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://levels/Level.gd" id="1_ax7dr"]
 [ext_resource type="Shader" path="res://sky_winter_cirrus.gdshader" id="2_4wtrk"]
-[ext_resource type="AudioStream" path="res://sounds/dragon-studio-winter-wind-402331.mp3" id="3_clakw"]
+[ext_resource type="AudioStream" path="res://sounds/winter_wind_loop.mp3" id="3_clakw"]
 [ext_resource type="Script" path="res://FallingSnow.gd" id="4_n1ry0"]
 [ext_resource type="ArrayMesh" path="res://generated/frostfall_chunks/frostfall_ground_visual_-10_-18.res" id="5_yg2y6"]
 [ext_resource type="ArrayMesh" path="res://generated/frostfall_chunks/frostfall_ground_visual_-9_-18.res" id="6_n7kw6"]

@@ -1,13 +1,13 @@
 extends CharacterBody3D
 
 const MISSILE_EXPLOSION_SOUNDS = [
-	preload("res://sounds/missile_explosion_wi_#1-1781728385875.wav"),
-	preload("res://sounds/missile_explosion_wi_#2-1781728388962.wav"),
-	preload("res://sounds/missile_explosion_wi_#3-1781728394157.wav"),
-	preload("res://sounds/missile_explosion_wi_#4-1781728398285.wav")
+	preload("res://sounds/missile_explosion_1.wav"),
+	preload("res://sounds/missile_explosion_2.wav"),
+	preload("res://sounds/missile_explosion_3.wav"),
+	preload("res://sounds/missile_explosion_4.wav")
 ]
 
-const FLIGHT_SOUND = preload("res://sounds/774270__thelittlecrow__rocket-launch-boost-and-burning-version-b.wav")
+const FLIGHT_SOUND = preload("res://sounds/rocket_thruster_loop.wav")
 
 @export var speed: float = 52.0   # Starts well above car top speed (cars reach ~40-43 m/s)
 const SPEED_MAX: float = 75.0     # Accelerates up to 75 m/s

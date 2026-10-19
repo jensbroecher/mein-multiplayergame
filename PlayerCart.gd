@@ -30,7 +30,7 @@ static var _lightning_spark_quad: QuadMesh
 const CAR_PRESETS = [
 	{
 		"name": "Viper",
-		"engine_sound": "res://sounds/enginesounds/Seamless_loop_of_a_h_#2-1792363041756.wav",
+		"engine_sound": "res://sounds/enginesounds/engine_viper_loop.wav",
 		"engine_gain_db": 0.0,
 		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
 		"model_path": "res://generated/cars/Viper.tscn",
@@ -45,7 +45,7 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Shadow",
-		"engine_sound": "res://sounds/enginesounds/electric_motor_#4-1792362886066.wav",
+		"engine_sound": "res://sounds/enginesounds/engine_shadow_electric_loop.wav",
 		"engine_gain_db": 10.8,
 		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
 		"model_path": "res://generated/cars/Shadow.tscn",
@@ -60,7 +60,7 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Strikeforce",
-		"engine_sound": "res://sounds/enginesounds/Seamless_loop_of_a_h_#4-1792363022411.wav",
+		"engine_sound": "res://sounds/enginesounds/engine_strikeforce_loop.wav",
 		"engine_gain_db": -3.1,
 		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
 		"model_path": "res://generated/cars/Strikeforce.tscn",
@@ -75,7 +75,7 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Apex",
-		"engine_sound": "res://sounds/enginesounds/Seamless_loop_of_a_h_#3-1792363081295.wav",
+		"engine_sound": "res://sounds/enginesounds/engine_apex_loop.wav",
 		"engine_gain_db": -2.8,
 		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
 		"model_path": "res://generated/cars/Apex.tscn",
@@ -90,7 +90,7 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Interceptor",
-		"engine_sound": "res://sounds/enginesounds/Seamless_loop_of_a_h_#3-1792363107864.wav",
+		"engine_sound": "res://sounds/enginesounds/engine_interceptor_loop.wav",
 		"engine_gain_db": -3.2,
 		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
 		"model_path": "res://generated/cars/Interceptor.tscn",
@@ -105,7 +105,7 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Mudrunner",
-		"engine_sound": "res://sounds/enginesounds/freesound_community-engine-6000_edited.wav",
+		"engine_sound": "res://sounds/enginesounds/engine_mudrunner_loop.wav",
 		"engine_gain_db": 0.0,
 		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
 		"model_path": "res://generated/cars/Mudrunner.tscn",
@@ -120,7 +120,7 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Phantom",
-		"engine_sound": "res://sounds/enginesounds/hum_of_an_electric_m_#2-1792362808545.wav",
+		"engine_sound": "res://sounds/enginesounds/engine_phantom_electric_loop.wav",
 		"engine_gain_db": 17.8,
 		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
 		"model_path": "res://generated/cars/Phantom.tscn",
@@ -135,7 +135,7 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Centurion",
-		"engine_sound": "res://sounds/enginesounds/Seamless_loop_of_a_h_#4-1792363055231.wav",
+		"engine_sound": "res://sounds/enginesounds/engine_centurion_loop.wav",
 		"engine_gain_db": -3.6,
 		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
 		"model_path": "res://generated/cars/Centurion.tscn",
@@ -181,31 +181,31 @@ const BOMB_SCENE = preload("res://Bomb.tscn")
 const WATER_SPLASH_SCENE = preload("res://WaterSplash.tscn")
 
 const DEEP_SPLASH_SOUNDS = [
-	preload("res://sounds/deep_water_splash_#1-1781728153794.wav"),
-	preload("res://sounds/deep_water_splash_#2-1781728156705.wav"),
-	preload("res://sounds/deep_water_splash_#3-1781728161657.wav"),
-	preload("res://sounds/deep_water_splash_#4-1781728165962.wav")
+	preload("res://sounds/deep_water_splash_1.wav"),
+	preload("res://sounds/deep_water_splash_2.wav"),
+	preload("res://sounds/deep_water_splash_3.wav"),
+	preload("res://sounds/deep_water_splash_4.wav")
 ]
 
 const REGULAR_SPLASH_SOUNDS = [
-	preload("res://sounds/water_splash_#2-1781728133304.wav"),
-	preload("res://sounds/water_splash_#3-1781728129266.wav"),
-	preload("res://sounds/water_splash_#4-1781728106730.wav")
+	preload("res://sounds/water_splash_1.wav"),
+	preload("res://sounds/water_splash_2.wav"),
+	preload("res://sounds/water_splash_3.wav")
 ]
 
 const BOMB_EXPLOSION_SOUNDS = [
-	preload("res://sounds/bomb_explosion_#2-1781728320398.wav"),
-	preload("res://sounds/bomb_explosion_#4-1781728322907.wav"),
-	preload("res://sounds/bomb_explosion_with__#1-1781728361227.wav"),
-	preload("res://sounds/bomb_explosion_with__#3-1781728366899.wav"),
-	preload("res://sounds/bomb_explosion_with__#4-1781728370769.wav")
+	preload("res://sounds/bomb_explosion_1.wav"),
+	preload("res://sounds/bomb_explosion_2.wav"),
+	preload("res://sounds/bomb_explosion_3.wav"),
+	preload("res://sounds/bomb_explosion_4.wav"),
+	preload("res://sounds/bomb_explosion_5.wav")
 ]
 
 const LANDING_SOUNDS = [
-	preload("res://sounds/freesound_community-bonk-46000.mp3")
+	preload("res://sounds/collision_bonk.mp3")
 ]
-const CRASH_SOUND = preload("res://sounds/crash.mp3")
-const LIGHTNING_SOUND = preload("res://sounds/electric_lightning_a_#1-1782053835008.wav")
+const CRASH_SOUND = preload("res://sounds/cart_crash.mp3")
+const LIGHTNING_SOUND = preload("res://sounds/lightning_strike.wav")
 const TELEPORT_SPARK = preload("res://sprites/energy_spark.png")
 
 @onready var visuals = $Visuals
@@ -2654,7 +2654,7 @@ func _physics_process(delta):
 ## The engine loop a preset without its own uses. Each car has one (`engine_sound`), and
 ## `engine_gain_db` brings it to the loudness of this one, the Mudrunner's: the loops were made at
 ## very different levels (the electric ones far quieter).
-const ENGINE_SOUND_PATH := "res://sounds/enginesounds/freesound_community-engine-6000_edited.wav"
+const ENGINE_SOUND_PATH := "res://sounds/enginesounds/engine_mudrunner_loop.wav"
 
 func _setup_engine_sound() -> void:
 	if engine_sound == null:
@@ -3451,9 +3451,9 @@ func client_start_pad_boost(strength: float = 1.0, duration: float = 2.0):
 		if tornado and is_instance_valid(tornado) and tornado.has_method("escape_cart_with_boost"):
 			tornado.escape_cart_with_boost(self)
 	
-	# Play swoosh sound (stereogenicstudio-swish-swoosh-woosh-sfx-47-357152.mp3)
+	# Play boost pad sound (boost_pad.wav)
 	var ap = AudioStreamPlayer3D.new()
-	ap.stream = preload("res://sounds/stereogenicstudio-swish-swoosh-woosh-sfx-47-357152.mp3")
+	ap.stream = preload("res://sounds/boost_pad.wav")
 	ap.bus = &"SFX"
 	ap.volume_db = -8.0
 	ap.unit_size = 20.0
@@ -3936,7 +3936,7 @@ func _start_respawn_teleport() -> void:
 	else:
 		_capture_teleport_scales()
 		_burst_teleport_fx(global_position)
-		MusicManager.play_sfx("res://sounds/stereogenicstudio-swish-swoosh-woosh-sfx-47-357152.mp3", -10.0, 1.15)
+		MusicManager.play_sfx("res://sounds/teleport_swoosh.mp3", -10.0, 1.15)
 		_teleport_tween.tween_method(_teleport_vanish_step, 0.0, 1.0, 0.40)
 		_teleport_tween.tween_callback(_teleport_appear)
 

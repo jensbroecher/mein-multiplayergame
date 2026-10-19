@@ -15,7 +15,7 @@ extends MultiMeshInstance3D
 const POLE_LAYER := 1 << 4
 ## Cart sphere (1.35m) + pole (0.15m) + one physics step of travel at top speed.
 const RELEASE_RADIUS := 3.5
-const BONK := preload("res://sounds/freesound_community-bonk-46000.mp3")
+const BONK := preload("res://sounds/collision_bonk.mp3")
 
 @export var pole_transforms: Array[Transform3D] = []
 @export var pole_height := 2.4

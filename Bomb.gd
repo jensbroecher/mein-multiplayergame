@@ -1,16 +1,16 @@
 extends RigidBody3D
 
 const BOMB_EXPLOSION_SOUNDS = [
-	preload("res://sounds/bomb_explosion_#2-1781728320398.wav"),
-	preload("res://sounds/bomb_explosion_#4-1781728322907.wav"),
-	preload("res://sounds/bomb_explosion_with__#1-1781728361227.wav"),
-	preload("res://sounds/bomb_explosion_with__#3-1781728366899.wav"),
-	preload("res://sounds/bomb_explosion_with__#4-1781728370769.wav")
+	preload("res://sounds/bomb_explosion_1.wav"),
+	preload("res://sounds/bomb_explosion_2.wav"),
+	preload("res://sounds/bomb_explosion_3.wav"),
+	preload("res://sounds/bomb_explosion_4.wav"),
+	preload("res://sounds/bomb_explosion_5.wav")
 ]
 
 const BOMB_FIZZLE_SOUNDS = [
-	preload("res://sounds/tnt_fizzle_#3-1781732688592.wav"),
-	preload("res://sounds/tnt_fizzle_#4-1781732701868.wav")
+	preload("res://sounds/bomb_fizzle_1.wav"),
+	preload("res://sounds/bomb_fizzle_2.wav")
 ]
 
 const FIRE_PARTICLE_TEXTURE = preload("res://materials/fire_particle.png")

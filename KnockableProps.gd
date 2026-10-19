@@ -14,7 +14,7 @@ extends MultiMeshInstance3D
 ## synced over the network.
 
 const PROP_LAYER := 1 << 4
-const BONK := preload("res://sounds/box-crash-106687.mp3")
+const BONK := preload("res://sounds/crate_crash.mp3")
 
 @export var prop_transforms: Array[Transform3D] = []
 ## Collision boxes in the prop's frame: [centre, size] pairs.

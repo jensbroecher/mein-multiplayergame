@@ -9,7 +9,7 @@ var respawn_timer = 0.0
 const RESPAWN_TIME = 5.0
 var current_scale: float = 0.0
 
-const SFX_PICKUP_SOUND = preload("res://sounds/game_bonus_collected_#3-1781737105214.wav")
+const SFX_PICKUP_SOUND = preload("res://sounds/item_box_pickup.wav")
 
 func _ready():
 	add_to_group("item_boxes")

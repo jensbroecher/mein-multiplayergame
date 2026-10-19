@@ -4395,7 +4395,7 @@ func _ready() -> void:
 	level_scene.add_child(aurora_clock)
 
 	# Ambient wind
-	var wind_stream = load("res://sounds/dragon-studio-winter-wind-402331.mp3")
+	var wind_stream = load("res://sounds/winter_wind_loop.mp3")
 	if wind_stream:
 		var wind_player := AudioStreamPlayer.new()
 		wind_player.name = "WinterWindAudio"
