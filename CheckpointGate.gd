@@ -78,6 +78,7 @@ const TRUSS_W := 0.4 # chord centre to chord centre
 const TRUSS_TOP := 8.0
 const TRUSS_MIN_TOP := 4.6
 const HEADROOM_GAP := 0.45 # space left under whatever is over the road
+const MASS_REACH := 25.0 # a ceiling this far out either side of a tower is a hill, not a gantry
 const HEADROOM_FROM := 3.0 # see _headroom()
 const TRUSS_FOOT := -1.0
 const CHORD_R := 0.025
@@ -473,7 +474,17 @@ func _headroom(space: PhysicsDirectSpaceState3D, road_y: float) -> float:
 	var room := INF
 	for x in [-TRUSS_X, 0.0, TRUSS_X]:
 		var hit := _cast(space, Vector3(x, road_y + HEADROOM_FROM, 0.0), Vector3(x, road_y + TRUSS_TOP + 1.0, 0.0))
-		if not hit.is_empty():
+		if hit.is_empty():
+			continue
+		# A gantry or a rock is narrow. A ceiling that runs on level far past the towers on both
+		# sides is a big mass whose underside happens to lie over the road (the Mountain course's
+		# DarkDune3 hangs a flat base 3m up), not something worth ducking under.
+		var wide := true
+		for side in [-1.0, 1.0]:
+			var far := _cast(space, Vector3(x + side * MASS_REACH, road_y + HEADROOM_FROM, 0.0), Vector3(x + side * MASS_REACH, road_y + TRUSS_TOP + 1.0, 0.0))
+			if far.is_empty() or absf(far["y"] - hit["y"]) > 0.5:
+				wide = false
+		if not wide:
 			room = minf(room, hit["y"] - road_y)
 	return room
 

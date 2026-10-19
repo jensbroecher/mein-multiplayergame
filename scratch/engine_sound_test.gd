@@ -12,7 +12,7 @@ func _ready() -> void:
 	NetworkManager.start_spectator()
 	for i in cars.size():
 		NetworkManager.players[100 + i]["car_index"] = int(cars[i])
-	var level: Node = load("res://levels/Level.tscn").instantiate()
+	var level: Node = load("res://levels/LakesideLevel.tscn").instantiate()
 	add_child(level)
 	while level.race_state != level.RaceState.RACING:
 		await get_tree().process_frame

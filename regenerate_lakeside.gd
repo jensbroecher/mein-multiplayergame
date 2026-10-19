@@ -1,5 +1,5 @@
 extends Node
-## Dresses the Lakeside Course (res://levels/Level.tscn, the Bloombay GP's first stage) as an RC race
+## Dresses the Lakeside Course (res://levels/LakesideLevel.tscn, the Bloombay GP's first stage) as an RC race
 ## meeting: the paddock, race control, the camera and lap towers, catch fences hung with sponsor
 ## boards, tyre walls and hay round the first corner, the grandstand across it, a campsite on the
 ## hill, and the big orange kicker after the long bridge. Run headless:
@@ -20,7 +20,7 @@ extends Node
 
 const PropKit = preload("res://PropKit.gd")
 const Woodland = preload("res://WoodlandBuilder.gd")
-const LEVEL_PATH := "res://levels/Level.tscn"
+const LEVEL_PATH := "res://levels/LakesideLevel.tscn"
 const RES_PREFIX := "lakeside_"
 const DRESSING := "LakesideDressing"
 const PROP_SCALE := 1.6
@@ -168,11 +168,11 @@ func _ready() -> void:
 	var packed := PackedScene.new()
 	var err := packed.pack(_level)
 	if err != OK:
-		push_error("Failed to pack Level.tscn: %d" % err)
+		push_error("Failed to pack LakesideLevel.tscn: %d" % err)
 	else:
 		err = ResourceSaver.save(packed, LEVEL_PATH)
 		if err != OK:
-			push_error("Failed to save Level.tscn: %d" % err)
+			push_error("Failed to save LakesideLevel.tscn: %d" % err)
 		else:
 			print("Saved %s (%.0fs)" % [LEVEL_PATH, (Time.get_ticks_msec() - t0) / 1000.0])
 	_level.free()

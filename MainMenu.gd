@@ -29,7 +29,7 @@ const COL_JUNGLE := Color(0.32, 0.80, 0.42)
 
 ## Every course's tile: title, one-line description, picture and accent colour.
 const STAGE_INFO := {
-	"res://levels/Level.tscn": {"title": "LAKESIDE COURSE", "subtitle": "Hills, lake, and the long bridge", "file": "tile_lakeside.jpg", "color": COL_LAKE},
+	"res://levels/LakesideLevel.tscn": {"title": "LAKESIDE COURSE", "subtitle": "Hills, lake, and the long bridge", "file": "tile_lakeside.jpg", "color": COL_LAKE},
 	"res://levels/PinecrestRidgeLevel.tscn": {"title": "PINECREST RIDGE", "subtitle": "Forest hillclimb, sharp switchbacks, and big jumps", "file": "tile_pinecrest.jpg", "color": COL_GREEN},
 	"res://levels/HarborPierLevel.tscn": {"title": "HARBOR PIER", "subtitle": "Piers, crates, and dark water", "file": "tile_harbor.jpg", "color": COL_HARBOR},
 	"res://levels/BloombayDunesLevel.tscn": {"title": "BLOOMBAY DUNES", "subtitle": "Ocean coastline, rolling waves, and beach sand dunes", "file": "tile_bloombay_dunes.jpg", "color": COL_BEACH},

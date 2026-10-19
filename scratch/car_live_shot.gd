@@ -4,7 +4,7 @@ extends Node
 # shoots each listed cart from a chase camera (like the player's), from its side and from ahead.
 # The bots get random paint jobs (they only show on procedural cars). Run windowed:
 #   Godot --path . --resolution 1376x768 res://scratch/car_live_shot.tscn -- <out_dir>
-#       [level=res://levels/Level.tscn] [cars=5,5,5,0,1,2] [wait=20] [carts=100,101]
+#       [level=res://levels/LakesideLevel.tscn] [cars=5,5,5,0,1,2] [wait=20] [carts=100,101]
 #       [fx=shock,respawn,teleport,fade]
 # fx= puts PlayerCart's flashes on the shot carts, one each in order, to check them on a car.
 
@@ -12,7 +12,7 @@ func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	var out_dir := args[0]
 	var wait := 20.0
-	var level_path := "res://levels/Level.tscn"
+	var level_path := "res://levels/LakesideLevel.tscn"
 	var cars: PackedStringArray = []
 	var shoot: PackedStringArray = ["100", "101"]
 	var fx: PackedStringArray = []

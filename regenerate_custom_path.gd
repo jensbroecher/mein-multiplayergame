@@ -7,13 +7,13 @@ extends Node
 func _ready():
 	print("Starting regeneration for all levels (preserving custom curves)...")
 	
-	# --- 1. DEFAULT OVAL TRACK (Level.tscn) ---
-	var desert_path = "res://levels/Level.tscn"
+	# --- 1. DEFAULT OVAL TRACK (LakesideLevel.tscn) ---
+	var desert_path = "res://levels/LakesideLevel.tscn"
 	var packed_desert = load(desert_path)
 	if packed_desert:
 		var level = packed_desert.instantiate()
 		if level:
-			print("Instantiated Level.tscn successfully")
+			print("Instantiated LakesideLevel.tscn successfully")
 			add_child(level)
 			
 			var tg = level.get_node_or_null("TerrainGenerator")
@@ -24,7 +24,7 @@ func _ready():
 			print("Aligning default spawn points...")
 			level._align_start_and_spawns_to_track()
 			
-			# Sand dunes are only for MountainLevel, not Level.tscn
+			# Sand dunes are only for MountainLevel, not LakesideLevel.tscn
 			var sd = level.get_node_or_null("SandDunes")
 			if sd:
 				sd.free()
@@ -42,9 +42,9 @@ func _ready():
 			var err = new_packed.pack(level)
 			if err == OK:
 				err = ResourceSaver.save(new_packed, desert_path)
-				print("Saved Level.tscn: ", err)
+				print("Saved LakesideLevel.tscn: ", err)
 			else:
-				print("Failed to pack Level.tscn: ", err)
+				print("Failed to pack LakesideLevel.tscn: ", err)
 	
 	# --- 2. MOUNTAIN DESERT TRACK (MountainLevel.tscn) ---
 	var mountain_path = "res://levels/MountainLevel.tscn"

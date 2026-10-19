@@ -3,7 +3,7 @@ extends Node
 # Nyota Stadium: drives a real PlayerCart over every jump (TrackPath's "jump_lips" meta) with its
 # top speed capped at each of SPEEDS, and prints for each run the airtime, how far past the lip it
 # first came down, the height it reached over the lip, and the speed it kept a second later.
-#   Godot --headless --path . res://scratch/nyota_jump_test.tscn [-- speeds=30,36,40 only=Triple level=res://levels/Level.tscn]
+#   Godot --headless --path . res://scratch/nyota_jump_test.tscn [-- speeds=30,36,40 only=Triple level=res://levels/LakesideLevel.tscn]
 # Any level whose TrackPath carries "jump_lips" works (the Lakeside Course's kicker has one).
 # The node's name holds "regenerate" so Level.gd skips its race setup (no UI, no grid).
 

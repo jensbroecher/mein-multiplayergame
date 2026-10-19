@@ -3,7 +3,7 @@ extends Node
 # Blows up carts on the start grid with forced damage (PlayerCart.damage_override) and shoots each
 # as it comes apart, from a camera that follows it. Prints how long explode() took. Run windowed:
 #   Godot --path . --resolution 1376x768 res://scratch/explosion_shots.tscn -- <out_dir>
-#       [level=res://levels/Level.tscn] [cars=0,1,2,3,4,5] [dmg=name:wheels:parts:dis ...]
+#       [level=res://levels/LakesideLevel.tscn] [cars=0,1,2,3,4,5] [dmg=name:wheels:parts:dis ...]
 #       [times=0.15,0.5,1.1,2.2] [random] [nofire]
 # nofire tears the car and flies the pieces for 0.6s without the blast, fire or tumble, then shoots
 # the car and its pieces from the front and the side (what's left of it).
@@ -21,7 +21,7 @@ const DEFAULT_DAMAGE := [
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	var out_dir := args[0]
-	var level_path := "res://levels/Level.tscn"
+	var level_path := "res://levels/LakesideLevel.tscn"
 	var cars: PackedStringArray = ["0", "1", "2", "3", "4", "5"]
 	var damages: Array = []
 	var times: PackedFloat32Array = [0.15, 0.5, 1.1, 2.2]

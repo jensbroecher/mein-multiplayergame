@@ -4,7 +4,7 @@ extends Node
 # scale, shadows, the saved car): the menu, the car select screen, then a time trial with the
 # throttle held. Prints the frame times of each stage: median, 95th percentile, worst, and the
 # frames per second. Run windowed (the saved window mode applies):
-#   Godot --path . res://scratch/flow_bench.tscn -- [stage=res://levels/Level.tscn] [car=<index>]
+#   Godot --path . res://scratch/flow_bench.tscn -- [stage=res://levels/LakesideLevel.tscn] [car=<index>]
 #       [race=20] [steer=0.3]
 # car= overrides the saved car for this run (the saved one is put back).
 
@@ -14,7 +14,7 @@ var _measuring := false
 
 
 func _ready() -> void:
-	var stage := "res://levels/Level.tscn"
+	var stage := "res://levels/LakesideLevel.tscn"
 	var car := -1
 	var race_s := 20.0
 	var steer := 0.3

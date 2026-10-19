@@ -11,7 +11,7 @@ var heard: Array = []
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
-	var level_path := "res://levels/Level.tscn"
+	var level_path := "res://levels/LakesideLevel.tscn"
 	var skip := 2
 	for a in args:
 		if a.begins_with("skip="):

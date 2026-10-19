@@ -4,7 +4,7 @@ extends Node
 func _ready():
 	print("--- TEST ALL LEVELS LOAD & TERRAIN ---")
 	var levels = [
-		"res://levels/Level.tscn",
+		"res://levels/LakesideLevel.tscn",
 		"res://levels/MountainLevel.tscn",
 		"res://levels/CanyonLevel.tscn",
 		"res://levels/CanyonChasmLevel.tscn",

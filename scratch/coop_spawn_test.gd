@@ -7,7 +7,7 @@ extends Node
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
-	var level_path: String = args[0] if args.size() > 0 else "res://levels/Level.tscn"
+	var level_path: String = args[0] if args.size() > 0 else "res://levels/LakesideLevel.tscn"
 	var seconds := 14.0
 	for a in args:
 		if a.begins_with("seconds="):

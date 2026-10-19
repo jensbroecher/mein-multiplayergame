@@ -26,14 +26,14 @@ self-checks (`_verify_ramp_junction`, `_verify_bridge_alignment`) that `push_err
 still save the level. You can ignore these at exit: "Node not found: Players/PlayerSpawner" (`Level.gd` runs
 outside a game), "Leaked instance dependency", and RID/ObjectDB leak messages.
 
-`Level.tscn` and `MountainLevel.tscn` can each be written by several generators (`regenerate_both`,
+`LakesideLevel.tscn` and `MountainLevel.tscn` can each be written by several generators (`regenerate_both`,
 `regenerate_custom_path`, `regenerate_desert`, ...). Don't regenerate them unless you know which one made the
-current file. `Level.tscn` (the Lakeside Course) is dressed by `regenerate_lakeside.gd`: run that after any of
+current file. `LakesideLevel.tscn` (the Lakeside Course) is dressed by `regenerate_lakeside.gd`: run that after any of
 the others re-bakes it (see Lakeside Course below).
 
 ## Lakeside Course (Bloombay GP, stage 1)
 
-- `regenerate_lakeside.gd` dresses `levels/Level.tscn` as an RC race meeting and replaces everything under
+- `regenerate_lakeside.gd` dresses `levels/LakesideLevel.tscn` as an RC race meeting and replaces everything under
   `LakesideDressing` on every run: the paddock, race control, the camera and lap towers, catch fences, crowd
   barriers, tyre walls, hay, cones, the grandstand across the first corner, the campsite on the hill, the
   orange kicker, the woods and the boulders. The terrain, road and grass stay TerrainGenerator's.
@@ -52,7 +52,7 @@ the others re-bakes it (see Lakeside Course below).
 - The kicker after the long bridge (`KICKER_*`) replaced the old `Ramps/NewRamp` curl: a transition into a
   25 degree lip 9.2m up, cut square. The deck is its own body `KickerJump` (driven on as road), the sides and
   back `KickerFrame`. Boost pads 5 to 7 are re-seated on the deck. The TrackPath's `jump_lips` meta records
-  the lip: `res://scratch/nyota_jump_test.tscn -- level=res://levels/Level.tscn speeds=30,40,50,60` (carts
+  the lip: `res://scratch/nyota_jump_test.tscn -- level=res://levels/LakesideLevel.tscn speeds=30,40,50,60` (carts
   land 63 to 105m out on the straight and keep their speed).
 - The lap boards are `LapBoard.gd` nodes: Level's `_feed_gantry` also calls the `lap_boards` group with the
   standings, and the LED label shows the leader's lap, then FINISH.
@@ -61,7 +61,7 @@ the others re-bakes it (see Lakeside Course below).
   two fence bays where the fence runs straight.
 - The sky is the level's own (Msitu Falls' static cumulus shader, a sun from the south-west); the shared
   `GodotWeatherSystem` controller is gone from this level because its fog washed the sky out.
-  `regenerate_desert_wadi.gd`, which copies Level.tscn as its template, puts the weather controller back and
+  `regenerate_desert_wadi.gd`, which copies LakesideLevel.tscn as its template, puts the weather controller back and
   clears the pads (`_reset_lakeside_template`).
 - The woods are `WoodlandBuilder.gd`: oak, lime, birch, spruce and hazel, Msitu Falls' technique (bark
   tubes, leaf-spray cards with the crown's normals, near/far crossfade), with `JungleDetail.gd` scaling them

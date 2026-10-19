@@ -3,14 +3,14 @@
 # off-road dune cuts, and a wide valley river/lake ford.
 #
 # Run: open res://regenerate_desert_wadi.tscn and Play Current Scene.
-# Does NOT re-import lakeside trees/ramps/props from Level.tscn — those are stripped.
+# Does NOT re-import lakeside trees/ramps/props from LakesideLevel.tscn — those are stripped.
 extends Node
 
 func _ready() -> void:
 	print("=== Desert Wadi Level Generation ===")
 	print("Building technical desert course with river valley. Please wait...")
 
-	var template_path := "res://levels/Level.tscn"
+	var template_path := "res://levels/LakesideLevel.tscn"
 	var target_path := "res://levels/DesertWadiLevel.tscn"
 
 	var dir := DirAccess.open("res://")
@@ -352,7 +352,7 @@ func _diagnose_wadi_curve(curve: Curve3D) -> void:
 		print("  ford ", q, " -> closest ", cp, " dist=", cp.distance_to(q), " underwater=", cp.y < 1.70)
 
 
-## Level.tscn is the Lakeside Course as regenerate_lakeside.gd dresses it: its own sky and sun, and
+## LakesideLevel.tscn is the Lakeside Course as regenerate_lakeside.gd dresses it: its own sky and sun, and
 ## graded pads and mown ground on the TerrainGenerator, all at the lakeside's coordinates. The desert
 ## wants none of it: put back the shared weather system the template used to carry (the lakeside's
 ## old settings) and clear the grading.
@@ -382,7 +382,7 @@ func _reset_lakeside_template(level: Node) -> void:
 		track_path.remove_meta(&"jump_lips")
 
 
-## Drop lakeside trees, ramps, and other decorative instances from Level.tscn.
+## Drop lakeside trees, ramps, and other decorative instances from LakesideLevel.tscn.
 func _strip_non_essential_props(level: Node) -> void:
 	var keep := {
 		"TerrainGenerator": true,

@@ -4,7 +4,7 @@ extends Node
 # turn, twice, and prints the longest frames after each use with the pipeline compilations the
 # renderer did in that window (a draw-time compilation is a stall). Also times the frames round the
 # countdown and GO. The bots' own items are taken away so only the probe's uses count. Run windowed:
-#   Godot --path . --resolution 1280x720 res://scratch/hitch_probe.tscn -- [level=res://levels/Level.tscn]
+#   Godot --path . --resolution 1280x720 res://scratch/hitch_probe.tscn -- [level=res://levels/LakesideLevel.tscn]
 #       [items=lightning,shockwave,missile,guided,bomb,boost,shield] [repeats=2] [gap=2.0] [cart=100]
 # items= also takes cart effects: respawn, explode, splash, fade, unfade, shocked (the lightning's
 # slow and blue blink on the cart itself), and explode_wheels / explode_parts / explode_shatter
@@ -27,7 +27,7 @@ var _level: Node
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
-	var level_path := "res://levels/Level.tscn"
+	var level_path := "res://levels/LakesideLevel.tscn"
 	var items: PackedStringArray = ["lightning", "shockwave", "missile", "guided", "bomb", "boost", "shield"]
 	var repeats := 2
 	var gap := 2.0

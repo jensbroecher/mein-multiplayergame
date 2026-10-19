@@ -10,7 +10,7 @@
 extends Node
 
 const LEVELS := [
-	"res://levels/Level.tscn",
+	"res://levels/LakesideLevel.tscn",
 	"res://levels/MountainLevel.tscn",
 	"res://levels/BloombayDunesLevel.tscn",
 	"res://levels/PinecrestRidgeLevel.tscn",

@@ -40,19 +40,19 @@ var current_game_mode: int = GameMode.MULTIPLAYER
 enum MultiplayerMode { SINGLE_STAGES, GRAND_PRIX }
 var multiplayer_mode: int = MultiplayerMode.SINGLE_STAGES
 var selected_mp_cup: String = "Bloombay GP"
-var current_single_stage: String = "res://levels/Level.tscn"
+var current_single_stage: String = "res://levels/LakesideLevel.tscn"
 
 var current_gp_name: String = ""
 var current_gp_stage: int = 0
 var gp_standings: Dictionary = {} # racer_name -> points
 var gp_last_pos: Dictionary = {} # racer_name -> finishing place in the latest race (breaks ties on points)
-var time_trial_stage: String = "res://levels/Level.tscn"
+var time_trial_stage: String = "res://levels/LakesideLevel.tscn"
 
 var stage_votes: Dictionary = {} # peer_id -> stage_path or "random"
 var is_voting_active: bool = false
 
 const ALL_STAGES = [
-	{"name": "Meadow Circuit", "path": "res://levels/Level.tscn"},
+	{"name": "Meadow Circuit", "path": "res://levels/LakesideLevel.tscn"},
 	{"name": "Pinecrest Ridge", "path": "res://levels/PinecrestRidgeLevel.tscn"},
 	{"name": "Frostpeak Creek", "path": "res://levels/FrostpeakCreekLevel.tscn"},
 	{"name": "Glacier Highway", "path": "res://levels/GlacierHighwayLevel.tscn"},
@@ -73,7 +73,7 @@ const GP_CUPS = {
 	"Bloombay GP": {
 		"name": "Bloombay GP",
 		"stages": [
-			"res://levels/Level.tscn",
+			"res://levels/LakesideLevel.tscn",
 			"res://levels/PinecrestRidgeLevel.tscn",
 			"res://levels/HarborPierLevel.tscn",
 			"res://levels/BloombayDunesLevel.tscn",

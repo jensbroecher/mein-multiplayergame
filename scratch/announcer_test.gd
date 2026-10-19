@@ -10,7 +10,7 @@ var _heard: Dictionary = {}
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
-	var level_path: String = args[0] if args.size() > 0 else "res://levels/Level.tscn"
+	var level_path: String = args[0] if args.size() > 0 else "res://levels/LakesideLevel.tscn"
 	AudioServer.set_bus_mute(0, true)
 	NetworkManager.current_game_mode = NetworkManager.GameMode.LOCAL_COOP
 	NetworkManager.start_local_coop("P1", "P2")

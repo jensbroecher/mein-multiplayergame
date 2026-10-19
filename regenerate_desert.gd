@@ -1,25 +1,25 @@
 # regenerate_desert.gd
-# Regenerates ONLY Level.tscn (the desert/oval track) — preserves your custom Path3D curve.
+# Regenerates ONLY LakesideLevel.tscn (the desert/oval track) — preserves your custom Path3D curve.
 # Run by opening regenerate_desert.tscn and pressing F6 (Run Current Scene).
 extends Node
 
 func _ready():
 	print("=== Desert Level Regeneration ===")
 
-	var desert_path = "res://levels/Level.tscn"
+	var desert_path = "res://levels/LakesideLevel.tscn"
 	var packed_desert = load(desert_path)
 	if not packed_desert:
-		push_error("Could not load Level.tscn")
+		push_error("Could not load LakesideLevel.tscn")
 		get_tree().quit(1)
 		return
 
 	var level = packed_desert.instantiate()
 	if not level:
-		push_error("Could not instantiate Level.tscn")
+		push_error("Could not instantiate LakesideLevel.tscn")
 		get_tree().quit(1)
 		return
 
-	print("Instantiated Level.tscn")
+	print("Instantiated LakesideLevel.tscn")
 	add_child(level)
 
 	var tg = level.get_node_or_null("TerrainGenerator")
@@ -30,12 +30,12 @@ func _ready():
 		print("Regenerating desert terrain from existing custom curve...")
 		tg.generate_world()
 	else:
-		push_error("TerrainGenerator node not found in Level.tscn")
+		push_error("TerrainGenerator node not found in LakesideLevel.tscn")
 
 	print("Aligning desert spawn points...")
 	level._align_start_and_spawns_to_track()
 
-	# Level.tscn has no SandDunes — remove them if somehow present
+	# LakesideLevel.tscn has no SandDunes — remove them if somehow present
 	var sd = level.get_node_or_null("SandDunes")
 	if sd:
 		sd.free()
@@ -50,7 +50,7 @@ func _ready():
 	if err == OK:
 		err = ResourceSaver.save(new_packed, desert_path)
 		if err == OK:
-			print("Saved Level.tscn successfully.")
+			print("Saved LakesideLevel.tscn successfully.")
 		else:
 			push_error("ResourceSaver.save failed: " + str(err))
 	else:
