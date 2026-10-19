@@ -16,6 +16,7 @@ var busy := false
 var _rect: ColorRect
 var _mat: ShaderMaterial
 var _tween: Tween
+var _black: ColorRect
 
 
 func _ready() -> void:
@@ -31,6 +32,14 @@ func _ready() -> void:
 	_rect.mouse_filter = Control.MOUSE_FILTER_STOP
 	_rect.material = _mat
 	add_child(_rect)
+	_black = ColorRect.new()
+	_black.name = "Black"
+	_black.color = Color.BLACK
+	_black.modulate.a = 0.0
+	_black.visible = false
+	_black.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_black.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(_black)
 
 
 ## Sweeps the panel in until it covers the screen.
@@ -75,6 +84,17 @@ func fade_out(duration: float = FADE_TIME) -> void:
 	_tween.tween_property(_mat, "shader_parameter/fade", 1.0, duration)
 	await _tween.finished
 	_done()
+
+
+## Fades the whole screen to black and stays there (for closing the app).
+func fade_to_black(duration: float = 0.6) -> void:
+	await _finish_running()
+	busy = true
+	visible = true
+	_black.visible = true
+	_tween = _new_tween()
+	_tween.tween_property(_black, "modulate:a", 1.0, duration)
+	await _tween.finished
 
 
 func _new_tween() -> Tween:

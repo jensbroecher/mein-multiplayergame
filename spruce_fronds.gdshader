@@ -17,7 +17,7 @@ uniform sampler2D leaf_tex : source_color, filter_linear_mipmap, repeat_disable;
 uniform float needle_boost : hint_range(0.5, 4.0) = 1.7;
 uniform float alpha_cut : hint_range(0.0, 1.0) = 0.5;
 uniform vec4 snow_color : source_color = vec4(0.86, 0.90, 0.97, 1.0);
-uniform float snow_amount : hint_range(0.0, 1.0) = 0.65;
+uniform float snow_amount : hint_range(0.0, 1.0) = 0.9;
 uniform float sway : hint_range(0.0, 0.3) = 0.06;
 uniform float sway_height = 11.0;
 
@@ -75,13 +75,16 @@ void fragment() {
 	float spine = 1.0 - smoothstep(0.05, 0.55, abs(fract(UV.x * 2.0) - 0.5) * 2.0);
 	float clump_snow = vnoise3(local_pos * vec3(2.6, 3.4, 2.6) + 3.1);
 	float fine = vnoise3(vec3(UV * 64.0, tree_seed * 7.0));
-	float cover = clump_snow * 0.55 + spine * 0.25 + fine * 0.20 + up * 0.35;
+	float cover = clump_snow * 0.50 + spine * 0.20 + fine * 0.15 + up * 0.55;
 	float snow = COLOR.a * smoothstep(0.62 - snow_amount * 0.45, 0.88 - snow_amount * 0.30, cover);
-	// Needles poke through the thin edge of the snow.
-	snow *= smoothstep(0.0, 0.7, 0.25 + tex.g * 0.9);
+	// A few small gaps, from noise, so the snow is not a uniform coat. (Not from the texture: its needle
+	// strokes showed through as dark lines on the upper side of every branch.)
+	snow *= 1.0 - smoothstep(0.62, 0.92, fine) * 0.55;
 	snow = clamp(snow, 0.0, 1.0);
 
-	ALBEDO = mix(needles, snow_color.rgb * (0.90 + fine * 0.10), snow);
+	// Under the snow the needle spray only shows as the faintest relief.
+	vec3 snow_col = snow_color.rgb * (0.90 + fine * 0.10) * mix(0.90, 1.0, smoothstep(0.1, 0.5, tex.r));
+	ALBEDO = mix(needles, snow_col, snow);
 	ROUGHNESS = mix(0.88, 0.72, snow);
 	SPECULAR = mix(0.18, 0.32, snow);
 	BACKLIGHT = vec3(0.10, 0.16, 0.08) * (1.0 - snow);

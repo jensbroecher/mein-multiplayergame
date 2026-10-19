@@ -2116,7 +2116,7 @@ func _spruce_mesh(variant: int, lod: int) -> ArrayMesh:
 			# A sunlit upper frond, drooping at the tip; lower branches droop more.
 			vbase = _spruce_frond(fr, vbase, Vector3(0, by, 0) + dir * 0.18, dir, rng.randf_range(0.06, 0.30) + t * t * 0.45,
 					rng.randf_range(0.9, 1.4) * (1.0 - t * 0.5), length, length * (0.62 if lod == 0 else 0.8), segs, tint, shade0, minf(shade0 + 0.3, 1.0),
-					0.30 + rng.randf_range(-0.08, 0.08), 0.55 + t * 0.2, rng.randf())
+					0.30 + rng.randf_range(-0.08, 0.08), 0.95, rng.randf())
 			if t < 0.9 and (lod == 0 or b % 2 == 0):
 				# A shorter frond under the branch, between the upper ones: it holds no snow and sits
 				# in the crown's shade.
@@ -2197,7 +2197,7 @@ func _spruce_frond(st: SurfaceTool, base: int, root: Vector3, dir: Vector3, rise
 		for e in [-1.0, 0.0, 1.0]:
 			var pos: Vector3 = q + side * (w * cf * e) + up * (w * sf * absf(e))
 			st.set_normal(out_n)
-			st.set_color(Color(tint.r * shade, tint.g * shade, tint.b * shade, snow * (0.5 + 0.5 * t) if not under else 0.0))
+			st.set_color(Color(tint.r * shade, tint.g * shade, tint.b * shade, snow * (0.75 + 0.25 * t) if not under else 0.0))
 			st.set_uv(Vector2(lerpf(u0, u1, 0.5 + e * 0.5), v))
 			st.add_vertex(pos)
 	for k in range(segs):

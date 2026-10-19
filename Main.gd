@@ -19,12 +19,16 @@ var podium: Control
 
 var _coop_p1_car: int = 0
 var _coop_selecting_p2: bool = false
+const QUIT_FADE_TIME := 0.6
+const QUIT_SOUND_TIME := 0.5
+
 var _level_swap_in_progress: bool = false
 
 func _ready():
 	_apply_platform_performance()
 	main_menu.start_pressed.connect(_on_menu_start_pressed)
 	main_menu.options_pressed.connect(_on_menu_options_pressed)
+	main_menu.quit_pressed.connect(_on_menu_quit_pressed)
 	car_selection.car_selected.connect(_on_car_selected)
 	car_selection.back_requested.connect(_on_car_selection_back)
 	NetworkManager.server_disconnected.connect(_on_server_disconnected)
@@ -75,6 +79,14 @@ func _swipe(change: Callable) -> void:
 	await screen_transition.cover()
 	await change.call()
 	await screen_transition.reveal()
+
+## Fades to black and gives the button sound time to finish before the app closes.
+func _on_menu_quit_pressed() -> void:
+	if screen_transition.busy:
+		return
+	await screen_transition.fade_to_black(QUIT_FADE_TIME)
+	await get_tree().create_timer(QUIT_SOUND_TIME, true, false, true).timeout
+	get_tree().quit()
 
 func _on_menu_start_pressed():
 	if NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR:

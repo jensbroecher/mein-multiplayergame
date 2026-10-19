@@ -3,6 +3,7 @@ extends Control
 ## Both leave the menu on screen: Main swipes to the next screen and hides this one behind it.
 signal start_pressed
 signal options_pressed
+signal quit_pressed
 
 ## Dev jump-in for Grand Prix stages. Set false (or delete the tile) before shipping.
 const SHOW_GP_TEST_MENU := true
@@ -559,4 +560,4 @@ func _on_options_pressed() -> void:
 
 
 func _on_quit_pressed() -> void:
-	get_tree().quit()
+	quit_pressed.emit()
