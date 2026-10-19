@@ -28,7 +28,50 @@ outside a game), "Leaked instance dependency", and RID/ObjectDB leak messages.
 
 `Level.tscn` and `MountainLevel.tscn` can each be written by several generators (`regenerate_both`,
 `regenerate_custom_path`, `regenerate_desert`, ...). Don't regenerate them unless you know which one made the
-current file.
+current file. `Level.tscn` (the Lakeside Course) is dressed by `regenerate_lakeside.gd`: run that after any of
+the others re-bakes it (see Lakeside Course below).
+
+## Lakeside Course (Bloombay GP, stage 1)
+
+- `regenerate_lakeside.gd` dresses `levels/Level.tscn` as an RC race meeting and replaces everything under
+  `LakesideDressing` on every run: the paddock, race control, the camera and lap towers, catch fences, crowd
+  barriers, tyre walls, hay, cones, the grandstand across the first corner, the campsite on the hill, the
+  orange kicker, the woods and the boulders. The terrain, road and grass stay TerrainGenerator's.
+- It grades flat pads (`TerrainGenerator.flat_pads`: paddock, grandstand footing, campsite terraces) and mows
+  the venue's verges (`grass_clearings`, no tall grass there). Both are applied after the road blend, so keep
+  them off the road. The world is re-baked only when they change (or with `-- rebake`): about 13 minutes,
+  nearly all of it the 4M grass blades. A run without a bake takes about 30s. Pad heights come from the
+  natural ground (pads cleared first), so they are the same on every run. The grass chunks are written
+  through `MultiMesh.buffer` and seeded, so a headless bake keeps them and a re-bake reproduces them.
+- People-sized things are built at life size in `PropKit.gd` (one SurfaceTool per material key, everything
+  through a frame that places, scales and even shears a prop) and scaled by `PROP_SCALE` (1.6), like
+  Bloombay's seafront. `_verify_clear` errors on any footprint too close to the road.
+- The venue sits in road coordinates (s along the TrackPath, lateral right of travel +). The first corner
+  (s = 0, the origin) is a single sharp point; `_offset_run` wraps fences and tyre walls round its outside.
+  Its inside is tight: anything there stands along the bisector, clear of both legs.
+- The kicker after the long bridge (`KICKER_*`) replaced the old `Ramps/NewRamp` curl: a transition into a
+  25 degree lip 9.2m up, cut square. The deck is its own body `KickerJump` (driven on as road), the sides and
+  back `KickerFrame`. Boost pads 5 to 7 are re-seated on the deck. The TrackPath's `jump_lips` meta records
+  the lip: `res://scratch/nyota_jump_test.tscn -- level=res://levels/Level.tscn speeds=30,40,50,60` (carts
+  land 63 to 105m out on the straight and keep their speed).
+- The lap boards are `LapBoard.gd` nodes: Level's `_feed_gantry` also calls the `lap_boards` group with the
+  standings, and the LED label shows the leader's lap, then FINISH.
+- Sponsor boards draw `StadiumAds.gd` artwork: its `ads` export takes a level's own 16 sponsors (the
+  generator's `ADS`, fictional); layout 3 is a run of colour bars. Boards are 8:1 like the artwork, spanning
+  two fence bays where the fence runs straight.
+- The sky is the level's own (Msitu Falls' static cumulus shader, a sun from the south-west); the shared
+  `GodotWeatherSystem` controller is gone from this level because its fog washed the sky out.
+  `regenerate_desert_wadi.gd`, which copies Level.tscn as its template, puts the weather controller back and
+  clears the pads (`_reset_lakeside_template`).
+- The woods are `WoodlandBuilder.gd`: oak, lime, birch, spruce and hazel, Msitu Falls' technique (bark
+  tubes, leaf-spray cards with the crown's normals, near/far crossfade), with `JungleDetail.gd` scaling them
+  by vegetation detail. A broadleaf grows from its crown inward: clusters in the crown's shell, grouped into
+  limbs, pipe-model radii. Each kind keeps its crown off the road (`TREE_ROAD_CLEAR`); trunks within 40m of
+  the road are solid. `res://scratch/woodland_preview.gd` (`-s`, windowed) renders every tree on a flat
+  meadow in seconds. Boulders use `granite_rock.gdshader` with a mossy foot.
+- AI races (`scratch/ai_race_test`, speed=2) show falls at about 680m, round the loop (2600m) and between
+  the two lakes at 3120 to 3132m; the undressed level had them too. None come from the venue's props. The
+  old curl threw carts off the road at 2213m; the kicker doesn't.
 
 ## Frostpeak Creek road joints
 

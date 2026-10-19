@@ -48,6 +48,7 @@ func _ready() -> void:
 
 	# Strip lakeside trees / ramps / props — keep only track infrastructure
 	_strip_non_essential_props(level)
+	_reset_lakeside_template(level)
 
 	var tg = level.get_node_or_null("TerrainGenerator")
 	var track_path = level.get_node_or_null("TrackPath") as Path3D
@@ -349,6 +350,36 @@ func _diagnose_wadi_curve(curve: Curve3D) -> void:
 	for q in fords:
 		var cp: Vector3 = curve.get_closest_point(q)
 		print("  ford ", q, " -> closest ", cp, " dist=", cp.distance_to(q), " underwater=", cp.y < 1.70)
+
+
+## Level.tscn is the Lakeside Course as regenerate_lakeside.gd dresses it: its own sky and sun, and
+## graded pads and mown ground on the TerrainGenerator, all at the lakeside's coordinates. The desert
+## wants none of it: put back the shared weather system the template used to carry (the lakeside's
+## old settings) and clear the grading.
+func _reset_lakeside_template(level: Node) -> void:
+	for n in ["WorldEnvironment", "SunLight"]:
+		var node := level.get_node_or_null(n)
+		if node:
+			level.remove_child(node)
+			node.free()
+	if level.get_node_or_null("WeatherController") == null:
+		var wc: Node = (load("res://addons/GodotWeatherSystem/weather_controller.tscn") as PackedScene).instantiate()
+		wc.name = "WeatherController"
+		level.add_child(wc)
+		level.move_child(wc, 0)
+		wc.owner = level
+		wc.set("time_of_day_hours", 13.239)
+		wc.set("selected_weather", 1)
+	var tg := level.get_node_or_null("TerrainGenerator")
+	if tg:
+		tg.set("flat_pads", PackedFloat32Array())
+		tg.set("grass_clearings", PackedFloat32Array())
+		for m in [&"baked_pads", &"baked_clearings"]:
+			if tg.has_meta(m):
+				tg.remove_meta(m)
+	var track_path := level.get_node_or_null("TrackPath")
+	if track_path and track_path.has_meta(&"jump_lips"):
+		track_path.remove_meta(&"jump_lips")
 
 
 ## Drop lakeside trees, ramps, and other decorative instances from Level.tscn.

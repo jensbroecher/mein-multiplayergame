@@ -9,6 +9,9 @@ extends Node
 
 ## Materials that sample the atlas.
 @export var targets: Array[ShaderMaterial] = []
+## The adverts, in ADS's layout (16 of them, the boards shader's AD_COUNT); empty draws Nyota's own.
+## Layout 3 is a run of colour bars, the accent first, then the text colour and the background.
+@export var ads: Array = []
 
 const COLS := 2
 const ROWS := 8
@@ -50,8 +53,9 @@ func _ready() -> void:
 	var plain := SystemFont.new()
 	plain.font_names = PackedStringArray(["Helvetica Neue", "Arial", "sans-serif"])
 	plain.font_weight = 700
-	for i in range(ADS.size()):
-		_draw_cell(vp, i, ADS[i], bold, plain)
+	var list: Array = ads if not ads.is_empty() else ADS
+	for i in range(list.size()):
+		_draw_cell(vp, i, list[i], bold, plain)
 	await RenderingServer.frame_post_draw
 	if not is_inside_tree():
 		return
@@ -109,6 +113,16 @@ func _draw_cell(vp: SubViewport, i: int, ad: Array, bold: Font, plain: Font) -> 
 		star.color = ad[2]
 		cell.add_child(star)
 		text_x = 170.0
+	elif layout == 3:
+		# Slanted colour bars across the left two thirds, the name on the right.
+		var bars: Array = [accent, fg, accent.lerp(ad[2], 0.5), fg.lerp(accent, 0.5), accent.lightened(0.25)]
+		for k in range(10):
+			var bar := Polygon2D.new()
+			var x0: float = -40.0 + k * 66.0
+			bar.polygon = PackedVector2Array([Vector2(x0 + 40, 0), Vector2(x0 + 92, 0), Vector2(x0 + 52, 128), Vector2(x0, 128)])
+			bar.color = bars[k % bars.size()]
+			cell.add_child(bar)
+		text_x = 640.0
 	else:
 		# Underlined, with stripes at the right end.
 		var line := ColorRect.new()

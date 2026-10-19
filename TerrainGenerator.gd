@@ -637,6 +637,7 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 					var target_bed: float = lerpf(bed_y, bed_y - 0.7, lake_center_boost)
 					height = lerp(height, target_bed, clampf(carve, 0.0, 1.0))
 
+	height = _apply_flat_pads(px, pz, height)
 	height = _carve_under_extra_roads(px, pz, height, for_collision)
 
 	# Edge falloff (all track types — curves down smoothly to abyss / horizon outside all track envelopes)
@@ -739,6 +740,51 @@ func _allowed_under_deck(c: Curve3D, sections: Dictionary, px: float, pz: float,
 	return deck_y - recess + maxf(0.0, out_dist - cell_pad) * bank_slope
 
 
+## How far (x, z) lies outside the rotated rectangle at `o` in `rects` (centre x, centre z, half
+## length, half width, yaw), negative inside: the layout shared by flat_pads and grass_clearings.
+static func _rect_outside(rects: PackedFloat32Array, o: int, px: float, pz: float) -> float:
+	var dx: float = px - rects[o]
+	var dz: float = pz - rects[o + 1]
+	var c: float = cos(rects[o + 4])
+	var s: float = sin(rects[o + 4])
+	# Into the rectangle's frame (Basis(UP, yaw) maps local to world).
+	var qx: float = absf(dx * c - dz * s) - rects[o + 2]
+	var qz: float = absf(dx * s + dz * c) - rects[o + 3]
+	return Vector2(maxf(qx, 0.0), maxf(qz, 0.0)).length() + minf(maxf(qx, qz), 0.0)
+
+
+## Grades `height` toward each of the flat_pads, fully inside a pad and easing out over its blend.
+func _apply_flat_pads(px: float, pz: float, height: float) -> float:
+	for o in range(0, flat_pads.size() - 6, 7):
+		var reach: float = flat_pads[o + 2] + flat_pads[o + 3] + flat_pads[o + 6]
+		var dx: float = px - flat_pads[o]
+		var dz: float = pz - flat_pads[o + 1]
+		if dx * dx + dz * dz > reach * reach:
+			continue
+		var outside: float = _rect_outside(flat_pads, o, px, pz)
+		var blend: float = maxf(flat_pads[o + 6], 0.01)
+		if outside >= blend:
+			continue
+		height = lerpf(height, flat_pads[o + 5], 1.0 - smoothstep(0.0, blend, outside))
+	return height
+
+
+## True where the tall grass is mown: inside one of the grass_clearings, or thinning out across
+## its feather (by chance, so the edge isn't a ruled line).
+func _in_grass_clearing(px: float, pz: float) -> bool:
+	for o in range(0, grass_clearings.size() - 5, 6):
+		var feather: float = maxf(grass_clearings[o + 5], 0.01)
+		var reach: float = grass_clearings[o + 2] + grass_clearings[o + 3] + feather
+		var dx: float = px - grass_clearings[o]
+		var dz: float = pz - grass_clearings[o + 1]
+		if dx * dx + dz * dz > reach * reach:
+			continue
+		var outside: float = _rect_outside(grass_clearings, o, px, pz)
+		if outside <= 0.0 or randf() > smoothstep(0.0, feather, outside):
+			return true
+	return false
+
+
 @export var generate_now: bool = false:
 	set(val):
 		if val:
@@ -813,6 +859,16 @@ var sand_width: float:
 @export var road_sides_material: Material
 @export var curb_sides_material: Material
 @export var save_to_files: bool = true
+
+@export_group("Grading")
+## Ground graded flat after the road blend (a paddock, a grandstand's footing, campsite terraces),
+## 7 floats a pad: centre x, centre z, half length (local x), half width (local z), yaw (radians),
+## height, and the distance over which it eases back into the natural ground. Keep pads and their
+## blend off the road: they're applied after it. Set by regenerate_lakeside.gd.
+@export var flat_pads: PackedFloat32Array = PackedFloat32Array()
+## Mown ground where the tall grass doesn't grow, 6 floats a rectangle: centre x, centre z, half
+## length, half width, yaw, and a feather over which the grass thins out toward it.
+@export var grass_clearings: PackedFloat32Array = PackedFloat32Array()
 
 var _visual_heights: PackedFloat32Array = PackedFloat32Array()
 
@@ -2415,7 +2471,9 @@ func _sq_dist_to_path(px: float, pz: float, baked: PackedVector2Array) -> float:
 func _generate_terrain_grass():
 	var target_count: int = terrain_grass_count
 	if target_count <= 0: return
-	
+	# Seeded, so baking the same terrain again lays the same grass (the chunks are tracked files).
+	seed(hash(level_prefix) ^ 0x6a55)
+
 	if not track_path:
 		track_path = get_node_or_null("../TrackPath")
 	if not track_path:
@@ -2544,6 +2602,9 @@ func _generate_terrain_grass():
 			if is_wadi_water_at(px, pz) or height < 1.8:
 				continue
 		
+		if not grass_clearings.is_empty() and _in_grass_clearing(px, pz):
+			continue
+
 		# Skip near-vertical cliffs (> 60 degrees)
 		var h_px := _sample_cached_height(px + 1.5, pz)
 		var h_pz := _sample_cached_height(px, pz + 1.5)
@@ -2607,12 +2668,29 @@ func _generate_terrain_grass():
 			mm.use_custom_data = false
 			mm.mesh = grass_mesh
 			mm.instance_count = list.size()
-			
+			# The dummy renderer that headless generators run on drops set_instance_transform():
+			# write the buffer itself, which every renderer keeps (CLAUDE.md, headless gotchas).
+			var buf := PackedFloat32Array()
+			buf.resize(list.size() * 12)
 			for i in range(list.size()):
-				var t = list[i]
-				t.origin -= chunk_center
-				mm.set_instance_transform(i, t)
-				
+				var t: Transform3D = list[i]
+				var b: Basis = t.basis
+				var o: Vector3 = t.origin - chunk_center
+				var k: int = i * 12
+				buf[k] = b.x.x
+				buf[k + 1] = b.y.x
+				buf[k + 2] = b.z.x
+				buf[k + 3] = o.x
+				buf[k + 4] = b.x.y
+				buf[k + 5] = b.y.y
+				buf[k + 6] = b.z.y
+				buf[k + 7] = o.y
+				buf[k + 8] = b.x.z
+				buf[k + 9] = b.y.z
+				buf[k + 10] = b.z.z
+				buf[k + 11] = o.z
+			mm.buffer = buf
+
 			mmi.multimesh = _save_resource(mm, "chunk_%d_%d" % [c, r], "grass")
 			mmi.material_override = saved_mat
 	

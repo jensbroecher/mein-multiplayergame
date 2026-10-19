@@ -822,6 +822,8 @@ func _setup_gantry_ticker() -> void:
 func _feed_gantry(rows: Array) -> void:
 	if _gantry:
 		_gantry.update_standings(rows)
+	# Trackside lap boards (LapBoard.gd) show the leader's lap.
+	get_tree().call_group(&"lap_boards", &"show_standings", rows)
 
 var _cached_grass_mat: ShaderMaterial = null
 
