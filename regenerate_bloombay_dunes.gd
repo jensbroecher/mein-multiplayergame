@@ -203,9 +203,14 @@ func _ready() -> void:
 
 	level_scene.add_child(tg)
 	tg.set("track_path", track_path)
+	# The inland camps stand on level pads graded into the dunes before the world is built.
+	_tg = tg
+	_curve = curve
+	tg.set("flat_pads", _plan_camps())
 	tg.call("generate_world")
 	_build_ocean(tg)
 	_build_seafront(level_scene, tg, curve)
+	_build_inland(level_scene)
 	_build_surf_sound(level_scene, tg)
 
 	# 4. Finish Line & Starting Grid
@@ -1286,16 +1291,16 @@ func _note(name: String, centre: Vector2, radius: float, clearance: float, heigh
 	_footprints.append([name, Vector2(w.x, w.z), radius * s, clearance, height * s])
 
 
-func _verify_seafront_clear() -> void:
+func _verify_seafront_clear(label := "Seafront") -> void:
 	var bad := 0
 	for f in _footprints:
 		var c: Vector2 = f[1]
 		var p := _curve.get_closest_point(Vector3(c.x, _ground(c.x, c.y), c.y))
 		var gap: float = Vector2(p.x, p.z).distance_to(c) - float(f[2]) - TRACK_HALF
 		if gap < float(f[3]):
-			push_error("Seafront: %s is %.1fm off the track edge (wants %.1fm)" % [f[0], gap, f[3]])
+			push_error("%s: %s is %.1fm off the track edge (wants %.1fm)" % [label, f[0], gap, f[3]])
 			bad += 1
-	print("Seafront: %d footprints checked, %d too close to the track" % [_footprints.size(), bad])
+	print("%s: %d footprints checked, %d too close to the track" % [label, _footprints.size(), bad])
 
 
 # --- Mesh kit -------------------------------------------------------------------------------------
@@ -1347,6 +1352,9 @@ func _mat(key: String) -> Material:
 			m.emission = Color(1.0, 0.42, 0.08)
 			m.emission_energy_multiplier = 1.4
 			m.roughness = 0.15
+		# Pebbles and rocks lying about the dunes, tinted by vertex colour.
+		"pebble":
+			m.roughness = 0.93
 		"glass":
 			m.metallic = 0.3
 			m.roughness = 0.05
@@ -1628,7 +1636,7 @@ func _flag(kit: Dictionary, hoist_top: Vector3, along: Vector3, face: Vector3, l
 
 ## A low-poly rock: an icosphere pushed about by noise, flat shaded. The wreck's net heaps use it too.
 ## Returns its points (layout space), for a hull collider.
-func _rock(kit: Dictionary, centre: Vector3, size: Vector3, seed_v: int, col: Color, key: String = "rock") -> PackedVector3Array:
+func _rock(kit: Dictionary, centre: Vector3, size: Vector3, seed_v: int, col: Color, key: String = "rock", subdivisions: int = 2) -> PackedVector3Array:
 	var noise := FastNoiseLite.new()
 	noise.seed = seed_v
 	noise.frequency = 0.9
@@ -1641,7 +1649,7 @@ func _rock(kit: Dictionary, centre: Vector3, size: Vector3, seed_v: int, col: Co
 		[4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]]
 	for i in verts.size():
 		verts[i] = (verts[i] as Vector3).normalized()
-	for _s in range(2):
+	for _s in range(subdivisions):
 		var cache := {}
 		var nf := []
 		for f in faces:
@@ -1688,13 +1696,24 @@ func _kit_mesh(kit: Dictionary) -> ArrayMesh:
 	return mesh
 
 
-func _commit(parent: Node3D, kit: Dictionary, name: String) -> MeshInstance3D:
+func _commit(parent: Node3D, kit: Dictionary, name: String, prefix: String = "seafront_", vis_range := 0.0, shadows := true) -> MeshInstance3D:
 	var mesh := _kit_mesh(kit)
 	var mi := MeshInstance3D.new()
 	mi.name = name
-	mi.mesh = _tg.call("_save_resource", mesh, "seafront_" + name.to_snake_case())
+	mi.mesh = _tg.call("_save_resource", mesh, prefix + name.to_snake_case())
+	_limit_view(mi, vis_range, shadows)
 	parent.add_child(mi)
 	return mi
+
+
+## Fades a mesh out at `vis_range` metres (0: never) and optionally stops it casting shadows.
+func _limit_view(mi: GeometryInstance3D, vis_range: float, shadows: bool) -> void:
+	if vis_range > 0.0:
+		mi.visibility_range_end = vis_range
+		mi.visibility_range_end_margin = 20.0
+		mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+	if not shadows:
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 ## Adds a shape at `xf` (layout space) to the body `name`Body under `parent` (at the origin), making
@@ -4648,7 +4667,12 @@ const PALM_SHAPES := [
 	{"h": 13.5, "lean": 0.16, "curve": 0.8, "fronds": 28, "len": 5.8, "nuts": 8, "dead": 1},
 	{"h": 8.5, "lean": 0.52, "curve": 0.62, "fronds": 22, "len": 4.9, "nuts": 5, "dead": 2},
 	{"h": 15.5, "lean": 0.08, "curve": 0.9, "fronds": 26, "len": 5.6, "nuts": 4, "dead": 0},
+	# The bent ones (the concept's): thrown out almost flat from the foot, curving back up under the crown.
+	{"h": 10.5, "lean": 0.95, "curve": 0.88, "fronds": 26, "len": 5.4, "nuts": 6, "dead": 2},
+	{"h": 8.5, "lean": 1.12, "curve": 0.93, "fronds": 24, "len": 5.0, "nuts": 5, "dead": 2},
 ]
+const BENT_FIRST := 4           # the first bent shape's index in PALM_SHAPES
+const PALM_DUNE_ANCHORS := 70   # bent palms along the dune lap, singly and in twos
 const PALM_BEACH := 95
 const PALM_SHORE := 170
 const PALM_DRY := 0.45          # lowest ground a palm stands on (the water is at 0)
@@ -5163,6 +5187,20 @@ func _palm_lean_clear(foot: Vector2, d: Vector2, variant: int, sc: float) -> boo
 	return true
 
 
+## Whether a palm's crown, where its trunk ends, is clear of the lap's edge by a few metres.
+func _palm_crown_off_road(foot: Vector2, d: Vector2, variant: int, sc: float) -> bool:
+	var sh: Dictionary = PALM_SHAPES[variant]
+	var h: float = sh["h"]
+	var reach := 0.0
+	var segs := 8
+	for k in range(1, segs + 1):
+		var th: float = float(sh["lean"]) * (1.0 - float(sh["curve"]) * pow(float(k) / segs, 1.3))
+		reach += sin(th) * h / segs
+	var crown := foot + d * (reach * sc)
+	var cp := _curve.get_closest_point(Vector3(crown.x, _ground(crown.x, crown.y), crown.y))
+	return Vector2(cp.x, cp.z).distance_to(crown) - TRACK_HALF > 5.5
+
+
 ## Direction to the nearest water within 14m (ground below the surface), or zero.
 func _water_dir(x: float, z: float) -> Vector2:
 	for r in [5.0, 9.0, 14.0]:
@@ -5187,6 +5225,8 @@ func _build_palms(level: Node3D) -> void:
 		gates.append(Vector2((g as Node3D).position.x, (g as Node3D).position.z))
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7023
+	var bend_rng := RandomNumberGenerator.new()
+	bend_rng.seed = 3191
 	var taken: Array = []
 	var spots: Array = []   # [foot, lean direction, variant, scale]
 	# The beach: groves along its land side, leaning out to sea, the strongest leaners nearest it.
@@ -5227,6 +5267,8 @@ func _build_palms(level: Node3D) -> void:
 		if wet == Vector2.ZERO or not _palm_ok(x2, z2, gates, taken, 3.8):
 			continue
 		var v2: int = [0, 0, 1, 1, 2, 3][rng.randi() % 6]
+		if bend_rng.randf() < 0.3:
+			v2 = BENT_FIRST + bend_rng.randi() % 2
 		var lean2 := wet.rotated(rng.randf_range(-0.45, 0.45))
 		var psc2 := rng.randf_range(0.85, 1.15)
 		if not _palm_lean_clear(Vector2(x2, z2), lean2, v2, psc2):
@@ -5234,6 +5276,51 @@ func _build_palms(level: Node3D) -> void:
 		taken.append(Vector2(x2, z2))
 		spots.append([Vector3(x2, y2, z2), lean2, v2, psc2])
 		shore += 1
+	# Bent palms out in the dunes, the inland's only trees: singly and in twos along the lap, and a few
+	# round each camp. Their crowns keep clear of the road; the lean may go toward it or away.
+	var dune := 0
+	var anchors: Array = []   # [foot, direction the lean prefers (zero: any)]
+	var dune_rng := RandomNumberGenerator.new()
+	dune_rng.seed = 6113
+	for plan in _camp_plan:
+		var half: Vector2 = _camp_layout(String(plan[3]))["half"]
+		var cb := Basis(Vector3.UP, float(plan[2]))
+		var cc: Vector2 = plan[1]
+		for k in [Vector2(-1.0, -1.0), Vector2(1.0, -1.0), Vector2(-1.0, 0.25), Vector2(1.0, 0.45)]:
+			var off := Vector3(k.x * (half.x + dune_rng.randf_range(3.0, 6.0)), 0.0, k.y * (half.y + dune_rng.randf_range(0.5, 3.0)))
+			var w3 := Vector3(cc.x, 0.0, cc.y) + cb * off
+			anchors.append([Vector2(w3.x, w3.z), Vector2((cb * Vector3(k.x, 0.0, 0.0)).x, (cb * Vector3(k.x, 0.0, 0.0)).z)])
+	var guard := 0
+	var along_lap := 0
+	while along_lap < PALM_DUNE_ANCHORS and guard < 4000:
+		guard += 1
+		var fr := _road_at(dune_rng.randf() * _curve.get_baked_length())
+		var rp: Vector3 = fr["pos"]
+		if rp.x < -15.0:
+			continue
+		var lat := dune_rng.randf_range(15.0, 46.0) * (1.0 if dune_rng.randf() < 0.5 else -1.0)
+		var rr: Vector3 = fr["right"]
+		anchors.append([Vector2(rp.x + rr.x * lat, rp.z + rr.z * lat), Vector2.ZERO])
+		along_lap += 1
+	for an in anchors:
+		var n_here := 1 if dune_rng.randf() < 0.6 else 2
+		for i in range(n_here):
+			var base: Vector2 = an[0] + Vector2.from_angle(dune_rng.randf() * TAU) * (0.0 if i == 0 else dune_rng.randf_range(3.5, 5.5))
+			var v4: int = BENT_FIRST + dune_rng.randi() % 2 if dune_rng.randf() < 0.75 else [0, 2, 1][dune_rng.randi() % 3]
+			var y4 := _ground(base.x, base.y)
+			if y4 > 40.0 or not _palm_ok(base.x, base.y, gates, taken, 3.6):
+				continue
+			var d4: Vector2 = an[1]
+			if d4 == Vector2.ZERO:
+				var cp4 := _curve.get_closest_point(Vector3(base.x, y4, base.y))
+				d4 = (Vector2(cp4.x, cp4.z) - base).normalized() * (1.0 if dune_rng.randf() < 0.5 else -1.0)
+			d4 = d4.rotated(dune_rng.randf_range(-0.5, 0.5))
+			var sc4 := dune_rng.randf_range(0.85, 1.15)
+			if not _palm_lean_clear(base, d4, v4, sc4) or not _palm_crown_off_road(base, d4, v4, sc4):
+				continue
+			taken.append(base)
+			spots.append([Vector3(base.x, y4, base.y), d4, v4, sc4])
+			dune += 1
 	# Meshes, then the palms in cells: the detailed ones near, the stand-ins far, and the trunks.
 	var near_mats := _palm_materials(1)
 	var far_mats := _palm_materials(2)
@@ -5288,7 +5375,7 @@ func _build_palms(level: Node3D) -> void:
 		mmi2.visibility_range_begin = maxf(0.0, PALM_NEAR - PALM_FADE * 0.5 - PALM_FADE_JITTER - PALM_FAR_CELL * 0.72)
 		mmi2.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(mmi2)
-	print("Palms: %d on the beach, %d by the water" % [beach, shore])
+	print("Palms: %d on the beach, %d by the water, %d in the dunes" % [beach, shore, dune])
 
 
 func _transform_buffer(transforms: Array) -> PackedFloat32Array:
@@ -5333,3 +5420,757 @@ func _set_owner_recursive(node: Node, scene_root: Node) -> void:
 		if child.owner != null and child.owner != scene_root:
 			continue
 		_set_owner_recursive(child, scene_root)
+
+
+# --- Inland camps ---------------------------------------------------------------------------------
+# Fans camp in the dunes beside the lap, on level pads graded into the sand (TerrainGenerator.flat_pads,
+# like the Lakeside Course's terraces): the same motorhomes, caravans, tents, gazebos and chairs as
+# the Lakeside camp, laid out from CampKit's layouts so nothing overlaps (build_layout checks each
+# pitch's footprint). The pads are planned before the world is built: for each camp the planner
+# searches along its stretch of the lap for the gentlest ground at a safe distance from the road,
+# then the camp is built on the graded pad.
+
+const CampKit = preload("res://CampKit.gd")
+const PropKit = preload("res://PropKit.gd")
+
+## [name, s along the lap (m), side (+1 right of travel, -1 left), CampKit layout]
+const CAMP_SITES := [
+	["RidgeCamp", 640.0, 1.0, "main"],
+	["ValleyCamp", 770.0, 1.0, "village"],
+	["HairpinCamp", 1000.0, -1.0, "pair"],
+	["BasinCamp", 1190.0, 1.0, "main"],
+	["DescentCamp", 1430.0, 1.0, "village"],
+]
+const CAMP_BLEND := 9.0          # a pad eases into the dune over this
+const CAMP_ROAD_MARGIN := 4.0    # the pad's blend stays this far from the curb's outer edge
+const CAMP_SEARCH_S := 110.0      # the planner looks this far either side of a site's s
+const CAMP_GATE_CLEAR := 45.0
+
+var _camp_plan: Array = []       # [name, centre Vector2, yaw, layout key, pad height]
+var _pk: PropKit
+var _camp: CampKit
+
+
+func _camp_layout(key: String) -> Dictionary:
+	match key:
+		"main":
+			return CampKit.LAYOUT_MAIN
+		"village":
+			return CampKit.LAYOUT_VILLAGE
+	return CampKit.LAYOUT_PAIR
+
+
+## The natural ground (no pads yet) at a point.
+func _natural(x: float, z: float) -> float:
+	return float(_tg.call("_sample_cached_height", x, z))
+
+
+## The road at `s`: its centre, forward and right (horizontal).
+func _road_at(s: float) -> Dictionary:
+	var l := _curve.get_baked_length()
+	var ss := fposmod(s, l)
+	var p := _curve.sample_baked(ss)
+	var f := _curve.sample_baked(fposmod(ss + 0.6, l)) - _curve.sample_baked(fposmod(ss - 0.6, l))
+	f.y = 0.0
+	f = f.normalized()
+	return {"pos": p, "fwd": f, "right": Vector3(-f.z, 0.0, f.x)}
+
+
+## Plans the camps and returns their pads for TerrainGenerator.flat_pads.
+func _plan_camps() -> PackedFloat32Array:
+	var pads := PackedFloat32Array()
+	_camp_plan.clear()
+	var gates: Array = []
+	for ratio in [0.0, 0.16, 0.33, 0.50, 0.67, 0.83]:
+		var g := _curve.sample_baked(_curve.get_baked_length() * ratio)
+		gates.append(Vector2(g.x, g.z))
+	var edge := float(_tg.get("curb_outer_width")) * 0.5
+	for site in CAMP_SITES:
+		var layout := _camp_layout(String(site[3]))
+		var half: Vector2 = layout["half"]
+		var lat0 := edge + CAMP_ROAD_MARGIN + CAMP_BLEND + half.y
+		var best := {}
+		var best_score := INF
+		var ds := -CAMP_SEARCH_S
+		while ds <= CAMP_SEARCH_S:
+			var fr := _road_at(float(site[1]) + ds)
+			var road: Vector3 = fr["pos"]
+			var right: Vector3 = fr["right"]
+			var lat := lat0
+			while lat <= lat0 + 32.0:
+				var c := Vector2(road.x, road.z) + Vector2(right.x, right.z) * float(site[2]) * lat
+				var to_road := Vector2(right.x, right.z) * -float(site[2])
+				var yaw := atan2(to_road.x, to_road.y)
+				var cand := _score_pad(c, yaw, half, road.y, gates, edge)
+				if not cand.is_empty():
+					var score: float = cand["score"] + absf(ds) * 0.012 + (lat - lat0) * 0.02
+					if score < best_score:
+						best_score = score
+						best = cand
+						best["centre"] = c
+						best["yaw"] = yaw
+				lat += 4.0
+			ds += 7.0
+		if best.is_empty():
+			push_error("Camp %s: no site found near s=%.0f" % [site[0], site[1]])
+			continue
+		var h := snappedf(float(best["mean"]), 0.05)
+		var c2: Vector2 = best["centre"]
+		pads.append_array(PackedFloat32Array([c2.x, c2.y, half.x, half.y, best["yaw"], h, CAMP_BLEND]))
+		_camp_plan.append([site[0], c2, best["yaw"], site[3], h])
+		print("  camp %s at (%.0f, %.0f), %.0f x %.0f m pad, height %.2f (relief %.1fm)" % [site[0], c2.x, c2.y, half.x * 2.0, half.y * 2.0, h, best["range"]])
+	return pads
+
+
+## Scores a pad: the natural ground's relief and mean height under it, or {} if it isn't usable (wet,
+## in the beach strip, near a gate or another camp, or its blend reaches the road).
+func _score_pad(c: Vector2, yaw: float, half: Vector2, road_y: float, gates: Array, edge: float) -> Dictionary:
+	if c.x < 12.0:
+		return {}
+	for g in gates:
+		if c.distance_to(g) < CAMP_GATE_CLEAR + half.x:
+			return {}
+	for p in _camp_plan:
+		if c.distance_to(p[1]) < 60.0:
+			return {}
+	var b := Basis(Vector3.UP, yaw)
+	var lo := INF
+	var hi := -INF
+	var sum := 0.0
+	var n := 0
+	for i in range(-3, 4):
+		for j in range(-3, 4):
+			var w := Vector3(c.x, 0.0, c.y) + b * Vector3(half.x * i / 3.0, 0.0, half.y * j / 3.0)
+			var h := _natural(w.x, w.z)
+			if h < 1.4:
+				return {}
+			lo = minf(lo, h)
+			hi = maxf(hi, h)
+			sum += h
+			n += 1
+	# The blend zone mustn't reach the road: sample the pad's outline pushed out by the blend.
+	var reach := Vector2(half.x + CAMP_BLEND, half.y + CAMP_BLEND)
+	for k in range(16):
+		var a := TAU * k / 16.0
+		var q := Vector3(c.x, 0.0, c.y) + b * Vector3(cos(a) * reach.x * 1.2, 0.0, sin(a) * reach.y * 1.2)
+		var cp := _curve.get_closest_point(Vector3(q.x, road_y, q.z))
+		if Vector2(cp.x, cp.z).distance_to(Vector2(q.x, q.z)) < edge + CAMP_ROAD_MARGIN:
+			return {}
+	var mean := sum / n
+	return {"score": (hi - lo) + absf(mean - road_y) * 0.15, "mean": mean, "range": hi - lo}
+
+
+func _camp_material(key: String) -> Material:
+	var k := "camp_mat_" + key
+	if _materials.has(k):
+		return _materials[k]
+	var m: Material = _tg.call("_save_resource", CampKit.make_material(key), k)
+	_materials[k] = m
+	return m
+
+
+## Commits a PropKit kit under `parent` as one saved mesh, with the camp's shared materials.
+func _commit_pk(parent: Node3D, kit: Dictionary, node_name: String, vis_range := 0.0) -> MeshInstance3D:
+	_pk.reset_frame()
+	var mi := MeshInstance3D.new()
+	mi.name = node_name
+	mi.mesh = _tg.call("_save_resource", _pk.commit(kit), "camp_" + node_name.to_snake_case())
+	_limit_view(mi, vis_range, true)
+	parent.add_child(mi)
+	return mi
+
+
+## The camps' meshes and colliders, on the pads the planner graded.
+func _build_inland(level: Node3D) -> void:
+	_pk = PropKit.new()
+	_pk.material_for = _camp_material
+	_camp = CampKit.new(_pk)
+	var root := Node3D.new()
+	root.name = "DuneCamps"
+	# Scales the grass, rocks and bent palms to the Vegetation Detail setting at runtime.
+	root.set_script(load("res://DuneDetail.gd"))
+	level.add_child(root)
+	var ground := func(x: float, z: float) -> float:
+		return float(_tg.call("_sample_cached_height", x, z))
+	for plan in _camp_plan:
+		var node := Node3D.new()
+		node.name = String(plan[0])
+		root.add_child(node)
+		var kit := {}
+		var gear := {}
+		var res: Dictionary = _camp.build_layout(kit, gear, _camp_layout(String(plan[3])), plan[1], float(plan[2]), ground, PROP_SCALE)
+		for pair in res["bad"]:
+			push_error("%s: %s" % [plan[0], pair])
+		for n in res["notes"]:
+			_note(String(plan[0]) + " " + String(n[0]), Vector2((n[1] as Vector3).x, (n[1] as Vector3).z), float(n[2]), 8.0, 6.0)
+		for entry in res["placed"]:
+			var poly: PackedVector2Array = entry[1]
+			var mid := Vector2.ZERO
+			for q in poly:
+				mid += q
+			mid /= poly.size()
+			_note(String(plan[0]) + " " + String(entry[0]), mid, poly[0].distance_to(mid), 8.0, 3.0)
+		_commit_pk(node, kit, "%sPitches" % plan[0])
+		_commit_pk(node, gear, "%sGear" % plan[0], 260.0)
+		var body := StaticBody3D.new()
+		body.name = "%sBody" % plan[0]
+		node.add_child(body)
+		for bx in res["boxes"]:
+			var cs := CollisionShape3D.new()
+			var shape := BoxShape3D.new()
+			shape.size = bx[1]
+			cs.shape = shape
+			cs.transform = Transform3D(bx[2], bx[0])
+			body.add_child(cs)
+		print("Camp %s: %d pitches, %d problems" % [plan[0], (res["placed"] as Array).size(), (res["bad"] as PackedStringArray).size()])
+	_build_dune_dressing(root)
+	_verify_seafront_clear("Inland")
+
+
+# --- Dune dressing --------------------------------------------------------------------------------
+# What fills the inland sand between the camps, after the concept: tyre walls and red-and-white
+# barriers on the outside of the lap's hardest corners and along each camp's frontage, feather flags
+# and chequered flags (streaming on the sea wind in flag_wave.gdshader), pebbles and rocks lying about,
+# and isolated patches of dune grass swaying in dune_grass.gdshader. All of it stands clear of the
+# road's curb (TYRE_LAT, BARRIER_LAT) and is noted as footprints, so the palms keep off it.
+
+const DRESS_SEED := 4417
+const CORNER_COUNT := 8
+const CORNER_SPACING := 110.0     # corners picked at least this far apart along the lap
+const TYRE_LAT := 10.9            # centre of a tyre wall off the lap's centre line
+const BARRIER_LAT := 10.9
+const TYRE_COLS := [Color(0.80, 0.10, 0.09), Color(0.92, 0.92, 0.90), Color(0.07, 0.07, 0.08)]
+const FLAG_COLOURS := [
+	[Color(0.10, 0.42, 0.82), Color(0.98, 0.98, 0.96)],
+	[Color(0.88, 0.16, 0.14), Color(0.98, 0.98, 0.96)],
+	[Color(0.98, 0.78, 0.14), Color(0.10, 0.30, 0.62)],
+	[Color(0.12, 0.62, 0.62), Color(0.98, 0.70, 0.18)],
+	[Color(0.96, 0.46, 0.14), Color(0.98, 0.98, 0.96)],
+]
+const POLE_COL := Color(0.84, 0.85, 0.87)
+const GRASS_PATCHES := 230
+const GRASS_PATCH_GAP := 24.0
+const ROCK_CLUSTERS := 300
+const DRESS_RANGE := 300.0        # tyre walls, barriers, flags: one mesh per corner or camp frontage
+const SCATTER_CELL := 60.0        # pebbles, rocks and grass are MultiMesh cells this wide
+const ROCK_RANGE := 230.0         # at Ultra; DuneDetail.gd pulls these in at lower levels of detail
+const GRASS_RANGE := 230.0
+
+var _dress_rng := RandomNumberGenerator.new()
+
+
+func _build_dune_dressing(root: Node3D) -> void:
+	_dress_rng.seed = DRESS_SEED
+	var node := Node3D.new()
+	node.name = "DuneDressing"
+	root.add_child(node)
+	_build_corner_runs(node)
+	_build_camp_frontage(node)
+	var patches := _build_dune_grass(node)
+	_build_rocks(node, patches)
+
+
+# -- Along the lap
+
+## The lap's `s` (metres) nearest a point on the ground plane.
+func _nearest_s(c: Vector2) -> float:
+	var l := _curve.get_baked_length()
+	var best := 0.0
+	var best_d := INF
+	var s := 0.0
+	while s < l:
+		var p := _curve.sample_baked(s)
+		var d := Vector2(p.x, p.z).distance_squared_to(c)
+		if d < best_d:
+			best_d = d
+			best = s
+		s += 3.0
+	return best
+
+
+## A line `lat` metres right of the lap (negative: left) from s0 to s1, on the ground, a point every
+## `step` metres along the line itself.
+func _lap_offset(s0: float, s1: float, lat: float, step: float) -> PackedVector3Array:
+	var fine := PackedVector3Array()
+	var s := s0
+	while s <= s1:
+		var fr := _road_at(s)
+		var q: Vector3 = (fr["pos"] as Vector3) + (fr["right"] as Vector3) * lat
+		fine.append(q)
+		s += 0.5
+	var out := PackedVector3Array()
+	var acc := 0.0
+	out.append(fine[0])
+	for i in range(1, fine.size()):
+		acc += Vector2(fine[i].x - fine[i - 1].x, fine[i].z - fine[i - 1].z).length()
+		if acc >= step:
+			acc = 0.0
+			out.append(fine[i])
+	for i in range(out.size()):
+		var v := out[i]
+		v.y = _ground(v.x, v.z)
+		out[i] = v
+	return out
+
+
+## The hardest corners of the dune lap, away from the beach and the gates: [s at the apex, outside side
+## (+1 right of travel, -1 left)], sharpest first, at least CORNER_SPACING apart.
+func _corner_sites() -> Array:
+	var l := _curve.get_baked_length()
+	var step := 5.0
+	var n := int(l / step)
+	var heading: Array = []
+	for i in range(n):
+		var f: Vector3 = _road_at(i * step)["fwd"]
+		heading.append(atan2(f.x, f.z))
+	var turn: Array = []
+	for i in range(n):
+		turn.append(wrapf(float(heading[(i + 5) % n]) - float(heading[(i - 5 + n) % n]), -PI, PI))
+	var cands: Array = []
+	for i in range(n):
+		if absf(float(turn[i])) < 0.45:
+			continue
+		var peak := true
+		for k in range(-10, 11):
+			if absf(float(turn[(i + k + n) % n])) > absf(float(turn[i])):
+				peak = false
+				break
+		if not peak:
+			continue
+		var s := i * step
+		var fr := _road_at(s)
+		var p: Vector3 = fr["pos"]
+		if p.x < -20.0:
+			continue
+		# The turn is toward the side its centre of curvature is on: the outside is the other.
+		var ahead: Vector3 = (_road_at(s + 20.0)["fwd"] as Vector3) - (_road_at(s - 20.0)["fwd"] as Vector3)
+		var toward: float = signf(ahead.dot(fr["right"]))
+		cands.append([s, -toward, absf(float(turn[i]))])
+	cands.sort_custom(func(a, b): return a[2] > b[2])
+	var picked: Array = []
+	for c in cands:
+		var ok := true
+		for q in picked:
+			var d := absf(float(c[0]) - float(q[0]))
+			if minf(d, l - d) < CORNER_SPACING:
+				ok = false
+		for ratio in [0.0, 0.16, 0.33, 0.50, 0.67, 0.83]:
+			var dg := absf(float(c[0]) - l * ratio)
+			if minf(dg, l - dg) < 45.0:
+				ok = false
+		if ok:
+			picked.append(c)
+		if picked.size() >= CORNER_COUNT:
+			break
+	return picked
+
+
+func _wall_box(a: Vector3, b: Vector3, w: float, h: float) -> Array:
+	var d := b - a
+	d.y = 0.0
+	var length := d.length()
+	var z := d / maxf(length, 1e-4)
+	var x := Vector3.UP.cross(z).normalized()
+	var mid := (a + b) * 0.5
+	mid.y = (a.y + b.y + h) * 0.5
+	return [mid, Vector3(w, h + absf(a.y - b.y), length), Basis(x, Vector3.UP, z)]
+
+
+## Stacks of three tyres, red, white and black in turn, down a line of ground points.
+func _tyre_wall(kit: Dictionary, boxes: Array, pts: PackedVector3Array) -> void:
+	for i in range(pts.size()):
+		var p: Vector3 = pts[i]
+		_pk.set_frame(Transform3D(Basis(Vector3.UP, _dress_rng.randf() * TAU).scaled(Vector3.ONE * PROP_SCALE), p))
+		var col: Color = TYRE_COLS[i % 3]
+		for k in range(3):
+			var j := Vector3(_dress_rng.randf_range(-0.02, 0.02), 0.0, _dress_rng.randf_range(-0.02, 0.02))
+			_pk.tyre(kit, "rubber", Vector3(0, 0.1 + k * 0.2, 0) + j, 0.19, 0.31, 0.2, 14, col.darkened(_dress_rng.randf_range(0.0, 0.12)))
+		if i > 0 and (i % 4 == 0 or i == pts.size() - 1):
+			boxes.append(_wall_box(pts[maxi(i - 4, 4 * ((i - 1) / 4))], p, 0.62 * PROP_SCALE, 0.6 * PROP_SCALE))
+		_note("Dune tyres", Vector2(p.x, p.z), 0.6, 1.2, 1.5)
+	_pk.reset_frame()
+
+
+## A run of red and white barrier segments (a low plastic water-filled type: a wide foot, a narrower
+## body and a stripe) down a line of ground points, `seg` metres a segment.
+func _barrier_run(kit: Dictionary, boxes: Array, pts: PackedVector3Array) -> void:
+	for i in range(pts.size() - 1):
+		var a: Vector3 = pts[i]
+		var b: Vector3 = pts[i + 1]
+		var d := b - a
+		d.y = 0.0
+		if d.length_squared() < 1e-6:
+			continue
+		var yaw := atan2(-d.z, d.x)
+		var mid := (a + b) * 0.5
+		var col: Color = Color(0.86, 0.12, 0.10) if i % 2 == 0 else Color(0.94, 0.94, 0.92)
+		var s := PROP_SCALE
+		_pk.set_frame(Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * s), mid))
+		var hl := d.length() / s * 0.5 - 0.02
+		_pk.block(kit, "plastic", Vector3(-hl, 0.0, -0.3), Vector3(hl, 0.26, 0.3), col)
+		_pk.block(kit, "plastic", Vector3(-hl + 0.03, 0.26, -0.22), Vector3(hl - 0.03, 0.62, 0.22), col)
+		_pk.block(kit, "plastic", Vector3(-hl + 0.06, 0.62, -0.17), Vector3(hl - 0.06, 0.70, 0.17), col.darkened(0.08))
+		_pk.block(kit, "plastic", Vector3(-hl + 0.2, 0.34, -0.225), Vector3(hl - 0.2, 0.5, -0.215), Color(0.12, 0.12, 0.14))
+		_pk.block(kit, "plastic", Vector3(-hl + 0.2, 0.34, 0.215), Vector3(hl - 0.2, 0.5, 0.225), Color(0.12, 0.12, 0.14))
+		boxes.append(_wall_box(a, b, 0.6 * s, 0.7 * s))
+		_note("Dune barrier", Vector2(mid.x, mid.z), d.length() * 0.5, 1.2, 1.2)
+	_pk.reset_frame()
+
+
+## Cones on the inside of a corner, the way a marshal leaves them.
+func _cones(kit: Dictionary, pts: PackedVector3Array) -> void:
+	for p in pts:
+		_pk.set_frame(Transform3D(Basis(Vector3.UP, _dress_rng.randf() * TAU).scaled(Vector3.ONE * PROP_SCALE), p))
+		_camp.cone(kit)
+	_pk.reset_frame()
+
+
+func _build_corner_runs(parent: Node3D) -> void:
+	var corners := _corner_sites()
+	var idx := 0
+	for c in corners:
+		var kit := {}
+		var flags := {}
+		var boxes: Array = []
+		var s: float = c[0]
+		var side: float = c[1]
+		# The outside of the turn: a wall of tyres around the apex (every other corner) or barriers,
+		# with feather flags along it and chequered flags behind the apex.
+		var half := 22.0
+		var wall := _lap_offset(s - half, s + half, side * TYRE_LAT, 0.62 * PROP_SCALE * 0.99 if idx % 2 == 0 else 3.0)
+		if idx % 2 == 0:
+			_tyre_wall(kit, boxes, wall)
+		else:
+			_barrier_run(kit, boxes, wall)
+		_flag_group(flags, _lap_offset(s - half - 3.0, s + half + 3.0, side * (TYRE_LAT + 3.5), 15.0), idx)
+		var back := _lap_offset(s - 8.0, s + 8.0, side * (TYRE_LAT + 5.5), 8.0)
+		for q in range(back.size()):
+			_chequered_flag(flags, back[q], _flag_dir())
+		# Cones on the inside of the apex.
+		_cones(kit, _lap_offset(s - 12.0, s + 12.0, -side * (TYRE_LAT - 1.0), 6.0))
+		var cpos: Vector3 = _road_at(s)["pos"]
+		print("  corner at s=%.0f (%.0f, %.0f), outside %s: %s" % [s, cpos.x, cpos.z, "right" if side > 0.0 else "left", "tyres" if idx % 2 == 0 else "barriers"])
+		_commit_pk(parent, kit, "Corner%dWall" % idx, DRESS_RANGE)
+		_commit(parent, flags, "Corner%dFlags" % idx, "dune_", DRESS_RANGE, false)
+		_collider_body(parent, "Corner%dWallBody" % idx, boxes)
+		idx += 1
+	print("Dune corners: %d walled" % corners.size())
+
+
+## The camp frontage: barriers along the road's edge facing each camp, feather flags behind them and
+## two at the camp's gate.
+func _build_camp_frontage(parent: Node3D) -> void:
+	var idx := 3
+	for plan in _camp_plan:
+		var kit := {}
+		var flags := {}
+		var boxes: Array = []
+		var c: Vector2 = plan[1]
+		var s0 := _nearest_s(c)
+		var fr := _road_at(s0)
+		var p: Vector3 = fr["pos"]
+		var side := signf((Vector2(c.x - p.x, c.y - p.z)).dot(Vector2((fr["right"] as Vector3).x, (fr["right"] as Vector3).z)))
+		_barrier_run(kit, boxes, _lap_offset(s0 - 15.0, s0 + 15.0, side * BARRIER_LAT, 3.0))
+		_flag_group(flags, _lap_offset(s0 - 18.0, s0 + 18.0, side * (BARRIER_LAT + 3.0), 9.0), idx)
+		# The camp's own gate: two flags at the pad's front corners, toward the road.
+		var layout := _camp_layout(String(plan[3]))
+		var half: Vector2 = layout["half"]
+		var b := Basis(Vector3.UP, float(plan[2]))
+		for sx in [-1.0, 1.0]:
+			var w: Vector3 = Vector3(c.x, 0.0, c.y) + b * Vector3(sx * (half.x - 1.5), 0.0, half.y - 0.8)
+			w.y = _ground(w.x, w.z)
+			_feather_flag(flags, w, _flag_dir(), idx + (1 if sx > 0.0 else 0))
+		idx += 1
+		_commit_pk(parent, kit, "%sFrontage" % plan[0], DRESS_RANGE)
+		_commit(parent, flags, "%sFlags" % plan[0], "dune_", DRESS_RANGE, false)
+		_collider_body(parent, "%sFrontageBody" % plan[0], boxes)
+
+
+func _collider_body(parent: Node3D, node_name: String, boxes: Array) -> void:
+	var body := StaticBody3D.new()
+	body.name = node_name
+	parent.add_child(body)
+	for bx in boxes:
+		var cs := CollisionShape3D.new()
+		var shape := BoxShape3D.new()
+		shape.size = bx[1]
+		cs.shape = shape
+		cs.transform = Transform3D(bx[2], bx[0])
+		body.add_child(cs)
+
+
+# -- Flags
+
+## The way the sea wind streams a flag: east off the water, a little different for each.
+func _flag_dir() -> Vector3:
+	return Vector3(1.0, 0.0, 0.0).rotated(Vector3.UP, _dress_rng.randf_range(-0.45, 0.45))
+
+
+## A banner hanging from `hoist`: `along` is the way it streams (horizontal), `length` its widest
+## reach, `height` its drop. `width(v)` (0..1, v down the banner) shapes its fly edge and `colour(u, v)`
+## paints each cell. The mesh is in world space and waves in flag_wave.gdshader (UV.x from the hoist).
+func _banner(kit: Dictionary, hoist: Vector3, along: Vector3, length: float, height: float, cols: int, rows: int, width: Callable, colour: Callable) -> void:
+	var st := _st(kit, "flag")
+	var face := along.cross(Vector3.UP).normalized()
+	var phase := _dress_rng.randf() * TAU
+	var point := func(u: float, v: float) -> Vector3:
+		return hoist + along * (u * length * float(width.call(v))) + Vector3.DOWN * (v * height)
+	var emit := func(u: float, v: float, col: Color) -> void:
+		st.set_color(col)
+		st.set_normal(face)
+		st.set_uv(Vector2(u * float(width.call(v)), v))
+		st.set_uv2(Vector2(phase, length))
+		st.add_vertex(point.call(u, v))
+	for r in range(rows):
+		for c in range(cols):
+			var u0 := float(c) / cols
+			var u1 := float(c + 1) / cols
+			var v0 := float(r) / rows
+			var v1 := float(r + 1) / rows
+			var col: Color = colour.call((u0 + u1) * 0.5, (v0 + v1) * 0.5)
+			var a: Vector3 = point.call(u0, v0)
+			var b: Vector3 = point.call(u1, v0)
+			var cc: Vector3 = point.call(u1, v1)
+			var tri := [[u0, v0], [u1, v0], [u1, v1], [u0, v0], [u1, v1], [u0, v1]]
+			if (cc - a).cross(b - a).dot(face) < 0.0:
+				tri = [[u0, v0], [u1, v1], [u1, v0], [u0, v0], [u0, v1], [u1, v1]]
+			for q in tri:
+				emit.call(q[0], q[1], col)
+
+
+## A pole from the sand to `top`, with a foot.
+func _pole(kit: Dictionary, base: Vector3, top: Vector3, r: float) -> void:
+	_tube(kit, "metal", base - Vector3(0, 0.3, 0), top, r, r * 0.8, 6, POLE_COL)
+	_tube(kit, "metal", base - Vector3(0, 0.1, 0), base + Vector3(0, 0.12, 0), r * 3.4, r * 3.0, 8, POLE_COL.darkened(0.25))
+
+
+## A feather flag (a tall blade of cloth down one side of its pole, wide near the top) 3.8m up.
+func _feather_flag(kit: Dictionary, base: Vector3, along: Vector3, palette: int) -> void:
+	var pal: Array = FLAG_COLOURS[palette % FLAG_COLOURS.size()]
+	var top := base + Vector3(0, 3.9, 0)
+	_pole(kit, base, top + Vector3(0, 0.15, 0), 0.04)
+	var main: Color = pal[0]
+	var accent: Color = pal[1]
+	var width := func(v: float) -> float:
+		return pow(sin(PI * (0.07 + 0.80 * pow(v, 0.85))), 0.5)
+	var paint := func(u: float, v: float) -> Color:
+		# A stripe of the second colour on the diagonal, the rest in the main one.
+		var d: float = fposmod(u * 1.1 + v * 0.9, 1.0)
+		return accent if (d > 0.46 and d < 0.62) else main
+	_banner(kit, top, along, 1.25, 3.3, 8, 16, width, paint)
+
+
+## A chequered flag on a short pole, 1.9m by 1.3m.
+func _chequered_flag(kit: Dictionary, base: Vector3, along: Vector3) -> void:
+	var top := base + Vector3(0, 3.0, 0)
+	_pole(kit, base, top + Vector3(0, 0.1, 0), 0.035)
+	var width := func(_v: float) -> float:
+		return 1.0
+	var paint := func(u: float, v: float) -> Color:
+		var iu := int(floor(u * 8.0))
+		var iv := int(floor(v * 5.0))
+		return Color(0.06, 0.06, 0.07) if (iu + iv) % 2 == 0 else Color(0.97, 0.97, 0.95)
+	_banner(kit, top, along, 1.9, 1.3, 8, 5, width, paint)
+
+
+## Feather flags down a line of ground points, the palette changing flag by flag.
+func _flag_group(kit: Dictionary, pts: PackedVector3Array, palette: int) -> void:
+	for i in range(pts.size()):
+		_feather_flag(kit, pts[i], _flag_dir(), palette + i)
+		_note("Dune flag", Vector2(pts[i].x, pts[i].z), 0.5, 1.5, 4.0)
+
+
+# -- Pebbles and rocks
+
+## Pebbles and rocks in clusters: a third of them in the dune grass, the rest wherever the sand is dry.
+func _build_rocks(parent: Node3D, patches: Array) -> void:
+	var pebble_cols := [Color(0.66, 0.56, 0.44), Color(0.56, 0.52, 0.47), Color(0.74, 0.66, 0.52), Color(0.44, 0.41, 0.38), Color(0.62, 0.50, 0.38)]
+	# Four rocks (320 faces) for the big ones and four pebbles (80 faces: they're a few hundred to the
+	# view) to scatter.
+	var meshes: Array = []
+	for v in range(8):
+		var kit := {}
+		_rock(kit, Vector3.ZERO, Vector3(1.0, 0.8, 1.0), 300 + v * 17, pebble_cols[v % pebble_cols.size()], "pebble", 2 if v < 4 else 1)
+		meshes.append(_tg.call("_save_resource", _kit_mesh(kit), "rock_%d" % v))
+	var cells := {}
+	var colliders: Array = []   # [centre, radius, height]
+	var placed := 0
+	var tries := 0
+	while placed < ROCK_CLUSTERS and tries < ROCK_CLUSTERS * 60:
+		tries += 1
+		var c := Vector2(_dress_rng.randf_range(10.0, 470.0), _dress_rng.randf_range(-470.0, 470.0))
+		if placed % 3 == 0 and not patches.is_empty():
+			c = (patches[_dress_rng.randi() % patches.size()] as Vector2) + Vector2.from_angle(_dress_rng.randf() * TAU) * _dress_rng.randf_range(1.0, 5.0)
+		if not _dress_ok(c, 11.0):
+			continue
+		placed += 1
+		# One anchor rock (a big one in two clusters out of three) and its scatter of pebbles.
+		var big := _dress_rng.randf() < 0.66
+		var n := _dress_rng.randi_range(3, 9)
+		for i in range(n + 1):
+			var anchor := i == 0
+			var sz: float = _dress_rng.randf_range(0.7, 1.5) if (anchor and big) else _dress_rng.randf_range(0.14, 0.55)
+			var off := Vector2.ZERO if anchor else Vector2.from_angle(_dress_rng.randf() * TAU) * _dress_rng.randf_range(0.8, 3.4)
+			var q := c + off
+			var y := _ground(q.x, q.y)
+			var sq := Vector3(_dress_rng.randf_range(0.8, 1.2), _dress_rng.randf_range(0.55, 0.9), _dress_rng.randf_range(0.8, 1.2)) * sz
+			var xf := Transform3D(Basis(Vector3.UP, _dress_rng.randf() * TAU).scaled(sq), Vector3(q.x, y + sq.y * 0.12, q.y))
+			var variant := _dress_rng.randi() % 4 + (0 if sz > 0.4 else 4)
+			var ck := Vector3i(floori(q.x / SCATTER_CELL), floori(q.y / SCATTER_CELL), variant)
+			if not cells.has(ck):
+				cells[ck] = []
+			cells[ck].append(xf)
+			if anchor and big and _road_distance(q) > 14.0:
+				colliders.append([Vector3(q.x, y, q.y), 0.78 * maxf(sq.x, sq.z), 1.3 * sq.y * 2.0])
+	for ck in cells.keys():
+		var mmi := _multimesh(meshes[ck.z], _shuffled(cells[ck]), "Rocks_%d_%d_%d" % [ck.x, ck.y, ck.z])
+		_limit_view(mmi, ROCK_RANGE + SCATTER_CELL * 0.72, false)
+		mmi.set_meta(&"base_range", mmi.visibility_range_end)
+		parent.add_child(mmi)
+	var body := StaticBody3D.new()
+	body.name = "RockCollision"
+	parent.add_child(body)
+	for cl in colliders:
+		var cs := CollisionShape3D.new()
+		var cyl := CylinderShape3D.new()
+		cyl.radius = cl[1]
+		cyl.height = cl[2]
+		cs.shape = cyl
+		cs.position = (cl[0] as Vector3) + Vector3(0, cl[2] * 0.4, 0)
+		body.add_child(cs)
+		_note("Dune rock", Vector2((cl[0] as Vector3).x, (cl[0] as Vector3).z), cl[1], 1.0, 1.5)
+	print("Dune rocks: %d clusters, %d boulders" % [placed, colliders.size()])
+
+
+## Whether dressing may go at `c` (ground plane): dry sand in the dunes, `road_clear` metres off the
+## lap's edge and not on a noted footprint.
+func _dress_ok(c: Vector2, road_clear: float) -> bool:
+	if c.x < 10.0:
+		return false
+	var y := _ground(c.x, c.y)
+	if y < 1.4:
+		return false
+	if _road_distance(c) - TRACK_HALF < road_clear:
+		return false
+	for f in _footprints:
+		if c.distance_to(f[1]) < float(f[2]) + 2.0:
+			return false
+	return true
+
+
+## The instances in random order, so DuneDetail can draw the first N of a cell and thin it evenly.
+func _shuffled(xfs: Array) -> Array:
+	var out := xfs.duplicate()
+	for i in range(out.size() - 1, 0, -1):
+		var j := _dress_rng.randi() % (i + 1)
+		var tmp = out[i]
+		out[i] = out[j]
+		out[j] = tmp
+	return out
+
+
+func _road_distance(c: Vector2) -> float:
+	var p := _curve.get_closest_point(Vector3(c.x, _ground(c.x, c.y), c.y))
+	return Vector2(p.x - c.x, p.z - c.y).length()
+
+
+# -- Dune grass
+
+func _grass_tuft(variant: int) -> ArrayMesh:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 900 + variant * 31
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var base_col := Color(0.30, 0.38, 0.19)
+	var tips: Array = [Color(0.66, 0.70, 0.36), Color(0.78, 0.72, 0.42), Color(0.52, 0.62, 0.30)]
+	var tip_col: Color = tips[variant % tips.size()]
+	var blades := 16
+	var segs := 3
+	for b in range(blades):
+		var az := rng.randf() * TAU
+		var dir := Vector3(cos(az), 0.0, sin(az))
+		var side := dir.cross(Vector3.UP).normalized()
+		var h := rng.randf_range(0.65, 1.25)
+		var lean := rng.randf_range(0.12, 0.5)
+		var curl := rng.randf_range(0.2, 0.8)
+		var w := rng.randf_range(0.075, 0.125)
+		var root := dir * rng.randf_range(0.0, 0.14)
+		var tint := Color(rng.randf_range(0.9, 1.1), rng.randf_range(0.92, 1.08), rng.randf_range(0.85, 1.1))
+		var ring: Array = []
+		for k in range(segs + 1):
+			var t := float(k) / segs
+			var centre := root + dir * h * (lean * t + curl * t * t * 0.6) + Vector3.UP * h * t * (1.0 - 0.2 * t)
+			var hw := w * 0.5 * pow(1.0 - t, 0.8)
+			ring.append([centre - side * hw, centre + side * hw, t])
+		for k in range(segs):
+			var r0: Array = ring[k]
+			var r1: Array = ring[k + 1]
+			var verts: Array = [r0[0], r0[1], r1[1], r1[0]]
+			var cols: Array = []
+			for rr in [r0, r0, r1, r1]:
+				var c := base_col.lerp(tip_col, pow(float(rr[2]), 0.9)) * tint
+				c.a = float(rr[2])
+				cols.append(c)
+			var n := (dir + Vector3.UP).normalized()
+			for idx in [0, 1, 2, 0, 2, 3]:
+				st.set_color(cols[idx])
+				st.set_normal(n)
+				st.add_vertex(verts[idx])
+	return st.commit()
+
+
+func _grass_material() -> Material:
+	if _materials.has("dune_grass"):
+		return _materials["dune_grass"]
+	var sm := ShaderMaterial.new()
+	sm.shader = load("res://dune_grass.gdshader")
+	var m: Material = _tg.call("_save_resource", sm, "dune_grass_mat")
+	_materials["dune_grass"] = m
+	return m
+
+
+func _build_dune_grass(parent: Node3D) -> Array:
+	var meshes: Array = []
+	for v in range(3):
+		var mesh := _grass_tuft(v)
+		mesh.surface_set_material(0, _grass_material())
+		meshes.append(_tg.call("_save_resource", mesh, "grass_tuft_%d" % v))
+	var centres: Array = []
+	var cells := {}
+	var tufts := 0
+	var tries := 0
+	while centres.size() < GRASS_PATCHES and tries < GRASS_PATCHES * 80:
+		tries += 1
+		var c := Vector2(_dress_rng.randf_range(10.0, 470.0), _dress_rng.randf_range(-470.0, 470.0))
+		if not _dress_ok(c, 9.0):
+			continue
+		var apart := true
+		for o in centres:
+			if c.distance_to(o) < GRASS_PATCH_GAP:
+				apart = false
+				break
+		if not apart:
+			continue
+		centres.append(c)
+		var radius := _dress_rng.randf_range(3.0, 8.0)
+		var n := int(radius * radius * _dress_rng.randf_range(1.3, 2.4))
+		for i in range(n):
+			var q := c + Vector2.from_angle(_dress_rng.randf() * TAU) * radius * sqrt(_dress_rng.randf())
+			if not _dress_ok(q, 7.0):
+				continue
+			var y := _ground(q.x, q.y)
+			var sc := _dress_rng.randf_range(1.3, 2.3) * (1.0 - 0.4 * q.distance_to(c) / radius)
+			var xf := Transform3D(Basis(Vector3.UP, _dress_rng.randf() * TAU).scaled(Vector3(sc, sc * _dress_rng.randf_range(0.9, 1.3), sc)), Vector3(q.x, y - 0.05, q.y))
+			var variant := _dress_rng.randi() % meshes.size()
+			var ck := Vector3i(floori(q.x / SCATTER_CELL), floori(q.y / SCATTER_CELL), variant)
+			if not cells.has(ck):
+				cells[ck] = []
+			cells[ck].append(xf)
+			tufts += 1
+	for ck in cells.keys():
+		var mmi := _multimesh(meshes[ck.z], _shuffled(cells[ck]), "Grass_%d_%d_%d" % [ck.x, ck.y, ck.z])
+		_limit_view(mmi, GRASS_RANGE + SCATTER_CELL * 0.72, false)
+		mmi.set_meta(&"base_range", mmi.visibility_range_end)
+		parent.add_child(mmi)
+	print("Dune grass: %d patches, %d tufts" % [centres.size(), tufts])
+	return centres

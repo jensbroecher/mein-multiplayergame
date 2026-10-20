@@ -46,6 +46,8 @@ the others re-bakes it (see Lakeside Course below).
 - People-sized things are built at life size in `PropKit.gd` (one SurfaceTool per material key, everything
   through a frame that places, scales and even shears a prop) and scaled by `PROP_SCALE` (1.6), like
   Bloombay's seafront. `_verify_clear` errors on any footprint too close to the road.
+- The camp's motorhomes, caravans, van, SUV, tents, gazebo, chairs, barbecue and cool box (and the crowd
+  barrier and cone) are `CampKit.gd`, shared with Bloombay Dunes' inland camps: see "Camps" below.
 - The venue sits in road coordinates (s along the TrackPath, lateral right of travel +). The first corner
   (s = 0, the origin) is a single sharp point; `_offset_run` wraps fences and tyre walls round its outside.
   Its inside is tight: anything there stands along the bisector, clear of both legs.
@@ -224,6 +226,8 @@ faces get culled and you see the far faces from the inside. To confirm, render i
 - The generator runs on the dummy renderer, which ignores `MultiMesh.set_instance_transform()`/
   `set_instance_color()`. Those instances are saved with no transforms and stay invisible. Write
   `MultiMesh.buffer` directly instead (see the icicles in `regenerate_frostpeak_creek.gd`).
+- A windowed `look_shots`-style run on macOS can stall after its first shot when its window goes behind
+  others (the OS throttles it): the process sits idle with no more `SHOT` lines. Kill it and rerun.
 - Headless can't render screenshots. To look at a level, run a `SceneTree` script (`-s`) with the
   windowed console exe and `--resolution 1600x900`, place a `Camera3D`, and save
   `root.get_texture().get_image()`.
@@ -382,6 +386,23 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   `res://scratch/nyota_live_shot.tscn -- <dir> [wait=25] [level=...] name:x,y,z:tx,ty,tz` takes shots
   during a live spectator race, for what only renders in a real game.
 
+## Camps (CampKit.gd: Lakeside Course and Bloombay Dunes)
+
+- `CampKit.gd` holds the vehicle and tent builders that used to live in `regenerate_lakeside.gd`, built
+  through a `PropKit` at life size (nose toward -z, y up) and placed by the caller with `set_frame` at
+  `PROP_SCALE` (1.6). `make_material(key)` is the one definition of the camp's vertex-colour materials
+  (`matte`, `metal`, `canvas`, `lamp`, ...): each generator saves and shares its own copies.
+- The layouts are data (`LAYOUT_MAIN` 34x26m, `LAYOUT_VILLAGE` 26x20m, `LAYOUT_PAIR` 18x16m: items in terrace
+  coordinates, +z toward the track) and `build_layout()` lays one out on a pad, so both levels place camps
+  the same way. It returns the pitches' footprints and `bad`, any pair closer than `CAMP_GAP` (1.5m) or
+  standing off the pad by more than a metre. Footprints (`FOOT`) are measured off the built meshes,
+  awnings included: a motorhome with its awning out is about 7 x 12m at game scale, so five vehicles, four
+  tents and three gazebos did not fit the Lakeside's 34 x 26m terrace and overlapped. Change a builder's
+  size and re-measure `FOOT` (build it into a PropKit, read `commit().get_aabb()`).
+- A vehicle's awning side is its +x, which a layout turns to terrace -x: space a row of awning vehicles
+  7m apart plus the gap, not the 4m body width.
+- Pads are the only level ground. A 12m vehicle on a slope floats at one end, so camps stay on their pad.
+
 ## Bloombay Dunes (beach stage)
 
 - The surf is `beach_water.gdshader` on the `BloombayWater` node, which `regenerate_bloombay_dunes.gd` builds
@@ -478,6 +499,39 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 - The surf is heard from `SurfSound`, AudioStreamPlayer3Ds 10m seaward of the waterline every
   `SURF_SPACING`. They alternate two clips baked by `_surf_stream`: rumble, curl, crash and swash
   on `SEA_PERIOD`, three waves in one clip and four in the other, so neighbours never fall into step.
+- The inland dunes are dressed after the seafront (`_build_inland`, before the palms, whose `_footprints`
+  check keeps them off everything noted here). The generator takes about 17s.
+  - Five camps (`CAMP_SITES`: s along the lap, side, `CampKit` layout) stand on pads graded into the sand
+    with `TerrainGenerator.flat_pads`. `_plan_camps` runs before `generate_world()`: it searches ±110m of
+    each site's s for the pad with the least relief at a distance that keeps its blend (`CAMP_BLEND` 9m) clear
+    of the curb, off the beach strip, gates and other camps, and reads natural heights through
+    `_sample_cached_height` (which computes them from the curve while no world exists). Every inland spot
+    is sloped (3-8m of relief over a camp), so each pad is a cut-and-fill terrace.
+  - `_build_corner_runs`: the sharpest corners (`_corner_sites`, outside of the turn picked from the
+    heading change) get a tyre wall or red/white barriers at `TYRE_LAT` (10.9m, 2m past the curb) with
+    feather flags, chequered flags and cones; `_build_camp_frontage` runs barriers and flags along the road
+    edge facing each camp. Tyre walls and barriers have box colliders.
+  - Flags are `_banner()` meshes in world space in `flag_wave.gdshader` (the seafront's flag shader):
+    feather flags are a width profile down a 3.9m pole, chequered flags a 8x5 cell grid. All stream east,
+    off the sea.
+  - Pebbles and rocks (`_build_rocks`) are eight `_rock` meshes (four 320-face rocks, four 80-face pebbles)
+    in 60m MultiMesh cells; the big ones get cylinder colliders and stay 14m+ off the lap. A third of the
+    clusters lie in the dune grass.
+  - Dune grass (`_build_dune_grass`, `dune_grass.gdshader`) is isolated patches (`GRASS_PATCH_GAP` apart)
+    of tufts in 60m MultiMesh cells; vertex colour alpha is the height up the blade, which the shader sways
+    with `TIME`. Grass and rocks cast no shadow. Tyre walls, barriers and flags are one mesh per corner or
+    camp frontage with a `visibility_range_end` (`DRESS_RANGE`): one level-wide mesh can't be culled by
+    distance, and measured 0.3ms of GPU on an M1 for no reason.
+  - `DuneDetail.gd` (on the `DuneCamps` node, group `vegetation_detail`) follows the Vegetation Detail
+    setting like `JungleDetail.gd`: it thins the grass, the rocks and the bent palms' cells
+    (`visible_instance_count`, so the generator shuffles each cell's instances) and pulls their draw
+    distance in. The level is built at the richest (Ultra) and guards against baking a level of detail into
+    the level when run by a generator. On an M1 (2020), against High (what Auto starts at): Off -0.77ms,
+    Low -0.53, Medium -0.29, Ultra +0.19 (`res://scratch/ab_bench.tscn -- <level> quality=0 quality=2 ...`).
+  - Bent palms are `PALM_SHAPES` 4 and 5 (`BENT_FIRST`): lean about 55-65 degrees at the foot, curving
+    back up under the crown. Some lagoon palms are bent (from their own RNG, so the beach palms keep their
+    places), and `PALM_DUNE_ANCHORS` anchors along the lap plus four round each camp grow singles and pairs
+    (`_palm_crown_off_road` keeps a crown 5.5m off the road's edge).
 - `res://scratch/bloombay_shots.tscn -- <dir> name:x,y,z:tx,ty,tz[:frames[:gap]]` renders into the window
   (not a SubViewport) and can save a time sequence to watch the surf.
 
