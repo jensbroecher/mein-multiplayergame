@@ -1,4 +1,4 @@
-[gd_scene load_steps=5 format=3 uid="uid://ci11yow3h0tq8"]
+[gd_scene load_steps=6 format=3 uid="uid://ci11yow3h0tq8"]
 
 [ext_resource type="Script" path="res://RaceUI.gd" id="1_ruisc"]
 [ext_resource type="Script" path="res://Minimap.gd" id="2_minimap"]
@@ -21,6 +21,22 @@ corner_radius_top_left = 10
 corner_radius_top_right = 10
 corner_radius_bottom_right = 10
 corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_countdown"]
+bg_color = Color(0.04, 0.05, 0.07, 0.72)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.55, 0.1, 0.65)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+content_margin_left = 22.0
+content_margin_top = 4.0
+content_margin_right = 22.0
+content_margin_bottom = 4.0
 
 [node name="RaceUI" type="CanvasLayer"]
 script = ExtResource("1_ruisc")
@@ -207,10 +223,45 @@ theme_override_font_sizes/font_size = 32
 text = "Race Finished!"
 horizontal_alignment = 1
 
-[node name="LabelTimer" type="Label" parent="EndPanel/VBoxContainer"]
+[node name="EndCountdown" type="PanelContainer" parent="."]
+visible = false
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -170.0
+offset_top = 12.0
+offset_right = 170.0
+offset_bottom = 108.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_countdown")
+
+[node name="HBoxContainer" type="HBoxContainer" parent="EndCountdown"]
 layout_mode = 2
-text = "Waiting for others: 30 s"
-horizontal_alignment = 1
+mouse_filter = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="LabelEnding" type="Label" parent="EndCountdown/HBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_font_sizes/font_size = 28
+text = "RACE ENDING IN"
+
+[node name="LabelCount" type="Label" parent="EndCountdown/HBoxContainer"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.62, 0.15, 1)
+theme_override_font_sizes/font_size = 72
+text = "30"
+horizontal_alignment = 2
+
+[node name="LabelUnit" type="Label" parent="EndCountdown/HBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 8
+theme_override_colors/font_color = Color(1, 0.62, 0.15, 1)
+theme_override_font_sizes/font_size = 32
+text = "s"
 
 [node name="UnderwaterOverlay" type="ColorRect" parent="."]
 visible = false

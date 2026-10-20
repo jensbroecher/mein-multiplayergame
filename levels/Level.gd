@@ -1076,7 +1076,6 @@ func update_hud_rpc(pos, total, lap, max_laps):
 @rpc("authority", "call_local", "reliable")
 func update_timer_rpc(t: int):
 	for ui in _all_race_uis():
-		ui.show_end_screen()
 		ui.update_end_timer(t)
 
 func _end_race():
@@ -1130,6 +1129,7 @@ func _end_race():
 @rpc("authority", "call_local", "reliable")
 func end_race_rpc(results_data: Array):
 	for ui in _all_race_uis():
+		ui.hide_end_countdown()
 		ui.show_message("Race Over!", 5.0)
 	_disable_local_cart()
 	if race_ui and race_ui.has_method("display_race_results"):

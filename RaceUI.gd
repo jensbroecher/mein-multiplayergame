@@ -50,7 +50,14 @@ func _process(delta: float) -> void:
 		terrain_clip_overlay.color = Color(0.02, 0.03, 0.04, _terrain_clip_alpha * _TERRAIN_CLIP_MAX_ALPHA)
 
 @onready var end_panel = $EndPanel
-@onready var end_timer_label = $EndPanel/VBoxContainer/LabelTimer
+## The "RACE ENDING" countdown: a slim panel at the top of the screen, so the road stays visible.
+## The score table ("Race Finished!") is end_panel, in the middle, and only shows once the race is over.
+@onready var end_countdown = $EndCountdown
+@onready var end_countdown_label = $EndCountdown/HBoxContainer/LabelCount
+## How far "You Finished!" and the other messages step down while the countdown is up.
+const END_COUNTDOWN_MESSAGE_SHIFT := 72.0
+var _msg_top: float = 0.0
+var _msg_bottom: float = 0.0
 
 var standings_panel: PanelContainer
 var standings_list: VBoxContainer
@@ -88,7 +95,9 @@ var local_ready = false
 func _ready():
 	_init_styleboxes()
 	_setup_standings_list()
-	
+	_msg_top = label_msg.offset_top
+	_msg_bottom = label_msg.offset_bottom
+
 	NetworkManager.stage_votes_updated.connect(_on_stage_votes_updated)
 	NetworkManager.stage_voting_concluded.connect(_on_stage_voting_concluded)
 	NetworkManager.stage_voting_started.connect(_on_stage_voting_started)
@@ -283,11 +292,28 @@ func update_items(item1_name: String, item2_name: String):
 			slot2_icon.texture = ITEM_ICONS[item2_name]
 			slot2_panel.add_theme_stylebox_override("panel", style_slot_backup)
 
+## The score table. It replaces the countdown.
 func show_end_screen():
+	hide_end_countdown()
 	end_panel.show()
 
+## Seconds until the race is called, from the first finisher on. Shows the countdown.
 func update_end_timer(time_left: int):
-	end_timer_label.text = "Waiting for others: %d s" % time_left
+	if end_panel.visible:
+		return
+	end_countdown_label.text = "%d" % time_left
+	if not end_countdown.visible:
+		end_countdown.show()
+		_shift_message(END_COUNTDOWN_MESSAGE_SHIFT)
+
+func hide_end_countdown():
+	if end_countdown.visible:
+		end_countdown.hide()
+		_shift_message(0.0)
+
+func _shift_message(down: float) -> void:
+	label_msg.offset_top = _msg_top + down
+	label_msg.offset_bottom = _msg_bottom + down
 
 func update_speed(val_kmh: float):
 	if label_speed:
@@ -301,9 +327,7 @@ var menu_button: Button = null
 
 func display_race_results(results_data: Array):
 	show_end_screen()
-	
-	end_timer_label.hide()
-	
+
 	var is_gp: bool = NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP \
 			or (NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP and NetworkManager.is_coop_gp) \
 			or (NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER and NetworkManager.multiplayer_mode == NetworkManager.MultiplayerMode.GRAND_PRIX)
