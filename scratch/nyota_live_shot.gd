@@ -5,6 +5,7 @@ extends Node
 # what they should in a real game, not in an offscreen render). Run windowed:
 #   Godot --path . --resolution 1376x768 res://scratch/nyota_live_shot.tscn -- <out_dir> [wait=25] [level=res://...]
 #       name:x,y,z:tx,ty,tz ...
+# `jumbo_always` keeps the big screen's viewport refreshing; `jumbo_dump` saves its own image (jumbo_view.png).
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
@@ -33,6 +34,17 @@ func _ready() -> void:
 			var vp: SubViewport = j.get_node("BroadcastViewport")
 			j.set_process(false)
 			vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	# `jumbo_dump` saves what the big screen's own camera sees (the viewport's image, not the screen).
+	if "jumbo_dump" in args:
+		for j in get_tree().root.find_children("Jumbotron", "", true, false):
+			var jvp: SubViewport = j.get_node("BroadcastViewport")
+			var jcam: Camera3D = jvp.get_node("BroadcastCamera")
+			jvp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+			for i in 6:
+				await get_tree().process_frame
+			await RenderingServer.frame_post_draw
+			jvp.get_texture().get_image().save_png("%s/jumbo_view.png" % out_dir)
+			print("JUMBO camera at ", jcam.global_position, " looking ", -jcam.global_transform.basis.z, " viewport ", jvp.size, " world ", jvp.world_3d == get_viewport().world_3d)
 	var cam := Camera3D.new()
 	cam.fov = 62.0
 	cam.far = 4000.0

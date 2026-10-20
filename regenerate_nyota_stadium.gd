@@ -45,6 +45,9 @@ const LEVEL_NAME := "NyotaStadiumLevel"
 const LEVEL_PATH := "res://levels/NyotaStadiumLevel.tscn"
 const RES_PREFIX := "nyota_"
 const MeshChunker = preload("res://MeshChunker.gd")
+const PropKit = preload("res://PropKit.gd")
+const MatatuKit = preload("res://MatatuKit.gd")
+const StreetLampKit = preload("res://StreetLampKit.gd")
 const MESH_CHUNK_CELL := 80.0
 
 ## The cart: PlayerCart.GRAVITY plus the engine's 9.8, its fall speed cap, sphere centre over the
@@ -616,6 +619,9 @@ class Builder:
 	var verts := PackedVector3Array()
 	var cols := PackedColorArray()
 	var uvs := PackedVector2Array()
+	## A second UV set, one per vertex like the first; commit() writes it only if tri2() was used.
+	var uv2s := PackedVector2Array()
+	var has_uv2 := false
 
 	func tri(a: Vector3, b: Vector3, c: Vector3, out_hint: Vector3, col: Color, ua := Vector2.ZERO, ub := Vector2.ZERO, uc := Vector2.ZERO) -> void:
 		if (c - a).cross(b - a).dot(out_hint) < 0.0:
@@ -625,6 +631,21 @@ class Builder:
 			verts.append_array([a, b, c])
 			uvs.append_array([ua, ub, uc])
 		cols.append_array([col, col, col])
+		uv2s.append_array([Vector2.ZERO, Vector2.ZERO, Vector2.ZERO])
+
+	## tri() with a second UV set (va, vb, vc).
+	func tri2(a: Vector3, b: Vector3, c: Vector3, out_hint: Vector3, col: Color, ua: Vector2, ub: Vector2, uc: Vector2, va: Vector2, vb: Vector2, vc: Vector2) -> void:
+		var n0: int = verts.size()
+		tri(a, b, c, out_hint, col, ua, ub, uc)
+		has_uv2 = true
+		if (c - a).cross(b - a).dot(out_hint) < 0.0:
+			uv2s[n0] = va
+			uv2s[n0 + 1] = vc
+			uv2s[n0 + 2] = vb
+		else:
+			uv2s[n0] = va
+			uv2s[n0 + 1] = vb
+			uv2s[n0 + 2] = vc
 
 	func quad(a: Vector3, b: Vector3, c: Vector3, d: Vector3, out_hint: Vector3, col: Color, uv_scale := 0.25) -> void:
 		var n: Vector3 = out_hint.normalized()
@@ -668,6 +689,8 @@ class Builder:
 		for i in range(verts.size()):
 			st.set_color(cols[i])
 			st.set_uv(uvs[i])
+			if has_uv2:
+				st.set_uv2(uv2s[i])
 			if flat:
 				var t: int = i - i % 3
 				var nrm: Vector3 = (verts[t + 2] - verts[t]).cross(verts[t + 1] - verts[t]).normalized()
@@ -918,6 +941,11 @@ func _spot(s: float, lat: float, lift: float) -> Dictionary:
 
 ## Stand front wall height over the floor, and the catch net above it.
 const WALL_TOP := 2.4
+## The stand fronts' wall as (centre, thickness) from the arena edge outward: its face stands 3cm proud
+## of the stand shell's front. The board frames and the boards in front of it keep 4cm gaps (FRAME_D, BOARD_D).
+const WALL_FACE_OFFSET := Vector2(0.28, 0.62)
+const FRAME_D := 0.05
+const BOARD_D := 0.11
 const NET_H := 3.2
 ## The corner retaining walls' parapet over street level.
 const PARAPET := 1.15
@@ -995,9 +1023,11 @@ func _build_walls(parent: Node, concrete: Material, net_mat: Material) -> void:
 		var a: Vector2 = f[0]
 		var c: Vector2 = f[1]
 		var out2: Vector2 = Vector2(signf(a.x) if absf(a.x) == ARENA_X else 0.0, signf(a.y) if absf(a.y) == ARENA_Z else 0.0)
-		var a2: Vector2 = a + out2 * 0.3
-		var c2: Vector2 = c + out2 * 0.3
-		_wall(b, a2, c2, FLOOR_Y - 0.2, WALL_TOP, 0.6, wall_col)
+		# The stand's own shell has its front face on the arena edge (d = 0), so the wall's stands 3cm in
+		# front of it: two coplanar faces z-fight, which showed on the wall the sun isn't lighting.
+		var a2: Vector2 = a + out2 * WALL_FACE_OFFSET.x
+		var c2: Vector2 = c + out2 * WALL_FACE_OFFSET.x
+		_wall(b, a2, c2, FLOOR_Y - 0.2, WALL_TOP, WALL_FACE_OFFSET.y, wall_col)
 		_wall(b, a2 - out2 * 0.05, c2 - out2 * 0.05, WALL_TOP, WALL_TOP + 0.12, 0.8, cap_col)
 		# Catch net: posts and a mesh panel over the wall.
 		var len: float = a.distance_to(c)
@@ -1527,10 +1557,10 @@ func _build_boards(parent: Node) -> void:
 		var n: int = int(2.0 * half / panel)
 		var w: float = 2.0 * half / float(n)
 		for i in range(n):
-			var c: Vector3 = _stand_point(st, -half + (float(i) + 0.5) * w, -0.08, FLOOR_Y + y0)
+			var c: Vector3 = _stand_point(st, -half + (float(i) + 0.5) * w, -BOARD_D, FLOOR_Y + y0)
 			_sign(boards, c, w - 0.16, h, -out3, idx % AD_COUNT, true)
 			idx += 1
-		var f0: Vector3 = _stand_point(st, 0.0, -0.03, FLOOR_Y + y0 + h * 0.5)
+		var f0: Vector3 = _stand_point(st, 0.0, -FRAME_D, FLOOR_Y + y0 + h * 0.5)
 		frames.box(f0, Vector3(2.0 * half, h + 0.3, 0.04) if absf(out2.y) > 0.5 else Vector3(0.04, h + 0.3, 2.0 * half), 0.0, Color(0.06, 0.06, 0.07))
 	# Printed banners on the corner walls (arena side), 24m x 3m.
 	var banners := [
@@ -1676,15 +1706,26 @@ func _build_screens(parent: Node, board_mat: ShaderMaterial) -> void:
 	face.position = Vector3(0, panel_y, 0)
 	face.rotation.x = deg_to_rad(-6.0)
 	screen.add_child(face)
+	# The frame tilts with the panel. Untilted, its flat front face stood in front of the quad's upper
+	# half (the quad leans back 6 degrees, so above 1m from its centre it sank behind the frame), which
+	# hid the top 44% of the picture.
 	var frame := Builder.new()
-	frame.box(Vector3(0, panel_y, -0.7), Vector3(panel_size.x + 1.2, panel_size.y + 1.2, 1.2), 0.0, Color(0.12, 0.13, 0.15))
-	for sx in [-1.0, 1.0]:
-		frame.box(Vector3(sx * panel_size.x * 0.3, 1.5, -1.2), Vector3(1.0, 3.0, 1.0), 0.0, Color(0.55, 0.57, 0.6))
+	frame.box(Vector3(0, 0, -0.7), Vector3(panel_size.x + 1.2, panel_size.y + 1.2, 1.2), 0.0, Color(0.12, 0.13, 0.15))
 	var fm := MeshInstance3D.new()
 	fm.name = "ScreenFrame"
 	fm.mesh = frame.commit()
 	fm.material_override = _metal_material()
+	fm.position = Vector3(0, panel_y, 0)
+	fm.rotation.x = face.rotation.x
 	screen.add_child(fm)
+	var legs := Builder.new()
+	for sx in [-1.0, 1.0]:
+		legs.box(Vector3(sx * panel_size.x * 0.3, 1.5, -1.2), Vector3(1.0, 3.0, 1.0), 0.0, Color(0.55, 0.57, 0.6))
+	var lgm := MeshInstance3D.new()
+	lgm.name = "ScreenLegs"
+	lgm.mesh = legs.commit()
+	lgm.material_override = _metal_material()
+	screen.add_child(lgm)
 	parent.add_child(screen)
 	# Entering the tree ran Jumbotron._ready(), which gave the screen a material bound to the
 	# viewport; it is made again at load, and saved here it would point at no viewport.
@@ -2102,11 +2143,20 @@ func _lap_distance(p: Vector2, reach := 60.0) -> float:
 
 ## A box building on footprint `r` (x, z) from the street up to `top`, walls UV'd in metres
 ## (along, up) for city_building.gdshader, a flat roof UV'd in world XZ.
+## city_building.gdshader's window bay, and its shop-front unit (1.5 bays).
+const CITY_BAY := 4.0
+const CITY_SHOP_UNIT := 6.0
+
+
 func _building(b: Builder, r: Rect2, top: float, col: Color) -> void:
 	var y0: float = STREET_Y - 0.3
 	var corners := [Vector2(r.position.x, r.position.y), Vector2(r.end.x, r.position.y), Vector2(r.end.x, r.end.y), Vector2(r.position.x, r.end.y)]
 	var centre: Vector2 = r.get_center()
-	var run := 0.0
+	# Each wall's UV.x is stretched (by under 15%) so the wall ends on a whole bay, and UV2.x so it ends on
+	# a whole shop front: the shader's windows then never straddle a corner. The counts carry on from wall to
+	# wall, so every wall starts on a bay boundary but gets its own run of random windows.
+	var run_bays := 0
+	var run_shops := 0
 	for k in range(4):
 		var a: Vector2 = corners[k]
 		var c: Vector2 = corners[(k + 1) % 4]
@@ -2118,9 +2168,16 @@ func _building(b: Builder, r: Rect2, top: float, col: Color) -> void:
 		var p2 := Vector3(c.x, top, c.y)
 		var p3 := Vector3(a.x, top, a.y)
 		var h: float = top - STREET_Y
-		b.tri(p0, p1, p2, out3, col, Vector2(run, -0.3), Vector2(run + len, -0.3), Vector2(run + len, h))
-		b.tri(p0, p2, p3, out3, col, Vector2(run, -0.3), Vector2(run + len, h), Vector2(run, h))
-		run += len
+		var n_bays: int = maxi(1, int(round(len / CITY_BAY)))
+		var n_shops: int = maxi(1, int(round(len / CITY_SHOP_UNIT)))
+		var u0: float = float(run_bays) * CITY_BAY
+		var u1: float = float(run_bays + n_bays) * CITY_BAY
+		var v0: float = float(run_shops) * CITY_SHOP_UNIT
+		var v1: float = float(run_shops + n_shops) * CITY_SHOP_UNIT
+		b.tri2(p0, p1, p2, out3, col, Vector2(u0, -0.3), Vector2(u1, -0.3), Vector2(u1, h), Vector2(v0, 0.0), Vector2(v1, 0.0), Vector2(v1, 0.0))
+		b.tri2(p0, p2, p3, out3, col, Vector2(u0, -0.3), Vector2(u1, h), Vector2(u0, h), Vector2(v0, 0.0), Vector2(v1, 0.0), Vector2(v0, 0.0))
+		run_bays += n_bays
+		run_shops += n_shops
 	var q := []
 	for c2 in corners:
 		q.append(Vector3(c2.x, top, c2.y))
@@ -2953,20 +3010,78 @@ func _build_facades(parent: Node, concrete: Material) -> void:
 	parent.add_child(sm)
 
 
-## A matatu: a long minibus in loud livery, at twice life size like everything else.
-func _matatu(b: Builder, pos: Vector3, yaw: float, body: Color, stripe: Color) -> void:
-	var bs := Basis(Vector3.UP, yaw)
-	var l := 10.6
-	var w := 4.0
-	var h := 4.4
-	b.box(pos + bs * Vector3(0, 0.6 + h * 0.5, 0), Vector3(w, h, l), yaw, body)
-	# Windows all round, and a livery stripe under them.
-	b.box(pos + bs * Vector3(0, 0.6 + h * 0.66, 0.2), Vector3(w + 0.06, 1.3, l - 1.6), yaw, Color(0.06, 0.07, 0.09))
-	b.box(pos + bs * Vector3(0, 0.6 + h * 0.36, 0), Vector3(w + 0.08, 0.6, l + 0.08), yaw, stripe)
-	b.box(pos + bs * Vector3(0, 0.6 + h + 0.25, 0.8), Vector3(w - 0.6, 0.5, l - 3.0), yaw, Color(0.15, 0.15, 0.16))
-	for sx in [-1.0, 1.0]:
-		for sz in [-1.0, 1.0]:
-			b.box(pos + bs * Vector3(sx * (w * 0.5 - 0.1), 0.75, sz * (l * 0.5 - 2.0)), Vector3(0.7, 1.5, 1.5), yaw, Color(0.05, 0.05, 0.05))
+## Matatus, the minibuses of Nairobi, parked in the east plaza and the car park north of the exit.
+## MatatuKit builds each livery once at life size, scaled by MATATU_SCALE like everything else here
+## (twice life size); the same mesh serves every van in that livery. `spots` are [position, yaw,
+## livery index]: the nose points along -z turned by yaw. A van within MATATU_SOLID of the lap gets a
+## box collider; the rest are scenery.
+const MATATU_SCALE := 2.0
+const MATATU_SOLID := 15.0
+const MATATU_LENGTH := 5.4
+const MATATU_WIDTH := 1.95
+const MATATU_HEIGHT := 2.4
+
+
+func _build_matatus(parent: Node, spots: Array) -> void:
+	var root := Node3D.new()
+	root.name = "Matatus"
+	parent.add_child(root)
+	var mats := {}
+	var kit := PropKit.new()
+	kit.material_for = func(key: String) -> Material:
+		if not mats.has(key):
+			mats[key] = _save_shared_resource(MatatuKit.make_material(key), "matatu_" + key)
+		return mats[key]
+	kit.set_frame(Transform3D(Basis().scaled(Vector3.ONE * MATATU_SCALE), Vector3.ZERO))
+	var meshes := {}
+	var solid := 0
+	var tris := 0
+	var closest := MATATU_SOLID
+	for k in range(spots.size()):
+		var sp: Array = spots[k]
+		var pos: Vector3 = sp[0]
+		var yaw: float = sp[1]
+		var li: int = sp[2]
+		if not meshes.has(li):
+			var mesh: ArrayMesh = MatatuKit.new(kit).build(MatatuKit.LIVERIES[li])
+			for si in range(mesh.get_surface_count()):
+				tris += (mesh.surface_get_arrays(si)[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
+			meshes[li] = _save_shared_resource(mesh, "matatu_%d" % li)
+		var mi := MeshInstance3D.new()
+		mi.name = "Matatu_%d" % k
+		mi.mesh = meshes[li]
+		mi.transform = Transform3D(Basis(Vector3.UP, yaw), pos)
+		mi.visibility_range_end = 420.0
+		mi.visibility_range_end_margin = 30.0
+		root.add_child(mi)
+		var lap_d: float = _matatu_lap_distance(pos, yaw)
+		closest = minf(closest, lap_d)
+		if lap_d < STREET_HALF + 1.5:
+			push_error("Matatu_%d stands %.1fm from the lap's centre line; the road is %.0fm wide each side" % [k, lap_d, STREET_HALF])
+		if lap_d < MATATU_SOLID:
+			var body := StaticBody3D.new()
+			body.name = "MatatuBody_%d" % k
+			var cs := CollisionShape3D.new()
+			var box := BoxShape3D.new()
+			box.size = Vector3(MATATU_WIDTH, MATATU_HEIGHT - 0.25, MATATU_LENGTH) * MATATU_SCALE
+			cs.shape = box
+			cs.position = Vector3(0.0, (0.25 + MATATU_HEIGHT) * 0.5 * MATATU_SCALE, 0.0)
+			body.add_child(cs)
+			body.transform = Transform3D(Basis(Vector3.UP, yaw), pos)
+			root.add_child(body)
+			solid += 1
+	print("  matatus: %d vans, %d liveries (%d triangles), %d solid, closest %.1fm to the lap" % [spots.size(), meshes.size(), tris, solid, closest])
+
+
+## The nearest the lap's centre line comes to a van's footprint (corners and edge midpoints).
+func _matatu_lap_distance(pos: Vector3, yaw: float) -> float:
+	var basis := Basis(Vector3.UP, yaw)
+	var best := MATATU_SOLID
+	for ix in [-1.0, 0.0, 1.0]:
+		for iz in [-1.0, -0.5, 0.0, 0.5, 1.0]:
+			var q: Vector3 = pos + basis * Vector3(float(ix) * MATATU_WIDTH * 0.5, 0.0, float(iz) * MATATU_LENGTH * 0.5) * MATATU_SCALE
+			best = minf(best, _lap_distance(Vector2(q.x, q.z), MATATU_SOLID))
+	return best
 
 
 ## A gazebo tent: four legs and a pyramid roof.
@@ -3043,19 +3158,18 @@ func _build_precinct_dressing(parent: Node) -> Array:
 		b.box(fp + bs * Vector3(0, 3.0, 0), Vector3(4.6, 5.2, 12.0), yaw, truck_cols[k])
 		b.box(fp + bs * Vector3(0, 2.3, 7.6), Vector3(4.4, 3.8, 3.4), yaw, Color(0.9, 0.9, 0.9))
 		b.box(fp + bs * Vector3(2.35, 3.4, 0.0), Vector3(0.1, 1.8, 7.0), yaw, Color(0.08, 0.08, 0.08))
-	# Matatus parked nose to tail along the plaza's south edge.
-	var liveries := [[Color(0.95, 0.75, 0.12), Color(0.08, 0.08, 0.09)], [Color(0.10, 0.10, 0.12), Color(0.95, 0.20, 0.55)],
-			[Color(0.92, 0.92, 0.90), Color(0.10, 0.45, 0.22)], [Color(0.78, 0.12, 0.12), Color(0.95, 0.75, 0.12)],
-			[Color(0.12, 0.30, 0.62), Color(0.93, 0.42, 0.07)], [Color(0.45, 0.10, 0.50), Color(0.20, 0.85, 0.80)]]
+	# Matatus parked nose to tail (nose to the stadium) along the plaza's south edge, and a car park of
+	# them north of the exit.
+	var matatu_spots: Array = []
+	var plaza_liveries := [0, 3, 5, 1, 4, 6]
 	for k in range(6):
-		var mp := Vector3(220.0 + float(k) * 14.0, STREET_Y, 36.0)
-		var lv: Array = liveries[k % liveries.size()]
-		_matatu(b, mp, PI * 0.5 + rng.randf_range(-0.05, 0.05), lv[0], lv[1])
-	# More matatus in the car park north of the exit, and on the north plaza.
+		matatu_spots.append([Vector3(220.0 + float(k) * 14.0, STREET_Y, 36.0), PI * 0.5 + rng.randf_range(-0.05, 0.05), plaza_liveries[k]])
+	var park_liveries := [2, 7, 4, 0, 6, 1, 3, 5, 7, 2]
+	var park_rng := RandomNumberGenerator.new()
+	park_rng.seed = 4242
 	for k in range(10):
-		var cp := Vector3(214.0 + float(k % 5) * 18.0, STREET_Y, -95.0 - float(k / 5) * 22.0)
-		var lv2: Array = liveries[(k + 2) % liveries.size()]
-		_matatu(b, cp, 0.0, lv2[0], lv2[1])
+		matatu_spots.append([Vector3(214.0 + float(k % 5) * 18.0, STREET_Y, -95.0 - float(k / 5) * 22.0), park_rng.randf_range(-0.04, 0.04), park_liveries[k]])
+	_build_matatus(parent, matatu_spots)
 	# Soko Street: market stalls behind the barriers on both sides, people at them.
 	var s0: float = _s_at_z(SEG_SOKO, 152.0)
 	var s1: float = _s_at_z(SEG_SOKO, 92.0)
@@ -3087,35 +3201,59 @@ func _build_precinct_dressing(parent: Node) -> Array:
 				b.box(base + Vector3(sx * 1.6, 6.0, sz2 * 1.6), Vector3(0.2, 12.0, 0.2), 0.0, Color(0.7, 0.7, 0.72))
 		b.box(base + Vector3(0, 12.1, 0), Vector3(4.2, 0.3, 4.2), 0.0, Color(0.45, 0.32, 0.20))
 		b.box(base + Vector3(0, 13.4, 0), Vector3(1.2, 1.2, 2.2), 0.0, Color(0.08, 0.08, 0.09))
-	# Streetlights along the lap's streets, behind the barriers.
-	var lamp := Builder.new()
+	# Streetlights along the lap's streets, behind the barriers: one StreetLampKit mesh, instanced per cell.
+	var lamp_xf: Array = []
 	var sl: float = _named_s["exit_to"] + 6.0
 	var sl_end: float = _named_s["drop_kick"] - 4.0
-	var side_k := 0
 	while sl < sl_end:
 		for side in [-1.0, 1.0]:
 			var lp: Dictionary = _spot(sl + (12.0 if side > 0.0 else 0.0), side * (STREET_HALF + 3.6), 0.0)
 			var base2: Vector3 = lp["pos"]
 			base2.y = STREET_Y
 			var inward: Vector3 = -lp["right"] * side
-			b.box(base2 + Vector3(0, 6.0, 0), Vector3(0.35, 12.0, 0.35), 0.0, Color(0.32, 0.34, 0.36))
-			var arm_end: Vector3 = base2 + inward * 3.4 + Vector3(0, 12.0, 0)
-			_beam(b, base2 + Vector3(0, 11.6, 0), arm_end, 0.22, Color(0.32, 0.34, 0.36))
-			lamp.box(arm_end - Vector3(0, 0.25, 0), Vector3(1.4, 0.3, 0.7), atan2(inward.x, inward.z), Color(1, 1, 1))
+			# The kit's arm reaches along +x.
+			lamp_xf.append(Transform3D(Basis(Vector3.UP, atan2(-inward.z, inward.x)), base2))
 		sl += 24.0
-		side_k += 1
+	_build_street_lamps(parent, lamp_xf)
 	var mi := MeshInstance3D.new()
 	mi.name = "PrecinctProps"
 	mi.mesh = _save_baked_resource(b.commit(), "precinct_props")
 	mi.material_override = _vertex_color_material(0.75)
 	parent.add_child(mi)
-	var lm := MeshInstance3D.new()
-	lm.name = "StreetLamps"
-	lm.mesh = lamp.commit()
-	lm.material_override = _lamp_material()
-	lm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	parent.add_child(lm)
 	return people
+
+
+## Street lights: StreetLampKit's mesh (life size, scaled by LAMP_SCALE) at each of `xf`, in cells so
+## the ones out of sight cost nothing.
+const LAMP_SCALE := 1.35
+const LAMP_CELL := 160.0
+const LAMP_RANGE := 380.0
+
+
+func _build_street_lamps(parent: Node, xf: Array) -> void:
+	var mats := {}
+	var kit := PropKit.new()
+	kit.material_for = func(key: String) -> Material:
+		if not mats.has(key):
+			mats[key] = _save_shared_resource(StreetLampKit.make_material(key), "streetlamp_" + key)
+		return mats[key]
+	kit.set_frame(Transform3D(Basis().scaled(Vector3.ONE * LAMP_SCALE), Vector3.ZERO))
+	var mesh: ArrayMesh = _save_shared_resource(StreetLampKit.new(kit).build(), "streetlamp")
+	var cells := {}
+	for t in xf:
+		var key := Vector2i(floori((t as Transform3D).origin.x / LAMP_CELL), floori((t as Transform3D).origin.z / LAMP_CELL))
+		if not cells.has(key):
+			cells[key] = []
+		cells[key].append(t)
+	var root := Node3D.new()
+	root.name = "StreetLamps"
+	parent.add_child(root)
+	for key in cells:
+		var mmi := _multimesh(mesh, cells[key], "StreetLamps_%d_%d" % [key.x, key.y])
+		mmi.visibility_range_end = LAMP_RANGE
+		mmi.visibility_range_end_margin = 20.0
+		root.add_child(mmi)
+	print("  street lamps: %d in %d cells" % [xf.size(), cells.size()])
 
 
 # ======================================================================================
@@ -3314,6 +3452,16 @@ func _build_environment(level_scene: Node3D) -> void:
 # ======================================================================================
 #  Build
 # ======================================================================================
+
+## Saves a resource that is not the level's own, under generated/ without the level's prefix: the
+## matatus belong to MatatuKit, and a nyota_ mesh over MESH_CHUNK_CELL triangles would be split by
+## MeshChunker at the origin (they are modelled around it, so each van would become four pieces).
+func _save_shared_resource(res: Resource, res_name: String) -> Resource:
+	var file_path: String = "res://generated/" + res_name + ".res"
+	res.take_over_path(file_path)
+	ResourceSaver.save(res, file_path)
+	return load(file_path)
+
 
 func _save_baked_resource(res: Resource, res_name: String) -> Resource:
 	if not DirAccess.dir_exists_absolute("res://generated/"):

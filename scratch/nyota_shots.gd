@@ -4,6 +4,7 @@ extends Node
 # down. Carts can be placed anywhere, mid-air over a jump included. Run windowed:
 #   Godot --path . res://scratch/nyota_shots.tscn -- <out_dir> [cart=Model,x,y,z,heading_deg,pitch_deg ...]
 #       name:x,y,z:tx,ty,tz ...
+# `freeze` stops the LED boards cycling, for diffing shots a few cm apart.
 # A cart's y of "g" puts it on the ground there. Heading 0 faces -z (north), 90 faces -x (west).
 # Models are the procedural cars, res://generated/cars/<Model>.tscn (Viper, Shadow, Apex, ...), in
 # their factory paint.
@@ -23,6 +24,12 @@ func _ready() -> void:
 	var level: Node3D = load("res://levels/NyotaStadiumLevel.tscn").instantiate()
 	vp.add_child(level)
 	MusicManager.set_shadow_quality(3, false)
+	# `freeze` stops the LED boards cycling their adverts, so two shots a few cm apart differ only by flicker.
+	if args.has("freeze"):
+		for mi in level.find_children("*", "MeshInstance3D", true, false):
+			var sm := mi.material_override as ShaderMaterial
+			if sm != null and sm.shader != null and sm.shader.resource_path.ends_with("stadium_boards.gdshader"):
+				sm.set_shader_parameter("cycle_seconds", 1.0e9)
 	for n in get_tree().root.find_children("*", "CanvasLayer", true, false):
 		n.visible = false
 	var cam := Camera3D.new()
@@ -53,7 +60,7 @@ func _ready() -> void:
 		var b := Basis(Vector3.UP, heading) * Basis(Vector3.RIGHT, pitch)
 		model.global_transform = Transform3D(b * Basis(Vector3.UP, PI) * 2.0, Vector3(x, y, z) + b * Vector3(0, -0.6072377, 0))
 	for a in args.slice(1):
-		if a.begins_with("cart="):
+		if a.begins_with("cart=") or a == "freeze":
 			continue
 		var parts := a.split(":")
 		var p := parts[1].split(",")

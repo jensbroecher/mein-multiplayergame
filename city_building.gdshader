@@ -2,7 +2,9 @@ shader_type spatial;
 render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 
 // Nyota Stadium's city: box buildings with the facade drawn here. Walls carry UV = (metres along
-// the wall, metres up from the street), roofs UV = world XZ. The vertex colour is the wall paint;
+// the wall, metres up from the street), roofs UV = world XZ. Each wall's length is a whole number of
+// bays in UV.x (and of shop fronts in UV2.x, which has the shop fronts' own count), so a window never
+// straddles a corner; the generator stretches them by a few percent to make it so. The vertex colour is the wall paint;
 // COLOR.a picks the facade: below 0.5 a concrete block (storeys of punched windows, a shopfront
 // on the ground floor; 0.25 a low one with a painted iron roof), above it a glass curtain wall
 // (the towers in town).
@@ -54,7 +56,7 @@ void fragment() {
 		}
 	} else if (vcol.a > 0.5) {
 		// Curtain wall: glass panels in a mullion grid, a different tint floor by floor.
-		vec2 g = vec2(UV.x / 2.4, UV.y / 4.0);
+		vec2 g = vec2(UV.x / (bay * 0.5), UV.y / 4.0);  // two panels a bay: a mullion falls on every corner
 		vec2 f = fract(g);
 		float mull = step(0.06, f.x) * step(0.08, f.y);
 		float floor_v = hash21(vec2(floor(g.y), vcol.r * 13.0));
@@ -69,10 +71,10 @@ void fragment() {
 		float rnd = hash21(cellid + vcol.rg * 31.0);
 		if (y < shop_h) {
 			// Ground floor: shop fronts behind rolled-up shutters, a sign band over them.
-			float u = fract(UV.x / (bay * 1.5));
+			float u = fract(UV2.x / (bay * 1.5));
 			float opening = step(0.08, u) * step(u, 0.92) * step(0.2, y) * step(y, shop_h - 1.6);
 			float sign_band = step(shop_h - 1.4, y) * step(y, shop_h - 0.3);
-			float shop_rnd = hash21(vec2(floor(UV.x / (bay * 1.5)), vcol.b * 17.0));
+			float shop_rnd = hash21(vec2(floor(UV2.x / (bay * 1.5)), vcol.b * 17.0));
 			vec3 inside = mix(vec3(0.08, 0.07, 0.06), vec3(0.35, 0.30, 0.24), shop_rnd * 0.6);
 			vec3 sign_cols[6] = vec3[](vec3(0.85, 0.15, 0.10), vec3(0.10, 0.45, 0.75), vec3(0.95, 0.75, 0.10),
 					vec3(0.10, 0.55, 0.25), vec3(0.95, 0.95, 0.92), vec3(0.85, 0.40, 0.08));

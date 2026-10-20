@@ -40,10 +40,15 @@ void fragment() {
 		vec3 a = ad_at(idx + k - 1.0, UV);
 		vec3 b = ad_at(idx + k, UV);
 		col = mix(a, b, edge);
-		// LED pixel grid, visible close up.
-		vec2 px = fract(UV * vec2(384.0, 48.0));
+		// LED pixel grid, visible close up. It fades out by how big a cell is on screen, not by distance
+		// alone: a board seen along its length from 25m has cells under a pixel wide, and the grid
+		// beat against the screen's pixels and shimmered as the camera moved.
+		vec2 cells = UV * vec2(384.0, 48.0);
+		vec2 px = fract(cells);
 		float grid = smoothstep(0.0, 0.25, px.x) * smoothstep(0.0, 0.25, px.y);
-		col *= mix(1.0, 0.75 + 0.25 * grid, 1.0 - smoothstep(10.0, 40.0, length(VERTEX)));
+		float cell_px = max(fwidth(cells.x), fwidth(cells.y));
+		float grid_vis = (1.0 - smoothstep(0.12, 0.4, cell_px)) * (1.0 - smoothstep(10.0, 40.0, length(VERTEX)));
+		col *= mix(1.0, 0.75 + 0.25 * grid, grid_vis);
 		ALBEDO = col * 0.35;
 		EMISSION = col * led_energy;
 		ROUGHNESS = 0.35;

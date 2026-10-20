@@ -386,6 +386,75 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   `res://scratch/nyota_live_shot.tscn -- <dir> [wait=25] [level=...] name:x,y,z:tx,ty,tz` takes shots
   during a live spectator race, for what only renders in a real game.
 
+## Matatus (Nyota Stadium's plaza and car park)
+
+- `MatatuKit.gd` builds a Nairobi matatu, a 14-seat high-roof minibus (the Toyota HiAce shape) at life size
+  (5.4 x 1.9 x 2.3m, nose toward -z) through a `PropKit`; the generator scales it by `MATATU_SCALE` (2). The
+  driver is on +x and the sliding door on -x, because Kenya drives on the left. `LIVERIES` is data: colours, the
+  name painted on the van, route number, plate, rear slogan and a `style` (flames, swoosh, zebra, flag, stars,
+  bolts, check) that picks the artwork in `_art_side`. A new livery is an entry there plus, for a new look,
+  a branch in `_art_side`.
+- The shell is a loft of cross-sections along z (`_ring`, `_params`): the arches are cut by lifting the
+  underside over each wheel (`_bottom`), with dark liners so they don't look through the van. The side wall
+  is exactly planar below the belt line and exactly tilted above it, which is why paint and glass can be flat
+  polygons: `_side_poly` clips a (z, y) shape to the paintable panel (`PANEL`) and the arches, splits it at the
+  belt line and lays it on the wall `off` metres proud. `L0` to `L5` are the paint layers' offsets (band,
+  artwork, two more, lettering shadow, lettering): the mobile renderer can't separate faces closer than
+  about a centimetre, so each layer stands 6mm (life size) above the last. Shapes that overlap must be on
+  different layers, and the lettering above all the artwork: pink and cyan swooshes both on `L1` z-fought where
+  the wave crossed itself (Malaika), and lettering between two artwork layers was covered by the upper one. Keep new artwork off the nose
+  above the belt (the belt drops there) and on the lower panel, or on the windows/pillars.
+- Offset a side's decals as `side * wall_x + off * normal.x`, not `side * (wall_x + off * normal.x)`: the
+  second form pushed the whole left side's glass and paint inside the body.
+- Lettering is the pixel font `GLYPHS` (`_text`, five rows; add any letter you need). On the +x side the text
+  reads toward the nose, on -x toward the tail, as on a real vehicle. Give a name a colour that contrasts
+  with the artwork under it: the first pass had pink lettering on a pink swoosh.
+- A matatu is five surfaces (`make_material`): `paint` (clearcoat), `glass`, `chrome`, `matte` (black plastic,
+  rubber, underbody) and `lamp` (emissive, tinted by vertex colour; the neon under the sills too), so a
+  van is five draw calls. About 10k triangles a van, eight meshes shared by the 16 vans.
+- `regenerate_nyota_stadium.gd`'s `_build_matatus` bakes one mesh per livery used and places `MeshInstance3D`s
+  (`spots`: position, yaw, livery). They save to `generated/matatu_*.res`, not `nyota_*`, through
+  `_save_shared_resource`: `MeshChunker.chunk_scene` splits any `nyota_` mesh of 8000+ triangles on an
+  80m grid in local space, and a van is modelled around its origin, so each one became four pieces.
+  `_matatu_lap_distance` errors on any van within `STREET_HALF` + 1.5 of the lap (the nearest is 12.5m); a van
+  within `MATATU_SOLID` gets a box collider.
+- `res://scratch/matatu_preview.gd` (`-s`, windowed) renders the vans in memory in a second:
+  `-- <dir> [livery=N | all=1] [scale=2] [fov=40] name:x,y,z:tx,ty,tz ...` (life size, nose toward -z, driver
+  on +x).
+
+## Street lights, the arena wall, facades and the big screen (Nyota Stadium)
+
+- `StreetLampKit.gd` builds the street light at life size through a `PropKit`: base plate and bolts, a sleeve
+  with a service door, a tapered pole with collars, a swan-neck arm with a brace, and a cobra-head luminaire
+  (`_build_luminaire`: a lofted aluminium shell, a dark underside, a glowing lens, a photocell). The arm
+  reaches along +x. `_build_street_lamps` bakes one mesh (`generated/streetlamp.res`, shared, not `nyota_`) and
+  instances it at `LAMP_SCALE` (1.35, a 12m pole) in 160m cells with a 380m draw range; `_build_precinct_dressing`
+  turns each so its arm is over the road. About 1.4k triangles a lamp. The lens uses plain additive emission:
+  an emission multiplied by a single vertex colour read dull tan against the sky.
+  `res://scratch/streetlamp_preview.gd` (`-s`, windowed) renders one: `-- <dir> [scale=1.35] name:x,y,z:tx,ty,tz`.
+  The stands' roof lamps and the floodlight heads are still boxes.
+- The stand fronts' wall (`_build_walls`) stands 3cm proud of the stand shell (`WALL_FACE_OFFSET`): both had their
+  arena-facing face at the arena edge, and two coplanar faces z-fought across the concrete above the boards.
+  It only showed on the south wall, where the sun is behind the face and the two meshes shade differently. The
+  board frames (`FRAME_D`) and the boards (`BOARD_D`) keep 4cm gaps in front of it.
+- `stadium_boards.gdshader` fades its LED pixel grid by how big a cell is on screen (`fwidth`), not by
+  distance alone: along a wall from 25m the 3cm cells were under a pixel wide and shimmered as the camera moved.
+- To tell flicker from parallax, render the same view from two camera spots 3cm apart and diff the images:
+  `res://scratch/nyota_shots.tscn -- <dir> freeze s0:... s1:...` (`freeze` stops the LED boards cycling their
+  adverts, or the diff just shows the ad changing). Z-fighting shows as blocky patches; parallax as thin edges.
+- City facades (`_building`, `city_building.gdshader`): each wall's UV.x is stretched (under 15%) so the wall
+  ends on a whole 4m bay, and the Builder's second UV set (`tri2`, UV2.x) so it ends on a whole 6m shop
+  front. Before, UV.x ran on round the perimeter, so a window could straddle a corner and show on both walls;
+  now every window has a margin at the corner, a glass tower's panel grid (two panels a bay) lands a mullion on
+  it, and the counts carry on from wall to wall so each wall still gets its own random windows. A Builder
+  only writes UV2 if `tri2` was used.
+- The Jumbotron (`_build_screens`, `Jumbotron.gd`): its frame is tilted with the screen (`rotation.x`, 6
+  degrees). The screen leans back, so with an upright frame the quad's upper half sank behind the frame's front
+  face and only the bottom 56% of the picture showed, a black bar over it. Glacier Highway tilts its housing
+  with its panel, which is why that one was fine. `res://scratch/nyota_live_shot.tscn -- <dir> wait=20 jumbo_dump`
+  saves what the screen's own camera sees (`jumbo_view.png`) apart from how the quad shows it, which tells a
+  camera problem from a mapping or occlusion one.
+
 ## Camps (CampKit.gd: Lakeside Course and Bloombay Dunes)
 
 - `CampKit.gd` holds the vehicle and tent builders that used to live in `regenerate_lakeside.gd`, built
