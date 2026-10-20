@@ -1,14 +1,17 @@
 extends Node3D
 
-## Inspection camera: no cars, just the course. Hold the right mouse button to look, WASD to fly,
-## Q/E down/up, Shift fast, Ctrl slow, mouse wheel changes the speed. The left stick flies and the
-## right stick looks on a pad (triggers fly down and up).
+## Inspection camera: no cars, just the course. Hold the left or right mouse button to look, or swipe
+## with two fingers on a trackpad (pinch to dolly forward and back). WASD to fly, Q/E down/up, Shift
+## fast, Ctrl slow, mouse wheel changes the speed. The left stick flies and the right stick looks on
+## a pad (triggers fly down and up).
 const BASE_SPEED := 30.0
 const FAST_MULT := 4.0
 const SLOW_MULT := 0.2
 const SPEED_MIN := 2.0
 const SPEED_MAX := 600.0
 const LOOK_SENS := 0.0028
+const PAN_LOOK_SENS := 0.02  # per unit of a trackpad swipe, which arrives in much smaller steps than pixels
+const PINCH_DOLLY := 40.0  # metres per unit of pinch, scaled by the fly speed
 const STICK_LOOK := 2.2
 const DEAD := 0.15
 
@@ -18,6 +21,7 @@ var _cam: Camera3D
 var _yaw := 0.0
 var _pitch := 0.0
 var _looking := false
+var _look_buttons := {}
 var _label: Label
 
 
@@ -59,13 +63,17 @@ func _apply_rotation() -> void:
 
 
 func _refresh_label() -> void:
-	_label.text = "INSPECTION  |  RMB + mouse: look  |  WASD: fly  |  Q/E: down/up  |  Shift/Ctrl: faster/slower  |  Wheel: speed (%d m/s)  |  Esc: menu" % int(speed)
+	_label.text = "INSPECTION  |  LMB/RMB drag or trackpad swipe: look  |  Pinch: forward/back  |  WASD: fly  |  Q/E: down/up  |  Shift/Ctrl: faster/slower  |  Wheel: speed (%d m/s)  |  Esc: menu" % int(speed)
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_RIGHT:
-			_looking = event.pressed
+		if event.button_index == MOUSE_BUTTON_LEFT or event.button_index == MOUSE_BUTTON_RIGHT:
+			if event.pressed:
+				_look_buttons[event.button_index] = true
+			else:
+				_look_buttons.erase(event.button_index)
+			_looking = not _look_buttons.is_empty()
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if _looking else Input.MOUSE_MODE_VISIBLE
 		elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			speed = minf(speed * 1.2, SPEED_MAX)
@@ -77,6 +85,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		_yaw -= event.relative.x * LOOK_SENS
 		_pitch = clampf(_pitch - event.relative.y * LOOK_SENS, -PI * 0.495, PI * 0.495)
 		_apply_rotation()
+	elif event is InputEventPanGesture:
+		_yaw -= event.delta.x * PAN_LOOK_SENS
+		_pitch = clampf(_pitch - event.delta.y * PAN_LOOK_SENS, -PI * 0.495, PI * 0.495)
+		_apply_rotation()
+	elif event is InputEventMagnifyGesture:
+		# factor > 1 while the fingers spread: move forward along the view.
+		global_position += -global_basis.z * (event.factor - 1.0) * PINCH_DOLLY * (speed / BASE_SPEED)
 
 
 func _exit_tree() -> void:

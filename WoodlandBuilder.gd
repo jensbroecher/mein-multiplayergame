@@ -29,8 +29,14 @@ const BROADLEAF := {
 	"birch": {"h": 16.0, "r": 0.21, "cr": 3.9, "under": 0.3, "fork": 0.28, "leader": 0.9, "limbs": 10,
 		"clusters": 34, "cl_r": 1.25, "shell": 0.45, "cards": 7, "card": Vector2(1.7, 2.3), "cell": CELL_BIRCH,
 		"tint": Color(0.86, 0.90, 0.76), "droop": 0.22, "bark": "birch"},
+	"alder": {"h": 13.5, "r": 0.28, "cr": 4.8, "under": 0.25, "fork": 0.22, "leader": 0.72, "limbs": 7,
+		"clusters": 36, "cl_r": 1.45, "shell": 0.45, "cards": 8, "card": Vector2(1.9, 2.5), "cell": CELL_ROUND,
+		"tint": Color(0.80, 0.88, 0.72), "droop": 0.08, "bark": "alder"},
 }
 const SPRUCE := {"h": 22.0, "r": 0.36, "base_r": 4.4, "whorls": 26, "per_whorl": 8}
+const PINE := {"h": 22.5, "r": 0.42, "cr": 5.4, "under": 0.48}
+const FIR := {"h": 24.5, "r": 0.38, "base_r": 3.2, "whorls": 28, "per_whorl": 7}
+const LARCH := {"h": 19.5, "r": 0.34, "base_r": 3.9, "whorls": 20, "per_whorl": 6}
 
 ## Bark per kind: [bark colour, fissure colour, fissure width, depth, plate stretch, vertex tint].
 const BARKS := {
@@ -39,6 +45,10 @@ const BARKS := {
 	"birch": [Color(0.95, 0.94, 0.90), Color(0.16, 0.15, 0.15), 0.18, 0.012, 0.22, Color(0.88, 0.88, 0.86)],
 	"spruce": [Color(0.56, 0.42, 0.33), Color(0.22, 0.16, 0.12), 0.36, 0.02, 1.4, Color(0.80, 0.76, 0.74)],
 	"hazel": [Color(0.60, 0.50, 0.40), Color(0.30, 0.24, 0.18), 0.25, 0.01, 4.0, Color(0.82, 0.78, 0.74)],
+	"pine": [Color(0.68, 0.40, 0.24), Color(0.24, 0.14, 0.10), 0.38, 0.032, 1.9, Color(0.88, 0.78, 0.70)],
+	"fir": [Color(0.46, 0.44, 0.42), Color(0.18, 0.17, 0.16), 0.28, 0.02, 2.2, Color(0.78, 0.78, 0.76)],
+	"larch": [Color(0.54, 0.44, 0.35), Color(0.22, 0.15, 0.11), 0.38, 0.035, 2.8, Color(0.82, 0.78, 0.74)],
+	"alder": [Color(0.48, 0.46, 0.42), Color(0.22, 0.20, 0.18), 0.26, 0.018, 3.0, Color(0.80, 0.80, 0.78)],
 }
 
 ## The canopy crossfades from the detailed trees to their stand-ins round TREE_NEAR (JungleDetail.gd
@@ -751,6 +761,276 @@ func shrub_mesh(variant: int, bark_mat: Material, leaf_mat: Material) -> ArrayMe
 			var cpos: Vector3 = mid.lerp(tip, 0.55 + 0.45 * j) + Vector3(rng.randf_range(-0.3, 0.3), 0, rng.randf_range(-0.3, 0.3))
 			lb = cluster_cards(leaf_st, lb, cpos, r * 0.38, 5, Vector2(r * 0.7, r * 0.95), crown_c, r, 0.0, hgt * 1.1,
 					CELL_ROUND, Color(0.82, 0.88, 0.74), rng)
+	var mesh: ArrayMesh = st.commit()
+	mesh.surface_set_material(0, bark_mat)
+	leaf_st.commit(mesh)
+	mesh.surface_set_material(1, leaf_mat)
+	return mesh
+
+
+# ======================================================================================
+#  Alpine conifers & mountain shrubs (Pinecrest Ridge)
+# ======================================================================================
+
+## A Scots / mountain pine (Pinus sylvestris): a tall, gently sinuous trunk bare in its lower half,
+## dark grey-brown at the foot and warm orange-red higher up, with crooked spreading limbs carrying
+## flat-topped tiered pads of pine needles and a domed umbrella crown.
+func pine_mesh(variant: int, lod: int, bark_mat: Material, leaf_mat: Material) -> ArrayMesh:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 8181 + variant * 137
+	var h: float = float(PINE["h"]) * rng.randf_range(0.88, 1.12)
+	var r0: float = float(PINE["r"]) * rng.randf_range(0.92, 1.08)
+	var cr: float = float(PINE["cr"]) * rng.randf_range(0.90, 1.12)
+	var under: float = h * float(PINE["under"])
+	var crown_c := Vector3(0.0, lerpf(under, h, 0.62), 0.0)
+	var shade := Vector2(under - 1.5, h * 0.88)
+
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var base_i := 0
+	var lower_bark := Color(0.62, 0.54, 0.48)
+	var upper_bark := Color(0.96, 0.76, 0.62)
+
+	# Sinuous trunk split into lower dark-fissured section and upper reddish-ochre section.
+	var sway_x: float = rng.randf_range(-0.65, 0.65)
+	var sway_z: float = rng.randf_range(-0.65, 0.65)
+	var trunk: Array = []
+	var radii: Array = []
+	for k in range(9):
+		var t: float = float(k) / 8.0
+		var y: float = lerpf(-0.9, h - 0.8, t)
+		var bend: float = sin(t * PI * 1.35 + float(variant) * 1.2) * (0.15 + 0.85 * t)
+		trunk.append(Vector3(sway_x * bend, y, sway_z * bend))
+		var flare: float = 1.0 + 0.42 * (1.0 - smoothstep(0.0, 0.14, t))
+		radii.append(r0 * lerpf(1.0, 0.16, pow(t, 0.88)) * flare)
+	# Lower trunk (indices 0..4)
+	base_i = bark_tube(st, base_i, trunk.slice(0, 5), radii.slice(0, 5), 8 if lod == 0 else 5, lower_bark, 0.38, shade)
+	# Upper reddish trunk (indices 4..8, overlapping joint 4)
+	base_i = bark_tube(st, base_i, trunk.slice(4, 9), radii.slice(4, 9), 8 if lod == 0 else 5, upper_bark, 0.36, shade)
+
+	# A couple of weathered dead snag stubs just below the live crown (near LOD only).
+	if lod == 0:
+		for s in range(3):
+			var sy: float = h * (0.34 + 0.05 * float(s)) + rng.randf_range(-0.3, 0.3)
+			var sa: float = rng.randf() * TAU
+			var sdir := Vector3(cos(sa), rng.randf_range(-0.18, 0.05), sin(sa)).normalized()
+			var sp0: Vector3 = _trunk_at(trunk, sy)
+			var sp1: Vector3 = sp0 + sdir * rng.randf_range(0.9, 1.6)
+			base_i = bark_tube(st, base_i, [sp0, sp1], [0.09, 0.03], 4, lower_bark.darkened(0.15), 0.3, shade)
+
+	var leaf_st := SurfaceTool.new()
+	leaf_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var lb := 0
+	var tint := Color(0.80, 0.90, 0.74)
+
+	# Tiered spreading limbs in the upper half + crown umbrella pads at the summit.
+	var n_limbs := 8 if lod == 0 else 6
+	for l in range(n_limbs):
+		var lt: float = float(l) / float(n_limbs - 1)
+		var attach_y: float = lerpf(under, h - 1.4, pow(lt, 0.85))
+		var a_pt: Vector3 = _trunk_at(trunk, attach_y)
+		var ang: float = float(l) * 2.39996 + float(variant) * 1.7 + rng.randf_range(-0.22, 0.22)
+		var dir := Vector3(cos(ang), 0.0, sin(ang))
+		var reach: float = cr * lerpf(0.92, 0.48, lt * lt) * rng.randf_range(0.86, 1.12)
+		var lift: float = lerpf(0.3, 1.35, lt) + rng.randf_range(-0.2, 0.25)
+		var elbow: Vector3 = a_pt + dir * (reach * 0.52) + Vector3(0.0, lift * 0.35 - 0.25, 0.0)
+		var tip: Vector3 = a_pt + dir * reach + Vector3(0.0, lift, 0.0)
+		var lr: float = r0 * lerpf(0.44, 0.22, lt)
+		base_i = bark_tube(st, base_i, [a_pt, elbow, tip], [lr, lr * 0.72, lr * 0.34], 6 if lod == 0 else 4, upper_bark, 0.34, shade)
+
+		# Needle pads at the limb tip and a secondary side pad off the elbow.
+		var pad_pts: Array = [tip, elbow.lerp(tip, 0.62) + dir.rotated(Vector3.UP, 0.55 if l % 2 == 0 else -0.55) * (reach * 0.32) + Vector3(0.0, 0.35, 0.0)]
+		for pi in range(pad_pts.size()):
+			var pc: Vector3 = pad_pts[pi]
+			var pad_scale: float = (1.0 if pi == 0 else 0.76) * lerpf(1.05, 0.78, lt)
+			if lod == 0 and pi > 0:
+				base_i = bark_tube(st, base_i, [elbow, pc], [lr * 0.55, lr * 0.24], 4, upper_bark, 0.32, shade)
+			var fan_n: int = (6 if pi == 0 else 4) if lod == 0 else (3 if pi == 0 else 2)
+			var rot0: float = ang + rng.randf_range(-0.3, 0.3)
+			for f in range(fan_n):
+				var fa: float = rot0 + lerpf(-1.15, 1.15, float(f) / float(maxi(fan_n - 1, 1)))
+				var fd := Vector3(cos(fa), 0.0, sin(fa))
+				var flen: float = (2.15 if lod == 0 else 2.6) * pad_scale * rng.randf_range(0.88, 1.12)
+				var fwid: float = flen * (0.72 if lod == 0 else 0.88)
+				var sh0: float = clampf(0.42 + 0.45 * lt, 0.38, 0.88)
+				lb = frond(leaf_st, lb, pc - fd * 0.35, fd, 0.22, 0.28, flen, fwid, 3 if lod == 0 else 2,
+						CELL_SPRUCE, tint, sh0, minf(sh0 + 0.28, 1.0), 0.26, fd)
+			# Crown cards on top of each pad so the foliage reads dense from every angle.
+			var n_cards: int = (6 if pi == 0 else 4) if lod == 0 else (3 if pi == 0 else 2)
+			var c_size := Vector2(1.85, 2.45) * pad_scale * (1.0 if lod == 0 else 1.32)
+			lb = cluster_cards(leaf_st, lb, pc + Vector3(0.0, 0.35, 0.0), 1.25 * pad_scale, n_cards, c_size,
+					crown_c, cr, under, h, CELL_SPRUCE, tint, rng, 0.0)
+
+	# Domed top umbrella cap at the leader apex.
+	var top_pt: Vector3 = trunk[trunk.size() - 1] + Vector3(0.0, 0.4, 0.0)
+	var top_fans: int = 7 if lod == 0 else 4
+	for f in range(top_fans):
+		var fa2: float = TAU * float(f) / float(top_fans) + rng.randf_range(-0.2, 0.2)
+		var fd2 := Vector3(cos(fa2), 0.0, sin(fa2))
+		lb = frond(leaf_st, lb, top_pt, fd2, 0.35, 0.30, 2.2, 1.65, 3 if lod == 0 else 2,
+				CELL_SPRUCE, tint.lightened(0.06), 0.78, 1.0, 0.24, fd2)
+	lb = cluster_cards(leaf_st, lb, top_pt + Vector3(0.0, 0.45, 0.0), 1.6, 7 if lod == 0 else 4,
+			Vector2(2.1, 2.7) * (1.0 if lod == 0 else 1.3), crown_c, cr, under, h + 1.0,
+			CELL_SPRUCE, tint.lightened(0.05), rng, 0.0)
+
+	var mesh: ArrayMesh = st.commit()
+	mesh.surface_set_material(0, bark_mat)
+	leaf_st.commit(mesh)
+	mesh.surface_set_material(1, leaf_mat)
+	return mesh
+
+
+## A subalpine silver fir (Abies lasiocarpa): a tall, narrow spire with horizontal layered platters
+## of cool blue-green needles (distinct from Lakeside's wide, drooping Norway spruce).
+func fir_mesh(variant: int, lod: int, bark_mat: Material, leaf_mat: Material) -> ArrayMesh:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 9191 + variant * 113
+	var h: float = float(FIR["h"]) * rng.randf_range(0.88, 1.12)
+	var r0: float = float(FIR["r"])
+	var base_r: float = float(FIR["base_r"]) * rng.randf_range(0.88, 1.08)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var bark: Color = BARKS["fir"][5]
+	var trunk: Array = []
+	var radii: Array = []
+	for k in range(7):
+		var t: float = float(k) / 6.0
+		trunk.append(Vector3(sin(t * 2.5 + variant) * 0.04, lerpf(-0.8, h - 0.25, t), cos(t * 2.2) * 0.04))
+		radii.append(r0 * lerpf(1.0, 0.07, t) * (1.0 + 0.30 * (1.0 - smoothstep(0.0, 0.12, t))))
+	bark_tube(st, 0, trunk, radii, 8 if lod == 0 else 5, bark, 0.35, Vector2(h * 0.28, h * 0.72))
+
+	var leaf_st := SurfaceTool.new()
+	leaf_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var lb := 0
+	var whorls: int = int(FIR["whorls"]) if lod == 0 else 15
+	var per: int = int(FIR["per_whorl"])
+	var y0: float = 2.0
+	var tint := Color(0.74, 0.90, 0.86)
+	for w in range(whorls):
+		var t: float = float(w) / float(whorls - 1)
+		var y: float = lerpf(y0, h - 0.9, 1.0 - pow(1.0 - t, 1.25)) + rng.randf_range(-0.14, 0.14) * (1.0 - t)
+		# Narrow, columnar-conical taper with crisp horizontal tier spacing.
+		var reach: float = base_r * pow(1.0 - t * 0.92, 0.85) + 0.45
+		var n: int = per if lod == 0 else 6
+		var rot: float = float(w) * 1.15 + rng.randf_range(-0.2, 0.2)
+		for b in range(n):
+			var a: float = rot + TAU * float(b) / float(n) + rng.randf_range(-0.18, 0.18)
+			var dir := Vector3(cos(a), 0.0, sin(a))
+			var length: float = reach * rng.randf_range(0.88, 1.08)
+			var width: float = length * (0.66 if lod == 0 else 0.82)
+			var sh0: float = lerpf(0.42, 0.82, t)
+			var by: float = y + rng.randf_range(-0.1, 0.1)
+			# Fir branches sweep slightly upward at their tips rather than weeping downward.
+			var rise: float = lerpf(0.08, 0.48, t) + rng.randf_range(-0.05, 0.08)
+			var droop: float = lerpf(0.18, -0.08, t)
+			lb = frond(leaf_st, lb, Vector3(0, by, 0) + dir * 0.08, dir, rise, droop,
+					length, width, 4 if lod == 0 else 2, CELL_SPRUCE, tint, sh0, minf(sh0 + 0.32, 1.0), 0.28, dir)
+			if t < 0.82 and (lod == 0 or b % 2 == 0):
+				var d2: Vector3 = dir.rotated(Vector3.UP, PI / float(n))
+				lb = frond(leaf_st, lb, Vector3(0, y - 0.35, 0) + d2 * 0.08, d2, 0.04, 0.22,
+						length * 0.68, width * 0.82, 3 if lod == 0 else 2, CELL_SPRUCE, tint.darkened(0.10), sh0 * 0.82, sh0 + 0.16, 0.26, d2)
+	var spire := [[h - 2.3, 5, 1.25, 1.0, -0.15, 1.9], [h - 1.5, 5, 0.92, 1.18, -0.2, 1.45], [h - 0.85, 4, 0.65, 1.32, -0.18, 1.05], [h - 0.35, 3, 0.38, 1.42, -0.12, 0.7]]
+	for ring in spire:
+		var rot2: float = rng.randf() * TAU
+		for k in range(int(ring[1])):
+			var a2: float = rot2 + TAU * float(k) / float(ring[1])
+			var dir2 := Vector3(cos(a2), 0.0, sin(a2))
+			lb = frond(leaf_st, lb, Vector3(0, ring[0], 0) + dir2 * 0.04, dir2, ring[3], ring[4], ring[5], ring[2], 3 if lod == 0 else 2, CELL_SPRUCE, tint.lightened(0.05), 0.82, 1.0, 0.26, dir2)
+	var mesh: ArrayMesh = st.commit()
+	mesh.surface_set_material(0, bark_mat)
+	leaf_st.commit(mesh)
+	mesh.surface_set_material(1, leaf_mat)
+	return mesh
+
+
+## An alpine larch (Larix decidua): an open, airy mountain conifer with sunlit golden-green / warm
+## olive needle sprays and visible woody branches.
+func larch_mesh(variant: int, lod: int, bark_mat: Material, leaf_mat: Material) -> ArrayMesh:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 6262 + variant * 127
+	var h: float = float(LARCH["h"]) * rng.randf_range(0.88, 1.12)
+	var r0: float = float(LARCH["r"])
+	var base_r: float = float(LARCH["base_r"]) * rng.randf_range(0.90, 1.10)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var base_i := 0
+	var bark: Color = BARKS["larch"][5]
+	var trunk: Array = []
+	var radii: Array = []
+	for k in range(8):
+		var t: float = float(k) / 7.0
+		trunk.append(Vector3(sin(t * 3.8 + variant) * 0.22 * t, lerpf(-0.8, h - 0.4, t), cos(t * 3.1 + variant) * 0.22 * t))
+		radii.append(r0 * lerpf(1.0, 0.09, t) * (1.0 + 0.36 * (1.0 - smoothstep(0.0, 0.14, t))))
+	base_i = bark_tube(st, base_i, trunk, radii, 8 if lod == 0 else 5, bark, 0.36, Vector2(h * 0.32, h * 0.78))
+
+	var leaf_st := SurfaceTool.new()
+	leaf_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var lb := 0
+	var whorls: int = int(LARCH["whorls"]) if lod == 0 else 11
+	var per: int = int(LARCH["per_whorl"])
+	var y0: float = 3.0
+	var tint := Color(1.06, 1.03, 0.70)
+	for w in range(whorls):
+		var t: float = float(w) / float(whorls - 1)
+		var y: float = lerpf(y0, h - 1.1, 1.0 - pow(1.0 - t, 1.28)) + rng.randf_range(-0.25, 0.25) * (1.0 - t)
+		var reach: float = base_r * (1.0 - t * 0.88) + 0.55
+		var n: int = per if lod == 0 else 5
+		var rot: float = rng.randf() * TAU
+		var a_pt: Vector3 = _trunk_at(trunk, y)
+		for b in range(n):
+			var a: float = rot + TAU * float(b) / float(n) + rng.randf_range(-0.32, 0.32)
+			var dir := Vector3(cos(a), 0.0, sin(a))
+			var length: float = reach * rng.randf_range(0.82, 1.14)
+			var width: float = length * (0.64 if lod == 0 else 0.80)
+			var sh0: float = lerpf(0.48, 0.86, t)
+			if lod == 0 and w % 2 == 0 and b % 2 == 0 and t < 0.78:
+				var tip_b: Vector3 = a_pt + dir * (length * 0.65) + Vector3(0.0, -0.25 + 0.4 * t, 0.0)
+				base_i = bark_tube(st, base_i, [a_pt, tip_b], [0.07 * (1.0 - 0.6 * t), 0.025], 4, bark, 0.32, Vector2(y0, h))
+			var w_tint := Color(tint.r * rng.randf_range(0.95, 1.05), tint.g * rng.randf_range(0.95, 1.04), tint.b * rng.randf_range(0.90, 1.06))
+			lb = frond(leaf_st, lb, a_pt + dir * 0.08, dir, rng.randf_range(0.05, 0.35) + t * 0.35, rng.randf_range(0.45, 0.80) * (1.0 - t * 0.45),
+					length, width, 4 if lod == 0 else 2, CELL_SPRUCE, w_tint, sh0, minf(sh0 + 0.32, 1.0), 0.30, dir)
+	var spire := [[h - 2.1, 4, 1.2, 0.95, -0.1, 1.8], [h - 1.2, 4, 0.85, 1.18, -0.15, 1.3], [h - 0.5, 3, 0.5, 1.35, -0.1, 0.85]]
+	for ring in spire:
+		var rot2: float = rng.randf() * TAU
+		for k in range(int(ring[1])):
+			var a2: float = rot2 + TAU * float(k) / float(ring[1])
+			var dir2 := Vector3(cos(a2), 0.0, sin(a2))
+			lb = frond(leaf_st, lb, _trunk_at(trunk, float(ring[0])) + dir2 * 0.04, dir2, ring[3], ring[4], ring[5], ring[2], 3 if lod == 0 else 2, CELL_SPRUCE, tint.lightened(0.06), 0.84, 1.0, 0.28, dir2)
+	var mesh: ArrayMesh = st.commit()
+	mesh.surface_set_material(0, bark_mat)
+	leaf_st.commit(mesh)
+	mesh.surface_set_material(1, leaf_mat)
+	return mesh
+
+
+## A dwarf mountain pine / alpine juniper shrub (Pinus mugo): low, sprawling woody stems carrying
+## dense cushions of dark-green conifer needles.
+func alpine_shrub_mesh(variant: int, bark_mat: Material, leaf_mat: Material) -> ArrayMesh:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5353 + variant * 47
+	var r: float = 2.1 + float(variant) * 0.45
+	var hgt: float = 2.1 + float(variant) * 0.45
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var leaf_st := SurfaceTool.new()
+	leaf_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var bi := 0
+	var lb := 0
+	var bark: Color = BARKS["pine"][5]
+	var crown_c := Vector3(0.0, hgt * 0.48, 0.0)
+	var tint := Color(0.76, 0.88, 0.72)
+	for k in range(8):
+		var a: float = TAU * float(k) / 8.0 + rng.randf_range(-0.28, 0.28)
+		var dir := Vector3(cos(a), 0.0, sin(a))
+		var reach: float = r * rng.randf_range(0.60, 0.95)
+		var top_y: float = hgt * rng.randf_range(0.65, 1.0)
+		var mid: Vector3 = dir * (reach * 0.55) + Vector3(0.0, top_y * 0.35, 0.0)
+		var tip: Vector3 = dir * reach + Vector3(0.0, top_y, 0.0)
+		bi = bark_tube(st, bi, [dir * 0.08 + Vector3(0.0, -0.35, 0.0), mid, tip], [0.065, 0.048, 0.022], 4, bark, 0.3, Vector2(0.0, hgt))
+		for j in range(2):
+			var cpos: Vector3 = mid.lerp(tip, 0.50 + 0.50 * float(j)) + Vector3(rng.randf_range(-0.22, 0.22), 0.1, rng.randf_range(-0.22, 0.22))
+			lb = cluster_cards(leaf_st, lb, cpos, r * 0.36, 5, Vector2(r * 0.68, r * 0.88), crown_c, r, 0.0, hgt * 1.1,
+					CELL_SPRUCE, tint, rng)
 	var mesh: ArrayMesh = st.commit()
 	mesh.surface_set_material(0, bark_mat)
 	leaf_st.commit(mesh)
