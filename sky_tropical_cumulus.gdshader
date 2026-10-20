@@ -26,6 +26,10 @@ uniform vec3 sun_tint : source_color = vec3(1.0, 0.95, 0.84);
 // Angular radius of the sun disc, degrees.
 uniform float sun_disc_degrees = 1.0;
 uniform float sun_glow = 0.5;
+// A warm glow along the horizon on the sun's side, as in a late afternoon (0 = none; Msitu Falls has none).
+uniform vec3 sun_horizon_tint : source_color = vec3(1.0, 0.80, 0.55);
+uniform float sun_horizon_glow : hint_range(0.0, 1.0) = 0.0;
+uniform float sun_horizon_height : hint_range(0.02, 0.6) = 0.22;
 
 group_uniforms clouds;
 uniform vec3 cloud_lit : source_color = vec3(1.0, 0.98, 0.94);
@@ -137,5 +141,11 @@ void sky() {
 	}
 
 	col = mix(col, horizon_haze, haze_strength * (1.0 - smoothstep(0.0, haze_height, abs(h))));
+	if (sun_horizon_glow > 0.0 && h > -0.05) {
+		// Strongest low in the sun's direction, fading round the sky and up.
+		float az = max(dot(normalize(d.xz + vec2(0.0001)), normalize(sun_flat)), 0.0);
+		float band = 1.0 - smoothstep(0.0, sun_horizon_height, max(h, 0.0));
+		col = mix(col, sun_tint * sun_horizon_tint, sun_horizon_glow * pow(az, 2.5) * band);
+	}
 	COLOR = col * sky_energy;
 }

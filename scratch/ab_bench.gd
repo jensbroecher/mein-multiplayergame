@@ -7,7 +7,7 @@ extends Node
 #        variant ...
 # Variants: base, storm (Northlight blizzard at full strength), noshadow, nolightshadow, noomni, nospot, nomoonshadow, sky=<shader path>,
 #           hide=<path substring>, unshadow=<path substring> (shadow off on matching lights), cheapmat=<path substring> (unshaded grey on matching meshes),
-#           quality=<0..4> (vegetation detail, MusicManager's Off..Ultra; the base runs at the level's default).
+#           quality=<0..4> (detail level, MusicManager's Off..Ultra; the base runs at the level's default).
 # Several toggles can be combined into one variant with '+', e.g. nolightshadow+sky=res://x.gdshader.
 
 var level_path := ""

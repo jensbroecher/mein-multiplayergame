@@ -54,7 +54,7 @@ func _ready() -> void:
 			for wname in ["NorthlightWeather", "JungleRain"]:
 				if level.get_node_or_null(wname):
 					level.get_node(wname).force_intensity = float(a.substr(8))
-	# quality=<0..4> pins the vegetation detail (MusicManager's Off..Ultra) instead of Auto.
+	# quality=<0..4> pins the detail level (MusicManager's Off..Ultra) instead of Auto.
 	for a in args.slice(2):
 		if a.begins_with("quality="):
 			MusicManager.set_grass_setting(int(a.substr(8)) + 1, false)

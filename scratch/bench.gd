@@ -10,7 +10,7 @@ const MeshChunker = preload("res://MeshChunker.gd")
 
 var level_path := ""
 var samples := 24
-## Vegetation detail pinned to MusicManager's Off..Ultra (0..4); -1 leaves the player's setting.
+## Detail level pinned to MusicManager's Off..Ultra (0..4); -1 leaves the player's setting.
 var quality := -1
 var render_scale := 1.0
 var shadow_q := 3

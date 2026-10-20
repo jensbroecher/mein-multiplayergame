@@ -29,15 +29,15 @@ var anti_aliasing: int = 2 # 0: Disabled, 1: 2x MSAA, 2: 4x MSAA, 3: 8x MSAA, 4:
 var shadows_enabled: bool = false
 ## 0=Off 1=Low 2=Medium 3=High — controls map size, soft filter, and light splits.
 var shadow_quality_index: int = 0
-## 0=Auto (default), 1=Off, 2=Low, 3=Medium, 4=High, 5=Ultra. Covers all vegetation detail:
-## the grass, and on stages with more (Msitu Falls' rainforest) whatever listens in the
-## "vegetation_detail" group.
+## 0=Auto (default), 1=Off, 2=Low, 3=Medium, 4=High, 5=Ultra. The Detail Level setting: the
+## grass, and on stages with more (Msitu Falls' rainforest, Nyota Stadium's crowd) whatever
+## listens in the "vegetation_detail" group.
 var grass_quality_setting: int = 0
 ## 0=Off 1=Low 2=Medium 3=High 4=Ultra — active runtime quality applied to meshes and shaders.
 var grass_quality_index: int = 4
 var _auto_grass_warmup: float = 3.0
 var _low_fps_duration: float = 0.0
-## Auto vegetation detail: GPU time and frames gathered since the last evaluation, how long the
+## Auto detail level: GPU time and frames gathered since the last evaluation, how long the
 ## frame has run over budget / with room to spare, and how long upgrades stay blocked after a
 ## downgrade (so the detail does not see-saw).
 var _auto_gpu_sum: float = 0.0
@@ -954,7 +954,7 @@ func set_grass_quality(index: int, save: bool = true) -> void:
 	if save:
 		save_settings()
 
-## Auto vegetation detail. Steps down one level when the frame runs over budget for a moment,
+## Auto detail level. Steps down one level when the frame runs over budget for a moment,
 ## and back up when the GPU has had plenty of room to spare for a while. Headroom is read from
 ## the main viewport's measured GPU time, so it shows even when the frame rate is capped; where
 ## the renderer can't measure it, only an uncapped frame rate well over the target counts.
@@ -1003,7 +1003,7 @@ func _check_auto_grass_quality(delta: float) -> void:
 		_auto_over += window
 		_auto_spare = 0.0
 		if _auto_over >= AUTO_DOWN_AFTER and grass_quality_index > AUTO_MIN_QUALITY:
-			print("[MusicManager] Auto vegetation detail: %d FPS, GPU %.1fms of %.1fms. Down to %s." % [
+			print("[MusicManager] Auto detail level: %d FPS, GPU %.1fms of %.1fms. Down to %s." % [
 				int(fps), gpu_ms, budget_ms, GRASS_QUALITY_NAMES[grass_quality_index - 1]])
 			set_grass_quality(grass_quality_index - 1, false)
 			_auto_over = 0.0
@@ -1013,7 +1013,7 @@ func _check_auto_grass_quality(delta: float) -> void:
 		_auto_spare += window
 		_auto_over = 0.0
 		if _auto_spare >= AUTO_UP_AFTER and _auto_block_up <= 0.0 and grass_quality_index < AUTO_MAX_QUALITY:
-			print("[MusicManager] Auto vegetation detail: %d FPS, GPU %.1fms of %.1fms. Up to %s." % [
+			print("[MusicManager] Auto detail level: %d FPS, GPU %.1fms of %.1fms. Up to %s." % [
 				int(fps), gpu_ms, budget_ms, GRASS_QUALITY_NAMES[grass_quality_index + 1]])
 			set_grass_quality(grass_quality_index + 1, false)
 			_auto_spare = 0.0

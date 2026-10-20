@@ -42,7 +42,7 @@ const BARKS := {
 }
 
 ## The canopy crossfades from the detailed trees to their stand-ins round TREE_NEAR (JungleDetail.gd
-## moves it with the vegetation detail setting).
+## moves it with the detail level setting).
 const TREE_NEAR := 115.0
 const TREE_FADE := 40.0
 const TREE_FADE_JITTER := 12.0

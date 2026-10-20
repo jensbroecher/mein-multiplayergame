@@ -1,6 +1,6 @@
 # JungleDetail.gd
 #
-# Scales Msitu Falls' rainforest to the machine, following the Vegetation Detail setting
+# Scales Msitu Falls' rainforest to the machine, following the Detail Level setting
 # (MusicManager.grass_quality_index: 0 Off .. 4 Ultra; in Auto it moves with the frame time). The
 # level keeps the forest at its richest; this hides what a level of detail doesn't draw:
 #   - the understory (Plants_*): a share of each cell's instances, and how far it is drawn

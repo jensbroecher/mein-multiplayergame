@@ -5587,7 +5587,7 @@ func _build_inland(level: Node3D) -> void:
 	_camp = CampKit.new(_pk)
 	var root := Node3D.new()
 	root.name = "DuneCamps"
-	# Scales the grass, rocks and bent palms to the Vegetation Detail setting at runtime.
+	# Scales the grass, rocks and bent palms to the Detail Level setting at runtime.
 	root.set_script(load("res://DuneDetail.gd"))
 	level.add_child(root)
 	var ground := func(x: float, z: float) -> float:

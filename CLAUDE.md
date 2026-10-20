@@ -67,7 +67,7 @@ the others re-bakes it (see Lakeside Course below).
   clears the pads (`_reset_lakeside_template`).
 - The woods are `WoodlandBuilder.gd`: oak, lime, birch, spruce and hazel, Msitu Falls' technique (bark
   tubes, leaf-spray cards with the crown's normals, near/far crossfade), with `JungleDetail.gd` scaling them
-  by vegetation detail. A broadleaf grows from its crown inward: clusters in the crown's shell, grouped into
+  by detail level. A broadleaf grows from its crown inward: clusters in the crown's shell, grouped into
   limbs, pipe-model radii. Each kind keeps its crown off the road (`TREE_ROAD_CLEAR`); trunks within 40m of
   the road are solid. `res://scratch/woodland_preview.gd` (`-s`, windowed) renders every tree on a flat
   meadow in seconds. Boulders use `granite_rock.gdshader` with a mossy foot.
@@ -373,8 +373,8 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 - Sponsor artwork can't be drawn headless, so `StadiumAds.gd` draws it into an atlas at load (fictional
   sponsors only). `stadium_boards.gdshader` reads it: `COLOR.r` picks the advert, `COLOR.g` marks LED
   boards that cycle. `_sign()` builds a panel whose text reads left to right from its front.
-- The crowd is one card per spectator (`stadium_crowd.gdshader` draws the figure; pose, shirt and skin
-  are in `INSTANCE_CUSTOM`), in a MultiMesh per 60m cell, casting no shadow.
+- The crowd (`_build_crowd`): every spectator is a card (far) and, near the lap, also a 3D figure (near). See
+  "The crowd" below.
 - `city_ground.gdshader` paints the street grid that `_build_city` fills with blocks (`STREET_X0`,
   `BLOCK_X`, ... must match). `city_building.gdshader` draws the facades; `COLOR.a` is 0 for a block,
   0.25 for a low block with a painted iron roof, 1 for a glass tower. The jacarandas reuse Mara
@@ -448,12 +448,69 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   now every window has a margin at the corner, a glass tower's panel grid (two panels a bay) lands a mullion on
   it, and the counts carry on from wall to wall so each wall still gets its own random windows. A Builder
   only writes UV2 if `tri2` was used.
+- The windows of the city's buildings (`city_building.gdshader`) look like glass without a real reflection: the
+  panes are dark with a tint (blue, green, bronze or grey) and low roughness, which gives the sun's glint from
+  the real specular, and the reflected sky is a made-up one in EMISSION: `reflected_sky(reflect(-view, normal))`,
+  a gradient to the horizon with a couple of noise reads for cloud puffs and a darker ground below it, scaled by
+  a Fresnel term (`refl_base` face-on, up to 1 at a grazing angle), brighter toward the top of each pane, and
+  dimmer in a fifth of them (a dark room). Panes behind a curtain stay dull. The glass towers' curtain wall gets
+  the same, stronger. It costs a few noise reads on window pixels within the detail range. `refl_top`,
+  `refl_horizon`, `refl_ground` and `refl_cloud` are set from the sky's colours in `_build_city`: change the sky
+  and change them too. (Giving the panes a metallic albedo to reflect the sky's radiance map gave pale flat
+  colour, since from above they only reflect the haze and the ground.)
+- The sky (`_build_environment`) is `sky_tropical_cumulus.gdshader` (Msitu Falls' shader) set for a Nairobi
+  afternoon: a deep clean-air blue overhead, big heaped cumulus (`cloud_coverage` 0.58, `cloud_scale` 1.15) with
+  blue-grey bases, a dusty haze along the horizon matching the fog (`HAZE`) and a warm glow on the sun's side
+  (`sun_horizon_glow`, a uniform that is 0 for Msitu). The cirrus sky was Frostpeak Creek's.
 - The Jumbotron (`_build_screens`, `Jumbotron.gd`): its frame is tilted with the screen (`rotation.x`, 6
   degrees). The screen leans back, so with an upright frame the quad's upper half sank behind the frame's front
   face and only the bottom 56% of the picture showed, a black bar over it. Glacier Highway tilts its housing
   with its panel, which is why that one was fine. `res://scratch/nyota_live_shot.tscn -- <dir> wait=20 jumbo_dump`
   saves what the screen's own camera sees (`jumbo_view.png`) apart from how the quad shows it, which tells a
   camera problem from a mapping or occlusion one.
+
+## The crowd (Nyota Stadium)
+
+- A spectator is two things drawn from one `INSTANCE_CUSTOM` (`crowd_common.gdshaderinc`: r a seed, g the skin
+  draw, b the pose `(id + 0.5) / 16`, a a second seed and the animation phase), so it is the same person at both
+  distances: a **card** (`stadium_crowd.gdshader`, a flat figure drawn in the shader, the old look, now with legs)
+  and, within reach of the lap, a **3D figure** (`CrowdKit.gd` mesh, `stadium_person.gdshader`). They swap by dither
+  between 34 and 44m (`tree_lod.gdshaderinc`: `lod_mode` 1 on the figure, 2 on the card).
+- `CrowdKit.gd` is one mesh (about 1.4k triangles, 800 of them drawn) in a standing rest pose at 1.86 times life
+  size (3.3m, the stands' scale), carrying every hair style, a dress and the props. Per vertex: COLOR the part
+  (limb), region (skin, shirt, trousers, ...) and style (which hair or prop); UV/UV2 the limb's two joints (they all
+  lie in the plane z = 0) or a head part's head-unit position. The vertex shader bends the joints per pose, hides
+  the styles a spectator doesn't have (`VERTEX = vec3(0)`), and the fragment shader paints the face (eyes, brows,
+  nose, mouth, ears, stubble, sunglasses). Its constants (`HEAD_C`, `HEAD_R`, `HIP_Y`) repeat CrowdKit's.
+- The 16 poses (0-6 seated: idle, clap, film, talk, arms crossed, cheer, drink; 7-15 standing: idle, clap, cheer,
+  film, arms crossed, flag, hands on hips, wave, drink) are tables in `stadium_person.gdshader` (`ARM_L`, `ARM_R`:
+  pitch, roll, elbow, yaw; `LEGS`), a forearm's direction from straight down being pitch + elbow. Not everyone
+  cheers: `POSE_*` in the generator are the odds (about 10% cheer, 17% in the main stand's middle).
+- The figure stands on y = 0; a seated one's pelvis drops to `SEAT_HIP` over it. In the stands the origin is the seat
+  cushion's top (`CROWD_SEAT_H`), so a standing fan stands on the seat; the people in the plazas, round the stalls
+  and in the yards behind the barriers (`standing_only` spots) stand on the ground and have legs.
+- Skin: about 80% African (dark to medium brown), the rest South Asian, European, East Asian, Arab or mixed
+  (`crowd_skin`). Hair is black and tight (short or an afro) in the African group; others vary. 6% are children
+  (`crowd_height`), and clothes have hoops, stripes, badges, long or short sleeves, dresses, caps and headscarves.
+- Cards: a pixel of a card is shaded however empty, and the stands are many cards deep, so there is a card shape
+  per pose class (`CROWD_CARDS`: seated, seated arms up, standing, standing arms up, standing with a flag; only
+  arms up need the wide ones). The per-person values are worked out once per card in `vertex()`, and `fragment()`
+  draws the outline first and discards outside it before choosing a colour. Seated cards stand 0.6m toward the
+  arena (`CROWD_CARD_FORWARD`) so their shins aren't hidden by the seat cushion; flat things that stand at the
+  seat's own depth lose their lower half to it.
+- Only spectators within `CROWD_NEAR_REACH` of the lap (in plan) get a figure, in 24m cells (`CrowdNear_*`) with a
+  visibility range. `CrowdDetail.gd` (group `vegetation_detail`, on the `Crowd` node) follows the Detail Level
+  setting: Off no figures (the cards at every distance), Low 24m, Medium 34m, High 44m, Ultra 57m. It sets
+  `lod_fade_begin`/`end` on every crowd material and the cells' range. The generator indexes the lap
+  (`_index_lap`) before the crowd for this.
+- Cost (M1, 1600x1000, `scratch/bench.tscn`): the 3D figures about 0.4ms, the cards about 1.5ms, of a 30ms frame at
+  the start grid; Ultra 0.5ms more than High. Bench runs on the M1 differ by up to 2x with the GPU's clock (one
+  "both hidden" run read 12ms against 30ms for the rest, and sent me looking for a 19ms card cost that wasn't
+  there): repeat a run before believing a big difference. In zsh a variable holding several `hide=` arguments
+  isn't split, so `hide=a hide=b` in one variable hides nothing.
+- `res://scratch/crowd_preview.gd` (`-s`, windowed) renders the figures in memory in a second: `-- <dir> [rows=3]
+  [seed=1] [cards=1] [skin=<g>] name:x,y,z:tx,ty,tz`, a column per pose 0..15 (2.6m apart), the cards in a row
+  behind with `cards=1`. `nyota_shots` takes `detail=N` to try a Detail Level.
 
 ## Camps (CampKit.gd: Lakeside Course and Bloombay Dunes)
 
@@ -591,7 +648,7 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
     with `TIME`. Grass and rocks cast no shadow. Tyre walls, barriers and flags are one mesh per corner or
     camp frontage with a `visibility_range_end` (`DRESS_RANGE`): one level-wide mesh can't be culled by
     distance, and measured 0.3ms of GPU on an M1 for no reason.
-  - `DuneDetail.gd` (on the `DuneCamps` node, group `vegetation_detail`) follows the Vegetation Detail
+  - `DuneDetail.gd` (on the `DuneCamps` node, group `vegetation_detail`) follows the Detail Level
     setting like `JungleDetail.gd`: it thins the grass, the rocks and the bent palms' cells
     (`visible_instance_count`, so the generator shuffles each cell's instances) and pulls their draw
     distance in. The level is built at the richest (Ultra) and guards against baking a level of detail into

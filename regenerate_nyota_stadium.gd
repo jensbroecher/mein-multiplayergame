@@ -48,6 +48,7 @@ const MeshChunker = preload("res://MeshChunker.gd")
 const PropKit = preload("res://PropKit.gd")
 const MatatuKit = preload("res://MatatuKit.gd")
 const StreetLampKit = preload("res://StreetLampKit.gd")
+const CrowdKit = preload("res://CrowdKit.gd")
 const MESH_CHUNK_CELL := 80.0
 
 ## The cart: PlayerCart.GRAVITY plus the engine's 9.8, its fall speed cap, sphere centre over the
@@ -1417,6 +1418,87 @@ func _concrete_material() -> StandardMaterial3D:
 # ======================================================================================
 
 const CROWD_CELL := 60.0
+## The 3D spectators are in smaller cells, so the ones too far to draw are culled with their cell.
+const CROWD_NEAR_CELL := 24.0
+## Only spectators this near the lap (in plan) ever get a 3D figure: the camera can't be nearer than that. It
+## covers Ultra's range (CrowdDetail.gd draws the figures out to 1.3 times CROWD_LOD_END).
+const CROWD_NEAR_REACH := 62.0
+## The card dithers into the 3D figure between these distances (tree_lod.gdshaderinc), jittered per spectator.
+const CROWD_LOD_BEGIN := 34.0
+const CROWD_LOD_END := 44.0
+const CROWD_LOD_JITTER := 3.0
+## Height of a seat's cushion over the tread: a seated spectator's pelvis is on it, a standing one's feet.
+const CROWD_SEAT_H := 0.84
+## The seated cards stand this far toward the arena, so their shins hang in front of the seat's cushion
+## instead of behind it.
+const CROWD_CARD_FORWARD := 0.6
+
+## Pose odds (crowd_common.gdshaderinc has the poses): seated 0-6, standing 7-15. Not everyone cheers: most sit
+## and watch, clap, film, talk or fold their arms.
+const POSE_SEATED := [0.34, 0.13, 0.12, 0.17, 0.08, 0.09, 0.07]
+const POSE_STANDING_FANS := [0.18, 0.13, 0.22, 0.10, 0.08, 0.05, 0.08, 0.10, 0.06]
+const POSE_STANDING_PLAZA := [0.26, 0.08, 0.05, 0.17, 0.12, 0.02, 0.14, 0.08, 0.08]
+
+
+## A pose id from `odds` (weights for poses first, first + 1, ...). `boost` multiplies one weight, the cheer.
+func _pick_pose(rng: RandomNumberGenerator, odds: Array, first: int, boost_at := -1, boost := 1.0) -> int:
+	var total := 0.0
+	for i in range(odds.size()):
+		total += float(odds[i]) * (boost if i == boost_at else 1.0)
+	var r: float = rng.randf() * total
+	for i in range(odds.size()):
+		r -= float(odds[i]) * (boost if i == boost_at else 1.0)
+		if r <= 0.0:
+			return first + i
+	return first
+
+
+func _crowd_material(mode: int, card_w := 1.1, card_h := 2.75, card_below := 0.9, card_x := 0.0) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = load("res://stadium_person.gdshader" if mode == 1 else "res://stadium_crowd.gdshader")
+	m.set_shader_parameter("lod_mode", mode)
+	m.set_shader_parameter("lod_fade_begin", CROWD_LOD_BEGIN)
+	m.set_shader_parameter("lod_fade_end", CROWD_LOD_END)
+	m.set_shader_parameter("lod_jitter", CROWD_LOD_JITTER)
+	if mode == 2:
+		m.set_shader_parameter("card_w", card_w)
+		m.set_shader_parameter("card_h", card_h)
+		m.set_shader_parameter("card_below", card_below)
+		m.set_shader_parameter("card_x", card_x)
+	return m
+
+
+## The card shapes, by the pose's class: [width, height, reach below the pelvis, x of its middle, y of its middle
+## in the spectator's frame]. A pixel of a card is shaded however empty it is, and the stands overlap many cards
+## deep, so each is as small as its pose allows: only arms up (and a flag) need the wide ones.
+##   0 seated   1 seated, arms up   2 standing   3 standing, arms up   4 standing with a flag
+const CROWD_CARDS := [
+	[1.1, 2.75, 0.9, 0.0, 0.475],
+	[2.1, 3.15, 0.9, 0.0, 0.675],
+	[1.1, 3.5, 1.65, 0.0, 1.75],
+	[2.1, 3.9, 1.65, 0.0, 1.95],
+	[3.0, 4.9, 1.65, -0.5, 2.45],
+]
+
+
+func _crowd_card_class(pose: int) -> int:
+	if pose == 5:
+		return 1
+	if pose == 9 or pose == 14:
+		return 3
+	if pose == 12:
+		return 4
+	return 2 if pose >= 7 else 0
+
+
+func _crowd_card_mesh(cls: int) -> QuadMesh:
+	var c: Array = CROWD_CARDS[cls]
+	var q := QuadMesh.new()
+	q.size = Vector2(float(c[0]), float(c[1]))
+	q.center_offset = Vector3(float(c[3]), float(c[4]), 0.0)
+	q.material = _crowd_material(2, float(c[0]), float(c[1]), float(c[2]), float(c[3]))
+	return q
+
 
 ## MultiMesh buffer with per-instance custom data (transform then INSTANCE_CUSTOM).
 func _custom_buffer(transforms: Array, customs: Array) -> PackedFloat32Array:
@@ -1446,19 +1528,24 @@ func _custom_buffer(transforms: Array, customs: Array) -> PackedFloat32Array:
 	return buf
 
 
-## One card per occupied seat, facing the arena, grouped into cells so the cameras cull them.
+## The crowd: every spectator is a card (far) and, near the lap, also a 3D figure (near); the two swap by
+## dither. Seated and standing ones have different cards (the standing ones reach the ground).
 func _build_crowd(parent: Node, spots: Array, extra: Array = []) -> void:
-	var card := QuadMesh.new()
-	card.size = Vector2(1.1, 2.6)
-	card.center_offset = Vector3(0.0, 1.3, 0.0)
-	var mat := ShaderMaterial.new()
-	mat.shader = load("res://stadium_crowd.gdshader")
-	card.material = mat
+	var card_meshes: Array = []
+	for cls in range(CROWD_CARDS.size()):
+		card_meshes.append(_crowd_card_mesh(cls))
+	var person_mesh: ArrayMesh = CrowdKit.new().build()
+	person_mesh.surface_set_material(0, _crowd_material(1))
+	person_mesh = _save_shared_resource(person_mesh, "crowd_person")
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 9021
 	var cells := {}
+	var near_cells := {}
 	var all: Array = spots.duplicate()
 	all.append_array(extra)
+	var near_count := 0
+	var standing_count := 0
+	var poses_used := {}
 	for sp in all:
 		var pos: Vector3 = sp[0]
 		var out3: Vector3 = sp[1]
@@ -1472,44 +1559,81 @@ func _build_crowd(parent: Node, spots: Array, extra: Array = []) -> void:
 		var x: Vector3 = Vector3.UP.cross(z).normalized()
 		var yaw_jit: float = rng.randf_range(-0.25, 0.25)
 		var bs := Basis(x, Vector3.UP, z).rotated(Vector3.UP, yaw_jit)
-		var base: Vector3 = pos + out3 * 0.2 + Vector3(0, 0.8, 0)
+		var hot: bool = absf(pos.x) < 60.0 and pos.z > 0.0
+		var pose: int
+		var origin: Vector3
 		if standing_only:
-			base = pos
-		var pr: float = rng.randf()
-		var pose: float = 0.2
-		var cheer_p: float = 0.12
-		if absf(pos.x) < 60.0 and pos.z > 0.0:
-			cheer_p = 0.3
-		if standing_only:
-			pose = 0.7 if pr > 0.35 else 0.95
-		elif pr < cheer_p:
-			pose = 0.95
-		elif pr < cheer_p + 0.16:
-			pose = 0.7
-		var cust := Color(rng.randf(), rng.randf(), pose, rng.randf())
-		var key := Vector2i(floori(pos.x / CROWD_CELL), floori(pos.z / CROWD_CELL))
+			pose = _pick_pose(rng, POSE_STANDING_PLAZA, 7)
+			origin = pos
+		else:
+			# A few stand in the stands, more in front of the main stand.
+			var up_p: float = 0.18 if hot else 0.11
+			if rng.randf() < up_p:
+				pose = _pick_pose(rng, POSE_STANDING_FANS, 7, 2, 1.4 if hot else 1.0)
+			else:
+				pose = _pick_pose(rng, POSE_SEATED, 0, 5, 1.8 if hot else 1.0)
+			origin = pos + out3 * 0.2 + Vector3(0.0, CROWD_SEAT_H, 0.0)
+		poses_used[pose] = int(poses_used.get(pose, 0)) + 1
+		var is_standing: bool = pose >= 7
+		if is_standing:
+			standing_count += 1
+		var cust := Color(rng.randf(), rng.randf(), (float(pose) + 0.5) / 16.0, rng.randf())
+		# The card: seated ones stand forward of the seat.
+		var card_origin: Vector3 = origin if is_standing else origin + z * CROWD_CARD_FORWARD
+		var key := Vector3i(floori(pos.x / CROWD_CELL), floori(pos.z / CROWD_CELL), _crowd_card_class(pose))
 		if not cells.has(key):
 			cells[key] = [[], []]
-		cells[key][0].append(Transform3D(bs, base))
+		cells[key][0].append(Transform3D(bs, card_origin))
 		cells[key][1].append(cust)
+		if _lap_distance(Vector2(pos.x, pos.z), CROWD_NEAR_REACH) < CROWD_NEAR_REACH:
+			var nkey := Vector2i(floori(pos.x / CROWD_NEAR_CELL), floori(pos.z / CROWD_NEAR_CELL))
+			if not near_cells.has(nkey):
+				near_cells[nkey] = [[], []]
+			near_cells[nkey][0].append(Transform3D(bs, origin))
+			near_cells[nkey][1].append(cust)
+			near_count += 1
 	var root := Node3D.new()
 	root.name = "Crowd"
+	root.set_script(load("res://CrowdDetail.gd"))
+	root.set("base_begin", CROWD_LOD_BEGIN)
+	root.set("base_end", CROWD_LOD_END)
+	root.set("jitter", CROWD_LOD_JITTER)
+	root.set("cell_reach", CROWD_NEAR_CELL)
 	parent.add_child(root)
 	var total := 0
 	for key in cells:
 		var mm := MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
 		mm.use_custom_data = true
-		mm.mesh = card
+		mm.mesh = card_meshes[key.z]
 		mm.instance_count = cells[key][0].size()
 		mm.buffer = _custom_buffer(cells[key][0], cells[key][1])
 		var mmi := MultiMeshInstance3D.new()
-		mmi.name = "Crowd_%d_%d" % [key.x, key.y]
+		mmi.name = "Crowd_%d_%d_%d" % [key.x, key.y, key.z]
 		mmi.multimesh = mm
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(mmi)
 		total += mm.instance_count
-	print("  crowd: %d spectators in %d cells" % [total, cells.size()])
+	var near_root := Node3D.new()
+	near_root.name = "CrowdNear"
+	root.add_child(near_root)
+	# A cell is drawn while its middle is within the fade's end plus the cell's reach, the dither doing the rest
+	# (CrowdDetail.gd moves this with the detail setting).
+	var near_range: float = CROWD_LOD_END + CROWD_LOD_JITTER + CROWD_NEAR_CELL
+	for key in near_cells:
+		var mm2 := MultiMesh.new()
+		mm2.transform_format = MultiMesh.TRANSFORM_3D
+		mm2.use_custom_data = true
+		mm2.mesh = person_mesh
+		mm2.instance_count = near_cells[key][0].size()
+		mm2.buffer = _custom_buffer(near_cells[key][0], near_cells[key][1])
+		var mmi2 := MultiMeshInstance3D.new()
+		mmi2.name = "CrowdNear_%d_%d" % [key.x, key.y]
+		mmi2.multimesh = mm2
+		mmi2.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mmi2.visibility_range_end = near_range
+		near_root.add_child(mmi2)
+	print("  crowd: %d spectators in %d cells (%d standing), %d with a 3D figure in %d cells" % [total, cells.size(), standing_count, near_count, near_cells.size()])
 
 
 # ======================================================================================
@@ -2219,6 +2343,11 @@ func _build_city(parent: Node) -> void:
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://city_building.gdshader")
 	mat.set_shader_parameter("concrete_tex", load("res://materials/concrete.png"))
+	# What the windows reflect: the sky's colours (see the sky in _build_environment).
+	mat.set_shader_parameter("refl_top", Color(0.07, 0.27, 0.68))
+	mat.set_shader_parameter("refl_horizon", Color(0.72, 0.84, 0.94))
+	mat.set_shader_parameter("refl_ground", Color(0.42, 0.40, 0.37))
+	mat.set_shader_parameter("refl_cloud", Color(1.0, 0.98, 0.95))
 	var count := 0
 	var ix0: int = int(floor((-CITY_RADIUS - STREET_X0) / BLOCK_X))
 	var ix1: int = int(ceil((CITY_RADIUS - STREET_X0) / BLOCK_X))
@@ -3399,23 +3528,29 @@ func _build_environment(level_scene: Node3D) -> void:
 	env.background_mode = Environment.BG_SKY
 	var sky := Sky.new()
 	var sky_mat := ShaderMaterial.new()
-	sky_mat.shader = load("res://sky_winter_cirrus.gdshader")
-	sky_mat.set_shader_parameter("sky_top", Color(0.20, 0.45, 0.80))
-	sky_mat.set_shader_parameter("sky_horizon", Color(0.80, 0.84, 0.86))
+	# A Nairobi afternoon at 1,800m: deep clean-air blue overhead, big heaped cumulus building up toward the
+	# horizon with flat blue-grey bases, a dusty cream haze along the horizon and a warm glow on the sun's side.
+	# (Msitu Falls has the same shader with a milky, humid look; the cirrus sky was Frostpeak Creek's.)
+	sky_mat.shader = load("res://sky_tropical_cumulus.gdshader")
+	sky_mat.set_shader_parameter("sky_top", Color(0.07, 0.27, 0.68))
+	sky_mat.set_shader_parameter("sky_horizon", Color(0.62, 0.78, 0.92))
 	sky_mat.set_shader_parameter("ground_horizon", Color(0.82, 0.76, 0.66))
 	sky_mat.set_shader_parameter("ground_bottom", Color(0.50, 0.45, 0.38))
-	sky_mat.set_shader_parameter("sky_curve", 0.3)
+	sky_mat.set_shader_parameter("sky_curve", 0.42)
 	sky_mat.set_shader_parameter("horizon_haze", HAZE)
-	sky_mat.set_shader_parameter("haze_strength", 0.7)
-	sky_mat.set_shader_parameter("haze_height", 0.16)
+	sky_mat.set_shader_parameter("haze_strength", 0.55)
+	sky_mat.set_shader_parameter("haze_height", 0.15)
 	sky_mat.set_shader_parameter("sun_tint", Color(1.0, 0.93, 0.80))
 	sky_mat.set_shader_parameter("sun_disc_degrees", 1.0)
 	sky_mat.set_shader_parameter("sun_glow", 0.5)
-	sky_mat.set_shader_parameter("cloud_lit", Color(1.0, 0.97, 0.92))
-	sky_mat.set_shader_parameter("cloud_shade", Color(0.70, 0.70, 0.74))
-	sky_mat.set_shader_parameter("cloud_coverage", 0.38)
-	sky_mat.set_shader_parameter("cloud_opacity", 0.65)
-	sky_mat.set_shader_parameter("cloud_seed", 23.7)
+	sky_mat.set_shader_parameter("sun_horizon_glow", 0.55)
+	sky_mat.set_shader_parameter("sun_horizon_tint", Color(1.0, 0.80, 0.55))
+	sky_mat.set_shader_parameter("cloud_lit", Color(1.0, 0.98, 0.95))
+	sky_mat.set_shader_parameter("cloud_shade", Color(0.46, 0.54, 0.70))
+	sky_mat.set_shader_parameter("cloud_coverage", 0.58)
+	sky_mat.set_shader_parameter("cloud_opacity", 0.97)
+	sky_mat.set_shader_parameter("cloud_scale", 1.15)
+	sky_mat.set_shader_parameter("cloud_seed", 12.3)
 	sky.sky_material = sky_mat
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
@@ -3542,6 +3677,8 @@ func _ready() -> void:
 	var seat_mat := _vertex_color_material(0.5)
 	var crowd_spots: Array = _build_stands(stadium, concrete, seat_mat)
 	print("  stands: %d seats" % crowd_spots.size())
+	# The crowd decides who gets a 3D figure by how near the lap they are.
+	_index_lap()
 	_build_crowd(stadium, crowd_spots, _corner_crowd_spots())
 	_build_boards(stadium)
 	_build_floodlights(stadium)

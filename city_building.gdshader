@@ -15,6 +15,14 @@ uniform float bay = 4.0;
 uniform float shop_h = 6.0;
 uniform vec4 sky_reflect : source_color = vec4(0.58, 0.70, 0.86, 1.0);
 uniform vec4 glass_dark : source_color = vec4(0.10, 0.13, 0.17, 1.0);
+// What the glass reflects: a made-up sky from the reflected direction (no real reflection is computed). The
+// generator sets these to the level's sky.
+uniform vec3 refl_top : source_color = vec3(0.14, 0.38, 0.80);
+uniform vec3 refl_horizon : source_color = vec3(0.80, 0.86, 0.93);
+uniform vec3 refl_ground : source_color = vec3(0.34, 0.32, 0.30);
+uniform vec3 refl_cloud : source_color = vec3(1.0, 0.98, 0.95);
+// How strongly the panes reflect face-on (the Fresnel term rises to 1 at a grazing angle).
+uniform float refl_base = 0.11;
 
 varying vec3 w_pos;
 varying vec3 w_nrm;
@@ -32,6 +40,24 @@ float hash21(vec2 p) {
 	return fract(p.x * p.y);
 }
 
+float vnoise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	vec2 u = f * f * (3.0 - 2.0 * f);
+	return mix(mix(hash21(i), hash21(i + vec2(1.0, 0.0)), u.x), mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+
+// The reflected sky: a gradient to the horizon with soft cloud puffs, and darker ground below it.
+vec3 reflected_sky(vec3 r) {
+	float h = r.y;
+	vec3 sky = mix(refl_horizon, refl_top, pow(clamp(h, 0.0, 1.0), 0.5));
+	vec2 uv = r.xz / (max(h, 0.0) + 0.3) * 1.6;
+	float cl = vnoise(uv * 1.3) * 0.65 + vnoise(uv * 2.9 + 7.0) * 0.35;
+	sky = mix(sky, refl_cloud, smoothstep(0.52, 0.78, cl) * 0.85 * smoothstep(0.0, 0.25, h));
+	vec3 ground = mix(refl_ground, refl_ground * 0.35, clamp(-h * 2.5, 0.0, 1.0));
+	return mix(ground, sky, smoothstep(-0.06, 0.06, h));
+}
+
 void fragment() {
 	vec3 paint = pow(vcol.rgb, vec3(2.2));
 	float cam_d = length(w_pos - CAMERA_POSITION_WORLD);
@@ -42,6 +68,11 @@ void fragment() {
 	vec3 col = paint * (0.8 + conc * 0.35);
 	float rough = 0.9;
 	float metal = 0.0;
+	vec3 emis = vec3(0.0);
+	float spec = 0.5;
+	vec3 view_w = normalize(CAMERA_POSITION_WORLD - w_pos);
+	vec3 refl_dir = reflect(-view_w, n);
+	float fresnel = refl_base + (1.0 - refl_base) * pow(1.0 - clamp(dot(n, view_w), 0.0, 1.0), 4.0);
 	if (n.y > 0.6) {
 		// Roofs: concrete on the blocks and towers; painted corrugated iron (mabati) on the low
 		// buildings, rusty red, green, blue or bare.
@@ -60,10 +91,13 @@ void fragment() {
 		vec2 f = fract(g);
 		float mull = step(0.06, f.x) * step(0.08, f.y);
 		float floor_v = hash21(vec2(floor(g.y), vcol.r * 13.0));
-		vec3 glass = mix(glass_dark.rgb, sky_reflect.rgb * paint * 1.6, 0.35 + 0.3 * floor_v);
+		// Dark glass, mirror-like: a reflected sky scaled by the Fresnel term (and a glint from the real specular).
+		vec3 tint = mix(vec3(0.05, 0.08, 0.12), vec3(0.04, 0.10, 0.09), step(0.55, hash21(vec2(floor(g.y), vcol.g * 29.0))));
+		vec3 glass = tint * (0.8 + 0.8 * floor_v) + paint * 0.04;
 		col = mix(paint * 0.6, glass, mull);
-		rough = mix(0.5, 0.12, mull);
-		metal = 0.3 * mull;
+		rough = mix(0.5, 0.04, mull);
+		spec = mix(0.5, 1.0, mull);
+		emis = reflected_sky(refl_dir) * clamp(fresnel * 1.5, 0.0, 1.0) * (0.7 + 0.5 * floor_v) * mull * detail;
 		col = mix(col, mix(glass_dark.rgb, sky_reflect.rgb, 0.4) * (0.8 + paint * 0.4), 1.0 - detail);
 	} else {
 		float y = UV.y;
@@ -85,8 +119,12 @@ void fragment() {
 			// Punched windows, a few with curtains or open; a ledge under every storey.
 			vec2 f = vec2(fract(UV.x / bay), fract((y - shop_h) / storey));
 			float win = step(0.22, f.x) * step(f.x, 0.78) * step(0.3, f.y) * step(f.y, 0.82);
-			vec3 glass = mix(glass_dark.rgb, sky_reflect.rgb * 0.7, 0.25 + 0.25 * rnd);
-			if (rnd > 0.8) {
+			// Glass: dark, with a tint (blue, green, bronze, grey), reflecting the sky. A pane with a curtain is dull.
+			float tint_pick = hash21(cellid * 1.7 + vcol.b * 53.0);
+			vec3 tint = tint_pick < 0.45 ? vec3(0.05, 0.09, 0.14) : (tint_pick < 0.70 ? vec3(0.04, 0.11, 0.10) : (tint_pick < 0.88 ? vec3(0.12, 0.09, 0.06) : vec3(0.08, 0.09, 0.10)));
+			vec3 glass = tint * (0.7 + 0.8 * rnd);
+			float curtain = step(0.8, rnd);
+			if (curtain > 0.5) {
 				glass = mix(glass, vec3(0.55, 0.30, 0.20) * (0.6 + rnd * 0.4), 0.6);
 			}
 			float frame = win * (1.0 - step(0.25, f.x) * step(f.x, 0.75) * step(0.33, f.y) * step(f.y, 0.79));
@@ -94,7 +132,14 @@ void fragment() {
 			col = mix(col, vec3(0.8), frame * detail * 0.6);
 			float ledge = step(0.0, f.y) * step(f.y, 0.05);
 			col *= 1.0 - ledge * 0.25 * detail;
-			rough = mix(rough, 0.2, win * detail);
+			// Reflective glass: low roughness for the sun's glint, and the reflected sky as emission, brighter
+			// toward the top of each pane (and brighter on some floors than others).
+			rough = mix(rough, mix(0.05, 0.6, curtain), win * detail);
+			spec = mix(spec, mix(1.0, 0.3, curtain), win * detail);
+			float pane_grad = mix(0.65, 1.15, smoothstep(0.3, 0.82, f.y));
+			// A fifth of the panes look into a dark room and reflect less.
+			float room = mix(1.0, 0.35, step(0.8, hash21(cellid * 5.3 + 1.0)));
+			emis = reflected_sky(refl_dir) * clamp(fresnel * 1.5, 0.0, 1.0) * pane_grad * (0.75 + 0.5 * hash21(cellid * 3.1 + 5.0)) * room * (1.0 - curtain * 0.9) * win * detail;
 			// Rain streaks down from the roof line, darker under the windows.
 			float streak = hash21(vec2(floor(UV.x * 1.3), vcol.g * 7.0));
 			col *= 1.0 - 0.12 * streak * (1.0 - win) * detail;
@@ -105,4 +150,6 @@ void fragment() {
 	ALBEDO = col;
 	ROUGHNESS = rough;
 	METALLIC = metal;
+	SPECULAR = spec;
+	EMISSION = emis;
 }

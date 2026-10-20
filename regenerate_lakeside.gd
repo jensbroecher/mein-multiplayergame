@@ -1784,7 +1784,7 @@ const TREE_ROAD_CLEAR := {"oak": 19.0, "lime": 17.0, "birch": 14.0, "spruce": 16
 const KINDS := ["oak", "lime", "birch", "spruce"]
 
 ## Woods on the hills and singles in the meadows: oak, lime, birch and spruce (WoodlandBuilder.gd),
-## in Msitu Falls' layers so JungleDetail.gd scales them with the vegetation detail: detailed trees
+## in Msitu Falls' layers so JungleDetail.gd scales them with the detail level: detailed trees
 ## near the camera crossfading into their stand-ins (Tree_, TreeFar_), shadow-only stand-ins for the
 ## detailed ones (TreeShadow_), the deep woods well off the road (TreeDeep_, TreeDeepFar_) and hazel
 ## along the woods' edges (Plants_). Trunks near the road are solid ("Tree" in the body's name: the

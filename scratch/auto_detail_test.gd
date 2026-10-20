@@ -1,6 +1,6 @@
 extends Node
 
-# Watches Auto vegetation detail (MusicManager) settle during a real spectator race: 6 AI carts,
+# Watches Auto detail level (MusicManager) settle during a real spectator race: 6 AI carts,
 # the spectator camera, the player's other graphics settings. Prints the level of detail, FPS and
 # the main viewport's GPU time every few seconds, and every step Auto takes. The setting is pinned
 # to Auto in memory only (nothing is saved). Run windowed:

@@ -1,6 +1,6 @@
 # DuneDetail.gd
 #
-# Scales Bloombay Dunes' inland dressing to the machine, following the Vegetation Detail setting
+# Scales Bloombay Dunes' inland dressing to the machine, following the Detail Level setting
 # (MusicManager.grass_quality_index: 0 Off .. 4 Ultra; in Auto it moves with the frame time), the way
 # JungleDetail.gd does for Msitu Falls. The level keeps the dunes at their richest; this hides what a
 # level of detail doesn't draw:
