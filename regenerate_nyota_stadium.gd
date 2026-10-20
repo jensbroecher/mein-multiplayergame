@@ -49,6 +49,7 @@ const PropKit = preload("res://PropKit.gd")
 const MatatuKit = preload("res://MatatuKit.gd")
 const StreetLampKit = preload("res://StreetLampKit.gd")
 const FoodTruckKit = preload("res://FoodTruckKit.gd")
+const MarketStallKit = preload("res://MarketStallKit.gd")
 const CrowdKit = preload("res://CrowdKit.gd")
 const MESH_CHUNK_CELL := 80.0
 
@@ -3650,28 +3651,41 @@ func _tent(b: Builder, pos: Vector3, size: float, col: Color) -> void:
 		b.quad(a2, d2, d2 - Vector3(0, 0.6, 0), a2 - Vector3(0, 0.6, 0), out4.normalized(), Color(0.95, 0.95, 0.93))
 
 
-## A market stall: a timber frame under a tarp, a table of goods.
-func _stall(b: Builder, pos: Vector3, yaw: float, tarp: Color, rng: RandomNumberGenerator) -> void:
-	var bs := Basis(Vector3.UP, yaw)
-	var w := 6.0
-	var d := 4.4
-	var wood := Color(0.42, 0.30, 0.18)
-	for sx in [-1.0, 1.0]:
-		for sz in [-1.0, 1.0]:
-			var hgt: float = 4.6 if sz < 0.0 else 3.8
-			b.box(pos + bs * Vector3(sx * w * 0.48, hgt * 0.5, sz * d * 0.48), Vector3(0.2, hgt, 0.2), yaw, wood)
-	var t0: Vector3 = pos + bs * Vector3(-w * 0.55, 4.7, -d * 0.55)
-	var t1: Vector3 = pos + bs * Vector3(w * 0.55, 4.7, -d * 0.55)
-	var t2: Vector3 = pos + bs * Vector3(w * 0.55, 3.9, d * 0.6)
-	var t3: Vector3 = pos + bs * Vector3(-w * 0.55, 3.9, d * 0.6)
-	b.quad(t0, t1, t2, t3, Vector3.UP, tarp)
-	b.quad(t0, t1, t2, t3, Vector3.DOWN, tarp * 0.75)
-	b.box(pos + bs * Vector3(0, 1.0, d * 0.15), Vector3(w * 0.9, 0.15, d * 0.6), yaw, wood)
-	var goods := [Color(0.85, 0.20, 0.10), Color(0.95, 0.75, 0.15), Color(0.25, 0.55, 0.20), Color(0.90, 0.50, 0.15), Color(0.55, 0.30, 0.55), Color(0.85, 0.85, 0.80)]
-	for k in range(6):
-		var gx: float = -w * 0.38 + float(k) * w * 0.15
-		var gs: float = rng.randf_range(0.6, 1.0)
-		b.box(pos + bs * Vector3(gx, 1.1 + gs * 0.35, d * 0.15 + rng.randf_range(-0.6, 0.6)), Vector3(0.75, gs * 0.7, 0.75), yaw + rng.randf(), goods[rng.randi() % goods.size()])
+const STALL_SCALE := 2.0
+var _stall_mats := {}
+
+
+## The market stalls of Soko Street (MarketStallKit, six trades, a few colourways): `spots` are
+## [position, yaw, kind, variant], the front toward +z of the stall's own frame. Built at STALL_SCALE like
+## everything else here (twice life size); the same mesh serves every stall of a trade and colourway.
+func _build_market_stalls(parent: Node, spots: Array) -> void:
+	var root := Node3D.new()
+	root.name = "MarketStalls"
+	parent.add_child(root)
+	var kit := PropKit.new()
+	kit.material_for = func(key: String) -> Material:
+		if not _stall_mats.has(key):
+			_stall_mats[key] = _save_shared_resource(MarketStallKit.make_stall_material(key), "stall_" + key)
+		return _stall_mats[key]
+	kit.set_frame(Transform3D(Basis().scaled(Vector3.ONE * STALL_SCALE), Vector3.ZERO))
+	var meshes := {}
+	var tris := 0
+	for k in range(spots.size()):
+		var sp: Array = spots[k]
+		var key := "%d_%d" % [sp[2], sp[3]]
+		if not meshes.has(key):
+			var mesh: ArrayMesh = MarketStallKit.new(kit).build_stall(int(sp[2]), int(sp[3]))
+			for si in range(mesh.get_surface_count()):
+				tris += (mesh.surface_get_arrays(si)[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
+			meshes[key] = _save_shared_resource(mesh, "stall_%s" % key)
+		var mi := MeshInstance3D.new()
+		mi.name = "Stall_%d" % k
+		mi.mesh = meshes[key]
+		mi.transform = Transform3D(Basis(Vector3.UP, float(sp[1])), sp[0])
+		mi.visibility_range_end = 380.0
+		mi.visibility_range_end_margin = 20.0
+		root.add_child(mi)
+	print("  market stalls: %d (%d meshes, %d triangles), the first at (%.0f, %.0f)" % [spots.size(), meshes.size(), tris, (spots[0][0] as Vector3).x, (spots[0][0] as Vector3).z])
 
 
 ## Everything round the stadium at street level: the fan zone in the east plaza (tents, food
@@ -3708,22 +3722,28 @@ func _build_precinct_dressing(parent: Node) -> Array:
 	for k in range(10):
 		matatu_spots.append([Vector3(214.0 + float(k % 5) * 18.0, STREET_Y, -95.0 - float(k / 5) * 22.0), park_rng.randf_range(-0.04, 0.04), park_liveries[k]])
 	_build_matatus(parent, matatu_spots)
-	# Soko Street: market stalls behind the barriers on both sides, people at them.
+	# Soko Street: market stalls behind the barriers on both sides, a seller at each and customers in front.
 	var s0: float = _s_at_z(SEG_SOKO, 152.0)
 	var s1: float = _s_at_z(SEG_SOKO, 92.0)
 	var ss: float = s0
+	var stall_spots: Array = []
+	var stall_i := 0
 	while ss < s1:
 		for side in [-1.0, 1.0]:
 			var sp: Dictionary = _spot(ss, side * (STREET_HALF + 6.2), 0.0)
 			var pos: Vector3 = sp["pos"]
 			pos.y = STREET_Y
 			var face: Vector3 = -sp["right"] * side
-			_stall(b, pos, atan2(face.x, face.z), tarps[rng.randi() % tarps.size()], rng)
+			stall_spots.append([pos, atan2(face.x, face.z), stall_i % 6, (stall_i / 6) % 3])
+			stall_i += 1
+			# The seller stands behind the counter, facing the street.
+			people.append([pos - face * 0.6 + sp["fwd"] * rng.randf_range(-0.8, 0.8), -face, 0, 0, true])
 			for k in range(3):
 				var pp2: Vector3 = pos + face * rng.randf_range(3.0, 4.5) + sp["fwd"] * rng.randf_range(-2.5, 2.5)
 				if _lap_distance(Vector2(pp2.x, pp2.z), 20.0) > STREET_HALF + 3.0:
-					people.append([pp2, -face, 0, 0, true])
+					people.append([pp2, face, 0, 0, true])
 		ss += 8.5
+	_build_market_stalls(parent, stall_spots)
 	# TV trucks and camera towers in the west corner yards.
 	for sz in [-1.0, 1.0]:
 		var tv := Vector3(-150.0, STREET_Y, sz * 104.0)

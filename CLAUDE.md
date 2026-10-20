@@ -487,6 +487,19 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   gas bottles on a rack and a generator. `_build_food_trucks` places them (yaw -90 degrees puts the hatch toward
   +z, the plaza) between the plaza's trees (the old boxes stood in front of them), sharing the matatu materials
   (`_vehicle_kit`). `res://scratch/foodtruck_preview.gd`: `-- <dir> [truck=N | all=1] [scale=2] name:x,y,z:tx,ty,tz`.
+- `MarketStallKit.gd` (extends MatatuKit, for the pixel lettering and the grid helper): Soko Street's market stalls at life
+  size (3 x 2.2m, the front toward +z), six trades in `KINDS`: vegetables (stepped crates of heaped produce with price
+  tags, a hanging scale, bananas, sacks), second-hand clothes (two rails of hung shirts, dresses and trousers, folded
+  piles, a bale, strung shoes), shoes (tiered shelves and a table of pairs, sandals strung from the beam), fruit (a
+  striped umbrella over watermelons and pineapples, a handcart with wheels), grains and spices (open sacks on two
+  stages behind the counter, bowls of spice, jars, scales) and an airtime and phone-accessories kiosk (a tin and
+  plank hut with a shutter propped as an awning, shelves of covers, a glowing charging board). Every stall has a
+  rough timber frame with lashings, a tarpaulin (wrinkled and sagging between the rafters, with a wavy valance) or
+  corrugated iron (real ridges), and a painted sign (`SIGNS`). `variant` changes the colours. Five-odd materials
+  (`make_stall_material`: wood, tin, cloth (double sided), plastic, produce, paint). About 3k triangles each.
+  `_build_market_stalls` builds one mesh per trade and colourway and places them (STALL_SCALE 2); a seller stands
+  behind each counter. A tarp's valance hides what is hung at its own height: signs under a tarp hang lower.
+  `res://scratch/stall_preview.gd`: `-- <dir> [kind=N | all=1] [variant=N] [scale=2] name:x,y,z:tx,ty,tz`.
 - The Jumbotron (`_build_screens`, `Jumbotron.gd`): its frame is tilted with the screen (`rotation.x`, 6
   degrees). The screen leans back, so with an upright frame the quad's upper half sank behind the frame's front
   face and only the bottom 56% of the picture showed, a black bar over it. Glacier Highway tilts its housing
