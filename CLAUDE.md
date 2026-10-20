@@ -462,6 +462,31 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   afternoon: a deep clean-air blue overhead, big heaped cumulus (`cloud_coverage` 0.58, `cloud_scale` 1.15) with
   blue-grey bases, a dusty haze along the horizon matching the fog (`HAZE`) and a warm glow on the sun's side
   (`sun_horizon_glow`, a uniform that is 0 for Msitu). The cirrus sky was Frostpeak Creek's.
+- City buildings (`_build_city`, `_building_massed`): no longer one box each. `_massing` makes a building's tiers as
+  polygons: a slab, a podium with a tower and a crown (the glass towers, with a lit mast), a stepped one (two
+  setbacks, on two sides or four) or an L with a lower wing. `_tier` builds a tier's walls (UV.x stretched to whole
+  bays, see above; UV2.y the window style) and roof. The architecture goes on top, by distance from the lap
+  (`CITY_DETAIL_NEAR` 180m: everything, `CITY_DETAIL_MID` 460m: massing, cornices and parapets, beyond: a plain
+  box): cornices, parapets, corner pilasters, shop awnings along the street fronts, balcony galleries (a slab, a
+  railing and a rail per floor on every other storey) and the roof's gear (`_roof_gear`: a lift housing, polytanks
+  on stands, solar water heaters, air-conditioner condensers, an antenna mast, a dish). `_edge_box` lays a box
+  along a polygon's edge (depth out from the wall, `inner` behind it).
+- The small parts go in a second mesh per cell (`BlockDetail_*`: no shadow, drawn to `CITY_DETAIL_RANGE`), the shell
+  in `Blocks_*` as before. The details use their own random stream (`drng`, seeded from the plot's position), and
+  `_add_rooftop`'s old draws are still burned on the city's `rng`: a new draw there moves every building after it.
+- A vertex colour's alpha picks the facade in `city_building.gdshader`: 0 a block with windows, 0.25 a low block
+  with an iron roof, `A_PLAIN` 0.7 plain concrete (the trim, plant rooms, tanks), `A_RAIL` 0.8 railing (vertical
+  bars, the gaps `discard`ed: alpha scissor would turn the whole building shader into a transparent pipeline), 1
+  glass. Windows have a sill, a dark line under it, a lintel and a shaded reveal, and a style per building: punched,
+  a ribbon, a narrow pair or tall (UV2.y). Regenerating Nyota takes about two minutes now (the polygon work).
+  Benchmark: no change at the start grid (29.9ms; the detail parts are about 20k visible triangles).
+- `FoodTruckKit.gd` (extends MatatuKit): the fan zone's three food trucks (`TRUCKS`: Chai na Mandazi, Nyama Choma,
+  Pizza Safari), each a HiAce cab (MatatuKit's shell cut at the cab's back, `_station_zs`, its wheels, lamps and
+  lettering) with a box body: a serving hatch on +x with a striped awning on stainless arms, a counter, bottles on
+  shelves under a lamp, a menu board, a lit roof sign with pennants, an air-conditioner and chimney, rear doors,
+  gas bottles on a rack and a generator. `_build_food_trucks` places them (yaw -90 degrees puts the hatch toward
+  +z, the plaza) between the plaza's trees (the old boxes stood in front of them), sharing the matatu materials
+  (`_vehicle_kit`). `res://scratch/foodtruck_preview.gd`: `-- <dir> [truck=N | all=1] [scale=2] name:x,y,z:tx,ty,tz`.
 - The Jumbotron (`_build_screens`, `Jumbotron.gd`): its frame is tilted with the screen (`rotation.x`, 6
   degrees). The screen leans back, so with an upright frame the quad's upper half sank behind the frame's front
   face and only the bottom 56% of the picture showed, a black bar over it. Glacier Highway tilts its housing

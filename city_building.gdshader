@@ -85,7 +85,17 @@ void fragment() {
 			rough = 0.55;
 			metal = 0.3;
 		}
-	} else if (vcol.a > 0.5) {
+	} else if (vcol.a > 0.5 && vcol.a <= 0.9) {
+		// Plain concrete: cornices, balconies, pilasters, canopies, plant rooms (no windows). 0.8 is railing:
+		// vertical bars with gaps between them.
+		if (vcol.a > 0.75) {
+			if (fract(UV.x * 4.0 / 0.42) > 0.20) {
+				discard;
+			}
+			col = paint * 0.7;
+		}
+		rough = 0.8;
+	} else if (vcol.a > 0.9) {
 		// Curtain wall: glass panels in a mullion grid, a different tint floor by floor.
 		vec2 g = vec2(UV.x / (bay * 0.5), UV.y / 4.0);  // two panels a bay: a mullion falls on every corner
 		vec2 f = fract(g);
@@ -118,7 +128,22 @@ void fragment() {
 		} else {
 			// Punched windows, a few with curtains or open; a ledge under every storey.
 			vec2 f = vec2(fract(UV.x / bay), fract((y - shop_h) / storey));
-			float win = step(0.22, f.x) * step(f.x, 0.78) * step(0.3, f.y) * step(f.y, 0.82);
+			// The window's shape in the bay, by the building's style (UV2.y): punched, a ribbon, a narrow pair, tall.
+			float style = UV2.y;
+			float wx0 = 0.22;
+			float wx1 = 0.78;
+			float wy0 = 0.30;
+			float wy1 = 0.82;
+			if (style > 0.5 && style < 1.5) {
+				wx0 = 0.04; wx1 = 0.96; wy0 = 0.40; wy1 = 0.76;
+			} else if (style > 2.5) {
+				wx0 = 0.30; wx1 = 0.70; wy0 = 0.14; wy1 = 0.88;
+			}
+			float pair_gap = (style > 1.5 && style < 2.5) ? step(0.14, f.x) * step(f.x, 0.40) + step(0.60, f.x) * step(f.x, 0.86) : 1.0;
+			if (style > 1.5 && style < 2.5) {
+				wx0 = 0.14; wx1 = 0.86; wy0 = 0.26; wy1 = 0.86;
+			}
+			float win = step(wx0, f.x) * step(f.x, wx1) * step(wy0, f.y) * step(f.y, wy1) * min(pair_gap, 1.0);
 			// Glass: dark, with a tint (blue, green, bronze, grey), reflecting the sky. A pane with a curtain is dull.
 			float tint_pick = hash21(cellid * 1.7 + vcol.b * 53.0);
 			vec3 tint = tint_pick < 0.45 ? vec3(0.05, 0.09, 0.14) : (tint_pick < 0.70 ? vec3(0.04, 0.11, 0.10) : (tint_pick < 0.88 ? vec3(0.12, 0.09, 0.06) : vec3(0.08, 0.09, 0.10)));
@@ -127,19 +152,29 @@ void fragment() {
 			if (curtain > 0.5) {
 				glass = mix(glass, vec3(0.55, 0.30, 0.20) * (0.6 + rnd * 0.4), 0.6);
 			}
-			float frame = win * (1.0 - step(0.25, f.x) * step(f.x, 0.75) * step(0.33, f.y) * step(f.y, 0.79));
+			float frame = win * (1.0 - step(wx0 + 0.03, f.x) * step(f.x, wx1 - 0.03) * step(wy0 + 0.03, f.y) * step(f.y, wy1 - 0.03));
+			// The window is set back in the wall: its glass is shaded along the top and the left inside the opening
+			// (the reveal), and the wall has a lit sill under it, a dark line under that and a lintel over it.
+			float reveal = win * max(smoothstep(wy1 - 0.10, wy1, f.y), 1.0 - smoothstep(wx0, wx0 + 0.09, f.x));
+			glass *= 1.0 - 0.5 * reveal;
+			float in_x = step(wx0 - 0.05, f.x) * step(f.x, wx1 + 0.05);
+			float sill = in_x * step(wy0 - 0.05, f.y) * step(f.y, wy0);
+			float sill_shadow = in_x * step(wy0 - 0.11, f.y) * step(f.y, wy0 - 0.05);
+			float lintel = in_x * step(wy1, f.y) * step(f.y, wy1 + 0.06);
 			col = mix(col, glass, win * detail);
-			col = mix(col, vec3(0.8), frame * detail * 0.6);
+			col = mix(col, vec3(0.78, 0.77, 0.74), frame * detail * 0.55);
+			col = mix(col, min(col * 1.22 + 0.04, vec3(1.0)), sill * detail);
+			col *= 1.0 - (0.22 * sill_shadow + 0.14 * lintel) * detail;
 			float ledge = step(0.0, f.y) * step(f.y, 0.05);
 			col *= 1.0 - ledge * 0.25 * detail;
 			// Reflective glass: low roughness for the sun's glint, and the reflected sky as emission, brighter
 			// toward the top of each pane (and brighter on some floors than others).
 			rough = mix(rough, mix(0.05, 0.6, curtain), win * detail);
 			spec = mix(spec, mix(1.0, 0.3, curtain), win * detail);
-			float pane_grad = mix(0.65, 1.15, smoothstep(0.3, 0.82, f.y));
+			float pane_grad = mix(0.65, 1.15, smoothstep(wy0, wy1, f.y));
 			// A fifth of the panes look into a dark room and reflect less.
 			float room = mix(1.0, 0.35, step(0.8, hash21(cellid * 5.3 + 1.0)));
-			emis = reflected_sky(refl_dir) * clamp(fresnel * 1.5, 0.0, 1.0) * pane_grad * (0.75 + 0.5 * hash21(cellid * 3.1 + 5.0)) * room * (1.0 - curtain * 0.9) * win * detail;
+			emis = reflected_sky(refl_dir) * clamp(fresnel * 1.5, 0.0, 1.0) * pane_grad * (0.75 + 0.5 * hash21(cellid * 3.1 + 5.0)) * room * (1.0 - curtain * 0.9) * (1.0 - 0.6 * reveal) * win * detail;
 			// Rain streaks down from the roof line, darker under the windows.
 			float streak = hash21(vec2(floor(UV.x * 1.3), vcol.g * 7.0));
 			col *= 1.0 - 0.12 * streak * (1.0 - win) * detail;

@@ -48,6 +48,7 @@ const MeshChunker = preload("res://MeshChunker.gd")
 const PropKit = preload("res://PropKit.gd")
 const MatatuKit = preload("res://MatatuKit.gd")
 const StreetLampKit = preload("res://StreetLampKit.gd")
+const FoodTruckKit = preload("res://FoodTruckKit.gd")
 const CrowdKit = preload("res://CrowdKit.gd")
 const MESH_CHUNK_CELL := 80.0
 
@@ -2270,43 +2271,385 @@ func _lap_distance(p: Vector2, reach := 60.0) -> float:
 ## city_building.gdshader's window bay, and its shop-front unit (1.5 bays).
 const CITY_BAY := 4.0
 const CITY_SHOP_UNIT := 6.0
+const CITY_STOREY := 4.6
+const CITY_SHOP_H := 6.0
+## Facade kinds in a vertex colour's alpha (city_building.gdshader): 0 a block with windows, 0.25 a low block with
+## an iron roof, 0.7 plain concrete (cornices, balconies, plant rooms), 0.8 railing bars, 1 glass.
+const A_PLAIN := 0.7
+const A_RAIL := 0.8
+## Buildings within this of the lap get the full detail; within the second, the massing and cornices only.
+const CITY_DETAIL_NEAR := 180.0
+const CITY_DETAIL_MID := 460.0
+## The small parts (balconies, canopies, rooftop gear) are drawn out to this and cast no shadow.
+const CITY_DETAIL_RANGE := 520.0
 
 
-func _building(b: Builder, r: Rect2, top: float, col: Color) -> void:
-	var y0: float = STREET_Y - 0.3
-	var corners := [Vector2(r.position.x, r.position.y), Vector2(r.end.x, r.position.y), Vector2(r.end.x, r.end.y), Vector2(r.position.x, r.end.y)]
-	var centre: Vector2 = r.get_center()
-	# Each wall's UV.x is stretched (by under 15%) so the wall ends on a whole bay, and UV2.x so it ends on
-	# a whole shop front: the shader's windows then never straddle a corner. The counts carry on from wall to
-	# wall, so every wall starts on a bay boundary but gets its own run of random windows.
-	var run_bays := 0
-	var run_shops := 0
-	for k in range(4):
-		var a: Vector2 = corners[k]
-		var c: Vector2 = corners[(k + 1) % 4]
+static func _poly_area(poly: PackedVector2Array) -> float:
+	var a := 0.0
+	for i in range(poly.size()):
+		var p := poly[i]
+		var q := poly[(i + 1) % poly.size()]
+		a += p.x * q.y - q.x * p.y
+	return a * 0.5
+
+
+static func _rect_poly(r: Rect2) -> PackedVector2Array:
+	return PackedVector2Array([r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)])
+
+
+## The polygon's outward normal for the edge i -> i+1, in (x, z).
+static func _edge_out(poly: PackedVector2Array, i: int) -> Vector2:
+	var a := poly[i]
+	var c := poly[(i + 1) % poly.size()]
+	var d := (c - a).normalized()
+	return Vector2(d.y, -d.x) if _poly_area(poly) > 0.0 else Vector2(-d.y, d.x)
+
+
+## One tier of a building: walls from `y0` to `y1` round `poly` (UV.x stretched so every wall ends on a whole bay
+## and a whole shop front, see city_building.gdshader), and a roof. `runs` carries the bay counts from tier to tier.
+func _tier(b: Builder, poly: PackedVector2Array, y0: float, y1: float, col: Color, runs: Dictionary) -> void:
+	for k in range(poly.size()):
+		var a: Vector2 = poly[k]
+		var c: Vector2 = poly[(k + 1) % poly.size()]
 		var len: float = a.distance_to(c)
-		var out2: Vector2 = ((a + c) * 0.5 - centre).normalized()
-		var out3 := Vector3(out2.x, 0, out2.y)
+		if len < 0.05:
+			continue
+		var o: Vector2 = _edge_out(poly, k)
+		var out3 := Vector3(o.x, 0, o.y)
 		var p0 := Vector3(a.x, y0, a.y)
 		var p1 := Vector3(c.x, y0, c.y)
-		var p2 := Vector3(c.x, top, c.y)
-		var p3 := Vector3(a.x, top, a.y)
-		var h: float = top - STREET_Y
+		var p2 := Vector3(c.x, y1, c.y)
+		var p3 := Vector3(a.x, y1, a.y)
 		var n_bays: int = maxi(1, int(round(len / CITY_BAY)))
 		var n_shops: int = maxi(1, int(round(len / CITY_SHOP_UNIT)))
-		var u0: float = float(run_bays) * CITY_BAY
-		var u1: float = float(run_bays + n_bays) * CITY_BAY
-		var v0: float = float(run_shops) * CITY_SHOP_UNIT
-		var v1: float = float(run_shops + n_shops) * CITY_SHOP_UNIT
-		b.tri2(p0, p1, p2, out3, col, Vector2(u0, -0.3), Vector2(u1, -0.3), Vector2(u1, h), Vector2(v0, 0.0), Vector2(v1, 0.0), Vector2(v1, 0.0))
-		b.tri2(p0, p2, p3, out3, col, Vector2(u0, -0.3), Vector2(u1, h), Vector2(u0, h), Vector2(v0, 0.0), Vector2(v1, 0.0), Vector2(v0, 0.0))
-		run_bays += n_bays
-		run_shops += n_shops
-	var q := []
-	for c2 in corners:
-		q.append(Vector3(c2.x, top, c2.y))
-	b.tri(q[0], q[1], q[2], Vector3.UP, col, Vector2(q[0].x, q[0].z), Vector2(q[1].x, q[1].z), Vector2(q[2].x, q[2].z))
-	b.tri(q[0], q[2], q[3], Vector3.UP, col, Vector2(q[0].x, q[0].z), Vector2(q[2].x, q[2].z), Vector2(q[3].x, q[3].z))
+		var u0: float = float(runs["bays"]) * CITY_BAY
+		var u1: float = float(int(runs["bays"]) + n_bays) * CITY_BAY
+		var v0: float = float(runs["shops"]) * CITY_SHOP_UNIT
+		var v1: float = float(int(runs["shops"]) + n_shops) * CITY_SHOP_UNIT
+		var h0: float = y0 - STREET_Y
+		var h1: float = y1 - STREET_Y
+		var st: float = float(runs.get("style", 0))
+		b.tri2(p0, p1, p2, out3, col, Vector2(u0, h0), Vector2(u1, h0), Vector2(u1, h1), Vector2(v0, st), Vector2(v1, st), Vector2(v1, st))
+		b.tri2(p0, p2, p3, out3, col, Vector2(u0, h0), Vector2(u1, h1), Vector2(u0, h1), Vector2(v0, st), Vector2(v1, st), Vector2(v0, st))
+		runs["bays"] = int(runs["bays"]) + n_bays
+		runs["shops"] = int(runs["shops"]) + n_shops
+	var tris := Geometry2D.triangulate_polygon(poly)
+	for i in range(0, tris.size(), 3):
+		var q0 := Vector3(poly[tris[i]].x, y1, poly[tris[i]].y)
+		var q1 := Vector3(poly[tris[i + 1]].x, y1, poly[tris[i + 1]].y)
+		var q2 := Vector3(poly[tris[i + 2]].x, y1, poly[tris[i + 2]].y)
+		b.tri(q0, q1, q2, Vector3.UP, col, Vector2(q0.x, q0.z), Vector2(q1.x, q1.z), Vector2(q2.x, q2.z))
+
+
+## A box along the edge i of `poly`, `along` long (centred, or from the start with `from_start`), `depth` out
+## from the wall (negative: in), `height` tall from `y`; for cornices, parapets, canopies and balconies.
+func _edge_box(b: Builder, poly: PackedVector2Array, i: int, y: float, height: float, depth: float, col: Color, grow := 0.0, margin := 0.0, inner := 0.0) -> void:
+	var a: Vector2 = poly[i]
+	var c: Vector2 = poly[(i + 1) % poly.size()]
+	var d: Vector2 = c - a
+	var len: float = d.length()
+	if len - 2.0 * margin < 0.3:
+		return
+	d /= len
+	var o: Vector2 = _edge_out(poly, i)
+	# The box spans from `inner` behind the wall face to `depth` in front of it.
+	var thick: float = absf(depth) + inner
+	var mid_off: float = (depth - inner) * 0.5
+	var centre2: Vector2 = (a + c) * 0.5 + o * mid_off
+	var length: float = len - 2.0 * margin + 2.0 * grow
+	b.box(Vector3(centre2.x, y + height * 0.5, centre2.y), Vector3(length, height, thick), -atan2(d.y, d.x), col)
+
+
+## True where edge i of `poly` lies along an edge of one of `others` (a wall shared with another tier).
+static func _edge_shared(poly: PackedVector2Array, i: int, others: Array) -> bool:
+	var m: Vector2 = (poly[i] + poly[(i + 1) % poly.size()]) * 0.5
+	for op in others:
+		var pg: PackedVector2Array = op
+		for k in range(pg.size()):
+			var a := pg[k]
+			var c := pg[(k + 1) % pg.size()]
+			var t := clampf((m - a).dot(c - a) / maxf((c - a).length_squared(), 0.001), 0.0, 1.0)
+			if m.distance_to(a + (c - a) * t) < 0.3:
+				return true
+	return false
+
+
+## The tiers of a building as [{poly, y0, y1}], bottom to top. `lot` is the whole plot, `fp` the footprint the
+## tower or the body stands on; `kind` 0 slab, 1 podium and tower, 2 stepped, 3 L-shaped.
+func _massing(lot: Rect2, fp: Rect2, top: float, storeys: int, kind: int, rng: RandomNumberGenerator) -> Array:
+	var y_base: float = STREET_Y - 0.3
+	var tiers: Array = []
+	match kind:
+		1:
+			# A podium of two floors on the plot, a tower on it, and a crown of two floors with a mast.
+			var py: float = STREET_Y + CITY_SHOP_H + 2.0 * CITY_STOREY
+			var crown_y: float = top - 2.0 * CITY_STOREY
+			tiers.append({"poly": _rect_poly(lot), "y0": y_base, "y1": py, "podium": true})
+			tiers.append({"poly": _rect_poly(fp), "y0": py, "y1": crown_y})
+			tiers.append({"poly": _rect_poly(fp.grow(-minf(fp.size.x, fp.size.y) * 0.16)), "y0": crown_y, "y1": top, "crown": true})
+		2:
+			# Stepped back twice, the upper steps on two sides or all four.
+			var f1: float = STREET_Y + CITY_SHOP_H + float(maxi(2, int(round(float(storeys) * 0.55)))) * CITY_STOREY
+			var f2: float = STREET_Y + CITY_SHOP_H + float(maxi(3, int(round(float(storeys) * 0.80)))) * CITY_STOREY
+			var s1: float = rng.randf_range(2.5, 4.0)
+			var s2: float = s1 + rng.randf_range(2.5, 4.0)
+			tiers.append({"poly": _rect_poly(fp), "y0": y_base, "y1": f1})
+			tiers.append({"poly": _rect_poly(_step_rect(fp, s1, rng)), "y0": f1, "y1": f2})
+			tiers.append({"poly": _rect_poly(_step_rect(fp, s2, rng)), "y0": f2, "y1": top})
+		3:
+			# An L: the main body full height, with a lower wing filling the notch.
+			var cut_x: float = fp.size.x * rng.randf_range(0.38, 0.5)
+			var cut_z: float = fp.size.y * rng.randf_range(0.38, 0.5)
+			var corner: int = rng.randi_range(0, 3)
+			var x0: float = fp.position.x
+			var x1: float = fp.end.x
+			var z0: float = fp.position.y
+			var z1: float = fp.end.y
+			var notch: Rect2
+			var l_poly: PackedVector2Array
+			match corner:
+				0:
+					notch = Rect2(x0, z0, cut_x, cut_z)
+					l_poly = PackedVector2Array([Vector2(x0 + cut_x, z0), Vector2(x1, z0), Vector2(x1, z1), Vector2(x0, z1), Vector2(x0, z0 + cut_z), Vector2(x0 + cut_x, z0 + cut_z)])
+				1:
+					notch = Rect2(x1 - cut_x, z0, cut_x, cut_z)
+					l_poly = PackedVector2Array([Vector2(x0, z0), Vector2(x1 - cut_x, z0), Vector2(x1 - cut_x, z0 + cut_z), Vector2(x1, z0 + cut_z), Vector2(x1, z1), Vector2(x0, z1)])
+				2:
+					notch = Rect2(x1 - cut_x, z1 - cut_z, cut_x, cut_z)
+					l_poly = PackedVector2Array([Vector2(x0, z0), Vector2(x1, z0), Vector2(x1, z1 - cut_z), Vector2(x1 - cut_x, z1 - cut_z), Vector2(x1 - cut_x, z1), Vector2(x0, z1)])
+				_:
+					notch = Rect2(x0, z1 - cut_z, cut_x, cut_z)
+					l_poly = PackedVector2Array([Vector2(x0, z0), Vector2(x1, z0), Vector2(x1, z1), Vector2(x0 + cut_x, z1), Vector2(x0 + cut_x, z1 - cut_z), Vector2(x0, z1 - cut_z)])
+			tiers.append({"poly": l_poly, "y0": y_base, "y1": top})
+			var wing_top: float = STREET_Y + CITY_SHOP_H + float(maxi(1, storeys - 3)) * CITY_STOREY
+			tiers.append({"poly": _rect_poly(notch), "y0": y_base, "y1": wing_top, "wing": true})
+		_:
+			tiers.append({"poly": _rect_poly(fp), "y0": y_base, "y1": top})
+	return tiers
+
+
+## `r` set back by `d` on two adjacent sides (a corner setback) or on all four.
+func _step_rect(r: Rect2, d: float, rng: RandomNumberGenerator) -> Rect2:
+	var dd: float = minf(d, minf(r.size.x, r.size.y) * 0.3)
+	if rng.randf() < 0.5:
+		return r.grow(-dd)
+	var sx: float = -1.0 if rng.randf() < 0.5 else 1.0
+	var sz: float = -1.0 if rng.randf() < 0.5 else 1.0
+	var out := r
+	if sx < 0.0:
+		out.position.x += dd
+		out.size.x -= dd
+	else:
+		out.size.x -= dd
+	if sz < 0.0:
+		out.position.y += dd
+		out.size.y -= dd
+	else:
+		out.size.y -= dd
+	return out
+
+
+## A building: its massing as tiers, then (by `detail` 0 none, 1 cornices, 2 everything) the architecture:
+## cornices and parapets, corner pilasters, shop awnings, balcony galleries, and the roof's gear. `b` is the
+## shell (it casts shadows) and `d` the small parts. `street` is the block's outline: edges along it are the
+## street fronts. Details use `rng`, their own stream, so the city's layout does not move.
+func _building_massed(b: Builder, d: Builder, lot: Rect2, fp: Rect2, top: float, storeys: int, col: Color, street: Rect2, detail: int, rng: RandomNumberGenerator) -> void:
+	var glass: bool = col.a > 0.9
+	var kind := 0
+	if glass and storeys >= 8:
+		kind = 1
+	elif detail >= 1 and not glass:
+		var roll: float = rng.randf()
+		if storeys >= 7 and roll < 0.40:
+			kind = 2
+		elif storeys >= 3 and roll < 0.62 and minf(fp.size.x, fp.size.y) > 16.0:
+			kind = 3
+	var tiers := _massing(lot, fp, top, storeys, kind, rng)
+	# The window style, in UV2.y: 0 punched, 1 ribbon, 2 a narrow pair, 3 tall (city_building.gdshader).
+	var runs := {"bays": 0, "shops": 0, "style": rng.randi_range(0, 3)}
+	var trim := Color(minf(col.r + 0.14, 1.0), minf(col.g + 0.14, 1.0), minf(col.b + 0.14, 1.0), A_PLAIN)
+	var dark := Color(col.r * 0.55, col.g * 0.55, col.b * 0.55, A_PLAIN)
+	var polys: Array = []
+	for t in tiers:
+		polys.append(t["poly"])
+	for ti in range(tiers.size()):
+		var t: Dictionary = tiers[ti]
+		var poly: PackedVector2Array = t["poly"]
+		var tier_col := col
+		if t.get("podium", false):
+			tier_col = Color(col.r, col.g, col.b, 0.0)
+		elif t.get("crown", false):
+			tier_col = Color(col.r, col.g, col.b, A_PLAIN) if rng.randf() < 0.5 else col
+		_tier(b, poly, float(t["y0"]), float(t["y1"]), tier_col, runs)
+	if detail < 1:
+		return
+	var others: Array
+	# Cornices and parapets on every tier's top; the parapet only where the roof is open.
+	for ti in range(tiers.size()):
+		var t2: Dictionary = tiers[ti]
+		var poly2: PackedVector2Array = t2["poly"]
+		others = polys.duplicate()
+		others.remove_at(ti)
+		var y1: float = t2["y1"]
+		for k in range(poly2.size()):
+			if _edge_shared(poly2, k, others):
+				continue
+			_edge_box(d, poly2, k, y1 - 0.55, 0.55, 0.30, trim, 0.30, 0.0, 0.1)
+			if ti == tiers.size() - 1 or t2.get("podium", false) or t2.get("wing", false) or t2.get("crown", false):
+				_edge_box(d, poly2, k, y1, 0.9, -0.0, dark, 0.0, 0.0, 0.28)
+	if detail < 2:
+		return
+	var base: Dictionary = tiers[0]
+	var bpoly: PackedVector2Array = base["poly"]
+	var base_top: float = base["y1"]
+	# Corner pilasters up the ground tier.
+	if not glass and rng.randf() < 0.55:
+		for k in range(bpoly.size()):
+			var corner: Vector2 = bpoly[k]
+			var o1: Vector2 = _edge_out(bpoly, k)
+			var o0: Vector2 = _edge_out(bpoly, (k - 1 + bpoly.size()) % bpoly.size())
+			if (o0 + o1).length() < 0.9:
+				continue
+			var bis: Vector2 = (o0 + o1).normalized()
+			var c2: Vector2 = corner + bis * 0.05
+			d.box(Vector3(c2.x, (STREET_Y - 0.3 + base_top) * 0.5, c2.y), Vector3(0.9, base_top - (STREET_Y - 0.3), 0.9), 0.0, trim)
+	# Shop awnings along the street fronts, in a bright cloth.
+	var awning: Color = [Color(0.85, 0.20, 0.12), Color(0.10, 0.45, 0.72), Color(0.95, 0.72, 0.12), Color(0.10, 0.52, 0.28), Color(0.90, 0.42, 0.10)][rng.randi() % 5]
+	awning.a = A_PLAIN
+	for k in range(bpoly.size()):
+		var mid: Vector2 = (bpoly[k] + bpoly[(k + 1) % bpoly.size()]) * 0.5
+		if bpoly[k].distance_to(bpoly[(k + 1) % bpoly.size()]) < 7.0:
+			continue
+		# Only along the street: the edge is near the outline of the block.
+		var d_street: float = minf(minf(absf(mid.x - street.position.x), absf(mid.x - street.end.x)), minf(absf(mid.y - street.position.y), absf(mid.y - street.end.y)))
+		if d_street > 1.5:
+			continue
+		_edge_box(d, bpoly, k, STREET_Y + 4.55, 0.18, 1.7, awning, 0.0, 0.6, 0.15)
+		_edge_box(d, bpoly, k, STREET_Y + 4.25, 0.30, 1.7, awning * 0.8, 0.0, 0.6, -1.55)
+	# Balcony galleries on the street fronts of the residential blocks, every other floor.
+	if not glass and storeys >= 3 and storeys <= 14 and kind != 1 and rng.randf() < 0.6:
+		var rail := Color(col.r, col.g, col.b, A_RAIL)
+		var slab := Color(col.r * 0.9, col.g * 0.9, col.b * 0.9, A_PLAIN)
+		var edges_done := 0
+		for k in range(bpoly.size()):
+			var a2: Vector2 = bpoly[k]
+			var c3: Vector2 = bpoly[(k + 1) % bpoly.size()]
+			if a2.distance_to(c3) < 10.0 or edges_done >= 2:
+				continue
+			var mid2: Vector2 = (a2 + c3) * 0.5
+			var d_st: float = minf(minf(absf(mid2.x - street.position.x), absf(mid2.x - street.end.x)), minf(absf(mid2.y - street.position.y), absf(mid2.y - street.end.y)))
+			if d_st > 1.5 or _edge_shared(bpoly, k, polys.slice(1)):
+				continue
+			var first: int = 1 + rng.randi_range(0, 1)
+			for fl in range(first, storeys, 2):
+				var fy: float = STREET_Y + CITY_SHOP_H + float(fl) * CITY_STOREY
+				if fy + 1.3 > base_top:
+					break
+				_edge_box(d, bpoly, k, fy, 0.22, 1.5, slab, 0.0, 1.0, 0.1)
+				_edge_box(d, bpoly, k, fy + 0.22, 1.0, 1.44, rail, 0.0, 1.0, -1.38)
+				_edge_box(d, bpoly, k, fy + 1.22, 0.07, 1.5, slab * 0.8, 0.0, 1.0, -1.43)
+			edges_done += 1
+	# The roof's gear, on the top tier.
+	var top_t: Dictionary = tiers[tiers.size() - 1]
+	if kind == 3:
+		top_t = tiers[0]
+	_roof_gear(d, top_t["poly"], float(top_t["y1"]), glass, kind == 1, rng)
+
+
+## What stands on a roof: water tanks on stands, a stair housing, solar water heaters, air-conditioner
+## boxes, a satellite dish, an antenna mast (tall on a glass tower), and a lift housing.
+func _roof_gear(d: Builder, poly: PackedVector2Array, y: float, glass: bool, tower: bool, rng: RandomNumberGenerator) -> void:
+	var bb := Rect2(poly[0], Vector2.ZERO)
+	for p in poly:
+		bb = bb.expand(p)
+	var inner: Rect2 = bb.grow(-2.0)
+	if inner.size.x < 3.0 or inner.size.y < 3.0:
+		return
+	var plain := func(c: Color) -> Color:
+		return Color(c.r, c.g, c.b, A_PLAIN)
+	var pick := func() -> Vector2:
+		var pt := Vector2.ZERO
+		for t in range(8):
+			pt = Vector2(rng.randf_range(inner.position.x, inner.end.x), rng.randf_range(inner.position.y, inner.end.y))
+			if Geometry2D.is_point_in_polygon(pt, poly):
+				break
+		return pt
+	# A lift or stair housing, with a door and a deeper roof.
+	if rng.randf() < 0.65 or tower:
+		var c: Vector2 = pick.call()
+		d.box(Vector3(c.x, y + 1.9, c.y), Vector3(4.2, 3.8, 4.6), 0.0, plain.call(Color(0.72, 0.70, 0.66)))
+		d.box(Vector3(c.x, y + 3.95, c.y), Vector3(4.6, 0.3, 5.0), 0.0, plain.call(Color(0.52, 0.52, 0.50)))
+	# Water tanks: black polytanks on steel stands.
+	var tanks: int = rng.randi_range(1, 3) if not tower else 1
+	for k in range(tanks):
+		var c2: Vector2 = pick.call()
+		for sx in [-1.0, 1.0]:
+			for sz in [-1.0, 1.0]:
+				d.box(Vector3(c2.x + sx * 0.9, y + 0.7, c2.y + sz * 0.9), Vector3(0.18, 1.4, 0.18), 0.0, plain.call(Color(0.35, 0.36, 0.38)))
+		d.box(Vector3(c2.x, y + 1.45, c2.y), Vector3(2.3, 0.2, 2.3), 0.0, plain.call(Color(0.35, 0.36, 0.38)))
+		var tank_poly := PackedVector2Array()
+		for i in range(10):
+			var a: float = TAU * float(i) / 10.0
+			tank_poly.append(c2 + Vector2(cos(a), sin(a)) * 1.05)
+		_roof_cylinder(d, tank_poly, y + 1.55, y + 3.45, plain.call(Color(0.07, 0.07, 0.08)))
+		_roof_cylinder(d, _scaled_poly(tank_poly, c2, 0.5), y + 3.45, y + 3.65, plain.call(Color(0.05, 0.05, 0.06)))
+	# Solar water heaters: a tilted panel and a cylinder on a frame, a Nairobi rooftop's staple.
+	if rng.randf() < 0.55 and not tower:
+		var c3: Vector2 = pick.call()
+		var yaw: float = float(rng.randi_range(0, 3)) * PI * 0.5
+		for k in range(rng.randi_range(1, 3)):
+			var o: Vector3 = Vector3(c3.x, y, c3.y) + Basis(Vector3.UP, yaw) * Vector3(float(k) * 2.4, 0.0, 0.0)
+			var bs := Basis(Vector3.UP, yaw)
+			d.box(o + bs * Vector3(0, 0.75, 0.2), Vector3(1.9, 0.14, 1.3), yaw, plain.call(Color(0.10, 0.12, 0.22)))
+			d.box(o + bs * Vector3(0, 1.35, 0.9), Vector3(1.9, 0.5, 0.5), yaw, plain.call(Color(0.84, 0.85, 0.86)))
+			d.box(o + bs * Vector3(0, 0.4, 0.2), Vector3(0.12, 0.8, 0.12), yaw, plain.call(Color(0.4, 0.4, 0.42)))
+	# Air-conditioner condensers.
+	if rng.randf() < 0.5:
+		var c4: Vector2 = pick.call()
+		for k in range(rng.randi_range(2, 4)):
+			d.box(Vector3(c4.x + float(k) * 1.3, y + 0.45, c4.y), Vector3(1.0, 0.9, 0.5), 0.0, plain.call(Color(0.85, 0.86, 0.87)))
+			d.box(Vector3(c4.x + float(k) * 1.3, y + 0.45, c4.y + 0.26), Vector3(0.7, 0.7, 0.03), 0.0, plain.call(Color(0.15, 0.15, 0.16)))
+	# An antenna mast with a crossbar, tall on a tower with a red lamp at the top.
+	if rng.randf() < 0.5 or tower:
+		var c5: Vector2 = pick.call()
+		var mh: float = 14.0 if tower else rng.randf_range(4.0, 7.0)
+		d.box(Vector3(c5.x, y + mh * 0.5, c5.y), Vector3(0.22, mh, 0.22), 0.0, plain.call(Color(0.55, 0.56, 0.58)))
+		d.box(Vector3(c5.x, y + mh * 0.8, c5.y), Vector3(2.2, 0.12, 0.12), 0.0, plain.call(Color(0.55, 0.56, 0.58)))
+		if tower:
+			d.box(Vector3(c5.x, y + mh + 0.2, c5.y), Vector3(0.5, 0.5, 0.5), 0.0, Color(1.0, 0.25, 0.2, A_PLAIN))
+	# A satellite dish on a post.
+	if rng.randf() < 0.35:
+		var c6: Vector2 = pick.call()
+		d.box(Vector3(c6.x, y + 0.6, c6.y), Vector3(0.15, 1.2, 0.15), 0.0, plain.call(Color(0.5, 0.5, 0.52)))
+		var dish := PackedVector2Array()
+		for i in range(9):
+			var a: float = TAU * float(i) / 9.0
+			dish.append(c6 + Vector2(cos(a), sin(a)) * 0.75)
+		_roof_cylinder(d, dish, y + 1.2, y + 1.3, plain.call(Color(0.9, 0.9, 0.9)))
+
+
+static func _scaled_poly(poly: PackedVector2Array, centre: Vector2, k: float) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for p in poly:
+		out.append(centre + (p - centre) * k)
+	return out
+
+
+## A prism over a convex plan polygon, from y0 to y1 (smooth walls are not needed: the shader paints flat).
+func _roof_cylinder(d: Builder, poly: PackedVector2Array, y0: float, y1: float, col: Color) -> void:
+	var cen := Vector2.ZERO
+	for p in poly:
+		cen += p
+	cen /= float(poly.size())
+	for k in range(poly.size()):
+		var a: Vector2 = poly[k]
+		var c: Vector2 = poly[(k + 1) % poly.size()]
+		var o: Vector2 = ((a + c) * 0.5 - cen).normalized()
+		d.quad(Vector3(a.x, y0, a.y), Vector3(c.x, y0, c.y), Vector3(c.x, y1, c.y), Vector3(a.x, y1, a.y), Vector3(o.x, 0, o.y), col, 0.5)
+	for k in range(poly.size()):
+		var a: Vector2 = poly[k]
+		var c: Vector2 = poly[(k + 1) % poly.size()]
+		d.tri(Vector3(cen.x, y1, cen.y), Vector3(a.x, y1, a.y), Vector3(c.x, y1, c.y), Vector3.UP, col, Vector2(cen.x, cen.y), Vector2(a.x, a.y), Vector2(c.x, c.y))
 
 
 const WALL_PAINTS := [
@@ -2330,16 +2673,17 @@ func _add_rooftop(b: Builder, r: Rect2, top: float, rng: RandomNumberGenerator) 
 		for k in range(n):
 			var tx: float = rng.randf_range(r.position.x + 2.0, r.end.x - 2.0)
 			var tz: float = rng.randf_range(r.position.y + 2.0, r.end.y - 2.0)
-			b.box(Vector3(tx, top + 1.3, tz), Vector3(2.2, 2.6, 2.2), rng.randf() * PI, Color(0.08, 0.08, 0.09))
+			b.box(Vector3(tx, top + 1.3, tz), Vector3(2.2, 2.6, 2.2), rng.randf() * PI, Color(0.08, 0.08, 0.09, A_PLAIN))
 	if rng.randf() < 0.5 and r.size.x > 10.0 and r.size.y > 10.0:
 		var c: Vector2 = r.get_center()
-		b.box(Vector3(c.x, top + 1.8, c.y), Vector3(4.0, 3.6, 5.0), 0.0, Color(0.70, 0.68, 0.64))
+		b.box(Vector3(c.x, top + 1.8, c.y), Vector3(4.0, 3.6, 5.0), 0.0, Color(0.70, 0.68, 0.64, A_PLAIN))
 
 
 func _build_city(parent: Node) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7171
 	var cells := {}
+	var detail_cells := {}
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://city_building.gdshader")
 	mat.set_shader_parameter("concrete_tex", load("res://materials/concrete.png"))
@@ -2385,6 +2729,7 @@ func _build_city(parent: Node) -> void:
 					var fz0: float = lz0 + (0.0 if bb == 0 else rng.randf_range(1.0, 4.0))
 					var fz1: float = lz1 - (0.0 if bb == nz - 1 else rng.randf_range(1.0, 4.0))
 					var fp := Rect2(fx0, fz0, fx1 - fx0, fz1 - fz0)
+					var lot_fp := fp
 					var storeys: int
 					var glass := 0.0
 					if cbd_d < 380.0:
@@ -2404,14 +2749,27 @@ func _build_city(parent: Node) -> void:
 					# roof is concrete (tall) or painted iron (low).
 					col.a = 1.0 if glass > 0.5 else (0.25 if storeys <= 3 else 0.0)
 					var b: Builder = _city_cell_builder(cells, c)
-					_building(b, fp, top, col)
+					var db: Builder = _city_cell_builder(detail_cells, c)
+					# The detail is by distance from the lap: all of it near, the massing and cornices at
+					# middle distance, a plain box beyond. Its own random stream keeps the layout where it was.
+					var lap_d: float = _lap_distance(fp.get_center(), CITY_DETAIL_MID)
+					var detail: int = 2 if lap_d < CITY_DETAIL_NEAR else (1 if lap_d < CITY_DETAIL_MID else 0)
+					var drng := RandomNumberGenerator.new()
+					drng.seed = hash(Vector2i(roundi(fp.position.x * 4.0), roundi(fp.position.y * 4.0)))
+					_building_massed(b, db, lot_fp, fp, top, storeys, col, blk, detail, drng)
 					if glass < 0.5:
-						_add_rooftop(b, fp, top, rng)
+						# The old rooftop's draws are still taken, so the layout of what comes after is the same.
+						var burn := Builder.new()
+						_add_rooftop(burn, fp, top, rng)
+						if detail == 0:
+							_add_rooftop(db, fp, top, drng)
 					count += 1
-	_build_inner_block(cells, rng)
+	_build_inner_block(cells, detail_cells, rng)
 	var root := Node3D.new()
 	root.name = "City"
 	parent.add_child(root)
+	var shell_tris := 0
+	var detail_tris := 0
 	for key in cells:
 		var b2: Builder = cells[key]
 		var mi := MeshInstance3D.new()
@@ -2423,12 +2781,27 @@ func _build_city(parent: Node) -> void:
 		if centre.length() > 700.0:
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(mi)
-	print("  city: %d buildings in %d cells" % [count, cells.size()])
+		shell_tris += b2.verts.size() / 3
+	# The small parts: no shadow, and out of sight beyond CITY_DETAIL_RANGE.
+	for key in detail_cells:
+		var b3: Builder = detail_cells[key]
+		if b3.is_empty():
+			continue
+		var mi2 := MeshInstance3D.new()
+		mi2.name = "BlockDetail_%d_%d" % [key.x, key.y]
+		mi2.mesh = b3.commit()
+		mi2.material_override = mat
+		mi2.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi2.visibility_range_end = CITY_DETAIL_RANGE
+		mi2.visibility_range_end_margin = 30.0
+		root.add_child(mi2)
+		detail_tris += b3.verts.size() / 3
+	print("  city: %d buildings in %d cells (%d triangles, %d in the detail)" % [count, cells.size(), shell_tris, detail_tris])
 
 
 ## The block inside the lap's streets, between Soko Street and the avenue: shops on every side,
 ## kept clear of the barriers.
-func _build_inner_block(cells: Dictionary, rng: RandomNumberGenerator) -> void:
+func _build_inner_block(cells: Dictionary, detail_cells: Dictionary, rng: RandomNumberGenerator) -> void:
 	var lots := [
 		Rect2(250.0, 66.0, 26.0, 30.0), Rect2(280.0, 66.0, 24.0, 22.0), Rect2(250.0, 100.0, 22.0, 34.0),
 		Rect2(276.0, 92.0, 28.0, 40.0), Rect2(250.0, 138.0, 30.0, 20.0), Rect2(284.0, 136.0, 20.0, 30.0),
@@ -2443,10 +2816,15 @@ func _build_inner_block(cells: Dictionary, rng: RandomNumberGenerator) -> void:
 			continue
 		var col: Color = WALL_PAINTS[rng.randi() % WALL_PAINTS.size()]
 		col.a = 0.25
-		var top: float = STREET_Y + 6.0 + float(rng.randi_range(1, 4)) * 4.6
+		var storeys: int = rng.randi_range(1, 4)
+		var top: float = STREET_Y + 6.0 + float(storeys) * 4.6
 		var b: Builder = _city_cell_builder(cells, fp.get_center())
-		_building(b, fp, top, col)
-		_add_rooftop(b, fp, top, rng)
+		var db: Builder = _city_cell_builder(detail_cells, fp.get_center())
+		var drng := RandomNumberGenerator.new()
+		drng.seed = hash(Vector2i(roundi(fp.position.x * 4.0), roundi(fp.position.y * 4.0)))
+		_building_massed(b, db, fp, fp, top, storeys, col, fp, 2, drng)
+		var burn := Builder.new()
+		_add_rooftop(burn, fp, top, rng)
 
 
 ## Hills on the horizon: a ring of ridges past the end of town, highest to the south-west.
@@ -3151,17 +3529,52 @@ const MATATU_WIDTH := 1.95
 const MATATU_HEIGHT := 2.4
 
 
+var _vehicle_mats := {}
+
+
+## A PropKit at MATATU_SCALE whose materials are MatatuKit's, saved once and shared by the matatus and the food
+## trucks (which are built on the same kit).
+func _vehicle_kit() -> PropKit:
+	var kit := PropKit.new()
+	kit.material_for = func(key: String) -> Material:
+		if not _vehicle_mats.has(key):
+			_vehicle_mats[key] = _save_shared_resource(MatatuKit.make_material(key), "matatu_" + key)
+		return _vehicle_mats[key]
+	kit.set_frame(Transform3D(Basis().scaled(Vector3.ONE * MATATU_SCALE), Vector3.ZERO))
+	return kit
+
+
+## The food trucks of the fan zone (FoodTruckKit, three liveries): `spots` are [position, yaw, truck index].
+func _build_food_trucks(parent: Node, spots: Array) -> void:
+	var root := Node3D.new()
+	root.name = "FoodTrucks"
+	parent.add_child(root)
+	var kit := _vehicle_kit()
+	var tris := 0
+	for k in range(spots.size()):
+		var sp: Array = spots[k]
+		var ti: int = sp[2]
+		var mesh: ArrayMesh = FoodTruckKit.new(kit).build_truck(FoodTruckKit.TRUCKS[ti])
+		for si in range(mesh.get_surface_count()):
+			tris += (mesh.surface_get_arrays(si)[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
+		var mi := MeshInstance3D.new()
+		mi.name = "FoodTruck_%d" % k
+		mi.mesh = _save_shared_resource(mesh, "foodtruck_%d" % ti)
+		mi.transform = Transform3D(Basis(Vector3.UP, float(sp[1])), sp[0])
+		mi.visibility_range_end = 420.0
+		mi.visibility_range_end_margin = 30.0
+		root.add_child(mi)
+		var lap_d: float = _matatu_lap_distance(sp[0], float(sp[1]))
+		if lap_d < STREET_HALF + 1.5:
+			push_error("FoodTruck_%d stands %.1fm from the lap's centre line" % [k, lap_d])
+	print("  food trucks: %d (%d triangles)" % [spots.size(), tris])
+
+
 func _build_matatus(parent: Node, spots: Array) -> void:
 	var root := Node3D.new()
 	root.name = "Matatus"
 	parent.add_child(root)
-	var mats := {}
-	var kit := PropKit.new()
-	kit.material_for = func(key: String) -> Material:
-		if not mats.has(key):
-			mats[key] = _save_shared_resource(MatatuKit.make_material(key), "matatu_" + key)
-		return mats[key]
-	kit.set_frame(Transform3D(Basis().scaled(Vector3.ONE * MATATU_SCALE), Vector3.ZERO))
+	var kit := _vehicle_kit()
 	var meshes := {}
 	var solid := 0
 	var tris := 0
@@ -3278,15 +3691,11 @@ func _build_precinct_dressing(parent: Node) -> Array:
 			for k in range(10):
 				var pp := tp + Vector3(rng.randf_range(-7.0, 7.0), 0, rng.randf_range(-7.0, 7.0))
 				people.append([pp, Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1)).normalized() + Vector3(0.001, 0, 0), 0, 0, true])
-	# Food trucks along the plaza's north edge.
-	var truck_cols := [Color(0.95, 0.75, 0.12), Color(0.10, 0.45, 0.70), Color(0.85, 0.20, 0.15)]
+	# Food trucks along the plaza's north edge, their serving hatches toward the fan zone (+z).
+	var truck_spots: Array = []
 	for k in range(3):
-		var fp := Vector3(225.0 + float(k) * 30.0, STREET_Y, -33.0)
-		var yaw: float = PI * 0.5
-		var bs := Basis(Vector3.UP, yaw)
-		b.box(fp + bs * Vector3(0, 3.0, 0), Vector3(4.6, 5.2, 12.0), yaw, truck_cols[k])
-		b.box(fp + bs * Vector3(0, 2.3, 7.6), Vector3(4.4, 3.8, 3.4), yaw, Color(0.9, 0.9, 0.9))
-		b.box(fp + bs * Vector3(2.35, 3.4, 0.0), Vector3(0.1, 1.8, 7.0), yaw, Color(0.08, 0.08, 0.08))
+		truck_spots.append([Vector3(235.0 + float(k) * 26.0, STREET_Y, -33.0), -PI * 0.5, k])
+	_build_food_trucks(parent, truck_spots)
 	# Matatus parked nose to tail (nose to the stadium) along the plaza's south edge, and a car park of
 	# them north of the exit.
 	var matatu_spots: Array = []
