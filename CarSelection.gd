@@ -528,9 +528,12 @@ func _build_showroom() -> void:
 	key.light_energy = 1.7
 	key.light_color = Color(1.0, 0.97, 0.92)
 	key.shadow_enabled = true
-	key.shadow_blur = 1.5
+	key.shadow_bias = 0.04
+	key.shadow_normal_bias = 2.4
+	key.shadow_blur = 1.0
 	key.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
-	key.directional_shadow_max_distance = 14.0
+	key.directional_shadow_max_distance = 10.0
+	key.directional_shadow_pancake_size = 10.0
 	key.rotation = Vector3(deg_to_rad(-58.0), deg_to_rad(-28.0), 0.0)
 	_stage.add_child(key)
 	var rim := DirectionalLight3D.new()

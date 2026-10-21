@@ -283,9 +283,12 @@ func _build_stage() -> void:
 	key.light_energy = 1.5
 	key.light_color = Color(1.0, 0.96, 0.9)
 	key.shadow_enabled = true
-	key.shadow_blur = 1.5
+	key.shadow_bias = 0.04
+	key.shadow_normal_bias = 2.4
+	key.shadow_blur = 1.0
 	key.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
-	key.directional_shadow_max_distance = 24.0
+	key.directional_shadow_max_distance = 18.0
+	key.directional_shadow_pancake_size = 15.0
 	key.rotation = Vector3(deg_to_rad(-52.0), deg_to_rad(-22.0), 0.0)
 	_stage.add_child(key)
 	var rim := DirectionalLight3D.new()
