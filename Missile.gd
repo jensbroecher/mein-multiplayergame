@@ -341,7 +341,8 @@ func _explode():
 			if dist <= blast_radius:
 				if p.has_method("on_hit"):
 					var was_shielded = p.is_shielded
-					p.on_hit(owner_id)
+					var weapon_type := "GUIDED_MISSILE" if is_guided else "MISSILE"
+					p.on_hit(owner_id, weapon_type)
 					if was_shielded:
 						continue
 					

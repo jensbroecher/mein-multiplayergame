@@ -45,16 +45,55 @@ const PLACE_LINES: PackedStringArray = [
 	"%s completes the podium in third.",
 ]
 const EXPLOSION_LINES: PackedStringArray = [
-	"%s blew up %s!",
 	"%s takes out %s!",
+	"%s blows up %s!",
 	"%s blasts %s off the track!",
 	"%s sends %s spinning!",
 	"Direct hit by %s on %s!",
+]
+const MISSILE_LINES: PackedStringArray = [
+	"%s hits %s with a missile!",
+	"%s blasts %s with a rocket!",
+	"%s fires a missile right into %s!",
+	"Direct missile hit by %s on %s!",
+	"%s snipes %s with a missile!",
+]
+const GUIDED_MISSILE_LINES: PackedStringArray = [
+	"%s locks on and hits %s with a guided missile!",
+	"%s's guided missile hunts down %s!",
+	"%s takes out %s with a homing missile!",
+	"No escape! %s hits %s with a guided missile!",
+]
+const BOMB_LINES: PackedStringArray = [
+	"%s blows up %s with a bomb!",
+	"%s detonates %s with a bomb!",
+	"%s drops a bomb right on %s!",
+	"%s wipes out %s with an explosive bomb!",
+]
+const LIGHTNING_LINES: PackedStringArray = [
+	"%s zaps %s with lightning!",
+	"%s shocks %s with a lightning bolt!",
+	"%s strikes %s with lightning!",
+	"%s fries %s with an electric arc!",
+]
+const LIGHTNING_MULTI_LINES: PackedStringArray = [
+	"%s zaps the whole pack with lightning!",
+	"%s strikes multiple racers with lightning!",
+	"%s unleashes lightning across the track!",
 ]
 const SELF_EXPLOSION_LINES: PackedStringArray = [
 	"%s blew themselves up!",
 	"Oh no, %s caught their own blast!",
 	"%s just took themselves out!",
+]
+const SELF_BOMB_LINES: PackedStringArray = [
+	"%s got caught in their own bomb!",
+	"%s blew themselves up with a bomb!",
+	"Ouch! %s detonated their own bomb!",
+]
+const SELF_MISSILE_LINES: PackedStringArray = [
+	"%s caught their own missile blast!",
+	"%s took themselves out with a rocket!",
 ]
 const EXPLOSION_COOLDOWN := 2.5
 
@@ -175,8 +214,8 @@ func _call_finishers(rows: Array) -> void:
 			_queue(PLACE_LINES[place - 1] % racer, FINISH_DELAY)
 
 
-## Called when a cart explodes. Announces who blew up who through text-to-speech.
-func call_explosion(attacker_name: String, victim_name: String) -> void:
+## Called when a cart explodes or gets hit. Announces the combat event with item details.
+func call_explosion(attacker_name: String, victim_name: String, weapon: String = "") -> void:
 	if not _active:
 		return
 	if _clock - _last_explosion_call < EXPLOSION_COOLDOWN:
@@ -185,11 +224,52 @@ func call_explosion(attacker_name: String, victim_name: String) -> void:
 		return
 	var a := _clean_name(attacker_name)
 	var v := _clean_name(victim_name)
+	var w := weapon.to_upper().strip_edges()
 	var text := ""
-	if a == "" or a == "Someone" or a == v:
-		text = SELF_EXPLOSION_LINES[randi() % SELF_EXPLOSION_LINES.size()] % v
+	var is_self := (a == "" or a == "Someone" or a == v)
+
+	if is_self:
+		if w == "BOMB":
+			text = SELF_BOMB_LINES[randi() % SELF_BOMB_LINES.size()] % v
+		elif w in ["MISSILE", "GUIDED_MISSILE"]:
+			text = SELF_MISSILE_LINES[randi() % SELF_MISSILE_LINES.size()] % v
+		else:
+			text = SELF_EXPLOSION_LINES[randi() % SELF_EXPLOSION_LINES.size()] % v
 	else:
-		text = EXPLOSION_LINES[randi() % EXPLOSION_LINES.size()] % [a, v]
+		if w == "GUIDED_MISSILE":
+			text = GUIDED_MISSILE_LINES[randi() % GUIDED_MISSILE_LINES.size()] % [a, v]
+		elif w == "MISSILE":
+			text = MISSILE_LINES[randi() % MISSILE_LINES.size()] % [a, v]
+		elif w == "BOMB":
+			text = BOMB_LINES[randi() % BOMB_LINES.size()] % [a, v]
+		elif w == "LIGHTNING":
+			text = LIGHTNING_LINES[randi() % LIGHTNING_LINES.size()] % [a, v]
+		else:
+			text = EXPLOSION_LINES[randi() % EXPLOSION_LINES.size()] % [a, v]
+
+	_last_explosion_call = _clock
+	_queue(text, 0.2)
+
+
+func call_lightning(attacker_name: String, victim_name: String) -> void:
+	call_explosion(attacker_name, victim_name, "LIGHTNING")
+
+
+func call_lightning_multi(attacker_name: String, victim_names: Array) -> void:
+	if not _active:
+		return
+	if _clock - _last_explosion_call < EXPLOSION_COOLDOWN:
+		return
+	if _is_speaking():
+		return
+	var a := _clean_name(attacker_name)
+	var text := ""
+	if victim_names.size() > 1:
+		text = LIGHTNING_MULTI_LINES[randi() % LIGHTNING_MULTI_LINES.size()] % a
+	elif victim_names.size() == 1:
+		text = LIGHTNING_LINES[randi() % LIGHTNING_LINES.size()] % [a, _clean_name(str(victim_names[0]))]
+	else:
+		return
 	_last_explosion_call = _clock
 	_queue(text, 0.2)
 

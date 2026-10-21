@@ -294,21 +294,34 @@ func _setup_killfeed() -> void:
 	hud_panel.add_child(killfeed_container)
 
 
-func show_explosion_notice(attacker_name: String, victim_name: String, attacker_id: int = 0, victim_id: int = 0) -> void:
+func show_combat_notice(attacker_name: String, victim_name: String, attacker_id: int = 0, victim_id: int = 0, weapon: String = "") -> void:
+	show_explosion_notice(attacker_name, victim_name, attacker_id, victim_id, weapon)
+
+
+func show_explosion_notice(attacker_name: String, victim_name: String, attacker_id: int = 0, victim_id: int = 0, weapon: String = "") -> void:
 	if hud_panel == null or killfeed_container == null:
 		return
 	
 	# Determine if local player is involved
 	var my_id := 0
+	var my_name := ""
 	for c in get_tree().get_nodes_in_group("player_carts"):
 		if c.get("race_ui") == self or (c.get("is_local_player") == true and int(c.get("device_id")) <= 0):
 			my_id = c.name.to_int()
+			if c.get("player_name"):
+				my_name = str(c.get("player_name"))
 			break
 	
-	var is_local_attacker := (attacker_id > 0 and attacker_id == my_id)
-	var is_local_victim := (victim_id > 0 and victim_id == my_id)
+	var is_local_attacker := (attacker_id > 0 and attacker_id == my_id) or (my_name != "" and attacker_name == my_name)
+	var is_local_victim := (victim_id > 0 and victim_id == my_id) or (my_name != "" and victim_name == my_name)
 	var is_self_blowup := (attacker_id == victim_id or attacker_id <= 0 or attacker_name == victim_name or attacker_name == "" or attacker_name == "Someone")
 	
+	var weapon_norm := weapon.to_upper().strip_edges()
+	var is_lightning := (weapon_norm == "LIGHTNING")
+	var is_guided := (weapon_norm == "GUIDED_MISSILE")
+	var is_missile := (weapon_norm == "MISSILE")
+	var is_bomb := (weapon_norm == "BOMB")
+
 	# Cap active notices to avoid screen clutter
 	while killfeed_container.get_child_count() >= 3:
 		var oldest = killfeed_container.get_child(0)
@@ -332,17 +345,41 @@ func show_explosion_notice(attacker_name: String, victim_name: String, attacker_
 	style.content_margin_bottom = 6
 	
 	if is_local_attacker:
-		# You scored a hit: Neon Cyan glow
-		style.border_color = Color(0.15, 0.85, 1.0, 0.95)
-		style.shadow_color = Color(0.1, 0.7, 0.9, 0.3)
+		if is_lightning:
+			# You zapped someone: Glowing Electric Cyan / Neon Arc
+			style.border_color = Color(0.2, 0.95, 1.0, 0.95)
+			style.shadow_color = Color(0.1, 0.8, 1.0, 0.35)
+		else:
+			# You scored an explosive hit: Neon Cyan glow
+			style.border_color = Color(0.15, 0.85, 1.0, 0.95)
+			style.shadow_color = Color(0.1, 0.7, 0.9, 0.3)
 	elif is_local_victim:
-		# You got hit: Crimson Warning glow
-		style.border_color = Color(1.0, 0.25, 0.2, 0.95)
-		style.shadow_color = Color(0.9, 0.1, 0.1, 0.35)
+		if is_lightning:
+			# You got zapped: Shocking Golden Warning glow
+			style.border_color = Color(1.0, 0.84, 0.2, 0.95)
+			style.shadow_color = Color(0.9, 0.65, 0.1, 0.35)
+		else:
+			# You got blown up: Crimson Warning glow
+			style.border_color = Color(1.0, 0.25, 0.2, 0.95)
+			style.shadow_color = Color(0.9, 0.1, 0.1, 0.35)
 	else:
-		# Combat between other racers: Ember Orange
-		style.border_color = Color(1.0, 0.52, 0.16, 0.8)
-		style.shadow_color = Color(0.8, 0.35, 0.05, 0.2)
+		# Combat between other racers
+		if is_lightning:
+			# Electric blue arc
+			style.border_color = Color(0.3, 0.75, 1.0, 0.85)
+			style.shadow_color = Color(0.1, 0.45, 0.8, 0.25)
+		elif is_guided:
+			# High-tech targeting magenta / violet
+			style.border_color = Color(0.8, 0.45, 1.0, 0.85)
+			style.shadow_color = Color(0.55, 0.2, 0.8, 0.25)
+		elif is_bomb:
+			# Deep bomb ember
+			style.border_color = Color(1.0, 0.38, 0.18, 0.85)
+			style.shadow_color = Color(0.8, 0.2, 0.1, 0.25)
+		else:
+			# Classic missile / explosion orange
+			style.border_color = Color(1.0, 0.52, 0.16, 0.8)
+			style.shadow_color = Color(0.8, 0.35, 0.05, 0.2)
 	
 	card.add_theme_stylebox_override("panel", style)
 	
@@ -351,9 +388,18 @@ func show_explosion_notice(attacker_name: String, victim_name: String, attacker_
 	hbox.add_theme_constant_override("separation", 8)
 	card.add_child(hbox)
 	
-	# 1. Blast Icon
+	# 1. Leading Type Icon
 	var icon_lbl := Label.new()
-	icon_lbl.text = "💥"
+	if is_lightning:
+		icon_lbl.text = "⚡"
+	elif is_guided:
+		icon_lbl.text = "🎯"
+	elif is_missile:
+		icon_lbl.text = "🚀"
+	elif is_bomb:
+		icon_lbl.text = "💣"
+	else:
+		icon_lbl.text = "💥"
 	icon_lbl.add_theme_font_size_override("font_size", 16)
 	hbox.add_child(icon_lbl)
 	
@@ -385,9 +431,27 @@ func show_explosion_notice(attacker_name: String, victim_name: String, attacker_
 		b_style.content_margin_bottom = 1
 		badge_panel.add_theme_stylebox_override("panel", b_style)
 
+		var badge_hbox := HBoxContainer.new()
+		badge_hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		badge_hbox.add_theme_constant_override("separation", 5)
+		badge_panel.add_child(badge_hbox)
+
+		if ITEM_ICONS.has(weapon_norm) and ITEM_ICONS[weapon_norm] != null:
+			var item_tex := TextureRect.new()
+			item_tex.texture = ITEM_ICONS[weapon_norm]
+			item_tex.custom_minimum_size = Vector2(16, 16)
+			item_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			item_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			badge_hbox.add_child(item_tex)
+
 		var badge := Label.new()
-		_setup_label.call(badge, "BLEW THEMSELVES UP", Color(1.0, 0.55, 0.3), 12)
-		badge_panel.add_child(badge)
+		var self_text := "BLEW THEMSELVES UP"
+		if is_bomb:
+			self_text = "SELF BOMB"
+		elif is_missile or is_guided:
+			self_text = "CAUGHT BLAST"
+		_setup_label.call(badge, self_text, Color(1.0, 0.55, 0.3), 12)
+		badge_hbox.add_child(badge)
 		hbox.add_child(badge_panel)
 	else:
 		# Attacker label
@@ -397,23 +461,62 @@ func show_explosion_notice(attacker_name: String, victim_name: String, attacker_
 		_setup_label.call(atk_lbl, a_text, a_col, 16)
 		hbox.add_child(atk_lbl)
 		
-		# Middle action badge: e.g. "BLEW UP"
+		# Middle action badge: e.g. "MISSILE", "GUIDED MISSILE", "BOMB", "ZAPPED"
 		var badge_panel := PanelContainer.new()
 		badge_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var b_style := StyleBoxFlat.new()
-		b_style.bg_color = Color(1.0, 0.4, 0.1, 0.25)
-		b_style.border_color = Color(1.0, 0.5, 0.15, 0.7)
 		b_style.set_border_width_all(1)
 		b_style.set_corner_radius_all(4)
 		b_style.content_margin_left = 7
 		b_style.content_margin_right = 7
 		b_style.content_margin_top = 1
 		b_style.content_margin_bottom = 1
+
+		var action_text := "BLEW UP"
+		var text_color := Color(1.0, 0.68, 0.22)
+
+		if is_lightning:
+			action_text = "ZAPPED"
+			text_color = Color(0.35, 0.95, 1.0)
+			b_style.bg_color = Color(0.1, 0.42, 0.7, 0.35)
+			b_style.border_color = Color(0.3, 0.85, 1.0, 0.8)
+		elif is_guided:
+			action_text = "GUIDED MISSILE"
+			text_color = Color(0.88, 0.6, 1.0)
+			b_style.bg_color = Color(0.35, 0.12, 0.55, 0.35)
+			b_style.border_color = Color(0.75, 0.45, 0.95, 0.8)
+		elif is_missile:
+			action_text = "MISSILE"
+			text_color = Color(1.0, 0.72, 0.28)
+			b_style.bg_color = Color(0.8, 0.32, 0.1, 0.3)
+			b_style.border_color = Color(1.0, 0.55, 0.2, 0.8)
+		elif is_bomb:
+			action_text = "BOMB"
+			text_color = Color(1.0, 0.42, 0.22)
+			b_style.bg_color = Color(0.85, 0.18, 0.12, 0.32)
+			b_style.border_color = Color(1.0, 0.35, 0.2, 0.8)
+		else:
+			b_style.bg_color = Color(1.0, 0.4, 0.1, 0.25)
+			b_style.border_color = Color(1.0, 0.5, 0.15, 0.7)
+
 		badge_panel.add_theme_stylebox_override("panel", b_style)
-		
+
+		var badge_hbox := HBoxContainer.new()
+		badge_hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		badge_hbox.add_theme_constant_override("separation", 5)
+		badge_panel.add_child(badge_hbox)
+
+		if ITEM_ICONS.has(weapon_norm) and ITEM_ICONS[weapon_norm] != null:
+			var item_tex := TextureRect.new()
+			item_tex.texture = ITEM_ICONS[weapon_norm]
+			item_tex.custom_minimum_size = Vector2(16, 16)
+			item_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			item_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			badge_hbox.add_child(item_tex)
+
 		var badge_lbl := Label.new()
-		_setup_label.call(badge_lbl, "BLEW UP", Color(1.0, 0.68, 0.22), 12)
-		badge_panel.add_child(badge_lbl)
+		_setup_label.call(badge_lbl, action_text, text_color, 12)
+		badge_hbox.add_child(badge_lbl)
 		hbox.add_child(badge_panel)
 		
 		# Victim label
@@ -434,7 +537,7 @@ func show_explosion_notice(attacker_name: String, victim_name: String, attacker_
 	tw.tween_property(card, "modulate:a", 1.0, 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tw.tween_property(card, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	
-	# Micro-shake effect if local player got blown up
+	# Micro-shake effect if local player got blown up or zapped
 	if is_local_victim:
 		var shake_tw = card.create_tween()
 		shake_tw.tween_property(card, "position:x", card.position.x + 6, 0.04)

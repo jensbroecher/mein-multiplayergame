@@ -3598,7 +3598,25 @@ func _update_visual_states(delta):
 		if sfx_rocket_loop.playing:
 			sfx_rocket_loop.stop()
 
-func on_hit(attacker_id: int = 0):
+func _broadcast_combat_notice(attacker_name: String, victim_name: String, attacker_id: int, victim_id: int, weapon: String = "") -> void:
+	var level = get_tree().get_first_node_in_group("level")
+	if level and level.has_method("_all_race_uis"):
+		for ui in level._all_race_uis():
+			if ui and ui.has_method("show_explosion_notice"):
+				ui.show_explosion_notice(attacker_name, victim_name, attacker_id, victim_id, weapon)
+	else:
+		for ui in get_tree().get_nodes_in_group("race_ui"):
+			if ui and ui.has_method("show_explosion_notice"):
+				ui.show_explosion_notice(attacker_name, victim_name, attacker_id, victim_id, weapon)
+		var local_cart = null
+		for c in get_tree().get_nodes_in_group("player_carts"):
+			if c.is_local_player:
+				local_cart = c
+				break
+		if local_cart and local_cart.race_ui and local_cart.race_ui.has_method("show_explosion_notice"):
+			local_cart.race_ui.show_explosion_notice(attacker_name, victim_name, attacker_id, victim_id, weapon)
+
+func on_hit(attacker_id: int = 0, weapon: String = ""):
 	if is_shielded:
 		is_shielded = false
 		var is_real_peer = name.to_int() > 0 and not get("is_ai") and NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER
@@ -3610,15 +3628,15 @@ func on_hit(attacker_id: int = 0):
 		return
 	# Server triggers the explosion for all clients
 	if multiplayer.multiplayer_peer != null and multiplayer.is_server():
-		explode_rpc.rpc(attacker_id)
+		explode_rpc.rpc(attacker_id, weapon)
 	else:
-		explode(attacker_id) # fallback for local-only / single-player
+		explode(attacker_id, weapon) # fallback for local-only / single-player
 
 @rpc("any_peer", "call_local", "reliable")
-func explode_rpc(attacker_id: int = 0):
-	explode(attacker_id)
+func explode_rpc(attacker_id: int = 0, weapon: String = ""):
+	explode(attacker_id, weapon)
 
-func explode(attacker_id: int = 0):
+func explode(attacker_id: int = 0, weapon: String = ""):
 	if is_exploding: return
 	is_exploding = true
 	can_move = false
@@ -3648,25 +3666,10 @@ func explode(attacker_id: int = 0):
 				attacker_name = str(NetworkManager.players[attacker_id].get("name", "Someone"))
 
 		# 1. Spoken by RaceCommentator narrator (TTS)
-		get_tree().call_group(&"race_commentator", &"call_explosion", attacker_name, victim_name)
+		get_tree().call_group(&"race_commentator", &"call_explosion", attacker_name, victim_name, weapon)
 
 		# 2. Rich in-game combat notification on all active race UIs
-		var level = get_tree().get_first_node_in_group("level")
-		if level and level.has_method("_all_race_uis"):
-			for ui in level._all_race_uis():
-				if ui and ui.has_method("show_explosion_notice"):
-					ui.show_explosion_notice(attacker_name, victim_name, attacker_id, victim_id)
-		else:
-			for ui in get_tree().get_nodes_in_group("race_ui"):
-				if ui and ui.has_method("show_explosion_notice"):
-					ui.show_explosion_notice(attacker_name, victim_name, attacker_id, victim_id)
-			var local_cart = null
-			for c in get_tree().get_nodes_in_group("player_carts"):
-				if c.is_local_player:
-					local_cart = c
-					break
-			if local_cart and local_cart.race_ui and local_cart.race_ui.has_method("show_explosion_notice"):
-				local_cart.race_ui.show_explosion_notice(attacker_name, victim_name, attacker_id, victim_id)
+		_broadcast_combat_notice(attacker_name, victim_name, attacker_id, victim_id, weapon)
 	
 	# Play a random bomb explosion sound
 	var selected_bomb_sound = BOMB_EXPLOSION_SOUNDS[randi() % BOMB_EXPLOSION_SOUNDS.size()]
@@ -4732,6 +4735,10 @@ func client_play_lightning(hit_player_names: Array, random_target: Vector3 = Vec
 		return global_position
 
 	if not hit_player_names.is_empty():
+		var attacker_name := player_name if player_name != "" else "Racer"
+		var attacker_id := name.to_int()
+		var victim_names: Array[String] = []
+
 		for name_str in hit_player_names:
 			var target = null
 			for c in get_tree().get_nodes_in_group("player_carts"):
@@ -4745,6 +4752,17 @@ func client_play_lightning(hit_player_names: Array, random_target: Vector3 = Vec
 					return Vector3.ZERO
 				_create_dynamic_lightning_arc(origin_getter, target_getter)
 				_spawn_sparks(target.global_position + target.visuals.global_transform.basis.y * 0.05)
+
+				var v_name: String = str(target.get("player_name")) if str(target.get("player_name")) != "" else "Racer"
+				var v_id: int = int(target.name.to_int())
+				victim_names.append(v_name)
+				_broadcast_combat_notice(attacker_name, v_name, attacker_id, v_id, "LIGHTNING")
+
+		if not victim_names.is_empty():
+			if victim_names.size() > 1:
+				get_tree().call_group(&"race_commentator", &"call_lightning_multi", attacker_name, victim_names)
+			else:
+				get_tree().call_group(&"race_commentator", &"call_lightning", attacker_name, victim_names[0])
 	else:
 		var strike_pos = random_target
 		if strike_pos == Vector3.ZERO:
