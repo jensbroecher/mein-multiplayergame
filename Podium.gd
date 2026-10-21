@@ -259,7 +259,11 @@ func _build_stage() -> void:
 	_stage = SubViewport.new()
 	_stage.own_world_3d = true
 	_stage.transparent_bg = true
-	_stage.msaa_3d = Viewport.MSAA_4X
+	if OS.has_feature("mobile"):
+		_stage.msaa_3d = Viewport.MSAA_DISABLED
+		_stage.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA
+	else:
+		_stage.msaa_3d = Viewport.MSAA_4X
 	_stage.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	holder.add_child(_stage)
 
@@ -282,13 +286,16 @@ func _build_stage() -> void:
 	var key := DirectionalLight3D.new()
 	key.light_energy = 1.5
 	key.light_color = Color(1.0, 0.96, 0.9)
-	key.shadow_enabled = true
-	key.shadow_bias = 0.04
-	key.shadow_normal_bias = 2.4
-	key.shadow_blur = 1.0
-	key.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
-	key.directional_shadow_max_distance = 18.0
-	key.directional_shadow_pancake_size = 15.0
+	if OS.has_feature("mobile"):
+		key.shadow_enabled = false
+	else:
+		key.shadow_enabled = true
+		key.shadow_bias = 0.04
+		key.shadow_normal_bias = 2.4
+		key.shadow_blur = 1.0
+		key.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+		key.directional_shadow_max_distance = 18.0
+		key.directional_shadow_pancake_size = 15.0
 	key.rotation = Vector3(deg_to_rad(-52.0), deg_to_rad(-22.0), 0.0)
 	_stage.add_child(key)
 	var rim := DirectionalLight3D.new()

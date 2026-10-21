@@ -515,7 +515,11 @@ func _build_showroom() -> void:
 	_stage = SubViewport.new()
 	_stage.own_world_3d = true
 	_stage.transparent_bg = true
-	_stage.msaa_3d = Viewport.MSAA_4X
+	if OS.has_feature("mobile"):
+		_stage.msaa_3d = Viewport.MSAA_DISABLED
+		_stage.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA
+	else:
+		_stage.msaa_3d = Viewport.MSAA_4X
 	# Only while the screen is up: it used to render the preview through every race.
 	_stage.render_target_update_mode = SubViewport.UPDATE_WHEN_PARENT_VISIBLE
 	holder.add_child(_stage)
@@ -540,13 +544,16 @@ func _build_showroom() -> void:
 	var key := DirectionalLight3D.new()
 	key.light_energy = 1.7
 	key.light_color = Color(1.0, 0.97, 0.92)
-	key.shadow_enabled = true
-	key.shadow_bias = 0.04
-	key.shadow_normal_bias = 2.4
-	key.shadow_blur = 1.0
-	key.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
-	key.directional_shadow_max_distance = 10.0
-	key.directional_shadow_pancake_size = 10.0
+	if OS.has_feature("mobile"):
+		key.shadow_enabled = false
+	else:
+		key.shadow_enabled = true
+		key.shadow_bias = 0.04
+		key.shadow_normal_bias = 2.4
+		key.shadow_blur = 1.0
+		key.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+		key.directional_shadow_max_distance = 10.0
+		key.directional_shadow_pancake_size = 10.0
 	key.rotation = Vector3(deg_to_rad(-58.0), deg_to_rad(-28.0), 0.0)
 	_stage.add_child(key)
 	var rim := DirectionalLight3D.new()

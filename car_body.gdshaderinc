@@ -65,14 +65,14 @@ instance uniform float fx_alpha = 1.0;
 
 varying vec3 v_pos;
 varying vec3 v_nrm;
-varying flat int v_mat;
+varying float v_mat_f;
 
 const int SEGMENTS[10] = int[](0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F);
 
 void vertex() {
 	v_pos = VERTEX;
 	v_nrm = NORMAL;
-	v_mat = int(UV2.x + 0.5);
+	v_mat_f = UV2.x;
 }
 
 // Coverage of a signed distance (negative inside), anti-aliased over one pixel.
@@ -371,6 +371,7 @@ vec3 paint_albedo(vec3 p, vec3 n) {
 }
 
 void fragment() {
+	int v_mat = int(round(v_mat_f));
 	vec3 base = pow(COLOR.rgb, vec3(2.2));
 	vec3 alb = base;
 	float rough = 0.6;
@@ -380,7 +381,7 @@ void fragment() {
 	float ccr = 0.1;
 	vec3 emit = vec3(0.0);
 	if (v_mat <= M_PAINT) {
-		vec3 n_obj = normalize(v_nrm);
+		vec3 n_obj = length(v_nrm) > 1e-4 ? normalize(v_nrm) : vec3(0.0, 1.0, 0.0);
 		alb = paint_albedo(v_pos, n_obj);
 		if (paint_finish == FIN_GLOSS) {
 			rough = 0.2;
@@ -461,6 +462,13 @@ void fragment() {
 		emit = base * 0.3;
 	}
 	alb = mix(alb, fx_tint.rgb, fx_tint.a);
+	rough = clamp(rough, 0.05, 1.0);
+	if (cc <= 0.001) {
+		cc = 0.0;
+		ccr = 1.0;
+	} else {
+		ccr = clamp(ccr, 0.08, 1.0);
+	}
 	ALBEDO = alb;
 	ROUGHNESS = rough;
 	METALLIC = metal;
