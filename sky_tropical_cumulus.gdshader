@@ -2,10 +2,21 @@
 // with heaped cumulus that are lit from the sun's side and grey-blue underneath.
 //
 // Static on purpose, like sky_winter_cirrus.gdshader: a sky shader that reads TIME forces Godot to
-// rebuild the radiance map every frame. The uniform names match that shader's (JungleRain.gd drives
-// the sky_top, sky_horizon, cloud_*, sun_glow and sky_energy ones to cloud the sky over in a storm).
+// rebuild the radiance map every frame. Storm transitions are driven smoothly via the rain_sky_blend
+// global uniform (JungleRain.gd), avoiding radiance rebuild stalls while smoothly animating the visible sky.
 shader_type sky;
 render_mode use_debanding;
+
+global uniform float rain_sky_blend;
+
+group_uniforms storm;
+uniform vec3 storm_sky_top : source_color = vec3(0.30, 0.34, 0.38);
+uniform vec3 storm_sky_horizon : source_color = vec3(0.46, 0.50, 0.50);
+uniform vec3 storm_cloud_lit : source_color = vec3(0.55, 0.58, 0.60);
+uniform float storm_cloud_coverage : hint_range(0.0, 1.0) = 0.95;
+uniform float storm_cloud_opacity : hint_range(0.0, 1.0) = 0.95;
+uniform float storm_sun_glow : hint_range(0.0, 1.0) = 0.05;
+uniform float storm_sky_energy : hint_range(0.0, 2.0) = 0.6;
 
 group_uniforms sky;
 uniform vec3 sky_top : source_color = vec3(0.16, 0.40, 0.78);
@@ -78,12 +89,21 @@ float heap(vec2 q, vec2 warp) {
 }
 
 void sky() {
+	float k = clamp(rain_sky_blend, 0.0, 1.0);
+	vec3 cur_sky_top = mix(sky_top, storm_sky_top, k);
+	vec3 cur_sky_horizon = mix(sky_horizon, storm_sky_horizon, k);
+	vec3 cur_cloud_lit = mix(cloud_lit, storm_cloud_lit, k);
+	float cur_cloud_coverage = mix(cloud_coverage, storm_cloud_coverage, k);
+	float cur_cloud_opacity = mix(cloud_opacity, storm_cloud_opacity, k);
+	float cur_sun_glow = mix(sun_glow, storm_sun_glow, k);
+	float cur_sky_energy = mix(sky_energy, storm_sky_energy, k);
+
 	vec3 d = normalize(EYEDIR);
 	float h = d.y;
 
 	vec3 col;
 	if (h >= 0.0) {
-		col = mix(sky_horizon, sky_top, pow(clamp(h, 0.0, 1.0), sky_curve));
+		col = mix(cur_sky_horizon, cur_sky_top, pow(clamp(h, 0.0, 1.0), sky_curve));
 	} else {
 		col = mix(ground_horizon, ground_bottom, pow(clamp(-h, 0.0, 1.0), 0.5));
 	}
@@ -95,7 +115,7 @@ void sky() {
 		float ang = acos(to_sun);
 		float r = radians(sun_disc_degrees);
 		float disc = 1.0 - smoothstep(r * 0.85, r, ang);
-		float glow = pow(max(to_sun, 0.0), 48.0) * sun_glow + pow(max(to_sun, 0.0), 6.0) * sun_glow * 0.25;
+		float glow = pow(max(to_sun, 0.0), 48.0) * cur_sun_glow + pow(max(to_sun, 0.0), 6.0) * cur_sun_glow * 0.25;
 		col += sun_tint * LIGHT0_COLOR * (glow + disc * 12.0) * min(LIGHT0_ENERGY, 2.0);
 		sun_flat = LIGHT0_DIRECTION.xz;
 		if (dot(sun_flat, sun_flat) < 0.0001) {
@@ -117,8 +137,8 @@ void sky() {
 		vec2 warp = (vec2(fbm(q * 0.7 + 3.1, 3), fbm(q * 0.7 + 8.3, 3)) - 0.5) * 0.5;
 
 		// Coverage is not linear in the threshold: the top of its range closes the sky over completely.
-		float thresh = mix(0.80, -0.15, pow(cloud_coverage, 1.8));
-		float overcast = smoothstep(0.65, 0.95, cloud_coverage);
+		float thresh = mix(0.80, -0.15, pow(cur_cloud_coverage, 1.8));
+		float overcast = smoothstep(0.65, 0.95, cur_cloud_coverage);
 		float ht = heap(q, warp);
 		float body = smoothstep(thresh, thresh + 0.09, ht);
 
@@ -134,13 +154,13 @@ void sky() {
 			float bright = clamp(lit * (1.0 - 0.5 * thick) + 0.35 * (1.0 - thick), 0.0, 1.0);
 			// A storm deck is dark underneath whatever the sun does.
 			vec3 shade = mix(cloud_shade, vec3(0.30, 0.34, 0.36), overcast);
-			vec3 cloud = mix(shade, cloud_lit, bright);
+			vec3 cloud = mix(shade, cur_cloud_lit, bright);
 			// Silver lining where thin cloud sits near the sun.
 			cloud += sun_tint * pow(max(to_sun, 0.0), 14.0) * (1.0 - thick) * 0.5;
 
 			// The deck thins into the horizon haze and its far edge fades out.
 			float fade = smoothstep(0.0, 0.14, h);
-			col = mix(col, cloud, body * cloud_opacity * fade);
+			col = mix(col, cloud, body * cur_cloud_opacity * fade);
 		}
 	}
 
@@ -151,5 +171,6 @@ void sky() {
 		float band = 1.0 - smoothstep(0.0, sun_horizon_height, max(h, 0.0));
 		col = mix(col, sun_tint * sun_horizon_tint, sun_horizon_glow * pow(az, 2.5) * band);
 	}
-	COLOR = col * sky_energy;
+	COLOR = col * cur_sky_energy;
 }
+

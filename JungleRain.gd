@@ -28,8 +28,8 @@ extends Node3D
 ## The ground's material: its `wetness` follows the road's.
 @export var ground_material: ShaderMaterial
 @export var sun_path: NodePath
-## The sky (sky_tropical_cumulus.gdshader): it clouds over and darkens with the storm. Changed in
-## steps of a tenth of the storm, since every change re-renders the sky's radiance map.
+## The sky (sky_tropical_cumulus.gdshader): it clouds over and darkens with the storm via the
+## rain_sky_blend global uniform, smoothly interpolating every frame without radiance map stalls.
 @export var sky_material: ShaderMaterial
 @export var storm_sky_top := Color(0.30, 0.34, 0.38)
 @export var storm_sky_horizon := Color(0.46, 0.50, 0.50)
@@ -88,10 +88,9 @@ func _ready() -> void:
 		_sun_energy = _sun.light_energy
 		_sun_color = _sun.light_color
 	if sky_material:
-		for prm in ["sky_top", "sky_horizon", "cloud_coverage", "cloud_opacity", "sun_glow", "cloud_lit", "sky_energy"]:
-			_sky_base[prm] = sky_material.get_shader_parameter(prm)
-		if _sky_base["sky_energy"] == null:
-			_sky_base["sky_energy"] = 1.0
+		sky_material.set_shader_parameter(&"storm_sky_top", storm_sky_top)
+		sky_material.set_shader_parameter(&"storm_sky_horizon", storm_sky_horizon)
+	RenderingServer.global_shader_parameter_set(&"rain_sky_blend", 0.0)
 	for path in road_paths:
 		var n := get_node_or_null(path)
 		if n:
@@ -117,7 +116,7 @@ func _exit_tree() -> void:
 	# The material is a shared resource and outlives the level: leave it dry.
 	if ground_material:
 		ground_material.set_shader_parameter(&"wetness", 0.0)
-	_set_sky(0)
+	RenderingServer.global_shader_parameter_set(&"rain_sky_blend", 0.0)
 
 
 ## Rain streaks falling past the camera, emitted from a slab of air above it. Built here rather
@@ -249,7 +248,7 @@ func _process(delta: float) -> void:
 		_sun.light_color = _sun_color.lerp(Color(0.8, 0.86, 1.0), maxf(intensity * 0.5, flash))
 	if ground_material:
 		ground_material.set_shader_parameter(&"wetness", wetness)
-	_set_sky(int(round(intensity * 10.0)))
+	RenderingServer.global_shader_parameter_set(&"rain_sky_blend", intensity)
 	for road in _roads:
 		if is_instance_valid(road):
 			var dry: float = float(road.get_meta(&"dry_grip", 1.0))
@@ -264,33 +263,21 @@ func _process(delta: float) -> void:
 		elif intensity <= 0.01 and _rain_audio.playing:
 			_rain_audio.stop()
 
-	_rain.emitting = intensity > 0.02
-	if _rain.emitting:
-		_rain.amount_ratio = intensity * particle_scale
-		var cam: Camera3D = get_viewport().get_camera_3d() if get_viewport() else null
-		if cam:
-			# Above and a little ahead of the camera, so the streaks fill the view as they fall.
-			var fwd: Vector3 = -cam.global_transform.basis.z
-			fwd.y = 0.0
-			_rain.global_position = cam.global_position + fwd.normalized() * 8.0 + Vector3.UP * 16.0
+	if _rain:
+		_rain.emitting = intensity > 0.02
+		if _rain.emitting:
+			_rain.amount_ratio = intensity * particle_scale
+			var cam: Camera3D = get_viewport().get_camera_3d() if get_viewport() else null
+			if cam:
+				# Above and a little ahead of the camera, so the streaks fill the view as they fall.
+				var fwd: Vector3 = -cam.global_transform.basis.z
+				fwd.y = 0.0
+				_rain.global_position = cam.global_position + fwd.normalized() * 8.0 + Vector3.UP * 16.0
 
 
-## Clouds the sky over to `step` tenths of a storm.
+## Clouds the sky over to `step` tenths of a storm (or smooth float via global uniform).
 func _set_sky(step: int) -> void:
-	if sky_material == null or _sky_base.is_empty() or step == _sky_step:
-		return
-	_sky_step = step
-	var k: float = float(step) / 10.0
-	var top: Color = _sky_base["sky_top"]
-	var hor: Color = _sky_base["sky_horizon"]
-	var lit: Color = _sky_base["cloud_lit"]
-	sky_material.set_shader_parameter(&"sky_top", top.lerp(storm_sky_top, k))
-	sky_material.set_shader_parameter(&"sky_horizon", hor.lerp(storm_sky_horizon, k))
-	sky_material.set_shader_parameter(&"cloud_coverage", lerpf(float(_sky_base["cloud_coverage"]), 0.95, k))
-	sky_material.set_shader_parameter(&"cloud_opacity", lerpf(float(_sky_base["cloud_opacity"]), 0.95, k))
-	sky_material.set_shader_parameter(&"sun_glow", lerpf(float(_sky_base["sun_glow"]), 0.05, k))
-	sky_material.set_shader_parameter(&"cloud_lit", lit.lerp(Color(0.55, 0.58, 0.60), k))
-	sky_material.set_shader_parameter(&"sky_energy", lerpf(float(_sky_base["sky_energy"]), 0.6, k))
+	RenderingServer.global_shader_parameter_set(&"rain_sky_blend", clampf(float(step) / 10.0, 0.0, 1.0))
 
 
 ## Now and then in a storm, lightning: the light flickers white and the thunder follows a second

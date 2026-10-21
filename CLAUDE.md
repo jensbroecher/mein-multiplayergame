@@ -707,10 +707,11 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 
 ## Msitu Falls (Matumaini GP, stage 3)
 
-- The sky is `sky_tropical_cumulus.gdshader`, static like the others (no `TIME`). It keeps
-  `sky_winter_cirrus.gdshader`'s uniform names, because `JungleRain.gd` drives `sky_top`, `sky_horizon`,
-  `cloud_*`, `sun_glow` and `sky_energy` to cloud the sky over in a storm. `cloud_coverage` past ~0.65 closes
-  it into a dark overcast deck on its own.
+- The sky is `sky_tropical_cumulus.gdshader`, static like the others (no `TIME`). The storm transition
+  is driven smoothly per frame by `JungleRain.gd` via the `rain_sky_blend` global shader parameter, blending
+  `sky_top`, `sky_horizon`, `cloud_*`, `sun_glow` and `sky_energy` toward storm values without triggering
+  radiance map rebuild stalls or stepping. `cloud_coverage` past ~0.65 closes it into a dark overcast deck
+  on its own.
 - `_ground_at()` must split each cell on the same diagonal as `_build_terrain` (the one joining the closer
   heights). With one fixed diagonal it stood up to a metre off the real surface on some cells, and plants,
   posts and signs floated or sank there. `_verify_ground_at` reads the mesh's index buffer back and

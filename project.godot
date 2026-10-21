@@ -280,3 +280,7 @@ aurora_clock={
 "type": "float",
 "value": 0.0
 }
+rain_sky_blend={
+"type": "float",
+"value": 0.0
+}
