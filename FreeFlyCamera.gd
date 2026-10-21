@@ -63,7 +63,7 @@ func _apply_rotation() -> void:
 
 
 func _refresh_label() -> void:
-	_label.text = "INSPECTION  |  LMB/RMB drag or trackpad swipe: look  |  Pinch: forward/back  |  WASD: fly  |  Q/E: down/up  |  Shift/Ctrl: faster/slower  |  Wheel: speed (%d m/s)  |  Esc: menu" % int(speed)
+	_label.text = "INSPECTION  |  LMB/RMB drag or trackpad swipe: look  |  Pinch: forward/back  |  WASD: fly  |  Q/E: down/up  |  Shift/Ctrl: faster/slower  |  Wheel: speed (%d m/s)  |  Esc/Backspace: menu" % int(speed)
 
 
 func _unhandled_input(event: InputEvent) -> void:

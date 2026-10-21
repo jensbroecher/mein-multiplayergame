@@ -550,13 +550,27 @@ func _return_to_menu_now():
 	main_menu.show()
 	MusicManager.stop_music()
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		if _find_level_nodes().size() > 0:
+			var focus = get_viewport().gui_get_focus_owner()
+			if focus is LineEdit or focus is TextEdit:
+				return
+			if pause_menu.visible:
+				pause_menu.hide()
+			else:
+				pause_menu.show_pause_menu()
+			get_viewport().set_input_as_handled()
+
 func _input(event: InputEvent):
 	var toggle_pause := false
 	if event.is_action_pressed("ui_cancel"):
 		toggle_pause = true
 	elif event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_ESCAPE or event.physical_keycode == KEY_ESCAPE \
-				or event.keycode == KEY_BACKSPACE or event.physical_keycode == KEY_BACKSPACE:
+		var key_event := event as InputEventKey
+		if key_event.keycode == KEY_ESCAPE or key_event.physical_keycode == KEY_ESCAPE or key_event.key_label == KEY_ESCAPE \
+				or key_event.keycode == KEY_BACKSPACE or key_event.physical_keycode == KEY_BACKSPACE or key_event.key_label == KEY_BACKSPACE \
+				or key_event.keycode == KEY_BACK or key_event.physical_keycode == KEY_BACK or key_event.key_label == KEY_BACK:
 			toggle_pause = true
 	if toggle_pause and (_find_level_nodes().size() > 0):
 		# Don't steal Backspace while typing in a focused LineEdit

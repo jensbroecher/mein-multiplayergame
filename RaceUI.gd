@@ -922,8 +922,17 @@ func _on_action_button_pressed():
 		main.call_deferred("_on_server_disconnected")
 
 func _input(event: InputEvent):
-	if event.is_action_pressed("ui_cancel") or (event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE):
+	var is_pause := event.is_action_pressed("ui_cancel")
+	if not is_pause and event is InputEventKey and event.pressed and not event.echo:
+		var key_event := event as InputEventKey
+		if key_event.keycode == KEY_ESCAPE or key_event.physical_keycode == KEY_ESCAPE or key_event.key_label == KEY_ESCAPE \
+				or key_event.keycode == KEY_BACKSPACE or key_event.physical_keycode == KEY_BACKSPACE or key_event.key_label == KEY_BACKSPACE \
+				or key_event.keycode == KEY_BACK or key_event.physical_keycode == KEY_BACK or key_event.key_label == KEY_BACK:
+			is_pause = true
+	if is_pause:
 		var main = get_tree().current_scene
+		if main == null or not main.has_method("_input"):
+			main = get_tree().root.get_node_or_null("Main")
 		if main and main.has_method("_input"):
 			main._input(event)
 
