@@ -8,6 +8,7 @@ extends Control
 
 var option_camera_mode: OptionButton
 var option_shadows: OptionButton
+var option_commentary: OptionButton
 
 func _ready():
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -17,6 +18,7 @@ func _ready():
 	sfx_slider.value = MusicManager.sfx_volume
 	_build_camera_option()
 	_build_shadows_option()
+	_build_commentary_option()
 	
 	# Connect signals
 	music_slider.value_changed.connect(_on_music_value_changed)
@@ -62,6 +64,23 @@ func _build_shadows_option() -> void:
 	option_shadows.item_selected.connect(_on_shadow_quality_selected)
 	row.add_child(option_shadows)
 
+func _build_commentary_option() -> void:
+	var settings_list = $Panel/MarginContainer/VBoxContainer/SettingsList
+	var row = HBoxContainer.new()
+	row.name = "CommentaryBox"
+	settings_list.add_child(row)
+	var lbl = Label.new()
+	lbl.text = "Race Announcer"
+	lbl.custom_minimum_size = Vector2(160, 0)
+	row.add_child(lbl)
+	option_commentary = OptionButton.new()
+	option_commentary.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	option_commentary.add_item("Off")
+	option_commentary.add_item("On")
+	option_commentary.selected = 1 if MusicManager.commentary_enabled else 0
+	option_commentary.item_selected.connect(_on_commentary_selected)
+	row.add_child(option_commentary)
+
 func show_pause_menu():
 	# Sync sliders
 	music_slider.value = MusicManager.music_volume
@@ -70,6 +89,8 @@ func show_pause_menu():
 		option_camera_mode.selected = 0 if MusicManager.use_isometric_camera else 1
 	if option_shadows:
 		option_shadows.selected = MusicManager.shadow_quality_index
+	if option_commentary:
+		option_commentary.selected = 1 if MusicManager.commentary_enabled else 0
 	
 	# Hide/show restart button based on game mode
 	if NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER:
@@ -90,6 +111,11 @@ func _on_camera_mode_selected(index: int) -> void:
 
 func _on_shadow_quality_selected(index: int) -> void:
 	MusicManager.set_shadow_quality(index)
+
+func _on_commentary_selected(index: int) -> void:
+	if option_commentary:
+		option_commentary.selected = index
+	MusicManager.set_commentary_enabled(index == 1)
 
 func _on_resume_pressed():
 	hide()

@@ -58,8 +58,12 @@ var _final_lap_called := false
 var _finish_called: Dictionary = {}
 ## Calls waiting out their delay: {"at": clock time, "text": String}.
 var _pending: Array = []
-var _voice_id := ""
-var _voice_searched := false
+var _last_speak_time := -1000.0
+
+static var _cached_voice_id: String = ""
+static var _voice_search_done: bool = false
+static var _has_tts_cached: bool = false
+static var _has_tts_checked: bool = false
 
 
 ## The race went green: the grid is settled, so start watching the lead.
@@ -174,6 +178,24 @@ func _queue(text: String, delay: float) -> void:
 		_pending.append({"at": _clock + delay, "text": text})
 
 
+## Pre-warms the OS text-to-speech engine and caches the best voice ID on a background
+## thread so that speaking during a race causes zero main-thread lag or frame drops.
+static func warm_up() -> void:
+	if _voice_search_done:
+		return
+	if not _has_tts():
+		_voice_search_done = true
+		return
+	WorkerThreadPool.add_task(func():
+		var voice := _find_best_voice()
+		_cached_voice_id = voice
+		_voice_search_done = true
+		if voice != "":
+			DisplayServer.tts_speak(" ", voice, 0, 1.0, 1.0, 0, false)
+			DisplayServer.tts_stop()
+	)
+
+
 func _say(text: String) -> void:
 	said.emit(text)
 	if not MusicManager.commentary_enabled or not _has_tts():
@@ -182,24 +204,45 @@ func _say(text: String) -> void:
 	if voice == "":
 		return
 	var volume := int(clampf(MusicManager.commentary_volume, 0.0, 1.0) * 100.0)
+	_last_speak_time = _clock
+	WorkerThreadPool.add_task(_speak_thread.bind(text, voice, volume))
+
+
+static func _speak_thread(text: String, voice: String, volume: int) -> void:
 	DisplayServer.tts_speak(text, voice, volume, 1.0, SPEECH_RATE, 0, false)
 
 
-func _has_tts() -> bool:
-	return DisplayServer.has_feature(DisplayServer.FEATURE_TEXT_TO_SPEECH)
+static func _has_tts() -> bool:
+	if not _has_tts_checked:
+		_has_tts_cached = DisplayServer.has_feature(DisplayServer.FEATURE_TEXT_TO_SPEECH)
+		_has_tts_checked = true
+	return _has_tts_cached
 
 
 func _is_speaking() -> bool:
-	return _has_tts() and DisplayServer.tts_is_speaking()
+	if not _has_tts():
+		return false
+	if _clock - _last_speak_time < 0.4:
+		return true
+	return DisplayServer.tts_is_speaking()
+
+
+## Returns the cached English voice for the calls, or searches for it if not already cached.
+static func _pick_voice() -> String:
+	if _voice_search_done:
+		return _cached_voice_id
+	_cached_voice_id = _find_best_voice()
+	_voice_search_done = true
+	return _cached_voice_id
 
 
 ## An English voice for the calls, the best-sounding one the OS has. The calls are English, so a
 ## voice for another language would mispronounce them; one is still used if there's no English.
-func _pick_voice() -> String:
-	if _voice_searched:
-		return _voice_id
-	_voice_searched = true
+static func _find_best_voice() -> String:
+	if not _has_tts():
+		return ""
 	var best_score := -1000
+	var chosen_id := ""
 	for id in DisplayServer.tts_get_voices_for_language("en"):
 		var lower: String = id.to_lower()
 		var score := 0
@@ -212,9 +255,9 @@ func _pick_voice() -> String:
 			score -= 5
 		if score > best_score:
 			best_score = score
-			_voice_id = id
-	if _voice_id == "":
+			chosen_id = id
+	if chosen_id == "":
 		var voices := DisplayServer.tts_get_voices()
 		if not voices.is_empty():
-			_voice_id = str(voices[0]["id"])
-	return _voice_id
+			chosen_id = str(voices[0]["id"])
+	return chosen_id

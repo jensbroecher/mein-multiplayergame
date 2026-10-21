@@ -197,6 +197,9 @@ func _ready():
 	player1.finished.connect(_on_track_finished)
 	player2.finished.connect(_on_track_finished)
 	_load_playlist()
+	if commentary_enabled:
+		const CommentatorClass = preload("res://RaceCommentator.gd")
+		CommentatorClass.warm_up()
 	get_tree().node_added.connect(_on_node_added)
 	for button in get_tree().root.find_children("*", "BaseButton", true, false):
 		_hook_button(button)
@@ -602,7 +605,10 @@ func set_sfx_volume(linear_val: float, save: bool = true):
 
 func set_commentary_enabled(enabled: bool, save: bool = true):
 	commentary_enabled = enabled
-	if not enabled and DisplayServer.has_feature(DisplayServer.FEATURE_TEXT_TO_SPEECH):
+	if enabled:
+		const CommentatorClass = preload("res://RaceCommentator.gd")
+		CommentatorClass.warm_up()
+	elif DisplayServer.has_feature(DisplayServer.FEATURE_TEXT_TO_SPEECH):
 		DisplayServer.tts_stop()
 	if save: save_settings()
 

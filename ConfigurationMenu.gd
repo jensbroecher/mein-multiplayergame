@@ -378,10 +378,10 @@ func _build_sound_page() -> Control:
 	label_sfx_value = sfx_row[1] as Label
 
 	body.add_child(HSeparator.new())
-	_add_section_title(body, "RACE COMMENTATOR")
-	_add_hint(body, "Calls the race by name (who takes the lead, who wins) with your system's text-to-speech voice. Its volume is separate from the sliders above.")
-	check_commentary = _add_check_row(body, "Race Commentator")
-	var commentary_row: Array = _add_slider_row(body, "Commentator Volume")
+	_add_section_title(body, "RACE ANNOUNCER & COMMENTATOR")
+	_add_hint(body, "Calls the race by name (who takes the lead, final lap, podium finishers) using your system's text-to-speech voice.")
+	check_commentary = _add_check_row(body, "Race Announcer (TTS)")
+	var commentary_row: Array = _add_slider_row(body, "Announcer Volume")
 	slider_commentary = commentary_row[0] as HSlider
 	label_commentary_value = commentary_row[1] as Label
 	return scroll
@@ -580,7 +580,11 @@ func _load_values_from_manager() -> void:
 		slider_sfx.value = MusicManager.sfx_volume
 		_update_volume_label(label_sfx_value, MusicManager.sfx_volume)
 	if check_commentary:
-		check_commentary.button_pressed = MusicManager.commentary_enabled
+		var has_tts = DisplayServer.has_feature(DisplayServer.FEATURE_TEXT_TO_SPEECH)
+		check_commentary.button_pressed = MusicManager.commentary_enabled and has_tts
+		if not has_tts:
+			check_commentary.disabled = true
+			check_commentary.tooltip_text = "Text-to-speech is not supported on this platform"
 	if slider_commentary:
 		slider_commentary.value = MusicManager.commentary_volume
 		_update_volume_label(label_commentary_value, MusicManager.commentary_volume)

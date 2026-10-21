@@ -1,0 +1,6 @@
+TTS Feature available: true
+tts_get_voices_for_language took: 28.874000 ms. Count: 3
+Using voice: HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech_OneCore\Voices\Tokens\MSTTS_V110_enUS_DavidM
+First tts_speak took: 0.011000 ms
+Second tts_speak took: 0.027000 ms
+tts_speak in Thread took: 0.000000 ms
