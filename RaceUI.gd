@@ -62,6 +62,7 @@ var _msg_bottom: float = 0.0
 var standings_panel: PanelContainer
 var standings_list: VBoxContainer
 var _standings_sig: String = ""
+var killfeed_container: VBoxContainer
 
 signal ready_pressed(is_ready: bool)
 signal start_pressed()
@@ -95,6 +96,7 @@ var local_ready = false
 func _ready():
 	_init_styleboxes()
 	_setup_standings_list()
+	_setup_killfeed()
 	_msg_top = label_msg.offset_top
 	_msg_bottom = label_msg.offset_bottom
 
@@ -272,6 +274,180 @@ func show_message(msg: String, duration: float = 0.0):
 		var tw = create_tween()
 		tw.tween_interval(duration)
 		tw.tween_callback(func(): if label_msg.text == msg: label_msg.text = "")
+
+
+func _setup_killfeed() -> void:
+	if hud_panel == null:
+		return
+	killfeed_container = VBoxContainer.new()
+	killfeed_container.name = "KillFeedContainer"
+	killfeed_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	killfeed_container.anchors_preset = Control.PRESET_CENTER_TOP
+	killfeed_container.anchor_left = 0.5
+	killfeed_container.anchor_right = 0.5
+	killfeed_container.offset_top = 64.0
+	killfeed_container.offset_left = -260.0
+	killfeed_container.offset_right = 260.0
+	killfeed_container.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	killfeed_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	killfeed_container.add_theme_constant_override("separation", 6)
+	hud_panel.add_child(killfeed_container)
+
+
+func show_explosion_notice(attacker_name: String, victim_name: String, attacker_id: int = 0, victim_id: int = 0) -> void:
+	if hud_panel == null or killfeed_container == null:
+		return
+	
+	# Determine if local player is involved
+	var my_id := 0
+	for c in get_tree().get_nodes_in_group("player_carts"):
+		if c.get("race_ui") == self or (c.get("is_local_player") == true and int(c.get("device_id")) <= 0):
+			my_id = c.name.to_int()
+			break
+	
+	var is_local_attacker := (attacker_id > 0 and attacker_id == my_id)
+	var is_local_victim := (victim_id > 0 and victim_id == my_id)
+	var is_self_blowup := (attacker_id == victim_id or attacker_id <= 0 or attacker_name == victim_name or attacker_name == "" or attacker_name == "Someone")
+	
+	# Cap active notices to avoid screen clutter
+	while killfeed_container.get_child_count() >= 3:
+		var oldest = killfeed_container.get_child(0)
+		killfeed_container.remove_child(oldest)
+		oldest.queue_free()
+	
+	var card := PanelContainer.new()
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	
+	# Card Style - rich glassmorphism pill with glowing accent border
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.06, 0.08, 0.13, 0.90)
+	style.set_corner_radius_all(10)
+	style.set_border_width_all(1)
+	style.shadow_color = Color(0, 0, 0, 0.5)
+	style.shadow_size = 6
+	style.content_margin_left = 16
+	style.content_margin_right = 16
+	style.content_margin_top = 6
+	style.content_margin_bottom = 6
+	
+	if is_local_attacker:
+		# You scored a hit: Neon Cyan glow
+		style.border_color = Color(0.15, 0.85, 1.0, 0.95)
+		style.shadow_color = Color(0.1, 0.7, 0.9, 0.3)
+	elif is_local_victim:
+		# You got hit: Crimson Warning glow
+		style.border_color = Color(1.0, 0.25, 0.2, 0.95)
+		style.shadow_color = Color(0.9, 0.1, 0.1, 0.35)
+	else:
+		# Combat between other racers: Ember Orange
+		style.border_color = Color(1.0, 0.52, 0.16, 0.8)
+		style.shadow_color = Color(0.8, 0.35, 0.05, 0.2)
+	
+	card.add_theme_stylebox_override("panel", style)
+	
+	var hbox := HBoxContainer.new()
+	hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hbox.add_theme_constant_override("separation", 8)
+	card.add_child(hbox)
+	
+	# 1. Blast Icon
+	var icon_lbl := Label.new()
+	icon_lbl.text = "💥"
+	icon_lbl.add_theme_font_size_override("font_size", 16)
+	hbox.add_child(icon_lbl)
+	
+	var _setup_label = func(lbl: Label, text: String, color: Color, size: int) -> void:
+		lbl.text = text
+		lbl.add_theme_font_size_override("font_size", size)
+		lbl.modulate = color
+		lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+		lbl.add_theme_constant_override("shadow_offset_x", 1)
+		lbl.add_theme_constant_override("shadow_offset_y", 1)
+	
+	if is_self_blowup:
+		var name_lbl := Label.new()
+		var n_text := victim_name + (" (YOU)" if is_local_victim else "")
+		var n_col := Color(1.0, 0.4, 0.35) if is_local_victim else Color(1.0, 0.85, 0.45)
+		_setup_label.call(name_lbl, n_text, n_col, 16)
+		hbox.add_child(name_lbl)
+		
+		var badge_panel := PanelContainer.new()
+		badge_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var b_style := StyleBoxFlat.new()
+		b_style.bg_color = Color(1.0, 0.25, 0.15, 0.22)
+		b_style.border_color = Color(1.0, 0.35, 0.2, 0.6)
+		b_style.set_border_width_all(1)
+		b_style.set_corner_radius_all(4)
+		b_style.content_margin_left = 7
+		b_style.content_margin_right = 7
+		b_style.content_margin_top = 1
+		b_style.content_margin_bottom = 1
+		badge_panel.add_theme_stylebox_override("panel", b_style)
+
+		var badge := Label.new()
+		_setup_label.call(badge, "BLEW THEMSELVES UP", Color(1.0, 0.55, 0.3), 12)
+		badge_panel.add_child(badge)
+		hbox.add_child(badge_panel)
+	else:
+		# Attacker label
+		var atk_lbl := Label.new()
+		var a_text := attacker_name + (" (YOU)" if is_local_attacker else "")
+		var a_col := Color(0.2, 0.92, 1.0) if is_local_attacker else Color(0.95, 0.96, 1.0)
+		_setup_label.call(atk_lbl, a_text, a_col, 16)
+		hbox.add_child(atk_lbl)
+		
+		# Middle action badge: e.g. "BLEW UP"
+		var badge_panel := PanelContainer.new()
+		badge_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var b_style := StyleBoxFlat.new()
+		b_style.bg_color = Color(1.0, 0.4, 0.1, 0.25)
+		b_style.border_color = Color(1.0, 0.5, 0.15, 0.7)
+		b_style.set_border_width_all(1)
+		b_style.set_corner_radius_all(4)
+		b_style.content_margin_left = 7
+		b_style.content_margin_right = 7
+		b_style.content_margin_top = 1
+		b_style.content_margin_bottom = 1
+		badge_panel.add_theme_stylebox_override("panel", b_style)
+		
+		var badge_lbl := Label.new()
+		_setup_label.call(badge_lbl, "BLEW UP", Color(1.0, 0.68, 0.22), 12)
+		badge_panel.add_child(badge_lbl)
+		hbox.add_child(badge_panel)
+		
+		# Victim label
+		var vic_lbl := Label.new()
+		var v_text := victim_name + (" (YOU)" if is_local_victim else "")
+		var v_col := Color(1.0, 0.35, 0.35) if is_local_victim else Color(1.0, 0.85, 0.45)
+		_setup_label.call(vic_lbl, v_text, v_col, 16)
+		hbox.add_child(vic_lbl)
+	
+	killfeed_container.add_child(card)
+	
+	# Entrance animation: smooth scale bounce and alpha fade
+	card.modulate.a = 0.0
+	card.scale = Vector2(0.85, 0.85)
+	card.pivot_offset = Vector2(card.size.x * 0.5, card.size.y * 0.5)
+	
+	var tw = card.create_tween().set_parallel(true)
+	tw.tween_property(card, "modulate:a", 1.0, 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(card, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	
+	# Micro-shake effect if local player got blown up
+	if is_local_victim:
+		var shake_tw = card.create_tween()
+		shake_tw.tween_property(card, "position:x", card.position.x + 6, 0.04)
+		shake_tw.tween_property(card, "position:x", card.position.x - 5, 0.04)
+		shake_tw.tween_property(card, "position:x", card.position.x + 3, 0.04)
+		shake_tw.tween_property(card, "position:x", card.position.x, 0.04)
+	
+	# Exit animation after 2.8 seconds
+	var exit_tw = card.create_tween()
+	exit_tw.tween_interval(2.8)
+	exit_tw.tween_property(card, "modulate:a", 0.0, 0.25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	exit_tw.parallel().tween_property(card, "position:y", card.position.y - 12, 0.25)
+	exit_tw.tween_callback(card.queue_free)
 
 func update_items(item1_name: String, item2_name: String):
 	# Update Slot 1 (Active)

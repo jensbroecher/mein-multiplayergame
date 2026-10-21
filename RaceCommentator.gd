@@ -44,6 +44,19 @@ const PLACE_LINES: PackedStringArray = [
 	"%s takes second place.",
 	"%s completes the podium in third.",
 ]
+const EXPLOSION_LINES: PackedStringArray = [
+	"%s blew up %s!",
+	"%s takes out %s!",
+	"%s blasts %s off the track!",
+	"%s sends %s spinning!",
+	"Direct hit by %s on %s!",
+]
+const SELF_EXPLOSION_LINES: PackedStringArray = [
+	"%s blew themselves up!",
+	"Oh no, %s caught their own blast!",
+	"%s just took themselves out!",
+]
+const EXPLOSION_COOLDOWN := 2.5
 
 var _active := false
 var _clock := 0.0
@@ -59,11 +72,16 @@ var _finish_called: Dictionary = {}
 ## Calls waiting out their delay: {"at": clock time, "text": String}.
 var _pending: Array = []
 var _last_speak_time := -1000.0
+var _last_explosion_call := -1000.0
 
 static var _cached_voice_id: String = ""
 static var _voice_search_done: bool = false
 static var _has_tts_cached: bool = false
 static var _has_tts_checked: bool = false
+
+
+func _ready() -> void:
+	add_to_group(&"race_commentator")
 
 
 ## The race went green: the grid is settled, so start watching the lead.
@@ -155,6 +173,25 @@ func _call_finishers(rows: Array) -> void:
 			_queue(WIN_LINES[randi() % WIN_LINES.size()] % racer, FINISH_DELAY)
 		else:
 			_queue(PLACE_LINES[place - 1] % racer, FINISH_DELAY)
+
+
+## Called when a cart explodes. Announces who blew up who through text-to-speech.
+func call_explosion(attacker_name: String, victim_name: String) -> void:
+	if not _active:
+		return
+	if _clock - _last_explosion_call < EXPLOSION_COOLDOWN:
+		return
+	if _is_speaking():
+		return
+	var a := _clean_name(attacker_name)
+	var v := _clean_name(victim_name)
+	var text := ""
+	if a == "" or a == "Someone" or a == v:
+		text = SELF_EXPLOSION_LINES[randi() % SELF_EXPLOSION_LINES.size()] % v
+	else:
+		text = EXPLOSION_LINES[randi() % EXPLOSION_LINES.size()] % [a, v]
+	_last_explosion_call = _clock
+	_queue(text, 0.2)
 
 
 ## A name fit to be spoken: letters, digits and spaces ("Player_1" reads as "Player 1"), no

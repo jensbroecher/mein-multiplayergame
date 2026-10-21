@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scratch/test_explosion_messages.gd" id="1"]
+
+[node name="TestExplosionMessages" type="Node"]
+script = ExtResource("1")

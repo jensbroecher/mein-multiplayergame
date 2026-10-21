@@ -3632,27 +3632,41 @@ func explode(attacker_id: int = 0):
 		sleeping = false
 	
 	if attacker_id > 0:
-		var attacker_name = "Someone"
-		var found_attacker = false
-		for c in get_tree().get_nodes_in_group("player_carts"):
-			if c.name.to_int() == attacker_id:
-				attacker_name = c.player_name
-				found_attacker = true
-				break
-		
-		var msg = ""
-		if attacker_id == name.to_int():
-			msg = "%s blew themselves up!" % player_name
+		var attacker_name := "Someone"
+		var victim_name := player_name if player_name != "" else "Racer"
+		var victim_id := name.to_int()
+		var is_self := (attacker_id == victim_id)
+
+		if is_self:
+			attacker_name = victim_name
 		else:
-			msg = "%s blew up %s!" % [attacker_name, player_name]
-			
-		var local_cart = null
-		for c in get_tree().get_nodes_in_group("player_carts"):
-			if c.is_local_player:
-				local_cart = c
-				break
-		if local_cart and local_cart.race_ui:
-			local_cart.race_ui.show_message(msg, 2.5)
+			for c in get_tree().get_nodes_in_group("player_carts"):
+				if c.name.to_int() == attacker_id:
+					attacker_name = c.player_name
+					break
+			if attacker_name == "Someone" and NetworkManager.players.has(attacker_id):
+				attacker_name = str(NetworkManager.players[attacker_id].get("name", "Someone"))
+
+		# 1. Spoken by RaceCommentator narrator (TTS)
+		get_tree().call_group(&"race_commentator", &"call_explosion", attacker_name, victim_name)
+
+		# 2. Rich in-game combat notification on all active race UIs
+		var level = get_tree().get_first_node_in_group("level")
+		if level and level.has_method("_all_race_uis"):
+			for ui in level._all_race_uis():
+				if ui and ui.has_method("show_explosion_notice"):
+					ui.show_explosion_notice(attacker_name, victim_name, attacker_id, victim_id)
+		else:
+			for ui in get_tree().get_nodes_in_group("race_ui"):
+				if ui and ui.has_method("show_explosion_notice"):
+					ui.show_explosion_notice(attacker_name, victim_name, attacker_id, victim_id)
+			var local_cart = null
+			for c in get_tree().get_nodes_in_group("player_carts"):
+				if c.is_local_player:
+					local_cart = c
+					break
+			if local_cart and local_cart.race_ui and local_cart.race_ui.has_method("show_explosion_notice"):
+				local_cart.race_ui.show_explosion_notice(attacker_name, victim_name, attacker_id, victim_id)
 	
 	# Play a random bomb explosion sound
 	var selected_bomb_sound = BOMB_EXPLOSION_SOUNDS[randi() % BOMB_EXPLOSION_SOUNDS.size()]
