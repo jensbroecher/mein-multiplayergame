@@ -125,6 +125,19 @@ const CAR_PRESETS = [
 		"offroad": 6.5,
 		"desc": "Heavy armored racer. Balanced stats with high durability.",
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Mirage",
+		"model_path": "res://generated/cars/Mirage.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 41.5,
+		"acceleration": 72.0,
+		"steer_speed": 3.0,
+		"grip": 5.2,
+		"braking": 45.0,
+		"offroad": 8.5,
+		"desc": "All-terrain rally hypercar. Supercar aerodynamics on long-travel trophy suspension.",
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 
@@ -133,7 +146,7 @@ const CAR_PRESETS = [
 const CAR_ACCENTS := {
 	"Viper": Color(0.36, 0.92, 0.40), "Shadow": Color(0.72, 0.40, 1.0), "Strikeforce": Color(0.70, 0.88, 0.20),
 	"Apex": Color(1.0, 0.60, 0.16), "Interceptor": Color(0.30, 0.52, 1.0), "Mudrunner": Color(0.22, 0.80, 0.66),
-	"Phantom": Color(1.0, 0.78, 0.14), "Centurion": Color(0.98, 0.46, 0.12),
+	"Phantom": Color(1.0, 0.78, 0.14), "Centurion": Color(0.98, 0.46, 0.12), "Mirage": Color(0.96, 0.28, 0.14),
 }
 ## Stat bars: caption, preset key, and the values at an empty and a full bar (spanning the fleet).
 const STATS := [

@@ -22,6 +22,7 @@ const CARS := [
 	{"name": "Interceptor", "prefix": "interceptor", "builder": preload("res://InterceptorBuilder.gd")},
 	{"name": "Viper", "prefix": "viper", "builder": preload("res://ViperBuilder.gd")},
 	{"name": "Apex", "prefix": "apex", "builder": preload("res://ApexBuilder.gd")},
+	{"name": "Mirage", "prefix": "mirage", "builder": preload("res://MirageBuilder.gd")},
 ]
 
 

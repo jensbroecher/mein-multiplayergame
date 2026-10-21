@@ -147,6 +147,21 @@ const CAR_PRESETS = [
 		"braking": 48.0,
 		"offroad": 6.5,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Mirage",
+		"engine_sound": "res://sounds/enginesounds/engine_apex_loop.wav",
+		"engine_gain_db": -2.5,
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Mirage.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 41.5,
+		"acceleration": 72.0,
+		"steer_speed": 3.0,
+		"grip": 5.2,
+		"braking": 45.0,
+		"offroad": 8.5,
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 
@@ -756,7 +771,7 @@ func _ready():
 		if antenna_placement:
 			antenna.position = visuals.to_local(antenna_placement.global_position)
 		# The antenna is an option in the paint shop (procedural cars only).
-		antenna.visible = CarPaint.has_antenna(_debris_paint) if CarPaint.is_paintable(new_model) else true
+		antenna.visible = CarPaint.has_antenna(_debris_paint) if CarPaint.is_paintable(new_model) else false
 		if CarPaint.is_paintable(new_model):
 			_paint_antenna_tip(_debris_paint["accent"])
 

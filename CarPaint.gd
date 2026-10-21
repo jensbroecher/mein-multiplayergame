@@ -61,6 +61,9 @@ const FACTORY := {
 	"Apex": {"pattern": 13, "finish": 0, "primary": Color(0.94, 0.94, 0.92),
 		"secondary": Color(0.96, 0.42, 0.06), "accent": Color(0.03, 0.03, 0.035),
 		"rim": Color(0.46, 0.47, 0.49), "number": 21},
+	"Mirage": {"pattern": 0, "finish": 1, "primary": Color(0.80, 0.82, 0.85),
+		"secondary": Color(0.06, 0.06, 0.07), "accent": Color(0.96, 0.28, 0.14),
+		"rim": Color(0.20, 0.21, 0.23), "number": 18},
 }
 const FALLBACK := {"pattern": 0, "finish": 0, "primary": Color(0.80, 0.07, 0.05),
 	"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.98, 0.78, 0.07),
@@ -69,7 +72,7 @@ const FALLBACK := {"pattern": 0, "finish": 0, "primary": Color(0.80, 0.07, 0.05)
 
 static func factory(car_name: String) -> Dictionary:
 	var out: Dictionary = (FACTORY.get(car_name, FALLBACK) as Dictionary).duplicate()
-	out["antenna"] = true
+	out["antenna"] = false
 	return out
 
 
@@ -118,9 +121,9 @@ static func apply(root: Node, paint: Dictionary) -> void:
 		apply(c, paint)
 
 
-## Does the paint job give the cart its RC antenna? (On unless the player turned it off.)
+## Does the paint job give the cart its RC antenna? (Off by default unless enabled.)
 static func has_antenna(paint: Dictionary) -> bool:
-	return bool(paint.get("antenna", true))
+	return bool(paint.get("antenna", false))
 
 
 ## Is this model paintable (a procedural car)?
