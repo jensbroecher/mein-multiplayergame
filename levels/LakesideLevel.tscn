@@ -25307,7 +25307,7 @@ shader_parameter/cloud_shade = Color(0.52, 0.6, 0.72, 1)
 shader_parameter/cloud_coverage = 0.36
 shader_parameter/cloud_opacity = 0.95
 shader_parameter/cloud_scale = 1.9
-shader_parameter/wind_dir = null
+shader_parameter/wind_dir = Vector2(0.82, 0.57)
 shader_parameter/cloud_seed = 27.9
 
 [sub_resource type="Sky" id="Sky_ckr1k"]

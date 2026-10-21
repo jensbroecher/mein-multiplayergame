@@ -4,9 +4,15 @@
 
 Portable install, not on PATH:
 
-- `D:\Godot\Godot_v4.8-dev6_win64_console.exe`: use this one from the shell, because it prints to stdout/stderr
-- `D:\Godot\Godot_v4.8-dev6_win64.exe`: GUI editor
+- `D:\Godot\Godot_v4.8-beta1_win64_console.exe` (or latest in `D:\Godot`): use this one from the shell, because it prints to stdout/stderr
+- `D:\Godot\Godot_v4.8-beta1_win64.exe`: GUI editor
 - On macOS: `/Applications/Godot.app/Contents/MacOS/Godot` (prints to stdout as well)
+
+## Scratch folder is committed and never deleted
+
+The `scratch/` folder contains permanent test, verification, look-dev, and audit scripts for the project.
+- **Do NOT exclude `scratch/` from git** (never add it to `.gitignore`).
+- **Do NOT delete or clean up files in `scratch/`**. Any new test scripts or probes created there are preserved so they can be re-run whenever needed.
 
 ## Levels are generated, not hand-edited
 

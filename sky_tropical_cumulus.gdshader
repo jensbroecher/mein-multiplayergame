@@ -44,9 +44,9 @@ uniform vec2 wind_dir = vec2(0.82, 0.57);
 uniform float cloud_seed = 3.7;
 
 float hash(vec2 p) {
-	p = fract(p * vec2(123.34, 456.21));
-	p += dot(p, p + 45.32);
-	return fract(p.x * p.y);
+	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+	p3 += dot(p3, p3.yzx + 33.33);
+	return fract((p3.x + p3.y) * p3.z);
 }
 
 float vnoise(vec2 p) {
@@ -106,7 +106,11 @@ void sky() {
 	if (h > 0.0) {
 		// Project onto a flat cloud deck: small clouds piled up near the horizon, large overhead.
 		vec2 uv = d.xz / (h + 0.14);
-		vec2 w = normalize(wind_dir);
+		vec2 w = wind_dir;
+		if (dot(w, w) < 0.0001) {
+			w = vec2(0.82, 0.57);
+		}
+		w = normalize(w);
 		vec2 n = vec2(-w.y, w.x);
 		// A little longer along the wind than across it.
 		vec2 q = vec2(dot(uv, w) * 0.9, dot(uv, n)) * cloud_scale + cloud_seed;

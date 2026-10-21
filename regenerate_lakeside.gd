@@ -219,6 +219,7 @@ func _build_sky() -> void:
 	sm.set_shader_parameter("cloud_coverage", 0.36)
 	sm.set_shader_parameter("cloud_opacity", 0.95)
 	sm.set_shader_parameter("cloud_scale", 1.9)
+	sm.set_shader_parameter("wind_dir", Vector2(0.82, 0.57))
 	sm.set_shader_parameter("cloud_seed", 27.9)
 	sky.sky_material = sm
 	env.sky = sky

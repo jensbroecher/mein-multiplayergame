@@ -42,9 +42,9 @@ uniform float streak_length = 6.0;
 uniform float cloud_seed = 3.7;
 
 float hash(vec2 p) {
-	p = fract(p * vec2(123.34, 456.21));
-	p += dot(p, p + 45.32);
-	return fract(p.x * p.y);
+	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+	p3 += dot(p3, p3.yzx + 33.33);
+	return fract((p3.x + p3.y) * p3.z);
 }
 
 float vnoise(vec2 p) {
@@ -69,7 +69,11 @@ float fbm(vec2 p) {
 
 // Cirrus density at a point on the cloud plane.
 float cirrus(vec2 uv) {
-	vec2 w = normalize(wind_dir);
+	vec2 w = wind_dir;
+	if (dot(w, w) < 0.0001) {
+		w = vec2(0.82, 0.57);
+	}
+	w = normalize(w);
 	vec2 n = vec2(-w.y, w.x);
 	vec2 q = vec2(dot(uv, w), dot(uv, n)) * cloud_scale;
 	// Domain warp bends the streaks into the hooks and curls cirrus uncinus has.
