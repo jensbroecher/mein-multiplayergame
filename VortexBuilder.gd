@@ -1,44 +1,47 @@
 # VortexBuilder.gd
 #
-# The Vortex: a high-downforce aero truggy / hypercar crossover.
-# A razor-sharp, low-slung modern supercar coupe body grafted onto a wide-track stadium
-# truck chassis with massive aerodynamic elements:
-# - Low wedge front nose with raised center power dome spine
-# - 4 circular RC body pin clip holes flush on the hood
-# - Massive front aerodynamic splitter with 4 vertical diffuser strakes and outer canards
-# - Steeply raked cockpit canopy with dual-channel aerodynamic roof runners
-# - Heavy-duty tubular side nerf bars / rock sliders under the sills with step rungs
-# - Sculpted side pod air intakes with vertical vents ahead of the rear wheels
-# - Flared muscular rear haunches over wide-track tires
-# - High-mounted GT gull-wing rear wing with downturned winglets on twin raked struts
-# - Triangular rear roll cage / chassis brace structure under the wing
+# The Vortex: a high-downforce aero truggy / hypercar crossover, shaped after its reference photo:
+# - Very low, wide slab nose with a raised centre power dome and hood V-creases
+# - 4 circular RC pin clip holes flush on the hood
+# - A big black double-deck front aero wing swallowed under the nose: its outboard tips curl up into
+#   fangs that sweep back over the front tires on black arch bars, with vertical endplates between
+#   the wing's two blades, a shark-fin chin plate and strakes under the nose
+# - Steeply raked cockpit: broad tinted glass canopy with two green aerodynamic roof runner ridges
+#   (dark glass channels painted between them) and a louvred glass hatch panel on the rear deck
+# - Big black fender flares sweeping over the wide-track rear tires
+# - Tubular side nerf bars with step rungs under the sills
+# - Vertical side-pod intake slots ahead of the rear arches
+# - High-mounted GT gull-wing rear wing on twin raked struts over a triangular roll cage
 # - Wide-track all-terrain stadium truck tires with aggressive tread blocks
-# - Deep-dish black multi-spoke rims with signature crisp white outer lip ring
+# - Deep-dish black multi-spoke rims with a signature crisp white outer lip ring
 # - Exposed double wishbone suspension with tall coilover dampers tucked under the hood
 extends "res://CarDesign.gd"
 
 # Wheels: wide stadium truck track, long-travel clearance
 const WHEEL_X := 0.565
-const AXLE_F := -0.740
+const AXLE_F := -0.743
 const AXLE_R := 0.620
 const HUB_Y := 0.260
 
-# Tub half-width (w) along the car (z):
-# Broad, muscular front hood matching the aggressive supercar proportions in the photo,
-# pinched at doors, and flaring out aggressively at the rear haunches over the tires.
+# Tub half-width (w) along the car (z): a wide slab nose, pinched at the doors, and the wheel
+# zones kept inside the tires' inner faces (0.437) so they poke out beside the body instead of
+# sinking into it; the black rear flares carry the track's muscle over the wheel tops.
 const W_KNOTS := [
-	[-1.140, 0.320], [-1.000, 0.360], [-0.860, 0.395], [-0.740, 0.420], [-0.580, 0.425],
-	[-0.440, 0.425], [-0.200, 0.395], [ 0.050, 0.400], [ 0.320, 0.445], [ 0.620, 0.485],
-	[ 0.800, 0.435], [ 0.900, 0.360], [ 0.960, 0.300]
+	[-1.140, 0.335], [-1.000, 0.375], [-0.900, 0.405], [-0.800, 0.418],
+	[-0.680, 0.428], [-0.560, 0.430], [-0.440, 0.428], [-0.300, 0.405],
+	[-0.100, 0.412], [ 0.060, 0.418], [ 0.220, 0.428], [ 0.370, 0.418],
+	[ 0.500, 0.415], [ 0.620, 0.415], [ 0.760, 0.425], [ 0.880, 0.400],
+	[ 0.960, 0.330]
 ]
 
 # Tub bottom (bot) along the car:
-# Front nose sits close to the splitter (Y = 0.21), center belly has high clearance (0.24-0.25),
-# and rear tail sweeps up into the diffuser (0.30).
+# A low nose lip (0.195) for the front wing to swallow, the belly under the doors at 0.24-0.25,
+# and the rear tail sweeping up into the diffuser (0.31).
 const BOT_KNOTS := [
-	[-1.140, 0.210], [-1.000, 0.220], [-0.860, 0.235], [-0.740, 0.245], [-0.580, 0.245],
-	[-0.440, 0.245], [-0.100, 0.245], [ 0.200, 0.245], [ 0.440, 0.250], [ 0.620, 0.260],
-	[ 0.800, 0.275], [ 0.900, 0.295], [ 0.960, 0.315]
+	[-1.140, 0.195], [-1.000, 0.225], [-0.860, 0.235], [-0.740, 0.240],
+	[-0.580, 0.245], [-0.440, 0.245], [-0.100, 0.245], [ 0.200, 0.248],
+	[ 0.440, 0.252], [ 0.620, 0.258], [ 0.800, 0.272], [ 0.900, 0.292],
+	[ 0.960, 0.312]
 ]
 
 # Section keyframes along the car:
@@ -46,27 +49,35 @@ const BOT_KNOTS := [
 # belt: height of vertical side / rocker top
 # sx, sy: shoulder crease position (wide hip / hood edge)
 # rx, ry: roof rail / inner hood crease position
-# top: center line top height
+# top: centre line top height
 # crown: dome / dish of top surface (+ dome, - dish)
 const KEYS := [
 	# z       belt    sx     sy     rx     ry     top    crown
-	[-1.140, 0.230, 0.295, 0.240, 0.150, 0.250, 0.260, 0.015], # Low chiseled wedge nose tip
-	[-1.000, 0.250, 0.335, 0.275, 0.190, 0.295, 0.315, 0.020],
-	[-0.860, 0.285, 0.370, 0.330, 0.225, 0.360, 0.390, 0.024], # Front hood clip area
-	[-0.740, 0.315, 0.395, 0.375, 0.255, 0.410, 0.445, 0.024], # Front axle plane
-	[-0.580, 0.350, 0.405, 0.425, 0.275, 0.465, 0.500, 0.020], # Rear hood clip area
-	[-0.440, 0.385, 0.410, 0.465, 0.285, 0.510, 0.540, 0.014], # Windshield cowl
-	[-0.260, 0.420, 0.385, 0.495, 0.255, 0.615, 0.645, 0.010], # Windshield mid
-	[-0.100, 0.435, 0.390, 0.510, 0.235, 0.665, 0.685, 0.008], # Roof header
-	[ 0.060, 0.445, 0.395, 0.520, 0.230, 0.675, 0.690, 0.008], # Roof peak
-	[ 0.220, 0.455, 0.410, 0.530, 0.225, 0.655, 0.670, 0.006], # Fastback slope start
-	[ 0.440, 0.470, 0.435, 0.545, 0.220, 0.610, 0.625, 0.004], # Rear window mid / haunch rise
-	[ 0.620, 0.480, 0.465, 0.555, 0.210, 0.575, 0.585, 0.004], # Rear axle plane (muscular haunch peak)
-	[ 0.800, 0.475, 0.420, 0.555, 0.190, 0.555, 0.560, 0.002], # Rear deck
-	[ 0.900, 0.455, 0.350, 0.545, 0.170, 0.540, 0.545, 0.002], # Tail transition
-	[ 0.960, 0.425, 0.290, 0.530, 0.145, 0.530, 0.535, 0.000], # Tail trailing edge
+	[-1.140, 0.205, 0.300, 0.240, 0.170, 0.245, 0.255, 0.022], # sharp low slab nose tip
+	[-1.000, 0.235, 0.360, 0.300, 0.230, 0.315, 0.330, 0.034], # hood rising over the fenders
+	[-0.860, 0.275, 0.400, 0.365, 0.260, 0.390, 0.400, 0.040], # front fender plane
+	[-0.740, 0.325, 0.415, 0.410, 0.270, 0.445, 0.465, 0.042], # front axle plane (fender crest)
+	[-0.580, 0.355, 0.420, 0.440, 0.280, 0.480, 0.510, 0.036], # cowl ramp
+	[-0.440, 0.375, 0.420, 0.465, 0.300, 0.530, 0.550, 0.028], # windshield base / cowl edge
+	[-0.260, 0.405, 0.380, 0.525, 0.270, 0.625, 0.645, 0.014], # windshield mid
+	[-0.100, 0.415, 0.385, 0.535, 0.258, 0.655, 0.675, 0.012], # roof header
+	[ 0.060, 0.425, 0.390, 0.545, 0.250, 0.660, 0.680, 0.012], # roof peak
+	[ 0.220, 0.440, 0.405, 0.555, 0.242, 0.650, 0.658, 0.010], # C-pillar drop
+	[ 0.440, 0.455, 0.430, 0.565, 0.225, 0.610, 0.622, 0.006], # haunch rise / deck
+	[ 0.620, 0.465, 0.450, 0.578, 0.212, 0.588, 0.590, 0.004], # rear axle haunch (under the flare)
+	[ 0.800, 0.455, 0.405, 0.570, 0.192, 0.578, 0.580, 0.002], # rear deck
+	[ 0.900, 0.435, 0.335, 0.552, 0.170, 0.560, 0.562, 0.002], # tail transition
+	[ 0.960, 0.405, 0.275, 0.530, 0.145, 0.538, 0.538, 0.000], # tail blade
 ]
 const KEY_NAMES := ["belt", "sx", "sy", "rx", "ry", "top", "crown"]
+
+# The rear black fender flare's lip (a floating arch over the tire: (z, y) side view).
+const REAR_LIP := [
+	[0.255, 0.395], [0.330, 0.455], [0.430, 0.520], [0.560, 0.548], [0.660, 0.550],
+	[0.760, 0.540], [0.855, 0.520], [0.925, 0.485], [0.955, 0.452]
+]
+const REAR_FLARE_OUT := 0.615
+const REAR_FLARE_DEPTH := 0.052
 
 # Tires: High-traction stadium truck carcass with aggressive tread blocks
 const TYRE_HALF := [
@@ -96,7 +107,7 @@ const PAINT_LAYOUT := {
 	"door_z": -0.05, "door_y": 0.40, "roundel_r": 0.075,
 	"hood_z": -0.78, "hood_r": 0.065, "stripe_w": 0.065, "stripe_gap": 0.022,
 }
-const ANTENNA_POS := Vector3(0.18, 0.690, 0.16)
+const ANTENNA_POS := Vector3(0.18, 0.672, 0.16)
 const WHEEL_POSITIONS := {
 	"FL": Vector3(-WHEEL_X, HUB_Y, AXLE_F), "FR": Vector3(WHEEL_X, HUB_Y, AXLE_F),
 	"RL": Vector3(-WHEEL_X, HUB_Y, AXLE_R), "RR": Vector3(WHEEL_X, HUB_Y, AXLE_R),
@@ -105,12 +116,12 @@ const WHEEL_POSITIONS := {
 
 func _init() -> void:
 	nose_tip = -1.140
-	nose_cap = 0.025
-	nose_cap_y = 0.235
-	nose_cap_exp = Vector2(5.5, 3.2)
+	nose_cap = 0.030
+	nose_cap_y = 0.232
+	nose_cap_exp = Vector2(5.2, 3.2)
 	tail_tip = 0.960
 	tail_cap = 0.025
-	tail_cap_y = 0.460
+	tail_cap_y = 0.470
 	tail_cap_exp = Vector2(4.5, 3.0)
 	# Half-ring segment counts: [bottom, corner, side, lower_shoulder, upper_shoulder, roof_corner, top]
 	segment_counts = [2, 3, 4, 4, 5, 5, 8]
@@ -216,97 +227,162 @@ func _side_parts(b) -> void:
 	coilover(b, Vector3(0.370, 0.235, k_rear + 0.02), Vector3(0.280, 0.420, k_rear - 0.02), 0.018, 0.030, 7.0, C_ALLOY, C_ALLOY_DARK, C_CHROME, C_DARK)
 
 	# -------------------------------------------------------------------------
-	# 3. Tubular Side Nerf Bars / Rock Sliders (Signature Feature from Photo)
+	# 3. Front wing's fang + arch bar: the wing's tip curls up over the front tire
+	# (all clearance-checked against the ring r = 0.28 about the wheel hub)
 	# -------------------------------------------------------------------------
-	# Outboard tubular rock slider with rectangular drop steps
-	var nerf_y := 0.180
-	var nerf_outer_x := 0.485
-	var nerf_inner_x := 0.370
+	var fang := PackedVector3Array([
+		Vector3(0.520, 0.400, -1.000),
+		Vector3(0.546, 0.440, -0.995),
+		Vector3(0.564, 0.476, -0.968),
+		Vector3(0.572, 0.512, -0.920),
+		Vector3(0.570, 0.545, -0.845),
+		Vector3(0.562, 0.565, -0.760),
+		Vector3(0.548, 0.548, -0.660),
+		Vector3(0.528, 0.508, -0.560),
+		Vector3(0.497, 0.438, -0.500),
+		Vector3(0.452, 0.355, -0.470),
+		Vector3(0.400, 0.386, -0.400)
+	])
+	b.tube(fang, 0.015, 8, CB.M_DARK, C_DARK, true, true)
+
+	# -------------------------------------------------------------------------
+	# 4. Big black rear fender flare (a floating arch over the wide rear tire)
+	# -------------------------------------------------------------------------
+	var saved_mat := fender_mat
+	var saved_col := fender_col
+	fender_mat = CB.M_DARK
+	fender_col = C_DARK
+	build_fender(b, REAR_LIP, AXLE_R, HUB_Y, REAR_FLARE_OUT, REAR_FLARE_DEPTH, 0.035)
+	fender_mat = saved_mat
+	fender_col = saved_col
+
+	# -------------------------------------------------------------------------
+	# 5. Tubular Side Nerf Bar (Signature Feature from Photo) — the rail's own tips and
+	# two angled braces anchor up into the tub floor so it hangs off the chassis
+	# -------------------------------------------------------------------------
+	var nerf_y := 0.175
+	var nerf_outer_x := 0.500
 	var nerf_path := PackedVector3Array([
-		Vector3(nerf_inner_x, nerf_y, -0.220),
+		Vector3(0.368, prof["bot"].at(-0.240) - 0.002, -0.240),
 		Vector3(nerf_outer_x, nerf_y, -0.170),
 		Vector3(nerf_outer_x, nerf_y,  0.220),
-		Vector3(nerf_inner_x, nerf_y,  0.270)
+		Vector3(0.368, prof["bot"].at(0.290) - 0.002,  0.290)
 	])
 	b.tube(_rounded(nerf_path, 0.04), 0.015, 8, CB.M_DARK, C_DARK, true, true)
-	# Two rectangular step rungs connecting outer rail to chassis tub
+	# Two angled braces tying the rail up into the tub floor between the anchored tips
 	for r_z in [-0.050, 0.140]:
-		b.tube(PackedVector3Array([Vector3(nerf_inner_x - 0.04, nerf_y, r_z), Vector3(nerf_outer_x - 0.005, nerf_y, r_z)]), 0.013, 6, CB.M_DARK, C_DARK, false, false)
+		var brace_bot: float = prof["bot"].at(r_z)
+		b.tube(PackedVector3Array([
+			Vector3(nerf_outer_x - 0.004, nerf_y + 0.004, r_z),
+			Vector3(0.426, nerf_y + 0.042, r_z),
+			Vector3(0.370, brace_bot - 0.001, r_z)
+		]), 0.011, 6, CB.M_DARK, C_DARK, false, false)
 
 	# -------------------------------------------------------------------------
-	# 4. Sculpted Side Pod Air Intake & Vertical Extractor Vent
+	# 6. Side pod intakes: tall vertical slot at the rear quarter + small lower vent
 	# -------------------------------------------------------------------------
-	# Flank intake recess ahead of rear wheel (Z = 0.15 to 0.45)
-	var pod_c := Vector3(0.425, 0.400, 0.300)
-	b.rbox(Transform3D(Basis(Vector3.UP, -0.10), pod_c), Vector3(0.018, 0.048, 0.080), 0.006, 1, CB.M_DARK, C_DARKER)
-	# Vertical black air extractor vent slit (clearly visible on rear quarter in photo)
-	b.rbox(Transform3D(Basis(), Vector3(0.460, 0.430, 0.460)), Vector3(0.008, 0.045, 0.012), 0.002, 1, CB.M_DARK, C_DARKER)
+	var slot_c := Vector3(0.448, 0.522, 0.470)
+	b.rbox(Transform3D(Basis(Vector3.UP, -0.30), slot_c), Vector3(0.011, 0.046, 0.030), 0.004, 1, CB.M_DARK, C_DARKER)
+	for k in 2:
+		bar(b, Vector3(0.452, 0.522, 0.448 + 0.026 * k), Vector3(0.010, 0.036, 0.0025), CB.M_DARK, C_DARK)
+	var low_c := Vector3(0.446, 0.385, 0.300)
+	b.rbox(Transform3D(Basis(Vector3.UP, -0.12), low_c), Vector3(0.012, 0.040, 0.024), 0.004, 1, CB.M_DARK, C_DARKER)
+	bar(b, low_c + Vector3(0.002, 0.0, -0.012), Vector3(0.010, 0.030, 0.0025), CB.M_DARK, C_DARK)
 
 	# -------------------------------------------------------------------------
-	# 5. Flush RC Body Pin Holes (4 Recessed Round Dark Holes on Hood)
+	# 7. Flush RC Body Pin Holes (4 Recessed Round Dark Holes on Hood)
 	# -------------------------------------------------------------------------
-	var post_f := Vector3(0.185, 0.370, -0.840)
+	var post_f := Vector3(0.185, top_y(0.185, -0.845) + 0.002, -0.845)
 	b.disc(post_f + Vector3(0, 0.001, 0), Vector3.UP, 0.018, 0.000, 16, CB.M_DARK, C_DARKER)
-	var post_r := Vector3(0.215, 0.470, -0.560)
+	var post_r := Vector3(0.205, top_y(0.205, -0.565) + 0.002, -0.565)
 	b.disc(post_r + Vector3(0, 0.001, 0), Vector3.UP, 0.018, 0.000, 16, CB.M_DARK, C_DARKER)
 
 	# -------------------------------------------------------------------------
-	# 6. Sleek Wing Mirrors
+	# 8. Sleek Wing Mirrors
 	# -------------------------------------------------------------------------
-	var mir_c := Vector3(0.360, 0.520, -0.200)
-	b.tube(PackedVector3Array([Vector3(0.320, 0.495, -0.200), mir_c]), 0.007, 6, CB.M_DARK, C_CARBON, true, false)
+	var mir_c := Vector3(0.368, 0.515, -0.240)
+	b.tube(PackedVector3Array([Vector3(0.320, 0.488, -0.240), mir_c]), 0.007, 6, CB.M_DARK, C_CARBON, true, false)
 	var mir_xf := Transform3D(Basis(Vector3.UP, -0.16) * Basis(Vector3.RIGHT, 0.05), mir_c + Vector3(0.030, 0.008, 0.0))
 	b.rbox(mir_xf, Vector3(0.028, 0.014, 0.018), 0.005, 1, CB.M_PAINT, Color(1, 1, 1))
 	b.rbox(mir_xf * Transform3D(Basis(), Vector3(0.0, 0.0, 0.014)), Vector3(0.022, 0.010, 0.003), 0.002, 1, CB.M_CHROME, C_CHROME)
 
 	# -------------------------------------------------------------------------
-	# 7. Rear Corner Taillight Blade & Exhaust
+	# 9. Rear Corner Taillight Blade & Exhaust
 	# -------------------------------------------------------------------------
-	b.rbox(Transform3D(Basis(), Vector3(0.240, 0.490, 0.950)), Vector3(0.035, 0.012, 0.006), 0.003, 1, CB.M_TAILLAMP, C_TAILLAMP)
-	var ex_c := Vector3(0.105, 0.340, 0.955)
-	b.tube(PackedVector3Array([ex_c + Vector3(0, 0, -0.06), ex_c + Vector3(0, 0, 0.025)]), 0.018, 12, CB.M_ALLOY, C_ALLOY, false, false)
-	b.tube(PackedVector3Array([ex_c + Vector3(0, 0, -0.05), ex_c + Vector3(0, 0, 0.026)]), 0.015, 10, CB.M_DARK, C_DARKER, false, false)
+	b.rbox(Transform3D(Basis(), Vector3(0.245, 0.486, 0.954)), Vector3(0.038, 0.012, 0.007), 0.003, 1, CB.M_TAILLAMP, C_TAILLAMP)
+	b.rbox(Transform3D(Basis(), Vector3(0.215, 0.452, 0.956)), Vector3(0.024, 0.008, 0.007), 0.003, 1, CB.M_TAILLAMP, C_TAILLAMP)
+	var ex_c := Vector3(0.105, 0.350, 0.948)
+	b.tube(PackedVector3Array([ex_c + Vector3(0, 0, -0.06), ex_c + Vector3(0, 0, 0.038)]), 0.018, 12, CB.M_ALLOY, C_ALLOY, false, false)
+	b.tube(PackedVector3Array([ex_c + Vector3(0, 0, -0.05), ex_c + Vector3(0, 0, 0.039)]), 0.015, 10, CB.M_DARK, C_DARKER, false, false)
 
 
-## Centerline components: Front splitter with strakes and canards, rear wing, diffuser, roof runners
+## The front aero wing's swept blade path from left tip to right tip: the centre sits low under
+## the nose and the outboard tips rise ("fangs"), pulling back only outboard of the tub's flank
+## so the blades wrap clear of the body. `low` drops to the splitter deck below it and pulls
+## forward; the low deck stays flatter.
+func _wing_path(low: float) -> PackedVector3Array:
+	var out := PackedVector3Array()
+	var lift: float = 0.196 * (0.30 if low > 0.0 else 1.0)
+	var y0: float = 0.148 if low > 0.0 else 0.204
+	var pull: float = 0.24 if low > 0.0 else 0.27
+	var zc: float = -1.262 if low > 0.0 else -1.226
+	for k in 19:
+		var f: float = k / 18.0
+		var u: float = lerpf(-1.0, 1.0, f)
+		var ax: float = absf(u)
+		var p: float = pow(maxf(ax - 0.30, 0.0) / 0.70, 1.35)
+		var z: float = zc + pull * pow(maxf(ax - 0.78, 0.0) / 0.22, 1.9 if low <= 0.0 else 1.7)
+		out.append(Vector3(0.52 * u, y0 + lift * p, z))
+	return out
+
+
+## Centreline components: the double-deck front wing, roof runners, rear wing, roll cage, diffuser.
 func _centre_parts(b) -> void:
 	# -------------------------------------------------------------------------
-	# 1. Massive Front Aerodynamic Splitter Assembly (Signature Feature from Photo)
+	# 1. Massive Front Aero Wing Assembly (Signature Feature from Photo)
 	# -------------------------------------------------------------------------
-	var split_y := 0.135
-	# Main horizontal splitter plate extending forward under the nose (Z from -1.00 to -1.26, X from -0.42 to +0.42)
-	b.rbox(Transform3D(Basis(), Vector3(0.0, split_y, -1.130)), Vector3(0.390, 0.008, 0.130), 0.005, 1, CB.M_DARK, C_DARK)
-	# Forward extension blade
-	b.rbox(Transform3D(Basis(), Vector3(0.0, split_y, -1.240)), Vector3(0.330, 0.007, 0.025), 0.004, 1, CB.M_DARK, C_DARK)
-
-	# 4 Vertical Diffuser Strakes connecting splitter plate up to nose chin
-	for x in [-0.220, -0.075, 0.075, 0.220]:
-		var strake_h := 0.085
-		var strake_c := Vector3(x, split_y + strake_h * 0.5, -1.130)
-		b.rbox(Transform3D(Basis(), strake_c), Vector3(0.005, strake_h * 0.5, 0.095), 0.002, 1, CB.M_DARK, C_DARK)
-
-	# Large Outer Canards / Dive Planes at the splitter tips (X = ±0.415)
+	# Upper main deck: a big swept blade wrapping round the nose, tips curling up
+	sweep(b, _wing_path(0.0), Vector3.BACK, Vector3.UP,
+		PackedVector2Array([Vector2(0.052, -0.006), Vector2(0.052, 0.006), Vector2(-0.052, 0.006),
+			Vector2(-0.052, -0.006)]), CB.M_DARK, C_DARK)
+	# Lower splitter deck: a slim second blade ahead of and below the main one
+	sweep(b, _wing_path(1.0), Vector3.BACK, Vector3.UP,
+		PackedVector2Array([Vector2(0.038, -0.004), Vector2(0.038, 0.004), Vector2(-0.038, 0.004),
+			Vector2(-0.038, -0.004)]), CB.M_DARK, C_DARK)
+	# Full-width flat splitter plate under the nose
+	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.146, -1.218)), Vector3(0.420, 0.007, 0.115), 0.005, 1, CB.M_DARK, C_DARK)
+	# Shark-fin chin plate dropping from the nose's lower lip between the two decks
+	slab(b, PackedVector2Array([Vector2(-1.030, 0.225), Vector2(-1.158, 0.205), Vector2(-1.190, 0.132),
+		Vector2(-1.112, 0.108)]), 0.0, 0.010, CB.M_DARK, C_DARK)
+	# Two wall strakes ramping from the wing decks up to the nose bottom
 	for sx in [-1.0, 1.0]:
-		var canard_c := Vector3(0.415 * sx, split_y + 0.065, -1.130)
-		b.rbox(Transform3D(Basis(Vector3.UP, -0.20 * sx) * Basis(Vector3.FORWARD, 0.18 * sx), canard_c), Vector3(0.006, 0.065, 0.105), 0.003, 1, CB.M_DARK, C_DARK)
-		b.rbox(Transform3D(Basis(), Vector3(0.380 * sx, split_y, -1.130)), Vector3(0.040, 0.007, 0.090), 0.003, 1, CB.M_DARK, C_DARK)
-
-	# Lower central intake cavity under nose
-	var mesh_c := Vector3(0.0, 0.210, -1.100)
-	b.rbox(Transform3D(Basis(), mesh_c), Vector3(0.180, 0.018, 0.015), 0.005, 1, CB.M_DARK, C_DARKER)
+		b.rbox(Transform3D(Basis(Vector3.RIGHT, -0.18) * Basis(Vector3.UP, 0.10 * sx), Vector3(0.105 * sx, 0.172, -1.098)),
+			Vector3(0.005, 0.050, 0.080), 0.002, 1, CB.M_DARK, C_DARK)
+	# Vertical endplates linking the two decks at each tip
+	for sx in [-1.0, 1.0]:
+		b.rbox(Transform3D(Basis(Vector3.UP, -0.55 * sx), Vector3(0.535 * sx, 0.300, -1.018)),
+			Vector3(0.006, 0.098, 0.042), 0.003, 1, CB.M_DARK, C_DARK)
+	# Dark intake mesh in the gap between the nose bottom and the wing's upper deck
+	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.215, -1.092)), Vector3(0.215, 0.010, 0.016), 0.004, 1, CB.M_DARK, C_DARKER)
+	for x in [-0.162, -0.054, 0.054, 0.162]:
+		bar(b, Vector3(x, 0.215, -1.092), Vector3(0.0035, 0.010, 0.016), CB.M_DARK, C_DARK)
 
 	# -------------------------------------------------------------------------
 	# 2. Dual Aerodynamic Roof Runners / Air Channels (Along Canopy)
 	# -------------------------------------------------------------------------
 	for sx in [-1.0, 1.0]:
-		var runner_x: float = 0.075 * sx
-		b.rbox(Transform3D(Basis(), Vector3(runner_x, 0.692, 0.040)), Vector3(0.014, 0.006, 0.160), 0.003, 1, CB.M_PAINT, Color(1, 1, 1))
+		var runner_x: float = 0.105 * sx
+		var runner_path := PackedVector3Array()
+		for k in 12:
+			var rz: float = lerpf(-0.125, 0.290, k / 11.0)
+			runner_path.append(Vector3(runner_x, top_y(runner_x, rz) + 0.003, rz))
+		b.tube(runner_path, 0.0065, 8, CB.M_PAINT, Color(1, 1, 1), true, true)
 
 	# -------------------------------------------------------------------------
 	# 3. High-Mounted GT Gull-Wing Rear Wing & Struts (Signature Feature from Photo)
 	# -------------------------------------------------------------------------
-	var wing_y := 0.810
-	var wing_z := 0.930
+	var wing_y := 0.835
+	var wing_z := 0.925
 	var wing_basis := Basis(Vector3.RIGHT, 0.14)
 
 	# Center section of wing blade (span X = -0.22 to +0.22)
@@ -318,7 +394,7 @@ func _centre_parts(b) -> void:
 		b.rbox(Transform3D(Basis(Vector3.FORWARD, 0.08 * sx) * wing_basis, out_c), Vector3(0.125, 0.008, 0.075), 0.004, 1, CB.M_DARK, C_DARK)
 		# Downturned Winglet Endplates at X = ±0.465 (curve down and back as in photo)
 		var ep_c := Vector3(0.465 * sx, wing_y - 0.028, wing_z + 0.010)
-		b.rbox(Transform3D(Basis(Vector3.FORWARD, 0.35 * sx) * wing_basis, ep_c), Vector3(0.006, 0.048, 0.090), 0.003, 1, CB.M_DARK, C_DARK)
+		b.rbox(Transform3D(Basis(Vector3.FORWARD, 0.30 * sx) * wing_basis, ep_c), Vector3(0.006, 0.048, 0.070), 0.003, 1, CB.M_DARK, C_DARK)
 
 	# Gurney flap along rear trailing edge
 	b.rbox(Transform3D(wing_basis, Vector3(0.0, wing_y + 0.012, wing_z + 0.065)), Vector3(0.450, 0.008, 0.004), 0.002, 1, CB.M_DARK, C_DARK)
@@ -327,8 +403,8 @@ func _centre_parts(b) -> void:
 	for sx in [-1.0, 1.0]:
 		var strut_x: float = 0.165 * sx
 		var strut_path := PackedVector3Array([
-			Vector3(strut_x, 0.540, 0.770),
-			Vector3(strut_x, 0.680, 0.840),
+			Vector3(strut_x, 0.545, 0.770),
+			Vector3(strut_x, 0.700, 0.845),
 			Vector3(strut_x, wing_y - 0.008, wing_z - 0.020),
 			Vector3(strut_x, wing_y - 0.008, wing_z + 0.030)
 		])
@@ -336,23 +412,33 @@ func _centre_parts(b) -> void:
 
 	# Rear Triangular Roll Cage / Chassis Frame Structure behind canopy under wing
 	b.tube(_rounded([
-		Vector3(-0.190, 0.520, 0.730),
-		Vector3(-0.135, 0.650, 0.800),
-		Vector3( 0.135, 0.650, 0.800),
-		Vector3( 0.190, 0.520, 0.730)
+		Vector3(-0.190, 0.530, 0.735),
+		Vector3(-0.135, 0.655, 0.800),
+		Vector3( 0.135, 0.655, 0.800),
+		Vector3( 0.190, 0.530, 0.735)
 	], 0.03), 0.011, 6, CB.M_DARK, C_DARK, true, true)
-	b.tube(PackedVector3Array([Vector3(-0.135, 0.650, 0.800), Vector3(0.0, 0.540, 0.810)]), 0.009, 6, CB.M_DARK, C_DARK, false, false)
-	b.tube(PackedVector3Array([Vector3( 0.135, 0.650, 0.800), Vector3(0.0, 0.540, 0.810)]), 0.009, 6, CB.M_DARK, C_DARK, false, false)
+	b.tube(PackedVector3Array([Vector3(-0.135, 0.655, 0.800), Vector3(0.0, 0.550, 0.812)]), 0.009, 6, CB.M_DARK, C_DARK, false, false)
+	b.tube(PackedVector3Array([Vector3( 0.135, 0.655, 0.800), Vector3(0.0, 0.550, 0.812)]), 0.009, 6, CB.M_DARK, C_DARK, false, false)
 
 	# -------------------------------------------------------------------------
 	# 4. Rear Diffuser
 	# -------------------------------------------------------------------------
 	var diff_angle := -0.22
-	var diff_c := Vector3(0.0, 0.270, 0.900)
+	var diff_c := Vector3(0.0, 0.272, 0.900)
 	var diff_xf := Transform3D(Basis(Vector3.RIGHT, diff_angle), diff_c)
 	b.rbox(diff_xf, Vector3(0.240, 0.007, 0.090), 0.004, 1, CB.M_DARK, C_CARBON)
 	for x in [-0.150, -0.050, 0.050, 0.150]:
 		b.rbox(diff_xf * Transform3D(Basis(), Vector3(x, -0.020, 0.0)), Vector3(0.003, 0.020, 0.080), 0.002, 1, CB.M_DARK, C_DARK)
+
+	# -------------------------------------------------------------------------
+	# 5. Louvre slats over the deck hatch (the glass paint alone reads too flat)
+	# -------------------------------------------------------------------------
+	for lz in [0.355, 0.408, 0.460, 0.512]:
+		b.tube(PackedVector3Array([
+			Vector3(-0.140, top_y(-0.140, lz) + 0.003, lz),
+			Vector3(0.0, top_y(0.0, lz) + 0.003, lz),
+			Vector3(0.140, top_y(0.140, lz) + 0.003, lz)
+		]), 0.0042, 8, CB.M_DARK, C_DARK, true, true)
 
 
 ## Detailed cockpit interior with dual bucket seats and sports steering
@@ -360,28 +446,27 @@ func _cockpit(b) -> void:
 	for sx in [-1.0, 1.0]:
 		_seat(b, 0.140 * sx)
 	# Digital dash binnacle
-	b.rbox(Transform3D(Basis(Vector3.RIGHT, -0.32), Vector3(0.0, 0.490, -0.260)), Vector3(0.230, 0.028, 0.014), 0.006, 1, CB.M_DARK, C_DARK)
+	b.rbox(Transform3D(Basis(Vector3.RIGHT, -0.32), Vector3(0.0, 0.500, -0.275)), Vector3(0.230, 0.028, 0.014), 0.006, 1, CB.M_DARK, C_DARK)
 	# Steering wheel on driver side (-X)
 	_steering(b, -0.140)
 
 
-## Racing bucket seat
+## Racing bucket seat (kept clear of the low flat canopy: back top ≈0.640, roof ≈0.674)
 func _seat(b, x: float) -> void:
 	var floor_y := 0.250
 	var rake := Basis(Vector3.RIGHT, 0.26)
 	var seat_c := Vector3(x, floor_y + 0.038, -0.040)
 	b.rbox(Transform3D(Basis(), seat_c), Vector3(0.100, 0.028, 0.115), 0.014, 2, CB.M_DARK, C_DARK)
-	var back_c := Vector3(x, floor_y + 0.235, 0.095)
-	b.rbox(Transform3D(rake, back_c), Vector3(0.100, 0.180, 0.025), 0.014, 2, CB.M_DARK, C_DARK)
+	var back_c := Vector3(x, floor_y + 0.215, 0.095)
+	b.rbox(Transform3D(rake, back_c), Vector3(0.100, 0.160, 0.025), 0.014, 2, CB.M_DARK, C_DARK)
 	for sx in [-1.0, 1.0]:
-		b.rbox(Transform3D(rake, back_c + rake * Vector3(0.088 * sx, -0.035, -0.028)), Vector3(0.014, 0.140, 0.035), 0.010, 2, CB.M_DARK, C_CARBON)
-		b.rbox(Transform3D(rake, back_c + rake * Vector3(0.038 * sx, 0.010, -0.026)), Vector3(0.010, 0.150, 0.003), 0.002, 1, CB.M_ANODISED, Color(1, 1, 1))
-	b.rbox(Transform3D(rake, back_c + rake * Vector3(0.0, 0.190, -0.008)), Vector3(0.060, 0.040, 0.026), 0.014, 2, CB.M_DARK, C_DARK)
+		b.rbox(Transform3D(rake, back_c + rake * Vector3(0.088 * sx, -0.035, -0.028)), Vector3(0.014, 0.125, 0.035), 0.010, 2, CB.M_DARK, C_CARBON)
+	b.rbox(Transform3D(rake, back_c + rake * Vector3(0.0, 0.140, -0.008)), Vector3(0.060, 0.034, 0.026), 0.014, 2, CB.M_DARK, C_DARK)
 
 
 ## Sports steering wheel
 func _steering(b, x: float) -> void:
-	var c := Vector3(x, 0.485, -0.170)
+	var c := Vector3(x, 0.498, -0.185)
 	var tilt := Basis(Vector3.RIGHT, -0.36)
 	var ring := PackedVector3Array()
 	for k in 21:
@@ -482,21 +567,17 @@ func build_wheel(b, side: float) -> void:
 
 
 # ============================================================================================
-#  Detail map: Windshield, canopy glass, panel shut lines, two-tone lower carbon panels
+#  Detail map: Canopy glass, roof runner channels, hood V-lines, louvred deck hatch,
+#  panel shut lines, two-tone lower carbon panels
 # ============================================================================================
 
 func _detail_shapes() -> Dictionary:
 	var shapes := {}
 	# Door shut line in side view (z, y)
 	shapes["door"] = _inset(PackedVector2Array([
-		Vector2(-0.350, 0.270), Vector2(0.150, 0.270),
-		Vector2(0.180, 0.490), Vector2(-0.320, 0.470)
+		Vector2(-0.350, 0.300), Vector2(0.160, 0.310),
+		Vector2(0.195, 0.545), Vector2(-0.320, 0.525)
 	]), 0.025)
-	# Side intake duct opening polygon
-	shapes["side_intake"] = PackedVector2Array([
-		Vector2(0.120, 0.340), Vector2(0.340, 0.340),
-		Vector2(0.340, 0.450), Vector2(0.160, 0.440)
-	])
 	return shapes
 
 
@@ -513,55 +594,64 @@ func _detail_at(p: Vector3, n: Vector3, fp: float, sh: Dictionary) -> Color:
 	var ry: float = prof["ry"].at(p.z)
 
 	# -------------------------------------------------------------------------
-	# 1. Dark Tinted Canopy Glass (Windshield, Side Windows, Rear Hatch) -> R channel
+	# 1. Dark Tinted Canopy Glass (Windshield, Side Windows, Runner Channels,
+	#    Louvred Deck Hatch) -> R channel
 	# -------------------------------------------------------------------------
-	# Windshield: from cowl (z = -0.43) up to roof header (z = -0.11), inside A-pillars
-	if p.z > -0.425 and p.z < -0.115:
-		if p.x < rx - 0.018 and p.y > sy + 0.012:
+	var on_top := n.y > 0.55
+	# Windshield: the big top face from the cowl up to the roof header, inside the rails
+	if p.z > -0.470 and p.z < -0.120:
+		if p.x < rx - 0.014 and p.y > sy + 0.010:
 			glass = 1.0
-	# Side windows: between shoulder and roof rail
-	if p.z >= -0.250 and p.z <= 0.160:
-		if p.y > sy + 0.014 and p.y < ry - 0.010 and p.x > rx + 0.010:
+	# Side windows: between shoulder and roof rail (separate from the windshield range, which
+	# overlaps it: the windshield paints the top face, this paints the side face)
+	if p.z >= -0.250 and p.z <= 0.205:
+		if p.y > sy + 0.012 and p.y < ry - 0.008 and p.x > rx + 0.008:
 			glass = 1.0
-	# Rear fastback glass / engine viewing window
-	if p.z > 0.240 and p.z < 0.480:
-		if p.x < rx - 0.022 and p.y > 0.560 and n.y > 0.35:
-			glass = 1.0
+	# Runner channels: dark glass bands running the canopy between the two green ridges
+	if p.x > 0.046 and p.x < 0.090 and p.z > -0.140 and p.z < 0.300 and p.y > sy - 0.005:
+		glass = 1.0
+	# Green roof runner ridges punch through the channel glass between the header and the deck cut
+	if absf(p.x) <= 0.062 and absf(p.x) >= 0.076 \
+			and p.z > -0.150 and p.z < 0.300 and p.y > sy + 0.005:
+		pass
+	# Rear deck's louvred glass hatch panel between the runners
+	if p.z > 0.310 and p.z < 0.525 and absf(p.x) < 0.150 and p.y > sy - 0.012 and on_top:
+		glass = 1.0
 
-	# Black rubber window seals bordering glass
+	# Black rubber window seals bordering glass (A- and C-pillar frames, hatch surround)
 	if glass == 0.0:
 		# Windshield rubber seal
-		if p.z > -0.440 and p.z < -0.100 and p.x < rx and p.y > sy:
-			if (p.x >= rx - 0.022 or p.z <= -0.415 or p.z >= -0.125):
+		if p.z > -0.490 and p.z < -0.105 and p.x < rx and p.y > sy:
+			if (p.x >= rx - 0.022 or p.z <= -0.438 or p.z >= -0.128 or p.y < sy + 0.018):
 				black = maxf(black, 0.95)
 		# Side window rubber seal
-		if p.z >= -0.270 and p.z <= 0.180 and p.x > rx and p.y > sy - 0.005 and p.y < ry + 0.015:
-			if (p.y <= sy + 0.018 or p.y >= ry - 0.008 or p.z <= -0.240 or p.z >= 0.150):
+		if p.z >= -0.275 and p.z <= 0.235 and p.x > rx and p.y > sy - 0.005 and p.y < ry + 0.015:
+			if (p.y <= sy + 0.018 or p.y >= ry - 0.008 or p.z <= -0.150 or p.z >= 0.205):
 				black = maxf(black, 0.95)
 
 	# -------------------------------------------------------------------------
-	# 2. Satin Black Lower Rockers, Diffuser & Body Post Circles -> A channel
+	# 2. Satin Black Trim -> A channel
 	# -------------------------------------------------------------------------
-	# Lower rockers
-	if p.y < 0.280 and n.y < 0.6:
+	# Lower rockers / sills two-tone band
+	if p.y < 0.298 and n.y < 0.55:
 		black = maxf(black, 0.95)
-	# Front chin spoiler area
-	if p.z < -1.020 and p.y < 0.260:
+	# Nose under-lip and front face
+	if p.z < -1.045 and p.y < 0.245:
 		black = maxf(black, 0.95)
 	# Rear recessed tail fascia
-	if p.z > 0.860 and p.y < 0.520 and n.z > 0.4:
+	if p.z > 0.872 and p.y < 0.475 and n.z > 0.4:
 		black = maxf(black, 0.98)
-	# Rear diffuser & lower bumper
-	if p.z > 0.820 and p.y < 0.360:
+	# Rear lower bumper & diffuser zone
+	if p.z > 0.830 and p.y < 0.360:
 		black = maxf(black, 0.95)
 	# Underside
 	if n.y < -0.45:
 		black = maxf(black, 1.0)
 
 	# Hood 4 RC body clip hole dark grommet circles
-	for post_pt in [Vector2(0.185, -0.840), Vector2(0.215, -0.560)]:
+	for post_pt in [Vector2(0.185, -0.845), Vector2(0.205, -0.565)]:
 		var dist: float = Vector2(p.x, p.z).distance_to(post_pt)
-		if dist < 0.018 and p.y > 0.33:
+		if dist < 0.019 and p.y > 0.33:
 			black = maxf(black, 0.98)
 
 	# -------------------------------------------------------------------------
@@ -570,11 +660,18 @@ func _detail_at(p: Vector3, n: Vector3, fp: float, sh: Dictionary) -> Color:
 	# Door shut lines on side panels
 	if p.x > w - 0.020 and p.z > -0.38 and p.z < 0.20 and p.y < sy:
 		gap = maxf(gap, _cover(absf(_sd_rounded(Vector2(p.z, p.y), sh["door"])) - 0.0022, fp))
-	# Front hood shut lines
-	if n.y > 0.5 and p.z > -1.00 and p.z < -0.44:
-		var hood_edge := 0.270 + (p.z + 0.74) * 0.05
-		gap = maxf(gap, _cover(absf(absf(p.x) - hood_edge) - 0.0020, fp))
-		if absf(p.z - (-0.440)) < 0.012:
-			gap = maxf(gap, _cover(absf(p.z - (-0.440)) - 0.0020, fp))
+	# Hood's chevron shut lines flanking the centre power dome, opening toward the nose
+	if on_top and p.z > -1.100 and p.z < -0.500:
+		var hood_edge := 0.220 + (-p.z - 0.5) * 0.133
+		gap = maxf(gap, _cover(absf(p.x - hood_edge) - 0.0035, fp))
+	# Cowl cross seam
+	if on_top and absf(p.z + 0.452) < 0.007 and p.y > 0.5:
+		gap = maxf(gap, _cover(absf(p.z + 0.452) - 0.0025, fp))
+	# The deck hatch's four louvre bars
+	if glass > 0.99 and p.z > 0.310 and p.z < 0.525:
+		for lz in [0.355, 0.408, 0.460, 0.512]:
+			if absf(p.z - lz) < 0.010:
+				black = maxf(black, 0.9)
+				break
 
 	return Color(glass, gap, chrome, black)
