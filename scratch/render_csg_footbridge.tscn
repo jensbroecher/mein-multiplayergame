@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://rndcsgftb001"]
+
+[ext_resource type="Script" path="res://scratch/render_csg_footbridge.gd" id="1_scr"]
+
+[node name="RenderCSGFootbridge" type="Node"]
+script = ExtResource("1_scr")

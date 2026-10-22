@@ -1,0 +1,55 @@
+[gd_scene format=3]
+
+[ext_resource type="Material" path="res://ConcreteFootbridge_material.tres" id="1_xjmta"]
+
+[node name="ConcreteFootbridge" type="Node3D" unique_id=222164769]
+
+[node name="CSGCombiner3D" type="CSGCombiner3D" parent="." unique_id=1625902046]
+use_collision = true
+
+[node name="WalkwayDeck" type="CSGPolygon3D" parent="CSGCombiner3D" unique_id=2138179218]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3.55)
+use_collision = true
+polygon = PackedVector2Array(-25.8, -1.2, -25.8, 0, -23.5, 0, -10.6, 8.25, 10.6, 8.25, 23.5, 0, 25.8, 0, 25.8, -1.2, 17.8, -1.2, 17.8, 0, 10.6, 4.96, -10.6, 4.96, -17.8, 0, -17.8, -1.2)
+depth = 7.1
+material = ExtResource("1_xjmta")
+
+[node name="LeftParapet" type="CSGPolygon3D" parent="CSGCombiner3D" unique_id=577310387]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -3.55)
+use_collision = true
+polygon = PackedVector2Array(-25.8, -1.2, -25.8, 0.73, -10.6, 10.6, 10.6, 10.6, 25.8, 0.73, 25.8, -1.2, 17.8, -1.2, 17.8, 0, 10.6, 4.96, -10.6, 4.96, -17.8, 0, -17.8, -1.2)
+depth = 1.25
+material = ExtResource("1_xjmta")
+
+[node name="RightParapet" type="CSGPolygon3D" parent="CSGCombiner3D" unique_id=866258988]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 4.8)
+use_collision = true
+polygon = PackedVector2Array(-25.8, -1.2, -25.8, 0.73, -10.6, 10.6, 10.6, 10.6, 25.8, 0.73, 25.8, -1.2, 17.8, -1.2, 17.8, 0, 10.6, 4.96, -10.6, 4.96, -17.8, 0, -17.8, -1.2)
+depth = 1.25
+material = ExtResource("1_xjmta")
+
+[node name="LeftCoping" type="CSGPolygon3D" parent="CSGCombiner3D" unique_id=1718529955]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -4.8)
+use_collision = true
+polygon = PackedVector2Array(-25.8, 0.4, -25.8, 0.75, -10.6, 10.62, 10.6, 10.62, 25.8, 0.75, 25.8, 0.4, 10.6, 10.25, -10.6, 10.25)
+depth = 0.15
+material = ExtResource("1_xjmta")
+
+[node name="RightCoping" type="CSGPolygon3D" parent="CSGCombiner3D" unique_id=1002786011]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 4.95)
+use_collision = true
+polygon = PackedVector2Array(-25.8, 0.4, -25.8, 0.75, -10.6, 10.62, 10.6, 10.62, 25.8, 0.75, 25.8, 0.4, 10.6, 10.25, -10.6, 10.25)
+depth = 0.15
+material = ExtResource("1_xjmta")
+
+[node name="GirderBand_Left" type="CSGBox3D" parent="CSGCombiner3D" unique_id=436546568]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.15, -4.84)
+use_collision = true
+size = Vector3(21.6, 0.45, 0.12)
+material = ExtResource("1_xjmta")
+
+[node name="GirderBand_Right" type="CSGBox3D" parent="CSGCombiner3D" unique_id=204271583]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.15, 4.84)
+use_collision = true
+size = Vector3(21.6, 0.45, 0.12)
+material = ExtResource("1_xjmta")
