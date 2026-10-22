@@ -67,6 +67,9 @@ const FACTORY := {
 	"Inferno": {"pattern": 0, "finish": 1, "primary": Color(0.82, 0.08, 0.08),
 		"secondary": Color(0.08, 0.08, 0.09), "accent": Color(0.98, 0.82, 0.12),
 		"rim": Color(0.23, 0.24, 0.26), "number": 9},
+	"Nocturne": {"pattern": 7, "finish": 0, "primary": Color(0.80, 0.07, 0.05),
+		"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.03, 0.03, 0.035),
+		"rim": Color(0.76, 0.77, 0.79), "number": 24},
 }
 const FALLBACK := {"pattern": 0, "finish": 0, "primary": Color(0.80, 0.07, 0.05),
 	"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.98, 0.78, 0.07),

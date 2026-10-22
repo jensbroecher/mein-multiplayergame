@@ -1,0 +1,40 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://generated/cars/nocturne_body.res" id="1_uepyv"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/nocturne_wheel_l.res" id="2_3ejed"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/nocturne_wheel_r.res" id="3_cc3tl"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/nocturne_rear_wheel_l.res" id="4_rn75u"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/nocturne_rear_wheel_r.res" id="5_ft73k"]
+
+[node name="Nocturne" type="Node3D" unique_id=722225707]
+metadata/procedural_car = true
+
+[node name="Model" type="Node3D" parent="." unique_id=1661259028]
+transform = Transform3D(-0.5, 0, -4.371139e-08, 0, 0.5, 0, 4.371139e-08, 0, -0.5, 0, 0, 0)
+
+[node name="Body" type="MeshInstance3D" parent="Model" unique_id=293554100]
+mesh = ExtResource("1_uepyv")
+metadata/car_shader = true
+
+[node name="Wheel_FL" type="MeshInstance3D" parent="Model" unique_id=7829834]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.44, 0.16, -0.665)
+mesh = ExtResource("2_3ejed")
+metadata/car_shader = true
+
+[node name="Wheel_FR" type="MeshInstance3D" parent="Model" unique_id=1335201364]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.44, 0.16, -0.665)
+mesh = ExtResource("3_cc3tl")
+metadata/car_shader = true
+
+[node name="Wheel_RL" type="MeshInstance3D" parent="Model" unique_id=351239527]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.445, 0.178, 0.625)
+mesh = ExtResource("4_rn75u")
+metadata/car_shader = true
+
+[node name="Wheel_RR" type="MeshInstance3D" parent="Model" unique_id=265416996]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.445, 0.178, 0.625)
+mesh = ExtResource("5_ft73k")
+metadata/car_shader = true
+
+[node name="AntennaPlacement" type="Node3D" parent="Model" unique_id=1464004860]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.44, 0.448, 0.9)

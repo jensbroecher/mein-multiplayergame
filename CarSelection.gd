@@ -151,6 +151,19 @@ const CAR_PRESETS = [
 		"offroad": 9.0,
 		"desc": "Dune supercar on paddle tyres. Flies over sand, slides on tarmac.",
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Nocturne",
+		"model_path": "res://generated/cars/Nocturne.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 44.0,
+		"acceleration": 56.0,
+		"steer_speed": 2.3,
+		"grip": 6.2,
+		"braking": 48.0,
+		"offroad": 1.5,
+		"desc": "Endurance prototype on slicks. Fastest on tarmac and glued to it, lost on dirt.",
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 
@@ -160,7 +173,7 @@ const CAR_ACCENTS := {
 	"Viper": Color(0.36, 0.92, 0.40), "Shadow": Color(0.72, 0.40, 1.0), "Strikeforce": Color(0.70, 0.88, 0.20),
 	"Apex": Color(1.0, 0.60, 0.16), "Interceptor": Color(0.30, 0.52, 1.0), "Mudrunner": Color(0.22, 0.80, 0.66),
 	"Phantom": Color(1.0, 0.78, 0.14), "Centurion": Color(0.98, 0.46, 0.12), "Mirage": Color(0.96, 0.28, 0.14),
-	"Inferno": Color(1.0, 0.22, 0.20),
+	"Inferno": Color(1.0, 0.22, 0.20), "Nocturne": Color(0.62, 0.86, 1.0),
 }
 ## Stat bars: caption, preset key, and the values at an empty and a full bar (spanning the fleet).
 const STATS := [
@@ -896,10 +909,12 @@ func _build_bottom_bar() -> void:
 	_confirm_btn.set_meta(&"ui_important", true)
 	add_child(_confirm_btn)
 
+	# Centred in the room between Back (to 240) and Confirm (from 400 short of the edge), not on
+	# the screen: Confirm is the wider of the two.
 	var mid := VBoxContainer.new()
 	mid.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	mid.offset_left = -560
-	mid.offset_right = 560
+	mid.offset_left = -640
+	mid.offset_right = 480
 	mid.offset_top = -124
 	mid.offset_bottom = -40
 	mid.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -908,7 +923,7 @@ func _build_bottom_bar() -> void:
 	add_child(mid)
 	var strip := HBoxContainer.new()
 	strip.alignment = BoxContainer.ALIGNMENT_CENTER
-	# Ten names fill the room between Back and Confirm: tight pills, small gaps.
+	# Eleven names fill the room between Back and Confirm: tight pills, small gaps.
 	strip.add_theme_constant_override("separation", 3)
 	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	mid.add_child(strip)
@@ -965,8 +980,8 @@ func _apply_accent(accent: Color) -> void:
 		pb.set_corner_radius_all(6)
 		pb.border_width_bottom = 4 if on else 0
 		pb.border_color = accent
-		pb.content_margin_left = 8
-		pb.content_margin_right = 8
+		pb.content_margin_left = 6
+		pb.content_margin_right = 6
 		pb.content_margin_top = 6
 		pb.content_margin_bottom = 6
 		var ph: StyleBoxFlat = pb.duplicate()

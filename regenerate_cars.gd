@@ -3,8 +3,8 @@
 # Builds the procedural cars (CarBuilder.gd + one *Builder.gd per car) and saves each as
 # generated/cars/<Name>.tscn, with its meshes, detail map and material beside it. PlayerCart and
 # CarSelection load that scene like any other car model. Run headless from the project root (the
-# scene saves and quits by itself):
-#   Godot --headless --path . res://regenerate_cars.tscn
+# scene saves and quits by itself); names after -- build only those cars:
+#   Godot --headless --path . res://regenerate_cars.tscn [-- Nocturne ...]
 extends Node
 
 const CB = preload("res://CarBuilder.gd")
@@ -24,11 +24,13 @@ const CARS := [
 	{"name": "Apex", "prefix": "apex", "builder": preload("res://ApexBuilder.gd")},
 	{"name": "Mirage", "prefix": "mirage", "builder": preload("res://MirageBuilder.gd")},
 	{"name": "Inferno", "prefix": "inferno", "builder": preload("res://InfernoBuilder.gd")},
+	{"name": "Nocturne", "prefix": "nocturne", "builder": preload("res://NocturneBuilder.gd")},
 ]
 
 
 ## Builds one car in memory: {"body", "wheel_l", "wheel_r"} ArrayMeshes sharing "material",
-## the "detail" map, and the "design" (builder instance) for its layout constants.
+## the "detail" map, and the "design" (builder instance) for its layout constants. A car with
+## staggered wheels (its builder has build_rear_wheel()) also gets "rear_wheel_l" and "rear_wheel_r".
 static func build_car(builder_script: Script) -> Dictionary:
 	var design = builder_script.new()
 	var detail: Image = design.build_detail_map(DETAIL_SIZE.x, DETAIL_SIZE.y)
@@ -49,11 +51,20 @@ static func build_car(builder_script: Script) -> Dictionary:
 	design.build_wheel(wr, 1.0)
 	var wl := CB.new()
 	design.build_wheel(wl, -1.0)
-	return {
+	var out := {
 		"body": body.commit(mat), "wheel_r": wr.commit(mat), "wheel_l": wl.commit(mat),
 		"material": mat, "detail": tex, "detail_image": detail, "design": design,
 		"triangles": body.triangle_count() + 2 * wr.triangle_count() + 2 * wl.triangle_count(),
 	}
+	if design.has_method("build_rear_wheel"):
+		var rr := CB.new()
+		design.build_rear_wheel(rr, 1.0)
+		var rl := CB.new()
+		design.build_rear_wheel(rl, -1.0)
+		out["rear_wheel_r"] = rr.commit(mat)
+		out["rear_wheel_l"] = rl.commit(mat)
+		out["triangles"] += rr.triangle_count() + rl.triangle_count() - wr.triangle_count() - wl.triangle_count()
+	return out
 
 
 ## The car's scene. PlayerCart scales the root x2 and turns it half round (the Hunyuan models
@@ -76,7 +87,10 @@ static func assemble(car_name: String, parts: Dictionary) -> Node3D:
 	for corner in ["FL", "FR", "RL", "RR"]:
 		var w := MeshInstance3D.new()
 		w.name = "Wheel_" + corner
-		w.mesh = parts["wheel_l"] if corner.ends_with("L") else parts["wheel_r"]
+		var key: String = "wheel_l" if corner.ends_with("L") else "wheel_r"
+		if corner.begins_with("R") and parts.has("rear_" + key):
+			key = "rear_" + key
+		w.mesh = parts[key]
 		w.position = design.WHEEL_POSITIONS[corner]
 		w.set_meta("car_shader", true)
 		model.add_child(w)
@@ -104,7 +118,10 @@ func _set_owner_recursive(node: Node, owner_node: Node) -> void:
 func _ready() -> void:
 	if not DirAccess.dir_exists_absolute(OUT_DIR):
 		DirAccess.make_dir_recursive_absolute(OUT_DIR)
+	var only := OS.get_cmdline_user_args()
 	for car in CARS:
+		if not only.is_empty() and not only.has(car["name"]):
+			continue
 		var t0 := Time.get_ticks_msec()
 		var parts: Dictionary = build_car(car["builder"])
 		var prefix: String = OUT_DIR + car["prefix"]
@@ -117,7 +134,9 @@ func _ready() -> void:
 		var mat: ShaderMaterial = parts["material"]
 		mat.set_shader_parameter("detail_map", tex)
 		mat = _save(mat, prefix + "_material.tres")
-		for key in ["body", "wheel_l", "wheel_r"]:
+		for key in ["body", "wheel_l", "wheel_r", "rear_wheel_l", "rear_wheel_r"]:
+			if not parts.has(key):
+				continue
 			var mesh: ArrayMesh = parts[key]
 			mesh.surface_set_material(0, mat)
 			parts[key] = _save(mesh, "%s_%s.res" % [prefix, key])

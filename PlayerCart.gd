@@ -177,6 +177,21 @@ const CAR_PRESETS = [
 		"braking": 42.0,
 		"offroad": 9.0,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Nocturne",
+		"engine_sound": "res://sounds/enginesounds/engine_strikeforce_loop.wav",
+		"engine_gain_db": -3.1,
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Nocturne.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 44.0,
+		"acceleration": 56.0,
+		"steer_speed": 2.3,
+		"grip": 6.2,
+		"braking": 48.0,
+		"offroad": 1.5,
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 

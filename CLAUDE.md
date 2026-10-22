@@ -799,15 +799,16 @@ the rest -3dB). `_setup_engine_sound` loads the preset's file; speed moves its p
 its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set the gain to
 20*log10(0.328/rms). `res://scratch/engine_sound_test.tscn -- cars=0,1,...` lists each car's loop.
 
-## Procedural cars (all eight)
+## Procedural cars
 
 - Every car is built in code; they replaced Hunyuan imports, which are all gone. `CarBuilder.gd` is the geometry toolkit (lofts,
   lathes, tubes, rounded boxes into one indexed mesh, the material id per vertex in UV2.x). `CarDesign.gd` is
   what the cars share: the lofted shell, fender sweeps, wheel parts, a coil-over, the detail map. Each car
   extends it (`MudrunnerBuilder.gd`, `PhantomBuilder.gd`, `StrikeforceBuilder.gd`, `CenturionBuilder.gd`, `ShadowBuilder.gd`, `InterceptorBuilder.gd`,
-  `ViperBuilder.gd`, `ApexBuilder.gd`) with
+  `ViperBuilder.gd`, `ApexBuilder.gd`, `MirageBuilder.gd`, `InfernoBuilder.gd`, `NocturneBuilder.gd`) with
   its shape and its own parts. `regenerate_cars.gd` saves each as `generated/cars/<Name>.tscn` with its meshes, material and detail
-  map; run `res://regenerate_cars.tscn` headless. PlayerCart and CarSelection load it through the preset's
+  map; run `res://regenerate_cars.tscn` headless (`-- Nocturne ...` builds only those cars: a full run rewrites every
+  car's scene, since node ids change on each save). PlayerCart and CarSelection load it through the preset's
   `model_path`, with `model_y_rotation` PI and `wheel_parts` `Wheel_FL` ... `Wheel_RR`. `PlayerCart.tscn`'s
   `CartModel` placeholder (swapped for the preset's model at spawn) and the look-dev tools' stand-in carts
   (`gate_shots`, `look_shots`, `msitu_shots`, `bloombay_shots`, `nyota_shots`) are procedural cars too, in their
@@ -884,10 +885,24 @@ its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set th
   `res://scratch/car_live_shot.tscn -- <dir> [level=...] [cars=5,5,0,1,2,3] [carts=100,101]
   [fx=shock,respawn,teleport,fade]` shoots carts in a live race. `scratch/ai_race_test` takes `cars=`, and
   `scratch/menu_shot` takes `car:<index>[:<pattern>]` for the paint shop (it saves nothing).
+- A builder with `build_rear_wheel()` gets its own rear wheel meshes (`<prefix>_rear_wheel_l/r.res`) on `Wheel_RL`/`RR`;
+  the others share one wheel mesh at all four corners.
+- The Nocturne (a 917K-style short-tail coupé on slicks) keys its section like the Inferno's, but above the side runs a
+  wall from A to B that goes down into the valleys (bonnet, engine deck) and up as the canopy's side glass: B passes A's
+  height well inboard of it, so the wall never vanishes. Its fender humps stand over those valleys, so the section isn't
+  monotonic in y and `CarDesign.shell_z()` (which assumes it is) found the side wall first: the Nocturne overrides it
+  with a point-in-polygon test. Its wheel wells' ceilings slope down inward to stay under the low fender tops.
+- In `car_body.gdshaderinc`, don't call `cover()` (it takes `fwidth`) inside a branch whose edge crosses the paint:
+  derivatives are undefined where a branch splits a pixel quad. The Racer pattern's bonnet roundel drew a dashed line
+  across every bonnet where its `p.z < hood_z + 2r` branch ended; the roundels are now drawn everywhere and masked.
+- CarSelection's line-up of names sits centred between Back and Confirm (not on the screen); eleven names fit at
+  1600 wide. A twelfth needs smaller pills or two rows.
 - To rebuild another car: write `<Name>Builder.gd` extending `CarDesign.gd` (set the shell in `_init()`;
   `build_body`, `build_wheel`, `_detail_shapes`/`_detail_at`, `PAINT_LAYOUT`, `WHEEL_POSITIONS`,
   `ANTENNA_POS`), add it to `regenerate_cars.gd`'s `CARS` and its factory paint to `CarPaint.FACTORY`, then
-  point the preset in both PlayerCart and CarSelection at `generated/cars/<Name>.tscn`.
+  point the preset in both PlayerCart and CarSelection at `generated/cars/<Name>.tscn`. A new car (not a
+  rebuild) also needs a preset appended to both lists (they're indexed, so append), a `CAR_ACCENTS` colour and its
+  name in `Lobby.CAR_NAMES`.
 - The Apex overrides `section()` to cut its wheel wells as notches (the bottom steps up an inner wall
   `x_well` to the arch's ceiling, then out round the fender's lip), instead of lifting the whole bottom over
   each wheel like the other cars. That lets its open bed's floor sit below the arches, between the rear
