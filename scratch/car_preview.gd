@@ -22,6 +22,7 @@ func _init() -> void:
 	var paint_arg := ""
 	var fov := 40.0
 	var yaw := 0.0
+	var steer_deg := 0.0
 	var sun_rot := Vector3(-48.0, 38.0, 0.0)
 	var shots := []
 	for a in args.slice(1):
@@ -37,6 +38,8 @@ func _init() -> void:
 			fov = float(a.substr(4))
 		elif a.begins_with("yaw="):
 			yaw = deg_to_rad(float(a.substr(4)))
+		elif a.begins_with("steer="):
+			steer_deg = float(a.substr(6))
 		elif a.begins_with("sun="):
 			var f := a.substr(4).split(",")
 			sun_rot = Vector3(float(f[0]), float(f[1]), 0.0)
@@ -72,6 +75,11 @@ func _init() -> void:
 			paint["rim"] = Color.html(f[5])
 			paint["number"] = int(f[6])
 		CarPaint.apply(car, paint)
+	if steer_deg != 0.0:
+		for corner in ["FL", "FR"]:
+			var w: Node3D = car.find_child("Wheel_" + corner, true, false)
+			if w:
+				w.rotation.y = deg_to_rad(steer_deg)
 	var cam := Camera3D.new()
 	cam.fov = fov
 	cam.near = 0.02

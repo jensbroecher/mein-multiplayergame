@@ -18,9 +18,9 @@
 # - Exposed double wishbone suspension with tall coilover dampers tucked under the hood
 extends "res://CarDesign.gd"
 
-# Wheels: wide stadium truck track, long-travel clearance, with a clear gap (tire inner face at
-# WHEEL_X - 0.128 = 0.512 against a tub half-width of about 0.43) so the front wheels can steer
-const WHEEL_X := 0.640
+# Wheels: wide stadium truck track with generous body clearance (WHEEL_X = 0.900,
+# tire inner face at 0.772 vs body flank at 0.420) so the front wheels can steer freely at full lock
+const WHEEL_X := 0.900
 const AXLE_F := -0.743
 const AXLE_R := 0.620
 const HUB_Y := 0.260
@@ -73,22 +73,18 @@ const KEYS := [
 ]
 const KEY_NAMES := ["belt", "sx", "sy", "rx", "ry", "top", "crown"]
 
-# The rear black fender flare's lip (a floating arch over the tire: (z, y) side view).
+# Mudguard arches over the wide-track stadium tires
 const REAR_LIP := [
 	[0.255, 0.395], [0.330, 0.455], [0.430, 0.520], [0.560, 0.548], [0.660, 0.550],
 	[0.760, 0.540], [0.855, 0.520], [0.925, 0.485], [0.955, 0.452]
 ]
-const REAR_FLARE_OUT := 0.690
-const REAR_FLARE_DEPTH := 0.052
-
-# The front black fender flare's lip: the rear arch mirrored about the front axle (door end first,
-# then round over the tire toward the nose).
 const FRONT_LIP := [
 	[-0.378, 0.395], [-0.453, 0.455], [-0.553, 0.520], [-0.683, 0.548], [-0.783, 0.550],
 	[-0.883, 0.535], [-0.965, 0.490], [-1.030, 0.425], [-1.085, 0.350]
 ]
-const FRONT_FLARE_OUT := 0.690
-const FRONT_FLARE_DEPTH := 0.052
+const FENDER_IN := 0.760
+const FENDER_OUT := 1.040
+const FENDER_DEPTH := 0.035
 
 # Tires: High-traction stadium truck carcass with aggressive tread blocks
 const TYRE_HALF := [
@@ -200,20 +196,130 @@ func build_body(b) -> void:
 	_cockpit(b)
 
 
-## Support stays holding a fender flare: dark round tubes from the tub's shoulder (buried in the
-## body) out to the flare's outer lip, spaced along its arch. Each end sits in the flare's underside
-## at the lip, and the tube runs above the tire (the lip is always above the tread there).
-func _fender_stays(b, lip: Array, x_out: float) -> void:
-	var spine: PackedVector2Array = _spine(lip, 40)
-	for i in [2, 9, 17, 25, 33]:
-		var z: float = spine[i].x
-		var y: float = spine[i].y
-		var body_x: float = minf(prof["sx"].at(z), prof["w"].at(z)) - 0.030
-		var body_y: float = minf(y - 0.020, prof["sy"].at(z) - 0.012)
-		var outer := Vector3(x_out - 0.020, y + 0.004, z)
-		# A short dog-leg: out from the body, then a straight run to the lip
-		var mid := Vector3(lerpf(body_x, outer.x, 0.30), lerpf(body_y, outer.y, 0.55), z)
-		b.tube(PackedVector3Array([Vector3(body_x, body_y, z), mid, outer]), 0.0085, 6, CB.M_DARK, C_DARK, false, false)
+## Dedicated 3D curved mudguard arch over a wide-track tire, with downturned inner and outer
+## lips, crowned top, and inner liner.
+func _build_truggy_fender(b, lip: Array, hub_z: float, hub_y: float, x_in: float, x_out: float, depth: float) -> void:
+	var spine: PackedVector2Array = _spine(lip, 36)
+	var n: int = spine.size()
+	var outer_rows := []
+	var liner_rows := []
+	var x_mid := (x_in + x_out) * 0.5
+
+	for k in n:
+		var t2: Vector2 = (spine[mini(k + 1, n - 1)] - spine[maxi(k - 1, 0)]).normalized()
+		var n2 := Vector2(t2.y, -t2.x)
+		if n2.dot(spine[k] - Vector2(hub_z, hub_y)) < 0.0:
+			n2 = -n2
+
+		var end_dist: float = minf(float(k), float(n - 1 - k))
+		var sc: float = clampf(end_dist / 2.0, 0.70, 1.0)
+		var d: float = depth * sc
+		var xi: float = lerpf(x_mid, x_in, sc)
+		var xo: float = lerpf(x_mid, x_out, sc)
+
+		# 6-point profile across the tire: outer downturned lip, outer shoulder, crowned center, inner shoulder, inner downturned lip
+		var p_outer: Array = [
+			Vector2(xo, -0.024 * sc),
+			Vector2(xo - 0.012, 0.003),
+			Vector2(lerpf(xi, xo, 0.68), d * 0.35),
+			Vector2(lerpf(xi, xo, 0.32), d * 0.35),
+			Vector2(xi + 0.012, 0.003),
+			Vector2(xi, -0.020 * sc)
+		]
+
+		var out_row := PackedVector3Array()
+		var in_row := PackedVector3Array()
+		for pt in p_outer:
+			var disp: float = pt.y
+			out_row.append(Vector3(pt.x, spine[k].y + disp * n2.y, spine[k].x + disp * n2.x))
+			in_row.append(Vector3(pt.x, spine[k].y + (disp - 0.006) * n2.y, spine[k].x + (disp - 0.006) * n2.x))
+
+		outer_rows.append(out_row)
+		liner_rows.append(in_row)
+
+	var base: int = b.vertex_count()
+	var ibase: int = b.index_count()
+	b.grid(outer_rows, CB.M_DARK, C_DARK, false, false)
+	b.orient_away_from(base, ibase, Vector3(x_mid, hub_y, hub_z))
+
+	base = b.vertex_count()
+	ibase = b.index_count()
+	b.grid(liner_rows, CB.M_DARK, Color(0.025, 0.025, 0.03), false, false)
+	b.orient_toward(base, ibase, Vector3(x_mid, hub_y, hub_z))
+
+	# End caps closing the front and rear tips
+	for end_idx in [0, n - 1]:
+		var r_out: PackedVector3Array = outer_rows[end_idx]
+		var r_in: PackedVector3Array = liner_rows[end_idx]
+		var cap := PackedVector3Array()
+		for pt in r_out:
+			cap.append(pt)
+		for j in range(r_in.size() - 1, -1, -1):
+			cap.append(r_in[j])
+		var end_t := (spine[1] - spine[0]).normalized() if end_idx == 0 else (spine[n - 1] - spine[n - 2]).normalized()
+		var cap_norm := Vector3(0.0, -end_t.y, -end_t.x) if end_idx == 0 else Vector3(0.0, end_t.y, end_t.x)
+		b.poly(cap, cap_norm, CB.M_DARK, C_DARK)
+
+
+## Tubular steel support structures firmly anchoring the front and rear mudguards to the chassis.
+func _fender_supports(b) -> void:
+	var f_in := FENDER_IN
+	# -------------------------------------------------------------------------
+	# Front Fender Supports
+	# -------------------------------------------------------------------------
+	# 1. Front stanchion arm (nose frame -> front of fender)
+	var f_nose_chassis := Vector3(0.360, 0.260, -0.980)
+	var f_fender_front := Vector3(f_in + 0.020, 0.365, -1.020)
+	b.rbox(Transform3D(Basis(), f_nose_chassis), Vector3(0.016, 0.020, 0.020), 0.004, 1, CB.M_DARK, C_STEEL)
+	b.rbox(Transform3D(Basis(), f_fender_front), Vector3(0.014, 0.016, 0.018), 0.003, 1, CB.M_DARK, C_STEEL)
+	b.tube(PackedVector3Array([f_nose_chassis, Vector3(0.550, 0.315, -1.000), f_fender_front]), 0.010, 8, CB.M_DARK, C_DARK, true, true)
+
+	# 2. Main A-frame center truss (chassis cowl/shock tower -> fender apex)
+	var f_chassis_mid := Vector3(0.390, 0.430, AXLE_F)
+	var f_fender_apex_f := Vector3(f_in + 0.030, 0.540, AXLE_F - 0.110)
+	var f_fender_apex_r := Vector3(f_in + 0.030, 0.540, AXLE_F + 0.110)
+	b.rbox(Transform3D(Basis(), f_chassis_mid), Vector3(0.018, 0.025, 0.035), 0.005, 1, CB.M_DARK, C_STEEL)
+	b.rbox(Transform3D(Basis(), f_fender_apex_f), Vector3(0.014, 0.016, 0.018), 0.003, 1, CB.M_DARK, C_STEEL)
+	b.rbox(Transform3D(Basis(), f_fender_apex_r), Vector3(0.014, 0.016, 0.018), 0.003, 1, CB.M_DARK, C_STEEL)
+	b.tube(PackedVector3Array([f_chassis_mid, f_fender_apex_f]), 0.009, 8, CB.M_DARK, C_DARK, true, true)
+	b.tube(PackedVector3Array([f_chassis_mid, f_fender_apex_r]), 0.009, 8, CB.M_DARK, C_DARK, true, true)
+	b.tube(PackedVector3Array([Vector3(0.580, 0.485, AXLE_F - 0.055), Vector3(0.580, 0.485, AXLE_F + 0.055)]), 0.007, 6, CB.M_DARK, C_DARK, false, false)
+
+	# 3. Rear trailing arm (chassis sill/firewall -> rear of front fender)
+	var f_sill_rear := Vector3(0.405, 0.355, -0.460)
+	var f_fender_rear := Vector3(f_in + 0.020, 0.405, -0.435)
+	b.rbox(Transform3D(Basis(), f_sill_rear), Vector3(0.016, 0.020, 0.020), 0.004, 1, CB.M_DARK, C_STEEL)
+	b.rbox(Transform3D(Basis(), f_fender_rear), Vector3(0.014, 0.016, 0.018), 0.003, 1, CB.M_DARK, C_STEEL)
+	b.tube(PackedVector3Array([f_sill_rear, Vector3(0.580, 0.380, -0.450), f_fender_rear]), 0.010, 8, CB.M_DARK, C_DARK, true, true)
+
+	# -------------------------------------------------------------------------
+	# Rear Fender Supports
+	# -------------------------------------------------------------------------
+	var r_in := FENDER_IN
+	# 1. Front leading arm (side pod/sill -> front of rear fender)
+	var r_sill_front := Vector3(0.420, 0.380, 0.290)
+	var r_fender_front := Vector3(r_in + 0.020, 0.410, 0.300)
+	b.rbox(Transform3D(Basis(), r_sill_front), Vector3(0.016, 0.020, 0.020), 0.004, 1, CB.M_DARK, C_STEEL)
+	b.rbox(Transform3D(Basis(), r_fender_front), Vector3(0.014, 0.016, 0.018), 0.003, 1, CB.M_DARK, C_STEEL)
+	b.tube(PackedVector3Array([r_sill_front, Vector3(0.590, 0.395, 0.295), r_fender_front]), 0.010, 8, CB.M_DARK, C_DARK, true, true)
+
+	# 2. Main A-frame center truss (rear haunch/deck -> fender apex)
+	var r_chassis_mid := Vector3(0.420, 0.530, AXLE_R)
+	var r_fender_apex_f := Vector3(r_in + 0.030, 0.545, AXLE_R - 0.110)
+	var r_fender_apex_r := Vector3(r_in + 0.030, 0.545, AXLE_R + 0.110)
+	b.rbox(Transform3D(Basis(), r_chassis_mid), Vector3(0.018, 0.025, 0.035), 0.005, 1, CB.M_DARK, C_STEEL)
+	b.rbox(Transform3D(Basis(), r_fender_apex_f), Vector3(0.014, 0.016, 0.018), 0.003, 1, CB.M_DARK, C_STEEL)
+	b.rbox(Transform3D(Basis(), r_fender_apex_r), Vector3(0.014, 0.016, 0.018), 0.003, 1, CB.M_DARK, C_STEEL)
+	b.tube(PackedVector3Array([r_chassis_mid, r_fender_apex_f]), 0.009, 8, CB.M_DARK, C_DARK, true, true)
+	b.tube(PackedVector3Array([r_chassis_mid, r_fender_apex_r]), 0.009, 8, CB.M_DARK, C_DARK, true, true)
+	b.tube(PackedVector3Array([Vector3(0.590, 0.538, AXLE_R - 0.055), Vector3(0.590, 0.538, AXLE_R + 0.055)]), 0.007, 6, CB.M_DARK, C_DARK, false, false)
+
+	# 3. Rear trailing arm (rear taillight frame -> rear of fender)
+	var r_frame_rear := Vector3(0.350, 0.440, 0.920)
+	var r_fender_rear := Vector3(r_in + 0.020, 0.440, 0.940)
+	b.rbox(Transform3D(Basis(), r_frame_rear), Vector3(0.016, 0.020, 0.020), 0.004, 1, CB.M_DARK, C_STEEL)
+	b.rbox(Transform3D(Basis(), r_fender_rear), Vector3(0.014, 0.016, 0.018), 0.003, 1, CB.M_DARK, C_STEEL)
+	b.tube(PackedVector3Array([r_frame_rear, Vector3(0.560, 0.440, 0.930), r_fender_rear]), 0.010, 8, CB.M_DARK, C_DARK, true, true)
 
 
 ## Side components built on +X then mirrored across X = 0
@@ -235,8 +341,8 @@ func _side_parts(b) -> void:
 	b.tube(PackedVector3Array([Vector3(knuckle_x, HUB_Y, k_front), Vector3(WHEEL_X - 0.02, HUB_Y, k_front)]), 0.016, 10, CB.M_ALLOY, C_ALLOY_DARK, false, true)
 	# Tie rod
 	b.tube(PackedVector3Array([Vector3(0.18, 0.235, k_front + 0.08), Vector3(knuckle_x - 0.01, 0.225, k_front + 0.04)]), 0.009, 6, CB.M_DARK, C_STEEL, false, false)
-	# Coilover shock tucked inside wheel well under the hood (mount at Y = 0.340)
-	coilover(b, Vector3(0.360, 0.220, k_front), Vector3(0.260, 0.340, k_front), 0.017, 0.028, 6.5, C_ALLOY, C_ALLOY_DARK, C_CHROME, C_DARK)
+	# Coilover shock tucked inside wheel well under the hood
+	coilover(b, Vector3(0.550, 0.215, k_front), Vector3(0.260, 0.340, k_front), 0.017, 0.028, 6.5, C_ALLOY, C_ALLOY_DARK, C_CHROME, C_DARK)
 
 	# -------------------------------------------------------------------------
 	# 2. Rear Suspension (Trailing Arms & Coilovers)
@@ -250,29 +356,22 @@ func _side_parts(b) -> void:
 	# Knuckle & axle
 	b.rbox(Transform3D(Basis(), Vector3(knuckle_x, HUB_Y, k_rear)), Vector3(0.018, 0.076, 0.034), 0.008, 1, CB.M_DARK, C_STEEL)
 	b.tube(PackedVector3Array([Vector3(knuckle_x, HUB_Y, k_rear), Vector3(WHEEL_X - 0.02, HUB_Y, k_rear)]), 0.016, 10, CB.M_ALLOY, C_ALLOY_DARK, false, true)
-	# Rear coilover shock under the haunch (mount at Y = 0.420)
-	coilover(b, Vector3(0.370, 0.235, k_rear + 0.02), Vector3(0.280, 0.420, k_rear - 0.02), 0.018, 0.030, 7.0, C_ALLOY, C_ALLOY_DARK, C_CHROME, C_DARK)
+	# Rear coilover shock under the haunch
+	coilover(b, Vector3(0.560, 0.230, k_rear + 0.02), Vector3(0.280, 0.420, k_rear - 0.02), 0.018, 0.030, 7.0, C_ALLOY, C_ALLOY_DARK, C_CHROME, C_DARK)
 
 	# -------------------------------------------------------------------------
-	# 3. Big black front and rear fender flares (floating arches over the wide tires)
+	# 3. Big black front and rear fender flares & structural support trusses
 	# -------------------------------------------------------------------------
-	var saved_mat := fender_mat
-	var saved_col := fender_col
-	fender_mat = CB.M_DARK
-	fender_col = C_DARK
-	build_fender(b, FRONT_LIP, AXLE_F, HUB_Y, FRONT_FLARE_OUT, FRONT_FLARE_DEPTH, 0.035)
-	build_fender(b, REAR_LIP, AXLE_R, HUB_Y, REAR_FLARE_OUT, REAR_FLARE_DEPTH, 0.035)
-	_fender_stays(b, FRONT_LIP, FRONT_FLARE_OUT)
-	_fender_stays(b, REAR_LIP, REAR_FLARE_OUT)
-	fender_mat = saved_mat
-	fender_col = saved_col
+	_build_truggy_fender(b, FRONT_LIP, AXLE_F, HUB_Y, FENDER_IN, FENDER_OUT, FENDER_DEPTH)
+	_build_truggy_fender(b, REAR_LIP, AXLE_R, HUB_Y, FENDER_IN, FENDER_OUT, FENDER_DEPTH)
+	_fender_supports(b)
 
 	# -------------------------------------------------------------------------
 	# 5. Tubular Side Nerf Bar (Signature Feature from Photo) — the rail's own tips and
 	# two angled braces anchor up into the tub floor so it hangs off the chassis
 	# -------------------------------------------------------------------------
 	var nerf_y := 0.175
-	var nerf_outer_x := 0.500
+	var nerf_outer_x := 0.520
 	var nerf_path := PackedVector3Array([
 		Vector3(0.368, prof["bot"].at(-0.240) - 0.002, -0.240),
 		Vector3(nerf_outer_x, nerf_y, -0.170),
@@ -343,7 +442,7 @@ func _wing_path(low: float) -> PackedVector3Array:
 		var ax: float = absf(u)
 		var p: float = pow(maxf(ax - 0.30, 0.0) / 0.70, 1.35)
 		var z: float = zc + pull * pow(maxf(ax - 0.78, 0.0) / 0.22, 1.9 if low <= 0.0 else 1.7)
-		out.append(Vector3(0.52 * u, y0 + lift * p, z))
+		out.append(Vector3(0.48 * u, y0 + lift * p, z))
 	return out
 
 
@@ -371,7 +470,7 @@ func _centre_parts(b) -> void:
 			Vector3(0.005, 0.050, 0.080), 0.002, 1, CB.M_DARK, C_DARK)
 	# Vertical endplates linking the two decks at each tip
 	for sx in [-1.0, 1.0]:
-		b.rbox(Transform3D(Basis(Vector3.UP, -0.55 * sx), Vector3(0.535 * sx, 0.300, -1.018)),
+		b.rbox(Transform3D(Basis(Vector3.UP, -0.55 * sx), Vector3(0.495 * sx, 0.300, -1.018)),
 			Vector3(0.006, 0.098, 0.042), 0.003, 1, CB.M_DARK, C_DARK)
 	# Dark intake mesh in the gap between the nose bottom and the wing's upper deck
 	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.215, -1.092)), Vector3(0.215, 0.010, 0.016), 0.004, 1, CB.M_DARK, C_DARKER)
