@@ -3,12 +3,13 @@
 # The Vortex: a high-downforce aero truggy / hypercar crossover, shaped after its reference photo:
 # - Very low, wide slab nose with a raised centre power dome and hood V-creases
 # - 4 circular RC pin clip holes flush on the hood
-# - A big black double-deck front aero wing swallowed under the nose: its outboard tips curl up into
-#   fangs that sweep back over the front tires on black arch bars, with vertical endplates between
-#   the wing's two blades, a shark-fin chin plate and strakes under the nose
-# - Steeply raked cockpit: broad tinted glass canopy with two green aerodynamic roof runner ridges
-#   (dark glass channels painted between them) and a louvred glass hatch panel on the rear deck
-# - Big black fender flares sweeping over the wide-track rear tires
+# - A big black double-deck front aero wing swallowed under the nose: its outboard tips curl up,
+#   with vertical endplates between the wing's two blades, a shark-fin chin plate and strakes
+#   under the nose
+# - Steeply raked cockpit: one continuous tinted glass bubble canopy wrapping from the cowl over
+#   the roof and down the sides (no separate side windows), plus a louvred glass hatch panel on
+#   the rear deck
+# - Big black fender flares sweeping over the wide-track front and rear tires
 # - Tubular side nerf bars with step rungs under the sills
 # - Vertical side-pod intake slots ahead of the rear arches
 # - High-mounted GT gull-wing rear wing on twin raked struts over a triangular roll cage
@@ -17,15 +18,16 @@
 # - Exposed double wishbone suspension with tall coilover dampers tucked under the hood
 extends "res://CarDesign.gd"
 
-# Wheels: wide stadium truck track, long-travel clearance
-const WHEEL_X := 0.565
+# Wheels: wide stadium truck track, long-travel clearance, with a clear gap (tire inner face at
+# WHEEL_X - 0.128 = 0.512 against a tub half-width of about 0.43) so the front wheels can steer
+const WHEEL_X := 0.640
 const AXLE_F := -0.743
 const AXLE_R := 0.620
 const HUB_Y := 0.260
 
 # Tub half-width (w) along the car (z): a wide slab nose, pinched at the doors, and the wheel
-# zones kept inside the tires' inner faces (0.437) so they poke out beside the body instead of
-# sinking into it; the black rear flares carry the track's muscle over the wheel tops.
+# zones kept well inside the tires' inner faces (0.512) so they stand clear of the body; the black
+# flares, held on stays, carry the track's muscle over the wheel tops.
 const W_KNOTS := [
 	[-1.140, 0.335], [-1.000, 0.375], [-0.900, 0.405], [-0.800, 0.418],
 	[-0.680, 0.428], [-0.560, 0.430], [-0.440, 0.428], [-0.300, 0.405],
@@ -53,12 +55,12 @@ const BOT_KNOTS := [
 # crown: dome / dish of top surface (+ dome, - dish)
 const KEYS := [
 	# z       belt    sx     sy     rx     ry     top    crown
-	[-1.140, 0.205, 0.300, 0.240, 0.170, 0.245, 0.255, 0.022], # sharp low slab nose tip
-	[-1.000, 0.235, 0.360, 0.300, 0.230, 0.315, 0.330, 0.034], # hood rising over the fenders
-	[-0.860, 0.275, 0.400, 0.365, 0.260, 0.390, 0.400, 0.040], # front fender plane
-	[-0.740, 0.325, 0.415, 0.410, 0.270, 0.445, 0.465, 0.042], # front axle plane (fender crest)
-	[-0.580, 0.355, 0.420, 0.440, 0.280, 0.480, 0.510, 0.036], # cowl ramp
-	[-0.440, 0.375, 0.420, 0.465, 0.300, 0.530, 0.550, 0.028], # windshield base / cowl edge
+	[-1.140, 0.215, 0.300, 0.260, 0.170, 0.262, 0.278, 0.024], # slab nose tip, hood raised a touch
+	[-1.000, 0.245, 0.365, 0.320, 0.230, 0.335, 0.354, 0.036], # hood rising over the fenders
+	[-0.860, 0.282, 0.400, 0.384, 0.260, 0.408, 0.422, 0.042], # front fender plane
+	[-0.740, 0.330, 0.415, 0.426, 0.270, 0.462, 0.488, 0.044], # front axle plane (fender crest)
+	[-0.580, 0.360, 0.420, 0.454, 0.282, 0.494, 0.530, 0.038], # cowl ramp
+	[-0.440, 0.380, 0.420, 0.476, 0.300, 0.540, 0.560, 0.028], # windshield base / cowl edge
 	[-0.260, 0.405, 0.380, 0.525, 0.270, 0.625, 0.645, 0.014], # windshield mid
 	[-0.100, 0.415, 0.385, 0.535, 0.258, 0.655, 0.675, 0.012], # roof header
 	[ 0.060, 0.425, 0.390, 0.545, 0.250, 0.660, 0.680, 0.012], # roof peak
@@ -76,8 +78,17 @@ const REAR_LIP := [
 	[0.255, 0.395], [0.330, 0.455], [0.430, 0.520], [0.560, 0.548], [0.660, 0.550],
 	[0.760, 0.540], [0.855, 0.520], [0.925, 0.485], [0.955, 0.452]
 ]
-const REAR_FLARE_OUT := 0.615
+const REAR_FLARE_OUT := 0.690
 const REAR_FLARE_DEPTH := 0.052
+
+# The front black fender flare's lip: the rear arch mirrored about the front axle (door end first,
+# then round over the tire toward the nose).
+const FRONT_LIP := [
+	[-0.378, 0.395], [-0.453, 0.455], [-0.553, 0.520], [-0.683, 0.548], [-0.783, 0.550],
+	[-0.883, 0.535], [-0.965, 0.490], [-1.030, 0.425], [-1.085, 0.350]
+]
+const FRONT_FLARE_OUT := 0.690
+const FRONT_FLARE_DEPTH := 0.052
 
 # Tires: High-traction stadium truck carcass with aggressive tread blocks
 const TYRE_HALF := [
@@ -117,7 +128,7 @@ const WHEEL_POSITIONS := {
 func _init() -> void:
 	nose_tip = -1.140
 	nose_cap = 0.030
-	nose_cap_y = 0.232
+	nose_cap_y = 0.242
 	nose_cap_exp = Vector2(5.2, 3.2)
 	tail_tip = 0.960
 	tail_cap = 0.025
@@ -189,6 +200,22 @@ func build_body(b) -> void:
 	_cockpit(b)
 
 
+## Support stays holding a fender flare: dark round tubes from the tub's shoulder (buried in the
+## body) out to the flare's outer lip, spaced along its arch. Each end sits in the flare's underside
+## at the lip, and the tube runs above the tire (the lip is always above the tread there).
+func _fender_stays(b, lip: Array, x_out: float) -> void:
+	var spine: PackedVector2Array = _spine(lip, 40)
+	for i in [2, 9, 17, 25, 33]:
+		var z: float = spine[i].x
+		var y: float = spine[i].y
+		var body_x: float = minf(prof["sx"].at(z), prof["w"].at(z)) - 0.030
+		var body_y: float = minf(y - 0.020, prof["sy"].at(z) - 0.012)
+		var outer := Vector3(x_out - 0.020, y + 0.004, z)
+		# A short dog-leg: out from the body, then a straight run to the lip
+		var mid := Vector3(lerpf(body_x, outer.x, 0.30), lerpf(body_y, outer.y, 0.55), z)
+		b.tube(PackedVector3Array([Vector3(body_x, body_y, z), mid, outer]), 0.0085, 6, CB.M_DARK, C_DARK, false, false)
+
+
 ## Side components built on +X then mirrored across X = 0
 func _side_parts(b) -> void:
 	var knuckle_x := WHEEL_X - 0.065
@@ -227,32 +254,16 @@ func _side_parts(b) -> void:
 	coilover(b, Vector3(0.370, 0.235, k_rear + 0.02), Vector3(0.280, 0.420, k_rear - 0.02), 0.018, 0.030, 7.0, C_ALLOY, C_ALLOY_DARK, C_CHROME, C_DARK)
 
 	# -------------------------------------------------------------------------
-	# 3. Front wing's fang + arch bar: the wing's tip curls up over the front tire
-	# (all clearance-checked against the ring r = 0.28 about the wheel hub)
-	# -------------------------------------------------------------------------
-	var fang := PackedVector3Array([
-		Vector3(0.520, 0.400, -1.000),
-		Vector3(0.546, 0.440, -0.995),
-		Vector3(0.564, 0.476, -0.968),
-		Vector3(0.572, 0.512, -0.920),
-		Vector3(0.570, 0.545, -0.845),
-		Vector3(0.562, 0.565, -0.760),
-		Vector3(0.548, 0.548, -0.660),
-		Vector3(0.528, 0.508, -0.560),
-		Vector3(0.497, 0.438, -0.500),
-		Vector3(0.452, 0.355, -0.470),
-		Vector3(0.400, 0.386, -0.400)
-	])
-	b.tube(fang, 0.015, 8, CB.M_DARK, C_DARK, true, true)
-
-	# -------------------------------------------------------------------------
-	# 4. Big black rear fender flare (a floating arch over the wide rear tire)
+	# 3. Big black front and rear fender flares (floating arches over the wide tires)
 	# -------------------------------------------------------------------------
 	var saved_mat := fender_mat
 	var saved_col := fender_col
 	fender_mat = CB.M_DARK
 	fender_col = C_DARK
+	build_fender(b, FRONT_LIP, AXLE_F, HUB_Y, FRONT_FLARE_OUT, FRONT_FLARE_DEPTH, 0.035)
 	build_fender(b, REAR_LIP, AXLE_R, HUB_Y, REAR_FLARE_OUT, REAR_FLARE_DEPTH, 0.035)
+	_fender_stays(b, FRONT_LIP, FRONT_FLARE_OUT)
+	_fender_stays(b, REAR_LIP, REAR_FLARE_OUT)
 	fender_mat = saved_mat
 	fender_col = saved_col
 
@@ -366,17 +377,14 @@ func _centre_parts(b) -> void:
 	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.215, -1.092)), Vector3(0.215, 0.010, 0.016), 0.004, 1, CB.M_DARK, C_DARKER)
 	for x in [-0.162, -0.054, 0.054, 0.162]:
 		bar(b, Vector3(x, 0.215, -1.092), Vector3(0.0035, 0.010, 0.016), CB.M_DARK, C_DARK)
+	# RC grille on the nose's shield face: two stepped black bars, their fronts landing right at the
+	# tip plane (the superellipse cap keeps the face full-width almost to the tip, so a plane here
+	# grazes the skin everywhere and reads as a proud inset grille — widths stay inside the shield)
+	for grille in [[0.233, 0.300], [0.256, 0.280]]:
+		b.rbox(Transform3D(Basis(), Vector3(0.0, grille[0], -1.130)),
+			Vector3(grille[1], 0.0075, 0.010), 0.003, 1, CB.M_DARK, C_DARK)
 
-	# -------------------------------------------------------------------------
-	# 2. Dual Aerodynamic Roof Runners / Air Channels (Along Canopy)
-	# -------------------------------------------------------------------------
-	for sx in [-1.0, 1.0]:
-		var runner_x: float = 0.105 * sx
-		var runner_path := PackedVector3Array()
-		for k in 12:
-			var rz: float = lerpf(-0.125, 0.290, k / 11.0)
-			runner_path.append(Vector3(runner_x, top_y(runner_x, rz) + 0.003, rz))
-		b.tube(runner_path, 0.0065, 8, CB.M_PAINT, Color(1, 1, 1), true, true)
+	# (The two green roof runner tubes were removed: the canopy is one clean glass bubble.)
 
 	# -------------------------------------------------------------------------
 	# 3. High-Mounted GT Gull-Wing Rear Wing & Struts (Signature Feature from Photo)
@@ -594,50 +602,36 @@ func _detail_at(p: Vector3, n: Vector3, fp: float, sh: Dictionary) -> Color:
 	var ry: float = prof["ry"].at(p.z)
 
 	# -------------------------------------------------------------------------
-	# 1. Dark Tinted Canopy Glass (Windshield, Side Windows, Runner Channels,
-	#    Louvred Deck Hatch) -> R channel
+	# 1. Dark Tinted Canopy Glass (one wrap-around bubble canopy + Louvred Deck Hatch)
+	#    -> R channel
 	# -------------------------------------------------------------------------
 	var on_top := n.y > 0.55
-	# Windshield: the big top face from the cowl up to the roof header, inside the rails
-	if p.z > -0.470 and p.z < -0.120:
-		if p.x < rx - 0.014 and p.y > sy + 0.010:
-			glass = 1.0
-	# Side windows: between shoulder and roof rail (separate from the windshield range, which
-	# overlaps it: the windshield paints the top face, this paints the side face)
-	if p.z >= -0.250 and p.z <= 0.205:
-		if p.y > sy + 0.012 and p.y < ry - 0.008 and p.x > rx + 0.008:
-			glass = 1.0
-	# Runner channels: dark glass bands running the canopy between the two green ridges
-	if p.x > 0.046 and p.x < 0.090 and p.z > -0.140 and p.z < 0.300 and p.y > sy - 0.005:
+	# One continuous tinted glass bubble: everything above the shoulder line between the cowl and
+	# the C-pillar drop is glass, over the roof and straight down the raked sides (no separate
+	# windshield / side windows, no pillars, no centre spine)
+	var canopy_z: bool = p.z > -0.440 and p.z < 0.205
+	if canopy_z and p.y > sy + 0.014 and n.y > -0.2:
 		glass = 1.0
-	# Green roof runner ridges punch through the channel glass between the header and the deck cut
-	if absf(p.x) <= 0.062 and absf(p.x) >= 0.076 \
-			and p.z > -0.150 and p.z < 0.300 and p.y > sy + 0.005:
-		pass
-	# Rear deck's louvred glass hatch panel between the runners
+	# Rear deck's louvred glass hatch panel behind the canopy
 	if p.z > 0.310 and p.z < 0.525 and absf(p.x) < 0.150 and p.y > sy - 0.012 and on_top:
 		glass = 1.0
 
-	# Black rubber window seals bordering glass (A- and C-pillar frames, hatch surround)
-	if glass == 0.0:
-		# Windshield rubber seal
-		if p.z > -0.490 and p.z < -0.105 and p.x < rx and p.y > sy:
-			if (p.x >= rx - 0.022 or p.z <= -0.438 or p.z >= -0.128 or p.y < sy + 0.018):
-				black = maxf(black, 0.95)
-		# Side window rubber seal
-		if p.z >= -0.275 and p.z <= 0.235 and p.x > rx and p.y > sy - 0.005 and p.y < ry + 0.015:
-			if (p.y <= sy + 0.018 or p.y >= ry - 0.008 or p.z <= -0.150 or p.z >= 0.205):
-				black = maxf(black, 0.95)
+	# Thin black rubber seal framing the canopy: cowl edge, rear edge and the shoulder line
+	if glass == 0.0 and p.z > -0.470 and p.z < 0.235 and p.y > sy - 0.004:
+		if p.z <= -0.440 or p.z >= 0.205 or p.y <= sy + 0.014:
+			black = maxf(black, 0.95)
 
 	# -------------------------------------------------------------------------
 	# 2. Satin Black Trim -> A channel
 	# -------------------------------------------------------------------------
-	# Lower rockers / sills two-tone band
-	if p.y < 0.298 and n.y < 0.55:
+	# Lower rockers / sills two-tone band (kept off the nose tip: its face is dominated by
+	# the grille zone and the tip's degenerate bake vectors would smear the boundary)
+	if p.y < 0.298 and n.y < 0.55 and p.z > -1.045:
 		black = maxf(black, 0.95)
-	# Nose under-lip and front face
-	if p.z < -1.045 and p.y < 0.245:
-		black = maxf(black, 0.95)
+	# Nose under-lip and front face: the black jaw below the grille bars (feathered boundary: the
+	# unpainted green gap above it kept crisp at texel scale)
+	if p.z < -1.045 and p.y < 0.216:
+		black = maxf(black, _cover(0.216 - p.y, fp))
 	# Rear recessed tail fascia
 	if p.z > 0.872 and p.y < 0.475 and n.z > 0.4:
 		black = maxf(black, 0.98)
