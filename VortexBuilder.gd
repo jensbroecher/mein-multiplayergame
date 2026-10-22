@@ -18,9 +18,9 @@
 # - Exposed double wishbone suspension with tall coilover dampers tucked under the hood
 extends "res://CarDesign.gd"
 
-# Wheels: wide stadium truck track with generous body clearance (WHEEL_X = 0.900,
-# tire inner face at 0.772 vs body flank at 0.420) so the front wheels can steer freely at full lock
-const WHEEL_X := 0.900
+# Wheels: wide stadium truck track with generous body clearance (WHEEL_X = 0.830,
+# tire inner face at 0.702 vs body flank at 0.420) so the front wheels can steer freely at full lock
+const WHEEL_X := 0.830
 const AXLE_F := -0.743
 const AXLE_R := 0.620
 const HUB_Y := 0.260
@@ -82,8 +82,8 @@ const FRONT_LIP := [
 	[-0.378, 0.395], [-0.453, 0.455], [-0.553, 0.520], [-0.683, 0.548], [-0.783, 0.550],
 	[-0.883, 0.535], [-0.965, 0.490], [-1.030, 0.425], [-1.085, 0.350]
 ]
-const FENDER_IN := 0.760
-const FENDER_OUT := 1.040
+const FENDER_IN := 0.690
+const FENDER_OUT := 0.970
 const FENDER_DEPTH := 0.035
 
 # Tires: High-traction stadium truck carcass with aggressive tread blocks
@@ -272,7 +272,7 @@ func _fender_supports(b) -> void:
 	var f_fender_front := Vector3(f_in + 0.020, 0.365, -1.020)
 	b.rbox(Transform3D(Basis(), f_nose_chassis), Vector3(0.016, 0.020, 0.020), 0.004, 1, CB.M_DARK, C_STEEL)
 	b.rbox(Transform3D(Basis(), f_fender_front), Vector3(0.014, 0.016, 0.018), 0.003, 1, CB.M_DARK, C_STEEL)
-	b.tube(PackedVector3Array([f_nose_chassis, Vector3(0.550, 0.315, -1.000), f_fender_front]), 0.010, 8, CB.M_DARK, C_DARK, true, true)
+	b.tube(PackedVector3Array([f_nose_chassis, Vector3(0.520, 0.315, -1.000), f_fender_front]), 0.010, 8, CB.M_DARK, C_DARK, true, true)
 
 	# 2. Main A-frame center truss (chassis cowl/shock tower -> fender apex)
 	var f_chassis_mid := Vector3(0.390, 0.430, AXLE_F)
@@ -283,14 +283,14 @@ func _fender_supports(b) -> void:
 	b.rbox(Transform3D(Basis(), f_fender_apex_r), Vector3(0.014, 0.016, 0.018), 0.003, 1, CB.M_DARK, C_STEEL)
 	b.tube(PackedVector3Array([f_chassis_mid, f_fender_apex_f]), 0.009, 8, CB.M_DARK, C_DARK, true, true)
 	b.tube(PackedVector3Array([f_chassis_mid, f_fender_apex_r]), 0.009, 8, CB.M_DARK, C_DARK, true, true)
-	b.tube(PackedVector3Array([Vector3(0.580, 0.485, AXLE_F - 0.055), Vector3(0.580, 0.485, AXLE_F + 0.055)]), 0.007, 6, CB.M_DARK, C_DARK, false, false)
+	b.tube(PackedVector3Array([Vector3(0.540, 0.485, AXLE_F - 0.055), Vector3(0.540, 0.485, AXLE_F + 0.055)]), 0.007, 6, CB.M_DARK, C_DARK, false, false)
 
 	# 3. Rear trailing arm (chassis sill/firewall -> rear of front fender)
 	var f_sill_rear := Vector3(0.405, 0.355, -0.460)
 	var f_fender_rear := Vector3(f_in + 0.020, 0.405, -0.435)
 	b.rbox(Transform3D(Basis(), f_sill_rear), Vector3(0.016, 0.020, 0.020), 0.004, 1, CB.M_DARK, C_STEEL)
 	b.rbox(Transform3D(Basis(), f_fender_rear), Vector3(0.014, 0.016, 0.018), 0.003, 1, CB.M_DARK, C_STEEL)
-	b.tube(PackedVector3Array([f_sill_rear, Vector3(0.580, 0.380, -0.450), f_fender_rear]), 0.010, 8, CB.M_DARK, C_DARK, true, true)
+	b.tube(PackedVector3Array([f_sill_rear, Vector3(0.540, 0.380, -0.450), f_fender_rear]), 0.010, 8, CB.M_DARK, C_DARK, true, true)
 
 	# -------------------------------------------------------------------------
 	# Rear Fender Supports
@@ -301,7 +301,7 @@ func _fender_supports(b) -> void:
 	var r_fender_front := Vector3(r_in + 0.020, 0.410, 0.300)
 	b.rbox(Transform3D(Basis(), r_sill_front), Vector3(0.016, 0.020, 0.020), 0.004, 1, CB.M_DARK, C_STEEL)
 	b.rbox(Transform3D(Basis(), r_fender_front), Vector3(0.014, 0.016, 0.018), 0.003, 1, CB.M_DARK, C_STEEL)
-	b.tube(PackedVector3Array([r_sill_front, Vector3(0.590, 0.395, 0.295), r_fender_front]), 0.010, 8, CB.M_DARK, C_DARK, true, true)
+	b.tube(PackedVector3Array([r_sill_front, Vector3(0.550, 0.395, 0.295), r_fender_front]), 0.010, 8, CB.M_DARK, C_DARK, true, true)
 
 	# 2. Main A-frame center truss (rear haunch/deck -> fender apex)
 	var r_chassis_mid := Vector3(0.420, 0.530, AXLE_R)
@@ -312,14 +312,14 @@ func _fender_supports(b) -> void:
 	b.rbox(Transform3D(Basis(), r_fender_apex_r), Vector3(0.014, 0.016, 0.018), 0.003, 1, CB.M_DARK, C_STEEL)
 	b.tube(PackedVector3Array([r_chassis_mid, r_fender_apex_f]), 0.009, 8, CB.M_DARK, C_DARK, true, true)
 	b.tube(PackedVector3Array([r_chassis_mid, r_fender_apex_r]), 0.009, 8, CB.M_DARK, C_DARK, true, true)
-	b.tube(PackedVector3Array([Vector3(0.590, 0.538, AXLE_R - 0.055), Vector3(0.590, 0.538, AXLE_R + 0.055)]), 0.007, 6, CB.M_DARK, C_DARK, false, false)
+	b.tube(PackedVector3Array([Vector3(0.555, 0.538, AXLE_R - 0.055), Vector3(0.555, 0.538, AXLE_R + 0.055)]), 0.007, 6, CB.M_DARK, C_DARK, false, false)
 
 	# 3. Rear trailing arm (rear taillight frame -> rear of fender)
 	var r_frame_rear := Vector3(0.350, 0.440, 0.920)
 	var r_fender_rear := Vector3(r_in + 0.020, 0.440, 0.940)
 	b.rbox(Transform3D(Basis(), r_frame_rear), Vector3(0.016, 0.020, 0.020), 0.004, 1, CB.M_DARK, C_STEEL)
 	b.rbox(Transform3D(Basis(), r_fender_rear), Vector3(0.014, 0.016, 0.018), 0.003, 1, CB.M_DARK, C_STEEL)
-	b.tube(PackedVector3Array([r_frame_rear, Vector3(0.560, 0.440, 0.930), r_fender_rear]), 0.010, 8, CB.M_DARK, C_DARK, true, true)
+	b.tube(PackedVector3Array([r_frame_rear, Vector3(0.535, 0.440, 0.930), r_fender_rear]), 0.010, 8, CB.M_DARK, C_DARK, true, true)
 
 
 ## Side components built on +X then mirrored across X = 0
@@ -342,7 +342,7 @@ func _side_parts(b) -> void:
 	# Tie rod
 	b.tube(PackedVector3Array([Vector3(0.18, 0.235, k_front + 0.08), Vector3(knuckle_x - 0.01, 0.225, k_front + 0.04)]), 0.009, 6, CB.M_DARK, C_STEEL, false, false)
 	# Coilover shock tucked inside wheel well under the hood
-	coilover(b, Vector3(0.550, 0.215, k_front), Vector3(0.260, 0.340, k_front), 0.017, 0.028, 6.5, C_ALLOY, C_ALLOY_DARK, C_CHROME, C_DARK)
+	coilover(b, Vector3(0.515, 0.215, k_front), Vector3(0.260, 0.340, k_front), 0.017, 0.028, 6.5, C_ALLOY, C_ALLOY_DARK, C_CHROME, C_DARK)
 
 	# -------------------------------------------------------------------------
 	# 2. Rear Suspension (Trailing Arms & Coilovers)
@@ -357,7 +357,7 @@ func _side_parts(b) -> void:
 	b.rbox(Transform3D(Basis(), Vector3(knuckle_x, HUB_Y, k_rear)), Vector3(0.018, 0.076, 0.034), 0.008, 1, CB.M_DARK, C_STEEL)
 	b.tube(PackedVector3Array([Vector3(knuckle_x, HUB_Y, k_rear), Vector3(WHEEL_X - 0.02, HUB_Y, k_rear)]), 0.016, 10, CB.M_ALLOY, C_ALLOY_DARK, false, true)
 	# Rear coilover shock under the haunch
-	coilover(b, Vector3(0.560, 0.230, k_rear + 0.02), Vector3(0.280, 0.420, k_rear - 0.02), 0.018, 0.030, 7.0, C_ALLOY, C_ALLOY_DARK, C_CHROME, C_DARK)
+	coilover(b, Vector3(0.525, 0.230, k_rear + 0.02), Vector3(0.280, 0.420, k_rear - 0.02), 0.018, 0.030, 7.0, C_ALLOY, C_ALLOY_DARK, C_CHROME, C_DARK)
 
 	# -------------------------------------------------------------------------
 	# 3. Big black front and rear fender flares & structural support trusses
