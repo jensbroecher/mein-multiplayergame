@@ -1,0 +1,19 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://car_body.gdshader" id="1_kdfg7"]
+[ext_resource type="Texture2D" path="res://generated/cars/inferno_detail.res" id="2_kf21r"]
+
+[resource]
+render_priority = -1
+shader = ExtResource("1_kdfg7")
+shader_parameter/detail_map = ExtResource("2_kf21r")
+shader_parameter/nose_z = -1.07
+shader_parameter/tail_z = 1.065
+shader_parameter/belt_y = 0.55
+shader_parameter/side_x = 0.5
+shader_parameter/door_roundel = Vector2(-0.16, 0.43)
+shader_parameter/roundel_r = 0.058
+shader_parameter/hood_z = -0.94
+shader_parameter/hood_r = 0.05
+shader_parameter/stripe_w = 0.06
+shader_parameter/stripe_gap = 0.022

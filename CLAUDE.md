@@ -900,3 +900,12 @@ its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set th
   grows slowly up the glass, and B is keyed by its own x (`bx`), so the bonnet's shut lines run on
   into the A-pillars. To check a cowl, print `top_y()`'s slope along z at a few x: it should rise
   the same at every x. Parts lying across a crowned roof (visor, light bar, lip) follow `top_y()`.
+- The Inferno (`InfernoBuilder.gd`, a dune supercar) cuts its wells like the Apex and sinks the bonnet
+  panel, cockpit and engine deck between the fenders and haunches with one keyed section (`KEYS`: a
+  roll onto the fender top, which falls inward to A, a wall down, a floor). Its visor, quarter windows
+  and rear window are separate panels drawn as glass: they are `M_BODY` with every UV on a patch of
+  the detail map kept glass on the flat bottom under the cockpit (`GLASS_Z`, `_glass_uv`). Its tail
+  cap shrinks toward the top of the black fascia (`tail_cap_y = TAIL_Y`): the cap's rings are scaled
+  copies of the section about that height, so the edge lies on the same ring points all over the
+  face. A boundary crossing a cap at another height came out wavy. The side is split at the sill line
+  for the same reason.

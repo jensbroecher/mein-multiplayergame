@@ -162,6 +162,21 @@ const CAR_PRESETS = [
 		"braking": 45.0,
 		"offroad": 8.5,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Inferno",
+		"engine_sound": "res://sounds/enginesounds/engine_viper_loop.wav",
+		"engine_gain_db": 0.0,
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Inferno.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 41.5,
+		"acceleration": 68.0,
+		"steer_speed": 2.9,
+		"grip": 4.4,
+		"braking": 42.0,
+		"offroad": 9.0,
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 
