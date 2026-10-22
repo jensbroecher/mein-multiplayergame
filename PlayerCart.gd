@@ -192,6 +192,21 @@ const CAR_PRESETS = [
 		"braking": 48.0,
 		"offroad": 1.5,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Vortex",
+		"engine_sound": "res://sounds/enginesounds/engine_apex_loop.wav",
+		"engine_gain_db": -2.5,
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Vortex.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 42.0,
+		"acceleration": 74.0,
+		"steer_speed": 3.1,
+		"grip": 5.8,
+		"braking": 49.0,
+		"offroad": 7.5,
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 

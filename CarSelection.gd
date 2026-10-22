@@ -164,6 +164,19 @@ const CAR_PRESETS = [
 		"offroad": 1.5,
 		"desc": "Endurance prototype on slicks. Fastest on tarmac and glued to it, lost on dirt.",
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Vortex",
+		"model_path": "res://generated/cars/Vortex.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 42.0,
+		"acceleration": 74.0,
+		"steer_speed": 3.1,
+		"grip": 5.8,
+		"braking": 49.0,
+		"offroad": 7.5,
+		"desc": "High-downforce aero truggy. Aggressive splitters and a dual-strut wing keep wide stadium tires glued to dirt and tarmac.",
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 
@@ -173,7 +186,7 @@ const CAR_ACCENTS := {
 	"Viper": Color(0.36, 0.92, 0.40), "Shadow": Color(0.72, 0.40, 1.0), "Strikeforce": Color(0.70, 0.88, 0.20),
 	"Apex": Color(1.0, 0.60, 0.16), "Interceptor": Color(0.30, 0.52, 1.0), "Mudrunner": Color(0.22, 0.80, 0.66),
 	"Phantom": Color(1.0, 0.78, 0.14), "Centurion": Color(0.98, 0.46, 0.12), "Mirage": Color(0.96, 0.28, 0.14),
-	"Inferno": Color(1.0, 0.22, 0.20), "Nocturne": Color(0.62, 0.86, 1.0),
+	"Inferno": Color(1.0, 0.22, 0.20), "Nocturne": Color(0.62, 0.86, 1.0), "Vortex": Color(0.55, 0.92, 0.15),
 }
 ## Stat bars: caption, preset key, and the values at an empty and a full bar (spanning the fleet).
 const STATS := [

@@ -70,6 +70,9 @@ const FACTORY := {
 	"Nocturne": {"pattern": 7, "finish": 0, "primary": Color(0.80, 0.07, 0.05),
 		"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.03, 0.03, 0.035),
 		"rim": Color(0.76, 0.77, 0.79), "number": 24},
+	"Vortex": {"pattern": 0, "finish": 0, "primary": Color(0.55, 0.88, 0.12),
+		"secondary": Color(0.08, 0.08, 0.09), "accent": Color(0.96, 0.96, 0.98),
+		"rim": Color(0.06, 0.06, 0.07), "number": 77},
 }
 const FALLBACK := {"pattern": 0, "finish": 0, "primary": Color(0.80, 0.07, 0.05),
 	"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.98, 0.78, 0.07),

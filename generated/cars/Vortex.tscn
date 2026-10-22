@@ -1,0 +1,38 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://generated/cars/vortex_body.res" id="1_jow45"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/vortex_wheel_l.res" id="2_bvxja"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/vortex_wheel_r.res" id="3_xrl4f"]
+
+[node name="Vortex" type="Node3D" unique_id=1247579059]
+metadata/procedural_car = true
+
+[node name="Model" type="Node3D" parent="." unique_id=626909562]
+transform = Transform3D(-0.5, 0, -4.371139e-08, 0, 0.5, 0, 4.371139e-08, 0, -0.5, 0, 0, 0)
+
+[node name="Body" type="MeshInstance3D" parent="Model" unique_id=1996217500]
+mesh = ExtResource("1_jow45")
+metadata/car_shader = true
+
+[node name="Wheel_FL" type="MeshInstance3D" parent="Model" unique_id=156935568]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.565, 0.26, -0.74)
+mesh = ExtResource("2_bvxja")
+metadata/car_shader = true
+
+[node name="Wheel_FR" type="MeshInstance3D" parent="Model" unique_id=13426168]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.565, 0.26, -0.74)
+mesh = ExtResource("3_xrl4f")
+metadata/car_shader = true
+
+[node name="Wheel_RL" type="MeshInstance3D" parent="Model" unique_id=891969280]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.565, 0.26, 0.62)
+mesh = ExtResource("2_bvxja")
+metadata/car_shader = true
+
+[node name="Wheel_RR" type="MeshInstance3D" parent="Model" unique_id=1445264901]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.565, 0.26, 0.62)
+mesh = ExtResource("3_xrl4f")
+metadata/car_shader = true
+
+[node name="AntennaPlacement" type="Node3D" parent="Model" unique_id=1624756457]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.18, 0.69, 0.16)
