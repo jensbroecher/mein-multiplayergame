@@ -204,6 +204,36 @@ so a change to the pad shows on every level. With `settle_on_track`, a pad drops
 under it at runtime (after `wait_for_collisions`), tilts with it and faces along the TrackPath.
 Bloombay sets it on.
 
+## Item boxes
+
+- `ItemBox.gd` (`@tool`) builds the box as internal children, so level files (and Level.gd's spawns) only
+  store the transform: a hologram glass cube (`item_box_glass.gdshader`), a gold "?" (`item_box_glyph`, a tube
+  swept along the glyph), a soap bubble (`item_box_bubble`), sparkles (`item_box_sparkles`) and a glow on the
+  ground (`item_box_glow`). Meshes and materials are static, shared by every box; a box's own state is shader
+  instance uniforms (`phase`, `pop`, `build`, the glow's `present` and `charge`).
+- The glass is premultiplied: ALBEDO is the light it gives off, ALPHA how much it dims what's behind it. Back
+  faces draw at 45%, which gives the far edges. Its even `fill` stays low because it lays cyan over the "?".
+- The "?" turns about world up to face the camera in its vertex shader (BILLBOARD_FIXED_Y's matrix), so it
+  reads on both split-screen viewports. It is unshaded with its own fixed key light: lit by the scene, its
+  specular took in the blue sky and turned the gold salmon.
+- The sparkles are one mesh of quads that the vertex shader places (seeds in COLOR, corner in UV, writes
+  `POSITION`): no particle system. `custom_aabb` covers the burst.
+- Once the level's collision exists (`_settle`) the box raycasts down: the cube's centre hovers `HOVER`
+  (1.45m) over the ground, at most `MAX_SEAT_SHIFT` off the node so it stays in the 2.5m pickup area, and the
+  glow lies on the hit. Level spawns boxes 1.2m (random) or 1.5m (gates) above the ground or the gate's origin.
+- Taken (`_deactivate_rpc`): `pop` runs to 1 over 0.5s (a flash, the glass and bubble swell and fade, the
+  sparkles fly out, a shock ring on the ground), then the box hides and the ring on the ground fills round
+  over `RESPAWN_TIME` (`charge`). Back (`_activate_rpc`, and at the start): `build` cuts the cube off under a
+  line sweeping up it. Each peer animates from the RPCs.
+- Every part gives off its own light, so `_settle` sets `gain` to 1 / the level's `tonemap_exposure` on the
+  shared materials: Northlight's 1.45 bloomed them into white balls. Fog is off on them; they fade themselves
+  (`fade_begin`/`fade_end`) and by `visibility_range_end`.
+- Cost: about 0.03ms of GPU on an M1 at Pinecrest's gates (`ab_bench ... gates hide=ItemBox`).
+- `res://scratch/itembox_preview.tscn -- <dir> [boxes=3] [car=0] name:x,y,z:tx,ty,tz[:frames[:gap]] pop=<i>
+  respawn=<i> wait=<s> param=<part>:<name>:<value>` (windowed; a scene, because ItemBox uses NetworkManager)
+  renders boxes over a flat road. Steps run in order: `pop=1 burst:0,2.4,9:0,1.6,0:8:0.07` saves the burst
+  frame by frame, and `param=` tries a shader value on a part's shared material.
+
 ## Frostpeak sky
 
 `sky_winter_cirrus.gdshader` (sky shader, set by the generator) draws the sky gradient, sun and static cirrus.
@@ -302,9 +332,10 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   faces (`surf_fbm`); sampled from above it is constant down a cliff and paints streaks and V shapes.
   The heightfield splits each cell along the diagonal joining the closer heights
   (`_build_heightfield_mesh`); one fixed diagonal saws steep slopes that cross it into teeth.
-- `res://scratch/ab_bench.tscn -- res://levels/X.tscn [samples=6] variant ...` switches variants
+- `res://scratch/ab_bench.tscn -- res://levels/X.tscn [samples=6] [gates] variant ...` switches variants
   (`storm`, `nolightshadow`, `nomoonshadow`, `unshadow=`, `sky=`, `hide=`, `cheapmat=`) back and forth
-  within one run. On macOS, separate `bench.tscn` runs differ by up to 2x with the GPU's clock.
+  within one run; `gates` samples 10m before each checkpoint instead of along the lap. On macOS, separate
+  `bench.tscn` runs differ by up to 2x with the GPU's clock.
 
 ## Frostfall Gorge (off-road stage)
 

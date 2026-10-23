@@ -4,7 +4,8 @@ extends Node
 # so GPU clock and thermal drift between runs can't masquerade as a difference.
 # Run windowed (not headless):
 #   Godot --path . res://scratch/ab_bench.tscn -- res://levels/X.tscn [samples=6] [shadows=3]
-#        variant ...
+#        [gates] variant ...
+# gates: sample 10m before each checkpoint gate (looking through it, at its item boxes) instead of along the lap.
 # Variants: base, storm (Northlight blizzard at full strength), noshadow, nolightshadow, noomni, nospot, nomoonshadow, sky=<shader path>,
 #           hide=<path substring>, unshadow=<path substring> (shadow off on matching lights), cheapmat=<path substring> (unshaded grey on matching meshes),
 #           quality=<0..4> (detail level, MusicManager's Off..Ultra; the base runs at the level's default).
@@ -12,6 +13,7 @@ extends Node
 
 var level_path := ""
 var samples := 6
+var at_gates := false
 var shadow_q := 3
 var variants: Array[String] = []
 var level: Node3D
@@ -24,6 +26,7 @@ func _ready() -> void:
 		if a.begins_with("res://"): level_path = a
 		elif a.begins_with("samples="): samples = int(a.substr(8))
 		elif a.begins_with("shadows="): shadow_q = int(a.substr(8))
+		elif a == "gates": at_gates = true
 		else: variants.append(a)
 	if not variants.has("base"):
 		variants.push_front("base")
@@ -65,11 +68,19 @@ func _ready() -> void:
 		await get_tree().process_frame
 	print("AB ", level_path, " tex=", vp.get_texture().get_size(), " variants=", variants)
 
+	var offsets: Array[float] = []
+	if at_gates and level.get_node_or_null("Checkpoints"):
+		for cp in level.get_node("Checkpoints").get_children():
+			offsets.append(fposmod(curve.get_closest_offset(path.to_local(cp.global_position)) - 10.0, length))
+	else:
+		for s in samples:
+			offsets.append(length * (float(s) + 0.5) / float(samples))
+	samples = offsets.size()
 	var totals := {}
 	for v in variants:
 		totals[v] = 0.0
 	for s in samples:
-		var off := length * (float(s) + 0.5) / float(samples)
+		var off := offsets[s]
 		var xf := path.global_transform * curve.sample_baked_with_rotation(off, true)
 		var p := xf.origin
 		var fwd := -xf.basis.z
