@@ -207,6 +207,21 @@ const CAR_PRESETS = [
 		"braking": 49.0,
 		"offroad": 7.5,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Zephyr",
+		"engine_sound": "res://sounds/enginesounds/engine_apex_loop.wav",
+		"engine_gain_db": -2.0,
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Zephyr.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 43.5,
+		"acceleration": 78.0,
+		"steer_speed": 3.2,
+		"grip": 5.4,
+		"braking": 48.0,
+		"offroad": 9.2,
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 

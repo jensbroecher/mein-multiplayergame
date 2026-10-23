@@ -1,0 +1,19 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://car_body.gdshader" id="1_8uop6"]
+[ext_resource type="Texture2D" path="res://generated/cars/zephyr_detail.res" id="2_8mgdr"]
+
+[resource]
+render_priority = -1
+shader = ExtResource("1_8uop6")
+shader_parameter/detail_map = ExtResource("2_8mgdr")
+shader_parameter/nose_z = -0.92
+shader_parameter/tail_z = 0.84
+shader_parameter/belt_y = 0.5
+shader_parameter/side_x = 0.4
+shader_parameter/door_roundel = Vector2(0, 0.4)
+shader_parameter/roundel_r = 0.09
+shader_parameter/hood_z = -0.55
+shader_parameter/hood_r = 0.08
+shader_parameter/stripe_w = 0.06
+shader_parameter/stripe_gap = 0.025

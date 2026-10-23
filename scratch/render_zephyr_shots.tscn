@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://zephyr_shots_probe_01"]
+
+[ext_resource type="Script" path="res://scratch/render_zephyr_shots.gd" id="1_shot"]
+
+[node name="ZephyrShots" type="Node"]
+script = ExtResource("1_shot")

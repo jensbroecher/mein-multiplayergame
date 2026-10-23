@@ -177,6 +177,19 @@ const CAR_PRESETS = [
 		"offroad": 7.5,
 		"desc": "High-downforce aero truggy. Aggressive splitters and a dual-strut wing keep wide stadium tires glued to dirt and tarmac.",
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Zephyr",
+		"model_path": "res://generated/cars/Zephyr.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 43.5,
+		"acceleration": 78.0,
+		"steer_speed": 3.2,
+		"grip": 5.4,
+		"braking": 48.0,
+		"offroad": 9.2,
+		"desc": "Futuristic cyber-Dakar hyper-coupe. A continuous panoramic canopy and long-travel trophy suspension conquer any terrain in style.",
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 
@@ -187,6 +200,7 @@ const CAR_ACCENTS := {
 	"Apex": Color(1.0, 0.60, 0.16), "Interceptor": Color(0.30, 0.52, 1.0), "Mudrunner": Color(0.22, 0.80, 0.66),
 	"Phantom": Color(1.0, 0.78, 0.14), "Centurion": Color(0.98, 0.46, 0.12), "Mirage": Color(0.96, 0.28, 0.14),
 	"Inferno": Color(1.0, 0.22, 0.20), "Nocturne": Color(0.62, 0.86, 1.0), "Vortex": Color(0.55, 0.92, 0.15),
+	"Zephyr": Color(0.85, 0.55, 0.25),
 }
 ## Stat bars: caption, preset key, and the values at an empty and a full bar (spanning the fleet).
 const STATS := [
