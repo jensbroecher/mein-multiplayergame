@@ -4,14 +4,28 @@ class_name WindTurbineBuilder
 ## Procedural builder for modern utility-scale wind turbines.
 ## Produces a complete wind turbine with tapered tower, streamlined nacelle,
 ## bullet-nose hub, and 3 aerodynamic twisted airfoil blades with red aviation stripes.
-## All meshes are completely solid & sealed (bulkheads, caps, deep foundation plinths)
-## with verified outward normals and zero gaps.
+## All meshes are completely solid & sealed (bulkheads, caps, deep foundation plinths).
+## The rotor faces +Z (upwind) and turns clockwise seen from there (WindTurbine.gd), like a real one.
 
 const TOWER_HEIGHT := 40.0
 const TOWER_BASE_R := 1.95
 const TOWER_TOP_R := 1.15
 const NACELLE_LEN := 7.9
 const ROTOR_RADIUS := 21.0
+## Blade tips lean upwind by this much per metre out (about 2.5 degrees), away from the tower.
+const PRECONE := 0.045
+
+# The nacelle's hull from the hub (+Z) to the tail: stations along z, half width, half height and
+# the centre's height, all from the tower top.
+const NACELLE_Z := [2.2, 1.6, 0.6, -1.0, -3.0, -4.8, -5.7]
+const NACELLE_HALF_W := [1.40, 1.45, 1.45, 1.40, 1.30, 1.00, 0.45]
+const NACELLE_HALF_H := [1.40, 1.45, 1.42, 1.38, 1.25, 0.95, 0.40]
+const NACELLE_YC := [0.0, 0.05, 0.08, 0.08, 0.05, 0.0, -0.05]
+## The aviation beacon stands on a post on the roof, ahead of the anemometer mast.
+const BEACON_Z := -3.7
+const BEACON_POST := 0.3
+const BEACON_RADIUS := 0.2
+const MAST_Z := -4.5
 
 # Explicit direction vectors (avoiding engine-dependent forward/back ambiguities)
 const DIR_FRONT := Vector3(0, 0, 1)  # Rotor spin axis pointing forward
@@ -61,8 +75,8 @@ static func build_turbine(spin_speed: float, initial_angle: float, yaw_deg: floa
 	var beacon_mi := MeshInstance3D.new()
 	beacon_mi.name = "Beacon"
 	var sphere := SphereMesh.new()
-	sphere.radius = 0.28
-	sphere.height = 0.45
+	sphere.radius = BEACON_RADIUS
+	sphere.height = BEACON_RADIUS * 1.6
 	sphere.radial_segments = 12
 	sphere.rings = 6
 	var beacon_mat := StandardMaterial3D.new()
@@ -73,7 +87,8 @@ static func build_turbine(spin_speed: float, initial_angle: float, yaw_deg: floa
 	beacon_mat.roughness = 0.2
 	beacon_mi.mesh = sphere
 	beacon_mi.material_override = beacon_mat
-	beacon_mi.position = Vector3(0, TOWER_HEIGHT + 1.75, -4.0)
+	# On top of its post (build_nacelle_mesh), its lower half round the post's head.
+	beacon_mi.position = Vector3(0, TOWER_HEIGHT + nacelle_roof_y(BEACON_Z) + BEACON_POST + BEACON_RADIUS * 0.4, BEACON_Z)
 	root.add_child(beacon_mi)
 
 	# 3. Rotor Pivot (rotates in _process)
@@ -81,7 +96,7 @@ static func build_turbine(spin_speed: float, initial_angle: float, yaw_deg: floa
 	pivot.name = "RotorPivot"
 	# Hub is positioned at front bulkhead of nacelle (+Z)
 	pivot.position = Vector3(0, TOWER_HEIGHT, 2.2)
-	pivot.rotation_degrees.z = initial_angle
+	pivot.rotation_degrees.z = -initial_angle # clockwise from upwind, as WindTurbine.gd turns it
 
 	var rotor_mi := MeshInstance3D.new()
 	rotor_mi.name = "Rotor"
@@ -166,10 +181,10 @@ static func build_nacelle_mesh() -> ArrayMesh:
 
 	# Nacelle coordinates along Z (local origin at tower top pivot):
 	# Hub is at +Z (~ +2.2), Tail is at -Z (~ -5.7).
-	var z_stations := [2.2, 1.6, 0.6, -1.0, -3.0, -4.8, -5.7]
-	var half_w := [1.40, 1.45, 1.45, 1.40, 1.30, 1.00, 0.45]
-	var half_h := [1.40, 1.45, 1.42, 1.38, 1.25, 0.95, 0.40]
-	var y_center := [0.0, 0.05, 0.08, 0.08, 0.05, 0.0, -0.05]
+	var z_stations := NACELLE_Z
+	var half_w := NACELLE_HALF_W
+	var half_h := NACELLE_HALF_H
+	var y_center := NACELLE_YC
 
 	# 1. Front Bulkhead / Hub mount disc (facing +Z at z = 2.2)
 	_add_disc(st, Vector3(0, y_center[0], z_stations[0]), half_w[0], DIR_FRONT, n_radial, COLOR_STEEL)
@@ -196,7 +211,7 @@ static func build_nacelle_mesh() -> ArrayMesh:
 			var p0 := Vector3(c0 * w0, yc0 + s0 * h0, z0)
 			var p1 := Vector3(c1 * w0, yc0 + s1 * h0, z0)
 			var p2 := Vector3(c1 * w1, yc1 + s1 * h1, z1)
-			var p3 := Vector3(c0 * w1, yc0 + s0 * h1, z1)
+			var p3 := Vector3(c0 * w1, yc1 + s0 * h1, z1)
 
 			var n0 := Vector3(c0, s0, (z0 - z1) * 0.1).normalized()
 			var n1 := Vector3(c1, s1, (z0 - z1) * 0.1).normalized()
@@ -219,10 +234,14 @@ static func build_nacelle_mesh() -> ArrayMesh:
 	# Bottom rim facing DOWN at -0.6
 	_add_horizontal_ring(st, -0.6, TOWER_TOP_R, skirt_r, n_radial, false, COLOR_STEEL)
 
-	# 5. Roof details: Anemometer mast
-	var mast_base := Vector3(0, 1.45, -4.2)
-	_add_box(st, mast_base + Vector3(0, 0.55, 0), Vector3(0.08, 1.1, 0.08), COLOR_STEEL)
-	_add_box(st, mast_base + Vector3(0, 1.1, 0), Vector3(0.5, 0.06, 0.06), COLOR_STEEL)
+	# 5. Roof details: anemometer mast, and the post the beacon stands on (both sunk 5cm into the roof,
+	# which falls toward the tail).
+	var mast_base := Vector3(0, nacelle_roof_y(MAST_Z) - 0.05, MAST_Z)
+	_add_box(st, mast_base + Vector3(0, 0.6, 0), Vector3(0.08, 1.2, 0.08), COLOR_STEEL)
+	_add_box(st, mast_base + Vector3(0, 1.15, 0), Vector3(0.5, 0.06, 0.06), COLOR_STEEL)
+	var post_base := Vector3(0, nacelle_roof_y(BEACON_Z) - 0.05, BEACON_Z)
+	_add_box(st, post_base + Vector3(0, 0.05, 0), Vector3(0.36, 0.1, 0.36), COLOR_STEEL)
+	_add_box(st, post_base + Vector3(0, (BEACON_POST + 0.05) * 0.5, 0), Vector3(0.09, BEACON_POST + 0.05, 0.09), COLOR_STEEL)
 
 	var mat := StandardMaterial3D.new()
 	mat.vertex_color_use_as_albedo = true
@@ -232,6 +251,17 @@ static func build_nacelle_mesh() -> ArrayMesh:
 	var mesh := st.commit()
 	mesh.surface_set_material(0, mat)
 	return mesh
+
+
+## Height of the nacelle's roof (the hull's top line) above the tower top at `z`.
+static func nacelle_roof_y(z: float) -> float:
+	for i in NACELLE_Z.size() - 1:
+		var z0: float = NACELLE_Z[i]
+		var z1: float = NACELLE_Z[i + 1]
+		if z <= z0 and z >= z1:
+			var t := (z - z0) / (z1 - z0)
+			return lerpf(NACELLE_YC[i] + NACELLE_HALF_H[i], NACELLE_YC[i + 1] + NACELLE_HALF_H[i + 1], t)
+	return NACELLE_YC[0] + NACELLE_HALF_H[0]
 
 
 ## Builds the rotating rotor assembly: aerodynamic spinner nosecone + 3 airfoil blades.
@@ -309,78 +339,97 @@ static func build_rotor_mesh() -> ArrayMesh:
 	return mesh
 
 
-## Constructs one aerodynamic airfoil blade radiating outward at `angle_rad`.
+## One blade along `angle_rad`, built as rings of its airfoil from the root to the tip, each point with
+## its outward normal. The rotor turns clockwise seen from upwind (+Z), so a blade travels toward
+## -v_tan: its leading edge is on that side, the flat pressure side faces the wind and the curved suction
+## side the tower, and the twist turns the leading edge upwind, most at the root. It cones upwind
+## (PRECONE). The old blade swapped its normals between neighbouring points, which drew dark streaks
+## along it, and had all three of these backwards.
 static func _build_single_blade(st: SurfaceTool, angle_rad: float) -> void:
-	# Blade radial stations (root starts inside the 1.42m spinner at 0.8m for seamless emergence)
 	var r_stations := [0.8, 1.8, 3.2, 5.5, 8.5, 12.0, 15.5, 18.0, 19.5, 21.0]
-	var chords := [1.10, 1.35, 1.55, 1.50, 1.30, 1.08, 0.80, 0.58, 0.42, 0.22]
-	var thicks := [0.95, 0.70, 0.42, 0.33, 0.25, 0.18, 0.13, 0.08, 0.06, 0.04]
+	var chords := [1.0, 1.3, 1.55, 1.5, 1.3, 1.08, 0.8, 0.58, 0.42, 0.24]
+	var thickness := [0.95, 0.6, 0.36, 0.27, 0.21, 0.18, 0.16, 0.15, 0.14, 0.13] # of the chord
 	var twists := [16.0, 14.0, 10.0, 7.0, 4.5, 2.5, 1.2, 0.5, 0.0, -0.5]
-
 	var v_rad := Vector3(cos(angle_rad), sin(angle_rad), 0.0)
 	var v_tan := Vector3(-sin(angle_rad), cos(angle_rad), 0.0)
-	var v_norm := DIR_FRONT
-
-	# Airfoil loop ordered CCW in airfoil cross-section so normals face outward
-	var x_pts := [1.0, 0.75, 0.40, 0.15, 0.0, 0.15, 0.40, 0.75]
-	var y_pts := [0.0, 0.28, 0.50, 0.38, 0.0, -0.10, -0.18, -0.15]
-	var n_pts := x_pts.size()
-
-	for s in range(r_stations.size() - 1):
-		var r0: float = r_stations[s]
-		var r1: float = r_stations[s + 1]
-		var ch0: float = chords[s]
-		var ch1: float = chords[s + 1]
-		var th0: float = thicks[s]
-		var th1: float = thicks[s + 1]
-		var tw0: float = deg_to_rad(twists[s])
-		var tw1: float = deg_to_rad(twists[s + 1])
-
+	var rings := []
+	for i in r_stations.size():
+		var r: float = r_stations[i]
+		var c: float = chords[i]
+		var tw := deg_to_rad(twists[i])
+		var chord_dir := v_tan * cos(tw) - DIR_FRONT * sin(tw) # leading edge to trailing edge
+		var thick_dir := -v_tan * sin(tw) - DIR_FRONT * cos(tw) # toward the suction side, downwind
+		var centre := v_rad * r + DIR_FRONT * (0.35 + r * PRECONE)
+		var ring := []
+		for pt in _airfoil(thickness[i]):
+			var pos: Vector2 = pt[0]
+			var n: Vector2 = pt[1]
+			ring.append([centre + chord_dir * (pos.x - 0.3) * c + thick_dir * pos.y * c,
+					(chord_dir * n.x + thick_dir * n.y).normalized()])
+		rings.append(ring)
+	for i in r_stations.size() - 1:
 		# Aviation red safety stripes near the tip
-		var col := COLOR_WHITE
-		var mid_r := (r0 + r1) * 0.5
-		if (mid_r >= 16.5 and mid_r <= 18.0) or (mid_r >= 19.2 and mid_r <= 21.0):
-			col = COLOR_RED_STRIPE
-
-		for p in range(n_pts):
-			var p_next: int = (p + 1) % n_pts
-			var p00 := _sample_airfoil(r0, x_pts[p], y_pts[p], ch0, th0, tw0, v_rad, v_tan, v_norm)
-			var p01 := _sample_airfoil(r0, x_pts[p_next], y_pts[p_next], ch0, th0, tw0, v_rad, v_tan, v_norm)
-			var p11 := _sample_airfoil(r1, x_pts[p_next], y_pts[p_next], ch1, th1, tw1, v_rad, v_tan, v_norm)
-			var p10 := _sample_airfoil(r1, x_pts[p], y_pts[p], ch1, th1, tw1, v_rad, v_tan, v_norm)
-
-			# Surface normal estimation for smooth lighting
-			var n0 := (p00 - (v_rad * r0 + v_norm * (0.35 - r0 * 0.03))).normalized()
-			var n1 := (p01 - (v_rad * r0 + v_norm * (0.35 - r0 * 0.03))).normalized()
-
-			_add_quad(st, p00, p10, p11, p01, n0, n1, col)
-
-	# Blade rounded tip cap
-	var r_tip: float = r_stations.back()
-	var ch_tip: float = chords.back()
-	var th_tip: float = thicks.back()
-	var tw_tip: float = deg_to_rad(twists.back())
-	var tip_apex := v_rad * (r_tip + 0.35) + v_norm * (0.35 - r_tip * 0.03)
-	for p in range(n_pts):
-		var p_next: int = (p + 1) % n_pts
-		var p0 := _sample_airfoil(r_tip, x_pts[p], y_pts[p], ch_tip, th_tip, tw_tip, v_rad, v_tan, v_norm)
-		var p1 := _sample_airfoil(r_tip, x_pts[p_next], y_pts[p_next], ch_tip, th_tip, tw_tip, v_rad, v_tan, v_norm)
-		st.set_color(COLOR_RED_STRIPE)
-		st.set_normal(v_rad)
-		st.add_vertex(tip_apex)
-		st.add_vertex(p1)
-		st.add_vertex(p0)
+		var mid_r: float = (r_stations[i] + r_stations[i + 1]) * 0.5
+		var col := COLOR_RED_STRIPE if (mid_r >= 16.5 and mid_r <= 18.0) or mid_r >= 19.2 else COLOR_WHITE
+		_join_rings(st, rings[i], rings[i + 1], col)
+	# Round the tip off to a point just beyond it, and close the root (inside the spinner).
+	var r_tip: float = r_stations.back() + 0.3
+	var apex := [v_rad * r_tip + DIR_FRONT * (0.35 + r_tip * PRECONE), v_rad]
+	var root_c := [v_rad * r_stations[0] + DIR_FRONT * (0.35 + r_stations[0] * PRECONE), -v_rad]
+	var tip: Array = rings.back()
+	var root: Array = rings[0]
+	for j in tip.size():
+		var k := (j + 1) % tip.size()
+		_tri_out(st, apex, [tip[j][0], (tip[j][1] + v_rad).normalized()], [tip[k][0], (tip[k][1] + v_rad).normalized()], COLOR_RED_STRIPE)
+		_tri_out(st, root_c, [root[j][0], -v_rad], [root[k][0], -v_rad], COLOR_WHITE)
 
 
-## Helper: computes 3D position of an airfoil point with pitch twist and hub offset.
-static func _sample_airfoil(r: float, u: float, v: float, chord: float, thick: float, twist: float,
-		v_rad: Vector3, v_tan: Vector3, v_norm: Vector3) -> Vector3:
-	var local_x := (u - 0.3) * chord
-	var local_y := v * thick
-	var rot_x := local_x * cos(twist) - local_y * sin(twist)
-	var rot_y := local_x * sin(twist) + local_y * cos(twist)
-	var precone_z := 0.35 - r * 0.03
-	return (v_rad * r) + (v_tan * rot_x) + (v_norm * (rot_y + precone_z))
+## A cambered airfoil (NACA four-digit thickness, 4% camber at 40% of the chord), `t` thick as a share of
+## the chord: [position, outward normal] round it, both in chords, x from the leading edge (0) to the
+## trailing edge (1), y toward the suction side. Cosine spacing packs the points round the nose.
+static func _airfoil(t: float) -> Array:
+	var n := 10
+	var upper: Array[Vector2] = []
+	var lower: Array[Vector2] = []
+	for i in n + 1:
+		var x := 0.5 * (1.0 - cos(PI * i / n))
+		var yt := 5.0 * t * (0.2969 * sqrt(x) - 0.126 * x - 0.3516 * x * x + 0.2843 * pow(x, 3.0) - 0.1036 * pow(x, 4.0))
+		var yc := 0.25 * (0.8 * x - x * x) if x < 0.4 else 0.04 / 0.36 * (0.2 + 0.8 * x - x * x)
+		upper.append(Vector2(x, yc + yt))
+		lower.append(Vector2(x, yc - yt))
+	# Anticlockwise: from the trailing edge over the upper side to the nose, back under the lower side.
+	var pts: Array[Vector2] = []
+	for i in range(n, -1, -1):
+		pts.append(upper[i])
+	for i in range(1, n):
+		pts.append(lower[i])
+	var out := []
+	for i in pts.size():
+		var tangent := pts[(i + 1) % pts.size()] - pts[(i - 1 + pts.size()) % pts.size()]
+		out.append([pts[i], Vector2(tangent.y, -tangent.x).normalized()])
+	return out
+
+
+## Joins two rings of [position, normal] (same count, closed) with quads.
+static func _join_rings(st: SurfaceTool, ra: Array, rb: Array, col: Color) -> void:
+	var n := ra.size()
+	for j in n:
+		var k := (j + 1) % n
+		_tri_out(st, ra[j], rb[j], rb[k], col)
+		_tri_out(st, ra[j], rb[k], ra[k], col)
+
+
+## A triangle of [position, normal] vertices, wound so its front faces the way its normals point:
+## Godot's front faces are clockwise, with (c - a) x (b - a) out of them.
+static func _tri_out(st: SurfaceTool, a: Array, b: Array, c: Array, col: Color) -> void:
+	if (c[0] - a[0]).cross(b[0] - a[0]).dot(a[1] + b[1] + c[1]) < 0.0:
+		var swap := b
+		b = c
+		c = swap
+	for v in [a, b, c]:
+		st.set_color(col)
+		st.set_normal(v[1])
+		st.add_vertex(v[0])
 
 
 ## Helper: adds a quad to SurfaceTool with proper CCW outward winding.

@@ -1,8 +1,7 @@
 @tool
 extends Node3D
 ## An item box: a hologram cube of glass (item_box_glass.gdshader) with a gold "?" floating in it that
-## turns to face the camera (item_box_glyph), inside a soap bubble (item_box_bubble), with sparkles
-## drifting round it (item_box_sparkles) and a glow on the ground under it (item_box_glow). The look is
+## turns to face the camera (item_box_glyph), with sparkles drifting round it (item_box_sparkles) and a glow on the ground under it (item_box_glow). The look is
 ## built here as internal children, shared meshes and materials for every box, so level files only store
 ## the box's transform. Once the level's collision exists the box finds the ground under it, hovers
 ## HOVER over it and lays its glow there. Its light is divided by the level's exposure.
@@ -20,14 +19,12 @@ const RESPAWN_TIME = 5.0
 const SFX_PICKUP_SOUND = preload("res://sounds/item_box_pickup.wav")
 const GLASS_SHADER := preload("res://item_box_glass.gdshader")
 const GLYPH_SHADER := preload("res://item_box_glyph.gdshader")
-const BUBBLE_SHADER := preload("res://item_box_bubble.gdshader")
 const SPARKLE_SHADER := preload("res://item_box_sparkles.gdshader")
 const GLOW_SHADER := preload("res://item_box_glow.gdshader")
 
 const CUBE := 1.5             # edge of the glass cube
 const GLYPH_HEIGHT := 1.02    # the "?", dot included
 const GLYPH_TUBE := 0.082     # its stroke's radius, in glyph heights
-const BUBBLE_RADIUS := 1.18
 const SPARKS := 56
 const GLOW_SIZE := 3.4
 const HOVER := 1.45           # cube centre over the ground
@@ -43,7 +40,6 @@ static var _materials := {}
 
 var _shell: MeshInstance3D
 var _glyph: MeshInstance3D
-var _bubble: MeshInstance3D
 var _sparks: MeshInstance3D
 var _glow: MeshInstance3D
 var _base_y := 0.25
@@ -72,7 +68,7 @@ func _process(delta):
 	if _phase < 0.0:
 		# Levels place a box after adding it, so its position is only known from the first frame.
 		_phase = fposmod(global_position.x * 0.173 + global_position.z * 0.097, 1.0)
-		for mi in [_shell, _glyph, _bubble, _sparks, _glow]:
+		for mi in [_shell, _glyph, _sparks, _glow]:
 			mi.set_instance_shader_parameter("phase", _phase)
 	var t := Time.get_ticks_msec() * 0.001
 	visuals.rotate_y(delta * SPIN)
@@ -106,9 +102,8 @@ func _process(delta):
 func _apply_build() -> void:
 	var grow := _ease_out_back(_build)
 	_shell.scale = Vector3.ONE * lerpf(0.8, 1.0, grow)
-	_bubble.scale = Vector3.ONE * lerpf(0.5, 1.0, grow)
 	_glyph.scale = Vector3.ONE * maxf(_ease_out_back(clampf((_build - 0.3) / 0.7, 0.0, 1.0)), 0.001)
-	for mi in [_shell, _bubble, _sparks]:
+	for mi in [_shell, _sparks]:
 		mi.set_instance_shader_parameter("build", _build)
 	_glow.set_instance_shader_parameter("present", _build)
 
@@ -116,10 +111,9 @@ func _apply_build() -> void:
 func _apply_pop() -> void:
 	var e := 1.0 - pow(1.0 - _pop, 3.0)
 	_shell.scale = Vector3.ONE * (1.0 + 0.45 * e)
-	_bubble.scale = Vector3.ONE * (1.0 + 0.8 * e)
 	_glyph.scale = Vector3.ONE * maxf(1.0 + 0.5 * _pop - 1.5 * _pop * _pop, 0.001)
 	_glyph.position.y = 0.7 * e
-	for mi in [_shell, _glyph, _bubble, _sparks, _glow]:
+	for mi in [_shell, _glyph, _sparks, _glow]:
 		mi.set_instance_shader_parameter("pop", _pop)
 	_glow.set_instance_shader_parameter("present", 1.0 - e)
 
@@ -173,18 +167,16 @@ func _build_visuals() -> void:
 		_meshes = {
 			"shell": _shell_mesh(),
 			"glyph": _glyph_mesh(),
-			"bubble": _bubble_mesh(),
 			"sparks": _spark_mesh(),
 			"glow": _glow_mesh(),
 		}
-		for key in ["shell", "glyph", "bubble", "sparks", "glow"]:
+		for key in ["shell", "glyph", "sparks", "glow"]:
 			var mat := ShaderMaterial.new()
-			mat.shader = {"shell": GLASS_SHADER, "glyph": GLYPH_SHADER, "bubble": BUBBLE_SHADER,
-					"sparks": SPARKLE_SHADER, "glow": GLOW_SHADER}[key]
+			mat.shader = {"shell": GLASS_SHADER, "glyph": GLYPH_SHADER, "sparks": SPARKLE_SHADER,
+					"glow": GLOW_SHADER}[key]
 			_materials[key] = mat
 	_glyph = _part("Glyph", "glyph", visuals, 330.0)
 	_shell = _part("Glass", "shell", visuals, 330.0)
-	_bubble = _part("Bubble", "bubble", visuals, 140.0)
 	_sparks = _part("Sparkles", "sparks", visuals, 100.0)
 	# The sparkles are placed by the shader: cover where they fly, the burst included.
 	_sparks.custom_aabb = AABB(Vector3(-5.0, -3.0, -5.0), Vector3(10.0, 9.0, 10.0))
@@ -322,15 +314,6 @@ static func _tri(st: SurfaceTool, a: Array, b: Array, c: Array) -> void:
 		st.add_vertex(v[0])
 
 
-static func _bubble_mesh() -> Mesh:
-	var m := SphereMesh.new()
-	m.radius = BUBBLE_RADIUS
-	m.height = BUBBLE_RADIUS * 2.0
-	m.radial_segments = 32
-	m.rings = 16
-	return m
-
-
 ## SPARKS quads, all at the origin: the shader places them. COLOR.rgb seeds a sparkle, COLOR.a picks its
 ## colour, UV is the corner.
 static func _spark_mesh() -> ArrayMesh:
@@ -412,7 +395,7 @@ func _activate_rpc():
 	is_active = true
 	visuals.visible = true
 	_pop = 0.0
-	for mi in [_shell, _glyph, _bubble, _sparks]:
+	for mi in [_shell, _glyph, _sparks]:
 		mi.set_instance_shader_parameter("pop", 0.0)
 	_glyph.position.y = 0.0
 	_build = 0.0

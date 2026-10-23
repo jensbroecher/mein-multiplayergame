@@ -3,6 +3,8 @@ extends Node3D
 
 ## Controller for modern animated wind turbine.
 ## Rotates the 3-blade rotor assembly and pulses the red aviation obstruction beacon.
+## The rotor turns clockwise seen from upwind (its front, +Z), as real turbines do and as the blades'
+## airfoils are built for (WindTurbineBuilder.gd): rotation about +Z is negative.
 
 @export var spin_speed: float = 40.0 ## Degrees per second
 @export var initial_angle: float = 0.0 ## Initial rotor angle in degrees
@@ -18,7 +20,7 @@ func _ready() -> void:
 	_angle = initial_angle
 	_rotor = get_node_or_null("RotorPivot")
 	if _rotor:
-		_rotor.rotation_degrees.z = _angle
+		_rotor.rotation_degrees.z = -_angle
 
 	_beacon = get_node_or_null("Beacon") as MeshInstance3D
 	if _beacon and _beacon.material_override is StandardMaterial3D:
@@ -37,7 +39,7 @@ func _process(delta: float) -> void:
 			_angle -= 360.0
 		elif _angle < 0.0:
 			_angle += 360.0
-		_rotor.rotation_degrees.z = _angle
+		_rotor.rotation_degrees.z = -_angle
 
 	# FAA/ICAO double-pulse aviation obstruction warning beacon
 	if _beacon_mat:

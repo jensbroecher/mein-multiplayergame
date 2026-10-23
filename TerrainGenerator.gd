@@ -2147,6 +2147,9 @@ func _generate_water():
 		mat.set_shader_parameter("enable_water_edge_fade", true)
 		mat.set_shader_parameter("water_fade_start", 1000.0)
 		mat.set_shader_parameter("water_fade_end", 3500.0)
+	# water.gdshader tiles its ripples 40 times across the mesh's UVs, tuned on the 1600m plane (40m
+	# tiles). Keep them that size on a bigger plane: on the 12000m one they were 300m across and raced.
+	mat.set_shader_parameter("wave_scale", plane.size.x / 1600.0)
 
 	water.material_override = mat
 	add_child(water)

@@ -80,6 +80,16 @@ the others re-bakes it (see Lakeside Course below).
 - AI races (`scratch/ai_race_test`, speed=2) show falls at about 680m, round the loop (2600m) and between
   the two lakes at 3120 to 3132m; the undressed level had them too. None come from the venue's props. The
   old curl threw carts off the road at 2213m; the kicker doesn't.
+- The water (`TerrainGenerator/Water_Surface`) is a 12000m plane. `water.gdshader` tiles its ripples 40 times
+  across the mesh's UVs and was tuned on a 1600m plane, so `wave_scale` is the plane's size / 1600; at 1 the
+  ripples were 300m across and raced. Both `_generate_water` and `_update_water_surface` set it.
+- The three wind turbines on the ridge south of the lake are `WindTurbineBuilder.gd` (tower, nacelle, rotor,
+  saved as `generated/lakeside_turbine_*.res`) and `WindTurbine.gd` (turns the rotor, flashes the beacon).
+  The rotor faces +Z and turns clockwise seen from there, as real ones do, and the blades are built for it:
+  rings of a cambered airfoil with normals from its cross-section, leading edge on the side they move toward,
+  flat side to the wind, twist turning the leading edge upwind, coned upwind away from the tower. The beacon
+  and the anemometer mast stand on the roof (`nacelle_roof_y`). `res://scratch/turbine_preview.gd` (`-s`,
+  windowed) renders one in seconds: `-- <dir> [spin=40] [angle=30] name:x,y,z:tx,ty,tz[:frames[:gap]]`.
 
 ## Frostpeak Creek road joints
 
@@ -208,9 +218,9 @@ Bloombay sets it on.
 
 - `ItemBox.gd` (`@tool`) builds the box as internal children, so level files (and Level.gd's spawns) only
   store the transform: a hologram glass cube (`item_box_glass.gdshader`), a gold "?" (`item_box_glyph`, a tube
-  swept along the glyph), a soap bubble (`item_box_bubble`), sparkles (`item_box_sparkles`) and a glow on the
-  ground (`item_box_glow`). Meshes and materials are static, shared by every box; a box's own state is shader
-  instance uniforms (`phase`, `pop`, `build`, the glow's `present` and `charge`).
+  swept along the glyph), sparkles (`item_box_sparkles`) and a glow on the ground (`item_box_glow`). Meshes
+  and materials are static, shared by every box; a box's own state is shader instance uniforms (`phase`,
+  `pop`, `build`, the glow's `present` and `charge`).
 - The glass is premultiplied: ALBEDO is the light it gives off, ALPHA how much it dims what's behind it. Back
   faces draw at 45%, which gives the far edges. Its even `fill` stays low because it lays cyan over the "?".
 - The "?" turns about world up to face the camera in its vertex shader (BILLBOARD_FIXED_Y's matrix), so it
@@ -221,7 +231,7 @@ Bloombay sets it on.
 - Once the level's collision exists (`_settle`) the box raycasts down: the cube's centre hovers `HOVER`
   (1.45m) over the ground, at most `MAX_SEAT_SHIFT` off the node so it stays in the 2.5m pickup area, and the
   glow lies on the hit. Level spawns boxes 1.2m (random) or 1.5m (gates) above the ground or the gate's origin.
-- Taken (`_deactivate_rpc`): `pop` runs to 1 over 0.5s (a flash, the glass and bubble swell and fade, the
+- Taken (`_deactivate_rpc`): `pop` runs to 1 over 0.5s (a flash, the glass swells and fades, the
   sparkles fly out, a shock ring on the ground), then the box hides and the ring on the ground fills round
   over `RESPAWN_TIME` (`charge`). Back (`_activate_rpc`, and at the start): `build` cuts the cube off under a
   line sweeping up it. Each peer animates from the RPCs.

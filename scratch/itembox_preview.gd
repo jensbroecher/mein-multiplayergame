@@ -8,7 +8,7 @@ extends Node
 # Boxes stand in a row across the road (x), 1.2m over it as Level spawns them; the road runs along z and
 # carts come from +z. Arguments run in order: `pop=1` takes box 1 (its burst and the ground ring
 # charging run on from there), `respawn=1` brings it back early, `wait=0.5` lets time pass, and
-# `param=glyph:glow:0.8` sets a shader parameter on a part's shared material (shell, glyph, bubble, sparks,
+# `param=glyph:glow:0.8` sets a shader parameter on a part's shared material (shell, glyph, sparks,
 # glow; a colour as a hex string). A shot with
 # frames > 1 saves name_00.png, name_01.png, ... `gap` seconds apart (default 0.1).
 

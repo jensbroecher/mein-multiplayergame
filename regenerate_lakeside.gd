@@ -1819,7 +1819,8 @@ func _build_wind_turbines(parent: Node3D) -> void:
 	print("  3 modern animated wind turbines built on ridge overlooking large bridge")
 
 
-## Expands the water surface to 12000x12000 and ensures seamless horizon fade.
+## Expands the water surface to 12000x12000 and ensures seamless horizon fade. The ripples are
+## scaled back to their size on the 1600m plane they were tuned on (TerrainGenerator._generate_water).
 func _update_water_surface() -> void:
 	var water := _level.get_node_or_null("TerrainGenerator/Water_Surface") as MeshInstance3D
 	if not water:
@@ -1835,6 +1836,7 @@ func _update_water_surface() -> void:
 		wm.set_shader_parameter("water_fade_start", 1000.0)
 		wm.set_shader_parameter("water_fade_end", 3500.0)
 		wm.set_shader_parameter("sky_tint", HAZE)
+		wm.set_shader_parameter("wave_scale", plane.size.x / 1600.0)
 
 
 const KINDS := ["oak", "lime", "birch", "spruce"]

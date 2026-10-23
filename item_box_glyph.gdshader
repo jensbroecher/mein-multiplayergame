@@ -4,8 +4,8 @@ render_mode unshaded, cull_back, shadows_disabled;
 // The gold "?" inside an item box (ItemBox.gd sweeps the mesh, facing +z). It turns about the vertical
 // to face the camera, swaying a little either side so it reads as solid, so it can be read from any side
 // of the spinning box and on every viewport of a split screen. It glows, lit by a key light fixed on
-// screen (up and to the left, like the bubble's highlights) with a glint: lit by the scene, its specular
-// took the blue sky into the gold and turned it salmon. `pop` (0 -> 1) flares it as the box bursts.
+// screen (up and to the left) with a glint: lit by the scene, its specular took the blue sky into the gold
+// and turned it salmon. `pop` (0 -> 1) flares it as the box bursts.
 
 instance uniform float phase = 0.0;
 instance uniform float pop = 0.0;
