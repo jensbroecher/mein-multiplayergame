@@ -2101,14 +2101,17 @@ func _generate_water():
 	var water = MeshInstance3D.new()
 	water.name = "Water_Surface"
 	var plane = PlaneMesh.new()
-	plane.size = Vector2(1600.0, 1600.0)
-	water.mesh = plane
 	if level_prefix == "pinecrest_ridge":
+		plane.size = Vector2(1600.0, 1600.0)
 		water.position = Vector3(0, -2.5, 0)
 	elif level_prefix == "frostpeak_creek":
+		plane.size = Vector2(1600.0, 1600.0)
 		water.position = Vector3(0, -1.2, 0)
 	else:
+		# Lakeside and open-water maps: vast expanse reaching past the visible horizon
+		plane.size = Vector2(12000.0, 12000.0)
 		water.position = Vector3(0, -10.0, 0) # Water level (below terrain base)
+	water.mesh = plane
 	water.set_meta("water_surface_y", water.position.y)
 
 	# Create a high-quality water shader material
@@ -2136,11 +2139,14 @@ func _generate_water():
 	else:
 		mat.set_shader_parameter("water_color", Color(0.1, 0.3, 0.6))
 		mat.set_shader_parameter("shallow_color", Color(0.15, 0.45, 0.55))
-		mat.set_shader_parameter("sky_tint", Color(0.55, 0.65, 0.75))
+		mat.set_shader_parameter("sky_tint", Color(0.70, 0.82, 0.93))
 		mat.set_shader_parameter("sky_reflect", 0.45)
 		mat.set_shader_parameter("transparency", 0.7)
 		mat.set_shader_parameter("metallic", 0.55)
 		mat.set_shader_parameter("roughness", 0.12)
+		mat.set_shader_parameter("enable_water_edge_fade", true)
+		mat.set_shader_parameter("water_fade_start", 1000.0)
+		mat.set_shader_parameter("water_fade_end", 3500.0)
 
 	water.material_override = mat
 	add_child(water)

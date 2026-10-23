@@ -21,6 +21,7 @@ extends Node
 const PropKit = preload("res://PropKit.gd")
 const Woodland = preload("res://WoodlandBuilder.gd")
 const CampKit = preload("res://CampKit.gd")
+const WindTurbineBuilder = preload("res://WindTurbineBuilder.gd")
 const LEVEL_PATH := "res://levels/LakesideLevel.tscn"
 const RES_PREFIX := "lakeside_"
 const DRESSING := "LakesideDressing"
@@ -157,6 +158,7 @@ func _ready() -> void:
 	_build_grandstand(root)
 	_build_campsite(root)
 	_move_old_props()
+	_build_wind_turbines(root)
 	_build_woodland(root)
 	_build_boulders(root)
 	_build_ads(root)
@@ -256,6 +258,7 @@ func _build_sky() -> void:
 	var tv := _level.get_node_or_null("TerrainGenerator/Terrain_Visual") as MeshInstance3D
 	if tv and tv.material_override is ShaderMaterial:
 		(tv.material_override as ShaderMaterial).set_shader_parameter("edge_fade_color", HAZE)
+	_update_water_surface()
 
 
 # ======================================================================================
@@ -1782,6 +1785,58 @@ const TRUNK_COLLIDE_REACH := 40.0
 ## How close to the centreline each kind may stand: its crown must keep off the road (and off the
 ## decks where the lap runs on bridges).
 const TREE_ROAD_CLEAR := {"oak": 19.0, "lime": 17.0, "birch": 14.0, "spruce": 16.0}
+## 3 modern animated wind turbines on the scenic ridge overlooking the large bridge.
+func _build_wind_turbines(parent: Node3D) -> void:
+	var container := Node3D.new()
+	container.name = "WindTurbines"
+	parent.add_child(container)
+
+	# Shared mesh resources saved into res://generated/
+	var tower_mesh: Mesh = _save_res(WindTurbineBuilder.build_tower_mesh(), "turbine_tower")
+	var nacelle_mesh: Mesh = _save_res(WindTurbineBuilder.build_nacelle_mesh(), "turbine_nacelle")
+	var rotor_mesh: Mesh = _save_res(WindTurbineBuilder.build_rotor_mesh(), "turbine_rotor")
+
+	var specs := [
+		{"name": "WindTurbine_West", "x": -510.0, "z": -740.0, "yaw": -15.0, "speed": 42.0, "angle": 25.0},
+		{"name": "WindTurbine_Summit", "x": -470.0, "z": -750.0, "yaw": -22.0, "speed": 38.0, "angle": 95.0},
+		{"name": "WindTurbine_East", "x": -430.0, "z": -720.0, "yaw": -30.0, "speed": 45.0, "angle": 190.0},
+	]
+
+	for i in range(specs.size()):
+		var s: Dictionary = specs[i]
+		var px: float = s["x"]
+		var pz: float = s["z"]
+		var gy: float = _ground(px, pz)
+		var turbine: Node3D = WindTurbineBuilder.build_turbine(
+			float(s["speed"]), float(s["angle"]), float(s["yaw"]),
+			tower_mesh, nacelle_mesh, rotor_mesh
+		)
+		turbine.name = s["name"]
+		turbine.position = Vector3(px, gy, pz)
+		container.add_child(turbine)
+		_note("WindTurbine_%d" % (i + 1), turbine.position, 6.0, 4.0)
+
+	print("  3 modern animated wind turbines built on ridge overlooking large bridge")
+
+
+## Expands the water surface to 12000x12000 and ensures seamless horizon fade.
+func _update_water_surface() -> void:
+	var water := _level.get_node_or_null("TerrainGenerator/Water_Surface") as MeshInstance3D
+	if not water:
+		return
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(12000.0, 12000.0)
+	water.mesh = plane
+	water.position = Vector3(0.0, -10.0, 0.0)
+	water.set_meta("water_surface_y", -10.0)
+	if water.material_override is ShaderMaterial:
+		var wm := water.material_override as ShaderMaterial
+		wm.set_shader_parameter("enable_water_edge_fade", true)
+		wm.set_shader_parameter("water_fade_start", 1000.0)
+		wm.set_shader_parameter("water_fade_end", 3500.0)
+		wm.set_shader_parameter("sky_tint", HAZE)
+
+
 const KINDS := ["oak", "lime", "birch", "spruce"]
 
 ## Woods on the hills and singles in the meadows: oak, lime, birch and spruce (WoodlandBuilder.gd),
