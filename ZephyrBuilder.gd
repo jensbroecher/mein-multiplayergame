@@ -277,8 +277,8 @@ func _build_front_suspension(b) -> void:
 
 	# Wheel upright / steering knuckle
 	b.rbox(Transform3D(Basis(), Vector3(kx, 0.265, z)), Vector3(0.016, 0.085, 0.028), 0.007, 1, CB.M_DARK, C_DARK)
-	# Stub axle spindle
-	b.tube(PackedVector3Array([Vector3(kx, HUB_Y, z), Vector3(kx + 0.09, HUB_Y, z)]), 0.014, 8,
+	# Stub axle spindle penetrating into wheel hub collar
+	b.tube(PackedVector3Array([Vector3(kx, HUB_Y, z), Vector3(kx + 0.125, HUB_Y, z)]), 0.014, 8,
 			CB.M_ALLOY, C_TITANIUM, false, true)
 	# Steering tie-rod
 	b.tube(PackedVector3Array([Vector3(0.22, 0.260, z + 0.075), Vector3(kx - 0.02, 0.260, z + 0.065)]),
@@ -302,9 +302,9 @@ func _build_rear_suspension(b) -> void:
 	b.tube(PackedVector3Array([Vector3(0.28, 0.360, z - 0.055), Vector3(kx - 0.02, 0.330, z)]),
 				0.010, 6, CB.M_DARK, C_DARK, true, true)
 
-	# Knuckle & axle spindle
+	# Knuckle & axle spindle penetrating into wheel hub collar
 	b.rbox(Transform3D(Basis(), Vector3(kx, 0.270, z)), Vector3(0.016, 0.090, 0.030), 0.007, 1, CB.M_DARK, C_DARK)
-	b.tube(PackedVector3Array([Vector3(kx, HUB_Y, z), Vector3(kx + 0.09, HUB_Y, z)]), 0.014, 8,
+	b.tube(PackedVector3Array([Vector3(kx, HUB_Y, z), Vector3(kx + 0.115, HUB_Y, z)]), 0.014, 8,
 			CB.M_ALLOY, C_TITANIUM, false, true)
 
 	# Drive half-shaft from center diff
@@ -358,41 +358,41 @@ func _build_front_skid_plate(b) -> void:
 				0.007, 6, CB.M_DARK, C_DARK, true, true)
 
 
-## Integrated Aerodynamic Rear Wing Bridge spanning the rear haunches
+## Integrated Aerodynamic Rear Wing Bridge spanning the rear haunches (Strictly Horizontal)
 func _build_rear_spoiler_bridge(b) -> void:
 	# 1. Twin sculpted aerodynamic swan-neck pylons rising from the rear haunches
 	for sx in [-1.0, 1.0]:
 		var pylon_path := PackedVector3Array([
 			Vector3(0.240 * sx, 0.585, 0.620),
-			Vector3(0.235 * sx, 0.645, 0.680),
-			Vector3(0.230 * sx, 0.695, 0.740)
+			Vector3(0.235 * sx, 0.645, 0.675),
+			Vector3(0.230 * sx, 0.696, 0.730)
 		])
 		# Sleek, streamlined carbon-fiber pylon
-		b.oval_tube(pylon_path, 0.012, 0.038, Vector3.FORWARD, 8, CB.M_DARK, C_DARK, true)
+		b.oval_tube(pylon_path, 0.010, 0.032, Vector3.FORWARD, 8, CB.M_DARK, C_DARK, true)
 
 		# 2. Sleek aerodynamic carbon endplate fins at the wingtips (clean, sharp, no dots or pods!)
-		var ep_pos := Vector3(0.372 * sx, 0.705, 0.745)
-		var ep_rot := Basis(Vector3.UP, 0.06 * sx)
-		b.rbox(Transform3D(ep_rot, ep_pos), Vector3(0.005, 0.038, 0.058), 0.004, 1, CB.M_DARK, C_DARK)
+		var ep_pos := Vector3(0.370 * sx, 0.705, 0.730)
+		var ep_rot := Basis(Vector3.UP, 0.04 * sx)
+		b.rbox(Transform3D(ep_rot, ep_pos), Vector3(0.004, 0.026, 0.064), 0.003, 1, CB.M_DARK, C_DARK)
 
-	# 3. Main aerodynamic aerofoil wing plane spanning between haunches
+	# 3. Main aerodynamic aerofoil wing plane spanning between haunches (Strictly Horizontal)
 	var wing_path := PackedVector3Array()
-	var n_pts := 20
+	var n_pts := 16
 	for k in n_pts + 1:
 		var t: float = float(k) / float(n_pts) * 2.0 - 1.0 # -1.0 to 1.0
-		var x: float = t * 0.368
-		# Elegant aerodynamic camber: slightly bowed in center for downforce
-		var y: float = 0.705 - 0.010 * (1.0 - t * t)
-		var z: float = 0.745 + 0.012 * (t * t)
-		wing_path.append(Vector3(x, y, z))
+		var x: float = t * 0.366
+		wing_path.append(Vector3(x, 0.705, 0.730))
 
-	# Sculpted pearl-white aerofoil blade
-	b.oval_tube(wing_path, 0.014, 0.062, Vector3.UP, 10, CB.M_PAINT, Color(1, 1, 1), true)
+	# Sculpted pearl-white horizontal aerofoil blade:
+	# r1 = 0.060 (horizontal chord radius along Z: 120mm chord, strictly horizontal)
+	# r2 = 0.009 (vertical thickness radius along Y: 18mm thickness)
+	# with Vector3.UP, e2 is strictly vertical UP, e1 is strictly horizontal BACK
+	b.oval_tube(wing_path, 0.060, 0.009, Vector3.UP, 12, CB.M_PAINT, Color(1, 1, 1), false)
 
-	# 4. Motorsport carbon-composite gurney flap / wickerbill trailing edge
+	# 4. Motorsport carbon-composite gurney flap / wickerbill at trailing edge
 	var lip_path := PackedVector3Array([
-		Vector3(-0.365, 0.708, 0.782),
-		Vector3( 0.365, 0.708, 0.782)
+		Vector3(-0.366, 0.710, 0.790),
+		Vector3( 0.366, 0.710, 0.790)
 	])
 	b.tube(lip_path, 0.0035, 6, CB.M_DARK, C_DARK, true, true)
 
@@ -443,14 +443,35 @@ func build_wheel(b, side: float) -> void:
 		block(b, c_mid1, Vector3.RIGHT, t, r, 0.025, 0.013, 0.015, 0.85, CB.M_RUBBER, C_RUBBER)
 		block(b, c_mid2, Vector3.RIGHT, t, r, 0.025, 0.013, 0.015, 0.85, CB.M_RUBBER, C_RUBBER)
 
-	# 3. High-Performance Brake Assembly Behind Rims
-	# Cross-drilled carbon-ceramic brake rotor disc
+	# 3. High-Performance Dual-Faced Brake Assembly & Solid Inner Hub
+	# Cross-drilled carbon-ceramic brake rotor disc (outboard friction face)
 	b.disc(Vector3(0.028, 0.0, 0.0), Vector3.RIGHT, 0.136, 0.045, 28, CB.M_ALLOY, C_TITANIUM)
-	# Center rotor mounting hat in dark iron
+	# Brake rotor inboard friction face (facing towards chassis / axle)
+	b.disc(Vector3(0.018, 0.0, 0.0), -Vector3.RIGHT, 0.136, 0.045, 28, CB.M_ALLOY, C_TITANIUM)
+	# Outer ventilated rotor rim band connecting friction faces
+	wheel_lathe(b, PackedVector2Array([
+		Vector2(0.018, 0.136), Vector2(0.028, 0.136)
+	]), 28, CB.M_ALLOY, C_TITANIUM, "out")
+
+	# Center rotor mounting hat in dark iron (outboard face)
 	b.disc(Vector3(0.033, 0.0, 0.0), Vector3.RIGHT, 0.054, 0.032, 20, CB.M_DARK, C_DARK)
-	# Monobloc 6-piston high-performance sport brake caliper
-	var cal_xf := Transform3D(Basis(Vector3.RIGHT, 0.40), Vector3(0.036, 0.088, -0.042))
-	b.rbox(cal_xf, Vector3(0.015, 0.038, 0.020), 0.005, 2, CB.M_DARK, C_DARKER)
+
+	# Inboard brake dust shield / backing plate (protects rotor, seals wheel cavity)
+	b.disc(Vector3(0.012, 0.0, 0.0), -Vector3.RIGHT, 0.142, 0.036, 28, CB.M_DARK, C_DARK)
+	wheel_lathe(b, PackedVector2Array([
+		Vector2(0.012, 0.142), Vector2(0.018, 0.142)
+	]), 28, CB.M_DARK, C_DARK, "out")
+
+	# Solid inner wheel hub bell / bearing carrier collar enclosing the axle spindle
+	wheel_lathe(b, PackedVector2Array([
+		Vector2(0.012, 0.036), Vector2(-0.025, 0.034), Vector2(-0.065, 0.026)
+	]), 20, CB.M_DARK, C_DARK, "out")
+	# Inboard hub sleeve collar face (snug against the axle spindle)
+	b.disc(Vector3(-0.065, 0.0, 0.0), -Vector3.RIGHT, 0.026, 0.014, 20, CB.M_DARK, C_DARK)
+
+	# Monobloc 6-piston high-performance sport brake caliper (straddling rotor)
+	var cal_xf := Transform3D(Basis(Vector3.RIGHT, 0.40), Vector3(0.023, 0.088, -0.042))
+	b.rbox(cal_xf, Vector3(0.018, 0.038, 0.020), 0.005, 2, CB.M_DARK, C_DARKER)
 
 	# 4. Multi-Piece Stepped Wheel Rim with Beadlock Perimeter
 	# Outer Bronze Lip Ring
@@ -475,6 +496,8 @@ func build_wheel(b, side: float) -> void:
 		Vector2(0.065, 0.134), Vector2(0.020, 0.142), Vector2(-0.090, 0.156),
 		Vector2(-0.098, 0.164)
 	]), 36, CB.M_DARK, C_DARK, "in")
+	# Inboard rim flange / inner barrel lip facing inboard towards suspension
+	b.disc(Vector3(-0.098, 0.0, 0.0), -Vector3.RIGHT, 0.164, 0.146, 36, CB.M_DARK, C_DARK)
 
 	# 5. Sunken Center Lock Hub & Lug Nuts
 	wheel_lathe(b, PackedVector2Array([

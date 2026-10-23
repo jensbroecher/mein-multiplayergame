@@ -76,17 +76,16 @@ func _ready() -> void:
 
 	# Poses centered on the car (which spans roughly x: -1.5..1.5, y: 0..1.3, z: -1.8..1.8)
 	var poses := {
-		"user_issue1_fender": [Vector3(-5.0, 1.25, -2.6), Vector3(-0.4, 0.45, 0.4)],
-		"user_issue2_window": [Vector3(-4.4, 1.60, 3.6), Vector3(0.0, 0.42, 0.0)],
-		"concept_match":      [Vector3(-3.4, 2.0, -3.2), Vector3(0.0, 0.38, 0.0)],
-		"front_3q":           [Vector3(3.2, 1.45, -3.2), Vector3(0.0, 0.45, 0.0)],
-		"side":               [Vector3(-4.8, 0.70, 0.0), Vector3(0.0, 0.45, 0.0)],
-		"wheel_close":        [Vector3(-2.8, 0.65, 1.3), Vector3(-1.26, 0.54, 1.3)],
-		"rear_spoiler":       [Vector3(0.0, 1.60, -3.8), Vector3(0.0, 0.60, -1.0)],
-		"top":                [Vector3(0.0, 5.5, 0.01),  Vector3(0.0, 0.0, 0.0)],
+		"inner_rear_wheel":  [Vector3(0.20, 0.32, 1.20),  Vector3(0.63, 0.27, 0.62)],
+		"inner_front_wheel": [Vector3(0.20, 0.32, -1.25), Vector3(0.63, 0.27, -0.66)],
+		"spoiler_profile":   [Vector3(1.40, 0.71, 0.73),  Vector3(0.0, 0.71, 0.73)],
+		"side":              [Vector3(-4.8, 0.70, 0.0),    Vector3(0.0, 0.45, 0.0)],
+		"concept_match":     [Vector3(-3.4, 2.0, -3.2),    Vector3(0.0, 0.38, 0.0)],
+		"rear_3q":           [Vector3(-3.4, 1.35, 3.2),    Vector3(0.0, 0.45, 0.0)],
+		"front_3q":          [Vector3(3.2, 1.45, -3.2),    Vector3(0.0, 0.45, 0.0)],
 	}
 
-	for shot_name in ["user_issue1_fender", "user_issue2_window", "concept_match", "front_3q", "side", "wheel_close", "rear_spoiler", "top"]:
+	for shot_name in poses.keys():
 		var p: Vector3 = poses[shot_name][0]
 		var t: Vector3 = poses[shot_name][1]
 		cam.position = p

@@ -805,7 +805,7 @@ its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set th
   lathes, tubes, rounded boxes into one indexed mesh, the material id per vertex in UV2.x). `CarDesign.gd` is
   what the cars share: the lofted shell, fender sweeps, wheel parts, a coil-over, the detail map. Each car
   extends it (`MudrunnerBuilder.gd`, `PhantomBuilder.gd`, `StrikeforceBuilder.gd`, `CenturionBuilder.gd`, `ShadowBuilder.gd`, `InterceptorBuilder.gd`,
-  `ViperBuilder.gd`, `ApexBuilder.gd`, `MirageBuilder.gd`, `InfernoBuilder.gd`, `NocturneBuilder.gd`) with
+  `ViperBuilder.gd`, `ApexBuilder.gd`, `MirageBuilder.gd`, `InfernoBuilder.gd`, `NocturneBuilder.gd`, `VortexBuilder.gd`, `ZephyrBuilder.gd`) with
   its shape and its own parts. `regenerate_cars.gd` saves each as `generated/cars/<Name>.tscn` with its meshes, material and detail
   map; run `res://regenerate_cars.tscn` headless (`-- Nocturne ...` builds only those cars: a full run rewrites every
   car's scene, since node ids change on each save). PlayerCart and CarSelection load it through the preset's

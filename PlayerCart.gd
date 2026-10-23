@@ -165,8 +165,8 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Inferno",
-		"engine_sound": "res://sounds/enginesounds/engine_viper_loop.wav",
-		"engine_gain_db": 0.0,
+		"engine_sound": "res://sounds/enginesounds/engine_inferno_electric_loop.wav",
+		"engine_gain_db": 3.3,
 		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
 		"model_path": "res://generated/cars/Inferno.tscn",
 		"model_y_rotation": PI,
@@ -210,8 +210,8 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Zephyr",
-		"engine_sound": "res://sounds/enginesounds/engine_apex_loop.wav",
-		"engine_gain_db": -2.0,
+		"engine_sound": "res://sounds/enginesounds/engine_zephyr_electric_loop.wav",
+		"engine_gain_db": 5.8,
 		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
 		"model_path": "res://generated/cars/Zephyr.tscn",
 		"model_y_rotation": PI,
