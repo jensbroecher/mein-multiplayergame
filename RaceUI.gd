@@ -213,7 +213,7 @@ func update_standings(rows: Array, highlight_id: int = 0) -> void:
 		return
 	var sig := "%d|" % highlight_id
 	for r in rows:
-		sig += "%s:%s:%s|" % [str(r.get("pos", 0)), str(r.get("name", "")), str(r.get("finished", false))]
+		sig += "%s:%s:%s:%s|" % [str(r.get("pos", 0)), str(r.get("name", "")), str(r.get("finished", false)), str(r.get("dq", false))]
 	if sig == _standings_sig:
 		return
 	_standings_sig = sig
@@ -235,7 +235,7 @@ func update_standings(rows: Array, highlight_id: int = 0) -> void:
 		var r_name: String = str(r.get("name", "Racer"))
 		if r_name.length() > 14:
 			r_name = r_name.substr(0, 13) + "."
-		pos_lbl.text = str(place)
+		pos_lbl.text = "DQ" if r.get("dq", false) else str(place)
 		name_lbl.text = r_name
 
 		var is_you: bool = int(r.get("id", 0)) == highlight_id
@@ -660,7 +660,7 @@ func display_race_results(results_data: Array):
 		var row = HBoxContainer.new()
 		
 		var r_pos = Label.new()
-		r_pos.text = "%d" % r["pos"]
+		r_pos.text = "DQ" if r.get("dq", false) else "%d" % r["pos"]
 		r_pos.custom_minimum_size = Vector2(50, 0)
 		r_pos.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		row.add_child(r_pos)

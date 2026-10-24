@@ -1,14 +1,16 @@
 extends Node3D
 ## Compiles, while the stage loads, the shaders of effects that first appear mid-race: missiles,
-## bombs, water splashes and the lightning's arc and sparks. A shader compiles when the first thing
-## using it enters the scene, so each of these froze the race for 30-140ms the first time it went
-## off (res://scratch/hitch_probe.tscn measures it). Level adds one. It holds hidden stand-ins, the
-## effects' own meshes, particles and materials without their scripts or bodies, for the level's
-## lifetime, so the shaders stay compiled. Hidden instances never draw but still compile.
+## bombs, water splashes (and WaterFx's big splash and bubbles) and the lightning's arc and sparks.
+## A shader compiles when the first thing using it enters the scene, so each of these froze the race
+## for 30-140ms the first time it went off (res://scratch/hitch_probe.tscn measures it). Level adds
+## one. It holds hidden stand-ins, the effects' own meshes, particles and materials without their
+## scripts or bodies, for the level's lifetime, so the shaders stay compiled. Hidden instances never
+## draw but still compile.
 ##
 ## The cart's own fades and flashes are warmed by each PlayerCart (_add_fx_twins).
 
 const PlayerCartScript = preload("res://PlayerCart.gd")
+const WaterFx = preload("res://WaterFx.gd")
 const SCENES := [
 	preload("res://Missile.tscn"),
 	preload("res://Bomb.tscn"),
@@ -40,6 +42,10 @@ func _ready() -> void:
 	sparks.mesh = PlayerCartScript.lightning_spark_mesh()
 	sparks.material_override = PlayerCartScript.lightning_spark_material()
 	add_child(sparks)
+
+	# Deep water: the big splash (column, spray, mist, foam) and the sinking cart's bubbles.
+	for n in WaterFx.warmup_nodes():
+		add_child(n)
 
 
 ## Copies the meshes and particle systems under `node` (nothing else: no scripts, bodies or sounds).

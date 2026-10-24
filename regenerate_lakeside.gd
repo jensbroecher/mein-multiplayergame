@@ -22,6 +22,7 @@ const PropKit = preload("res://PropKit.gd")
 const Woodland = preload("res://WoodlandBuilder.gd")
 const CampKit = preload("res://CampKit.gd")
 const WindTurbineBuilder = preload("res://WindTurbineBuilder.gd")
+const MeadowGrass = preload("res://MeadowGrass.gd")
 const LEVEL_PATH := "res://levels/LakesideLevel.tscn"
 const RES_PREFIX := "lakeside_"
 const DRESSING := "LakesideDressing"
@@ -99,6 +100,9 @@ var _camp: CampKit
 var _heights := PackedFloat32Array()
 var _materials := {}
 var _footprints: Array = []   # [name, centre Vector2, radius, clearance]
+var _stamps: Array = []       # [mesh, transforms]: the woods' and boulders' instances, for _build_meadow
+var _hit_mask := PackedByteArray()    # _build_meadow: texels under something, and their list
+var _hits := PackedInt32Array()
 var _ad_k := 0
 var _rng := RandomNumberGenerator.new()
 
@@ -158,10 +162,14 @@ func _ready() -> void:
 	_build_grandstand(root)
 	_build_campsite(root)
 	_move_old_props()
+	_fit_loop()
 	_build_wind_turbines(root)
 	_build_woodland(root)
 	_build_boulders(root)
 	_build_ads(root)
+	# The loop's CSG builds its mesh on the next frame; the meadow reads it.
+	await get_tree().process_frame
+	_build_meadow(root)
 	_verify_clear()
 
 	# 3. The concept's fair-weather sky.
@@ -510,16 +518,21 @@ func _material(key: String) -> Material:
 			cm.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 			cm.uv1_scale = Vector3(1.0 / 0.085, 1.0 / 0.085, 1.0)
 			m = cm
-		"straw":
-			var hm := StandardMaterial3D.new()
-			hm.albedo_texture = _straw_texture()
-			hm.vertex_color_use_as_albedo = true
-			hm.vertex_color_is_srgb = true
-			hm.uv1_triplanar = true
-			hm.uv1_world_triplanar = true
-			hm.uv1_scale = Vector3(0.7, 0.7, 0.7)
-			hm.roughness = 0.95
+		"hay":
+			var hm := ShaderMaterial.new()
+			hm.shader = load("res://hay_bale.gdshader")
 			m = hm
+		"straw_loose":
+			var lm := StandardMaterial3D.new()
+			lm.vertex_color_use_as_albedo = true
+			lm.vertex_color_is_srgb = true
+			lm.cull_mode = BaseMaterial3D.CULL_DISABLED
+			lm.roughness = 0.9
+			m = lm
+		"tyre":
+			var tm := ShaderMaterial.new()
+			tm.shader = load("res://tyre_wall.gdshader")
+			m = tm
 		_:
 			m = CampKit.make_material(key)
 	m = _save_res(m, "mat_" + key)
@@ -546,33 +559,6 @@ func _chainlink_texture() -> Texture2D:
 			img.set_pixel(x, y, Color(shade, shade, shade, a))
 	img.generate_mipmaps()
 	return _save_res(ImageTexture.create_from_image(img), "chainlink")
-
-
-## Straw for the hay bales: short strands, mostly lying one way, gold with pale and dark ones mixed.
-func _straw_texture() -> Texture2D:
-	const N := 256
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 818
-	var lum := PackedFloat32Array()
-	lum.resize(N * N)
-	lum.fill(0.55)
-	for k in range(5200):
-		var x0 := rng.randf() * N
-		var y0 := rng.randf() * N
-		var ang := rng.randf_range(-0.5, 0.5) + (PI * 0.5 if rng.randf() < 0.2 else 0.0)
-		var length := rng.randf_range(6.0, 22.0)
-		var l := rng.randf_range(0.35, 1.0)
-		for t in range(int(length * 2.0)):
-			var px := posmod(int(x0 + cos(ang) * t * 0.5), N)
-			var py := posmod(int(y0 + sin(ang) * t * 0.5), N)
-			lum[py * N + px] = l
-	var img := Image.create(N, N, false, Image.FORMAT_RGB8)
-	for y in range(N):
-		for x in range(N):
-			var l: float = lum[y * N + x]
-			img.set_pixel(x, y, Color(0.62 + 0.38 * l, 0.50 + 0.36 * l, 0.22 + 0.20 * l))
-	img.generate_mipmaps()
-	return _save_res(ImageTexture.create_from_image(img), "straw")
 
 
 ## Commits a kit to a MeshInstance3D under `parent`, saving the mesh.
@@ -1546,9 +1532,13 @@ func _build_tyre_walls(root: Node3D) -> void:
 			var p: Vector3 = pts[i]
 			_kit.set_frame(_place(p, rng.randf() * TAU))
 			var col: Color = TYRE_COLS[i % 3]
+			var y := 0.0
 			for t in range(3):
-				var j := Vector3(rng.randf_range(-0.02, 0.02), 0.0, rng.randf_range(-0.02, 0.02))
-				_kit.tyre(kit, "rubber", Vector3(0, 0.1 + t * 0.2, 0) + j, 0.19, 0.31, 0.2, 14, col.darkened(rng.randf_range(0.0, 0.12)))
+				# Stacked a little untidily: each tyre off centre and tipped on the one below.
+				var j := Vector3(rng.randf_range(-0.025, 0.025), 0.0, rng.randf_range(-0.025, 0.025))
+				var tip := Basis(Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1)).normalized(), rng.randf_range(0.0, 0.035))
+				_tyre(kit, Vector3(0, y + 0.1, 0) + j, 0.19, 0.31, 0.2, col.darkened(rng.randf_range(0.0, 0.1)), rng.randf(), tip)
+				y += 0.2
 			if i > 0 and (i % 4 == 0 or i == pts.size() - 1):
 				boxes.append(_wall_box(pts[maxi(i - 4, 4 * ((i - 1) / 4))], p, 0.62 * PROP_SCALE, 0.6 * PROP_SCALE))
 		_commit(root, kit, String(r[3]))
@@ -1573,20 +1563,23 @@ func _build_hay_and_cones(root: Node3D) -> void:
 		var p: Vector3 = apex + bis * float(d[0]) + Vector3(-bis.z, 0, bis.x) * float(d[1])
 		bales.append([p, _yaw_to(Vector3(-bis.z, 0, bis.x)) + float(d[2])])
 	bales.append([_at(3297.0, -13.4), _yaw_to(_frame(3297.0)["fwd"]) + 0.1])
+	var rng_b := RandomNumberGenerator.new()
+	rng_b.seed = 1717
 	for b in bales:
 		var at: Vector3 = b[0]
-		at.y = _ground_min(at.x, at.z, 1.2)
+		at.y = _ground_min(at.x, at.z, 1.7) - 0.03
 		var yaw: float = b[1]
 		_kit.set_frame(_place(at, yaw))
-		_hay_bale(kit)
+		_hay_bale(kit, rng_b)
 		boxes.append([at + Vector3(0, 0.45 * PROP_SCALE, 0), Vector3(1.0, 0.9, 2.0) * PROP_SCALE, Basis(Vector3.UP, yaw)])
 		_note("HayBale", at, 1.1 * PROP_SCALE, 1.5)
 	# A stack: two bales with one on top, beside the corner's lap tower.
 	var st := _at(3306.0, -19.5)
+	st.y = _ground_min(st.x, st.z, 2.0) - 0.03
 	var yaw2 := _yaw_to(_frame(3306.0)["fwd"])
 	for p in [Vector3(0, 0, -0.55), Vector3(0, 0, 0.55), Vector3(0.0, 0.9, 0.0)]:
-		_kit.set_frame(_place(st, yaw2) * Transform3D(Basis(Vector3.UP, PI * 0.5), p))
-		_hay_bale(kit)
+		_kit.set_frame(_place(st, yaw2) * Transform3D(Basis(Vector3.UP, PI * 0.5 + rng_b.randf_range(-0.04, 0.04)), p))
+		_hay_bale(kit, rng_b)
 	boxes.append([st + Vector3(0, 0.9 * PROP_SCALE, 0), Vector3(2.0, 1.8, 2.1) * PROP_SCALE, Basis(Vector3.UP, yaw2)])
 	_commit(root, kit, "HayBales")
 	_boxes_body(root, "HayBalesBody", boxes)
@@ -1634,16 +1627,154 @@ func _build_hay_and_cones(root: Node3D) -> void:
 
 ## A big square bale at life size: 2.0 long (x), 1.0 wide, 0.9 high, its edges rounded off, three
 ## twine bands round it.
-func _hay_bale(kit: Dictionary) -> void:
+## A big square bale at life size (2 x 0.9 x 1m, length along x, standing on y = 0): a rounded box
+## bulging a little between its edges and lumpy, in hay_bale.gdshader's straw (UV in metres along
+## the faces, COLOR r weathering, g a random, b the face), four orange twines running round it
+## lengthwise and pressed into it, and loose straws sticking out of its edges.
+const BALE := Vector3(1.0, 0.9, 0.5)   # half length, height, half width
+const BALE_ROUND := 0.07
+
+func _hay_bale(kit: Dictionary, rng: RandomNumberGenerator) -> void:
 	var k := _kit
-	var outline := PackedVector2Array([Vector2(-1.0, 0.04), Vector2(-0.96, 0.0), Vector2(0.96, 0.0), Vector2(1.0, 0.04),
-			Vector2(1.0, 0.84), Vector2(0.95, 0.9), Vector2(-0.95, 0.9), Vector2(-1.0, 0.84)])
-	k.extrude(kit, "straw", outline, -0.5, 0.5, 0.05, Color(1, 1, 1))
-	var tw := Color(0.30, 0.22, 0.12)
-	for x in [-0.55, 0.0, 0.55]:
-		k.block(kit, "matte", Vector3(x - 0.012, -0.002, -0.508), Vector3(x + 0.012, 0.906, -0.5), tw)
-		k.block(kit, "matte", Vector3(x - 0.012, -0.002, 0.5), Vector3(x + 0.012, 0.906, 0.508), tw)
-		k.block(kit, "matte", Vector3(x - 0.012, 0.9, -0.5), Vector3(x + 0.012, 0.908, 0.5), tw)
+	var noise := FastNoiseLite.new()
+	noise.seed = rng.randi()
+	noise.frequency = 1.6
+	noise.fractal_octaves = 2
+	var seed_v := rng.randf()
+	var weather := rng.randf_range(0.35, 1.0)
+	# Faces: [normal, u axis, v axis, u span, v span, segments u, v, face kind]. The bottom isn't seen.
+	var faces := [
+		[Vector3(0, 0, 1), Vector3(1, 0, 0), Vector3(0, 1, 0), 2.0, 0.9, 16, 7, 0.0],
+		[Vector3(0, 0, -1), Vector3(1, 0, 0), Vector3(0, 1, 0), 2.0, 0.9, 16, 7, 0.0],
+		[Vector3(0, 1, 0), Vector3(1, 0, 0), Vector3(0, 0, 1), 2.0, 1.0, 16, 8, 0.5],
+		[Vector3(1, 0, 0), Vector3(0, 0, 1), Vector3(0, 1, 0), 1.0, 0.9, 8, 7, 1.0],
+		[Vector3(-1, 0, 0), Vector3(0, 0, 1), Vector3(0, 1, 0), 1.0, 0.9, 8, 7, 1.0],
+	]
+	for f in faces:
+		var n: Vector3 = f[0]
+		var au: Vector3 = f[1]
+		var av: Vector3 = f[2]
+		var su: int = f[5]
+		var sv: int = f[6]
+		var col := Color(weather, seed_v, float(f[7]), 1.0)
+		var grid: Array = []
+		for i in range(su + 1):
+			var row: Array = []
+			# Rows bunch up toward the edges, where the rounding is.
+			var tu := 0.5 - 0.5 * cos(PI * float(i) / su)
+			for j in range(sv + 1):
+				var tv := 0.5 - 0.5 * cos(PI * float(j) / sv)
+				var on := Vector3(n.x * BALE.x, BALE.y * 0.5 + n.y * BALE.y * 0.5, n.z * BALE.z)
+				on += au * (tu - 0.5) * float(f[3]) + av * (tv - 0.5) * float(f[4])
+				var pn := _bale_surface(on, noise)
+				# UVs in metres: along the bale on its long faces, across it on the ends.
+				row.append([pn[0], pn[1], Vector2(tu * float(f[3]), tv * float(f[4]))])
+			grid.append(row)
+		for i in range(su):
+			for j in range(sv):
+				var a: Array = grid[i][j]
+				var b: Array = grid[i + 1][j]
+				var c: Array = grid[i + 1][j + 1]
+				var d: Array = grid[i][j + 1]
+				k.tri(kit, "hay", a[0], b[0], c[0], a[1], b[1], c[1], col, n, a[2], b[2], c[2])
+				k.tri(kit, "hay", a[0], c[0], d[0], a[1], c[1], d[1], col, n, a[2], c[2], d[2])
+	# Twine: four strings running round the bale lengthwise, over the top and down the ends.
+	var twine := Color(0.93, 0.42, 0.07) if rng.randf() < 0.7 else Color(0.16, 0.36, 0.78)
+	for z in [-0.33, -0.11, 0.11, 0.33]:
+		var path: Array = []
+		for i in range(9):
+			path.append(Vector3(-BALE.x, BALE.y * float(i) / 8.0, z))
+		for i in range(1, 24):
+			path.append(Vector3(-BALE.x + 2.0 * BALE.x * float(i) / 24.0, BALE.y, z))
+		for i in range(8, -1, -1):
+			path.append(Vector3(BALE.x, BALE.y * float(i) / 8.0, z))
+		var prev: Array = []
+		for q in path:
+			var pn := _bale_surface(q, noise)
+			var p: Vector3 = (pn[0] as Vector3) + (pn[1] as Vector3) * 0.003
+			var w := Vector3(0, 0, 0.007)
+			if not prev.is_empty():
+				k.quad(kit, "matte", [prev[0] - w, p - w, p + w, prev[0] + w], ((pn[1] as Vector3) + (prev[1] as Vector3)).normalized(), twine)
+			prev = [p, pn[1]]
+	# Loose straws poking out, most along the top edges.
+	var straw_cols := [Color(0.86, 0.72, 0.40), Color(0.94, 0.86, 0.60), Color(0.62, 0.50, 0.26)]
+	for i in range(70):
+		var on := Vector3(rng.randf_range(-1, 1) * BALE.x, rng.randf_range(0.15, 1.0) * BALE.y, rng.randf_range(-1, 1) * BALE.z)
+		# Onto the surface, often at an edge.
+		match rng.randi() % 4:
+			0, 1:
+				on.y = BALE.y
+				if rng.randf() < 0.6:
+					on.z = signf(on.z) * BALE.z
+			2:
+				on.z = signf(on.z) * BALE.z
+			3:
+				on.x = signf(on.x) * BALE.x
+		var pn := _bale_surface(on, noise)
+		var root: Vector3 = (pn[0] as Vector3) - (pn[1] as Vector3) * 0.01
+		var dir: Vector3 = ((pn[1] as Vector3) * rng.randf_range(0.3, 1.0) + Vector3(rng.randf_range(-1, 1), rng.randf_range(-0.3, 0.6), rng.randf_range(-1, 1)) * 0.8).normalized()
+		var tip: Vector3 = root + dir * rng.randf_range(0.05, 0.16)
+		var side: Vector3 = dir.cross(Vector3.UP if absf(dir.y) < 0.9 else Vector3.RIGHT).normalized() * 0.0035
+		var sc: Color = straw_cols[rng.randi() % straw_cols.size()]
+		k.tri(kit, "straw_loose", root - side, root + side, tip, pn[1], pn[1], pn[1], sc, side.cross(dir))
+
+
+## A point of the bale's surface (`on` on the plain box) and its normal: the box's edges rounded,
+## its faces bulging out between them, and lumps all over.
+func _bale_surface(on: Vector3, noise: FastNoiseLite) -> Array:
+	var lo := Vector3(-BALE.x, 0.0, -BALE.z) + Vector3.ONE * BALE_ROUND
+	var hi := Vector3(BALE.x, BALE.y, BALE.z) - Vector3.ONE * BALE_ROUND
+	var q := on.clamp(lo, hi)
+	var d := on - q
+	var n := d.normalized() if d.length() > 1e-6 else Vector3.UP
+	var p := q + n * BALE_ROUND
+	var fx := 1.0 - pow(on.x / BALE.x, 2.0)
+	var fy := 1.0 - pow((on.y - BALE.y * 0.5) / (BALE.y * 0.5), 2.0)
+	var fz := 1.0 - pow(on.z / BALE.z, 2.0)
+	p += Vector3(n.x * 0.02 * fy * fz, n.y * 0.018 * fx * fz, n.z * 0.035 * fx * fy)
+	p += n * noise.get_noise_3dv(on) * 0.014
+	return [p, n]
+
+
+## A painted tyre lying flat at `c` (life size): a lathe of a rounded section with tyre_wall.gdshader's
+## UVs (x round the tyre, y across the section: lower sidewall, tread, upper sidewall, then the inside),
+## its paint in the vertex colour and `seed` in the alpha, tipped by `tip`.
+func _tyre(kit: Dictionary, c: Vector3, r_in: float, r_out: float, h: float, col: Color, seed_v: float, tip: Basis) -> void:
+	var rr := minf(h * 0.3, (r_out - r_in) * 0.32)
+	# [radius, height, v]: from the inner bead under it, out across the bottom, up the tread, back in
+	# over the top, and down the inside of the ring.
+	var prof: Array = [
+		[r_in + 0.01, -h * 0.5 + 0.02, 0.0], [r_in + rr * 0.8, -h * 0.5, 0.08], [(r_in + r_out) * 0.5, -h * 0.5 - 0.004, 0.17],
+		[r_out - rr, -h * 0.5 + 0.002, 0.26], [r_out - rr * 0.29, -h * 0.5 + rr * 0.29, 0.3], [r_out, -h * 0.5 + rr, 0.34],
+		[r_out + 0.004, 0.0, 0.5], [r_out, h * 0.5 - rr, 0.66], [r_out - rr * 0.29, h * 0.5 - rr * 0.29, 0.7],
+		[r_out - rr, h * 0.5 - 0.002, 0.74], [(r_in + r_out) * 0.5, h * 0.5 + 0.004, 0.83], [r_in + rr * 0.8, h * 0.5, 0.92],
+		[r_in + 0.01, h * 0.5 - 0.02, 1.0], [r_in, 0.0, 1.05], [r_in + 0.01, -h * 0.5 + 0.02, 1.1],
+	]
+	var segs := 22
+	var paint := Color(col.r, col.g, col.b, seed_v)
+	for kk in range(prof.size() - 1):
+		var p0: Array = prof[kk]
+		var p1: Array = prof[kk + 1]
+		var d := Vector2(float(p1[0]) - float(p0[0]), float(p1[1]) - float(p0[1]))
+		var n2 := Vector2(d.y, -d.x).normalized()
+		for j in range(segs):
+			var t0 := TAU * j / segs
+			var t1 := TAU * (j + 1) / segs
+			var u0 := Vector3(cos(t0), 0.0, sin(t0))
+			var u1 := Vector3(cos(t1), 0.0, sin(t1))
+			var q00 := c + tip * (u0 * float(p0[0]) + Vector3.UP * float(p0[1]))
+			var q01 := c + tip * (u1 * float(p0[0]) + Vector3.UP * float(p0[1]))
+			var q10 := c + tip * (u0 * float(p1[0]) + Vector3.UP * float(p1[1]))
+			var q11 := c + tip * (u1 * float(p1[0]) + Vector3.UP * float(p1[1]))
+			var n0 := tip * (u0 * n2.x + Vector3.UP * n2.y)
+			var n1 := tip * (u1 * n2.x + Vector3.UP * n2.y)
+			var out := (n0 + n1).normalized()
+			var uv00 := Vector2(float(j) / segs, float(p0[2]))
+			var uv01 := Vector2(float(j + 1) / segs, float(p0[2]))
+			var uv10 := Vector2(float(j) / segs, float(p1[2]))
+			var uv11 := Vector2(float(j + 1) / segs, float(p1[2]))
+			_kit.tri(kit, "tyre", q00, q01, q11, n0, n1, n1, paint, out, uv00, uv01, uv11)
+			_kit.tri(kit, "tyre", q00, q11, q10, n0, n1, n0, paint, out, uv00, uv11, uv10)
 
 
 # ======================================================================================
@@ -2275,6 +2406,9 @@ func _multimesh(mesh: Mesh, transforms: Array, node_name: String) -> MultiMeshIn
 	mm.mesh = mesh
 	mm.instance_count = order.size()
 	mm.buffer = PropKit.transform_buffer(order)
+	# The far and shadow stand-ins repeat the near cells' instances.
+	if not ("Far" in node_name or "Shadow" in node_name):
+		_stamps.append([mesh, transforms])
 	var mmi := MultiMeshInstance3D.new()
 	mmi.name = node_name
 	mmi.multimesh = mm
@@ -2282,8 +2416,410 @@ func _multimesh(mesh: Mesh, transforms: Array, node_name: String) -> MultiMeshIn
 
 
 # ======================================================================================
+#  Meadow grass
+# ======================================================================================
+
+const MEADOW_STEP := 0.5       # the grass map's texel (m)
+const MEADOW_SIDE := 4000      # its texels a side, from GRID_START
+const GRASS_TOP := 1.5         # geometry lower than this over the ground keeps the grass off
+const GRASS_ROAD := 8.7        # no grass this close to a road's centreline (the curb ends at 8)
+const GRASS_VERGE := 15.0      # from short to full height out to here
+const GRASS_WATER := -9.85     # no grass below this (the lake is at -10)
+const MOWN := 0.24             # the mown grass on the venue's verges and pads, as a share of full height
+
+## The meadow (MeadowGrass.gd, meadow_grass.gdshader): tufts of real blades in three tiers that the
+## shader stands on the ground and grows as the grass map says. The map (0.5m) is drawn here: the
+## meadow thinner and shorter in the woods, mown on the clearings and pads, short along the verges,
+## none on the roads (except under the bridge), in the lake or on cliffs, and none under anything
+## standing on the ground: every prop's triangles near the ground, the trunks, boulders and hazel.
+## It replaces TerrainGenerator's picture cards (no_grass), which took most of a re-bake's 13 minutes.
+func _build_meadow(root: Node3D) -> void:
+	var t0 := Time.get_ticks_msec()
+	var node := Node3D.new()
+	node.name = "Meadow"
+	node.set_script(load("res://MeadowDetail.gd"))
+	root.add_child(node)
+	var data := _meadow_base()
+	print("  meadow: base map (%.1fs)" % ((Time.get_ticks_msec() - t0) / 1000.0))
+	_meadow_roads(data)
+	print("  meadow: roads (%.1fs)" % ((Time.get_ticks_msec() - t0) / 1000.0))
+	var blocked := _meadow_blockers(data)
+	print("  meadow: %d texels under props (%.1fs)" % [blocked, (Time.get_ticks_msec() - t0) / 1000.0])
+	var grass_tex: Texture2D = _save_res(MeadowGrass.grass_texture(data, MEADOW_SIDE), "meadow_map")
+	var ht: Array = MeadowGrass.height_texture(_heights, GRID_RES + 1)
+	var height_tex: Texture2D = _save_res(ht[0], "meadow_heights")
+	var height_grid := Vector4(GRID_START, GRID_START, GRID_STEP, GRID_RES + 1)
+	var grass_grid := Vector3(GRID_START, GRID_START, MEADOW_SIDE * MEADOW_STEP)
+	var mats: Array[ShaderMaterial] = []
+	var mms: Array[MultiMesh] = []
+	var cells := 0
+	for tier in range(MeadowGrass.TIERS.size()):
+		var t: Dictionary = MeadowGrass.TIERS[tier]
+		var mesh: Mesh = _save_res(MeadowGrass.tuft_mesh(tier, 1301 + tier), "meadow_tuft_%d" % tier)
+		var mm: MultiMesh = _save_res(MeadowGrass.cell_multimesh(tier, mesh, 2203 + tier), "meadow_cells_%d" % tier)
+		var mat: ShaderMaterial = _save_res(MeadowGrass.material(tier, height_tex, ht[1], grass_tex, height_grid, grass_grid), "meadow_mat_%d" % tier)
+		mats.append(mat)
+		mms.append(mm)
+		var size: float = t["cell"]
+		var fade_end: float = (t["fade"] as Vector2).y
+		var reach: float = size * 0.71
+		var n := int(MEADOW_SIDE * MEADOW_STEP / size)
+		for cj in range(n):
+			for ci in range(n):
+				var x0: float = GRID_START + ci * size
+				var z0: float = GRID_START + cj * size
+				var hr := _meadow_cell(data, x0, z0, size)
+				if hr.x > hr.y:
+					continue
+				var mmi := MultiMeshInstance3D.new()
+				mmi.name = "Grass%d_%d_%d" % [tier, ci, cj]
+				mmi.multimesh = mm
+				mmi.material_override = mat
+				mmi.position = Vector3(x0, 0.0, z0)
+				# The tufts are at y = 0 in the MultiMesh; the shader lifts them onto the ground.
+				mmi.custom_aabb = AABB(Vector3(-1.5, hr.x - 1.0, -1.5), Vector3(size + 3.0, hr.y - hr.x + 3.5, size + 3.0))
+				mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				mmi.visibility_range_end = fade_end + reach
+				mmi.set_meta(&"fade_end", fade_end)
+				mmi.set_meta(&"reach", reach)
+				node.add_child(mmi)
+				cells += 1
+	node.set("materials", mats)
+	node.set("multimeshes", mms)
+	# TerrainGenerator's own grass is gone for good: a re-bake no longer grows it.
+	_tg.set("no_grass", true)
+	var old := _tg.get_node_or_null("GrassContainer")
+	if old:
+		_tg.remove_child(old)
+		old.free()
+	if DirAccess.dir_exists_absolute("res://generated/grass"):
+		for f in DirAccess.get_files_at("res://generated/grass"):
+			DirAccess.remove_absolute("res://generated/grass/" + f)
+		DirAccess.remove_absolute("res://generated/grass")
+	print("  meadow: %d cells in %d tiers (%.1fs)" % [cells, mms.size(), (Time.get_ticks_msec() - t0) / 1000.0])
+
+
+## The meadow before the roads and props, on the terrain's 2m grid and blown up to the map's 0.5m:
+## R how much grass, G how tall.
+func _meadow_base() -> PackedByteArray:
+	var forest := FastNoiseLite.new()
+	forest.seed = 4711
+	forest.frequency = 0.0045
+	forest.fractal_octaves = 3
+	var tallness := FastNoiseLite.new()
+	tallness.seed = 5150
+	tallness.frequency = 0.018
+	tallness.fractal_octaves = 2
+	var cl: PackedFloat32Array = _tg.get("grass_clearings")
+	var pads: PackedFloat32Array = _tg.get("flat_pads")
+	var mown_rects: Array = []
+	for o in range(0, cl.size() - 5, 6):
+		mown_rects.append([cl[o], cl[o + 1], cl[o + 2], cl[o + 3], cl[o + 4], maxf(cl[o + 5], 1.0)])
+	for o in range(0, pads.size() - 6, 7):
+		mown_rects.append([pads[o], pads[o + 1], pads[o + 2], pads[o + 3], pads[o + 4], 3.0])
+	var n := GRID_RES
+	var stride := GRID_RES + 1
+	var base := PackedByteArray()
+	base.resize(n * n * 2)
+	for j in range(n):
+		var z: float = GRID_START + (j + 0.5) * GRID_STEP
+		for i in range(n):
+			var x: float = GRID_START + (i + 0.5) * GRID_STEP
+			var k := (j * n + i) * 2
+			var h00: float = _heights[j * stride + i]
+			var h11: float = _heights[(j + 1) * stride + i + 1]
+			var h10: float = _heights[j * stride + i + 1]
+			var h01: float = _heights[(j + 1) * stride + i]
+			var g: float = (h00 + h11 + h10 + h01) * 0.25
+			var steep: float = maxf(absf(h10 - h00), maxf(absf(h01 - h00), absf(h11 - h00))) / GRID_STEP
+			if g < GRASS_WATER or steep > 1.65:
+				continue
+			var amount := 1.0
+			var height: float = lerpf(0.68, 1.0, tallness.get_noise_2d(x, z) * 0.5 + 0.5)
+			# Thinner and shorter where the woods are thick (the woods' own noise).
+			var f: float = forest.get_noise_2d(x, z) + clampf((g - 4.0) * 0.012, -0.1, 0.15)
+			var wood: float = smoothstep(0.35, 0.85, lerpf(0.035, 0.9, smoothstep(-0.02, 0.28, f)))
+			amount *= lerpf(1.0, 0.45, wood)
+			height *= lerpf(1.0, 0.75, wood)
+			var mown := 0.0
+			for r in mown_rects:
+				var dx: float = x - float(r[0])
+				var dz: float = z - float(r[1])
+				var reach: float = float(r[2]) + float(r[3]) + float(r[5])
+				if dx * dx + dz * dz > reach * reach:
+					continue
+				var c: float = cos(float(r[4]))
+				var sn: float = sin(float(r[4]))
+				var qx: float = absf(dx * c - dz * sn) - float(r[2])
+				var qz: float = absf(dx * sn + dz * c) - float(r[3])
+				var outside: float = Vector2(maxf(qx, 0.0), maxf(qz, 0.0)).length() + minf(maxf(qx, qz), 0.0)
+				mown = maxf(mown, 1.0 - smoothstep(0.0, float(r[5]), outside))
+			height = lerpf(height, MOWN, mown)
+			base[k] = int(round(amount * 255.0))
+			base[k + 1] = int(round(clampf(height, 0.0, 1.0) * 255.0))
+	var img := Image.create_from_data(n, n, false, Image.FORMAT_RG8, base)
+	img.resize(MEADOW_SIDE, MEADOW_SIDE, Image.INTERPOLATE_BILINEAR)
+	return img.get_data()
+
+
+## The roads in the map: no grass on the lap and the shortcuts (unless they're up on the bridge),
+## short grass along their verges. Cross-sections every 0.4m, 0.25m apart across.
+func _meadow_roads(data: PackedByteArray) -> void:
+	var paths: Array = [_level.get_node("TrackPath")]
+	var alts := _level.get_node_or_null("AlternativePaths")
+	if alts:
+		paths.append_array(alts.get_children().filter(func(c): return c is Path3D))
+	for pth in paths:
+		var c: Curve3D = (pth as Path3D).curve
+		var xf: Transform3D = (pth as Path3D).global_transform
+		var length := c.get_baked_length()
+		var s := 0.0
+		while s < length:
+			var p: Vector3 = xf * c.sample_baked(s)
+			var fwd: Vector3 = xf * c.sample_baked(minf(s + 0.6, length)) - xf * c.sample_baked(maxf(s - 0.6, 0.0))
+			s += 0.4
+			fwd.y = 0.0
+			if fwd.length_squared() < 1e-6:
+				continue
+			fwd = fwd.normalized()
+			var lat := -GRASS_VERGE - 0.25
+			while lat < GRASS_VERGE:
+				lat += 0.25
+				var px: float = p.x - fwd.z * lat
+				var pz: float = p.z + fwd.x * lat
+				var ti := int((px - GRID_START) / MEADOW_STEP)
+				var tj := int((pz - GRID_START) / MEADOW_STEP)
+				if ti < 0 or tj < 0 or ti >= MEADOW_SIDE or tj >= MEADOW_SIDE:
+					continue
+				# Up on the bridge: the grass grows on under it.
+				if p.y - _ground(px, pz) > 2.4:
+					continue
+				var k := (tj * MEADOW_SIDE + ti) * 2
+				var a := absf(lat)
+				if a < GRASS_ROAD:
+					data[k] = 0
+				else:
+					data[k + 1] = mini(data[k + 1], int(round(lerpf(MOWN, 1.0, smoothstep(GRASS_ROAD, GRASS_VERGE, a)) * 255.0)))
+
+
+## Clears the grass from under everything standing on the ground: the triangles of every prop in
+## the dressing, the level's own props, the loop and the bridge's supports within GRASS_TOP of the
+## ground, and the trunks, boulders and shrubs (their meshes' footprints at each instance).
+## Each hit clears its texel and the eight round it. Returns the texels cleared.
+func _meadow_blockers(data: PackedByteArray) -> int:
+	var geometry: Array = []
+	for n in [DRESSING, "LevelDesign", "Ramps", "WoodenCart", "FinishLine", "Checkpoints"]:
+		var nd := _level.get_node_or_null(n)
+		if nd:
+			_meadow_geometry(nd, geometry)
+	for c in _tg.get_children():
+		if str(c.name).begins_with("BridgeSupport"):
+			_meadow_geometry(c, geometry)
+	_hit_mask.resize(MEADOW_SIDE * MEADOW_SIDE)
+	_hit_mask.fill(0)
+	_hits.clear()
+	for g in geometry:
+		_meadow_block_mesh(g[0], g[1])
+	var footprints := {}
+	for st in _stamps:
+		var mesh: Mesh = st[0]
+		if not footprints.has(mesh):
+			footprints[mesh] = _meadow_footprint(mesh)
+		var pts: PackedVector3Array = footprints[mesh]
+		for xf in st[1]:
+			for q in pts:
+				_meadow_hit((xf as Transform3D) * q)
+	for key in _hits:
+		var ti: int = key % MEADOW_SIDE
+		var tj: int = key / MEADOW_SIDE
+		for dj in range(-1, 2):
+			for di in range(-1, 2):
+				var i := ti + di
+				var j := tj + dj
+				if i >= 0 and j >= 0 and i < MEADOW_SIDE and j < MEADOW_SIDE:
+					data[(j * MEADOW_SIDE + i) * 2] = 0
+	return _hits.size()
+
+
+## [mesh, global transform] of every visible mesh under `node` (generated parts included), and the
+## CSG roots' meshes (the loop). The woods, boulders and the meadow itself are left out.
+func _meadow_geometry(node: Node, out: Array) -> void:
+	var nm := str(node.name)
+	if nm == "Woodland" or nm == "Boulders" or nm == "Meadow":
+		return
+	if node is MeshInstance3D and (node as MeshInstance3D).mesh and (node as MeshInstance3D).is_visible_in_tree():
+		out.append([(node as MeshInstance3D).mesh, (node as MeshInstance3D).global_transform])
+	elif node is MultiMeshInstance3D and (node as MultiMeshInstance3D).multimesh:
+		var mm := (node as MultiMeshInstance3D).multimesh
+		var gx := (node as MultiMeshInstance3D).global_transform
+		var buf := mm.buffer
+		var xfs: Array = []
+		for i in range(mm.instance_count):
+			var o := i * (12 + (4 if mm.use_colors else 0) + (4 if mm.use_custom_data else 0))
+			xfs.append(gx * Transform3D(Vector3(buf[o], buf[o + 4], buf[o + 8]), Vector3(buf[o + 1], buf[o + 5], buf[o + 9]),
+					Vector3(buf[o + 2], buf[o + 6], buf[o + 10]), Vector3(buf[o + 3], buf[o + 7], buf[o + 11])))
+		if mm.mesh and not xfs.is_empty():
+			_stamps.append([mm.mesh, xfs])
+	elif node is CSGShape3D and (node as CSGShape3D).is_root_shape():
+		var got: Array = (node as CSGShape3D).get_meshes()
+		if got.size() >= 2 and got[1] is Mesh:
+			out.append([got[1], (node as CSGShape3D).global_transform])
+	for c in node.get_children(true):
+		_meadow_geometry(c, out)
+
+
+func _meadow_block_mesh(mesh: Mesh, xf: Transform3D) -> void:
+	for si in range(mesh.get_surface_count()):
+		if mesh is ArrayMesh and (mesh as ArrayMesh).surface_get_primitive_type(si) != Mesh.PRIMITIVE_TRIANGLES:
+			continue
+		var arr := mesh.surface_get_arrays(si)
+		var v: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+		var idx: PackedInt32Array = arr[Mesh.ARRAY_INDEX] if arr[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+		var w := PackedVector3Array()
+		w.resize(v.size())
+		for i in range(v.size()):
+			w[i] = xf * v[i]
+		var count := idx.size() / 3 if not idx.is_empty() else v.size() / 3
+		for t in range(count):
+			var a: Vector3 = w[idx[t * 3]] if not idx.is_empty() else w[t * 3]
+			var b: Vector3 = w[idx[t * 3 + 1]] if not idx.is_empty() else w[t * 3 + 1]
+			var c: Vector3 = w[idx[t * 3 + 2]] if not idx.is_empty() else w[t * 3 + 2]
+			var g := _ground((a.x + b.x + c.x) / 3.0, (a.z + b.z + c.z) / 3.0)
+			var lo := minf(a.y, minf(b.y, c.y))
+			var hi := maxf(a.y, maxf(b.y, c.y))
+			if lo > g + GRASS_TOP + 3.0 or hi < g - 1.0:
+				continue
+			var e := maxf(a.distance_to(b), maxf(b.distance_to(c), c.distance_to(a)))
+			var n := clampi(ceili(e / 0.35), 1, 300)
+			for i in range(n + 1):
+				for j in range(n + 1 - i):
+					_meadow_hit(a + (b - a) * (float(i) / n) + (c - a) * (float(j) / n))
+
+
+## Marks the texel under `p` if `p` is near the ground there.
+func _meadow_hit(p: Vector3) -> void:
+	var ti := int((p.x - GRID_START) / MEADOW_STEP)
+	var tj := int((p.z - GRID_START) / MEADOW_STEP)
+	if ti < 0 or tj < 0 or ti >= MEADOW_SIDE or tj >= MEADOW_SIDE:
+		return
+	var k := tj * MEADOW_SIDE + ti
+	if _hit_mask[k] != 0:
+		return
+	var g := _ground(p.x, p.z)
+	if p.y > g + GRASS_TOP or p.y < g - 0.6:
+		return
+	_hit_mask[k] = 1
+	_hits.append(k)
+
+
+## Points over a mesh's triangles near its foot (local y under 2m), 0.25m apart: a trunk's or a
+## boulder's footprint, to be stamped at each instance.
+func _meadow_footprint(mesh: Mesh) -> PackedVector3Array:
+	var seen := {}
+	var out := PackedVector3Array()
+	for si in range(mesh.get_surface_count()):
+		var arr := mesh.surface_get_arrays(si)
+		var v: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+		var idx: PackedInt32Array = arr[Mesh.ARRAY_INDEX] if arr[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+		var count := idx.size() / 3 if not idx.is_empty() else v.size() / 3
+		for t in range(count):
+			var a: Vector3 = v[idx[t * 3]] if not idx.is_empty() else v[t * 3]
+			var b: Vector3 = v[idx[t * 3 + 1]] if not idx.is_empty() else v[t * 3 + 1]
+			var c: Vector3 = v[idx[t * 3 + 2]] if not idx.is_empty() else v[t * 3 + 2]
+			if minf(a.y, minf(b.y, c.y)) > 2.0:
+				continue
+			var e := maxf(a.distance_to(b), maxf(b.distance_to(c), c.distance_to(a)))
+			var n := clampi(ceili(e / 0.25), 1, 200)
+			for i in range(n + 1):
+				for j in range(n + 1 - i):
+					var p := a + (b - a) * (float(i) / n) + (c - a) * (float(j) / n)
+					if p.y > 2.0:
+						continue
+					var key := Vector3i(floori(p.x / 0.25), floori(p.y / 0.5), floori(p.z / 0.25))
+					if not seen.has(key):
+						seen[key] = true
+						out.append(p)
+	return out
+
+
+## The ground's height range under a cell (min, max), or an empty range if no grass grows in it.
+func _meadow_cell(data: PackedByteArray, x0: float, z0: float, size: float) -> Vector2:
+	var t0i := int((x0 - GRID_START) / MEADOW_STEP)
+	var t0j := int((z0 - GRID_START) / MEADOW_STEP)
+	var span := int(size / MEADOW_STEP)
+	var any := false
+	var j := 0
+	while j < span and not any:
+		var i := 0
+		while i < span:
+			if data[((t0j + j) * MEADOW_SIDE + t0i + i) * 2] > 0:
+				any = true
+				break
+			i += 3
+		j += 3
+	if not any:
+		return Vector2(INF, -INF)
+	var lo := INF
+	var hi := -INF
+	var stride := GRID_RES + 1
+	var g0i := int((x0 - GRID_START) / GRID_STEP)
+	var g0j := int((z0 - GRID_START) / GRID_STEP)
+	var gs := int(size / GRID_STEP)
+	for gj in range(g0j, mini(g0j + gs + 1, stride)):
+		for gi in range(g0i, mini(g0i + gs + 1, stride)):
+			var h: float = _heights[gj * stride + gi]
+			lo = minf(lo, h)
+			hi = maxf(hi, h)
+	return Vector2(lo, hi + 1.5)
+
+
+# ======================================================================================
 #  Old props, ownership
 # ======================================================================================
+
+## The loop (Ramps/LoopCSG) was placed facing against the lap: the race drove into its exit lane and
+## out through its entry, and since the road falls 1.2m across it, the lane the carts left by ended a
+## metre above the road. Its lanes were 11m wide and only 6.5m apart, so the underside of the loop's
+## last quarter hung over the entry lane down to its floor, and carts following the road drove into
+## it. Now: lanes 8.5m wide, 10.5m apart (clear of each other with their walls), the loop's axis along
+## the road and centred on it, and both lane ends 25cm under the road at the road's grade, so the
+## carts roll on and off it. Exit lane 30m, gentler, and no boost pad on it.
+const LOOP_EXIT_LENGTH := 30.0
+const LOOP_END_SINK := 0.25
+const LOOP_TRACK_WIDTH := 8.5
+const LOOP_SPIRAL_OFFSET := 10.5
+
+func _fit_loop() -> void:
+	var loop := _level.get_node_or_null("Ramps/LoopCSG") as Node3D
+	if loop == null:
+		return
+	var off := _curve.get_closest_offset(loop.position)
+	var axis := _curve.sample_baked(fposmod(off + 25.0, _length)) - _curve.sample_baked(fposmod(off - 25.0, _length))
+	axis.y = 0.0
+	var on_road := _curve.sample_baked(off)
+	# Basis.looking_at points -z at its target: the loop's lanes run toward +z.
+	loop.transform = Transform3D(Basis.looking_at(-axis.normalized(), Vector3.UP), Vector3(on_road.x, loop.position.y, on_road.z))
+	loop.set("track_width", LOOP_TRACK_WIDTH)
+	loop.set("spiral_offset", LOOP_SPIRAL_OFFSET)
+	# A 60 degree corner follows 55m after the exit: the exit pad boosted carts off it into the lake.
+	loop.set("exit_boost", false)
+	var half_shift: float = float(loop.get("spiral_offset")) * 0.5
+	var z_in: float = -5.0 - float(loop.get("approach_length"))
+	var z_out: float = -5.0 + LOOP_EXIT_LENGTH
+	var road_in := _road_surface(loop.transform * Vector3(-half_shift, 0.0, z_in))
+	var road_out := _road_surface(loop.transform * Vector3(half_shift, 0.0, z_out))
+	loop.set("exit_length", LOOP_EXIT_LENGTH)
+	loop.set("entry_end_y", road_in - loop.position.y - LOOP_END_SINK)
+	loop.set("exit_end_y", road_out - loop.position.y - LOOP_END_SINK)
+	loop.set("road_grade", (road_out - road_in) / (z_out - z_in))
+	loop.call("_rebuild")
+	print("  loop ends: entry %.2f, exit %.2f under the origin, grade %.3f" % [loop.get("entry_end_y"), loop.get("exit_end_y"), loop.get("road_grade")])
+
+
+## The road's surface height at `at`: the lap's nearest centreline point, raised by the road offset.
+func _road_surface(at: Vector3) -> float:
+	return _curve.get_closest_point(at).y + _road_y
+
 
 ## Moves the two hand-placed plants by the start out of the barrier and fence lines.
 func _move_old_props() -> void:

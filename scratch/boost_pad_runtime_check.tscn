@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scratch/boost_pad_runtime_check.gd" id="1"]
+
+[node name="BoostPadRuntimeCheck" type="Node"]
+script = ExtResource("1")

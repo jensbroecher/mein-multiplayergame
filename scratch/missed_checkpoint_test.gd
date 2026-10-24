@@ -1,12 +1,14 @@
 extends Node
 # Moves splitscreen player 1 along the racing line, a few metres a frame, through every gate's area
 # but one, which it passes 16 m wide of. Prints every time the announcer says "checkpoint missed",
-# and how far past the gate that was. Then goes back for the gate and drives on, to see it is
-# counted and nothing more is said. Headless:
+# and how far past the gate that was. One missed gate is allowed: the cart drives on, the gate after
+# it counts and the lap is completed. Then it drives the wrong way for a few seconds ("wrong way"),
+# and on lap two misses two gates in a row, which disqualifies it. Headless:
 #   Godot --headless --path . res://scratch/missed_checkpoint_test.tscn -- [res://levels/X.tscn] [skip=2]
 # skip=-1 drives a clean lap and must say nothing.
 
 var heard: Array = []
+var said := {}
 
 
 func _ready() -> void:
@@ -22,8 +24,13 @@ func _ready() -> void:
 	NetworkManager.current_game_mode = NetworkManager.GameMode.LOCAL_COOP
 	NetworkManager.start_local_coop("P1", "P2")
 	MusicManager.child_entered_tree.connect(func(n: Node):
-		if n is AudioStreamPlayer and n.stream and n.stream.resource_path.ends_with("checkpointmissed.mp3"):
-			heard.append(true))
+		if n is AudioStreamPlayer and n.stream:
+			var f: String = n.stream.resource_path.get_file()
+			said[f] = int(said.get(f, 0)) + 1
+			if f.begins_with("wrongway"):
+				print("  said %s at %d ms" % [f, Time.get_ticks_msec()])
+			if f == "checkpointmissed.mp3":
+				heard.append(true))
 	var level: Node = load(level_path).instantiate()
 	add_child(level)
 	while level.race_state != level.RaceState.RACING:
@@ -55,23 +62,39 @@ func _ready() -> void:
 		if missed_at < 0.0 and not heard.is_empty():
 			missed_at = d
 			print("MISSED heard at %.0f m: gate %d is at %.0f m, so %.0f m past it; next expected %d" % [d, skip, gates[skip], d - gates[skip], stats["next_checkpoint_idx"]])
-	print("lap one: said %d time(s) (want %d), next expected gate %d (want %d), laps %d" % [heard.size(), 1 if skip >= 0 else 0, stats["next_checkpoint_idx"], skip if skip >= 0 else 0, stats["laps"]])
+	print("lap one: said %d time(s) (want %d), next expected gate %d (want 0), laps %d (want 1), disqualified %s (want false)" % [heard.size(),
+			1 if skip >= 0 else 0, stats["next_checkpoint_idx"], stats["laps"], str(stats.get("disqualified", false))])
 	if skip < 0:
 		get_tree().quit()
 		return
 
-	# Back for the gate: counted, then on round the rest of the lap.
+	# The wrong way: back along the line at 15 m/s for 4 s.
+	cart.freeze = false
+	var t := 0.0
+	var back := d
+	while t < 4.0:
+		var dt := get_process_delta_time()
+		t += dt
+		back -= 15.0 * dt
+		_put(cart, level, curve, o0 + back, length)
+		var o := fmod(o0 + back + length * 4.0, length)
+		var along: Vector3 = level.track_path.to_global(curve.sample_baked(fmod(o + 1.0, length))) - level.track_path.to_global(curve.sample_baked(o))
+		cart.linear_velocity = -along.normalized() * 15.0
+		await get_tree().process_frame
+	cart.freeze = true
+	print("wrong way: said %d time(s) (want 1)" % (int(said.get("wrongway.mp3", 0)) + int(said.get("wrongway-2.mp3", 0))))
+
+	# Lap two: two gates in a row missed, which disqualifies.
 	heard.clear()
-	d = gates[skip] - 20.0
-	for i in 20:
+	var lap2 := length
+	d = 0.0
+	while d < gates[mini(skip + 1, gates.size() - 1)] + 30.0:
 		d += step
-		_put(cart, level, curve, o0 + d, length)
+		var wide2 := 16.0 if absf(d - gates[skip]) < 14.0 or absf(d - gates[mini(skip + 1, gates.size() - 1)]) < 14.0 else 0.0
+		_put(cart, level, curve, o0 + lap2 + d, length, wide2)
 		await get_tree().process_frame
-	while d < gates[gates.size() - 1] + 30.0:
-		d += step
-		_put(cart, level, curve, o0 + d, length)
-		await get_tree().process_frame
-	print("after going back: said %d time(s) (want 0), laps %d (want 1)" % [heard.size(), stats["laps"]])
+	print("lap two: missed said %d time(s) (want 1), disqualified said %d (want 1), disqualified %s (want true)" % [heard.size(),
+			int(said.get("disqualified.mp3", 0)), str(stats.get("disqualified", false))])
 	get_tree().quit()
 
 
@@ -81,3 +104,5 @@ func _put(cart: Node3D, level: Node, curve: Curve3D, offset: float, length: floa
 	var along := (curve.sample_baked(fmod(o + 1.0, length)) - p).normalized()
 	var right := along.cross(Vector3.UP).normalized()
 	cart.global_position = level.track_path.to_global(p + right * aside) + Vector3.UP * 0.8
+	# Moving forward, as a cart driving there would (the wrong-way check reads the velocity).
+	cart.linear_velocity = level.track_path.global_transform.basis * along * 20.0

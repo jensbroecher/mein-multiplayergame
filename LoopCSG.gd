@@ -61,11 +61,43 @@ extends Node3D
 		ramp_height = maxf(v, 0.0)
 		_maybe_rebuild()
 
+## Heights of the two lane ends above the loop's origin: the entry lane's start and the exit
+## lane's end. Set each a little under the road there, so a lane rises out of the road and sinks back
+## into it. On a slope they differ: the Lakeside loop's road falls a metre across it, and with both
+## ends at -0.25 the exit stopped a metre above the road and dropped the carts off a ledge.
+@export var entry_end_y: float = -0.25:
+	set(v):
+		entry_end_y = v
+		_maybe_rebuild()
+@export var exit_end_y: float = -0.25:
+	set(v):
+		exit_end_y = v
+		_maybe_rebuild()
+
+## The road's grade along the loop (rise per metre toward +z). Each lane meets the road at this slope.
+@export_range(-0.3, 0.3, 0.001) var road_grade: float = 0.0:
+	set(v):
+		road_grade = v
+		_maybe_rebuild()
+
+## Length of the exit lane, from the loop to where it meets the road (approach_length when 0).
+@export_range(0.0, 60.0, 1.0) var exit_length: float = 0.0:
+	set(v):
+		exit_length = maxf(v, 0.0)
+		_maybe_rebuild()
+
 @export_group("Features")
 ## Whether to place speed boost pads on the entry and exit ramps
 @export var add_boost_pads: bool = true:
 	set(v):
 		add_boost_pads = v
+		_maybe_rebuild()
+
+## Whether the exit lane gets its boost pad too. Off where a corner follows the loop: a pad pushes
+## for its whole duration whatever the brakes do.
+@export var exit_boost: bool = true:
+	set(v):
+		exit_boost = v
 		_maybe_rebuild()
 
 ## Whether to generate structural support pillars under the high points of the loop
@@ -105,8 +137,9 @@ func _enter_tree() -> void:
 func _ready() -> void:
 	add_to_group("loop_track")
 	add_to_group("collision_trimesh")
-	if get_child_count() == 0:
-		_rebuild()
+	# Always built from the exports: the scene stores none of the generated nodes, so an instance's
+	# settings (a level's end heights) are what shows, in the editor and in the game.
+	_rebuild()
 
 
 func _maybe_rebuild() -> void:
@@ -120,7 +153,7 @@ func _rebuild() -> void:
 	_building = true
 
 	# Clear previous generated children immediately to prevent duplicate node warnings
-	for child in get_children():
+	for child in get_children(true):
 		remove_child(child)
 		child.free()
 
@@ -128,7 +161,7 @@ func _rebuild() -> void:
 	var path_node := Path3D.new()
 	path_node.name = "Path3D"
 	path_node.curve = _create_loop_curve()
-	add_child(path_node)
+	add_child(path_node, false, INTERNAL_MODE_FRONT)
 
 	# 2. Main CSG Combiner for track & structural supports
 	var combiner := CSGCombiner3D.new()
@@ -137,7 +170,7 @@ func _rebuild() -> void:
 	combiner.collision_layer = 1
 	combiner.add_to_group("loop_track")
 	combiner.add_to_group("collision_trimesh")
-	add_child(combiner)
+	add_child(combiner, false, INTERNAL_MODE_FRONT)
 
 	# 3. CSGPolygon3D extruded along the Path3D
 	var csg_track := CSGPolygon3D.new()
@@ -167,10 +200,7 @@ func _rebuild() -> void:
 	if add_boost_pads and BOOST_PAD_SCENE:
 		_add_boost_pads()
 
-	# Only set owner if we are editing LoopCSG.tscn directly (never when instanced in a level)
-	if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root == self:
-		_set_owner_recursive(self, self)
-
+	# Internal children, never saved: _ready rebuilds them from the exports.
 	_building = false
 
 
@@ -190,6 +220,27 @@ func get_entry_direction() -> Vector3:
 		var p1 = path_node.to_global(path_node.curve.get_point_position(1))
 		return (p1 - p0).normalized()
 	return -global_transform.basis.z
+
+
+## Where a cart at `at` should aim while it's on the loop or its ground lanes: the lane's centre
+## `ahead` metres on from the cart's place on the loop's curve. Vector3.ZERO when the cart is outside
+## the loop's footprint or away from its lanes. The lap's own path crosses the footprint on a diagonal,
+## close enough to the divider that carts following it drove into it.
+func lane_goal(at: Vector3, ahead: float) -> Vector3:
+	var path_node: Path3D = get_node_or_null("Path3D")
+	if path_node == null or path_node.curve == null:
+		return Vector3.ZERO
+	var local := path_node.to_local(at)
+	var exit_len := exit_length if exit_length > 0.0 else approach_length
+	if local.z < -5.0 - approach_length - 3.0 or local.z > -5.0 + exit_len + 3.0:
+		return Vector3.ZERO
+	if absf(local.x) > spiral_offset * 0.5 + track_width * 0.5 + 2.0:
+		return Vector3.ZERO
+	var c := path_node.curve
+	var off := c.get_closest_offset(local)
+	if c.sample_baked(off).distance_to(local) > track_width * 0.5 + 2.5:
+		return Vector3.ZERO
+	return path_node.to_global(c.sample_baked(minf(off + ahead, c.get_baked_length())))
 
 
 ## Angled center safety divider separating entry climbing ramp and exit descending road
@@ -218,14 +269,10 @@ func _create_loop_curve() -> Curve3D:
 	var half_shift := spiral_offset * 0.5
 	var z_center := -5.0
 
-	# Entry approach ramp leading into the loop:
-	# Starts sunken below ground (Y = -0.25) so it emerges seamlessly from the road surface
-	# Then elevates smoothly up to ramp_height before entering the vertical loop
+	# Entry approach ramp: starts under the road (entry_end_y) so it rises out of it at the road's
+	# grade, then levels out at ramp_height before the loop.
 	var z_entry_start := z_center - approach_length
-	curve.add_point(Vector3(-half_shift, -0.25, z_entry_start))
-	curve.add_point(Vector3(-half_shift, 0.0, z_entry_start + 3.0))
-	curve.add_point(Vector3(-half_shift, ramp_height * 0.5, z_entry_start + 10.0))
-	curve.add_point(Vector3(-half_shift, ramp_height, z_center - 4.0))
+	_add_lane(curve, -half_shift, z_entry_start, entry_end_y, road_grade, z_center - 4.0, ramp_height, 0.0, 0.0)
 	curve.add_point(Vector3(-half_shift, ramp_height, z_center))
 
 	# Helix roll compensation:
@@ -249,24 +296,36 @@ func _create_loop_curve() -> Curve3D:
 		curve.add_point(Vector3(x, y, z))
 		curve.set_point_tilt(pt_idx, deg_to_rad(total_roll_deg * s_factor))
 
-	# Exit ramp: descends from ramp_height back down into the road surface (Y = -0.25)
-	var exit_idx1 := curve.point_count
-	curve.add_point(Vector3(half_shift, ramp_height, z_center + 4.0))
-	curve.set_point_tilt(exit_idx1, deg_to_rad(total_roll_deg))
-
-	var exit_idx2 := curve.point_count
-	curve.add_point(Vector3(half_shift, ramp_height * 0.5, z_center + approach_length - 10.0))
-	curve.set_point_tilt(exit_idx2, deg_to_rad(total_roll_deg))
-
-	var exit_idx3 := curve.point_count
-	curve.add_point(Vector3(half_shift, 0.0, z_center + approach_length - 3.0))
-	curve.set_point_tilt(exit_idx3, deg_to_rad(total_roll_deg))
-
-	var exit_idx4 := curve.point_count
-	curve.add_point(Vector3(half_shift, -0.25, z_center + approach_length))
-	curve.set_point_tilt(exit_idx4, deg_to_rad(total_roll_deg))
+	# Exit ramp: from ramp_height down into the road (exit_end_y), meeting it at its grade.
+	var exit_len := exit_length if exit_length > 0.0 else approach_length
+	_add_lane(curve, half_shift, z_center + 4.0, ramp_height, 0.0, z_center + exit_len, exit_end_y, road_grade,
+			deg_to_rad(total_roll_deg))
 
 	return curve
+
+
+## A straight lane at x from (z0, y0) to (z1, y1) whose height is a cubic with slopes g0 and g1 at
+## its ends, as points every 2m or so with Bezier handles along it, so the ramp has no kinks.
+func _add_lane(curve: Curve3D, x: float, z0: float, y0: float, g0: float, z1: float, y1: float, g1: float, tilt: float) -> void:
+	var span := z1 - z0
+	var n := maxi(2, ceili(absf(span) / 2.0))
+	var dz := span / n
+	for i in range(n + 1):
+		var u := float(i) / n
+		var h00 := 2.0 * u * u * u - 3.0 * u * u + 1.0
+		var h10 := u * u * u - 2.0 * u * u + u
+		var h01 := -2.0 * u * u * u + 3.0 * u * u
+		var h11 := u * u * u - u * u
+		var y := h00 * y0 + h10 * span * g0 + h01 * y1 + h11 * span * g1
+		var d00 := 6.0 * u * u - 6.0 * u
+		var d10 := 3.0 * u * u - 4.0 * u + 1.0
+		var d01 := -6.0 * u * u + 6.0 * u
+		var d11 := 3.0 * u * u - 2.0 * u
+		var slope := (d00 * y0 + d01 * y1) / span + d10 * g0 + d11 * g1
+		var handle := Vector3(0.0, slope * dz / 3.0, dz / 3.0)
+		var idx := curve.point_count
+		curve.add_point(Vector3(x, y, z0 + dz * i), -handle if i > 0 else Vector3.ZERO, handle if i < n else Vector3.ZERO)
+		curve.set_point_tilt(idx, tilt)
 
 
 ## Generates a sturdy U-channel cross section: flat road floor with angled containment curbs
@@ -398,7 +457,7 @@ func _add_support_pylons(combiner: CSGCombiner3D) -> void:
 func _add_boost_pads() -> void:
 	var pads_node := Node3D.new()
 	pads_node.name = "BoostPads"
-	add_child(pads_node)
+	add_child(pads_node, false, INTERNAL_MODE_FRONT)
 
 	var path_node: Path3D = get_node_or_null("Path3D")
 	var curve: Curve3D = path_node.curve if path_node else null
@@ -425,6 +484,8 @@ func _add_boost_pads() -> void:
 	_align_pad_to_curve(pad_entry_2, curve, 20.0)
 
 	# Boost Pad on exit ramp (speed boost shooting out of the loop)
+	if not exit_boost:
+		return
 	var pad_exit = BOOST_PAD_SCENE.instantiate()
 	pad_exit.name = "BoostPad_Exit"
 	if "boost_strength" in pad_exit:
@@ -441,13 +502,3 @@ func _align_pad_to_curve(pad: Node3D, curve: Curve3D, offset: float) -> void:
 	var tf := curve.sample_baked_with_rotation(offset, false, true)
 	pad.transform = tf
 	pad.position += tf.basis.y * 0.08
-
-
-func _set_owner_recursive(node: Node, scene_root: Node) -> void:
-	if scene_root == null:
-		return
-	for c in node.get_children():
-		c.owner = scene_root
-		# Only recurse into procedural nodes; never into children of an instanced sub-scene
-		if c.scene_file_path.is_empty():
-			_set_owner_recursive(c, scene_root)

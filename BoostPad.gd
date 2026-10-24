@@ -5,7 +5,9 @@ extends Area3D
 ## pad, drawn by boost_pad.gdshader with chevrons streaming toward the pad's front (-z). It is an
 ## internal child, rebuilt on load, so level files only store the pad's transform.
 ## With `settle_on_track`, the pad drops onto whatever is under it once the level's collision is
-## built, tilts with the slope and turns to face along the TrackPath.
+## built, tilts with the slope and turns to face along the TrackPath. Every other pad still turns at
+## runtime to face the way the lap runs under it (`_face_lap`), keeping its tilt: generators had laid
+## pads backwards and across shortcuts (`res://scratch/boost_pad_audit.gd` lists them).
 
 const PAD_WIDTH := 4.0
 const PAD_LENGTH := 6.0
@@ -56,6 +58,8 @@ func _ready() -> void:
 	body_entered.connect(_on_body_entered)
 	if settle_on_track:
 		_settle()
+	else:
+		_face_lap.call_deferred()
 
 
 func _build_visual() -> void:
@@ -174,6 +178,54 @@ func _settle() -> void:
 	# Half sunk between the lowest corner and the mean, so it neither floats nor vanishes on a crest.
 	var settle_y := lerpf(y, mid_y, 0.5)
 	global_transform = Transform3D(Basis.looking_at(fwd, normal).scaled(sc), Vector3(centre.x, settle_y, centre.z) + normal * 0.01)
+
+
+## Turns the pad about its own up axis so its front (-z) runs along the nearest lap path: the
+## TrackPath, the alternative paths and any other Path3D on the level (Mara's CrocJumpPath).
+## Deferred, because the Level only joins its group and gathers the alternative paths in its _ready.
+func _face_lap() -> void:
+	if not is_inside_tree():
+		return
+	var up := global_transform.basis.y.normalized()
+	var at := global_position
+	var best := INF
+	var tangent := Vector3.ZERO
+	for path in _lap_paths():
+		var local := path.to_local(at)
+		var off := path.curve.get_closest_offset(local)
+		var d := path.to_global(path.curve.sample_baked(off)).distance_to(at)
+		if d >= best:
+			continue
+		var a := path.to_global(path.curve.sample_baked(maxf(off - 2.0, 0.0)))
+		var b := path.to_global(path.curve.sample_baked(minf(off + 2.0, path.curve.get_baked_length())))
+		if a.distance_squared_to(b) < 0.01:
+			continue
+		best = d
+		tangent = b - a
+	var fwd := tangent - up * tangent.dot(up)
+	if best > 30.0 or fwd.length_squared() < 1e-4:
+		return
+	var sc := global_transform.basis.get_scale()
+	global_transform = Transform3D(Basis.looking_at(fwd.normalized(), up).scaled(sc), at)
+
+
+func _lap_paths() -> Array[Path3D]:
+	var out: Array[Path3D] = []
+	var level: Node = get_tree().get_first_node_in_group("level")
+	if level == null:
+		var tp := _find_track_path()
+		if tp:
+			out.append(tp)
+		return out
+	var candidates: Array = [level.get("track_path")]
+	if level.get("alternative_paths") is Array:
+		candidates.append_array(level.get("alternative_paths"))
+	candidates.append_array(level.get_children())
+	for c in candidates:
+		if c is Path3D and (c as Path3D).curve and not out.has(c) and ("Path" in str(c.name)):
+			if (c as Path3D).curve.get_baked_length() > 20.0:
+				out.append(c)
+	return out
 
 
 func _on_snap_button_pressed() -> void:

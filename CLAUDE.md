@@ -42,13 +42,35 @@ the others re-bakes it (see Lakeside Course below).
 - `regenerate_lakeside.gd` dresses `levels/LakesideLevel.tscn` as an RC race meeting and replaces everything under
   `LakesideDressing` on every run: the paddock, race control, the camera and lap towers, catch fences, crowd
   barriers, tyre walls, hay, cones, the grandstand across the first corner, the campsite on the hill, the
-  orange kicker, the woods and the boulders. The terrain, road and grass stay TerrainGenerator's.
+  orange kicker, the woods, the boulders and the meadow grass. The terrain and road stay TerrainGenerator's.
 - It grades flat pads (`TerrainGenerator.flat_pads`: paddock, grandstand footing, campsite terraces) and mows
   the venue's verges (`grass_clearings`, no tall grass there). Both are applied after the road blend, so keep
-  them off the road. The world is re-baked only when they change (or with `-- rebake`): about 13 minutes,
-  nearly all of it the 4M grass blades. A run without a bake takes about 30s. Pad heights come from the
-  natural ground (pads cleared first), so they are the same on every run. The grass chunks are written
-  through `MultiMesh.buffer` and seeded, so a headless bake keeps them and a re-bake reproduces them.
+  them off the road. The world is re-baked only when they change (or with `-- rebake`). A run without a
+  bake takes about 35s. Pad heights come from the natural ground (pads cleared first), so they are the
+  same on every run. TerrainGenerator's own grass cards are gone (`no_grass`): they were most of a
+  re-bake's 13 minutes.
+- The meadow grass is `_build_meadow` (`MeadowGrass.gd`, `meadow_grass.gdshader`, `MeadowDetail.gd`): tufts of
+  real blades (curved, tapering strips with rounded normals, a few flowers) swaying in gusts that roll across
+  the meadow from the turbines' side. Nothing is placed one by one: three tiers (dense near, sparser and
+  wider out to 116m and 230m) each draw one shared MultiMesh of a cell's tufts at y = 0 in every cell, and
+  the shader stands each tuft on the ground from a height texture (the terrain's 2m grid, read on its own
+  triangles like `_ground()`) and grows it as a 0.5m grass map says (R how much, G how tall). The map is
+  drawn in the generator: thinner and shorter in the woods, mown on the clearings and pads, short along the
+  verges, none on the roads (except under the bridge), in the lake or on cliffs, and none under anything
+  standing on the ground: every prop's triangles within `GRASS_TOP` of the ground (the dressing, the level's
+  own props, the loop, the bridge piers) and the footprints of the trunks, boulders and hazel at each
+  instance (`_stamps`). New dressing needs nothing. Cost (M1, ab_bench): 5.6ms, against the old cards' 8.3ms.
+  `MeadowDetail.gd` thins the shared MultiMeshes and pulls the fade in with the Detail Level; Level.gd feeds
+  the carts' positions to the materials (group `grass_push`) so the grass bends round them.
+- Hay bales (`_hay_bale`, `hay_bale.gdshader`): a lumpy rounded bale with flake seams, strands and weathering
+  drawn in the shader (UVs in metres), four twines and loose straws. Tyre walls (`_tyre`, `tyre_wall.gdshader`):
+  each tyre a lathe with UVs across its section, the shader drawing tread, sidewall ribs and lettering, and
+  the paint chipped off the tread and edges.
+- The loop (`Ramps/LoopCSG`, `LoopCSG.gd`) builds itself from its exports as internal children, never saved.
+  It was placed facing against the lap, and the road falls 1.2m across it, so the lane the carts left by
+  ended a metre above the road. `_fit_loop` turns it to face the lap and sets `entry_end_y`/`exit_end_y`
+  25cm under the road at each end, with the road's grade (`road_grade`); the lanes are cubic ramps.
+  `res://scratch/loop_exit_probe.gd` (`-s`, headless) raycasts the surface across both ends against the road.
 - People-sized things are built at life size in `PropKit.gd` (one SurfaceTool per material key, everything
   through a frame that places, scales and even shears a prop) and scaled by `PROP_SCALE` (1.6), like
   Bloombay's seafront. `_verify_clear` errors on any footprint too close to the road.
@@ -77,9 +99,11 @@ the others re-bakes it (see Lakeside Course below).
   limbs, pipe-model radii. Each kind keeps its crown off the road (`TREE_ROAD_CLEAR`); trunks within 40m of
   the road are solid. `res://scratch/woodland_preview.gd` (`-s`, windowed) renders every tree on a flat
   meadow in seconds. Boulders use `granite_rock.gdshader` with a mossy foot.
-- AI races (`scratch/ai_race_test`, speed=2) show falls at about 680m, round the loop (2600m) and between
-  the two lakes at 3120 to 3132m; the undressed level had them too. None come from the venue's props. The
-  old curl threw carts off the road at 2213m; the kicker doesn't.
+- AI races (`scratch/ai_race_test`, speed=2) show falls at about 668m and between the two lakes at 3115 to
+  3132m; the undressed level had them too. None come from the venue's props. The loop used to stall carts
+  at its entry (2600m) until its lanes were separated, and its exit pad then boosted them off the corner
+  55m on (2745m): see the loop note above. `res://scratch/loop_ai_probe.tscn` traces one AI cart through it.
+  The old curl threw carts off the road at 2213m; the kicker doesn't.
 - The water (`TerrainGenerator/Water_Surface`) is a 12000m plane. `water.gdshader` tiles its ripples 40 times
   across the mesh's UVs and was tuned on a 1600m plane, so `wave_scale` is the plane's size / 1600; at 1 the
   ripples were 300m across and raced. Both `_generate_water` and `_update_water_surface` set it.
@@ -153,13 +177,41 @@ player is counted for (`_play_lap_cue`) the chime `sounds/checkpoint_passed.wav`
 first to third (`_announce_place`). The podium calls each place as it's revealed.
 - A human who drives on past the gate they need without being counted gets "checkpoint missed"
   (`_watch_missed_checkpoints`, server). It follows the cart along the racing line like the AI's gate
-  credit does, and fires once as the cart passes `MISS_DISTANCE` (14m; a gate's area is 8m deep) beyond
-  the gate, until a gate counts. A step along the line over `MISS_MAX_STEP` is a re-sync, not driving
-  (a respawn resets the line). Bots don't hear it: they are credited by progress.
+  credit does, and fires as the cart passes `MISS_DISTANCE` (14m; a gate's area is 8m deep) beyond the
+  gate. A step along the line over `MISS_MAX_STEP` is a re-sync, not driving (a respawn resets the line).
+  Bots don't hear it: they are credited by progress.
+- One gate may be missed (`_checkpoint_missed`): the gate after it becomes the one they need, so catching
+  it keeps them in the race. Missing that one too, two in a row, disqualifies them (`_disqualify`: the
+  "disqualified" call, the cart drives itself as after the finish, it ranks last as DQ and scores nothing).
+  The line on the last lap can't be skipped. Once no human is still racing, the race ends 10s later.
+- Driving the wrong way (`_watch_wrong_way`, server, humans): velocity against every lap path within 14m
+  (`_lap_tangents_near`: where a shortcut crosses the road either way is right) for 2.5s gives "wrong
+  way" and an alert chime, again every 7s while it lasts.
+- A human's clean lap (no gate missed) faster than the stage's record in `user://lap_records.cfg` gets
+  "new lap record" (`_lap_completed`); the first lap ever only sets the record. Laps faster than the track
+  at 70 m/s are teleports (tests), not laps.
 - `res://scratch/announcer_test.tscn` (headless) walks a player through every gate and lists what was
   said. `res://scratch/missed_checkpoint_test.tscn -- [level] [skip=N]` drives a cart along the line past
-  all gates but one (16m wide of its area) and reports when the call comes; `skip=-1` is a clean lap,
-  which must say nothing (checked on Meadow, Northlight, Frostpeak, Nyota and Glacier).
+  all gates but one (16m wide of its area): the call, the lap still counted, then the wrong way, then two
+  gates missed in a row (disqualified). `skip=-1` is a clean lap, which must say nothing.
+
+## Deep water, stage ambience and the sounds
+
+- Deep water (`PlayerCart._set_engine_flooded`): once a cart is under (`is_underwater`, not boosting), the
+  engine floods: no drive, the engine sound dies, the cart sinks instead of bobbing, `sinking_underwater.wav`
+  plays where it went under and `WaterFx.spawn_bubbles` rises off it (a column cut off at the surface,
+  `water_bubble.gdshader`, and fizz on top) until it drowns (2.5s) and respawns. A fall faster than 11 m/s
+  (`_entry_fall_speed`, from first touch to going under) sets off `WaterFx.spawn_splash`: a column, spray,
+  mist and a foam ring that spreads (`water_foam.gdshader`). FxWarmup holds their stand-ins.
+  `res://scratch/deep_water_test.tscn -- <dir> [at=x,z] [height=25]` (windowed) drops a cart and saves frames
+  on physics time (the shots stall frames, and physics catches up only 4 steps a frame).
+- `StageAmbience.gd` (added by Level) plays the recorded backgrounds in `sounds/<kind>/` per stage (`STAGES`),
+  under the levels' own baked ambiences, crossfading random clips. Each clip is levelled by its measured
+  RMS (`CLIP_DB`): they range from -12 to -49 dBFS. Measure a new clip before adding it.
+- Leftover sounds now used: `unused_tire_screech_*` (a one-shot at the start of a skid over 12 m/s),
+  `unused_car_crash_clank` (cart against cart), `unused_warning_beep` (a missile closing on the local
+  cart), `unused_double_beep` (an item in hand), `unused_alert` (wrong way). The odd-named loops in
+  `sounds/enginesounds/` (`cccc`, `kkk`, ...) are spares no car uses.
 
 ## Button sounds and the screen swipe
 
@@ -212,7 +264,10 @@ shared by every pad, drawn by `boost_pad.gdshader` with chevrons streaming towar
 The trigger flash is the per-instance shader parameter `flash`. Level files only store the transform,
 so a change to the pad shows on every level. With `settle_on_track`, a pad drops onto the surface
 under it at runtime (after `wait_for_collisions`), tilts with it and faces along the TrackPath.
-Bloombay sets it on.
+Bloombay sets it on. Every other pad turns about its own up axis at runtime to face the nearest lap path
+(`_face_lap`: TrackPath, the alternative paths, other `*Path` children such as Mara's CrocJumpPath):
+31 pads on 8 levels had been laid backwards or across shortcuts. `res://scratch/boost_pad_audit.gd` (`-s`)
+lists the saved transforms; `res://scratch/boost_pad_runtime_check.tscn -- <level>` checks them in game.
 
 ## Item boxes
 

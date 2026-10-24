@@ -255,6 +255,9 @@ const MISSILE_SCENE = preload("res://Missile.tscn")
 const BOMB_SCENE = preload("res://Bomb.tscn")
 const WATER_SPLASH_SCENE = preload("res://WaterSplash.tscn")
 
+## Deep water floods the engine (_set_engine_flooded): the sound of the cart going under.
+const SINKING_SOUND := preload("res://sounds/sinking_underwater.wav")
+const WaterFx = preload("res://WaterFx.gd")
 const DEEP_SPLASH_SOUNDS = [
 	preload("res://sounds/deep_water_splash_1.wav"),
 	preload("res://sounds/deep_water_splash_2.wav"),
@@ -280,6 +283,18 @@ const LANDING_SOUNDS = [
 	preload("res://sounds/collision_bonk.mp3")
 ]
 const CRASH_SOUND = preload("res://sounds/cart_crash.mp3")
+## Cart against cart: a metal clank instead of the wall crash.
+const CLANK_SOUND = preload("res://sounds/unused_car_crash_clank.mp3")
+## The bite of the tyres letting go at the start of a skid, over the squeal's loop.
+const TIRE_SCREECH_SOUNDS = [
+	preload("res://sounds/unused_tire_screech_1.mp3"),
+	preload("res://sounds/unused_tire_screech_2.mp3"),
+	preload("res://sounds/unused_tire_screech_3.mp3"),
+	preload("res://sounds/unused_tire_screech_4.mp3"),
+]
+## A missile closing on the local cart from within this far sets off the warning beep
+## (SFX_BeepWarning), faster as it nears.
+const MISSILE_WARN_RANGE := 60.0
 const LIGHTNING_SOUND = preload("res://sounds/lightning_strike.wav")
 const TELEPORT_SPARK = preload("res://sprites/energy_spark.png")
 
@@ -545,6 +560,19 @@ var _was_in_water_zone: bool = false
 var _wake_particles: GPUParticles3D = null
 var is_drowned: bool = false
 var _drown_tween: Tween = null
+## Under deep water the engine floods: no drive (unless a boost is carrying the cart through), the
+## engine sound cut, and the cart sinks with bubbles rising off it to the sinking sound. Worked out
+## from the water state on every peer; cleared at respawn.
+var _engine_flooded := false
+var _last_screech_time := -10.0
+var _missile_beep_wait := 0.0
+var _sink_bubbles: Node3D = null
+var _sink_sound: AudioStreamPlayer3D = null
+## The cart's height last frame in the water check, for how fast it fell in (remote carts' velocity
+## isn't simulated).
+var _water_prev_y := INF
+## The fastest it was falling while touching the water but not yet under it (-1: splashed already).
+var _entry_fall_speed := 0.0
 var original_wheel_transforms: Dictionary = {}
 var original_cart_model_transform: Transform3D
 ## The explosion's damage ({wheels: [corners], parts: int, disintegrate: bool}, see CarDebris.roll()),
@@ -1177,9 +1205,9 @@ func _integrate_forces(state: PhysicsDirectBodyState3D):
 			var other = state.get_contact_collider_object(i)
 			if other is Node and (other as Node).is_in_group("knockable_props"):
 				continue
-			# This contact is mostly horizontal = wall / obstacle / barrier
+			# This contact is mostly horizontal = wall / obstacle / barrier, or another cart
 			last_crash_sound_time = now
-			_play_crash_sound()
+			_play_crash_sound(other is Node and (other as Node).is_in_group("player_carts"))
 			return
 
 
@@ -1269,6 +1297,7 @@ func _process(delta):
 		_update_visuals_alignment(delta)
 		
 	if is_local_player:
+		_update_missile_warning(delta)
 		# Camera toggle (persists across stages via MusicManager)
 		if Input.is_action_just_pressed(input_prefix + "toggle_camera"):
 			_set_isometric_camera(not is_isometric, true)
@@ -1527,7 +1556,7 @@ func _process(delta):
 			var b = Input.get_joy_axis(device_id, JOY_AXIS_TRIGGER_LEFT)
 			throttle_input = b - t
 		# Play when throttling/braking OR moving so coasting still has engine presence
-		var wants_to_play = can_move and not is_exploding and (
+		var wants_to_play = can_move and not is_exploding and not _engine_flooded and (
 			abs(throttle_input) > 0.08 or linear_velocity.length() > 1.5
 		)
 		
@@ -1550,8 +1579,9 @@ func _process(delta):
 			engine_sound.pitch_scale = move_toward(engine_sound.pitch_scale, target_pitch, 2.5 * delta)
 		else:
 			if engine_sound.playing:
-				engine_sound.volume_db = move_toward(engine_sound.volume_db, -45.0, 15.0 * delta)
-				engine_sound.pitch_scale = move_toward(engine_sound.pitch_scale, 0.8, 1.5 * delta)
+				# A flooded engine dies at once, its pitch falling away.
+				engine_sound.volume_db = move_toward(engine_sound.volume_db, -45.0, (70.0 if _engine_flooded else 15.0) * delta)
+				engine_sound.pitch_scale = move_toward(engine_sound.pitch_scale, 0.5 if _engine_flooded else 0.8, (3.0 if _engine_flooded else 1.5) * delta)
 				if engine_sound.volume_db <= -44.9:
 					engine_sound.stop()
 	elif not has_physics_authority:
@@ -1923,6 +1953,23 @@ func _physics_process(delta):
 				water_timer = 0.0
 
 		var boosting_in_water := boost_timer > 0.0 or pad_boost_timer > 0.0
+		var fall_speed: float = -linear_velocity.y
+		if _water_prev_y < INF:
+			fall_speed = maxf(fall_speed, (_water_prev_y - global_position.y) / maxf(delta, 0.001))
+		_water_prev_y = global_position.y
+		if (is_underwater and not boosting_in_water) != _engine_flooded:
+			_set_engine_flooded(is_underwater and not boosting_in_water)
+		# The big splash goes off as the cart goes under, at the speed it came down at: the first touch
+		# is still shallow water under the cart, and the splash there is the small one.
+		if not in_water_contact:
+			_entry_fall_speed = 0.0
+		elif not is_underwater:
+			_entry_fall_speed = maxf(_entry_fall_speed, fall_speed)
+		elif _entry_fall_speed >= 0.0:
+			if maxf(_entry_fall_speed, fall_speed) > 11.0:
+				WaterFx.spawn_splash(get_tree().current_scene, Vector3(global_position.x, water_surface_y, global_position.z),
+						maxf(_entry_fall_speed, fall_speed) / 12.0)
+			_entry_fall_speed = -1.0
 
 		# First contact with any water (shallow ford or deep dive) — splash + hit
 		if in_water_contact and not _was_in_water_zone:
@@ -1937,13 +1984,16 @@ func _physics_process(delta):
 					splash_stream = DEEP_SPLASH_SOUNDS[randi() % DEEP_SPLASH_SOUNDS.size()]
 				else:
 					splash_stream = REGULAR_SPLASH_SOUNDS[randi() % REGULAR_SPLASH_SOUNDS.size()]
+				# Off the bridge or a jump: a big splash, heard from further off.
+				var big := fall_speed > 11.0
 				if splash_stream:
 					var ap = AudioStreamPlayer3D.new()
 					ap.stream = splash_stream
 					ap.bus = &"SFX"
-					ap.max_distance = 80.0
-					ap.unit_size = 15.0
-					ap.volume_db = 2.0
+					ap.max_distance = 140.0 if big else 80.0
+					ap.unit_size = 28.0 if big else 15.0
+					ap.volume_db = 2.0 + (clampf((fall_speed - 11.0) * 0.35, 0.0, 5.0) if big else 0.0)
+					ap.pitch_scale = 0.85 if big else 1.0
 					ap.position = global_position
 					get_tree().current_scene.add_child(ap)
 					ap.global_position = global_position
@@ -2008,7 +2058,12 @@ func _physics_process(delta):
 					drown_rpc.rpc()
 				elif multiplayer.multiplayer_peer == null:
 					drown()
-			apply_central_force(Vector3.UP * 12.0)
+			if _engine_flooded:
+				# Flooded, it sinks slowly instead of bobbing at the surface.
+				if has_physics_authority:
+					linear_velocity.y = move_toward(linear_velocity.y, -1.4, 6.0 * delta)
+			else:
+				apply_central_force(Vector3.UP * 12.0)
 		elif in_water_contact:
 			water_timer = maxf(0.0, water_timer - delta * 1.5)
 			# Drown in shallow water ONLY if the car is actually stalled or rolling backward in water!
@@ -2158,6 +2213,11 @@ func _physics_process(delta):
 			
 			effective_brake = _kb_brake_amount if raw_brake > 0.05 else 0.0
 			input_dir.y = effective_brake - raw_throttle
+
+	# A flooded engine drives nothing.
+	if _engine_flooded:
+		input_dir = Vector2.ZERO
+		effective_brake = 0.0
 
 	var on_ground = false
 	var on_loop = false
@@ -2604,7 +2664,10 @@ func _physics_process(delta):
 			
 			var play_brake_sfx = on_ground and (is_drifting or (input_dir.y > 0.2 and current_speed > 5.0))
 			if play_brake_sfx:
-				if not sfx_brake_drift.playing: sfx_brake_drift.play()
+				if not sfx_brake_drift.playing:
+					sfx_brake_drift.play()
+					if current_speed > 12.0:
+						_play_tire_screech(current_speed)
 			else:
 				if sfx_brake_drift.playing: sfx_brake_drift.stop()
 			
@@ -3204,6 +3267,7 @@ func _interpolate_remote_visual(delta: float):
 	if sync_emit_drift:
 		if not sfx_brake_drift.playing:
 			sfx_brake_drift.play()
+			_play_tire_screech(max_speed * 0.6)
 	else:
 		if sfx_brake_drift.playing:
 			sfx_brake_drift.stop()
@@ -3389,6 +3453,8 @@ func _use_item():
 		var item1_name = ItemType.keys()[current_item]
 		var item2_name = ItemType.keys()[current_item_2]
 		race_ui.update_items(item1_name, item2_name)
+		# The item's in hand: a double beep after the box's own pickup sound.
+		get_tree().create_timer(0.35).timeout.connect(func(): if is_instance_valid(self): sfx_double_beep.play())
 	
 	if is_ai or multiplayer.multiplayer_peer == null or multiplayer.is_server():
 		_execute_use_item(item_to_use)
@@ -3406,6 +3472,8 @@ func _discard_item():
 		var item1_name = ItemType.keys()[current_item]
 		var item2_name = ItemType.keys()[current_item_2]
 		race_ui.update_items(item1_name, item2_name)
+		# The item's in hand: a double beep after the box's own pickup sound.
+		get_tree().create_timer(0.35).timeout.connect(func(): if is_instance_valid(self): sfx_double_beep.play())
 
 @rpc("any_peer", "call_local", "reliable")
 func request_use_item(item_to_use: int):
@@ -3442,13 +3510,54 @@ func _execute_use_item(type: int):
 		ItemType.LIGHTNING:
 			_activate_lightning()
 
-func _play_crash_sound() -> void:
+func _play_crash_sound(cart_hit := false) -> void:
 	if sfx_landing_bonk == null: return
-	sfx_landing_bonk.stream = CRASH_SOUND
+	sfx_landing_bonk.stream = CLANK_SOUND if cart_hit else CRASH_SOUND
 	sfx_landing_bonk.unit_size = 40.0
 	sfx_landing_bonk.max_distance = 180.0
-	sfx_landing_bonk.volume_db = 6.0
+	sfx_landing_bonk.volume_db = 4.0 if cart_hit else 6.0
+	sfx_landing_bonk.pitch_scale = randf_range(0.92, 1.08) if cart_hit else 1.0
 	sfx_landing_bonk.play()
+
+
+## A one-shot tyre screech from the cart, louder the faster it goes; at most one every 0.9s.
+func _play_tire_screech(speed: float) -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	if now - _last_screech_time < 0.9:
+		return
+	_last_screech_time = now
+	var ap := AudioStreamPlayer3D.new()
+	ap.stream = TIRE_SCREECH_SOUNDS[randi() % TIRE_SCREECH_SOUNDS.size()]
+	ap.bus = &"SFX"
+	ap.unit_size = 14.0
+	ap.max_distance = 90.0
+	ap.volume_db = lerpf(-14.0, -5.0, clampf(speed / maxf(max_speed, 1.0), 0.0, 1.0))
+	ap.pitch_scale = randf_range(0.94, 1.06)
+	visuals.add_child(ap)
+	ap.play()
+	ap.finished.connect(ap.queue_free)
+
+
+## Beeps while a missile someone else fired is closing on this cart, faster as it nears.
+func _update_missile_warning(delta: float) -> void:
+	_missile_beep_wait -= delta
+	if _missile_beep_wait > 0.0 or is_exploding or is_finished_race:
+		return
+	var nearest := INF
+	var my_id := name.to_int()
+	for m in get_tree().get_nodes_in_group("missiles"):
+		var missile := m as Node3D
+		if missile == null or missile.get("is_exploding") or int(missile.get("owner_id")) == my_id:
+			continue
+		var to_me := global_position - missile.global_position
+		var d := to_me.length()
+		if d < MISSILE_WARN_RANGE and d > 0.5 and (-missile.global_transform.basis.z).dot(to_me / d) > 0.9:
+			nearest = minf(nearest, d)
+	if nearest == INF:
+		_missile_beep_wait = 0.1
+		return
+	sfx_beep_warning.play()
+	_missile_beep_wait = lerpf(0.12, 0.5, nearest / MISSILE_WARN_RANGE)
 
 @rpc("any_peer", "call_local", "unreliable")
 func play_landing_sound_rpc(p_air_time: float):
@@ -3460,6 +3569,7 @@ func play_landing_sound_rpc(p_air_time: float):
 	# Map descent impact to punchy volume_db [2.0, 9.0]
 	var volume = lerpf(2.0, 9.0, clampf(p_air_time / 0.6, 0.0, 1.0))
 	sfx_landing_bonk.volume_db = volume
+	sfx_landing_bonk.pitch_scale = 1.0
 	sfx_landing_bonk.play()
 
 @rpc("any_peer", "call_local", "reliable")
@@ -3942,6 +4052,37 @@ func _clear_debris() -> void:
 	_debris_body_mesh = null
 
 
+## Deep water floods the engine (`on`): the engine stops, the sinking sound plays where the cart
+## went under and bubbles rise off it until it respawns or gets out. Off again: the bubbles stop
+## and the sound fades.
+func _set_engine_flooded(on: bool) -> void:
+	_engine_flooded = on
+	if on:
+		if _sink_bubbles == null or not is_instance_valid(_sink_bubbles):
+			_sink_bubbles = WaterFx.spawn_bubbles(get_tree().current_scene, self, water_surface_y)
+		if _sink_sound == null or not is_instance_valid(_sink_sound):
+			_sink_sound = AudioStreamPlayer3D.new()
+			_sink_sound.stream = SINKING_SOUND
+			_sink_sound.bus = &"SFX"
+			_sink_sound.unit_size = 12.0
+			_sink_sound.max_distance = 70.0
+			_sink_sound.volume_db = -2.0
+			get_tree().current_scene.add_child(_sink_sound)
+			_sink_sound.global_position = global_position
+			_sink_sound.play()
+			_sink_sound.finished.connect(_sink_sound.queue_free)
+		return
+	if _sink_bubbles and is_instance_valid(_sink_bubbles):
+		_sink_bubbles.stop()
+	_sink_bubbles = null
+	if _sink_sound and is_instance_valid(_sink_sound):
+		var snd := _sink_sound
+		var tw := snd.create_tween()
+		tw.tween_property(snd, "volume_db", -40.0, 1.2)
+		tw.tween_callback(snd.queue_free)
+	_sink_sound = null
+
+
 @rpc("any_peer", "call_local", "reliable")
 func drown_rpc():
 	drown()
@@ -4172,6 +4313,9 @@ func _apply_respawn_pose() -> void:
 	is_exploding = false
 	is_drowned = false
 	is_underwater = false
+	_water_prev_y = INF
+	if _engine_flooded:
+		_set_engine_flooded(false)
 	water_timer = 0.0
 	_was_in_water_zone = false
 	last_splash_time = -999.0
@@ -4578,6 +4722,8 @@ func give_item(type: int):
 		var item1_name = ItemType.keys()[current_item]
 		var item2_name = ItemType.keys()[current_item_2]
 		race_ui.update_items(item1_name, item2_name)
+		# The item's in hand: a double beep after the box's own pickup sound.
+		get_tree().create_timer(0.35).timeout.connect(func(): if is_instance_valid(self): sfx_double_beep.play())
 
 @rpc("any_peer", "call_local", "reliable")
 func give_item_rpc(type: int):
@@ -6234,6 +6380,14 @@ func _get_ai_input(delta: float) -> Vector2:
 			if approaching_loop:
 				pad_blend = clampf(pad_blend * 1.5, 0.25, 0.70)
 			target_global_pos = target_global_pos.lerp(best_pad.global_position, pad_blend)
+
+	# On a stunt loop and its ground lanes, follow the loop's own lane rather than the track path.
+	for lnode in get_tree().get_nodes_in_group("loop_track"):
+		if lnode is LoopCSG and is_instance_valid(lnode):
+			var lane_goal: Vector3 = lnode.lane_goal(global_position, 10.0)
+			if lane_goal != Vector3.ZERO:
+				target_global_pos = lane_goal
+				break
 
 	var target_vec = visuals.global_transform.inverse() * target_global_pos
 	var fwd_dist: float = -target_vec.z

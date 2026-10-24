@@ -6,6 +6,7 @@ const RACE_UI_SCENE = preload("res://RaceUI.tscn")
 const ITEM_BOX_SCENE = preload("res://ItemBox.tscn")
 const CarPaint = preload("res://CarPaint.gd")
 const FX_WARMUP = preload("res://FxWarmup.gd")
+const STAGE_AMBIENCE = preload("res://StageAmbience.gd")
 
 @export var checkpoints: Array[Area3D] = []
 @export var track_path: Path3D
@@ -86,6 +87,17 @@ const MISS_DISTANCE := 14.0
 ## A step along the racing line longer than this in one frame is a re-sync (a respawn, a jump
 ## back onto the track), not driving.
 const MISS_MAX_STEP := 40.0
+## A human driving against the lap (their velocity along the racing line under -WRONG_WAY_DOT of
+## their speed, above WRONG_WAY_SPEED) for WRONG_WAY_TIME is told so, and again every
+## WRONG_WAY_REPEAT while it lasts. Checked WRONG_WAY_STEP apart.
+const WRONG_WAY_SPEED := 5.0
+const WRONG_WAY_DOT := 0.5
+const WRONG_WAY_TIME := 2.5
+const WRONG_WAY_REPEAT := 7.0
+const WRONG_WAY_STEP := 0.2
+const WRONG_WAY_ALERT := "res://sounds/unused_alert.wav"
+## Each stage's fastest lap by a human on this machine (the server's, in a network race).
+const LAP_RECORDS_PATH := "user://lap_records.cfg"
 ## The start gantry (CheckpointGate's finish line), fed the standings for its ticker.
 var _gantry: Node = null
 ## Speaks the race calls by racer name (RaceCommentator.gd); fed the standings on every peer.
@@ -105,6 +117,9 @@ var next_finish_pos: int = 1
 
 var cp_offsets: Array[float] = []
 var track_length: float = 0.0
+## When the lights went green (ticks msec), the start of everyone's first lap.
+var _race_go_msec := 0
+var _wrong_way_clock := 0.0
 
 var collisions_ready: bool = false
 signal collisions_built
@@ -161,6 +176,10 @@ func _ready():
 	# Compile the shaders of effects that first show up mid-race (lightning, missiles, splashes)
 	# while the stage loads, instead of freezing the race when they first appear.
 	add_child(FX_WARMUP.new())
+	# The stage's recorded background (birds, woods, beach, crowd...), under its own baked ambiences.
+	var ambience = STAGE_AMBIENCE.new()
+	ambience.setup(scene_file_path)
+	add_child(ambience)
 	_setup_gantry_ticker()
 
 	# Canyon Chasm: fill the first hill-jump pit with murky reflective water
@@ -345,7 +364,7 @@ func _grant_checkpoint(id: int, cp_idx: int) -> void:
 	if not player_stats.has(id):
 		return
 	var stats = player_stats[id]
-	if stats["finished"]:
+	if stats["finished"] or stats.get("disqualified", false):
 		return
 	if cp_idx != stats["next_checkpoint_idx"]:
 		return
@@ -355,6 +374,7 @@ func _grant_checkpoint(id: int, cp_idx: int) -> void:
 	print("[CHECKPOINT] Valid checkpoint hit! Next expected index: ", cp_idx + 1)
 	stats["next_checkpoint_idx"] += 1
 	stats["missed_idx"] = -1
+	stats["missed_run"] = 0
 
 	var cp = checkpoints[cp_idx]
 	var cart = players_container.get_node_or_null(str(id))
@@ -382,6 +402,7 @@ func _grant_checkpoint(id: int, cp_idx: int) -> void:
 	if stats["next_checkpoint_idx"] >= checkpoints.size():
 		stats["laps"] += 1
 		stats["next_checkpoint_idx"] = 0
+		_lap_completed(id)
 		_check_finish(id)
 
 
@@ -805,6 +826,7 @@ func start_race():
 		ui.show_message("GO!", 2.0)
 	_show_start_lights(4)
 	MusicManager.play_voice("go")
+	_race_go_msec = Time.get_ticks_msec()
 	_commentator.begin()
 	MusicManager.play_race_start_beep(true) # higher/longer 4th beep
 	MusicManager.load_playlist_for_level(scene_file_path)
@@ -854,7 +876,10 @@ func _feed_gantry(rows: Array) -> void:
 	if _commentator:
 		_commentator.update(rows, NetworkManager.max_laps)
 
-var _cached_grass_mat: ShaderMaterial = null
+## The grass materials that bend round the carts: TerrainGenerator's grass cards, or a level's own
+## grass that joins the "grass_push" group (MeadowDetail.gd on the Lakeside Course).
+var _grass_push_mats: Array = []
+var _grass_push_found := false
 
 func _update_grass_cart_positions():
 	if Engine.is_editor_hint():
@@ -863,21 +888,19 @@ func _update_grass_cart_positions():
 		return
 	if MusicManager.grass_quality_index == 0:
 		return
-	if not _cached_grass_mat:
-		var tg = get_node_or_null("TerrainGenerator")
-		if tg:
-			var gc = tg.get_node_or_null("GrassContainer")
-			if gc and gc.get_child_count() > 0:
-				var first_chunk = gc.get_child(0)
-				if first_chunk is MultiMeshInstance3D and first_chunk.material_override is ShaderMaterial:
-					_cached_grass_mat = first_chunk.material_override
-		if not _cached_grass_mat:
-			var mat_res = load("res://generated/grass/grass_material.res")
-			if mat_res is ShaderMaterial:
-				_cached_grass_mat = mat_res
-	if not _cached_grass_mat:
+	if not _grass_push_found:
+		_grass_push_found = true
+		var gc = get_node_or_null("TerrainGenerator/GrassContainer")
+		if gc and gc.get_child_count() > 0:
+			var first_chunk = gc.get_child(0)
+			if first_chunk is MultiMeshInstance3D and first_chunk.material_override is ShaderMaterial:
+				_grass_push_mats.append(first_chunk.material_override)
+		for n in get_tree().get_nodes_in_group(&"grass_push"):
+			if n.has_method("push_materials"):
+				_grass_push_mats.append_array(n.push_materials())
+	if _grass_push_mats.is_empty():
 		return
-	
+
 	var carts = get_tree().get_nodes_in_group("player_carts")
 	var positions: PackedVector3Array = PackedVector3Array()
 	var count: int = 0
@@ -887,9 +910,10 @@ func _update_grass_cart_positions():
 			count += 1
 			if count >= 8:
 				break
-	_cached_grass_mat.set_shader_parameter("player_count", count)
-	if count > 0:
-		_cached_grass_mat.set_shader_parameter("player_positions", positions)
+	for mat in _grass_push_mats:
+		mat.set_shader_parameter("player_count", count)
+		if count > 0:
+			mat.set_shader_parameter("player_positions", positions)
 
 func _process(delta):
 	if not Engine.is_editor_hint():
@@ -900,6 +924,7 @@ func _process(delta):
 		if race_state == RaceState.RACING:
 			_update_positions()
 			_watch_missed_checkpoints()
+			_watch_wrong_way(delta)
 
 			if end_timer > 0.0:
 				end_timer -= delta
@@ -934,8 +959,204 @@ func _watch_missed_checkpoints() -> void:
 		if _forward_curve_delta(prev_off, now_off, t_len) > MISS_MAX_STEP:
 			continue
 		if _crossed_curve_offset(prev_off, now_off, fmod(cp_offsets[next_idx] + MISS_DISTANCE, t_len), t_len):
-			stats["missed_idx"] = next_idx
-			_announce_missed_checkpoint(id)
+			_checkpoint_missed(id, next_idx)
+
+
+## A human passed the gate they needed without being counted for it. One gate may be missed: the
+## announcer says so and the gate after it is the one they need now. Missing that one too, two in a
+## row, disqualifies them. The line on the last lap can't be skipped: they have to go back for it.
+## A lap with a missed gate can't be a lap record.
+func _checkpoint_missed(id: int, idx: int) -> void:
+	var stats: Dictionary = player_stats[id]
+	stats["missed_idx"] = idx
+	if int(stats.get("missed_run", 0)) >= 1:
+		_disqualify(id)
+		return
+	_announce_missed_checkpoint(id)
+	if idx == checkpoints.size() - 1 and stats["laps"] + 1 >= NetworkManager.max_laps:
+		return
+	stats["missed_run"] = 1
+	stats["lap_clean"] = false
+	stats["next_checkpoint_idx"] += 1
+	if stats["next_checkpoint_idx"] >= checkpoints.size():
+		stats["laps"] += 1
+		stats["next_checkpoint_idx"] = 0
+		_lap_completed(id)
+
+
+## Out of the race: the cart drives itself from here (as after the finish), the racer ranks last
+## and scores nothing.
+func _disqualify(id: int) -> void:
+	var stats: Dictionary = player_stats[id]
+	if stats.get("disqualified", false):
+		return
+	stats["disqualified"] = true
+	stats["finished"] = true
+	var cart = players_container.get_node_or_null(str(id))
+	if cart and cart.has_method("set_finished_race"):
+		cart.set_finished_race(true)
+	if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
+		_show_disqualified(race_ui if id == 1 else race_ui_p2)
+	elif id == multiplayer.get_unique_id():
+		_show_disqualified_rpc()
+	else:
+		_show_disqualified_rpc.rpc_id(id)
+	_start_end_timer_if_humans_done()
+
+
+@rpc("authority", "call_local", "reliable")
+func _show_disqualified_rpc() -> void:
+	_set_local_cart_finished()
+	_show_disqualified(race_ui)
+
+
+func _show_disqualified(ui) -> void:
+	MusicManager.play_voice("disqualified")
+	if ui:
+		ui.show_message("DISQUALIFIED\nTwo checkpoints missed", 6.0)
+
+
+## Once no human is still racing (all finished or disqualified), the race ends after a short wait
+## instead of the bots' whole race.
+func _start_end_timer_if_humans_done() -> void:
+	for id in player_stats:
+		if NetworkManager.players.has(id) and not NetworkManager.players[id].get("is_ai", false) and not player_stats[id]["finished"]:
+			return
+	if end_timer <= 0.0 or end_timer > 10.0:
+		end_timer = 10.0
+
+
+## A racer completed a lap. A human's clean lap (no gate missed) faster than the stage's record is
+## a new lap record: saved, and the announcer calls it (only when it beats an earlier record).
+func _lap_completed(id: int) -> void:
+	var stats: Dictionary = player_stats[id]
+	var now := Time.get_ticks_msec()
+	var lap_ms: int = now - int(stats.get("lap_start", _race_go_msec))
+	var clean: bool = stats.get("lap_clean", true)
+	stats["lap_start"] = now
+	stats["lap_clean"] = true
+	# No cart averages 70 m/s: anything faster was a teleport (a test, a respawn glitch), not a lap.
+	if not clean or _race_go_msec <= 0 or lap_ms < int(track_length / 70.0 * 1000.0):
+		return
+	if not NetworkManager.players.has(id) or NetworkManager.players[id].get("is_ai", false):
+		return
+	var cfg := ConfigFile.new()
+	cfg.load(LAP_RECORDS_PATH)
+	var key := scene_file_path.get_file().get_basename()
+	var best: int = int(cfg.get_value("records", key, 0))
+	if best > 0 and lap_ms >= best:
+		return
+	cfg.set_value("records", key, lap_ms)
+	cfg.save(LAP_RECORDS_PATH)
+	if best <= 0:
+		return
+	var text := "New lap record! %d:%06.3f" % [lap_ms / 60000, fmod(lap_ms / 1000.0, 60.0)]
+	if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
+		_show_lap_record(text, race_ui if id == 1 else race_ui_p2)
+	elif id == multiplayer.get_unique_id():
+		_show_lap_record_rpc(text)
+	else:
+		_show_lap_record_rpc.rpc_id(id, text)
+
+
+@rpc("authority", "call_local", "reliable")
+func _show_lap_record_rpc(text: String) -> void:
+	_show_lap_record(text, race_ui)
+
+
+func _show_lap_record(text: String, ui) -> void:
+	# After the line's own call (checkpoint, final lap).
+	get_tree().create_timer(1.3).timeout.connect(MusicManager.play_voice.bind("new_lap_record"))
+	if ui:
+		ui.show_message(text, 4.0)
+
+
+## Warns a human driving the wrong way round (server): their velocity against the lap, measured on
+## the nearest of the track path and the shortcuts, for WRONG_WAY_TIME.
+func _watch_wrong_way(delta: float) -> void:
+	_wrong_way_clock += delta
+	if _wrong_way_clock < WRONG_WAY_STEP:
+		return
+	var dt := _wrong_way_clock
+	_wrong_way_clock = 0.0
+	if track_path == null or track_path.curve == null:
+		return
+	for id in player_stats:
+		var stats: Dictionary = player_stats[id]
+		var cart = players_container.get_node_or_null(str(id))
+		if stats["finished"] or cart == null or cart.get("is_ai") or not (cart is RigidBody3D):
+			continue
+		var vel: Vector3 = (cart as RigidBody3D).linear_velocity
+		vel.y = 0.0
+		var against := false
+		if vel.length() > WRONG_WAY_SPEED and not cart.get("is_teleporting") and not cart.get("is_exploding"):
+			# Against every lap path near it: where a shortcut crosses or runs beside the road, going
+			# the right way along either is fine.
+			var tangents := _lap_tangents_near(cart.global_position)
+			against = not tangents.is_empty()
+			for tangent in tangents:
+				if vel.normalized().dot(tangent) >= -WRONG_WAY_DOT:
+					against = false
+		if not against:
+			stats["wrong_way"] = maxf(float(stats.get("wrong_way", 0.0)) - dt * 2.0, 0.0)
+			if float(stats["wrong_way"]) <= 0.0:
+				stats["wrong_way_said"] = -INF
+			continue
+		stats["wrong_way"] = float(stats.get("wrong_way", 0.0)) + dt
+		var said: float = float(stats.get("wrong_way_said", -INF))
+		if float(stats["wrong_way"]) >= WRONG_WAY_TIME and float(stats["wrong_way"]) - said >= WRONG_WAY_REPEAT:
+			stats["wrong_way_said"] = float(stats["wrong_way"])
+			if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
+				_show_wrong_way(race_ui if id == 1 else race_ui_p2)
+			elif id == multiplayer.get_unique_id():
+				_show_wrong_way_rpc()
+			else:
+				_show_wrong_way_rpc.rpc_id(id)
+
+
+## The lap's direction (flat) on each of the track path and the shortcuts that passes within
+## WRONG_WAY_REACH of `at`, or on the nearest one if none does.
+const WRONG_WAY_REACH := 14.0
+
+func _lap_tangents_near(at: Vector3) -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	var nearest := INF
+	var nearest_t := Vector3.ZERO
+	var paths: Array = [track_path]
+	paths.append_array(alternative_paths)
+	for p in paths:
+		var path := p as Path3D
+		if path == null or path.curve == null:
+			continue
+		var local := path.to_local(at)
+		var off := path.curve.get_closest_offset(local)
+		var length := path.curve.get_baked_length()
+		var a := path.to_global(path.curve.sample_baked(maxf(off - 2.0, 0.0)))
+		var b := path.to_global(path.curve.sample_baked(minf(off + 2.0, length)))
+		var t := Vector3(b.x - a.x, 0.0, b.z - a.z)
+		if t.length_squared() < 0.01:
+			continue
+		var d := path.to_global(path.curve.sample_baked(off)).distance_to(at)
+		if d < WRONG_WAY_REACH:
+			out.append(t.normalized())
+		if d < nearest:
+			nearest = d
+			nearest_t = t.normalized()
+	if out.is_empty() and nearest_t != Vector3.ZERO:
+		out.append(nearest_t)
+	return out
+
+
+@rpc("authority", "call_local", "reliable")
+func _show_wrong_way_rpc() -> void:
+	_show_wrong_way(race_ui)
+
+
+func _show_wrong_way(ui) -> void:
+	MusicManager.play_sfx(WRONG_WAY_ALERT, -6.0)
+	MusicManager.play_voice("wrong_way")
+	if ui:
+		ui.show_message("WRONG WAY!", 3.0)
 
 
 func _update_positions():
@@ -947,7 +1168,10 @@ func _update_positions():
 
 		# If they finished, give them a massive score boost so they stay top
 		var score = 0.0
-		if pinfo["finished"]:
+		if pinfo.get("disqualified", false):
+			# Out of the race: below everyone still in it, in the order they went out.
+			score = -1000000.0 + pinfo["laps"] * 1000.0 + pinfo["next_checkpoint_idx"]
+		elif pinfo["finished"]:
 			# Subtract pos so 1st-place finisher scores highest, works for any racer count
 			score = 10000000.0 - pinfo["pos"] * 1000.0
 		else:
@@ -998,8 +1222,9 @@ func _update_positions():
 	for i in range(ranking.size()):
 		var id = ranking[i]["id"]
 		var pos = i + 1
-		# Only update pos if not finished, so their finishing pos freezes
-		if not player_stats[id]["finished"]:
+		# Only update pos if not finished, so their finishing pos freezes (a disqualified racer
+		# stays at the back).
+		if not player_stats[id]["finished"] or player_stats[id].get("disqualified", false):
 			player_stats[id]["pos"] = pos
 		else:
 			pos = player_stats[id]["pos"]
@@ -1043,6 +1268,7 @@ func _push_standings(ranking: Array) -> void:
 			"pos": int(player_stats[id]["pos"]),
 			"name": p_name,
 			"finished": entry["finished"],
+			"dq": player_stats[id].get("disqualified", false),
 			"lap": mini(int(entry["laps"]) + 1, NetworkManager.max_laps),
 		})
 	rows.sort_custom(func(a, b): return int(a["pos"]) < int(b["pos"]))
@@ -1100,14 +1326,15 @@ func _end_race():
 			"id": id,
 			"name": p_name,
 			"pos": stats["pos"],
-			"is_bot": is_bot
+			"is_bot": is_bot,
+			"dq": stats.get("disqualified", false),
 		})
 	final_rankings.sort_custom(func(a, b): return a["pos"] < b["pos"])
 
 	var points_map = [10, 8, 6, 4]
 	for i in range(final_rankings.size()):
 		var racer = final_rankings[i]
-		var round_pts = points_map[mini(i, points_map.size() - 1)]
+		var round_pts = 0 if racer["dq"] else points_map[mini(i, points_map.size() - 1)]
 
 		var is_gp := NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP \
 				or (NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP and NetworkManager.is_coop_gp) \
@@ -1120,6 +1347,7 @@ func _end_race():
 		results.append({
 			"name": racer["name"],
 			"pos": racer["pos"],
+			"dq": racer["dq"],
 			"round_points": round_pts,
 			"total_points": NetworkManager.gp_standings.get(racer["name"], round_pts)
 		})
