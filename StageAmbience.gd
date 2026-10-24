@@ -44,7 +44,7 @@ const STAGES := {
 	"PinecrestRidgeLevel": [["forest", -30.0], ["insects_birds", -38.0]],
 	"MountainLevel": [["forest", -32.0]],
 	"HarborPierLevel": [["beach", -30.0]],
-	"BloombayDunesLevel": [["beach", -32.0], ["insects_birds", -42.0]],
+	"BloombayDunesLevel": [["beach", -32.0]],
 	"MaraCrossingLevel": [["insects_birds", -30.0]],
 	"NyotaStadiumLevel": [["stadium", -27.0]],
 	"MsituFallsLevel": [["rainforest", -30.0]],

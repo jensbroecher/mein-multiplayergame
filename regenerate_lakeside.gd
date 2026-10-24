@@ -23,6 +23,7 @@ const Woodland = preload("res://WoodlandBuilder.gd")
 const CampKit = preload("res://CampKit.gd")
 const WindTurbineBuilder = preload("res://WindTurbineBuilder.gd")
 const MeadowGrass = preload("res://MeadowGrass.gd")
+const TyreStacks = preload("res://TyreStacks.gd")
 const LEVEL_PATH := "res://levels/LakesideLevel.tscn"
 const RES_PREFIX := "lakeside_"
 const DRESSING := "LakesideDressing"
@@ -1516,32 +1517,26 @@ func _build_barriers(root: Node3D) -> void:
 	_boxes_body(root, "CrowdBarriersBody", boxes)
 
 
-const TYRE_COLS := [Color(0.80, 0.10, 0.09), Color(0.92, 0.92, 0.90), Color(0.07, 0.07, 0.08)]
-
 ## Tyre walls: stacks of three, red, white and black in turn, along the curb behind the grid on the
-## right and round the outside of the first corner.
+## right and round the outside of the first corner. The stacks give when a cart hits the wall
+## (TyreStacks.gd, SpringProps.gd); the wall's boxes stop the cart.
 func _build_tyre_walls(root: Node3D) -> void:
+	var designs: Array = TyreStacks.meshes(_kit, "tyre", 2027)
+	for d in range(designs.size()):
+		designs[d] = _save_res(designs[d], "tyre_stack_%d" % d)
 	var runs := [[3132.0, 3204.0, TYRE_LAT, "TyreWallGrid"], [3289.0, 27.0, -TYRE_LAT, "TyreWallCorner"]]
 	for r in runs:
 		var pts := _offset_run(float(r[0]), float(r[1]), float(r[2]), 0.995 * PROP_SCALE * 0.62)
-		var kit := {}
+		var stacks: Array = []
 		var boxes: Array = []
 		var rng := RandomNumberGenerator.new()
 		rng.seed = hash(String(r[3]))
 		for i in range(pts.size()):
 			var p: Vector3 = pts[i]
-			_kit.set_frame(_place(p, rng.randf() * TAU))
-			var col: Color = TYRE_COLS[i % 3]
-			var y := 0.0
-			for t in range(3):
-				# Stacked a little untidily: each tyre off centre and tipped on the one below.
-				var j := Vector3(rng.randf_range(-0.025, 0.025), 0.0, rng.randf_range(-0.025, 0.025))
-				var tip := Basis(Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1)).normalized(), rng.randf_range(0.0, 0.035))
-				_tyre(kit, Vector3(0, y + 0.1, 0) + j, 0.19, 0.31, 0.2, col.darkened(rng.randf_range(0.0, 0.1)), rng.randf(), tip)
-				y += 0.2
+			stacks.append([_place(p, rng.randf() * TAU), TyreStacks.design(i, rng)])
 			if i > 0 and (i % 4 == 0 or i == pts.size() - 1):
 				boxes.append(_wall_box(pts[maxi(i - 4, 4 * ((i - 1) / 4))], p, 0.62 * PROP_SCALE, 0.6 * PROP_SCALE))
-		_commit(root, kit, String(r[3]))
+		root.add_child(TyreStacks.spring_node(String(r[3]), designs, stacks, PROP_SCALE))
 		_boxes_body(root, String(r[3]) + "Body", boxes)
 		for p in pts:
 			_note(String(r[3]), p, 0.5, 1.2)
@@ -1571,7 +1566,8 @@ func _build_hay_and_cones(root: Node3D) -> void:
 		var yaw: float = b[1]
 		_kit.set_frame(_place(at, yaw))
 		_hay_bale(kit, rng_b)
-		boxes.append([at + Vector3(0, 0.45 * PROP_SCALE, 0), Vector3(1.0, 0.9, 2.0) * PROP_SCALE, Basis(Vector3.UP, yaw)])
+		# A bale is 2m long along its own x, 1m wide.
+		boxes.append([at + Vector3(0, 0.45 * PROP_SCALE, 0), Vector3(2.0, 0.9, 1.0) * PROP_SCALE, Basis(Vector3.UP, yaw)])
 		_note("HayBale", at, 1.1 * PROP_SCALE, 1.5)
 	# A stack: two bales with one on top, beside the corner's lap tower.
 	var st := _at(3306.0, -19.5)
@@ -1736,47 +1732,6 @@ func _bale_surface(on: Vector3, noise: FastNoiseLite) -> Array:
 	return [p, n]
 
 
-## A painted tyre lying flat at `c` (life size): a lathe of a rounded section with tyre_wall.gdshader's
-## UVs (x round the tyre, y across the section: lower sidewall, tread, upper sidewall, then the inside),
-## its paint in the vertex colour and `seed` in the alpha, tipped by `tip`.
-func _tyre(kit: Dictionary, c: Vector3, r_in: float, r_out: float, h: float, col: Color, seed_v: float, tip: Basis) -> void:
-	var rr := minf(h * 0.3, (r_out - r_in) * 0.32)
-	# [radius, height, v]: from the inner bead under it, out across the bottom, up the tread, back in
-	# over the top, and down the inside of the ring.
-	var prof: Array = [
-		[r_in + 0.01, -h * 0.5 + 0.02, 0.0], [r_in + rr * 0.8, -h * 0.5, 0.08], [(r_in + r_out) * 0.5, -h * 0.5 - 0.004, 0.17],
-		[r_out - rr, -h * 0.5 + 0.002, 0.26], [r_out - rr * 0.29, -h * 0.5 + rr * 0.29, 0.3], [r_out, -h * 0.5 + rr, 0.34],
-		[r_out + 0.004, 0.0, 0.5], [r_out, h * 0.5 - rr, 0.66], [r_out - rr * 0.29, h * 0.5 - rr * 0.29, 0.7],
-		[r_out - rr, h * 0.5 - 0.002, 0.74], [(r_in + r_out) * 0.5, h * 0.5 + 0.004, 0.83], [r_in + rr * 0.8, h * 0.5, 0.92],
-		[r_in + 0.01, h * 0.5 - 0.02, 1.0], [r_in, 0.0, 1.05], [r_in + 0.01, -h * 0.5 + 0.02, 1.1],
-	]
-	var segs := 22
-	var paint := Color(col.r, col.g, col.b, seed_v)
-	for kk in range(prof.size() - 1):
-		var p0: Array = prof[kk]
-		var p1: Array = prof[kk + 1]
-		var d := Vector2(float(p1[0]) - float(p0[0]), float(p1[1]) - float(p0[1]))
-		var n2 := Vector2(d.y, -d.x).normalized()
-		for j in range(segs):
-			var t0 := TAU * j / segs
-			var t1 := TAU * (j + 1) / segs
-			var u0 := Vector3(cos(t0), 0.0, sin(t0))
-			var u1 := Vector3(cos(t1), 0.0, sin(t1))
-			var q00 := c + tip * (u0 * float(p0[0]) + Vector3.UP * float(p0[1]))
-			var q01 := c + tip * (u1 * float(p0[0]) + Vector3.UP * float(p0[1]))
-			var q10 := c + tip * (u0 * float(p1[0]) + Vector3.UP * float(p1[1]))
-			var q11 := c + tip * (u1 * float(p1[0]) + Vector3.UP * float(p1[1]))
-			var n0 := tip * (u0 * n2.x + Vector3.UP * n2.y)
-			var n1 := tip * (u1 * n2.x + Vector3.UP * n2.y)
-			var out := (n0 + n1).normalized()
-			var uv00 := Vector2(float(j) / segs, float(p0[2]))
-			var uv01 := Vector2(float(j + 1) / segs, float(p0[2]))
-			var uv10 := Vector2(float(j) / segs, float(p1[2]))
-			var uv11 := Vector2(float(j + 1) / segs, float(p1[2]))
-			_kit.tri(kit, "tyre", q00, q01, q11, n0, n1, n1, paint, out, uv00, uv01, uv11)
-			_kit.tri(kit, "tyre", q00, q11, q10, n0, n1, n0, paint, out, uv00, uv11, uv10)
-
-
 # ======================================================================================
 #  The grandstand
 # ======================================================================================
@@ -1916,6 +1871,8 @@ const TRUNK_COLLIDE_REACH := 40.0
 ## How close to the centreline each kind may stand: its crown must keep off the road (and off the
 ## decks where the lap runs on bridges).
 const TREE_ROAD_CLEAR := {"oak": 19.0, "lime": 17.0, "birch": 14.0, "spruce": 16.0}
+## A tree's collider reaches this share of its branches' spread at a cart's height (the tips give).
+const TREE_SOLID_SHARE := 0.7
 ## 3 modern animated wind turbines on the scenic ridge overlooking the large bridge.
 func _build_wind_turbines(parent: Node3D) -> void:
 	var container := Node3D.new()
@@ -2006,6 +1963,7 @@ func _build_woodland(root: Node3D) -> void:
 				fm = w.broadleaf_mesh(kind, v, 1, bf, leaf_far)
 			near_meshes.append(_save_res(nm, "tree_%s_%d" % [kind, v]))
 			far_meshes.append(_save_res(fm, "tree_%s_%d_far" % [kind, v]))
+	var band_r: Array = near_meshes.map(func(m: Mesh) -> float: return Woodland.band_radius(m, 0.3, 2.0))
 	var hazel_bark: ShaderMaterial = _save_res(w.bark_material("hazel", 0), "bark_hazel")
 	var hazel_leaf: ShaderMaterial = _save_res(w.leaf_material(0, 0.08, 4.0), "leaf_shrub")
 	var shrubs: Array = [_save_res(w.shrub_mesh(0, hazel_bark, hazel_leaf), "shrub_hazel_0"), _save_res(w.shrub_mesh(1, hazel_bark, hazel_leaf), "shrub_hazel_1")]
@@ -2099,7 +2057,9 @@ func _build_woodland(root: Node3D) -> void:
 			counts[kind] += 1
 			if rd < TRUNK_COLLIDE_REACH:
 				var tr: float = (0.52 if kind == "oak" else (0.46 if kind == "lime" else (0.21 if kind == "birch" else 0.36))) * sc
-				trunks.append([Vector3(px, y, pz), maxf(tr * 1.25, 0.35), 5.0 * sc])
+				# Out to the branches at a cart's height (a spruce's skirt), not just the trunk.
+				var reach_r: float = TREE_SOLID_SHARE * float(band_r[mi]) * sc
+				trunks.append([Vector3(px, y, pz), maxf(maxf(tr * 1.25, 0.35), reach_r), 5.0 * sc])
 		x += step
 	print("  woods: %s (%.1fs)" % [str(counts), (Time.get_ticks_msec() - t0) / 1000.0])
 	var near_end: float = Woodland.TREE_NEAR + Woodland.TREE_FADE * 0.5 + Woodland.TREE_FADE_JITTER + FOREST_CELL * 0.72

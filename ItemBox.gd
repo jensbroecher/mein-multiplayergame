@@ -1,7 +1,14 @@
 @tool
 extends Node3D
-## An item box: a hologram cube of glass (item_box_glass.gdshader) with a gold "?" floating in it that
-## turns to face the camera (item_box_glyph), with sparkles drifting round it (item_box_sparkles) and a glow on the ground under it (item_box_glow). The look is
+## An item box: a holographic globe of glass (item_box_orb.gdshader; the cube it used to be,
+## item_box_glass.gdshader, is kept behind SHELL) with the symbol of the item it holds
+## floating in it, a glowing white outline (ItemSymbols.gd, item_box_glyph) that turns to face the
+## camera, with sparkles drifting round it (item_box_sparkles) and a glow on the ground under it
+## (item_box_glow). What it shows is what it gives: the server picks the item (roll_item) whenever the
+## box comes back and tells every peer (_activate_rpc), and a pickup hands over that item. For the first
+## START_BOOST_ONLY_SECONDS of a race every box holds a boost (the grid is still bunched up, and one
+## bomb or missile could take out half of it); then the boxes still standing are picked again. The one
+## exception: a racer in last place always gets a boost. The look is
 ## built here as internal children, shared meshes and materials for every box, so level files only store
 ## the box's transform. Once the level's collision exists the box finds the ground under it, hovers
 ## HOVER over it and lays its glow there. Its light is divided by the level's exposure.
@@ -17,14 +24,26 @@ var respawn_timer = 0.0
 const RESPAWN_TIME = 5.0
 
 const SFX_PICKUP_SOUND = preload("res://sounds/item_box_pickup.wav")
+const ItemSymbols = preload("res://ItemSymbols.gd")
+## PlayerCart.ItemType: NONE 0, then ItemSymbols.NAMES in order from 1.
+const BOOST := 1
+const START_BOOST_ONLY_SECONDS := 10.0
+## Weighted draw: boosts three times as likely as each of the others.
+const ITEM_POOL := [1, 1, 1, 2, 3, 4, 5, 6, 7]
 const GLASS_SHADER := preload("res://item_box_glass.gdshader")
+const ORB_SHADER := preload("res://item_box_orb.gdshader")
+## The glass's shape: a holographic globe (item_box_orb), or the cube it was (item_box_glass). Both are
+## kept; switch here.
+enum Shell { CUBE, SPHERE }
+const SHELL := Shell.SPHERE
+const ORB_RADIUS := 0.92
 const GLYPH_SHADER := preload("res://item_box_glyph.gdshader")
 const SPARKLE_SHADER := preload("res://item_box_sparkles.gdshader")
 const GLOW_SHADER := preload("res://item_box_glow.gdshader")
 
 const CUBE := 1.5             # edge of the glass cube
-const GLYPH_HEIGHT := 1.02    # the "?", dot included
-const GLYPH_TUBE := 0.082     # its stroke's radius, in glyph heights
+const GLYPH_HEIGHT := 1.15    # the symbols' square, in metres
+const GLYPH_TUBE := 0.045     # their strokes' radius, in glyph heights
 const SPARKS := 56
 const GLOW_SIZE := 3.4
 const HOVER := 1.45           # cube centre over the ground
@@ -37,6 +56,12 @@ const POP_TIME := 0.5
 
 static var _meshes := {}
 static var _materials := {}
+## Until when (Time.get_ticks_msec) the boxes hold boosts only: set by Level at the green light, and
+## forever before it.
+static var boost_only_until := INF
+
+## The item this box holds (PlayerCart.ItemType).
+var item := BOOST
 
 var _shell: MeshInstance3D
 var _glyph: MeshInstance3D
@@ -60,6 +85,40 @@ func _ready():
 		sfx_pickup.stream = SFX_PICKUP_SOUND
 	_apply_build()
 	_settle()
+	# A box that turns up after the boost-only start (the finish line's, 10s in) gets its own item.
+	if (multiplayer.multiplayer_peer == null or multiplayer.is_server()) and Time.get_ticks_msec() >= boost_only_until:
+		server_reroll.call_deferred()
+
+
+## The server's draw for a box: a boost during the start, otherwise from ITEM_POOL.
+static func roll_item() -> int:
+	if Time.get_ticks_msec() < boost_only_until:
+		return BOOST
+	return ITEM_POOL[randi() % ITEM_POOL.size()]
+
+
+## Server: picks this box's item again (the end of the boost-only start) and tells every peer.
+func server_reroll() -> void:
+	if not is_active or not is_inside_tree():
+		return
+	if multiplayer.multiplayer_peer != null:
+		_set_item_rpc.rpc(roll_item())
+	else:
+		_set_item_rpc(roll_item())
+
+
+@rpc("authority", "call_local", "reliable")
+func _set_item_rpc(it: int) -> void:
+	_show_item(it)
+	# The new symbol grows in.
+	_build = minf(_build, 0.3)
+	_apply_build()
+
+
+func _show_item(it: int) -> void:
+	item = clampi(it, 1, ItemSymbols.NAMES.size())
+	if _glyph:
+		_glyph.mesh = _meshes["glyph_%d" % item]
 
 
 func _process(delta):
@@ -94,9 +153,9 @@ func _process(delta):
 		respawn_timer -= delta
 		if respawn_timer <= 0:
 			if multiplayer.multiplayer_peer != null:
-				_activate_rpc.rpc()
+				_activate_rpc.rpc(roll_item())
 			else:
-				_activate_rpc()
+				_activate_rpc(roll_item())
 
 
 func _apply_build() -> void:
@@ -128,7 +187,10 @@ func _settle() -> void:
 	await get_tree().physics_frame
 	# The hologram gives off its own light: keep it as bright on screen whatever the level's exposure
 	# (Northlight's night runs at 1.45, which bloomed the boxes into white balls).
-	var env := get_world_3d().environment
+	var world := get_world_3d()
+	if world == null:
+		return
+	var env := world.environment
 	if env:
 		for mat in _materials.values():
 			mat.set_shader_parameter("gain", 1.0 / maxf(env.tonemap_exposure, 0.1))
@@ -165,22 +227,25 @@ func _build_visuals() -> void:
 		return
 	if _meshes.is_empty():
 		_meshes = {
-			"shell": _shell_mesh(),
-			"glyph": _glyph_mesh(),
+			"shell": _shell_mesh() if SHELL == Shell.CUBE else _orb_mesh(),
 			"sparks": _spark_mesh(),
 			"glow": _glow_mesh(),
 		}
+		for i in ItemSymbols.NAMES.size():
+			_meshes["glyph_%d" % (i + 1)] = _symbol_mesh(ItemSymbols.NAMES[i])
+		_meshes["glyph"] = _meshes["glyph_%d" % BOOST]
 		for key in ["shell", "glyph", "sparks", "glow"]:
 			var mat := ShaderMaterial.new()
-			mat.shader = {"shell": GLASS_SHADER, "glyph": GLYPH_SHADER, "sparks": SPARKLE_SHADER,
-					"glow": GLOW_SHADER}[key]
+			mat.shader = {"shell": GLASS_SHADER if SHELL == Shell.CUBE else ORB_SHADER, "glyph": GLYPH_SHADER,
+					"sparks": SPARKLE_SHADER, "glow": GLOW_SHADER}[key]
 			_materials[key] = mat
 	_glyph = _part("Glyph", "glyph", visuals, 330.0)
 	_shell = _part("Glass", "shell", visuals, 330.0)
 	_sparks = _part("Sparkles", "sparks", visuals, 100.0)
 	# The sparkles are placed by the shader: cover where they fly, the burst included.
 	_sparks.custom_aabb = AABB(Vector3(-5.0, -3.0, -5.0), Vector3(10.0, 9.0, 10.0))
-	# The "?" turns to the camera, so its box is the space it turns in.
+	_show_item(item)
+	# The symbol turns to the camera, so its box is the space it turns in.
 	_glyph.custom_aabb = AABB(Vector3(-0.6, -0.6, -0.6), Vector3(1.2, 1.2, 1.2))
 	_glow = _part("GroundGlow", "glow", self, 200.0)
 	# Where most boxes' ground is until they find it; in the editor it stays there.
@@ -197,6 +262,26 @@ func _part(part_name: String, key: String, parent: Node, reach: float) -> MeshIn
 	mi.visibility_range_end = reach
 	parent.add_child(mi, false, Node.INTERNAL_MODE_BACK)
 	return mi
+
+
+## The globe: a UV sphere of ORB_RADIUS, UV x round it (longitude) and y up it (latitude), for
+## item_box_orb's grid and traces.
+static func _orb_mesh() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var lon := 40
+	var lat := 20
+	var pt := func(i: int, j: int) -> Array:
+		var a := TAU * i / lon
+		var b := lerpf(-PI * 0.5, PI * 0.5, float(j) / lat)
+		var n := Vector3(cos(b) * cos(a), sin(b), cos(b) * sin(a))
+		return [n * ORB_RADIUS, n, Vector2(float(i) / lon, float(j) / lat)]
+	for j in lat:
+		for i in lon:
+			var q := [pt.call(i, j), pt.call(i + 1, j), pt.call(i + 1, j + 1), pt.call(i, j + 1)]
+			_tri(st, q[0], q[1], q[2])
+			_tri(st, q[0], q[2], q[3])
+	return st.commit()
 
 
 ## The cube: six faces, each with UV 0..1 and its index in COLOR.r for the shader's circuit pattern.
@@ -218,50 +303,56 @@ static func _shell_mesh() -> ArrayMesh:
 	return st.commit()
 
 
-## The "?": a tube swept along the hook and stem (an arc over the top, then a curve into the stem), with
-## round caps on both ends, and a ball for the dot. Built in glyph heights, centred on the origin, facing
-## +z, and scaled to GLYPH_HEIGHT.
-static func _glyph_mesh() -> ArrayMesh:
-	var path: Array[Vector2] = []
-	var centre := Vector2(0.0, 0.7)
-	var r := 0.2
-	for i in 23:
-		var a := deg_to_rad(lerpf(200.0, -40.0, i / 22.0))
-		path.append(centre + Vector2(cos(a), sin(a)) * r)
-	var p0 := path[-1]
-	var a1 := deg_to_rad(-40.0)
-	var p1 := p0 + Vector2(sin(a1), -cos(a1)) * 0.09
-	var p2 := Vector2(0.0, 0.46)
-	var p3 := Vector2(0.0, 0.33)
-	for i in range(1, 11):
-		path.append(p0.bezier_interpolate(p1, p2, p3, i / 10.0))
-	var seg := 12
+## An item's symbol (ItemSymbols.gd): a tube swept along each stroke, round caps on the open ones,
+## mitred at sharp corners, and balls for the dots. Built in metres, centred on the origin, facing +z,
+## the symbols' square GLYPH_HEIGHT across.
+static func _symbol_mesh(symbol: String) -> ArrayMesh:
+	var seg := 10
 	var rw := GLYPH_TUBE
 	var rd := GLYPH_TUBE * 0.85
 	var to_m := func(p: Vector2) -> Vector3:
-		return Vector3(p.x, p.y - 0.5, 0.0) * GLYPH_HEIGHT
+		return Vector3(p.x, p.y, 0.0) * (GLYPH_HEIGHT * 0.5)
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var rings := []
-	for i in path.size():
-		var t := (path[mini(i + 1, path.size() - 1)] - path[maxi(i - 1, 0)]).normalized()
-		rings.append(_glyph_ring(to_m.call(path[i]), Vector3(-t.y, t.x, 0.0), 1.0, Vector3.ZERO, 0.0, seg, rw, rd))
-	for i in path.size() - 1:
-		_join(st, rings[i], rings[i + 1])
-	# Round caps: rings shrinking to a point beyond each end.
-	for end in [0, path.size() - 1]:
-		var t := (path[1] - path[0]).normalized() if end == 0 else (path[end] - path[end - 1]).normalized()
-		var out := Vector3(t.x, t.y, 0.0) * (-1.0 if end == 0 else 1.0)
-		var prev: Array = rings[end]
-		for k in range(1, 5):
-			var phi := k / 4.0 * PI * 0.5
-			var ring := _glyph_ring(to_m.call(path[end]) + out * sin(phi) * rw * GLYPH_HEIGHT, Vector3(-t.y, t.x, 0.0),
-					cos(phi), out, sin(phi), seg, rw, rd)
-			_join(st, prev, ring)
-			prev = ring
-	# The dot.
-	var dot_c := to_m.call(Vector2(0.0, 0.12)) as Vector3
-	var dr := rw * 1.3
+	for stroke in ItemSymbols.strokes(symbol):
+		if stroke.size() > 2:
+			# The dot's radius is in the symbols' square (2 across): in glyph heights, half of it.
+			_ball(st, to_m.call(stroke[0]), maxf(float(stroke[1]) * 0.5, rw * 1.3), seg)
+			continue
+		var path: PackedVector2Array = stroke[0]
+		var closed: bool = stroke[1]
+		var n := path.size()
+		var rings := []
+		for i in n:
+			var prev := path[(i - 1 + n) % n] if (closed or i > 0) else path[i]
+			var next := path[(i + 1) % n] if (closed or i < n - 1) else path[i]
+			var d_in := (path[i] - prev).normalized() if prev != path[i] else (next - path[i]).normalized()
+			var d_out := (next - path[i]).normalized() if next != path[i] else d_in
+			var t := (d_in + d_out).normalized() if (d_in + d_out).length() > 0.01 else d_out
+			# Mitre: as wide across a corner as along the straights.
+			var miter := 1.0 / maxf(t.dot(d_out), 0.5)
+			rings.append(_glyph_ring(to_m.call(path[i]), Vector3(-t.y, t.x, 0.0), miter, Vector3.ZERO, 0.0, seg, rw, rd))
+		for i in n - 1:
+			_join(st, rings[i], rings[i + 1])
+		if closed:
+			_join(st, rings[n - 1], rings[0])
+			continue
+		# Round caps: rings shrinking to a point beyond each end.
+		for end in [0, n - 1]:
+			var t := (path[1] - path[0]).normalized() if end == 0 else (path[end] - path[end - 1]).normalized()
+			var out := Vector3(t.x, t.y, 0.0) * (-1.0 if end == 0 else 1.0)
+			var prev_ring: Array = rings[end]
+			for k in range(1, 5):
+				var phi := k / 4.0 * PI * 0.5
+				var ring := _glyph_ring(to_m.call(path[end]) + out * sin(phi) * rw * GLYPH_HEIGHT, Vector3(-t.y, t.x, 0.0),
+						cos(phi), out, sin(phi), seg, rw, rd)
+				_join(st, prev_ring, ring)
+				prev_ring = ring
+	return st.commit()
+
+
+## A ball of radius `r` glyph heights at `c` (flattened in depth like the tubes).
+static func _ball(st: SurfaceTool, c: Vector3, r: float, seg: int) -> void:
 	var lat_rings := []
 	for i in 9:
 		var phi := lerpf(-PI * 0.5, PI * 0.5, i / 8.0)
@@ -269,12 +360,10 @@ static func _glyph_mesh() -> ArrayMesh:
 		for j in seg:
 			var a := TAU * j / seg
 			var d := Vector3(cos(phi) * cos(a), sin(phi), cos(phi) * sin(a))
-			ring.append([dot_c + Vector3(d.x * dr, d.y * dr, d.z * dr * 0.85) * GLYPH_HEIGHT,
-					Vector3(d.x, d.y, d.z / 0.85).normalized()])
+			ring.append([c + Vector3(d.x * r, d.y * r, d.z * r * 0.85) * GLYPH_HEIGHT, Vector3(d.x, d.y, d.z / 0.85).normalized()])
 		lat_rings.append(ring)
 	for i in 8:
 		_join(st, lat_rings[i], lat_rings[i + 1])
-	return st.commit()
 
 
 ## A ring of the glyph's tube round `c`: `side` is the in-plane normal, z the depth. `shrink` and the
@@ -367,7 +456,11 @@ func request_pickup(player_id: int):
 
 func _server_process_pickup(body):
 	if body.has_method("give_item_rpc"):
-		var item_type = body._get_random_item_rpc()
+		var item_type := item
+		# Last place always gets a boost, whatever the box showed: a chance to catch up, without
+		# slowing anyone ahead.
+		if _is_last_place(body):
+			item_type = BOOST
 		if body.get("is_ai"):
 			body.give_item(item_type)
 		else:
@@ -380,6 +473,15 @@ func _server_process_pickup(body):
 		else:
 			_deactivate_rpc()
 
+func _is_last_place(body: Node) -> bool:
+	var level = get_tree().get_first_node_in_group("level")
+	if level == null or not level.get("player_stats"):
+		return false
+	var stats: Dictionary = level.player_stats
+	var id := str(body.name).to_int()
+	return stats.size() > 1 and stats.has(id) and int(stats[id].get("pos", 0)) == stats.size()
+
+
 @rpc("authority", "call_local", "reliable")
 func _deactivate_rpc():
 	is_active = false
@@ -391,7 +493,8 @@ func _deactivate_rpc():
 	_glow.set_instance_shader_parameter("charge", 0.0)
 
 @rpc("authority", "call_local", "reliable")
-func _activate_rpc():
+func _activate_rpc(it: int = BOOST):
+	_show_item(it)
 	is_active = true
 	visuals.visible = true
 	_pop = 0.0

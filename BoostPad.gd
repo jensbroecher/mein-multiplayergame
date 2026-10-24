@@ -4,10 +4,10 @@ extends Area3D
 ## A boost pad. Its look is built here, not imported: a flat bevelled slab, one mesh shared by every
 ## pad, drawn by boost_pad.gdshader with chevrons streaming toward the pad's front (-z). It is an
 ## internal child, rebuilt on load, so level files only store the pad's transform.
-## With `settle_on_track`, the pad drops onto whatever is under it once the level's collision is
-## built, tilts with the slope and turns to face along the TrackPath. Every other pad still turns at
-## runtime to face the way the lap runs under it (`_face_lap`), keeping its tilt: generators had laid
-## pads backwards and across shortcuts (`res://scratch/boost_pad_audit.gd` lists them).
+## At runtime (`settle_on_track`, on by default) the pad drops onto whatever is under it once the
+## level's collision is built, tilts with the slope and turns to face the way the lap runs there, along
+## the nearest lap path (`_lap_tangent`): generators had laid pads backwards and across shortcuts
+## (`res://scratch/boost_pad_audit.gd` lists them), and at heights that floated or sank.
 
 const PAD_WIDTH := 4.0
 const PAD_LENGTH := 6.0
@@ -39,8 +39,9 @@ static var _material: ShaderMaterial
 ## Align pad to the slope (keeps forward direction projected on the surface).
 @export var align_to_slope: bool = true
 ## At runtime, once the level's collision exists: lie on the surface under the pad, tilted with it,
-## facing the way the lap runs there.
-@export var settle_on_track: bool = false
+## facing the way the lap runs there. On by default: pads at hand-set or generated heights floated on
+## one side or sank into sloping roads. Off, a pad only turns to face the lap (_face_lap).
+@export var settle_on_track: bool = true
 
 var _visual: MeshInstance3D
 var _flash := 0.0
@@ -69,6 +70,7 @@ func _build_visual() -> void:
 		_mesh = _pad_mesh()
 		_material = ShaderMaterial.new()
 		_material.shader = SHADER
+		_material.set_shader_parameter("aspect", (PAD_LENGTH - 2.0 * PAD_BEVEL) / (PAD_WIDTH - 2.0 * PAD_BEVEL))
 	_visual = MeshInstance3D.new()
 	_visual.name = "PadVisual"
 	_visual.mesh = _mesh
@@ -165,14 +167,9 @@ func _settle() -> void:
 	var normal := normal_sum.normalized() if normal_sum.length() > 0.01 else Vector3.UP
 	if normal.y < 0.5:
 		normal = Vector3.UP
-	var fwd := -global_transform.basis.z
-	var path := _find_track_path()
-	if path and path.curve:
-		var off := path.curve.get_closest_offset(path.to_local(centre))
-		var a := path.to_global(path.curve.sample_baked(off - 2.0))
-		var b := path.to_global(path.curve.sample_baked(off + 2.0))
-		if a.distance_squared_to(b) > 0.01:
-			fwd = b - a
+	var fwd := _lap_tangent(centre)
+	if fwd == Vector3.ZERO:
+		fwd = -global_transform.basis.z
 	fwd = (fwd - normal * fwd.dot(normal)).normalized()
 	var sc := global_transform.basis.get_scale()
 	# Half sunk between the lowest corner and the mean, so it neither floats nor vanishes on a crest.
@@ -188,11 +185,20 @@ func _face_lap() -> void:
 		return
 	var up := global_transform.basis.y.normalized()
 	var at := global_position
+	var tangent := _lap_tangent(at)
+	var fwd := tangent - up * tangent.dot(up)
+	if fwd.length_squared() < 1e-4:
+		return
+	var sc := global_transform.basis.get_scale()
+	global_transform = Transform3D(Basis.looking_at(fwd.normalized(), up).scaled(sc), at)
+
+
+## The way the lap runs at `at`: along the nearest of the lap paths (within 30m), or zero.
+func _lap_tangent(at: Vector3) -> Vector3:
 	var best := INF
 	var tangent := Vector3.ZERO
 	for path in _lap_paths():
-		var local := path.to_local(at)
-		var off := path.curve.get_closest_offset(local)
+		var off := path.curve.get_closest_offset(path.to_local(at))
 		var d := path.to_global(path.curve.sample_baked(off)).distance_to(at)
 		if d >= best:
 			continue
@@ -202,11 +208,7 @@ func _face_lap() -> void:
 			continue
 		best = d
 		tangent = b - a
-	var fwd := tangent - up * tangent.dot(up)
-	if best > 30.0 or fwd.length_squared() < 1e-4:
-		return
-	var sc := global_transform.basis.get_scale()
-	global_transform = Transform3D(Basis.looking_at(fwd.normalized(), up).scaled(sc), at)
+	return tangent if best <= 30.0 else Vector3.ZERO
 
 
 func _lap_paths() -> Array[Path3D]:

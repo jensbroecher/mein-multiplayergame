@@ -75,15 +75,12 @@ var style_slot_empty = StyleBoxFlat.new()
 var style_slot_active = StyleBoxFlat.new()
 var style_slot_backup = StyleBoxFlat.new()
 
-var ITEM_ICONS = {
-	"BOOST": load("res://sprites/icon_boost.png"),
-	"MISSILE": load("res://sprites/icon_missile.png"),
-	"GUIDED_MISSILE": load("res://sprites/icon_guided_missile.png"),
-	"SHIELD": load("res://sprites/icon_shield.png"),
-	"SHOCKWAVE": load("res://sprites/icon_shockwave.png"),
-	"BOMB": load("res://sprites/icon_bomb.png"),
-	"LIGHTNING": load("res://sprites/icon_lightning.png")
-}
+## The items' symbols (ItemSymbols.gd, drawn by ItemSymbolIcon.gd): the same white outlines the
+## item boxes show, in the item slots and the kill feed.
+const ItemSymbolIcon = preload("res://ItemSymbolIcon.gd")
+const ItemSymbols = preload("res://ItemSymbols.gd")
+var slot1_symbol: Control
+var slot2_symbol: Control
 
 var voting_panel: PanelContainer = null
 var voting_timer_label: Label = null
@@ -110,6 +107,26 @@ func _ready():
 	
 	if slot1_panel: slot1_panel.add_theme_stylebox_override("panel", style_slot_empty)
 	if slot2_panel: slot2_panel.add_theme_stylebox_override("panel", style_slot_empty)
+	slot1_symbol = _slot_symbol(slot1_icon)
+	slot2_symbol = _slot_symbol(slot2_icon)
+
+
+## An item symbol filling a slot's icon area, in place of the old pictures.
+func _slot_symbol(icon: TextureRect) -> Control:
+	if icon == null:
+		return null
+	icon.texture = null
+	var sym := ItemSymbolIcon.new()
+	sym.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	icon.add_child(sym)
+	return sym
+
+
+func _item_symbol(item_name: String, side: float) -> Control:
+	var sym := ItemSymbolIcon.new()
+	sym.item = item_name
+	sym.custom_minimum_size = Vector2(side, side)
+	return sym
 
 func _init_styleboxes():
 	for s in [style_blue, style_orange, style_red]:
@@ -436,13 +453,8 @@ func show_explosion_notice(attacker_name: String, victim_name: String, attacker_
 		badge_hbox.add_theme_constant_override("separation", 5)
 		badge_panel.add_child(badge_hbox)
 
-		if ITEM_ICONS.has(weapon_norm) and ITEM_ICONS[weapon_norm] != null:
-			var item_tex := TextureRect.new()
-			item_tex.texture = ITEM_ICONS[weapon_norm]
-			item_tex.custom_minimum_size = Vector2(16, 16)
-			item_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			item_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			badge_hbox.add_child(item_tex)
+		if weapon_norm in ItemSymbols.NAMES:
+			badge_hbox.add_child(_item_symbol(weapon_norm, 16.0))
 
 		var badge := Label.new()
 		var self_text := "BLEW THEMSELVES UP"
@@ -506,13 +518,8 @@ func show_explosion_notice(attacker_name: String, victim_name: String, attacker_
 		badge_hbox.add_theme_constant_override("separation", 5)
 		badge_panel.add_child(badge_hbox)
 
-		if ITEM_ICONS.has(weapon_norm) and ITEM_ICONS[weapon_norm] != null:
-			var item_tex := TextureRect.new()
-			item_tex.texture = ITEM_ICONS[weapon_norm]
-			item_tex.custom_minimum_size = Vector2(16, 16)
-			item_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			item_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			badge_hbox.add_child(item_tex)
+		if weapon_norm in ItemSymbols.NAMES:
+			badge_hbox.add_child(_item_symbol(weapon_norm, 16.0))
 
 		var badge_lbl := Label.new()
 		_setup_label.call(badge_lbl, action_text, text_color, 12)
@@ -553,23 +560,13 @@ func show_explosion_notice(attacker_name: String, victim_name: String, attacker_
 	exit_tw.tween_callback(card.queue_free)
 
 func update_items(item1_name: String, item2_name: String):
-	# Update Slot 1 (Active)
-	if slot1_panel and slot1_icon:
-		if item1_name == "NONE" or not ITEM_ICONS.has(item1_name):
-			slot1_icon.texture = null
-			slot1_panel.add_theme_stylebox_override("panel", style_slot_empty)
-		else:
-			slot1_icon.texture = ITEM_ICONS[item1_name]
-			slot1_panel.add_theme_stylebox_override("panel", style_slot_active)
-
-	# Update Slot 2 (Backup)
-	if slot2_panel and slot2_icon:
-		if item2_name == "NONE" or not ITEM_ICONS.has(item2_name):
-			slot2_icon.texture = null
-			slot2_panel.add_theme_stylebox_override("panel", style_slot_empty)
-		else:
-			slot2_icon.texture = ITEM_ICONS[item2_name]
-			slot2_panel.add_theme_stylebox_override("panel", style_slot_backup)
+	# Slot 1 (active), slot 2 (backup).
+	for slot in [[slot1_panel, slot1_symbol, item1_name, style_slot_active], [slot2_panel, slot2_symbol, item2_name, style_slot_backup]]:
+		if slot[0] == null or slot[1] == null:
+			continue
+		var held: bool = slot[2] in ItemSymbols.NAMES
+		slot[1].item = slot[2] if held else ""
+		slot[0].add_theme_stylebox_override("panel", slot[3] if held else style_slot_empty)
 
 ## The score table. It replaces the countdown.
 func show_end_screen():

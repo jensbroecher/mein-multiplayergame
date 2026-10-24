@@ -15,6 +15,7 @@ extends Node
 const Woodland = preload("res://WoodlandBuilder.gd")
 const PropKit = preload("res://PropKit.gd")
 const CampKit = preload("res://CampKit.gd")
+const TyreStacks = preload("res://TyreStacks.gd")
 
 const LEVEL_PATH := "res://levels/PinecrestRidgeLevel.tscn"
 const MESH_DIR := "res://levels/pinecrest_ridge_meshes"
@@ -565,6 +566,10 @@ func _material(key: String) -> Material:
 			cm.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 			cm.uv1_scale = Vector3(1.0 / 0.085, 1.0 / 0.085, 1.0)
 			m = cm
+		"tyre":
+			var tm := ShaderMaterial.new()
+			tm.shader = load("res://tyre_wall.gdshader")
+			m = tm
 		_:
 			m = CampKit.make_material(key)
 	m = _save_res(m, "mat_" + key)
@@ -724,6 +729,9 @@ func _place_track_features(track_path: Path3D) -> void:
 			bp.name = bp_info[0]
 			bp.position = bp_info[1]
 			bp.rotation_degrees = Vector3(0, bp_info[2], 0)
+			# Flat slabs at hand-set heights sat up to 20cm under the sloping road: at runtime each one
+			# drops onto the surface under it, tilts with it and faces along the lap.
+			bp.set("settle_on_track", true)
 			boost_container.add_child(bp)
 
 	# 8. Item Boxes
@@ -1101,8 +1109,6 @@ func _marshal_hut(kit: Dictionary) -> void:
 #  4. Tyre Walls, Chequered Tarps, Water Barrels, Cones & Rockfall Fences
 # ======================================================================================
 
-const TYRE_COLS := [Color(0.82, 0.11, 0.10), Color(0.93, 0.93, 0.90), Color(0.08, 0.08, 0.09)]
-
 func _build_tyre_walls_and_props(root: Node3D) -> void:
 	var node := Node3D.new()
 	node.name = "RaceBarriers"
@@ -1134,23 +1140,23 @@ func _build_tyre_walls_and_props(root: Node3D) -> void:
 		for sr in _offset_runs(float(r[0]), float(r[1]), float(r[2]), 0.995 * PROP_SCALE * 0.62):
 			tyre_subs.append([sr, String(r[3]) + ("" if sub_i == 0 else str(sub_i))])
 			sub_i += 1
+	# The stacks give when a cart hits the wall (TyreStacks.gd, SpringProps.gd); the boxes stop it.
+	var designs: Array = TyreStacks.meshes(_kit, "tyre", 1344)
+	for d in range(designs.size()):
+		designs[d] = _save_res(designs[d], "tyre_stack_%d" % d)
 	for sub in tyre_subs:
 		var pts: PackedVector3Array = sub[0]
 		var tw_name: String = sub[1]
-		var kit := {}
+		var stacks: Array = []
 		var boxes: Array = []
 		var rng := RandomNumberGenerator.new()
 		rng.seed = hash(tw_name)
 		for i in range(pts.size()):
 			var p: Vector3 = pts[i]
-			_kit.set_frame(_place(p, rng.randf() * TAU))
-			var col: Color = TYRE_COLS[i % 3]
-			for t in range(3):
-				var j := Vector3(rng.randf_range(-0.02, 0.02), 0.0, rng.randf_range(-0.02, 0.02))
-				_kit.tyre(kit, "rubber", Vector3(0, 0.1 + t * 0.2, 0) + j, 0.19, 0.31, 0.2, 14, col.darkened(rng.randf_range(0.0, 0.12)))
+			stacks.append([_place(p, rng.randf() * TAU), TyreStacks.design(i, rng)])
 			if i > 0 and (i % 4 == 0 or i == pts.size() - 1):
 				boxes.append(_wall_box(pts[maxi(i - 4, 4 * ((i - 1) / 4))], p, 0.62 * PROP_SCALE, 0.6 * PROP_SCALE))
-		_commit(node, kit, tw_name)
+		node.add_child(TyreStacks.spring_node(tw_name, designs, stacks, PROP_SCALE))
 		_boxes_body(node, tw_name + "Body", boxes)
 		for p in pts:
 			_note(tw_name, p, 0.5, 1.0)
@@ -1195,6 +1201,8 @@ func _build_tyre_walls_and_props(root: Node3D) -> void:
 			var yaw := _yaw_to(-(fr["right"] as Vector3) * signf(float(rfl[2])))
 			_kit.set_frame(_place(at, yaw))
 			_rockfall_fence(prop_kit)
+			# The slatted panel (2.9 x 1.15m at life size, leaning back a little) is solid.
+			prop_boxes.append([at + Basis(Vector3.UP, yaw) * Vector3(0, 0.6, -0.1) * PROP_SCALE, Vector3(2.9, 1.2, 0.35) * PROP_SCALE, Basis(Vector3.UP, yaw)])
 			_note("RockfallFence", at, 1.2 * PROP_SCALE, 4.0)
 			s += 5.5
 
@@ -1249,7 +1257,7 @@ func _chequered_tyres_and_barrels(kit: Dictionary) -> void:
 	var k := _kit
 	for sx in [-0.34, 0.34]:
 		for t in range(3):
-			k.tyre(kit, "rubber", Vector3(sx, 0.1 + t * 0.2, 0.0), 0.19, 0.31, 0.2, 14, Color(0.08, 0.08, 0.09))
+			k.painted_tyre(kit, "tyre", Vector3(sx, 0.1 + t * 0.2, 0.0), 0.19, 0.31, 0.2, Color(0.08, 0.08, 0.09), fmod(sx * 7.3 + t * 0.37, 1.0) + 0.5)
 	# Chequered cloth draped over top & front of the double stack
 	var cw := Color(0.95, 0.95, 0.92)
 	var cb := Color(0.10, 0.10, 0.12)
@@ -1790,6 +1798,9 @@ func _root_tangle_mesh(bark_mat: Material) -> ArrayMesh:
 const FOREST_CELL := 100.0
 const FAR_CELL := 240.0
 const TRUNK_COLLIDE_REACH := 38.0
+const SHRUB_COLLIDE_REACH := 60.0
+## A tree's collider reaches this share of its branches' spread at a cart's height (the tips give).
+const TREE_SOLID_SHARE := 0.7
 const TREE_ROAD_CLEAR := {
 	"pine": 14.5,
 	"fir": 13.5,
@@ -1837,6 +1848,8 @@ func _build_woodland(root: Node3D) -> void:
 					fm = w.broadleaf_mesh(kind, v, 1, bf, leaf_far)
 			near_meshes.append(_save_res(nm, "tree_%s_%d" % [kind, v]))
 			far_meshes.append(_save_res(fm, "tree_%s_%d_far" % [kind, v]))
+
+	var band_r: Array = near_meshes.map(func(m: Mesh) -> float: return Woodland.band_radius(m, 0.3, 2.0))
 
 	# Understory & GroundCover plant meshes (`Plants_*` and `GroundCover_*`):
 	#   0, 1: Dwarf mountain pine / alpine juniper shrub (WoodlandBuilder.alpine_shrub_mesh)
@@ -1899,6 +1912,7 @@ func _build_woodland(root: Node3D) -> void:
 	var plants := {}
 	var cover := {}
 	var trunks: Array = []
+	var logs: Array = []   # [transform, variant] of the fallen logs, for their colliders
 	var counts := {"pine": 0, "fir": 0, "larch": 0, "birch": 0, "alder": 0, "deep": 0, "plants": 0, "cover": 0}
 
 	var step := 10.5
@@ -1926,6 +1940,10 @@ func _build_woodland(root: Node3D) -> void:
 					var sk := 2 if (g < 14.0 and rng.randf() < 0.45) else (rng.randi() % 2)
 					_add_to_cells(plants, _cell(px, pz, FOREST_CELL, sk), xf_s)
 					counts["plants"] += 1
+					# Dwarf pines and junipers stand like small trees: a cart stops against their core.
+					# Hazel stays soft.
+					if sk < 2 and _road_distance(px, pz) < SHRUB_COLLIDE_REACH:
+						trunks.append([xf_s.origin, 1.0 * sc_s, 2.2 * sc_s])
 				continue
 			if _slope(px, pz) > 0.78:
 				continue
@@ -1992,7 +2010,9 @@ func _build_woodland(root: Node3D) -> void:
 
 			if rd < TRUNK_COLLIDE_REACH:
 				var tr: float = (0.42 if kind == "pine" else (0.38 if kind == "fir" else (0.34 if kind == "larch" else (0.22 if kind == "birch" else 0.28)))) * sc
-				trunks.append([Vector3(px, y, pz), maxf(tr * 1.2, 0.32), 5.0 * sc])
+				# Out to the branches at a cart's height (a fir's or larch's low whorls), not just the trunk.
+				var reach_r: float = TREE_SOLID_SHARE * float(band_r[mi]) * sc
+				trunks.append([Vector3(px, y, pz), maxf(maxf(tr * 1.2, 0.32), reach_r), 5.0 * sc])
 
 			# Understory ferns & fallen deadwood logs around near trees
 			if not deep and rd < 85.0:
@@ -2022,8 +2042,10 @@ func _build_woodland(root: Node3D) -> void:
 						var lright := lfwd.cross(lnrm).normalized()
 						var lsc := rng.randf_range(0.80, 1.25)
 						var lxf := Transform3D(Basis(lright, lnrm, lfwd).scaled(Vector3.ONE * lsc), Vector3(lx, ly - 0.08, lz))
-						_add_to_cells(plants, _cell(lx, lz, FOREST_CELL, 5 + (rng.randi() % 2)), lxf)
+						var lv := rng.randi() % 2
+						_add_to_cells(plants, _cell(lx, lz, FOREST_CELL, 5 + lv), lxf)
 						counts["plants"] += 1
+						logs.append([lxf, lv])
 		x += step
 
 	# Walk along the 1650m track to dress the road shoulders, cut banks & meadows with ferns,
@@ -2163,6 +2185,21 @@ func _build_woodland(root: Node3D) -> void:
 		cs.shape = cyl
 		cs.position = p3 + Vector3(0, cyl.height * 0.5 - 0.4, 0)
 		bodies[bk].add_child(cs)
+
+	# Fallen logs: a box along each (_deadwood_log_mesh's length and girth), scaled into the shape.
+	var log_body := StaticBody3D.new()
+	log_body.name = "Deadwood"
+	node.add_child(log_body)
+	for lg in logs:
+		var lxf: Transform3D = lg[0]
+		var lsc: float = lxf.basis.x.length()
+		var v: int = lg[1]
+		var cs2 := CollisionShape3D.new()
+		var box := BoxShape3D.new()
+		box.size = Vector3(0.7, (0.24 + v * 0.04) * 1.1, 4.2 + v * 1.1) * lsc
+		cs2.shape = box
+		cs2.transform = Transform3D(lxf.basis.orthonormalized(), lxf.origin + lxf.basis.y.normalized() * box.size.y * 0.5)
+		log_body.add_child(cs2)
 
 	var detail := Node3D.new()
 	detail.name = "JungleDetail"

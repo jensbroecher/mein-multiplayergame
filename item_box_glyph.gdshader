@@ -1,17 +1,18 @@
 shader_type spatial;
 render_mode unshaded, cull_back, shadows_disabled;
 
-// The gold "?" inside an item box (ItemBox.gd sweeps the mesh, facing +z). It turns about the vertical
-// to face the camera, swaying a little either side so it reads as solid, so it can be read from any side
-// of the spinning box and on every viewport of a split screen. It glows, lit by a key light fixed on
-// screen (up and to the left) with a glint: lit by the scene, its specular took the blue sky into the gold
-// and turned it salmon. `pop` (0 -> 1) flares it as the box bursts.
+// The item's symbol inside an item box, a glowing white outline (ItemBox.gd sweeps it from
+// ItemSymbols.gd, facing +z). It turns about the vertical to face the camera, swaying a little either
+// side so it reads as solid, so it can be read from any side of the spinning box and on every viewport
+// of a split screen. It glows, lit by a key light fixed on screen (up and to the left) with a glint: lit
+// by the scene, its specular took in the blue sky. The rim is a cool blue so the white reads as a lit
+// tube. `pop` (0 -> 1) flares it as the box bursts.
 
 instance uniform float phase = 0.0;
 instance uniform float pop = 0.0;
-uniform vec3 core_colour : source_color = vec3(1.0, 0.78, 0.16);
-uniform vec3 rim_colour : source_color = vec3(1.0, 0.5, 0.0);
-uniform vec3 glint_colour : source_color = vec3(1.0, 0.95, 0.75);
+uniform vec3 core_colour : source_color = vec3(1.0, 1.0, 1.0);
+uniform vec3 rim_colour : source_color = vec3(0.55, 0.78, 1.0);
+uniform vec3 glint_colour : source_color = vec3(1.0, 1.0, 1.0);
 uniform float glow = 1.0;
 uniform float gain = 1.0;          // 1 / the level's exposure (ItemBox.gd)
 uniform float sway = 0.38;

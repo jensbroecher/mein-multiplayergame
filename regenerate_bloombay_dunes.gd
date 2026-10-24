@@ -219,7 +219,7 @@ func _ready() -> void:
 
 	var finish_line = gate_scene.instantiate()
 	finish_line.name = "FinishLine"
-	finish_line.position = Vector3(-42.0, 0.76, 160.0)
+	finish_line.position = FINISH_AT
 	finish_line.rotation_degrees = Vector3(0, 0, 0)
 	finish_line.set("is_finish_line", true)
 	level_scene.add_child(finish_line)
@@ -5028,6 +5028,15 @@ func _palm_nut(st: SurfaceTool, c: Vector3, r: float, col: Color) -> void:
 			_pquad(st, [ring[i][j], ring[i][j + 1], ring[i + 1][j + 1], ring[i + 1][j]])
 
 
+## The vertices of a palm's trunk (its mesh's first surface) up to 2.4m over its foot.
+func _palm_low_trunk(mesh: Mesh) -> PackedVector3Array:
+	var out := PackedVector3Array()
+	for q in (mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX] as PackedVector3Array):
+		if q.y <= 2.4:
+			out.append(q)
+	return out
+
+
 ## Palm shape `variant` leaning toward +X, its foot at the origin. Surfaces: the trunk, the fronds,
 ## and in the detailed palm (`lod` 0) the coconuts. `lod` 1 is the stand-in: fewer rings and sides,
 ## two fronds in three, coarser cards, no stalks.
@@ -5332,6 +5341,7 @@ func _build_palms(level: Node3D) -> void:
 	var near := {}
 	var far := {}
 	var bodies := {}
+	var low_trunks := {}   # bent shape -> its trunk's low vertices (_palm_low_trunk)
 	for s in spots:
 		var foot: Vector3 = s[0]
 		var d: Vector2 = s[1]
@@ -5362,6 +5372,21 @@ func _build_palms(level: Node3D) -> void:
 		cs.shape = cyl
 		cs.transform = Transform3D(Basis(Quaternion(Vector3.UP, axis)), foot + axis * cyl.height * 0.5 - Vector3(0.0, 0.6, 0.0))
 		bodies[bk].add_child(cs)
+		# A bent palm's trunk runs low over the sand well past the cylinder: the part of it at a cart's
+		# height as a hull, from the trunk's own vertices (scaled into the shape: physics wants its
+		# shapes unscaled).
+		if int(s[2]) >= BENT_FIRST:
+			if not low_trunks.has(s[2]):
+				low_trunks[s[2]] = _palm_low_trunk(near_meshes[s[2]])
+			var hull := ConvexPolygonShape3D.new()
+			var hp := PackedVector3Array()
+			for q in (low_trunks[s[2]] as PackedVector3Array):
+				hp.append(xf.basis * q)
+			hull.points = hp
+			var hs := CollisionShape3D.new()
+			hs.shape = hull
+			hs.position = foot
+			bodies[bk].add_child(hs)
 	# Ranges are measured to a cell's centre, so they're padded by half a cell's diagonal: a cell
 	# only switches off once every palm in it has faded, and the shader does the visible swap. The
 	# stand-ins cast no shadow (the shadow pass can't tell which of the two a palm is showing).
@@ -5432,6 +5457,7 @@ func _set_owner_recursive(node: Node, scene_root: Node) -> void:
 
 const CampKit = preload("res://CampKit.gd")
 const PropKit = preload("res://PropKit.gd")
+const TyreStacks = preload("res://TyreStacks.gd")
 
 ## [name, s along the lap (m), side (+1 right of travel, -1 left), CampKit layout]
 const CAMP_SITES := [
@@ -5564,7 +5590,14 @@ func _camp_material(key: String) -> Material:
 	var k := "camp_mat_" + key
 	if _materials.has(k):
 		return _materials[k]
-	var m: Material = _tg.call("_save_resource", CampKit.make_material(key), k)
+	var src: Material
+	if key == "tyre":
+		var tm := ShaderMaterial.new()
+		tm.shader = load("res://tyre_wall.gdshader")
+		src = tm
+	else:
+		src = CampKit.make_material(key)
+	var m: Material = _tg.call("_save_resource", src, k)
 	_materials[k] = m
 	return m
 
@@ -5639,7 +5672,6 @@ const CORNER_COUNT := 8
 const CORNER_SPACING := 110.0     # corners picked at least this far apart along the lap
 const TYRE_LAT := 10.9            # centre of a tyre wall off the lap's centre line
 const BARRIER_LAT := 10.9
-const TYRE_COLS := [Color(0.80, 0.10, 0.09), Color(0.92, 0.92, 0.90), Color(0.07, 0.07, 0.08)]
 const FLAG_COLOURS := [
 	[Color(0.10, 0.42, 0.82), Color(0.98, 0.98, 0.96)],
 	[Color(0.88, 0.16, 0.14), Color(0.98, 0.98, 0.96)],
@@ -5648,6 +5680,9 @@ const FLAG_COLOURS := [
 	[Color(0.96, 0.46, 0.14), Color(0.98, 0.98, 0.96)],
 ]
 const POLE_COL := Color(0.84, 0.85, 0.87)
+## Flags at 1.5 times their life size, like the other people-sized things: at life size a feather
+## flag was barely four carts tall.
+const FLAG_SCALE := 1.5
 const GRASS_PATCHES := 230
 const GRASS_PATCH_GAP := 24.0
 const ROCK_CLUSTERS := 300
@@ -5657,6 +5692,9 @@ const ROCK_RANGE := 230.0         # at Ultra; DuneDetail.gd pulls these in at lo
 const GRASS_RANGE := 230.0
 
 var _dress_rng := RandomNumberGenerator.new()
+var _tyre_stacks: Array = []    # [Transform3D, design] for TyreStacks.spring_node
+var _spring_flags := {}         # design name -> [[Transform3D, phase]]
+var _cone_xfs: Array = []       # the corners' cones, knockable (_build_cones)
 
 
 func _build_dune_dressing(root: Node3D) -> void:
@@ -5668,6 +5706,13 @@ func _build_dune_dressing(root: Node3D) -> void:
 	_build_camp_frontage(node)
 	var patches := _build_dune_grass(node)
 	_build_rocks(node, patches)
+	_build_finish_flags()
+	_build_spring_flags(node)
+	_build_cones(node)
+	var designs: Array = TyreStacks.meshes(_pk, "tyre", DRESS_SEED)
+	for d in range(designs.size()):
+		designs[d] = _tg.call("_save_resource", designs[d], "dune_tyre_stack_%d" % d)
+	node.add_child(TyreStacks.spring_node("TyreStacks", designs, _tyre_stacks, PROP_SCALE))
 
 
 # -- Along the lap
@@ -5777,18 +5822,16 @@ func _wall_box(a: Vector3, b: Vector3, w: float, h: float) -> Array:
 
 
 ## Stacks of three tyres, red, white and black in turn, down a line of ground points.
-func _tyre_wall(kit: Dictionary, boxes: Array, pts: PackedVector3Array) -> void:
+## A tyre wall of stacks that give when hit (TyreStacks.gd): their places go into _tyre_stacks, built
+## once the corners are done; the wall's boxes stop the cart.
+func _tyre_wall(boxes: Array, pts: PackedVector3Array) -> void:
 	for i in range(pts.size()):
 		var p: Vector3 = pts[i]
-		_pk.set_frame(Transform3D(Basis(Vector3.UP, _dress_rng.randf() * TAU).scaled(Vector3.ONE * PROP_SCALE), p))
-		var col: Color = TYRE_COLS[i % 3]
-		for k in range(3):
-			var j := Vector3(_dress_rng.randf_range(-0.02, 0.02), 0.0, _dress_rng.randf_range(-0.02, 0.02))
-			_pk.tyre(kit, "rubber", Vector3(0, 0.1 + k * 0.2, 0) + j, 0.19, 0.31, 0.2, 14, col.darkened(_dress_rng.randf_range(0.0, 0.12)))
+		_tyre_stacks.append([Transform3D(Basis(Vector3.UP, _dress_rng.randf() * TAU).scaled(Vector3.ONE * PROP_SCALE), p),
+				TyreStacks.design(i, _dress_rng)])
 		if i > 0 and (i % 4 == 0 or i == pts.size() - 1):
 			boxes.append(_wall_box(pts[maxi(i - 4, 4 * ((i - 1) / 4))], p, 0.62 * PROP_SCALE, 0.6 * PROP_SCALE))
 		_note("Dune tyres", Vector2(p.x, p.z), 0.6, 1.2, 1.5)
-	_pk.reset_frame()
 
 
 ## A run of red and white barrier segments (a low plastic water-filled type: a wide foot, a narrower
@@ -5817,12 +5860,37 @@ func _barrier_run(kit: Dictionary, boxes: Array, pts: PackedVector3Array) -> voi
 	_pk.reset_frame()
 
 
-## Cones on the inside of a corner, the way a marshal leaves them.
-func _cones(kit: Dictionary, pts: PackedVector3Array) -> void:
+## Cones on the inside of a corner, the way a marshal leaves them: knocked flying by any cart
+## (KnockableProps.gd, built with the rest in _build_cones).
+func _cones(pts: PackedVector3Array) -> void:
 	for p in pts:
-		_pk.set_frame(Transform3D(Basis(Vector3.UP, _dress_rng.randf() * TAU).scaled(Vector3.ONE * PROP_SCALE), p))
-		_camp.cone(kit)
+		_cone_xfs.append(Transform3D(Basis(Vector3.UP, _dress_rng.randf() * TAU), p))
+
+
+func _build_cones(parent: Node3D) -> void:
+	var ck := {}
+	_pk.set_frame(Transform3D(Basis().scaled(Vector3.ONE * PROP_SCALE), Vector3.ZERO))
+	_camp.cone(ck)
 	_pk.reset_frame()
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = _tg.call("_save_resource", _pk.commit(ck), "dune_cone")
+	mm.instance_count = _cone_xfs.size()
+	mm.buffer = PropKit.transform_buffer(_cone_xfs)
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = "Cones"
+	mmi.set_script(load("res://KnockableProps.gd"))
+	var typed: Array[Transform3D] = []
+	for t in _cone_xfs:
+		typed.append(t)
+	mmi.set("prop_transforms", typed)
+	mmi.set("boxes", [[Vector3(0, 0.03, 0) * PROP_SCALE, Vector3(0.38, 0.06, 0.38) * PROP_SCALE], [Vector3(0, 0.36, 0) * PROP_SCALE, Vector3(0.2, 0.62, 0.2) * PROP_SCALE]])
+	mmi.set("prop_mass", 6.0)
+	mmi.set("push_speed", 1.5)
+	mmi.set("release_radius", 3.2)
+	mmi.set("centre_of_mass_y", 0.06)
+	mmi.multimesh = mm
+	parent.add_child(mmi)
 
 
 func _build_corner_runs(parent: Node3D) -> void:
@@ -5830,28 +5898,24 @@ func _build_corner_runs(parent: Node3D) -> void:
 	var idx := 0
 	for c in corners:
 		var kit := {}
-		var flags := {}
 		var boxes: Array = []
 		var s: float = c[0]
 		var side: float = c[1]
 		# The outside of the turn: a wall of tyres around the apex (every other corner) or barriers,
-		# with feather flags along it and chequered flags behind the apex.
+		# with feather flags along it. Chequered flags are for the finish (_build_finish_flags).
 		var half := 22.0
 		var wall := _lap_offset(s - half, s + half, side * TYRE_LAT, 0.62 * PROP_SCALE * 0.99 if idx % 2 == 0 else 3.0)
 		if idx % 2 == 0:
-			_tyre_wall(kit, boxes, wall)
+			_tyre_wall(boxes, wall)
 		else:
 			_barrier_run(kit, boxes, wall)
-		_flag_group(flags, _lap_offset(s - half - 3.0, s + half + 3.0, side * (TYRE_LAT + 3.5), 15.0), idx)
-		var back := _lap_offset(s - 8.0, s + 8.0, side * (TYRE_LAT + 5.5), 8.0)
-		for q in range(back.size()):
-			_chequered_flag(flags, back[q], _flag_dir())
+		_flag_group(_lap_offset(s - half - 3.0, s + half + 3.0, side * (TYRE_LAT + 3.5), 15.0), idx)
 		# Cones on the inside of the apex.
-		_cones(kit, _lap_offset(s - 12.0, s + 12.0, -side * (TYRE_LAT - 1.0), 6.0))
+		_cones(_lap_offset(s - 12.0, s + 12.0, -side * (TYRE_LAT - 1.0), 6.0))
 		var cpos: Vector3 = _road_at(s)["pos"]
 		print("  corner at s=%.0f (%.0f, %.0f), outside %s: %s" % [s, cpos.x, cpos.z, "right" if side > 0.0 else "left", "tyres" if idx % 2 == 0 else "barriers"])
-		_commit_pk(parent, kit, "Corner%dWall" % idx, DRESS_RANGE)
-		_commit(parent, flags, "Corner%dFlags" % idx, "dune_", DRESS_RANGE, false)
+		if not kit.is_empty():
+			_commit_pk(parent, kit, "Corner%dWall" % idx, DRESS_RANGE)
 		_collider_body(parent, "Corner%dWallBody" % idx, boxes)
 		idx += 1
 	print("Dune corners: %d walled" % corners.size())
@@ -5863,7 +5927,6 @@ func _build_camp_frontage(parent: Node3D) -> void:
 	var idx := 3
 	for plan in _camp_plan:
 		var kit := {}
-		var flags := {}
 		var boxes: Array = []
 		var c: Vector2 = plan[1]
 		var s0 := _nearest_s(c)
@@ -5871,7 +5934,7 @@ func _build_camp_frontage(parent: Node3D) -> void:
 		var p: Vector3 = fr["pos"]
 		var side := signf((Vector2(c.x - p.x, c.y - p.z)).dot(Vector2((fr["right"] as Vector3).x, (fr["right"] as Vector3).z)))
 		_barrier_run(kit, boxes, _lap_offset(s0 - 15.0, s0 + 15.0, side * BARRIER_LAT, 3.0))
-		_flag_group(flags, _lap_offset(s0 - 18.0, s0 + 18.0, side * (BARRIER_LAT + 3.0), 9.0), idx)
+		_flag_group(_lap_offset(s0 - 18.0, s0 + 18.0, side * (BARRIER_LAT + 3.0), 9.0), idx)
 		# The camp's own gate: two flags at the pad's front corners, toward the road.
 		var layout := _camp_layout(String(plan[3]))
 		var half: Vector2 = layout["half"]
@@ -5879,10 +5942,9 @@ func _build_camp_frontage(parent: Node3D) -> void:
 		for sx in [-1.0, 1.0]:
 			var w: Vector3 = Vector3(c.x, 0.0, c.y) + b * Vector3(sx * (half.x - 1.5), 0.0, half.y - 0.8)
 			w.y = _ground(w.x, w.z)
-			_feather_flag(flags, w, _flag_dir(), idx + (1 if sx > 0.0 else 0))
+			_spring_flag(_feather_design(idx + (1 if sx > 0.0 else 0)), w, _flag_dir())
 		idx += 1
 		_commit_pk(parent, kit, "%sFrontage" % plan[0], DRESS_RANGE)
-		_commit(parent, flags, "%sFlags" % plan[0], "dune_", DRESS_RANGE, false)
 		_collider_body(parent, "%sFrontageBody" % plan[0], boxes)
 
 
@@ -5944,11 +6006,12 @@ func _pole(kit: Dictionary, base: Vector3, top: Vector3, r: float) -> void:
 	_tube(kit, "metal", base - Vector3(0, 0.1, 0), base + Vector3(0, 0.12, 0), r * 3.4, r * 3.0, 8, POLE_COL.darkened(0.25))
 
 
-## A feather flag (a tall blade of cloth down one side of its pole, wide near the top) 3.8m up.
+## A feather flag (a tall blade of cloth down one side of its pole, wide near the top) 3.9m up at life
+## size, built FLAG_SCALE times larger.
 func _feather_flag(kit: Dictionary, base: Vector3, along: Vector3, palette: int) -> void:
 	var pal: Array = FLAG_COLOURS[palette % FLAG_COLOURS.size()]
-	var top := base + Vector3(0, 3.9, 0)
-	_pole(kit, base, top + Vector3(0, 0.15, 0), 0.04)
+	var top := base + Vector3(0, 3.9 * FLAG_SCALE, 0)
+	_pole(kit, base, top + Vector3(0, 0.15 * FLAG_SCALE, 0), 0.04 * FLAG_SCALE)
 	var main: Color = pal[0]
 	var accent: Color = pal[1]
 	var width := func(v: float) -> float:
@@ -5957,27 +6020,129 @@ func _feather_flag(kit: Dictionary, base: Vector3, along: Vector3, palette: int)
 		# A stripe of the second colour on the diagonal, the rest in the main one.
 		var d: float = fposmod(u * 1.1 + v * 0.9, 1.0)
 		return accent if (d > 0.46 and d < 0.62) else main
-	_banner(kit, top, along, 1.25, 3.3, 8, 16, width, paint)
+	_banner(kit, top, along, 1.25 * FLAG_SCALE, 3.3 * FLAG_SCALE, 8, 16, width, paint)
 
 
-## A chequered flag on a short pole, 1.9m by 1.3m.
+## A chequered flag on a short pole, 1.9m by 1.3m at life size, built FLAG_SCALE times larger.
 func _chequered_flag(kit: Dictionary, base: Vector3, along: Vector3) -> void:
-	var top := base + Vector3(0, 3.0, 0)
-	_pole(kit, base, top + Vector3(0, 0.1, 0), 0.035)
+	var top := base + Vector3(0, 3.0 * FLAG_SCALE, 0)
+	_pole(kit, base, top + Vector3(0, 0.1 * FLAG_SCALE, 0), 0.035 * FLAG_SCALE)
 	var width := func(_v: float) -> float:
 		return 1.0
 	var paint := func(u: float, v: float) -> Color:
 		var iu := int(floor(u * 8.0))
 		var iv := int(floor(v * 5.0))
 		return Color(0.06, 0.06, 0.07) if (iu + iv) % 2 == 0 else Color(0.97, 0.97, 0.95)
-	_banner(kit, top, along, 1.9, 1.3, 8, 5, width, paint)
+	_banner(kit, top, along, 1.9 * FLAG_SCALE, 1.3 * FLAG_SCALE, 8, 5, width, paint)
 
 
 ## Feather flags down a line of ground points, the palette changing flag by flag.
-func _flag_group(kit: Dictionary, pts: PackedVector3Array, palette: int) -> void:
+func _flag_group(pts: PackedVector3Array, palette: int) -> void:
 	for i in range(pts.size()):
-		_feather_flag(kit, pts[i], _flag_dir(), palette + i)
+		_spring_flag(_feather_design(palette + i), pts[i], _flag_dir())
 		_note("Dune flag", Vector2(pts[i].x, pts[i].z), 0.5, 1.5, 4.0)
+
+
+func _feather_design(palette: int) -> String:
+	return "feather_%d" % (palette % FLAG_COLOURS.size())
+
+
+## Chequered flags only at the start and finish: a row each side of the road either side of the line,
+## FINISH_FLAG_LAT off its centre, leaving out any that would stand in a seafront footprint.
+## Where the FinishLine stands (placed after the dressing is built, so shared as a constant).
+const FINISH_AT := Vector3(-42.0, 0.76, 160.0)
+const FINISH_FLAG_LAT := 11.5
+const FINISH_FLAG_S := [-22.0, -14.0, -6.0, 6.0, 14.0, 22.0]
+
+func _build_finish_flags() -> void:
+	var s0 := _nearest_s(Vector2(FINISH_AT.x, FINISH_AT.z))
+	var placed := 0
+	for ds in FINISH_FLAG_S:
+		var fr := _road_at(s0 + float(ds))
+		for side in [-1.0, 1.0]:
+			var p: Vector3 = (fr["pos"] as Vector3) + (fr["right"] as Vector3) * side * FINISH_FLAG_LAT
+			var free := true
+			for f in _footprints:
+				if (f[1] as Vector2).distance_to(Vector2(p.x, p.z)) < float(f[2]) + 1.0:
+					free = false
+					break
+			if not free:
+				continue
+			p.y = _ground(p.x, p.z)
+			_spring_flag("chequered", p, _flag_dir())
+			_note("Finish flag", Vector2(p.x, p.z), 0.5, 1.5, 4.0)
+			placed += 1
+	print("Finish flags: %d" % placed)
+
+
+## Records a flag of `design` standing at `base`, streaming along `along`: its place and its own phase
+## (the same draws from _dress_rng as when each flag was drawn into its corner's mesh).
+func _spring_flag(design: String, base: Vector3, along: Vector3) -> void:
+	if not _spring_flags.has(design):
+		_spring_flags[design] = []
+	_spring_flags[design].append([Transform3D(Basis(Vector3.UP, atan2(-along.z, along.x)), base), _dress_rng.randf()])
+
+
+## The flags, one SpringProps MultiMesh per design (each feather palette and the chequered flag), built
+## at the origin streaming along +x: a cart drives through a flag, which bends over on its spring base
+## and wobbles back up. The phase of each flag's waving is its instance's custom data
+## (flag_wave.gdshader).
+func _build_spring_flags(parent: Node3D) -> void:
+	var node := Node3D.new()
+	node.name = "Flags"
+	parent.add_child(node)
+	var designs := _spring_flags.keys()
+	designs.sort()
+	for design in designs:
+		var kit := {}
+		if design == "chequered":
+			_chequered_flag(kit, Vector3.ZERO, Vector3.RIGHT)
+		else:
+			_feather_flag(kit, Vector3.ZERO, Vector3.RIGHT, int(String(design).get_slice("_", 1)))
+		var mesh: Mesh = _tg.call("_save_resource", _kit_mesh(kit), "dune_flag_" + String(design))
+		var items: Array = _spring_flags[design]
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.use_custom_data = true
+		mm.mesh = mesh
+		mm.instance_count = items.size()
+		var buf := PackedFloat32Array()
+		buf.resize(items.size() * 16)
+		var rest: Array[Transform3D] = []
+		for i in range(items.size()):
+			var t: Transform3D = items[i][0]
+			rest.append(t)
+			var o := i * 16
+			buf[o] = t.basis.x.x
+			buf[o + 1] = t.basis.y.x
+			buf[o + 2] = t.basis.z.x
+			buf[o + 3] = t.origin.x
+			buf[o + 4] = t.basis.x.y
+			buf[o + 5] = t.basis.y.y
+			buf[o + 6] = t.basis.z.y
+			buf[o + 7] = t.origin.y
+			buf[o + 8] = t.basis.x.z
+			buf[o + 9] = t.basis.y.z
+			buf[o + 10] = t.basis.z.z
+			buf[o + 11] = t.origin.z
+			buf[o + 12] = float(items[i][1])
+		# The dummy renderer drops set_instance_transform(): write the buffer (CLAUDE.md, headless gotchas).
+		mm.buffer = buf
+		var mmi := MultiMeshInstance3D.new()
+		mmi.name = "Flags_" + String(design)
+		mmi.multimesh = mm
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mmi.set_script(load("res://SpringProps.gd"))
+		mmi.set("rest", rest)
+		mmi.set("reach", 1.55)
+		mmi.set("height", (3.9 if design != "chequered" else 3.0) * FLAG_SCALE)
+		mmi.set("tip_per_speed", 0.03)
+		mmi.set("max_tip", 1.2)
+		mmi.set("spring", 7.0)
+		mmi.set("damping", 0.15)
+		mmi.set("drag", 0.03)
+		node.add_child(mmi)
+	print("Dune flags: %d designs, %d flags" % [designs.size(), _spring_flags.values().reduce(func(a, v): return a + (v as Array).size(), 0)])
 
 
 # -- Pebbles and rocks
@@ -6020,7 +6185,9 @@ func _build_rocks(parent: Node3D, patches: Array) -> void:
 			if not cells.has(ck):
 				cells[ck] = []
 			cells[ck].append(xf)
-			if anchor and big and _road_distance(q) > 14.0:
+			# Every rock is solid (pebbles aren't): the big ones near the road were left out, and carts
+			# drove through them.
+			if sz > 0.4:
 				colliders.append([Vector3(q.x, y, q.y), 0.78 * maxf(sq.x, sq.z), 1.3 * sq.y * 2.0])
 	for ck in cells.keys():
 		var mmi := _multimesh(meshes[ck.z], _shuffled(cells[ck]), "Rocks_%d_%d_%d" % [ck.x, ck.y, ck.z])

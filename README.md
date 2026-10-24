@@ -2,7 +2,7 @@
 
 A local and LAN multiplayer RC racing game built in Godot.
 
-**Copyright © 2026 Jens Andreas Bröcher. All rights reserved.**
+Copyright © 2026 Jens Andreas Bröcher
 
 [![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 
@@ -14,12 +14,11 @@ This project is licensed under
 
 In plain language:
 
-- **Copyright stays with Jens Andreas Bröcher.** Contributors do not become owners of the original work.
-- **You may play, study, change, and share** the game for non-commercial purposes.
-- **If you change the game and share it**, you must publish those changes (including source) under the same license so others can use them too.
-- **You may not sell the game or use it primarily for commercial gain.** Only Jens Andreas Bröcher may offer commercial versions or sales.
-- **Credit is required.** Keep the copyright notice and license when you share the project.
+- **Non-commercial:** You may not sell this game, monetize it, or distribute it for commercial gain. Commercial distribution rights are exclusively reserved by Jens Andreas Bröcher.
+- **Play, study and mod:** You are free to run, modify, and build upon the project for non-commercial purposes.
+- **ShareAlike:** If you remix, transform, or build upon the material and distribute your version, you must license your modifications under CC BY-NC-SA 4.0.
+- **Attribution:** You must give appropriate credit and retain all copyright notices.
 
-Contributions sent to this repository are accepted under the same license.
+### Third-party assets
 
 Third-party assets and add-ons (for example models, music, or plugins under `addons/`) remain under their own original licenses where those apply.

@@ -355,6 +355,19 @@ func leaf_material(lod_mode: int, sway: float, sway_height: float) -> ShaderMate
 	return m
 
 
+## How far a tree reaches out (flat, from its axis) between `y0` and `y1` over its foot: a spruce's
+## low skirt, an oak's flared foot. The generators size the trees' colliders from it, so a cart
+## stops at the branches instead of driving into them up to the trunk.
+static func band_radius(mesh: Mesh, y0: float, y1: float) -> float:
+	var r := 0.0
+	for si in range(mesh.get_surface_count()):
+		var v: PackedVector3Array = mesh.surface_get_arrays(si)[Mesh.ARRAY_VERTEX]
+		for q in v:
+			if q.y >= y0 and q.y <= y1:
+				r = maxf(r, Vector2(q.x, q.z).length())
+	return r
+
+
 static func set_lod(m: ShaderMaterial, lod_mode: int) -> void:
 	m.set_shader_parameter("lod_mode", lod_mode)
 	m.set_shader_parameter("lod_fade_begin", TREE_NEAR - TREE_FADE * 0.5)

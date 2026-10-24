@@ -5,7 +5,6 @@
 [ext_resource type="AudioStream" uid="uid://bblp15g61n0br" path="res://sounds/nitro_boost_start.mp3" id="4_nitro"]
 [ext_resource type="AudioStream" uid="uid://cjace5lfxnac4" path="res://sounds/rocket_thruster_loop.wav" id="5_rocket"]
 [ext_resource type="AudioStream" uid="uid://cdk3hgsnfy0wt" path="res://sounds/nitro_boost_release.wav" id="6_release"]
-[ext_resource type="AudioStream" uid="uid://cphictex845bp" path="res://sounds/unused_double_beep.wav" id="7_beep2"]
 [ext_resource type="AudioStream" uid="uid://bbdsav3kknhfl" path="res://sounds/unused_warning_beep.ogg" id="8_beep1"]
 [ext_resource type="AudioStream" uid="uid://citd4tl517h1r" path="res://sounds/cart_explosion.wav" id="9_explosion"]
 [ext_resource type="AudioStream" uid="uid://bue32aws7o5ae" path="res://sounds/cart_fire_loop.mp3" id="10_fireloop"]
@@ -448,11 +447,6 @@ unit_size = 20.0
 stream = ExtResource("6_release")
 volume_db = -5.0
 unit_size = 20.0
-
-[node name="SFX_DoubleBeep" type="AudioStreamPlayer3D" parent="Visuals" unique_id=1121517406]
-stream = ExtResource("7_beep2")
-volume_db = -8.0
-unit_size = 15.0
 
 [node name="SFX_BeepWarning" type="AudioStreamPlayer3D" parent="Visuals" unique_id=428971605]
 stream = ExtResource("8_beep1")

@@ -322,7 +322,6 @@ var last_respawn_time: float = -999.0
 @onready var sfx_nitro_start = $Visuals/SFX_NitroStart
 @onready var sfx_rocket_loop = $Visuals/SFX_RocketLoop
 @onready var sfx_release_pop = $Visuals/SFX_ReleasePop
-@onready var sfx_double_beep = $Visuals/SFX_DoubleBeep
 @onready var sfx_beep_warning = $Visuals/SFX_BeepWarning
 @onready var sfx_explosion = $Visuals/SFX_Explosion
 @onready var sfx_fire_loop = $Visuals/SFX_FireLoop
@@ -354,8 +353,6 @@ var _kb_brake_amount: float = 0.0
 var smoothed_speed: float = 0.0
 var stuck_timer: float = 0.0
 var race_start_time: float = 0.0
-## Item boxes hand out only boosts for this long after the start.
-const START_BOOST_ONLY_SECONDS := 10.0
 var _ai_avoid_force: float = 0.0
 var _ai_offtrack_timer: float = 0.0
 var _ai_unstuck_dir: float = 0.0
@@ -3453,8 +3450,6 @@ func _use_item():
 		var item1_name = ItemType.keys()[current_item]
 		var item2_name = ItemType.keys()[current_item_2]
 		race_ui.update_items(item1_name, item2_name)
-		# The item's in hand: a double beep after the box's own pickup sound.
-		get_tree().create_timer(0.35).timeout.connect(func(): if is_instance_valid(self): sfx_double_beep.play())
 	
 	if is_ai or multiplayer.multiplayer_peer == null or multiplayer.is_server():
 		_execute_use_item(item_to_use)
@@ -3472,8 +3467,6 @@ func _discard_item():
 		var item1_name = ItemType.keys()[current_item]
 		var item2_name = ItemType.keys()[current_item_2]
 		race_ui.update_items(item1_name, item2_name)
-		# The item's in hand: a double beep after the box's own pickup sound.
-		get_tree().create_timer(0.35).timeout.connect(func(): if is_instance_valid(self): sfx_double_beep.play())
 
 @rpc("any_peer", "call_local", "reliable")
 func request_use_item(item_to_use: int):
@@ -4722,37 +4715,17 @@ func give_item(type: int):
 		var item1_name = ItemType.keys()[current_item]
 		var item2_name = ItemType.keys()[current_item_2]
 		race_ui.update_items(item1_name, item2_name)
-		# The item's in hand: a double beep after the box's own pickup sound.
-		get_tree().create_timer(0.35).timeout.connect(func(): if is_instance_valid(self): sfx_double_beep.play())
+
+## Time trial: the boosts a lap starts with, in place of whatever was left in the slots.
+func set_lap_boosts(count: int) -> void:
+	current_item = ItemType.BOOST if count >= 1 else ItemType.NONE
+	current_item_2 = ItemType.BOOST if count >= 2 else ItemType.NONE
+	if is_local_player and race_ui:
+		race_ui.update_items(ItemType.keys()[current_item], ItemType.keys()[current_item_2])
 
 @rpc("any_peer", "call_local", "reliable")
 func give_item_rpc(type: int):
 	give_item(type)
-
-func _get_random_item_rpc() -> int:
-	# Boosts only for the first seconds after the start: the grid is still bunched up, and one
-	# bomb or missile could take out half of it.
-	if race_start_time > 0.0 and Time.get_ticks_msec() / 1000.0 - race_start_time < START_BOOST_ONLY_SECONDS:
-		return ItemType.BOOST
-	var id = name.to_int()
-	var level = get_tree().get_first_node_in_group("level")
-	if level and level.get("player_stats") and level.player_stats.has(id):
-		var stats = level.player_stats[id]
-		if level.player_stats.size() > 1:
-			if stats.get("pos", 0) == level.player_stats.size():
-				return ItemType.BOOST
-
-	# Weighted list of items: BOOST has 3x weight compared to others
-	var items = [
-		ItemType.BOOST, ItemType.BOOST, ItemType.BOOST,
-		ItemType.MISSILE,
-		ItemType.GUIDED_MISSILE,
-		ItemType.SHIELD,
-		ItemType.SHOCKWAVE,
-		ItemType.BOMB,
-		ItemType.LIGHTNING
-	]
-	return items[randi() % items.size()]
 
 func _remove_collisions_recursive(node: Node):
 	if node == null: return

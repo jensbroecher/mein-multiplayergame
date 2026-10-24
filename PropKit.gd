@@ -210,6 +210,48 @@ func tyre(kit: Dictionary, key: String, c: Vector3, r_in: float, r_out: float, h
 	lathe(kit, key, c, prof, segs, col, false, axis_basis)
 
 
+## A painted tyre lying flat at `c`: a lathe of a rounded section with tyre_wall.gdshader's UVs (x round
+## the tyre, y across the section: lower sidewall, tread, upper sidewall, then the inside of the ring),
+## its paint in the vertex colour (black: bare rubber) and `seed` in the alpha, tipped by `tip`. The
+## key's material should be tyre_wall.gdshader's.
+func painted_tyre(kit: Dictionary, key: String, c: Vector3, r_in: float, r_out: float, h: float, col: Color, seed_v: float, tip := Basis()) -> void:
+	var rr := minf(h * 0.3, (r_out - r_in) * 0.32)
+	# [radius, height, v]: from the inner bead under it, out across the bottom, up the tread, back in
+	# over the top, and down the inside of the ring.
+	var prof: Array = [
+		[r_in + 0.01, -h * 0.5 + 0.02, 0.0], [r_in + rr * 0.8, -h * 0.5, 0.08], [(r_in + r_out) * 0.5, -h * 0.5 - 0.004, 0.17],
+		[r_out - rr, -h * 0.5 + 0.002, 0.26], [r_out - rr * 0.29, -h * 0.5 + rr * 0.29, 0.3], [r_out, -h * 0.5 + rr, 0.34],
+		[r_out + 0.004, 0.0, 0.5], [r_out, h * 0.5 - rr, 0.66], [r_out - rr * 0.29, h * 0.5 - rr * 0.29, 0.7],
+		[r_out - rr, h * 0.5 - 0.002, 0.74], [(r_in + r_out) * 0.5, h * 0.5 + 0.004, 0.83], [r_in + rr * 0.8, h * 0.5, 0.92],
+		[r_in + 0.01, h * 0.5 - 0.02, 1.0], [r_in, 0.0, 1.05], [r_in + 0.01, -h * 0.5 + 0.02, 1.1],
+	]
+	var segs := 22
+	var paint := Color(col.r, col.g, col.b, seed_v)
+	for kk in range(prof.size() - 1):
+		var p0: Array = prof[kk]
+		var p1: Array = prof[kk + 1]
+		var d := Vector2(float(p1[0]) - float(p0[0]), float(p1[1]) - float(p0[1]))
+		var n2 := Vector2(d.y, -d.x).normalized()
+		for j in range(segs):
+			var t0 := TAU * j / segs
+			var t1 := TAU * (j + 1) / segs
+			var u0 := Vector3(cos(t0), 0.0, sin(t0))
+			var u1 := Vector3(cos(t1), 0.0, sin(t1))
+			var q00 := c + tip * (u0 * float(p0[0]) + Vector3.UP * float(p0[1]))
+			var q01 := c + tip * (u1 * float(p0[0]) + Vector3.UP * float(p0[1]))
+			var q10 := c + tip * (u0 * float(p1[0]) + Vector3.UP * float(p1[1]))
+			var q11 := c + tip * (u1 * float(p1[0]) + Vector3.UP * float(p1[1]))
+			var n0 := tip * (u0 * n2.x + Vector3.UP * n2.y)
+			var n1 := tip * (u1 * n2.x + Vector3.UP * n2.y)
+			var out := (n0 + n1).normalized()
+			var uv00 := Vector2(float(j) / segs, float(p0[2]))
+			var uv01 := Vector2(float(j + 1) / segs, float(p0[2]))
+			var uv10 := Vector2(float(j) / segs, float(p1[2]))
+			var uv11 := Vector2(float(j + 1) / segs, float(p1[2]))
+			tri(kit, key, q00, q01, q11, n0, n1, n1, paint, out, uv00, uv01, uv11)
+			tri(kit, key, q00, q11, q10, n0, n1, n0, paint, out, uv00, uv11, uv10)
+
+
 ## An outline in the local x-y plane (x along, y up), extruded across z from z0 to z1, with its edges
 ## bevelled by `bevel`: vehicle bodies, booths, ramps' side frames. The outline runs counter-clockwise
 ## seen from +z and may be concave (the side faces are triangulated). Returns nothing; `col_fn`, if

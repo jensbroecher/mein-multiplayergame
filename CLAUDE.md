@@ -104,6 +104,9 @@ the others re-bakes it (see Lakeside Course below).
   at its entry (2600m) until its lanes were separated, and its exit pad then boosted them off the corner
   55m on (2745m): see the loop note above. `res://scratch/loop_ai_probe.tscn` traces one AI cart through it.
   The old curl threw carts off the road at 2213m; the kicker doesn't.
+- `ConcreteRamp.tscn` (hand-built CSG, Ramps/ConcreteRamp): its rear cornice hangs just under the lip (it
+  stood 0.38m above it and carts leaving the jump hit it), and the side plinths slope in at the toe, under
+  the walls (flat, they stood up out of the ramp's foot).
 - The water (`TerrainGenerator/Water_Surface`) is a 12000m plane. `water.gdshader` tiles its ripples 40 times
   across the mesh's UVs and was tuned on a 1600m plane, so `wave_scale` is the plane's size / 1600; at 1 the
   ripples were 300m across and raced. Both `_generate_water` and `_update_water_surface` set it.
@@ -210,8 +213,33 @@ first to third (`_announce_place`). The podium calls each place as it's revealed
   RMS (`CLIP_DB`): they range from -12 to -49 dBFS. Measure a new clip before adding it.
 - Leftover sounds now used: `unused_tire_screech_*` (a one-shot at the start of a skid over 12 m/s),
   `unused_car_crash_clank` (cart against cart), `unused_warning_beep` (a missile closing on the local
-  cart), `unused_double_beep` (an item in hand), `unused_alert` (wrong way). The odd-named loops in
-  `sounds/enginesounds/` (`cccc`, `kkk`, ...) are spares no car uses.
+  cart), `unused_alert` (wrong way). The double beep (an item in hand) was too distracting and is gone.
+  The odd-named loops in `sounds/enginesounds/` (`cccc`, `kkk`, ...) are spares no car uses.
+
+## Props that give: flags, tyre stacks, cones
+
+- `SpringProps.gd` (a MultiMeshInstance3D, one per design, rest transforms in `rest`): each prop is a damped
+  spring tip about its foot plus, for stacks, a slide. A cart's touch (its speed from how far it moved, so
+  remote carts count) tips it away and the prop wobbles back; only moving props are written back. Local
+  scenery, not synced. Flags (Bloombay's feather and chequered flags, `_build_spring_flags`, FLAG_SCALE 1.5)
+  have no collider: a cart drives through, the flag bends over and loses it a little speed. Their waving
+  phase is the instance custom data (`flag_wave.gdshader`'s INSTANCE_CUSTOM.x). Chequered flags stand only
+  at the start/finish (`_build_finish_flags`, FINISH_AT).
+- `TyreStacks.gd`: tyre walls of stacks of `PropKit.painted_tyre` (tyre_wall.gdshader), as SpringProps (they
+  shift up to 0.6m and rock) over the wall's own box colliders, which still stop the cart. Lakeside,
+  Bloombay and Pinecrest all build their tyre walls through it. Bloombay's corner cones are KnockableProps.
+- `res://scratch/spring_props_test.tscn -- <dir> [level=] [props=Flags|Stacks] [index=N] [speed=25]` (windowed)
+  drives a cart through one prop and logs the tip and slide.
+
+## Collision audit
+
+`res://scratch/collision_audit.tscn -- <level> [reach=30] [all=1]` (headless, a spectator race so Level.gd's
+runtime colliders exist) lists, per node, the 1m cells within `reach` of the lap where something is drawn at
+a cart's height (0.4 to 1.4m over the ground) with no collider: what a cart drives through. Flags, ground
+cover, hazel and ferns are meant to be soft. Trees' colliders now reach `TREE_SOLID_SHARE` (0.7) of their
+branches' spread at that height (`WoodlandBuilder.band_radius`: a spruce's or fir's skirt), Pinecrest's dwarf
+pines and junipers have a core collider and its logs and rockfall fences boxes, Bloombay's rocks (not
+pebbles) are all solid and its bent palms carry a hull of their low trunk.
 
 ## Button sounds and the screen swipe
 
@@ -266,21 +294,36 @@ so a change to the pad shows on every level. With `settle_on_track`, a pad drops
 under it at runtime (after `wait_for_collisions`), tilts with it and faces along the TrackPath.
 Bloombay sets it on. Every other pad turns about its own up axis at runtime to face the nearest lap path
 (`_face_lap`: TrackPath, the alternative paths, other `*Path` children such as Mara's CrocJumpPath):
-31 pads on 8 levels had been laid backwards or across shortcuts. `res://scratch/boost_pad_audit.gd` (`-s`)
-lists the saved transforms; `res://scratch/boost_pad_runtime_check.tscn -- <level>` checks them in game.
+31 pads on 8 levels had been laid backwards or across shortcuts. `settle_on_track` is on by default: every
+pad drops onto the surface under it once the level's collision exists, tilts with it and faces along the
+nearest lap path (`_lap_tangent`); flat pads at set heights had floated on one side or sunk into slopes.
+The shader's lit border is one rectangular frame (`aspect`, the top's proportions): separate side and end
+lines had overshot each other at the corners. `res://scratch/boost_pad_audit.gd` (`-s`) lists the saved
+transforms; `res://scratch/boost_pad_runtime_check.tscn -- <level>` checks them in game.
 
 ## Item boxes
 
 - `ItemBox.gd` (`@tool`) builds the box as internal children, so level files (and Level.gd's spawns) only
-  store the transform: a hologram glass cube (`item_box_glass.gdshader`), a gold "?" (`item_box_glyph`, a tube
-  swept along the glyph), sparkles (`item_box_sparkles`) and a glow on the ground (`item_box_glow`). Meshes
-  and materials are static, shared by every box; a box's own state is shader instance uniforms (`phase`,
-  `pop`, `build`, the glow's `present` and `charge`).
+  store the transform: a holographic glass globe (`item_box_orb.gdshader`: a rim, latitude and longitude
+  lines, the circuit traces; `SHELL` switches back to the cube, `item_box_glass.gdshader`), the symbol of the item it holds
+  (`item_box_glyph`, white tubes swept along `ItemSymbols.gd`'s strokes), sparkles (`item_box_sparkles`) and a
+  glow on the ground (`item_box_glow`). Meshes and materials are static, shared by every box; a box's own state
+  is shader instance uniforms (`phase`, `pop`, `build`, the glow's `present` and `charge`) and its `item`.
+- What a box shows is what it gives. The server picks the item (`roll_item`, ITEM_POOL) when the box comes back
+  (`_activate_rpc(item)`) and every peer shows it. Until START_BOOST_ONLY_SECONDS after the green light every box
+  holds a boost (`boost_only_until`, set by Level); then Level has the server pick again for the boxes still
+  standing (`server_reroll`). One exception: the racer in last place always gets a boost, a chance to catch up
+  without slowing anyone. `res://scratch/item_box_roll_check.tscn` checks both.
+- `ItemSymbols.gd` holds the seven symbols (flame, rocket, rocket and reticle, shield, rings, bomb, bolt) as
+  strokes in a -1..1 square; `ItemSymbolIcon.gd` draws them in the HUD's item slots and the kill feed (white
+  over a soft dark edge). `res://scratch/item_symbols_preview.tscn -- <dir>` (windowed) shows boxes and icons.
+- Time trial: no boxes at all (Level frees the levels' own too), and each lap starts with two boosts in the
+  slots (`_give_lap_boosts`, `PlayerCart.set_lap_boosts`). `res://scratch/time_trial_items_check.tscn`.
 - The glass is premultiplied: ALBEDO is the light it gives off, ALPHA how much it dims what's behind it. Back
-  faces draw at 45%, which gives the far edges. Its even `fill` stays low because it lays cyan over the "?".
-- The "?" turns about world up to face the camera in its vertex shader (BILLBOARD_FIXED_Y's matrix), so it
+  faces draw at 45%, which gives the far edges. Its even `fill` stays low because it lays cyan over the symbol.
+- The symbol turns about world up to face the camera in its vertex shader (BILLBOARD_FIXED_Y's matrix), so it
   reads on both split-screen viewports. It is unshaded with its own fixed key light: lit by the scene, its
-  specular took in the blue sky and turned the gold salmon.
+  specular took in the blue sky.
 - The sparkles are one mesh of quads that the vertex shader places (seeds in COLOR, corner in UV, writes
   `POSITION`): no particle system. `custom_aabb` covers the burst.
 - Once the level's collision exists (`_settle`) the box raycasts down: the cube's centre hovers `HOVER`

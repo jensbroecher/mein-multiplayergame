@@ -7,6 +7,7 @@ const ITEM_BOX_SCENE = preload("res://ItemBox.tscn")
 const CarPaint = preload("res://CarPaint.gd")
 const FX_WARMUP = preload("res://FxWarmup.gd")
 const STAGE_AMBIENCE = preload("res://StageAmbience.gd")
+const ITEM_BOX = preload("res://ItemBox.gd")
 
 @export var checkpoints: Array[Area3D] = []
 @export var track_path: Path3D
@@ -175,6 +176,8 @@ func _ready():
 	MusicManager.load_playlist_for_level(scene_file_path)
 	# Compile the shaders of effects that first show up mid-race (lightning, missiles, splashes)
 	# while the stage loads, instead of freezing the race when they first appear.
+	# Every box holds a boost until the start (ItemBox.roll_item).
+	ITEM_BOX.boost_only_until = INF
 	add_child(FX_WARMUP.new())
 	# The stage's recorded background (birds, woods, beach, crowd...), under its own baked ambiences.
 	var ambience = STAGE_AMBIENCE.new()
@@ -827,11 +830,19 @@ func start_race():
 	_show_start_lights(4)
 	MusicManager.play_voice("go")
 	_race_go_msec = Time.get_ticks_msec()
+	# Boosts only for the first seconds: the grid is still bunched up. Then the boxes still standing
+	# show (and hold) an item of their own.
+	ITEM_BOX.boost_only_until = _race_go_msec + ITEM_BOX.START_BOOST_ONLY_SECONDS * 1000.0
+	if multiplayer.is_server():
+		get_tree().create_timer(ITEM_BOX.START_BOOST_ONLY_SECONDS).timeout.connect(_reroll_item_boxes)
 	_commentator.begin()
 	MusicManager.play_race_start_beep(true) # higher/longer 4th beep
 	MusicManager.load_playlist_for_level(scene_file_path)
 	MusicManager.play_race_music()
 	get_tree().call_group("player_carts", "on_race_started")
+	if _is_time_trial() and multiplayer.is_server():
+		for id in player_stats:
+			_give_lap_boosts(id)
 	_spawn_start_finish_items_delayed()
 
 
@@ -1026,10 +1037,12 @@ func _start_end_timer_if_humans_done() -> void:
 		end_timer = 10.0
 
 
-## A racer completed a lap. A human's clean lap (no gate missed) faster than the stage's record is
+## A racer completed a lap (in time trial the next one starts with its boosts). A human's clean lap (no gate missed) faster than the stage's record is
 ## a new lap record: saved, and the announcer calls it (only when it beats an earlier record).
 func _lap_completed(id: int) -> void:
 	var stats: Dictionary = player_stats[id]
+	if _is_time_trial() and stats["laps"] < NetworkManager.max_laps:
+		_give_lap_boosts(id)
 	var now := Time.get_ticks_msec()
 	var lap_ms: int = now - int(stats.get("lap_start", _race_go_msec))
 	var clean: bool = stats.get("lap_clean", true)
@@ -1376,7 +1389,31 @@ func on_player_exploded(is_local: bool):
 func _spawn_item_boxes_deferred():
 	await get_tree().physics_frame
 	await get_tree().physics_frame
+	if _is_time_trial():
+		# Time trial: no items, only the boosts each lap starts with (_give_lap_boosts). The boxes some
+		# levels carry go too.
+		for box in get_tree().get_nodes_in_group("item_boxes"):
+			box.queue_free()
+		return
 	_spawn_item_boxes()
+
+
+func _reroll_item_boxes() -> void:
+	if is_inside_tree():
+		get_tree().call_group(&"item_boxes", &"server_reroll")
+
+
+func _is_time_trial() -> bool:
+	return NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL
+
+
+## Time trial: every lap starts with TIME_TRIAL_BOOSTS boosts in the item slots, whatever was left.
+const TIME_TRIAL_BOOSTS := 2
+
+func _give_lap_boosts(id: int) -> void:
+	var cart = players_container.get_node_or_null(str(id))
+	if cart and cart.has_method("set_lap_boosts"):
+		cart.set_lap_boosts(TIME_TRIAL_BOOSTS)
 
 
 func _setup_chasm_pit_water() -> void:
@@ -1493,6 +1530,8 @@ func _spawn_item_boxes():
 	_spawn_random_item_boxes(15)
 
 func _spawn_start_finish_items_delayed():
+	if _is_time_trial():
+		return
 	await get_tree().create_timer(10.0).timeout
 	if not is_inside_tree():
 		return
