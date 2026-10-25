@@ -122,7 +122,7 @@ the others re-bakes it (see Lakeside Course below).
   lap's centreline at s0 across the inside of the bend to s1, its end handles turned from the lap's heading
   toward the chord by `leave`/`join`, so it parts at about 27 degrees and merges at about 22, on the ground
   (on the road near its ends). The woods (`alts`) and boulders (`_on_shortcut`) keep off it. It removes any
-  `AlternativePaths` child not listed: the hand-drawn AlternativePath2 (s 506-622) was a jump off the high road
+  `AlternativePaths` child not listed (and drops it from Level's exported `alternative_paths`): the hand-drawn AlternativePath2 (s 506-622) was a jump off the high road
   onto the island inside that bend, the tilted wooden cart FBX its ramp. The island lies 5-22m under the road
   except for 70m of gentle bend, so there is no cut to drive there. `res://scratch/lakeside_bank_profile.gd`
   (`-s`, `-- <s0> <s1> [lats=-20,...]`) prints the ground beside the road against the road's height.
@@ -155,7 +155,8 @@ the others re-bakes it (see Lakeside Course below).
   over the old 4km lap): 2.5km, half tarmac, half gravel and dirt. The start straight runs down the river's
   west bank past the Parador del Viento, over the Puente (a camel-back through truss), up a shelf road on
   the east wall to La Horquilla, onto the mesa where the tarmac ends, along La Cuchilla (a knife-edge gravel
-  ridge, the old course's elevated road with the misty hills behind), down La Bajada (two kickers) into the
+  ridge, the old course's elevated road with the misty hills behind), down La Bajada (two dirt kickers,
+  `_build_kickers`, with shoulders down into the ground each side, `KICK_SHOULDER`) into the
   Valle de los Duendes (procedural hoodoos), through La Garganta (a slot canyon), over the ford El Vado and
   back on tarmac through El Arco del Viento. Regenerating takes about 25s.
 - The lap is turtle moves (`PLAN`) with two solved straights (one north-south, one east-west), as on Msitu
@@ -199,7 +200,9 @@ the others re-bakes it (see Lakeside Course below).
     little foam only where the riffle runs over the bar (by the depth straight down to the bed, from the
     depth texture). `ambient_light_disabled`: lit by the sky's radiance it mirrored blue, so its ambient
     is EMISSION and its reflection is drawn in the shader (sky over a skyline of canyon walls, rock
-    below). The mesh is a ribbon 12m wider than the river each side (UV in metres), so it reaches past
+    below). That skyline is low, gently rolling and blurred: a sharp, wavy one read as a dark wavy smear
+    along every far shore. The depth texture is read unfiltered (`filter_nearest`): mipmapped, it
+    averaged the banks' silhouettes into deep water. The mesh is a ribbon 12m wider than the river each side (UV in metres), so it reaches past
     every beach's shore; the banks hide the rest.
   - `canyon_ground.gdshader` draws the bars (river cobbles: the pebble rubble half washed out of its red,
     sand drifted between), a dark wet band and a drift line along the waterline, the bed under the water

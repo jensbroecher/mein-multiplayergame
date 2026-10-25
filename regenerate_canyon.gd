@@ -2150,6 +2150,10 @@ func _build_hoodoos(level_scene: Node3D) -> void:
 ## PlayerCart drives on it as track.
 const KICK_H := 1.1
 const KICK_RUN := 7.0
+## The dirt shoulders down each side: how far out they reach at the foot (plus 1.2 per metre of height)
+## and how far under the road they end, so they meet the ground.
+const KICK_SHOULDER := 1.4
+const KICK_SINK := 0.35
 
 func _build_kickers(level_scene: Node3D) -> Array:
 	var root := Node3D.new()
@@ -2162,19 +2166,27 @@ func _build_kickers(level_scene: Node3D) -> Array:
 		st.begin(Mesh.PRIMITIVE_TRIANGLES)
 		var prof: Array = [[-KICK_RUN, 0.0], [-KICK_RUN * 0.6, KICK_H * 0.22], [-KICK_RUN * 0.3, KICK_H * 0.58], [0.0, KICK_H], [1.0, KICK_H], [2.6, -0.2]]
 		var half := 6.4
+		# Each row runs out past the top's edges and down into the ground (KICK_SHOULDER): with only the
+		# top, the kicker was a strip with open sides you could see under.
+		var lats: Array = []
 		for pi in range(prof.size()):
 			var ds: float = prof[pi][0]
 			var lift: float = prof[pi][1]
-			for side in [-1.0, 1.0]:
-				var q: Dictionary = _spot(s_lip + ds, side * half, 0.0)
+			var sh: float = KICK_SHOULDER + maxf(lift, 0.0) * 1.2
+			lats = [[-half - sh, minf(lift, 0.0) - KICK_SINK], [-half, lift], [half, lift], [half + sh, minf(lift, 0.0) - KICK_SINK]]
+			for l in lats:
+				var lat: float = l[0]
+				var q: Dictionary = _spot(s_lip + ds, lat, 0.0)
 				var p: Vector3 = q["pos"]
-				p.y = _road_y(s_lip + ds) + lift
-				st.set_color(Color(0.0, 1.0, 0.0, clampf(side * half / 24.0 + 0.5, 0.0, 1.0)))
+				p.y = _road_y(s_lip + ds) + float(l[1])
+				st.set_color(Color(0.0, 1.0, 0.0, clampf(lat / 24.0 + 0.5, 0.0, 1.0)))
 				st.set_uv(Vector2(p.x, p.z))
 				st.set_uv2(Vector2(s_lip + ds, 0.0))
 				st.add_vertex(p)
+		var cols: int = lats.size()
 		for pi in range(prof.size() - 1):
-			_add_quad_up(st, pi * 2, pi * 2 + 1, pi * 2 + 2, pi * 2 + 3)
+			for c in range(cols - 1):
+				_add_quad_up(st, pi * cols + c, pi * cols + c + 1, (pi + 1) * cols + c, (pi + 1) * cols + c + 1)
 		st.generate_normals()
 		var mesh: ArrayMesh = st.commit()
 		_fix_winding_up(mesh)

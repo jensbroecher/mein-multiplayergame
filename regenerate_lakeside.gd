@@ -3154,6 +3154,12 @@ func _lay_shortcuts() -> void:
 			print("  shortcut %s removed" % old.name)
 			holder.remove_child(old)
 			old.free()
+	# The level's own list of them (Level.alternative_paths) mustn't keep the removed one.
+	var listed: Array[Path3D] = []
+	for p in _level.get("alternative_paths"):
+		if is_instance_valid(p):
+			listed.append(p)
+	_level.set("alternative_paths", listed)
 	for sc in SHORTCUTS:
 		var f0 := _frame(float(sc[1]))
 		var f1 := _frame(float(sc[2]))

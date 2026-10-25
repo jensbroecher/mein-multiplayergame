@@ -14,7 +14,9 @@ render_mode cull_back, depth_draw_never, blend_mix, specular_schlick_ggx, ambien
 
 uniform sampler2D noise_tex : hint_normal, filter_linear_mipmap, repeat_enable;
 uniform sampler2D foam_noise : filter_linear_mipmap, repeat_enable;
-uniform sampler2D depth_texture : hint_depth_texture, filter_linear_mipmap;
+// Unfiltered: averaged across the banks' silhouettes (filter_linear_mipmap), it read them as deep water and
+// painted a dark smear of each bank along the shore.
+uniform sampler2D depth_texture : hint_depth_texture, filter_nearest;
 
 // Silt-laden water lit by the sun (sRGB): tan where it is shallow, olive where it runs deep.
 uniform vec3 shallow_color : source_color = vec3(0.47, 0.42, 0.28);
@@ -102,9 +104,11 @@ void fragment() {
 	vec3 vw = normalize((INV_VIEW_MATRIX * vec4(VIEW, 0.0)).xyz);
 	vec3 r = reflect(-vw, nw);
 	float az = atan(r.x, r.z);
-	float skyline = 0.10 + 0.08 * sin(az * 3.0 + 1.3) + 0.05 * sin(az * 7.0 + 0.4);
+	// A low, gently rolling skyline, blurred: it is made up, so a sharp, wavy one (two sines, up to 0.23
+	// high) read as a dark wavy smear along every far shore that matched none of the real banks.
+	float skyline = 0.07 + 0.02 * sin(az * 2.0 + 1.3);
 	vec3 sky = mix(sky_low, sky_top, smoothstep(skyline, 0.75, r.y));
-	vec3 refl = mix(wall_color * (0.65 + 0.35 * smoothstep(-0.2, skyline, r.y)), sky, smoothstep(skyline - 0.02, skyline + 0.04, r.y));
+	vec3 refl = mix(wall_color * (0.8 + 0.2 * smoothstep(-0.2, skyline, r.y)), sky, smoothstep(skyline - 0.09, skyline + 0.12, r.y));
 	float ndotv = clamp(dot(NORMAL, VIEW), 0.0, 1.0);
 	float fresnel = 0.02 + 0.98 * pow(1.0 - ndotv, 5.0);
 	fresnel *= 0.75 * (1.0 - foam);
