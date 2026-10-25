@@ -411,6 +411,17 @@ var alternative_paths: Array[Path3D] = []
 var active_path: Path3D = null
 var on_alternative_path: bool = false
 var alt_path_decisions: Dictionary = {} # Path3D -> bool
+## On a shortcut: the lap distance where it rejoins the lap (its end's nearest point), so the AI's route
+## runs on along the lap past the shortcut's end (_ai_route_local).
+var _ai_rejoin_offset: float = 0.0
+## A shortcut the AI has decided to take and is lining up for, and how far out it decides.
+var _ai_pending_route: Path3D = null
+const AI_ROUTE_DECIDE := 45.0
+## How far ahead the AI aims on a route with an "ai_lane_limit" meta, and how fast it drives it.
+const AI_TIGHT_LOOK_AHEAD := 16.0
+const AI_TIGHT_SPEED := 18.0
+## How hard it steers against sliding across such a route's line (per radian of the slide).
+const AI_TIGHT_DAMP := 2.0
 
 
 var is_exploding = false
@@ -603,16 +614,16 @@ var _sink_sound: AudioStreamPlayer3D = null
 var _water_prev_y := INF
 ## The fastest it was falling while touching the water but not yet under it (-1: splashed already).
 var _entry_fall_speed := 0.0
-## The follower camera's splash shot: once the cart plunges into deep water it stops following it
-## down and holds back and up from where it went in (on the surface; x INF = none), facing the way the
-## cart was heading, so the splash is in view. Held while the cart is under, until the respawn.
+## The follower camera's splash shot: it follows the cart down to the water as usual, and once the cart
+## is sinking (under and flooded, so never for one that lands short or skims through) it pulls back
+## fast, back along the way the cart went in and up over the spot (on the surface; x INF = none), so
+## the splash is in view. Held until the respawn, or until the cart boosts out again.
 var _splash_cam_at := Vector3(INF, 0.0, 0.0)
 var _splash_cam_fwd := Vector3.FORWARD
-var _splash_cam_time := 0.0
-## Falling faster than this with deep water close below is a plunge.
-const SPLASH_CAM_FALL := 9.0
 const SPLASH_CAM_BACK := 10.0
 const SPLASH_CAM_UP := 5.5
+## How fast it pulls back (per second, of the way left): about 0.35s to get most of the way.
+const SPLASH_CAM_PULL := 7.0
 var original_wheel_transforms: Dictionary = {}
 var original_cart_model_transform: Transform3D
 ## The explosion's damage ({wheels: [corners], parts: int, disintegrate: bool}, see CarDebris.roll()),
@@ -1493,7 +1504,7 @@ func _process(delta):
 					cam_fwd = cam_fwd.normalized()
 				camera_look_at = camera_look_at.lerp(visuals.global_position + cam_fwd * look_ahead_dist, 10.0 * delta)
 				camera_pivot.look_at(camera_look_at, Vector3.UP)
-			elif _splash_cam_wanted(visual_forward, excludes, delta):
+			elif _splash_cam_wanted(visual_forward):
 				_splash_camera(excludes, delta)
 			else:
 				var cam_dist = lerp(5.2, 6.8, clamp(boost_time / 4.0, 0.0, 1.0))
@@ -4394,7 +4405,6 @@ func _apply_respawn_pose() -> void:
 	is_underwater = false
 	_water_prev_y = INF
 	_splash_cam_at = Vector3(INF, 0.0, 0.0)
-	_splash_cam_time = 0.0
 	if _engine_flooded:
 		_set_engine_flooded(false)
 	water_timer = 0.0
@@ -4403,6 +4413,7 @@ func _apply_respawn_pose() -> void:
 	was_on_ground = true
 	air_time = 0.0
 	on_alternative_path = false
+	_ai_pending_route = null
 	active_path = track_path
 	alt_path_decisions.clear()
 
@@ -6209,6 +6220,9 @@ func _get_ai_input(delta: float) -> Vector2:
 		var num_steps = int((search_back + search_fwd) / step)
 		for s in range(num_steps + 1):
 			var test_off = fmod(_ai_last_ontrack_offset - search_back + s * step + curve_length * 4.0, curve_length)
+			if on_alternative_path:
+				# A shortcut doesn't go round: searching past its end found its start.
+				test_off = clampf(_ai_last_ontrack_offset - search_back + s * step, 0.0, curve_length)
 			var p = curve.sample_baked(test_off)
 			var d_sq = p.distance_squared_to(local_pos)
 			if d_sq < min_d_sq:
@@ -6239,8 +6253,10 @@ func _get_ai_input(delta: float) -> Vector2:
 			current_offset = curve.get_closest_offset(local_pos)
 			_ai_last_ontrack_offset = current_offset
 	elif not alternative_paths.is_empty():
-		# Alternative path detection and decision logic (shortcuts)
-		# Only cars whose personality rolls below ai_shortcut_chance take the shortcut
+		# Shortcuts: AI_ROUTE_DECIDE before one's start a car rolls once whether it takes it (its
+		# ai_shortcut_chance); one that does lines up with the start (_ai_pending_route) and switches onto
+		# it there. Deciding only 14m out, cars took a fork from the far lane and went in wide at full speed
+		# (Glacier Highway's Viaduct Express, into the bend after the fork).
 		for alt_path in alternative_paths:
 			if not is_instance_valid(alt_path) or alt_path.curve == null:
 				continue
@@ -6251,22 +6267,30 @@ func _get_ai_input(delta: float) -> Vector2:
 			var start_local = alt_curve.get_point_position(0)
 			var start_global = alt_path.to_global(start_local)
 			
-			var dist = global_position.distance_to(start_global)
-			if dist < 14.0:
+			var to_start: Vector3 = start_global - global_position
+			var dist: float = to_start.length()
+			var ahead: bool = to_start.dot(-visuals.global_transform.basis.z) > 0.0
+			if dist < AI_ROUTE_DECIDE and (ahead or dist < 12.0):
 				if not alt_path_decisions.has(alt_path):
-					var take_shortcut = randf() < ai_shortcut_chance
-					alt_path_decisions[alt_path] = take_shortcut
-					if take_shortcut:
-						on_alternative_path = true
-						active_path = alt_path
-						curve = active_path.curve
-						curve_length = maxf(curve.get_baked_length(), 1.0)
-						local_pos = active_path.to_local(global_position)
-						current_offset = curve.get_closest_offset(local_pos)
-						_ai_last_ontrack_offset = current_offset
-						break
-			elif dist > 28.0:
+					alt_path_decisions[alt_path] = randf() < ai_shortcut_chance
+					if alt_path_decisions[alt_path]:
+						_ai_pending_route = alt_path
+				if _ai_pending_route == alt_path and (dist < 12.0 or not ahead):
+					_ai_pending_route = null
+					on_alternative_path = true
+					active_path = alt_path
+					var alt_end: Vector3 = alt_path.to_global(alt_curve.sample_baked(alt_curve.get_baked_length()))
+					_ai_rejoin_offset = track_path.curve.get_closest_offset(track_path.to_local(alt_end))
+					curve = active_path.curve
+					curve_length = maxf(curve.get_baked_length(), 1.0)
+					local_pos = active_path.to_local(global_position)
+					current_offset = curve.get_closest_offset(local_pos)
+					_ai_last_ontrack_offset = current_offset
+					break
+			elif dist > AI_ROUTE_DECIDE + 20.0:
 				alt_path_decisions.erase(alt_path)
+				if _ai_pending_route == alt_path:
+					_ai_pending_route = null
 	
 	var style: float = 0.0 if _harbor_stage else ai_aggression
 
@@ -6302,11 +6326,28 @@ func _get_ai_input(delta: float) -> Vector2:
 	elif _mountain_stage:
 		ai_lane_offset = clampf(ai_lane_offset, -0.75, 0.75)
 	
-	var turn_info: Dictionary = _ai_measure_upcoming_turn(curve, current_offset, speed)
+	var turn_info: Dictionary = _ai_measure_upcoming_turn(current_offset, speed)
 	_ai_upcoming_turn_angle = float(turn_info.get("angle", 0.0))
 	_ai_upcoming_turn_dist = float(turn_info.get("dist", 40.0))
 	_ai_upcoming_turn_dir = float(turn_info.get("dir", 0.0))
 	var corner_factor: float = clampf(_ai_upcoming_turn_angle / 1.15, 0.0, 1.0)
+	# Lining up for a shortcut it has decided to take: toward the side of the road its start is on.
+	var lining_up := false
+	var route_lat := 0.0
+	if _ai_pending_route != null and is_instance_valid(_ai_pending_route) and not on_alternative_path:
+		var st: Vector3 = _ai_pending_route.to_global(_ai_pending_route.curve.get_point_position(0))
+		var lp: Vector3 = active_path.to_global(_ai_route_local(current_offset))
+		var lt: Vector3 = active_path.to_global(_ai_route_local(current_offset + 1.0)) - lp
+		lt.y = 0.0
+		if lt.length_squared() > 1e-6:
+			lt = lt.normalized()
+			# Kept well inside the road (a fork's start lies past the barrier that ends at the fork), and
+			# eased in over the run up to it.
+			var half_w: float = maxf(_get_track_outer_half_width() - 2.2, 1.0)
+			var lat: float = clampf(Vector3(-lt.z, 0.0, lt.x).dot(st - lp), -half_w, half_w)
+			var ease: float = clampf((AI_ROUTE_DECIDE - global_position.distance_to(st)) / (AI_ROUTE_DECIDE - 15.0), 0.0, 1.0)
+			route_lat = lerpf(ai_lane_offset, lat, ease)
+			lining_up = true
 
 	var look_ahead = lerp(lerpf(10.0, 14.0, style), lerpf(22.0, 26.0, style), clampf(speed / maxf(max_speed, 1.0), 0.0, 1.0)) * ai_lookahead_mult
 	# In a tight nearby bend, aim closer so the car follows the road instead of cutting into walls
@@ -6326,14 +6367,16 @@ func _get_ai_input(delta: float) -> Vector2:
 	if corner_factor > 0.22:
 		var corner_max_look = lerpf(15.0, 7.5, corner_factor)
 		look_ahead = minf(look_ahead, maxf(corner_max_look, _ai_upcoming_turn_dist * 0.40))
+	# A route that holds the AI to its line (Northlight's Thin Ice weaves between holes) is followed
+	# closely, at its capped speed (AI_TIGHT_SPEED): aimed 22-26m ahead at full speed, the chord cut the
+	# inside of each bend into a hole; much closer than 10m, the steering swung across the line on the ice.
+	if on_alternative_path and active_path and active_path.has_meta(&"ai_lane_limit"):
+		look_ahead = clampf(speed * 0.6, 10.0, AI_TIGHT_LOOK_AHEAD)
 	var target_offset = current_offset + look_ahead
-	target_offset = fmod(target_offset, curve_length)
-	
-	var target_local_pos = curve.sample_baked(target_offset)
+	var target_local_pos = _ai_route_local(target_offset)
 	
 	# Compute perpendicular offset (lane offset) along the track tangent
-	var tangent_offset = fmod(target_offset + 1.0, curve_length)
-	var tangent_local_pos = curve.sample_baked(tangent_offset)
+	var tangent_local_pos = _ai_route_local(target_offset + 1.0)
 	var tangent = (tangent_local_pos - target_local_pos).normalized()
 	var right_vec = Vector3(-tangent.z, 0, tangent.x).normalized()
 	
@@ -6364,7 +6407,7 @@ func _get_ai_input(delta: float) -> Vector2:
 
 	# Dynamic Racing Line (Out-In-Out Cornering)
 	var racing_line_offset: float = 0.0
-	if not approaching_loop and not is_on_loop and not _harbor_stage and not on_alternative_path and not is_start_phase and corner_factor > 0.15:
+	if not approaching_loop and not is_on_loop and not _harbor_stage and not on_alternative_path and not lining_up and not is_start_phase and corner_factor > 0.15:
 		var turn_side = -_ai_upcoming_turn_dir
 		var max_line_span = clampf(ai_lane_span * 0.9, 1.5, 3.2) * ai_racing_line_weight
 		if _mountain_stage:
@@ -6394,6 +6437,8 @@ func _get_ai_input(delta: float) -> Vector2:
 		actual_lane_offset = 0.0
 	elif is_finished_race:
 		actual_lane_offset = 0.0
+	elif lining_up:
+		actual_lane_offset = route_lat
 	elif is_airborne:
 		actual_lane_offset *= 0.25
 	elif is_offroad and not on_course:
@@ -6405,12 +6450,12 @@ func _get_ai_input(delta: float) -> Vector2:
 	elif _mountain_stage:
 		actual_lane_offset = clampf(actual_lane_offset * 0.5, -0.7, 0.7)
 	
-	var p_now = curve.sample_baked(current_offset)
-	var p_ahead = curve.sample_baked(fmod(current_offset + 8.0, curve_length))
+	var p_now = _ai_route_local(current_offset)
+	var p_ahead = _ai_route_local(current_offset + 8.0)
 	var elev_delta = absf(p_ahead.y - p_now.y)
-	if elev_delta > 1.0 and not is_hairpin:
+	if elev_delta > 1.0 and not is_hairpin and not lining_up:
 		actual_lane_offset *= 0.1
-	if is_hairpin and not _ai_may_overshoot:
+	if is_hairpin and not _ai_may_overshoot and not lining_up:
 		actual_lane_offset *= 0.25
 	target_local_pos += right_vec * actual_lane_offset
 
@@ -6530,6 +6575,16 @@ func _get_ai_input(delta: float) -> Vector2:
 		input.x = turn_sign * 1.0
 	else:
 		input.x = clamp(dir_flat.x * steer_gain, -1.0, 1.0)
+	# On a route that holds the AI to its line, steer against sliding across it: aiming the nose alone,
+	# the carts swung 5m either side of the Thin Ice's weave (a slide nothing damped) and into the holes.
+	if on_alternative_path and active_path and active_path.has_meta(&"ai_lane_limit") and speed > 4.0 and not is_target_behind:
+		var here: Vector3 = active_path.to_global(_ai_route_local(current_offset))
+		var tg: Vector3 = active_path.to_global(_ai_route_local(current_offset + 1.0)) - here
+		tg.y = 0.0
+		if tg.length_squared() > 1e-6:
+			tg = tg.normalized()
+			var across: float = linear_velocity.dot(Vector3(-tg.z, 0.0, tg.x)) / speed
+			input.x = clampf(input.x - across * AI_TIGHT_DAMP, -1.0, 1.0)
 
 	if is_finished_race:
 		_ai_want_drift = false
@@ -6606,8 +6661,10 @@ func _get_ai_input(delta: float) -> Vector2:
 			brake_window = maxf(brake_window, brake_window * (1.0 + fwd_pitch_down * 0.40))
 		
 		var in_braking_zone: bool = _ai_upcoming_turn_dist < brake_window and corner_factor > react_corner
-		# While boosting on a straight, let the boost rip! Only brake if turn is immediately imminent
-		if (is_boosting or is_pad_boosting) and _ai_upcoming_turn_dist > 14.0:
+		# While boosting, let the boost rip through bends it can take; a sharp corner is still braked for
+		# in time. (Braking only once a turn was 14m off, a boosted cart met Glacier Highway's Ridge Bypass
+		# fork, 84 degrees, at 60 m/s.)
+		if (is_boosting or is_pad_boosting) and _ai_upcoming_turn_dist > 14.0 and corner_factor < react_corner * 1.6:
 			in_braking_zone = false
 
 		if in_braking_zone:
@@ -6638,6 +6695,15 @@ func _get_ai_input(delta: float) -> Vector2:
 		
 		if speed < 4.0 and input.y > -0.2:
 			input.y = -0.80
+
+		# A route that holds the AI to its line is driven at most AI_TIGHT_SPEED, boost or not: on the
+		# Thin Ice carts came off the spire run-in at 60-70 m/s and slid off the weave into the holes.
+		if on_alternative_path and active_path and active_path.has_meta(&"ai_lane_limit"):
+			if speed > AI_TIGHT_SPEED + 1.0:
+				input.y = maxf(input.y, clampf((speed - AI_TIGHT_SPEED) / 4.0, 0.35, 1.0))
+				_ai_want_drift = false
+			elif speed > AI_TIGHT_SPEED - 2.0 and input.y < -0.35:
+				input.y = -0.35
 
 		if _ai_recovering:
 			_ai_want_drift = false
@@ -6699,6 +6765,7 @@ func _get_ai_input(delta: float) -> Vector2:
 		]
 		var is_start_grid_phase: bool = (Time.get_ticks_msec() / 1000.0 - race_start_time) < 3.0
 		var obstacle_count = 0
+		var tight_route: bool = on_alternative_path and active_path != null and active_path.has_meta(&"ai_lane_limit")
 		for ray in rays:
 			var query = PhysicsRayQueryParameters3D.create(ray["start"], ray["end"])
 			query.exclude = [self.get_rid()]
@@ -6708,6 +6775,10 @@ func _get_ai_input(delta: float) -> Vector2:
 				var collider = result.collider
 				# Track surface or terrain floor is NEVER an obstacle
 				if _is_track_surface(collider) or _is_world_terrain_collider(collider):
+					continue
+				# Markers only the AI sees (layer value 4: the Thin Ice's holes) are already cleared by a route
+				# that holds the AI to its line; dodging the one ahead put carts into the one beside it.
+				if tight_route and collider is CollisionObject3D and ((collider as CollisionObject3D).collision_layer & 1) == 0:
 					continue
 				if result.normal.y >= 0.55:
 					# Upward ground / road / ramps are drivable, not obstacles
@@ -6784,8 +6855,8 @@ func _get_ai_input(delta: float) -> Vector2:
 		# Road Boundary Limiter: prevent obstacle avoidance from ever pushing the car off the road onto hills or shoulders
 		if active_path and active_path.curve:
 			var road_half_w: float = _get_track_outer_half_width()
-			var road_center_pos: Vector3 = active_path.to_global(curve.sample_baked(current_offset))
-			var road_next_pos: Vector3 = active_path.to_global(curve.sample_baked(fmod(current_offset + 1.0, curve_length)))
+			var road_center_pos: Vector3 = active_path.to_global(_ai_route_local(current_offset))
+			var road_next_pos: Vector3 = active_path.to_global(_ai_route_local(current_offset + 1.0))
 			var road_tan: Vector3 = (road_next_pos - road_center_pos).normalized()
 			var road_r: Vector3 = road_tan.cross(Vector3.UP).normalized()
 			var cur_lat_dist: float = (global_position - road_center_pos).dot(road_r) # + = right, - = left
@@ -7050,11 +7121,10 @@ func _ai_update_recovery(_delta: float, current_offset: float) -> void:
 	_ai_recovering = true
 
 
-func _ai_measure_upcoming_turn(curve: Curve3D, offset: float, speed: float) -> Dictionary:
-	var length: float = maxf(curve.get_baked_length(), 1.0)
+func _ai_measure_upcoming_turn(offset: float, speed: float) -> Dictionary:
 	var look: float = clampf(speed * 1.8, 30.0, 80.0)
-	var p0: Vector3 = curve.sample_baked(offset)
-	var p0b: Vector3 = curve.sample_baked(fmod(offset + 1.5, length))
+	var p0: Vector3 = _ai_route_local(offset)
+	var p0b: Vector3 = _ai_route_local(offset + 1.5)
 	var h0: Vector3 = p0b - p0
 	h0.y = 0.0
 	if h0.length_squared() < 1e-6:
@@ -7069,9 +7139,8 @@ func _ai_measure_upcoming_turn(curve: Curve3D, offset: float, speed: float) -> D
 	var near_ang: float = 0.0
 	var d: float = 3.0
 	while d <= look:
-		var o1: float = fmod(offset + d, length)
-		var p1: Vector3 = curve.sample_baked(o1)
-		var p1b: Vector3 = curve.sample_baked(fmod(o1 + 1.5, length))
+		var p1: Vector3 = _ai_route_local(offset + d)
+		var p1b: Vector3 = _ai_route_local(offset + d + 1.5)
 		var h1: Vector3 = p1b - p1
 		h1.y = 0.0
 		if h1.length_squared() > 1e-6:
@@ -7089,6 +7158,22 @@ func _ai_measure_upcoming_turn(curve: Curve3D, offset: float, speed: float) -> D
 		d += 3.0
 	var effective_dist: float = turn_start_dist if found_turn_start else worst_dist
 	return {"angle": absf(worst_ang), "dir": worst_dir, "dist": effective_dist, "near_angle": absf(near_ang)}
+
+
+## The AI's route `d` metres from the start of its active path, in that path's local space. On a
+## shortcut it runs on past the end along the lap from where the shortcut rejoins it: wrapped round
+## (fmod), the aim point and the turn ahead jumped back to the shortcut's start near its end, and the
+## cars swerved off across the field into the water.
+func _ai_route_local(d: float) -> Vector3:
+	var c: Curve3D = active_path.curve
+	var length: float = maxf(c.get_baked_length(), 1.0)
+	if not on_alternative_path or track_path == null or active_path == track_path:
+		return c.sample_baked(fposmod(d, length))
+	if d <= length:
+		return c.sample_baked(maxf(d, 0.0))
+	var lap: Curve3D = track_path.curve
+	var p: Vector3 = track_path.to_global(lap.sample_baked(fposmod(_ai_rejoin_offset + d - length, maxf(lap.get_baked_length(), 1.0))))
+	return active_path.to_local(p)
 
 
 func _process_ai_items(delta: float):
@@ -7245,40 +7330,27 @@ func _get_water_surface_y_at(pos: Vector3) -> float:
 	return water_surface_y
 
 
-## Whether the follower camera should hold the splash shot (see _splash_cam_at): starts while the cart
-## is falling fast with deep water close below it and no ground above the surface in between, and lasts
-## while it is under. Keeps the anchor up to date.
-func _splash_cam_wanted(visual_forward: Vector3, excludes: Array, delta: float) -> bool:
-	_splash_cam_time = maxf(_splash_cam_time - delta, 0.0)
-	var p: Vector3 = visuals.global_position
-	if not is_drowned and linear_velocity.y < -SPLASH_CAM_FALL:
-		var wy: float = _get_water_surface_y_at(p)
-		if wy > -9000.0 and p.y > wy - 0.5 and p.y - wy < 14.0 and not _ground_above_water(p, wy, excludes):
-			if _splash_cam_at.x == INF:
-				var f := Vector3(linear_velocity.x, 0.0, linear_velocity.z)
-				if f.length() < 2.0:
-					f = Vector3(visual_forward.x, 0.0, visual_forward.z)
-				_splash_cam_fwd = f.normalized() if f.length_squared() > 0.0001 else Vector3.FORWARD
-			_splash_cam_at = Vector3(p.x, wy, p.z)
-			_splash_cam_time = 0.6
-	if _splash_cam_at.x == INF:
+## Whether the follower camera should hold the splash shot (see _splash_cam_at): while the cart sinks.
+## Above the water it keeps note of the way the cart is heading, for the shot.
+func _splash_cam_wanted(visual_forward: Vector3) -> bool:
+	if not _engine_flooded and not is_drowned:
+		var f := Vector3(linear_velocity.x, 0.0, linear_velocity.z)
+		if f.length() > 2.0:
+			_splash_cam_fwd = f.normalized()
+		elif _splash_cam_at.x == INF:
+			var v := Vector3(visual_forward.x, 0.0, visual_forward.z)
+			if v.length_squared() > 0.0001:
+				_splash_cam_fwd = v.normalized()
+		_splash_cam_at = Vector3(INF, 0.0, 0.0)
 		return false
-	if is_underwater or is_drowned or _engine_flooded or _splash_cam_time > 0.0:
-		return true
-	# It came up again (shallow after all, or boosted out).
-	_splash_cam_at = Vector3(INF, 0.0, 0.0)
-	return false
-
-
-func _ground_above_water(p: Vector3, water_y: float, excludes: Array) -> bool:
-	var q := PhysicsRayQueryParameters3D.create(p, Vector3(p.x, water_y - 0.2, p.z))
-	q.exclude = excludes
-	var hit := get_world_3d().direct_space_state.intersect_ray(q)
-	return not hit.is_empty() and hit.collider != null and _is_world_collider(hit.collider)
+	if _splash_cam_at.x == INF:
+		var p: Vector3 = visuals.global_position
+		_splash_cam_at = Vector3(p.x, water_surface_y, p.z)
+	return true
 
 
 ## The splash shot: back along the way the cart was heading from where it went in and up over the
-## water, looking at the spot, easing there rather than snapping.
+## water, looking at the spot; a quick pull back from where the follower had it.
 func _splash_camera(excludes: Array, delta: float) -> void:
 	var anchor: Vector3 = _splash_cam_at
 	var target: Vector3 = anchor - _splash_cam_fwd * SPLASH_CAM_BACK + Vector3.UP * SPLASH_CAM_UP
@@ -7290,9 +7362,9 @@ func _splash_camera(excludes: Array, delta: float) -> void:
 		var span: float = maxf(from.distance_to(target), 0.01)
 		target = from + (target - from) * clampf((from.distance_to(hit.position) - 0.6) / span, 0.2, 1.0)
 	target = _raise_point_above_terrain(target, excludes)
-	camera_pivot.global_position = camera_pivot.global_position.lerp(target, 3.0 * delta)
+	camera_pivot.global_position = camera_pivot.global_position.lerp(target, minf(SPLASH_CAM_PULL * delta, 1.0))
 	camera_pivot.global_position = _raise_point_above_terrain(camera_pivot.global_position, excludes)
-	camera_look_at = camera_look_at.lerp(anchor + Vector3.UP * 1.2, 4.0 * delta)
+	camera_look_at = camera_look_at.lerp(anchor + Vector3.UP * 1.2, minf(8.0 * delta, 1.0))
 	camera_pivot.look_at(camera_look_at, Vector3.UP)
 	_update_camera_xray(camera_pivot.global_position, anchor + Vector3.UP * 0.8, excludes, delta)
 	if race_ui:

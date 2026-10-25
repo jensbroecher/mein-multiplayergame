@@ -24,6 +24,9 @@ const CampKit = preload("res://CampKit.gd")
 const WindTurbineBuilder = preload("res://WindTurbineBuilder.gd")
 const MeadowGrass = preload("res://MeadowGrass.gd")
 const TyreStacks = preload("res://TyreStacks.gd")
+const VenueKit = preload("res://VenueKit.gd")
+const CrowdPlacer = preload("res://CrowdPlacer.gd")
+const CarPaint = preload("res://CarPaint.gd")
 const LEVEL_PATH := "res://levels/LakesideLevel.tscn"
 const RES_PREFIX := "lakeside_"
 const DRESSING := "LakesideDressing"
@@ -98,6 +101,10 @@ var _length := 0.0
 var _road_y := 0.4
 var _kit: PropKit
 var _camp: CampKit
+var _venue: VenueKit
+## Gazebos ([frame, has a show car]) and the grandstand's sections (frames), for the spectators.
+var _gazebo_frames: Array = []
+var _stand_frames: Array = []
 var _heights := PackedFloat32Array()
 var _materials := {}
 var _footprints: Array = []   # [name, centre Vector2, radius, clearance]
@@ -106,6 +113,8 @@ var _hit_mask := PackedByteArray()    # _build_meadow: texels under something, a
 var _hits := PackedInt32Array()
 var _ad_k := 0
 var _rng := RandomNumberGenerator.new()
+## Where the crowd barriers stand ([middle, along]), for the spectators behind them.
+var _barrier_spots: Array = []
 
 
 func _ready() -> void:
@@ -114,6 +123,9 @@ func _ready() -> void:
 	_kit = PropKit.new()
 	_kit.material_for = _material
 	_camp = CampKit.new(_kit)
+	_venue = VenueKit.new(_kit)
+	_venue.bark_material = _save_res(Woodland.new().bark_material("oak", 0), "bark_logs")
+	_venue.logwall_material = _save_res(_logwall_material(), "logwall")
 	_level = (load(LEVEL_PATH) as PackedScene).instantiate()
 	add_child(_level)
 	_tg = _level.get_node("TerrainGenerator")
@@ -162,8 +174,11 @@ func _ready() -> void:
 	_build_hay_and_cones(root)
 	_build_grandstand(root)
 	_build_campsite(root)
+	_build_spectators(root)
 	_move_old_props()
 	_fit_loop()
+	_lay_shortcuts()
+	_build_venue(root)
 	_build_wind_turbines(root)
 	_build_woodland(root)
 	_build_boulders(root)
@@ -534,6 +549,20 @@ func _material(key: String) -> Material:
 			var tm := ShaderMaterial.new()
 			tm.shader = load("res://tyre_wall.gdshader")
 			m = tm
+		"timber", "lapboards", "battens", "painted":
+			# VenueKit's sawn wood (hut_wood.gdshader's styles: 2 grain along v, 1 lapped boards, 0 upright
+			# boards with battens, 3 painted boards).
+			var wm := ShaderMaterial.new()
+			wm.shader = load("res://hut_wood.gdshader")
+			wm.set_shader_parameter("style", {"timber": 2, "lapboards": 1, "battens": 0, "painted": 3}[key])
+			wm.set_shader_parameter("weathering", 0.55)
+			m = wm
+		"endgrain":
+			m = CampKit.make_material("wood")
+		"iron":
+			m = CampKit.make_material("steel")
+		"stone":
+			m = CampKit.make_material("matte")
 		_:
 			m = CampKit.make_material(key)
 	m = _save_res(m, "mat_" + key)
@@ -835,13 +864,27 @@ const CHAIR_COLS := CampKit.CHAIR_COLS
 
 ## Team gazebos in a row facing the straight past the gantry, each with a table, chairs, a tool chest,
 ## a cool box, toolboxes and a generator; portable toilets and two big team tents behind them.
+## The gazebos and team tents are built bigger than CampKit's and _team_tent's own (GAZEBO_GROW, TENT_GROW,
+## on top of PROP_SCALE), so a race car fits on the display table under each; the furniture stays
+## PROP_SCALE. The cars on show are the game's own (SHOW_CARS: the lighter models), at race size, on every
+## other gazebo's table and in each team tent; the rest keep the 1/8 buggies.
+const GAZEBO_GROW := Vector3(1.3, 1.1, 1.3)
+const TENT_GROW := Vector3(1.25, 1.12, 1.4)
+const SHOW_CARS := ["Mudrunner", "Zephyr", "Mirage", "Centurion", "Shadow", "Phantom"]
+## The cars' meshes aren't drawn past this (they are 37-51k triangles each).
+const SHOW_CAR_RANGE := 130.0
+
 func _build_paddock(root: Node3D) -> void:
 	var node := Node3D.new()
 	node.name = "Paddock"
 	root.add_child(node)
+	var cars := Node3D.new()
+	cars.name = "ShowCars"
+	node.add_child(cars)
 	var kit := {}
 	var clutter := {}
 	var boxes: Array = []
+	var shown := 0
 	var n := 7
 	for i in range(n):
 		var s: float = PADDOCK_S.x + 6.0 + (PADDOCK_S.y - PADDOCK_S.x - 14.0) * i / (n - 1)
@@ -850,26 +893,38 @@ func _build_paddock(root: Node3D) -> void:
 		var at := _at(s, lat)
 		var yaw := _yaw_to(fr["right"]) + _rng.randf_range(-0.05, 0.05)
 		var canopy: Color = CANOPIES[i % CANOPIES.size()]
-		_kit.set_frame(_place(at, yaw))
+		_kit.set_frame(_grown(at, yaw, GAZEBO_GROW))
 		_camp.gazebo(kit, canopy, i % 3 == 2)
 		_kit.set_frame(_place(at, yaw))
-		_pit_set(clutter, i)
-		_note("Gazebo%d" % i, at, 2.6 * PROP_SCALE, 4.0)
+		var car: String = SHOW_CARS[shown] if i % 2 == 0 and shown < SHOW_CARS.size() else ""
+		var spot: Array = _pit_set(clutter, i, yaw, car != "")
+		if car != "":
+			_show_car(cars, car, spot[0], spot[1], yaw, boxes)
+			shown += 1
+		_gazebo_frames.append([_place(at, yaw), car != ""])
+		_note("Gazebo%d" % i, at, 2.6 * PROP_SCALE * GAZEBO_GROW.x, 4.0)
 		# Legs, as thin posts carts bump.
 		for sx in [-1.47, 1.47]:
 			for sz in [-1.47, 1.47]:
-				var leg := Transform3D(Basis(Vector3.UP, yaw), at) * Vector3(sx * PROP_SCALE, 1.6, sz * PROP_SCALE)
+				var leg := Transform3D(Basis(Vector3.UP, yaw), at) * Vector3(sx * PROP_SCALE * GAZEBO_GROW.x, 1.6, sz * PROP_SCALE * GAZEBO_GROW.z)
 				boxes.append([leg, Vector3(0.12, 3.2, 0.12), Basis(Vector3.UP, yaw)])
-	# Behind the row: two big team tents (6 x 3) and a line of portable toilets.
+	# Behind the row: two big team tents and a line of portable toilets between them.
 	for j in range(2):
 		var s2: float = PADDOCK_S.x + 18.0 + j * 30.0
-		var at2 := _at(s2, -38.5)
+		var at2 := _at(s2, -39.0)
 		var yaw2 := _yaw_to(_frame(s2)["right"])
+		var col: Color = [Color(0.93, 0.93, 0.91), Color(0.06, 0.10, 0.22)][j]
+		_kit.set_frame(_grown(at2, yaw2, TENT_GROW))
+		_team_tent(kit, col)
 		_kit.set_frame(_place(at2, yaw2))
-		_team_tent(kit, [Color(0.93, 0.93, 0.91), Color(0.06, 0.10, 0.22)][j])
-		_note("TeamTent%d" % j, at2, 3.4 * PROP_SCALE, 6.0)
+		var spot2: Array = _team_tent_inside(clutter, _tent_accent(col), yaw2)
+		if shown < SHOW_CARS.size():
+			_show_car(cars, SHOW_CARS[shown], spot2[0], spot2[1], yaw2, boxes)
+			shown += 1
+		_gazebo_frames.append([_place(at2, yaw2) * Transform3D(Basis(), Vector3(-1.7, 0.0, 0.0)), true])
+		_note("TeamTent%d" % j, at2, 3.4 * PROP_SCALE * TENT_GROW.x, 6.0)
 	for t in range(4):
-		var s3: float = PADDOCK_S.x + 36.0 + t * 2.0
+		var s3: float = PADDOCK_S.x + 28.0 + t * 2.0
 		var at3 := _at(s3, -40.5)
 		var yaw3 := _yaw_to(_frame(s3)["right"])
 		_kit.set_frame(_place(at3, yaw3))
@@ -878,39 +933,120 @@ func _build_paddock(root: Node3D) -> void:
 	_commit(node, kit, "PaddockTents")
 	_commit(node, clutter, "PaddockGear", 260.0)
 	_boxes_body(node, "PaddockBody", boxes)
+	print("  paddock: %d cars on show" % shown)
 
 
-## The gear under gazebo `i`: a table with a car on its stand, a transmitter and a charger, chairs, a
-## rolling tool chest, toolboxes, a cool box and a generator out the back.
-func _pit_set(kit: Dictionary, i: int) -> void:
+## A frame at `at` turned `yaw`, grown by `grow` (local axes) on top of PROP_SCALE.
+func _grown(at: Vector3, yaw: float, grow: Vector3) -> Transform3D:
+	return Transform3D(Basis(Vector3.UP, yaw) * Basis.from_scale(grow * PROP_SCALE), at)
+
+
+func _tent_accent(col: Color) -> Color:
+	return Color(0.84, 0.16, 0.12) if col.v > 0.5 else Color(0.96, 0.68, 0.12)
+
+
+## The gear under gazebo `i` (turned `yaw`): a display table with a car on its stand (`show_car`: the
+## car itself is _show_car's), or a folding table with a buggy, a transmitter and a charger; chairs, a
+## rolling tool chest, toolboxes, a cool box and a generator out the back. Returns [where the car's
+## wheels go (world), the way its nose points (yaw)] for a show car.
+func _pit_set(kit: Dictionary, i: int, yaw: float, show_car: bool) -> Array:
 	var k := _kit
 	var base := k.xf
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 400 + i * 17
-	var sub := func(x: float, z: float, yaw: float) -> void:
-		k.set_frame(base * Transform3D(Basis(Vector3.UP, yaw), Vector3(x, 0, z)))
-	sub.call(0.1, 0.55, 0.0)
-	_camp.folding_table(kit, Color(0.90, 0.90, 0.88))
-	sub.call(-0.25, 0.55, 0.15)
-	_rc_buggy(kit, CAR_COLS[i % CAR_COLS.size()], 0.74)
-	sub.call(0.45, 0.48, -0.4)
-	_transmitter(kit, 0.74)
-	sub.call(0.75, 0.62, 0.1)
-	_charger(kit, 0.74)
+	var sub := func(x: float, z: float, a: float) -> void:
+		k.set_frame(base * Transform3D(Basis(Vector3.UP, a), Vector3(x, 0, z)))
+	var spot: Array = []
+	if show_car:
+		sub.call(0.0, 0.7, 0.0)
+		var top: float = _venue.display_table(kit, Color(0.90, 0.90, 0.88))
+		# Along the table, its nose turned a little toward the paddock's lane.
+		spot = [base * Vector3(0.0, top, 0.7), yaw - PI * 0.5 + rng.randf_range(-0.3, 0.3)]
+		sub.call(1.55, 1.05, PI * 0.5 + rng.randf_range(-0.2, 0.2))
+		_tool_chest(kit, CHEST_COLS[i % CHEST_COLS.size()])
+		sub.call(1.5, 1.0, 0.3)
+		_transmitter(kit, 1.22)
+		sub.call(1.62, 0.92, -0.2)
+		_charger(kit, 1.22)
+	else:
+		sub.call(0.1, 0.55, 0.0)
+		_camp.folding_table(kit, Color(0.90, 0.90, 0.88))
+		sub.call(-0.25, 0.55, 0.15)
+		_rc_buggy(kit, CAR_COLS[i % CAR_COLS.size()], 0.74)
+		sub.call(0.45, 0.48, -0.4)
+		_transmitter(kit, 0.74)
+		sub.call(0.75, 0.62, 0.1)
+		_charger(kit, 0.74)
+		sub.call(1.55, 1.05, PI * 0.5 + rng.randf_range(-0.2, 0.2))
+		_tool_chest(kit, CHEST_COLS[i % CHEST_COLS.size()])
 	for c in range(2):
 		sub.call(-0.75 + c * 1.1 + rng.randf_range(-0.1, 0.1), -0.55 + rng.randf_range(-0.15, 0.15), PI + rng.randf_range(-0.4, 0.4))
 		_camp.camp_chair(kit, CHAIR_COLS[(i + c * 2) % CHAIR_COLS.size()])
-	sub.call(1.05, 1.05, PI * 0.5 + rng.randf_range(-0.2, 0.2))
-	_tool_chest(kit, CHEST_COLS[i % CHEST_COLS.size()])
 	sub.call(-1.15, -1.05 + rng.randf_range(0, 0.4), rng.randf_range(0, TAU))
 	_camp.cooler(kit, [Color(0.80, 0.10, 0.10), Color(0.10, 0.30, 0.70), Color(0.92, 0.92, 0.90)][i % 3], WHITE)
-	sub.call(-1.0, 1.0, rng.randf_range(-0.5, 0.5))
+	sub.call(-1.35, 1.0, rng.randf_range(-0.5, 0.5))
 	_toolbox(kit, [Color(0.08, 0.12, 0.30), Color(0.12, 0.12, 0.13), Color(0.75, 0.08, 0.07)][i % 3])
-	sub.call(-0.6, 1.1, rng.randf_range(-0.5, 0.5))
+	sub.call(-1.35, 0.45, rng.randf_range(-0.5, 0.5))
 	_toolbox(kit, Color(0.08, 0.12, 0.30))
-	sub.call(1.9, 1.9 + rng.randf_range(-0.3, 0.3), rng.randf_range(0, TAU))
+	sub.call(2.5, 1.9 + rng.randf_range(-0.3, 0.3), rng.randf_range(0, TAU))
 	_generator(kit, [Color(0.85, 0.12, 0.08), Color(0.95, 0.75, 0.08)][i % 2])
 	k.set_frame(base)
+	return spot
+
+
+## A team tent's inside (frame: the tent's, at PROP_SCALE): a display table for a show car, a workbench
+## with a buggy and a charger, a rolling tool chest and a cool box. Returns the show car's spot (as
+## _pit_set's).
+func _team_tent_inside(kit: Dictionary, accent: Color, yaw: float) -> Array:
+	var k := _kit
+	var b0 := k.xf
+	k.set_frame(b0 * Transform3D(Basis(), Vector3(-1.7, 0, 0.8)))
+	var top: float = _venue.display_table(kit, WHITE)
+	var spot := [b0 * Vector3(-1.7, top, 0.8), yaw - PI * 0.5 + 0.35]
+	k.set_frame(b0 * Transform3D(Basis(), Vector3(1.6, 0, 0.7)))
+	_camp.folding_table(kit, WHITE)
+	k.set_frame(b0 * Transform3D(Basis(Vector3.UP, -0.15), Vector3(1.45, 0, 0.7)))
+	_rc_buggy(kit, Color(0.15, 0.55, 0.88), 0.74)
+	k.set_frame(b0 * Transform3D(Basis(Vector3.UP, -0.25), Vector3(2.0, 0, 0.66)))
+	_charger(kit, 0.74)
+	k.set_frame(b0 * Transform3D(Basis(Vector3.UP, PI * 0.5), Vector3(-3.15, 0, 1.1)))
+	_tool_chest(kit, accent)
+	k.set_frame(b0 * Transform3D(Basis(Vector3.UP, 0.2), Vector3(3.0, 0, 1.3)))
+	_camp.cooler(kit, accent, WHITE)
+	k.set_frame(b0)
+	return spot
+
+
+## One of the game's cars on show at race size (its scene's meshes under a DisplayCar node, which paints
+## it at load in the car's factory colours), wheels at `at`, nose along `nose_yaw`; with box colliders
+## for it and its table (turned `table_yaw`).
+func _show_car(parent: Node3D, car: String, at: Vector3, nose_yaw: float, table_yaw: float, boxes: Array) -> void:
+	var src: Node3D = (load("res://generated/cars/%s.tscn" % car) as PackedScene).instantiate()
+	var holder := Node3D.new()
+	holder.name = "ShowCar%s" % car
+	holder.set_script(load("res://DisplayCar.gd"))
+	holder.set("paint", CarPaint.factory(car))
+	# The scene's Model undoes PlayerCart's x2 and half turn: the same here.
+	holder.transform = Transform3D(Basis(Vector3.UP, nose_yaw + PI).scaled(Vector3.ONE * 2.0), at)
+	parent.add_child(holder)
+	var model := src.get_node("Model") as Node3D
+	var m2 := Node3D.new()
+	m2.name = "Model"
+	m2.transform = model.transform
+	holder.add_child(m2)
+	for c in model.get_children():
+		if c is MeshInstance3D:
+			var mi := MeshInstance3D.new()
+			mi.name = c.name
+			mi.mesh = (c as MeshInstance3D).mesh
+			mi.transform = (c as MeshInstance3D).transform
+			mi.set_meta(&"car_shader", true)
+			mi.visibility_range_end = SHOW_CAR_RANGE
+			m2.add_child(mi)
+	src.free()
+	var tb := Basis(Vector3.UP, table_yaw)
+	boxes.append([at + Vector3(0, 0.45, 0), Vector3(1.3, 0.9, 2.2), Basis(Vector3.UP, nose_yaw)])
+	boxes.append([at - Vector3(0, VenueKit.DISPLAY_TOP * PROP_SCALE * 0.5, 0), Vector3(VenueKit.DISPLAY_HL * 2.0, VenueKit.DISPLAY_TOP, VenueKit.DISPLAY_HW * 2.0) * PROP_SCALE, tb])
 
 
 const CAR_COLS := [Color(0.85, 0.10, 0.10), Color(0.20, 0.75, 0.25), Color(0.30, 0.25, 0.85), Color(0.95, 0.75, 0.10),
@@ -1006,7 +1142,8 @@ func _charger(kit: Dictionary, y: float) -> void:
 
 
 ## A 6 x 3 m race team marquee tent: two portal-framed bays under a ridged roof with gable vents,
-## Georgian-style windowed side walls, tied-back front entrance drapes, and a pit workshop inside.
+## Georgian-style windowed side walls and tied-back front entrance drapes (the workshop inside is
+## _team_tent_inside's, built at PROP_SCALE while the tent is grown).
 func _team_tent(kit: Dictionary, col: Color) -> void:
 	var k := _kit
 	var hw := 2.95
@@ -1106,23 +1243,6 @@ func _team_tent(kit: Dictionary, col: Color) -> void:
 		k.tube(kit, "canvas", Vector3(px + dx, eave - 0.24, fz), Vector3(px + dx * 0.35, 1.05, fz), 0.18, 0.075, 7, col.lightened(0.06))
 		k.tube(kit, "canvas", Vector3(px + dx * 0.35, 1.05, fz), Vector3(px + dx * 0.75, 0.05, fz), 0.075, 0.15, 7, col.lightened(0.06))
 		k.tube(kit, "canvas", Vector3(px + dx * 0.35, 1.02, fz), Vector3(px + dx * 0.35, 1.08, fz), 0.084, 0.084, 7, accent)
-	# Inside: two workbenches, an RC buggy on a stand, a rolling tool chest, and a charger.
-	var b0 := k.xf
-	k.set_frame(b0 * Transform3D(Basis(), Vector3(-1.35, 0, 0.55)))
-	_camp.folding_table(kit, WHITE)
-	k.set_frame(b0 * Transform3D(Basis(Vector3.UP, 0.18), Vector3(-1.45, 0, 0.55)))
-	_rc_buggy(kit, accent, 0.74)
-	k.set_frame(b0 * Transform3D(Basis(Vector3.UP, -0.25), Vector3(-0.95, 0, 0.52)))
-	_charger(kit, 0.74)
-	k.set_frame(b0 * Transform3D(Basis(), Vector3(1.25, 0, 0.55)))
-	_camp.folding_table(kit, WHITE)
-	k.set_frame(b0 * Transform3D(Basis(Vector3.UP, -0.15), Vector3(1.15, 0, 0.55)))
-	_rc_buggy(kit, Color(0.15, 0.55, 0.88), 0.74)
-	k.set_frame(b0 * Transform3D(Basis(Vector3.UP, PI * 0.5), Vector3(-2.45, 0, 0.75)))
-	_tool_chest(kit, accent)
-	k.set_frame(b0 * Transform3D(Basis(Vector3.UP, 0.2), Vector3(2.35, 0, 0.85)))
-	_camp.cooler(kit, accent, WHITE)
-	k.set_frame(b0)
 
 
 ## A portable toilet at life size: a moulded cabin with a door at the front, a pale roof and a vent.
@@ -1411,8 +1531,50 @@ func _build_fences(root: Node3D) -> void:
 		[3294.0, 108.0, -12.2, "FenceCorner"],
 	]
 	for r in runs:
-		var pts := _offset_run(float(r[0]), float(r[1]), float(r[2]), 0.5)
-		_fence(node, pts, -signf(float(r[2])), String(r[3]))
+		var pieces := _trim_run(_offset_run(float(r[0]), float(r[1]), float(r[2]), 0.5), String(r[3]))
+		for k in range(pieces.size()):
+			_fence(node, pieces[k], -signf(float(r[2])), String(r[3]) + ("" if k == 0 else str(k)))
+
+
+## Fences, barriers and tyre walls stand on ground near the road's height that isn't steep, and end where
+## it falls away down a bank: they had run on down the slopes round the start. A run comes back in pieces
+## of at least RUN_MIN, the rest left out (printed).
+const RUN_MAX_DROP := 1.2
+const RUN_MAX_SLOPE := 0.32
+const RUN_MIN := 6.0
+
+func _trim_run(pts: PackedVector3Array, what: String) -> Array:
+	var pieces: Array = []
+	var cur := PackedVector3Array()
+	var dropped := 0.0
+	var total := 0.0
+	for i in range(pts.size()):
+		var p: Vector3 = pts[i]
+		var step: float = 0.0 if i == 0 else Vector2(p.x - pts[i - 1].x, p.z - pts[i - 1].z).length()
+		total += step
+		if absf(p.y - _road_surface(p)) < RUN_MAX_DROP and _slope(p.x, p.z) < RUN_MAX_SLOPE:
+			cur.append(p)
+			continue
+		dropped += step
+		dropped += _keep_piece(pieces, cur)
+		cur = PackedVector3Array()
+	dropped += _keep_piece(pieces, cur)
+	if dropped > 0.5:
+		print("  %s: %.0fm of %.0fm left out on banks, %d piece(s)" % [what, dropped, total, pieces.size()])
+	return pieces
+
+
+## Keeps `cur` as a piece if it's long enough; returns its length if not (left out).
+func _keep_piece(pieces: Array, cur: PackedVector3Array) -> float:
+	if cur.size() < 2:
+		return 0.0
+	var length := 0.0
+	for i in range(1, cur.size()):
+		length += Vector2(cur[i].x - cur[i - 1].x, cur[i].z - cur[i - 1].z).length()
+	if length < RUN_MIN:
+		return length
+	pieces.append(cur)
+	return 0.0
 
 
 ## A fence along `pts` (ground points), the road on side `road_side` of its direction (+1 right).
@@ -1483,36 +1645,37 @@ func _fence(parent: Node3D, pts: PackedVector3Array, road_side: float, node_name
 ## at race control, the camera tower and the paddock's entrance.
 func _build_barriers(root: Node3D) -> void:
 	var kit := {}
-	var pts := _offset_run(3140.0, 3300.0, BARRIER_LAT, 0.25)
 	var length := 2.3 * PROP_SCALE
 	var gaps := [Vector2(BOOTH.x - 3.5, BOOTH.x + 3.0), Vector2(CAMERA_TOWER.x - 3.0, CAMERA_TOWER.x + 3.0), Vector2(3288.0, 3294.0)]
 	var boxes: Array = []
-	var i := 0
-	var acc := 0.0
-	var start: Vector3 = pts[0]
-	while i < pts.size() - 1:
-		i += 1
-		acc = Vector2(pts[i].x - start.x, pts[i].z - start.z).length()
-		if acc < length:
-			continue
-		var a: Vector3 = start
-		var b: Vector3 = pts[i]
-		start = b
-		var mid := (a + b) * 0.5
-		var s_mid := _curve.get_closest_offset(Vector3(mid.x, 0, mid.z))
-		var skip := false
-		for g in gaps:
-			if s_mid > g.x and s_mid < g.y:
-				skip = true
-		if skip:
-			continue
-		# A frame from foot to foot, sheared to the slope so the uprights stay vertical.
-		var x := (b - a) / 2.3
-		var z := Vector3(-x.z, 0, x.x).normalized() * PROP_SCALE
-		var bx := Basis(x, Vector3(0, PROP_SCALE, 0), z)
-		_kit.set_frame(Transform3D(bx, (a + b) * 0.5))
-		_camp.crowd_barrier(kit)
-		boxes.append(_wall_box(a, b, 0.25, 1.1 * PROP_SCALE))
+	for pts in _trim_run(_offset_run(3140.0, 3300.0, BARRIER_LAT, 0.25), "CrowdBarriers"):
+		var i := 0
+		var acc := 0.0
+		var start: Vector3 = pts[0]
+		while i < pts.size() - 1:
+			i += 1
+			acc = Vector2(pts[i].x - start.x, pts[i].z - start.z).length()
+			if acc < length:
+				continue
+			var a: Vector3 = start
+			var b: Vector3 = pts[i]
+			start = b
+			var mid := (a + b) * 0.5
+			var s_mid := _curve.get_closest_offset(Vector3(mid.x, 0, mid.z))
+			var skip := false
+			for g in gaps:
+				if s_mid > g.x and s_mid < g.y:
+					skip = true
+			if skip:
+				continue
+			# A frame from foot to foot, sheared to the slope so the uprights stay vertical.
+			var x := (b - a) / 2.3
+			var z := Vector3(-x.z, 0, x.x).normalized() * PROP_SCALE
+			var bx := Basis(x, Vector3(0, PROP_SCALE, 0), z)
+			_kit.set_frame(Transform3D(bx, (a + b) * 0.5))
+			_camp.crowd_barrier(kit)
+			boxes.append(_wall_box(a, b, 0.25, 1.1 * PROP_SCALE))
+			_barrier_spots.append([mid, (b - a).normalized()])
 	_commit(root, kit, "CrowdBarriers")
 	_boxes_body(root, "CrowdBarriersBody", boxes)
 
@@ -1526,20 +1689,23 @@ func _build_tyre_walls(root: Node3D) -> void:
 		designs[d] = _save_res(designs[d], "tyre_stack_%d" % d)
 	var runs := [[3132.0, 3204.0, TYRE_LAT, "TyreWallGrid"], [3289.0, 27.0, -TYRE_LAT, "TyreWallCorner"]]
 	for r in runs:
-		var pts := _offset_run(float(r[0]), float(r[1]), float(r[2]), 0.995 * PROP_SCALE * 0.62)
-		var stacks: Array = []
-		var boxes: Array = []
+		var pieces := _trim_run(_offset_run(float(r[0]), float(r[1]), float(r[2]), 0.995 * PROP_SCALE * 0.62), String(r[3]))
 		var rng := RandomNumberGenerator.new()
 		rng.seed = hash(String(r[3]))
-		for i in range(pts.size()):
-			var p: Vector3 = pts[i]
-			stacks.append([_place(p, rng.randf() * TAU), TyreStacks.design(i, rng)])
-			if i > 0 and (i % 4 == 0 or i == pts.size() - 1):
-				boxes.append(_wall_box(pts[maxi(i - 4, 4 * ((i - 1) / 4))], p, 0.62 * PROP_SCALE, 0.6 * PROP_SCALE))
-		root.add_child(TyreStacks.spring_node(String(r[3]), designs, stacks, PROP_SCALE))
-		_boxes_body(root, String(r[3]) + "Body", boxes)
-		for p in pts:
-			_note(String(r[3]), p, 0.5, 1.2)
+		for k in range(pieces.size()):
+			var pts: PackedVector3Array = pieces[k]
+			var nm: String = String(r[3]) + ("" if k == 0 else str(k))
+			var stacks: Array = []
+			var boxes: Array = []
+			for i in range(pts.size()):
+				var p: Vector3 = pts[i]
+				stacks.append([_place(p, rng.randf() * TAU), TyreStacks.design(i, rng)])
+				if i > 0 and (i % 4 == 0 or i == pts.size() - 1):
+					boxes.append(_wall_box(pts[maxi(i - 4, 4 * ((i - 1) / 4))], p, 0.62 * PROP_SCALE, 0.6 * PROP_SCALE))
+			root.add_child(TyreStacks.spring_node(nm, designs, stacks, PROP_SCALE))
+			_boxes_body(root, nm + "Body", boxes)
+			for p in pts:
+				_note(nm, p, 0.5, 1.2)
 
 
 ## Big square bales round the first corner and loose cones along the verges by the gantry.
@@ -1760,6 +1926,7 @@ func _build_grandstand(root: Node3D) -> void:
 		var hull := _bleacher(kit, width, rows)
 		var pts := PackedVector3Array()
 		var xf := _place(at, yaw)
+		_stand_frames.append(xf)
 		for p in hull:
 			pts.append(xf * p)
 		var body := StaticBody3D.new()
@@ -2164,7 +2331,7 @@ func _build_boulders(root: Node3D) -> void:
 			var shore: bool = g > -10.4 and g < -8.6
 			if rng.randf() > (0.5 if shore else 0.13) or g < -10.4:
 				continue
-			if _slope(cx, cz) > 0.65 or _road_distance(cx, cz) < 14.0 or _kept_out(keep_out, cx, cz, 3.0):
+			if _slope(cx, cz) > 0.65 or _road_distance(cx, cz) < 14.0 or _kept_out(keep_out, cx, cz, 3.0) or _on_shortcut(cx, cz, 4.0):
 				continue
 			var n: int = rng.randi_range(2, 5)
 			for k in range(n):
@@ -2295,8 +2462,8 @@ func _woodland_keep_out() -> Array:
 	for o in range(0, pads.size() - 6, 7):
 		out.append([pads[o], pads[o + 1], pads[o + 2] + 4.0, pads[o + 3] + 4.0, pads[o + 4]])
 	out.append(_road_rect(KICKER_S0 - 15.0, KICKER_S0 + 60.0, -14.0, 14.0))
-	for n in ["Ramps/ConcreteRamp", "Ramps/LoopCSG", "LevelDesign/ConcreteFootbridge", "LevelDesign/FestivalTent", "LevelDesign/Boat",
-			"LevelDesign/Logs", "LevelDesign/Hay", "LevelDesign/Hay2", "WoodenCart", "LevelDesign/Box", "LevelDesign/Box2", "LevelDesign/Bush"]:
+	for n in ["Ramps/ConcreteRamp", "Ramps/LoopCSG", "LevelDesign/ConcreteFootbridge", "LevelDesign/Boat",
+			"LevelDesign/Hay", "LevelDesign/Hay2", "LevelDesign/Box", "LevelDesign/Box2", "LevelDesign/Bush"]:
 		var p := _level.get_node_or_null(n) as Node3D
 		if p:
 			out.append([p.position.x, p.position.z, 22.0])
@@ -2568,7 +2735,7 @@ func _meadow_roads(data: PackedByteArray) -> void:
 ## Each hit clears its texel and the eight round it. Returns the texels cleared.
 func _meadow_blockers(data: PackedByteArray) -> int:
 	var geometry: Array = []
-	for n in [DRESSING, "LevelDesign", "Ramps", "WoodenCart", "FinishLine", "Checkpoints"]:
+	for n in [DRESSING, "LevelDesign", "Ramps", "FinishLine", "Checkpoints"]:
 		var nd := _level.get_node_or_null(n)
 		if nd:
 			_meadow_geometry(nd, geometry)
@@ -2744,6 +2911,185 @@ func _meadow_cell(data: PackedByteArray, x0: float, z0: float, size: float) -> V
 ## it. Now: lanes 8.5m wide, 10.5m apart (clear of each other with their walls), the loop's axis along
 ## the road and centred on it, and both lane ends 25cm under the road at the road's grade, so the
 ## carts roll on and off it. Exit lane 30m, gentler, and no boost pad on it.
+# ======================================================================================
+#  The woodcutter's yard and the marquee
+# ======================================================================================
+
+## The FBX they replace (removed from the level on every run, if still there).
+const OLD_FBX := ["WoodenCart", "LevelDesign/Logs", "LevelDesign/FestivalTent"]
+## [what, near (x, z), footprint radius in the level]: inside the long bend after the hill (s 500-626),
+## where the cart stood as the old shortcut's ramp, and the marquee where the festival tent was.
+const YARD := [
+	["cabin", Vector2(250.0, -394.0), 6.0],
+	["cart", Vector2(270.0, -398.0), 4.1],
+	["logs", Vector2(266.0, -410.0), 3.9],
+	["marquee", Vector2(-83.2, -511.6), 6.9],
+]
+
+func _build_venue(root: Node3D) -> void:
+	for n in OLD_FBX:
+		var old := _level.get_node_or_null(n)
+		if old:
+			old.get_parent().remove_child(old)
+			old.free()
+	var node := Node3D.new()
+	node.name = "Woodyard"
+	root.add_child(node)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5150
+	var boxes: Array = []
+	for item in YARD:
+		var what: String = item[0]
+		var radius: float = item[2]
+		var at := _free_spot(item[1], radius)
+		var yaw := _yaw_to(_curve.get_closest_point(at) - at)
+		if what == "cart" or what == "logs":
+			yaw += rng.randf_range(-0.9, 0.9)
+		var xf := _place(at, yaw)
+		var b := Basis(Vector3.UP, yaw)
+		var kit := {}
+		_kit.set_frame(xf)
+		match what:
+			"cabin":
+				_venue.log_cabin(kit, rng)
+				_venue.woodpile(kit, rng, -2.4, 1.75, -VenueKit.CABIN_HZ - VenueKit.CABIN_LOG_R, Vector3(-1.4, 0.0, -VenueKit.CABIN_HZ - 2.3))
+				boxes.append([xf * Vector3(0, 1.3, 0), Vector3(VenueKit.CABIN_HX * 2.0 + 0.6, 2.6, VenueKit.CABIN_HZ * 2.0 + 0.6) * PROP_SCALE, b])
+				boxes.append([xf * Vector3(VenueKit.CABIN_HX + 0.42, 2.2, 0.5), Vector3(0.75, 4.4, 0.9) * PROP_SCALE, b])
+				boxes.append([xf * Vector3(-1.55, 0.5, -VenueKit.CABIN_HZ - 0.45), Vector3(1.9, 1.0, 0.6) * PROP_SCALE, b])
+			"cart":
+				_venue.hay_cart(kit, rng)
+				_kit.set_frame(xf * Transform3D(Basis(Vector3.UP, PI * 0.5), Vector3(0.0, 1.0, -0.15)))
+				_hay_bale(kit, rng)
+				boxes.append([xf * Vector3(0, 0.95, -0.2), Vector3(1.9, 1.9, 2.9) * PROP_SCALE, b])
+				boxes.append([xf * Vector3(0, 0.3, -2.4), Vector3(1.0, 0.6, 1.9) * PROP_SCALE, b])
+			"logs":
+				_venue.log_stack(kit, rng)
+				boxes.append([xf * Vector3(0, 0.8, 0), Vector3(2.6, 1.6, 4.3) * PROP_SCALE, b])
+			"marquee":
+				_venue.marquee(kit, Color(0.10, 0.28, 0.66), rng)
+				for sx in [-1.0, 1.0]:
+					for sz in [-1.0, 1.0]:
+						boxes.append([xf * Vector3(sx * 3.0, 1.2, sz * 3.0), Vector3(0.2, 2.4, 0.2) * PROP_SCALE, b])
+		_kit.reset_frame()
+		var mi := MeshInstance3D.new()
+		mi.name = {"cabin": "LogCabin", "cart": "HayCart", "logs": "LogStack", "marquee": "Marquee"}[what]
+		mi.mesh = _save_res(_venue.finish(kit), "venue_" + what)
+		node.add_child(mi)
+		_note(what, at, radius, 5.0)
+		print("  %s at (%.0f, %.1f, %.0f), %.0fm off the road" % [what, at.x, at.y, at.z, _road_distance(at.x, at.z)])
+	_boxes_body(node, "WoodyardBody", boxes)
+
+
+## The nearest level place to `near` for something `radius` across: clear of the road, the shortcuts,
+## the water and everything noted, on ground that doesn't fall more than 0.9m under it and isn't down a
+## bank (3m+ under the road nearby); the lowest ground there, so it doesn't float.
+func _free_spot(near: Vector2, radius: float) -> Vector3:
+	for ring in range(0, 16):
+		var rr := ring * 2.5
+		var n := maxi(1, int(TAU * rr / 2.5))
+		for k in range(n):
+			var a := TAU * k / n
+			var x := near.x + cos(a) * rr
+			var z := near.y + sin(a) * rr
+			if _spot_ok(x, z, radius):
+				return Vector3(x, _ground_min(x, z, radius * 0.7), z)
+	push_error("no free spot within 40m of %s for %.1fm" % [near, radius])
+	return Vector3(near.x, _ground(near.x, near.y), near.y)
+
+
+func _spot_ok(x: float, z: float, radius: float) -> bool:
+	# _verify_clear's rule for what _build_venue notes (5m past the road's edge), and a little more.
+	if _road_distance(x, z) < ROAD_HALF + radius + 5.5 or _on_shortcut(x, z, radius + 2.0):
+		return false
+	var lo := _ground(x, z)
+	var hi := lo
+	for k in range(8):
+		var a := TAU * k / 8.0
+		var g := _ground(x + cos(a) * radius * 0.8, z + sin(a) * radius * 0.8)
+		lo = minf(lo, g)
+		hi = maxf(hi, g)
+	if hi - lo > 0.9 or lo < -9.0 or lo < _road_surface(Vector3(x, 0.0, z)) - 3.0:
+		return false
+	for f in _footprints:
+		var c: Vector2 = f[1]
+		if Vector2(x, z).distance_to(c) < radius + float(f[2]) + 1.5:
+			return false
+	return true
+
+
+## The cabin's logs: tree_bark.gdshader set for weathered, debarked wood (pale, faint checks along it).
+func _logwall_material() -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = load("res://tree_bark.gdshader")
+	m.set_shader_parameter("bark_color", Color(0.60, 0.53, 0.44))
+	m.set_shader_parameter("fissure_color", Color(0.33, 0.28, 0.23))
+	m.set_shader_parameter("fissure_width", 0.12)
+	m.set_shader_parameter("fissure_depth", 0.008)
+	m.set_shader_parameter("plate_stretch", 7.0)
+	m.set_shader_parameter("roughness_value", 0.85)
+	m.set_shader_parameter("lod_mode", 0)
+	return m
+
+
+# ======================================================================================
+#  Spectators
+# ======================================================================================
+
+## The start's crowd (CrowdPlacer.gd, Nyota Stadium's people at this level's 1.6 times life size): along
+## the crowd barriers by the straight, filling the grandstand at the first corner, and round the
+## paddock's tables. A European venue: SPECTATOR_SKIN weights crowd_common's groups.
+const SPECTATOR_SCALE := PROP_SCALE / 1.86
+const SPECTATOR_SKIN := [0.10, 0.08, 0.70, 0.07, 0.05]
+
+func _build_spectators(root: Node3D) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7781
+	var spots: Array = []
+	# Behind the barriers, facing the road: a front row along them and a looser one behind.
+	for b in _barrier_spots:
+		var mid: Vector3 = b[0]
+		var along: Vector3 = b[1]
+		var cp := _curve.get_closest_point(mid)
+		var away := Vector3(mid.x - cp.x, 0.0, mid.z - cp.z).normalized()
+		for k in range(3):
+			var u := rng.randf_range(-1.6, 1.6)
+			var back := rng.randf_range(1.0, 1.6) if k < 2 else rng.randf_range(2.3, 3.4)
+			if rng.randf() < (0.25 if k < 2 else 0.55):
+				continue
+			var p := mid + along * u + away * back
+			p.y = _ground(p.x, p.z)
+			spots.append([p, -away + along * rng.randf_range(-0.35, 0.35), false])
+	# The grandstand: a seat every 0.55m on each of the seven rows (VenueKit's _bleacher: the seat boards'
+	# tops 0.72 + 0.4 a row up, 0.57 + 0.75 a row back, life size), about two in three taken.
+	var seated := 0
+	for xf in _stand_frames:
+		var fx: Transform3D = xf
+		var face: Vector3 = fx.basis * Vector3(0, 0, -1)
+		for r in range(7):
+			var x := -2.8
+			while x <= 2.81:
+				if rng.randf() < 0.66:
+					spots.append([fx * Vector3(x + rng.randf_range(-0.05, 0.05), 0.72 + r * 0.4, r * 0.75 + 0.57), face, true])
+					seated += 1
+				x += 0.55
+	# Round the paddock: a pair at each show car's table, looking at it, and a few more about.
+	for g in _gazebo_frames:
+		var gx: Transform3D = g[0]
+		if g[1]:
+			# At the table's ends, so they don't hide the car from the lane.
+			for k in range(2):
+				var p := gx * Vector3((1.0 if k == 0 else -1.0) * rng.randf_range(1.15, 1.45), 0.0, rng.randf_range(0.2, 0.9))
+				p.y = _ground(p.x, p.z)
+				var look: Vector3 = gx * Vector3(0.0, 0.0, 0.7) - p
+				spots.append([p, look, false])
+		if rng.randf() < 0.7:
+			var q := gx * Vector3(rng.randf_range(-2.0, 2.0), 0.0, -2.6 - rng.randf_range(0.0, 1.5))
+			q.y = _ground(q.x, q.z)
+			spots.append([q, Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1)) + 0.01 * Vector3.RIGHT, false])
+	CrowdPlacer.build(root, spots, SPECTATOR_SCALE, SPECTATOR_SKIN, 7781, func(res: Resource, n: String) -> Resource: return _save_res(res, n))
+	print("  spectators: %d (%d seated)" % [spots.size(), seated])
+
+
 const LOOP_EXIT_LENGTH := 30.0
 const LOOP_END_SINK := 0.25
 const LOOP_TRACK_WIDTH := 8.5
@@ -2779,6 +3125,90 @@ func _fit_loop() -> void:
 ## The road's surface height at `at`: the lap's nearest centreline point, raised by the road offset.
 func _road_surface(at: Vector3) -> float:
 	return _curve.get_closest_point(at).y + _road_y
+
+
+## The AI's shortcuts (AlternativePaths/*): [node, s0, s1, leave, join]. Each leaves the lap's centreline
+## at s0 and rejoins it at s1, a cubic across the inside of the bend laid on the ground; `leave` and `join`
+## say how far its end handles turn from the lap's heading toward the chord (0 along the lap, 1 straight
+## at the other end), so it parts from the road and merges back at a shallow angle. Hand-drawn, they were
+## three straight legs meeting the lap side on just before a lake, where carts coming off them ran into
+## the water. There was a second, AlternativePath2 (s 506-622), a jump off the high road onto the island
+## inside that bend with the tilted wooden cart FBX as its ramp; the island is 5-22m under the road but for
+## 70m of gentle bend, so there's no cut to drive, and _lay_shortcuts removes any path not listed here.
+const SHORTCUTS := [
+	["AlternativePath1", 2948.0, 3066.0, 0.55, 0.3],
+]
+const SHORTCUT_LIFT := 0.3
+const SHORTCUT_HALF := 4.0
+var _shortcut_curves: Array = []
+
+
+func _lay_shortcuts() -> void:
+	var holder := _level.get_node_or_null("AlternativePaths")
+	if holder == null:
+		holder = Node3D.new()
+		holder.name = "AlternativePaths"
+		_level.add_child(holder)
+	for old in holder.get_children():
+		if not SHORTCUTS.any(func(sc: Array) -> bool: return String(sc[0]) == String(old.name)):
+			print("  shortcut %s removed" % old.name)
+			holder.remove_child(old)
+			old.free()
+	for sc in SHORTCUTS:
+		var f0 := _frame(float(sc[1]))
+		var f1 := _frame(float(sc[2]))
+		var p0: Vector3 = f0["pos"]
+		var p3: Vector3 = f1["pos"]
+		var chord := p3 - p0
+		chord.y = 0.0
+		var span := chord.length()
+		var cd := chord / span
+		var d0: Vector3 = (f0["fwd"] as Vector3).lerp(cd, float(sc[3])).normalized()
+		var d3: Vector3 = (f1["fwd"] as Vector3).lerp(cd, float(sc[4])).normalized()
+		var p1 := p0 + d0 * span * 0.36
+		var p2 := p3 - d3 * span * 0.36
+		var curve := Curve3D.new()
+		var n := ceili(span / 3.0)
+		var lowest := INF
+		var steepest := 0.0
+		var widest := 0.0
+		for i in range(n + 1):
+			var t := float(i) / n
+			var u := 1.0 - t
+			var q := p0 * (u * u * u) + p1 * (3.0 * u * u * t) + p2 * (3.0 * u * t * t) + p3 * (t * t * t)
+			var g := _ground(q.x, q.z)
+			var rd := _road_distance(q.x, q.z)
+			# On the road at its ends, on the ground between.
+			q.y = (maxf(g, _road_surface(q)) if rd < ROAD_HALF + 1.0 else g) + SHORTCUT_LIFT
+			curve.add_point(q)
+			lowest = minf(lowest, g)
+			steepest = maxf(steepest, _slope(q.x, q.z))
+			widest = maxf(widest, rd)
+		var path := holder.get_node_or_null(String(sc[0])) as Path3D
+		if path == null:
+			path = Path3D.new()
+			path.name = String(sc[0])
+			holder.add_child(path)
+		path.transform = Transform3D.IDENTITY
+		path.curve = curve
+		_shortcut_curves.append(curve)
+		var leave := rad_to_deg((f0["fwd"] as Vector3).angle_to(d0))
+		var join := rad_to_deg((f1["fwd"] as Vector3).angle_to(d3))
+		print("  shortcut %s: %.0fm for %.0fm of lap, parts at %.0f deg and joins at %.0f, up to %.0fm off the road, steepest %.2f" % [
+			sc[0], curve.get_baked_length(), float(sc[2]) - float(sc[1]), leave, join, widest, steepest])
+		if lowest < -9.6:
+			push_error("shortcut %s runs into the lake (ground %.1f)" % [sc[0], lowest])
+		if steepest > 0.45:
+			push_error("shortcut %s climbs a %.2f slope" % [sc[0], steepest])
+
+
+## Whether (x, z) is within `margin` of a shortcut's line (nothing that stops a cart stands there).
+func _on_shortcut(x: float, z: float, margin: float) -> bool:
+	for c in _shortcut_curves:
+		var cp: Vector3 = (c as Curve3D).get_closest_point(Vector3(x, 0.0, z))
+		if Vector2(cp.x - x, cp.z - z).length() < SHORTCUT_HALF + margin:
+			return true
+	return false
 
 
 ## Moves the two hand-placed plants by the start out of the barrier and fence lines.

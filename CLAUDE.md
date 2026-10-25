@@ -42,7 +42,8 @@ the others re-bakes it (see Lakeside Course below).
 - `regenerate_lakeside.gd` dresses `levels/LakesideLevel.tscn` as an RC race meeting and replaces everything under
   `LakesideDressing` on every run: the paddock, race control, the camera and lap towers, catch fences, crowd
   barriers, tyre walls, hay, cones, the grandstand across the first corner, the campsite on the hill, the
-  orange kicker, the woods, the boulders and the meadow grass. The terrain and road stay TerrainGenerator's.
+  orange kicker, the woods, the boulders, the meadow grass, the woodcutter's yard, the marquee, the cars on
+  show and the spectators; it also lays the AI's shortcut. The terrain and road stay TerrainGenerator's.
 - It grades flat pads (`TerrainGenerator.flat_pads`: paddock, grandstand footing, campsite terraces) and mows
   the venue's verges (`grass_clearings`, no tall grass there). Both are applied after the road blend, so keep
   them off the road. The world is re-baked only when they change (or with `-- rebake`). A run without a
@@ -117,6 +118,36 @@ the others re-bakes it (see Lakeside Course below).
   flat side to the wind, twist turning the leading edge upwind, coned upwind away from the tower. The beacon
   and the anemometer mast stand on the roof (`nacelle_roof_y`). `res://scratch/turbine_preview.gd` (`-s`,
   windowed) renders one in seconds: `-- <dir> [spin=40] [angle=30] name:x,y,z:tx,ty,tz[:frames[:gap]]`.
+- The AI's shortcut is laid by `_lay_shortcuts` (`SHORTCUTS`: [node, s0, s1, leave, join]): a cubic from the
+  lap's centreline at s0 across the inside of the bend to s1, its end handles turned from the lap's heading
+  toward the chord by `leave`/`join`, so it parts at about 27 degrees and merges at about 22, on the ground
+  (on the road near its ends). The woods (`alts`) and boulders (`_on_shortcut`) keep off it. It removes any
+  `AlternativePaths` child not listed: the hand-drawn AlternativePath2 (s 506-622) was a jump off the high road
+  onto the island inside that bend, the tilted wooden cart FBX its ramp. The island lies 5-22m under the road
+  except for 70m of gentle bend, so there is no cut to drive there. `res://scratch/lakeside_bank_profile.gd`
+  (`-s`, `-- <s0> <s1> [lats=-20,...]`) prints the ground beside the road against the road's height.
+- Fences, crowd barriers and tyre walls stop where the ground falls away (`_trim_run`: within `RUN_MAX_DROP` of
+  the road's height and under `RUN_MAX_SLOPE`, pieces of at least `RUN_MIN`); they had run on down the banks
+  round the start. The generator prints what each run left out.
+- The woodcutter's yard inside the bend after the hill and the marquee by the far woods are `VenueKit.gd`
+  (life size through the PropKit, at PROP_SCALE): a hay cart with spoked wheels and a bale, a stack of felled
+  logs between stakes, a saddle-notched log cabin (stone footing and chimney, shake roof, gables on the end
+  walls, shuttered windows, a bench, a woodpile and chopping block), and a 6 x 6m pagoda marquee with beer
+  tables. They replaced three Hunyuan FBX (a cart, logs, a festival tent) that stood 2-3 times too big and are
+  deleted. `_build_venue` removes the old nodes (`OLD_FBX`) and places each prop with `_free_spot`: the nearest
+  place to `YARD`'s point clear of the road (`_verify_clear`'s rule), the shortcut and what's noted, level to
+  within 0.9m and not down a bank. Timber is `hut_wood.gdshader` (keys "timber", "lapboards", "battens",
+  "painted"; not "boards", which is the sponsor boards' key), round logs `tree_bark.gdshader` on their own
+  surfaces (oak bark, or `_logwall_material`'s pale debarked logs).
+- The paddock's gazebos and team tents are grown (`GAZEBO_GROW`, `TENT_GROW`, on top of PROP_SCALE; their
+  furniture isn't) so a race car fits on a display table (`VenueKit.display_table`). `SHOW_CARS`, the lighter
+  models, stand on every other gazebo's table and in each team tent at race size: `_show_car` lays the car's
+  scene out again (its Model node and its meshes, the same `.res` files) under a `DisplayCar.gd` node, which
+  applies the car's factory paint at load. Their meshes stop drawing at `SHOW_CAR_RANGE` (130m): a car is
+  37-51k triangles.
+- Spectators (`_build_spectators`, `CrowdPlacer.gd`: Nyota Stadium's people at PROP_SCALE / 1.86, a European mix
+  of skins, `SPECTATOR_SKIN`): two loose rows behind the crowd barriers by the straight (`_barrier_spots`), the
+  grandstand about two thirds full (`_stand_frames`, on the seat boards) and a pair at each show car's table.
 
 ## Canyon Course (Sierra del Viento, stage 1)
 
@@ -313,13 +344,13 @@ first to third (`_announce_place`). The podium calls each place as it's revealed
   `res://scratch/deep_water_test.tscn -- <dir> [at=x,z] [height=25]` (windowed) drops a cart and saves frames
   on physics time (the shots stall frames, and physics catches up only 4 steps a frame); `follow=1
   vel=x,y,z pre=0.5,0.8` shoots through the cart's own follower camera, during the fall as well.
-- The follower camera's splash shot (`_splash_cam_wanted`, `_splash_camera`): a cart falling faster than
-  `SPLASH_CAM_FALL` (9 m/s) within 14m of deep water, with no ground above the surface under it (a ray),
-  sets an anchor on the surface under it; from then until the respawn (while it's under) the camera stops
-  following it down and eases to `SPLASH_CAM_BACK` (10m) back along its heading and `SPLASH_CAM_UP`
-  (5.5m) over the water, looking at the spot. Following it, the camera had dropped to the water with the
-  cart and the splash filled the view. Test harnesses that make an AI cart the local player must set
-  `camera_pivot.top_level` as PlayerCart's setup does, or the cart drags the pivot along.
+- The follower camera's splash shot (`_splash_cam_wanted`, `_splash_camera`): it follows the cart down to the
+  water as usual; once the cart is sinking (`_engine_flooded`: under and not boosting) it pulls back fast
+  (`SPLASH_CAM_PULL`) to `SPLASH_CAM_BACK` (10m) back along the way the cart was heading (noted while it was
+  above the water) and `SPLASH_CAM_UP` (5.5m) over the spot, looking at it, until the respawn or a boost out.
+  An earlier version set off as soon as a cart fell fast with water below, and fired for carts that landed
+  short. Test harnesses that make an AI cart the local player must set `camera_pivot.top_level` as
+  PlayerCart's setup does, or the cart drags the pivot along.
 - `StageAmbience.gd` (added by Level) plays the recorded backgrounds in `sounds/<kind>/` per stage (`STAGES`),
   under the levels' own baked ambiences, crossfading random clips. Each clip is levelled by its measured
   RMS (`CLIP_DB`): they range from -12 to -49 dBFS. Measure a new clip before adding it. The deserts
@@ -921,6 +952,9 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   "both hidden" run read 12ms against 30ms for the rest, and sent me looking for a 19ms card cost that wasn't
   there): repeat a run before believing a big difference. In zsh a variable holding several `hide=` arguments
   isn't split, so `hide=a hide=b` in one variable hides nothing.
+- `CrowdPlacer.gd` builds the same people for other levels (cards, figures, `CrowdDetail.gd`, the shared
+  `generated/crowd_person.res`) from spots of [position, facing, seated], at a scale and with a skin mix of its
+  own (Lakeside's start). Nyota's generator still has its own copy of these numbers.
 - `res://scratch/crowd_preview.gd` (`-s`, windowed) renders the figures in memory in a second: `-- <dir> [rows=3]
   [seed=1] [cards=1] [skin=<g>] name:x,y,z:tx,ty,tz`, a column per pose 0..15 (2.6m apart), the cards in a row
   behind with `cards=1`. `nyota_shots` takes `detail=N` to try a Detail Level.
@@ -1117,6 +1151,33 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   name of anything with collision: `PlayerCart._is_track_surface` treats it as drivable.
 - `res://scratch/ranger_post_preview.gd` (run with `-s`, windowed, `-- <dir> name:x,y,z:tx,ty,tz ...`) renders the post
   on flat ground in a few seconds, without generating the level.
+
+## AI shortcuts (AlternativePaths)
+
+- A level's shortcuts are the Path3D children of its `AlternativePaths` (Level.gd collects them). A bot rolls
+  once, `AI_ROUTE_DECIDE` (45m) before a shortcut's start, whether it takes it (`ai_shortcut_chance`); one
+  that does lines up with the start (`_ai_pending_route`: the lane offset eases toward the start's side,
+  kept 2.2m inside the road's half width) and switches onto it within 12m of it. Deciding 14m out, bots took
+  Glacier Highway's forks from the far lane at full speed.
+- On a shortcut the AI samples one route (`_ai_route_local`): the shortcut, then on along the lap from where
+  it rejoins (`_ai_rejoin_offset`). The aim point, the turn ahead (`_ai_measure_upcoming_turn`) and the road
+  limits all go through it. They used to wrap round the shortcut with fmod: within a look-ahead of its end
+  the aim point jumped back to its start and the bots swerved off (Lakeside's two ran into the lakes).
+- A route with an `ai_lane_limit` meta (Northlight's Thin Ice) is driven tightly: at most `AI_TIGHT_SPEED`
+  (18 m/s, boost or not), aiming 10-16m ahead, steering against sliding across the line (`AI_TIGHT_DAMP`; on
+  the ice, aiming the nose alone swung bots 5m either side of the weave into the holes), and ignoring the
+  layer-4 markers it's laid to clear. 40 of 55 bots had drowned there; now about 1 in 20.
+- A boost no longer skips braking for a sharp corner ("let the boost rip" only for bends under 1.6 times
+  `react_corner`): a boosted bot met Glacier Highway's Ridge Bypass fork, 84 degrees, at 60 m/s.
+- `res://scratch/shortcut_probe.tscn -- <level> [seconds=180] [speed=2] [static=1] [chance=1.0] [trace=<name>]`
+  checks each shortcut (ends against the lap, water, drops, solid things on the line) and races bots that
+  take every one, listing where any falls, drowns or sticks (and where it was 0.5s before); `trace=` logs a
+  shortcut's riders every 0.2s (off the line, speed, the turn ahead, boosting). `res://scratch/colliders_near.tscn
+  -- <level> x,y,z ... [radius=3] [route=<path>:<s0>:<s1>[:half]]` lists what is solid at a spot, and what a
+  ray down a route meets. `res://scratch/path_overlay_shots.tscn -- <level> <dir> name:x,y,z:tx,ty,tz[:fov]`
+  renders a level with its lap (white), shortcuts (yellow) and other paths (cyan) drawn over it.
+- Still on the main laps (not shortcuts): Glacier Highway catches bots on a sign gantry's leg at the S-bend
+  near 470m and at 790-850m; Lakeside loses a few round its lakes, scattered.
 
 ## Race cameras
 

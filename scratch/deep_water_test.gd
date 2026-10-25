@@ -86,9 +86,8 @@ func _ready() -> void:
 			await RenderingServer.frame_post_draw
 			get_viewport().get_texture().get_image().save_png("%s/fall_%02d.png" % [out_dir, pk])
 			var wy: float = cart._get_water_surface_y_at(cart.visuals.global_position)
-			print("FALL SHOT %d t=%.2f cart_y=%.2f vy=%.1f on_ground=%s water_y=%.1f ground_above=%s splash_at=%s cam=%s" % [pk, t,
-				cart.global_position.y, cart.linear_velocity.y, cart.is_on_ground, wy,
-				cart._ground_above_water(cart.visuals.global_position, wy, cart._camera_excludes), cart._splash_cam_at,
+			print("FALL SHOT %d t=%.2f cart_y=%.2f vy=%.1f water_y=%.1f splash_at=%s cam=%s" % [pk, t,
+				cart.global_position.y, cart.linear_velocity.y, wy, cart._splash_cam_at,
 				get_viewport().get_camera_3d().global_position])
 			pk += 1
 	print("UNDER at %.2fs, flooded=%s engine_playing=%s" % [t, cart._engine_flooded, cart.engine_sound.playing])
