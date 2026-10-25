@@ -34,6 +34,14 @@ Thumbs.db
 !sounds/**/*.import
 !music/*.import
 !music/**/*.import
+# The rock and plant models' textures import as streamed textures (scratch/stream_textures.py):
+# their import settings have to travel with the project, or a fresh checkout imports them plain.
+!models/plants/*.png.import
+!models/desert/*.png.import
+!models/desert2/*.png.import
+!models/desert3/*.png.import
+!models/desertridge/*.png.import
+!models/trees/*.png.import
 
 # Large asset models and raw files
 *.fbx

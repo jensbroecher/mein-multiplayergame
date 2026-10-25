@@ -6,11 +6,26 @@ enum Phase { PATROL, DIVE, GRAB, CARRY, RELEASE, COOLDOWN }
 
 @export_group("Wings")
 @export var wing_part_names: PackedStringArray = ["part_4", "part_7"]
-@export var flap_degrees: float = 28.0
-@export var flap_speed_glide: float = 2.2
-@export var flap_speed_flap: float = 7.5
-## Local axis for wing fold (body right = up/down flap).
+## Parts of the model that are hidden: part_8 is a stray feather floating over the head.
+@export var hidden_part_names: PackedStringArray = ["part_8"]
+## Local axis the wings hinge on at the shoulder (the body's long axis in the model).
 @export var wing_hinge_axis: Vector3 = Vector3.RIGHT
+## The wings' angle over level (degrees) when gliding: a shallow V, as an eagle soars. The model holds
+## them raised steeply; each wing's own angle is measured off it and lowered to this.
+@export var glide_dihedral_deg: float = 9.0
+## A full beat: the top and bottom of the stroke over level (degrees). The downstroke, the power
+## stroke, takes 40% of the beat; the wing twists leading edge down through it.
+@export var beat_top_deg: float = 44.0
+@export var beat_bottom_deg: float = -36.0
+@export var wing_twist_deg: float = 9.0
+## Wingbeats per second: heaving a car up, braking over it for the grab, a burst while soaring.
+@export var beat_rate_carry: float = 1.5
+@export var beat_rate_grab: float = 2.1
+@export var beat_rate_soar: float = 1.25
+## In the stoop (the dive) the wings are drawn up and back, half closed.
+@export var stoop_deg: float = 52.0
+## How far it banks into a turn, at most (degrees).
+@export var bank_max_deg: float = 24.0
 
 @export_group("Flight")
 @export var patrol_height: float = 75.0
@@ -44,6 +59,9 @@ enum Phase { PATROL, DIVE, GRAB, CARRY, RELEASE, COOLDOWN }
 ## If true, slightly prefer local player; still often picks AI / other cars at random.
 @export var prefer_local_player: bool = false
 @export var randomize_targets: bool = true
+## A cart going at least this share of its top speed outruns the eagle: it is never picked, and a dive
+## on a cart that speeds up to it breaks off.
+@export var escape_speed_share: float = 0.88
 
 @export_group("Audio")
 @export var scream_volume_db: float = -2.0
@@ -54,13 +72,21 @@ var flap_stream: AudioStream = null
 
 var _phase: int = Phase.PATROL
 var _wing_pivots: Array[Node3D] = []
-var _wing_sign: Array[float] = [] # +1 / -1 mirror pair (same phase)
+## Which side of the hinge axis each wing reaches out on (+1 / -1), so both beat as a mirrored pair.
+var _wing_side: Array[float] = []
+## Each wing's angle over level in the model's own pose (radians).
+var _wing_rest: Array[float] = []
 ## Local scale of each wing pivot after reparent (cancels parent FBX scale).
 var _wing_pivot_scales: Array[Vector3] = []
-var _flap_t: float = 0.0
-var _flap_rate: float = 2.2
-var _flap_angle_smooth: float = 0.0
-var _prev_flap_wave: float = 0.0
+## The beat: where in it (0..1, the downstroke first), how much of it shows (0 gliding, 1 full),
+## how many beats are left in a burst while soaring, and the time to the next burst.
+var _beat_phase: float = 0.0
+var _beat_amp: float = 0.0
+var _burst_left: int = 0
+var _soar_timer: float = 2.0
+var _glide_t: float = 0.0
+var _pose_deg: float = 9.0
+var _bank: float = 0.0
 
 var _target_cart: RigidBody3D = null
 var _carry_time: float = 0.0
@@ -82,10 +108,19 @@ var _was_racing: bool = false
 
 
 func _ready() -> void:
+	# The level generator runs this too: the wing pivots and sound players it adds are saved into the
+	# level, and at runtime the model's own wings came back beside them (two eagles, one in another).
+	if Engine.is_editor_hint() or _in_generator():
+		set_physics_process(false)
+		return
 	add_to_group("eagles")
 	_home = global_position
 	_home_basis = global_basis.orthonormalized()
 	_setup_audio()
+	for n in hidden_part_names:
+		var part := _find_desc_named(self, str(n)) as Node3D
+		if part:
+			part.visible = false
 	_setup_wings()
 	_phase = Phase.PATROL
 	_patrol_timer = 0.5
@@ -95,6 +130,13 @@ func _ready() -> void:
 	# Start high
 	global_position = _patrol_target
 	set_physics_process(true)
+
+
+func _in_generator() -> bool:
+	for child in get_tree().root.get_children():
+		if "regenerate" in str(child.name).to_lower():
+			return true
+	return false
 
 
 func _setup_audio() -> void:
@@ -174,7 +216,8 @@ func _physics_process(delta: float) -> void:
 
 func _setup_wings() -> void:
 	_wing_pivots.clear()
-	_wing_sign.clear()
+	_wing_side.clear()
+	_wing_rest.clear()
 	_wing_pivot_scales.clear()
 	var wings: Array[Node3D] = []
 	for n in wing_part_names:
@@ -197,9 +240,25 @@ func _setup_wings() -> void:
 		tagged.append({"w": w, "root": root_g, "lx": local_off.x})
 	tagged.sort_custom(func(a, b): return float(a["lx"]) < float(b["lx"]))
 
+	var axis := wing_hinge_axis.normalized() if wing_hinge_axis.length_squared() > 0.0001 else Vector3.RIGHT
+	var inv := global_transform.affine_inverse()
 	for i in range(tagged.size()):
 		var w: Node3D = tagged[i]["w"]
 		var root_g: Vector3 = tagged[i]["root"]
+		# The wing's tip: the corner of its mesh farthest from the shoulder (eagle's local frame).
+		var root_l: Vector3 = inv * root_g
+		var tip_l: Vector3 = root_l
+		var mi := w as MeshInstance3D
+		if mi and mi.mesh:
+			var aabb: AABB = mi.mesh.get_aabb()
+			for k in range(8):
+				var q: Vector3 = inv * mi.to_global(aabb.get_endpoint(k))
+				if q.distance_squared_to(root_l) > tip_l.distance_squared_to(root_l):
+					tip_l = q
+		var reach: Vector3 = tip_l - root_l
+		reach -= axis * reach.dot(axis)
+		var up_l := Vector3.UP - axis * axis.y
+		var out_l: Vector3 = (reach - up_l * reach.dot(up_l)).normalized()
 		# Hinge at the shoulder (closest point to body), not wing center.
 		var pivot := Node3D.new()
 		pivot.name = "WingPivot_" + w.name
@@ -217,38 +276,79 @@ func _setup_wings() -> void:
 		# Critical: keep the local scale that compensates parent scale (~1/10).
 		# Overwriting basis with Basis(axis,ang) alone made wings ~10x huge.
 		_wing_pivot_scales.append(pivot.scale)
-		# Sorted left→right: opposite mirror signs, SAME phase (both up / both down).
-		var sign_v: float = -1.0 if i == 0 else 1.0
-		if tagged.size() == 1:
-			sign_v = 1.0
-		_wing_sign.append(sign_v)
+		# Rotating about the hinge by +a turns this wing's tip down when it reaches out on this side.
+		var down_dir: Vector3 = Basis(axis, 0.1) * out_l - out_l
+		_wing_side.append(1.0 if down_dir.dot(Vector3.UP) < 0.0 else -1.0)
+		_wing_rest.append(atan2(reach.dot(up_l), maxf(reach.dot(out_l), 0.0001)))
 
 
+## The wings: a shallow V soaring, with a burst of beats now and then (and while climbing); drawn up
+## and back in the stoop; full beats braking over a car and heaving it up.
 func _update_wings(delta: float) -> void:
-	var hard_flap := _phase == Phase.CARRY or _phase == Phase.DIVE or _phase == Phase.GRAB
-	_flap_rate = flap_speed_flap if hard_flap else flap_speed_glide
-	var amp: float = flap_degrees if hard_flap else flap_degrees * 0.35
-	_flap_t += delta * _flap_rate
-	# Single shared phase so both wings beat together (mirrored).
-	var target_wave: float = sin(_flap_t)
-	# One single-flap SFX per downstroke while climbing with a car
-	if _phase == Phase.CARRY and _prev_flap_wave < 0.0 and target_wave >= 0.0:
-		_play_flap_once()
-	_prev_flap_wave = target_wave
+	_glide_t += delta
+	var base: float = glide_dihedral_deg + sin(_glide_t * 0.9) * 2.0
+	var rate: float = beat_rate_soar
+	var amp_target: float = 0.0
+	match _phase:
+		Phase.DIVE:
+			base = stoop_deg
+		Phase.GRAB:
+			rate = beat_rate_grab
+			amp_target = 1.0
+		Phase.CARRY:
+			rate = beat_rate_carry
+			amp_target = 1.0
+		_:
+			_soar_timer -= delta
+			if _burst_left <= 0 and _soar_timer <= 0.0:
+				_burst_left = randi_range(3, 5)
+				_soar_timer = randf_range(5.0, 9.0)
+			if _velocity.y > 3.0:
+				_burst_left = maxi(_burst_left, 1)
+			amp_target = 0.75 if _burst_left > 0 else 0.0
+	_beat_amp = lerpf(_beat_amp, amp_target, 1.0 - exp(-4.0 * delta))
+	if amp_target > 0.0 or _beat_amp > 0.02:
+		var before: float = _beat_phase
+		_beat_phase += delta * rate
+		if _beat_phase >= 1.0:
+			_beat_phase -= 1.0
+			_burst_left = maxi(_burst_left - 1, 0)
+		# One flap sound per downstroke while heaving a car up.
+		if _phase == Phase.CARRY and before > _beat_phase:
+			_play_flap_once()
+	var stroke: float = stroke_angle(_beat_phase)
+	var target: float = lerpf(base, stroke, _beat_amp)
+	_pose_deg = lerpf(_pose_deg, target, 1.0 - exp(-18.0 * delta))
+	set_wing_pose(_pose_deg, stroke_twist(_beat_phase) * _beat_amp)
 
-	if _wing_pivots.is_empty():
-		return
-	var blend: float = 1.0 - exp(-14.0 * delta)
-	_flap_angle_smooth = lerpf(_flap_angle_smooth, target_wave, blend)
+
+## The wing's angle over level (degrees) at `phase` of a beat: down fast, up slower.
+func stroke_angle(phase: float) -> float:
+	if phase < 0.4:
+		return lerpf(beat_top_deg, beat_bottom_deg, smoothstep(0.0, 1.0, phase / 0.4))
+	return lerpf(beat_bottom_deg, beat_top_deg, smoothstep(0.0, 1.0, (phase - 0.4) / 0.6))
+
+
+## The twist (degrees): leading edge down through the downstroke, a little up on the way back.
+func stroke_twist(phase: float) -> float:
+	if phase < 0.4:
+		return -wing_twist_deg * sin(phase / 0.4 * PI)
+	return wing_twist_deg * 0.5 * sin((phase - 0.4) / 0.6 * PI)
+
+
+## Both wings at `angle_deg` over level, twisted `twist_deg`, as a mirrored pair.
+func set_wing_pose(angle_deg: float, twist_deg: float) -> void:
 	var axis := wing_hinge_axis.normalized() if wing_hinge_axis.length_squared() > 0.0001 else Vector3.RIGHT
 	for i in range(_wing_pivots.size()):
 		var pivot: Node3D = _wing_pivots[i]
 		if not is_instance_valid(pivot):
 			continue
-		var ang: float = deg_to_rad(amp) * _flap_angle_smooth * _wing_sign[i]
-		# Axis-angle rotation, then restore the scale that cancels the eagle FBX scale.
+		var side: float = _wing_side[i]
+		var ang: float = side * (_wing_rest[i] - deg_to_rad(angle_deg))
+		# The span runs across the hinge: twist about it the same way on both wings.
+		var span: Vector3 = axis.cross(Vector3.UP).normalized()
 		var sc: Vector3 = _wing_pivot_scales[i] if i < _wing_pivot_scales.size() else Vector3.ONE
-		pivot.basis = Basis(axis, ang).scaled(sc)
+		pivot.basis = (Basis(axis, ang) * Basis(span, deg_to_rad(twist_deg))).scaled(sc)
 
 
 func _estimate_body_center(wings: Array[Node3D]) -> Vector3:
@@ -347,6 +447,11 @@ func _tick_dive(delta: float) -> void:
 		_abort_hunt(false)
 		return
 
+	# A cart that gets up to its top speed outruns the eagle: it pulls up and gives up.
+	if _outrunning(_target_cart):
+		_abort_hunt(false)
+		return
+
 	# Safety: scream once on approach if not already played
 	if not _scream_played_this_hunt:
 		_play_random_scream()
@@ -361,7 +466,6 @@ func _tick_dive(delta: float) -> void:
 	if dist <= grab_radius:
 		_phase = Phase.GRAB
 		_carry_time = 0.0
-		_prev_flap_wave = 0.0
 
 
 func _tick_grab(delta: float) -> void:
@@ -486,6 +590,7 @@ func _face_direction(flat_dir: Vector3, delta: float = 0.016) -> void:
 	if flat_dir.length_squared() < 0.0001:
 		return
 	flat_dir = flat_dir.normalized()
+	var before: Vector3 = _face_dir_smooth
 	# Smooth yaw so turns aren't jerky
 	var tblend: float = 1.0 - exp(-turn_smooth * delta)
 	_face_dir_smooth = _face_dir_smooth.lerp(flat_dir, tblend)
@@ -494,10 +599,15 @@ func _face_direction(flat_dir: Vector3, delta: float = 0.016) -> void:
 	else:
 		_face_dir_smooth = _face_dir_smooth.normalized()
 	_last_flat_fwd = _face_dir_smooth
+	# Bank into the turn: the inside wing low.
+	var turn_rate: float = before.cross(_face_dir_smooth).y / maxf(delta, 0.001)
+	var bank_cap: float = deg_to_rad(bank_max_deg)
+	_bank = lerpf(_bank, clampf(-turn_rate * 0.8, -bank_cap, bank_cap), 1.0 - exp(-4.0 * delta))
 	var sc: Vector3 = global_transform.basis.get_scale()
 	var b := Basis.looking_at(_face_dir_smooth, Vector3.UP)
 	if absf(model_yaw_offset_deg) > 0.01:
 		b = b.rotated(Vector3.UP, deg_to_rad(model_yaw_offset_deg))
+	b = Basis(_face_dir_smooth, _bank) * b
 	b = b.scaled(sc.abs())
 	global_transform = Transform3D(b, global_position)
 
@@ -574,6 +684,8 @@ func _pick_target_cart() -> RigidBody3D:
 			continue
 		if c.has_method("has_physics_authority") and not c.has_physics_authority():
 			continue
+		if _outrunning(c):
+			continue
 		candidates.append(c as RigidBody3D)
 	if candidates.is_empty():
 		return null
@@ -611,6 +723,15 @@ func _pick_target_cart() -> RigidBody3D:
 			best_score = score
 			best = cart
 	return best
+
+
+## True while `cart` is going at least escape_speed_share of its top speed.
+func _outrunning(cart: Object) -> bool:
+	var rb := cart as RigidBody3D
+	if rb == null:
+		return false
+	var top: float = float(cart.get("max_speed")) if cart.get("max_speed") != null else 40.0
+	return rb.linear_velocity.length() >= top * escape_speed_share
 
 
 func _valid_cart(cart: Object) -> bool:

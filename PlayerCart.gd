@@ -18,6 +18,8 @@ var paint: Dictionary = {}
 
 const CarPaint = preload("res://CarPaint.gd")
 const CarDebris = preload("res://CarDebris.gd")
+const Surfaces = preload("res://Surfaces.gd")
+const SkidMarksScript = preload("res://SkidMarks.gd")
 const CAR_FADE_SHADER = preload("res://car_body_fade.gdshader")
 ## Transparent twins of the procedural cars' materials, by the opaque one's instance id.
 static var _car_fade_materials := {}
@@ -507,6 +509,30 @@ var _surface_dust := Color(0, 0, 0, 0)
 ## True on a surface with a "surface_spray" meta: it throws dirt like off-road ground although it
 ## counts as track (Msitu Falls' mud).
 var _surface_spray := false
+## What the tyres are on (Surfaces.gd), refreshed every physics tick on the ground and kept in the
+## air. Only paved road takes skid marks and screeches; the rest throws its own spray and plays its
+## own sliding loop. Remote carts read it from sync_surface (-1 while the owner's cart is airborne).
+var surface: int = Surfaces.ASPHALT
+@export var sync_surface: int = 0
+## How hard the tyres slide, 0..1: a drift or a locked brake at speed is most of it, sliding wide
+## through a corner the rest. Drives the marks, the spray and the sliding noise.
+var _skid_amount := 0.0
+var _skid_marks_node: Node = null
+## Whether this cart's wheels left marks last frame (so they are lifted once when they stop).
+var _skid_wheels_down := false
+var _wheel_pivots: Array = []
+## The tyre's footprint (m): a mark is the width across the direction of travel, so a tyre sliding
+## sideways leaves a wider one.
+const TYRE_WIDTH := 0.26
+const TYRE_LENGTH := 0.34
+## The sliding loops (Surfaces.stream) on two players that crossfade when the surface changes.
+var _sfx_surface: Array = []
+var _sfx_surface_gain: Array = [0.0, 0.0]
+var _sfx_surface_cur := 0
+var _sfx_surface_kind := -1
+## Gritty bits the rear tyres fling (stones, sand, snow, clods, grass), beside the dust cloud.
+var grit_particles = []
+static var _grit_texture: Texture2D = null
 ## How much of the surface grip loss reaches braking, traction and rolling resistance.
 const ICE_BRAKE_SHARE := 0.75
 const ICE_TRACTION_SHARE := 0.35
@@ -1102,6 +1128,9 @@ func _ready():
 	_create_drift_particles("RR")
 	_create_dirt_particles("RL")
 	_create_dirt_particles("RR")
+	_create_grit_particles("RL")
+	_create_grit_particles("RR")
+	_create_surface_audio()
 	_current_dust_color = _get_current_surface_dust_color()
 	_apply_dust_particle_colors(_current_dust_color)
 	_update_boost_particle_positions()
@@ -1593,64 +1622,11 @@ func _process(delta):
 			_clear_trail_stopped_meta(p)
 			var pivot = p.get_meta("pivot", null)
 			if is_instance_valid(pivot):
-				if p.name.ends_with("_Skid"):
-					# Raycast directly beneath this specific wheel to get exact road/terrain surface and normal
-					var n: Vector3 = current_ground_normal if is_on_ground else Vector3.UP
-					var down_dir: Vector3 = -n
-					var mark_pos: Vector3 = pivot.global_position + pivot.global_transform.basis * Vector3(0, 0, 0.12)
-					mark_pos += down_dir * (-WHEEL_Y_OFFSET - 0.03)
-					
-					var space_state = get_world_3d().direct_space_state
-					if space_state:
-						var query = PhysicsRayQueryParameters3D.create(
-							pivot.global_position - down_dir * 0.35,
-							pivot.global_position + down_dir * 1.10
-						)
-						query.exclude = [get_rid()]
-						query.collision_mask = 1
-						var hit = space_state.intersect_ray(query)
-						if hit:
-							n = hit.normal.normalized()
-							mark_pos = hit.position + n * 0.045
-					
-					# Compute motion velocity of the wheel contact point
-					var vel: Vector3 = linear_velocity
-					if not has_physics_authority and sync_velocity.length_squared() > 0.5:
-						vel = sync_velocity
-					var wheel_offset: Vector3 = mark_pos - global_position
-					var wheel_vel: Vector3 = vel
-					if has_physics_authority and angular_velocity.length_squared() > 0.01:
-						wheel_vel += angular_velocity.cross(wheel_offset)
-					
-					# Project wheel motion onto the ground surface normal
-					var move_on_ground: Vector3 = wheel_vel - n * wheel_vel.dot(n)
-					var fwd_plane: Vector3
-					if move_on_ground.length_squared() >= 0.25:
-						# Align skid mark quad with the wheel's actual path of motion across the ground
-						fwd_plane = move_on_ground.normalized()
-					else:
-						# Fallback for stationary or near-zero speed (e.g. burnout / standing still)
-						var fwd_sk: Vector3 = -visuals.global_transform.basis.z
-						fwd_plane = fwd_sk - n * fwd_sk.dot(n)
-						if fwd_plane.length_squared() < 0.0001:
-							fwd_plane = -visuals.global_transform.basis.z
-						else:
-							fwd_plane = fwd_plane.normalized()
-					
-					var right_sk: Vector3 = n.cross(fwd_plane)
-					if right_sk.length_squared() < 0.0001:
-						p.global_rotation = Vector3(0.0, visuals.global_rotation.y, 0.0)
-					else:
-						right_sk = right_sk.normalized()
-						fwd_plane = right_sk.cross(n).normalized()
-						p.global_transform.basis = Basis(right_sk, n, -fwd_plane)
-					p.global_position = mark_pos
-				else:
-					# Smoke behind tire contact patch
-					p.global_rotation = pivot.global_rotation
-					p.global_position = pivot.global_position + pivot.global_transform.basis * Vector3(0, -0.22, 0.16)
+				# Smoke behind tire contact patch
+				p.global_rotation = pivot.global_rotation
+				p.global_position = pivot.global_position + pivot.global_transform.basis * Vector3(0, -0.22, 0.16)
 
-	for p in dirt_particles:
+	for p in dirt_particles + grit_particles:
 		if is_instance_valid(p) and p is CPUParticles3D:
 			if not p.emitting:
 				_update_idle_trail_emitter(p)
@@ -1659,6 +1635,8 @@ func _process(delta):
 			var pivot = p.get_meta("pivot", null)
 			if is_instance_valid(pivot):
 				_attach_dirt_emitter(p, pivot)
+
+	_update_skid_marks()
 
 func _physics_process(delta):
 	if slow_timer > 0.0:
@@ -2175,6 +2153,7 @@ func _physics_process(delta):
 
 	if not can_move and not is_landing:
 		linear_velocity = linear_velocity.lerp(Vector3.ZERO, 3.0 * delta)
+		_update_surface_audio(delta, 0.0, 0.0, false)
 		_move_and_sync()
 		return
 
@@ -2338,8 +2317,16 @@ func _physics_process(delta):
 			surface_grip = _surface_grip_of(collider)
 			_surface_dust = _surface_meta_of(collider, &"dust_color", Color(0, 0, 0, 0))
 			_surface_spray = bool(_surface_meta_of(collider, &"surface_spray", false))
+			var lvl_node: Node = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
+			surface = Surfaces.of(collider, lvl_node, not is_offroad)
+	elif on_ground:
+		surface = Surfaces.ASPHALT
 
 	is_in_snow = on_snow_surface or (_snow_drift_depth > 0) or (is_offroad and _snow_stage)
+	# A snow drift lying over the road (Frostpeak Creek) is snow, whatever is under it.
+	if on_ground and _snow_drift_depth > 0:
+		surface = Surfaces.SNOW
+	sync_surface = surface if on_ground else -1
 	_update_snow_plough_depth()
 
 	if _snow_drift_depth > 0 and not is_offroad:
@@ -2659,7 +2646,17 @@ func _physics_process(delta):
 
 			is_drifting = drift_mode
 			
-			var play_brake_sfx = on_ground and (is_drifting or (input_dir.y > 0.2 and current_speed > 5.0))
+			var hard_brake: bool = input_dir.y > 0.2 and current_speed > 5.0
+			# How hard the tyres slide: a drift or a locked brake, or sliding wide through a corner.
+			var lock := 0.0
+			if is_drifting:
+				lock = 0.85
+			elif hard_brake:
+				lock = clampf(input_dir.y, 0.4, 1.0) * clampf((current_speed - 5.0) / 10.0, 0.3, 1.0)
+			var slide_wide: float = clampf((absf(linear_velocity.dot(visuals.global_transform.basis.x)) - 2.5) / 7.0, 0.0, 1.0)
+			_skid_amount = maxf(lock, slide_wide * 0.8) if drive_grounded else 0.0
+			# Paved road squeals and screeches; every other surface has its own sliding loop.
+			var play_brake_sfx = on_ground and (is_drifting or hard_brake) and Surfaces.is_paved(surface)
 			if play_brake_sfx:
 				if not sfx_brake_drift.playing:
 					sfx_brake_drift.play()
@@ -2738,6 +2735,7 @@ func _physics_process(delta):
 		if sfx_rocket_loop.playing: sfx_rocket_loop.stop()
 		if sfx_brake_drift.playing: sfx_brake_drift.stop()
 		_exit_drift()
+		_skid_amount = 0.0
 		_set_drift_emitting(false)
 		sync_emit_drift = false
 		
@@ -2766,11 +2764,15 @@ func _physics_process(delta):
 		var excess_ratio = (current_speed - effective_max) / max_speed
 		apply_central_force(-fwd * excess_ratio * acceleration * 8.0 * mass)
 
-	# Emit dirt particles when offroad or on snow, moving, and NOT in water
+	# The wheels raise the surface's dust and fling its grit (Surfaces.FX): rolling on loose ground,
+	# more when sliding. Paved road only smokes, when skidding (_set_drift_emitting). Not in water.
 	var in_water_now := stage_has_water and (is_underwater or (water_surface_y - global_position.y >= -0.80 and _is_over_water_volume()))
-	var emit_dirt = (is_offroad or is_in_snow or _surface_spray) and on_ground and linear_velocity.length() > 1.8 and not in_water_now
+	var surf_fx: Dictionary = Surfaces.fx(surface)
+	var raises_dust: bool = (surf_fx["dust"] as Color).a > 0.0 and (float(surf_fx["dust_roll"]) > 0.0 or _skid_amount > 0.25)
+	var emit_dirt = (raises_dust or _surface_spray) and on_ground and linear_velocity.length() > 1.8 and not in_water_now
 	_set_dirt_emitting(emit_dirt)
 	sync_emit_dirt = emit_dirt
+	_update_surface_audio(delta, _skid_amount, linear_velocity.length(), on_ground and not in_water_now)
 
 	sync_steer = current_steer
 	if on_ground and not on_loop and hop_cooldown <= 1.0:
@@ -3258,16 +3260,22 @@ func _interpolate_remote_visual(delta: float):
 			mesh_node.rotation.x = wheel_rotation
 
 	_update_blob_shadow()
-	# Visual particle/sound effects for remote player carts
+	# Visual particle/sound effects for remote player carts, on the surface their owner reports
+	# (-1: its cart is in the air).
+	var remote_grounded: bool = sync_surface >= 0
+	if remote_grounded:
+		surface = sync_surface
+	_skid_amount = 0.85 if sync_emit_drift and remote_grounded else 0.0
 	_set_drift_emitting(sync_emit_drift)
 	_set_dirt_emitting(sync_emit_dirt)
-	if sync_emit_drift:
+	if sync_emit_drift and Surfaces.is_paved(surface):
 		if not sfx_brake_drift.playing:
 			sfx_brake_drift.play()
 			_play_tire_screech(max_speed * 0.6)
 	else:
 		if sfx_brake_drift.playing:
 			sfx_brake_drift.stop()
+	_update_surface_audio(delta, _skid_amount, speed, remote_grounded)
 
 func _setup_new_car_wheels():
 	var cart_model = get_node_or_null("Visuals/CartModel")
@@ -3511,6 +3519,63 @@ func _play_crash_sound(cart_hit := false) -> void:
 	sfx_landing_bonk.volume_db = 4.0 if cart_hit else 6.0
 	sfx_landing_bonk.pitch_scale = randf_range(0.92, 1.08) if cart_hit else 1.0
 	sfx_landing_bonk.play()
+
+
+func _create_surface_audio() -> void:
+	for i in 2:
+		var ap := AudioStreamPlayer3D.new()
+		ap.name = "SFX_Surface%d" % i
+		ap.bus = &"SFX"
+		ap.unit_size = 12.0
+		ap.max_distance = 80.0
+		ap.volume_db = -80.0
+		visuals.add_child(ap)
+		_sfx_surface.append(ap)
+
+
+## The tyres on anything but paved road (which squeals instead): the surface's sliding loop, as loud
+## as the slide (`slide` 0..1) or, quieter, just rolling over loose ground, its pitch rising with
+## speed. A change of surface crossfades to the other player.
+func _update_surface_audio(delta: float, slide: float, speed: float, grounded: bool) -> void:
+	if _sfx_surface.size() < 2:
+		return
+	var stream: AudioStream = null if Surfaces.is_paved(surface) else Surfaces.stream(surface)
+	var fxs: Dictionary = Surfaces.fx(surface)
+	var gain := 0.0
+	if stream != null and grounded and speed > 1.0:
+		var roll: float = clampf((speed - 3.0) / 22.0, 0.0, 1.0) * db_to_linear(float(fxs["roll_db"]))
+		gain = maxf(clampf(slide, 0.0, 1.0), roll)
+	if stream != null and gain > 0.0 and _sfx_surface_kind != surface:
+		_sfx_surface_kind = surface
+		_sfx_surface_cur = 1 - _sfx_surface_cur
+		var fresh: AudioStreamPlayer3D = _sfx_surface[_sfx_surface_cur]
+		fresh.stream = stream
+		_sfx_surface_gain[_sfx_surface_cur] = 0.0
+		fresh.volume_db = -80.0
+		fresh.play(randf() * 2.0)
+	var k: float = 1.0 - exp(-14.0 * delta)
+	for i in 2:
+		var ap: AudioStreamPlayer3D = _sfx_surface[i]
+		var target: float = gain if i == _sfx_surface_cur else 0.0
+		_sfx_surface_gain[i] = lerpf(_sfx_surface_gain[i], target, k)
+		var g: float = _sfx_surface_gain[i]
+		if g < 0.003:
+			if ap.playing and target == 0.0:
+				ap.stop()
+				if i == _sfx_surface_cur:
+					_sfx_surface_kind = -1
+			continue
+		if not ap.playing and ap.stream != null:
+			ap.play(randf() * 2.0)
+		ap.volume_db = linear_to_db(g) + float(fxs["sound_db"])
+		ap.pitch_scale = lerpf(0.85, 1.2, clampf(speed / 32.0, 0.0, 1.0))
+
+
+func _stop_surface_audio() -> void:
+	for i in _sfx_surface.size():
+		(_sfx_surface[i] as AudioStreamPlayer3D).stop()
+		_sfx_surface_gain[i] = 0.0
+	_sfx_surface_kind = -1
 
 
 ## A one-shot tyre screech from the cart, louder the faster it goes; at most one every 0.9s.
@@ -4431,6 +4496,8 @@ func _apply_respawn_pose() -> void:
 	sfx_rocket_loop.stop()
 	sfx_nitro_start.stop()
 	sfx_brake_drift.stop()
+	_stop_surface_audio()
+	_skid_amount = 0.0
 	
 	_set_drift_emitting(false)
 	_set_dirt_emitting(false)
@@ -5296,7 +5363,7 @@ func _configure_trail_particle_draw(p: CPUParticles3D) -> void:
 
 func _collect_trail_particles() -> Array:
 	var all := []
-	for p in dirt_particles:
+	for p in dirt_particles + grit_particles:
 		if is_instance_valid(p) and p is CPUParticles3D:
 			all.append(p)
 	for p in drift_particles:
@@ -5437,113 +5504,96 @@ func _create_drift_particles(wheel_name: String):
 	smoke.color_ramp = grad
 	_configure_trail_particle_draw(smoke)
 
-	# Skidmarks — continuous deep dark rubber tire tracks on road surface
-	var skid = CPUParticles3D.new()
-	skid.name = wheel_name + "_Skid"
-	skid.emitting = false
-	skid.amount = 140
-	skid.lifetime = 1.8
-	skid.explosiveness = 0.0
-	skid.randomness = 0.0
-	skid.fixed_fps = 60
-	skid.mesh = QuadMesh.new()
-	skid.mesh.orientation = PlaneMesh.FACE_Y
-	skid.mesh.size = Vector2(0.26, 0.60)
+## Skid marks for every wheel that slides on paved road (SkidMarks.gd): each wheel's ray finds the
+## ground under it, and the mark lies there, as wide as the tyre's footprint across its path.
+func _update_skid_marks() -> void:
+	if not _is_skid_active:
+		if _skid_wheels_down:
+			_skid_wheels_down = false
+			if is_instance_valid(_skid_marks_node):
+				for k in 4:
+					_skid_marks_node.lift(get_instance_id() * 4 + k)
+		return
+	var marks: Node = _skid_marks()
+	var space := get_world_3d().direct_space_state if is_inside_tree() else null
+	if marks == null or space == null:
+		return
+	_skid_wheels_down = true
+	var authority: bool = has_physics_authority()
+	var vel: Vector3 = linear_velocity if authority else sync_velocity
+	var up: Vector3 = visuals.global_transform.basis.y
+	if _wheel_pivots.is_empty():
+		for corner in ["FL", "FR", "RL", "RR"]:
+			_wheel_pivots.append(visuals.get_node_or_null("WheelPivot" + corner))
+	for k in 4:
+		var key: int = get_instance_id() * 4 + k
+		var rear: bool = k >= 2
+		var pivot: Node3D = _wheel_pivots[k]
+		if not is_instance_valid(pivot):
+			continue
+		var q := PhysicsRayQueryParameters3D.create(pivot.global_position + up * 0.3, pivot.global_position - up * 1.1)
+		q.exclude = [get_rid()]
+		q.collision_mask = 1
+		var hit := space.intersect_ray(q)
+		if hit.is_empty() or (hit.normal as Vector3).y < 0.3:
+			marks.lift(key)
+			continue
+		var n: Vector3 = hit.normal
+		var wheel_vel: Vector3 = vel
+		if authority:
+			wheel_vel += angular_velocity.cross((hit.position as Vector3) - global_position)
+		var heading: Vector3 = -pivot.global_transform.basis.z
+		heading = (heading - n * heading.dot(n)).normalized()
+		var path: Vector3 = wheel_vel - n * wheel_vel.dot(n)
+		var fwd: Vector3 = path.normalized() if path.length_squared() > 0.25 else heading
+		# Sideways, a tyre wipes a band as long as its contact patch.
+		var slip: float = absf(heading.cross(fwd).dot(n))
+		var width: float = lerpf(TYRE_WIDTH, TYRE_LENGTH, slip)
+		# The rear tyres, which slide most, lay the most rubber.
+		var strength: float = clampf(_skid_amount, 0.0, 1.0) * (0.75 if rear else 0.5)
+		marks.lay(key, hit.position, n, fwd, width, strength)
 
-	var mat_skid = StandardMaterial3D.new()
-	mat_skid.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat_skid.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat_skid.albedo_color = Color(1.0, 1.0, 1.0, 1.0)
-	mat_skid.vertex_color_use_as_albedo = true
-	mat_skid.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mat_skid.render_priority = 10
-	mat_skid.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
-	skid.material_override = mat_skid
 
-	var skid_grad = Gradient.new()
-	# Fade-in from alpha 0 over first 2% of lifetime (~36ms) so the very first
-	# particles spawned when the emitter initialises are invisible, preventing
-	# the dark "disc" artifact that appears on first contact with the surface.
-	skid_grad.offsets = PackedFloat32Array([0.0, 0.02, 0.55, 0.85, 1.0])
-	skid_grad.colors = PackedColorArray([
-		Color(0.08, 0.08, 0.08, 0.0),   # Invisible at birth
-		Color(0.08, 0.08, 0.08, 0.48),  # Semi-transparent dark charcoal rubber
-		Color(0.08, 0.08, 0.08, 0.40),
-		Color(0.08, 0.08, 0.08, 0.18),
-		Color(0.08, 0.08, 0.08, 0.0)
-	])
-	skid.color_ramp = skid_grad
-
-	skid.gravity = Vector3.ZERO
-	skid.direction = Vector3.ZERO
-	skid.spread = 0.0
-	skid.initial_velocity_min = 0.0
-	skid.initial_velocity_max = 0.0
-	skid.local_coords = false
-	skid.top_level = true
-	skid.set_meta("pivot", pivot)
-	skid.set_meta("kind", "skid")
-
-	visuals.add_child(skid)
-	drift_particles.append(skid)
-
-	if pivot.is_inside_tree():
-		var local_offset = Vector3(0, WHEEL_Y_OFFSET + 0.02, 0)
-		skid.global_position = pivot.global_position + pivot.global_transform.basis * local_offset
-		var yaw: float = visuals.global_rotation.y if is_instance_valid(visuals) else 0.0
-		skid.global_rotation = Vector3(0.0, yaw, 0.0)
-	_configure_trail_particle_draw(skid)
-
-func _is_asphalt_road_surface() -> bool:
-	if is_offroad or _wadi_stage:
-		return false
-	var lvl = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
-	if lvl:
-		var lvl_name: String = str(lvl.name).to_lower()
-		# Desert Wadi is an offroad sand stage and Canyon is dirt: neither emits asphalt skidmarks
-		if lvl_name.contains("canyon") or lvl_name.contains("wadi") or lvl_name.contains("desert"):
-			return false
-		var tg = lvl.get_node_or_null("TerrainGenerator")
-		if tg and "road_material" in tg and tg.road_material:
-			var mat = tg.road_material
-			if mat is ShaderMaterial:
-				var tex = mat.get_shader_parameter("albedo_texture")
-				if tex and str(tex.resource_path).to_lower().contains("dirt"):
-					return false
-	return true
+func _skid_marks() -> Node:
+	if is_instance_valid(_skid_marks_node):
+		return _skid_marks_node
+	var lvl: Node = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
+	if lvl == null or not lvl.is_inside_tree():
+		return null
+	_skid_marks_node = lvl.get_node_or_null("SkidMarks")
+	if _skid_marks_node == null:
+		_skid_marks_node = SkidMarksScript.new()
+		_skid_marks_node.name = "SkidMarks"
+		lvl.add_child(_skid_marks_node)
+	return _skid_marks_node
 
 
 func _set_drift_emitting(emitting: bool):
 	if not _trail_particles_ready:
 		return
-	var speed: float = linear_velocity.length()
+	var authority: bool = has_physics_authority()
+	var speed: float = linear_velocity.length() if authority else sync_velocity.length()
 	var time_since_respawn = (Time.get_ticks_msec() / 1000.0) - last_respawn_time
-	var is_asphalt: bool = _is_asphalt_road_surface()
-	var grounded: bool = is_on_ground or _ground_grace > 0.0
+	var paved: bool = Surfaces.is_paved(surface)
+	var grounded: bool = (is_on_ground or _ground_grace > 0.0) if authority else sync_surface >= 0
 
-	# Hysteresis gating to prevent rapid flickering on small bumps or seams
+	# Marks only on paved road. Hysteresis keeps a small bump or a seam from breaking the mark.
 	if _is_skid_active:
-		if not emitting or speed < 3.8 or is_landing or not can_move or not grounded or not is_asphalt or time_since_respawn < 0.5:
+		if not emitting or speed < 3.8 or is_landing or not can_move or not grounded or not paved or time_since_respawn < 0.5:
 			_is_skid_active = false
 	else:
-		if emitting and speed > 5.0 and not is_landing and can_move and grounded and is_asphalt and time_since_respawn > 0.5:
+		if emitting and speed > 5.0 and not is_landing and can_move and grounded and paved and time_since_respawn > 0.5:
 			_is_skid_active = true
 
+	# Tyre smoke during a drift or hard braking at speed, on paved road only: on anything else the
+	# surface's own dust and grit take over (_set_dirt_emitting).
+	var smoke_on: bool = emitting and paved and speed > 4.8 and not is_landing and can_move and grounded and time_since_respawn > 0.5
 	for p in drift_particles:
 		if not is_instance_valid(p) or not (p is CPUParticles3D):
 			continue
-		var kind: String = str(p.get_meta("kind", ""))
-		if kind == "skid" or p.name.ends_with("_Skid"):
-			# Skidmarks emit only during active drift or hard braking on asphalt roads (never on dirt or terrain)
-			p.emitting = _is_skid_active
-			if _is_skid_active and "amount_ratio" in p:
-				p.amount_ratio = clampf((speed - 5.0) / 16.0, 0.25, 1.0)
-		else:
-			# Smoke emits during drift or hard braking at speed
-			var smoke_on: bool = emitting and speed > 4.8 and not is_landing and can_move and grounded and time_since_respawn > 0.5
-			p.emitting = smoke_on
-			if smoke_on and "amount_ratio" in p:
-				p.amount_ratio = clampf(speed / 20.0, 0.15, 0.65)
+		p.emitting = smoke_on
+		if smoke_on and "amount_ratio" in p:
+			p.amount_ratio = clampf(speed / 20.0, 0.15, 0.65)
 
 func _set_boost_emitting(emitting: bool) -> void:
 	if is_instance_valid(boost_particles_l) and boost_particles_l.emitting != emitting:
@@ -5579,16 +5629,18 @@ func _create_dirt_particles(wheel_name: String):
 	var pivot = get_node_or_null("Visuals/WheelPivot" + wheel_name)
 	if not pivot: return
 	
+	# The surface's dust cloud. Its colour, size, rise and density follow the surface under the
+	# wheels (Surfaces.FX) as the cart drives (_set_dirt_emitting).
 	var dirt = CPUParticles3D.new()
 	dirt.name = wheel_name + "_Dirt"
 	dirt.emitting = false
-	dirt.amount = 60
-	dirt.lifetime = 0.48
+	dirt.amount = 70
+	dirt.lifetime = 0.8
 	dirt.explosiveness = 0.0
 	dirt.randomness = 0.35
-	dirt.lifetime_randomness = 0.25
+	dirt.lifetime_randomness = 0.35
 	dirt.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
-	dirt.emission_sphere_radius = 0.05
+	dirt.emission_sphere_radius = 0.08
 	dirt.mesh = QuadMesh.new()
 	dirt.local_coords = false
 	dirt.top_level = true
@@ -5614,10 +5666,13 @@ func _create_dirt_particles(wheel_name: String):
 	dirt.direction = Vector3(0.0, 0.8, 1.4).normalized()
 	dirt.spread = 32.0
 	dirt.gravity = Vector3(0, -4.5, 0)
-	dirt.initial_velocity_min = 2.4
+	dirt.initial_velocity_min = 2.0
 	dirt.initial_velocity_max = 5.6
-	dirt.scale_amount_min = 0.08
-	dirt.scale_amount_max = 0.36
+	# Air drag, so a cloud slows and hangs behind the car instead of flying on.
+	dirt.damping_min = 1.5
+	dirt.damping_max = 3.0
+	dirt.scale_amount_min = 0.1
+	dirt.scale_amount_max = 0.4
 	
 	var scale_curve = Curve.new()
 	scale_curve.add_point(Vector2(0.0, 0.08)) # Starts small at tire contact
@@ -5626,46 +5681,100 @@ func _create_dirt_particles(wheel_name: String):
 	dirt.scale_amount_curve = scale_curve
 	
 	var grad = Gradient.new()
-	grad.offsets = PackedFloat32Array([0.0, 0.15, 0.55, 1.0])
+	grad.offsets = PackedFloat32Array([0.0, 0.12, 0.5, 1.0])
 	grad.colors = PackedColorArray([
 		Color(1.0, 1.0, 1.0, 0.0),
-		Color(1.0, 1.0, 1.0, 0.26),
-		Color(1.0, 1.0, 1.0, 0.12),
+		Color(1.0, 1.0, 1.0, 0.48),
+		Color(1.0, 1.0, 1.0, 0.22),
 		Color(1.0, 1.0, 1.0, 0.0)
 	])
 	dirt.color_ramp = grad
 	_configure_trail_particle_draw(dirt)
 
 
+## What the tyre flings beside the dust: stones, sand, snow clumps, clods of mud, bits of grass,
+## small spinning chips that fall back under gravity. Colour, size and weight per surface.
+func _create_grit_particles(wheel_name: String):
+	var pivot = get_node_or_null("Visuals/WheelPivot" + wheel_name)
+	if not pivot: return
+	var grit = CPUParticles3D.new()
+	grit.name = wheel_name + "_Grit"
+	grit.emitting = false
+	grit.amount = 56
+	grit.lifetime = 0.75
+	grit.explosiveness = 0.0
+	grit.randomness = 0.5
+	grit.lifetime_randomness = 0.3
+	grit.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	grit.emission_sphere_radius = 0.06
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.08, 0.08)
+	grit.mesh = quad
+	grit.local_coords = false
+	grit.top_level = true
+	grit.set_meta("pivot", pivot)
+	visuals.add_child(grit)
+	grit_particles.append(grit)
+	if pivot.is_inside_tree():
+		grit.global_position = pivot.global_position + pivot.global_transform.basis * Vector3(0, -0.24, 0.16)
+		grit.global_rotation = pivot.global_rotation
+	# Unshaded like the dust: lit, a billboard facing away from the sun read as a black dot.
+	var mat := StandardMaterial3D.new()
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+	mat.alpha_scissor_threshold = 0.5
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	mat.vertex_color_use_as_albedo = true
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.albedo_texture = _get_grit_texture()
+	grit.material_override = mat
+	grit.direction = Vector3(0.0, 0.7, 1.0).normalized()
+	grit.spread = 28.0
+	grit.gravity = Vector3(0, -12.0, 0)
+	grit.initial_velocity_min = 3.0
+	grit.initial_velocity_max = 8.0
+	grit.angle_min = -180.0
+	grit.angle_max = 180.0
+	grit.angular_velocity_min = -540.0
+	grit.angular_velocity_max = 540.0
+	grit.scale_amount_min = 0.55
+	grit.scale_amount_max = 1.4
+	# Each chip a little lighter or darker than the next.
+	var shade := Gradient.new()
+	shade.offsets = PackedFloat32Array([0.0, 1.0])
+	shade.colors = PackedColorArray([Color(0.62, 0.62, 0.62), Color(1.0, 1.0, 1.0)])
+	grit.color_initial_ramp = shade
+	var fade := Gradient.new()
+	fade.offsets = PackedFloat32Array([0.0, 0.8, 1.0])
+	fade.colors = PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 1), Color(1, 1, 1, 0)])
+	grit.color_ramp = fade
+	_configure_trail_particle_draw(grit)
+
+
+## A small irregular chip, lit from one side, for the grit.
+func _get_grit_texture() -> Texture2D:
+	if _grit_texture != null:
+		return _grit_texture
+	var img := Image.create(16, 16, false, Image.FORMAT_RGBA8)
+	var noise := FastNoiseLite.new()
+	noise.seed = 913
+	noise.frequency = 0.35
+	for y in range(16):
+		for x in range(16):
+			var nx := (x + 0.5) / 16.0 - 0.5
+			var ny := (y + 0.5) / 16.0 - 0.5
+			var r := sqrt(nx * nx + ny * ny) * 2.0 + noise.get_noise_2d(x, y) * 0.35
+			var a := 1.0 - smoothstep(0.62, 0.78, r)
+			var lit := clampf(0.85 - (nx + ny) * 0.6, 0.55, 1.0)
+			img.set_pixel(x, y, Color(lit, lit, lit, a))
+	_grit_texture = ImageTexture.create_from_image(img)
+	return _grit_texture
+
+
 func _get_current_surface_dust_color() -> Color:
 	if _surface_dust.a > 0.0:
 		return _surface_dust
-	var lvl = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
-	var lvl_name = ""
-	if lvl:
-		lvl_name = str(lvl.name).to_lower()
-	
-	if is_in_snow or (_snow_stage and is_offroad) or lvl_name.contains("frost") or lvl_name.contains("snow"):
-		return Color(0.96, 0.98, 1.0, 0.95) # Pure snow powder white
-
-	if not is_offroad:
-		# Driving on asphalt / pavement
-		return Color(0.92, 0.90, 0.88)
-	
-	# Check steep rock cliffs
-	if ground_ray and ground_ray.is_colliding() and ground_ray.get_collision_normal().y < 0.60:
-		return Color(0.76, 0.74, 0.70) # Rocky cliff light grey
-		
-	if lvl_name.contains("canyon"):
-		return Color(0.90, 0.68, 0.50) # Terracotta sandstone
-	elif lvl_name.contains("desert") or lvl_name.contains("wadi") or lvl_name.contains("bloombay") or lvl_name.contains("dune"):
-		return Color(0.95, 0.88, 0.70) # Warm golden sand
-	elif lvl_name.contains("mountain"):
-		return Color(0.88, 0.82, 0.72) # Mountain sand & gravel
-	elif lvl_name.contains("harbor"):
-		return Color(0.70, 0.68, 0.62) # Dry concrete / dock dust
-	else:
-		return Color(0.75, 0.85, 0.60) # Meadow grass & loam
+	return Surfaces.dust_color(surface, _cached_level)
 
 
 func _apply_dust_particle_colors(base_color: Color) -> void:
@@ -5707,34 +5816,34 @@ func _park_trail_emitter(p: CPUParticles3D) -> void:
 func _set_dirt_emitting(emitting: bool):
 	if not _trail_particles_ready:
 		return
+	var authority: bool = has_physics_authority()
 	var in_water := stage_has_water and (is_underwater or (water_surface_y - global_position.y >= -0.80 and _is_over_water_volume()))
-	var speed: float = linear_velocity.length()
+	var speed: float = linear_velocity.length() if authority else sync_velocity.length()
 	var time_since_respawn = (Time.get_ticks_msec() / 1000.0) - last_respawn_time
-	
-	var is_sand_stage: bool = _wadi_stage or _mountain_stage or _bloombay_stage
-	if not is_sand_stage:
-		var lvl = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
-		if lvl:
-			var lvl_nm = str(lvl.name).to_lower()
-			is_sand_stage = lvl_nm.contains("wadi") or lvl_nm.contains("desert") or lvl_nm.contains("mountain") or lvl_nm.contains("bloombay") or lvl_nm.contains("dune")
-
-	var in_snow_active: bool = is_in_snow or (_snow_stage and is_offroad)
-	var min_speed: float = 1.5 if in_snow_active else (2.2 if is_sand_stage else 4.8)
-	var deact_speed: float = 1.0 if in_snow_active else (1.4 if is_sand_stage else 3.6)
+	var fxs: Dictionary = Surfaces.fx(surface)
+	# Loose ground (sand, snow, dirt, mud) smokes at walking pace; firm ground only at speed.
+	var loose: bool = float(fxs["dust_roll"]) >= 0.5
+	var min_speed: float = 1.5 if loose else 4.8
+	var deact_speed: float = 1.0 if loose else 3.6
+	var airborne: bool = air_time >= 0.03 if authority else sync_surface < 0
 
 	# Hysteresis gating to prevent blinking / jittering when speed hovers near cutoff
 	if _is_dust_active:
-		if not emitting or speed < deact_speed or is_landing or not can_move or air_time >= 0.03 or in_water or time_since_respawn < 0.5:
+		if not emitting or speed < deact_speed or is_landing or not can_move or airborne or in_water or time_since_respawn < 0.5:
 			_is_dust_active = false
 	else:
-		if emitting and speed > min_speed and not is_landing and can_move and air_time < 0.03 and not in_water and time_since_respawn > 0.5:
+		if emitting and speed > min_speed and not is_landing and can_move and not airborne and not in_water and time_since_respawn > 0.5:
 			_is_dust_active = true
-			
+
 	var on: bool = _is_dust_active
+	var slide: float = clampf(_skid_amount, 0.0, 1.0)
 	if on:
 		var target_col: Color = _get_current_surface_dust_color()
 		_current_dust_color = _current_dust_color.lerp(target_col, 0.25)
 		_apply_dust_particle_colors(_current_dust_color)
+	var roll: float = float(fxs["dust_roll"]) * clampf((speed - 3.0) / 18.0, 0.0, 1.0)
+	var rise: float = fxs["dust_rise"]
+	var size: float = fxs["dust_size"]
 	for p in dirt_particles:
 		if is_instance_valid(p) and p is CPUParticles3D:
 			if on:
@@ -5742,23 +5851,39 @@ func _set_dirt_emitting(emitting: bool):
 				if is_instance_valid(pivot):
 					_attach_dirt_emitter(p, pivot)
 				p.emitting = true
-				if in_snow_active:
-					p.scale_amount_max = 0.65
-					p.initial_velocity_max = 7.5
-					p.direction = Vector3(0.0, 1.1, 1.3).normalized()
-					if "amount_ratio" in p:
-						p.amount_ratio = clampf((speed - 0.8) / 7.0, 0.75, 1.0)
-				else:
-					p.scale_amount_max = 0.36
-					p.initial_velocity_max = 5.6
-					p.direction = Vector3(0.0, 0.8, 1.4).normalized()
-					if "amount_ratio" in p:
-						if is_sand_stage:
-							p.amount_ratio = clampf((speed - 1.2) / 10.0, 0.45, 1.0)
-						else:
-							p.amount_ratio = clampf((speed - 3.5) / 14.0, 0.20, 1.0)
+				# A slide throws a bigger, faster cloud; light dust lifts and hangs, sand falls back.
+				p.scale_amount_min = size * 0.25
+				p.scale_amount_max = size * (1.0 + slide * 0.6)
+				p.initial_velocity_max = lerpf(4.0, 7.5, slide) * clampf(0.7 + speed / 50.0, 0.7, 1.4)
+				p.direction = Vector3(0.0, lerpf(0.5, 1.2, rise), 1.3).normalized()
+				p.gravity = Vector3(0.0, lerpf(-9.0, 0.5, rise), 0.0)
+				if "amount_ratio" in p:
+					p.amount_ratio = clampf(maxf(roll, slide), 0.15, 1.0)
 			else:
 				p.emitting = false
+
+	# Grit flies when sliding, and off loose ground at speed.
+	var grit_col: Color = Surfaces.grit_color(surface, _cached_level)
+	var fling := 0.0
+	if on and grit_col.a > 0.0:
+		fling = maxf(slide, float(fxs["dust_roll"]) * 0.5 * clampf((speed - 12.0) / 20.0, 0.0, 1.0))
+	for g in grit_particles:
+		if not (is_instance_valid(g) and g is CPUParticles3D):
+			continue
+		if fling > 0.12:
+			var pivot = g.get_meta("pivot", null)
+			if is_instance_valid(pivot):
+				_attach_dirt_emitter(g, pivot)
+			g.emitting = true
+			g.color = Color(grit_col.r, grit_col.g, grit_col.b, 1.0)
+			(g.mesh as QuadMesh).size = Vector2.ONE * float(fxs["grit_size"])
+			g.gravity = Vector3(0.0, -float(fxs["grit_gravity"]), 0.0)
+			g.initial_velocity_max = lerpf(5.0, 9.0, slide)
+			if "amount_ratio" in g:
+				g.amount_ratio = clampf(fling, 0.2, 1.0)
+		else:
+			g.emitting = false
+
 
 func _get_ground_height(global_pos: Vector3) -> float:
 	var space_state = get_world_3d().direct_space_state

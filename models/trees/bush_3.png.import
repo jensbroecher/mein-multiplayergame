@@ -1,0 +1,27 @@
+[remap]
+
+importer="streamed_texture_2d"
+type="StreamedTexture2D"
+uid="uid://shlmlk5hav0s"
+path.s3tc="res://.godot/imported/bush_3.png-d81a09b638f14e1050eace86ec85e894.s3tc.stex"
+path.etc2="res://.godot/imported/bush_3.png-d81a09b638f14e1050eace86ec85e894.etc2.stex"
+metadata={
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
+}
+
+[deps]
+
+source_file="res://models/trees/bush_3.png"
+dest_files=["res://.godot/imported/bush_3.png-d81a09b638f14e1050eace86ec85e894.s3tc.stex", "res://.godot/imported/bush_3.png-d81a09b638f14e1050eace86ec85e894.etc2.stex"]
+
+[params]
+
+compress/high_quality=false
+compress/hdr_compression=1
+compress/normal_map=2
+compress/channel_pack=0
+roughness/mode=1
+roughness/src_normal=""
+streaming/min_lod_override=0
+streaming/max_lod_override=0

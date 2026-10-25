@@ -22,6 +22,8 @@ uniform float ripple_scale = 0.11;
 uniform float normal_depth = 0.75;
 uniform float shore_foam_depth = 0.9;
 uniform float clarity_depth = 2.4;
+// How clear the water is at the very edge, where it is shallowest (a ford shows its bed through it).
+uniform float shallow_alpha = 0.7;
 // How glassy calm water is, and how strongly it mirrors the sky. With no screen-space reflection
 // the only thing to mirror is the sky, so water deep in a forest is better dull (Msitu Falls).
 uniform float roughness_min = 0.04;
@@ -77,7 +79,7 @@ void fragment() {
 	SPECULAR = mix(specular_max, 0.3, foam);
 	METALLIC = 0.0;
 	// Clear at the very edge so the bank shows through, opaque once there is depth or foam.
-	ALPHA = clamp(mix(0.7, 0.97, smoothstep(0.0, 0.8, water_depth)) + foam, 0.0, 1.0);
+	ALPHA = clamp(mix(shallow_alpha, 0.97, smoothstep(0.0, 0.8, water_depth)) + foam, 0.0, 1.0);
 	// Where two water surfaces overlap, the upper one fades out so they meet without a seam.
 	ALPHA *= 1.0 - edge_fade * edge_fade * (3.0 - 2.0 * edge_fade);
 	// Foam stays readable in the gorge's shade.

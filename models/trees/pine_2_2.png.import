@@ -1,0 +1,27 @@
+[remap]
+
+importer="streamed_texture_2d"
+type="StreamedTexture2D"
+uid="uid://xbg23es6cweu"
+path.s3tc="res://.godot/imported/pine_2_2.png-6c109a799519f8eacd02d6a644381db6.s3tc.stex"
+path.etc2="res://.godot/imported/pine_2_2.png-6c109a799519f8eacd02d6a644381db6.etc2.stex"
+metadata={
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
+}
+
+[deps]
+
+source_file="res://models/trees/pine_2_2.png"
+dest_files=["res://.godot/imported/pine_2_2.png-6c109a799519f8eacd02d6a644381db6.s3tc.stex", "res://.godot/imported/pine_2_2.png-6c109a799519f8eacd02d6a644381db6.etc2.stex"]
+
+[params]
+
+compress/high_quality=false
+compress/hdr_compression=1
+compress/normal_map=1
+compress/channel_pack=0
+roughness/mode=1
+roughness/src_normal=""
+streaming/min_lod_override=0
+streaming/max_lod_override=0

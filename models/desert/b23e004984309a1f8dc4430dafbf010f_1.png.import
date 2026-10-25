@@ -1,0 +1,27 @@
+[remap]
+
+importer="streamed_texture_2d"
+type="StreamedTexture2D"
+uid="uid://bdgc4rekpm1ch"
+path.s3tc="res://.godot/imported/b23e004984309a1f8dc4430dafbf010f_1.png-cdba9a6ca30fe1753b8f3bbe50e342da.s3tc.stex"
+path.etc2="res://.godot/imported/b23e004984309a1f8dc4430dafbf010f_1.png-cdba9a6ca30fe1753b8f3bbe50e342da.etc2.stex"
+metadata={
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
+}
+
+[deps]
+
+source_file="res://models/desert/b23e004984309a1f8dc4430dafbf010f_1.png"
+dest_files=["res://.godot/imported/b23e004984309a1f8dc4430dafbf010f_1.png-cdba9a6ca30fe1753b8f3bbe50e342da.s3tc.stex", "res://.godot/imported/b23e004984309a1f8dc4430dafbf010f_1.png-cdba9a6ca30fe1753b8f3bbe50e342da.etc2.stex"]
+
+[params]
+
+compress/high_quality=false
+compress/hdr_compression=1
+compress/normal_map=1
+compress/channel_pack=0
+roughness/mode=1
+roughness/src_normal=""
+streaming/min_lod_override=0
+streaming/max_lod_override=0

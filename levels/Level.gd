@@ -1479,6 +1479,19 @@ func _build_runtime_collisions_deferred() -> void:
 	# Automatically build collisions for any node manually placed in the collision groups
 	_add_collisions_for_group_nodes(self)
 
+	# Every plant and object drawn as MultiMesh instances is solid, near the road or not; the smaller
+	# plants wobble when hit (DressingColliders.gd).
+	var in_generator := false
+	for child in get_tree().root.get_children():
+		if "regenerate" in str(child.name).to_lower():
+			in_generator = true
+	if not in_generator and not has_node("DressingColliders"):
+		var dc := Node.new()
+		dc.name = "DressingColliders"
+		dc.set_script(load("res://DressingColliders.gd"))
+		add_child(dc)
+		dc.build(self)
+
 	# Align dynamically generated or editor-loaded road collision height to Visual_Road's Y position
 	var tg = get_node_or_null("TerrainGenerator")
 	if tg:

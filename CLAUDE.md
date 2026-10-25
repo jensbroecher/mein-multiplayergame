@@ -118,6 +118,110 @@ the others re-bakes it (see Lakeside Course below).
   and the anemometer mast stand on the roof (`nacelle_roof_y`). `res://scratch/turbine_preview.gd` (`-s`,
   windowed) renders one in seconds: `-- <dir> [spin=40] [angle=30] name:x,y,z:tx,ty,tz[:frames[:gap]]`.
 
+## Canyon Course (Sierra del Viento, stage 1)
+
+- `regenerate_canyon.gd` builds `levels/CanyonLevel.tscn` from scratch (it used to re-run TerrainGenerator
+  over the old 4km lap): 2.5km, half tarmac, half gravel and dirt. The start straight runs down the river's
+  west bank past the Parador del Viento, over the Puente (a camel-back through truss), up a shelf road on
+  the east wall to La Horquilla, onto the mesa where the tarmac ends, along La Cuchilla (a knife-edge gravel
+  ridge, the old course's elevated road with the misty hills behind), down La Bajada (two kickers) into the
+  Valle de los Duendes (procedural hoodoos), through La Garganta (a slot canyon), over the ford El Vado and
+  back on tarmac through El Arco del Viento. Regenerating takes about 25s.
+- The lap is turtle moves (`PLAN`) with two solved straights (one north-south, one east-west), as on Msitu
+  Falls. The river is laid through the plan: through the ford and under the bridge's middle
+  (`_build_river`), and the canyon's walls stand at offsets from it (`_river_frame`), so the canyon follows
+  the plan. The ridge is tabulated by x (`_build_ridge_table`); La Cuchilla's flanks are its own profile,
+  not the mesa's.
+- No road mesh: the ground is graded flat under the road (`_grade`: against the true distance to the
+  road's polyline; a "beyond the segment end" term times the slot's vertical cut stood the floor up 2m
+  round bends) and `canyon_ground.gdshader` paints the tarmac (lines from the lateral in COLOR.a) or the
+  gravel, `UV2.y` saying which (it crumbles from one to the other over `PAVED_BLEND`). The bridge deck
+  carries the same data and material. Collision is split by surface into `BODIES`, each with a `surface`
+  meta and dust colour; roads end in "Road" so they count as track.
+- Rock: `canyon_strata.gdshaderinc` (beds by world height, cross-bedded laminations in sets of three beds,
+  varnish streaks, grain from `dark_rock.png`) is shared by the ground's cliffs and `canyon_rock.gdshader`
+  on the slot's walls, the arch and the hoodoos, so a bed runs on from one to the other. `sand.png` is near
+  flat colour and `dark_canyon_rock.png` is pebble rubble (the desert pavement), not a cliff.
+  - None of the strata is mipmapped, so each pattern fades to its average by the pixel's size in metres
+    (`fw = length(fwidth(w_pos))`, taken outside any branch and passed in): drawn sharp, the laminations,
+    partings and streaks shimmered on every distant cliff.
+  - Buff and cream beds start at `pale_from` (22m); below it is the red formation. A cream bed along the
+    slot's floor read as a dusty smear on both walls. The bed hash (`cs_hash`) is chaotic in float32, so
+    which beds come out pale can't be worked out off the GPU: render `ALBEDO = strata_color(...)` to see.
+- The slot's walls are meshes standing on a floor graded `SLOT_FLAT` (14.5m) wide, with the heightfield's
+  vertical cut behind them. Their feet reach out to 10.6m, so the floor runs a 2.5m cell's diagonal past
+  them: at 11m the cut's rising triangles stood in front of the feet. The top row reaches out to
+  `SLOT_LIP` (20m), over the trench behind each wall, and tucks under the ground there. The arch is a
+  lofted lintel over a steep cutting through a fin of rock (`FIN_*`), its legs down on the cutting's walls.
+  `res://scratch/slot_wall_probe.gd` (`-s`, headless) checks that every wall triangle faces the road.
+- The river (`_build_river`, `_water_cap`): meanders of 180-300m swing it between the big bends (not near
+  the ford or under the bridge, where the road crosses it); it widens round its bends, its deepest line
+  swings toward the outside bank, which is cut steep, and a gravel bar shelves up out of the water on the
+  inside (`_rv_bend`: signed 1/radius, smoothed). Either side of the ford both banks are broad beaches and
+  the bed a shallow riffle (`FORD_DEPTH`); under the bridge it keeps its old gorge (steep banks, 20m
+  half width): with a beach there the approach stood on a tall embankment, and an AI cart went off it
+  into the river. The shore wanders a few metres on noise. The river is carved
+  before the road's grading, so at the ford the road's shoulders ease into the bed. Without all this it
+  was a canal: one width, steep parallel banks, a square trench where the road crossed.
+  - The water is `canyon_river.gdshader` (not `river_water.gdshader`, which Frostfall Gorge shares):
+    silt-laden, tan in the shallows and olive with depth, plumes drifting down it, ripple crests and a
+    little foam only where the riffle runs over the bar (by the depth straight down to the bed, from the
+    depth texture). `ambient_light_disabled`: lit by the sky's radiance it mirrored blue, so its ambient
+    is EMISSION and its reflection is drawn in the shader (sky over a skyline of canyon walls, rock
+    below). The mesh is a ribbon 12m wider than the river each side (UV in metres), so it reaches past
+    every beach's shore; the banks hide the rest.
+  - `canyon_ground.gdshader` draws the bars (river cobbles: the pebble rubble half washed out of its red,
+    sand drifted between), a dark wet band and a drift line along the waterline, the bed under the water
+    (silt over cobbles, greener with depth) and fades the road's paint out under the water.
+  - The riverside (`_build_riverside`): reed clumps at the shore (`_reed_clump`, `dune_grass.gdshader`),
+    tamarisk and willows on the bars and low banks, cottonwoods on the terraces (WoodlandBuilder's
+    `cottonwood` and `willow`, added for this; their leaf material's backlight dulled, the lakeside's
+    glowed lime here). It walks both shores, finding each one's waterline on the built ground.
+- Dressing (`_build_dressing`): the agaves, yuccas, sotol, brush, flowers and joshua trees are Hunyuan
+  models, each reduced twice: a near model (Godot's simplifier, and vertex clustering, `_cluster_reduce`,
+  where the simplifier gives up on seamed foliage) and a far one (clustered to a few hundred triangles).
+  The cacti and the rocks are built in code (`_build_procedural_dressing`, near and far): the models'
+  cacti were smooth green blobs and their boulders stacked pancakes, cairns and grey blobs.
+  - `CactusKit.gd`: saguaro (seven arm layouts), organ pipe, barrel, prickly pear, cholla, hedgehog and
+    ocotillo, every stem a sweep of a ribbed section along a path, closed by a dome. `cactus.gdshader`
+    shades the ribs round (a normal map across each rib from the tangents), puts areoles and spines on
+    the ridges (fading to their sheen as they get smaller than a pixel), corks old saguaros' feet and
+    varies each plant's colour by its position. The vertex data is documented at CactusKit's top.
+  - `SandstoneKit.gd`: blocks (rounded boxes sheared by fracture planes, bedding grooves), pebble
+    scatters, and the landmarks (`FORMATIONS`, `_build_formations`): buttes with a talus apron and an
+    overhanging cap rock, spire clusters, balanced rocks; each pushed further out if its spot falls in
+    the river, by the road or on the Parador's pad, stood on the lowest ground under its foot, solid as
+    a convex hull near the road. All drawn by `canyon_rock.gdshader`, so they carry the cliffs' beds.
+  - Talus under the cliffs is clusters of blocks; a mix names a species or "block"/"stones" and
+    `_variant` picks the shape. Each 96m cell is two MultiMeshes with the same shuffled instances,
+    swapping at `DRESS_FAR`'s distance (or `_dress_swap`'s); `CanyonDetail.gd` thins both alike and scales
+    the far one's range by Detail Level. Small things cast no shadow. The far terrain is one mesh outside
+    the chunker (`canyonfar_ground.res`): cut into 80m cells it was thousands of one-triangle draws.
+  - Cost (M1, `scratch/bench.tscn`): about 12ms GPU, 1.54M primitives, 640 draws (the M1's clock moves a
+    run's GPU time up to 2x, so compare primitives and draws); the dressing with full models and big
+    cells had been 26ms and 13M primitives.
+- The Parador del Viento (`_build_parador`, on a pad `PARADOR_HALF` graded level, its near edge 19m off
+  the centreline so the pad's blend never reaches the road): a canopy over three islands of pumps, the
+  shop, a streamlined diner with a patio, a motel wing and office, a workshop with tyres, drums and a
+  wreck, restrooms, a picnic ramada, the water tower, a windmill (`_windmill`) over a stock tank, lot
+  lights, CampKit vehicles and Label3D signs, at life size in the pad's frame (x along the road, z away
+  from it), grown by `PROP_SCALE`. Every building has a box collider. The dressing keeps off the pad.
+- The eagle (`Eagle.gd` on `models/animals/20260717033727_7db23447.fbx`) skips its setup in the generator:
+  its wing pivots and sound players were saved into the level, and at runtime the model's own wings came
+  back beside them (two eagles, one inside the other). Its wings (`part_4`, `part_7`) hinge on the body's
+  long axis; each one's angle in the model (a steep V) is measured and lowered to `glide_dihedral_deg`.
+  Soaring it beats in bursts; in the dive (a stoop) the wings are drawn up; grabbing and carrying it
+  beats hard, the downstroke 40% of the beat, the wing twisting through it. It banks into turns. A cart
+  at `escape_speed_share` (0.88) of its top speed outruns it: never picked, and a dive breaks off.
+  `part_8` (a stray feather over the head) is hidden. `res://scratch/eagle_preview.tscn -- <dir> [yaw=]
+  [pitch=]` renders the wing poses through a beat.
+- `res://scratch/lap_shots.tscn -- <level> <dir> [every=N] [s=<m>] [high=1]` renders chase views along any
+  lap; `scratch/canyon_props_preview.gd` (`-s`, windowed, `-- <dir> set=rocks|forms|cacti [far=1]
+  name:x,y,z:tx,ty,tz`) renders the cacti and rocks in memory in seconds; `scratch/dress_list.gd` (`-s`,
+  headless, `-- [match=Near_saguaro] [count=8] [max=60]`) lists where a level's MultiMesh dressing stands
+  (to aim a camera at it); `scratch/asset_sheet.gd` (windowed) a contact sheet of a model folder;
+  `scratch/lod_probe.gd` and `scratch/asset_survey.gd` (headless) a model's LOD chain and triangles/textures.
+
 ## Frostpeak Creek road joints
 
 - Surfaces that meet are built to shared heights above their centrelines: trunk collision deck +0.08
@@ -215,6 +319,43 @@ first to third (`_announce_place`). The podium calls each place as it's revealed
   `unused_car_crash_clank` (cart against cart), `unused_warning_beep` (a missile closing on the local
   cart), `unused_alert` (wrong way). The double beep (an item in hand) was too distracting and is gone.
   The odd-named loops in `sounds/enginesounds/` (`cccc`, `kkk`, ...) are spares no car uses.
+  The screech and the squeal (`SFX_BrakeDrift`) only play on paved road: see Surfaces below.
+
+## Surfaces: skid marks, sliding sounds and spray
+
+- `Surfaces.gd` says what the tyres are on: asphalt (any paved road: concrete and brick too), dirt, gravel,
+  sand, snow, ice, grass, mud, wood or rock. PlayerCart sets `surface` every physics tick on the ground
+  (`Surfaces.of`) and sends it to remote carts as `sync_surface` (-1 while airborne; replicated on change).
+  A collider says what it is with a `surface` meta (on itself or an ancestor): new generators set it on
+  their bodies. Older levels have none: their entry in `Surfaces.LEVELS` names surfaces by node-name
+  fragment, then by track (`_is_track_surface`) or not. A snow drift over a road is snow. A level's entry
+  can also recolour a surface's dust (`"dust"`: Mara's murram is red), and a body's `dust_color` meta
+  overrides everything.
+- Only paved road takes rubber, screeches and squeals. `SkidMarks.gd` is one MultiMeshInstance3D per level
+  (added by the first cart that skids): a ring of 8192 quads, each wheel's mark a strip whose quads share
+  corners with the one before, so it bends without gaps or dark overlaps. A quad's four corners ride in its
+  instance transform's columns and `skid_marks.gdshader` builds the quad from them (skip_vertex_transform,
+  the node at the identity). The corners lie on the ground each wheel's ray hits (`_update_skid_marks`,
+  every frame, remote carts too), 1.5cm up; the shader also pulls each vertex toward the camera along its
+  own ray (same pixels, wins the depth test) instead of standing it off the road. Multiply blending: a mark
+  darkens whatever the road's lighting made of it. Width is the tyre's footprint across its path (wider
+  sliding sideways); marks fade over 45s and past 90-150m. The old marks were CPU particle quads that
+  floated over crests and streaked when the emitter was parked.
+- Everywhere else the tyres slide audibly in the surface's own loop: `regenerate_surface_sounds.gd` (run
+  headless) synthesises one seamless 2.4s loop per surface from filtered noise (gravel crunch, sand hiss,
+  snow crunch, ice scrape with stick-slip chatter, mud squelch, plank knocks...) into
+  `generated/surfaces/skid_<surface>.res`, all at -16 dBFS RMS; `Surfaces.FX` sets each one's level
+  (`sound_db`, about -13 matches the asphalt squeal) and how much quieter it plays just rolling at speed
+  (`roll_db`). Two players per cart crossfade when the surface changes (`_update_surface_audio`).
+  `res://scratch/surface_sound_dump.gd -- <dir>` writes the loops out as .wav.
+- `_skid_amount` (0..1) drives all of it: a drift or a locked brake at speed, or sliding wide in a corner.
+  Paved road smokes when skidding; anything else raises its dust (`_set_dirt_emitting`: colour, size, rise,
+  density per surface, some even rolling) and flings grit (`grit_particles`: stones, sand, snow clumps, mud
+  clods, grass bits; unshaded, since a lit billboard facing away from the sun read as a black dot).
+- `res://scratch/surface_fx_test.tscn -- <level> [seconds=60]` races the AI and tallies, per surface, the
+  marks, smoke, dust, grit and sound (windowed: headless never primes the trail particles, so only the
+  classification counts there). `res://scratch/skid_shots.tscn -- <dir>` (windowed) photographs marks the
+  AI laid; `res://scratch/spray_shots.tscn -- <dir> level=...` shoots carts raising dust.
 
 ## Props that give: flags, tyre stacks, cones
 
@@ -231,12 +372,42 @@ first to third (`_announce_place`). The podium calls each place as it's revealed
 - `res://scratch/spring_props_test.tscn -- <dir> [level=] [props=Flags|Stacks] [index=N] [speed=25]` (windowed)
   drives a cart through one prop and logs the tip and slide.
 
+## Everything solid (DressingColliders.gd)
+
+- Every plant and object is solid on every course, near the road or far off it: Level.gd adds
+  `DressingColliders.gd` once its own runtime colliders exist (not in generators). It needs no level to
+  be regenerated.
+  - MultiMesh instances: each mesh's shape is worked out once from its vertices (the median radius of its
+    lower band): tall and slender (trees, saguaros, palms, posts) gets a trunk cylinder up to 6m, anything
+    else a box round what's below 2.6m. One StaticBody3D per 64m cell, rock and plant bodies apart (their
+    `surface` meta), shapes added through shape owners, not nodes. Instances drawn twice (near and far
+    MultiMeshes) are solid once. Transforms come from `multimesh.buffer`: on the dummy renderer (a headless
+    server, whose bots still drive into things) `get_instance_transform()` returns zeros.
+  - Not solid: ground cover under `MIN_HEIGHT` (0.5m) and anything named in `SOFT` (grass, meadow, crowd,
+    flags and tyre stacks, which are SpringProps, knockable props, icicles, skid marks, shadow-only
+    stand-ins).
+  - The Detail Level: an instance a MultiMesh doesn't draw (past `visible_instance_count`, or hidden) has
+    its collider switched off, checked every half second, so nobody hits a plant they can't see.
+  - Single meshes (`_cover_meshes`, a few physics frames later): every visible MeshInstance3D gets a
+    collider, a trimesh of its own triangles (both sides) if it is over 5m across (a camp's gear, a dune:
+    driven over), else its convex hull; overlapping colliders it had already does no harm. Skipped
+    (`MESH_SKIP`): the ground, roads and anything driven on (decks, ramps, jumps, kickers, piers, gates:
+    a second, unnamed collider there would read as off-road), water, sky, effects, see-through materials,
+    and meshes under a body or under a script that moves itself (the eagle, item boxes, carts). It prints
+    what it made solid.
+  - Plants up to 5.5m (not `ROCKY` things) wobble when a cart touches them: a damped spring about the foot
+    (`SPRING_K`, `SPRING_DAMP`), the kick from the cart's speed (from how far it moved, so remote carts
+    count), written into every MultiMesh that draws the plant. Local scenery, not synced.
+  - `res://scratch/plant_hit_test.tscn -- <dir> [level=] [match=PlantsNear_pear] [index=0] [speed=14]`
+    checks a plant's collider and logs its wobble; `res://scratch/mmi_survey.gd` (`-s`) lists every
+    MultiMesh a level holds.
+
 ## Collision audit
 
 `res://scratch/collision_audit.tscn -- <level> [reach=30] [all=1]` (headless, a spectator race so Level.gd's
 runtime colliders exist) lists, per node, the 1m cells within `reach` of the lap where something is drawn at
-a cart's height (0.4 to 1.4m over the ground) with no collider: what a cart drives through. Flags, ground
-cover, hazel and ferns are meant to be soft. Trees' colliders now reach `TREE_SOLID_SHARE` (0.7) of their
+a cart's height (0.4 to 1.4m over the ground) with no collider: what a cart drives through. Since
+DressingColliders.gd only flags, tyre stacks and ground cover are soft. Trees' colliders now reach `TREE_SOLID_SHARE` (0.7) of their
 branches' spread at that height (`WoodlandBuilder.band_radius`: a spruce's or fir's skirt), Pinecrest's dwarf
 pines and junipers have a core collider and its logs and rockfall fences boxes, Bloombay's rocks (not
 pebbles) are all solid and its bent palms carry a hull of their low trunk.
@@ -297,6 +468,11 @@ Bloombay sets it on. Every other pad turns about its own up axis at runtime to f
 31 pads on 8 levels had been laid backwards or across shortcuts. `settle_on_track` is on by default: every
 pad drops onto the surface under it once the level's collision exists, tilts with it and faces along the
 nearest lap path (`_lap_tangent`); flat pads at set heights had floated on one side or sunk into slopes.
+`_settle` lies the pad on the plane through its four corners' hits, at the middle's hit; only hits on
+level-ish ground (normal y >= 0.6) within 1.5m of the middle count, and the tilt stops at 40 degrees.
+Setting its height from the lowest corner buried pads on slopes (Lakeside's kicker: a metre under the
+deck), and a corner ray clipping a wall or curb tipped some onto their sides.
+`res://scratch/boost_pad_settle_probe.tscn -- <level>` lists each pad's saved and settled place and tilt.
 The shader's lit border is one rectangular frame (`aspect`, the top's proportions): separate side and end
 lines had overshot each other at the corners. `res://scratch/boost_pad_audit.gd` (`-s`) lists the saved
 transforms; `res://scratch/boost_pad_runtime_check.tscn -- <level>` checks them in game.
@@ -375,6 +551,21 @@ faces get culled and you see the far faces from the inside. To confirm, render i
 - Headless can't render screenshots. To look at a level, run a `SceneTree` script (`-s`) with the
   windowed console exe and `--resolution 1600x900`, place a `Camera3D`, and save
   `root.get_texture().get_image()`.
+
+## Texture streaming (the rock and plant models)
+
+- Godot 4.8's texture streaming is on (`rendering/textures/streaming/enabled`; the editor needs a restart
+  after changing it): a streamed texture loads only the mip levels the camera needs. Works with the Mobile
+  renderer on Metal here; Compatibility has no streaming.
+- The Hunyuan models in `models/plants`, `models/desert`, `desert2`, `desert3` (4096px maps) and
+  `models/desertridge`, `models/trees` import their textures with the "Texture2D Streamed" importer
+  (`streamed_texture_2d`). `scratch/stream_textures.py` converts a folder: it shrinks each PNG in place
+  (Lanczos: the maps the materials use to `--size`, 1024 for plants and 2048 for rocks; the grey
+  metallic/roughness maps no material reads to 512) and rewrites its `.import` keeping its uid. Which file
+  is a normal map comes from the models' own materials (`scratch/texture_roles.gd` writes them as JSON),
+  not from its name. The streamed importer has no size limit, which is why the sources are shrunk.
+  `.gitignore` lets those `.import` files through, so the setting travels with the project.
+- Reimport headless with `Godot --headless --path . --import` (about 9 minutes for all of them).
 
 ## Large meshes are chunked
 

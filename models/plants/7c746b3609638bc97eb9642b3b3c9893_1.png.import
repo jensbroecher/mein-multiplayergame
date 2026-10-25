@@ -1,0 +1,27 @@
+[remap]
+
+importer="streamed_texture_2d"
+type="StreamedTexture2D"
+uid="uid://b7lwtakfpwix0"
+path.s3tc="res://.godot/imported/7c746b3609638bc97eb9642b3b3c9893_1.png-ec1222092da78207b0bccc92ab583c6d.s3tc.stex"
+path.etc2="res://.godot/imported/7c746b3609638bc97eb9642b3b3c9893_1.png-ec1222092da78207b0bccc92ab583c6d.etc2.stex"
+metadata={
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
+}
+
+[deps]
+
+source_file="res://models/plants/7c746b3609638bc97eb9642b3b3c9893_1.png"
+dest_files=["res://.godot/imported/7c746b3609638bc97eb9642b3b3c9893_1.png-ec1222092da78207b0bccc92ab583c6d.s3tc.stex", "res://.godot/imported/7c746b3609638bc97eb9642b3b3c9893_1.png-ec1222092da78207b0bccc92ab583c6d.etc2.stex"]
+
+[params]
+
+compress/high_quality=false
+compress/hdr_compression=1
+compress/normal_map=1
+compress/channel_pack=0
+roughness/mode=1
+roughness/src_normal=""
+streaming/min_lod_override=0
+streaming/max_lod_override=0

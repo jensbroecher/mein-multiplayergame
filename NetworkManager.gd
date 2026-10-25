@@ -92,9 +92,14 @@ const GP_CUPS = {
 		"name": "Al-Raihana GP",
 		"stages": [
 			"res://levels/MountainLevel.tscn",
+			"res://levels/DesertWadiLevel.tscn",
+		]
+	},
+	"Sierra del Viento": {
+		"name": "Sierra del Viento",
+		"stages": [
 			"res://levels/CanyonLevel.tscn",
 			"res://levels/CanyonChasmLevel.tscn",
-			"res://levels/DesertWadiLevel.tscn",
 		]
 	},
 	"Matumaini GP": {

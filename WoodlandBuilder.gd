@@ -32,6 +32,14 @@ const BROADLEAF := {
 	"alder": {"h": 13.5, "r": 0.28, "cr": 4.8, "under": 0.25, "fork": 0.22, "leader": 0.72, "limbs": 7,
 		"clusters": 36, "cl_r": 1.45, "shell": 0.45, "cards": 8, "card": Vector2(1.9, 2.5), "cell": CELL_ROUND,
 		"tint": Color(0.80, 0.88, 0.72), "droop": 0.08, "bark": "alder"},
+	# The Canyon Course's river (regenerate_canyon.gd): a Fremont cottonwood, broad and spreading on a
+	# short furrowed trunk, its leaves a light yellow green; and a willow, droopy, narrow-leaved.
+	"cottonwood": {"h": 16.5, "r": 0.5, "cr": 7.4, "under": 0.22, "fork": 0.2, "leader": 0.25, "limbs": 6,
+		"clusters": 44, "cl_r": 1.9, "shell": 0.5, "cards": 9, "card": Vector2(2.2, 3.0), "cell": CELL_ROUND,
+		"tint": Color(0.84, 0.88, 0.62), "droop": 0.04, "bark": "cottonwood"},
+	"willow": {"h": 9.5, "r": 0.26, "cr": 4.4, "under": 0.16, "fork": 0.14, "leader": 0.3, "limbs": 8,
+		"clusters": 34, "cl_r": 1.35, "shell": 0.42, "cards": 8, "card": Vector2(1.6, 2.6), "cell": CELL_BIRCH,
+		"tint": Color(0.74, 0.82, 0.64), "droop": 0.5, "bark": "alder"},
 }
 const SPRUCE := {"h": 22.0, "r": 0.36, "base_r": 4.4, "whorls": 26, "per_whorl": 8}
 const PINE := {"h": 22.5, "r": 0.42, "cr": 5.4, "under": 0.48}
@@ -49,6 +57,7 @@ const BARKS := {
 	"fir": [Color(0.46, 0.44, 0.42), Color(0.18, 0.17, 0.16), 0.28, 0.02, 2.2, Color(0.78, 0.78, 0.76)],
 	"larch": [Color(0.54, 0.44, 0.35), Color(0.22, 0.15, 0.11), 0.38, 0.035, 2.8, Color(0.82, 0.78, 0.74)],
 	"alder": [Color(0.48, 0.46, 0.42), Color(0.22, 0.20, 0.18), 0.26, 0.018, 3.0, Color(0.80, 0.80, 0.78)],
+	"cottonwood": [Color(0.66, 0.63, 0.58), Color(0.24, 0.21, 0.18), 0.46, 0.05, 2.2, Color(0.84, 0.82, 0.78)],
 }
 
 ## The canopy crossfades from the detailed trees to their stand-ins round TREE_NEAR (JungleDetail.gd

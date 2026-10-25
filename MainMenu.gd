@@ -39,7 +39,7 @@ const STAGE_INFO := {
 	"res://levels/NorthlightCavernsLevel.tscn": {"title": "NORTHLIGHT CAVERNS", "subtitle": "Night race under the aurora, through a glacier and over an ice arch", "file": "tile_northlight_caverns.jpg", "color": COL_SNOW},
 	"res://levels/FrostfallGorgeLevel.tscn": {"title": "FROSTFALL GORGE", "subtitle": "Off-road along a river gorge: gully jumps, a frozen waterfall, and a mega-jump", "file": "tile_frostfall_gorge.jpg", "color": COL_SNOW},
 	"res://levels/MountainLevel.tscn": {"title": "MOUNTAIN COURSE", "subtitle": "Dunes and high desert ridges", "file": "tile_mountain.jpg", "color": COL_MOUNTAIN},
-	"res://levels/CanyonLevel.tscn": {"title": "CANYON COURSE", "subtitle": "Red rock walls and mesa turns", "file": "tile_canyon.jpg", "color": COL_CANYON},
+	"res://levels/CanyonLevel.tscn": {"title": "CANYON COURSE", "subtitle": "A truss bridge, a shelf road up the canyon wall, a knife-edge ridge, a slot canyon and a ford", "file": "tile_canyon.jpg", "color": COL_CANYON},
 	"res://levels/CanyonChasmLevel.tscn": {"title": "CANYON CHASM", "subtitle": "A narrow run over the drop", "file": "tile_canyon_chasm.jpg", "color": COL_CHASM},
 	"res://levels/DesertWadiLevel.tscn": {"title": "DESERT WADI", "subtitle": "Dry riverbed sand and heat", "file": "tile_desert_wadi.jpg", "color": COL_WADI},
 	"res://levels/MaraCrossingLevel.tscn": {"title": "MARA CROSSING", "subtitle": "Murram road across the savanna: the migration, Pride Rock, and the croc jump", "file": "tile_mara_crossing.jpg", "color": COL_SAVANNA},
@@ -47,7 +47,7 @@ const STAGE_INFO := {
 	"res://levels/MsituFallsLevel.tscn": {"title": "MSITU FALLS", "subtitle": "Rainforest hairpins, a mud bend, a rope bridge over the brink, behind the falls, and tropical downpours", "file": "tile_msitu_falls.jpg", "color": COL_JUNGLE},
 }
 ## Section header colour per cup on the course lists (same accents as the cup tiles).
-const CUP_COLORS := {"Bloombay GP": COL_GREEN, "Svartfjell GP": COL_SNOW, "Al-Raihana GP": COL_BRONZE, "Matumaini GP": COL_SAVANNA}
+const CUP_COLORS := {"Bloombay GP": COL_GREEN, "Svartfjell GP": COL_SNOW, "Al-Raihana GP": COL_BRONZE, "Sierra del Viento": COL_CANYON, "Matumaini GP": COL_SAVANNA}
 ## Tiles per row in a cup section: one cup per row.
 const SECTION_COLUMNS := 4
 
@@ -295,8 +295,11 @@ func show_sub_menu(menu_name: String) -> void:
 			_add_tile("SVARTFJELL GP", "Frostpeak  •  Glacier Highway  •  Northlight  •  Frostfall Gorge", "tile_arctic_cup.jpg", COL_SNOW, func():
 				_on_cup_selected("Svartfjell GP")
 			)
-			_add_tile("AL-RAIHANA GP", "Mountain  •  Canyon  •  Chasm  •  Wadi", "tile_al_raihana_gp.jpg", COL_BRONZE, func():
+			_add_tile("AL-RAIHANA GP", "Mountain Pass  •  Desert Wadi", "tile_al_raihana_gp.jpg", COL_BRONZE, func():
 				_on_cup_selected("Al-Raihana GP")
+			)
+			_add_tile("SIERRA DEL VIENTO", "Canyon Drift  •  Canyon Chasm", "tile_canyon.jpg", COL_CANYON, func():
+				_on_cup_selected("Sierra del Viento")
 			)
 			_add_tile("MATUMAINI GP", "Mara Crossing  •  Nyota Stadium  •  Msitu Falls", "tile_matumaini_gp.jpg", COL_SAVANNA, func():
 				_on_cup_selected("Matumaini GP")

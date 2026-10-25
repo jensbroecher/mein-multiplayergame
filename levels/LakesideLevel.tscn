@@ -1,62 +1,59 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://rgcctoqacrkv"]
 
-[ext_resource type="Script" path="res://levels/Level.gd" id="1_lev99"]
-[ext_resource type="PackedScene" path="res://CheckpointGate.tscn" id="2_gate"]
-[ext_resource type="Texture2D" path="res://materials/asphalt.png" id="3_asph"]
-[ext_resource type="Texture2D" path="res://materials/grass.png" id="5_grass"]
+[ext_resource type="Script" uid="uid://d2hujjwkl3s4a" path="res://levels/Level.gd" id="1_lev99"]
+[ext_resource type="PackedScene" uid="uid://gate123" path="res://CheckpointGate.tscn" id="2_gate"]
+[ext_resource type="Texture2D" uid="uid://bsmrfxbh6vqe2" path="res://materials/asphalt.png" id="3_asph"]
+[ext_resource type="Texture2D" uid="uid://ce51lhh2jn4l0" path="res://materials/grass.png" id="5_grass"]
 [ext_resource type="ArrayMesh" path="res://generated/terrain_visual.res" id="6_d6u53"]
 [ext_resource type="Shape3D" path="res://generated/terrain_collision_shape.res" id="7_dn5x0"]
-[ext_resource type="Script" path="res://TerrainGenerator.gd" id="7_gen"]
-[ext_resource type="Shader" path="res://curb_stripes.gdshader" id="8_esphl"]
-[ext_resource type="PackedScene" path="res://SpawnIndicator.tscn" id="8_spawn"]
+[ext_resource type="Script" uid="uid://b2sbc4x8rba5g" path="res://TerrainGenerator.gd" id="7_gen"]
+[ext_resource type="Shader" uid="uid://cvne02d6iyem5" path="res://curb_stripes.gdshader" id="8_esphl"]
+[ext_resource type="PackedScene" uid="uid://clxv8p6x0y6k2" path="res://SpawnIndicator.tscn" id="8_spawn"]
 [ext_resource type="ArrayMesh" path="res://generated/Visual_Curbs.res" id="9_5qkpu"]
 [ext_resource type="ArrayMesh" path="res://generated/Visual_Road.res" id="9_esphl"]
 [ext_resource type="ArrayMesh" path="res://generated/Visual_Road_Sides.res" id="10_5qkpu"]
 [ext_resource type="ArrayMesh" path="res://generated/Visual_Curbs_Sides.res" id="10_dcckh"]
 [ext_resource type="Shape3D" path="res://generated/track_collision_shape.res" id="12_esphl"]
-[ext_resource type="Shader" path="res://water.gdshader" id="14_5qkpu"]
+[ext_resource type="Shader" uid="uid://srampgbp5hcn" path="res://water.gdshader" id="14_5qkpu"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_tyre_stack_1.res" id="47_xjyd1"]
-[ext_resource type="Script" path="res://SpringProps.gd" id="48_btlx0"]
+[ext_resource type="Script" uid="uid://d1hpr0j0nei5w" path="res://SpringProps.gd" id="48_btlx0"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_tyre_stack_3.res" id="49_pxldp"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_tyre_stack_4.res" id="50_7mijb"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_tyre_stack_2.res" id="51_j7cli"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_tyre_stack_0.res" id="52_utgl8"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_tyre_stack_5.res" id="53_lu8q3"]
-[ext_resource type="PackedScene" path="res://models/be10e042cec0f40d5041acdc304a0ac3.fbx" id="79_ybx0l"]
+[ext_resource type="PackedScene" uid="uid://cpge3qx4v72bi" path="res://models/be10e042cec0f40d5041acdc304a0ac3.fbx" id="79_ybx0l"]
 [ext_resource type="PackedScene" path="res://ConcreteRamp.tscn" id="80_1gvc6"]
-[ext_resource type="PackedScene" path="res://BoostPad.tscn" id="93_m7b4a"]
-[ext_resource type="Script" path="res://MeadowDetail.gd" id="94_ly5jr"]
+[ext_resource type="PackedScene" uid="uid://boostpad123" path="res://BoostPad.tscn" id="93_m7b4a"]
+[ext_resource type="Script" uid="uid://cww0d3lelfmre" path="res://MeadowDetail.gd" id="94_ly5jr"]
 [ext_resource type="Material" path="res://generated/lakeside_meadow_mat_0.res" id="95_o46b7"]
 [ext_resource type="Material" path="res://generated/lakeside_meadow_mat_1.res" id="96_0e5b2"]
 [ext_resource type="Material" path="res://generated/lakeside_meadow_mat_2.res" id="97_66fnx"]
 [ext_resource type="MultiMesh" path="res://generated/lakeside_meadow_cells_0.res" id="98_ehafg"]
-[ext_resource type="Texture2D" path="res://sprites/decals/rc_vibe_grand_prix.png" id="98_ueu0w"]
-[ext_resource type="PackedScene" path="res://models/trees/bush.glb" id="99_7575d"]
+[ext_resource type="Texture2D" uid="uid://wk3agb86mm3j" path="res://sprites/decals/rc_vibe_grand_prix.png" id="98_ueu0w"]
+[ext_resource type="PackedScene" uid="uid://dt2ceq4my2rxu" path="res://models/trees/bush.glb" id="99_7575d"]
 [ext_resource type="PackedScene" path="res://ConcreteFootbridge.tscn" id="99_fsv80"]
 [ext_resource type="MultiMesh" path="res://generated/lakeside_meadow_cells_1.res" id="99_xjyd1"]
 [ext_resource type="MultiMesh" path="res://generated/lakeside_meadow_cells_2.res" id="100_btlx0"]
-[ext_resource type="PackedScene" path="res://models/23c38776dfac266dfa5dd2b6ac787812.fbx" id="104_3ll0q"]
-[ext_resource type="PackedScene" path="res://LoopCSG.tscn" id="120_loopcsg"]
-[ext_resource type="Script" path="res://CheckpointGate.gd" id="316_7yy8q"]
-[ext_resource type="Script" path="res://LoopCSG.gd" id="321_uoydd"]
-[ext_resource type="Script" path="res://BoostPad.gd" id="329_cc7ju"]
+[ext_resource type="PackedScene" uid="uid://ce1t4fkra37oc" path="res://models/23c38776dfac266dfa5dd2b6ac787812.fbx" id="104_3ll0q"]
+[ext_resource type="PackedScene" uid="uid://bos1i52omy3pm" path="res://LoopCSG.tscn" id="120_loopcsg"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_orange_kicker.res" id="339_22o5o"]
-[ext_resource type="PackedScene" path="res://models/4e31009f7a2edfdc2afa3b1bc41d0c88.fbx" id="339_j82va"]
+[ext_resource type="PackedScene" uid="uid://die0jeswaprm4" path="res://models/4e31009f7a2edfdc2afa3b1bc41d0c88.fbx" id="339_j82va"]
 [ext_resource type="Shape3D" path="res://generated/lakeside_kicker_deck_collision.res" id="340_e2157"]
-[ext_resource type="PackedScene" path="res://models/3e5e2cd06e6c9da2b1975573a42dddd0.fbx" id="340_oaaeu"]
+[ext_resource type="PackedScene" uid="uid://dun7kyshy0l5e" path="res://models/3e5e2cd06e6c9da2b1975573a42dddd0.fbx" id="340_oaaeu"]
 [ext_resource type="Shape3D" path="res://generated/lakeside_kicker_frame_collision.res" id="341_ho1xc"]
-[ext_resource type="PackedScene" path="res://models/2bb90f9b26067aec89692598b6a76198.fbx" id="341_oaaeu"]
+[ext_resource type="PackedScene" uid="uid://bm2lautibw1kd" path="res://models/2bb90f9b26067aec89692598b6a76198.fbx" id="341_oaaeu"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_paddock_tents.res" id="342_sghpl"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_paddock_gear.res" id="343_00obq"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_race_control.res" id="344_6sjmh"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_camera_tower.res" id="345_jnwot"]
-[ext_resource type="Script" path="res://LapBoard.gd" id="346_7rdgx"]
+[ext_resource type="Script" uid="uid://cbwq04dt33spw" path="res://LapBoard.gd" id="346_7rdgx"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_lap_board_corner_mesh.res" id="347_ly0vg"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_lap_board_straight_mesh.res" id="348_akoue"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_fence_straight.res" id="349_3gs50"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_fence_corner.res" id="350_mj146"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_crowd_barriers.res" id="351_q3ddf"]
-[ext_resource type="Script" path="res://WindTurbine.gd" id="352_fn75o"]
+[ext_resource type="Script" uid="uid://bv8u7uq4s2pqv" path="res://WindTurbine.gd" id="352_fn75o"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_turbine_tower.res" id="353_s0prx"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_hay_bales.res" id="354_e6ruf"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_tree_oak_1.res" id="354_fn1es"]
@@ -64,7 +61,7 @@
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_turbine_rotor.res" id="355_0r7dc"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_tree_oak_1_far.res" id="355_7hb5x"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_cone.res" id="355_bh45d"]
-[ext_resource type="Script" path="res://KnockableProps.gd" id="356_5yph5"]
+[ext_resource type="Script" uid="uid://bc6eogdrdwxiw" path="res://KnockableProps.gd" id="356_5yph5"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_tree_oak_0.res" id="356_e2ekl"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_grandstand_seats.res" id="357_fn1es"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_tree_oak_0_far.res" id="357_hikbm"]
@@ -72,7 +69,7 @@
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_tree_spruce_0.res" id="358_84fa2"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_camp_gear.res" id="359_e2ekl"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_tree_spruce_0_far.res" id="359_m66t4"]
-[ext_resource type="Script" path="res://StadiumAds.gd" id="360_hikbm"]
+[ext_resource type="Script" uid="uid://cppuo1aphdy25" path="res://StadiumAds.gd" id="360_hikbm"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_tree_spruce_1.res" id="360_ix5cx"]
 [ext_resource type="Material" path="res://generated/lakeside_mat_boards.res" id="361_84fa2"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_tree_spruce_1_far.res" id="361_akibc"]
@@ -86,7 +83,7 @@
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_tree_birch_1_far.res" id="369_cq21v"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_shrub_hazel_0.res" id="370_q8o2t"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_shrub_hazel_1.res" id="371_65c6j"]
-[ext_resource type="Script" path="res://JungleDetail.gd" id="372_qlh7k"]
+[ext_resource type="Script" uid="uid://cem8schv3c33s" path="res://JungleDetail.gd" id="372_qlh7k"]
 [ext_resource type="Material" path="res://generated/lakeside_leaf_near.res" id="373_10874"]
 [ext_resource type="Material" path="res://generated/lakeside_leaf_far.res" id="374_yxpoo"]
 [ext_resource type="Material" path="res://generated/lakeside_bark_oak_near.res" id="375_e0j3b"]
@@ -100,12 +97,12 @@
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_boulder_0.res" id="383_84fa2"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_boulder_2.res" id="384_m66t4"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_boulder_3.res" id="385_ix5cx"]
-[ext_resource type="Shader" path="res://sky_tropical_cumulus.gdshader" id="385_jl4it"]
+[ext_resource type="Shader" uid="uid://tj3h5badie1n" path="res://sky_tropical_cumulus.gdshader" id="385_jl4it"]
 [ext_resource type="ArrayMesh" path="res://generated/lakeside_boulder_1.res" id="386_akibc"]
-[ext_resource type="Texture2D" path="res://materials/concrete_normal.png" id="Concrete_Norm"]
-[ext_resource type="Texture2D" path="res://materials/concrete_roughness.png" id="Concrete_Rough"]
-[ext_resource type="Texture2D" path="res://materials/concrete.png" id="Concrete_Tex"]
-[ext_resource type="Shader" path="res://terrain_stochastic.gdshader" id="Shader_stoch_file"]
+[ext_resource type="Texture2D" uid="uid://j6l2pulbaugj" path="res://materials/concrete_normal.png" id="Concrete_Norm"]
+[ext_resource type="Texture2D" uid="uid://dasndv73breob" path="res://materials/concrete_roughness.png" id="Concrete_Rough"]
+[ext_resource type="Texture2D" uid="uid://bf05h3t4rlqs7" path="res://materials/concrete.png" id="Concrete_Tex"]
+[ext_resource type="Shader" uid="uid://ionm7cyho23g" path="res://terrain_stochastic.gdshader" id="Shader_stoch_file"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_grass"]
 render_priority = 0
@@ -781,6 +778,7 @@ size = Vector3(1.9200001, 3.68, 1.9200001)
 [sub_resource type="SystemFont" id="SystemFont_xdlou"]
 font_names = PackedStringArray("Arial Black", "Impact", "Helvetica Neue", "Arial", "sans-serif")
 font_weight = 900
+subpixel_positioning = 0
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_ume30"]
 size = Vector3(3.36, 4.16, 3.36)
@@ -1359,7 +1357,7 @@ size = Vector3(3.8400002, 5.28, 11.84)
 height = 12.0
 radius = 2.15
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_88344"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_0e5b2"]
 albedo_color = Color(1, 0.12, 0.12, 1)
 roughness = 0.2
 emission_enabled = true
@@ -1376,7 +1374,7 @@ rings = 6
 height = 12.0
 radius = 2.15
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_avutb"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_66fnx"]
 albedo_color = Color(1, 0.12, 0.12, 1)
 roughness = 0.2
 emission_enabled = true
@@ -1393,7 +1391,7 @@ rings = 6
 height = 12.0
 radius = 2.15
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_7f8xv"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ehafg"]
 albedo_color = Color(1, 0.12, 0.12, 1)
 roughness = 0.2
 emission_enabled = true
@@ -24976,28 +24974,28 @@ points = PackedVector3Array(-0.28056946, 0.3726032, 0, 0.26011515, 0.39949295, 0
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_d0dgy"]
 shader = ExtResource("385_jl4it")
-shader_parameter/storm_sky_top = null
-shader_parameter/storm_sky_horizon = null
-shader_parameter/storm_cloud_lit = null
-shader_parameter/storm_cloud_coverage = null
-shader_parameter/storm_cloud_opacity = null
-shader_parameter/storm_sun_glow = null
-shader_parameter/storm_sky_energy = null
+shader_parameter/storm_sky_top = Color(0.3, 0.34, 0.38, 1)
+shader_parameter/storm_sky_horizon = Color(0.46, 0.5, 0.5, 1)
+shader_parameter/storm_cloud_lit = Color(0.55, 0.58, 0.6, 1)
+shader_parameter/storm_cloud_coverage = 0.95
+shader_parameter/storm_cloud_opacity = 0.95
+shader_parameter/storm_sun_glow = 0.05
+shader_parameter/storm_sky_energy = 0.6
 shader_parameter/sky_top = Color(0.17, 0.41, 0.82, 1)
 shader_parameter/sky_horizon = Color(0.7, 0.82, 0.93, 1)
 shader_parameter/ground_horizon = Color(0.72, 0.8, 0.88, 1)
 shader_parameter/ground_bottom = Color(0.34, 0.42, 0.38, 1)
 shader_parameter/sky_curve = 0.32
-shader_parameter/sky_energy = null
+shader_parameter/sky_energy = 1.0
 shader_parameter/horizon_haze = Color(0.72, 0.8, 0.88, 1)
 shader_parameter/haze_strength = 0.7
 shader_parameter/haze_height = 0.16
 shader_parameter/sun_tint = Color(1, 0.95, 0.84, 1)
 shader_parameter/sun_disc_degrees = 1.0
 shader_parameter/sun_glow = 0.5
-shader_parameter/sun_horizon_tint = null
-shader_parameter/sun_horizon_glow = null
-shader_parameter/sun_horizon_height = null
+shader_parameter/sun_horizon_tint = Color(1, 0.8, 0.55, 1)
+shader_parameter/sun_horizon_glow = 0.0
+shader_parameter/sun_horizon_height = 0.22
 shader_parameter/cloud_lit = Color(1, 0.99, 0.96, 1)
 shader_parameter/cloud_shade = Color(0.52, 0.6, 0.72, 1)
 shader_parameter/cloud_coverage = 0.36
@@ -25784,9 +25782,8 @@ metadata/jump_lips = [{
 
 [node name="Players" type="Node3D" parent="." unique_id=1342420519]
 
-[node name="FinishLine" type="Area3D" parent="." unique_id=1647223077 instance=ExtResource("2_gate")]
+[node name="FinishLine" parent="." unique_id=1647223077 instance=ExtResource("2_gate")]
 transform = Transform3D(0.9688041, -0.0011075623, 0.2478253, -2.4447215e-09, 0.9999901, 0.0044690906, -0.24782774, -0.004329674, 0.9687945, 22.037237, 0.5383645, 108.04608)
-script = ExtResource("316_7yy8q")
 is_finish_line = true
 
 [node name="SpawnPoints" type="Node3D" parent="FinishLine" unique_id=1842025298]
@@ -25795,37 +25792,37 @@ is_finish_line = true
 transform = Transform3D(0.9999933, -1.5801983e-05, 0.0036528558, 1.632329e-05, 0.9999999, -0.0001427047, -0.0036528558, 0.00014276383, 0.9999932, -2.9870968, 0.44941106, 6.011444)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn1" unique_id=1548440755 instance=ExtResource("8_spawn")]
+[node name="SpawnIndicator" parent="FinishLine/SpawnPoints/Spawn1" unique_id=1548440755 instance=ExtResource("8_spawn")]
 
 [node name="Spawn2" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1113036692]
 transform = Transform3D(0.9999933, -1.5801983e-05, 0.0036528558, 1.632329e-05, 0.9999999, -0.0001427047, -0.0036528558, 0.00014276383, 0.9999932, 3.0128632, 0.44950905, 5.989517)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn2" unique_id=2042257383 instance=ExtResource("8_spawn")]
+[node name="SpawnIndicator" parent="FinishLine/SpawnPoints/Spawn2" unique_id=2042257383 instance=ExtResource("8_spawn")]
 
 [node name="Spawn3" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1890587806]
 transform = Transform3D(0.9999743, -3.0475901e-05, 0.0071724057, 3.2063108e-05, 0.9999999, -0.00022114301, -0.0071724057, 0.000221367, 0.99997413, -2.952797, 0.4482087, 12.022072)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn3" unique_id=850940999 instance=ExtResource("8_spawn")]
+[node name="SpawnIndicator" parent="FinishLine/SpawnPoints/Spawn3" unique_id=850940999 instance=ExtResource("8_spawn")]
 
 [node name="Spawn4" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=941021993]
 transform = Transform3D(0.9999743, -3.0475901e-05, 0.0071724057, 3.2063108e-05, 0.9999999, -0.00022114301, -0.0071724057, 0.000221367, 0.99997413, 3.0470505, 0.44840103, 11.979034)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn4" unique_id=820472034 instance=ExtResource("8_spawn")]
+[node name="SpawnIndicator" parent="FinishLine/SpawnPoints/Spawn4" unique_id=820472034 instance=ExtResource("8_spawn")]
 
 [node name="Spawn5" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1881870320]
 transform = Transform3D(0.99994254, -4.513096e-05, 0.01071991, 4.790502e-05, 0.9999998, -0.00025852816, -0.010719925, 0.00025902689, 0.99994236, -2.8973217, 0.44668663, 18.03238)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn5" unique_id=292489338 instance=ExtResource("8_spawn")]
+[node name="SpawnIndicator" parent="FinishLine/SpawnPoints/Spawn5" unique_id=292489338 instance=ExtResource("8_spawn")]
 
 [node name="Spawn6" type="Marker3D" parent="FinishLine/SpawnPoints" unique_id=1261126601]
 transform = Transform3D(0.99994254, -4.513096e-05, 0.01071991, 4.790502e-05, 0.9999998, -0.00025852816, -0.010719925, 0.00025902689, 0.99994236, 3.102335, 0.4469741, 17.968063)
 gizmo_extents = 0.3
 
-[node name="SpawnIndicator" type="Node3D" parent="FinishLine/SpawnPoints/Spawn6" unique_id=242840792 instance=ExtResource("8_spawn")]
+[node name="SpawnIndicator" parent="FinishLine/SpawnPoints/Spawn6" unique_id=242840792 instance=ExtResource("8_spawn")]
 
 [node name="PlayerSpawner" type="MultiplayerSpawner" parent="." unique_id=642896597]
 _spawnable_scenes = PackedStringArray("uid://cart123")
@@ -25837,39 +25834,31 @@ spawn_path = NodePath(".")
 
 [node name="Checkpoints" type="Node3D" parent="." unique_id=342440943]
 
-[node name="Halfway4" type="Area3D" parent="Checkpoints" unique_id=409562182 instance=ExtResource("2_gate")]
+[node name="Halfway4" parent="Checkpoints" unique_id=409562182 instance=ExtResource("2_gate")]
 transform = Transform3D(0.9695361, 0.006104205, -0.24487223, 0, 0.99968946, 0.02492038, 0.2449483, -0.024161208, 0.96923506, 273.42392, 8.641575, -219.41853)
-script = ExtResource("316_7yy8q")
 
-[node name="Halfway3" type="Area3D" parent="Checkpoints" unique_id=1076613409 instance=ExtResource("2_gate")]
+[node name="Halfway3" parent="Checkpoints" unique_id=1076613409 instance=ExtResource("2_gate")]
 transform = Transform3D(-0.4710697, -0.0039050851, 0.88208735, -3.1781383e-08, 0.9999902, 0.0044270353, -0.882096, 0.0020854142, -0.47106507, 135.32043, 1.9449267, -412.5677)
-script = ExtResource("316_7yy8q")
 
-[node name="Halfway2" type="Area3D" parent="Checkpoints" unique_id=760818968 instance=ExtResource("2_gate")]
+[node name="Halfway2" parent="Checkpoints" unique_id=760818968 instance=ExtResource("2_gate")]
 transform = Transform3D(0.38153738, 0.024056153, 0.9240404, -1.5087426e-07, 0.9996614, -0.02602478, -0.9243535, 0.009929286, 0.38140813, -203.48048, 13.710995, -530.076)
-script = ExtResource("316_7yy8q")
 
-[node name="Halfway1" type="Area3D" parent="Checkpoints" unique_id=970429380 instance=ExtResource("2_gate")]
+[node name="Halfway1" parent="Checkpoints" unique_id=970429380 instance=ExtResource("2_gate")]
 transform = Transform3D(-0.3222638, -0.0032716733, 0.9466443, 6.3679174e-08, 0.9999941, 0.0034560757, -0.9466499, 0.0011138284, -0.3222619, -542.4464, 20.203787, -637.262)
-script = ExtResource("316_7yy8q")
 
-[node name="Halfway5" type="Area3D" parent="Checkpoints" unique_id=409562185 instance=ExtResource("2_gate")]
+[node name="Halfway5" parent="Checkpoints" unique_id=409562185 instance=ExtResource("2_gate")]
 transform = Transform3D(-0.8378578, 0.019953262, -0.5455238, -6.072223e-07, 0.99933183, 0.03655282, 0.54588866, 0.030626396, -0.83729786, -650.452, 12.030335, -350.69427)
-script = ExtResource("316_7yy8q")
 
-[node name="Halfway6" type="Area3D" parent="Checkpoints" unique_id=1076613412 instance=ExtResource("2_gate")]
+[node name="Halfway6" parent="Checkpoints" unique_id=1076613412 instance=ExtResource("2_gate")]
 transform = Transform3D(-0.9705958, 0.014220705, 0.24029489, -5.4109836e-07, 0.9982534, -0.059079044, -0.2407153, -0.057342, -0.9689005, -399.5931, 4.5382013, -86.84882)
-script = ExtResource("316_7yy8q")
 
-[node name="Halfway7" type="Area3D" parent="Checkpoints" unique_id=760818971 instance=ExtResource("2_gate")]
+[node name="Halfway7" parent="Checkpoints" unique_id=760818971 instance=ExtResource("2_gate")]
 transform = Transform3D(-0.72159106, 0.013014751, -0.6921972, 0, 0.99982333, 0.018798761, 0.6923196, 0.013565018, -0.7214635, -292.59552, 6.3630095, 212.07228)
-script = ExtResource("316_7yy8q")
 
-[node name="Halfway8" type="Area3D" parent="Checkpoints" unique_id=970429383 instance=ExtResource("2_gate")]
+[node name="Halfway8" parent="Checkpoints" unique_id=970429383 instance=ExtResource("2_gate")]
 transform = Transform3D(0.04254194, 0.0047366563, -0.9990835, 1.5395925e-08, 0.9999888, 0.004740949, 0.99909467, -0.00020170453, 0.042541463, -84.35418, 2.8974676, 289.7146)
-script = ExtResource("316_7yy8q")
 
-[node name="be10e042cec0f40d5041acdc304a0ac3" type="Node3D" parent="Checkpoints" unique_id=51618898 groups=["collision_trimesh"] instance=ExtResource("79_ybx0l")]
+[node name="be10e042cec0f40d5041acdc304a0ac3" parent="Checkpoints" unique_id=51618898 groups=["collision_trimesh"] instance=ExtResource("79_ybx0l")]
 transform = Transform3D(0.408103, 0.018805888, 0.9127422, -3.7811697e-07, 0.99978787, -0.020599183, -0.9129359, 0.008406242, 0.4080164, -424.43256, 19.48409, -640.4886)
 
 [node name="AlternativePaths" type="Node3D" parent="." unique_id=528788535]
@@ -25882,17 +25871,16 @@ curve = SubResource("Curve3D_shortcut2")
 
 [node name="Ramps" type="Node3D" parent="." unique_id=1288188222]
 
-[node name="ConcreteRamp" type="Node3D" parent="Ramps" unique_id=1495161938 groups=["collision_trimesh"] instance=ExtResource("80_1gvc6")]
+[node name="ConcreteRamp" parent="Ramps" unique_id=1495161938 groups=["collision_trimesh"] instance=ExtResource("80_1gvc6")]
 transform = Transform3D(0.8222328, 0, 0.5691513, 0, 1, 0, -0.5691513, 0, 0.8222328, 167.59178, 6.9242396, -80.37636)
 
-[node name="LoopCSG" type="Node3D" parent="Ramps" unique_id=180241874 groups=["collision_trimesh", "loop_track"] instance=ExtResource("120_loopcsg")]
+[node name="LoopCSG" parent="Ramps" unique_id=180241874 groups=["collision_trimesh", "loop_track"] instance=ExtResource("120_loopcsg")]
 transform = Transform3D(0.71190405, 0, 0.70227677, 0, 1, 0, -0.70227677, 0, 0.71190405, -267.90543, 6.787854, 237.48096)
-script = ExtResource("321_uoydd")
 track_width = 8.5
 spiral_offset = 10.5
-entry_end_y = -0.39661941528320277
+entry_end_y = -0.3966194152832028
 exit_end_y = -1.4025798797607418
-road_grade = -0.018628897490324797
+road_grade = -0.01862889749032479
 exit_length = 30.0
 exit_boost = false
 
@@ -25900,7 +25888,7 @@ exit_boost = false
 
 [node name="Trees" type="Node3D" parent="LevelDesign" unique_id=1570701901]
 
-[node name="ConcreteFootbridge" type="Node3D" parent="LevelDesign" unique_id=391028000 groups=["collision_trimesh"] instance=ExtResource("99_fsv80")]
+[node name="ConcreteFootbridge" parent="LevelDesign" unique_id=391028000 groups=["collision_trimesh"] instance=ExtResource("99_fsv80")]
 transform = Transform3D(0.36897597, 0, 0.929439, -0.0071143787, 0.9999707, 0.0028243216, -0.92941177, -0.0076544867, 0.36896515, 54.197052, 3.6402335, -416.77783)
 
 [node name="Decals" type="Node3D" parent="LevelDesign" unique_id=672293724]
@@ -25909,22 +25897,22 @@ transform = Transform3D(0.36897597, 0, 0.929439, -0.0071143787, 0.9999707, 0.002
 transform = Transform3D(0.97546, 0, 0.2202, 0, 1, 0, -0.2202, 0, 0.97546, 17.778269, 0.8747457, 91.51997)
 mesh = SubResource("PlaneMesh_logo")
 
-[node name="Bush" type="Node3D" parent="LevelDesign" unique_id=2090644951 groups=["collision_trimesh"] instance=ExtResource("99_7575d")]
+[node name="Bush" parent="LevelDesign" unique_id=2090644951 groups=["collision_trimesh"] instance=ExtResource("99_7575d")]
 transform = Transform3D(0.6, 0, 0, 0, 0.6, 0, 0, 0, 0.6, 317.37152, 5.7240515, -239.96208)
 
-[node name="Logs" type="Node3D" parent="LevelDesign" unique_id=1918818692 groups=["collision_trimesh"] instance=ExtResource("339_j82va")]
+[node name="Logs" parent="LevelDesign" unique_id=1918818692 groups=["collision_trimesh"] instance=ExtResource("339_j82va")]
 transform = Transform3D(13.027363, -0.90938514, 7.379756, 1.1036632, 14.958972, -0.10492903, -7.353209, 0.6341144, 13.05864, 275.34253, 4.4887753, -446.8521)
 
-[node name="Boat" type="Node3D" parent="LevelDesign" unique_id=1969635757 groups=["collision_trimesh"] instance=ExtResource("79_ybx0l")]
+[node name="Boat" parent="LevelDesign" unique_id=1969635757 groups=["collision_trimesh"] instance=ExtResource("79_ybx0l")]
 transform = Transform3D(-1.5295483, -0.10915717, -17.934565, -0.2665328, 17.997818, -0.08681091, 17.932917, 0.25818712, -1.530979, 175.12502, -10.411753, -496.62048)
 
-[node name="Hay" type="Node3D" parent="LevelDesign" unique_id=1900935291 groups=["collision_box"] instance=ExtResource("340_oaaeu")]
+[node name="Hay" parent="LevelDesign" unique_id=1900935291 groups=["collision_box"] instance=ExtResource("340_oaaeu")]
 transform = Transform3D(7.925372, -1.0901732, 0, 1.0901732, 7.925372, 0, 0, 0, 8, 160.83614, 6.8446083, -49.507862)
 
-[node name="Hay2" type="Node3D" parent="LevelDesign" unique_id=429092922 groups=["collision_box"] instance=ExtResource("340_oaaeu")]
+[node name="Hay2" parent="LevelDesign" unique_id=429092922 groups=["collision_box"] instance=ExtResource("340_oaaeu")]
 transform = Transform3D(-6.782342, -0.7410099, 4.177409, -0.8128943, 7.958063, 0.0918456, -4.164018, -0.346608, -6.822083, 152.00746, 6.8446083, -39.00565)
 
-[node name="FestivalTent" type="Node3D" parent="LevelDesign" unique_id=437974526 groups=["collision_trimesh"] instance=ExtResource("341_oaaeu")]
+[node name="FestivalTent" parent="LevelDesign" unique_id=437974526 groups=["collision_trimesh"] instance=ExtResource("341_oaaeu")]
 transform = Transform3D(26.21302, 0, -14.590323, 0, 30, 0, 14.590323, 0, 26.21302, -83.18033, 9.810052, -511.57874)
 
 [node name="Box" type="CSGBox3D" parent="LevelDesign" unique_id=705381155 groups=["collision_box"]]
@@ -25941,32 +25929,22 @@ material = SubResource("StandardMaterial3D_wa883")
 
 [node name="BoostPads" type="Node3D" parent="." unique_id=1164637541]
 
-[node name="BoostPad1" type="Area3D" parent="BoostPads" unique_id=1454562377 instance=ExtResource("93_m7b4a")]
-transform = Transform3D(0.54046994, 0.019094123, -0.84114665, -0.00017530566, 0.99974513, 0.022581683, 0.8413634, -0.0120572625, 0.5403355, 153.24869, 6.981581, -70.7803)
-collision_layer = 0
-script = ExtResource("329_cc7ju")
+[node name="BoostPad1" parent="BoostPads" unique_id=1454562377 instance=ExtResource("93_m7b4a")]
+transform = Transform3D(0.54047334, -0.03133626, -0.8407774, 1.4100226e-06, 0.9993063, -0.037243817, 0.84136117, 0.020128103, 0.54009837, 153.24619, 6.9688454, -70.77869)
 
-[node name="BoostPad2" type="Area3D" parent="BoostPads" unique_id=1232121474 instance=ExtResource("93_m7b4a")]
-transform = Transform3D(0.928403, 0.012464364, -0.3713658, 0.0003111245, 0.99941194, 0.03432164, 0.3715748, -0.03197982, 0.9278522, 255.9263, 10.310571, -163.65369)
-collision_layer = 0
-script = ExtResource("329_cc7ju")
+[node name="BoostPad2" parent="BoostPads" unique_id=1232121474 instance=ExtResource("93_m7b4a")]
+transform = Transform3D(0.92839915, 0.004978808, -0.37155116, 4.9639552e-06, 0.9999113, 0.013411275, 0.37158453, -0.012452847, 0.92831576, 255.9267, 10.3738165, -163.65468)
 
-[node name="BoostPad5" type="Area3D" parent="BoostPads" unique_id=2120834706 instance=ExtResource("93_m7b4a")]
-transform = Transform3D(-0.6714307, -0.23097163, -0.70415413, 0.00016728042, 0.9501419, -0.31181824, 0.7410674, -0.20948213, -0.63791573, -507.86026, 12.146725, -214.25397)
-collision_layer = 0
-script = ExtResource("329_cc7ju")
+[node name="BoostPad5" parent="BoostPads" unique_id=2120834706 instance=ExtResource("93_m7b4a")]
+transform = Transform3D(-0.6714302, -0.2287489, -0.70487976, 0.00016519429, 0.95112157, -0.3088171, 0.7410678, -0.20746553, -0.6385738, -507.87857, 12.159754, -214.27057)
 
-[node name="BoostPad6" type="Area3D" parent="BoostPads" unique_id=651558407 instance=ExtResource("93_m7b4a")]
-transform = Transform3D(-0.6714307, -0.23097163, -0.70415413, 0.00016728042, 0.9501419, -0.31181824, 0.7410674, -0.20948213, -0.63791573, -510.8834, 12.146725, -210.92072)
-collision_layer = 0
-script = ExtResource("329_cc7ju")
+[node name="BoostPad6" parent="BoostPads" unique_id=651558407 instance=ExtResource("93_m7b4a")]
+transform = Transform3D(-0.6714302, -0.2287489, -0.70487976, 0.00016519429, 0.95112157, -0.3088171, 0.7410678, -0.20746553, -0.6385738, -510.9017, 12.159754, -210.93732)
 
-[node name="BoostPad7" type="Area3D" parent="BoostPads" unique_id=7532161 instance=ExtResource("93_m7b4a")]
-transform = Transform3D(-0.6715244, -0.0934878, -0.7350613, 4.8764046e-05, 0.9920035, -0.12621117, 0.74098253, -0.08478973, -0.6661499, -521.2152, 8.543717, -223.32878)
-collision_layer = 0
-script = ExtResource("329_cc7ju")
+[node name="BoostPad7" parent="BoostPads" unique_id=7532161 instance=ExtResource("93_m7b4a")]
+transform = Transform3D(-0.6715242, -0.09132322, -0.73533344, 4.744158e-05, 0.99237096, -0.12328879, 0.7409826, -0.08282628, -0.66639674, -521.22253, 8.562666, -223.3354)
 
-[node name="WoodenCart" type="Node3D" parent="." unique_id=1815157679 groups=["collision_trimesh"] instance=ExtResource("104_3ll0q")]
+[node name="WoodenCart" parent="." unique_id=1815157679 groups=["collision_trimesh"] instance=ExtResource("104_3ll0q")]
 transform = Transform3D(-13.756499, 2.4407263, 14.31089, 7.891328, 17.80546, 4.5488987, -12.18547, 8.775443, -13.21007, 274.95892, 2.2898998, -380.07974)
 
 [node name="LakesideDressing" type="Node3D" parent="." unique_id=2028575530]
@@ -27126,11 +27104,11 @@ mesh = ExtResource("354_t8a2h")
 
 [node name="Beacon" type="MeshInstance3D" parent="LakesideDressing/WindTurbines/WindTurbine_West" unique_id=375333037]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 41.543888, -3.7)
-material_override = SubResource("StandardMaterial3D_88344")
+material_override = SubResource("StandardMaterial3D_0e5b2")
 mesh = SubResource("SphereMesh_ud16u")
 
 [node name="RotorPivot" type="Node3D" parent="LakesideDressing/WindTurbines/WindTurbine_West" unique_id=1753379026]
-transform = Transform3D(0.90630776, 0.42261827, 0, -0.42261827, 0.90630776, 0, 0, 0, 1, 0, 40, 2.2)
+transform = Transform3D(0.9063077, 0.42261824, 0, -0.42261824, 0.9063077, 0, 0, 0, 1, 0, 40, 2.2)
 
 [node name="Rotor" type="MeshInstance3D" parent="LakesideDressing/WindTurbines/WindTurbine_West/RotorPivot" unique_id=1205048463]
 mesh = ExtResource("355_0r7dc")
@@ -27156,7 +27134,7 @@ mesh = ExtResource("354_t8a2h")
 
 [node name="Beacon" type="MeshInstance3D" parent="LakesideDressing/WindTurbines/WindTurbine_Summit" unique_id=656732874]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 41.543888, -3.7)
-material_override = SubResource("StandardMaterial3D_avutb")
+material_override = SubResource("StandardMaterial3D_66fnx")
 mesh = SubResource("SphereMesh_v88j7")
 
 [node name="RotorPivot" type="Node3D" parent="LakesideDressing/WindTurbines/WindTurbine_Summit" unique_id=352453226]
@@ -27186,11 +27164,11 @@ mesh = ExtResource("354_t8a2h")
 
 [node name="Beacon" type="MeshInstance3D" parent="LakesideDressing/WindTurbines/WindTurbine_East" unique_id=1959462402]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 41.543888, -3.7)
-material_override = SubResource("StandardMaterial3D_7f8xv")
+material_override = SubResource("StandardMaterial3D_ehafg")
 mesh = SubResource("SphereMesh_marrx")
 
 [node name="RotorPivot" type="Node3D" parent="LakesideDressing/WindTurbines/WindTurbine_East" unique_id=1465360728]
-transform = Transform3D(-0.9848077, -0.17364822, 0, 0.17364822, -0.9848077, 0, 0, 0, 1, 0, 40, 2.2)
+transform = Transform3D(-0.98480767, -0.17364821, 0, 0.17364821, -0.98480767, 0, 0, 0, 1, 0, 40, 2.2)
 
 [node name="Rotor" type="MeshInstance3D" parent="LakesideDressing/WindTurbines/WindTurbine_East/RotorPivot" unique_id=897927114]
 mesh = ExtResource("355_0r7dc")

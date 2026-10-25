@@ -143,38 +143,58 @@ func _settle() -> void:
 	if not is_inside_tree():
 		return
 	var space := get_world_3d().direct_space_state
-	var up := Vector3.UP
 	var centre := global_position
-	# Four corners and the middle: the lowest of them sets the height, so no edge floats.
-	var hits: Array[Vector3] = []
-	var normal_sum := Vector3.ZERO
-	for o in [Vector3.ZERO, Vector3(1.6, 0, 2.6), Vector3(-1.6, 0, 2.6), Vector3(1.6, 0, -2.6), Vector3(-1.6, 0, -2.6)]:
-		var p: Vector3 = centre + global_transform.basis.orthonormalized() * o + Vector3(0.031, 0.0, 0.017)
-		var q := PhysicsRayQueryParameters3D.create(p + up * 4.0, p - up * 6.0, 1)
-		q.hit_back_faces = false
-		var hit := space.intersect_ray(q)
-		if not hit.is_empty():
-			hits.append(hit.position)
-			normal_sum += hit.normal
-	if hits.is_empty():
+	var flat := global_transform.basis.orthonormalized()
+	# The middle and the four corners, each a ray straight down. Only hits on fairly level ground near
+	# the middle's height count: one ray clipping a wall, a curb or a gate's foot used to tip the whole
+	# pad (some lay on their sides), and the lowest corner's height buried pads on slopes.
+	var mid := _ground_under(space, centre + Vector3(0.031, 0.0, 0.017), Vector3(INF, INF, INF))
+	if mid.is_empty():
 		return
-	var y := INF
-	var mid_y := 0.0
-	for hp in hits:
-		y = minf(y, hp.y)
-		mid_y += hp.y
-	mid_y /= hits.size()
-	var normal := normal_sum.normalized() if normal_sum.length() > 0.01 else Vector3.UP
-	if normal.y < 0.5:
+	var base: Vector3 = mid["position"]
+	var pts: Dictionary = {}
+	for o in [Vector3(1.6, 0, 2.6), Vector3(-1.6, 0, 2.6), Vector3(1.6, 0, -2.6), Vector3(-1.6, 0, -2.6)]:
+		var h := _ground_under(space, centre + flat * o + Vector3(0.031, 0.0, 0.017), base)
+		if not h.is_empty():
+			pts[o] = h["position"]
+	# The surface's plane: across the four corners if all landed, else the middle's own normal.
+	var normal: Vector3 = mid["normal"]
+	if pts.size() == 4:
+		var along: Vector3 = (pts[Vector3(1.6, 0, -2.6)] + pts[Vector3(-1.6, 0, -2.6)]) - (pts[Vector3(1.6, 0, 2.6)] + pts[Vector3(-1.6, 0, 2.6)])
+		var across: Vector3 = (pts[Vector3(1.6, 0, 2.6)] + pts[Vector3(1.6, 0, -2.6)]) - (pts[Vector3(-1.6, 0, 2.6)] + pts[Vector3(-1.6, 0, -2.6)])
+		var n := across.cross(along).normalized()
+		if n.y < 0.0:
+			n = -n
+		if n.length() > 0.5:
+			normal = n
+	# No steeper than 40 degrees: anything more is a wrong hit, not a ramp.
+	if normal.y < cos(deg_to_rad(40.0)):
 		normal = Vector3.UP
+	# Where a corner's ground falls away under that plane (a crest), sink by half of it.
+	var drop := 0.0
+	for k in pts:
+		drop = minf(drop, ((pts[k] as Vector3) - base).dot(normal))
 	var fwd := _lap_tangent(centre)
-	if fwd == Vector3.ZERO:
-		fwd = -global_transform.basis.z
-	fwd = (fwd - normal * fwd.dot(normal)).normalized()
+	if fwd.length_squared() < 1e-6:
+		fwd = -flat.z
+	fwd -= normal * fwd.dot(normal)
+	if fwd.length_squared() < 1e-6:
+		fwd = normal.cross(Vector3.RIGHT)
 	var sc := global_transform.basis.get_scale()
-	# Half sunk between the lowest corner and the mean, so it neither floats nor vanishes on a crest.
-	var settle_y := lerpf(y, mid_y, 0.5)
-	global_transform = Transform3D(Basis.looking_at(fwd, normal).scaled(sc), Vector3(centre.x, settle_y, centre.z) + normal * 0.01)
+	global_transform = Transform3D(Basis.looking_at(fwd.normalized(), normal).scaled(sc), base + normal * (drop * 0.5 + 0.01))
+
+
+## The ground straight under `at`: its hit (position, normal), or empty if nothing level is there or
+## (given a `near` height) it is more than 1.5m off it.
+func _ground_under(space: PhysicsDirectSpaceState3D, at: Vector3, near: Vector3) -> Dictionary:
+	var q := PhysicsRayQueryParameters3D.create(at + Vector3.UP * 4.0, at - Vector3.UP * 6.0, 1)
+	q.hit_back_faces = false
+	var hit := space.intersect_ray(q)
+	if hit.is_empty() or (hit["normal"] as Vector3).y < 0.6:
+		return {}
+	if near.x != INF and absf((hit["position"] as Vector3).y - near.y) > 1.5:
+		return {}
+	return hit
 
 
 ## Turns the pad about its own up axis so its front (-z) runs along the nearest lap path: the
