@@ -44,7 +44,8 @@ const LEVELS := {
 ##   sound: the sliding loop in generated/surfaces/ ("" = the asphalt squeal and screeches),
 ##     sound_db its level at a full slide (the loops are all baked at -16 dBFS RMS; about -13 puts
 ##     them level with the asphalt squeal, -21 dBFS played at -8 dB), roll_db how much quieter it
-##     plays just rolling at speed (-80: silent when rolling).
+##     plays just rolling at speed (-80: silent when rolling). The surfaces with real recordings
+##     (RECORDED_CLIPS: driving-on sounds, not just slides) roll only a few dB under a full slide.
 const FX := [
 	# ASPHALT
 	{"dust": Color(0.90, 0.90, 0.90, 0.0), "dust_size": 0.3, "dust_rise": 0.4, "dust_roll": 0.0,
@@ -54,16 +55,16 @@ const FX := [
 	"grit": Color(0.42, 0.32, 0.22, 1.0), "grit_size": 0.05, "grit_gravity": 11.0, "sound": "skid_dirt", "sound_db": -13.0, "roll_db": -15.0},
 	# GRAVEL
 	{"dust": Color(0.72, 0.66, 0.58, 0.6), "dust_size": 0.75, "dust_rise": 0.45, "dust_roll": 0.45,
-	"grit": Color(0.46, 0.43, 0.40, 1.0), "grit_size": 0.055, "grit_gravity": 14.0, "sound": "skid_gravel", "sound_db": -12.0, "roll_db": -13.0},
+	"grit": Color(0.46, 0.43, 0.40, 1.0), "grit_size": 0.055, "grit_gravity": 14.0, "sound": "skid_gravel", "sound_db": -12.0, "roll_db": -5.0},
 	# SAND
 	{"dust": Color(0.93, 0.84, 0.64, 0.6), "dust_size": 0.75, "dust_rise": 0.15, "dust_roll": 0.7,
-	"grit": Color(0.88, 0.76, 0.52, 1.0), "grit_size": 0.035, "grit_gravity": 12.0, "sound": "skid_sand", "sound_db": -13.5, "roll_db": -14.0},
+	"grit": Color(0.88, 0.76, 0.52, 1.0), "grit_size": 0.035, "grit_gravity": 12.0, "sound": "skid_sand", "sound_db": -13.5, "roll_db": -5.0},
 	# SNOW
 	{"dust": Color(0.97, 0.98, 1.0, 0.85), "dust_size": 1.0, "dust_rise": 0.6, "dust_roll": 0.8,
-	"grit": Color(0.92, 0.95, 1.0, 1.0), "grit_size": 0.07, "grit_gravity": 7.0, "sound": "skid_snow", "sound_db": -12.5, "roll_db": -13.0},
+	"grit": Color(0.92, 0.95, 1.0, 1.0), "grit_size": 0.07, "grit_gravity": 7.0, "sound": "skid_snow", "sound_db": -12.5, "roll_db": -5.0},
 	# ICE
 	{"dust": Color(0.90, 0.95, 1.0, 0.4), "dust_size": 0.35, "dust_rise": 0.3, "dust_roll": 0.0,
-	"grit": Color(0.85, 0.93, 1.0, 1.0), "grit_size": 0.03, "grit_gravity": 9.0, "sound": "skid_ice", "sound_db": -15.0, "roll_db": -80.0},
+	"grit": Color(0.85, 0.93, 1.0, 1.0), "grit_size": 0.03, "grit_gravity": 9.0, "sound": "skid_ice", "sound_db": -13.0, "roll_db": -6.0},
 	# GRASS
 	{"dust": Color(0.62, 0.58, 0.42, 0.35), "dust_size": 0.45, "dust_rise": 0.4, "dust_roll": 0.3,
 	"grit": Color(0.36, 0.48, 0.20, 1.0), "grit_size": 0.05, "grit_gravity": 6.0, "sound": "skid_grass", "sound_db": -14.5, "roll_db": -16.0},
@@ -79,6 +80,35 @@ const FX := [
 ]
 
 const SOUND_DIR := "res://generated/surfaces/"
+
+## Real recorded tyre loops layered in alongside the synthesised ones (scratch/measure_surface_rms.gd):
+## [path, gain_db], gain_db normalising the clip's measured RMS to the synthesised loops' -16 dBFS
+## baseline, so a surface's existing `sound_db`/`roll_db` still set its level the same way.
+## pick_clip() takes one at random whenever a cart enters that surface.
+const RECORDED_CLIPS := {
+	GRAVEL: [
+		["res://sounds/continuous_gravel_tire_1.wav", -11.20],
+		["res://sounds/continuous_gravel_tire_2.wav", -11.12],
+		["res://sounds/continuous_gravel_tire_3.wav", -11.18],
+		["res://sounds/continuous_gravel_tire_4.wav", -11.14],
+	],
+	SAND: [
+		["res://sounds/continuous_sand_crunching.wav", -11.10],
+		["res://sounds/continuous_sand_crunching_2.wav", -11.09],
+		["res://sounds/continuous_sand_tire_2.wav", -11.20],
+	],
+	SNOW: [
+		["res://sounds/driving_on_snow_1.wav", -10.93],
+		["res://sounds/driving_on_snow_2.wav", -11.00],
+		["res://sounds/driving_on_snow_3.wav", -10.96],
+		["res://sounds/snow_impact_and_driving.wav", -11.09],
+	],
+	ICE: [
+		["res://sounds/driving_on_ice_1.wav", -11.17],
+		["res://sounds/driving_on_ice_2.wav", -11.14],
+		["res://sounds/driving_on_ice_3.wav", -10.89],
+	],
+}
 
 static var _streams := {}
 static var _key_level_id := 0
@@ -139,16 +169,26 @@ static func fx(surface: int) -> Dictionary:
 	return FX[clampi(surface, 0, COUNT - 1)]
 
 
-## The surface's sliding loop, loaded on first use and shared by every cart (null for asphalt, or
-## if regenerate_surface_sounds.gd has not been run).
-static func stream(surface: int) -> AudioStream:
+## A sliding loop for `surface` and the extra gain (dB) it needs to sit level with the rest: a
+## random take of the real recordings if there are any, else the synthesised loop at 0 dB. Call once
+## per surface change (it rerolls the take every call), not every tick.
+static func pick_clip(surface: int) -> Dictionary:
+	var clips: Array = RECORDED_CLIPS.get(surface, [])
+	if not clips.is_empty():
+		var pick: Array = clips[randi() % clips.size()]
+		var path: String = pick[0]
+		if not _streams.has(path):
+			_streams[path] = load(path) if ResourceLoader.exists(path) else null
+		var s: AudioStream = _streams[path]
+		if s != null:
+			return {"stream": s, "gain_db": float(pick[1])}
 	var nm: String = fx(surface)["sound"]
 	if nm.is_empty():
-		return null
+		return {"stream": null, "gain_db": 0.0}
 	if not _streams.has(nm):
-		var path := SOUND_DIR + nm + ".res"
-		_streams[nm] = load(path) if ResourceLoader.exists(path) else null
-	return _streams[nm]
+		var path2 := SOUND_DIR + nm + ".res"
+		_streams[nm] = load(path2) if ResourceLoader.exists(path2) else null
+	return {"stream": _streams[nm], "gain_db": 0.0}
 
 
 ## The level's scene file name (its LEVELS key), remembered for the last level asked about: every

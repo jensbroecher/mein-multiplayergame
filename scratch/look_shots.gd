@@ -2,7 +2,7 @@ extends Node
 
 # Look-dev shots of a level with RC carts standing in for scale. Run windowed:
 #   Godot --path . res://scratch/look_shots.tscn -- <level.tscn> <out_dir> [car=x,z,yaw_deg ...]
-#       [weather=0..1] name:x,y,z:tx,ty,tz ...
+#       [weather=0..1] name:x,y,z:tx,ty,tz[:fov] ...
 # A cart is dropped onto the ground at each car= spot. A shot named herd* first waits until the
 # Mara Crossing herd is streaming across the road. weather= pins Northlight Caverns' blizzard or
 # Msitu Falls' rain.
@@ -65,6 +65,7 @@ func _ready() -> void:
 		var parts := a.split(":")
 		var p := parts[1].split(",")
 		var t := parts[2].split(",")
+		cam.fov = float(parts[3]) if parts.size() > 3 else 62.0
 		cam.global_position = Vector3(float(p[0]), float(p[1]), float(p[2]))
 		cam.look_at(Vector3(float(t[0]), float(t[1]), float(t[2])), Vector3.UP)
 		if parts[0].begins_with("herd") and herd:

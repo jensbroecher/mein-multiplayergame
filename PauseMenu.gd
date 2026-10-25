@@ -40,7 +40,7 @@ func _build_camera_option() -> void:
 	row.add_child(lbl)
 	option_camera_mode = OptionButton.new()
 	option_camera_mode.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	option_camera_mode.add_item("Isometric")
+	option_camera_mode.add_item("Top Down")
 	option_camera_mode.add_item("Follower")
 	option_camera_mode.selected = 0 if MusicManager.use_isometric_camera else 1
 	option_camera_mode.item_selected.connect(_on_camera_mode_selected)

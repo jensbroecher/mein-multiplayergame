@@ -34,7 +34,7 @@ func _ready() -> void:
 				continue
 			var s: int = c.surface
 			if not stats.has(s):
-				stats[s] = {"frames": 0, "track": 0, "marks": 0, "smoke": 0, "dust": 0, "grit": 0, "sound": 0, "slide": 0}
+				stats[s] = {"frames": 0, "track": 0, "marks": 0, "smoke": 0, "dust": 0, "grit": 0, "sound": 0, "slide": 0, "loud": 0.0, "loud_n": 0, "engine": 0.0}
 			var st: Dictionary = stats[s]
 			st["frames"] += 1
 			if not c.is_offroad:
@@ -53,10 +53,19 @@ func _ready() -> void:
 				if g.emitting:
 					st["grit"] += 1
 					break
-			for ap in c._sfx_surface:
+			var best := -200.0
+			for i in c._sfx_surface.size():
+				var ap: AudioStreamPlayer3D = c._sfx_surface[i]
 				if ap.playing:
-					st["sound"] += 1
-					break
+					# What reaches the bus: the player's volume plus the clip's own RMS (every clip is
+					# normalised to -16 dBFS by its clip gain).
+					best = maxf(best, ap.volume_db - 16.0 - float(c._sfx_surface_clip_gain[i]))
+			if best > -200.0:
+				st["sound"] += 1
+				st["loud"] += best
+				st["loud_n"] += 1
+			# The engine loops are levelled to an RMS of 0.328 (-9.7 dBFS) by their gain.
+			st["engine"] += c.engine_sound.volume_db - c._engine_gain_db - 9.7
 		frames += 1
 	print("=== %s, %.0fs ===" % [level_path.get_file(), seconds])
 	for c in get_tree().get_nodes_in_group("player_carts"):
@@ -66,9 +75,10 @@ func _ready() -> void:
 	for s in stats:
 		var st: Dictionary = stats[s]
 		var f: float = maxf(float(st["frames"]), 1.0)
-		print("  %-8s %6d frames  track %3.0f%%  sliding %3.0f%%  marks %3.0f%%  smoke %3.0f%%  dust %3.0f%%  grit %3.0f%%  sound %3.0f%%" % [
+		print("  %-8s %6d frames  track %3.0f%%  sliding %3.0f%%  marks %3.0f%%  smoke %3.0f%%  dust %3.0f%%  grit %3.0f%%  sound %3.0f%% at %5.1f dBFS (engine %5.1f)" % [
 			Surfaces.NAMES[s], st["frames"], 100.0 * st["track"] / f, 100.0 * st["slide"] / f, 100.0 * st["marks"] / f,
-			100.0 * st["smoke"] / f, 100.0 * st["dust"] / f, 100.0 * st["grit"] / f, 100.0 * st["sound"] / f])
+			100.0 * st["smoke"] / f, 100.0 * st["dust"] / f, 100.0 * st["grit"] / f, 100.0 * st["sound"] / f,
+			st["loud"] / maxf(float(st["loud_n"]), 1.0), st["engine"] / f])
 	var marks: Node = level.get_node_or_null("SkidMarks")
 	print("  skid mark segments laid: %d" % (marks._used if marks else 0))
 	get_tree().quit()

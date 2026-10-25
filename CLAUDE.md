@@ -311,10 +311,20 @@ first to third (`_announce_place`). The podium calls each place as it's revealed
   (`_entry_fall_speed`, from first touch to going under) sets off `WaterFx.spawn_splash`: a column, spray,
   mist and a foam ring that spreads (`water_foam.gdshader`). FxWarmup holds their stand-ins.
   `res://scratch/deep_water_test.tscn -- <dir> [at=x,z] [height=25]` (windowed) drops a cart and saves frames
-  on physics time (the shots stall frames, and physics catches up only 4 steps a frame).
+  on physics time (the shots stall frames, and physics catches up only 4 steps a frame); `follow=1
+  vel=x,y,z pre=0.5,0.8` shoots through the cart's own follower camera, during the fall as well.
+- The follower camera's splash shot (`_splash_cam_wanted`, `_splash_camera`): a cart falling faster than
+  `SPLASH_CAM_FALL` (9 m/s) within 14m of deep water, with no ground above the surface under it (a ray),
+  sets an anchor on the surface under it; from then until the respawn (while it's under) the camera stops
+  following it down and eases to `SPLASH_CAM_BACK` (10m) back along its heading and `SPLASH_CAM_UP`
+  (5.5m) over the water, looking at the spot. Following it, the camera had dropped to the water with the
+  cart and the splash filled the view. Test harnesses that make an AI cart the local player must set
+  `camera_pivot.top_level` as PlayerCart's setup does, or the cart drags the pivot along.
 - `StageAmbience.gd` (added by Level) plays the recorded backgrounds in `sounds/<kind>/` per stage (`STAGES`),
   under the levels' own baked ambiences, crossfading random clips. Each clip is levelled by its measured
-  RMS (`CLIP_DB`): they range from -12 to -49 dBFS. Measure a new clip before adding it.
+  RMS (`CLIP_DB`): they range from -12 to -49 dBFS. Measure a new clip before adding it. The deserts
+  (Mountain Pass's dunes too: it had the forest layer, birdsong over sand) have none: nothing recorded
+  suits them.
 - Leftover sounds now used: `unused_tire_screech_*` (a one-shot at the start of a skid over 12 m/s),
   `unused_car_crash_clank` (cart against cart), `unused_warning_beep` (a missile closing on the local
   cart), `unused_alert` (wrong way). The double beep (an item in hand) was too distracting and is gone.
@@ -348,12 +358,25 @@ first to third (`_announce_place`). The podium calls each place as it's revealed
   (`sound_db`, about -13 matches the asphalt squeal) and how much quieter it plays just rolling at speed
   (`roll_db`). Two players per cart crossfade when the surface changes (`_update_surface_audio`).
   `res://scratch/surface_sound_dump.gd -- <dir>` writes the loops out as .wav.
+- Gravel, sand, snow and ice also have real recorded takes (`sounds/continuous_gravel_tire_*.wav`,
+  `continuous_sand_*.wav`, `driving_on_snow_*.wav`/`snow_impact_and_driving.wav`, `driving_on_ice_*.wav`):
+  `Surfaces.RECORDED_CLIPS`, picked at random by `pick_clip()` whenever a cart enters that surface,
+  alongside the synthesised loop as a fallback. They were recorded much hotter than the synthesised
+  -16 dBFS baseline, so each clip's entry carries its own gain back down to it (measured with
+  `res://scratch/measure_surface_rms.gd`), which `_update_surface_audio` adds on top of the surface's
+  usual `sound_db`. Their `.wav.import` has `loop_mode` forward (full file): unlike the synthesised
+  `.res` loops they aren't crossfaded at the seam, so a 15s take restarts audibly, but that beats the
+  dead air and hard restart of `loop_mode` disabled. They are driving sounds, not just slides, so these
+  four surfaces roll only 5-6 dB under a full slide (`roll_db`; ice rolled silent before): about -34 dBFS
+  at speed, level with the engine. At the old roll levels (-13, ice -80) they sat 10-25 dB under it and
+  only slides were heard.
 - `_skid_amount` (0..1) drives all of it: a drift or a locked brake at speed, or sliding wide in a corner.
   Paved road smokes when skidding; anything else raises its dust (`_set_dirt_emitting`: colour, size, rise,
   density per surface, some even rolling) and flings grit (`grit_particles`: stones, sand, snow clumps, mud
   clods, grass bits; unshaded, since a lit billboard facing away from the sun read as a black dot).
 - `res://scratch/surface_fx_test.tscn -- <level> [seconds=60]` races the AI and tallies, per surface, the
-  marks, smoke, dust, grit and sound (windowed: headless never primes the trail particles, so only the
+  marks, smoke, dust, grit and sound, with the sliding loop's mean level in dBFS against the engine's
+  (windowed: headless never primes the trail particles, so only the
   classification counts there). `res://scratch/skid_shots.tscn -- <dir>` (windowed) photographs marks the
   AI laid; `res://scratch/spray_shots.tscn -- <dir> level=...` shoots carts raising dust.
 
@@ -371,6 +394,13 @@ first to third (`_announce_place`). The podium calls each place as it's revealed
   Bloombay and Pinecrest all build their tyre walls through it. Bloombay's corner cones are KnockableProps.
 - `res://scratch/spring_props_test.tscn -- <dir> [level=] [props=Flags|Stacks] [index=N] [speed=25]` (windowed)
   drives a cart through one prop and logs the tip and slide.
+- Marker poles (`KnockablePoles.gd`: Msitu Falls, Frostfall Gorge, Mara Crossing) are rigid bodies frozen until
+  a cart comes within `RELEASE_RADIUS`. On the hit (`_launch`) a pole is thrown: away from the cart and
+  along its travel at `LAUNCH_SPEED_SHARE` of its speed (from how far it moved, so remote carts count), a
+  hop up (`LAUNCH_UP_*`), tumbling. Left to the contact, the cart's sphere only tipped it over and rolled
+  on top of it (0.2m up at most); now 5-23m out and up to 5m high at 30 m/s.
+  `res://scratch/pole_launch_test.tscn -- [level=] [index=40] [speed=22]` (headless) drives a real cart
+  into one and logs where the pole went, and anything else solid at its foot.
 
 ## Everything solid (DressingColliders.gd)
 
@@ -383,9 +413,16 @@ first to third (`_announce_place`). The podium calls each place as it's revealed
     `surface` meta), shapes added through shape owners, not nodes. Instances drawn twice (near and far
     MultiMeshes) are solid once. Transforms come from `multimesh.buffer`: on the dummy renderer (a headless
     server, whose bots still drive into things) `get_instance_transform()` returns zeros.
-  - Not solid: ground cover under `MIN_HEIGHT` (0.5m) and anything named in `SOFT` (grass, meadow, crowd,
+  - Not solid: ground cover under `MIN_HEIGHT` (0.5m), anything named in `SOFT` (grass, meadow, crowd,
     flags and tyre stacks, which are SpringProps, knockable props, icicles, skid marks, shadow-only
-    stand-ins).
+    stand-ins), and MultiMeshes run by a script that moves its own instances (`SELF_MOVING`: KnockablePoles,
+    KnockableIce, KnockableProps, SpringProps). The poles' MultiMesh is named `MarkerPosts`/`SnowPoles`,
+    which `SOFT` missed: a static collider and a wobble here stopped the carts on it and fought the poles'
+    rigid bodies for the transforms (a wiggle and a glitch instead of the pole flying).
+  - Brush (`BRUSH`, by the mesh's file name: the ferns, not `tree_fern`): no collider at all. A cart drives
+    through, bends it right over (`BRUSH_LEAN`, `BRUSH_KICK`, along its travel) and loses `BRUSH_DRAG`
+    (3.5%) of its speed entering each one (carts this peer has physics authority over, as SpringProps'
+    flags do); one the Detail Level doesn't draw slows nobody. Solid, the ferns stopped carts dead.
   - The Detail Level: an instance a MultiMesh doesn't draw (past `visible_instance_count`, or hidden) has
     its collider switched off, checked every half second, so nobody hits a plant they can't see.
   - Single meshes (`_cover_meshes`, a few physics frames later): every visible MeshInstance3D gets a
@@ -398,8 +435,10 @@ first to third (`_announce_place`). The podium calls each place as it's revealed
   - Plants up to 5.5m (not `ROCKY` things) wobble when a cart touches them: a damped spring about the foot
     (`SPRING_K`, `SPRING_DAMP`), the kick from the cart's speed (from how far it moved, so remote carts
     count), written into every MultiMesh that draws the plant. Local scenery, not synced.
-  - `res://scratch/plant_hit_test.tscn -- <dir> [level=] [match=PlantsNear_pear] [index=0] [speed=14]`
-    checks a plant's collider and logs its wobble; `res://scratch/mmi_survey.gd` (`-s`) lists every
+  - `res://scratch/plant_hit_test.tscn -- <dir> [level=] [match=PlantsNear_pear] [index=0] [speed=14]
+    [brush=1]` checks a plant's collider and logs its wobble (`brush=1`: the index-th fern);
+    `res://scratch/brush_drive_test.tscn -- [level=] [index=0] [speed=20]` drives a real cart through ferns
+    near the lap and logs its speed at each one; `res://scratch/mmi_survey.gd` (`-s`) lists every
     MultiMesh a level holds.
 
 ## Collision audit
@@ -1071,10 +1110,25 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   and understory out of it, and `_verify_ranger_post` checks every footprint is within 12cm of the pad
   and well clear of the road. The old buildings sat where the start clearing happened to fall, and two of them
   hung over the hillside.
+- The bamboo marker posts (`_build_marker_posts`) stand 2m off the road's edge, or 1.2m if that's steep, on
+  ground under a 0.55 slope and within 1.5m of the road's height (`_post_spot`), else not at all: behind
+  the falls the verge runs into the cliff's foot, and three posts stood 3-9m up its face.
 - Don't put "road", "track", "ramp", "bridge", "deck", "jump", "curb", "pier", "gate" or "checkpoint" in the
   name of anything with collision: `PlayerCart._is_track_surface` treats it as drivable.
 - `res://scratch/ranger_post_preview.gd` (run with `-s`, windowed, `-- <dir> name:x,y,z:tx,ty,tz ...`) renders the post
   on flat ground in a few seconds, without generating the level.
+
+## Race cameras
+
+- Two modes, toggled with C and saved by MusicManager (`use_isometric_camera`, the setting's old name):
+  "Top Down" and "Follower". Top Down (`is_isometric` in PlayerCart) sits at `TOPDOWN_OFFSET` (-22, 48, 22)
+  from the cart in world axes (it doesn't turn with the cart) with a 44 degree lens (`TOPDOWN_FOV`),
+  looking 11-24m ahead of it: about 1.6x the track the old isometric view (-26, 26, 26) at 35 degrees
+  showed. In Msitu Falls' jungle the canopy still hides the road in places from up there (the old view sat
+  inside it). Follower trails 5.2-6.8m behind; see the splash shot under Deep water.
+- `res://scratch/race_cam_shots.tscn -- <dir> [level=] [mode=top|follow] [cart=0] [every=4] [count=6]`
+  (windowed) rides along with an AI cart through its own race camera and saves frames.
+  `scratch/look_shots` takes a lens per shot (`name:x,y,z:tx,ty,tz:fov`).
 
 ## Car select screen
 

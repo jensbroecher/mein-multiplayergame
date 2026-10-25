@@ -55,7 +55,7 @@ const FACTORY := {
 	"Interceptor": {"pattern": 11, "finish": 1, "primary": Color(0.07, 0.36, 0.80),
 		"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.98, 0.78, 0.07),
 		"rim": Color(0.86, 0.63, 0.24), "number": 5},
-	"Viper": {"pattern": 12, "finish": 0, "primary": Color(0.52, 0.82, 0.12),
+	"Trailblazer": {"pattern": 12, "finish": 0, "primary": Color(0.52, 0.82, 0.12),
 		"secondary": Color(0.23, 0.25, 0.27), "accent": Color(0.52, 0.82, 0.12),
 		"rim": Color(0.05, 0.05, 0.055), "number": 3},
 	"Apex": {"pattern": 13, "finish": 0, "primary": Color(0.94, 0.94, 0.92),

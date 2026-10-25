@@ -38,11 +38,11 @@ const CLIP_DB := {
 }
 
 ## Per stage (the level file's name): [kind, level in dBFS] layers. Stages not listed have none
-## (the desert canyons: nothing recorded suits them).
+## (the deserts, Mountain Pass's dunes included: nothing recorded suits them, and the forest's
+## birdsong over sand dunes didn't fit).
 const STAGES := {
 	"LakesideLevel": [["insects_birds", -31.0], ["forest", -37.0]],
 	"PinecrestRidgeLevel": [["forest", -30.0], ["insects_birds", -38.0]],
-	"MountainLevel": [["forest", -32.0]],
 	"HarborPierLevel": [["beach", -30.0]],
 	"BloombayDunesLevel": [["beach", -32.0]],
 	"MaraCrossingLevel": [["insects_birds", -30.0]],

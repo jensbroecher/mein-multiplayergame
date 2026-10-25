@@ -19,7 +19,7 @@ const FLOOR_SHADER = preload("res://showroom_floor.gdshader")
 
 const CAR_PRESETS = [
 	{
-		"name": "Viper",
+		"name": "Trailblazer",
 		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
 		"model_path": "res://generated/cars/Viper.tscn",
 		"model_y_rotation": PI,
@@ -29,7 +29,7 @@ const CAR_PRESETS = [
 		"grip": 5.0,
 		"braking": 40.0,
 		"offroad": 6.0,
-		"desc": "All-around performer. Great for beginners.",
+		"desc": "Versatile off-road buggy engineered for stable handling and smooth performance across rough terrain.",
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
@@ -123,7 +123,7 @@ const CAR_PRESETS = [
 		"grip": 5.5,
 		"braking": 48.0,
 		"offroad": 6.5,
-		"desc": "Heavy armored racer. Balanced stats with high durability.",
+		"desc": "Lightweight competitive racer featuring an open-frame safety structure and refined handling for asphalt and dirt.",
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
@@ -196,7 +196,7 @@ const CAR_PRESETS = [
 ## Each car's colour on this screen: its name's underline, stat bars, the turntable's light ring
 ## and the confirm button.
 const CAR_ACCENTS := {
-	"Viper": Color(0.36, 0.92, 0.40), "Shadow": Color(0.72, 0.40, 1.0), "Strikeforce": Color(0.70, 0.88, 0.20),
+	"Trailblazer": Color(0.36, 0.92, 0.40), "Viper": Color(0.36, 0.92, 0.40), "Shadow": Color(0.72, 0.40, 1.0), "Strikeforce": Color(0.70, 0.88, 0.20),
 	"Apex": Color(1.0, 0.60, 0.16), "Interceptor": Color(0.30, 0.52, 1.0), "Mudrunner": Color(0.22, 0.80, 0.66),
 	"Phantom": Color(1.0, 0.78, 0.14), "Centurion": Color(0.98, 0.46, 0.12), "Mirage": Color(0.96, 0.28, 0.14),
 	"Inferno": Color(1.0, 0.22, 0.20), "Nocturne": Color(0.62, 0.86, 1.0), "Vortex": Color(0.55, 0.92, 0.15),
@@ -1044,8 +1044,11 @@ func _load_paint() -> void:
 	var car_name: String = CAR_PRESETS[current_car_index].name
 	var saved: Variant = null
 	var config := ConfigFile.new()
-	if config.load("user://settings.cfg") == OK and config.has_section_key(_paint_section(), car_name):
-		saved = config.get_value(_paint_section(), car_name)
+	if config.load("user://settings.cfg") == OK:
+		if config.has_section_key(_paint_section(), car_name):
+			saved = config.get_value(_paint_section(), car_name)
+		elif car_name == "Trailblazer" and config.has_section_key(_paint_section(), "Viper"):
+			saved = config.get_value(_paint_section(), "Viper")
 	current_paint = CarPaint.sanitize(saved, car_name)
 	_paint_changed(false)
 

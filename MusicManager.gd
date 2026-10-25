@@ -56,7 +56,7 @@ var scaling_3d_mode_index: int = 0
 var fsr_sharpness: float = 0.2
 var anisotropic_index: int = 1 # 0:Off 1:2x 2:4x 3:8x 4:16x
 var max_fps_index: int = 1 # 0:30 1:60 2:120 3:Unlimited
-## true = isometric / top-down race cam, false = behind-the-car follower cam.
+## true = the top-down race cam ("Top Down"; it was isometric once, hence the name), false = behind-the-car follower cam.
 ## Remembered across stages and sessions.
 var use_isometric_camera: bool = true
 

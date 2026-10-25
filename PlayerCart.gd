@@ -31,7 +31,7 @@ static var _lightning_spark_quad: QuadMesh
 
 const CAR_PRESETS = [
 	{
-		"name": "Viper",
+		"name": "Trailblazer",
 		"engine_sound": "res://sounds/enginesounds/engine_viper_loop.wav",
 		"engine_gain_db": 0.0,
 		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
@@ -452,7 +452,11 @@ var camera_look_at: Vector3 = Vector3.ZERO
 var camera_clip_distance_mult: float = 1.0
 var camera_clip_distance_mult_iso: float = 1.0
 ## Loaded from MusicManager so stage changes keep the player's camera choice.
+## The top-down race camera (is_isometric; it used to be an isometric view): a fixed offset in world
+## axes, not turning with the cart, high and steep enough to see well down the track, and its lens.
 var is_isometric: bool = true
+const TOPDOWN_OFFSET := Vector3(-22.0, 48.0, 22.0)
+const TOPDOWN_FOV := 44.0
 var is_carried_by_eagle: bool = false
 var is_intro_active: bool = false
 var intro_time: float = 0.0
@@ -525,9 +529,12 @@ var _wheel_pivots: Array = []
 ## sideways leaves a wider one.
 const TYRE_WIDTH := 0.26
 const TYRE_LENGTH := 0.34
-## The sliding loops (Surfaces.stream) on two players that crossfade when the surface changes.
+## The sliding loops (Surfaces.pick_clip) on two players that crossfade when the surface changes.
 var _sfx_surface: Array = []
 var _sfx_surface_gain: Array = [0.0, 0.0]
+## Extra gain (dB) the clip currently on each player needs to sit level with the rest (real
+## recordings are normalised against the synthesised loops' -16 dBFS baseline; see Surfaces.pick_clip).
+var _sfx_surface_clip_gain: Array = [0.0, 0.0]
 var _sfx_surface_cur := 0
 var _sfx_surface_kind := -1
 ## Gritty bits the rear tyres fling (stones, sand, snow, clods, grass), beside the dust cloud.
@@ -596,6 +603,16 @@ var _sink_sound: AudioStreamPlayer3D = null
 var _water_prev_y := INF
 ## The fastest it was falling while touching the water but not yet under it (-1: splashed already).
 var _entry_fall_speed := 0.0
+## The follower camera's splash shot: once the cart plunges into deep water it stops following it
+## down and holds back and up from where it went in (on the surface; x INF = none), facing the way the
+## cart was heading, so the splash is in view. Held while the cart is under, until the respawn.
+var _splash_cam_at := Vector3(INF, 0.0, 0.0)
+var _splash_cam_fwd := Vector3.FORWARD
+var _splash_cam_time := 0.0
+## Falling faster than this with deep water close below is a plunge.
+const SPLASH_CAM_FALL := 9.0
+const SPLASH_CAM_BACK := 10.0
+const SPLASH_CAM_UP := 5.5
 var original_wheel_transforms: Dictionary = {}
 var original_cart_model_transform: Transform3D
 ## The explosion's damage ({wheels: [corners], parts: int, disintegrate: bool}, see CarDebris.roll()),
@@ -1088,7 +1105,7 @@ func _ready():
 		
 		# Set initial top-view camera settings
 		camera.projection = Camera3D.PROJECTION_PERSPECTIVE
-		camera.fov = 35.0 if is_isometric else 75.0
+		camera.fov = TOPDOWN_FOV if is_isometric else 75.0
 		
 		# Rotation is already locked globally at startup
 
@@ -1106,8 +1123,7 @@ func _ready():
 
 		# Position camera immediately at start to avoid sliding in
 		if is_isometric:
-			var iso_offset = Vector3(-26, 26, 26)
-			camera_pivot.global_position = visuals.global_position + iso_offset
+			camera_pivot.global_position = visuals.global_position + TOPDOWN_OFFSET
 			camera_pivot.look_at(visuals.global_position, Vector3.UP)
 		else:
 			var fwd0 = -visuals.global_transform.basis.z
@@ -1334,7 +1350,7 @@ func _process(delta):
 
 		var visual_forward = -visuals.global_transform.basis.z
 		var speed_factor = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
-		var look_ahead_dist = (8.0 + speed_factor * 8.0) if is_isometric else (6.0 + speed_factor * 5.0)
+		var look_ahead_dist = (11.0 + speed_factor * 13.0) if is_isometric else (6.0 + speed_factor * 5.0)
 		if splitscreen_camera != null:
 			look_ahead_dist *= 0.4 # Keep camera closer to car in splitscreen to prevent going off-screen
 
@@ -1422,8 +1438,8 @@ func _process(delta):
 						listener.current = true
 						listener.make_current()
 			elif is_isometric or is_carried_by_eagle:
-				var iso_zoom: float = 1.45 if is_carried_by_eagle else 1.0
-				var iso_offset = Vector3(-26, 26, 26) * iso_zoom
+				var iso_zoom: float = 1.2 if is_carried_by_eagle else 1.0
+				var iso_offset = TOPDOWN_OFFSET * iso_zoom
 				var desired_cam_pos = visuals.global_position + iso_offset
 				var ray_start = visuals.global_position + Vector3.UP * 1.0
 				
@@ -1477,6 +1493,8 @@ func _process(delta):
 					cam_fwd = cam_fwd.normalized()
 				camera_look_at = camera_look_at.lerp(visuals.global_position + cam_fwd * look_ahead_dist, 10.0 * delta)
 				camera_pivot.look_at(camera_look_at, Vector3.UP)
+			elif _splash_cam_wanted(visual_forward, excludes, delta):
+				_splash_camera(excludes, delta)
 			else:
 				var cam_dist = lerp(5.2, 6.8, clamp(boost_time / 4.0, 0.0, 1.0))
 				
@@ -1534,7 +1552,7 @@ func _process(delta):
 		elif is_carried_by_eagle:
 			target_fov = 48.0 # Zoom out when grabbed by eagle
 		elif is_isometric:
-			target_fov = 35.0
+			target_fov = TOPDOWN_FOV
 		else:
 			target_fov = 75.0
 			if is_boosting:
@@ -3539,20 +3557,23 @@ func _create_surface_audio() -> void:
 func _update_surface_audio(delta: float, slide: float, speed: float, grounded: bool) -> void:
 	if _sfx_surface.size() < 2:
 		return
-	var stream: AudioStream = null if Surfaces.is_paved(surface) else Surfaces.stream(surface)
 	var fxs: Dictionary = Surfaces.fx(surface)
+	var has_sound: bool = not Surfaces.is_paved(surface) and not str(fxs["sound"]).is_empty()
 	var gain := 0.0
-	if stream != null and grounded and speed > 1.0:
+	if has_sound and grounded and speed > 1.0:
 		var roll: float = clampf((speed - 3.0) / 22.0, 0.0, 1.0) * db_to_linear(float(fxs["roll_db"]))
 		gain = maxf(clampf(slide, 0.0, 1.0), roll)
-	if stream != null and gain > 0.0 and _sfx_surface_kind != surface:
-		_sfx_surface_kind = surface
-		_sfx_surface_cur = 1 - _sfx_surface_cur
-		var fresh: AudioStreamPlayer3D = _sfx_surface[_sfx_surface_cur]
-		fresh.stream = stream
-		_sfx_surface_gain[_sfx_surface_cur] = 0.0
-		fresh.volume_db = -80.0
-		fresh.play(randf() * 2.0)
+	if has_sound and gain > 0.0 and _sfx_surface_kind != surface:
+		var clip: Dictionary = Surfaces.pick_clip(surface)
+		if clip["stream"] != null:
+			_sfx_surface_kind = surface
+			_sfx_surface_cur = 1 - _sfx_surface_cur
+			var fresh: AudioStreamPlayer3D = _sfx_surface[_sfx_surface_cur]
+			fresh.stream = clip["stream"]
+			_sfx_surface_gain[_sfx_surface_cur] = 0.0
+			_sfx_surface_clip_gain[_sfx_surface_cur] = float(clip["gain_db"])
+			fresh.volume_db = -80.0
+			fresh.play(randf() * 2.0)
 	var k: float = 1.0 - exp(-14.0 * delta)
 	for i in 2:
 		var ap: AudioStreamPlayer3D = _sfx_surface[i]
@@ -3567,7 +3588,7 @@ func _update_surface_audio(delta: float, slide: float, speed: float, grounded: b
 			continue
 		if not ap.playing and ap.stream != null:
 			ap.play(randf() * 2.0)
-		ap.volume_db = linear_to_db(g) + float(fxs["sound_db"])
+		ap.volume_db = linear_to_db(g) + float(fxs["sound_db"]) + float(_sfx_surface_clip_gain[i])
 		ap.pitch_scale = lerpf(0.85, 1.2, clampf(speed / 32.0, 0.0, 1.0))
 
 
@@ -4372,6 +4393,8 @@ func _apply_respawn_pose() -> void:
 	is_drowned = false
 	is_underwater = false
 	_water_prev_y = INF
+	_splash_cam_at = Vector3(INF, 0.0, 0.0)
+	_splash_cam_time = 0.0
 	if _engine_flooded:
 		_set_engine_flooded(false)
 	water_timer = 0.0
@@ -7220,6 +7243,60 @@ func _get_water_surface_y_at(pos: Vector3) -> float:
 		var river_y: float = float(_river_water.call("surface_at", pos.x, pos.z))
 		return -9999.0 if is_nan(river_y) else river_y
 	return water_surface_y
+
+
+## Whether the follower camera should hold the splash shot (see _splash_cam_at): starts while the cart
+## is falling fast with deep water close below it and no ground above the surface in between, and lasts
+## while it is under. Keeps the anchor up to date.
+func _splash_cam_wanted(visual_forward: Vector3, excludes: Array, delta: float) -> bool:
+	_splash_cam_time = maxf(_splash_cam_time - delta, 0.0)
+	var p: Vector3 = visuals.global_position
+	if not is_drowned and linear_velocity.y < -SPLASH_CAM_FALL:
+		var wy: float = _get_water_surface_y_at(p)
+		if wy > -9000.0 and p.y > wy - 0.5 and p.y - wy < 14.0 and not _ground_above_water(p, wy, excludes):
+			if _splash_cam_at.x == INF:
+				var f := Vector3(linear_velocity.x, 0.0, linear_velocity.z)
+				if f.length() < 2.0:
+					f = Vector3(visual_forward.x, 0.0, visual_forward.z)
+				_splash_cam_fwd = f.normalized() if f.length_squared() > 0.0001 else Vector3.FORWARD
+			_splash_cam_at = Vector3(p.x, wy, p.z)
+			_splash_cam_time = 0.6
+	if _splash_cam_at.x == INF:
+		return false
+	if is_underwater or is_drowned or _engine_flooded or _splash_cam_time > 0.0:
+		return true
+	# It came up again (shallow after all, or boosted out).
+	_splash_cam_at = Vector3(INF, 0.0, 0.0)
+	return false
+
+
+func _ground_above_water(p: Vector3, water_y: float, excludes: Array) -> bool:
+	var q := PhysicsRayQueryParameters3D.create(p, Vector3(p.x, water_y - 0.2, p.z))
+	q.exclude = excludes
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	return not hit.is_empty() and hit.collider != null and _is_world_collider(hit.collider)
+
+
+## The splash shot: back along the way the cart was heading from where it went in and up over the
+## water, looking at the spot, easing there rather than snapping.
+func _splash_camera(excludes: Array, delta: float) -> void:
+	var anchor: Vector3 = _splash_cam_at
+	var target: Vector3 = anchor - _splash_cam_fwd * SPLASH_CAM_BACK + Vector3.UP * SPLASH_CAM_UP
+	var from: Vector3 = anchor + Vector3.UP * 1.5
+	var q := PhysicsRayQueryParameters3D.create(from, target)
+	q.exclude = excludes
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	if not hit.is_empty() and hit.collider != null and _is_world_collider(hit.collider):
+		var span: float = maxf(from.distance_to(target), 0.01)
+		target = from + (target - from) * clampf((from.distance_to(hit.position) - 0.6) / span, 0.2, 1.0)
+	target = _raise_point_above_terrain(target, excludes)
+	camera_pivot.global_position = camera_pivot.global_position.lerp(target, 3.0 * delta)
+	camera_pivot.global_position = _raise_point_above_terrain(camera_pivot.global_position, excludes)
+	camera_look_at = camera_look_at.lerp(anchor + Vector3.UP * 1.2, 4.0 * delta)
+	camera_pivot.look_at(camera_look_at, Vector3.UP)
+	_update_camera_xray(camera_pivot.global_position, anchor + Vector3.UP * 0.8, excludes, delta)
+	if race_ui:
+		race_ui.set_terrain_clipped(false)
 
 
 func _raise_point_above_terrain(pos: Vector3, excludes: Array) -> Vector3:

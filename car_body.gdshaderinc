@@ -350,7 +350,8 @@ vec3 paint_albedo(vec3 p, vec3 n) {
 		// dashed line across the bonnet where it ended).
 		vec3 door = roundel(col, vec2(-sign(p.x) * (p.z - door_roundel.x), p.y - door_roundel.y), roundel_r);
 		col = mix(col, door, step(0.55, abs(n.x)));
-		vec3 hood = roundel(col, vec2(p.x, hood_z - p.z), hood_r);
+		// Upright seen from in front of the car: the digits' tops toward the windscreen.
+		vec3 hood = roundel(col, vec2(-p.x, p.z - hood_z), hood_r);
 		col = mix(col, hood, step(0.5, n.y) * step(p.z, hood_z + hood_r * 2.0));
 	} else if (paint_pattern == PAT_FADE) {
 		float t = smoothstep(nose_z + 0.25, tail_z - 0.25, p.z + 0.05 * (vnoise(p * 9.0) - 0.5));

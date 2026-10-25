@@ -24,10 +24,19 @@ const MIN_HEIGHT := 0.5
 ## Not solid at all: what these names say.
 const SOFT := ["grass", "groundcover", "meadow", "crowd", "flag", "stack", "lounger", "parasol", "coolbox",
 	"cone", "icicle", "skid", "shadow", "giraffe", "hole", "fx", "warmup", "cloud", "particle", "spark", "water"]
+## Scenery that knocks over or springs by itself (rigid bodies or springs of its own).
+const SELF_MOVING := ["res://KnockablePoles.gd", "res://KnockableIce.gd", "res://KnockableProps.gd", "res://SpringProps.gd"]
 ## Rigid: rocks and built things (they never wobble).
 const ROCKY := ["rock", "boulder", "block", "stone", "scree", "pebble", "mound", "ridge", "divider", "lamp",
 	"butte", "spire", "hoodoo", "formation", "slab", "crate", "barrier"]
 const WOBBLE_MAX_HEIGHT := 5.5
+## Brush (ferns, by their mesh's file name; not tree ferns): not solid. A cart drives through it, bends
+## it right over and loses BRUSH_DRAG of its speed entering each one.
+const BRUSH := ["fern"]
+const BRUSH_NOT := ["tree_fern", "treefern"]
+const BRUSH_LEAN := 1.05
+const BRUSH_KICK := 0.25
+const BRUSH_DRAG := 0.035
 ## The spring: stiffness, damping, how far it can lean (radians), how hard a cart's speed kicks it.
 const SPRING_K := 55.0
 const SPRING_DAMP := 4.5
@@ -41,13 +50,16 @@ var _shape_cache := {}
 var _bodies := {}
 ## Per MultiMesh that owns instances: [mmi, [[body, owner id] per instance index or null], last count].
 var _owned: Array = []
-## Wobbling plants: entries [mmis (Array), index, rest Transform3D, foot Vector3, radius, axis, angle, speed];
+## Wobbling plants: entries [mmis (Array), index, rest Transform3D, foot Vector3, radius, axis, angle, speed,
+## brush bool];
 ## the cells hold indices into it, and so does the set of those moving (an Array as a key hashes by
 ## its contents, which change as it swings).
 var _wobble: Array = []
 var _wobble_cells := {}
 var _moving := {}
 var _cart_prev := {}
+## Cart instance id -> {wobble index: true} of the brush it was inside last tick (drag on entering).
+var _brush_in := {}
 var _vis_timer := 0.0
 var shapes_made := 0
 
@@ -69,6 +81,7 @@ func build(level: Node) -> void:
 		if info.is_empty():
 			continue
 		var rocky: bool = _named(mmi, ROCKY)
+		var brush: bool = not rocky and _brush(mmi.multimesh.mesh)
 		var mm: MultiMesh = mmi.multimesh
 		var to_world: Transform3D = mmi.global_transform
 		var owned: Array = []
@@ -95,6 +108,11 @@ func build(level: Node) -> void:
 			if height < MIN_HEIGHT:
 				seen[key] = []
 				continue
+			if brush:
+				var be: Array = [[mmi], i, local, xf.origin, float(info["r"]) * maxf(sc.x, sc.z), Vector3.ZERO, 0.0, 0.0, true]
+				_add_wobbler(be)
+				seen[key] = be
+				continue
 			var shape: Shape3D = _shape_for(mmi.multimesh.mesh, info, sc)
 			var basis: Basis = xf.basis.orthonormalized()
 			var centre: Vector3 = xf.origin + basis * (Vector3(info["centre"]) * sc)
@@ -106,20 +124,49 @@ func build(level: Node) -> void:
 			shapes_made += 1
 			any = true
 			if not rocky and height <= WOBBLE_MAX_HEIGHT:
-				var entry: Array = [[mmi], i, local, xf.origin, float(info["r"]) * maxf(sc.x, sc.z), Vector3.ZERO, 0.0, 0.0]
-				var ck := Vector2i(floori(xf.origin.x / 8.0), floori(xf.origin.z / 8.0))
-				if not _wobble_cells.has(ck):
-					_wobble_cells[ck] = []
-				_wobble_cells[ck].append(_wobble.size())
-				_wobble.append(entry)
+				var entry: Array = [[mmi], i, local, xf.origin, float(info["r"]) * maxf(sc.x, sc.z), Vector3.ZERO, 0.0, 0.0, false]
+				_add_wobbler(entry)
 				seen[key] = entry
 			else:
 				seen[key] = []
 		if any:
 			_owned.append([mmi, owned, -2, true])
 	_sync_visibility()
-	print("[DressingColliders] %d colliders, %d plants wobble (%d ms)" % [shapes_made, _wobble.size(), Time.get_ticks_msec() - t0])
+	var brush_count := 0
+	for e in _wobble:
+		if e[8]:
+			brush_count += 1
+	print("[DressingColliders] %d colliders, %d plants wobble, %d of them brush driven through (%d ms)" % [
+		shapes_made, _wobble.size(), brush_count, Time.get_ticks_msec() - t0])
 	_cover_meshes.call_deferred(level)
+
+
+func _add_wobbler(entry: Array) -> void:
+	var foot: Vector3 = entry[3]
+	var ck := Vector2i(floori(foot.x / 8.0), floori(foot.z / 8.0))
+	if not _wobble_cells.has(ck):
+		_wobble_cells[ck] = []
+	_wobble_cells[ck].append(_wobble.size())
+	_wobble.append(entry)
+
+
+static func _brush(mesh: Mesh) -> bool:
+	var file := mesh.resource_path.get_file().to_lower()
+	for w in BRUSH_NOT:
+		if file.contains(w):
+			return false
+	for w in BRUSH:
+		if file.contains(w):
+			return true
+	return false
+
+
+## Whether the Detail Level draws instance `index` of `mmi` (brush it doesn't draw doesn't slow anyone).
+static func _drawn(mmi: MultiMeshInstance3D, index: int) -> bool:
+	if not is_instance_valid(mmi) or not mmi.is_visible_in_tree():
+		return false
+	var count: int = mmi.multimesh.visible_instance_count
+	return count < 0 or index < count
 
 
 ## Names of meshes that get no collider here: the ground and roads and whatever is driven on (decks,
@@ -254,6 +301,11 @@ static func _named(n: Node, words: Array) -> bool:
 func _soft(mmi: MultiMeshInstance3D) -> bool:
 	if _named(mmi, SOFT):
 		return true
+	# Their own bodies are their collision, and they move their own instances: a static collider and
+	# a wobble here stopped the poles dead and fought their rigid bodies for the transforms.
+	var scr: Script = mmi.get_script()
+	if scr != null and SELF_MOVING.has(scr.resource_path):
+		return true
 	# Shadow-only stand-ins draw nothing.
 	return mmi.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
 
@@ -380,8 +432,13 @@ func _physics_process(delta: float) -> void:
 		_cart_prev[c.get_instance_id()] = pos
 		var vel: Vector3 = (pos - prev) / maxf(delta, 0.001)
 		var speed: float = Vector2(vel.x, vel.z).length()
-		if speed < 1.0:
+		var cid: int = c.get_instance_id()
+		var was_in: Dictionary = _brush_in.get(cid, {})
+		var now_in := {}
+		if speed < 1.0 or speed > 90.0:
+			_brush_in[cid] = was_in if speed < 1.0 else now_in
 			continue
+		var drags: bool = c.has_method("has_physics_authority") and c.has_physics_authority()
 		var ck := Vector2i(floori(pos.x / 8.0), floori(pos.z / 8.0))
 		for dz in range(-1, 2):
 			for dx in range(-1, 2):
@@ -391,20 +448,33 @@ func _physics_process(delta: float) -> void:
 					var d := Vector2(foot.x - pos.x, foot.z - pos.z)
 					if d.length() > float(e[4]) + CART_RADIUS or absf(pos.y - foot.y) > 4.0:
 						continue
-					# Tip away from the cart, about the horizontal axis across the push.
+					var brush: bool = e[8]
+					if brush:
+						if not _drawn(e[0][0], int(e[1])):
+							continue
+						now_in[idx] = true
+						if drags and not was_in.has(idx):
+							(c as RigidBody3D).linear_velocity *= 1.0 - BRUSH_DRAG
+					# Tip away from the cart, about the horizontal axis across the push; brush goes over
+					# along the cart's travel, the way a cart flattens it.
 					var push := Vector3(d.x, 0.0, d.y).normalized() if d.length() > 0.05 else Vector3(vel.x, 0.0, vel.z).normalized()
+					if brush:
+						push = (push + Vector3(vel.x, 0.0, vel.z) / speed * 2.0).normalized()
 					var axis: Vector3 = Vector3.UP.cross(push).normalized()
-					if float(e[7]) * (axis.dot(e[5]) if (e[5] as Vector3).length() > 0.5 else 1.0) < speed * KICK * 0.5:
+					var kick: float = BRUSH_KICK if brush else KICK
+					if float(e[7]) * (axis.dot(e[5]) if (e[5] as Vector3).length() > 0.5 else 1.0) < speed * kick * 0.5:
 						e[5] = axis
-						e[7] = float(e[7]) + speed * KICK
+						e[7] = float(e[7]) + speed * kick
 						_moving[idx] = true
+		_brush_in[cid] = now_in
 	var done: Array = []
 	for idx in _moving:
 		var e: Array = _wobble[idx]
 		var ang: float = float(e[6])
 		var spd: float = float(e[7])
 		spd += (-SPRING_K * ang - SPRING_DAMP * spd) * delta
-		ang = clampf(ang + spd * delta, -MAX_LEAN, MAX_LEAN)
+		var lean: float = BRUSH_LEAN if e[8] else MAX_LEAN
+		ang = clampf(ang + spd * delta, -lean, lean)
 		e[6] = ang
 		e[7] = spd
 		var rest: Transform3D = e[2]

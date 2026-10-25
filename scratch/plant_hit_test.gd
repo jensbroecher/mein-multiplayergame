@@ -5,7 +5,8 @@ extends Node
 # through it (a stand-in in the "player_carts" group is moved through it; the wobble reads carts'
 # positions, so it needs no physics). Logs the lean; windowed, it also saves frames. Spectator race:
 #   Godot --path . res://scratch/plant_hit_test.tscn -- <out_dir> [level=res://levels/CanyonLevel.tscn]
-#       [match=PlantsNear_barrel] [index=0] [speed=14]
+#       [match=PlantsNear_barrel] [index=0] [speed=14] [brush=1]
+# brush=1 picks the index-th brush plant (ferns: driven through, not solid) instead of matching a name.
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
@@ -14,11 +15,13 @@ func _ready() -> void:
 	var filter := "PlantsNear_barrel"
 	var index := 0
 	var speed := 14.0
+	var brush := false
 	for a in args.slice(1):
 		if a.begins_with("level="): level_path = a.substr(6)
 		elif a.begins_with("match="): filter = a.substr(6)
 		elif a.begins_with("index="): index = int(a.substr(6))
 		elif a.begins_with("speed="): speed = float(a.substr(6))
+		elif a.begins_with("brush="): brush = a.substr(6) == "1"
 	AudioServer.set_bus_mute(0, true)
 	NetworkManager.current_game_mode = NetworkManager.GameMode.SPECTATOR
 	NetworkManager.start_spectator()
@@ -31,7 +34,7 @@ func _ready() -> void:
 	var entry: Array = []
 	var k := 0
 	for e in dc._wobble:
-		if filter in String((e[0][0] as Node).name):
+		if (brush and e.size() > 8 and e[8]) or (not brush and filter in String((e[0][0] as Node).name)):
 			if k == index:
 				entry = e
 				break

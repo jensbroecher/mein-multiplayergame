@@ -4104,6 +4104,7 @@ void fragment() {
 	mat.shader = sh
 	post.material = mat
 	var transforms: Array = []
+	var steep := 0
 	var s := 10.0
 	while s < _lap_len - 6.0:
 		var skip: bool = _on_bridge(s) or _on_bridge(s + 12.0) or _on_bridge(s - 12.0)
@@ -4114,8 +4115,11 @@ void fragment() {
 				var q: Vector3 = (sp["pos"] as Vector3) + (sp["right"] as Vector3) * side * (ROAD_HALF + 2.0)
 				if _in_water(q.x, q.z, 0.5):
 					continue
-				q.y = _ground_at(q.x, q.z) + 0.75
-				transforms.append(Transform3D(Basis(), q))
+				var at: Variant = _post_spot(sp, side)
+				if at == null:
+					steep += 1
+					continue
+				transforms.append(Transform3D(Basis(), at))
 		s += 28.0
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
@@ -4133,7 +4137,22 @@ void fragment() {
 	mmi.multimesh = mm
 	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(mmi)
-	print("  marker posts: %d" % transforms.size())
+	print("  marker posts: %d (%d left out on steep ground)" % [transforms.size(), steep])
+
+
+## Where a marker post stands on `side` of the road at `sp`: on level ground near the road's height,
+## 2m off its edge or, failing that, closer in; null if neither is (a bank, or the foot of the cliff
+## behind the falls, where the verge runs into the rock and the posts stood in its face).
+func _post_spot(sp: Dictionary, side: float) -> Variant:
+	var road_y: float = (sp["pos"] as Vector3).y
+	for lat in [ROAD_HALF + 2.0, ROAD_HALF + 1.2]:
+		var q: Vector3 = (sp["pos"] as Vector3) + (sp["right"] as Vector3) * side * lat
+		var g: float = _ground_at(q.x, q.z)
+		if _slope_at(q.x, q.z) > 0.55 or absf(g - road_y) > 1.5:
+			continue
+		q.y = g + 0.75
+		return q
+	return null
 
 
 ## Every building's footprint must stand on the level pad (every sample within 12cm of the base
