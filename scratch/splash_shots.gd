@@ -4,7 +4,7 @@ extends Node
 # frame rate, so the clock (and the dust, which is simulated per frame) is the same however slowly the
 # shots save:
 #   Godot --path . --resolution 1600x900 --fixed-fps 30 res://scratch/splash_shots.tscn -- <out_dir>
-#       [times=0.5,1.0,2.0,...] [seek=1]
+#       [times=0.5,1.0,2.0,...] [seek=1] [seed=N] [look=x,y]
 # seek=1 jumps the clock to each time instead of playing up to it (quicker; no dust, since it is made
 # as the cars move). bench=1 takes no shots: it plays the title card in real time (leave out --fixed-fps)
 # and prints its frame times.
@@ -17,6 +17,8 @@ func _ready() -> void:
 	var times: Array = [0.4, 0.8, 1.2, 1.6, 2.0, 2.4, 3.0, 4.5, 6.0]
 	var seek := false
 	var bench := false
+	var seed_value := -1
+	var look := Vector2(INF, INF)
 	for a in args.slice(1):
 		if a.begins_with("times="):
 			times = []
@@ -26,10 +28,18 @@ func _ready() -> void:
 			seek = true
 		elif a == "bench=1":
 			bench = true
+		elif a.begins_with("seed="):
+			seed_value = int(a.substr(5))
+		elif a.begins_with("look="):
+			var f := a.substr(5).split(",")
+			look = Vector2(float(f[0]), float(f[1]))
 	var splash: Control = load("res://SplashScreen.tscn").instantiate()
+	splash.random_seed = seed_value
+	splash.look_override = look
 	get_tree().root.add_child.call_deferred(splash)
 	await get_tree().process_frame
 	await get_tree().process_frame
+	print("line-up: %s" % [splash.lineup])
 	if bench:
 		var frame_times: Array[float] = []
 		var last := Time.get_ticks_usec()

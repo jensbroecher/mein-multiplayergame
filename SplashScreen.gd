@@ -1,7 +1,9 @@
 extends Control
 ## The title card the game opens with: the 3D RC VIBE GP logo (generated/logo/RcVibeLogo.tscn) hanging over
-## a polished floor, with five of the cars skidding in below it in their factory paint. Main plays it once
-## a launch, over the menu, and swipes to the menu when it `finished`; any key, click or button skips it.
+## a polished floor, with five of the cars skidding in below it. Which cars, and how each is painted, is drawn
+## afresh at every launch. Main plays it once a launch, over the menu, and swipes to the menu when it
+## `finished`: any key, click or button skips it, and it ends by itself after DURATION. Moving the mouse or a
+## stick shifts the camera a little, so the scene can be looked round.
 ##
 ## It builds itself (SplashScreen.tscn is only the root) in a SubViewport of its own, like the car select
 ## screen's showroom. Every motion is a function of the clock (`_apply(t)`), not a tween, so
@@ -10,15 +12,18 @@ extends Control
 ## arrive missing.
 ##
 ## The stage: z is toward the camera, the floor y = 0. The cars come in on the floor from far away, brake
-## and swing round into place in a clutter of dust; the logo's plates (rim, then body) arrive under them
+## and swing round into place in a clutter of dust; the logo's plates (rim and body) arrive under them
 ## and its letters fly in one by one from the camera's side and land, the last with a hit: the camera
-## jolts, a ring of light spreads over the floor and a highlight sweeps across the letters. Cars and logo
-## also stand mirrored below the floor (`_mirror`), which the floor shows through (splash_floor.gdshader).
+## jolts, a ring of light spreads over the floor and a highlight sweeps across the letters, and again every
+## few seconds while the card holds. Cars and logo also stand mirrored below the floor (`_mirror`), which the
+## floor shows through (splash_floor.gdshader).
 
 signal finished
 
 const LOGO_PATH := "res://generated/logo/RcVibeLogo.tscn"
 const CarPaint = preload("res://CarPaint.gd")
+## The cars to draw from: the car select screen's list.
+const CarSelectionScript = preload("res://CarSelection.gd")
 const SKY_SHADER = preload("res://splash_sky.gdshader")
 const FLOOR_SHADER = preload("res://splash_floor.gdshader")
 const BURST_SHADER = preload("res://splash_burst.gdshader")
@@ -28,7 +33,10 @@ const VIGNETTE_SHADER = preload("res://splash_vignette.gdshader")
 static var played := false
 
 # ---- Timeline (seconds) ----
-const DURATION := 5.9
+## How long the card holds before it ends by itself.
+const DURATION := 20.0
+## The camera's push in takes this long (the rest of the time it only drifts).
+const DOLLY_TIME := 6.5
 const FADE_IN := 0.5
 ## A key in the first moments doesn't skip (it may be the one that started the game).
 const SKIP_AFTER := 0.5
@@ -39,6 +47,17 @@ const T_FACES := 1.2
 const FACE_STAGGER := 0.075
 const FACE_TIME := 0.62
 const T_PROMPT := 2.9
+## The highlight sweeping the letters: how long a pass takes, and how often it comes round.
+const SHEEN_TIME := 1.1
+const SHEEN_EVERY := 4.6
+
+# ---- Looking round ----
+## How far the camera moves for the mouse at the window's edge or a stick pushed right over (metres, across and
+## up), how much of that the point it looks at follows, how fast the view catches up, and the stick's dead zone.
+const LOOK_SHIFT := Vector2(1.0, 0.45)
+const LOOK_TARGET_SHARE := 0.35
+const LOOK_RATE := 3.5
+const STICK_DEADZONE := 0.2
 
 # ---- The logo ----
 const LOGO_POS := Vector3(0.0, 4.9, -8.0)
@@ -48,16 +67,20 @@ const FACE_FLY := 6.5
 const FACE_START_SCALE := 1.7
 
 # ---- The cars ----
-## In the order they arrive. `from` (x, z) is where each comes in from, `to` where it comes to rest, `yaw`
-## the way it ends up facing (degrees: 0 at the camera, positive toward +x), `drift` how far past that its
-## tail swings on the way.
-const CARS := [
-	{"name": "Phantom", "from": Vector2(-26.0, -16.0), "to": Vector2(-5.9, -1.6), "yaw": 24.0, "drift": -16.0, "t0": 0.05},
-	{"name": "Vortex", "from": Vector2(26.0, -15.0), "to": Vector2(6.1, -1.8), "yaw": -24.0, "drift": 16.0, "t0": 0.17},
-	{"name": "Interceptor", "from": Vector2(-10.0, -26.0), "to": Vector2(-3.3, 1.9), "yaw": 18.0, "drift": 22.0, "t0": 0.32},
-	{"name": "Apex", "from": Vector2(10.0, -25.0), "to": Vector2(3.5, 1.7), "yaw": -19.0, "drift": -22.0, "t0": 0.44},
-	{"name": "Inferno", "from": Vector2(0.6, -28.0), "to": Vector2(0.1, 3.4), "yaw": -4.0, "drift": 20.0, "t0": 0.58},
+## The five places, in the order the cars set off. `from` (x, z) is where one comes in from, `to` where it comes
+## to rest, `yaw` the way it ends up facing (degrees: 0 at the camera, positive toward +x), `drift` how far past
+## that its tail swings on the way. Which car takes which place, and its paint, is drawn at every launch
+## (`_pick_cars`).
+const SLOTS := [
+	{"from": Vector2(-26.0, -16.0), "to": Vector2(-5.9, -1.6), "yaw": 24.0, "drift": -16.0, "t0": 0.05},
+	{"from": Vector2(26.0, -15.0), "to": Vector2(6.1, -1.8), "yaw": -24.0, "drift": 16.0, "t0": 0.17},
+	{"from": Vector2(-10.0, -26.0), "to": Vector2(-3.3, 1.9), "yaw": 18.0, "drift": 22.0, "t0": 0.32},
+	{"from": Vector2(10.0, -25.0), "to": Vector2(3.5, 1.7), "yaw": -19.0, "drift": -22.0, "t0": 0.44},
+	{"from": Vector2(0.6, -28.0), "to": Vector2(0.1, 3.4), "yaw": -4.0, "drift": 20.0, "t0": 0.58},
 ]
+## A paint job's body colour has to show against the dark floor, and not be close to one already in the line.
+const MIN_PAINT_LUMINANCE := 0.21
+const PAINT_APART := 0.3
 const CAR_SCALE := 2.0
 const ARRIVE_TIME := 1.5
 ## Per level of the Detail Level setting (MusicManager.grass_quality_index, Off to Ultra): the share of
@@ -65,14 +88,19 @@ const ARRIVE_TIME := 1.5
 const PARTICLES := [0.35, 0.55, 0.8, 1.0, 1.0]
 const MIRROR_FROM := 2
 const WHEELS := ["Wheel_FL", "Wheel_FR", "Wheel_RL", "Wheel_RR"]
-## A wheel's radius in the cars' own frame, for how fast it turns.
-const WHEEL_RADIUS := 0.26
 
 var _t := 0.0
 var _frames := 0
 var _done := false
 ## false: the clock stands still (the screenshot tool sets the time itself).
 var autoplay := true
+## The seed the line-up is drawn with (the screenshot tool's way to see the same one again); under 0, a new
+## one every launch.
+var random_seed := -1
+## Where the view is held, -1 to 1 across and down, instead of following the mouse and the sticks (INF: not).
+var look_override := Vector2(INF, INF)
+## The names of the cars that were drawn, in the order they set off.
+var lineup: Array[String] = []
 
 var _stage: SubViewport
 var _world: Node3D
@@ -88,6 +116,14 @@ var _cars: Array = []
 var _veil: ColorRect
 var _flash: ColorRect
 var _prompt: Label
+## Where the player is looking, -1 to 1 across and down, eased toward `_look_input()`.
+var _look := Vector2.ZERO
+## Where the pointer was the last time it moved, in the window's own coordinates. It only counts once it
+## has moved: it may be anywhere when the card comes up.
+var _mouse_pos := Vector2.ZERO
+var _mouse_moved := false
+## The last value of every pad axis that has moved (axis -> -1 to 1), whichever pad it came from.
+var _axes := {}
 
 
 ## Does the game open with the title card? Once a launch, when Main is the running scene (a test that
@@ -112,11 +148,16 @@ func _ready() -> void:
 		return
 	_build_stage()
 	_build_overlay()
+	Input.joy_connection_changed.connect(_on_joy_connection_changed)
 	_apply(0.0)
 
 
 func _process(delta: float) -> void:
 	_frames += 1
+	if look_override.x != INF:
+		_look = look_override
+	else:
+		_look = _look.lerp(_look_input(), 1.0 - exp(-delta * LOOK_RATE))
 	if _frames <= WARMUP_FRAMES:
 		_apply(0.0)
 		return
@@ -129,6 +170,13 @@ func _process(delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		_mouse_pos = (event as InputEventMouseMotion).position
+		_mouse_moved = true
+		return
+	if event is InputEventJoypadMotion:
+		_axes[event.axis] = event.axis_value
+		return
 	if _done or _t < SKIP_AFTER:
 		return
 	var pressed := false
@@ -139,6 +187,26 @@ func _input(event: InputEvent) -> void:
 	if pressed:
 		get_viewport().set_input_as_handled()
 		finish()
+
+
+## Where the player is looking, -1 to 1 across and down: whichever stick of a pad is pushed furthest past its
+## dead zone, else where the mouse is in the window once it has moved.
+func _look_input() -> Vector2:
+	var stick := Vector2.ZERO
+	for axes in [[JOY_AXIS_RIGHT_X, JOY_AXIS_RIGHT_Y], [JOY_AXIS_LEFT_X, JOY_AXIS_LEFT_Y]]:
+		var v := Vector2(float(_axes.get(axes[0], 0.0)), float(_axes.get(axes[1], 0.0)))
+		if v.length() > stick.length():
+			stick = v
+	if stick.length() > STICK_DEADZONE:
+		return stick.normalized() * clampf((stick.length() - STICK_DEADZONE) / (1.0 - STICK_DEADZONE), 0.0, 1.0)
+	if _mouse_moved:
+		return (_mouse_pos / get_viewport_rect().size * 2.0 - Vector2.ONE).clamp(-Vector2.ONE, Vector2.ONE)
+	return Vector2.ZERO
+
+
+## A pad coming or going: a stick that was pushed over at that moment would otherwise stay so.
+func _on_joy_connection_changed(_device: int, _connected: bool) -> void:
+	_axes.clear()
 
 
 ## Ends the title card (Main takes it from there).
@@ -318,31 +386,91 @@ func _build_logo() -> void:
 	_logo_mat.set_shader_parameter("clearcoat_amount", 0.7)
 
 
+## Five different cars, one for each slot, drawn at random from the game's cars, each with a random paint job
+## (CarPaint.random: any pattern, finish and colours the paint shop has) whose body colour shows against the
+## dark floor and isn't close to one already in the line.
+func _pick_cars() -> Array:
+	var rng := RandomNumberGenerator.new()
+	if random_seed >= 0:
+		rng.seed = random_seed
+	else:
+		rng.randomize()
+	var models: Array = []
+	for preset in CarSelectionScript.CAR_PRESETS:
+		if ResourceLoader.exists(preset["model_path"]):
+			models.append(preset)
+	if models.is_empty():
+		return []
+	for i in range(models.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var swap = models[i]
+		models[i] = models[j]
+		models[j] = swap
+	var picks: Array = []
+	var primaries: Array[Color] = []
+	for i in SLOTS.size():
+		var preset: Dictionary = models[i % models.size()]
+		var paint := _random_paint(rng, preset["name"], primaries)
+		primaries.append(paint["primary"])
+		var pick: Dictionary = (SLOTS[i] as Dictionary).duplicate()
+		pick["name"] = preset["name"]
+		pick["path"] = preset["model_path"]
+		pick["paint"] = paint
+		picks.append(pick)
+	return picks
+
+
+func _random_paint(rng: RandomNumberGenerator, car_name: String, taken: Array[Color]) -> Dictionary:
+	var paint := CarPaint.random(rng, car_name)
+	for attempt in 24:
+		var c: Color = paint["primary"]
+		var fits := c.get_luminance() >= MIN_PAINT_LUMINANCE
+		for t in taken:
+			if Vector3(c.r - t.r, c.g - t.g, c.b - t.b).length() < PAINT_APART:
+				fits = false
+		if fits:
+			break
+		paint = CarPaint.random(rng, car_name)
+	return paint
+
+
 ## Cars and logo go into the world and, again, into the mirror.
 func _build_cars() -> void:
-	for i in CARS.size():
-		var spec: Dictionary = CARS[i]
-		var path := "res://generated/cars/%s.tscn" % spec["name"]
-		var packed := load(path) as PackedScene
+	for spec in _pick_cars():
+		lineup.append(spec["name"])
+		var packed := load(spec["path"]) as PackedScene
 		var pair: Array = []
 		for parent in [_world, _mirror]:
 			var car := packed.instantiate() as Node3D
 			parent.add_child(car)
 			if CarPaint.is_paintable(car):
-				CarPaint.apply(car, CarPaint.factory(spec["name"]))
+				CarPaint.apply(car, spec["paint"])
 			_no_shadow(car, parent == _mirror)
 			pair.append(car)
+		# Every car is its own size. The wheels' radii and places (in the cars' frame, whose metres are the
+		# world's: CAR_SCALE and the model's half scale cancel) say how fast they turn, where the dust comes
+		# from and how big the shadow is.
 		var wheels: Array = []
+		var radii: Array[float] = []
+		var spots: Array[Vector3] = []
 		for w in WHEELS:
-			wheels.append([pair[0].get_node("Model/" + w), pair[1].get_node("Model/" + w)])
+			var twin: Array = [pair[0].get_node("Model/" + w), pair[1].get_node("Model/" + w)]
+			wheels.append(twin)
+			radii.append(maxf((twin[0] as MeshInstance3D).mesh.get_aabb().size.y * 0.5, 0.1))
+			spots.append((twin[0] as Node3D).position)
+		var track := absf(spots[0].x - spots[1].x)
+		var wheelbase := absf(spots[0].z - spots[2].z)
 		var dust := _make_dust()
 		pair[0].add_child(dust)
-		# At the rear axle, on the ground; the car's frame is CAR_SCALE times the world's, so the emitter
-		# is scaled back down to keep the cloud's sizes and speeds in metres.
-		dust.position = Vector3(0.0, 0.05, -0.3)
+		# At the rear axle, on the ground, as wide as the track; the car's frame is CAR_SCALE times the
+		# world's, so the emitter is scaled back down to keep the cloud's sizes and speeds in metres.
+		var axle: Vector3 = (pair[0].get_node("Model") as Node3D).transform * ((spots[2] + spots[3]) * 0.5)
+		dust.position = Vector3(axle.x, 0.04, axle.z)
 		dust.scale = Vector3.ONE / CAR_SCALE
-		_make_blob(pair[0])
-		_cars.append({"spec": spec, "real": pair[0], "mirror": pair[1], "wheels": wheels, "dust": dust, "spin": 0.0, "speed": 0.0})
+		dust.emission_box_extents = Vector3(track * 0.5 + 0.1, 0.04, 0.12)
+		_make_blob(pair[0], Vector2(track + 0.8, wheelbase + 1.2) * 0.5 * 1.25)
+		_cars.append({"spec": spec, "real": pair[0], "mirror": pair[1], "wheels": wheels, "radii": radii,
+			"dust": dust, "rolled": 0.0, "speed": 0.0})
 
 
 ## The mirrored copies cast no shadow (the real ones do).
@@ -400,12 +528,13 @@ func _make_dust() -> CPUParticles3D:
 	return dust
 
 
-## A soft blob of shadow under a car (in the car's own frame, which is CAR_SCALE times the world's).
-func _make_blob(car: Node3D) -> MeshInstance3D:
+## A soft blob of shadow under a car, `size` across and along in the car's own frame (CAR_SCALE times the
+## world's).
+func _make_blob(car: Node3D, size: Vector2) -> MeshInstance3D:
 	var blob := MeshInstance3D.new()
 	blob.name = "Shadow"
 	var quad := PlaneMesh.new()
-	quad.size = Vector2(0.95, 1.55)
+	quad.size = size
 	blob.mesh = quad
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -563,11 +692,13 @@ func _apply_logo(t: float) -> void:
 			mi.visible = u > 0.0
 			mi.transform = face_xf
 			mi.set_instance_shader_parameter("fade", smoothstep(0.0, 0.12, u))
-	# The highlight sweeping the letters, twice.
+	# The highlight sweeping the letters: as the last one lands, and again every SHEEN_EVERY.
 	var sweep := -1.0
-	for start in [landed + 0.05, landed + 2.1]:
-		if t >= start and t <= start + 1.1:
-			sweep = (t - start) / 1.1
+	var pass_time := t - (landed + 0.05)
+	if pass_time >= 0.0:
+		var into := fposmod(pass_time, SHEEN_EVERY)
+		if into <= SHEEN_TIME:
+			sweep = into / SHEEN_TIME
 	_logo_mat.set_shader_parameter("sheen", sweep)
 
 
@@ -605,9 +736,9 @@ func _apply_car(i: int, t: float) -> void:
 	# Front wheels steer into the slide.
 	var steer := deg_to_rad(float(spec["drift"])) * -0.9 * sin(PI * w) if u < 1.0 else 0.0
 	for k in 4:
-		var pair: Array = c["wheels"][k]
-		for node in pair:
-			(node as Node3D).rotation = Vector3(float(c["spin"]), steer if k < 2 else 0.0, 0.0)
+		var angle := -float(c["rolled"]) / float(c["radii"][k])
+		for node in c["wheels"][k]:
+			(node as Node3D).rotation = Vector3(angle, steer if k < 2 else 0.0, 0.0)
 	var dust: CPUParticles3D = c["dust"]
 	dust.emitting = speed > 3.0 and _frames > WARMUP_FRAMES
 	# The dust thrown back off the tyres while running; out to the side of the slide on the brakes.
@@ -615,10 +746,11 @@ func _apply_car(i: int, t: float) -> void:
 	dust.direction = Vector3(side * 0.9, 0.55, -1.0 + 0.9 * smoothstep(0.6, 1.0, u)).normalized()
 
 
-## The wheels turn with the car's speed (the wheel's own frame is the cart's: forward is down the angle).
+## The wheels turn as far as the car has rolled, each by its own radius (a wheel node's frame is the cart's:
+## forward is a falling angle).
 func _spin_wheels(delta: float) -> void:
 	for c in _cars:
-		c["spin"] = float(c["spin"]) - float(c["speed"]) * delta / (WHEEL_RADIUS * CAR_SCALE)
+		c["rolled"] = float(c["rolled"]) + float(c["speed"]) * delta
 
 
 func _apply_floor(t: float) -> void:
@@ -635,8 +767,10 @@ func _apply_floor(t: float) -> void:
 
 
 func _apply_camera(t: float) -> void:
-	# A slow push in with a drift across, low, looking up at the logo.
-	var k := smoothstep(0.0, DURATION, t)
+	# A push in over DOLLY_TIME with a drift across, low, looking up at the logo; after it the camera only
+	# breathes, so the long hold is never still.
+	var k := smoothstep(0.0, DOLLY_TIME, t)
+	var breathe := Vector3(sin(t * 0.43) * 0.22, sin(t * 0.31) * 0.07, 0.0) * k
 	# Each letter that lands knocks the camera a little, the last one hard; it settles in a moment.
 	var jolt := 0.0
 	for i in _faces.size():
@@ -644,8 +778,11 @@ func _apply_camera(t: float) -> void:
 		if since >= 0.0:
 			jolt += (0.22 if i == _faces.size() - 1 else 0.035) * exp(-since * 7.0)
 	var shake := Vector3(sin(t * 61.0), cos(t * 53.0) * 0.8, sin(t * 47.0 + 1.0) * 0.5) * jolt
-	var pos := Vector3(lerpf(-1.0, 0.7, k), lerpf(1.6, 1.95, k), lerpf(16.5, 14.6, k)) + shake
-	var target := Vector3(0.0, lerpf(2.9, 3.2, k), -6.0) + shake * 0.4
+	# Where the player looks moves the camera that way, and the point it looks at part as far: the near
+	# things shift against the far ones (the cars against the logo) and the logo stays in frame.
+	var look := Vector3(_look.x * LOOK_SHIFT.x, -_look.y * LOOK_SHIFT.y, 0.0)
+	var pos := Vector3(lerpf(-1.0, 0.7, k), lerpf(1.6, 1.95, k), lerpf(16.5, 14.6, k)) + shake + breathe + look
+	var target := Vector3(0.0, lerpf(2.9, 3.2, k), -6.0) + shake * 0.4 + look * LOOK_TARGET_SHARE
 	_camera.look_at_from_position(pos, target, Vector3.UP)
 
 

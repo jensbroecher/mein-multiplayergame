@@ -5,7 +5,7 @@ extends SceneTree
 # swipe to the menu. Run windowed:
 #   Godot --path . --resolution 1600x900 -s res://scratch/splash_flow_test.gd -- <out_dir> [key=3.0]
 # key=<seconds> presses a key then (seconds since Main is running); key=-1 lets the card play to its end
-# (it takes about 7 seconds).
+# (it takes about 21 seconds).
 var _out := ""
 var _key_at := 3.0
 var _start := 0
@@ -70,7 +70,7 @@ func _process(_delta: float) -> bool:
 		_save("flow_menu")
 		print("splash gone at %.2fs, menu up at %.2fs: %s" % [_splash_gone_at, _menu_seen_at, "ok" if menu.visible else "MENU NOT VISIBLE"])
 		return true
-	if t > 16.0:
+	if t > 30.0:
 		print("TIMEOUT: the card never gave way to the menu")
 		return true
 	return false

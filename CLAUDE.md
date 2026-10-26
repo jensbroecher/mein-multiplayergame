@@ -567,9 +567,25 @@ Godot --headless --path . res://regenerate_logo.tscn                         # L
   function of the clock: `seek(t)` jumps anywhere. Main plays it once a launch (`should_play`: not when
   headless, not with `nosplash` as a user arg, and only when Main is the *running scene*, so the tests that
   instantiate Main from their own scene never see it), on a CanvasLayer at 105, under the swipe (120) that takes
-  it away, with the menu hidden behind it; any key, click or button skips it after half a second. It follows
-  the player's settings: `MusicManager.anti_aliasing`, shadows, and the Detail Level (the floor's mirror from
-  Medium, particles thinned below).
+  it away, with the menu hidden behind it. It holds for `DURATION` (20s) and then ends by itself; any key, click
+  or button skips it after half a second. The camera's push in takes `DOLLY_TIME` (6.5s), after that it only
+  breathes, and the highlight sweeps the letters every `SHEEN_EVERY`, so the long hold is never still. It
+  follows the player's settings: `MusicManager.anti_aliasing`, shadows, and the Detail Level (the floor's mirror
+  from Medium, particles thinned below).
+  - Looking round: the mouse, or the stick of a pad pushed furthest past `STICK_DEADZONE`, moves the camera
+    toward where it points by `LOOK_SHIFT` metres, and the point it looks at `LOOK_TARGET_SHARE` as far, so the
+    cars shift against the logo and the logo stays in frame; it eases there at `LOOK_RATE`. Both are read from
+    the *events* (`_mouse_pos`, `_axes`), not polled: the pointer's place only counts once it has moved (it may
+    be anywhere when the card comes up), a pad coming or going clears the sticks, and a test can drive it. Mouse
+    events reach `_input` in the window's canvas coordinates (an injected event is read as window pixels and
+    scaled by the stretch transform, like the real one: send `root.get_final_transform() * canvas_pos`).
+  - The cars are drawn afresh at every launch (`_pick_cars`): five distinct models from `CarSelection.CAR_PRESETS`
+    (the car select list, so a new car turns up here by itself) into the five `SLOTS`, each with a
+    `CarPaint.random` paint job whose body colour is bright enough for the dark floor (`MIN_PAINT_LUMINANCE`)
+    and not close to one already in the line (`PAINT_APART`). Cars differ in size, so what depends on it is
+    read off each: a wheel's radius from its mesh (the cars' frame is the world's in metres: `CAR_SCALE` and the
+    model's half scale cancel), the dust from the rear axle as wide as the track, the shadow from the track and
+    wheelbase. `random_seed` fixes the draw, `lineup` says what was drawn.
   - The floor is a transparent plane, and the cars and logo stand again below it upside down (`_mirror`, the
     same transforms): `splash_floor.gdshader` reads the depth texture and is see-through where it hides
     something, by how far below the floor that thing is, so a reflection fades away from its contact.
@@ -579,14 +595,18 @@ Godot --headless --path . res://regenerate_logo.tscn                         # L
     `render_priority`: burst -3, floor 0, shadow blobs 1, dust 2, sparks 3); the sky's sun glow at `pow(s, 30)`
     covered half the view and the warm and cool soft boxes the floor reflected must stay above the low parts
     of the sky.
-  - The cars are `generated/cars/<Name>.tscn` at `CAR_SCALE` 2 (PlayerCart's x2) in factory paint, facing +z
-    at yaw 0; a wheel node turns about its own x (forward is a falling angle) and steers about y. The dust
-    emitter sits at the rear axle and is scaled by 1/`CAR_SCALE`, or the cloud's sizes and speeds double.
-  - `res://scratch/splash_shots.tscn -- <dir> [times=0.5,1.0,...] [seek=1]` (windowed, with `--fixed-fps 30`
-    so the clock and the dust are the same however slowly the shots save) photographs it; `bench=1` (without
+  - The cars are `generated/cars/<Name>.tscn` at `CAR_SCALE` 2 (PlayerCart's x2), facing +z at yaw 0; a
+    wheel node turns about its own x (forward is a falling angle, by the distance rolled over the wheel's
+    radius) and steers about y. The dust emitter is scaled by 1/`CAR_SCALE`, or the cloud's sizes and speeds
+    double.
+  - `res://scratch/splash_shots.tscn -- <dir> [times=0.5,1.0,...] [seek=1] [seed=N] [look=x,y]` (windowed, with
+    `--fixed-fps 30` so the clock and the dust are the same however slowly the shots save) photographs it, with
+    the line-up of that seed and the view held as if the mouse stood at (x, y); `bench=1` (without
     `--fixed-fps`) prints its frame times (60 fps on an M1 at 1920x1080). `res://scratch/splash_flow_test.gd`
     (`-s`, windowed, `-- <dir> [key=3.0 | key=-1] [nosplash]`) plays the real start-up and checks the hand-over
-    to the menu; `res://scratch/car_lineup.gd` photographs the cars in factory paint.
+    to the menu (`key=-1` waits out the 20s); `res://scratch/splash_input_test.gd` (`-s`, windowed) drives the
+    mouse, a stick and a pad button through the real start-up; `res://scratch/car_lineup.gd` photographs the
+    cars in factory paint.
 - The engine's own boot image (`application/boot_splash/image`, shown while the project initialises, before
   Main exists) is `images/logo_black_bg.png`, with `boot_splash/bg_color` black to match its background so a
   window of another shape gets no grey bars. It has to be a PNG: Godot 4.8 logs "The only supported format is
