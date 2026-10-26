@@ -463,35 +463,40 @@ var camera_look_at: Vector3 = Vector3.ZERO
 var camera_clip_distance_mult: float = 1.0
 var camera_clip_distance_mult_iso: float = 1.0
 ## Loaded from MusicManager so stage changes keep the player's camera choice.
-## The top-down race camera (is_isometric; it used to be an isometric view): a fixed offset in world
-## axes, not turning with the cart, high and steep enough to see well down the track, and its lens.
+## The High race camera (is_isometric, CameraMode.TOP_DOWN; it used to be an isometric view): a fixed
+## offset in world axes, not turning with the cart, about 45 degrees down, and its lens. In the menus
+## the High Chase camera is "Chase" and the follower "Close".
 var is_isometric: bool = false
-const TOPDOWN_OFFSET := Vector3(-22.0, 48.0, 22.0)
+const TOPDOWN_OFFSET := Vector3(-30.0, 42.0, 30.0)
 const TOPDOWN_FOV := 44.0
-## The Top Down view never turns: it looks along TOPDOWN_OFFSET at a point led ahead of the cart, so a
-## corner slides the picture instead of swinging it. The lead is the travel direction times the speed
-## (TOPDOWN_LEAD_TIME, at most TOPDOWN_LEAD_MAX metres), eased by a critically damped spring of
-## TOPDOWN_LEAD_RATE (1/s): a hairpin swings it round over a second or two. It used to aim 11-24m along
-## the nose, which whipped round with every steering input.
-const TOPDOWN_LEAD_TIME := 0.25
-const TOPDOWN_LEAD_MAX := 11.0
+## The High view never turns: it looks along TOPDOWN_OFFSET at a point led ahead of the cart along its
+## travel, so the cart rides in the far corner of the frame from where it is heading and the road ahead
+## fills the rest. The lead is TOPDOWN_LEAD_BASE (at rest, along the nose) plus the speed times
+## TOPDOWN_LEAD_TIME, at most TOPDOWN_LEAD_MAX metres, and is scaled down until the cart stays inside
+## TOPDOWN_CAR_FRAME of the frame (a share of its half width and half height from the middle). A critically
+## damped spring of TOPDOWN_LEAD_RATE (1/s) eases it, so a hairpin slides the cart across the frame over a
+## second or two. It used to aim 11-24m along the nose, which whipped round with every steering input.
+const TOPDOWN_LEAD_TIME := 0.5
+const TOPDOWN_LEAD_MAX := 40.0
+const TOPDOWN_LEAD_BASE := 12.0
 const TOPDOWN_LEAD_RATE := 1.3
+const TOPDOWN_CAR_FRAME := Vector2(0.55, 0.55)
 var _topdown_lead := Vector3.ZERO
 var _topdown_lead_vel := Vector3.ZERO
-## The High Chase camera (MusicManager's default): behind and above the cart, about 36 degrees down,
+## The High Chase camera (MusicManager's default): behind and above the cart, about 35 degrees down,
 ## its heading turning after the cart's direction of travel on a critically damped spring with a
 ## capped rate, so a corner is a gentle pan that eases in and out, not the swing of a look-ahead.
 ## Both are raised cameras: the plants and rocks between them and the cart thin out
 ## (camera_xray.gdshaderinc). It rides at the checkpoint trusses' and the start gantry's height, so
 ## those dissolve near a camera (CheckpointGate's CAMERA_FADE_*).
 var is_high_chase: bool = true
-const CHASE_BACK := 11.0
-const CHASE_UP := 8.0
+const CHASE_BACK := 14.0
+const CHASE_UP := 10.0
 const CHASE_FOV := 62.0
-const CHASE_LOOK_AHEAD := 6.0
+const CHASE_LOOK_AHEAD := 7.0
 ## The chase heading's spring (rad/s natural frequency), and the most it turns (rad/s).
-const CHASE_YAW_RATE := 3.0
-const CHASE_YAW_MAX := 1.2
+const CHASE_YAW_RATE := 4.5
+const CHASE_YAW_MAX := 2.2
 ## How fast the camera's height follows the cart's, so bumps don't shake the view, and how far the
 ## cart may rise above or drop below it before the camera is dragged along.
 const CHASE_Y_RATE := 2.0
@@ -502,7 +507,7 @@ const CHASE_Y_ABOVE := 2.0
 const RAISED_CAM_PULL_RATE := 6.0
 const RAISED_CAM_RELEASE_RATE := 1.5
 ## Radius (m) of the see-through tube round the line to the cart, per raised camera.
-const XRAY_RADIUS_CHASE := 2.6
+const XRAY_RADIUS_CHASE := 3.0
 const XRAY_RADIUS_TOPDOWN := 5.0
 var _chase_yaw: float = NAN
 var _chase_yaw_vel: float = 0.0
@@ -7413,18 +7418,50 @@ func _update_chase_heading(delta: float) -> void:
 	_chase_y = clampf(_chase_y, car_y - CHASE_Y_ABOVE, car_y + CHASE_Y_BELOW)
 
 
-## Eases the Top Down view's lead toward the cart's travel times its speed (see TOPDOWN_LEAD_TIME)
-## on a critically damped spring. Slow or reversing, the lead shrinks back toward the cart.
+## Eases the High view's lead on a critically damped spring toward TOPDOWN_LEAD_BASE plus the cart's
+## speed along its travel (the way it is rolling when it's moving forward, else its nose; see
+## TOPDOWN_LEAD_TIME), fitted to the frame (_fit_topdown_lead).
 func _update_topdown_lead(delta: float) -> void:
 	var dt: float = minf(delta, 0.05)
 	var vel := Vector3(linear_velocity.x, 0.0, linear_velocity.z)
-	var lead_max: float = TOPDOWN_LEAD_MAX * (0.4 if splitscreen_camera != null else 1.0)
-	var want: Vector3 = vel * TOPDOWN_LEAD_TIME
-	if want.length() > lead_max:
-		want = want.normalized() * lead_max
+	var nose: Vector3 = -visuals.global_transform.basis.z
+	nose.y = 0.0
+	var dir: Vector3 = nose.normalized() if nose.length_squared() > 0.0001 else Vector3.FORWARD
+	if vel.length() > 4.0 and vel.normalized().dot(dir) > 0.2:
+		dir = vel.normalized()
+	var ahead: float = minf(TOPDOWN_LEAD_BASE + maxf(vel.dot(dir), 0.0) * TOPDOWN_LEAD_TIME, TOPDOWN_LEAD_MAX)
+	var want: Vector3 = _fit_topdown_lead(dir * ahead)
 	var w: float = TOPDOWN_LEAD_RATE
 	_topdown_lead_vel += (w * w * (want - _topdown_lead) - 2.0 * w * _topdown_lead_vel) * dt
-	_topdown_lead += _topdown_lead_vel * dt
+	_topdown_lead = _fit_topdown_lead(_topdown_lead + _topdown_lead_vel * dt)
+
+
+## Scales a lead down until the cart, which stands `lead` behind the point the view looks at, is inside
+## TOPDOWN_CAR_FRAME of the frame. Worked out for the view's own lens and the viewport's shape (a
+## split-screen half is narrower), so it holds at any speed or direction of travel: the lead pulls the
+## cart toward the near edge, and past the frame's edge it would be out of sight.
+func _fit_topdown_lead(lead: Vector3) -> Vector3:
+	var o: Vector3 = TOPDOWN_OFFSET
+	var fwd: Vector3 = -o.normalized()
+	var right: Vector3 = fwd.cross(Vector3.UP).normalized()
+	var up: Vector3 = right.cross(fwd)
+	var view_cam: Camera3D = splitscreen_camera if splitscreen_camera != null and is_instance_valid(splitscreen_camera) else camera
+	var size: Vector2 = view_cam.get_viewport().get_visible_rect().size
+	if size.x < 1.0 or size.y < 1.0:
+		size = Vector2(16.0, 9.0)
+	var tan_half: float = tan(deg_to_rad(TOPDOWN_FOV) * 0.5)
+	var dist: float = o.length()
+	# The cart sits at depth dist - k * lead.fwd and k * lead.right (up) sideways (upward) of the view's
+	# axis, so its frame position is k * a / (dist - k * b). Solve each limit for the largest k.
+	var b: float = lead.dot(fwd)
+	var k: float = 1.0
+	for axis in 2:
+		var a: float = absf(lead.dot(right)) / (tan_half * size.x / maxf(size.y, 1.0)) if axis == 0 else absf(lead.dot(up)) / tan_half
+		var limit: float = TOPDOWN_CAR_FRAME[axis]
+		var denom: float = a + limit * b
+		if denom > 0.0001:
+			k = minf(k, limit * dist / denom)
+	return lead * k
 
 
 ## Feeds camera_xray.gdshaderinc: this player's camera and cart, so the plants and rocks between

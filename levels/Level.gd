@@ -88,6 +88,11 @@ const MISS_DISTANCE := 14.0
 ## A step along the racing line longer than this in one frame is a re-sync (a respawn, a jump
 ## back onto the track), not driving.
 const MISS_MAX_STEP := 40.0
+## When a skipped gate is only noticed on reaching the next one, its call waits for that gate's own call.
+const SKIPPED_GATE_VOICE_DELAY := 1.4
+## ...and only counts if the cart's nearest point on the lap is within this of the gate's, so a gate where
+## the lap crosses itself isn't taken for skipped on the first pass over the crossing.
+const SKIPPED_GATE_REACH := 40.0
 ## A human driving against the lap (their velocity along the racing line under -WRONG_WAY_DOT of
 ## their speed, above WRONG_WAY_SPEED) for WRONG_WAY_TIME is told so, and again every
 ## WRONG_WAY_REPEAT while it lasts. Checked WRONG_WAY_STEP apart.
@@ -117,6 +122,12 @@ var end_timer = 0.0
 var next_finish_pos: int = 1
 
 var cp_offsets: Array[float] = []
+## How far (m) off the racing line a human is still followed along it, for the missed-gate watch. The
+## tracker gives up on a cart further out than the AI's 28m and it never found the line again, so a cut
+## round a gate across the grass 30m out meant no call and no credit for any gate after. Past this the
+## watch loses the line too, and reaching the gate after the one still needed (`_count_skipped_gate`)
+## says the one in between was missed.
+var miss_track_reach: float = 150.0
 var track_length: float = 0.0
 ## When the lights went green (ticks msec), the start of everyone's first lap.
 var _race_go_msec := 0
@@ -360,7 +371,30 @@ func _on_checkpoint_entered(body: Node3D, cp_idx: int):
 		return
 	var id = body.name.to_int()
 	if id > 0 and player_stats.has(id):
+		_count_skipped_gate(id, cp_idx)
 		_grant_checkpoint(id, cp_idx)
+
+
+## A human reached the gate after the one they still need: they went round the one in between and the
+## racing-line watch didn't see it (a detour too wide to follow, or a jump onto another stretch of road). It is
+## the one gate they may miss, so it counts as missed now and this gate counts for them.
+func _count_skipped_gate(id: int, cp_idx: int) -> void:
+	if not multiplayer.is_server() or checkpoints.size() < 2:
+		return
+	var stats: Dictionary = player_stats[id]
+	var cart = players_container.get_node_or_null(str(id))
+	if stats["finished"] or stats.get("disqualified", false) or cart == null or cart.get("is_ai"):
+		return
+	var next_idx: int = stats["next_checkpoint_idx"]
+	if cp_idx == next_idx or cp_idx != (next_idx + 1) % checkpoints.size() or int(stats.get("missed_idx", -1)) == next_idx:
+		return
+	if track_path == null or track_path.curve == null or cp_idx >= cp_offsets.size():
+		return
+	var t_len := maxf(track_length, 1.0)
+	var near: float = track_path.curve.get_closest_offset(track_path.to_local(cart.global_position))
+	if absf(fposmod(near - cp_offsets[cp_idx] + t_len * 0.5, t_len) - t_len * 0.5) > SKIPPED_GATE_REACH:
+		return
+	_checkpoint_missed(id, next_idx, SKIPPED_GATE_VOICE_DELAY)
 
 
 func _grant_checkpoint(id: int, cp_idx: int) -> void:
@@ -422,7 +456,7 @@ func _crossed_curve_offset(prev_off: float, now_off: float, target_off: float, t
 	return to_target > 0.05 and to_target <= moved + 1.5
 
 
-func _track_cart_curve_offset(cart: Node3D, stats: Dictionary) -> float:
+func _track_cart_curve_offset(cart: Node3D, stats: Dictionary, reach: float = 28.0) -> float:
 	if track_path == null or track_path.curve == null:
 		return 0.0
 	var curve: Curve3D = track_path.curve
@@ -456,7 +490,7 @@ func _track_cart_curve_offset(cart: Node3D, stats: Dictionary) -> float:
 	var dx: float = cart.global_position.x - world_pt.x
 	var dz: float = cart.global_position.z - world_pt.z
 	# Off in the hills: freeze the racing-line offset so later gates aren't credited.
-	if dx * dx + dz * dz > 28.0 * 28.0:
+	if dx * dx + dz * dz > reach * reach:
 		return last
 	stats["path_off"] = best
 	return best
@@ -551,7 +585,10 @@ func _play_lap_cue(cue: int, ui) -> void:
 
 ## A human drove on past a gate without being counted for it (server): the announcer tells them.
 ## Every peer's own player hears it (split screen has one speaker for both).
-func _announce_missed_checkpoint(id: int) -> void:
+func _announce_missed_checkpoint(id: int, delay: float = 0.0) -> void:
+	if delay > 0.0:
+		get_tree().create_timer(delay).timeout.connect(_announce_missed_checkpoint.bind(id))
+		return
 	if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP or id == multiplayer.get_unique_id():
 		_play_checkpoint_missed()
 	else:
@@ -963,7 +1000,7 @@ func _watch_missed_checkpoints() -> void:
 			stats["path_off"] = -1.0
 			continue
 		var prev_off: float = float(stats.get("path_off", -1.0))
-		var now_off := _track_cart_curve_offset(cart, stats)
+		var now_off := _track_cart_curve_offset(cart, stats, miss_track_reach)
 		var next_idx: int = stats["next_checkpoint_idx"]
 		if prev_off < 0.0 or next_idx >= cp_offsets.size() or int(stats.get("missed_idx", -1)) == next_idx:
 			continue
@@ -977,13 +1014,13 @@ func _watch_missed_checkpoints() -> void:
 ## announcer says so and the gate after it is the one they need now. Missing that one too, two in a
 ## row, disqualifies them. The line on the last lap can't be skipped: they have to go back for it.
 ## A lap with a missed gate can't be a lap record.
-func _checkpoint_missed(id: int, idx: int) -> void:
+func _checkpoint_missed(id: int, idx: int, voice_delay: float = 0.0) -> void:
 	var stats: Dictionary = player_stats[id]
 	stats["missed_idx"] = idx
 	if int(stats.get("missed_run", 0)) >= 1:
 		_disqualify(id)
 		return
-	_announce_missed_checkpoint(id)
+	_announce_missed_checkpoint(id, voice_delay)
 	if idx == checkpoints.size() - 1 and stats["laps"] + 1 >= NetworkManager.max_laps:
 		return
 	stats["missed_run"] = 1

@@ -391,7 +391,7 @@ func _build_gameplay_page() -> Control:
 	var scroll := _make_scroll_page()
 	var body := _make_page_body(scroll)
 	_add_section_title(body, "CAMERA")
-	_add_hint(body, "Top Down looks down on the track from high above. Follower sits behind the cart.")
+	_add_hint(body, "Chase follows from behind and above. High looks down on the track from high above. Close sits just behind the cart.")
 	option_camera_mode = _add_option_row(body, "Race Camera")
 	for mode_name in MusicManager.CAMERA_MODE_NAMES:
 		option_camera_mode.add_item(mode_name)

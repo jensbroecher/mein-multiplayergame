@@ -343,6 +343,17 @@ first to third (`_announce_place`). The podium calls each place as it's revealed
   credit does, and fires as the cart passes `MISS_DISTANCE` (14m; a gate's area is 8m deep) beyond the
   gate. A step along the line over `MISS_MAX_STEP` is a re-sync, not driving (a respawn resets the line).
   Bots don't hear it: they are credited by progress.
+  - The racing-line tracker (`_track_cart_curve_offset`) stops following a cart further than `reach` from
+    the line and holds its last value (the AI's gate credit wants that: 28m). For humans the watch passes
+    `miss_track_reach` (150m): at 28m a wide cut round a gate across the grass lost the line for good (30m
+    out was enough; nothing re-found it but a respawn), so there was no call, and the gate after never
+    counted because the lap still needed the skipped one. A respawn then put them two gates back.
+  - Whatever the tracker says, reaching the gate after the one still needed counts the gate between as the
+    one missed (`_count_skipped_gate`, from `_on_checkpoint_entered`, server): `_checkpoint_missed` runs, the
+    reached gate counts, and the call waits `SKIPPED_GATE_VOICE_DELAY` (1.4s) for that gate's own. It only
+    counts when the cart's nearest point on the lap is within `SKIPPED_GATE_REACH` (40m) of the gate, so a
+    gate where the lap crosses itself isn't taken for skipped on the first pass over the crossing. No two
+    gates on any level are closer than 53m.
 - One gate may be missed (`_checkpoint_missed`): the gate after it becomes the one they need, so catching
   it keeps them in the race. Missing that one too, two in a row, disqualifies them (`_disqualify`: the
   "disqualified" call, the cart drives itself as after the finish, it ranks last as DQ and scores nothing).
@@ -356,7 +367,14 @@ first to third (`_announce_place`). The podium calls each place as it's revealed
 - `res://scratch/announcer_test.tscn` (headless) walks a player through every gate and lists what was
   said. `res://scratch/missed_checkpoint_test.tscn -- [level] [skip=N]` drives a cart along the line past
   all gates but one (16m wide of its area): the call, the lap still counted, then the wrong way, then two
-  gates missed in a row (disqualified). `skip=-1` is a clean lap, which must say nothing.
+  gates missed in a row (disqualified). `skip=-1` is a clean lap, which must say nothing. It moves the cart
+  a few metres a frame exactly along the line, which is why it never saw the wide-detour failure.
+  `res://scratch/human_skip_test.tscn -- [level=] [skip=1] [aside=30] [span=30] [reach=]` (headless) drives
+  a real, non-AI cart with the throttle and steering actions, `aside` metres off the line (negative: left)
+  round one gate, and prints PASS or FAIL: the call heard once, the lap needing the gate three on. A run in
+  which the cart respawns (Lakeside's lakes beside gate 2) is INVALID, so try it on open ground (Mara
+  Crossing, `skip=1`: 29m and further failed before the fix, 16m passed). `reach=5` makes the watch lose the
+  line at once, to try the reached-the-next-gate fallback alone.
 
 ## Water edges against what stands in front
 
@@ -1323,23 +1341,34 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 ## Race cameras
 
 - Three modes (`MusicManager.CameraMode`, the menus' order), cycled with C and saved as `camera_mode` (an old
-  `use_isometric_camera` = false loads as Follower, true as High Chase):
-  - High Chase (`is_high_chase`, the default): `CHASE_BACK` 11m behind and `CHASE_UP` 8m over the cart
-    (about 36 degrees down to it, the horizon still in the frame's top), lens `CHASE_FOV`, a boost widening it
+  `use_isometric_camera` = false loads as Follower, true as High Chase). The menus call them Chase, High and
+  Close (`CAMERA_MODE_NAMES`); the code keeps High Chase / Top Down (`is_isometric`) / Follower:
+  - High Chase (`is_high_chase`, the default): `CHASE_BACK` 14m behind and `CHASE_UP` 10m over the cart
+    (about 35 degrees down to it, the horizon still in the frame's top), lens `CHASE_FOV`, a boost widening it
     only 2-3 degrees. Its heading (`_chase_yaw`, `_update_chase_heading`) follows the cart's velocity (its nose
-    when slow or reversing) on a critically damped spring (`CHASE_YAW_RATE`, turn rate capped at
-    `CHASE_YAW_MAX`), so a pan eases in and out; easing the angle itself started and stopped the turn at once.
+    when slow or reversing) on a critically damped spring (`CHASE_YAW_RATE` 4.5, turn rate capped at
+    `CHASE_YAW_MAX` 2.2 rad/s: it was 3.0 and 1.2 and the user found it too slow in corners), so a pan eases
+    in and out; easing the angle itself started and stopped the turn at once.
     The camera's position and aim are both eased at the same rate from the same smoothed point, so the view
     turns only with that heading, never with the cart's wobbles. Its height eases after the cart's
     (`CHASE_Y_RATE`, within `CHASE_Y_ABOVE`/`CHASE_Y_BELOW`). It rides at the checkpoint trusses' and start
     gantry's height (it used to stay under the banners at 5.4m, which the user found too low): the gates'
     materials, the banner text and the gantry's LED screen dissolve within `CheckpointGate.CAMERA_FADE_*` (2-5m)
     of a camera (pixel dither, still opaque).
-  - Top Down (`is_isometric`) sits at `TOPDOWN_OFFSET` (-22, 48, 22) in world axes, about 57 degrees down, with
-    a 44 degree lens (`TOPDOWN_FOV`). It never turns: it looks along the offset at a point led ahead of the
-    cart by its velocity (`_update_topdown_lead`: `TOPDOWN_LEAD_TIME` x speed, at most `TOPDOWN_LEAD_MAX`,
-    eased by a critically damped spring `TOPDOWN_LEAD_RATE`), so a corner slides the picture over a second or
-    two. It used to aim 11-24m along the nose, which swung the view with every steering input.
+  - Top Down (`is_isometric`, "High" in the menus) sits at `TOPDOWN_OFFSET` (-30, 42, 30) in world axes, about
+    45 degrees down (68 had been too steep to read as a view of the road), with a 44 degree lens
+    (`TOPDOWN_FOV`). It never turns: it looks along the offset at a point led ahead of the cart along its
+    travel (`_update_topdown_lead`: `TOPDOWN_LEAD_BASE` 12m along the velocity, else the nose, plus
+    `TOPDOWN_LEAD_TIME` x speed, at most `TOPDOWN_LEAD_MAX`, eased by a critically damped spring
+    `TOPDOWN_LEAD_RATE`), so the car rides toward the far side of the frame from where it is heading and
+    the road ahead fills the rest. `_fit_topdown_lead` scales the lead down until the car stays within
+    `TOPDOWN_CAR_FRAME` (0.55) of the half width and half height from the middle, worked out from the lens,
+    the viewport's shape (a split-screen half is narrower: `scratch/coop_high_cam_check.tscn`) and the
+    perspective (a lead toward the view's depth brings the car nearer the camera). The first version led
+    along the road with no limit and a cut across the view put the car out of the frame (1.5 half widths
+    out); the second, depth-only, kept the car centred sideways, which the user said "still centres the car".
+    A corner slides the car across the frame over a second or two (95th percentile 0.3 half-screens a
+    second). It used to aim 11-24m along the nose, which swung the view with every steering input.
   - Both made the user dizzy before these changes (motion comfort matters here): terrain pulling a raised
     camera in now eases in at `RAISED_CAM_PULL_RATE` and out at `RAISED_CAM_RELEASE_RATE`, not a 15/s snap.
     `res://scratch/race_cam_motion_probe.tscn -- [level=] [mode=chase|top|follow] [cart=0] [seconds=60]`

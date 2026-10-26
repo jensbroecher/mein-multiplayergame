@@ -56,11 +56,12 @@ var scaling_3d_mode_index: int = 0
 var fsr_sharpness: float = 0.2
 var anisotropic_index: int = 1 # 0:Off 1:2x 2:4x 3:8x 4:16x
 var max_fps_index: int = 1 # 0:30 1:60 2:120 3:Unlimited
-## The race camera, remembered across stages and sessions, in the menus' order: High Chase (behind
-## and above the cart, turning slowly; the default), Top Down (high, fixed to world axes) and Follower
-## (close behind the cart).
+## The race camera, remembered across stages and sessions, in the menus' order: Chase (behind and
+## above the cart, turning slowly; the default; HIGH_CHASE), High (steeply down from high above, fixed
+## to world axes; TOP_DOWN) and Close (just behind the cart; FOLLOWER). The enum keeps its old names,
+## and the saved values their numbers.
 enum CameraMode { HIGH_CHASE, TOP_DOWN, FOLLOWER }
-const CAMERA_MODE_NAMES := ["High Chase", "Top Down", "Follower"]
+const CAMERA_MODE_NAMES := ["Chase", "High", "Close"]
 var camera_mode: int = CameraMode.HIGH_CHASE
 
 signal camera_mode_changed(mode: int)
