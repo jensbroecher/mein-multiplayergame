@@ -46,10 +46,26 @@ const T_PLATE := 0.85
 const T_FACES := 1.2
 const FACE_STAGGER := 0.075
 const FACE_TIME := 0.62
+## When the announcer line plays (splash_1..3.wav).
+const T_VOICE := 1.2
 const T_PROMPT := 2.9
 ## The highlight sweeping the letters: how long a pass takes, and how often it comes round.
 const SHEEN_TIME := 1.1
 const SHEEN_EVERY := 4.6
+
+# ---- Audio ----
+const VOICE_TAKES := [
+	preload("res://voice/lola/splash_1.wav"),
+	preload("res://voice/lola/splash_2.wav"),
+	preload("res://voice/lola/splash_3.wav"),
+]
+const SWOOSH_SOUNDS := [
+	preload("res://sounds/letter_swoosh_1.wav"),
+	preload("res://sounds/letter_swoosh_2.wav"),
+	preload("res://sounds/letter_swoosh_3.wav"),
+]
+const VOICE_VOLUME_DB := 0.0
+const SWOOSH_VOLUME_DB := -11.0
 
 # ---- Looking round ----
 ## How far the camera moves for the mouse at the window's edge or a stick pushed right over (metres, across and
@@ -124,6 +140,11 @@ var _mouse_pos := Vector2.ZERO
 var _mouse_moved := false
 ## The last value of every pad axis that has moved (axis -> -1 to 1), whichever pad it came from.
 var _axes := {}
+var _voice_player: AudioStreamPlayer
+var _picked_voice: AudioStream
+var _voice_played := false
+var _swoosh_players: Array[AudioStreamPlayer] = []
+var _swooshes_played: Array[bool] = []
 
 
 ## Does the game open with the title card? Once a launch, when Main is the running scene (a test that
@@ -148,6 +169,7 @@ func _ready() -> void:
 		return
 	_build_stage()
 	_build_overlay()
+	_build_audio()
 	Input.joy_connection_changed.connect(_on_joy_connection_changed)
 	_apply(0.0)
 
@@ -163,6 +185,7 @@ func _process(delta: float) -> void:
 		return
 	if autoplay:
 		_t += delta
+		_update_audio(_t)
 	_apply(_t)
 	_spin_wheels(delta)
 	if _t >= DURATION:
@@ -214,12 +237,14 @@ func finish() -> void:
 	if _done:
 		return
 	_done = true
+	_stop_audio()
 	finished.emit()
 
 
 ## Jumps the clock to `t` seconds (the screenshot tool's way in); the clock stays there.
 func seek(t: float) -> void:
 	autoplay = false
+	_stop_audio()
 	_frames = WARMUP_FRAMES + 1
 	_t = t
 	_apply(t)
@@ -382,6 +407,8 @@ func _build_logo() -> void:
 	var mirror_faces: Node = pivots[1][1].get_node("Faces")
 	for face in real_faces.get_children():
 		_faces.append({"real": face, "mirror": mirror_faces.get_node(NodePath(face.name)), "home": (face as Node3D).position})
+	_swooshes_played.resize(_faces.size())
+	_swooshes_played.fill(false)
 	_logo_mat = (_plates[0]["real"].mesh as Mesh).surface_get_material(0) as ShaderMaterial
 	_logo_mat.set_shader_parameter("clearcoat_amount", 0.7)
 
@@ -641,6 +668,78 @@ func _build_overlay() -> void:
 	_prompt.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_prompt.modulate.a = 0.0
 	add_child(_prompt)
+
+
+# ---- Audio -------------------------------------------------------------------------------------------
+
+func _build_audio() -> void:
+	var rng := RandomNumberGenerator.new()
+	if random_seed >= 0:
+		rng.seed = random_seed
+	else:
+		rng.randomize()
+	if not VOICE_TAKES.is_empty():
+		_picked_voice = VOICE_TAKES[rng.randi_range(0, VOICE_TAKES.size() - 1)]
+
+	var bus := _audio_bus()
+	_voice_player = AudioStreamPlayer.new()
+	_voice_player.name = "VoicePlayer"
+	_voice_player.bus = bus
+	_voice_player.volume_db = VOICE_VOLUME_DB
+	add_child(_voice_player)
+
+	_swoosh_players.clear()
+	for i in 8:
+		var sp := AudioStreamPlayer.new()
+		sp.name = "SwooshPlayer_%d" % i
+		sp.bus = bus
+		sp.volume_db = SWOOSH_VOLUME_DB
+		add_child(sp)
+		_swoosh_players.append(sp)
+
+
+func _audio_bus() -> StringName:
+	return &"SFX" if AudioServer.get_bus_index(&"SFX") != -1 else &"Master"
+
+
+func _update_audio(t: float) -> void:
+	# Swooshes as each letter flies in
+	for i in _faces.size():
+		if i < _swooshes_played.size() and not _swooshes_played[i]:
+			var fly_time := T_FACES + FACE_STAGGER * i
+			if t >= fly_time:
+				_swooshes_played[i] = true
+				_play_swoosh(i)
+
+	# Title voice line
+	if not _voice_played and t >= T_VOICE:
+		_voice_played = true
+		_play_voice()
+
+
+func _play_swoosh(index: int) -> void:
+	if _swoosh_players.is_empty() or SWOOSH_SOUNDS.is_empty():
+		return
+	var player: AudioStreamPlayer = _swoosh_players[index % _swoosh_players.size()]
+	player.stream = SWOOSH_SOUNDS[index % SWOOSH_SOUNDS.size()]
+	var progress := float(index) / maxf(1.0, float(_faces.size() - 1))
+	player.pitch_scale = lerpf(0.94, 1.16, progress)
+	player.play()
+
+
+func _play_voice() -> void:
+	if _voice_player == null or _picked_voice == null:
+		return
+	_voice_player.stream = _picked_voice
+	_voice_player.play()
+
+
+func _stop_audio() -> void:
+	if _voice_player != null and _voice_player.playing:
+		_voice_player.stop()
+	for sp in _swoosh_players:
+		if sp != null and sp.playing:
+			sp.stop()
 
 
 # ---- The clock ---------------------------------------------------------------------------------------

@@ -121,10 +121,15 @@ const SFX_PRELOAD_PATHS: PackedStringArray = [
 	"res://sounds/teleport_swoosh.mp3",
 	"res://sounds/item_box_pickup.wav",
 	"res://sounds/shield_loop.wav",
+	"res://sounds/letter_swoosh_1.wav",
+	"res://sounds/letter_swoosh_2.wav",
+	"res://sounds/letter_swoosh_3.wav",
+	"res://sounds/letter_swoosh.wav",
 ]
 
 ## The announcer, voice/lola/: each line's takes. play_voice() picks one at random.
 const VOICE_LINES := {
+	"splash": ["res://voice/lola/splash_1.wav", "res://voice/lola/splash_2.wav", "res://voice/lola/splash_3.wav"],
 	"3": ["res://voice/lola/3.mp3"],
 	"2": ["res://voice/lola/2.mp3"],
 	"1": ["res://voice/lola/1.mp3"],
