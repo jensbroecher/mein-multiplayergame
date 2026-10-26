@@ -96,6 +96,12 @@ const TEXT_CAP := 0.62
 const FOOT_WALL := 2.5 # how high the feet's colliders reach (see _add_foot)
 const ROAD_SEARCH := 4.0 # how far over the origin _settle_on_ground() looks for the road
 
+# The High Chase camera rides at the trusses' and the gantry beam's height, so the gate dissolves
+# (dithered, opaque) where it is closer than CAMERA_FADE_MAX to a camera, and is gone inside
+# CAMERA_FADE_MIN. From the road the nearest part is further off than that.
+const CAMERA_FADE_MIN := 2.0
+const CAMERA_FADE_MAX := 5.0
+
 const NAVY := Color(0.055, 0.08, 0.13)
 const INK := Color(0.06, 0.09, 0.17)
 const START_LIGHTS := preload("res://start_lights.gdshader")
@@ -324,6 +330,8 @@ func _build_gantry() -> void:
 	_screen_mat.shader = START_LIGHTS
 	_screen_mat.set_shader_parameter("led_count", (SCREEN_SIZE / LED_PITCH).round())
 	_screen_mat.set_shader_parameter("board", 0.0)
+	_screen_mat.set_shader_parameter("camera_fade_min", CAMERA_FADE_MIN)
+	_screen_mat.set_shader_parameter("camera_fade_max", CAMERA_FADE_MAX)
 	_screen_mat.set_shader_parameter("lamps_red", Vector3.ZERO)
 	_screen_mat.set_shader_parameter("lamps_green", 0.0)
 	_screen_mat.set_shader_parameter("flag_mix", 1.0 if _flag_on else 0.0)
@@ -394,6 +402,8 @@ func _banner_text(side: float) -> Label3D:
 	label.shaded = true
 	label.alpha_cut = Label3D.ALPHA_CUT_DISCARD
 	label.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# A label can't dither: it goes with the banner round it as a camera comes through.
+	label.visibility_range_begin = CAMERA_FADE_MIN + 1.0
 	var size: Vector2 = label.font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, label.font_size)
 	label.pixel_size = minf(TEXT_W / maxf(size.x, 1.0), TEXT_CAP / (label.font_size * 0.72))
 	label.transform = Transform3D(Basis(Vector3.UP, 0.0 if side > 0.0 else PI), Vector3(0.0, 0.0, side * 0.016))
@@ -547,6 +557,7 @@ static func _mat(key: String) -> Material:
 			m.vertex_color_use_as_albedo = true
 			m.vertex_color_is_srgb = true
 			m.roughness = 0.6
+	_camera_fade(m)
 	_mats[key] = m
 	return m
 
@@ -557,8 +568,15 @@ static func _accent_mat(c: Color) -> Material:
 		var m := StandardMaterial3D.new()
 		m.albedo_color = c
 		m.roughness = 0.55
+		_camera_fade(m)
 		_mats[key] = m
 	return _mats[key]
+
+
+static func _camera_fade(m: StandardMaterial3D) -> void:
+	m.distance_fade_mode = BaseMaterial3D.DISTANCE_FADE_PIXEL_DITHER
+	m.distance_fade_min_distance = CAMERA_FADE_MIN
+	m.distance_fade_max_distance = CAMERA_FADE_MAX
 
 
 ## The ticker's font: plain coverage, not MSDF, since the strip is sampled once per LED.

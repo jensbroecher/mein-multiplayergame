@@ -28,6 +28,10 @@ uniform float lamps_green : hint_range(0.0, 1.0) = 0.0;
 // and the green to mint.
 uniform float flag_energy = 2.0;
 uniform float lamp_energy = 1.6;
+// Dithered away near a camera (CheckpointGate's CAMERA_FADE_*), like the gantry round it: the
+// High Chase camera rides at the screen's height.
+uniform float camera_fade_min = 2.0;
+uniform float camera_fade_max = 5.0;
 
 const vec3 RED = vec3(1.0, 0.0, 0.0);
 const vec3 GREEN = vec3(0.0, 1.0, 0.12);
@@ -89,6 +93,13 @@ vec3 picture(vec2 uv) {
 }
 
 void fragment() {
+	float near_fade = smoothstep(camera_fade_min, camera_fade_max, length(VERTEX));
+	if (near_fade < 0.999) {
+		const vec3 magic = vec3(0.06711056, 0.00583715, 52.9829189);
+		if (near_fade < fract(magic.z * fract(dot(FRAGCOORD.xy, magic.xy)))) {
+			discard;
+		}
+	}
 	vec2 g = UV * led_count;
 	vec2 cell = floor(g);
 	// LEDs per pixel. At 0.4 an LED is 2.5 pixels wide and drawn as a dot; by 0.8 the dots are gone.

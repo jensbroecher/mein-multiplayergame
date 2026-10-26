@@ -1324,14 +1324,28 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 
 - Three modes (`MusicManager.CameraMode`, the menus' order), cycled with C and saved as `camera_mode` (an old
   `use_isometric_camera` = false loads as Follower, true as High Chase):
-  - High Chase (`is_high_chase`, the default): `CHASE_BACK` 9.5m behind and `CHASE_UP` 5.4m over the cart
-    (about 30 degrees down), lens `CHASE_FOV`. Its heading (`_chase_yaw`, `_update_chase_heading`) follows the
-    cart's velocity (its nose when slow or reversing), eased at `CHASE_YAW_RATE` and capped at `CHASE_YAW_MAX`,
-    and it aims along that heading, so a corner is a slow pan. Its height eases after the cart's
-    (`CHASE_Y_RATE`). It stays under a checkpoint banner's bottom edge (6.2m): at 8m the camera rode through
-    the banners. Top Down gave the user motion sickness: its aim point swings with the nose up to 24m ahead.
-  - Top Down (`is_isometric`) sits at `TOPDOWN_OFFSET` (-22, 48, 22) from the cart in world axes (it doesn't
-    turn with the cart) with a 44 degree lens (`TOPDOWN_FOV`), looking 11-24m ahead of it.
+  - High Chase (`is_high_chase`, the default): `CHASE_BACK` 11m behind and `CHASE_UP` 8m over the cart
+    (about 36 degrees down to it, the horizon still in the frame's top), lens `CHASE_FOV`, a boost widening it
+    only 2-3 degrees. Its heading (`_chase_yaw`, `_update_chase_heading`) follows the cart's velocity (its nose
+    when slow or reversing) on a critically damped spring (`CHASE_YAW_RATE`, turn rate capped at
+    `CHASE_YAW_MAX`), so a pan eases in and out; easing the angle itself started and stopped the turn at once.
+    The camera's position and aim are both eased at the same rate from the same smoothed point, so the view
+    turns only with that heading, never with the cart's wobbles. Its height eases after the cart's
+    (`CHASE_Y_RATE`, within `CHASE_Y_ABOVE`/`CHASE_Y_BELOW`). It rides at the checkpoint trusses' and start
+    gantry's height (it used to stay under the banners at 5.4m, which the user found too low): the gates'
+    materials, the banner text and the gantry's LED screen dissolve within `CheckpointGate.CAMERA_FADE_*` (2-5m)
+    of a camera (pixel dither, still opaque).
+  - Top Down (`is_isometric`) sits at `TOPDOWN_OFFSET` (-22, 48, 22) in world axes, about 57 degrees down, with
+    a 44 degree lens (`TOPDOWN_FOV`). It never turns: it looks along the offset at a point led ahead of the
+    cart by its velocity (`_update_topdown_lead`: `TOPDOWN_LEAD_TIME` x speed, at most `TOPDOWN_LEAD_MAX`,
+    eased by a critically damped spring `TOPDOWN_LEAD_RATE`), so a corner slides the picture over a second or
+    two. It used to aim 11-24m along the nose, which swung the view with every steering input.
+  - Both made the user dizzy before these changes (motion comfort matters here): terrain pulling a raised
+    camera in now eases in at `RAISED_CAM_PULL_RATE` and out at `RAISED_CAM_RELEASE_RATE`, not a 15/s snap.
+    `res://scratch/race_cam_motion_probe.tscn -- [level=] [mode=chase|top|follow] [cart=0] [seconds=60]`
+    (headless, `--fixed-fps 60`) rides along with an AI cart and prints the camera's turn rate, its
+    acceleration, the shake, pitch, FOV and where the cart sits on screen, plus `EDGE` lines when it nears
+    the frame's edge. On Lakeside the Top Down's mean turn rate went from 11.4 to 1.1 deg/s.
   - Follower trails 5.2-6.8m behind; see the splash shot under Deep water.
 - See-through in the raised cameras (`camera_xray.gdshaderinc`): the tree, palm, spruce, cactus and rock
   shaders (`tree_bark`, `acacia_leaves`, `palm_*`, `spruce*`, `cactus`, `granite_rock`, `canyon_rock`) dither

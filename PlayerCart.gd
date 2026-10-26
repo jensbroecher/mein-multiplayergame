@@ -468,25 +468,44 @@ var camera_clip_distance_mult_iso: float = 1.0
 var is_isometric: bool = false
 const TOPDOWN_OFFSET := Vector3(-22.0, 48.0, 22.0)
 const TOPDOWN_FOV := 44.0
-## The High Chase camera (MusicManager's default): behind and above the cart, about 30 degrees down,
-## its heading turning after the cart's direction of travel slowly and at a capped rate, so a corner
-## is a gentle pan, not the swing of the Top Down view's look-ahead. Both are raised cameras: the
-## plants and rocks between them and the cart thin out (camera_xray.gdshaderinc).
+## The Top Down view never turns: it looks along TOPDOWN_OFFSET at a point led ahead of the cart, so a
+## corner slides the picture instead of swinging it. The lead is the travel direction times the speed
+## (TOPDOWN_LEAD_TIME, at most TOPDOWN_LEAD_MAX metres), eased by a critically damped spring of
+## TOPDOWN_LEAD_RATE (1/s): a hairpin swings it round over a second or two. It used to aim 11-24m along
+## the nose, which whipped round with every steering input.
+const TOPDOWN_LEAD_TIME := 0.25
+const TOPDOWN_LEAD_MAX := 11.0
+const TOPDOWN_LEAD_RATE := 1.3
+var _topdown_lead := Vector3.ZERO
+var _topdown_lead_vel := Vector3.ZERO
+## The High Chase camera (MusicManager's default): behind and above the cart, about 36 degrees down,
+## its heading turning after the cart's direction of travel on a critically damped spring with a
+## capped rate, so a corner is a gentle pan that eases in and out, not the swing of a look-ahead.
+## Both are raised cameras: the plants and rocks between them and the cart thin out
+## (camera_xray.gdshaderinc). It rides at the checkpoint trusses' and the start gantry's height, so
+## those dissolve near a camera (CheckpointGate's CAMERA_FADE_*).
 var is_high_chase: bool = true
-const CHASE_BACK := 9.5
-## Under a checkpoint banner's bottom edge (6.2m), so the line down to the cart passes beneath it.
-const CHASE_UP := 5.4
+const CHASE_BACK := 11.0
+const CHASE_UP := 8.0
 const CHASE_FOV := 62.0
-const CHASE_LOOK_AHEAD := 4.0
-## How fast the chase heading follows the cart's (1/s), and the most it turns (rad/s).
-const CHASE_YAW_RATE := 1.8
-const CHASE_YAW_MAX := 1.4
-## How fast the camera's height follows the cart's, so bumps don't shake the view.
-const CHASE_Y_RATE := 3.0
+const CHASE_LOOK_AHEAD := 6.0
+## The chase heading's spring (rad/s natural frequency), and the most it turns (rad/s).
+const CHASE_YAW_RATE := 3.0
+const CHASE_YAW_MAX := 1.2
+## How fast the camera's height follows the cart's, so bumps don't shake the view, and how far the
+## cart may rise above or drop below it before the camera is dragged along.
+const CHASE_Y_RATE := 2.0
+const CHASE_Y_BELOW := 3.0
+const CHASE_Y_ABOVE := 2.0
+## Raised cameras pulled in by terrain between them and the cart: how fast they come in and go back
+## out (1/s). Fast pull-ins (15/s) read as a sudden zoom.
+const RAISED_CAM_PULL_RATE := 6.0
+const RAISED_CAM_RELEASE_RATE := 1.5
 ## Radius (m) of the see-through tube round the line to the cart, per raised camera.
 const XRAY_RADIUS_CHASE := 2.6
 const XRAY_RADIUS_TOPDOWN := 5.0
 var _chase_yaw: float = NAN
+var _chase_yaw_vel: float = 0.0
 var _chase_y: float = NAN
 var is_carried_by_eagle: bool = false
 var is_intro_active: bool = false
@@ -1483,12 +1502,15 @@ func _process(delta):
 			elif is_isometric or is_high_chase or is_carried_by_eagle:
 				var chase: bool = is_high_chase and not is_isometric and not is_carried_by_eagle
 				var desired_cam_pos: Vector3
+				var topdown_focus: Vector3 = visuals.global_position
 				if chase:
 					_update_chase_heading(delta)
 					desired_cam_pos = Vector3(visuals.global_position.x, _chase_y, visuals.global_position.z) + _chase_offset()
 				else:
 					var iso_zoom: float = 1.2 if is_carried_by_eagle else 1.0
-					desired_cam_pos = visuals.global_position + TOPDOWN_OFFSET * iso_zoom
+					_update_topdown_lead(delta)
+					topdown_focus += _topdown_lead
+					desired_cam_pos = topdown_focus + TOPDOWN_OFFSET * iso_zoom
 				var ray_start = visuals.global_position + Vector3.UP * 1.0
 				
 				# Throttle expensive clip raycasts
@@ -1520,8 +1542,8 @@ func _process(delta):
 					_cached_iso_clip_ratio = target_ratio
 
 				# Lerp pull-in, then clamp target above terrain so we never lerp underground
-				var lerp_speed = 15.0 if _cached_iso_clip_ratio < camera_clip_distance_mult_iso else 3.0
-				camera_clip_distance_mult_iso = lerp(camera_clip_distance_mult_iso, _cached_iso_clip_ratio, lerp_speed * delta)
+				var lerp_speed = RAISED_CAM_PULL_RATE if _cached_iso_clip_ratio < camera_clip_distance_mult_iso else RAISED_CAM_RELEASE_RATE
+				camera_clip_distance_mult_iso = lerp(camera_clip_distance_mult_iso, _cached_iso_clip_ratio, minf(lerp_speed * delta, 1.0))
 				var target_cam_pos = ray_start + (desired_cam_pos - ray_start) * camera_clip_distance_mult_iso
 				target_cam_pos = _raise_point_above_terrain(target_cam_pos, excludes)
 				camera_pivot.global_position = camera_pivot.global_position.lerp(target_cam_pos, 10.0 * delta)
@@ -1534,18 +1556,14 @@ func _process(delta):
 					# Only a gentle darken if still deeply under surface — smooth, never binary black
 					race_ui.set_terrain_clipped(_cached_cam_below_terrain)
 
-				var cam_fwd = Vector3(visual_forward.x, 0.0, visual_forward.z)
+				var look_target: Vector3 = topdown_focus
 				if chase:
 					# Along the camera's own slow heading, so the aim never swings ahead of it.
-					cam_fwd = Vector3(sin(_chase_yaw), 0.0, cos(_chase_yaw))
-				elif cam_fwd.length_squared() < 0.01:
-					cam_fwd = Vector3.FORWARD
-				else:
-					cam_fwd = cam_fwd.normalized()
-				var look_base: Vector3 = visuals.global_position
-				if chase:
-					look_base.y = _chase_y + 0.6
-				camera_look_at = camera_look_at.lerp(look_base + cam_fwd * look_ahead_dist, 10.0 * delta)
+					var cam_fwd := Vector3(sin(_chase_yaw), 0.0, cos(_chase_yaw))
+					look_target = Vector3(visuals.global_position.x, _chase_y + 0.6, visuals.global_position.z) + cam_fwd * look_ahead_dist
+				# Eased at the camera's own rate, so the view's direction stays the offset's: it turns
+				# only with the chase heading (or a pull-in), never with the cart's wobbles.
+				camera_look_at = camera_look_at.lerp(look_target, minf(10.0 * delta, 1.0))
 				camera_pivot.look_at(camera_look_at, Vector3.UP)
 			elif _splash_cam_wanted(visual_forward):
 				_splash_camera(excludes, delta)
@@ -1608,11 +1626,12 @@ func _process(delta):
 		elif is_isometric:
 			target_fov = TOPDOWN_FOV
 		elif is_high_chase:
+			# Only a small widening for a boost: a big FOV kick pumps the whole picture.
 			target_fov = CHASE_FOV
 			if is_boosting:
-				target_fov += 8.0
+				target_fov += 3.0
 			elif is_pad_boosting:
-				target_fov += 5.0
+				target_fov += 2.0
 		else:
 			target_fov = 75.0
 			if is_boosting:
@@ -4324,8 +4343,11 @@ func _teleport_vanish_step(t: float) -> void:
 
 func _teleport_appear() -> void:
 	_apply_respawn_pose()
-	# The High Chase heading starts again behind the respawned cart instead of panning round to it.
+	# The High Chase heading starts again behind the respawned cart instead of panning round to it,
+	# and the Top Down view's lead from the cart.
 	_chase_yaw = NAN
+	_topdown_lead = Vector3.ZERO
+	_topdown_lead_vel = Vector3.ZERO
 	# Keep the scales captured before vanish. Recapturing here stored the
 	# already-shrunk chassis and left only the restored wheels at full size.
 	if _teleport_base_scales.is_empty():
@@ -7341,6 +7363,8 @@ func _set_camera_mode(mode: int, persist: bool) -> void:
 	is_high_chase = mode == MusicManager.CameraMode.HIGH_CHASE
 	_chase_yaw = NAN
 	_chase_y = NAN
+	_topdown_lead = Vector3.ZERO
+	_topdown_lead_vel = Vector3.ZERO
 	_update_name_tag_scale(mode)
 	if camera:
 		camera.projection = Camera3D.PROJECTION_PERSPECTIVE
@@ -7361,8 +7385,9 @@ func _chase_offset() -> Vector3:
 
 
 ## Turns the chase heading toward the way the cart is going: its velocity when it's rolling forward
-## (a drift or a bump doesn't swing the view the way the nose would), else its nose. Eased at
-## CHASE_YAW_RATE and capped at CHASE_YAW_MAX, so even a hairpin is a slow pan.
+## (a drift or a bump doesn't swing the view the way the nose would), else its nose. A critically
+## damped spring (CHASE_YAW_RATE) with its turn rate capped at CHASE_YAW_MAX: the pan builds up and
+## dies away smoothly, where easing the angle itself started and stopped turning at once.
 func _update_chase_heading(delta: float) -> void:
 	var nose: Vector3 = -visuals.global_transform.basis.z
 	nose.y = 0.0
@@ -7372,16 +7397,34 @@ func _update_chase_heading(delta: float) -> void:
 		dir = vel.normalized()
 	var want: float = atan2(dir.x, dir.z)
 	var car_y: float = visuals.global_position.y
-	if is_nan(_chase_yaw):
+	if is_nan(_chase_yaw) or is_nan(_chase_y):
 		_chase_yaw = want
+		_chase_yaw_vel = 0.0
 		_chase_y = car_y
 		return
+	var dt: float = minf(delta, 0.05)
 	var diff: float = wrapf(want - _chase_yaw, -PI, PI)
-	var step: float = clampf(diff * minf(CHASE_YAW_RATE * delta, 1.0), -CHASE_YAW_MAX * delta, CHASE_YAW_MAX * delta)
-	_chase_yaw = wrapf(_chase_yaw + step, -PI, PI)
-	_chase_y = lerpf(_chase_y, car_y, minf(CHASE_Y_RATE * delta, 1.0))
+	var w: float = CHASE_YAW_RATE
+	_chase_yaw_vel += (w * w * diff - 2.0 * w * _chase_yaw_vel) * dt
+	_chase_yaw_vel = clampf(_chase_yaw_vel, -CHASE_YAW_MAX, CHASE_YAW_MAX)
+	_chase_yaw = wrapf(_chase_yaw + _chase_yaw_vel * dt, -PI, PI)
+	_chase_y = lerpf(_chase_y, car_y, minf(CHASE_Y_RATE * dt, 1.0))
 	# Never so far behind a drop or a climb that the cart leaves the frame.
-	_chase_y = clampf(_chase_y, car_y - 2.0, car_y + 1.5)
+	_chase_y = clampf(_chase_y, car_y - CHASE_Y_ABOVE, car_y + CHASE_Y_BELOW)
+
+
+## Eases the Top Down view's lead toward the cart's travel times its speed (see TOPDOWN_LEAD_TIME)
+## on a critically damped spring. Slow or reversing, the lead shrinks back toward the cart.
+func _update_topdown_lead(delta: float) -> void:
+	var dt: float = minf(delta, 0.05)
+	var vel := Vector3(linear_velocity.x, 0.0, linear_velocity.z)
+	var lead_max: float = TOPDOWN_LEAD_MAX * (0.4 if splitscreen_camera != null else 1.0)
+	var want: Vector3 = vel * TOPDOWN_LEAD_TIME
+	if want.length() > lead_max:
+		want = want.normalized() * lead_max
+	var w: float = TOPDOWN_LEAD_RATE
+	_topdown_lead_vel += (w * w * (want - _topdown_lead) - 2.0 * w * _topdown_lead_vel) * dt
+	_topdown_lead += _topdown_lead_vel * dt
 
 
 ## Feeds camera_xray.gdshaderinc: this player's camera and cart, so the plants and rocks between
