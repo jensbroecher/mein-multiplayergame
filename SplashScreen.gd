@@ -24,6 +24,7 @@ const LOGO_PATH := "res://generated/logo/RcVibeLogo.tscn"
 const CarPaint = preload("res://CarPaint.gd")
 ## The cars to draw from: the car select screen's list.
 const CarSelectionScript = preload("res://CarSelection.gd")
+const PlayerCartScript = preload("res://PlayerCart.gd")
 const SKY_SHADER = preload("res://splash_sky.gdshader")
 const FLOOR_SHADER = preload("res://splash_floor.gdshader")
 const BURST_SHADER = preload("res://splash_burst.gdshader")
@@ -261,6 +262,7 @@ func _build_stage() -> void:
 	add_child(holder)
 	_stage = SubViewport.new()
 	_stage.own_world_3d = true
+	_stage.audio_listener_enable_3d = true
 	_apply_anti_aliasing(_stage)
 	_stage.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	holder.add_child(_stage)
@@ -443,6 +445,9 @@ func _pick_cars() -> Array:
 		pick["name"] = preset["name"]
 		pick["path"] = preset["model_path"]
 		pick["paint"] = paint
+		var cart_preset := _find_cart_preset(preset["name"])
+		pick["engine_sound"] = cart_preset.get("engine_sound", "res://sounds/enginesounds/engine_mudrunner_loop.wav")
+		pick["engine_gain_db"] = float(cart_preset.get("engine_gain_db", 0.0))
 		picks.append(pick)
 	return picks
 
@@ -495,9 +500,21 @@ func _build_cars() -> void:
 		dust.position = Vector3(axle.x, 0.04, axle.z)
 		dust.scale = Vector3.ONE / CAR_SCALE
 		dust.emission_box_extents = Vector3(track * 0.5 + 0.1, 0.04, 0.12)
+		var engine_player := AudioStreamPlayer3D.new()
+		engine_player.name = "EngineSound"
+		engine_player.bus = _audio_bus()
+		engine_player.unit_size = 14.0
+		engine_player.max_distance = 65.0
+		engine_player.attenuation_filter_cutoff_hz = 14000.0
+		engine_player.volume_db = -80.0
+		var stream: AudioStream = _load_engine_stream(spec.get("engine_sound", ""))
+		if stream != null:
+			engine_player.stream = stream
+		pair[0].add_child(engine_player)
 		_make_blob(pair[0], Vector2(track + 0.8, wheelbase + 1.2) * 0.5 * 1.25)
 		_cars.append({"spec": spec, "real": pair[0], "mirror": pair[1], "wheels": wheels, "radii": radii,
-			"dust": dust, "rolled": 0.0, "speed": 0.0})
+			"dust": dust, "engine": engine_player, "gain_db": spec.get("engine_gain_db", 0.0),
+			"rolled": 0.0, "speed": 0.0})
 
 
 ## The mirrored copies cast no shadow (the real ones do).
@@ -740,6 +757,52 @@ func _stop_audio() -> void:
 	for sp in _swoosh_players:
 		if sp != null and sp.playing:
 			sp.stop()
+	for c in _cars:
+		var ep: AudioStreamPlayer3D = c.get("engine")
+		if ep != null and ep.playing:
+			ep.stop()
+
+
+static var _engine_stream_cache: Dictionary = {}
+
+func _find_cart_preset(car_name: String) -> Dictionary:
+	for p in PlayerCartScript.CAR_PRESETS:
+		if p.get("name") == car_name:
+			return p
+	return {}
+
+
+func _load_engine_stream(path: String) -> AudioStream:
+	if _engine_stream_cache.has(path):
+		return _engine_stream_cache[path]
+	if not ResourceLoader.exists(path):
+		return null
+	var base_stream := load(path) as AudioStream
+	if base_stream == null:
+		return null
+	var stream: AudioStream = base_stream.duplicate()
+	if stream is AudioStreamWAV:
+		var wav := stream as AudioStreamWAV
+		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		wav.loop_begin = 0
+		var bytes_per_sample := 2
+		match wav.format:
+			AudioStreamWAV.FORMAT_8_BITS:
+				bytes_per_sample = 1
+			AudioStreamWAV.FORMAT_16_BITS:
+				bytes_per_sample = 2
+			_:
+				bytes_per_sample = 2
+		if wav.stereo:
+			bytes_per_sample *= 2
+		if wav.data.size() > 0 and bytes_per_sample > 0:
+			wav.loop_end = int(wav.data.size() / bytes_per_sample)
+	elif stream is AudioStreamMP3:
+		(stream as AudioStreamMP3).loop = true
+	elif stream is AudioStreamOggVorbis:
+		(stream as AudioStreamOggVorbis).loop = true
+	_engine_stream_cache[path] = stream
+	return stream
 
 
 # ---- The clock ---------------------------------------------------------------------------------------
@@ -843,6 +906,30 @@ func _apply_car(i: int, t: float) -> void:
 	# The dust thrown back off the tyres while running; out to the side of the slide on the brakes.
 	var side := -signf(float(spec["drift"])) * smoothstep(0.35, 0.8, u)
 	dust.direction = Vector3(side * 0.9, 0.55, -1.0 + 0.9 * smoothstep(0.6, 1.0, u)).normalized()
+
+	# Engine sound: revs down into the slide, then settles to a warm, gentle idle.
+	var engine: AudioStreamPlayer3D = c.get("engine")
+	if engine != null:
+		if not autoplay or t < float(spec["t0"]):
+			if engine.playing:
+				engine.stop()
+		else:
+			if not engine.playing:
+				engine.play()
+			var gain_db: float = float(c.get("gain_db", 0.0))
+			if u < 1.0:
+				var speed_ratio := clampf(speed / 38.0, 0.0, 1.0)
+				var dist_factor := smoothstep(0.0, 0.45, u)
+				var target_vol := lerpf(-38.0, -28.0, speed_ratio * dist_factor) + gain_db
+				var target_pitch := lerpf(0.74, 1.18, speed_ratio)
+				engine.volume_db = target_vol
+				engine.pitch_scale = target_pitch
+			else:
+				var duck := 3.5 if (t >= T_VOICE - 0.1 and t < T_PROMPT + 1.5) else 0.0
+				var idle_vol := -40.0 + gain_db - duck
+				var idle_pitch := 0.73 + sin(t * 1.8 + float(i) * 1.5) * 0.015
+				engine.volume_db = idle_vol
+				engine.pitch_scale = idle_pitch
 
 
 ## The wheels turn as far as the car has rolled, each by its own radius (a wheel node's frame is the cart's:

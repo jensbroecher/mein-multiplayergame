@@ -2,8 +2,7 @@ extends SceneTree
 
 # Records the audio output of SplashScreen to test mix and timing
 var _rec: AudioEffectRecord
-var _splash: Control
-var _t0 := 0
+var _t_splash := -1
 var _saved := false
 
 func _initialize() -> void:
@@ -14,11 +13,16 @@ func _initialize() -> void:
 	_rec.set_recording_active(true)
 
 	change_scene_to_file("res://Main.tscn")
-	_t0 = Time.get_ticks_msec()
 
 func _process(_delta: float) -> bool:
-	var elapsed := (Time.get_ticks_msec() - _t0) / 1000.0
-	if elapsed >= 6.0 and not _saved:
+	var main := current_scene
+	if main == null or not main.has_node("SplashCanvas"):
+		return false
+	if _t_splash < 0:
+		_t_splash = Time.get_ticks_msec()
+		print("SplashScreen active, recording...")
+	var elapsed := (Time.get_ticks_msec() - _t_splash) / 1000.0
+	if elapsed >= 5.0 and not _saved:
 		_saved = true
 		_rec.set_recording_active(false)
 		var recording := _rec.get_recording()

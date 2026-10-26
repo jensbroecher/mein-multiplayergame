@@ -5,8 +5,9 @@ extends RefCounted
 ## CrowdDetail.gd scales with the Detail Level. regenerate_nyota_stadium.gd builds its own (the same
 ## numbers); this is the part a level only adds people with.
 ##
-## A spot is [position, facing (horizontal), seated]: a standing one's position is the ground under its
-## feet, a seated one's the top of its seat. `scale` takes Nyota's 1.86 times life size to the level's.
+## A spot is [position, facing (horizontal), seated, in a stand (optional)]: a standing one's position is the
+## ground (or the stand's tread) under its feet, a seated one's the top of its seat. Only people in a stand
+## wave flags: anywhere else a gazebo, a tent or a stall can hang over them, and the flag stood through it. `scale` takes Nyota's 1.86 times life size to the level's.
 ## `skin` weights the four groups crowd_common.gdshaderinc draws from INSTANCE_CUSTOM.g:
 ## [African, South Asian, European, East Asian, Arab or mixed].
 
@@ -30,6 +31,8 @@ const CARDS := [
 const CARD_FORWARD := 0.6
 const POSE_SEATED := [0.34, 0.13, 0.12, 0.17, 0.08, 0.09, 0.07]
 const POSE_STANDING := [0.26, 0.10, 0.08, 0.17, 0.12, 0.0, 0.14, 0.05, 0.08]
+## Standing up in a stand: more cheering, and the flags.
+const POSE_STAND_FANS := [0.16, 0.13, 0.22, 0.10, 0.06, 0.14, 0.06, 0.08, 0.05]
 ## The g ranges of crowd_skin's groups.
 const SKIN_RANGES := [Vector2(0.0, 0.80), Vector2(0.80, 0.86), Vector2(0.86, 0.93), Vector2(0.93, 0.96), Vector2(0.96, 1.0)]
 
@@ -104,11 +107,12 @@ static func build(parent: Node, spots: Array, scale: float, skin: Array, seed_v:
 		var pos: Vector3 = sp[0]
 		var face: Vector3 = sp[1]
 		var seated: bool = sp[2]
+		var in_stand: bool = sp.size() > 3 and sp[3]
 		# The figure faces its +z.
 		var z: Vector3 = Vector3(face.x, 0.0, face.z).normalized()
 		var x: Vector3 = Vector3.UP.cross(z).normalized()
 		var bs := Basis(x, Vector3.UP, z).rotated(Vector3.UP, rng.randf_range(-0.3, 0.3)).scaled(Vector3.ONE * scale)
-		var pose: int = pick(rng, POSE_SEATED, 0) if seated else pick(rng, POSE_STANDING, 7)
+		var pose: int = pick(rng, POSE_SEATED, 0) if seated else pick(rng, POSE_STAND_FANS if in_stand else POSE_STANDING, 7)
 		var cust := Color(rng.randf(), skin_draw(rng, skin), (float(pose) + 0.5) / 16.0, rng.randf())
 		var card_at: Vector3 = pos + z * (CARD_FORWARD * scale) if seated else pos
 		var key := Vector3i(floori(pos.x / CELL), floori(pos.z / CELL), card_class(pose))

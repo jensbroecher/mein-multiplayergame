@@ -145,9 +145,31 @@ the others re-bakes it (see Lakeside Course below).
   scene out again (its Model node and its meshes, the same `.res` files) under a `DisplayCar.gd` node, which
   applies the car's factory paint at load. Their meshes stop drawing at `SHOW_CAR_RANGE` (130m): a car is
   37-51k triangles.
+- The bend round the woodyard (s 465-690, a 125 degree left-hander over both arms of the lake) is a banked board
+  track (`_build_banked_turn`, `BANK_*`): a timber deck over the road from curb to curb, flush with it at both ends
+  (2cm up), tilting about its inner edge to 17 degrees through the corner (the outer edge 4.9m over the road), with
+  painted bands (a blue apron, black, red and blue lines: vertex colour, alpha the paint) and the planks, nails and
+  rubber line drawn by `board_track.gdshader` (UV in world metres: x along the lap, y across). The deck is its own
+  body `BankedDeck` (road, `surface` wood); the boarded wall along its top (sponsor boards inside, posts and battens
+  outside, down to the road's edge so nothing gets under the deck) is `BankedWall`. Both hold their meshes, so
+  DressingColliders leaves them alone. An AI race (speed=2) ran it with no falls. `res://scratch/lakeside_bend_probe.gd`
+  (`-s`, headless, `-- [s0=] [s1=] [step=]`) prints a stretch of the lap's heading, radius, heights and gates.
+- The rowing boat on the lake north of that bend is `RowboatCSG.gd`: modelled in CSG at life size (a lens of two
+  upright cylinders for the plan, an elliptic cylinder for the bilges, tilted boxes for the bottom's V, long
+  cylinders for the keel's rocker and the sheer; `_hull(g)` grows the solid so the same build gives the planking's
+  inside, the boot top, the strake and the keel). The generator builds the tree, waits a frame and bakes it
+  (`RowboatCSG.bake`: the placeholder materials named "key:colour" become the level's materials, the colour goes into
+  the vertex colours, UVs in metres along the boat), so the level holds no CSG. Placed at `BOAT_AT`, `BOAT_SCALE` 2.
+  `res://scratch/rowboat_preview.gd` (`-s`, windowed, `-- <dir> [csg=1] name:x,y,z:tx,ty,tz`) renders it. It and the
+  removal of the stray boat copy and two hay bales (`OLD_FBX`) left the course with no FBX; the only imported model
+  left is `LevelDesign/Bush` (`models/trees/bush.glb`).
 - Spectators (`_build_spectators`, `CrowdPlacer.gd`: Nyota Stadium's people at PROP_SCALE / 1.86, a European mix
   of skins, `SPECTATOR_SKIN`): two loose rows behind the crowd barriers by the straight (`_barrier_spots`), the
-  grandstand about two thirds full (`_stand_frames`, on the seat boards) and a pair at each show car's table.
+  grandstand about two thirds full (`_stand_frames`, on the seat boards; `STAND_UP_SHARE` of them stand on the
+  foot board in front of their seat) and a pair at each show car's table. Only the grandstand's standers wave
+  flags (a spot's fourth field, "in a stand", picks `CrowdPlacer.POSE_STAND_FANS`): under a gazebo the flag stood
+  up through the roof. `res://scratch/spectator_ground_probe.gd` (`-s`, headless, `-- [level=...]`) checks the
+  grandstands' bases and the standing spectators' feet against the ground under them.
 
 ## Canyon Course (Sierra del Viento, stage 1)
 
@@ -1029,7 +1051,7 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   distances: a **card** (`stadium_crowd.gdshader`, a flat figure drawn in the shader, the old look, now with legs)
   and, within reach of the lap, a **3D figure** (`CrowdKit.gd` mesh, `stadium_person.gdshader`). They swap by dither
   between 34 and 44m (`tree_lod.gdshaderinc`: `lod_mode` 1 on the figure, 2 on the card).
-- `CrowdKit.gd` is one mesh (about 1.4k triangles, 800 of them drawn) in a standing rest pose at 1.86 times life
+- `CrowdKit.gd` is one mesh (about 1.8k triangles, 1k of them drawn) in a standing rest pose at 1.86 times life
   size (3.3m, the stands' scale), carrying every hair style, a dress and the props. Per vertex: COLOR the part
   (limb), region (skin, shirt, trousers, ...) and style (which hair or prop); UV/UV2 the limb's two joints (they all
   lie in the plane z = 0) or a head part's head-unit position. The vertex shader bends the joints per pose, hides
@@ -1037,8 +1059,18 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   nose, mouth, ears, stubble, sunglasses). Its constants (`HEAD_C`, `HEAD_R`, `HIP_Y`) repeat CrowdKit's.
 - The 16 poses (0-6 seated: idle, clap, film, talk, arms crossed, cheer, drink; 7-15 standing: idle, clap, cheer,
   film, arms crossed, flag, hands on hips, wave, drink) are tables in `stadium_person.gdshader` (`ARM_L`, `ARM_R`:
-  pitch, roll, elbow, yaw; `LEGS`), a forearm's direction from straight down being pitch + elbow. Not everyone
-  cheers: `POSE_*` in the generator are the odds (about 10% cheer, 17% in the main stand's middle).
+  pitch, roll, elbow, yaw; `TWIST`, the upper arm turned about its own length; `LEGS`), a forearm's direction from
+  straight down being pitch + elbow. The elbow only bends forward, so a hand on the hip needs the twist (90 degrees
+  in) to bring the forearm round to the waist. Not everyone cheers: `POSE_*` in the generator are the odds (about
+  10% cheer, 17% in the main stand's middle). Flags (pose 12) only in the stands: `POSE_STANDING_PLAZA` has none
+  (they stood up through the fan zone's tents and the stalls' tarps), and a fan under less than `FLAG_HEADROOM` of
+  the roof (`_roof_underside`: the upper tier's back rows) cheers instead.
+- The shoulder joint (`SHOULDER_X` 0.34) is just inside the torso's side, with a deltoid on the upper arm: out at
+  0.40, beside the chest, a raised arm swung about a point outside the body and stood off the shoulder with a gap.
+  (A deltoid turning only part of the way with the arm stuck out as a lump under a raised arm.) The cap is a crown
+  cut on a slant (at the brows in front, mid-head at the back) with a curved bill from its front edge
+  (`_build_cap`); the short hair is on the head's own 6 x 12 grid, since on a coarser one the head's corners poked
+  through it. `res://scratch/crowd_preview.gd` is the way to check a pose.
 - The figure stands on y = 0; a seated one's pelvis drops to `SEAT_HIP` over it. In the stands the origin is the seat
   cushion's top (`CROWD_SEAT_H`), so a standing fan stands on the seat; the people in the plazas, round the stalls
   and in the yards behind the barriers (`standing_only` spots) stand on the ground and have legs.

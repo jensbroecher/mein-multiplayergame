@@ -1302,6 +1302,16 @@ func _build_stands(parent: Node, concrete: Material, seat_mat: Material) -> Arra
 	return crowd_spots
 
 
+## Height of a long stand's roof underside (the trusses' bottom chords, _build_roof) over a point `d` back from
+## the arena edge; INF where there is no roof (in front of it, or a stand without an upper tier).
+func _roof_underside(d: float, tier: int) -> float:
+	if tier < 1 or d < ROOF_FRONT_D + 4.0:
+		return INF
+	var back_d: float = float(_stand_section(true)["depth"]) + 1.5
+	var t: float = clampf((d - (ROOF_FRONT_D + 4.0)) / (back_d - (ROOF_FRONT_D + 4.0)), 0.0, 1.0)
+	return lerpf(ROOF_FRONT_Y - 0.6, ROOF_BACK_Y - 6.0, t)
+
+
 ## Cantilever roof over a long stand: back columns, a truss every 11m, the roof sheet and a fascia
 ## carrying a row of floodlights along the front edge.
 func _build_roof(parent: Node, st: Array, sec: Dictionary, concrete: Material) -> void:
@@ -1439,7 +1449,11 @@ const CROWD_CARD_FORWARD := 0.6
 ## and watch, clap, film, talk or fold their arms.
 const POSE_SEATED := [0.34, 0.13, 0.12, 0.17, 0.08, 0.09, 0.07]
 const POSE_STANDING_FANS := [0.18, 0.13, 0.22, 0.10, 0.08, 0.05, 0.08, 0.10, 0.06]
-const POSE_STANDING_PLAZA := [0.26, 0.08, 0.05, 0.17, 0.12, 0.02, 0.14, 0.08, 0.08]
+## Off the stands nobody waves a flag (pose 12): the fan zone's tents and the stalls' tarps hang over people
+## there, and the flags stood up through them.
+const POSE_STANDING_PLAZA := [0.26, 0.08, 0.05, 0.17, 0.12, 0.0, 0.14, 0.08, 0.08]
+## A flag waver's flag reaches this far over what they stand on; under less of the roof they cheer instead.
+const FLAG_HEADROOM := 6.0
 
 
 ## A pose id from `odds` (weights for poses first, first + 1, ...). `boost` multiplies one weight, the cheer.
@@ -1575,6 +1589,8 @@ func _build_crowd(parent: Node, spots: Array, extra: Array = []) -> void:
 			else:
 				pose = _pick_pose(rng, POSE_SEATED, 0, 5, 1.8 if hot else 1.0)
 			origin = pos + out3 * 0.2 + Vector3(0.0, CROWD_SEAT_H, 0.0)
+			if pose == 12 and _roof_underside(Vector2(pos.x, pos.z).dot(Vector2(out3.x, out3.z)) - ARENA_Z, int(sp[3])) - origin.y < FLAG_HEADROOM:
+				pose = 9
 		poses_used[pose] = int(poses_used.get(pose, 0)) + 1
 		var is_standing: bool = pose >= 7
 		if is_standing:

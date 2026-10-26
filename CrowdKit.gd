@@ -49,10 +49,12 @@ const S_FLAG := 9
 const HIP_Y := 1.65
 const KNEE_Y := 0.88
 const ANKLE_Y := 0.17
-const SHOULDER_Y := 2.64
+## The shoulder joint, just inside the torso's side: out at 0.40 a raised arm swung about a point beside
+## the chest and left a gap over the shoulder.
+const SHOULDER_Y := 2.60
 const ELBOW_Y := 2.06
 const WRIST_Y := 1.56
-const SHOULDER_X := 0.40
+const SHOULDER_X := 0.34
 const HIP_X := 0.16
 const NECK_Y := 2.80
 const HEAD_C := Vector3(0.0, 3.07, 0.02)
@@ -252,9 +254,11 @@ func _build_head() -> void:
 	var none := Vector2.ZERO
 	_ellipsoid(HEAD_C, HEAD_R, 6, 12, P_HEAD, R_SKIN, S_ALWAYS, none, none)
 	# Short hair: a shell over the crown and round the sides, the forehead left bare. Long hair has it too.
+	# On the head's own grid (6 x 12): coarser, the head's corners stuck out through the middle of its facets
+	# as skin-coloured spikes along the hairline.
 	var short_keep := func(q: Vector3) -> bool:
-		return q.y > -0.10 and not (q.z > 0.30 and absf(q.x) < 0.80 and q.y < 0.60)
-	_ellipsoid(HEAD_C + Vector3(0.0, 0.006, -0.004), HEAD_R * 1.06, 5, 10, P_HEAD, R_HAIR, S_HAIR_SHORT, none, none, short_keep)
+		return q.y > -0.30 and not (q.z > 0.30 and absf(q.x) < 0.80 and q.y < 0.60)
+	_ellipsoid(HEAD_C + Vector3(0.0, 0.004, -0.003), HEAD_R * 1.07, 6, 12, P_HEAD, R_HAIR, S_HAIR_SHORT, none, none, short_keep)
 	# An afro: a big round head of hair, open at the face.
 	var afro_keep := func(q: Vector3) -> bool:
 		return q.y > -0.55 and not (q.z > 0.28 and absf(q.x) < 0.95 and q.y < 0.66)
@@ -262,17 +266,79 @@ func _build_head() -> void:
 	# Long hair: a curtain down the back to the shoulders.
 	var curtain := [[2.42, 0.24, 0.09, 0.0, -0.21], [2.80, 0.24, 0.10, 0.0, -0.21], [3.20, 0.21, 0.10, 0.0, -0.17]]
 	_loft(curtain, 8, P_HEAD, func(_y: float) -> int: return R_HAIR, S_HAIR_LONG, none, none, true, true)
-	# A cap: a dome with a brim.
-	var cap_keep := func(q: Vector3) -> bool:
-		return q.y > 0.16
-	_ellipsoid(HEAD_C + Vector3(0.0, 0.012, -0.004), HEAD_R * 1.10, 5, 10, P_HEAD, R_ACC, S_CAP, none, none, cap_keep)
-	_box(Vector3(-0.17, 3.085, 0.17), Vector3(0.17, 3.118, 0.48), P_HEAD, R_ACC, S_CAP, none, none)
+	_build_cap()
 	# A headscarf: wrapped round the head, the face open, and a roll round the neck.
 	var scarf_keep := func(q: Vector3) -> bool:
 		return not (q.z > 0.10 and absf(q.x) < 0.72 and q.y > -0.60 and q.y < 0.64)
 	_ellipsoid(HEAD_C + Vector3(0.0, 0.0, -0.01), HEAD_R * 1.15, 5, 10, P_HEAD, R_ACC, S_SCARF, none, none, scarf_keep)
 	var wrap := [[2.70, 0.13, 0.13, 0.0, 0.01], [2.86, 0.15, 0.14, 0.0, 0.0], [2.98, 0.13, 0.12, 0.0, 0.0]]
 	_loft(wrap, 8, P_HEAD, func(_y: float) -> int: return R_ACC, S_SCARF, none, none)
+
+
+## A baseball cap: a crown over the head cut on a slant (at the brows in front, the middle of the head at the
+## back) and a curved bill growing out of the crown's front edge. The old one was a dome cut level at the
+## temples with a flat board across the eyes, a gap between the two.
+func _build_cap() -> void:
+	var none := Vector2.ZERO
+	var c := HEAD_C + Vector3(0.0, 0.01, -0.012)
+	var r := HEAD_R * Vector3(1.09, 1.07, 1.11)
+	var lon := 14
+	var rings := 5
+	# The crown's edge: its elevation round the head, from 25 degrees at the front to 0 at the back.
+	var edge := func(ph: float) -> float: return deg_to_rad(25.0) * (1.0 + cos(ph)) * 0.5
+	var dir := func(e: float, ph: float) -> Vector3: return Vector3(cos(e) * sin(ph), sin(e), cos(e) * cos(ph))
+	var grid: Array = []
+	for i in range(rings + 1):
+		var t := float(i) / float(rings)
+		var row: Array = []
+		for j in range(lon):
+			var ph := TAU * float(j) / float(lon)
+			var e0: float = edge.call(ph)
+			# Rings bunch toward the top, where the crown turns fastest.
+			var e := lerpf(e0, PI * 0.5, sin(t * PI * 0.5))
+			row.append(dir.call(e, ph))
+		grid.append(row)
+	for i in range(rings):
+		for j in range(lon):
+			var j2 := (j + 1) % lon
+			var ids: Array = []
+			for u in [grid[i][j], grid[i][j2], grid[i + 1][j2], grid[i + 1][j]]:
+				var d: Vector3 = u
+				var p := c + d * r
+				var uvp := _joint_uv(P_HEAD, p, none, none)
+				ids.append(_vert(p, d / r, P_HEAD, R_ACC, S_CAP, 0.0, uvp[0], uvp[1]))
+			_tri(ids[0], ids[1], ids[2])
+			if i < rings - 1:
+				_tri(ids[0], ids[2], ids[3])
+	# The bill: from the crown's edge (a touch inside it, so no gap shows) out and a little down, longest in
+	# the middle; a top, an underside and a rim.
+	var segs := 10
+	var half := deg_to_rad(64.0)
+	var thick := 0.018
+	var tops: Array = []
+	var bots: Array = []
+	var rims: Array = []
+	for k in range(segs + 1):
+		var ph := lerpf(-half, half, float(k) / float(segs))
+		var inner: Vector3 = c + (dir.call(edge.call(ph), ph) as Vector3) * r * 0.97
+		var out := Vector3(sin(ph), 0.0, cos(ph))
+		var reach := 0.015 + 0.24 * pow(cos(ph / half * PI * 0.5), 0.55)
+		var outer := inner + out * reach + Vector3(0.0, -0.16 * reach, 0.0)
+		var up := (Vector3.UP + out * 0.16).normalized()
+		tops.append([inner, outer, up])
+		bots.append([inner - up * thick, outer - up * thick, -up])
+		rims.append([outer, outer - up * thick, out])
+	for strip in [tops, bots, rims]:
+		var ids: Array = []
+		for e in strip:
+			for p in [e[0], e[1]]:
+				var uvp := _joint_uv(P_HEAD, p, none, none)
+				ids.append(_vert(p, e[2], P_HEAD, R_ACC, S_CAP, 0.0, uvp[0], uvp[1]))
+		for k in range(segs):
+			_tri(ids[k * 2], ids[k * 2 + 1], ids[k * 2 + 3])
+			_tri(ids[k * 2], ids[k * 2 + 3], ids[k * 2 + 2])
+	# The button on top.
+	_ellipsoid(c + Vector3(0.0, r.y, 0.0), Vector3(0.03, 0.018, 0.03), 2, 6, P_HEAD, R_ACC, S_CAP, none, none, Callable(), false)
 
 
 func _build_arms() -> void:
@@ -286,7 +352,9 @@ func _build_arms() -> void:
 		# Upper arm: the sleeve to y = 2.30, then bare or long sleeve.
 		var upper := [[2.62, 0.100, 0.100, x, 0.0], [2.45, 0.098, 0.098, x, 0.0], [2.30, 0.092, 0.092, x, 0.0], [2.06, 0.080, 0.080, x, 0.0]]
 		_loft(upper, 7, up_part, func(y: float) -> int: return R_SHIRT if y > 2.30 else R_SLEEVE, S_ALWAYS, sh, el, false, false)
-		_ellipsoid(Vector3(x, 2.60, 0.0), Vector3(0.102, 0.102, 0.102), 3, 7, up_part, R_SHIRT, S_ALWAYS, sh, el, Callable(), false)
+		_ellipsoid(Vector3(x, 2.58, 0.0), Vector3(0.102, 0.102, 0.102), 3, 7, up_part, R_SHIRT, S_ALWAYS, sh, el, Callable(), false)
+		# The deltoid over the joint, a little proud of the arm.
+		_ellipsoid(Vector3(side * 0.35, 2.53, 0.0), Vector3(0.11, 0.14, 0.115), 4, 8, up_part, R_SHIRT, S_ALWAYS, sh, el, Callable(), false)
 		# Forearm and hand.
 		var fore := [[2.06, 0.080, 0.080, x, 0.0], [1.80, 0.071, 0.071, x, 0.0], [WRIST_Y, 0.058, 0.058, x, 0.0]]
 		_loft(fore, 7, lo_part, func(_y: float) -> int: return R_SLEEVE, S_ALWAYS, sh, el)

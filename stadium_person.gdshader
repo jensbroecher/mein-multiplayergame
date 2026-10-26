@@ -37,10 +37,10 @@ const vec4 ARM_L[16] = vec4[](
 	vec4(10.0, 152.0, 6.0, 0.0),   // 9 stand cheer
 	vec4(6.0, 8.0, 18.0, 0.0),     // 10 stand film
 	vec4(30.0, 0.0, 70.0, 56.0),   // 11 stand arms crossed
-	vec4(-6.0, 38.0, 86.0, 0.0),   // 12 stand flag: hand on the hip
-	vec4(-8.0, 40.0, 84.0, 0.0),   // 13 hands on hips
+	vec4(-6.0, 45.0, 88.0, 0.0),   // 12 stand flag: hand on the hip
+	vec4(-8.0, 46.0, 88.0, 0.0),   // 13 hands on hips
 	vec4(4.0, 6.0, 14.0, 0.0),     // 14 stand wave
-	vec4(-6.0, 38.0, 86.0, 0.0)    // 15 stand drink
+	vec4(-6.0, 45.0, 88.0, 0.0)    // 15 stand drink
 );
 const vec4 ARM_R[16] = vec4[](
 	vec4(12.0, 8.0, 72.0, 0.0),
@@ -56,9 +56,17 @@ const vec4 ARM_R[16] = vec4[](
 	vec4(76.0, -4.0, 84.0, 26.0),
 	vec4(38.0, 0.0, 70.0, 56.0),
 	vec4(6.0, 150.0, 6.0, 0.0),
-	vec4(-8.0, 40.0, 84.0, 0.0),
+	vec4(-8.0, 46.0, 88.0, 0.0),
 	vec4(6.0, 142.0, 28.0, 0.0),
 	vec4(62.0, -6.0, 116.0, 40.0)
+);
+// Per pose: how far each upper arm (left, right) turns in about its own length before the shoulder swings it
+// (degrees). A hand on the hip needs it: the elbow only bends forward, so without the turn the forearm
+// pointed ahead and the hand stood off beside the hip.
+const vec2 TWIST[16] = vec2[](
+	vec2(0.0), vec2(0.0), vec2(0.0), vec2(0.0), vec2(0.0), vec2(0.0), vec2(0.0),
+	vec2(0.0), vec2(0.0), vec2(0.0), vec2(0.0), vec2(0.0),
+	vec2(90.0, 0.0), vec2(90.0, 90.0), vec2(0.0), vec2(90.0, 0.0)
 );
 // Per pose: hip and knee bend for the left and the right leg (degrees). Seated poses bend both to a right angle.
 const vec4 LEGS[16] = vec4[](
@@ -189,6 +197,7 @@ void vertex() {
 			float roll = a.y * DEG + (left ? wave_l : wave_r);
 			float elbow = a.z * DEG;
 			float yaw = a.w * DEG;
+			float arm_twist = (left ? TWIST[pose].x : TWIST[pose].y) * DEG;
 			if (clap != 0.0) {
 				elbow += clap * 0.10;
 				yaw += clap * 0.16;
@@ -200,7 +209,7 @@ void vertex() {
 				v = el + Re * (v - el);
 				n = Re * n;
 			}
-			mat3 Rs = rot_y(-side * yaw) * rot_z(side * roll) * rot_x(-pitch);
+			mat3 Rs = rot_y(-side * yaw) * rot_z(side * roll) * rot_x(-pitch) * rot_y(-side * arm_twist);
 			v = sh + Rs * (v - sh);
 			n = Rs * n;
 		} else if (part >= 6) {

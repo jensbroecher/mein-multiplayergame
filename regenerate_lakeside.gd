@@ -27,6 +27,7 @@ const TyreStacks = preload("res://TyreStacks.gd")
 const VenueKit = preload("res://VenueKit.gd")
 const CrowdPlacer = preload("res://CrowdPlacer.gd")
 const CarPaint = preload("res://CarPaint.gd")
+const RowboatCSG = preload("res://RowboatCSG.gd")
 const LEVEL_PATH := "res://levels/LakesideLevel.tscn"
 const RES_PREFIX := "lakeside_"
 const DRESSING := "LakesideDressing"
@@ -179,12 +180,15 @@ func _ready() -> void:
 	_fit_loop()
 	_lay_shortcuts()
 	_build_venue(root)
+	_build_banked_turn(root)
+	var boat := _start_rowboat()
 	_build_wind_turbines(root)
 	_build_woodland(root)
 	_build_boulders(root)
 	_build_ads(root)
-	# The loop's CSG builds its mesh on the next frame; the meadow reads it.
+	# The loop's and the boat's CSG build their meshes on the next frame; the meadow reads them.
 	await get_tree().process_frame
+	_finish_rowboat(root, boat)
 	_build_meadow(root)
 	_verify_clear()
 
@@ -557,6 +561,10 @@ func _material(key: String) -> Material:
 			wm.set_shader_parameter("style", {"timber": 2, "lapboards": 1, "battens": 0, "painted": 3}[key])
 			wm.set_shader_parameter("weathering", 0.55)
 			m = wm
+		"boardtrack":
+			var bm := ShaderMaterial.new()
+			bm.shader = load("res://board_track.gdshader")
+			m = bm
 		"endgrain":
 			m = CampKit.make_material("wood")
 		"iron":
@@ -1920,8 +1928,15 @@ func _build_grandstand(root: Node3D) -> void:
 		var right: Vector3 = fr["right"]
 		# Front edge on STAND_FRONT_LAT; the stand climbs away from the road (to the left).
 		var at := _at(s, STAND_FRONT_LAT)
-		at.y = _ground_min(at.x, at.z, 3.0)
 		var yaw := _yaw_to(right)
+		# On the highest ground under its footprint (the pad). The lowest ground within 3m of the front edge
+		# reached down the pad's blend toward the road, which falls along the leg: the sections stood 0.15,
+		# 0.63 and 2.62m sunk into the pad, the front rows' feet under the ground.
+		var foot := _footprint_heights(_place(at, yaw), width * 0.5, rows * 0.75)
+		at.y = foot.y
+		if foot.y - foot.x > 0.4:
+			push_error("Lakeside grandstand %d: the ground under it falls %.2fm, its front posts hang in the air" % [i, foot.y - foot.x])
+		print("  grandstand %d at %.2f (ground under it %.2f to %.2f)" % [i, at.y, foot.x, foot.y])
 		_kit.set_frame(_place(at, yaw))
 		var hull := _bleacher(kit, width, rows)
 		var pts := PackedVector3Array()
@@ -1939,6 +1954,20 @@ func _build_grandstand(root: Node3D) -> void:
 		body.add_child(cs)
 		_note("Grandstand%d" % i, at + (xf.basis * Vector3(0, 0, 2.6)), 4.0 * PROP_SCALE, 0.5)
 	_commit(node, kit, "GrandstandSeats")
+
+
+## The lowest and highest ground (x, y) under a prop's rectangle, `half_w` either side of its x and from its
+## front (z = 0) back to `depth`, in the life-size frame `xf`, on a 5 x 5 grid.
+func _footprint_heights(xf: Transform3D, half_w: float, depth: float) -> Vector2:
+	var lo := INF
+	var hi := -INF
+	for i in range(5):
+		for j in range(5):
+			var w: Vector3 = xf * Vector3(lerpf(-half_w, half_w, i / 4.0), 0.0, depth * j / 4.0)
+			var g := _ground(w.x, w.z)
+			lo = minf(lo, g)
+			hi = maxf(hi, g)
+	return Vector2(lo, hi)
 
 
 ## One bleacher section at life size, front toward -z, rows climbing toward +z. Returns the corners
@@ -2462,11 +2491,14 @@ func _woodland_keep_out() -> Array:
 	for o in range(0, pads.size() - 6, 7):
 		out.append([pads[o], pads[o + 1], pads[o + 2] + 4.0, pads[o + 3] + 4.0, pads[o + 4]])
 	out.append(_road_rect(KICKER_S0 - 15.0, KICKER_S0 + 60.0, -14.0, 14.0))
-	for n in ["Ramps/ConcreteRamp", "Ramps/LoopCSG", "LevelDesign/ConcreteFootbridge", "LevelDesign/Boat",
-			"LevelDesign/Hay", "LevelDesign/Hay2", "LevelDesign/Box", "LevelDesign/Box2", "LevelDesign/Bush"]:
+	for n in ["Ramps/ConcreteRamp", "Ramps/LoopCSG", "LevelDesign/ConcreteFootbridge", "LevelDesign/Box", "LevelDesign/Box2",
+			"LevelDesign/Bush"]:
 		var p := _level.get_node_or_null(n) as Node3D
 		if p:
 			out.append([p.position.x, p.position.z, 22.0])
+	# Where the boat and the two hay FBX stood, as before they went, so the woods grow as they did.
+	for c in [BOAT_AT, Vector3(160.84, 0.0, -49.51), Vector3(152.01, 0.0, -39.01)]:
+		out.append([c.x, c.z, 22.0])
 	for f in _footprints:
 		var c: Vector2 = f[1]
 		out.append([c.x, c.y, float(f[2]) + 2.0])
@@ -2915,8 +2947,12 @@ func _meadow_cell(data: PackedByteArray, x0: float, z0: float, size: float) -> V
 #  The woodcutter's yard and the marquee
 # ======================================================================================
 
-## The FBX they replace (removed from the level on every run, if still there).
-const OLD_FBX := ["WoodenCart", "LevelDesign/Logs", "LevelDesign/FestivalTent"]
+## The FBX the dressing replaced (removed from the level on every run, if still there): the yard's cart,
+## logs and festival tent; the rowing boat (RowboatCSG.gd) and a stray copy of it at 1/18 the size that
+## hung 37m over the lake's western arm, filed under Checkpoints; and two hay bales by the concrete ramp,
+## gone for good. With them the course loads no FBX.
+const OLD_FBX := ["WoodenCart", "LevelDesign/Logs", "LevelDesign/FestivalTent", "LevelDesign/Boat",
+	"Checkpoints/be10e042cec0f40d5041acdc304a0ac3", "LevelDesign/Hay", "LevelDesign/Hay2"]
 ## [what, near (x, z), footprint radius in the level]: inside the long bend after the hill (s 500-626),
 ## where the cart stood as the old shortcut's ramp, and the marquee where the festival tent was.
 const YARD := [
@@ -3032,6 +3068,277 @@ func _logwall_material() -> ShaderMaterial:
 
 
 # ======================================================================================
+#  The rowing boat
+# ======================================================================================
+
+## Where the FBX boat lay, on the lake north of the woodyard's bend (its waterline), and the way its bow points.
+const BOAT_AT := Vector3(175.13, -10.0, -496.62)
+const BOAT_YAW := 0.085
+## Life size times this: a little over PROP_SCALE, as big as the boat it replaced reads from the road.
+const BOAT_SCALE := 2.0
+
+## Builds the boat's CSG tree (RowboatCSG.gd) in the generator's own tree: it updates on the next frame.
+func _start_rowboat() -> CSGCombiner3D:
+	var csg := RowboatCSG.build()
+	add_child(csg)
+	return csg
+
+
+## Bakes the updated tree into the boat's mesh and moors it where the FBX was.
+func _finish_rowboat(root: Node3D, csg: CSGCombiner3D) -> void:
+	var mi := MeshInstance3D.new()
+	mi.name = "Rowboat"
+	mi.mesh = _save_res(RowboatCSG.bake(csg, _material), "rowboat")
+	mi.transform = Transform3D(Basis(Vector3.UP, BOAT_YAW).scaled(Vector3.ONE * BOAT_SCALE), BOAT_AT)
+	root.add_child(mi)
+	remove_child(csg)
+	csg.free()
+	print("  rowboat: %d surfaces, %.1fm long" % [mi.mesh.get_surface_count(), mi.mesh.get_aabb().size.z * BOAT_SCALE])
+
+
+# ======================================================================================
+#  The banked board turn
+# ======================================================================================
+
+## The bend round the woodyard (s 465-690: 125 degrees to the left, over both arms of the lake) is a
+## banked board track. A timber deck lies over the road from curb to curb: level with it at both ends,
+## it tilts up about its inner edge to BANK_ANGLE through the corner, its outer edge 4.9m over the road.
+## A boarded wall runs along the top, sponsor boards on its inside, posts and battens outside, and on
+## down to the road's edge so nothing gets in under the deck. The deck is its own body, "BankedDeck"
+## (road to PlayerCart, `surface` wood); the wall is "BankedWall". Each holds its mesh, so
+## DressingColliders leaves them be. The planks, paint and rubber are board_track.gdshader's.
+const BANK_S := [465.0, 505.0, 650.0, 690.0]   # s where the bank starts to rise, is full, eases off, ends
+const BANK_ANGLE := 0.2967                     # 17 degrees
+const BANK_EDGE := 8.0                         # the deck's half width: the curb's outer edge
+const BANK_LIFT := 0.06                        # the deck's inner edge over the road (0.02 at its ends)
+const BANK_WALL_H := 1.4                       # the wall over the deck's outer edge
+const BANK_WALL_T := 0.16
+const BANK_WALL_FOOT := 0.35                   # how far the wall reaches under the road's surface
+## Painted bands up the deck: [from, to] (m from its inner edge, in plan), colour. The rest is bare wood.
+const BANK_PAINT := [
+	[0.0, 1.1, Color(0.36, 0.62, 0.86)],   # the blue apron along the inside
+	[1.5, 1.68, Color(0.08, 0.08, 0.09)],
+	[3.3, 3.48, Color(0.82, 0.12, 0.10)],
+	[7.6, 7.78, Color(0.12, 0.30, 0.72)],
+]
+const BANK_TIMBER := Color(0.60, 0.47, 0.34)
+## The side of the road the bend's inside is on (-1 left), from the lap's turn.
+var _bank_inner := -1.0
+
+
+func _build_banked_turn(root: Node3D) -> void:
+	var turn := (_frame(BANK_S[0])["fwd"] as Vector3).cross(_frame(BANK_S[3])["fwd"] as Vector3).y
+	_bank_inner = -1.0 if turn > 0.0 else 1.0
+	var node := Node3D.new()
+	node.name = "BankedTurn"
+	root.add_child(node)
+	var width := BANK_EDGE * 2.0
+	var s0: float = BANK_S[0]
+	var s3: float = BANK_S[3]
+	# Strips across the deck: [from, to, paint (alpha 0: bare wood)].
+	var strips: Array = []
+	var d := 0.0
+	for b in BANK_PAINT:
+		if float(b[0]) > d:
+			strips.append([d, float(b[0]), Color(1, 1, 1, 0)])
+		var pc: Color = b[2]
+		strips.append([float(b[0]), float(b[1]), Color(pc.r, pc.g, pc.b, 1.0)])
+		d = float(b[1])
+	strips.append([d, width, Color(1, 1, 1, 0)])
+
+	# The deck: a row of points across every metre, planar across, its normal from its neighbours.
+	_kit.reset_frame()
+	var n := ceili(s3 - s0)
+	var rows: Array = []   # [s, points at the strips' edges, normal, cos of the bank]
+	for i in range(n + 1):
+		var s := lerpf(s0, s3, float(i) / n)
+		var pts: Array = [_bank_point(s, 0.0)]
+		for st in strips:
+			pts.append(_bank_point(s, float(st[1])))
+		var along := _bank_point(s + 0.5, BANK_EDGE) - _bank_point(s - 0.5, BANK_EDGE)
+		var nrm := along.cross((pts[-1] as Vector3) - (pts[0] as Vector3)).normalized()
+		if nrm.y < 0.0:
+			nrm = -nrm
+		rows.append([s, pts, nrm, cos(_bank_angle(s))])
+	var deck := {}
+	var faces := PackedVector3Array()
+	for i in range(n):
+		var r0: Array = rows[i]
+		var r1: Array = rows[i + 1]
+		var n0: Vector3 = r0[2]
+		var n1: Vector3 = r1[2]
+		for k in range(strips.size()):
+			var st: Array = strips[k]
+			var a: Vector3 = r0[1][k]
+			var b: Vector3 = r0[1][k + 1]
+			var c: Vector3 = r1[1][k + 1]
+			var e: Vector3 = r1[1][k]
+			var ua := Vector2(r0[0] - s0, float(st[0]) / r0[3])
+			var ub := Vector2(r0[0] - s0, float(st[1]) / r0[3])
+			var uc := Vector2(r1[0] - s0, float(st[1]) / r1[3])
+			var ue := Vector2(r1[0] - s0, float(st[0]) / r1[3])
+			_kit.tri(deck, "boardtrack", a, b, c, n0, n0, n1, st[2], n0, ua, ub, uc)
+			_kit.tri(deck, "boardtrack", a, c, e, n0, n1, n1, st[2], n0, ua, uc, ue)
+		# Collision: one quad across, wound like the kicker's deck (l on the left of travel).
+		var l0: Vector3 = r0[1][0] if _bank_inner < 0.0 else r0[1][-1]
+		var rr0: Vector3 = r0[1][-1] if _bank_inner < 0.0 else r0[1][0]
+		var l1: Vector3 = r1[1][0] if _bank_inner < 0.0 else r1[1][-1]
+		var rr1: Vector3 = r1[1][-1] if _bank_inner < 0.0 else r1[1][0]
+		faces.append_array(PackedVector3Array([l0, rr1, rr0, l0, l1, rr1]))
+	var deck_body := StaticBody3D.new()
+	deck_body.name = "BankedDeck"
+	deck_body.set_meta(&"surface", "wood")
+	node.add_child(deck_body)
+	var dcs := CollisionShape3D.new()
+	var dshape := ConcavePolygonShape3D.new()
+	dshape.set_faces(faces)
+	dcs.shape = _save_res(dshape, "bank_deck_collision")
+	deck_body.add_child(dcs)
+	_commit(deck_body, deck, "BankedDeckBoards")
+
+	# The wall, where the deck's outer edge is 0.3m or more over the road. Built at life size through
+	# the kit's frame (PROP_SCALE), so the boards and timbers come out at the venue's scale.
+	var w0 := s0
+	while _bank_rise(w0) < 0.3:
+		w0 += 0.5
+	var w1 := s3
+	while _bank_rise(w1) < 0.3:
+		w1 -= 0.5
+	var inv := 1.0 / PROP_SCALE
+	_kit.set_frame(Transform3D(Basis().scaled(Vector3.ONE * PROP_SCALE), Vector3.ZERO))
+	var kit := {}
+	var wall_faces := PackedVector3Array()
+	var m := ceili((w1 - w0) / 2.0)
+	var prev: Dictionary = {}
+	for i in range(m + 1):
+		var s := lerpf(w0, w1, float(i) / m)
+		var fr := _frame(s)
+		var out: Vector3 = (fr["right"] as Vector3) * -_bank_inner
+		var q: Vector3 = (fr["pos"] as Vector3) + out * BANK_EDGE
+		var foot: float = (fr["pos"] as Vector3).y + _road_y - BANK_WALL_FOOT
+		var deck_y := _bank_point(s, width).y
+		var top := deck_y + lerpf(0.5, BANK_WALL_H, clampf(minf(s - w0, w1 - s) / 5.0, 0.0, 1.0))
+		var cur := {"s": s, "out": out, "fwd": fr["fwd"],
+				"if": Vector3(q.x, foot, q.z), "id": Vector3(q.x, deck_y, q.z), "it": Vector3(q.x, top, q.z),
+				"of": Vector3(q.x, foot, q.z) + out * BANK_WALL_T, "ot": Vector3(q.x, top, q.z) + out * BANK_WALL_T}
+		if i == 0 or i == m:
+			# The wall's ends, boarded.
+			var end_n: Vector3 = (cur["fwd"] as Vector3) * (-1.0 if i == 0 else 1.0)
+			_wall_quad(kit, "battens", [cur["if"], cur["of"], cur["ot"], cur["it"]], end_n, s, inv)
+			wall_faces.append_array(PackedVector3Array([cur["if"], cur["of"], cur["ot"], cur["if"], cur["ot"], cur["it"]]))
+		if i % 2 == 0:
+			# Posts outside, every 4m.
+			var pq: Vector3 = (cur["of"] as Vector3) + out * 0.11
+			_venue.timber(kit, Vector3(pq.x, foot - 0.05, pq.z) * inv, Vector3(pq.x, top + 0.12, pq.z) * inv, 0.22 * inv, 0.2 * inv,
+					BANK_TIMBER.darkened(0.08), out)
+		if not prev.is_empty():
+			var pout: Vector3 = ((prev["out"] as Vector3) + out).normalized()
+			# Inside, above the deck: boards along the wall. Outside: upright boards.
+			_wall_quad(kit, "lapboards", [prev["id"], cur["id"], cur["it"], prev["it"]], -pout, s, inv, prev["s"])
+			_wall_quad(kit, "battens", [prev["of"], cur["of"], cur["ot"], prev["ot"]], pout, s, inv, prev["s"])
+			# A cap along the top and a wale outside where the deck meets the wall.
+			var cap := pout * (BANK_WALL_T * 0.5) + Vector3(0, 0.06, 0)
+			_venue.timber(kit, ((prev["it"] as Vector3) + cap) * inv, ((cur["it"] as Vector3) + cap) * inv, (BANK_WALL_T + 0.14) * inv,
+					0.12 * inv, BANK_TIMBER, pout)
+			var wale := pout * (BANK_WALL_T + 0.06) + Vector3(0, -0.25, 0)
+			_venue.timber(kit, ((prev["id"] as Vector3) + wale) * inv, ((cur["id"] as Vector3) + wale) * inv, 0.26 * inv, 0.1 * inv,
+					BANK_TIMBER.darkened(0.15), Vector3.UP)
+			for f in [["if", "it"], ["of", "ot"], ["it", "ot"]]:
+				var a: Vector3 = prev[f[0]]
+				var b: Vector3 = cur[f[0]]
+				var c: Vector3 = cur[f[1]]
+				var e: Vector3 = prev[f[1]]
+				wall_faces.append_array(PackedVector3Array([a, b, c, a, c, e]))
+		prev = cur
+	# Sponsor boards on the inside of the wall through the full bank, 8m each, 12m apart.
+	var sb: float = float(BANK_S[1]) + 4.0
+	while sb + 8.0 < float(BANK_S[2]) - 2.0:
+		var ends: Array = []
+		var face := Vector3.ZERO
+		for sa in [sb, sb + 8.0]:
+			var fr2 := _frame(sa)
+			var out2: Vector3 = (fr2["right"] as Vector3) * -_bank_inner
+			var q2: Vector3 = (fr2["pos"] as Vector3) + out2 * BANK_EDGE
+			ends.append(Vector3(q2.x, _bank_point(sa, width).y + 0.3, q2.z))
+			face -= out2
+		_ad_board(kit, (ends[0] as Vector3) * inv, (ends[1] as Vector3) * inv, 1.0 * inv, face.normalized(), _next_ad())
+		sb += 12.0
+	# The deck's inner edge: a painted fascia down over the curb.
+	var apron: Color = BANK_PAINT[0][2]
+	for i in range(n):
+		var r0: Array = rows[i]
+		var r1: Array = rows[i + 1]
+		var a: Vector3 = r0[1][0]
+		var b: Vector3 = r1[1][0]
+		var lo := -0.25 + _road_y
+		var a_lo := Vector3(a.x, _curve.sample_baked(r0[0]).y + lo, a.z)
+		var b_lo := Vector3(b.x, _curve.sample_baked(r1[0]).y + lo, b.z)
+		var inward: Vector3 = (_frame(r0[0])["right"] as Vector3) * _bank_inner
+		_wall_quad(kit, "painted", [a_lo, b_lo, b, a], inward, r1[0], inv, r0[0], apron)
+	var wall_body := StaticBody3D.new()
+	wall_body.name = "BankedWall"
+	wall_body.set_meta(&"surface", "wood")
+	node.add_child(wall_body)
+	var wcs := CollisionShape3D.new()
+	var wshape := ConcavePolygonShape3D.new()
+	wshape.set_faces(wall_faces)
+	wshape.backface_collision = true
+	wcs.shape = _save_res(wshape, "bank_wall_collision")
+	wall_body.add_child(wcs)
+	_commit(wall_body, kit, "BankedWallTimber")
+	print("  banked turn: s %.0f..%.0f at %d deg, the outer edge up to %.1fm over the road, its wall s %.0f..%.0f" % [
+		s0, s3, int(round(rad_to_deg(BANK_ANGLE))), _bank_rise((s0 + s3) * 0.5), w0, w1])
+
+
+## A wall quad (world points) facing `nrm`, through the life-size frame, with UVs in life metres:
+## along the wall from `s_a` to `s` and up it.
+func _wall_quad(kit: Dictionary, key: String, p: Array, nrm: Vector3, s: float, inv: float, s_a := NAN, col := BANK_TIMBER) -> void:
+	var sa := s if is_nan(s_a) else s_a
+	var uv: Array = []
+	var lp: Array = []
+	for k in range(4):
+		var w: Vector3 = p[k]
+		lp.append(w * inv)
+		# Points 0 and 3 are at the segment's start, 1 and 2 at its end (end caps: all at `s`).
+		var su := sa if (k == 0 or k == 3) else s
+		uv.append(Vector2(su, w.y) * inv)
+	if is_nan(s_a):
+		# An end cap: across it instead of along.
+		for k in range(4):
+			uv[k] = Vector2(float(k == 1 or k == 2) * BANK_WALL_T, (p[k] as Vector3).y) * inv
+	_kit.quad(kit, key, lp, nrm, col, uv)
+
+
+## The deck at `s`, `d` metres across (in plan) from its inner edge, in the world.
+func _bank_point(s: float, d: float) -> Vector3:
+	var fr := _frame(s)
+	var c: Vector3 = fr["pos"]
+	var p: Vector3 = c + (fr["right"] as Vector3) * (_bank_inner * (BANK_EDGE - d))
+	var lift := lerpf(0.02, BANK_LIFT, clampf(minf(s - float(BANK_S[0]), float(BANK_S[3]) - s) / 4.0, 0.0, 1.0))
+	p.y = c.y + _road_y + lift + d * tan(_bank_angle(s))
+	return p
+
+
+## How far the deck's outer edge stands over its inner edge at `s`.
+func _bank_rise(s: float) -> float:
+	return BANK_EDGE * 2.0 * tan(_bank_angle(s))
+
+
+func _bank_angle(s: float) -> float:
+	var t := 1.0
+	if s < float(BANK_S[1]):
+		t = _smoother((s - float(BANK_S[0])) / (float(BANK_S[1]) - float(BANK_S[0])))
+	elif s > float(BANK_S[2]):
+		t = _smoother((float(BANK_S[3]) - s) / (float(BANK_S[3]) - float(BANK_S[2])))
+	return BANK_ANGLE * t
+
+
+static func _smoother(x: float) -> float:
+	var t := clampf(x, 0.0, 1.0)
+	return t * t * t * (t * (t * 6.0 - 15.0) + 10.0)
+
+
+# ======================================================================================
 #  Spectators
 # ======================================================================================
 
@@ -3040,6 +3347,8 @@ func _logwall_material() -> ShaderMaterial:
 ## paddock's tables. A European venue: SPECTATOR_SKIN weights crowd_common's groups.
 const SPECTATOR_SCALE := PROP_SCALE / 1.86
 const SPECTATOR_SKIN := [0.10, 0.08, 0.70, 0.07, 0.05]
+## Of the grandstand's taken seats, the share whose spectator stands.
+const STAND_UP_SHARE := 0.11
 
 func _build_spectators(root: Node3D) -> void:
 	var rng := RandomNumberGenerator.new()
@@ -3059,8 +3368,10 @@ func _build_spectators(root: Node3D) -> void:
 			var p := mid + along * u + away * back
 			p.y = _ground(p.x, p.z)
 			spots.append([p, -away + along * rng.randf_range(-0.35, 0.35), false])
-	# The grandstand: a seat every 0.55m on each of the seven rows (VenueKit's _bleacher: the seat boards'
-	# tops 0.72 + 0.4 a row up, 0.57 + 0.75 a row back, life size), about two in three taken.
+	# The grandstand: a seat every 0.55m on each of the seven rows (_bleacher: the seat boards' tops 0.72 +
+	# 0.4 a row up, 0.57 + 0.75 a row back, life size), about two in three taken. A few stand up on the foot
+	# board in front of their seat (its top 0.3 + 0.4 a row up, 0.16 + 0.75 a row back); only they wave
+	# flags, since nothing hangs over the stand.
 	var seated := 0
 	for xf in _stand_frames:
 		var fx: Transform3D = xf
@@ -3069,8 +3380,12 @@ func _build_spectators(root: Node3D) -> void:
 			var x := -2.8
 			while x <= 2.81:
 				if rng.randf() < 0.66:
-					spots.append([fx * Vector3(x + rng.randf_range(-0.05, 0.05), 0.72 + r * 0.4, r * 0.75 + 0.57), face, true])
-					seated += 1
+					var xs := x + rng.randf_range(-0.05, 0.05)
+					if rng.randf() < STAND_UP_SHARE:
+						spots.append([fx * Vector3(xs, 0.3 + r * 0.4, r * 0.75 + 0.16), face, false, true])
+					else:
+						spots.append([fx * Vector3(xs, 0.72 + r * 0.4, r * 0.75 + 0.57), face, true, true])
+						seated += 1
 				x += 0.55
 	# Round the paddock: a pair at each show car's table, looking at it, and a few more about.
 	for g in _gazebo_frames:
