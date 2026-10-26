@@ -1,5 +1,6 @@
 shader_type spatial;
 render_mode cull_disabled, diffuse_burley, specular_schlick_ggx;
+#include "res://camera_xray.gdshaderinc"
 
 // The needle fronds of Frostfall Gorge's spruces (spruce.gdshader draws their trunks). Each frond is a
 // curved, folded card (regenerate_frostfall_gorge.gd, _spruce_frond) textured with a drawn spray of
@@ -57,6 +58,9 @@ void vertex() {
 }
 
 void fragment() {
+	if (xray_hidden(VERTEX, VIEW_MATRIX, CAMERA_POSITION_WORLD, PROJECTION_MATRIX, FRAGCOORD.xy)) {
+		discard;
+	}
 	if (lod_hidden(cam_dist, FRAGCOORD.xy, PROJECTION_MATRIX)) {
 		discard;
 	}

@@ -40,9 +40,9 @@ func _build_camera_option() -> void:
 	row.add_child(lbl)
 	option_camera_mode = OptionButton.new()
 	option_camera_mode.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	option_camera_mode.add_item("Top Down")
-	option_camera_mode.add_item("Follower")
-	option_camera_mode.selected = 0 if MusicManager.use_isometric_camera else 1
+	for mode_name in MusicManager.CAMERA_MODE_NAMES:
+		option_camera_mode.add_item(mode_name)
+	option_camera_mode.selected = MusicManager.camera_mode
 	option_camera_mode.item_selected.connect(_on_camera_mode_selected)
 	row.add_child(option_camera_mode)
 func _build_shadows_option() -> void:
@@ -86,7 +86,7 @@ func show_pause_menu():
 	music_slider.value = MusicManager.music_volume
 	sfx_slider.value = MusicManager.sfx_volume
 	if option_camera_mode:
-		option_camera_mode.selected = 0 if MusicManager.use_isometric_camera else 1
+		option_camera_mode.selected = MusicManager.camera_mode
 	if option_shadows:
 		option_shadows.selected = MusicManager.shadow_quality_index
 	if option_commentary:
@@ -107,7 +107,7 @@ func _on_sfx_volume_changed(value: float):
 	MusicManager.set_sfx_volume(value)
 
 func _on_camera_mode_selected(index: int) -> void:
-	MusicManager.set_use_isometric_camera(index == 0)
+	MusicManager.set_camera_mode(index)
 
 func _on_shadow_quality_selected(index: int) -> void:
 	MusicManager.set_shadow_quality(index)

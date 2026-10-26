@@ -254,7 +254,11 @@ void fragment() {
 		refr_uv = clamp(SCREEN_UV, px, 1.0 - px);
 		behind = scene_depth(refr_uv, INV_PROJECTION_MATRIX);
 	}
-	float path = max(behind - surf_depth, 0.0);
+	// Still in front of the surface: a pixel along the silhouette of something standing before the
+	// water (a pier rail, a palm), where the depth texture and the water's pixels don't line up. Not a
+	// contact: take the depth of the sea there, or it drew a white outline of foam round them.
+	bool occluded = behind < surf_depth - 0.05;
+	float path = occluded ? max(-g, 0.0) * 2.0 : max(behind - surf_depth, 0.0);
 	vec3 below = textureLod(screen_tex, refr_uv, 0.0).rgb;
 	vec3 transmit = exp(-absorption * path);
 	float body_t = 1.0 - exp(-path * 0.22);
@@ -272,7 +276,7 @@ void fragment() {
 	pat = mix(pat, 0.55, 0.7 * (1.0 - ripple_fade));
 	float foam = smoothstep(1.0 - s.foam, 1.0 - s.foam + 0.22, pat) * covered;
 	// Foam round anything standing in the water (piles, rocks, wrecks, carts).
-	float contact = (1.0 - smoothstep(0.0, 0.35, path)) * step(0.0, -g) * smoothstep(0.1, 0.6, -g);
+	float contact = occluded ? 0.0 : (1.0 - smoothstep(0.0, 0.35, path)) * step(0.0, -g) * smoothstep(0.1, 0.6, -g);
 	foam = max(foam, contact * smoothstep(0.35, 0.65, pat) * 0.8);
 	// The frothy line at the swash edge.
 	float edge_line = (1.0 - smoothstep(0.0, 0.05, edge - g)) * swash_covers * step(0.0, g) * (1.0 - smoothstep(0.6, 1.0, since_peak));

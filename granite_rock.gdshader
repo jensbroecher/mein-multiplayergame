@@ -1,5 +1,6 @@
 shader_type spatial;
 render_mode cull_back, diffuse_burley, specular_schlick_ggx;
+#include "res://camera_xray.gdshaderinc"
 
 // Granite boulders of Mara Crossing's kopjes (see granite.gdshaderinc for the look).
 // The generator bakes occlusion into vertex colour r: dark in the cracks between stacked blocks
@@ -19,6 +20,9 @@ void vertex() {
 }
 
 void fragment() {
+	if (xray_hidden(VERTEX, VIEW_MATRIX, CAMERA_POSITION_WORLD, PROJECTION_MATRIX, FRAGCOORD.xy)) {
+		discard;
+	}
 	float dist = length(w_pos - CAMERA_POSITION_WORLD);
 	float detail = 1.0 - smoothstep(30.0, 220.0, dist);
 	vec3 n = normalize(w_nrm);

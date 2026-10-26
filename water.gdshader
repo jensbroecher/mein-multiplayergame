@@ -22,7 +22,7 @@ uniform bool enable_water_edge_fade = true;
 uniform float water_fade_start = 800.0;
 uniform float water_fade_end = 2200.0;
 
-uniform sampler2D depth_texture : hint_depth_texture, filter_linear_mipmap;
+uniform sampler2D depth_texture : hint_depth_texture, filter_nearest;
 uniform float depth_fade_distance : hint_range(1.0, 50.0) = 6.0;
 uniform vec3 deep_water_color : source_color = vec3(0.005, 0.025, 0.05);
 
@@ -61,7 +61,12 @@ void fragment() {
 	vec3 ndc = vec3(SCREEN_UV * 2.0 - 1.0, depth_raw);
 	vec4 view_coords = INV_PROJECTION_MATRIX * vec4(ndc, 1.0);
 	view_coords.xyz /= view_coords.w;
-	float linear_depth = max(0.0, -view_coords.z + VERTEX.z);
+	float linear_depth = -view_coords.z + VERTEX.z;
+	// Something in front of the water at this pixel (along a silhouette): deep, not a pale shallow rim.
+	if (linear_depth < -0.05) {
+		linear_depth = depth_fade_distance;
+	}
+	linear_depth = max(0.0, linear_depth);
 	float depth_blend = clamp(linear_depth / depth_fade_distance, 0.0, 1.0);
 	depth_blend = depth_blend * depth_blend * (3.0 - 2.0 * depth_blend);
 	final_color = mix(final_color, deep_water_color, depth_blend * 0.85);

@@ -465,9 +465,29 @@ var camera_clip_distance_mult_iso: float = 1.0
 ## Loaded from MusicManager so stage changes keep the player's camera choice.
 ## The top-down race camera (is_isometric; it used to be an isometric view): a fixed offset in world
 ## axes, not turning with the cart, high and steep enough to see well down the track, and its lens.
-var is_isometric: bool = true
+var is_isometric: bool = false
 const TOPDOWN_OFFSET := Vector3(-22.0, 48.0, 22.0)
 const TOPDOWN_FOV := 44.0
+## The High Chase camera (MusicManager's default): behind and above the cart, about 30 degrees down,
+## its heading turning after the cart's direction of travel slowly and at a capped rate, so a corner
+## is a gentle pan, not the swing of the Top Down view's look-ahead. Both are raised cameras: the
+## plants and rocks between them and the cart thin out (camera_xray.gdshaderinc).
+var is_high_chase: bool = true
+const CHASE_BACK := 9.5
+## Under a checkpoint banner's bottom edge (6.2m), so the line down to the cart passes beneath it.
+const CHASE_UP := 5.4
+const CHASE_FOV := 62.0
+const CHASE_LOOK_AHEAD := 4.0
+## How fast the chase heading follows the cart's (1/s), and the most it turns (rad/s).
+const CHASE_YAW_RATE := 1.8
+const CHASE_YAW_MAX := 1.4
+## How fast the camera's height follows the cart's, so bumps don't shake the view.
+const CHASE_Y_RATE := 3.0
+## Radius (m) of the see-through tube round the line to the cart, per raised camera.
+const XRAY_RADIUS_CHASE := 2.6
+const XRAY_RADIUS_TOPDOWN := 5.0
+var _chase_yaw: float = NAN
+var _chase_y: float = NAN
 var is_carried_by_eagle: bool = false
 var is_intro_active: bool = false
 var intro_time: float = 0.0
@@ -722,16 +742,21 @@ func _refresh_name_tag() -> void:
 	else:
 		tag.text = player_name
 	
-	var iso: bool = MusicManager.use_isometric_camera if MusicManager != null else is_isometric
-	_update_name_tag_scale(iso)
+	_update_name_tag_scale(MusicManager.camera_mode if MusicManager != null else _camera_mode())
 
 
-func _update_name_tag_scale(iso: bool) -> void:
+func _update_name_tag_scale(mode: int) -> void:
 	var tag: Label3D = name_tag if name_tag != null else get_node_or_null("Visuals/NameTag")
 	if tag == null:
 		return
-	# Uniform name tag sizing for all cars: compact in isometric/spectator view, clear & legible in follower chase cam
-	tag.pixel_size = 0.00022 if iso else 0.00048
+	# Uniform name tag sizing for all cars: compact in the raised views, clear & legible in the follower
+	match mode:
+		MusicManager.CameraMode.TOP_DOWN:
+			tag.pixel_size = 0.00022
+		MusicManager.CameraMode.HIGH_CHASE:
+			tag.pixel_size = 0.00032
+		_:
+			tag.pixel_size = 0.00048
 
 func has_physics_authority() -> bool:
 	return is_local_player or (is_ai and (multiplayer.multiplayer_peer == null or is_multiplayer_authority()))
@@ -1110,13 +1135,14 @@ func _ready():
 		camera_pivot.top_level = true
 
 		# Restore preferred camera across stages / races
-		is_isometric = MusicManager.use_isometric_camera
+		is_isometric = MusicManager.camera_mode == MusicManager.CameraMode.TOP_DOWN
+		is_high_chase = MusicManager.camera_mode == MusicManager.CameraMode.HIGH_CHASE
 		if not MusicManager.camera_mode_changed.is_connected(_on_camera_mode_setting_changed):
 			MusicManager.camera_mode_changed.connect(_on_camera_mode_setting_changed)
 		
 		# Set initial top-view camera settings
 		camera.projection = Camera3D.PROJECTION_PERSPECTIVE
-		camera.fov = TOPDOWN_FOV if is_isometric else 75.0
+		camera.fov = TOPDOWN_FOV if is_isometric else (CHASE_FOV if is_high_chase else 75.0)
 		
 		# Rotation is already locked globally at startup
 
@@ -1135,6 +1161,12 @@ func _ready():
 		# Position camera immediately at start to avoid sliding in
 		if is_isometric:
 			camera_pivot.global_position = visuals.global_position + TOPDOWN_OFFSET
+			camera_pivot.look_at(visuals.global_position, Vector3.UP)
+		elif is_high_chase:
+			var fwd0 = -visuals.global_transform.basis.z
+			_chase_yaw = atan2(fwd0.x, fwd0.z)
+			_chase_y = visuals.global_position.y
+			camera_pivot.global_position = visuals.global_position + _chase_offset()
 			camera_pivot.look_at(visuals.global_position, Vector3.UP)
 		else:
 			var fwd0 = -visuals.global_transform.basis.z
@@ -1353,7 +1385,7 @@ func _process(delta):
 		_update_missile_warning(delta)
 		# Camera toggle (persists across stages via MusicManager)
 		if Input.is_action_just_pressed(input_prefix + "toggle_camera"):
-			_set_isometric_camera(not is_isometric, true)
+			_set_camera_mode((_camera_mode() + 1) % MusicManager.CAMERA_MODE_NAMES.size(), true)
 
 		# Action buttons
 		if Input.is_action_just_pressed(input_prefix + "respawn") and not is_finished_race:
@@ -1361,7 +1393,7 @@ func _process(delta):
 
 		var visual_forward = -visuals.global_transform.basis.z
 		var speed_factor = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
-		var look_ahead_dist = (11.0 + speed_factor * 13.0) if is_isometric else (6.0 + speed_factor * 5.0)
+		var look_ahead_dist = (11.0 + speed_factor * 13.0) if is_isometric else (CHASE_LOOK_AHEAD if is_high_chase else (6.0 + speed_factor * 5.0))
 		if splitscreen_camera != null:
 			look_ahead_dist *= 0.4 # Keep camera closer to car in splitscreen to prevent going off-screen
 
@@ -1448,10 +1480,15 @@ func _process(delta):
 					if not listener.current:
 						listener.current = true
 						listener.make_current()
-			elif is_isometric or is_carried_by_eagle:
-				var iso_zoom: float = 1.2 if is_carried_by_eagle else 1.0
-				var iso_offset = TOPDOWN_OFFSET * iso_zoom
-				var desired_cam_pos = visuals.global_position + iso_offset
+			elif is_isometric or is_high_chase or is_carried_by_eagle:
+				var chase: bool = is_high_chase and not is_isometric and not is_carried_by_eagle
+				var desired_cam_pos: Vector3
+				if chase:
+					_update_chase_heading(delta)
+					desired_cam_pos = Vector3(visuals.global_position.x, _chase_y, visuals.global_position.z) + _chase_offset()
+				else:
+					var iso_zoom: float = 1.2 if is_carried_by_eagle else 1.0
+					desired_cam_pos = visuals.global_position + TOPDOWN_OFFSET * iso_zoom
 				var ray_start = visuals.global_position + Vector3.UP * 1.0
 				
 				# Throttle expensive clip raycasts
@@ -1498,11 +1535,17 @@ func _process(delta):
 					race_ui.set_terrain_clipped(_cached_cam_below_terrain)
 
 				var cam_fwd = Vector3(visual_forward.x, 0.0, visual_forward.z)
-				if cam_fwd.length_squared() < 0.01:
+				if chase:
+					# Along the camera's own slow heading, so the aim never swings ahead of it.
+					cam_fwd = Vector3(sin(_chase_yaw), 0.0, cos(_chase_yaw))
+				elif cam_fwd.length_squared() < 0.01:
 					cam_fwd = Vector3.FORWARD
 				else:
 					cam_fwd = cam_fwd.normalized()
-				camera_look_at = camera_look_at.lerp(visuals.global_position + cam_fwd * look_ahead_dist, 10.0 * delta)
+				var look_base: Vector3 = visuals.global_position
+				if chase:
+					look_base.y = _chase_y + 0.6
+				camera_look_at = camera_look_at.lerp(look_base + cam_fwd * look_ahead_dist, 10.0 * delta)
 				camera_pivot.look_at(camera_look_at, Vector3.UP)
 			elif _splash_cam_wanted(visual_forward):
 				_splash_camera(excludes, delta)
@@ -1564,6 +1607,12 @@ func _process(delta):
 			target_fov = 48.0 # Zoom out when grabbed by eagle
 		elif is_isometric:
 			target_fov = TOPDOWN_FOV
+		elif is_high_chase:
+			target_fov = CHASE_FOV
+			if is_boosting:
+				target_fov += 8.0
+			elif is_pad_boosting:
+				target_fov += 5.0
 		else:
 			target_fov = 75.0
 			if is_boosting:
@@ -1571,6 +1620,7 @@ func _process(delta):
 			elif is_pad_boosting:
 				target_fov += 9.0 # Zoom out slightly less when pad boosting!
 		camera.fov = lerp(camera.fov, target_fov, 8.0 * delta)
+		_update_xray_globals()
 
 		if (not is_finished_race or finish_spectate_delay > 0.0) and has_node("AudioListener3D"):
 			var listener = get_node("AudioListener3D")
@@ -4274,6 +4324,8 @@ func _teleport_vanish_step(t: float) -> void:
 
 func _teleport_appear() -> void:
 	_apply_respawn_pose()
+	# The High Chase heading starts again behind the respawned cart instead of panning round to it.
+	_chase_yaw = NAN
 	# Keep the scales captured before vanish. Recapturing here stored the
 	# already-shrunk chassis and left only the restored wheels at full size.
 	if _teleport_base_scales.is_empty():
@@ -7265,32 +7317,86 @@ func _update_intro_camera(_delta: float):
 	camera_pivot.look_at(intro_orbit_center, Vector3.UP)
 
 
-func _on_camera_mode_setting_changed(iso: bool) -> void:
-	_update_name_tag_scale(iso)
+func _on_camera_mode_setting_changed(mode: int) -> void:
+	_update_name_tag_scale(mode)
 	if not is_local_player:
 		return
-	_set_isometric_camera(iso, false)
+	_set_camera_mode(mode, false)
 
 
-func _set_isometric_camera(iso: bool, persist: bool) -> void:
-	if is_isometric == iso:
+func _camera_mode() -> int:
+	if is_isometric:
+		return MusicManager.CameraMode.TOP_DOWN
+	if is_high_chase:
+		return MusicManager.CameraMode.HIGH_CHASE
+	return MusicManager.CameraMode.FOLLOWER
+
+
+func _set_camera_mode(mode: int, persist: bool) -> void:
+	if _camera_mode() == mode:
 		if persist:
-			MusicManager.set_use_isometric_camera(iso)
+			MusicManager.set_camera_mode(mode)
 		return
-	is_isometric = iso
-	_update_name_tag_scale(is_isometric)
+	is_isometric = mode == MusicManager.CameraMode.TOP_DOWN
+	is_high_chase = mode == MusicManager.CameraMode.HIGH_CHASE
+	_chase_yaw = NAN
+	_chase_y = NAN
+	_update_name_tag_scale(mode)
 	if camera:
 		camera.projection = Camera3D.PROJECTION_PERSPECTIVE
-	if not is_isometric:
-		camera_clip_distance_mult = 1.0
-	else:
-		camera_clip_distance_mult_iso = 1.0
+	camera_clip_distance_mult = 1.0
+	camera_clip_distance_mult_iso = 1.0
 	_clear_camera_xray_immediate()
 	_cached_cam_below_terrain = false
 	if race_ui:
 		race_ui.set_terrain_clipped(false)
 	if persist:
-		MusicManager.set_use_isometric_camera(is_isometric)
+		MusicManager.set_camera_mode(mode)
+
+
+## The High Chase camera's place relative to the cart (at the smoothed height), from its heading.
+func _chase_offset() -> Vector3:
+	var yaw: float = 0.0 if is_nan(_chase_yaw) else _chase_yaw
+	return Vector3(-sin(yaw) * CHASE_BACK, CHASE_UP, -cos(yaw) * CHASE_BACK)
+
+
+## Turns the chase heading toward the way the cart is going: its velocity when it's rolling forward
+## (a drift or a bump doesn't swing the view the way the nose would), else its nose. Eased at
+## CHASE_YAW_RATE and capped at CHASE_YAW_MAX, so even a hairpin is a slow pan.
+func _update_chase_heading(delta: float) -> void:
+	var nose: Vector3 = -visuals.global_transform.basis.z
+	nose.y = 0.0
+	var dir: Vector3 = nose.normalized() if nose.length_squared() > 0.0001 else Vector3.FORWARD
+	var vel := Vector3(linear_velocity.x, 0.0, linear_velocity.z)
+	if vel.length() > 4.0 and vel.normalized().dot(dir) > 0.2:
+		dir = vel.normalized()
+	var want: float = atan2(dir.x, dir.z)
+	var car_y: float = visuals.global_position.y
+	if is_nan(_chase_yaw):
+		_chase_yaw = want
+		_chase_y = car_y
+		return
+	var diff: float = wrapf(want - _chase_yaw, -PI, PI)
+	var step: float = clampf(diff * minf(CHASE_YAW_RATE * delta, 1.0), -CHASE_YAW_MAX * delta, CHASE_YAW_MAX * delta)
+	_chase_yaw = wrapf(_chase_yaw + step, -PI, PI)
+	_chase_y = lerpf(_chase_y, car_y, minf(CHASE_Y_RATE * delta, 1.0))
+	# Never so far behind a drop or a climb that the cart leaves the frame.
+	_chase_y = clampf(_chase_y, car_y - 2.0, car_y + 1.5)
+
+
+## Feeds camera_xray.gdshaderinc: this player's camera and cart, so the plants and rocks between
+## them thin out in the raised cameras. Off in the follower, the intro, after the finish (the
+## spectator view follows other carts) and in the eagle's grip.
+func _update_xray_globals() -> void:
+	var slot: String = "b" if input_prefix == "p2_" else "a"
+	var on: bool = (is_isometric or is_high_chase) and not is_intro_active and not is_carried_by_eagle \
+			and not (is_finished_race and finish_spectate_delay <= 0.0)
+	var cam_pos: Vector3 = camera.global_position
+	var car_pos: Vector3 = visuals.global_position + Vector3.UP * 0.6
+	var radius: float = XRAY_RADIUS_TOPDOWN if is_isometric else XRAY_RADIUS_CHASE
+	var strength: float = 1.0 if on else 0.0
+	RenderingServer.global_shader_parameter_set("xray_cam_" + slot, Vector4(cam_pos.x, cam_pos.y, cam_pos.z, strength))
+	RenderingServer.global_shader_parameter_set("xray_car_" + slot, Vector4(car_pos.x, car_pos.y, car_pos.z, radius))
 
 
 func _is_world_collider(collider: Object) -> bool:
@@ -7521,6 +7627,8 @@ func _find_node_by_name(root: Node, node_name: String) -> Node:
 
 func _exit_tree():
 	_clear_camera_xray_immediate()
+	if is_local_player:
+		RenderingServer.global_shader_parameter_set("xray_cam_" + ("b" if input_prefix == "p2_" else "a"), Vector4.ZERO)
 	if MusicManager and MusicManager.camera_mode_changed.is_connected(_on_camera_mode_setting_changed):
 		MusicManager.camera_mode_changed.disconnect(_on_camera_mode_setting_changed)
 	var tree = get_tree()

@@ -1,0 +1,29 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://logo_3d.gdshader" id="1_ik0f3"]
+[ext_resource type="Texture2D" path="res://generated/logo/logo_faces.png" id="2_ln8mq"]
+[ext_resource type="Texture2D" path="res://generated/logo/logo_gradients.png" id="3_qhi77"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_ik0f3")
+shader_parameter/faces_tex = ExtResource("2_ln8mq")
+shader_parameter/gradients_tex = ExtResource("3_qhi77")
+shader_parameter/y_range = Vector2(0.23271276, 0.8005319)
+shader_parameter/aspect = 1.8351063829787233
+shader_parameter/rim_rough = null
+shader_parameter/body_rough = null
+shader_parameter/face_rough = null
+shader_parameter/clearcoat_amount = null
+shader_parameter/clearcoat_rough = null
+shader_parameter/glow = null
+shader_parameter/rim_gain = null
+shader_parameter/body_gain = null
+shader_parameter/face_gain = null
+shader_parameter/foot_dark = null
+shader_parameter/sheen = null
+shader_parameter/sheen_width = null
+shader_parameter/sheen_slant = null
+shader_parameter/sheen_range = null
+shader_parameter/sheen_color = null
+shader_parameter/sheen_strength = null

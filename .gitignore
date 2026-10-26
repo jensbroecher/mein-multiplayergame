@@ -42,6 +42,8 @@ Thumbs.db
 !models/desert3/*.png.import
 !models/desertridge/*.png.import
 !models/trees/*.png.import
+# The 3D logo's textures (scratch/logo_trace.gd writes their settings: lossless, the faces with mipmaps).
+!generated/logo/*.png.import
 
 # Large asset models and raw files
 *.fbx

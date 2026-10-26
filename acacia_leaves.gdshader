@@ -1,5 +1,6 @@
 shader_type spatial;
 render_mode cull_disabled, diffuse_burley, specular_schlick_ggx;
+#include "res://camera_xray.gdshaderinc"
 
 // Foliage of Mara Crossing's umbrella-thorn acacias: cards textured with sprays of fine bipinnate
 // leaves on zigzag twigs (the generator draws the texture, _acacia_leaf_texture), alpha-tested.
@@ -35,6 +36,9 @@ void vertex() {
 }
 
 void fragment() {
+	if (xray_hidden(VERTEX, VIEW_MATRIX, CAMERA_POSITION_WORLD, PROJECTION_MATRIX, FRAGCOORD.xy)) {
+		discard;
+	}
 	if (lod_hidden(cam_dist, FRAGCOORD.xy, PROJECTION_MATRIX)) {
 		discard;
 	}

@@ -1,5 +1,6 @@
 shader_type spatial;
 render_mode cull_disabled, diffuse_burley, specular_schlick_ggx;
+#include "res://camera_xray.gdshaderinc"
 
 // Coconut palm fronds on Bloombay Dunes (regenerate_bloombay_dunes.gd, _palm_mesh). Each frond is a
 // pair of cards hung from its midrib in a V, each textured with one side's leaflets (the generator
@@ -36,6 +37,9 @@ void vertex() {
 }
 
 void fragment() {
+	if (xray_hidden(VERTEX, VIEW_MATRIX, CAMERA_POSITION_WORLD, PROJECTION_MATRIX, FRAGCOORD.xy)) {
+		discard;
+	}
 	if (lod_hidden(cam_dist, FRAGCOORD.xy, PROJECTION_MATRIX)) {
 		discard;
 	}

@@ -1,5 +1,6 @@
 shader_type spatial;
 render_mode cull_back, diffuse_burley, specular_schlick_ggx;
+#include "res://camera_xray.gdshaderinc"
 
 // Sandstone for the Canyon Course's rock meshes (regenerate_canyon.gd): the walls of La Garganta,
 // El Arco del Viento and the hoodoos. Their beds come from canyon_strata.gdshaderinc, the same as
@@ -24,6 +25,9 @@ void vertex() {
 }
 
 void fragment() {
+	if (xray_hidden(VERTEX, VIEW_MATRIX, CAMERA_POSITION_WORLD, PROJECTION_MATRIX, FRAGCOORD.xy)) {
+		discard;
+	}
 	vec3 n = normalize(w_nrm);
 	float cam_dist = length(w_pos - CAMERA_POSITION_WORLD);
 	float detail = 1.0 - smoothstep(60.0, 500.0, cam_dist);

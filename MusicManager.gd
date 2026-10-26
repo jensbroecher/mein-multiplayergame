@@ -56,11 +56,14 @@ var scaling_3d_mode_index: int = 0
 var fsr_sharpness: float = 0.2
 var anisotropic_index: int = 1 # 0:Off 1:2x 2:4x 3:8x 4:16x
 var max_fps_index: int = 1 # 0:30 1:60 2:120 3:Unlimited
-## true = the top-down race cam ("Top Down"; it was isometric once, hence the name), false = behind-the-car follower cam.
-## Remembered across stages and sessions.
-var use_isometric_camera: bool = true
+## The race camera, remembered across stages and sessions, in the menus' order: High Chase (behind
+## and above the cart, turning slowly; the default), Top Down (high, fixed to world axes) and Follower
+## (close behind the cart).
+enum CameraMode { HIGH_CHASE, TOP_DOWN, FOLLOWER }
+const CAMERA_MODE_NAMES := ["High Chase", "Top Down", "Follower"]
+var camera_mode: int = CameraMode.HIGH_CHASE
 
-signal camera_mode_changed(is_isometric: bool)
+signal camera_mode_changed(mode: int)
 
 const RESOLUTIONS = [
 	Vector2i(1280, 720),
@@ -288,7 +291,11 @@ func load_settings():
 		fsr_sharpness = clampf(float(config.get_value("graphics", "fsr_sharpness", 0.2)), 0.0, 2.0)
 		anisotropic_index = config.get_value("graphics", "anisotropic_index", 1)
 		max_fps_index = config.get_value("graphics", "max_fps_index", 1)
-		use_isometric_camera = config.get_value("gameplay", "use_isometric_camera", true)
+		if config.has_section_key("gameplay", "camera_mode"):
+			camera_mode = clampi(int(config.get_value("gameplay", "camera_mode")), 0, CAMERA_MODE_NAMES.size() - 1)
+		elif not bool(config.get_value("gameplay", "use_isometric_camera", true)):
+			# Saved before High Chase existed: Follower stays; Top Down moves to High Chase.
+			camera_mode = CameraMode.FOLLOWER
 		
 	# Apply loaded settings
 	set_music_volume(music_volume, false)
@@ -330,7 +337,7 @@ func save_settings():
 	config.set_value("graphics", "fsr_sharpness", fsr_sharpness)
 	config.set_value("graphics", "anisotropic_index", anisotropic_index)
 	config.set_value("graphics", "max_fps_index", max_fps_index)
-	config.set_value("gameplay", "use_isometric_camera", use_isometric_camera)
+	config.set_value("gameplay", "camera_mode", camera_mode)
 	config.save(SETTINGS_FILE)
 
 func _shuffle_array(arr: Array) -> void:
@@ -859,11 +866,11 @@ func set_max_fps(index: int, save: bool = true):
 	Engine.max_fps = MAX_FPS_VALUES[index]
 	if save: save_settings()
 
-func set_use_isometric_camera(enabled: bool, save: bool = true) -> void:
-	if use_isometric_camera == enabled:
+func set_camera_mode(mode: int, save: bool = true) -> void:
+	if camera_mode == mode:
 		return
-	use_isometric_camera = enabled
-	camera_mode_changed.emit(use_isometric_camera)
+	camera_mode = mode
+	camera_mode_changed.emit(camera_mode)
 	if save:
 		save_settings()
 

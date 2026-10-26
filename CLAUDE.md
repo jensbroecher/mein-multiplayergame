@@ -336,6 +336,13 @@ first to third (`_announce_place`). The podium calls each place as it's revealed
   all gates but one (16m wide of its area): the call, the lap still counted, then the wrong way, then two
   gates missed in a row (disqualified). `skip=-1` is a clean lap, which must say nothing.
 
+## Water edges against what stands in front
+
+`river_water`, `water` and `beach_water` read the depth texture unfiltered, and where it says something is in
+front of the water (a pixel along a silhouette: MSAA, the interpolated camera in motion) they take it as deep
+water, not a shore. Clamped to 0 depth, those pixels drew white foam round every bridge rail, hanger and tree
+in front of the water while driving (Msitu Falls, Bloombay Dunes). `canyon_river` still clamps.
+
 ## Deep water, stage ambience and the sounds
 
 - Deep water (`PlayerCart._set_engine_flooded`): once a cart is under (`is_underwater`, not boosting), the
@@ -507,6 +514,85 @@ pebbles) are all solid and its bent palms carry a hull of their low trunk.
 - `res://scratch/screen_swipe_test.tscn` (headless) walks the flows and checks the timing (about 0.9s
   for cover and reveal, `COVER_TIME`/`REVEAL_TIME`); `res://scratch/swipe_shots.tscn -- <dir>` renders
   the swipe over the menu.
+
+## The 3D logo and the title card
+
+The logo (`images/logo_simple.jpeg`) is a model, `generated/logo/RcVibeLogo.tscn`, and the game opens with a
+title card (`SplashScreen.gd`) of it and five cars. Like the levels it is generated: don't edit the files in
+`generated/logo/`. Run, in this order (the trace needs about 20s, the rest seconds):
+
+```sh
+Godot --headless --path . -s res://scratch/logo_trace.gd [-- debug=<dir>]   # shapes + colours out of the picture
+Godot --headless --path . --import                                           # the two textures it wrote
+Godot --headless --path . res://regenerate_logo.tscn                         # LogoBuilder.gd -> the scene
+```
+
+- The picture is a JPEG, and none of it is taken as it comes: a bevel and a clearcoat show every wobble of an
+  edge and every speck. `logo_trace.gd` works at half size: navy is any pixel under `NAVY_V`; the not-navy
+  pixels are flood-filled into regions; one that reaches the image's edge is outside, and so is a small one with
+  the background in it (the gaps between the letters are real holes, ringed in amber, but enclosed by navy) or
+  a wedge of amber filling a narrow gap (the V-I one); the faces are the big enclosed regions. The loops
+  (marching squares) are then fitted, not simplified: resampled, corners found by the turn over a window,
+  each stretch between corners a straight line within `LINE_TOL` or Schneider cubic Beziers (flat ones become
+  lines), and each corner moved to where its two lines meet, which gives back the sharp point the blur rounded
+  (the flicks' tips). A face's and the body's edge is where the *brightness* crosses 0.5, halfway between the
+  navy and the face, not at the navy threshold: a glowing stroke fades into the navy slowly, and the threshold
+  sat in the noisy tail of the fade (the C's tip came out wavy). It prints how far a fit strays (over 4px) and
+  `scratch/logo_shape_check.gd` (`-s`, headless) checks every loop for self-crossings and triangulates each tier.
+- Colours are not the picture's either. The rim and the navy are gradients by height (`logo_gradients.png`: the
+  median of 24 bands, end bands that are mostly edge fringe replaced by their neighbour). The faces are
+  `logo_faces.png`: a bilateral blur (edge-preserving: the blocks and ringing go, the strokes and the horizon
+  lines stay) run only on pixels inside a face, then spread 20px past each face's edge. The `.import` files
+  (lossless, the faces with mipmaps) are written by the tracer and let through `.gitignore`.
+- `LogoBuilder.gd`: three tiers on a flat back (`RIM_TOP` 80, `BODY_TOP` 108, `FACE_TOP` 146 picture pixels,
+  `PX` metres a pixel: 9 x 3.4 m), the eight faces built round their own centres (nodes `Face_R` ... `Face_P`
+  under `Faces`, `Rim`, `Body`) so a letter can move on its own. Each shape is a wall, then `BEVEL_STEPS` rings
+  of a quarter ellipse, each the outline pushed in by the mitered normals (rings correspond vertex for vertex),
+  then a flat top. Three things the push needed, each found by a bad render: the push is capped by the point's
+  *displacement* (a sharp corner's miter is longer than the push, and an uncapped one crossed a neck); the room
+  is the shortest distance to an edge outside the point's own `SKIP_ARC` of outline, not the way straight in
+  (that overshoots in a tapering neck); and `_cure` collapses the swallowtails that are left (three to nine
+  points of no area at a spike's tip; it warns for anything bigger). The picture is looked up `UV_INSET` (4px)
+  inside the edge on walls and bevels too, or they showed a row of dark ticks. `PolyTriangulate.gd` triangulates
+  a polygon with holes (ear clipping, holes bridged to the outline): `Geometry2D.triangulate_polygon` takes
+  none, and the B, P, G, R and the C-V gap have them (`scratch/poly_triangulate_test.gd`).
+- `logo_3d.gdshader` is the one material: UV2.x says rim (gradient row 0), body (row 1) or face (the faces
+  texture), UV2.y how far up a wall from the tier below (the foot is darker: no ambient occlusion otherwise), UV
+  is the place in the picture so every lookup is the same whatever a letter's pivot. `instance uniform fade`
+  is a brightness, not a transparency: a mesh waiting at its start pose has to be `visible = false`. `glow` is
+  the share of the colour that is self-lit, so the navy doesn't go black and the pale colours don't burn out
+  under a key light; `sheen` (0 to 1) sweeps a slanted highlight across. `res://scratch/logo_preview.gd`
+  (`-s`, windowed, `-- <dir> [yaw=] [key=] [amb=] name:x,y,z:tx,ty,tz[:fov]`) renders it in the showroom sky.
+- `SplashScreen.gd` builds everything in code in a SubViewport (see the file's header) and every motion is a
+  function of the clock: `seek(t)` jumps anywhere. Main plays it once a launch (`should_play`: not when
+  headless, not with `nosplash` as a user arg, and only when Main is the *running scene*, so the tests that
+  instantiate Main from their own scene never see it), on a CanvasLayer at 105, under the swipe (120) that takes
+  it away, with the menu hidden behind it; any key, click or button skips it after half a second. It follows
+  the player's settings: `MusicManager.anti_aliasing`, shadows, and the Detail Level (the floor's mirror from
+  Medium, particles thinned below).
+  - The floor is a transparent plane, and the cars and logo stand again below it upside down (`_mirror`, the
+    same transforms): `splash_floor.gdshader` reads the depth texture and is see-through where it hides
+    something, by how far below the floor that thing is, so a reflection fades away from its contact.
+  - Things that went wrong: the two rim lights glinted off the polished floor as enormous coloured sheets
+    (the floor is on layer 2 and the rims' `light_cull_mask` is 1); the dust was drawn before the floor, which
+    painted over it, because transparent things sort by their node's distance (give each transparent layer a
+    `render_priority`: burst -3, floor 0, shadow blobs 1, dust 2, sparks 3); the sky's sun glow at `pow(s, 30)`
+    covered half the view and the warm and cool soft boxes the floor reflected must stay above the low parts
+    of the sky.
+  - The cars are `generated/cars/<Name>.tscn` at `CAR_SCALE` 2 (PlayerCart's x2) in factory paint, facing +z
+    at yaw 0; a wheel node turns about its own x (forward is a falling angle) and steers about y. The dust
+    emitter sits at the rear axle and is scaled by 1/`CAR_SCALE`, or the cloud's sizes and speeds double.
+  - `res://scratch/splash_shots.tscn -- <dir> [times=0.5,1.0,...] [seek=1]` (windowed, with `--fixed-fps 30`
+    so the clock and the dust are the same however slowly the shots save) photographs it; `bench=1` (without
+    `--fixed-fps`) prints its frame times (60 fps on an M1 at 1920x1080). `res://scratch/splash_flow_test.gd`
+    (`-s`, windowed, `-- <dir> [key=3.0 | key=-1] [nosplash]`) plays the real start-up and checks the hand-over
+    to the menu; `res://scratch/car_lineup.gd` photographs the cars in factory paint.
+- The engine's own boot image (`application/boot_splash/image`, shown while the project initialises, before
+  Main exists) is `images/logo_black_bg.png`, with `boot_splash/bg_color` black to match its background so a
+  window of another shape gets no grey bars. It has to be a PNG: Godot 4.8 logs "The only supported format is
+  PNG" and shows its own logo for a JPEG, so `logo_black_bg.jpeg` was converted losslessly (RGB, no alpha). It
+  is read straight from the file at start-up, not through the import system. The title card fades in from
+  near black, so the two meet.
 
 ## First-use freezes
 
@@ -1184,12 +1270,27 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 
 ## Race cameras
 
-- Two modes, toggled with C and saved by MusicManager (`use_isometric_camera`, the setting's old name):
-  "Top Down" and "Follower". Top Down (`is_isometric` in PlayerCart) sits at `TOPDOWN_OFFSET` (-22, 48, 22)
-  from the cart in world axes (it doesn't turn with the cart) with a 44 degree lens (`TOPDOWN_FOV`),
-  looking 11-24m ahead of it: about 1.6x the track the old isometric view (-26, 26, 26) at 35 degrees
-  showed. In Msitu Falls' jungle the canopy still hides the road in places from up there (the old view sat
-  inside it). Follower trails 5.2-6.8m behind; see the splash shot under Deep water.
+- Three modes (`MusicManager.CameraMode`, the menus' order), cycled with C and saved as `camera_mode` (an old
+  `use_isometric_camera` = false loads as Follower, true as High Chase):
+  - High Chase (`is_high_chase`, the default): `CHASE_BACK` 9.5m behind and `CHASE_UP` 5.4m over the cart
+    (about 30 degrees down), lens `CHASE_FOV`. Its heading (`_chase_yaw`, `_update_chase_heading`) follows the
+    cart's velocity (its nose when slow or reversing), eased at `CHASE_YAW_RATE` and capped at `CHASE_YAW_MAX`,
+    and it aims along that heading, so a corner is a slow pan. Its height eases after the cart's
+    (`CHASE_Y_RATE`). It stays under a checkpoint banner's bottom edge (6.2m): at 8m the camera rode through
+    the banners. Top Down gave the user motion sickness: its aim point swings with the nose up to 24m ahead.
+  - Top Down (`is_isometric`) sits at `TOPDOWN_OFFSET` (-22, 48, 22) from the cart in world axes (it doesn't
+    turn with the cart) with a 44 degree lens (`TOPDOWN_FOV`), looking 11-24m ahead of it.
+  - Follower trails 5.2-6.8m behind; see the splash shot under Deep water.
+- See-through in the raised cameras (`camera_xray.gdshaderinc`): the tree, palm, spruce, cactus and rock
+  shaders (`tree_bark`, `acacia_leaves`, `palm_*`, `spruce*`, `cactus`, `granite_rock`, `canyon_rock`) dither
+  away up to 72% of their pixels in a tube from the camera to the cart (`XRAY_RADIUS_*`). PlayerCart feeds the
+  globals `xray_cam_a/b`, `xray_car_a/b` (project.godot `[shader_globals]`, slot b for split screen's player 2)
+  in `_update_xray_globals`. A slot applies to a view whose camera is within 4m of it: physics interpolation
+  draws the camera behind where `_process` put it, and a 0.25m match never fired at speed. Shadow passes
+  (orthographic) are skipped. A new plant or rock shader includes it and calls `xray_hidden()` first in
+  fragment(). The old `_update_camera_xray` sets `GeometryInstance3D.transparency`, which the Mobile renderer
+  ignores, and MultiMesh instances can't be faded one by one anyway; StandardMaterial props (Hunyuan models)
+  aren't covered.
 - `res://scratch/race_cam_shots.tscn -- <dir> [level=] [mode=top|follow] [cart=0] [every=4] [count=6]`
   (windowed) rides along with an AI cart through its own race camera and saves frames.
   `scratch/look_shots` takes a lens per shot (`name:x,y,z:tx,ty,tz:fov`).

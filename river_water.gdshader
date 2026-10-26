@@ -11,7 +11,9 @@ render_mode cull_back, depth_draw_never, blend_mix, specular_schlick_ggx;
 
 uniform sampler2D noise_tex : hint_normal, filter_linear_mipmap, repeat_enable;
 uniform sampler2D foam_noise : filter_linear_mipmap, repeat_enable;
-uniform sampler2D depth_texture : hint_depth_texture, filter_linear_mipmap;
+// Unfiltered: filtered, a pixel by the edge of anything in front of the water (a bridge, a tree)
+// blended its depth into the water's and read as shallow.
+uniform sampler2D depth_texture : hint_depth_texture, filter_nearest;
 
 uniform vec3 deep_color : source_color = vec3(0.010, 0.060, 0.080);
 uniform vec3 shallow_color : source_color = vec3(0.035, 0.17, 0.19);
@@ -56,7 +58,14 @@ void fragment() {
 	float depth_raw = texture(depth_texture, SCREEN_UV).r;
 	vec4 view_far = INV_PROJECTION_MATRIX * vec4(SCREEN_UV * 2.0 - 1.0, depth_raw, 1.0);
 	view_far.xyz /= view_far.w;
-	float water_depth = max(0.0, -view_far.z + VERTEX.z);
+	float water_depth = -view_far.z + VERTEX.z;
+	// Something in front of the water at this pixel (the depth texture and the water's own pixels
+	// don't quite line up along a silhouette): no shore there, or every bridge rail, hanger and
+	// tree in front of the river got a white outline of foam.
+	if (water_depth < -0.05) {
+		water_depth = clarity_depth * 2.0;
+	}
+	water_depth = max(0.0, water_depth);
 
 	float clear = clamp(water_depth / clarity_depth, 0.0, 1.0);
 	vec3 col = mix(shallow_color, deep_color, smoothstep(0.0, 1.0, clear));

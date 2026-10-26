@@ -393,8 +393,8 @@ func _build_gameplay_page() -> Control:
 	_add_section_title(body, "CAMERA")
 	_add_hint(body, "Top Down looks down on the track from high above. Follower sits behind the cart.")
 	option_camera_mode = _add_option_row(body, "Race Camera")
-	option_camera_mode.add_item("Top Down")
-	option_camera_mode.add_item("Follower")
+	for mode_name in MusicManager.CAMERA_MODE_NAMES:
+		option_camera_mode.add_item(mode_name)
 	return scroll
 
 
@@ -572,7 +572,7 @@ func _load_values_from_manager() -> void:
 	if option_max_fps:
 		option_max_fps.selected = MusicManager.max_fps_index
 	if option_camera_mode:
-		option_camera_mode.selected = 0 if MusicManager.use_isometric_camera else 1
+		option_camera_mode.selected = MusicManager.camera_mode
 	if slider_music:
 		slider_music.value = MusicManager.music_volume
 		_update_volume_label(label_music_value, MusicManager.music_volume)
@@ -607,7 +607,7 @@ func _connect_setting_signals() -> void:
 	)
 	option_anisotropic.item_selected.connect(func(i): MusicManager.set_anisotropic(i))
 	option_max_fps.item_selected.connect(func(i): MusicManager.set_max_fps(i))
-	option_camera_mode.item_selected.connect(func(i): MusicManager.set_use_isometric_camera(i == 0))
+	option_camera_mode.item_selected.connect(func(i): MusicManager.set_camera_mode(i))
 	slider_music.value_changed.connect(func(v):
 		MusicManager.set_music_volume(v)
 		_update_volume_label(label_music_value, v)

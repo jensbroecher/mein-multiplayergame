@@ -1,5 +1,6 @@
 shader_type spatial;
 render_mode cull_back, diffuse_burley, specular_schlick_ggx;
+#include "res://camera_xray.gdshaderinc"
 
 // Bark for Mara Crossing's trees: plates split by fissures that run along the branch, done in the
 // shader from the tube's UVs (regenerate_mara_crossing.gd, _bark_tube):
@@ -62,6 +63,9 @@ void vertex() {
 }
 
 void fragment() {
+	if (xray_hidden(VERTEX, VIEW_MATRIX, CAMERA_POSITION_WORLD, PROJECTION_MATRIX, FRAGCOORD.xy)) {
+		discard;
+	}
 	if (lod_hidden(cam_dist, FRAGCOORD.xy, PROJECTION_MATRIX)) {
 		discard;
 	}

@@ -1,0 +1,55 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://generated/logo/logo_rim.res" id="1_3uudq"]
+[ext_resource type="ArrayMesh" path="res://generated/logo/logo_body.res" id="2_0a17h"]
+[ext_resource type="ArrayMesh" path="res://generated/logo/logo_face_R.res" id="3_me5wh"]
+[ext_resource type="ArrayMesh" path="res://generated/logo/logo_face_C.res" id="4_e5tha"]
+[ext_resource type="ArrayMesh" path="res://generated/logo/logo_face_V.res" id="5_4d1qf"]
+[ext_resource type="ArrayMesh" path="res://generated/logo/logo_face_I.res" id="6_ysxdl"]
+[ext_resource type="ArrayMesh" path="res://generated/logo/logo_face_B.res" id="7_inf6g"]
+[ext_resource type="ArrayMesh" path="res://generated/logo/logo_face_E.res" id="8_xg553"]
+[ext_resource type="ArrayMesh" path="res://generated/logo/logo_face_G.res" id="9_m5ew7"]
+[ext_resource type="ArrayMesh" path="res://generated/logo/logo_face_P.res" id="10_h3mah"]
+
+[node name="RcVibeLogo" type="Node3D" unique_id=1078300528]
+metadata/logo_size = Vector3(9.002399, 3.4163604, 0.584)
+
+[node name="Rim" type="MeshInstance3D" parent="." unique_id=677092570]
+mesh = ExtResource("1_3uudq")
+
+[node name="Body" type="MeshInstance3D" parent="." unique_id=1162239526]
+mesh = ExtResource("2_0a17h")
+
+[node name="Faces" type="Node3D" parent="." unique_id=1936885923]
+
+[node name="Face_R" type="MeshInstance3D" parent="Faces" unique_id=299833227]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.11188, 0.88586, 0.432)
+mesh = ExtResource("3_me5wh")
+
+[node name="Face_C" type="MeshInstance3D" parent="Faces" unique_id=661791795]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.7214799, 0.83426, 0.432)
+mesh = ExtResource("4_e5tha")
+
+[node name="Face_V" type="MeshInstance3D" parent="Faces" unique_id=875693548]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.13492012, 0.88626, 0.432)
+mesh = ExtResource("5_4d1qf")
+
+[node name="Face_I" type="MeshInstance3D" parent="Faces" unique_id=222210625]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1421201, 0.83866, 0.432)
+mesh = ExtResource("6_ysxdl")
+
+[node name="Face_B" type="MeshInstance3D" parent="Faces" unique_id=822264960]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.1053202, 0.82986003, 0.432)
+mesh = ExtResource("7_inf6g")
+
+[node name="Face_E" type="MeshInstance3D" parent="Faces" unique_id=681342779]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.4285202, 0.82626, 0.432)
+mesh = ExtResource("8_xg553")
+
+[node name="Face_G" type="MeshInstance3D" parent="Faces" unique_id=1194699557]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8374799, -0.7045401, 0.432)
+mesh = ExtResource("9_m5ew7")
+
+[node name="Face_P" type="MeshInstance3D" parent="Faces" unique_id=1218699536]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.98612016, -0.5969401, 0.432)
+mesh = ExtResource("10_h3mah")

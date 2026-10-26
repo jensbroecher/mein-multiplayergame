@@ -66,6 +66,7 @@ func _ready() -> void:
 			await get_tree().physics_frame
 		cart.is_local_player = true
 		cart.is_isometric = false
+		cart.is_high_chase = false
 		# As PlayerCart sets up a local player's camera.
 		cart.camera_pivot.top_level = true
 		cart.camera.make_current()

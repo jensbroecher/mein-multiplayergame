@@ -4,20 +4,20 @@ extends Node
 # player's, as PlayerCart sets one up) and saves a frame every `every` seconds: the Top Down camera
 # (mode=top) or the follower (mode=follow). Windowed:
 #   Godot --path . --resolution 1600x900 res://scratch/race_cam_shots.tscn -- <out_dir>
-#       [level=res://levels/LakesideLevel.tscn] [mode=top] [cart=0] [every=4] [count=6]
+#       [level=res://levels/LakesideLevel.tscn] [mode=chase] [cart=0] [every=4] [count=6]
 
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	var out_dir: String = args[0]
 	var level_path := "res://levels/LakesideLevel.tscn"
-	var top := true
+	var mode := "chase"
 	var index := 0
 	var every := 4.0
 	var count := 6
 	for a in args.slice(1):
 		if a.begins_with("level="): level_path = a.substr(6)
-		elif a.begins_with("mode="): top = a.substr(5) != "follow"
+		elif a.begins_with("mode="): mode = a.substr(5)
 		elif a.begins_with("cart="): index = int(a.substr(5))
 		elif a.begins_with("every="): every = float(a.substr(6))
 		elif a.begins_with("count="): count = int(a.substr(6))
@@ -34,7 +34,8 @@ func _ready() -> void:
 	while not cart.can_move:
 		await get_tree().physics_frame
 	cart.is_local_player = true
-	cart.is_isometric = top
+	cart.is_isometric = mode == "top"
+	cart.is_high_chase = mode == "chase"
 	cart.camera_pivot.top_level = true
 	cart.camera.make_current()
 	var t := 0.0

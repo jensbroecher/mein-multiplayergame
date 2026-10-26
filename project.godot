@@ -17,7 +17,8 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 config/name="RC Vibe GP"
 run/main_scene="res://Main.tscn"
 config/features=PackedStringArray("4.8", "Forward Plus")
-boot_splash/image="res://images/Logo_edited.png"
+boot_splash/bg_color=Color(0, 0, 0, 1)
+boot_splash/image="res://images/logo_black_bg.png"
 config/icon="res://icon.svg"
 
 [autoload]
@@ -277,6 +278,22 @@ mesh_lod/lod_change/threshold_pixels=6.0
 
 [shader_globals]
 
+xray_cam_a={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+xray_car_a={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+xray_cam_b={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+xray_car_b={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
 aurora_clock={
 "type": "float",
 "value": 0.0

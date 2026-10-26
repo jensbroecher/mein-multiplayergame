@@ -6,6 +6,8 @@ const PAUSE_MENU_SCENE = preload("res://PauseMenu.tscn")
 const LOADING_SCREEN_SCENE = preload("res://LoadingScreen.tscn")
 const PODIUM_SCENE = preload("res://Podium.tscn")
 const SCREEN_TRANSITION_SCRIPT = preload("res://ScreenTransition.gd")
+const SPLASH_SCREEN_SCENE = preload("res://SplashScreen.tscn")
+const SPLASH_SCREEN_SCRIPT = preload("res://SplashScreen.gd")
 
 @onready var lobby = $Lobby
 @onready var main_menu = $MainMenu
@@ -63,6 +65,27 @@ func _ready():
 	screen_transition = SCREEN_TRANSITION_SCRIPT.new()
 	screen_transition.name = "ScreenTransition"
 	add_child(screen_transition)
+
+	if SPLASH_SCREEN_SCRIPT.should_play(self):
+		_play_splash()
+
+
+## The title card the game opens with, over the menu (SplashScreen.gd: the 3D logo and some of the cars).
+## Any key skips it; when it is over a swipe takes its place with the menu. Once a launch, and only when
+## Main is the running scene, not a test that has instantiated it (SplashScreen.should_play).
+func _play_splash() -> void:
+	main_menu.hide()
+	var canvas := CanvasLayer.new()
+	canvas.name = "SplashCanvas"
+	# Over the menus and the loading screen (100), under the swipe (120) that takes it away.
+	canvas.layer = 105
+	add_child(canvas)
+	var splash := SPLASH_SCREEN_SCENE.instantiate()
+	canvas.add_child(splash)
+	await splash.finished
+	await _swipe(func():
+		canvas.queue_free()
+		main_menu.show())
 
 
 func _apply_platform_performance() -> void:

@@ -1,5 +1,6 @@
 shader_type spatial;
 render_mode cull_back, diffuse_burley, specular_schlick_ggx;
+#include "res://camera_xray.gdshaderinc"
 
 // Trunks of Frostfall Gorge's spruces (the needle fronds are spruce_fronds.gdshader, which supersedes the
 // whorl-cone crown this shader was written for; its needle and snow code is unused now, bark only).
@@ -65,6 +66,9 @@ void vertex() {
 }
 
 void fragment() {
+	if (xray_hidden(VERTEX, VIEW_MATRIX, CAMERA_POSITION_WORLD, PROJECTION_MATRIX, FRAGCOORD.xy)) {
+		discard;
+	}
 	// Shadow passes for the sun are orthographic; their "camera" is the light, so don't fade there.
 	if (lod_mode != 0 && PROJECTION_MATRIX[3][3] < 0.5) {
 		float t = clamp((cam_dist - lod_fade_begin) / max(lod_fade_end - lod_fade_begin, 0.001), 0.0, 1.0);

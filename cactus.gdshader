@@ -1,5 +1,6 @@
 shader_type spatial;
 render_mode cull_back, diffuse_burley, specular_schlick_ggx;
+#include "res://camera_xray.gdshaderinc"
 
 // The Canyon Course's cacti (CactusKit.gd, which documents the vertex data): the ribs shaded round
 // between their ridges and dark in their valleys, felt areoles along the ridges with spines from each,
@@ -65,6 +66,9 @@ void vertex() {
 }
 
 void fragment() {
+	if (xray_hidden(VERTEX, VIEW_MATRIX, CAMERA_POSITION_WORLD, PROJECTION_MATRIX, FRAGCOORD.xy)) {
+		discard;
+	}
 	float sp = floor(info.x + 0.5);
 	float part = floor(info.y + 0.5);
 	vec3 col = base_col;
