@@ -3,7 +3,9 @@ extends Node
 # Nyota Stadium: drives a real PlayerCart over every jump (TrackPath's "jump_lips" meta) with its
 # top speed capped at each of SPEEDS, and prints for each run the airtime, how far past the lip it
 # first came down, the height it reached over the lip, and the speed it kept a second later.
-#   Godot --headless --path . res://scratch/nyota_jump_test.tscn [-- speeds=30,36,40 only=Triple level=res://levels/LakesideLevel.tscn]
+#   Godot --headless --path . res://scratch/nyota_jump_test.tscn [-- speeds=30,36,40 only=Triple level=res://levels/LakesideLevel.tscn ground=1]
+# The cart starts 30m before the lip moving along the lip's direction; `ground=1` starts it along the
+# surface under it instead (a ramp on a flat road: launched 17 degrees up there, it hopped over the ramp).
 # Any level whose TrackPath carries "jump_lips" works (the Lakeside Course's kicker has one).
 # The node's name holds "regenerate" so Level.gd skips its race setup (no UI, no grid).
 
@@ -11,6 +13,7 @@ const CART_SCENE := preload("res://PlayerCart.tscn")
 var speeds: Array[float] = [30.0, 36.0, 40.0]
 var only := ""
 var level_path := "res://levels/NyotaStadiumLevel.tscn"
+var along_ground := false
 
 
 func _ready() -> void:
@@ -23,6 +26,8 @@ func _ready() -> void:
 			only = a.substr(5)
 		elif a.begins_with("level="):
 			level_path = a.substr(6)
+		elif a == "ground=1":
+			along_ground = true
 	Engine.physics_ticks_per_second = 60
 	AudioServer.set_bus_mute(0, true)
 	var level: Node3D = load(level_path).instantiate()
@@ -49,8 +54,12 @@ func _run(level: Node3D, lip: Dictionary, v: float) -> Dictionary:
 	var space := level.get_world_3d().direct_space_state
 	var q := PhysicsRayQueryParameters3D.create(start + Vector3.UP * 30.0, start - Vector3.UP * 30.0)
 	var hit := space.intersect_ray(q)
+	var start_dir := d
 	if hit:
 		start.y = hit.position.y + 0.9
+		if along_ground:
+			var n: Vector3 = hit.normal
+			start_dir = (d - n * d.dot(n)).normalized()
 	var cart: RigidBody3D = CART_SCENE.instantiate()
 	cart.name = "1"
 	level.get_node("Players").add_child(cart)
@@ -62,7 +71,7 @@ func _run(level: Node3D, lip: Dictionary, v: float) -> Dictionary:
 	cart.set("can_move", true)
 	cart.set("max_speed", v)
 	cart.freeze = false
-	cart.linear_velocity = d * v
+	cart.linear_velocity = start_dir * v
 	Input.action_press("p1_throttle")
 	var air := 0.0
 	var max_air := 0.0

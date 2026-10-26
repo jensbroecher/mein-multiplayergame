@@ -1,6 +1,6 @@
 extends Node
 ## Dresses the Lakeside Course (res://levels/LakesideLevel.tscn, the Bloombay GP's first stage) as an RC race
-## meeting: the paddock, race control, the camera and lap towers, catch fences hung with sponsor
+## meeting: the paddock, race control, the lap towers, catch fences hung with sponsor
 ## boards, tyre walls and hay round the first corner, the grandstand across it, a campsite on the
 ## hill, and the big orange kicker after the long bridge. Run headless:
 ##   Godot --headless --path . res://regenerate_lakeside.tscn [-- rebake]
@@ -28,6 +28,8 @@ const VenueKit = preload("res://VenueKit.gd")
 const CrowdPlacer = preload("res://CrowdPlacer.gd")
 const CarPaint = preload("res://CarPaint.gd")
 const RowboatCSG = preload("res://RowboatCSG.gd")
+const WOODEN_RAMP := preload("res://WoodenRamp.tscn")
+const BOOST_PAD := preload("res://BoostPad.tscn")
 const LEVEL_PATH := "res://levels/LakesideLevel.tscn"
 const RES_PREFIX := "lakeside_"
 const DRESSING := "LakesideDressing"
@@ -45,7 +47,6 @@ const GRID_STEP := 2.0
 ## a sharp right-hander with the lake outside it); the east leg leaves it at 67 degrees.
 const S_GANTRY := 3209.0
 const BOOTH := Vector2(3216.0, -11.3)
-const CAMERA_TOWER := Vector2(3229.0, -10.9)
 const LAP_TOWER_CORNER := Vector2(3302.0, -15.5)
 const LAP_TOWER_STRAIGHT := Vector2(3238.0, 15.6)
 ## Paddock: gazebos along the straight's left side, past the gantry.
@@ -165,9 +166,9 @@ func _ready() -> void:
 	_level.add_child(root)
 	_rng.seed = 7311
 	_build_kicker(root)
+	_build_bridge_jumps(root)
 	_build_paddock(root)
 	_build_race_control(root)
-	_build_camera_tower(root)
 	_build_lap_towers(root)
 	_build_fences(root)
 	_build_barriers(root)
@@ -820,6 +821,61 @@ func _build_kicker(root: Node3D) -> void:
 	print("  kicker: %.1fm long, lip %.1fm over the road at %d deg (s %.0f..%.0f)" % [a_end, h_end, int(rad_to_deg(KICKER_ANGLE)), s0, s0 + a_end])
 
 
+# ======================================================================================
+#  The long bridge's ramps and boost pads
+# ======================================================================================
+
+## Wooden ramps (WoodenRamp.tscn) curb to curb on the climb to the long bridge and on it, each [s of the
+## toe, length, height, curve, table, tail]: two rollers on the climb (s 955-1000), a kicker where the
+## bridge leaves the shore (it lands on the straight before the bend at 1360), and a table-top on the far
+## straight after the bend. None near a checkpoint (737, 1106, 1475, 1844) or in the bend.
+const BRIDGE_RAMPS := [
+	[955.0, 5.0, 0.9, 0.7, 0.0, 5.0],
+	[985.0, 5.0, 0.9, 0.7, 0.0, 5.0],
+	[1215.0, 7.0, 1.4, 0.6, 0.0, 0.0],
+	[1570.0, 6.0, 1.2, 0.5, 5.0, 6.0],
+]
+## Boost pads along the same run, [s, lateral]: one after the rollers, a staggered pair after Halfway2,
+## one straight into the kicker and one into the table-top.
+const BRIDGE_PADS := [[1040.0, 0.0], [1145.0, -3.2], [1165.0, 3.2], [1195.0, 0.0], [1545.0, 0.0]]
+
+func _build_bridge_jumps(root: Node3D) -> void:
+	var node := Node3D.new()
+	node.name = "BridgeJumps"
+	root.add_child(node)
+	var track_path := _level.get_node("TrackPath")
+	var lips: Array = (track_path.get_meta(&"jump_lips", []) as Array).duplicate()
+	for r in BRIDGE_RAMPS:
+		var ramp := WOODEN_RAMP.instantiate() as WoodenRamp
+		ramp.name = "WoodenRamp_%d" % int(r[0])
+		ramp.length = r[1]
+		ramp.height = r[2]
+		ramp.curve = r[3]
+		ramp.table_length = r[4]
+		ramp.tail_length = r[5]
+		ramp.width = ROAD_HALF * 2.0
+		ramp.transform = _road_frame(r[0], 0.0, ramp.run())
+		node.add_child(ramp)
+		lips.append(ramp.lip_info())
+	for pd in BRIDGE_PADS:
+		var pad := BOOST_PAD.instantiate() as Node3D
+		pad.name = "BoostPad_%d" % int(pd[0])
+		pad.transform = _road_frame(pd[0] - 3.0, pd[1], 6.0).translated_local(Vector3(0.0, 0.0, -3.0))
+		node.add_child(pad)
+	track_path.set_meta(&"jump_lips", lips)
+	print("  bridge: %d wooden ramps, %d boost pads" % [BRIDGE_RAMPS.size(), BRIDGE_PADS.size()])
+
+
+## A frame on the road's surface at `s`, `lat` right of the centreline, its -z along the lap with the
+## road's grade over the next `ahead` metres, y up.
+func _road_frame(s: float, lat: float, ahead: float) -> Transform3D:
+	var fr := _frame(s)
+	var right: Vector3 = fr["right"]
+	var p0: Vector3 = (fr["pos"] as Vector3) + right * lat + Vector3(0.0, _road_y, 0.0)
+	var p1: Vector3 = _curve.sample_baked(fposmod(s + ahead, _length)) + right * lat + Vector3(0.0, _road_y, 0.0)
+	return Transform3D(Basis.looking_at((p1 - p0).normalized(), Vector3.UP), p0)
+
+
 ## A sponsor board from a to b (its bottom edge, world), `h` tall, its face toward `face`, showing
 ## advert `ad` (StadiumAds atlas), with a dark back and frame.
 func _ad_board(kit: Dictionary, a: Vector3, b: Vector3, h: float, face: Vector3, ad: int) -> void:
@@ -954,7 +1010,7 @@ func _tent_accent(col: Color) -> Color:
 
 
 ## The gear under gazebo `i` (turned `yaw`): a display table with a car on its stand (`show_car`: the
-## car itself is _show_car's), or a folding table with a buggy, a transmitter and a charger; chairs, a
+## car itself is _show_car's), or a folding table with a charger; chairs, a
 ## rolling tool chest, toolboxes, a cool box and a generator out the back. Returns [where the car's
 ## wheels go (world), the way its nose points (yaw)] for a show car.
 func _pit_set(kit: Dictionary, i: int, yaw: float, show_car: bool) -> Array:
@@ -972,17 +1028,11 @@ func _pit_set(kit: Dictionary, i: int, yaw: float, show_car: bool) -> Array:
 		spot = [base * Vector3(0.0, top, 0.7), yaw - PI * 0.5 + rng.randf_range(-0.3, 0.3)]
 		sub.call(1.55, 1.05, PI * 0.5 + rng.randf_range(-0.2, 0.2))
 		_tool_chest(kit, CHEST_COLS[i % CHEST_COLS.size()])
-		sub.call(1.5, 1.0, 0.3)
-		_transmitter(kit, 1.22)
 		sub.call(1.62, 0.92, -0.2)
 		_charger(kit, 1.22)
 	else:
 		sub.call(0.1, 0.55, 0.0)
 		_camp.folding_table(kit, Color(0.90, 0.90, 0.88))
-		sub.call(-0.25, 0.55, 0.15)
-		_rc_buggy(kit, CAR_COLS[i % CAR_COLS.size()], 0.74)
-		sub.call(0.45, 0.48, -0.4)
-		_transmitter(kit, 0.74)
 		sub.call(0.75, 0.62, 0.1)
 		_charger(kit, 0.74)
 		sub.call(1.55, 1.05, PI * 0.5 + rng.randf_range(-0.2, 0.2))
@@ -1003,7 +1053,7 @@ func _pit_set(kit: Dictionary, i: int, yaw: float, show_car: bool) -> Array:
 
 
 ## A team tent's inside (frame: the tent's, at PROP_SCALE): a display table for a show car, a workbench
-## with a buggy and a charger, a rolling tool chest and a cool box. Returns the show car's spot (as
+## with a charger, a rolling tool chest and a cool box. Returns the show car's spot (as
 ## _pit_set's).
 func _team_tent_inside(kit: Dictionary, accent: Color, yaw: float) -> Array:
 	var k := _kit
@@ -1013,8 +1063,6 @@ func _team_tent_inside(kit: Dictionary, accent: Color, yaw: float) -> Array:
 	var spot := [b0 * Vector3(-1.7, top, 0.8), yaw - PI * 0.5 + 0.35]
 	k.set_frame(b0 * Transform3D(Basis(), Vector3(1.6, 0, 0.7)))
 	_camp.folding_table(kit, WHITE)
-	k.set_frame(b0 * Transform3D(Basis(Vector3.UP, -0.15), Vector3(1.45, 0, 0.7)))
-	_rc_buggy(kit, Color(0.15, 0.55, 0.88), 0.74)
 	k.set_frame(b0 * Transform3D(Basis(Vector3.UP, -0.25), Vector3(2.0, 0, 0.66)))
 	_charger(kit, 0.74)
 	k.set_frame(b0 * Transform3D(Basis(Vector3.UP, PI * 0.5), Vector3(-3.15, 0, 1.1)))
@@ -1055,10 +1103,6 @@ func _show_car(parent: Node3D, car: String, at: Vector3, nose_yaw: float, table_
 	var tb := Basis(Vector3.UP, table_yaw)
 	boxes.append([at + Vector3(0, 0.45, 0), Vector3(1.3, 0.9, 2.2), Basis(Vector3.UP, nose_yaw)])
 	boxes.append([at - Vector3(0, VenueKit.DISPLAY_TOP * PROP_SCALE * 0.5, 0), Vector3(VenueKit.DISPLAY_HL * 2.0, VenueKit.DISPLAY_TOP, VenueKit.DISPLAY_HW * 2.0) * PROP_SCALE, tb])
-
-
-const CAR_COLS := [Color(0.85, 0.10, 0.10), Color(0.20, 0.75, 0.25), Color(0.30, 0.25, 0.85), Color(0.95, 0.75, 0.10),
-		Color(0.95, 0.45, 0.10), Color(0.10, 0.65, 0.85)]
 
 
 func _tool_chest(kit: Dictionary, body: Color) -> void:
@@ -1111,35 +1155,6 @@ func _generator(kit: Dictionary, col: Color) -> void:
 	k.block(kit, "paint", Vector3(-0.27, 0.35, -0.18), Vector3(0.27, 0.46, 0.18), col)
 	k.tube(kit, "plastic", Vector3(-0.1, 0.46, 0.0), Vector3(-0.1, 0.5, 0.0), 0.035, 0.035, 8, fr)
 	k.block(kit, "plastic", Vector3(0.12, 0.08, -0.235), Vector3(0.26, 0.30, -0.22), fr.lightened(0.1))
-
-
-## A 1/8 buggy on its stand on a table top `y` high: chassis, a shell, a wing and four wheels.
-func _rc_buggy(kit: Dictionary, col: Color, y: float) -> void:
-	var k := _kit
-	var dark := Color(0.07, 0.07, 0.08)
-	k.block(kit, "plastic", Vector3(-0.05, y, -0.05), Vector3(0.05, y + 0.07, 0.05), dark)
-	var cy := y + 0.11
-	k.block(kit, "metal", Vector3(-0.09, cy - 0.01, -0.21), Vector3(0.09, cy + 0.005, 0.2), Color(0.2, 0.2, 0.22))
-	# Shell: a low wedge.
-	var shell := PackedVector2Array([Vector2(-0.2, cy), Vector2(0.17, cy), Vector2(0.21, cy + 0.02), Vector2(0.08, cy + 0.075), Vector2(-0.12, cy + 0.085), Vector2(-0.2, cy + 0.05)])
-	var b := k.xf
-	k.set_frame(b * Transform3D(Basis(Vector3.UP, PI * 0.5), Vector3.ZERO))
-	k.extrude(kit, "plastic", shell, -0.075, 0.075, 0.015, col)
-	k.set_frame(b)
-	k.block(kit, "plastic", Vector3(-0.11, cy + 0.12, 0.17), Vector3(0.11, cy + 0.13, 0.24), col.darkened(0.2))
-	k.block(kit, "plastic", Vector3(-0.01, cy + 0.03, 0.18), Vector3(0.01, cy + 0.12, 0.2), dark)
-	for wx in [-1.0, 1.0]:
-		for wz in [-0.15, 0.15]:
-			k.tube(kit, "rubber", Vector3(wx * 0.1, cy, wz), Vector3(wx * 0.15, cy, wz), 0.05, 0.05, 10, dark)
-			k.tube(kit, "plastic", Vector3(wx * 0.151, cy, wz), Vector3(wx * 0.152, cy, wz), 0.03, 0.03, 8, Color(0.85, 0.85, 0.85))
-
-
-func _transmitter(kit: Dictionary, y: float) -> void:
-	var k := _kit
-	var dark := Color(0.08, 0.08, 0.09)
-	k.block(kit, "plastic", Vector3(-0.05, y, -0.09), Vector3(0.05, y + 0.06, 0.09), dark)
-	k.block(kit, "plastic", Vector3(-0.03, y + 0.06, -0.05), Vector3(0.03, y + 0.1, 0.02), Color(0.75, 0.1, 0.08))
-	k.tube(kit, "plastic", Vector3(0, y + 0.1, 0.05), Vector3(0, y + 0.22, 0.07), 0.006, 0.004, 4, dark)
 
 
 func _charger(kit: Dictionary, y: float) -> void:
@@ -1337,99 +1352,6 @@ func _bold_font() -> SystemFont:
 		_font.font_names = PackedStringArray(["Arial Black", "Impact", "Helvetica Neue", "Arial", "sans-serif"])
 		_font.font_weight = 900
 	return _font
-
-
-## A scaffold tower `w` x `d` with its working platform at `plat`: standards, ledgers, facade braces,
-## boards with toe boards and guard rails, a ladder up the back.
-func _scaffold(kit: Dictionary, w: float, d: float, plat: float) -> void:
-	var k := _kit
-	var r := 0.024
-	var hx := w * 0.5
-	var hz := d * 0.5
-	var top := plat + 1.05
-	var cs := [Vector3(-hx, 0, -hz), Vector3(hx, 0, -hz), Vector3(hx, 0, hz), Vector3(-hx, 0, hz)]
-	for c in cs:
-		k.tube(kit, "metal", c, c + Vector3(0, top, 0), r, r, 6, GALV)
-		k.block(kit, "metal", c - Vector3(0.08, 0, 0.08), c + Vector3(0.08, 0.012, 0.08), GALV.darkened(0.2))
-	var levels: Array = [0.18, plat * 0.5, plat - 0.02, plat + 0.5, plat + 1.0]
-	for y in levels:
-		for i in range(4):
-			var a: Vector3 = cs[i]
-			var b: Vector3 = cs[(i + 1) % 4]
-			k.tube(kit, "metal", a + Vector3(0, y, 0), b + Vector3(0, y, 0), r, r, 6, GALV)
-	for i in range(4):
-		var a: Vector3 = cs[i]
-		var b: Vector3 = cs[(i + 1) % 4]
-		var flip := i % 2 == 0
-		for lift in range(2):
-			var y0: float = levels[lift]
-			var y1: float = levels[lift + 1]
-			if flip:
-				k.tube(kit, "metal", a + Vector3(0, y0, 0), b + Vector3(0, y1, 0), r * 0.85, r * 0.85, 5, GALV)
-			else:
-				k.tube(kit, "metal", b + Vector3(0, y0, 0), a + Vector3(0, y1, 0), r * 0.85, r * 0.85, 5, GALV)
-			flip = not flip
-	# Platform boards, toe boards.
-	var wood := Color(0.62, 0.48, 0.30)
-	var nb := 5
-	for b in range(nb):
-		var z0 := -hz + d * b / nb + 0.01
-		var z1 := -hz + d * (b + 1) / nb - 0.01
-		k.block(kit, "wood", Vector3(-hx, plat, z0), Vector3(hx, plat + 0.05, z1), wood.darkened(0.06 * (b % 2)))
-	var toe := Color(0.95, 0.75, 0.12)
-	k.block(kit, "paint", Vector3(-hx, plat + 0.05, -hz - 0.03), Vector3(hx, plat + 0.2, -hz), toe)
-	k.block(kit, "paint", Vector3(-hx, plat + 0.05, hz), Vector3(hx, plat + 0.2, hz + 0.03), toe)
-	k.block(kit, "paint", Vector3(-hx - 0.03, plat + 0.05, -hz), Vector3(-hx, plat + 0.2, hz), toe)
-	k.block(kit, "paint", Vector3(hx, plat + 0.05, -hz), Vector3(hx + 0.03, plat + 0.2, hz), toe)
-	# Ladder up the back.
-	var lz := hz + 0.12
-	for sx in [-0.22, 0.22]:
-		k.tube(kit, "metal", Vector3(sx, 0, lz), Vector3(sx, plat + 0.9, lz), 0.02, 0.02, 5, GALV)
-	var y := 0.3
-	while y < plat + 0.6:
-		k.tube(kit, "metal", Vector3(-0.22, y, lz), Vector3(0.22, y, lz), 0.014, 0.014, 5, GALV)
-		y += 0.3
-
-
-func _build_camera_tower(root: Node3D) -> void:
-	var fr := _frame(CAMERA_TOWER.x)
-	var at := _at(CAMERA_TOWER.x, CAMERA_TOWER.y)
-	at.y = _ground_min(at.x, at.z, 1.8)
-	var yaw := _yaw_to(fr["right"])
-	var kit := {}
-	_kit.set_frame(_place(at, yaw))
-	var plat := 3.3
-	_scaffold(kit, 2.0, 2.0, plat)
-	# A broadcast camera on its tripod at the front of the platform, aimed down the straight.
-	var base := _kit.xf
-	_kit.set_frame(base * Transform3D(Basis(Vector3.UP, 0.5), Vector3(0.1, plat + 0.05, -0.35)))
-	_camera_rig(kit)
-	_kit.set_frame(base)
-	_commit(root, kit, "CameraTower")
-	var hx := 1.0 * PROP_SCALE
-	var boxes: Array = []
-	for sx in [-1.0, 1.0]:
-		for sz in [-1.0, 1.0]:
-			boxes.append([Transform3D(Basis(Vector3.UP, yaw), at) * Vector3(sx * hx, 2.6, sz * hx), Vector3(0.14, 5.2, 0.14), Basis(Vector3.UP, yaw)])
-	boxes.append([at + Vector3(0, (plat + 0.03) * PROP_SCALE, 0), Vector3(2.0, 0.1, 2.0) * PROP_SCALE, Basis(Vector3.UP, yaw)])
-	_boxes_body(root, "CameraTowerBody", boxes)
-	_note("CameraTower", at, 1.45 * PROP_SCALE, 1.0)
-
-
-## A broadcast camera on a tripod (life size, lens toward -z).
-func _camera_rig(kit: Dictionary) -> void:
-	var k := _kit
-	var dark := Color(0.08, 0.08, 0.09)
-	var head := Vector3(0, 1.35, 0)
-	for i in range(3):
-		var a := TAU * i / 3.0 + 0.3
-		k.tube(kit, "metal", head - Vector3(0, 0.08, 0), Vector3(cos(a) * 0.42, 0.0, sin(a) * 0.42), 0.016, 0.012, 5, dark)
-	k.block(kit, "plastic", head + Vector3(-0.12, 0.0, -0.3), head + Vector3(0.12, 0.26, 0.28), Color(0.15, 0.15, 0.16))
-	k.tube(kit, "plastic", head + Vector3(0, 0.13, -0.3), head + Vector3(0, 0.13, -0.7), 0.09, 0.075, 12, dark)
-	k.tube(kit, "glass", head + Vector3(0, 0.13, -0.7), head + Vector3(0, 0.13, -0.705), 0.074, 0.074, 12, Color(0.2, 0.3, 0.45, 0.9))
-	k.block(kit, "plastic", head + Vector3(0.12, 0.12, -0.05), head + Vector3(0.28, 0.24, 0.12), dark)
-	k.tube(kit, "metal", head + Vector3(-0.05, 0.05, 0.28), head + Vector3(-0.25, -0.05, 0.6), 0.012, 0.012, 5, dark)
-	k.tube(kit, "metal", head + Vector3(0.05, 0.05, 0.28), head + Vector3(0.25, -0.05, 0.6), 0.012, 0.012, 5, dark)
 
 
 ## The lap boards: lattice towers carrying an RC VIBE panel over an LED display (LapBoard.gd), one
@@ -1654,7 +1576,7 @@ func _fence(parent: Node3D, pts: PackedVector3Array, road_side: float, node_name
 func _build_barriers(root: Node3D) -> void:
 	var kit := {}
 	var length := 2.3 * PROP_SCALE
-	var gaps := [Vector2(BOOTH.x - 3.5, BOOTH.x + 3.0), Vector2(CAMERA_TOWER.x - 3.0, CAMERA_TOWER.x + 3.0), Vector2(3288.0, 3294.0)]
+	var gaps := [Vector2(BOOTH.x - 3.5, BOOTH.x + 3.0), Vector2(3288.0, 3294.0)]
 	var boxes: Array = []
 	for pts in _trim_run(_offset_run(3140.0, 3300.0, BARRIER_LAT, 0.25), "CrowdBarriers"):
 		var i := 0
@@ -2988,7 +2910,7 @@ func _build_venue(root: Node3D) -> void:
 		match what:
 			"cabin":
 				_venue.log_cabin(kit, rng)
-				_venue.woodpile(kit, rng, -2.4, 1.75, -VenueKit.CABIN_HZ - VenueKit.CABIN_LOG_R, Vector3(-1.4, 0.0, -VenueKit.CABIN_HZ - 2.3))
+				_venue.woodpile(kit, rng, -2.4, 1.75, -VenueKit.CABIN_HZ - VenueKit.CABIN_LOG_R)
 				boxes.append([xf * Vector3(0, 1.3, 0), Vector3(VenueKit.CABIN_HX * 2.0 + 0.6, 2.6, VenueKit.CABIN_HZ * 2.0 + 0.6) * PROP_SCALE, b])
 				boxes.append([xf * Vector3(VenueKit.CABIN_HX + 0.42, 2.2, 0.5), Vector3(0.75, 4.4, 0.9) * PROP_SCALE, b])
 				boxes.append([xf * Vector3(-1.55, 0.5, -VenueKit.CABIN_HZ - 0.45), Vector3(1.9, 1.0, 0.6) * PROP_SCALE, b])
@@ -3006,6 +2928,9 @@ func _build_venue(root: Node3D) -> void:
 				for sx in [-1.0, 1.0]:
 					for sz in [-1.0, 1.0]:
 						boxes.append([xf * Vector3(sx * 3.0, 1.2, sz * 3.0), Vector3(0.2, 2.4, 0.2) * PROP_SCALE, b])
+				# The two beer-table sets (VenueKit.beer_set at z = -1.2 and 1.2): table and benches as one block.
+				for z in [-1.2, 1.2]:
+					boxes.append([xf * Vector3(0.0, 0.39, z), Vector3(2.2, 0.78, 1.35) * PROP_SCALE, b])
 		_kit.reset_frame()
 		var mi := MeshInstance3D.new()
 		mi.name = {"cabin": "LogCabin", "cart": "HayCart", "logs": "LogStack", "marquee": "Marquee"}[what]
@@ -3093,6 +3018,21 @@ func _finish_rowboat(root: Node3D, csg: CSGCombiner3D) -> void:
 	root.add_child(mi)
 	remove_child(csg)
 	csg.free()
+	# Solid as its hull's convex shape (the boat is open, but nothing gets in it). DressingColliders.gd
+	# skips everything under LakesideDressing ("lake" is one of its water words), so it needs its own.
+	var hull := mi.mesh.create_convex_shape(true, true)
+	var pts := PackedVector3Array()
+	for q in hull.points:
+		pts.append(q * BOAT_SCALE)
+	hull.points = pts
+	var body := StaticBody3D.new()
+	body.name = "RowboatBody"
+	body.set_meta(&"surface", "wood")
+	body.transform = Transform3D(Basis(Vector3.UP, BOAT_YAW), BOAT_AT)
+	root.add_child(body)
+	var cs := CollisionShape3D.new()
+	cs.shape = _save_res(hull, "rowboat_collision")
+	body.add_child(cs)
 	print("  rowboat: %d surfaces, %.1fm long" % [mi.mesh.get_surface_count(), mi.mesh.get_aabb().size.z * BOAT_SCALE])
 
 

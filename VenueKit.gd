@@ -1,7 +1,7 @@
 extends RefCounted
 ## The Lakeside Course's farm and fair props, built in code at life size through a PropKit (front toward
 ## -z, y up) and placed by regenerate_lakeside.gd at PROP_SCALE: a hay cart, a stack of felled logs, a
-## woodcutter's log cabin with its woodpile and chopping block, a pagoda marquee with beer tables, and the
+## woodcutter's log cabin with its woodpile, a pagoda marquee with beer tables, and the
 ## paddock's display tables. The cart, the logs and the marquee replaced three Hunyuan FBX that stood two
 ## to three times too big (the cart tipped up on its tail as the old shortcut's ramp).
 ##
@@ -255,8 +255,7 @@ const CABIN_RIDGE := 3.85
 
 ## A woodcutter's cabin, 5 x 4m of saddle-notched logs on a stone footing, the door and a window at the
 ## front (-z), a window at the back and on the left, a stone chimney up the right end, a shake roof
-## overhanging all round, shutters, a bench under the front window. The woodpile and chopping block are
-## woodpile().
+## overhanging all round, shutters, a bench under the front window. The woodpile is woodpile().
 func log_cabin(kit: Dictionary, rng: RandomNumberGenerator) -> void:
 	var hx := CABIN_HX
 	var hz := CABIN_HZ
@@ -417,9 +416,8 @@ func log_cabin(kit: Dictionary, rng: RandomNumberGenerator) -> void:
 		timber(kit, Vector3(bx, 0.0, -hz - 0.45), Vector3(bx, 0.43, -hz - 0.45), 0.28, 0.05, dark, Vector3.BACK)
 
 
-## Split firewood stacked along a wall (`length` along x, from x0, against z = z0 facing -z), and a
-## chopping block with an axe in it at `block`.
-func woodpile(kit: Dictionary, rng: RandomNumberGenerator, x0: float, length: float, z0: float, block: Vector3) -> void:
+## Split firewood stacked along a wall (`length` along x, from x0, against z = z0 facing -z).
+func woodpile(kit: Dictionary, rng: RandomNumberGenerator, x0: float, length: float, z0: float) -> void:
 	var rows := 5
 	var n := int(length / 0.19)
 	for k in range(rows):
@@ -435,15 +433,10 @@ func woodpile(kit: Dictionary, rng: RandomNumberGenerator, x0: float, length: fl
 	timber(kit, Vector3(x0 - 0.05, 0.05, z0 - 0.25), Vector3(x0 + length + 0.05, 0.05, z0 - 0.25), 0.4, 0.1, Color(0.36, 0.28, 0.2), Vector3.BACK)
 	for px in [x0 - 0.06, x0 + length + 0.06]:
 		timber(kit, Vector3(px, 0.0, z0 - 0.25), Vector3(px, 1.0, z0 - 0.25), 0.08, 0.08, Color(0.36, 0.28, 0.2))
-	# Chopping block: a round on end, an axe stuck in it, a few splits round its foot.
-	round_log(kit, block, block + Vector3(0, 0.55, 0), 0.26, 0.25, LOG_TINT)
-	var top := block + Vector3(0, 0.55, 0)
-	timber(kit, top + Vector3(0.02, 0.02, 0.0), top + Vector3(0.4, 0.62, -0.05), 0.035, 0.03, Color(0.62, 0.48, 0.32))
-	_kit.box(kit, "iron", Transform3D(Basis(Vector3.BACK, -0.55), top + Vector3(0.0, 0.03, 0.0)), Vector3(0.05, 0.16, 0.12), Color(0.25, 0.25, 0.26))
+	# A chopping block with an axe and splits round it stood here; the draws it took are kept so the
+	# yard's other props keep their places.
 	for i in range(4):
-		var a := rng.randf() * TAU
-		var p := block + Vector3(cos(a) * 0.55, 0.07, sin(a) * 0.55)
-		round_log(kit, p, p + Vector3(sin(a), 0, -cos(a)) * 0.45, 0.07, 0.07, LOG_TINT, false, true, 6)
+		rng.randf()
 
 
 # ======================================================================================

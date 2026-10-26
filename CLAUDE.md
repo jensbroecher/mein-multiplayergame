@@ -40,9 +40,9 @@ the others re-bakes it (see Lakeside Course below).
 ## Lakeside Course (Bloombay GP, stage 1)
 
 - `regenerate_lakeside.gd` dresses `levels/LakesideLevel.tscn` as an RC race meeting and replaces everything under
-  `LakesideDressing` on every run: the paddock, race control, the camera and lap towers, catch fences, crowd
+  `LakesideDressing` on every run: the paddock, race control, the lap towers, catch fences, crowd
   barriers, tyre walls, hay, cones, the grandstand across the first corner, the campsite on the hill, the
-  orange kicker, the woods, the boulders, the meadow grass, the woodcutter's yard, the marquee, the cars on
+  orange kicker, the long bridge's wooden ramps and boost pads, the woods, the boulders, the meadow grass, the woodcutter's yard, the marquee, the cars on
   show and the spectators; it also lays the AI's shortcut. The terrain and road stay TerrainGenerator's.
 - It grades flat pads (`TerrainGenerator.flat_pads`: paddock, grandstand footing, campsite terraces) and mows
   the venue's verges (`grass_clearings`, no tall grass there). Both are applied after the road blend, so keep
@@ -85,6 +85,18 @@ the others re-bakes it (see Lakeside Course below).
   back `KickerFrame`. Boost pads 5 to 7 are re-seated on the deck. The TrackPath's `jump_lips` meta records
   the lip: `res://scratch/nyota_jump_test.tscn -- level=res://levels/LakesideLevel.tscn speeds=30,40,50,60` (carts
   land 63 to 105m out on the straight and keep their speed).
+- The long bridge (s 1180-1690, about 20m over the lake; a bend at 1360-1520) and the climb to it carry
+  `WoodenRamp.tscn`s curb to curb under `LakesideDressing/BridgeJumps` (`BRIDGE_RAMPS`, `BRIDGE_PADS`,
+  `_build_bridge_jumps`): two rollers at s 955 and 985, a kicker at 1215 where the bridge leaves the shore with a
+  boost pad straight into it, a table-top at 1570 after the bend, and boost pads at 1040, a staggered pair after
+  Halfway2 (1145, 1165) and 1545. Their lips join the TrackPath's `jump_lips`:
+  `nyota_jump_test ... level=res://levels/LakesideLevel.tscn ground=1` lands the kicker 38-74m on at 30-58 m/s
+  (before the bend), the table-top 25-50m on, every cart keeping its speed. Hand-tune them in the generator:
+  anything under `LakesideDressing` is replaced on every run. AI races (speed=2) lose about one bot a race in the
+  bridge's bend (1485-1588), with or without them.
+- Single meshes under `LakesideDressing` get no collider from DressingColliders.gd: "lake" (in the node's path) is
+  one of its `MESH_SKIP` water words. Give new dressing its own boxes (`_boxes_body`): the marquee's beer tables
+  have a block each, the rowing boat a convex hull (`RowboatBody`).
 - The lap boards are `LapBoard.gd` nodes: Level's `_feed_gantry` also calls the `lap_boards` group with the
   standings, and the LED label shows the leader's lap, then FINISH.
 - Sponsor boards draw `StadiumAds.gd` artwork: its `ads` export takes a level's own 16 sponsors (the
@@ -132,8 +144,8 @@ the others re-bakes it (see Lakeside Course below).
 - The woodcutter's yard inside the bend after the hill and the marquee by the far woods are `VenueKit.gd`
   (life size through the PropKit, at PROP_SCALE): a hay cart with spoked wheels and a bale, a stack of felled
   logs between stakes, a saddle-notched log cabin (stone footing and chimney, shake roof, gables on the end
-  walls, shuttered windows, a bench, a woodpile and chopping block), and a 6 x 6m pagoda marquee with beer
-  tables. They replaced three Hunyuan FBX (a cart, logs, a festival tent) that stood 2-3 times too big and are
+  walls, shuttered windows, a bench, a woodpile), and a 6 x 6m pagoda marquee with beer
+  tables. The chopping block and its axe are gone (`woodpile` still burns their random draws, so the yard stays put). They replaced three Hunyuan FBX (a cart, logs, a festival tent) that stood 2-3 times too big and are
   deleted. `_build_venue` removes the old nodes (`OLD_FBX`) and places each prop with `_free_spot`: the nearest
   place to `YARD`'s point clear of the road (`_verify_clear`'s rule), the shortcut and what's noted, level to
   within 0.9m and not down a bank. Timber is `hut_wood.gdshader` (keys "timber", "lapboards", "battens",
@@ -141,7 +153,8 @@ the others re-bakes it (see Lakeside Course below).
   surfaces (oak bark, or `_logwall_material`'s pale debarked logs).
 - The paddock's gazebos and team tents are grown (`GAZEBO_GROW`, `TENT_GROW`, on top of PROP_SCALE; their
   furniture isn't) so a race car fits on a display table (`VenueKit.display_table`). `SHOW_CARS`, the lighter
-  models, stand on every other gazebo's table and in each team tent at race size: `_show_car` lays the car's
+  models, stand on every other gazebo's table and in each team tent at race size (the other tables hold a
+  charger and the toolkit; the small RC buggies and transmitters are gone, and so is the camera tower by race control): `_show_car` lays the car's
   scene out again (its Model node and its meshes, the same `.res` files) under a `DisplayCar.gd` node, which
   applies the car's factory paint at load. Their meshes stop drawing at `SHOW_CAR_RANGE` (130m): a car is
   37-51k triangles.
@@ -695,6 +708,23 @@ deck), and a corner ray clipping a wall or curb tipped some onto their sides.
 The shader's lit border is one rectangular frame (`aspect`, the top's proportions): separate side and end
 lines had overshot each other at the corners. `res://scratch/boost_pad_audit.gd` (`-s`) lists the saved
 transforms; `res://scratch/boost_pad_runtime_check.tscn -- <level>` checks them in game.
+
+## Wooden ramps
+
+`WoodenRamp.tscn` (`WoodenRamp.gd`, `@tool`, a StaticBody3D) is a jump to place by hand on any level. It builds
+its mesh and a trimesh collider from its exports as internal children (cached per shape), so a level stores only
+the transform and the shape: `length` (toe to lip), `height`, `width`, `curve` (0 a wedge, 1 a transition flat at
+the toe; the lip's slope is height / length * (1 + curve)), `table_length` (a flat top), `tail_length` (a run back
+down: a roller; 0 cuts it square, a kicker with a boarded back), `wood_color`, `trim_color` (the toe and lip
+planks). Planks across the run on stringers, upright boards on the sides, posts and a sill outside, all
+`hut_wood.gdshader`. The origin is the toe's middle on the ground and the ramp rises toward -z (like a boost
+pad's front). Like the pads, `settle_on_track` (on) drops it onto the surface under it once the level's collision
+exists, on the plane through its corners' hits, 1cm under so the toe shows no edge; `face_lap` (on) turns it
+along the nearest lap path; the Snap To Ground button does the drop in the editor (the saved colliders, else
+the meshes under it). It is in the `ramps` group with `surface` wood, so it is track whatever it is called and
+the AI never steers round it: make it as wide as the road. `lip_info()` gives a `jump_lips` entry.
+`res://scratch/wooden_ramp_preview.gd` (`-s`, windowed, `-- <dir> name:x,y,z:tx,ty,tz`) renders a kicker, a
+table-top and a roller on a flat road.
 
 ## Item boxes
 
