@@ -1599,8 +1599,16 @@ its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set th
 - In `car_body.gdshaderinc`, don't call `cover()` (it takes `fwidth`) inside a branch whose edge crosses the paint:
   derivatives are undefined where a branch splits a pixel quad. The Racer pattern's bonnet roundel drew a dashed line
   across every bonnet where its `p.z < hood_z + 2r` branch ended; the roundels are now drawn everywhere and masked.
-- CarSelection's line-up of names sits centred between Back and Confirm (not on the screen); eleven names fit at
-  1600 wide. A twelfth needs smaller pills or two rows.
+- The Titan (`TitanBuilder.gd`, an RC monster truck) uses the Strikeforce's keyed section on a body raised to a 0.50m
+  sill, with 0.69m tyres (hub 0.345m); PlayerCart plants any car by its lowest wheel, so nothing else needed changing.
+  Its arches are circles round each hub (`_bot_knots`: the sill and the circle blended by a smooth max), the
+  body-colour flares sweep along them, and the arch liners stop short of the nose and tail (full length, they stood
+  out of the tail as black bars). Its shocks are big-bore bodies in the accent colour (`_big_shock`), stood nearly
+  upright beside the tyres so they show in the gap under the flares.
+- CarSelection's line-up of names sits centred between Back and Confirm (not on the screen), as a carousel: the names
+  ride on a reel (`_reel`) in a window between the arrows (`REEL_SIZE`, room for about eleven) that fades them out over
+  `REEL_FADE` at each end (a gradient drawn only as a mask, `clip_children`), and `_place_reel` slides the car on show
+  to the middle, stopping where the first or last name would go into the fade. Any number of cars fits.
 - To rebuild another car: write `<Name>Builder.gd` extending `CarDesign.gd` (set the shell in `_init()`;
   `build_body`, `build_wheel`, `_detail_shapes`/`_detail_at`, `PAINT_LAYOUT`, `WHEEL_POSITIONS`,
   `ANTENNA_POS`), add it to `regenerate_cars.gd`'s `CARS` and its factory paint to `CarPaint.FACTORY`, then

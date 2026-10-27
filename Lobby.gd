@@ -30,7 +30,7 @@ signal change_car_requested()
 @onready var button_ready = $RoomView/Panel/Margin/VBox/ActionBar/ButtonReady
 @onready var button_start = $RoomView/Panel/Margin/VBox/ActionBar/ButtonStart
 
-const CAR_NAMES = ["Trailblazer", "Shadow", "Strikeforce", "Apex", "Interceptor", "Mudrunner", "Phantom", "Centurion", "Mirage", "Inferno", "Nocturne", "Vortex", "Zephyr"]
+const CAR_NAMES = ["Trailblazer", "Shadow", "Strikeforce", "Apex", "Interceptor", "Mudrunner", "Phantom", "Centurion", "Mirage", "Inferno", "Nocturne", "Vortex", "Zephyr", "Titan"]
 
 var server_buttons = {}
 var is_in_room = false

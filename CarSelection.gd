@@ -190,6 +190,19 @@ const CAR_PRESETS = [
 		"offroad": 9.2,
 		"desc": "Futuristic cyber-Dakar hyper-coupe. A continuous panoramic canopy and long-travel trophy suspension conquer any terrain in style.",
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Titan",
+		"model_path": "res://generated/cars/Titan.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 37.0,
+		"acceleration": 80.0,
+		"steer_speed": 2.4,
+		"grip": 4.3,
+		"braking": 44.0,
+		"offroad": 9.8,
+		"desc": "Monster truck on huge chevron-tread tyres and long-travel big-bore shocks. Rolls over anything off-road, leans hard on tarmac.",
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 
@@ -200,7 +213,7 @@ const CAR_ACCENTS := {
 	"Apex": Color(1.0, 0.60, 0.16), "Interceptor": Color(0.30, 0.52, 1.0), "Mudrunner": Color(0.22, 0.80, 0.66),
 	"Phantom": Color(1.0, 0.78, 0.14), "Centurion": Color(0.98, 0.46, 0.12), "Mirage": Color(0.96, 0.28, 0.14),
 	"Inferno": Color(1.0, 0.22, 0.20), "Nocturne": Color(0.62, 0.86, 1.0), "Vortex": Color(0.55, 0.92, 0.15),
-	"Zephyr": Color(0.85, 0.55, 0.25),
+	"Zephyr": Color(0.85, 0.55, 0.25), "Titan": Color(0.62, 0.95, 0.18),
 }
 ## Stat bars: caption, preset key, and the values at an empty and a full bar (spanning the fleet).
 const STATS := [
@@ -225,6 +238,11 @@ const SPIN_SPEED := 0.26          # rad/s: a turn every 24 s
 const SPIN_RESUME := 2.5          # s after you let go before the turntable takes over again
 const DRAG_RAD_PER_PX := 0.009
 const STICK_SPEED := 2.4          # rad/s at full right stick
+# The line-up's carousel: its window between the arrows (room for about eleven names), how far in
+# from each end the names fade out, how long a slide takes.
+const REEL_SIZE := Vector2(980, 44)
+const REEL_FADE := 90.0
+const REEL_SLIDE_TIME := 0.35
 const CAMERA_FOV := 26.0          # a long lens: no wide-angle stretch on the car
 const CAMERA_DIST := 7.6
 const CAMERA_PITCH := 13.0        # degrees above the turntable
@@ -272,6 +290,9 @@ var _number_row: Control
 ## "antenna" option.
 var _showroom_antenna: Node3D
 var _pills: Array[Button] = []
+var _reel: HBoxContainer              # the line-up's names, slid along inside _reel_window
+var _reel_window: TextureRect
+var _reel_tween: Tween
 var _confirm_btn: Button
 var _back_btn: Button
 
@@ -377,6 +398,7 @@ func update_car_selection() -> void:
 		var v: float = inverse_lerp(st[2], st[3], float(preset.get(st[1], st[2])))
 		_stat_bars[k].set_value(clampf(v, 0.05, 1.0), accent)
 	_apply_accent(accent)
+	_place_reel(is_visible_in_tree())
 	_show_model(preset)
 	_load_paint()
 
@@ -950,11 +972,35 @@ func _build_bottom_bar() -> void:
 	add_child(mid)
 	var strip := HBoxContainer.new()
 	strip.alignment = BoxContainer.ALIGNMENT_CENTER
-	# Eleven names fill the room between Back and Confirm: tight pills, small gaps.
-	strip.add_theme_constant_override("separation", 3)
+	strip.add_theme_constant_override("separation", 6)
 	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	mid.add_child(strip)
 	strip.add_child(_arrow_button("‹", _on_prev_pressed))
+	# The line-up is a carousel: more names than fit between the arrows, so they ride on a reel
+	# that slides to keep the car on show in view (_place_reel), seen through a window that fades
+	# them out at both ends. The window draws its gradient only as the mask of what's inside it.
+	var fade: float = REEL_FADE / REEL_SIZE.x
+	var grad := Gradient.new()
+	grad.offsets = PackedFloat32Array([0.0, fade, 1.0 - fade, 1.0])
+	grad.colors = PackedColorArray([Color(1, 1, 1, 0), Color.WHITE, Color.WHITE, Color(1, 1, 1, 0)])
+	var mask := GradientTexture2D.new()
+	mask.gradient = grad
+	mask.width = 256
+	mask.height = 1
+	_reel_window = TextureRect.new()
+	_reel_window.texture = mask
+	_reel_window.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_reel_window.stretch_mode = TextureRect.STRETCH_SCALE
+	_reel_window.custom_minimum_size = REEL_SIZE
+	_reel_window.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_reel_window.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
+	_reel_window.clip_contents = true
+	_reel_window.mouse_filter = Control.MOUSE_FILTER_PASS
+	strip.add_child(_reel_window)
+	_reel = HBoxContainer.new()
+	_reel.add_theme_constant_override("separation", 3)
+	_reel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_reel_window.add_child(_reel)
 	for k in CAR_PRESETS.size():
 		var pill := Button.new()
 		pill.text = str(CAR_PRESETS[k].name).to_upper()
@@ -964,12 +1010,38 @@ func _build_bottom_bar() -> void:
 		pill.add_theme_font_override("font", _font_bold)
 		pill.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		pill.pressed.connect(_select_car.bind(k))
-		strip.add_child(pill)
+		_reel.add_child(pill)
 		_pills.append(pill)
 	strip.add_child(_arrow_button("›", _on_next_pressed))
 	var hint := _label("‹ ›  change car      drag  rotate      Enter  confirm      Esc  back", 15, Color(COL_DIM, 0.75))
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	mid.add_child(hint)
+
+
+## Slides the line-up so the car on show sits in the middle of the window, though never so far
+## that the first or last name goes into the fade at its end. A line-up that fits stays centred.
+func _place_reel(animate: bool) -> void:
+	if _reel == null:
+		return
+	var full: Vector2 = _reel.get_combined_minimum_size()
+	_reel.size = full
+	var win: Vector2 = _reel_window.size.max(REEL_SIZE)
+	_reel.position.y = (win.y - full.y) * 0.5
+	var x: float = (win.x - full.x) * 0.5
+	if full.x > win.x - 2.0 * REEL_FADE:
+		var sep: float = _reel.get_theme_constant("separation")
+		var mid := 0.0
+		for k in current_car_index:
+			mid += _pills[k].get_combined_minimum_size().x + sep
+		mid += _pills[current_car_index].get_combined_minimum_size().x * 0.5
+		x = clampf(win.x * 0.5 - mid, win.x - REEL_FADE - full.x, REEL_FADE)
+	if _reel_tween:
+		_reel_tween.kill()
+	if animate:
+		_reel_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		_reel_tween.tween_property(_reel, "position:x", x, REEL_SLIDE_TIME)
+	else:
+		_reel.position.x = x
 
 
 ## Recolours what follows the car: its name's underline, the bars, the ring, Confirm, the line-up.

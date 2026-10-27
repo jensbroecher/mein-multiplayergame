@@ -76,6 +76,9 @@ const FACTORY := {
 	"Zephyr": {"pattern": 0, "finish": 1, "primary": Color(0.95, 0.95, 0.96),
 		"secondary": Color(0.08, 0.08, 0.09), "accent": Color(0.72, 0.45, 0.22),
 		"rim": Color(0.70, 0.44, 0.22), "number": 1},
+	"Titan": {"pattern": 11, "finish": 0, "primary": Color(0.55, 0.85, 0.12),
+		"secondary": Color(0.07, 0.36, 0.80), "accent": Color(0.55, 0.85, 0.12),
+		"rim": Color(0.05, 0.05, 0.055), "number": 7},
 }
 const FALLBACK := {"pattern": 0, "finish": 0, "primary": Color(0.80, 0.07, 0.05),
 	"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.98, 0.78, 0.07),

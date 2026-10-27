@@ -224,6 +224,21 @@ const CAR_PRESETS = [
 		"braking": 48.0,
 		"offroad": 9.2,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Titan",
+		"engine_sound": "res://sounds/enginesounds/engine_mudrunner_loop.wav",
+		"engine_gain_db": 0.0,
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Titan.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 37.0,
+		"acceleration": 80.0,
+		"steer_speed": 2.4,
+		"grip": 4.3,
+		"braking": 44.0,
+		"offroad": 9.8,
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 
