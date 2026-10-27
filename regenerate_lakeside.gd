@@ -1,6 +1,6 @@
 extends Node
 ## Dresses the Lakeside Course (res://levels/LakesideLevel.tscn, the Bloombay GP's first stage) as an RC race
-## meeting: the paddock, race control, the lap towers, catch fences hung with sponsor
+## meeting: the paddock, race control and its observer tower, the lap towers, catch fences hung with sponsor
 ## boards, tyre walls and hay round the first corner, the grandstand across it, a campsite on the
 ## hill, and the big orange kicker after the long bridge. Run headless:
 ##   Godot --headless --path . res://regenerate_lakeside.tscn [-- rebake]
@@ -47,6 +47,7 @@ const GRID_STEP := 2.0
 ## a sharp right-hander with the lake outside it); the east leg leaves it at 67 degrees.
 const S_GANTRY := 3209.0
 const BOOTH := Vector2(3216.0, -11.3)
+const OBSERVER_TOWER := Vector2(3229.0, -10.9)
 const LAP_TOWER_CORNER := Vector2(3302.0, -15.5)
 const LAP_TOWER_STRAIGHT := Vector2(3238.0, 15.6)
 ## Paddock: gazebos along the straight's left side, past the gantry.
@@ -117,6 +118,8 @@ var _ad_k := 0
 var _rng := RandomNumberGenerator.new()
 ## Where the crowd barriers stand ([middle, along]), for the spectators behind them.
 var _barrier_spots: Array = []
+## The observer on the tower by race control: [feet, facing].
+var _observer_spot: Array = []
 
 
 func _ready() -> void:
@@ -145,15 +148,19 @@ func _ready() -> void:
 	var clearings := _plan_clearings()
 	var saved_pads: PackedFloat32Array = _level.get_node("TerrainGenerator").get_meta(&"baked_pads", PackedFloat32Array())
 	var saved_clear: PackedFloat32Array = _level.get_node("TerrainGenerator").get_meta(&"baked_clearings", PackedFloat32Array())
+	var gaps := _plan_road_gaps()
+	var saved_gaps: PackedFloat32Array = _tg.get_meta(&"baked_road_gaps", PackedFloat32Array())
 	_tg.set("flat_pads", pads)
 	_tg.set("grass_clearings", clearings)
+	_tg.set("road_gaps", gaps)
 	var rebake: bool = "rebake" in OS.get_cmdline_user_args() or pads != saved_pads or clearings != saved_clear \
-			or not FileAccess.file_exists("res://generated/terrain_visual.res")
+			or gaps != saved_gaps or not FileAccess.file_exists("res://generated/terrain_visual.res")
 	if rebake:
 		print("  re-baking the terrain, road and grass (%d pads, %d clearings)..." % [pads.size() / 7, clearings.size() / 6])
 		_tg.call("generate_world")
 		_tg.set_meta(&"baked_pads", pads)
 		_tg.set_meta(&"baked_clearings", clearings)
+		_tg.set_meta(&"baked_road_gaps", gaps)
 		_heights = (_tg.get("_visual_heights") as PackedFloat32Array).duplicate()
 		print("  baked (%.0fs)" % ((Time.get_ticks_msec() - t0) / 1000.0))
 	else:
@@ -169,6 +176,7 @@ func _ready() -> void:
 	_build_bridge_jumps(root)
 	_build_paddock(root)
 	_build_race_control(root)
+	_build_observer_tower(root)
 	_build_lap_towers(root)
 	_build_fences(root)
 	_build_barriers(root)
@@ -181,6 +189,7 @@ func _ready() -> void:
 	_fit_loop()
 	_lay_shortcuts()
 	_build_venue(root)
+	_build_loop_sign(root)
 	_build_banked_turn(root)
 	var boat := _start_rowboat()
 	_build_wind_turbines(root)
@@ -1285,7 +1294,7 @@ func _toilet(kit: Dictionary, col: Color) -> void:
 
 
 # ======================================================================================
-#  Race control, the camera tower, the lap towers
+#  Race control, the observer tower, the lap towers
 # ======================================================================================
 
 ## A race-control booth by the gantry: a cream cabin on a plinth, tinted windows on three sides, a
@@ -1352,6 +1361,82 @@ func _bold_font() -> SystemFont:
 		_font.font_names = PackedStringArray(["Arial Black", "Impact", "Helvetica Neue", "Arial", "sans-serif"])
 		_font.font_weight = 900
 	return _font
+
+
+## A scaffold tower `w` x `d` with its working platform at `plat`: standards, ledgers, facade braces,
+## boards with toe boards and guard rails, a ladder up the back.
+func _scaffold(kit: Dictionary, w: float, d: float, plat: float) -> void:
+	var k := _kit
+	var r := 0.024
+	var hx := w * 0.5
+	var hz := d * 0.5
+	var top := plat + 1.05
+	var cs := [Vector3(-hx, 0, -hz), Vector3(hx, 0, -hz), Vector3(hx, 0, hz), Vector3(-hx, 0, hz)]
+	for c in cs:
+		k.tube(kit, "metal", c, c + Vector3(0, top, 0), r, r, 6, GALV)
+		k.block(kit, "metal", c - Vector3(0.08, 0, 0.08), c + Vector3(0.08, 0.012, 0.08), GALV.darkened(0.2))
+	var levels: Array = [0.18, plat * 0.5, plat - 0.02, plat + 0.5, plat + 1.0]
+	for y in levels:
+		for i in range(4):
+			var a: Vector3 = cs[i]
+			var b: Vector3 = cs[(i + 1) % 4]
+			k.tube(kit, "metal", a + Vector3(0, y, 0), b + Vector3(0, y, 0), r, r, 6, GALV)
+	for i in range(4):
+		var a: Vector3 = cs[i]
+		var b: Vector3 = cs[(i + 1) % 4]
+		var flip := i % 2 == 0
+		for lift in range(2):
+			var y0: float = levels[lift]
+			var y1: float = levels[lift + 1]
+			if flip:
+				k.tube(kit, "metal", a + Vector3(0, y0, 0), b + Vector3(0, y1, 0), r * 0.85, r * 0.85, 5, GALV)
+			else:
+				k.tube(kit, "metal", b + Vector3(0, y0, 0), a + Vector3(0, y1, 0), r * 0.85, r * 0.85, 5, GALV)
+			flip = not flip
+	# Platform boards, toe boards.
+	var wood := Color(0.62, 0.48, 0.30)
+	var nb := 5
+	for b in range(nb):
+		var z0 := -hz + d * b / nb + 0.01
+		var z1 := -hz + d * (b + 1) / nb - 0.01
+		k.block(kit, "wood", Vector3(-hx, plat, z0), Vector3(hx, plat + 0.05, z1), wood.darkened(0.06 * (b % 2)))
+	var toe := Color(0.95, 0.75, 0.12)
+	k.block(kit, "paint", Vector3(-hx, plat + 0.05, -hz - 0.03), Vector3(hx, plat + 0.2, -hz), toe)
+	k.block(kit, "paint", Vector3(-hx, plat + 0.05, hz), Vector3(hx, plat + 0.2, hz + 0.03), toe)
+	k.block(kit, "paint", Vector3(-hx - 0.03, plat + 0.05, -hz), Vector3(-hx, plat + 0.2, hz), toe)
+	k.block(kit, "paint", Vector3(hx, plat + 0.05, -hz), Vector3(hx + 0.03, plat + 0.2, hz), toe)
+	# Ladder up the back.
+	var lz := hz + 0.12
+	for sx in [-0.22, 0.22]:
+		k.tube(kit, "metal", Vector3(sx, 0, lz), Vector3(sx, plat + 0.9, lz), 0.02, 0.02, 5, GALV)
+	var y := 0.3
+	while y < plat + 0.6:
+		k.tube(kit, "metal", Vector3(-0.22, y, lz), Vector3(0.22, y, lz), 0.014, 0.014, 5, GALV)
+		y += 0.3
+
+
+## The observer's tower beside race control: the scaffold with a race observer on its platform (it
+## carried a broadcast camera on a tripod).
+func _build_observer_tower(root: Node3D) -> void:
+	var fr := _frame(OBSERVER_TOWER.x)
+	var at := _at(OBSERVER_TOWER.x, OBSERVER_TOWER.y)
+	at.y = _ground_min(at.x, at.z, 1.8)
+	var yaw := _yaw_to(fr["right"])
+	var kit := {}
+	_kit.set_frame(_place(at, yaw))
+	var plat := 3.3
+	_scaffold(kit, 2.0, 2.0, plat)
+	_commit(root, kit, "ObserverTower")
+	# A race observer stands at the platform's front, watching the straight (_build_spectators).
+	_observer_spot = [_place(at, yaw) * Vector3(0.1, plat + 0.05, -0.3), Basis(Vector3.UP, yaw + 0.5) * Vector3(0, 0, -1)]
+	var hx := 1.0 * PROP_SCALE
+	var boxes: Array = []
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			boxes.append([Transform3D(Basis(Vector3.UP, yaw), at) * Vector3(sx * hx, 2.6, sz * hx), Vector3(0.14, 5.2, 0.14), Basis(Vector3.UP, yaw)])
+	boxes.append([at + Vector3(0, (plat + 0.03) * PROP_SCALE, 0), Vector3(2.0, 0.1, 2.0) * PROP_SCALE, Basis(Vector3.UP, yaw)])
+	_boxes_body(root, "ObserverTowerBody", boxes)
+	_note("ObserverTower", at, 1.45 * PROP_SCALE, 1.0)
 
 
 ## The lap boards: lattice towers carrying an RC VIBE panel over an LED display (LapBoard.gd), one
@@ -1572,11 +1657,11 @@ func _fence(parent: Node3D, pts: PackedVector3Array, road_side: float, node_name
 
 
 ## Crowd barriers along the straight's left side, from behind the grid to the corner, leaving gaps
-## at race control, the camera tower and the paddock's entrance.
+## at race control, the observer tower and the paddock's entrance.
 func _build_barriers(root: Node3D) -> void:
 	var kit := {}
 	var length := 2.3 * PROP_SCALE
-	var gaps := [Vector2(BOOTH.x - 3.5, BOOTH.x + 3.0), Vector2(3288.0, 3294.0)]
+	var gaps := [Vector2(BOOTH.x - 3.5, BOOTH.x + 3.0), Vector2(OBSERVER_TOWER.x - 3.0, OBSERVER_TOWER.x + 3.0), Vector2(3288.0, 3294.0)]
 	var boxes: Array = []
 	for pts in _trim_run(_offset_run(3140.0, 3300.0, BARRIER_LAT, 0.25), "CrowdBarriers"):
 		var i := 0
@@ -2650,6 +2735,7 @@ func _meadow_roads(data: PackedByteArray) -> void:
 	var alts := _level.get_node_or_null("AlternativePaths")
 	if alts:
 		paths.append_array(alts.get_children().filter(func(c): return c is Path3D))
+	var lap: Node = paths[0]
 	for pth in paths:
 		var c: Curve3D = (pth as Path3D).curve
 		var xf: Transform3D = (pth as Path3D).global_transform
@@ -2658,6 +2744,9 @@ func _meadow_roads(data: PackedByteArray) -> void:
 		while s < length:
 			var p: Vector3 = xf * c.sample_baked(s)
 			var fwd: Vector3 = xf * c.sample_baked(minf(s + 0.6, length)) - xf * c.sample_baked(maxf(s - 0.6, 0.0))
+			# Where the lap's road narrows into a gap (round the loop) mown grass grows up to the asphalt.
+			var road_w: float = float(_tg.call("_road_gap_width", s)) if pth == lap else 1.0
+			var road_lim: float = GRASS_ROAD if road_w >= 1.0 else (0.0 if road_w <= 0.0 else ROAD_HALF * road_w + 1.2)
 			s += 0.4
 			fwd.y = 0.0
 			if fwd.length_squared() < 1e-6:
@@ -2677,8 +2766,10 @@ func _meadow_roads(data: PackedByteArray) -> void:
 					continue
 				var k := (tj * MEADOW_SIDE + ti) * 2
 				var a := absf(lat)
-				if a < GRASS_ROAD:
+				if a < road_lim:
 					data[k] = 0
+				elif a < GRASS_ROAD:
+					data[k + 1] = mini(data[k + 1], int(round(MOWN * 255.0)))
 				else:
 					data[k + 1] = mini(data[k + 1], int(round(lerpf(MOWN, 1.0, smoothstep(GRASS_ROAD, GRASS_VERGE, a)) * 255.0)))
 
@@ -3341,14 +3432,34 @@ func _build_spectators(root: Node3D) -> void:
 			var q := gx * Vector3(rng.randf_range(-2.0, 2.0), 0.0, -2.6 - rng.randf_range(0.0, 1.5))
 			q.y = _ground(q.x, q.z)
 			spots.append([q, Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1)) + 0.01 * Vector3.RIGHT, false])
+	# The race observer on the tower by race control, arms crossed.
+	if not _observer_spot.is_empty():
+		spots.append([_observer_spot[0], _observer_spot[1], false, false, CrowdPlacer.POSE_ARMS_CROSSED])
 	CrowdPlacer.build(root, spots, SPECTATOR_SCALE, SPECTATOR_SKIN, 7781, func(res: Resource, n: String) -> Resource: return _save_res(res, n))
 	print("  spectators: %d (%d seated)" % [spots.size(), seated])
 
 
 const LOOP_EXIT_LENGTH := 30.0
+## The road stops round the loop (TerrainGenerator.road_gaps): this far before the entry lane's start and
+## after the exit lane's end (m). The asphalt and curbs taper to a point over the TerrainGenerator's
+## road_gap_taper (12m) before the gap and widen again after it, so carts cross a short stretch of grass
+## into the loop and out of it; the lanes rise out of the grass and sink back into it.
+const LOOP_ROAD_GAP := Vector2(8.0, 10.0)
 const LOOP_END_SINK := 0.25
 const LOOP_TRACK_WIDTH := 8.5
 const LOOP_SPIRAL_OFFSET := 10.5
+
+## The gap in the road round the loop, as TerrainGenerator.road_gaps: [s0, s1] along the lap. From the
+## loop's saved place (which _fit_loop only slides onto the road), so it's the same on every run.
+func _plan_road_gaps() -> PackedFloat32Array:
+	var loop := _level.get_node_or_null("Ramps/LoopCSG") as Node3D
+	if loop == null:
+		return PackedFloat32Array()
+	var off := _curve.get_closest_offset(loop.position)
+	var z_in: float = -5.0 - float(loop.get("approach_length"))
+	var z_out: float = -5.0 + LOOP_EXIT_LENGTH
+	return PackedFloat32Array([snappedf(off + z_in - LOOP_ROAD_GAP.x, 0.1), snappedf(off + z_out + LOOP_ROAD_GAP.y, 0.1)])
+
 
 func _fit_loop() -> void:
 	var loop := _level.get_node_or_null("Ramps/LoopCSG") as Node3D
@@ -3373,8 +3484,112 @@ func _fit_loop() -> void:
 	loop.set("entry_end_y", road_in - loop.position.y - LOOP_END_SINK)
 	loop.set("exit_end_y", road_out - loop.position.y - LOOP_END_SINK)
 	loop.set("road_grade", (road_out - road_in) / (z_out - z_in))
+	# The pylons down into the ground beside the road, which falls away there: they started at the origin.
+	var foot := 0.0
+	for spot in loop.call("support_spots"):
+		var w: Vector3 = loop.transform * Vector3(spot.x, 0.0, spot.y)
+		foot = minf(foot, _ground_min(w.x, w.z, 1.0) - loop.position.y - 0.4)
+	loop.set("support_foot_y", foot)
 	loop.call("_rebuild")
-	print("  loop ends: entry %.2f, exit %.2f under the origin, grade %.3f" % [loop.get("entry_end_y"), loop.get("exit_end_y"), loop.get("road_grade")])
+	print("  loop ends: entry %.2f, exit %.2f under the origin, grade %.3f; pylons down to %.2f" % [loop.get("entry_end_y"),
+			loop.get("exit_end_y"), loop.get("road_grade"), foot])
+
+
+## A warning sign before the loop, right of the road: a yellow board on two posts with a black loop
+## drawn on it (the road running in flat, round the loop a little further on, and out) and LOOP AHEAD under
+## it. Life size, at PROP_SCALE; its front faces the carts coming. Its layers stand 2cm apart (3cm at
+## PROP_SCALE): closer, the mobile renderer can't keep them apart.
+const LOOP_SIGN_BEFORE := 75.0   # metres before the entry lane's start
+const LOOP_SIGN_LAT := 12.5
+
+func _build_loop_sign(root: Node3D) -> void:
+	var loop := _level.get_node_or_null("Ramps/LoopCSG") as Node3D
+	if loop == null:
+		return
+	var s_in := _curve.get_closest_offset(loop.transform * Vector3(0.0, 0.0, -5.0 - float(loop.get("approach_length"))))
+	var s := s_in - LOOP_SIGN_BEFORE
+	var fr := _frame(s)
+	var at := _at(s, LOOP_SIGN_LAT)
+	at.y = _ground_min(at.x, at.z, 1.2)
+	# Facing the carts coming, turned a little toward the road.
+	var yaw := _yaw_to(-(fr["fwd"] as Vector3)) - 0.18
+	var xf := _place(at, yaw)
+	var kit := {}
+	_kit.set_frame(xf)
+	var k := _kit
+	var yellow := Color(1.0, 0.84, 0.12)
+	var black := Color(0.05, 0.05, 0.06)
+	var hw := 1.0
+	var y0 := 1.5
+	var y1 := 3.0
+	for sx in [-0.7, 0.7]:
+		k.tube(kit, "metal", Vector3(sx, 0.0, 0.05), Vector3(sx, y1 - 0.05, 0.05), 0.045, 0.045, 8, GALV)
+	# The board: a black rim round a yellow face, its back grey.
+	k.block(kit, "paint", Vector3(-hw, y0, -0.01), Vector3(hw, y1, 0.02), Color(0.55, 0.56, 0.58))
+	k.quad(kit, "paint", [Vector3(-hw, y0, -0.03), Vector3(hw, y0, -0.03), Vector3(hw, y1, -0.03), Vector3(-hw, y1, -0.03)], Vector3.FORWARD, black)
+	var e := 0.06
+	k.quad(kit, "paint", [Vector3(-hw + e, y0 + e, -0.05), Vector3(hw - e, y0 + e, -0.05), Vector3(hw - e, y1 - e, -0.05), Vector3(-hw + e, y1 - e, -0.05)],
+			Vector3.FORWARD, yellow)
+	# The loop on the board's upper part: the road in along the bottom, round a circle shifted on a little
+	# like the corkscrew, and out, left to right seen from the front (its -z: the board's local +x is the
+	# viewer's left, so x is drawn negated; unflipped, the arrow pointed back at the carts).
+	var r := 0.36
+	var lead := 0.7
+	var shift := 0.28
+	var pts: Array[Vector2] = []
+	for i in range(9):
+		pts.append(Vector2(lead - lead * i / 8.0, 0.0))
+	for i in range(1, 73):
+		var t := TAU * i / 72.0
+		pts.append(Vector2(-(shift * t / TAU + r * sin(t)), r * (1.0 - cos(t))))
+	for i in range(1, 9):
+		pts.append(Vector2(-(shift + lead * i / 8.0), 0.0))
+	var n := pts.size() - 1
+	var mid_x := (pts[0].x + pts[n].x) * 0.5
+	var base := Vector2(-mid_x, y0 + 0.62)
+	var w := 0.055
+	var z := -0.07
+	for i in range(n):
+		var a: Vector2 = pts[i] + base
+		var b: Vector2 = pts[i + 1] + base
+		var na := _stroke_normal(pts, i) * w
+		var nb := _stroke_normal(pts, i + 1) * w
+		k.quad(kit, "paint", [Vector3(a.x - na.x, a.y - na.y, z), Vector3(b.x - nb.x, b.y - nb.y, z), Vector3(b.x + nb.x, b.y + nb.y, z),
+				Vector3(a.x + na.x, a.y + na.y, z)], Vector3.FORWARD, black)
+	# An arrowhead on the way out.
+	var tip: Vector2 = pts[n] + base
+	var dir: Vector2 = (pts[n] - pts[n - 3]).normalized()
+	var side := Vector2(-dir.y, dir.x)
+	var tip_end := tip + dir * 0.14
+	var tz := z
+	k.tri(kit, "paint", Vector3(tip_end.x, tip_end.y, tz), Vector3(tip.x + side.x * 0.12, tip.y + side.y * 0.12, tz),
+			Vector3(tip.x - side.x * 0.12, tip.y - side.y * 0.12, tz), Vector3.FORWARD, Vector3.FORWARD, Vector3.FORWARD, black, Vector3.FORWARD)
+	_commit(root, kit, "LoopSign")
+	var label := Label3D.new()
+	label.name = "LoopSignText"
+	label.text = "LOOP AHEAD"
+	label.font = _bold_font()
+	label.font_size = 64
+	label.pixel_size = 0.0036 * PROP_SCALE
+	label.modulate = black
+	label.outline_size = 0
+	label.double_sided = false
+	label.transform = xf * Transform3D(Basis(Vector3.UP, PI).scaled(Vector3.ONE / PROP_SCALE), Vector3(0.0, y0 + 0.3, -0.09))
+	root.add_child(label)
+	var b := Basis(Vector3.UP, yaw)
+	_boxes_body(root, "LoopSignBody", [[xf * Vector3(0.0, (y0 + y1) * 0.5, 0.0), Vector3(hw * 2.0, y1 - y0, 0.1) * PROP_SCALE, b],
+			[xf * Vector3(-0.7, y0 * 0.5, 0.05), Vector3(0.12, y0, 0.12) * PROP_SCALE, b],
+			[xf * Vector3(0.7, y0 * 0.5, 0.05), Vector3(0.12, y0, 0.12) * PROP_SCALE, b]])
+	_note("LoopSign", at, 1.2 * PROP_SCALE, 1.0)
+	print("  loop sign at s %.0f, %.0fm off the road" % [s, _road_distance(at.x, at.z)])
+
+
+## The unit normal of a polyline stroke at point `i` (the average of its two segments').
+static func _stroke_normal(pts: Array[Vector2], i: int) -> Vector2:
+	var a: Vector2 = pts[maxi(i - 1, 0)]
+	var b: Vector2 = pts[mini(i + 1, pts.size() - 1)]
+	var d := (b - a).normalized()
+	return Vector2(-d.y, d.x)
 
 
 ## The road's surface height at `at`: the lap's nearest centreline point, raised by the road offset.

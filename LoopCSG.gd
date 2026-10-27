@@ -86,6 +86,22 @@ extends Node3D
 		exit_length = maxf(v, 0.0)
 		_maybe_rebuild()
 
+## How far in from each lane's end its walls (and the entry's divider) taper down into the road: a
+## wedge is cut away above a plane from the lane's surface at its end up to the walls' tops this far
+## in. 0 keeps them full height to the end, where they stood up out of the road as blunt blocks.
+@export_range(0.0, 12.0, 0.5) var end_taper: float = 8.0:
+	set(v):
+		end_taper = maxf(v, 0.0)
+		_maybe_rebuild()
+
+## How low the support pylons reach, metres from the loop's origin (negative: under it). They started at
+## the origin, and where the ground falls away beside the road (the Lakeside loop) they stood in the air;
+## regenerate_lakeside.gd sets this from the ground under support_spots().
+@export var support_foot_y: float = 0.0:
+	set(v):
+		support_foot_y = v
+		_maybe_rebuild()
+
 @export_group("Features")
 ## Whether to place speed boost pads on the entry and exit ramps
 @export var add_boost_pads: bool = true:
@@ -196,7 +212,11 @@ func _rebuild() -> void:
 	# 5. Entry Safety Divider (separates climb lane from descent track)
 	_add_entry_divider(combiner)
 
-	# 6. Boost Pads (if enabled)
+	# 6. The walls taper down into the road at both lane ends
+	if end_taper > 0.0:
+		_add_end_tapers(combiner, path_node.curve)
+
+	# 7. Boost Pads (if enabled)
 	if add_boost_pads and BOOST_PAD_SCENE:
 		_add_boost_pads()
 
@@ -257,6 +277,43 @@ func _add_entry_divider(combiner: CSGCombiner3D) -> void:
 	divider.use_collision = true
 	divider.collision_layer = 1
 	combiner.add_child(divider)
+
+
+## Cuts each lane's walls down toward its end (end_taper): a box subtracted above a plane that runs from
+## just over the lane's surface at the end up to the walls' tops end_taper in, across the lane (and on the
+## entry, across the divider's nose). The box stops there and stays low, clear of the loop overhead: the
+## climb's floor reaches z ~12.6 and the descent's -22.6, both 10m+ up; the pylons stand outside it.
+func _add_end_tapers(combiner: CSGCombiner3D, curve: Curve3D) -> void:
+	var half_shift := spiral_offset * 0.5
+	var z_center := -5.0
+	var exit_len := exit_length if exit_length > 0.0 else approach_length
+	var reach := track_width * 0.5 + wall_thickness + 0.1
+	var cut_h := 6.0
+	# [lane x, the end's z, the lane's surface there, the way the lane runs from the end toward the loop]
+	var ends := [[-half_shift, z_center - approach_length, entry_end_y, 1.0], [half_shift, z_center + exit_len, exit_end_y, -1.0]]
+	for e in ends:
+		var x: float = e[0]
+		var z_end: float = e[1]
+		var y0: float = float(e[2]) + 0.03
+		var dir: float = e[3]
+		var z_far := z_end + dir * end_taper
+		var y_far: float = curve.get_closest_point(Vector3(x, y0, z_far)).y + wall_height + 0.3
+		var k := (y_far - y0) / end_taper
+		var tilt := Basis(Vector3.RIGHT, -dir * atan(k))
+		var lo := x - reach
+		var hi := x + reach
+		if dir > 0.0:
+			hi = maxf(hi, 0.35)   # the divider between the lanes starts 3m into the entry lane
+		var z_mid := z_end + dir * (end_taper - 1.0) * 0.5
+		var on_plane := Vector3((lo + hi) * 0.5, y0 + k * dir * (z_mid - z_end), z_mid)
+		var cut := CSGBox3D.new()
+		cut.name = "EndTaper"
+		cut.operation = CSGShape3D.OPERATION_SUBTRACTION
+		# A subtraction's cut faces take its own material: white by default.
+		cut.material = _create_asphalt_material()
+		cut.size = Vector3(hi - lo, cut_h, (end_taper + 1.0) * sqrt(1.0 + k * k))
+		cut.transform = Transform3D(tilt, on_plane + tilt * Vector3(0.0, cut_h * 0.5, 0.0))
+		combiner.add_child(cut)
 
 
 ## Generates the 3D stunt loop curve:
@@ -366,6 +423,21 @@ func _create_asphalt_material() -> StandardMaterial3D:
 
 
 ## Support pillars grounding the high points of the loop to Y=0
+## Where the pylons stand in the loop's frame (x, z): the ascent tower, the apex gantry's two legs and the
+## descent tower.
+func support_spots() -> Array[Vector2]:
+	var r := loop_radius
+	var z_center := -5.0
+	var half_shift := spiral_offset * 0.5
+	var hw := track_width * 0.5 + wall_thickness
+	var x_climb := lerpf(-half_shift, half_shift, smoothstep(0.0, 1.0, 0.25))
+	var x_desc := lerpf(-half_shift, half_shift, smoothstep(0.0, 1.0, 0.75))
+	var lateral_span := half_shift + hw + 3.8
+	var out: Array[Vector2] = [Vector2(x_climb - hw - 2.8, z_center + r + road_thickness + 0.6), Vector2(-lateral_span, z_center),
+			Vector2(lateral_span, z_center), Vector2(x_desc + hw + 2.8, z_center - r - road_thickness - 0.6)]
+	return out
+
+
 func _add_support_pylons(combiner: CSGCombiner3D) -> void:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = support_color
@@ -377,6 +449,8 @@ func _add_support_pylons(combiner: CSGCombiner3D) -> void:
 	var col_radius := 0.65
 	var half_shift := spiral_offset * 0.5
 	var hw := track_width * 0.5 + wall_thickness
+	var spots := support_spots()
+	var foot := minf(support_foot_y, 0.0)
 
 	# Support 1: Ascent tower (under front climb at a = PI/2, y = r, z = z_center + r)
 	# Positioned well outside the left wall and behind the road backing
@@ -385,9 +459,9 @@ func _add_support_pylons(combiner: CSGCombiner3D) -> void:
 	var pylon_climb := CSGCylinder3D.new()
 	pylon_climb.name = "Pylon_Ascent"
 	pylon_climb.radius = col_radius
-	pylon_climb.height = r + ramp_height
+	pylon_climb.height = r + ramp_height - foot
 	pylon_climb.sides = 16
-	pylon_climb.position = Vector3(x_climb - hw - 2.8, (r + ramp_height) * 0.5, z_center + r + road_thickness + 0.6)
+	pylon_climb.position = Vector3(spots[0].x, (r + ramp_height + foot) * 0.5, spots[0].y)
 	pylon_climb.material = mat
 	pylon_climb.use_collision = true
 	pylon_climb.collision_layer = 1
@@ -412,9 +486,9 @@ func _add_support_pylons(combiner: CSGCombiner3D) -> void:
 		var pylon_apex := CSGCylinder3D.new()
 		pylon_apex.name = "Pylon_Apex_" + ("L" if side < 0 else "R")
 		pylon_apex.radius = col_radius * 1.15
-		pylon_apex.height = tower_h
+		pylon_apex.height = tower_h - foot
 		pylon_apex.sides = 16
-		pylon_apex.position = Vector3(side * lateral_span, tower_h * 0.5, z_center)
+		pylon_apex.position = Vector3(side * lateral_span, (tower_h + foot) * 0.5, z_center)
 		pylon_apex.material = mat
 		pylon_apex.use_collision = true
 		pylon_apex.collision_layer = 1
@@ -436,9 +510,9 @@ func _add_support_pylons(combiner: CSGCombiner3D) -> void:
 	var pylon_descent := CSGCylinder3D.new()
 	pylon_descent.name = "Pylon_Descent"
 	pylon_descent.radius = col_radius
-	pylon_descent.height = r + ramp_height
+	pylon_descent.height = r + ramp_height - foot
 	pylon_descent.sides = 16
-	pylon_descent.position = Vector3(x_desc + hw + 2.8, (r + ramp_height) * 0.5, z_center - r - road_thickness - 0.6)
+	pylon_descent.position = Vector3(spots[3].x, (r + ramp_height + foot) * 0.5, spots[3].y)
 	pylon_descent.material = mat
 	pylon_descent.use_collision = true
 	pylon_descent.collision_layer = 1

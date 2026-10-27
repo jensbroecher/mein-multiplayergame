@@ -94,6 +94,8 @@ func _is_in_gap_pos(pos: Vector3) -> bool:
 func _segment_in_gap(curve: Curve3D, length: float, point_count: int, i: int) -> bool:
 	var o0 := (float(i) / float(point_count)) * length
 	var o1 := (float(i + 1) / float(point_count)) * length
+	if not road_gaps.is_empty() and (_road_gap_width(o0) <= 0.0 or _road_gap_width(o1) <= 0.0):
+		return true
 	return _is_in_gap_pos(curve.sample_baked(o0)) or _is_in_gap_pos(curve.sample_baked(o1))
 
 
@@ -625,6 +627,13 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			else:
 				height = lerp(height, road_h - terrain_recession_visual, basin_blend)
 
+			# A road gap and its tapers: the ground just under the road's surface across the road and its
+			# curbs (visual and collision alike), easing back into the blend beyond them.
+			var gap_w: float = _road_gap_ground(px, pz, curve)
+			if gap_w > 0.0:
+				var across: float = 1.0 - smoothstep(sand_edge, sand_edge + 6.0, dist)
+				height = lerp(height, road_h + road_y_offset - ROAD_GAP_GROUND, gap_w * across)
+
 			# Desert Wadi: carve a shallow river corridor (banks dip below the water plane).
 			# Road blend above still wins near the path so the ford stays driveable.
 			if level_prefix == "desert_wadi":
@@ -869,6 +878,18 @@ var sand_width: float:
 ## Mown ground where the tall grass doesn't grow, 6 floats a rectangle: centre x, centre z, half
 ## length, half width, yaw, and a feather over which the grass thins out toward it.
 @export var grass_clearings: PackedFloat32Array = PackedFloat32Array()
+## Stretches of the lap with no road, 2 floats a gap: its start and end (metres along the curve). The
+## asphalt, the curbs, their sides and the road's collision narrow to a point over `road_gap_taper`
+## before a gap and widen again after it, and the ground under the gap and both tapers is graded to
+## ROAD_GAP_GROUND under the road's surface, so carts drive over grass there (PlayerCart counts it as
+## off-road). The Lakeside loop stands in one (regenerate_lakeside.gd). Default roads only.
+@export var road_gaps: PackedFloat32Array = PackedFloat32Array()
+@export var road_gap_taper: float = 12.0
+## How far under the road's surface the ground in a road gap lies: under the curbs' outer edge (15cm
+## down), so the grass doesn't cut through them along the taper.
+const ROAD_GAP_GROUND := 0.18
+## Per road gap: [x0, z0, x1, z1 (the zone's bounds, padded), points along it every metre, their offsets].
+var _gap_zones: Array = []
 
 var _visual_heights: PackedFloat32Array = PackedFloat32Array()
 
@@ -886,6 +907,63 @@ var junction_openings: Array = []
 ## Cached axis-aligned XZ bounds (x0, z0, x1, z1) per extra road curve, for a cheap reject before the
 ## nearest-point search.
 var _extra_road_bounds: Array = []
+
+## The road's share of its width at `offset` along the curve: 0 in a road gap, 1 clear of the gaps, and
+## straight in between over road_gap_taper (the road narrows to a point).
+func _road_gap_width(offset: float) -> float:
+	var w := 1.0
+	for k in range(0, road_gaps.size() - 1, 2):
+		var g0: float = road_gaps[k]
+		var g1: float = road_gaps[k + 1]
+		if offset >= g0 and offset <= g1:
+			return 0.0
+		var d: float = (g0 - offset) if offset < g0 else (offset - g1)
+		w = minf(w, clampf(d / maxf(road_gap_taper, 0.01), 0.0, 1.0))
+	return w
+
+
+## How much the ground at (px, pz) belongs to a road gap's grading: 1 along the gap and its tapers
+## (measured along the curve), easing to 0 over 6m past them. Cheap outside the zones' bounds.
+func _road_gap_ground(px: float, pz: float, curve: Curve3D) -> float:
+	if road_gaps.is_empty():
+		return 0.0
+	if _gap_zones.is_empty():
+		for k in range(0, road_gaps.size() - 1, 2):
+			var a: float = road_gaps[k] - road_gap_taper - 6.0
+			var b: float = road_gaps[k + 1] + road_gap_taper + 6.0
+			var pts := PackedVector3Array()
+			var offs := PackedFloat32Array()
+			var lo := Vector2(INF, INF)
+			var hi := Vector2(-INF, -INF)
+			var o := a
+			while o <= b:
+				var p := curve.sample_baked(o)
+				pts.append(p)
+				offs.append(o)
+				lo = Vector2(minf(lo.x, p.x), minf(lo.y, p.z))
+				hi = Vector2(maxf(hi.x, p.x), maxf(hi.y, p.z))
+				o += 1.0
+			var pad := curb_outer_width * 0.5 + 8.0
+			_gap_zones.append([lo.x - pad, lo.y - pad, hi.x + pad, hi.y + pad, pts, offs, road_gaps[k], road_gaps[k + 1]])
+	var best := 0.0
+	for z in _gap_zones:
+		if px < z[0] or pz < z[1] or px > z[2] or pz > z[3]:
+			continue
+		var pts: PackedVector3Array = z[4]
+		var offs: PackedFloat32Array = z[5]
+		var near_d := INF
+		var near_o := 0.0
+		for i in range(pts.size()):
+			var d := Vector2(pts[i].x - px, pts[i].z - pz).length_squared()
+			if d < near_d:
+				near_d = d
+				near_o = offs[i]
+		var g0: float = float(z[6]) - road_gap_taper
+		var g1: float = float(z[7]) + road_gap_taper
+		var outside := maxf(g0 - near_o, near_o - g1)
+		best = maxf(best, 1.0 - smoothstep(0.0, 6.0, outside))
+	return best
+
 
 func _sample_cached_height(px: float, pz: float) -> float:
 	if _visual_heights.is_empty():
@@ -948,6 +1026,7 @@ func generate_world():
 	
 	# Keep high-resolution bake interval for exact curve sampling
 	track_path.curve.bake_interval = 0.25
+	_gap_zones.clear()
 
 	# IMPORTANT: Use free() in editor for immediate cleanup to prevent 'ghost' nodes
 	# queue_free() is too slow for tool scripts and causes scene-save bloat
@@ -1522,9 +1601,10 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 		var up_dir: Vector3 = frames[i]["up"] if frames[i].has("up") else Vector3.UP
 		var offset: float = float(frames[i]["offset"])
 
+		var taper: float = _road_gap_width(offset)
 		if is_curb:
 			# Inner edge locked to full asphalt edge; only the outer flare may shrink on hairpins.
-			var use_inner: float = inner_w
+			var use_inner: float = inner_w * taper
 			var want_extra: float = maxf(outer_w - inner_w, 0.35)
 			var max_extra: float = _max_shoulder_extra_at(frames, i, length, point_count)
 			var use_outer: float = use_inner + minf(want_extra, max_extra)
@@ -1554,8 +1634,9 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 			st.set_uv(Vector2(1.0, offset))
 			st.add_vertex(p_ro)
 		else:
-			# Full constant road width every slice — prevents "deep cuts" on curves
-			var right: Vector3 = right_dir * half_w
+			# Full constant road width every slice — prevents "deep cuts" on curves (narrowing only toward
+			# a road gap)
+			var right: Vector3 = right_dir * (half_w * taper)
 			st.set_normal(up_dir)
 			st.set_uv(Vector2(0, offset))
 			st.add_vertex(final_pos - right + up_dir * deck_y)
@@ -1738,8 +1819,9 @@ func _create_track_collision(point_count: int, width: float, node_name: String):
 			var final_pos: Vector3 = frames_col[i]["pos"]
 			var right_dir: Vector3 = frames_col[i]["right"]
 			var up_dir: Vector3 = frames_col[i]["up"] if frames_col[i].has("up") else Vector3.UP
-			var use_outer: float = col_outer
-			var use_inner: float = inner_w
+			var taper_c: float = _road_gap_width(float(frames_col[i]["offset"]))
+			var use_inner: float = inner_w * taper_c
+			var use_outer: float = use_inner + (col_outer - inner_w)
 
 			# Driveable sand + road matching banked up vector, with a subtle outer shoulder bevel
 			var p_lo = final_pos - right_dir * use_outer + up_dir * (col_y - 0.12)
@@ -1878,7 +1960,8 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 		var offset: float = float(frames_side[i]["offset"])
 		var final_pos: Vector3 = frames_side[i]["pos"]
 		var right_dir: Vector3 = frames_side[i]["right"]
-		var right: Vector3 = right_dir * half_w
+		var taper_s: float = _road_gap_width(offset)
+		var right: Vector3 = right_dir * (half_w * taper_s)
 		var tangent: Vector3 = Vector3.FORWARD
 		if i < point_count:
 			tangent = (frames_side[i + 1]["pos"] as Vector3) - final_pos
@@ -1896,7 +1979,7 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 			var use_inner: float = road_width / 2.0
 			var want_extra: float = maxf(half_w - use_inner, 0.35)
 			var max_extra: float = _max_shoulder_extra_at(frames_side, i, length, point_count)
-			var use_outer: float = use_inner + minf(want_extra, max_extra)
+			var use_outer: float = use_inner * taper_s + minf(want_extra, max_extra)
 			eff_right = right_dir * use_outer
 			eff_side_y_offset = road_y_offset - maxf(curb_slope, 0.12)
 

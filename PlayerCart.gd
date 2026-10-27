@@ -3025,11 +3025,27 @@ func _is_track_surface(collider: Object) -> bool:
 			var y_diff: float = absf(global_position.y - sampled_world.y)
 			var outer_hw: float = _get_track_outer_half_width()
 			if xz_dist <= outer_hw and y_diff <= 3.2:
-				return true
+				# Where the road stops (TerrainGenerator.road_gaps, and the tapers either side) it's grass.
+				return p_track != track_path or not _in_road_gap(closest_off)
 		return false
 
 	return false
 
+	return false
+
+
+## True `offset` metres along the lap is in one of the level's road gaps or their tapers
+## (TerrainGenerator.road_gaps, road_gap_taper), where the ground is grass.
+func _in_road_gap(offset: float) -> bool:
+	var lvl: Node = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
+	var tg: Node = lvl.get_node_or_null("TerrainGenerator") if lvl else null
+	if tg == null or not ("road_gaps" in tg):
+		return false
+	var gaps: PackedFloat32Array = tg.road_gaps
+	var taper: float = float(tg.road_gap_taper)
+	for k in range(0, gaps.size() - 1, 2):
+		if offset >= gaps[k] - taper and offset <= gaps[k + 1] + taper:
+			return true
 	return false
 
 

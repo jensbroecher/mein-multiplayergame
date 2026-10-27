@@ -31,6 +31,10 @@ const POST_EVERY := 1.3
 const SINK := 0.05           # how far the visuals reach under the ground
 const FOOT := 0.25           # how far the collision reaches under it
 const SETTLE_SINK := 0.01    # the toe sits this far under the surface, so no edge shows
+## The planks never come lower than this over the ground: where the deck runs nearer (the toe, a roller's
+## foot) they lie flat on the road instead. A plank top grazing the road z-fought with it all across the
+## ramp (the mobile renderer can't part faces a centimetre apart). The collision keeps the true profile.
+const PLANK_MIN_Y := PLANK_T
 
 static var _materials := {}
 static var _built := {}      # shape key -> [mesh, collision shape]
@@ -217,6 +221,8 @@ func _build_mesh() -> ArrayMesh:
 	var deck: Array = _deck_points()
 	var pts: Array[Vector2] = deck[0]
 	var paint: Array[int] = deck[1]
+	for i in range(pts.size()):
+		pts[i].y = maxf(pts[i].y, PLANK_MIN_Y)
 	var hw := width * 0.5
 	# Planks across the run, each its own timber (grain across) on the chord between two deck points.
 	for i in range(pts.size() - 1):
@@ -235,7 +241,8 @@ func _build_mesh() -> ArrayMesh:
 	var side_col := wood_color.darkened(0.1)
 	var last := pts.size() - 1
 	for side in [-1.0, 1.0]:
-		var x: float = side * (hw - STRINGER_W * 0.5)
+		# 1cm in from the planks' ends, or its face and theirs shared a plane along the side.
+		var x: float = side * (hw - STRINGER_W * 0.5 - 0.01)
 		for i in range(last):
 			var a: Vector2 = pts[i] - Vector2(0.0, PLANK_T + STRINGER_D * 0.5)
 			var b: Vector2 = pts[i + 1] - Vector2(0.0, PLANK_T + STRINGER_D * 0.5)
@@ -263,13 +270,17 @@ func _build_mesh() -> ArrayMesh:
 				d = clampf(d, d_from + POST * 0.5, d_to - POST * 0.5)
 				var top := deck_y(d) - PLANK_T - 0.01
 				venue.timber(mk, _p(d, POST, xo), _p(d, top, xo), POST, POST, frame_col, Vector3.BACK)
-	# A kicker's back: boards from the ground up under the last plank, and a header along the top.
+	# A kicker's back: boards from the ground up to a header under the last plank. The header stands 1.5cm
+	# proud of the boards and the stringers' ends, and the boards stop under it: flush, their faces shared a
+	# plane along the top of the back and flickered.
 	if tail_length <= 0.0:
 		var d := run()
 		var y := height - PLANK_T
-		kit.quad(mk, "battens", [_p(d, -SINK, -hw), _p(d, -SINK, hw), _p(d, y, hw), _p(d, y, -hw)], Vector3.FORWARD, side_col,
-				[Vector2(-hw, -SINK), Vector2(hw, -SINK), Vector2(hw, y), Vector2(-hw, y)])
-		venue.timber(mk, _p(d - STRINGER_W * 0.5, y - STRINGER_D * 0.5, -hw), _p(d - STRINGER_W * 0.5, y - STRINGER_D * 0.5, hw), STRINGER_W, STRINGER_D, frame_col, Vector3.FORWARD)
+		var yb := y - STRINGER_D
+		kit.quad(mk, "battens", [_p(d, -SINK, -hw), _p(d, -SINK, hw), _p(d, yb, hw), _p(d, yb, -hw)], Vector3.FORWARD, side_col,
+				[Vector2(-hw, -SINK), Vector2(hw, -SINK), Vector2(hw, yb), Vector2(-hw, yb)])
+		var zh := d - STRINGER_W * 0.5 + 0.015
+		venue.timber(mk, _p(zh, y - STRINGER_D * 0.5, -hw), _p(zh, y - STRINGER_D * 0.5, hw), STRINGER_W, STRINGER_D, frame_col, Vector3.FORWARD)
 		for sx in [-1.0, 1.0]:
 			var xc: float = sx * (hw - POST * 0.5)
 			venue.timber(mk, _p(d - POST * 0.5 - 0.005, -SINK, xc), _p(d - POST * 0.5 - 0.005, y - STRINGER_D, xc), POST, POST, frame_col, Vector3.BACK)

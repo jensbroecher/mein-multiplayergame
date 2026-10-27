@@ -40,7 +40,7 @@ the others re-bakes it (see Lakeside Course below).
 ## Lakeside Course (Bloombay GP, stage 1)
 
 - `regenerate_lakeside.gd` dresses `levels/LakesideLevel.tscn` as an RC race meeting and replaces everything under
-  `LakesideDressing` on every run: the paddock, race control, the lap towers, catch fences, crowd
+  `LakesideDressing` on every run: the paddock, race control and its observer tower, the lap towers, catch fences, crowd
   barriers, tyre walls, hay, cones, the grandstand across the first corner, the campsite on the hill, the
   orange kicker, the long bridge's wooden ramps and boost pads, the woods, the boulders, the meadow grass, the woodcutter's yard, the marquee, the cars on
   show and the spectators; it also lays the AI's shortcut. The terrain and road stay TerrainGenerator's.
@@ -94,6 +94,23 @@ the others re-bakes it (see Lakeside Course below).
   (before the bend), the table-top 25-50m on, every cart keeping its speed. Hand-tune them in the generator:
   anything under `LakesideDressing` is replaced on every run. AI races (speed=2) lose about one bot a race in the
   bridge's bend (1485-1588), with or without them.
+- The scaffold tower beside race control (`_build_observer_tower`, `OBSERVER_TOWER`) carries a race observer
+  instead of its old broadcast camera: a spectator with arms crossed on the platform (`_observer_spot`, added
+  in `_build_spectators`; a spot's fifth field picks `CrowdPlacer`'s pose).
+- The loop's lanes taper their walls (and the entry divider's nose) down into the road over the last
+  `LoopCSG.end_taper` (8m) of each end: a CSG box subtracted above a plane from 3cm over the lane's surface at
+  its end to the walls' tops. Cut square, 2.6m walls stood up out of the road as blunt black blocks. The cut
+  box takes the asphalt material (a subtraction's faces take its own: white by default) and stays low and
+  inside the lane, clear of the loop above it.
+- The road stops round the loop (`_plan_road_gaps`, `LOOP_ROAD_GAP`: 8m before the entry lane's start to 10m
+  after the exit lane's end, from the loop's saved place): `TerrainGenerator.road_gaps`, with the asphalt and
+  curbs tapering to a point over `road_gap_taper` (12m) either side, so carts cross a short stretch of grass into
+  the loop and out of it (the meadow grows mown grass there). Changing the gap re-bakes the world (meta
+  `baked_road_gaps`). The pylons reach down to the ground beside the road (`LoopCSG.support_foot_y`, from the
+  ground under `support_spots()`, 0.4m in): they started at the loop's origin and stood in the air.
+- A LOOP AHEAD sign stands `LOOP_SIGN_BEFORE` (75m) before the entry lane, right of the road (`_build_loop_sign`):
+  a yellow board on two posts with the loop drawn on it (a road in, a circle shifted on a little, an arrow out)
+  and the words in a Label3D.
 - Single meshes under `LakesideDressing` get no collider from DressingColliders.gd: "lake" (in the node's path) is
   one of its `MESH_SKIP` water words. Give new dressing its own boxes (`_boxes_body`): the marquee's beer tables
   have a block each, the rowing boat a convex hull (`RowboatBody`).
@@ -154,7 +171,7 @@ the others re-bakes it (see Lakeside Course below).
 - The paddock's gazebos and team tents are grown (`GAZEBO_GROW`, `TENT_GROW`, on top of PROP_SCALE; their
   furniture isn't) so a race car fits on a display table (`VenueKit.display_table`). `SHOW_CARS`, the lighter
   models, stand on every other gazebo's table and in each team tent at race size (the other tables hold a
-  charger and the toolkit; the small RC buggies and transmitters are gone, and so is the camera tower by race control): `_show_car` lays the car's
+  charger and the toolkit; the small RC buggies and transmitters are gone): `_show_car` lays the car's
   scene out again (its Model node and its meshes, the same `.res` files) under a `DisplayCar.gd` node, which
   applies the car's factory paint at load. Their meshes stop drawing at `SHOW_CAR_RANGE` (130m): a car is
   37-51k triangles.
@@ -312,6 +329,16 @@ the others re-bakes it (see Lakeside Course below).
 1 (corners), and a plain shoulder with a white edge line elsewhere. TerrainGenerator writes that weight
 (`_apply_curb_corner_weights`) when it builds the curbs. To update the saved curb meshes of every level
 without regenerating them, run `res://refresh_curb_corners.tscn` headless.
+
+## Road gaps
+
+`TerrainGenerator.road_gaps` ([s0, s1] pairs along the curve, default roads only) leaves stretches of a lap
+with no road. `_road_gap_width(offset)` scales the asphalt's half width, the curbs' inner edge, the road sides
+and the road collision to 0 over `road_gap_taper` before each gap and back after it, and `_segment_in_gap`
+drops the segments where it reaches 0. `_road_gap_ground` grades the ground (visual and collision) along the gap
+and both tapers to `ROAD_GAP_GROUND` (18cm, under the curbs' outer edge) below the road's surface, easing
+back 6m past them. PlayerCart's corridor rule (terrain within the road's half width counts as road) skips the
+gaps and tapers (`_in_road_gap`), so the ground there is grass, off-road, with its sound and dust.
 
 ## Race gates
 
@@ -716,7 +743,10 @@ its mesh and a trimesh collider from its exports as internal children (cached pe
 the transform and the shape: `length` (toe to lip), `height`, `width`, `curve` (0 a wedge, 1 a transition flat at
 the toe; the lip's slope is height / length * (1 + curve)), `table_length` (a flat top), `tail_length` (a run back
 down: a roller; 0 cuts it square, a kicker with a boarded back), `wood_color`, `trim_color` (the toe and lip
-planks). Planks across the run on stringers, upright boards on the sides, posts and a sill outside, all
+planks). The planks never lie lower than `PLANK_MIN_Y` (5cm) over the ground: at the toe and a roller's foot
+they lie flat on the road there, since a plank top grazing the road z-fought with it all across the ramp (the
+collision keeps the true profile). A kicker's back boards stop under the header along its top, which stands
+1.5cm proud of them: flush, they shared a plane in a band under the lip that flickered. Planks across the run on stringers, upright boards on the sides, posts and a sill outside, all
 `hut_wood.gdshader`. The origin is the toe's middle on the ground and the ramp rises toward -z (like a boost
 pad's front). Like the pads, `settle_on_track` (on) drops it onto the surface under it once the level's collision
 exists, on the plane through its corners' hits, 1cm under so the toe shows no edge; `face_lap` (on) turns it
