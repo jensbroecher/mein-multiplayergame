@@ -1614,6 +1614,12 @@ its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set th
   hung off the back and were taken off: only the sphere collides, but 30cm of bar 2cm off the ground would sink into
   every ramp and landing. Its shocks are big-bore bodies in the accent colour (`_big_shock`), stood nearly
   upright beside the tyres so they show in the gap under the flares.
+- The Sandstorm (`SandstormBuilder.gd`, a desert rally-raid buggy, an original design with a made-up name) is built on
+  the Titan's keyed section and flares, lower and longer: a closed cab with a sloping rear window, an engine cover
+  falling to the tail with two sand ladders (`_deck_load`, accent colour) strapped on it, a painted roof scoop
+  (`_roof_scoop`, a lofted superellipse eased down into the roof), a tubular bull bar with spot lamps, twin shocks
+  at each corner (CarDesign's `coilover` and `_bypass`), all-terrain tyres on ten-spoke rims. A spare lying on a flat
+  deck made it read as a pickup, so the deck slopes and carries the ladders instead.
 - CarSelection's line-up of names sits centred between Back and Confirm (not on the screen), as a carousel: the names
   ride on a reel (`_reel`) in a window between the arrows (`REEL_SIZE`, room for about eleven) that fades them out over
   `REEL_FADE` at each end (a gradient drawn only as a mask, `clip_children`), and `_place_reel` slides the car on show

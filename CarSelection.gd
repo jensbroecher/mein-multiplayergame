@@ -203,6 +203,19 @@ const CAR_PRESETS = [
 		"offroad": 9.8,
 		"desc": "Monster truck on huge chevron-tread tyres and long-travel big-bore shocks. Rolls over anything off-road, leans hard on tarmac.",
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Sandstorm",
+		"model_path": "res://generated/cars/Sandstorm.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 40.5,
+		"acceleration": 74.0,
+		"steer_speed": 2.8,
+		"grip": 4.9,
+		"braking": 46.0,
+		"offroad": 9.6,
+		"desc": "Desert rally-raid buggy with a roof scoop, twin shocks at every corner and sand ladders on the deck. Flat out over dunes and gravel, honest on tarmac.",
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 
@@ -214,6 +227,7 @@ const CAR_ACCENTS := {
 	"Phantom": Color(1.0, 0.78, 0.14), "Centurion": Color(0.98, 0.46, 0.12), "Mirage": Color(0.96, 0.28, 0.14),
 	"Inferno": Color(1.0, 0.22, 0.20), "Nocturne": Color(0.62, 0.86, 1.0), "Vortex": Color(0.55, 0.92, 0.15),
 	"Zephyr": Color(0.85, 0.55, 0.25), "Titan": Color(0.62, 0.95, 0.18),
+	"Sandstorm": Color(1.0, 0.55, 0.16),
 }
 ## Stat bars: caption, preset key, and the values at an empty and a full bar (spanning the fleet).
 const STATS := [

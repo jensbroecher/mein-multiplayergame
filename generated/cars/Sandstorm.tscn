@@ -1,0 +1,38 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://generated/cars/sandstorm_body.res" id="1_bkrwq"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/sandstorm_wheel_l.res" id="2_8u04w"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/sandstorm_wheel_r.res" id="3_okxvq"]
+
+[node name="Sandstorm" type="Node3D" unique_id=2068315148]
+metadata/procedural_car = true
+
+[node name="Model" type="Node3D" parent="." unique_id=1559901034]
+transform = Transform3D(-0.5, 0, -4.371139e-08, 0, 0.5, 0, 4.371139e-08, 0, -0.5, 0, 0, 0)
+
+[node name="Body" type="MeshInstance3D" parent="Model" unique_id=1078886416]
+mesh = ExtResource("1_bkrwq")
+metadata/car_shader = true
+
+[node name="Wheel_FL" type="MeshInstance3D" parent="Model" unique_id=1134339747]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.64, 0.29, -0.7)
+mesh = ExtResource("2_8u04w")
+metadata/car_shader = true
+
+[node name="Wheel_FR" type="MeshInstance3D" parent="Model" unique_id=1066654111]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.64, 0.29, -0.7)
+mesh = ExtResource("3_okxvq")
+metadata/car_shader = true
+
+[node name="Wheel_RL" type="MeshInstance3D" parent="Model" unique_id=1736473727]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.64, 0.29, 0.66)
+mesh = ExtResource("2_8u04w")
+metadata/car_shader = true
+
+[node name="Wheel_RR" type="MeshInstance3D" parent="Model" unique_id=1239616993]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.64, 0.29, 0.66)
+mesh = ExtResource("3_okxvq")
+metadata/car_shader = true
+
+[node name="AntennaPlacement" type="Node3D" parent="Model" unique_id=229899701]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3, 1.085, 0.34)

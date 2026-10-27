@@ -239,6 +239,21 @@ const CAR_PRESETS = [
 		"braking": 44.0,
 		"offroad": 9.8,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Sandstorm",
+		"engine_sound": "res://sounds/enginesounds/engine_centurion_loop.wav",
+		"engine_gain_db": -3.6,
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Sandstorm.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 40.5,
+		"acceleration": 74.0,
+		"steer_speed": 2.8,
+		"grip": 4.9,
+		"braking": 46.0,
+		"offroad": 9.6,
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 
