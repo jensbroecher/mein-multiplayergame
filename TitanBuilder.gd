@@ -1,16 +1,19 @@
 # TitanBuilder.gd
 #
-# The Titan: an RC monster truck. A short pickup body (a bulged bonnet, a raked windscreen, a flat
-# roof, a tonneau over the bed) rides high on a long-travel chassis, its wide body-colour box flares
-# over huge tyres with chevron tread on black split-spoke beadlock rims. Fat big-bore shocks in the
-# accent colour stand at every corner between the A-arms; black plastic bumpers with skid plates and
-# a hoop guard the ends.
+# The Titan: an RC monster truck. A short pickup body (a bonnet sloping down to a rounded nose with a
+# bulge along it, a raked windscreen, a cab with soft corners, an open bed with thick rounded rails)
+# rides high on a long-travel chassis. Swelling body-colour flares rise out of the bonnet's and the
+# bed's shoulders and roll down over huge chevron-tread tyres on black split-spoke beadlock rims.
+# Fat big-bore shocks in the accent colour stand at every corner between the A-arms; black plastic
+# bumpers with skid plates guard the ends. In the bed: a chase rack with a light bar over a spare
+# tyre strapped down, jerrycans in the front corners.
 #
-# The shell, flares, wheel parts and detail map come from CarDesign.gd. The section above the side is
-# the Strikeforce's (a rounded rim, a wall, a corner, a crowned top with the bonnet's bulge), keyed
-# along the car in one table (KEYS), so the windscreen and the cab's back are clean walls between
-# regions. The arches are cut by lifting the shell's bottom in a circle round each hub (_bot_knots);
-# the flares sweep along that same outline.
+# The shell, wheel parts and detail map come from CarDesign.gd. The section above the side is the
+# Strikeforce's (a rounded rim, a wall, a corner, a crowned top with the bonnet's bulge), keyed along
+# the car in one table (KEYS), so the windscreen and the cab's back are clean walls between regions;
+# here the rim is a big rounding (RIM_R), and the body is wider over the wheels than at the doors
+# (W_KNOTS). The arches are cut by lifting the shell's bottom in a circle round each hub
+# (_bot_knots); the flares sweep along that outline and fade into the body at both ends (_build_flare).
 extends "res://CarDesign.gd"
 
 const WHEEL_X := 0.660
@@ -23,37 +26,44 @@ const END_SILL_Y := 0.585          # and under the nose and the tail
 const NOSE_TIP := -1.120
 const TAIL_TIP := 1.020
 
-const W_KNOTS := [[-1.12, 0.565], [-1.02, 0.590], [-0.90, 0.600], [0.86, 0.600], [0.96, 0.592], [1.02, 0.582]]
+# Half-width of the body's side in plan: pinched at the nose and tail, swelling over the wheels, a
+# waist at the doors.
+const W_KNOTS := [[-1.12, 0.560], [-1.00, 0.615], [-0.86, 0.645], [-0.58, 0.645], [-0.40, 0.612], [0.28, 0.612],
+	[0.45, 0.645], [0.86, 0.645], [0.98, 0.615], [1.02, 0.600]]
 
 # The section above the side, keyframed along the car. Per row: z; belt (top of the side, where the
-# rim's rounding starts); rim_w (the shelf along the bonnet's edge, under the cab, along the bed);
-# wall_dx (how far the wall leans in: the cab's tumblehome); edge (the top beside the crown: bonnet,
-# roof, tonneau); cx, cy (the corner from the wall onto the top: cy > 0 a roof corner, 0 flat);
-# crown; the bonnet bulge's half-width and height.
+# rim's rounding starts); rim_w (the rim, its rounding included: the shelf along the bonnet's edge,
+# under the cab, along the bed); wall_dx (how far the wall leans in: the cab's tumblehome); edge (the
+# top beside the crown: bonnet, roof, the bed's floor, the tailgate); cx, cy (the corner from the
+# wall onto the top: cy > 0 a roof corner, < 0 the bed floor's fillet, 0 flat); crown; the bonnet bulge's half-width and height (it ramps up from the nose
+# and drops off at a scoop before the windscreen).
 const KEYS := [
 	# z       belt   rim_w  wall_dx edge   cx     cy     crown  dome_w dome_h
-	[-1.120, 0.815, 0.030, 0.030, 0.829, 0.030, 0.000, 0.010, 0.190, 0.000],
-	[-1.050, 0.820, 0.030, 0.030, 0.834, 0.030, 0.000, 0.010, 0.190, 0.000],
-	[-1.010, 0.823, 0.030, 0.030, 0.837, 0.030, 0.000, 0.010, 0.195, 0.026],
-	[-0.520, 0.852, 0.030, 0.030, 0.866, 0.030, 0.000, 0.010, 0.215, 0.030],
-	[-0.490, 0.853, 0.030, 0.030, 0.867, 0.030, 0.000, 0.010, 0.215, 0.000],
-	[-0.440, 0.855, 0.030, 0.030, 0.869, 0.030, 0.000, 0.010, 0.215, 0.000],
-	[-0.415, 0.855, 0.031, 0.042, 0.889, 0.036, 0.012, 0.011, 0.215, 0.000],
-	[-0.385, 0.855, 0.032, 0.058, 0.920, 0.042, 0.024, 0.012, 0.215, 0.000],
-	[-0.200, 0.855, 0.032, 0.085, 1.096, 0.050, 0.045, 0.015, 0.215, 0.000],
-	[-0.170, 0.855, 0.032, 0.085, 1.125, 0.050, 0.045, 0.015, 0.215, 0.000],
-	[-0.140, 0.855, 0.032, 0.085, 1.135, 0.050, 0.045, 0.015, 0.215, 0.000],
-	[0.180, 0.855, 0.032, 0.085, 1.135, 0.050, 0.045, 0.015, 0.215, 0.000],
-	[0.200, 0.855, 0.032, 0.080, 1.120, 0.050, 0.045, 0.015, 0.215, 0.000],
-	[0.235, 0.855, 0.030, 0.030, 0.869, 0.030, 0.000, 0.006, 0.215, 0.000],
-	[0.950, 0.840, 0.030, 0.030, 0.854, 0.030, 0.000, 0.006, 0.215, 0.000],
-	[1.020, 0.836, 0.030, 0.030, 0.850, 0.030, 0.000, 0.006, 0.215, 0.000],
+	[-1.120, 0.750, 0.055, 0.030, 0.800, 0.030, 0.000, 0.012, 0.190, 0.000],
+	[-1.040, 0.762, 0.055, 0.030, 0.812, 0.030, 0.000, 0.012, 0.190, 0.000],
+	[-0.880, 0.783, 0.055, 0.030, 0.833, 0.030, 0.000, 0.012, 0.200, 0.024],
+	[-0.560, 0.812, 0.055, 0.030, 0.862, 0.030, 0.000, 0.012, 0.215, 0.030],
+	[-0.500, 0.816, 0.055, 0.030, 0.866, 0.030, 0.000, 0.012, 0.215, 0.000],
+	[-0.440, 0.819, 0.055, 0.030, 0.869, 0.030, 0.000, 0.012, 0.215, 0.000],
+	[-0.415, 0.819, 0.056, 0.042, 0.889, 0.040, 0.014, 0.013, 0.215, 0.000],
+	[-0.385, 0.819, 0.056, 0.058, 0.920, 0.050, 0.028, 0.014, 0.215, 0.000],
+	[-0.200, 0.819, 0.056, 0.085, 1.096, 0.070, 0.060, 0.018, 0.215, 0.000],
+	[-0.170, 0.819, 0.056, 0.085, 1.122, 0.070, 0.060, 0.018, 0.215, 0.000],
+	[-0.130, 0.819, 0.056, 0.085, 1.135, 0.070, 0.060, 0.018, 0.215, 0.000],
+	[0.150, 0.819, 0.056, 0.085, 1.135, 0.070, 0.060, 0.018, 0.215, 0.000],
+	[0.195, 0.819, 0.056, 0.082, 1.110, 0.070, 0.060, 0.018, 0.215, 0.000],
+	[0.240, 0.845, 0.055, 0.000, 0.775, 0.015, -0.015, 0.000, 0.215, 0.000],
+	[0.930, 0.845, 0.055, 0.000, 0.775, 0.015, -0.015, 0.000, 0.215, 0.000],
+	[0.950, 0.845, 0.055, 0.030, 0.895, 0.030, 0.000, 0.000, 0.215, 0.000],
+	[1.020, 0.840, 0.055, 0.030, 0.890, 0.030, 0.000, 0.000, 0.215, 0.000],
 ]
 const KEY_NAMES := ["belt", "rim_w", "wall_dx", "edge", "cx", "cy", "crown", "dome_w", "dome_h"]
-const RIM_R := 0.014               # the rounding of the side's top edge
+const RIM_R := 0.050               # the rounding of the side's top edge into the bonnet, roof rail and bed
+
+const BED_FLOOR := 0.775           # over the rear arch's ceiling (0.755)
 
 const FLARE_OUT := 0.800
-const FLARE_DEPTH := 0.065
+const FLARE_EXP := 2.4             # the flare's superelliptic swell: 2 a quarter ellipse, higher squarer
 
 # Palette (sRGB; the shader linearises vertex colours).
 const C_RUBBER := Color(0.22, 0.22, 0.23)
@@ -68,14 +78,16 @@ const C_RIM_BARREL := Color(0.6, 0.6, 0.62)
 const C_TAILLAMP := Color(0.85, 0.06, 0.04)
 const C_AMBER := Color(0.95, 0.55, 0.08)
 const C_REVERSE := Color(0.85, 0.85, 0.82)
+const C_STRAP := Color(0.95, 0.45, 0.08)
+const C_CAN := Color(0.62, 0.08, 0.05)
 
 ## Paint layout for car_body.gdshader's patterns (see CarPaint.gd), in the cart frame.
 const PAINT_LAYOUT := {
-	"nose_z": -1.12, "tail_z": 1.02, "belt_y": 0.855, "side_x": 0.60,
+	"nose_z": -1.12, "tail_z": 1.02, "belt_y": 0.83, "side_x": 0.612,
 	"door_z": -0.06, "door_y": 0.69, "roundel_r": 0.11,
 	"hood_z": -0.80, "hood_r": 0.10, "stripe_w": 0.08, "stripe_gap": 0.03,
 }
-const ANTENNA_POS := Vector3(0.40, 0.862, 0.88)
+const ANTENNA_POS := Vector3(0.60, 0.894, 0.86)
 const WHEEL_POSITIONS := {
 	"FL": Vector3(-WHEEL_X, HUB_Y, AXLE_F), "FR": Vector3(WHEEL_X, HUB_Y, AXLE_F),
 	"RL": Vector3(-WHEEL_X, HUB_Y, AXLE_R), "RR": Vector3(WHEEL_X, HUB_Y, AXLE_R),
@@ -84,17 +96,17 @@ const WHEEL_POSITIONS := {
 
 func _init() -> void:
 	nose_tip = NOSE_TIP
-	nose_cap = 0.020
+	nose_cap = 0.070
 	nose_cap_y = 0.700
-	nose_cap_exp = Vector2(8.0, 8.0)
+	nose_cap_exp = Vector2(4.0, 5.0)
 	tail_tip = TAIL_TIP
-	tail_cap = 0.020
+	tail_cap = 0.060
 	tail_cap_y = 0.700
-	tail_cap_exp = Vector2(8.0, 8.0)
+	tail_cap_exp = Vector2(4.0, 5.0)
 	# Bottom, bottom corner, side; rim, wall, corner, outer top, bulge step, bulge top.
-	segment_counts = [2, 3, 6, 5, 6, 5, 4, 4, 4]
-	half_ring = 39
-	bottom_radius = 0.025
+	segment_counts = [2, 5, 5, 7, 6, 5, 4, 4, 4]
+	half_ring = 42
+	bottom_radius = 0.06
 	var knots: Dictionary = keyed_knots(KEYS, KEY_NAMES)
 	knots["w"] = W_KNOTS
 	knots["bot"] = _bot_knots()
@@ -163,16 +175,17 @@ func _upper_segments(z: float, w: float, belt: float, _top: float) -> Array:
 	return [rim, PackedVector2Array([a_pt, b_pt]), corner, outer, step, dome]
 
 
-## A moulded box flare: a lip, a face bulging out over the tyre, a rounded shoulder and a top
-## rising a little toward the body; underneath, a flat liner from the lip in to the body side.
+## A swelling flare's section in (x, height above the lip): [skin, liner]. The skin starts at a
+## rolled lip out over the tyre and rises in a superelliptic quarter round to the top at the body
+## (x_in, d), level there so it runs on into the bonnet's (or the bed's) shoulder; the liner runs
+## flat from the lip in to the body side.
 func _fender_section(xo: float, x_in: float, d: float) -> Array:
-	var w: float = x_in + 0.035
-	return [
-		[Vector2(xo - 0.012, 0.0), Vector2(xo - 0.002, 0.010), Vector2(xo + 0.003, 0.30 * d), Vector2(xo + 0.002, 0.60 * d),
-			Vector2(xo - 0.008, 0.84 * d), Vector2(xo - 0.026, 0.97 * d), Vector2(xo - 0.055, d + 0.003),
-			Vector2(w + 0.010, d + 0.014), Vector2(x_in, d + 0.015)],
-		[Vector2(xo - 0.012, 0.0), Vector2(w + 0.002, 0.0)],
-	]
+	var skin := [Vector2(xo - 0.016, 0.0), Vector2(xo - 0.004, 0.006)]
+	for k in 13:
+		var a: float = PI * 0.5 * k / 12.0
+		skin.append(Vector2(x_in + (xo - x_in) * pow(cos(a), 2.0 / FLARE_EXP),
+				0.016 + (d - 0.016) * pow(sin(a), 2.0 / FLARE_EXP)))
+	return [skin, [Vector2(xo - 0.016, 0.0), Vector2(x_in + 0.037, 0.0)]]
 
 
 ## The outline of a wheel arch as a flare's lip: the shell's bottom from the sill at the door end
@@ -189,13 +202,78 @@ func _arch_lip(z_door: float, z_end: float) -> Array:
 	return lip
 
 
-## Body mesh: shell, flares, nose and tail, mirrors, the chassis and its suspension.
+## One flare (right side; the caller mirrors it), swept along a wheel-arch lip [[z, y], ...] from the
+## door end round to the outer end: CarDesign.build_fender's sweep, but the section shrinks into the
+## body over `taper_door` and `taper_end` metres of the spine (an elliptical taper), so the swell
+## rises out of the door and runs out into the nose or the tail instead of ending in a flat cap.
+func _build_flare(b, lip: Array, hub_z: float, d: float, taper_door: float, taper_end: float) -> void:
+	var spine: PackedVector2Array = _spine(lip, 48)
+	var n: int = spine.size()
+	var acc := PackedFloat32Array([0.0])
+	for k in range(1, n):
+		acc.append(acc[k - 1] + spine[k].distance_to(spine[k - 1]))
+	var total: float = acc[n - 1]
+	var skin_rows := []
+	var liner_rows := []
+	for k in n:
+		var t2: Vector2 = (spine[mini(k + 1, n - 1)] - spine[maxi(k - 1, 0)]).normalized()
+		var n2 := Vector2(t2.y, -t2.x)
+		if n2.dot(spine[k] - Vector2(hub_z, HUB_Y)) < 0.0:
+			n2 = -n2
+		var x_in: float = prof["w"].at(spine[k].x) - 0.035
+		var sc: float = minf(_taper_scale(acc[k], taper_door), _taper_scale(total - acc[k], taper_end))
+		# What the section shrinks toward: inside the body side, a little up from the lip.
+		var into := Vector2(x_in - 0.03, d * 0.3)
+		var rows := []
+		for profile in _fender_section(FLARE_OUT, x_in, d):
+			var row := PackedVector3Array()
+			for p in profile:
+				var q: Vector2 = into + (p - into) * sc
+				row.append(Vector3(q.x, spine[k].y + q.y * n2.y, spine[k].x + q.y * n2.x))
+			rows.append(row)
+		skin_rows.append(rows[0])
+		liner_rows.append(rows[1])
+	var base: int = b.vertex_count()
+	var ibase: int = b.index_count()
+	b.grid(skin_rows, CB.M_PAINT, Color(1, 1, 1), false, false)
+	# The skin faces outward: over the middle of the arch, its outermost point's normal is along +x.
+	var mid: int = n / 2
+	var row_m: PackedVector3Array = skin_rows[mid]
+	var far := 0
+	for j in row_m.size():
+		if row_m[j].x > row_m[far].x:
+			far = j
+	if b._n[base + mid * row_m.size() + far].dot(Vector3.RIGHT) < 0.0:
+		b.flip(base, ibase)
+	base = b.vertex_count()
+	ibase = b.index_count()
+	b.grid(liner_rows, CB.M_DARK, C_DARKER, false, false)
+	b.orient_toward(base, ibase, Vector3.DOWN)
+
+
+## 1 beyond `length` from an end, falling to 0 at the end along a quarter ellipse.
+static func _taper_scale(dist: float, length: float) -> float:
+	if length <= 0.0 or dist >= length:
+		return 1.0
+	var t: float = 1.0 - dist / length
+	return sqrt(maxf(1.0 - t * t, 0.0))
+
+
+## A rounded box set on the nose's (front) or the tail's face at (x, y), turned with the face's
+## normal there and `out` metres proud of it: lamps and their surrounds on the rounded corners.
+func _on_face(b, x: float, y: float, front: bool, h: Vector3, r: float, mat: int, col: Color, out: float) -> void:
+	var f: Array = face_frame(x, y, front)
+	var nrm: Vector3 = f[1]
+	b.rbox(Transform3D(facing(nrm), (f[0] as Vector3) + nrm * out), h, r, 2, mat, col)
+
+
+## Body mesh: shell, flares, lamps, mirrors, the chassis and its suspension, the ends.
 func build_body(b) -> void:
 	build_shell(b)
 	var v0: int = b.vertex_count()
 	var i0: int = b.index_count()
-	build_fender(b, _arch_lip(-0.325, -1.060), AXLE_F, HUB_Y, FLARE_OUT, FLARE_DEPTH, 0.0)
-	build_fender(b, _arch_lip(0.265, 0.995), AXLE_R, HUB_Y, FLARE_OUT, FLARE_DEPTH, 0.0)
+	_build_flare(b, _arch_lip(-0.325, -1.060), AXLE_F, 0.082, 0.20, 0.10)
+	_build_flare(b, _arch_lip(0.265, 0.990), AXLE_R, 0.115, 0.20, 0.10)
 	_side_parts(b)
 	_suspension(b, AXLE_F, 1.0)
 	_suspension(b, AXLE_R, -1.0)
@@ -203,13 +281,14 @@ func build_body(b) -> void:
 	_front_parts(b)
 	_rear_parts(b)
 	_chassis(b)
+	_bed_load(b)
 
 
 ## Right-hand parts, mirrored to the left by build_body().
 func _side_parts(b) -> void:
 	# Arch liners: dark walls inboard of each arch, so it doesn't look through the car. They stop
 	# short of the nose and the tail, or they stood out of the end faces.
-	for arch in [[nose_tip + 0.03, AXLE_F + 0.38], [AXLE_R - 0.38, tail_tip - 0.03]]:
+	for arch in [[nose_tip + 0.07, AXLE_F + 0.38], [AXLE_R - 0.38, tail_tip - 0.07]]:
 		b.rbox(Transform3D(Basis(), Vector3(0.222, 0.635, (arch[0] + arch[1]) * 0.5)),
 				Vector3(0.004, 0.140, (arch[1] - arch[0]) * 0.5), 0.003, 1, CB.M_DARK, C_DARKER)
 	# Mirror on a short stalk at the foot of the A-pillar.
@@ -217,26 +296,37 @@ func _side_parts(b) -> void:
 			C_DARK, false, true)
 	b.rbox(Transform3D(Basis(Vector3.UP, -0.15), Vector3(0.640, 0.912, -0.384)), Vector3(0.045, 0.032, 0.012), 0.010, 2,
 			CB.M_DARK, C_PLASTIC)
-	# Slim LED headlamp in a dark housing at the nose's corner, an amber marker under it.
-	var gz: float = nose_tip - 0.002
-	b.rbox(Transform3D(Basis(), Vector3(0.420, 0.762, gz + 0.004)), Vector3(0.102, 0.030, 0.010), 0.008, 2, CB.M_DARK,
-			C_DARK)
-	b.rbox(Transform3D(Basis(), Vector3(0.420, 0.764, gz - 0.006)), Vector3(0.088, 0.016, 0.004), 0.004, 1,
-			CB.M_HEADLAMP, Color(1, 1, 1))
-	b.rbox(Transform3D(Basis(), Vector3(0.455, 0.706, gz - 0.002)), Vector3(0.050, 0.010, 0.005), 0.004, 1,
-			CB.M_TAILLAMP, C_AMBER)
-	# Taillamps: tall red lenses at the tail's corners, a reverse lamp in each.
-	var tz: float = tail_tip + 0.002
-	b.rbox(Transform3D(Basis(), Vector3(0.470, 0.735, tz - 0.004)), Vector3(0.050, 0.075, 0.010), 0.008, 2, CB.M_DARK,
-			C_DARK)
-	b.rbox(Transform3D(Basis(), Vector3(0.470, 0.752, tz + 0.006)), Vector3(0.038, 0.050, 0.004), 0.003, 1,
-			CB.M_TAILLAMP, C_TAILLAMP)
-	b.rbox(Transform3D(Basis(), Vector3(0.470, 0.682, tz + 0.006)), Vector3(0.038, 0.012, 0.004), 0.003, 1,
-			CB.M_TAILLAMP, C_REVERSE)
-	# Body posts: from the chassis up into the body's underside, front and rear.
-	for z in [-0.98, 0.92]:
+	# A slim LED headlamp in a dark housing on the nose's rounded corner, turned with it; an amber
+	# marker under it.
+	_on_face(b, 0.400, 0.742, true, Vector3(0.082, 0.026, 0.010), 0.008, CB.M_DARK, C_DARK, 0.0)
+	_on_face(b, 0.400, 0.744, true, Vector3(0.070, 0.014, 0.004), 0.004, CB.M_HEADLAMP, Color(1, 1, 1), 0.008)
+	_on_face(b, 0.440, 0.690, true, Vector3(0.040, 0.009, 0.005), 0.004, CB.M_TAILLAMP, C_AMBER, 0.003)
+	# Taillamps wrapping round the tail's corners: a tall lens in a dark surround, the reverse lamp
+	# under it.
+	_on_face(b, 0.485, 0.735, false, Vector3(0.050, 0.072, 0.010), 0.010, CB.M_DARK, C_DARK, 0.0)
+	_on_face(b, 0.485, 0.752, false, Vector3(0.040, 0.048, 0.004), 0.004, CB.M_TAILLAMP, C_TAILLAMP, 0.008)
+	_on_face(b, 0.485, 0.684, false, Vector3(0.040, 0.011, 0.004), 0.004, CB.M_TAILLAMP, C_REVERSE, 0.008)
+	# Body posts: from the chassis up into the body, front and rear; the front ones come through the
+	# bonnet, each held by an R-clip.
+	for z in [-0.98, 0.90]:
 		b.tube(PackedVector3Array([Vector3(0.10, 0.28, z), Vector3(0.10, END_SILL_Y + 0.01, z)]), 0.010, 8, CB.M_DARK, C_DARK,
 				false, false)
+	var py: float = top_y(0.10, -0.98)
+	b.tube(PackedVector3Array([Vector3(0.10, py - 0.01, -0.98), Vector3(0.10, py + 0.026, -0.98)]), 0.0075, 8, CB.M_DARK,
+			C_DARK, false, true)
+	_r_clip(b, Vector3(0.10, py + 0.016, -0.98), py + 0.005)
+
+
+## An R-clip through a body post at `pin` (its straight leg along z), the bent leg looping out
+## toward +x and back along the body's top at `rest_y`.
+func _r_clip(b, pin: Vector3, rest_y: float) -> void:
+	var path := PackedVector3Array([pin + Vector3(0.0, 0.0, -0.022), pin + Vector3(0.0, 0.0, 0.016)])
+	for k in range(1, 8):
+		var a: float = PI * k / 8.0
+		path.append(Vector3(pin.x + 0.011 - 0.011 * cos(a), lerpf(pin.y, rest_y, k / 8.0), pin.z + 0.016 + 0.011 * sin(a)))
+	path.append(Vector3(pin.x + 0.026, rest_y, pin.z - 0.006))
+	path.append(Vector3(pin.x + 0.020, rest_y, pin.z - 0.030))
+	b.tube(path, 0.0022, 6, CB.M_CHROME, C_CHROME, true, true)
 
 
 ## One corner's suspension (right side): A-arms from the chassis to the hub carrier, a CV driveshaft
@@ -296,29 +386,26 @@ func _big_shock(b, lo: Vector3, hi: Vector3) -> void:
 	b.spring(lo.lerp(hi, 0.12), lo.lerp(hi, 0.72), 0.046, 0.0065, 6.0, CB.M_DARK, C_DARK)
 
 
-## The nose: a slatted grille, the bumper with its hoop and skid plate.
+## The nose: a slatted grille, the bumper with its hoop, tow hooks and skid plate.
 func _front_parts(b) -> void:
 	var gz: float = nose_tip - 0.002
-	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.712, gz + 0.006)), Vector3(0.285, 0.072, 0.012), 0.010, 2, CB.M_DARK,
+	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.700, gz + 0.006)), Vector3(0.255, 0.064, 0.012), 0.010, 2, CB.M_DARK,
 			C_DARK)
-	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.712, gz - 0.006)), Vector3(0.255, 0.055, 0.003), 0.003, 1, CB.M_DARK,
+	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.700, gz - 0.006)), Vector3(0.228, 0.048, 0.003), 0.003, 1, CB.M_DARK,
 			C_DARKER)
 	for k in 4:
-		bar(b, Vector3(0.0, 0.676 + 0.024 * k, gz - 0.010), Vector3(0.250, 0.0055, 0.004), CB.M_ALLOY, C_ALLOY_DARK)
-	bar(b, Vector3(0.0, 0.712, gz - 0.011), Vector3(0.006, 0.055, 0.004), CB.M_ALLOY, C_ALLOY_DARK)
+		bar(b, Vector3(0.0, 0.664 + 0.024 * k, gz - 0.010), Vector3(0.222, 0.0055, 0.004), CB.M_ALLOY, C_ALLOY_DARK)
+	bar(b, Vector3(0.0, 0.700, gz - 0.011), Vector3(0.006, 0.048, 0.004), CB.M_ALLOY, C_ALLOY_DARK)
 	# Bumper: a deep beam with its wings swept back, a hoop over it, a skid plate under it back to
 	# the chassis, mounts.
 	var bz := -1.175
-	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.468, bz)), Vector3(0.330, 0.058, 0.048), 0.020, 3, CB.M_DARK, C_PLASTIC)
+	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.468, bz)), Vector3(0.330, 0.058, 0.048), 0.022, 3, CB.M_DARK, C_PLASTIC)
 	for sx in [-1.0, 1.0]:
 		b.rbox(Transform3D(Basis(Vector3.UP, 0.55 * sx), Vector3(0.375 * sx, 0.468, bz + 0.040)),
-				Vector3(0.075, 0.050, 0.040), 0.018, 3, CB.M_DARK, C_PLASTIC)
+				Vector3(0.075, 0.050, 0.040), 0.020, 3, CB.M_DARK, C_PLASTIC)
 		b.rbox(Transform3D(Basis(), Vector3(0.16 * sx, 0.400, -1.08)), Vector3(0.025, 0.030, 0.070), 0.008, 1, CB.M_DARK,
 				C_DARK)
-		# Tow hook.
-		b.tube(_rounded([Vector3(0.24 * sx, 0.49, bz - 0.04), Vector3(0.24 * sx, 0.49, bz - 0.085),
-				Vector3(0.24 * sx, 0.43, bz - 0.085), Vector3(0.24 * sx, 0.43, bz - 0.045)], 0.02), 0.007, 8,
-				CB.M_ANODISED, Color(1, 1, 1), true, true)
+		_tow_hook(b, 0.24 * sx, bz - 0.04, -1.0)
 	b.tube(_rounded([Vector3(-0.20, 0.515, bz - 0.020), Vector3(-0.17, 0.610, bz - 0.040),
 			Vector3(0.17, 0.610, bz - 0.040), Vector3(0.20, 0.515, bz - 0.020)], 0.06), 0.016, 10, CB.M_DARK, C_PLASTIC,
 			false, false)
@@ -329,19 +416,113 @@ func _front_parts(b) -> void:
 			CB.M_DARK, C_PLASTIC)
 
 
-## The tail: a bumper with a skid plate, the tailgate's handle.
+## A tow hook (accent colour) from a bumper's face at (x, z), looping out along `dir` (-1 forward,
+## 1 back).
+func _tow_hook(b, x: float, z: float, dir: float) -> void:
+	b.tube(_rounded([Vector3(x, 0.49, z), Vector3(x, 0.49, z + 0.045 * dir), Vector3(x, 0.43, z + 0.045 * dir),
+			Vector3(x, 0.43, z + 0.005 * dir)], 0.02), 0.007, 8, CB.M_ANODISED, Color(1, 1, 1), true, true)
+
+
+## The tail: the tailgate's seams and handle, the bumper with a step plate and tow hooks, the skid
+## plate.
 func _rear_parts(b) -> void:
+	# Tailgate: its seams standing a hair proud of the tail's face, the handle in a dark recess.
+	var sz: float = tail_tip + 0.0005
+	for y in [0.615, 0.800]:
+		bar(b, Vector3(0.0, y, sz), Vector3(0.36, 0.0022, 0.0025), CB.M_DARK, C_DARKER)
+	for x in [-0.36, 0.36]:
+		bar(b, Vector3(x, 0.7075, sz), Vector3(0.0022, 0.0925, 0.0025), CB.M_DARK, C_DARKER)
+	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.772, tail_tip + 0.002)), Vector3(0.060, 0.013, 0.005), 0.004, 1,
+			CB.M_DARK, C_DARKER)
+	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.768, tail_tip + 0.006)), Vector3(0.048, 0.005, 0.004), 0.003, 1,
+			CB.M_DARK, C_DARK)
 	var bz := 1.075
-	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.500, bz)), Vector3(0.360, 0.052, 0.045), 0.018, 3, CB.M_DARK, C_PLASTIC)
+	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.500, bz)), Vector3(0.360, 0.055, 0.048), 0.022, 3, CB.M_DARK, C_PLASTIC)
+	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.557, bz + 0.006)), Vector3(0.20, 0.004, 0.032), 0.003, 1, CB.M_ALLOY,
+			C_ALLOY)
+	for k in 7:
+		bar(b, Vector3(-0.15 + 0.05 * k, 0.5625, bz + 0.006), Vector3(0.012, 0.0015, 0.026), CB.M_ALLOY, C_ALLOY_DARK)
 	for sx in [-1.0, 1.0]:
 		b.rbox(Transform3D(Basis(Vector3.UP, -0.5 * sx), Vector3(0.39 * sx, 0.500, bz - 0.035)),
-				Vector3(0.06, 0.045, 0.036), 0.016, 3, CB.M_DARK, C_PLASTIC)
+				Vector3(0.06, 0.048, 0.036), 0.018, 3, CB.M_DARK, C_PLASTIC)
 		b.rbox(Transform3D(Basis(), Vector3(0.16 * sx, 0.430, 1.01)), Vector3(0.025, 0.030, 0.06), 0.008, 1, CB.M_DARK,
 				C_DARK)
+		_tow_hook(b, 0.26 * sx, bz + 0.04, 1.0)
 	b.rbox(Transform3D(Basis(Vector3.RIGHT, -0.55), Vector3(0.0, 0.365, 0.955)), Vector3(0.19, 0.010, 0.14), 0.008, 1,
 			CB.M_DARK, C_PLASTIC)
-	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.800, tail_tip + 0.004)), Vector3(0.060, 0.010, 0.006), 0.004, 1,
-			CB.M_DARK, C_DARK)
+
+
+## What rides in the bed: a chase rack (a hoop behind the cab carrying a light bar, rails from it
+## back to the tailgate's corners), a spare tyre lying under it tilted up toward the cab and strapped
+## down to the floor, and a pair of jerrycans in each front corner.
+func _bed_load(b) -> void:
+	var rail_y: float = prof["belt"].at(0.6) + RIM_R
+	# Chase rack: feet on the rails' tops, the hoop just behind the cab, the light bar on it.
+	var hz := 0.300
+	var hx: float = prof["w"].at(hz) - RIM_R
+	var rx: float = prof["w"].at(0.905) - RIM_R
+	var top := 1.150
+	b.tube(_rounded([Vector3(-hx, rail_y, hz), Vector3(-hx + 0.05, top, hz), Vector3(hx - 0.05, top, hz),
+			Vector3(hx, rail_y, hz)], 0.09), 0.016, 10, CB.M_DARK, C_DARK, false, false)
+	for sx in [-1.0, 1.0]:
+		b.tube(_rounded([Vector3(sx * (hx - 0.07), top - 0.004, hz + 0.01), Vector3(sx * (hx - 0.045), 1.085, 0.56),
+				Vector3(sx * rx, rail_y, 0.905)], 0.10), 0.014, 10, CB.M_DARK, C_DARK, false, false)
+		for foot in [Vector3(sx * hx, rail_y, hz), Vector3(sx * rx, rail_y, 0.905)]:
+			b.rbox(Transform3D(Basis(), foot + Vector3(0.0, 0.004, 0.0)), Vector3(0.026, 0.006, 0.030), 0.004, 1, CB.M_DARK,
+					C_DARK)
+	b.tube(PackedVector3Array([Vector3(-hx + 0.08, 1.050, 0.56), Vector3(hx - 0.08, 1.050, 0.56)]), 0.012, 10, CB.M_DARK,
+			C_DARK, false, false)
+	var ly: float = top + 0.034
+	b.rbox(Transform3D(Basis(), Vector3(0.0, ly, hz)), Vector3(0.300, 0.024, 0.024), 0.010, 2, CB.M_DARK, C_DARK)
+	b.rbox(Transform3D(Basis(), Vector3(0.0, ly, hz - 0.022)), Vector3(0.286, 0.014, 0.004), 0.003, 1, CB.M_HEADLAMP,
+			Color(1, 1, 1))
+	for k in 5:
+		bar(b, Vector3(-0.228 + 0.114 * k, ly, hz - 0.027), Vector3(0.003, 0.015, 0.002), CB.M_DARK, C_DARK)
+	for sx in [-1.0, 1.0]:
+		b.rbox(Transform3D(Basis(), Vector3(sx * 0.27, top + 0.006, hz)), Vector3(0.012, 0.012, 0.016), 0.004, 1, CB.M_DARK,
+				C_DARK)
+	# Spare tyre: the truck's own wheel at 70%, face up, its front edge raised.
+	var spare_s := 0.70
+	var tilt := 0.10
+	var sc := Vector3(0.0, BED_FLOOR + 0.155 * spare_s * cos(tilt) + 0.345 * spare_s * sin(tilt) + 0.004, 0.62)
+	var vb: int = b.vertex_count()
+	build_wheel(b, 1.0)
+	b.transform_from(vb, Transform3D((Basis(Vector3.RIGHT, tilt) * Basis(Vector3.BACK, PI * 0.5)) * spare_s, sc))
+	# Two ratchet straps over it from the floor, each with its buckle.
+	for dz in [-0.12, 0.12]:
+		var z: float = sc.z + dz
+		var yt: float = sc.y + 0.110 * spare_s / 0.70 - dz * sin(tilt)
+		var strap: PackedVector3Array = _rounded([Vector3(-0.300, BED_FLOOR + 0.003, z), Vector3(-0.258, yt - 0.06, z),
+				Vector3(-0.215, yt, z), Vector3(0.215, yt, z), Vector3(0.258, yt - 0.06, z),
+				Vector3(0.300, BED_FLOOR + 0.003, z)], 0.035)
+		b.oval_tube(strap, 0.017, 0.0025, Vector3.UP, 8, CB.M_DARK, C_STRAP, false)
+		b.rbox(Transform3D(Basis(), Vector3(0.150, yt + 0.006, z)), Vector3(0.028, 0.006, 0.021), 0.003, 1, CB.M_ALLOY,
+				C_ALLOY_DARK)
+		for sx in [-1.0, 1.0]:
+			b.rbox(Transform3D(Basis(), Vector3(0.305 * sx, BED_FLOOR + 0.006, z)), Vector3(0.012, 0.006, 0.020), 0.003, 1,
+					CB.M_ALLOY, C_ALLOY_DARK)
+	# Jerrycans, two in each front corner, a handle and a spout cap on each.
+	for sx in [-1.0, 1.0]:
+		for cz in [0.335, 0.475]:
+			_jerrycan(b, Vector3(0.465 * sx, BED_FLOOR, cz))
+
+
+## A jerrycan standing on the bed's floor at `foot`: a rounded body with a pressed band round it, a
+## three-legged handle along its top and a spout cap at one corner.
+func _jerrycan(b, foot: Vector3) -> void:
+	var h := Vector3(0.042, 0.085, 0.064)
+	var c: Vector3 = foot + Vector3(0.0, h.y, 0.0)
+	b.rbox(Transform3D(Basis(), c), h, 0.012, 2, CB.M_DARK, C_CAN)
+	b.rbox(Transform3D(Basis(), c + Vector3(0.0, 0.010, 0.0)), Vector3(h.x + 0.003, 0.007, h.z + 0.003), 0.004, 1,
+			CB.M_DARK, C_CAN.darkened(0.25))
+	var ty: float = c.y + h.y
+	b.tube(_rounded([Vector3(c.x, ty, c.z - 0.045), Vector3(c.x, ty + 0.022, c.z - 0.035),
+			Vector3(c.x, ty + 0.022, c.z + 0.020), Vector3(c.x, ty, c.z + 0.030)], 0.01), 0.006, 6, CB.M_DARK, C_CAN, false,
+			false)
+	b.tube(PackedVector3Array([Vector3(c.x, ty, c.z - 0.010), Vector3(c.x, ty + 0.022, c.z - 0.010)]), 0.005, 6,
+			CB.M_DARK, C_CAN, false, false)
+	b.tube(PackedVector3Array([Vector3(c.x, ty - 0.004, c.z + 0.046), Vector3(c.x, ty + 0.016, c.z + 0.048)]), 0.012, 10,
+			CB.M_DARK, C_DARK, false, true)
 
 
 ## The chassis tub, the gearboxes, the centre driveshaft.
@@ -419,24 +600,23 @@ func build_wheel(b, side: float) -> void:
 #  Detail map
 # ============================================================================================
 
+
 func _detail_shapes() -> Dictionary:
 	var shapes := {}
 	# Side windows in side view (z, y): the door glass, its front edge leaning back with the
 	# A-pillar, and a small rear quarter window behind the B-pillar.
 	shapes["side_front"] = _inset(PackedVector2Array([Vector2(-0.352, 0.892), Vector2(0.035, 0.892),
-			Vector2(0.035, 1.080), Vector2(-0.188, 1.080)]), 0.014)
-	shapes["side_rear"] = _inset(PackedVector2Array([Vector2(0.075, 0.892), Vector2(0.160, 0.892),
-			Vector2(0.160, 1.080), Vector2(0.075, 1.080)]), 0.014)
+			Vector2(0.035, 1.062), Vector2(-0.205, 1.062)]), 0.016)
+	shapes["side_rear"] = _inset(PackedVector2Array([Vector2(0.075, 0.892), Vector2(0.150, 0.892),
+			Vector2(0.150, 1.062), Vector2(0.075, 1.062)]), 0.016)
 	# Windscreen in front view (x, y); the cab's rear window in back view.
-	shapes["windscreen"] = _inset(PackedVector2Array([Vector2(-0.415, 0.892), Vector2(0.415, 0.892),
-			Vector2(0.385, 1.105), Vector2(-0.385, 1.105)]), 0.022)
-	shapes["rear"] = _inset(PackedVector2Array([Vector2(-0.380, 0.915), Vector2(0.380, 0.915),
-			Vector2(0.370, 1.085), Vector2(-0.370, 1.085)]), 0.025)
-	# Panels: the door in side view (its top hidden in the window frame), the tonneau from above.
-	shapes["door"] = PackedVector2Array([Vector2(-0.300, 0.530), Vector2(0.180, 0.530), Vector2(0.180, 0.880),
+	shapes["windscreen"] = _inset(PackedVector2Array([Vector2(-0.400, 0.892), Vector2(0.400, 0.892),
+			Vector2(0.355, 1.090), Vector2(-0.355, 1.090)]), 0.026)
+	shapes["rear"] = _inset(PackedVector2Array([Vector2(-0.360, 0.915), Vector2(0.360, 0.915),
+			Vector2(0.345, 1.070), Vector2(-0.345, 1.070)]), 0.028)
+	# The door in side view (its top hidden in the window frame).
+	shapes["door"] = PackedVector2Array([Vector2(-0.300, 0.565), Vector2(0.180, 0.565), Vector2(0.180, 0.880),
 			Vector2(-0.300, 0.880)])
-	shapes["tonneau"] = _inset(PackedVector2Array([Vector2(-0.525, 0.262), Vector2(0.525, 0.262),
-			Vector2(0.525, 0.985), Vector2(-0.525, 0.985)]), 0.03)
 	return shapes
 
 
@@ -449,43 +629,44 @@ func _detail_at(p: Vector3, n: Vector3, fp: float, sh: Dictionary) -> Color:
 	var szy := Vector2(p.z, p.y)
 	var sxy := Vector2(p.x, p.y)
 	var sxz := Vector2(p.x, p.z)
-	# Windows and their black seals.
+	# Windows and their black seals; the pillars between them black too.
 	if n.x > 0.3 and p.z > -0.40 and p.z < 0.20 and p.y > 0.87:
 		for key in ["side_front", "side_rear"]:
 			var d: float = _sd_rounded(szy, sh[key])
 			glass = maxf(glass, _cover(d, fp))
 			black = maxf(black, _cover(d - 0.009, fp))
-		# The pillars' faces between the windows are black too.
-		black = maxf(black, _cover(maxf(0.882 - p.y, p.y - 1.092), fp) * _cover(maxf(-0.30 - p.z, p.z - 0.17), fp))
+		black = maxf(black, _cover(maxf(0.882 - p.y, p.y - 1.072), fp) * _cover(maxf(-0.30 - p.z, p.z - 0.16), fp))
 	if n.z < -0.3 and p.z > -0.43 and p.z < -0.13:
 		var d: float = _sd_rounded(sxy, sh["windscreen"])
 		glass = maxf(glass, _cover(d, fp))
 		black = maxf(black, _cover(d - 0.010, fp))
-	if n.z > 0.3 and p.z > 0.17 and p.z < 0.245 and p.y > 0.88:
+	if n.z > 0.3 and p.z > 0.15 and p.z < 0.25 and p.y > 0.88:
 		var d: float = _sd_rounded(sxy, sh["rear"])
 		glass = maxf(glass, _cover(d, fp))
 		black = maxf(black, _cover(d - 0.009, fp))
 	# Door gaps and handle.
-	if outside and p.z > -0.32 and p.z < 0.20 and p.y > 0.51 and p.y < 0.87:
+	if outside and p.z > -0.32 and p.z < 0.20 and p.y > 0.55 and p.y < 0.87:
 		gap = maxf(gap, _cover(absf(_sd_poly(szy, sh["door"])) - 0.0024, fp))
 		var hd: float = _sd_box(szy - Vector2(0.105, 0.808), Vector2(0.032, 0.008)) - 0.003
 		black = maxf(black, _cover(hd, fp))
-	# Bonnet: seams along the wings; vents either side of the bulge's back.
-	if n.y > 0.4 and p.z < -0.44:
-		gap = maxf(gap, _cover(absf(p.x - 0.545) - 0.0022, fp))
-	if n.y > 0.7 and p.z > -0.66 and p.z < -0.52 and p.x > 0.24 and p.x < 0.40:
+	# Bonnet: seams along the wings (which follow the body's width); vents either side of the
+	# bulge's back.
+	if n.y > 0.4 and p.z < -0.45:
+		gap = maxf(gap, _cover(absf(p.x - (prof["w"].at(p.z) - 0.105)) - 0.0022, fp))
+	if n.y > 0.7 and p.z > -0.70 and p.z < -0.56 and p.x > 0.25 and p.x < 0.41:
 		var slot := 1e3
 		for k in 4:
-			slot = minf(slot, _sd_box(Vector2(p.x - 0.32, p.z + 0.635 - 0.034 * k), Vector2(0.065, 0.0065)) - 0.003)
+			slot = minf(slot, _sd_box(Vector2(p.x - 0.33, p.z + 0.675 - 0.034 * k), Vector2(0.065, 0.0065)) - 0.003)
 		black = maxf(black, _cover(slot, fp))
 	# The cowl's vent across the foot of the windscreen.
 	if n.y > 0.5 and p.z > -0.465 and p.z < -0.425 and p.x < 0.46:
-		black = maxf(black, _cover(_sd_box(Vector2(p.x, p.z + 0.445), Vector2(0.43, 0.010)) - 0.002, fp))
-	# Tonneau cover's outline and its ribs.
-	if n.y > 0.6 and p.z > 0.24:
-		gap = maxf(gap, _cover(absf(_sd_rounded(sxz, sh["tonneau"])) - 0.0024, fp))
-		if p.z > 0.30 and p.z < 0.95 and p.x < 0.49:
-			gap = maxf(gap, 0.6 * _cover(absf(fposmod(p.z - 0.30, 0.13) - 0.065) - 0.0015, fp))
+		black = maxf(black, _cover(_sd_box(Vector2(p.x, p.z + 0.445), Vector2(0.42, 0.010)) - 0.002, fp))
+	# The bed's liner: its floor, the inside of its rails, the cab's back under the window and the
+	# tailgate's inside (the rails' tops stay painted).
+	var on_rail: bool = n.x > 0.5 and p.x > prof["w"].at(p.z) - 0.04
+	if p.z > 0.20 and p.z < 0.955 and p.y < 0.884 and not on_rail:
+		if n.y > 0.5 or n.x < -0.4 or (n.z > 0.4 and p.z < 0.3) or (n.z < -0.4 and p.z > 0.9):
+			black = 1.0
 	# Underside and the arches' ceilings.
 	if n.y < -0.55:
 		black = maxf(black, 0.9)

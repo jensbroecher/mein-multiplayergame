@@ -1601,9 +1601,18 @@ its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set th
   across every bonnet where its `p.z < hood_z + 2r` branch ended; the roundels are now drawn everywhere and masked.
 - The Titan (`TitanBuilder.gd`, an RC monster truck) uses the Strikeforce's keyed section on a body raised to a 0.50m
   sill, with 0.69m tyres (hub 0.345m); PlayerCart plants any car by its lowest wheel, so nothing else needed changing.
-  Its arches are circles round each hub (`_bot_knots`: the sill and the circle blended by a smooth max), the
-  body-colour flares sweep along them, and the arch liners stop short of the nose and tail (full length, they stood
-  out of the tail as black bars). Its shocks are big-bore bodies in the accent colour (`_big_shock`), stood nearly
+  Its arches are circles round each hub (`_bot_knots`: the sill and the circle blended by a smooth max), and the arch
+  liners stop short of the nose and tail (full length, they stood out of the tail as black bars). It was too boxy
+  with flat box flares and sharp edges; now the shoulders round over 5cm (`RIM_R`, so `rim_w` must stay above it),
+  the body swells over the wheels and pinches at the doors (`W_KNOTS`), the nose and tail caps are rounded, and the
+  flares (`_build_flare`, not `build_fender`) are a superelliptic swell from the bonnet's or bed's shoulder down to a
+  rolled lip, shrinking into the body over both ends instead of ending in flat caps. Lamps on the rounded ends go
+  through `_on_face` (`face_frame`). The bed is open (`KEYS`: a floor with a fillet, `cy` < 0, like the Strikeforce's)
+  with a black liner (detail map), and carries a chase rack with a light bar, a spare tyre (the truck's own wheel at
+  70%) under two ratchet straps and jerrycans (`_bed_load`). Its floor must stay over the rear arch's ceiling (0.755),
+  so `BED_FLOOR` is 0.775 and the rails stand above the doors' belt to give it depth. A wheelie bar and a tow hitch
+  hung off the back and were taken off: only the sphere collides, but 30cm of bar 2cm off the ground would sink into
+  every ramp and landing. Its shocks are big-bore bodies in the accent colour (`_big_shock`), stood nearly
   upright beside the tyres so they show in the gap under the flares.
 - CarSelection's line-up of names sits centred between Back and Confirm (not on the screen), as a carousel: the names
   ride on a reel (`_reel`) in a window between the arrows (`REEL_SIZE`, room for about eleven) that fades them out over
