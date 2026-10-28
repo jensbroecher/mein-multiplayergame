@@ -458,7 +458,7 @@ transform = Transform3D(3.802534, 0, -3.246649, 0, 5, 0, 3.246649, 0, 3.802534, 
 transform = Transform3D(-12.444993, 0, 3.7579427, 0, 12.999999, 0, -3.7579427, 0, -12.444993, 102.28944, 20.489555, -164.30675)
 
 [node name="Tornado" parent="." unique_id=457428002 instance=ExtResource("37_yfrwy")]
-transform = Transform3D(40, 0, 0, 0, 40, 0, 0, 0, 40, -190.73326, 14.531099, -13.189145)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -190.73326, 14.531099, -13.189145)
 
 [node name="ArrowSign" parent="." unique_id=1803191181 groups=["collision_trimesh"] instance=ExtResource("38_yfrwy")]
 transform = Transform3D(-0.9996108, 0, 0.027896273, 0, 1, 0, -0.027896273, 0, -0.9996108, 172.84212, 13.691994, 57.046265)

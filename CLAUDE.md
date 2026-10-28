@@ -1682,3 +1682,15 @@ its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set th
   (`models/signs/300e3a6c...`, deleted), so the level's node kept its rotation and position and lost its x10 scale.
   `res://scratch/chasm_arrow_sign_shot.gd` (`-s`, windowed, `-- <dir> [scene]`) renders it from four sides;
   `scratch/chasm_arrow_sign_check.gd` (`-s`, headless) reports its mesh and collider in the level.
+- The wandering twister (`Tornado`) is `TornadoCSG.gd`, modelled in CSG at life size (35.5m tall, 38.3m anvil diameter,
+  slender 1.15m touchdown stem, multi-tiered cloud shelves and a rounded storm anvil dome). `regenerate_tornado.tscn`
+  (headless) bakes it to `generated/tornado.res` (6.7k triangles, single ArrayMesh surface, 150 KB), which `Tornado.tscn`
+  draws at scale 1.0; the level holds no CSG and no heavy asset. It replaced the 50k-triangle Hunyuan FBX
+  (`models/desert2/d4250e86adc7a52ecf39a804e207694e.fbx` and its 30MB of textures, deleted), eliminating coordinate hacks
+  and 40x level scaling. `tornado_vortex.gdshader` drives dynamic serpentine trunk sway, 3D helical spiral vertex fluting,
+  warm terracotta-to-sand height gradients, high-contrast roping dust ribbons, and soft ground fade. `Tornado.gd` adds
+  ground touchdown dust blast, orbiting debris particles, a 3D looping wind roar (`winter_wind_loop.mp3`), 38m aerodynamic
+  suction with cyclonic crosswind swirl, escalating vertical car capture, boost-to-escape mechanics, and high-velocity
+  ejection with one-shot dust burst and swoosh SFX. `res://scratch/test_tornado_look.gd` renders preview shots;
+  `scratch/test_tornado_suction.gd` runs headless physics and authority verification.
+
