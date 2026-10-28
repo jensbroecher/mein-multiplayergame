@@ -95,8 +95,8 @@ const GP_CUPS = {
 			"res://levels/DesertWadiLevel.tscn",
 		]
 	},
-	"Sierra del Viento": {
-		"name": "Sierra del Viento",
+	"Sierra del Viento GP": {
+		"name": "Sierra del Viento GP",
 		"stages": [
 			"res://levels/CanyonLevel.tscn",
 			"res://levels/CanyonChasmLevel.tscn",
@@ -162,6 +162,8 @@ static func get_gp_cup(cup_name: String) -> Dictionary:
 		return GP_CUPS["Svartfjell GP"]
 	if cup_name == "Desert Cup" or cup_name == "Mountain GP":
 		return GP_CUPS["Al-Raihana GP"]
+	if cup_name == "Sierra del Viento":
+		return GP_CUPS["Sierra del Viento GP"]
 	return {}
 
 ## Course after `stage_path` in the course menu's order (cups in order, then the courses outside

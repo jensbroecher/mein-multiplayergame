@@ -47,7 +47,7 @@ const STAGE_INFO := {
 	"res://levels/MsituFallsLevel.tscn": {"title": "MSITU FALLS", "subtitle": "Rainforest hairpins, a mud bend, a rope bridge over the brink, behind the falls, and tropical downpours", "file": "tile_msitu_falls.jpg", "color": COL_JUNGLE},
 }
 ## Section header colour per cup on the course lists (same accents as the cup tiles).
-const CUP_COLORS := {"Bloombay GP": COL_GREEN, "Svartfjell GP": COL_SNOW, "Al-Raihana GP": COL_BRONZE, "Sierra del Viento": COL_CANYON, "Matumaini GP": COL_SAVANNA}
+const CUP_COLORS := {"Bloombay GP": COL_GREEN, "Svartfjell GP": COL_SNOW, "Al-Raihana GP": COL_BRONZE, "Sierra del Viento GP": COL_CANYON, "Matumaini GP": COL_SAVANNA}
 ## Tiles per row in a cup section: one cup per row.
 const SECTION_COLUMNS := 4
 
@@ -292,14 +292,14 @@ func show_sub_menu(menu_name: String) -> void:
 			_add_tile("BLOOMBAY GP", "Lakeside  •  Pinecrest  •  Harbor  •  Bloombay Dunes", "tile_bloombay_gp.jpg", COL_GREEN, func():
 				_on_cup_selected("Bloombay GP")
 			)
-			_add_tile("SVARTFJELL GP", "Frostpeak  •  Glacier Highway  •  Northlight  •  Frostfall Gorge", "tile_arctic_cup.jpg", COL_SNOW, func():
+			_add_tile("SVARTFJELL GP", "Frostpeak  •  Glacier Highway  •  Northlight  •  Frostfall Gorge", "tile_svartfjell_gp.jpg", COL_SNOW, func():
 				_on_cup_selected("Svartfjell GP")
 			)
 			_add_tile("AL-RAIHANA GP", "Mountain Pass  •  Desert Wadi", "tile_al_raihana_gp.jpg", COL_BRONZE, func():
 				_on_cup_selected("Al-Raihana GP")
 			)
-			_add_tile("SIERRA DEL VIENTO", "Canyon Drift  •  Canyon Chasm", "tile_canyon.jpg", COL_CANYON, func():
-				_on_cup_selected("Sierra del Viento")
+			_add_tile("SIERRA DEL VIENTO GP", "Canyon Drift  •  Canyon Chasm", "tile_sierra_del_viento_gp.jpg", COL_CANYON, func():
+				_on_cup_selected("Sierra del Viento GP")
 			)
 			_add_tile("MATUMAINI GP", "Mara Crossing  •  Nyota Stadium  •  Msitu Falls", "tile_matumaini_gp.jpg", COL_SAVANNA, func():
 				_on_cup_selected("Matumaini GP")
