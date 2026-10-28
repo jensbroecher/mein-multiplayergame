@@ -1675,3 +1675,10 @@ its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set th
   the Canyon Course's look. `res://scratch/chasm_rock_preview.gd` (`-s`, windowed, `-- <dir> [fbx=1] [kind=N]`)
   renders each kind (beside its FBX while one exists); `scratch/chasm_rock_check.gd` (`-s`, headless) lists the
   level's rocks with their colliders.
+- The chevron arrow sign (`ArrowSign`) is `ArrowSignCSG.gd`, modelled in CSG at life size like the rowing boat
+  (`RowboatCSG.gd`): each colour band is the sign's outline intersected with its chevron prism, so faces and edges
+  take the band's material. `regenerate_arrow_sign.tscn` (headless) bakes it to `generated/arrow_sign.res`, which
+  `ArrowSign.tscn` draws; the level holds no CSG. It keeps the frame of the Hunyuan FBX it replaced
+  (`models/signs/300e3a6c...`, deleted), so the level's node kept its rotation and position and lost its x10 scale.
+  `res://scratch/chasm_arrow_sign_shot.gd` (`-s`, windowed, `-- <dir> [scene]`) renders it from four sides;
+  `scratch/chasm_arrow_sign_check.gd` (`-s`, headless) reports its mesh and collider in the level.

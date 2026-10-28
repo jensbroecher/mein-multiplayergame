@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="ArrayMesh" path="res://generated/arrow_sign.res" id="1_arrow_mesh"]
+
+[node name="ArrowSign" type="Node3D"]
+
+[node name="Mesh" type="MeshInstance3D" parent="."]
+mesh = ExtResource("1_arrow_mesh")

@@ -34,7 +34,7 @@
 [ext_resource type="PackedScene" uid="uid://boostpad123" path="res://BoostPad.tscn" id="35_g7jjn"]
 [ext_resource type="PackedScene" uid="uid://jgnyjkmvtfm2" path="res://models/desert2/a9540c80c20c1585b38229b13a303bae.fbx" id="35_jlq4o"]
 [ext_resource type="PackedScene" uid="uid://dqbb2220q777" path="res://Tornado.tscn" id="37_yfrwy"]
-[ext_resource type="PackedScene" uid="uid://bl2qwyie25rwo" path="res://models/signs/300e3a6c1bcdf1aa873e688a8ff387b6.fbx" id="38_yfrwy"]
+[ext_resource type="PackedScene" path="res://ArrowSign.tscn" id="38_yfrwy"]
 [ext_resource type="PackedScene" uid="uid://bx7y3j6jeljfl" path="res://models/clouds/7de0ccae5a6e93d1c9aaa73423f08f02.fbx" id="40_g1aow"]
 [ext_resource type="PackedScene" uid="uid://cxwf622lvnqu3" path="res://models/desert/2f1728e226824507fc3188405c2c7935.fbx" id="41_bqk36"]
 [ext_resource type="PackedScene" uid="uid://dui7hge4elksh" path="res://models/desert/7b4c6b35c14804590f71c63e961076cb.fbx" id="43_ctbtb"]
@@ -461,7 +461,7 @@ transform = Transform3D(-12.444993, 0, 3.7579427, 0, 12.999999, 0, -3.7579427, 0
 transform = Transform3D(40, 0, 0, 0, 40, 0, 0, 0, 40, -190.73326, 14.531099, -13.189145)
 
 [node name="ArrowSign" parent="." unique_id=1803191181 groups=["collision_trimesh"] instance=ExtResource("38_yfrwy")]
-transform = Transform3D(-9.996108, 0, 0.27896273, 0, 10, 0, -0.27896273, 0, -9.996108, 172.84212, 13.691994, 57.046265)
+transform = Transform3D(-0.9996108, 0, 0.027896273, 0, 1, 0, -0.027896273, 0, -0.9996108, 172.84212, 13.691994, 57.046265)
 
 [node name="Cloud" parent="." unique_id=249770628 instance=ExtResource("40_g1aow")]
 transform = Transform3D(40, 0, 0, 0, 40, 0, 0, 0, 40, 41.54222, 69.721954, -155.88416)
