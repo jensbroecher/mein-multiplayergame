@@ -2,6 +2,10 @@ extends CanvasLayer
 
 ## Fullscreen loading overlay used during race load / stage swaps.
 
+const LOGO_PATH := "res://images/logo_transparent.png"
+const LOGO_FALLBACK_PATH := "res://images/logo_black_bg.png"
+
+var _logo_rect: TextureRect
 var _label: Label
 var _status: Label
 var _bar: ProgressBar
@@ -36,17 +40,34 @@ func _ready() -> void:
 	var vbox := VBoxContainer.new()
 	vbox.name = "VBox"
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_theme_constant_override("separation", 16)
+	vbox.add_theme_constant_override("separation", 18)
 	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	center.add_child(vbox)
 
-	_label = Label.new()
-	_label.name = "Title"
-	_label.text = "RC VIBE GP"
-	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_label.add_theme_font_size_override("font_size", 42)
-	_label.add_theme_color_override("font_color", Color(0.0, 0.85, 1.0, 1.0))
-	vbox.add_child(_label)
+	var logo_tex: Texture2D = null
+	if ResourceLoader.exists(LOGO_PATH):
+		logo_tex = load(LOGO_PATH) as Texture2D
+	elif ResourceLoader.exists(LOGO_FALLBACK_PATH):
+		logo_tex = load(LOGO_FALLBACK_PATH) as Texture2D
+
+	if logo_tex:
+		_logo_rect = TextureRect.new()
+		_logo_rect.name = "Logo"
+		_logo_rect.texture = logo_tex
+		_logo_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		_logo_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		_logo_rect.custom_minimum_size = Vector2(480, 184)
+		_logo_rect.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		_logo_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		vbox.add_child(_logo_rect)
+	else:
+		_label = Label.new()
+		_label.name = "Title"
+		_label.text = "RC VIBE GP"
+		_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_label.add_theme_font_size_override("font_size", 42)
+		_label.add_theme_color_override("font_color", Color(0.0, 0.85, 1.0, 1.0))
+		vbox.add_child(_label)
 
 	_status = Label.new()
 	_status.name = "Status"
@@ -58,7 +79,7 @@ func _ready() -> void:
 
 	_bar = ProgressBar.new()
 	_bar.name = "Bar"
-	_bar.custom_minimum_size = Vector2(320, 14)
+	_bar.custom_minimum_size = Vector2(340, 14)
 	_bar.min_value = 0.0
 	_bar.max_value = 1.0
 	_bar.value = 0.0
@@ -82,9 +103,11 @@ func _ready() -> void:
 
 func show_loading(message: String = "Loading...") -> void:
 	_base_status = message
-	_status.text = message
+	if _status:
+		_status.text = message
 	_progress = 0.05
-	_bar.value = _progress
+	if _bar:
+		_bar.value = _progress
 	visible = true
 	set_process(true)
 	# Ensure a frame paints before heavy work continues.
@@ -93,7 +116,8 @@ func show_loading(message: String = "Loading...") -> void:
 
 func set_status(message: String) -> void:
 	_base_status = message
-	_status.text = message
+	if _status:
+		_status.text = message
 
 
 func set_progress(amount: float) -> void:
@@ -120,9 +144,10 @@ func _process(delta: float) -> void:
 		return
 	_anim_time += delta
 	# Animated ellipsis
-	var dots := int(_anim_time * 3.0) % 4
-	_status.text = _base_status + ".".repeat(dots)
+	if _status:
+		var dots := int(_anim_time * 3.0) % 4
+		_status.text = _base_status + ".".repeat(dots)
 	# Creep the bar slowly so it never looks frozen during long loads.
-	if _progress < 0.9:
+	if _bar and _progress < 0.9:
 		_progress = minf(0.9, _progress + delta * 0.12)
 		_bar.value = _progress

@@ -639,7 +639,8 @@ func _show_loading(message: String) -> void:
 		return
 	await screen_transition.cover()
 	await loading_screen.show_loading(message)
-	screen_transition.fade_out()
+	await screen_transition.fade_out()
+	await get_tree().process_frame
 
 
 ## The panel takes over from the loading screen at once, then sweeps away to show what's under it.
