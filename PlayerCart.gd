@@ -254,6 +254,21 @@ const CAR_PRESETS = [
 		"braking": 46.0,
 		"offroad": 9.6,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Obsidian",
+		"engine_sound": "res://sounds/enginesounds/engine_centurion_loop.wav",
+		"engine_gain_db": -3.6,
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Obsidian.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 41.0,
+		"acceleration": 76.0,
+		"steer_speed": 2.7,
+		"grip": 5.0,
+		"braking": 47.0,
+		"offroad": 9.7,
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 

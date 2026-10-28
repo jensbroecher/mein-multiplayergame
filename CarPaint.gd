@@ -82,6 +82,9 @@ const FACTORY := {
 	"Sandstorm": {"pattern": 11, "finish": 0, "primary": Color(0.96, 0.42, 0.06),
 		"secondary": Color(0.23, 0.25, 0.27), "accent": Color(0.94, 0.94, 0.92),
 		"rim": Color(0.70, 0.72, 0.74), "number": 31},
+	"Obsidian": {"pattern": 0, "finish": 2, "primary": Color(0.04, 0.04, 0.045),
+		"secondary": Color(0.18, 0.18, 0.20), "accent": Color(0.74, 0.62, 0.46),
+		"rim": Color(0.75, 0.58, 0.36), "number": 8},
 }
 const FALLBACK := {"pattern": 0, "finish": 0, "primary": Color(0.80, 0.07, 0.05),
 	"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.98, 0.78, 0.07),
