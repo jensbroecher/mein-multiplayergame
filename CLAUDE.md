@@ -1651,3 +1651,12 @@ its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set th
   copies of the section about that height, so the edge lies on the same ring points all over the
   face. A boundary crossing a cap at another height came out wavy. The side is split at the sill line
   for the same reason.
+
+## Canyon Chasm dirt ramps
+
+- `DirtRampCSG.gd` (`@tool`) builds the two `DirtRamp` humps in `CanyonChasmLevel.tscn` as CSG internal children (a side
+  profile extruded across the width, intersected with a cross section extruded along the run; `use_collision`), so the
+  level stores only each node's transform and script. They replaced the Hunyuan FBX `models/ramps/a0c68129...`
+  (deleted), whose baked mesh sat in the level; the profile in `PROFILE` was measured off it (about 33 x 13 x 8.9m).
+  `res://scratch/dirt_ramp_preview.gd` (`-s`, windowed, `-- <dir>`) renders one; `scratch/chasm_ramp_check.gd`
+  (`-s`, headless) lists the level's ramp colliders. `scratch/chasm_ramp_probe*.gd` read the deleted FBX.
