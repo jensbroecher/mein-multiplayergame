@@ -338,7 +338,6 @@ func _surface(f: PackedFloat32Array, g0: Vector3, nx: int, ny: int, nz: int) -> 
 	# A quad across every grid edge the surface crosses, between the four cells round it, facing out.
 	var idx := PackedInt32Array()
 	var axes := [[1, nx, sxy], [nx, sxy, 1], [sxy, 1, nx]]   # the edge's step, then the two steps across it
-	var dirs := [Vector3.RIGHT, Vector3.UP, Vector3.BACK]
 	for base in cells:
 		var fa := f[base]
 		for a in 3:
@@ -354,9 +353,11 @@ func _surface(f: PackedFloat32Array, g0: Vector3, nx: int, ny: int, nz: int) -> 
 			var q3 := cell_vert[base - u]
 			if q0 < 0 or q1 < 0 or q2 < 0 or q3 < 0:
 				continue
-			var out: Vector3 = dirs[a] if fa < 0.0 else -dirs[a]
-			# Godot's front faces wind clockwise: a triangle's normal is (c - a) x (b - a).
-			if (verts[q2] - verts[q0]).cross(verts[q1] - verts[q0]).dot(out) < 0.0:
+			# Godot's front faces wind clockwise: a triangle's normal is (c - a) x (b - a). Taken round the
+			# grid (-u-w, -w, 0, -u), q0..q3 face down axis a; flip them when the inside is at `base`. Decided
+			# by the grid, not the vertices: a quad folded across a crease would turn a geometric test
+			# over, wind it inwards and leave it culled, a hole.
+			if fa < 0.0:
 				var t := q1
 				q1 = q3
 				q3 = t
