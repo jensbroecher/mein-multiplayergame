@@ -36,9 +36,9 @@
 [ext_resource type="PackedScene" uid="uid://dqbb2220q777" path="res://Tornado.tscn" id="37_yfrwy"]
 [ext_resource type="PackedScene" path="res://ArrowSign.tscn" id="38_yfrwy"]
 [ext_resource type="PackedScene" uid="uid://bx7y3j6jeljfl" path="res://models/clouds/7de0ccae5a6e93d1c9aaa73423f08f02.fbx" id="40_g1aow"]
-[ext_resource type="PackedScene" uid="uid://cxwf622lvnqu3" path="res://models/desert/2f1728e226824507fc3188405c2c7935.fbx" id="41_bqk36"]
+[ext_resource type="PackedScene" path="res://LargeHouse.tscn" id="41_bqk36"]
 [ext_resource type="PackedScene" uid="uid://dui7hge4elksh" path="res://models/desert/7b4c6b35c14804590f71c63e961076cb.fbx" id="43_ctbtb"]
-[ext_resource type="PackedScene" uid="uid://b7yey6mjdt5sr" path="res://models/desert/49ac41a0567226438249fc402b0d629c.fbx" id="44_jmhce"]
+[ext_resource type="PackedScene" path="res://AdobeHouse.tscn" id="44_jmhce"]
 [ext_resource type="PackedScene" uid="uid://df3xo0b6m6d3u" path="res://models/clouds/9dfd1cceace1d88062d0a36959d52540.fbx" id="47_jmhce"]
 [ext_resource type="PackedScene" uid="uid://xn57ge2pslo2" path="res://models/desert/20260617011251_4d3f8d7e.fbx" id="48_vgigm"]
 [ext_resource type="Script" uid="uid://bmfdcyskrdayn" path="res://Windmill.gd" id="49_windmill"]
@@ -473,7 +473,7 @@ transform = Transform3D(-35.26255, 0, -18.882597, 0, 40, 0, 18.882597, 0, -35.26
 transform = Transform3D(28.287628, 0, -28.280916, 0, 40.000004, 0, 28.280916, 0, 28.287628, 85.97191, 69.721954, 70.140976)
 
 [node name="LargeHouse" parent="." unique_id=1836076422 groups=["collision_trimesh"] instance=ExtResource("41_bqk36")]
-transform = Transform3D(45, 0, 0, 0, 45, 0, 0, 0, 45, 92.01698, 22.813381, -226.99994)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 92.01698, 22.813381, -226.99994)
 
 [node name="Rock2" type="Node3D" parent="." unique_id=200053900]
 transform = Transform3D(-0.927431, 0, 0.373995, 0, 1, 0, -0.373995, 0, -0.927431, 18.4555, 9.08054, -221.509)
@@ -503,7 +503,7 @@ rock_seed = 12
 transform = Transform3D(-5.9097557, 0, 12.6915245, 0, 14, 0, -12.6915245, 0, -5.9097557, -10.751764, 11.38545, -221.50865)
 
 [node name="House" parent="." unique_id=168986308 groups=["collision_trimesh"] instance=ExtResource("44_jmhce")]
-transform = Transform3D(30.403774, 0, 17.33812, 0, 35, 0, -17.33812, 0, 30.403774, 66.34487, 24.385925, -95.454575)
+transform = Transform3D(0.86867926, 0, 0.49537486, 0, 1, 0, -0.49537486, 0, 0.86867926, 66.34487, 24.385925, -95.454575)
 
 [node name="NewCloud" parent="." unique_id=1071866098 instance=ExtResource("47_jmhce")]
 transform = Transform3D(40, 0, 0, 0, 40, 0, 0, 0, 40, -4.315048, 61.000793, 4.0584097)

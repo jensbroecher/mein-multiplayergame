@@ -1652,7 +1652,7 @@ its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set th
   face. A boundary crossing a cap at another height came out wavy. The side is split at the sill line
   for the same reason.
 
-## Canyon Chasm dirt ramps and rocks
+## Canyon Chasm dirt ramps, rocks, signs, tornado and houses
 
 - `DirtRampCSG.gd` (`@tool`) builds the two `DirtRamp` humps in `CanyonChasmLevel.tscn` as CSG internal children (a side
   profile extruded across the width, intersected with a cross section extruded along the run; `use_collision`), so the
@@ -1693,4 +1693,23 @@ its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set th
   suction with cyclonic crosswind swirl, escalating vertical car capture, boost-to-escape mechanics, and high-velocity
   ejection with one-shot dust burst and swoosh SFX. `res://scratch/test_tornado_look.gd` renders preview shots;
   `scratch/test_tornado_suction.gd` runs headless physics and authority verification.
+- The two houses (`LargeHouse` and `House`) are `LargeHouseCSG.gd` and `AdobeHouseCSG.gd`, modelled in CSG at life size
+  with foundations extending `SINK = 2.5m` below `y = 0` so they bed into uneven terrain. `LargeHouseCSG.gd` builds a
+  37.3m x 37.9m Mediterranean whitewashed stucco villa (`hut_masonry.gdshader` `style = 4`) under Spanish terracotta
+  barrel-tile roofs (`style = 5`, normal-mapped ribs and course overlaps), with a protruding left cross-gable entrance
+  bay (arched oak door, limestone step, wrought-iron coach lanterns, quatrefoil gable vent), a recessed right veranda
+  (double French doors, casement window, segmental-arch multi-pane window), a left shed wing, and a chimney with a rain
+  cap. `AdobeHouseCSG.gd` builds a 31.5m x 23.1m x 22.8m two-story desert adobe pueblo house (`hut_masonry.gdshader`
+  `style = 3`, sun-baked mud-plaster with weathered stone cobble patches masked by `COLOR.a` to flat wall interiors),
+  rounded corners, saddle-curved roof parapets in isolated tower/wing CSG combiners, protruding wooden vigas, a slatted
+  wooden pergola on stilts with knee braces, recessed plank doors under timber lintels, shuttered windows, and upper
+  alcoves. `regenerate_chasm_houses.tscn` (headless) bakes them to `generated/large_house.res` (3,058 triangles) and
+  `generated/adobe_house.res` (4,112 triangles), which `LargeHouse.tscn` and `AdobeHouse.tscn` draw at scale 1.0 in
+  `CanyonChasmLevel.tscn` (preserving `groups=["collision_trimesh"]`). They replaced the two heavy Hunyuan FBX files
+  (`models/desert/2f1728e226824507fc3188405c2c7935*` [67MB, 500k tris, scale 45] and
+  `models/desert/49ac41a0567226438249fc402b0d629c*` [39MB, 50k tris, scale 35], deleted). `res://scratch/chasm_house_shot.gd`
+  (`-s`, windowed, `-- <dir>`) renders six views of each baked mesh; `scratch/render_chasm_houses_in_level.gd` renders
+  in-level road and 3/4 views; `scratch/chasm_house_check.gd` (`-s`, headless) verifies their meshes, world bounds, and
+  runtime `Col_*` trimesh colliders in the level.
+
 

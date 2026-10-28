@@ -6,6 +6,9 @@ render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 //   0  rubble stone: irregular blocks with mortar between, mossy at the foot
 //   1  lime-washed plaster: mottled, hairline cracks, splashed with mud toward the ground (v = 0)
 //   2  brick in running bond, sooted toward the top of a chimney
+//   3  desert adobe mud-plaster: sun-baked plaster with flaked patches exposing stone cobbles
+//   4  Mediterranean whitewashed stucco: bright plaster with subtle trowel mottle and hairline cracks
+//   5  Spanish terracotta barrel tiles (tejas): half-round ribs along u, lapped courses along v
 
 uniform int style = 0;
 
@@ -100,7 +103,7 @@ void fragment() {
 		// Rain streaks down from the roof.
 		col *= 1.0 - 0.18 * smoothstep(0.55, 0.85, vnoise(vec2(q.x * 3.0, q.y * 0.2)));
 		rough = 0.95;
-	} else {
+	} else if (style == 2) {
 		// Running bond: courses of 7cm, bricks of 22cm, in world metres at 1.6x.
 		float bh = 0.12;
 		float bwid = 0.37;
@@ -115,6 +118,62 @@ void fragment() {
 		// Soot toward the top, where the smoke comes out.
 		col *= 1.0 - 0.45 * smoothstep(0.55, 1.0, vnoise(vec2(q.x * 2.0, 3.0)) * 0.4 + 0.6 * smoothstep(0.0, 6.0, q.y) );
 		rough = 0.9;
+	} else if (style == 3) {
+		// Desert adobe mud-plaster with weathered patches exposing stone cobbles underneath.
+		float mottle = vnoise(q * 0.55 + 2.1) * 0.55 + vnoise(q * 2.1 + 7.3) * 0.30 + vnoise(q * 7.5) * 0.15;
+		float warm_drift = vnoise(q * 0.22 + 4.8);
+		vec3 plaster = tint * mix(vec3(0.95, 0.91, 0.86), vec3(1.04, 1.00, 0.94), warm_drift) * (0.86 + 0.22 * mottle);
+		// Flaked patches revealing pale desert cobbles in recessed mortar (confined to flat wall interiors via COLOR.a).
+		float patch_n = vnoise(q * 0.24 + vec2(11.3, 5.7)) * 0.65 + vnoise(q * 0.72 + 3.1) * 0.35;
+		float patch_mask = smoothstep(0.67, 0.73, patch_n) * COLOR.a;
+		float rim = smoothstep(0.63, 0.67, patch_n) * (1.0 - patch_mask) * COLOR.a;
+		vec2 warp = vec2(vnoise(q * 1.1 + 1.3), vnoise(q * 1.1 + 6.7)) - 0.5;
+		vec2 vc_stone = voronoi(vec2(q.x / 0.85, q.y / 0.62) + warp * 0.42 + 9.0);
+		float mortar = 1.0 - smoothstep(0.03, 0.12, vc_stone.x);
+		vec3 cobble = mix(srgb(vec3(0.91, 0.85, 0.73)), srgb(vec3(0.79, 0.71, 0.58)), vc_stone.y);
+		cobble *= 0.86 + 0.14 * smoothstep(0.03, 0.24, vc_stone.x);
+		vec3 exposed = mix(cobble, srgb(vec3(0.54, 0.45, 0.35)), mortar * 0.72);
+		col = mix(plaster * (1.0 - rim * 0.16), exposed, patch_mask);
+		// Subtle warm ground dust at the foot and streaks from the parapets.
+		float foot = 1.0 - smoothstep(0.0, 1.4, q.y);
+		col = mix(col, srgb(vec3(0.62, 0.50, 0.38)), foot * 0.22);
+		col *= 1.0 - 0.08 * smoothstep(0.55, 0.85, vnoise(vec2(q.x * 0.7, q.y * 0.08 + 1.7)));
+		rough = 0.94;
+	} else if (style == 4) {
+		// Mediterranean whitewashed stucco: bright plaster with fine trowel texture.
+		float mottle = vnoise(q * 0.7 + 1.3) * 0.5 + vnoise(q * 2.8) * 0.35 + vnoise(q * 9.5) * 0.15;
+		col = tint * (0.92 + 0.11 * mottle);
+		float foot = 1.0 - smoothstep(0.0, 0.9, q.y);
+		col = mix(col, srgb(vec3(0.72, 0.64, 0.55)), foot * 0.18);
+		rough = 0.92;
+	} else {
+		// Spanish terracotta barrel tiles (tejas): u across the slope, v up the slope.
+		float pitch = 0.42;
+		float course_h = 0.62;
+		float cid = floor(q.x / pitch);
+		float cf = fract(q.x / pitch);
+		float rid = floor(q.y / course_h);
+		float rf = fract(q.y / course_h);
+		float ph = cf * TAU;
+		float rib = 0.5 + 0.5 * sin(ph - PI * 0.5);
+		float slope = cos(ph - PI * 0.5);
+		float tile_id = hash12(vec2(cid, rid));
+		float tile_id2 = hash12(vec2(cid + 19.3, rid + 7.1));
+		// Blend warm terracotta, sun-bleached buff clay, and deeper sienna per tile.
+		vec3 clay_a = tint * (0.82 + 0.32 * tile_id);
+		vec3 clay_b = srgb(vec3(0.76, 0.58, 0.44)) * (0.85 + 0.25 * tile_id2);
+		vec3 tile_col = mix(clay_a, clay_b, smoothstep(0.25, 0.85, tile_id2) * 0.55);
+		// Fine clay grain and weathering along the barrel.
+		float grain = vnoise(vec2(q.x * 14.0, q.y * 6.0)) * 0.6 + vnoise(q * 2.2) * 0.4;
+		tile_col *= 0.86 + 0.26 * grain;
+		// Shading in the troughs between barrels and under each course overlap lip.
+		float lap = 1.0 - smoothstep(0.0, 0.11, rf);
+		float trough = 1.0 - rib;
+		col = tile_col * (0.68 + 0.38 * rib) * (1.0 - 0.38 * lap) * (1.0 - 0.18 * trough * trough);
+		rough = 0.84;
+		vec3 n = normalize(vec3(-0.75 * slope, -0.35 * lap, 1.0));
+		NORMAL_MAP = n * 0.5 + 0.5;
+		NORMAL_MAP_DEPTH = 1.0;
 	}
 
 	ALBEDO = col;

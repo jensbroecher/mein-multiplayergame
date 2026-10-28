@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="ArrayMesh" path="res://generated/adobe_house.res" id="1_adobe_house_mesh"]
+
+[node name="AdobeHouse" type="Node3D"]
+
+[node name="Mesh" type="MeshInstance3D" parent="."]
+mesh = ExtResource("1_adobe_house_mesh")
