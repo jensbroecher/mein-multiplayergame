@@ -11,6 +11,15 @@ render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 uniform sampler2D sand_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform vec4 sand_tint : source_color = vec4(0.86, 0.60, 0.44, 1.0);
 uniform float grain_scale = 0.11;
+// Meshes without vertex colours (Canyon Chasm's CSG rocks, ChasmRockCSG.gd) turn the occlusion off:
+// a missing COLOR reads as white, fully shaded.
+uniform bool vertex_occlusion = true;
+// A share (0 to 1) of the beds' colour replaced by `tint` times their brightness (Canyon Chasm's pale
+// sandstone and grey limestone), and moss on whatever faces up (0 none).
+uniform float tint_amount = 0.0;
+uniform vec4 tint : source_color = vec4(0.72, 0.70, 0.66, 1.0);
+uniform float moss = 0.0;
+uniform vec4 moss_tint : source_color = vec4(0.30, 0.42, 0.12, 1.0);
 
 varying vec3 w_pos;
 varying vec3 w_nrm;
@@ -21,7 +30,7 @@ varying float occlusion;
 void vertex() {
 	w_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	w_nrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
-	occlusion = COLOR.r;
+	occlusion = vertex_occlusion ? COLOR.r : 0.0;
 }
 
 void fragment() {
@@ -42,6 +51,18 @@ void fragment() {
 	vec3 sand = texture(sand_tex, w_pos.xz * 0.19).rgb;
 	sand = sand_tint.rgb * (0.7 + dot(sand, vec3(0.3, 0.59, 0.11)) * 0.8);
 	rock = mix(rock, sand, up * 0.8);
+	if (tint_amount > 0.0) {
+		float lum = dot(rock, vec3(0.3, 0.59, 0.11));
+		// 0.2: the beds' mean brightness (linear), so the tint keeps their variation at its own level.
+		rock = mix(rock, tint.rgb * lum / 0.2, tint_amount);
+	}
+	if (moss > 0.0) {
+		float m = smoothstep(0.4, 0.75, n.y) * smoothstep(0.25, 0.55, cs_fbm(w_pos.xz * 0.35 + w_pos.y * 0.2));
+		// and in pockets down the steep faces, thinning upward from the foot
+		float pocket = smoothstep(0.55, 0.75, cs_fbm(vec2(w_pos.x + w_pos.z, w_pos.y) * 0.45));
+		m = max(m, pocket * 0.8 * (1.0 - smoothstep(0.4, 0.75, n.y)));
+		rock = mix(rock, moss_tint.rgb * (0.7 + 0.6 * cs_fbm(w_pos.xz * 1.7)), m * moss);
+	}
 	ALBEDO = rock * (1.0 - 0.55 * occlusion);
 	ROUGHNESS = 0.9;
 	SPECULAR = 0.25;

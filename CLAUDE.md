@@ -1652,7 +1652,7 @@ its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set th
   face. A boundary crossing a cap at another height came out wavy. The side is split at the sill line
   for the same reason.
 
-## Canyon Chasm dirt ramps
+## Canyon Chasm dirt ramps and rocks
 
 - `DirtRampCSG.gd` (`@tool`) builds the two `DirtRamp` humps in `CanyonChasmLevel.tscn` as CSG internal children (a side
   profile extruded across the width, intersected with a cross section extruded along the run; `use_collision`), so the
@@ -1660,3 +1660,18 @@ its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set th
   (deleted), whose baked mesh sat in the level; the profile in `PROFILE` was measured off it (about 33 x 13 x 8.9m).
   `res://scratch/dirt_ramp_preview.gd` (`-s`, windowed, `-- <dir>`) renders one; `scratch/chasm_ramp_check.gd`
   (`-s`, headless) lists the level's ramp colliders. `scratch/chasm_ramp_probe*.gd` read the deleted FBX.
+- The rocks are `ChasmRockCSG.gd` (`@tool`), the same way: every slab a prism (an irregular outline extruded down
+  from its top, stepped in along its top edge so the layers read as ledges), boulders squashed spheres. `kind`
+  picks the shape the FBX had: CLUSTER (block stacks among boulders, the six `Rock_Curve*`/`Rock3-5`), TOR (stepped
+  pancake slabs, `Rock`), ARCH (stacked legs and two courses of slabs round a flat arc, `RockArc`), MOSSY (grey
+  limestone pillars on ledges, `Rock2`, `Rock6-8`). `stretch` scales the shape inside the CSG (RockArc's model was
+  scaled unevenly), so the node and its collider's body stay unscaled. `rock_seed` varies each one.
+  The FBX it replaced (`models/desert/462b0835...`, `8fc36b06...`, `5de45969...`) are deleted; `0c797c60...` (the
+  TOR's model) stays because MountainLevel uses it.
+- They draw with `canyon_rock.gdshader`, the Canyon Course's sandstone beds, with `vertex_occlusion` off (CSG
+  meshes have no vertex colours, and a missing COLOR reads as white: fully shaded), `tint`/`tint_amount` (the
+  beds' colour replaced by the tint at their own brightness, divided by their 0.2 mean: the pale salmon of the
+  models, or grey limestone) and `moss` (on what faces up, and in pockets down the steep faces). All default to
+  the Canyon Course's look. `res://scratch/chasm_rock_preview.gd` (`-s`, windowed, `-- <dir> [fbx=1] [kind=N]`)
+  renders each kind (beside its FBX while one exists); `scratch/chasm_rock_check.gd` (`-s`, headless) lists the
+  level's rocks with their colliders.

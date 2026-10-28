@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://d2hujjwkl3s4a" path="res://levels/Level.gd" id="1_lev99"]
 [ext_resource type="Script" path="res://DirtRampCSG.gd" id="dirtramp_csg"]
+[ext_resource type="Script" path="res://ChasmRock.gd" id="chasm_rock_csg"]
 [ext_resource type="PackedScene" uid="uid://gate123" path="res://CheckpointGate.tscn" id="2_gate"]
 [ext_resource type="Script" uid="uid://cpx88edmwbon1" path="res://addons/GodotWeatherSystem/scripts/SeasonResource.gd" id="3_jpwbr"]
 [ext_resource type="Script" uid="uid://ct8ssg1fuina4" path="res://addons/GodotWeatherSystem/scripts/SkyColourResource.gd" id="4_kr1e0"]
@@ -19,12 +20,9 @@
 [ext_resource type="PackedScene" uid="uid://clxv8p6x0y6k2" path="res://SpawnIndicator.tscn" id="21_623mb"]
 [ext_resource type="PackedScene" uid="uid://ddgtf515dekvm" path="res://models/plants/e963227e4c0f549dc4852c7b2189de15.fbx" id="22_a7e1k"]
 [ext_resource type="Shader" uid="uid://srampgbp5hcn" path="res://water.gdshader" id="22_ocis7"]
-[ext_resource type="PackedScene" uid="uid://0svgxvl76rcs" path="res://models/desert/462b0835dae4689feaf62903546389ee.fbx" id="24_cjhef"]
 [ext_resource type="PackedScene" uid="uid://dh7a4boyktnrg" path="res://models/plants/aff6cf16c1bc07c2988e5df33874dd37.fbx" id="25_cjhef"]
 [ext_resource type="PackedScene" uid="uid://c1ougb5ppnj6a" path="res://models/plants/155b46f430c01d85b690a61ac5be8ae0.fbx" id="26_n0bgs"]
 [ext_resource type="PackedScene" uid="uid://brr0dl1hvares" path="res://models/plants/04b2c6e2e49cc272be24d5807fee4ea0.fbx" id="28_fwawu"]
-[ext_resource type="PackedScene" uid="uid://d2ebh72m1ayx8" path="res://models/desert/0c797c60dd8eef1acae70d532301f210.fbx" id="28_wjk7k"]
-[ext_resource type="PackedScene" uid="uid://df627fcdbj0e3" path="res://models/desert/8fc36b06f12d9b9e49c5877a89ef126c.fbx" id="29_imvwc"]
 [ext_resource type="PackedScene" uid="uid://cxyogjy00k714" path="res://models/plants/7c746b3609638bc97eb9642b3b3c9893.fbx" id="30_pkpnn"]
 [ext_resource type="PackedScene" uid="uid://c7xdtb64ni652" path="res://models/plants/33c2bdd34237248948d6d4ca5c4ac8f2.fbx" id="31_7uf2i"]
 [ext_resource type="PackedScene" uid="uid://da2i62hjyc1cp" path="res://addons/GodotWeatherSystem/weather_controller.tscn" id="31_weather"]
@@ -39,7 +37,6 @@
 [ext_resource type="PackedScene" uid="uid://bl2qwyie25rwo" path="res://models/signs/300e3a6c1bcdf1aa873e688a8ff387b6.fbx" id="38_yfrwy"]
 [ext_resource type="PackedScene" uid="uid://bx7y3j6jeljfl" path="res://models/clouds/7de0ccae5a6e93d1c9aaa73423f08f02.fbx" id="40_g1aow"]
 [ext_resource type="PackedScene" uid="uid://cxwf622lvnqu3" path="res://models/desert/2f1728e226824507fc3188405c2c7935.fbx" id="41_bqk36"]
-[ext_resource type="PackedScene" uid="uid://cg8pcnaxtiyar" path="res://models/desert/5de45969eb67cee87dc8ebbdd862dc99.fbx" id="42_g7jjn"]
 [ext_resource type="PackedScene" uid="uid://dui7hge4elksh" path="res://models/desert/7b4c6b35c14804590f71c63e961076cb.fbx" id="43_ctbtb"]
 [ext_resource type="PackedScene" uid="uid://b7yey6mjdt5sr" path="res://models/desert/49ac41a0567226438249fc402b0d629c.fbx" id="44_jmhce"]
 [ext_resource type="PackedScene" uid="uid://df3xo0b6m6d3u" path="res://models/clouds/9dfd1cceace1d88062d0a36959d52540.fbx" id="47_jmhce"]
@@ -300,23 +297,35 @@ transform = Transform3D(-1, 0, 0, 0, 0.99930537, 0.03726767, 0, 0.03726767, -0.9
 [node name="DesertPlant_Curve1" parent="." unique_id=966673545 groups=["collision_capsule"] instance=ExtResource("22_a7e1k")]
 transform = Transform3D(-1.6062878, -1.3921094, 3.3884916, 0.17964505, 3.6655366, 1.5910885, -3.6589024, 0.7911185, -1.4094554, 181.04541, 7.318948, 47.667957)
 
-[node name="Rock_Curve4" parent="." unique_id=956620995 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
-transform = Transform3D(8.838506, 0, -28.668457, 0, 29.999994, 0, 28.668457, 0, 8.838506, 219.23856, 14.633577, -203.92395)
+[node name="Rock_Curve4" type="Node3D" parent="." unique_id=956620995]
+transform = Transform3D(0.294617, 0, -0.955615, 0, 1, 0, 0.955615, 0, 0.294617, 219.239, 14.6336, -203.924)
+script = ExtResource("chasm_rock_csg")
+rock_seed = 1
 
-[node name="Rock_Curve5" parent="." unique_id=1740016918 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
-transform = Transform3D(29.79269, 0, -3.5206861, 0, 29.999994, 0, 3.5206861, 0, 29.79269, -68.33507, -0.7832155, 260.20734)
+[node name="Rock_Curve5" type="Node3D" parent="." unique_id=1740016918]
+transform = Transform3D(0.99309, 0, -0.117356, 0, 1, 0, 0.117356, 0, 0.99309, -68.3351, -0.783215, 260.207)
+script = ExtResource("chasm_rock_csg")
+rock_seed = 2
 
-[node name="Rock_Curve6" parent="." unique_id=1465697561 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
-transform = Transform3D(-29.824936, 0, -3.2362132, 0, 29.999994, 0, 3.2362132, 0, -29.824936, 225.66571, 7.710058, -46.72766)
+[node name="Rock_Curve6" type="Node3D" parent="." unique_id=1465697561]
+transform = Transform3D(-0.994165, 0, -0.107874, 0, 1, 0, 0.107874, 0, -0.994165, 225.666, 7.71006, -46.7277)
+script = ExtResource("chasm_rock_csg")
+rock_seed = 3
 
-[node name="Rock5" parent="." unique_id=641434051 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
-transform = Transform3D(27.864042, 0, 11.117328, 0, 29.999998, 0, -11.117328, 0, 27.864042, 163.87051, 7.458252, 54.920425)
+[node name="Rock5" type="Node3D" parent="." unique_id=641434051]
+transform = Transform3D(0.928801, 0, 0.370578, 0, 1, 0, -0.370578, 0, 0.928801, 163.871, 7.45825, 54.9204)
+script = ExtResource("chasm_rock_csg")
+rock_seed = 4
 
-[node name="Rock4" parent="." unique_id=807565829 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
-transform = Transform3D(7.212676, 0, -29.120045, 0, 29.999994, 0, 29.120045, 0, 7.212676, 13.206236, 5.4254436, 120.170166)
+[node name="Rock4" type="Node3D" parent="." unique_id=807565829]
+transform = Transform3D(0.240423, 0, -0.970668, 0, 1, 0, 0.970668, 0, 0.240423, 13.2062, 5.42544, 120.17)
+script = ExtResource("chasm_rock_csg")
+rock_seed = 5
 
-[node name="Rock3" parent="." unique_id=956620996 groups=["collision_trimesh"] instance=ExtResource("24_cjhef")]
-transform = Transform3D(-22.197853, 0, -20.18056, 0, 29.999994, 0, 20.18056, 0, -22.197853, 203.6976, 15.681635, -280.43048)
+[node name="Rock3" type="Node3D" parent="." unique_id=956620996]
+transform = Transform3D(-0.739929, 0, -0.672685, 0, 1, 0, 0.672685, 0, -0.739929, 203.698, 15.6816, -280.43)
+script = ExtResource("chasm_rock_csg")
+rock_seed = 6
 
 [node name="RockBush" parent="." unique_id=1573835 groups=["collision_trimesh"] instance=ExtResource("25_cjhef")]
 transform = Transform3D(8.511437, 0, -5.249329, 0, 10, 0, 5.249329, 0, 8.511437, 197.2773, 10.352097, -34.09053)
@@ -375,11 +384,18 @@ flash_brightness = 1.0
 transform = Transform3D(-0.99857885, 0.00025839047, -0.053294096, -5.7049823e-05, 0.9999825, 0.005917254, 0.053294692, 0.005911885, -0.9985613, -2.3749793, 5.8449826, -72.75264)
 flash_brightness = 1.0
 
-[node name="Rock" parent="." unique_id=392354509 groups=["collision_trimesh"] instance=ExtResource("28_wjk7k")]
-transform = Transform3D(-24.610638, 0, 4.395059, 0, 25, 0, -4.395059, 0, -24.610638, 82.71512, 23.312023, -129.08461)
+[node name="Rock" type="Node3D" parent="." unique_id=392354509]
+transform = Transform3D(-0.984425, 0, 0.175802, 0, 1, 0, -0.175802, 0, -0.984425, 82.7151, 23.312, -129.085)
+script = ExtResource("chasm_rock_csg")
+kind = 1
+rock_seed = 7
 
-[node name="RockArc" parent="." unique_id=1972210431 groups=["collision_trimesh"] instance=ExtResource("29_imvwc")]
-transform = Transform3D(18.271385, 0, 38.811317, 0, 31.270712, 0, -49.931297, 0, 14.202244, 94.92699, 16.49191, -296.09634)
+[node name="RockArc" type="Node3D" parent="." unique_id=1972210431]
+transform = Transform3D(0.343645, 0, 0.9391, 0, 1, 0, -0.9391, 0, 0.343645, 94.927, 16.4919, -296.096)
+script = ExtResource("chasm_rock_csg")
+kind = 2
+stretch = Vector3(1.7151, 1.0087, 1.3332)
+rock_seed = 8
 
 [node name="SmallCactus" parent="." unique_id=1651551431 groups=["collision_trimesh"] instance=ExtResource("33_imvwc")]
 transform = Transform3D(7, 0, 0, 0, 7, 0, 0, 0, 7, 147.1193, 20.266645, -289.58734)
@@ -459,17 +475,29 @@ transform = Transform3D(28.287628, 0, -28.280916, 0, 40.000004, 0, 28.280916, 0,
 [node name="LargeHouse" parent="." unique_id=1836076422 groups=["collision_trimesh"] instance=ExtResource("41_bqk36")]
 transform = Transform3D(45, 0, 0, 0, 45, 0, 0, 0, 45, 92.01698, 22.813381, -226.99994)
 
-[node name="Rock2" parent="." unique_id=200053900 groups=["collision_trimesh"] instance=ExtResource("42_g7jjn")]
-transform = Transform3D(-18.548613, 0, 7.4799037, 0, 20, 0, -7.4799037, 0, -18.548613, 18.455477, 9.080536, -221.50865)
+[node name="Rock2" type="Node3D" parent="." unique_id=200053900]
+transform = Transform3D(-0.927431, 0, 0.373995, 0, 1, 0, -0.373995, 0, -0.927431, 18.4555, 9.08054, -221.509)
+script = ExtResource("chasm_rock_csg")
+kind = 3
+rock_seed = 9
 
-[node name="Rock6" parent="." unique_id=1619642538 groups=["collision_trimesh"] instance=ExtResource("42_g7jjn")]
-transform = Transform3D(-18.548613, 0, 7.4799037, 0, 20, 0, -7.4799037, 0, -18.548613, 68.40123, 18.264492, -174.7418)
+[node name="Rock6" type="Node3D" parent="." unique_id=1619642538]
+transform = Transform3D(-0.927431, 0, 0.373995, 0, 1, 0, -0.373995, 0, -0.927431, 68.4012, 18.2645, -174.742)
+script = ExtResource("chasm_rock_csg")
+kind = 3
+rock_seed = 10
 
-[node name="Rock7" parent="." unique_id=640136694 groups=["collision_trimesh"] instance=ExtResource("42_g7jjn")]
-transform = Transform3D(-8.502161, 0, 18.102852, 0, 20, 0, -18.102852, 0, -8.502161, 69.67526, 17.196981, -181.58078)
+[node name="Rock7" type="Node3D" parent="." unique_id=640136694]
+transform = Transform3D(-0.425108, 0, 0.905143, 0, 1, 0, -0.905143, 0, -0.425108, 69.6753, 17.197, -181.581)
+script = ExtResource("chasm_rock_csg")
+kind = 3
+rock_seed = 11
 
-[node name="Rock8" parent="." unique_id=1152921927 groups=["collision_trimesh"] instance=ExtResource("42_g7jjn")]
-transform = Transform3D(19.675526, 0, 3.5879836, 0, 20, 0, -3.5879836, 0, 19.675526, 69.67526, 16.776197, -192.06033)
+[node name="Rock8" type="Node3D" parent="." unique_id=1152921927]
+transform = Transform3D(0.983776, 0, 0.179399, 0, 1, 0, -0.179399, 0, 0.983776, 69.6753, 16.7762, -192.06)
+script = ExtResource("chasm_rock_csg")
+kind = 3
+rock_seed = 12
 
 [node name="Cactus" parent="." unique_id=1091832397 groups=["collision_trimesh"] instance=ExtResource("43_ctbtb")]
 transform = Transform3D(-5.9097557, 0, 12.6915245, 0, 14, 0, -12.6915245, 0, -5.9097557, -10.751764, 11.38545, -221.50865)

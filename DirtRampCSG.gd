@@ -26,7 +26,7 @@ const SINK := 2.0
 const LENGTH := 34.0
 const WIDTH := 13.2
 
-static var _material: StandardMaterial3D
+static var _material: ShaderMaterial
 
 func _ready() -> void:
 	_build()
@@ -69,26 +69,20 @@ func _build() -> void:
 	section.material = _dirt()
 	root.add_child(section)
 
-static func _dirt() -> StandardMaterial3D:
+## The track's own dirt (the level's Visual_Road material: terrain_stochastic.gdshader, dirt.png in world
+## space), so the ramp reads as the road heaped up. A noise texture before it was soft and blurry up close.
+static func _dirt() -> ShaderMaterial:
 	if _material:
 		return _material
-	var noise := FastNoiseLite.new()
-	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	noise.frequency = 0.04
-	noise.fractal_octaves = 4
-	var ramp := Gradient.new()
-	ramp.colors = PackedColorArray([Color(0.52, 0.36, 0.25), Color(0.70, 0.51, 0.37)])
-	var tex := NoiseTexture2D.new()
-	tex.noise = noise
-	tex.color_ramp = ramp
-	tex.width = 512
-	tex.height = 512
-	tex.seamless = true
-	var m := StandardMaterial3D.new()
-	m.albedo_texture = tex
-	m.uv1_triplanar = true
-	m.uv1_scale = Vector3(0.12, 0.12, 0.12)
-	m.roughness = 1.0
-	m.metallic_specular = 0.2
+	var m := ShaderMaterial.new()
+	m.shader = load("res://terrain_stochastic.gdshader")
+	m.set_shader_parameter("albedo_texture", load("res://materials/dirt.png"))
+	m.set_shader_parameter("normal_texture", load("res://materials/dirt_normal.png"))
+	m.set_shader_parameter("albedo", Color(0.7, 0.7, 0.7))
+	m.set_shader_parameter("uv_scale", 10.0)
+	m.set_shader_parameter("uv_scale_v2", Vector2(0.125, 0.125))
+	m.set_shader_parameter("use_world_uv", true)
+	m.set_shader_parameter("use_normal_map", true)
+	m.set_shader_parameter("normal_scale", 1.2)
 	_material = m
 	return m
