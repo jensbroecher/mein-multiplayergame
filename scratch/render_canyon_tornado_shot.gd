@@ -1,7 +1,8 @@
 extends SceneTree
 
 func _initialize():
-	var dir := "/Users/jensbrocher/.gemini/antigravity-ide/brain/fafee246-b7a8-4be6-99b6-20f826dde6c7"
+	var args := OS.get_cmdline_user_args()
+	var dir := args[0] if args.size() > 0 else "/Users/jensbrocher/.gemini/antigravity/brain/c17bffc8-1e40-4f64-87dd-dba36506980b"
 	var packed: PackedScene = load("res://levels/CanyonChasmLevel.tscn")
 	var level: Node3D = packed.instantiate()
 	root.add_child(level)

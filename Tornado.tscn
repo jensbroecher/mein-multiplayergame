@@ -7,7 +7,7 @@
 script = ExtResource("1_script")
 mesh_path = NodePath("Mesh")
 spin_speed_deg = 220.0
-mesh_alpha = 0.65
+mesh_alpha = 0.92
 wander_radius = 55.0
 wander_speed = 6.0
 suction_radius = 38.0

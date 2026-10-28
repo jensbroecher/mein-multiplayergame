@@ -9,10 +9,10 @@ const VORTEX_SHADER: Shader = preload("res://tornado_vortex.gdshader")
 @export_group("Visuals")
 @export var mesh_path: NodePath = NodePath("Mesh")
 @export var spin_speed_deg: float = 220.0
-@export var mesh_alpha: float = 0.65
-@export var base_dust_color: Color = Color(0.72, 0.42, 0.24, 0.88)
-@export var mid_dust_color: Color = Color(0.86, 0.60, 0.36, 0.75)
-@export var top_dust_color: Color = Color(0.82, 0.76, 0.70, 0.50)
+@export var mesh_alpha: float = 0.92
+@export var base_dust_color: Color = Color(0.62, 0.35, 0.20, 0.98)
+@export var mid_dust_color: Color = Color(0.76, 0.48, 0.29, 0.94)
+@export var top_dust_color: Color = Color(0.72, 0.54, 0.39, 0.90)
 
 @export_group("Wander")
 @export var wander_radius: float = 55.0
@@ -55,10 +55,14 @@ var _cooldown: Dictionary = {} # cart instance_id -> time left
 # VFX and Audio child elements (rescaled to 1:1 world meters)
 var _effects_root: Node3D
 var _ground_dust: GPUParticles3D
+var _vortex_wisps: GPUParticles3D
 var _debris_particles: GPUParticles3D
 var _ejection_burst: CPUParticles3D
 var _audio_wind: AudioStreamPlayer3D
 var _audio_eject: AudioStreamPlayer3D
+
+static var _cached_dust_tex: Texture2D
+static var _cached_grit_tex: Texture2D
 
 
 func _ready() -> void:
@@ -88,41 +92,75 @@ func _setup_effects() -> void:
 	_effects_root.scale = Vector3(1.0 / sx, 1.0 / sy, 1.0 / sz)
 	add_child(_effects_root)
 
-	var soft_tex := _create_soft_dust_texture()
+	var dust_atlas := _create_soft_dust_texture()
+	var grit_tex := _create_grit_chip_texture()
 
-	# 1. Ground contact dust blast / churning ring where vortex meets terrain
+	# Shared puff expansion curve: starts compact at lift-off, billows wide as it rises
+	var puff_curve := Curve.new()
+	puff_curve.add_point(Vector2(0.0, 0.42))
+	puff_curve.add_point(Vector2(0.35, 0.92))
+	puff_curve.add_point(Vector2(1.0, 1.38))
+	var puff_curve_tex := CurveTexture.new()
+	puff_curve_tex.curve = puff_curve
+
+	# Shared colour variation ramp so puffs vary between sunlit ochre and deeper canyon terracotta
+	var init_shade := Gradient.new()
+	init_shade.offsets = PackedFloat32Array([0.0, 0.5, 1.0])
+	init_shade.colors = PackedColorArray([
+		Color(0.76, 0.68, 0.62, 1.0),
+		Color(0.94, 0.88, 0.82, 1.0),
+		Color(1.0, 0.98, 0.94, 1.0)
+	])
+	var init_shade_tex := GradientTexture1D.new()
+	init_shade_tex.gradient = init_shade
+
+	# 1. Ground contact dust plume: wide, billowing clouds of canyon dust hugging the touchdown foot
 	_ground_dust = GPUParticles3D.new()
 	_ground_dust.name = "GroundDust"
-	_ground_dust.position = Vector3(0, 0.4, 0)
-	_ground_dust.amount = 95
-	_ground_dust.lifetime = 2.0
-	_ground_dust.local_coords = false
+	_ground_dust.position = Vector3(0, 1.0, 0)
+	_ground_dust.amount = 135
+	_ground_dust.lifetime = 2.2
+	_ground_dust.preprocess = 2.0
+	_ground_dust.local_coords = true
 	_ground_dust.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_ground_dust.visibility_aabb = AABB(Vector3(-30, -5, -30), Vector3(60, 30, 60))
+	_ground_dust.visibility_aabb = AABB(Vector3(-35, -8, -35), Vector3(70, 35, 70))
 
 	var pm := ParticleProcessMaterial.new()
 	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_RING
 	pm.emission_ring_axis = Vector3(0, 1, 0)
-	pm.emission_ring_radius = 5.5
-	pm.emission_ring_inner_radius = 0.8
-	pm.emission_ring_height = 0.4
-	pm.direction = Vector3(0, 0.6, 0)
-	pm.spread = 45.0
-	pm.initial_velocity_min = 4.0
-	pm.initial_velocity_max = 8.5
-	pm.gravity = Vector3(0, 0.8, 0)
-	pm.tangential_accel_min = 18.0
-	pm.tangential_accel_max = 32.0
-	pm.radial_accel_min = 3.0
-	pm.radial_accel_max = 7.0
-	pm.damping_min = 2.0
-	pm.damping_max = 4.0
-	pm.scale_min = 3.5
-	pm.scale_max = 7.5
+	pm.emission_ring_radius = 4.6
+	pm.emission_ring_inner_radius = 0.6
+	pm.emission_ring_height = 1.0
+	pm.direction = Vector3(0, 0.75, 0)
+	pm.spread = 38.0
+	pm.initial_velocity_min = 2.2
+	pm.initial_velocity_max = 5.2
+	pm.gravity = Vector3(0, 1.0, 0)
+	pm.tangential_accel_min = 12.0
+	pm.tangential_accel_max = 20.0
+	pm.radial_accel_min = -9.0
+	pm.radial_accel_max = -2.5
+	pm.damping_min = 3.2
+	pm.damping_max = 5.5
+	pm.angle_min = -180.0
+	pm.angle_max = 180.0
+	pm.angular_velocity_min = -38.0
+	pm.angular_velocity_max = 38.0
+	pm.scale_min = 6.5
+	pm.scale_max = 13.5
+	pm.scale_curve = puff_curve_tex
+	pm.anim_offset_min = 0.0
+	pm.anim_offset_max = 1.0
+	pm.color_initial_ramp = init_shade_tex
 
 	var alpha_grad := Gradient.new()
-	alpha_grad.colors = PackedColorArray([Color(1, 1, 1, 0), Color(1, 1, 1, 1), Color(1, 1, 1, 0)])
-	alpha_grad.offsets = PackedFloat32Array([0.0, 0.25, 1.0])
+	alpha_grad.offsets = PackedFloat32Array([0.0, 0.18, 0.58, 1.0])
+	alpha_grad.colors = PackedColorArray([
+		Color(1, 1, 1, 0.0),
+		Color(1, 1, 1, 0.92),
+		Color(1, 1, 1, 0.62),
+		Color(1, 1, 1, 0.0)
+	])
 	var alpha_tex := GradientTexture1D.new()
 	alpha_tex.gradient = alpha_grad
 	pm.color_ramp = alpha_tex
@@ -134,64 +172,128 @@ func _setup_effects() -> void:
 	dmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	dmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	dmat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	dmat.billboard_keep_scale = true
+	dmat.particles_anim_h_frames = 2
+	dmat.particles_anim_v_frames = 2
+	dmat.particles_anim_loop = false
 	dmat.vertex_color_use_as_albedo = true
-	dmat.albedo_texture = soft_tex
-	dmat.albedo_color = Color(0.78, 0.48, 0.30, 0.45)
+	dmat.albedo_texture = dust_atlas
+	dmat.albedo_color = Color(0.68, 0.42, 0.25, 0.44)
 	dmat.proximity_fade_enabled = true
-	dmat.proximity_fade_distance = 1.8
+	dmat.proximity_fade_distance = 2.2
 	quad.material = dmat
 	_ground_dust.draw_pass_1 = quad
 	_effects_root.add_child(_ground_dust)
 
-	# 2. Funnel debris particles (dark grit / sand grains orbiting up the column)
+	# 2. Rising vortex dust wisps: large, soft dust clouds spiraling up the lower-to-mid trunk
+	_vortex_wisps = GPUParticles3D.new()
+	_vortex_wisps.name = "VortexWisps"
+	_vortex_wisps.position = Vector3(0, 1.4, 0)
+	_vortex_wisps.amount = 95
+	_vortex_wisps.lifetime = 2.3
+	_vortex_wisps.preprocess = 2.0
+	_vortex_wisps.local_coords = true
+	_vortex_wisps.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_vortex_wisps.visibility_aabb = AABB(Vector3(-30, -4, -30), Vector3(60, 42, 60))
+
+	var wpm := ParticleProcessMaterial.new()
+	wpm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_RING
+	wpm.emission_ring_axis = Vector3(0, 1, 0)
+	wpm.emission_ring_radius = 3.8
+	wpm.emission_ring_inner_radius = 1.0
+	wpm.emission_ring_height = 2.0
+	wpm.direction = Vector3(0, 1, 0)
+	wpm.spread = 12.0
+	wpm.initial_velocity_min = 6.5
+	wpm.initial_velocity_max = 11.5
+	wpm.gravity = Vector3(0, 1.2, 0)
+	wpm.tangential_accel_min = 16.0
+	wpm.tangential_accel_max = 26.0
+	wpm.radial_accel_min = -13.0
+	wpm.radial_accel_max = -5.5
+	wpm.damping_min = 2.6
+	wpm.damping_max = 4.2
+	wpm.angle_min = -180.0
+	wpm.angle_max = 180.0
+	wpm.angular_velocity_min = -45.0
+	wpm.angular_velocity_max = 45.0
+	wpm.scale_min = 4.8
+	wpm.scale_max = 9.5
+	wpm.scale_curve = puff_curve_tex
+	wpm.anim_offset_min = 0.0
+	wpm.anim_offset_max = 1.0
+	wpm.color_initial_ramp = init_shade_tex
+	wpm.color_ramp = alpha_tex
+	_vortex_wisps.process_material = wpm
+
+	var w_quad := QuadMesh.new()
+	w_quad.size = Vector2(1.0, 1.0)
+	var wmat := dmat.duplicate() as StandardMaterial3D
+	wmat.albedo_color = Color(0.72, 0.45, 0.27, 0.30)
+	w_quad.material = wmat
+	_vortex_wisps.draw_pass_1 = w_quad
+	_effects_root.add_child(_vortex_wisps)
+
+	# 3. Funnel debris particles: small, sharp canyon grit/clod fragments whipping in the wind
 	_debris_particles = GPUParticles3D.new()
 	_debris_particles.name = "FunnelDebris"
-	_debris_particles.position = Vector3(0, 1.0, 0)
-	_debris_particles.amount = 80
-	_debris_particles.lifetime = 2.2
-	_debris_particles.local_coords = false
+	_debris_particles.position = Vector3(0, 0.8, 0)
+	_debris_particles.amount = 85
+	_debris_particles.lifetime = 1.8
+	_debris_particles.preprocess = 1.5
+	_debris_particles.local_coords = true
 	_debris_particles.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_debris_particles.visibility_aabb = AABB(Vector3(-25, -2, -25), Vector3(50, 40, 50))
 
 	var dpm := ParticleProcessMaterial.new()
 	dpm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_RING
 	dpm.emission_ring_axis = Vector3(0, 1, 0)
-	dpm.emission_ring_radius = 4.2
-	dpm.emission_ring_inner_radius = 0.5
-	dpm.emission_ring_height = 1.0
+	dpm.emission_ring_radius = 4.4
+	dpm.emission_ring_inner_radius = 1.2
+	dpm.emission_ring_height = 1.5
 	dpm.direction = Vector3(0, 1, 0)
-	dpm.spread = 15.0
-	dpm.initial_velocity_min = 14.0
-	dpm.initial_velocity_max = 24.0
-	dpm.tangential_accel_min = 28.0
-	dpm.tangential_accel_max = 48.0
-	dpm.radial_accel_min = -2.0
-	dpm.radial_accel_max = 5.0
-	dpm.scale_min = 0.4
-	dpm.scale_max = 1.4
+	dpm.spread = 16.0
+	dpm.initial_velocity_min = 8.0
+	dpm.initial_velocity_max = 14.0
+	dpm.gravity = Vector3(0, -1.5, 0)
+	dpm.tangential_accel_min = 20.0
+	dpm.tangential_accel_max = 32.0
+	dpm.radial_accel_min = -15.0
+	dpm.radial_accel_max = -6.0
+	dpm.damping_min = 2.0
+	dpm.damping_max = 3.5
+	dpm.angle_min = -180.0
+	dpm.angle_max = 180.0
+	dpm.angular_velocity_min = -480.0
+	dpm.angular_velocity_max = 480.0
+	dpm.scale_min = 0.55
+	dpm.scale_max = 1.45
+	dpm.color_initial_ramp = init_shade_tex
 
 	var d_alpha_grad := Gradient.new()
-	d_alpha_grad.colors = PackedColorArray([Color(1, 1, 1, 0), Color(1, 1, 1, 1), Color(1, 1, 1, 0)])
-	d_alpha_grad.offsets = PackedFloat32Array([0.0, 0.15, 1.0])
+	d_alpha_grad.colors = PackedColorArray([Color(1, 1, 1, 0), Color(1, 1, 1, 1), Color(1, 1, 1, 0.85), Color(1, 1, 1, 0)])
+	d_alpha_grad.offsets = PackedFloat32Array([0.0, 0.12, 0.78, 1.0])
 	var d_alpha_tex := GradientTexture1D.new()
 	d_alpha_tex.gradient = d_alpha_grad
 	dpm.color_ramp = d_alpha_tex
 	_debris_particles.process_material = dpm
 
 	var d_quad := QuadMesh.new()
-	d_quad.size = Vector2(0.8, 0.8)
+	d_quad.size = Vector2(0.16, 0.16)
 	var deb_mat := StandardMaterial3D.new()
-	deb_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	deb_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+	deb_mat.alpha_scissor_threshold = 0.45
 	deb_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	deb_mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	deb_mat.billboard_keep_scale = true
 	deb_mat.vertex_color_use_as_albedo = true
-	deb_mat.albedo_texture = soft_tex
-	deb_mat.albedo_color = Color(0.48, 0.30, 0.18, 0.75)
+	deb_mat.albedo_texture = grit_tex
+	deb_mat.albedo_color = Color(0.42, 0.25, 0.15, 1.0)
 	d_quad.material = deb_mat
 	_debris_particles.draw_pass_1 = d_quad
 	_effects_root.add_child(_debris_particles)
 
-	# 3. Ejection burst (one-shot dust puff on cart fling or boost escape)
+	# 4. Ejection burst (one-shot dust puff on cart fling or boost escape)
 	_ejection_burst = CPUParticles3D.new()
 	_ejection_burst.name = "EjectionBurst"
 	_ejection_burst.emitting = false
@@ -200,25 +302,29 @@ func _setup_effects() -> void:
 	_ejection_burst.amount = 32
 	_ejection_burst.lifetime = 1.2
 	_ejection_burst.spread = 180.0
-	_ejection_burst.initial_velocity_min = 12.0
-	_ejection_burst.initial_velocity_max = 24.0
+	_ejection_burst.initial_velocity_min = 10.0
+	_ejection_burst.initial_velocity_max = 22.0
 	_ejection_burst.damping_min = 8.0
 	_ejection_burst.damping_max = 16.0
-	_ejection_burst.scale_amount_min = 2.0
-	_ejection_burst.scale_amount_max = 4.5
+	_ejection_burst.angle_min = -180.0
+	_ejection_burst.angle_max = 180.0
+	_ejection_burst.angular_velocity_min = -45.0
+	_ejection_burst.angular_velocity_max = 45.0
+	_ejection_burst.scale_amount_min = 3.5
+	_ejection_burst.scale_amount_max = 7.0
+	_ejection_burst.scale_amount_curve = puff_curve
+	_ejection_burst.anim_offset_min = 0.0
+	_ejection_burst.anim_offset_max = 1.0
+	_ejection_burst.color_ramp = alpha_grad
 	var b_quad := QuadMesh.new()
 	b_quad.size = Vector2(1.0, 1.0)
-	var b_mat := StandardMaterial3D.new()
-	b_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	b_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	b_mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
-	b_mat.albedo_texture = soft_tex
-	b_mat.albedo_color = Color(0.85, 0.58, 0.38, 0.65)
+	var b_mat := dmat.duplicate() as StandardMaterial3D
+	b_mat.albedo_color = Color(0.74, 0.46, 0.28, 0.42)
 	b_quad.material = b_mat
 	_ejection_burst.mesh = b_quad
 	_effects_root.add_child(_ejection_burst)
 
-	# 4. Continuous 3D roaring wind audio
+	# 5. Continuous 3D roaring wind audio
 	_audio_wind = AudioStreamPlayer3D.new()
 	_audio_wind.name = "AudioWind"
 	var wind_stream := load("res://sounds/winter_wind_loop.mp3") as AudioStream
@@ -236,7 +342,7 @@ func _setup_effects() -> void:
 	_effects_root.add_child(_audio_wind)
 	_audio_wind.play()
 
-	# 5. Ejection whoosh SFX player
+	# 6. Ejection whoosh SFX player
 	_audio_eject = AudioStreamPlayer3D.new()
 	_audio_eject.name = "AudioEject"
 	_audio_eject.stream = load("res://sounds/teleport_swoosh.mp3")
@@ -246,18 +352,104 @@ func _setup_effects() -> void:
 	_effects_root.add_child(_audio_eject)
 
 
+## Builds a 256x256 2x2 atlas of domain-warped FBM dust cloud wisps (no hard spherical core).
 static func _create_soft_dust_texture() -> Texture2D:
-	var grad := Gradient.new()
-	grad.colors = PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0.8), Color(1, 1, 1, 0)])
-	grad.offsets = PackedFloat32Array([0.0, 0.45, 1.0])
-	var tex := GradientTexture2D.new()
-	tex.gradient = grad
-	tex.width = 64
-	tex.height = 64
-	tex.fill = GradientTexture2D.FILL_RADIAL
-	tex.fill_from = Vector2(0.5, 0.5)
-	tex.fill_to = Vector2(0.5, 0.0)
-	return tex
+	if _cached_dust_tex != null:
+		return _cached_dust_tex
+
+	var cell := 96
+	var size := cell * 2
+	var img := Image.create(size, size, true, Image.FORMAT_RGBA8)
+
+	var warp_noise := FastNoiseLite.new()
+	warp_noise.seed = 419
+	warp_noise.frequency = 0.024
+	warp_noise.fractal_octaves = 3
+
+	var fbm_noise := FastNoiseLite.new()
+	fbm_noise.seed = 877
+	fbm_noise.frequency = 0.030
+	fbm_noise.fractal_octaves = 3
+
+	# Four asymmetric multi-lobe offsets per quadrant so puffs never look like round balls
+	var lobe_sets := [
+		[Vector3(-0.18, 0.04, 0.62), Vector3(0.22, -0.06, 0.58), Vector3(0.02, 0.16, 0.54)],
+		[Vector3(0.16, 0.08, 0.60), Vector3(-0.22, -0.08, 0.56), Vector3(-0.04, -0.18, 0.52)],
+		[Vector3(-0.14, -0.12, 0.61), Vector3(0.20, 0.10, 0.58), Vector3(0.05, -0.02, 0.56)],
+		[Vector3(0.18, -0.06, 0.60), Vector3(-0.18, 0.12, 0.58), Vector3(0.0, 0.08, 0.54)],
+	]
+
+	for fy in range(2):
+		for fx in range(2):
+			var frame_idx := fy * 2 + fx
+			var lobes: Array = lobe_sets[frame_idx]
+			var seed_off := Vector2(fx * 137.0, fy * 251.0)
+			for py in range(cell):
+				for px in range(cell):
+					# Normalized cell coords in [-1, 1]
+					var nx := ((float(px) + 0.5) / float(cell)) * 2.0 - 1.0
+					var ny := ((float(py) + 0.5) / float(cell)) * 2.0 - 1.0
+
+					# Radial safety border so quad edges never clip sharply
+					var edge_r := sqrt(nx * nx + ny * ny)
+					if edge_r >= 0.96:
+						img.set_pixel(fx * cell + px, fy * cell + py, Color(1, 1, 1, 0))
+						continue
+
+					var wx := warp_noise.get_noise_2d(px + seed_off.x, py + seed_off.y) * 0.28
+					var wy := warp_noise.get_noise_2d(px + seed_off.x + 71.0, py + seed_off.y + 93.0) * 0.28
+					var qx := nx + wx
+					var qy := ny + wy
+
+					# Combine 3 overlapping elliptical cloud lobes smoothly (soft union)
+					var lobe_val := 0.0
+					for l in lobes:
+						var lv: Vector3 = l
+						var dx := (qx - lv.x) / (lv.z * 1.18)
+						var dy := (qy - lv.y) / (lv.z * 0.92)
+						var d2 := dx * dx + dy * dy
+						var w := clampf(1.0 - d2, 0.0, 1.0)
+						lobe_val = 1.0 - (1.0 - lobe_val) * (1.0 - w * w)
+
+					# Modulate with smooth FBM billows so the cloud is creamy silt with wispy edges
+					var n1 := fbm_noise.get_noise_2d(px + seed_off.x, py + seed_off.y) * 0.5 + 0.5
+					var n2 := fbm_noise.get_noise_2d(px * 1.6 + seed_off.x + 43.0, py * 1.6 + seed_off.y) * 0.5 + 0.5
+					var wisp := clampf(n1 * 0.70 + n2 * 0.30, 0.0, 1.0)
+
+					var border_fade := 1.0 - smoothstep(0.58, 0.95, edge_r)
+					var alpha := pow(lobe_val, 1.35) * smoothstep(0.10, 0.68, wisp) * border_fade
+
+					# Soft internal cloud shading: warmer sunlit upper wisps, deeper lower folds
+					var shade := clampf(0.90 - ny * 0.14 + (n1 - 0.5) * 0.18, 0.72, 1.06)
+					img.set_pixel(
+						fx * cell + px,
+						fy * cell + py,
+						Color(clampf(shade, 0.0, 1.0), clampf(shade * 0.97, 0.0, 1.0), clampf(shade * 0.93, 0.0, 1.0), clampf(alpha, 0.0, 1.0))
+					)
+
+	img.generate_mipmaps()
+	_cached_dust_tex = ImageTexture.create_from_image(img)
+	return _cached_dust_tex
+
+
+## Small angular rock/clod chip texture for flying desert grit.
+static func _create_grit_chip_texture() -> Texture2D:
+	if _cached_grit_tex != null:
+		return _cached_grit_tex
+	var img := Image.create(16, 16, false, Image.FORMAT_RGBA8)
+	var noise := FastNoiseLite.new()
+	noise.seed = 913
+	noise.frequency = 0.35
+	for y in range(16):
+		for x in range(16):
+			var nx := (x + 0.5) / 16.0 - 0.5
+			var ny := (y + 0.5) / 16.0 - 0.5
+			var r := sqrt(nx * nx + ny * ny) * 2.0 + noise.get_noise_2d(x, y) * 0.38
+			var a := 1.0 - smoothstep(0.58, 0.76, r)
+			var lit := clampf(0.86 - (nx + ny) * 0.55, 0.55, 1.0)
+			img.set_pixel(x, y, Color(lit, lit, lit, a))
+	_cached_grit_tex = ImageTexture.create_from_image(img)
+	return _cached_grit_tex
 
 
 ## Called when a cart explodes/drowns/respawns while captured.
