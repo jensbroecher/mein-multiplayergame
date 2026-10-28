@@ -12,10 +12,10 @@ extends RefCounted
 
 const SINK := 0.55
 
-const COL_STEEL := Color(0.54, 0.58, 0.63)
-const COL_POST := Color(0.44, 0.48, 0.53)
-const COL_BASE := Color(0.38, 0.42, 0.46)
-const COL_BOLT := Color(0.24, 0.26, 0.29)
+const COL_STEEL := Color(0.56, 0.60, 0.66)
+const COL_POST := Color(0.42, 0.46, 0.51)
+const COL_BASE := Color(0.30, 0.33, 0.37)
+const COL_BOLT := Color(0.20, 0.22, 0.25)
 
 static var _placeholder_mats := {}
 static var _final_mats := {}
@@ -30,58 +30,62 @@ static func build() -> CSGCombiner3D:
 	var m_base := _mat("iron", COL_BASE)
 	var m_bolt := _mat("iron", COL_BOLT)
 
+	# In Barrier/Barrier2's local frame, +X faces the road and -X faces the cliff drop-off.
+	# Place the H-posts on the cliff side (-X) and the corrugated W-beam rails on the road side (+X).
 	# 1. Three Steel H-Posts & Beveled Base Plates along Z (-4.55, +0.03, +4.61)
 	for pz in [-4.55, 0.03, 4.61]:
-		# Under-grade anchor plinth + stepped beveled base plate (X [-0.92 .. +0.54], Z [pz-0.68 .. pz+0.68])
-		_add(root, _box(Vector3(-0.19, (0.20 - SINK) * 0.5, pz), Vector3(1.46, 0.20 + SINK, 1.36), m_base), CSGShape3D.OPERATION_UNION)
-		_add(root, _box(Vector3(-0.19, 0.26, pz), Vector3(1.22, 0.14, 1.14), m_post), CSGShape3D.OPERATION_UNION)
+		var zf: float = float(pz)
+		# Under-grade anchor plinth + stepped beveled base plate
+		_add(root, _box(Vector3(-0.07, (0.20 - SINK) * 0.5, zf), Vector3(1.46, 0.20 + SINK, 1.36), m_base), CSGShape3D.OPERATION_UNION)
+		_add(root, _box(Vector3(-0.07, 0.26, zf), Vector3(1.22, 0.14, 1.14), m_post), CSGShape3D.OPERATION_UNION)
 		# Four corner anchor bolts
-		for bx in [-0.62, 0.24]:
+		for bx in [-0.50, 0.36]:
 			for bz in [-0.42, 0.42]:
-				_add(root, _box(Vector3(bx, 0.36, pz + bz), Vector3(0.14, 0.10, 0.14), m_bolt), CSGShape3D.OPERATION_UNION)
-		# H-post flanges & web rising to Y = 3.92
-		_add(root, _box(Vector3(-0.40, 2.10, pz), Vector3(0.10, 3.64, 0.44), m_post), CSGShape3D.OPERATION_UNION)
-		_add(root, _box(Vector3(0.14, 2.10, pz), Vector3(0.10, 3.64, 0.44), m_post), CSGShape3D.OPERATION_UNION)
-		_add(root, _box(Vector3(-0.13, 2.10, pz), Vector3(0.46, 3.64, 0.12), m_base), CSGShape3D.OPERATION_UNION)
+				_add(root, _box(Vector3(float(bx), 0.36, zf + float(bz)), Vector3(0.14, 0.10, 0.14), m_bolt), CSGShape3D.OPERATION_UNION)
+		# H-post flanges & web rising to Y = 3.92 on the outer (-X) side
+		_add(root, _box(Vector3(-0.40, 2.10, zf), Vector3(0.10, 3.64, 0.44), m_post), CSGShape3D.OPERATION_UNION)
+		_add(root, _box(Vector3(0.14, 2.10, zf), Vector3(0.10, 3.64, 0.44), m_post), CSGShape3D.OPERATION_UNION)
+		_add(root, _box(Vector3(-0.13, 2.10, zf), Vector3(0.46, 3.64, 0.12), m_base), CSGShape3D.OPERATION_UNION)
 		# Slanted top post cap
-		_add(root, _box(Vector3(-0.13, 3.90, pz), Vector3(0.68, 0.08, 0.50), m_post), CSGShape3D.OPERATION_UNION)
-		# Spacer blocks between post and upper/lower W-beam rails
+		_add(root, _box(Vector3(-0.13, 3.90, zf), Vector3(0.68, 0.08, 0.50), m_post), CSGShape3D.OPERATION_UNION)
+		# Spacer blocks between post (+X flange) and upper/lower W-beam rails (+X road side)
 		for ry in [1.48, 2.98]:
-			_add(root, _box(Vector3(-0.56, ry, pz), Vector3(0.26, 0.68, 0.36), m_base), CSGShape3D.OPERATION_UNION)
+			_add(root, _box(Vector3(0.30, float(ry), zf), Vector3(0.26, 0.68, 0.36), m_base), CSGShape3D.OPERATION_UNION)
 
-	# 2. Two Corrugated W-Beam Guardrail Bands (Y = 1.48 and Y = 2.98, Z [-5.67 .. +5.73])
+	# 2. Two Corrugated W-Beam Guardrail Bands on the road-facing (+X) side (Y = 1.48 and Y = 2.98, Z [-5.67 .. +5.73])
 	for ry in [1.48, 2.98]:
-		var rail_prof := _w_beam_profile(ry)
+		var ryf: float = float(ry)
+		var rail_prof := _w_beam_profile(ryf)
 		_add(root, _extrude_z(rail_prof, -5.67, 5.73, m_steel), CSGShape3D.OPERATION_UNION)
-		# Splice bolt heads at the 3 posts
+		# Splice bolt heads on the road-facing (+X) face at the 3 posts
 		for pz in [-4.55, 0.03, 4.61]:
 			for by in [-0.28, 0.0, 0.28]:
-				_add(root, _box(Vector3(-0.98, ry + by, pz), Vector3(0.08, 0.09, 0.09), m_bolt), CSGShape3D.OPERATION_UNION)
+				_add(root, _box(Vector3(0.72, ryf + float(by), float(pz)), Vector3(0.08, 0.09, 0.09), m_bolt), CSGShape3D.OPERATION_UNION)
 
 	return root
 
 
 static func _w_beam_profile(cy: float) -> PackedVector2Array:
-	# Cross-section in (X, Y) of a corrugated W-beam guardrail facing -X (X in [-1.00 .. -0.64], height 1.12m)
+	# Cross-section in (X, Y) of a corrugated W-beam guardrail facing +X (road side, X in [0.34 .. 0.74], height 1.12m)
 	return PackedVector2Array([
-		Vector2(-0.68, cy - 0.56),
-		Vector2(-0.84, cy - 0.50),
-		Vector2(-1.00, cy - 0.30),
-		Vector2(-0.98, cy - 0.16),
-		Vector2(-0.74, cy - 0.04),
-		Vector2(-0.74, cy + 0.04),
-		Vector2(-0.98, cy + 0.16),
-		Vector2(-1.00, cy + 0.30),
-		Vector2(-0.84, cy + 0.50),
-		Vector2(-0.68, cy + 0.56),
-		Vector2(-0.60, cy + 0.48),
-		Vector2(-0.76, cy + 0.42),
-		Vector2(-0.88, cy + 0.24),
-		Vector2(-0.64, cy + 0.06),
-		Vector2(-0.64, cy - 0.06),
-		Vector2(-0.88, cy - 0.24),
-		Vector2(-0.76, cy - 0.42),
-		Vector2(-0.60, cy - 0.48),
+		Vector2(0.42, cy - 0.56),
+		Vector2(0.58, cy - 0.50),
+		Vector2(0.74, cy - 0.30),
+		Vector2(0.72, cy - 0.16),
+		Vector2(0.48, cy - 0.04),
+		Vector2(0.48, cy + 0.04),
+		Vector2(0.72, cy + 0.16),
+		Vector2(0.74, cy + 0.30),
+		Vector2(0.58, cy + 0.50),
+		Vector2(0.42, cy + 0.56),
+		Vector2(0.34, cy + 0.48),
+		Vector2(0.50, cy + 0.42),
+		Vector2(0.62, cy + 0.24),
+		Vector2(0.38, cy + 0.06),
+		Vector2(0.38, cy - 0.06),
+		Vector2(0.62, cy - 0.24),
+		Vector2(0.50, cy - 0.42),
+		Vector2(0.34, cy - 0.48),
 	])
 
 
@@ -122,12 +126,20 @@ static func _final_material(key: String) -> Material:
 		return _final_mats[key]
 	var sm := StandardMaterial3D.new()
 	sm.vertex_color_use_as_albedo = true
+	sm.vertex_color_is_srgb = true
+	sm.normal_enabled = true
+	sm.normal_texture = load("res://materials/dark_canyon_rock_normal.png")
+	sm.uv1_scale = Vector3(0.45, 0.45, 0.45)
 	if key == "galv":
-		sm.metallic = 0.68
-		sm.roughness = 0.36
+		sm.metallic = 0.90
+		sm.metallic_specular = 0.78
+		sm.roughness = 0.22
+		sm.normal_scale = 0.14
 	else:
-		sm.metallic = 0.58
-		sm.roughness = 0.48
+		sm.metallic = 0.82
+		sm.metallic_specular = 0.65
+		sm.roughness = 0.34
+		sm.normal_scale = 0.20
 	_final_mats[key] = sm
 	return sm
 

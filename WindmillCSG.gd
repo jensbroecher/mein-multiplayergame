@@ -17,7 +17,7 @@ extends RefCounted
 const SINK := 3.8
 const CENTER_X := -0.40
 const CENTER_Z := -0.89
-const HUB_POS := Vector3(-0.30, 23.18, 1.62)
+const HUB_POS := Vector3(-0.30, 23.18, 1.95)
 
 const COL_TIMBER := Color(0.56, 0.54, 0.50)
 const COL_TIMBER_DARK := Color(0.42, 0.40, 0.37)
@@ -92,8 +92,8 @@ static func build_tower() -> CSGCombiner3D:
 	var brace_bays := [
 		[1.35, 4.10, 0.24],
 		[4.10, 8.85, 0.26],
-		[8.85, 13.80, 0.26],
-		[15.65, 19.15, 0.20],
+		[8.85, 13.55, 0.26],
+		[14.15, 19.15, 0.20],
 		[19.15, 22.45, 0.18],
 	]
 	for bay in brace_bays:
@@ -112,49 +112,65 @@ static func build_tower() -> CSGCombiner3D:
 			_add(root, _box(mid, Vector3(0.32, 0.32, 0.32), m_iron), CSGShape3D.OPERATION_UNION)
 
 	# ------------------------------------------------------------------
-	# 3. Wooden Maintenance Platform & Guardrails (Y = 15.35 .. 17.05)
+	# 3. Wooden Maintenance Platform & Guardrails (Y = 13.80 .. 15.05)
+	#    (Well below the lowest rotor tip at Y = 23.18 - 6.55 = 16.63)
 	# ------------------------------------------------------------------
-	var plat_y := 15.55
-	# Two pairs of heavy cantilevered bearer joists under the platform
+	var plat_y := 13.80
+	# Two pairs of heavy cantilevered bearer joists under the platform (Z extent 5.20m)
 	for jx in [-2.05, -1.25, 1.25, 2.05]:
-		_add(root, _box(Vector3(CENTER_X + jx, plat_y - 0.22, CENTER_Z), Vector3(0.28, 0.36, 6.45), m_timber_dark), CSGShape3D.OPERATION_UNION)
+		_add(root, _box(Vector3(CENTER_X + float(jx), plat_y - 0.22, CENTER_Z), Vector3(0.26, 0.34, 5.20), m_timber_dark), CSGShape3D.OPERATION_UNION)
 	for jz in [-2.05, 2.05]:
-		_add(root, _box(Vector3(CENTER_X, plat_y - 0.18, CENTER_Z + jz), Vector3(6.45, 0.32, 0.28), m_timber_dark), CSGShape3D.OPERATION_UNION)
+		_add(root, _box(Vector3(CENTER_X, plat_y - 0.18, CENTER_Z + float(jz)), Vector3(5.20, 0.30, 0.26), m_timber_dark), CSGShape3D.OPERATION_UNION)
 
-	# Plank deck floor (6.20m x 6.20m) with central pump-rod opening collar
-	_add(root, _box(Vector3(CENTER_X, plat_y, CENTER_Z), Vector3(6.20, 0.18, 6.20), m_deck), CSGShape3D.OPERATION_UNION)
-	_add(root, _box(Vector3(CENTER_X, plat_y + 0.14, CENTER_Z), Vector3(6.32, 0.22, 6.32), m_timber_dark), CSGShape3D.OPERATION_UNION)
+	# Plank deck floor (5.20m x 5.20m, outer trim 5.32m -> front edge at CENTER_Z + 2.66)
+	_add(root, _box(Vector3(CENTER_X, plat_y, CENTER_Z), Vector3(5.20, 0.18, 5.20), m_deck), CSGShape3D.OPERATION_UNION)
+	_add(root, _box(Vector3(CENTER_X, plat_y + 0.12, CENTER_Z), Vector3(5.32, 0.20, 5.32), m_timber_dark), CSGShape3D.OPERATION_UNION)
 
 	# Platform perimeter safety posts & top/mid rails (leaving ladder entry gap on +Z front)
-	for sx in [-2.95, 0.0, 2.95]:
-		for sz in [-2.95, 2.95]:
-			if absf(sx) < 0.5 and sz > 0.0:
+	var rail_off := 2.48
+	for sx in [-rail_off, 0.0, rail_off]:
+		for sz in [-rail_off, rail_off]:
+			if absf(float(sx)) < 0.5 and float(sz) > 0.0:
 				continue
-			_add(root, _box(Vector3(CENTER_X + sx, plat_y + 0.80, CENTER_Z + sz), Vector3(0.20, 1.50, 0.20), m_timber_dark), CSGShape3D.OPERATION_UNION)
-	for rail_y in [plat_y + 0.78, plat_y + 1.45]:
+			_add(root, _box(Vector3(CENTER_X + float(sx), plat_y + 0.68, CENTER_Z + float(sz)), Vector3(0.18, 1.28, 0.18), m_timber_dark), CSGShape3D.OPERATION_UNION)
+	# Two gate posts flanking the front (+Z) ladder entry opening
+	for gx in [-0.56, 0.56]:
+		_add(root, _box(Vector3(CENTER_X + float(gx), plat_y + 0.68, CENTER_Z + rail_off), Vector3(0.18, 1.28, 0.18), m_timber_dark), CSGShape3D.OPERATION_UNION)
+
+	for rail_y in [plat_y + 0.65, plat_y + 1.24]:
+		var ryf: float = float(rail_y)
 		# Left (-X), Right (+X), Back (-Z) rails
-		_add(root, _box(Vector3(CENTER_X - 2.95, rail_y, CENTER_Z), Vector3(0.16, 0.16, 6.06), m_timber), CSGShape3D.OPERATION_UNION)
-		_add(root, _box(Vector3(CENTER_X + 2.95, rail_y, CENTER_Z), Vector3(0.16, 0.16, 6.06), m_timber), CSGShape3D.OPERATION_UNION)
-		_add(root, _box(Vector3(CENTER_X, rail_y, CENTER_Z - 2.95), Vector3(6.06, 0.16, 0.16), m_timber), CSGShape3D.OPERATION_UNION)
-		# Front (+Z) rails either side of ladder hatch
-		_add(root, _box(Vector3(CENTER_X - 1.85, rail_y, CENTER_Z + 2.95), Vector3(2.35, 0.16, 0.16), m_timber), CSGShape3D.OPERATION_UNION)
-		_add(root, _box(Vector3(CENTER_X + 1.85, rail_y, CENTER_Z + 2.95), Vector3(2.35, 0.16, 0.16), m_timber), CSGShape3D.OPERATION_UNION)
+		_add(root, _box(Vector3(CENTER_X - rail_off, ryf, CENTER_Z), Vector3(0.15, 0.15, 5.12), m_timber), CSGShape3D.OPERATION_UNION)
+		_add(root, _box(Vector3(CENTER_X + rail_off, ryf, CENTER_Z), Vector3(0.15, 0.15, 5.12), m_timber), CSGShape3D.OPERATION_UNION)
+		_add(root, _box(Vector3(CENTER_X, ryf, CENTER_Z - rail_off), Vector3(5.12, 0.15, 0.15), m_timber), CSGShape3D.OPERATION_UNION)
+		# Front (+Z) rails either side of the 1.12m ladder gate opening
+		_add(root, _box(Vector3(CENTER_X - 1.52, ryf, CENTER_Z + rail_off), Vector3(2.00, 0.15, 0.15), m_timber), CSGShape3D.OPERATION_UNION)
+		_add(root, _box(Vector3(CENTER_X + 1.52, ryf, CENTER_Z + rail_off), Vector3(2.00, 0.15, 0.15), m_timber), CSGShape3D.OPERATION_UNION)
 
 	# ------------------------------------------------------------------
-	# 4. Front Wooden Ladder (+Z face, from y = -SINK up to y = 16.40)
+	# 4. Front Wooden Ladder (+Z face, climbing outside the platform edge)
 	# ------------------------------------------------------------------
-	var lad_bot_z := CENTER_Z + 4.95
-	var lad_top_z := CENTER_Z + 2.85
+	var lad_bot_z := CENTER_Z + 4.85
+	var lad_plat_z := CENTER_Z + 2.78 # 0.12m outside the platform's +2.66m trim edge so it never cuts through the deck
 	for lx_off in [-0.52, 0.52]:
-		var lb := Vector3(CENTER_X + lx_off, -SINK, lad_bot_z)
-		var lt := Vector3(CENTER_X + lx_off, 16.45, lad_top_z)
-		_add(root, _beam(lb, lt, 0.16, 0.24, m_timber_dark), CSGShape3D.OPERATION_UNION)
-	var rung_count := 24
+		var lxf: float = float(lx_off)
+		var lb := Vector3(CENTER_X + lxf, -SINK, lad_bot_z)
+		var lp := Vector3(CENTER_X + lxf, plat_y + 0.10, lad_plat_z)
+		var lt := Vector3(CENTER_X + lxf, plat_y + 1.24, lad_plat_z)
+		var lg := Vector3(CENTER_X + lxf, plat_y + 1.24, CENTER_Z + rail_off)
+		_add(root, _beam(lb, lp, 0.14, 0.22, m_timber_dark), CSGShape3D.OPERATION_UNION)
+		# Upper vertical handrail stiles & step-through returns into the gate posts
+		_add(root, _beam(lp, lt, 0.14, 0.18, m_timber_dark), CSGShape3D.OPERATION_UNION)
+		_add(root, _beam(lt, lg, 0.14, 0.16, m_timber_dark), CSGShape3D.OPERATION_UNION)
+		# Standoff bracket tying ladder stile to platform fascia at deck height
+		_add(root, _box(Vector3(CENTER_X + lxf, plat_y + 0.06, CENTER_Z + 2.68), Vector3(0.16, 0.18, 0.26), m_iron), CSGShape3D.OPERATION_UNION)
+
+	var rung_count := 22
 	for r in rung_count:
 		var t := float(r) / float(rung_count - 1)
-		var ry := lerpf(-1.2, 16.0, t)
-		var rz := lerpf(lad_bot_z, lad_top_z, (ry - (-SINK)) / (16.45 - (-SINK)))
-		_add(root, _box(Vector3(CENTER_X, ry, rz), Vector3(1.18, 0.10, 0.12), m_timber), CSGShape3D.OPERATION_UNION)
+		var ry := lerpf(-1.0, plat_y + 0.05, t)
+		var rz := lerpf(lad_bot_z, lad_plat_z, (ry - (-SINK)) / (plat_y + 0.10 - (-SINK)))
+		_add(root, _box(Vector3(CENTER_X, ry, rz), Vector3(1.16, 0.09, 0.11), m_timber), CSGShape3D.OPERATION_UNION)
 
 	# ------------------------------------------------------------------
 	# 5. Central Wellhead Casing, Pump Rod & Upper Turntable Gearbox
@@ -269,30 +285,30 @@ static func build_rotor() -> CSGCombiner3D:
 	nose_cap.material = m_rust
 	_add(root, nose_cap, CSGShape3D.OPERATION_UNION)
 
-	# 2. Concentric Inner (r = 3.05m) & Outer (r = 6.65m) Steel Rim Hoops (18 segments)
+	# 2. Concentric Inner (r = 2.75m) & Outer (r = 5.85m) Steel Rim Hoops (18 segments)
 	var sail_count := 18
-	for rr in [3.05, 6.65]:
+	for rr in [2.75, 5.85]:
 		for i in sail_count:
 			var a0 := TAU * float(i) / float(sail_count)
 			var a1 := TAU * float(i + 1) / float(sail_count)
-			var p0 := Vector3(cos(a0) * rr, sin(a0) * rr, 0.0)
-			var p1 := Vector3(cos(a1) * rr, sin(a1) * rr, 0.0)
+			var p0 := Vector3(cos(a0) * float(rr), sin(a0) * float(rr), 0.0)
+			var p1 := Vector3(cos(a1) * float(rr), sin(a1) * float(rr), 0.0)
 			_add(root, _beam(p0, p1, 0.16, 0.18, m_iron), CSGShape3D.OPERATION_UNION)
 
 	# 3. Six Heavy Steel Spoke Pairs radiating from Hub to Outer Rim
 	for s in 6:
 		var sa := TAU * float(s) / 6.0
 		var dir := Vector3(cos(sa), sin(sa), 0.0)
-		_add(root, _beam(Vector3(0, 0, -0.35) + dir * 0.65, dir * 6.85, 0.16, 0.16, m_iron), CSGShape3D.OPERATION_UNION)
-		_add(root, _beam(Vector3(0, 0, 0.35) + dir * 0.65, dir * 3.15, 0.14, 0.14, m_rust), CSGShape3D.OPERATION_UNION)
+		_add(root, _beam(Vector3(0, 0, -0.35) + dir * 0.65, dir * 6.05, 0.16, 0.16, m_iron), CSGShape3D.OPERATION_UNION)
+		_add(root, _beam(Vector3(0, 0, 0.35) + dir * 0.65, dir * 2.85, 0.14, 0.14, m_rust), CSGShape3D.OPERATION_UNION)
 
-	# 4. Eighteen Curved / Pitched Galvanized Steel Wind-Wheel Sails (r = 2.40m .. 7.45m)
+	# 4. Eighteen Curved / Pitched Galvanized Steel Wind-Wheel Sails (r = 2.15m .. 6.55m)
 	# Each sail is a trapezoidal sheet-metal blade pitched at 28 degrees out of the XY wheel plane
 	var sail_poly := PackedVector2Array([
-		Vector2(-0.34, 2.40),
-		Vector2(0.34, 2.40),
-		Vector2(0.76, 7.45),
-		Vector2(-0.76, 7.45),
+		Vector2(-0.32, 2.15),
+		Vector2(0.32, 2.15),
+		Vector2(0.68, 6.55),
+		Vector2(-0.68, 6.55),
 	])
 	for i in sail_count:
 		var ang := TAU * float(i) / float(sail_count)
@@ -304,8 +320,8 @@ static func build_rotor() -> CSGCombiner3D:
 		sail.transform = Transform3D(sail_basis, Vector3.ZERO)
 		_add(root, sail, CSGShape3D.OPERATION_UNION)
 		# Center stiffening rib along the sail back
-		var rib_a := sail_basis * Vector3(0.0, 2.45, -0.08)
-		var rib_b := sail_basis * Vector3(0.0, 7.35, -0.08)
+		var rib_a := sail_basis * Vector3(0.0, 2.20, -0.08)
+		var rib_b := sail_basis * Vector3(0.0, 6.45, -0.08)
 		_add(root, _beam(rib_a, rib_b, 0.12, 0.10, m_rust if (i % 4 == 0) else m_iron), CSGShape3D.OPERATION_UNION)
 
 	return root
@@ -377,18 +393,21 @@ static func _final_material(key: String) -> Material:
 		"galv":
 			var sm := StandardMaterial3D.new()
 			sm.vertex_color_use_as_albedo = true
-			sm.metallic = 0.62
-			sm.roughness = 0.44
+			sm.vertex_color_is_srgb = true
+			sm.metallic = 0.72
+			sm.roughness = 0.34
 			m = sm
 		"iron":
 			var sm := StandardMaterial3D.new()
 			sm.vertex_color_use_as_albedo = true
-			sm.metallic = 0.58
-			sm.roughness = 0.52
+			sm.vertex_color_is_srgb = true
+			sm.metallic = 0.68
+			sm.roughness = 0.42
 			m = sm
 		_:
 			var sm := StandardMaterial3D.new()
 			sm.vertex_color_use_as_albedo = true
+			sm.vertex_color_is_srgb = true
 			m = sm
 	_final_mats[key] = m
 	return m
