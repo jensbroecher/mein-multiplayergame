@@ -1,22 +1,29 @@
 # regenerate_chasm_houses.gd
-# Builds Canyon Chasm's two houses (LargeHouseCSG.gd and AdobeHouseCSG.gd) in CSG and bakes them to
-# generated/large_house.res and generated/adobe_house.res, which LargeHouse.tscn and AdobeHouse.tscn
-# draw. Run it after changing LargeHouseCSG.gd or AdobeHouseCSG.gd:
+# Builds Canyon Chasm's CSG architectural props (LargeHouseCSG.gd, AdobeHouseCSG.gd, CasitaHouseCSG.gd,
+# WindmillCSG.gd, ChasmBarrierCSG.gd) in CSG and bakes them to generated/*.res, which their scenes draw.
+# Run headless:
 #   Godot --headless --path . res://regenerate_chasm_houses.tscn
 extends Node
 
 const LargeHouseCSG := preload("res://LargeHouseCSG.gd")
 const AdobeHouseCSG := preload("res://AdobeHouseCSG.gd")
+const CasitaHouseCSG := preload("res://CasitaHouseCSG.gd")
+const WindmillCSG := preload("res://WindmillCSG.gd")
+const ChasmBarrierCSG := preload("res://ChasmBarrierCSG.gd")
 
 const TARGETS := [
-	["LargeHouse", LargeHouseCSG, "res://generated/large_house.res"],
-	["AdobeHouse", AdobeHouseCSG, "res://generated/adobe_house.res"],
+	["LargeHouse", LargeHouseCSG, "build", "res://generated/large_house.res"],
+	["AdobeHouse", AdobeHouseCSG, "build", "res://generated/adobe_house.res"],
+	["CasitaHouse", CasitaHouseCSG, "build", "res://generated/casita_house.res"],
+	["WindmillTower", WindmillCSG, "build_tower", "res://generated/windmill_tower.res"],
+	["WindmillRotor", WindmillCSG, "build_rotor", "res://generated/windmill_rotor.res"],
+	["ChasmBarrier", ChasmBarrierCSG, "build", "res://generated/chasm_barrier.res"],
 ]
 
 func _ready() -> void:
 	var nodes: Array[CSGShape3D] = []
 	for t in TARGETS:
-		var csg: CSGShape3D = t[1].build()
+		var csg: CSGShape3D = t[1].call(t[2])
 		add_child(csg)
 		nodes.append(csg)
 	await get_tree().process_frame
@@ -24,7 +31,7 @@ func _ready() -> void:
 	for i in TARGETS.size():
 		var label: String = TARGETS[i][0]
 		var builder = TARGETS[i][1]
-		var out_path: String = TARGETS[i][2]
+		var out_path: String = TARGETS[i][3]
 		var mesh: ArrayMesh = builder.bake(nodes[i])
 		if mesh == null or mesh.get_surface_count() == 0:
 			push_error("%s bake produced an empty mesh" % label)

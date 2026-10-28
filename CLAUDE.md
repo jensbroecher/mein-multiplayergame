@@ -1693,23 +1693,32 @@ its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set th
   suction with cyclonic crosswind swirl, escalating vertical car capture, boost-to-escape mechanics, and high-velocity
   ejection with one-shot dust burst and swoosh SFX. `res://scratch/test_tornado_look.gd` renders preview shots;
   `scratch/test_tornado_suction.gd` runs headless physics and authority verification.
-- The two houses (`LargeHouse` and `House`) are `LargeHouseCSG.gd` and `AdobeHouseCSG.gd`, modelled in CSG at life size
-  with foundations extending `SINK = 2.5m` below `y = 0` so they bed into uneven terrain. `LargeHouseCSG.gd` builds a
-  37.3m x 37.9m Mediterranean whitewashed stucco villa (`hut_masonry.gdshader` `style = 4`) under Spanish terracotta
-  barrel-tile roofs (`style = 5`, normal-mapped ribs and course overlaps), with a protruding left cross-gable entrance
-  bay (arched oak door, limestone step, wrought-iron coach lanterns, quatrefoil gable vent), a recessed right veranda
-  (double French doors, casement window, segmental-arch multi-pane window), a left shed wing, and a chimney with a rain
-  cap. `AdobeHouseCSG.gd` builds a 31.5m x 23.1m x 22.8m two-story desert adobe pueblo house (`hut_masonry.gdshader`
-  `style = 3`, sun-baked mud-plaster with weathered stone cobble patches masked by `COLOR.a` to flat wall interiors),
-  rounded corners, saddle-curved roof parapets in isolated tower/wing CSG combiners, protruding wooden vigas, a slatted
-  wooden pergola on stilts with knee braces, recessed plank doors under timber lintels, shuttered windows, and upper
-  alcoves. `regenerate_chasm_houses.tscn` (headless) bakes them to `generated/large_house.res` (3,058 triangles) and
-  `generated/adobe_house.res` (4,112 triangles), which `LargeHouse.tscn` and `AdobeHouse.tscn` draw at scale 1.0 in
-  `CanyonChasmLevel.tscn` (preserving `groups=["collision_trimesh"]`). They replaced the two heavy Hunyuan FBX files
-  (`models/desert/2f1728e226824507fc3188405c2c7935*` [67MB, 500k tris, scale 45] and
-  `models/desert/49ac41a0567226438249fc402b0d629c*` [39MB, 50k tris, scale 35], deleted). `res://scratch/chasm_house_shot.gd`
-  (`-s`, windowed, `-- <dir>`) renders six views of each baked mesh; `scratch/render_chasm_houses_in_level.gd` renders
-  in-level road and 3/4 views; `scratch/chasm_house_check.gd` (`-s`, headless) verifies their meshes, world bounds, and
-  runtime `Col_*` trimesh colliders in the level.
+- The three houses (`LargeHouse`, `House`, and `CasitaHouse`), the ranch windmill (`Windmill`), and the jump barriers
+  (`Barrier`, `Barrier2`) are built in CSG at life size (`LargeHouseCSG.gd`, `AdobeHouseCSG.gd`, `CasitaHouseCSG.gd`,
+  `WindmillCSG.gd`, `ChasmBarrierCSG.gd`) and baked headless by `regenerate_chasm_houses.tscn` into `generated/*.res`:
+  - `LargeHouseCSG.gd` -> `generated/large_house.res` (3,058 tris) -> `LargeHouse.tscn`: 37.3m x 37.9m Mediterranean
+    whitewashed stucco villa (`hut_masonry.gdshader` `style = 4`) under Spanish terracotta barrel-tile roofs (`style = 5`).
+  - `AdobeHouseCSG.gd` -> `generated/adobe_house.res` (4,112 tris) -> `AdobeHouse.tscn`: 31.5m x 23.1m x 22.8m two-story
+    desert adobe pueblo house (`style = 3`) with saddle-curved roof parapets, protruding wooden vigas, and a slatted wooden
+    pergola on stilts.
+  - `CasitaHouseCSG.gd` -> `generated/casita_house.res` (5,434 tris) -> `CasitaHouse.tscn`: 23.0m x 18.2m x 21.2m Southwest
+    cream-adobe casita on the West straight (`(-229.5, 16.0, 65.0)`) with sculpted side parapet wing walls, Spanish
+    terracotta barrel-tile roof extending over a timber-post entrance porch with carved corbel (`zapata`), four protruding
+    dark vigas, a coffered Spanish oak front door, two recessed round-arched window niches with iron grilles, a flagstone
+    courtyard with rounded adobe walls, wooden bench, and three potted agaves.
+  - `WindmillCSG.gd` -> `generated/windmill_tower.res` (7,872 tris) + `generated/windmill_rotor.res` (5,864 tris) ->
+    `Windmill.tscn`: 25.4m tapered 4-leg timber derrick tower (5 bays of X-bracing, railed upper wooden platform, front
+    ladder, wellhead & pump rod, turntable gearbox, tail vane) and 15.0m 18-bladed galvanized steel rotor on `BladePivot`
+    spun by `Windmill.gd`. Replaced `models/desert/20260617011251_4d3f8d7e.fbx` (580k tris, deleted).
+  - `ChasmBarrierCSG.gd` -> `generated/chasm_barrier.res` (1,132 tris) -> `ChasmBarrier.tscn`: 11.4m double corrugated
+    W-beam steel guardrail on 3 H-posts, replacing `models/concrete/3947899e2e8ccf226587409e9b0ce96a.fbx` (deleted).
+- `regenerate_canyon_chasm_dressing.tscn` (`regenerate_canyon_chasm_dressing.gd`) builds `ChasmDressing.tscn` (`CanyonDressing`
+  with `CanyonDetail.gd`), containing:
+  - `ChasmCliffs` (`generated/canyon_chasm_cliffs.res`, `SandstoneKit.gd` + `canyon_rock.gdshader`): 3D tiered sandstone
+    cliff formations lining the West, East, North, and South walls of the chasm water pit, eliminating stretched planar UVs.
+  - Over 3,200 non-FBX procedural desert plants and rocks in `MultiMeshInstance3D` cells (`CactusKit.gd` 7 cactus species,
+    `DesertFloraKit.gd` procedural Joshua trees, agaves, yuccas, desert shrubs, and wildflowers, and `SandstoneKit.gd`
+    boulders/pebbles). `CanyonChasmLevel.tscn` now uses zero `.fbx` files, a warm golden-hour desert sky
+    (`sky_tropical_cumulus.gdshader`), and calm, wave-free emerald-teal chasm water (`ChasmPitWater`).
 
 

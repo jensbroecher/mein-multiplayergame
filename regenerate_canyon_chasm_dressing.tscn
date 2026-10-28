@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://regenerate_canyon_chasm_dressing.gd" id="1_dress"]
+
+[node name="RegenerateCanyonChasmDressing" type="Node"]
+script = ExtResource("1_dress")

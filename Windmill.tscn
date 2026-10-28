@@ -1,0 +1,17 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" uid="uid://bmfdcyskrdayn" path="res://Windmill.gd" id="1_script"]
+[ext_resource type="ArrayMesh" path="res://generated/windmill_tower.res" id="2_tower"]
+[ext_resource type="ArrayMesh" path="res://generated/windmill_rotor.res" id="3_rotor"]
+
+[node name="Windmill" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Tower" type="MeshInstance3D" parent="." groups=["collision_trimesh"]]
+mesh = ExtResource("2_tower")
+
+[node name="BladePivot" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.3, 23.18, 1.62)
+
+[node name="Rotor" type="MeshInstance3D" parent="BladePivot"]
+mesh = ExtResource("3_rotor")

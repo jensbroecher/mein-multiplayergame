@@ -30,6 +30,12 @@ func setup_blade_pivot() -> void:
 		# Already set up
 		return
 
+	var existing_pivot := get_node_or_null("BladePivot") as Node3D
+	if existing_pivot != null:
+		_pivot = existing_pivot
+		_axis = spin_axis_local.normalized() if spin_axis_local.length_squared() > 0.0001 else Vector3.FORWARD
+		return
+
 	var blades: Array[Node3D] = []
 	for n in blade_part_names:
 		var node := _find_desc_named(self, str(n))

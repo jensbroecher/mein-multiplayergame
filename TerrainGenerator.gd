@@ -2101,19 +2101,24 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 		(final_side_mat as StandardMaterial3D).cull_mode = BaseMaterial3D.CULL_DISABLED
 
 	if track_layout_type == TrackLayoutType.CANYON and not node_name.contains("Curbs"):
-		var rock_mat = StandardMaterial3D.new()
-		rock_mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
-		var rock_tex = load("res://materials/dark_canyon_rock.png")
-		var rock_normal = load("res://materials/dark_canyon_rock_normal.png")
-		if rock_tex:
-			rock_mat.albedo_texture = rock_tex
-		if rock_normal:
-			rock_mat.roughness = 0.9
-			rock_mat.normal_enabled = true
-			rock_mat.normal_texture = rock_normal
-			rock_mat.normal_scale = 1.5
-		_configure_triplanar_pbr(rock_mat, 0.05, 8.0)
-		rock_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		var rock_mat: Material
+		if level_prefix == "canyon_chasm" and ResourceLoader.exists("res://generated/canyon_chasm_road_rock_material.res"):
+			rock_mat = load("res://generated/canyon_chasm_road_rock_material.res")
+		else:
+			var std_rock := StandardMaterial3D.new()
+			std_rock.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+			var rock_tex = load("res://materials/dark_canyon_rock.png")
+			var rock_normal = load("res://materials/dark_canyon_rock_normal.png")
+			if rock_tex:
+				std_rock.albedo_texture = rock_tex
+			if rock_normal:
+				std_rock.roughness = 0.9
+				std_rock.normal_enabled = true
+				std_rock.normal_texture = rock_normal
+				std_rock.normal_scale = 1.5
+			_configure_triplanar_pbr(std_rock, 0.05, 8.0)
+			std_rock.cull_mode = BaseMaterial3D.CULL_DISABLED
+			rock_mat = std_rock
 		final_side_mat = rock_mat
 
 		# Separate end-cap mesh (own verts + normals) so triplanar is not warped and
@@ -2173,7 +2178,7 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 				(cap_shape as ConcavePolygonShape3D).backface_collision = true
 			cap_col.shape = _save_resource(cap_shape, node_name + "_endcap_collision_shape")
 			static_body.add_child(cap_col)
-	if track_layout_type == TrackLayoutType.CANYON and final_side_mat is ShaderMaterial:
+	if track_layout_type == TrackLayoutType.CANYON and level_prefix != "canyon_chasm" and final_side_mat is ShaderMaterial:
 		final_side_mat.set_shader_parameter("use_world_uv", false)
 		final_side_mat.set_shader_parameter("uv_scale", 4.0)
 
@@ -2467,19 +2472,22 @@ func add_chasm_pit_water() -> void:
 	noise_tex.height = 512
 	noise_tex.noise = noise
 
-	# Green/brown canyon water — mostly opaque so sky specular shows
+	# Natural calm emerald-teal canyon water with zero vertex wave heave
 	mat.set_shader_parameter("noise_tex", noise_tex)
-	mat.set_shader_parameter("water_color", Color(0.06, 0.09, 0.04))
-	mat.set_shader_parameter("shallow_color", Color(0.2, 0.26, 0.09))
-	mat.set_shader_parameter("sky_tint", Color(0.62, 0.72, 0.78)) # bright sky mirror
-	mat.set_shader_parameter("sky_reflect", 0.85)
-	mat.set_shader_parameter("transparency", 0.18) # mostly solid
-	mat.set_shader_parameter("metallic", 0.72)
-	mat.set_shader_parameter("roughness", 0.05)
-	mat.set_shader_parameter("wave_speed", 0.03)
-	mat.set_shader_parameter("wave_strength", 0.85)
-	mat.set_shader_parameter("wave_height", 1.15) # large visible swells
-	mat.set_shader_parameter("wave_scale", 0.55) # lower = bigger world waves
+	mat.set_shader_parameter("water_color", Color(0.03, 0.24, 0.26))
+	mat.set_shader_parameter("shallow_color", Color(0.12, 0.44, 0.40))
+	mat.set_shader_parameter("deep_water_color", Color(0.015, 0.14, 0.18))
+	mat.set_shader_parameter("sky_tint", Color(0.18, 0.46, 0.50))
+	mat.set_shader_parameter("sky_reflect", 0.16)
+	mat.set_shader_parameter("transparency", 0.18)
+	mat.set_shader_parameter("metallic", 0.08)
+	mat.set_shader_parameter("roughness", 0.22)
+	mat.set_shader_parameter("wave_speed", 0.002)
+	mat.set_shader_parameter("wave_strength", 0.02)
+	mat.set_shader_parameter("wave_height", 0.0)
+	mat.set_shader_parameter("wave_scale", 0.55)
+	mat.set_shader_parameter("enable_water_edge_fade", false)
+	mat.set_shader_parameter("depth_fade_distance", 7.5)
 
 	water.material_override = mat
 	add_child(water)
