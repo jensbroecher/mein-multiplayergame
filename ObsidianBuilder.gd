@@ -1,14 +1,14 @@
 # ObsidianBuilder.gd
 #
-# The Obsidian: a matte-black desert raider (an original design with a made-up name). A narrow open
-# tub slung between towering mud-terrain tyres that stand clear outboard of it: a low rounded nose
-# carrying two transverse tan canisters, a raked windscreen framed by a chrome A-pillar tube that
-# runs on back as the roof rail and down the B-pillar, two tan bucket seats in the cockpit, a roof
-# cylinder pod on the roll hoop, and a sculpted rear cowl that arches over the front and top of the
-# rear wheels, ending in a ducktail with twin aerodynamic winglet fins. Under the tub the chassis
-# shows: frame rails, a bronze tank down each side held by black clamps over a skid plate, long
-# A-arms out to the hubs, coil-overs, and massive directional mud-terrain tyres on gold/bronze
-# beadlock rims.
+# The Obsidian: a matte-black desert raider (an original design with a made-up name). A long, low,
+# sculpted matte-black body slung between towering mud-terrain tyres that stand clear outboard of it:
+# a low tapering hood with recessed extractors and an LED headlamp bar, a raked windscreen framed
+# by chrome A-pillars that run on back as the roof rails and down the B-pillars, two tan bucket
+# seats in the cockpit, a central cylindrical roof pod on the roll hoop, and a sculpted rear cowl
+# that arches over the front and top of the rear wheels, ending in a ducktail with twin aerodynamic
+# winglet fins. Under the tub the chassis shows: frame rails, a bronze power cylinder down each side
+# held by black clamps over a skid plate, long A-arms out to the hubs, coil-overs, and massive
+# directional mud-terrain tyres on gold/bronze beadlock rims.
 #
 # The shell, wheel parts and detail map come from CarDesign.gd. Its section above the side is keyed
 # along the car in one table (KEYS): a rounded rim, a wall, a corner, a crowned top. Over the
@@ -22,15 +22,15 @@ const AXLE_F := -0.740
 const AXLE_R := 0.720
 const HUB_Y := 0.300               # the tyre's radius over its lugs: it stands on y = 0
 const ARCH_R := 0.345              # rear arch radius over the hub
-const NOSE_TIP := -0.480
+const NOSE_TIP := -0.880
 const TAIL_TIP := 0.980
 const GLASS_Z := 0.0               # the windscreen's patch of glass on the tub's flat bottom
 
-# Half-width of the tub in plan: narrow at the nose (clear of the front tyres at full lock), the
-# cockpit, then flaring out into the rear cowl that arches over the rear tyres.
+# Half-width of the body in plan: slender at the front hood, expanding at the cowl, open cockpit,
+# then flaring out into the rear cowl arching over the rear tyres.
 const W_KNOTS := [
-	[-0.480, 0.300], [-0.420, 0.345], [-0.340, 0.380], [0.180, 0.400], [0.280, 0.440],
-	[0.450, 0.670], [0.720, 0.690], [0.900, 0.670], [0.980, 0.620]
+	[-0.880, 0.220], [-0.740, 0.280], [-0.580, 0.325], [-0.440, 0.360], [-0.340, 0.380],
+	[0.180, 0.400], [0.280, 0.440], [0.450, 0.670], [0.720, 0.690], [0.900, 0.670], [0.980, 0.620]
 ]
 
 # The section above the side, keyframed along the car. Per row: z; belt (top of the side, where the
@@ -39,9 +39,11 @@ const W_KNOTS := [
 # from the wall onto the top: cy > 0 rising to a deck, < 0 a fillet down onto the floor); crown.
 const KEYS := [
 	# z       belt   rim_w  wall_dx edge   cx     cy      crown
-	[-0.480, 0.450, 0.040, 0.010, 0.490, 0.050, 0.008, 0.008],
-	[-0.420, 0.465, 0.040, 0.010, 0.505, 0.050, 0.008, 0.010],
-	[-0.350, 0.478, 0.040, 0.010, 0.520, 0.050, 0.008, 0.010],
+	[-0.880, 0.330, 0.035, 0.010, 0.355, 0.040, 0.008, 0.008],
+	[-0.740, 0.385, 0.038, 0.010, 0.415, 0.045, 0.008, 0.010],
+	[-0.580, 0.435, 0.040, 0.010, 0.470, 0.050, 0.008, 0.010],
+	[-0.440, 0.465, 0.040, 0.010, 0.505, 0.050, 0.008, 0.010],
+	[-0.350, 0.480, 0.040, 0.010, 0.522, 0.050, 0.008, 0.010],
 	[-0.320, 0.485, 0.040, 0.000, 0.410, 0.030, -0.030, 0.000],
 	[0.180, 0.500, 0.040, 0.000, 0.410, 0.030, -0.030, 0.000],
 	[0.240, 0.525, 0.042, 0.004, 0.430, 0.034, -0.020, 0.000],
@@ -73,27 +75,36 @@ const C_BRONZE_DARK := Color(0.42, 0.28, 0.17)
 
 ## Paint layout for car_body.gdshader's patterns (see CarPaint.gd), in the cart frame.
 const PAINT_LAYOUT := {
-	"nose_z": -0.48, "tail_z": 0.98, "belt_y": 0.64, "side_x": 0.67,
+	"nose_z": -0.88, "tail_z": 0.98, "belt_y": 0.64, "side_x": 0.67,
 	"door_z": 0.60, "door_y": 0.65, "roundel_r": 0.055,
-	"hood_z": 0.60, "hood_r": 0.08, "stripe_w": 0.06, "stripe_gap": 0.02,
+	"hood_z": -0.62, "hood_r": 0.08, "stripe_w": 0.06, "stripe_gap": 0.02,
 }
 const ANTENNA_POS := Vector3(0.30, 0.745, 0.70)
 const WHEEL_POSITIONS := {
 	"FL": Vector3(-WHEEL_X, HUB_Y, AXLE_F), "FR": Vector3(WHEEL_X, HUB_Y, AXLE_F),
 	"RL": Vector3(-WHEEL_X, HUB_Y, AXLE_R), "RR": Vector3(WHEEL_X, HUB_Y, AXLE_R),
 }
-# The tyre's half profile [[x, r], ...], inner bead to the middle of the tread: a tall, wide
-# balloon carcass round a small rim; the lugs stand 2.4cm proud of it.
-const TYRE_HALF := [[-0.132, 0.165], [-0.143, 0.176], [-0.150, 0.200], [-0.152, 0.228], [-0.148, 0.252],
-	[-0.138, 0.266], [-0.118, 0.274], [-0.080, 0.2775], [-0.030, 0.278]]
+# The tyre's half profile [[x, r], ...], inner bead to the middle of the tread:
+# Starts at inner bead (-0.125, 0.160), swells through sidewall and shoulder, ends exactly at center (0.0, 0.279).
+const TYRE_HALF := [
+	[-0.125, 0.160],
+	[-0.138, 0.174],
+	[-0.148, 0.198],
+	[-0.152, 0.226],
+	[-0.148, 0.252],
+	[-0.138, 0.268],
+	[-0.116, 0.275],
+	[-0.070, 0.278],
+	[0.000, 0.279]
+]
 
 var _glass_uv := Vector2.ZERO
 
 
 func _init() -> void:
 	nose_tip = NOSE_TIP
-	nose_cap = 0.050
-	nose_cap_y = 0.450
+	nose_cap = 0.045
+	nose_cap_y = 0.335
 	nose_cap_exp = Vector2(2.6, 2.4)
 	tail_tip = TAIL_TIP
 	tail_cap = 0.080
@@ -113,13 +124,20 @@ func _init() -> void:
 	_glass_uv = Vector2(u_of_z(GLASS_Z), 1.5 / half_ring)
 
 
-## The shell's bottom: the flat cockpit floor, smoothly lifting in an arch over each rear tyre.
+## The shell's bottom: rising under the nose, flat under the cockpit, smoothly arching over each rear tyre.
 static func _bot_knots() -> Array:
 	var out := []
-	var n := 160
+	var n := 180
 	for k in n + 1:
 		var z: float = lerpf(NOSE_TIP, TAIL_TIP, float(k) / n)
-		var sill: float = 0.392 if z < 0.28 else 0.440
+		var sill: float
+		if z < -0.380:
+			var t: float = clampf((z - NOSE_TIP) / (-0.380 - NOSE_TIP), 0.0, 1.0)
+			sill = lerpf(0.280, 0.392, t)
+		elif z < 0.280:
+			sill = 0.392
+		else:
+			sill = 0.440
 		var arch := 0.0
 		var dz: float = z - AXLE_R
 		if absf(dz) < ARCH_R:
@@ -177,12 +195,10 @@ func build_body(b) -> void:
 	_suspension(b, AXLE_F, true)
 	_suspension(b, AXLE_R, false)
 	_frame_side(b)
-	_front_frame_side(b)
 	_fin(b, 0.280)
 	b.mirror_x(v0, i0)
 	_cage_centre(b)
 	_windscreen(b)
-	_front_canisters(b)
 	_cockpit(b)
 	_chassis(b)
 	_front_parts(b)
@@ -191,11 +207,7 @@ func build_body(b) -> void:
 
 ## Right-hand trim on the body: lamps, inner wheel well liner.
 func _side_parts(b) -> void:
-	# A slim LED strip on the nose's rounded front, an amber marker at its corner.
-	_on_face(b, 0.150, 0.468, true, Vector3(0.075, 0.010, 0.008), 0.005, CB.M_DARK, C_DARKER, 0.0)
-	_on_face(b, 0.150, 0.468, true, Vector3(0.066, 0.005, 0.004), 0.003, CB.M_HEADLAMP, Color(1, 1, 1), 0.006)
-	_on_face(b, 0.255, 0.462, true, Vector3(0.018, 0.006, 0.004), 0.003, CB.M_TAILLAMP, C_AMBER, 0.004)
-	# Taillamps: a slim red bar across each of the rear cowl's corners.
+	# Slim LED taillamps across the rear cowl corner.
 	_on_face(b, 0.280, 0.655, false, Vector3(0.080, 0.012, 0.008), 0.006, CB.M_DARK, C_DARKER, 0.0)
 	_on_face(b, 0.280, 0.657, false, Vector3(0.070, 0.006, 0.004), 0.003, CB.M_TAILLAMP, C_TAILLAMP, 0.006)
 	# Inner arch liner wall inside the rear cowl, so nothing looks through.
@@ -219,7 +231,6 @@ func _fin(b, x: float) -> void:
 ## a headrest, piped in a darker tan.
 func _seat(b, x: float) -> void:
 	var floor_y := 0.410
-	# Cushion on a dark base.
 	b.rbox(Transform3D(Basis(), Vector3(x, floor_y + 0.018, 0.075)), Vector3(0.090, 0.018, 0.085), 0.010, 1,
 			CB.M_DARK, C_DARK)
 	b.rbox(Transform3D(Basis(Vector3.RIGHT, -0.06), Vector3(x, floor_y + 0.050, 0.070)), Vector3(0.082, 0.018, 0.090),
@@ -227,7 +238,6 @@ func _seat(b, x: float) -> void:
 	for s in [-1.0, 1.0]:
 		b.rbox(Transform3D(Basis(Vector3.BACK, 0.25 * s), Vector3(x + 0.085 * s, floor_y + 0.062, 0.075)),
 				Vector3(0.018, 0.026, 0.088), 0.014, 2, CB.M_DARK, C_TAN)
-	# The back, leaning back about 18 degrees.
 	var lean := Basis(Vector3.RIGHT, 0.32)
 	var bc := Vector3(x, floor_y + 0.135, 0.190)
 	b.rbox(Transform3D(lean, bc), Vector3(0.082, 0.105, 0.022), 0.016, 2, CB.M_DARK, C_TAN)
@@ -235,20 +245,18 @@ func _seat(b, x: float) -> void:
 	for s in [-1.0, 1.0]:
 		b.rbox(Transform3D(lean * Basis(Vector3.UP, -0.30 * s), bc + lean.x * 0.085 * s - lean.z * 0.010),
 				Vector3(0.016, 0.098, 0.030), 0.013, 2, CB.M_DARK, C_TAN)
-	# Headrest above the back, a seam between.
 	var hc: Vector3 = bc + lean.y * 0.140
 	b.rbox(Transform3D(lean, hc), Vector3(0.060, 0.038, 0.024), 0.018, 2, CB.M_DARK, C_TAN)
 	b.rbox(Transform3D(lean, bc + lean.y * 0.103), Vector3(0.050, 0.004, 0.020), 0.003, 1, CB.M_DARK, C_TAN_DARK)
-	# Two harness straps down the back.
 	for s in [-1.0, 1.0]:
 		b.rbox(Transform3D(lean, bc + lean.x * 0.035 * s - lean.z * 0.024 + lean.y * 0.010), Vector3(0.010, 0.090, 0.002),
 				0.002, 1, CB.M_DARK, C_DARKER)
 
 
-## Right half of the cage & window frame: chrome A-pillar tube rising from the nose, along the roof,
-## down the B-pillar, and framing the window sill.
+## Right half of the cage & window frame: chrome A-pillar tube rising from the hood shoulder,
+## along the roof, down the B-pillar, and framing the window sill.
 func _cage_side(b) -> void:
-	var foot := Vector3(0.300, top_y(0.300, -0.465) - 0.002, -0.465)
+	var foot := Vector3(0.280, top_y(0.280, -0.420) - 0.002, -0.420)
 	# Chrome upper rail: A-pillar and roof rail to the hoop.
 	b.tube(_rounded([foot, Vector3(0.300, 0.690, -0.165), Vector3(0.300, 0.692, 0.285)], 0.06, 6), 0.012, 10,
 			CB.M_CHROME, C_CHROME, true, false)
@@ -271,7 +279,7 @@ func _cage_side(b) -> void:
 			0.012, 8, CB.M_DARK, C_DARK, true, true)
 
 
-## The cage's parts on the centre line: the hoop's top bar, the header, and the central cylindrical pod.
+## The cage's parts on the centre line: the hoop's top bar, header, and central cylindrical roof pod.
 func _cage_centre(b) -> void:
 	b.tube(_rounded([Vector3(-0.250, 0.760, 0.285), Vector3(-0.200, 0.768, 0.285), Vector3(0.200, 0.768, 0.285),
 			Vector3(0.250, 0.760, 0.285)], 0.05), 0.016, 10, CB.M_DARK, C_DARK, false, false)
@@ -280,7 +288,7 @@ func _cage_centre(b) -> void:
 	# Diagonal brace behind the seats.
 	b.tube(PackedVector3Array([Vector3(-0.330, 0.560, 0.295), Vector3(0.220, 0.762, 0.295)]), 0.010, 8, CB.M_DARK,
 			C_DARK, false, false)
-	# The central roof cylinder pod (intake / sensor / light fixture).
+	# The central roof cylinder pod.
 	var pc := Vector3(0.0, 0.750, 0.285)
 	b.tube(PackedVector3Array([pc, pc + Vector3(0.0, 0.070, 0.0)]), 0.032, 18, CB.M_CHROME, C_CHROME, true, true)
 	b.tube(PackedVector3Array([pc + Vector3(0.0, 0.024, 0.0), pc + Vector3(0.0, 0.046, 0.0)]), 0.0335, 18, CB.M_DARK,
@@ -289,32 +297,10 @@ func _cage_centre(b) -> void:
 			CB.M_HEADLAMP, Color(1, 1, 1))
 
 
-## Two horizontal transverse tan canisters mounted on the front frame ahead of the windshield.
-func _front_canisters(b) -> void:
-	var cans := [
-		Vector3(0.0, 0.525, -0.585),
-		Vector3(0.0, 0.545, -0.485)
-	]
-	for c in cans:
-		var half_len := 0.210
-		b.tube(PackedVector3Array([c + Vector3(-half_len, 0.0, 0.0), c + Vector3(half_len, 0.0, 0.0)]), 0.040, 18,
-				CB.M_DARK, C_TAN, false, false)
-		for sx in [-1.0, 1.0]:
-			b.disc(c + Vector3(half_len * sx, 0.0, 0.0), Vector3(sx, 0.0, 0.0), 0.040, 0.0, 18, CB.M_DARK, C_TAN_DARK)
-			# Chrome center bolt head visible in side view.
-			bar(b, c + Vector3((half_len + 0.004) * sx, 0.0, 0.0), Vector3(0.004, 0.008, 0.008), CB.M_CHROME, C_CHROME)
-			# Black clamp band and bracket down to frame.
-			var cx: float = 0.120 * sx
-			b.tube(PackedVector3Array([c + Vector3(cx - 0.008, 0.0, 0.0), c + Vector3(cx + 0.008, 0.0, 0.0)]), 0.0425,
-					18, CB.M_DARK, C_DARK, false, false)
-			b.rbox(Transform3D(Basis(), Vector3(cx, c.y - 0.040, c.z)), Vector3(0.008, 0.016, 0.010), 0.003, 1,
-					CB.M_DARK, C_DARK)
-
-
 ## A point on the windscreen: s across (-1 left to 1 right), t up (0 at foot, 1 at header).
 func _screen_point(s: float, t: float) -> Vector3:
-	var xb: float = 0.284 * s
-	var zb := -0.440
+	var xb: float = 0.270 * s
+	var zb := -0.380
 	var yb: float = top_y(xb, zb) + 0.003
 	var xt: float = 0.290 * s
 	var zt := -0.170
@@ -350,11 +336,9 @@ func _cockpit(b) -> void:
 	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.468, -0.300)), Vector3(0.340, 0.060, 0.032), 0.020, 2, CB.M_DARK, C_TAN)
 	b.rbox(Transform3D(Basis(Vector3.RIGHT, -0.5), Vector3(0.0, 0.528, -0.282)), Vector3(0.330, 0.006, 0.028), 0.005,
 			1, CB.M_DARK, C_DARK)
-	# Gauges: two dials.
 	for dx in [-0.035, 0.035]:
 		b.disc(Vector3(-0.175 + dx, 0.495, -0.267), Vector3(0.0, 0.25, 1.0).normalized(), 0.018, 0.0, 12, CB.M_DARK,
 				C_DARKER)
-	# Steering wheel on column.
 	var wc := Vector3(-0.175, 0.520, -0.205)
 	var tilt := Basis(Vector3.RIGHT, -0.45)
 	var ring := PackedVector3Array()
@@ -366,7 +350,6 @@ func _cockpit(b) -> void:
 	for a in [PI * 0.5, PI * 1.17, PI * 1.83]:
 		b.tube(PackedVector3Array([wc, wc + tilt * Vector3(cos(a) * 0.046, sin(a) * 0.046, 0.0)]), 0.005, 5, CB.M_DARK,
 				C_DARK, false, false)
-	# Centre tunnel and gear lever.
 	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.432, 0.020)), Vector3(0.040, 0.024, 0.230), 0.012, 2, CB.M_DARK, C_DARK)
 	b.tube(PackedVector3Array([Vector3(0.0, 0.450, -0.040), Vector3(0.0, 0.505, -0.020)]), 0.005, 6, CB.M_CHROME,
 			C_CHROME, false, true)
@@ -378,15 +361,13 @@ func _cockpit(b) -> void:
 func _suspension(b, axle_z: float, front: bool) -> void:
 	var kx: float = WHEEL_X - 0.100
 	for dz in [-0.095, 0.095]:
-		b.tube(PackedVector3Array([Vector3(0.140, 0.190, axle_z + dz), Vector3(kx - 0.012, 0.215, axle_z)]), 0.014, 8,
+		b.tube(PackedVector3Array([Vector3(0.120, 0.190, axle_z + dz), Vector3(kx - 0.012, 0.215, axle_z)]), 0.014, 8,
 				CB.M_DARK, C_PLASTIC, true, true)
-		b.tube(PackedVector3Array([Vector3(0.170, 0.370, axle_z + dz * 0.6), Vector3(kx - 0.015, 0.385, axle_z)]),
+		b.tube(PackedVector3Array([Vector3(0.150, 0.330 if front else 0.370, axle_z + dz * 0.6), Vector3(kx - 0.015, 0.385, axle_z)]),
 				0.011, 6, CB.M_DARK, C_PLASTIC, true, true)
-	# Hub carrier, stub axle.
 	b.rbox(Transform3D(Basis(), Vector3(kx, HUB_Y, axle_z)), Vector3(0.018, 0.098, 0.032), 0.010, 2, CB.M_DARK, C_DARK)
 	b.tube(PackedVector3Array([Vector3(kx, HUB_Y, axle_z), Vector3(WHEEL_X - 0.02, HUB_Y, axle_z)]), 0.016, 10,
 			CB.M_ALLOY, C_ALLOY_DARK, false, true)
-	# CV driveshaft from gearbox.
 	var d0 := Vector3(0.115, 0.255, axle_z)
 	var d1 := Vector3(kx - 0.02, HUB_Y, axle_z)
 	b.tube(PackedVector3Array([d0, d1]), 0.010, 8, CB.M_ALLOY, C_ALLOY_DARK, false, false)
@@ -394,24 +375,23 @@ func _suspension(b, axle_z: float, front: bool) -> void:
 		b.tube(PackedVector3Array([d0.lerp(d1, t - 0.05), d0.lerp(d1, t + 0.05)]), 0.018, 10, CB.M_DARK, C_DARKER,
 				true, true, PackedFloat32Array([0.012, 0.018]) if t < 0.5 else PackedFloat32Array([0.018, 0.012]))
 	var fz: float = 1.0 if front else -1.0
-	# Web under the shock foot.
 	b.rbox(Transform3D(Basis(Vector3.BACK, 0.06), Vector3(0.420, 0.205, axle_z)), Vector3(0.080, 0.006, 0.085), 0.005, 1,
 			CB.M_DARK, C_PLASTIC)
 	var lo := Vector3(0.450, 0.218, axle_z + 0.060 * fz)
-	var hi := Vector3(0.240, 0.520, axle_z + 0.085 * fz) if front else Vector3(0.360, 0.585, axle_z - 0.090)
+	var hi := Vector3(0.220, 0.435, axle_z + 0.040) if front else Vector3(0.360, 0.585, axle_z - 0.090)
 	coilover(b, lo, hi, 0.022, 0.035, 7.0, C_ALLOY, C_ALLOY_DARK, C_CHROME, C_DARK)
 
 
 ## Right-hand frame under the tub: rails, posts, the bronze tank in its clamps.
 func _frame_side(b) -> void:
-	b.tube(_rounded([Vector3(0.140, 0.190, AXLE_F + 0.13), Vector3(0.300, 0.195, -0.420), Vector3(0.320, 0.195, 0.380),
+	b.tube(_rounded([Vector3(0.120, 0.190, AXLE_F + 0.08), Vector3(0.300, 0.195, -0.420), Vector3(0.320, 0.195, 0.380),
 			Vector3(0.140, 0.190, AXLE_R - 0.13)], 0.08), 0.013, 8, CB.M_DARK, C_PLASTIC, true, true)
 	b.tube(PackedVector3Array([Vector3(0.330, 0.385, -0.400), Vector3(0.340, 0.385, 0.330)]), 0.012, 8, CB.M_ALLOY,
 			C_ALLOY_DARK, true, true)
 	for z in [-0.360, -0.020, 0.300]:
 		b.tube(PackedVector3Array([Vector3(0.315, 0.195, z), Vector3(0.335, 0.385, z)]), 0.010, 8, CB.M_DARK, C_PLASTIC,
 				false, false)
-	# The bronze tank down the side, darker banded ends.
+	# Bronze power cylinder down the side.
 	var t0 := Vector3(0.300, 0.272, -0.270)
 	var t1 := Vector3(0.300, 0.272, 0.250)
 	b.tube(PackedVector3Array([t0, t1]), 0.040, 18, CB.M_ALLOY, C_BRONZE, true, true)
@@ -421,7 +401,7 @@ func _frame_side(b) -> void:
 	for z in [-0.150, -0.050, 0.050, 0.150]:
 		b.tube(PackedVector3Array([Vector3(0.300, 0.272, z - 0.003), Vector3(0.300, 0.272, z + 0.003)]), 0.0415, 18,
 				CB.M_ALLOY, C_BRONZE_DARK, false, false)
-	# Clamps round it on brackets.
+	# Clamps.
 	for z in [-0.120, 0.120]:
 		b.tube(PackedVector3Array([Vector3(0.300, 0.272, z - 0.012), Vector3(0.300, 0.272, z + 0.012)]), 0.046, 18,
 				CB.M_DARK, C_DARK, true, true)
@@ -430,23 +410,9 @@ func _frame_side(b) -> void:
 				C_DARK)
 
 
-## Right-hand front frame: rails to the bulkhead, shock tower.
-func _front_frame_side(b) -> void:
-	b.tube(_rounded([Vector3(0.230, 0.440, -0.430), Vector3(0.240, 0.470, -0.600), Vector3(0.150, 0.420, -0.900)],
-			0.06), 0.012, 8, CB.M_DARK, C_PLASTIC, true, true)
-	b.tube(PackedVector3Array([Vector3(0.150, 0.420, -0.900), Vector3(0.130, 0.205, -0.900)]), 0.012, 8, CB.M_DARK,
-			C_PLASTIC, true, true)
-	b.tube(PackedVector3Array([Vector3(0.240, 0.468, -0.600), Vector3(0.140, 0.200, -0.640)]), 0.010, 8, CB.M_DARK,
-			C_PLASTIC, false, false)
-	# Shock tower.
-	b.rbox(Transform3D(Basis(), Vector3(0.245, 0.505, -0.640)), Vector3(0.055, 0.008, 0.055), 0.004, 1, CB.M_DARK,
-			C_DARK)
-
-
 ## Chassis spine, skid plate, gearboxes, driveshaft.
 func _chassis(b) -> void:
 	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.215, 0.0)), Vector3(0.125, 0.040, 0.850), 0.020, 2, CB.M_DARK, C_PLASTIC)
-	# Skid plate under the middle.
 	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.168, -0.010)), Vector3(0.335, 0.008, 0.300), 0.005, 1, CB.M_ALLOY,
 			C_ALLOY_DARK)
 	for sx in [-1.0, 1.0]:
@@ -460,19 +426,23 @@ func _chassis(b) -> void:
 			CB.M_ALLOY, C_ALLOY_DARK, false, false)
 
 
-## Front bulkhead, bumper, front skid plate and tow points.
+## Front nose tip: slim LED headlamp bar, front bumper, skid plate and tow hooks.
 func _front_parts(b) -> void:
-	b.tube(_rounded([Vector3(-0.150, 0.420, -0.900), Vector3(-0.150, 0.420, -0.920), Vector3(0.150, 0.420, -0.920),
-			Vector3(0.150, 0.420, -0.900)], 0.02), 0.012, 8, CB.M_DARK, C_PLASTIC, false, false)
-	b.tube(_rounded([Vector3(-0.250, 0.300, -0.860), Vector3(-0.200, 0.280, -0.935), Vector3(0.200, 0.280, -0.935),
-			Vector3(0.250, 0.300, -0.860)], 0.06), 0.015, 10, CB.M_DARK, C_PLASTIC, true, true)
-	b.rbox(Transform3D(Basis(Vector3.RIGHT, 0.45), Vector3(0.0, 0.215, -0.880)), Vector3(0.150, 0.008, 0.075), 0.005, 1,
-			CB.M_ALLOY, C_ALLOY_DARK)
+	# Front LED headlamp bar across the nose face.
+	_on_face(b, 0.0, 0.340, true, Vector3(0.120, 0.012, 0.008), 0.006, CB.M_DARK, C_DARKER, 0.0)
+	_on_face(b, 0.0, 0.340, true, Vector3(0.110, 0.006, 0.004), 0.003, CB.M_HEADLAMP, Color(1, 1, 1), 0.006)
 	for sx in [-1.0, 1.0]:
-		b.tube(PackedVector3Array([Vector3(0.130 * sx, 0.205, -0.900), Vector3(0.200 * sx, 0.280, -0.935)]), 0.010, 8,
-				CB.M_DARK, C_PLASTIC, false, false)
-		b.tube(_rounded([Vector3(0.090 * sx, 0.290, -0.935), Vector3(0.090 * sx, 0.290, -0.975),
-				Vector3(0.090 * sx, 0.245, -0.975), Vector3(0.090 * sx, 0.245, -0.940)], 0.015), 0.006, 8, CB.M_ANODISED,
+		_on_face(b, 0.135 * sx, 0.338, true, Vector3(0.015, 0.005, 0.004), 0.002, CB.M_TAILLAMP, C_AMBER, 0.004)
+	# Front tubular bumper.
+	b.tube(_rounded([Vector3(-0.160, 0.260, -0.900), Vector3(-0.120, 0.250, -0.930), Vector3(0.120, 0.250, -0.930),
+			Vector3(0.160, 0.260, -0.900)], 0.04), 0.013, 8, CB.M_DARK, C_PLASTIC, true, true)
+	# Skid plate under the nose.
+	b.rbox(Transform3D(Basis(Vector3.RIGHT, 0.35), Vector3(0.0, 0.220, -0.880)), Vector3(0.130, 0.007, 0.060), 0.004, 1,
+			CB.M_ALLOY, C_ALLOY_DARK)
+	# Tow hooks.
+	for sx in [-1.0, 1.0]:
+		b.tube(_rounded([Vector3(0.070 * sx, 0.260, -0.930), Vector3(0.070 * sx, 0.260, -0.965),
+				Vector3(0.070 * sx, 0.220, -0.965), Vector3(0.070 * sx, 0.220, -0.935)], 0.015), 0.0055, 8, CB.M_ANODISED,
 				Color(1, 1, 1), true, true)
 
 
@@ -485,7 +455,6 @@ func _rear_parts(b) -> void:
 				CB.M_DARK, C_PLASTIC, false, false)
 		b.tube(PackedVector3Array([Vector3(0.100 * sx, 0.230, 0.880), Vector3(0.100 * sx, 0.420, 0.940)]), 0.010, 8,
 				CB.M_DARK, C_PLASTIC, false, false)
-		# Bronze exhaust pipe out under the cowl.
 		var ez: float = 0.950
 		b.tube(_rounded([Vector3(0.090 * sx, 0.330, 0.700), Vector3(0.110 * sx, 0.480, 0.840),
 				Vector3(0.110 * sx, 0.510, ez)], 0.05), 0.020, 14, CB.M_ALLOY, C_BRONZE, false, false)
@@ -496,36 +465,60 @@ func _rear_parts(b) -> void:
 
 ## A wheel centred on the origin, axle along X: a tall mud-terrain tyre with aggressive directional
 ## lugs round a deep-dish rim: a wide bronze/gold outer beadlock ring with bolts, a dark centre and hub.
+## Built with exact bead matching and embedded block bases so there are zero gaps.
 func build_wheel(b, side: float) -> void:
 	var half: Array = TYRE_HALF
 	tyre(b, half, 56, C_RUBBER)
 	var n := 14
-	var rc: float = carcass_r(half, 0.050)
-	var rs: float = carcass_r(half, 0.112)
 	for k in n:
 		for row in 2:
 			var f: Array = wheel_frame(TAU * (k + 0.5 * row) / n)
 			var r: Vector3 = f[0]
 			var t: Vector3 = f[1]
 			var sx: float = -1.0 if row == 0 else 1.0
+			# Center / mid paddle embedded 3mm into carcass
+			var x_mid: float = 0.048 * sx
+			var rc: float = carcass_r(half, x_mid) - 0.003
 			var across: Vector3 = (Vector3.RIGHT + t * 0.18 * sx).normalized()
-			block(b, r * (rc + 0.4 * 0.024) + Vector3(0.052 * sx, 0.0, 0.0), across, t, r, 0.062, 0.024, 0.030, 0.84,
+			block(b, r * (rc + 0.4 * 0.024) + Vector3(x_mid, 0.0, 0.0), across, t, r, 0.058, 0.024, 0.028, 0.84,
 					CB.M_RUBBER, C_RUBBER)
-			block(b, r * (rs + 0.4 * 0.022) + Vector3(-0.112 * sx, 0.0, 0.0), Vector3.RIGHT, t, r, 0.030, 0.022, 0.034,
+			# Shoulder block embedded 3mm into carcass
+			var x_sh: float = -0.108 * sx
+			var rs: float = carcass_r(half, x_sh) - 0.003
+			block(b, r * (rs + 0.4 * 0.022) + Vector3(x_sh, 0.0, 0.0), Vector3.RIGHT, t, r, 0.028, 0.022, 0.032,
 					0.84, CB.M_RUBBER, C_RUBBER)
-			var up: Vector3 = (r * 0.62 + Vector3(0.78 * sx, 0.0, 0.0)).normalized()
-			block(b, r * 0.250 + Vector3(0.147 * sx, 0.0, 0.0), up.cross(t).normalized(), t, up, 0.022, 0.022, 0.030,
+			# Sidewall lug embedded 3mm into sidewall
+			var x_lug: float = 0.136 * sx
+			var r_lug: float = carcass_r(half, x_lug) - 0.003
+			var up: Vector3 = (r * 0.65 + Vector3(0.75 * sx, 0.0, 0.0)).normalized()
+			block(b, r * r_lug + Vector3(x_lug, 0.0, 0.0) + up * (0.4 * 0.020), up.cross(t).normalized(), t, up, 0.020, 0.020, 0.028,
 					0.8, CB.M_RUBBER, C_RUBBER)
-	# Rim: beadlock ring, dish face, barrel.
-	wheel_lathe(b, PackedVector2Array([Vector2(0.112, 0.168), Vector2(0.122, 0.170), Vector2(0.127, 0.165),
-			Vector2(0.126, 0.152), Vector2(0.120, 0.148)]), 56, CB.M_RIM, C_RIM, "out", Vector3(0.09, 0.0, 0.0))
-	wheel_lathe(b, PackedVector2Array([Vector2(0.120, 0.148), Vector2(0.112, 0.138), Vector2(0.104, 0.122),
-			Vector2(0.098, 0.116)]), 56, CB.M_RIM, C_RIM, "+x")
-	wheel_lathe(b, PackedVector2Array([Vector2(0.098, 0.116), Vector2(0.086, 0.118), Vector2(0.074, 0.140),
-			Vector2(-0.120, 0.150), Vector2(-0.132, 0.165)]), 56, CB.M_RIM, C_RIM_BARREL, "in")
+	# Beadlock ring wrapping over the outer tyre bead at x = 0.125, r = 0.160.
+	wheel_lathe(b, PackedVector2Array([
+		Vector2(0.118, 0.168),
+		Vector2(0.126, 0.172),
+		Vector2(0.134, 0.168),
+		Vector2(0.132, 0.155),
+		Vector2(0.124, 0.148)
+	]), 56, CB.M_RIM, C_RIM, "out", Vector3(0.09, 0.0, 0.0))
+	# Dish face stepping into the center
+	wheel_lathe(b, PackedVector2Array([
+		Vector2(0.124, 0.148),
+		Vector2(0.114, 0.138),
+		Vector2(0.105, 0.122),
+		Vector2(0.098, 0.116)
+	]), 56, CB.M_RIM, C_RIM, "+x")
+	# Barrel running back inside to meet inner tyre bead at x = -0.125, r = 0.160
+	wheel_lathe(b, PackedVector2Array([
+		Vector2(0.098, 0.116),
+		Vector2(0.086, 0.118),
+		Vector2(0.070, 0.140),
+		Vector2(-0.110, 0.148),
+		Vector2(-0.125, 0.160)
+	]), 56, CB.M_RIM, C_RIM_BARREL, "in")
 	for k in 16:
 		var f: Array = wheel_frame(TAU * (k + 0.5) / 16.0)
-		bar(b, (f[0] as Vector3) * 0.158 + Vector3(0.127, 0.0, 0.0), Vector3(0.003, 0.004, 0.004), CB.M_DARK, C_DARK)
+		bar(b, (f[0] as Vector3) * 0.160 + Vector3(0.130, 0.0, 0.0), Vector3(0.003, 0.004, 0.004), CB.M_DARK, C_DARK)
 	# Dark centre disc with spoke cutouts and hub.
 	b.disc(Vector3(0.080, 0.0, 0.0), Vector3.RIGHT, 0.118, 0.0, 32, CB.M_DARK, C_DARK)
 	for k in 8:
@@ -566,6 +559,18 @@ func _detail_at(p: Vector3, n: Vector3, fp: float, _sh: Dictionary) -> Color:
 	# Sill black band.
 	if n.x > 0.4 and p.y < prof["bot"].at(p.z) + 0.050:
 		black = maxf(black, _cover(p.y - (prof["bot"].at(p.z) + 0.040), fp) * 0.85)
+	# Hood details:
+	if n.y > 0.4 and p.z < -0.380:
+		# Hood shut line across cowl ahead of windscreen:
+		gap = maxf(gap, _cover(absf(p.z + 0.410) - 0.0024, fp))
+		# Hood side shut lines:
+		gap = maxf(gap, _cover(absf(p.x - (w - 0.035)) - 0.0020, fp))
+		# Dual recessed hood extraction vents:
+		if p.z > -0.720 and p.z < -0.520 and p.x > 0.040 and p.x < 0.200:
+			var slot := 1e3
+			for k in 4:
+				slot = minf(slot, _sd_box(Vector2(p.x - 0.120, p.z + 0.680 - 0.045 * k), Vector2(0.065, 0.008)) - 0.003)
+			black = maxf(black, _cover(slot, fp))
 	# Rear cowl engine lid seams and louvres.
 	if n.y > 0.5 and p.z > 0.42:
 		gap = maxf(gap, _cover(absf(_sd_box(Vector2(p.x, p.z - 0.660), Vector2(0.320, 0.220))) - 0.0022, fp))
@@ -574,7 +579,4 @@ func _detail_at(p: Vector3, n: Vector3, fp: float, _sh: Dictionary) -> Color:
 			for k in 7:
 				slot = minf(slot, _sd_box(Vector2(p.x, p.z - 0.530 - 0.032 * k), Vector2(0.160, 0.006)) - 0.002)
 			black = maxf(black, _cover(slot, fp))
-	# Nose deck shut line.
-	if n.y > 0.5 and p.z < -0.34 and p.z > -0.47:
-		gap = maxf(gap, _cover(absf(p.z + 0.455) - 0.0022, fp))
 	return Color(0.0, gap, 0.0, black)

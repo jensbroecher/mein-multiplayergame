@@ -7,13 +7,13 @@
 render_priority = -1
 shader = ExtResource("1_1dmwy")
 shader_parameter/detail_map = ExtResource("2_f647c")
-shader_parameter/nose_z = -0.48
+shader_parameter/nose_z = -0.88
 shader_parameter/tail_z = 0.98
 shader_parameter/belt_y = 0.64
 shader_parameter/side_x = 0.67
 shader_parameter/door_roundel = Vector2(0.6, 0.65)
 shader_parameter/roundel_r = 0.055
-shader_parameter/hood_z = 0.6
+shader_parameter/hood_z = -0.62
 shader_parameter/hood_r = 0.08
 shader_parameter/stripe_w = 0.06
 shader_parameter/stripe_gap = 0.02

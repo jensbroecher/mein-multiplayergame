@@ -1651,7 +1651,7 @@ its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set th
   copies of the section about that height, so the edge lies on the same ring points all over the
   face. A boundary crossing a cap at another height came out wavy. The side is split at the sill line
   for the same reason.
-- The Obsidian (`ObsidianBuilder.gd`, a futuristic matte-black desert raider, an original design with a made-up name) features an open-wheel front with long A-arms and twin transverse tan canisters ahead of the raked windshield, a chrome-framed cockpit canopy with tan bucket seats, a central cylindrical sensor pod on the roll hoop, exposed underfloor bronze power cylinders clamped along the sills, and a sculpted rear cowl that arches over the rear tyres, finished with twin aerodynamic winglet fins. Its balloon mud-terrain tyres ride on deep-dish gold/bronze beadlock rims.
+- The Obsidian (`ObsidianBuilder.gd`, a futuristic matte-black desert raider, an original design with a made-up name) features a low sculpted hood with extraction vents and an LED light bar, an open-wheel front with long A-arms, a chrome-framed cockpit canopy with tan bucket seats, a central cylindrical sensor pod on the roll hoop, exposed underfloor bronze power cylinders clamped along the sills, and a sculpted rear cowl that arches over the rear tyres, finished with twin aerodynamic winglet fins. Its balloon mud-terrain tyres ride on deep-dish gold/bronze beadlock rims.
 
 ## Canyon Chasm dirt ramps, rocks, signs, tornado and houses
 
