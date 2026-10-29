@@ -516,11 +516,27 @@ func build_wheel(b, side: float) -> void:
 		Vector2(-0.110, 0.148),
 		Vector2(-0.125, 0.160)
 	]), 56, CB.M_RIM, C_RIM_BARREL, "in")
+	# Outer surface of rim barrel (facing outward toward chassis)
+	wheel_lathe(b, PackedVector2Array([
+		Vector2(-0.125, 0.160),
+		Vector2(-0.110, 0.148),
+		Vector2(0.070, 0.140),
+		Vector2(0.086, 0.118),
+		Vector2(0.098, 0.116)
+	]), 36, CB.M_DARK, C_DARK, "out")
+	# Inboard rim flange / inner barrel lip facing inboard towards suspension
+	b.disc(Vector3(-0.125, 0.0, 0.0), -Vector3.RIGHT, 0.166, 0.146, 36, CB.M_DARK, C_DARK)
+	wheel_lathe(b, PackedVector2Array([
+		Vector2(-0.120, 0.166),
+		Vector2(-0.125, 0.166)
+	]), 36, CB.M_DARK, C_DARK, "out")
 	for k in 16:
 		var f: Array = wheel_frame(TAU * (k + 0.5) / 16.0)
 		bar(b, (f[0] as Vector3) * 0.160 + Vector3(0.130, 0.0, 0.0), Vector3(0.003, 0.004, 0.004), CB.M_DARK, C_DARK)
 	# Dark centre disc with spoke cutouts and hub.
 	b.disc(Vector3(0.080, 0.0, 0.0), Vector3.RIGHT, 0.118, 0.0, 32, CB.M_DARK, C_DARK)
+	# Solid backface for the centre disc (facing inboard towards chassis)
+	b.disc(Vector3(0.078, 0.0, 0.0), -Vector3.RIGHT, 0.118, 0.0, 32, CB.M_DARK, C_DARK)
 	for k in 8:
 		spoke(b, TAU * k / 8.0, 0.0, 0.055, 0.114, 0.090, 0.094, 0.008, 0.010, 0.010, CB.M_DARK, C_PLASTIC)
 	wheel_lathe(b, PackedVector2Array([Vector2(0.080, 0.058), Vector2(0.100, 0.058), Vector2(0.104, 0.050)]), 24,
@@ -534,6 +550,25 @@ func build_wheel(b, side: float) -> void:
 	b.lathe(Vector3(0.104, 0.0, 0.0), Vector3.RIGHT, PackedVector2Array([Vector2(0.0, 0.020), Vector2(0.006, 0.018),
 			Vector2(0.010, 0.010), Vector2(0.011, 0.0)]), 16, CB.M_DARK, C_DARK)
 	b.orient_away_from(vb, ib, Vector3(0.100, 0.0, 0.0))
+	# Dual-faced ventilated brake rotor (outboard + inboard friction faces):
+	b.disc(Vector3(0.026, 0.0, 0.0), Vector3.RIGHT, 0.134, 0.045, 28, CB.M_ALLOY, C_ALLOY)
+	b.disc(Vector3(0.016, 0.0, 0.0), -Vector3.RIGHT, 0.134, 0.045, 28, CB.M_ALLOY, C_ALLOY)
+	wheel_lathe(b, PackedVector2Array([
+		Vector2(0.016, 0.134), Vector2(0.026, 0.134)
+	]), 28, CB.M_ALLOY, C_ALLOY, "out")
+	# Inboard brake dust shield / backing plate (protects rotor, completely seals inner cavity):
+	b.disc(Vector3(0.010, 0.0, 0.0), -Vector3.RIGHT, 0.140, 0.036, 28, CB.M_DARK, C_DARKER)
+	wheel_lathe(b, PackedVector2Array([
+		Vector2(0.010, 0.140), Vector2(0.016, 0.140)
+	]), 28, CB.M_DARK, C_DARKER, "out")
+	# Inboard hub sleeve / bearing collar meeting the suspension upright:
+	wheel_lathe(b, PackedVector2Array([
+		Vector2(0.010, 0.036), Vector2(-0.035, 0.032), Vector2(-0.075, 0.024)
+	]), 20, CB.M_DARK, C_DARK, "out")
+	b.disc(Vector3(-0.075, 0.0, 0.0), -Vector3.RIGHT, 0.024, 0.0, 20, CB.M_DARK, C_DARK)
+	# Heavy-duty off-road brake caliper straddling the rotor:
+	var cal_xf := Transform3D(Basis(Vector3.RIGHT, 0.38), Vector3(0.021, 0.092, -0.038))
+	b.rbox(cal_xf, Vector3(0.018, 0.036, 0.022), 0.005, 2, CB.M_DARK, C_DARKER)
 	if side < 0.0:
 		b.mirror_in_place()
 
