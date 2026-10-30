@@ -218,17 +218,17 @@ func _side_parts(b) -> void:
 	_build_floating_winglet(b, AXLE_R, 0.280, 0.585, 0.580, 0.020, false)
 
 	# -------------------------------------------------------------------------
-	# 4. Razor-Sharp Slanted Chevron Headlight Blade
+	# 4. Razor-Sharp Slanted Chevron Headlight Blade (cleanly layered, no Z-fighting)
 	# -------------------------------------------------------------------------
-	var hl_pos := Vector3(0.190, 0.405, -1.040)
+	var hl_pos := Vector3(0.190, 0.412, -1.042)
 	var hl_dir := Vector3(0.15, -0.06, -0.99).normalized()
 	var hl_basis := facing(hl_dir)
-	# Recessed dark carbon housing
-	b.rbox(Transform3D(hl_basis, hl_pos), Vector3(0.055, 0.016, 0.016), 0.005, 1, CB.M_DARK, C_DARKER)
-	# Piercing horizontal LED blade
-	b.rbox(Transform3D(hl_basis, hl_pos + hl_basis.z * 0.010), Vector3(0.045, 0.007, 0.006), 0.003, 1, CB.M_HEADLAMP, Color(1, 1, 1))
-	# Angled outer chevron accent blade
-	b.rbox(Transform3D(hl_basis * Basis(Vector3.FORWARD, 0.42), hl_pos + hl_basis.x * 0.042 + hl_basis.z * 0.010), Vector3(0.007, 0.020, 0.005), 0.002, 1, CB.M_HEADLAMP, Color(1, 1, 1))
+	# Recessed dark carbon housing (depth 0.010 -> front face at local z = +0.010)
+	b.rbox(Transform3D(hl_basis, hl_pos), Vector3(0.055, 0.022, 0.010), 0.004, 1, CB.M_DARK, C_DARKER)
+	# Piercing horizontal LED blade (center +0.010, depth 0.005 -> front face at +0.015, 5mm proud of housing)
+	b.rbox(Transform3D(hl_basis, hl_pos + hl_basis.z * 0.010), Vector3(0.040, 0.006, 0.005), 0.003, 1, CB.M_HEADLAMP, Color(1, 1, 1))
+	# Angled outer chevron accent blade (center +0.010, depth 0.005 -> front face at +0.015, 5mm proud of housing)
+	b.rbox(Transform3D(hl_basis * Basis(Vector3.FORWARD, 0.42), hl_pos + hl_basis.x * 0.038 + hl_basis.z * 0.010), Vector3(0.006, 0.018, 0.005), 0.002, 1, CB.M_HEADLAMP, Color(1, 1, 1))
 
 	# -------------------------------------------------------------------------
 	# 5. Sculpted Aerodynamic Wing Mirrors
@@ -255,8 +255,6 @@ func _side_parts(b) -> void:
 	b.tube(PackedVector3Array([ex_c + Vector3(0, 0, -0.06), ex_c + Vector3(0, 0, 0.036)]), 0.016, 12, CB.M_DARK, C_DARKER, false, false)
 	# Side aero fin on rear quarter
 	b.rbox(Transform3D(Basis(), Vector3(0.325, 0.540, 0.940)), Vector3(0.006, 0.045, 0.060), 0.004, 1, CB.M_DARK, C_CARBON)
-	# Corner rear tail light blade
-	b.rbox(Transform3D(Basis(), Vector3(0.280, 0.575, 0.985)), Vector3(0.025, 0.012, 0.006), 0.003, 1, CB.M_TAILLAMP, C_TAILLAMP)
 
 
 ## High floating angular fender winglets (Carbon composite)
@@ -358,15 +356,15 @@ func _centre_parts(b) -> void:
 		b.rbox(Transform3D(Basis(Vector3.RIGHT, 0.26), Vector3(0.0, ly, lz)), Vector3(0.120 - 0.014 * k, 0.005, 0.018), 0.003, 1, CB.M_DARK, C_CARBON)
 
 	# -------------------------------------------------------------------------
-	# 4. Full-Width Sharp Red LED Rear Light Blade & Recessed Black Fascia
+	# 4. Full-Width Sharp Red LED Rear Light Blade & Recessed Black Fascia (Zero Z-fighting)
 	# -------------------------------------------------------------------------
 	var tail_y := 0.575
-	var tail_z := 0.990
-	var tb_len := 0.260
-	# Recessed dark matte fascia plate covering the rear center
-	b.rbox(Transform3D(Basis(), Vector3(0.0, tail_y - 0.03, tail_z - 0.006)), Vector3(tb_len + 0.03, 0.065, 0.010), 0.006, 1, CB.M_DARK, C_DARKER)
-	# Continuous red emissive LED blade
-	b.rbox(Transform3D(Basis(), Vector3(0.0, tail_y, tail_z)), Vector3(tb_len, 0.008, 0.006), 0.003, 1, CB.M_TAILLAMP, C_TAILLAMP)
+	var tail_z := 0.998
+	var tb_len := 0.270
+	# Recessed dark matte fascia plate covering the rear center (stands proud of shell 0.998 at z = 1.006)
+	b.rbox(Transform3D(Basis(), Vector3(0.0, tail_y - 0.03, tail_z)), Vector3(tb_len + 0.015, 0.065, 0.008), 0.005, 1, CB.M_DARK, C_DARKER)
+	# Continuous red emissive LED blade (stands 5mm proud of fascia plate at z = 1.011)
+	b.rbox(Transform3D(Basis(), Vector3(0.0, tail_y, tail_z + 0.009)), Vector3(tb_len, 0.008, 0.004), 0.003, 1, CB.M_TAILLAMP, C_TAILLAMP)
 
 	# -------------------------------------------------------------------------
 	# 4. Integrated Rear Ducktail Spoiler Trailing Lip
