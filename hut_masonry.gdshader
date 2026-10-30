@@ -9,6 +9,9 @@ render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 //   3  desert adobe mud-plaster: sun-baked plaster with flaked patches exposing stone cobbles
 //   4  Mediterranean whitewashed stucco: bright plaster with subtle trowel mottle and hairline cracks
 //   5  Spanish terracotta barrel tiles (tejas): half-round ribs along u, lapped courses along v
+//   6  alpine slate / stone shingles (Ridgecrest's chalets): staggered courses up v, lichen and wear
+//   7  standing-seam zinc (Ridgecrest's modern houses): flat pans along v between raised seams across u
+//   8  board-formed concrete: smooth grey with the shuttering's board lines along u and tie holes
 
 uniform int style = 0;
 
@@ -146,6 +149,53 @@ void fragment() {
 		float foot = 1.0 - smoothstep(0.0, 0.9, q.y);
 		col = mix(col, srgb(vec3(0.72, 0.64, 0.55)), foot * 0.18);
 		rough = 0.92;
+	} else if (style == 6) {
+		// Slate shingles: u along the ridge, v up the slope; courses of 0.22m, each tile 0.3-0.45m wide,
+		// every course offset, the lower edge of each a shadowed lip.
+		float course = 0.22;
+		float row = floor(q.y / course);
+		float rf = fract(q.y / course);
+		float tw = 0.3 + 0.15 * hash12(vec2(row, 3.0));
+		float tx = q.x / tw + 0.5 * mod(row, 2.0) + hash12(vec2(row, 9.0));
+		float tid = hash12(vec2(floor(tx), row));
+		float tf = fract(tx);
+		vec3 slate = tint * (0.78 + 0.34 * tid) * (0.9 + 0.2 * vnoise(q * 11.0));
+		float joint = 1.0 - smoothstep(0.0, 0.06, min(tf, 1.0 - tf));
+		float lip = 1.0 - smoothstep(0.0, 0.16, rf);
+		col = slate * (1.0 - 0.35 * joint) * (1.0 - 0.32 * lip);
+		// Pale lichen and a few chipped corners.
+		float lichen = smoothstep(0.66, 0.8, vnoise(q * 1.7 + 8.0)) * smoothstep(0.4, 0.7, vnoise(q * 9.0));
+		col = mix(col, srgb(vec3(0.62, 0.64, 0.50)), lichen * 0.4);
+		rough = 0.78;
+		NORMAL_MAP = normalize(vec3(0.0, -0.6 * lip, 1.0)) * 0.5 + 0.5;
+		NORMAL_MAP_DEPTH = 1.0;
+	} else if (style == 7) {
+		// Standing seam: pans 0.5m wide across u, a raised seam between, faint oil-canning along v.
+		float pan = 0.5;
+		float f = fract(q.x / pan);
+		float seam = 1.0 - smoothstep(0.0, 0.035, min(f, 1.0 - f));
+		col = tint * (0.92 + 0.12 * vnoise(vec2(floor(q.x / pan) * 3.1, q.y * 0.4)));
+		col *= 1.0 + 0.35 * seam;
+		col *= 1.0 - 0.12 * smoothstep(0.6, 1.0, vnoise(vec2(q.x * 0.5, q.y * 0.15)));
+		rough = mix(0.42, 0.3, seam);
+		METALLIC = 0.6;
+		float side = (f < 0.5) ? 1.0 : -1.0;
+		NORMAL_MAP = normalize(vec3(side * seam * 0.9, 0.0, 1.0)) * 0.5 + 0.5;
+		NORMAL_MAP_DEPTH = 1.0;
+	} else if (style == 8) {
+		// Board-formed concrete: boards 0.15m tall along u, a joint between them, tie holes on a grid.
+		float bh = 0.15;
+		float row = floor(q.y / bh);
+		float f = fract(q.y / bh);
+		float joint = 1.0 - smoothstep(0.0, 0.06, min(f, 1.0 - f));
+		col = tint * (0.86 + 0.12 * hash12(vec2(row, 1.0)) + 0.1 * vnoise(vec2(q.x * 1.5, row * 2.0)));
+		col *= 0.92 + 0.12 * vnoise(q * 6.0);
+		col *= 1.0 - 0.18 * joint;
+		vec2 tie = fract(q / vec2(0.9, 0.6)) - 0.5;
+		col *= 1.0 - 0.45 * (1.0 - smoothstep(0.012, 0.022, length(tie * vec2(0.9, 0.6))));
+		// Rain streaks.
+		col *= 1.0 - 0.1 * smoothstep(0.55, 0.85, vnoise(vec2(q.x * 2.5, q.y * 0.15)));
+		rough = 0.85;
 	} else {
 		// Spanish terracotta barrel tiles (tejas): u across the slope, v up the slope.
 		float pitch = 0.42;

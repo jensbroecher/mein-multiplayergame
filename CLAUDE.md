@@ -201,6 +201,75 @@ the others re-bakes it (see Lakeside Course below).
   up through the roof. `res://scratch/spectator_ground_probe.gd` (`-s`, headless, `-- [level=...]`) checks the
   grandstands' bases and the standing spectators' feet against the ground under them.
 
+## Pinecrest Ridge (Bloombay GP, stage 2)
+
+- `regenerate_pinecrest_ridge.gd` builds `levels/PinecrestRidgeLevel.tscn` through TerrainGenerator, headless, in
+  about 25s. The lap's handles are made collinear in plan, each keeping its length and its rise (so the jump
+  lips keep their kick): pairs that disagreed were corners in the road (up to 39 degrees). The summit hairpin
+  (`P_SB3`, an 11m arc) and the last corner onto the start straight (a 15m arc through `P_VALLEY_SW` and its
+  own entry point) had been bends crammed into the end of a segment, 3.4m and 6m in radius, and the road folded
+  over itself there. `res://scratch/pinecrest_curve_probe.gd` (`-s`, headless, `-- [min=12] [s0= s1=]`) lists the
+  generator's curve's kinks and tight stretches without building anything; `res://scratch/pinecrest_road_probe.gd`
+  (`-s`, headless, `-- [level=]`) checks a saved level: ground over the asphalt, tight corners, legs close in plan
+  and dressing standing on the road.
+- The generator measures along the closed lap (`_closed_curve`, as TerrainGenerator lays the road): the
+  TrackPath stops at its last point, short of the start line, and flowers and shrubs grew on that asphalt.
+- The ground is graded to the road at its nearest point in plan (`TerrainGenerator.road_height_from_plan`): the
+  3D query asks from the natural ground's height, and where the road is cut into the hillside it found a point
+  further up the road (or the switchback leg above). The whole climb was buried, up to 3.4m deep, the asphalt
+  showing in islands.
+- The forest trail (`TRAIL_GAPS`): from jump 1's landing to switchback 2, and on from switchback 2's paved
+  hairpin to the summit hairpin, the climb has no asphalt (road gaps). The ground lies `TRAIL_GROUND` (6cm) under
+  the road's surface, painted as a rutted dirt track by `terrain_grass_varied.gdshader` from the ground map; it is
+  off-road to the carts and gravel to their tyres. Toward each stretch the asphalt breaks up over the taper and
+  `TRAIL_LEAD` before it (`road_crumble.gdshader`: cracks, dirt washed over, pieces discarded so the dirt shows
+  through; the tyres carry dirt out of a stretch along two lines). The curbs and the road's side walls stop
+  where the taper begins (`curbs_stop_at_gaps`): with the ground that close under the asphalt, the side walls drew
+  two thin lines across the dirt.
+- `terrain_grass_varied.gdshader` (only this level uses it) also draws bare rock on the steepest faces (the cut
+  banks between the switchbacks: `rock_tex`), the forest floor under the trees (`woods_map`, each tree's crown
+  shaded in by `_shade_woods`), Ridgecrest's lanes and lawns (`ground_map` B and A), wet silt at the lake's edge
+  (`water_level`), and, past the rim, hands over to the backdrop's vertex colours by their alpha. Chevron boards
+  stand on the outside of each turn behind its tyre wall (`_turn_between`); they had been on the inside of every
+  hairpin.
+- Ridgecrest (`RIDGECREST_SITES`, `RidgecrestKit.gd`), a district of Bloombay on the summit's broad back north of the
+  summit road: chalets (stone or white-washed ground floor, timber upper floor, a balcony with geraniums, slate or
+  shingle roof), the Hotel Ridgecrest (a farmhouse, its barn glazed behind boards, a terrace), the chapel on the
+  peak (a copper spire, clocks), concrete-and-timber villas with walls of glass and a pool, glass-gabled houses
+  under zinc, the clubhouse pavilion on the lip over the course (coin telescopes), the estate gate. `_plan_ridgecrest`
+  runs before `generate_world`: it builds each building once at the origin to measure it and pads it at the
+  natural ground's mean under it (`TerrainGenerator.natural_height`). The lanes (`RIDGECREST_LANES`, a drive to
+  each house) are painted on the ground, and `_on_lane` keeps the woods, boulders and the summit road's guardrail
+  (`_rail_gaps`) off them. Hedges and dry-stone walls, garden trees from the woods' own meshes (`_garden_trees`,
+  added by `_build_woodland`), the plaza's fountain, lamps, SUVs on four drives; the names are Label3Ds.
+  - The walls are solid quads, so a window's glass lies just proud of the face inside a casing that stands out (set
+    back, it was hidden behind the wall). Glass is `ridgecrest_glass.gdshader` (a made-up reflection in EMISSION, as
+    on Nyota's towers; COLOR.a is the curtain); slate, standing-seam zinc and board-formed concrete are
+    `hut_masonry.gdshader` styles 6-8; hedges `hedge.gdshader`. `RidgecrestKit.finish` adds the tangents their
+    normal maps need. `res://scratch/ridgecrest_preview.gd` (`-s`, windowed, `-- <dir> [only=chalet,...]
+    name:x,y,z:tx,ty,tz`) renders every building in memory in seconds.
+- The country round it (`_build_backdrop`): TerrainGenerator's edge falloff is off (`edge_falloff`), so the
+  ground runs on to the terrain's rim, and past it a ring of ground (`BACK_R0` to `BACK_R1`, inside the race
+  cameras' 4000m far plane) carries the island on into wooded foothills and ranges (broad massifs with ridges cut
+  into them, highest to the north behind the summit), with a valley to the south-west opening onto the coast,
+  where Bloombay's skyline stands (`_build_bloombay`) by the sea. Out to `BACK_SHADE` it is drawn in the terrain's
+  own material (saved as `terrain_mat`), then a plain vertex-colour one; inside `BACK_SOLID` it is solid; the woods
+  carry on over it (`_backdrop_trees`). Nothing within 820m dips under TerrainGenerator's 1600m water plane. The fog
+  runs out to `BACK_FOG` (4.6km) so the ranges show, hazed. Sharp ridged noise alone made a row of identical spikes.
+- The meadow (`_build_meadow`): the Lakeside Course's grass (MeadowGrass.gd, meadow_grass.gdshader, MeadowDetail.gd)
+  on Pinecrest's own map: thinner under the trees (the woods map), mown on the pads and verges, none on the road,
+  the trail, the lanes, in the water, on rock faces, past the rim, or under the footprints, trunks, boulders and
+  Ridgecrest's boxes (`_trunk_spots`, `_boulder_spots`, `_rc_boxes`).
+- The lake's and ponds' edges (`_build_pond`, `PondKit.gd`, at `POND_SCALE`): bulrush stands from the shallows up
+  the wet bank, soft rushes and yellow flag irises on the bank (`dune_grass.gdshader`), rafts of water lilies
+  floating 0.6-2.6m deep near a shore. Named "PondGrass"/"PondLilies", so DressingColliders leaves them soft.
+- Cost (M1, 4320x2700, `ab_bench` samples=6): 20.9ms in all; the meadow 3.9ms (MeadowDetail scales it), the backdrop
+  0.44, Ridgecrest 0.17, the pond plants 0.06.
+- AI races (`scratch/ai_race_test`, 6 carts) finish every lap at speed 1 and 2. Bots that ran wide at switchback 2's
+  exit wedged up the bank (its tyre wall now runs on 34m past the apex); one ran up Ridgecrest's lane where the
+  summit road bends (the guardrail's gap is now only the lane and 1.5m a side); one wedges now and then inside
+  switchback 4 (969m) and at switchback 1's exit (375m).
+
 ## Canyon Course (Sierra del Viento, stage 1)
 
 - `regenerate_canyon.gd` builds `levels/CanyonLevel.tscn` from scratch (it used to re-run TerrainGenerator
@@ -339,6 +408,11 @@ drops the segments where it reaches 0. `_road_gap_ground` grades the ground (vis
 and both tapers to `ROAD_GAP_GROUND` (18cm, under the curbs' outer edge) below the road's surface, easing
 back 6m past them. PlayerCart's corridor rule (terrain within the road's half width counts as road) skips the
 gaps and tapers (`_in_road_gap`), so the ground there is grass, off-road, with its sound and dust.
+- A level's `Surfaces.LEVELS` entry can name what that ground is (`"gap"`: Pinecrest Ridge's forest trail is
+  gravel; PlayerCart's `_on_road_gap_ground`, `Surfaces.of_road_gap`).
+- `curbs_stop_at_gaps` ends the curbs and the road's side walls where a taper begins (instead of following the
+  asphalt down to its point) and eases the gap's grading in inside the taper, so `road_gap_ground` (default
+  `ROAD_GAP_GROUND`) can bring the ground up to a few centimetres under the asphalt: Pinecrest Ridge, 6cm.
 
 ## Race gates
 

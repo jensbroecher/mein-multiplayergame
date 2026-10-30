@@ -269,6 +269,21 @@ const CAR_PRESETS = [
 		"braking": 47.0,
 		"offroad": 9.7,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Fulmine",
+		"engine_sound": "res://sounds/enginesounds/engine_apex_loop.wav",
+		"engine_gain_db": -2.8,
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Fulmine.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 45.0,
+		"acceleration": 66.0,
+		"steer_speed": 2.6,
+		"grip": 6.4,
+		"braking": 50.0,
+		"offroad": 2.5,
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 
@@ -584,6 +599,9 @@ var offroad_penalty: float = 1.0
 var offroad_target_penalty: float = 1.0
 var offroad_timer: float = 0.0
 var is_offroad: bool = false
+## Set by _is_track_surface: the terrain it was last asked about lies in a road gap (or its tapers)
+## within the road's width, the level's own gap ground (Surfaces.of_road_gap).
+var _on_road_gap_ground: bool = false
 var visual_offset_y: float = 0.0
 
 var stage_has_water: bool = false
@@ -2467,6 +2485,8 @@ func _physics_process(delta):
 			_surface_spray = bool(_surface_meta_of(collider, &"surface_spray", false))
 			var lvl_node: Node = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
 			surface = Surfaces.of(collider, lvl_node, not is_offroad)
+			if is_offroad and _on_road_gap_ground:
+				surface = Surfaces.of_road_gap(lvl_node, surface)
 	elif on_ground:
 		surface = Surfaces.ASPHALT
 
@@ -3026,6 +3046,7 @@ func _is_world_terrain_collider(collider: Object) -> bool:
 
 
 func _is_track_surface(collider: Object) -> bool:
+	_on_road_gap_ground = false
 	if collider == null or not (collider is Node):
 		return false
 
@@ -3070,8 +3091,10 @@ func _is_track_surface(collider: Object) -> bool:
 			var y_diff: float = absf(global_position.y - sampled_world.y)
 			var outer_hw: float = _get_track_outer_half_width()
 			if xz_dist <= outer_hw and y_diff <= 3.2:
-				# Where the road stops (TerrainGenerator.road_gaps, and the tapers either side) it's grass.
-				return p_track != track_path or not _in_road_gap(closest_off)
+				# Where the road stops (TerrainGenerator.road_gaps, and the tapers either side) it's grass,
+				# or whatever the level says lies there.
+				_on_road_gap_ground = p_track == track_path and _in_road_gap(closest_off)
+				return not _on_road_gap_ground
 		return false
 
 	return false

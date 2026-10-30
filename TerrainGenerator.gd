@@ -531,7 +531,11 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 				height = lerp(height, target_bed, clampf(river_t, 0.0, 1.0))
 	else:
 		var query_y = -200.0 if (track_layout_type == TrackLayoutType.CANYON) else base_terrain_height
-		var closest_pos = curve.get_closest_point(Vector3(px, query_y, pz))
+		var closest_pos: Vector3
+		if road_height_from_plan:
+			closest_pos = _plan_foot(curve, px, pz)
+		else:
+			closest_pos = curve.get_closest_point(Vector3(px, query_y, pz))
 		var dist = Vector2(px, pz).distance_to(Vector2(closest_pos.x, closest_pos.z))
 		var road_h = closest_pos.y
 
@@ -632,7 +636,7 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			var gap_w: float = _road_gap_ground(px, pz, curve)
 			if gap_w > 0.0:
 				var across: float = 1.0 - smoothstep(sand_edge, sand_edge + 6.0, dist)
-				height = lerp(height, road_h + road_y_offset - ROAD_GAP_GROUND, gap_w * across)
+				height = lerp(height, road_h + road_y_offset - road_gap_ground, gap_w * across)
 
 			# Desert Wadi: carve a shallow river corridor (banks dip below the water plane).
 			# Road blend above still wins near the path so the ford stays driveable.
@@ -648,6 +652,8 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 
 	height = _apply_flat_pads(px, pz, height)
 	height = _carve_under_extra_roads(px, pz, height, for_collision)
+	if not edge_falloff:
+		return height
 
 	# Edge falloff (all track types — curves down smoothly to abyss / horizon outside all track envelopes)
 	var max_radius: float = terrain_size.x * 0.5
@@ -888,6 +894,21 @@ var sand_width: float:
 ## How far under the road's surface the ground in a road gap lies: under the curbs' outer edge (15cm
 ## down), so the grass doesn't cut through them along the taper.
 const ROAD_GAP_GROUND := 0.18
+## The same, per level: with curbs_stop_at_gaps nothing hangs over the taper's edges but the asphalt,
+## so the ground can come up to a few centimetres under it (the asphalt then barely stands proud).
+@export var road_gap_ground: float = ROAD_GAP_GROUND
+## The curbs end where a road gap's taper begins, instead of following the asphalt down to its point,
+## and so do the road's side walls (with the ground road_gap_ground under the asphalt they would only
+## show as two thin lines drawing the taper's point across the ground).
+@export var curbs_stop_at_gaps: bool = false
+## Grade the ground to the road's height at its nearest point in plan, not in 3D. The 3D query asks
+## from the natural ground's height, so where a road is cut into a hillside it finds a point further
+## up the road (or the switchback leg above), and the ground came out over the asphalt: up to 3.4m
+## on Pinecrest Ridge's climb. Only for laps that never pass over themselves.
+@export var road_height_from_plan: bool = false
+## The ground curves down past 0.88 of the terrain's radius into the void. Off, it runs on at its natural
+## height to the disc's rim, for a level that carries the land on past it (Pinecrest Ridge's backdrop).
+@export var edge_falloff: bool = true
 ## Per road gap: [x0, z0, x1, z1 (the zone's bounds, padded), points along it every metre, their offsets].
 var _gap_zones: Array = []
 
@@ -920,6 +941,74 @@ func _road_gap_width(offset: float) -> float:
 		var d: float = (g0 - offset) if offset < g0 else (offset - g1)
 		w = minf(w, clampf(d / maxf(road_gap_taper, 0.01), 0.0, 1.0))
 	return w
+
+
+## True where segment i of the road's slices lies in a road gap's taper (or the gap) and the curbs and
+## side walls stop.
+func _curb_segment_cut(length: float, point_count: int, i: int) -> bool:
+	if not curbs_stop_at_gaps or road_gaps.is_empty():
+		return false
+	var o0 := (float(i) / float(point_count)) * length
+	var o1 := (float(i + 1) / float(point_count)) * length
+	return _road_gap_width(o0) < 1.0 or _road_gap_width(o1) < 1.0
+
+
+## The point of `curve` nearest (px, pz) in plan (road_height_from_plan). The lap is copied flat onto
+## y = 0, whose nearest point is the nearest in plan, and its offsets are mapped back to the real
+## curve's through a table of both along the lap (built once per curve).
+var _plan_src: Curve3D
+var _plan_curve: Curve3D
+var _plan_offs := PackedFloat32Array()
+var _plan_real := PackedFloat32Array()
+
+func _plan_foot(curve: Curve3D, px: float, pz: float) -> Vector3:
+	if _plan_src != curve:
+		_plan_src = curve
+		_plan_curve = Curve3D.new()
+		_plan_curve.bake_interval = curve.bake_interval
+		for i in range(curve.point_count):
+			var flat := Vector3(1.0, 0.0, 1.0)
+			_plan_curve.add_point(curve.get_point_position(i) * flat, curve.get_point_in(i) * flat,
+					curve.get_point_out(i) * flat)
+		_plan_offs.clear()
+		_plan_real.clear()
+		var length := curve.get_baked_length()
+		var plan_length := _plan_curve.get_baked_length()
+		var o := 0.0
+		while o < length:
+			var p := curve.sample_baked(o)
+			var po := _plan_curve.get_closest_offset(Vector3(p.x, 0.0, p.z))
+			# A loop's ends share one point: keep the table rising.
+			if _plan_offs.is_empty():
+				po = 0.0
+			elif po < _plan_offs[_plan_offs.size() - 1]:
+				po = _plan_offs[_plan_offs.size() - 1]
+			_plan_offs.append(po)
+			_plan_real.append(o)
+			o += 0.5
+		_plan_offs.append(plan_length)
+		_plan_real.append(length)
+	var q := _plan_curve.get_closest_offset(Vector3(px, 0.0, pz))
+	var k := clampi(_plan_offs.bsearch(q), 1, _plan_offs.size() - 1)
+	var a := _plan_offs[k - 1]
+	var b := _plan_offs[k]
+	var t := clampf((q - a) / maxf(b - a, 1e-4), 0.0, 1.0)
+	return curve.sample_baked(lerpf(_plan_real[k - 1], _plan_real[k], t))
+
+
+## The ground at (px, pz) before the road shapes it (no road, but the flat_pads already set), for a
+## generator planning pads and buildings before generate_world(), or carrying the land on past the
+## terrain's rim (with edge_falloff off it doesn't fall away there).
+var _natural_noise: FastNoiseLite
+
+func natural_height(px: float, pz: float) -> float:
+	if _natural_noise == null:
+		_natural_noise = FastNoiseLite.new()
+		_natural_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+		_natural_noise.frequency = noise_frequency
+		_natural_noise.seed = 12345
+		_natural_noise.fractal_octaves = 4
+	return _get_terrain_height(px, pz, _natural_noise, null, false, false)
 
 
 ## How much the ground at (px, pz) belongs to a road gap's grading: 1 along the gap and its tapers
@@ -960,6 +1049,11 @@ func _road_gap_ground(px: float, pz: float, curve: Curve3D) -> float:
 				near_o = offs[i]
 		var g0: float = float(z[6]) - road_gap_taper
 		var g1: float = float(z[7]) + road_gap_taper
+		if curbs_stop_at_gaps:
+			# Ease in inside the taper, where the curbs have stopped: road_gap_ground is then above
+			# the curbs' outer edge, and easing in beyond the taper stood the ground up through them.
+			g0 += 6.0
+			g1 -= 6.0
 		var outside := maxf(g0 - near_o, near_o - g1)
 		best = maxf(best, 1.0 - smoothstep(0.0, 6.0, outside))
 	return best
@@ -1649,6 +1743,8 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 	for i in range(point_count):
 		if _segment_in_gap(curve, length, point_count, i):
 			continue
+		if is_curb and _curb_segment_cut(length, point_count, i):
+			continue
 
 		if is_curb:
 			var base = i * 4
@@ -2063,6 +2159,8 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 	# 2. INDEX GENERATION
 	for i in range(point_count):
 		if _segment_in_gap(curve, length, point_count, i):
+			continue
+		if _curb_segment_cut(length, point_count, i):
 			continue
 
 		var base = i * 4

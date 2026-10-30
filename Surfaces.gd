@@ -13,12 +13,15 @@ const NAMES := ["asphalt", "dirt", "gravel", "sand", "snow", "ice", "grass", "mu
 const COUNT := 10
 
 ## Per level (the scene's file name): "road" and "ground" defaults, "nodes", lower-case name
-## fragments of a collider or its ancestors that override them (first match wins), and "dust", the
-## colour a surface's dust takes on this level (Mara's murram is red, not the default brown).
+## fragments of a collider or its ancestors that override them (first match wins), "gap", the ground
+## where the road stops (TerrainGenerator.road_gaps: Pinecrest Ridge's forest trail) if it isn't the
+## level's "ground", and "dust", the colour a surface's dust takes on this level (Mara's murram is
+## red, not the default brown).
 const LEVELS := {
 	"LakesideLevel": {"road": ASPHALT, "ground": GRASS},
 	"BloombayDunesLevel": {"road": ASPHALT, "ground": SAND, "nodes": [["pier", WOOD]]},
-	"PinecrestRidgeLevel": {"road": ASPHALT, "ground": GRASS, "nodes": [["boulder", ROCK]]},
+	"PinecrestRidgeLevel": {"road": ASPHALT, "ground": GRASS, "gap": GRAVEL, "nodes": [["boulder", ROCK]],
+		"dust": {GRAVEL: Color(0.62, 0.54, 0.44, 0.6)}},
 	"FrostpeakCreekLevel": {"road": ASPHALT, "ground": SNOW, "nodes": [["bridgedeck", WOOD], ["abutment", ROCK], ["snowdrift", SNOW]]},
 	"GlacierHighwayLevel": {"road": ASPHALT, "ground": SNOW},
 	"NorthlightCavernsLevel": {"road": ICE, "ground": SNOW, "nodes": [["snowbank", SNOW], ["marker", ICE]]},
@@ -132,6 +135,11 @@ static func of(collider: Object, level: Node, is_track: bool) -> int:
 	if is_track:
 		return int(table.get("road", ASPHALT))
 	return int(table.get("ground", GRASS))
+
+
+## The ground in a road gap on `level` (its "gap" entry), else `ground`.
+static func of_road_gap(level: Node, ground: int) -> int:
+	return int(LEVELS.get(_level_key(level), {}).get("gap", ground))
 
 
 static func from_name(value: Variant) -> int:

@@ -9,13 +9,20 @@ extends Node
 ## with procedural alpine trees (Scots/mountain pine, subalpine silver fir, alpine larch, birch,
 ## alder), dwarf mountain shrubs, ferns, wildflower drifts, meadow grass tufts, fallen deadwood
 ## logs, granite cliff-cut outcrops & boulders, W-beam steel guardrails, chain-link catch fences
-## with sponsor boards, wooden marshal booths, tyre walls, and spectator camps.
-## Respects the Options Menu Detail Level via `JungleDetail.gd` (`vegetation_detail` group).
+## with sponsor boards, wooden marshal booths, tyre walls, and spectator camps. The climb is a forest
+## trail (road gaps); Ridgecrest, a district of Bloombay, stands on the summit (RidgecrestKit.gd); the
+## country carries on past the terrain's rim to far ranges and Bloombay on its coast; the meadow is
+## the Lakeside Course's real grass, the lake and ponds have reeds and lilies (PondKit.gd). See
+## CLAUDE.md, "Pinecrest Ridge".
+## Respects the Options Menu Detail Level via `JungleDetail.gd` and `MeadowDetail.gd` (`vegetation_detail` group).
 
 const Woodland = preload("res://WoodlandBuilder.gd")
 const PropKit = preload("res://PropKit.gd")
 const CampKit = preload("res://CampKit.gd")
 const TyreStacks = preload("res://TyreStacks.gd")
+const RidgecrestKit = preload("res://RidgecrestKit.gd")
+const MeadowGrass = preload("res://MeadowGrass.gd")
+const PondKit = preload("res://PondKit.gd")
 
 const LEVEL_PATH := "res://levels/PinecrestRidgeLevel.tscn"
 const MESH_DIR := "res://levels/pinecrest_ridge_meshes"
@@ -47,7 +54,7 @@ const P_JUMP1_TAKEOFF := Vector3(-70.0, 10.0, -50.0)
 const P_JUMP1_LAND := Vector3(-75.0, 20.0, -90.0)
 const P_SB1 := Vector3(-55.0, 31.0, -160.0)
 const P_SB2 := Vector3(50.0, 53.0, -175.0)
-const P_SB3 := Vector3(-65.0, 74.0, -240.0)
+const P_SB3 := Vector3(-62.0, 73.0, -230.0)
 const P_SUMMIT_W := Vector3(-15.0, 78.0, -250.0)
 const P_SUMMIT_CREST := Vector3(45.0, 77.0, -235.0)
 const P_JUMP2_TAKEOFF := Vector3(85.0, 75.0, -205.0)
@@ -58,7 +65,28 @@ const P_DESCENT_S := Vector3(70.0, 17.0, 25.0)
 const P_JUMP3_TAKEOFF := Vector3(75.0, 14.0, 60.0)
 const P_JUMP3_LAND := Vector3(65.0, 1.5, 105.0)
 const P_VALLEY_SE := Vector3(50.0, 0.0, 165.0)
-const P_VALLEY_SW := Vector3(22.0, 0.0, 215.0)
+const P_VALLEY_SW := Vector3(10.6, 0.0, 204.8)
+
+## The climb is a forest trail in two stretches, either side of switchback 2's paved hairpin: no
+## asphalt (TerrainGenerator.road_gaps), the ground graded TRAIL_GROUND under the road's surface and
+## painted as a rutted dirt track (terrain_grass_varied.gdshader), off-road for the carts and gravel
+## to their tyres (Surfaces' "gap"). The asphalt breaks up toward each stretch (road_crumble.gdshader)
+## and the curbs stop where its taper begins. [from point, metres on, to point, metres on].
+const TRAIL_GAPS := [
+	[P_JUMP1_LAND, 18.0, P_SB2, -40.0],
+	[P_SB2, 34.0, P_SB3, -34.0],
+]
+const TRAIL_TAPER := 14.0
+const TRAIL_GROUND := 0.06
+## How far before a stretch the asphalt starts to break up (road_crumble.gdshader's lead).
+const TRAIL_LEAD := 10.0
+const TRAIL_TINT := Color(0.80, 0.70, 0.58)
+
+## The painted ground's map (terrain_grass_varied.gdshader's ground_map): the trail and Ridgecrest.
+const GROUND_RECT := Rect2(-170.0, -440.0, 340.0, 420.0)
+const GROUND_STEP := 0.5
+## The forest floor's map (woods_map), over the whole terrain.
+const WOODS_STEP := 2.0
 
 ## Graded level terraces for the paddock and spectator camps: [centre Vector2, half Vector2, yaw, target_y]
 const PADDOCK_TERRACE := [Vector2(-29.0, 122.0), Vector2(32.0, 12.0), PI * 0.5, 0.0]
@@ -99,6 +127,12 @@ var _kit: PropKit
 var _camp: CampKit
 var _ad_k := 0
 var _font: SystemFont
+## Ridgecrest's lanes ([PackedVector2Array centreline, half width]) and lawns ([centre, half size, yaw])
+## for the ground map.
+var _lanes: Array = []
+var _lawns: Array = []
+## The forest floor's weight on a WOODS_STEP grid over the terrain: each tree adds its crown's shade.
+var _woods := PackedFloat32Array()
 
 
 func _ready() -> void:
@@ -147,8 +181,12 @@ func _ready() -> void:
 	track_path.name = "TrackPath"
 	_setup_track_curve(track_path)
 	_level.add_child(track_path)
-	_curve = track_path.curve
+	# The generator measures along the closed lap, as TerrainGenerator lays the road: the TrackPath
+	# stops at its last point, and the 30m from there onto the start line had flowers and shrubs
+	# planted on its asphalt.
+	_curve = _closed_curve(track_path.curve)
 	_length = _curve.get_baked_length()
+	_cache_road_samples()
 
 	# 3. TerrainGenerator Setup
 	_tg = Node3D.new()
@@ -170,6 +208,14 @@ func _ready() -> void:
 	_tg.set("no_grass", false)
 	_tg.set("terrain_grass_count", 0)
 	_tg.set("generate_bridge_supports", false)
+	_tg.set("edge_falloff", false)
+	_tg.set("road_height_from_plan", true)
+	_tg.set("curbs_stop_at_gaps", true)
+	_tg.set("road_gap_ground", TRAIL_GROUND)
+	_tg.set("road_gap_taper", TRAIL_TAPER)
+	_tg.set("road_gaps", _plan_trail_gaps())
+	print("Planning Ridgecrest on the summit...")
+	_plan_ridgecrest()
 	_tg.set("flat_pads", _plan_pads())
 	_tg.set("grass_clearings", _plan_clearings())
 
@@ -183,11 +229,21 @@ func _ready() -> void:
 		grass_mat.set_shader_parameter("dirt_normal", load("res://materials/dirt_normal.png"))
 		_tg.set("grass_material", grass_mat)
 	if asphalt_tex:
-		var road_mat := StandardMaterial3D.new()
-		road_mat.albedo_texture = asphalt_tex
-		road_mat.albedo_color = Color(0.92, 0.92, 0.92)
-		road_mat.uv1_scale = Vector3(0.2, 0.2, 0.2)
-		road_mat.roughness = 0.75
+		var road_mat := ShaderMaterial.new()
+		road_mat.shader = load("res://road_crumble.gdshader")
+		road_mat.set_shader_parameter("asphalt_tex", asphalt_tex)
+		road_mat.set_shader_parameter("dirt_tex", load("res://materials/dirt.png"))
+		road_mat.set_shader_parameter("dirt_normal", load("res://materials/dirt_normal.png"))
+		road_mat.set_shader_parameter("dirt_tint", TRAIL_TINT)
+		var gaps: PackedFloat32Array = _plan_trail_gaps()
+		var pairs := PackedVector2Array()
+		for k in range(0, gaps.size() - 1, 2):
+			pairs.append(Vector2(gaps[k], gaps[k + 1]))
+		road_mat.set_shader_parameter("gaps", pairs)
+		road_mat.set_shader_parameter("gap_count", pairs.size())
+		road_mat.set_shader_parameter("taper", TRAIL_TAPER)
+		road_mat.set_shader_parameter("lead", TRAIL_LEAD)
+		road_mat.set_shader_parameter("road_width", ROAD_HALF * 2.0)
 		_tg.set("road_material", road_mat)
 
 	_level.add_child(_tg)
@@ -195,11 +251,11 @@ func _ready() -> void:
 	print("Calling tg.generate_world()...")
 	_tg.call("generate_world")
 
-	# Re-read curve length in case TerrainGenerator closed the loop
-	_curve = track_path.curve
-	_length = _curve.get_baked_length()
 	_heights = _tg.get("_visual_heights")
-	_cache_road_samples()
+	# The terrain's material as a file of its own: the backdrop's near hills share it.
+	var terrain_mat: Material = _save_res(_tg.get("grass_material"), "terrain_mat")
+	_tg.set("grass_material", terrain_mat)
+	(_level.get_node("TerrainGenerator/Terrain_Visual") as MeshInstance3D).material_override = terrain_mat
 
 	_kit = PropKit.new()
 	_kit.material_for = _material
@@ -226,16 +282,31 @@ func _ready() -> void:
 	_build_campsites(dressing)
 	_build_ads(dressing)
 
+	print("Building Ridgecrest, Bloombay's district on the summit...")
+	_build_ridgecrest(dressing)
+
+	print("Building the country round it: the far ranges and Bloombay on its coast...")
+	_build_backdrop(dressing)
+
 	print("Building granite cliff-cut outcrops, exposed root banks & alpine boulders...")
 	_build_boulders(dressing)
 
 	print("Building procedural alpine woodland, shrubs, ferns, wildflowers & deadwood...")
 	_build_woodland(dressing)
 
+	print("Planting the lake's and the ponds' edges...")
+	_build_pond(dressing)
+
 	for c_name in ["Props", "AlternativePaths"]:
 		var c := Node3D.new()
 		c.name = c_name
 		_level.add_child(c)
+
+	print("Painting the forest trail, the forest floor and Ridgecrest's lanes and lawns...")
+	_build_ground_map()
+
+	print("Growing the meadow...")
+	_build_meadow(dressing)
 
 	_verify_clear()
 	_set_owner_recursive(_level, _level)
@@ -281,8 +352,10 @@ func _setup_track_curve(track_path: Path3D) -> void:
 		[Vector3(-18, -1.0, 4), Vector3(15, 1.0, -6), Vector3(35.0, 45.0, -150.0)],
 		[Vector3(10, -1.2, 16), Vector3(-12, 1.2, -18), Vector3(50.0, 53.0, -175.0)],
 		[Vector3(22, -1.0, 6), Vector3(-22, 1.0, -6), Vector3(15.0, 61.0, -200.0)],
-		[Vector3(18, -1.0, 4), Vector3(-16, 1.0, -8), Vector3(-35.0, 68.0, -210.0)],
-		[Vector3(-15, -1.0, 4), Vector3(20, 0.8, -4), Vector3(-65.0, 74.0, -240.0)],
+		[Vector3(18, -1.0, 4), Vector3(-11, 0.7, -5.5), Vector3(-35.0, 68.0, -210.0)],
+		# The summit hairpin's apex, on a 13m arc: as a bend at the end of the segments round the old
+		# point (-65, 74, -240) it closed to a 3.4m radius and the road folded over itself there.
+		[Vector3(-2.11, -0.6, 15.85), Vector3(2.11, 0.6, -15.85), P_SB3],
 
 		# --- TIER 3: SUMMIT RIDGE & JUMP 2 (High Vista Super-Jump, Y = 78m -> 58m) ---
 		[Vector3(-20, -0.5, 4), Vector3(25, 0.0, -4), Vector3(-15.0, 78.0, -250.0)],
@@ -300,13 +373,49 @@ func _setup_track_curve(track_path: Path3D) -> void:
 		# --- TIER 5: JUMP 3 (Forest Creek Launch Ramp & Valley Sprint) ---
 		[Vector3(-2, 0.8, -12), Vector3(0, 2.2, 16), Vector3(75.0, 14.0, 60.0)],
 		[Vector3(0, 3.0, -16), Vector3(-4, -0.5, 18), Vector3(65.0, 1.5, 105.0)],
-		[Vector3(12, 0.0, -16), Vector3(-12, 0.0, 18), Vector3(50.0, 0.0, 165.0)],
-		[Vector3(16, 0.0, -8), Vector3(-16, 0.0, 8), Vector3(22.0, 0.0, 215.0)],
-		[Vector3(8, 0.0, 10), Vector3(0, 0.0, -15), Vector3(0.0, 0.0, 205.0)],
+		[Vector3(12, 0.0, -16), Vector3(-7.5, 0.0, 11.2), Vector3(50.0, 0.0, 165.0)],
+		# The last corner onto the start straight: a 15m arc from here, through its apex, to the straight
+		# (handles 4/3 tan(a/4) r for each 73 degree half). It was a 6m bend ending in a 39 degree kink at
+		# (0, 0, 205), where the straight began.
+		[Vector3(7.5, 0.0, -11.2), Vector3(-3.66, 0.0, 5.49), Vector3(27.5, 0.0, 198.7)],
+		[Vector3(6.32, 0.0, 1.91), Vector3(-6.32, 0.0, -1.91), P_VALLEY_SW],
+		[Vector3(0, 0.0, 6.6), Vector3(0, 0.0, -10), Vector3(0.0, 0.0, 190.4)],
 	]
 	for pt in curve_pts:
-		curve.add_point(pt[2], pt[0], pt[1])
+		var pin: Vector3 = pt[0]
+		var pout: Vector3 = pt[1]
+		# Collinear in plan, each handle keeping its length and its rise: a point whose handles disagree
+		# is a corner in the road (up to 14 degrees here) and the ribbon folds on its inside. The rise
+		# stays as it was, so the jump lips keep their kick.
+		var a := Vector2(-pin.x, -pin.z).normalized()
+		var b := Vector2(pout.x, pout.z).normalized()
+		var d := (a + b).normalized()
+		var li := Vector2(pin.x, pin.z).length()
+		var lo := Vector2(pout.x, pout.z).length()
+		pin = Vector3(-d.x * li, pin.y, -d.y * li)
+		pout = Vector3(d.x * lo, pout.y, d.y * lo)
+		curve.add_point(pt[2], pin, pout)
 	track_path.curve = curve
+
+
+## `open` closed into a loop the way TerrainGenerator._get_world_curve does (its first point again at
+## the end), so offsets along it are the road's.
+static func _closed_curve(open: Curve3D) -> Curve3D:
+	var c := Curve3D.new()
+	c.bake_interval = 0.25
+	for i in range(open.point_count):
+		c.add_point(open.get_point_position(i), open.get_point_in(i), open.get_point_out(i))
+	c.add_point(open.get_point_position(0), open.get_point_in(0), open.get_point_out(0))
+	return c
+
+
+## TRAIL_GAPS as road_gaps: [s0, s1, ...] along the lap.
+func _plan_trail_gaps() -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	for g in TRAIL_GAPS:
+		out.append(_d_at_point(g[0]) + float(g[1]))
+		out.append(_d_at_point(g[2]) + float(g[3]))
+	return out
 
 
 func _cache_road_samples() -> void:
@@ -437,6 +546,7 @@ func _plan_pads() -> PackedFloat32Array:
 		var yaw: float = float(t[2])
 		var ty: float = float(t[3])
 		out.append_array(PackedFloat32Array([c.x, c.y, h.x, h.y, yaw, ty, 11.0]))
+	out.append_array(_rc_pads)
 	return out
 
 
@@ -447,6 +557,8 @@ func _plan_clearings() -> PackedFloat32Array:
 		var h: Vector2 = t[1]
 		var yaw: float = float(t[2])
 		out.append_array(PackedFloat32Array([c.x, c.y, h.x + 3.0, h.y + 3.0, yaw, 6.0]))
+	for o in range(0, _rc_pads.size() - 6, 7):
+		out.append_array(PackedFloat32Array([_rc_pads[o], _rc_pads[o + 1], _rc_pads[o + 2] + 1.0, _rc_pads[o + 3] + 1.0, _rc_pads[o + 4], 3.0]))
 	return out
 
 
@@ -571,7 +683,7 @@ func _material(key: String) -> Material:
 			tm.shader = load("res://tyre_wall.gdshader")
 			m = tm
 		_:
-			m = CampKit.make_material(key)
+			m = RidgecrestKit.make_material(key)
 	m = _save_res(m, "mat_" + key)
 	_materials[key] = m
 	return m
@@ -807,9 +919,10 @@ func _build_sky() -> void:
 	env.fog_light_color = HAZE
 	env.fog_sun_scatter = 0.2
 	env.fog_density = 1.0
-	env.fog_depth_begin = 210.0
-	env.fog_depth_end = 1450.0
-	env.fog_depth_curve = 1.2
+	# Out far enough that the ranges round the course (_build_backdrop) show, hazed.
+	env.fog_depth_begin = BACK_FOG.x
+	env.fog_depth_end = BACK_FOG.y
+	env.fog_depth_curve = 1.25
 	env.fog_sky_affect = 0.05
 	env.fog_aerial_perspective = 0.32
 	we.environment = _save_res(env, "alpine_env")
@@ -877,7 +990,7 @@ func _build_guardrails(root: Node3D) -> void:
 		for i in range(pts.size()):
 			var p: Vector3 = pts[i]
 			var s_near := _curve.get_closest_offset(p)
-			if _in_jump_zone(s_near, 4.0):
+			if _in_jump_zone(s_near, 4.0) or _in_rail_gap(p):
 				continue
 			# Steel I-post + reflector tab
 			k.beam(kit, "steel", p - Vector3(0, 0.45, 0), p + Vector3(0, 1.08, 0), 0.14, 0.12, post_col)
@@ -888,7 +1001,7 @@ func _build_guardrails(root: Node3D) -> void:
 			if i == 0:
 				continue
 			var q: Vector3 = pts[i - 1]
-			if _in_jump_zone(_curve.get_closest_offset(q), 4.0):
+			if _in_jump_zone(_curve.get_closest_offset(q), 4.0) or _in_rail_gap(q):
 				continue
 			var seg := p - q
 			seg.y = 0.0
@@ -904,6 +1017,14 @@ func _build_guardrails(root: Node3D) -> void:
 
 	_commit(node, kit, "WBeamGuardrails")
 	_boxes_body(node, "GuardrailBarrierBody", boxes)
+
+
+## True where a guardrail post would stand in one of _rail_gaps (Ridgecrest's lane).
+func _in_rail_gap(p: Vector3) -> bool:
+	for g in _rail_gaps:
+		if Vector2(p.x, p.z).distance_to(g[0]) < float(g[1]):
+			return true
+	return false
 
 
 # ======================================================================================
@@ -1127,7 +1248,7 @@ func _build_tyre_walls_and_props(root: Node3D) -> void:
 	# 1. Red/white/black tyre stacks at switchback apexes/exits and valley sweepers
 	var tyre_runs := [
 		[d_sb1 - 22.0, d_sb1 + 20.0, -(VERGE + 1.0), "TyreWallSB1"],
-		[d_sb2 - 20.0, d_sb2 + 20.0, VERGE + 1.0, "TyreWallSB2"],
+		[d_sb2 - 20.0, d_sb2 + 34.0, VERGE + 1.0, "TyreWallSB2"],  # on round the exit: AI carts ran wide up the bank there
 		[d_sb3 - 20.0, d_sb3 + 20.0, -(VERGE + 1.0), "TyreWallSB3"],
 		[d_sb4 - 18.0, d_sb4 + 20.0, VERGE + 1.0, "TyreWallSB4"],
 		[d_sb5 - 18.0, d_sb5 + 18.0, -(VERGE + 1.0), "TyreWallSB5"],
@@ -1323,23 +1444,25 @@ func _build_chevrons(root: Node3D) -> void:
 	var d_vse := _d_at_point(P_VALLEY_SE)
 	var d_vsw := _d_at_point(P_VALLEY_SW)
 
-	# [d_start, d_end, count, lat_offset, point_dir (+1 right, -1 left)]
+	# [d_start, d_end, count]. The boards stand on the outside of the turn, behind its tyre wall: they
+	# had been on the inside of every hairpin.
 	var banks := [
-		[d_sb1 - 18.0, d_sb1 + 18.0, 5, VERGE + 1.85, -1.0],
-		[d_sb2 - 18.0, d_sb2 + 18.0, 5, -(VERGE + 1.85), 1.0],
-		[d_sb3 - 18.0, d_sb3 + 18.0, 5, VERGE + 1.85, -1.0],
-		[d_sum_w - 16.0, d_sum_w + 16.0, 4, -(VERGE + 1.85), 1.0],
-		[d_sb4 - 16.0, d_sb4 + 18.0, 4, -(VERGE + 1.85), 1.0],
-		[d_sb5 - 16.0, d_sb5 + 16.0, 4, VERGE + 1.85, -1.0],
-		[d_vse - 18.0, d_vse + 18.0, 4, -(VERGE + 1.95), 1.0],
-		[d_vsw - 18.0, d_vsw + 18.0, 4, VERGE + 1.95, -1.0],
+		[d_sb1 - 18.0, d_sb1 + 18.0, 5],
+		[d_sb2 - 18.0, d_sb2 + 18.0, 5],
+		[d_sb3 - 18.0, d_sb3 + 18.0, 5],
+		[d_sum_w - 16.0, d_sum_w + 16.0, 4],
+		[d_sb4 - 16.0, d_sb4 + 18.0, 4],
+		[d_sb5 - 16.0, d_sb5 + 16.0, 4],
+		[d_vse - 18.0, d_vse + 18.0, 4],
+		[d_vsw - 18.0, d_vsw + 18.0, 4],
 	]
 	for b in banks:
 		var s0: float = b[0]
 		var s1: float = b[1]
 		var cnt: int = b[2]
-		var lat: float = b[3]
-		var pdir: float = b[4]
+		var turn := _turn_between(s0, s1)
+		var lat: float = -signf(turn) * (VERGE + 2.6)
+		var pdir: float = signf(turn)
 		for i in range(cnt):
 			var s := lerpf(s0, s1, float(i) / float(maxi(cnt - 1, 1)))
 			var fr := _frame(s)
@@ -1355,6 +1478,20 @@ func _build_chevrons(root: Node3D) -> void:
 
 	_commit(node, kit, "ChevronSigns")
 	_boxes_body(node, "ChevronSignsBody", boxes)
+
+
+## How far the lap turns from s0 to s1 (radians, the heading's change summed every 2m): positive for a
+## right-hander (the heading's angle atan2(z, x) grows), negative for a left.
+func _turn_between(s0: float, s1: float) -> float:
+	var total := 0.0
+	var prev: Vector3 = _frame(s0)["fwd"]
+	var s := s0 + 2.0
+	while s <= s1:
+		var f: Vector3 = _frame(s)["fwd"]
+		total += wrapf(atan2(f.z, f.x) - atan2(prev.z, prev.x), -PI, PI)
+		prev = f
+		s += 2.0
+	return total
 
 
 func _chevron_board(kit: Dictionary, dir: float) -> void:
@@ -1602,6 +1739,7 @@ func _build_boulders(root: Node3D) -> void:
 		var pos := Vector3(px, gy - sc * 0.22, pz)
 		var xf := Transform3D(basis.scaled(Vector3.ONE * sc), pos)
 		_add_to_cells(cells, _cell(px, pz, 180.0, v), xf)
+		_boulder_spots.append([px, pz, sc * 0.9])
 		count[0] += 1
 		if _road_distance(px, pz) < 32.0 and sc >= 1.1:
 			solid.append([Transform3D(basis, pos), v, sc])
@@ -1638,6 +1776,9 @@ func _build_boulders(root: Node3D) -> void:
 				var lat: float = side * (VERGE + rng.randf_range(3.6, 6.8))
 				var p: Vector3 = rp + right * lat
 				var sc: float = rng.randf_range(2.2, 3.8)
+				if _on_lane(p.x, p.z, 4.0):
+					d += rng.randf_range(11.0, 16.0)
+					continue
 				place_boulder.call(p.x, p.z, sc, 1 + (rng.randi() % 3), 0.18)
 				for m in range(2):
 					var mp: Vector3 = p + (fr["fwd"] as Vector3) * rng.randf_range(-3.0, 3.0) - right * (side * rng.randf_range(1.2, 2.2))
@@ -1789,6 +1930,1121 @@ func _root_tangle_mesh(bark_mat: Material) -> ArrayMesh:
 	var mesh: ArrayMesh = st.commit()
 	mesh.surface_set_material(0, bark_mat)
 	return mesh
+
+
+# ======================================================================================
+#  9. Ridgecrest: Bloombay's district on the summit
+# ======================================================================================
+
+## Ridgecrest, a district of Bloombay, on the summit's broad back north of the summit road: [kind,
+## variant, x, z, the point its front looks toward]. Traditional and modern mixed (RidgecrestKit.gd),
+## each on a pad graded level at the natural ground's mean under it, the pines left standing between.
+const RIDGECREST_SITES := [
+	["gate", 0, 3.0, -284.0, Vector3(3.0, 0.0, 0.0)],
+	["pavilion", 0, -38.0, -292.0, Vector3(-38.0, 0.0, 0.0)],
+	["hotel", 0, 56.0, -306.0, Vector3(120.0, 0.0, -40.0)],
+	["chapel", 0, 10.0, -392.0, Vector3(6.0, 0.0, -300.0)],
+	["chalet", 0, -82.0, -312.0, Vector3(-150.0, 0.0, 140.0)],
+	["chalet", 1, -50.0, -346.0, Vector3(-40.0, 0.0, 0.0)],
+	["chalet", 2, 30.0, -350.0, Vector3(60.0, 0.0, 0.0)],
+	["chalet", 3, -64.0, -383.0, Vector3(-250.0, 0.0, -250.0)],
+	["chalet", 4, 58.0, -378.0, Vector3(250.0, 0.0, -300.0)],
+	["villa_cube", 0, -108.0, -345.0, Vector3(-300.0, 0.0, -220.0)],
+	["villa_cube", 1, 94.0, -342.0, Vector3(300.0, 0.0, -260.0)],
+	["villa_gable", 0, -16.0, -350.0, Vector3(-10.0, 0.0, 0.0)],
+	["villa_gable", 1, -26.0, -397.0, Vector3(-60.0, 0.0, -700.0)],
+]
+## The district's lanes: [half width, points (x, z)]. Up from the summit road through the gate to the
+## plaza (one point: a disc) and out to the houses; each house gets a drive to its nearest lane.
+const RIDGECREST_LANES := [
+	[3.4, [Vector2(3.0, -255.0), Vector2(3.0, -284.0), Vector2(4.0, -300.0), Vector2(5.0, -314.0)]],
+	[11.0, [Vector2(5.0, -314.0)]],
+	[3.0, [Vector2(5.0, -314.0), Vector2(6.0, -335.0), Vector2(8.0, -360.0), Vector2(10.0, -374.0)]],
+	[3.0, [Vector2(5.0, -314.0), Vector2(-15.0, -322.0), Vector2(-40.0, -326.0), Vector2(-62.0, -330.0), Vector2(-85.0, -336.0)]],
+	[2.8, [Vector2(8.0, -360.0), Vector2(-30.0, -375.0), Vector2(-50.0, -372.0)]],
+	[3.0, [Vector2(5.0, -314.0), Vector2(25.0, -326.0), Vector2(45.0, -328.0), Vector2(74.0, -332.0)]],
+	[2.8, [Vector2(8.0, -360.0), Vector2(30.0, -368.0), Vector2(45.0, -372.0)]],
+	[2.8, [Vector2(4.0, -300.0), Vector2(-14.0, -302.0)]],
+]
+const RIDGECREST_PLAZA := Vector2(5.0, -314.0)
+## Garden round each building's footprint (m), and how far its pad's grading eases out.
+const RC_PAD_MARGIN := 3.0
+const RC_PAD_BLEND := 10.0
+const RC_DRIVE_HALF := 2.2
+## The houses' kinds that get garden trees, hedges and a drive.
+const RC_HOUSES := ["chalet", "villa_cube", "villa_gable", "hotel"]
+
+## Planned sites: [kind, variant, position (y the pad's), yaw, local footprint Rect2 (life size, x and z)].
+var _rc_sites: Array = []
+## Ridgecrest's pads and the woods' extra trees and plants for its gardens (_build_woodland adds them):
+## [Transform3D, near mesh index] and [Transform3D, plant mesh index].
+var _rc_pads := PackedFloat32Array()
+var _garden_trees: Array = []
+var _garden_plants: Array = []
+## Where the summit road's guardrail stops for the district's lane: [centre (x, z), radius].
+var _rail_gaps: Array = []
+
+
+## Builds `kind` with `kit` (and `fine`) in the kit's current frame.
+func _rc_build(rk: RidgecrestKit, kind: String, variant: int, kit: Dictionary, fine: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
+	match kind:
+		"chalet":
+			return rk.chalet(kit, fine, rng, variant)
+		"hotel":
+			return rk.hotel(kit, fine, rng)
+		"chapel":
+			return rk.chapel(kit, fine, rng)
+		"villa_cube":
+			return rk.villa_cube(kit, fine, rng, variant)
+		"villa_gable":
+			return rk.villa_gable(kit, fine, rng, variant)
+		"pavilion":
+			return rk.pavilion(kit, fine, rng)
+	return rk.estate_gate(kit, fine)
+
+
+## Before the world is built: each building's footprint (built once at the origin and measured), its
+## pad at the mean of the natural ground under it, the lanes and drives, the lawns and the guardrail's
+## gap. Pads go to _plan_pads (and the clearings), lanes and lawns to the ground map.
+func _plan_ridgecrest() -> void:
+	var kit := PropKit.new()
+	kit.material_for = func(_k: String) -> Material: return null
+	var rk := RidgecrestKit.new(kit)
+	var rng := RandomNumberGenerator.new()
+	for site in RIDGECREST_SITES:
+		var kind: String = site[0]
+		var variant: int = site[1]
+		var pos := Vector3(float(site[2]), 0.0, float(site[3]))
+		var look: Vector3 = site[4]
+		var yaw := _yaw_to(Vector3(look.x - pos.x, 0.0, look.z - pos.z))
+		var shell := {}
+		var fine := {}
+		kit.reset_frame()
+		_rc_build(rk, kind, variant, shell, fine, rng)
+		var ab := kit.commit(shell).get_aabb()
+		if not fine.is_empty():
+			ab = ab.merge(kit.commit(fine).get_aabb())
+		var foot := Rect2(ab.position.x, ab.position.z, ab.size.x, ab.size.z)
+		var c_local := Vector3(foot.get_center().x, 0.0, foot.get_center().y) * PROP_SCALE
+		var centre := pos + Basis(Vector3.UP, yaw) * c_local
+		var half := Vector2(foot.size.x, foot.size.y) * PROP_SCALE * 0.5 + Vector2.ONE * RC_PAD_MARGIN
+		var y := pos.y
+		if kind != "gate":
+			# The pad at the natural ground's mean over its footprint: cut at one end, fill at the other.
+			var sum := 0.0
+			var n := 0
+			for i in range(5):
+				for j in range(5):
+					var l := Vector3(lerpf(-half.x, half.x, i / 4.0), 0.0, lerpf(-half.y, half.y, j / 4.0))
+					var w := centre + Basis(Vector3.UP, yaw) * l
+					sum += float(_tg.call("natural_height", w.x, w.z))
+					n += 1
+			y = sum / float(n)
+			_rc_pads.append_array(PackedFloat32Array([centre.x, centre.z, half.x, half.y, yaw, y, RC_PAD_BLEND]))
+			_lawns.append([Vector2(centre.x, centre.z), half - Vector2.ONE * 0.5, yaw])
+		pos.y = y
+		_rc_sites.append([kind, variant, pos, yaw, foot, Vector2(centre.x, centre.z), half])
+	for ln in RIDGECREST_LANES:
+		_lanes.append([PackedVector2Array(ln[1]), float(ln[0])])
+	# The plaza where the lanes meet, graded level.
+	var pc := RIDGECREST_PLAZA
+	_rc_pads.append_array(PackedFloat32Array([pc.x, pc.y, 12.0, 12.0, 0.0, float(_tg.call("natural_height", pc.x, pc.y)), 8.0]))
+	# A drive from each house to the nearest lane, ending a little way inside its pad.
+	for st in _rc_sites:
+		if not RC_HOUSES.has(st[0]):
+			continue
+		var c: Vector2 = st[5]
+		var best := Vector2.ZERO
+		var best_d := INF
+		for ln in RIDGECREST_LANES:
+			var pts: Array = ln[1]
+			for i in range(pts.size() - 1):
+				var q := Geometry2D.get_closest_point_to_segment(c, pts[i], pts[i + 1])
+				if q.distance_to(c) < best_d:
+					best_d = q.distance_to(c)
+					best = q
+		var half2: Vector2 = st[6]
+		var reach: float = maxf(best_d - minf(half2.x, half2.y) * 0.6, 0.0)
+		if reach > 2.0:
+			_lanes.append([PackedVector2Array([best, best + (c - best).normalized() * (best_d - minf(half2.x, half2.y) + 4.0)]), RC_DRIVE_HALF])
+	# The lane leaves the summit road through a gap in its guardrail.
+	var mouth: Vector2 = (RIDGECREST_LANES[0][1] as Array)[0]
+	_rail_gaps.append([mouth, float(RIDGECREST_LANES[0][0]) + 1.5])
+	print("  Ridgecrest: %d buildings, %d pads, %d lanes and drives" % [_rc_sites.size(), _rc_pads.size() / 7, _lanes.size()])
+
+
+## True where a lane's centreline passes within `margin` of (x, z) (plus its half width).
+func _on_lane(x: float, z: float, margin: float) -> bool:
+	var p := Vector2(x, z)
+	for ln in _lanes:
+		var pts: PackedVector2Array = ln[0]
+		var hw: float = ln[1]
+		if pts.size() == 1:
+			if p.distance_to(pts[0]) < hw + margin:
+				return true
+			continue
+		for i in range(pts.size() - 1):
+			if p.distance_to(Geometry2D.get_closest_point_to_segment(p, pts[i], pts[i + 1])) < hw + margin:
+				return true
+	return false
+
+
+## The district: the buildings (one mesh, its small parts in a second drawn nearer) on their pads with
+## their solid boxes, the names lettered on, hedges round the gardens, the plaza with its fountain,
+## benches and lamps, lamps along the lanes, cars on some drives, and for _build_woodland the gardens'
+## trees and flower beds.
+func _build_ridgecrest(root: Node3D) -> void:
+	var node := Node3D.new()
+	node.name = "Ridgecrest"
+	root.add_child(node)
+	var body := StaticBody3D.new()
+	body.name = "RidgecrestBody"
+	node.add_child(body)
+	var shell := {}
+	var fine := {}
+	var rk := RidgecrestKit.new(_kit)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7302
+	var boxes: Array = []
+	var serif := SystemFont.new()
+	serif.font_names = PackedStringArray(["Georgia", "Times New Roman", "Palatino", "serif"])
+	serif.font_weight = 600
+	for st in _rc_sites:
+		var kind: String = st[0]
+		var pos: Vector3 = st[2]
+		var yaw: float = st[3]
+		if kind == "gate":
+			# No pad of its own: on the ground where the lane climbs through it.
+			pos.y = _ground(pos.x, pos.z) - 0.1
+		var xf := _place(pos, yaw)
+		_kit.set_frame(xf)
+		var res := _rc_build(rk, kind, int(st[1]), shell, fine, rng)
+		for b in res["boxes"]:
+			var bb: Basis = b[2] if (b as Array).size() > 2 else Basis()
+			boxes.append([xf * (b[0] as Vector3), (b[1] as Vector3) * PROP_SCALE, Basis(Vector3.UP, yaw) * bb])
+		for lb in res["labels"]:
+			var l := Label3D.new()
+			l.name = "Sign"
+			l.text = lb[0]
+			l.font = serif
+			l.font_size = 64
+			l.pixel_size = float(lb[3]) * PROP_SCALE / (64.0 * 0.72)
+			l.outline_size = 0
+			l.modulate = lb[4] if (lb as Array).size() > 4 else Color(0.95, 0.92, 0.84)
+			l.alpha_cut = Label3D.ALPHA_CUT_OPAQUE_PREPASS
+			var nrm: Vector3 = Basis(Vector3.UP, yaw) * (lb[2] as Vector3)
+			l.transform = Transform3D(Basis(Vector3.UP, atan2(nrm.x, nrm.z)), xf * (lb[1] as Vector3) + nrm * 0.03)
+			node.add_child(l)
+		var half: Vector2 = st[6]
+		_note("Ridgecrest " + kind, pos, (half.y * 0.5 if kind == "gate" else maxf(half.x, half.y) * 0.8), 6.0)
+		if RC_HOUSES.has(kind):
+			_rc_garden(rk, shell, st, rng, boxes)
+	_rc_plaza(rk, shell, fine, rng, boxes)
+	# Lamps along the lanes, every 22m or so, set back off their edge.
+	_kit.set_frame(Transform3D(Basis().scaled(Vector3.ONE * PROP_SCALE), Vector3.ZERO))
+	var lamps := 0
+	for ln in RIDGECREST_LANES:
+		var pts: Array = ln[1]
+		var hw: float = ln[0]
+		if pts.size() < 2:
+			continue
+		var acc := 11.0
+		for i in range(pts.size() - 1):
+			var a: Vector2 = pts[i]
+			var b: Vector2 = pts[i + 1]
+			var d := a.distance_to(b)
+			var side := (b - a).normalized().orthogonal()
+			while acc < d:
+				var p := a.lerp(b, acc / d) + side * (hw + 1.2) * (1.0 if lamps % 2 == 0 else -1.0)
+				if not _rc_in_pad(p, 1.0):
+					var gy := _ground(p.x, p.y)
+					rk.lamp_post(shell, fine, Vector3(p.x, gy, p.y) / PROP_SCALE)
+					boxes.append([Vector3(p.x, gy + 2.5, p.y), Vector3(0.2, 5.0, 0.2), Basis()])
+					lamps += 1
+				acc += 22.0
+			acc -= d
+	_kit.reset_frame()
+	var mi := MeshInstance3D.new()
+	mi.name = "RidgecrestBuildings"
+	mi.mesh = _save_res(rk.finish(shell), "ridgecrest_buildings")
+	body.add_child(mi)
+	var mf := MeshInstance3D.new()
+	mf.name = "RidgecrestDetail"
+	mf.mesh = _save_res(rk.finish(fine), "ridgecrest_detail")
+	mf.visibility_range_end = 300.0
+	mf.visibility_range_end_margin = 20.0
+	mf.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+	mf.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	body.add_child(mf)
+	for b in boxes:
+		var cs := CollisionShape3D.new()
+		var shape := BoxShape3D.new()
+		shape.size = b[1]
+		cs.shape = shape
+		cs.transform = Transform3D(b[2], b[0])
+		body.add_child(cs)
+	_rc_boxes = boxes
+	_rc_cars(node)
+	print("  Ridgecrest: %d boxes, %d lamps, %d garden trees" % [boxes.size(), lamps, _garden_trees.size()])
+
+
+## True where (x, z) lies on one of Ridgecrest's pads (grown by `margin`).
+func _rc_in_pad(p: Vector2, margin: float) -> bool:
+	for o in range(0, _rc_pads.size() - 6, 7):
+		if float(_tg.call("_rect_outside", _rc_pads, o, p.x, p.y)) < margin:
+			return true
+	return false
+
+
+## A house's garden: hedges (or, round some of the old houses, dry-stone walls) along the back and sides
+## of its pad with gaps where a lane or drive comes in, trees at its back corners and one side just off
+## the pad, and flower beds inside the hedge.
+func _rc_garden(rk: RidgecrestKit, shell: Dictionary, st: Array, rng: RandomNumberGenerator, boxes: Array) -> void:
+	var kind: String = st[0]
+	var c: Vector2 = st[5]
+	var half: Vector2 = st[6]
+	var yaw: float = st[3]
+	var b := Basis(Vector3.UP, yaw)
+	var to_world := func(l: Vector2) -> Vector3:
+		var w := b * Vector3(l.x, 0.0, l.y)
+		return Vector3(c.x + w.x, _ground(c.x + w.x, c.y + w.z), c.y + w.z)
+	_kit.reset_frame()
+	var modern := kind.begins_with("villa")
+	var walled := not modern and rng.randf() < 0.5
+	var col: Color = [Color(0.30, 0.42, 0.16), Color(0.17, 0.30, 0.13), Color(0.36, 0.44, 0.18)][rng.randi() % 3]
+	var hx := half.x - 1.0
+	var hz := half.y - 1.0
+	if kind != "hotel":
+		for edge in [[Vector2(-hx, hz), Vector2(hx, hz)], [Vector2(-hx, -hz * 0.4), Vector2(-hx, hz)], [Vector2(hx, -hz * 0.4), Vector2(hx, hz)]]:
+			var e0: Vector2 = edge[0]
+			var e1: Vector2 = edge[1]
+			var pieces := maxi(1, int(e0.distance_to(e1) / 2.0))
+			for i in range(pieces):
+				var a: Vector3 = to_world.call(e0.lerp(e1, float(i) / pieces))
+				var z: Vector3 = to_world.call(e0.lerp(e1, float(i + 1) / pieces))
+				var mid := (a + z) * 0.5
+				if _on_lane(mid.x, mid.z, 0.8):
+					continue
+				if walled:
+					rk.stone_wall(shell, a, z, 0.9 * PROP_SCALE, 0.55 * PROP_SCALE, 1.0 / PROP_SCALE)
+				else:
+					rk.hedge(shell, a, z, (1.0 if modern else 1.3) * PROP_SCALE, 0.7 * PROP_SCALE, col, 1.0 / PROP_SCALE)
+				boxes.append(_wall_box(a, z, 0.7 * PROP_SCALE, 1.2 * PROP_SCALE))
+	# Trees: birches round the modern houses, larch, pine and birch round the old.
+	var kinds: Array = ["birch", "birch", "larch"] if modern else ["larch", "pine", "birch", "alder"]
+	for spot in [Vector2(-half.x - 3.0, half.y + 2.5), Vector2(half.x + 3.0, half.y + 2.5), Vector2((1.0 if rng.randf() < 0.5 else -1.0) * (half.x + 3.5), rng.randf_range(-half.y, 0.0))]:
+		var p: Vector3 = to_world.call(spot)
+		if _on_lane(p.x, p.z, 2.5) or _road_distance(p.x, p.z) < 16.0:
+			continue
+		var kind_t: String = kinds[rng.randi() % kinds.size()]
+		var sc := rng.randf_range(0.72, 0.95)
+		var mi: int = KINDS.find(kind_t) * 2 + rng.randi() % 2
+		_garden_trees.append([Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * sc), p - Vector3(0, 0.2, 0)), mi])
+	# Flower beds along the inside of the hedges.
+	for i in range(rng.randi_range(3, 6)):
+		var l := Vector2((1.0 if i % 2 == 0 else -1.0) * (hx - 1.6), rng.randf_range(-hz * 0.3, hz - 1.5))
+		var p2: Vector3 = to_world.call(l)
+		if _on_lane(p2.x, p2.z, 0.5):
+			continue
+		_garden_plants.append([Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * rng.randf_range(1.0, 1.5)), p2), 7 + rng.randi() % 3])
+
+
+## Ridgecrest's plaza where the lanes meet: a fountain, benches round it facing in, lamps, big trees
+## round its edge and beds of flowers.
+func _rc_plaza(rk: RidgecrestKit, shell: Dictionary, fine: Dictionary, rng: RandomNumberGenerator, boxes: Array) -> void:
+	var c := Vector3(RIDGECREST_PLAZA.x, _ground(RIDGECREST_PLAZA.x, RIDGECREST_PLAZA.y), RIDGECREST_PLAZA.y)
+	_kit.set_frame(Transform3D(Basis().scaled(Vector3.ONE * PROP_SCALE), c))
+	rk.fountain(shell, Vector3.ZERO)
+	boxes.append([c + Vector3(0, 0.6, 0), Vector3(4.6, 1.3, 4.6) * PROP_SCALE, Basis()])
+	for k in range(4):
+		var a := PI * 0.25 + PI * 0.5 * k
+		var p := Vector3(cos(a), 0.0, sin(a)) * 4.6
+		rk.bench(fine, p, _yaw_to(-p))
+		var lp := Vector3(cos(a + PI * 0.25), 0.0, sin(a + PI * 0.25)) * 5.6
+		rk.lamp_post(shell, fine, lp)
+		boxes.append([c + lp * PROP_SCALE + Vector3(0, 2.5, 0), Vector3(0.2, 5.0, 0.2), Basis()])
+	_kit.reset_frame()
+	for k in range(7):
+		var a2 := TAU * (k + rng.randf() * 0.5) / 7.0
+		var p2 := Vector3(c.x + cos(a2) * 15.0, 0.0, c.z + sin(a2) * 15.0)
+		if _on_lane(p2.x, p2.z, 2.0):
+			continue
+		p2.y = _ground(p2.x, p2.z) - 0.2
+		var kind := "alder" if k % 2 == 0 else "birch"
+		_garden_trees.append([Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * rng.randf_range(1.0, 1.2)), p2), KINDS.find(kind) * 2 + k % 2])
+	for k in range(10):
+		var a3 := TAU * k / 10.0 + 0.2
+		var p3 := Vector3(c.x + cos(a3) * 9.6, 0.0, c.z + sin(a3) * 9.6)
+		if _on_lane(p3.x, p3.z, 0.3):
+			continue
+		p3.y = _ground(p3.x, p3.z)
+		_garden_plants.append([Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * 1.5), p3), 7 + k % 3])
+
+
+## Residents' cars on four of the drives, nose toward the lane.
+func _rc_cars(root: Node3D) -> void:
+	var kit := {}
+	var boxes: Array = []
+	var cols := [Color(0.18, 0.19, 0.21), Color(0.93, 0.93, 0.91), Color(0.12, 0.22, 0.42), Color(0.62, 0.64, 0.66)]
+	var placed := 0
+	for ln in _lanes:
+		var pts: PackedVector2Array = ln[0]
+		if float(ln[1]) != RC_DRIVE_HALF or pts.size() < 2 or placed >= cols.size():
+			continue
+		var dir := (pts[1] - pts[0]).normalized()
+		var p := pts[1] - dir * 4.5
+		var at := Vector3(p.x, _ground(p.x, p.y), p.y)
+		var yaw := _yaw_to(Vector3(-dir.x, 0.0, -dir.y))
+		_kit.set_frame(_place(at, yaw))
+		var sz: Vector3 = _camp.vehicle(kit, "suv", cols[placed], 0)
+		boxes.append([at + Vector3(0, sz.y * 0.5 * PROP_SCALE, 0), Vector3(sz.z, sz.y, sz.x) * PROP_SCALE, Basis(Vector3.UP, yaw)])
+		placed += 1
+	_kit.reset_frame()
+	if placed > 0:
+		var body := _boxes_body(root, "RidgecrestCarsBody", boxes)
+		_commit(body, kit, "RidgecrestCars", 300.0)
+
+
+# ======================================================================================
+#  10. The country round it: the far ranges, and Bloombay on its coast
+# ======================================================================================
+
+## Past the terrain's rim (TerrainGenerator.edge_falloff is off, so the ground runs on to it) the land
+## carries on as one ring of ground out to BACK_R1, inside the race cameras' 4000m far plane from
+## anywhere on the course: the summit's ridge and the valley's meadows go on into wooded foothills,
+## and 1-3.4km out stand high ranges with snow on their peaks, highest to the north behind the summit,
+## lower east and west. To the south-west, past the lake, a valley opens onto the coast where
+## Bloombay's towers stand by the sea. The band inside BACK_SOLID is solid (a cart that leaves the
+## terrain drives on), and the woods carry on over it (_build_woodland's deep trees).
+const BACK_R0 := 450.0
+const BACK_R1 := 3400.0
+const BACK_SOLID := 640.0
+const BACK_SEGS := 360
+## Out to here the ground is drawn with the terrain's own material, handing over to its vertex colours
+## between BACK_SHADE.x and .y (a cheaper plain material carries them on past it).
+const BACK_SHADE := Vector2(700.0, 1100.0)
+## Bearing (degrees from north toward east) of the coast and its valley's half width.
+const COAST_BEARING := -138.0
+const COAST_HALF := 32.0
+## How far out the shore lies along the coast's bearing, and the sea's level.
+const COAST_SHORE := 2250.0
+const SEA_Y := -3.0
+const BACK_FOREST := Color(0.15, 0.23, 0.14)
+const BACK_MEADOW := Color(0.36, 0.46, 0.22)
+const BACK_ROCK := Color(0.46, 0.45, 0.43)
+const BACK_SNOW := Color(0.93, 0.95, 0.98)
+const BACK_FIELDS := Color(0.52, 0.54, 0.30)
+const BACK_SAND := Color(0.80, 0.74, 0.58)
+## The fog runs out this far so the ranges show through it.
+const BACK_FOG := Vector2(260.0, 4600.0)
+
+var _back_hills: FastNoiseLite
+var _back_ridge: FastNoiseLite
+var _back_massif: FastNoiseLite
+## The backdrop's trees for _build_woodland: [Transform3D, mesh index, solid].
+var _backdrop_trees: Array = []
+
+
+## The country's height at (x, z): the island's ground carried on past its rim, easing into the far
+## country between BACK_R0 + 30 and BACK_R0 + 380.
+func _back_height(x: float, z: float) -> float:
+	var r := Vector2(x, z).length()
+	var t := smoothstep(BACK_R0 + 30.0, BACK_R0 + 380.0, r)
+	var h := _back_far(x, z, r)
+	if t < 1.0:
+		h = lerpf(float(_tg.call("natural_height", x, z)), h, t)
+	# Nothing in reach of the water plane (TerrainGenerator's, 1600m across at WATER_Y) dips under it.
+	if r < 820.0:
+		h = maxf(h, WATER_Y + 2.5)
+	return h
+
+
+## The far country alone: foothills, the ranges by bearing, the coast's valley and the sea past it.
+func _back_far(x: float, z: float, r: float) -> float:
+	var bearing := rad_to_deg(atan2(x, -z))
+	var hills := _back_hills.get_noise_2d(x, z) * 0.5 + 0.5
+	var ridge := clampf(_back_ridge.get_noise_2d(x, z) * 0.5 + 0.5, 0.0, 1.0)
+	var coast := 1.0 - smoothstep(COAST_HALF * 0.55, COAST_HALF * 1.4, absf(wrapf(bearing - COAST_BEARING, -180.0, 180.0)))
+	var north := cos(deg_to_rad(bearing)) * 0.5 + 0.5
+	var amp := lerpf(320.0, 1200.0, north * north)
+	var h := 35.0 + 150.0 * hills * smoothstep(BACK_R0, 1000.0, r)
+	# Ranges: broad massifs (the low noise) rising at different distances, their ridges cut into them.
+	var massif := clampf(_back_massif.get_noise_2d(x, z) * 0.5 + 0.5, 0.0, 1.0)
+	var rise := smoothstep(900.0 + 900.0 * (1.0 - massif), 2700.0, r)
+	h += amp * rise * pow(0.25 + 0.75 * massif, 1.8) * (0.62 + 0.38 * ridge)
+	# The valley to the coast: meadows, then a plain a few metres over the sea.
+	var valley := lerpf(10.0 + 26.0 * hills, 3.0 + 7.0 * hills, smoothstep(1300.0, 1900.0, r))
+	h = lerpf(h, valley, coast)
+	# The shore runs straight across the valley's mouth, wandering a little; low land past it is sea bed,
+	# the ranges stand into it as headlands.
+	var cd := Vector2(sin(deg_to_rad(COAST_BEARING)), -cos(deg_to_rad(COAST_BEARING)))
+	var along := x * cd.x + z * cd.y
+	var across := x * -cd.y + z * cd.x
+	var shore := COAST_SHORE + 90.0 * sin(across / 310.0) + 40.0 * sin(across / 97.0)
+	var sea := smoothstep(shore - 20.0, shore + 140.0, along) * (1.0 - smoothstep(60.0, 320.0, h))
+	return lerpf(h, SEA_Y - 22.0, sea)
+
+
+## The ring of ground (BACK_SEGS round, rings 4m apart at the rim widening outward), coloured by height
+## and slope (forest, meadow, rock, snow; fields and sand by the sea), its inner band solid; the sea;
+## Bloombay; and the woods carried on over the near hills.
+func _build_backdrop(root: Node3D) -> void:
+	var t0 := Time.get_ticks_msec()
+	_back_hills = FastNoiseLite.new()
+	_back_hills.seed = 6611
+	_back_hills.frequency = 1.0 / 520.0
+	_back_hills.fractal_octaves = 4
+	_back_ridge = FastNoiseLite.new()
+	_back_ridge.seed = 9127
+	_back_ridge.frequency = 1.0 / 950.0
+	_back_ridge.fractal_type = FastNoiseLite.FRACTAL_RIDGED
+	_back_ridge.fractal_octaves = 5
+	_back_massif = FastNoiseLite.new()
+	_back_massif.seed = 2718
+	_back_massif.frequency = 1.0 / 2100.0
+	_back_massif.fractal_octaves = 2
+	var tint := FastNoiseLite.new()
+	tint.seed = 31
+	tint.frequency = 1.0 / 160.0
+	var node := Node3D.new()
+	node.name = "Backdrop"
+	root.add_child(node)
+
+	var radii := PackedFloat32Array()
+	var r := BACK_R0
+	while r < 540.0:
+		radii.append(r)
+		r += 4.0
+	while r < BACK_R1:
+		radii.append(r)
+		r *= 1.055
+	radii.append(BACK_R1)
+	var nr := radii.size()
+	var heights := PackedFloat32Array()
+	heights.resize(nr * BACK_SEGS)
+	var pts := PackedVector3Array()
+	pts.resize(nr * BACK_SEGS)
+	for i in range(nr):
+		for j in range(BACK_SEGS):
+			var a := TAU * j / BACK_SEGS
+			var x := cos(a) * radii[i]
+			var z := sin(a) * radii[i]
+			var h := _back_height(x, z)
+			# Tuck the first rings under the terrain's rim, which they overlap.
+			if radii[i] < 476.0:
+				h -= lerpf(1.2, 0.0, smoothstep(468.0, 476.0, radii[i]))
+			pts[i * BACK_SEGS + j] = Vector3(x, h, z)
+	# Two surfaces over one set of vertices (normals worked out here, so they agree across the seam):
+	# the near hills in the terrain's material, the rest in a plain one.
+	var near_st := SurfaceTool.new()
+	near_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var far_st := SurfaceTool.new()
+	far_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var col_st := SurfaceTool.new()
+	col_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in range(nr):
+		for j in range(BACK_SEGS):
+			var p := pts[i * BACK_SEGS + j]
+			var pl := pts[i * BACK_SEGS + (j + BACK_SEGS - 1) % BACK_SEGS]
+			var pr := pts[i * BACK_SEGS + (j + 1) % BACK_SEGS]
+			var pi := pts[maxi(i - 1, 0) * BACK_SEGS + j]
+			var po := pts[mini(i + 1, nr - 1) * BACK_SEGS + j]
+			var n := (po - pi).cross(pr - pl).normalized()
+			if n.y < 0.0:
+				n = -n
+			var c := _back_colour(p, n, tint)
+			c.a = 1.0 - smoothstep(BACK_SHADE.x, BACK_SHADE.y, radii[i])
+			for st2 in [near_st, far_st]:
+				st2.set_normal(n)
+				st2.set_color(c)
+				st2.add_vertex(p)
+	for i in range(nr - 1):
+		for j in range(BACK_SEGS):
+			var a := i * BACK_SEGS + j
+			var b := i * BACK_SEGS + (j + 1) % BACK_SEGS
+			var c := (i + 1) * BACK_SEGS + j
+			var d := (i + 1) * BACK_SEGS + (j + 1) % BACK_SEGS
+			for tri in [[a, b, c], [b, d, c]]:
+				var pa := pts[tri[0]]
+				var pb := pts[tri[1]]
+				var pc := pts[tri[2]]
+				# Front faces wind clockwise seen from above: (c - a) x (b - a) points up.
+				if (pc - pa).cross(pb - pa).y < 0.0:
+					tri = [tri[0], tri[2], tri[1]]
+				var st: SurfaceTool = near_st if radii[i + 1] <= BACK_SHADE.y else far_st
+				for k in tri:
+					st.add_index(k)
+				if radii[i + 1] <= BACK_SOLID:
+					col_st.add_vertex(pts[tri[0]])
+					col_st.add_vertex(pts[tri[1]])
+					col_st.add_vertex(pts[tri[2]])
+	var mesh := near_st.commit()
+	mesh.surface_set_material(0, _tg.get("grass_material"))
+	far_st.commit(mesh)
+	var mat := StandardMaterial3D.new()
+	mat.vertex_color_use_as_albedo = true
+	mat.vertex_color_is_srgb = true
+	mat.roughness = 0.95
+	mesh.surface_set_material(1, _save_res(mat, "backdrop_mat"))
+	var body := StaticBody3D.new()
+	body.name = "BackdropGround"
+	body.set_meta(&"surface", "grass")
+	node.add_child(body)
+	var mi := MeshInstance3D.new()
+	mi.name = "BackdropGroundMesh"
+	mi.mesh = _save_res(mesh, "backdrop_ground")
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	body.add_child(mi)
+	var cs := CollisionShape3D.new()
+	cs.shape = _save_res(col_st.commit().create_trimesh_shape(), "backdrop_collision")
+	body.add_child(cs)
+	_build_sea(node)
+	_build_bloombay(node)
+	_plan_backdrop_trees()
+	print("  backdrop: %d rings x %d, %d trees (%.1fs)" % [nr, BACK_SEGS, _backdrop_trees.size(), (Time.get_ticks_msec() - t0) / 1000.0])
+
+
+## The ground's colour at p (normal n): woods below the tree line, meadows on the gentle low ground,
+## rock where it's steep or high, snow over the snow line; by the sea fields, then sand.
+func _back_colour(p: Vector3, n: Vector3, tint: FastNoiseLite) -> Color:
+	var nz := tint.get_noise_2d(p.x, p.z) * 0.5 + 0.5
+	var slope := 1.0 - n.y
+	var col := BACK_FOREST.lerp(BACK_FOREST.darkened(0.2), nz)
+	col = col.lerp(BACK_MEADOW, smoothstep(0.55, 0.8, nz) * (1.0 - smoothstep(0.08, 0.25, slope)) * (1.0 - smoothstep(350.0, 450.0, p.y)))
+	col = col.lerp(BACK_MEADOW.lerp(BACK_ROCK, 0.4), smoothstep(560.0, 720.0, p.y + nz * 60.0))
+	col = col.lerp(BACK_ROCK.lerp(BACK_ROCK.darkened(0.25), nz), maxf(smoothstep(0.42, 0.62, slope), smoothstep(760.0, 880.0, p.y + nz * 80.0)))
+	var snow := smoothstep(880.0, 960.0, p.y + nz * 120.0) * (1.0 - smoothstep(0.62, 0.8, slope))
+	col = col.lerp(BACK_SNOW, snow)
+	var r := Vector2(p.x, p.z).length()
+	if r > 1300.0 and p.y < 40.0:
+		var low := 1.0 - smoothstep(14.0, 40.0, p.y)
+		var fields := BACK_FIELDS.lerp(BACK_FIELDS.lightened(0.18), float(int(floor(p.x / 70.0) + floor(p.z / 55.0)) % 2))
+		col = col.lerp(fields, low * 0.8)
+		col = col.lerp(BACK_SAND, 1.0 - smoothstep(SEA_Y + 0.5, SEA_Y + 4.0, p.y))
+	return col
+
+
+## The sea off the coast: a calm plane from 1.7km out to the far plane, its edge under the land.
+func _build_sea(root: Node3D) -> void:
+	var cd := Vector3(sin(deg_to_rad(COAST_BEARING)), 0.0, -cos(deg_to_rad(COAST_BEARING)))
+	var side := Vector3(-cd.z, 0.0, cd.x)
+	var near := COAST_SHORE - 500.0
+	var far := 4200.0
+	var w := 2900.0
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(w * 2.0, far - near)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.09, 0.24, 0.34)
+	mat.roughness = 0.1
+	mat.metallic = 0.3
+	mat.metallic_specular = 0.7
+	pm.material = _save_res(mat, "backdrop_sea_mat")
+	var sea := MeshInstance3D.new()
+	sea.name = "BackdropSea"
+	sea.mesh = _save_res(pm, "backdrop_sea")
+	sea.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var centre := cd * ((near + far) * 0.5)
+	sea.transform = Transform3D(Basis(side, Vector3.UP, cd), Vector3(centre.x, SEA_Y, centre.z))
+	root.add_child(sea)
+
+
+## Bloombay on its coastal plain: low white houses with terracotta roofs along the shore, apartment
+## blocks behind, and downtown's glass towers round the harbour, seen from the summit 2km off.
+func _build_bloombay(root: Node3D) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4402
+	var cd := Vector2(sin(deg_to_rad(COAST_BEARING)), -cos(deg_to_rad(COAST_BEARING)))
+	var side := Vector2(-cd.y, cd.x)
+	var walls := SurfaceTool.new()
+	walls.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var glass := SurfaceTool.new()
+	glass.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var count := 0
+	for k in range(900):
+		var across := rng.randf_range(-900.0, 900.0)
+		var shore := COAST_SHORE + 90.0 * sin(across / 310.0) + 40.0 * sin(across / 97.0)
+		var back := rng.randf_range(30.0, 520.0)
+		var c := cd * (shore - back) + side * across
+		var g := _back_far(c.x, c.y, c.length())
+		if g < SEA_Y + 0.5 or g > 30.0:
+			continue
+		var downtown := exp(-pow(across / 260.0, 2.0)) * exp(-pow((back - 120.0) / 180.0, 2.0))
+		var h: float
+		var tower := false
+		if rng.randf() < downtown * 0.55:
+			h = rng.randf_range(60.0, 170.0)
+			tower = true
+		elif rng.randf() < 0.35 + downtown * 0.4:
+			h = rng.randf_range(18.0, 48.0)
+		else:
+			h = rng.randf_range(7.0, 15.0)
+		var fw := rng.randf_range(16.0, 34.0) if not tower else rng.randf_range(22.0, 36.0)
+		var fd := rng.randf_range(14.0, 28.0) if not tower else fw * rng.randf_range(0.8, 1.2)
+		var yaw := atan2(cd.x, cd.y) + (0.0 if rng.randf() < 0.7 else PI * 0.25)
+		var wall_col: Color
+		if tower:
+			wall_col = [Color(0.48, 0.62, 0.74), Color(0.62, 0.70, 0.76), Color(0.40, 0.52, 0.62)][rng.randi() % 3]
+		else:
+			wall_col = [Color(0.95, 0.93, 0.88), Color(0.93, 0.86, 0.72), Color(0.86, 0.84, 0.80), Color(0.96, 0.90, 0.80)][rng.randi() % 4]
+		var roof_col := Color(0.72, 0.36, 0.24) if h < 16.0 and rng.randf() < 0.7 else wall_col.darkened(0.15)
+		_city_block(glass if tower else walls, Vector3(c.x, g - 2.0, c.y), fw, fd, h + 2.0, yaw, wall_col, roof_col)
+		count += 1
+	var city := Node3D.new()
+	city.name = "BloombaySkyline"
+	root.add_child(city)
+	for pair in [[walls, 0.75, 0.0, "bloombay_blocks"], [glass, 0.18, 0.55, "bloombay_towers"]]:
+		var s: SurfaceTool = pair[0]
+		s.index()
+		s.generate_normals()
+		var m := s.commit()
+		var mat := StandardMaterial3D.new()
+		mat.vertex_color_use_as_albedo = true
+		mat.vertex_color_is_srgb = true
+		mat.roughness = float(pair[1])
+		mat.metallic = float(pair[2])
+		m.surface_set_material(0, _save_res(mat, String(pair[3]) + "_mat"))
+		var mi := MeshInstance3D.new()
+		mi.name = String(pair[3]).to_pascal_case()
+		mi.mesh = _save_res(m, String(pair[3]))
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		city.add_child(mi)
+	print("  Bloombay: %d buildings on the coast" % count)
+
+
+## One of Bloombay's buildings: a box w by d, h tall, turned by yaw, its roof in its own colour.
+func _city_block(st: SurfaceTool, at: Vector3, w: float, d: float, h: float, yaw: float, col: Color, roof: Color) -> void:
+	var b := Basis(Vector3.UP, yaw)
+	var c := [b * Vector3(-w, 0, -d) * 0.5, b * Vector3(w, 0, -d) * 0.5, b * Vector3(w, 0, d) * 0.5, b * Vector3(-w, 0, d) * 0.5]
+	var up := Vector3(0, h, 0)
+	for i in range(4):
+		var p0: Vector3 = at + c[i]
+		var p1: Vector3 = at + c[(i + 1) % 4]
+		var out := ((p0 + p1) * 0.5 - at) * Vector3(1, 0, 1)
+		var shade := col.darkened(0.06 * float(i % 2))
+		_out_tri(st, p0, p1, p1 + up, out, shade)
+		_out_tri(st, p0, p1 + up, p0 + up, out, shade)
+	var top := [at + c[0] + up, at + c[1] + up, at + c[2] + up, at + c[3] + up]
+	_out_tri(st, top[0], top[1], top[2], Vector3.UP, roof)
+	_out_tri(st, top[0], top[2], top[3], Vector3.UP, roof)
+
+
+## A triangle facing `out`: Godot's front faces wind so that (c - a) x (b - a) points out of them.
+static func _out_tri(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, out: Vector3, col: Color) -> void:
+	if (c - a).cross(b - a).dot(out) < 0.0:
+		var t := b
+		b = c
+		c = t
+	for v in [a, b, c]:
+		st.set_color(col)
+		st.add_vertex(v)
+
+
+## The woods carried on over the near hills past the rim, thinning with the woods' own noise and out
+## toward 760m, kept off the steep and the high; the near ones solid.
+func _plan_backdrop_trees() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5150
+	var forest := FastNoiseLite.new()
+	forest.seed = 4815
+	forest.frequency = 0.005
+	forest.fractal_octaves = 3
+	var step := 12.0
+	var x := -780.0
+	while x <= 780.0:
+		var z := -780.0
+		while z <= 780.0:
+			var px := x + rng.randf_range(-0.45, 0.45) * step
+			var pz := z + rng.randf_range(-0.45, 0.45) * step
+			z += step
+			var r := Vector2(px, pz).length()
+			if r < 500.0 or r > 770.0:
+				continue
+			var dens := smoothstep(-0.1, 0.25, forest.get_noise_2d(px, pz)) * (1.0 - smoothstep(650.0, 770.0, r))
+			if rng.randf() > dens * 0.85:
+				continue
+			var g := _back_height(px, pz)
+			var slope := Vector2(_back_height(px + 3.0, pz) - g, _back_height(px, pz + 3.0) - g).length() / 3.0
+			if slope > 0.7:
+				continue
+			var kind: String = ["pine", "fir", "larch", "pine", "fir"][rng.randi() % 5]
+			var sc := rng.randf_range(0.85, 1.2)
+			var mi: int = KINDS.find(kind) * 2 + rng.randi() % 2
+			_backdrop_trees.append([Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(sc, sc * rng.randf_range(0.92, 1.1), sc)), Vector3(px, g - 0.4, pz)), mi, r < BACK_SOLID - 10.0])
+		x += step
+
+
+# ======================================================================================
+#  11. The meadow: grass of real blades (the Lakeside Course's MeadowGrass)
+# ======================================================================================
+
+## The meadow (MeadowGrass.gd, meadow_grass.gdshader, MeadowDetail.gd, as on the Lakeside Course): tufts
+## of real blades in three tiers that the shader stands on the ground and grows as the grass map says
+## (MEADOW_STEP texels over the terrain, R how much, G how tall). The map: thinner and shorter under the
+## trees (the forest floor's map), mown on the pads, Ridgecrest's lawns and along the verges, none on the
+## road, the trail and the lanes, in the water, on the rock faces or past the terrain's rim, and none under
+## anything standing on the ground: the props' footprints, the trunks, the boulders, Ridgecrest's
+## buildings and hedges.
+const MEADOW_STEP := 0.5
+const MEADOW_SIDE := 1900
+const GRASS_ROAD := 8.7
+const GRASS_VERGE := 15.0
+const MOWN := 0.24
+
+## What stands on the ground, for the meadow to keep off: [position, radius] of the trunks (woods, gardens,
+## backdrop), [x, z, radius] of the boulders, Ridgecrest's solid boxes [centre, size, basis].
+var _trunk_spots: Array = []
+var _boulder_spots: Array = []
+var _rc_boxes: Array = []
+
+
+func _build_meadow(root: Node3D) -> void:
+	var t0 := Time.get_ticks_msec()
+	var node := Node3D.new()
+	node.name = "Meadow"
+	node.set_script(load("res://MeadowDetail.gd"))
+	root.add_child(node)
+	var data := _meadow_base()
+	_meadow_roads(data)
+	var cleared := _meadow_blockers(data)
+	var grass_tex: Texture2D = _save_res(MeadowGrass.grass_texture(data, MEADOW_SIDE), "meadow_map")
+	var ht: Array = MeadowGrass.height_texture(_heights, GRID_RES + 1)
+	var height_tex: Texture2D = _save_res(ht[0], "meadow_heights")
+	var height_grid := Vector4(GRID_START, GRID_START, GRID_STEP, GRID_RES + 1)
+	var grass_grid := Vector3(GRID_START, GRID_START, MEADOW_SIDE * MEADOW_STEP)
+	var mats: Array[ShaderMaterial] = []
+	var mms: Array[MultiMesh] = []
+	var cells := 0
+	for tier in range(MeadowGrass.TIERS.size()):
+		var t: Dictionary = MeadowGrass.TIERS[tier]
+		var mesh: Mesh = _save_res(MeadowGrass.tuft_mesh(tier, 1301 + tier), "meadow_tuft_%d" % tier)
+		var mm: MultiMesh = _save_res(MeadowGrass.cell_multimesh(tier, mesh, 2203 + tier), "meadow_cells_%d" % tier)
+		var mat: ShaderMaterial = _save_res(MeadowGrass.material(tier, height_tex, ht[1], grass_tex, height_grid, grass_grid), "meadow_mat_%d" % tier)
+		mats.append(mat)
+		mms.append(mm)
+		var size: float = t["cell"]
+		var fade_end: float = (t["fade"] as Vector2).y
+		var reach: float = size * 0.71
+		var n := int(MEADOW_SIDE * MEADOW_STEP / size)
+		for cj in range(n):
+			for ci in range(n):
+				var x0: float = GRID_START + ci * size
+				var z0: float = GRID_START + cj * size
+				var hr := _meadow_cell(data, x0, z0, size)
+				if hr.x > hr.y:
+					continue
+				var mmi := MultiMeshInstance3D.new()
+				mmi.name = "Grass%d_%d_%d" % [tier, ci, cj]
+				mmi.multimesh = mm
+				mmi.material_override = mat
+				mmi.position = Vector3(x0, 0.0, z0)
+				# The tufts are at y = 0 in the MultiMesh; the shader lifts them onto the ground.
+				mmi.custom_aabb = AABB(Vector3(-1.5, hr.x - 1.0, -1.5), Vector3(size + 3.0, hr.y - hr.x + 3.5, size + 3.0))
+				mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				mmi.visibility_range_end = fade_end + reach
+				mmi.set_meta(&"fade_end", fade_end)
+				mmi.set_meta(&"reach", reach)
+				node.add_child(mmi)
+				cells += 1
+	node.set("materials", mats)
+	node.set("multimeshes", mms)
+	print("  meadow: %d cells in %d tiers, %d texels under things cleared (%.1fs)" % [cells, mms.size(), cleared, (Time.get_ticks_msec() - t0) / 1000.0])
+
+
+## The grass map's texel at (x, z) (its R byte's index), or -1 off the map.
+func _meadow_texel(x: float, z: float) -> int:
+	var ti := int((x - GRID_START) / MEADOW_STEP)
+	var tj := int((z - GRID_START) / MEADOW_STEP)
+	if ti < 0 or tj < 0 or ti >= MEADOW_SIDE or tj >= MEADOW_SIDE:
+		return -1
+	return (tj * MEADOW_SIDE + ti) * 2
+
+
+## The meadow before the roads and props, on the terrain's grid blown up to the map's texels: R how much
+## grass, G how tall.
+func _meadow_base() -> PackedByteArray:
+	var tallness := FastNoiseLite.new()
+	tallness.seed = 5150
+	tallness.frequency = 0.018
+	tallness.fractal_octaves = 2
+	var cl: PackedFloat32Array = _tg.get("grass_clearings")
+	var pads: PackedFloat32Array = _tg.get("flat_pads")
+	var mown_rects: Array = []
+	for o in range(0, cl.size() - 5, 6):
+		mown_rects.append([cl[o], cl[o + 1], cl[o + 2], cl[o + 3], cl[o + 4], maxf(cl[o + 5], 1.0)])
+	for o in range(0, pads.size() - 6, 7):
+		mown_rects.append([pads[o], pads[o + 1], pads[o + 2], pads[o + 3], pads[o + 4], 3.0])
+	var n := GRID_RES
+	var stride := GRID_RES + 1
+	var wn := int(TERRAIN_SIZE / WOODS_STEP)
+	var base := PackedByteArray()
+	base.resize(n * n * 2)
+	for j in range(n):
+		var z: float = GRID_START + (j + 0.5) * GRID_STEP
+		for i in range(n):
+			var x: float = GRID_START + (i + 0.5) * GRID_STEP
+			if x * x + z * z > 468.0 * 468.0:
+				continue
+			var h00: float = _heights[j * stride + i]
+			var h11: float = _heights[(j + 1) * stride + i + 1]
+			var h10: float = _heights[j * stride + i + 1]
+			var h01: float = _heights[(j + 1) * stride + i]
+			var g: float = (h00 + h11 + h10 + h01) * 0.25
+			var steep: float = maxf(absf(h10 - h00), maxf(absf(h01 - h00), absf(h11 - h00))) / GRID_STEP
+			if g < WATER_Y + 0.15 or steep > 1.2:
+				continue
+			var amount := 1.0
+			var height: float = lerpf(0.68, 1.0, tallness.get_noise_2d(x, z) * 0.5 + 0.5)
+			# Thinner and shorter where the woods shade the ground.
+			var wood := 0.0
+			if not _woods.is_empty():
+				wood = smoothstep(0.15, 0.85, _woods[clampi(int((z - GRID_START) / WOODS_STEP), 0, wn - 1) * wn + clampi(int((x - GRID_START) / WOODS_STEP), 0, wn - 1)])
+			amount *= lerpf(1.0, 0.35, wood)
+			height *= lerpf(1.0, 0.75, wood)
+			var mown := 0.0
+			for r in mown_rects:
+				var dx: float = x - float(r[0])
+				var dz: float = z - float(r[1])
+				var reach: float = float(r[2]) + float(r[3]) + float(r[5])
+				if dx * dx + dz * dz > reach * reach:
+					continue
+				var c: float = cos(float(r[4]))
+				var sn: float = sin(float(r[4]))
+				var qx: float = absf(dx * c - dz * sn) - float(r[2])
+				var qz: float = absf(dx * sn + dz * c) - float(r[3])
+				var outside: float = Vector2(maxf(qx, 0.0), maxf(qz, 0.0)).length() + minf(maxf(qx, qz), 0.0)
+				mown = maxf(mown, 1.0 - smoothstep(0.0, float(r[5]), outside))
+			height = lerpf(height, MOWN, mown)
+			var k := (j * n + i) * 2
+			base[k] = int(round(amount * 255.0))
+			base[k + 1] = int(round(clampf(height, 0.0, 1.0) * 255.0))
+	var img := Image.create_from_data(n, n, false, Image.FORMAT_RG8, base)
+	img.resize(MEADOW_SIDE, MEADOW_SIDE, Image.INTERPOLATE_BILINEAR)
+	return img.get_data()
+
+
+## The roads in the map: none on the lap (the trail's bed too) and short along its verges, cross-sections
+## every 0.4m, 0.25m apart across; none on Ridgecrest's lanes, mown along their edges.
+func _meadow_roads(data: PackedByteArray) -> void:
+	var s := 0.0
+	while s < _length:
+		var fr := _frame(s)
+		var p: Vector3 = fr["pos"]
+		var right: Vector3 = fr["right"]
+		s += 0.4
+		var lat := -GRASS_VERGE
+		while lat <= GRASS_VERGE:
+			var k := _meadow_texel(p.x + right.x * lat, p.z + right.z * lat)
+			var a := absf(lat)
+			lat += 0.25
+			if k < 0:
+				continue
+			if a < GRASS_ROAD:
+				data[k] = 0
+			else:
+				data[k + 1] = mini(data[k + 1], int(round(lerpf(MOWN, 1.0, smoothstep(GRASS_ROAD, GRASS_VERGE, a)) * 255.0)))
+	for ln in _lanes:
+		var pts: PackedVector2Array = ln[0]
+		var hw: float = ln[1]
+		var segs: Array = [[pts[0], pts[0]]] if pts.size() == 1 else []
+		for i in range(pts.size() - 1):
+			segs.append([pts[i], pts[i + 1]])
+		for sg in segs:
+			var p0: Vector2 = sg[0]
+			var p1: Vector2 = sg[1]
+			var lo := Vector2(minf(p0.x, p1.x), minf(p0.y, p1.y)) - Vector2.ONE * (hw + 3.0)
+			var hi := Vector2(maxf(p0.x, p1.x), maxf(p0.y, p1.y)) + Vector2.ONE * (hw + 3.0)
+			var x := lo.x
+			while x <= hi.x:
+				var z := lo.y
+				while z <= hi.y:
+					var q := Vector2(x, z)
+					var d := q.distance_to(Geometry2D.get_closest_point_to_segment(q, p0, p1))
+					var k := _meadow_texel(x, z)
+					z += MEADOW_STEP
+					if k < 0:
+						continue
+					if d < hw + 0.4:
+						data[k] = 0
+					elif d < hw + 3.0:
+						data[k + 1] = mini(data[k + 1], int(round(MOWN * 255.0)))
+				x += MEADOW_STEP
+
+
+## Clears the grass from under everything standing on the ground: the props' footprints, the trunks
+## and boulders (their radius), Ridgecrest's boxes (their rectangles). Returns the texels cleared.
+func _meadow_blockers(data: PackedByteArray) -> int:
+	var cleared := [0]
+	var clear_disc := func(c: Vector2, r: float) -> void:
+		var x := c.x - r
+		while x <= c.x + r:
+			var z := c.y - r
+			while z <= c.y + r:
+				if Vector2(x - c.x, z - c.y).length() <= r:
+					var k := _meadow_texel(x, z)
+					if k >= 0 and data[k] > 0:
+						data[k] = 0
+						cleared[0] += 1
+				z += MEADOW_STEP
+			x += MEADOW_STEP
+	for f in _footprints:
+		clear_disc.call(f[1], float(f[2]) + 0.5)
+	for t in _trunk_spots:
+		var tp: Vector3 = t[0]
+		clear_disc.call(Vector2(tp.x, tp.z), float(t[1]) + 0.2)
+	for b in _boulder_spots:
+		clear_disc.call(Vector2(b[0], b[1]), float(b[2]))
+	for bx in _rc_boxes:
+		var c3: Vector3 = bx[0]
+		var sz: Vector3 = bx[1]
+		var bas: Basis = bx[2]
+		# Only what stands on the ground (not the lanterns up on the gate's piers).
+		if c3.y - sz.y * 0.5 > _ground(c3.x, c3.z) + 0.8:
+			continue
+		var ex := bas.x * (sz.x * 0.5 + 0.3)
+		var ez := bas.z * (sz.z * 0.5 + 0.3)
+		var reach := Vector2(absf(ex.x) + absf(ez.x), absf(ex.z) + absf(ez.z))
+		var x := c3.x - reach.x
+		while x <= c3.x + reach.x:
+			var z := c3.z - reach.y
+			while z <= c3.z + reach.y:
+				var d := Vector3(x - c3.x, 0.0, z - c3.z)
+				if absf(d.dot(bas.x.normalized())) <= sz.x * 0.5 + 0.3 and absf(d.dot(bas.z.normalized())) <= sz.z * 0.5 + 0.3:
+					var k := _meadow_texel(x, z)
+					if k >= 0 and data[k] > 0:
+						data[k] = 0
+						cleared[0] += 1
+				z += MEADOW_STEP
+			x += MEADOW_STEP
+	return cleared[0]
+
+
+## A cell's range of ground heights (for its AABB), or an empty range where it has no grass.
+func _meadow_cell(data: PackedByteArray, x0: float, z0: float, size: float) -> Vector2:
+	var t0i := int((x0 - GRID_START) / MEADOW_STEP)
+	var t0j := int((z0 - GRID_START) / MEADOW_STEP)
+	var span := int(size / MEADOW_STEP)
+	var any := false
+	var j := 0
+	while j < span and not any:
+		var i := 0
+		while i < span:
+			var ti := t0i + i
+			var tj := t0j + j
+			if ti < MEADOW_SIDE and tj < MEADOW_SIDE and data[(tj * MEADOW_SIDE + ti) * 2] > 0:
+				any = true
+				break
+			i += 3
+		j += 3
+	if not any:
+		return Vector2(INF, -INF)
+	var lo := INF
+	var hi := -INF
+	var stride := GRID_RES + 1
+	var g0i := int((x0 - GRID_START) / GRID_STEP)
+	var g0j := int((z0 - GRID_START) / GRID_STEP)
+	var gs := int(size / GRID_STEP)
+	for gj in range(g0j, mini(g0j + gs + 1, stride)):
+		for gi in range(g0i, mini(g0i + gs + 1, stride)):
+			var h: float = _heights[gj * stride + gi]
+			if h > -60.0:
+				lo = minf(lo, h)
+				hi = maxf(hi, h)
+	return Vector2(lo, hi + 1.5)
+
+
+# ======================================================================================
+#  12. The lake's and the ponds' edges
+# ======================================================================================
+
+## Plants where the ground meets the water (WATER_Y), round the lake and the small ponds in the hollows
+## (PondKit.gd): bulrushes in stands from the shallows up the wet bank, soft rushes and yellow flag irises
+## on the bank, rafts of water lilies floating 0.6-2.6m deep within reach of a shore. Each grows in
+## patches (noise), off the road, the paddock, the camps and the rest kept out of the woods, at
+## POND_SCALE (life size reads small beside the carts, like the people at PROP_SCALE).
+const POND_SCALE := 1.5
+func _build_pond(root: Node3D) -> void:
+	var t0 := Time.get_ticks_msec()
+	var node := Node3D.new()
+	node.name = "Pond"
+	root.add_child(node)
+	var reed := ShaderMaterial.new()
+	reed.shader = load("res://dune_grass.gdshader")
+	reed.set_shader_parameter("sway", 0.1)
+	reed.set_shader_parameter("speed", 1.1)
+	var reed_mat: Material = _save_res(reed, "mat_pond_reeds")
+	var lily := StandardMaterial3D.new()
+	lily.vertex_color_use_as_albedo = true
+	lily.vertex_color_is_srgb = true
+	lily.roughness = 0.38
+	lily.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var lily_mat: Material = _save_res(lily, "mat_pond_lilies")
+	# 0, 1 bulrushes, 2 rushes, 3, 4 irises, 5-7 lilies.
+	var meshes: Array = [
+		_save_res(PondKit.bulrush(0, reed_mat), "pond_bulrush_0"),
+		_save_res(PondKit.bulrush(1, reed_mat), "pond_bulrush_1"),
+		_save_res(PondKit.rushes(0, reed_mat), "pond_rushes_0"),
+		_save_res(PondKit.iris(0, reed_mat), "pond_iris_0"),
+		_save_res(PondKit.iris(1, reed_mat), "pond_iris_1"),
+		_save_res(PondKit.lilies(0, lily_mat), "pond_lilies_0"),
+		_save_res(PondKit.lilies(1, lily_mat), "pond_lilies_1"),
+		_save_res(PondKit.lilies(2, lily_mat), "pond_lilies_2"),
+	]
+	var patch := FastNoiseLite.new()
+	patch.seed = 3141
+	patch.frequency = 1.0 / 22.0
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 2718
+	var keep_out := _woodland_keep_out()
+	var cells := {}
+	var counts := [0, 0, 0]
+	var stride := GRID_RES + 1
+	for j in range(GRID_RES):
+		for i in range(GRID_RES):
+			var h: float = _heights[j * stride + i]
+			if h < WATER_Y - 2.6 or h > WATER_Y + 1.2:
+				continue
+			for k in range(2):
+				var px: float = GRID_START + (i + rng.randf()) * GRID_STEP
+				var pz: float = GRID_START + (j + rng.randf()) * GRID_STEP
+				var g := _ground(px, pz)
+				var depth: float = WATER_Y - g
+				var pn := patch.get_noise_2d(px, pz)
+				var roll := rng.randf()
+				if Vector2(px, pz).length() > 466.0 or _road_distance(px, pz) < VERGE + 3.0 or _kept_out(keep_out, px, pz, 1.5):
+					continue
+				var kind := -1
+				if depth > 0.6 and depth < 2.6 and pn > 0.0 and roll < 0.55:
+					if _near_shore(px, pz, 18.0):
+						kind = 5 + rng.randi() % 3
+				elif depth > -0.35 and depth < 0.6 and pn < -0.12 and roll < 0.5:
+					kind = rng.randi() % 2
+				elif depth > -0.9 and depth <= 0.1 and roll < 0.14:
+					kind = 2 if pn > -0.25 else 3 + rng.randi() % 2
+				if kind < 0:
+					continue
+				var sc: float = POND_SCALE * (rng.randf_range(0.9, 1.4) if kind >= 5 else rng.randf_range(0.85, 1.3))
+				var y: float = WATER_Y if kind >= 5 else g - 0.06
+				_add_to_cells(cells, _cell(px, pz, FOREST_CELL, kind), Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * sc), Vector3(px, y, pz)))
+				counts[0 if kind < 2 else (2 if kind >= 5 else 1)] += 1
+	for key in cells.keys():
+		var lilies: bool = key.z >= 5
+		# "Grass" and "lilies": DressingColliders leaves both soft (one a SOFT name, the other under its
+		# MIN_HEIGHT), a cart drives through the reeds.
+		var mmi := _multimesh(meshes[key.z], cells[key], ("PondLilies_%d_%d_%d" if lilies else "PondGrass_%d_%d_%d") % [key.x, key.y, key.z])
+		mmi.visibility_range_end = 170.0 if lilies else 240.0
+		mmi.visibility_range_end_margin = 15.0
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		node.add_child(mmi)
+	print("  pond: %d bulrush stands, %d rushes and irises, %d lily rafts (%.1fs)" % [counts[0], counts[1], counts[2], (Time.get_ticks_msec() - t0) / 1000.0])
+
+
+## True where the ground rises out of the water within r of (x, z) (eight bearings).
+func _near_shore(x: float, z: float, r: float) -> bool:
+	for k in range(8):
+		var a := TAU * k / 8.0
+		if _ground(x + cos(a) * r, z + sin(a) * r) > WATER_Y - 0.2:
+			return true
+	return false
 
 
 # ======================================================================================
@@ -1998,6 +3254,7 @@ func _build_woodland(root: Node3D) -> void:
 			var lean := Basis(Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1)).normalized(), rng.randf_range(0.0, 0.04))
 			var xf := Transform3D(lean * Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(sc, sc * rng.randf_range(0.92, 1.08), sc)), Vector3(px, y, pz))
 
+			_shade_woods(px, pz, (3.2 if kind == "birch" or kind == "alder" else 4.2) * sc)
 			var deep: bool = rd > 125.0 and ldist > 45.0 and rng.randf() < 0.65
 			if deep:
 				_add_to_cells(deep_near, _cell(px, pz, FOREST_CELL, mi), xf)
@@ -2118,6 +3375,26 @@ func _build_woodland(root: Node3D) -> void:
 					counts["cover"] += 1
 		s_walk += 4.2
 
+	# Ridgecrest's garden trees and flower beds (_build_ridgecrest), with the woods' own meshes.
+	for gt in _garden_trees:
+		var gxf: Transform3D = gt[0]
+		var gmi: int = gt[1]
+		var gsc: float = gxf.basis.x.length()
+		_add_to_cells(near, _cell(gxf.origin.x, gxf.origin.z, FOREST_CELL, gmi), gxf)
+		_add_to_cells(far, _cell(gxf.origin.x, gxf.origin.z, FAR_CELL, gmi), gxf)
+		trunks.append([gxf.origin, maxf(0.32, TREE_SOLID_SHARE * float(band_r[gmi]) * gsc), 5.0 * gsc])
+	for gp in _garden_plants:
+		var pxf: Transform3D = gp[0]
+		_add_to_cells(plants, _cell(pxf.origin.x, pxf.origin.z, FOREST_CELL, int(gp[1])), pxf)
+	# The woods carried on past the rim (_build_backdrop), with the deep woods' near and far meshes.
+	for bt in _backdrop_trees:
+		var bxf: Transform3D = bt[0]
+		var bmi: int = bt[1]
+		_add_to_cells(deep_near, _cell(bxf.origin.x, bxf.origin.z, FOREST_CELL, bmi), bxf)
+		_add_to_cells(deep_far, _cell(bxf.origin.x, bxf.origin.z, FAR_CELL, bmi), bxf)
+		counts["deep"] += 1
+		if bt[2]:
+			trunks.append([bxf.origin, maxf(0.32, TREE_SOLID_SHARE * float(band_r[bmi]) * bxf.basis.x.length()), 5.0 * bxf.basis.x.length()])
 	print("  woodland counts: %s (%.1fs)" % [str(counts), (Time.get_ticks_msec() - t0) / 1000.0])
 
 	var near_end: float = Woodland.TREE_NEAR + Woodland.TREE_FADE * 0.5 + Woodland.TREE_FADE_JITTER + FOREST_CELL * 0.72
@@ -2169,6 +3446,7 @@ func _build_woodland(root: Node3D) -> void:
 		mmi6.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		node.add_child(mmi6)
 
+	_trunk_spots.append_array(trunks)
 	var bodies := {}
 	for t in trunks:
 		var p3: Vector3 = t[0]
@@ -2209,6 +3487,119 @@ func _build_woodland(root: Node3D) -> void:
 	detail.set("tree_fade_jitter", Woodland.TREE_FADE_JITTER)
 	detail.set("forest_cell", FOREST_CELL)
 	node.add_child(detail)
+
+
+## Adds a tree's shade (a crown of radius r) to the forest floor's map.
+func _shade_woods(x: float, z: float, r: float) -> void:
+	var n := int(TERRAIN_SIZE / WOODS_STEP)
+	if _woods.is_empty():
+		_woods.resize(n * n)
+	var reach := r * 1.4
+	var i0 := maxi(0, floori((x - reach - GRID_START) / WOODS_STEP))
+	var i1 := mini(n - 1, ceili((x + reach - GRID_START) / WOODS_STEP))
+	var j0 := maxi(0, floori((z - reach - GRID_START) / WOODS_STEP))
+	var j1 := mini(n - 1, ceili((z + reach - GRID_START) / WOODS_STEP))
+	for j in range(j0, j1 + 1):
+		for i in range(i0, i1 + 1):
+			var d := Vector2(GRID_START + (i + 0.5) * WOODS_STEP - x, GRID_START + (j + 0.5) * WOODS_STEP - z).length()
+			if d < reach:
+				_woods[j * n + i] = minf(1.0, _woods[j * n + i] + 0.55 * (1.0 - smoothstep(r * 0.5, reach, d)))
+
+
+## The painted ground (terrain_grass_varied.gdshader): the forest trail's bed and the line across it
+## that its ruts follow, Ridgecrest's lanes and lawns (ground_map, GROUND_STEP over GROUND_RECT), and
+## the forest floor under the trees (woods_map, over the whole terrain).
+func _build_ground_map() -> void:
+	var w := int(GROUND_RECT.size.x / GROUND_STEP)
+	var h := int(GROUND_RECT.size.y / GROUND_STEP)
+	var data := PackedByteArray()
+	data.resize(w * h * 4)
+	# Where the trail is: R and, for the texel's nearest cross-section, G.
+	var best := PackedFloat32Array()
+	best.resize(w * h)
+	best.fill(INF)
+	var gaps := _plan_trail_gaps()
+	for k in range(0, gaps.size() - 1, 2):
+		var a: float = gaps[k] - TRAIL_TAPER - TRAIL_LEAD
+		var b: float = gaps[k + 1] + TRAIL_TAPER + TRAIL_LEAD
+		var s := a - 6.0
+		while s <= b + 6.0:
+			var fr := _frame(s)
+			var along: float = 1.0 - smoothstep(0.0, 6.0, maxf(a - s, s - b))
+			var lat := -10.0
+			while lat <= 10.0:
+				var p: Vector3 = (fr["pos"] as Vector3) + (fr["right"] as Vector3) * lat
+				var ti := int((p.x - GROUND_RECT.position.x) / GROUND_STEP)
+				var tj := int((p.z - GROUND_RECT.position.y) / GROUND_STEP)
+				if ti >= 0 and tj >= 0 and ti < w and tj < h:
+					var t := tj * w + ti
+					var r: float = along * (1.0 - smoothstep(6.6, 9.4, absf(lat)))
+					data[t * 4] = maxi(data[t * 4], int(round(r * 255.0)))
+					if absf(lat) < best[t]:
+						best[t] = absf(lat)
+						data[t * 4 + 1] = int(round(clampf(0.5 + lat / 16.0, 0.0, 1.0) * 255.0))
+				lat += 0.25
+			s += 0.25
+	# Ridgecrest's lanes (B), a soft edge 0.6m wide either side of their half width.
+	for ln in _lanes:
+		var pts: PackedVector2Array = ln[0]
+		var hw: float = ln[1]
+		for i in range(pts.size() - 1):
+			var p0: Vector2 = pts[i]
+			var p1: Vector2 = pts[i + 1]
+			var lo := Vector2(minf(p0.x, p1.x), minf(p0.y, p1.y)) - Vector2.ONE * (hw + 1.0)
+			var hi := Vector2(maxf(p0.x, p1.x), maxf(p0.y, p1.y)) + Vector2.ONE * (hw + 1.0)
+			for tj in range(maxi(0, int((lo.y - GROUND_RECT.position.y) / GROUND_STEP)), mini(h, int((hi.y - GROUND_RECT.position.y) / GROUND_STEP) + 1)):
+				for ti in range(maxi(0, int((lo.x - GROUND_RECT.position.x) / GROUND_STEP)), mini(w, int((hi.x - GROUND_RECT.position.x) / GROUND_STEP) + 1)):
+					var q := GROUND_RECT.position + Vector2(ti + 0.5, tj + 0.5) * GROUND_STEP
+					var d := q.distance_to(Geometry2D.get_closest_point_to_segment(q, p0, p1))
+					var v: float = 1.0 - smoothstep(hw - 0.6, hw + 0.6, d)
+					var t := (tj * w + ti) * 4 + 2
+					data[t] = maxi(data[t], int(round(v * 255.0)))
+	# Lawns (A), feathered 1.5m.
+	for lw in _lawns:
+		var c: Vector2 = lw[0]
+		var half: Vector2 = lw[1]
+		var yaw: float = lw[2]
+		var reach := half.length() + 2.0
+		for tj in range(maxi(0, int((c.y - reach - GROUND_RECT.position.y) / GROUND_STEP)), mini(h, int((c.y + reach - GROUND_RECT.position.y) / GROUND_STEP) + 1)):
+			for ti in range(maxi(0, int((c.x - reach - GROUND_RECT.position.x) / GROUND_STEP)), mini(w, int((c.x + reach - GROUND_RECT.position.x) / GROUND_STEP) + 1)):
+				var q := GROUND_RECT.position + Vector2(ti + 0.5, tj + 0.5) * GROUND_STEP - c
+				# Into the lawn's frame (Basis(UP, yaw) maps local to world).
+				var lq := Vector2(q.x * cos(yaw) - q.y * sin(yaw), q.x * sin(yaw) + q.y * cos(yaw))
+				var out := Vector2(maxf(absf(lq.x) - half.x, 0.0), maxf(absf(lq.y) - half.y, 0.0)).length()
+				var v: float = 1.0 - smoothstep(0.0, 1.5, out)
+				var t := (tj * w + ti) * 4 + 3
+				data[t] = maxi(data[t], int(round(v * 255.0)))
+	var img := Image.create_from_data(w, h, false, Image.FORMAT_RGBA8, data)
+	var ground_tex: Texture2D = _save_res(ImageTexture.create_from_image(img), "ground_map")
+
+	var n := int(TERRAIN_SIZE / WOODS_STEP)
+	if _woods.is_empty():
+		_woods.resize(n * n)
+	var wdata := PackedByteArray()
+	wdata.resize(n * n)
+	for i in range(n * n):
+		wdata[i] = int(round(clampf(_woods[i], 0.0, 1.0) * 255.0))
+	var wimg := Image.create_from_data(n, n, false, Image.FORMAT_L8, wdata)
+	var woods_tex: Texture2D = _save_res(ImageTexture.create_from_image(wimg), "woods_map")
+
+	var tv := _level.get_node_or_null("TerrainGenerator/Terrain_Visual") as MeshInstance3D
+	var mat := tv.material_override as ShaderMaterial if tv else null
+	if mat == null:
+		push_error("Pinecrest: no terrain material to paint")
+		return
+	mat.set_shader_parameter("ground_map", ground_tex)
+	mat.set_shader_parameter("ground_rect", Vector4(GROUND_RECT.position.x, GROUND_RECT.position.y, GROUND_RECT.size.x, GROUND_RECT.size.y))
+	mat.set_shader_parameter("woods_map", woods_tex)
+	mat.set_shader_parameter("woods_rect", Vector4(GRID_START, GRID_START, n * WOODS_STEP, n * WOODS_STEP))
+	mat.set_shader_parameter("lane_tex", load("res://materials/asphalt.png"))
+	mat.set_shader_parameter("trail_tint", TRAIL_TINT)
+	mat.set_shader_parameter("water_level", WATER_Y)
+	mat.set_shader_parameter("rock_tex", load("res://materials/dark_rock.png"))
+	mat.set_shader_parameter("rock_amount", 1.0)
+	_save_res(mat, "terrain_mat")
+	print("  ground map %dx%d, woods map %dx%d" % [w, h, n, n])
 
 
 ## Lush arched fern rosette (12-14 folded fronds using WoodlandBuilder's frond helper).
@@ -2414,6 +3805,20 @@ func _woodland_keep_out() -> Array:
 	for f in _footprints:
 		var c: Vector2 = f[1]
 		out.append([c.x, c.y, float(f[2]) + 2.0])
+	# Ridgecrest's lanes, as circles every 3m along them.
+	for ln in _lanes:
+		var pts: PackedVector2Array = ln[0]
+		var hw: float = ln[1]
+		if pts.size() == 1:
+			out.append([pts[0].x, pts[0].y, hw + 1.5])
+			continue
+		for i in range(pts.size() - 1):
+			var d := pts[i].distance_to(pts[i + 1])
+			var k := 0.0
+			while k <= d:
+				var q := pts[i].lerp(pts[i + 1], k / maxf(d, 0.01))
+				out.append([q.x, q.y, hw + 1.5])
+				k += 3.0
 	return out
 
 

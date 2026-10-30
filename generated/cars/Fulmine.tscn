@@ -1,0 +1,40 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://generated/cars/fulmine_body.res" id="1_ahk8o"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/fulmine_wheel_l.res" id="2_hp21x"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/fulmine_wheel_r.res" id="3_ua7n1"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/fulmine_rear_wheel_l.res" id="4_62cvl"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/fulmine_rear_wheel_r.res" id="5_v5nvi"]
+
+[node name="Fulmine" type="Node3D" unique_id=686741444]
+metadata/procedural_car = true
+
+[node name="Model" type="Node3D" parent="." unique_id=732203509]
+transform = Transform3D(-0.5, 0, -4.371139e-08, 0, 0.5, 0, 4.371139e-08, 0, -0.5, 0, 0, 0)
+
+[node name="Body" type="MeshInstance3D" parent="Model" unique_id=769436192]
+mesh = ExtResource("1_ahk8o")
+metadata/car_shader = true
+
+[node name="Wheel_FL" type="MeshInstance3D" parent="Model" unique_id=288589423]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.444, 0.168, -0.665)
+mesh = ExtResource("2_hp21x")
+metadata/car_shader = true
+
+[node name="Wheel_FR" type="MeshInstance3D" parent="Model" unique_id=1087204518]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.444, 0.168, -0.665)
+mesh = ExtResource("3_ua7n1")
+metadata/car_shader = true
+
+[node name="Wheel_RL" type="MeshInstance3D" parent="Model" unique_id=973095396]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.468, 0.182, 0.675)
+mesh = ExtResource("4_62cvl")
+metadata/car_shader = true
+
+[node name="Wheel_RR" type="MeshInstance3D" parent="Model" unique_id=2024053719]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.468, 0.182, 0.675)
+mesh = ExtResource("5_v5nvi")
+metadata/car_shader = true
+
+[node name="AntennaPlacement" type="Node3D" parent="Model" unique_id=639369839]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3, 0.48, 0.86)
