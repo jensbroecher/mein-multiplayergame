@@ -2901,6 +2901,7 @@ func _place(placed: Dictionary, nm: String, x: float, y: float, z: float, height
 const CampKit = preload("res://CampKit.gd")
 const VenueKit = preload("res://VenueKit.gd")
 const RoadsideKit = preload("res://RoadsideKit.gd")
+const LogoFlag = preload("res://LogoFlag.gd")
 const CrowdPlacer = preload("res://CrowdPlacer.gd")
 ## People-sized things are built at life size and scaled up, as on the Lakeside Course and Bloombay.
 const PROP_SCALE := 1.6
@@ -3913,11 +3914,10 @@ const VENUE_PAD_HALF := Vector2(14.0, 10.0)
 const VENUE_BARRIER_LAT := -11.5
 const VENUE_BARRIER_RUN := Vector2(-52.0, 38.0)
 const VENUE_FLAG := Vector2(4.0, -15.0)
-## The flagpole's height and the flag's length (hoist to fly) and depth, in metres. The flag streams west
+## The flagpole's height (LogoFlag.gd's flag, 6.6 x 4.1m). The flag streams west
 ## (across the road, the way the wind blows the Parador's windmill round to face east), so the grid sees it
 ## broadside.
 const VENUE_FLAG_POLE := 14.0
-const VENUE_FLAG_SIZE := Vector2(6.6, 4.1)
 ## Along the Parador's forecourt edge: [from, to] along the lap from the line, and how far out.
 const VENUE_FORECOURT := Vector3(-4.0, 20.0, 21.0)
 ## The people: Nyota Stadium's at this level's PROP_SCALE, a Spanish meeting's mix (CrowdPlacer's groups:
@@ -4059,96 +4059,18 @@ func _build_venue(level_scene: Node3D) -> void:
 	print("  start venue: %d barriers, %d spectators" % [_venue_barriers.size(), _venue_people.size()])
 
 
-## The RC Vibe GP flag: a white pole on a concrete foot with a gilt ball on top, and the flag waving from it
-## (logo_flag.gdshader, flag_wave's wave), the artwork drawn here (_logo_flag_texture).
-func _build_logo_flag(root: Node3D, body: StaticBody3D) -> void:
-	var pk := PropKit.new()
-	pk.material_for = func(key: String) -> Material: return _prop_material(key)
-	var kit := {}
-	var foot: Vector3 = _venue_flag.origin
-	var top: Vector3 = foot + Vector3(0, VENUE_FLAG_POLE, 0)
-	pk.block(kit, "concrete", foot + Vector3(-0.55, -0.3, -0.55), foot + Vector3(0.55, 0.35, 0.55), Color(0.80, 0.78, 0.74))
-	pk.tube(kit, "metal", foot, top, 0.13, 0.08, 10, Color(0.92, 0.92, 0.90))
-	pk.lathe(kit, "metal", top, [Vector2(0.0, 0.0), Vector2(0.17, 0.1), Vector2(0.2, 0.22), Vector2(0.15, 0.36), Vector2(0.0, 0.42)], 12, Color(0.95, 0.72, 0.22))
-	var pmi := MeshInstance3D.new()
-	pmi.name = "LogoFlagPole"
-	pmi.mesh = _save_baked_resource(pk.commit(kit), "venue_flag_pole")
-	root.add_child(pmi)
-	_solid_cylinder(body, foot + Vector3(0, VENUE_FLAG_POLE * 0.5, 0), 0.16, VENUE_FLAG_POLE)
-	# The flag: a grid from the hoist (u 0, at the pole) to the fly (u 1), streaming along its local +x,
-	# facing +z (flag_wave.gdshaderinc reads which way it streams from the normal), UV2 its phase and length.
-	var length: float = VENUE_FLAG_SIZE.x
-	var depth: float = VENUE_FLAG_SIZE.y
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var nu := 28
-	var nv := 12
-	for j in range(nv + 1):
-		for i in range(nu + 1):
-			var u: float = float(i) / nu
-			var v: float = float(j) / nv
-			st.set_normal(Vector3(0, 0, 1))
-			st.set_uv(Vector2(u, v))
-			st.set_uv2(Vector2(0.0, length))
-			st.add_vertex(Vector3(u * length, -v * depth, 0.0))
-	for j in range(nv):
-		for i in range(nu):
-			var a: int = j * (nu + 1) + i
-			var b: int = a + 1
-			var c: int = a + nu + 1
-			var d: int = c + 1
-			# Clockwise seen from +z, the front (CLAUDE.md, procedural mesh winding).
-			st.add_index(c)
-			st.add_index(a)
-			st.add_index(d)
-			st.add_index(a)
-			st.add_index(b)
-			st.add_index(d)
-	var mesh: ArrayMesh = st.commit()
-	var mat := ShaderMaterial.new()
-	mat.shader = load("res://logo_flag.gdshader")
-	mat.set_shader_parameter("flag_tex", _logo_flag_texture())
-	mat.set_shader_parameter("amplitude", 0.12)
-	mat.set_shader_parameter("speed", 5.5)
-	mesh.surface_set_material(0, _save_baked_resource(mat, "logo_flag_material"))
-	var fmi := MeshInstance3D.new()
-	fmi.name = "LogoFlag"
-	fmi.mesh = _save_baked_resource(mesh, "logo_flag")
-	# Streaming west: local +x is the venue frame's +z (its right: toward the road from the river side).
+## The RC Vibe GP flag (LogoFlag.gd: it builds its pole and flag itself) at VENUE_FLAG, streaming west, the
+## artwork baked first (shared with Bloombay Dunes' flags and the other stages').
+func _build_logo_flag(root: Node3D, _body: StaticBody3D) -> void:
+	LogoFlag.bake_texture()
+	var flag := Node3D.new()
+	flag.name = "LogoFlag"
+	flag.set_script(LogoFlag)
+	flag.set("pole_height", VENUE_FLAG_POLE)
+	# Streaming west: its +x is the venue frame's +z (its right: toward the road from the river side).
 	var fly: Vector3 = _venue_flag.basis.z
-	fmi.transform = Transform3D(Basis(fly, Vector3.UP, fly.cross(Vector3.UP)), top - Vector3(0, 0.45, 0) + fly * 0.1)
-	fmi.extra_cull_margin = length * 0.25
-	root.add_child(fmi)
-
-
-## The flag's artwork: the logo (images/logo_transparent.png) on its own navy between orange bands with a
-## white pinstripe, 1024 x 640, mipmapped so it doesn't shimmer at a distance.
-func _logo_flag_texture() -> Texture2D:
-	var w := 1024
-	var h := 640
-	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
-	img.fill(Color8(14, 26, 64))
-	var band := int(h * 0.075)
-	img.fill_rect(Rect2i(0, 0, w, band), Color8(244, 120, 24))
-	img.fill_rect(Rect2i(0, h - band, w, band), Color8(244, 120, 24))
-	var pin := int(h * 0.014)
-	img.fill_rect(Rect2i(0, band, w, pin), Color8(240, 240, 236))
-	img.fill_rect(Rect2i(0, h - band - pin, w, pin), Color8(240, 240, 236))
-	var logo: Image = (load("res://images/logo_transparent.png") as Texture2D).get_image()
-	if logo.is_compressed():
-		logo.decompress()
-	logo.convert(Image.FORMAT_RGBA8)
-	var lw := int(w * 0.84)
-	var lh := int(float(lw) * logo.get_height() / logo.get_width())
-	logo.resize(lw, lh, Image.INTERPOLATE_LANCZOS)
-	img.blend_rect(logo, Rect2i(0, 0, lw, lh), Vector2i((w - lw) / 2, (h - lh) / 2))
-	img.convert(Image.FORMAT_RGB8)
-	img.generate_mipmaps()
-	var tex := PortableCompressedTexture2D.new()
-	# Kept, or a headless save writes the texture empty (CLAUDE.md, procedural cars).
-	tex.keep_compressed_buffer = true
-	tex.create_from_image(img, PortableCompressedTexture2D.COMPRESSION_MODE_LOSSLESS)
-	return _save_baked_resource(tex, "logo_flag_texture")
+	flag.transform = Transform3D(Basis(fly, Vector3.UP, fly.cross(Vector3.UP)), _venue_flag.origin)
+	root.add_child(flag)
 
 
 # ======================================================================================

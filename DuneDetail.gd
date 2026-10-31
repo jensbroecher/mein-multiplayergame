@@ -7,6 +7,7 @@
 #   - the dune grass (Grass_*): a share of each cell's tufts, and how far they are drawn
 #   - the pebbles and rocks (Rocks_*): the same
 #   - the bent palms (the Palms/PalmsFar cells of the bent shapes): a share of each cell
+# It also hands the dune grass's material to Level.gd (group "grass_push"), so the blades part round carts.
 # Instances in every MultiMesh are stored in random order (the generator shuffles each cell), so
 # drawing the first N of them thins a cell evenly. The tyre walls, barriers and flags are few and stay.
 # Nothing here is synced or saved: every peer picks its own detail.
@@ -29,10 +30,27 @@ func _ready() -> void:
 	if Engine.is_editor_hint() or _in_generator():
 		return
 	add_to_group(&"vegetation_detail")
+	add_to_group(&"grass_push")
 	var q: int = 3
 	if get_node_or_null("/root/MusicManager"):
 		q = int(get_node("/root/MusicManager").grass_quality_index)
 	apply_vegetation_quality(q)
+
+
+## The dune grass's materials, for Level.gd to feed the carts' positions so the blades part round them.
+func push_materials() -> Array[ShaderMaterial]:
+	var out: Array[ShaderMaterial] = []
+	for node in find_children("Grass_*", "MultiMeshInstance3D", true, false):
+		var mmi := node as MultiMeshInstance3D
+		var mats: Array = [mmi.material_override]
+		if mmi.multimesh and mmi.multimesh.mesh:
+			for si in range(mmi.multimesh.mesh.get_surface_count()):
+				mats.append(mmi.multimesh.mesh.surface_get_material(si))
+		for m in mats:
+			if m is ShaderMaterial and not out.has(m) and (m as ShaderMaterial).shader \
+					and (m as ShaderMaterial).shader.resource_path == "res://dune_grass.gdshader":
+				out.append(m)
+	return out
 
 
 func _in_generator() -> bool:

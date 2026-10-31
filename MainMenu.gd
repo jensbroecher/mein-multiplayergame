@@ -33,14 +33,14 @@ const STAGE_INFO := {
 	"res://levels/LakesideLevel.tscn": {"title": "LAKESIDE COURSE", "subtitle": "Hills, lake, and the long bridge", "file": "tile_lakeside.jpg", "color": COL_LAKE},
 	"res://levels/PinecrestRidgeLevel.tscn": {"title": "PINECREST RIDGE", "subtitle": "Forest hillclimb, sharp switchbacks, and big jumps", "file": "tile_pinecrest.jpg", "color": COL_GREEN},
 	"res://levels/HarborPierLevel.tscn": {"title": "HARBOR PIER", "subtitle": "Piers, crates, and dark water", "file": "tile_harbor.jpg", "color": COL_HARBOR},
-	"res://levels/BloombayDunesLevel.tscn": {"title": "BLOOMBAY DUNES", "subtitle": "Ocean coastline, rolling waves, and beach sand dunes", "file": "tile_bloombay_dunes.jpg", "color": COL_BEACH},
+	"res://levels/BloombayDunesLevel.tscn": {"title": "SOUTH BEACH", "subtitle": "Ocean coastline, rolling waves, and beach sand dunes", "file": "tile_bloombay_dunes.jpg", "color": COL_BEACH},
 	"res://levels/FrostpeakCreekLevel.tscn": {"title": "FROSTPEAK CREEK", "subtitle": "Snow drifts, creek leaps, and the alpine bridge", "file": "tile_frostpeak_creek.jpg", "color": COL_SNOW},
 	"res://levels/GlacierHighwayLevel.tscn": {"title": "GLACIER HIGHWAY", "subtitle": "Multi-tier concrete expressway, tunnels, and icy on-ramps", "file": "tile_glacier_highway.jpg", "color": COL_SNOW},
 	"res://levels/NorthlightCavernsLevel.tscn": {"title": "NORTHLIGHT CAVERNS", "subtitle": "Night race under the aurora, through a glacier and over an ice arch", "file": "tile_northlight_caverns.jpg", "color": COL_SNOW},
 	"res://levels/FrostfallGorgeLevel.tscn": {"title": "FROSTFALL GORGE", "subtitle": "Off-road along a river gorge: gully jumps, a frozen waterfall, and a mega-jump", "file": "tile_frostfall_gorge.jpg", "color": COL_SNOW},
 	"res://levels/MountainLevel.tscn": {"title": "MOUNTAIN COURSE", "subtitle": "Dunes and high desert ridges", "file": "tile_mountain.jpg", "color": COL_MOUNTAIN},
-	"res://levels/CanyonLevel.tscn": {"title": "CANYON COURSE", "subtitle": "A truss bridge, a shelf road up the canyon wall, a knife-edge ridge, a slot canyon and a ford", "file": "tile_canyon.jpg", "color": COL_CANYON},
-	"res://levels/CanyonChasmLevel.tscn": {"title": "CANYON CHASM", "subtitle": "A narrow run over the drop", "file": "tile_canyon_chasm.jpg", "color": COL_CHASM},
+	"res://levels/CanyonLevel.tscn": {"title": "ARCO DEL VIENTO", "subtitle": "A truss bridge, a shelf road up the canyon wall, a knife-edge ridge, a slot canyon and a ford", "file": "tile_canyon.jpg", "color": COL_CANYON},
+	"res://levels/CanyonChasmLevel.tscn": {"title": "TOLVANERA GULCH", "subtitle": "A narrow run over the drop, where a dust devil roams", "file": "tile_canyon_chasm.jpg", "color": COL_CHASM},
 	"res://levels/DesertWadiLevel.tscn": {"title": "DESERT WADI", "subtitle": "Dry riverbed sand and heat", "file": "tile_desert_wadi.jpg", "color": COL_WADI},
 	"res://levels/MaraCrossingLevel.tscn": {"title": "MARA CROSSING", "subtitle": "Murram road across the savanna: the migration, Pride Rock, and the croc jump", "file": "tile_mara_crossing.jpg", "color": COL_SAVANNA},
 	"res://levels/NyotaStadiumLevel.tscn": {"title": "NYOTA STADIUM", "subtitle": "Stadium supercross: doubles, whoops and a triple, a lap of the streets, and the Drop-In", "file": "tile_nyota_stadium.jpg", "color": COL_SAVANNA},
@@ -289,7 +289,7 @@ func show_sub_menu(menu_name: String) -> void:
 			screen_title.text = "SELECT CUP"
 			screen_subtitle.text = "Each cup is a series of courses"
 			tile_grid.columns = 2
-			_add_tile("BLOOMBAY GP", "Lakeside  •  Pinecrest  •  Harbor  •  Bloombay Dunes", "tile_bloombay_gp.jpg", COL_GREEN, func():
+			_add_tile("BLOOMBAY GP", "Lakeside  •  Pinecrest  •  Harbor  •  South Beach", "tile_bloombay_gp.jpg", COL_GREEN, func():
 				_on_cup_selected("Bloombay GP")
 			)
 			_add_tile("SVARTFJELL GP", "Frostpeak  •  Glacier Highway  •  Northlight  •  Frostfall Gorge", "tile_svartfjell_gp.jpg", COL_SNOW, func():
@@ -298,7 +298,7 @@ func show_sub_menu(menu_name: String) -> void:
 			_add_tile("AL-RAIHANA GP", "Mountain Pass  •  Desert Wadi", "tile_al_raihana_gp.jpg", COL_BRONZE, func():
 				_on_cup_selected("Al-Raihana GP")
 			)
-			_add_tile("SIERRA DEL VIENTO GP", "Canyon Drift  •  Canyon Chasm", "tile_sierra_del_viento_gp.jpg", COL_CANYON, func():
+			_add_tile("SIERRA DEL VIENTO GP", "Arco del Viento  •  Tolvanera Gulch", "tile_sierra_del_viento_gp.jpg", COL_CANYON, func():
 				_on_cup_selected("Sierra del Viento GP")
 			)
 			_add_tile("MATUMAINI GP", "Mara Crossing  •  Nyota Stadium  •  Msitu Falls", "tile_matumaini_gp.jpg", COL_SAVANNA, func():

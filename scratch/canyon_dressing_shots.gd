@@ -1,10 +1,10 @@
 extends Node
 
-# Shots of the Canyon Course's roadside dressing, aimed from the level itself, so they follow the props
+# Shots of the Canyon Course's (Arco del Viento's) roadside dressing, aimed from the level itself, so they follow the props
 # when the generator moves them. Run windowed:
 #   Godot --path . res://scratch/canyon_dressing_shots.tscn -- <out_dir> [level=res://levels/CanyonLevel.tscn]
 #       [only=signs,kickers,start,windmill,parador,lines] [name:x,y,z:tx,ty,tz[:fov] ...]
-# signs: each SectionSigns label from up the road and from the side; kickers: each BajadaKickers mesh from
+# Any level for start (its finish line and the RC Vibe GP flag beside it). signs: each SectionSigns label from up the road and from the side; kickers: each BajadaKickers mesh from
 # beside the trail; start: the start/finish area (FinishLine) from above and from the grid; windmill: the
 # Parador's windmill (ParadorWindmill), two frames a second apart so a turning rotor shows; parador: the
 # Parador's corners up close, in its own frame (found from the windmill's node); lines: the power line where
@@ -51,6 +51,11 @@ func _ready() -> void:
 	_cam.make_current()
 	for i in 40:
 		await get_tree().process_frame
+	# Level.gd stands the RC Vibe GP flag at the start once its collision exists (LogoFlag.gd).
+	if level.has_method("wait_for_collisions"):
+		await level.wait_for_collisions()
+	for i in 30:
+		await get_tree().physics_frame
 	if "signs" in only:
 		var signs := level.get_node_or_null("SectionSigns")
 		var k := 0
@@ -87,6 +92,17 @@ func _ready() -> void:
 			await _shot("start_left", p + f * 25.0 - r * 30.0 + Vector3.UP * 9.0, p)
 			await _shot("start_right", p + f * 25.0 + r * 30.0 + Vector3.UP * 9.0, p)
 			await _shot("start_top", p + Vector3.UP * 110.0 + f * 0.1, p, 70.0)
+			# The RC Vibe GP flag, from the grid and from the road beside it.
+			for lf in get_tree().get_nodes_in_group("logo_flags"):
+				if level.is_ancestor_of(lf):
+					var fp: Vector3 = (lf as Node3D).global_position
+					await _shot("start_flag", p - f * 18.0 + Vector3.UP * 3.0, fp + Vector3.UP * 9.0, 62.0)
+					# From down the road past it, looking back at it.
+					var to_flag: Vector3 = fp - p
+					to_flag.y = 0.0
+					await _shot("start_flag_near", fp + f * 24.0 - to_flag.normalized() * 6.0 + Vector3.UP * 4.0, fp + Vector3.UP * 8.0, 62.0)
+					print("FLAG at ", fp, " pole ", lf.get("pole_height"))
+					break
 	if "windmill" in only:
 		var wm := level.find_child("ParadorWindmill", true, false) as Node3D
 		if wm:

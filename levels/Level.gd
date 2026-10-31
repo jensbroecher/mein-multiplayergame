@@ -1541,6 +1541,18 @@ func _build_runtime_collisions_deferred() -> void:
 	collisions_ready = true
 	collisions_built.emit()
 	print("[COLLISION BUILDER] runtime collisions ready")
+	if not in_generator:
+		_place_logo_flag()
+
+
+## The RC Vibe GP flag beside the start gantry, on every level that hasn't one of its own (LogoFlag.gd):
+## once DressingColliders has made the single meshes solid too (a few physics frames on), so it finds
+## open ground.
+func _place_logo_flag() -> void:
+	for i in 8:
+		await get_tree().physics_frame
+	if is_inside_tree():
+		load("res://LogoFlag.gd").place_at_finish(self)
 
 
 func wait_for_collisions(timeout_sec: float = 90.0) -> void:

@@ -1308,6 +1308,11 @@ func _verify_seafront_clear(label := "Seafront") -> void:
 func _mat(key: String) -> Material:
 	if _materials.has(key):
 		return _materials[key]
+	# The RC Vibe GP flags: the artwork baked first (LogoFlag.gd), waving like the others.
+	if key == "logo_flag":
+		LogoFlag.bake_texture()
+		_materials[key] = LogoFlag.flag_material(0.18, 7.5)
+		return _materials[key]
 	# Flags, waved by their shader (see _flag).
 	if key == "flag":
 		var fm := ShaderMaterial.new()
@@ -1867,9 +1872,11 @@ func _build_grandstand(root: Node3D) -> void:
 		var tx := x0 + i * tier_d
 		var ty := front_y + i * tier_h
 		_block(kit, "paint", Vector3(tx, base, z0), Vector3(tx + tier_d, ty, z1), concrete.darkened(0.04 * (i % 2)))
-		# Bench seats in team colours, broken by two aisles.
+		# Bench seats in team colours, broken by two aisles, at a seat's height for the level's people (1.6
+		# times life size, PROP_SCALE).
 		for seg in [[z0 + 0.6, 160.0], [161.6, 178.4], [180.0, z1 - 0.6]]:
-			_block(kit, "paint", Vector3(tx + 0.35, ty, seg[0]), Vector3(tx + 0.85, ty + 0.42, seg[1]), seat_cols[i % 3])
+			_block(kit, "paint", Vector3(tx + 0.35, ty, seg[0]), Vector3(tx + 0.85, ty + STAND_SEAT_H, seg[1]), seat_cols[i % 3])
+			_stand_seats(tx, ty, float(seg[0]), float(seg[1]), i)
 	var back_x := x0 + tiers * tier_d
 	var top := front_y + tiers * tier_h
 	_block(kit, "paint", Vector3(back_x, base, z0), Vector3(back_x + 0.4, top + 4.2, z1), concrete)
@@ -1901,6 +1908,34 @@ func _build_grandstand(root: Node3D) -> void:
 	_box_collider(root, "Grandstand", Vector3(back_x, top + 1.0, z0 - 0.4), Vector3(back_x + 0.5, roof_y + 0.3, z1 + 0.4))
 	for zc in [152.0, 162.0, 172.0, 182.0, 190.0]:
 		_note("Grandstand", Vector2(x0, zc), 0.5, CLEAR_BUILDING)
+	CrowdPlacer.build(root, _stand_spots, PROP_SCALE / 1.86, SPECTATOR_SKIN, 4410, func(res: Resource, n: String) -> Resource: return _tg.call("_save_resource", res, n))
+	print("Grandstand: %d spectators" % _stand_spots.size())
+
+
+## The grandstand's crowd (CrowdPlacer.gd, Nyota Stadium's people at the level's PROP_SCALE, a seaside
+## resort's mix of visitors): about two seats in three taken, a seat every 0.9m along each bench, facing
+## the sea and the finish. On the four lower tiers a few stand on the tread in front of their seat; only
+## they wave flags, which fit under the roof there.
+const STAND_SEAT_H := 0.72
+const STAND_TAKEN := 0.68
+const STAND_UP_SHARE := 0.1
+const SPECTATOR_SKIN := [0.10, 0.08, 0.70, 0.07, 0.05]
+var _stand_spots: Array = []
+var _stand_rng := RandomNumberGenerator.new()
+
+func _stand_seats(tx: float, ty: float, za: float, zb: float, tier: int) -> void:
+	if _stand_spots.is_empty():
+		_stand_rng.seed = 4410
+	var face := Vector3(-1.0, 0.0, 0.0)
+	var z := za + 0.45
+	while z < zb - 0.3:
+		if _stand_rng.randf() < STAND_TAKEN:
+			var zz := z + _stand_rng.randf_range(-0.06, 0.06)
+			if tier < 4 and _stand_rng.randf() < STAND_UP_SHARE:
+				_stand_spots.append([Vector3(tx + 0.17, ty, zz), face, false, true])
+			else:
+				_stand_spots.append([Vector3(tx + 0.6, ty + STAND_SEAT_H, zz), face, true, true])
+		z += 0.9
 
 
 ## A row of striped bathing huts with their doors to the sea. Each is laid out at life size round the
@@ -5458,6 +5493,8 @@ func _set_owner_recursive(node: Node, scene_root: Node) -> void:
 const CampKit = preload("res://CampKit.gd")
 const PropKit = preload("res://PropKit.gd")
 const TyreStacks = preload("res://TyreStacks.gd")
+const LogoFlag = preload("res://LogoFlag.gd")
+const CrowdPlacer = preload("res://CrowdPlacer.gd")
 
 ## [name, s along the lap (m), side (+1 right of travel, -1 left), CampKit layout]
 const CAMP_SITES := [
@@ -5971,8 +6008,8 @@ func _flag_dir() -> Vector3:
 ## A banner hanging from `hoist`: `along` is the way it streams (horizontal), `length` its widest
 ## reach, `height` its drop. `width(v)` (0..1, v down the banner) shapes its fly edge and `colour(u, v)`
 ## paints each cell. The mesh is in world space and waves in flag_wave.gdshader (UV.x from the hoist).
-func _banner(kit: Dictionary, hoist: Vector3, along: Vector3, length: float, height: float, cols: int, rows: int, width: Callable, colour: Callable) -> void:
-	var st := _st(kit, "flag")
+func _banner(kit: Dictionary, hoist: Vector3, along: Vector3, length: float, height: float, cols: int, rows: int, width: Callable, colour: Callable, key := "flag") -> void:
+	var st := _st(kit, key)
 	var face := along.cross(Vector3.UP).normalized()
 	var phase := _dress_rng.randf() * TAU
 	var point := func(u: float, v: float) -> Vector3:
@@ -6036,6 +6073,18 @@ func _chequered_flag(kit: Dictionary, base: Vector3, along: Vector3) -> void:
 	_banner(kit, top, along, 1.9 * FLAG_SCALE, 1.3 * FLAG_SCALE, 8, 5, width, paint)
 
 
+## An RC Vibe GP flag on the chequered flag's pole, 1.9m by 1.2m at life size (the artwork's proportions),
+## built FLAG_SCALE times larger: logo_flag.gdshader's cloth (LogoFlag.gd's artwork), key "logo_flag".
+func _logo_flag(kit: Dictionary, base: Vector3, along: Vector3) -> void:
+	var top := base + Vector3(0, 3.0 * FLAG_SCALE, 0)
+	_pole(kit, base, top + Vector3(0, 0.1 * FLAG_SCALE, 0), 0.035 * FLAG_SCALE)
+	var width := func(_v: float) -> float:
+		return 1.0
+	var paint := func(_u: float, _v: float) -> Color:
+		return Color.WHITE
+	_banner(kit, top, along, 1.9 * FLAG_SCALE, 1.2 * FLAG_SCALE, 12, 6, width, paint, "logo_flag")
+
+
 ## Feather flags down a line of ground points, the palette changing flag by flag.
 func _flag_group(pts: PackedVector3Array, palette: int) -> void:
 	for i in range(pts.size()):
@@ -6047,32 +6096,61 @@ func _feather_design(palette: int) -> String:
 	return "feather_%d" % (palette % FLAG_COLOURS.size())
 
 
-## Chequered flags only at the start and finish: a row each side of the road either side of the line,
-## FINISH_FLAG_LAT off its centre, leaving out any that would stand in a seafront footprint.
+## Flags at the start and finish: a row along the left of the road either side of the line, FINISH_FLAG_LAT
+## off its centre, every other one an RC Vibe GP flag and the rest chequered, leaving out any that would
+## stand in a seafront footprint. (The row on the right is gone.)
 ## Where the FinishLine stands (placed after the dressing is built, so shared as a constant).
 const FINISH_AT := Vector3(-42.0, 0.76, 160.0)
 const FINISH_FLAG_LAT := 11.5
 const FINISH_FLAG_S := [-22.0, -14.0, -6.0, 6.0, 14.0, 22.0]
+## The big RC Vibe GP flag's places to try, along from the line (ahead first) and left of the road.
+## Behind the line (the cars run toward -z), across the road from the grandstand's middle; on the beach
+## between the row of small flags and the waterline.
+const LOGO_FLAG_S := [-10.0, -6.0, -14.0, -18.0, -2.0]
+const LOGO_FLAG_LAT := [14.0, 15.0, 16.0]
+var _logo_flag_at := Transform3D()
 
 func _build_finish_flags() -> void:
 	var s0 := _nearest_s(Vector2(FINISH_AT.x, FINISH_AT.z))
 	var placed := 0
 	for ds in FINISH_FLAG_S:
 		var fr := _road_at(s0 + float(ds))
-		for side in [-1.0, 1.0]:
-			var p: Vector3 = (fr["pos"] as Vector3) + (fr["right"] as Vector3) * side * FINISH_FLAG_LAT
-			var free := true
-			for f in _footprints:
-				if (f[1] as Vector2).distance_to(Vector2(p.x, p.z)) < float(f[2]) + 1.0:
-					free = false
-					break
-			if not free:
-				continue
-			p.y = _ground(p.x, p.z)
-			_spring_flag("chequered", p, _flag_dir())
-			_note("Finish flag", Vector2(p.x, p.z), 0.5, 1.5, 4.0)
-			placed += 1
+		var p: Vector3 = (fr["pos"] as Vector3) - (fr["right"] as Vector3) * FINISH_FLAG_LAT
+		var free := true
+		for f in _footprints:
+			if (f[1] as Vector2).distance_to(Vector2(p.x, p.z)) < float(f[2]) + 1.0:
+				free = false
+				break
+		if not free:
+			continue
+		p.y = _ground(p.x, p.z)
+		_spring_flag("logo" if placed % 2 == 1 else "chequered", p, _flag_dir())
+		_note("Finish flag", Vector2(p.x, p.z), 0.5, 1.5, 4.0)
+		placed += 1
 	print("Finish flags: %d" % placed)
+	# The big RC Vibe GP flag (LogoFlag.gd) on the beach across the road from the grandstand, the shipwreck's
+	# side, beyond the row: the nearest spot clear of every footprint, 3m+ above the waterline. It streams
+	# east off the sea, as the small flags do (_flag_dir, without their scatter). (Left to Level.gd, it found
+	# only the right, behind the grandstand.)
+	_logo_flag_at = Transform3D()
+	for ds in LOGO_FLAG_S:
+		for lat in LOGO_FLAG_LAT:
+			var fr2 := _road_at(s0 + float(ds))
+			var q: Vector3 = (fr2["pos"] as Vector3) - (fr2["right"] as Vector3) * float(lat)
+			var ok := true
+			for f in _footprints:
+				if (f[1] as Vector2).distance_to(Vector2(q.x, q.z)) < float(f[2]) + 2.5:
+					ok = false
+					break
+			q.y = _ground(q.x, q.z)
+			# The sea lies west of the waterline.
+			if not ok or q.x < float(load("res://TerrainGenerator.gd").bloombay_shore_x(q.z)) + 3.0:
+				continue
+			_logo_flag_at = Transform3D(Basis(Vector3.RIGHT, Vector3.UP, Vector3.BACK), q)
+			_note("Logo flag", Vector2(q.x, q.z), 1.0, 1.5, 14.0)
+			print("Logo flag: %+.0fm along, %.0fm left of the line" % [float(ds), float(lat)])
+			return
+	push_error("Logo flag: no free spot on the beach across from the grandstand")
 
 
 ## Records a flag of `design` standing at `base`, streaming along `along`: its place and its own phase
@@ -6097,6 +6175,8 @@ func _build_spring_flags(parent: Node3D) -> void:
 		var kit := {}
 		if design == "chequered":
 			_chequered_flag(kit, Vector3.ZERO, Vector3.RIGHT)
+		elif design == "logo":
+			_logo_flag(kit, Vector3.ZERO, Vector3.RIGHT)
 		else:
 			_feather_flag(kit, Vector3.ZERO, Vector3.RIGHT, int(String(design).get_slice("_", 1)))
 		var mesh: Mesh = _tg.call("_save_resource", _kit_mesh(kit), "dune_flag_" + String(design))
@@ -6135,14 +6215,23 @@ func _build_spring_flags(parent: Node3D) -> void:
 		mmi.set_script(load("res://SpringProps.gd"))
 		mmi.set("rest", rest)
 		mmi.set("reach", 1.55)
-		mmi.set("height", (3.9 if design != "chequered" else 3.0) * FLAG_SCALE)
+		mmi.set("height", (3.0 if design == "chequered" or design == "logo" else 3.9) * FLAG_SCALE)
 		mmi.set("tip_per_speed", 0.03)
 		mmi.set("max_tip", 1.2)
 		mmi.set("spring", 7.0)
 		mmi.set("damping", 0.15)
 		mmi.set("drag", 0.03)
+		# Driven into, the pole boings and throws the cart off to the side (SpringProps.gd).
+		mmi.set("deflect", 0.22)
+		mmi.set("boing", true)
 		node.add_child(mmi)
 	print("Dune flags: %d designs, %d flags" % [designs.size(), _spring_flags.values().reduce(func(a, v): return a + (v as Array).size(), 0)])
+	if _logo_flag_at.origin != Vector3.ZERO:
+		var big := Node3D.new()
+		big.name = "LogoFlag"
+		big.set_script(LogoFlag)
+		big.transform = _logo_flag_at
+		node.add_child(big)
 
 
 # -- Pebbles and rocks

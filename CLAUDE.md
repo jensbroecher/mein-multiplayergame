@@ -270,7 +270,11 @@ the others re-bakes it (see Lakeside Course below).
   summit road bends (the guardrail's gap is now only the lane and 1.5m a side); one wedges now and then inside
   switchback 4 (969m) and at switchback 1's exit (375m).
 
-## Canyon Course (Sierra del Viento, stage 1)
+## Arco del Viento (the Canyon Course, Sierra del Viento, stage 1)
+
+The menus call it Arco del Viento (it was Canyon Drift / CANYON COURSE); files and code keep "canyon"
+(`CanyonLevel.tscn`, `regenerate_canyon.gd`). Lap records are keyed by the file, so a rename keeps them.
+
 
 - `regenerate_canyon.gd` builds `levels/CanyonLevel.tscn` from scratch (it used to re-run TerrainGenerator
   over the old 4km lap): 2.5km, half tarmac, half gravel and dirt. The start straight runs down the river's
@@ -369,10 +373,8 @@ the others re-bakes it (see Lakeside Course below).
   stand on the kicker's shoulder or the ground, not at the lip's height.
 - The start venue (`_plan_venue`, `_build_venue`, `VENUE_*`), on the river side across from the Parador: CampKit's crowd
   barriers along the verge, CrowdPlacer's people behind them, at and round VenueKit's marquee on its own pad, and along
-  the Parador's forecourt edge; and the RC Vibe GP flag (`_build_logo_flag`): `logo_flag.gdshader` (flag_wave's wave,
-  now `flag_wave.gdshaderinc`, shared with `flag_wave.gdshader`) draws `_logo_flag_texture`, the logo
-  (`images/logo_transparent.png`) on navy between orange bands, baked with mipmaps. The back face mirrors u, so the
-  logo reads from both sides. The flag streams west, the way the windmill faces (into an east wind).
+  the Parador's forecourt edge; and the RC Vibe GP flag (`_build_logo_flag`, a `LogoFlag.gd` node: see "The RC Vibe GP
+  flag"), streaming west, the way the windmill faces (into an east wind).
 - The Parador's furniture and fittings are `RoadsideKit.gd` (life size through the PropKit, placed at PROP_SCALE): the
   café's patio tables under market umbrellas with chrome diner chairs, the fuel pumps (displays, grade buttons,
   nozzles in holsters, hoses), the islands' bins and squeegee buckets, the ice chest, the gas-bottle cage, a bench,
@@ -620,15 +622,33 @@ in front of the water while driving (Msitu Falls, Bloombay Dunes). `canyon_river
   classification counts there). `res://scratch/skid_shots.tscn -- <dir>` (windowed) photographs marks the
   AI laid; `res://scratch/spray_shots.tscn -- <dir> level=...` shoots carts raising dust.
 
-## Props that give: flags, tyre stacks, cones
+## The RC Vibe GP flag (LogoFlag.gd)
+
+- `LogoFlag.gd` (`@tool` Node3D) builds a 14m white pole (`pole_height`) on a concrete foot with a gilt ball, its
+  collider, and the flag (6.6 x 4.1m) streaming along the node's +x, as internal children: a level stores only the
+  transform. The cloth is `logo_flag.gdshader`: flag_wave's wave (`flag_wave.gdshaderinc`, shared with
+  `flag_wave.gdshader`) and the artwork from `generated/logo_flag_texture.res`, which `LogoFlag.bake_texture()` draws (the
+  logo, `images/logo_transparent.png`, on navy between orange bands, mipmapped) and the Arco del Viento and Bloombay
+  generators run. The back face mirrors u, so the logo reads the right way round from both sides.
+- Arco del Viento's and Bloombay's generators place their own. Every other level gets one at race start:
+  Level.gd's `_place_logo_flag` (after the runtime collision and DressingColliders' meshes) calls
+  `LogoFlag.place_at_finish`, which tries spots beside the start gantry (`TRY_ALONG`, `TRY_ACROSS`, past the line
+  first) for level, dry ground off the road and `LAP_CLEAR` from every lap path, with nothing solid round the pole
+  or where the flag hangs, a roof high enough (it lowers the pole under one), and a clear view from the grid to the
+  flag's corners. It streams away from the road. No level needs regenerating for it.
+- `res://scratch/canyon_dressing_shots.tscn -- <dir> only=start level=res://levels/X.tscn` (windowed) photographs any
+  level's start and its flag (`start_flag`, `start_flag_near`) and prints where it stood.
+
 
 - `SpringProps.gd` (a MultiMeshInstance3D, one per design, rest transforms in `rest`): each prop is a damped
   spring tip about its foot plus, for stacks, a slide. A cart's touch (its speed from how far it moved, so
   remote carts count) tips it away and the prop wobbles back; only moving props are written back. Local
   scenery, not synced. Flags (Bloombay's feather and chequered flags, `_build_spring_flags`, FLAG_SCALE 1.5)
   have no collider: a cart drives through, the flag bends over and loses it a little speed. Their waving
-  phase is the instance custom data (`flag_wave.gdshader`'s INSTANCE_CUSTOM.x). Chequered flags stand only
-  at the start/finish (`_build_finish_flags`, FINISH_AT).
+  phase is the instance custom data (`flag_wave.gdshader`'s INSTANCE_CUSTOM.x). At the start/finish
+  (`_build_finish_flags`, FINISH_AT) a row stands on the left only (the right's was taken away), every other one an RC
+  Vibe GP flag (design "logo", `_logo_flag`: logo_flag.gdshader's cloth, key "logo_flag"), and the big LogoFlag stands
+  on the beach past them (`LOGO_FLAG_S`, `LOGO_FLAG_LAT`): left to Level.gd it found only the right, behind the stand.
 - `TyreStacks.gd`: tyre walls of stacks of `PropKit.painted_tyre` (tyre_wall.gdshader), as SpringProps (they
   shift up to 0.6m and rock) over the wall's own box colliders, which still stop the cart. Lakeside,
   Bloombay and Pinecrest all build their tyre walls through it. Bloombay's corner cones are KnockableProps.
@@ -1803,6 +1823,9 @@ its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set th
   intakes and cockpit tub). Every other car's shell is white, so nothing changes for them.
 
 ## Canyon Chasm dirt ramps, rocks, signs, tornado and houses
+
+The menus call this stage Tolvanera Gulch (a dust devil, for its tornado); files and code keep "CanyonChasm".
+
 
 - `DirtRampCSG.gd` (`@tool`) builds the two `DirtRamp` humps in `CanyonChasmLevel.tscn` as CSG internal children (a side
   profile extruded across the width, intersected with a cross section extruded along the run; `use_collision`), so the
