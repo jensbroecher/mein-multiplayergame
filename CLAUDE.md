@@ -1264,6 +1264,37 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   saves what the screen's own camera sees (`jumbo_view.png`) apart from how the quad shows it, which tells a
   camera problem from a mapping or occlusion one.
 
+- The football (`Football`, a `KickBall.gd`, see "Kick balls") waits on lane 4's flat run before the exit boost
+  (`FOOTBALL_X`, `FOOTBALL_LAT`), placed by `_place_gameplay`.
+
+## Kick balls (KickBall.gd)
+
+- `KickBall.gd` (`@tool` RigidBody3D) is a ball the carts kick about: `Style.FOOTBALL` (Nyota Stadium: a size 5
+  ball at the stadium's 1.86 times life size, 0.41m across, about a fifth of a car's length) and `Style.BEACH`
+  (Bloombay: 0.9m, light, floaty). It builds its sphere and shape as internal children from `STYLES` (radius,
+  mass, gravity, damping, bounce, kick, lift, slow, float, drag, roll), so a level stores the transform, the
+  style, `water_y` and `drift`. `kick_ball.gdshader` draws both: the football's 32 panels of a truncated
+  icosahedron (the face its ray from the centre meets first, pentagons black) with dust scuffs, the beach ball's
+  six gores and white caps.
+- Carts never touch it through the physics: every cart gets a collision exception (their 1.5m sphere rode up
+  over a 0.4m ball and pressed it into the ground). The ball tests itself against a box round each car's body
+  (`CAR_HALF`, `CAR_Y`, in the cart's frame: its body never rolls; the box reaches down so nothing passes under)
+  and kicks itself off along the contact's normal at `kick` times the closing speed, lofted by `lift`. A fast car
+  swallows the ball's centre in one frame, so the normal is then the face it came in through (`_entry_face`).
+  The cart this peer drives loses `slow` of the closing speed: a football costs a head-on cart about 12% at
+  30 m/s, a beach ball about 4%. It is on its own layer (`LAYER`, 6), so AI obstacle rays and ground probes
+  don't see it.
+- Local scenery like KnockableProps: each peer runs its own ball from every cart it sees (velocity from how far
+  a remote cart moved; a respawn's jump is none). Nothing is synced.
+- Afloat (`water_y`) it sits `float` under and drifts by `drift`; rolling slowly on the ground it meets a fixed
+  rolling resistance (`roll`, m/s^2): a proportional one let a beach ball creep 5m down the beach's 3 degrees
+  into the sea. Lost (fallen out, at rest away from home for `RESET_IDLE` with no cart within `RESET_CLEAR`, or
+  adrift past `ADRIFT`) it goes back to where it started. Its thump is synthesised (`_thump`).
+- `res://scratch/kick_ball_test.tscn -- [level=] [index=0 | spawn=football|beach s=300] [speed=30] [watch=4]
+  [trace=1]` (headless) drives a real cart into a ball and logs the cart's speed before and after and the
+  ball's flight (`aside` is undone by the cart's own grip); `res://scratch/kick_ball_float_check.tscn --
+  [level=] [seconds=20]` lists where every ball went, afloat or not.
+
 ## The crowd (Nyota Stadium)
 
 - A spectator is two things drawn from one `INSTANCE_CUSTOM` (`crowd_common.gdshaderinc`: r a seed, g the skin
@@ -1346,8 +1377,49 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   bay and close up as they shoal), surf weight, and the shallowest depth seaward. The shader numbers waves by
   phase, breaks them where they get taller than 0.78 of the depth, and runs their swash up the sand. Change
   the terrain and the field follows on the next regeneration.
+  - The field reaches `FIELD_NORTH` (260m) past the terrain's north rim and `FIELD_SOUTH` (1.3km) past its
+    south one, and east to `SHORE_X1` (900m) along the north coast, from `_coast_height` off the terrain: its
+    edge rows repeat outward, and the north beach's shallows repeated had surfed across the whole bay; ending
+    at x 5, the foam stopped dead at the causeway. Its A channel (shallowest water seaward) runs along the
+    rows from the west for the west beach and down the columns from the north for the north coast.
+  - East of the field and past its ends the shader takes the edge texel where its surf weight says open sea
+    (the bay north of the course: weight 1 off the north coast too) and fades the swell out as the water
+    shoals by a coarse ground map (`_bake_coast_map`, `COAST_MAP`, 8m texels of `_coast_height`), with no
+    swash: given the edge's sand, the water draped over the north beach in bands. Behind the west beach (the
+    dune ponds) it is calm, over a shallow bottom (-1.5m; at -50 the occluded pixels round a pond's edge drew
+    it a dark rim). Calm everywhere east, the bay had showed as a pale rectangle.
+  - Over land the sheet hides a metre under the field's ground, and each chunk's culling box reaches up over
+    the highest ground it spans (`_water_ground`): with boxes 4m high, chunks up the dunes culled in and out
+    (tiles popping in motion). Hiding it at a fixed depth instead stepped the water's edge along the grid and
+    flashed cells as waves lifted a corner. A chunk wholly over dry land (`DRY_GROUND`) is left out; the fine
+    columns go into chunks `OCEAN_CHUNK_COLS` wide.
 - The water mesh is a grid on the terrain's grid lines (thirds of a cell across the surf zone `SURF_X0..X1`),
-  so the swash sheet lies parallel to the sand, then wider out to `OCEAN_REACH`. It is chunked for culling.
+  so the swash sheet lies parallel to the sand, then wider out to `OCEAN_REACH`. It is chunked for culling. Its
+  fine rows run on south along the coast to `OCEAN_FINE_SOUTH` (z 900).
+- The course is no island (`_build_backdrop`, `_coast_height`): TerrainGenerator's `edge_falloff` and
+  `clip_to_disc` are off (the terrain is the whole square: the disc's rim of 2.26m cells showed as a staircase
+  over the ring under it) and
+  `TerrainGenerator.bloombay_north_coast` gives the map a north waterline (`bloombay_north_shore_z`, z about
+  -450) with a 45m beach and the dunes easing in by 110m, only ever lowering the ground (switching on whether
+  the ground was under sea level stood ponds and the west beach in cliffs); `bloombay_sea_depth` deepens past
+  240m offshore to 40m (where the falloff used to take it). The dune hollows (ponds) ease in from x 40 to 70
+  (a hard switch at x 50 cut ponds with a straight wall) and fade out between r 360 and 440.
+  `res://scratch/bloombay_shots.tscn` takes a camera velocity (`name:...:frames:gap:vx,vy,vz`) to catch what
+  only shows in motion. `res://scratch/terrain_step_scan.gd` (`-s`, headless, `-- [level=] [step=1.5] [shore=1] [column=x,z0,z1]
+  [row=z,x0,x1]`) lists steps between neighbouring vertices of a level's saved terrain. Past the
+  terrain's square a ring of ground (from its edge, `BACK_R0` 475 on the edges' middles, to `BACK_R1` 3.7km, `BACK_SEGS` 720 round, `BACK_SECTORS` meshes, solid
+  inside `BACK_SOLID`) carries on: the beach south along the coast past the wreck, dunes, scrub and hills
+  inland, the north coast east along a bay that closes at `BAY_HEAD_X`. Open sea west and north-west. Across
+  the bay Bloombay's skyline (`_build_bloombay`, as on Pinecrest Ridge: houses, blocks, downtown towers round
+  where the monorail comes in) stands on its shore (`_city_shore`, `CITY_SHORE_Z` -2300), 2-3km from the
+  course, inside the cameras' 4000m. `_land_d` says how far inland a point is (negative at sea) for all three
+  coasts; `_coast_far` is the far country, `_coast_height` blends the terrain's own (`natural_height`) into it
+  from 30m past the square's edge (by the distance past the edge, so the square's corners meet it on the
+  terrain's own ground). The ring's rings are distances past the square's edge: one a cell inside, tucked
+  0.15m under, then one on the edge at the terrain's own heights, then out (4m apart to 600m, 1.5% a ring to
+  1.3km, 3% past it); its angles hit the square's corners. Out to `BACK_SHADE` the ring is drawn in the sand material tinted by vertex colour (`_sand_mean`,
+  the texture's mean, is white), past it in plain vertex colour. Keep its sea floor whole (`BACK_DEEP`): water
+  over the void past a floor's edge reads darker, and the edge showed from the air.
 - The waterline is `TerrainGenerator.bloombay_shore_x(z)`, the seabed `bloombay_sea_depth()` (1:25 foreshore,
   sandbar about 40m out). Keep the waterline 10m+ off the beach straight's outer edge.
 - The water draws the sand under it from the screen texture as emission. Clamp any screen UV you offset:
@@ -1367,6 +1439,17 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   parasol sets and the fence. The pier and the lighthouse grow seaward from their landward ends.
 - Parasol sets are rejection-sampled per zone (`PARASOL_ZONES`): `PARASOL_GAP` apart, on dry level sand,
   clear of the track and of every footprint noted before them. The fence is built first for that reason.
+- Beach play on the beach section (`_build_beach_play`): beach balls (`KickBall.gd`, see "Kick balls") on the
+  racing line (`BEACH_BALLS`, by s), on the dry sand (`BEACH_BALLS_DRY`) and afloat in the shallows
+  (`BEACH_BALLS_AFLOAT`, `water_y` 0, `drift` up the beach), and sand toys: buckets, spades and swim rings are
+  knockable (`TOY_COLOURS`, push 0: any moving cart frees them; plastic knocks), sandcastles (`_sandcastle`) are scenery in the Umbrellas mesh. Toys lie by some parasol sets
+  (`_toy_group`, their own RNG seeded by the set, so the sets' draws stay put) and at `LINE_TOYS` by the line.
+- Knocked props sound as what they are (`KnockableProps.Sound`, `bonk_sound`, -1 by the node's name, so no
+  level needs regenerating): the crate crash for loungers, a synthesised hollow plastic tok-tok-tok for cones,
+  cool boxes and sand toys, a canvas whump and pole ping for parasols (`_synth_sound`), louder the harder
+  the hit, carrying like a cart's knock (unit_size 20). At -10dB and unit_size 8 they were lost under the
+  engine. `res://scratch/knock_sound_dump.gd` (`-s`, headless, `-- <dir>`) writes them and the balls' kicks
+  out as .wav with their levels.
 - Loungers, cool boxes and parasols are knockable (`KnockableProps.gd`). Each design is one MultiMesh,
   and each prop a frozen rigid body that a cart faster than `push_speed` frees as it nears. At 22 m/s
   a cart keeps ~88% of its speed and flings a lounger clear; a slower cart stops against it.
@@ -1418,8 +1501,12 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 - The monorail (`_build_monorail`, `MONO_*`) runs on a beam 9m up along the landward edge of the
   beach.
   - To the south it curves over a dune lagoon to a buffer. To the north it crosses the lap, with no
-    pylon in the road corridor, and runs on off the map and out to sea (`MONO_FAR_Z`), as if it went
-    somewhere. Off the map it has no collision or footprints.
+    pylon in the road corridor, and runs on off the map 1.9km across the bay into Bloombay (`MONO_FAR_Z`).
+    Off the map it has no collision or footprints. Its pylons there stood on nothing, their footings in
+    clear water: now they stand on pile caps on a causeway (`_build_causeway`, `DAM_*`), a rubble mound
+    whose crest is 1.3m under the surface and whose sides run down at 1:1.6 to the sea bed, in the rocks'
+    material, from the north beach to Bloombay's shore; its flanks lower down are the sea bed's sand
+    (`_mat("seabed")`), or it read as a dark wedge. The train cruises at 32 m/s for the longer run.
   - The beam's dark conductor band is part of its side faces (`_beam`): laid on as a strip, it
     flickered.
   - South Beach station (`_build_mono_station`) stands at the beach path, so the dune fence's gap
@@ -1468,6 +1555,8 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
     (`_palm_crown_off_road` keeps a crown 5.5m off the road's edge).
 - `res://scratch/bloombay_shots.tscn -- <dir> name:x,y,z:tx,ty,tz[:frames[:gap]]` renders into the window
   (not a SubViewport) and can save a time sequence to watch the surf.
+- Regenerating takes about 2 minutes on the M1, nearly all of it TerrainGenerator's own heightfield and
+  road grading (the shore field bakes in 1s, the backdrop in under 1s).
 
 ## Mtaa Nights (Matumaini GP, stage 4)
 

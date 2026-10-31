@@ -10,7 +10,8 @@ render_mode blend_mix, depth_draw_never, cull_disabled, specular_schlick_ggx;
 //   B  surf weight: 1 on the ocean side, 0 inland (dune ponds stay flat)
 //   A  the shallowest depth seaward of here along the row (a wave that broke on the sandbar leaves
 //      foam behind it in the trough)
-// West of the field the travel time grows at the deep water speed; elsewhere edge texels repeat.
+// West of the field the travel time grows at the deep water speed; elsewhere edge texels repeat (east
+// of it only where the edge is open sea).
 //
 // Waves are numbered by phase: theta = (TIME + travel_time) / period, so every crest reaches the
 // waterline at a whole number. Within a wave u = fract(theta) runs from its shoreward foot (0) up the
@@ -22,6 +23,12 @@ uniform sampler2D shore_tex : filter_linear, repeat_disable;
 uniform vec2 shore_origin = vec2(-330.0, -475.0);
 uniform float shore_step = 2.2619;
 uniform vec2 shore_size = vec2(149.0, 421.0);
+
+// The ground everywhere the field doesn't reach, coarsely (R, metres): east of it and past its ends the
+// swell fades out as the water shoals toward a shore it knows nothing else about.
+uniform sampler2D coast_tex : filter_linear, repeat_disable;
+uniform vec2 coast_origin = vec2(-1200.0, -2800.0);
+uniform vec2 coast_extent = vec2(3800.0, 6600.0);
 
 uniform sampler2D foam_tex : filter_linear_mipmap, repeat_enable;
 uniform sampler2D ripple_tex : hint_normal, filter_linear_mipmap, repeat_enable;
@@ -49,12 +56,21 @@ float hash11(float n) {
 }
 
 vec4 shore_at(vec2 p) {
-	// East of the field (the dunes and their ponds) is calm water with no beach under it.
-	if (p.x > shore_origin.x + (shore_size.x - 1.0) * shore_step) {
-		return vec4(-50.0, 0.0, 0.0, 50.0);
-	}
-	vec2 uv = ((p - shore_origin) / shore_step + 0.5) / shore_size;
+	vec2 cell = (p - shore_origin) / shore_step;
+	vec2 uv = (cell + 0.5) / shore_size;
 	vec4 s = textureLod(shore_tex, uv, 0.0);
+	// East of the field and past its ends: where the field's edge is the open sea (surf weight: the bay
+	// north of the course, the sea off the coast to the south) the swell goes on as the edge says, fading
+	// out as the coarse ground says the water shoals, with no swash (the edge's sand isn't the sand there,
+	// and the water draped over it in bands). Behind the beach (the dunes and their ponds) it is calm.
+	// A calm bottom is shallow, not deep: the occluded pixels round a pond's edge take its depth.
+	if (cell.x >= 0.0 && (cell.x > shore_size.x - 1.0 || cell.y < 0.0 || cell.y > shore_size.y - 1.0)) {
+		if (s.b < 0.5) {
+			return vec4(-1.5, 0.0, 0.0, 50.0);
+		}
+		float g = textureLod(coast_tex, (p - coast_origin) / coast_extent, 0.0).r;
+		return vec4(min(g, -1.0), s.g, s.b * smoothstep(1.0, 6.0, -g), max(s.a, 8.0));
+	}
 	s.g += max(shore_origin.x - p.x, 0.0) / c_deep;
 	return s;
 }
@@ -177,6 +193,9 @@ void vertex() {
 		float edge = swash_edge(p.y, t, since_peak, reach);
 		float film = s0.ground + 0.035 + clamp((edge - s0.ground) * 0.3, 0.0, 0.08);
 		y = max(y, film);
+		// Far up the beach the sheet hides a metre under the sand (each chunk's culling box reaches over the
+		// ground it spans). Hidden at a fixed depth, the triangles from the swash's edge dived steeply into
+		// the sand along the grid: the water's edge stepped and cells flashed as the waves lifted a corner.
 		if (s0.ground > runup * 1.8) {
 			y = s0.ground - 1.0;
 		}

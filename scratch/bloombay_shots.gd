@@ -4,7 +4,9 @@ extends Node
 # texture, which a SubViewport fills with stray 2D). Run windowed:
 #   Godot --path . --resolution 1600x900 res://scratch/bloombay_shots.tscn -- <out_dir>
 #       [level=res://levels/BloombayDunesLevel.tscn] [car=x,z,yaw ...] name:x,y,z:tx,ty,tz[:frames[:gap]] ...
-# frames>1 saves name_0..name_N, gap seconds apart (default 1), to watch the surf move.
+# frames>1 saves name_0..name_N, gap seconds apart (default 1), to watch the surf move. A sixth field
+# name:x,y,z:tx,ty,tz:frames:gap:vx,vy,vz moves the camera (and its target) at that velocity in m/s
+# meanwhile, to catch what only shows in motion.
 
 const CART_MODEL := "res://generated/cars/Viper.tscn"
 const CarPaint = preload("res://CarPaint.gd")
@@ -52,8 +54,14 @@ func _ready() -> void:
 		var t := parts[2].split(",")
 		var frames := int(parts[3]) if parts.size() > 3 else 1
 		var gap := float(parts[4]) if parts.size() > 4 else 1.0
+		var vel := Vector3.ZERO
+		if parts.size() > 5:
+			var v := parts[5].split(",")
+			vel = Vector3(float(v[0]), float(v[1]), float(v[2]))
 		cam.global_position = Vector3(float(p[0]), float(p[1]), float(p[2]))
 		cam.look_at(Vector3(float(t[0]), float(t[1]), float(t[2])), Vector3.UP)
+		var t0 := Time.get_ticks_msec()
+		var start := cam.global_position
 		for i in 20:
 			await get_tree().process_frame
 		for f in frames:
@@ -61,6 +69,7 @@ func _ready() -> void:
 				var until := Time.get_ticks_msec() + int(gap * 1000.0)
 				while Time.get_ticks_msec() < until:
 					await get_tree().process_frame
+					cam.global_position = start + vel * (Time.get_ticks_msec() - t0) / 1000.0
 			await RenderingServer.frame_post_draw
 			var name := parts[0] if frames == 1 else "%s_%d" % [parts[0], f]
 			get_viewport().get_texture().get_image().save_png("%s/%s.png" % [out_dir, name])

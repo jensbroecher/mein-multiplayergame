@@ -207,10 +207,16 @@ func _ready() -> void:
 	_tg = tg
 	_curve = curve
 	tg.set("flat_pads", _plan_camps())
+	# The land runs on past the rim (_build_backdrop, from the square's edge): no falloff into the void,
+	# and the whole square, not the disc in it.
+	tg.set("edge_falloff", false)
+	tg.set("clip_to_disc", false)
 	tg.call("generate_world")
+	_init_backdrop()
 	_build_ocean(tg)
 	_build_seafront(level_scene, tg, curve)
 	_build_inland(level_scene)
+	_build_backdrop(level_scene)
 	_build_surf_sound(level_scene, tg)
 
 	# 4. Finish Line & Starting Grid
@@ -356,11 +362,22 @@ func _ready() -> void:
 const SEA_PERIOD := 7.5
 const SEA_C_DEEP := 8.0
 const SHORE_X0 := -330.0
-const SHORE_X1 := 5.0
+## The field and the water grid's fine columns run east along the north coast to here (past the causeway,
+## where the foam had stopped).
+const SHORE_X1 := 900.0
+## Fine columns go into chunks this many wide; a chunk wholly over dry land (DRY_GROUND) is left out.
+const OCEAN_CHUNK_COLS := 40
+const DRY_GROUND := 1.5
 const SURF_X0 := -125.0
 const SURF_X1 := -38.0
 const OCEAN_REACH := 4000.0
 const OCEAN_CHUNK_ROWS := 60
+## The shore field reaches past the terrain: north into deep water (its edge rows repeat outward, and
+## the north beach's shallows repeated would surf across the whole bay), and south along the coast.
+const FIELD_NORTH := 260.0
+const FIELD_SOUTH := 1300.0
+## The water grid keeps the terrain's rows south along the coast to here (the swash sheet needs them).
+const OCEAN_FINE_SOUTH := 900.0
 
 
 func _build_ocean(tg: Node3D) -> void:
@@ -372,7 +389,9 @@ func _build_ocean(tg: Node3D) -> void:
 	var step: float = size.x / float(res)
 	var start: float = -size.x * 0.5
 
+	var t0 := Time.get_ticks_msec()
 	var field: Dictionary = _bake_shore_field(tg, res, step, start)
+	print("Shore field: %d x %d (%.1fs)" % [int(field.size.x), int(field.size.y), (Time.get_ticks_msec() - t0) / 1000.0])
 
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://beach_water.gdshader")
@@ -382,6 +401,10 @@ func _build_ocean(tg: Node3D) -> void:
 	mat.set_shader_parameter("shore_size", field.size)
 	mat.set_shader_parameter("period", SEA_PERIOD)
 	mat.set_shader_parameter("c_deep", SEA_C_DEEP)
+	var coast: Dictionary = _bake_coast_map()
+	mat.set_shader_parameter("coast_tex", coast.texture)
+	mat.set_shader_parameter("coast_origin", coast.origin)
+	mat.set_shader_parameter("coast_extent", coast.extent)
 	mat.set_shader_parameter("foam_tex", _foam_texture())
 	mat.set_shader_parameter("ripple_tex", _ripple_texture())
 
@@ -414,40 +437,89 @@ func _build_ocean(tg: Node3D) -> void:
 		x += step / 3.0
 	col_groups.append(xs.size() - 1)
 	x = x_beach
+	var in_group := 0
 	while x < x_shore_end + 0.01:
 		xs.append(x)
 		x += step
-	x = xs[xs.size() - 1]
-	while x < size.x * 0.5 + 5.0:
-		x += 10.0
-		xs.append(x)
-	xs.append_array(_geometric_run(x, OCEAN_REACH, 20.0))
+		in_group += 1
+		if in_group == OCEAN_CHUNK_COLS:
+			col_groups.append(xs.size() - 1)
+			in_group = 0
+	if in_group > 0:
+		col_groups.append(xs.size() - 1)
+	xs.append_array(_geometric_run(xs[xs.size() - 1], OCEAN_REACH, step * 2.0))
 	col_groups.append(xs.size() - 1)
 
 	var zs := PackedFloat32Array()
 	var far_south := _geometric_run(start, -OCEAN_REACH, step * 2.0)
 	far_south.reverse()
 	zs.append_array(far_south)
-	for r in range(res + 1):
-		zs.append(start + r * step)
-	zs.append_array(_geometric_run(-start, OCEAN_REACH, step * 2.0))
+	var z_fine := start
+	while z_fine < OCEAN_FINE_SOUTH + 0.01:
+		zs.append(z_fine)
+		z_fine += step
+	zs.append_array(_geometric_run(zs[zs.size() - 1], OCEAN_REACH, step * 2.0))
 
+	# A chunk's culling box reaches up over the highest ground it spans: over land the sheet hides a metre
+	# under the sand, and with a box only 4m high chunks up the dunes culled in and out (tiles popping).
+	# A chunk wholly over dry land is left out.
 	var c0 := 0
 	var chunk := 0
+	var dry := 0
 	for c1 in col_groups:
 		var r0 := 0
 		while r0 < zs.size() - 1:
 			var r1: int = mini(r0 + OCEAN_CHUNK_ROWS, zs.size() - 1)
+			var lo := INF
+			var hi := -INF
+			for r in range(r0, r1 + 1, 2 if r1 - r0 > 2 else 1):
+				for c in range(c0, c1 + 1, 2 if c1 - c0 > 2 else 1):
+					var g := _water_ground(xs[c], zs[r])
+					lo = minf(lo, g)
+					hi = maxf(hi, g)
+			if lo > DRY_GROUND:
+				dry += 1
+				r0 = r1
+				continue
 			var mi := MeshInstance3D.new()
 			mi.name = "Ocean_%d" % chunk
-			mi.mesh = tg.call("_save_resource", _ocean_grid(xs, zs, c0, c1, r0, r1), "ocean_%d" % chunk)
+			mi.mesh = tg.call("_save_resource", _ocean_grid(xs, zs, c0, c1, r0, r1, maxf(hi, 3.0)), "ocean_%d" % chunk)
 			mi.material_override = mat
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			water.add_child(mi)
 			chunk += 1
 			r0 = r1
 		c0 = c1
-	print("Ocean: %d x %d grid in %d chunks" % [xs.size(), zs.size(), chunk])
+	print("Ocean: %d x %d grid in %d chunks (%d over dry land left out)" % [xs.size(), zs.size(), chunk, dry])
+
+
+## The ground under the water: the terrain's own on its square, the coast's past it.
+func _water_ground(x: float, z: float) -> float:
+	var half: float = (_tg.get("terrain_size") as Vector2).x * 0.5
+	if absf(x) <= half and absf(z) <= half:
+		return float(_tg.call("_sample_cached_height", x, z))
+	return _coast_height(x, z)
+
+
+## The ground over the whole sea in sight (COAST_MAP, COAST_STEP texels), for beach_water.gdshader past
+## the shore field: the swell fades out where this says the water shoals.
+const COAST_MAP := Rect2(-1200.0, -2800.0, 3800.0, 6600.0)
+const COAST_STEP := 8.0
+
+
+func _bake_coast_map() -> Dictionary:
+	var w := int(COAST_MAP.size.x / COAST_STEP)
+	var h := int(COAST_MAP.size.y / COAST_STEP)
+	var img := Image.create(w, h, false, Image.FORMAT_RF)
+	for j in h:
+		var z := COAST_MAP.position.y + (j + 0.5) * COAST_STEP
+		for i in w:
+			img.set_pixel(i, j, Color(_coast_height(COAST_MAP.position.x + (i + 0.5) * COAST_STEP, z), 0, 0))
+	return {
+		"texture": _tg.call("_save_resource", ImageTexture.create_from_image(img), "coast_map"),
+		"origin": COAST_MAP.position,
+		"extent": Vector2(w, h) * COAST_STEP,
+	}
 
 
 ## Positions from `from` (exclusive) to `to`, spacing starting at `first` and growing 30% a step.
@@ -467,7 +539,7 @@ func _geometric_run(from: float, to: float, first: float) -> PackedFloat32Array:
 	return out
 
 
-func _ocean_grid(xs: PackedFloat32Array, zs: PackedFloat32Array, c0: int, c1: int, r0: int, r1: int) -> ArrayMesh:
+func _ocean_grid(xs: PackedFloat32Array, zs: PackedFloat32Array, c0: int, c1: int, r0: int, r1: int, top: float) -> ArrayMesh:
 	var verts := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var idx := PackedInt32Array()
@@ -489,26 +561,34 @@ func _ocean_grid(xs: PackedFloat32Array, zs: PackedFloat32Array, c0: int, c1: in
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	# Waves lift, drop and lean the surface; the swash sheet climbs the beach.
 	var lo := Vector3(xs[c0] - 2.0, -4.0, zs[r0] - 2.0)
-	var hi := Vector3(xs[c1] + 2.0, 4.0, zs[r1] + 2.0)
+	var hi := Vector3(xs[c1] + 2.0, top + 1.0, zs[r1] + 2.0)
 	mesh.custom_aabb = AABB(lo, hi - lo)
 	return mesh
 
 
 ## Shore field texels (see beach_water.gdshader): ground height, wave travel time to the waterline,
-## surf weight, shallowest depth seaward along the row.
+## surf weight, shallowest depth seaward along the row. On the terrain's grid, from FIELD_NORTH past its
+## north rim to FIELD_SOUTH past its south one: the terrain's heights on the map, the coast's past it.
 func _bake_shore_field(tg: Node3D, res: int, step: float, start: float) -> Dictionary:
 	var heights: PackedFloat32Array = tg.get("_visual_heights")
 	var stride := res + 1
 	var col0 := int(ceil((SHORE_X0 - start) / step))
 	var col1 := int(floor((SHORE_X1 - start) / step))
 	var w := col1 - col0 + 1
-	var h := stride
+	var north := int(ceil(FIELD_NORTH / step))
+	var h := stride + north + int(ceil(FIELD_SOUTH / step))
 	var n := w * h
 	var ground := PackedFloat32Array()
 	ground.resize(n)
 	for r in range(h):
+		var tr := r - north
+		var pz := start + tr * step
 		for c in range(w):
-			ground[r * w + c] = heights[r * stride + col0 + c]
+			var px := start + (col0 + c) * step
+			if tr >= 0 and tr < stride and col0 + c <= res:
+				ground[r * w + c] = heights[tr * stride + col0 + c]
+			else:
+				ground[r * w + c] = _coast_height(px, pz)
 
 	# Travel time: eikonal |grad T| = 1/c with c = sqrt(g*depth), solved by fast sweeping from the
 	# waterline (land is T = 0; water next to land starts at its share of the cell to the waterline).
@@ -568,20 +648,35 @@ func _bake_shore_field(tg: Node3D, res: int, step: float, start: float) -> Dicti
 					c += c_dir
 				r += r_dir
 
+	# The shallowest water seaward: for the west beach along the row from the west, for the north coast
+	# down the column from the north (along the rows there it crossed the beach's wanderings and laced
+	# foam across the open water).
+	var down_col := PackedFloat32Array()
+	down_col.resize(n)
+	for c in range(w):
+		var least := 1000.0
+		for r in range(h):
+			least = minf(least, maxf(-ground[r * w + c], 0.0))
+			down_col[r * w + c] = least
 	var img := Image.create(w, h, false, Image.FORMAT_RGBAH)
 	for r in range(h):
-		var shallowest := 1000.0
+		var along_row := 1000.0
 		for c in range(w):
 			var i := r * w + c
 			var px: float = start + (col0 + c) * step
-			shallowest = minf(shallowest, maxf(-ground[i], 0.0))
-			var weight: float = 1.0 - smoothstep(-25.0, -5.0, px)
+			along_row = minf(along_row, maxf(-ground[i], 0.0))
+			var shallowest: float = along_row if px < -40.0 else down_col[i]
+			# The surf dies behind the west beach (the dune ponds lie calm) but runs on along the north
+			# coast and out over the bay.
+			var pz: float = start + (r - north) * step
+			var dn: float = pz - float(_tgs.bloombay_north_shore_z(px))
+			var weight: float = maxf(1.0 - smoothstep(-25.0, -5.0, px), 1.0 - smoothstep(-30.0, 10.0, dn))
 			var tv: float = tt[i] if tt[i] < big * 0.5 else 0.0
 			img.set_pixel(c, r, Color(ground[i], tv, weight, shallowest))
 	var tex := ImageTexture.create_from_image(img)
 	return {
 		"texture": tg.call("_save_resource", tex, "shore_field"),
-		"origin": Vector2(start + col0 * step, start),
+		"origin": Vector2(start + col0 * step, start - north * step),
 		"size": Vector2(w, h),
 	}
 
@@ -727,15 +822,15 @@ func _surf_stream(tg: Node3D, seed_v: int, waves: int, res_name: String) -> Audi
 # --- Monorail --------------------------------------------------------------------------------------
 # A monorail runs behind the beach: a white beam on flared pylons along the landward edge of the sand
 # (MONO_X). To the south it curves out over a dune lagoon to a buffer. To the north it runs on over
-# the lap, off the map and out to sea toward the horizon, as if to somewhere else (MONO_FAR_Z). A
-# three-car train (Monorail.gd) shuttles from the far end to the station and the south end on the
-# wall clock, with a chime as it pulls in. South Beach station stands at the beach path: a glass
+# the lap, off the map and 1.9km across the bay to Bloombay (MONO_FAR_Z), its pylons standing on a
+# causeway just under the water (_build_causeway). A three-car train (Monorail.gd) shuttles from
+# Bloombay to the station and the south end on the wall clock, with a chime as it pulls in. South Beach station stands at the beach path: a glass
 # vault over the platform, a glazed hall under it and stairs down to the sand facing the track.
 # Everything on the map has collision; palms keep out of the line's corridor (its footprints).
 
 const MONO_X := -7.0
 const MONO_Y := 9.0          # top of the beam
-const MONO_FAR_Z := -1200.0  # the north end, far out to sea
+const MONO_FAR_Z := -2380.0  # the north end, in Bloombay across the bay
 const MONO_S_Z := 130.0      # and to the south one
 const MONO_TURN_R := 30.0
 const MONO_TURN := 1.22      # radians each end curves through
@@ -807,7 +902,12 @@ func _build_monorail(root: Node3D) -> void:
 			if Vector2(lap.x - p.x, lap.z - p.z).length() < TRACK_HALF + CLEAR_BUILDING + 1.2:
 				s += 4.0
 				continue
-		var g := maxf(_ground(p.x, p.z), -3.0) if on_map else -3.0
+		# Off the map they stand on the causeway's crest (_build_causeway), or on Bloombay's ground.
+		var g := maxf(_ground(p.x, p.z), -3.0)
+		if not on_map:
+			g = maxf(_coast_height(p.x, p.z), DAM_TOP + 0.5)
+			if g < DAM_TOP + 0.6:
+				_tube(kit, "paint", Vector3(p.x, DAM_TOP - 0.4, p.z), Vector3(p.x, g, p.z), 1.5, 1.4, 16, MONO_CONCRETE.darkened(0.2))
 		var head_y := MONO_Y - BEAM_H
 		_tube(kit, "paint", Vector3(p.x, g - 0.3, p.z), Vector3(p.x, g + 0.25, p.z), 1.0, 0.95, 16, MONO_CONCRETE.darkened(0.08))
 		_tube(kit, "paint", Vector3(p.x, g, p.z), Vector3(p.x, head_y - 0.9, p.z), 0.55, 0.42, 16, MONO_CONCRETE)
@@ -831,6 +931,7 @@ func _build_monorail(root: Node3D) -> void:
 		_box(kit, "glow", Transform3D(bb, bp + Vector3(0, 0.55, 0)), Vector3(0.2, 0.2, 0.2), Color(1.0, 0.2, 0.15))
 		_box_along(root, name, bp, back, Vector3(1.6, 0.9, 0.8))
 	_build_mono_station(root, kit, curve)
+	_build_causeway(root, kit)
 	_commit(root, kit, name)
 	# The train.
 	var s_station := curve.get_closest_offset(Vector3(MONO_X, MONO_Y, MONO_STATION_Z))
@@ -842,9 +943,9 @@ func _build_monorail(root: Node3D) -> void:
 	train.set("end_car", _tg.call("_save_resource", _car_mesh(true), "monorail_end_car"))
 	train.set("mid_car", _tg.call("_save_resource", _car_mesh(false), "monorail_mid_car"))
 	train.set("stops", PackedFloat32Array([s_station, half_train, s_station, length - half_train]))
-	train.set("dwells", PackedFloat32Array([14.0, 8.0, 14.0, 6.0]))
+	train.set("dwells", PackedFloat32Array([14.0, 10.0, 14.0, 6.0]))
 	train.set("car_pitch", CAR_PITCH)
-	train.set("cruise", 22.0)
+	train.set("cruise", 32.0)
 	train.set("accel", 1.2)
 	train.set("chime", _station_chime())
 	train.set("chime_stops", PackedInt32Array([0, 2]))
@@ -1360,6 +1461,13 @@ func _mat(key: String) -> Material:
 		# Pebbles and rocks lying about the dunes, tinted by vertex colour.
 		"pebble":
 			m.roughness = 0.93
+		# The sea bed's sand (the terrain's sand material, tinted): the causeway's flanks.
+		"seabed":
+			var sand := (_tg.get("grass_material") as StandardMaterial3D).duplicate() as StandardMaterial3D
+			sand.vertex_color_use_as_albedo = true
+			sand.vertex_color_is_srgb = true
+			_materials[key] = sand
+			return sand
 		"glass":
 			m.metallic = 0.3
 			m.roughness = 0.05
@@ -4310,6 +4418,7 @@ func _build_knockables(root: Node3D) -> void:
 		_scale_about(Vector3.ZERO, k)
 		var boxes: Array = []
 		var mass := 120.0
+		var sound := -1
 		var push := 9.0
 		var reach := 5.0
 		var com := -1.0
@@ -4317,6 +4426,25 @@ func _build_knockables(root: Node3D) -> void:
 			_cool_box(kit)
 			boxes = [[Vector3(0, 0.21, 0) * k, Vector3(0.6, 0.42, 0.4) * k]]
 			mass = 40.0
+		elif key.begins_with("bucket_") or key.begins_with("spade_") or key.begins_with("swimring_"):
+			# Sand toys: light plastic, freed by any cart that comes near, so nothing this small
+			# ever stops a cart; their knock is the beach ball's hollow bwong.
+			var tc: Color = TOY_COLOURS[int(key.get_slice("_", 1))]
+			if key.begins_with("bucket_"):
+				_sand_bucket(kit, tc)
+				boxes = [[Vector3(0, 0.1, 0) * k, Vector3(0.2, 0.2, 0.2) * k]]
+				mass = 3.0
+			elif key.begins_with("spade_"):
+				_spade(kit, tc)
+				boxes = [[Vector3(0, 0.02, 0.0) * k, Vector3(0.14, 0.04, 0.56) * k]]
+				mass = 2.0
+			else:
+				_swim_ring(kit, tc)
+				boxes = [[Vector3(0, 0.1, 0) * k, Vector3(0.72, 0.2, 0.72) * k]]
+				mass = 2.5
+			push = 0.0
+			reach = 2.6
+			sound = 1
 		elif key.begins_with("parasol_"):
 			_parasol(kit, HUT_COLOURS[int(key.substr(8))])
 			# Base, pole and canopy. Light, and freed by any cart that isn't crawling: it topples
@@ -4353,6 +4481,7 @@ func _build_knockables(root: Node3D) -> void:
 		mmi.set("push_speed", push)
 		mmi.set("release_radius", reach)
 		mmi.set("centre_of_mass_y", com)
+		mmi.set("bonk_sound", sound)
 		mmi.multimesh = mm
 		root.add_child(mmi)
 
@@ -4522,6 +4651,163 @@ func _towel(kit: Dictionary, rng: RandomNumberGenerator, centre: Vector3, yaw: f
 		_tube(kit, "paint", hp + Vector3(0, 0.025, 0), hp + Vector3(0, 0.05, 0), 0.112, 0.11, 14, pal[0])
 
 
+## Sand toys at life size, their origin on the sand: a bucket, a spade lying flat and a striped swim
+## ring (knockable, TOY_COLOURS), and sandcastles (scenery, in the parasol sets' mesh).
+const TOY_COLOURS := [Color(0.95, 0.28, 0.22), Color(0.18, 0.52, 0.92), Color(0.99, 0.80, 0.12), Color(0.22, 0.72, 0.38)]
+const CASTLE_SAND := Color(0.80, 0.69, 0.50)
+
+
+func _sand_bucket(kit: Dictionary, col: Color) -> void:
+	_lathe(kit, "gloss", Vector3.ZERO, [Vector2(0.0, 0.0), Vector2(0.075, 0.0), Vector2(0.104, 0.188), Vector2(0.113, 0.2),
+		Vector2(0.1, 0.2), Vector2(0.072, 0.016), Vector2(0.0, 0.016)], 18, col)
+	# Damp sand half filling it, and the handle over the top.
+	_lathe(kit, "wood", Vector3.ZERO, [Vector2(0.088, 0.1), Vector2(0.06, 0.13), Vector2(0.0, 0.14)], 14, CASTLE_SAND.darkened(0.12))
+	var prev := Vector3(-0.108, 0.19, 0.0)
+	for i in range(1, 9):
+		var a := PI * i / 8.0
+		var q := Vector3(-0.108 * cos(a), 0.19 + 0.09 * sin(a), 0.0)
+		_tube(kit, "gloss", prev, q, 0.006, 0.006, 6, col.darkened(0.25))
+		prev = q
+
+
+func _spade(kit: Dictionary, col: Color) -> void:
+	_tube(kit, "gloss", Vector3(0, 0.017, -0.27), Vector3(0, 0.017, 0.1), 0.016, 0.016, 8, col)
+	_tube(kit, "gloss", Vector3(-0.06, 0.017, -0.28), Vector3(0.06, 0.017, -0.28), 0.018, 0.018, 8, col)
+	# The blade: a shallow scoop, its sides turned up.
+	_box(kit, "gloss", Transform3D(Basis(), Vector3(0, 0.012, 0.19)), Vector3(0.13, 0.012, 0.18), col)
+	for sx in [-1.0, 1.0]:
+		_box(kit, "gloss", Transform3D(Basis(Vector3.BACK, sx * 0.5), Vector3(sx * 0.072, 0.024, 0.19)), Vector3(0.03, 0.01, 0.18), col)
+
+
+func _swim_ring(kit: Dictionary, col: Color) -> void:
+	var st := _st(kit, "gloss")
+	var big := 0.3
+	var tube := 0.1
+	var nu := 24
+	var nv := 10
+	for i in nu:
+		var c := col if (i / 3) % 2 == 0 else WHITE
+		for j in nv:
+			var q := []
+			var nn := []
+			for e in [[i, j], [i + 1, j], [i + 1, j + 1], [i, j + 1]]:
+				var u: float = TAU * e[0] / nu
+				var v: float = TAU * e[1] / nv
+				var ring := Vector3(cos(u), 0.0, sin(u))
+				var n := ring * cos(v) + Vector3.UP * sin(v)
+				q.append(ring * big + n * tube + Vector3(0, tube, 0))
+				nn.append(n)
+			var out: Vector3 = (nn[0] + nn[2]).normalized()
+			_tri(st, q[0], q[1], q[2], nn[0], nn[1], nn[2], c, out)
+			_tri(st, q[0], q[2], q[3], nn[0], nn[2], nn[3], c, out)
+
+
+## A sandcastle at `at` (layout space): a keep with crenellations, two to four turrets round it and a
+## little flag.
+func _sandcastle(kit: Dictionary, rng: RandomNumberGenerator, at: Vector3) -> void:
+	var sand := CASTLE_SAND.lerp(CASTLE_SAND.darkened(0.15), rng.randf())
+	var keep := rng.randf_range(0.16, 0.22)
+	var kh := rng.randf_range(0.2, 0.3)
+	_tower(kit, at, keep, kh, sand)
+	var n := rng.randi_range(2, 4)
+	var a0 := rng.randf() * TAU
+	for i in n:
+		var a := a0 + TAU * i / n + rng.randf_range(-0.3, 0.3)
+		var d := keep + rng.randf_range(0.12, 0.2)
+		var tp := at + Vector3(cos(a) * d, 0.0, sin(a) * d)
+		tp.y = _ground(tp.x, tp.z)
+		_tower(kit, tp, rng.randf_range(0.07, 0.1), rng.randf_range(0.12, 0.18), sand.darkened(rng.randf_range(0.0, 0.08)))
+	var top := at + Vector3(0, kh + 0.03, 0)
+	_tube(kit, "wood", top, top + Vector3(0, 0.22, 0), 0.004, 0.004, 5, Color(0.9, 0.85, 0.7))
+	# A pennant (the canvas material is double sided).
+	_tri(_st(kit, "canvas"), top + Vector3(0, 0.22, 0), top + Vector3(0.11, 0.19, 0), top + Vector3(0, 0.15, 0),
+		Vector3.BACK, Vector3.BACK, Vector3.BACK, TOY_COLOURS[rng.randi() % TOY_COLOURS.size()], Vector3.BACK)
+
+
+## One bucket-moulded tower: a frustum, slightly lumpy, crenellated round its top.
+func _tower(kit: Dictionary, at: Vector3, r: float, h: float, col: Color) -> void:
+	_lathe(kit, "wood", at - Vector3(0, 0.03, 0), [Vector2(r * 1.12, 0.0), Vector2(r * 1.06, 0.02), Vector2(r * 0.9, h), Vector2(r * 0.72, h + 0.005),
+		Vector2(0.0, h + 0.005)], 14, col, true)
+	var merlons := 6
+	for i in merlons:
+		var a := TAU * (i + 0.5) / merlons
+		var mp := at + Vector3(cos(a) * r * 0.8, h - 0.03 + 0.025, sin(a) * r * 0.8)
+		_box(kit, "wood", Transform3D(Basis(Vector3.UP, -a), mp), Vector3(0.035, 0.05, r * 0.45), col)
+
+
+## Toys by a towel at `at` (layout space): a bucket and a spade, and sometimes a sandcastle or a
+## swim ring.
+func _toy_group(kit: Dictionary, rng: RandomNumberGenerator, at: Vector3, castle: bool) -> void:
+	at.y = _ground(at.x, at.z)
+	var c := rng.randi() % TOY_COLOURS.size()
+	_knock_toy("bucket_%d" % c, at + Vector3(rng.randf_range(-0.2, 0.2), 0, rng.randf_range(-0.2, 0.2)), rng)
+	_knock_toy("spade_%d" % ((c + 1 + rng.randi() % 3) % TOY_COLOURS.size()), at + Vector3(0.35, 0, rng.randf_range(-0.3, 0.3)), rng)
+	if castle:
+		var cp := at + Vector3(-0.75, 0, rng.randf_range(-0.4, 0.4))
+		cp.y = _ground(cp.x, cp.z)
+		_sandcastle(kit, rng, cp)
+	elif rng.randf() < 0.6:
+		_knock_toy("swimring_%d" % (rng.randi() % TOY_COLOURS.size()), at + Vector3(-0.7, 0, rng.randf_range(-0.5, 0.5)), rng)
+
+
+func _knock_toy(key: String, lp: Vector3, rng: RandomNumberGenerator) -> void:
+	lp.y = _ground(lp.x, lp.z)
+	_knock_add(key, Transform3D(Basis(Vector3.UP, rng.randf() * TAU), _frame * lp))
+
+
+## Play on the beach section of the lap: beach balls (KickBall.gd) on the racing line, on the dry sand
+## by the parasols and afloat in the shallows (the surf carries them back up the beach), and sand toys
+## dropped along the line, all for the carts to send flying.
+const BEACH_BALLS := [
+	# [s along the lap, metres right of the line] on the beach; [x off the waterline, z] afloat
+	# (negative s: from the lap's end, the run back onto the start straight)
+	[70.0, -2.0], [165.0, 3.5], [265.0, -4.5], [360.0, 2.0], [-45.0, -3.0],
+]
+const BEACH_BALLS_DRY := [Vector2(-22.0, -60.0), Vector2(-20.0, 108.0), Vector2(-27.0, -190.0)]
+const BEACH_BALLS_AFLOAT := [Vector2(-9.0, 30.0), Vector2(-12.0, -150.0)]
+const LINE_TOYS := [[120.0, 5.5], [215.0, -6.0], [310.0, 6.5], [-80.0, 5.0]]
+
+
+func _build_beach_play(root: Node3D, kit: Dictionary) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 6161
+	var spots: Array = []
+	var length := _curve.get_baked_length()
+	for b in BEACH_BALLS:
+		var sp := _curve.sample_baked(fposmod(float(b[0]), length))
+		var ahead := _curve.sample_baked(fposmod(float(b[0]) + 2.0, length)) - sp
+		var right := Vector3(-ahead.z, 0.0, ahead.x).normalized()
+		var q := sp + right * float(b[1])
+		spots.append([Vector3(q.x, _ground(q.x, q.z), q.z), false])
+	for d in BEACH_BALLS_DRY:
+		spots.append([Vector3(d.x, _ground(d.x, d.y), d.y), false])
+	for d in BEACH_BALLS_AFLOAT:
+		var x: float = float(_tgs.bloombay_shore_x(d.y)) + d.x
+		spots.append([Vector3(x, 0.0, d.y), true])
+	var r: float = KickBall.STYLES[KickBall.Style.BEACH]["radius"]
+	for i in spots.size():
+		var ball := RigidBody3D.new()
+		ball.name = "BeachBall_%d" % i
+		ball.set_script(load("res://KickBall.gd"))
+		ball.set("style", KickBall.Style.BEACH)
+		ball.set("water_y", 0.0)
+		# The surf runs up the beach to the east.
+		ball.set("drift", Vector3(1.4, 0.0, 0.0))
+		var p: Vector3 = spots[i][0]
+		ball.position = p + Vector3(0, (r * 0.76 if spots[i][1] else r) + 0.02, 0)
+		ball.rotation = Vector3(rng.randf_range(-PI, PI), rng.randf_range(-PI, PI), 0.0)
+		root.add_child(ball)
+	for t in LINE_TOYS:
+		var sp := _curve.sample_baked(fposmod(float(t[0]), length))
+		var ahead := _curve.sample_baked(fposmod(float(t[0]) + 2.0, length)) - sp
+		var right := Vector3(-ahead.z, 0.0, ahead.x).normalized()
+		var q := sp + right * float(t[1])
+		_scale_about(Vector3(q.x, 0.0, q.z), PROP_SCALE)
+		_toy_group(kit, rng, Vector3(q.x, 0.0, q.z), false)
+		_end_scale()
+	print("Beach: %d beach balls, toys at %d spots on the line" % [spots.size(), LINE_TOYS.size()])
+
+
 ## Parasol sets spread over the dry sand between the racing line and the dune fence, and round the
 ## beach's far ends: rejection-sampled per zone, PARASOL_GAP apart and clear of everything noted so far.
 const PARASOL_ZONES := [
@@ -4552,6 +4838,7 @@ func _build_umbrellas(root: Node3D) -> void:
 			_parasol_set(root, kit, rng, p, placed.size())
 			placed.append(p)
 			got += 1
+	_build_beach_play(root, kit)
 	_commit(root, kit, "Umbrellas")
 	_build_knockables(root)
 	print("Seafront: %d parasol sets" % placed.size())
@@ -4605,6 +4892,11 @@ func _parasol_set(root: Node3D, kit: Dictionary, rng: RandomNumberGenerator, p: 
 		var cp := at + b * Vector3(1.45 if count == 2 else -0.65, 0, 0.7)
 		cp.y = _ground(cp.x, cp.z)
 		_knock_add("coolbox", Transform3D(Basis(Vector3.UP, rng.randf_range(0.0, PI)), _frame * cp))
+	# Sand toys by some sets: their own random stream, so the sets' draws stay as they were.
+	var trng := RandomNumberGenerator.new()
+	trng.seed = 9100 + n
+	if trng.randf() < 0.55:
+		_toy_group(kit, trng, at + b * Vector3(trng.randf_range(-0.8, 0.8), 0, 1.6 + trng.randf_range(0.0, 0.6)), trng.randf() < 0.6)
 	_note("Parasol%d" % n, p, PARASOL_SET_R, CLEAR_DECOR, 2.6)
 	_end_scale()
 
@@ -6430,3 +6722,414 @@ func _build_dune_grass(parent: Node3D) -> Array:
 		parent.add_child(mmi)
 	print("Dune grass: %d patches, %d tufts" % [centres.size(), tufts])
 	return centres
+
+
+# --- The coast round the course, the bay and Bloombay ---------------------------------------------
+# The course is no island. TerrainGenerator's edge falloff is off, so its ground runs on to the rim,
+# and past it the land carries on as one ring of ground out to BACK_R1 (inside the race cameras'
+# 4000m far plane): the beach runs on south along the coast past the wreck, the dunes inland give way
+# to scrub and then hills, and the north coast (TerrainGenerator.bloombay_north_shore_z) runs east
+# along a bay. The open sea lies west and north-west. Across the bay, where the monorail goes, Bloombay
+# stands on the far shore, its hills behind it; the bay closes to the east (BAY_HEAD_X). The ring's
+# inner band is solid, so a cart that leaves the map drives on. _coast_height is the one description
+# of all of it: the ring, the surf's shore field and the monorail's causeway read it.
+
+## The terrain is the whole square (TerrainGenerator.clip_to_disc off); the ring starts at its edge.
+const TERRAIN_HALF := 475.0
+const BACK_R0 := 475.0
+const BACK_R1 := 3700.0
+const BACK_SOLID := 640.0
+const BACK_SEGS := 720
+const BACK_SECTORS := 12
+## Out to here the ground is drawn in the terrain's sand material, tinted by vertex colour; past it in a
+## plain vertex colour one.
+const BACK_SHADE := 1000.0
+## Bloombay's shore across the bay (its z at x = 0), the point at its west end, and the bay's head.
+const CITY_SHORE_Z := -2300.0
+const CITY_WEST_X := -1500.0
+const BAY_HEAD_X := 2100.0
+## Ring triangles wholly deeper than this are left out (the sea bed bottoms out at 40m: none are). The
+## floor must go on: water over the void beyond it reads darker, and its edge showed from the air.
+const BACK_DEEP := -45.0
+## The sand's colour if its texture can't be read.
+const BACK_SAND := Color(0.84, 0.76, 0.60)
+const BACK_DUNE_GRASS := Color(0.60, 0.62, 0.38)
+const BACK_SCRUB := Color(0.44, 0.46, 0.29)
+const BACK_FOREST := Color(0.24, 0.31, 0.17)
+const BACK_ROCK := Color(0.52, 0.49, 0.44)
+
+var _back_hills: FastNoiseLite
+var _back_ridge: FastNoiseLite
+var _back_tint: FastNoiseLite
+var _tgs: Script
+## The sand texture's mean colour (with its albedo), what a vertex tint of white gives on the near ring.
+var _sand_mean := BACK_SAND
+
+
+func _init_backdrop() -> void:
+	_tgs = load("res://TerrainGenerator.gd")
+	_back_hills = FastNoiseLite.new()
+	_back_hills.seed = 7301
+	_back_hills.frequency = 1.0 / 620.0
+	_back_hills.fractal_octaves = 4
+	_back_ridge = FastNoiseLite.new()
+	_back_ridge.seed = 2207
+	_back_ridge.frequency = 1.0 / 900.0
+	_back_ridge.fractal_type = FastNoiseLite.FRACTAL_RIDGED
+	_back_ridge.fractal_octaves = 4
+	_back_tint = FastNoiseLite.new()
+	_back_tint.seed = 88
+	_back_tint.frequency = 1.0 / 140.0
+	var mat := _tg.get("grass_material") as StandardMaterial3D
+	if mat and mat.albedo_texture:
+		var img := mat.albedo_texture.get_image()
+		if img:
+			if img.is_compressed():
+				img.decompress()
+			img.resize(4, 4, Image.INTERPOLATE_BILINEAR)
+			var sum := Color(0, 0, 0)
+			for y in 4:
+				for x in 4:
+					sum += img.get_pixel(x, y)
+			_sand_mean = Color(sum.r / 16.0, sum.g / 16.0, sum.b / 16.0) * mat.albedo_color
+
+
+## How far inland of the sea (x, z) lies (negative out at sea): the main coast (west and north), the
+## land across the bay where Bloombay stands, and the bay's head joining them.
+func _land_d(x: float, z: float) -> float:
+	var west: float = x - float(_tgs.bloombay_shore_x(z))
+	var north: float = z - float(_tgs.bloombay_north_shore_z(x))
+	var main := minf(west, north)
+	var city := minf(_city_shore(x) - z, x - (CITY_WEST_X + 70.0 * sin(z / 310.0)))
+	var head := x - (BAY_HEAD_X + 140.0 * sin(z / 420.0))
+	return maxf(main, maxf(city, head))
+
+
+## Bloombay's waterline across the bay, at x.
+func _city_shore(x: float) -> float:
+	return CITY_SHORE_Z + 40.0 * sin(x / 260.0) + 18.0 * sin(x / 83.0)
+
+
+## The far country alone: the sea bed, a beach, dunes behind it and the hinterland's hills.
+func _coast_far(x: float, z: float) -> float:
+	var d := _land_d(x, z)
+	if d <= 0.0:
+		return -float(_tgs.bloombay_sea_depth(-d))
+	var bt := clampf(d / 55.0, 0.0, 1.0)
+	var h := 2.8 * (0.55 * bt + 0.45 * bt * bt)
+	var dunes := sin(x * 0.022 + cos(z * 0.016) * 1.5) * 14.0 + cos(z * 0.024 + sin(x * 0.014)) * 11.0 \
+			+ sin(x * 0.035 - z * 0.025) * 6.5
+	h += smoothstep(55.0, 140.0, d) * (2.2 + maxf(dunes * 0.5 + 6.0, 0.0))
+	var hills := _back_hills.get_noise_2d(x, z) * 0.5 + 0.5
+	var ridge := clampf(_back_ridge.get_noise_2d(x, z) * 0.5 + 0.5, 0.0, 1.0)
+	h += smoothstep(300.0, 1500.0, d) * (25.0 + 240.0 * pow(hills, 1.4) * (0.55 + 0.45 * ridge))
+	return h
+
+
+## The ground anywhere: the terrain's own (no road) on its square and just past it, easing into the far
+## country from 30m to 480m past the square's edge (by the distance past the edge, so the ring meets the
+## square's corners on the terrain's own ground too).
+func _coast_height(x: float, z: float) -> float:
+	var past := maxf(absf(x), absf(z)) - TERRAIN_HALF
+	var t := smoothstep(30.0, 480.0, past)
+	var h := _coast_far(x, z)
+	if t < 1.0:
+		h = lerpf(float(_tg.call("natural_height", x, z)), h, t)
+	return h
+
+
+## The ground's colour at p (normal n): sand on the beaches and dunes, dune grass in patches and scrub
+## further in, woods on the hills, rock where it's steep.
+func _back_colour(p: Vector3, n: Vector3, r: float) -> Color:
+	var nz := _back_tint.get_noise_2d(p.x, p.z) * 0.5 + 0.5
+	var d := _land_d(p.x, p.z)
+	var slope := 1.0 - n.y
+	# Sand is the island's own (a white tint on the sand material), the sea bed too: darkened, it drew the
+	# terrain's jagged rim through the water.
+	var col := _sand_mean
+	if p.y < 0.4:
+		return col
+	var green := smoothstep(520.0, 720.0, r)
+	col = col.lerp(BACK_DUNE_GRASS, smoothstep(0.5, 0.7, nz) * smoothstep(80.0, 220.0, d) * green)
+	col = col.lerp(BACK_SCRUB.lerp(BACK_DUNE_GRASS, nz * 0.6), smoothstep(260.0, 800.0, d) * green)
+	col = col.lerp(BACK_FOREST.lerp(BACK_FOREST.darkened(0.25), nz), smoothstep(45.0, 110.0, p.y + nz * 40.0) * smoothstep(0.35, 0.6, nz + 0.2) * green)
+	col = col.lerp(BACK_ROCK.lerp(BACK_ROCK.darkened(0.2), nz), smoothstep(0.38, 0.6, slope) * green)
+	return col
+
+
+## The ring of ground in BACK_SECTORS meshes (one surface in the sand material, one plain past
+## BACK_SHADE), its inner band solid; Bloombay across the bay.
+func _build_backdrop(level: Node3D) -> void:
+	var t0 := Time.get_ticks_msec()
+	var node := Node3D.new()
+	node.name = "Backdrop"
+	level.add_child(node)
+	# Rings as distances past the square's edge (radii on the edge's middles): one a cell inside it, tucked
+	# under the terrain, then one on the edge itself, where the two meet at the same heights; 4m apart out
+	# to 600m, growing 1.5% a ring to 1300m and 3% past it. The angles that hit the square's corners are
+	# among the ring's (BACK_SEGS a multiple of 8), so it follows the square exactly.
+	var radii := PackedFloat32Array([-2.4, 0.0])
+	var r := BACK_R0 + 4.0
+	while r < 600.0:
+		radii.append(r - BACK_R0)
+		r += 4.0
+	while r < 1300.0:
+		radii.append(r - BACK_R0)
+		r *= 1.015
+	while r < BACK_R1:
+		radii.append(r - BACK_R0)
+		r *= 1.03
+	radii.append(BACK_R1 - BACK_R0)
+	var nr := radii.size()
+	var pts := PackedVector3Array()
+	pts.resize(nr * BACK_SEGS)
+	for i in range(nr):
+		for j in range(BACK_SEGS):
+			var a := TAU * j / BACK_SEGS
+			var edge := TERRAIN_HALF / maxf(absf(cos(a)), absf(sin(a)))
+			var d := radii[i]
+			var rr := edge + d if d <= 0.0 else edge + d * (BACK_R1 - edge) / (BACK_R1 - BACK_R0)
+			var x := cos(a) * rr
+			var z := sin(a) * rr
+			var h := _coast_height(x, z)
+			if d < 0.0:
+				h -= 0.15
+			pts[i * BACK_SEGS + j] = Vector3(x, h, z)
+	var cols := PackedColorArray()
+	var nrm := PackedVector3Array()
+	cols.resize(pts.size())
+	nrm.resize(pts.size())
+	for i in range(nr):
+		for j in range(BACK_SEGS):
+			var p := pts[i * BACK_SEGS + j]
+			var pl := pts[i * BACK_SEGS + (j + BACK_SEGS - 1) % BACK_SEGS]
+			var pr := pts[i * BACK_SEGS + (j + 1) % BACK_SEGS]
+			var pi := pts[maxi(i - 1, 0) * BACK_SEGS + j]
+			var po := pts[mini(i + 1, nr - 1) * BACK_SEGS + j]
+			var n := (po - pi).cross(pr - pl).normalized()
+			if n.y < 0.0:
+				n = -n
+			nrm[i * BACK_SEGS + j] = n
+			cols[i * BACK_SEGS + j] = _back_colour(p, n, BACK_R0 + radii[i])
+	var near_mat := (_tg.get("grass_material") as StandardMaterial3D).duplicate() as StandardMaterial3D
+	near_mat.vertex_color_use_as_albedo = true
+	near_mat.vertex_color_is_srgb = true
+	near_mat = _tg.call("_save_resource", near_mat, "backdrop_near_mat")
+	var far_mat := StandardMaterial3D.new()
+	far_mat.vertex_color_use_as_albedo = true
+	far_mat.vertex_color_is_srgb = true
+	far_mat.roughness = 0.95
+	far_mat = _tg.call("_save_resource", far_mat, "backdrop_far_mat")
+	var col_st := SurfaceTool.new()
+	col_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var tris := 0
+	var per := BACK_SEGS / BACK_SECTORS
+	for sector in range(BACK_SECTORS):
+		var near_st := SurfaceTool.new()
+		near_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		var far_st := SurfaceTool.new()
+		far_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		var any := [false, false]
+		for i in range(nr - 1):
+			var near := BACK_R0 + radii[i + 1] <= BACK_SHADE
+			var st: SurfaceTool = near_st if near else far_st
+			for j in range(sector * per, (sector + 1) * per):
+				var a := i * BACK_SEGS + j
+				var b := i * BACK_SEGS + (j + 1) % BACK_SEGS
+				var c := (i + 1) * BACK_SEGS + j
+				var d := (i + 1) * BACK_SEGS + (j + 1) % BACK_SEGS
+				for tri in [[a, b, c], [b, d, c]]:
+					var pa := pts[tri[0]]
+					var pb := pts[tri[1]]
+					var pc := pts[tri[2]]
+					if maxf(pa.y, maxf(pb.y, pc.y)) < BACK_DEEP:
+						continue
+					# Front faces wind clockwise seen from above: (c - a) x (b - a) points up.
+					if (pc - pa).cross(pb - pa).y < 0.0:
+						tri = [tri[0], tri[2], tri[1]]
+					for k in tri:
+						var colour: Color = cols[k]
+						if near:
+							colour = Color(minf(colour.r / _sand_mean.r, 1.0), minf(colour.g / _sand_mean.g, 1.0), minf(colour.b / _sand_mean.b, 1.0))
+						st.set_color(colour)
+						st.set_normal(nrm[k])
+						st.add_vertex(pts[k])
+					any[0 if near else 1] = true
+					tris += 1
+					if BACK_R0 + radii[i + 1] <= BACK_SOLID:
+						col_st.add_vertex(pts[tri[0]])
+						col_st.add_vertex(pts[tri[1]])
+						col_st.add_vertex(pts[tri[2]])
+		var mesh := ArrayMesh.new()
+		if any[0]:
+			near_st.index()
+			near_st.commit(mesh)
+			mesh.surface_set_material(mesh.get_surface_count() - 1, near_mat)
+		if any[1]:
+			far_st.index()
+			far_st.commit(mesh)
+			mesh.surface_set_material(mesh.get_surface_count() - 1, far_mat)
+		if mesh.get_surface_count() == 0:
+			continue
+		var mi := MeshInstance3D.new()
+		mi.name = "BackdropGround_%d" % sector
+		mi.mesh = _tg.call("_save_resource", mesh, "backdrop_ground_%d" % sector)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		node.add_child(mi)
+	var body := StaticBody3D.new()
+	body.name = "BackdropGroundBody"
+	body.set_meta(&"surface", "sand")
+	node.add_child(body)
+	var cs := CollisionShape3D.new()
+	cs.shape = _tg.call("_save_resource", col_st.commit().create_trimesh_shape(), "backdrop_collision")
+	body.add_child(cs)
+	# The meshes go under the body too, so DressingColliders leaves them alone.
+	for mi in node.get_children():
+		if mi is MeshInstance3D:
+			mi.reparent(body)
+	_build_bloombay(node)
+	print("Backdrop: %d rings x %d, %d triangles (%.1fs)" % [nr, BACK_SEGS, tris, (Time.get_ticks_msec() - t0) / 1000.0])
+
+
+## Bloombay on the far shore of the bay: low white houses with terracotta roofs along the front,
+## apartment blocks behind, and downtown's glass towers round where the monorail comes in (MONO_X), as
+## on Pinecrest Ridge's horizon. Named "...Skyline" so DressingColliders leaves it be.
+func _build_bloombay(root: Node3D) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4402
+	var walls := SurfaceTool.new()
+	walls.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var glass := SurfaceTool.new()
+	glass.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var count := 0
+	for k in range(1400):
+		var x := rng.randf_range(CITY_WEST_X + 120.0, 1900.0)
+		var back := rng.randf_range(35.0, 620.0)
+		var z := _city_shore(x) - back
+		var g := _coast_far(x, z)
+		if g < 0.8 or g > 70.0:
+			continue
+		# Keep the monorail's way in clear.
+		if absf(x - MONO_X) < 14.0 and z > MONO_FAR_Z - 30.0:
+			continue
+		var downtown := exp(-pow((x - MONO_X) / 330.0, 2.0)) * exp(-pow((back - 170.0) / 200.0, 2.0))
+		var h: float
+		var tower := false
+		if rng.randf() < downtown * 0.6:
+			h = rng.randf_range(60.0, 175.0)
+			tower = true
+		elif rng.randf() < 0.3 + downtown * 0.45:
+			h = rng.randf_range(18.0, 48.0)
+		else:
+			h = rng.randf_range(7.0, 15.0)
+		var fw := rng.randf_range(22.0, 36.0) if tower else rng.randf_range(16.0, 34.0)
+		var fd := fw * rng.randf_range(0.8, 1.2) if tower else rng.randf_range(14.0, 28.0)
+		var yaw := (0.0 if rng.randf() < 0.7 else PI * 0.25) + rng.randf_range(-0.08, 0.08)
+		var wall_col: Color
+		if tower:
+			wall_col = [Color(0.48, 0.62, 0.74), Color(0.62, 0.70, 0.76), Color(0.40, 0.52, 0.62)][rng.randi() % 3]
+		else:
+			wall_col = [Color(0.95, 0.93, 0.88), Color(0.93, 0.86, 0.72), Color(0.86, 0.84, 0.80), Color(0.96, 0.90, 0.80)][rng.randi() % 4]
+		var roof_col := Color(0.72, 0.36, 0.24) if h < 16.0 and rng.randf() < 0.7 else wall_col.darkened(0.15)
+		_city_block(glass if tower else walls, Vector3(x, g - 2.0, z), fw, fd, h + 2.0, yaw, wall_col, roof_col)
+		count += 1
+	var city := Node3D.new()
+	city.name = "BloombaySkyline"
+	root.add_child(city)
+	for pair in [[walls, 0.75, 0.0, "bloombay_blocks"], [glass, 0.18, 0.55, "bloombay_towers"]]:
+		var s: SurfaceTool = pair[0]
+		s.index()
+		s.generate_normals()
+		var m := s.commit()
+		var mat := StandardMaterial3D.new()
+		mat.vertex_color_use_as_albedo = true
+		mat.vertex_color_is_srgb = true
+		mat.roughness = float(pair[1])
+		mat.metallic = float(pair[2])
+		m.surface_set_material(0, _tg.call("_save_resource", mat, String(pair[3]) + "_mat"))
+		var mi := MeshInstance3D.new()
+		mi.name = String(pair[3]).to_pascal_case()
+		mi.mesh = _tg.call("_save_resource", m, String(pair[3]))
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		city.add_child(mi)
+	print("Bloombay: %d buildings across the bay" % count)
+
+
+## One of Bloombay's buildings: a box w by d, h tall, turned by yaw, its roof in its own colour.
+func _city_block(st: SurfaceTool, at: Vector3, w: float, d: float, h: float, yaw: float, col: Color, roof: Color) -> void:
+	var b := Basis(Vector3.UP, yaw)
+	var c := [b * Vector3(-w, 0, -d) * 0.5, b * Vector3(w, 0, -d) * 0.5, b * Vector3(w, 0, d) * 0.5, b * Vector3(-w, 0, d) * 0.5]
+	var up := Vector3(0, h, 0)
+	for i in range(4):
+		var p0: Vector3 = at + c[i]
+		var p1: Vector3 = at + c[(i + 1) % 4]
+		var out := ((p0 + p1) * 0.5 - at) * Vector3(1, 0, 1)
+		var shade := col.darkened(0.06 * float(i % 2))
+		_out_tri(st, p0, p1, p1 + up, out, shade)
+		_out_tri(st, p0, p1 + up, p0 + up, out, shade)
+	var top := [at + c[0] + up, at + c[1] + up, at + c[2] + up, at + c[3] + up]
+	_out_tri(st, top[0], top[1], top[2], Vector3.UP, roof)
+	_out_tri(st, top[0], top[2], top[3], Vector3.UP, roof)
+
+
+## A triangle facing `out`: Godot's front faces wind so that (c - a) x (b - a) points out of them.
+static func _out_tri(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, out: Vector3, col: Color) -> void:
+	if (c - a).cross(b - a).dot(out) < 0.0:
+		var t := b
+		b = c
+		c = t
+	for v in [a, b, c]:
+		st.set_color(col)
+		st.add_vertex(v)
+
+
+## The monorail's causeway: a rubble mound under the line from the north beach across the bay to
+## Bloombay, its crest DAM_TOP under the surface with the pylons' footings on it, its sides at 1:1.6
+## down to the sea bed. Lumpy armour stone, in the rocks' material.
+const DAM_TOP := -1.3
+const DAM_CREST := 4.0
+const DAM_SIDE := 1.6
+const DAM_STEP := 6.0
+
+
+func _build_causeway(root: Node3D, kit: Dictionary) -> void:
+	var z0 := float(_tgs.bloombay_north_shore_z(MONO_X)) + 10.0
+	var z1 := _city_shore(MONO_X) - 10.0
+	var lump := FastNoiseLite.new()
+	lump.seed = 515
+	lump.frequency = 0.18
+	var st := _st(kit, "rock")
+	# Across the mound: fractions of the way from the crest's edge to the foot, each side.
+	var across := [-1.0, -0.66, -0.33, -0.0001, 0.0, 0.0001, 0.33, 0.66, 1.0]
+	var rows: Array = []
+	var z := z0
+	while z > z1 - 0.01:
+		var row := PackedVector3Array()
+		for f in across:
+			var side := signf(f)
+			var t := absf(f)
+			var foot_x := MONO_X + side * DAM_CREST
+			var bed := _coast_height(foot_x + side * 20.0, z)
+			var half := DAM_CREST + DAM_SIDE * maxf(DAM_TOP - bed, 0.0) + 2.0
+			var x := MONO_X + side * lerpf(DAM_CREST, half, t) if f != 0.0 else MONO_X
+			var y := lerpf(DAM_TOP, bed - 1.0, t) if t > 0.01 else DAM_TOP
+			y += lump.get_noise_2d(x, z) * 0.45 * (1.0 - t * 0.5)
+			row.append(Vector3(x, y, z))
+		rows.append(row)
+		z -= DAM_STEP
+	# The crest and the top of the flanks are armour stone; further down the sand has drifted over it
+	# (the sea bed's own sand, so the mound doesn't read as a dark wedge under the water).
+	var col := Color(0.80, 0.77, 0.70)
+	var bed_st := _st(kit, "seabed")
+	for i in range(rows.size() - 1):
+		var a: PackedVector3Array = rows[i]
+		var b: PackedVector3Array = rows[i + 1]
+		for k in range(a.size() - 1):
+			var q := [a[k], a[k + 1], b[k + 1], b[k]]
+			var n: Vector3 = ((q[1] - q[0]).cross(q[3] - q[0])).normalized()
+			if n.y < 0.0:
+				n = -n
+			var lower := absf(float(across[k]) + float(across[k + 1])) > 0.9
+			var shade := Color.WHITE if lower else col.darkened(0.08 * float((i * 7 + k * 3) % 3))
+			_tri(bed_st if lower else st, q[0], q[1], q[2], n, n, n, shade, Vector3.UP)
+			_tri(bed_st if lower else st, q[0], q[2], q[3], n, n, n, shade, Vector3.UP)

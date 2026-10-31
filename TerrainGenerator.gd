@@ -369,14 +369,41 @@ static func bloombay_shore_x(pz: float) -> float:
 	return -63.0 + 4.0 * sin(pz * 0.011 + 0.9) + 2.0 * sin(pz * 0.029 + 2.0)
 
 
+## Bloombay Dunes' north waterline (sea level 0) at a given x: the coast turns east round the
+## lighthouse's point and runs on along the bay, open sea to the north (the level's generator carries it
+## on past the terrain's rim).
+static func bloombay_north_shore_z(px: float) -> float:
+	return -450.0 + 6.0 * sin(px * 0.013 + 0.4) + 3.0 * sin(px * 0.037 + 1.7)
+
+
 ## Still-water depth at a distance offshore of the Bloombay waterline: a 1:25 foreshore, a sandbar
-## about 40m out (waves break on it, reform in the trough and break again on the beach), then the
-## shelf dropping to 18m.
+## about 40m out (waves break on it, reform in the trough and break again on the beach), the shelf
+## dropping to 18m, and past 240m on down to 40m (where the edge falloff used to take it).
 static func bloombay_sea_depth(offshore: float) -> float:
 	var o: float = maxf(offshore, 0.0)
 	var d: float = 0.04 * o + maxf(o - 42.0, 0.0) * 0.10
 	d -= 0.75 * exp(-pow((o - 40.0) / 8.0, 2.0))
-	return clampf(d, 0.0, 18.0)
+	var t: float = clampf((o - 240.0) / 280.0, 0.0, 1.0)
+	return clampf(d, 0.0, 18.0) + 22.0 * t * t * (3.0 - 2.0 * t)
+
+
+## The Bloombay north coast over a height from the west coast and the dunes: past the north waterline
+## the sea, inland of it a beach 45m deep, the dunes easing in behind it by 110m. It only ever lowers the
+## ground (the lower of the two), so the west beach and sea and the dune ponds stay as they are, and
+## nothing steps: switching on whether h was under the sea level stood the ponds and the west beach in
+## cliffs.
+static func bloombay_north_coast(px: float, pz: float, h: float) -> float:
+	var dn: float = pz - bloombay_north_shore_z(px)
+	if dn >= 110.0:
+		return h
+	var sea: float = -bloombay_sea_depth(-dn)
+	if dn <= 0.0:
+		return minf(h, sea)
+	var bt: float = clampf(dn / 45.0, 0.0, 1.0)
+	var beach: float = 2.8 * (0.55 * bt + 0.45 * bt * bt)
+	var w: float = clampf((dn - 45.0) / 65.0, 0.0, 1.0)
+	var band: float = lerpf(beach, h, w * w * (3.0 - 2.0 * w))
+	return minf(h, band)
 
 
 func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curve3D, for_collision: bool, is_near_track: bool = true) -> float:
@@ -489,10 +516,14 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			var noise_weight = lerpf(0.04, 0.50, inland_shape)
 			base_terrain_height = dune_base + h_noise * noise_weight
 			# In deep inland dunes (px > 50.0), allow occasional calm oasis hollows dipping to water plane
-			if px > 50.0:
-				base_terrain_height = maxf(base_terrain_height, -2.5)
-			else:
-				base_terrain_height = maxf(base_terrain_height, 1.5)
+			# The hollows hold water from x 50 east (eased in from 40 to 70: a hard switch at 50 cut the
+			# ponds that crossed it with a straight wall), and keep off the terrain's rim: the land runs on
+			# past it.
+			var east_t: float = clampf((px - 40.0) / 30.0, 0.0, 1.0)
+			var rim_t: float = clampf((Vector2(px, pz).length() - 360.0) / 80.0, 0.0, 1.0)
+			var hollow: float = east_t * east_t * (3.0 - 2.0 * east_t) * (1.0 - rim_t * rim_t * (3.0 - 2.0 * rim_t))
+			base_terrain_height = maxf(base_terrain_height, lerpf(1.5, -2.5, hollow))
+		base_terrain_height = bloombay_north_coast(px, pz, base_terrain_height)
 	else:
 		base_terrain_height = h_noise
 
@@ -909,6 +940,10 @@ const ROAD_GAP_GROUND := 0.18
 ## The ground curves down past 0.88 of the terrain's radius into the void. Off, it runs on at its natural
 ## height to the disc's rim, for a level that carries the land on past it (Pinecrest Ridge's backdrop).
 @export var edge_falloff: bool = true
+## The terrain mesh is the disc inside the square (quads whose middle is within its radius). Off, it is the
+## whole square, for a level whose ground carries on past it (Bloombay Dunes' backdrop starts at the
+## square's edge: overlapping the disc, the disc's staircase rim showed over it).
+@export var clip_to_disc: bool = true
 ## Per road gap: [x0, z0, x1, z1 (the zone's bounds, padded), points along it every metre, their offsets].
 var _gap_zones: Array = []
 
@@ -1414,7 +1449,7 @@ func _generate_mesh(for_collision: bool) -> ArrayMesh:
 			var p_sq = px * px + pz * pz
 			var idx = y * stride + x
 
-			if p_sq > outer_limit_sq:
+			if p_sq > outer_limit_sq and clip_to_disc:
 				heights[idx] = falloff_y_out
 			else:
 				var cx = clampi(int((px - start_x) / cell_size_x), 0, mask_res - 1)
@@ -1432,7 +1467,7 @@ func _generate_mesh(for_collision: bool) -> ArrayMesh:
 			var idx = y * stride + x
 			var h = heights[idx]
 
-			if for_collision or (px * px + pz * pz) > outer_limit_sq:
+			if for_collision or ((px * px + pz * pz) > outer_limit_sq and clip_to_disc):
 				st.set_normal(Vector3.UP)
 			else:
 				var x_prev = max(0, x - 1)
@@ -1456,7 +1491,7 @@ func _generate_mesh(for_collision: bool) -> ArrayMesh:
 		for x in range(res):
 			var qx: float = start_x + (float(x) + 0.5) * step_x
 			var qz: float = start_y + (float(y) + 0.5) * step_y
-			if (qx * qx + qz * qz) > max_radius_sq:
+			if clip_to_disc and (qx * qx + qz * qz) > max_radius_sq:
 				continue
 
 			var i = y * (res + 1) + x

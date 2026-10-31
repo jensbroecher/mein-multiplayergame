@@ -1,5 +1,5 @@
 extends MultiMeshInstance3D
-## Loose props carts can shove out of the way: beach loungers, cool boxes, parasols.
+## Loose props carts can shove out of the way: beach loungers, cool boxes, parasols, sand toys.
 ##
 ## Drawn as one MultiMesh. At runtime each prop gets a rigid body made of `boxes`, frozen where it
 ## stands. A cart that comes within RELEASE_RADIUS faster than `push_speed` frees it, so the hit
@@ -12,9 +12,19 @@ extends MultiMeshInstance3D
 ## to its own layer, which carts still collide with (its mask has layer 1) but AI obstacle rays and
 ## the carts' ground probes don't see. Like KnockablePoles.gd, they're local scenery: nothing is
 ## synced over the network.
+## Knocked loose, a prop sounds as what it is (Sound, `bonk_sound`, by default from the node's name):
+## a wooden crash for loungers, a hollow plastic tok-tok-tok tumbling away for cones, cool boxes and sand
+## toys, a canvas whump and a pole's ping for parasols. The two made ones are synthesised once
+## (_synth). They carry like a cart's knock (unit_size 20): at -10dB and unit_size 8 they were lost
+## under the engine from the chase camera.
 
 const PROP_LAYER := 1 << 4
 const BONK := preload("res://sounds/crate_crash.mp3")
+enum Sound { CRATE, PLASTIC, PARASOL }
+## Name fragments that pick a sound when bonk_sound is -1.
+const PLASTIC_NAMES := ["cone", "coolbox", "bucket", "spade", "swimring"]
+
+static var _synth := {}
 
 @export var prop_transforms: Array[Transform3D] = []
 ## Collision boxes in the prop's frame: [centre, size] pairs.
@@ -28,6 +38,8 @@ const BONK := preload("res://sounds/crate_crash.mp3")
 ## Height of the centre of mass above the prop's origin, or below zero to work it out from the shapes.
 ## Parasols keep theirs in the weighted base so they stand until hit.
 @export var centre_of_mass_y := -1.0
+## The knock (Sound): -1 picks it from the node's name.
+@export var bonk_sound := -1
 
 var _bodies: Array[RigidBody3D] = []
 var _state: PackedByteArray = PackedByteArray()   # 0 frozen, 1 released, 2 knocked (sound played)
@@ -77,11 +89,12 @@ func _ready() -> void:
 	for i in range(prop_transforms.size()):
 		multimesh.set_instance_transform(i, prop_transforms[i])
 	_bonk = AudioStreamPlayer3D.new()
-	_bonk.stream = BONK
+	var kind := _sound_kind()
+	_bonk.stream = BONK if kind == Sound.CRATE else _synth_sound(kind)
 	_bonk.bus = &"SFX"
-	_bonk.volume_db = -10.0
-	_bonk.unit_size = 8.0
-	_bonk.max_distance = 70.0
+	_bonk.volume_db = 0.0 if kind == Sound.CRATE else -2.0
+	_bonk.unit_size = 20.0
+	_bonk.max_distance = 140.0
 	add_child(_bonk, false, Node.INTERNAL_MODE_BACK)
 
 
@@ -107,6 +120,8 @@ func _physics_process(_delta: float) -> void:
 			_state[i] = 2
 			_bonk.global_position = b.global_position
 			_bonk.pitch_scale = randf_range(0.85, 1.15)
+			# Louder the harder it was hit.
+			_bonk.volume_db = (0.0 if _bonk.stream == BONK else -2.0) + clampf((b.linear_velocity.length() - 8.0) * 0.25, -6.0, 3.0)
 			_bonk.play()
 		if b.sleeping:
 			continue
@@ -114,3 +129,67 @@ func _physics_process(_delta: float) -> void:
 			b.freeze = true
 			continue
 		multimesh.set_instance_transform(i, b.transform)
+
+
+func _sound_kind() -> int:
+	if bonk_sound >= 0:
+		return bonk_sound
+	var n := String(name).to_lower()
+	for w in PLASTIC_NAMES:
+		if n.contains(w):
+			return Sound.PLASTIC
+	if n.contains("parasol"):
+		return Sound.PARASOL
+	return Sound.CRATE
+
+
+## A knock made once per kind: struck hollow plastic (modes of a thin shell, a click, then two smaller
+## bounces as it tumbles), or a parasol (its canopy's whump, the pole's ring, the thud as it lands).
+static func _synth_sound(kind: int) -> AudioStreamWAV:
+	if _synth.has(kind):
+		return _synth[kind]
+	var rate := 22050
+	# Hits: [time, amplitude, modes [[Hz, decay s, amplitude]], click decay, click amplitude, noise low-pass].
+	var hits: Array
+	var length: float
+	if kind == Sound.PARASOL:
+		length = 0.6
+		hits = [[0.0, 1.0, [[95.0, 0.07, 0.5]], 0.09, 0.9, 0.08],
+			[0.04, 0.6, [[1870.0, 0.16, 0.5], [4730.0, 0.07, 0.25], [2960.0, 0.1, 0.2]], 0.002, 0.2, 0.9],
+			[0.3, 0.55, [[85.0, 0.06, 0.8], [240.0, 0.03, 0.3]], 0.03, 0.6, 0.15]]
+	else:
+		length = 0.5
+		var modes := [[390.0, 0.045, 0.7], [930.0, 0.026, 0.5], [1680.0, 0.016, 0.35], [2750.0, 0.01, 0.2]]
+		hits = [[0.0, 1.0, modes, 0.004, 0.8, 0.7], [0.15, 0.45, modes, 0.003, 0.5, 0.7], [0.26, 0.22, modes, 0.003, 0.4, 0.7]]
+	var n := int(rate * length)
+	var buf := PackedFloat32Array()
+	buf.resize(n)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 31 + kind
+	for h in hits:
+		var i0 := int(float(h[0]) * rate)
+		var amp: float = h[1]
+		var lp := 0.0
+		var detune := rng.randf_range(0.96, 1.05)
+		for i in range(i0, n):
+			var t := float(i - i0) / rate
+			var v := 0.0
+			for m in h[2]:
+				v += sin(TAU * float(m[0]) * detune * t) * exp(-t / float(m[1])) * float(m[2])
+			lp += (rng.randf_range(-1.0, 1.0) - lp) * float(h[5])
+			v += lp * float(h[4]) * exp(-t / float(h[3])) * minf(t / 0.004, 1.0)
+			buf[i] += v * amp * minf(t / 0.0008, 1.0)
+	var peak := 0.001
+	for v in buf:
+		peak = maxf(peak, absf(v))
+	var data := PackedByteArray()
+	data.resize(n * 2)
+	for i in n:
+		data.encode_s16(i * 2, int(clampf(buf[i] / peak * 0.9, -1.0, 1.0) * 32767.0))
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = rate
+	wav.stereo = false
+	wav.data = data
+	_synth[kind] = wav
+	return wav

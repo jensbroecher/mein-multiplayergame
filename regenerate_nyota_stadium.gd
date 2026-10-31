@@ -126,6 +126,10 @@ const DROP_HILL_TOP_Y := 6.2
 const DROP_HILL_END_X := 116.0
 
 const FINISH_S := 30.0
+## Where the football waits: x along lane 4 (flat from the Kibo double's landing to the exit ramp),
+## metres right of the line.
+const FOOTBALL_X := 78.0
+const FOOTBALL_LAT := 1.6
 
 var _segs: Array = []
 var _lap_len := 0.0
@@ -3958,6 +3962,15 @@ func _place_gameplay(level_scene: Node3D) -> void:
 			ib.position = s2["pos"]
 			item_container.add_child(ib)
 			item_idx += 1
+
+	# The football (KickBall.gd: carts kick it about and lose a little speed to it), resting on lane
+	# 4's flat run before the exit boost, a little off the line.
+	var ball := RigidBody3D.new()
+	ball.name = "Football"
+	ball.set_script(load("res://KickBall.gd"))
+	var bs: Dictionary = _spot(_s_at_x(SEG_L4, FOOTBALL_X), FOOTBALL_LAT, float(KickBall.STYLES[KickBall.Style.FOOTBALL]["radius"]) + 0.02)
+	ball.position = bs["pos"]
+	level_scene.add_child(ball)
 
 
 # ======================================================================================
