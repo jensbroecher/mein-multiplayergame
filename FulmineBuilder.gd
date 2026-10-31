@@ -147,6 +147,9 @@ const LAMP := [Vector2(0.300, 0.220), Vector2(0.505, 0.264), Vector2(0.517, 0.29
 	Vector2(0.304, 0.246)]
 const LAMP_DRL := [Vector2(0.316, 0.247), Vector2(0.476, 0.301), Vector2(0.507, 0.294)]
 const LAMP_LENSES := [Vector3(0.364, 0.240, 0.012), Vector3(0.418, 0.255, 0.012)]
+# The intakes' fins: a blade's section (thickness, then depth: mostly behind the face it stands on).
+const FIN_PROFILE := [Vector2(-0.0018, -0.016), Vector2(0.0018, -0.016), Vector2(0.0018, 0.003),
+	Vector2(-0.0018, 0.003)]
 # The bonnet's two extractor vents: |x| from, to; z from, to.
 const BONNET_VENT := Vector4(0.070, 0.205, -0.960, -0.860)
 # The tail: the light bar's height (the tail's face is black from just over it down).
@@ -256,6 +259,15 @@ static func _arc(c: Vector2, r: float, a0: float, a1: float) -> PackedVector2Arr
 		var a: float = lerpf(a0, a1, k / 6.0)
 		pts.append(c + Vector2(cos(a), sin(a)) * r)
 	return pts
+
+
+## The flank intake at z as section() lays it: [depth, its bottom, its top].
+func _scoop_at(z: float) -> Array:
+	var bot: float = prof["bot"].at(z)
+	var belt: float = prof["belt"].at(z)
+	var ceil_y: float = _ceiling(z)
+	var rl: float = minf(lerpf(SILL_R, LIP_R, clampf((ceil_y - bot) / 0.03, 0.0, 1.0)), (belt - ceil_y) * 0.45)
+	return _scoop(z, ceil_y + rl, belt)
 
 
 ## A quadratic Bézier from a over c to e, n + 1 points.
@@ -424,6 +436,35 @@ func _lamp_tube(b, path: PackedVector3Array, r: float, mat: int, col: Color) -> 
 		b._uv[k] = Vector2.ZERO
 
 
+## The flank intake's fittings (right side): a radiator core across its back wall, which faces
+## forward into the opening (a dark frame, alloy fins), and a lip in the accent colour along the
+## opening's lower edge.
+func _side_intake_parts(b) -> void:
+	var zb: float = SCOOP_Z.y
+	var w: float = prof["w"].at(zb)
+	var sc: Array = _scoop_at(zb)
+	var d: float = sc[0]
+	var y0: float = float(sc[1]) + d * 0.30 + 0.004
+	var y1: float = float(sc[2]) - d * 0.15 - 0.004
+	var x0: float = w - d + 0.004
+	var x1: float = w - 0.006
+	var xm: float = (x0 + x1) * 0.5
+	var hx: float = (x1 - x0) * 0.5
+	b.rbox(Transform3D(Basis(), Vector3(xm, (y0 + y1) * 0.5, zb - 0.003)), Vector3(hx, (y1 - y0) * 0.5, 0.003), 0.002, 1,
+			CB.M_DARK, C_DARKER)
+	var fins: int = int((y1 - y0) / 0.011)
+	for k in fins:
+		var y: float = lerpf(y0 + 0.004, y1 - 0.004, float(k) / maxf(fins - 1, 1))
+		bar(b, Vector3(xm, y, zb - 0.0075), Vector3(hx - 0.002, 0.0016, 0.0025), CB.M_ALLOY, C_STEEL)
+	for fx in [x0 + 0.003, xm, x1 - 0.003]:
+		bar(b, Vector3(fx, (y0 + y1) * 0.5, zb - 0.009), Vector3(0.0025, (y1 - y0) * 0.5, 0.003), CB.M_DARK, C_TRIM)
+	var lip := PackedVector3Array()
+	for k in 25:
+		var z: float = lerpf(SCOOP_Z.x + 0.03, zb - 0.002, k / 24.0)
+		lip.append(Vector3(prof["w"].at(z) + 0.0015, float(_scoop_at(z)[1]) - 0.0015, z))
+	b.tube(lip, 0.0035, 6, CB.M_ANODISED, Color(1, 1, 1), true, true)
+
+
 ## Right-hand parts, mirrored to the left by build_body().
 func _side_parts(b) -> void:
 	# Headlamp: the black housing is the detail map's; an LED strip along its top edge and two
@@ -444,13 +485,12 @@ func _side_parts(b) -> void:
 			CB.M_ANODISED, Color(1, 1, 1))
 	b.rbox(Transform3D(mb, head + Vector3(0.012, 0.004, 0.0145)), Vector3(0.030, 0.011, 0.002), 0.002, 1,
 			CB.M_CHROME, C_CHROME)
-	# Strakes standing in the intake under the lamp.
-	for k in 3:
-		var sx: float = 0.320 + 0.045 * k
-		var top: Array = face_frame(sx, 0.168, true)
-		var low: Array = face_frame(sx, 0.112, true)
-		b.tube(PackedVector3Array([(top[0] as Vector3) + (top[1] as Vector3) * 0.002,
-				(low[0] as Vector3) + (low[1] as Vector3) * 0.002]), 0.0030, 6, CB.M_ALLOY, C_ALLOY_DARK, true, true)
+	# Fins standing upright in the intake under the lamp.
+	for k in 4:
+		var fx: float = 0.312 + 0.040 * k
+		sweep(b, _on_face_line([Vector2(fx, 0.172), Vector2(fx, 0.110)], true, 0.0, 6), Vector3.RIGHT, Vector3.FORWARD,
+				PackedVector2Array(FIN_PROFILE), CB.M_ALLOY, C_ALLOY_DARK)
+	_side_intake_parts(b)
 	# Bonnet vents: painted slats across the black openings.
 	var vx: float = (BONNET_VENT.x + BONNET_VENT.y) * 0.5
 	for k in 5:
@@ -484,10 +524,14 @@ func _centre_parts(b) -> void:
 	var bar_pts: PackedVector3Array = _on_face_line([Vector2(-0.505, TAIL_LAMP_Y), Vector2(0.505, TAIL_LAMP_Y)], false,
 			0.002, 33)
 	_lamp_tube(b, bar_pts, 0.0055, CB.M_TAILLAMP, C_TAILLAMP)
-	# Vanes across the mouth, so it reads as an opening: dark alloy blades following the nose's face.
-	for y in [0.120, 0.140]:
-		var vane: PackedVector3Array = _on_face_line([Vector2(-0.215, y), Vector2(0.215, y)], true, 0.002, 13)
-		b.tube(vane, 0.0032, 6, CB.M_ALLOY, C_ALLOY_DARK, true, true)
+	# Fins across the mouth, so it reads as an opening: dark alloy blades standing out of the nose's
+	# face, split by a divider in the body colour.
+	for y in [0.114, 0.130, 0.146, 0.160]:
+		sweep(b, _on_face_line([Vector2(-0.205, y), Vector2(0.205, y)], true, 0.0, 13), Vector3.UP, Vector3.FORWARD,
+				PackedVector2Array(FIN_PROFILE), CB.M_ALLOY, C_ALLOY_DARK)
+	var keel: PackedVector3Array = _on_face_line([Vector2(0.0, 0.168), Vector2(0.0, 0.104)], true, 0.0, 6)
+	sweep(b, keel, Vector3.RIGHT, Vector3.FORWARD, PackedVector2Array([Vector2(-0.006, -0.012), Vector2(0.006, -0.012),
+			Vector2(0.006, 0.006), Vector2(-0.006, 0.006)]), CB.M_PAINT, Color(1, 1, 1))
 	# Splitter: a black blade under the nose, following its plan, its lip just ahead of it.
 	var path := PackedVector3Array()
 	for k in 17:

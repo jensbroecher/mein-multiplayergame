@@ -619,6 +619,11 @@ var _active_drifts: Array = []
 var snow_plough_depth: float = 0.0
 ## Loose snow depth at which a drift costs its full resistance.
 const SNOW_FULL_DEPTH := 0.6
+## Loose track (a dirt, gravel, sand or mud road, packed snow) holds a car to this share of its top
+## speed at the worst offroad rating, rising to all of it at the best; off the road is harsher. Paved
+## road, wood, rock and ice (its own grip, ice_grip) don't.
+const LOOSE_TRACK_PENALTY := 0.78
+const LOOSE_TRACK_SURFACES := [Surfaces.DIRT, Surfaces.GRAVEL, Surfaces.SAND, Surfaces.SNOW, Surfaces.MUD]
 ## Ploughing drag at full depth, as a fraction of horizontal speed lost per second.
 const SNOW_PLOUGH_DRAG := 1.1
 ## Grip of the surface under the wheels, from an "ice_grip" meta on the collider or one of its
@@ -2524,6 +2529,9 @@ func _physics_process(delta):
 				# Snow provides drag and slows cars down
 				offroad_target_penalty = minf(offroad_target_penalty, lerp(0.58, 0.78, offroad_factor))
 		offroad_penalty = lerp(offroad_penalty, offroad_target_penalty, 5.0 * delta)
+	elif on_ground and surface in LOOSE_TRACK_SURFACES:
+		var loose_factor: float = clamp((CAR_PRESETS[car_index].get("offroad", 5.0) - 1.0) / 9.0, 0.0, 1.0)
+		offroad_penalty = lerp(offroad_penalty, lerpf(LOOSE_TRACK_PENALTY, 1.0, loose_factor), 5.0 * delta)
 	else:
 		offroad_penalty = lerp(offroad_penalty, 1.0, 10.0 * delta)
 

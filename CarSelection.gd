@@ -240,7 +240,7 @@ const CAR_PRESETS = [
 		"grip": 6.4,
 		"braking": 50.0,
 		"offroad": 2.5,
-		"desc": "Mid-engined hypercar under a glass canopy, with hollow side intakes and a swan-neck wing. Blistering top speed and glued to tarmac, but unhappy in the dirt.",
+		"desc": "Glass-canopy hypercar. The fastest car on tarmac, out of its depth on dirt.",
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]

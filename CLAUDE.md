@@ -569,6 +569,13 @@ in front of the water while driving (Msitu Falls, Bloombay Dunes). `canyon_river
   Paved road smokes when skidding; anything else raises its dust (`_set_dirt_emitting`: colour, size, rise,
   density per surface, some even rolling) and flings grit (`grit_particles`: stones, sand, snow clumps, mud
   clods, grass bits; unshaded, since a lit billboard facing away from the sun read as a black dot).
+- Loose track slows a car by its offroad rating (`LOOSE_TRACK_SURFACES`: a dirt, gravel, sand or mud road, packed
+  snow): its speed cap falls to `LOOSE_TRACK_PENALTY` (0.78) of its top speed at the worst rating, none at the best;
+  off the road (0.55-0.65 at the worst) is harsher. Before, every car ran flat out on Canyon's gravel half, Mara's
+  murram and Msitu's dirt whatever its rating (a road car at its full 81 km/h there). Paved road, wood, rock and ice
+  aren't loose. `res://scratch/offroad_speed_probe.tscn -- [level=] [car=16] [aside=30] [from=150] [seconds=40]`
+  (headless) drives the human's cart flat out with the player's input actions, `aside` metres off the lap line, and
+  logs its speed (and as the HUD shows it: x1.8), whether it is off-road, the penalty, the surface and boosts.
 - `res://scratch/surface_fx_test.tscn -- <level> [seconds=60]` races the AI and tallies, per surface, the
   marks, smoke, dust, grit and sound, with the sliding loop's mean level in dBFS against the engine's
   (windowed: headless never primes the trail particles, so only the
@@ -1741,7 +1748,10 @@ its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set th
   through `face_frame()` (`_on_face_line`), their UVs zeroed (`_lamp_tube`) or the headlamp material's reflector rings
   stripe them. The detail map gives each ring segment the same number of texels, so a long segment with few points
   draws jagged edges. `res://scratch/car_mesh_check.gd` (`-s`, headless, `-- [Fulmine ...]`) checks a car's meshes
-  (glass included) for NaNs, zero normals and bad material ids.
+  (glass included) for NaNs, zero normals and bad material ids. The flank intake's back wall faces forward into the
+  opening, so a radiator core stands across it (`_side_intake_parts`: a dark frame, alloy fins), with a lip in the
+  accent colour along the opening's lower edge; the nose's intakes carry flat fins (`FIN_PROFILE` swept along the
+  face), which read as blades where round tubes read as wires.
 - See-through canopies: a builder with `build_glass(b)` gets a `Glass` mesh beside `Body` (regenerate_cars.gd,
   `<prefix>_glass.res`), drawn by `car_glass.gdshader` (car_body.gdshaderinc's `CAR_GLASS` path: the vertex colour is
   the tint, its alpha the opacity face on, rising with Fresnel; premultiplied so reflections keep their strength). It

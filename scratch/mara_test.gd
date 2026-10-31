@@ -2,7 +2,8 @@ extends Node
 
 # Mara Crossing: sends every AI cart down the Croc Jump line and reports, per attempt, the take-off
 # speed at the lip and whether the cart made the far bank or drowned; also counts herd bumps.
-#   Godot --headless --path . res://scratch/mara_test.tscn -- [seconds=200] [speed=4] [croc=1.0]
+#   Godot --headless --path . res://scratch/mara_test.tscn -- [seconds=200] [speed=4] [croc=1.0] [cars=16,10,...]
+# cars= picks each bot's car (CAR_PRESETS indices); the lines name the car each cart drives.
 
 const LIP := Vector3(-31.5, 5.0, -437.0)
 
@@ -10,6 +11,7 @@ func _ready() -> void:
 	var seconds := 200.0
 	var speed := 4.0
 	var croc := 1.0
+	var cars: PackedStringArray = []
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("seconds="):
 			seconds = float(a.substr(8))
@@ -17,9 +19,13 @@ func _ready() -> void:
 			speed = float(a.substr(6))
 		elif a.begins_with("croc="):
 			croc = float(a.substr(5))
+		elif a.begins_with("cars="):
+			cars = a.substr(5).split(",")
 	AudioServer.set_bus_mute(0, true)
 	NetworkManager.current_game_mode = NetworkManager.GameMode.SPECTATOR
 	NetworkManager.start_spectator()
+	for i in mini(cars.size(), 6):
+		NetworkManager.players[100 + i]["car_index"] = int(cars[i])
 	var level: Node = load("res://levels/MaraCrossingLevel.tscn").instantiate()
 	add_child(level)
 	Engine.time_scale = speed
@@ -48,11 +54,11 @@ func _ready() -> void:
 				lip_speed[c] = c.linear_velocity.length()
 			if near[c] and c.is_drowned:
 				drowned += 1
-				print("DROWN %s took off at %.1f m/s" % [c.name, lip_speed[c]])
+				print("DROWN %s (%s) took off at %.1f m/s" % [c.name, c.CAR_PRESETS[c.car_index]["name"], lip_speed[c]])
 				near[c] = false
 			elif near[c] and p.x < LIP.x - 32.0:
 				made += 1
-				print("MADE  %s took off at %.1f m/s" % [c.name, lip_speed[c]])
+				print("MADE  %s (%s) took off at %.1f m/s" % [c.name, c.CAR_PRESETS[c.car_index]["name"], lip_speed[c]])
 				near[c] = false
 	print("croc jumps: %d made, %d drowned; herd bumps: %d" % [made, drowned, herd.bump_count])
 	get_tree().quit()

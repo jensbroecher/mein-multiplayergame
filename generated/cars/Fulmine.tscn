@@ -7,41 +7,41 @@
 [ext_resource type="ArrayMesh" path="res://generated/cars/fulmine_rear_wheel_r.res" id="5_greg0"]
 [ext_resource type="ArrayMesh" path="res://generated/cars/fulmine_glass.res" id="6_1o67g"]
 
-[node name="Fulmine" type="Node3D" unique_id=1181320688]
+[node name="Fulmine" type="Node3D" unique_id=10067259]
 metadata/procedural_car = true
 
-[node name="Model" type="Node3D" parent="." unique_id=325464960]
+[node name="Model" type="Node3D" parent="." unique_id=63676802]
 transform = Transform3D(-0.5, 0, -4.371139e-08, 0, 0.5, 0, 4.371139e-08, 0, -0.5, 0, 0, 0)
 
-[node name="Body" type="MeshInstance3D" parent="Model" unique_id=1797218854]
+[node name="Body" type="MeshInstance3D" parent="Model" unique_id=561272570]
 mesh = ExtResource("1_hp21x")
 metadata/car_shader = true
 
-[node name="Wheel_FL" type="MeshInstance3D" parent="Model" unique_id=1891124986]
+[node name="Wheel_FL" type="MeshInstance3D" parent="Model" unique_id=647249597]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.455, 0.16, -0.68)
 mesh = ExtResource("2_ua7n1")
 metadata/car_shader = true
 
-[node name="Wheel_FR" type="MeshInstance3D" parent="Model" unique_id=1835896570]
+[node name="Wheel_FR" type="MeshInstance3D" parent="Model" unique_id=312213589]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.455, 0.16, -0.68)
 mesh = ExtResource("3_62cvl")
 metadata/car_shader = true
 
-[node name="Wheel_RL" type="MeshInstance3D" parent="Model" unique_id=1857403606]
+[node name="Wheel_RL" type="MeshInstance3D" parent="Model" unique_id=1991523964]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.462, 0.175, 0.65)
 mesh = ExtResource("4_v5nvi")
 metadata/car_shader = true
 
-[node name="Wheel_RR" type="MeshInstance3D" parent="Model" unique_id=975264275]
+[node name="Wheel_RR" type="MeshInstance3D" parent="Model" unique_id=1308776444]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.462, 0.175, 0.65)
 mesh = ExtResource("5_greg0")
 metadata/car_shader = true
 
-[node name="Glass" type="MeshInstance3D" parent="Model" unique_id=41636580]
+[node name="Glass" type="MeshInstance3D" parent="Model" unique_id=954934827]
 cast_shadow = 0
 mesh = ExtResource("6_1o67g")
 metadata/car_shader = true
 metadata/car_glass = true
 
-[node name="AntennaPlacement" type="Node3D" parent="Model" unique_id=249839714]
+[node name="AntennaPlacement" type="Node3D" parent="Model" unique_id=235740139]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.44, 0.428, 0.92)
