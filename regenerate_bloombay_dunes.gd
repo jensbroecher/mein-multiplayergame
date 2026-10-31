@@ -1024,6 +1024,7 @@ func _build_monorail(root: Node3D) -> void:
 	train.set("accel", 1.2)
 	train.set("chime", _station_chime())
 	train.set("chime_stops", PackedInt32Array([0, 2]))
+	train.set("stop_names", PackedStringArray(["SOUTH BEACH", "BLOOMBAY CENTRAL", "SOUTH BEACH", "LAGOON"]))
 	train.set("chime_at", Vector3(-12.0, MONO_Y + 3.0, MONO_STATION_Z))
 	root.add_child(train)
 
@@ -1121,7 +1122,6 @@ func _build_mono_station(root: Node3D, kit: Dictionary, curve: Curve3D) -> void:
 	var g := _ground_min((px0 + px1) * 0.5, zc, 4.0, 21.0)
 	var stone := Color(0.88, 0.87, 0.84)
 	var yellow := Color(0.98, 0.82, 0.18)
-	var green := Color(0.36, 0.62, 0.28)
 	# Platform deck, its yellow edge line, a white fascia.
 	_block(kit, "paint", Vector3(px1, py - 0.55, sz0), Vector3(px0, py, sz1), MONO_WHITE)
 	_block(kit, "paint", Vector3(px0 - 0.55, py, sz0 + 0.4), Vector3(px0 - 0.2, py + 0.05, sz1 - 0.4), yellow)
@@ -1216,22 +1216,36 @@ func _build_mono_station(root: Node3D, kit: Dictionary, curve: Curve3D) -> void:
 		for lx in [x_land1 + 0.3, x_land0 - 0.3]:
 			_tube(kit, "paint", Vector3(lx, _ground(lx, zc + lz) - 0.3, zc + lz), Vector3(lx, y_land - 0.35, zc + lz), 0.14, 0.14, 8, MONO_WHITE)
 	_box_collider(root, name, Vector3(x_land1, y_land - 0.35, zc - st_hw), Vector3(x_land0, y_land, zc + st_hw))
-	_balustrade(root, kit, name, Vector3(x_land1, y_land, zc - st_hw), Vector3(x_land1, y_land, zc + st_hw))
+	# Balustrades along the landing's sides only: the flights run on in a line, and one across its far
+	# edge closed off the way down.
 	for sd in [-1.0, 1.0]:
 		_balustrade(root, kit, name, Vector3(x_land0, y_land, zc + sd * st_hw), Vector3(x_land1, y_land, zc + sd * st_hw))
-	# Planters either side of the stair foot, and along the hall's beach side.
+	# Planters either side of the stair foot, and along the hall's beach side: a little palm in each
+	# (handed to _build_palms), flowering shrubs and ornamental grass round it.
+	var grass_xf: Array = []
 	for sd in [-1.0, 1.0]:
 		var pc := Vector3(x_foot + 3.0, _ground(x_foot + 3.0, zc + sd * (st_hw + 1.2)), zc + sd * (st_hw + 1.2))
-		_block(kit, "paint", pc + Vector3(-1.0, -0.2, -0.9), pc + Vector3(1.0, 0.7, 0.9), stone.darkened(0.08))
-		for b in 3:
-			_rock(kit, pc + Vector3(rng.randf_range(-0.6, 0.6), 0.95, rng.randf_range(-0.5, 0.5)), Vector3(0.7, 0.45 + 0.12 * b, 0.6), 700 + b + int(sd * 10.0), green.darkened(rng.randf_range(0.0, 0.2)), "paint")
-		_box_collider(root, name, pc + Vector3(-1.0, -0.2, -0.9), pc + Vector3(1.0, 0.7, 0.9))
+		var soil := _planter(root, kit, name, pc, Vector2(1.0, 0.9), 0.7, stone.darkened(0.08))
+		_planter_palms.append([Vector3(pc.x, soil, pc.z), Vector2(-1.0, 0.0), 3, 0.18])
+		_flower_shrub(kit, rng, Vector3(pc.x - 0.5, soil, pc.z - 0.45 * sd), 0.42)
+		_flower_shrub(kit, rng, Vector3(pc.x + 0.5, soil, pc.z + 0.4 * sd), 0.36)
+		for gq in [Vector3(-0.6, 0, 0.5), Vector3(0.55, 0, -0.5), Vector3(0.0, 0, 0.62 * sd)]:
+			grass_xf.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * rng.randf_range(0.7, 0.9)), Vector3(pc.x, soil, pc.z) + gq))
 	for pz in [hz0 + 2.0, hz1 - 2.0]:
 		var pp := Vector3(hx0 - 1.3, _ground(hx0 - 1.3, pz), pz)
-		_block(kit, "paint", pp + Vector3(-0.6, -0.2, -3.5), pp + Vector3(0.6, 0.6, 3.5), stone.darkened(0.08))
-		for b in 5:
-			_rock(kit, pp + Vector3(rng.randf_range(-0.2, 0.2), 0.85, -2.8 + b * 1.4), Vector3(0.65, 0.42 + 0.07 * b, 0.75), 720 + b + int(pz), green.darkened(rng.randf_range(0.0, 0.2)), "paint")
-		_box_collider(root, name, pp + Vector3(-0.6, -0.2, -3.5), pp + Vector3(0.6, 0.6, 3.5))
+		var soil2 := _planter(root, kit, name, pp, Vector2(0.6, 3.5), 0.6, stone.darkened(0.08))
+		for pzz in [-2.2, 2.2]:
+			# Their crowns stay well under the platform's deck (at 0.25 they reached over its edge).
+			_planter_palms.append([Vector3(pp.x, soil2, pp.z + pzz), Vector2(-1.0, 0.0), 3, rng.randf_range(0.15, 0.17)])
+		for b in 4:
+			_flower_shrub(kit, rng, Vector3(pp.x + rng.randf_range(-0.12, 0.12), soil2, pp.z - 3.0 + b * 2.0 + rng.randf_range(-0.2, 0.2)), rng.randf_range(0.34, 0.44))
+		for b in 7:
+			grass_xf.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * rng.randf_range(0.6, 0.85)), Vector3(pp.x + rng.randf_range(-0.3, 0.3), soil2, pp.z - 3.1 + b * 1.03)))
+	var gmesh := _grass_tuft(1)
+	gmesh.surface_set_material(0, _grass_material())
+	var gmm := _multimesh(_tg.call("_save_resource", gmesh, "station_grass"), grass_xf, name + "PlanterGrass")
+	gmm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(gmm)
 	# Benches on the platform, the sign over the stairs.
 	for bz in [zc - 12.0, zc + 8.0, zc + 15.0]:
 		var bc := Vector3(px1 + 1.2, py, bz)
@@ -1245,8 +1259,99 @@ func _build_mono_station(root: Node3D, kit: Dictionary, curve: Curve3D) -> void:
 	_pixel_text(kit, "paint", sign_c + Vector3(-0.12, 0, 0), Vector3(0, 0, 1), Vector3.UP, 0.13, "SOUTH BEACH", Color(1, 1, 1))
 	for sz in [-3.0, 3.0]:
 		_tube(kit, "metal", sign_c + Vector3(0, 0.55, sz), Vector3(sign_c.x, spring + 0.05, zc + sz), 0.03, 0.03, 6, Color(0.6, 0.62, 0.65))
+	# Departure boards (StationBoard.gd: the next trains from the train's own timetable): over the hall's
+	# doors to the beach, on the platform beside the head of the stairs, and one hung across the platform.
+	var face_w := Basis(Vector3.UP, -PI * 0.5)
+	_station_board(root, kit, "DepartureBoardHall", Transform3D(face_w, Vector3(hx0 - 0.3, g + 3.6, zc)), false)
+	var pb := Vector3(px1 + 0.5, py + 2.6, zc + st_hw + 2.6)
+	_station_board(root, kit, "DepartureBoardStairs", Transform3D(face_w, pb), false)
+	for pz in [-1.3, 1.3]:
+		_tube(kit, "metal", Vector3(pb.x, py, pb.z + pz), Vector3(pb.x, pb.y - 0.65, pb.z + pz), 0.05, 0.05, 8, Color(0.6, 0.62, 0.65))
+	var hang := Vector3((px1 + px0) * 0.5, py + 3.0, zc - 9.0)
+	_station_board(root, kit, "DepartureBoardPlatform", Transform3D(Basis(), hang), true)
+	for hx in [-1.4, 1.4]:
+		_tube(kit, "metal", hang + Vector3(hx, 0.7, 0), Vector3(hang.x + hx, spring + rise * 0.55, hang.z), 0.025, 0.025, 6, Color(0.6, 0.62, 0.65))
 	_note(name, Vector2(-14.0, zc), 14.0, CLEAR_BUILDING)
 	_note(name + "Stairs", Vector2(x_foot + 2.5, zc), 3.6, CLEAR_BUILDING)
+
+
+## Small palms for the station's planters: [foot, lean, PALM_SHAPES index, scale], planted by _build_palms.
+var _planter_palms: Array = []
+
+
+## A planter: stone walls `h` high round soil a little under their rim (half sizes `half` in x and z),
+## solid. Returns the soil's height.
+func _planter(root: Node3D, kit: Dictionary, name: String, c: Vector3, half: Vector2, h: float, col: Color) -> float:
+	var t := 0.12
+	var lo := c + Vector3(-half.x, -0.2, -half.y)
+	var hi := c + Vector3(half.x, h, half.y)
+	_block(kit, "paint", lo, Vector3(lo.x + t, hi.y, hi.z), col)
+	_block(kit, "paint", Vector3(hi.x - t, lo.y, lo.z), hi, col)
+	_block(kit, "paint", Vector3(lo.x + t, lo.y, lo.z), Vector3(hi.x - t, hi.y, lo.z + t), col)
+	_block(kit, "paint", Vector3(lo.x + t, lo.y, hi.z - t), Vector3(hi.x - t, hi.y, hi.z), col)
+	# A coping stone round the top, 3cm proud.
+	_block(kit, "paint", Vector3(lo.x - 0.03, hi.y, lo.z - 0.03), Vector3(hi.x + 0.03, hi.y + 0.05, lo.z + t + 0.03), col.lightened(0.08))
+	_block(kit, "paint", Vector3(lo.x - 0.03, hi.y, hi.z - t - 0.03), Vector3(hi.x + 0.03, hi.y + 0.05, hi.z + 0.03), col.lightened(0.08))
+	_block(kit, "paint", Vector3(lo.x - 0.03, hi.y, lo.z + t + 0.03), Vector3(lo.x + t + 0.03, hi.y + 0.05, hi.z - t - 0.03), col.lightened(0.08))
+	_block(kit, "paint", Vector3(hi.x - t - 0.03, hi.y, lo.z + t + 0.03), Vector3(hi.x + 0.03, hi.y + 0.05, hi.z - t - 0.03), col.lightened(0.08))
+	var soil := hi.y - 0.08
+	_block(kit, "paint", Vector3(lo.x + t, lo.y, lo.z + t), Vector3(hi.x - t, soil, hi.z - t), Color(0.30, 0.22, 0.15))
+	_box_collider(root, name, lo, hi)
+	return soil
+
+
+## A flowering shrub (bougainvillea, hibiscus) standing on `foot`: a mound of leaves, cards of two
+## greens turned every way over a squashed dome, with bright flowers set into its surface. In the
+## double-sided canvas material.
+func _flower_shrub(kit: Dictionary, rng: RandomNumberGenerator, foot: Vector3, r: float) -> void:
+	var st := _st(kit, "canvas")
+	var bloom: Color = [Color(0.92, 0.22, 0.52), Color(0.98, 0.42, 0.20), Color(0.95, 0.85, 0.25), Color(0.85, 0.20, 0.25)][rng.randi() % 4]
+	var leaves := int(70 * r / 0.4)
+	for i in leaves:
+		var u := rng.randf()
+		var a := rng.randf() * TAU
+		var el := acos(1.0 - u)   # more towards the top
+		var n := Vector3(sin(el) * cos(a), cos(el), sin(el) * sin(a))
+		var c := foot + Vector3(n.x * r, 0.05 + n.y * r * 0.85, n.z * r) * rng.randf_range(0.6, 1.0)
+		var tangent := n.cross(Vector3(rng.randf_range(-1, 1), rng.randf_range(-1, 1), rng.randf_range(-1, 1))).normalized()
+		var bit := n.cross(tangent).normalized()
+		var lw := r * 0.32
+		var lh := r * 0.15
+		var col := Color(0.18, 0.42, 0.16).lerp(Color(0.34, 0.58, 0.22), rng.randf())
+		var p := [c - tangent * lw - bit * lh * 0.3, c + bit * lh, c + tangent * lw - bit * lh * 0.3, c - bit * lh]
+		_tri(st, p[0], p[1], p[2], n, n, n, col, n)
+		_tri(st, p[0], p[2], p[3], n, n, n, col.darkened(0.12), n)
+	var flowers := int(22 * r / 0.4)
+	for i in flowers:
+		var a := rng.randf() * TAU
+		var el := rng.randf_range(0.0, 1.3)
+		var n := Vector3(sin(el) * cos(a), cos(el), sin(el) * sin(a))
+		var c := foot + Vector3(n.x * r * 1.02, 0.05 + n.y * r * 0.88, n.z * r * 1.02)
+		var tangent := n.cross(Vector3.UP if absf(n.y) < 0.9 else Vector3.RIGHT).normalized()
+		var bit := n.cross(tangent).normalized()
+		var pr := r * rng.randf_range(0.09, 0.13)
+		# Five petals round a pale centre.
+		for k in 5:
+			var ang := TAU * k / 5.0 + a
+			var d1 := (tangent * cos(ang) + bit * sin(ang))
+			var d2 := (tangent * cos(ang + 0.6) + bit * sin(ang + 0.6))
+			var d0 := (tangent * cos(ang - 0.6) + bit * sin(ang - 0.6))
+			_tri(st, c, c + d0 * pr * 0.7 + n * 0.01, c + d1 * pr + n * 0.015, n, n, n, bloom, n)
+			_tri(st, c, c + d1 * pr + n * 0.015, c + d2 * pr * 0.7 + n * 0.01, n, n, n, bloom.darkened(0.1), n)
+		_tri(st, c + n * 0.02 - tangent * pr * 0.2, c + n * 0.02 + bit * pr * 0.2, c + n * 0.02 + tangent * pr * 0.2, n, n, n, Color(1.0, 0.92, 0.6), n)
+
+
+## A departure board (StationBoard.gd) at `xf`, its face toward the xf's +z, on the station's train.
+func _station_board(root: Node3D, _kit: Dictionary, node_name: String, xf: Transform3D, two_sided: bool) -> void:
+	var board := Node3D.new()
+	board.name = node_name
+	board.set_script(load("res://StationBoard.gd"))
+	board.transform = xf
+	board.set("train", NodePath("../MonorailTrain"))
+	board.set("at", PackedInt32Array([0, 2]))
+	board.set("station_name", "SOUTH BEACH")
+	board.set("two_sided", two_sided)
+	root.add_child(board)
 
 
 ## A glass balustrade between two points at deck level: panels, posts and a white rail on top.
@@ -1735,6 +1840,16 @@ func _hip_roof(kit: Dictionary, key: String, xf: Transform3D, x0: float, x1: flo
 ## Block capitals for painted signs, five cells high.
 const GLYPHS := {
 	" ": ["..", "..", "..", "..", ".."],
+	"0": ["XXX", "X.X", "X.X", "X.X", "XXX"],
+	"1": [".X.", "XX.", ".X.", ".X.", "XXX"],
+	"2": ["XXX", "..X", "XXX", "X..", "XXX"],
+	"3": ["XXX", "..X", ".XX", "..X", "XXX"],
+	"4": ["X.X", "X.X", "XXX", "..X", "..X"],
+	"5": ["XXX", "X..", "XXX", "..X", "XXX"],
+	"6": ["XXX", "X..", "XXX", "X.X", "XXX"],
+	"7": ["XXX", "..X", ".X.", ".X.", ".X."],
+	"8": ["XXX", "X.X", "XXX", "X.X", "XXX"],
+	"9": ["XXX", "X.X", "XXX", "..X", "XXX"],
 	"A": [".XX.", "X..X", "XXXX", "X..X", "X..X"],
 	"C": [".XXX", "X...", "X...", "X...", ".XXX"],
 	"H": ["X..X", "X..X", "XXXX", "X..X", "X..X"],
@@ -2036,7 +2151,7 @@ func _build_grandstand(root: Node3D) -> void:
 	var z0 := 146.0
 	var z1 := 194.0
 	var tiers := 7
-	var tier_d := 1.05
+	var tier_d := STAND_TIER_D
 	var tier_h := 0.55
 	var base := _ground_min(-22.0, 170.0, 6.0, 24.0) - 0.6
 	var front_y := maxf(_ground(x0, 170.0), base + 0.6) + 0.9
@@ -2051,17 +2166,43 @@ func _build_grandstand(root: Node3D) -> void:
 		_block(kit, "paint", Vector3(x0 - 0.36, front_y - 0.1, z), Vector3(x0 - 0.3, front_y + 0.75, z + 3.6), c)
 		z += 4.6
 		k += 1
+	var aisles := [[160.0, 161.6], [178.4, 180.0]]
 	for i in range(tiers):
 		var tx := x0 + i * tier_d
 		var ty := front_y + i * tier_h
 		_block(kit, "paint", Vector3(tx, base, z0), Vector3(tx + tier_d, ty, z1), concrete.darkened(0.04 * (i % 2)))
-		# Bench seats in team colours, broken by two aisles, at a seat's height for the level's people (1.6
-		# times life size, PROP_SCALE).
-		for seg in [[z0 + 0.6, 160.0], [161.6, 178.4], [180.0, z1 - 0.6]]:
-			_block(kit, "paint", Vector3(tx + 0.35, ty, seg[0]), Vector3(tx + 0.85, ty + STAND_SEAT_H, seg[1]), seat_cols[i % 3])
-			_stand_seats(tx, ty, float(seg[0]), float(seg[1]), i)
+		# A nosing along the tread's front edge, 2cm proud.
+		_block(kit, "paint", Vector3(tx - 0.02, ty - 0.06, z0), Vector3(tx + 0.08, ty + 0.02, z1), concrete.darkened(0.18))
+		# Moulded seats at the back of each tread, in rows of the stand's colours, broken by two aisles,
+		# at a seat's height for the level's people (1.6 times life size, PROP_SCALE): seated, their feet
+		# rest on their own tread (on 1.05m treads with the seats in the middle they reached over the
+		# edge into the row below).
+		for seg in [[z0 + 0.6, aisles[0][0]], [aisles[0][1], aisles[1][0]], [aisles[1][1], z1 - 0.6]]:
+			_stand_seats(kit, tx, ty, float(seg[0]), float(seg[1]), i, seat_cols[i % 3])
+		# Half steps up the aisles.
+		if i > 0:
+			for a in aisles:
+				_block(kit, "paint", Vector3(tx - tier_d * 0.5, ty - tier_h * 1.5, a[0]), Vector3(tx, ty - tier_h * 0.5, a[1]), concrete.darkened(0.1))
+				_block(kit, "paint", Vector3(tx - tier_d * 0.5 - 0.02, ty - tier_h * 0.5 - 0.06, a[0]), Vector3(tx - tier_d * 0.5 + 0.08, ty - tier_h * 0.5 + 0.02, a[1]), Color(0.98, 0.82, 0.18))
 	var back_x := x0 + tiers * tier_d
 	var top := front_y + tiers * tier_h
+	# Handrails up the aisles' middles, on posts, and a rail along the front parapet.
+	var rail_col := Color(0.82, 0.84, 0.86)
+	for a in aisles:
+		var am: float = (a[0] + a[1]) * 0.5
+		var r0 := Vector3(x0 + 0.4, front_y + 1.0, am)
+		var r1 := Vector3(back_x - 0.6, top - tier_h + 1.0, am)
+		_tube(kit, "metal", r0, r1, 0.035, 0.035, 8, rail_col)
+		for kk in range(tiers):
+			var px := x0 + 0.4 + (back_x - 1.0 - x0) * float(kk) / float(tiers - 1)
+			var py := lerpf(r0.y, r1.y, float(kk) / float(tiers - 1))
+			var floor_y := front_y + floorf((px - x0) / tier_d) * tier_h
+			_tube(kit, "metal", Vector3(px, floor_y, am), Vector3(px, py, am), 0.03, 0.03, 6, rail_col)
+	_tube(kit, "metal", Vector3(x0 - 0.15, front_y + 1.55, z0 + 0.2), Vector3(x0 - 0.15, front_y + 1.55, z1 - 0.2), 0.04, 0.04, 8, rail_col)
+	var rz := z0 + 0.2
+	while rz <= z1 - 0.19:
+		_tube(kit, "metal", Vector3(x0 - 0.15, front_y + 0.9, rz), Vector3(x0 - 0.15, front_y + 1.55, rz), 0.03, 0.03, 6, rail_col)
+		rz += 2.4
 	_block(kit, "paint", Vector3(back_x, base, z0), Vector3(back_x + 0.4, top + 4.2, z1), concrete)
 	# Side walls.
 	for zz in [z0 - 0.4, z1]:
@@ -2091,6 +2232,8 @@ func _build_grandstand(root: Node3D) -> void:
 	_box_collider(root, "Grandstand", Vector3(back_x, top + 1.0, z0 - 0.4), Vector3(back_x + 0.5, roof_y + 0.3, z1 + 0.4))
 	for zc in [152.0, 162.0, 172.0, 182.0, 190.0]:
 		_note("Grandstand", Vector2(x0, zc), 0.5, CLEAR_BUILDING)
+		# Its depth, for the palms.
+		_note("GrandstandBody", Vector2((x0 + back_x) * 0.5 + 0.5, zc), (back_x - x0) * 0.5, CLEAR_BUILDING)
 	CrowdPlacer.build(root, _stand_spots, PROP_SCALE / 1.86, SPECTATOR_SKIN, 4410, func(res: Resource, n: String) -> Resource: return _tg.call("_save_resource", res, n))
 	print("Grandstand: %d spectators" % _stand_spots.size())
 
@@ -2100,25 +2243,47 @@ func _build_grandstand(root: Node3D) -> void:
 ## the sea and the finish. On the four lower tiers a few stand on the tread in front of their seat; only
 ## they wave flags, which fit under the roof there.
 const STAND_SEAT_H := 0.72
+const STAND_TIER_D := 1.45
+## The seat's middle from the back of its tread (the seated figure's hip; its feet come 0.8m forward).
+const STAND_SEAT_BACK := 0.36
 const STAND_TAKEN := 0.68
 const STAND_UP_SHARE := 0.1
 const SPECTATOR_SKIN := [0.10, 0.08, 0.70, 0.07, 0.05]
 var _stand_spots: Array = []
 var _stand_rng := RandomNumberGenerator.new()
 
-func _stand_seats(tx: float, ty: float, za: float, zb: float, tier: int) -> void:
+func _stand_seats(kit: Dictionary, tx: float, ty: float, za: float, zb: float, tier: int, col: Color) -> void:
 	if _stand_spots.is_empty():
 		_stand_rng.seed = 4410
 	var face := Vector3(-1.0, 0.0, 0.0)
+	var sx := tx + STAND_TIER_D - STAND_SEAT_BACK
 	var z := za + 0.45
 	while z < zb - 0.3:
+		_stand_seat(kit, Vector3(sx, ty, z), col)
 		if _stand_rng.randf() < STAND_TAKEN:
 			var zz := z + _stand_rng.randf_range(-0.06, 0.06)
 			if tier < 4 and _stand_rng.randf() < STAND_UP_SHARE:
-				_stand_spots.append([Vector3(tx + 0.17, ty, zz), face, false, true])
+				# Standing on the tread in front of the seat.
+				_stand_spots.append([Vector3(sx - 0.62, ty, zz), face, false, true])
 			else:
-				_stand_spots.append([Vector3(tx + 0.6, ty + STAND_SEAT_H, zz), face, true, true])
+				_stand_spots.append([Vector3(sx, ty + STAND_SEAT_H, zz), face, true, true])
 		z += 0.9
+
+
+## One moulded stadium seat, its pan's middle over `at` (on the tread) at STAND_SEAT_H, facing -x: a
+## pedestal, the pan dished a little, a back curving up behind with the seat number's plate.
+func _stand_seat(kit: Dictionary, at: Vector3, col: Color) -> void:
+	var pan_y := at.y + STAND_SEAT_H
+	var steel := Color(0.35, 0.37, 0.40)
+	_block(kit, "metal", Vector3(at.x - 0.06, at.y, at.z - 0.05), Vector3(at.x + 0.06, pan_y - 0.07, at.z + 0.05), steel)
+	_block(kit, "metal", Vector3(at.x - 0.16, at.y, at.z - 0.12), Vector3(at.x + 0.16, at.y + 0.03, at.z + 0.12), steel)
+	# The pan, with a raised front lip.
+	_block(kit, "gloss", Vector3(at.x - 0.27, pan_y - 0.07, at.z - 0.33), Vector3(at.x + 0.26, pan_y - 0.01, at.z + 0.33), col)
+	_block(kit, "gloss", Vector3(at.x - 0.30, pan_y - 0.08, at.z - 0.33), Vector3(at.x - 0.24, pan_y + 0.02, at.z + 0.33), col.darkened(0.08))
+	# The back, leaning back 12 degrees, in two pieces so it curves.
+	var lean := Basis(Vector3.BACK, deg_to_rad(-12.0))
+	_box(kit, "gloss", Transform3D(lean, Vector3(at.x + 0.30, pan_y + 0.22, at.z)), Vector3(0.05, 0.44, 0.64), col)
+	_box(kit, "gloss", Transform3D(Basis(Vector3.BACK, deg_to_rad(-22.0)), Vector3(at.x + 0.38, pan_y + 0.55, at.z)), Vector3(0.05, 0.26, 0.6), col.darkened(0.06))
 
 
 ## A row of striped bathing huts with their doors to the sea. Each is laid out at life size round the
@@ -2158,9 +2323,9 @@ func _build_beach_huts(root: Node3D) -> void:
 			var xb := minf(x - d * 0.5 + d * (s + 1) / n, x + d * 0.5 - 0.08)
 			_block(kit, "paint", Vector3(xa, floor_y, z - w * 0.5), Vector3(xb, floor_y + wall_h, z - w * 0.5 + 0.08), sc2)
 			_block(kit, "paint", Vector3(xa, floor_y, z + w * 0.5 - 0.08), Vector3(xb, floor_y + wall_h, z + w * 0.5), sc2)
-		# Door on the sea side.
-		_block(kit, "paint", Vector3(x - d * 0.5 - 0.04, floor_y + 0.05, z - 0.55), Vector3(x - d * 0.5, floor_y + 1.95, z + 0.55), col.darkened(0.35))
+		_hut_details(kit, i, x, z, d, w, g, floor_y, wall_h, col)
 		_gable_roof(kit, "paint", Transform3D(Basis(Vector3.UP, PI * 0.5), Vector3(x, floor_y + wall_h, z)), w + 0.4, d + 0.5, 1.0, WHITE.darkened(0.05), col)
+		_hut_roof_trim(kit, x, z, d, w, floor_y + wall_h, col)
 		_box_collider(root, "Hut%d" % i, Vector3(x - d * 0.5 - 0.5, g - 0.3, z - w * 0.5), Vector3(x + d * 0.5, floor_y + wall_h, z + w * 0.5))
 		_hull_collider(root, "Hut%d" % i, PackedVector3Array([
 			Vector3(x - d * 0.5 - 0.25, floor_y + wall_h, z - w * 0.5 - 0.2), Vector3(x + d * 0.5 + 0.25, floor_y + wall_h, z - w * 0.5 - 0.2),
@@ -2171,6 +2336,100 @@ func _build_beach_huts(root: Node3D) -> void:
 		z += (w + 0.9) * PROP_SCALE
 		i += 1
 	_commit(root, kit, "BeachHuts")
+
+
+## A bathing hut's joinery, at life size round its sea-side wall (xf, its outer face; the door in its
+## middle): a panelled door with a louvred vent, a brass knob and the hut's number over it in a white
+## architrave; white corner boards and skirting; a shuttered window in one side; the deck boarded with
+## steps down to the sand; now and then a towel on a hook or a surfboard leaning by the door. Every layer
+## stands 2-3cm proud of the one behind it (the mobile renderer's depth can't part closer faces).
+func _hut_details(kit: Dictionary, i: int, x: float, z: float, d: float, w: float, g: float, floor_y: float, wall_h: float, col: Color) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5300 + i
+	var xf := x - d * 0.5
+	var door := col.darkened(0.3)
+	var hw := w * 0.5
+	# The door: leaf, two raised panels below, a louvred vent above, knob; architrave round it.
+	_block(kit, "paint", Vector3(xf - 0.02, floor_y + 0.05, z - 0.5), Vector3(xf, floor_y + 1.95, z + 0.5), door)
+	_block(kit, "paint", Vector3(xf - 0.04, floor_y + 0.22, z - 0.38), Vector3(xf - 0.02, floor_y + 0.62, z + 0.38), door.lightened(0.1))
+	_block(kit, "paint", Vector3(xf - 0.04, floor_y + 0.72, z - 0.38), Vector3(xf - 0.02, floor_y + 1.12, z + 0.38), door.lightened(0.1))
+	_block(kit, "paint", Vector3(xf - 0.03, floor_y + 1.25, z - 0.36), Vector3(xf - 0.02, floor_y + 1.78, z + 0.36), door.darkened(0.45))
+	for k in 6:
+		var sy := floor_y + 1.3 + k * 0.085
+		_box(kit, "paint", Transform3D(Basis(Vector3.BACK, deg_to_rad(35.0)), Vector3(xf - 0.045, sy, z)), Vector3(0.012, 0.075, 0.7), door.lightened(0.05))
+	_tube(kit, "metal", Vector3(xf - 0.02, floor_y + 1.0, z + 0.38), Vector3(xf - 0.09, floor_y + 1.0, z + 0.38), 0.022, 0.03, 8, Color(0.85, 0.68, 0.25))
+	for zz in [-0.58, 0.58]:
+		_block(kit, "paint", Vector3(xf - 0.035, floor_y, z + zz - 0.06), Vector3(xf, floor_y + 2.03, z + zz + 0.06), WHITE)
+	_block(kit, "paint", Vector3(xf - 0.035, floor_y + 1.95, z - 0.64), Vector3(xf, floor_y + 2.05, z + 0.64), WHITE)
+	# The number, on a white plate over the door.
+	_block(kit, "paint", Vector3(xf - 0.035, floor_y + 2.1, z - 0.16), Vector3(xf, floor_y + 2.32, z + 0.16), WHITE)
+	_pixel_text(kit, "paint", Vector3(xf - 0.05, floor_y + 2.21, z), Vector3(0, 0, 1), Vector3.UP, 0.032, str(i + 1), door.darkened(0.3))
+	# Corner boards and skirting.
+	for cz in [-hw, hw]:
+		var inward := -signf(cz)
+		_block(kit, "paint", Vector3(xf - 0.025, floor_y, z + cz + inward * 0.11 if inward < 0.0 else z + cz), Vector3(xf, floor_y + wall_h, z + cz if inward < 0.0 else z + cz + 0.11), WHITE)
+		for cx in [xf, x + d * 0.5 - 0.11]:
+			var zo: float = z + cz + (0.025 if cz > 0.0 else -0.025)
+			_block(kit, "paint", Vector3(cx, floor_y, minf(z + cz, zo)), Vector3(cx + 0.11, floor_y + wall_h, maxf(z + cz, zo)), WHITE)
+	_block(kit, "paint", Vector3(xf - 0.02, floor_y, z - hw + 0.11), Vector3(xf, floor_y + 0.14, z - 0.58 - 0.06), WHITE)
+	_block(kit, "paint", Vector3(xf - 0.02, floor_y, z + 0.58 + 0.06), Vector3(xf, floor_y + 0.14, z + hw - 0.11), WHITE)
+	# A shuttered window in the side away from the row's start.
+	var wz := z + hw
+	var wx := x + 0.1
+	_block(kit, "paint", Vector3(wx - 0.36, floor_y + 1.1, wz), Vector3(wx + 0.36, floor_y + 1.82, wz + 0.035), WHITE)
+	_block(kit, "glass", Vector3(wx - 0.28, floor_y + 1.18, wz + 0.035), Vector3(wx + 0.28, floor_y + 1.74, wz + 0.05), Color(0.25, 0.38, 0.48))
+	_block(kit, "paint", Vector3(wx - 0.02, floor_y + 1.18, wz + 0.035), Vector3(wx + 0.02, floor_y + 1.74, wz + 0.06), WHITE)
+	for sx in [-1.0, 1.0]:
+		var s0: float = wx + sx * 0.37
+		var s1: float = wx + sx * 0.66
+		_block(kit, "paint", Vector3(minf(s0, s1), floor_y + 1.1, wz), Vector3(maxf(s0, s1), floor_y + 1.82, wz + 0.04), door)
+		for k in 5:
+			var ly := floor_y + 1.2 + k * 0.13
+			_block(kit, "paint", Vector3(minf(s0, s1) + 0.03, ly, wz + 0.04), Vector3(maxf(s0, s1) - 0.03, ly + 0.03, wz + 0.055), door.darkened(0.2))
+	# The deck's boards (over the floor slab, 1cm proud, with gaps) and two steps to the sand.
+	var deck_x0 := xf - 0.5
+	var b := 0
+	var bz := z - hw
+	while bz < z + hw - 0.01:
+		var shade := WOOD.lightened(0.06) if b % 2 == 0 else WOOD.darkened(0.04)
+		_block(kit, "wood", Vector3(deck_x0, floor_y, bz + 0.01), Vector3(xf, floor_y + 0.012, minf(bz + 0.15, z + hw) - 0.01), shade)
+		bz += 0.16
+		b += 1
+	var rise := floor_y - g
+	for k in 2:
+		var top := g + rise * (2 - k) / 3.0
+		_block(kit, "wood", Vector3(deck_x0 - 0.3 * (k + 1), g - 0.1, z - 0.6), Vector3(deck_x0 - 0.3 * k, top, z + 0.6), WOOD.darkened(0.05 * k))
+	# Now and then: a striped towel on a hook, a surfboard leaning by the door.
+	if rng.randf() < 0.45:
+		var tz := z - 0.95
+		var tc: Color = [Color(0.95, 0.45, 0.38), Color(0.2, 0.55, 0.8), Color(0.98, 0.78, 0.3)][rng.randi() % 3]
+		_tube(kit, "metal", Vector3(xf, floor_y + 1.62, tz), Vector3(xf - 0.07, floor_y + 1.64, tz), 0.012, 0.012, 6, Color(0.7, 0.7, 0.72))
+		for k in 4:
+			var y0 := floor_y + 1.6 - k * 0.18
+			_quad(kit, "canvas", [Vector3(xf - 0.05, y0, tz - 0.2), Vector3(xf - 0.05, y0, tz + 0.2), Vector3(xf - 0.055, y0 - 0.18, tz + 0.2), Vector3(xf - 0.055, y0 - 0.18, tz - 0.2)],
+				Vector3(-1, 0, 0), tc if k % 2 == 0 else WHITE)
+	if rng.randf() < 0.35:
+		var lean := deg_to_rad(-11.0)
+		var bb := Basis(Vector3.UP, -PI * 0.5) * Basis(Vector3.RIGHT, lean)
+		_surfboard(kit, Transform3D(bb, Vector3(xf - 0.42, floor_y + 0.012, z + 0.92)), 1.95, rng.randi() % 3, rng.randi() % 3,
+			[WHITE, Color(0.98, 0.85, 0.3), Color(0.35, 0.75, 0.7)][rng.randi() % 3], col.darkened(0.2), col)
+
+
+## A hut roof's trim (its ridge along x at `eave_y` + 1, gables to the sea and the land): white barge
+## boards down the gables' edges, a ridge cap, and a pennant on the sea gable's peak.
+func _hut_roof_trim(kit: Dictionary, x: float, z: float, d: float, w: float, eave_y: float, col: Color) -> void:
+	var hd := (d + 0.5) * 0.5
+	var hw := (w + 0.4) * 0.5
+	var ridge := eave_y + 1.0
+	for ex in [x - hd - 0.03, x + hd + 0.03]:
+		for sz in [-1.0, 1.0]:
+			_tube(kit, "paint", Vector3(ex, eave_y - 0.02, z + sz * (hw + 0.02)), Vector3(ex, ridge + 0.04, z), 0.045, 0.045, 6, WHITE)
+	_tube(kit, "paint", Vector3(x - hd - 0.05, ridge + 0.02, z), Vector3(x + hd + 0.05, ridge + 0.02, z), 0.06, 0.06, 8, WHITE)
+	var pole := Vector3(x - hd + 0.05, ridge, z)
+	_tube(kit, "paint", pole, pole + Vector3(0, 0.7, 0), 0.015, 0.015, 6, WHITE)
+	var st := _st(kit, "canvas")
+	var n := Vector3(-1, 0, 0)
+	_tri(st, pole + Vector3(0, 0.68, 0), pole + Vector3(0, 0.46, 0), pole + Vector3(0, 0.57, 0.38), n, n, n, col.darkened(0.15), n)
 
 
 ## A timber pier from the beach out past the sandbar, a pavilion on its T-head. Laid out at life size
@@ -5732,6 +5991,8 @@ func _build_palms(level: Node3D) -> void:
 			taken.append(base)
 			spots.append([Vector3(base.x, y4, base.y), d4, v4, sc4])
 			dune += 1
+	# The monorail station's planters (_build_mono_station).
+	spots.append_array(_planter_palms)
 	# Meshes, then the palms in cells: the detailed ones near, the stand-ins far, and the trunks.
 	var near_mats := _palm_materials(1)
 	var far_mats := _palm_materials(2)

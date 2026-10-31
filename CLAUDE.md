@@ -1439,6 +1439,14 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   in the life-size layout land on the real sand. Pick the pivot on the sea side so the structure grows
   inland, away from the racing line. This applies to the huts, the bar, the lifeguard towers, the
   parasol sets and the fence. The pier and the lighthouse grow seaward from their landward ends.
+- The grandstand's treads are `STAND_TIER_D` (1.45m) deep with moulded seats (`_stand_seat`: pedestal, pan,
+  curved back) at their back (`STAND_SEAT_BACK`), so a seated spectator's feet rest on their own tread; on the
+  old 1.05m treads with benches in the middle, legs stood out through the row below. Nosings on the treads,
+  half steps with yellow edges up the two aisles, aisle handrails and a front rail.
+- The beach huts (`_hut_details`, `_hut_roof_trim`): a panelled door with a louvred vent and knob in a white
+  architrave, the hut's number over it (`GLYPHS` has digits now), corner boards and skirting, a shuttered side
+  window, a boarded deck with two steps, now and then a towel on a hook or a surfboard by the door; barge
+  boards, a ridge cap and a pennant on the roof.
 - Parasol sets are rejection-sampled per zone (`PARASOL_ZONES`): `PARASOL_GAP` apart, on dry level sand,
   clear of the track and of every footprint noted before them. The fence is built first for that reason.
 - Beach play on the beach section (`_build_beach_play`): beach balls (`KickBall.gd`, see "Kick balls") on the
@@ -1513,7 +1521,16 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
     flickered.
   - South Beach station (`_build_mono_station`) stands at the beach path, so the dune fence's gap
     there is wide. It has a glass vault, a glazed hall and stairs toward the track, kept 5m+ off its
-    edge.
+    edge. The landing between the two flights has balustrades on its sides only (one across its far edge
+    closed the way down). Its planters (`_planter`: walls, coping, soil) hold small palms (`_planter_palms`,
+    planted by `_build_palms` at 0.15-0.18 scale: at 0.25 their crowns reached over the platform's edge),
+    flowering shrubs (`_flower_shrub`, leaf cards and five-petal flowers in the canvas material) and dune
+    grass tufts (`StationPlanterGrass`); they had been green lumps of `_rock`.
+  - Departure boards (`StationBoard.gd`, `_station_board`): over the hall's doors, beside the head of the
+    stairs and one hung across the platform (two-sided). A dark panel with amber Label3D text (modulate
+    over 1, so the glow takes it): the station and the clock, the next two trains (where to, minutes, DUE,
+    BOARDING) and a status line. It reads `Monorail.upcoming()`, the timetable from the same wall clock the
+    train runs on, so every peer agrees unsynced; the train's `stop_names` name the stops.
   - `Monorail.gd` shuttles a three-car train between the far end, the station and the south end on
     the wall clock, like `WildebeestHerd.gd`, so LAN peers agree without syncing. It plays the baked
     station chime (`_station_chime`) 3s before each stop at the station. The cars are internal

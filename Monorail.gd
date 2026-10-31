@@ -11,6 +11,9 @@ extends Node3D
 ##
 ## `chime` plays at `chime_at` (the station) `chime_lead` seconds before the train stops at any of
 ## `chime_stops` (indices into `stops`).
+##
+## `upcoming()` gives the timetable from the same clock (the station's departure boards, StationBoard.gd),
+## naming each stop by `stop_names`.
 
 @export var path: Curve3D
 @export var end_car: Mesh
@@ -27,6 +30,8 @@ extends Node3D
 @export var chime_stops := PackedInt32Array()
 @export var chime_at := Vector3.ZERO
 @export var chime_lead := 3.0
+## A name per stop, for the departure boards.
+@export var stop_names := PackedStringArray()
 
 var _cars: Array[Node3D] = []
 var _bodies: Array[AnimatableBody3D] = []
@@ -156,3 +161,31 @@ func _leg_dist(d: float, t: float) -> float:
 		var r := total - t
 		return d - 0.5 * accel * r * r
 	return 0.5 * accel * t_up * t_up + cruise * (t - t_up)
+
+
+## The next `count` calls at any of the stops in `at` (indices into `stops`), soonest first:
+## {"arrive": seconds until the train stops there (0 while it waits there), "leave": seconds until it
+## leaves, "to": the index of the stop it leaves for}.
+func upcoming(at: PackedInt32Array, count: int) -> Array:
+	var out: Array = []
+	if _period <= 0.0:
+		return out
+	var tt := fposmod(_now(), _period)
+	var n := stops.size()
+	var arrive := PackedFloat32Array()
+	var acc := 0.0
+	for i in n:
+		arrive.append(acc)
+		acc += dwells[i] + _leg_time(absf(stops[(i + 1) % n] - stops[i]))
+	for cycle in 3:
+		for i in n:
+			if not (i in at):
+				continue
+			var a := arrive[i] + cycle * _period
+			var leave := a + dwells[i]
+			if leave <= tt:
+				continue
+			out.append({"arrive": maxf(a - tt, 0.0), "leave": leave - tt, "to": (i + 1) % n})
+			if out.size() >= count:
+				return out
+	return out
