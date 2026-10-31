@@ -256,6 +256,20 @@ the others re-bakes it (see Lakeside Course below).
   own material (saved as `terrain_mat`), then a plain vertex-colour one; inside `BACK_SOLID` it is solid; the woods
   carry on over it (`_backdrop_trees`). Nothing within 820m dips under TerrainGenerator's 1600m water plane. The fog
   runs out to `BACK_FOG` (4.6km) so the ranges show, hazed. Sharp ridged noise alone made a row of identical spikes.
+- The far forest (`_build_far_forest`, `FAR_FOREST_*`): from where the backdrop's 3D trees thin out (690m) to 3.3km,
+  about 150k impostor trees over the ranges: wherever the backdrop is painted forest (not the meadows, the fields and
+  sand by the sea, Bloombay) and up the steep faces short of the cliffs, to a ragged tree line (`FAR_FOREST_LINE`),
+  spacing out and growing with distance. Each is a quad whose corners all sit at its foot (the corner's offset in
+  UV2); `tree_impostor.gdshader` opens it out facing the camera about its upright and lights it with the crown's
+  baked normals. The sprites are the woods' own fir and larch (WoodlandBuilder, detailed meshes, two shapes, five
+  bearings each) baked by `regenerate_pinecrest_impostors.gd` (`-s`, **windowed**: run it after changing those
+  trees, then regenerate): their own shaders made unshaded into `generated/pinecrest_impostor_albedo.res`
+  (coverage-keeping mipmaps, meta `frames`: each tree's frame height and foot) and the normals into
+  `..._normal.res`. The pine is in the atlas but not planted: its open crown on a red trunk read as a stick with
+  dark blobs. Slope is read over 30m (`FAR_FOREST_SLOPE_SPAN`): over 6m the ridges' fine noise read as cliffs and
+  left the mountains bare. COLOR.b is a rank the Detail Level thins by (JungleDetail's `impostor_material`,
+  `IMPOSTORS`); DressingColliders skips "impostor". Cost 0.7ms (M1, 4320x2700). `scratch/impostor_atlas_dump.gd`
+  (`-s`, headless, `-- <dir>`) writes the atlas out as PNGs.
 - The meadow (`_build_meadow`): the Lakeside Course's grass (MeadowGrass.gd, meadow_grass.gdshader, MeadowDetail.gd)
   on Pinecrest's own map: thinner under the trees (the woods map), mown on the pads and verges, none on the road,
   the trail, the lanes, in the water, on rock faces, past the rim, or under the footprints, trunks, boulders and
@@ -264,7 +278,7 @@ the others re-bakes it (see Lakeside Course below).
   the wet bank, soft rushes and yellow flag irises on the bank (`dune_grass.gdshader`), rafts of water lilies
   floating 0.6-2.6m deep near a shore. Named "PondGrass"/"PondLilies", so DressingColliders leaves them soft.
 - Cost (M1, 4320x2700, `ab_bench` samples=6): 20.9ms in all; the meadow 3.9ms (MeadowDetail scales it), the backdrop
-  0.44, Ridgecrest 0.17, the pond plants 0.06.
+  0.44, Ridgecrest 0.17, the pond plants 0.06 (before the far forest's 0.7).
 - AI races (`scratch/ai_race_test`, 6 carts) finish every lap at speed 1 and 2. Bots that ran wide at switchback 2's
   exit wedged up the bank (its tyre wall now runs on 34m past the apex); one ran up Ridgecrest's lane where the
   summit road bends (the guardrail's gap is now only the lane and 1.5m a side); one wedges now and then inside

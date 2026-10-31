@@ -175,7 +175,7 @@ static func _drawn(mmi: MultiMeshInstance3D, index: int) -> bool:
 const MESH_SKIP := ["terrain", "road", "curb", "ground", "water", "river", "sea", "ocean", "lake", "pool", "sky",
 	"cloud", "decal", "skid", "fx", "warmup", "particle", "spark", "shadow", "glow", "beam", "light", "flare",
 	"grass", "meadow", "fog", "mist", "spray", "foam", "splash", "trail", "wake", "marking", "line", "chunk_", "label",
-	"deck", "ramp", "jump", "kicker", "track", "pier", "gate", "checkpoint", "finish"]
+	"deck", "ramp", "jump", "kicker", "track", "pier", "gate", "checkpoint", "finish", "impostor"]
 
 ## Single meshes (props placed one by one): every one gets a collider, a trimesh of its own triangles
 ## if it is over 5m across (a camp, a dune: driven over), else its convex hull.

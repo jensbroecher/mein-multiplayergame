@@ -12,6 +12,7 @@
 #   - the rain's particle count (JungleRain.particle_scale)
 #   - the ground's fine detail (wheel tracks, the soil's bump, the cut banks' triplanar earth)
 #   - at Off and Low, the canopy's shadows altogether
+#   - the impostor forest on the far hills (Pinecrest Ridge, tree_impostor.gdshader): a share of its trees
 # Instances in every MultiMesh are stored in random order, so drawing the first N of them thins a
 # cell evenly. Nothing here is synced or saved: every peer picks its own detail.
 extends Node3D
@@ -26,6 +27,7 @@ const RAIN := [0.4, 0.55, 0.8, 1.0, 1.0]
 const LIANAS := [false, false, true, true, true]
 const FINE_GROUND := [0.0, 0.3, 1.0, 1.0, 1.0]
 const TREE_SHADOWS := [false, false, true, true, true]
+const IMPOSTORS := [0.4, 0.55, 0.8, 1.0, 1.0]
 
 ## The LOD materials every tree shares (tree_lod.gdshaderinc): the crossfade band moves with
 ## TREE_NEAR.
@@ -34,6 +36,8 @@ const TREE_SHADOWS := [false, false, true, true, true]
 @export var tree_fade_jitter := 12.0
 @export var forest_cell := 80.0
 @export var rain_path: NodePath
+## The far forest's impostors (tree_impostor.gdshader), if the level has them: `density` thins them.
+@export var impostor_material: ShaderMaterial
 ## The ground's material (jungle_ground.gdshader), shared by every terrain chunk.
 @export var ground_material: ShaderMaterial
 
@@ -100,6 +104,8 @@ func apply_vegetation_quality(q: int) -> void:
 		rain.particle_scale = RAIN[q]
 	if ground_material:
 		ground_material.set_shader_parameter(&"fine_detail", FINE_GROUND[q])
+	if impostor_material:
+		impostor_material.set_shader_parameter(&"density", IMPOSTORS[q])
 
 
 ## Draws the first `share` of the MultiMesh's instances (they are stored in random order).

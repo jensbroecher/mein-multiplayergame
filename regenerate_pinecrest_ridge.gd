@@ -2501,6 +2501,7 @@ func _build_backdrop(root: Node3D) -> void:
 	_build_sea(node)
 	_build_bloombay(node)
 	_plan_backdrop_trees()
+	_build_far_forest(node)
 	print("  backdrop: %d rings x %d, %d trees (%.1fs)" % [nr, BACK_SEGS, _backdrop_trees.size(), (Time.get_ticks_msec() - t0) / 1000.0])
 
 
@@ -2671,6 +2672,183 @@ func _plan_backdrop_trees() -> void:
 			var mi: int = KINDS.find(kind) * 2 + rng.randi() % 2
 			_backdrop_trees.append([Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(sc, sc * rng.randf_range(0.92, 1.1), sc)), Vector3(px, g - 0.4, pz)), mi, r < BACK_SOLID - 10.0])
 		x += step
+
+
+## The far forest: the woods carried on over the ranges, from where the backdrop's trees thin out
+## (FAR_FOREST_R.x) to FAR_FOREST_R.y, as impostors: sprites of the woods' own fir and larch
+## (regenerate_pinecrest_impostors.gd bakes them, windowed) that tree_impostor.gdshader turns to face the
+## camera about their upright and lights with the crowns' baked normals. Wherever the ground is painted
+## forest (_back_colour's rules: not the meadows, over the tree line, or the fields and sand by the sea),
+## and up the steep faces short of the cliffs, clumped by the woods' noise and ragged toward the tree
+## line. They space out and grow with distance, where each is a few pixels. One mesh per FAR_FOREST_CELL (a quad per tree,
+## its four corners at the tree's foot, the corner's offset in UV2); COLOR.b is a rank per tree that the
+## Detail Level thins by (JungleDetail.gd, `impostor_material`).
+const FAR_FOREST_R := Vector2(690.0, 3300.0)
+const FAR_FOREST_CELL := 330.0
+## Tree spacing near and far (metres).
+const FAR_FOREST_STEP := Vector2(7.0, 14.0)
+## The tree line: the forest thins out between these heights, into the high meadow under the rock.
+const FAR_FOREST_LINE := Vector2(640.0, 800.0)
+## Slope is read over this span, as coarse as the backdrop's rings (_back_colour's slope is the mesh's):
+## over a few metres the ridges' fine noise read as cliffs and left the ranges bare.
+const FAR_FOREST_SLOPE_SPAN := 30.0
+const IMPOSTOR_ALBEDO := "res://generated/pinecrest_impostor_albedo.res"
+const IMPOSTOR_NORMAL := "res://generated/pinecrest_impostor_normal.res"
+## The atlas's layout (regenerate_pinecrest_impostors.gd): pine, fir, larch, two shapes each, VIEWS cells
+## each, COLS cells a row of 1024 x 1024.
+const IMPOSTOR_VIEWS := 5
+const IMPOSTOR_COLS := 8
+const IMPOSTOR_CELL_UV := Vector2(0.125, 0.25)
+
+var _far_forest_mat: ShaderMaterial
+
+
+func _build_far_forest(root: Node3D) -> void:
+	var t0 := Time.get_ticks_msec()
+	var albedo := load(IMPOSTOR_ALBEDO) as Texture2D
+	if albedo == null:
+		push_error("far forest: no impostor atlas; run regenerate_pinecrest_impostors.gd (windowed) first")
+		return
+	var frames: PackedFloat32Array = albedo.get_meta(&"frames")
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://tree_impostor.gdshader")
+	mat.set_shader_parameter("albedo_tex", albedo)
+	mat.set_shader_parameter("normal_tex", load(IMPOSTOR_NORMAL))
+	_far_forest_mat = _save_res(mat, "far_forest_mat")
+
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7341
+	# The backdrop's own tint noise (_build_backdrop), so the forest keeps to what is painted forest.
+	var tint := FastNoiseLite.new()
+	tint.seed = 31
+	tint.frequency = 1.0 / 160.0
+	var clump := FastNoiseLite.new()
+	clump.seed = 4815
+	clump.frequency = 1.0 / 420.0
+	clump.fractal_octaves = 3
+	var kind_noise := FastNoiseLite.new()
+	kind_noise.seed = 1623
+	kind_noise.frequency = 1.0 / 300.0
+	kind_noise.fractal_type = FastNoiseLite.FRACTAL_NONE
+
+	var cells := {}
+	var count := 0
+	var step := FAR_FOREST_STEP.x
+	var reach := FAR_FOREST_R.y
+	var x := -reach
+	while x <= reach:
+		var z := -reach
+		while z <= reach:
+			var px := x + rng.randf_range(-0.5, 0.5) * step
+			var pz := z + rng.randf_range(-0.5, 0.5) * step
+			z += step
+			var roll := rng.randf()
+			var r := Vector2(px, pz).length()
+			if r < FAR_FOREST_R.x or r > FAR_FOREST_R.y:
+				continue
+			# Fewer trees further out (each one bigger), and none past the far edge's fade.
+			var far_t := smoothstep(FAR_FOREST_R.x + 300.0, FAR_FOREST_R.y - 200.0, r)
+			var spacing := lerpf(FAR_FOREST_STEP.x, FAR_FOREST_STEP.y, far_t)
+			var keep := pow(FAR_FOREST_STEP.x / spacing, 2.0)
+			keep *= smoothstep(FAR_FOREST_R.x, FAR_FOREST_R.x + 90.0, r) * (1.0 - smoothstep(FAR_FOREST_R.y - 120.0, FAR_FOREST_R.y, r))
+			keep *= lerpf(0.25, 1.0, smoothstep(-0.25, 0.15, clump.get_noise_2d(px, pz)))
+			if roll > keep:
+				continue
+			var g := _back_height(px, pz)
+			var nz := tint.get_noise_2d(px, pz) * 0.5 + 0.5
+			var forest := 1.0 - smoothstep(FAR_FOREST_LINE.x, FAR_FOREST_LINE.y, g + nz * 60.0)
+			if forest <= 0.0 or g < SEA_Y + 4.0 or (r > 1300.0 and g < 40.0):
+				continue
+			var sp := FAR_FOREST_SLOPE_SPAN
+			var slope := Vector2(_back_height(px + sp, pz) - _back_height(px - sp, pz), _back_height(px, pz + sp) - _back_height(px, pz - sp)).length() / (2.0 * sp)
+			# Woods climb the steep faces (the ground's paint turns to rock there, the trees stand over it),
+			# thinning toward the cliffs.
+			forest *= 1.0 - smoothstep(0.6, 0.95, slope)
+			forest *= 1.0 - smoothstep(0.55, 0.8, nz) * (1.0 - smoothstep(0.08, 0.25, slope)) * (1.0 - smoothstep(350.0, 450.0, g))
+			if r > 1300.0:
+				forest *= smoothstep(40.0, 70.0, g)
+			if rng.randf() > forest:
+				continue
+			# Fir and larch. Not the pine: its open crown on a long red trunk reads as a stick with
+			# dark blobs on it from afar.
+			var kn := kind_noise.get_noise_2d(px, pz) + rng.randf_range(-0.35, 0.35)
+			var kind := 1 if kn < 0.05 else 2
+			var tree := kind * 2 + rng.randi() % 2
+			var cell := tree * IMPOSTOR_VIEWS + rng.randi() % IMPOSTOR_VIEWS
+			var sc := rng.randf_range(0.82, 1.18) * lerpf(1.0, 1.45, far_t) * lerpf(1.0, 0.8, smoothstep(FAR_FOREST_LINE.x - 80.0, FAR_FOREST_LINE.y, g))
+			var key := Vector2i(floori(px / FAR_FOREST_CELL), floori(pz / FAR_FOREST_CELL))
+			if not cells.has(key):
+				cells[key] = []
+			# Wider further out, so the far woods close into a canopy.
+			var wide := sc * lerpf(1.0, 1.3, far_t)
+			cells[key].append([Vector3(px, g - 0.4 - slope * 3.0 * sc, pz), cell, sc, float(frames[tree * 2]), float(frames[tree * 2 + 1]), wide])
+			count += 1
+		x += step
+
+	var node := Node3D.new()
+	node.name = "FarForest"
+	root.add_child(node)
+	for key in cells.keys():
+		var trees: Array = cells[key]
+		var n := trees.size()
+		var verts := PackedVector3Array()
+		verts.resize(n * 4)
+		var uvs := PackedVector2Array()
+		uvs.resize(n * 4)
+		var offs := PackedVector2Array()
+		offs.resize(n * 4)
+		var cols := PackedColorArray()
+		cols.resize(n * 4)
+		var idx := PackedInt32Array()
+		idx.resize(n * 6)
+		var box := AABB(trees[0][0], Vector3.ZERO)
+		for i in range(n):
+			var t: Array = trees[i]
+			var foot: Vector3 = t[0]
+			var c: int = t[1]
+			var sc: float = t[2]
+			var hgt: float = t[3] * sc
+			var under: float = t[4] * sc
+			var half_w: float = 0.25 * float(t[3]) * float(t[5])
+			var uv0 := Vector2(c % IMPOSTOR_COLS, c / IMPOSTOR_COLS) * IMPOSTOR_CELL_UV
+			var flip := rng.randf() < 0.5
+			var col := Color(rng.randf(), 1.0 if flip else 0.0, rng.randf(), 1.0)
+			for k in range(4):
+				var right := k == 1 or k == 2
+				var top := k >= 2
+				verts[i * 4 + k] = foot
+				offs[i * 4 + k] = Vector2(half_w if right else -half_w, (hgt - under) if top else -under)
+				var u := uv0.x + (IMPOSTOR_CELL_UV.x if right != flip else 0.0)
+				uvs[i * 4 + k] = Vector2(u, uv0.y + (0.0 if top else IMPOSTOR_CELL_UV.y))
+				cols[i * 4 + k] = col
+			# Clockwise seen from the camera's side: bottom-left, top-left, top-right; bottom-left,
+			# top-right, bottom-right (the material draws both sides anyway).
+			idx[i * 6] = i * 4
+			idx[i * 6 + 1] = i * 4 + 3
+			idx[i * 6 + 2] = i * 4 + 2
+			idx[i * 6 + 3] = i * 4
+			idx[i * 6 + 4] = i * 4 + 2
+			idx[i * 6 + 5] = i * 4 + 1
+			box = box.expand(foot + Vector3(0, hgt, 0))
+			box = box.expand(foot - Vector3(0, under, 0))
+		var arrays := []
+		arrays.resize(Mesh.ARRAY_MAX)
+		arrays[Mesh.ARRAY_VERTEX] = verts
+		arrays[Mesh.ARRAY_TEX_UV] = uvs
+		arrays[Mesh.ARRAY_TEX_UV2] = offs
+		arrays[Mesh.ARRAY_COLOR] = cols
+		arrays[Mesh.ARRAY_INDEX] = idx
+		var mesh := ArrayMesh.new()
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		mesh.surface_set_material(0, _far_forest_mat)
+		# The quads open out round their feet in the shader: the box grows by a crown's width.
+		mesh.custom_aabb = box.grow(12.0)
+		var mi := MeshInstance3D.new()
+		mi.name = "Impostors_%d_%d" % [key.x, key.y]
+		mi.mesh = _save_res(mesh, "far_forest_%d_%d" % [key.x, key.y])
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		node.add_child(mi)
+	print("  far forest: %d impostor trees in %d cells (%.1fs)" % [count, cells.size(), (Time.get_ticks_msec() - t0) / 1000.0])
 
 
 # ======================================================================================
@@ -3486,6 +3664,7 @@ func _build_woodland(root: Node3D) -> void:
 	detail.set("tree_fade", Woodland.TREE_FADE)
 	detail.set("tree_fade_jitter", Woodland.TREE_FADE_JITTER)
 	detail.set("forest_cell", FOREST_CELL)
+	detail.set("impostor_material", _far_forest_mat)
 	node.add_child(detail)
 
 
