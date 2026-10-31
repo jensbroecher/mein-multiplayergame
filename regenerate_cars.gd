@@ -9,6 +9,7 @@ extends Node
 
 const CB = preload("res://CarBuilder.gd")
 const CAR_SHADER = preload("res://car_body.gdshader")
+const GLASS_SHADER = preload("res://car_glass.gdshader")
 const OUT_DIR := "res://generated/cars/"
 const DETAIL_SIZE := Vector2i(1024, 512)
 
@@ -36,7 +37,8 @@ const CARS := [
 
 ## Builds one car in memory: {"body", "wheel_l", "wheel_r"} ArrayMeshes sharing "material",
 ## the "detail" map, and the "design" (builder instance) for its layout constants. A car with
-## staggered wheels (its builder has build_rear_wheel()) also gets "rear_wheel_l" and "rear_wheel_r".
+## staggered wheels (its builder has build_rear_wheel()) also gets "rear_wheel_l" and "rear_wheel_r";
+## one with a see-through canopy (build_glass()) gets "glass" and its own "glass_material".
 static func build_car(builder_script: Script) -> Dictionary:
 	var design = builder_script.new()
 	var detail: Image = design.build_detail_map(DETAIL_SIZE.x, DETAIL_SIZE.y)
@@ -70,6 +72,15 @@ static func build_car(builder_script: Script) -> Dictionary:
 		out["rear_wheel_r"] = rr.commit(mat)
 		out["rear_wheel_l"] = rl.commit(mat)
 		out["triangles"] += rr.triangle_count() + rl.triangle_count() - wr.triangle_count() - wl.triangle_count()
+	if design.has_method("build_glass"):
+		var gb := CB.new()
+		design.build_glass(gb)
+		var gmat := ShaderMaterial.new()
+		gmat.shader = GLASS_SHADER
+		gmat.render_priority = -1
+		out["glass"] = gb.commit(gmat)
+		out["glass_material"] = gmat
+		out["triangles"] += gb.triangle_count()
 	return out
 
 
@@ -100,6 +111,15 @@ static func assemble(car_name: String, parts: Dictionary) -> Node3D:
 		w.position = design.WHEEL_POSITIONS[corner]
 		w.set_meta("car_shader", true)
 		model.add_child(w)
+	if parts.has("glass"):
+		# The canopy: car_glass.gdshader, see-through, casting no shadow on the cockpit under it.
+		var glass := MeshInstance3D.new()
+		glass.name = "Glass"
+		glass.mesh = parts["glass"]
+		glass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		glass.set_meta("car_shader", true)
+		glass.set_meta("car_glass", true)
+		model.add_child(glass)
 	var ant := Node3D.new()
 	ant.name = "AntennaPlacement"
 	ant.position = design.ANTENNA_POS
@@ -146,6 +166,11 @@ func _ready() -> void:
 			var mesh: ArrayMesh = parts[key]
 			mesh.surface_set_material(0, mat)
 			parts[key] = _save(mesh, "%s_%s.res" % [prefix, key])
+		if parts.has("glass"):
+			var gmat: Material = _save(parts["glass_material"], prefix + "_glass_material.tres")
+			var gmesh: ArrayMesh = parts["glass"]
+			gmesh.surface_set_material(0, gmat)
+			parts["glass"] = _save(gmesh, prefix + "_glass.res")
 		var root: Node3D = assemble(car["name"], parts)
 		_set_owner_recursive(root, root)
 		var packed := PackedScene.new()

@@ -245,7 +245,18 @@ func build_shell(b) -> void:
 		uvs.append(uv)
 	# Rows run nose to tail (+z) and each ring goes up the right side first, so d/dj x d/di
 	# already points outward.
+	var vb: int = b.vertex_count()
 	b.grid(rows, CB.M_BODY, Color(1, 1, 1), false, true, uvs)
+	for k in range(vb, b.vertex_count()):
+		var s: float = _shell_shade(b._v[k])
+		if s < 1.0:
+			b._c[k] = Color(s, s, s)
+
+
+## How much the shell is shaded at surface point p (1 = not at all): car_body.gdshader darkens the
+## paint and takes its gloss off by it, for a recess that should read as a cavity.
+func _shell_shade(_p: Vector3) -> float:
+	return 1.0
 
 
 ## Where the body's surface is at (x, y), searching from the nose (or from the tail): its z.

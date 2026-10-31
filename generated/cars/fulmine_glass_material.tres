@@ -1,0 +1,17 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://car_glass.gdshader" id="1_x8kpx"]
+
+[resource]
+render_priority = -1
+shader = ExtResource("1_x8kpx")
+shader_parameter/nose_z = null
+shader_parameter/tail_z = null
+shader_parameter/belt_y = null
+shader_parameter/side_x = null
+shader_parameter/door_roundel = null
+shader_parameter/roundel_r = null
+shader_parameter/hood_z = null
+shader_parameter/hood_r = null
+shader_parameter/stripe_w = null
+shader_parameter/stripe_gap = null

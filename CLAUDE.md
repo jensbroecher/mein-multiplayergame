@@ -904,6 +904,9 @@ faces get culled and you see the far faces from the inside. To confirm, render i
 - Headless can't render screenshots. To look at a level, run a `SceneTree` script (`-s`) with the
   windowed console exe and `--resolution 1600x900`, place a `Camera3D`, and save
   `root.get_texture().get_image()`.
+- A windowed run on the M1 that logs `ERROR: timeout waiting for fence` (Metal) can save garbage frames:
+  wrong colours (a green car came out red and blue), every shot the same whatever changed. It is the GPU,
+  not the scene: rerun before believing the picture.
 
 ## Texture streaming (the rock and plant models)
 
@@ -1726,6 +1729,30 @@ its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set th
   face. A boundary crossing a cap at another height came out wavy. The side is split at the sill line
   for the same reason.
 - The Obsidian (`ObsidianBuilder.gd`, a futuristic matte-black desert raider, an original design with a made-up name) features a low sculpted hood with extraction vents and an LED light bar, an open-wheel front with long A-arms, a chrome-framed cockpit canopy with tan bucket seats, a central cylindrical sensor pod on the roll hoop, exposed underfloor bronze power cylinders clamped along the sills, and a sculpted rear cowl that arches over the rear tyres, finished with twin aerodynamic winglet fins. Its balloon mud-terrain tyres ride on deep-dish gold/bronze beadlock rims.
+- The Fulmine (`FulmineBuilder.gd`, a mid-engined hypercar, an original design with a made-up name) is built on the
+  Nocturne's section (wells cut as notches, fender humps over a sunken bonnet and tail) with the Inferno's flank intake
+  (`_scoop()`) carved ahead of each rear wheel, 10cm deep. Beside the cockpit B drops deep below A, so the shell is an
+  open tub (a dash in front, a bulkhead behind) with seats, a steering wheel and a tunnel in it, under a see-through
+  canopy (`build_glass()`, `_canopy_ring()`: an arch standing on the door tops and running up the sail panels into the
+  engine cover) on dark frames. Its first version, a square keyed section with a chamfer and a flat top, read as a
+  boxy wedge; the second, with an opaque painted canopy and a shallow scoop, as the Nocturne again. The nose's leading
+  edge is raised (`nose_cap_y` 0.18) so there is a front face under it for the black mouth and its vanes: on a shovel
+  nose the mouth fell on the underside and never showed. Lamps and light bars are thin tubes laid along the surface
+  through `face_frame()` (`_on_face_line`), their UVs zeroed (`_lamp_tube`) or the headlamp material's reflector rings
+  stripe them. The detail map gives each ring segment the same number of texels, so a long segment with few points
+  draws jagged edges. `res://scratch/car_mesh_check.gd` (`-s`, headless, `-- [Fulmine ...]`) checks a car's meshes
+  (glass included) for NaNs, zero normals and bad material ids.
+- See-through canopies: a builder with `build_glass(b)` gets a `Glass` mesh beside `Body` (regenerate_cars.gd,
+  `<prefix>_glass.res`), drawn by `car_glass.gdshader` (car_body.gdshaderinc's `CAR_GLASS` path: the vertex colour is
+  the tint, its alpha the opacity face on, rising with Fresnel; premultiplied so reflections keep their strength). It
+  is tagged `car_shader` (paint and flashes reach it through the same instance uniforms; a fade swaps in
+  car_body_fade.gdshader, which draws it by its material id, so give the glass M_DARK) and `car_glass`: PlayerCart never
+  turns its shadow on (it would black out the cockpit) and hides it while the body is disintegrated
+  (`_debris_glass`). It can't be part of the body mesh: CarDebris only splits a one-surface `Body`, and a plain
+  transparent material would be made opaque by PlayerCart's fade code when the fade ends.
+- `CarDesign._shell_shade(p)` (default 1) writes a grey into the shell's vertex colours; car_body.gdshader multiplies the
+  body's colour by it and takes the gloss and clearcoat off with it, so a recess reads as a cavity (the Fulmine's
+  intakes and cockpit tub). Every other car's shell is white, so nothing changes for them.
 
 ## Canyon Chasm dirt ramps, rocks, signs, tornado and houses
 

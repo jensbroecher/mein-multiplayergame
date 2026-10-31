@@ -741,6 +741,8 @@ var _engine_gain_db := 0.0
 ## The car's body mesh node, the key its pieces are cached under (CarDebris.prepare()) and the paint
 ## its pieces are given.
 var _debris_body: MeshInstance3D
+## A see-through canopy beside the body (a car with build_glass()), hidden while the body is in pieces.
+var _debris_glass: MeshInstance3D
 var _debris_key := ""
 var _debris_paint: Dictionary = {}
 ## What the body drew before an explosion tore pieces off it, and the pieces now flying.
@@ -1011,6 +1013,7 @@ func _ready():
 			_debris_paint = CarPaint.sanitize(paint, preset.name)
 			CarPaint.apply(new_model, _debris_paint)
 			_debris_body = new_model.find_child("Body", true, false) as MeshInstance3D
+			_debris_glass = new_model.find_child("Glass", true, false) as MeshInstance3D
 			_debris_key = preset.model_path
 			# Worker thread: splits the body into the pieces an explosion tears off.
 			CarDebris.prepare(_debris_key, _debris_body)
@@ -4213,6 +4216,8 @@ func _tear_car(damage: Dictionary) -> void:
 		body.mesh = torn["stay"]
 	if torn["hide_body"]:
 		body.visible = false
+		if is_instance_valid(_debris_glass):
+			_debris_glass.visible = false
 
 	var from := body.global_transform
 	var start_rotation := from.basis.get_rotation_quaternion()
@@ -4297,6 +4302,8 @@ func _clear_debris() -> void:
 	if _debris_body_mesh != null and _debris_body != null and is_instance_valid(_debris_body):
 		_debris_body.mesh = _debris_body_mesh
 		_debris_body.visible = true
+	if is_instance_valid(_debris_glass):
+		_debris_glass.visible = true
 	_debris_body_mesh = null
 
 
@@ -5490,7 +5497,8 @@ func apply_shadow_setting(enabled: bool = true):
 
 func _set_shadows_recursive(node: Node, enabled: bool):
 	if node == null: return
-	if node is GeometryInstance3D:
+	# A see-through canopy never casts one: it would black out the cockpit under it.
+	if node is GeometryInstance3D and not node.has_meta("car_glass"):
 		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if enabled else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	for child in node.get_children():
 		_set_shadows_recursive(child, enabled)

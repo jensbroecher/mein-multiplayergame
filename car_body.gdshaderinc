@@ -2,6 +2,7 @@
 // with) and car_body_fade.gdshader (its transparent twin, swapped in by PlayerCart only while a car
 // fades out: the Mobile renderer ignores GeometryInstance3D.transparency, and a shader that writes
 // ALPHA is always drawn as transparent, so the fade can't be one shader). See car_body.gdshader.
+// car_glass.gdshader (CAR_GLASS) draws a see-through canopy with the same instance uniforms.
 
 #define M_BODY 0
 #define M_PAINT 1
@@ -371,6 +372,19 @@ vec3 paint_albedo(vec3 p, vec3 n) {
 }
 
 void fragment() {
+#ifdef CAR_GLASS
+	// A canopy's glass (car_glass.gdshader): the vertex colour is its tint and, in alpha, how much it
+	// dims what is behind it face on, rising toward a grazing angle. Premultiplied, so the reflections
+	// keep their strength over the see-through middle.
+	float fres = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
+	float glass_a = mix(COLOR.a, 0.94, fres);
+	ALBEDO = pow(COLOR.rgb, vec3(2.2)) * glass_a;
+	ALPHA = glass_a;
+	ROUGHNESS = 0.04;
+	METALLIC = 0.0;
+	SPECULAR = 0.8;
+	EMISSION = fx_glow.rgb * fx_glow.a;
+#else
 	int v_mat = int(round(v_mat_f));
 	vec3 base = pow(COLOR.rgb, vec3(2.2));
 	vec3 alb = base;
@@ -426,6 +440,12 @@ void fragment() {
 			metal = mix(metal, 0.0, d.r);
 			spec = mix(spec, 0.9, d.r);
 			cc = mix(cc, 0.0, d.r);
+			// The shell's vertex colour shades a deep recess (CarDesign._shell_shade: an intake's
+			// cavity): its colour, gloss and clearcoat fade with it. Other shells are white.
+			alb *= base;
+			spec *= COLOR.r;
+			cc *= COLOR.r;
+			rough = mix(1.0, rough, COLOR.r);
 		}
 	} else if (v_mat == M_RUBBER) {
 		rough = 0.86;
@@ -478,5 +498,6 @@ void fragment() {
 	EMISSION = emit + fx_glow.rgb * fx_glow.a;
 #ifdef CAR_FADE
 	ALPHA = fx_alpha;
+#endif
 #endif
 }
