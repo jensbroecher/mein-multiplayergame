@@ -143,7 +143,9 @@ func _test_mesh(mesh: Mesh, xf: Transform3D, key: String, found: Dictionary) -> 
 		var g := _ground_at(p)
 		if p.y < g + 0.4 or p.y > g + 1.4:
 			continue
-		cells[k] = Vector3(k.x + 0.5, g + 0.9, k.y + 0.5)
+		# Tested where the geometry is (at a cart's middle height over the ground there), not at the cell's
+		# middle: a chair or a post near a cell's corner stood out of the sphere's reach of its own collider.
+		cells[k] = Vector3(p.x, g + 0.9, p.z)
 	var open := 0
 	var first := Vector3.ZERO
 	var sphere := SphereShape3D.new()

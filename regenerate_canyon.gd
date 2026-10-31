@@ -2900,6 +2900,7 @@ func _place(placed: Dictionary, nm: String, x: float, y: float, z: float, height
 
 const CampKit = preload("res://CampKit.gd")
 const VenueKit = preload("res://VenueKit.gd")
+const RoadsideKit = preload("res://RoadsideKit.gd")
 const CrowdPlacer = preload("res://CrowdPlacer.gd")
 ## People-sized things are built at life size and scaled up, as on the Lakeside Course and Bloombay.
 const PROP_SCALE := 1.6
@@ -2937,6 +2938,18 @@ func _prop_material(key: String) -> Material:
 			m = _vc_material(0.45, 0.55)
 		"wood":
 			m = _vc_material(0.92)
+		"tyre":
+			# PropKit.painted_tyre's tyres (RoadsideKit's stacks).
+			var tm := ShaderMaterial.new()
+			tm.shader = load("res://tyre_wall.gdshader")
+			m = tm
+		"timber":
+			# VenueKit.timber's sawn wood: hut_wood.gdshader's grain along v (UVs in metres).
+			var wm := ShaderMaterial.new()
+			wm.shader = load("res://hut_wood.gdshader")
+			wm.set_shader_parameter("style", 2)
+			wm.set_shader_parameter("weathering", 0.7)
+			m = wm
 		_:
 			m = CampKit.make_material(key) if key in ["matte", "canvas", "gloss", "chrome", "rubber"] else _vc_material(0.6)
 	m = _save_baked_resource(m, "prop_mat_" + key)
@@ -3006,6 +3019,12 @@ func _build_parador(level_scene: Node3D) -> void:
 	var hx: float = PARADOR_HALF.x / PROP_SCALE
 	var hz: float = PARADOR_HALF.y / PROP_SCALE
 	var boxes: Array = []
+	# The furniture and fittings (RoadsideKit), each laid out at life size in its own frame inside this one.
+	var road := RoadsideKit.new(pk)
+	var place := func(at: Vector3, yaw_deg: float) -> void:
+		pk.set_frame(frame * Transform3D(Basis(Vector3.UP, deg_to_rad(yaw_deg)), at))
+	var prng := RandomNumberGenerator.new()
+	prng.seed = 3407
 
 	# --- The ground: a concrete forecourt in front, an asphalt lot behind, parking lines, stains. ----
 	pk.block(kit, "concrete", Vector3(-hx + 1.0, 0.0, -hz + 1.0), Vector3(hx - 1.0, 0.07, -1.0), white)
@@ -3036,30 +3055,26 @@ func _build_parador(level_scene: Node3D) -> void:
 			pk.box(kit, "paint", Transform3D(Basis(), ic + Vector3(0, 0.17, ez)), Vector3(1.66, 0.22, 0.25), yellow)
 			# Bollards at the island ends, and the column that carries the roof.
 			pk.tube(kit, "paint", ic + Vector3(0, 0.26, ez * 1.08), ic + Vector3(0, 1.2, ez * 1.08), 0.12, 0.12, 8, yellow)
+			boxes.append([ic + Vector3(0, 0.7, ez * 1.08), Vector3(0.3, 1.4, 0.3)])
 		pk.box(kit, "paint", Transform3D(Basis(), ic + Vector3(0, 2.7, 0)), Vector3(0.5, 4.9, 0.5), white)
 		boxes.append([ic + Vector3(0, 1.3, 0), Vector3(1.6, 2.6, 7.0)])
+		# Two pumps on each island, serving both sides (RoadsideKit.fuel_pump faces ±z: turned to face ±x),
+		# and a bin with its towels and squeegee bucket at the island's end.
 		for pz in [-1.8, 1.8]:
-			var pc: Vector3 = ic + Vector3(0, 0.26, pz)
-			pk.box(kit, "paint", Transform3D(Basis(), pc + Vector3(0, 0.9, 0)), Vector3(0.7, 1.8, 1.0), red)
-			pk.box(kit, "paint", Transform3D(Basis(), pc + Vector3(0, 1.95, 0)), Vector3(0.76, 0.32, 1.06), white)
-			pk.box(kit, "paint", Transform3D(Basis(), pc + Vector3(0, 0.05, 0)), Vector3(0.8, 0.1, 1.1), dark)
-			for sx in [-1.0, 1.0]:
-				# The screen and the price window, a nozzle in its holster, the hose looping down.
-				pk.box(kit, "glass", Transform3D(Basis(), pc + Vector3(sx * 0.36, 1.35, 0.15)), Vector3(0.03, 0.4, 0.5), dark)
-				pk.box(kit, "lamp", Transform3D(Basis(), pc + Vector3(sx * 0.37, 1.65, -0.25)), Vector3(0.02, 0.12, 0.3), Color(0.4, 1.0, 0.5))
-				pk.box(kit, "matte", Transform3D(Basis(), pc + Vector3(sx * 0.4, 1.0, -0.3)), Vector3(0.1, 0.3, 0.12), dark)
-				pk.tube(kit, "matte", pc + Vector3(sx * 0.4, 1.0, -0.3), pc + Vector3(sx * 0.62, 0.35, -0.1), 0.035, 0.035, 5, dark)
-				pk.tube(kit, "matte", pc + Vector3(sx * 0.62, 0.35, -0.1), pc + Vector3(sx * 0.38, 1.7, 0.3), 0.035, 0.035, 5, dark)
-		# A bin and a bucket of squeegees at the end of each island.
-		pk.tube(kit, "paint", ic + Vector3(0.4, 0.26, 2.9), ic + Vector3(0.4, 1.2, 2.9), 0.25, 0.25, 10, Color(0.25, 0.32, 0.30))
-		pk.tube(kit, "paint", ic + Vector3(-0.4, 0.26, 2.9), ic + Vector3(-0.4, 0.7, 2.9), 0.18, 0.2, 10, Color(0.20, 0.36, 0.62))
+			place.call(ic + Vector3(0, 0.26, pz), 90.0)
+			road.fuel_pump(kit, red, Color(1.0, 0.85, 0.3))
+		place.call(ic + Vector3(0, 0.26, 2.75), 90.0)
+		road.island_bin(kit, Color(0.25, 0.32, 0.30))
+		pk.set_frame(frame)
 	for cx in [-10.4, 10.4]:
 		for dz in [-4.6, 4.6]:
 			pk.box(kit, "paint", Transform3D(Basis(), cc + Vector3(cx, 2.4, dz)), Vector3(0.45, 4.8, 0.45), white)
 			boxes.append([cc + Vector3(cx, 2.4, dz), Vector3(0.5, 4.8, 0.5)])
 	# The air and water post.
-	pk.box(kit, "paint", Transform3D(Basis(), Vector3(4.6, 0.8, -17.5)), Vector3(0.5, 1.6, 0.4), Color(0.20, 0.36, 0.62))
-	pk.tube(kit, "matte", Vector3(4.6, 1.2, -17.75), Vector3(4.9, 0.3, -18.1), 0.03, 0.03, 5, dark)
+	place.call(Vector3(4.6, 0.07, -17.5), 0.0)
+	road.air_post(kit)
+	pk.set_frame(frame)
+	boxes.append([Vector3(4.6, 0.8, -17.5), Vector3(0.65, 1.6, 0.55)])
 
 	# --- The shop: flat roof and parapet, a glazed front with its door, a sign band and an awning,
 	# posters in the windows; an ice chest, a gas-bottle cage and a bench outside. ------------------
@@ -3077,14 +3092,18 @@ func _build_parador(level_scene: Node3D) -> void:
 	pk.box(kit, "paint", Transform3D(Basis(), shop + Vector3(0, 3.1, -5.9)), Vector3(13.0, 0.12, 1.8), red)
 	for ax in [-6.0, 6.0]:
 		pk.tube(kit, "metal", shop + Vector3(ax, 0.07, -6.7), shop + Vector3(ax, 3.05, -6.7), 0.06, 0.06, 6, steel)
-	pk.box(kit, "paint", Transform3D(Basis(), shop + Vector3(-4.6, 0.6, -6.0)), Vector3(1.6, 1.1, 0.8), white)
-	pk.box(kit, "paint", Transform3D(Basis(), shop + Vector3(-4.6, 1.16, -6.0)), Vector3(1.62, 0.04, 0.82), Color(0.2, 0.45, 0.8))
-	for gx in range(4):
-		pk.tube(kit, "paint", shop + Vector3(4.2 + gx * 0.45, 0.07, -6.0), shop + Vector3(4.2 + gx * 0.45, 1.0, -6.0), 0.17, 0.17, 8, Color(0.85, 0.82, 0.78))
-	pk.box(kit, "metal", Transform3D(Basis(), shop + Vector3(4.9, 0.75, -6.0)), Vector3(2.0, 1.5, 0.9), Color(0.45, 0.47, 0.48))
-	pk.box(kit, "wood", Transform3D(Basis(), shop + Vector3(-2.8, 0.45, -6.4)), Vector3(2.0, 0.08, 0.45), Color(0.48, 0.34, 0.22))
-	for bx in [-3.6, -2.0]:
-		pk.box(kit, "metal", Transform3D(Basis(), shop + Vector3(bx, 0.22, -6.4)), Vector3(0.06, 0.44, 0.4), dark)
+		boxes.append([shop + Vector3(ax, 1.5, -6.7), Vector3(0.2, 3.0, 0.2)])
+	# Outside the shop: the ice chest, the gas-bottle cage, a bench under the awning.
+	place.call(shop + Vector3(-4.6, 0.07, -5.6), 0.0)
+	road.ice_chest(kit)
+	place.call(shop + Vector3(4.9, 0.07, -5.6), 0.0)
+	road.gas_cage(kit, prng)
+	place.call(shop + Vector3(-2.2, 0.07, -5.5), 0.0)
+	road.bench(kit)
+	pk.set_frame(frame)
+	boxes.append([shop + Vector3(-4.6, 0.68, -5.6), Vector3(1.75, 1.3, 0.85)])
+	boxes.append([shop + Vector3(4.9, 0.75, -5.6), Vector3(2.1, 1.5, 0.95)])
+	boxes.append([shop + Vector3(-2.2, 0.45, -5.5), Vector3(1.8, 0.9, 0.65)])
 	for rx in [-4.0, 2.0]:
 		pk.box(kit, "metal", Transform3D(Basis(), shop + Vector3(rx, 5.15, 1.5)), Vector3(1.6, 0.9, 1.2), Color(0.70, 0.71, 0.70))
 	boxes.append([shop + Vector3(0, 2.3, 0), Vector3(13.2, 4.6, 10.2)])
@@ -3113,20 +3132,30 @@ func _build_parador(level_scene: Node3D) -> void:
 	pk.box(kit, "paint", Transform3D(Basis(), dn + Vector3(0, 6.6, 0)), Vector3(9.2, 1.8, 0.24), white)
 	pk.tube(kit, "metal", dn + Vector3(4.5, 3.6, 1.5), dn + Vector3(4.5, 5.4, 1.5), 0.2, 0.2, 8, Color(0.4, 0.4, 0.42))
 	boxes.append([dn + Vector3(0, 1.8, 0), Vector3(dl * 2.0 + dr * 2.0, 3.6, dr * 2.0)])
+	# The patio: four tables under market umbrellas striped white, three or four chrome chairs at each,
+	# pulled out at odd angles. All solid.
 	var pr := RandomNumberGenerator.new()
 	pr.seed = 77
 	for k in range(4):
 		var tc: Vector3 = dn + Vector3(-6.6 + k * 4.4, 0.07, -dr - 3.2)
-		pk.tube(kit, "metal", tc, tc + Vector3(0, 0.75, 0), 0.05, 0.05, 6, steel)
-		pk.lathe(kit, "paint", tc + Vector3(0, 0.75, 0), [Vector2(0.0, 0.0), Vector2(0.55, 0.0), Vector2(0.55, 0.04), Vector2(0.0, 0.04)], 12, white, true)
-		pk.tube(kit, "metal", tc + Vector3(0, 0.79, 0), tc + Vector3(0, 2.5, 0), 0.03, 0.03, 5, steel)
-		var umb: Color = [red, teal, yellow, Color(0.85, 0.85, 0.82)][k]
-		pk.lathe(kit, "canvas", tc + Vector3(0, 2.2, 0), [Vector2(1.5, 0.0), Vector2(1.2, 0.18), Vector2(0.6, 0.38), Vector2(0.0, 0.5)], 12, umb)
-		for c4 in range(3):
-			var ca: float = TAU * float(c4) / 3.0 + pr.randf()
-			var chair: Vector3 = tc + Vector3(cos(ca) * 0.95, 0.0, sin(ca) * 0.95)
-			pk.box(kit, "metal", Transform3D(Basis(Vector3.UP, -ca), chair + Vector3(0, 0.45, 0)), Vector3(0.45, 0.05, 0.45), Color(0.3, 0.3, 0.32))
-			pk.box(kit, "metal", Transform3D(Basis(Vector3.UP, -ca), chair + Vector3(cos(ca) * 0.2, 0.75, sin(ca) * 0.2)), Vector3(0.05, 0.6, 0.45), Color(0.3, 0.3, 0.32))
+		place.call(tc, pr.randf_range(0.0, 90.0))
+		road.patio_table(kit, Color(0.93, 0.92, 0.88), pr)
+		road.market_umbrella(kit, [red, teal, yellow, Color(0.20, 0.36, 0.62)][k], Color(0.95, 0.94, 0.9))
+		boxes.append([tc + Vector3(0, 0.4, 0), Vector3(1.15, 0.8, 1.15)])
+		boxes.append([tc + Vector3(0, 1.3, 0), Vector3(0.12, 2.6, 0.12)])
+		var vinyl: Color = [red, teal][k % 2]
+		for c4 in range(4):
+			if c4 == 3 and pr.randf() < 0.5:
+				continue
+			var ca: float = TAU * float(c4) / 4.0 + PI * 0.25 + pr.randf_range(-0.35, 0.35)
+			var dist: float = pr.randf_range(0.72, 0.95)
+			var chair: Vector3 = tc + Vector3(cos(ca) * dist, 0.0, sin(ca) * dist)
+			# The chair faces the table (its -z toward it), give or take.
+			var yaw: float = atan2(cos(ca), sin(ca)) + pr.randf_range(-0.4, 0.4)
+			pk.set_frame(frame * Transform3D(Basis(Vector3.UP, yaw), chair))
+			road.diner_chair(kit, vinyl)
+			boxes.append([chair + Vector3(0, 0.46, 0), Vector3(0.46, 0.92, 0.48), yaw])
+	pk.set_frame(frame)
 
 	# --- The motel: a row of rooms under a walkway roof on posts, the office at its end. ---------------
 	var mz := 14.0
@@ -3143,9 +3172,11 @@ func _build_parador(level_scene: Node3D) -> void:
 		pk.box(kit, "glass", Transform3D(Basis(), Vector3(rx + 0.8, 1.5, mz - 0.03)), Vector3(1.5, 1.0, 0.08), dark)
 		pk.box(kit, "paint", Transform3D(Basis(), Vector3(rx + 0.8, 0.95, mz - 0.06)), Vector3(1.7, 0.1, 0.12), white)
 		pk.box(kit, "metal", Transform3D(Basis(), Vector3(rx + 0.8, 0.5, mz - 0.35)), Vector3(0.8, 0.55, 0.5), Color(0.75, 0.75, 0.74))
+		boxes.append([Vector3(rx + 0.8, 0.5, mz - 0.35), Vector3(0.85, 1.0, 0.55)])
 		# The walkway's posts, every other room.
 		if k % 2 == 0:
 			pk.box(kit, "wood", Transform3D(Basis(), Vector3(rx - room_w * 0.5, 1.6, mz - 2.0)), Vector3(0.18, 3.0, 0.18), Color(0.45, 0.32, 0.22))
+			boxes.append([Vector3(rx - room_w * 0.5, 1.6, mz - 2.0), Vector3(0.25, 3.0, 0.25)])
 	pk.box(kit, "paint", Transform3D(Basis(), Vector3(mx0 + rooms * room_w * 0.5, 3.1, mz - 1.0)), Vector3(rooms * room_w, 0.15, 2.4), Color(0.55, 0.30, 0.20))
 	boxes.append([Vector3(mx0 + rooms * room_w * 0.5, 1.6, mz + 3.5), Vector3(rooms * room_w, 3.2, 7.0)])
 	var office := Vector3(mx0 + rooms * room_w + 3.5, 0.0, mz + 2.5)
@@ -3181,13 +3212,14 @@ func _build_parador(level_scene: Node3D) -> void:
 	var tr := RandomNumberGenerator.new()
 	tr.seed = 515
 	for stack in range(5):
-		var tsc := Vector3(-24.6 + (stack % 3) * 1.0, 0.07, -9.0 + float(stack / 3) * 1.0)
-		for t in range(tr.randi_range(3, 6)):
-			pk.tyre(kit, "rubber", tsc + Vector3(tr.randf_range(-0.05, 0.05), 0.15 + t * 0.29, tr.randf_range(-0.05, 0.05)), 0.24, 0.42, 0.28, 12, Color(0.1, 0.1, 0.1))
+		place.call(Vector3(-24.6 + (stack % 3) * 0.9, 0.07, -9.0 + float(stack / 3) * 0.9), 0.0)
+		road.tyre_stack(kit, tr.randi_range(3, 6), tr)
 	for d in range(5):
-		var dc := Vector3(-35.5 + d * 0.75, 0.07, -9.5 + (d % 2) * 0.7)
-		pk.tube(kit, "paint", dc, dc + Vector3(0, 1.0, 0), 0.3, 0.3, 10, [Color(0.18, 0.32, 0.55), red, Color(0.25, 0.4, 0.25)][d % 3])
-	boxes.append([Vector3(-24.0, 0.8, -8.5), Vector3(3.2, 1.6, 2.2)])
+		place.call(Vector3(-35.5 + d * 0.66, 0.07, -9.5 + (d % 2) * 0.62), tr.randf() * 360.0)
+		road.oil_drum(kit, [Color(0.18, 0.32, 0.55), red, Color(0.25, 0.4, 0.25)][d % 3])
+	pk.set_frame(frame)
+	boxes.append([Vector3(-23.7, 0.8, -8.55), Vector3(2.8, 1.6, 1.9)])
+	boxes.append([Vector3(-34.2, 0.45, -9.2), Vector3(3.3, 0.9, 1.3)])
 
 	# --- Restrooms, a picnic ramada, the water tower, the windmill over its stock tank, lot lights. --
 	var wc := Vector3(9.0, 0.0, 15.5)
@@ -3202,9 +3234,14 @@ func _build_parador(level_scene: Node3D) -> void:
 			pk.box(kit, "wood", Transform3D(Basis(), ram + Vector3(px, 1.4, pz)), Vector3(0.2, 2.8, 0.2), Color(0.45, 0.32, 0.22))
 	for sl in range(9):
 		pk.box(kit, "wood", Transform3D(Basis(), ram + Vector3(-2.8 + sl * 0.7, 2.9, 0)), Vector3(0.35, 0.08, 4.4), Color(0.50, 0.36, 0.24))
-	pk.box(kit, "wood", Transform3D(Basis(), ram + Vector3(0, 0.75, 0)), Vector3(3.2, 0.08, 1.0), Color(0.55, 0.40, 0.27))
-	for bz in [-0.85, 0.85]:
-		pk.box(kit, "wood", Transform3D(Basis(), ram + Vector3(0, 0.45, bz)), Vector3(3.2, 0.06, 0.35), Color(0.55, 0.40, 0.27))
+	for tx in [-1.15, 1.15]:
+		place.call(ram + Vector3(tx, 0.07, 0.0), 0.0)
+		road.picnic_table(kit)
+	pk.set_frame(frame)
+	boxes.append([ram + Vector3(0, 0.42, 0), Vector3(4.2, 0.84, 1.7)])
+	for px in [-2.5, 2.5]:
+		for pz in [-1.8, 1.8]:
+			boxes.append([ram + Vector3(px, 1.4, pz), Vector3(0.25, 2.8, 0.25)])
 	var wt := Vector3(22.0, 0.0, 17.0)
 	for lx in [-1.8, 1.8]:
 		for lz in [-1.8, 1.8]:
@@ -3251,7 +3288,11 @@ func _build_parador(level_scene: Node3D) -> void:
 		var vb := Basis(Vector3.UP, deg_to_rad(float(v[3])))
 		pk.set_frame(frame * Transform3D(vb, v[2]))
 		camp.vehicle(vkit, v[0], v[1])
-		boxes.append([v[2] + Vector3(0, 1.2, 0), Vector3(2.4, 2.4, 5.6) if v[0] != "motorhome" else Vector3(2.6, 3.2, 8.0), deg_to_rad(float(v[3]))])
+		# The body, drawbar included; a motorhome's or caravan's awning out on its +x side, legs and all.
+		var vsize: Vector3 = {"motorhome": Vector3(2.6, 3.2, 8.0), "caravan": Vector3(2.4, 2.6, 8.6)}.get(v[0], Vector3(2.4, 2.4, 5.6))
+		boxes.append([v[2] + Vector3(0, 1.2, 0), vsize, deg_to_rad(float(v[3]))])
+		if v[0] == "motorhome" or v[0] == "caravan":
+			boxes.append([v[2] + vb * Vector3(2.6, 1.2, 0), Vector3(2.8, 2.4, 5.0), deg_to_rad(float(v[3]))])
 	pk.material_for = func(key: String) -> Material: return _prop_material(key)
 	var vmi := MeshInstance3D.new()
 	vmi.name = "ParadorCars"
@@ -3268,6 +3309,8 @@ func _build_parador(level_scene: Node3D) -> void:
 	_label(root, "MOTEL", to_world.call(mpole + Vector3(0, 8.8, -0.21)), basis, 0.016 * PROP_SCALE, Color(0.98, 0.95, 0.85))
 	_label(root, "HAY CUARTOS", to_world.call(mpole + Vector3(0, 7.4, -0.19)), basis, 0.0065 * PROP_SCALE, Color(1.0, 0.95, 0.8))
 	_label(root, "TALLER", to_world.call(ws + Vector3(0, 4.3, -wd * 0.5 - 0.11)), basis, 0.010 * PROP_SCALE, Color(0.12, 0.12, 0.12))
+	_label(root, "HIELO", to_world.call(shop + Vector3(-4.6, 1.18, -6.03)), basis, 0.0042 * PROP_SCALE, Color(1, 1, 1))
+	_label(root, "AIRE  AGUA", to_world.call(Vector3(4.6, 1.5, -17.72)), basis, 0.0022 * PROP_SCALE, Color(1, 1, 1))
 	# The windmill's wheel turns slowly in the wind (Windmill.gd turns the BladePivot about the hub's axis).
 	var mill := Node3D.new()
 	mill.name = "ParadorWindmill"
@@ -3451,7 +3494,143 @@ func _build_guardrails(level_scene: Node3D) -> void:
 	root.add_child(mi)
 
 
-## Telegraph poles along the tarmac on the west bank, wires sagging between them.
+## The power line that feeds the Parador (_plan_poles, _build_poles): it comes in over the plateau west of the
+## canyon from past the draw distance, down the west wall north of the Parador, turns at the road past El
+## Arco and runs along the verge to the Parador, where it ends at a guyed dead-end pole by the diner. Service
+## drops run to the shop (from the pole with the transformer) and to the diner, onto weatherheads on their
+## roofs. It used to run along the road on its own and stop in the air at both ends, at El Arco and either
+## side of the Parador.
+const LINE_LAT := 17.0
+const LINE_SPAN := 46.0
+## How far west of the road it runs, out over the plateau, past where the poles stop being drawn.
+const LINE_WEST := 1150.0
+## The wires keep at least this far over the ground along every span (one that would graze a ledge gets a
+## pole in its middle).
+const LINE_CLEAR := 4.5
+const POLE_H := 10.3
+const ARM_Y := 9.6
+## The drops' weatherheads, in the Parador's frame (life size, on the roofs near their fronts): the shop's and
+## the diner's.
+const PARADOR_DROPS := [Vector3(14.5, 4.8, -9.6), Vector3(31.0, 3.62, -9.8)]
+
+## The poles from the far end to the Parador: {pos (the foot), dir (the line's way through it), drop (an
+## index into PARADOR_DROPS, or -1), guy (a guy wire's way out, or zero)}.
+var _poles: Array = []
+
+
+## A point in the Parador's frame (life size, x along the road, z away from it) in the world.
+func _parador_point(local: Vector3) -> Vector3:
+	var sp: Dictionary = _spot(PARADOR_AT.x, PARADOR_AT.y, 0.0)
+	var basis := Basis(sp["fwd"], Vector3.UP, sp["right"])
+	var origin := Vector3((sp["pos"] as Vector3).x, _road_y(PARADOR_AT.x) + 0.15, (sp["pos"] as Vector3).z)
+	return origin + basis * (local * PROP_SCALE)
+
+
+func _plan_poles() -> void:
+	_poles.clear()
+	# Where the line leaves the road: the first place past El Arco clear of the fin and its cutting.
+	var s_turn: float = _arch_s + 30.0
+	while s_turn < _arch_s + 220.0:
+		var q: Vector3 = _spot(fposmod(s_turn, _lap_len), LINE_LAT, 0.0)["pos"]
+		if _seg_distance(Vector2(q.x, q.z), FIN_A, FIN_B) > FIN_HALF * 2.5 + 6.0 and _slope_at(q.x, q.z) < 0.3:
+			break
+		s_turn += 2.0
+	# Along the road (in s past the lap's end: the line runs on over it to the start straight): evenly to the
+	# shop's drop, then the diner's.
+	var drop_s: Array = []
+	for d in PARADOR_DROPS:
+		drop_s.append(PARADOR_AT.x + (d as Vector3).x * PROP_SCALE + (_lap_len if s_turn > PARADOR_AT.x else 0.0))
+	var road: Array = []
+	var n: int = ceili((float(drop_s[0]) - s_turn) / LINE_SPAN)
+	for k in range(n + 1):
+		road.append([lerpf(s_turn, float(drop_s[0]), float(k) / n), 0 if k == n else -1])
+	road.append([float(drop_s[1]), 1])
+	var c_sp: Dictionary = _spot(fposmod(s_turn, _lap_len), LINE_LAT, 0.0)
+	var corner: Vector3 = c_sp["pos"]
+	var west: Vector3 = corner + (c_sp["right"] as Vector3) * LINE_WEST
+	var nw: int = ceili(LINE_WEST / LINE_SPAN)
+	var pts: Array = []
+	for k in range(nw, 0, -1):
+		pts.append({"pos": _pole_foot(corner.lerp(west, float(k) / nw), c_sp["right"], 12.0), "drop": -1})
+	for r in road:
+		var sp: Dictionary = _spot(fposmod(float(r[0]), _lap_len), LINE_LAT, 0.0)
+		pts.append({"pos": _pole_foot(sp["pos"], sp["fwd"], 0.0), "drop": int(r[1])})
+	# A span whose wires would come within LINE_CLEAR of the ground (the west wall's ledges) gets a pole in
+	# its middle, until they clear.
+	var i := 0
+	var added := 0
+	while i < pts.size() - 1 and added < 200:
+		var a: Vector3 = pts[i]["pos"]
+		var b: Vector3 = pts[i + 1]["pos"]
+		var flat := Vector3(b.x - a.x, 0.0, b.z - a.z)
+		if flat.length() > 14.0 and not _span_clear(a, b):
+			pts.insert(i + 1, {"pos": _pole_foot((a + b) * 0.5, flat.normalized(), flat.length() * 0.15), "drop": -1})
+			added += 1
+			continue
+		i += 1
+	for k in range(pts.size()):
+		var p: Vector3 = pts[k]["pos"]
+		var to_prev := Vector3.ZERO
+		var to_next := Vector3.ZERO
+		if k > 0:
+			to_prev = (pts[k - 1]["pos"] as Vector3) - p
+			to_prev.y = 0.0
+			to_prev = to_prev.normalized()
+		if k < pts.size() - 1:
+			to_next = (pts[k + 1]["pos"] as Vector3) - p
+			to_next.y = 0.0
+			to_next = to_next.normalized()
+		var dir: Vector3 = (to_next - to_prev).normalized()
+		# A guy against the wires' pull: at the dead end beyond it, at a corner out of the bend.
+		var guy := Vector3.ZERO
+		if k == pts.size() - 1:
+			guy = -to_prev
+		elif k > 0 and to_prev.dot(to_next) > -0.94:
+			guy = -(to_prev + to_next).normalized()
+		_poles.append({"pos": p, "dir": dir, "drop": pts[k]["drop"], "guy": guy})
+		_landmarks.append(Vector3(p.x, p.z, 2.0))
+	print("  power line: %d poles (%d added over ledges), off the road at %.0fm" % [_poles.size(), added, fposmod(s_turn, _lap_len)])
+
+
+## A pole's foot near `p`: up to `reach` either way along `along` for ground that isn't steep and isn't in
+## the water, the least steep if none is.
+func _pole_foot(p: Vector3, along: Vector3, reach: float) -> Vector3:
+	var best := p
+	var best_slope := 1e9
+	var off := 0.0
+	while off <= reach + 0.01:
+		for sgn in ([1.0] if off == 0.0 else [1.0, -1.0]):
+			var q: Vector3 = p + along * (off * float(sgn))
+			var g: float = _ground_at(q.x, q.z)
+			if g < RIVER_Y + 0.6:
+				continue
+			var sl: float = _slope_at(q.x, q.z)
+			if sl < 0.45:
+				return Vector3(q.x, g, q.z)
+			if sl < best_slope:
+				best_slope = sl
+				best = Vector3(q.x, g, q.z)
+		off += 3.0
+	return Vector3(best.x, _ground_at(best.x, best.z), best.z)
+
+
+## The sag of a span `length` long.
+func _sag(length: float) -> float:
+	return 0.02 * length
+
+
+## True if the wires between poles standing at `a` and `b` keep LINE_CLEAR over the ground.
+func _span_clear(a: Vector3, b: Vector3) -> bool:
+	var length: float = Vector2(b.x - a.x, b.z - a.z).length()
+	for k in range(1, 12):
+		var u: float = float(k) / 12.0
+		var q: Vector3 = a.lerp(b, u)
+		var wire: float = lerpf(a.y, b.y, u) + ARM_Y - _sag(length) * 4.0 * u * (1.0 - u)
+		if wire - _ground_at(q.x, q.z) < LINE_CLEAR:
+			return false
+	return true
+
+
 func _build_poles(level_scene: Node3D) -> void:
 	var root := Node3D.new()
 	root.name = "TelegraphPoles"
@@ -3459,49 +3638,83 @@ func _build_poles(level_scene: Node3D) -> void:
 	var pk := PropKit.new()
 	var kit := {}
 	var wood := Color(0.36, 0.27, 0.20)
-	var tops: Array = []
+	var glass := Color(0.40, 0.55, 0.50)
+	var cable := Color(0.08, 0.08, 0.08)
 	var body: StaticBody3D = _solid_body(root, "TelegraphPoleBody", "wood")
-	var s: float = _paved_s0 + 20.0
-	var end_s: float = _lap_len + _bridge_s0 - 40.0
-	while s < end_s:
-		var ss: float = fposmod(s, _lap_len)
-		var sp: Dictionary = _spot(ss, 17.0, 0.0)
-		if absf(ss - _arch_s) > 30.0 and absf(ss - (PARADOR_AT.x)) > 66.0 and not _near_sign(sp["pos"], 1.5):
-			var p: Vector3 = sp["pos"]
-			p.y = _ground_at(p.x, p.z) - 0.3
-			var r: Vector3 = sp["right"]
-			var f: Vector3 = sp["fwd"]
-			pk.tube(kit, "wood", p, p + Vector3(0, 10.3, 0), 0.2, 0.15, 7, wood)
-			_solid_cylinder(body, p + Vector3(0, 5.15, 0), 0.2, 10.3)
-			var arm := p + Vector3(0, 9.6, 0)
-			pk.beam(kit, "wood", arm - r * 1.3, arm + r * 1.3, 0.16, 0.14, wood, f)
-			var ends: Array = []
-			for k in [-1.1, 0.0, 1.1]:
-				var ins: Vector3 = arm + r * float(k) + Vector3(0, 0.08, 0)
-				pk.tube(kit, "metal", ins, ins + Vector3(0, 0.22, 0), 0.05, 0.04, 6, Color(0.40, 0.55, 0.50))
-				ends.append(ins + Vector3(0, 0.2, 0))
-			tops.append(ends)
-		else:
-			tops.append([])
-		s += 46.0
-	for i in range(tops.size() - 1):
-		if (tops[i] as Array).is_empty() or (tops[i + 1] as Array).is_empty():
-			continue
+	var tops: Array = []
+	for pl in _poles:
+		var p: Vector3 = (pl["pos"] as Vector3) - Vector3(0, 0.3, 0)
+		var f: Vector3 = pl["dir"]
+		var r: Vector3 = Vector3.UP.cross(f).normalized()
+		pk.tube(kit, "wood", p, p + Vector3(0, POLE_H + 0.3, 0), 0.2, 0.15, 7, wood)
+		_solid_cylinder(body, p + Vector3(0, (POLE_H + 0.3) * 0.5, 0), 0.2, POLE_H + 0.3)
+		var arm: Vector3 = p + Vector3(0, ARM_Y + 0.3, 0)
+		pk.beam(kit, "wood", arm - r * 1.3, arm + r * 1.3, 0.16, 0.14, wood, f)
+		for k in [-1.0, 1.0]:
+			pk.beam(kit, "metal", p + Vector3(0, ARM_Y - 0.5, 0), arm + r * (k * 0.8) - Vector3(0, 0.07, 0), 0.04, 0.02, Color(0.4, 0.4, 0.4), f)
+		var ends: Array = []
+		for k in [-1.1, 0.0, 1.1]:
+			var ins: Vector3 = arm + r * float(k) + Vector3(0, 0.08, 0)
+			pk.tube(kit, "metal", ins, ins + Vector3(0, 0.22, 0), 0.05, 0.04, 6, glass)
+			for skirt in [0.07, 0.15]:
+				pk.tube(kit, "metal", ins + Vector3(0, skirt, 0), ins + Vector3(0, skirt + 0.02, 0), 0.075, 0.075, 6, glass)
+			ends.append(ins + Vector3(0, 0.2, 0))
+		tops.append(ends)
+		var guy: Vector3 = pl["guy"]
+		if guy != Vector3.ZERO:
+			# A guy wire to an anchor in the ground, a yellow guard over its foot.
+			var anchor: Vector3 = (pl["pos"] as Vector3) + guy * 7.0
+			anchor.y = _ground_at(anchor.x, anchor.z)
+			var hook: Vector3 = p + Vector3(0, ARM_Y + 0.1, 0) + guy * 0.18
+			pk.tube(kit, "metal", hook, anchor, 0.018, 0.018, 4, Color(0.55, 0.56, 0.57), false)
+			pk.tube(kit, "paint", anchor + (hook - anchor).normalized() * 0.2, anchor + (hook - anchor).normalized() * 2.4, 0.06, 0.06, 8, Color(0.95, 0.78, 0.10))
+			pk.block(kit, "concrete", anchor - Vector3(0.3, 0.2, 0.3), anchor + Vector3(0.3, 0.08, 0.3), Color(0.7, 0.68, 0.64))
+			# Solid along its guard: a cart runs into it, not through it.
+			var gd: Vector3 = (hook - anchor).normalized()
+			var gz: Vector3 = gd
+			var gx: Vector3 = Vector3.UP.cross(gz).normalized()
+			_solid_box(body, Transform3D(Basis(gx, gz.cross(gx), gz), anchor + gd * 1.6), Vector3(0.14, 0.14, 3.2))
+		var drop: int = pl["drop"]
+		if drop >= 0:
+			# The service drop: from the pole (the shop's has the transformer) over to the weatherhead, a mast on
+			# the roof with its gooseneck.
+			var head: Vector3 = _parador_point(PARADOR_DROPS[drop])
+			var mast_top: Vector3 = head + Vector3(0, 1.5, 0)
+			var toward: Vector3 = Vector3(head.x - p.x, 0.0, head.z - p.z).normalized()
+			pk.tube(kit, "metal", head, mast_top, 0.05, 0.05, 6, Color(0.6, 0.62, 0.64))
+			pk.tube(kit, "metal", mast_top, mast_top - toward * 0.18 - Vector3(0, 0.1, 0), 0.05, 0.03, 6, Color(0.2, 0.2, 0.2))
+			var from: Vector3 = p + Vector3(0, ARM_Y - 0.9, 0)
+			if drop == 0:
+				# The transformer can on its bracket, its bushing and the jumper up to the line.
+				var can: Vector3 = p + toward * 0.45 + Vector3(0, ARM_Y - 2.2, 0)
+				pk.tube(kit, "metal", can, can + Vector3(0, 1.1, 0), 0.32, 0.32, 12, Color(0.55, 0.58, 0.58))
+				pk.lathe(kit, "metal", can + Vector3(0, 1.1, 0), [Vector2(0.33, 0.0), Vector2(0.3, 0.08), Vector2(0.0, 0.1)], 12, Color(0.5, 0.53, 0.53))
+				pk.beam(kit, "metal", p + Vector3(0, ARM_Y - 1.8, 0), can + Vector3(0, 0.6, 0) - toward * 0.3, 0.08, 0.08, Color(0.35, 0.35, 0.36))
+				var bush: Vector3 = can + Vector3(0, 1.2, 0)
+				pk.tube(kit, "metal", bush, bush + Vector3(0, 0.25, 0), 0.04, 0.03, 6, glass)
+				pk.tube(kit, "matte", bush + Vector3(0, 0.25, 0), (ends[1] as Vector3), 0.012, 0.012, 4, cable, false)
+				from = can + Vector3(0, 0.75, 0) + toward * 0.32
+			_wire(pk, kit, from, mast_top - toward * 0.18 - Vector3(0, 0.1, 0), 0.03, 0.6, cable, 10)
+	for i in range(_poles.size() - 1):
+		var length: float = ((_poles[i + 1]["pos"] as Vector3) - (_poles[i]["pos"] as Vector3)).length()
 		for k in range(3):
-			var a: Vector3 = tops[i][k]
-			var b: Vector3 = tops[i + 1][k]
-			var prev := a
-			for t in range(1, 9):
-				var u: float = float(t) / 8.0
-				var q: Vector3 = a.lerp(b, u) - Vector3(0, 0.9 * 4.0 * u * (1.0 - u), 0)
-				pk.tube(kit, "matte", prev, q, 0.025, 0.025, 4, Color(0.08, 0.08, 0.08), false)
-				prev = q
+			_wire(pk, kit, tops[i][k], tops[i + 1][k], 0.025, _sag(length), cable, 8)
 	pk.material_for = func(key: String) -> Material: return _prop_material(key)
 	var mi := MeshInstance3D.new()
 	mi.name = "PoleMesh"
 	mi.mesh = _save_baked_resource(pk.commit(kit), "telegraph_poles")
 	mi.visibility_range_end = 900.0
 	root.add_child(mi)
+
+
+## A wire from a to b sagging `sag` in its middle, `n` straight pieces.
+func _wire(pk: PropKit, kit: Dictionary, a: Vector3, b: Vector3, r: float, sag: float, col: Color, n: int) -> void:
+	var prev := a
+	for t in range(1, n + 1):
+		var u: float = float(t) / n
+		var q: Vector3 = a.lerp(b, u) - Vector3(0, sag * 4.0 * u * (1.0 - u), 0)
+		pk.tube(kit, "matte", prev, q, r, r, 4, col, false)
+		prev = q
 
 
 ## Marker posts along the dirt sections (white, a red band at the top), and orange pennants beside
@@ -3645,15 +3858,6 @@ func _sign_candidate(s: float, lat: float, width: float, max_spread: float) -> D
 		posts.append(_ground_at(q2.x, q2.z))
 	return {"pos": Vector3(c.x, gmax, c.z), "fwd": f, "right": r, "width": width, "posts": posts,
 		"spread": gmax - gmin, "below": maxf(road_y - gmax, 0.0)}
-
-
-## True within `margin` of a section sign's board.
-func _near_sign(p: Vector3, margin: float) -> bool:
-	for spot in _sign_spots:
-		var c: Vector3 = spot["pos"]
-		if Vector2(p.x - c.x, p.z - c.z).length() < float(spot["width"]) * 0.5 + margin:
-			return true
-	return false
 
 
 func _build_signs(level_scene: Node3D) -> void:
@@ -4318,6 +4522,7 @@ func _ready() -> void:
 	# Planned first, so the plants and rocks keep off them.
 	_plan_signs()
 	_plan_venue()
+	_plan_poles()
 	_build_dressing(level_scene)
 	_build_parador(level_scene)
 	_build_venue(level_scene)

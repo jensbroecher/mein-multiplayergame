@@ -365,7 +365,7 @@ the others re-bakes it (see Lakeside Course below).
   either way, for ground level under the whole board, near the road's height, off every leg of the lap and out of the
   water; where there is none (the shelf road, the end of the ridge) the board stays level and each post runs down to
   its own ground. At a fixed 11m out they had one post on the road's edge and the other hanging over a bank or buried
-  in a cut. The plants keep off them (`_landmarks`), and so do the telegraph poles (`_near_sign`). The kicker pennants
+  in a cut. The plants and the power line keep off them (`_landmarks`). The kicker pennants
   stand on the kicker's shoulder or the ground, not at the lip's height.
 - The start venue (`_plan_venue`, `_build_venue`, `VENUE_*`), on the river side across from the Parador: CampKit's crowd
   barriers along the verge, CrowdPlacer's people behind them, at and round VenueKit's marquee on its own pad, and along
@@ -373,6 +373,20 @@ the others re-bakes it (see Lakeside Course below).
   now `flag_wave.gdshaderinc`, shared with `flag_wave.gdshader`) draws `_logo_flag_texture`, the logo
   (`images/logo_transparent.png`) on navy between orange bands, baked with mipmaps. The back face mirrors u, so the
   logo reads from both sides. The flag streams west, the way the windmill faces (into an east wind).
+- The Parador's furniture and fittings are `RoadsideKit.gd` (life size through the PropKit, placed at PROP_SCALE): the
+  café's patio tables under market umbrellas with chrome diner chairs, the fuel pumps (displays, grade buttons,
+  nozzles in holsters, hoses), the islands' bins and squeegee buckets, the ice chest, the gas-bottle cage, a bench,
+  picnic tables under the ramada, the air and water post, oil drums and tyre stacks (`tyre_wall.gdshader`, key
+  "tyre"; sawn wood is "timber", `hut_wood.gdshader`). They replaced boxes and slabs. The Parador's mesh is chunked,
+  and DressingColliders skips chunks, so nothing in it is solid but `_build_parador`'s boxes: every new prop needs
+  its own (`collision_audit ... reach=95` lists what isn't; it now tests its sphere at the geometry, not the cell's
+  middle, which missed chairs and posts near a cell's corner).
+- The power line (`_plan_poles`, `_build_poles`, `LINE_*`) comes in over the plateau west of the canyon from past the
+  draw distance, down the west wall (a span whose wires would come within `LINE_CLEAR` of a ledge gets a pole in its
+  middle; poles keep off steep ground, `_pole_foot`), turns at the road past El Arco and runs along the verge to the
+  Parador: a transformer pole drops to the shop's roof, a guyed dead-end pole by the diner drops to its roof
+  (`PARADOR_DROPS`). Guy wires are solid along their guards. It used to stop in the air at El Arco, either side of the
+  Parador and before the bridge.
 - The Parador's windmill wheel is its own mesh (`_windmill_rotor`) under `ParadorWindmill/BladePivot`, which
   `Windmill.gd` turns (`WINDMILL_SPIN` degrees a second). `res://scratch/canyon_dressing_shots.tscn -- <dir>
   [only=signs,kickers,start,windmill]` (windowed) photographs the signs, kickers, start and windmill from the level's
