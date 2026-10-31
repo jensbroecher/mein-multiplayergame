@@ -406,11 +406,21 @@ func _load_playlist(folder: String = music_folder):
 	_add_folder(folder)
 	_refill_and_shuffle_queue()
 
-## Stages that play one fixed track instead of a folder's shuffle.
+## Matumaini GP stages that shuffle their own tracks from music/africa/ instead of a folder.
 const STAGE_TRACKS := {
-	"mara": "res://music/africa/Sunrise_on_the_Mara.mp3",
-	"nyota": "res://music/africa/Clay_and_Chrome.mp3",
-	"msitu": "res://music/africa/Msitu_Unaita.mp3",
+	"mara": [
+		"res://music/africa/Sunrise_on_the_Mara.mp3",
+		"res://music/africa/High_Noon_Dash.mp3",
+		"res://music/africa/Red_Clay_Canopy.mp3",
+		"res://music/africa/Red_Clay_Pursuit.mp3",
+	],
+	"nyota": ["res://music/africa/Clay_and_Chrome.mp3"],
+	"msitu": ["res://music/africa/Msitu_Unaita.mp3"],
+	"mtaa": [
+		"res://music/africa/Green_Canopy_Dash.mp3",
+		"res://music/africa/Nairobi_at_Top_Speed.mp3",
+		"res://music/africa/Red_Clay_Drift.mp3",
+	],
 }
 
 ## Stage categories that shuffle their own folder (and the root folder if it's empty).
@@ -428,6 +438,8 @@ static func _stage_track_key(path_lower: String) -> String:
 		return "nyota"
 	if path_lower.contains("msitu"):
 		return "msitu"
+	if path_lower.contains("mtaa"):
+		return "mtaa"
 	return ""
 
 ## Picks the stage's tracks and starts loading the first one in the background. Level calls it when
@@ -468,8 +480,8 @@ func load_playlist_for_level(scene_path: String):
 	_clear_playlist()
 	_current_level_key = level_key
 	if STAGE_TRACKS.has(level_key):
-		# Matumaini GP stages each have their own single track.
-		_add_tracks([STAGE_TRACKS[level_key]])
+		# Matumaini GP stages: their own tracks only.
+		_add_tracks(STAGE_TRACKS[level_key])
 	elif level_key == "beach":
 		# Bloombay Dunes: only music/beach/.
 		_add_folder(music_folder + "beach/", [

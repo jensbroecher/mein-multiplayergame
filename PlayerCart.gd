@@ -1954,6 +1954,19 @@ func _physics_process(delta):
 			_ai_offroad_max_dist = 0.0
 			_ai_slope_rollback_timer = maxf(0.0, _ai_slope_rollback_timer - delta * 0.5)
 		
+		# A shortcut missed (boxed in at its mouth, or carried past its turn): the cart is still on the lap,
+		# so it drops the shortcut and drives on, instead of being respawned for straying from it.
+		if on_alternative_path and active_path and active_path != track_path and track_path and track_path.curve and active_path.curve:
+			var alt_c: Curve3D = active_path.curve
+			var alt_pt: Vector3 = active_path.to_global(alt_c.sample_baked(alt_c.get_closest_offset(active_path.to_local(global_position))))
+			var lap_off: float = track_path.curve.get_closest_offset(track_path.to_local(global_position))
+			var lap_pt: Vector3 = track_path.to_global(track_path.curve.sample_baked(lap_off))
+			if Vector2(global_position.x - alt_pt.x, global_position.z - alt_pt.z).length() > 16.0 \
+					and Vector2(global_position.x - lap_pt.x, global_position.z - lap_pt.z).length() < 9.0 and absf(lap_pt.y - global_position.y) < 4.0:
+				on_alternative_path = false
+				active_path = track_path
+				_ai_last_ontrack_offset = lap_off
+
 		# Check if cart has fallen off track (e.g. fallen down a cliff, bridge or ravine)
 		var check_path = active_path if active_path else track_path
 		if check_path == null:

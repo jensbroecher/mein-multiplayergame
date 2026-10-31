@@ -85,6 +85,11 @@ const STAGE_VIEWS := {
 		{"name": "msitu_start", "from": Vector3(-82.7, 14.5, -127.7), "to": Vector3(-82.7, 5.0, -57.7), "fov": 58.0},
 		{"name": "msitu_falls_view", "from": Vector3(-50.0, 24.0, -110.0), "to": Vector3(-120.0, 10.0, -40.0), "fov": 62.0},
 		{"name": "msitu_jungle", "from": Vector3(-110.0, 20.0, -20.0), "to": Vector3(-60.0, 6.0, 50.0), "fov": 60.0},
+	],
+	"res://levels/MtaaNightsLevel.tscn": [
+		{"name": "mtaa_club", "from": Vector3(-262.0, 14.0, 168.0), "to": Vector3(-345.0, 6.0, 128.0), "fov": 60.0},
+		{"name": "mtaa_start", "from": Vector3(-60.0, 12.0, -242.0), "to": Vector3(-180.0, 3.0, -250.0), "fov": 58.0},
+		{"name": "mtaa_market", "from": Vector3(150.0, 13.0, -40.0), "to": Vector3(150.0, 3.0, -150.0), "fov": 58.0},
 	]
 }
 

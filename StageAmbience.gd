@@ -48,6 +48,7 @@ const STAGES := {
 	"MaraCrossingLevel": [["insects_birds", -30.0]],
 	"NyotaStadiumLevel": [["stadium", -27.0]],
 	"MsituFallsLevel": [["rainforest", -30.0]],
+	"MtaaNightsLevel": [["stadium", -36.0]],
 	"FrostpeakCreekLevel": [["blizzard", -37.0]],
 	"GlacierHighwayLevel": [["blizzard", -37.0]],
 	"FrostfallGorgeLevel": [["blizzard", -36.0]],

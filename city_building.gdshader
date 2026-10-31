@@ -23,6 +23,11 @@ uniform vec3 refl_ground : source_color = vec3(0.34, 0.32, 0.30);
 uniform vec3 refl_cloud : source_color = vec3(1.0, 0.98, 0.95);
 // How strongly the panes reflect face-on (the Fresnel term rises to 1 at a grazing angle).
 uniform float refl_base = 0.11;
+// Evening (Mtaa Nights): the share of windows lit from inside, their light, and the shop fronts and sign
+// bands glowing. 0 (the default, Nyota's afternoon) draws no light at all.
+uniform float lit_share = 0.0;
+uniform vec3 lit_color : source_color = vec3(1.0, 0.78, 0.50);
+uniform float lit_energy = 1.4;
 
 varying vec3 w_pos;
 varying vec3 w_nrm;
@@ -109,6 +114,9 @@ void fragment() {
 		spec = mix(0.5, 1.0, mull);
 		emis = reflected_sky(refl_dir) * clamp(fresnel * 1.5, 0.0, 1.0) * (0.7 + 0.5 * floor_v) * mull * detail;
 		col = mix(col, mix(glass_dark.rgb, sky_reflect.rgb, 0.4) * (0.8 + paint * 0.4), 1.0 - detail);
+		// Offices still at work: whole floors lit, cool white, a few panels dark.
+		float office = step(hash21(vec2(floor(g.y), vcol.b * 41.0)), lit_share) * step(0.25, hash21(floor(g) * 1.3));
+		emis += vec3(0.80, 0.88, 1.0) * lit_energy * 0.4 * office * mull * mix(0.3, 1.0, detail);
 	} else {
 		float y = UV.y;
 		vec2 cellid = vec2(floor(UV.x / bay), floor((y - shop_h) / storey));
@@ -125,6 +133,10 @@ void fragment() {
 			vec3 sgn = pow(sign_cols[int(shop_rnd * 6.0) % 6], vec3(1.0));
 			col = mix(col, inside, opening * detail);
 			col = mix(col, sgn * 0.8, sign_band * detail);
+			// Open late: a lit shop inside, the sign band backlit. Some are shuttered.
+			float open_shop = step(hash21(vec2(shop_rnd * 7.0, vcol.g * 3.0)), lit_share * 1.25);
+			emis += lit_color * inside * 2.2 * lit_energy * opening * open_shop * detail;
+			emis += sgn * 0.7 * lit_energy * sign_band * step(0.001, lit_share) * detail;
 		} else {
 			// Punched windows, a few with curtains or open; a ledge under every storey.
 			vec2 f = vec2(fract(UV.x / bay), fract((y - shop_h) / storey));
@@ -175,12 +187,18 @@ void fragment() {
 			// A fifth of the panes look into a dark room and reflect less.
 			float room = mix(1.0, 0.35, step(0.8, hash21(cellid * 5.3 + 1.0)));
 			emis = reflected_sky(refl_dir) * clamp(fresnel * 1.5, 0.0, 1.0) * pane_grad * (0.75 + 0.5 * hash21(cellid * 3.1 + 5.0)) * room * (1.0 - curtain * 0.9) * (1.0 - 0.6 * reveal) * win * detail;
+			// A lit room: warm or cool, a curtain glowing its own colour.
+			float lit = step(hash21(cellid * 2.3 + vcol.rg * 7.1), lit_share);
+			vec3 room_light = mix(lit_color, vec3(0.75, 0.85, 1.0), step(0.7, hash21(cellid * 4.7)));
+			room_light = mix(room_light, glass * 1.6 + lit_color * 0.25, curtain);
+			emis += room_light * lit_energy * (0.55 + 0.45 * hash21(cellid * 9.1)) * lit * win * (1.0 - 0.5 * reveal) * detail;
 			// Rain streaks down from the roof line, darker under the windows.
 			float streak = hash21(vec2(floor(UV.x * 1.3), vcol.g * 7.0));
 			col *= 1.0 - 0.12 * streak * (1.0 - win) * detail;
 		}
-		// Far away: the average of wall and windows.
+		// Far away: the average of wall and windows (and of the lit ones).
 		col = mix(col, paint * 0.7 + glass_dark.rgb * 0.2, (1.0 - detail) * 0.6);
+		emis += lit_color * lit_energy * lit_share * 0.16 * step(shop_h, y) * (1.0 - detail);
 	}
 	ALBEDO = col;
 	ROUGHNESS = rough;

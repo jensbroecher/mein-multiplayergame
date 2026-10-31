@@ -1469,6 +1469,49 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 - `res://scratch/bloombay_shots.tscn -- <dir> name:x,y,z:tx,ty,tz[:frames[:gap]]` renders into the window
   (not a SubViewport) and can save a time sequence to watch the surf.
 
+## Mtaa Nights (Matumaini GP, stage 4)
+
+- `regenerate_mtaa_nights.gd` (`regenerate_mtaa_nights.tscn`, headless, about 30s) builds `levels/MtaaNightsLevel.tscn`: an
+  early-evening race through a made-up Nairobi-style district. Kilele Avenue (the start), Biashara Street (the market),
+  Mtaa Road (tarmac, then murram through the estate), the park, Mwangaza Road into Club Kilele (an open-air club: its lane
+  crosses the LED dancefloor), Kanisa Road (murram, past the church) and back. Music: `Green_Canopy_Dash`,
+  `Nairobi_at_Top_Speed`, `Red_Clay_Drift` (`MusicManager.STAGE_TRACKS["mtaa"]`; Mara Crossing shuffles the other
+  three unused africa tracks with its own).
+- Every road is a path of straights and arcs (`_fillet`: corner points and radii; `MAIN`, the forks `YARD`, `LAWN`,
+  `BACKSTAGE`, the dressing-only `SIDE_STREETS`); everything is placed by (path, s). No road mesh: one heightfield
+  (`GRID` 2m, in `TILE` tiles) carries per vertex the distance to the nearest road's edge (a smooth minimum, so junction
+  corners are round), the lateral and the distance along that road (`ARRAY_CUSTOM0`, RGBA float), and the surface and zone
+  masks; `mtaa_ground.gdshader` paints tarmac and lane lines, murram, gravel, kerbs, pavements, the lawn, bare earth and
+  the club's pavers from them. Collision is split per triangle (`BODIES`): AsphaltRoad, MurramRoad, GravelRoad and
+  DanceDeck are track; CityPaving, ClubPaving, ParkLawn and BareEarth are off-road. The ground isn't chunked by
+  MeshChunker (it would drop CUSTOM0); the generator builds its own tiles.
+- The forks are AlternativePaths the AI takes too, each paved against loose: Biashara Street or the jua kali alley (murram,
+  a zigzag, whoops, a plank table-top `AlleyJump`), the park's paved path or straight over the lawn (off-road grass: the
+  lawn's path is not painted or counted as road, it only shapes its mound and wears a trail), the lane over the
+  dancefloor or the backstage road (gravel, the `LoadingJump` kicker). The loose routes are 0.76-0.92 of the paved ones
+  (`_verify_forks` prints them and the trunk's paved to murram ratio, about 2:1), so off-road cars take them and road
+  cars stay on the tarmac. Checkpoints are only on the trunk (Mtaa Road's murram, Kanisa Road).
+  - The alley's corners were 12m and bots coming off the avenue ran straight past its entry; now 16-24m. Bots that miss a
+    shortcut anyway drop it and drive on (PlayerCart, before its off-course check: far from the shortcut, inside the lap's
+    road), instead of being respawned for straying from it. `scratch/shortcut_probe ... chance=1.0`: no respawns on any fork.
+- Buildings fill every ground cell that is neither road, pavement (`_setback`: the market's 13m holds the stalls) nor an
+  open place (`PARK`, `CLUB`, `CHURCH`): greedy rectangles (`_plan_buildings`), styled by district (`_style_at`), each a box
+  collider, so no block can be driven through. They use `city_building.gdshader` with its evening lights on (`lit_share`,
+  `lit_color`, `lit_energy`: lit rooms, open shops, glowing sign bands, office floors). Those uniforms default to 0, so
+  Nyota Stadium is unchanged. Past the detailed ground, `_build_far_city` lays a skyline of boxes (a business district to
+  the north-east), and `_build_hills` Ngong-like knuckles under the sunset.
+- Club Kilele (`_build_club`): mural walls, neon gate arches (Label3D, unshaded, HDR modulate so they bloom), a stage with a
+  truss, the LED wall (`club_screen.gdshader`), the DJ booth, the VIP deck, bars, festoon bulbs (`neon_emissive.gdshader`),
+  the dancefloor (`club_dancefloor.gdshader`: tiles in patterns on the beat, white under the carts) with the ground left out
+  under it. `ClubLights.gd` runs the show on the wall clock (LAN peers agree): 16 moving heads with additive beam cones
+  (`club_beam.gdshader`, instance uniforms `tint`, `strength`), 8 lasers, 6 coloured washes; it feeds the floor the carts'
+  positions. Slow sweeps and a soft swell on the beat, never a strobe (motion comfort).
+- Jacarandas are Nyota Stadium's saved tree meshes (`generated/nyota_tree_*.res`): regenerate Nyota first if they're missing.
+- Cost (M1, 1600x1000, `scratch/bench.tscn`): 13.5ms GPU, 413 draws (Nyota 12.0ms, 416).
+- `scratch/ai_race_test`: 6 bots finish 3 laps at speed 2; the odd bot runs wide onto the pavement at the market corner.
+- Generators that loop must advance their loop variable: `_build_far_city` once didn't, ate the machine's memory and
+  rebooted the Mac twice. Run new generators under a memory watchdog (kill Godot past a few GB).
+
 ## Msitu Falls (Matumaini GP, stage 3)
 
 - The sky is `sky_tropical_cumulus.gdshader`, static like the others (no `TIME`). The storm transition

@@ -35,6 +35,7 @@ const LEVELS := {
 		"dust": {DIRT: Color(0.82, 0.46, 0.29, 0.75), GRASS: Color(0.80, 0.68, 0.48, 0.45)}},
 	"NyotaStadiumLevel": {"road": ASPHALT, "ground": DIRT, "nodes": [["stadiumtrack", DIRT], ["arenainfield", DIRT], ["streetpaving", ASPHALT]],
 		"dust": {DIRT: Color(0.76, 0.52, 0.40, 0.75)}},
+	"MtaaNightsLevel": {"road": ASPHALT, "ground": ASPHALT, "dust": {DIRT: Color(0.80, 0.44, 0.28, 0.75), GRAVEL: Color(0.70, 0.64, 0.56, 0.6)}},
 	"MsituFallsLevel": {"road": DIRT, "ground": DIRT, "nodes": [["mudroad", MUD], ["bridgedeck", WOOD], ["boulder", ROCK]]},
 	"HarborPierLevel": {"road": ASPHALT, "ground": SAND, "nodes": [["breakwater", ROCK]]},
 }
