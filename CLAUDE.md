@@ -361,7 +361,31 @@ the others re-bakes it (see Lakeside Course below).
   wreck, restrooms, a picnic ramada, the water tower, a windmill (`_windmill`) over a stock tank, lot
   lights, CampKit vehicles and Label3D signs, at life size in the pad's frame (x along the road, z away
   from it), grown by `PROP_SCALE`. Every building has a box collider. The dressing keeps off the pad.
-- The eagle (`Eagle.gd` on `models/animals/20260717033727_7db23447.fbx`) skips its setup in the generator:
+- The section signs (`_plan_signs`, before the dressing) each search their stretch, both sides and up to `SIGN_SHIFT`
+  either way, for ground level under the whole board, near the road's height, off every leg of the lap and out of the
+  water; where there is none (the shelf road, the end of the ridge) the board stays level and each post runs down to
+  its own ground. At a fixed 11m out they had one post on the road's edge and the other hanging over a bank or buried
+  in a cut. The plants keep off them (`_landmarks`), and so do the telegraph poles (`_near_sign`). The kicker pennants
+  stand on the kicker's shoulder or the ground, not at the lip's height.
+- The start venue (`_plan_venue`, `_build_venue`, `VENUE_*`), on the river side across from the Parador: CampKit's crowd
+  barriers along the verge, CrowdPlacer's people behind them, at and round VenueKit's marquee on its own pad, and along
+  the Parador's forecourt edge; and the RC Vibe GP flag (`_build_logo_flag`): `logo_flag.gdshader` (flag_wave's wave,
+  now `flag_wave.gdshaderinc`, shared with `flag_wave.gdshader`) draws `_logo_flag_texture`, the logo
+  (`images/logo_transparent.png`) on navy between orange bands, baked with mipmaps. The back face mirrors u, so the
+  logo reads from both sides. The flag streams west, the way the windmill faces (into an east wind).
+- The Parador's windmill wheel is its own mesh (`_windmill_rotor`) under `ParadorWindmill/BladePivot`, which
+  `Windmill.gd` turns (`WINDMILL_SPIN` degrees a second). `res://scratch/canyon_dressing_shots.tscn -- <dir>
+  [only=signs,kickers,start,windmill]` (windowed) photographs the signs, kickers, start and windmill from the level's
+  own nodes.
+- The eagle (`Eagle.gd` on `models/animals/20260717033727_7db23447.fbx`, `EAGLE_SCALE` 6.5: at 10 it dwarfed the
+  carts) swoops onto a cart matching its velocity, then holds it on a critically damped spring under the talons
+  (`_follow_talons`, `carry_follow_rate`) while the climb eases in (`lift_time`, `carry_turn_rate`); the cart's model
+  hangs and swings under it (`_process`). It used to snap 3m above the cart and jerk the cart up into its grip in one
+  frame, and its clearance ray (from 40m up, carts included) lifted it onto the gantry, checkpoint banners and the cart
+  it held; now the ray starts just over it, skips carts, and near a cart steers the climb (`soft`, `look_ahead`).
+  `res://scratch/eagle_carry_test.tscn -- [seconds=150] [shots=<dir>]` (headless, `--fixed-fps 60`; windowed for
+  shots) races the AI with the eagle hunting at once and prints each hunt's largest step and acceleration per phase
+  (a smooth carry stays under about 300 m/s^2; the old snaps were thousands). It skips its setup in the generator:
   its wing pivots and sound players were saved into the level, and at runtime the model's own wings came
   back beside them (two eagles, one inside the other). Its wings (`part_4`, `part_7`) hinge on the body's
   long axis; each one's angle in the model (a steep V) is measured and lowered to `glide_dihedral_deg`.

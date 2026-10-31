@@ -36,11 +36,21 @@ enum Phase { PATROL, DIVE, GRAB, CARRY, RELEASE, COOLDOWN }
 @export var turn_smooth: float = 6.0
 @export var grab_radius: float = 12.0
 @export var grab_height_above_car: float = 3.5
-## Meters in WORLD space under the eagle (claws / talons).
-## Meters under eagle origin for talon hold (smaller = higher / closer to claws).
-@export var carry_hold_below: float = 0.45
-## Slight forward so the car sits under the chest/claws.
-@export var carry_hold_forward: float = 1.0
+## Where the carried cart's middle hangs, in world metres under and ahead of the eagle's origin. The
+## model's talons reach down to its origin's height, 0.13 model units behind it (0.85m at the level's 6.5):
+## the cart's roof just under them.
+@export var carry_hold_below: float = 0.6
+@export var carry_hold_forward: float = -0.8
+## The cart follows the talons on a critically damped spring at this rate (1/s), from where it was grabbed
+## and at the speed it was going: lifted off the road over half a second, swinging a little as the eagle
+## turns. It used to jump 3m up into the grip in one frame.
+@export var carry_follow_rate: float = 6.5
+## The climb eases in over this long after the grab, and the eagle turns its flight from the cart's way onto
+## the way to the drop at carry_turn_rate (1/s, flight_smooth's half by the end): a heavy lift.
+@export var lift_time: float = 1.3
+@export var carry_turn_rate: float = 2.2
+## How far the carried cart leans to hang under the talons as it swings (0 upright, 1 fully).
+@export var carry_swing: float = 0.6
 @export var release_height: float = 64.0
 @export var shockwave_push_speed: float = 48.0
 @export var shockwave_push_up: float = 18.0
@@ -89,6 +99,10 @@ var _pose_deg: float = 9.0
 var _bank: float = 0.0
 
 var _target_cart: RigidBody3D = null
+## While a cart is locked in the talons: where it is and how fast it goes (the follow spring's state).
+var _holding: bool = false
+var _cart_pos: Vector3 = Vector3.ZERO
+var _cart_vel: Vector3 = Vector3.ZERO
 var _carry_time: float = 0.0
 var _cooldown_left: float = 0.0
 var _patrol_timer: float = 0.0
@@ -457,8 +471,9 @@ func _tick_dive(delta: float) -> void:
 		_play_random_scream()
 		_scream_played_this_hunt = true
 
-	# High-speed steep dive bomb directly at the target car
-	var aim: Vector3 = _target_cart.global_position + Vector3.UP * grab_height_above_car
+	# High-speed steep dive at where the car will be when it gets there.
+	var lead: float = clampf(global_position.distance_to(_target_cart.global_position) / dive_speed, 0.0, 1.0)
+	var aim: Vector3 = _target_cart.global_position + _target_cart.linear_velocity * lead + Vector3.UP * grab_height_above_car
 	_fly_toward(aim, dive_speed, delta, true)
 	_ensure_terrain_clearance(2.5)
 
@@ -478,15 +493,24 @@ func _tick_grab(delta: float) -> void:
 		_abort_hunt(false)
 		return
 
-	# Hover just above the car (world meters, ignores FBX scale)
-	var aim: Vector3 = _target_cart.global_position + Vector3.UP * grab_height_above_car
-	_fly_toward(aim, dive_speed * 0.7, delta, true)
+	# Swoop onto it: match its velocity and close on the place that puts the talons on its roof. It used to
+	# fly at a point 3.5m over the car and, 0.2s later wherever it was, jump there.
+	var cart_vel: Vector3 = _target_cart.linear_velocity
+	var to: Vector3 = _talon_anchor(_target_cart.global_position) - global_position
+	var desired: Vector3 = (cart_vel + to * 3.5).limit_length(dive_speed)
+	_velocity = _velocity.lerp(desired, 1.0 - exp(-flight_smooth * delta))
+	global_position += _velocity * delta
+	var flat := Vector3(cart_vel.x, 0.0, cart_vel.z)
+	if flat.length_squared() < 4.0:
+		flat = Vector3(to.x, 0.0, to.z)
+	_face_direction(flat, delta)
+	_ensure_terrain_clearance(1.0, true)
 	_carry_time += delta
-
-	if _carry_time >= 0.2 or global_position.distance_to(aim) < 2.5:
-		# Snap eagle above the car first so the hold pose is never underground
-		global_position = _target_cart.global_position + Vector3.UP * grab_height_above_car
+	if to.length() < 1.2 or _carry_time > 0.9:
+		_cart_pos = _target_cart.global_position
+		_cart_vel = cart_vel
 		_lock_cart(_target_cart)
+		_holding = true
 		_drop_world = _compute_road_drop_point(_target_cart.global_position)
 		_carry_time = 0.0
 		_phase = Phase.CARRY
@@ -499,20 +523,66 @@ func _tick_carry(delta: float) -> void:
 		return
 
 	_carry_time += delta
-	# Climb while flying toward the road drop point
+	# Climb toward the road drop point: carrying on the cart's way at first, the climb and the turn easing in.
+	var lift: float = smoothstep(0.0, lift_time, _carry_time)
 	var road_y: float = _sample_track_world(global_position, 0.0).y
 	var target_y: float = maxf(road_y + 18.0, release_height)
 	var target: Vector3 = Vector3(_drop_world.x, target_y, _drop_world.z)
-	_fly_toward(target, carry_speed, delta, true)
-	_ensure_terrain_clearance(3.5)
+	var desired: Vector3 = (target - global_position).normalized() * carry_speed
+	desired.y = minf(desired.y, climb_speed * lift)
+	var rate: float = lerpf(carry_turn_rate, flight_smooth * 0.5, lift)
+	_velocity = _velocity.lerp(desired, 1.0 - exp(-rate * delta))
+	global_position += _velocity * delta
+	_face_direction(Vector3(_velocity.x, 0.0, _velocity.z), delta)
+	# Down at the road while it heaves the cart up, the full clearance once it is climbing.
+	_ensure_terrain_clearance(lerpf(1.2, 3.5 + carry_hold_below, smoothstep(lift_time, lift_time * 2.5, _carry_time)), true, true)
 
-	_attach_cart_under_eagle(_target_cart)
+	_follow_talons(delta)
 
 	var high_enough: bool = global_position.y >= release_height - 1.5
 	var near_drop: bool = Vector2(global_position.x - _drop_world.x, global_position.z - _drop_world.z).length() < 16.0
 	var timeout: bool = _carry_time > 9.0
-	if (high_enough and near_drop) or (high_enough and _carry_time > 4.0) or timeout:
+	if _carry_time > lift_time and ((high_enough and near_drop) or (high_enough and _carry_time > 4.0)) or timeout:
 		_phase = Phase.RELEASE
+
+
+## Where the eagle's origin goes so its talons hold a cart at `cart_pos`.
+func _talon_anchor(cart_pos: Vector3) -> Vector3:
+	return cart_pos + Vector3.UP * carry_hold_below - _last_flat_fwd * carry_hold_forward
+
+
+## Where a held cart's middle hangs.
+func _talon_hold() -> Vector3:
+	return global_position + Vector3.DOWN * carry_hold_below + _last_flat_fwd * carry_hold_forward
+
+
+## The held cart follows the talons on a critically damped spring, relative to the eagle's own velocity, so
+## it trails only while the eagle changes pace or way.
+func _follow_talons(delta: float) -> void:
+	var w: float = carry_follow_rate
+	var acc: Vector3 = (_talon_hold() - _cart_pos) * (w * w) + (_velocity - _cart_vel) * (2.0 * w)
+	_cart_vel += acc * delta
+	_cart_pos += _cart_vel * delta
+	_target_cart.global_transform = Transform3D(Basis.looking_at(_last_flat_fwd, Vector3.UP), _cart_pos)
+	_target_cart.linear_velocity = Vector3.ZERO
+	_target_cart.angular_velocity = Vector3.ZERO
+
+
+## The held cart's model hangs from the talons: it faces the way the eagle flies and leans toward the grip as
+## it swings. Per frame, eased, so it turns smoothly whatever the physics rate (its own code only moves the
+## model while it is in the air).
+func _process(delta: float) -> void:
+	if not _holding or not _valid_cart(_target_cart):
+		return
+	var vis := _target_cart.get("visuals") as Node3D
+	if vis == null or not is_instance_valid(vis):
+		return
+	var hang: Vector3 = (_talon_hold() + Vector3.UP * 2.0 - _cart_pos).normalized()
+	var up: Vector3 = Vector3.UP.slerp(hang, carry_swing).normalized()
+	var fwd: Vector3 = (_last_flat_fwd - up * _last_flat_fwd.dot(up)).normalized()
+	var want := Basis(fwd.cross(up).normalized(), up, -fwd).get_rotation_quaternion()
+	var cur: Quaternion = vis.global_basis.orthonormalized().get_rotation_quaternion()
+	vis.global_basis = Basis(cur.slerp(want, 1.0 - exp(-6.0 * delta)).normalized())
 
 
 func _tick_release(_delta: float) -> void:
@@ -545,23 +615,45 @@ func _tick_cooldown(delta: float) -> void:
 
 # --- Flight helpers ------------------------------------------------------
 
-func _ensure_terrain_clearance(min_clearance: float = 3.5) -> void:
-	if not is_inside_tree():
+## Keeps the eagle `min_clearance` over whatever is under it (not the carts: a held one under the ray
+## pushed it up in steps). `soft`, while it is down at a cart: it steers its climb up to clear the ground
+## (with `look_ahead`, the ground 0.6s and 1.2s ahead too: a canyon wall comes up fast) instead of being
+## lifted onto it, which jerked it and the cart it held a little every tick; it only snaps where it is more
+## than 3m under the ground right under it.
+func _ensure_terrain_clearance(min_clearance: float = 3.5, soft: bool = false, look_ahead: bool = false) -> void:
+	if not is_inside_tree() or get_world_3d() == null:
 		return
-	var space = get_world_3d().direct_space_state if get_world_3d() else null
-	if space == null:
-		return
-	var from_pt = Vector3(global_position.x, global_position.y + 40.0, global_position.z)
-	var to_pt = Vector3(global_position.x, global_position.y - 120.0, global_position.z)
-	var q = PhysicsRayQueryParameters3D.create(from_pt, to_pt)
+	var under: float = _ground_under(global_position) + min_clearance
+	var steer: float = under
+	if look_ahead:
+		var flat := Vector3(_velocity.x, 0.0, _velocity.z)
+		for t in [0.6, 1.2]:
+			steer = maxf(steer, _ground_under(global_position + flat * float(t) + Vector3.UP * 4.0 * float(t)) + min_clearance)
+	if soft:
+		if global_position.y < steer:
+			var need: float = (steer - global_position.y) * 3.0
+			if _velocity.y < need:
+				_velocity.y = lerpf(_velocity.y, need, 0.35)
+		global_position.y = maxf(global_position.y, under - 3.0)
+	elif global_position.y < under:
+		global_position.y = under
+		if _velocity.y < 0.0:
+			_velocity.y = 0.0
+
+
+## The height of whatever solid is under `at`, from just over it (from 40m up, the start gantry's beam, a
+## checkpoint's banner or the bridge's truss over a cart it swooped on counted as the ground, and it jumped
+## up onto them); the carts don't count. -INF if nothing is.
+func _ground_under(at: Vector3) -> float:
+	var q := PhysicsRayQueryParameters3D.create(at + Vector3.UP * 3.0, at + Vector3.DOWN * 120.0)
 	q.collision_mask = 1
-	var hit = space.intersect_ray(q)
-	if not hit.is_empty():
-		var floor_y = float(hit.position.y) + min_clearance
-		if global_position.y < floor_y:
-			global_position.y = floor_y
-			if _velocity.y < 0.0:
-				_velocity.y = 0.0
+	var skip: Array[RID] = []
+	for c in get_tree().get_nodes_in_group("player_carts"):
+		if c is CollisionObject3D:
+			skip.append((c as CollisionObject3D).get_rid())
+	q.exclude = skip
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	return -INF if hit.is_empty() else float(hit.position.y)
 
 
 func _fly_toward(target: Vector3, speed: float, delta: float, face: bool) -> void:
@@ -757,28 +849,6 @@ func _lock_cart(cart: RigidBody3D) -> void:
 		cart.axis_lock_angular_x = false
 		cart.axis_lock_angular_y = false
 		cart.axis_lock_angular_z = false
-	_attach_cart_under_eagle(cart)
-
-
-func _attach_cart_under_eagle(cart: RigidBody3D) -> void:
-	# WORLD-space claw hold — tight under body (ignore FBX scale).
-	var fwd: Vector3 = _last_flat_fwd
-	fwd.y = 0.0
-	if fwd.length_squared() < 0.0001:
-		fwd = Vector3.FORWARD
-	else:
-		fwd = fwd.normalized()
-
-	var hold: Vector3 = global_position
-	hold += Vector3.DOWN * absf(carry_hold_below)
-	hold += fwd * carry_hold_forward
-	var road_y: float = _sample_track_world(global_position, 0.0).y
-	# Never bury under the road mesh
-	hold.y = maxf(hold.y, road_y + 1.2)
-
-	cart.global_transform = Transform3D(Basis.looking_at(fwd, Vector3.UP), hold)
-	cart.linear_velocity = Vector3.ZERO
-	cart.angular_velocity = Vector3.ZERO
 
 
 ## Called by player shockwave — drop any car and get shoved away.
@@ -823,6 +893,7 @@ func _abort_hunt(was_holding: bool) -> void:
 				_release_cart(rb)
 			else:
 				_detach_dead_cart(rb)
+	_holding = false
 	_cooldown_left = maxf(_cooldown_left, cooldown_time * 0.55)
 	_patrol_target = _high_point_near_track(50.0)
 	# Nudge upward/away so it reads as "flew off" after a kill mid-grab
@@ -874,26 +945,19 @@ func _break_cart_shield(cart: Object) -> void:
 func _release_cart(cart: RigidBody3D) -> void:
 	if "is_carried_by_eagle" in cart:
 		cart.set("is_carried_by_eagle", false)
-	# Drop from current carry pose (already above the road), slight nudge along track
-	var drop: Vector3 = cart.global_position
-	var road_y: float = _sample_track_world(drop, 0.0).y
-	drop.y = maxf(drop.y, road_y + 3.0)
-	# Prefer XZ over planned drop if nearby
-	if Vector2(global_position.x - _drop_world.x, global_position.z - _drop_world.z).length() < 25.0:
-		drop.x = global_position.x
-		drop.z = global_position.z
-	cart.global_position = drop
-
-	var fwd := -global_basis.orthonormalized().z
-	fwd.y = 0.0
-	if fwd.length_squared() < 0.0001:
-		fwd = Vector3.FORWARD
-	else:
-		fwd = fwd.normalized()
+	if not _holding:
+		# Let go in the swoop, before the grip: the cart was never locked.
+		return
+	_holding = false
+	# Let go where it hangs (it's already over the road, near the drop), carrying a little of its way.
+	var road_y: float = _sample_track_world(cart.global_position, 0.0).y
+	if cart.global_position.y < road_y + 3.0:
+		cart.global_position.y = road_y + 3.0
+	var flat := Vector3(_cart_vel.x, 0.0, _cart_vel.z).limit_length(8.0)
 
 	cart.freeze = false
 	cart.sleeping = false
-	cart.linear_velocity = fwd * 6.0 + Vector3.DOWN * release_down_speed
+	cart.linear_velocity = flat + Vector3.DOWN * (release_down_speed + maxf(-_cart_vel.y, 0.0))
 	cart.angular_velocity = Vector3(randf_range(-2.0, 2.0), randf_range(-3.0, 3.0), randf_range(-2.0, 2.0))
 
 	if cart.has_method("_tornado_restore_control"):

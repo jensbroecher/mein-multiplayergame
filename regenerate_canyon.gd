@@ -183,6 +183,7 @@ const COARSE_MAX := 160.0
 const CENTRE := Vector2(200.0, -110.0)
 
 const FINISH_OFF := 45.0
+const EAGLE_SCALE := 6.5
 
 var _segs: Array = []
 var _lap_len := 0.0
@@ -2898,6 +2899,8 @@ func _place(placed: Dictionary, nm: String, x: float, y: float, z: float, height
 # ======================================================================================
 
 const CampKit = preload("res://CampKit.gd")
+const VenueKit = preload("res://VenueKit.gd")
+const CrowdPlacer = preload("res://CrowdPlacer.gd")
 ## People-sized things are built at life size and scaled up, as on the Lakeside Course and Bloombay.
 const PROP_SCALE := 1.6
 ## The Parador del Viento: on a pad graded level beside the start straight, [s, metres right] of its
@@ -2905,6 +2908,11 @@ const PROP_SCALE := 1.6
 ## pad's 10m blend never reaches the road's flat strip.
 const PARADOR_AT := Vector2(100.0, 53.0)
 const PARADOR_HALF := Vector2(62.0, 34.0)
+## The windmill over the stock tank, in the Parador's frame (life size): its foot, its wheel's hub over the
+## foot, and how fast the wheel turns (degrees a second).
+const WINDMILL_BASE := Vector3(31.0, 0.0, 17.0)
+const WINDMILL_HUB := Vector3(0.0, 10.6, -0.9)
+const WINDMILL_SPIN := 32.0
 
 var _prop_mats := {}
 
@@ -2943,6 +2951,11 @@ func _plan_pads() -> void:
 	var sp: Dictionary = _spot(PARADOR_AT.x, PARADOR_AT.y, 0.0)
 	var f: Vector3 = sp["fwd"]
 	_pads = [[Vector2((sp["pos"] as Vector3).x, (sp["pos"] as Vector3).z), Vector2(f.x, f.z), PARADOR_HALF, _road_y(PARADOR_AT.x) + 0.15]]
+	# The start venue's marquee, across the road from the Parador.
+	var ts: float = _finish_s() + VENUE_TENT.x
+	var tp: Dictionary = _spot(ts, VENUE_TENT.y, 0.0)
+	var tf: Vector3 = tp["fwd"]
+	_pads.append([Vector2((tp["pos"] as Vector3).x, (tp["pos"] as Vector3).z), Vector2(tf.x, tf.z), VENUE_PAD_HALF, _road_y(ts) + 0.1])
 
 
 ## How much a pad levels the ground at (x, z): 1 on it, easing to 0 over 10m; and its height.
@@ -3198,7 +3211,7 @@ func _build_parador(level_scene: Node3D) -> void:
 			pk.tube(kit, "metal", wt + Vector3(lx, 0, lz), wt + Vector3(lx * 0.55, 9.5, lz * 0.55), 0.13, 0.11, 6, Color(0.55, 0.56, 0.56))
 	pk.lathe(kit, "metal", wt + Vector3(0, 9.4, 0), [Vector2(0.0, 0.0), Vector2(2.4, 0.0), Vector2(2.5, 0.2), Vector2(2.5, 3.6), Vector2(1.0, 4.8), Vector2(0.0, 5.1)], 16, Color(0.70, 0.71, 0.70))
 	boxes.append([wt + Vector3(0, 2.0, 0), Vector3(3.8, 4.0, 3.8)])
-	_windmill(pk, kit, Vector3(31.0, 0.0, 17.0))
+	_windmill(pk, kit, WINDMILL_BASE)
 	boxes.append([Vector3(31.0, 2.0, 17.0), Vector3(2.6, 4.0, 2.6)])
 	pk.lathe(kit, "metal", Vector3(34.5, 0.07, 16.5), [Vector2(0.0, 0.0), Vector2(2.2, 0.0), Vector2(2.2, 0.75), Vector2(2.1, 0.75), Vector2(2.1, 0.1), Vector2(0.0, 0.1)], 20, Color(0.58, 0.60, 0.60))
 	pk.lathe(kit, "glass", Vector3(34.5, 0.62, 16.5), [Vector2(0.0, 0.0), Vector2(2.1, 0.0)], 20, Color(0.24, 0.30, 0.22), true)
@@ -3255,6 +3268,27 @@ func _build_parador(level_scene: Node3D) -> void:
 	_label(root, "MOTEL", to_world.call(mpole + Vector3(0, 8.8, -0.21)), basis, 0.016 * PROP_SCALE, Color(0.98, 0.95, 0.85))
 	_label(root, "HAY CUARTOS", to_world.call(mpole + Vector3(0, 7.4, -0.19)), basis, 0.0065 * PROP_SCALE, Color(1.0, 0.95, 0.8))
 	_label(root, "TALLER", to_world.call(ws + Vector3(0, 4.3, -wd * 0.5 - 0.11)), basis, 0.010 * PROP_SCALE, Color(0.12, 0.12, 0.12))
+	# The windmill's wheel turns slowly in the wind (Windmill.gd turns the BladePivot about the hub's axis).
+	var mill := Node3D.new()
+	mill.name = "ParadorWindmill"
+	mill.set_script(load("res://Windmill.gd"))
+	mill.set("spin_axis_local", Vector3(0, 0, 1))
+	mill.set("spin_degrees_per_second", WINDMILL_SPIN)
+	mill.transform = Transform3D(basis, to_world.call(WINDMILL_BASE + WINDMILL_HUB))
+	var pivot := Node3D.new()
+	pivot.name = "BladePivot"
+	mill.add_child(pivot)
+	var rpk := PropKit.new()
+	rpk.set_frame(Transform3D(Basis().scaled(Vector3.ONE * PROP_SCALE), Vector3.ZERO))
+	var rkit := {}
+	_windmill_rotor(rpk, rkit)
+	rpk.material_for = func(key: String) -> Material: return _prop_material(key)
+	var rotor := MeshInstance3D.new()
+	rotor.name = "Wheel"
+	rotor.mesh = _save_baked_resource(rpk.commit(rkit), "parador_windmill_wheel")
+	pivot.add_child(rotor)
+	# Added once its pivot is in it: Windmill.gd looks for BladePivot when it enters the tree.
+	root.add_child(mill)
 	# Collision for everything a cart can reach.
 	var body := StaticBody3D.new()
 	body.name = "ParadorBody"
@@ -3292,26 +3326,31 @@ func _windmill(pk: PropKit, kit: Dictionary, base: Vector3) -> void:
 			var b2: Vector3 = base + (corners[k] as Vector3).lerp((corners[k] as Vector3) * 0.2, t1) + Vector3(0, h * t1, 0)
 			pk.beam(kit, "metal", a, b, 0.04, 0.04, steel)
 			pk.beam(kit, "metal", a2, b2, 0.04, 0.04, steel)
-	var hub: Vector3 = base + Vector3(0, h + 0.6, -0.9)
+	# The gearbox the wheel turns on (the wheel is _windmill_rotor's, at WINDMILL_HUB).
 	pk.box(kit, "metal", Transform3D(Basis(), base + Vector3(0, h + 0.4, 0)), Vector3(0.5, 0.5, 1.6), Color(0.40, 0.42, 0.42))
-	pk.tube(kit, "metal", hub, hub + Vector3(0, 0, -0.25), 0.15, 0.15, 8, Color(0.4, 0.42, 0.42))
-	# Eighteen curved vanes between two rims.
-	var blades := 18
-	for k in range(blades):
-		var a: float = TAU * float(k) / float(blades)
-		var d := Vector3(cos(a), sin(a), 0.0)
-		var tang := Vector3(-sin(a), cos(a), 0.0)
-		var basis_v := Basis(tang, d, Vector3(0, 0, 1)) * Basis(Vector3.UP, 0.45)
-		pk.box(kit, "metal", Transform3D(basis_v, hub + d * 1.35 + Vector3(0, 0, -0.12)), Vector3(0.32, 1.5, 0.02), Color(0.76, 0.77, 0.76))
-		pk.beam(kit, "metal", hub, hub + d * 0.65, 0.03, 0.03, steel)
-	for rr in [0.65, 2.05]:
-		pk.tyre(kit, "metal", hub + Vector3(0, 0, -0.12), rr - 0.03, rr + 0.03, 0.05, 28, steel, Basis(Vector3.RIGHT, PI * 0.5))
 	# The tail vane.
 	pk.beam(kit, "metal", base + Vector3(0, h + 0.45, 0.5), base + Vector3(0, h + 0.5, 2.6), 0.06, 0.06, steel)
 	pk.box(kit, "paint", Transform3D(Basis(), base + Vector3(0, h + 0.7, 3.1)), Vector3(0.03, 1.1, 1.4), Color(0.8, 0.78, 0.74))
 	# The pump rod down the middle, and the pipe to the tank.
 	pk.tube(kit, "metal", base + Vector3(0, 0.0, 0), base + Vector3(0, h, 0), 0.04, 0.04, 6, Color(0.35, 0.35, 0.35))
 	pk.tube(kit, "metal", base + Vector3(0, 0.6, 0), base + Vector3(2.6, 0.6, -0.4), 0.06, 0.06, 6, Color(0.35, 0.35, 0.35))
+
+
+## The windmill's wheel, round its hub at the origin (the same frame as _windmill's, at life size): eighteen
+## curved vanes between two rims, facing -z. It is its own mesh on a pivot that Windmill.gd turns.
+func _windmill_rotor(pk: PropKit, kit: Dictionary) -> void:
+	var steel := Color(0.58, 0.60, 0.60)
+	pk.tube(kit, "metal", Vector3.ZERO, Vector3(0, 0, -0.25), 0.15, 0.15, 8, Color(0.4, 0.42, 0.42))
+	var blades := 18
+	for k in range(blades):
+		var a: float = TAU * float(k) / float(blades)
+		var d := Vector3(cos(a), sin(a), 0.0)
+		var tang := Vector3(-sin(a), cos(a), 0.0)
+		var basis_v := Basis(tang, d, Vector3(0, 0, 1)) * Basis(Vector3.UP, 0.45)
+		pk.box(kit, "metal", Transform3D(basis_v, d * 1.35 + Vector3(0, 0, -0.12)), Vector3(0.32, 1.5, 0.02), Color(0.76, 0.77, 0.76))
+		pk.beam(kit, "metal", Vector3.ZERO, d * 0.65, 0.03, 0.03, steel)
+	for rr in [0.65, 2.05]:
+		pk.tyre(kit, "metal", Vector3(0, 0, -0.12), rr - 0.03, rr + 0.03, 0.05, 28, steel, Basis(Vector3.RIGHT, PI * 0.5))
 
 
 ## A static body for a set of props, with the `surface` its colliders give a cart that lands on them.
@@ -3426,8 +3465,8 @@ func _build_poles(level_scene: Node3D) -> void:
 	var end_s: float = _lap_len + _bridge_s0 - 40.0
 	while s < end_s:
 		var ss: float = fposmod(s, _lap_len)
-		if absf(ss - _arch_s) > 30.0 and absf(ss - (PARADOR_AT.x)) > 66.0:
-			var sp: Dictionary = _spot(ss, 17.0, 0.0)
+		var sp: Dictionary = _spot(ss, 17.0, 0.0)
+		if absf(ss - _arch_s) > 30.0 and absf(ss - (PARADOR_AT.x)) > 66.0 and not _near_sign(sp["pos"], 1.5):
 			var p: Vector3 = sp["pos"]
 			p.y = _ground_at(p.x, p.z) - 0.3
 			var r: Vector3 = sp["right"]
@@ -3487,13 +3526,20 @@ func _build_markers(level_scene: Node3D, lips: Array) -> void:
 		s += 28.0
 	for lip in lips:
 		for side in [-1.0, 1.0]:
-			var sp2: Dictionary = _spot(float(lip), side * 7.6, 0.0)
+			var lat := 7.6
+			var sp2: Dictionary = _spot(float(lip), side * lat, 0.0)
 			var p2: Vector3 = sp2["pos"]
-			p2.y = _road_y(float(lip)) + KICK_H
-			pk.tube(kit, "paint", p2, p2 + Vector3(0, 3.2, 0), 0.06, 0.05, 6, Color(0.9, 0.9, 0.88))
-			_solid_cylinder(body, p2 + Vector3(0, 1.6, 0), 0.07, 3.2)
+			var top_y: float = _road_y(float(lip)) + KICK_H + 3.2
+			# The pole stands on what is under it: the kicker's shoulder, falling from the top's edge (6.4m
+			# out, KICK_H up) to KICK_SINK under the road (_build_kickers), or the ground where La Bajada's
+			# embankment falls away. It used to start at the lip's height and hang in the air over both.
+			var shoulder: float = KICK_SHOULDER + KICK_H * 1.2
+			var on_kicker: float = _road_y(float(lip)) + KICK_H - (lat - 6.4) / shoulder * (KICK_H + KICK_SINK)
+			p2.y = maxf(on_kicker, _ground_at(p2.x, p2.z)) - 0.25
+			pk.tube(kit, "paint", p2, Vector3(p2.x, top_y, p2.z), 0.06, 0.05, 6, Color(0.9, 0.9, 0.88))
+			_solid_cylinder(body, (p2 + Vector3(p2.x, top_y, p2.z)) * 0.5, 0.07, top_y - p2.y)
 			var f: Vector3 = sp2["fwd"]
-			var t0: Vector3 = p2 + Vector3(0, 3.15, 0)
+			var t0 := Vector3(p2.x, top_y - 0.05, p2.z)
 			pk.tri(kit, "paint", t0, t0 + Vector3(0, -0.8, 0), t0 - f * 1.2 + Vector3(0, -0.4, 0), sp2["right"], sp2["right"], sp2["right"], Color(0.95, 0.42, 0.08), sp2["right"])
 			pk.tri(kit, "paint", t0, t0 - f * 1.2 + Vector3(0, -0.4, 0), t0 + Vector3(0, -0.8, 0), -(sp2["right"] as Vector3), -(sp2["right"] as Vector3), -(sp2["right"] as Vector3), Color(0.95, 0.42, 0.08), -(sp2["right"] as Vector3))
 	pk.material_for = func(key: String) -> Material: return _prop_material(key)
@@ -3510,6 +3556,106 @@ const SECTION_SIGNS := [
 	["VALLE DE LOS DUENDES", 17, 0.2], ["LA GARGANTA", 18, 0.75], ["EL VADO", 23, 0.2], ["EL ARCO DEL VIENTO", 25, 0.05],
 ]
 
+## How far along the lap either way a sign may move from its place in SECTION_SIGNS to find level ground.
+const SIGN_SHIFT := 36.0
+## The section signs' places (_plan_signs): {text, pos (the board's middle at the highest ground under it),
+## fwd, right, width, posts (the ground under each post)}.
+var _sign_spots: Array = []
+
+## A sign is wide (the longest 9m across) and stands across the verge, facing the traffic, and the verges
+## are rarely level: the shelf road has the cut wall on one side and the drop on the other, La Cuchilla's
+## flanks fall away, La Bajada runs on an embankment. Each sign looks along its stretch, on either side, up
+## to SIGN_SHIFT either way of its place, for ground that is level under the whole board, near the road's
+## height, clear of every leg of the lap and out of the water, and the plants and rocks keep off it
+## (_landmarks). It used to stand 11m off the centreline wherever that fell, on the ground under its middle,
+## with one post on the road's edge, the other hanging over a bank or buried in a cut.
+func _plan_signs() -> void:
+	_sign_spots.clear()
+	for sg in SECTION_SIGNS:
+		var text: String = sg[0]
+		var s0: float = _seg_s(int(sg[1]), float(sg[2]))
+		var width: float = 1.0 + float(text.length()) * 0.42
+		var best: Dictionary = {}
+		# Level ground first; where there is none (the shelf road, the end of the ridge), a slope falling
+		# away from the road, the board level at the road's height and each post down to its own ground.
+		for max_spread in [1.2, 4.0]:
+			if not best.is_empty():
+				break
+			_sign_search(text, s0, width, max_spread, best)
+		if best.is_empty():
+			push_error("Sign %s: no ground beside the road within %.0fm of its place" % [text, SIGN_SHIFT])
+			continue
+		_sign_spots.append(best)
+		var c: Vector3 = best["pos"]
+		_landmarks.append(Vector3(c.x, c.z, width * 0.5 + 2.5))
+		print("  sign %s: %+.0fm along, %.1fm under the road, the ground under it %.2fm uneven" % [text, float(best["ds"]), float(best["below"]), float(best["spread"])])
+
+
+## The best place for a sign within SIGN_SHIFT of s0 whose ground varies by at most `max_spread`, into `best`.
+func _sign_search(text: String, s0: float, width: float, max_spread: float, best: Dictionary) -> void:
+	var best_score := 1e9
+	for side in [1.0, -1.0]:
+		var ds := -SIGN_SHIFT
+		while ds <= SIGN_SHIFT + 0.01:
+			var s: float = fposmod(s0 + ds, _lap_len)
+			# Not in the slot canyon, between its walls.
+			if s > _slot_s0 - 8.0 and s < _slot_s1 + 8.0:
+				ds += 4.0
+				continue
+			for extra in [0.0, 1.5, 3.0, 5.0]:
+				# The inner post stands clear of the trail's marker posts (ROAD_HALF + 2.6).
+				var cand: Dictionary = _sign_candidate(s, side * (ROAD_HALF + 3.4 + width * 0.5 + float(extra)), width, max_spread)
+				if cand.is_empty():
+					continue
+				var score: float = float(cand["spread"]) * 2.0 + absf(ds) * 0.04 + float(extra) * 0.15 + (0.0 if side > 0.0 else 0.6) + float(cand["below"]) * 0.8
+				if score < best_score:
+					best_score = score
+					best.clear()
+					best.merge(cand)
+					best["text"] = text
+					best["ds"] = ds
+			ds += 4.0
+
+
+## A sign of `width` across the road at (s, lat): its place, or {} if the ground there won't do.
+func _sign_candidate(s: float, lat: float, width: float, max_spread: float) -> Dictionary:
+	var sp: Dictionary = _spot(s, lat, 0.0)
+	var c: Vector3 = sp["pos"]
+	var r: Vector3 = sp["right"]
+	var f: Vector3 = sp["fwd"]
+	var road_y: float = _road_y(s)
+	var gmin := 1e9
+	var gmax := -1e9
+	for k in range(7):
+		var u: float = -0.5 + float(k) / 6.0
+		for d in [-0.6, 0.6]:
+			var q: Vector3 = c + r * (u * width) + f * float(d)
+			if _road_lat(q.x, q.z).x < ROAD_HALF + 2.0 or _in_landmark(q.x, q.z) or _pad_at(q.x, q.z).x > 0.0:
+				return {}
+			var g: float = _ground_at(q.x, q.z)
+			if g < RIVER_Y + 0.8:
+				return {}
+			gmin = minf(gmin, g)
+			gmax = maxf(gmax, g)
+	if gmax - gmin > max_spread or gmax > road_y + 1.5 or gmax < road_y - 3.0:
+		return {}
+	var posts: Array = []
+	for k in [-1.0, 1.0]:
+		var q2: Vector3 = c + r * (float(k) * width * 0.42)
+		posts.append(_ground_at(q2.x, q2.z))
+	return {"pos": Vector3(c.x, gmax, c.z), "fwd": f, "right": r, "width": width, "posts": posts,
+		"spread": gmax - gmin, "below": maxf(road_y - gmax, 0.0)}
+
+
+## True within `margin` of a section sign's board.
+func _near_sign(p: Vector3, margin: float) -> bool:
+	for spot in _sign_spots:
+		var c: Vector3 = spot["pos"]
+		if Vector2(p.x - c.x, p.z - c.z).length() < float(spot["width"]) * 0.5 + margin:
+			return true
+	return false
+
+
 func _build_signs(level_scene: Node3D) -> void:
 	var root := Node3D.new()
 	root.name = "SectionSigns"
@@ -3519,26 +3665,286 @@ func _build_signs(level_scene: Node3D) -> void:
 	var wood := Color(0.42, 0.30, 0.20)
 	var board := Color(0.55, 0.40, 0.26)
 	var body: StaticBody3D = _solid_body(root, "SectionSignBody", "wood")
-	for sg in SECTION_SIGNS:
-		var s: float = _seg_s(int(sg[1]), float(sg[2]))
-		var sp: Dictionary = _spot(s, ROAD_HALF + 4.0, 0.0)
-		var p: Vector3 = sp["pos"]
-		p.y = _ground_at(p.x, p.z) - 0.2
-		var f: Vector3 = sp["fwd"]
-		var r: Vector3 = sp["right"]
-		# The board faces back down the road: its front is -fwd.
+	for spot in _sign_spots:
+		var p: Vector3 = spot["pos"]
+		var f: Vector3 = spot["fwd"]
+		var r: Vector3 = spot["right"]
+		var width: float = spot["width"]
+		# The board faces back down the road: its front is -fwd. Its foot is 1.85m over the highest ground
+		# under it; each post runs down into the ground under it.
 		var basis := Basis(-r, Vector3.UP, f)
-		var width: float = 1.0 + float(String(sg[0]).length()) * 0.42
-		for k in [-1.0, 1.0]:
-			pk.box(kit, "wood", Transform3D(basis, p + r * k * (width * 0.42) + Vector3(0, 1.4, 0)), Vector3(0.22, 2.8, 0.22), wood)
-		pk.box(kit, "wood", Transform3D(basis, p + Vector3(0, 2.6, 0)), Vector3(width, 1.1, 0.14), board)
-		_solid_box(body, Transform3D(basis, p + Vector3(0, 1.6, 0)), Vector3(width * 0.84 + 0.22, 3.2, 0.24))
-		_label(root, sg[0], p + Vector3(0, 2.6, 0) - f * 0.09, basis, 0.0105, Color(0.98, 0.92, 0.78))
+		var board_y: float = p.y + 2.4
+		var low: float = p.y
+		for i in range(2):
+			var k: float = -1.0 if i == 0 else 1.0
+			var foot: float = float(spot["posts"][i]) - 0.4
+			low = minf(low, foot)
+			var top: float = board_y + 0.35
+			var q: Vector3 = p + r * k * (width * 0.42)
+			pk.box(kit, "wood", Transform3D(basis, Vector3(q.x, (foot + top) * 0.5, q.z)), Vector3(0.22, top - foot, 0.22), wood)
+		pk.box(kit, "wood", Transform3D(basis, Vector3(p.x, board_y, p.z)), Vector3(width, 1.1, 0.14), board)
+		var top_y: float = board_y + 0.55
+		_solid_box(body, Transform3D(basis, Vector3(p.x, (low + top_y) * 0.5, p.z)), Vector3(width * 0.84 + 0.22, top_y - low, 0.24))
+		_label(root, spot["text"], Vector3(p.x, board_y, p.z) - f * 0.09, basis, 0.0105, Color(0.98, 0.92, 0.78))
 	pk.material_for = func(key: String) -> Material: return _prop_material(key)
 	var mi := MeshInstance3D.new()
 	mi.name = "SignMesh"
 	mi.mesh = _save_baked_resource(pk.commit(kit), "section_signs")
 	root.add_child(mi)
+
+
+# ======================================================================================
+#  The start venue
+# ======================================================================================
+
+## The start's venue, on the river side of the straight across from the Parador: crowd barriers along the
+## verge either side of the line with spectators behind them, a pagoda marquee (VenueKit's, the Lakeside
+## Course's beer tent) on its own pad with people at its tables and about it, the RC Vibe GP flag on a tall
+## pole by the line, and a few people watching from the Parador's forecourt. Places are [metres along the
+## lap from the line, metres right of the centreline]; the river side is left (negative).
+const VENUE_TENT := Vector2(-12.0, -31.0)
+## The marquee's pad: half extents along and across. Its near edge stands 21m off the centreline, so its
+## 10m blend stays off the road's flat strip (ROAD_FLAT).
+const VENUE_PAD_HALF := Vector2(14.0, 10.0)
+const VENUE_BARRIER_LAT := -11.5
+const VENUE_BARRIER_RUN := Vector2(-52.0, 38.0)
+const VENUE_FLAG := Vector2(4.0, -15.0)
+## The flagpole's height and the flag's length (hoist to fly) and depth, in metres. The flag streams west
+## (across the road, the way the wind blows the Parador's windmill round to face east), so the grid sees it
+## broadside.
+const VENUE_FLAG_POLE := 14.0
+const VENUE_FLAG_SIZE := Vector2(6.6, 4.1)
+## Along the Parador's forecourt edge: [from, to] along the lap from the line, and how far out.
+const VENUE_FORECOURT := Vector3(-4.0, 20.0, 21.0)
+## The people: Nyota Stadium's at this level's PROP_SCALE, a Spanish meeting's mix (CrowdPlacer's groups:
+## African, South Asian, European, East Asian, Arab or mixed).
+const VENUE_PEOPLE_SCALE := PROP_SCALE / 1.86
+const VENUE_SKIN := [0.06, 0.04, 0.74, 0.05, 0.11]
+
+## Planned before the dressing, so the plants and rocks keep off it: the barriers [centre, along], the
+## spectators (CrowdPlacer spots) and the marquee's and the flag's frames.
+var _venue_barriers: Array = []
+var _venue_people: Array = []
+var _venue_tent := Transform3D()
+var _venue_flag := Transform3D()
+
+
+func _finish_s() -> float:
+	return _seg_s(SEG_START, 0.0) + FINISH_OFF
+
+
+## A frame on the ground at (metres along from the line, metres right): x along the road, y up.
+func _venue_frame(along: float, lat: float) -> Transform3D:
+	var sp: Dictionary = _spot(fposmod(_finish_s() + along, _lap_len), lat, 0.0)
+	var f: Vector3 = sp["fwd"]
+	var p: Vector3 = sp["pos"]
+	p.y = _ground_at(p.x, p.z)
+	return Transform3D(Basis(f, Vector3.UP, f.cross(Vector3.UP)), p)
+
+
+func _plan_venue() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 2207
+	_venue_barriers.clear()
+	_venue_people.clear()
+	_venue_flag = _venue_frame(VENUE_FLAG.x, VENUE_FLAG.y)
+	_venue_tent = _venue_frame(VENUE_TENT.x, VENUE_TENT.y)
+	var piece: float = 2.3 * PROP_SCALE
+	var along: float = VENUE_BARRIER_RUN.x
+	while along + piece <= VENUE_BARRIER_RUN.y + 0.01:
+		var xf: Transform3D = _venue_frame(along + piece * 0.5, VENUE_BARRIER_LAT)
+		_venue_barriers.append(xf)
+		_landmarks.append(Vector3(xf.origin.x, xf.origin.z, 3.0))
+		# Behind it, facing the road: a front row along it and a looser one further back.
+		var away: Vector3 = -xf.basis.z
+		for k in range(3):
+			if rng.randf() < (0.2 if k < 2 else 0.5):
+				continue
+			var back: float = rng.randf_range(1.1, 1.7) if k < 2 else rng.randf_range(2.4, 3.6)
+			var p: Vector3 = xf.origin + xf.basis.x * rng.randf_range(-piece * 0.45, piece * 0.45) + away * back
+			if Vector2(p.x - _venue_flag.origin.x, p.z - _venue_flag.origin.z).length() < 1.4:
+				continue
+			p.y = _ground_at(p.x, p.z)
+			_venue_people.append([p, -away + xf.basis.x * rng.randf_range(-0.35, 0.35), false])
+		# Keep the plants out of the crowd (a saguaro grew among them): the rows reach 3.6m back.
+		for back in [2.5, 5.0]:
+			var lm: Vector3 = xf.origin + away * float(back)
+			_landmarks.append(Vector3(lm.x, lm.z, 3.4))
+		along += piece
+	_landmarks.append(Vector3(_venue_flag.origin.x, _venue_flag.origin.z, 2.5))
+	# At the marquee's tables (VenueKit.beer_set at z = -1.2 and 1.2, its benches 0.55 either side, their
+	# tops 0.475 up), about two in three seats taken, facing the table; more standing about it.
+	var tx: Transform3D = _venue_tent.scaled_local(Vector3.ONE * PROP_SCALE)
+	for set_z in [-1.2, 1.2]:
+		for bz in [-0.55, 0.55]:
+			for x in [-0.72, 0.0, 0.72]:
+				if rng.randf() < 0.36:
+					continue
+				var seat: Vector3 = tx * Vector3(float(x) + rng.randf_range(-0.06, 0.06), 0.475, float(set_z) + float(bz))
+				var face: Vector3 = _venue_tent.basis.z * (-signf(float(bz)))
+				_venue_people.append([seat, face, true])
+	var standing := 0
+	var tries := 0
+	while standing < 16 and tries < 200:
+		tries += 1
+		var a: float = rng.randf() * TAU
+		var rr: float = rng.randf_range(6.2, 11.0)
+		var p: Vector3 = _venue_tent.origin + _venue_tent.basis.x * cos(a) * rr * 1.2 + _venue_tent.basis.z * sin(a) * rr * 0.8
+		if _pad_at(p.x, p.z).x < 0.9:
+			continue
+		p.y = _ground_at(p.x, p.z)
+		# In twos and threes, talking, or looking toward the road.
+		var look: Vector3 = (_venue_tent.origin - p) if rng.randf() < 0.4 else _venue_tent.basis.z
+		_venue_people.append([p, look + Vector3(rng.randf_range(-0.5, 0.5), 0.0, rng.randf_range(-0.5, 0.5)), false])
+		standing += 1
+		if rng.randf() < 0.6:
+			var q: Vector3 = p + Vector3(rng.randf_range(-1.6, 1.6), 0.0, rng.randf_range(-1.6, 1.6))
+			if _pad_at(q.x, q.z).x > 0.9:
+				q.y = _ground_at(q.x, q.z)
+				_venue_people.append([q, p - q, false])
+				standing += 1
+	# A few at the front of the Parador's forecourt, watching the start.
+	var f_along: float = VENUE_FORECOURT.x
+	while f_along < VENUE_FORECOURT.y:
+		var fx: Transform3D = _venue_frame(f_along, VENUE_FORECOURT.z + rng.randf_range(0.0, 1.2))
+		_venue_people.append([fx.origin, -fx.basis.z + fx.basis.x * rng.randf_range(-0.4, 0.4), false])
+		f_along += rng.randf_range(1.2, 3.4)
+
+
+func _build_venue(level_scene: Node3D) -> void:
+	var root := Node3D.new()
+	root.name = "StartVenue"
+	level_scene.add_child(root)
+	var pk := PropKit.new()
+	pk.material_for = func(key: String) -> Material: return _prop_material(key)
+	var camp := CampKit.new(pk)
+	var venue := VenueKit.new(pk)
+	var body: StaticBody3D = _solid_body(root, "StartVenueBody", "asphalt")
+	# The barriers along the verge.
+	var bkit := {}
+	for xf in _venue_barriers:
+		var bx: Transform3D = xf
+		pk.set_frame(bx.scaled_local(Vector3.ONE * PROP_SCALE))
+		camp.crowd_barrier(bkit)
+		_solid_box(body, Transform3D(bx.basis, bx.origin + Vector3(0, 0.9, 0)), Vector3(2.3 * PROP_SCALE, 1.8, 0.3))
+	pk.reset_frame()
+	var bmi := MeshInstance3D.new()
+	bmi.name = "Barriers"
+	bmi.mesh = _save_baked_resource(pk.commit(bkit), "venue_barriers")
+	bmi.visibility_range_end = 600.0
+	root.add_child(bmi)
+	# The marquee, trimmed in the logo's orange, its posts and tables solid.
+	var tkit := {}
+	var tx: Transform3D = _venue_tent.scaled_local(Vector3.ONE * PROP_SCALE)
+	pk.set_frame(tx)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3141
+	venue.marquee(tkit, Color(0.95, 0.45, 0.08), rng)
+	pk.reset_frame()
+	var tmi := MeshInstance3D.new()
+	tmi.name = "Marquee"
+	tmi.mesh = _save_baked_resource(venue.finish(tkit), "venue_marquee")
+	root.add_child(tmi)
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			_solid_cylinder(body, tx * Vector3(float(sx) * 3.0, 1.2, float(sz) * 3.0), 0.2, 2.4 * PROP_SCALE)
+	for z in [-1.2, 1.2]:
+		_solid_box(body, Transform3D(_venue_tent.basis, tx * Vector3(0.0, 0.39, float(z))), Vector3(2.2, 0.78, 1.35) * PROP_SCALE)
+	_build_logo_flag(root, body)
+	CrowdPlacer.build(root, _venue_people, VENUE_PEOPLE_SCALE, VENUE_SKIN, 2207, func(res: Resource, n: String) -> Resource: return _save_baked_resource(res, n))
+	print("  start venue: %d barriers, %d spectators" % [_venue_barriers.size(), _venue_people.size()])
+
+
+## The RC Vibe GP flag: a white pole on a concrete foot with a gilt ball on top, and the flag waving from it
+## (logo_flag.gdshader, flag_wave's wave), the artwork drawn here (_logo_flag_texture).
+func _build_logo_flag(root: Node3D, body: StaticBody3D) -> void:
+	var pk := PropKit.new()
+	pk.material_for = func(key: String) -> Material: return _prop_material(key)
+	var kit := {}
+	var foot: Vector3 = _venue_flag.origin
+	var top: Vector3 = foot + Vector3(0, VENUE_FLAG_POLE, 0)
+	pk.block(kit, "concrete", foot + Vector3(-0.55, -0.3, -0.55), foot + Vector3(0.55, 0.35, 0.55), Color(0.80, 0.78, 0.74))
+	pk.tube(kit, "metal", foot, top, 0.13, 0.08, 10, Color(0.92, 0.92, 0.90))
+	pk.lathe(kit, "metal", top, [Vector2(0.0, 0.0), Vector2(0.17, 0.1), Vector2(0.2, 0.22), Vector2(0.15, 0.36), Vector2(0.0, 0.42)], 12, Color(0.95, 0.72, 0.22))
+	var pmi := MeshInstance3D.new()
+	pmi.name = "LogoFlagPole"
+	pmi.mesh = _save_baked_resource(pk.commit(kit), "venue_flag_pole")
+	root.add_child(pmi)
+	_solid_cylinder(body, foot + Vector3(0, VENUE_FLAG_POLE * 0.5, 0), 0.16, VENUE_FLAG_POLE)
+	# The flag: a grid from the hoist (u 0, at the pole) to the fly (u 1), streaming along its local +x,
+	# facing +z (flag_wave.gdshaderinc reads which way it streams from the normal), UV2 its phase and length.
+	var length: float = VENUE_FLAG_SIZE.x
+	var depth: float = VENUE_FLAG_SIZE.y
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var nu := 28
+	var nv := 12
+	for j in range(nv + 1):
+		for i in range(nu + 1):
+			var u: float = float(i) / nu
+			var v: float = float(j) / nv
+			st.set_normal(Vector3(0, 0, 1))
+			st.set_uv(Vector2(u, v))
+			st.set_uv2(Vector2(0.0, length))
+			st.add_vertex(Vector3(u * length, -v * depth, 0.0))
+	for j in range(nv):
+		for i in range(nu):
+			var a: int = j * (nu + 1) + i
+			var b: int = a + 1
+			var c: int = a + nu + 1
+			var d: int = c + 1
+			# Clockwise seen from +z, the front (CLAUDE.md, procedural mesh winding).
+			st.add_index(c)
+			st.add_index(a)
+			st.add_index(d)
+			st.add_index(a)
+			st.add_index(b)
+			st.add_index(d)
+	var mesh: ArrayMesh = st.commit()
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://logo_flag.gdshader")
+	mat.set_shader_parameter("flag_tex", _logo_flag_texture())
+	mat.set_shader_parameter("amplitude", 0.12)
+	mat.set_shader_parameter("speed", 5.5)
+	mesh.surface_set_material(0, _save_baked_resource(mat, "logo_flag_material"))
+	var fmi := MeshInstance3D.new()
+	fmi.name = "LogoFlag"
+	fmi.mesh = _save_baked_resource(mesh, "logo_flag")
+	# Streaming west: local +x is the venue frame's +z (its right: toward the road from the river side).
+	var fly: Vector3 = _venue_flag.basis.z
+	fmi.transform = Transform3D(Basis(fly, Vector3.UP, fly.cross(Vector3.UP)), top - Vector3(0, 0.45, 0) + fly * 0.1)
+	fmi.extra_cull_margin = length * 0.25
+	root.add_child(fmi)
+
+
+## The flag's artwork: the logo (images/logo_transparent.png) on its own navy between orange bands with a
+## white pinstripe, 1024 x 640, mipmapped so it doesn't shimmer at a distance.
+func _logo_flag_texture() -> Texture2D:
+	var w := 1024
+	var h := 640
+	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color8(14, 26, 64))
+	var band := int(h * 0.075)
+	img.fill_rect(Rect2i(0, 0, w, band), Color8(244, 120, 24))
+	img.fill_rect(Rect2i(0, h - band, w, band), Color8(244, 120, 24))
+	var pin := int(h * 0.014)
+	img.fill_rect(Rect2i(0, band, w, pin), Color8(240, 240, 236))
+	img.fill_rect(Rect2i(0, h - band - pin, w, pin), Color8(240, 240, 236))
+	var logo: Image = (load("res://images/logo_transparent.png") as Texture2D).get_image()
+	if logo.is_compressed():
+		logo.decompress()
+	logo.convert(Image.FORMAT_RGBA8)
+	var lw := int(w * 0.84)
+	var lh := int(float(lw) * logo.get_height() / logo.get_width())
+	logo.resize(lw, lh, Image.INTERPOLATE_LANCZOS)
+	img.blend_rect(logo, Rect2i(0, 0, lw, lh), Vector2i((w - lw) / 2, (h - lh) / 2))
+	img.convert(Image.FORMAT_RGB8)
+	img.generate_mipmaps()
+	var tex := PortableCompressedTexture2D.new()
+	# Kept, or a headless save writes the texture empty (CLAUDE.md, procedural cars).
+	tex.keep_compressed_buffer = true
+	tex.create_from_image(img, PortableCompressedTexture2D.COMPRESSION_MODE_LOSSLESS)
+	return _save_baked_resource(tex, "logo_flag_texture")
 
 
 # ======================================================================================
@@ -3619,14 +4025,15 @@ func _place_gameplay(level_scene: Node3D) -> void:
 		bp.rotation_degrees = Vector3(0, sp2["yaw"], 0)
 		boost_container.add_child(bp)
 
-	# The eagle that patrols the canyon and snatches carts (Eagle.gd).
+	# The eagle that patrols the canyon and snatches carts (Eagle.gd), EAGLE_SCALE times the model: about a
+	# 10m span, its body as long as a cart (at 10 it dwarfed them).
 	var eagle_scene: PackedScene = load("res://models/animals/20260717033727_7db23447.fbx")
 	if eagle_scene:
 		var eagle: Node3D = eagle_scene.instantiate()
 		eagle.name = "Eagle"
 		eagle.set_script(load("res://Eagle.gd"))
 		var ep: Vector3 = _spot(_seg_s(10, 0.5), 0.0, 70.0)["pos"]
-		eagle.transform = Transform3D(Basis().scaled(Vector3.ONE * 10.0), ep)
+		eagle.transform = Transform3D(Basis().scaled(Vector3.ONE * EAGLE_SCALE), ep)
 		level_scene.add_child(eagle)
 
 
@@ -3908,8 +4315,12 @@ func _ready() -> void:
 	_build_formations(level_scene)
 	var lips: Array = _build_kickers(level_scene)
 	track_path.set_meta("jump_lips", lips)
+	# Planned first, so the plants and rocks keep off them.
+	_plan_signs()
+	_plan_venue()
 	_build_dressing(level_scene)
 	_build_parador(level_scene)
+	_build_venue(level_scene)
 	_build_guardrails(level_scene)
 	_build_poles(level_scene)
 	_build_markers(level_scene, lips)

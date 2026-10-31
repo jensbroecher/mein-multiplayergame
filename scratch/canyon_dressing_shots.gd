@@ -1,0 +1,111 @@
+extends Node
+
+# Shots of the Canyon Course's roadside dressing, aimed from the level itself, so they follow the props
+# when the generator moves them. Run windowed:
+#   Godot --path . res://scratch/canyon_dressing_shots.tscn -- <out_dir> [level=res://levels/CanyonLevel.tscn]
+#       [only=signs,kickers,start,windmill] [name:x,y,z:tx,ty,tz[:fov] ...]
+# signs: each SectionSigns label from up the road and from the side; kickers: each BajadaKickers mesh from
+# beside the trail; start: the start/finish area (FinishLine) from above and from the grid; windmill: the
+# Parador's windmill (ParadorWindmill), two frames a second apart so a turning rotor shows.
+
+const SIZE := Vector2i(1376, 768)
+
+var _vp: SubViewport
+var _cam: Camera3D
+var _out := ""
+
+
+func _ready() -> void:
+	var args := OS.get_cmdline_user_args()
+	_out = args[0]
+	var level_path := "res://levels/CanyonLevel.tscn"
+	var only := PackedStringArray(["signs", "kickers", "start", "windmill"])
+	var extra: Array = []
+	for a in args.slice(1):
+		if a.begins_with("level="):
+			level_path = a.substr(6)
+		elif a.begins_with("only="):
+			only = a.substr(5).split(",")
+		elif ":" in a:
+			extra.append(a)
+	AudioServer.set_bus_mute(0, true)
+	_vp = SubViewport.new()
+	_vp.size = SIZE
+	_vp.msaa_3d = Viewport.MSAA_4X
+	_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	add_child(_vp)
+	var level: Node3D = load(level_path).instantiate()
+	_vp.add_child(level)
+	MusicManager.set_shadow_quality(3, false)
+	for n in get_tree().root.find_children("*", "CanvasLayer", true, false):
+		n.visible = false
+	_cam = Camera3D.new()
+	_cam.fov = 62.0
+	_cam.far = 4000.0
+	_vp.add_child(_cam)
+	_cam.make_current()
+	for i in 40:
+		await get_tree().process_frame
+	if "signs" in only:
+		var signs := level.get_node_or_null("SectionSigns")
+		var k := 0
+		if signs:
+			for lab in signs.find_children("*", "Label3D", true, false):
+				var l := lab as Label3D
+				var p := l.global_position
+				var n := l.global_basis.z
+				n.y = 0.0
+				n = n.normalized()
+				var side := Vector3.UP.cross(n).normalized()
+				await _shot("sign%d_front" % k, p + n * 20.0 + side * 3.0 + Vector3.UP * 1.0, p - Vector3.UP * 1.2)
+				await _shot("sign%d_side" % k, p + side * 16.0 + n * 6.0 + Vector3.UP * 0.5, p - Vector3.UP * 1.2)
+				print("SIGN %d '%s' at %s" % [k, l.text, p])
+				k += 1
+	if "kickers" in only:
+		var kk := level.get_node_or_null("BajadaKickers")
+		var k := 0
+		if kk:
+			for mi in kk.find_children("Kicker*", "MeshInstance3D", true, false):
+				var bb: AABB = (mi as MeshInstance3D).global_transform * (mi as MeshInstance3D).mesh.get_aabb()
+				var c := bb.get_center()
+				await _shot("kicker%d_a" % k, c + Vector3(14.0, 5.0, 10.0), c)
+				await _shot("kicker%d_b" % k, c + Vector3(-14.0, 4.0, -10.0), c)
+				k += 1
+	if "start" in only:
+		var fl := level.get_node_or_null("FinishLine") as Node3D
+		if fl:
+			var p := fl.global_position
+			var f := -fl.global_basis.z
+			var r := fl.global_basis.x
+			await _shot("start_high", p - f * 45.0 + Vector3.UP * 28.0, p + f * 20.0)
+			await _shot("start_grid", p - f * 22.0 + Vector3.UP * 3.0, p + f * 10.0 + Vector3.UP * 2.0)
+			await _shot("start_left", p + f * 25.0 - r * 30.0 + Vector3.UP * 9.0, p)
+			await _shot("start_right", p + f * 25.0 + r * 30.0 + Vector3.UP * 9.0, p)
+			await _shot("start_top", p + Vector3.UP * 110.0 + f * 0.1, p, 70.0)
+	if "windmill" in only:
+		var wm := level.find_child("ParadorWindmill", true, false) as Node3D
+		if wm:
+			# The node sits on the wheel's hub, the wheel facing its -z.
+			var p := wm.global_position
+			var eye := p - wm.global_basis.z * 14.0 + wm.global_basis.x * 6.0 - Vector3.UP * 3.0
+			await _shot("windmill_0", eye, p, 40.0)
+			for i in 60:
+				await get_tree().process_frame
+			await _shot("windmill_1", eye, p, 40.0)
+	for a in extra:
+		var parts: PackedStringArray = (a as String).split(":")
+		var pp := parts[1].split(",")
+		var t := parts[2].split(",")
+		await _shot(parts[0], Vector3(float(pp[0]), float(pp[1]), float(pp[2])), Vector3(float(t[0]), float(t[1]), float(t[2])), float(parts[3]) if parts.size() > 3 else 62.0)
+	get_tree().quit()
+
+
+func _shot(nm: String, from: Vector3, at: Vector3, fov := 62.0) -> void:
+	_cam.fov = fov
+	_cam.global_position = from
+	_cam.look_at(at, Vector3.UP)
+	for i in 12:
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	_vp.get_texture().get_image().save_png("%s/%s.png" % [_out, nm])
+	print("SHOT ", nm)
