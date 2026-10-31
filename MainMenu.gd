@@ -3,6 +3,7 @@ extends Control
 ## Both leave the menu on screen: Main swipes to the next screen and hides this one behind it.
 signal start_pressed
 signal options_pressed
+signal garage_pressed
 signal quit_pressed
 
 ## Dev jump-in for Grand Prix stages. Set false (or delete the tile) before shipping.
@@ -248,6 +249,9 @@ func show_sub_menu(menu_name: String) -> void:
 				show_sub_menu("coop_config")
 			)
 			_add_tile("MULTIPLAYER", "Host or join a LAN race", "tile_multiplayer.jpg", COL_MAGENTA, _on_multiplayer_pressed)
+			_add_tile("GARAGE", "Walk your collection, pick the line-up, see your trophies", "tile_garage.jpg", COL_BRONZE, func():
+				garage_pressed.emit()
+			)
 			_add_tile("SPECTATOR", "Watch 6 AI racers — pick any course", "tile_grand_prix.jpg", COL_CYAN, func():
 				NetworkManager.current_game_mode = NetworkManager.GameMode.SPECTATOR
 				NetworkManager.inspect_mode = false
@@ -532,6 +536,7 @@ func _on_cup_selected(cup_name: String) -> void:
 		NetworkManager.current_game_mode = NetworkManager.GameMode.SINGLE_PLAYER_GP
 	NetworkManager.current_gp_name = cup_name
 	NetworkManager.current_gp_stage = 0
+	NetworkManager.gp_trophy_eligible = true
 	NetworkManager.gp_standings.clear()
 	NetworkManager.gp_last_pos.clear()
 	start_pressed.emit()
@@ -542,6 +547,7 @@ func _on_gp_test_stage_selected(cup_name: String, stage_idx: int) -> void:
 	NetworkManager.is_coop_gp = false
 	NetworkManager.current_gp_name = cup_name
 	NetworkManager.current_gp_stage = stage_idx
+	NetworkManager.gp_trophy_eligible = stage_idx == 0
 	NetworkManager.gp_standings.clear()
 	NetworkManager.gp_last_pos.clear()
 	start_pressed.emit()

@@ -1635,6 +1635,52 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   (windowed) rides along with an AI cart through its own race camera and saves frames.
   `scratch/look_shots` takes a lens per shot (`name:x,y,z:tx,ty,tz:fov`).
 
+## Slipstream
+
+- `PlayerCart._update_slipstream`: a cart within `SLIPSTREAM_RANGE` (26m) behind another, inside a wake `SLIPSTREAM_WIDTH`
+  (1.3m) either side of its line that widens by `SLIPSTREAM_WIDEN` a metre of gap, both above `SLIPSTREAM_MIN_SPEED`
+  (18 m/s) and heading the same way, builds a `_draft` (0..1, deeper the closer it follows; up at `SLIPSTREAM_RISE`,
+  down at `SLIPSTREAM_FALL`). It raises the speed cap (`speed_cap`, `effective_max`) by up to `SLIPSTREAM_GAIN` (6%)
+  and the drive force by up to `SLIPSTREAM_PULL`. No HUD, sound or effect shows it. The wake is looked up every
+  `SLIPSTREAM_CHECK` (0.2s, staggered per cart) by carts this peer drives, bots too: a loop over the carts, no rays.
+  Boosting carts neither take nor get it.
+- `res://scratch/slipstream_probe.tscn -- [level=] [car=5] [seconds=60]` (headless) drives the human flat out on the
+  line in a GP with bots and logs speed against the cap, the draft and the gap ahead; then how long each cart drafted.
+  On Lakeside the human ran at about 1.07 of its cap in a draft (1.00-1.02 out of one); bots drafted 7-30% of a race.
+
+## The garage (Garage.gd)
+
+- A walk-in car collection, from the main menu's GARAGE tile (`MainMenu.garage_pressed`, `Main._on_menu_garage_pressed`:
+  built under the loading screen, since it loads every car; `finished` swipes back to the menu, waiting out a swipe
+  still running). Built in code in its own world (a SubViewport), like the podium; first person (a CharacterBody3D).
+- The hall grows with the collection: the foyer (the player's car, `NetworkManager.local_car_index`, on a turntable),
+  the concourse with a gallery per category off either side in pairs (`SLOT` apart), each as long as its cars need
+  (`G_ENTRY`, `BAY`, `G_END`), and the trophy hall at the end. Categories are `CarCollection.CATEGORIES` (by preset
+  name); a car none names goes into "New Arrivals". Cars stand at `SHOW_SCALE` (1.8) times race size, about a road
+  car, in the player's saved paint, angled toward the way in, each on a two-post lift with a lectern and a spotlight.
+  Walls are cut into pieces of 8m at most and floors into 8m tiles, so no mesh takes in more lights than the mobile
+  renderer gives one. `garage_floor.gdshader` is polished concrete in world space.
+- The line-up (`CarCollection.gd`): the cars the car select screen offers, saved as the cars left out (settings.cfg
+  `[garage] hidden_cars`), so new cars join it by themselves; never empty. Looking at a car (within `REACH`, `AIM_CONE`,
+  no wall between) and pressing E (pad A) puts it in or out: the bay's floor rim lights in the gallery's colour and the
+  spotlight comes up, or the rim goes grey and the light dims. CarSelection re-reads the line-up whenever it shows
+  (`_refresh_lineup`: pills only for those cars, stepping through them; car indices stay the presets' own).
+- F (pad Y) lifts the car (`LIFT_TIME`): the carriages rise to its underside (`_underside`: the body's lowest vertex
+  between the axles, not the wheels), then car and arms together by `LIFT_HEIGHT`, and the camera orbits it from any
+  side and from below (kept above the floor and out of the walls), an inspection lamp under it lit while it is up.
+  The camera blends between the eye and the orbit (`CAM_BLEND_TIME`); no head bob (motion comfort).
+- Trophies (`Trophies.gd`, user://trophies.cfg): `Main._show_gp_podium_impl` records one per finished Grand Prix for
+  the best local place in the top three (`Podium.local_names()`), only if it started from stage 1
+  (`NetworkManager.gp_trophy_eligible`, cleared by GP TEST from a later stage). The hall shows a pedestal per cup
+  (`NetworkManager.GP_CUPS`) with the best trophy (Podium's cup mesh) in a glass case or a grey ghost, the counts and the
+  car, and the tally under the logo.
+- Cost (M1, 2880x1800): 60 fps, 7.8-9.3ms GPU. Touch has no controls in it yet.
+- `res://scratch/garage_shots.tscn -- <dir> [trophies=demo] walk:<name>:x,z:yaw[:pitch] inspect:<name>:<car>[:yaw:pitch:dist]
+  lower toggle:<car> cam:<name>:x,y,z:tx,ty,tz[:fov] bench:x,z:yaw tile:<path.jpg>:...` (windowed, `--resolution 1600x900`)
+  photographs it with its HUD, benchmarks it, and rendered `images/menu/tile_garage.jpg`;
+  `res://scratch/garage_flow_test.tscn` (headless) walks Main's flow (open, line-up, Esc, car select, trophies) and
+  prints PASS/FAIL, putting the player's settings and trophies back.
+
 ## Car select screen
 
 - `CarSelection.gd` builds the whole screen in code (`CarSelection.tscn` is only the root): a showroom

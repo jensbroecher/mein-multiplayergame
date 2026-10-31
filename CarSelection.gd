@@ -6,6 +6,8 @@ extends Control
 ##
 ## Main.gd shows it from the main menu and the lobby, and show_for_player(2) lets split-screen's
 ## second player choose. car_selected fires on confirm, back_requested on Back, Esc or the pad's B.
+## It offers the player's line-up (CarCollection.gd, chosen in the garage), re-read each time it shows;
+## car indices are still the presets' own.
 ## Controls: left/right (or Q/E, the shoulder buttons, the arrows by the car, the names along the
 ## bottom) change car; drag the car, or the right stick, to turn it; up/down reach the paint shop,
 ## whose rows change with left/right.
@@ -14,6 +16,7 @@ signal car_selected(car_index: int)
 signal back_requested
 
 const CarPaint = preload("res://CarPaint.gd")
+const CarCollection = preload("res://CarCollection.gd")
 const SKY_SHADER = preload("res://showroom_sky.gdshader")
 const FLOOR_SHADER = preload("res://showroom_floor.gdshader")
 
@@ -330,7 +333,9 @@ var _number_row: Control
 ## The RC antenna on the showroom car (PlayerCart's own is a separate node), shown with the paint's
 ## "antenna" option.
 var _showroom_antenna: Node3D
-var _pills: Array[Button] = []
+var _pills: Array[Button] = []          # one per car in _lineup, in its order
+## The preset indices this screen offers: CarCollection.lineup().
+var _lineup: Array = []
 var _reel: HBoxContainer              # the line-up's names, slid along inside _reel_window
 var _reel_window: TextureRect
 var _reel_tween: Tween
@@ -350,6 +355,8 @@ func _ready() -> void:
 	_build_info_card()
 	_build_paint_panel()
 	_build_bottom_bar()
+	_refresh_lineup()
+	NetworkManager.local_car_index = current_car_index
 	visibility_changed.connect(_on_visibility_changed)
 	update_car_selection()
 	_on_visibility_changed()
@@ -408,6 +415,10 @@ func _input(event: InputEvent) -> void:
 func _on_visibility_changed() -> void:
 	if not is_visible_in_tree():
 		return
+	var shown := current_car_index
+	_refresh_lineup()
+	if current_car_index != shown or _lineup.size() != _pills.size():
+		update_car_selection()
 	if player_slot == 1:
 		var coop: bool = NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP
 		_set_title("PLAYER 1 — SELECT YOUR CAR" if coop else "SELECT YOUR CAR")
@@ -433,7 +444,7 @@ func update_car_selection() -> void:
 	_name_label.text = car_name
 	_bg_name.text = car_name
 	_desc.text = preset.desc
-	_counter.text = "%d / %d" % [current_car_index + 1, CAR_PRESETS.size()]
+	_counter.text = "%d / %d" % [maxi(_lineup.find(current_car_index), 0) + 1, _lineup.size()]
 	for k in STATS.size():
 		var st: Array = STATS[k]
 		var v: float = inverse_lerp(st[2], st[3], float(preset.get(st[1], st[2])))
@@ -445,7 +456,8 @@ func update_car_selection() -> void:
 
 
 func _change_car(step: int) -> void:
-	current_car_index = posmod(current_car_index + step, CAR_PRESETS.size())
+	var at: int = maxi(_lineup.find(current_car_index), 0)
+	current_car_index = _lineup[posmod(at + step, _lineup.size())]
 	update_car_selection()
 	_play_swap(step)
 
@@ -453,7 +465,7 @@ func _change_car(step: int) -> void:
 func _select_car(index: int) -> void:
 	if index == current_car_index:
 		return
-	var step: int = 1 if index > current_car_index else -1
+	var step: int = 1 if _lineup.find(index) > _lineup.find(current_car_index) else -1
 	current_car_index = index
 	update_car_selection()
 	_play_swap(step)
@@ -496,11 +508,12 @@ func show_for_player(player_num: int):
 	player_slot = player_num
 	if player_num == 2:
 		# Start player 2 on the first car, so the two don't end up on the same one by accident.
-		current_car_index = 0
+		current_car_index = CarCollection.lineup()[0]
 	else:
 		var config := ConfigFile.new()
 		if config.load("user://settings.cfg") == OK:
 			current_car_index = clampi(int(config.get_value("player", "car_index", 0)), 0, CAR_PRESETS.size() - 1)
+	_refresh_lineup()
 	update_car_selection()
 	show()
 	_set_title("PLAYER %d — SELECT YOUR CAR" % player_num)
@@ -1042,7 +1055,25 @@ func _build_bottom_bar() -> void:
 	_reel.add_theme_constant_override("separation", 3)
 	_reel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_reel_window.add_child(_reel)
-	for k in CAR_PRESETS.size():
+	strip.add_child(_arrow_button("›", _on_next_pressed))
+	var hint := _label("‹ ›  change car      drag  rotate      Enter  confirm      Esc  back", 15, Color(COL_DIM, 0.75))
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	mid.add_child(hint)
+
+
+## Re-reads the line-up and lays its names on the reel, and moves the car on show into it (to the first
+## car of the line-up) if the garage took it out.
+func _refresh_lineup() -> void:
+	var lineup: Array = CarCollection.lineup()
+	if not lineup.has(current_car_index):
+		current_car_index = lineup[0]
+	if lineup == _lineup:
+		return
+	_lineup = lineup
+	for pill in _pills:
+		pill.queue_free()
+	_pills.clear()
+	for k in _lineup:
 		var pill := Button.new()
 		pill.text = str(CAR_PRESETS[k].name).to_upper()
 		pill.focus_mode = Control.FOCUS_NONE
@@ -1053,10 +1084,6 @@ func _build_bottom_bar() -> void:
 		pill.pressed.connect(_select_car.bind(k))
 		_reel.add_child(pill)
 		_pills.append(pill)
-	strip.add_child(_arrow_button("›", _on_next_pressed))
-	var hint := _label("‹ ›  change car      drag  rotate      Enter  confirm      Esc  back", 15, Color(COL_DIM, 0.75))
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	mid.add_child(hint)
 
 
 ## Slides the line-up so the car on show sits in the middle of the window, though never so far
@@ -1072,9 +1099,10 @@ func _place_reel(animate: bool) -> void:
 	if full.x > win.x - 2.0 * REEL_FADE:
 		var sep: float = _reel.get_theme_constant("separation")
 		var mid := 0.0
-		for k in current_car_index:
+		var at: int = maxi(_lineup.find(current_car_index), 0)
+		for k in at:
 			mid += _pills[k].get_combined_minimum_size().x + sep
-		mid += _pills[current_car_index].get_combined_minimum_size().x * 0.5
+		mid += _pills[at].get_combined_minimum_size().x * 0.5
 		x = clampf(win.x * 0.5 - mid, win.x - REEL_FADE - full.x, REEL_FADE)
 	if _reel_tween:
 		_reel_tween.kill()
@@ -1114,7 +1142,7 @@ func _apply_accent(accent: Color) -> void:
 		_confirm_btn.add_theme_color_override(state, ink)
 	for k in _pills.size():
 		var pill: Button = _pills[k]
-		var on: bool = k == current_car_index
+		var on: bool = _lineup[k] == current_car_index
 		var pb := StyleBoxFlat.new()
 		pb.bg_color = Color(accent, 0.22) if on else Color(0, 0, 0, 0)
 		pb.set_corner_radius_all(6)

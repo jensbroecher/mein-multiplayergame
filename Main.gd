@@ -8,6 +8,8 @@ const PODIUM_SCENE = preload("res://Podium.tscn")
 const SCREEN_TRANSITION_SCRIPT = preload("res://ScreenTransition.gd")
 const SPLASH_SCREEN_SCENE = preload("res://SplashScreen.tscn")
 const SPLASH_SCREEN_SCRIPT = preload("res://SplashScreen.gd")
+const GARAGE_SCRIPT = preload("res://Garage.gd")
+const Trophies = preload("res://Trophies.gd")
 
 @onready var lobby = $Lobby
 @onready var main_menu = $MainMenu
@@ -18,6 +20,7 @@ var pause_menu
 var loading_screen
 var screen_transition: CanvasLayer
 var podium: Control
+var garage: Control
 
 var _coop_p1_car: int = 0
 var _coop_selecting_p2: bool = false
@@ -30,6 +33,7 @@ func _ready():
 	_apply_platform_performance()
 	main_menu.start_pressed.connect(_on_menu_start_pressed)
 	main_menu.options_pressed.connect(_on_menu_options_pressed)
+	main_menu.garage_pressed.connect(_on_menu_garage_pressed)
 	main_menu.quit_pressed.connect(_on_menu_quit_pressed)
 	car_selection.car_selected.connect(_on_car_selected)
 	car_selection.back_requested.connect(_on_car_selection_back)
@@ -127,6 +131,36 @@ func _on_menu_options_pressed():
 	await _swipe(func():
 		main_menu.hide()
 		configuration_menu.show())
+
+
+## The garage (Garage.gd): built under the loading screen, since it loads every car, then handed the
+## mouse. Back out of it and a swipe returns to the menu.
+func _on_menu_garage_pressed() -> void:
+	if screen_transition.busy or garage != null:
+		return
+	await _show_loading("Opening the garage")
+	main_menu.hide()
+	garage = GARAGE_SCRIPT.new()
+	garage.name = "Garage"
+	garage.finished.connect(_on_garage_finished)
+	add_child(garage)
+	# New shaders compile in the background and draw nothing until they are ready.
+	for _i in range(45):
+		await get_tree().process_frame
+	await _hide_loading()
+	if garage != null:
+		garage.start()
+
+
+func _on_garage_finished() -> void:
+	# Left straight away, the swipe that revealed it may still be running: a second one would be dropped.
+	while screen_transition.busy:
+		await get_tree().process_frame
+	await _swipe(func():
+		if garage != null:
+			garage.queue_free()
+			garage = null
+		main_menu.show())
 
 
 func _on_options_back_pressed() -> void:
@@ -248,6 +282,7 @@ func start_game(is_host: bool):
 		if NetworkManager.multiplayer_mode == NetworkManager.MultiplayerMode.GRAND_PRIX:
 			NetworkManager.current_gp_name = NetworkManager.selected_mp_cup
 			NetworkManager.current_gp_stage = 0
+			NetworkManager.gp_trophy_eligible = true
 			var gp_data = NetworkManager.get_gp_cup(NetworkManager.selected_mp_cup)
 			if gp_data and gp_data["stages"].size() > 0:
 				status = "Loading GP stage 1"
@@ -389,6 +424,8 @@ func _show_gp_podium_impl(cup_name: String, ranking: Array) -> void:
 	podium.setup(cup_name, ranking)
 	podium.finished.connect(_on_podium_finished)
 	add_child(podium)
+	if NetworkManager.gp_trophy_eligible:
+		Trophies.record_gp(cup_name, ranking, podium.local_names())
 	# New shaders compile in the background and draw nothing until they are ready: let that happen
 	# under the loading screen.
 	for _i in range(45):
@@ -554,6 +591,9 @@ func _on_server_disconnected():
 
 func _return_to_menu_now():
 	_free_podium()
+	if garage != null and is_instance_valid(garage):
+		garage.queue_free()
+	garage = null
 	# Don't free mid-callback from a level UI without deferring.
 	if _level_swap_in_progress:
 		# Still tear down; swap flag will clear after.

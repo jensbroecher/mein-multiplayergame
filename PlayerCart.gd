@@ -598,6 +598,25 @@ static var _dust_radial_texture: Texture2D = null
 var offroad_penalty: float = 1.0
 var offroad_target_penalty: float = 1.0
 var offroad_timer: float = 0.0
+## Slipstream: close behind a cart going the same way, both quick, a cart's top speed rises by up
+## to SLIPSTREAM_GAIN and its pull by SLIPSTREAM_PULL. Nothing shows it. Checked every
+## SLIPSTREAM_CHECK (staggered per cart) by carts this peer drives, so it costs a few dot products.
+const SLIPSTREAM_RANGE := 26.0
+const SLIPSTREAM_MIN_GAP := 1.5
+## Half width of the wake: SLIPSTREAM_WIDTH right behind the car ahead, widening with the gap.
+const SLIPSTREAM_WIDTH := 1.3
+const SLIPSTREAM_WIDEN := 0.05
+const SLIPSTREAM_MIN_SPEED := 18.0
+const SLIPSTREAM_GAIN := 0.06
+const SLIPSTREAM_PULL := 0.3
+const SLIPSTREAM_CHECK := 0.2
+## Per second: the draft builds over about a second and fades a little slower once out of the wake.
+const SLIPSTREAM_RISE := 1.2
+const SLIPSTREAM_FALL := 0.8
+## 0..1, eased toward _draft_target.
+var _draft: float = 0.0
+var _draft_target: float = 0.0
+var _draft_check: float = 0.0
 var is_offroad: bool = false
 ## Set by _is_track_surface: the terrain it was last asked about lies in a road gap (or its tapers)
 ## within the road's width, the level's own gap ground (Surfaces.of_road_gap).
@@ -854,6 +873,42 @@ func _update_name_tag_scale(mode: int) -> void:
 
 func has_physics_authority() -> bool:
 	return is_local_player or (is_ai and (multiplayer.multiplayer_peer == null or is_multiplayer_authority()))
+
+
+## Eases _draft toward how deep in another cart's wake this one is: within SLIPSTREAM_RANGE behind it,
+## inside a wake that widens with the gap, both carts going the same way above SLIPSTREAM_MIN_SPEED.
+## Deeper the closer it follows. Looked up every SLIPSTREAM_CHECK, offset per cart so they spread out.
+func _update_slipstream(delta: float) -> void:
+	_draft_check -= delta
+	if _draft_check <= 0.0:
+		_draft_check = SLIPSTREAM_CHECK + float(get_instance_id() % 7) * 0.004
+		_draft_target = 0.0
+		var vel := Vector3(linear_velocity.x, 0.0, linear_velocity.z)
+		var speed: float = vel.length()
+		if speed > SLIPSTREAM_MIN_SPEED and not is_boosting and not is_pad_boosting:
+			var dir: Vector3 = vel / speed
+			for c in get_tree().get_nodes_in_group("player_carts"):
+				if c == self or not (c is RigidBody3D):
+					continue
+				var other := c as RigidBody3D
+				var ov := Vector3(other.linear_velocity.x, 0.0, other.linear_velocity.z)
+				var os: float = ov.length()
+				if os < SLIPSTREAM_MIN_SPEED or ov.dot(dir) < os * 0.9:
+					continue
+				var to: Vector3 = other.global_position - global_position
+				if absf(to.y) > 3.0:
+					continue
+				var gap: float = to.x * dir.x + to.z * dir.z
+				if gap < SLIPSTREAM_MIN_GAP or gap > SLIPSTREAM_RANGE:
+					continue
+				var side: float = absf(to.x * dir.z - to.z * dir.x)
+				var width: float = SLIPSTREAM_WIDTH + SLIPSTREAM_WIDEN * gap
+				if side > width:
+					continue
+				var depth: float = (1.0 - gap / SLIPSTREAM_RANGE) * (1.0 - side / width * 0.6)
+				_draft_target = maxf(_draft_target, clampf(depth * 1.4, 0.0, 1.0))
+	var rate: float = SLIPSTREAM_RISE if _draft_target > _draft else SLIPSTREAM_FALL
+	_draft = move_toward(_draft, _draft_target, rate * delta)
 
 func on_race_started():
 	race_start_time = Time.get_ticks_msec() / 1000.0
@@ -2584,6 +2639,8 @@ func _physics_process(delta):
 
 	# Handle acceleration/braking even when slightly airborne for better control
 	var current_speed = linear_velocity.dot(fwd)
+	_update_slipstream(delta)
+	var draft_mult: float = 1.0 + SLIPSTREAM_GAIN * _draft
 
 	# Drift mini-boost grace window: triggers boost if player accelerates out of drift within 0.15s
 	if _drift_boost_grace_timer > 0.0:
@@ -2696,6 +2753,7 @@ func _physics_process(delta):
 		if not is_boosting:
 			var input_scale = abs(input_dir.y)
 			var accel_force = acceleration * slow_mult * input_scale * lerpf(1.0, surface_grip, ICE_TRACTION_SHARE)
+			accel_force *= 1.0 + SLIPSTREAM_PULL * _draft
 			if drift_mode:
 				# Power-slide: keep pushing forward while carving through turn
 				accel_force *= 1.15
@@ -2703,7 +2761,7 @@ func _physics_process(delta):
 				var steer_in: float = current_steer * drift_dir
 				if steer_in > 0.0:
 					apply_central_force(right * drift_dir * acceleration * 0.08 * steer_in * mass * input_scale)
-			var speed_cap: float = max_speed * offroad_penalty * slow_mult * input_scale
+			var speed_cap: float = max_speed * offroad_penalty * slow_mult * input_scale * draft_mult
 			if is_offroad and heading_uphill > 0.05:
 				accel_force *= lerpf(1.0, uphill_power_factor, clampf(heading_uphill * 1.5, 0.0, 1.0))
 				speed_cap *= lerpf(1.0, uphill_speed_cap_factor, clampf(heading_uphill * 1.5, 0.0, 1.0))
@@ -2951,7 +3009,7 @@ func _physics_process(delta):
 		linear_velocity -= Vector3(linear_velocity.x, 0.0, linear_velocity.z) * (plough_drag * delta)
 
 	# Dampen speed if exceeding offroad max speed
-	var effective_max = max_speed * offroad_penalty * slow_mult
+	var effective_max = max_speed * offroad_penalty * slow_mult * draft_mult
 	if on_ground and not is_boosting and current_speed > effective_max:
 		var excess_ratio = (current_speed - effective_max) / max_speed
 		apply_central_force(-fwd * excess_ratio * acceleration * 8.0 * mass)

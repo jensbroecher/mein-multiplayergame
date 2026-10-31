@@ -44,6 +44,9 @@ var current_single_stage: String = "res://levels/LakesideLevel.tscn"
 
 var current_gp_name: String = ""
 var current_gp_stage: int = 0
+## Whether the Grand Prix under way started from its first stage, so its podium earns a trophy
+## (Trophies.gd). The menu's GP TEST jumps in at any stage and clears it.
+var gp_trophy_eligible: bool = true
 var gp_standings: Dictionary = {} # racer_name -> points
 var gp_last_pos: Dictionary = {} # racer_name -> finishing place in the latest race (breaks ties on points)
 var time_trial_stage: String = "res://levels/LakesideLevel.tscn"

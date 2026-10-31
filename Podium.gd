@@ -190,6 +190,11 @@ func _on_continue_pressed() -> void:
 	finished.emit()
 
 
+## The names of the players on this machine (what the standings call "you").
+func local_names() -> Array:
+	return _local_names
+
+
 ## Anyone enabled to read the standings as "you": the host's own name, or both split-screen players.
 func _find_local_names() -> Array:
 	var names: Array = []
