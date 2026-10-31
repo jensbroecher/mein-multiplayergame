@@ -4,16 +4,21 @@ extends Control
 ## won (Trophies.gd). Built in code, in its own world in a SubViewport, like the podium; Main.gd adds it
 ## from the main menu (GARAGE), calls start() once the loading screen has gone, and frees it on `finished`.
 ##
-## The hall, looking down it from the door: the foyer with the player's own car on a turntable, then the
-## concourse, with a gallery per category (CarCollection.galleries()) off either side, in pairs, and the
-## trophy hall at its end. A gallery's cars stand in two rows either side of its aisle, angled toward the
-## way in, each on a two-post lift, with a lectern and a spotlight. More cars lengthen the galleries and
-## more categories the concourse, so the hall grows with the collection.
+## Everything is at life size except the cars, which are large-scale RC cars: on the courses people and
+## props stand at 1.6 times life size beside the cars (PROP_SCALE), so here a car is its race size over 1.6
+## (SHOW_SCALE), about 1.4m long. Each stands on a plinth on a two-post lift of its own size.
 ##
-## A car in the line-up has its bay's floor rim lit in its gallery's colour and its spotlight up; one left
-## out stands in a dimmer light with a grey rim. Look at a car (within REACH) and press E to put it in or
-## take it out (the last one stays), F to lift it: it goes up on the lift and the camera orbits it, from
-## any side and from under it, until F or Esc lowers it again.
+## The hall, looking down it from the entrance doors (glass, locked: a forecourt, a road and a lawn under the
+## sky outside): the foyer with the player's own car on a turntable, then the concourse under a glass gable
+## roof (the sky's sun lights only what is on SUN_LAYER), with a gallery per category
+## (CarCollection.galleries()) off either side in pairs, and the trophy hall at its end. A gallery's cars
+## stand in two rows either side of its aisle, angled toward the way in, each with a placard and a
+## spotlight. More cars lengthen the galleries and more categories the concourse.
+##
+## A car in the line-up has its plinth's band lit in its gallery's colour and its spotlight up; one left out
+## stands in a dimmer light with a grey band. Look at a car (within REACH) and press E to put it in or take
+## it out (the last one stays), F to lift it: it goes up on the lift and the camera orbits it, from any side
+## and from under it, until F or Esc lowers it again.
 ##
 ## Controls: WASD or the left stick walk, Shift or a pressed left stick runs, the mouse or the right stick
 ## looks; E or the pad's A, F or Y; Esc or B leaves (from an inspection, back to walking). In an
@@ -25,70 +30,81 @@ const CarPaint = preload("res://CarPaint.gd")
 const CarCollection = preload("res://CarCollection.gd")
 const Trophies = preload("res://Trophies.gd")
 const PodiumScript = preload("res://Podium.gd")
+const LogoFlag = preload("res://LogoFlag.gd")
 const CAR_PRESETS = preload("res://PlayerCart.gd").CAR_PRESETS
 const CAR_ACCENTS = preload("res://CarSelection.gd").CAR_ACCENTS
 ## The car select screen's copy of the presets, which has each car's description.
 const SELECT_PRESETS = preload("res://CarSelection.gd").CAR_PRESETS
-const SKY_SHADER = preload("res://showroom_sky.gdshader")
+const SKY_SHADER = preload("res://garage_sky.gdshader")
 const FLOOR_SHADER = preload("res://garage_floor.gdshader")
 const LOGO_PATH := "res://generated/logo/RcVibeLogo.tscn"
 
-## What PlayerCart scales a car's scene by, and how much bigger than that the cars stand here: about a
-## road car's 4m, so the hall reads as a car collection at the walker's eye height.
+## What PlayerCart scales a car's scene by, and the share of that the cars stand at here: the courses'
+## people are 1.6 times life size (PROP_SCALE), this hall's are life size.
 const CAR_SCALE := 2.0
-const SHOW_SCALE := 1.8
+const SHOW_SCALE := 1.0 / 1.6
 
-# The hall, in metres. The concourse runs from the door (ENTRANCE_Z) toward -z, x within SPINE_HALF.
-const WALL_H := 7.0
+# The hall, in metres. The concourse runs from the entrance (ENTRANCE_Z) toward -z, x within SPINE_HALF.
+const WALL_H := 5.0
+## The concourse's roof ridge, and the walls that close its gable ends (entrance, trophy hall).
+const RIDGE_H := 7.0
+const TALL_H := 7.4
 const WALL_T := 0.4
-const WAINSCOT := 1.1
-const SPINE_HALF := 6.0
+const WAINSCOT := 1.0
+const SPINE_HALF := 4.5
 const ENTRANCE_Z := 4.0
-## From the door to the first pair of galleries.
-const FOYER := 14.0
-## A gallery's inside along the concourse, and the pitch of the pairs (a 2m pier between them).
-const GALLERY_W := 16.0
-const SLOT := 18.0
-const DOOR_W := 8.0
-const DOOR_H := 4.8
+## From the entrance to the first pair of galleries.
+const FOYER := 9.0
+## A gallery's inside along the concourse, and the pitch of the pairs (a 1.5m pier between them).
+const GALLERY_W := 11.0
+const SLOT := 12.5
+const DOOR_W := 5.0
+const DOOR_H := 3.3
 ## Along a gallery: from the concourse wall to the first cars, between cars, after the last.
-const G_ENTRY := 6.5
-const BAY := 7.6
-const G_END := 5.5
+const G_ENTRY := 3.4
+const BAY := 3.7
+const G_END := 2.8
 ## A car's middle off its gallery's aisle, and how far it is turned from facing straight across toward the
 ## way in.
-const BAY_SIDE := 4.4
+const BAY_SIDE := 2.75
 const CAR_TURN := 0.52
-const HALL_HALF := 13.0
-const HALL_D := 24.0
-const TROPHY_RING := 8.0
-const PEDESTAL_H := 1.3
+const HALL_HALF := 9.0
+const HALL_D := 16.0
+const TROPHY_RING := 5.6
+const PEDESTAL_H := 1.2
+## The entrance doors' opening in the entrance wall.
+const ENTRY_HALF := 1.6
+const ENTRY_H := 3.3
+## The sun lights only what is on this render layer as well: the concourse, the foyer and the outside, so it
+## never reaches into the galleries through their roofs when shadows are off.
+const SUN_LAYER := 2
 
-# The lifts.
-const POST_GAP := 0.45
-const POST_H := 3.3
-const LIFT_HEIGHT := 2.0
-const LIFT_TIME := 3.2
-## The pads' top over the carriage's foot, and the carriage's foot at rest (the arms on the dais). A car
+# The plinths and lifts, at the cars' size.
+const DAIS_H := 0.7
+const POST_GAP := 0.16
+const LIFT_HEIGHT := 0.95
+const LIFT_TIME := 3.0
+## The pads' top over the carriage's foot, and the carriage's foot at rest (the arms on the plinth). A car
 ## whose underside is lower than the pads at rest just rests on its wheels over them.
-const PAD_TOP := 0.17
-const LIFT_REST := 0.05
+const PAD_TOP := 0.075
+const LIFT_REST := 0.015
+const CARRIAGE_H := 0.17
 
 # Walking and looking.
 const EYE := 1.7
-const WALK_SPEED := 3.4
-const RUN_SPEED := 6.5
+const WALK_SPEED := 3.0
+const RUN_SPEED := 5.5
 const MOVE_RATE := 10.0
 const MOUSE_LOOK := 0.0022
 const STICK_LOOK := 2.4
 const STICK_DEADZONE := 0.18
 const PITCH_LIMIT := 1.35
-const REACH := 7.5
+const REACH := 4.5
 const AIM_CONE := 0.5
 
 # Inspecting.
-const ORBIT_MIN := 3.2
-const ORBIT_MAX := 11.0
+const ORBIT_MIN := 1.3
+const ORBIT_MAX := 5.0
 const ORBIT_RATE := 10.0
 const ORBIT_PITCH_MIN := -1.1
 const ORBIT_PITCH_MAX := 1.3
@@ -137,7 +153,6 @@ var _blend := 1.0                            # 0..1: eye to orbit camera (and ba
 var _blend_from: Transform3D
 var _leaving := false
 var _pad := false
-var _area := ""
 var _time := 0.0
 
 var _mats := {}
@@ -152,9 +167,6 @@ var _prompt_desc: Label
 var _prompt_keys: Label
 var _toast: Label
 var _toast_tween: Tween
-var _banner: Label
-var _banner_sub: Label
-var _banner_tween: Tween
 var _hint: Label
 
 
@@ -165,6 +177,8 @@ func _ready() -> void:
 	_make_fonts()
 	_build_stage()
 	_build_hall()
+	_build_roof()
+	_build_entrance()
 	_build_featured()
 	_build_trophies()
 	_build_player()
@@ -196,7 +210,6 @@ func _process(delta: float) -> void:
 		_player.rotation.y = _yaw
 		_head.rotation.x = _pitch
 		_update_target()
-		_update_area()
 	else:
 		_orbit_goal.y -= look.x * STICK_LOOK * delta
 		_orbit_goal.x = clampf(_orbit_goal.x + look.y * STICK_LOOK * 0.75 * delta, ORBIT_PITCH_MIN, ORBIT_PITCH_MAX)
@@ -207,7 +220,7 @@ func _process(delta: float) -> void:
 			zoom += 1.0
 		if Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN):
 			zoom -= 1.0
-		_orbit_goal.z = clampf(_orbit_goal.z - zoom * 5.0 * delta, ORBIT_MIN, ORBIT_MAX)
+		_orbit_goal.z = clampf(_orbit_goal.z - zoom * 2.5 * delta, ORBIT_MIN, ORBIT_MAX)
 	_update_camera(delta)
 
 
@@ -261,9 +274,9 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and _mode == Mode.INSPECT:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
-			_orbit_goal.z = maxf(ORBIT_MIN, _orbit_goal.z - 0.5)
+			_orbit_goal.z = maxf(ORBIT_MIN, _orbit_goal.z - 0.25)
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			_orbit_goal.z = minf(ORBIT_MAX, _orbit_goal.z + 0.5)
+			_orbit_goal.z = minf(ORBIT_MAX, _orbit_goal.z + 0.25)
 	var lineup_key := false
 	var lift_key := false
 	var back_key := false
@@ -388,7 +401,7 @@ func _show_lineup_state(i: int, animate: bool) -> void:
 	var col: Color = bay["color"]
 	var rim: StandardMaterial3D = bay["rim_mat"]
 	var spot: SpotLight3D = bay["spot"]
-	var energy: float = 11.0 if on else 3.2
+	var energy: float = 5.0 if on else 1.4
 	var rim_col: Color = col if on else COL_OFF
 	var rim_energy: float = 2.6 if on else 0.35
 	if animate:
@@ -421,11 +434,11 @@ func _pose_lift(bay: Dictionary) -> void:
 	var rest: float = LIFT_REST
 	var top: float = float(bay["contact"]) - PAD_TOP + LIFT_HEIGHT
 	var cy: float = lerpf(rest, top, t)
-	(bay["carriage"] as Node3D).position.y = cy
+	(bay["carriage"] as Node3D).position.y = float(bay["car_y"]) + cy
 	var raise: float = maxf(0.0, cy + PAD_TOP - float(bay["contact"]))
 	(bay["car"] as Node3D).position.y = float(bay["car_y"]) + raise
 	var lamp: OmniLight3D = bay["lamp"]
-	lamp.light_energy = 1.6 * clampf(raise / LIFT_HEIGHT, 0.0, 1.0)
+	lamp.light_energy = 0.7 * clampf(raise / LIFT_HEIGHT, 0.0, 1.0)
 	lamp.visible = lamp.light_energy > 0.01
 
 
@@ -438,7 +451,7 @@ func _begin_inspect(i: int) -> void:
 	# Start the orbit where the player stands, so the camera only has to swing up and out a little.
 	var c: Vector3 = _bay_centre(i)
 	var from: Vector3 = _eye_cam.global_position - c
-	_orbit_goal = Vector3(0.28, atan2(from.x, from.z), clampf(Vector2(from.x, from.z).length() + 1.0, 5.5, 8.0))
+	_orbit_goal = Vector3(0.28, atan2(from.x, from.z), clampf(Vector2(from.x, from.z).length() + 0.4, 2.4, 3.4))
 	_orbit_pitch = clampf(asin(clampf(from.y / maxf(from.length(), 0.01), -1.0, 1.0)), ORBIT_PITCH_MIN, ORBIT_PITCH_MAX)
 	_orbit_yaw = _orbit_goal.y
 	_orbit_dist = from.length()
@@ -482,16 +495,18 @@ func _update_camera(delta: float) -> void:
 	var c: Vector3 = _bay_centre(_inspected)
 	var dir := Vector3(sin(_orbit_yaw) * cos(_orbit_pitch), sin(_orbit_pitch), cos(_orbit_yaw) * cos(_orbit_pitch))
 	var dist := _orbit_dist
-	# Never through the floor: shorten the arm when it points down.
+	# Never into the plinth: shorten the arm when it points down, so the camera stays over the plinth's
+	# top, under the lifted car.
+	var low: float = (_bays[_inspected]["root"] as Node3D).global_position.y + DAIS_H + 0.15
 	if dir.y < -0.01:
-		dist = minf(dist, (c.y - 0.35) / -dir.y)
+		dist = minf(dist, (c.y - low) / -dir.y)
 	var q := PhysicsRayQueryParameters3D.create(c, c + dir * (dist + 0.4))
 	q.collision_mask = 1
 	q.exclude = [_player.get_rid()]
 	var hit: Dictionary = _world.get_world_3d().direct_space_state.intersect_ray(q)
 	if not hit.is_empty() and hit["collider"] == _walls:
-		dist = minf(dist, c.distance_to(hit["position"]) - 0.4)
-	dist = maxf(dist, 1.2)
+		dist = minf(dist, c.distance_to(hit["position"]) - 0.3)
+	dist = maxf(dist, 0.5)
 	var pos := c + dir * dist
 	var goal := Transform3D(Basis.looking_at(c - pos, Vector3.UP), pos)
 	_orbit_cam.global_transform = _blend_from.interpolate_with(goal, w) if _blend < 1.0 else goal
@@ -586,22 +601,6 @@ func _build_hud() -> void:
 	_toast.modulate.a = 0.0
 	add_child(_toast)
 
-	var banner := VBoxContainer.new()
-	banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	banner.offset_left = -600
-	banner.offset_right = 600
-	banner.offset_top = 120
-	banner.offset_bottom = 230
-	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(banner)
-	_banner = _label("", 54, COL_TEXT, _font_title)
-	_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	banner.add_child(_banner)
-	_banner_sub = _label("", 20, COL_DIM, _font_bold)
-	_banner_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	banner.add_child(_banner_sub)
-	banner.modulate.a = 0.0
-
 	_hint = _label(_hint_text(), 15, Color(COL_DIM, 0.8))
 	_hint.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
 	_hint.offset_left = -900
@@ -678,42 +677,6 @@ func _show_toast(text: String) -> void:
 	_toast_tween.tween_property(_toast, "modulate:a", 0.0, 0.6)
 
 
-## The name of the room the player walks into, faded in and out at the top.
-func _show_banner(title: String, sub: String, color: Color = COL_TEXT) -> void:
-	_banner.text = title
-	_banner.add_theme_color_override("font_color", color)
-	_banner_sub.text = sub
-	var box: Control = _banner.get_parent()
-	if _banner_tween:
-		_banner_tween.kill()
-	_banner_tween = create_tween()
-	_banner_tween.tween_property(box, "modulate:a", 1.0, 0.5)
-	_banner_tween.tween_interval(2.2)
-	_banner_tween.tween_property(box, "modulate:a", 0.0, 0.9)
-
-
-func _update_area() -> void:
-	var p := Vector2(_player.global_position.x, _player.global_position.z)
-	var area := "spine"
-	for r in _rooms:
-		if (r["rect"] as Rect2).has_point(p):
-			area = r["name"]
-			if area != _area:
-				var n: int = (r["cars"] as Array).size()
-				var in_line := 0
-				for idx in r["cars"]:
-					if CarCollection.in_lineup(idx):
-						in_line += 1
-				_show_banner(str(r["name"]).to_upper(), "%d cars  ·  %d in the line-up" % [n, in_line],
-						(r["color"] as Color).lightened(0.25))
-			break
-	if area == "spine" and p.y < _spine_end:
-		area = "hall"
-		if area != _area:
-			_show_banner("HALL OF FAME", "Your Grand Prix trophies", COL_GOLD)
-	_area = area
-
-
 # ============================================================================================
 #  The stage
 # ============================================================================================
@@ -737,10 +700,9 @@ func _build_stage() -> void:
 	_world.name = "World"
 	_stage.add_child(_world)
 
-	# The studio sky lights and reflects (soft boxes in the paint) but is never seen: the hall is closed.
+	# garage_sky.gdshader: a summer sky where it is seen (the roof, the doors), the studio in the reflections.
 	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.02, 0.022, 0.028)
+	env.background_mode = Environment.BG_SKY
 	var sky := Sky.new()
 	var sky_mat := ShaderMaterial.new()
 	sky_mat.shader = SKY_SHADER
@@ -759,18 +721,31 @@ func _build_stage() -> void:
 	we.environment = env
 	_world.add_child(we)
 
+	# The sun, high behind the entrance and straight down the concourse, so it falls on its floor and never
+	# on the walls between it and the galleries; it lights only SUN_LAYER.
+	var sun := DirectionalLight3D.new()
+	sun.name = "Sun"
+	sun.rotation = Vector3(deg_to_rad(-56.0), 0.0, 0.0)
+	sun.light_energy = 1.5
+	sun.light_color = Color(1.0, 0.95, 0.86)
+	sun.light_cull_mask = 1 << (SUN_LAYER - 1)
+	sun.shadow_enabled = MusicManager.shadow_quality_index > 0 and not OS.has_feature("mobile")
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+	sun.directional_shadow_max_distance = 60.0
+	_world.add_child(sun)
+
 	_walls = StaticBody3D.new()
 	_walls.name = "Walls"
 	_world.add_child(_walls)
 
 
-func _mat(key: String) -> StandardMaterial3D:
+func _mat(key: String) -> Material:
 	if _mats.has(key):
 		return _mats[key]
 	var m := StandardMaterial3D.new()
 	match key:
 		"wall":
-			m.albedo_color = Color(0.5, 0.49, 0.47)
+			m.albedo_color = Color(0.64, 0.63, 0.6)
 			m.roughness = 0.85
 		"wainscot":
 			m.albedo_color = Color(0.13, 0.14, 0.16)
@@ -794,6 +769,9 @@ func _mat(key: String) -> StandardMaterial3D:
 			m.albedo_color = Color(0.07, 0.075, 0.085)
 			m.metallic = 0.3
 			m.roughness = 0.3
+		"board":
+			m.albedo_color = Color(0.05, 0.055, 0.065)
+			m.roughness = 0.45
 		"lectern":
 			m.albedo_color = Color(0.11, 0.12, 0.14)
 			m.metallic = 0.5
@@ -802,16 +780,65 @@ func _mat(key: String) -> StandardMaterial3D:
 			m.albedo_color = Color(0.09, 0.09, 0.1)
 			m.metallic = 0.1
 			m.roughness = 0.18
+		"steel":
+			m.albedo_color = Color(0.86, 0.87, 0.89)
+			m.metallic = 0.3
+			m.roughness = 0.45
+		"alu":
+			m.albedo_color = Color(0.13, 0.14, 0.16)
+			m.metallic = 0.7
+			m.roughness = 0.32
+		"chrome":
+			m.albedo_color = Color(0.9, 0.9, 0.92)
+			m.metallic = 1.0
+			m.roughness = 0.12
 		"glass":
 			m.albedo_color = Color(0.75, 0.85, 0.95, 0.10)
 			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			m.metallic = 0.2
 			m.roughness = 0.04
 			m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		"roof_glass":
+			m.albedo_color = Color(0.8, 0.9, 0.95, 0.07)
+			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			m.roughness = 0.05
+			m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		"door_glass":
+			m.albedo_color = Color(0.7, 0.85, 0.85, 0.16)
+			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			m.roughness = 0.04
+			m.cull_mode = BaseMaterial3D.CULL_DISABLED
 		"ghost":
 			m.albedo_color = Color(0.25, 0.27, 0.3, 0.35)
 			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			m.roughness = 0.5
+		"asphalt":
+			m.albedo_color = Color(0.11, 0.115, 0.12)
+			m.roughness = 0.92
+		"curb":
+			m.albedo_color = Color(0.62, 0.61, 0.58)
+			m.roughness = 0.85
+		"lawn":
+			m.albedo_color = Color(0.2, 0.34, 0.12)
+			m.roughness = 1.0
+		"hedge":
+			m.albedo_color = Color(0.12, 0.26, 0.09)
+			m.roughness = 1.0
+		"bark":
+			m.albedo_color = Color(0.25, 0.19, 0.14)
+			m.roughness = 1.0
+		"leaves":
+			m.albedo_color = Color(0.17, 0.33, 0.12)
+			m.roughness = 1.0
+		"floor", "paving":
+			var fm := ShaderMaterial.new()
+			fm.shader = FLOOR_SHADER
+			if key == "paving":
+				fm.set_shader_parameter("base_color", Color(0.46, 0.45, 0.42))
+				fm.set_shader_parameter("slab", 1.2)
+				fm.set_shader_parameter("gloss", 0.6)
+			_mats[key] = fm
+			return fm
 	_mats[key] = m
 	return m
 
@@ -839,7 +866,28 @@ func _box(parent: Node3D, a: Vector3, b: Vector3, mat: Material, shadow := true)
 	return mi
 
 
-## A collision box on the walls' body, in world coordinates.
+## A beam `w` wide and `h` deep from `a` to `b`.
+func _beam(parent: Node3D, a: Vector3, b: Vector3, w: float, h: float, mat: Material) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(w, h, a.distance_to(b))
+	mi.mesh = bm
+	mi.material_override = mat
+	mi.transform = Transform3D(Basis.looking_at(b - a, Vector3.UP), (a + b) * 0.5)
+	parent.add_child(mi)
+	return mi
+
+
+## Lets the sun light `node` and everything drawn under it (SUN_LAYER as well as the first layer).
+func _sunlit(node: Node) -> Node:
+	if node is VisualInstance3D:
+		(node as VisualInstance3D).layers = 1 | (1 << (SUN_LAYER - 1))
+	for c in node.get_children(true):
+		_sunlit(c)
+	return node
+
+
+## A collision box on the walls' body (or `body`), in world coordinates (or the body's).
 func _solid(a: Vector3, b: Vector3, body: StaticBody3D = null) -> void:
 	var cs := CollisionShape3D.new()
 	var shape := BoxShape3D.new()
@@ -849,28 +897,57 @@ func _solid(a: Vector3, b: Vector3, body: StaticBody3D = null) -> void:
 	(body if body else _walls).add_child(cs)
 
 
-func _text(parent: Node3D, text: String, size: int, color: Color, pos: Vector3, yaw: float,
-		pixel := 0.01, font: Font = null) -> Label3D:
+## Text `height` metres tall (a line), facing +z of its frame at `pos`, made smaller if it would be wider than
+## `max_w`.
+func _text(parent: Node3D, text: String, height: float, color: Color, pos: Vector3, max_w := 0.0,
+		font: Font = null) -> Label3D:
 	var l := Label3D.new()
 	l.text = text
-	l.font_size = size
+	l.font_size = 128
+	l.font = font if font else _font_title
+	var pixel: float = height / 128.0
+	if max_w > 0.0:
+		var w: float = l.font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 128).x * pixel
+		if w > max_w:
+			pixel *= max_w / w
 	l.pixel_size = pixel
 	l.modulate = color
 	l.outline_size = 0
-	l.font = font if font else _font_title
 	l.shaded = false
 	l.double_sided = false
 	l.position = pos
-	l.rotation.y = yaw
 	l.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	parent.add_child(l)
 	return l
 
 
-## A wall along x (at `z`) or along z (at `x`), from `from` to `to` along it, with openings ([a, b] along
-## it, a lintel over each from DOOR_H). Cut into pieces of at most 8m, so no piece takes in more lights than
-## the mobile renderer gives a mesh, and the dark wainscot is its own box under the plaster.
-func _wall(along_x: bool, at: float, from: float, to: float, openings: Array = []) -> void:
+## A sign: a dark board `size` (width, height) metres, its back on the plane through `pos` and facing +z
+## turned by `yaw`, the title fitted to its width (with `sub` under it if any) and a band of `band` light
+## along its foot.
+func _sign(pos: Vector3, yaw: float, size: Vector2, title: String, color: Color, sub := "", band := Color(0, 0, 0, 0)) -> Node3D:
+	var root := Node3D.new()
+	root.position = pos
+	root.rotation.y = yaw
+	_world.add_child(root)
+	var hw: float = size.x * 0.5
+	var hh: float = size.y * 0.5
+	_box(root, Vector3(-hw, -hh, 0.0), Vector3(hw, hh, 0.06), _mat("board"), false)
+	var text_w: float = size.x - 0.4
+	if sub == "":
+		_text(root, title, size.y * 0.62, color, Vector3(0.0, 0.03 * size.y, 0.075), text_w)
+	else:
+		_text(root, title, size.y * 0.48, color, Vector3(0.0, 0.14 * size.y, 0.075), text_w)
+		_text(root, sub, size.y * 0.2, COL_DIM, Vector3(0.0, -0.27 * size.y, 0.075), text_w, _font_bold)
+	if band.a > 0.0:
+		_box(root, Vector3(-hw, -hh, 0.06), Vector3(hw, -hh + 0.035, 0.075), _glow_mat(band, 2.2), false)
+	return root
+
+
+## A wall along x (at `z`) or along z (at `x`), from `from` to `to` along it, `height` tall, with openings
+## (Vector3: from, to along it and the top; a lintel over each). Cut into pieces of at most 8m, so no piece
+## takes in more lights than the mobile renderer gives a mesh, and the dark wainscot is its own box under the
+## plaster.
+func _wall(along_x: bool, at: float, from: float, to: float, openings: Array = [], height := WALL_H, sun := false) -> void:
 	var cuts: Array = [[minf(from, to), maxf(from, to), 0.0]]
 	for o in openings:
 		var next: Array = []
@@ -882,7 +959,7 @@ func _wall(along_x: bool, at: float, from: float, to: float, openings: Array = [
 				continue
 			if o.x > a:
 				next.append([a, o.x, 0.0])
-			next.append([maxf(a, o.x), minf(b, o.y), DOOR_H])
+			next.append([maxf(a, o.x), minf(b, o.y), o.z])
 			if o.y < b:
 				next.append([o.y, b, 0.0])
 		cuts = next
@@ -890,26 +967,28 @@ func _wall(along_x: bool, at: float, from: float, to: float, openings: Array = [
 		var a: float = c[0]
 		var b: float = c[1]
 		var y0: float = c[2]
+		if y0 >= height:
+			continue
 		var n := maxi(1, ceili((b - a) / 8.0))
 		for k in n:
 			var s0: float = lerpf(a, b, float(k) / n)
 			var s1: float = lerpf(a, b, float(k + 1) / n)
 			var lo := Vector3(s0, 0.0, at - WALL_T * 0.5) if along_x else Vector3(at - WALL_T * 0.5, 0.0, s0)
 			var hi := Vector3(s1, 0.0, at + WALL_T * 0.5) if along_x else Vector3(at + WALL_T * 0.5, 0.0, s1)
+			var pieces: Array = []
 			if y0 <= 0.0:
-				_box(_world, Vector3(lo.x, 0.0, lo.z), Vector3(hi.x, WAINSCOT, hi.z), _mat("wainscot"))
-				_box(_world, Vector3(lo.x, WAINSCOT, lo.z), Vector3(hi.x, WALL_H, hi.z), _mat("wall"))
+				pieces.append(_box(_world, Vector3(lo.x, 0.0, lo.z), Vector3(hi.x, WAINSCOT, hi.z), _mat("wainscot")))
+				pieces.append(_box(_world, Vector3(lo.x, WAINSCOT, lo.z), Vector3(hi.x, height, hi.z), _mat("wall")))
 			else:
-				_box(_world, Vector3(lo.x, y0, lo.z), Vector3(hi.x, WALL_H, hi.z), _mat("wall"))
-			_solid(Vector3(lo.x, y0, lo.z), Vector3(hi.x, WALL_H, hi.z))
+				pieces.append(_box(_world, Vector3(lo.x, y0, lo.z), Vector3(hi.x, height, hi.z), _mat("wall")))
+			if sun:
+				for p in pieces:
+					_sunlit(p)
+			_solid(Vector3(lo.x, y0, lo.z), Vector3(hi.x, height, hi.z))
 
 
-## The floor of a room (x0..x1, z0..z1) in tiles of at most 8m, and its ceiling.
-func _room(x0: float, x1: float, z0: float, z1: float) -> void:
-	if not _mats.has("floor"):
-		var fm := ShaderMaterial.new()
-		fm.shader = FLOOR_SHADER
-		_mats["floor"] = fm
+## Floor tiles of at most 8m over x0..x1, z0..z1 in `mat`.
+func _tiles(x0: float, x1: float, z0: float, z1: float, mat: Material, sun := false, y := 0.0) -> void:
 	var nx := maxi(1, ceili((x1 - x0) / 8.0))
 	var nz := maxi(1, ceili((z1 - z0) / 8.0))
 	for i in nx:
@@ -920,11 +999,30 @@ func _room(x0: float, x1: float, z0: float, z1: float) -> void:
 			var pm := PlaneMesh.new()
 			pm.size = b - a
 			mi.mesh = pm
-			mi.position = Vector3((a.x + b.x) * 0.5, 0.0, (a.y + b.y) * 0.5)
-			mi.material_override = _mats["floor"]
+			mi.position = Vector3((a.x + b.x) * 0.5, y, (a.y + b.y) * 0.5)
+			mi.material_override = mat
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			_world.add_child(mi)
-	_box(_world, Vector3(x0, WALL_H, z0), Vector3(x1, WALL_H + 0.3, z1), _mat("ceiling"), false)
+			if sun:
+				_sunlit(mi)
+
+
+## A room's floor and, at `ceiling` (0: none), its ceiling.
+func _room(x0: float, x1: float, z0: float, z1: float, ceiling: float, sun := false) -> void:
+	_tiles(x0, x1, z0, z1, _mat("floor"), sun)
+	if ceiling > 0.0:
+		_box(_world, Vector3(x0, ceiling, z0), Vector3(x1, ceiling + 0.3, z1), _mat("ceiling"), false)
+
+
+func _omni(pos: Vector3, energy: float, reach: float) -> void:
+	var o := OmniLight3D.new()
+	o.position = pos
+	o.light_energy = energy
+	o.omni_range = reach
+	o.omni_attenuation = 1.2
+	o.light_color = Color(1.0, 0.95, 0.88)
+	o.shadow_enabled = false
+	_world.add_child(o)
 
 
 # ============================================================================================
@@ -940,15 +1038,15 @@ func _build_hall() -> void:
 		var g: Dictionary = _galleries[gi]
 		var side: float = -1.0 if gi % 2 == 0 else 1.0
 		var slot: int = gi / 2
-		var z_top: float = -FOYER - slot * SLOT - 1.0
+		var z_top: float = -FOYER - slot * SLOT - (SLOT - GALLERY_W) * 0.5
 		var z_bot: float = z_top - GALLERY_W
 		var zc: float = (z_top + z_bot) * 0.5
 		var cols: int = ceili((g["cars"] as Array).size() / 2.0)
 		var length: float = G_ENTRY + (cols - 1) * BAY + G_END
 		var x_in: float = side * SPINE_HALF
 		var x_out: float = side * (SPINE_HALF + length)
-		(left_doors if side < 0.0 else right_doors).append(Vector2(zc - DOOR_W * 0.5, zc + DOOR_W * 0.5))
-		_room(minf(x_in, x_out), maxf(x_in, x_out), z_bot, z_top)
+		(left_doors if side < 0.0 else right_doors).append(Vector3(zc - DOOR_W * 0.5, zc + DOOR_W * 0.5, DOOR_H))
+		_room(minf(x_in, x_out), maxf(x_in, x_out), z_bot, z_top, WALL_H)
 		_wall(true, z_top, x_in, x_out + side * WALL_T * 0.5)
 		_wall(true, z_bot, x_in, x_out + side * WALL_T * 0.5)
 		_wall(false, x_out, z_bot - WALL_T * 0.5, z_top + WALL_T * 0.5)
@@ -965,34 +1063,34 @@ func _build_hall() -> void:
 			var face := Vector3(-side * sin(CAR_TURN), 0.0, -row * cos(CAR_TURN))
 			_build_bay(cars[j], g, pos, atan2(face.x, face.z))
 
-	# The concourse, its walls with the galleries' doors, the door wall, and the trophy hall.
-	_room(-SPINE_HALF, SPINE_HALF, _spine_end, ENTRANCE_Z)
+	# The concourse (its roof is _build_roof's), its walls with the galleries' doors, the entrance wall
+	# (its doors are _build_entrance's), and the trophy hall, whose front wall closes the roof's gable.
+	_room(-SPINE_HALF, SPINE_HALF, _spine_end, ENTRANCE_Z, 0.0, true)
 	_wall(false, -SPINE_HALF, _spine_end, ENTRANCE_Z, left_doors)
 	_wall(false, SPINE_HALF, _spine_end, ENTRANCE_Z, right_doors)
-	_wall(true, ENTRANCE_Z, -SPINE_HALF - WALL_T * 0.5, SPINE_HALF + WALL_T * 0.5)
+	_wall(true, ENTRANCE_Z, -SPINE_HALF - WALL_T * 0.5, SPINE_HALF + WALL_T * 0.5,
+			[Vector3(-ENTRY_HALF, ENTRY_HALF, ENTRY_H)], TALL_H, true)
 	var hall_back: float = _spine_end - HALL_D
-	_room(-HALL_HALF, HALL_HALF, hall_back, _spine_end)
-	_wall(true, _spine_end, -HALL_HALF - WALL_T * 0.5, HALL_HALF + WALL_T * 0.5, [Vector2(-SPINE_HALF, SPINE_HALF)])
-	_wall(true, hall_back, -HALL_HALF - WALL_T * 0.5, HALL_HALF + WALL_T * 0.5)
-	_wall(false, -HALL_HALF, hall_back, _spine_end)
-	_wall(false, HALL_HALF, hall_back, _spine_end)
-	# The floor's collision, under everything.
-	_solid(Vector3(-200.0, -1.0, hall_back - 10.0), Vector3(200.0, 0.0, ENTRANCE_Z + 10.0))
+	_room(-HALL_HALF, HALL_HALF, hall_back, _spine_end, TALL_H)
+	_wall(true, _spine_end, -HALL_HALF - WALL_T * 0.5, HALL_HALF + WALL_T * 0.5,
+			[Vector3(-SPINE_HALF, SPINE_HALF, WALL_H)], TALL_H, true)
+	_wall(true, hall_back, -HALL_HALF - WALL_T * 0.5, HALL_HALF + WALL_T * 0.5, [], TALL_H)
+	_wall(false, -HALL_HALF, hall_back, _spine_end, [], TALL_H)
+	_wall(false, HALL_HALF, hall_back, _spine_end, [], TALL_H)
+	# The floor's collision, under everything, outside too.
+	_solid(Vector3(-200.0, -1.0, hall_back - 10.0), Vector3(200.0, 0.0, ENTRANCE_Z + 40.0))
 
-	# Light: two strips down the concourse's ceiling and lamps along it.
-	for x in [-3.2, 3.2]:
-		_box(_world, Vector3(x - 0.2, WALL_H - 0.06, _spine_end + 1.0), Vector3(x + 0.2, WALL_H, ENTRANCE_Z - 1.0), _mat("strip"), false)
-	var z := ENTRANCE_Z - 4.0
+	# Lamps along the concourse for the parts the sun doesn't reach.
+	var z := ENTRANCE_Z - 3.0
 	while z > _spine_end:
-		_omni(Vector3(0.0, WALL_H - 1.2, z), 1.1, 13.0)
-		z -= 10.0
-	# The sign: a board across the concourse just before its first pair of doors, hung from the ceiling.
-	_box(_world, Vector3(-SPINE_HALF + 0.6, 4.5, -FOYER - 0.2), Vector3(SPINE_HALF - 0.6, 6.6, -FOYER), _mat("wainscot"), false)
-	_box(_world, Vector3(-SPINE_HALF + 0.6, 4.5, -FOYER + 0.0), Vector3(SPINE_HALF - 0.6, 4.56, -FOYER + 0.02), _glow_mat(COL_GOLD, 1.8), false)
-	for x in [-4.5, 4.5]:
-		_box(_world, Vector3(x - 0.02, 6.6, -FOYER - 0.12), Vector3(x + 0.02, WALL_H, -FOYER - 0.08), _mat("post"), false)
-	_text(_world, "THE COLLECTION", 120, COL_TEXT, Vector3(0.0, 5.85, -FOYER + 0.02), 0.0, 0.01)
-	_text(_world, "RC VIBE GP", 56, COL_GOLD, Vector3(0.0, 4.98, -FOYER + 0.02), 0.0, 0.01, _font_bold)
+		_omni(Vector3(0.0, WALL_H - 0.6, z), 0.6, 10.0)
+		z -= 9.0
+	# The sign hangs across the foyer from the roof, short of the first pair of doors.
+	var sign_z: float = -FOYER + 1.2
+	_sign(Vector3(0.0, 4.25, sign_z), 0.0, Vector2(6.6, 1.3), "THE COLLECTION", COL_TEXT, "RC VIBE GP", COL_GOLD)
+	for x in [-2.6, 2.6]:
+		var roof_y: float = WALL_H + (RIDGE_H - WALL_H) * (1.0 - absf(x) / SPINE_HALF)
+		_box(_world, Vector3(x - 0.015, 4.9, sign_z + 0.015), Vector3(x + 0.015, roof_y, sign_z + 0.045), _mat("alu"), false)
 
 
 ## A gallery's sign over its door, its name on the end wall, a stripe in its colour round its walls, the
@@ -1002,36 +1100,292 @@ func _dress_gallery(g: Dictionary, side: float, x_in: float, x_out: float, z_top
 	var zc: float = (z_top + z_bot) * 0.5
 	var glow := _glow_mat(color, 2.2)
 	var name_up := str(g["name"]).to_upper()
-	# Over the door, on the concourse side, facing across it.
-	var sign_x: float = x_in - side * (WALL_T * 0.5 + 0.02)
-	_text(_world, name_up, 96, color.lightened(0.3), Vector3(sign_x, 5.75, zc), -side * PI * 0.5, 0.01)
-	_text(_world, "%d CARS" % (g["cars"] as Array).size(), 40, COL_DIM, Vector3(sign_x, 5.05, zc), -side * PI * 0.5, 0.01, _font_bold)
-	_box(_world, Vector3(sign_x - 0.02, DOOR_H + 0.04, zc - DOOR_W * 0.5), Vector3(sign_x + 0.02, DOOR_H + 0.12, zc + DOOR_W * 0.5), glow, false)
+	var n: int = (g["cars"] as Array).size()
+	# Over the door on the concourse side, on the lintel.
+	var face_in: float = -side * PI * 0.5
+	_sign(Vector3(x_in - side * WALL_T * 0.5, DOOR_H + 0.85, zc), face_in, Vector2(DOOR_W + 0.2, 1.3),
+			name_up, color.lightened(0.3), "%d CAR%s" % [n, "" if n == 1 else "S"], color)
 	# On the end wall, facing back up the aisle.
-	var end_x: float = x_out - side * (WALL_T * 0.5 + 0.02)
-	_text(_world, name_up, 160, color.lightened(0.25), Vector3(end_x, 4.6, zc), side * -PI * 0.5, 0.01)
-	# A stripe round the inside at 3.1m: along both long walls and the end wall.
-	var y0 := 3.05
-	var y1 := 3.17
+	_sign(Vector3(x_out - side * WALL_T * 0.5, 3.75, zc), face_in,
+			Vector2(minf(GALLERY_W - 3.0, 7.0), 1.3), name_up, color.lightened(0.25), "", color)
+	# A stripe round the inside at 2.6m: along both long walls and the end wall.
+	var y0 := 2.55
+	var y1 := 2.65
 	var t: float = WALL_T * 0.5
+	var end_x: float = x_out - side * (t + 0.015)
 	_box(_world, Vector3(minf(x_in, x_out), y0, z_top - t - 0.03), Vector3(maxf(x_in, x_out), y1, z_top - t), glow, false)
 	_box(_world, Vector3(minf(x_in, x_out), y0, z_bot + t), Vector3(maxf(x_in, x_out), y1, z_bot + t + 0.03), glow, false)
 	_box(_world, Vector3(end_x - 0.015, y0, z_bot + t), Vector3(end_x + 0.015, y1, z_top - t), glow, false)
-	# The aisle's light strip, and a lamp at each end of it for the floor and walls.
-	_box(_world, Vector3(minf(x_in, x_out) + 1.0, WALL_H - 0.06, zc - 0.25), Vector3(maxf(x_in, x_out) - 1.0, WALL_H, zc + 0.25), _mat("strip"), false)
-	_omni(Vector3(lerpf(x_in, x_out, 0.3), WALL_H - 1.0, zc), 0.8, 12.0)
-	_omni(Vector3(lerpf(x_in, x_out, 0.8), WALL_H - 1.0, zc), 0.8, 12.0)
+	# The aisle's light strip, and lamps along it for the floor and walls.
+	_box(_world, Vector3(minf(x_in, x_out) + 1.0, WALL_H - 0.06, zc - 0.2), Vector3(maxf(x_in, x_out) - 1.0, WALL_H, zc + 0.2), _mat("strip"), false)
+	_omni(Vector3(lerpf(x_in, x_out, 0.3), WALL_H - 0.8, zc), 0.6, 9.0)
+	_omni(Vector3(lerpf(x_in, x_out, 0.8), WALL_H - 0.8, zc), 0.6, 9.0)
 
 
-func _omni(pos: Vector3, energy: float, reach: float) -> void:
-	var o := OmniLight3D.new()
-	o.position = pos
-	o.light_energy = energy
-	o.omni_range = reach
-	o.omni_attenuation = 1.2
-	o.light_color = Color(1.0, 0.95, 0.88)
-	o.shadow_enabled = false
-	_world.add_child(o)
+## The concourse's glass gable roof: white steel rafters every 3m with a tie across their feet, a ridge
+## beam and purlins, glass between. The sky shows through it and the sun casts the steel's shadow.
+func _build_roof() -> void:
+	var z0: float = _spine_end + 0.25
+	var z1: float = ENTRANCE_Z - 0.25
+	var foot: float = SPINE_HALF + 0.2
+	var rise: float = RIDGE_H - WALL_H
+	var steel := _mat("steel")
+	var roof := Node3D.new()
+	roof.name = "GlassRoof"
+	_world.add_child(roof)
+	var z := z1
+	while z >= z0 - 0.01:
+		for s in [-1.0, 1.0]:
+			_beam(roof, Vector3(s * foot, WALL_H + 0.1, z), Vector3(0.0, RIDGE_H + 0.02, z), 0.1, 0.2, steel)
+		_beam(roof, Vector3(-foot, WALL_H - 0.08, z), Vector3(foot, WALL_H - 0.08, z), 0.05, 0.05, steel)
+		z -= 3.0
+	_beam(roof, Vector3(0.0, RIDGE_H + 0.02, z1), Vector3(0.0, RIDGE_H + 0.02, z0), 0.14, 0.2, steel)
+	for s in [-1.0, 1.0]:
+		var mid := Vector3(s * foot * 0.5, WALL_H + 0.1 + rise * 0.5, 0.0)
+		_beam(roof, Vector3(mid.x, mid.y, z1), Vector3(mid.x, mid.y, z0), 0.08, 0.12, steel)
+	_sunlit(roof)
+	# The glass: a pane per slope per stretch of 8m, lying on the rafters.
+	var slope := Vector2(foot, rise + 0.08)
+	var across: float = slope.length() + 0.2
+	var n := maxi(1, ceili((z1 - z0) / 8.0))
+	for s in [-1.0, 1.0]:
+		var along := Vector3(-s * slope.x, slope.y, 0.0).normalized()
+		var up := Vector3(0.0, 0.0, 1.0).cross(along)
+		if up.y < 0.0:
+			up = -up
+		var basis := Basis(along, up, along.cross(up))
+		for k in n:
+			var za: float = lerpf(z1, z0, float(k) / n)
+			var zb: float = lerpf(z1, z0, float(k + 1) / n)
+			var mi := MeshInstance3D.new()
+			var bm := BoxMesh.new()
+			bm.size = Vector3(across, 0.02, absf(zb - za))
+			mi.mesh = bm
+			mi.material_override = _mat("roof_glass")
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			var centre := Vector3(s * foot * 0.5, WALL_H + 0.1 + rise * 0.5, (za + zb) * 0.5) + up * 0.12
+			mi.transform = Transform3D(basis, centre)
+			roof.add_child(mi)
+
+
+## The entrance: glazed double doors in an aluminium frame with a transom over them, pull handles, a mat,
+## an EXIT sign; outside, a canopy, the forecourt, a road, lawns, trees and the RC Vibe GP flag. The doors
+## are locked (solid), but it all reads as the way out.
+func _build_entrance() -> void:
+	var z := ENTRANCE_Z
+	var door := Node3D.new()
+	door.name = "Entrance"
+	_world.add_child(door)
+	var alu := _mat("alu")
+	var f := 0.07
+	var transom := 2.6
+	# Jambs, head, transom bar, the meeting stiles and each leaf's rails.
+	for s in [-1.0, 1.0]:
+		_box(door, Vector3(s * ENTRY_HALF - f, 0.0, z - 0.07), Vector3(s * ENTRY_HALF + f, ENTRY_H, z + 0.07), alu)
+		_box(door, Vector3(s * 0.06 - 0.035, 0.0, z - 0.05), Vector3(s * 0.06 + 0.035, transom, z + 0.05), alu)
+		var x0: float = minf(s * 0.06, s * (ENTRY_HALF - f))
+		var x1: float = maxf(s * 0.06, s * (ENTRY_HALF - f))
+		_box(door, Vector3(x0, 0.0, z - 0.05), Vector3(x1, 0.16, z + 0.05), alu)
+		_box(door, Vector3(x0, transom - 0.08, z - 0.05), Vector3(x1, transom, z + 0.05), alu)
+		# Pull handles, inside and out, by the meeting stiles.
+		for side_z in [-1.0, 1.0]:
+			var hz: float = z + side_z * 0.1
+			var hx: float = s * 0.2
+			_box(door, Vector3(hx - 0.015, 0.8, hz - 0.015), Vector3(hx + 0.015, 1.7, hz + 0.015), _mat("chrome"))
+			for y in [0.88, 1.62]:
+				_box(door, Vector3(hx - 0.01, y - 0.01, minf(hz, z)), Vector3(hx + 0.01, y + 0.01, maxf(hz, z)), _mat("chrome"))
+	_box(door, Vector3(-ENTRY_HALF, ENTRY_H - 0.1, z - 0.07), Vector3(ENTRY_HALF, ENTRY_H, z + 0.07), alu)
+	_box(door, Vector3(-ENTRY_HALF, transom, z - 0.06), Vector3(ENTRY_HALF, transom + 0.08, z + 0.06), alu)
+	var glass := _mat("door_glass")
+	_box(door, Vector3(-ENTRY_HALF + f, 0.16, z - 0.004), Vector3(ENTRY_HALF - f, transom - 0.08, z + 0.004), glass, false)
+	_box(door, Vector3(-ENTRY_HALF + f, transom + 0.08, z - 0.004), Vector3(ENTRY_HALF - f, ENTRY_H - 0.1, z + 0.004), glass, false)
+	_solid(Vector3(-ENTRY_HALF, 0.0, z - 0.2), Vector3(ENTRY_HALF, ENTRY_H, z + 0.2))
+	_sunlit(door)
+	# Inside: the mat and the EXIT sign.
+	_box(_world, Vector3(-1.4, 0.0, z - 1.5), Vector3(1.4, 0.012, z - 0.25), _mat("rubber"), false)
+	var exit_root := Node3D.new()
+	exit_root.position = Vector3(0.0, ENTRY_H + 0.45, z - WALL_T * 0.5)
+	exit_root.rotation.y = PI
+	_world.add_child(exit_root)
+	_box(exit_root, Vector3(-0.42, -0.15, 0.0), Vector3(0.42, 0.15, 0.06), _glow_mat(Color(0.1, 0.75, 0.3), 1.6), false)
+	_text(exit_root, "EXIT", 0.2, Color.WHITE, Vector3(0.0, 0.0, 0.075), 0.7)
+
+	# Outside, all in the sun.
+	var out := Node3D.new()
+	out.name = "Outside"
+	_world.add_child(out)
+	var zo: float = z + WALL_T * 0.5
+	_box(out, Vector3(-3.2, 3.6, zo), Vector3(3.2, 3.75, zo + 3.6), _mat("steel"))
+	for s in [-1.0, 1.0]:
+		_box(out, Vector3(s * 3.0 - 0.07, 0.0, zo + 3.3), Vector3(s * 3.0 + 0.07, 3.6, zo + 3.44), _mat("steel"))
+	_box(out, Vector3(-40.0, 0.0, zo + 14.0), Vector3(40.0, 0.14, zo + 14.3), _mat("curb"))
+	for s in [-1.0, 1.0]:
+		_box(out, Vector3(s * 9.0 - 0.5, 0.0, zo + 1.0), Vector3(s * 9.0 + 0.5, 0.9, zo + 12.5), _mat("hedge"))
+	_sunlit(out)
+	_tiles(-16.0, 16.0, zo, zo + 14.0, _mat("paving"), true)
+	_tiles(-120.0, 120.0, zo + 14.3, zo + 21.0, _mat("asphalt"), true, -0.02)
+	for s in [-1.0, 1.0]:
+		var x0: float = s * 16.0
+		_tiles(minf(x0, s * 60.0), maxf(x0, s * 60.0), zo, zo + 14.0, _mat("lawn"), true)
+	_tiles(-140.0, 140.0, zo + 21.0, zo + 140.0, _mat("lawn"), true)
+	# Trees across the road.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var trunk_mesh := CylinderMesh.new()
+	trunk_mesh.top_radius = 0.16
+	trunk_mesh.bottom_radius = 0.24
+	trunk_mesh.height = 3.0
+	var crown_mesh := SphereMesh.new()
+	crown_mesh.radius = 2.4
+	crown_mesh.height = 5.0
+	crown_mesh.radial_segments = 16
+	crown_mesh.rings = 10
+	for i in 14:
+		var p := Vector3(rng.randf_range(-36.0, 36.0), 0.0, zo + rng.randf_range(25.0, 60.0))
+		var k: float = rng.randf_range(0.8, 1.3)
+		var trunk := MeshInstance3D.new()
+		trunk.mesh = trunk_mesh
+		trunk.material_override = _mat("bark")
+		trunk.position = p + Vector3(0.0, 1.5 * k, 0.0)
+		trunk.scale = Vector3.ONE * k
+		out.add_child(trunk)
+		var crown := MeshInstance3D.new()
+		crown.mesh = crown_mesh
+		crown.material_override = _mat("leaves")
+		crown.position = p + Vector3(0.0, 4.6 * k, 0.0)
+		crown.scale = Vector3(k, k * rng.randf_range(0.9, 1.2), k)
+		out.add_child(crown)
+	_sunlit(out)
+	var flag := LogoFlag.new()
+	flag.position = Vector3(6.0, 0.0, zo + 9.0)
+	flag.scale = Vector3.ONE * 0.6
+	out.add_child(flag)
+	_sunlit(flag)
+
+
+## Everything at one car: the plinth and its band, the car (in `car`, whose y the lift sets), the two-post
+## lift, the placard, the spotlight and the inspection lamp. Bay frame: the car's middle at the origin on the
+## floor, its nose toward +z; the plinth, lift and car are at the car's own size.
+func _build_bay(index: int, g: Dictionary, pos: Vector3, yaw: float) -> void:
+	var root := Node3D.new()
+	root.name = "Bay_%s" % CAR_PRESETS[index].name
+	root.position = pos
+	root.rotation.y = yaw
+	_world.add_child(root)
+	var color: Color = g["color"]
+	var car := Node3D.new()
+	car.name = "Car"
+	root.add_child(car)
+	var model := _car_model(index)
+	if model == null:
+		return
+	car.add_child(model)
+	model.transform = Transform3D(Basis.from_scale(Vector3.ONE * CAR_SCALE * SHOW_SCALE), Vector3.ZERO)
+	var box: AABB = _bounds(model, root)
+	var centre: Vector3 = box.get_center()
+	model.position -= Vector3(centre.x, box.position.y, centre.z)
+	box = _bounds(model, root)
+	var size: Vector3 = box.size
+	var contact := _underside(model, root, size)
+	car.position.y = DAIS_H
+
+	# The plinth, with a band of light under its top edge that says whether the car is in the line-up.
+	var px: float = size.x * 0.5 + POST_GAP
+	var hw: float = px + 0.3
+	var hl: float = size.z * 0.5 + 0.36
+	var rim_mat := _glow_mat(color, 2.6)
+	_box(root, Vector3(-hw, 0.0, -hl), Vector3(hw, DAIS_H, hl), _mat("dais"))
+	_box(root, Vector3(-hw - 0.012, DAIS_H - 0.075, -hl - 0.012), Vector3(hw + 0.012, DAIS_H - 0.04, hl + 0.012), rim_mat, false)
+	var blob := MeshInstance3D.new()
+	var quad := PlaneMesh.new()
+	quad.size = Vector2(size.x * 1.25, size.z * 1.12)
+	blob.mesh = quad
+	blob.position.y = DAIS_H + 0.004
+	blob.material_override = _blob_mat()
+	blob.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(blob)
+
+	# The lift: a post either side at the middle of the car, tall enough for the carriage at the top of its
+	# travel, a carriage on each with two arms swung in under the car to its pads.
+	var post_h: float = maxf(contact, LIFT_REST + PAD_TOP) - PAD_TOP + LIFT_HEIGHT + CARRIAGE_H + 0.08
+	var cap := _glow_mat(color, 1.4)
+	var body := StaticBody3D.new()
+	body.name = "BayBody"
+	root.add_child(body)
+	for s in [-1.0, 1.0]:
+		_box(root, Vector3(s * px - 0.09, DAIS_H, -0.09), Vector3(s * px + 0.09, DAIS_H + 0.012, 0.09), _mat("post"))
+		_box(root, Vector3(s * px - 0.04, DAIS_H, -0.05), Vector3(s * px + 0.04, DAIS_H + post_h, 0.05), _mat("post"))
+		_box(root, Vector3(s * px - 0.048, DAIS_H + post_h, -0.058), Vector3(s * px + 0.048, DAIS_H + post_h + 0.02, 0.058), cap, false)
+	var carriage := Node3D.new()
+	carriage.name = "Carriage"
+	root.add_child(carriage)
+	for s in [-1.0, 1.0]:
+		var sx: float = s
+		_box(carriage, Vector3(sx * px - 0.06, 0.0, -0.07), Vector3(sx * px + 0.06, CARRIAGE_H, 0.07), _mat("post"))
+		for e in [-1.0, 1.0]:
+			var a := Vector3(sx * (px - 0.05), 0.022, 0.0)
+			var pad := Vector3(sx * size.x * 0.22, 0.022, e * size.z * 0.27)
+			var arm := MeshInstance3D.new()
+			var bm := BoxMesh.new()
+			bm.size = Vector3(0.04, 0.03, a.distance_to(pad))
+			arm.mesh = bm
+			arm.material_override = _mat("post")
+			arm.transform = Transform3D(Basis.looking_at(pad - a, Vector3.UP), (a + pad) * 0.5)
+			carriage.add_child(arm)
+			var p := MeshInstance3D.new()
+			var cyl := CylinderMesh.new()
+			cyl.top_radius = 0.04
+			cyl.bottom_radius = 0.04
+			cyl.height = 0.03
+			p.mesh = cyl
+			p.material_override = _mat("rubber")
+			p.position = pad + Vector3(0.0, PAD_TOP - 0.015 - 0.022, 0.0)
+			carriage.add_child(p)
+	# The plinth is solid to walk into, up past the car.
+	_solid(Vector3(-hw, 0.0, -hl), Vector3(hw, 1.2, hl), body)
+
+	# The plaque on the plinth's front, under the car's nose.
+	var plaque := Node3D.new()
+	plaque.position = Vector3(0.0, DAIS_H * 0.5, hl)
+	root.add_child(plaque)
+	var pw: float = minf(hw * 2.0 - 0.3, 0.9)
+	_box(plaque, Vector3(-pw * 0.5, -0.15, 0.0), Vector3(pw * 0.5, 0.15, 0.015), _mat("board"), false)
+	var accent: Color = CAR_ACCENTS.get(CAR_PRESETS[index].name, color)
+	_text(plaque, str(CAR_PRESETS[index].name).to_upper(), 0.1, accent.lightened(0.2), Vector3(0.0, 0.06, 0.025), pw - 0.1)
+	var status := _text(plaque, "", 0.05, COL_DIM, Vector3(0.0, -0.035, 0.025), pw - 0.1, _font_bold)
+	_text(plaque, str(g["name"]).to_upper(), 0.035, Color(COL_DIM, 0.7), Vector3(0.0, -0.1, 0.025), pw - 0.1, _font_bold)
+
+	# The spotlight: high on the aisle side, aimed at the car.
+	var spot := SpotLight3D.new()
+	root.add_child(spot)
+	spot.position = Vector3(0.0, WALL_H - 0.35, size.z * 0.5 + 1.5)
+	spot.look_at(root.to_global(Vector3(0.0, DAIS_H + size.y * 0.4, 0.0)), Vector3.UP)
+	spot.spot_angle = 18.0
+	spot.spot_angle_attenuation = 0.8
+	spot.spot_range = 8.0
+	spot.light_color = Color(1.0, 0.96, 0.9)
+	spot.shadow_enabled = MusicManager.shadow_quality_index > 0 and not OS.has_feature("mobile")
+	spot.shadow_bias = 0.03
+	spot.shadow_normal_bias = 1.0
+	# The inspection lamp: lights the underside once the car is up (only while it is: _pose_lift).
+	var lamp := OmniLight3D.new()
+	lamp.position = Vector3(0.0, DAIS_H + 0.08, 0.0)
+	lamp.omni_range = size.z * 0.5 + 1.0
+	lamp.omni_attenuation = 0.8
+	lamp.light_color = Color(0.92, 0.96, 1.0)
+	lamp.shadow_enabled = false
+	lamp.visible = false
+	root.add_child(lamp)
+
+	var bay := {
+		"index": index, "lamp": lamp, "gallery": g["name"], "color": color, "root": root, "car": car,
+		"car_y": DAIS_H, "centre": Vector3(0.0, size.y * 0.45, 0.0), "radius": size.z * 0.5 + 0.4,
+		"contact": maxf(contact, LIFT_REST + PAD_TOP + 0.005), "carriage": carriage, "blob": blob,
+		"rim_mat": rim_mat, "spot": spot, "status": status, "lift": 0.0, "up": false,
+	}
+	_bays.append(bay)
+	_pose_lift(bay)
+	_show_lineup_state(_bays.size() - 1, false)
 
 
 ## A car's scene at show size, in the player's paint for it (or its factory paint).
@@ -1054,150 +1408,7 @@ func _car_model(index: int) -> Node3D:
 	return model
 
 
-## Everything at one car: the car (in `car`, whose y the lift sets), the dais and its rim, the two-post lift,
-## the lectern, the spotlight. Bay frame: the car's middle on the floor at the origin, its nose toward +z.
-func _build_bay(index: int, g: Dictionary, pos: Vector3, yaw: float) -> void:
-	var root := Node3D.new()
-	root.name = "Bay_%s" % CAR_PRESETS[index].name
-	root.position = pos
-	root.rotation.y = yaw
-	_world.add_child(root)
-	var color: Color = g["color"]
-	var car := Node3D.new()
-	car.name = "Car"
-	root.add_child(car)
-	var model := _car_model(index)
-	if model == null:
-		return
-	car.add_child(model)
-	model.transform = Transform3D(Basis.from_scale(Vector3.ONE * CAR_SCALE * SHOW_SCALE), Vector3.ZERO)
-	var box: AABB = _bounds(model, root)
-	var centre: Vector3 = box.get_center()
-	model.position -= Vector3(centre.x, box.position.y, centre.z)
-	box = _bounds(model, root)
-	var size: Vector3 = box.size
-	var contact := _underside(model, root, size)
-
-	# The dais: a dark plate with a rim of light round it, which says whether the car is in the line-up.
-	var hw: float = size.x * 0.5 + POST_GAP + 0.75
-	var hl: float = size.z * 0.5 + 0.8
-	var rim_mat := _glow_mat(color, 2.6)
-	_box(root, Vector3(-hw - 0.06, 0.0, -hl - 0.06), Vector3(hw + 0.06, 0.03, hl + 0.06), rim_mat, false)
-	_box(root, Vector3(-hw, 0.0, -hl), Vector3(hw, 0.045, hl), _mat("dais"), false)
-	car.position.y = 0.045
-	# A soft shadow under the car, which stays on the dais when the car goes up.
-	var blob := MeshInstance3D.new()
-	var quad := PlaneMesh.new()
-	quad.size = Vector2(size.x * 1.25, size.z * 1.12)
-	blob.mesh = quad
-	blob.position.y = 0.05
-	blob.material_override = _blob_mat()
-	blob.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	root.add_child(blob)
-
-	# The lift: a post either side at the middle of the car, a carriage on each with two arms swung in
-	# under the car to its pads.
-	var px: float = size.x * 0.5 + POST_GAP
-	var cap := _glow_mat(color, 1.4)
-	var body := StaticBody3D.new()
-	body.name = "BayBody"
-	root.add_child(body)
-	for s in [-1.0, 1.0]:
-		_box(root, Vector3(s * px - 0.3, 0.045, -0.3), Vector3(s * px + 0.3, 0.07, 0.3), _mat("post"))
-		_box(root, Vector3(s * px - 0.12, 0.07, -0.15), Vector3(s * px + 0.12, POST_H, 0.15), _mat("post"))
-		_box(root, Vector3(s * px - 0.14, POST_H, -0.17), Vector3(s * px + 0.14, POST_H + 0.05, 0.17), cap, false)
-		_solid(Vector3(s * px - 0.3, 0.0, -0.3), Vector3(s * px + 0.3, POST_H, 0.3), body)
-	var carriage := Node3D.new()
-	carriage.name = "Carriage"
-	root.add_child(carriage)
-	for s in [-1.0, 1.0]:
-		var sx: float = s
-		_box(carriage, Vector3(sx * px - 0.17, 0.0, -0.2), Vector3(sx * px + 0.17, 0.45, 0.2), _mat("post"))
-		for e in [-1.0, 1.0]:
-			var a := Vector3(sx * (px - 0.18), 0.06, 0.0)
-			var pad := Vector3(sx * size.x * 0.24, 0.06, e * size.z * 0.27)
-			var arm := MeshInstance3D.new()
-			var bm := BoxMesh.new()
-			bm.size = Vector3(0.1, 0.07, a.distance_to(pad))
-			arm.mesh = bm
-			arm.material_override = _mat("post")
-			arm.transform = Transform3D(Basis.looking_at(pad - a, Vector3.UP), (a + pad) * 0.5)
-			carriage.add_child(arm)
-			var p := MeshInstance3D.new()
-			var cyl := CylinderMesh.new()
-			cyl.top_radius = 0.13
-			cyl.bottom_radius = 0.13
-			cyl.height = 0.06
-			p.mesh = cyl
-			p.material_override = _mat("rubber")
-			p.position = pad + Vector3(0.0, PAD_TOP - 0.06 - 0.03, 0.0)
-			carriage.add_child(p)
-	# The car itself is solid to walk into, up to its roof.
-	_solid(Vector3(-size.x * 0.5 - 0.1, 0.0, -size.z * 0.5 - 0.1), Vector3(size.x * 0.5 + 0.1, size.y, size.z * 0.5 + 0.1), body)
-
-	# The lectern, at the front corner away from the concourse, angled to the aisle.
-	var corner := 1.0
-	var probe_a: Vector3 = root.transform * Vector3(hw - 0.6, 0.0, hl + 0.5)
-	var probe_b: Vector3 = root.transform * Vector3(-hw + 0.6, 0.0, hl + 0.5)
-	if absf(probe_b.x) > absf(probe_a.x):
-		corner = -1.0
-	var lectern := Node3D.new()
-	lectern.position = Vector3(corner * (hw - 0.65), 0.0, hl + 0.55)
-	lectern.rotation.y = -corner * 0.35
-	root.add_child(lectern)
-	_box(lectern, Vector3(-0.08, 0.0, -0.08), Vector3(0.08, 0.95, 0.08), _mat("lectern"))
-	var top := _box(lectern, Vector3(-0.62, -0.03, -0.32), Vector3(0.62, 0.03, 0.32), _mat("lectern"))
-	top.position = Vector3(0.0, 1.0, 0.0)
-	top.rotation.x = 0.55
-	_box(lectern, Vector3(-0.3, 0.0, -0.3), Vector3(0.3, 0.04, 0.3), _mat("lectern"))
-	_solid(Vector3(-0.2, 0.0, -0.2) + lectern.position, Vector3(0.2, 1.0, 0.2) + lectern.position, body)
-	var face := Node3D.new()
-	face.position = Vector3(0.0, 1.0, 0.0)
-	face.rotation.x = -PI * 0.5 + 0.55
-	lectern.add_child(face)
-	var accent: Color = CAR_ACCENTS.get(CAR_PRESETS[index].name, color)
-	# Long names in smaller type, so they stay on the board.
-	var car_name := str(CAR_PRESETS[index].name).to_upper()
-	var name_size: int = clampi(int(64.0 * 8.0 / maxf(car_name.length(), 8.0)), 36, 64)
-	_text(face, car_name, name_size, accent.lightened(0.2), Vector3(0.0, 0.12, 0.035), 0.0, 0.0028)
-	var status := _text(face, "", 32, COL_DIM, Vector3(0.0, -0.06, 0.035), 0.0, 0.0028, _font_bold)
-	_text(face, str(g["name"]).to_upper(), 26, Color(COL_DIM, 0.7), Vector3(0.0, -0.17, 0.035), 0.0, 0.0028, _font_bold)
-
-	# The spotlight: high on the aisle side, aimed at the car.
-	var spot := SpotLight3D.new()
-	root.add_child(spot)
-	spot.position = Vector3(0.0, WALL_H - 0.6, size.z * 0.5 + 2.6)
-	spot.look_at(root.to_global(Vector3(0.0, size.y * 0.35, 0.0)), Vector3.UP)
-	spot.spot_angle = 30.0
-	spot.spot_angle_attenuation = 0.7
-	spot.spot_range = 13.0
-	spot.light_color = Color(1.0, 0.96, 0.9)
-	spot.shadow_enabled = MusicManager.shadow_quality_index > 0 and not OS.has_feature("mobile")
-	spot.shadow_bias = 0.05
-	spot.shadow_normal_bias = 1.5
-
-	# The inspection lamp: lights the underside once the car is up (only while it is: _pose_lift).
-	var lamp := OmniLight3D.new()
-	lamp.position = Vector3(0.0, 0.25, 0.0)
-	lamp.omni_range = size.z * 0.5 + 2.0
-	lamp.omni_attenuation = 0.8
-	lamp.light_color = Color(0.92, 0.96, 1.0)
-	lamp.shadow_enabled = false
-	lamp.visible = false
-	root.add_child(lamp)
-
-	var bay := {
-		"index": index, "lamp": lamp, "gallery": g["name"], "color": color, "root": root, "car": car, "car_y": car.position.y,
-		"centre": Vector3(0.0, size.y * 0.45, 0.0), "radius": size.z * 0.5,
-		"contact": maxf(contact + car.position.y, LIFT_REST + PAD_TOP + 0.01), "carriage": carriage, "blob": blob, "rim_mat": rim_mat,
-		"spot": spot, "status": status, "lift": 0.0, "up": false,
-	}
-	_bays.append(bay)
-	_pose_lift(bay)
-	_show_lineup_state(_bays.size() - 1, false)
-
-
-## How high over the floor the lift's pads meet the car: the lowest point of its body over the middle of
+## How high over the car's foot the lift's pads meet it: the lowest point of its body over the middle of
 ## its floor (between the axles, inside the wheels). The wheels themselves don't count.
 func _underside(model: Node3D, space: Node3D, size: Vector3) -> float:
 	var lowest := INF
@@ -1259,36 +1470,37 @@ static func _bounds(node: Node, space: Node3D) -> AABB:
 	return box
 
 
-## The foyer: the player's own car (the one the car select screen last confirmed) on a turntable.
+## The foyer: the player's own car (the one the car select screen last confirmed) on a turntable plinth,
+## in the sun under the glass.
 func _build_featured() -> void:
 	var index: int = clampi(NetworkManager.local_car_index, 0, CAR_PRESETS.size() - 1)
 	var base := Node3D.new()
 	base.name = "Featured"
-	base.position = Vector3(0.0, 0.0, -4.0)
+	base.position = Vector3(0.0, 0.0, -3.0)
 	_world.add_child(base)
-	var disc := MeshInstance3D.new()
+	var plinth := MeshInstance3D.new()
 	var cyl := CylinderMesh.new()
-	cyl.top_radius = 3.0
-	cyl.bottom_radius = 3.05
-	cyl.height = 0.12
-	cyl.radial_segments = 96
-	disc.mesh = cyl
-	disc.position.y = 0.06
-	disc.material_override = _mat("dais")
-	base.add_child(disc)
+	cyl.top_radius = 1.25
+	cyl.bottom_radius = 1.3
+	cyl.height = DAIS_H
+	cyl.radial_segments = 64
+	plinth.mesh = cyl
+	plinth.position.y = DAIS_H * 0.5
+	plinth.material_override = _mat("dais")
+	base.add_child(plinth)
 	var ring := MeshInstance3D.new()
 	var torus := TorusMesh.new()
-	torus.inner_radius = 3.04
-	torus.outer_radius = 3.1
-	torus.rings = 96
+	torus.inner_radius = 1.26
+	torus.outer_radius = 1.3
+	torus.rings = 64
 	torus.ring_segments = 6
 	ring.mesh = torus
-	ring.position.y = 0.06
+	ring.position.y = DAIS_H - 0.05
 	ring.material_override = _glow_mat(CAR_ACCENTS.get(CAR_PRESETS[index].name, COL_TEAL), 2.6)
 	base.add_child(ring)
-	_solid(Vector3(-3.0, 0.0, -7.0), Vector3(3.0, 1.6, -1.0))
+	_solid(Vector3(-1.3, 0.0, -4.3), Vector3(1.3, 1.2, -1.7))
 	_featured = Node3D.new()
-	_featured.position.y = 0.12
+	_featured.position.y = DAIS_H
 	_featured.rotation.y = 0.6
 	base.add_child(_featured)
 	var model := _car_model(index)
@@ -1298,25 +1510,26 @@ func _build_featured() -> void:
 		var box: AABB = _bounds(model, _featured)
 		var c: Vector3 = box.get_center()
 		model.position -= Vector3(c.x, box.position.y, c.z)
-	for s in [-1.0, 1.0]:
-		var spot := SpotLight3D.new()
-		base.add_child(spot)
-		spot.position = Vector3(s * 4.5, WALL_H - 0.6, 3.5)
-		spot.look_at(base.to_global(Vector3(0.0, 0.6, 0.0)), Vector3.UP)
-		spot.spot_angle = 28.0
-		spot.spot_range = 13.0
-		spot.light_energy = 7.0
-		spot.light_color = Color(1.0, 0.96, 0.9)
-	var label := _text(_world, "YOUR CAR  ·  %s" % str(CAR_PRESETS[index].name).to_upper(), 40, COL_DIM,
-			Vector3(0.0, 0.14, -0.7), 0.0, 0.006, _font_bold)
+	_sunlit(base)
+	var spot := SpotLight3D.new()
+	base.add_child(spot)
+	spot.position = Vector3(2.6, WALL_H - 0.3, 2.2)
+	spot.look_at(base.to_global(Vector3(0.0, DAIS_H + 0.3, 0.0)), Vector3.UP)
+	spot.spot_angle = 16.0
+	spot.spot_range = 9.0
+	spot.light_energy = 4.0
+	spot.light_color = Color(1.0, 0.96, 0.9)
+	var label := _text(_world, "YOUR CAR  ·  %s" % str(CAR_PRESETS[index].name).to_upper(), 0.16, COL_DIM,
+			Vector3(0.0, 0.006, -1.35), 2.4, _font_bold)
 	label.rotation.x = -PI * 0.5
 
 
 ## The trophy hall: a pedestal per Grand Prix in an arc, each holding the best trophy won there (gold,
-## silver or bronze) in a glass case, or a grey ghost of one; the logo and the tally on the back wall.
+## silver or bronze) in a glass case, or a grey ghost of one; on the back wall the logo and the tally, high
+## enough to clear the cases seen from the door (the sign over the door names the hall).
 func _build_trophies() -> void:
 	var hall_back: float = _spine_end - HALL_D
-	var centre := Vector3(0.0, 0.0, _spine_end - HALL_D * 0.55)
+	var centre := Vector3(0.0, 0.0, _spine_end - HALL_D * 0.5)
 	var cups: Array = NetworkManager.GP_CUPS.keys()
 	var wins := 0
 	var podiums := 0
@@ -1334,23 +1547,20 @@ func _build_trophies() -> void:
 		ped.rotation.y = -a
 		_world.add_child(ped)
 		_build_pedestal(ped, cup_name, rec)
-	# The back wall: the logo, the title and the tally.
-	var wall_z: float = hall_back + WALL_T * 0.5 + 0.03
+	var wall_z: float = hall_back + WALL_T * 0.5 + 0.02
 	var logo_scene := load(LOGO_PATH) as PackedScene
 	if logo_scene:
 		var logo := logo_scene.instantiate() as Node3D
-		logo.position = Vector3(0.0, 5.3, wall_z + 0.4)
-		logo.scale = Vector3.ONE * 0.55
+		logo.position = Vector3(0.0, 5.15, wall_z + 0.3)
+		logo.scale = Vector3.ONE * 0.45
 		_world.add_child(logo)
-	_text(_world, "HALL OF FAME", 110, COL_GOLD, Vector3(0.0, 3.75, wall_z), 0.0, 0.01)
-	_text(_world, "%d GRAND PRIX WON  ·  %d PODIUMS" % [wins, podiums], 40, COL_DIM, Vector3(0.0, 3.05, wall_z), 0.0, 0.01, _font_bold)
-	_box(_world, Vector3(-9.0, 2.7, wall_z - 0.03), Vector3(9.0, 2.75, wall_z), _glow_mat(COL_GOLD, 1.6), false)
-	# A ring of light on the ceiling over the arc, and lamps.
-	_box(_world, Vector3(-8.0, WALL_H - 0.06, centre.z - 0.25), Vector3(8.0, WALL_H, centre.z + 0.25), _mat("strip"), false)
-	_omni(Vector3(-6.0, WALL_H - 1.2, centre.z), 0.9, 14.0)
-	_omni(Vector3(6.0, WALL_H - 1.2, centre.z), 0.9, 14.0)
-	# Over the hall's door, facing the concourse.
-	_text(_world, "HALL OF FAME", 96, COL_GOLD, Vector3(0.0, 5.75, _spine_end + WALL_T * 0.5 + 0.02), 0.0, 0.01)
+	_text(_world, "%d GRAND PRIX WON  ·  %d PODIUMS" % [wins, podiums], 0.34, COL_GOLD, Vector3(0.0, 3.85, wall_z), 10.0, _font_bold)
+	_box(_world, Vector3(-6.0, 3.55, wall_z - 0.02), Vector3(6.0, 3.59, wall_z), _glow_mat(COL_GOLD, 1.6), false)
+	_box(_world, Vector3(-6.0, TALL_H - 0.06, centre.z - 0.2), Vector3(6.0, TALL_H, centre.z + 0.2), _mat("strip"), false)
+	_omni(Vector3(-5.0, TALL_H - 1.2, centre.z), 0.8, 12.0)
+	_omni(Vector3(5.0, TALL_H - 1.2, centre.z), 0.8, 12.0)
+	# Over the hall's opening, on the concourse side, under the roof's slopes.
+	_sign(Vector3(0.0, 5.55, _spine_end + WALL_T * 0.5), 0.0, Vector2(3.6, 0.85), "HALL OF FAME", COL_GOLD, "", COL_GOLD)
 
 
 func _build_pedestal(ped: Node3D, cup_name: String, rec: Dictionary) -> void:
@@ -1359,8 +1569,8 @@ func _build_pedestal(ped: Node3D, cup_name: String, rec: Dictionary) -> void:
 	var col: Color = MEDAL[best] if won else COL_OFF
 	var column := MeshInstance3D.new()
 	var cyl := CylinderMesh.new()
-	cyl.top_radius = 0.72
-	cyl.bottom_radius = 0.8
+	cyl.top_radius = 0.62
+	cyl.bottom_radius = 0.7
 	cyl.height = PEDESTAL_H
 	cyl.radial_segments = 48
 	column.mesh = cyl
@@ -1369,8 +1579,8 @@ func _build_pedestal(ped: Node3D, cup_name: String, rec: Dictionary) -> void:
 	ped.add_child(column)
 	var band := MeshInstance3D.new()
 	var tor := TorusMesh.new()
-	tor.inner_radius = 0.7
-	tor.outer_radius = 0.76
+	tor.inner_radius = 0.6
+	tor.outer_radius = 0.66
 	tor.rings = 48
 	tor.ring_segments = 6
 	band.mesh = tor
@@ -1379,22 +1589,23 @@ func _build_pedestal(ped: Node3D, cup_name: String, rec: Dictionary) -> void:
 	ped.add_child(band)
 	var body := StaticBody3D.new()
 	ped.add_child(body)
-	_solid(Vector3(-0.8, 0.0, -0.8), Vector3(0.8, PEDESTAL_H + 1.4, 0.8), body)
+	_solid(Vector3(-0.7, 0.0, -0.7), Vector3(0.7, PEDESTAL_H + 1.2, 0.7), body)
 	# The cup (Podium's), or a ghost of it.
 	var holder := Node3D.new()
 	holder.position.y = PEDESTAL_H + 0.02
-	holder.scale = Vector3.ONE * 1.05
+	holder.scale = Vector3.ONE * 0.9
 	ped.add_child(holder)
-	var mat: StandardMaterial3D
+	var mat: Material
 	if won:
-		mat = StandardMaterial3D.new()
-		mat.albedo_color = col
-		mat.metallic = 1.0
-		mat.roughness = 0.22
-		mat.emission_enabled = true
-		mat.emission = col
-		mat.emission_energy_multiplier = 0.2
-		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		var m := StandardMaterial3D.new()
+		m.albedo_color = col
+		m.metallic = 1.0
+		m.roughness = 0.22
+		m.emission_enabled = true
+		m.emission = col
+		m.emission_energy_multiplier = 0.2
+		m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		mat = m
 	else:
 		mat = _mat("ghost")
 	var cup := MeshInstance3D.new()
@@ -1414,12 +1625,12 @@ func _build_pedestal(ped: Node3D, cup_name: String, rec: Dictionary) -> void:
 		handle.position = Vector3(side * 0.43, 0.8, 0.0)
 		handle.material_override = mat
 		holder.add_child(handle)
-	_box(ped, Vector3(-0.68, PEDESTAL_H, -0.68), Vector3(0.68, PEDESTAL_H + 1.35, 0.68), _mat("glass"), false)
+	_box(ped, Vector3(-0.58, PEDESTAL_H, -0.58), Vector3(0.58, PEDESTAL_H + 1.15, 0.58), _mat("glass"), false)
 	# The plaque on the column's front.
 	var plaque := Node3D.new()
-	plaque.position = Vector3(0.0, PEDESTAL_H * 0.6, 0.82)
+	plaque.position = Vector3(0.0, PEDESTAL_H * 0.62, 0.7)
 	ped.add_child(plaque)
-	_text(plaque, cup_name.to_upper(), 46, col.lightened(0.2) if won else COL_DIM, Vector3(0.0, 0.22, 0.0), 0.0, 0.004)
+	_text(plaque, cup_name.to_upper(), 0.15, col.lightened(0.2) if won else COL_DIM, Vector3(0.0, 0.18, 0.0), 1.1)
 	var line := "NOT YET WON"
 	var sub := ""
 	if won:
@@ -1431,12 +1642,12 @@ func _build_pedestal(ped: Node3D, cup_name: String, rec: Dictionary) -> void:
 		line = "  ·  ".join(parts)
 		if str(rec["car"]) != "":
 			sub = "BEST: %s WITH THE %s" % [PLACE_NAMES[best], str(rec["car"]).to_upper()]
-	_text(plaque, line, 34, COL_TEXT if won else Color(COL_DIM, 0.7), Vector3(0.0, 0.03, 0.0), 0.0, 0.004, _font_bold)
+	_text(plaque, line, 0.11, COL_TEXT if won else Color(COL_DIM, 0.7), Vector3(0.0, 0.02, 0.0), 1.1, _font_bold)
 	if sub != "":
-		_text(plaque, sub, 24, COL_DIM, Vector3(0.0, -0.12, 0.0), 0.0, 0.004, _font_bold)
+		_text(plaque, sub, 0.075, COL_DIM, Vector3(0.0, -0.11, 0.0), 1.1, _font_bold)
 	var spot := SpotLight3D.new()
 	ped.add_child(spot)
-	spot.position = Vector3(0.0, WALL_H - 0.5, 3.0)
+	spot.position = Vector3(0.0, TALL_H - 0.4, 3.0)
 	spot.look_at(ped.to_global(Vector3(0.0, PEDESTAL_H + 0.5, 0.0)), Vector3.UP)
 	spot.spot_angle = 14.0
 	spot.spot_range = 10.0
@@ -1447,10 +1658,10 @@ func _build_pedestal(ped: Node3D, cup_name: String, rec: Dictionary) -> void:
 func _build_player() -> void:
 	_player = CharacterBody3D.new()
 	_player.name = "Walker"
-	_player.position = Vector3(0.0, 0.05, ENTRANCE_Z - 1.6)
+	_player.position = Vector3(0.0, 0.05, ENTRANCE_Z - 1.8)
 	var cs := CollisionShape3D.new()
 	var cap := CapsuleShape3D.new()
-	cap.radius = 0.35
+	cap.radius = 0.32
 	cap.height = 1.8
 	cs.shape = cap
 	cs.position.y = 0.9
@@ -1462,13 +1673,13 @@ func _build_player() -> void:
 	_eye_cam = Camera3D.new()
 	_eye_cam.fov = 72.0
 	_eye_cam.near = 0.05
-	_eye_cam.far = 200.0
+	_eye_cam.far = 400.0
 	_head.add_child(_eye_cam)
 	_eye_cam.current = true
 	_orbit_cam = Camera3D.new()
 	_orbit_cam.fov = 50.0
-	_orbit_cam.near = 0.05
-	_orbit_cam.far = 200.0
+	_orbit_cam.near = 0.03
+	_orbit_cam.far = 400.0
 	_world.add_child(_orbit_cam)
-	_pitch = -0.05
+	_pitch = -0.12
 	_head.rotation.x = _pitch

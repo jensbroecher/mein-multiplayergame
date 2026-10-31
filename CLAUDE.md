@@ -1653,28 +1653,43 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 - A walk-in car collection, from the main menu's GARAGE tile (`MainMenu.garage_pressed`, `Main._on_menu_garage_pressed`:
   built under the loading screen, since it loads every car; `finished` swipes back to the menu, waiting out a swipe
   still running). Built in code in its own world (a SubViewport), like the podium; first person (a CharacterBody3D).
-- The hall grows with the collection: the foyer (the player's car, `NetworkManager.local_car_index`, on a turntable),
-  the concourse with a gallery per category off either side in pairs (`SLOT` apart), each as long as its cars need
-  (`G_ENTRY`, `BAY`, `G_END`), and the trophy hall at the end. Categories are `CarCollection.CATEGORIES` (by preset
-  name); a car none names goes into "New Arrivals". Cars stand at `SHOW_SCALE` (1.8) times race size, about a road
-  car, in the player's saved paint, angled toward the way in, each on a two-post lift with a lectern and a spotlight.
-  Walls are cut into pieces of 8m at most and floors into 8m tiles, so no mesh takes in more lights than the mobile
-  renderer gives one. `garage_floor.gdshader` is polished concrete in world space.
+- Scale: the walker and the building are life size; the cars are large-scale RC cars. On the courses people and props
+  stand at 1.6 times life size beside the cars (`PROP_SCALE`, Lakeside's spectators about 2.85m), so a car here is its
+  race size over 1.6 (`SHOW_SCALE`): about 1.4m long. At 1.8 times race size (the first version) they read as real cars.
+  Each stands on a plinth at table height (`DAIS_H` 0.7) with a two-post lift of its own size and a plaque on its front.
+- The hall grows with the collection: the entrance (glazed double doors, locked, `_build_entrance`; outside a canopy,
+  a forecourt, a road, lawns, trees and a `LogoFlag`, room for more places later), the foyer (the player's car,
+  `NetworkManager.local_car_index`, on a turntable), the concourse under a glass gable roof (`_build_roof`) with a
+  gallery per category off either side in pairs (`SLOT` apart), each as long as its cars need (`G_ENTRY`, `BAY`,
+  `G_END`), and the trophy hall, whose front wall and the entrance wall (`TALL_H`) close the roof's gables. Categories
+  are `CarCollection.CATEGORIES` (by preset name); a car none names goes into "New Arrivals". Cars are in the player's
+  saved paint, angled toward the way in. Walls are cut into pieces of 8m at most and floors into 8m tiles, so no mesh
+  takes in more lights than the mobile renderer gives one. `garage_floor.gdshader` is polished concrete (and the
+  forecourt's paving) in world space.
+- `garage_sky.gdshader` is two skies: the radiance cubemap (`AT_CUBEMAP_PASS`: reflections and ambient) is the car
+  select screen's studio, so the paint keeps its soft-box highlights in the closed galleries; what the eye sees through
+  the roof and the doors is a summer sky with cumulus and the sun. The sun (a DirectionalLight) lights only
+  `SUN_LAYER` (`_sunlit`: the concourse floor, the roof's steel, the foyer, the outside) and shines straight down the
+  concourse, so it never reaches the galleries through their roofs or the walls' gallery sides with shadows off.
+- Signs are boards with their text fitted to their width (`_sign`, `_text`'s `max_w`): the first version's free text
+  ran into the next line, past its door ("4X4 & MONSTERS") and into the trophy hall's logo. The trophy hall's back
+  wall has only the logo and the tally (its door's sign names it), above the cases as seen from the door.
 - The line-up (`CarCollection.gd`): the cars the car select screen offers, saved as the cars left out (settings.cfg
   `[garage] hidden_cars`), so new cars join it by themselves; never empty. Looking at a car (within `REACH`, `AIM_CONE`,
-  no wall between) and pressing E (pad A) puts it in or out: the bay's floor rim lights in the gallery's colour and the
-  spotlight comes up, or the rim goes grey and the light dims. CarSelection re-reads the line-up whenever it shows
+  no wall between) and pressing E (pad A) puts it in or out: the plinth's band lights in the gallery's colour and the
+  spotlight comes up, or the band goes grey and the light dims. CarSelection re-reads the line-up whenever it shows
   (`_refresh_lineup`: pills only for those cars, stepping through them; car indices stay the presets' own).
 - F (pad Y) lifts the car (`LIFT_TIME`): the carriages rise to its underside (`_underside`: the body's lowest vertex
   between the axles, not the wheels), then car and arms together by `LIFT_HEIGHT`, and the camera orbits it from any
-  side and from below (kept above the floor and out of the walls), an inspection lamp under it lit while it is up.
-  The camera blends between the eye and the orbit (`CAM_BLEND_TIME`); no head bob (motion comfort).
+  side and from below (kept over the plinth's top and out of the walls), an inspection lamp under it lit while it is
+  up. The camera blends between the eye and the orbit (`CAM_BLEND_TIME`); no head bob (motion comfort).
 - Trophies (`Trophies.gd`, user://trophies.cfg): `Main._show_gp_podium_impl` records one per finished Grand Prix for
   the best local place in the top three (`Podium.local_names()`), only if it started from stage 1
   (`NetworkManager.gp_trophy_eligible`, cleared by GP TEST from a later stage). The hall shows a pedestal per cup
-  (`NetworkManager.GP_CUPS`) with the best trophy (Podium's cup mesh) in a glass case or a grey ghost, the counts and the
-  car, and the tally under the logo.
-- Cost (M1, 2880x1800): 60 fps, 7.8-9.3ms GPU. Touch has no controls in it yet.
+  (`NetworkManager.GP_CUPS`) with the best trophy (Podium's cup mesh) in a glass case or a grey ghost, the counts and
+  the car, and the tally under the logo.
+- Cost (M1, 2880x1800): 60 fps, 6.8-10.9ms GPU (the most at the entrance, looking through the roof). Touch has no
+  controls in it yet.
 - `res://scratch/garage_shots.tscn -- <dir> [trophies=demo] walk:<name>:x,z:yaw[:pitch] inspect:<name>:<car>[:yaw:pitch:dist]
   lower toggle:<car> cam:<name>:x,y,z:tx,ty,tz[:fov] bench:x,z:yaw tile:<path.jpg>:...` (windowed, `--resolution 1600x900`)
   photographs it with its HUD, benchmarks it, and rendered `images/menu/tile_garage.jpg`;
