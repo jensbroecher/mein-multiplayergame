@@ -81,6 +81,11 @@ func _ready() -> void:
 			print("t=%5.1f speed %5.1f m/s HUD %3.0f  offroad %s penalty %.2f surface %d boost %s/%s lateral %.0f" % [t, speed,
 					speed * 1.8, "Y" if offroad else "n", cart.offroad_penalty, cart.surface, str(cart.is_boosting),
 					str(cart.get("is_pad_boosting")), lateral])
+			# What the cart stands on, and where (to tell a missing road collider from the rules).
+			var gr: RayCast3D = cart.get("ground_ray")
+			if gr and gr.is_colliding():
+				var col := gr.get_collider() as Node
+				print("        s %.0f on %s at %s" % [off, String(col.name) if col else "?", cart.global_position])
 	print("RESULT car %d: top HUD speed off-road %.0f (on road %.0f)" % [cart.car_index, top_off * 1.8, top_road * 1.8])
 	get_tree().quit()
 

@@ -667,7 +667,7 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			var gap_w: float = _road_gap_ground(px, pz, curve)
 			if gap_w > 0.0:
 				var across: float = 1.0 - smoothstep(sand_edge, sand_edge + 6.0, dist)
-				height = lerp(height, road_h + road_y_offset - road_gap_ground, gap_w * across)
+				height = lerp(height, road_h + road_y_offset - road_gap_ground + _gap_drift_here, gap_w * across)
 
 			# Desert Wadi: carve a shallow river corridor (banks dip below the water plane).
 			# Road blend above still wins near the path so the ford stays driveable.
@@ -928,6 +928,12 @@ const ROAD_GAP_GROUND := 0.18
 ## The same, per level: with curbs_stop_at_gaps nothing hangs over the taper's edges but the asphalt,
 ## so the ground can come up to a few centimetres under it (the asphalt then barely stands proud).
 @export var road_gap_ground: float = ROAD_GAP_GROUND
+## Per gap (in road_gaps' order), the height of a drift heaped across it: the ground rises to that much
+## over road_gap_ground in the gap's middle, easing to nothing at its ends (Bloombay Dunes' sand drifts
+## over the road). Missing entries are 0.
+@export var road_gap_drift: PackedFloat32Array = PackedFloat32Array()
+## The drift under the point _road_gap_ground last weighed (it finds the gap and the offset along it).
+var _gap_drift_here := 0.0
 ## The curbs end where a road gap's taper begins, instead of following the asphalt down to its point,
 ## and so do the road's side walls (with the ground road_gap_ground under the asphalt they would only
 ## show as two thin lines drawing the taper's point across the ground).
@@ -1070,7 +1076,9 @@ func _road_gap_ground(px: float, pz: float, curve: Curve3D) -> float:
 			var pad := curb_outer_width * 0.5 + 8.0
 			_gap_zones.append([lo.x - pad, lo.y - pad, hi.x + pad, hi.y + pad, pts, offs, road_gaps[k], road_gaps[k + 1]])
 	var best := 0.0
-	for z in _gap_zones:
+	_gap_drift_here = 0.0
+	for zi in range(_gap_zones.size()):
+		var z: Array = _gap_zones[zi]
 		if px < z[0] or pz < z[1] or px > z[2] or pz > z[3]:
 			continue
 		var pts: PackedVector3Array = z[4]
@@ -1091,12 +1099,21 @@ func _road_gap_ground(px: float, pz: float, curve: Curve3D) -> float:
 			g1 -= 6.0
 		var outside := maxf(g0 - near_o, near_o - g1)
 		best = maxf(best, 1.0 - smoothstep(0.0, 6.0, outside))
+		if zi < road_gap_drift.size() and road_gap_drift[zi] != 0.0:
+			var along := clampf((near_o - float(z[6])) / maxf(float(z[7]) - float(z[6]), 0.01), 0.0, 1.0)
+			_gap_drift_here = maxf(_gap_drift_here, road_gap_drift[zi] * pow(sin(PI * along), 2.0))
 	return best
 
 
+## The world curve for _sample_cached_height before the terrain exists, made once: a new one each call
+## rebuilt road_height_from_plan's table along the whole lap for every sample.
+var _sample_curve: Curve3D
+
 func _sample_cached_height(px: float, pz: float) -> float:
 	if _visual_heights.is_empty():
-		var curve = _get_world_curve() if track_path else null
+		if _sample_curve == null and track_path:
+			_sample_curve = _get_world_curve()
+		var curve = _sample_curve
 		if not curve:
 			return 0.0
 		var noise = FastNoiseLite.new()

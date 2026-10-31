@@ -19,7 +19,7 @@ const COUNT := 10
 ## red, not the default brown).
 const LEVELS := {
 	"LakesideLevel": {"road": ASPHALT, "ground": GRASS},
-	"BloombayDunesLevel": {"road": ASPHALT, "ground": SAND, "nodes": [["pier", WOOD]]},
+	"BloombayDunesLevel": {"road": ASPHALT, "ground": SAND, "gap": SAND, "nodes": [["pier", WOOD]]},
 	"PinecrestRidgeLevel": {"road": ASPHALT, "ground": GRASS, "gap": GRAVEL, "nodes": [["boulder", ROCK]],
 		"dust": {GRAVEL: Color(0.62, 0.54, 0.44, 0.6)}},
 	"FrostpeakCreekLevel": {"road": ASPHALT, "ground": SNOW, "nodes": [["bridgedeck", WOOD], ["abutment", ROCK], ["snowdrift", SNOW]]},

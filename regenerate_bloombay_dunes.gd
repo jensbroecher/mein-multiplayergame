@@ -193,12 +193,34 @@ func _ready() -> void:
 			sand_mat.normal_scale = 0.85
 		tg.set("grass_material", sand_mat)
 
+	# The road and where sand has drifted over it (SAND_GAPS) or it runs out onto the beach: road gaps
+	# (TerrainGenerator.road_gaps), toward which the asphalt breaks up under blown sand
+	# (road_crumble.gdshader, Pinecrest's forest trail in sand). Off-road sand to the carts.
+	var gaps := _plan_sand_gaps(curve)
+	tg.set("road_gaps", gaps)
+	tg.set("road_gap_taper", SAND_TAPER)
+	tg.set("road_gap_ground", SAND_GROUND)
+	tg.set("curbs_stop_at_gaps", true)
+	tg.set("road_gap_drift", _sand_gap_drifts(gaps))
+	# The ground graded to the road beside it in plan: asked from the dunes' height, the nearest point
+	# was further up the road and the dunes buried its edges in places.
+	tg.set("road_height_from_plan", true)
 	if asphalt_tex:
-		var road_mat := StandardMaterial3D.new()
-		road_mat.albedo_texture = asphalt_tex
-		road_mat.albedo_color = Color(0.92, 0.92, 0.92)
-		road_mat.uv1_scale = Vector3(0.2, 0.2, 0.2)
-		road_mat.roughness = 0.75
+		var road_mat := ShaderMaterial.new()
+		road_mat.shader = load("res://road_crumble.gdshader")
+		road_mat.set_shader_parameter("asphalt_tex", asphalt_tex)
+		road_mat.set_shader_parameter("dirt_tex", sand_tex)
+		road_mat.set_shader_parameter("dirt_normal", sand_norm)
+		road_mat.set_shader_parameter("dirt_tint", SAND_TINT)
+		road_mat.set_shader_parameter("dirt_tile", 1.0 / 0.12)
+		var pairs := PackedVector2Array()
+		for k in range(0, gaps.size() - 1, 2):
+			pairs.append(Vector2(gaps[k], gaps[k + 1]))
+		road_mat.set_shader_parameter("gaps", pairs)
+		road_mat.set_shader_parameter("gap_count", pairs.size())
+		road_mat.set_shader_parameter("taper", SAND_TAPER)
+		road_mat.set_shader_parameter("lead", SAND_LEAD)
+		road_mat.set_shader_parameter("road_width", 15.0)
 		tg.set("road_material", road_mat)
 
 	level_scene.add_child(tg)
@@ -351,6 +373,59 @@ func _ready() -> void:
 
 	print("Successfully generated and saved res://levels/BloombayDunesLevel.tscn!")
 	get_tree().quit(0)
+
+
+# --- Sand over the road ---------------------------------------------------------------------------
+# Where the lap runs out onto the beach, and two stretches in the dunes where sand has drifted across
+# the road (SAND_DRIFTS, s along the lap), are road gaps: the asphalt breaks up under blown sand over the
+# taper and SAND_LEAD before each (road_crumble.gdshader with the beach's sand), the curbs stop, the
+# ground runs SAND_GROUND under the road's surface with a drift heaped across the dune ones
+# (road_gap_drift), and the tyres carry sand out. PlayerCart counts gaps and tapers as off-road: sand
+# (Surfaces' "gap").
+
+const SAND_DRIFTS := [[530.0, 558.0, 0.45], [1203.0, 1231.0, 0.5]]
+const SAND_TAPER := 12.0
+const SAND_LEAD := 10.0
+const SAND_GROUND := 0.06
+const SAND_TINT := Color(1.0, 0.96, 0.88)
+## The lap's beach (no road): west of this, as TerrainGenerator draws it.
+const BEACH_X := -24.0
+
+
+## The road gaps: the beach (at the lap's two ends, either side of the start) and the drifts.
+func _plan_sand_gaps(curve: Curve3D) -> PackedFloat32Array:
+	var length := curve.get_baked_length()
+	var beach := []
+	var s := 0.0
+	var start := -1.0
+	while s <= length:
+		var on := curve.sample_baked(s).x < BEACH_X
+		if on and start < 0.0:
+			start = s
+		elif not on and start >= 0.0:
+			beach.append([start, s])
+			start = -1.0
+		s += 0.5
+	if start >= 0.0:
+		beach.append([start, length])
+	var gaps := PackedFloat32Array()
+	for b in beach:
+		gaps.append_array([b[0], b[1]])
+	for d in SAND_DRIFTS:
+		gaps.append_array([d[0], d[1]])
+	print("Sand over the road: beach %s, drifts %s" % [str(beach), str(SAND_DRIFTS)])
+	return gaps
+
+
+func _sand_gap_drifts(gaps: PackedFloat32Array) -> PackedFloat32Array:
+	var drifts := PackedFloat32Array()
+	for k in range(0, gaps.size() - 1, 2):
+		var h := 0.0
+		for d in SAND_DRIFTS:
+			if is_equal_approx(gaps[k], float(d[0])):
+				h = d[2]
+		drifts.append(h)
+	return drifts
 
 
 # --- Ocean ---------------------------------------------------------------------------------------

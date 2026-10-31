@@ -450,6 +450,8 @@ back 6m past them. PlayerCart's corridor rule (terrain within the road's half wi
 gaps and tapers (`_in_road_gap`), so the ground there is grass, off-road, with its sound and dust.
 - A level's `Surfaces.LEVELS` entry can name what that ground is (`"gap"`: Pinecrest Ridge's forest trail is
   gravel; PlayerCart's `_on_road_gap_ground`, `Surfaces.of_road_gap`).
+- `road_gap_drift` (per gap, in `road_gaps`' order) heaps a mound across a gap, highest in its middle, easing to
+  nothing at its ends: Bloombay Dunes' sand drifts over the road.
 - `curbs_stop_at_gaps` ends the curbs and the road's side walls where a taper begins (instead of following the
   asphalt down to its point) and eases the gap's grading in inside the taper, so `road_gap_ground` (default
   `ROAD_GAP_GROUND`) can bring the ground up to a few centimetres under the asphalt: Pinecrest Ridge, 6cm.
@@ -1555,8 +1557,23 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
     (`_palm_crown_off_road` keeps a crown 5.5m off the road's edge).
 - `res://scratch/bloombay_shots.tscn -- <dir> name:x,y,z:tx,ty,tz[:frames[:gap]]` renders into the window
   (not a SubViewport) and can save a time sequence to watch the surf.
-- Regenerating takes about 2 minutes on the M1, nearly all of it TerrainGenerator's own heightfield and
-  road grading (the shore field bakes in 1s, the backdrop in under 1s).
+- Regenerating takes about 30s on the M1. It took 2 minutes while TerrainGenerator's `_sample_cached_height` built
+  a new world curve on every call before the terrain existed (each then baked on its first query, and with
+  `road_height_from_plan` rebuilt its plan table along the whole lap): the camps' planning samples thousands of
+  heights. It keeps the curve now (`_sample_curve`).
+- Sand over the road (`_plan_sand_gaps`, `SAND_*`): where the lap runs out onto the beach (west of `BEACH_X`, either
+  side of the start) and two stretches in the dunes where sand has drifted across it (`SAND_DRIFTS`: s 530-558 on the
+  climb north, 1203-1231 over the third crest) are `TerrainGenerator.road_gaps`. The asphalt breaks up under blown
+  sand over the taper and `SAND_LEAD` before each (`road_crumble.gdshader` with the beach's sand texture and tint),
+  the curbs stop (`curbs_stop_at_gaps`), the ground runs `SAND_GROUND` under the road's surface with a drift heaped
+  across the dune ones (`TerrainGenerator.road_gap_drift`, per gap: 0.45-0.5m in the middle), and the tyres carry sand
+  out. PlayerCart counts gaps and tapers as off-road, sand (Surfaces' `"gap"`): about two thirds of a car's speed.
+  Before, the dunes buried the road there by accident (up to 1.5m over its edge; the ground graded from the dunes'
+  height found a point further up the road) with a ragged edge, and a cart on that sand counted as on asphalt.
+  `road_height_from_plan` is on now. The road crumble shader takes 4 gaps: all used. `scratch/pinecrest_road_probe.gd
+  -- level=res://levels/BloombayDunesLevel.tscn` lists what is left buried (the drifts, and 0.4m at the inside edge of
+  the 7.5m corner at s 1080); `scratch/offroad_speed_probe.tscn ... from=2000 seconds=24` drives from the grid through
+  the beach's end and the first drift, printing what the cart stands on.
 
 ## Mtaa Nights (Matumaini GP, stage 4)
 
