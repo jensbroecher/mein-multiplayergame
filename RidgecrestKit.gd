@@ -48,6 +48,15 @@ const WOOD := {"battens": 0, "lapboards": 1, "timber": 2, "painted": 3}
 var _kit: PropKit
 ## Solid boxes for furniture and the like, in world space: [centre, size, basis] (see _solid).
 var solid: Array = []
+## Window-box geraniums (window_geranium.gdshader), grown by flower_box for the generator to commit per building:
+## `flora` the plants (every leaf, floret and bud a quad the shader draws), `flora_far` a few coloured quads
+## standing in for them further off. The two crossfade over FLOWER_FADE (metres).
+var flora: Dictionary = {}
+var flora_far: Dictionary = {}
+const FLOWER_FADE := Vector2(95.0, 125.0)
+const LEAF_GREENS := [Color(0.17, 0.36, 0.11), Color(0.21, 0.41, 0.13), Color(0.25, 0.46, 0.15), Color(0.19, 0.38, 0.14)]
+const IVY_GREEN := Color(0.17, 0.36, 0.13)
+const STALK := Color(0.30, 0.42, 0.18)
 
 
 func _init(kit: PropKit) -> void:
@@ -88,6 +97,14 @@ static func make_material(key: String) -> Material:
 			var h := ShaderMaterial.new()
 			h.shader = load("res://hedge.gdshader")
 			return h
+		"geranium", "geranium_far":
+			var fl := ShaderMaterial.new()
+			fl.shader = load("res://window_geranium.gdshader")
+			fl.set_shader_parameter("lod_mode", 1 if key == "geranium" else 2)
+			fl.set_shader_parameter("lod_fade_begin", FLOWER_FADE.x)
+			fl.set_shader_parameter("lod_fade_end", FLOWER_FADE.y)
+			fl.set_shader_parameter("lod_jitter", 0.0)
+			return fl
 		"pool":
 			var p := StandardMaterial3D.new()
 			p.vertex_color_use_as_albedo = true
@@ -221,7 +238,7 @@ func _plate(kit: Dictionary, key: String, c: Vector3, along: Vector3, n: Vector3
 ## beside it, and `flowers` puts a box of geraniums on the sill. Shutters and flowers go to `fine`.
 func window(kit: Dictionary, fine: Dictionary, c: Vector3, along: Vector3, n: Vector3, w: float, h: float,
 		frame: Color, rng: RandomNumberGenerator, lights := 2, shutter := Color(0, 0, 0, 0), depth := 0.14,
-		wall_key := "plaster", wall_col := WHITE_WASH, flowers := false) -> void:
+		wall_key := "plaster", wall_col := WHITE_WASH, flowers := false, trail := 1.0) -> void:
 	var hw := w * 0.5
 	var hh := h * 0.5
 	var up := Vector3.UP
@@ -252,7 +269,7 @@ func window(kit: Dictionary, fine: Dictionary, c: Vector3, along: Vector3, n: Ve
 			_plate(fine, "painted", sc, along, n, w * 0.52, h + 0.1, shutter, true)
 			_plate(fine, "painted", sc - n * 0.03, along, -n, w * 0.52, h + 0.1, shutter.darkened(0.2), true)
 	if flowers:
-		flower_box(fine, c - up * (hh + 0.12) + n * (depth + 0.12), along, n, w + 0.1, rng)
+		flower_box(fine, c - up * (hh + 0.12) + n * (depth + 0.12), along, n, w + 0.1, rng, trail)
 
 
 ## The casing round an opening w by h (its middle `c` on the wall's face): a border `cw` wide standing
@@ -370,35 +387,187 @@ func balcony(kit: Dictionary, fine: Dictionary, a: Vector3, b: Vector3, y: float
 
 ## A flower box hanging off a sill or a rail: `c` the middle of its top, along `along`, its front `n`.
 ## Geraniums in clumps above it and trailing over its front.
-## A window box of geraniums: a painted trough, mounds of round leaves spilling over its lip, heads of blossom
-## (a few round florets each) standing over them, and leaves trailing down the front. Leaves and blooms had been
-## boxes, which read as cubes.
-func flower_box(fine: Dictionary, c: Vector3, along: Vector3, n: Vector3, length: float, rng: RandomNumberGenerator) -> void:
+## A window box of geraniums: a painted trough; zonal geraniums in it (a mound of round, scalloped leaves on their
+## stalks, spilling over the front and kept off the wall, heads of florets on long stalks above); and, `trail` times
+## their usual length (0: none), ivy-leaved ones hanging down the front, leaves along each stem by turns and small
+## heads of florets. The plants go into `flora`, a stand-in for them into `flora_far`. They draw on a stream of their
+## own (seeded from `rng`), so the many draws they make move nothing else. The leaves and blooms had been lumps
+## of plain colour (boxes, then balls).
+func flower_box(fine: Dictionary, c: Vector3, along: Vector3, n: Vector3, length: float, rng: RandomNumberGenerator, trail := 1.0) -> void:
 	var up := Vector3.UP
 	_kit.box(fine, "painted", Transform3D(Basis(along, up, n), c - up * 0.1), Vector3(length, 0.2, 0.2), DARK_WOOD, 1.0)
 	var bloom: Color = BLOOMS[rng.randi() % BLOOMS.size()]
-	var clumps := maxi(1, int(length / 0.2))
-	for i in range(clumps):
-		var p := c + along * (-length * 0.5 + 0.1 + 0.2 * i) + n * rng.randf_range(-0.04, 0.05)
-		for k in range(2):
-			var lp := p + along * rng.randf_range(-0.06, 0.06) + n * rng.randf_range(-0.02, 0.08) + up * rng.randf_range(0.03, 0.08)
-			_ball(fine, lp, rng.randf_range(0.08, 0.11), 0.7, LEAF.lightened(rng.randf() * 0.12))
-		for k in range(2 if rng.randf() < 0.7 else 1):
-			var hc := p + along * rng.randf_range(-0.07, 0.07) + n * rng.randf_range(-0.04, 0.04) + up * rng.randf_range(0.15, 0.22)
-			var col: Color = bloom.lightened(rng.randf() * 0.15)
-			for f in range(3):
-				var a := TAU * float(f) / 3.0 + rng.randf() * 0.6
-				_ball(fine, hc + (along * cos(a) + n * sin(a)) * 0.035 + up * rng.randf_range(-0.01, 0.02), rng.randf_range(0.035, 0.045), 1.0, col)
-		# Trailing leaves down the front.
-		if rng.randf() < 0.6:
-			var tp := p + n * 0.11
-			_kit.quad(fine, "matte", [tp - along * 0.08, tp + along * 0.08, tp + along * 0.05 - up * rng.randf_range(0.2, 0.4), tp - along * 0.05 - up * 0.3], n, LEAF.darkened(0.1))
+	var pr := RandomNumberGenerator.new()
+	pr.seed = rng.randi()
+	var hanging: Color = bloom if pr.randf() < 0.6 else BLOOMS[pr.randi() % BLOOMS.size()]
+	var plants := maxi(1, int(round(length / 0.2)))
+	for i in range(plants):
+		var base := c + along * (-length * 0.5 + (float(i) + 0.5) * length / float(plants)) + n * pr.randf_range(-0.03, 0.02)
+		_geranium(base, along, n, bloom, pr)
+	if trail > 0.0:
+		var trails := maxi(1, int(round(length / 0.2)))
+		for i in range(trails):
+			var t0 := c + along * (-length * 0.5 + (float(i) + 0.5 + pr.randf_range(-0.3, 0.3)) * length / float(trails)) + n * 0.1
+			_ivy_trail(t0, along, n, hanging, pr.randf_range(0.22, 0.5) * trail, pr)
+	_flora_stand_in(c, along, n, length, bloom.lerp(hanging, 0.3), trail)
 
 
-## A small round lump at `c` (`r` across, `squash` times as tall): a leaf mound or a floret, smooth shaded.
-func _ball(kit: Dictionary, c: Vector3, r: float, squash: float, col: Color) -> void:
-	_kit.lathe(kit, "matte", c, [Vector2(0.0, -r * squash), Vector2(r * 0.71, -r * 0.71 * squash), Vector2(r, 0.0),
-			Vector2(r * 0.71, r * 0.71 * squash), Vector2(0.0, r * squash)], 5, col)
+## One zonal geranium at `base` (on the soil): a full mound of leaves on their stalks, the outer and front ones lower
+## and drooping over the lip, none reaching back to the wall; three to five round heads of florets sitting on it.
+## Thinner (a dozen small leaves, heads on long bare stalks), the boxes had looked sparse from across the terrace.
+func _geranium(base: Vector3, along: Vector3, n: Vector3, bloom: Color, rng: RandomNumberGenerator) -> void:
+	var up := Vector3.UP
+	var leaves := rng.randi_range(16, 22)
+	for i in range(leaves):
+		var az := TAU * (float(i) + rng.randf_range(-0.3, 0.3)) / float(leaves)
+		var dir := along * cos(az) + n * sin(az)
+		var reach := rng.randf_range(0.03, 0.15)
+		if sin(az) < -0.1:
+			reach = minf(reach, 0.07 / -sin(az))
+		var front := maxf(sin(az), 0.0)
+		var lc := base + dir * reach + up * (0.17 - reach * 0.75 - front * reach * 0.5 + rng.randf_range(-0.02, 0.03))
+		var ln := (up * 0.75 + dir * (0.35 + front * 0.4) + along * rng.randf_range(-0.15, 0.15) + n * rng.randf_range(-0.1, 0.1)).normalized()
+		var col: Color = LEAF_GREENS[rng.randi() % LEAF_GREENS.size()]
+		if rng.randf() < 0.05:
+			col = Color(0.55, 0.55, 0.22)
+		var sway := 0.1 + reach
+		_flora_card(lc, ln, dir + up * 0.2, rng.randf_range(0.09, 0.13), col.lightened(rng.randf() * 0.06), 0.0, sway)
+		# Only the outer leaves' stalks show.
+		if reach > 0.09:
+			_stalk(base + up * 0.01, lc - ln * 0.004, 0.006, STALK, 0.0, sway, up)
+	for h in range(rng.randi_range(3, 5)):
+		var az := rng.randf() * TAU
+		var dir := (along * cos(az) + n * (0.2 + 0.8 * absf(sin(az)))).normalized()
+		var top := base + up * rng.randf_range(0.2, 0.28) + dir * rng.randf_range(0.02, 0.08)
+		_stalk(base + up * 0.02, top, 0.007, STALK, 0.0, 0.4, n)
+		_umbel(top, (up + dir * 0.35).normalized(), bloom, rng, rng.randi_range(14, 20), 0.045, 0.039, 0.4)
+
+
+## A head of `count` florets `size` across on a dome of radius `r` round `axis` at `c`, a few buds hanging under it.
+func _umbel(c: Vector3, axis: Vector3, bloom: Color, rng: RandomNumberGenerator, count: int, r: float, size: float, sway: float) -> void:
+	var t1 := axis.cross(Vector3.RIGHT if absf(axis.x) < 0.9 else Vector3.FORWARD).normalized()
+	var t2 := axis.cross(t1)
+	for f in range(count):
+		# Over the dome by the golden angle, from its crown out to 80 degrees; the upper petals toward the crown.
+		var el := acos(1.0 - (float(f) + 0.5) / float(count) * 0.85)
+		var az := float(f) * 2.39996 + rng.randf_range(-0.2, 0.2)
+		var side := t1 * cos(az) + t2 * sin(az)
+		var d := (axis * cos(el) + side * sin(el)).normalized()
+		var col: Color = bloom.darkened(rng.randf_range(0.0, 0.15)) if rng.randf() < 0.5 else bloom.lightened(rng.randf_range(0.0, 0.1))
+		_flora_card(c + d * r, d, axis + side * 0.3, size * rng.randf_range(0.9, 1.1), col, 2.0, sway, 0.25)
+	for b in range(rng.randi_range(0, 3)):
+		var az := rng.randf() * TAU
+		var side := t1 * cos(az) + t2 * sin(az)
+		_flora_card(c - axis * 0.012 + side * r * 0.8, side, axis, size * 0.55, bloom, 3.0, sway, 0.2)
+
+
+## An ivy-leaved geranium hanging from the box's front lip at `start`, `drop` long: a stem arching out over the lip
+## and falling, wandering a little sideways, leaves along it by turns, small heads of florets every third node and
+## at its end.
+func _ivy_trail(start: Vector3, along: Vector3, n: Vector3, bloom: Color, drop: float, rng: RandomNumberGenerator) -> void:
+	var up := Vector3.UP
+	var segs := maxi(3, ceili(drop / 0.05))
+	var phase := rng.randf() * TAU
+	var wander := rng.randf_range(0.02, 0.05)
+	var pts: Array = []
+	for k in range(segs + 1):
+		var s := drop * float(k) / float(segs)
+		pts.append(start + n * (0.04 * minf(s / 0.08, 1.0) + 0.02 * s) + up * (0.02 - s) + along * sin(s * 9.0 + phase) * wander)
+	for k in range(segs):
+		var w0 := float(k) / float(segs)
+		var w1 := float(k + 1) / float(segs)
+		_stalk(pts[k], pts[k + 1], 0.006, Color(0.28, 0.36, 0.16), w0, w1, n)
+		var side := -1.0 if k % 2 == 0 else 1.0
+		var mid: Vector3 = ((pts[k] as Vector3) + (pts[k + 1] as Vector3)) * 0.5
+		# A leaf by turns either side, and now and then a smaller one opposite it.
+		for o: float in ([side, -side] if rng.randf() < 0.5 else [side]):
+			var ln := (n + up * 0.25 + along * o * 0.3).normalized()
+			_flora_card(mid + along * o * 0.026 + n * 0.012, ln, -up + along * o * 0.6, rng.randf_range(0.055, 0.075) * (1.0 if o == side else 0.75),
+					IVY_GREEN.lightened(rng.randf() * 0.1), 1.0, (w0 + w1) * 0.5, 0.3)
+		if k % 2 == 1 or k == segs - 1:
+			_umbel((pts[k + 1] as Vector3) + n * 0.025 - along * side * 0.015, (n + up * 0.2).normalized(), bloom, rng,
+					rng.randi_range(6, 9), 0.025, 0.03, w1)
+
+
+## One quad for window_geranium.gdshader: its middle `c`, facing `n`, its +V toward `tip` (in its plane), `size`
+## across, drawn as `kind` (UV2.x) and swaying by `sway` (UV2.y). The corners' normals lean out from the middle by
+## `cup`, so a leaf shades as a shallow dome.
+func _flora_card(c: Vector3, n: Vector3, tip: Vector3, size: float, col: Color, kind: float, sway: float, cup := 0.45) -> void:
+	var v := tip - n * tip.dot(n)
+	if v.length_squared() < 1e-4:
+		v = n.cross(Vector3.RIGHT if absf(n.x) < 0.9 else Vector3.FORWARD)
+	v = v.normalized()
+	var u := v.cross(n).normalized()
+	var pts: Array = []
+	var nrm: Array = []
+	var uvs: Array = []
+	for cc: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
+		var o: Vector3 = u * cc.x + v * cc.y
+		pts.append(c + o * size * 0.5)
+		nrm.append((n + o * cup).normalized())
+		uvs.append(cc * 0.5 + Vector2(0.5, 0.5))
+	var w := Vector2(kind, sway)
+	_flora_quad(flora, "geranium", pts, nrm, uvs, [col, col, col, col], n, [w, w, w, w])
+
+
+## A stalk from a to b, `w` wide: a strip turned toward `face` as near as it can be, drawn whole, swaying from `sa`
+## at a to `sb` at b.
+func _stalk(a: Vector3, b: Vector3, w: float, col: Color, sa: float, sb: float, face: Vector3) -> void:
+	var d := b - a
+	if d.length_squared() < 1e-6:
+		return
+	var side := d.cross(face)
+	if side.length_squared() < 1e-8:
+		side = d.cross(Vector3.RIGHT)
+	side = side.normalized() * w * 0.5
+	var nn := side.cross(d).normalized()
+	_flora_quad(flora, "geranium", [a - side, a + side, b + side, b - side], [nn, nn, nn, nn],
+			[Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)], [col, col, col, col], nn,
+			[Vector2(4.0, sa), Vector2(4.0, sa), Vector2(4.0, sb), Vector2(4.0, sb)])
+
+
+## The far stand-in for a box's plants: the mound's front leaning out over the lip, green going to the flowers'
+## colour at its top; its top; and, with trailing plants, a curtain hanging down the front.
+func _flora_stand_in(c: Vector3, along: Vector3, n: Vector3, length: float, bloom: Color, trail: float) -> void:
+	var up := Vector3.UP
+	var hl := along * length * 0.5
+	var leaf := Color(0.24, 0.45, 0.16)
+	var blend := leaf.lerp(bloom, 0.55)
+	var f0 := c + n * 0.14
+	var f1 := c + n * 0.1 + up * 0.2
+	var b1 := c - n * 0.06 + up * 0.22
+	_stand_in_quad([f0 - hl, f0 + hl, f1 + hl, f1 - hl], [leaf, leaf, blend, blend], (n + up * 0.3).normalized())
+	_stand_in_quad([f1 - hl, f1 + hl, b1 + hl, b1 - hl], [blend, blend, bloom, bloom], (up + n * 0.3).normalized())
+	if trail > 0.0:
+		var t0 := c + n * 0.13
+		var t1 := c + n * 0.16 - up * 0.32 * trail
+		_stand_in_quad([t0 - hl * 0.85, t0 + hl * 0.85, t1 + hl * 0.6, t1 - hl * 0.6], [blend, blend, leaf, leaf], n)
+
+
+func _stand_in_quad(p: Array, cols: Array, face: Vector3) -> void:
+	var w := Vector2(4.0, 0.0)
+	_flora_quad(flora_far, "geranium_far", p, [face, face, face, face], [Vector2.ZERO, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO],
+			cols, face, [w, w, w, w])
+
+
+## A quad p[0..3] (in order round its edge) into kit's `key` with a UV2 per corner, for window_geranium.gdshader. Its
+## front winds toward `face` (PropKit.tri's rule), so the shader's side check lights each side by its own normal.
+func _flora_quad(kit: Dictionary, key: String, p: Array, nrm: Array, uv: Array, col: Array, face: Vector3, uv2: Array) -> void:
+	var s := _kit.st(kit, key)
+	var w: Array = []
+	var wn: Array = []
+	for i in range(4):
+		w.append(_kit.xf * (p[i] as Vector3))
+		wn.append((_kit._nb * (nrm[i] as Vector3)).normalized())
+	var order := [0, 1, 2, 0, 2, 3]
+	if ((w[2] as Vector3) - (w[0] as Vector3)).cross((w[1] as Vector3) - (w[0] as Vector3)).dot(_kit._nb * face) < 0.0:
+		order = [0, 2, 1, 0, 3, 2]
+	for i in order:
+		s.set_color(col[i])
+		s.set_normal(wn[i])
+		s.set_uv(uv[i])
+		s.set_uv2(uv2[i])
+		s.add_vertex(w[i])
 
 
 ## Records a solid box for something in the kit's current frame (`c`, `size` and `turn` in that frame); the
@@ -534,7 +703,9 @@ func hotel(kit: Dictionary, fine: Dictionary, rng: RandomNumberGenerator) -> Dic
 	for fl in [g1 + 1.5, g1 + 4.2]:
 		for x in [-7.2, -4.4, -1.4, 1.6, 4.6]:
 			var c := Vector3(x, fl, z0)
-			window(kit, fine, c, right, fr, 1.05, 1.35, WHITE_WASH, rng, 2, shutter, 0.18, "plaster", CREAM, fl < g1 + 2.0 or absf(x + 1.4) > 0.1)
+			# The box over the hotel's name has nothing trailing from it, which would hang across the lettering.
+			window(kit, fine, c, right, fr, 1.05, 1.35, WHITE_WASH, rng, 2, shutter, 0.18, "plaster", CREAM, fl < g1 + 2.0 or absf(x + 1.4) > 0.1,
+					0.0 if fl < g1 + 2.0 and absf(x + 1.4) < 0.1 else 1.0)
 			# Painted surrounds, grey bands round each opening (the sgraffito frames of the old houses).
 			_plate(kit, "plaster", c + fr * 0.012 + Vector3(0, 0.82, 0), right, fr, 1.6, 0.18, Color(0.62, 0.66, 0.70))
 			_plate(kit, "plaster", c + fr * 0.012 - Vector3(0, 0.82, 0), right, fr, 1.4, 0.12, Color(0.62, 0.66, 0.70))
@@ -575,7 +746,9 @@ func hotel(kit: Dictionary, fine: Dictionary, rng: RandomNumberGenerator) -> Dic
 	var boxes: Array = [[Vector3((x0 + x1) * 0.5, ridge * 0.5, 0.0), Vector3(x1 - x0, ridge, z1 - z0)],
 			[Vector3((bx0 + bx1) * 0.5, bridge * 0.5, 0.0), Vector3(bx1 - bx0, bridge, bz1 - bz0)],
 			[Vector3((x0 + bx1) * 0.5, -0.44, z0 - 3.35), Vector3(bx1 - x0 + 1.0, 1.52, 6.3)]]
-	return {"boxes": boxes, "labels": [["HOTEL RIDGECREST", Vector3(-1.4, 3.62, z0 - 0.02), fr, 0.42, Color(0.16, 0.30, 0.20)]]}
+	# The name between the stone course (its top at g1 + 0.12) and the first floor's window boxes (their bottoms at
+	# about 3.7): at 0.42 it ran up behind the boxes.
+	return {"boxes": boxes, "labels": [["HOTEL RIDGECREST", Vector3(-1.4, 3.5, z0 - 0.02), fr, 0.3, Color(0.16, 0.30, 0.20)]]}
 
 
 ## The chapel on the peak: a white nave on a stone plinth under a steep slate roof, round-arched windows,
@@ -673,6 +846,18 @@ func chapel(kit: Dictionary, fine: Dictionary, _rng: RandomNumberGenerator) -> D
 	arched_window(kit, Vector3(0, 6.0, tz0), Vector3(1, 0, 0), Vector3(0, 0, -1), 0.7, 1.6)
 	var boxes: Array = [[Vector3(0, ridge * 0.5, (z0 + z1) * 0.5), Vector3(hx * 2.0, ridge, z1 - z0)],
 			[Vector3(0, th * 0.5, tcz), Vector3(tx * 2.0, th, tz1 - tz0)]]
+	# Up to the door: a landing at the plinth's height and three steps down to the ground, each a little wider than
+	# the one above (the door stood up the plinth's face with no way up to it).
+	var land := tz0 - 1.05
+	var sw := 1.35
+	slab(kit, "stone", Vector3(-sw, -1.0, land), Vector3(sw, 0.55, tz0 - 0.25), STONE.darkened(0.05))
+	boxes.append([Vector3(0, -0.225, (land + tz0 - 0.25) * 0.5), Vector3(sw * 2.0, 1.55, tz0 - 0.25 - land)])
+	for i in range(3):
+		var top := 0.55 - 0.1375 * float(i + 1)
+		var zb := land - 0.32 * float(i)
+		var w := sw + 0.08 * float(i + 1)
+		slab(kit, "stone", Vector3(-w, -1.0, zb - 0.32), Vector3(w, top, zb), STONE.darkened(0.05 + 0.04 * float(i % 2)))
+		boxes.append([Vector3(0, (top - 1.0) * 0.5, zb - 0.16), Vector3(w * 2.0, top + 1.0, 0.32)])
 	return {"boxes": boxes, "labels": []}
 
 

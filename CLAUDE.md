@@ -253,8 +253,22 @@ the others re-bakes it (see Lakeside Course below).
   - Furniture is solid: RidgecrestKit's helpers (`table_set`, `parasol`, `bench`, `lounger`, `telescope`,
     `lamp_post`) record boxes in world space from the kit's frame (`_solid`, `solid`), which `_build_ridgecrest`
     adds to RidgecrestBody; carts drove through the hotel's terrace tables (and its raised terrace, now a box of
-    its own). Window boxes are geraniums of round leaf mounds and florets (`_ball`), not boxes.
-    `res://scratch/ridgecrest_solids.gd` (`-s`, headless, `-- x,z ... [r=3]`) lists the boxes near a spot.
+    its own). `res://scratch/ridgecrest_solids.gd` (`-s`, headless, `-- x,z ... [r=3]`) lists the boxes near a spot.
+  - Window boxes (`flower_box`) hold geraniums: zonal ones (a mound of 16-22 leaves, 3-5 round heads of 14-20 florets)
+    and ivy-leaved ones trailing down the front (`trail`: 0 on the hotel's box over its name). Every leaf, floret,
+    bud and stalk is one quad whose shape `window_geranium.gdshader` draws (UV2.x what it is, UV2.y its sway): the
+    scalloped leaf with its notch, dark horseshoe band and veins, the five-pointed ivy leaf, five petals round a
+    pale eye. They go into RidgecrestKit's `flora` (and a few coloured quads standing in for them into
+    `flora_far`), which `_rc_flowers` commits per building, so each pair's visibility range is measured from its
+    building; the two crossfade over `FLOWER_FADE` (95-125m) by tree_lod.gdshaderinc's dither. They draw on a
+    random stream of their own. About 158k triangles in all; on an RTX 2060 0.1ms of GPU looking at the district
+    (`ab_bench ... cam=... hide=Flowers_`). Lumps of plain colour (boxes, then balls) had read as cubes.
+  - The chapel's tower door has a landing and three steps up to it. The residents' four SUVs park in bays beside
+    their drives (`_plan_car`: parallel to the lane, clear of buildings, lanes and other bays; a short lane of its
+    own, so paved and kept clear of hedges and trees, on a pad graded level a ground cell wider than the car,
+    planned after the houses' pads so it wins). The houses stand 0-12m from their lanes, too close to park nose-in:
+    the cars had stood across a house pad's graded edge, one end buried. `_verify_car_level` prints the ground's
+    rise and fall under each car.
   - The walls are solid quads, so a window's glass lies just proud of the face inside a casing that stands out (set
     back, it was hidden behind the wall). Glass is `ridgecrest_glass.gdshader` (a made-up reflection in EMISSION, as
     on Nyota's towers; COLOR.a is the curtain); slate, standing-seam zinc and board-formed concrete are
@@ -1110,7 +1124,8 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   (`_build_heightfield_mesh`); one fixed diagonal saws steep slopes that cross it into teeth.
 - `res://scratch/ab_bench.tscn -- res://levels/X.tscn [samples=6] [gates] variant ...` switches variants
   (`storm`, `nolightshadow`, `nomoonshadow`, `unshadow=`, `sky=`, `hide=`, `cheapmat=`) back and forth
-  within one run; `gates` samples 10m before each checkpoint instead of along the lap. On macOS, separate
+  within one run; `gates` samples 10m before each checkpoint instead of along the lap, `cam=x,y,z:tx,ty,tz`
+  (repeatable) from those spots. On macOS, separate
   `bench.tscn` runs differ by up to 2x with the GPU's clock.
 
 ## Frostfall Gorge (off-road stage)

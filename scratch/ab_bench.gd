@@ -4,8 +4,9 @@ extends Node
 # so GPU clock and thermal drift between runs can't masquerade as a difference.
 # Run windowed (not headless):
 #   Godot --path . res://scratch/ab_bench.tscn -- res://levels/X.tscn [samples=6] [shadows=3]
-#        [gates] variant ...
+#        [gates] [cam=x,y,z:tx,ty,tz ...] variant ...
 # gates: sample 10m before each checkpoint gate (looking through it, at its item boxes) instead of along the lap.
+# cam=x,y,z:tx,ty,tz (repeatable): sample from these camera spots instead.
 # Variants: base, storm (Northlight blizzard at full strength), noshadow, nolightshadow, noomni, nospot, nomoonshadow, sky=<shader path>,
 #           hide=<path substring>, unshadow=<path substring> (shadow off on matching lights), cheapmat=<path substring> (unshaded grey on matching meshes),
 #           quality=<0..4> (detail level, MusicManager's Off..Ultra; the base runs at the level's default).
@@ -14,6 +15,8 @@ extends Node
 var level_path := ""
 var samples := 6
 var at_gates := false
+## cam=x,y,z:tx,ty,tz (as many as wanted): sample from these spots instead of along the lap.
+var cams: Array = []
 var shadow_q := 3
 var variants: Array[String] = []
 var level: Node3D
@@ -27,6 +30,11 @@ func _ready() -> void:
 		elif a.begins_with("samples="): samples = int(a.substr(8))
 		elif a.begins_with("shadows="): shadow_q = int(a.substr(8))
 		elif a == "gates": at_gates = true
+		elif a.begins_with("cam="):
+			var pt := a.substr(4).split(":")
+			var p := pt[0].split(",")
+			var t := pt[1].split(",")
+			cams.append([Vector3(float(p[0]), float(p[1]), float(p[2])), Vector3(float(t[0]), float(t[1]), float(t[2]))])
 		else: variants.append(a)
 	if not variants.has("base"):
 		variants.push_front("base")
@@ -75,19 +83,23 @@ func _ready() -> void:
 	else:
 		for s in samples:
 			offsets.append(length * (float(s) + 0.5) / float(samples))
-	samples = offsets.size()
+	samples = offsets.size() if cams.is_empty() else cams.size()
 	var totals := {}
 	for v in variants:
 		totals[v] = 0.0
 	for s in samples:
-		var off := offsets[s]
-		var xf := path.global_transform * curve.sample_baked_with_rotation(off, true)
-		var p := xf.origin
-		var fwd := -xf.basis.z
-		fwd.y = 0.0
-		fwd = fwd.normalized()
-		cam.global_position = p - fwd * 6.0 + Vector3.UP * 2.6
-		cam.look_at(p + fwd * 8.0 + Vector3.UP * 0.8, Vector3.UP)
+		if not cams.is_empty():
+			cam.global_position = cams[s][0]
+			cam.look_at(cams[s][1], Vector3.UP)
+		else:
+			var off := offsets[s]
+			var xf := path.global_transform * curve.sample_baked_with_rotation(off, true)
+			var p := xf.origin
+			var fwd := -xf.basis.z
+			fwd.y = 0.0
+			fwd = fwd.normalized()
+			cam.global_position = p - fwd * 6.0 + Vector3.UP * 2.6
+			cam.look_at(p + fwd * 8.0 + Vector3.UP * 0.8, Vector3.UP)
 		var line := "  s%02d" % s
 		# Two passes over the variants; the first also warms up shader compiles.
 		var best := {}

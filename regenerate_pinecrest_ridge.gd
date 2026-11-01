@@ -1987,6 +1987,11 @@ var _garden_trees: Array = []
 var _garden_plants: Array = []
 ## Where the summit road's guardrail stops for the district's lane: [centre (x, z), radius].
 var _rail_gaps: Array = []
+## The cars parked in bays beside the houses' drives: at most RC_CARS, each [centre (x, z), yaw] (_plan_car).
+var _rc_car_spots: Array = []
+const RC_CARS := 4
+## The window boxes' geraniums: triangles in all the buildings' near meshes (_rc_flowers), for the log.
+var _rc_flower_tris := 0
 
 
 ## Builds `kind` with `kit` (and `fine`) in the kit's current frame; `ground` (x, z in the frame) gives the
@@ -2081,6 +2086,8 @@ func _plan_ridgecrest() -> void:
 		var c: Vector2 = st[5]
 		var best := Vector2.ZERO
 		var best_d := INF
+		var best_hw := 0.0
+		var best_axis := Vector2.RIGHT
 		for ln in RIDGECREST_LANES:
 			var pts: Array = ln[1]
 			for i in range(pts.size() - 1):
@@ -2088,14 +2095,67 @@ func _plan_ridgecrest() -> void:
 				if q.distance_to(c) < best_d:
 					best_d = q.distance_to(c)
 					best = q
+					best_hw = float(ln[0])
+					best_axis = ((pts[i + 1] as Vector2) - (pts[i] as Vector2)).normalized()
 		var half2: Vector2 = st[6]
 		var reach: float = maxf(best_d - minf(half2.x, half2.y) * 0.6, 0.0)
 		if reach > 2.0:
 			_lanes.append([PackedVector2Array([best, best + (c - best).normalized() * (best_d - minf(half2.x, half2.y) + 4.0)]), RC_DRIVE_HALF])
+			if _rc_car_spots.size() < RC_CARS:
+				_plan_car(best, best_axis, (c - best).normalized(), best_hw)
 	# The lane leaves the summit road through a gap in its guardrail.
 	var mouth: Vector2 = (RIDGECREST_LANES[0][1] as Array)[0]
 	_rail_gaps.append([mouth, float(RIDGECREST_LANES[0][0]) + 1.5])
 	print("  Ridgecrest: %d buildings, %d pads, %d lanes and drives" % [_rc_sites.size(), _rc_pads.size() / 7, _lanes.size()])
+
+
+## Plans a parking bay for a house's car beside its drive, which meets the lane at `best`, the lane running along
+## `axis` there, `lane_hw` a side, the house toward `dir`: the car parallel to the lane 0.6m off its edge, nose
+## forward, on whichever side of the drive is clear of every building (by 0.8m), lane and bay. The bay is a short
+## lane of its own (paved, and the hedges, trees and lamps keep off it) on a pad graded level at the natural
+## ground's mean under it, added after the houses' pads so it wins where they blend out. The houses stand 0-12m
+## from their lanes, too close for a car nose-in on the drive: there it had stood half on the house's pad and half
+## down its graded edge, one end buried.
+func _plan_car(best: Vector2, axis: Vector2, dir: Vector2, lane_hw: float) -> void:
+	# The SUV's footprint at life size (CampKit.FOOT): x across, z from its nose (-) to its tail (+).
+	var f: Vector4 = CampKit.FOOT["suv"]
+	var half := Vector2((f.y - f.x) * 0.5, (f.w - f.z) * 0.5) * PROP_SCALE
+	var side := Vector2(-axis.y, axis.x)
+	if side.dot(dir) < 0.0:
+		side = -side
+	for along in [1.0, -1.0]:
+		var o: Vector2 = best + side * (lane_hw + 0.6 + half.x) + axis * along * (RC_DRIVE_HALF + 0.6 + half.y)
+		if not _bay_clear(o, axis, side, half + Vector2.ONE * 0.5):
+			continue
+		var nose: Vector2 = axis * along
+		_rc_car_spots.append([o, _yaw_to(Vector3(nose.x, 0.0, nose.y))])
+		_lanes.append([PackedVector2Array([o - axis * (half.y + 0.4), o + axis * (half.y + 0.4)]), half.x + 0.4])
+		var y := 0.0
+		for c: Vector2 in [Vector2.ZERO, Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
+			var p: Vector2 = o + side * c.x * half.x + axis * c.y * half.y
+			y += float(_tg.call("natural_height", p.x, p.y)) / 5.0
+		# A whole ground cell past the car each way: with less, cells under its edges had a corner out in the blend,
+		# and the ground under it rose and fell by 10cm.
+		var m := GRID_STEP + 0.5
+		_rc_pads.append_array(PackedFloat32Array([o.x, o.y, half.x + m, half.y + m, _yaw_to(Vector3(nose.x, 0.0, nose.y)), y, 4.0]))
+		return
+
+
+## True where a car's bay (`o` its middle, `axis` along it, `side` across, `half` its half size) stands clear of every
+## Ridgecrest building's footprint (by 0.8m) and off every lane, drive and bay planned so far.
+func _bay_clear(o: Vector2, axis: Vector2, side: Vector2, half: Vector2) -> bool:
+	for i in range(5):
+		for j in range(9):
+			var p: Vector2 = o + side * lerpf(-half.x, half.x, i / 4.0) + axis * lerpf(-half.y, half.y, j / 8.0)
+			if _on_lane(p.x, p.y, 0.0):
+				return false
+			for st in _rc_sites:
+				var pos: Vector3 = st[2]
+				var foot: Rect2 = st[4]
+				var l: Vector3 = Basis(Vector3.UP, float(st[3])).inverse() * Vector3(p.x - pos.x, 0.0, p.y - pos.z) / PROP_SCALE
+				if foot.grow(0.8 / PROP_SCALE).has_point(Vector2(l.x, l.z)):
+					return false
+	return true
 
 
 ## True where a lane's centreline passes within `margin` of (x, z) (plus its half width).
@@ -2151,6 +2211,7 @@ func _build_ridgecrest(root: Node3D) -> void:
 		var xf := _place(pos, yaw)
 		_kit.set_frame(xf)
 		var res := _rc_build(rk, kind, int(st[1]), shell, fine, rng, ground)
+		_rc_flowers(body, rk, "%s_%d" % [kind, _rc_sites.find(st)])
 		for b in res["boxes"]:
 			var bb: Basis = b[2] if (b as Array).size() > 2 else Basis()
 			boxes.append([xf * (b[0] as Vector3), (b[1] as Vector3) * PROP_SCALE, Basis(Vector3.UP, yaw) * bb])
@@ -2218,7 +2279,7 @@ func _build_ridgecrest(root: Node3D) -> void:
 		body.add_child(cs)
 	_rc_boxes = boxes
 	_rc_cars(node)
-	print("  Ridgecrest: %d boxes, %d lamps, %d garden trees" % [boxes.size(), lamps, _garden_trees.size()])
+	print("  Ridgecrest: %d boxes, %d lamps, %d garden trees, %d triangles of window-box geraniums" % [boxes.size(), lamps, _garden_trees.size(), _rc_flower_tris])
 
 
 ## True where (x, z) lies on one of Ridgecrest's pads (grown by `margin`).
@@ -2313,28 +2374,65 @@ func _rc_plaza(rk: RidgecrestKit, shell: Dictionary, fine: Dictionary, rng: Rand
 		_garden_plants.append([Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * 1.5), p3), 7 + k % 3])
 
 
-## Residents' cars on four of the drives, nose toward the lane.
+## Residents' cars on four of the drives, nose toward the lane, each on the level spot _plan_car graded for it.
 func _rc_cars(root: Node3D) -> void:
 	var kit := {}
 	var boxes: Array = []
 	var cols := [Color(0.18, 0.19, 0.21), Color(0.93, 0.93, 0.91), Color(0.12, 0.22, 0.42), Color(0.62, 0.64, 0.66)]
-	var placed := 0
-	for ln in _lanes:
-		var pts: PackedVector2Array = ln[0]
-		if float(ln[1]) != RC_DRIVE_HALF or pts.size() < 2 or placed >= cols.size():
-			continue
-		var dir := (pts[1] - pts[0]).normalized()
-		var p := pts[1] - dir * 4.5
-		var at := Vector3(p.x, _ground(p.x, p.y), p.y)
-		var yaw := _yaw_to(Vector3(-dir.x, 0.0, -dir.y))
+	for i in range(_rc_car_spots.size()):
+		var o: Vector2 = _rc_car_spots[i][0]
+		var yaw: float = _rc_car_spots[i][1]
+		var at := Vector3(o.x, _ground(o.x, o.y), o.y)
 		_kit.set_frame(_place(at, yaw))
-		var sz: Vector3 = _camp.vehicle(kit, "suv", cols[placed], 0)
+		var sz: Vector3 = _camp.vehicle(kit, "suv", cols[i % cols.size()], 0)
 		boxes.append([at + Vector3(0, sz.y * 0.5 * PROP_SCALE, 0), Vector3(sz.z, sz.y, sz.x) * PROP_SCALE, Basis(Vector3.UP, yaw)])
-		placed += 1
+		_verify_car_level(at, yaw)
 	_kit.reset_frame()
-	if placed > 0:
+	if not _rc_car_spots.is_empty():
 		var body := _boxes_body(root, "RidgecrestCarsBody", boxes)
 		_commit(body, kit, "RidgecrestCars", 300.0)
+
+
+## Errors where the ground under a parked car is not level with it: sampled over its footprint, more than 10cm over
+## its wheels' plane (the body sunk into the ground) or 25cm under it (a wheel in the air).
+func _verify_car_level(at: Vector3, yaw: float) -> void:
+	var f: Vector4 = CampKit.FOOT["suv"]
+	var b := Basis(Vector3.UP, yaw)
+	var lo := INF
+	var hi := -INF
+	for i in range(3):
+		for j in range(5):
+			var w := at + b * (Vector3(lerpf(f.x, f.y, i / 2.0), 0.0, lerpf(f.z, f.w, j / 4.0)) * PROP_SCALE)
+			var d := _ground(w.x, w.z) - at.y
+			lo = minf(lo, d)
+			hi = maxf(hi, d)
+	print("  car at (%.0f, %.0f): the ground under it from %+.2f to %+.2f m" % [at.x, at.z, lo, hi])
+	if hi > 0.1 or lo < -0.25:
+		push_error("Ridgecrest: the car at (%.1f, %.1f) is not on level ground (%+.2f to %+.2f m)" % [at.x, at.z, lo, hi])
+
+
+## Commits the window boxes' geraniums RidgecrestKit grew on the building just built, as two meshes of its own (so
+## their visibility range is measured from the building, not the middle of the district): the plants out to past
+## the end of their crossfade (RidgecrestKit.FLOWER_FADE), the stand-in from before its start. No shadows.
+func _rc_flowers(parent: Node3D, rk: RidgecrestKit, tag: String) -> void:
+	for far in [false, true]:
+		var kit: Dictionary = rk.flora_far if far else rk.flora
+		if kit.is_empty():
+			continue
+		var nm: String = ("FlowersFar_" if far else "Flowers_") + tag
+		var mi := MeshInstance3D.new()
+		mi.name = nm
+		mi.mesh = _save_res(_kit.commit(kit), "ridgecrest_" + nm.to_snake_case())
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		if far:
+			mi.visibility_range_begin = RidgecrestKit.FLOWER_FADE.x - 20.0
+			mi.visibility_range_end = 280.0
+		else:
+			mi.visibility_range_end = RidgecrestKit.FLOWER_FADE.y + 20.0
+			_rc_flower_tris += (mi.mesh as ArrayMesh).surface_get_array_index_len(0) / 3
+		parent.add_child(mi)
+	rk.flora = {}
+	rk.flora_far = {}
 
 
 # ======================================================================================
