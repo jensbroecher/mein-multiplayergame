@@ -44,6 +44,16 @@ func _ready() -> void:
 		striped.resize(n)
 		var seen := PackedByteArray()
 		seen.resize(n)
+		# Each side apart (TerrainGenerator stripes the inside through a corner and the outside from its apex on):
+		# left of travel is UV.x under the middle.
+		var sides := [PackedByteArray(), PackedByteArray()]
+		sides[0].resize(n)
+		sides[1].resize(n)
+		var u_lo := INF
+		var u_hi := -INF
+		for uv in uvs:
+			u_lo = minf(u_lo, uv.x)
+			u_hi = maxf(u_hi, uv.x)
 		if cols == null or (cols as PackedColorArray).is_empty():
 			print("%s: curbs have NO corner weights (all striped)" % path)
 		else:
@@ -52,10 +62,13 @@ func _ready() -> void:
 				seen[i] = 1
 				if (cols as PackedColorArray)[vi].r > 0.5:
 					striped[i] = 1
+					sides[1 if uvs[vi].x > (u_lo + u_hi) * 0.5 else 0][i] = 1
 		# Fill the metres between mesh slices from the slice before.
 		for i in range(1, n):
 			if seen[i] == 0:
 				striped[i] = striped[i - 1]
+				sides[0][i] = sides[0][i - 1]
+				sides[1][i] = sides[1][i - 1]
 		var heading := PackedFloat32Array()
 		heading.resize(n)
 		for i in range(n):
@@ -66,6 +79,21 @@ func _ready() -> void:
 		for v in striped:
 			count += v
 		print("%s: lap %.0fm, %.0f%% striped" % [path, length, 100.0 * float(count) / float(n)])
+		for sd in range(2):
+			var k0 := 0
+			while k0 < n:
+				if sides[sd][k0] == 0:
+					k0 += 1
+					continue
+				var k1 := k0
+				while k1 + 1 < n and sides[sd][k1 + 1] == 1:
+					k1 += 1
+				# Which way the lap turns round this stretch (+-30m): a right-hander turns the heading up.
+				var t := _turn(heading, maxi(k0 - 30, 0), mini(k1 + 30, n - 1))
+				var inside: bool = (t > 0.0) == (sd == 1)
+				print("  %s kerb %5d-%5dm (%3dm): %s of a %4.0f deg %s" % ["left " if sd == 0 else "right", k0, k1,
+					k1 - k0 + 1, "INSIDE " if inside else "outside", rad_to_deg(absf(t)), "right-hander" if t > 0.0 else "left-hander"])
+				k0 = k1 + 1
 		var i := 0
 		while i < n:
 			if striped[i] == 0:
@@ -87,10 +115,13 @@ func _ready() -> void:
 				while e + 20 < n and absf(rad_to_deg(_turn(heading, e, e + 20))) >= 8.0:
 					e += 20
 				var cover := 0
+				var present := 0
 				for k in range(s, e + 1):
 					cover += striped[k]
-				print("  CORNER %5d-%5dm: turns %4.0f deg, tightest %s, %3.0f%% striped" % [s, e,
-					rad_to_deg(_turn(heading, s, e)), _tightest(heading, s, e), 100.0 * float(cover) / float(e - s + 1)])
+					present += seen[k]
+				print("  CORNER %5d-%5dm: turns %4.0f deg, tightest %s, %3.0f%% striped (curbs on %.0f%% of it)" % [s, e,
+					rad_to_deg(_turn(heading, s, e)), _tightest(heading, s, e), 100.0 * float(cover) / float(e - s + 1),
+					100.0 * float(present) / float(e - s + 1)])
 				s = e + 1
 			else:
 				s += 5

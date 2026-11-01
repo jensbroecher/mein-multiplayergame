@@ -46,6 +46,8 @@ const MASONRY := {"stone": 0, "plaster": 4, "slate": 6, "zinc": 7, "concrete": 8
 const WOOD := {"battens": 0, "lapboards": 1, "timber": 2, "painted": 3}
 
 var _kit: PropKit
+## Solid boxes for furniture and the like, in world space: [centre, size, basis] (see _solid).
+var solid: Array = []
 
 
 func _init(kit: PropKit) -> void:
@@ -368,21 +370,43 @@ func balcony(kit: Dictionary, fine: Dictionary, a: Vector3, b: Vector3, y: float
 
 ## A flower box hanging off a sill or a rail: `c` the middle of its top, along `along`, its front `n`.
 ## Geraniums in clumps above it and trailing over its front.
+## A window box of geraniums: a painted trough, mounds of round leaves spilling over its lip, heads of blossom
+## (a few round florets each) standing over them, and leaves trailing down the front. Leaves and blooms had been
+## boxes, which read as cubes.
 func flower_box(fine: Dictionary, c: Vector3, along: Vector3, n: Vector3, length: float, rng: RandomNumberGenerator) -> void:
 	var up := Vector3.UP
 	_kit.box(fine, "painted", Transform3D(Basis(along, up, n), c - up * 0.1), Vector3(length, 0.2, 0.2), DARK_WOOD, 1.0)
 	var bloom: Color = BLOOMS[rng.randi() % BLOOMS.size()]
-	var clumps := int(length / 0.22)
+	var clumps := maxi(1, int(length / 0.2))
 	for i in range(clumps):
-		var p := c + along * (-length * 0.5 + 0.11 + 0.22 * i) + n * rng.randf_range(-0.05, 0.05)
-		_kit.box(fine, "matte", Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p + up * 0.06), Vector3(0.2, 0.12, 0.2), LEAF, 0.0)
-		for k in range(3):
-			var fp := p + Vector3(rng.randf_range(-0.09, 0.09), rng.randf_range(0.12, 0.26), rng.randf_range(-0.09, 0.09))
-			_kit.box(fine, "matte", Transform3D(Basis(Vector3.UP, rng.randf() * TAU), fp), Vector3.ONE * rng.randf_range(0.07, 0.1), bloom.lightened(rng.randf() * 0.15), 0.0)
+		var p := c + along * (-length * 0.5 + 0.1 + 0.2 * i) + n * rng.randf_range(-0.04, 0.05)
+		for k in range(2):
+			var lp := p + along * rng.randf_range(-0.06, 0.06) + n * rng.randf_range(-0.02, 0.08) + up * rng.randf_range(0.03, 0.08)
+			_ball(fine, lp, rng.randf_range(0.08, 0.11), 0.7, LEAF.lightened(rng.randf() * 0.12))
+		for k in range(2 if rng.randf() < 0.7 else 1):
+			var hc := p + along * rng.randf_range(-0.07, 0.07) + n * rng.randf_range(-0.04, 0.04) + up * rng.randf_range(0.15, 0.22)
+			var col: Color = bloom.lightened(rng.randf() * 0.15)
+			for f in range(3):
+				var a := TAU * float(f) / 3.0 + rng.randf() * 0.6
+				_ball(fine, hc + (along * cos(a) + n * sin(a)) * 0.035 + up * rng.randf_range(-0.01, 0.02), rng.randf_range(0.035, 0.045), 1.0, col)
 		# Trailing leaves down the front.
 		if rng.randf() < 0.6:
 			var tp := p + n * 0.11
 			_kit.quad(fine, "matte", [tp - along * 0.08, tp + along * 0.08, tp + along * 0.05 - up * rng.randf_range(0.2, 0.4), tp - along * 0.05 - up * 0.3], n, LEAF.darkened(0.1))
+
+
+## A small round lump at `c` (`r` across, `squash` times as tall): a leaf mound or a floret, smooth shaded.
+func _ball(kit: Dictionary, c: Vector3, r: float, squash: float, col: Color) -> void:
+	_kit.lathe(kit, "matte", c, [Vector2(0.0, -r * squash), Vector2(r * 0.71, -r * 0.71 * squash), Vector2(r, 0.0),
+			Vector2(r * 0.71, r * 0.71 * squash), Vector2(0.0, r * squash)], 5, col)
+
+
+## Records a solid box for something in the kit's current frame (`c`, `size` and `turn` in that frame); the
+## generator gives each its collider. Furniture is in the small-parts mesh, which nothing made solid: carts
+## drove through the hotel's terrace tables.
+func _solid(c: Vector3, size: Vector3, turn := Basis()) -> void:
+	var s: float = _kit.xf.basis.get_scale().x
+	solid.append([_kit.xf * c, size * s, _kit.xf.basis.orthonormalized() * turn])
 
 
 ## A stone chimney through the roof from y0 to y1 at (x, z), w across.
@@ -549,7 +573,8 @@ func hotel(kit: Dictionary, fine: Dictionary, rng: RandomNumberGenerator) -> Dic
 		table_set(fine, t, rng.randf() * TAU, rng)
 		parasol(fine, t, Color(0.94, 0.92, 0.86), 1.4)
 	var boxes: Array = [[Vector3((x0 + x1) * 0.5, ridge * 0.5, 0.0), Vector3(x1 - x0, ridge, z1 - z0)],
-			[Vector3((bx0 + bx1) * 0.5, bridge * 0.5, 0.0), Vector3(bx1 - bx0, bridge, bz1 - bz0)]]
+			[Vector3((bx0 + bx1) * 0.5, bridge * 0.5, 0.0), Vector3(bx1 - bx0, bridge, bz1 - bz0)],
+			[Vector3((x0 + bx1) * 0.5, -0.44, z0 - 3.35), Vector3(bx1 - x0 + 1.0, 1.52, 6.3)]]
 	return {"boxes": boxes, "labels": [["HOTEL RIDGECREST", Vector3(-1.4, 3.62, z0 - 0.02), fr, 0.42, Color(0.16, 0.30, 0.20)]]}
 
 
@@ -803,8 +828,11 @@ func pavilion(kit: Dictionary, fine: Dictionary, rng: RandomNumberGenerator) -> 
 	var px := 11.0
 	var pz0 := -9.0
 	var pz1 := 5.0
+	# The floor stands `deck` over the platform's foot: at 0 it lay in the plane of the pad the ground is graded
+	# to, and the grass showed through it in flickering patches.
+	var deck := 0.06
 	slab(kit, "stone", Vector3(-px, -2.8, pz0), Vector3(px, -0.05, pz1), STONE)
-	lid(kit, "stone", -px, px, pz0, pz1, 0.0, STONE.lightened(0.08))
+	lid(kit, "stone", -px, px, pz0, pz1, deck, STONE.lightened(0.08))
 	walls(kit, "stone", -px - 0.15, px + 0.15, pz0 - 0.15, pz1 + 0.15, -0.05, 0.12, STONE.darkened(0.15))
 	var gx := 8.0
 	var gz0 := -2.5
@@ -818,60 +846,72 @@ func pavilion(kit: Dictionary, fine: Dictionary, rng: RandomNumberGenerator) -> 
 	flat_roof(kit, "concrete", -px + 0.5, px - 0.5, pz0 + 1.5, pz1 - 0.2, h + 0.4, 0.38, CONCRETE.lightened(0.05), "metal", FRAME_DARK)
 	for c in [Vector3(-px + 1.0, 0, pz0 + 2.0), Vector3(px - 1.0, 0, pz0 + 2.0), Vector3(-px + 1.0, 0, pz1 - 0.7), Vector3(px - 1.0, 0, pz1 - 0.7)]:
 		_kit.tube(kit, "metal", c, c + Vector3(0, h + 0.02, 0), 0.09, 0.09, 10, FRAME_DARK)
-	glass_rail(kit, Vector3(px - 0.2, 0.0, pz0 + 0.2), Vector3(-px + 0.2, 0.0, pz0 + 0.2))
-	glass_rail(kit, Vector3(-px + 0.2, 0.0, pz0 + 0.2), Vector3(-px + 0.2, 0.0, gz0))
-	glass_rail(kit, Vector3(px - 0.2, 0.0, gz0), Vector3(px - 0.2, 0.0, pz0 + 0.2))
+	glass_rail(kit, Vector3(px - 0.2, deck, pz0 + 0.2), Vector3(-px + 0.2, deck, pz0 + 0.2))
+	glass_rail(kit, Vector3(-px + 0.2, deck, pz0 + 0.2), Vector3(-px + 0.2, deck, gz0))
+	glass_rail(kit, Vector3(px - 0.2, deck, gz0), Vector3(px - 0.2, deck, pz0 + 0.2))
 	for x in [-6.0, 0.0, 6.0]:
-		bench(fine, Vector3(x, 0.0, pz0 + 2.6), PI)
+		bench(fine, Vector3(x, deck, pz0 + 2.6), PI)
 	for x in [-3.0, 3.0]:
-		telescope(fine, Vector3(x, 0.0, pz0 + 0.9))
+		telescope(fine, Vector3(x, deck, pz0 + 0.9))
 	for i in range(3):
-		table_set(fine, Vector3(-4.5 + i * 3.6, 0.0, 0.8), rng.randf() * TAU, rng)
+		table_set(fine, Vector3(-4.5 + i * 3.6, deck, 0.8), rng.randf() * TAU, rng)
 	var boxes: Array = [[Vector3(0, -1.4, (pz0 + pz1) * 0.5), Vector3(px * 2.0, 2.8, pz1 - pz0)],
 			[Vector3(0, h * 0.5, (gz0 + gz1) * 0.5), Vector3(gx * 2.0, h, gz1 - gz0)]]
 	return {"boxes": boxes, "labels": [["RIDGECREST", Vector3(0, -1.35, pz0 - 0.03), Vector3(0, 0, -1), 1.15]]}
 
 
-## The estate's gate on the lane up from the road: stone piers with lanterns, wrought-iron gates swung
-## open, low stone walls curving away, the district's name on a slate in the left wall.
-func estate_gate(kit: Dictionary, fine: Dictionary) -> Dictionary:
+## The estate's entrance on the lane up from the road: two stone piers with lanterns (no gates between them),
+## low stone walls curving away, the district's name on a slate in the left wall. `ground` (x, z) gives
+## the ground's height in the frame there (none: flat): each pier stands on its own ground and the walls step
+## with the slope in short courses, their foot sunk under the lowest ground beneath them. Set level at the
+## ground under its middle, the walls had burrowed into the rising ground to one side.
+func estate_gate(kit: Dictionary, fine: Dictionary, ground := Callable()) -> Dictionary:
+	var gy := func(x: float, z: float) -> float:
+		return float(ground.call(x, z)) if ground.is_valid() else 0.0
 	var gap := 4.2
 	var boxes: Array = []
 	for s in [-1.0, 1.0]:
 		var x: float = s * gap
-		slab(kit, "stone", Vector3(x - 0.45, -1.0, -0.45), Vector3(x + 0.45, 2.7, 0.45), STONE)
-		slab(kit, "stone", Vector3(x - 0.55, 2.7, -0.55), Vector3(x + 0.55, 2.9, 0.55), STONE.darkened(0.15))
-		_kit.tube(fine, "metal", Vector3(x, 2.9, 0), Vector3(x, 3.05, 0), 0.12, 0.08, 8, FRAME_DARK)
-		_kit.box(kit, "lamp", Transform3D(Basis(), Vector3(x, 3.3, 0)), Vector3(0.32, 0.45, 0.32), Color(1.0, 0.86, 0.6))
-		_kit.lathe(kit, "metal", Vector3(x, 3.52, 0), [Vector2(0.26, 0.0), Vector2(0.0, 0.22)], 4, FRAME_DARK, true)
-		boxes.append([Vector3(x, 1.0, 0), Vector3(0.9, 3.4, 0.9)])
-		# The wall: straight out, then turning back from the lane.
+		var py: float = gy.call(x, 0.0)
+		var pfoot: float = minf(py, minf(gy.call(x - 0.45 * s, -0.45), gy.call(x + 0.45 * s, 0.45))) - 1.0
+		var up := Vector3(0, py, 0)
+		slab(kit, "stone", Vector3(x - 0.45, pfoot, -0.45), Vector3(x + 0.45, py + 2.7, 0.45), STONE)
+		slab(kit, "stone", Vector3(x - 0.55, 2.7, -0.55) + up, Vector3(x + 0.55, 2.9, 0.55) + up, STONE.darkened(0.15))
+		_kit.tube(fine, "metal", Vector3(x, 2.9, 0) + up, Vector3(x, 3.05, 0) + up, 0.12, 0.08, 8, FRAME_DARK)
+		_kit.box(kit, "lamp", Transform3D(Basis(), Vector3(x, 3.3, 0) + up), Vector3(0.32, 0.45, 0.32), Color(1.0, 0.86, 0.6))
+		_kit.lathe(kit, "metal", Vector3(x, 3.52, 0) + up, [Vector2(0.26, 0.0), Vector2(0.0, 0.22)], 4, FRAME_DARK, true)
+		boxes.append([Vector3(x, (pfoot + py + 3.4) * 0.5, 0), Vector3(0.9, py + 3.4 - pfoot, 0.9)])
+		# The wall: straight out, then turning back from the lane, in courses of at most 1.6m.
 		var w0 := Vector3(x + s * 0.45, 0, 0)
 		var w1 := Vector3(x + s * 5.5, 0, 0)
 		var w2 := Vector3(x + s * 8.0, 0, 2.6)
 		for seg in [[w0, w1], [w1, w2]]:
 			var a: Vector3 = seg[0]
 			var b: Vector3 = seg[1]
-			var mid := (a + b) * 0.5 + Vector3(0, 0.15, 0)
 			var dir := (b - a).normalized()
 			var bas := Basis(dir.cross(Vector3.UP).normalized() * -1.0, Vector3.UP, dir)
-			_kit.box(kit, "stone", Transform3D(bas, mid), Vector3(0.55, 2.3, a.distance_to(b)), STONE, 1.0)
-			_kit.box(kit, "stone", Transform3D(bas, mid + Vector3(0, 1.2, 0)), Vector3(0.7, 0.12, a.distance_to(b) + 0.1), STONE.darkened(0.2), 1.0)
-			boxes.append([mid, Vector3(0.55, 2.3, a.distance_to(b)), bas])
-		# The gate leaf, swung open toward the house.
-		var hinge := Vector3(x - s * 0.5, 0, 0.1)
-		var open := Vector3(-s * cos(deg_to_rad(70.0)), 0, sin(deg_to_rad(70.0)))
-		var tip := hinge + open * (gap - 0.55)
-		for y in [0.25, 1.95]:
-			_kit.beam(kit, "metal", hinge + Vector3(0, y, 0), tip + Vector3(0, y, 0), 0.06, 0.06, FRAME_DARK)
-		for i in range(10):
-			var p := hinge.lerp(tip, (float(i) + 0.5) / 10.0)
-			var top := 2.1 + 0.35 * sin(PI * (float(i) + 0.5) / 10.0)
-			_kit.beam(fine, "metal", p + Vector3(0, 0.1, 0), p + Vector3(0, top, 0), 0.03, 0.03, FRAME_DARK)
-			_kit.lathe(fine, "metal", p + Vector3(0, top, 0), [Vector2(0.04, 0.0), Vector2(0.0, 0.1)], 4, FRAME_DARK, true)
-	_plate(kit, "stone", Vector3(-gap - 3.0, 1.25, -0.29), Vector3(1, 0, 0), Vector3(0, 0, -1), 3.6, 0.85, Color(0.20, 0.22, 0.25))
-	return {"boxes": boxes, "labels": [["RIDGECREST", Vector3(-gap - 3.0, 1.38, -0.31), Vector3(0, 0, -1), 0.36],
-			["A DISTRICT OF BLOOMBAY", Vector3(-gap - 3.0, 1.0, -0.31), Vector3(0, 0, -1), 0.14]]}
+			var courses: int = maxi(1, ceili(a.distance_to(b) / 1.6))
+			for c in range(courses):
+				var ca := a.lerp(b, float(c) / float(courses))
+				var cb := a.lerp(b, float(c + 1) / float(courses))
+				var cm := (ca + cb) * 0.5
+				var top: float = gy.call(cm.x, cm.z) + 1.3
+				var foot: float = minf(gy.call(ca.x, ca.z), gy.call(cb.x, cb.z)) - 1.0
+				var length: float = ca.distance_to(cb)
+				var mid := Vector3(cm.x, (top + foot) * 0.5, cm.z)
+				_kit.box(kit, "stone", Transform3D(bas, mid), Vector3(0.55, top - foot, length + 0.02), STONE, 1.0)
+				_kit.box(kit, "stone", Transform3D(bas, Vector3(cm.x, top + 0.05, cm.z)), Vector3(0.7, 0.12, length + 0.1), STONE.darkened(0.2), 1.0)
+				boxes.append([mid, Vector3(0.55, top - foot, length), bas])
+	# The slate in the left wall's straight run, its top under the coping of the lowest course behind it: at a
+	# fixed height over the ground at its middle, the coping ran across RIDGECREST and hid it.
+	var sx: float = -gap - 3.0
+	var low := INF
+	for k in range(5):
+		low = minf(low, gy.call(sx + (float(k) - 2.0) * 0.9, 0.0))
+	var sy: float = low + 1.3 - 0.08 - 0.425
+	_plate(kit, "stone", Vector3(sx, sy, -0.29), Vector3(1, 0, 0), Vector3(0, 0, -1), 3.6, 0.85, Color(0.20, 0.22, 0.25))
+	return {"boxes": boxes, "labels": [["RIDGECREST", Vector3(sx, sy + 0.12, -0.31), Vector3(0, 0, -1), 0.36],
+			["CITY OF BLOOMBAY", Vector3(sx, sy - 0.24, -0.31), Vector3(0, 0, -1), 0.15]]}
 
 
 # ======================================================================================
@@ -909,6 +949,7 @@ func stone_wall(kit: Dictionary, a: Vector3, b: Vector3, h: float, w: float, uv 
 ## A lounger on a deck at `c` (its foot toward yaw's front): a frame, a cushion, the back raised.
 func lounger(fine: Dictionary, c: Vector3, yaw: float, cushion: Color) -> void:
 	var b := Basis(Vector3.UP, yaw)
+	_solid(c + b * Vector3(0, 0.45, 0.2), Vector3(0.7, 0.9, 1.9), b)
 	_kit.box(fine, "timber", Transform3D(b, c + b * Vector3(0, 0.28, 0.1)), Vector3(0.7, 0.06, 1.5), HONEY, 1.0)
 	_kit.box(fine, "canvas", Transform3D(b, c + b * Vector3(0, 0.34, 0.15)), Vector3(0.64, 0.07, 1.3), cushion)
 	_kit.box(fine, "canvas", Transform3D(b * Basis(Vector3(1, 0, 0), deg_to_rad(-55.0)), c + b * Vector3(0, 0.62, 0.88)), Vector3(0.64, 0.07, 0.7), cushion)
@@ -920,6 +961,7 @@ func lounger(fine: Dictionary, c: Vector3, yaw: float, cushion: Color) -> void:
 ## A teak table with four chairs round it at `c`.
 func table_set(fine: Dictionary, c: Vector3, yaw: float, rng: RandomNumberGenerator) -> void:
 	var b := Basis(Vector3.UP, yaw)
+	_solid(c + Vector3(0, 0.5, 0), Vector3(2.2, 1.0, 2.2), b)
 	_kit.box(fine, "timber", Transform3D(b, c + Vector3(0, 0.74, 0)), Vector3(1.4, 0.05, 0.85), HONEY, 1.0)
 	for sx in [-0.62, 0.62]:
 		for sz in [-0.36, 0.36]:
@@ -937,6 +979,7 @@ func table_set(fine: Dictionary, c: Vector3, yaw: float, rng: RandomNumberGenera
 
 ## A market parasol at `c`: a pole and an eight-sided canopy.
 func parasol(fine: Dictionary, c: Vector3, col: Color, r := 1.3) -> void:
+	_solid(c + Vector3(0, 1.2, 0), Vector3(0.12, 2.4, 0.12))
 	_kit.tube(fine, "metal", c, c + Vector3(0, 2.45, 0), 0.025, 0.025, 6, Color(0.85, 0.85, 0.82))
 	_kit.lathe(fine, "canvas", c + Vector3(0, 2.0, 0), [Vector2(r, 0.0), Vector2(r * 0.95, 0.06), Vector2(0.05, 0.48)], 8, col, true)
 	_kit.lathe(fine, "canvas", c + Vector3(0, 2.0, 0), [Vector2(0.05, 0.47), Vector2(r * 0.95, 0.05)], 8, col.darkened(0.25), true)
@@ -945,6 +988,7 @@ func parasol(fine: Dictionary, c: Vector3, col: Color, r := 1.3) -> void:
 ## A park bench at `c` facing yaw's front.
 func bench(fine: Dictionary, c: Vector3, yaw: float) -> void:
 	var b := Basis(Vector3.UP, yaw)
+	_solid(c + b * Vector3(0, 0.45, 0.04), Vector3(1.8, 0.9, 0.62), b)
 	for k in range(3):
 		_kit.box(fine, "timber", Transform3D(b, c + b * Vector3(0, 0.45, -0.18 + k * 0.17)), Vector3(1.8, 0.04, 0.14), HONEY, 1.0)
 	for k in range(2):
@@ -956,6 +1000,7 @@ func bench(fine: Dictionary, c: Vector3, yaw: float) -> void:
 
 ## A coin-operated telescope on a post at `c`, looking toward -z.
 func telescope(fine: Dictionary, c: Vector3) -> void:
+	_solid(c + Vector3(0, 0.7, 0), Vector3(0.36, 1.4, 0.36))
 	_kit.tube(fine, "metal", c, c + Vector3(0, 1.05, 0), 0.06, 0.05, 8, Color(0.18, 0.40, 0.30))
 	_kit.box(fine, "metal", Transform3D(Basis(Vector3(1, 0, 0), deg_to_rad(8.0)), c + Vector3(0, 1.25, 0)), Vector3(0.36, 0.32, 0.6), Color(0.18, 0.40, 0.30))
 	for s in [-1.0, 1.0]:
@@ -964,6 +1009,7 @@ func telescope(fine: Dictionary, c: Vector3) -> void:
 
 ## A garden lamp post at `c`: a slim dark post with a lantern.
 func lamp_post(kit: Dictionary, fine: Dictionary, c: Vector3, h := 2.6) -> void:
+	_solid(c + Vector3(0, h * 0.5, 0), Vector3(0.14, h, 0.14))
 	_kit.tube(kit, "metal", c, c + Vector3(0, h, 0), 0.05, 0.04, 6, FRAME_DARK)
 	_kit.box(kit, "lamp", Transform3D(Basis(), c + Vector3(0, h + 0.2, 0)), Vector3(0.24, 0.32, 0.24), Color(1.0, 0.86, 0.62))
 	_kit.lathe(fine, "metal", c + Vector3(0, h + 0.36, 0), [Vector2(0.2, 0.0), Vector2(0.0, 0.16)], 4, FRAME_DARK, true)

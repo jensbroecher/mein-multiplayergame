@@ -242,6 +242,19 @@ the others re-bakes it (see Lakeside Course below).
   each house) are painted on the ground, and `_on_lane` keeps the woods, boulders and the summit road's guardrail
   (`_rail_gaps`) off them. Hedges and dry-stone walls, garden trees from the woods' own meshes (`_garden_trees`,
   added by `_build_woodland`), the plaza's fountain, lamps, SUVs on four drives; the names are Label3Ds.
+  - A building's floor at its local y 0 lies in the plane of its pad, which the ground is graded to, and flickers
+    with the grass: the pavilion's terrace stands `deck` (6cm) up. `_verify_ridgecrest_apart` errors where two
+    footprints overlap in plan (the gate's west wall ran through the pavilion terrace's glass balustrade; the
+    pavilion moved west). The gate has no pad: `estate_gate` takes a ground lookup, so each pier and each course of
+    its walls (at most 1.6m, stepping with the slope) stands on its own ground; set level at the ground under its
+    middle, its walls burrowed into the rising ground. It has no gates between its piers, and its slate ("CITY OF
+    BLOOMBAY") sits under the coping of the lowest course behind it (the coping had run across RIDGECREST).
+    Chevron boards keep off the lanes (`_on_lane`).
+  - Furniture is solid: RidgecrestKit's helpers (`table_set`, `parasol`, `bench`, `lounger`, `telescope`,
+    `lamp_post`) record boxes in world space from the kit's frame (`_solid`, `solid`), which `_build_ridgecrest`
+    adds to RidgecrestBody; carts drove through the hotel's terrace tables (and its raised terrace, now a box of
+    its own). Window boxes are geraniums of round leaf mounds and florets (`_ball`), not boxes.
+    `res://scratch/ridgecrest_solids.gd` (`-s`, headless, `-- x,z ... [r=3]`) lists the boxes near a spot.
   - The walls are solid quads, so a window's glass lies just proud of the face inside a casing that stands out (set
     back, it was hidden behind the wall). Glass is `ridgecrest_glass.gdshader` (a made-up reflection in EMISSION, as
     on Nyota's towers; COLOR.a is the curtain); slate, standing-seam zinc and board-formed concrete are
@@ -449,9 +462,22 @@ The menus call it Arco del Viento (it was Canyon Drift / CANYON COURSE); files a
 ## Curbs
 
 `curb_stripes.gdshader` draws the red/white kerb only where the curb mesh's vertex colour red channel is
-1 (corners), and a plain shoulder with a white edge line elsewhere. TerrainGenerator writes that weight
+1 (corners), and a plain white kerb elsewhere. TerrainGenerator writes that weight
 (`_apply_curb_corner_weights`) when it builds the curbs. To update the saved curb meshes of every level
-without regenerating them, run `res://refresh_curb_corners.tscn` headless.
+without regenerating them, run `res://refresh_curb_corners.tscn` headless (Lakeside, Mountain Pass, Bloombay,
+Pinecrest and Frostpeak are the levels with these curbs; Mountain Pass's had no weights at all and was striped
+all round).
+- A metre is in a corner when the `CURB_CORNER_SPAN` (60m) centred on it turns `CURB_CORNER_TURN` (30 degrees) or
+  more in plan; each corner runs on `CURB_CORNER_LEAD` (10m) into its braking zone and exit, corners closer than
+  `CURB_CORNER_JOIN` (12m) become one kerb, and the transitions snap to whole stripe pairs. The old rule (a radius
+  under about 105m over a +-8m window) striped gentle sweepers and left real corners in fragments, and joining
+  over 30m made Pinecrest's hairpins one 420m kerb.
+- Each side is weighted apart, as on a circuit: the inside where the corner measures as one, the outside from the
+  apex out through the exit (where the turn in the 30m behind outweighs the 30m ahead). A right-hander turns the
+  heading's angle `atan2(z, x)` up and its inside is the right of travel (`_path_right`: UV.x past the curb mesh's
+  middle). Striped on both sides from braking zone to exit, a corner read as a painted lane.
+- `res://scratch/curb_corner_probe.tscn -- [level=...] [turn=35]` (headless) lists each level's striped runs (how
+  far the lap turns over each) and its real corners with how much of each is striped.
 
 ## Road gaps
 

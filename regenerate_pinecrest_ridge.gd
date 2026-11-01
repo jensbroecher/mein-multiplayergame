@@ -1469,6 +1469,10 @@ func _build_chevrons(root: Node3D) -> void:
 			var at := _at(s, lat)
 			if _road_distance(at.x, at.z) - 0.8 * PROP_SCALE - ROAD_HALF < 0.6:
 				continue
+			# Not on Ridgecrest's lanes: one stood in the lane up to the estate's gate.
+			if _on_lane(at.x, at.z, 0.8 * PROP_SCALE):
+				print("  chevron left off the lane at ", at)
+				continue
 			var aim: Vector3 = -(fr["fwd"] as Vector3) - (fr["right"] as Vector3) * signf(lat) * 0.45
 			var yaw := _yaw_to(aim.normalized())
 			_kit.set_frame(_place(at, yaw))
@@ -1941,7 +1945,7 @@ func _root_tangle_mesh(bark_mat: Material) -> ArrayMesh:
 ## each on a pad graded level at the natural ground's mean under it, the pines left standing between.
 const RIDGECREST_SITES := [
 	["gate", 0, 3.0, -284.0, Vector3(3.0, 0.0, 0.0)],
-	["pavilion", 0, -38.0, -292.0, Vector3(-38.0, 0.0, 0.0)],
+	["pavilion", 0, -46.0, -292.0, Vector3(-46.0, 0.0, 0.0)],
 	["hotel", 0, 56.0, -306.0, Vector3(120.0, 0.0, -40.0)],
 	["chapel", 0, 10.0, -392.0, Vector3(6.0, 0.0, -300.0)],
 	["chalet", 0, -82.0, -312.0, Vector3(-150.0, 0.0, 140.0)],
@@ -1964,7 +1968,7 @@ const RIDGECREST_LANES := [
 	[2.8, [Vector2(8.0, -360.0), Vector2(-30.0, -375.0), Vector2(-50.0, -372.0)]],
 	[3.0, [Vector2(5.0, -314.0), Vector2(25.0, -326.0), Vector2(45.0, -328.0), Vector2(74.0, -332.0)]],
 	[2.8, [Vector2(8.0, -360.0), Vector2(30.0, -368.0), Vector2(45.0, -372.0)]],
-	[2.8, [Vector2(4.0, -300.0), Vector2(-14.0, -302.0)]],
+	[2.8, [Vector2(4.0, -300.0), Vector2(-22.0, -302.0)]],
 ]
 const RIDGECREST_PLAZA := Vector2(5.0, -314.0)
 ## Garden round each building's footprint (m), and how far its pad's grading eases out.
@@ -1985,8 +1989,9 @@ var _garden_plants: Array = []
 var _rail_gaps: Array = []
 
 
-## Builds `kind` with `kit` (and `fine`) in the kit's current frame.
-func _rc_build(rk: RidgecrestKit, kind: String, variant: int, kit: Dictionary, fine: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
+## Builds `kind` with `kit` (and `fine`) in the kit's current frame; `ground` (x, z in the frame) gives the
+## ground's height there for the gate, which has no pad.
+func _rc_build(rk: RidgecrestKit, kind: String, variant: int, kit: Dictionary, fine: Dictionary, rng: RandomNumberGenerator, ground := Callable()) -> Dictionary:
 	match kind:
 		"chalet":
 			return rk.chalet(kit, fine, rng, variant)
@@ -2000,7 +2005,26 @@ func _rc_build(rk: RidgecrestKit, kind: String, variant: int, kit: Dictionary, f
 			return rk.villa_gable(kit, fine, rng, variant)
 		"pavilion":
 			return rk.pavilion(kit, fine, rng)
-	return rk.estate_gate(kit, fine)
+	return rk.estate_gate(kit, fine, ground)
+
+
+## Errors where two of Ridgecrest's buildings (their footprints, no garden) overlap in plan: the gate's west
+## wall once ran through the clubhouse terrace's glass balustrade.
+func _verify_ridgecrest_apart() -> void:
+	var polys: Array = []
+	for st in _rc_sites:
+		var foot: Rect2 = st[4]
+		var pos: Vector3 = st[2]
+		var b := Basis(Vector3.UP, float(st[3]))
+		var poly := PackedVector2Array()
+		for c in [foot.position, Vector2(foot.end.x, foot.position.y), foot.end, Vector2(foot.position.x, foot.end.y)]:
+			var w: Vector3 = pos + b * (Vector3(c.x, 0.0, c.y) * PROP_SCALE)
+			poly.append(Vector2(w.x, w.z))
+		polys.append(poly)
+	for i in range(polys.size()):
+		for j in range(i + 1, polys.size()):
+			if not Geometry2D.intersect_polygons(polys[i], polys[j]).is_empty():
+				push_error("Ridgecrest: %s and %s overlap" % [_rc_sites[i][0], _rc_sites[j][0]])
 
 
 ## Before the world is built: each building's footprint (built once at the origin and measured), its
@@ -2044,6 +2068,7 @@ func _plan_ridgecrest() -> void:
 			_lawns.append([Vector2(centre.x, centre.z), half - Vector2.ONE * 0.5, yaw])
 		pos.y = y
 		_rc_sites.append([kind, variant, pos, yaw, foot, Vector2(centre.x, centre.z), half])
+	_verify_ridgecrest_apart()
 	for ln in RIDGECREST_LANES:
 		_lanes.append([PackedVector2Array(ln[1]), float(ln[0])])
 	# The plaza where the lanes meet, graded level.
@@ -2113,12 +2138,19 @@ func _build_ridgecrest(root: Node3D) -> void:
 		var kind: String = st[0]
 		var pos: Vector3 = st[2]
 		var yaw: float = st[3]
+		var ground := Callable()
 		if kind == "gate":
-			# No pad of its own: on the ground where the lane climbs through it.
-			pos.y = _ground(pos.x, pos.z) - 0.1
+			# No pad of its own: on the ground where the lane climbs through it, each pier and course of its
+			# walls on the ground under it.
+			pos.y = _ground(pos.x, pos.z)
+			var origin := pos
+			var turn := Basis(Vector3.UP, yaw)
+			ground = func(lx: float, lz: float) -> float:
+				var w: Vector3 = origin + turn * (Vector3(lx, 0.0, lz) * PROP_SCALE)
+				return (_ground(w.x, w.z) - origin.y) / PROP_SCALE
 		var xf := _place(pos, yaw)
 		_kit.set_frame(xf)
-		var res := _rc_build(rk, kind, int(st[1]), shell, fine, rng)
+		var res := _rc_build(rk, kind, int(st[1]), shell, fine, rng, ground)
 		for b in res["boxes"]:
 			var bb: Basis = b[2] if (b as Array).size() > 2 else Basis()
 			boxes.append([xf * (b[0] as Vector3), (b[1] as Vector3) * PROP_SCALE, Basis(Vector3.UP, yaw) * bb])
@@ -2159,7 +2191,6 @@ func _build_ridgecrest(root: Node3D) -> void:
 				if not _rc_in_pad(p, 1.0):
 					var gy := _ground(p.x, p.y)
 					rk.lamp_post(shell, fine, Vector3(p.x, gy, p.y) / PROP_SCALE)
-					boxes.append([Vector3(p.x, gy + 2.5, p.y), Vector3(0.2, 5.0, 0.2), Basis()])
 					lamps += 1
 				acc += 22.0
 			acc -= d
@@ -2176,6 +2207,8 @@ func _build_ridgecrest(root: Node3D) -> void:
 	mf.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 	mf.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	body.add_child(mf)
+	# The furniture, lamps and the like RidgecrestKit made solid as it built them (in world space already).
+	boxes.append_array(rk.solid)
 	for b in boxes:
 		var cs := CollisionShape3D.new()
 		var shape := BoxShape3D.new()
@@ -2262,7 +2295,6 @@ func _rc_plaza(rk: RidgecrestKit, shell: Dictionary, fine: Dictionary, rng: Rand
 		rk.bench(fine, p, _yaw_to(-p))
 		var lp := Vector3(cos(a + PI * 0.25), 0.0, sin(a + PI * 0.25)) * 5.6
 		rk.lamp_post(shell, fine, lp)
-		boxes.append([c + lp * PROP_SCALE + Vector3(0, 2.5, 0), Vector3(0.2, 5.0, 0.2), Basis()])
 	_kit.reset_frame()
 	for k in range(7):
 		var a2 := TAU * (k + rng.randf() * 0.5) / 7.0

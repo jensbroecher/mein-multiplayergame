@@ -1293,13 +1293,18 @@ func _get_world_curve() -> Curve3D:
 	return world_curve
 
 
-## Curb stripes belong in corners only. Tight corners get the red/white kerb, straights a plain
-## shoulder -- curb_stripes.gdshader reads this weight from the vertex colour's red channel.
-const CURB_CORNER_RADIUS := 70.0     # at or below this radius the curb is fully striped
-const CURB_STRAIGHT_RADIUS := 140.0  # at or above this radius it is plain
-## The kerb starts this far before the corner is measured to begin and runs on past its exit, the
-## way real kerbs cover the braking zone and the exit run-off.
-const CURB_CORNER_LEAD := 12.0
+## Curb stripes belong in corners only, as on a real circuit: corners get the red/white kerb, the rest a
+## plain white one -- curb_stripes.gdshader reads this weight from the vertex colour's red channel.
+## A metre of the lap is in a corner when the CURB_CORNER_SPAN centred on it turns CURB_CORNER_TURN or more
+## (in plan), which covers a hairpin from its braking zone to its exit and leaves sweepers plain. The
+## old rule (radius under ~105m over a +-8m window) striped gentle bends and left corners in fragments.
+const CURB_CORNER_SPAN := 60
+const CURB_CORNER_TURN := 30.0
+const CURB_CORNER_LEAD := 10
+## Corners closer than this run on into one kerb (a chicane, an S); striped runs shorter than
+## CURB_CORNER_MIN are dropped.
+const CURB_CORNER_JOIN := 12
+const CURB_CORNER_MIN := 20
 ## Transitions snap to whole stripe pairs (2 x the shader's 1.5m stripe), so a kerb never starts or
 ## ends with half a stripe.
 const CURB_STRIPE_PAIR := 3.0
@@ -1317,52 +1322,137 @@ func _apply_curb_corner_weights(mesh: ArrayMesh, curve: Curve3D) -> void:
 	var length: float = curve.get_baked_length()
 	if length < 1.0:
 		return
-	# 1. Radius every metre from the heading change across a +-8m window (horizontal plane only, so
-	#    crests and dips do not count as corners).
+	# 1. The heading every metre (horizontal plane only, so crests and dips do not count as corners), and
+	#    its change from one metre to the next.
 	var n: int = int(length) + 1
-	var raw := PackedFloat32Array()
-	raw.resize(n)
-	const WIN := 8.0
+	var turn := PackedFloat32Array()
+	turn.resize(n)
+	var prev_h := 0.0
 	for i in range(n):
-		var d: float = float(i)
-		var a: Vector3 = _curve_sample_wrapped(curve, d - WIN, length)
-		var b: Vector3 = _curve_sample_wrapped(curve, d, length)
-		var c: Vector3 = _curve_sample_wrapped(curve, d + WIN, length)
-		var v1 := Vector2(b.x - a.x, b.z - a.z)
-		var v2 := Vector2(c.x - b.x, c.z - b.z)
-		var w: float = 0.0
-		if v1.length() > 0.01 and v2.length() > 0.01:
-			var ang: float = absf(v1.angle_to(v2))
-			var radius: float = WIN / maxf(ang, 1e-4)
-			w = 1.0 - smoothstep(CURB_CORNER_RADIUS, CURB_STRAIGHT_RADIUS, radius)
-		raw[i] = w
-	# 2. Spread each corner forward and back by CURB_CORNER_LEAD (a max filter).
+		var a: Vector3 = _curve_sample_wrapped(curve, float(i) - 1.0, length)
+		var b: Vector3 = _curve_sample_wrapped(curve, float(i) + 1.0, length)
+		var h: float = atan2(b.z - a.z, b.x - a.x)
+		turn[i] = wrapf(h - prev_h, -PI, PI) if i > 0 else 0.0
+		prev_h = h
+	if is_loop:
+		var a0: Vector3 = _curve_sample_wrapped(curve, -1.0, length)
+		var b0: Vector3 = _curve_sample_wrapped(curve, 1.0, length)
+		turn[0] = wrapf(atan2(b0.z - a0.z, b0.x - a0.x) - prev_h, -PI, PI)
+	# 2. In a corner where the span centred on the metre turns CURB_CORNER_TURN or more.
 	var spread := PackedFloat32Array()
 	spread.resize(n)
-	var lead: int = int(CURB_CORNER_LEAD)
+	var half_span: int = CURB_CORNER_SPAN / 2
+	var wsum := PackedFloat32Array()
+	wsum.resize(n)
 	for i in range(n):
-		var m: float = 0.0
-		for k in range(-lead, lead + 1):
+		var sum := 0.0
+		for k in range(-half_span + 1, half_span + 1):
 			var j: int = i + k
 			if is_loop:
 				j = posmod(j, n)
 			elif j < 0 or j >= n:
 				continue
-			m = maxf(m, raw[j])
-		spread[i] = m
-	# 3. Decide per stripe pair, so the kerb begins and ends on a whole stripe.
+			sum += turn[j]
+		wsum[i] = sum
+		spread[i] = 1.0 if absf(sum) >= deg_to_rad(CURB_CORNER_TURN) else 0.0
+	# 3. Run each kerb on CURB_CORNER_LEAD past where the corner is measured, into the braking zone and
+	#    the exit (a 40 degree bend spread over 60m measures as a corner for only its middle 16m). Then join
+	#    corners closer than CURB_CORNER_JOIN and drop what is left shorter than CURB_CORNER_MIN.
+	var core := spread.duplicate()
+	for i in range(n):
+		if core[i] == 0.0:
+			continue
+		for k in range(-CURB_CORNER_LEAD, CURB_CORNER_LEAD + 1):
+			var j: int = i + k
+			if is_loop:
+				spread[posmod(j, n)] = 1.0
+			elif j >= 0 and j < n:
+				spread[j] = 1.0
+	_curb_runs(spread, 0.0, CURB_CORNER_JOIN, 1.0)
+	_curb_runs(spread, 1.0, CURB_CORNER_MIN, 0.0)
+	# 4. Which side, as on a circuit: the inside through the corner (where it measures as one), the outside
+	#    from the apex out through the exit (where the turn behind outweighs the turn ahead, and on through the
+	#    lead after it). Both sides from braking zone to exit read as a painted lane. A right-hander turns the
+	#    heading's angle up, and its inside is the right of travel (_path_right, UV.x past the middle).
+	var left := PackedFloat32Array()
+	left.resize(n)
+	var right := PackedFloat32Array()
+	right.resize(n)
+	for i in range(n):
+		if spread[i] == 0.0:
+			continue
+		if core[i] == 1.0:
+			if wsum[i] > 0.0:
+				right[i] = 1.0
+			else:
+				left[i] = 1.0
+		var behind := 0.0
+		var ahead := 0.0
+		for k in range(1, half_span + 1):
+			behind += _turn_at(turn, i - k + 1)
+			ahead += _turn_at(turn, i + k)
+		if absf(behind) >= absf(ahead) and absf(behind) > deg_to_rad(5.0):
+			if behind > 0.0:
+				left[i] = 1.0
+			else:
+				right[i] = 1.0
+	# 5. Decide per stripe pair, so the kerb begins and ends on a whole stripe.
 	var arrays: Array = mesh.surface_get_arrays(0)
 	var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
+	var u_min := INF
+	var u_max := -INF
+	for uv in uvs:
+		u_min = minf(u_min, uv.x)
+		u_max = maxf(u_max, uv.x)
+	var u_mid: float = (u_min + u_max) * 0.5
 	var colors := PackedColorArray()
 	colors.resize(uvs.size())
 	for vi in range(uvs.size()):
 		var cell_mid: float = (floorf(uvs[vi].y / CURB_STRIPE_PAIR) + 0.5) * CURB_STRIPE_PAIR
 		var idx: int = clampi(int(cell_mid), 0, n - 1)
-		var w: float = 1.0 if spread[idx] >= 0.5 else 0.0
+		var side: PackedFloat32Array = right if uvs[vi].x > u_mid else left
+		var w: float = 1.0 if side[idx] >= 0.5 else 0.0
 		colors[vi] = Color(w, w, w, 1.0)
 	arrays[Mesh.ARRAY_COLOR] = colors
 	mesh.clear_surfaces()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+
+
+## The heading's change at metre i (round the lap's end on a loop, none past the ends otherwise).
+func _turn_at(turn: PackedFloat32Array, i: int) -> float:
+	if is_loop:
+		return turn[posmod(i, turn.size())]
+	return turn[i] if i >= 0 and i < turn.size() else 0.0
+
+
+## Sets every run of `value` in `w` shorter than `shorter` metres to `to` (round the lap's end on a loop;
+## a run that is the whole lap is left alone).
+func _curb_runs(w: PackedFloat32Array, value: float, shorter: int, to: float) -> void:
+	var n: int = w.size()
+	var start := 0
+	if is_loop:
+		# Start the scan where a run of `value` begins, so no run is split at the lap's end.
+		start = -1
+		for i in range(n):
+			if w[i] == value and w[posmod(i - 1, n)] != value:
+				start = i
+				break
+		if start < 0:
+			return
+	var i := 0
+	while i < n:
+		var p: int = posmod(start + i, n) if is_loop else i
+		if w[p] != value:
+			i += 1
+			continue
+		var run_len := 0
+		while i + run_len < n and w[posmod(start + i + run_len, n) if is_loop else i + run_len] == value:
+			run_len += 1
+		var touches_end: bool = not is_loop and (i == 0 or i + run_len >= n)
+		if run_len < shorter and not touches_end:
+			for k in range(run_len):
+				w[posmod(start + i + k, n) if is_loop else i + k] = to
+		i += run_len
 
 
 func _curve_sample_wrapped(curve: Curve3D, d: float, length: float) -> Vector3:
