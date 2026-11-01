@@ -1063,8 +1063,7 @@ func estate_gate(kit: Dictionary, fine: Dictionary, ground := Callable()) -> Dic
 		slab(kit, "stone", Vector3(x - 0.45, pfoot, -0.45), Vector3(x + 0.45, py + 2.7, 0.45), STONE)
 		slab(kit, "stone", Vector3(x - 0.55, 2.7, -0.55) + up, Vector3(x + 0.55, 2.9, 0.55) + up, STONE.darkened(0.15))
 		_kit.tube(fine, "metal", Vector3(x, 2.9, 0) + up, Vector3(x, 3.05, 0) + up, 0.12, 0.08, 8, FRAME_DARK)
-		_kit.box(kit, "lamp", Transform3D(Basis(), Vector3(x, 3.3, 0) + up), Vector3(0.32, 0.45, 0.32), Color(1.0, 0.86, 0.6))
-		_kit.lathe(kit, "metal", Vector3(x, 3.52, 0) + up, [Vector2(0.26, 0.0), Vector2(0.0, 0.22)], 4, FRAME_DARK, true)
+		lantern(kit, fine, Vector3(x, 3.05, 0) + up, 1.25)
 		boxes.append([Vector3(x, (pfoot + py + 3.4) * 0.5, 0), Vector3(0.9, py + 3.4 - pfoot, 0.9)])
 		# The wall: straight out, then turning back from the lane, in courses of at most 1.6m.
 		var w0 := Vector3(x + s * 0.45, 0, 0)
@@ -1194,10 +1193,51 @@ func telescope(fine: Dictionary, c: Vector3) -> void:
 
 ## A garden lamp post at `c`: a slim dark post with a lantern.
 func lamp_post(kit: Dictionary, fine: Dictionary, c: Vector3, h := 2.6) -> void:
-	_solid(c + Vector3(0, h * 0.5, 0), Vector3(0.14, h, 0.14))
-	_kit.tube(kit, "metal", c, c + Vector3(0, h, 0), 0.05, 0.04, 6, FRAME_DARK)
-	_kit.box(kit, "lamp", Transform3D(Basis(), c + Vector3(0, h + 0.2, 0)), Vector3(0.24, 0.32, 0.24), Color(1.0, 0.86, 0.62))
-	_kit.lathe(fine, "metal", c + Vector3(0, h + 0.36, 0), [Vector2(0.2, 0.0), Vector2(0.0, 0.16)], 4, FRAME_DARK, true)
+	_solid(c + Vector3(0, h * 0.5, 0), Vector3(0.2, h, 0.2))
+	# A cast-iron post: a flared foot, a tapering shaft with collars, a ladder bar (its ends balled) under the lantern.
+	_kit.lathe(kit, "metal", c, [Vector2(0.13, 0.0), Vector2(0.13, 0.05), Vector2(0.1, 0.1), Vector2(0.07, 0.2),
+			Vector2(0.05, 0.32), Vector2(0.0, 0.32)], 8, FRAME_DARK)
+	_kit.tube(kit, "metal", c + Vector3(0, 0.3, 0), c + Vector3(0, h - 0.06, 0), 0.045, 0.034, 8, FRAME_DARK)
+	for y in [0.32, 1.05, h - 0.14]:
+		_kit.lathe(fine, "metal", c + Vector3(0, y, 0), [Vector2(0.044, 0.0), Vector2(0.062, 0.02), Vector2(0.062, 0.05),
+				Vector2(0.044, 0.07)], 8, FRAME_DARK)
+	var bar := c + Vector3(0, h - 0.32, 0)
+	_kit.beam(fine, "metal", bar - Vector3(0.2, 0, 0), bar + Vector3(0.2, 0, 0), 0.025, 0.025, FRAME_DARK)
+	for s in [-1.0, 1.0]:
+		_kit.lathe(fine, "metal", bar + Vector3(s * 0.21, -0.03, 0), [Vector2(0.0, 0.0), Vector2(0.025, 0.012), Vector2(0.03, 0.03),
+				Vector2(0.025, 0.048), Vector2(0.0, 0.06)], 6, FRAME_DARK)
+	lantern(kit, fine, c + Vector3(0, h - 0.06, 0))
+
+
+## A lantern standing on `c` (its foot), `s` times its usual size: a cup under it, four glass panes (glowing, "lamp")
+## widening upward between dark corner posts, a glazing bar down each, frames round their feet and heads, a pyramid
+## roof with eaves (closed underneath) and a finial. The lamp posts' lanterns had been glowing boxes.
+func lantern(kit: Dictionary, fine: Dictionary, c: Vector3, s := 1.0) -> void:
+	var up := Vector3.UP
+	# A four-sided lathe turned so its flats face x and z, like the panes.
+	var turn := Basis(Vector3.UP, PI * 0.25)
+	var glow := Color(1.0, 0.86, 0.62)
+	var b := 0.1 * s
+	var t := 0.13 * s
+	var y0 := 0.065 * s
+	var y1 := 0.4 * s
+	_kit.lathe(kit, "metal", c, [Vector2(0.03, 0.0) * s, Vector2(0.13, 0.05) * s, Vector2(0.15, 0.065) * s, Vector2(0.0, 0.065) * s],
+			4, FRAME_DARK, true, turn)
+	for d: Vector3 in [Vector3.RIGHT, Vector3.BACK, Vector3.LEFT, Vector3.FORWARD]:
+		var a := up.cross(d)
+		var n := (d * (y1 - y0) - up * (t - b)).normalized()
+		_kit.quad(kit, "lamp", [c + d * b - a * b + up * y0, c + d * b + a * b + up * y0, c + d * t + a * t + up * y1,
+				c + d * t - a * t + up * y1], n, glow)
+		_kit.beam(fine, "metal", c + d * (b + 0.004 * s) + up * y0, c + d * (t + 0.004 * s) + up * y1, 0.012 * s, 0.008 * s, FRAME_DARK, a)
+		_kit.beam(fine, "metal", c + (d + a) * b + up * y0, c + (d + a) * t + up * y1, 0.025 * s, 0.025 * s, FRAME_DARK, d)
+	_kit.box(kit, "metal", Transform3D(Basis(), c + up * (y0 + 0.01 * s)), Vector3(2.0 * b + 0.03 * s, 0.02 * s, 2.0 * b + 0.03 * s), FRAME_DARK)
+	_kit.box(kit, "metal", Transform3D(Basis(), c + up * (y1 + 0.0175 * s)), Vector3(2.0 * t + 0.03 * s, 0.035 * s, 2.0 * t + 0.03 * s), FRAME_DARK)
+	var r0 := y1 + 0.035 * s
+	_kit.lathe(kit, "metal", c, [Vector2(0.14 * s, r0), Vector2(0.25 * s, r0), Vector2(0.24 * s, r0 + 0.02 * s),
+			Vector2(0.04 * s, r0 + 0.165 * s), Vector2(0.0, r0 + 0.18 * s)], 4, FRAME_DARK, true, turn)
+	var top := r0 + 0.17 * s
+	_kit.lathe(fine, "metal", c, [Vector2(0.0, top), Vector2(0.03 * s, top + 0.015 * s), Vector2(0.035 * s, top + 0.04 * s),
+			Vector2(0.015 * s, top + 0.07 * s), Vector2(0.008 * s, top + 0.11 * s), Vector2(0.0, top + 0.13 * s)], 8, FRAME_DARK)
 
 
 ## The fountain on Ridgecrest's green: a stone basin, a column, a bowl.

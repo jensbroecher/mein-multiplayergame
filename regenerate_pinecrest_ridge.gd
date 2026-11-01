@@ -2249,7 +2249,7 @@ func _build_ridgecrest(root: Node3D) -> void:
 			var side := (b - a).normalized().orthogonal()
 			while acc < d:
 				var p := a.lerp(b, acc / d) + side * (hw + 1.2) * (1.0 if lamps % 2 == 0 else -1.0)
-				if not _rc_in_pad(p, 1.0):
+				if not _rc_in_pad(p, 1.0) and not _on_lane(p.x, p.y, 0.6):
 					var gy := _ground(p.x, p.y)
 					rk.lamp_post(shell, fine, Vector3(p.x, gy, p.y) / PROP_SCALE)
 					lamps += 1
@@ -2350,12 +2350,23 @@ func _rc_plaza(rk: RidgecrestKit, shell: Dictionary, fine: Dictionary, rng: Rand
 	_kit.set_frame(Transform3D(Basis().scaled(Vector3.ONE * PROP_SCALE), c))
 	rk.fountain(shell, Vector3.ZERO)
 	boxes.append([c + Vector3(0, 0.6, 0), Vector3(4.6, 1.3, 4.6) * PROP_SCALE, Basis()])
-	for k in range(4):
-		var a := PI * 0.25 + PI * 0.5 * k
-		var p := Vector3(cos(a), 0.0, sin(a)) * 4.6
-		rk.bench(fine, p, _yaw_to(-p))
-		var lp := Vector3(cos(a + PI * 0.25), 0.0, sin(a + PI * 0.25)) * 5.6
-		rk.lamp_post(shell, fine, lp)
+	# A bench facing the fountain and a lamp behind it in each gap between the lanes leaving the plaza, at the gap's
+	# middle bearing. On fixed bearings, two lamps had stood in the lanes going south and north.
+	var bearings: Array[float] = []
+	for ln in RIDGECREST_LANES:
+		var pts: Array = ln[1]
+		if pts.size() < 2:
+			continue
+		for e in [[0, 1], [pts.size() - 1, pts.size() - 2]]:
+			if (pts[e[0]] as Vector2).distance_to(RIDGECREST_PLAZA) < 1.0:
+				var d: Vector2 = (pts[e[1]] as Vector2) - RIDGECREST_PLAZA
+				bearings.append(atan2(d.y, d.x))
+	bearings.sort()
+	for i in range(bearings.size()):
+		var a := (bearings[i] + bearings[(i + 1) % bearings.size()] + (TAU if i == bearings.size() - 1 else 0.0)) * 0.5
+		var dir := Vector3(cos(a), 0.0, sin(a))
+		rk.bench(fine, dir * 4.6, _yaw_to(-dir))
+		rk.lamp_post(shell, fine, dir * 5.6)
 	_kit.reset_frame()
 	for k in range(7):
 		var a2 := TAU * (k + rng.randf() * 0.5) / 7.0

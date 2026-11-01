@@ -269,6 +269,12 @@ the others re-bakes it (see Lakeside Course below).
     planned after the houses' pads so it wins). The houses stand 0-12m from their lanes, too close to park nose-in:
     the cars had stood across a house pad's graded edge, one end buried. `_verify_car_level` prints the ground's
     rise and fall under each car.
+  - Lamp posts (`lamp_post`: a flared cast-iron foot, a tapering shaft with collars, a ladder bar) and the entrance's
+    piers carry `RidgecrestKit.lantern` (a cup, four glowing panes widening upward between dark corner posts, glazing
+    bars, a roof with eaves and a finial); they had been glowing boxes. The plaza's benches, each with a lamp
+    behind it, stand in the gaps between the lanes leaving it (`_rc_plaza` reads their bearings off
+    `RIDGECREST_LANES`): on fixed bearings two lamps had stood in the lanes. Lamps along the lanes keep off other
+    lanes and drives too.
   - The walls are solid quads, so a window's glass lies just proud of the face inside a casing that stands out (set
     back, it was hidden behind the wall). Glass is `ridgecrest_glass.gdshader` (a made-up reflection in EMISSION, as
     on Nyota's towers; COLOR.a is the curtain); slate, standing-seam zinc and board-formed concrete are
