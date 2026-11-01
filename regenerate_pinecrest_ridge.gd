@@ -308,7 +308,10 @@ func _ready() -> void:
 	print("Growing the meadow...")
 	_build_meadow(dressing)
 
+	_build_bird_flocks(dressing)
+
 	_verify_clear()
+	_verify_lane_grades()
 	_set_owner_recursive(_level, _level)
 
 	remove_child(_level)
@@ -451,6 +454,39 @@ func _in_jump_zone(d: float, pad := 0.0) -> bool:
 		if dw >= z.x - pad and dw <= z.y + pad:
 			return true
 	return false
+
+
+# Flocks of birds (BirdFlock.gd: models/animals/birds.glb, flapping on its own animation) circling over the
+# summit, the descent and the valley: [x, z, radius, speed, scale, clockwise].
+const BIRD_FLOCKS := [
+	[0.0, -260.0, 120.0, 12.0, 6.0, false],
+	[85.0, -110.0, 90.0, 10.0, 5.0, true],
+	[40.0, 70.0, 100.0, 11.0, 6.5, false],
+]
+const BIRD_CLEARANCE := 38.0
+
+
+func _build_bird_flocks(dressing: Node3D) -> void:
+	var root := Node3D.new()
+	root.name = "Flocks"
+	dressing.add_child(root)
+	var script: Script = load("res://BirdFlock.gd")
+	for i in BIRD_FLOCKS.size():
+		var f: Array = BIRD_FLOCKS[i]
+		var top := -INF
+		for k in 12:
+			var a := TAU * float(k) / 12.0
+			top = maxf(top, _ground(f[0] + cos(a) * f[2], f[1] + sin(a) * f[2]))
+		top = maxf(top, _ground(f[0], f[1]))
+		var flock := Node3D.new()
+		flock.set_script(script)
+		flock.name = "Flock%d" % (i + 1)
+		flock.set("radius", f[2])
+		flock.set("speed", f[3])
+		flock.set("bird_scale", f[4])
+		flock.set("clockwise", f[5])
+		flock.position = Vector3(f[0], top + BIRD_CLEARANCE, f[1])
+		root.add_child(flock)
 
 
 func _ground(x: float, z: float) -> float:
@@ -637,6 +673,26 @@ func _safe_lat(s: float, lat: float, radius: float) -> float:
 
 func _note(what: String, at: Vector3, radius: float, clearance: float) -> void:
 	_footprints.append([what, Vector2(at.x, at.z), radius, clearance])
+
+
+## Prints the steepest 4m stretch of each of Ridgecrest's lanes and drives (rise over run on the graded ground).
+func _verify_lane_grades() -> void:
+	for li in _lanes.size():
+		var pts: PackedVector2Array = _lanes[li][0]
+		var worst := 0.0
+		var at := Vector2.ZERO
+		for i in range(pts.size() - 1):
+			var a := pts[i]
+			var b := pts[i + 1]
+			var n := maxi(int(a.distance_to(b) / 4.0), 1)
+			for k in n:
+				var p := a.lerp(b, float(k) / float(n))
+				var q := a.lerp(b, float(k + 1) / float(n))
+				var g := absf(_ground(q.x, q.y) - _ground(p.x, p.y)) / maxf(p.distance_to(q), 0.1)
+				if g > worst:
+					worst = g
+					at = p
+		print("  lane %d (%d points, from %s): steepest grade %.0f%% near %s" % [li, pts.size(), pts[0], worst * 100.0, at])
 
 
 func _verify_clear() -> void:
@@ -1960,13 +2016,15 @@ const RIDGECREST_SITES := [
 ]
 ## The district's lanes: [half width, points (x, z)]. Up from the summit road through the gate to the
 ## plaza (one point: a disc) and out to the houses; each house gets a drive to its nearest lane.
+## Kinds of building that get no drive from the lanes.
+const RC_NO_DRIVE := ["villa_cube"]
 const RIDGECREST_LANES := [
 	[3.4, [Vector2(3.0, -255.0), Vector2(3.0, -284.0), Vector2(4.0, -300.0), Vector2(5.0, -314.0)]],
 	[11.0, [Vector2(5.0, -314.0)]],
 	[3.0, [Vector2(5.0, -314.0), Vector2(6.0, -335.0), Vector2(8.0, -360.0), Vector2(10.0, -374.0)]],
-	[3.0, [Vector2(5.0, -314.0), Vector2(-15.0, -322.0), Vector2(-40.0, -326.0), Vector2(-62.0, -330.0), Vector2(-85.0, -336.0)]],
+	[3.0, [Vector2(5.0, -314.0), Vector2(-15.0, -322.0), Vector2(-40.0, -326.0), Vector2(-65.0, -331.0)]],
 	[2.8, [Vector2(8.0, -360.0), Vector2(-30.0, -375.0), Vector2(-50.0, -372.0)]],
-	[3.0, [Vector2(5.0, -314.0), Vector2(25.0, -326.0), Vector2(45.0, -328.0), Vector2(74.0, -332.0)]],
+	[3.0, [Vector2(5.0, -314.0), Vector2(25.0, -326.0), Vector2(45.0, -328.0)]],
 	[2.8, [Vector2(8.0, -360.0), Vector2(30.0, -368.0), Vector2(45.0, -372.0)]],
 	[2.8, [Vector2(4.0, -300.0), Vector2(-22.0, -302.0)]],
 ]
@@ -2099,6 +2157,10 @@ func _plan_ridgecrest() -> void:
 					best_axis = ((pts[i + 1] as Vector2) - (pts[i] as Vector2)).normalized()
 		var half2: Vector2 = st[6]
 		var reach: float = maxf(best_d - minf(half2.x, half2.y) * 0.6, 0.0)
+		# The concrete villas stand on terraces cut into the slope: their drives fell 11m in 20m (130-230%), so
+		# they have none, and no car.
+		if RC_NO_DRIVE.has(st[0]):
+			continue
 		if reach > 2.0:
 			_lanes.append([PackedVector2Array([best, best + (c - best).normalized() * (best_d - minf(half2.x, half2.y) + 4.0)]), RC_DRIVE_HALF])
 			if _rc_car_spots.size() < RC_CARS:

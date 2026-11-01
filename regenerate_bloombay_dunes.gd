@@ -306,6 +306,7 @@ func _ready() -> void:
 
 	# Palm groves, kept clear of the gates placed above.
 	_build_palms(level_scene)
+	_build_gull_flocks(level_scene)
 
 	# 6. Boost Pads
 	var boost_scene: PackedScene = load("res://BoostPad.tscn")
@@ -1549,6 +1550,55 @@ func _end_scale() -> void:
 
 
 ## Ground height under a layout point, in layout space: whatever stands on it lands on the real sand.
+# Seagulls (BirdFlock.gd: the seagull model, flapping on its own animation) wheeling over the surf, the
+# north coast and the dunes: [x or -1 for "off the waterline", z, radius, speed, clockwise, gulls].
+const GULL_MODEL := "res://models/animals/seagull/source/Sketchfab_2022_02_14_15_08_30.blend"
+const GULL_TEXTURE := "res://models/animals/seagull/textures/Seagull-Base_Color.png"
+const GULL_SCALE := 0.3
+const GULL_CLEARANCE := 24.0
+const GULL_FLOCKS := [
+	[-1.0, -60.0, 70.0, 9.0, false, 4],
+	[-1.0, 150.0, 80.0, 10.0, true, 5],
+	[120.0, -120.0, 100.0, 9.5, false, 4],
+]
+
+
+func _build_gull_flocks(level: Node3D) -> void:
+	var root := Node3D.new()
+	root.name = "GullFlocks"
+	level.add_child(root)
+	var script: Script = load("res://BirdFlock.gd")
+	var model: PackedScene = load(GULL_MODEL)
+	var shore := load("res://TerrainGenerator.gd")
+	for i in GULL_FLOCKS.size():
+		var f: Array = GULL_FLOCKS[i]
+		var x: float = f[0]
+		if x < 0.0:
+			x = float(shore.bloombay_shore_x(f[1])) - 15.0
+		var top := _ground(x, f[1])
+		for k in 12:
+			var a := TAU * float(k) / 12.0
+			top = maxf(top, _ground(x + cos(a) * f[2], f[1] + sin(a) * f[2]))
+		var flock := Node3D.new()
+		flock.set_script(script)
+		flock.name = "Flock%d" % (i + 1)
+		flock.set("model", model)
+		flock.set("albedo_texture", load(GULL_TEXTURE))
+		flock.set("model_yaw_deg", -90.0)
+		flock.set("model_centre", Vector3.ZERO)
+		flock.set("drop_nodes", PackedStringArray(["Camera", "Light"]))
+		flock.set("animation_name", "ArmatureAction")
+		flock.set("bird_scale", GULL_SCALE)
+		flock.set("copies", f[5])
+		flock.set("spread", Vector3(16.0, 4.0, 16.0))
+		flock.set("radius", f[2])
+		flock.set("speed", f[3])
+		flock.set("clockwise", f[4])
+		flock.set("flap_speed", 0.8)
+		flock.position = Vector3(x, maxf(top, 0.0) + GULL_CLEARANCE, f[1])
+		root.add_child(flock)
+
+
 func _ground(x: float, z: float) -> float:
 	var w := _frame * Vector3(x, 0.0, z)
 	var h := float(_tg.call("_sample_cached_height", w.x, w.z))
