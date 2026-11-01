@@ -32,11 +32,17 @@ uniform float lit_energy = 1.4;
 varying vec3 w_pos;
 varying vec3 w_nrm;
 varying vec4 vcol;
+// The same colour, not interpolated: every hash reads this. A face's colour is the same at its three corners, but
+// interpolated across it on NVIDIA (Vulkan) it drifts in the last bits from pixel to pixel (not on Apple's GPUs), and
+// hash21 turns any drift into a different draw: every window, shop front and sign band was speckled with noise that
+// crawled as the camera moved (on Windows only).
+varying flat vec4 vkey;
 
 void vertex() {
 	w_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	w_nrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 	vcol = COLOR;
+	vkey = COLOR;
 }
 
 float hash21(vec2 p) {
@@ -81,7 +87,7 @@ void fragment() {
 	if (n.y > 0.6) {
 		// Roofs: concrete on the blocks and towers; painted corrugated iron (mabati) on the low
 		// buildings, rusty red, green, blue or bare.
-		float rid = hash21(floor(w_pos.xz / 7.0) * 0.0 + vcol.rg * 97.0 + vcol.b * 13.0);
+		float rid = hash21(floor(w_pos.xz / 7.0) * 0.0 + vkey.rg * 97.0 + vkey.b * 13.0);
 		col = vec3(0.24, 0.235, 0.23) * (0.8 + conc * 0.4);
 		if (vcol.a > 0.12 && vcol.a < 0.5 && rid > 0.3) {
 			vec3 mabati[4] = vec3[](vec3(0.32, 0.11, 0.07), vec3(0.12, 0.24, 0.16), vec3(0.14, 0.20, 0.32), vec3(0.36, 0.36, 0.37));
@@ -105,9 +111,9 @@ void fragment() {
 		vec2 g = vec2(UV.x / (bay * 0.5), UV.y / 4.0);  // two panels a bay: a mullion falls on every corner
 		vec2 f = fract(g);
 		float mull = step(0.06, f.x) * step(0.08, f.y);
-		float floor_v = hash21(vec2(floor(g.y), vcol.r * 13.0));
+		float floor_v = hash21(vec2(floor(g.y), vkey.r * 13.0));
 		// Dark glass, mirror-like: a reflected sky scaled by the Fresnel term (and a glint from the real specular).
-		vec3 tint = mix(vec3(0.05, 0.08, 0.12), vec3(0.04, 0.10, 0.09), step(0.55, hash21(vec2(floor(g.y), vcol.g * 29.0))));
+		vec3 tint = mix(vec3(0.05, 0.08, 0.12), vec3(0.04, 0.10, 0.09), step(0.55, hash21(vec2(floor(g.y), vkey.g * 29.0))));
 		vec3 glass = tint * (0.8 + 0.8 * floor_v) + paint * 0.04;
 		col = mix(paint * 0.6, glass, mull);
 		rough = mix(0.5, 0.04, mull);
@@ -115,18 +121,18 @@ void fragment() {
 		emis = reflected_sky(refl_dir) * clamp(fresnel * 1.5, 0.0, 1.0) * (0.7 + 0.5 * floor_v) * mull * detail;
 		col = mix(col, mix(glass_dark.rgb, sky_reflect.rgb, 0.4) * (0.8 + paint * 0.4), 1.0 - detail);
 		// Offices still at work: whole floors lit, cool white, a few panels dark.
-		float office = step(hash21(vec2(floor(g.y), vcol.b * 41.0)), lit_share) * step(0.25, hash21(floor(g) * 1.3));
+		float office = step(hash21(vec2(floor(g.y), vkey.b * 41.0)), lit_share) * step(0.25, hash21(floor(g) * 1.3));
 		emis += vec3(0.80, 0.88, 1.0) * lit_energy * 0.4 * office * mull * mix(0.3, 1.0, detail);
 	} else {
 		float y = UV.y;
 		vec2 cellid = vec2(floor(UV.x / bay), floor((y - shop_h) / storey));
-		float rnd = hash21(cellid + vcol.rg * 31.0);
+		float rnd = hash21(cellid + vkey.rg * 31.0);
 		if (y < shop_h) {
 			// Ground floor: shop fronts behind rolled-up shutters, a sign band over them.
 			float u = fract(UV2.x / (bay * 1.5));
 			float opening = step(0.08, u) * step(u, 0.92) * step(0.2, y) * step(y, shop_h - 1.6);
 			float sign_band = step(shop_h - 1.4, y) * step(y, shop_h - 0.3);
-			float shop_rnd = hash21(vec2(floor(UV2.x / (bay * 1.5)), vcol.b * 17.0));
+			float shop_rnd = hash21(vec2(floor(UV2.x / (bay * 1.5)), vkey.b * 17.0));
 			vec3 inside = mix(vec3(0.08, 0.07, 0.06), vec3(0.35, 0.30, 0.24), shop_rnd * 0.6);
 			vec3 sign_cols[6] = vec3[](vec3(0.85, 0.15, 0.10), vec3(0.10, 0.45, 0.75), vec3(0.95, 0.75, 0.10),
 					vec3(0.10, 0.55, 0.25), vec3(0.95, 0.95, 0.92), vec3(0.85, 0.40, 0.08));
@@ -134,7 +140,7 @@ void fragment() {
 			col = mix(col, inside, opening * detail);
 			col = mix(col, sgn * 0.8, sign_band * detail);
 			// Open late: a lit shop inside, the sign band backlit. Some are shuttered.
-			float open_shop = step(hash21(vec2(shop_rnd * 7.0, vcol.g * 3.0)), lit_share * 1.25);
+			float open_shop = step(hash21(vec2(shop_rnd * 7.0, vkey.g * 3.0)), lit_share * 1.25);
 			emis += lit_color * inside * 2.2 * lit_energy * opening * open_shop * detail;
 			emis += sgn * 0.7 * lit_energy * sign_band * step(0.001, lit_share) * detail;
 		} else {
@@ -157,7 +163,7 @@ void fragment() {
 			}
 			float win = step(wx0, f.x) * step(f.x, wx1) * step(wy0, f.y) * step(f.y, wy1) * min(pair_gap, 1.0);
 			// Glass: dark, with a tint (blue, green, bronze, grey), reflecting the sky. A pane with a curtain is dull.
-			float tint_pick = hash21(cellid * 1.7 + vcol.b * 53.0);
+			float tint_pick = hash21(cellid * 1.7 + vkey.b * 53.0);
 			vec3 tint = tint_pick < 0.45 ? vec3(0.05, 0.09, 0.14) : (tint_pick < 0.70 ? vec3(0.04, 0.11, 0.10) : (tint_pick < 0.88 ? vec3(0.12, 0.09, 0.06) : vec3(0.08, 0.09, 0.10)));
 			vec3 glass = tint * (0.7 + 0.8 * rnd);
 			float curtain = step(0.8, rnd);
@@ -188,12 +194,12 @@ void fragment() {
 			float room = mix(1.0, 0.35, step(0.8, hash21(cellid * 5.3 + 1.0)));
 			emis = reflected_sky(refl_dir) * clamp(fresnel * 1.5, 0.0, 1.0) * pane_grad * (0.75 + 0.5 * hash21(cellid * 3.1 + 5.0)) * room * (1.0 - curtain * 0.9) * (1.0 - 0.6 * reveal) * win * detail;
 			// A lit room: warm or cool, a curtain glowing its own colour.
-			float lit = step(hash21(cellid * 2.3 + vcol.rg * 7.1), lit_share);
+			float lit = step(hash21(cellid * 2.3 + vkey.rg * 7.1), lit_share);
 			vec3 room_light = mix(lit_color, vec3(0.75, 0.85, 1.0), step(0.7, hash21(cellid * 4.7)));
 			room_light = mix(room_light, glass * 1.6 + lit_color * 0.25, curtain);
 			emis += room_light * lit_energy * (0.55 + 0.45 * hash21(cellid * 9.1)) * lit * win * (1.0 - 0.5 * reveal) * detail;
 			// Rain streaks down from the roof line, darker under the windows.
-			float streak = hash21(vec2(floor(UV.x * 1.3), vcol.g * 7.0));
+			float streak = hash21(vec2(floor(UV.x * 1.3), vkey.g * 7.0));
 			col *= 1.0 - 0.12 * streak * (1.0 - win) * detail;
 		}
 		// Far away: the average of wall and windows (and of the lit ones).

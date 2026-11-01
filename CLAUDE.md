@@ -4,8 +4,8 @@
 
 Portable install, not on PATH:
 
-- `D:\Godot\Godot_v4.8-beta1_win64_console.exe` (or latest in `D:\Godot`): use this one from the shell, because it prints to stdout/stderr
-- `D:\Godot\Godot_v4.8-beta1_win64.exe`: GUI editor
+- `F:\Godot\Godot_v4.8-beta2_win64_console.exe` (or latest in `F:\Godot`): use this one from the shell, because it prints to stdout/stderr
+- `F:\Godot\Godot_v4.8-beta2_win64.exe`: GUI editor
 - On macOS: `/Applications/Godot.app/Contents/MacOS/Godot` (prints to stdout as well)
 
 ## Scratch folder is committed and never deleted
@@ -24,7 +24,7 @@ Change the generator and regenerate instead.
 Regenerate headless from the project root (the scene saves the level and quits by itself):
 
 ```sh
-"/d/Godot/Godot_v4.8-dev6_win64_console.exe" --headless --path . res://regenerate_frostpeak_creek.tscn
+"/f/Godot/Godot_v4.8-beta2_win64_console.exe" --headless --path . res://regenerate_frostpeak_creek.tscn
 ```
 
 Afterwards, check the output for `ERROR:` lines from the generator. Generators like Frostpeak Creek run
@@ -968,6 +968,20 @@ Cars ride on its packed layer and carve the loose powder at runtime. The mesh an
 internal children rebuilt on load, so the level file only stores the row data. PlayerCart reads
 `snow_depth_at()` at its nose for drag and the speed cap (`snow_plough_depth`).
 
+## Hashes of interpolated values (flicker on Windows only)
+
+A face's vertex colour (or any attribute equal at its three corners) arrives in the fragment shader bit-exact on
+Apple's GPUs, but on NVIDIA under Vulkan perspective-correct interpolation lets it drift in the last bits from pixel
+to pixel. A hash (`fract(p * big)`) turns that drift into a different draw per pixel: `city_building.gdshader`'s
+per-window and per-shop picks hashed `vcol`, and on Windows every window, shop front and sign band of Nyota Stadium
+and Mtaa Nights was speckled noise that crawled as the camera moved; on the Mac it was clean. Feed hashes from a
+`varying flat` copy (`vkey`) or from per-instance data, never from a smooth varying. `res://scratch/depth_flicker_probe.tscn
+-- <dir> [level=] [chase=<s>,...] [near=1.0] name:x,y,z:tx,ty,tz` (windowed) renders each view in one frame from four
+cameras (near 0.05 and `near`, each also 3cm to the side) and prints the share of pixels that differ: unstable
+shading changes between two cameras at the same spot, z-fighting shows against the near plane, parallax is thin edges.
+Godot's Mobile renderer takes a D24 depth buffer where the GPU has one (the RTX 2060 here) and D32 float on Apple
+Silicon, which has none; the probe found no z-fighting from it on these levels.
+
 ## Procedural mesh winding
 
 Godot front faces wind **clockwise**, and `generate_normals()` gives a face normal of `(c - a) x (b - a)`.
@@ -1636,7 +1650,11 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   collider, so no block can be driven through. They use `city_building.gdshader` with its evening lights on (`lit_share`,
   `lit_color`, `lit_energy`: lit rooms, open shops, glowing sign bands, office floors). Those uniforms default to 0, so
   Nyota Stadium is unchanged. Past the detailed ground, `_build_far_city` lays a skyline of boxes (a business district to
-  the north-east), and `_build_hills` Ngong-like knuckles under the sunset.
+  the north-east), and `_build_hills` the hills round the horizon: low rolling country, and under the sunset an
+  Ngong-like ridge (`HILL_KNUCKLES`: four rounded knuckles on one long back, steep at its south end, sinking slowly
+  north), a polar heightfield of 720 columns and 20 rings with a wandering crest and gullies cut by noise
+  (`_hill_height`). The knuckles had been |sin| humps three vertices wide on four rings: pyramids. `HILL_PEAK` (270)
+  keeps them under the sun's disc from the west of the course.
 - Club Kilele (`_build_club`): mural walls, neon gate arches (Label3D, unshaded, HDR modulate so they bloom), a stage with a
   truss, the LED wall (`club_screen.gdshader`), the DJ booth, the VIP deck, bars, festoon bulbs (`neon_emissive.gdshader`),
   the dancefloor (`club_dancefloor.gdshader`: tiles in patterns on the beat, white under the carts) with the ground left out

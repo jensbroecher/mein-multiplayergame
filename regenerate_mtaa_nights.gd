@@ -1405,42 +1405,84 @@ func _build_far_city(parent: Node3D) -> void:
 	print("  far city: %d blocks" % count)
 
 
-## Hills round the horizon: the Ngong-like knuckles against the sunset to the west-south-west.
+## Hills round the horizon: low rolling country all round, and against the sunset to the west-south-west an
+## Ngong-like ridge, four rounded knuckles on one long back (the highest at its southern end, which falls away
+## steeply; northward the ridge sinks slowly into the plain). A polar heightfield: `HILL_SEGS` columns round, each
+## from the foot (`HILL_R0`, under the far ground) up the front face to a crest that wanders in and out, and down
+## the back to `HILL_R1`. A face rises concave from its foot and rounds over at the top (a smoothstep), and 2D noise
+## cuts spurs and gullies into it. The knuckles had been |sin| humps three vertices wide on four rings: against the
+## sun they stood as pyramids with notches between them.
+const HILL_SEGS := 720
+const HILL_R0 := 2500.0
+const HILL_R1 := 3650.0
+const HILL_CREST_R := 3080.0
+const HILL_FRONT_RINGS := 14
+const HILL_BACK_RINGS := 5
+## The knuckles' height over the country. At 340 they reached the sun's disc from the west of the course.
+const HILL_PEAK := 270.0
+## The knuckles: bearing (degrees from +x round through +z, so 180 is west; the sun sets at 166), height (a share
+## of HILL_PEAK) and width (degrees, a Gaussian's).
+const HILL_KNUCKLES := [[154.0, 1.0, 2.6], [160.5, 0.88, 2.4], [166.5, 0.93, 2.5], [173.0, 0.80, 2.9]]
+
+
 func _build_hills(parent: Node3D) -> void:
-	var noise := FastNoiseLite.new()
-	noise.seed = 3131
-	noise.frequency = 0.0009
-	var segs := 160
-	var rings := [2600.0, 3000.0, 3400.0, 3800.0]
+	var country := FastNoiseLite.new()
+	country.seed = 3131
+	country.frequency = 0.0007
+	country.fractal_octaves = 4
+	var crest := FastNoiseLite.new()
+	crest.seed = 3132
+	crest.frequency = 0.0011
+	var rough := FastNoiseLite.new()
+	rough.seed = 3133
+	rough.frequency = 0.0045
+	rough.fractal_octaves = 3
+	var spurs := FastNoiseLite.new()
+	spurs.seed = 3134
+	spurs.frequency = 0.0032
+	spurs.fractal_octaves = 3
+	var rows: int = HILL_FRONT_RINGS + 1 + HILL_BACK_RINGS
+	var verts := PackedVector3Array()
+	var top := 0.0
+	for k in range(HILL_SEGS):
+		var a: float = TAU * float(k) / float(HILL_SEGS)
+		var dir := Vector2(cos(a), sin(a))
+		var ring: Vector2 = dir * HILL_CREST_R
+		var rc: float = HILL_CREST_R + crest.get_noise_2d(ring.x, ring.y) * 170.0
+		var h: float = _hill_height(rad_to_deg(a), dir * rc, country, rough)
+		for i in range(rows):
+			# t: 0 at the foot (front) or the far edge (back), 1 on the crest.
+			var t: float
+			var r: float
+			if i <= HILL_FRONT_RINGS:
+				t = float(i) / float(HILL_FRONT_RINGS)
+				r = lerpf(HILL_R0, rc, t)
+			else:
+				t = 1.0 - float(i - HILL_FRONT_RINGS) / float(HILL_BACK_RINGS)
+				r = lerpf(HILL_R1, rc, t)
+			var p: Vector2 = dir * r
+			var y: float = -2.0 + (h + 2.0) * smoothstep(0.0, 1.0, t)
+			# Spurs and gullies down the faces, deepest halfway up.
+			y = maxf(y + spurs.get_noise_2d(p.x, p.y) * 0.2 * h * sin(PI * t), -2.0)
+			top = maxf(top, y)
+			verts.append(Vector3(p.x, y, p.y))
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var grid: Array = []
-	for ri in range(rings.size()):
-		var row: Array = []
-		for k in range(segs):
-			var a: float = TAU * float(k) / float(segs)
-			var rad: float = rings[ri]
-			var p := Vector2(cos(a), sin(a)) * rad
-			# The knuckles to the west-south-west (about 165 degrees from east, round through south).
-			var sw: float = exp(-pow(wrapf(a - deg_to_rad(168.0), -PI, PI) / 0.30, 2.0))
-			var knuckles: float = absf(sin(a * 24.0)) * 0.5 + 0.5
-			var h: float = (60.0 + noise.get_noise_2d(p.x, p.y) * 80.0) + sw * 420.0 * knuckles
-			var t: float = float(ri) / float(rings.size() - 1)
-			var y: float = -2.0 + h * sin(t * PI * 0.9) if ri > 0 else -2.0
-			row.append(Vector3(p.x, y, p.y))
-		grid.append(row)
-	for ri in range(rings.size() - 1):
-		for k in range(segs):
-			var k2: int = (k + 1) % segs
-			var quad := [grid[ri][k], grid[ri][k2], grid[ri + 1][k2], grid[ri + 1][k]]
-			for t in [[0, 1, 2], [0, 2, 3]]:
-				var a: Vector3 = quad[t[0]]
-				var b: Vector3 = quad[t[1]]
-				var c: Vector3 = quad[t[2]]
-				var order: Array = t if (c - a).cross(b - a).dot(-a.normalized() + Vector3.UP * 0.3) >= 0.0 else [t[0], t[2], t[1]]
+	for v in verts:
+		st.set_color(Color(0.16, 0.15, 0.20))
+		st.add_vertex(v)
+	for k in range(HILL_SEGS):
+		var k2: int = (k + 1) % HILL_SEGS
+		for i in range(rows - 1):
+			var quad := [k * rows + i, k2 * rows + i, k2 * rows + i + 1, k * rows + i + 1]
+			for tri in [[0, 1, 2], [0, 2, 3]]:
+				var a: Vector3 = verts[quad[tri[0]]]
+				var b: Vector3 = verts[quad[tri[1]]]
+				var c: Vector3 = verts[quad[tri[2]]]
+				# A heightfield: every face looks up (generate_normals' normal is (c - a) x (b - a)).
+				var order: Array = tri if (c - a).cross(b - a).y >= 0.0 else [tri[0], tri[2], tri[1]]
 				for idx in order:
-					st.set_color(Color(0.16, 0.15, 0.20))
-					st.add_vertex(quad[idx])
+					st.add_index(quad[idx])
 	st.generate_normals()
 	var mi := MeshInstance3D.new()
 	mi.name = "HorizonHills"
@@ -1450,10 +1492,23 @@ func _build_hills(parent: Node3D) -> void:
 	m.set_shader_parameter("haze_color", HAZE)
 	m.set_shader_parameter("haze_base", 0.75)
 	m.set_shader_parameter("haze_top", 0.35)
-	m.set_shader_parameter("peak_height", 480.0)
+	m.set_shader_parameter("peak_height", top)
 	mi.material_override = _save_res(m, "hills_mat")
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(mi)
+
+
+## The crest's height at bearing `deg` (degrees), at `c` in plan: the rolling country, the ridge's knuckles on
+## their long back, and a little roughness so no skyline is drawn with a ruler.
+func _hill_height(deg: float, c: Vector2, country: FastNoiseLite, rough: FastNoiseLite) -> float:
+	var h: float = 35.0 + 75.0 * (country.get_noise_2d(c.x, c.y) * 0.5 + 0.5)
+	var back: float = smoothstep(141.0, 153.0, deg) * (1.0 - smoothstep(176.0, 212.0, deg))
+	var knuckles := 0.0
+	for kn in HILL_KNUCKLES:
+		var d: float = (deg - float(kn[0])) / float(kn[2])
+		knuckles += float(kn[1]) * exp(-d * d)
+	h += HILL_PEAK * back * (0.56 + 0.44 * minf(knuckles, 1.0))
+	return h * (1.0 + rough.get_noise_2d(c.x, c.y) * 0.07)
 
 
 # ======================================================================================
