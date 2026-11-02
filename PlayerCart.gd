@@ -1499,20 +1499,23 @@ const JOLT_K := 520.0
 const JOLT_DAMP := 24.0
 const JOLT_MAX := 0.15
 var _jolt := Vector4.ZERO   # height, its rate, pitch, its rate
+var _jolt_roll := Vector2.ZERO   # roll angle, its rate
 
-func jolt(lift: float, pitch := 0.0) -> void:
+func jolt(lift: float, pitch := 0.0, roll := 0.0) -> void:
 	if is_exploding:
 		return
 	_jolt.y += lift
 	_jolt.w += pitch
+	_jolt_roll.y += roll
 
 
 func _update_jolt(delta: float) -> void:
-	if _jolt == Vector4.ZERO:
+	if _jolt == Vector4.ZERO and _jolt_roll == Vector2.ZERO:
 		return
 	var model := visuals.get_node_or_null("CartModel") as Node3D
 	if is_exploding or model == null:
 		_jolt = Vector4.ZERO
+		_jolt_roll = Vector2.ZERO
 		if model:
 			model.transform = original_cart_model_transform
 		return
@@ -1522,9 +1525,13 @@ func _update_jolt(delta: float) -> void:
 		_jolt.x = clampf(_jolt.x + _jolt.y * h, -JOLT_MAX, JOLT_MAX)
 		_jolt.w += (-JOLT_K * _jolt.z - JOLT_DAMP * _jolt.w) * h
 		_jolt.z = clampf(_jolt.z + _jolt.w * h, -JOLT_MAX, JOLT_MAX)
-	if absf(_jolt.x) < 0.0004 and absf(_jolt.y) < 0.004 and absf(_jolt.z) < 0.0004 and absf(_jolt.w) < 0.004:
+		_jolt_roll.y += (-JOLT_K * _jolt_roll.x - JOLT_DAMP * _jolt_roll.y) * h
+		_jolt_roll.x = clampf(_jolt_roll.x + _jolt_roll.y * h, -JOLT_MAX, JOLT_MAX)
+	if absf(_jolt.x) < 0.0004 and absf(_jolt.y) < 0.004 and absf(_jolt.z) < 0.0004 and absf(_jolt.w) < 0.004 and absf(_jolt_roll.x) < 0.0004 and absf(_jolt_roll.y) < 0.004:
 		_jolt = Vector4.ZERO
-	model.transform = Transform3D(Basis(Vector3.RIGHT, _jolt.z), Vector3(0.0, _jolt.x, 0.0)) * original_cart_model_transform
+		_jolt_roll = Vector2.ZERO
+	var rot_basis := Basis(Vector3.RIGHT, _jolt.z) * Basis(Vector3.FORWARD, _jolt_roll.x)
+	model.transform = Transform3D(rot_basis, Vector3(0.0, _jolt.x, 0.0)) * original_cart_model_transform
 
 
 func _dampen_ground_bounce(state: PhysicsDirectBodyState3D) -> void:

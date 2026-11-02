@@ -1,0 +1,7 @@
+[gd_scene format=3 uid="uid://dmv7382kalta3"]
+
+[ext_resource type="Script" path="res://scratch/test_sage_colliders.gd" id="1_test"]
+
+[node name="TestSageColliders" type="Node"]
+script = ExtResource("1_test")
+

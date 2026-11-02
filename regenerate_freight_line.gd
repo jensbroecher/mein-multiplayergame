@@ -1565,7 +1565,24 @@ func _build_yard(level_scene: Node3D) -> void:
 		var pk := _scaled_kit(1.5)
 		var kit := {}
 		FreightKit.buffer_stop(pk, kit)
-		_instance_mesh(root, "BufferStop_%d" % si, _save_baked_resource(pk.commit(kit), "buffer_stop") as ArrayMesh, xf)
+		var buffer_mesh: ArrayMesh = _save_baked_resource(pk.commit(kit), "buffer_stop") as ArrayMesh
+		var bs_mi := _instance_mesh(root, "BufferStop_%d" % si, buffer_mesh, xf)
+		var bs_body := StaticBody3D.new()
+		bs_body.name = "BufferStop_Body"
+		bs_body.set_meta(&"surface", "metal")
+		# Solid impact front box covering base, buffer heads and crossbeam
+		var front_box := BoxShape3D.new()
+		front_box.size = Vector3(4.6 * 1.5, 2.4 * 1.5, 1.2 * 1.5)
+		var front_col := CollisionShape3D.new()
+		front_col.shape = front_box
+		front_col.position = Vector3(0, 1.0 * 1.5, 0.5 * 1.5)
+		bs_body.add_child(front_col)
+		var bs_shape := buffer_mesh.create_trimesh_shape()
+		if bs_shape:
+			var bs_col := CollisionShape3D.new()
+			bs_col.shape = bs_shape
+			bs_body.add_child(bs_col)
+		bs_mi.add_child(bs_body)
 		_label(root, "FIN DE VIA", xf.origin + xf.basis * ((FreightKit.BUFFER_PLATE[0] as Vector3) * 1.5), Basis(xf.basis * Basis(Vector3.UP, PI)), 0.008,
 				Color(0.97, 0.95, 0.9), 48, float(FreightKit.BUFFER_PLATE[1]) * 1.5)
 	# The turnouts.
@@ -2045,7 +2062,7 @@ func _build_flora(level_scene: Node3D) -> void:
 			far_meshes["%s_%d" % [pl[0], v]] = cactus.build(pl[0], v, 1, cmat)
 	var sage_meshes: Array = []
 	for v in 3:
-		sage_meshes.append(FreightKit.sage(100 + v))
+		sage_meshes.append(_save_baked_resource(FreightKit.sage(100 + v), "sage_%d" % v) as ArrayMesh)
 	# Rocks: weathered boulders (FreightKit.boulder) in canyon_rock.gdshader, the hills' sandstone beds tinted toward the
 	# plain's tan. "rock_l" are low and wide (a cart rides over them), "rock_t" rounder and taller.
 	var rock_mat := ShaderMaterial.new()
@@ -2061,10 +2078,92 @@ func _build_flora(level_scene: Node3D) -> void:
 	for v in 4:
 		rock_meshes["rock_l%d" % v] = _save_baked_resource(FreightKit.boulder(4300 + v, Vector3(1.4, 0.62, 1.15), rock_mat), "rock_l%d" % v)
 		rock_meshes["rock_t%d" % v] = _save_baked_resource(FreightKit.boulder(4320 + v, Vector3(1.0, 0.95, 0.88), rock_mat), "rock_t%d" % v)
-	# Candidate spots along the lap: both sides, closer in more of them.
+
+	# Hull vertices for each boulder mesh to bake precise collision shapes for large immovable rocks.
+	var rock_hull_points := {}
+	for rk in rock_meshes.keys():
+		var rm: ArrayMesh = rock_meshes[rk]
+		var pts := PackedVector3Array()
+		var seen_pts := {}
+		for si in range(rm.get_surface_count()):
+			var verts: PackedVector3Array = rm.surface_get_arrays(si)[Mesh.ARRAY_VERTEX]
+			for v in verts:
+				var k := Vector3i(roundi(v.x * 200.0), roundi(v.y * 200.0), roundi(v.z * 200.0))
+				if not seen_pts.has(k):
+					seen_pts[k] = true
+					pts.append(v)
+		rock_hull_points[rk] = pts
+
+	# Rock clusters across the circuit: carts can push through them, but get significantly slowed down.
+	var clusters_parent := Node3D.new()
+	clusters_parent.name = "RockClusters"
+	root.add_child(clusters_parent)
+
 	var cells := {}
-	var s := 0.0
 	var placed := 0
+	var large_boulders_xfs: Array = []
+	var cluster_s := 30.0
+	var cluster_idx := 0
+	while cluster_s < float(_lap["len"]) - 40.0:
+		var side: float = -1.0 if rng.randf() < 0.5 else 1.0
+		var lat: float = side * rng.randf_range(ROAD_HALF + 3.2, ROAD_HALF + 24.0)
+		var sp: Dictionary = _spot(cluster_s, lat, 0.0)
+		var cpos: Vector3 = sp["pos"]
+		if _flora_ok(Vector2(cpos.x, cpos.z)):
+			var num_rocks := rng.randi_range(5, 8)
+			var cluster_r := rng.randf_range(2.0, 3.8)
+			var cluster_kind: String = "rock_l%d" % rng.randi_range(0, 3)
+			var cluster_mesh: ArrayMesh = rock_meshes[cluster_kind]
+			var cluster_xfs: Array[Transform3D] = []
+			var cluster_radii: Array[float] = []
+
+			for ri in range(num_rocks):
+				var ang: float = rng.randf() * TAU
+				var rdist: float = rng.randf_range(0.3, cluster_r)
+				var rpos: Vector3 = cpos + Vector3(cos(ang) * rdist, 0.0, sin(ang) * rdist)
+				if not _flora_ok(Vector2(rpos.x, rpos.z)):
+					continue
+				var rh: float = rng.randf_range(0.35, 0.78)
+				var r_xf: Transform3D = _rock_xf(cluster_kind, rh, rng.randf() * TAU, rpos, cluster_mesh)
+				cluster_xfs.append(r_xf)
+				cluster_radii.append(rh * 0.7)
+
+			if cluster_xfs.size() >= 3:
+				var kr := MultiMeshInstance3D.new()
+				kr.name = "RockCluster_%d" % cluster_idx
+				kr.set_script(load("res://KnockableRocks.gd"))
+				var mm := MultiMesh.new()
+				mm.transform_format = MultiMesh.TRANSFORM_3D
+				mm.mesh = cluster_mesh
+				mm.instance_count = cluster_xfs.size()
+				mm.buffer = PropKit.transform_buffer(cluster_xfs)
+				kr.multimesh = mm
+				kr.set("rock_transforms", cluster_xfs)
+				kr.set("rock_radii", cluster_radii)
+				kr.set("cluster_drag", 7.5)
+				kr.set_meta(&"skip_dressing_colliders", true)
+				clusters_parent.add_child(kr)
+				cluster_idx += 1
+
+				# In ~40% of clusters, an immovable anchor boulder
+				if rng.randf() < 0.40:
+					var anchor_ang: float = rng.randf() * TAU
+					var anchor_pos: Vector3 = cpos + Vector3(cos(anchor_ang) * 0.9, 0.0, sin(anchor_ang) * 0.9)
+					if _flora_ok(Vector2(anchor_pos.x, anchor_pos.z)):
+						var anchor_kind: String = "rock_t%d" % rng.randi_range(0, 3)
+						var anchor_h: float = rng.randf_range(1.4, 2.2)
+						var anchor_xf: Transform3D = _rock_xf(anchor_kind, anchor_h, rng.randf() * TAU, anchor_pos, rock_meshes[anchor_kind])
+						large_boulders_xfs.append([anchor_xf, anchor_kind])
+						var akey := "rock_large_%s|%d|%d" % [anchor_kind, floori(anchor_pos.x / 160.0), floori(anchor_pos.z / 160.0)]
+						if not cells.has(akey):
+							cells[akey] = []
+						cells[akey].append(anchor_xf)
+						placed += 1
+
+		cluster_s += rng.randf_range(48.0, 72.0)
+
+	# Candidate spots along the lap: both sides, closer in more of them.
+	var s := 0.0
 	while s < float(_lap["len"]):
 		for k in range(14):
 			var side: float = -1.0 if rng.randf() < 0.5 else 1.0
@@ -2085,10 +2184,15 @@ func _build_flora(level_scene: Node3D) -> void:
 				scl = rng.randf_range(0.9, 2.2)
 			elif roll < 0.80:
 				var rk: Dictionary = _pick_rock(rng, absf(lat))
-				kind = rk["kind"]
+				var r_kind: String = rk["kind"]
 				scl = rk["h"]
-				rock_xf = _rock_xf(kind, scl, rng.randf() * TAU, pos, rock_meshes[kind])
+				rock_xf = _rock_xf(r_kind, scl, rng.randf() * TAU, pos, rock_meshes[r_kind])
 				is_rock = true
+				if scl >= 1.0:
+					kind = "rock_large_" + r_kind
+					large_boulders_xfs.append([rock_xf, r_kind])
+				else:
+					kind = r_kind
 			else:
 				var pl: Array = plants[rng.randi_range(0, plants.size() - 1)]
 				if rng.randf() > float(pl[3]) * 5.0:
@@ -2129,8 +2233,13 @@ func _build_flora(level_scene: Node3D) -> void:
 		var range_end := 600.0
 		if kind.begins_with("sage"):
 			mesh = sage_meshes[int(kind.substr(5))]
-			node_name = "groundcover_sage_%s_%s" % [parts[1], parts[2]]
-			range_end = 170.0
+			node_name = "Sagebrush_%s_%s" % [parts[1], parts[2]]
+			range_end = 260.0
+		elif kind.begins_with("rock_large_"):
+			var base_kind: String = kind.substr(11)
+			mesh = rock_meshes[base_kind]
+			node_name = "Boulders_Large_%s_%s_%s" % [base_kind, parts[1], parts[2]]
+			range_end = 520.0
 		elif kind.begins_with("rock"):
 			mesh = rock_meshes[kind]
 			node_name = "Boulders_%s_%s_%s" % [kind, parts[1], parts[2]]
@@ -2157,15 +2266,48 @@ func _build_flora(level_scene: Node3D) -> void:
 			mmi.multimesh = mm
 			mmi.visibility_range_begin = vr[1]
 			mmi.visibility_range_end = vr[2]
-			if kind.begins_with("sage") or vr[1] > 0.0:
+			if vr[1] > 0.0:
 				mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			if kind.begins_with("rock"):
+			if kind.begins_with("sage"):
+				# Desert sagebrush shrubs: solid wobbling vegetation colliders
+				mmi.set_meta(&"min_collider_height", 0.35)
+			elif kind.begins_with("rock_large_"):
+				# Large immovable boulders have their permanent collision shapes baked in BouldersBody
+				mmi.set_meta(&"skip_dressing_colliders", true)
+			elif kind.begins_with("rock"):
 				# DressingColliders gives these the hull of the stone, not a box, and lets even the low ones
 				# (down to 15cm) be felt: a cart rides over a small one, hopping if it is fast.
 				mmi.set_meta(&"hull_collider", true)
 				mmi.set_meta(&"min_collider_height", 0.15)
 			root.add_child(mmi)
-	print("  desert: %d plants and rocks in %d cells" % [placed, cells.size()])
+
+	# Build explicit StaticBody3D with individual ConvexPolygonShape3Ds for all large immovable boulders
+	var boulders_body := StaticBody3D.new()
+	boulders_body.name = "BouldersBody"
+	boulders_body.collision_layer = 1
+	boulders_body.collision_mask = 1
+	boulders_body.set_meta(&"surface", "rock")
+	root.add_child(boulders_body)
+
+	for bi in range(large_boulders_xfs.size()):
+		var entry: Array = large_boulders_xfs[bi]
+		var b_xf: Transform3D = entry[0]
+		var b_kind: String = entry[1]
+		var pts: PackedVector3Array = rock_hull_points[b_kind]
+		var sc: Vector3 = b_xf.basis.get_scale()
+		var scaled_pts := PackedVector3Array()
+		for pt in pts:
+			scaled_pts.append(pt * sc)
+		var hull := ConvexPolygonShape3D.new()
+		hull.points = scaled_pts
+
+		var cs := CollisionShape3D.new()
+		cs.name = "Boulder_%d" % bi
+		cs.shape = hull
+		cs.transform = Transform3D(b_xf.basis.orthonormalized(), b_xf.origin)
+		boulders_body.add_child(cs)
+
+	print("  desert: %d plants and rocks in %d cells, %d clusters, %d large boulders in BouldersBody" % [placed, cells.size(), cluster_idx, large_boulders_xfs.size()])
 
 
 ## A rock's size and shape: mostly small low stones (under 60cm, a cart rides over them), some medium ones and a

@@ -30,10 +30,10 @@ const MIN_HEIGHT := 0.5
 const SOFT := ["grass", "groundcover", "meadow", "crowd", "flag", "stack", "lounger", "parasol", "coolbox",
 	"cone", "icicle", "skid", "shadow", "giraffe", "hole", "fx", "warmup", "cloud", "particle", "spark", "water"]
 ## Scenery that knocks over or springs by itself (rigid bodies or springs of its own).
-const SELF_MOVING := ["res://KnockablePoles.gd", "res://KnockableIce.gd", "res://KnockableProps.gd", "res://SpringProps.gd"]
+const SELF_MOVING := ["res://KnockablePoles.gd", "res://KnockableIce.gd", "res://KnockableProps.gd", "res://SpringProps.gd", "res://KnockableRocks.gd"]
 ## Rigid: rocks and built things (they never wobble).
 const ROCKY := ["rock", "boulder", "block", "stone", "scree", "pebble", "mound", "ridge", "divider", "lamp",
-	"butte", "spire", "hoodoo", "formation", "slab", "crate", "barrier"]
+	"butte", "spire", "hoodoo", "formation", "slab", "crate", "barrier", "pole", "post", "mast", "telegraph"]
 const WOBBLE_MAX_HEIGHT := 5.5
 ## Brush (ferns, by their mesh's file name; not tree ferns): not solid. A cart drives through it, bends
 ## it right over and loses BRUSH_DRAG of its speed entering each one.
@@ -104,11 +104,11 @@ func build(level: Node) -> void:
 		for i in range(mm.instance_count):
 			var local: Transform3D = _buffer_transform(buf, i * stride)
 			var xf: Transform3D = to_world * local
-			var key := Vector3i(roundi(xf.origin.x * 20.0), roundi(xf.origin.y * 20.0), roundi(xf.origin.z * 20.0))
+			var key := Vector4i(roundi(xf.origin.x * 20.0), roundi(xf.origin.y * 20.0), roundi(xf.origin.z * 20.0), 1 if rocky else 0)
 			if seen.has(key):
 				# The same plant drawn again (its far version): wobble that one too.
 				var e = seen[key]
-				if e is Array and (e as Array).size() > 0:
+				if not rocky and e is Array and (e as Array).size() > 0:
 					(e[0] as Array).append(mmi)
 				continue
 			var sc: Vector3 = xf.basis.get_scale()
@@ -314,6 +314,8 @@ static func _named(n: Node, words: Array) -> bool:
 
 
 func _soft(mmi: MultiMeshInstance3D) -> bool:
+	if mmi.get_meta(&"skip_dressing_colliders", false):
+		return true
 	if _named(mmi, SOFT):
 		return true
 	# Their own bodies are their collision, and they move their own instances: a static collider and
@@ -357,14 +359,24 @@ func _mesh_shape(mesh: Mesh) -> Dictionary:
 			if q.y <= reach_top:
 				lo = lo.min(q)
 				hi = hi.max(q)
+	if band.is_empty() and lo.x != INF:
+		# Slender vertical props without vertices strictly between b0 and b1 (e.g. single-span pole/tube)
+		for si in range(mesh.get_surface_count()):
+			var arr := mesh.surface_get_arrays(si)
+			var v: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+			var step: int = maxi(1, v.size() / 6000)
+			for k in range(0, v.size(), step):
+				var q: Vector3 = v[k]
+				if q.y <= reach_top:
+					band.append(Vector2(q.x, q.z).length())
 	if band.is_empty() or lo.x == INF:
 		_mesh_info[id] = info
 		return info
 	band.sort()
 	var r_med: float = band[band.size() / 2]
 	var horiz: float = maxf(hi.x - lo.x, hi.z - lo.z) * 0.5
-	if h > 4.0 * maxf(r_med, 0.01) and r_med < horiz * 0.7:
-		# Tall and slender: the trunk, up to where a cart could reach (6m).
+	if h > 4.0 * maxf(r_med, 0.01) and (r_med < horiz * 0.7 or h > 4.5 * horiz):
+		# Tall and slender: the trunk or post, up to where a cart could reach (6m).
 		var ch: float = minf(h, 6.0)
 		info = {"kind": "cyl", "r": maxf(r_med * 0.9, 0.05), "h": h, "ch": ch, "centre": Vector3(0.0, foot + ch * 0.5, 0.0)}
 	else:

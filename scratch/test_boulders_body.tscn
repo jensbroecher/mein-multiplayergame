@@ -1,0 +1,7 @@
+[gd_scene format=3 uid="uid://daavxo1j4k2lm"]
+
+[ext_resource type="Script" path="res://scratch/test_boulders_body.gd" id="1_test"]
+
+[node name="TestBouldersBody" type="Node"]
+script = ExtResource("1_test")
+

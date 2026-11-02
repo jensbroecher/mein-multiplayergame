@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scratch/preview_sage_lookdev.gd" id="1_sage"]
+
+[node name="PreviewSage" type="Node"]
+script = ExtResource("1_sage")
+

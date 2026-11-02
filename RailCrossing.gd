@@ -90,6 +90,24 @@ func _build() -> void:
 		# Faces the traffic it warns: side 0's light faces +z, side 1's -z.
 		mast.basis = Basis(Vector3.UP, 0.0 if side == 0 else PI)
 		add_child(mast, false, Node.INTERNAL_MODE_BACK)
+
+		var mast_body := StaticBody3D.new()
+		mast_body.name = "Collider"
+		mast_body.set_meta(&"surface", "metal")
+		var base_col := CollisionShape3D.new()
+		var base_box := BoxShape3D.new()
+		base_box.size = Vector3(1.0, 0.6, 1.0)
+		base_col.shape = base_box
+		base_col.position = Vector3(0, 0.3, 0)
+		mast_body.add_child(base_col)
+		var pole_col := CollisionShape3D.new()
+		var pole_cyl := CylinderShape3D.new()
+		pole_cyl.radius = 0.28
+		pole_cyl.height = MAST_H
+		pole_col.shape = pole_cyl
+		pole_col.position = Vector3(0, MAST_H * 0.5, 0)
+		mast_body.add_child(pole_col)
+		mast.add_child(mast_body)
 		var kit := {}
 		pk.set_frame(Transform3D.IDENTITY)
 		pk.beam(kit, "steel", Vector3(0, 0, 0), Vector3(0, MAST_H, 0), 0.36, 0.36, Color(0.86, 0.86, 0.84))

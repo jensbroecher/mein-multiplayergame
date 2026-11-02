@@ -2282,9 +2282,10 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
   - The feel: `RailRumble.gd` (node `RailRumble`, fed every stretch of track's centre line by the generator,
     `_rumble_lines`) gives a cart that crosses a rail on the ground (at a level crossing or off the road) a clunk
     (`FreightKit.rail_clunk`) and a jolt, and one running along a track a knock (`sleeper_knock`) and a smaller jolt every
-    third sleeper. The jolt is `PlayerCart.jolt(lift, pitch)`: the body bounces over its wheels on a damped spring
-    (`JOLT_K`, `JOLT_DAMP`), looks only, for every cart a peer sees; real kicks were soaked up by `_dampen_ground_bounce` or
-    launched carts. On the bed the tyres also roll on gravel (the bodies' surface).
+    third sleeper. The jolt is `PlayerCart.jolt(lift, pitch, roll)`: the body bounces over its wheels on a damped spring
+    with 3-axis roll damping, simulating the rough sleeper ballast surface with physical micro-bumps. When speeding along the
+    raw tracks (`speed > DANGER_SPEED`, 24.5 m/s, off paved crossings), carts shake violently, flip over and get thrown to the
+    side with lateral impulses and rotational air tumble. On the bed the tyres also roll on gravel (the bodies' surface).
 - `TrainKit.gd` builds the rolling stock through a PropKit at SCALE 1.5 (`KINDS`: loco 19m, box 15, tank 14, flat 16,
   flat_load 16, hopper 16, caboose 10, ploco 20, coach 26, obs 26, in life-size metres): a hood-unit diesel (`loco:2` is
   the yellow yard switcher), boxcars and tank cars in four colourways, an open flatcar, the log car (`_flat_car` with
@@ -2397,12 +2398,30 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
   anything within 12.5m of the road's centre) are low stones of 22-60cm, some 0.8-1.5m, a few 1.6-2.6m, the big ones kept
   off the road by their size. The sagebrush (`FreightKit.sage`) is smooth ellipsoid lobes (`_blob`, darker underneath)
   sitting down on the ground: on a stem it had read as a ball on a stick, as lathe lobes as green crystals.
-  Their MultiMeshes carry `hull_collider` and `min_collider_height` meta, which makes DressingColliders give each instance
-  the convex hull of its mesh (scaled by the instance) instead of a box, solid from `min_collider_height` (15cm): a cart's
-  sphere rolls up the low ones, and at speed they bump it into the air; the big ones stop it.
-- Dressing: telegraph poles and wires along the rails (`_build_poles`), advance warning signs (`_build_crossing_signs`),
-  saguaros and other cacti (CactusKit, two detail levels swapped at 150m), sagebrush (named "groundcover", soft) and
-  boulders (`_build_flora`). Wind loop `PlainsWind`; the trains have synthesised diesel and clatter loops, the crossings a
+  - The sagebrush (`FreightKit.sage`, `Sagebrush_*`): an authentic desert shrub (*Artemisia tridentata*) with gnarled,
+    radiating woody stems (`Color(0.38, 0.32, 0.24)`), multi-plane foliage sprays of serrated silvery grey-green leaves with
+    sun-bleached straw tips, and dry sticks poking through, using two-sided `sage_leaf` material. In `DressingColliders`, each
+    bush gets a base collider and spring-loaded wobble behaviour when struck by carts.
+  - Large immovable boulders (`h >= 1.0m`, up to 2.6m, plus cluster anchor stones): have permanent convex hull colliders
+    baked directly into `Desert/BouldersBody` (`StaticBody3D`), guaranteeing 100% solid, immovable collision with zero
+    risk of being missed or culled by detail LODs.
+  - Rock clusters (`KnockableRocks.gd` under `Desert/RockClusters`): 47 clusters across the circuit consisting of 5-8
+    pushable stones (35-78cm) and optional immovable anchor boulders. Dynamic stones have realistic sandstone mass
+    (320-950kg), high friction (0.95), and heavy cluster drag (`cluster_drag = 7.5`) with direct impact deceleration
+    (18-35% cart speed loss on strike). Their material duplicates `canyon_rock.gdshader` with `local_coords = true`
+    so strata and textures rotate rigidly with the stone rather than sliding in world space.
+  - Track buffer stops (`BufferStop_0`, `BufferStop_1`): have permanent `StaticBody3D` colliders (`BufferStop_Body`) combining
+    a front barrier impact box (6.9m wide, 3.6m tall) and full trimesh geometry of the steel beam, hydraulic heads and earth mound.
+  - Level crossing gate posts (`RailCrossing.gd` `Mast0`, `Mast1`): have dedicated `StaticBody3D` colliders (0.9m foundation box
+    and 5.4m tall cylinder mast), preventing carts from ghosting through crossing barriers.
+  - Telegraph poles (`TelegraphPoles`): `DressingColliders` samples lower vertex bounds and generates rigid cylinder colliders
+    for all poles along the railway; `ROCKY` classifies poles and masts as solid rigid obstacles.
+  - Standalone small/medium rocks: their MultiMeshes carry `hull_collider` and `min_collider_height` (15cm) meta for
+    `DressingColliders`, which uses a distinct rock-versus-plant spatial hash key to prevent nearby vegetation from skipping
+    rock colliders: a cart's sphere rolls up the low ones, bumping it into the air.
+- Dressing: telegraph poles and wires along the rails (`_build_poles`, solid cylinder colliders), advance warning signs (`_build_crossing_signs`),
+  saguaros and other cacti (CactusKit, two detail levels swapped at 150m), sagebrush shrubs (`Sagebrush_*`, wobbling vegetation)
+  and boulders (`_build_flora`). Wind loop `PlainsWind`; the trains have synthesised diesel and clatter loops, the crossings a
   bell and a horn (`FreightKit.bell/horn/diesel/clatter`).
 - AI races (`scratch/ai_race_test`, speed=1 only: the trains run on the real clock, not the engine's) finish three laps in
   about 250s; a few bots a race are blown up queueing at a closed crossing (missiles), rarely run into a train (a boosting

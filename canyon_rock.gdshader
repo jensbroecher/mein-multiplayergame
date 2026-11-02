@@ -20,14 +20,20 @@ uniform float tint_amount = 0.0;
 uniform vec4 tint : source_color = vec4(0.72, 0.70, 0.66, 1.0);
 uniform float moss = 0.0;
 uniform vec4 moss_tint : source_color = vec4(0.30, 0.42, 0.12, 1.0);
+// When true, uses object-space coordinates so dynamic/rolling rocks keep their texture locked without sliding.
+uniform bool local_coords = false;
 
 varying vec3 w_pos;
 varying vec3 w_nrm;
+varying vec3 obj_pos;
+varying vec3 obj_nrm;
 varying float occlusion;
 
 #include "res://canyon_strata.gdshaderinc"
 
 void vertex() {
+	obj_pos = VERTEX;
+	obj_nrm = NORMAL;
 	w_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	w_nrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 	occlusion = vertex_occlusion ? COLOR.r : 0.0;
@@ -37,18 +43,19 @@ void fragment() {
 	if (xray_hidden(VERTEX, VIEW_MATRIX, CAMERA_POSITION_WORLD, PROJECTION_MATRIX, FRAGCOORD.xy)) {
 		discard;
 	}
-	vec3 n = normalize(w_nrm);
+	vec3 pos = local_coords ? obj_pos : w_pos;
+	vec3 n = normalize(local_coords ? obj_nrm : w_nrm);
 	float cam_dist = length(w_pos - CAMERA_POSITION_WORLD);
 	float detail = 1.0 - smoothstep(60.0, 500.0, cam_dist);
 	float steep = 1.0 - smoothstep(0.55, 0.85, abs(n.y));
-	float fw = length(fwidth(w_pos));
-	vec3 rock = strata_color(w_pos, fw);
-	float grain = strata_grain(w_pos, n, grain_scale);
+	float fw = length(fwidth(pos));
+	vec3 rock = strata_color(pos, fw);
+	float grain = strata_grain(pos, n, grain_scale);
 	rock *= mix(1.0, clamp(grain, 0.45, 1.5), 0.75 * detail + 0.3);
-	rock *= 1.0 - 0.45 * strata_varnish(w_pos, steep, fw);
+	rock *= 1.0 - 0.45 * strata_varnish(pos, steep, fw);
 	// Sand on whatever faces up.
-	float up = smoothstep(0.7, 0.92, n.y) * smoothstep(0.35, 0.65, cs_fbm(w_pos.xz * 0.12));
-	vec3 sand = texture(sand_tex, w_pos.xz * 0.19).rgb;
+	float up = smoothstep(0.7, 0.92, n.y) * smoothstep(0.35, 0.65, cs_fbm(pos.xz * 0.12));
+	vec3 sand = texture(sand_tex, pos.xz * 0.19).rgb;
 	sand = sand_tint.rgb * (0.7 + dot(sand, vec3(0.3, 0.59, 0.11)) * 0.8);
 	rock = mix(rock, sand, up * 0.8);
 	if (tint_amount > 0.0) {
@@ -57,11 +64,11 @@ void fragment() {
 		rock = mix(rock, tint.rgb * lum / 0.2, tint_amount);
 	}
 	if (moss > 0.0) {
-		float m = smoothstep(0.4, 0.75, n.y) * smoothstep(0.25, 0.55, cs_fbm(w_pos.xz * 0.35 + w_pos.y * 0.2));
+		float m = smoothstep(0.4, 0.75, n.y) * smoothstep(0.25, 0.55, cs_fbm(pos.xz * 0.35 + pos.y * 0.2));
 		// and in pockets down the steep faces, thinning upward from the foot
-		float pocket = smoothstep(0.55, 0.75, cs_fbm(vec2(w_pos.x + w_pos.z, w_pos.y) * 0.45));
+		float pocket = smoothstep(0.55, 0.75, cs_fbm(vec2(pos.x + pos.z, pos.y) * 0.45));
 		m = max(m, pocket * 0.8 * (1.0 - smoothstep(0.4, 0.75, n.y)));
-		rock = mix(rock, moss_tint.rgb * (0.7 + 0.6 * cs_fbm(w_pos.xz * 1.7)), m * moss);
+		rock = mix(rock, moss_tint.rgb * (0.7 + 0.6 * cs_fbm(pos.xz * 1.7)), m * moss);
 	}
 	ALBEDO = rock * (1.0 - 0.55 * occlusion);
 	ROUGHNESS = 0.9;
@@ -69,9 +76,9 @@ void fragment() {
 	// The grain's normal map, triplanar.
 	vec3 w = pow(abs(n), vec3(4.0));
 	w /= w.x + w.y + w.z;
-	vec3 nx = texture(rock_normal, w_pos.zy * grain_scale).rgb;
-	vec3 ny = texture(rock_normal, w_pos.xz * grain_scale).rgb;
-	vec3 nz = texture(rock_normal, w_pos.xy * grain_scale).rgb;
+	vec3 nx = texture(rock_normal, pos.zy * grain_scale).rgb;
+	vec3 ny = texture(rock_normal, pos.xz * grain_scale).rgb;
+	vec3 nz = texture(rock_normal, pos.xy * grain_scale).rgb;
 	NORMAL_MAP = nx * w.x + ny * w.y + nz * w.z;
 	NORMAL_MAP_DEPTH = 0.9 * detail;
 }

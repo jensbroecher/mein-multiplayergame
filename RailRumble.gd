@@ -20,9 +20,13 @@ const OVER_RAIL := 2.4
 const SLEEPER_STEP := 2.79
 const VOICES := 8
 
+## Speeds above this on the raw tracks cause violent shaking and danger of flipping over.
+const DANGER_SPEED := 24.5
+const FLIP_SPEED := 26.5
+
 var _cells := {}
 var _segs: Array = []        # [a, b, line]
-var _state := {}             # cart id -> {pos, line, lat, run}
+var _state := {}             # cart id -> {pos, line, lat, run, fast_time, flip_cd}
 var _voices: Array[AudioStreamPlayer3D] = []
 var _next_voice := 0
 
@@ -102,26 +106,66 @@ func _physics_process(delta: float) -> void:
 		var speed: float = vel.length()
 		var lat: float = tr["lat"]
 		var run: float = st.get("run", 0.0)
+		var fast_time: float = st.get("fast_time", 0.0)
+		var flip_cd: float = maxf(0.0, float(st.get("flip_cd", 0.0)) - delta)
+		var on_track: bool = absf(lat) < GAUGE_HALF + 1.2
+		var surf: int = int(cart.get("surface")) if cart.get("surface") != null else -1
+		var is_road_crossing: bool = surf == 0 or surf == 8 # Surfaces.ASPHALT or Surfaces.WOOD
+
 		if st.has("lat") and int(st.get("line", -1)) == int(tr["line"]):
 			var was: float = st["lat"]
 			for r in [-GAUGE_HALF, GAUGE_HALF]:
 				if (was - r) * (lat - r) < 0.0 and speed > 2.0:
 					# Over a rail: a heavy clunk, the nose kicked up a little.
 					var lift: float = clampf(0.5 + speed * 0.045, 0.6, 2.2)
-					cart.jolt(lift, lift * 0.35)
+					cart.jolt(lift, lift * 0.35, randf_range(-0.3, 0.3))
 					_play(FreightKit.rail_clunk(), pos, lerpf(-16.0, -5.0, clampf(speed / 30.0, 0.0, 1.0)), randf_range(0.9, 1.08))
-			# Along the track over the sleepers: a smaller jolt and a knock every SLEEPER_STEP.
+
+			# Shaking / rattling to simulate that the tracks are not a smooth surface
 			var along: float = absf(vel.dot(tr["dir"]))
-			if absf(lat) < GAUGE_HALF + 1.4 and speed > 3.0 and along > 0.6 * speed:
-				run += along * delta
-				if run >= SLEEPER_STEP:
-					run = fmod(run, SLEEPER_STEP)
-					var small: float = clampf(0.25 + speed * 0.022, 0.3, 1.0)
-					cart.jolt(small * randf_range(0.8, 1.2), small * randf_range(-0.4, 0.4))
-					_play(FreightKit.sleeper_knock(), pos, lerpf(-22.0, -10.0, clampf(speed / 30.0, 0.0, 1.0)), randf_range(0.85, 1.15))
+			if on_track and speed > 2.0:
+				var rattle_scale: float = clampf(speed / 16.0, 0.25, 1.25)
+				# Rapid chassis chatter: lift, pitch, and roll
+				cart.jolt(randf_range(-0.35, 0.45) * rattle_scale, randf_range(-0.3, 0.3) * rattle_scale, randf_range(-0.35, 0.35) * rattle_scale)
+				# Physical micro-bumps on sleepers/ballast
+				var has_auth: bool = not cart.has_method("has_physics_authority") or cart.has_physics_authority()
+				if cart.get("is_on_ground") and not is_road_crossing and has_auth:
+					var cmass: float = float(cart.get("mass")) if cart.get("mass") != null else 1200.0
+					var bump: Vector3 = (Vector3.UP * randf_range(0.25, 0.75) + Vector3(randf_range(-0.4, 0.4), 0, randf_range(-0.4, 0.4))) * (cmass * 0.12 * rattle_scale)
+					cart.apply_central_impulse(bump)
+
+				# Rhythmic sleeper knocks proportional to speed
+				run += (along if along > 1.0 else speed * 0.7) * delta
+				var step_dist := 1.3
+				if run >= step_dist:
+					run = fmod(run, step_dist)
+					_play(FreightKit.sleeper_knock(), pos, lerpf(-20.0, -8.0, clampf(speed / 30.0, 0.0, 1.0)), randf_range(0.85, 1.15))
 			else:
 				run = 0.0
-		_state[id] = {"pos": pos, "line": tr["line"], "lat": lat, "run": run}
+
+			# When going too fast on the train tracks, flip over and be thrown to the side!
+			if on_track and not is_road_crossing and speed > DANGER_SPEED:
+				fast_time += delta
+				var has_auth: bool = not cart.has_method("has_physics_authority") or cart.has_physics_authority()
+				if flip_cd <= 0.0 and has_auth and (fast_time >= 0.22 or speed > FLIP_SPEED):
+					var side_norm := Vector3(-tr["dir"].z, 0.0, tr["dir"].x)
+					var throw_side: Vector3 = side_norm * (1.0 if lat >= 0.0 else -1.0)
+					var up_force: float = randf_range(6.5, 9.5)
+					var side_force: float = randf_range(5.5, 8.5)
+					var cmass: float = float(cart.get("mass")) if cart.get("mass") != null else 1200.0
+					var throw_impulse: Vector3 = (throw_side * side_force + Vector3.UP * up_force + vel.normalized() * 1.5) * cmass
+					cart.apply_central_impulse(throw_impulse)
+					cart.air_angular_velocity = Vector3(
+						randf_range(-8.0, 8.0),
+						randf_range(-4.0, 4.0),
+						randf_range(11.0, 17.0) * (1.0 if lat >= 0.0 else -1.0)
+					)
+					_play(FreightKit.rail_clunk(), pos, 2.0, randf_range(0.82, 0.95))
+					flip_cd = 2.5
+					fast_time = 0.0
+			else:
+				fast_time = 0.0
+		_state[id] = {"pos": pos, "line": tr["line"], "lat": lat, "run": run, "fast_time": fast_time, "flip_cd": flip_cd}
 	for id in _state.keys():
 		if not seen.has(id):
 			_state.erase(id)
