@@ -2233,37 +2233,80 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
   they run into. Each line has a `trains` list (name, speed, `period`, `phase`, consist), and `_build_railways` errors if
   two trains on a line overlap (a turn on the line takes (line + train) / speed seconds): the Main Line runs a long
   Freight (28 cars: two diesels, boxcars, hoppers, tank cars, log cars, flatcars, a caboose) and the Express (a
-  streamlined diesel, five coaches and an observation car) 68s apart, the Branch Line a shorter Freight.
-  Nobody is "gapped" any more: a train is one solid string, and the only way over a crossing while a train is on it is the
-  flatcar kicker (below).
-- Tunnel portals (`FreightKit.portal`, `_build_portals`, names unaccented: Label3D's default font has no accents, so
-  "TUNEL", "FIN DE VIA", "ESTACION") stand where the grading stops inside a hill: a stone facade with wing walls built
-  into the hillside (its top follows the hill behind), a vaulted arch with voussoirs, a 24m lining that goes dark with
-  depth (`_tunnel_shade`: the vertex colour falls to black, so a train runs into a hole and not under the terrain),
-  a black plug at its end and two lamps. The track runs on into the lining (`PortalTrackBed`).
+  streamlined diesel, five coaches and an observation car) 68s apart, the Branch Line a shorter Freight; the local passenger
+  train shares the Main Line's west end (below). Nobody is "gapped" any more: a train is one solid string, and the only way
+  over a crossing while a train is on it is the flatcar kicker (below).
+- Tunnel portals (`FreightKit.portal`, names unaccented: Label3D's default font has no accents, so "TUNEL", "FIN DE VIA",
+  "ESTACION") close the end of a cutting where a railway goes into a hill. They are planned before the ground is graded
+  (`_plan_portals`, `_portals`: place, the way in, the tunnel's depth behind, the bay's height and the wing tops). The
+  facade is dressed stone (hut_masonry's rubble, key "dressed", UVs from PropKit's `extrude`/`block` `uv_scale`, offset
+  clear of the shader's moss): a segmental arch with voussoirs, a bay 13.5-15m high (0.8m over the hill above the arch,
+  `PORTAL_TOP_MIN`), and wings whose tops follow the natural hill just behind (`_wing_tops`), so it never stands out of the
+  hillside as a slab. The lining (24m) is unshaded (key "tunnel": no sun or sky reaches in), dim at the mouth and black
+  within a third of the way, with weak lamps and a black plug; black veils across it (`tunnel_fog`, its own mesh
+  `TunnelFog_*`, more opaque deeper in) fade a train into the dark. The track runs on into it (`PortalTrackBed`).
+  - The ground: a heightfield can't hold a tunnel, so behind a portal's face `_grade` leaves out the line's own segments
+    (`_behind_portal`: the last ones outside cut a bowl round the mouth that ran on up through the lining, and the trains
+    drove into a slope of rock), holds the hill `PORTAL_COVER` over the lining's crown, and keeps it under the facade's top
+    (or the cutting's walls beside it) plus `PORTAL_RISE` per metre back from the facade's back, so it rises from the
+    facade instead of standing over it. The grid has lines exactly on each portal's face and back and is halved across the
+    cutting (`PORTAL_REFINE`, `_grid_axis`), so the step from the cutting's floor to the hill over the lining falls inside the
+    facade's thickness; those cells under the arch are left out of the drawn ground (`_in_portal_hole`; they keep their
+    collision, which also stops a cart driving in). The cutting's walls rise `PORTAL_CUT` (2) per metre. No telegraph
+    pole stands in a cutting.
+  - The hills are smooth buttes (`_hills`: rims wander 12% on low-frequency noise), and `canyon_ground.gdshader`'s
+    `face_slope` is 0 here: taken from each triangle's own face (as on the Canyon Course), the rock's edge followed the 5m
+    grid's triangles and the hills showed every facet.
 - Terrain as on the Canyon Course: no road mesh, the ground is graded flat under the lap and the rails (`_grade`,
   samples chained by `_rs_next`) and `canyon_ground.gdshader` paints the tarmac from the vertex data. Heights are `_plain`
   (gentle swell), the hills and the far mesas. The road and the rails follow `_plain` smoothed along them; near a crossing
   the rail takes the road's height (`_rail_height`, 14m flat, easing over 46m), and its top stands `RAIL_LIFT_CROSSING`
   (10cm) over the road there and 60cm elsewhere (`_rail_lift`), so the crossing is flush and the ballast has room.
-  Depot pad: `_pads` (x -305..45, z 110..222 and a 16m blend), `_pad_at`. The track is `FreightKit.track_piece` (ballast,
-  sleepers, rails at TrainKit.SCALE, in pieces of 32 samples, named "TrackBed..." so DressingColliders leaves it soft) and
-  each crossing has a planked deck (`FreightKit.crossing_deck`).
+  Depot pad: `_pads` (x -305..45, z 110..222 and a 16m blend), `_pad_at`. Each crossing has a planked deck
+  (`FreightKit.crossing_deck`; its joints, flangeways and edge strips stand 1.2, 2.4 and 3.6cm up: closer, they flickered).
+- The track is `FreightKit.track_piece` (rails, sleepers and ballast at TrainKit.SCALE, in pieces of 32 samples named
+  "TrackBed..."). The ballast is `rail_ballast.gdshader`: crushed stone from the desert pavement's pebbles washed to grey,
+  laid in world space from above (beds that meet or overlap match), stained with oil between the rails and rust under them
+  by UV.x and UV.y (metres from each track's centre, 99 for none), dusty on the shoulders, its stones' normal map tipped onto
+  the face in world space (the meshes have no tangents). Sleepers are hut_wood's squared timber (`_sleeper`: UVs in metres,
+  the grain along v); rails have rusty sides and a bright running surface (keys "rail", "railtop"). Every point's "across"
+  is mitred between its segments (`before`/`after` carry it over a piece's ends), so curves have no seams.
+  - Collision: every bed is a body `RailBed_<line>` (`_bed_body`, surface gravel; the name keeps clear of PlayerCart's track
+    words) of `_bed_faces`: a low, wide hump rising 7 degrees from under the ground to 15cm under the rails' tops. A cart
+    crossing at full speed comes off it about 4 m/s up (a hop of a few tens of centimetres) and keeps its speed. PlayerCart
+    smooths only the pop off small edges, so shorter, steeper ramps (the ballast's own shoulders) threw carts crossing a
+    turnout a metre up, and a longer 17-degree one launched them like a kicker. `res://scratch/track_cross_test.tscn --
+    [run=x,z,yaw,run_up ...] [trace=1]` (headless) drives a real cart across and prints the hop, the speed in and out and
+    what it stood on. The yard lead's embankment by T1 still throws a fast cart: that is the ground.
 - `TrainKit.gd` builds the rolling stock through a PropKit at SCALE 1.5 (`KINDS`: loco 19m, box 15, tank 14, flat 16,
   flat_load 16, hopper 16, caboose 10, ploco 20, coach 26, obs 26, in life-size metres): a hood-unit diesel (`loco:2` is
   the yellow yard switcher), boxcars and tank cars in four colourways, an open flatcar, the log car (`_flat_car` with
   `_log_load`: bulkheads, three layers of 17/16/17 crosswise logs, stakes and chains; every log `_log` has eight bark
   ridges and a cut face with rim, sapwood, heartwood rings and pith), a covered grain hopper with three roof hatches
-  (`_hopper`), a caboose, the Express's streamlined cab unit (`_cab_unit`, a lofted nose), coaches and the observation car
-  (`_coach`: windows every 2.2m, a gold pinstripe, air-conditioning units, a beavertail with a tail lamp).
+  (`_hopper`), a caboose, the passenger cab unit (`_cab_unit`), coaches and the observation car (`_coach`: windows every
+  2.2m, a gold pinstripe, air-conditioning units, a beavertail with a tail lamp).
+  - The cab unit has a full-width "bulldog" nose: the body's rounded section carried forward, its top dropping from the cab
+    roof down a raked two-pane windscreen onto a rounded hood and over a bulging front to a pilot, the headlight set into
+    the hood's slope. A tapering bullet nose had read as Bloombay's monorail. Its livery (teal, a gold line, cream, the line
+    sweeping down the nose) is `_banded_shell`: the rings cut at the livery's heights into bands lofted apart, each one
+    colour, so the lines run clean however coarse the rings (one loft coloured quad by quad stepped them into teeth).
   `Train.gd` runs a train along a Curve3D on the wall clock: `consist` ("loco", "box:1", "flat", "flat_load", "hopper",
-  "tank", "caboose", "ploco", "coach", "obs", and "gap:20" for an opening, which only the tests use now), `speed`,
-  `period` (>= (line + train) / speed), `phase`. Hits are a swept test of each cart this peer drives against each car's
-  box in the car's own frame (a car is solid from the rail down 1.2m to its height: a flatcar is 2.2m, a boxcar 6.3m,
-  loaded flatcar 4.4m); no collision body, because a cart moves a metre a step. `blocked_intervals`/`pass_window` give
-  the timetable at a point. `clock_override` holds a train at one clock reading, with `kills` and `sounds` off:
-  that is a train standing still (`_park_train`: the Stabled Express against the platform and the yard switcher with
-  three hoppers under the loadout; set the head's distance along the track).
+  "tank", "caboose", "ploco", "coach", "obs", "gap:20" for an opening, which only the tests use now, and "~" before a car
+  to turn it round), `speed`, `period` (>= (line + train) / speed), `phase`. Hits are a swept test of each cart this peer
+  drives against each car's box in the car's own frame (a car is solid from the rail down 1.2m to its height: a flatcar is
+  2.2m, a boxcar 6.3m, loaded flatcar 4.4m); no collision body, because a cart moves a metre a step.
+  `blocked_intervals`/`pass_window`/`pass_windows` (each pass its own window) give the timetable at a point. With `legs`
+  ([start, end, from, to, ramp] per leg, flattened) a train keeps a timetable of its own: it pulls away, runs, stops, stands
+  and may back up; its blocked intervals are stepped out once per point and kept, and it idles (diesel, no wheels) when
+  standing. `clock_override` holds a train at one clock reading, with `kills` and `sounds` off: that is a train standing
+  still (`_park_train`: the yard switcher with three hoppers under the loadout; set the head's distance along the track).
+- The local (`_build_local_train`, `LOCAL_*`, node `MainLineLocalTrain`): a diesel at each end (the rear one "~ploco") and two
+  coaches. Its path is the Main Line from its west end to T1 and the yard lead on to the buffer stop; every 250s (two of the
+  Main Line's turns) it comes out of the west tunnel, takes T1 round into the platform (in at 20-82s), stands at the station,
+  and backs out the same way into the tunnel (191-247s), in the gaps the Freight and the Express leave on that stretch.
+  `_verify_local` errors if they ever meet there. The west crossing listens to it too: `res://scratch/crossing_windows_probe.gd`
+  (`-s`, headless, `-- [at=40,60]`) lists every crossing's trains and passes, and with `at=` holds the trains' clocks to print
+  what a bot would hear.
   `res://scratch/train_kill_test.tscn` (headless) puts a real cart through a crossing at the middle of each car, in a gap
   and before and after the train (all must come out right); `scratch/train_preview.gd` (`-s`, windowed) renders the cars;
   `scratch/lap_shots.tscn ... clock=<s>` holds every train at a time of day to shoot it.
@@ -2272,7 +2315,9 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
   before the first car of the first train, the arms down after `arm_delay`, off `hold` after the last. The barriers are not
   solid. It is in the group `rail_crossings`; PlayerCart's `_ai_rail_crossing_override` makes a bot stop `ai_stop_short`
   (+3) metres short of a crossing a train is on and wait (and turns the stuck checks off, `_ai_crossing_hold`); bots never
-  try the kicker. Waiting bots bunch up and get shot.
+  try the kicker. Waiting bots bunch up and get shot. A crossing closes for each pass of each train on its own (`_windows`:
+  `pass_windows`, so the local closes it twice a cycle, not for the minutes between). A boosting bot (a pad or an item)
+  can't brake for a closed crossing.
 - Every crossing has the flatcar kicker (`KICKER_*`, `_build_kicker`, a WoodenRamp whose lip is 11m before the rails): at
   35-40 m/s a cart is 4.4-4.8m over the road (centre) over the rails, clearing a 2.2m flatcar and not a boxcar (6.3m), a
   log car, a hopper or a coach. The lines' freights carry runs of empty flatcars (four in a row) to jump over.
@@ -2281,11 +2326,15 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
   to the south), curves round to the east (`_turtle`: straights and arcs, R 100 then R 60) and runs on as the platform track
   (z 170) past Estacion del Viento to a buffer stop at x -108; at T2 (x -262) the factory track leaves it to the left,
   an S-curve (R 150) onto z 158, and runs on past the grain cooperative to its own buffer stop at x 25. Each spur has
-  its own ground (`_spur_heights`: the plain smoothed along it, held to the track it leaves near the turnout and to the pad's
-  height on the pad). `FreightKit.turnout` builds a turnout: both tracks' rails, the switch blades, the frog, check rails,
-  stretcher bars, long switch sleepers and a switch stand, on one ballast bed (where the two tracks are
-  `TURNOUT_SEPARATION` apart they get beds of their own, `_in_turnout` cuts the plain bed out of the zone). The ground
-  grading and the flora keep off the spurs (`_spur_distance`).
+  its own ground (`_spur_heights`: the plain smoothed along it, held exactly to the track it leaves for `TURNOUT_HOLD`
+  (42m, past the turnout) and to the pad's height on the pad). `FreightKit.turnout` builds a turnout: both tracks' rails,
+  the switch blades, the frog, check rails, stretcher bars, long switch sleepers and a switch stand, on one ballast bed
+  (where the two tracks are `TURNOUT_SEPARATION` apart they get beds of their own, `_in_turnout` cuts the plain bed out of
+  the zone). The joins: the shared bed starts 1.5m before the toe and runs `TURNOUT_OVERLAP` past the zone, 3cm under the
+  tracks' own beds (so the two never share a plane); the branch's rails run `TURNOUT_RAILS` past it, lifted 1.8cm only
+  where the blades lie on the through rails (level by 12m), and the branch's own track starts at the very sample they reach
+  (it had started a sample later, leaving bare rails over the ground and gaps in the ballast). The ground grading and
+  the flora keep off the spurs (`_spur_distance`).
   `FreightKit.buffer_stop` is a slab and an anchor block under a red-and-white buffer beam on two H-section uprights, two
   buffer heads on hydraulic cylinders, diagonal braces, white rail ends with a tie bar, a red lamp, a plate, and a heap
   of ballast behind (`_ballast_heap`: a lumpy mound of facets with loose stones; it had been a flat-coloured earth bank).
@@ -2296,13 +2345,16 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
   slate normal maps need) and grown by PROP_SCALE. Every roof rests on what carries it: posts, columns and braces are cut to
   the plane above them (`_plane_y`) or stand on the slab under a girder (`canopy`), which is what the old station got
   wrong (its veranda posts stopped short of a sloped roof, the freight shed's posts 0.9m below it).
-  - Estacion del Viento (`station`): stucco walls on a stone plinth with quoins, a stone cornice, a terracotta tile roof with
+  - Estacion del Viento (`station`): stucco walls on a stone plinth with quoins (on the walls from the corner inward,
+    alternately long and short, 5cm proud: they had been laid past the corners, sticking out beyond both walls), a stone
+    cornice, a terracotta tile roof with
     eave and rake boards, two brick chimneys, a pedimented portico on four columns over the entrance with the name on
     its entablature, shuttered windows (`window`: frame, mullions, sill, lintel, louvred shutters), a clock tower with a clock
     face on each side and a hipped tile roof with a weathervane, a platform canopy on cast-iron columns (`canopy`: iron roof,
     girder, columns with brackets, scalloped valance, gutter, downpipes; `dir`/`floor_y` make it a dock canopy too), and
     `platform` (an asphalt slab in 4m panels, a stone-faced edge, a concrete coping, a yellow line, ramps, benches, lamp
-    posts, blue enamel name boards facing the track, a luggage trolley, milk churns, crates) and `goods_shed` (red
+    posts, blue enamel name boards facing the track, a luggage trolley, milk churns, crates: their battens stand 2.5cm proud,
+    and flush they flickered; the slab joints and the yellow line 1.2cm up) and `goods_shed` (red
     weatherboards, a ridge lantern, sliding doors on rails, its own canopy, drums and crates). The platform's top is
     0.5m over the rail top: the frame's origin is `STATION_BACK` (37.2m) south of the platform track and the edge
     `PLATFORM_EDGE` (2.6m) from its centre, 35cm from a coach's side.
@@ -2323,10 +2375,13 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
     ground in seconds.
 - `hut_roof_iron.gdshader` fades its ribs and laps to their average by the pixel's size in metres (`fwidth` of the UV): sharp,
   the 17cm ribs aliased into rings that crawled across a distant roof (it is also Msitu Falls' ranger post's shader).
-- The rocks (`FreightKit.rock`, `_pick_rock`, `_rock_base` in `_build_flora`): faceted boulders that stand on the ground
-  (each is set with its foot on the lowest ground under its footprint and sunk a little more, so no side hangs over a slope)
-  instead of floating or flaring into mushrooms. Most (64%, and anything within 12.5m of the road's centre) are low stones
-  of 22-60cm, some 0.8-1.5m, a few 1.6-2.6m, the big ones kept off the road by their size.
+- The rocks (`FreightKit.boulder`, `_pick_rock`, `_rock_xf` in `_build_flora`): weathered boulders (an icosphere dented by
+  noise, a flat buried base, on half of them a bedding-plane top, smooth normals) in `canyon_rock.gdshader`, the hills'
+  sandstone beds tinted toward the plain's tan, each set with its foot on the lowest ground under it. Lumps of flat facets
+  had read as mushrooms, and the Canyon Course's fallen blocks (SandstoneKit) as bricks on this plain. Most (64%, and
+  anything within 12.5m of the road's centre) are low stones of 22-60cm, some 0.8-1.5m, a few 1.6-2.6m, the big ones kept
+  off the road by their size. The sagebrush (`FreightKit.sage`) is smooth ellipsoid lobes (`_blob`, darker underneath)
+  sitting down on the ground: on a stem it had read as a ball on a stick, as lathe lobes as green crystals.
   Their MultiMeshes carry `hull_collider` and `min_collider_height` meta, which makes DressingColliders give each instance
   the convex hull of its mesh (scaled by the instance) instead of a box, solid from `min_collider_height` (15cm): a cart's
   sphere rolls up the low ones, and at speed they bump it into the air; the big ones stop it.
@@ -2335,7 +2390,11 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
   boulders (`_build_flora`). Wind loop `PlainsWind`; the trains have synthesised diesel and clatter loops, the crossings a
   bell and a horn (`FreightKit.bell/horn/diesel/clatter`).
 - AI races (`scratch/ai_race_test`, speed=1 only: the trains run on the real clock, not the engine's) finish three laps in
-  about 250s; a few bots a race are blown up queueing at a closed crossing (missiles), rarely run into a train.
+  about 250s; a few bots a race are blown up queueing at a closed crossing (missiles), rarely run into a train (a boosting
+  bot can't brake for one). `noitems=1` doesn't take every item away here: a bot was still blown up with it. With the local
+  running, six bots finished three laps with no train hits.
+- Cost (M1, 4320x2700, `scratch/ab_bench`): about 19ms of GPU along the lap; the track beds 0.06ms (their ballast shader
+  0.3ms over a plain material where the yard fills the view), the tunnel veils 0.06ms, the desert's plants and rocks 0.8ms.
   `res://scratch/freight_ground_profile.tscn` (headless) raycasts the collision along the lap for steps (`across=1` the
   road's width), `scratch/freight_nodes_near.tscn -- x,y,z radius=` lists nodes near a point, `scratch/freight_drive_test.tscn`
   drives a cart straight (it has no steering).

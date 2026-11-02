@@ -8,6 +8,11 @@ extends Node3D
 ## `consist` lists the cars from the head: "loco", "box" ("box:1" a colourway), "tank", "flat",
 ## "flat_load", "caboose", and "gap:14" for an uncoupled cut: an opening 14m wide in game metres,
 ## with nothing in it. The gaps are what a cart can drive through when it catches the right moment.
+## A "~" before a car turns it round (a second diesel at the tail, nose outward).
+##
+## With `legs` the train keeps a timetable of its own instead of running through at `speed`: it pulls
+## away, runs, slows and stops, stands, and may back up the way it came (Freight Line's local into the
+## station). `pass_windows` then gives each of its passes over a point separately.
 ##
 ## Touching a car anywhere destroys a cart: the roof and a flatcar's deck count. There is no collision
 ## body (a cart at 60 m/s moves a metre a step): `_check_hits` tests every cart this peer drives
@@ -34,11 +39,16 @@ const FreightKit = preload("res://FreightKit.gd")
 @export var sounds := true
 ## Seconds into the day; set to hold the train still for tests and shots (negative: the wall clock).
 @export var clock_override := -1.0
+## A timetable of its own: legs of [start, end (seconds into the cycle), from, to (metres of the head along the
+## path), ramp (seconds to reach its pace, and to stop)], flattened, in order. Between legs (and from the last leg's
+## end round to the first's start) it stands where the last one left it. `to` < `from` backs it up.
+@export var legs := PackedFloat32Array()
 
 signal cart_hit(cart: Node)
 
 class Car:
 	var kind := ""
+	var flip := false
 	var solid := true
 	var offset := 0.0     # from the head back to the car's front
 	var length := 0.0
@@ -68,6 +78,9 @@ func _ready() -> void:
 		var parts := String(entry).split(":")
 		var kind := parts[0]
 		var car := Car.new()
+		if kind.begins_with("~"):
+			kind = kind.substr(1)
+			car.flip = true
 		car.kind = kind
 		car.offset = off
 		if kind == "gap":
@@ -87,7 +100,7 @@ func _ready() -> void:
 		off += car.length
 		cars.append(car)
 	train_length = off
-	if period * speed < _path_length + train_length:
+	if legs.is_empty() and period * speed < _path_length + train_length:
 		push_warning("Train %s: period %.0fs at %.0f m/s is too short to clear a %.0fm path with a %.0fm train" % [name, period, speed, _path_length, train_length])
 	if sounds:
 		_add_sounds()
@@ -100,7 +113,7 @@ func _add_sounds() -> void:
 	for car in cars:
 		if car.node == null:
 			continue
-		if car.kind == "loco" and loco == null:
+		if (car.kind == "loco" or car.kind == "ploco") and loco == null:
 			loco = car
 		if car.offset > train_length * 0.45 and mid == null:
 			mid = car
@@ -141,7 +154,37 @@ func _clock() -> float:
 
 ## Where the head is along the path, `t` seconds into the day (negative before it enters).
 func head_at(t: float) -> float:
+	if not legs.is_empty():
+		return _leg_head(fposmod(t - phase, period))
 	return fposmod(t - phase, period) * speed
+
+
+## The head's place `tc` seconds into the cycle, from `legs`.
+func _leg_head(tc: float) -> float:
+	var n: int = floori(legs.size() / 5.0)
+	var head := legs[(n - 1) * 5 + 3]
+	for k in n:
+		var t0 := legs[k * 5]
+		var t1 := legs[k * 5 + 1]
+		if tc < t0:
+			return head
+		var s0 := legs[k * 5 + 2]
+		var s1 := legs[k * 5 + 3]
+		if tc <= t1:
+			return s0 + (s1 - s0) * _ramped((tc - t0) / maxf(t1 - t0, 0.001), legs[k * 5 + 4] / maxf(t1 - t0, 0.001))
+		head = s1
+	return head
+
+
+## The share of a leg run `u` of the way through it, pulling away and stopping with an even acceleration over the
+## first and last `a` of it and at a steady pace between.
+static func _ramped(u: float, a: float) -> float:
+	a = clampf(a, 0.001, 0.5)
+	if u <= a:
+		return u * u / (2.0 * a) / (1.0 - a)
+	if u >= 1.0 - a:
+		return 1.0 - (1.0 - u) * (1.0 - u) / (2.0 * a) / (1.0 - a)
+	return (u - a * 0.5) / (1.0 - a)
 
 
 ## Seconds into the train's cycle (0 as the head enters the path).
@@ -156,6 +199,22 @@ func pass_window(s: float, pad := 0.0) -> Array:
 	if ivs.is_empty():
 		return []
 	return [ivs[0][0], ivs[-1][1]]
+
+
+## Each pass of the train over the point `s` as its own [start, end] window (seconds into the cycle, widened by
+## `pad` metres): one for a train that runs straight through, two for one that comes back the way it went.
+func pass_windows(s: float, pad := 0.0) -> Array:
+	var ivs := blocked_intervals(s, 0.0, pad)
+	var out: Array = []
+	for iv in ivs:
+		if not out.is_empty() and float(iv[0]) - float(out[-1][1]) < PASS_GAP:
+			out[-1][1] = maxf(float(out[-1][1]), float(iv[1]))
+		else:
+			out.append([float(iv[0]), float(iv[1])])
+	return out
+
+## Two blocked intervals closer than this are one pass (the openings between a train's cars).
+const PASS_GAP := 12.0
 
 
 ## A point `s` metres along the path, running on past either end along its end tangents.
@@ -193,7 +252,7 @@ func _place(t: float) -> void:
 		if dir.length_squared() < 1e-6:
 			continue
 		var mid := (pf + pb) * 0.5
-		car.xf = Transform3D(Basis.looking_at(dir.normalized(), Vector3.UP), mid)
+		car.xf = Transform3D(Basis.looking_at(-dir.normalized() if car.flip else dir.normalized(), Vector3.UP), mid)
 		car.node.transform = car.xf
 		if not car.prev_present:
 			car.prev_xf = car.xf
@@ -201,12 +260,17 @@ func _place(t: float) -> void:
 
 
 func _update_sounds() -> void:
+	# A train on a timetable of its own that is standing still idles: its diesel, but no wheels.
+	var rolling := true
+	if not legs.is_empty():
+		var tc := cycle_time()
+		rolling = absf(_leg_head(tc) - _leg_head(fposmod(tc - 0.5, period))) > 0.5
 	for pair in [[_engine_audio, "loco"], [_clatter_audio, ""]]:
 		var pl: AudioStreamPlayer3D = pair[0]
 		if pl == null:
 			continue
 		var node := pl.get_parent() as MeshInstance3D
-		var on: bool = node != null and node.visible
+		var on: bool = node != null and node.visible and (rolling or pl == _engine_audio)
 		if on and not pl.playing:
 			pl.play()
 		elif not on and pl.playing:
@@ -290,6 +354,8 @@ func _kill(cart: Node) -> void:
 ## than `clear_height` are ignored. Merged: a run of boxcars is one interval, a gap splits it.
 func blocked_intervals(s: float, clear_height := 0.0, pad := 0.0) -> Array:
 	var train_s := _path_length - s if reverse else s
+	if not legs.is_empty():
+		return _leg_intervals(train_s, clear_height, pad)
 	var out: Array = []
 	for car in cars:
 		if not car.solid or car.height <= clear_height:
@@ -305,6 +371,39 @@ func blocked_intervals(s: float, clear_height := 0.0, pad := 0.0) -> Array:
 		else:
 			merged.append([iv[0], iv[1]])
 	return merged
+
+
+## blocked_intervals for a train on `legs`: the cycle stepped through a tenth of a second at a time (once per point,
+## then kept: the crossings and the AI ask about the same few points every frame).
+var _leg_cache := {}
+
+func _leg_intervals(train_s: float, clear_height: float, pad: float) -> Array:
+	var key := Vector3(train_s, clear_height, pad)
+	if _leg_cache.has(key):
+		return _leg_cache[key]
+	var out: Array = []
+	var start := -1.0
+	var tc := 0.0
+	while tc <= period:
+		var head := _leg_head(tc)
+		var covered := false
+		for car in cars:
+			if not car.solid or car.height <= clear_height:
+				continue
+			var front := head - car.offset + pad
+			if train_s <= front and train_s >= front - car.length - 2.0 * pad:
+				covered = true
+				break
+		if covered and start < 0.0:
+			start = tc
+		elif not covered and start >= 0.0:
+			out.append([start, tc])
+			start = -1.0
+		tc += 0.1
+	if start >= 0.0:
+		out.append([start, period])
+	_leg_cache[key] = out
+	return out
 
 
 ## Seconds from now until the point `s` is next covered (0 while it is), and until it is next clear

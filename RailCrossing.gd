@@ -175,21 +175,20 @@ func _physics_process(delta: float) -> void:
 	if _trains.is_empty():
 		_resolve_trains()
 		return
-	# The warning: any train's pass window, from `warn_lead` before its first car to `hold` after its last, and
-	# how long the earliest of those has been on.
+	# The warning: any of any train's passes, from `warn_lead` before its first car to `hold` after its last, and
+	# how long the earliest of those has been on. A train that comes back the way it went (Freight Line's local)
+	# passes twice a cycle, each pass its own window.
 	warning = false
 	var since := 0.0
 	var tt := 0.0
 	for t in _trains:
-		var win: Array = t.pass_window(train_s, pad)
-		if win.is_empty():
-			continue
 		tt = t.cycle_time()
 		var period: float = t.period
-		for x in [tt, tt - period]:
-			if x >= float(win[0]) - warn_lead and x <= float(win[1]) + hold:
-				warning = true
-				since = maxf(since, x - (float(win[0]) - warn_lead))
+		for win in _windows(t):
+			for x in [tt, tt - period, tt + period]:
+				if x >= float(win[0]) - warn_lead and x <= float(win[1]) + hold:
+					warning = true
+					since = maxf(since, x - (float(win[0]) - warn_lead))
 	var target: float = 1.0 if warning and since >= arm_delay else 0.0
 	_arm = move_toward(_arm, target, delta / lower_time)
 	_set_arm(_arm)
@@ -214,12 +213,18 @@ func _physics_process(delta: float) -> void:
 ## little for the cart's own length and the time it takes to cross.
 func is_closed_for(eta: float, margin := 1.0) -> bool:
 	for t in _trains:
-		var win: Array = t.pass_window(train_s, pad)
-		if win.is_empty():
-			continue
 		var tt: float = t.cycle_time()
 		var period: float = t.period
-		for x in [tt + eta, tt + eta - period, tt + eta + period]:
-			if x >= float(win[0]) - margin and x <= float(win[1]) + margin:
-				return true
+		for win in _windows(t):
+			for x in [tt + eta, tt + eta - period, tt + eta + period]:
+				if x >= float(win[0]) - margin and x <= float(win[1]) + margin:
+					return true
 	return false
+
+
+## A train's passes over this crossing, each as [start, end] in its cycle.
+func _windows(t: Node) -> Array:
+	if t.has_method("pass_windows"):
+		return t.pass_windows(train_s, pad)
+	var win: Array = t.pass_window(train_s, pad)
+	return [] if win.is_empty() else [win]

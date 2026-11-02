@@ -467,7 +467,7 @@ static func warehouse(pk: PropKit, kit: Dictionary, x0: float, x1: float, z0: fl
 	# The dock: a raised concrete slab along the front with bumpers, a stair at each end, a yellow edge.
 	var dz: float = z1 + 3.2
 	blk(pk, kit, "concrete", Vector3(x0 - 0.2, 0, z1), Vector3(x1 + 0.2, DOCK_H, dz), CONCRETE.darkened(0.06))
-	pk.quad(kit, "paint", [Vector3(x0 - 0.2, DOCK_H + 0.003, dz - 0.5), Vector3(x1 + 0.2, DOCK_H + 0.003, dz - 0.5), Vector3(x1 + 0.2, DOCK_H + 0.003, dz - 0.34), Vector3(x0 - 0.2, DOCK_H + 0.003, dz - 0.34)],
+	pk.quad(kit, "paint", [Vector3(x0 - 0.2, DOCK_H + 0.012, dz - 0.5), Vector3(x1 + 0.2, DOCK_H + 0.012, dz - 0.5), Vector3(x1 + 0.2, DOCK_H + 0.012, dz - 0.34), Vector3(x0 - 0.2, DOCK_H + 0.012, dz - 0.34)],
 			Vector3.UP, SAFETY_YELLOW)
 	var bxp: float = x0 + 2.0
 	while bxp < x1:

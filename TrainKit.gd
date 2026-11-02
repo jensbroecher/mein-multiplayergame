@@ -398,6 +398,157 @@ static func _rrect(hw: float, y0: float, y1: float, r: float, z: float, n := 4, 
 	return pts
 
 
+## A shell lofted through `rings` (from _rrect, all at their own z, the first at the nose), cut at the heights `cuts`
+## returns for a z (ascending, as many at every ring) into bands lofted apart, each in its own colour (`colours`, one
+## more than the cuts, from the bottom up), so a livery's lines run clean along the cuts however coarse the rings are:
+## one loft coloured quad by quad stepped the cab unit's lines into teeth. The lowest band runs round under the car
+## from one side to the other, the highest over the top, each band between is a strip down either side. `counts` is how
+## many points (by arc length) a band's piece takes at every ring. Both ends are capped, band by band.
+static func _banded_shell(pk: PropKit, kit: Dictionary, key: String, rings: Array, cuts: Callable, colours: Array, counts: Array) -> void:
+	var nb: int = colours.size()
+	# parts[b][j]: the pieces of band b at ring j, each a PackedVector3Array of counts[b] points.
+	var parts: Array = []
+	for b in nb:
+		parts.append([])
+	var mids: Array = []
+	for ring in rings:
+		var z: float = (ring[0] as Vector3).z
+		var pts := PackedVector2Array()
+		var y0 := INF
+		var y1 := -INF
+		for p in ring:
+			pts.append(Vector2(p.x, p.y))
+			y0 = minf(y0, p.y)
+			y1 = maxf(y1, p.y)
+		mids.append((y0 + y1) * 0.5)
+		var cs: Array = cuts.call(z)
+		var cl: Array = []
+		for k in range(cs.size()):
+			cl.append(clampf(float(cs[k]), y0 + 0.004 * float(k + 1), y1 - 0.004 * float(cs.size() - k)))
+		for b in nb:
+			var lo: float = cl[b - 1] if b > 0 else -INF
+			var hi: float = cl[b] if b < nb - 1 else INF
+			var pieces: Array = []
+			for poly in _ring_pieces(pts, lo, hi):
+				pieces.append(_resample(poly, int(counts[b]), z))
+			parts[b].append(pieces)
+	for b in nb:
+		var col: Color = colours[b]
+		var nr: int = parts[b].size()
+		for q in range((parts[b][0] as Array).size()):
+			for j in range(nr - 1):
+				var a: PackedVector3Array = parts[b][j][q]
+				var c: PackedVector3Array = parts[b][j + 1][q]
+				for i in range(a.size() - 1):
+					var na: Vector3 = _shell_normal(parts[b], j, q, i, mids)
+					var nb2: Vector3 = _shell_normal(parts[b], j, q, i + 1, mids)
+					var nc: Vector3 = _shell_normal(parts[b], j + 1, q, i + 1, mids)
+					var nd: Vector3 = _shell_normal(parts[b], j + 1, q, i, mids)
+					var out: Vector3 = (na + nb2 + nc + nd).normalized()
+					pk.tri(kit, key, a[i], a[i + 1], c[i + 1], na, nb2, nc, col, out)
+					pk.tri(kit, key, a[i], c[i + 1], c[i], na, nc, nd, col, out)
+		# The caps: the band's region of the end face, its pieces joined into one outline, as a fan.
+		for end in [0, nr - 1]:
+			var outline: Array = []
+			for piece in parts[b][end]:
+				for p in piece:
+					outline.append(p)
+			var centre := Vector3.ZERO
+			for p in outline:
+				centre += p
+			centre /= float(outline.size())
+			var nz := Vector3(0, 0, -1.0 if end == 0 else 1.0)
+			for i in range(outline.size()):
+				pk.tri(kit, key, centre, outline[i], outline[(i + 1) % outline.size()], nz, nz, nz, col, nz)
+
+
+## The outline `pts` (a closed ring from _rrect, from the bottom, counter-clockwise seen from +z) between the heights
+## lo and hi (-INF: everything under hi, round the bottom; INF: everything over lo, over the top), as polylines: one
+## round the bottom or over the top, else the right side going up and the left going down.
+static func _ring_pieces(pts: PackedVector2Array, lo: float, hi: float) -> Array:
+	var n: int = pts.size()
+	var cross := func(i: int, j: int, y: float) -> Vector2:
+		var a: Vector2 = pts[i]
+		var b: Vector2 = pts[j]
+		return a.lerp(b, (y - a.y) / (b.y - a.y) if absf(b.y - a.y) > 1e-6 else 0.0)
+	# The first point up the right side over `y`, and the last point down the left side over it.
+	var right_over := func(y: float) -> int:
+		for i in range(1, n):
+			if pts[i].y > y:
+				return i
+		return n - 1
+	var left_over := func(y: float) -> int:
+		for i in range(n - 1, 0, -1):
+			if pts[i].y > y:
+				return i
+		return 1
+	if lo == -INF:
+		var ir: int = right_over.call(hi)
+		var il: int = left_over.call(hi)
+		var poly := PackedVector2Array([cross.call(il, (il + 1) % n, hi)])
+		for i in range(il + 1, n):
+			poly.append(pts[i])
+		for i in range(0, ir):
+			poly.append(pts[i])
+		poly.append(cross.call(ir - 1, ir, hi))
+		return [poly]
+	if hi == INF:
+		var ir2: int = right_over.call(lo)
+		var il2: int = left_over.call(lo)
+		var poly2 := PackedVector2Array([cross.call(ir2 - 1, ir2, lo)])
+		for i in range(ir2, il2 + 1):
+			poly2.append(pts[i])
+		poly2.append(cross.call(il2, (il2 + 1) % n, lo))
+		return [poly2]
+	var r_lo: int = right_over.call(lo)
+	var r_hi: int = right_over.call(hi)
+	var right := PackedVector2Array([cross.call(r_lo - 1, r_lo, lo)])
+	for i in range(r_lo, r_hi):
+		right.append(pts[i])
+	right.append(cross.call(r_hi - 1, r_hi, hi))
+	var l_hi: int = left_over.call(hi)
+	var l_lo: int = left_over.call(lo)
+	var left := PackedVector2Array([cross.call(l_hi, (l_hi + 1) % n, hi)])
+	for i in range(l_hi + 1, l_lo + 1):
+		left.append(pts[i])
+	left.append(cross.call(l_lo, (l_lo + 1) % n, lo))
+	return [right, left]
+
+
+## A polyline resampled to `count` points evenly by length, at depth z.
+static func _resample(poly: PackedVector2Array, count: int, z: float) -> PackedVector3Array:
+	var lens := PackedFloat32Array([0.0])
+	for i in range(1, poly.size()):
+		lens.append(lens[i - 1] + poly[i].distance_to(poly[i - 1]))
+	var total: float = lens[lens.size() - 1]
+	var out := PackedVector3Array()
+	var k := 0
+	for i in range(count):
+		var d: float = total * float(i) / float(maxi(count - 1, 1))
+		while k < poly.size() - 2 and lens[k + 1] < d:
+			k += 1
+		var seg: float = lens[k + 1] - lens[k] if k + 1 < lens.size() else 0.0
+		var p: Vector2 = poly[k].lerp(poly[mini(k + 1, poly.size() - 1)], (d - lens[k]) / seg if seg > 1e-6 else 0.0)
+		out.append(Vector3(p.x, p.y, z))
+	return out
+
+
+## A shell's normal at point i of piece q of ring j: across the piece and along the rings, turned away from the ring's
+## middle.
+static func _shell_normal(band: Array, j: int, q: int, i: int, mids: Array) -> Vector3:
+	var piece: PackedVector3Array = band[j][q]
+	var p: Vector3 = piece[i]
+	var across: Vector3 = piece[mini(i + 1, piece.size() - 1)] - piece[maxi(i - 1, 0)]
+	var along: Vector3 = (band[mini(j + 1, band.size() - 1)][q] as PackedVector3Array)[i] - (band[maxi(j - 1, 0)][q] as PackedVector3Array)[i]
+	var n: Vector3 = across.cross(along)
+	if n.length_squared() < 1e-10:
+		n = Vector3(p.x, p.y - float(mids[j]), 0.0)
+	n = n.normalized()
+	if n.dot(Vector3(p.x, p.y - float(mids[j]), 0.0)) < 0.0:
+		n = -n
+	return n
+
+
 ## Skins a stack of rings (each an Array of Vector3 with the same count, closed loops) with smooth normals.
 ## `col_fn(point, ring index)` colours a vertex; `cap_first` / `cap_last` close the ends with a flat fan.
 static func _loft(pk: PropKit, kit: Dictionary, key: String, rings: Array, col_fn: Callable, cap_first := false, cap_last := false) -> void:
@@ -465,70 +616,107 @@ static func _loft(pk: PropKit, kit: Dictionary, key: String, rings: Array, col_f
 			pk.tri(kit, key, centres[ri], rings[ri][j], rings[ri][j2], out, out, out, col, out)
 
 
-## A streamlined diesel cab unit for the express: a bullet nose with a raked windscreen, cream upper body over
-## a teal skirt with a gold stripe, louvres, round windows, roof fans and a horn.
+## A streamlined diesel cab unit for the express, in the coaches' teal, cream and gold: a full-width "bulldog" nose
+## (the body's rounded section carried forward, its top dropping from the cab's roof down a raked two-pane windscreen
+## onto a rounded hood and over a bulging front to a pilot), not the tapering bullet it had been, which read as the
+## Bloombay monorail. A cream band runs along the sides between gold lines and sweeps down into a V on the nose under
+## a big headlight; the cab has side windows and a door, the engine room portholes and louvres, the roof fans and a
+## horn.
 static func _cab_unit(pk: PropKit, kit: Dictionary) -> void:
 	var hl := 10.0
-	_underframe(pk, kit, hl, 0.95, 1.3, IRON)
+	# The frame's end beams tucked under the nose and the tail (a full-length frame stood out in front of the nose).
+	_underframe(pk, kit, hl - 0.35, 0.95, 1.3, IRON)
 	_bogie(pk, kit, -6.4, [-1.8, 0.0, 1.8])
 	_bogie(pk, kit, 6.4, [-1.8, 0.0, 1.8])
+	# The section from the nose's tip back: [z, half width, bottom, top, corner radius].
+	const WS_FOOT := -7.75
+	const WS_HEAD := -6.75
+	var sections: Array = [
+		[-10.15, 1.06, 1.32, 1.98, 0.55],
+		[-10.06, 1.31, 1.22, 2.28, 0.62],
+		[-9.88, 1.45, 1.17, 2.54, 0.7],
+		[-9.55, 1.52, 1.15, 2.76, 0.74],
+		[-9.05, 1.545, 1.15, 2.93, 0.74],
+		[-8.4, 1.55, 1.15, 3.08, 0.7],
+		[WS_FOOT, 1.55, 1.15, 3.24, 0.66],
+		[WS_HEAD, 1.55, 1.15, 4.12, 0.6],
+		[-6.35, 1.55, 1.15, 4.3, 0.55],
+		[9.9, 1.55, 1.15, 4.3, 0.55],
+	]
+	# The livery: teal below, a gold line, cream above, the line sweeping down along the nose to a teal chin under the
+	# headlight. Each colour is a band of its own (_banded_shell), so the line stays clean down the curved nose.
+	const BAND_LO := 2.45
 	var rings: Array = []
-	var nose_hw: Array = []
-	# The nose: fourteen rings from the tip back to the body, narrowing and sinking toward the tip.
-	const NOSE_RINGS := 14
-	for k in range(NOSE_RINGS):
-		var u: float = 1.0 - float(k) / float(NOSE_RINGS - 1)
-		var hw: float = 1.55 * (1.0 - 0.82 * pow(u, 2.6))
-		var y1: float = 4.3 - 1.7 * pow(u, 2.0)
-		var y0: float = 1.15 + 0.7 * pow(u, 2.2)
-		var rad: float = lerpf(0.55, hw * 0.95, pow(u, 1.5))
-		rings.append(_rrect(hw, y0, y1, rad, -6.0 - 4.0 * u, 10))
-		nose_hw.append(hw)
-	rings.append(_rrect(1.55, 1.15, 4.3, 0.55, 9.9, 10))
-	var body := func(p: Vector3, _i: int) -> Color:
-		if p.y < 2.2:
-			return TEAL
-		if p.y > 4.18:
-			return ROOF_GREY
-		return CREAM
-	_loft(pk, kit, "paint", rings, body, true, true)
-	# The gold stripe along each side of the body, over the teal skirt's top edge.
+	for sc in sections:
+		rings.append(_rrect(sc[1], sc[2], sc[3], sc[4], sc[0], 10))
+	var cuts := func(z: float) -> Array:
+		var lo: float = BAND_LO - 0.6 * smoothstep(-6.4, -10.1, z)
+		return [lo - 0.1, lo]
+	_banded_shell(pk, kit, "paint", rings, cuts, [TEAL, PGOLD, CREAM], [34, 3, 44])
+	# The windscreen: two panes on the flat of the raked slope between WS_FOOT and WS_HEAD, a centre post between them,
+	# each in a dark frame; all standing off the paint along the slope's normal.
+	var foot := Vector3(0.0, 3.24, WS_FOOT)
+	var head := Vector3(0.0, 4.12, WS_HEAD)
+	var up_slope: Vector3 = (head - foot).normalized()
+	var ws_n := Vector3(0.0, up_slope.z, -up_slope.y)
 	for sx in [-1.0, 1.0]:
-		pk.block(kit, "paint", Vector3(sx * 1.55 - 0.02, 2.2, -6.0), Vector3(sx * 1.55 + 0.02, 2.32, 9.9), PGOLD)
-	# The windscreen: a dark glass strip over the top of the sloping nose, a hair off the paint, following the
-	# rings' points either side of the roof's centre line.
-	var glass_ring: Callable = func(k: int) -> Array:
-		var out: Array = []
-		var ring: Array = rings[k]
-		# Points straddling the top centre: arc 0 is points 0-10, the right edge 11-13, the top-right arc 14-24 and the
-		# top-left arc 25-35 (the centre is between 24 and 25).
-		for i in range(19, 31):
-			var q: Vector3 = ring[i]
-			out.append(q + Vector3(0.0, 0.035, -0.02))
-		return out
-	for k in range(2, NOSE_RINGS - 1):
-		var r0: Array = glass_ring.call(k)
-		var r1: Array = glass_ring.call(k + 1)
-		for i in range(r0.size() - 1):
-			pk.quad(kit, "matte", [r0[i], r1[i], r1[i + 1], r0[i + 1]], Vector3.UP, PGLASS)
-	# Side detail: louvres in two banks, three round windows.
+		var xa: float = sx * 0.08
+		var xb: float = sx * 0.86
+		var b0: Vector3 = foot + up_slope * 0.12
+		var t0: Vector3 = head - up_slope * 0.1
+		pk.quad(kit, "steel", [b0 + Vector3(xa - sx * 0.04, 0, 0) + ws_n * 0.02, b0 + Vector3(xb + sx * 0.06, 0, 0) + ws_n * 0.02,
+				t0 + Vector3(xb + sx * 0.06, 0, 0) + ws_n * 0.02, t0 + Vector3(xa - sx * 0.04, 0, 0) + ws_n * 0.02], ws_n, Color(0.1, 0.1, 0.11))
+		var g0: Vector3 = b0 + up_slope * 0.05
+		var g1: Vector3 = t0 - up_slope * 0.05
+		pk.quad(kit, "glass", [g0 + Vector3(xa, 0, 0) + ws_n * 0.04, g0 + Vector3(xb, 0, 0) + ws_n * 0.04, g1 + Vector3(xb, 0, 0) + ws_n * 0.04,
+				g1 + Vector3(xa, 0, 0) + ws_n * 0.04], ws_n, PGLASS)
+	# The cab: a side window either side and a door behind it, each framed (on the side's straight part, under the
+	# roof's curve); grab irons beside the door.
 	for sx in [-1.0, 1.0]:
-		for bank in [[-3.4, 0.4], [2.2, 6.4]]:
-			var z0: float = bank[0]
-			while z0 < float(bank[1]):
-				pk.block(kit, "steel", Vector3(sx * 1.55 - 0.03, 2.55, z0), Vector3(sx * 1.55 + 0.03, 3.6, z0 + 0.1), Color(0.18, 0.19, 0.2))
-				z0 += 0.22
-		for wz in [-5.2, 8.0, 9.2]:
-			pk.tube(kit, "glass", Vector3(sx * 1.55, 3.05, wz), Vector3(sx * 1.55 + sx * 0.04, 3.05, wz), 0.34, 0.34, 12, PGLASS, true)
-	# Headlight on the tip, ditch lights lower down, a horn on the roof.
-	pk.tube(kit, "lamp", Vector3(0.0, 2.15, -10.02), Vector3(0.0, 2.15, -10.1), 0.2, 0.2, 10, LAMP, true)
+		var x: float = sx * 1.55
+		pk.block(kit, "steel", Vector3(x - 0.02 if sx > 0 else x - 0.03, 2.94, -6.28), Vector3(x + 0.03 if sx > 0 else x + 0.02, 3.68, -5.0), Color(0.1, 0.1, 0.11))
+		pk.block(kit, "glass", Vector3(x - 0.02 if sx > 0 else x - 0.045, 3.0, -6.22), Vector3(x + 0.045 if sx > 0 else x + 0.02, 3.62, -5.06), PGLASS)
+		for door in [[-4.75, -3.85]]:
+			pk.block(kit, "steel", Vector3(x - 0.02 if sx > 0 else x - 0.03, 1.35, door[0]), Vector3(x + 0.03 if sx > 0 else x + 0.02, 3.68, door[0] + 0.05), Color(0.1, 0.1, 0.11))
+			pk.block(kit, "steel", Vector3(x - 0.02 if sx > 0 else x - 0.03, 1.35, door[1] - 0.05), Vector3(x + 0.03 if sx > 0 else x + 0.02, 3.68, door[1]), Color(0.1, 0.1, 0.11))
+			pk.block(kit, "steel", Vector3(x - 0.02 if sx > 0 else x - 0.03, 3.63, door[0]), Vector3(x + 0.03 if sx > 0 else x + 0.02, 3.68, door[1]), Color(0.1, 0.1, 0.11))
+			pk.block(kit, "glass", Vector3(x - 0.02 if sx > 0 else x - 0.045, 3.0, door[0] + 0.15), Vector3(x + 0.045 if sx > 0 else x + 0.02, 3.55, door[1] - 0.15), PGLASS)
+			pk.tube(kit, "steel", Vector3(x + sx * 0.08, 1.6, door[0] - 0.15), Vector3(x + sx * 0.08, 3.3, door[0] - 0.15), 0.025, 0.025, 6, Color(0.75, 0.76, 0.77), true)
+		# Portholes along the engine room, in the cream band, and louvred grilles toward the rear.
+		for wz in [-1.6, 1.2, 4.0]:
+			pk.tube(kit, "steel", Vector3(x, 3.12, wz), Vector3(x + sx * 0.035, 3.12, wz), 0.36, 0.36, 14, Color(0.74, 0.75, 0.76), true)
+			pk.tube(kit, "glass", Vector3(x + sx * 0.035, 3.12, wz), Vector3(x + sx * 0.05, 3.12, wz), 0.29, 0.29, 14, PGLASS, true)
+		pk.block(kit, "steel", Vector3(x - 0.02 if sx > 0 else x - 0.035, 2.75, 5.8), Vector3(x + 0.035 if sx > 0 else x + 0.02, 3.55, 9.1), Color(0.14, 0.15, 0.16))
+		var lz := 5.95
+		while lz < 9.0:
+			pk.block(kit, "steel", Vector3(x - 0.02 if sx > 0 else x - 0.06, 2.8, lz), Vector3(x + 0.06 if sx > 0 else x + 0.02, 3.5, lz + 0.07), Color(0.32, 0.34, 0.35))
+			lz += 0.2
+	# The headlight, set into the slope of the hood's front (a chrome rim round a lamp, both tilted with the surface),
+	# and two marker lights low on the nose.
+	var hl_c := Vector3(0.0, 2.41, -9.97)
+	var hl_n := Vector3(0.0, 0.57, -0.82).normalized()
+	pk.tube(kit, "steel", hl_c - hl_n * 0.04, hl_c + hl_n * 0.05, 0.27, 0.25, 16, Color(0.78, 0.79, 0.8), true)
+	pk.tube(kit, "lamp", hl_c + hl_n * 0.05, hl_c + hl_n * 0.065, 0.2, 0.2, 16, LAMP, true)
 	for sx in [-1.0, 1.0]:
-		pk.tube(kit, "lamp", Vector3(sx * 0.62, 1.95, -8.8), Vector3(sx * 0.62, 1.95, -8.88), 0.12, 0.12, 8, LAMP, true)
-	pk.tube(kit, "steel", Vector3(0.0, 4.3, 2.0), Vector3(0.0, 4.75, 2.0), 0.1, 0.18, 8, Color(0.7, 0.62, 0.35), true)
-	# Roof fans over the engine and a dynamic-brake hump at the rear.
+		pk.tube(kit, "lamp", Vector3(sx * 0.66, 1.52, -10.0), Vector3(sx * 0.66, 1.52, -10.2), 0.1, 0.1, 10, Color(1.0, 0.86, 0.6), true)
+	# The pilot: a plough plate raked back under the nose, with its cheeks.
+	var pt0 := 1.15
+	var pt1 := 0.36
+	var pz0 := -9.95
+	var pz1 := -10.75
+	var pcol := Color(0.26, 0.27, 0.28)
+	pk.quad(kit, "steel", [Vector3(-1.32, pt0, pz0), Vector3(1.32, pt0, pz0), Vector3(1.2, pt1, pz1), Vector3(-1.2, pt1, pz1)], Vector3(0, -0.8, -1.0).normalized(), pcol)
+	for sx in [-1.0, 1.0]:
+		pk.tri(kit, "steel", Vector3(sx * 1.32, pt0, pz0), Vector3(sx * 1.2, pt1, pz1), Vector3(sx * 1.32, pt1, pz0), Vector3(sx, 0, 0), Vector3(sx, 0, 0), Vector3(sx, 0, 0), pcol.darkened(0.2), Vector3(sx, 0, 0))
+	for k in range(5):
+		var bx: float = -0.9 + 0.45 * float(k)
+		pk.beam(kit, "steel", Vector3(bx, pt0 - 0.08, pz0 - 0.1), Vector3(bx * 0.95, pt1 + 0.08, pz1 + 0.06), 0.06, 0.06, pcol.darkened(0.35), Vector3(1, 0, 0))
+	# The horn, roof fans over the engine and the dynamic brake's hatch toward the rear.
+	pk.tube(kit, "steel", Vector3(0.0, 4.3, -5.4), Vector3(0.0, 4.72, -5.4), 0.1, 0.18, 8, Color(0.7, 0.62, 0.35), true)
 	for fz in [-2.0, 0.6, 3.2]:
 		pk.tube(kit, "steel", Vector3(0.0, 4.28, fz), Vector3(0.0, 4.4, fz), 0.55, 0.55, 14, Color(0.2, 0.21, 0.22), true)
-	pk.block(kit, "paint", Vector3(-0.9, 4.28, 6.0), Vector3(0.9, 4.62, 9.4), ROOF_GREY.darkened(0.15))
+		pk.tube(kit, "steel", Vector3(0.0, 4.4, fz), Vector3(0.0, 4.43, fz), 0.48, 0.48, 14, Color(0.35, 0.36, 0.37), false)
+	pk.block(kit, "paint", Vector3(-0.9, 4.28, 6.0), Vector3(0.9, 4.58, 9.4), ROOF_GREY.darkened(0.15))
 	for sx in [-1.0, 1.0]:
 		_ladder(pk, kit, sx, 9.0, 1.3, 2.6)
 

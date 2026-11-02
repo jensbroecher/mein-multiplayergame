@@ -251,18 +251,25 @@ static func station(pk: PropKit, kit: Dictionary, labels: Array) -> void:
 		var o: float = -1.0 if sx == 0.0 else 1.0
 		pk.tube(kit, "painted", Vector3(sx, WALL + 1.45, -D * 0.5), Vector3(sx + o * 0.1, WALL + 1.45, -D * 0.5), 0.55, 0.55, 16, TRIM, true)
 		pk.tube(kit, "glass", Vector3(sx + o * 0.08, WALL + 1.45, -D * 0.5), Vector3(sx + o * 0.12, WALL + 1.45, -D * 0.5), 0.42, 0.42, 16, GLASS_COL, true)
-	# Quoins at the four corners and a stone cornice under the eaves.
+	# Quoins at the four corners: dressed blocks on both faces of the corner, standing 5cm proud of the plaster, laid
+	# alternately long and short (a course long on the front is short on the end), from the plinth to under the
+	# cornice. Each lies on its own wall from the corner inward; the front's wraps the corner.
+	const PROUD := 0.05
 	for cx in [0.0, L]:
 		for cz in [0.0, -D]:
-			var sxn: float = -1.0 if cx == 0.0 else 1.0
-			var szn: float = 1.0 if cz == 0.0 else -1.0
-			var y := PL
+			var sxn: float = -1.0 if cx == 0.0 else 1.0    # out of the end wall, along x
+			var szn: float = 1.0 if cz == 0.0 else -1.0    # out of the long wall, along z
+			var y := PL + 0.04
 			var k := 0
-			while y < WALL - 0.3:
-				var wide: float = 0.8 if k % 2 == 0 else 0.5
-				blk(pk, kit, "plaster", Vector3(minf(cx, cx + sxn * wide), y, minf(cz, cz + szn * 0.07)), Vector3(maxf(cx, cx + sxn * wide), y + 0.55, maxf(cz, cz + szn * 0.07)), QUOIN)
-				blk(pk, kit, "plaster", Vector3(minf(cx, cx + sxn * 0.07), y, minf(cz, cz + szn * wide)), Vector3(maxf(cx, cx + sxn * 0.07), y + 0.55, maxf(cz, cz + szn * wide)), QUOIN)
-				y += 0.6
+			while y + 0.5 <= WALL - 0.55:
+				var on_long: float = 0.85 if k % 2 == 0 else 0.5
+				var on_end: float = 0.5 if k % 2 == 0 else 0.85
+				var x_a: float = cx + sxn * PROUD
+				var x_b: float = cx - sxn * on_long
+				blk(pk, kit, "plaster", Vector3(minf(x_a, x_b), y, minf(cz, cz + szn * PROUD)), Vector3(maxf(x_a, x_b), y + 0.5, maxf(cz, cz + szn * PROUD)), QUOIN)
+				var z_b: float = cz - szn * on_end
+				blk(pk, kit, "plaster", Vector3(minf(cx, cx + sxn * PROUD), y, minf(cz, z_b)), Vector3(maxf(cx, cx + sxn * PROUD), y + 0.5, maxf(cz, z_b)), QUOIN)
+				y += 0.56
 				k += 1
 	blk(pk, kit, "stone", Vector3(-0.2, WALL - 0.5, 0.0), Vector3(L + 0.2, WALL - 0.2, 0.28), STONE.lightened(0.1))
 	blk(pk, kit, "stone", Vector3(-0.2, WALL - 0.5, -D - 0.28), Vector3(L + 0.2, WALL - 0.2, 0.0), STONE.lightened(0.1))
@@ -512,13 +519,14 @@ static func churn(pk: PropKit, kit: Dictionary, p: Vector3, col := Color(0.70, 0
 		pk.beam(kit, "steel", p + Vector3(sx * 0.12, 0.8, 0), p + Vector3(sx * 0.24, 0.62, 0), 0.04, 0.04, col.darkened(0.2))
 
 
-## A wooden crate (or a stack of two) with battens, `p` the middle of its base.
+## A wooden crate (or a stack of two) with battens, `p` the middle of its base. The battens stand 2.5cm proud of the
+## boards on every face: flush with the sides, they shared their planes and flickered.
 static func crate(pk: PropKit, kit: Dictionary, p: Vector3, yaw: float, size: Vector3, col := Color(0.54, 0.40, 0.26)) -> void:
 	var basis := Basis(Vector3.UP, yaw)
 	box_at(pk, kit, "timber", p + Vector3(0, size.y * 0.5, 0), basis, size, col)
 	for sx in [-1.0, 1.0]:
-		box_at(pk, kit, "timber", p + basis * Vector3(sx * (size.x * 0.5 - 0.04), size.y * 0.5, 0), basis, Vector3(0.08, size.y + 0.02, size.z + 0.02), col.darkened(0.2))
-	box_at(pk, kit, "timber", p + Vector3(0, size.y + 0.005, 0), basis, Vector3(size.x + 0.02, 0.03, 0.08), col.darkened(0.2))
+		box_at(pk, kit, "timber", p + basis * Vector3(sx * (size.x * 0.5 - 0.015), size.y * 0.5, 0), basis, Vector3(0.08, size.y + 0.03, size.z + 0.05), col.darkened(0.2))
+	box_at(pk, kit, "timber", p + Vector3(0, size.y + 0.01, 0), basis, Vector3(size.x + 0.02, 0.04, 0.08), col.darkened(0.2))
 
 
 ## A drum with two rolling hoops, `p` on the ground.
@@ -561,16 +569,17 @@ static func platform(pk: PropKit, kit: Dictionary, x0: float, x1: float, z_wall:
 	wall(pk, kit, "stone", Vector3(x0, 0, z_edge), Vector3(x1, 0, z_edge), 0.0, top, STONE.darkened(0.04), Vector3(0, 0, -1))
 	# Coping along the edge, and the line behind it.
 	blk(pk, kit, "concrete", Vector3(x0, top, z_edge - 0.08), Vector3(x1, top + 0.1, z_edge + 0.5), CONCRETE.lightened(0.05))
-	pk.quad(kit, "paint", [Vector3(x0, top + 0.102, z_edge + 0.62), Vector3(x1, top + 0.102, z_edge + 0.62), Vector3(x1, top + 0.102, z_edge + 0.78), Vector3(x0, top + 0.102, z_edge + 0.78)],
+	# The line and the slab joints stand 1.2cm (2cm grown) over what they lie on: at 3mm they flickered from afar.
+	pk.quad(kit, "paint", [Vector3(x0, top + 0.112, z_edge + 0.62), Vector3(x1, top + 0.112, z_edge + 0.62), Vector3(x1, top + 0.112, z_edge + 0.78), Vector3(x0, top + 0.112, z_edge + 0.78)],
 			Vector3.UP, Color(0.95, 0.80, 0.14))
 	# The surface is laid in slabs.
 	var x := x0 + 4.0
 	while x < x1 - 0.1:
-		pk.quad(kit, "paint", [Vector3(x - 0.012, top + 0.003, z_wall), Vector3(x + 0.012, top + 0.003, z_wall), Vector3(x + 0.012, top + 0.003, z_edge + 0.5), Vector3(x - 0.012, top + 0.003, z_edge + 0.5)],
+		pk.quad(kit, "paint", [Vector3(x - 0.012, top + 0.012, z_wall), Vector3(x + 0.012, top + 0.012, z_wall), Vector3(x + 0.012, top + 0.012, z_edge + 0.5), Vector3(x - 0.012, top + 0.012, z_edge + 0.5)],
 				Vector3.UP, Color(0.17, 0.17, 0.18))
 		x += 4.0
 	var zm: float = (z_wall + z_edge) * 0.5
-	pk.quad(kit, "paint", [Vector3(x0, top + 0.003, zm - 0.012), Vector3(x1, top + 0.003, zm - 0.012), Vector3(x1, top + 0.003, zm + 0.012), Vector3(x0, top + 0.003, zm + 0.012)], Vector3.UP, Color(0.17, 0.17, 0.18))
+	pk.quad(kit, "paint", [Vector3(x0, top + 0.014, zm - 0.012), Vector3(x1, top + 0.014, zm - 0.012), Vector3(x1, top + 0.014, zm + 0.012), Vector3(x0, top + 0.014, zm + 0.012)], Vector3.UP, Color(0.17, 0.17, 0.18))
 	# Ramps: a sloped surface over the full depth with a stone cheek each side.
 	for end in [[ramp_w, x0, -1.0], [ramp_e, x1, 1.0]]:
 		if not end[0]:

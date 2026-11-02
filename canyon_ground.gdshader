@@ -36,6 +36,7 @@ uniform vec4 line_yellow : source_color = vec4(0.92, 0.70, 0.18, 1.0);
 uniform vec4 road_gravel : source_color = vec4(0.84, 0.70, 0.58, 1.0);
 uniform vec4 road_dust : source_color = vec4(0.82, 0.64, 0.50, 1.0);
 uniform float road_half_width = 7.0;
+uniform float face_slope : hint_range(0.0, 1.0) = 1.0;
 // Edge lines this far out from the centre; the yellow pair this far either side of it.
 uniform float edge_line = 6.3;
 uniform float centre_gap = 0.13;
@@ -65,7 +66,9 @@ void fragment() {
 	float detail = 1.0 - smoothstep(90.0, 700.0, cam_dist);
 	vec2 xz = w_pos.xz;
 	float face_ny = abs(normalize(cross(dFdx(w_pos), dFdy(w_pos))).y);
-	float slope_ny = min(n.y, face_ny);
+	// Each triangle's own face catches the cliffs' edges sharply; 0 takes the slope from the smooth normals alone (Freight
+	// Line's hills, whose 5m triangles showed as facets).
+	float slope_ny = mix(n.y, min(n.y, face_ny), face_slope);
 	// The pixel's size in metres, for the rock's patterns (taken here: the rock is drawn in a branch).
 	float fw = length(fwidth(w_pos));
 

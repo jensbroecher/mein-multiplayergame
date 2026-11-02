@@ -109,6 +109,9 @@ const FACTORY_R := 150.0
 const FACTORY_END_X := 25.0
 ## Where the two tracks of a turnout are this far apart (centre to centre) they get beds of their own.
 const TURNOUT_SEPARATION := 4.4
+## A yard track keeps exactly the height of the track it leaves for this many metres from the turnout's toe (past the
+## turnout's zone, so its rails meet the turnout's on the same sleepers), easing to its own over 46m more.
+const TURNOUT_HOLD := 42.0
 
 ## Terrain grid: fine round the lap and the railways, cells growing outward to the horizon.
 const FINE_X := Vector2(-1050.0, 1050.0)
@@ -152,6 +155,7 @@ var _rs_kind := PackedByteArray()     # 0 the road, 1 a railway
 var _rs_cut := PackedFloat32Array()
 var _rs_flat := PackedFloat32Array()
 var _rs_fill := PackedFloat32Array()
+var _rs_line := PackedInt32Array()     # which line: a railway's index, 100 + a yard track's, -1 the lap
 var _rs_cells := {}
 var _road_cells := {}
 var _road_y := PackedFloat32Array()   # the lap's height at each of its samples
@@ -164,6 +168,7 @@ var _road_d := PackedFloat32Array()
 var _vert_lat := PackedFloat32Array()
 var _vert_s := PackedFloat32Array()
 var _ground_mat: ShaderMaterial
+var _rock_normal: Texture2D
 
 
 # ======================================================================================
@@ -272,6 +277,108 @@ func _portal_distance(p: Vector2) -> float:
 	return best
 
 
+## The cutting into a portal: its floor's half width and its walls' rise per metre (past a rounded shoulder).
+const PORTAL_FLAT := 5.4
+const PORTAL_CUT := 2.0
+## Metres either side of a railway, at a portal, over which the terrain grid is halved.
+const PORTAL_REFINE := 32.0
+## Behind a facade the hill keeps this much cover over the lining's crown, and rises from the facade's top at most
+## this much per metre back.
+const PORTAL_COVER := 1.2
+const PORTAL_RISE := 1.2
+const PORTAL_TOP_MIN := 13.5
+
+## The tunnel mouths, planned before the ground is graded: where each railway goes into a hill, at the last sample
+## outside it. {line, pos (the rail's top at the facade's front), into (Vector2, into the hill), right (Vector2, the
+## world's right of `into`), ground (the graded ground under the rails there), depth (metres of tunnel behind it),
+## wing_l, wing_r (FreightKit.portal's wing tops)}. The portal's frame is Basis(-right, UP, into) at `pos`.
+var _portals: Array = []
+
+func _plan_portals() -> void:
+	_portals.clear()
+	for ri in range(_rails.size()):
+		var len_r: float = _rail_len(ri)
+		var a: Vector2 = _rails[ri]["a"]
+		var dir: Vector2 = (_rails[ri]["b"] - a).normalized()
+		var n: int = int(floor(len_r / SAMPLE_STEP)) + 1
+		var prev_in: bool = _in_hill(_rail_at(ri, 0.0))
+		for k in range(1, n):
+			var s: float = float(k) * SAMPLE_STEP
+			var now_in: bool = _in_hill(_rail_at(ri, s))
+			if now_in == prev_in:
+				continue
+			prev_in = now_in
+			# The boundary: the outside sample is k - 1 (going in) or k (coming out).
+			var out_s: float = s - SAMPLE_STEP if now_in else s
+			var sgn: float = 1.0 if now_in else -1.0
+			var into: Vector2 = dir * sgn
+			var p: Vector2 = _rail_at(ri, out_s)
+			# How far the tunnel runs behind: to where the line comes out again, or to its end.
+			var depth := 0.0
+			var d := SAMPLE_STEP
+			while out_s + sgn * d >= 0.0 and out_s + sgn * d <= len_r and _in_hill(_rail_at(ri, out_s + sgn * d)):
+				depth = d
+				d += SAMPLE_STEP
+			var pd := {"line": ri, "pos": Vector3(p.x, _rail_top(ri, out_s), p.y), "into": into, "right": Vector2(-into.y, into.x),
+					"ground": _rail_height(ri, out_s), "depth": depth + SAMPLE_STEP, "out_s": out_s}
+			# The bay stands 0.8m over the hill above the arch, at least PORTAL_TOP_MIN (room for the plaque over the string
+			# course) and at most FreightKit.PORTAL_TOP.
+			var over_arch: Vector2 = p + into * 2.5
+			pd["top"] = clampf(_base_height(over_arch.x, over_arch.y) - float(pd["pos"].y) + 0.8, PORTAL_TOP_MIN, FreightKit.PORTAL_TOP)
+			pd["wing_l"] = _wing_tops(pd, -1.0)
+			pd["wing_r"] = _wing_tops(pd, 1.0)
+			_portals.append(pd)
+	print("  %d tunnel portals planned" % _portals.size())
+
+
+## A portal's wing tops on its local side `sx` (the portal's +x is the world's -right): [metres out, height over the
+## rail], every 2m from the bay's edge out, each 0.8m over the natural hill just behind the facade (at least 1m, at
+## most the bay's height), so the facade's top follows the hill.
+func _wing_tops(pd: Dictionary, sx: float) -> Array:
+	var out: Array = []
+	var bx: Vector2 = -(pd["right"] as Vector2)
+	var p: Vector3 = pd["pos"]
+	var x: float = FreightKit.PORTAL_BAY + 2.0
+	while x <= FreightKit.PORTAL_WING_END + 0.01:
+		var q: Vector2 = Vector2(p.x, p.z) + bx * (sx * x) + (pd["into"] as Vector2) * 2.5
+		var h: float = _base_height(q.x, q.y) - p.y
+		out.append([x, clampf(h + 0.8, 1.0, float(pd["top"]))])
+		x += 2.0
+	return out
+
+
+## The height of a portal's facade over the rail at the world lateral `lat` (metres along `right`).
+func _facade_top(pd: Dictionary, lat: float) -> float:
+	var x: float = -lat
+	var ax: float = absf(x)
+	if ax <= FreightKit.PORTAL_BAY:
+		return pd["top"]
+	var wing: Array = pd["wing_r"] if x > 0.0 else pd["wing_l"]
+	var px: float = FreightKit.PORTAL_BAY
+	var py: float = pd["top"]
+	for w in wing:
+		if ax <= float(w[0]):
+			return lerpf(py, float(w[1]), (ax - px) / maxf(float(w[0]) - px, 0.001))
+		px = w[0]
+		py = w[1]
+	return py
+
+
+## The portal whose tunnel `p` lies behind (within its depth; of a tunnel's two mouths, the nearer), and how far behind
+## and how far across: [index, e, lat], or [-1, 0, 0].
+func _behind_portal(x: float, z: float) -> Array:
+	var best: Array = [-1, 0.0, 0.0]
+	for i in range(_portals.size()):
+		var pd: Dictionary = _portals[i]
+		var rel := Vector2(x - pd["pos"].x, z - pd["pos"].z)
+		var e: float = rel.dot(pd["into"])
+		if e > 0.0 and e < float(pd["depth"]) and (int(best[0]) < 0 or e < float(best[1])):
+			var lat: float = rel.dot(pd["right"])
+			if absf(lat) < GRADE_REACH + FreightKit.PORTAL_WING_END:
+				best = [i, e, lat]
+	return best
+
+
 ## How far a rail's top stands over the ground it is graded to: a few centimetres over a crossing, so the
 ## rails are flush with the road, and the full height of a bed (ballast under the sleepers) 24m away.
 const RAIL_LIFT_CROSSING := 0.10
@@ -301,8 +408,8 @@ func _init_noise() -> void:
 	_far_noise.fractal_type = FastNoiseLite.FRACTAL_RIDGED
 	_far_noise.fractal_octaves = 4
 	_hill_noise.seed = 91
-	_hill_noise.frequency = 0.018
-	_hill_noise.fractal_octaves = 3
+	_hill_noise.frequency = 0.011
+	_hill_noise.fractal_octaves = 2
 
 
 ## The rolling plain the lines follow: a few metres of gentle swell.
@@ -319,7 +426,7 @@ func _hills(x: float, z: float) -> float:
 		var d: float = sqrt(dx * dx + dz * dz)
 		if d > float(hl[2]) * 1.6:
 			continue
-		var r: float = float(hl[2]) * (1.0 + _hill_noise.get_noise_2d(x, z) * 0.22)
+		var r: float = float(hl[2]) * (1.0 + _hill_noise.get_noise_2d(x, z) * 0.12)
 		var t: float = 1.0 - smoothstep(r * 0.55, r, d)
 		h = maxf(h, float(hl[3]) * t * (0.92 + 0.08 * _hill_noise.get_noise_2d(x * 2.0, z * 2.0)))
 	return h
@@ -559,7 +666,7 @@ func _spur_heights(si: int) -> void:
 	for k in range(samples.size()):
 		var p: Vector2 = samples[k]["p"]
 		var s: float = samples[k]["s"]
-		var w: float = smoothstep(14.0, 60.0, s)
+		var w: float = smoothstep(TURNOUT_HOLD, TURNOUT_HOLD + 46.0, s)
 		var h: float = lerpf(_parent_ground(si, p), smooth[k], w)
 		var pad: Vector2 = _pad_at(p.x, p.y)
 		h = lerpf(h, pad.y, pad.x)
@@ -636,6 +743,7 @@ func _add_samples() -> void:
 	_rs_cut = PackedFloat32Array()
 	_rs_flat = PackedFloat32Array()
 	_rs_fill = PackedFloat32Array()
+	_rs_line = PackedInt32Array()
 	_rs_cells.clear()
 	_road_cells.clear()
 	for k in range(_road_n):
@@ -663,10 +771,10 @@ func _add_samples() -> void:
 			var cut: float = RAIL_CUT
 			var flat: float = RAIL_FLAT
 			if _portal_distance(p2) < 50.0:
-				cut = 2.8
-				flat = 5.4
+				cut = PORTAL_CUT
+				flat = PORTAL_FLAT
 			_push_sample(Vector3(p2.x, _rail_height(ri, s), p2.y), right, s, 1, flat, cut, RAIL_FILL,
-					first + k + 1 if link else -1, false)
+					first + k + 1 if link else -1, false, ri)
 	for si in range(_spurs.size()):
 		var sm: Array = _spurs[si]["samples"]
 		var gr: PackedFloat32Array = _spurs[si]["ground"]
@@ -675,12 +783,14 @@ func _add_samples() -> void:
 			var q: Vector2 = sm[k]["p"]
 			var rv: Vector2 = _right_of(float(sm[k]["th"]))
 			_push_sample(Vector3(q.x, gr[k], q.y), Vector3(rv.x, 0.0, rv.y), float(sm[k]["s"]), 1, RAIL_FLAT + 1.0, RAIL_CUT, RAIL_FILL,
-					first2 + k + 1 if k < sm.size() - 1 else -1, false)
+					first2 + k + 1 if k < sm.size() - 1 else -1, false, 100 + si)
 	print("  samples: %d on the lap, %d on the rails and the yard" % [base, _rs_pos.size() - base])
 
 
-func _push_sample(pos: Vector3, right: Vector3, s: float, kind: int, flat: float, cut: float, fill: float, next: int, _closed: bool) -> void:
+## `line`: the railway's index, 100 + a yard track's, -1 for the lap.
+func _push_sample(pos: Vector3, right: Vector3, s: float, kind: int, flat: float, cut: float, fill: float, next: int, _closed: bool, line := -1) -> void:
 	var idx: int = _rs_pos.size()
+	_rs_line.append(line)
 	_rs_pos.append(pos)
 	_rs_right.append(right)
 	_rs_s.append(s)
@@ -701,6 +811,12 @@ func _push_sample(pos: Vector3, right: Vector3, s: float, kind: int, flat: float
 
 ## Clamps `h` between the fill and cut bounds of every line's segment within reach. Returns the graded
 ## height and, beside a segment inside its flat strip, that segment's height there (else NAN).
+##
+## Behind a tunnel portal (inside the hill, over its tunnel) a railway's own segments are left out: the last ones
+## outside would cut a bowl round the mouth that ran on into the hill and up through the lining, and the trains drove
+## into a slope of rock. There the hill is held at least PORTAL_COVER over the lining's crown, and no higher than the
+## facade's top (or the cutting's walls beside it) plus PORTAL_RISE per metre back, so it rises from the facade's top
+## instead of standing over it as a cliff.
 func _grade(h: float, x: float, z: float) -> Vector2:
 	var cx: int = floori(x / CELL)
 	var cz: int = floori(z / CELL)
@@ -709,12 +825,14 @@ func _grade(h: float, x: float, z: float) -> Vector2:
 	var touched := false
 	var flat_y := NAN
 	var flat_lat := 1e9
+	var behind: Array = _behind_portal(x, z)
+	var skip_line: int = int(_portals[int(behind[0])]["line"]) if int(behind[0]) >= 0 else -999
 	for gz in range(cz - 1, cz + 2):
 		for gx in range(cx - 1, cx + 2):
 			var bucket: PackedInt32Array = _rs_cells.get(Vector2i(gx, gz), PackedInt32Array())
 			for i in bucket:
 				var j: int = _rs_next[i]
-				if j < 0:
+				if j < 0 or _rs_line[i] == skip_line:
 					continue
 				var a: Vector3 = _rs_pos[i]
 				var dx: float = x - a.x
@@ -742,11 +860,26 @@ func _grade(h: float, x: float, z: float) -> Vector2:
 				if lateral <= flat and lateral < flat_lat:
 					flat_lat = lateral
 					flat_y = foot_y
+	var res: float = h
+	if touched:
+		res = upper if lower > upper else clampf(h, lower, upper)
+	if int(behind[0]) >= 0:
+		var pd: Dictionary = _portals[int(behind[0])]
+		var e: float = behind[1]
+		var lat: float = behind[2]
+		var al: float = absf(lat)
+		var top_y: float = pd["pos"].y
+		var over2: float = maxf(0.0, al - PORTAL_FLAT)
+		var cut_wall: float = float(pd["ground"]) + over2 * over2 / (over2 + 4.0) * PORTAL_CUT
+		var cap: float = maxf(top_y + _facade_top(pd, lat), cut_wall) + maxf(e - FreightKit.PORTAL_BACK, 0.0) * PORTAL_RISE
+		var cover := -1e9
+		if al < FreightKit.PORTAL_HW + 2.5 and e < FreightKit.PORTAL_BACK + FreightKit.PORTAL_DEPTH + 2.0:
+			cover = top_y + FreightKit.PORTAL_CROWN + PORTAL_COVER
+		res = clampf(res, cover, maxf(cap, cover))
+		return Vector2(res, NAN)
 	if not touched:
 		return Vector2(h, NAN)
-	if lower > upper:
-		return Vector2(upper, flat_y)
-	return Vector2(clampf(h, lower, upper), flat_y)
+	return Vector2(res, flat_y)
 
 
 ## Distance to the nearest road centreline, the signed lateral across it (+ right of travel) and the arc
@@ -780,7 +913,10 @@ func _road_lat(x: float, z: float) -> Vector3:
 	return Vector3(sqrt(best), lat, at_s)
 
 
-func _grid_axis(fine: Vector2, outer: Vector2) -> PackedFloat32Array:
+## One axis of the terrain grid: FINE_STEP over the fine range, growing outward to the horizon, halved inside the
+## `refine` ranges ([lo, hi]), and with a line exactly on each of `exact` (a portal's face and back): lines within 1m
+## of one give way to it.
+func _grid_axis(fine: Vector2, outer: Vector2, refine: Array = [], exact: Array = []) -> PackedFloat32Array:
 	var out := PackedFloat32Array()
 	var left := PackedFloat32Array()
 	var step: float = FINE_STEP
@@ -800,12 +936,52 @@ func _grid_axis(fine: Vector2, outer: Vector2) -> PackedFloat32Array:
 		step = minf(step * COARSE_GROWTH, COARSE_MAX)
 		x += step
 		out.append(minf(x, outer.y))
+	if not refine.is_empty():
+		var dense := PackedFloat32Array()
+		for i in range(out.size()):
+			dense.append(out[i])
+			if i + 1 < out.size():
+				var mid: float = (out[i] + out[i + 1]) * 0.5
+				for r in refine:
+					if mid >= float(r[0]) and mid <= float(r[1]):
+						dense.append(mid)
+						break
+		out = dense
+	if not exact.is_empty():
+		var kept: Array = []
+		for v in out:
+			var clear := true
+			for e in exact:
+				if absf(v - float(e)) < 1.0:
+					clear = false
+			if clear:
+				kept.append(v)
+		for e in exact:
+			kept.append(float(e))
+		kept.sort()
+		out = PackedFloat32Array(kept)
 	return out
 
 
 func _build_heights() -> void:
-	_grid_x = _grid_axis(FINE_X, OUTER_X)
-	_grid_z = _grid_axis(FINE_Z, OUTER_Z)
+	# Across each cutting (z for the Main Line, x for the Branch) the grid is halved, and lines run exactly along each
+	# portal's face and back, so the cutting's walls are smooth and the step from the cutting's floor up to the hill over
+	# the lining falls inside the facade's thickness (see _grade and _build_terrain).
+	var refine_x: Array = []
+	var refine_z: Array = []
+	var exact_x: Array = []
+	var exact_z: Array = []
+	for pd in _portals:
+		var p: Vector3 = pd["pos"]
+		var into: Vector2 = pd["into"]
+		if absf(into.x) > 0.5:
+			refine_z.append([p.z - PORTAL_REFINE, p.z + PORTAL_REFINE])
+			exact_x.append_array([p.x, p.x + into.x * FreightKit.PORTAL_BACK])
+		else:
+			refine_x.append([p.x - PORTAL_REFINE, p.x + PORTAL_REFINE])
+			exact_z.append_array([p.z, p.z + into.y * FreightKit.PORTAL_BACK])
+	_grid_x = _grid_axis(FINE_X, OUTER_X, refine_x, exact_x)
+	_grid_z = _grid_axis(FINE_Z, OUTER_Z, refine_z, exact_z)
 	var nx: int = _grid_x.size()
 	var nz: int = _grid_z.size()
 	print("  terrain grid %d x %d = %d vertices" % [nx, nz, nx * nz])
@@ -940,7 +1116,7 @@ func _compact_mesh(verts: PackedVector3Array, normals: PackedVector3Array, color
 func _terrain_masks(i: int, x: float, z: float, nrm_y: float) -> Color:
 	var road_d: float = _road_d[i]
 	var band: float = 1.0 - smoothstep(13.0, 15.0, road_d)
-	var rock: float = 1.0 - smoothstep(0.62, 0.8, nrm_y)
+	var rock: float = 1.0 - smoothstep(0.5, 0.86, nrm_y)
 	rock *= smoothstep(ROAD_HALF + 0.5, ROAD_HALF + 2.0, road_d)
 	# Dry washes of pale sand wander over the plain.
 	var sand: float = smoothstep(0.35, 0.6, _detail_noise.get_noise_2d(x * 0.12 + 40.0, z * 0.12)) * 0.45 * (1.0 - rock)
@@ -962,6 +1138,18 @@ func _ground_kind(tri: Array) -> int:
 
 
 var _vert_rock := PackedFloat32Array()
+
+
+## Whether a ground triangle (by its centre) lies under a portal's arch inside the facade's thickness, where the ground
+## steps from the cutting's floor up over the lining: such cells are left out of the drawn ground (they keep their
+## collision, which also stops a cart driving into the tunnel), so the arch shows the lining and not a slope of rock.
+func _in_portal_hole(c: Vector3) -> bool:
+	for pd in _portals:
+		var rel := Vector2(c.x - pd["pos"].x, c.z - pd["pos"].z)
+		var e: float = rel.dot(pd["into"])
+		if e > 0.0 and e < FreightKit.PORTAL_BACK and absf(rel.dot(pd["right"])) < FreightKit.PORTAL_HW + 2.2:
+			return true
+	return false
 
 
 ## Terrain mesh with the shader masks in the vertex colour and the road data in UV2, and its collision
@@ -1031,9 +1219,10 @@ func _build_terrain(parent: Node, mat: Material) -> void:
 					tri = [tri[0], tri[2], tri[1]]
 					p1 = verts[tri[1]]
 					p2 = verts[tri[2]]
-				indices.append(tri[0])
-				indices.append(tri[1])
-				indices.append(tri[2])
+				if not _in_portal_hole((p0 + p1 + p2) / 3.0):
+					indices.append(tri[0])
+					indices.append(tri[1])
+					indices.append(tri[2])
 				var k: int = _ground_kind(tri) if _road_d[tri[0]] < 1e8 else 1
 				var f: PackedVector3Array = faces[k]
 				f.append(p0)
@@ -1160,27 +1349,36 @@ func _build_railways(level_scene: Node3D) -> void:
 			pts.append(v)
 			outside.append(not _in_hill(p))
 			s_at.append(s)
-		# Track pieces over every stretch outside the hills.
+		# Track pieces over every stretch outside the hills, and the bed's collision.
 		var piece: Array = []
 		var bed: Array = []
 		var piece_no := 0
+		var faces: Array = []
+		# The line's points beyond each piece's ends (outside the hills), for the joints' mitres.
+		var beyond := func(k: int):
+			return pts[k] if k >= 0 and k < n and outside[k] else null
+		var k_start := 0
 		for k in range(n):
 			if not outside[k]:
 				if piece.size() > 1:
-					piece_no = _flush_track(root, ri, piece, bed, piece_no)
+					piece_no = _flush_track(root, ri, piece, bed, piece_no, faces, beyond.call(k_start - 1), null)
 				piece = []
 				bed = []
 				continue
+			if piece.is_empty():
+				k_start = k
 			piece.append(pts[k])
 			if piece.size() > 1:
 				var mid_s: float = (float(s_at[k]) + float(s_at[k - 1])) * 0.5
 				bed.append(not _near_crossing(ri, mid_s, DECK_HALF_LEN + 1.5) and not _in_turnout("rail", ri, mid_s))
 			if piece.size() > TRACK_PIECE:
-				piece_no = _flush_track(root, ri, piece, bed, piece_no)
+				piece_no = _flush_track(root, ri, piece, bed, piece_no, faces, beyond.call(k_start - 1), beyond.call(k + 1))
 				piece = [pts[k]]
 				bed = []
+				k_start = k
 		if piece.size() > 1:
-			piece_no = _flush_track(root, ri, piece, bed, piece_no)
+			piece_no = _flush_track(root, ri, piece, bed, piece_no, faces, beyond.call(k_start - 1), null)
+		_bed_body(root, "RailBed_%s" % info["name"], faces)
 		# The trains.
 		for tr in info["trains"]:
 			var train := Node3D.new()
@@ -1212,6 +1410,7 @@ func _build_railways(level_scene: Node3D) -> void:
 				for shift in [-period_j, 0.0, period_j]:
 					if a0 < b1 + shift and b0 + shift < a1:
 						push_error("%s: trains %d and %d overlap on the line" % [info["name"], i, j])
+	_build_local_train(level_scene)
 	# The crossings.
 	var ci := 0
 	for c in _crossings:
@@ -1234,6 +1433,9 @@ func _build_railways(level_scene: Node3D) -> void:
 		var paths := PackedStringArray()
 		for tr in _rails[ri]["trains"]:
 			paths.append("../%s%sTrain" % [_rails[ri]["name"], tr["name"]])
+		# The local passes the crossings on the Main Line between its west end and T1, both ways.
+		if ri == 0 and float(c["rail_s"]) < float(_turnouts[0]["s0"]):
+			paths.append("../%s" % LOCAL_NAME)
 		cn.set("train_paths", paths)
 		cn.set("train_s", float(c["rail_s"]))
 		cn.set("road_half", ROAD_HALF)
@@ -1244,8 +1446,9 @@ func _build_railways(level_scene: Node3D) -> void:
 		print("  crossing %d: %s at lap %.0fm (skew %.0f deg)" % [ci, _rails[ri]["name"], lap_s, rad_to_deg(acos(skew))])
 
 
-## A masonry portal where each railway goes into a hill: at the last sample outside it, facing out. The
-## facade's top follows the hill behind it, the track runs on into a dark lining, and a plaque names the tunnel.
+## A masonry portal where each railway goes into a hill (planned by _plan_portals): its wings' tops follow the hill,
+## the track runs on into the dark lining, black veils inside it fade a train into the dark (`TunnelFog_*`, a mesh of
+## its own: DressingColliders leaves anything named "fog" soft), and a plaque names the tunnel.
 const PORTAL_NAMES := ["TUNEL DE LA SIERRA", "TUNEL DEL OESTE", "TUNEL DEL VIENTO", "TUNEL DEL NORTE", "TUNEL DE LA CUMBRE", "TUNEL DEL ESTE"]
 
 func _build_portals(level_scene: Node3D) -> void:
@@ -1253,46 +1456,39 @@ func _build_portals(level_scene: Node3D) -> void:
 	root.name = "TunnelPortals"
 	level_scene.add_child(root)
 	var count := 0
-	for ri in range(_rails.size()):
+	for pd in _portals:
+		var ri: int = pd["line"]
 		var len_r: float = _rail_len(ri)
-		var a: Vector2 = _rails[ri]["a"]
-		var dir: Vector2 = (_rails[ri]["b"] - a).normalized()
-		var n: int = int(floor(len_r / SAMPLE_STEP)) + 1
-		var prev_in: bool = _in_hill(_rail_at(ri, 0.0))
-		for k in range(1, n):
-			var s: float = float(k) * SAMPLE_STEP
-			var now_in: bool = _in_hill(_rail_at(ri, s))
-			if now_in == prev_in:
-				continue
-			# The boundary: the outside sample is k - 1 (going in) or k (coming out).
-			var out_s: float = s - SAMPLE_STEP if now_in else s
-			var sgn: float = 1.0 if now_in else -1.0
-			var into := Vector3(dir.x, 0.0, dir.y) * sgn
-			var p: Vector2 = _rail_at(ri, out_s)
-			var top := Vector3(p.x, _rail_top(ri, out_s), p.y)
-			var right := Vector3(-into.z, 0.0, into.x)
-			var basis := Basis(-right, Vector3.UP, into)
-			var xf := Transform3D(basis, top)
-			var pk := FreightKit.new_kit()
-			pk.reset_frame()
-			var kit := {}
-			FreightKit.portal(pk, kit)
-			var mesh: ArrayMesh = _save_baked_resource(pk.commit(kit), "portal_%d" % count) as ArrayMesh
-			_instance_mesh(root, "Portal_%s_%d" % [_rails[ri]["name"], count], mesh, xf)
-			_label(root, PORTAL_NAMES[count % PORTAL_NAMES.size()], xf.origin + basis * Vector3(0.0, 13.2, -0.6), Basis(basis * Basis(Vector3.UP, PI)), 0.017, Color(0.95, 0.9, 0.78), 56)
-			# The track runs on into the lining.
-			var pts: Array = []
-			var bed: Array = []
-			var d2 := 0.0
-			while d2 <= 24.0:
-				var q: Vector2 = _rail_at(ri, out_s + sgn * d2)
-				pts.append(Vector3(q.x, _rail_top(ri, clampf(out_s + sgn * d2, 0.0, len_r)), q.y))
-				if pts.size() > 1:
-					bed.append(true)
-				d2 += SAMPLE_STEP
-			_instance_mesh(root, "PortalTrackBed_%d" % count, FreightKit.track_piece(pts, bed, 900 + count), Transform3D.IDENTITY)
-			count += 1
-			prev_in = now_in
+		var into := Vector3(pd["into"].x, 0.0, pd["into"].y)
+		var right := Vector3(pd["right"].x, 0.0, pd["right"].y)
+		var basis := Basis(-right, Vector3.UP, into)
+		var xf := Transform3D(basis, pd["pos"])
+		var pk := FreightKit.new_kit()
+		pk.reset_frame()
+		var kit := {}
+		FreightKit.portal(pk, kit, pd["wing_l"], pd["wing_r"], pd["top"])
+		var mesh: ArrayMesh = _save_baked_resource(pk.commit(kit), "portal_%d" % count) as ArrayMesh
+		_instance_mesh(root, "Portal_%s_%d" % [_rails[ri]["name"], count], mesh, xf)
+		var fk := {}
+		FreightKit.tunnel_fog(pk, fk)
+		var fog: MeshInstance3D = _instance_mesh(root, "TunnelFog_%d" % count, _save_baked_resource(pk.commit(fk), "tunnel_fog") as ArrayMesh, xf)
+		fog.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var plaque_y: float = (11.35 + float(pd["top"])) * 0.5
+		_label(root, PORTAL_NAMES[count % PORTAL_NAMES.size()], xf.origin + basis * Vector3(0.0, plaque_y, -0.6), Basis(basis * Basis(Vector3.UP, PI)), 0.017, Color(0.95, 0.9, 0.78), 56)
+		# The track runs on into the lining.
+		var out_s: float = pd["out_s"]
+		var sgn: float = signf(Vector2(pd["into"]).dot((_rails[ri]["b"] - _rails[ri]["a"]).normalized()))
+		var pts: Array = []
+		var bed: Array = []
+		var d2 := 0.0
+		while d2 <= FreightKit.PORTAL_BACK + FreightKit.PORTAL_DEPTH:
+			var q: Vector2 = _rail_at(ri, out_s + sgn * d2)
+			pts.append(Vector3(q.x, _rail_top(ri, clampf(out_s + sgn * d2, 0.0, len_r)), q.y))
+			if pts.size() > 1:
+				bed.append(true)
+			d2 += SAMPLE_STEP
+		_instance_mesh(root, "PortalTrackBed_%d" % count, FreightKit.track_piece(pts, bed, 900 + count), Transform3D.IDENTITY)
+		count += 1
 	print("  %d tunnel portals" % count)
 
 
@@ -1310,16 +1506,24 @@ func _build_yard(level_scene: Node3D) -> void:
 		for t in _turnouts:
 			if int(t["spur"]) == si:
 				tn = t
-		# The stretch inside the turnout is the turnout's own.
+		# The stretch inside the turnout is the turnout's own: the track starts at the last sample its rails reach.
 		var k0 := 0
 		if not tn.is_empty():
 			for k in range(samples.size()):
-				if float(samples[k]["p"].x) - float(tn["x0"]) >= float(tn["zone_end"]) + 3.0:
-					k0 = k
+				if float(samples[k]["p"].x) - float(tn["x0"]) > float(tn["zone_end"]) + FreightKit.TURNOUT_RAILS:
 					break
+				k0 = k
 		var piece: Array = []
 		var bed: Array = []
 		var piece_no := 0
+		var faces: Array = []
+		# The track's points beyond each piece's ends, for the joints' mitres (the first piece's comes off the turnout).
+		var point_at := func(k: int):
+			if k < 0 or k >= samples.size():
+				return null
+			var qq: Vector2 = samples[k]["p"]
+			return Vector3(qq.x, top[k], qq.y)
+		var k_start: int = k0
 		for k in range(k0, samples.size()):
 			var q: Vector2 = samples[k]["p"]
 			piece.append(Vector3(q.x, top[k], q.y))
@@ -1327,12 +1531,14 @@ func _build_yard(level_scene: Node3D) -> void:
 				var mid_s: float = (float(samples[k]["s"]) + float(samples[k - 1]["s"])) * 0.5
 				bed.append(not _in_turnout("spur", si, mid_s))
 			if piece.size() > TRACK_PIECE:
-				_flush_spur_track(root, si, piece, bed, piece_no)
+				_flush_spur_track(root, si, piece, bed, piece_no, faces, point_at.call(k_start - 1), point_at.call(k + 1))
 				piece_no += 1
 				piece = [piece[piece.size() - 1]]
 				bed = []
+				k_start = k
 		if piece.size() > 1:
-			_flush_spur_track(root, si, piece, bed, piece_no)
+			_flush_spur_track(root, si, piece, bed, piece_no, faces, point_at.call(k_start - 1), null)
+		_bed_body(root, "RailBed_%s" % sp["name"], faces)
 		# The buffer stop where the track ends.
 		var last: Dictionary = samples[samples.size() - 1]
 		var lp: Vector2 = last["p"]
@@ -1367,16 +1573,38 @@ func _build_yard(level_scene: Node3D) -> void:
 				break
 			branch.append(Vector3(bs[k]["p"].x, btop[k], bs[k]["p"].y))
 		var info := {}
-		var mesh: ArrayMesh = FreightKit.turnout(through, branch, float(t["side"]), info)
+		var tfaces: Array = []
+		var mesh: ArrayMesh = FreightKit.turnout(through, branch, float(t["side"]), info, tfaces)
 		_instance_mesh(root, "TurnoutTrackBed_%s" % t["name"], _save_baked_resource(mesh, "turnout_%s" % String(t["name"]).to_lower()) as ArrayMesh, Transform3D.IDENTITY)
+		_bed_body(root, "RailBed_%s" % t["name"], tfaces)
 		print("  turnout %s at x %.0f: zone %.1fm (the builder says %.1fm)" % [t["name"], x0, float(t["zone_end"]), float(info.get("zone_end", -1.0))])
 
 
-func _flush_spur_track(root: Node3D, si: int, piece: Array, bed: Array, piece_no: int) -> void:
+func _flush_spur_track(root: Node3D, si: int, piece: Array, bed: Array, piece_no: int, faces: Array, before = null, after = null) -> void:
 	var mi := MeshInstance3D.new()
 	mi.name = "TrackBed_%s_%d" % [_spurs[si]["name"], piece_no]
-	mi.mesh = FreightKit.track_piece(piece, bed, piece_no + (si + 5) * 1000)
+	mi.mesh = FreightKit.track_piece(piece, bed, piece_no + (si + 5) * 1000, faces, before, after)
 	root.add_child(mi)
+
+
+## A railway's bed as a solid body: FreightKit._bed_faces' hump, which a cart's sphere rolls over (up the ballast's
+## shoulders and on over the rails), gravel to its tyres. Its name keeps clear of "track", "road", "ramp" and "deck",
+## which PlayerCart takes for the lap's own surface.
+func _bed_body(parent: Node3D, body_name: String, faces: Array) -> void:
+	if faces.is_empty():
+		return
+	var body := StaticBody3D.new()
+	body.name = body_name
+	body.set_meta(&"surface", "gravel")
+	body.set_meta(&"dust_color", Color(0.62, 0.58, 0.52, 0.5))
+	parent.add_child(body)
+	var shape := ConcavePolygonShape3D.new()
+	shape.set_faces(PackedVector3Array(faces))
+	shape.backface_collision = true
+	var cs := CollisionShape3D.new()
+	cs.name = "Shape"
+	cs.shape = _save_baked_resource(shape, body_name.to_snake_case() + "_shape")
+	body.add_child(cs)
 
 
 func info_of(ri: int) -> Dictionary:
@@ -1391,8 +1619,97 @@ func _consist_length(consist: Array) -> float:
 		if parts[0] == "gap":
 			total += float(parts[1]) if parts.size() > 1 else 14.0
 		else:
-			total += TrainKit.car_length(parts[0])
+			total += TrainKit.car_length(parts[0].trim_prefix("~"))
 	return total
+
+
+## The local passenger train: a diesel at each end (the rear one turned round) and two coaches. It comes out of the
+## west tunnel along the Main Line, takes turnout T1 onto the yard's lead and runs round into Estación del Viento's
+## platform, stands there, then backs out the way it came, onto the Main Line and away into the tunnel. Its path is
+## the Main Line from its west end to T1 and the lead on to the buffer stop; it keeps a timetable of its own
+## (Train.gd's `legs`) every LOCAL_PERIOD seconds, two of the Main Line's: in while the line between the tunnel and
+## T1 is clear after the first freight, out after the second express. _verify_local checks it never meets them.
+const LOCAL_NAME := "MainLineLocalTrain"
+const LOCAL_CONSIST := ["ploco", "coach", "coach", "~ploco"]
+const LOCAL_PERIOD := 250.0
+## The head stops this far short of the buffer stop.
+const LOCAL_STOP_SHORT := 7.0
+## [start, end, ramp] of the run in and of the run out, seconds into its cycle.
+const LOCAL_IN := [20.0, 82.0, 14.0]
+const LOCAL_OUT := [191.0, 247.0, 12.0]
+
+func _build_local_train(level_scene: Node3D) -> void:
+	var curve := Curve3D.new()
+	curve.bake_interval = 1.0
+	var t1_s: float = _turnouts[0]["s0"]
+	var s := 0.0
+	while s < t1_s - 0.01:
+		var p: Vector2 = _rail_at(0, s)
+		curve.add_point(Vector3(p.x, _rail_top(0, s), p.y))
+		s += SAMPLE_STEP
+	var lead: Array = _spurs[0]["samples"]
+	var top: PackedFloat32Array = _spurs[0]["top"]
+	for k in range(lead.size()):
+		var q: Vector2 = lead[k]["p"]
+		curve.add_point(Vector3(q.x, top[k], q.y))
+	var stop: float = curve.get_baked_length() - LOCAL_STOP_SHORT
+	var train := Node3D.new()
+	train.name = LOCAL_NAME
+	train.set_script(load("res://Train.gd"))
+	train.set("path", curve)
+	train.set("consist", PackedStringArray(LOCAL_CONSIST))
+	train.set("period", LOCAL_PERIOD)
+	train.set("legs", PackedFloat32Array([LOCAL_IN[0], LOCAL_IN[1], 0.0, stop, LOCAL_IN[2], LOCAL_OUT[0], LOCAL_OUT[1], stop, 0.0, LOCAL_OUT[2]]))
+	level_scene.add_child(train)
+	print("  %s: %d cars, %.0fm, %.0fm of path, stands at the platform %.0f-%.0fs of every %.0fs" % [LOCAL_NAME, LOCAL_CONSIST.size(),
+			_consist_length(LOCAL_CONSIST), curve.get_baked_length(), LOCAL_IN[1], LOCAL_OUT[0], LOCAL_PERIOD])
+	_verify_local(stop, t1_s)
+
+
+## Errors if the local and the Main Line's own trains are ever on the line between its west end and T1 together (the
+## local's leading end and its tail both counted, two Main Line cycles round), or if the local would not fit its legs.
+func _verify_local(stop: float, t1_s: float) -> void:
+	var length: float = _consist_length(LOCAL_CONSIST)
+	var trains: Array = _rails[0]["trains"]
+	var clashes := 0
+	var t := 0.0
+	while t < LOCAL_PERIOD:
+		var head: float = _local_head(t, stop)
+		# The part of the local on the shared stretch [0, t1_s].
+		var a: float = maxf(head - length, 0.0)
+		var b: float = minf(head, t1_s)
+		if b > a:
+			for tr in trains:
+				var th: float = fposmod(t - float(tr["phase"]), float(tr["period"])) * float(tr["speed"])
+				var ta: float = maxf(th - _consist_length(tr["consist"]), 0.0)
+				var tb: float = minf(th, t1_s)
+				if tb > ta and ta < b + 20.0 and a < tb + 20.0:
+					clashes += 1
+					if clashes < 4:
+						push_error("the local meets the %s at %.1fs (local %.0f-%.0fm, it %.0f-%.0fm)" % [tr["name"], t, a, b, ta, tb])
+		t += 0.25
+	print("  local checked against the Main Line's trains: %d clashes" % clashes)
+
+
+## The local's head along its path `t` seconds into its cycle (as Train.gd's legs).
+func _local_head(t: float, stop: float) -> float:
+	var legs: Array = [[LOCAL_IN[0], LOCAL_IN[1], 0.0, stop, LOCAL_IN[2]], [LOCAL_OUT[0], LOCAL_OUT[1], stop, 0.0, LOCAL_OUT[2]]]
+	var head := 0.0
+	for lg in legs:
+		if t < float(lg[0]):
+			return head
+		if t <= float(lg[1]):
+			var dur: float = float(lg[1]) - float(lg[0])
+			var u: float = (t - float(lg[0])) / dur
+			var ar: float = clampf(float(lg[4]) / dur, 0.001, 0.5)
+			var f: float = (u - ar * 0.5) / (1.0 - ar)
+			if u <= ar:
+				f = u * u / (2.0 * ar) / (1.0 - ar)
+			elif u >= 1.0 - ar:
+				f = 1.0 - (1.0 - u) * (1.0 - u) / (2.0 * ar) / (1.0 - ar)
+			return float(lg[2]) + (float(lg[3]) - float(lg[2])) * f
+		head = lg[3]
+	return head
 
 
 ## The flatcar kicker before a crossing: a wooden ramp the full width of the road whose lip stands KICKER_LIP
@@ -1424,10 +1741,10 @@ func _near_crossing(ri: int, s: float, reach: float) -> bool:
 	return false
 
 
-func _flush_track(root: Node3D, ri: int, piece: Array, bed: Array, piece_no: int) -> int:
+func _flush_track(root: Node3D, ri: int, piece: Array, bed: Array, piece_no: int, faces: Array, before = null, after = null) -> int:
 	var mi := MeshInstance3D.new()
 	mi.name = "TrackBed_%s_%d" % [_rails[ri]["name"], piece_no]
-	mi.mesh = FreightKit.track_piece(piece, bed, piece_no + ri * 1000)
+	mi.mesh = FreightKit.track_piece(piece, bed, piece_no + ri * 1000, faces, before, after)
 	root.add_child(mi)
 	return piece_no + 1
 
@@ -1462,6 +1779,8 @@ func _label(parent: Node3D, text: String, at: Vector3, basis: Basis, pixel: floa
 	l.modulate = col
 	l.outline_size = 8
 	l.outline_modulate = Color(0.05, 0.05, 0.05)
+	# One-sided: from behind a plate or a facade the letters read backwards.
+	l.double_sided = false
 	l.transform = Transform3D(basis, at)
 	parent.add_child(l)
 
@@ -1511,9 +1830,8 @@ func _build_depot(level_scene: Node3D) -> void:
 	kit = {}
 	FreightKit.water_tower(pk, kit)
 	_instance_mesh(root, "TankTower", _save_baked_resource(pk.commit(kit), "tank_tower", YARD_PREFIX), Transform3D(Basis(), Vector3(WATER_TOWER_AT.x, h, WATER_TOWER_AT.y)))
-	# Stock standing on the yard: the express's diesel and two coaches against the platform, the yard switcher with
-	# three grain hoppers on the factory track, the first one under the loadout's spout.
-	_park_train(root, "StabledExpress", 0, ["ploco", "coach", "coach"], 7.0, true)
+	# Stock standing on the yard: the yard switcher with three grain hoppers on the factory track, the first one under
+	# the loadout's spout. (The platform is the local's: see _build_local_train.)
 	_park_train(root, "LoadingHoppers", 1, ["hopper", "hopper:1", "hopper", "loco:2"], 0.0, false, FACTORY_X)
 	print("  depot built on a pad at %.1fm (station at x %.0f, z %.0f; cooperative at x %.0f, z %.0f)" % [h, STATION_X, z_p + STATION_BACK, FACTORY_X, origin.z])
 
@@ -1593,7 +1911,8 @@ func _build_poles(level_scene: Node3D) -> void:
 			var p: Vector2 = _rail_at(ri, s)
 			var side := Vector2(right.x, right.z) * 11.0
 			var q: Vector2 = p + side
-			if _in_hill(p) or _near_crossing(ri, s, 34.0) or _near_pad(q, 10.0) or _spur_distance(q) < 12.0:
+			# No pole in a portal's cutting (it stood on the cut wall, in front of the facade).
+			if _in_hill(p) or _portal_distance(p) < 36.0 or _near_crossing(ri, s, 34.0) or _near_pad(q, 10.0) or _spur_distance(q) < 12.0:
 				prev = PackedVector3Array()
 				s += 70.0
 				continue
@@ -1695,11 +2014,21 @@ func _build_flora(level_scene: Node3D) -> void:
 	var sage_meshes: Array = []
 	for v in 3:
 		sage_meshes.append(FreightKit.sage(100 + v))
-	# Rocks at unit height: low wide stones (a cart rides over these) and taller ones.
+	# Rocks: weathered boulders (FreightKit.boulder) in canyon_rock.gdshader, the hills' sandstone beds tinted toward the
+	# plain's tan. "rock_l" are low and wide (a cart rides over them), "rock_t" rounder and taller.
+	var rock_mat := ShaderMaterial.new()
+	rock_mat.shader = load("res://canyon_rock.gdshader")
+	rock_mat.set_shader_parameter("sand_tex", load("res://materials/sand.png"))
+	rock_mat.set_shader_parameter("rock_tex", load("res://materials/dark_rock.png"))
+	rock_mat.set_shader_parameter("rock_normal", _rock_normal)
+	rock_mat.set_shader_parameter("sand_tint", Color(0.70, 0.55, 0.40))
+	rock_mat.set_shader_parameter("tint", Color(0.80, 0.66, 0.52))
+	rock_mat.set_shader_parameter("tint_amount", 0.7)
+	rock_mat = _save_baked_resource(rock_mat, "rock_material") as ShaderMaterial
 	var rock_meshes := {}
 	for v in 4:
-		rock_meshes["rock_l%d" % v] = FreightKit.rock(300 + v, 1.7)
-		rock_meshes["rock_t%d" % v] = FreightKit.rock(320 + v, 1.0)
+		rock_meshes["rock_l%d" % v] = _save_baked_resource(FreightKit.boulder(4300 + v, Vector3(1.4, 0.62, 1.15), rock_mat), "rock_l%d" % v)
+		rock_meshes["rock_t%d" % v] = _save_baked_resource(FreightKit.boulder(4320 + v, Vector3(1.0, 0.95, 0.88), rock_mat), "rock_t%d" % v)
 	# Candidate spots along the lap: both sides, closer in more of them.
 	var cells := {}
 	var s := 0.0
@@ -1717,6 +2046,8 @@ func _build_flora(level_scene: Node3D) -> void:
 			var roll: float = rng.randf()
 			var kind: String
 			var scl: float
+			var rock_xf := Transform3D()
+			var is_rock := false
 			if roll < 0.62:
 				kind = "sage_%d" % rng.randi_range(0, 2)
 				scl = rng.randf_range(0.9, 2.2)
@@ -1724,7 +2055,8 @@ func _build_flora(level_scene: Node3D) -> void:
 				var rk: Dictionary = _pick_rock(rng, absf(lat))
 				kind = rk["kind"]
 				scl = rk["h"]
-				pos.y = _rock_base(pos, scl, rock_meshes[kind])
+				rock_xf = _rock_xf(kind, scl, rng.randf() * TAU, pos, rock_meshes[kind])
+				is_rock = true
 			else:
 				var pl: Array = plants[rng.randi_range(0, plants.size() - 1)]
 				if rng.randf() > float(pl[3]) * 5.0:
@@ -1737,7 +2069,7 @@ func _build_flora(level_scene: Node3D) -> void:
 			var key := "%s|%d|%d" % [kind, floori(pos.x / 160.0), floori(pos.z / 160.0)]
 			if not cells.has(key):
 				cells[key] = []
-			cells[key].append(Transform3D(basis, pos))
+			cells[key].append(rock_xf if is_rock else Transform3D(basis, pos))
 			placed += 1
 		s += 6.0
 	# Small stones right beside the road, where a cart that runs wide meets them.
@@ -1751,12 +2083,10 @@ func _build_flora(level_scene: Node3D) -> void:
 			if _flora_ok(Vector2(pos2.x, pos2.z)):
 				var h2: float = rng.randf_range(0.2, 0.55)
 				var kind2: String = "rock_l%d" % rng.randi_range(0, 3)
-				pos2.y = _rock_base(pos2, h2, rock_meshes[kind2])
-				var basis2 := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * h2)
 				var key2 := "%s|%d|%d" % [kind2, floori(pos2.x / 160.0), floori(pos2.z / 160.0)]
 				if not cells.has(key2):
 					cells[key2] = []
-				cells[key2].append(Transform3D(basis2, pos2))
+				cells[key2].append(_rock_xf(kind2, h2, rng.randf() * TAU, pos2, rock_meshes[kind2]))
 				placed += 1
 		s += 5.0
 	for key in cells.keys():
@@ -1818,15 +2148,18 @@ func _pick_rock(rng: RandomNumberGenerator, lat: float) -> Dictionary:
 	return {"kind": "rock_t%d" % rng.randi_range(0, 3), "h": rng.randf_range(1.6, 2.6)}
 
 
-## Where a rock of height `h` (its mesh at unit height) sits: its foot on the lowest ground under its footprint,
-## and a little more sunk, so no side of it hangs over a slope.
-func _rock_base(pos: Vector3, h: float, mesh: ArrayMesh) -> float:
-	var half: float = maxf(mesh.get_aabb().size.x, mesh.get_aabb().size.z) * 0.5 * h * 0.85
+## A rock `h` high at `pos` (x and z), turned by `yaw`, at its mesh's own proportions. Its foot sits on the lowest
+## ground under its footprint and a little lower, so no side of it hangs over a slope.
+func _rock_xf(_kind: String, h: float, yaw: float, pos: Vector3, mesh: ArrayMesh) -> Transform3D:
+	var size: Vector3 = mesh.get_aabb().size
+	var sy: float = h / maxf(size.y, 0.05)
+	var sxz: float = sy
+	var half: float = maxf(size.x, size.z) * 0.5 * sxz * 0.85
 	var lowest: float = _ground_at(pos.x, pos.z)
 	for k in range(8):
 		var a: float = TAU * float(k) / 8.0
 		lowest = minf(lowest, _ground_at(pos.x + cos(a) * half, pos.z + sin(a) * half))
-	return lowest - 0.12 * h
+	return Transform3D(Basis(Vector3.UP, yaw) * Basis.from_scale(Vector3(sxz, sy, sxz)), Vector3(pos.x, lowest - 0.1 * h, pos.z))
 
 
 ## Whether flora may stand at `p`: off the road, the rails, the hills, the depot and steep ground.
@@ -1994,6 +2327,21 @@ func _build_environment(level_scene: Node3D) -> void:
 #  Build
 # ======================================================================================
 
+## The sandstone's grain as a normal map, from dark_rock.png (as the Canyon Course's): the hills' rock and the boulders.
+func _rock_normal_texture() -> Texture2D:
+	var img: Image = (load("res://materials/dark_rock.png") as Texture2D).get_image()
+	if img.is_compressed():
+		img.decompress()
+	img.convert(Image.FORMAT_RGBA8)
+	img.resize(512, 512, Image.INTERPOLATE_LANCZOS)
+	img.bump_map_to_normal_map(5.0)
+	img.generate_mipmaps()
+	var tex := PortableCompressedTexture2D.new()
+	tex.keep_compressed_buffer = true
+	tex.create_from_image(img, PortableCompressedTexture2D.COMPRESSION_MODE_LOSSY, true, 0.9)
+	return _save_baked_resource(tex, "rock_normal")
+
+
 func _save_baked_resource(res: Resource, res_name: String, prefix := RES_PREFIX) -> Resource:
 	if not DirAccess.dir_exists_absolute("res://generated/"):
 		DirAccess.make_dir_absolute("res://generated/")
@@ -2044,6 +2392,7 @@ func _ready() -> void:
 
 	_plan_pads()
 	_build_spurs()
+	_plan_portals()
 	_add_samples()
 	_build_heights()
 	print("  heights built (%.1fs)" % ((Time.get_ticks_msec() - t_start) / 1000.0))
@@ -2051,6 +2400,9 @@ func _ready() -> void:
 	ground_mat.shader = load("res://canyon_ground.gdshader")
 	ground_mat.set_shader_parameter("sand_tex", load("res://materials/sand.png"))
 	ground_mat.set_shader_parameter("dirt_tex", load("res://materials/dirt.png"))
+	_rock_normal = _rock_normal_texture()
+	ground_mat.set_shader_parameter("rock_tex", load("res://materials/dark_rock.png"))
+	ground_mat.set_shader_parameter("rock_normal", _rock_normal)
 	ground_mat.set_shader_parameter("gravel_tex", load("res://materials/dark_canyon_rock.png"))
 	ground_mat.set_shader_parameter("gravel_normal", load("res://materials/dark_canyon_rock_normal.png"))
 	ground_mat.set_shader_parameter("asphalt_tex", load("res://materials/asphalt.png"))
@@ -2063,6 +2415,9 @@ func _ready() -> void:
 	ground_mat.set_shader_parameter("gravel_tint", Color(1.0, 0.95, 0.86))
 	ground_mat.set_shader_parameter("scrub_tint", Color(0.58, 0.54, 0.30))
 	ground_mat.set_shader_parameter("river_y", -1000.0)
+	# The rock's slope from the smooth normals alone: by each triangle's own face the rock's edge followed the 5m grid's
+	# triangles, and the hills showed every facet.
+	ground_mat.set_shader_parameter("face_slope", 0.0)
 	_ground_mat = _save_baked_resource(ground_mat, "ground_material") as ShaderMaterial
 	var terrain_root := Node3D.new()
 	terrain_root.name = "PlainsTerrain"

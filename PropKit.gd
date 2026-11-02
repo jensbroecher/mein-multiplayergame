@@ -88,8 +88,8 @@ func panel(kit: Dictionary, key: String, p: Array, n: Vector3, col: Color, back_
 
 
 ## A box of `size` centred at `lx` (a local transform inside the frame). `uv_scale` > 0 maps UVs in
-## metres (times it) on every face, for tiled textures.
-func box(kit: Dictionary, key: String, lx: Transform3D, size: Vector3, col: Color, uv_scale := 0.0, skip_bottom := false) -> void:
+## metres (times it, plus `uv_offset`) on every face, for tiled textures.
+func box(kit: Dictionary, key: String, lx: Transform3D, size: Vector3, col: Color, uv_scale := 0.0, skip_bottom := false, uv_offset := Vector2.ZERO) -> void:
 	var h := size * 0.5
 	var axes := [Vector3.RIGHT, Vector3.UP, Vector3.BACK]
 	for a in range(3):
@@ -107,14 +107,14 @@ func box(kit: Dictionary, key: String, lx: Transform3D, size: Vector3, col: Colo
 			if uv_scale > 0.0:
 				var su: float = (lx.basis * (u * size)).length() * uv_scale
 				var sv: float = (lx.basis * (v * size)).length() * uv_scale
-				quad(kit, key, pts, nn, col, [Vector2(0, 0), Vector2(su, 0), Vector2(su, sv), Vector2(0, sv)])
+				quad(kit, key, pts, nn, col, [uv_offset, Vector2(su, 0) + uv_offset, Vector2(su, sv) + uv_offset, Vector2(0, sv) + uv_offset])
 			else:
 				quad(kit, key, pts, nn, col)
 
 
 ## Axis-aligned box between two corners (local frame).
-func block(kit: Dictionary, key: String, lo: Vector3, hi: Vector3, col: Color, uv_scale := 0.0) -> void:
-	box(kit, key, Transform3D(Basis(), (lo + hi) * 0.5), (hi - lo).abs(), col, uv_scale)
+func block(kit: Dictionary, key: String, lo: Vector3, hi: Vector3, col: Color, uv_scale := 0.0, uv_offset := Vector2.ZERO) -> void:
+	box(kit, key, Transform3D(Basis(), (lo + hi) * 0.5), (hi - lo).abs(), col, uv_scale, false, uv_offset)
 
 
 ## A box from `a` to `b` (its long axis), `w` wide and `t` thick, the width along `side` (or any
@@ -264,8 +264,11 @@ func painted_tyre(kit: Dictionary, key: String, c: Vector3, r_in: float, r_out: 
 ## An outline in the local x-y plane (x along, y up), extruded across z from z0 to z1, with its edges
 ## bevelled by `bevel`: vehicle bodies, booths, ramps' side frames. The outline runs counter-clockwise
 ## seen from +z and may be concave (the side faces are triangulated). Returns nothing; `col_fn`, if
-## valid, gives the colour of a face from its centre and normal (stripes, two-tone paint).
-func extrude(kit: Dictionary, key: String, outline: PackedVector2Array, z0: float, z1: float, bevel: float, col: Color, col_fn := Callable()) -> void:
+## valid, gives the colour of a face from its centre and normal (stripes, two-tone paint). `uv_scale` > 0
+## maps UVs in metres (times it, plus `uv_offset`): (x, y) on the two side faces, (along the outline, z) round
+## the rim.
+func extrude(kit: Dictionary, key: String, outline: PackedVector2Array, z0: float, z1: float, bevel: float, col: Color, col_fn := Callable(),
+		uv_scale := 0.0, uv_offset := Vector2.ZERO) -> void:
 	var n := outline.size()
 	var ccw := _signed_area(outline) > 0.0
 	var inner: PackedVector2Array = _inset(outline, bevel) if bevel > 0.0 else outline
@@ -279,10 +282,15 @@ func extrude(kit: Dictionary, key: String, outline: PackedVector2Array, z0: floa
 			var b := Vector3(inner[tris[i + 1]].x, inner[tris[i + 1]].y, z)
 			var c := Vector3(inner[tris[i + 2]].x, inner[tris[i + 2]].y, z)
 			var cc: Color = col if not col_fn.is_valid() else col_fn.call((a + b + c) / 3.0, nz)
-			tri(kit, key, a, b, c, nz, nz, nz, cc, nz)
+			if uv_scale > 0.0:
+				tri(kit, key, a, b, c, nz, nz, nz, cc, nz, Vector2(a.x, a.y) * uv_scale + uv_offset, Vector2(b.x, b.y) * uv_scale + uv_offset,
+						Vector2(c.x, c.y) * uv_scale + uv_offset)
+			else:
+				tri(kit, key, a, b, c, nz, nz, nz, cc, nz)
 	# The rim round the outline: the full outline between the bevels, the bevels out to the sides.
 	var zi0 := z0 + bevel
 	var zi1 := z1 - bevel
+	var run := 0.0
 	for i in range(n):
 		var j := (i + 1) % n
 		var p := outline[i]
@@ -296,7 +304,14 @@ func extrude(kit: Dictionary, key: String, outline: PackedVector2Array, z0: floa
 		var qi: Vector2 = inner[j]
 		var mid := Vector3((p.x + q.x) * 0.5, (p.y + q.y) * 0.5, (z0 + z1) * 0.5)
 		var cc: Color = col if not col_fn.is_valid() else col_fn.call(mid, o3)
-		quad(kit, key, [Vector3(p.x, p.y, zi0), Vector3(q.x, q.y, zi0), Vector3(q.x, q.y, zi1), Vector3(p.x, p.y, zi1)], o3, cc)
+		if uv_scale > 0.0:
+			var r1: float = run + e.length()
+			quad(kit, key, [Vector3(p.x, p.y, zi0), Vector3(q.x, q.y, zi0), Vector3(q.x, q.y, zi1), Vector3(p.x, p.y, zi1)], o3, cc,
+					[Vector2(run, zi0) * uv_scale + uv_offset, Vector2(r1, zi0) * uv_scale + uv_offset, Vector2(r1, zi1) * uv_scale + uv_offset,
+					Vector2(run, zi1) * uv_scale + uv_offset])
+			run = r1
+		else:
+			quad(kit, key, [Vector3(p.x, p.y, zi0), Vector3(q.x, q.y, zi0), Vector3(q.x, q.y, zi1), Vector3(p.x, p.y, zi1)], o3, cc)
 		if bevel > 0.0:
 			var nb0 := (o3 - Vector3(0, 0, 1)).normalized()
 			var nb1 := (o3 + Vector3(0, 0, 1)).normalized()
