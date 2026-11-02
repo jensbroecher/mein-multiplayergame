@@ -8,6 +8,8 @@ var level: Node3D = null
 
 var finish_line_pos: Vector2 = Vector2.ZERO
 var has_finish_line: bool = false
+var start_line_pos: Vector2 = Vector2.ZERO
+var has_start_line: bool = false
 
 var time_elapsed: float = 0.0
 var _redraw_frame: int = 0
@@ -47,7 +49,15 @@ func _initialize_track() -> void:
 		max_pos.x = max(max_pos.x, p2d.x)
 		max_pos.y = max(max_pos.y, p2d.y)
 		
-	# Finish Line
+	# Start Line & Finish Line
+	var sl = level.get_node_or_null("StartLine")
+	if sl:
+		var sl_global = sl.global_position
+		start_line_pos = Vector2(sl_global.x, sl_global.z)
+		has_start_line = true
+	else:
+		has_start_line = false
+
 	var fl = level.get_node_or_null("FinishLine")
 	if fl:
 		var fl_global = fl.global_position
@@ -131,15 +141,23 @@ func _draw() -> void:
 		var local_pt = (pt - track_center) * track_scale + size * 0.5
 		local_points.append(local_pt)
 		
-	# Connect loop
-	if local_points.size() > 1 and local_points[0].distance_to(local_points[-1]) > 1.0:
+	# Connect loop (circuits only; leave open for point-to-point / rally stages)
+	var is_ptp: bool = level != null and bool(level.get("is_point_to_point"))
+	if not is_ptp and local_points.size() > 1 and local_points[0].distance_to(local_points[-1]) > 1.0:
 		local_points.append(local_points[0])
 		
 	# Draw track shadows/borders for glow effect
 	draw_polyline(local_points, Color(1, 1, 1, 0.08), 5.0, true)
 	draw_polyline(local_points, Color(0.0, 0.8, 1.0, 0.7), 2.0, true)
 	
-	# Draw Finish Line
+	# Draw Start Line (green)
+	if has_start_line:
+		var sl_local = (start_line_pos - track_center) * track_scale + size * 0.5
+		draw_circle(sl_local, 4.5, Color(0.2, 0.88, 0.35))
+		draw_circle(sl_local, 2.5, Color(0.05, 0.16, 0.08))
+		draw_circle(sl_local, 1.0, Color(1.0, 1.0, 1.0))
+
+	# Draw Finish Line (gold)
 	if has_finish_line:
 		var fl_local = (finish_line_pos - track_center) * track_scale + size * 0.5
 		draw_circle(fl_local, 4.5, Color(1.0, 0.85, 0.0))

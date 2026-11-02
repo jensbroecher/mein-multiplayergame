@@ -12,6 +12,7 @@ const ITEM_BOX = preload("res://ItemBox.gd")
 @export var checkpoints: Array[Area3D] = []
 @export var track_path: Path3D
 @export var alternative_paths: Array[Path3D] = []
+@export var is_point_to_point: bool = false
 
 
 
@@ -120,6 +121,9 @@ var spectator_camera: Node3D = null
 var player_stats = {} # id -> {"laps": 0, "next_checkpoint_idx": 0, "finished": false, "pos": 0}
 var end_timer = 0.0
 var next_finish_pos: int = 1
+
+func get_target_laps() -> int:
+	return 1 if is_point_to_point else NetworkManager.max_laps
 
 var cp_offsets: Array[float] = []
 ## How far (m) off the racing line a human is still followed along it, for the missed-gate watch. The
@@ -282,15 +286,23 @@ func _setup_spectator_camera() -> void:
 			slots.hide()
 
 func _load_spawn_points():
-	# Read spawn points from the baked scene tree (under FinishLine/SpawnPoints)
+	# Read spawn points from the baked scene tree (under StartLine or FinishLine/SpawnPoints)
 	spawn_points.clear()
-	var fl = get_node_or_null("FinishLine")
-	if fl:
-		var sp_container = fl.get_node_or_null("SpawnPoints")
+	var sl = get_node_or_null("StartLine")
+	if sl:
+		var sp_container = sl.get_node_or_null("SpawnPoints")
 		if sp_container:
 			for child in sp_container.get_children():
 				if child is Marker3D:
 					spawn_points.append(child)
+	if spawn_points.is_empty():
+		var fl = get_node_or_null("FinishLine")
+		if fl:
+			var sp_container = fl.get_node_or_null("SpawnPoints")
+			if sp_container:
+				for child in sp_container.get_children():
+					if child is Marker3D:
+						spawn_points.append(child)
 	# Fallback: also check for a legacy root-level SpawnPoints node
 	if spawn_points.is_empty():
 		var sp_root = get_node_or_null("SpawnPoints")
@@ -326,8 +338,8 @@ func _setup_checkpoints():
 			container_cps.sort_custom(func(a, b):
 				var a_local = track_path.to_local(a.global_position)
 				var b_local = track_path.to_local(b.global_position)
-				var a_offset = fmod(curve.get_closest_offset(a_local) - fl_off + t_len, t_len)
-				var b_offset = fmod(curve.get_closest_offset(b_local) - fl_off + t_len, t_len)
+				var a_offset = curve.get_closest_offset(a_local) if is_point_to_point else fmod(curve.get_closest_offset(a_local) - fl_off + t_len, t_len)
+				var b_offset = curve.get_closest_offset(b_local) if is_point_to_point else fmod(curve.get_closest_offset(b_local) - fl_off + t_len, t_len)
 				return a_offset < b_offset
 			)
 
@@ -418,9 +430,9 @@ func _grant_checkpoint(id: int, cp_idx: int) -> void:
 
 	var cue := LapCue.CHECKPOINT
 	if cp_idx == checkpoints.size() - 1:
-		if stats["laps"] + 1 >= NetworkManager.max_laps:
+		if stats["laps"] + 1 >= get_target_laps():
 			cue = LapCue.FINISH
-		elif stats["laps"] + 2 == NetworkManager.max_laps:
+		elif stats["laps"] + 2 == get_target_laps():
 			cue = LapCue.FINAL_LAP
 
 	if cart and cart.get("is_ai"):
@@ -519,7 +531,7 @@ func _credit_passed_checkpoints(id: int, cart: Node3D, stats: Dictionary) -> voi
 
 func _check_finish(id: int):
 	var stats = player_stats[id]
-	if stats["laps"] >= NetworkManager.max_laps and not stats["finished"]:
+	if stats["laps"] >= get_target_laps() and not stats["finished"]:
 		stats["finished"] = true
 		stats["pos"] = next_finish_pos
 		next_finish_pos += 1
@@ -893,10 +905,12 @@ func _show_start_lights(step: int) -> void:
 ## Gives the start gantry's ticker its title: the Grand Prix (and which race of it, in a GP) and
 ## the stage.
 func _setup_gantry_ticker() -> void:
-	var fl := get_node_or_null("FinishLine")
-	if fl == null or not fl.has_method("set_ticker_title"):
+	var gantry: Node = get_node_or_null("StartLine")
+	if gantry == null or not gantry.has_method("set_ticker_title"):
+		gantry = get_node_or_null("FinishLine")
+	if gantry == null or not gantry.has_method("set_ticker_title"):
 		return
-	_gantry = fl
+	_gantry = gantry
 	var stage := ""
 	for st in NetworkManager.ALL_STAGES:
 		if st["path"] == scene_file_path:
@@ -912,7 +926,7 @@ func _setup_gantry_ticker() -> void:
 		for cup_name in NetworkManager.GP_CUPS:
 			if NetworkManager.GP_CUPS[cup_name]["stages"].has(scene_file_path):
 				cup = cup_name
-	_gantry.set_ticker_title(cup, stage, race, NetworkManager.max_laps)
+	_gantry.set_ticker_title(cup, stage, race, get_target_laps())
 
 
 ## The standings rows (_push_standings) go to the gantry's ticker on every peer.
@@ -922,7 +936,7 @@ func _feed_gantry(rows: Array) -> void:
 	# Trackside lap boards (LapBoard.gd) show the leader's lap.
 	get_tree().call_group(&"lap_boards", &"show_standings", rows)
 	if _commentator:
-		_commentator.update(rows, NetworkManager.max_laps)
+		_commentator.update(rows, get_target_laps())
 
 ## The grass materials that bend round the carts: TerrainGenerator's grass cards, or a level's own
 ## grass that joins the "grass_push" group (MeadowDetail.gd on the Lakeside Course).
@@ -1021,7 +1035,7 @@ func _checkpoint_missed(id: int, idx: int, voice_delay: float = 0.0) -> void:
 		_disqualify(id)
 		return
 	_announce_missed_checkpoint(id, voice_delay)
-	if idx == checkpoints.size() - 1 and stats["laps"] + 1 >= NetworkManager.max_laps:
+	if idx == checkpoints.size() - 1 and stats["laps"] + 1 >= get_target_laps():
 		return
 	stats["missed_run"] = 1
 	stats["lap_clean"] = false
@@ -1078,7 +1092,7 @@ func _start_end_timer_if_humans_done() -> void:
 ## a new lap record: saved, and the announcer calls it (only when it beats an earlier record).
 func _lap_completed(id: int) -> void:
 	var stats: Dictionary = player_stats[id]
-	if _is_time_trial() and stats["laps"] < NetworkManager.max_laps:
+	if _is_time_trial() and stats["laps"] < get_target_laps():
 		_give_lap_boosts(id)
 	var now := Time.get_ticks_msec()
 	var lap_ms: int = now - int(stats.get("lap_start", _race_go_msec))
@@ -1284,21 +1298,28 @@ func _update_positions():
 			tagged.race_place = pos
 
 		var l = ranking[i]["laps"]
+		var progress_val: float = -1.0
+		if is_point_to_point and track_length > 0.0:
+			var cart_node = players_container.get_node_or_null(str(id))
+			if cart_node and track_path and track_path.curve:
+				var coff = track_path.curve.get_closest_offset(track_path.to_local(cart_node.global_position))
+				progress_val = clampf(coff / track_length, 0.0, 1.0)
+
 		if NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR:
 			if spectator_camera and is_instance_valid(spectator_camera.focus_cart):
 				var focus_id: int = str(spectator_camera.focus_cart.name).to_int()
 				if id == focus_id and race_ui:
-					race_ui.update_hud(pos, ranking.size(), mini(l + 1, NetworkManager.max_laps), NetworkManager.max_laps)
+					race_ui.update_hud(pos, ranking.size(), mini(l + 1, get_target_laps()), get_target_laps(), progress_val)
 			continue
 		if NetworkManager.players.has(id) and not NetworkManager.players[id].get("is_ai", false):
 			if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
 				# Direct HUD update — no RPC routing needed for local co-op
 				var ui = race_ui if id == 1 else race_ui_p2
-				if ui: ui.update_hud(pos, ranking.size(), mini(l + 1, NetworkManager.max_laps), NetworkManager.max_laps)
+				if ui: ui.update_hud(pos, ranking.size(), mini(l + 1, get_target_laps()), get_target_laps(), progress_val)
 			elif id == multiplayer.get_unique_id():
-				update_hud_rpc(pos, ranking.size(), mini(l + 1, NetworkManager.max_laps), NetworkManager.max_laps)
+				update_hud_rpc(pos, ranking.size(), mini(l + 1, get_target_laps()), get_target_laps(), progress_val)
 			else:
-				update_hud_rpc.rpc_id(id, pos, ranking.size(), mini(l + 1, NetworkManager.max_laps), NetworkManager.max_laps)
+				update_hud_rpc.rpc_id(id, pos, ranking.size(), mini(l + 1, get_target_laps()), get_target_laps(), progress_val)
 
 	_push_standings(ranking)
 
@@ -1319,7 +1340,7 @@ func _push_standings(ranking: Array) -> void:
 			"name": p_name,
 			"finished": entry["finished"],
 			"dq": player_stats[id].get("disqualified", false),
-			"lap": mini(int(entry["laps"]) + 1, NetworkManager.max_laps),
+			"lap": mini(int(entry["laps"]) + 1, get_target_laps()),
 		})
 	rows.sort_custom(func(a, b): return int(a["pos"]) < int(b["pos"]))
 
@@ -1346,8 +1367,8 @@ func update_standings_rpc(rows: Array):
 	_feed_gantry(rows)
 
 @rpc("authority", "call_local", "unreliable")
-func update_hud_rpc(pos, total, lap, max_laps):
-	race_ui.update_hud(pos, total, lap, max_laps)
+func update_hud_rpc(pos, total, lap, max_laps, progress: float = -1.0):
+	race_ui.update_hud(pos, total, lap, max_laps, progress)
 
 @rpc("authority", "call_local", "reliable")
 func update_timer_rpc(t: int):

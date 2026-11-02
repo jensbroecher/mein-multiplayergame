@@ -2432,3 +2432,49 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
   `res://scratch/freight_ground_profile.tscn` (headless) raycasts the collision along the lap for steps (`across=1` the
   road's width), `scratch/freight_nodes_near.tscn -- x,y,z radius=` lists nodes near a point, `scratch/freight_drive_test.tscn`
   drives a cart straight (it has no steering).
+
+## Mina del Viento (Sierra del Viento GP, stage 4 - Grand Finale)
+
+The grand finale of Sierra del Viento GP: a downhill point-to-point rally sprint (no repeating laps, one single 4.6km stage)
+descending 84 meters from the high observatory plateau down through a colossal open-pit copper mine to the caldera floor.
+It synthesizes all four finale concepts: Dawn Balloon Fiesta, Very Large Array radio telescopes, the Haboob dust storm weather
+front, and the terraced open-pit copper mine with 400-ton haul trucks and overhead conveyor bridges.
+`regenerate_mina.gd` (`regenerate_mina.tscn`, headless, ~10s) builds `levels/MinaLevel.tscn` and chunked ground meshes in
+`generated/mina_chunks/`.
+
+- **Point-to-Point Rally Architecture**:
+  - `Level.gd` flag `is_point_to_point: bool = true`: changes race logic from multi-lap to single-stage descent (`target_laps = 1`).
+    Separate `StartLine` (with grid spawners) and `FinishLine` (at the mine floor). Checkpoints are ordered along the open
+    curve without loop wrapping. Crossing `FinishLine` triggers the race finish sequence and stores fastest stage time.
+  - `RaceUI.gd`: Detects single-lap stages (`max_laps <= 1`) and renders stage completion percentage (`STAGE: %d%%`) instead
+    of lap counters.
+  - `Minimap.gd`: Suppresses closed-loop polygon drawing, rendering an open polyline along the descent with distinct Start (green)
+    and Finish (checkered) markers.
+- **The Route (4,604.5m, 84m descent from +52m to -32m)**:
+  - *Sector 1: The High Plateau (0 to 1,150m, +52m to +42m, asphalt)*: Fast high-speed paved highway through the Very Large Array
+    radio telescope field (eight 24m dishes on rails with blinking red beacons) and the Dawn Balloon Fiesta launch field
+    (tethered and drifting multi-coloured hot air balloons with glowing burners).
+  - *Sector 2: The Rim Notch & Shelf Descent (1,150m to 2,050m, +42m to +21m, quarry gravel)*: Tarmac ends; road transitions to
+    rough quarry gravel. The road breaches the crater rim through a blast cut. An emergency siren sounds as a massive Haboob dust
+    storm rolls across the mesa, dropping visibility and howling across exposed shelf drops.
+  - *Sector 3: The Terraced Copper Mine Spiral (2,050m to 3,450m, +21m to -19m)*: Spiral descent down massive terraced benches
+    carved into rich copper ore (reds, ochres, malachite teals). Colossal CAT-scale 400-ton haul trucks (yellow livery, 4m wheels)
+    parked along the ramps and benches. Mobile diesel floodlight towers illuminate the pit.
+  - *Sector 4: Conveyor Bridges, Blast Cutting & Pit Depot (3,450m to 4,604m, -19m to -32.5m)*: A 240m long blast cut under two
+    overhead heavy steel conveyor bridges (36m span, 9.5m road clearance, rubber belt carrying crushed copper ore), followed by
+    a sweeping chicane through the crushing plant and a flat-out sprint across the maintenance depot floor to the Finish portal.
+- **Atmosphere & Weather (`HaboobWeather.gd`)**:
+  - Progressive weather evolution tied to stage progress: calm golden dawn sky on the plateau -> sudden Haboob dust storm wall
+    upon breaching the rim -> swirling dust and reduced wind in the pit shelter -> calm interior depot sprint.
+  - Physics crosswind: lateral aerodynamic forces push carts sideways across exposed shelf roads (sheltered inside cuttings and pit).
+  - Audio: multi-layer synthesized desert wind with low rumble, buffeting gusts, and whistling grit.
+  - Tumbleweeds: procedural thorny tumbleweeds tumble across the road ahead of the storm front as pushable obstacles.
+- **Asset Kit (`MinaKit.gd`)**:
+  - `radio_dish()`: 24m parabolic antenna with open lattice dish, support yoke, quad-pod subreflector feed, rail carriage, and flashing red beacon.
+  - `hot_air_balloon(style, airborne)`: Southwestern banded teardrop envelope (3 styles), burner ring with flickering orange point light, wicker basket, and tether ropes.
+  - `haul_truck()`: Ultra-class 400-ton mining dump truck (15m long, 9m wide, 7.5m high) with 4m diameter dual tyres, access stairs, cabin, hydraulic hoist cylinders, and rock-lined dump bed.
+  - `conveyor_bridge(span, clearance)`: Heavy lattice Warren truss bridge spanning 36m across the roadway with 9.5m clearance, continuous conveyor belt with crushed copper ore, and steel trestle towers.
+  - `floodlight_tower()`: Mobile diesel generator trailer with 4-bank halogen floodlights.
+  - `tumbleweed()`: Tangled procedural ball of thorny branches.
+- **AI Race Validation**: Headless 6-bot AI races (`scratch/ai_race_test.tscn -- res://levels/MinaLevel.tscn seconds=220 speed=4`)
+  consistently finish all 6 carts across the 4.6km finish line, with multiple bots completing the descent with 0 respawns.

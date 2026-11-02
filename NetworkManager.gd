@@ -66,6 +66,7 @@ const ALL_STAGES = [
 	{"name": "Arco del Viento", "path": "res://levels/CanyonLevel.tscn"},
 	{"name": "Tolvanera Gulch", "path": "res://levels/CanyonChasmLevel.tscn"},
 	{"name": "Freight Line", "path": "res://levels/FreightLevel.tscn"},
+	{"name": "Mina del Viento", "path": "res://levels/MinaLevel.tscn"},
 	{"name": "Desert Wadi", "path": "res://levels/DesertWadiLevel.tscn"},
 	{"name": "South Beach", "path": "res://levels/BloombayDunesLevel.tscn"},
 	{"name": "Mara Crossing", "path": "res://levels/MaraCrossingLevel.tscn"},
@@ -106,6 +107,7 @@ const GP_CUPS = {
 			"res://levels/CanyonLevel.tscn",
 			"res://levels/CanyonChasmLevel.tscn",
 			"res://levels/FreightLevel.tscn",
+			"res://levels/MinaLevel.tscn",
 		]
 	},
 	"Matumaini GP": {

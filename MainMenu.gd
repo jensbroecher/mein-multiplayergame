@@ -44,6 +44,7 @@ const STAGE_INFO := {
 	"res://levels/CanyonLevel.tscn": {"title": "ARCO DEL VIENTO", "subtitle": "A truss bridge, a shelf road up the canyon wall, a knife-edge ridge, a slot canyon and a ford", "file": "tile_canyon.jpg", "color": COL_CANYON},
 	"res://levels/CanyonChasmLevel.tscn": {"title": "TOLVANERA GULCH", "subtitle": "A narrow run over the drop, where a dust devil roams", "file": "tile_canyon_chasm.jpg", "color": COL_CHASM},
 	"res://levels/FreightLevel.tscn": {"title": "FREIGHT LINE", "subtitle": "Two railways cross the lap: wait for the gap, jump the flatcars, or lose the race to a train", "file": "tile_freight_line.jpg", "color": COL_FREIGHT},
+	"res://levels/MinaLevel.tscn": {"title": "MINA DEL VIENTO", "subtitle": "A downhill rally sprint: the radio array, the dawn balloon fiesta, the haboob, and the open-pit copper mine", "file": "tile_mina_del_viento.jpg", "color": COL_CANYON},
 	"res://levels/DesertWadiLevel.tscn": {"title": "DESERT WADI", "subtitle": "Dry riverbed sand and heat", "file": "tile_desert_wadi.jpg", "color": COL_WADI},
 	"res://levels/MaraCrossingLevel.tscn": {"title": "MARA CROSSING", "subtitle": "Murram road across the savanna: the migration, Pride Rock, and the croc jump", "file": "tile_mara_crossing.jpg", "color": COL_SAVANNA},
 	"res://levels/NyotaStadiumLevel.tscn": {"title": "NYOTA STADIUM", "subtitle": "Stadium supercross: doubles, whoops and a triple, a lap of the streets, and the Drop-In", "file": "tile_nyota_stadium.jpg", "color": COL_SAVANNA},
@@ -305,7 +306,7 @@ func show_sub_menu(menu_name: String) -> void:
 			_add_tile("AL-RAIHANA GP", "Mountain Pass  •  Desert Wadi", "tile_al_raihana_gp.jpg", COL_BRONZE, func():
 				_on_cup_selected("Al-Raihana GP")
 			)
-			_add_tile("SIERRA DEL VIENTO GP", "Arco del Viento  •  Tolvanera Gulch  •  Freight Line", "tile_sierra_del_viento_gp.jpg", COL_CANYON, func():
+			_add_tile("SIERRA DEL VIENTO GP", "Arco del Viento  •  Tolvanera Gulch  •  Freight Line  •  Mina del Viento", "tile_sierra_del_viento_gp.jpg", COL_CANYON, func():
 				_on_cup_selected("Sierra del Viento GP")
 			)
 			_add_tile("MATUMAINI GP", "Mara Crossing  •  Nyota Stadium  •  Msitu Falls", "tile_matumaini_gp.jpg", COL_SAVANNA, func():

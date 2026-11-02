@@ -194,10 +194,16 @@ func show_hud():
 	lobby_panel.hide()
 	hud_panel.show()
 
-func update_hud(pos: int, total: int, lap: int, max_laps: int):
+func update_hud(pos: int, total: int, lap: int, max_laps: int, progress: float = -1.0):
 	label_pos.text = "%d" % pos
 	label_pos_total.text = "/ %d" % total
-	label_lap.text = "Lap: %d/%d" % [lap, max_laps]
+	if max_laps <= 1:
+		if progress >= 0.0:
+			label_lap.text = "STAGE: %d%%" % int(clampf(progress * 100.0, 0.0, 100.0))
+		else:
+			label_lap.text = "STAGE"
+	else:
+		label_lap.text = "Lap: %d/%d" % [lap, max_laps]
 
 func _setup_standings_list() -> void:
 	if hud_panel == null:
