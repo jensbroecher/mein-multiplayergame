@@ -2433,48 +2433,70 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
   road's width), `scratch/freight_nodes_near.tscn -- x,y,z radius=` lists nodes near a point, `scratch/freight_drive_test.tscn`
   drives a cart straight (it has no steering).
 
-## Mina del Viento (Sierra del Viento GP, stage 4 - Grand Finale)
+## Mina del Viento (Sierra del Viento GP, stage 4, the finale)
 
-The grand finale of Sierra del Viento GP: a downhill point-to-point rally sprint (no repeating laps, one single 4.6km stage)
-descending 84 meters from the high observatory plateau down through a colossal open-pit copper mine to the caldera floor.
-It synthesizes all four finale concepts: Dawn Balloon Fiesta, Very Large Array radio telescopes, the Haboob dust storm weather
-front, and the terraced open-pit copper mine with 400-ton haul trucks and overhead conveyor bridges.
-`regenerate_mina.gd` (`regenerate_mina.tscn`, headless, ~10s) builds `levels/MinaLevel.tscn` and chunked ground meshes in
-`generated/mina_chunks/`.
+A point-to-point rally sprint (one run, no laps): `regenerate_mina.gd` (`regenerate_mina.tscn`, headless, about 15s) builds
+`levels/MinaLevel.tscn`, 4.2km from a plateau at dawn (+54m) down into an open-pit copper mine and out into the valley (-34m).
+Rebuilt on 2026-11-02 (Gemini's first version had a pit unrelated to its road, trucks in walls, a storm that never ended).
 
-- **Point-to-Point Rally Architecture**:
-  - `Level.gd` flag `is_point_to_point: bool = true`: changes race logic from multi-lap to single-stage descent (`target_laps = 1`).
-    Separate `StartLine` (with grid spawners) and `FinishLine` (at the mine floor). Checkpoints are ordered along the open
-    curve without loop wrapping. Crossing `FinishLine` triggers the race finish sequence and stores fastest stage time.
-  - `RaceUI.gd`: Detects single-lap stages (`max_laps <= 1`) and renders stage completion percentage (`STAGE: %d%%`) instead
-    of lap counters.
-  - `Minimap.gd`: Suppresses closed-loop polygon drawing, rendering an open polyline along the descent with distinct Start (green)
-    and Finish (checkered) markers.
-- **The Route (4,604.5m, 84m descent from +52m to -32m)**:
-  - *Sector 1: The High Plateau (0 to 1,150m, +52m to +42m, asphalt)*: Fast high-speed paved highway through the Very Large Array
-    radio telescope field (eight 24m dishes on rails with blinking red beacons) and the Dawn Balloon Fiesta launch field
-    (tethered and drifting multi-coloured hot air balloons with glowing burners).
-  - *Sector 2: The Rim Notch & Shelf Descent (1,150m to 2,050m, +42m to +21m, quarry gravel)*: Tarmac ends; road transitions to
-    rough quarry gravel. The road breaches the crater rim through a blast cut. An emergency siren sounds as a massive Haboob dust
-    storm rolls across the mesa, dropping visibility and howling across exposed shelf drops.
-  - *Sector 3: The Terraced Copper Mine Spiral (2,050m to 3,450m, +21m to -19m)*: Spiral descent down massive terraced benches
-    carved into rich copper ore (reds, ochres, malachite teals). Colossal CAT-scale 400-ton haul trucks (yellow livery, 4m wheels)
-    parked along the ramps and benches. Mobile diesel floodlight towers illuminate the pit.
-  - *Sector 4: Conveyor Bridges, Blast Cutting & Pit Depot (3,450m to 4,604m, -19m to -32.5m)*: A 240m long blast cut under two
-    overhead heavy steel conveyor bridges (36m span, 9.5m road clearance, rubber belt carrying crushed copper ore), followed by
-    a sweeping chicane through the crushing plant and a flat-out sprint across the maintenance depot floor to the Finish portal.
-- **Atmosphere & Weather (`HaboobWeather.gd`)**:
-  - Progressive weather evolution tied to stage progress: calm golden dawn sky on the plateau -> sudden Haboob dust storm wall
-    upon breaching the rim -> swirling dust and reduced wind in the pit shelter -> calm interior depot sprint.
-  - Physics crosswind: lateral aerodynamic forces push carts sideways across exposed shelf roads (sheltered inside cuttings and pit).
-  - Audio: multi-layer synthesized desert wind with low rumble, buffeting gusts, and whistling grit.
-  - Tumbleweeds: procedural thorny tumbleweeds tumble across the road ahead of the storm front as pushable obstacles.
-- **Asset Kit (`MinaKit.gd`)**:
-  - `radio_dish()`: 24m parabolic antenna with open lattice dish, support yoke, quad-pod subreflector feed, rail carriage, and flashing red beacon.
-  - `hot_air_balloon(style, airborne)`: Southwestern banded teardrop envelope (3 styles), burner ring with flickering orange point light, wicker basket, and tether ropes.
-  - `haul_truck()`: Ultra-class 400-ton mining dump truck (15m long, 9m wide, 7.5m high) with 4m diameter dual tyres, access stairs, cabin, hydraulic hoist cylinders, and rock-lined dump bed.
-  - `conveyor_bridge(span, clearance)`: Heavy lattice Warren truss bridge spanning 36m across the roadway with 9.5m clearance, continuous conveyor belt with crushed copper ore, and steel trestle towers.
-  - `floodlight_tower()`: Mobile diesel generator trailer with 4-bank halogen floodlights.
-  - `tumbleweed()`: Tangled procedural ball of thorny branches.
-- **AI Race Validation**: Headless 6-bot AI races (`scratch/ai_race_test.tscn -- res://levels/MinaLevel.tscn seconds=220 speed=4`)
-  consistently finish all 6 carts across the 4.6km finish line, with multiple bots completing the descent with 0 respawns.
+- The route is an open path of straights and arcs (`_fillet_open`: HEAD corners, the pit's three, TAIL), measured from the
+  path's start (`_at(s)`, `_spot(s, lat, lift)`). Sections: the plateau, tarmac (0-1.26km: the start in the balloon fiesta,
+  the radio array's arm, the dry wash's crest jump `WASH_SHAPE` at 820m), the mine's gate (`GATE_S`, tarmac ends), the shelf
+  road cut into the escarpment's face (to 1.77km), the notch through the pit's rim, the haul ramp three quarters of the way
+  round the pit (1.87-3.01km, 5.5%), the floor, the mouth (a benched cut through the south wall), the valley (concrete
+  again from `PAVED_AGAIN`), the finish (`FINISH_RUNOUT` before the path's end). The road's height is `_prof` (HEAD_PROFILE and
+  stations from the solved route, linear, smoothed, the wash added).
+- The pit is one function, `_pit_d` (distance outside a rounded rectangle, the floor): benches are its contours
+  (`_benches`: BENCH_H every BENCH_W, face then berm). `_solve_route` puts the ramp's corners on contours whose mean wall
+  height matches the road's there, so the ramp is cut into the benches it crosses. The mouth is the same bench function
+  across its centreline (`_mine_cut`). Grading (`_grade`, per stretch `_grading_at`) clamps the ground to every road
+  segment's cut and fill. Dressing is placed by (s, lat) or on `_ground_at` and every footprint is checked (`_seat`,
+  `_report_seats`: errors past twice its tolerance), so nothing stands in a wall.
+- Terrain: one heightfield (`FINE_STEP` 5m, half that over `PIT_X`/`PIT_Z`), the far land a mesh of its own (`minafar_`).
+  `mina_ground.gdshader` (derived from canyon_ground): desert floor, sandstone on the escarpment, the pit's ore by depth
+  below the rim (`copper_rock`: leached cap, oxide zone with malachite streaks, grey porphyry; presplit half barrels on the
+  faces), the roads painted from the vertex data, sand drifted over the shelf road (UV.y, `DRIFTS`, the `MinaSandRoad`
+  body), blowing sand along the ground (`storm`, `wind_dir`, set by HaboobWeather). UV.x is how deep the mine cut (the ore's
+  rock and rubble); the sump's stain is limited to `sump` (xz, radius), or the mouth's floor (below the sump's water) went
+  teal. Bodies: `MinaRoad`, `MinaHaulRoad`, `MinaSandRoad` (track), `MinaGround`, `MinaPitGround`, `MinaRockFace`.
+- Safety berms (`BERMS`, `_build_berms`, `mina_rubble.gdshader`): rubble windrows on the drop side of the shelf road and down
+  the ramp, their collider a steeper, taller wall than the heap (a cart glances off instead of riding over the edge).
+- Set pieces are `MinaKit.gd` (life size, grown by `PROP_SCALE` 1.6; balloons 1.5, dishes 1.25), meshes and materials
+  saved under `minaprop_` (MeshChunker leaves them whole) by `_save_props`, each big prop under a StaticBody3D with its own
+  boxes (`_prop`), so DressingColliders leaves it be: the haul trucks (`haul_truck`, `water_truck`, `mina_tyre.gdshader`
+  chevron lugs), the rope shovel at the muck pile on the floor, the crusher by the mouth, drills, light towers, the radio
+  telescopes (`radio_dish`) on a double track (`FreightKit.track_piece`, a trestle over the wash), the balloons
+  (`balloon`, `balloon_inflating`, `mina_balloon.gdshader`, `mina_flame.gdshader`), the conveyors (`conveyor_run`: two
+  galleries over the road, `CONVEYOR_A`/`B`; the generator errors if one clears the ground by under 9m), the stockpile,
+  the truck shop, the concentrator and thickeners, the grandstand. `res://scratch/mina_kit_preview.gd` (`-s`, windowed,
+  `-- <dir> set=truck,shovel,... name:x,y,z:tx,ty,tz`) renders them in seconds; `scratch/test_mina_kit.gd` (`-s`, headless)
+  builds each and prints its triangles.
+- `BalloonFiesta.gd`: the balloons aloft loop slowly over the plateau on the wall clock; every burner fires now and then
+  (the `burn` instance uniform).
+- Never name a node in this level "...Water": PlayerCart takes the first such node for the sea, and the sump's
+  ("SumpWater", y -31) flooded every cart in the mouth and the valley, which lie below it. It is `SumpPool`.
+- The haboob (`HaboobWeather.gd`): a place, not a schedule. `intensity_at(p)` is the storm's cover there (a grid the
+  generator bakes, `_storm_cover`: the escarpment's band from `STORM_FROM` north of its edge to `STORM_TO` out over the
+  valley, and the pit) less the shelter of lying below the land's natural height (the pit, the notch, the mouth). So it
+  thickens from about 1.1km, is thickest along the shelf road and the notch, thins down the ramp to a haze on the floor
+  and is gone in the valley; every viewer sees it by their own camera (eased, snapping on a cut). At its thickest the dust
+  closes in to `storm_fog_end` (230m, depth fog; aerial perspective off), the sun dims to a pale disc, sheets of dust roll
+  past (faded within 30m of the lens) and sand snakes low over the ground; nothing streaks across the view (motion
+  comfort). Gust fronts sweep downwind (`gust_at`, position and wall clock) and push the carts this peer drives across their
+  line at up to `gust_accel` (19 m/s^2: 3-4 m/s of slide on a grip of 5), a little along it. From the plateau it is the
+  `DustWall`: curtains along the edge (`DUST_CURTAINS`, `mina_dust_wall.gdshader`) that fade as you near them, at grazing
+  angles, and once you are inside the storm (`inside`). A blast siren wails at the gate; "HABOOB!" on the HUD once.
+- `Tumbleweeds.gd` (a MultiMesh, in DressingColliders' SELF_MOVING): weeds roll across the shelf road on paths of their own
+  (berms included in their heights) on the wall clock; a cart bursts one and keeps `HIT_KEEP` of its speed.
+- Level.gd: `is_point_to_point` (one lap; checkpoints sorted along the open path; the start gantry is `StartLine`, which
+  holds the grid's SpawnPoints and the start lights and ticker); the HUD's stage progress is measured to the finish line
+  (`_finish_offset`); after the finish carts brake to a stop in the run-out. RaceUI shows `STAGE: n%`, the minimap an open
+  line with start and finish.
+- Tests: `scratch/ai_race_test.tscn -- res://levels/MinaLevel.tscn seconds=150 speed=2` (6/6 finish in about 100-120s, no
+  respawns but items); `scratch/nyota_jump_test.tscn -- level=res://levels/MinaLevel.tscn speeds=40,46 ground=1` (the wash's
+  crest: 14-23m); `scratch/route_ai_probe.tscn -- [level=] start=<s> [speed=30]` (headless) traces one bot from any point
+  of a route with what it touches; `scratch/route_surface_scan.tscn -- <level> x0,z0 x1,z1` raycasts a line for steps;
+  `scratch/inspect_mina_stuck.gd` (`-s`, `-- <s> ...`) prints where the route is at given distances;
+  `scratch/race_cam_shots.tscn -- <dir> level=res://levels/MinaLevel.tscn every=5 count=22` rides through the storm.
+  The menu tile is `res://scratch/render_mina_shot.tscn` (windowed).
+- Cost (M1, scratch/bench.tscn, 1280x720): about 37ms GPU on average, 610 draws (Freight Line measured 64ms in the same run).

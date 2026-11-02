@@ -33,7 +33,7 @@ func _ready() -> void:
 		NetworkManager.players[100 + i]["car_index"] = int(cars[i])
 	var level: Node = load(level_path).instantiate()
 	add_child(level)
-	for wname in ["NorthlightWeather", "JungleRain"]:
+	for wname in ["NorthlightWeather", "JungleRain", "HaboobWeather"]:
 		if weather >= 0.0 and level.get_node_or_null(wname):
 			level.get_node(wname).force_intensity = weather
 	if no_items:

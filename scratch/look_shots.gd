@@ -51,7 +51,7 @@ func _ready() -> void:
 	# weather=<0..1> pins Northlight Caverns' blizzard instead of following the wall clock.
 	for a in args.slice(2):
 		if a.begins_with("weather="):
-			for wname in ["NorthlightWeather", "JungleRain"]:
+			for wname in ["NorthlightWeather", "JungleRain", "HaboobWeather"]:
 				if level.get_node_or_null(wname):
 					level.get_node(wname).force_intensity = float(a.substr(8))
 	# quality=<0..4> pins the detail level (MusicManager's Off..Ultra) instead of Auto.

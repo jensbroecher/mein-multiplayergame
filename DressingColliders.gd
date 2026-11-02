@@ -30,7 +30,8 @@ const MIN_HEIGHT := 0.5
 const SOFT := ["grass", "groundcover", "meadow", "crowd", "flag", "stack", "lounger", "parasol", "coolbox",
 	"cone", "icicle", "skid", "shadow", "giraffe", "hole", "fx", "warmup", "cloud", "particle", "spark", "water"]
 ## Scenery that knocks over or springs by itself (rigid bodies or springs of its own).
-const SELF_MOVING := ["res://KnockablePoles.gd", "res://KnockableIce.gd", "res://KnockableProps.gd", "res://SpringProps.gd", "res://KnockableRocks.gd"]
+const SELF_MOVING := ["res://KnockablePoles.gd", "res://KnockableIce.gd", "res://KnockableProps.gd", "res://SpringProps.gd", "res://KnockableRocks.gd",
+	"res://Tumbleweeds.gd"]
 ## Rigid: rocks and built things (they never wobble).
 const ROCKY := ["rock", "boulder", "block", "stone", "scree", "pebble", "mound", "ridge", "divider", "lamp",
 	"butte", "spire", "hoodoo", "formation", "slab", "crate", "barrier", "pole", "post", "mast", "telegraph"]

@@ -125,6 +125,22 @@ var next_finish_pos: int = 1
 func get_target_laps() -> int:
 	return 1 if is_point_to_point else NetworkManager.max_laps
 
+
+var _finish_off := -1.0
+
+## How far along the TrackPath the finish line stands (a point-to-point stage's path runs on past it).
+func _finish_offset() -> float:
+	if _finish_off < 0.0:
+		_finish_off = track_length
+		var fl := get_node_or_null("FinishLine") as Node3D
+		if fl and track_path and track_path.curve:
+			_finish_off = track_path.curve.get_closest_offset(track_path.to_local(fl.global_position))
+	return _finish_off
+
+
+func stats_finished(id: int) -> bool:
+	return player_stats.has(id) and bool(player_stats[id].get("finished", false))
+
 var cp_offsets: Array[float] = []
 ## How far (m) off the racing line a human is still followed along it, for the missed-gate watch. The
 ## tracker gives up on a cart further out than the AI's 28m and it never found the line again, so a cut
@@ -1301,9 +1317,12 @@ func _update_positions():
 		var progress_val: float = -1.0
 		if is_point_to_point and track_length > 0.0:
 			var cart_node = players_container.get_node_or_null(str(id))
-			if cart_node and track_path and track_path.curve:
+			if stats_finished(id):
+				progress_val = 1.0
+			elif cart_node and track_path and track_path.curve:
+				# Measured to the finish line: the path runs on past it into the run-out.
 				var coff = track_path.curve.get_closest_offset(track_path.to_local(cart_node.global_position))
-				progress_val = clampf(coff / track_length, 0.0, 1.0)
+				progress_val = clampf(coff / maxf(_finish_offset(), 1.0), 0.0, 1.0)
 
 		if NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR:
 			if spectator_camera and is_instance_valid(spectator_camera.focus_cart):
