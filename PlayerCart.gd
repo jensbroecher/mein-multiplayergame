@@ -1902,7 +1902,7 @@ func _physics_process(delta):
 			ai_stuck_position_timer = 0.0
 			var dist = global_position.distance_to(ai_last_stuck_position)
 			# While recovering, keep circling — don't warp out just for sitting near a pillar.
-			if dist < 2.5:
+			if dist < 2.5 and not _ai_crossing_hold:
 				print("AI Cart ", name, " detected stuck (distance traveled in 2.8s: ", dist, "m). Respawning.")
 				if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 					respawn_rpc.rpc(last_checkpoint_transform)
@@ -7162,7 +7162,7 @@ func _get_ai_input(delta: float) -> Vector2:
 	# ── AI Obstacle Stuck Detection & Recovery ──────────────────────────────────
 	# Detect when the bot is grinding against an obstacle (throttle on but barely moving)
 	var is_actively_reversing: bool = _ai_obstacle_reverse_timer > 0.0
-	var speed_stalling: bool = speed < 2.8 and input.y < -0.15 and not is_finished_race and can_move and not is_exploding
+	var speed_stalling: bool = speed < 2.8 and input.y < -0.15 and not is_finished_race and can_move and not is_exploding and not _ai_crossing_hold
 	var grinding_obstacle: bool = speed_stalling and (closest_prop_dist < 4.5 or _prop_directly_ahead)
 	
 	if is_actively_reversing:
@@ -7216,7 +7216,7 @@ func _get_ai_input(delta: float) -> Vector2:
 			_ai_obstacle_stuck_timer = maxf(_ai_obstacle_stuck_timer - delta * 2.0, 0.0)
 
 	# Speed stall fallback: if speed stays very low for a while (stuck on geometry the rays don't see)
-	if speed < 1.5 and input.y < -0.1 and can_move and not is_exploding and not is_finished_race and not is_actively_reversing:
+	if speed < 1.5 and input.y < -0.1 and can_move and not is_exploding and not is_finished_race and not is_actively_reversing and not _ai_crossing_hold:
 		_ai_speed_stall_timer += delta
 		if _ai_speed_stall_timer > 0.6 and _ai_unstuck_dir == 0.0:
 			_ai_unstuck_dir = signf(dir_flat.x) if absf(dir_flat.x) > 0.1 else (1.0 if randf() > 0.5 else -1.0)
@@ -7243,6 +7243,52 @@ func _get_ai_input(delta: float) -> Vector2:
 			_ai_unstuck_dir = 0.0
 			stuck_timer = 0.0
 
+	return _ai_rail_crossing_override(input, speed)
+
+
+## Freight Line's level crossings (group "rail_crossings", RailCrossing.gd): a bot that would reach one while a
+## train is on it stops short of it and waits, instead of driving into the train. Bots don't try the gaps
+## or the jumps. While it waits, the stuck checks leave it alone (`_ai_crossing_hold`).
+const AI_CROSSING_LOOK := 140.0
+const AI_CROSSING_BRAKE := 11.0
+var _ai_crossing_hold := false
+
+func _ai_rail_crossing_override(input: Vector2, speed: float) -> Vector2:
+	_ai_crossing_hold = false
+	var crossings := get_tree().get_nodes_in_group("rail_crossings")
+	if crossings.is_empty() or is_finished_race:
+		return input
+	var fwd: Vector3 = -visuals.global_transform.basis.z
+	fwd.y = 0.0
+	fwd = fwd.normalized()
+	for c in crossings:
+		var cn: Node3D = c as Node3D
+		var to: Vector3 = cn.global_position - global_position
+		to.y = 0.0
+		var ahead: float = to.dot(fwd)
+		if ahead < -2.0 or ahead > AI_CROSSING_LOOK:
+			continue
+		# Only a crossing on the way: roughly along the cart's heading and the road's.
+		var road_fwd: Vector3 = -cn.global_transform.basis.z
+		if absf(to.dot(fwd.cross(Vector3.UP))) > 30.0 or fwd.dot(road_fwd) < 0.5:
+			continue
+		var eta: float = maxf(ahead, 0.0) / maxf(speed, 6.0)
+		if not cn.is_closed_for(eta + 0.5, 1.6):
+			continue
+		_ai_crossing_hold = true
+		var room: float = ahead - float(cn.get("ai_stop_short")) - 3.0
+		if room <= 0.5:
+			# At the line: hold still (a brake at a standstill would reverse).
+			input.y = 0.6 if speed > 1.0 else 0.0
+			input.x *= 0.3
+			return input
+		var allowed: float = sqrt(2.0 * AI_CROSSING_BRAKE * room)
+		if speed > allowed:
+			input.y = clampf((speed - allowed) / 3.0, 0.45, 1.0)
+		elif input.y < 0.0:
+			# Still room: roll up to the line gently rather than flat out.
+			input.y = maxf(input.y, -0.35)
+		return input
 	return input
 
 

@@ -466,7 +466,7 @@ func load_playlist_for_level(scene_path: String):
 		level_key = "mountain"
 	elif path_lower.contains("msitu") or path_lower.contains("jungle"):
 		level_key = "forest"
-	elif path_lower.contains("canyon"):
+	elif path_lower.contains("canyon") or path_lower.contains("freight"):
 		level_key = "canyon"
 	elif path_lower.contains("city") or path_lower.contains("harbor"):
 		level_key = "city"

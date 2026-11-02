@@ -23,6 +23,7 @@ const COL_HARBOR := Color(0.18, 0.55, 0.78)
 const COL_MOUNTAIN := Color(0.92, 0.68, 0.32)
 const COL_CANYON := Color(0.92, 0.42, 0.22)
 const COL_CHASM := Color(0.72, 0.28, 0.22)
+const COL_FREIGHT := Color(0.86, 0.62, 0.20)
 const COL_WADI := Color(0.9, 0.74, 0.38)
 const COL_SNOW := Color(0.45, 0.82, 0.98)
 const COL_BEACH := Color(0.96, 0.78, 0.40)
@@ -42,6 +43,7 @@ const STAGE_INFO := {
 	"res://levels/MountainLevel.tscn": {"title": "MOUNTAIN COURSE", "subtitle": "Dunes and high desert ridges", "file": "tile_mountain.jpg", "color": COL_MOUNTAIN},
 	"res://levels/CanyonLevel.tscn": {"title": "ARCO DEL VIENTO", "subtitle": "A truss bridge, a shelf road up the canyon wall, a knife-edge ridge, a slot canyon and a ford", "file": "tile_canyon.jpg", "color": COL_CANYON},
 	"res://levels/CanyonChasmLevel.tscn": {"title": "TOLVANERA GULCH", "subtitle": "A narrow run over the drop, where a dust devil roams", "file": "tile_canyon_chasm.jpg", "color": COL_CHASM},
+	"res://levels/FreightLevel.tscn": {"title": "FREIGHT LINE", "subtitle": "Two railways cross the lap: wait for the gap, jump the flatcars, or lose the race to a train", "file": "tile_freight_line.jpg", "color": COL_FREIGHT},
 	"res://levels/DesertWadiLevel.tscn": {"title": "DESERT WADI", "subtitle": "Dry riverbed sand and heat", "file": "tile_desert_wadi.jpg", "color": COL_WADI},
 	"res://levels/MaraCrossingLevel.tscn": {"title": "MARA CROSSING", "subtitle": "Murram road across the savanna: the migration, Pride Rock, and the croc jump", "file": "tile_mara_crossing.jpg", "color": COL_SAVANNA},
 	"res://levels/NyotaStadiumLevel.tscn": {"title": "NYOTA STADIUM", "subtitle": "Stadium supercross: doubles, whoops and a triple, a lap of the streets, and the Drop-In", "file": "tile_nyota_stadium.jpg", "color": COL_SAVANNA},
@@ -303,7 +305,7 @@ func show_sub_menu(menu_name: String) -> void:
 			_add_tile("AL-RAIHANA GP", "Mountain Pass  •  Desert Wadi", "tile_al_raihana_gp.jpg", COL_BRONZE, func():
 				_on_cup_selected("Al-Raihana GP")
 			)
-			_add_tile("SIERRA DEL VIENTO GP", "Arco del Viento  •  Tolvanera Gulch", "tile_sierra_del_viento_gp.jpg", COL_CANYON, func():
+			_add_tile("SIERRA DEL VIENTO GP", "Arco del Viento  •  Tolvanera Gulch  •  Freight Line", "tile_sierra_del_viento_gp.jpg", COL_CANYON, func():
 				_on_cup_selected("Sierra del Viento GP")
 			)
 			_add_tile("MATUMAINI GP", "Mara Crossing  •  Nyota Stadium  •  Msitu Falls", "tile_matumaini_gp.jpg", COL_SAVANNA, func():

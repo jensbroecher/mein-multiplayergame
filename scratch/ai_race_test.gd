@@ -3,12 +3,14 @@ extends Node
 # Races 6 AI carts around a level headless and reports lap times, respawns (with where they
 # happened) and how far each cart got. cars= picks each bot's car (CAR_PRESETS indices).
 #   Godot --headless --path . res://scratch/ai_race_test.tscn -- res://levels/X.tscn [seconds=300] [speed=4]
-#       [weather=0..1] [cars=5,5,0,1,2,3]
+#       [weather=0..1] [cars=5,5,0,1,2,3] [noitems=1] [hide=<node name>]
+# noitems=1 frees every item box (to tell what an item box does to a lap from what the course does).
 
 var seconds := 300.0
 var speed := 4.0
 var weather := -1.0
 var cars: PackedStringArray = []
+var no_items := false
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
@@ -22,6 +24,8 @@ func _ready() -> void:
 			weather = float(a.substr(8))
 		elif a.begins_with("cars="):
 			cars = a.substr(5).split(",")
+		elif a == "noitems=1":
+			no_items = true
 	AudioServer.set_bus_mute(0, true)
 	NetworkManager.current_game_mode = NetworkManager.GameMode.SPECTATOR
 	NetworkManager.start_spectator()
@@ -32,6 +36,12 @@ func _ready() -> void:
 	for wname in ["NorthlightWeather", "JungleRain"]:
 		if weather >= 0.0 and level.get_node_or_null(wname):
 			level.get_node(wname).force_intensity = weather
+	if no_items:
+		for i in 10:
+			await get_tree().physics_frame
+		for n in level.find_children("*ItemBox*", "Node3D", true, false):
+			if n.get_parent() == level or n.get_parent().name == "ItemBoxes":
+				n.queue_free()
 	Engine.time_scale = speed
 	var track: Path3D = level.track_path
 	var length: float = track.curve.get_baked_length()

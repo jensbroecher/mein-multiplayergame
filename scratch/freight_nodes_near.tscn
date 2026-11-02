@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scratch/freight_nodes_near.gd" id="1"]
+
+[node name="FreightNodesNear" type="Node"]
+script = ExtResource("1")

@@ -31,6 +31,7 @@ const LEVELS := {
 	"CanyonChasmLevel": {"road": DIRT, "ground": GRAVEL, "nodes": [["road_sides", GRAVEL]],
 		"dust": {GRAVEL: Color(0.80, 0.56, 0.42, 0.6)}},
 	"CanyonLevel": {"road": ASPHALT, "ground": GRAVEL},
+	"FreightLevel": {"road": ASPHALT, "ground": GRAVEL, "dust": {GRAVEL: Color(0.84, 0.72, 0.54, 0.6)}},
 	"MaraCrossingLevel": {"road": DIRT, "ground": GRASS, "nodes": [["granite", ROCK]],
 		"dust": {DIRT: Color(0.82, 0.46, 0.29, 0.75), GRASS: Color(0.80, 0.68, 0.48, 0.45)}},
 	"NyotaStadiumLevel": {"road": ASPHALT, "ground": DIRT, "nodes": [["stadiumtrack", DIRT], ["arenainfield", DIRT], ["streetpaving", ASPHALT]],
