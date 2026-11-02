@@ -33,10 +33,23 @@ extends Node3D
 @export var albedo_texture: Texture2D
 @export var copies: int = 1
 @export var spread: Vector3 = Vector3(12.0, 3.0, 12.0)
+## Calls the flock gives (each a clip of its own length), played in random order with `call_gap` seconds
+## (min, max) between them, from the flock's middle. `call_db` is each clip's gain (by index): the clips
+## differ in loudness, so the level brings each to the same one. `call_unit_size` is how far off they
+## sound at that gain (inverse distance beyond it).
+@export var calls: Array[AudioStream] = []
+@export var call_db: PackedFloat32Array = PackedFloat32Array()
+@export var call_gap: Vector2 = Vector2(3.0, 12.0)
+@export var call_unit_size: float = 30.0
+@export var call_max_distance: float = 320.0
 
 var _angle: float = 0.0
 var _pivot: Node3D
 var _time: float = 0.0
+var _call_player: AudioStreamPlayer3D
+var _call_bag: Array[int] = []
+var _call_last := -1
+var _call_wait := 0.0
 
 
 func _ready() -> void:
@@ -81,6 +94,33 @@ func _ready() -> void:
 	_angle = randf() * TAU
 	_time = randf() * 100.0
 	_place(0.0)
+	if not calls.is_empty():
+		_call_player = AudioStreamPlayer3D.new()
+		_call_player.name = "Calls"
+		_call_player.bus = &"SFX"
+		_call_player.unit_size = call_unit_size
+		_call_player.max_distance = call_max_distance
+		# Gulls are shrill: the default 5kHz cut-off muffled them to a murmur at a distance.
+		_call_player.attenuation_filter_cutoff_hz = 12000.0
+		_call_player.finished.connect(_on_call_finished)
+		_pivot.add_child(_call_player, false, Node.INTERNAL_MODE_BACK)
+		_call_wait = randf_range(0.5, call_gap.y)
+
+
+## The next clip: a shuffled bag of all of them, never the one just played twice in a row.
+func _next_call() -> int:
+	if _call_bag.is_empty():
+		for i in calls.size():
+			_call_bag.append(i)
+		_call_bag.shuffle()
+		if _call_bag.size() > 1 and _call_bag[-1] == _call_last:
+			_call_bag.reverse()
+	_call_last = _call_bag.pop_back()
+	return _call_last
+
+
+func _on_call_finished() -> void:
+	_call_wait = randf_range(call_gap.x, call_gap.y)
 
 
 func _texture(mi: MeshInstance3D) -> void:
@@ -97,6 +137,16 @@ func _texture(mi: MeshInstance3D) -> void:
 
 func _process(delta: float) -> void:
 	_place(delta)
+	if _call_player != null and not _call_player.playing:
+		_call_wait -= delta
+		if _call_wait <= 0.0:
+			var i := _next_call()
+			_call_player.stream = calls[i]
+			_call_player.volume_db = call_db[i] if i < call_db.size() else 0.0
+			# No louder overhead than at `call_unit_size`.
+			_call_player.max_db = _call_player.volume_db
+			_call_wait = INF
+			_call_player.play()
 
 
 func _place(delta: float) -> void:

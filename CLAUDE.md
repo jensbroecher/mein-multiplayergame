@@ -1649,6 +1649,24 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
     (`_palm_crown_off_road` keeps a crown 5.5m off the road's edge).
 - `res://scratch/bloombay_shots.tscn -- <dir> name:x,y,z:tx,ty,tz[:frames[:gap]]` renders into the window
   (not a SubViewport) and can save a time sequence to watch the surf.
+- Boats (`_build_boats`, `BOATS`): the yacht at anchor about 110m off the waterline (`super_yacht02.glb`), the low-poly
+  cruise ship and two low-poly sailboats (`models/lowpoly/`, bows along +z) are `SeaBoat.gd` nodes: each sails a loop
+  (two straights along the node's z, half-circle turns) at its speed, placed from the wall clock like the monorail (LAN
+  peers agree), bobbing and rolling, the sailboats heeling away from the wind, an AnimatableBody3D box round each hull.
+  `draft` is the waterline over the model's y 0. The generator errors if the sea bed comes within `BOAT_KEEL_CLEAR` of a
+  keel anywhere on a loop. The old boxy sailboats are gone.
+- The raft (`_build_raft`, `RAFT_*`, Quaternius's inflatable) lies on the sand by the south lifeguard tower, tilted with
+  the beach, with a box collider: north of there the lap runs only 15-20m off the waterline
+  (`res://scratch/beach_lap_profile.gd`, `-s`, headless, prints the waterline and the lap's x along the beach).
+- Seashells (`_build_seashells`, `SHELL_PATCHES`): the model holds a scallop and a conch as two surfaces, split into two
+  meshes (`_shell_meshes`; the conch stands on its point in the file and is laid on its side; the file has no normals),
+  scattered in eight patches 3-12m up from the waterline, about 60 in all, MultiMeshes per patch drawn to `SHELL_RANGE`.
+  Not solid (under DressingColliders' `MIN_HEIGHT`).
+- The gull flocks call (`BirdFlock.gd`'s `calls`: `sounds/beach/Seagulls_*.wav` in a shuffled order, a pause of
+  `call_gap` between them, from the flock's middle). Each clip's gain brings its measured RMS (`GULL_CALL_RMS`) to
+  `GULL_CALL_LEVEL` at `GULL_CALL_UNIT` metres, capped there when nearer (`max_db`). The clips aren't in
+  StageAmbience's `CLIP_DB`, so the beach ambience doesn't play them. `res://scratch/sea_life_check.tscn -- [seconds=40]`
+  (headless) prints each boat's speed and heading and the calls each flock played.
 - Regenerating takes about 30s on the M1. It took 2 minutes while TerrainGenerator's `_sample_cached_height` built
   a new world curve on every call before the terrain existed (each then baked on its first query, and with
   `road_height_from_plan` rebuilt its plan table along the whole lap): the camps' planning samples thousands of

@@ -1534,6 +1534,8 @@ func _build_seafront(level: Node3D, tg: Node3D, curve: Curve3D) -> void:
 	_build_sand_fence(root)
 	_build_umbrellas(root)
 	_build_boats(root)
+	_build_raft(root)
+	_build_seashells(root)
 	_verify_seafront_clear()
 
 
@@ -1561,6 +1563,14 @@ const GULL_FLOCKS := [
 	[-1.0, 150.0, 80.0, 10.0, true, 5],
 	[120.0, -120.0, 100.0, 9.5, false, 4],
 ]
+# Their calls (25s recordings, played in random order by each flock) with each clip's RMS in dBFS,
+# measured: each is brought to GULL_CALL_LEVEL at GULL_CALL_UNIT metres (no louder nearer), a few dB over
+# the engine at 80m. The loudest peak then just reaches full scale overhead.
+const GULL_CALLS := ["res://sounds/beach/Seagulls_1.wav", "res://sounds/beach/Seagulls_2.wav",
+		"res://sounds/beach/Seagulls_3.wav", "res://sounds/beach/Seagulls_4.wav"]
+const GULL_CALL_RMS := [-30.7, -28.9, -37.5, -39.5]
+const GULL_CALL_LEVEL := -23.0
+const GULL_CALL_UNIT := 30.0
 
 
 func _build_gull_flocks(level: Node3D) -> void:
@@ -1595,6 +1605,14 @@ func _build_gull_flocks(level: Node3D) -> void:
 		flock.set("speed", f[3])
 		flock.set("clockwise", f[4])
 		flock.set("flap_speed", 0.8)
+		var calls: Array[AudioStream] = []
+		var gains := PackedFloat32Array()
+		for c in GULL_CALLS.size():
+			calls.append(load(GULL_CALLS[c]))
+			gains.append(GULL_CALL_LEVEL - float(GULL_CALL_RMS[c]))
+		flock.set("calls", calls)
+		flock.set("call_db", gains)
+		flock.set("call_unit_size", GULL_CALL_UNIT)
 		flock.position = Vector3(x, maxf(top, 0.0) + GULL_CLEARANCE, f[1])
 		root.add_child(flock)
 
@@ -5324,42 +5342,222 @@ func _build_sand_fence(root: Node3D) -> void:
 	_commit(root, kit, "SandFence")
 
 
-## A yacht at anchor beyond the bar and two sailing boats far out.
+# --- Boats, the raft and the shells -------------------------------------------------------------
+# The yacht at anchor off the beach and boats sailing loops out at sea (SeaBoat.gd: placed from the wall
+# clock, so peers agree; they bob, and a box rides round each hull). The low-poly models' bows point
+# along +z. [name, model, scale, draft (the waterline over the model's y 0, metres), the loop's middle,
+# its straights' bearing (degrees), straight length, turn radius, speed (m/s), phase (metres along the
+# loop), heel (degrees), swing at anchor (degrees), box top over the water]
+const YACHT_MODEL := "res://models/boats/super_yacht02.glb"
+const SAILBOAT_MODEL := "res://models/lowpoly/Sailboat by Poly by Google - 7AOnch2wREC.glb"
+const CRUISE_MODEL := "res://models/lowpoly/Cruise ship by Poly by Google - dgLCxDWhnZQ.glb"
+const BOATS := [
+	# About 110m off the waterline, broadside to the beach: 300m out it was hard to make out.
+	["AnchoredYacht", YACHT_MODEL, 0.08, -0.25, Vector2(-175.0, -60.0), -70.0, 0.0, 0.0, 0.0, 0.0, 0.0, 6.0, 4.0],
+	# Up and down the coast, its near leg 320m off the beach.
+	["CruiseShip", CRUISE_MODEL, 2.0, 1.0, Vector2(-520.0, 0.0), 0.0, 1400.0, 140.0, 7.0, 0.0, 0.0, 0.0, 9.0],
+	["Sailboat0", SAILBOAT_MODEL, 0.5, 3.63, Vector2(-260.0, 200.0), 0.0, 300.0, 45.0, 4.0, 0.0, 7.0, 0.0, 2.5],
+	["Sailboat1", SAILBOAT_MODEL, 0.5, 3.63, Vector2(-950.0, -300.0), 30.0, 400.0, 60.0, 4.5, 500.0, 7.0, 0.0, 2.5],
+]
+## Water a hull keeps under its keel along its loop.
+const BOAT_KEEL_CLEAR := 1.5
+
+
 func _build_boats(root: Node3D) -> void:
-	var yacht: Node3D = load("res://models/boats/super_yacht02.glb").instantiate()
-	yacht.name = "AnchoredYacht"
-	root.add_child(yacht)
-	yacht.transform = Transform3D(Basis(Vector3.UP, deg_to_rad(-70.0)).scaled(Vector3.ONE * 0.08), Vector3(-360.0, 0.25, -60.0))
-	# Its box, from the model's own bounds.
-	var bounds := AABB()
+	var script: Script = load("res://SeaBoat.gd")
+	for b in BOATS:
+		var scene: PackedScene = load(b[1])
+		var boat := Node3D.new()
+		boat.set_script(script)
+		boat.name = b[0]
+		var c: Vector2 = b[4]
+		boat.transform = Transform3D(Basis(Vector3.UP, deg_to_rad(b[5])), Vector3(c.x, 0.0, c.y))
+		boat.set("model", scene)
+		boat.set("model_scale", b[2])
+		boat.set("draft", b[3])
+		boat.set("length", b[6])
+		boat.set("turn_radius", b[7])
+		boat.set("speed", b[8])
+		boat.set("phase", b[9])
+		boat.set("heel_deg", b[10])
+		boat.set("swing_deg", b[11])
+		boat.set("body_top", b[12])
+		root.add_child(boat)
+		# Along the loop (or round the anchorage), the sea bed stays clear of the keel.
+		var keel: float = float(b[3]) - _model_bounds(scene).position.y * float(b[2])
+		var span: float = 2.0 * float(b[6]) + TAU * float(b[7])
+		var shallowest := INF
+		var at := Vector3.ZERO
+		var s := 0.0
+		while s <= span:
+			var p: Vector3 = boat.transform * ((boat.call("_on_loop", s) as Array)[0] as Vector3) if span > 0.0 else boat.position
+			var depth := -_coast_height(p.x, p.z)
+			if depth < shallowest:
+				shallowest = depth
+				at = p
+			s += 10.0
+		if shallowest < keel + BOAT_KEEL_CLEAR:
+			push_error("Boats: %s's keel (%.1fm) has only %.1fm of water at (%.0f, %.0f)" % [b[0], keel, shallowest, at.x, at.z])
+		print("Boats: %s, keel %.1fm, the shallowest water on its course %.1fm" % [b[0], keel, shallowest])
+
+
+## A model's bounds in its own frame (it need not be in the tree).
+func _model_bounds(scene: PackedScene) -> AABB:
+	var m := scene.instantiate() as Node3D
+	var box := AABB()
 	var first := true
-	for m in yacht.find_children("*", "MeshInstance3D", true, false):
-		var mi := m as MeshInstance3D
-		var local := yacht.global_transform.affine_inverse() * mi.global_transform * mi.get_aabb()
-		bounds = local if first else bounds.merge(local)
+	for mi in m.find_children("*", "MeshInstance3D", true, false):
+		var b: AABB = _to_model(m, mi as Node3D) * (mi as MeshInstance3D).get_aabb()
+		box = b if first else box.merge(b)
 		first = false
-	if not first:
-		var hull := BoxShape3D.new()
-		hull.size = bounds.size * 0.08
-		_collider(root, "AnchoredYacht", hull, Transform3D(yacht.global_transform.basis.orthonormalized(), yacht.global_transform * bounds.get_center()))
-	for b in range(2):
-		var kit := {}
-		var at: Vector3 = [Vector3(-620.0, 0.0, 180.0), Vector3(-900.0, 0.0, -320.0)][b]
-		var yaw: float = [0.5, -0.9][b]
-		var bs := Basis(Vector3.UP, yaw)
-		_box(kit, "paint", Transform3D(bs, at + Vector3(0, 0.3, 0)), Vector3(2.4, 1.2, 9.0), WHITE)
-		_box(kit, "paint", Transform3D(bs, at + Vector3(0, 0.95, -0.5)), Vector3(1.8, 0.4, 3.0), Color(0.75, 0.75, 0.72))
-		_tube(kit, "metal", at + Vector3(0, 0.9, 0), at + Vector3(0, 12.0, 0), 0.08, 0.06, 5, Color(0.8, 0.8, 0.8))
-		var st := _st(kit, "canvas")
-		var fwd := bs * Vector3(0, 0, 1)
-		var sail_n := bs * Vector3.RIGHT
-		_tri(st, at + Vector3(0, 1.4, 0), at + Vector3(0, 11.8, 0), at + Vector3(0, 1.4, 0) - fwd * 4.5, sail_n, sail_n, sail_n, Color(0.97, 0.96, 0.92), sail_n)
-		_tri(st, at + Vector3(0, 1.6, 0) + fwd * 0.3, at + Vector3(0, 10.5, 0), at + Vector3(0, 1.4, 0) + fwd * 4.2, sail_n, sail_n, sail_n, [Color(0.85, 0.3, 0.25), Color(0.25, 0.5, 0.8)][b], sail_n)
-		_commit(root, kit, "Sailboat%d" % b)
-		var sail_hull := BoxShape3D.new()
-		sail_hull.size = Vector3(2.4, 1.6, 9.0)
-		_collider(root, "Sailboat%d" % b, sail_hull, Transform3D(bs, at + Vector3(0, 0.4, 0)))
-		_rod_collider(root, "Sailboat%d" % b, at + Vector3(0, 0.9, 0), at + Vector3(0, 12.0, 0), 0.1)
+	m.free()
+	return box
+
+
+func _to_model(root: Node3D, n: Node3D) -> Transform3D:
+	var t := Transform3D.IDENTITY
+	var c: Node = n
+	while c != root and c != null:
+		if c is Node3D:
+			t = (c as Node3D).transform * t
+		c = c.get_parent()
+	return t
+
+
+# One inflatable raft pulled up on the sand by the south lifeguard tower, bow to the sea: the beach is
+# widest there (the lap turns inland); further north it runs 15-20m off the waterline.
+const RAFT_MODEL := "res://models/lowpoly/Raft by Quaternius - Hgf0R8s4Uo.glb"
+const RAFT_AT := Vector2(-47.0, 272.0)
+const RAFT_YAW := 80.0
+const RAFT_SCALE := 0.25     # 6m long, 3m across: an RC car's view of a rafting raft, at PROP_SCALE
+
+
+func _build_raft(root: Node3D) -> void:
+	var scene: PackedScene = load(RAFT_MODEL)
+	var box := _model_bounds(scene)
+	var bs := Basis(Vector3.UP, deg_to_rad(RAFT_YAW))
+	var hl := box.size.z * RAFT_SCALE * 0.5
+	var hw := box.size.x * RAFT_SCALE * 0.5
+	var c := Vector3(RAFT_AT.x, 0.0, RAFT_AT.y)
+	var along := bs * Vector3.BACK
+	var across := bs * Vector3.RIGHT
+	var gy := func(p: Vector3) -> float: return _ground(p.x, p.z)
+	var yf: float = gy.call(c + along * hl)
+	var yb: float = gy.call(c - along * hl)
+	var yr: float = gy.call(c + across * hw)
+	var yl: float = gy.call(c - across * hw)
+	# Lying with the sand's slope under it.
+	var fwd := (along * 2.0 * hl + Vector3.UP * (yf - yb)).normalized()
+	var right := (across * 2.0 * hw + Vector3.UP * (yr - yl)).normalized()
+	var up := fwd.cross(right).normalized()
+	right = up.cross(fwd).normalized()
+	var basis := Basis(right, up, fwd)
+	var floor_y := (yf + yb + yr + yl) * 0.25 - 0.06
+	var raft := scene.instantiate() as Node3D
+	raft.name = "BeachRaft"
+	raft.transform = Transform3D(basis.scaled_local(Vector3.ONE * RAFT_SCALE), c + Vector3(0.0, floor_y, 0.0) - basis * (Vector3(box.get_center().x, box.position.y, box.get_center().z) * RAFT_SCALE))
+	root.add_child(raft)
+	var shape := BoxShape3D.new()
+	shape.size = box.size * RAFT_SCALE
+	_collider(root, "BeachRaft", shape, Transform3D(basis, c + Vector3(0.0, floor_y, 0.0) + up * box.size.y * RAFT_SCALE * 0.5))
+	_note("Raft", RAFT_AT, hl, CLEAR_DECOR, box.size.y * RAFT_SCALE)
+
+
+# Seashells (the file holds two: a scallop and an oyster, one surface each) in a few patches along the
+# drift line, a few metres up the sand from the waterline: [z, shells]. Not solid (under
+# DressingColliders' MIN_HEIGHT).
+const SHELL_MODEL := "res://models/lowpoly/Seashell by Poly by Google - 5ovn4mnRejL.glb"
+const SHELL_PATCHES := [[-300.0, 7], [-205.0, 10], [-130.0, 6], [-25.0, 9], [55.0, 7], [165.0, 10], [255.0, 8], [325.0, 6]]
+const SHELL_PATCH_LEN := 16.0     # each patch runs this far either way along the beach
+const SHELL_UP_BEACH := Vector2(3.0, 12.0)   # metres inland of the waterline
+const SHELL_SIZE := [Vector2(0.5, 0.7), Vector2(0.4, 0.55)]   # longest side, metres: scallop, conch
+const SHELL_RANGE := 140.0
+
+
+func _build_seashells(root: Node3D) -> void:
+	var meshes := _shell_meshes()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5150
+	var shore := load("res://TerrainGenerator.gd")
+	var placed := 0
+	for pk in SHELL_PATCHES.size():
+		var patch: Array = SHELL_PATCHES[pk]
+		var groups: Array = [[], []]
+		var tries := 0
+		var n := 0
+		while n < int(patch[1]) and tries < int(patch[1]) * 30:
+			tries += 1
+			var z: float = float(patch[0]) + rng.randf_range(-SHELL_PATCH_LEN, SHELL_PATCH_LEN)
+			var x: float = float(shore.bloombay_shore_x(z)) + rng.randf_range(SHELL_UP_BEACH.x, SHELL_UP_BEACH.y)
+			var c := Vector2(x, z)
+			var y := _ground(x, z)
+			if y < 0.15 or _road_distance(c) - TRACK_HALF < 1.5:
+				continue
+			var clear := true
+			for f in _footprints:
+				if c.distance_to(f[1]) < float(f[2]) + 0.6:
+					clear = false
+					break
+			if not clear:
+				continue
+			var kind := rng.randi() % 2
+			var m: Dictionary = meshes[kind]
+			var size: Vector2 = SHELL_SIZE[kind]
+			var k: float = rng.randf_range(size.x, size.y) / float(m["across"])
+			var b := Basis(Vector3.UP, rng.randf() * TAU) * Basis(Vector3.RIGHT, rng.randf_range(-0.15, 0.15)) * Basis(Vector3.BACK, rng.randf_range(-0.15, 0.15))
+			groups[kind].append(Transform3D(b.scaled_local(Vector3.ONE * k), Vector3(x, y - 0.02, z)))
+			n += 1
+		for kind in 2:
+			if groups[kind].is_empty():
+				continue
+			var mmi := _multimesh(meshes[kind]["mesh"], groups[kind], "Seashells_%d_%d" % [pk, kind])
+			_limit_view(mmi, SHELL_RANGE, false)
+			root.add_child(mmi)
+		placed += n
+	print("Seashells: %d in %d patches" % [placed, SHELL_PATCHES.size()])
+
+
+## The two shells as meshes of their own, each lying on the sand (the conch stands on its point in the
+## file: it is laid on its side) and centred over its foot at the origin: [{mesh, across (longest side)}].
+func _shell_meshes() -> Array:
+	var src := (load(SHELL_MODEL) as PackedScene).instantiate() as Node3D
+	var mi := src.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D
+	var out := []
+	for i in mi.mesh.get_surface_count():
+		var xf := _to_model(src, mi)
+		var arrays := mi.mesh.surface_get_arrays(i)
+		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var lo := Vector3.INF
+		var hi := -Vector3.INF
+		for v in verts.size():
+			var p := xf * verts[v]
+			lo = lo.min(p)
+			hi = hi.max(p)
+		if hi.y - lo.y > maxf(hi.x - lo.x, hi.z - lo.z):
+			xf = Transform3D(Basis(Vector3.RIGHT, PI * 0.5), Vector3.ZERO) * xf
+			lo = Vector3.INF
+			hi = -Vector3.INF
+			for v in verts.size():
+				var p := xf * verts[v]
+				lo = lo.min(p)
+				hi = hi.max(p)
+		for v in verts.size():
+			verts[v] = xf * verts[v]
+		var foot := Vector3((lo.x + hi.x) * 0.5, lo.y, (lo.z + hi.z) * 0.5)
+		for v in verts.size():
+			verts[v] -= foot
+		arrays[Mesh.ARRAY_VERTEX] = verts
+		# The file has no normals (and they would need turning with the conch).
+		arrays[Mesh.ARRAY_NORMAL] = null
+		arrays[Mesh.ARRAY_TANGENT] = null
+		var st := SurfaceTool.new()
+		st.create_from_arrays(arrays)
+		st.generate_normals()
+		st.set_material(mi.get_active_material(i))
+		var mesh := st.commit()
+		out.append({"mesh": _tg.call("_save_resource", mesh, "seashell_%d" % i), "across": (hi - lo)[(hi - lo).max_axis_index()]})
+	src.free()
+	return out
 
 
 # --- Palms ---------------------------------------------------------------------------------------
