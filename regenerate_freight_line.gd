@@ -168,6 +168,8 @@ var _road_d := PackedFloat32Array()
 var _vert_lat := PackedFloat32Array()
 var _vert_s := PackedFloat32Array()
 var _ground_mat: ShaderMaterial
+## The centre line (rails' top) of every stretch of track outside the hills, for RailRumble.gd.
+var _rumble_lines: Array[PackedVector3Array] = []
 var _rock_normal: Texture2D
 
 
@@ -1379,6 +1381,17 @@ func _build_railways(level_scene: Node3D) -> void:
 		if piece.size() > 1:
 			piece_no = _flush_track(root, ri, piece, bed, piece_no, faces, beyond.call(k_start - 1), null)
 		_bed_body(root, "RailBed_%s" % info["name"], faces)
+		var stretch := PackedVector3Array()
+		for k in range(n):
+			if outside[k]:
+				stretch.append(pts[k])
+			elif stretch.size() > 1:
+				_rumble_lines.append(stretch)
+				stretch = PackedVector3Array()
+			else:
+				stretch = PackedVector3Array()
+		if stretch.size() > 1:
+			_rumble_lines.append(stretch)
 		# The trains.
 		for tr in info["trains"]:
 			var train := Node3D.new()
@@ -1474,7 +1487,8 @@ func _build_portals(level_scene: Node3D) -> void:
 		var fog: MeshInstance3D = _instance_mesh(root, "TunnelFog_%d" % count, _save_baked_resource(pk.commit(fk), "tunnel_fog") as ArrayMesh, xf)
 		fog.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		var plaque_y: float = (11.35 + float(pd["top"])) * 0.5
-		_label(root, PORTAL_NAMES[count % PORTAL_NAMES.size()], xf.origin + basis * Vector3(0.0, plaque_y, -0.6), Basis(basis * Basis(Vector3.UP, PI)), 0.017, Color(0.95, 0.9, 0.78), 56)
+		_label(root, PORTAL_NAMES[count % PORTAL_NAMES.size()], xf.origin + basis * Vector3(0.0, plaque_y, -0.6), Basis(basis * Basis(Vector3.UP, PI)), 0.017, Color(0.95, 0.9, 0.78), 56,
+				10.5)
 		# The track runs on into the lining.
 		var out_s: float = pd["out_s"]
 		var sgn: float = signf(Vector2(pd["into"]).dot((_rails[ri]["b"] - _rails[ri]["a"]).normalized()))
@@ -1539,6 +1553,10 @@ func _build_yard(level_scene: Node3D) -> void:
 		if piece.size() > 1:
 			_flush_spur_track(root, si, piece, bed, piece_no, faces, point_at.call(k_start - 1), null)
 		_bed_body(root, "RailBed_%s" % sp["name"], faces)
+		var centre := PackedVector3Array()
+		for k in range(samples.size()):
+			centre.append(Vector3(samples[k]["p"].x, top[k], samples[k]["p"].y))
+		_rumble_lines.append(centre)
 		# The buffer stop where the track ends.
 		var last: Dictionary = samples[samples.size() - 1]
 		var lp: Vector2 = last["p"]
@@ -1548,7 +1566,8 @@ func _build_yard(level_scene: Node3D) -> void:
 		var kit := {}
 		FreightKit.buffer_stop(pk, kit)
 		_instance_mesh(root, "BufferStop_%d" % si, _save_baked_resource(pk.commit(kit), "buffer_stop") as ArrayMesh, xf)
-		_label(root, "FIN DE VIA", xf.origin + xf.basis * Vector3(-2.3 * 1.5, 2.0 * 1.5, 0.78 * 1.5), Basis(xf.basis * Basis(Vector3.UP, PI)), 0.008, Color(0.1, 0.1, 0.1), 48)
+		_label(root, "FIN DE VIA", xf.origin + xf.basis * ((FreightKit.BUFFER_PLATE[0] as Vector3) * 1.5), Basis(xf.basis * Basis(Vector3.UP, PI)), 0.008,
+				Color(0.97, 0.95, 0.9), 48, float(FreightKit.BUFFER_PLATE[1]) * 1.5)
 	# The turnouts.
 	for t in _turnouts:
 		var through: Array = []
@@ -1771,11 +1790,12 @@ func _scaled_kit(sc: float) -> PropKit:
 	return pk
 
 
-func _label(parent: Node3D, text: String, at: Vector3, basis: Basis, pixel: float, col: Color, size := 64) -> void:
+## A label `pixel` metres a font pixel, shrunk to fit `max_w` metres (0: any width) when it would run past its board.
+func _label(parent: Node3D, text: String, at: Vector3, basis: Basis, pixel: float, col: Color, size := 64, max_w := 0.0) -> void:
 	var l := Label3D.new()
 	l.text = text
 	l.font_size = size
-	l.pixel_size = pixel
+	l.pixel_size = _fit_pixel(text, size, pixel, max_w)
 	l.modulate = col
 	l.outline_size = 8
 	l.outline_modulate = Color(0.05, 0.05, 0.05)
@@ -1836,6 +1856,18 @@ func _build_depot(level_scene: Node3D) -> void:
 	print("  depot built on a pad at %.1fm (station at x %.0f, z %.0f; cooperative at x %.0f, z %.0f)" % [h, STATION_X, z_p + STATION_BACK, FACTORY_X, origin.z])
 
 
+## The pixel size at which `text` at `font_size` (Label3D's default font, which ThemeDB measures headless too) is no
+## wider than `max_w` metres, at most `pixel`. Signs' letters ran past their boards.
+func _fit_pixel(text: String, font_size: int, pixel: float, max_w: float) -> float:
+	if max_w <= 0.0:
+		return pixel
+	var w: float = ThemeDB.fallback_font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	if w * pixel <= max_w:
+		return pixel
+	print("  sign '%s' shrunk to fit %.2fm (it was %.2fm)" % [text, max_w, w * pixel])
+	return max_w / maxf(w, 1.0)
+
+
 ## Letters for a yard building's signs: `labels` are [text, position, outward normal, cap height, colour] in the kit's
 ## own units, placed by the building's origin and PROP_SCALE.
 func _yard_labels(parent: Node3D, labels: Array, origin: Vector3) -> void:
@@ -1843,7 +1875,7 @@ func _yard_labels(parent: Node3D, labels: Array, origin: Vector3) -> void:
 		var lab := Label3D.new()
 		lab.text = l[0]
 		lab.font_size = 64
-		lab.pixel_size = float(l[3]) * PROP_SCALE / 44.8
+		lab.pixel_size = _fit_pixel(l[0], 64, float(l[3]) * PROP_SCALE / 44.8, float(l[5]) * PROP_SCALE if l.size() > 5 else 0.0)
 		lab.modulate = l[4]
 		lab.outline_size = 4
 		lab.outline_modulate = Color(0.05, 0.05, 0.05)
@@ -1984,7 +2016,7 @@ func _build_crossing_signs(level_scene: Node3D) -> void:
 			pos.y = _ground_at(pos.x, pos.z)
 			var basis := Basis(Vector3.UP, deg_to_rad(float(sp["yaw"])))
 			_instance_mesh(root, "RRSign%d_%d" % [ci, int(before)], mesh, Transform3D(basis, pos))
-			_label(root, "RR", pos + basis * Vector3(0.0, 3.8 * 1.4 - 0.15, 0.2), basis, 0.012, Color(0.05, 0.05, 0.05), 64)
+			_label(root, "RR", pos + basis * Vector3(0.0, 3.8 * 1.4 - 0.15, 0.2), basis, 0.012, Color(0.05, 0.05, 0.05), 64, 1.6)
 
 
 ## Cacti, sagebrush and boulders over the plain: dense near the road, thinning out to the hills.
@@ -2427,6 +2459,12 @@ func _ready() -> void:
 
 	_build_railways(level_scene)
 	_build_yard(level_scene)
+	# The clunk over the rails and the rattle along the sleepers (RailRumble.gd).
+	var rumble := Node3D.new()
+	rumble.name = "RailRumble"
+	rumble.set_script(load("res://RailRumble.gd"))
+	rumble.set("lines", _rumble_lines)
+	level_scene.add_child(rumble)
 	_build_portals(level_scene)
 	_build_depot(level_scene)
 	_build_poles(level_scene)

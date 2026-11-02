@@ -3,6 +3,10 @@ extends Node
 # Drives a real cart straight across Freight Line's track off the road, to check the beds' collision (RailBed_*: a hump
 # a cart's sphere rolls over): how high it hops, whether it sticks, how much speed it loses, what it stands on. Headless:
 #   Godot --headless --path . res://scratch/track_cross_test.tscn -- [run=x,z,yaw_deg,run_up ...] [trace=1]
+#       [hold=<train node>:<clock s>] [kills=1]
+# It also counts the jolts RailRumble.gd gives the chassis over the rails and sleepers, and whether the cart was blown up.
+# hold= holds a train at one clock reading (MainLineLocalTrain:120 stands it at the platform); kills=1 leaves the trains
+# deadly (they are made harmless otherwise, to test the track alone).
 # Each run drops the cart `run_up` metres back from (x, z) along its heading (yaw 0 = north, -z; 90 = west, -x) and
 # drives it at full throttle through (x, z) and 25m on. Without runs it tries the Main Line fast and slow and both
 # yard tracks by the station.
@@ -12,9 +16,16 @@ const CART_SCENE := preload("res://PlayerCart.tscn")
 func _ready() -> void:
 	var runs: Array = []
 	var trace := false
+	var holds := {}
+	var keep_kills := false
 	for a in OS.get_cmdline_user_args():
 		if a == "trace=1":
 			trace = true
+		if a == "kills=1":
+			keep_kills = true
+		if a.begins_with("hold="):
+			var hp := a.substr(5).split(":")
+			holds[hp[0]] = float(hp[1])
 		if a.begins_with("run="):
 			var c := a.substr(4).split(",")
 			runs.append([float(c[0]), float(c[1]), float(c[2]), float(c[3])])
@@ -26,8 +37,10 @@ func _ready() -> void:
 	var level: Node3D = load("res://levels/FreightLevel.tscn").instantiate()
 	add_child(level)
 	for ch in level.get_children():
-		if "kills" in ch:
+		if "kills" in ch and not keep_kills:
 			ch.kills = false
+		if holds.has(String(ch.name)):
+			ch.clock_override = holds[String(ch.name)]
 	for i in 40:
 		await get_tree().physics_frame
 	var space := level.get_world_3d().direct_space_state
@@ -55,6 +68,10 @@ func _ready() -> void:
 		var speed_in := 0.0
 		var speed_out := 0.0
 		var colliders := {}
+		var jolts := 0
+		var max_jolt := 0.0
+		var last_jolt := Vector4.ZERO
+		var blown := false
 		var t := 0.0
 		var travelled := 0.0
 		var last := cart.global_position
@@ -62,6 +79,13 @@ func _ready() -> void:
 			await get_tree().physics_frame
 			t += 1.0 / 60.0
 			var pos: Vector3 = cart.global_position
+			var jv: Vector4 = cart.get("_jolt")
+			if jv.y > last_jolt.y + 0.05:
+				jolts += 1
+			max_jolt = maxf(max_jolt, absf(jv.x))
+			last_jolt = jv
+			if cart.get("is_exploding"):
+				blown = true
 			travelled += Vector2(pos.x - last.x, pos.z - last.z).length()
 			last = pos
 			# Height over the ground under it (the terrain alone: the beds are what it rides).
@@ -91,8 +115,9 @@ func _ready() -> void:
 			else:
 				slow_time = 0.0
 		Input.action_release("p1_throttle")
-		print("RUN through (%.0f, %.0f) heading %.0f from %.0fm: in %.1f m/s, out %.1f m/s, height over what it stands on up to %.2fm, rising up to %.1f m/s, %s, on %s" % [
-			float(r[0]), float(r[1]), float(r[2]), float(r[3]), speed_in, speed_out, max_hop, max_vy, "STUCK" if stuck else "through", ", ".join(colliders.keys())])
+		print("RUN through (%.0f, %.0f) heading %.0f from %.0fm: in %.1f m/s, out %.1f m/s, height over what it stands on up to %.2fm, rising up to %.1f m/s, %s, on %s; %d jolts (body up to %.3f)%s" % [
+			float(r[0]), float(r[1]), float(r[2]), float(r[3]), speed_in, speed_out, max_hop, max_vy, "STUCK" if stuck else "through", ", ".join(colliders.keys()),
+			jolts, max_jolt, ", BLOWN UP" if blown else ""])
 		cart.queue_free()
 		for i in 5:
 			await get_tree().physics_frame

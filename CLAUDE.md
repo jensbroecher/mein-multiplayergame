@@ -2277,7 +2277,14 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
     smooths only the pop off small edges, so shorter, steeper ramps (the ballast's own shoulders) threw carts crossing a
     turnout a metre up, and a longer 17-degree one launched them like a kicker. `res://scratch/track_cross_test.tscn --
     [run=x,z,yaw,run_up ...] [trace=1]` (headless) drives a real cart across and prints the hop, the speed in and out and
-    what it stood on. The yard lead's embankment by T1 still throws a fast cart: that is the ground.
+    what it stood on, the chassis jolts and whether it was blown up (`hold=<train>:<clock>` holds a train, `kills=1`
+    leaves them deadly). The yard lead's embankment by T1 still throws a fast cart: that is the ground.
+  - The feel: `RailRumble.gd` (node `RailRumble`, fed every stretch of track's centre line by the generator,
+    `_rumble_lines`) gives a cart that crosses a rail on the ground (at a level crossing or off the road) a clunk
+    (`FreightKit.rail_clunk`) and a jolt, and one running along a track a knock (`sleeper_knock`) and a smaller jolt every
+    third sleeper. The jolt is `PlayerCart.jolt(lift, pitch)`: the body bounces over its wheels on a damped spring
+    (`JOLT_K`, `JOLT_DAMP`), looks only, for every cart a peer sees; real kicks were soaked up by `_dampen_ground_bounce` or
+    launched carts. On the bed the tyres also roll on gravel (the bodies' surface).
 - `TrainKit.gd` builds the rolling stock through a PropKit at SCALE 1.5 (`KINDS`: loco 19m, box 15, tank 14, flat 16,
   flat_load 16, hopper 16, caboose 10, ploco 20, coach 26, obs 26, in life-size metres): a hood-unit diesel (`loco:2` is
   the yellow yard switcher), boxcars and tank cars in four colourways, an open flatcar, the log car (`_flat_car` with
@@ -2300,6 +2307,11 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
   and may back up; its blocked intervals are stepped out once per point and kept, and it idles (diesel, no wheels) when
   standing. `clock_override` holds a train at one clock reading, with `kills` and `sounds` off: that is a train standing
   still (`_park_train`: the yard switcher with three hoppers under the loadout; set the head's distance along the track).
+  - A train standing still (`is_moving`: under `STAND_SPEED`, the local at the platform, parked stock) destroys nobody
+    and is solid: each car has a box body (`Car.body`, an AnimatableBody3D following its car, `sync_to_physics` off: on, it
+    stayed at the origin) on layer 1 only while it stands in view. Moving, it is not solid and destroys what it touches.
+  - Physics interpolation is on: a car coming back into view resets it (`reset_physics_interpolation`), or for one frame it
+    was drawn between where it left the path and where it came back, a ghost car flashing near the tunnels.
 - The local (`_build_local_train`, `LOCAL_*`, node `MainLineLocalTrain`): a diesel at each end (the rear one "~ploco") and two
   coaches. Its path is the Main Line from its west end to T1 and the yard lead on to the buffer stop; every 250s (two of the
   Main Line's turns) it comes out of the west tunnel, takes T1 round into the platform (in at 20-82s), stands at the station,
@@ -2358,8 +2370,11 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
     weatherboards, a ridge lantern, sliding doors on rails, its own canopy, drums and crates). The platform's top is
     0.5m over the rail top: the frame's origin is `STATION_BACK` (37.2m) south of the platform track and the edge
     `PLATFORM_EDGE` (2.6m) from its centre, 35cm from a coach's side.
-  - Labels are `[text, position, outward normal, cap height, colour]` in the kit's units; `_yard_labels` lays them out as
-    Label3Ds (`pixel_size` = cap x PROP_SCALE / 44.8 at font size 64, `double_sided` off).
+  - Labels are `[text, position, outward normal, cap height, colour, board width]` in the kit's units; `_yard_labels` lays
+    them out as Label3Ds (`pixel_size` = cap x PROP_SCALE / 44.8 at font size 64, `double_sided` off) and `_fit_pixel`
+    shrinks one that would run past its board (measured with ThemeDB's fallback font, Label3D's default, which works
+    headless; it prints what it shrank). The generator's own `_label` (the portals' plaques, FIN DE VIA on the buffer
+    stops' `BUFFER_PLATE`, the RR signs) takes a width too. Letters ran past their boards.
   - The cooperative (`factory`): two rows of four slip-formed concrete silos (a footing, eight pilasters, ring beams, a
     parapet and a hatch and vent on the deck, cage ladders), an enclosed sheet-metal gallery along their tops (it stands on
     the decks, with plugs over the star bins between the silos) into the head house (board-formed concrete with

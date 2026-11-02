@@ -1491,6 +1491,42 @@ func _soften_edge_pops(state: PhysicsDirectBodyState3D) -> void:
 		_step_climb_time = 0.0
 
 
+## A jolt through the chassis (Freight Line's rails and sleepers, RailRumble.gd): the body bounces over its wheels by
+## `lift` metres a second and pitches by `pitch` radians a second (nose up +), then settles on a damped spring. Looks
+## only: the physics body and the wheels don't move (a real kick is soaked up by _dampen_ground_bounce, or launches
+## the cart). Every peer jolts every cart it sees.
+const JOLT_K := 520.0
+const JOLT_DAMP := 24.0
+const JOLT_MAX := 0.15
+var _jolt := Vector4.ZERO   # height, its rate, pitch, its rate
+
+func jolt(lift: float, pitch := 0.0) -> void:
+	if is_exploding:
+		return
+	_jolt.y += lift
+	_jolt.w += pitch
+
+
+func _update_jolt(delta: float) -> void:
+	if _jolt == Vector4.ZERO:
+		return
+	var model := visuals.get_node_or_null("CartModel") as Node3D
+	if is_exploding or model == null:
+		_jolt = Vector4.ZERO
+		if model:
+			model.transform = original_cart_model_transform
+		return
+	var h: float = minf(delta, 0.05) * 0.5
+	for i in 2:
+		_jolt.y += (-JOLT_K * _jolt.x - JOLT_DAMP * _jolt.y) * h
+		_jolt.x = clampf(_jolt.x + _jolt.y * h, -JOLT_MAX, JOLT_MAX)
+		_jolt.w += (-JOLT_K * _jolt.z - JOLT_DAMP * _jolt.w) * h
+		_jolt.z = clampf(_jolt.z + _jolt.w * h, -JOLT_MAX, JOLT_MAX)
+	if absf(_jolt.x) < 0.0004 and absf(_jolt.y) < 0.004 and absf(_jolt.z) < 0.0004 and absf(_jolt.w) < 0.004:
+		_jolt = Vector4.ZERO
+	model.transform = Transform3D(Basis(Vector3.RIGHT, _jolt.z), Vector3(0.0, _jolt.x, 0.0)) * original_cart_model_transform
+
+
 func _dampen_ground_bounce(state: PhysicsDirectBodyState3D) -> void:
 	# Multiple sphere colliders on bumpy trimesh inject tiny upward pops.
 	# Kill those so the kart settles instead of buzzing in place.
@@ -1521,6 +1557,7 @@ func _dampen_ground_bounce(state: PhysicsDirectBodyState3D) -> void:
 
 func _process(delta):
 	_update_visual_states(delta)
+	_update_jolt(delta)
 	_update_antenna(delta)
 	
 	if slow_timer > 0.0:

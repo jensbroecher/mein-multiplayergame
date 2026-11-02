@@ -265,7 +265,7 @@ static func head_house(pk: PropKit, kit: Dictionary, labels: Array) -> void:
 	box_at(pk, kit, "paint", Vector3(0, 19.2, hz + 0.18), Basis(), Vector3(10.4, 2.1, 0.12), Color(0.10, 0.27, 0.19))
 	box_at(pk, kit, "paint", Vector3(0, 19.2, hz + 0.22), Basis(), Vector3(10.1, 1.8, 0.06), Color(0.82, 0.74, 0.50))
 	box_at(pk, kit, "paint", Vector3(0, 19.2, hz + 0.26), Basis(), Vector3(9.9, 1.6, 0.04), Color(0.10, 0.27, 0.19))
-	labels.append(["COOPERATIVA GRANERA", Vector3(0, 19.2, hz + 0.3), Vector3(0, 0, 1), 0.85, Color(0.95, 0.90, 0.72)])
+	labels.append(["COOPERATIVA GRANERA", Vector3(0, 19.2, hz + 0.3), Vector3(0, 0, 1), 0.85, Color(0.95, 0.90, 0.72), 9.3])
 	# The loading door at the foot of the front (for sacks): a roller door under a lintel.
 	sliding_door(pk, kit, Vector3(-3.5, pl, hz), Vector3(0, 0, 1), 3.2, 3.6, Color(0.5, 0.52, 0.5))
 	door(pk, kit, Vector3(3.2, pl, hz), Vector3(0, 0, 1), 1.6, 2.6, true)
@@ -494,7 +494,7 @@ static func warehouse(pk: PropKit, kit: Dictionary, x0: float, x1: float, z0: fl
 	door(pk, kit, Vector3(x1 - 12.0, 0.4, z0), Vector3(0, 0, -1), 1.6, 2.6, true)
 	# The sign on the east gable.
 	box_at(pk, kit, "paint", Vector3(x1 + 0.1, 5.4, zm), Basis(Vector3.UP, PI * 0.5), Vector3(6.4, 1.3, 0.1), Color(0.10, 0.27, 0.19))
-	labels.append(["ALMACEN", Vector3(x1 + 0.17, 5.4, zm), Vector3(1, 0, 0), 0.7, Color(0.95, 0.90, 0.72)])
+	labels.append(["ALMACEN", Vector3(x1 + 0.17, 5.4, zm), Vector3(1, 0, 0), 0.7, Color(0.95, 0.90, 0.72), 5.8])
 	# Pallets of sacks on the dock.
 	for k in range(5):
 		sack_stack(pk, kit, Vector3(x0 + 3.0 + 7.6 * float(k), DOCK_H, z1 + 1.6), 0.1 * float(k), 3 + (k % 3))
@@ -529,7 +529,7 @@ static func hut(pk: PropKit, kit: Dictionary, x0: float, x1: float, z0: float, z
 	window(pk, kit, Vector3(x1, 1.9, zm), Vector3(1, 0, 0), 1.0, 1.1, Color(0, 0, 0, 0))
 	pk.tube(kit, "steel", Vector3(x0 + 1.0, ridge - 1.2, z0 + 0.8), Vector3(x0 + 1.0, ridge + 1.0, z0 + 0.8), 0.13, 0.13, 8, STEELWORK, true)
 	box_at(pk, kit, "paint", Vector3((x0 + x1) * 0.5 + 0.4, wall_h - 0.32, z1 + 0.06), Basis(), Vector3(2.6, 0.42, 0.06), Color(0.10, 0.27, 0.19))
-	labels.append(["BASCULA", Vector3((x0 + x1) * 0.5 + 0.4, wall_h - 0.32, z1 + 0.1), Vector3(0, 0, 1), 0.26, Color(0.95, 0.90, 0.72)])
+	labels.append(["BASCULA", Vector3((x0 + x1) * 0.5 + 0.4, wall_h - 0.32, z1 + 0.1), Vector3(0, 0, 1), 0.26, Color(0.95, 0.90, 0.72), 2.3])
 
 
 ## The whole complex in its frame.

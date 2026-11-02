@@ -279,6 +279,52 @@ static func _pcm(samples: PackedFloat32Array, rate: int, loop: bool, gain := 0.8
 	return wav
 
 
+## Wheels over a rail (RailRumble.gd): a short heavy thump, a scrape of grit and the rail's steel ringing briefly.
+static func rail_clunk() -> AudioStreamWAV:
+	if _streams.has("rail_clunk"):
+		return _streams["rail_clunk"]
+	const RATE := 22050
+	var n: int = int(RATE * 0.32)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4711
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var lp := 0.0
+	for i in range(n):
+		var t: float = float(i) / RATE
+		var attack: float = minf(t * 1500.0, 1.0)
+		var thump: float = sin(TAU * (95.0 - 40.0 * minf(t * 20.0, 1.0)) * t) * exp(-t * 38.0)
+		lp += (rng.randf_range(-1.0, 1.0) - lp) * 0.35
+		var grit: float = lp * exp(-t * 60.0) * 0.6
+		var ring: float = (sin(TAU * 1730.0 * t) + 0.6 * sin(TAU * 2610.0 * t + 0.7) + 0.35 * sin(TAU * 3980.0 * t + 1.3)) * exp(-t * 22.0) * 0.22
+		out[i] = (thump + grit + ring) * attack
+	_streams["rail_clunk"] = _pcm(out, RATE, false, 0.9)
+	return _streams["rail_clunk"]
+
+
+## Wheels over a sleeper in the ballast (RailRumble.gd): a dull wooden knock and a rattle of stones.
+static func sleeper_knock() -> AudioStreamWAV:
+	if _streams.has("sleeper_knock"):
+		return _streams["sleeper_knock"]
+	const RATE := 22050
+	var n: int = int(RATE * 0.16)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 815
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var lp := 0.0
+	var lp2 := 0.0
+	for i in range(n):
+		var t: float = float(i) / RATE
+		var knock: float = (sin(TAU * 150.0 * t) + 0.5 * sin(TAU * 236.0 * t)) * exp(-t * 55.0)
+		lp += (rng.randf_range(-1.0, 1.0) - lp) * 0.5
+		lp2 += (lp - lp2) * 0.3
+		var stones: float = (lp - lp2) * exp(-t * 28.0) * 1.4
+		out[i] = (knock + stones) * minf(t * 1200.0, 1.0)
+	_streams["sleeper_knock"] = _pcm(out, RATE, false, 0.8)
+	return _streams["sleeper_knock"]
+
+
 ## A crossing's bell: two strokes of a bright, slightly out-of-tune bell, and the quiet before the next
 ## pair, as a seamless loop of 0.9s.
 static func bell() -> AudioStreamWAV:
@@ -1046,6 +1092,8 @@ static func _ballast_heap(pk: PropKit, kit: Dictionary, c: Vector3, rx: float, r
 		pk.box(kit, "matte", Transform3D(basis, p), Vector3(sz * 1.3, sz * 0.8, sz), Color(g, g * 0.97, g * 0.9))
 
 
+const BUFFER_PLATE := [Vector3(-2.3, 2.26, 0.78), 1.45]
+
 ## A buffer stop at the dead end of a track, life size, in a frame where the track runs along +z toward the stop
 ## (the arriving train comes from -z), x across, y up from the rail's top: a concrete slab and anchor block under
 ## a red-and-white striped buffer beam on two steel uprights, two buffer heads, two hydraulic cylinders back to the
@@ -1094,6 +1142,7 @@ static func buffer_stop(pk: PropKit, kit: Dictionary) -> void:
 	pk.tube(kit, "steel", Vector3(2.2, -0.25, 0.9), Vector3(2.2, 2.7, 0.9), 0.06, 0.06, 8, steel)
 	pk.block(kit, "steel", Vector3(2.0, 2.6, 0.78), Vector3(2.4, 3.05, 1.02), Color(0.12, 0.12, 0.13))
 	pk.tube(kit, "lamp", Vector3(2.2, 2.82, 0.78), Vector3(2.2, 2.82, 0.72), 0.14, 0.14, 12, Color(1.0, 0.12, 0.08), true)
-	pk.block(kit, "paint", Vector3(-2.7, 1.7, 0.85), Vector3(-1.9, 2.3, 0.92), white)
-	pk.block(kit, "paint", Vector3(-2.64, 1.76, 0.83), Vector3(-1.96, 2.24, 0.9), red.darkened(0.1))
-	pk.tube(kit, "steel", Vector3(-2.3, -0.25, 0.9), Vector3(-2.3, 1.75, 0.9), 0.05, 0.05, 8, steel)
+	# The plate the generator letters FIN DE VIA on (BUFFER_PLATE: its middle and inner width), over the upright's top.
+	pk.block(kit, "paint", Vector3(-3.15, 2.0, 0.85), Vector3(-1.45, 2.52, 0.92), white)
+	pk.block(kit, "paint", Vector3(-3.09, 2.06, 0.83), Vector3(-1.51, 2.46, 0.9), red.darkened(0.1))
+	pk.tube(kit, "steel", Vector3(-2.3, -0.25, 0.9), Vector3(-2.3, 2.02, 0.9), 0.05, 0.05, 8, steel)

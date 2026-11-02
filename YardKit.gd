@@ -223,7 +223,8 @@ static func clock_face(pk: PropKit, kit: Dictionary, c: Vector3, out: Vector3, r
 #  The station
 # ======================================================================================
 
-## Labels are [text, position, outward normal, cap height, colour] in the kit's own (life size) units.
+## Labels are [text, position, outward normal, cap height, colour, (the width they must fit, 0 or left out: any)] in the
+## kit's own (life size) units; the generator shrinks a label that would run past its board.
 ##
 ## Estación del Viento: x in [0, 40], the front (road) on z = 0 facing +z, the back (platform) on z = -12;
 ## plinth to y = 0.9, stucco walls to 5.9 under a gabled tile roof (ridge at y = 9.2 over z = -6), a clock tower on
@@ -375,8 +376,7 @@ static func station(pk: PropKit, kit: Dictionary, labels: Array) -> void:
 	canopy(pk, kit, 1.0, 39.0, -D, 4.9)
 	# The name across the portico's entablature (a navy board with cream letters) and on the platform side.
 	box_at(pk, kit, "paint", Vector3(20.0, 4.225, 3.53), Basis(), Vector3(5.7, 0.55, 0.05), Color(0.08, 0.20, 0.42))
-	labels.append(["ESTACION DEL VIENTO", Vector3(20.0, 4.225, 3.57), Vector3(0, 0, 1), 0.3, Color(0.96, 0.94, 0.86)])
-	labels.append(["ESTACION DEL VIENTO", Vector3(20.0, 5.18, -D - 0.32), Vector3(0, 0, -1), 0.3, Color(0.95, 0.92, 0.82)])
+	labels.append(["ESTACION DEL VIENTO", Vector3(20.0, 4.225, 3.57), Vector3(0, 0, 1), 0.3, Color(0.96, 0.94, 0.86), 5.3])
 
 
 ## A canopy: x in [x0, x1], from the wall at z = wall_z (the roof's top edge at y = wall_y) out `depth` toward `dir`
@@ -499,7 +499,7 @@ static func name_board(pk: PropKit, kit: Dictionary, c: Vector3, out: Vector3, w
 	var mid: Vector3 = c + Vector3(0, 1.85, 0)
 	box_at(pk, kit, "paint", mid + out * 0.05, basis, Vector3(w + 0.1, 0.72, 0.08), Color(0.92, 0.92, 0.88))
 	box_at(pk, kit, "paint", mid + out * 0.1, basis, Vector3(w - 0.06, 0.62, 0.04), Color(0.08, 0.20, 0.42))
-	labels.append([text, mid + out * 0.135, out, 0.22, Color(0.96, 0.96, 0.92)])
+	labels.append([text, mid + out * 0.135, out, 0.22, Color(0.96, 0.96, 0.92), w - 0.3])
 
 
 ## A platform clock hung by a bracket from a point `p` on a girder, double faced along ±x.
@@ -703,7 +703,8 @@ static func goods_shed(pk: PropKit, kit: Dictionary, x0: float, x1: float, label
 		window(pk, kit, Vector3(wx, 2.55, 0.0), Vector3(0, 0, 1), 1.0, 1.5, SHUTTER)
 	var mid: float = (x0 + x1) * 0.5
 	door(pk, kit, Vector3(mid, PL, 0.0), Vector3(0, 0, 1), 2.2, 2.9, true)
-	labels.append(["MERCANCIAS", Vector3(mid, 4.05, 0.07), Vector3(0, 0, 1), 0.3, Color(0.95, 0.92, 0.82)])
+	# Its name on an enamel board beside the door (on the wall it sat on the door's lintel).
+	name_board(pk, kit, Vector3(mid + 4.6, 0.0, 2.2), Vector3(0, 0, 1), 3.2, "MERCANCIAS", labels)
 	# The platform side: two sliding doors and a window between them, the canopy in front.
 	var d1: float = x0 + 6.5
 	var d2: float = x1 - 6.5

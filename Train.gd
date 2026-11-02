@@ -14,9 +14,15 @@ extends Node3D
 ## away, runs, slows and stops, stands, and may back up the way it came (Freight Line's local into the
 ## station). `pass_windows` then gives each of its passes over a point separately.
 ##
-## Touching a car anywhere destroys a cart: the roof and a flatcar's deck count. There is no collision
-## body (a cart at 60 m/s moves a metre a step): `_check_hits` tests every cart this peer drives
-## against each car's box, swept between the last tick and this one in the cars' own frames.
+## Touching a moving car anywhere destroys a cart: the roof and a flatcar's deck count. There is no
+## collision body then (a cart at 60 m/s moves a metre a step): `_check_hits` tests every cart this peer
+## drives against each car's box, swept between the last tick and this one in the cars' own frames. A
+## train standing still (under STAND_SPEED: parked stock, the local at the platform) destroys nobody and
+## is solid instead: each car has a box body (`Car.body`) that only collides while it stands.
+##
+## The cars move in _physics_process, so physics interpolation draws them between ticks: one that comes
+## into view (or goes out of it) has its interpolation reset, or for a frame it was drawn somewhere
+## between where it left the path and where it came back, a ghost car flashing by the tunnels.
 ##
 ## `blocked_intervals(s, clear_height)` says when the train covers a point on the path, so crossings
 ## can warn and the AI can brake. A car lower than `clear_height` (a flatcar, for a kicker that clears
@@ -46,10 +52,14 @@ const FreightKit = preload("res://FreightKit.gd")
 
 signal cart_hit(cart: Node)
 
+## Below this speed (m/s) a train counts as standing: solid, and harmless.
+const STAND_SPEED := 1.0
+
 class Car:
 	var kind := ""
 	var flip := false
 	var solid := true
+	var body: AnimatableBody3D
 	var offset := 0.0     # from the head back to the car's front
 	var length := 0.0
 	var height := 0.0
@@ -97,6 +107,7 @@ func _ready() -> void:
 			mi.visible = false
 			add_child(mi, false, Node.INTERNAL_MODE_BACK)
 			car.node = mi
+			car.body = _car_body(car)
 		off += car.length
 		cars.append(car)
 	train_length = off
@@ -105,6 +116,45 @@ func _ready() -> void:
 	if sounds:
 		_add_sounds()
 	_place(_clock())
+
+
+## The box a standing car is solid as: its length (less the couplers' gap), its width, from 30cm over the rail to
+## its roof. Off (no layer) until the car stands in view (_update_bodies).
+func _car_body(car: Car) -> AnimatableBody3D:
+	var body := AnimatableBody3D.new()
+	body.name = "Solid"
+	# Follows the car node (synced to physics, it stayed at the origin).
+	body.sync_to_physics = false
+	body.collision_layer = 0
+	body.collision_mask = 0
+	body.set_meta(&"surface", "rock")
+	var shape := BoxShape3D.new()
+	var y0 := 0.3
+	shape.size = Vector3(car.half_width * 2.0, car.height - y0, maxf(car.length - 0.8, 1.0))
+	var cs := CollisionShape3D.new()
+	cs.shape = shape
+	cs.position = Vector3(0.0, y0 + (car.height - y0) * 0.5, 0.0)
+	body.add_child(cs)
+	car.node.add_child(body)
+	return body
+
+
+## Whether the train is moving at more than STAND_SPEED (one on `legs` stands between them).
+func is_moving() -> bool:
+	if legs.is_empty():
+		return speed > STAND_SPEED
+	var tc := cycle_time()
+	return absf(_leg_head(tc) - _leg_head(fposmod(tc - 0.25, period))) > STAND_SPEED * 0.25
+
+
+## Standing cars in view are solid; moving ones are not (they destroy what touches them instead).
+func _update_bodies(moving: bool) -> void:
+	for car in cars:
+		if car.body == null:
+			continue
+		var layer: int = 0 if moving or not car.present else 1
+		if car.body.collision_layer != layer:
+			car.body.collision_layer = layer
 
 
 func _add_sounds() -> void:
@@ -142,7 +192,9 @@ func _physics_process(_delta: float) -> void:
 	if cars.is_empty():
 		return
 	_place(_clock())
-	if kills:
+	var moving := is_moving()
+	_update_bodies(moving)
+	if kills and moving:
 		_check_hits()
 
 
@@ -256,6 +308,8 @@ func _place(t: float) -> void:
 		car.node.transform = car.xf
 		if not car.prev_present:
 			car.prev_xf = car.xf
+			# Back in view: drawn from here, not from where it left the path.
+			car.node.reset_physics_interpolation()
 	_update_sounds()
 
 
