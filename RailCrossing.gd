@@ -16,6 +16,9 @@ const PropKit = preload("res://PropKit.gd")
 const FreightKit = preload("res://FreightKit.gd")
 
 @export var train_path: NodePath
+## Every train that runs over the crossing (node paths as strings, from this node): a line may carry a freight
+## train and an express. `train_path` alone still works.
+@export var train_paths := PackedStringArray()
 ## Metres along the train's path where this crossing lies.
 @export var train_s := 0.0
 @export var road_half := 7.0
@@ -34,7 +37,7 @@ const OPEN_ANGLE := deg_to_rad(82.0)
 const ARM_LEN := 9.2
 const MAST_H := 5.4
 
-var _train: Node
+var _trains: Array = []
 var _arms: Array[Node3D] = []
 var _lamp_mats: Array[StandardMaterial3D] = []
 var _bell: AudioStreamPlayer3D
@@ -47,8 +50,20 @@ var warning := false
 func _ready() -> void:
 	add_to_group("rail_crossings")
 	_build()
+	_resolve_trains()
+
+
+func _resolve_trains() -> void:
+	_trains.clear()
+	var paths: Array = []
 	if train_path != NodePath():
-		_train = get_node_or_null(train_path)
+		paths.append(train_path)
+	for p in train_paths:
+		paths.append(NodePath(p))
+	for p in paths:
+		var t: Node = get_node_or_null(p)
+		if t != null and t.has_method("pass_window"):
+			_trains.append(t)
 
 
 func _build() -> void:
@@ -157,25 +172,30 @@ func _set_arm(v: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if _train == null:
-		if train_path != NodePath():
-			_train = get_node_or_null(train_path)
+	if _trains.is_empty():
+		_resolve_trains()
 		return
-	var win: Array = _train.pass_window(train_s, pad)
-	var tt: float = _train.cycle_time()
-	var period: float = _train.period
+	# The warning: any train's pass window, from `warn_lead` before its first car to `hold` after its last, and
+	# how long the earliest of those has been on.
 	warning = false
 	var since := 0.0
-	if not win.is_empty():
+	var tt := 0.0
+	for t in _trains:
+		var win: Array = t.pass_window(train_s, pad)
+		if win.is_empty():
+			continue
+		tt = t.cycle_time()
+		var period: float = t.period
 		for x in [tt, tt - period]:
 			if x >= float(win[0]) - warn_lead and x <= float(win[1]) + hold:
 				warning = true
-				since = x - (float(win[0]) - warn_lead)
+				since = maxf(since, x - (float(win[0]) - warn_lead))
 	var target: float = 1.0 if warning and since >= arm_delay else 0.0
 	_arm = move_toward(_arm, target, delta / lower_time)
 	_set_arm(_arm)
 	if warning:
-		var on: bool = int(floor(tt * 2.2)) % 2 == 0
+		var flash: float = fmod(Time.get_unix_time_from_system(), 86400.0)
+		var on: bool = int(floor(flash * 2.2)) % 2 == 0
 		_lamp_mats[0].emission_energy_multiplier = 5.0 if on else 0.15
 		_lamp_mats[1].emission_energy_multiplier = 0.15 if on else 5.0
 		if not _bell.playing:
@@ -193,14 +213,13 @@ func _physics_process(delta: float) -> void:
 ## Whether a cart that reaches the crossing `eta` seconds from now would meet the train: the pass, widened a
 ## little for the cart's own length and the time it takes to cross.
 func is_closed_for(eta: float, margin := 1.0) -> bool:
-	if _train == null:
-		return false
-	var win: Array = _train.pass_window(train_s, pad)
-	if win.is_empty():
-		return false
-	var tt: float = _train.cycle_time()
-	var period: float = _train.period
-	for x in [tt + eta, tt + eta - period, tt + eta + period]:
-		if x >= float(win[0]) - margin and x <= float(win[1]) + margin:
-			return true
+	for t in _trains:
+		var win: Array = t.pass_window(train_s, pad)
+		if win.is_empty():
+			continue
+		var tt: float = t.cycle_time()
+		var period: float = t.period
+		for x in [tt + eta, tt + eta - period, tt + eta + period]:
+			if x >= float(win[0]) - margin and x <= float(win[1]) + margin:
+				return true
 	return false

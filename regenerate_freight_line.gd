@@ -34,6 +34,8 @@ const FreightKit = preload("res://FreightKit.gd")
 const TrainKit = preload("res://TrainKit.gd")
 const CactusKit = preload("res://CactusKit.gd")
 const PropKit = preload("res://PropKit.gd")
+const YardKit = preload("res://YardKit.gd")
+const FactoryKit = preload("res://FactoryKit.gd")
 
 const MESH_CHUNK_CELL := 80.0
 
@@ -67,13 +69,24 @@ const LAP := [
 	[-260.0, -390.0, 100.0],  # 6
 	[-500.0, -210.0, 100.0],  # 7
 ]
-## The railways: straight lines [x0, z0, x1, z1] from where they come out of the hills to where they go
-## into them. Trains run from the first point to the second.
+## The railways: straight lines from where they come out of the hills to where they go into them. Every train
+## on a line runs from the first point to the second once a `period`, entering `phase` seconds into it, so a
+## line's trains must be scheduled not to overlap on it: each one's turn on the line is (line + train) / speed
+## seconds. `kicker` puts a flatcar kicker before each of the line's crossings.
 const RAILS := [
-	{"name": "MainLine", "a": Vector2(-860.0, 0.0), "b": Vector2(860.0, 0.0), "speed": 30.0, "period": 70.0,
-		"consist": ["loco", "box", "box:1", "flat", "flat", "gap:20", "tank", "tank:1", "box:2", "box", "flat_load", "flat_load", "caboose"]},
-	{"name": "BranchLine", "a": Vector2(210.0, -850.0), "b": Vector2(210.0, -60.0), "speed": 24.0, "period": 48.0, "phase": 17.0, "kicker": 1,
-		"consist": ["loco", "flat_load", "flat", "flat", "flat", "flat", "flat_load", "caboose"]},
+	{"name": "MainLine", "a": Vector2(-860.0, 0.0), "b": Vector2(860.0, 0.0), "kicker": 1, "trains": [
+		{"name": "Freight", "speed": 36.0, "period": 125.0, "phase": 0.0, "consist": [
+			"loco", "loco:1", "box", "box:1", "hopper", "hopper", "hopper:1", "flat", "flat", "flat", "flat", "box:2",
+			"tank", "tank:1", "tank", "box", "flat_load", "flat_load", "flat", "flat", "flat", "hopper", "hopper:1", "box:3",
+			"flat", "flat", "flat", "caboose"]},
+		{"name": "Express", "speed": 40.0, "period": 125.0, "phase": 68.0, "consist": [
+			"ploco", "coach", "coach", "coach", "coach", "coach", "obs"]},
+	]},
+	{"name": "BranchLine", "a": Vector2(210.0, -850.0), "b": Vector2(210.0, -60.0), "kicker": 1, "trains": [
+		{"name": "Freight", "speed": 28.0, "period": 60.0, "phase": 17.0, "consist": [
+			"loco", "flat_load", "flat_load", "flat", "flat", "flat", "flat", "hopper", "hopper:1", "tank", "box", "flat", "flat",
+			"flat_load", "box:1", "caboose"]},
+	]},
 ]
 ## The hills the railways run into: centre x, z, radius, height.
 const HILLS := [
@@ -82,6 +95,20 @@ const HILLS := [
 	[210.0, -880.0, 100.0, 34.0],
 	[210.0, -50.0, 90.0, 30.0],
 ]
+
+## The yard behind the start straight, a network of its own off the Main Line: a lead leaves it at turnout T1 (to
+## the right, toward the south), curves round to the east and runs on, as the platform track, past Estación del
+## Viento to a buffer stop. At turnout T2 (to the left) the factory track leaves the platform track and runs
+## on, 12m north of it, past the grain complex to its own buffer stop. Moves are ["S", length] and
+## ["A", radius, degrees] (positive turns right), from the toe with heading east.
+const YARD_T1 := Vector2(-440.0, 0.0)
+const YARD_LEAD_MOVES := [["A", 100.0, 90.0], ["S", 10.0], ["A", 60.0, -90.0], ["S", 172.0]]
+const YARD_T2_X := -262.0
+const FACTORY_SHIFT := 12.0
+const FACTORY_R := 150.0
+const FACTORY_END_X := 25.0
+## Where the two tracks of a turnout are this far apart (centre to centre) they get beds of their own.
+const TURNOUT_SEPARATION := 4.4
 
 ## Terrain grid: fine round the lap and the railways, cells growing outward to the horizon.
 const FINE_X := Vector2(-1050.0, 1050.0)
@@ -98,13 +125,17 @@ const FINISH_S := 160.0
 ## Level pads for the depot: centre x, z, half length (x), half width (z), the blend over which the ground
 ## eases back, and the pad's height (set from the plain's mean under it by _plan_pads).
 var _pads: Array = [
-	{"c": Vector2(-215.0, 192.0), "half": Vector2(135.0, 38.0), "blend": 16.0, "h": 0.0},
+	{"c": Vector2(-130.0, 166.0), "half": Vector2(175.0, 56.0), "blend": 16.0, "h": 0.0},
 ]
 
 var _lap: Dictionary = {}
 var _rails: Array = []
 ## Where a railway crosses the lap: {rail, lap_s, rail_s, pos (Vector2), road_y}.
 var _crossings: Array = []
+## The yard's tracks (see _build_spurs): {name, samples, ground, top, parent (kind, index, junction s), zone_end}.
+var _spurs: Array = []
+## Its turnouts: {name, through (kind, index), x0, z0, side, spur, zone_end}.
+var _turnouts: Array = []
 var main_curve: Curve3D
 
 var _base_noise := FastNoiseLite.new()
@@ -224,7 +255,7 @@ func _rail_at(i: int, s: float) -> Vector2:
 
 ## Whether a point is inside one of the hills the railways run into (their tunnel mouths lie at HILL_PORTAL of
 ## its radius): there the line is not graded and has no track, and the trains run on underground.
-const HILL_PORTAL := 0.85
+const HILL_PORTAL := 0.78
 
 func _in_hill(p: Vector2) -> bool:
 	for hl in HILLS:
@@ -409,6 +440,159 @@ func _rail_height(ri: int, s: float) -> float:
 
 
 # ======================================================================================
+#  The yard's tracks
+# ======================================================================================
+
+## A path of straights and arcs from `start` heading `th` (the heading's direction is (cos, sin) in x, z, so a
+## positive turn is to the right): moves are ["S", length] and ["A", radius, degrees]. A sample every SAMPLE_STEP at
+## most: {"p": Vector2, "th": float, "s": float}.
+func _turtle(start: Vector2, th: float, moves: Array) -> Array:
+	var out: Array = [{"p": start, "th": th, "s": 0.0}]
+	var p := start
+	var s := 0.0
+	for mv in moves:
+		if mv[0] == "S":
+			var length: float = mv[1]
+			var n: int = maxi(int(ceil(length / SAMPLE_STEP)), 1)
+			var d: Vector2 = _dir_of(th)
+			for i in range(1, n + 1):
+				var f: float = float(i) / float(n)
+				out.append({"p": p + d * (length * f), "th": th, "s": s + length * f})
+			p = p + d * length
+			s += length
+		else:
+			var r: float = mv[1]
+			var ang: float = deg_to_rad(float(mv[2]))
+			var sgn: float = signf(ang)
+			var arc_len: float = r * absf(ang)
+			var n2: int = maxi(int(ceil(arc_len / SAMPLE_STEP)), 1)
+			var c: Vector2 = p + _right_of(th) * r * sgn
+			for i in range(1, n2 + 1):
+				var f2: float = float(i) / float(n2)
+				var th2: float = th + ang * f2
+				out.append({"p": c - _right_of(th2) * r * sgn, "th": th2, "s": s + arc_len * f2})
+			th += ang
+			p = c - _right_of(th) * r * sgn
+			s += arc_len
+	return out
+
+
+## The spur's ground height at distance `s` along it (linear between samples).
+func _spur_ground_at(si: int, s: float) -> float:
+	var samples: Array = _spurs[si]["samples"]
+	var ground: PackedFloat32Array = _spurs[si]["ground"]
+	if s <= 0.0:
+		return ground[0]
+	for k in range(1, samples.size()):
+		if s <= float(samples[k]["s"]):
+			var s0: float = samples[k - 1]["s"]
+			var s1: float = samples[k]["s"]
+			return lerpf(ground[k - 1], ground[k], (s - s0) / maxf(s1 - s0, 0.0001))
+	return ground[ground.size() - 1]
+
+
+## The ground height of the track a spur leaves, at the spur's point `p` (the parent's own height at the same distance
+## along it), so the two meet without a step.
+func _parent_ground(si: int, p: Vector2) -> float:
+	var parent: Dictionary = _spurs[si]["parent"]
+	if parent["kind"] == "rail":
+		var ri: int = parent["index"]
+		var a: Vector2 = _rails[ri]["a"]
+		var dir: Vector2 = (_rails[ri]["b"] - a).normalized()
+		return _rail_height(ri, (p - a).dot(dir))
+	var pi: int = parent["index"]
+	var axis: Vector2 = parent["axis"]
+	return _spur_ground_at(pi, float(parent["s"]) + (p - parent["at"]).dot(axis))
+
+
+## The lead, the platform track and the factory track: their samples, heights (the plain smoothed along each, held
+## to the track it leaves near the turnout and to the pad's height on it), and the two turnouts.
+func _build_spurs() -> void:
+	_spurs.clear()
+	_turnouts.clear()
+	var lead: Array = _turtle(YARD_T1, 0.0, YARD_LEAD_MOVES)
+	_spurs.append({"name": "YardLead", "samples": lead, "parent": {"kind": "rail", "index": 0}, "ground": PackedFloat32Array(), "top": PackedFloat32Array(), "zone_end": 0.0})
+	_spur_heights(0)
+	# T2: on the lead's final straight at x = YARD_T2_X.
+	var s_t2 := 0.0
+	var ls: Array = lead
+	for k in range(1, ls.size()):
+		if float(ls[k]["p"].x) >= YARD_T2_X and absf(float(ls[k]["th"])) < 0.01:
+			var x0: float = ls[k - 1]["p"].x
+			var x1: float = ls[k]["p"].x
+			s_t2 = lerpf(float(ls[k - 1]["s"]), float(ls[k]["s"]), (YARD_T2_X - x0) / maxf(x1 - x0, 0.0001))
+			break
+	var z_platform: float = lead[lead.size() - 1]["p"].y
+	var theta: float = acos(1.0 - FACTORY_SHIFT / (2.0 * FACTORY_R))
+	var run: float = FACTORY_END_X - (YARD_T2_X + 2.0 * FACTORY_R * sin(theta))
+	var factory: Array = _turtle(Vector2(YARD_T2_X, z_platform), 0.0, [["A", FACTORY_R, -rad_to_deg(theta)], ["A", FACTORY_R, rad_to_deg(theta)], ["S", run]])
+	_spurs.append({"name": "FactoryTrack", "samples": factory, "parent": {"kind": "spur", "index": 0, "s": s_t2, "at": Vector2(YARD_T2_X, z_platform), "axis": Vector2(1.0, 0.0)},
+			"ground": PackedFloat32Array(), "top": PackedFloat32Array(), "zone_end": 0.0})
+	_spur_heights(1)
+	_turnouts.append({"name": "T1", "through": {"kind": "rail", "index": 0}, "x0": YARD_T1.x, "z0": YARD_T1.y, "side": 1.0, "spur": 0, "s0": YARD_T1.x - float(_rails[0]["a"].x)})
+	_turnouts.append({"name": "T2", "through": {"kind": "spur", "index": 0}, "x0": YARD_T2_X, "z0": z_platform, "side": -1.0, "spur": 1, "s0": s_t2})
+	for t in _turnouts:
+		var samples: Array = _spurs[int(t["spur"])]["samples"]
+		var zone: float = float(samples[samples.size() - 1]["p"].x) - float(t["x0"])
+		for sm in samples:
+			if absf(float(sm["p"].y) - float(t["z0"])) >= TURNOUT_SEPARATION:
+				zone = float(sm["p"].x) - float(t["x0"])
+				break
+		t["zone_end"] = zone
+		_spurs[int(t["spur"])]["zone_end"] = zone
+	print("  yard: lead %.0fm, factory track %.0fm, turnouts at x %.0f and %.0f (zones %.0fm, %.0fm)" % [
+		float(lead[lead.size() - 1]["s"]), float(factory[factory.size() - 1]["s"]), YARD_T1.x, YARD_T2_X, _turnouts[0]["zone_end"], _turnouts[1]["zone_end"]])
+
+
+func _spur_heights(si: int) -> void:
+	var samples: Array = _spurs[si]["samples"]
+	var raw := PackedFloat32Array()
+	raw.resize(samples.size())
+	for k in range(samples.size()):
+		var p: Vector2 = samples[k]["p"]
+		raw[k] = _plain(p.x, p.y)
+	var smooth: PackedFloat32Array = _smooth_along(raw, false, int(SMOOTH_REACH / SAMPLE_STEP))
+	var ground := PackedFloat32Array()
+	ground.resize(samples.size())
+	var top := PackedFloat32Array()
+	top.resize(samples.size())
+	for k in range(samples.size()):
+		var p: Vector2 = samples[k]["p"]
+		var s: float = samples[k]["s"]
+		var w: float = smoothstep(14.0, 60.0, s)
+		var h: float = lerpf(_parent_ground(si, p), smooth[k], w)
+		var pad: Vector2 = _pad_at(p.x, p.y)
+		h = lerpf(h, pad.y, pad.x)
+		ground[k] = h
+		top[k] = h + RAIL_LIFT
+	# Packed arrays are values: store them once they are filled.
+	_spurs[si]["ground"] = ground
+	_spurs[si]["top"] = top
+
+
+## The spur's rail-top height at distance `s` along it.
+func _spur_top_at(si: int, s: float) -> float:
+	return _spur_ground_at(si, s) + RAIL_LIFT
+
+
+## Distance from `p` to the nearest yard track.
+func _spur_distance(p: Vector2) -> float:
+	var best := 1e9
+	for sp in _spurs:
+		for sm in sp["samples"]:
+			best = minf(best, p.distance_to(sm["p"]))
+	return best
+
+
+func _in_turnout(kind: String, index: int, s: float) -> bool:
+	for t in _turnouts:
+		if t["through"]["kind"] == kind and int(t["through"]["index"]) == index:
+			if s >= float(t["s0"]) - 0.5 and s <= float(t["s0"]) + float(t["zone_end"]) + 3.0:
+				return true
+	return false
+
+
+# ======================================================================================
 #  Samples and grading
 # ======================================================================================
 
@@ -483,7 +667,16 @@ func _add_samples() -> void:
 				flat = 5.4
 			_push_sample(Vector3(p2.x, _rail_height(ri, s), p2.y), right, s, 1, flat, cut, RAIL_FILL,
 					first + k + 1 if link else -1, false)
-	print("  samples: %d on the lap, %d on the rails" % [base, _rs_pos.size() - base])
+	for si in range(_spurs.size()):
+		var sm: Array = _spurs[si]["samples"]
+		var gr: PackedFloat32Array = _spurs[si]["ground"]
+		var first2: int = _rs_pos.size()
+		for k in range(sm.size()):
+			var q: Vector2 = sm[k]["p"]
+			var rv: Vector2 = _right_of(float(sm[k]["th"]))
+			_push_sample(Vector3(q.x, gr[k], q.y), Vector3(rv.x, 0.0, rv.y), float(sm[k]["s"]), 1, RAIL_FLAT + 1.0, RAIL_CUT, RAIL_FILL,
+					first2 + k + 1 if k < sm.size() - 1 else -1, false)
+	print("  samples: %d on the lap, %d on the rails and the yard" % [base, _rs_pos.size() - base])
 
 
 func _push_sample(pos: Vector3, right: Vector3, s: float, kind: int, flat: float, cut: float, fill: float, next: int, _closed: bool) -> void:
@@ -981,24 +1174,44 @@ func _build_railways(level_scene: Node3D) -> void:
 			piece.append(pts[k])
 			if piece.size() > 1:
 				var mid_s: float = (float(s_at[k]) + float(s_at[k - 1])) * 0.5
-				bed.append(not _near_crossing(ri, mid_s, DECK_HALF_LEN + 1.5))
+				bed.append(not _near_crossing(ri, mid_s, DECK_HALF_LEN + 1.5) and not _in_turnout("rail", ri, mid_s))
 			if piece.size() > TRACK_PIECE:
 				piece_no = _flush_track(root, ri, piece, bed, piece_no)
 				piece = [pts[k]]
 				bed = []
 		if piece.size() > 1:
 			piece_no = _flush_track(root, ri, piece, bed, piece_no)
-		# The train.
-		var train := Node3D.new()
-		train.name = "%sTrain" % info["name"]
-		train.set_script(load("res://Train.gd"))
-		train.set("path", curve)
-		train.set("consist", PackedStringArray(info["consist"]))
-		train.set("speed", float(info["speed"]))
-		train.set("period", float(info["period"]))
-		train.set("phase", float(info.get("phase", 0.0)))
-		level_scene.add_child(train)
-		print("  %s: %.0fm of line, a train every %.0fs at %.0f m/s" % [info["name"], len_r, float(info["period"]), float(info["speed"])])
+		# The trains.
+		for tr in info["trains"]:
+			var train := Node3D.new()
+			train.name = "%s%sTrain" % [info["name"], tr["name"]]
+			train.set_script(load("res://Train.gd"))
+			train.set("path", curve)
+			train.set("consist", PackedStringArray(tr["consist"]))
+			train.set("speed", float(tr["speed"]))
+			train.set("period", float(tr["period"]))
+			train.set("phase", float(tr.get("phase", 0.0)))
+			level_scene.add_child(train)
+			var length_m: float = _consist_length(tr["consist"])
+			var turn_s: float = (len_r + length_m) / float(tr["speed"])
+			print("  %s %s: %d cars, %.0fm, %.0f m/s, every %.0fs (a turn on the line takes %.0fs)" % [
+				info["name"], tr["name"], (tr["consist"] as Array).size(), length_m, float(tr["speed"]), float(tr["period"]), turn_s])
+			if turn_s > float(tr["period"]):
+				push_error("%s %s needs %.0fs to clear the line but runs every %.0fs" % [info["name"], tr["name"], turn_s, float(tr["period"])])
+		# Two trains on a line must not overlap: each one's turn [phase, phase + turn] within the period.
+		var turns: Array = []
+		for tr in info["trains"]:
+			turns.append([float(tr.get("phase", 0.0)), float(tr.get("phase", 0.0)) + (len_r + _consist_length(tr["consist"])) / float(tr["speed"]), float(tr["period"])])
+		for i in range(turns.size()):
+			for j in range(i + 1, turns.size()):
+				var period_j: float = turns[i][2]
+				var a0: float = turns[i][0]
+				var a1: float = turns[i][1]
+				var b0: float = turns[j][0]
+				var b1: float = turns[j][1]
+				for shift in [-period_j, 0.0, period_j]:
+					if a0 < b1 + shift and b0 + shift < a1:
+						push_error("%s: trains %d and %d overlap on the line" % [info["name"], i, j])
 	# The crossings.
 	var ci := 0
 	for c in _crossings:
@@ -1018,7 +1231,10 @@ func _build_railways(level_scene: Node3D) -> void:
 		cn.set_script(load("res://RailCrossing.gd"))
 		cn.position = sp["pos"]
 		cn.rotation_degrees = Vector3(0, sp["yaw"], 0)
-		cn.set("train_path", NodePath("../%sTrain" % _rails[ri]["name"]))
+		var paths := PackedStringArray()
+		for tr in _rails[ri]["trains"]:
+			paths.append("../%s%sTrain" % [_rails[ri]["name"], tr["name"]])
+		cn.set("train_paths", paths)
 		cn.set("train_s", float(c["rail_s"]))
 		cn.set("road_half", ROAD_HALF)
 		level_scene.add_child(cn)
@@ -1028,16 +1244,14 @@ func _build_railways(level_scene: Node3D) -> void:
 		print("  crossing %d: %s at lap %.0fm (skew %.0f deg)" % [ci, _rails[ri]["name"], lap_s, rad_to_deg(acos(skew))])
 
 
-## A masonry portal where each railway goes into a hill: at the last sample outside it, facing out.
+## A masonry portal where each railway goes into a hill: at the last sample outside it, facing out. The
+## facade's top follows the hill behind it, the track runs on into a dark lining, and a plaque names the tunnel.
+const PORTAL_NAMES := ["TUNEL DE LA SIERRA", "TUNEL DEL OESTE", "TUNEL DEL VIENTO", "TUNEL DEL NORTE", "TUNEL DE LA CUMBRE", "TUNEL DEL ESTE"]
+
 func _build_portals(level_scene: Node3D) -> void:
 	var root := Node3D.new()
 	root.name = "TunnelPortals"
 	level_scene.add_child(root)
-	var pk := FreightKit.new_kit()
-	pk.reset_frame()
-	var kit := {}
-	FreightKit.portal(pk, kit)
-	var mesh: ArrayMesh = _save_baked_resource(pk.commit(kit), "portal") as ArrayMesh
 	var count := 0
 	for ri in range(_rails.size()):
 		var len_r: float = _rail_len(ri)
@@ -1052,19 +1266,133 @@ func _build_portals(level_scene: Node3D) -> void:
 				continue
 			# The boundary: the outside sample is k - 1 (going in) or k (coming out).
 			var out_s: float = s - SAMPLE_STEP if now_in else s
-			var into := Vector3(dir.x, 0.0, dir.y) * (1.0 if now_in else -1.0)
+			var sgn: float = 1.0 if now_in else -1.0
+			var into := Vector3(dir.x, 0.0, dir.y) * sgn
 			var p: Vector2 = _rail_at(ri, out_s)
 			var top := Vector3(p.x, _rail_top(ri, out_s), p.y)
 			var right := Vector3(-into.z, 0.0, into.x)
 			var basis := Basis(-right, Vector3.UP, into)
-			_instance_mesh(root, "Portal_%s_%d" % [_rails[ri]["name"], count], mesh, Transform3D(basis, top))
+			var xf := Transform3D(basis, top)
+			var pk := FreightKit.new_kit()
+			pk.reset_frame()
+			var kit := {}
+			FreightKit.portal(pk, kit)
+			var mesh: ArrayMesh = _save_baked_resource(pk.commit(kit), "portal_%d" % count) as ArrayMesh
+			_instance_mesh(root, "Portal_%s_%d" % [_rails[ri]["name"], count], mesh, xf)
+			_label(root, PORTAL_NAMES[count % PORTAL_NAMES.size()], xf.origin + basis * Vector3(0.0, 13.2, -0.6), Basis(basis * Basis(Vector3.UP, PI)), 0.017, Color(0.95, 0.9, 0.78), 56)
+			# The track runs on into the lining.
+			var pts: Array = []
+			var bed: Array = []
+			var d2 := 0.0
+			while d2 <= 24.0:
+				var q: Vector2 = _rail_at(ri, out_s + sgn * d2)
+				pts.append(Vector3(q.x, _rail_top(ri, clampf(out_s + sgn * d2, 0.0, len_r)), q.y))
+				if pts.size() > 1:
+					bed.append(true)
+				d2 += SAMPLE_STEP
+			_instance_mesh(root, "PortalTrackBed_%d" % count, FreightKit.track_piece(pts, bed, 900 + count), Transform3D.IDENTITY)
 			count += 1
 			prev_in = now_in
 	print("  %d tunnel portals" % count)
 
 
+## The yard's track: each spur's rails, ballast and sleepers outside its turnout, the turnouts themselves (rails,
+## blades, frog, check rail, stretcher bars, switch stand, one bed), and a buffer stop at the end of each track.
+func _build_yard(level_scene: Node3D) -> void:
+	var root := Node3D.new()
+	root.name = "YardTracks"
+	level_scene.add_child(root)
+	for si in range(_spurs.size()):
+		var sp: Dictionary = _spurs[si]
+		var samples: Array = sp["samples"]
+		var top: PackedFloat32Array = sp["top"]
+		var tn: Dictionary = {}
+		for t in _turnouts:
+			if int(t["spur"]) == si:
+				tn = t
+		# The stretch inside the turnout is the turnout's own.
+		var k0 := 0
+		if not tn.is_empty():
+			for k in range(samples.size()):
+				if float(samples[k]["p"].x) - float(tn["x0"]) >= float(tn["zone_end"]) + 3.0:
+					k0 = k
+					break
+		var piece: Array = []
+		var bed: Array = []
+		var piece_no := 0
+		for k in range(k0, samples.size()):
+			var q: Vector2 = samples[k]["p"]
+			piece.append(Vector3(q.x, top[k], q.y))
+			if piece.size() > 1:
+				var mid_s: float = (float(samples[k]["s"]) + float(samples[k - 1]["s"])) * 0.5
+				bed.append(not _in_turnout("spur", si, mid_s))
+			if piece.size() > TRACK_PIECE:
+				_flush_spur_track(root, si, piece, bed, piece_no)
+				piece_no += 1
+				piece = [piece[piece.size() - 1]]
+				bed = []
+		if piece.size() > 1:
+			_flush_spur_track(root, si, piece, bed, piece_no)
+		# The buffer stop where the track ends.
+		var last: Dictionary = samples[samples.size() - 1]
+		var lp: Vector2 = last["p"]
+		var lth: float = last["th"]
+		var xf := Transform3D(Basis(Vector3.UP, PI * 0.5 - lth), Vector3(lp.x, top[top.size() - 1], lp.y))
+		var pk := _scaled_kit(1.5)
+		var kit := {}
+		FreightKit.buffer_stop(pk, kit)
+		_instance_mesh(root, "BufferStop_%d" % si, _save_baked_resource(pk.commit(kit), "buffer_stop") as ArrayMesh, xf)
+		_label(root, "FIN DE VIA", xf.origin + xf.basis * Vector3(-2.3 * 1.5, 2.0 * 1.5, 0.78 * 1.5), Basis(xf.basis * Basis(Vector3.UP, PI)), 0.008, Color(0.1, 0.1, 0.1), 48)
+	# The turnouts.
+	for t in _turnouts:
+		var through: Array = []
+		var branch: Array = []
+		var si2: int = int(t["spur"])
+		var x0: float = t["x0"]
+		var z0: float = t["z0"]
+		var reach: float = float(t["zone_end"]) + 14.0
+		var x := x0
+		while x <= x0 + reach:
+			var ty: float
+			if t["through"]["kind"] == "rail":
+				ty = _rail_top(int(t["through"]["index"]), x - float(_rails[int(t["through"]["index"])]["a"].x))
+			else:
+				ty = _spur_top_at(int(t["through"]["index"]), float(t["s0"]) + (x - x0))
+			through.append(Vector3(x, ty, z0))
+			x += 3.0
+		var bs: Array = _spurs[si2]["samples"]
+		var btop: PackedFloat32Array = _spurs[si2]["top"]
+		for k in range(bs.size()):
+			if float(bs[k]["p"].x) - x0 > reach:
+				break
+			branch.append(Vector3(bs[k]["p"].x, btop[k], bs[k]["p"].y))
+		var info := {}
+		var mesh: ArrayMesh = FreightKit.turnout(through, branch, float(t["side"]), info)
+		_instance_mesh(root, "TurnoutTrackBed_%s" % t["name"], _save_baked_resource(mesh, "turnout_%s" % String(t["name"]).to_lower()) as ArrayMesh, Transform3D.IDENTITY)
+		print("  turnout %s at x %.0f: zone %.1fm (the builder says %.1fm)" % [t["name"], x0, float(t["zone_end"]), float(info.get("zone_end", -1.0))])
+
+
+func _flush_spur_track(root: Node3D, si: int, piece: Array, bed: Array, piece_no: int) -> void:
+	var mi := MeshInstance3D.new()
+	mi.name = "TrackBed_%s_%d" % [_spurs[si]["name"], piece_no]
+	mi.mesh = FreightKit.track_piece(piece, bed, piece_no + (si + 5) * 1000)
+	root.add_child(mi)
+
+
 func info_of(ri: int) -> Dictionary:
 	return _rails[ri]
+
+
+## The length of a train: the sum of its cars (a gap is its own length in game metres).
+func _consist_length(consist: Array) -> float:
+	var total := 0.0
+	for entry in consist:
+		var parts: PackedStringArray = String(entry).split(":")
+		if parts[0] == "gap":
+			total += float(parts[1]) if parts.size() > 1 else 14.0
+		else:
+			total += TrainKit.car_length(parts[0])
+	return total
 
 
 ## The flatcar kicker before a crossing: a wooden ramp the full width of the road whose lip stands KICKER_LIP
@@ -1138,52 +1466,109 @@ func _label(parent: Node3D, text: String, at: Vector3, basis: Basis, pixel: floa
 	parent.add_child(l)
 
 
+## The yard's buildings are YardKit's and FactoryKit's (life size, grown by PROP_SCALE through their own kit), each
+## one mesh under "Depot" saved under `YARD_PREFIX` so MeshChunker leaves it whole and DressingColliders makes it solid.
+## The station stands south of the platform track with its platform between them (its frame's origin `STATION_BACK`
+## beyond the track, so the platform's edge is 2.6m from the track's centre); the grain cooperative stands north of the
+## factory track, its loadout gantry straddling it at `FACTORY_X`; the water tower is east of the platform track's end.
+const YARD_PREFIX := "freightyard_"
+const STATION_X := -180.0
+const STATION_BACK := 37.2
+const PLATFORM_EDGE := 2.6
+const FACTORY_X := -13.5
+const WATER_TOWER_AT := Vector2(-84.0, 192.0)
+
 func _build_depot(level_scene: Node3D) -> void:
 	var root := Node3D.new()
 	root.name = "Depot"
 	level_scene.add_child(root)
 	var h: float = _pads[0]["h"]
-	var pk := _scaled_kit(PROP_SCALE)
+	var p_samples: Array = _spurs[0]["samples"]
+	var f_samples: Array = _spurs[1]["samples"]
+	var z_p: float = p_samples[p_samples.size() - 1]["p"].y
+	var z_f: float = f_samples[f_samples.size() - 1]["p"].y
+	# The station, its goods shed and the platform.
+	var pk := YardKit.new_kit(PROP_SCALE)
 	var kit := {}
-	FreightKit.depot(pk, kit)
-	var x0 := -330.0
-	var z_front := 214.0
-	_instance_mesh(root, "Station", _save_baked_resource(pk.commit(kit), "station"), Transform3D(Basis(), Vector3(x0, h, z_front)))
-	_label(root, "ESTACIÓN DEL VIENTO", Vector3(x0 + 22.0 * PROP_SCALE, h + 7.4 * PROP_SCALE, z_front + 1.0 * PROP_SCALE), Basis(), 0.036, Color(0.96, 0.92, 0.82))
-	_label(root, "FREIGHT LINE · KM 0", Vector3(x0 + 22.0 * PROP_SCALE, h + 2.9 * PROP_SCALE, z_front + 0.5), Basis(), 0.012, Color(0.2, 0.2, 0.2), 48)
-	# The water tower and the grain silos.
+	var labels: Array = []
+	var z_edge: float = (PLATFORM_EDGE - STATION_BACK) / PROP_SCALE
+	YardKit.station(pk, kit, labels)
+	YardKit.platform(pk, kit, -32.0, 40.0, -12.0, z_edge, true, true, labels)
+	YardKit.goods_shed(pk, kit, -30.0, -4.0, labels)
+	var origin := Vector3(STATION_X, h, z_p + STATION_BACK)
+	_instance_mesh(root, "Station", _save_baked_resource(YardKit.commit(pk, kit), "station", YARD_PREFIX), Transform3D(Basis(), origin))
+	_yard_labels(root, labels, origin)
+	# The grain cooperative.
+	pk = YardKit.new_kit(PROP_SCALE)
+	kit = {}
+	labels = []
+	FactoryKit.factory(pk, kit, labels)
+	origin = Vector3(FACTORY_X, h, z_f - FactoryKit.TRACK_Z * PROP_SCALE)
+	_instance_mesh(root, "GrainCooperative", _save_baked_resource(YardKit.commit(pk, kit), "cooperative", YARD_PREFIX), Transform3D(Basis(), origin))
+	_yard_labels(root, labels, origin)
+	# The water tower by the end of the platform track.
 	pk = _scaled_kit(PROP_SCALE)
 	kit = {}
 	FreightKit.water_tower(pk, kit)
-	_instance_mesh(root, "TankTower", _save_baked_resource(pk.commit(kit), "tank_tower"), Transform3D(Basis(), Vector3(-105.0, h, 186.0)))
-	pk = _scaled_kit(PROP_SCALE)
-	kit = {}
-	FreightKit.silos(pk, kit)
-	_instance_mesh(root, "GrainSilos", _save_baked_resource(pk.commit(kit), "silos"), Transform3D(Basis(), Vector3(-205.0, h, 170.0)))
-	_label(root, "COOPERATIVA GRANERA", Vector3(-205.0 + 10.5 * PROP_SCALE, h + 6.6 * PROP_SCALE, 170.0 + 11.2 * PROP_SCALE), Basis(), 0.024, Color(0.96, 0.94, 0.88), 56)
-	# A siding behind them with wagons on it: track, then the cars standing on the rails.
-	var siding_z := 160.0
-	var pts: Array = []
-	var bed: Array = []
-	var top: float = h + RAIL_LIFT
-	var sx := -345.0
-	while sx <= -95.0:
-		pts.append(Vector3(sx, top, siding_z))
-		if pts.size() > 1:
-			bed.append(true)
-		sx += SAMPLE_STEP
-	var track := _instance_mesh(root, "SidingTrackBed", FreightKit.track_piece(pts, bed, 4242), Transform3D.IDENTITY)
-	track.name = "SidingTrackBed"
-	var parked := [["box", 0, -330.0], ["box", 1, -305.0], ["tank", 1, -278.0], ["flat_load", 0, -250.0], ["box", 2, -222.0]]
-	for w in parked:
-		var kind: String = w[0]
-		_instance_mesh(root, "ParkedWagon_%s_%d" % [kind, int(w[2])], TrainKit.build(kind, int(w[1])), Transform3D(Basis(Vector3.UP, PI * 0.5), Vector3(float(w[2]), top, siding_z)))
-	# Buffer stop at the siding's east end.
-	pk = FreightKit.new_kit()
-	kit = {}
-	pk.block(kit, "steel", Vector3(-96.0, top - 0.1, siding_z - 2.6), Vector3(-94.4, top + 2.6, siding_z + 2.6), Color(0.45, 0.10, 0.08))
-	_instance_mesh(root, "BufferStop", pk.commit(kit), Transform3D.IDENTITY)
-	print("  depot built on a pad at %.1fm" % h)
+	_instance_mesh(root, "TankTower", _save_baked_resource(pk.commit(kit), "tank_tower", YARD_PREFIX), Transform3D(Basis(), Vector3(WATER_TOWER_AT.x, h, WATER_TOWER_AT.y)))
+	# Stock standing on the yard: the express's diesel and two coaches against the platform, the yard switcher with
+	# three grain hoppers on the factory track, the first one under the loadout's spout.
+	_park_train(root, "StabledExpress", 0, ["ploco", "coach", "coach"], 7.0, true)
+	_park_train(root, "LoadingHoppers", 1, ["hopper", "hopper:1", "hopper", "loco:2"], 0.0, false, FACTORY_X)
+	print("  depot built on a pad at %.1fm (station at x %.0f, z %.0f; cooperative at x %.0f, z %.0f)" % [h, STATION_X, z_p + STATION_BACK, FACTORY_X, origin.z])
+
+
+## Letters for a yard building's signs: `labels` are [text, position, outward normal, cap height, colour] in the kit's
+## own units, placed by the building's origin and PROP_SCALE.
+func _yard_labels(parent: Node3D, labels: Array, origin: Vector3) -> void:
+	for l in labels:
+		var lab := Label3D.new()
+		lab.text = l[0]
+		lab.font_size = 64
+		lab.pixel_size = float(l[3]) * PROP_SCALE / 44.8
+		lab.modulate = l[4]
+		lab.outline_size = 4
+		lab.outline_modulate = Color(0.05, 0.05, 0.05)
+		lab.double_sided = false
+		var n: Vector3 = l[2]
+		lab.transform = Transform3D(Basis.looking_at(-n, Vector3.UP), origin + (l[1] as Vector3) * PROP_SCALE)
+		parent.add_child(lab)
+
+
+## A train standing still on yard track `si`: the head `from_end` metres short of the track's end, or (with `at_x`) the
+## middle of the first car at that x. It runs on the wall clock like the others, held at one clock reading.
+func _park_train(parent: Node3D, node_name: String, si: int, consist: Array, from_end: float, _at_end: bool, at_x := 1.0e9) -> void:
+	var samples: Array = _spurs[si]["samples"]
+	var top: PackedFloat32Array = _spurs[si]["top"]
+	var curve := Curve3D.new()
+	curve.bake_interval = 1.0
+	for k in range(samples.size()):
+		var q: Vector2 = samples[k]["p"]
+		curve.add_point(Vector3(q.x, top[k], q.y))
+	var length: float = curve.get_baked_length()
+	var head: float = length - from_end
+	if at_x < 1.0e8:
+		# Along the track to the point at `at_x`, then half the first car on (the head leads the car's middle by half).
+		var s_at := 0.0
+		for k in range(1, samples.size()):
+			if float(samples[k]["p"].x) >= at_x:
+				var x0: float = samples[k - 1]["p"].x
+				var x1: float = samples[k]["p"].x
+				s_at = lerpf(float(samples[k - 1]["s"]), float(samples[k]["s"]), (at_x - x0) / maxf(x1 - x0, 0.0001))
+				break
+		head = s_at + TrainKit.car_length(String(consist[0]).split(":")[0]) * 0.5
+	var train := Node3D.new()
+	train.name = node_name
+	train.set_script(load("res://Train.gd"))
+	train.set("path", curve)
+	train.set("consist", PackedStringArray(consist))
+	train.set("speed", 1.0)
+	train.set("period", 1.0e6)
+	train.set("kills", false)
+	train.set("sounds", false)
+	train.set("clock_override", head)
+	parent.add_child(train)
+	print("  %s: %d cars, head %.0fm along a %.0fm track" % [node_name, consist.size(), head, length])
 
 
 func _build_poles(level_scene: Node3D) -> void:
@@ -1208,7 +1593,7 @@ func _build_poles(level_scene: Node3D) -> void:
 			var p: Vector2 = _rail_at(ri, s)
 			var side := Vector2(right.x, right.z) * 11.0
 			var q: Vector2 = p + side
-			if _in_hill(p) or _near_crossing(ri, s, 34.0) or _near_pad(q, 10.0):
+			if _in_hill(p) or _near_crossing(ri, s, 34.0) or _near_pad(q, 10.0) or _spur_distance(q) < 12.0:
 				prev = PackedVector3Array()
 				s += 70.0
 				continue
@@ -1310,9 +1695,11 @@ func _build_flora(level_scene: Node3D) -> void:
 	var sage_meshes: Array = []
 	for v in 3:
 		sage_meshes.append(FreightKit.sage(100 + v))
-	var rock_meshes: Array = []
-	for v in 5:
-		rock_meshes.append(FreightKit.rock(300 + v))
+	# Rocks at unit height: low wide stones (a cart rides over these) and taller ones.
+	var rock_meshes := {}
+	for v in 4:
+		rock_meshes["rock_l%d" % v] = FreightKit.rock(300 + v, 1.7)
+		rock_meshes["rock_t%d" % v] = FreightKit.rock(320 + v, 1.0)
 	# Candidate spots along the lap: both sides, closer in more of them.
 	var cells := {}
 	var s := 0.0
@@ -1334,8 +1721,10 @@ func _build_flora(level_scene: Node3D) -> void:
 				kind = "sage_%d" % rng.randi_range(0, 2)
 				scl = rng.randf_range(0.9, 2.2)
 			elif roll < 0.80:
-				kind = "rock_%d" % rng.randi_range(0, 4)
-				scl = rng.randf_range(0.9, 4.0)
+				var rk: Dictionary = _pick_rock(rng, absf(lat))
+				kind = rk["kind"]
+				scl = rk["h"]
+				pos.y = _rock_base(pos, scl, rock_meshes[kind])
 			else:
 				var pl: Array = plants[rng.randi_range(0, plants.size() - 1)]
 				if rng.randf() > float(pl[3]) * 5.0:
@@ -1351,6 +1740,25 @@ func _build_flora(level_scene: Node3D) -> void:
 			cells[key].append(Transform3D(basis, pos))
 			placed += 1
 		s += 6.0
+	# Small stones right beside the road, where a cart that runs wide meets them.
+	s = 0.0
+	while s < float(_lap["len"]):
+		if rng.randf() < 0.55:
+			var side2: float = -1.0 if rng.randf() < 0.5 else 1.0
+			var lat2: float = side2 * (ROAD_HALF + 1.7 + rng.randf() * rng.randf() * 34.0)
+			var sp2: Dictionary = _spot(s + rng.randf_range(-2.0, 2.0), lat2, 0.0)
+			var pos2: Vector3 = sp2["pos"]
+			if _flora_ok(Vector2(pos2.x, pos2.z)):
+				var h2: float = rng.randf_range(0.2, 0.55)
+				var kind2: String = "rock_l%d" % rng.randi_range(0, 3)
+				pos2.y = _rock_base(pos2, h2, rock_meshes[kind2])
+				var basis2 := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * h2)
+				var key2 := "%s|%d|%d" % [kind2, floori(pos2.x / 160.0), floori(pos2.z / 160.0)]
+				if not cells.has(key2):
+					cells[key2] = []
+				cells[key2].append(Transform3D(basis2, pos2))
+				placed += 1
+		s += 5.0
 	for key in cells.keys():
 		var parts: PackedStringArray = String(key).split("|")
 		var kind: String = parts[0]
@@ -1362,7 +1770,7 @@ func _build_flora(level_scene: Node3D) -> void:
 			node_name = "groundcover_sage_%s_%s" % [parts[1], parts[2]]
 			range_end = 170.0
 		elif kind.begins_with("rock"):
-			mesh = rock_meshes[int(kind.substr(5))]
+			mesh = rock_meshes[kind]
 			node_name = "Boulders_%s_%s_%s" % [kind, parts[1], parts[2]]
 			range_end = 520.0
 		else:
@@ -1389,8 +1797,36 @@ func _build_flora(level_scene: Node3D) -> void:
 			mmi.visibility_range_end = vr[2]
 			if kind.begins_with("sage") or vr[1] > 0.0:
 				mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			if kind.begins_with("rock"):
+				# DressingColliders gives these the hull of the stone, not a box, and lets even the low ones
+				# (down to 15cm) be felt: a cart rides over a small one, hopping if it is fast.
+				mmi.set_meta(&"hull_collider", true)
+				mmi.set_meta(&"min_collider_height", 0.15)
 			root.add_child(mmi)
 	print("  desert: %d plants and rocks in %d cells" % [placed, cells.size()])
+
+
+## A rock's size and shape: mostly small low stones (under 60cm, a cart rides over them), some medium ones and a
+## few big ones, kept off the road by their size (`lat` is the lateral distance from the road's centre).
+func _pick_rock(rng: RandomNumberGenerator, lat: float) -> Dictionary:
+	var roll: float = rng.randf()
+	if roll < 0.64 or lat < 12.5:
+		return {"kind": "rock_l%d" % rng.randi_range(0, 3), "h": rng.randf_range(0.22, 0.60)}
+	if roll < 0.93 or lat < 16.0:
+		var tall: bool = rng.randf() < 0.5
+		return {"kind": "rock_%s%d" % ["t" if tall else "l", rng.randi_range(0, 3)], "h": rng.randf_range(0.8, 1.5)}
+	return {"kind": "rock_t%d" % rng.randi_range(0, 3), "h": rng.randf_range(1.6, 2.6)}
+
+
+## Where a rock of height `h` (its mesh at unit height) sits: its foot on the lowest ground under its footprint,
+## and a little more sunk, so no side of it hangs over a slope.
+func _rock_base(pos: Vector3, h: float, mesh: ArrayMesh) -> float:
+	var half: float = maxf(mesh.get_aabb().size.x, mesh.get_aabb().size.z) * 0.5 * h * 0.85
+	var lowest: float = _ground_at(pos.x, pos.z)
+	for k in range(8):
+		var a: float = TAU * float(k) / 8.0
+		lowest = minf(lowest, _ground_at(pos.x + cos(a) * half, pos.z + sin(a) * half))
+	return lowest - 0.12 * h
 
 
 ## Whether flora may stand at `p`: off the road, the rails, the hills, the depot and steep ground.
@@ -1404,7 +1840,7 @@ func _flora_ok(p: Vector2) -> bool:
 		var t: float = clampf((p - a).dot(ab) / ab.length_squared(), 0.0, 1.0)
 		if p.distance_to(a + ab * t) < 15.0:
 			return false
-	if _near_pad(p, 6.0):
+	if _near_pad(p, 6.0) or _spur_distance(p) < 14.0:
 		return false
 	if _hills(p.x, p.y) > 1.0:
 		return false
@@ -1558,10 +1994,10 @@ func _build_environment(level_scene: Node3D) -> void:
 #  Build
 # ======================================================================================
 
-func _save_baked_resource(res: Resource, res_name: String) -> Resource:
+func _save_baked_resource(res: Resource, res_name: String, prefix := RES_PREFIX) -> Resource:
 	if not DirAccess.dir_exists_absolute("res://generated/"):
 		DirAccess.make_dir_absolute("res://generated/")
-	var file_path: String = "res://generated/" + RES_PREFIX + res_name + ".res"
+	var file_path: String = "res://generated/" + prefix + res_name + ".res"
 	res.take_over_path(file_path)
 	ResourceSaver.save(res, file_path)
 	return load(file_path)
@@ -1607,6 +2043,7 @@ func _ready() -> void:
 	level_scene.add_child(track_path)
 
 	_plan_pads()
+	_build_spurs()
 	_add_samples()
 	_build_heights()
 	print("  heights built (%.1fs)" % ((Time.get_ticks_msec() - t_start) / 1000.0))
@@ -1634,6 +2071,7 @@ func _ready() -> void:
 	print("  terrain built (%.1fs)" % ((Time.get_ticks_msec() - t_start) / 1000.0))
 
 	_build_railways(level_scene)
+	_build_yard(level_scene)
 	_build_portals(level_scene)
 	_build_depot(level_scene)
 	_build_poles(level_scene)

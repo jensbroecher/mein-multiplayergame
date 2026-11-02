@@ -28,9 +28,13 @@ float vnoise(vec2 p) {
 void fragment() {
 	vec2 q = UV;
 	vec3 paint = pow(COLOR.rgb, vec3(2.2));
+	// The ribs are fine: past a few metres a pixel spans more than half a rib, and drawn sharp they alias into rings
+	// that crawl as the camera moves. Fade them to their average by the pixel's size in metres (outside any branch).
+	float fw = max(fwidth(q.x), fwidth(q.y));
+	float rib_vis = 1.0 - smoothstep(0.18 * pitch, 0.5 * pitch, fw);
 	float ph = q.x / pitch * TAU;
-	float rib = 0.5 + 0.5 * sin(ph);
-	float slope = cos(ph);
+	float rib = mix(0.5, 0.5 + 0.5 * sin(ph), rib_vis);
+	float slope = cos(ph) * rib_vis;
 
 	// Sheets: each one a little different in tone, lapped every sheet_w across and sheet_len up.
 	float sid = floor(q.x / sheet_w);
@@ -50,7 +54,7 @@ void fragment() {
 	rust = clamp(rust + lap * 0.12 * rust_amount, 0.0, 1.0);
 
 	vec3 col = paint * tone * (0.78 + 0.3 * rib);
-	col *= 1.0 - 0.3 * lap;
+	col *= 1.0 - 0.3 * lap * rib_vis;
 	vec3 rust_col = rust_color * (0.7 + 0.5 * vnoise(q * 11.0));
 	col = mix(col, rust_col, rust);
 

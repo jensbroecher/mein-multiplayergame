@@ -119,7 +119,7 @@ func block(kit: Dictionary, key: String, lo: Vector3, hi: Vector3, col: Color, u
 
 ## A box from `a` to `b` (its long axis), `w` wide and `t` thick, the width along `side` (or any
 ## horizontal if zero): beams, rails, planks and bars.
-func beam(kit: Dictionary, key: String, a: Vector3, b: Vector3, w: float, t: float, col: Color, side := Vector3.ZERO) -> void:
+func beam(kit: Dictionary, key: String, a: Vector3, b: Vector3, w: float, t: float, col: Color, side := Vector3.ZERO, uv_scale := 0.0) -> void:
 	var ax := b - a
 	var length := ax.length()
 	if length < 1e-5:
@@ -132,11 +132,11 @@ func beam(kit: Dictionary, key: String, a: Vector3, b: Vector3, w: float, t: flo
 			x = Vector3.RIGHT
 	x = (x - z * x.dot(z)).normalized()
 	var y := z.cross(x).normalized()
-	box(kit, key, Transform3D(Basis(x, y, z), (a + b) * 0.5), Vector3(w, t, length), col)
+	box(kit, key, Transform3D(Basis(x, y, z), (a + b) * 0.5), Vector3(w, t, length), col, uv_scale)
 
 
 ## A tube from a to b (radius ra at a, rb at b), smooth sided, with optional caps.
-func tube(kit: Dictionary, key: String, a: Vector3, b: Vector3, ra: float, rb: float, segs: int, col: Color, caps := true) -> void:
+func tube(kit: Dictionary, key: String, a: Vector3, b: Vector3, ra: float, rb: float, segs: int, col: Color, caps := true, uv_scale := 0.0) -> void:
 	var d := b - a
 	if d.length_squared() < 1e-10:
 		return
@@ -152,8 +152,17 @@ func tube(kit: Dictionary, key: String, a: Vector3, b: Vector3, ra: float, rb: f
 		var n0 := (d0 + axis * slope).normalized()
 		var n1 := (d1 + axis * slope).normalized()
 		var mid := (d0 + d1).normalized()
-		tri(kit, key, a + d0 * ra, a + d1 * ra, b + d1 * rb, n0, n1, n1, col, mid)
-		tri(kit, key, a + d0 * ra, b + d1 * rb, b + d0 * rb, n0, n1, n0, col, mid)
+		if uv_scale > 0.0:
+			# UVs in metres (times uv_scale): u round the tube, v along it.
+			var r_mid: float = (ra + rb) * 0.5
+			var u0: float = a0 * r_mid * uv_scale
+			var u1: float = a1 * r_mid * uv_scale
+			var vl: float = d.length() * uv_scale
+			tri(kit, key, a + d0 * ra, a + d1 * ra, b + d1 * rb, n0, n1, n1, col, mid, Vector2(u0, 0), Vector2(u1, 0), Vector2(u1, vl))
+			tri(kit, key, a + d0 * ra, b + d1 * rb, b + d0 * rb, n0, n1, n0, col, mid, Vector2(u0, 0), Vector2(u1, vl), Vector2(u0, vl))
+		else:
+			tri(kit, key, a + d0 * ra, a + d1 * ra, b + d1 * rb, n0, n1, n1, col, mid)
+			tri(kit, key, a + d0 * ra, b + d1 * rb, b + d0 * rb, n0, n1, n0, col, mid)
 		if caps:
 			if rb > 0.0:
 				tri(kit, key, b, b + d0 * rb, b + d1 * rb, axis, axis, axis, col, axis)

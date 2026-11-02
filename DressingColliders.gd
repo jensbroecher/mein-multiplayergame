@@ -10,6 +10,11 @@ extends Node
 ## or named in SOFT), the crowd, flags and tyre stacks (SpringProps), knockable props (KnockableProps),
 ## icicles, skid marks and shadow-only stand-ins.
 ##
+## A MultiMesh with the meta `hull_collider` gets the convex hull of its mesh (scaled by each instance) instead of
+## a box, so a rock is as wide as it looks and a low one is a bump a cart rides up and over, hopping if it is
+## fast; its meta `min_collider_height` (metres, default MIN_HEIGHT) is the lowest instance that is solid.
+## (Freight Line's boulders.)
+##
 ## The colliders go into one StaticBody3D per CELL, split into rock and plant bodies (their `surface`
 ## meta), shapes added through shape owners rather than as thousands of nodes. An instance the Detail
 ## Level hides (CanyonDetail.gd and the others draw only the first N of a MultiMesh) has its collider
@@ -47,6 +52,7 @@ const CART_RADIUS := 1.2
 ## mesh instance id -> {kind, r, h, centre, size} in the mesh's own frame (see _mesh_shape).
 var _mesh_info := {}
 var _shape_cache := {}
+var _hull_points := {}
 var _bodies := {}
 ## Per MultiMesh that owns instances: [mmi, [[body, owner id] per instance index or null], last count].
 var _owned: Array = []
@@ -81,6 +87,8 @@ func build(level: Node) -> void:
 		if info.is_empty():
 			continue
 		var rocky: bool = _named(mmi, ROCKY)
+		var hull_mode: bool = bool(mmi.get_meta(&"hull_collider", false))
+		var min_h: float = float(mmi.get_meta(&"min_collider_height", MIN_HEIGHT))
 		var brush: bool = not rocky and _brush(mmi.multimesh.mesh)
 		var mm: MultiMesh = mmi.multimesh
 		var to_world: Transform3D = mmi.global_transform
@@ -105,7 +113,7 @@ func build(level: Node) -> void:
 				continue
 			var sc: Vector3 = xf.basis.get_scale()
 			var height: float = float(info["h"]) * sc.y
-			if height < MIN_HEIGHT:
+			if height < min_h:
 				seen[key] = []
 				continue
 			if brush:
@@ -113,13 +121,20 @@ func build(level: Node) -> void:
 				_add_wobbler(be)
 				seen[key] = be
 				continue
-			var shape: Shape3D = _shape_for(mmi.multimesh.mesh, info, sc)
 			var basis: Basis = xf.basis.orthonormalized()
-			var centre: Vector3 = xf.origin + basis * (Vector3(info["centre"]) * sc)
+			var shape: Shape3D
+			var owner_xf: Transform3D
+			if hull_mode:
+				shape = _hull_for(mmi.multimesh.mesh, sc)
+				owner_xf = Transform3D(basis, xf.origin)
+			else:
+				shape = _shape_for(mmi.multimesh.mesh, info, sc)
+				var centre: Vector3 = xf.origin + basis * (Vector3(info["centre"]) * sc)
+				owner_xf = Transform3D(basis if info["kind"] == "box" else Basis(), centre)
 			var body: StaticBody3D = _body_at(level, xf.origin, rocky)
 			var owner_id: int = body.create_shape_owner(body)
 			body.shape_owner_add_shape(owner_id, shape)
-			body.shape_owner_set_transform(owner_id, body.global_transform.affine_inverse() * Transform3D(basis if info["kind"] == "box" else Basis(), centre))
+			body.shape_owner_set_transform(owner_id, body.global_transform.affine_inverse() * owner_xf)
 			owned[i] = [body, owner_id]
 			shapes_made += 1
 			any = true
@@ -377,6 +392,36 @@ func _shape_for(mesh: Mesh, info: Dictionary, sc: Vector3) -> Shape3D:
 		shape = box
 	_shape_cache[key] = shape
 	return shape
+
+
+## The convex hull of a mesh's distinct vertices, scaled: a rock's own shape. Shared by instances of about the
+## same size.
+func _hull_for(mesh: Mesh, sc: Vector3) -> Shape3D:
+	var key := "h%d:%d:%d" % [mesh.get_instance_id(), roundi(sc.x * 40.0), roundi(sc.y * 40.0)]
+	if _shape_cache.has(key):
+		return _shape_cache[key]
+	var id := mesh.get_instance_id()
+	var pts: PackedVector3Array
+	if _hull_points.has(id):
+		pts = _hull_points[id]
+	else:
+		pts = PackedVector3Array()
+		var seen := {}
+		for si in range(mesh.get_surface_count()):
+			var verts: PackedVector3Array = mesh.surface_get_arrays(si)[Mesh.ARRAY_VERTEX]
+			for q in verts:
+				var k := Vector3i(roundi(q.x * 200.0), roundi(q.y * 200.0), roundi(q.z * 200.0))
+				if not seen.has(k):
+					seen[k] = true
+					pts.append(q)
+		_hull_points[id] = pts
+	var scaled := PackedVector3Array()
+	for q in pts:
+		scaled.append(q * sc)
+	var hull := ConvexPolygonShape3D.new()
+	hull.points = scaled
+	_shape_cache[key] = hull
+	return hull
 
 
 func _body_at(level: Node, p: Vector3, rocky: bool) -> StaticBody3D:

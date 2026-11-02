@@ -12,7 +12,7 @@ func _init() -> void:
 	var args := OS.get_cmdline_user_args()
 	var out: String = args[0]
 	var head := 150.0
-	var consist := PackedStringArray(["loco", "box", "box:1", "flat", "flat_load", "gap:16", "tank", "tank:1", "box:2", "caboose"])
+	var consist := PackedStringArray(["loco", "box", "hopper", "flat", "flat_load", "tank", "hopper:1", "box:2", "caboose"])
 	var fov := 40.0
 	var sun_rot := Vector3(-55.0, 38.0, 0.0)
 	var shots := []
