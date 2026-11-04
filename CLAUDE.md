@@ -343,7 +343,10 @@ the others re-bakes it (see Lakeside Course below).
     vertex alpha: 0 grown, 0.5 asphalt, 1 concrete slabs. The town (`_build_city`, `_add_building`): city_building.gdshader
     facades under tile and slate hip roofs, merged per 450m tile; the harbour front row, the city grid with downtown to the
     north-east, the old town's pastel houses up the west hill. Breakwaters (`WEST_BREAKWATER`, `EAST_MOLE`): granite
-    mounds, crown walls, tetrapods and armour stone, the red (west) and green (east) entrance lights. The terminal:
+    mounds, crown walls, tetrapods and armour stone, the red (west) and green (east) entrance lights, each on a head
+    (`_roundhead`, `HEAD_R`, `HEAD_TOP`): a cone of rubble wrapping the mound's end with tetrapods round its seaward half,
+    a round concrete block on it (tide line, railing, bollards) the light stands on, the crown wall stopping at it (the
+    mound had ended cut off square with the light's foot half over the water). The terminal:
     the feeder ship BLOOMBAY STAR alongside (`ShipKit.container_ship`, bow north), three ship-to-shore cranes
     (`PortKit.sts_crane`, one boom raised), the yard and two RTGs. The marina below the old town (pontoons, moored
     yachts and trawlers), trawlers at the fish market, boats under way (SeaBoat.gd with the boats saved as
@@ -364,6 +367,29 @@ the others re-bakes it (see Lakeside Course below).
     the boot-topping band at 10.8m): one at anchor off the harbour mouth, one cruising past. `_cruise_scene` merges each
     file's ~1,500 meshes into one surface per material (turned bow +z for SeaBoat) plus a far mesh without the parts
     under `CRUISE_SMALL`, past `CRUISE_NEAR`.
+  - The small craft (`ShipKit.fishing_boat`, `sailboat`, `tug`, their sizes in `TRAWLER`, `YACHT`, `TUG`) share `hull`:
+    smooth normals along and up each side (the transom flat), a sheer rising to the bow, bulwarks inside where the sheer
+    stands over the deck, `strake` for rubbing strakes and toe rails. Fittings: `deckhouse` (raked front windows),
+    `lifelines`, `fender`, `tyre_fender`, `liferaft`, `radar`, `nav_light`; `axis_basis` turns a ring to face along an
+    axis. Trawlers moor only on a pontoon's south side (two stern to stern across a gap overlapped).
+  - Sound: StageAmbience's harbour layer (`sounds/harbor/harbor_pier_ambiance*.wav`, -30 dBFS) with the town under it
+    (`sounds/city/`, -38); only clips in `CLIP_DB` play, so the folder's engine and horns stay out of the bed. SeaBoat's
+    optional `engine_sound` (a loop on the hull; the diesel's import loops) and `horns` (a blast every `horn_gap`
+    seconds): the trawlers and the tug run the diesel, the tug sounds its horn, the cruising liner the same horns
+    pitched down (0.48) heard across the bay; the tug alongside the terminal idles (`TugAlongsideEngine`). Levels from
+    the clips' measured RMS (`DIESEL_RMS`, `TUG_HORN_RMS`) to `ENGINE_LEVEL`/`HORN_LEVEL` at the unit size (engines 40-55m,
+    horns 160-400m: at 14-20m and -26 dBFS nobody heard them from the track).
+  - Wakes: SeaBoat's optional `wake_width`/`wake_spread`/`wake_seconds` lay a ribbon of foam along the way the boat came
+    (stern samples every 0.25s in an ImmediateMesh, pre-filled from the clock at load) and a bow wave on the hull,
+    `boat_wake.gdshader` (thin broken arms, churn behind the stern, drawn after the water: render_priority 2; its normal
+    forced up, or the strip's back came out dark grey).
+    `res://scratch/harbor_sound_check.tscn` (windowed) lists the layers and every boat's players.
+  - The steel channel bridges (`HarborBridge_*`) drum under the wheels: `BridgeRumble.gd` (`decks`, their boxes read in
+    `_read_quays`) plays, for every cart it sees, a synthesised hollow steel rumble that rises with speed, a plate clank
+    every `JOINT_STEP` (3m) and a clang over the expansion joint on and off (no recording: all made in code, like
+    RailRumble's). `res://scratch/bridge_rumble_check.tscn -- [speed=25]` (windowed) drives a stand-in across and logs it.
+  - The jump ramps' barriers (TerrainGenerator, `Rail_Jump*_Takeoff/Landing_*`) stand on the ramps' edges (7.8-8.2m out)
+    and reach down past their 0.65m-thick undersides: at 8.2m and from the ramp's top they hung beside it over the water.
   - Signs are Label3Ds with `alpha_cut` DISCARD: blended, the ship's name sorted against the water and lost pieces.
     Anything laid on a wall stands 6cm (life) proud: the roller doors at 2cm flickered against the brick.
 - `HarborDetail.gd` (on PortScenery) follows the Detail Level: High draws what the generator built, Ultra the extra
@@ -685,7 +711,8 @@ in front of the water while driving (Msitu Falls, Bloombay Dunes). `canyon_river
   stands at the finish, so only the finish hears it; Lakeside's across the first corner, 150m from the line.
   `res://scratch/crowd_cheer_check.tscn` (headless) lists what each stage plays. Nyota's paper banner cheers too
   when the first cart bursts it.
-- `StageAmbience.gd` (added by Level) plays the recorded backgrounds in `sounds/<kind>/` per stage (`STAGES`),
+- `StageAmbience.gd` (added by Level) plays the recorded backgrounds in `sounds/<kind>/` per stage (`STAGES`; Harbor Pier:
+  `harbor` and `city`),
   under the levels' own baked ambiences, crossfading random clips. Each clip is levelled by its measured
   RMS (`CLIP_DB`): they range from -12 to -49 dBFS. Measure a new clip before adding it. The deserts
   (Mountain Pass's dunes too: it had the forest layer, birdsong over sand) have none: nothing recorded

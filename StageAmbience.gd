@@ -16,6 +16,12 @@ const CLIP_DB := {
 	"res://sounds/beach/beach_ambiance_2.wav": -25.5,
 	"res://sounds/beach/beach_ambiance_3.wav": -28.7,
 	"res://sounds/beach/beach_ambiance_4.wav": -46.1,
+	"res://sounds/city/city_ambiance1.wav": -39.7,
+	"res://sounds/city/city_ambiance2.wav": -34.3,
+	"res://sounds/city/city_ambiance3.wav": -34.5,
+	"res://sounds/city/city_ambiance4.wav": -40.5,
+	"res://sounds/harbor/harbor_pier_ambiance.wav": -35.4,
+	"res://sounds/harbor/harbor_pier_ambiance2.wav": -40.8,
 	"res://sounds/blizzard/blizzard_1.wav": -20.5,
 	"res://sounds/blizzard/blizzard_2.wav": -22.3,
 	"res://sounds/blizzard/blizzard_3.wav": -11.7,
@@ -43,7 +49,8 @@ const CLIP_DB := {
 const STAGES := {
 	"LakesideLevel": [["insects_birds", -31.0], ["forest", -37.0]],
 	"PinecrestRidgeLevel": [["forest", -30.0], ["insects_birds", -38.0]],
-	"HarborPierLevel": [["beach", -30.0]],
+	# The harbour's own recordings, the town all round it under them (the boat engines and horns are SeaBoat's, in 3D).
+	"HarborPierLevel": [["harbor", -30.0], ["city", -38.0]],
 	"BloombayDunesLevel": [["beach", -32.0]],
 	"MaraCrossingLevel": [["insects_birds", -30.0]],
 	"NyotaStadiumLevel": [["stadium", -27.0]],

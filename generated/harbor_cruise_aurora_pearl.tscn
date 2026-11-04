@@ -3,15 +3,15 @@
 [ext_resource type="ArrayMesh" path="res://generated/harbor_cruise_aurora_pearl_near.res" id="1_4dqr4"]
 [ext_resource type="ArrayMesh" path="res://generated/harbor_cruise_aurora_pearl_far.res" id="2_mrv8n"]
 
-[node name="Liner" type="Node3D" unique_id=498700523]
+[node name="Liner" type="Node3D" unique_id=1419902635]
 
-[node name="Near" type="MeshInstance3D" parent="." unique_id=1422723731]
+[node name="Near" type="MeshInstance3D" parent="." unique_id=1359464205]
 visibility_range_end = 700.0
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_4dqr4")
 
-[node name="Far" type="MeshInstance3D" parent="." unique_id=1910506325]
+[node name="Far" type="MeshInstance3D" parent="." unique_id=478821231]
 cast_shadow = 0
 visibility_range_begin = 700.0
 visibility_range_begin_margin = 40.0

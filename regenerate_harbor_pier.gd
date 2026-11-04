@@ -335,6 +335,7 @@ var _rails: Array = []      # Rect2: the crash barriers and the skyway's rails, 
 var _junctions: Array = []  # Vector2: the corner blocks' middles (the racing line cuts their inside)
 var _ramps: Array = []      # Rect2: the jump ramps
 var _keep_clear: Array = [] # [Vector2, radius]: gates, boost pads, the grid
+var _bridge_boxes: Array[AABB] = []  # the steel channel bridges' decks (BridgeRumble)
 var _mats := {}
 
 
@@ -345,6 +346,13 @@ func _build_scenery(level_scene: Node3D, tg: Node3D) -> void:
 	# The Detail Level scales the trees, the armour and the props' draw distances (High is what's built here).
 	root.set_script(load("res://HarborDetail.gd"))
 	level_scene.add_child(root)
+	# The steel bridges drum under the wheels (BridgeRumble.gd, synthesised: no recording).
+	var rumble := Node3D.new()
+	rumble.name = "BridgeRumble"
+	rumble.set_script(load("res://BridgeRumble.gd"))
+	rumble.set("decks", _bridge_boxes)
+	root.add_child(rumble)
+	print("  bridge rumble: %d steel decks" % _bridge_boxes.size())
 	_build_wharf_buildings(root)
 	_build_wharf_cargo(root)
 	_build_quay_furniture(root)
@@ -380,6 +388,8 @@ func _read_quays(tg: Node3D, level_scene: Node3D) -> void:
 			if nm.contains("Pillar"):
 				continue
 			_decks.append([r, nm])
+			if nm.begins_with("HarborBridge_"):
+				_bridge_boxes.append(box)
 	for c2 in piers.get_children():
 		if String(c2.name).begins_with("Junction_") and String(c2.name).ends_with("_Hull"):
 			var mi := c2 as MeshInstance3D
@@ -1092,6 +1102,9 @@ func _build_breakwaters(root: Node3D) -> void:
 			var sea2: Vector2 = left2 * sea_side
 			var wa: Vector2 = a + sea2 * (MOUND_HALF - 1.0)
 			var wb: Vector2 = b + sea2 * (MOUND_HALF - 1.0)
+			# The crown wall stops at the head's block (it had run on to the very end, past the light's foot).
+			if k == line.size() - 2:
+				wb -= dir2 * HEAD_R * 0.75
 			walls_pk.beam(walls_kit, "quay", Vector3(wa.x, MOUND_CREST + 0.6, wa.y), Vector3(wb.x, MOUND_CREST + 0.6, wb.y), 1.6, 3.6, Color(0.72, 0.7, 0.66), Vector3(sea2.x, 0, sea2.y))
 			walls_pk.beam(walls_kit, "quay", Vector3(a.x, MOUND_CREST - 0.9, a.y), Vector3(b.x, MOUND_CREST - 0.9, b.y), 10.0, 1.2, Color(0.68, 0.66, 0.62), Vector3(left2.x, 0, left2.y))
 			var mid := (a + b) * 0.5
@@ -1107,6 +1120,19 @@ func _build_breakwaters(root: Node3D) -> void:
 	var bmesh: ArrayMesh = PortKit.rock_mesh(31, Vector3(1.0, 0.8, 1.2), rock)
 	_multimesh_cells(node, "Boulders", _save_res(bmesh, "mound_boulder"), boulder_xf, 200.0, 650.0)
 	_solid(node, "BreakwaterSolid", shapes, "rock")
+	# The heads: a roundhead of rubble and tetrapods round each end, a concrete block on it, the light on that.
+	var head_xf: Array = []
+	var hpk := PortKit.new_port_kit(1.0)
+	var hkit := {}
+	for hd in [[WEST_BREAKWATER, -1.0], [EAST_MOLE, 1.0]]:
+		var hl: Array = hd[0]
+		var tip: Vector2 = hl[hl.size() - 1]
+		var back: Vector2 = ((hl[hl.size() - 2] as Vector2) - tip).normalized()
+		_roundhead(node, rock, noise, tip, back, head_xf, rng, hpk, hkit)
+		shapes.append(_cyl_shape(HEAD_R, MOUND_CREST - SEABED_Y, Vector3(tip.x, SEABED_Y, tip.y)))
+	_multimesh_cells(node, "Tetrapods_head", tmesh, head_xf, 200.0, 650.0)
+	_mesh_node(node, "HeadBlocks", _commit_kit(hpk, hkit, "head_blocks"))
+	_solid(node, "HeadSolid", shapes.slice(shapes.size() - 2), "rock")
 	# The lights at the heads.
 	for head in [[WEST_BREAKWATER[WEST_BREAKWATER.size() - 1], Color(0.78, 0.12, 0.10), "BLOOMBAY  W"], [EAST_MOLE[EAST_MOLE.size() - 1], Color(0.12, 0.52, 0.24), "BLOOMBAY  E"]]:
 		var hp: Vector2 = head[0]
@@ -1114,11 +1140,11 @@ func _build_breakwaters(root: Node3D) -> void:
 		var lkit := {}
 		var labels: Array = []
 		PortKit.harbour_light(lpk, lkit, Vector3.ZERO, head[1], labels, head[2])
-		var xf := Transform3D(Basis(Vector3.UP, PI if hp.x > 0.0 else 0.0).scaled(Vector3.ONE * PROP_SCALE), Vector3(hp.x, MOUND_CREST - 0.3, hp.y))
+		var xf := Transform3D(Basis(Vector3.UP, PI if hp.x > 0.0 else 0.0).scaled(Vector3.ONE * PROP_SCALE), Vector3(hp.x, HEAD_TOP, hp.y))
 		lpk.set_frame(Transform3D.IDENTITY)
 		_mesh_node(node, "HarbourLight_%s" % ("E" if hp.x > 200.0 else "W"), _commit_kit(lpk, lkit, "harbour_light_%d" % int(hp.x)), xf)
 		_labels(node, labels, xf)
-		_solid(node, "HarbourLightSolid_%d" % int(hp.x), [_cyl_shape(3.4 * PROP_SCALE, 18.0 * PROP_SCALE, Vector3(hp.x, MOUND_CREST - 0.3, hp.y))])
+		_solid(node, "HarbourLightSolid_%d" % int(hp.x), [_cyl_shape(3.4 * PROP_SCALE, 18.0 * PROP_SCALE, Vector3(hp.x, HEAD_TOP, hp.y))])
 	print("  breakwaters: %d tetrapods, %d boulders" % [tetra_xf.size(), boulder_xf.size()])
 
 
@@ -1820,7 +1846,10 @@ func _build_marina(root: Node3D) -> void:
 					var kind: String = ["sail_blue", "sail_red", "sail_green", "sail_blue", "fishing_red", "fishing_blue"][rng.randi() % 6]
 					if pz == PONTOONS_Z[0] and sz < 0.0:
 						continue
-					var length: float = (15.0 if kind.begins_with("fishing") else 11.0) * PROP_SCALE
+					# Trawlers only on a pontoon's south side: two moored stern to stern across a gap overlapped.
+					if kind.begins_with("fishing") and sz < 0.0:
+						kind = ["sail_blue", "sail_red", "sail_green"][rng.randi() % 3]
+					var length: float = (ShipKit.TRAWLER["L"] if kind.begins_with("fishing") else ShipKit.YACHT["L"]) * PROP_SCALE
 					var bz: float = pz + sz * (PONTOON_W * 0.5 + 0.8 + length * 0.5)
 					var yaw: float = PI if sz > 0.0 else 0.0
 					var xf := Transform3D(Basis(Vector3.UP, yaw + rng.randf_range(-0.03, 0.03)).scaled(Vector3.ONE * PROP_SCALE), Vector3(fx + FINGER_EVERY * 0.5, WATER_Y, bz))
@@ -1885,6 +1914,7 @@ func _build_boats(root: Node3D) -> void:
 		boat.set("heel_deg", b[8])
 		boat.set("wind", Vector3(0.82, 0, 0.57))
 		boat.set("body_top", b[9])
+		_boat_sounds(boat, String(b[1]))
 		node.add_child(boat)
 	for cs in CRUISE_SHIPS:
 		var scene := _cruise_scene(cs[1], String(cs[0]).to_snake_case())
@@ -1906,7 +1936,30 @@ func _build_boats(root: Node3D) -> void:
 		ship.set("roll_deg", 0.15)
 		ship.set("pitch_deg", 0.05)
 		ship.set("body_top", 30.0)
+		if float(cs[6]) > 0.0:
+			# The liner under way sounds her horn now and then: the tug's, an octave and more down, heard across the bay.
+			ship.set("horns", [load(TUG_HORNS[0]), load(TUG_HORNS[1])] as Array[AudioStream])
+			ship.set("horn_db", PackedFloat32Array([HORN_LEVEL - TUG_HORN_RMS[0] + 4.0, HORN_LEVEL - TUG_HORN_RMS[1] + 4.0]))
+			ship.set("horn_unit", 400.0)
+			ship.set("wake_width", 34.0)
+			ship.set("wake_spread", 1.6)
+			ship.set("wake_seconds", 40.0)
+			ship.set("horn_pitch", 0.48)
+			ship.set("horn_gap", Vector2(100.0, 190.0))
+			ship.set("horn_y", 60.0)
 		node.add_child(ship)
+	# The tug alongside the terminal idles.
+	var idle := AudioStreamPlayer3D.new()
+	idle.name = "TugAlongsideEngine"
+	idle.stream = load(DIESEL)
+	idle.bus = &"SFX"
+	idle.volume_db = ENGINE_LEVEL - DIESEL_RMS - 4.0
+	idle.unit_size = 35.0
+	idle.max_distance = 500.0
+	idle.pitch_scale = 0.72
+	idle.autoplay = true
+	idle.position = Vector3(QUAY_E_X - 9.0, WATER_Y + 3.0, 118.0)
+	node.add_child(idle)
 
 
 ## A liner's model merged into one mesh per material, turned so its bow is along +z (SeaBoat's convention): the
@@ -2206,3 +2259,119 @@ func _build_cathedral(node: Node3D) -> void:
 		_occupied[c] = true
 	_solid(node, "CathedralSolid", [_box_shape(Vector3(62.0, 38.0, 72.0) * PROP_SCALE, Transform3D(b, Vector3(mid.x, floor_y + 19.0 * PROP_SCALE, mid.z)))])
 	print("  cathedral: floor %.1fm (ground %.1f in front, %.1f behind), towers to %.0fm" % [floor_y, g_front, g_back, floor_y + 67.0 * PROP_SCALE])
+
+
+# --------------------------------------------------------------------------------------
+#  The boats' sounds (sounds/harbor/: SeaBoat plays them on the hull)
+# --------------------------------------------------------------------------------------
+const DIESEL := "res://sounds/harbor/boat_diesel_engine.wav"
+const DIESEL_RMS := -18.4
+const TUG_HORNS := ["res://sounds/harbor/tug_boat_horn.wav", "res://sounds/harbor/tug_boat_horn2.wav"]
+const TUG_HORN_RMS := [-28.1, -30.2]
+## An engine is brought to this RMS at its unit size (about a cart's engine heard from behind), a horn to HORN_LEVEL at its.
+const ENGINE_LEVEL := -16.0
+const HORN_LEVEL := -10.0
+
+func _boat_sounds(boat: Node3D, kind: String) -> void:
+	if kind.begins_with("sail"):
+		# Under sail: quiet, a slim wake.
+		boat.set("wake_width", 4.0)
+		boat.set("wake_spread", 0.45)
+		return
+	var tug: bool = kind == "tug"
+	boat.set("engine_sound", load(DIESEL))
+	boat.set("engine_db", ENGINE_LEVEL - DIESEL_RMS + (2.0 if tug else 0.0))
+	boat.set("engine_unit", 55.0 if tug else 40.0)
+	boat.set("wake_width", 8.0 if tug else 6.0)
+	boat.set("wake_spread", 0.7)
+	boat.set("engine_pitch", 0.85 if tug else 0.95 + 0.17 * float(absi(hash(String(boat.name))) % 100) / 100.0)
+	if tug:
+		boat.set("horns", [load(TUG_HORNS[0]), load(TUG_HORNS[1])] as Array[AudioStream])
+		boat.set("horn_db", PackedFloat32Array([HORN_LEVEL - TUG_HORN_RMS[0], HORN_LEVEL - TUG_HORN_RMS[1]]))
+		boat.set("horn_unit", 160.0)
+		boat.set("horn_gap", Vector2(35.0, 80.0))
+		boat.set("horn_y", 8.0)
+
+
+## A breakwater's head: a round concrete block HEAD_R across (its top HEAD_TOP, the light's foot), rising out of the water
+## with the tide line on it, a railing round its seaward side, bollards; under it a roundhead of granite rubble wrapping
+## the mound's end, with tetrapods piled round the seaward half (`back` points back along the breakwater).
+const HEAD_R := 10.0
+const HEAD_TOP := MOUND_CREST - 0.3
+
+func _roundhead(node: Node3D, rock: Material, noise: FastNoiseLite, tip: Vector2, back: Vector2, xfs: Array, rng: RandomNumberGenerator, pk: PropKit, kit: Dictionary) -> void:
+	# The rubble cone: rings of the mound's own profile, all the way round.
+	var prof := [Vector2(MOUND_HALF + 24.0, SEABED_Y), Vector2(MOUND_HALF + 10.0, WATER_Y - 0.6), Vector2(HEAD_R + 2.5, MOUND_CREST - 2.4),
+			Vector2(HEAD_R - 0.5, MOUND_CREST - 2.2)]
+	var segs := 36
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var ring := func(i: int, j: int) -> Vector3:
+		var a: float = TAU * float(i % segs) / float(segs)
+		var pr: Vector2 = prof[j]
+		var q := tip + Vector2(cos(a), sin(a)) * pr.x
+		var y: float = pr.y + (noise.get_noise_2d(q.x, q.y) * 0.9 if j > 0 else 0.0)
+		return Vector3(q.x, y, q.y)
+	for i in range(segs):
+		for j in range(prof.size() - 1):
+			var v00: Vector3 = ring.call(i, j)
+			var v10: Vector3 = ring.call(i + 1, j)
+			var v01: Vector3 = ring.call(i, j + 1)
+			var v11: Vector3 = ring.call(i + 1, j + 1)
+			for t in [[v00, v10, v11], [v00, v11, v01]]:
+				var va: Vector3 = t[0]
+				var vb: Vector3 = t[1]
+				var vc: Vector3 = t[2]
+				if (vc - va).cross(vb - va).y < 0.0:
+					var tmp := vb
+					vb = vc
+					vc = tmp
+				for v in [va, vb, vc]:
+					st.set_color(Color(0.85 + 0.15 * noise.get_noise_2d(v.x * 3.0, v.z * 3.0), clampf((v.y - WATER_Y) / 2.5, 0.0, 1.0), 0, 1))
+					st.add_vertex(v)
+	st.index()
+	st.generate_normals()
+	var mesh := st.commit()
+	mesh.surface_set_material(0, rock)
+	_mesh_node(node, "Roundhead_%d" % int(tip.x), _save_res(mesh, "roundhead_%d" % int(tip.x + 1000.0)))
+	# Tetrapods in three rings round the seaward half and the sides.
+	for row in range(3):
+		var r: float = HEAD_R + 3.0 + float(row) * 3.6
+		var n: int = int(TAU * r / 3.6)
+		for k in range(n):
+			var a: float = TAU * (float(k) + rng.randf_range(-0.3, 0.3)) / float(n)
+			var d := Vector2(cos(a), sin(a))
+			if d.dot(back) > 0.55:
+				continue
+			var q := tip + d * (r + rng.randf_range(-0.6, 0.6))
+			var y: float = lerpf(MOUND_CREST - 2.0, WATER_Y - 0.4, float(row) / 2.4) + rng.randf_range(-0.3, 0.4)
+			var basis := Basis(Vector3(rng.randf_range(-1, 1), rng.randf_range(-1, 1), rng.randf_range(-1, 1)).normalized(), rng.randf() * TAU)
+			xfs.append(Transform3D(basis.scaled(Vector3.ONE * PROP_SCALE * rng.randf_range(0.9, 1.15)), Vector3(q.x, y, q.y)))
+	# The block: a drum of concrete from under the water to the light's foot, a coping, its deck.
+	var c := Vector3(tip.x, 0, tip.y)
+	pk.lathe(kit, "pile", c + Vector3(0, WATER_Y - 3.0, 0), [Vector2(0.001, 0.0), Vector2(HEAD_R + 0.4, 0.0), Vector2(HEAD_R + 0.4, 0.6), Vector2(HEAD_R, 0.8),
+			Vector2(HEAD_R, HEAD_TOP - WATER_Y + 2.6), Vector2(HEAD_R + 0.3, HEAD_TOP - WATER_Y + 2.7), Vector2(HEAD_R + 0.3, HEAD_TOP - WATER_Y + 3.0),
+			Vector2(0.001, HEAD_TOP - WATER_Y + 3.0)], 40, Color(0.74, 0.72, 0.68), false)
+	# A railing round the seaward side, bollards on the harbour side, a ladder down to the water.
+	var ring_r: float = HEAD_R - 0.4
+	var prev := Vector3.ZERO
+	var had := false
+	for k in range(41):
+		var a: float = TAU * float(k) / 40.0
+		var d := Vector2(cos(a), sin(a))
+		var p := Vector3(tip.x + d.x * ring_r, HEAD_TOP, tip.y + d.y * ring_r)
+		if d.dot(back) > 0.45:
+			had = false
+			continue
+		pk.tube(kit, "steel", p, p + Vector3(0, 1.7, 0), 0.05, 0.05, 6, Color(0.86, 0.66, 0.12), false)
+		if had:
+			pk.tube(kit, "steel", prev + Vector3(0, 1.7, 0), p + Vector3(0, 1.7, 0), 0.05, 0.05, 6, Color(0.86, 0.66, 0.12), false)
+			pk.tube(kit, "steel", prev + Vector3(0, 0.85, 0), p + Vector3(0, 0.85, 0), 0.04, 0.04, 6, Color(0.86, 0.66, 0.12), false)
+		prev = p
+		had = true
+	var side := Vector2(back.y, -back.x)
+	for sgn in [-1.0, 1.0]:
+		var bp: Vector2 = tip + (side * sgn + back * 0.35).normalized() * (HEAD_R - 1.4)
+		pk.set_frame(Transform3D(Basis.from_scale(Vector3.ONE * PROP_SCALE), Vector3(bp.x, HEAD_TOP, bp.y)))
+		PortKit.bollard(pk, kit, Vector3.ZERO)
+	pk.reset_frame()

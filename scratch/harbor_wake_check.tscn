@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scratch/harbor_wake_check.gd" id="1"]
+
+[node name="HarborWakeCheck" type="Node"]
+script = ExtResource("1")

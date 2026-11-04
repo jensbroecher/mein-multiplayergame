@@ -3902,10 +3902,10 @@ func _add_harbor_piers() -> void:
 	# E. South Pier / Jump 2 Guardrails
 	_harbor_add_railing(root, "Rail_Jump2_PreN", Vector3(-48.0, HARBOR_DECK_Y, 116.8), Vector3(-85.0, HARBOR_DECK_Y, 116.8), barrier_mat)
 	_harbor_add_railing(root, "Rail_Jump2_PreS", Vector3(-48.0, HARBOR_DECK_Y, 133.2), Vector3(-85.0, HARBOR_DECK_Y, 133.2), barrier_mat)
-	_harbor_add_sloped_box(root, "Rail_Jump2_Takeoff_N", Vector3(-85.0, HARBOR_DECK_Y + 0.6, 116.8), Vector3(-97.0, HARBOR_DECK_Y + 1.8 + 0.6, 116.8), 0.4, 1.2, barrier_mat, "")
-	_harbor_add_sloped_box(root, "Rail_Jump2_Takeoff_S", Vector3(-85.0, HARBOR_DECK_Y + 0.6, 133.2), Vector3(-97.0, HARBOR_DECK_Y + 1.8 + 0.6, 133.2), 0.4, 1.2, barrier_mat, "")
-	_harbor_add_sloped_box(root, "Rail_Jump2_Landing_N", Vector3(-113.0, HARBOR_DECK_Y + 0.7 + 0.6, 116.8), Vector3(-127.0, HARBOR_DECK_Y + 0.6, 116.8), 0.4, 1.2, barrier_mat, "")
-	_harbor_add_sloped_box(root, "Rail_Jump2_Landing_S", Vector3(-113.0, HARBOR_DECK_Y + 0.7 + 0.6, 133.2), Vector3(-127.0, HARBOR_DECK_Y + 0.6, 133.2), 0.4, 1.2, barrier_mat, "")
+	_harbor_add_sloped_box(root, "Rail_Jump2_Takeoff_N", Vector3(-85.0, HARBOR_DECK_Y + 0.25, 117.0), Vector3(-97.0, HARBOR_DECK_Y + 1.8 + 0.25, 117.0), 0.4, 1.9, barrier_mat, "")
+	_harbor_add_sloped_box(root, "Rail_Jump2_Takeoff_S", Vector3(-85.0, HARBOR_DECK_Y + 0.25, 133.0), Vector3(-97.0, HARBOR_DECK_Y + 1.8 + 0.25, 133.0), 0.4, 1.9, barrier_mat, "")
+	_harbor_add_sloped_box(root, "Rail_Jump2_Landing_N", Vector3(-113.0, HARBOR_DECK_Y + 0.7 + 0.25, 117.0), Vector3(-127.0, HARBOR_DECK_Y + 0.25, 117.0), 0.4, 1.9, barrier_mat, "")
+	_harbor_add_sloped_box(root, "Rail_Jump2_Landing_S", Vector3(-113.0, HARBOR_DECK_Y + 0.7 + 0.25, 133.0), Vector3(-127.0, HARBOR_DECK_Y + 0.25, 133.0), 0.4, 1.9, barrier_mat, "")
 	_harbor_add_railing(root, "Rail_Jump2_PostN", Vector3(-127.0, HARBOR_DECK_Y, 116.8), Vector3(-167.0, HARBOR_DECK_Y, 116.8), barrier_mat)
 	_harbor_add_railing(root, "Rail_Jump2_PostS", Vector3(-127.0, HARBOR_DECK_Y, 133.2), Vector3(-167.0, HARBOR_DECK_Y, 133.2), barrier_mat)
 
@@ -3918,7 +3918,7 @@ func _add_harbor_piers() -> void:
 	_harbor_add_railing(root, "Rail_NW_OuterNorth", Vector3(-183.2, HARBOR_DECK_Y, -103.2), Vector3(-150.0, HARBOR_DECK_Y, -103.2), barrier_mat)
 
 	# H. Jump 1 Flanking Side Rails (North Pier)
-	_harbor_add_sloped_box(root, "Rail_Jump1_Takeoff_N", Vector3(56.0, HARBOR_DECK_Y + 0.6, -103.2), Vector3(70.0, HARBOR_DECK_Y + 2.35 + 0.6, -103.2), 0.4, 1.2, barrier_mat, "")
-	_harbor_add_sloped_box(root, "Rail_Jump1_Takeoff_S", Vector3(56.0, HARBOR_DECK_Y + 0.6, -86.8), Vector3(70.0, HARBOR_DECK_Y + 2.35 + 0.6, -86.8), 0.4, 1.2, barrier_mat, "")
-	_harbor_add_sloped_box(root, "Rail_Jump1_Landing_N", Vector3(94.0, HARBOR_DECK_Y + 0.85 + 0.6, -103.2), Vector3(110.0, HARBOR_DECK_Y + 0.6, -103.2), 0.4, 1.2, barrier_mat, "")
-	_harbor_add_sloped_box(root, "Rail_Jump1_Landing_S", Vector3(94.0, HARBOR_DECK_Y + 0.85 + 0.6, -86.8), Vector3(110.0, HARBOR_DECK_Y + 0.6, -86.8), 0.4, 1.2, barrier_mat, "")
+	_harbor_add_sloped_box(root, "Rail_Jump1_Takeoff_N", Vector3(56.0, HARBOR_DECK_Y + 0.25, -103.0), Vector3(70.0, HARBOR_DECK_Y + 2.35 + 0.25, -103.0), 0.4, 1.9, barrier_mat, "")
+	_harbor_add_sloped_box(root, "Rail_Jump1_Takeoff_S", Vector3(56.0, HARBOR_DECK_Y + 0.25, -87.0), Vector3(70.0, HARBOR_DECK_Y + 2.35 + 0.25, -87.0), 0.4, 1.9, barrier_mat, "")
+	_harbor_add_sloped_box(root, "Rail_Jump1_Landing_N", Vector3(94.0, HARBOR_DECK_Y + 0.85 + 0.25, -103.0), Vector3(110.0, HARBOR_DECK_Y + 0.25, -103.0), 0.4, 1.9, barrier_mat, "")
+	_harbor_add_sloped_box(root, "Rail_Jump1_Landing_S", Vector3(94.0, HARBOR_DECK_Y + 0.85 + 0.25, -87.0), Vector3(110.0, HARBOR_DECK_Y + 0.25, -87.0), 0.4, 1.9, barrier_mat, "")

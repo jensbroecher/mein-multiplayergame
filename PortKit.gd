@@ -775,8 +775,9 @@ static func cathedral(pk: PropKit, kit: Dictionary, foot: float) -> void:
 		portal(pk, kit, Vector3(xt, 0, zc), Vector3(sx, 0, 0), 2.6, 5.0)
 		for side in [[tr_z0, Vector3.BACK], [tr_z1, Vector3.FORWARD]]:
 			var zz: float = side[0]
-			wall(pk, kit, "plaster", Vector3(sx * aisle, 0, zz) if (sx > 0) == (side[1] == Vector3.BACK) else Vector3(xt, 0, zz),
-					Vector3(xt, 0, zz) if (sx > 0) == (side[1] == Vector3.BACK) else Vector3(sx * aisle, 0, zz), 0.0, nave_h, st, side[1])
+			# From the nave's wall out to the end: from the aisle's wall it left a hole over the aisle roof at each corner.
+			wall(pk, kit, "plaster", Vector3(sx * nave_w, 0, zz) if (sx > 0) == (side[1] == Vector3.BACK) else Vector3(xt, 0, zz),
+					Vector3(xt, 0, zz) if (sx > 0) == (side[1] == Vector3.BACK) else Vector3(sx * nave_w, 0, zz), 0.0, nave_h, st, side[1])
 			lancet(pk, kit, Vector3((sx * aisle + xt) * 0.5, 4.0, zz), side[1], 2.0, 7.0)
 			pinnacle(pk, kit, Vector3(xt - sx * 0.6, nave_h, zz), 1.2, 6.0)
 		roof(pk, kit, "slate", Vector3(xt + sx * 0.4, nave_h - 0.4, tr_z0 + 0.4) if sx > 0 else Vector3(sx * nave_w, nave_h - 0.4, tr_z0 + 0.4),
@@ -791,6 +792,9 @@ static func cathedral(pk: PropKit, kit: Dictionary, foot: float) -> void:
 	var cz: float = (tr_z0 + tr_z1) * 0.5
 	var cc := Vector3(0, ridge - 0.5, cz)
 	var drum_r := 8.0
+	# A plain base under the drum, down through the roofs: the drum is wider than the nave and its foot hung in the air
+	# over the roof slopes.
+	pk.lathe(kit, "stonetrim", Vector3(0, nave_h - 1.5, cz), [Vector2(0.001, 0.0), Vector2(drum_r - 0.1, 0.0), Vector2(drum_r - 0.1, cc.y - nave_h + 1.6), Vector2(0.001, cc.y - nave_h + 1.6)], 8, st.darkened(0.05), true, Basis(Vector3.UP, PI / 8.0))
 	pk.lathe(kit, "stonetrim", cc, [Vector2(0.001, 0.0), Vector2(drum_r, 0.0), Vector2(drum_r, 7.0), Vector2(drum_r + 0.5, 7.2), Vector2(drum_r + 0.5, 7.8), Vector2(0.001, 7.8)], 8, st, true, Basis(Vector3.UP, PI / 8.0))
 	for k in range(8):
 		var a: float = TAU * float(k) / 8.0
@@ -806,6 +810,9 @@ static func cathedral(pk: PropKit, kit: Dictionary, foot: float) -> void:
 	pk.lathe(kit, "copper", cc + Vector3(0, top_y + 2.9, 0), [Vector2(1.9, 0.0), Vector2(1.2, 1.2), Vector2(0.3, 2.6), Vector2(0.001, 3.0)], 8, CATH_COPPER)
 	pk.beam(kit, "steel", cc + Vector3(0, top_y + 5.8, 0), cc + Vector3(0, top_y + 8.6, 0), 0.25, 0.25, Color(0.8, 0.66, 0.3))
 	pk.beam(kit, "steel", cc + Vector3(-0.9, top_y + 7.8, 0), cc + Vector3(0.9, top_y + 7.8, 0), 0.25, 0.25, Color(0.8, 0.66, 0.3))
+	# The nave's east end over the apse: a wall from the apse's eaves up and its gable (the roof had stood open there).
+	wall(pk, kit, "plaster", Vector3(nave_w, 0, z_end), Vector3(-nave_w, 0, z_end), nave_h - 4.5, nave_h, st, Vector3.FORWARD)
+	gable(pk, kit, "plaster", Vector3(nave_w, nave_h, z_end), Vector3(-nave_w, nave_h, z_end), Vector3(0, ridge, z_end), st, Vector3.FORWARD)
 	# The apse: a half drum of lancets under a cone.
 	var ac := Vector3(0, 0, z_end)
 	for k3 in range(7):
