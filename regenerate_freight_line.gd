@@ -2145,7 +2145,8 @@ func _build_town(root: Node3D) -> void:
 	var porch_x: Array = []
 	for b in TownKit.STREET:
 		var w: float = b[1]
-		if b[0] == "cantina":
+		# ...nor in front of the grocer's, which has its own bench by the door.
+		if b[0] == "cantina" or b[0] == "tienda":
 			porch_x.append(Vector2(x, x + w))
 		var bxf: Transform3D = street_xf * Transform3D(Basis(), Vector3(x + w * 0.5, 0.0, 0.0))
 		pk.set_frame(bxf)

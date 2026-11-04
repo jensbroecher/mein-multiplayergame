@@ -491,9 +491,10 @@ static func _cantina(pk: PropKit, kit: Dictionary, w: float, d: float, col: Colo
 		window(pk, kit, Vector3(sx * w * 0.3, 2.05, 0.0), Vector3(0, 0, 1), 1.4, 1.3, shutter)
 		window(pk, kit, Vector3(sx * w * 0.5, 2.05, -d * 0.5), Vector3(sx, 0, 0), 1.0, 1.2, shutter)
 	# Lanterns on the beam, barrels and a bench on the portal, a hitching rail in front of it.
-	for lx in [-w * 0.32, 0.0, w * 0.32]:
-		pk.beam(kit, "steel", Vector3(lx, ph, pd - 0.2), Vector3(lx, ph - 0.35, pd - 0.2), 0.02, 0.02, CAST)
-		pk.block(kit, "lamp", Vector3(lx - 0.1, ph - 0.7, pd - 0.3), Vector3(lx + 0.1, ph - 0.35, pd - 0.1), Color(1.0, 0.78, 0.45))
+	# Between the posts (in line with them, a lantern hung inside one).
+	for lx in [-w * 0.3625, -w * 0.12, w * 0.12, w * 0.3625]:
+		pk.beam(kit, "steel", Vector3(lx, ph, pd - 0.2), Vector3(lx, ph - 0.2, pd - 0.2), 0.02, 0.02, CAST)
+		lantern(pk, kit, Vector3(lx, ph - 0.95, pd - 0.2), 0.75, true)
 	for bx in [-w * 0.42, -w * 0.42 + 0.75]:
 		drum(pk, kit, Vector3(bx, 0.45, 1.2), WOOD_MID, 0.95, 0.34)
 	bench(pk, kit, Vector3(w * 0.32, 0.45, 1.3), Vector3(0, 0, 1), 1.8)

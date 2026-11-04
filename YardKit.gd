@@ -182,16 +182,61 @@ static func door(pk: PropKit, kit: Dictionary, c: Vector3, out: Vector3, w: floa
 					Vector3(w + 0.6 + 0.2 * float(k), top - g, depth), STONE.lightened(0.06 - 0.03 * float(k)))
 
 
-## A cast-iron lamp post: a flared foot, a fluted shaft, a bracket and a glowing lantern. `p` on the ground.
+## A cast-iron lamp post: a fluted foot on a plinth, a shaft with collars and a ladder bar, a capital, and a lantern on top
+## (`lantern`). `p` on the ground.
 static func lamp_post(pk: PropKit, kit: Dictionary, p: Vector3, height := 3.6) -> void:
-	pk.tube(kit, "steel", p, p + Vector3(0, 0.5, 0), 0.26, 0.14, 10, CAST, true)
-	pk.tube(kit, "steel", p + Vector3(0, 0.5, 0), p + Vector3(0, height, 0), 0.1, 0.07, 10, CAST, false)
-	pk.tube(kit, "steel", p + Vector3(0, 1.1, 0), p + Vector3(0, 1.2, 0), 0.15, 0.15, 10, CAST, true)
-	pk.tube(kit, "steel", p + Vector3(0, height - 0.15, 0), p + Vector3(0, height, 0), 0.14, 0.1, 10, CAST, true)
-	# The lantern: a glowing glass body between a base and a cap.
-	pk.block(kit, "steel", p + Vector3(-0.2, height, -0.2), p + Vector3(0.2, height + 0.08, 0.2), CAST)
-	pk.block(kit, "lamp", p + Vector3(-0.16, height + 0.08, -0.16), p + Vector3(0.16, height + 0.55, 0.16), Color(1.0, 0.88, 0.58))
-	pk.lathe(kit, "steel", p + Vector3(0, height + 0.55, 0), [Vector2(0.28, 0.0), Vector2(0.16, 0.14), Vector2(0.001, 0.3)], 8, CAST, true)
+	pk.lathe(kit, "steel", p, [Vector2(0.24, 0.0), Vector2(0.24, 0.08), Vector2(0.2, 0.12), Vector2(0.2, 0.3), Vector2(0.14, 0.42), Vector2(0.12, 0.6),
+			Vector2(0.001, 0.6)], 12, CAST, true)
+	for k in 8:
+		var a: float = TAU * float(k) / 8.0
+		var d := Vector3(cos(a), 0, sin(a))
+		pk.beam(kit, "steel", p + d * 0.205 + Vector3(0, 0.12, 0), p + d * 0.205 + Vector3(0, 0.3, 0), 0.04, 0.03, CAST, Vector3(-d.z, 0, d.x))
+	pk.tube(kit, "steel", p + Vector3(0, 0.6, 0), p + Vector3(0, height - 0.3, 0), 0.085, 0.065, 12, CAST, false)
+	for y in [1.0, 1.08, height * 0.62]:
+		pk.tube(kit, "steel", p + Vector3(0, y, 0), p + Vector3(0, y + 0.06, 0), 0.11, 0.11, 12, CAST, true)
+	# The ladder bar (lamplighters leant their ladders on it).
+	pk.beam(kit, "steel", p + Vector3(-0.32, height - 0.65, 0), p + Vector3(0.32, height - 0.65, 0), 0.04, 0.04, CAST, Vector3.UP)
+	for sx in [-1.0, 1.0]:
+		pk.lathe(kit, "steel", p + Vector3(sx * 0.32, height - 0.65, 0), [Vector2(0.045, -0.04), Vector2(0.045, 0.04), Vector2(0.001, 0.07)], 8, CAST, true)
+	# The capital: a flared collar the lantern stands on.
+	pk.lathe(kit, "steel", p + Vector3(0, height - 0.3, 0), [Vector2(0.07, 0.0), Vector2(0.16, 0.22), Vector2(0.18, 0.3), Vector2(0.001, 0.3)], 12, CAST, true)
+	lantern(pk, kit, p + Vector3(0, height, 0), 1.0)
+
+
+## A four-sided lantern standing on `base` (the middle of its foot), `s` its scale (1: 0.85m tall): a stepped base, four
+## glowing panes widening upward between dark corner posts, glazing bars across them, a hipped hood with a flared,
+## overhanging skirt and its underside, a crown and a finial; `hanging` puts a ring on top to hang it by.
+static func lantern(pk: PropKit, kit: Dictionary, base: Vector3, s := 1.0, hanging := false) -> void:
+	var glow := Color(1.0, 0.86, 0.55)
+	var rot := Basis(Vector3.UP, PI * 0.25)
+	pk.lathe(kit, "steel", base, [Vector2(0.09 * s, 0.0), Vector2(0.15 * s, 0.03 * s), Vector2(0.15 * s, 0.07 * s), Vector2(0.12 * s, 0.08 * s), Vector2(0.001, 0.08 * s)], 4, CAST, true, rot)
+	var y0: float = 0.08 * s
+	var y1: float = 0.5 * s
+	var w0: float = 0.11 * s
+	var w1: float = 0.16 * s
+	# The panes: a glowing body with flat sides (a 4-sided lathe turned square to the axes), slightly inside the posts.
+	pk.lathe(kit, "lamp", base + Vector3(0, y0, 0), [Vector2(w0 * 1.38, 0.0), Vector2(w1 * 1.38, y1 - y0), Vector2(0.001, y1 - y0)], 4, glow, true, rot)
+	for k in 4:
+		var a: float = PI * 0.5 * float(k)
+		var c := Vector3(cos(a), 0, sin(a))
+		var side := Vector3(-sin(a), 0, cos(a))
+		var c0: Vector3 = base + Vector3(0, y0, 0) + (c + side) * w0
+		var c1: Vector3 = base + Vector3(0, y1, 0) + (c + side) * w1
+		# A corner post, 1cm outside the glass.
+		pk.beam(kit, "steel", c0 + (c + side).normalized() * 0.012 * s, c1 + (c + side).normalized() * 0.012 * s, 0.025 * s, 0.025 * s, CAST)
+		# A glazing bar across each pane, 1cm proud.
+		var m0: Vector3 = base + Vector3(0, lerpf(y0, y1, 0.55), 0) + c * (lerpf(w0, w1, 0.55) + 0.01 * s)
+		pk.beam(kit, "steel", m0 - side * lerpf(w0, w1, 0.55), m0 + side * lerpf(w0, w1, 0.55), 0.012 * s, 0.012 * s, CAST, Vector3.UP)
+	# The hood: a flared skirt overhanging the panes (with its underside), a hipped roof, a crown and a finial.
+	var hy: float = y1
+	pk.lathe(kit, "steel", base + Vector3(0, hy, 0), [Vector2(w1 * 1.45, 0.0), Vector2(w1 * 1.9, 0.04 * s), Vector2(w1 * 1.75, 0.07 * s), Vector2(w1 * 0.9, 0.24 * s),
+			Vector2(w1 * 0.45, 0.3 * s), Vector2(0.001, 0.31 * s)], 4, CAST, true, rot)
+	pk.lathe(kit, "steel", base + Vector3(0, hy - 0.005, 0), [Vector2(0.001, 0.0), Vector2(w1 * 1.9, 0.04 * s)], 4, CAST.darkened(0.3), true, rot)
+	pk.lathe(kit, "steel", base + Vector3(0, hy + 0.3 * s, 0), [Vector2(0.03 * s, 0.0), Vector2(0.05 * s, 0.04 * s), Vector2(0.03 * s, 0.08 * s), Vector2(0.001, 0.15 * s)], 8, CAST, true)
+	if hanging:
+		pk.tube(kit, "steel", base + Vector3(-0.05 * s, hy + 0.47 * s, 0), base + Vector3(0.05 * s, hy + 0.47 * s, 0), 0.05 * s, 0.05 * s, 8, CAST)
+	# A drop under the foot.
+	pk.lathe(kit, "steel", base - Vector3(0, 0.08 * s, 0), [Vector2(0.001, 0.0), Vector2(0.04 * s, 0.05 * s), Vector2(0.06 * s, 0.08 * s), Vector2(0.001, 0.08 * s)], 8, CAST, true)
 
 
 ## A station bench: a slatted seat and back on cast-iron ends, `c` the middle of the seat's front edge on the

@@ -2497,7 +2497,10 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
   (`fountain_water.gdshader`: pools rippling out from where the water lands, sheets streaking down, all from TIME,
   `_build_fountain_water`, node `FountainSpray`: named "...Water" it was taken for the level's sea and every engine
   flooded; its sound `sounds/Gentle_flowing_water.wav`, looped in its import), four planters with WoodlandBuilder cottonwoods at `PLAZA_TREE_SCALE` (each under a body with a
-  trunk cylinder), benches, a bus shelter, a flagpole, bollards. Detail: wall lanterns (a scrolled bracket, a hexagonal lantern), clay pots with agaves or flowering shrubs, window
+  trunk cylinder), benches, a bus shelter, a flagpole, bollards. Detail: lamp posts and the cantina's porch lanterns are `YardKit.lantern` (four panes widening upward between
+  corner posts, glazing bars, a flared hood with its underside, a crown and finial; `hanging` adds a ring), the posts
+  `YardKit.lamp_post` (a fluted foot, collars, a ladder bar, a capital): the station's platform lamps too. Wall
+  lanterns (a scrolled bracket, a hexagonal lantern), clay pots with agaves or flowering shrubs, window
   boxes of geraniums (`_geranium`: scalloped leaves with a dark zone, umbels of five-petal florets), rejas (window grilles), gutters and downpipes, rafter tails, a door canopy, meter boxes, AC units,
   satellite dishes, an aerial, the cantina's beer sign and string lights, the grocer's blade sign, a clothesline with
   pegged washing, and on every back a door, windows and bins. Roof slopes are boarded underneath over their whole width
