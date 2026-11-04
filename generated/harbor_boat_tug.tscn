@@ -2,7 +2,7 @@
 
 [ext_resource type="ArrayMesh" path="res://generated/harbor_boat_tug.res" id="1_iu05r"]
 
-[node name="Boat" type="Node3D" unique_id=1636780570]
+[node name="Boat" type="Node3D" unique_id=717724482]
 
-[node name="Hull" type="MeshInstance3D" parent="." unique_id=945274628]
+[node name="Hull" type="MeshInstance3D" parent="." unique_id=1593689154]
 mesh = ExtResource("1_iu05r")

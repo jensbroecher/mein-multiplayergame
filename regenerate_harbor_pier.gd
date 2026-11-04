@@ -1102,11 +1102,14 @@ func _build_breakwaters(root: Node3D) -> void:
 			var sea2: Vector2 = left2 * sea_side
 			var wa: Vector2 = a + sea2 * (MOUND_HALF - 1.0)
 			var wb: Vector2 = b + sea2 * (MOUND_HALF - 1.0)
-			# The crown wall stops at the head's block (it had run on to the very end, past the light's foot).
+			# The crown wall and the walkway stop inside the head's block (they had run on to the very end, past the
+			# light's foot, and the walkway's top lay in the plane of the block's: it flickered under the light).
+			var walk_b: Vector2 = b
 			if k == line.size() - 2:
 				wb -= dir2 * HEAD_R * 0.75
+				walk_b -= dir2 * HEAD_R * 0.8
 			walls_pk.beam(walls_kit, "quay", Vector3(wa.x, MOUND_CREST + 0.6, wa.y), Vector3(wb.x, MOUND_CREST + 0.6, wb.y), 1.6, 3.6, Color(0.72, 0.7, 0.66), Vector3(sea2.x, 0, sea2.y))
-			walls_pk.beam(walls_kit, "quay", Vector3(a.x, MOUND_CREST - 0.9, a.y), Vector3(b.x, MOUND_CREST - 0.9, b.y), 10.0, 1.2, Color(0.68, 0.66, 0.62), Vector3(left2.x, 0, left2.y))
+			walls_pk.beam(walls_kit, "quay", Vector3(a.x, MOUND_CREST - 0.9, a.y), Vector3(walk_b.x, MOUND_CREST - 0.9, walk_b.y), 10.0, 1.2, Color(0.68, 0.66, 0.62), Vector3(left2.x, 0, left2.y))
 			var mid := (a + b) * 0.5
 			var len_ab: float = a.distance_to(b)
 			shapes.append(_box_shape(Vector3(len_ab, MOUND_CREST - SEABED_Y, MOUND_HALF * 2.0), Transform3D(Basis(Vector3.UP, atan2(-dir2.y, dir2.x)), Vector3(mid.x, (MOUND_CREST + SEABED_Y) * 0.5, mid.y))))
@@ -1879,12 +1882,12 @@ const BOATS_UNDER_WAY := [
 	["YachtEast", "sail_red", Vector2(600.0, 420.0), 100.0, 400.0, 60.0, 4.5, 380.0, 8.0, 3.0],
 ]
 
-## The cruise liners (models/boats/*_CruiseShip.glb, 360m long, bows toward -z in the files): one at anchor off the
+## The cruise liners (models/boats/*_CruiseShip.blend, imported by Godot through Blender; 360m long, bows toward -z): one at anchor off the
 ## harbour mouth, broadside to the course, one cruising past further out. [name, model, middle (x, z), bearing
 ## (degrees), straight length, turn radius, speed, phase, swing at anchor (degrees)]
 const CRUISE_SHIPS := [
-	["AuroraPearl", "res://models/boats/AuroraPearl_CruiseShip.glb", Vector2(-150.0, 570.0), 90.0, 0.0, 0.0, 0.0, 0.0, 4.0],
-	["MeridianAstra", "res://models/boats/MeridianAstra_CruiseShip.glb", Vector2(300.0, 900.0), 90.0, 1200.0, 180.0, 6.0, 900.0, 0.0],
+	["AuroraPearl", "res://models/boats/AuroraPearl_CruiseShip.blend", Vector2(-150.0, 570.0), 90.0, 0.0, 0.0, 0.0, 0.0, 4.0],
+	["MeridianAstra", "res://models/boats/MeridianAstra_CruiseShip.blend", Vector2(300.0, 900.0), 90.0, 1200.0, 180.0, 6.0, 900.0, 0.0],
 ]
 ## The waterline over the models' keel: in the boot-topping band (navy below it, white above).
 const CRUISE_DRAFT := 10.8
@@ -1962,6 +1965,36 @@ func _build_boats(root: Node3D) -> void:
 	node.add_child(idle)
 
 
+## The liners' glass, as Godot draws it from 300m and more. Blender exports every material double-sided, and every pane
+## lies with its back face on the wall behind it: seen through the semi-transparent cabin glass, that back face fought
+## the wall (every window flickered). Windows and glazed panels become opaque, dark and mirror-like (the sky's
+## reflection from the environment, a little tint by kind), drawn front faces only; the railings' clear glass stays
+## see-through with its back faces culled. Nobody sees into a cabin from the course.
+const CRUISE_GLASS := {
+	"Glass_Cabin": [Color(0.05, 0.10, 0.13), 0.55, 0.06],
+	"Glass_Bridge": [Color(0.03, 0.06, 0.08), 0.6, 0.05],
+	"Glass_Dark": [Color(0.03, 0.05, 0.07), 0.5, 0.08],
+	"Panel_Blue_Glass": [Color(0.10, 0.20, 0.34), 0.5, 0.08],
+	"Panel_Teal_Glass": [Color(0.08, 0.26, 0.28), 0.5, 0.08],
+}
+
+func _cruise_material(mat: Material, key: String) -> Material:
+	if not (mat is StandardMaterial3D):
+		return mat
+	var m := (mat as StandardMaterial3D).duplicate() as StandardMaterial3D
+	if CRUISE_GLASS.has(key):
+		var g: Array = CRUISE_GLASS[key]
+		m.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+		m.albedo_color = g[0]
+		m.metallic = g[1]
+		m.roughness = g[2]
+		m.metallic_specular = 0.8
+		m.cull_mode = BaseMaterial3D.CULL_BACK
+	elif m.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
+		m.cull_mode = BaseMaterial3D.CULL_BACK
+	return _save_res(m, "cruise_mat_" + key.to_lower())
+
+
 ## A liner's model merged into one mesh per material, turned so its bow is along +z (SeaBoat's convention): the
 ## files hold about 1,500 meshes each, a draw call apiece. A second mesh leaves out the small parts for the distance.
 ## Both are saved in a scene for SeaBoat (`harbor_cruise_<name>.tscn`).
@@ -1972,6 +2005,9 @@ func _cruise_scene(model_path: String, key: String) -> PackedScene:
 	var mats := {}
 	for mi in src.find_children("*", "MeshInstance3D", true, false):
 		var m: MeshInstance3D = mi
+		# The .blend's Environment collection: its sea plane (lights and cameras aren't meshes).
+		if String(m.name) == "Sea":
+			continue
 		var t := Transform3D.IDENTITY
 		var c: Node = m
 		while c != src and c != null:
@@ -1985,7 +2021,8 @@ func _cruise_scene(model_path: String, key: String) -> PackedScene:
 		for i in m.mesh.get_surface_count():
 			var mat: Material = m.get_active_material(i)
 			var mk: String = String(mat.resource_name) if mat else "none"
-			mats[mk] = mat
+			if not mats.has(mk):
+				mats[mk] = _cruise_material(mat, mk)
 			var arr: Array = m.mesh.surface_get_arrays(i)
 			var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
 			var norms = arr[Mesh.ARRAY_NORMAL]
@@ -2297,7 +2334,8 @@ func _boat_sounds(boat: Node3D, kind: String) -> void:
 ## with the tide line on it, a railing round its seaward side, bollards; under it a roundhead of granite rubble wrapping
 ## the mound's end, with tetrapods piled round the seaward half (`back` points back along the breakwater).
 const HEAD_R := 10.0
-const HEAD_TOP := MOUND_CREST - 0.3
+## The block's top: 5cm over the walkway's (MOUND_CREST - 0.3), the light standing 5cm into it.
+const HEAD_TOP := MOUND_CREST - 0.25
 
 func _roundhead(node: Node3D, rock: Material, noise: FastNoiseLite, tip: Vector2, back: Vector2, xfs: Array, rng: RandomNumberGenerator, pk: PropKit, kit: Dictionary) -> void:
 	# The rubble cone: rings of the mound's own profile, all the way round.

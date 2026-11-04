@@ -346,7 +346,8 @@ the others re-bakes it (see Lakeside Course below).
     mounds, crown walls, tetrapods and armour stone, the red (west) and green (east) entrance lights, each on a head
     (`_roundhead`, `HEAD_R`, `HEAD_TOP`): a cone of rubble wrapping the mound's end with tetrapods round its seaward half,
     a round concrete block on it (tide line, railing, bollards) the light stands on, the crown wall stopping at it (the
-    mound had ended cut off square with the light's foot half over the water). The terminal:
+    mound had ended cut off square with the light's foot half over the water). The block's top is 5cm over the
+    walkway's and the walkway ends inside its rim: both tops at one height, running into each other, flickered. The terminal:
     the feeder ship BLOOMBAY STAR alongside (`ShipKit.container_ship`, bow north), three ship-to-shore cranes
     (`PortKit.sts_crane`, one boom raised), the yard and two RTGs. The marina below the old town (pontoons, moored
     yachts and trawlers), trawlers at the fish market, boats under way (SeaBoat.gd with the boats saved as
@@ -363,10 +364,24 @@ the others re-bakes it (see Lakeside Course below).
   - The trees (`_build_trees`) are WoodlandBuilder's oak, lime, birch and spruce (one shape each: eight would split
     every 300m cell eight ways), `Tree_`/`TreeShadow_` near cells under JungleDetail and `Trees_far_` stand-in cells,
     all holding the same shuffled instances so HarborDetail thins them alike.
-  - The cruise liners (`CRUISE_SHIPS`, models/boats/*_CruiseShip.glb, 360m, bows toward -z in the files, waterline in
-    the boot-topping band at 10.8m): one at anchor off the harbour mouth, one cruising past. `_cruise_scene` merges each
-    file's ~1,500 meshes into one surface per material (turned bow +z for SeaBoat) plus a far mesh without the parts
-    under `CRUISE_SMALL`, past `CRUISE_NEAR`.
+  - The cruise liners (`CRUISE_SHIPS`, the user's `models/boats/*_CruiseShip.blend`, imported by Godot through Blender,
+    so the editor settings' `filesystem/import/blender/blender_path` must be set on every machine that imports the project;
+    the .glb copies are gone. 360m, bows toward -z, waterline in the boot-topping band at 10.8m): one at anchor off the
+    harbour mouth, one cruising past. `_cruise_scene` merges each file's ~1,500 meshes into one surface per material (turned
+    bow +z for SeaBoat; the .blend's `Sea` plane skipped) plus a far mesh without the parts under `CRUISE_SMALL`, past
+    `CRUISE_NEAR`. The files were fixed in Blender by `scratch/cruise_ship_fix.py` (`Blender -b <file> --python
+    scratch/cruise_ship_fix.py -- backup=<dir>`): a duplicated bow railing (and cap) deleted, every railing set onto its
+    deck (they stood 6cm over it, the stepped aft ones 8-10cm out past its edge) with its cap closed onto it, the funnel's
+    mast stretched down onto the deck (it hung 1.4m over nothing), and parts lying flush on another (stripes, headers,
+    balcony bases, glass on frames, curtains) moved 3cm in front, as a whole along the flush faces' normal, open sheets
+    along their own normals (inflating a closed part moved its hidden back faces onto the glass behind). `scratch/
+    cruise_ship_audit.py` lists what is left under 1cm (about 50 m2 a ship of the original ~4000: the sports court's glass
+    walls on its floor, the stripe's ends at the stern, the promenade's teal accent). Blender's `.blend1` (the previous
+    save) is git-ignored. Blender exports every material double-sided and every window pane lies with its back face on
+    the wall behind it, so through the semi-transparent cabin glass that back face fought the wall (every window
+    flickered): `_cruise_material` (`CRUISE_GLASS`) makes the windows and glazed panels opaque, dark and mirror-like,
+    front faces only, and culls the back faces of the railings' clear glass. `scratch/depth_flicker_probe.tscn` on a
+    liner's side: 0.02% precision difference.
   - The small craft (`ShipKit.fishing_boat`, `sailboat`, `tug`, their sizes in `TRAWLER`, `YACHT`, `TUG`) share `hull`:
     smooth normals along and up each side (the transom flat), a sheer rising to the bow, bulwarks inside where the sheer
     stands over the deck, `strake` for rubbing strakes and toe rails. Fittings: `deckhouse` (raked front windows),

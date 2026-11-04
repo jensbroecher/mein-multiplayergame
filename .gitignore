@@ -55,3 +55,6 @@ models/ramps/*.fbx
 
 
 
+
+# Blender keeps the previous save as .blend1 next to a .blend
+*.blend1
