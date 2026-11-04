@@ -12,7 +12,7 @@ func _init() -> void:
 	for n in level.find_children("*", "Node3D", true, false):
 		var nm := String(n.name)
 		if not (nm.begins_with("Sign_") or nm in ["Gate", "GuardHouse", "PlateauJump"] or nm.begins_with("PitTruck") \
-				or nm.begins_with("DrillRig") or nm.begins_with("LightTower")):
+				or nm.begins_with("DrillRig") or nm.begins_with("LightTower") or nm.contains("Balloon_")):
 			continue
 		if m != "" and not nm.contains(m):
 			continue

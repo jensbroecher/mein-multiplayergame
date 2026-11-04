@@ -1546,9 +1546,11 @@ func _build_fiesta(level: Node3D) -> void:
 		var livery: int = fb[3]
 		if int(fb[2]) == 0:
 			pos.y = _seat("balloon %d" % i, pos, 0.0, Vector2(3.0, 3.0))
-			var mesh: ArrayMesh = _mesh("balloon_%d" % livery, bs, func(pk, kit): MinaKit.balloon(pk, kit, livery))
+			var mesh: ArrayMesh = _mesh("balloon_field_%d" % livery, bs, func(pk, kit): MinaKit.balloon(pk, kit, livery, Basis(), true))
 			var body := _prop(fiesta, "FieldBalloon_%d" % i, mesh, pos, rng.randf() * TAU, [[Vector3(0, 0.9, 0), Vector3(1.6, 1.8, 1.6) * bs]], 15.0)
 			body.set_meta(&"burner", true)
+			# Solid: the envelope as its hull, over the basket.
+			_hull_shape(body, MinaKit.envelope_hull(Transform3D(Basis(), Vector3(0, MinaKit.BALLOON_MOUTH, 0))), bs)
 			# The crew round the basket and people come to look.
 			for k in range(rng.randi_range(4, 7)):
 				var a: float = rng.randf() * TAU
@@ -1561,12 +1563,23 @@ func _build_fiesta(level: Node3D) -> void:
 			var yaw: float = _yaw_to(-(sp["fwd"] as Vector3))
 			var mesh2: ArrayMesh = _mesh("balloon_lying_%d" % livery, bs, func(pk, kit): MinaKit.balloon_inflating(pk, kit, livery))
 			pos.y = _seat("lying balloon %d" % i, pos, yaw, Vector2(14.0, 18.0), 1.2)
-			var body2 := _prop(fiesta, "InflatingBalloon_%d" % i, mesh2, pos, yaw, [[Vector3(0, 1.0, -5.4) , Vector3(1.8, 2.0, 2.0) * bs]], 22.0)
+			# Solid: the lying envelope as its hull, the basket on its side and the fan.
+			var body2 := _prop(fiesta, "InflatingBalloon_%d" % i, mesh2, pos, yaw, [[Vector3(0, 0.8, -4.8) * bs, Vector3(1.7, 1.7, 3.0) * bs],
+					[(MinaKit.INFLATE_FAN + Vector3(0, 1.0, 0)) * bs, Vector3(2.2, 2.0, 1.8) * bs]], 22.0)
 			body2.set_meta(&"burner", false)
-			for k in range(rng.randi_range(3, 5)):
-				var lp: Vector3 = body2.transform * Vector3(rng.randf_range(-12.0, 12.0), 0.0, rng.randf_range(-12.0, 20.0))
+			_hull_shape(body2, MinaKit.envelope_hull(MinaKit.inflating_frame(), MinaKit.INFLATE_FLAT), bs)
+			# The crew at their jobs, all outside the envelope: two holding the mouth open, one at the fan, one on the
+			# crown line, the pilot by the basket ([place, what they face], life size in the balloon's frame).
+			var mouth_r: float = float(MinaKit.ENVELOPE[0][0])
+			var jobs: Array = [
+				[Vector3(-mouth_r - 0.7, 0, -1.6), Vector3(1, 0, 0.2)], [Vector3(mouth_r + 0.7, 0, -1.6), Vector3(-1, 0, 0.2)],
+				[MinaKit.INFLATE_FAN + Vector3(1.4, 0, -0.6), Vector3(-1, 0, 0.4)], [MinaKit.INFLATE_CROWN_HOLD, Vector3(0, 0, -1)],
+				[Vector3(-1.8, 0, -6.6), Vector3(0.6, 0, 1)],
+			]
+			for job in jobs:
+				var lp: Vector3 = body2.transform * ((job[0] as Vector3) * bs)
 				lp.y = _ground_at(lp.x, lp.z)
-				_people.append([lp, (pos - lp).normalized(), false])
+				_people.append([lp, body2.transform.basis * (job[1] as Vector3).normalized(), false])
 		# A chase truck by each balloon.
 		var vp: Vector3 = _spot(float(fb[0]) + 14.0, float(fb[1]) * 0.62, 0.0)["pos"]
 		_footprints.append([Vector2(vp.x, vp.z), 5.0])
@@ -1790,6 +1803,15 @@ func _build_rail_loop(level: Node3D) -> void:
 	# Plants and rocks keep off the track.
 	for q in line:
 		_flora_blockers.append([q, 5.5])
+	# The clunk over the rails and the knocks along the sleepers, as on Freight Line (RailRumble.gd).
+	var centre := PackedVector3Array(pts)
+	centre.append(pts[0])
+	var rumble := Node3D.new()
+	rumble.name = "RailRumble"
+	rumble.set_script(load("res://RailRumble.gd"))
+	var lines: Array[PackedVector3Array] = [centre]
+	rumble.set("lines", lines)
+	root.add_child(rumble)
 	# The train, circling for ever on the wall clock.
 	var curve := Curve3D.new()
 	for p in pts:
@@ -2280,6 +2302,18 @@ func _build_conveyors(level: Node3D) -> void:
 	pbody.add_child(ccs)
 	if _route_dist(STOCKPILE_AT) < STOCKPILE_R * s + ROAD_HALF + 6.0:
 		push_error("the stockpile is %.0fm from the road" % _route_dist(STOCKPILE_AT))
+
+
+## A convex hull of `pts` (times `sc`) on `body`.
+func _hull_shape(body: Node3D, pts: PackedVector3Array, sc: float) -> void:
+	var scaled := PackedVector3Array()
+	for p in pts:
+		scaled.append(p * sc)
+	var hull := ConvexPolygonShape3D.new()
+	hull.points = scaled
+	var cs := CollisionShape3D.new()
+	cs.shape = hull
+	body.add_child(cs)
 
 
 func _box_shape(body: Node3D, xf: Transform3D, size: Vector3) -> void:

@@ -42,6 +42,9 @@ const GLASS := Color(0.07, 0.12, 0.18, 0.9)
 const LAMP := Color(1.0, 0.93, 0.70)
 
 static var _cache := {}
+## While a car is built without its bogies (`build(..., false)`), where each would go: [z (life size), axles].
+static var _collect: Variant = null
+static var _bogie_places := {}
 
 
 static func make_material(key: String) -> StandardMaterial3D:
@@ -70,10 +73,15 @@ static func car_half_width(kind: String) -> float:
 	return float(KINDS[kind]["width"]) * 0.5 * SCALE
 
 
-static func build(kind: String, variant: int = 0) -> ArrayMesh:
-	var key := "%s_%d" % [kind, variant]
+## A car's mesh, life size times SCALE, front toward -z, the rails' top at y = 0. Without its bogies
+## (`with_bogies` false), Train.gd sets them on the track one by one (`bogies`, `bogie_mesh`), so on a curve they
+## follow the rails and the body swings between their pivots, as a real car's does.
+static func build(kind: String, variant: int = 0, with_bogies := true) -> ArrayMesh:
+	var key := "%s_%d%s" % [kind, variant, "" if with_bogies else "_bare"]
 	if _cache.has(key):
 		return _cache[key]
+	if not with_bogies:
+		_collect = []
 	var pk := PropKit.new()
 	var mats := {}
 	pk.material_for = func(k: String) -> Material:
@@ -107,6 +115,39 @@ static func build(kind: String, variant: int = 0) -> ArrayMesh:
 			_coach(pk, kit, true)
 	var mesh := pk.commit(kit)
 	_cache[key] = mesh
+	if not with_bogies:
+		_bogie_places["%s_%d" % [kind, variant]] = _collect
+		_collect = null
+	return mesh
+
+
+## Where a car's bogies go: [[z along the car (game metres, + toward its back), axles (life size)], ...].
+static func bogies(kind: String, variant: int = 0) -> Array:
+	var key := "%s_%d" % [kind, variant]
+	if not _bogie_places.has(key):
+		build(kind, variant, false)
+	var out: Array = []
+	for b in _bogie_places.get(key, []):
+		out.append([float(b[0]) * SCALE, b[1]])
+	return out
+
+
+## One bogie, centred on its pivot at the origin (life size times SCALE).
+static func bogie_mesh(axles: Array) -> ArrayMesh:
+	var key := "bogie_%s" % str(axles)
+	if _cache.has(key):
+		return _cache[key]
+	var pk := PropKit.new()
+	var mats := {}
+	pk.material_for = func(k: String) -> Material:
+		if not mats.has(k):
+			mats[k] = make_material(k)
+		return mats[k]
+	pk.set_frame(Transform3D(Basis.from_scale(Vector3.ONE * SCALE), Vector3.ZERO))
+	var kit := {}
+	_bogie(pk, kit, 0.0, axles)
+	var mesh := pk.commit(kit)
+	_cache[key] = mesh
 	return mesh
 
 
@@ -121,6 +162,9 @@ static func _jit(c: Color, rng: RandomNumberGenerator, amount := 0.05) -> Color:
 
 ## A two-axle (or three-axle) truck centred at z: side frames, bolster, axles and wheels.
 static func _bogie(pk: PropKit, kit: Dictionary, z: float, axles: Array = [-0.85, 0.85]) -> void:
+	if _collect != null:
+		(_collect as Array).append([z, axles.duplicate()])
+		return
 	var span: float = absf(axles[0]) + 0.5
 	for sx in [-1.0, 1.0]:
 		pk.block(kit, "steel", Vector3(sx * 0.98 - 0.07, 0.40, z - span), Vector3(sx * 0.98 + 0.07, 0.74, z + span), IRON)

@@ -68,6 +68,8 @@ class Car:
 	var height := 0.0
 	var half_width := 0.0
 	var node: MeshInstance3D
+	## [MeshInstance3D, z along the car (+ toward its back)]: each set on the rails on its own (_place).
+	var bogies: Array = []
 	var xf := Transform3D.IDENTITY
 	var prev_xf := Transform3D.IDENTITY
 	var present := false
@@ -106,10 +108,17 @@ func _ready() -> void:
 			car.half_width = TrainKit.car_half_width(kind)
 			var mi := MeshInstance3D.new()
 			mi.name = "Car%d_%s" % [cars.size(), kind]
-			mi.mesh = TrainKit.build(kind, variant)
+			mi.mesh = TrainKit.build(kind, variant, false)
 			mi.visible = false
 			add_child(mi, false, Node.INTERNAL_MODE_BACK)
 			car.node = mi
+			for b in TrainKit.bogies(kind, variant):
+				var bm := MeshInstance3D.new()
+				bm.name = "Car%d_bogie%d" % [cars.size(), car.bogies.size()]
+				bm.mesh = TrainKit.bogie_mesh(b[1])
+				bm.visible = false
+				add_child(bm, false, Node.INTERNAL_MODE_BACK)
+				car.bogies.append([bm, float(b[0])])
 			car.body = _car_body(car)
 		off += car.length
 		cars.append(car)
@@ -305,10 +314,41 @@ func _place(t: float) -> void:
 		if car.node == null:
 			continue
 		car.node.visible = car.present
+		for b in car.bogies:
+			(b[0] as MeshInstance3D).visible = car.present
 		if not car.present:
 			continue
 		var pf := _point(_along(s_front))
 		var pb := _point(_along(s_back))
+		# On its bogies: each stands on the rails at its own place along the path, turned along them there, and the
+		# body hangs between the outermost two's pivots (the chord between the car's ends left the bogies off the
+		# rails on a curve, swung out under the body).
+		var s_mid: float = s_front - car.length * 0.5
+		var sgn: float = -1.0 if car.flip else 1.0
+		if car.bogies.size() >= 2:
+			var z_front: float = 1e9
+			var z_back: float = -1e9
+			for b in car.bogies:
+				var bz: float = float(b[1]) * sgn
+				z_front = minf(z_front, bz)
+				z_back = maxf(z_back, bz)
+				var sb: float = s_mid - bz
+				var pa := _point(_along(sb + 0.6))
+				var pc := _point(_along(sb - 0.6))
+				var bnode: MeshInstance3D = b[0]
+				var tang := pa - pc
+				if tang.length_squared() > 1e-6:
+					bnode.transform = Transform3D(Basis.looking_at(tang.normalized(), Vector3.UP), _point(_along(sb)))
+				if not car.prev_present:
+					bnode.reset_physics_interpolation()
+			var pivot_f := _point(_along(s_mid - z_front))
+			var pivot_b := _point(_along(s_mid - z_back))
+			var span: float = z_back - z_front
+			var ddir := pivot_f - pivot_b
+			if ddir.length_squared() > 1e-6 and span > 0.1:
+				var mid2: Vector3 = (pivot_f + pivot_b) * 0.5 + ddir.normalized() * ((z_front + z_back) * -0.5)
+				pf = mid2 + ddir.normalized() * car.length * 0.5
+				pb = mid2 - ddir.normalized() * car.length * 0.5
 		var dir := pf - pb
 		if dir.length_squared() < 1e-6:
 			continue

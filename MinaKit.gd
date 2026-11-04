@@ -666,19 +666,72 @@ static func _envelope_colour(livery: Array, g: int, h01: float, a: float) -> Col
 
 
 ## A hot air balloon at life size, its basket's floor at y = 0 and the envelope's mouth over it, in livery `style`
-## (BALLOONS). The flame over the burner is its own surface ("flame"), lit by the `burn` instance uniform.
-static func balloon(pk: PropKit, kit: Dictionary, style: int, tilt := Basis()) -> void:
+## (BALLOONS). The flame over the burner is its own surface ("flame"), lit by the `burn` instance uniform. A
+## `tethered` one (on the launch field) is held down by two ropes to stakes.
+const BALLOON_MOUTH := 4.1
+
+static func balloon(pk: PropKit, kit: Dictionary, style: int, tilt := Basis(), tethered := false) -> void:
 	var base: Transform3D = pk.xf
-	var mouth_y := 4.1
+	var mouth_y := BALLOON_MOUTH
 	pk.set_frame(base * Transform3D(tilt, Vector3.ZERO))
 	_envelope(pk, kit, BALLOONS[style % BALLOONS.size()], Transform3D(Basis(), Vector3(0, mouth_y, 0)), 1.0)
-	# The scoop round the mouth, the load cables down to the burner frame.
+	_skirt(pk, kit, Transform3D(Basis(), Vector3(0, mouth_y, 0)))
+	# The load cables from the mouth's ring down to the burner frame.
 	for k in range(8):
 		var a: float = TAU * float(k) / 8.0
 		var top := Vector3(cos(a) * 2.2, mouth_y + 0.1, sin(a) * 2.2)
 		pk.beam(kit, "steel", top, Vector3(cos(a) * 0.55, 2.35, sin(a) * 0.55), 0.03, 0.03, Color(0.2, 0.2, 0.2))
 	_basket(pk, kit)
+	if tethered:
+		for side in [-1.0, 1.0]:
+			var from := Vector3(side * 0.8, 0.85, 0.0)
+			var stake := Vector3(side * 7.5, 0.0, 2.5)
+			var sag := (from + stake) * 0.5 + Vector3(0, -0.15, 0)
+			pk.tube(kit, "matte", from, sag, 0.02, 0.02, 5, Color(0.85, 0.8, 0.65), false)
+			pk.tube(kit, "matte", sag, stake + Vector3(0, 0.3, 0), 0.02, 0.02, 5, Color(0.85, 0.8, 0.65), false)
+			pk.tube(kit, "steel", stake + Vector3(0, -0.2, 0), stake + Vector3(0, 0.35, 0), 0.04, 0.03, 6, Color(0.3, 0.3, 0.3))
 	pk.set_frame(base)
+
+
+## The skirt (the scoop of fireproof cloth) hanging from the mouth through `xf`, dark: flaring a little as it falls.
+static func _skirt(pk: PropKit, kit: Dictionary, xf: Transform3D) -> void:
+	var segs := GORES
+	var col := Color(0.16, 0.15, 0.15)
+	for j in range(segs):
+		var t0: float = TAU * float(j) / float(segs)
+		var t1: float = TAU * float(j + 1) / float(segs)
+		var u0 := Vector3(cos(t0), 0.0, sin(t0))
+		var u1 := Vector3(cos(t1), 0.0, sin(t1))
+		var a0: Vector3 = xf * (u0 * 2.3)
+		var a1: Vector3 = xf * (u1 * 2.3)
+		var b0: Vector3 = xf * (u0 * 2.55 + Vector3.DOWN * 1.1)
+		var b1: Vector3 = xf * (u1 * 2.55 + Vector3.DOWN * 1.1)
+		var n: Vector3 = xf.basis * ((u0 + u1).normalized() * 0.97 + Vector3.DOWN * 0.22).normalized()
+		var uv := [Vector2(float(j), 0.0), Vector2(float(j + 1), 0.0), Vector2(float(j + 1), 0.0), Vector2(float(j), 0.0)]
+		pk.tri(kit, "envelope", a0, a1, b1, n, n, n, col, n, uv[0], uv[1], uv[2])
+		pk.tri(kit, "envelope", a0, b1, b0, n, n, n, col, n, uv[0], uv[2], uv[3])
+
+
+## Points of an envelope's hull through `xf` (as `_envelope` draws it, squashed onto `flat_y`): the generator's
+## convex collision.
+static func envelope_hull(xf: Transform3D, flat_y := -1e9) -> PackedVector3Array:
+	var pts := PackedVector3Array()
+	for p in ENVELOPE:
+		for k in range(16):
+			var a: float = TAU * float(k) / 16.0
+			var q: Vector3 = xf * Vector3(cos(a) * float(p[0]), float(p[1]), sin(a) * float(p[0]))
+			if flat_y > -1e8:
+				q.y = maxf(q.y, flat_y)
+			pts.append(q)
+	return pts
+
+
+## The inflating envelope's frame: lying on its side along +z, its mouth at z = -2, squashed to 0.62 of its height,
+## the mouth's lower edge just off the ground, the belly slumped flat.
+static func inflating_frame() -> Transform3D:
+	return Transform3D(Basis(Vector3.RIGHT, PI * 0.5) * Basis.from_scale(Vector3(1.0, 1.0, 0.62)), Vector3(0, 2.0, -2.0))
+
+const INFLATE_FLAT := 0.2
 
 
 ## The envelope through `xf` (its mouth at the origin, up its axis), squashed onto the ground below `flat_y` (in the
@@ -714,8 +767,8 @@ static func _envelope(pk: PropKit, kit: Dictionary, livery: Array, xf: Transform
 			var q01: Vector3 = xf * (u1 * p0.x * bul1 + Vector3.UP * p0.y)
 			var q10: Vector3 = xf * (u0 * p1.x * bul0 + Vector3.UP * p1.y)
 			var q11: Vector3 = xf * (u1 * p1.x * bul1 + Vector3.UP * p1.y)
-			var nn0: Vector3 = xf.basis * (u0 * n2.x + Vector3.UP * n2.y)
-			var nn1: Vector3 = xf.basis * (u1 * n2.x + Vector3.UP * n2.y)
+			var nn0: Vector3 = (xf.basis * (u0 * n2.x + Vector3.UP * n2.y)).normalized()
+			var nn1: Vector3 = (xf.basis * (u1 * n2.x + Vector3.UP * n2.y)).normalized()
 			if flat_y > -1e8:
 				q00.y = maxf(q00.y, flat_y)
 				q01.y = maxf(q01.y, flat_y)
@@ -732,18 +785,62 @@ static func _envelope(pk: PropKit, kit: Dictionary, livery: Array, xf: Transform
 			if p0.x > 1e-5 or p1.x > 1e-5:
 				pk.tri(kit, "envelope", q00, q01, q11, nn0, nn1, nn1, col, out, uv00, uv01, uv11)
 				pk.tri(kit, "envelope", q00, q11, q10, nn0, nn1, nn0, col, out, uv00, uv11, uv10)
+	# The crown ring and its vent's edge, on top.
+	pk.tube(kit, "steel", xf * Vector3(0, top_h - 0.05, 0), xf * Vector3(0, top_h + 0.08, 0), 0.55, 0.45, 16, Color(0.3, 0.3, 0.3))
 
 
-## The wicker basket (floor at y = 0), its padded rim, the burner frame and twin burners over it, the flame.
+## The wicker basket (floor at y = 0): woven sides (stakes and weavers), a padded leather rim, rope handles, skids
+## under it, fuel cylinders in its corners with hoses up to the burner; the burner frame on padded uprights, twin
+## burners with their coils, blast valves and pilot lights, the flame.
 static func _basket(pk: PropKit, kit: Dictionary) -> void:
 	var wicker := Color(0.62, 0.46, 0.28)
-	pk.block(kit, "canvas", Vector3(-0.75, 0.0, -0.75), Vector3(0.75, 1.1, 0.75), wicker)
-	pk.block(kit, "matte", Vector3(-0.8, 1.05, -0.8), Vector3(0.8, 1.2, 0.8), Color(0.30, 0.20, 0.14))
+	var leather := Color(0.36, 0.22, 0.13)
+	var hw := 0.75
+	pk.block(kit, "canvas", Vector3(-hw, 0.0, -hw), Vector3(hw, 1.1, hw), wicker)
+	# The weave: stakes up each side, weavers round it in darker courses.
+	for f in range(4):
+		var n: Vector3 = [Vector3(1, 0, 0), Vector3(-1, 0, 0), Vector3(0, 0, 1), Vector3(0, 0, -1)][f]
+		var along := Vector3(-n.z, 0, n.x)
+		for k in range(9):
+			var c: Vector3 = n * (hw + 0.006) + along * lerpf(-hw + 0.08, hw - 0.08, float(k) / 8.0)
+			var a2: Vector3 = c + Vector3(0, 0.02, 0) - along * 0.012
+			var b2: Vector3 = c + Vector3(0, 1.05, 0) + along * 0.012 + n * 0.012
+			pk.block(kit, "canvas", Vector3(minf(a2.x, b2.x), a2.y, minf(a2.z, b2.z)), Vector3(maxf(a2.x, b2.x), b2.y, maxf(a2.z, b2.z)), wicker.darkened(0.12))
+		for k in range(5):
+			var y: float = 0.15 + 0.2 * float(k)
+			var c2: Vector3 = n * (hw + 0.014)
+			var a3: Vector3 = c2 - along * hw + Vector3(0, y - 0.025, 0)
+			var b3: Vector3 = c2 + along * hw + Vector3(0, y + 0.025, 0) + n * 0.01
+			pk.block(kit, "canvas", Vector3(minf(a3.x, b3.x), a3.y, minf(a3.z, b3.z)), Vector3(maxf(a3.x, b3.x), b3.y, maxf(a3.z, b3.z)), wicker.darkened(0.25))
+		# A rope handle on each side.
+		var hc: Vector3 = n * (hw + 0.05) + Vector3(0, 0.75, 0)
+		pk.tyre(kit, "matte", hc, 0.1, 0.13, 0.03, 10, Color(0.8, 0.72, 0.55), Basis(along.normalized(), PI * 0.5) if false else Basis.looking_at(n, Vector3.UP) * Basis(Vector3.RIGHT, PI * 0.5))
+	# The padded rim: four rolls of leather round the top.
+	for e in [[Vector3(-hw, 0, -hw), Vector3(hw, 0, -hw)], [Vector3(hw, 0, -hw), Vector3(hw, 0, hw)], [Vector3(hw, 0, hw), Vector3(-hw, 0, hw)], [Vector3(-hw, 0, hw), Vector3(-hw, 0, -hw)]]:
+		pk.tube(kit, "matte", (e[0] as Vector3) + Vector3(0, 1.12, 0), (e[1] as Vector3) + Vector3(0, 1.12, 0), 0.08, 0.08, 10, leather)
+	# Skids under the floor.
+	for sx in [-0.45, 0.45]:
+		pk.block(kit, "matte", Vector3(sx - 0.06, -0.06, -hw - 0.02), Vector3(sx + 0.06, 0.02, hw + 0.02), Color(0.3, 0.22, 0.15))
+	# Fuel cylinders in the corners, their valves and hoses up to the burner.
+	for c3 in [Vector3(-0.45, 0, -0.45), Vector3(0.45, 0, -0.45), Vector3(0.45, 0, 0.45), Vector3(-0.45, 0, 0.45)]:
+		pk.tube(kit, "paint", c3 + Vector3(0, 0.02, 0), c3 + Vector3(0, 0.95, 0), 0.19, 0.19, 12, Color(0.72, 0.74, 0.76))
+		pk.tube(kit, "metal", c3 + Vector3(0, 0.95, 0), c3 + Vector3(0, 1.02, 0), 0.06, 0.05, 8, Color(0.2, 0.2, 0.2))
+	for hx in [-0.45, 0.45]:
+		pk.tube(kit, "rubber", Vector3(hx, 1.02, -0.45), Vector3(hx * 0.5, 1.7, -0.2), 0.025, 0.025, 6, Color(0.1, 0.1, 0.1), false)
+		pk.tube(kit, "rubber", Vector3(hx * 0.5, 1.7, -0.2), Vector3(hx * 0.4, 2.3, 0.0), 0.025, 0.025, 6, Color(0.1, 0.1, 0.1), false)
+	# The uprights in padded sleeves, the frame, the burners, coils, valves.
 	for c in [Vector3(-0.7, 1.2, -0.7), Vector3(0.7, 1.2, -0.7), Vector3(0.7, 1.2, 0.7), Vector3(-0.7, 1.2, 0.7)]:
-		pk.beam(kit, "steel", c, Vector3(c.x * 0.8, 2.35, c.z * 0.8), 0.04, 0.04, Color(0.25, 0.25, 0.25))
+		var top := Vector3(c.x * 0.8, 2.35, c.z * 0.8)
+		pk.beam(kit, "steel", c, top, 0.04, 0.04, Color(0.25, 0.25, 0.25))
+		pk.tube(kit, "matte", c.lerp(top, 0.05), c.lerp(top, 0.8), 0.06, 0.06, 8, leather.lightened(0.15))
 	pk.block(kit, "steel", Vector3(-0.6, 2.3, -0.6), Vector3(0.6, 2.4, 0.6), Color(0.6, 0.6, 0.6))
 	for bx in [-0.22, 0.22]:
 		pk.tube(kit, "metal", Vector3(bx, 2.4, 0), Vector3(bx, 2.75, 0), 0.2, 0.2, 10, Color(0.75, 0.74, 0.7))
+		for k in range(3):
+			pk.tyre(kit, "metal", Vector3(bx, 2.47 + 0.09 * k, 0), 0.19, 0.24, 0.05, 12, Color(0.55, 0.53, 0.5))
+		pk.beam(kit, "steel", Vector3(bx, 2.2, -0.25), Vector3(bx, 2.2, -0.5), 0.03, 0.03, Color(0.15, 0.15, 0.15))
+		pk.tube(kit, "matte", Vector3(bx, 2.2, -0.5), Vector3(bx, 2.2, -0.56), 0.04, 0.04, 8, Color(0.8, 0.1, 0.08))
+		pk.tube(kit, "metal", Vector3(bx + 0.12, 2.75, 0.1), Vector3(bx + 0.12, 2.82, 0.1), 0.02, 0.015, 6, Color(0.3, 0.3, 0.3))
 	# The flame: a cone up into the mouth, UV.y from its root to its tip.
 	var root := Vector3(0, 2.8, 0)
 	var tip := Vector3(0, 5.8, 0)
@@ -756,19 +853,51 @@ static func _basket(pk: PropKit, kit: Dictionary) -> void:
 		pk.tri(kit, "flame", p0, p1, tip, n0, n0, n0, Color.WHITE, n0, Vector2(float(k) / 10.0, 0.0), Vector2(float(k + 1) / 10.0, 0.0), Vector2(float(k) / 10.0, 1.0))
 
 
-## A balloon being cold-inflated: the envelope lying on its side downwind of its basket (on its side too), half full
-## and slumped onto the ground, an inflator fan blowing into the mouth. Its mouth toward -z.
+## A balloon being cold-inflated: the envelope lying on its side along +z (inflating_frame), half full and slumped onto
+## the ground, its mouth (at z = -2, held open by the crew) just off the ground; the basket on its side before it, its
+## burner pointing into the mouth; the inflator fan beside it blowing in; the crown line out past the crown to the
+## crew member holding it.
+const INFLATE_FAN := Vector3(2.4, 0.0, -5.4)
+const INFLATE_CROWN_HOLD := Vector3(0.4, 0.0, 24.0)
+
 static func balloon_inflating(pk: PropKit, kit: Dictionary, style: int) -> void:
-	var lie := Transform3D(Basis(Vector3.RIGHT, PI * 0.5) * Basis.from_scale(Vector3(1.0, 1.0, 0.62)), Vector3(0, 5.2, -2.0))
-	_envelope(pk, kit, BALLOONS[style % BALLOONS.size()], lie, 1.0, 0.25)
-	# The basket on its side at the mouth, the fan behind it.
+	var lie: Transform3D = inflating_frame()
+	_envelope(pk, kit, BALLOONS[style % BALLOONS.size()], lie, 1.0, INFLATE_FLAT)
+	_skirt(pk, kit, lie)
+	# The basket on its side, its floor toward -z and its burner into the mouth.
 	var base: Transform3D = pk.xf
-	pk.set_frame(base * Transform3D(Basis(Vector3.RIGHT, -PI * 0.5), Vector3(0, 0.75, -3.6)))
+	pk.set_frame(base * Transform3D(Basis(Vector3.RIGHT, PI * 0.5), Vector3(0, 0.82, -6.2)))
 	_basket(pk, kit)
 	pk.set_frame(base)
-	var fan_c := Vector3(1.8, 1.0, -6.8)
-	pk.tube(kit, "paint", fan_c, fan_c + Vector3(-0.5, 0.15, 1.2), 0.95, 0.95, 16, Color(0.85, 0.2, 0.15))
-	pk.block(kit, "steel", fan_c + Vector3(-0.7, -1.0, -0.6), fan_c + Vector3(0.7, -0.6, 0.6), Color(0.25, 0.25, 0.25))
+	# The inflator: a ducted fan on a frame with wheels, its engine behind, aimed at the mouth.
+	var aim: Vector3 = (lie.origin + Vector3(0, -0.3, 0) - (INFLATE_FAN + Vector3(0, 1.0, 0))).normalized()
+	var fb := Basis.looking_at(aim, Vector3.UP)
+	pk.set_frame(base * Transform3D(fb, INFLATE_FAN + Vector3(0, 1.0, 0)))
+	var red := Color(0.85, 0.2, 0.15)
+	pk.tube(kit, "paint", Vector3(0, 0, 0.25), Vector3(0, 0, -0.35), 0.95, 0.95, 24, red, false)
+	pk.tube(kit, "paint", Vector3(0, 0, 0.27), Vector3(0, 0, -0.37), 0.9, 0.9, 24, red.darkened(0.3), false)
+	for k in range(5):
+		var a: float = TAU * float(k) / 5.0 + 0.3
+		pk.box(kit, "metal", Transform3D(Basis(Vector3.BACK, a) * Basis(Vector3.UP, 0.4), Vector3(cos(a), sin(a), 0) * 0.45 + Vector3(0, 0, 0.05)), Vector3(0.75, 0.22, 0.02), Color(0.7, 0.7, 0.72))
+	pk.tube(kit, "metal", Vector3(0, 0, 0.12), Vector3(0, 0, -0.05), 0.16, 0.12, 12, Color(0.3, 0.3, 0.3))
+	# The guard: rings and spokes over the front.
+	for r in [0.3, 0.6, 0.9]:
+		pk.tyre(kit, "steel", Vector3(0, 0, -0.38), r - 0.015, r + 0.015, 0.02, 24, Color(0.15, 0.15, 0.15), Basis(Vector3.RIGHT, PI * 0.5))
+	for k in range(8):
+		var a2: float = TAU * float(k) / 8.0
+		pk.beam(kit, "steel", Vector3(0, 0, -0.38), Vector3(cos(a2), sin(a2), 0) * 0.92 + Vector3(0, 0, -0.38), 0.015, 0.015, Color(0.15, 0.15, 0.15))
+	# Engine and fuel tank behind, the frame round it all down to two wheels and a foot.
+	pk.block(kit, "paint", Vector3(-0.35, -0.55, 0.3), Vector3(0.35, 0.05, 0.95), Color(0.2, 0.2, 0.22))
+	pk.tube(kit, "paint", Vector3(-0.3, 0.12, 0.6), Vector3(0.3, 0.12, 0.6), 0.14, 0.14, 12, red)
+	for sx in [-1.0, 1.0]:
+		pk.beam(kit, "steel", Vector3(sx * 1.0, -1.0, 0.9), Vector3(sx * 1.0, 0.0, 0.0), 0.05, 0.05, Color(0.15, 0.15, 0.15))
+		pk.beam(kit, "steel", Vector3(sx * 1.0, -1.0, -0.3), Vector3(sx * 1.0, 0.0, 0.0), 0.05, 0.05, Color(0.15, 0.15, 0.15))
+		pk.tyre(kit, "rubber", Vector3(sx * 1.05, -0.8, 0.9), 0.08, 0.2, 0.1, 12, Color(0.07, 0.07, 0.07), Basis(Vector3.FORWARD, PI * 0.5))
+	pk.set_frame(base)
+	# The crown line, from the crown out to the crew member holding it.
+	var crown: Vector3 = lie * Vector3(0, float(ENVELOPE[ENVELOPE.size() - 1][1]), 0)
+	crown.y = maxf(crown.y, INFLATE_FLAT + 0.3)
+	pk.tube(kit, "matte", crown, INFLATE_CROWN_HOLD + Vector3(-0.3, 1.1, 0), 0.025, 0.025, 5, Color(0.9, 0.85, 0.7), false)
 
 
 # ======================================================================================

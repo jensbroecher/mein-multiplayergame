@@ -2300,13 +2300,12 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
     [run=x,z,yaw,run_up ...] [trace=1]` (headless) drives a real cart across and prints the hop, the speed in and out and
     what it stood on, the chassis jolts and whether it was blown up (`hold=<train>:<clock>` holds a train, `kills=1`
     leaves them deadly). The yard lead's embankment by T1 still throws a fast cart: that is the ground.
-  - The feel: `RailRumble.gd` (node `RailRumble`, fed every stretch of track's centre line by the generator,
-    `_rumble_lines`) gives a cart that crosses a rail on the ground (at a level crossing or off the road) a clunk
-    (`FreightKit.rail_clunk`) and a jolt, and one running along a track a knock (`sleeper_knock`) and a smaller jolt every
-    third sleeper. The jolt is `PlayerCart.jolt(lift, pitch, roll)`: the body bounces over its wheels on a damped spring
-    with 3-axis roll damping, simulating the rough sleeper ballast surface with physical micro-bumps. When speeding along the
-    raw tracks (`speed > DANGER_SPEED`, 24.5 m/s, off paved crossings), carts shake violently, flip over and get thrown to the
-    side with lateral impulses and rotational air tumble. On the bed the tyres also roll on gravel (the bodies' surface).
+  - The sound: `RailRumble.gd` (node `RailRumble`, fed every stretch of track's centre line by the generator,
+    `_rumble_lines`) plays a clunk (`FreightKit.rail_clunk`) as a cart crosses a rail on the ground (at a level crossing or
+    off the road) and a knock (`sleeper_knock`) every third sleeper as one runs along a track. Sound only: the handling is
+    the beds' collision alone, as on Mina del Viento's rail loop (which has a RailRumble too). Its jolts, impulses and the
+    flip and throw over the rails at speed (24.5 m/s) made the carts shake and tumble, and the user preferred Mina's.
+    On the bed the tyres roll on gravel (the bodies' surface).
 - `TrainKit.gd` builds the rolling stock through a PropKit at SCALE 1.5 (`KINDS`: loco 19m, box 15, tank 14, flat 16,
   flat_load 16, hopper 16, caboose 10, ploco 20, coach 26, obs 26, in life-size metres): a hood-unit diesel (`loco:2` is
   the yellow yard switcher), boxcars and tank cars in four colourways, an open flatcar, the log car (`_flat_car` with
@@ -2322,7 +2321,12 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
   `Train.gd` runs a train along a Curve3D on the wall clock (`looped`: round a closed path for ever, Mina del Viento's
   rail loop): `consist` ("loco", "box:1", "flat", "flat_load", "hopper",
   "tank", "caboose", "ploco", "coach", "obs", "gap:20" for an opening, which only the tests use now, and "~" before a car
-  to turn it round), `speed`, `period` (>= (line + train) / speed), `phase`. Hits are a swept test of each cart this peer
+  to turn it round), `speed`, `period` (>= (line + train) / speed), `phase`. Each car's bogies are meshes of their own
+  (`TrainKit.build(kind, variant, false)`, `bogies`, `bogie_mesh`), each set on the rails at its own place along the
+  path and turned along them there, the body hung between the outermost two's pivots: as one mesh placed on the chord
+  between the car's ends, the bogies stood off the rails on a curve (the local's turn into the station).
+  `res://scratch/train_curve_preview.gd` (`-s`, windowed, `-- <dir> [r=60] [head=190] [consist=...] name:x,y,z:tx,ty,tz`)
+  holds a train on a tight curve. Hits are a swept test of each cart this peer
   drives against each car's box in the car's own frame (a car is solid from the rail down 1.2m to its height: a flatcar is
   2.2m, a boxcar 6.3m, loaded flatcar 4.4m); no collision body, because a cart moves a metre a step.
   `blocked_intervals`/`pass_window`/`pass_windows` (each pass its own window) give the timetable at a point. With `legs`
@@ -2568,6 +2572,15 @@ Rebuilt on 2026-11-02 (Gemini's first version had a pit unrelated to its road, t
   the truck shop, the concentrator and thickeners, the grandstand. `res://scratch/mina_kit_preview.gd` (`-s`, windowed,
   `-- <dir> set=truck,shovel,... name:x,y,z:tx,ty,tz`) renders them in seconds; `scratch/test_mina_kit.gd` (`-s`, headless)
   builds each and prints its triangles.
+- The balloons (`MinaKit.balloon`, `balloon_inflating`): a woven wicker basket (stakes and weavers, a padded leather rim,
+  rope handles, skids, fuel cylinders with hoses), padded uprights, twin burners with coils, blast valves and pilot
+  lights, a dark skirt under the mouth, the crown ring; the field's standing ones tethered by two ropes to stakes. An
+  inflating one lies on the ground (`inflating_frame`), its mouth just off it, the basket on its side with its burner
+  into the mouth, a ducted inflator fan (guard, blades, engine, frame on wheels) beside it, the crown line out to the
+  crew member holding it; the crew stand at their jobs (the mouth, the fan, the crown line, the basket), not inside it.
+  The envelopes are solid as convex hulls (`envelope_hull`, `_hull_shape`); their inside glows with the daylight through
+  the nylon (`mina_balloon.gdshader`), not black through the mouth. `scratch/drive_under_check.tscn` checks each is solid
+  and no spectator stands inside a lying one.
 - `BalloonFiesta.gd`: the balloons aloft loop slowly over the plateau on the wall clock; every burner fires now and then
   (the `burn` instance uniform).
 - The haboob (`HaboobWeather.gd`): a place, not a schedule. `intensity_at(p)` is the storm's cover there (a grid the

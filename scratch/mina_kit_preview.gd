@@ -29,7 +29,7 @@ func _build(which: String, sc: float) -> Node3D:
 		"dish":
 			MinaKit.radio_dish(pk, kit, deg_to_rad(40.0), deg_to_rad(52.0))
 		"balloon":
-			MinaKit.balloon(pk, kit, 0)
+			MinaKit.balloon(pk, kit, 0, Basis(), true)
 		"balloonlow":
 			MinaKit.balloon_inflating(pk, kit, 1)
 		"light":
