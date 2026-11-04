@@ -94,6 +94,11 @@ func _ready():
 		sync_position = global_position
 		sync_rotation = global_rotation
 
+## Racers who have finished are out of the fight: never targeted, hit or pushed.
+static func _finished(cart: Object) -> bool:
+	return cart != null and is_instance_valid(cart) and cart.get("is_finished_race") == true
+
+
 func _find_target():
 	if not is_guided:
 		_find_nudge_target()
@@ -116,7 +121,7 @@ func _find_target():
 			continue
 		if p.name.to_int() == owner_id:
 			continue
-		if p.get("is_exploding") == true or p.get("is_drowned") == true:
+		if p.get("is_exploding") == true or p.get("is_drowned") == true or _finished(p):
 			continue
 			
 		var to_p: Vector3 = p.global_position - global_position
@@ -168,7 +173,7 @@ func _find_nudge_target() -> void:
 	for p in get_tree().get_nodes_in_group("player_carts"):
 		if p == null or not is_instance_valid(p) or p.name.to_int() == owner_id:
 			continue
-		if p.get("is_exploding") == true or p.get("is_drowned") == true:
+		if p.get("is_exploding") == true or p.get("is_drowned") == true or _finished(p):
 			continue
 		var to_p: Vector3 = p.global_position - global_position
 		var dist: float = to_p.length()
@@ -249,7 +254,10 @@ func _physics_process(delta):
 			var hit = space_state.intersect_ray(query)
 			if hit and hit.collider:
 				var col = hit.collider
-				if col.is_in_group("player_carts"):
+				if col.is_in_group("player_carts") and _finished(col):
+					# A racer who has finished is out of the fight: the missile flies on past.
+					add_collision_exception_with(col)
+				elif col.is_in_group("player_carts"):
 					if not (col.name.to_int() == owner_id and spawn_safety_timer > 0.0):
 						_explode()
 						return
@@ -260,7 +268,9 @@ func _physics_process(delta):
 		# Check overlapping bodies in Area3D in case target was already touching at launch
 		if is_instance_valid(area):
 			for body in area.get_overlapping_bodies():
-				if body.is_in_group("player_carts"):
+				if body.is_in_group("player_carts") and _finished(body):
+					add_collision_exception_with(body)
+				elif body.is_in_group("player_carts"):
 					if not (body.name.to_int() == owner_id and spawn_safety_timer > 0.0):
 						_explode()
 						return
@@ -276,7 +286,9 @@ func _physics_process(delta):
 			var collision = get_slide_collision(i)
 			var col = collision.get_collider()
 			if col:
-				if col.is_in_group("player_carts"):
+				if col.is_in_group("player_carts") and _finished(col):
+					add_collision_exception_with(col)
+				elif col.is_in_group("player_carts"):
 					if not (col.name.to_int() == owner_id and spawn_safety_timer > 0.0):
 						_explode()
 						return
@@ -337,6 +349,8 @@ func _explode():
 		var players = get_tree().get_nodes_in_group("player_carts")
 		for p in players:
 			# Notice there is no owner exclusion, so the owner can be hit if close to the blast!
+			if _finished(p):
+				continue
 			var dist = global_position.distance_to(p.global_position)
 			if dist <= blast_radius:
 				if p.has_method("on_hit"):

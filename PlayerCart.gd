@@ -1436,9 +1436,15 @@ func _integrate_forces(state: PhysicsDirectBodyState3D):
 	var now = Time.get_ticks_msec() / 1000.0
 	if now - last_crash_sound_time < 0.6:
 		return
-	# Check contact normals: ground points UP (y~1), walls point sideways (y~0)
+	# Check contact normals: ground points UP (y~1), walls point sideways (y~0). Round the loop the floor itself faces
+	# sideways and down, and played the crash every 0.6s: nothing on the loop, and a contact facing the way the ground
+	# under the cart does is floor, not a wall.
+	if is_on_loop or _loop_grace > 0.0:
+		return
 	for i in range(state.get_contact_count()):
 		var normal = state.get_contact_local_normal(i)
+		if (is_on_ground or _ground_grace > 0.0) and normal.dot(current_ground_normal) > 0.6:
+			continue
 		if abs(normal.y) < 0.5:
 			# Light props a cart knocks aside (snow poles) make their own sound, not a crash.
 			var other = state.get_contact_collider_object(i)
@@ -1639,11 +1645,11 @@ func _process(delta):
 					elif spectate_target_cart == null or not is_instance_valid(spectate_target_cart):
 						spectate_index = (spectate_index + 1) % active_racing_carts.size()
 						spectate_target_cart = active_racing_carts[spectate_index]
-				else:
-					# All cars finished — focus on self or winner
-					spectate_target_cart = self
+				elif spectate_target_cart == null or not is_instance_valid(spectate_target_cart) or spectate_target_cart == self:
+					# Everyone has finished: stay on whoever was being watched (never back to this car), or another racer.
+					spectate_target_cart = _spectate_fallback()
 				
-				var focus_cart: Node3D = spectate_target_cart if (spectate_target_cart and is_instance_valid(spectate_target_cart)) else self
+				var focus_cart: Node3D = spectate_target_cart if (spectate_target_cart and is_instance_valid(spectate_target_cart)) else _spectate_fallback()
 				var focus_pos: Vector3 = focus_cart.global_position
 				
 				# 3/4 broadcast angle (same as debug SpectatorCamera) with zoom factor
@@ -2352,9 +2358,15 @@ func _physics_process(delta):
 		_interpolate_remote_physics(delta)
 		return
 
-	# Align ground ray with visual orientation so it points along the vehicle's local down axis.
+	# Align ground ray with visual orientation so it points along the vehicle's local down axis. On the loop it points
+	# straight at the loop's surface (along its last normal): down the model's up, which lags the loop's turn, it missed
+	# the surface, and the cart was taken for airborne (tumbling free, landing sounds).
 	if is_instance_valid(ground_ray):
-		ground_ray.global_transform.basis = visuals.global_transform.basis
+		if is_on_loop and _loop_last_normal.length_squared() > 0.5:
+			ground_ray.global_transform.basis = Basis(Quaternion(Vector3.UP, _loop_last_normal.normalized()))
+			ground_ray.force_raycast_update()
+		else:
+			ground_ray.global_transform.basis = visuals.global_transform.basis
 
 	# Update loop detection with grace timer so micro-bounces don't instantly drop cars off ceilings
 	var hitting_loop: bool = is_instance_valid(ground_ray) and ground_ray.is_colliding() and _is_loop_surface(ground_ray.get_collider())
@@ -2552,7 +2564,9 @@ func _physics_process(delta):
 		if not was_on_ground:
 			var time_since_respawn = (Time.get_ticks_msec() / 1000.0) - last_respawn_time
 			var is_descending = linear_velocity.y < -1.0 or linear_velocity.dot(-ground_normal) > 1.0
-			if not can_move or is_landing or time_since_respawn < 0.6 or ignore_next_landing_sound or air_time < 0.15 or not is_descending:
+			# Never on the loop: the ground probe touching it again after a moment off isn't a landing.
+			if not can_move or is_landing or time_since_respawn < 0.6 or ignore_next_landing_sound or air_time < 0.15 or not is_descending \
+					or on_loop or is_on_loop or _loop_grace > 0.0:
 				ignore_next_landing_sound = false
 			else:
 				if multiplayer.multiplayer_peer != null:
@@ -3403,6 +3417,9 @@ func _get_ground_visual_offset() -> float:
 	const GROUND_PLANT_OFFSET = 0.015
 	return collision_radius + min_wheel_bottom_y + GROUND_PLANT_OFFSET
 
+## How fast the model turns to the loop's surface while on it (per second, exponential).
+const LOOP_ALIGN_RATE := 40.0
+
 func _update_visuals_alignment(delta: float) -> void:
 	if is_exploding:
 		if is_drowned:
@@ -3418,7 +3435,12 @@ func _update_visuals_alignment(delta: float) -> void:
 	var target_up = Vector3.UP
 	var on_loop_vis = false
 
-	if is_instance_valid(ground_ray):
+	if is_on_loop and _loop_last_normal.length_squared() > 0.5:
+		# On the loop: its surface's normal, fresh from this physics step.
+		on_ground = true
+		on_loop_vis = true
+		target_up = _loop_last_normal.normalized()
+	elif is_instance_valid(ground_ray):
 		ground_ray.global_transform.basis = visuals.global_transform.basis
 		if ground_ray.is_colliding():
 			var norm = ground_ray.get_collision_normal()
@@ -3448,8 +3470,13 @@ func _update_visuals_alignment(delta: float) -> void:
 		else:
 			_smooth_visual_up = _smooth_visual_up.normalized()
 
+		if on_loop_vis:
+			# One smoothing on the loop (the basis slerp below), not two in a row.
+			_smooth_visual_up = target_up
 		var dot_up: float = clampf(_smooth_visual_up.dot(target_up), -1.0, 1.0)
-		var slerp_t: float = 1.0 - exp(-8.0 * delta)
+		# On the loop the surface turns about 3 radians a second: smoothed as on a hill (8, then 9 for the basis) the
+		# model ran 30-40 degrees behind it, standing off the surface.
+		var slerp_t: float = 1.0 - exp(-(LOOP_ALIGN_RATE if on_loop_vis else 8.0) * delta)
 		if dot_up > 0.9999 or dot_up < -0.9999:
 			_smooth_visual_up = target_up
 		else:
@@ -3480,6 +3507,9 @@ func _update_visuals_alignment(delta: float) -> void:
 	# Smoothly align the visual mesh normal to terrain slope (no horizontal clamp!)
 	var current_basis = visuals.global_transform.basis.orthonormalized()
 	var forward = -current_basis.z
+	if on_loop_vis and linear_velocity.length() > 3.0:
+		# Round the loop the nose follows the way the cart goes.
+		forward = linear_velocity.normalized()
 
 	var target_forward = (forward - target_up * forward.dot(target_up)).normalized()
 	if target_forward.length_squared() < 0.001:
@@ -3490,7 +3520,7 @@ func _update_visuals_alignment(delta: float) -> void:
 	var target_basis = Basis(target_right, target_up, -target_forward).orthonormalized()
 	var cur_q: Quaternion = current_basis.get_rotation_quaternion().normalized()
 	var tgt_q: Quaternion = target_basis.get_rotation_quaternion().normalized()
-	var new_q: Quaternion = cur_q.slerp(tgt_q, 1.0 - exp(-9.0 * delta)).normalized()
+	var new_q: Quaternion = cur_q.slerp(tgt_q, 1.0 - exp(-(LOOP_ALIGN_RATE if on_loop_vis else 9.0) * delta)).normalized()
 	visuals.global_transform.basis = Basis(new_q)
 
 	var target_pos = get_global_transform_interpolated().origin - target_up * visual_offset_y
@@ -4180,6 +4210,9 @@ func _broadcast_combat_notice(attacker_name: String, victim_name: String, attack
 			local_cart.race_ui.show_explosion_notice(attacker_name, victim_name, attacker_id, victim_id, weapon)
 
 func on_hit(attacker_id: int = 0, weapon: String = ""):
+	# Racers who have finished are out of the fight.
+	if is_finished_race:
+		return
 	if is_shielded:
 		is_shielded = false
 		var is_real_peer = name.to_int() > 0 and not get("is_ai") and NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER
@@ -4724,6 +4757,12 @@ func _apply_respawn_pose() -> void:
 	_ai_unstuck_dir = 0.0
 	_ai_recovering = false
 	_ai_recover_refresh = 0.0
+	_ai_recover_goal = Vector3.ZERO
+	_ai_rejoin_lost = 0.0
+	_ai_rejoin_last_d = INF
+	_ai_rejoin_job = null
+	_ai_rejoin_path = PackedVector3Array()
+	_ai_aim_blocked = false
 	_ai_no_progress_timer = 0.0
 	_ai_progress_sample_pos = global_position
 	_ai_fall_origin = Vector3.ZERO
@@ -5186,6 +5225,8 @@ func _on_shield_timeout():
 
 @rpc("any_peer", "call_local", "reliable")
 func apply_blast_impulse(impulse: Vector3):
+	if is_finished_race:
+		return
 	if is_local_player or (is_ai and (multiplayer.multiplayer_peer == null or multiplayer.is_server())):
 		apply_central_impulse(impulse)
 		# Add rotational tumble so blast waves and explosions flip the car
@@ -5199,8 +5240,11 @@ func _activate_shockwave():
 	# Apply force to nearby players (only on server)
 	if multiplayer.multiplayer_peer == null or multiplayer.is_server():
 		var players = get_tree().get_nodes_in_group("player_carts")
+		# Who it threw (for the commentator, on every peer through client_play_shockwave).
+		var victims := PackedStringArray()
 		for p in players:
-			if p == self: continue
+			# Racers who have finished are out of the fight.
+			if p == self or p.get("is_finished_race"): continue
 			var dist = global_position.distance_to(p.global_position)
 			if dist < 15.0:
 				if p.is_shielded:
@@ -5213,6 +5257,8 @@ func _activate_shockwave():
 						p.shield_mesh.scale = Vector3.ONE
 					continue
 				
+				var vn := str(p.get("player_name"))
+				victims.append(vn if vn != "" and vn != "<null>" else str(p.name))
 				var dir = (p.global_position - global_position).normalized()
 				var impulse = dir * 54.0 * p.mass + Vector3.UP * 27.0 * p.mass
 				if p.has_method("apply_blast_impulse"):
@@ -5235,12 +5281,18 @@ func _activate_shockwave():
 		
 		# Play visual for all clients
 		if multiplayer.multiplayer_peer != null:
-			client_play_shockwave.rpc()
+			client_play_shockwave.rpc(victims)
 		else:
-			client_play_shockwave()
+			client_play_shockwave(victims)
 
 @rpc("any_peer", "call_local", "reliable")
-func client_play_shockwave():
+func client_play_shockwave(victims: PackedStringArray = PackedStringArray()):
+	# The commentator calls who it threw, as it does missile, bomb and lightning hits.
+	if not victims.is_empty():
+		var attacker_name := str(get("player_name"))
+		if attacker_name == "" or attacker_name == "<null>":
+			attacker_name = str(name)
+		get_tree().call_group(&"race_commentator", &"call_shockwave", attacker_name, Array(victims))
 	shockwave_visual.visible = true
 	shockwave_visual.scale = Vector3(0.1, 0.1, 0.1)
 	if shockwave_visual.material_override:
@@ -5269,7 +5321,7 @@ func _activate_lightning():
 		var hit_players: Array[String] = []
 		
 		for p in players:
-			if p == self: continue
+			if p == self or p.get("is_finished_race"): continue
 			var dist = global_position.distance_to(p.global_position)
 			if dist < 25.0:
 				if p.is_shielded:
@@ -5313,6 +5365,8 @@ func _activate_lightning():
 
 @rpc("authority", "call_local", "reliable")
 func apply_lightning_slow_multicast():
+	if is_finished_race:
+		return
 	slow_timer = 2.5
 
 @rpc("any_peer", "call_local", "reliable")
@@ -6767,22 +6821,48 @@ func _get_ai_input(delta: float) -> Vector2:
 	
 	var target_global_pos: Vector3
 	
-	# Checkpoint Priority Navigation & Seamless Road Rejoining:
-	if is_offroad and not on_course:
+	# Checkpoint Priority Navigation & Seamless Road Rejoining: off the course (more than the corridor from the lap),
+	# on grass, or on some other surface named as road far from the lap in plan (Glacier Highway's other decks: a bot
+	# 30m off the lap on one counted as on the road, had no goal and ground along it until it was respawned). Never in
+	# the air, and never for being high over the lap: on a kicker's lip or flying off it a bot is metres above the
+	# lap's line, and taken for off the course it braked and turned for a road point behind or beside it (every one
+	# ahead was a drop) and drove off the road.
+	# Also on grass inside the corridor when the way to the usual aim point is blocked (a guardrail, a fence, a wall, a
+	# bank too steep: _ai_line_drivable, looked at every AI_BLOCK_CHECK): just outside Pinecrest's guardrails (8.5m off
+	# the line, inside the 16m corridor) bots counted as on the course, aimed through the rail and ground along it. And
+	# for as long as a way back planned (RejoinPlanner) is being followed, until the bot is on the road again.
+	var aim_blocked := false
+	if is_offroad and was_on_ground and on_course and space_state:
+		_ai_block_check -= delta
+		if _ai_block_check <= 0.0:
+			_ai_block_check = AI_BLOCK_CHECK
+			_ai_aim_blocked = not _ai_line_drivable(space_state, global_position, active_path.to_global(target_local_pos))
+		aim_blocked = _ai_aim_blocked
+	elif not is_offroad:
+		_ai_aim_blocked = false
+		if not _ai_rejoin_path.is_empty() or _ai_rejoin_job != null:
+			_ai_rejoin_path = PackedVector3Array()
+			_ai_rejoin_job = null
+	var following_way_back: bool = is_offroad and (not _ai_rejoin_path.is_empty() or _ai_rejoin_job != null)
+	if (not on_course and was_on_ground and (is_offroad or _ai_plan_distance_to_lap() > AI_OFF_LAP_PLAN)) or aim_blocked or following_way_back:
 		# Update offset to current position so rejoining is instant
 		_ai_last_ontrack_offset = curve.get_closest_offset(local_pos)
 		
-		var cp_pos: Vector3 = _ai_checkpoint_recovery_goal()
-		var road_pos: Vector3 = _ai_alongside_goal()
-		
-		# If a reachable road point is anywhere nearby (< 32m, height diff < 4.0m), head straight to the road!
-		if road_pos != Vector3.ZERO and global_position.distance_to(road_pos) < 32.0 and absf(road_pos.y - global_position.y) < 4.0:
-			target_global_pos = road_pos
-		elif cp_pos != Vector3.ZERO:
-			# Otherwise drive directly across terrain toward the next checkpoint!
-			target_global_pos = cp_pos
+		# Back to the road by a way it can drive (_ai_rejoin_goal): the nearest road point whose straight line from
+		# here climbs no bank, crosses no water and meets no wall, rail or fence. Aiming at the nearest road point
+		# whatever lay between, bots ground along the barriers between them and the road, and with the road up a
+		# bank, set off across country for the next gate and wandered.
+		var rejoin: Vector3 = _ai_rejoin_goal(delta, space_state)
+		if rejoin != Vector3.ZERO:
+			target_global_pos = rejoin
 		else:
-			target_global_pos = active_path.to_global(target_local_pos)
+			var cp_pos: Vector3 = _ai_checkpoint_recovery_goal()
+			if cp_pos != Vector3.ZERO and _ai_line_drivable(space_state, global_position, cp_pos):
+				target_global_pos = cp_pos
+			else:
+				# A way round being planned (a few frames): hold the old aim (the road ahead) meanwhile.
+				var road_pos: Vector3 = _ai_alongside_goal()
+				target_global_pos = road_pos if road_pos != Vector3.ZERO else active_path.to_global(target_local_pos)
 
 		# Off-road stuck detection (stalled against steep cliff, wall or boulder, or rolling backwards)
 		var fwd_speed: float = linear_velocity.dot(fwd_3d)
@@ -6808,6 +6888,13 @@ func _get_ai_input(delta: float) -> Vector2:
 		_ai_steep_hill_stuck_timer = 0.0
 		_ai_slope_rollback_timer = 0.0
 		target_global_pos = active_path.to_global(target_local_pos)
+		# On the course: no rejoin goal or way back is kept over from the last time it was off.
+		_ai_recover_goal = Vector3.ZERO
+		_ai_recover_refresh = 0.0
+		_ai_rejoin_lost = 0.0
+		_ai_rejoin_last_d = INF
+		_ai_rejoin_job = null
+		_ai_rejoin_path = PackedVector3Array()
 
 	# Item Box Seeking (strictly within lane on mountain roads so cars never steer off)
 	var wants_item := (current_item == ItemType.NONE or current_item_2 == ItemType.NONE) and not is_finished_race and (not is_offroad or on_course)
@@ -7383,6 +7470,280 @@ func _ai_alongside_goal() -> Vector3:
 	return best
 
 
+## How far a bot on something called road must be from its route's line in plan (not in height: over a jump it is
+## high above it) to count as off the course.
+const AI_OFF_LAP_PLAN := 16.0
+
+## The distance in plan from the cart to its route's line (the active path: a shortcut while it is on one).
+func _ai_plan_distance_to_lap() -> float:
+	var pth: Path3D = active_path if (active_path and active_path.curve) else track_path
+	if pth == null or pth.curve == null:
+		return 0.0
+	var c: Curve3D = pth.curve
+	var best := INF
+	# Nearest in plan: the curve's closest point in 3D can be a stretch above or below (a bridge over the lap).
+	var p: Vector3 = pth.to_global(c.get_closest_point(pth.to_local(global_position)))
+	best = Vector2(p.x - global_position.x, p.z - global_position.z).length()
+	if _ai_last_ontrack_offset >= 0.0:
+		var q: Vector3 = pth.to_global(c.sample_baked(_ai_last_ontrack_offset))
+		best = minf(best, Vector2(q.x - global_position.x, q.z - global_position.z).length())
+	return best
+
+
+## Off the course: how often the rejoin goal is looked for again, how long the bot may find none before it is
+## respawned (it is somewhere it can't drive out of: under a bridge, in a hollow between banks, behind a wall), and
+## how far along the lap (behind and ahead) and across it road points are tried.
+const AI_REJOIN_REFRESH := 0.5
+const AI_REJOIN_GIVE_UP := 3.5
+const AI_REJOIN_BACK := 12.0
+const AI_REJOIN_AHEAD := 96.0
+const AI_REJOIN_REACH := 75.0
+## A drivable line: sampled every AI_LINE_STEP metres, it may climb at most AI_LINE_MAX_RISE per metre (a cart
+## won't climb much past 35 degrees off the road) and drop at most AI_LINE_MAX_DROP in one step.
+const AI_LINE_STEP := 4.0
+const AI_LINE_MAX_RISE := 0.7
+const AI_LINE_MAX_DROP := 3.0
+var _ai_rejoin_lost: float = 0.0
+var _ai_rejoin_last_d: float = INF
+## A search for a way back under way (RejoinPlanner), and the way found: points on the ground to follow.
+var _ai_rejoin_job = null
+var _ai_rejoin_path := PackedVector3Array()
+var _ai_rejoin_idx := 0
+var _ai_road_half_cached := -1.0
+## On grass inside the corridor: whether the line to the usual aim point is blocked, looked at every AI_BLOCK_CHECK.
+var _ai_aim_blocked := false
+var _ai_block_check := 0.0
+const AI_BLOCK_CHECK := 0.5
+const AI_WAY_BACK_REACHED := 5.0
+const AI_WAY_BACK_LEAVE := 14.0
+const RejoinPlanner = preload("res://RejoinPlanner.gd")
+
+
+## A road point the bot can drive straight to from where it is, or ZERO: points of the lap from AI_REJOIN_BACK behind
+## to AI_REJOIN_AHEAD ahead of the nearest, within AI_REJOIN_REACH, best first (near, not far above, ahead rather than
+## behind), the first whose line _ai_line_drivable passes; looked for again every AI_REJOIN_REFRESH. None for
+## AI_REJOIN_GIVE_UP seconds and the bot is respawned.
+func _ai_rejoin_goal(delta: float, space: PhysicsDirectSpaceState3D) -> Vector3:
+	if track_path == null or track_path.curve == null or space == null:
+		return Vector3.ZERO
+	# A way back planned: follow it to its end (looking for straight lines on the way made the bots flit between the two
+	# and plan again and again).
+	if not _ai_rejoin_path.is_empty():
+		var tgt := _ai_follow_way_back()
+		if tgt != Vector3.ZERO:
+			_ai_recover_goal = tgt
+			return tgt
+		_ai_rejoin_path = PackedVector3Array()
+		_ai_recover_goal = Vector3.ZERO
+		_ai_recover_refresh = 0.0
+	# A search under way: a few frames (RejoinPlanner shares its rays between the bots, a few hundred a frame).
+	if _ai_rejoin_job != null:
+		if not _ai_rejoin_job.step():
+			return _ai_recover_goal
+		var job = _ai_rejoin_job
+		_ai_rejoin_job = null
+		if job.found:
+			_ai_rejoin_path = job.path
+			_ai_rejoin_idx = 0
+			var first := _ai_follow_way_back()
+			_ai_recover_goal = first
+			return first
+		print("AI Cart ", name, " off the course with no way back to the road within ", RejoinPlanner.MAX_RADIUS, "m (",
+				job.expanded, " cells searched). Respawning.")
+		_ai_recover_goal = Vector3.ZERO
+		if multiplayer.multiplayer_peer != null and multiplayer.is_server():
+			respawn_rpc.rpc(last_checkpoint_transform)
+		else:
+			respawn()
+		return Vector3.ZERO
+	# A straight line to the road first (cheap), looked at every AI_REJOIN_REFRESH: the one it has while its line stays
+	# drivable, else the best there is.
+	_ai_recover_refresh -= delta
+	if _ai_recover_refresh > 0.0:
+		return _ai_recover_goal
+	_ai_recover_refresh = AI_REJOIN_REFRESH
+	if _ai_recover_goal != Vector3.ZERO and _ai_line_drivable(space, global_position, _ai_recover_goal):
+		return _ai_recover_goal
+	var goal := _ai_direct_rejoin(space)
+	if goal != Vector3.ZERO:
+		_ai_recover_goal = goal
+		return goal
+	# None: plan a way round (behind a guardrail, down a bank, round a pond).
+	_ai_rejoin_job = RejoinPlanner.new(self, space, track_path, _ai_road_half())
+	return _ai_recover_goal
+
+
+## A road point the cart can drive straight to from where it is, or ZERO: points of the lap from AI_REJOIN_BACK behind to
+## AI_REJOIN_AHEAD ahead of the nearest, within AI_REJOIN_REACH, best first (near, not far above, ahead rather than
+## behind), the first whose line _ai_line_drivable passes.
+func _ai_direct_rejoin(space: PhysicsDirectSpaceState3D) -> Vector3:
+	var curve: Curve3D = track_path.curve
+	var length: float = maxf(curve.get_baked_length(), 1.0)
+	var cur_off: float = curve.get_closest_offset(track_path.to_local(global_position))
+	var cands: Array = []
+	var d := -AI_REJOIN_BACK
+	while d <= AI_REJOIN_AHEAD:
+		var p: Vector3 = track_path.to_global(curve.sample_baked(fposmod(cur_off + d, length)))
+		var xz: float = Vector2(p.x - global_position.x, p.z - global_position.z).length()
+		var dy: float = p.y - global_position.y
+		if xz < AI_REJOIN_REACH and dy < 6.0 and dy > -25.0:
+			cands.append([xz + maxf(dy, 0.0) * 2.0 + absf(d) * 0.1 + (12.0 if d < 0.0 else 0.0), p])
+		d += 6.0
+	cands.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) < float(b[0]))
+	for k in range(mini(cands.size(), 6)):
+		var goal: Vector3 = cands[k][1]
+		if _ai_line_drivable(space, global_position, goal):
+			return goal
+	return Vector3.ZERO
+
+
+## The point of the planned way back to aim at, or ZERO once it is done (at its last point) or abandoned (the cart is
+## more than AI_WAY_BACK_LEAVE off it: it is planned again). Points reached (within AI_WAY_BACK_REACHED) are passed, a
+## nearer one further on skips to it, and close to the point aimed at the one after it is taken, so the cart flows on.
+func _ai_follow_way_back() -> Vector3:
+	var n := _ai_rejoin_path.size()
+	if n == 0:
+		return Vector3.ZERO
+	var p := global_position
+	var flat := func(q: Vector3) -> float: return Vector2(q.x - p.x, q.z - p.z).length()
+	while _ai_rejoin_idx < n - 1 and float(flat.call(_ai_rejoin_path[_ai_rejoin_idx])) < AI_WAY_BACK_REACHED:
+		_ai_rejoin_idx += 1
+	for k in range(_ai_rejoin_idx + 1, mini(_ai_rejoin_idx + 6, n)):
+		if float(flat.call(_ai_rejoin_path[k])) < float(flat.call(_ai_rejoin_path[_ai_rejoin_idx])):
+			_ai_rejoin_idx = k
+	var d: float = flat.call(_ai_rejoin_path[_ai_rejoin_idx])
+	if d > AI_WAY_BACK_LEAVE:
+		return Vector3.ZERO
+	if _ai_rejoin_idx >= n - 1 and d < AI_WAY_BACK_REACHED:
+		return Vector3.ZERO
+	if _ai_rejoin_idx < n - 1 and d < AI_WAY_BACK_REACHED + 2.5:
+		return _ai_rejoin_path[_ai_rejoin_idx + 1]
+	return _ai_rejoin_path[_ai_rejoin_idx]
+
+
+## The road's half width (its TerrainGenerator's road_width, else 7.5m), for the planner's goals.
+func _ai_road_half() -> float:
+	if _ai_road_half_cached > 0.0:
+		return _ai_road_half_cached
+	_ai_road_half_cached = 7.5
+	var lvl: Node = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
+	if lvl:
+		var tg := lvl.get_node_or_null("TerrainGenerator")
+		if tg and tg.get("road_width") != null:
+			_ai_road_half_cached = float(tg.get("road_width")) * 0.5
+	return _ai_road_half_cached
+
+
+## Whether a cart could drive the straight line from `from` to `to`: every AI_LINE_STEP metres the ground under it
+## (a ray down) must be there, out of deep water, not steeper than AI_LINE_MAX_RISE up or AI_LINE_MAX_DROP down from
+## the last, and nothing solid but track and ground may stand across it at a cart's height (walls, rails, fences, trees).
+func _ai_line_drivable(space: PhysicsDirectSpaceState3D, from: Vector3, to: Vector3) -> bool:
+	# _is_track_surface clears the cart's own road-gap flag as it goes: keep it.
+	var gap_flag := _on_road_gap_ground
+	var ok := _ai_line_drivable_steps(space, from, to)
+	_on_road_gap_ground = gap_flag
+	return ok
+
+
+func _ai_line_drivable_steps(space: PhysicsDirectSpaceState3D, from: Vector3, to: Vector3) -> bool:
+	if space == null:
+		return true
+	var flat := Vector3(to.x - from.x, 0.0, to.z - from.z)
+	var dist := flat.length()
+	if dist < 2.0:
+		return true
+	var dir := flat / dist
+	var steps := int(ceil(dist / AI_LINE_STEP))
+	var prev := Vector3(from.x, from.y - 0.5, from.z)
+	var down := PhysicsRayQueryParameters3D.create(from + Vector3.UP * 2.0, from + Vector3.DOWN * 4.0)
+	down.exclude = [get_rid()]
+	down.collision_mask = 1
+	var hit0 := space.intersect_ray(down)
+	if hit0:
+		prev = hit0.position
+	for i in range(1, steps + 1):
+		var t: float = minf(i * AI_LINE_STEP, dist)
+		var step_len: float = t - minf((i - 1) * AI_LINE_STEP, dist)
+		var q := from + dir * t
+		var guess: float = lerpf(from.y, to.y, t / dist)
+		var top: float = maxf(guess, prev.y) + 8.0
+		down = PhysicsRayQueryParameters3D.create(Vector3(q.x, top, q.z), Vector3(q.x, minf(guess, prev.y) - 30.0, q.z))
+		down.exclude = [get_rid()]
+		down.collision_mask = 1
+		var hit := space.intersect_ray(down)
+		if hit.is_empty():
+			return false
+		var g: Vector3 = hit.position
+		var on_track: bool = _is_track_surface(hit.collider)
+		if not on_track:
+			if (hit.normal as Vector3).y < 0.55:
+				return false
+			if _deep_water_at(g):
+				return false
+		var rise: float = (g.y - prev.y) / maxf(step_len, 0.5)
+		if rise > AI_LINE_MAX_RISE and not on_track:
+			return false
+		if prev.y - g.y > AI_LINE_MAX_DROP:
+			return false
+		# Anything standing across the step at a cart's height. A narrow thing (a tree, a rock, a post: it ends within
+		# 1.8m either side of where the line meets it) is no bar, the obstacle avoidance steers round it; only something
+		# longer (a wall, a rail, a fence) is. Through the jungle every line met a trunk and bots were respawned; testing
+		# lines 1.6m either side of the step instead let a guardrail met at a shallow angle pass as narrow (the lines
+		# beside meet it in another step), and bots outside Pinecrest's rails drove along them for the road.
+		var block := _ai_step_hit(space, prev, g)
+		if not block.is_empty() and not _ai_narrow_obstacle(space, block):
+			return false
+		prev = g
+	return true
+
+
+## What solid thing but track and ground stands across the step from `a` to `b` (ground points) at a cart's height: the
+## ray's hit, or empty.
+func _ai_step_hit(space: PhysicsDirectSpaceState3D, a: Vector3, b: Vector3) -> Dictionary:
+	var across := PhysicsRayQueryParameters3D.create(a + Vector3.UP * 0.7, b + Vector3.UP * 0.7)
+	across.exclude = [get_rid()]
+	across.collision_mask = 1
+	var block := space.intersect_ray(across)
+	if not block.is_empty() and not _is_track_surface(block.collider) and not _is_world_terrain_collider(block.collider) \
+			and not block.collider.is_in_group("player_carts") and (block.normal as Vector3).y < 0.55:
+		return block
+	return {}
+
+
+## Whether the thing hit (`block`, a ray's result) is narrow: 1.8m either way along its face, a short ray into where its
+## face would be finds nothing on both sides (a trunk, a post, a rock), where a rail, a fence or a wall goes on.
+func _ai_narrow_obstacle(space: PhysicsDirectSpaceState3D, block: Dictionary) -> bool:
+	var n: Vector3 = block.normal
+	n.y = 0.0
+	if n.length_squared() < 1e-4:
+		return false
+	n = n.normalized()
+	var along := Vector3(-n.z, 0.0, n.x)
+	var h: Vector3 = block.position
+	for sgn in [-1.0, 1.0]:
+		var o: Vector3 = h + along * (1.8 * sgn)
+		var q := PhysicsRayQueryParameters3D.create(o + n * 0.6, o - n * 0.6)
+		q.exclude = [get_rid()]
+		q.collision_mask = 1
+		var r := space.intersect_ray(q)
+		if not r.is_empty() and r.collider == block.collider:
+			return false
+	return true
+
+
+## Whether the ground at `p` lies under enough water to drown a cart (the level's water there).
+func _deep_water_at(p: Vector3) -> bool:
+	var wy: float = water_surface_y
+	if _river_water and is_instance_valid(_river_water) and _river_water.has_method("surface_at"):
+		var r = _river_water.call("surface_at", p.x, p.z)
+		if r is float:
+			# NAN where there is no water there (RiverWater, NorthlightWater): the test below is then false.
+			wy = r
+	elif water_bounds_active and (p.x < water_bounds_min.x or p.x > water_bounds_max.x or p.z < water_bounds_min.y or p.z > water_bounds_max.y):
+		return false
+	return p.y < wy - 0.6
+
+
 ## Returns the world-space position of the next expected checkpoint gate.
 ## Used during recovery so the bot navigates toward the correct gate.
 func _ai_checkpoint_recovery_goal() -> Vector3:
@@ -7545,6 +7906,12 @@ func _process_ai_items(delta: float):
 				# 1. Recovery boost: if slowed down or off-road, boost to immediately regain speed!
 				var spd: float = linear_velocity.length()
 				var recovering: bool = (is_offroad and was_on_ground) or (spd < 14.0 and can_move and not is_exploding)
+				# Not while finding a way back to the road (a boost there overshot every turn of it) or turned off its aim.
+				if (not _ai_rejoin_path.is_empty() or _ai_rejoin_job != null or _ai_aim_blocked or _ai_recover_goal != Vector3.ZERO) \
+						or absf(current_steer) > 0.35:
+					recovering = false
+					if is_offroad:
+						return
 				
 				# 2. Straightaway / corner exit boost:
 				# Use boost when on an open section, not heading into a sharp corner
@@ -7561,7 +7928,8 @@ func _process_ai_items(delta: float):
 		ItemType.MISSILE, ItemType.GUIDED_MISSILE:
 			var fwd = -visuals.global_transform.basis.z
 			for cart in get_tree().get_nodes_in_group("player_carts"):
-				if cart == self: continue
+				# Racers who have finished are out of the fight.
+				if cart == self or cart.get("is_finished_race"): continue
 				var to_cart = cart.global_position - global_position
 				if to_cart.length() < 40.0 and fwd.dot(to_cart.normalized()) > 0.8:
 					should_use = true
@@ -7569,7 +7937,7 @@ func _process_ai_items(delta: float):
 		ItemType.BOMB, ItemType.SHOCKWAVE:
 			var fwd = -visuals.global_transform.basis.z
 			for cart in get_tree().get_nodes_in_group("player_carts"):
-				if cart == self: continue
+				if cart == self or cart.get("is_finished_race"): continue
 				var to_cart = cart.global_position - global_position
 				if to_cart.length() < 18.0 and fwd.dot(to_cart.normalized()) < -0.5:
 					should_use = true
@@ -7578,7 +7946,7 @@ func _process_ai_items(delta: float):
 			should_use = true
 		ItemType.LIGHTNING:
 			for cart in get_tree().get_nodes_in_group("player_carts"):
-				if cart == self: continue
+				if cart == self or cart.get("is_finished_race"): continue
 				var dist = global_position.distance_to(cart.global_position)
 				if dist < 25.0:
 					should_use = true
@@ -8089,6 +8457,15 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 
+## Another racer to watch once this one has finished: never this car while there is any other (the camera went back
+## to the player's own car when the last racer crossed the line).
+func _spectate_fallback() -> Node3D:
+	for c in get_tree().get_nodes_in_group("player_carts"):
+		if is_instance_valid(c) and c is Node3D and c != self:
+			return c
+	return self
+
+
 func _cycle_spectate(dir: int) -> void:
 	var all_carts = get_tree().get_nodes_in_group("player_carts")
 	var active_racing_carts: Array[Node3D] = []
@@ -8096,8 +8473,9 @@ func _cycle_spectate(dir: int) -> void:
 		if is_instance_valid(c) and c is Node3D and not c.get("is_finished_race"):
 			active_racing_carts.append(c)
 	if active_racing_carts.is_empty():
+		# Everyone has finished: cycle through the others, not back to this car.
 		for c in all_carts:
-			if is_instance_valid(c) and c is Node3D:
+			if is_instance_valid(c) and c is Node3D and c != self:
 				active_racing_carts.append(c)
 	if active_racing_carts.is_empty():
 		return

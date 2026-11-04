@@ -666,7 +666,8 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			# curbs (visual and collision alike), easing back into the blend beyond them.
 			var gap_w: float = _road_gap_ground(px, pz, curve)
 			if gap_w > 0.0:
-				var across: float = 1.0 - smoothstep(sand_edge, sand_edge + 6.0, dist)
+				var gap_half: float = maxf(sand_edge, road_gap_half_width)
+				var across: float = 1.0 - smoothstep(gap_half, gap_half + 6.0, dist)
 				height = lerp(height, road_h + road_y_offset - road_gap_ground + _gap_drift_here, gap_w * across)
 
 			# Desert Wadi: carve a shallow river corridor (banks dip below the water plane).
@@ -922,6 +923,9 @@ var sand_width: float:
 ## off-road). The Lakeside loop stands in one (regenerate_lakeside.gd). Default roads only.
 @export var road_gaps: PackedFloat32Array = PackedFloat32Array()
 @export var road_gap_taper: float = 12.0
+## How far either side of the line a road gap's ground is graded (road_gap_ground under the road's surface), easing back
+## over 6m beyond: at least the curbs' outer edge. The Lakeside loop's platform is wider than the road (13m).
+@export var road_gap_half_width: float = 0.0
 ## How far under the road's surface the ground in a road gap lies: under the curbs' outer edge (15cm
 ## down), so the grass doesn't cut through them along the taper.
 const ROAD_GAP_GROUND := 0.18
@@ -982,6 +986,27 @@ func _road_gap_width(offset: float) -> float:
 		var d: float = (g0 - offset) if offset < g0 else (offset - g1)
 		w = minf(w, clampf(d / maxf(road_gap_taper, 0.01), 0.0, 1.0))
 	return w
+
+
+## A curb slice is tested against the rest of the lap only where the road's heading turns more than
+## acos(CURB_FOLD_TURN_COS) over CURB_FOLD_LOOK metres either side of it.
+const CURB_FOLD_LOOK := 10.0
+const CURB_FOLD_TURN_COS := 0.94
+
+## True where `p` (a point on the road's edge at offset `own`) lies on the asphalt of another stretch of the lap:
+## nearer its centreline (in plan, at about its height) than the road's half width, `half_w`.
+func _on_other_asphalt(curve: Curve3D, p: Vector3, own: float, half_w: float) -> bool:
+	var off := curve.get_closest_offset(p)
+	var length := curve.get_baked_length()
+	var along := absf(off - own)
+	if is_loop:
+		along = minf(along, length - along)
+	if along < 0.5:
+		return false
+	var q := curve.sample_baked(off)
+	if absf(q.y - p.y) > 2.5:
+		return false
+	return Vector2(q.x - p.x, q.z - p.z).length() < half_w - 0.05
 
 
 ## True where segment i of the road's slices lies in a road gap's taper (or the gap) and the curbs and
@@ -1830,6 +1855,26 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 	var deck_y: float = road_y_offset
 	var shoulder_drop: float = maxf(curb_slope, 0.12)
 
+	# Curb slices whose inner edge lies on the asphalt of another stretch of the lap (inside a corner sharper than
+	# the road is wide, like the Lakeside Meadows' first corner: the incoming leg's curb ran on past where the two
+	# inner edges meet and lay across the outgoing leg as a red and white spike). Their segments are left out.
+	var curb_on_road_l := PackedByteArray()
+	var curb_on_road_r := PackedByteArray()
+	if is_curb:
+		curb_on_road_l.resize(point_count + 1)
+		curb_on_road_r.resize(point_count + 1)
+		var reach: int = maxi(1, int(round(float(point_count) / length * CURB_FOLD_LOOK)))
+		for i in range(point_count + 1):
+			var r0: Vector3 = frames[maxi(i - reach, 0)]["right"]
+			var r1: Vector3 = frames[mini(i + reach, point_count)]["right"]
+			if r0.dot(r1) > CURB_FOLD_TURN_COS:
+				continue
+			var pos: Vector3 = frames[i]["pos"]
+			var rd: Vector3 = frames[i]["right"]
+			var off: float = float(frames[i]["offset"])
+			curb_on_road_l[i] = 1 if _on_other_asphalt(curve, pos - rd * inner_w, off, inner_w) else 0
+			curb_on_road_r[i] = 1 if _on_other_asphalt(curve, pos + rd * inner_w, off, inner_w) else 0
+
 	# VERTEX LOOP — asphalt always full width (no curvature cuts into the deck)
 	for i in range(point_count + 1):
 		var final_pos: Vector3 = frames[i]["pos"]
@@ -1894,14 +1939,14 @@ func _create_path_visual(point_count: int, width: float, mat: Material, side_mat
 			var seg_off = (float(i) / float(point_count)) * length
 
 			# Left slope
-			if not _is_frostpeak_junction_opening(seg_off, true):
+			if not _is_frostpeak_junction_opening(seg_off, true) and curb_on_road_l[i] == 0 and curb_on_road_l[i + 1] == 0:
 				st.add_index(base + 0); st.add_index(nxt + 0); st.add_index(base + 1)
 				st.add_index(base + 1); st.add_index(nxt + 0); st.add_index(nxt + 1)
 				st.add_index(base + 0); st.add_index(base + 1); st.add_index(nxt + 0)
 				st.add_index(base + 1); st.add_index(nxt + 1); st.add_index(nxt + 0)
 
 			# Right slope
-			if not _is_frostpeak_junction_opening(seg_off, false):
+			if not _is_frostpeak_junction_opening(seg_off, false) and curb_on_road_r[i] == 0 and curb_on_road_r[i + 1] == 0:
 				st.add_index(base + 2); st.add_index(nxt + 2); st.add_index(base + 3)
 				st.add_index(base + 3); st.add_index(nxt + 2); st.add_index(nxt + 3)
 				st.add_index(base + 2); st.add_index(base + 3); st.add_index(nxt + 2)
@@ -2298,6 +2343,22 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 		side_bot_r.append(bot_r)
 		side_tangents.append(tangent.normalized() if tangent.length_squared() > 1e-8 else Vector3.FORWARD)
 
+	# Walls whose top lies on the asphalt of another stretch of the lap (the inside of a corner sharper than the road is
+	# wide, as for the curbs in _create_path_visual): their edge showed as a pale streak across the other leg.
+	var fold_l := PackedByteArray()
+	var fold_r := PackedByteArray()
+	fold_l.resize(point_count + 1)
+	fold_r.resize(point_count + 1)
+	var fold_reach: int = maxi(1, int(round(float(point_count) / length * CURB_FOLD_LOOK)))
+	for i in range(point_count + 1):
+		var r0: Vector3 = frames_side[maxi(i - fold_reach, 0)]["right"]
+		var r1: Vector3 = frames_side[mini(i + fold_reach, point_count)]["right"]
+		if r0.dot(r1) > CURB_FOLD_TURN_COS:
+			continue
+		var own: float = float(frames_side[i]["offset"])
+		fold_l[i] = 1 if _on_other_asphalt(curve, side_top_l[i], own, road_width / 2.0) else 0
+		fold_r[i] = 1 if _on_other_asphalt(curve, side_top_r[i], own, road_width / 2.0) else 0
+
 	# 2. INDEX GENERATION
 	for i in range(point_count):
 		if _segment_in_gap(curve, length, point_count, i):
@@ -2313,12 +2374,12 @@ func _create_path_sides(point_count: int, width: float, mat: Material, y_offset:
 
 		# Side walls must face OUTWARD (visible + collidable from outside the ramp).
 		# Left wall: outward = -right_dir
-		if not is_curb_side or not _is_frostpeak_junction_opening(seg_off, true):
+		if (not is_curb_side or not _is_frostpeak_junction_opening(seg_off, true)) and fold_l[i] == 0 and fold_l[i + 1] == 0:
 			st.add_index(base + 0); st.add_index(nxt + 0); st.add_index(base + 1)
 			st.add_index(base + 1); st.add_index(nxt + 0); st.add_index(nxt + 1)
 
 		# Right wall: outward = +right_dir
-		if not is_curb_side or not _is_frostpeak_junction_opening(seg_off, false):
+		if (not is_curb_side or not _is_frostpeak_junction_opening(seg_off, false)) and fold_r[i] == 0 and fold_r[i + 1] == 0:
 			st.add_index(base + 2); st.add_index(base + 3); st.add_index(nxt + 2)
 			st.add_index(base + 3); st.add_index(nxt + 3); st.add_index(nxt + 2)
 

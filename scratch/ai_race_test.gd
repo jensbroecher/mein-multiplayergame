@@ -5,6 +5,8 @@ extends Node
 #   Godot --headless --path . res://scratch/ai_race_test.tscn -- res://levels/X.tscn [seconds=300] [speed=4]
 #       [weather=0..1] [cars=5,5,0,1,2,3] [noitems=1] [hide=<node name>]
 # noitems=1 frees every item box (to tell what an item box does to a lap from what the course does).
+# It prints each jump lip's crossing speeds (TrackPath's "jump_lips"), and REJOIN-ON-ROAD when a bot goes into
+# off-course recovery while it is over the road (that once made every bot brake on the kickers).
 
 var seconds := 300.0
 var speed := 4.0
@@ -53,6 +55,11 @@ func _ready() -> void:
 	var trail := {}
 	var under := {}
 	var on_route := {}
+	# Each cart's speed as it crosses each jump lip (TrackPath's "jump_lips"): a bot that brakes on a kicker shows here.
+	var lips: Array = track.get_meta(&"jump_lips", [])
+	var lip_speeds := {}
+	var lip_last := {}
+	var rejoin_warned := {}
 	var t := 0.0
 	var next_report := 20.0
 	while t < seconds:
@@ -82,6 +89,23 @@ func _ready() -> void:
 				for k in range(maxi(0, tr0.size() - 90), tr0.size(), 10):
 					print("    ", tr0[k])
 			was_tele[c] = tele
+			if not tele:
+				for li in range(lips.size()):
+					var lip: Vector3 = lips[li]["lip"]
+					var key := "%s/%d" % [c.name, li]
+					if Vector2(lip.x - c.global_position.x, lip.z - c.global_position.z).length() < 4.0 and t - float(lip_last.get(key, -99.0)) > 4.0:
+						lip_last[key] = t
+						if not lip_speeds.has(li):
+							lip_speeds[li] = []
+						lip_speeds[li].append(c.linear_velocity.length())
+			# A bot in off-course recovery while over the road (within 9m of the lap in plan, near its height): the
+			# recovery taking a bot on a jump for lost made it brake on the lip and drive off the road.
+			if not tele and c.get("_ai_recover_goal") != Vector3.ZERO and c.get("_ai_recover_goal") != null:
+				var lp2: Vector3 = track.to_global(track.curve.get_closest_point(track.to_local(c.global_position)))
+				if Vector2(lp2.x - c.global_position.x, lp2.z - c.global_position.z).length() < 9.0 and not rejoin_warned.has(c):
+					rejoin_warned[c] = true
+					print("REJOIN-ON-ROAD %s at %.0fm (%.1fm over the lap)" % [c.name, track.curve.get_closest_offset(track.to_local(c.global_position)),
+							c.global_position.y - lp2.y])
 			if not tele:
 				# First moment a cart drops well below anything drivable: where, how fast, on what.
 				if c.global_position.y < -4.0 and last_pos.get(c, Vector3.ZERO).y >= -4.0:
@@ -115,6 +139,17 @@ func _ready() -> void:
 				var off: float = track.curve.get_closest_offset(track.to_local(c.global_position))
 				line += "  %s:L%d/%.0fm %.0fkmh" % [c.name, st.get("laps", 0), off, c.linear_velocity.length() * 3.6]
 			print(line)
+	for li in range(lips.size()):
+		var sp: Array = lip_speeds.get(li, [])
+		if sp.is_empty():
+			print("LIP %s: no cart crossed it" % lips[li]["name"])
+			continue
+		var lo := 999.0
+		var sum := 0.0
+		for v in sp:
+			lo = minf(lo, v)
+			sum += v
+		print("LIP %s: %d crossings, %.1f m/s on average, slowest %.1f" % [lips[li]["name"], sp.size(), sum / sp.size(), lo])
 	for c in carts:
 		var st: Dictionary = level.player_stats.get(c.name.to_int(), {})
 		print("CART %s car=%d laps=%d finished=%s respawns=%d %s" % [c.name, c.car_index, st.get("laps", 0), st.get("finished", false), respawns[c].size(), respawns[c]])

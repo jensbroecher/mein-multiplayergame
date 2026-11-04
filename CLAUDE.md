@@ -34,10 +34,14 @@ outside a game), "Leaked instance dependency", and RID/ObjectDB leak messages.
 
 `LakesideLevel.tscn` and `MountainLevel.tscn` can each be written by several generators (`regenerate_both`,
 `regenerate_custom_path`, `regenerate_desert`, ...). Don't regenerate them unless you know which one made the
-current file. `LakesideLevel.tscn` (the Lakeside Course) is dressed by `regenerate_lakeside.gd`: run that after any of
-the others re-bakes it (see Lakeside Course below).
+current file. `LakesideLevel.tscn` (Lakeside Meadows) is dressed by `regenerate_lakeside.gd`: run that after any of
+the others re-bakes it (see Lakeside Meadows below).
 
-## Lakeside Course (Bloombay GP, stage 1)
+## Lakeside Meadows (Bloombay GP, stage 1)
+
+The menus call it Lakeside Meadows (it was the Lakeside Course / Meadow Circuit); files and code keep "lakeside"
+(`LakesideLevel.tscn`, `regenerate_lakeside.gd`).
+
 
 - `regenerate_lakeside.gd` dresses `levels/LakesideLevel.tscn` as an RC race meeting and replaces everything under
   `LakesideDressing` on every run: the paddock, race control and its observer tower, the lap towers, catch fences, crowd
@@ -102,12 +106,24 @@ the others re-bakes it (see Lakeside Course below).
   its end to the walls' tops. Cut square, 2.6m walls stood up out of the road as blunt black blocks. The cut
   box takes the asphalt material (a subtraction's faces take its own: white by default) and stays low and
   inside the lane, clear of the loop above it.
-- The road stops round the loop (`_plan_road_gaps`, `LOOP_ROAD_GAP`: 8m before the entry lane's start to 10m
-  after the exit lane's end, from the loop's saved place): `TerrainGenerator.road_gaps`, with the asphalt and
-  curbs tapering to a point over `road_gap_taper` (12m) either side, so carts cross a short stretch of grass into
-  the loop and out of it (the meadow grows mown grass there). Changing the gap re-bakes the world (meta
-  `baked_road_gaps`). The pylons reach down to the ground beside the road (`LoopCSG.support_foot_y`, from the
-  ground under `support_spots()`, 0.4m in): they started at the loop's origin and stood in the air.
+- The loop stands on a platform of its own (`_build_loop_apron`, `LOOP_APRON_*`, `loop_apron.gdshader`): the road
+  stops square at its ends (a road gap from `_plan_road_gaps`, `LOOP_GAP_TAPER` 5cm, the curbs stopping there,
+  `TerrainGenerator.road_gap_half_width` grading the ground under its whole width), and a 40cm concrete slab, its top
+  level with the road along the lap's line (so flush with it at both ends), flares from the road's edge to
+  `LOOP_APRON_HALF` under both lanes; the lanes' ends lie on it `LOOP_END_LIP` up. Drawn in bays with joints, a white
+  edge line, hazard stripes along the flared sides and white chevrons leading into the entry lane; its vertices are
+  pulled toward the eye (as the paths') so its ends win the depth test against the road's last centimetres. Solid
+  (`LoopApronDeck`: track, asphalt). The user disliked both earlier versions: the road tapering to a point into the
+  grass either side of the loop, and the road running on under it with the lanes sunk into the asphalt, half on it.
+  Without grass to slow them (the second version) bots left the loop at full speed into the 60 degree corner after it
+  and ran off the deck over the inlet: see the guardrails below. The pylons reach down to the ground beside the road
+  (`LoopCSG.support_foot_y`, from the ground under `support_spots()`, 0.4m in): they started at the loop's origin
+  and stood in the air.
+- W-beam guardrails (`_build_drop_rails`, `DROP_RAILS`: [s0, s1, sides]) stand on the deck's edge
+  (`DROP_RAIL_LAT` 7.75) wherever the ground `DROP_RAIL_OUT` past it is more than `DROP_RAIL_DEPTH` under the road,
+  led in `DROP_RAIL_LEAD` posts before each drop: over the inlet after the loop (s 2690-2805, both sides; the ground
+  falls 15-18m just past the curbs) and round the outside of the first corner (s 3270-45, over its embankment, where
+  `_trim_run` leaves the tyre wall out and boosted bots flew off). Boxes per span (`GuardrailBody`).
 - A LOOP AHEAD sign stands `LOOP_SIGN_BEFORE` (75m) before the entry lane, right of the road (`_build_loop_sign`):
   a yellow board on two posts with the loop drawn on it (a road in, a circle shifted on a little, an arrow out)
   and the words in a Label3D.
@@ -200,6 +216,74 @@ the others re-bakes it (see Lakeside Course below).
   flags (a spot's fourth field, "in a stand", picks `CrowdPlacer.POSE_STAND_FANS`): under a gazebo the flag stood
   up through the roof. `res://scratch/spectator_ground_probe.gd` (`-s`, headless, `-- [level=...]`) checks the
   grandstands' bases and the standing spectators' feet against the ground under them.
+
+- The country round it (`_build_backdrop`, `BACK_*`, `LAND_BEARING`/`LAND_HALF`): past the terrain's rim (it falls into
+  the sea from 880m) a ring of ground (`BACK_R0` 830 to `BACK_R1` 3.8km) carries the land on away from the big lake and
+  the long bridge (they lie north-west): across `LAND_HALF` either side of `LAND_BEARING` farmland, woods and ranges on
+  the horizon, elsewhere the sea and a low far shore, so the stage no longer reads as an island. Inside `BACK_NEAR` it
+  takes the terrain's grass material (UVs world xz, as the terrain's), past it vertex colour; solid out to `BACK_SOLID`
+  (`CountryGround`). Its woods (`_build_country_woods`, the woods' far stand-ins in 500m cells named
+  `TreeDeepFar_country_*`, shuffled) follow the Detail Level through a `JungleDetail` of their own (`CountryDetail`:
+  none at Off and Low, 70% at High, all at Ultra; 1.6ms of an M1's frame at 4320x2700 at High). Bloombay's skyline
+  (`_build_bloombay`, `BloombayCity.gd`, the harbour's blue glass towers and blocks under tile roofs) stands on a plain
+  `CITY_DIST` (2.35km) out on that side, from the other side than Harbor Pier's. The fog runs to `BACK_FOG` (4.6km).
+  `res://scratch/lakeside_rim_probe.gd` (`-s`, headless) prints the ground across the rim.
+- The lookout tower (`_build_lookout`, the user's `models/lookout_tower.blend`, imported through Blender): the
+  best-scoring free spot within `LOOKOUT_REACH` of the road (how far it stands over the ground round it), off every pad
+  (`_on_pad`: it first stood among the upper camp terrace's motorhomes, which note no footprints) and at least
+  `LOOKOUT_FINISH_CLEAR` (450m) from the finish gantry (the user didn't want it at the start); now on a hill above the
+  banked turn. The .blend's ground pad is left out, the glass drawn front faces only; its frame's triangles are its
+  collider.
+- The playground (`_build_playground`, `ParkKit.gd`, life size at PROP_SCALE) on a pad of its own (`PLAYGROUND_*`,
+  graded with the others) `PLAYGROUND_AWAY` past the marquee's anchor, away from the road: a swing set, a slide tower,
+  a seesaw, a roundabout, a climbing dome, a sandpit, safety mats, a rail fence with a gate toward the marquee, benches,
+  a bin, a fingerpost; children (CrowdPlacer spots at `PLAYGROUND_CHILD` of the size) on the swings, the slide, the
+  seesaw, the roundabout and round the sandpit, parents watching and on the benches; box colliders. Its sound: the
+  user's `sounds/playground_ambience*.wav` from two corners, levelled by RMS (`PLAYGROUND_RMS`) to `PLAYGROUND_LEVEL`
+  at `PLAYGROUND_SOUND_UNIT` metres.
+- The south bike loop comes up to the lap: across the inlet beside the lap's own bridge over it on a 115m wooden
+  trestle (`TRAIL_BRIDGES`: [path, leg], a leg straight between its anchors, its deck level from bank to bank;
+  `_build_trail_bridge`: planks on three stringers, a bent every `BRIDGE_BENT` down to the pond's bed with crossed
+  braces, railings; boxes, `PondBoardwalk_*`), 20m from the road's middle, then along the bottom straight 25-30m off it,
+  so the riders pass close by the race (the user couldn't see them from the track: the loops had kept 150m off it).
+  A bridge leg's far bank may be land of its own: each routed leg is searched in the region its start lies in.
+- The paths (`_plan_trails`, `_build_trails`, `TRAILS`: [name, kind, anchors, closed]): two bike loops (`BikeEast` in the
+  east country (not "BikeLoop": Level.gd bakes a trimesh under anything named "loop" and PlayerCart counts it as road), `BikeSouth` across the southern meadows, 5.1km, pale gravel) and footpaths (`MeadowWalk` north of the
+  lap, `PlaygroundWalk` from the playground's gate onto it, `CampWalk` from the campsite east). Routed by AStarGrid2D on
+  a `TRAIL_CELL` grid: solid in and near the water, on the road and its verges (a path may pass only under a bridge
+  high over the ground), on pads, footprints and the shortcut, past `TRAIL_REACH`, on ground steeper than
+  `TRAIL_MAX_SLOPE`; dearer on slopes, near the road and near ground earlier legs took (so an out-and-back doesn't run
+  down one corridor twice). A path's anchors all go to the open region most of them fall in (the lakes cut the land
+  into pieces; `_trail_label`), excursions that come back to where they were are cut (`_trail_cut_excursions`), then
+  Chaikin and a running mean smooth them. The generator prints overlaps (`_trail_overlaps`), points in the water or on
+  the road, and anchors it had to move. Each is a ribbon (`trail_path.gdshader`, COLOR.r the kind: worn earth with a
+  grassy crown or compacted gravel, ragged grassy edges discarded, vertices pulled toward the eye like the skid marks
+  so it wins the depth test; front faces up: wound the other way it was invisible from above) on the ground, "Trail_*"
+  (no collider: DressingColliders' "trail"); the meadow clears its grass under them, and the woods, shrubs and
+  boulders keep off them (`_on_trail`). Walkers in ones and twos along the footpaths and benches with people at
+  viewpoints (`WALKER_EVERY`, `BENCH_EVERY`).
+- Cyclists (`Cyclists.gd`, `_build_cyclists`, `RIDERS` 14, shared between the bike loops by length): each rides its loop
+  on the wall clock (LAN peers agree), both ways round in ones to threes, keeping right (`w` of its Vector4), leaning
+  into bends. ParkKit's parts at PROP_SCALE: the frame and the rider's body one mesh in its colours, wheels rolling and
+  cranks turning with the distance (wrapped in doubles before they become rotations), each leg a thigh and a shin set
+  by two-bone IK from the hip to its pedal. An AnimatableBody3D box each (layer 1). Sounds: the user's
+  `sounds/bicycle1/2.wav` (rolling, one each in turn) and `bicycle_pedalling.wav`, levelled by RMS (`BIKE_*_RMS`) to
+  `BIKE_ROLL_LEVEL`/`BIKE_PEDAL_LEVEL` at `BIKE_SOUND_UNIT`, pitched with the rider's speed; none on a headless server.
+- The airship (`_build_airship`, `ParkKit.airship`, `Airship.gd`): a 70m blimp (a lathed envelope, X tail fins with
+  rudders, a gondola, engine pods with ducted propellers that spin) with the RC Vibe GP logo on both sides between its
+  orange bands (`_airship_logo_mesh`: a patch following the envelope's curve `AIRSHIP_LOGO_PROUD` out, reading left to
+  right from each side; `_airship_logo_texture`: images/logo_transparent.png halved, `fix_alpha_edges`, mipmapped, saved
+  lossless; alpha blended), flying an ellipse (`AIRSHIP_CENTRE`, `AIRSHIP_RADII`) at
+  `AIRSHIP_ALTITUDE` (165m) on the wall clock, banking a little and bobbing. Its engines: the user's
+  `sounds/airship_engine.wav` levelled to `AIRSHIP_ENGINE_LEVEL` at `AIRSHIP_ENGINE_UNIT` (120m), about -20 dBFS as it
+  passes 165m overhead, no distance low-pass (`attenuation_filter_db` 0): at -38 dBFS and filtered the user heard
+  nothing standing under it.
+- `res://scratch/lakeside_ascii_map.gd` (`-s`, headless, `-- [cell=20] [x0= x1= z0= z1=] [h]`) prints the level as an ASCII
+  map (road, bridges, water, steep ground, the paths, named landmarks) for planning by eye;
+  `res://scratch/lakeside_park_shots.tscn -- <dir> [rider=N] [frames=N] [trails=1] name:x,y,z:tx,ty,tz` (windowed)
+  photographs a rider, the airship and each path piece where they are right now, cameras kept out of the ground.
+- Stats (M1, 4320x2700, `ab_bench`, with other work running): about 25ms at High; the paths, playground, airship and skyline
+  under 0.05ms each.
 
 ## Pinecrest Ridge (Bloombay GP, stage 2)
 
@@ -303,7 +387,7 @@ the others re-bakes it (see Lakeside Course below).
   left the mountains bare. COLOR.b is a rank the Detail Level thins by (JungleDetail's `impostor_material`,
   `IMPOSTORS`); DressingColliders skips "impostor". Cost 0.7ms (M1, 4320x2700). `scratch/impostor_atlas_dump.gd`
   (`-s`, headless, `-- <dir>`) writes the atlas out as PNGs.
-- The meadow (`_build_meadow`): the Lakeside Course's grass (MeadowGrass.gd, meadow_grass.gdshader, MeadowDetail.gd)
+- The meadow (`_build_meadow`): the Lakeside Meadows' grass (MeadowGrass.gd, meadow_grass.gdshader, MeadowDetail.gd)
   on Pinecrest's own map: thinner under the trees (the woods map), mown on the pads and verges, none on the road,
   the trail, the lanes, in the water, on rock faces, past the rim, or under the footprints, trunks, boulders and
   Ridgecrest's boxes (`_trunk_spots`, `_boulder_spots`, `_rc_boxes`).
@@ -596,6 +680,12 @@ all round).
   middle). Striped on both sides from braking zone to exit, a corner read as a painted lane.
 - `res://scratch/curb_corner_probe.tscn -- [level=...] [turn=35]` (headless) lists each level's striped runs (how
   far the lap turns over each) and its real corners with how much of each is striped.
+- Inside a corner sharper than the road is wide (Lakeside's first corner, a single point), the inner offsets of the
+  slices before the apex run on past where the two legs' inner edges meet: the curb lay across the other leg's
+  asphalt as a red and white spike. `_create_path_visual` and `_create_path_sides` leave out every curb and side-wall
+  segment whose inner edge (the wall's top) lies on another stretch's asphalt (`_on_other_asphalt`: nearer its
+  centreline than the road's half width, at about its height), tested only where the heading turns more than
+  acos(`CURB_FOLD_TURN_COS`) over `CURB_FOLD_LOOK` either side. Applies on each level's next re-bake.
 
 ## Road gaps
 
@@ -610,6 +700,8 @@ gaps and tapers (`_in_road_gap`), so the ground there is grass, off-road, with i
   gravel; PlayerCart's `_on_road_gap_ground`, `Surfaces.of_road_gap`).
 - `road_gap_drift` (per gap, in `road_gaps`' order) heaps a mound across a gap, highest in its middle, easing to
   nothing at its ends: Bloombay Dunes' sand drifts over the road.
+- `road_gap_half_width` grades a gap's ground out to that far either side of the line (at least the curbs' outer edge),
+  easing back over 6m: the Lakeside loop's platform is wider than the road.
 - `curbs_stop_at_gaps` ends the curbs and the road's side walls where a taper begins (instead of following the
   asphalt down to its point) and eases the gap's grading in inside the taper, so `road_gap_ground` (default
   `ROAD_GAP_GROUND`) can bring the ground up to a few centimetres under the asphalt: Pinecrest Ridge, 6cm.
@@ -644,6 +736,21 @@ gaps and tapers (`_in_road_gap`), so the ground there is grass, off-road, with i
   name:gate:x,y,z:tx,ty,tz[:step[:scroll]]` renders gates from cameras in gate space (X across the road,
   grid on +Z), with any start-light step (-1 for none) and the ticker `scroll` LEDs along. `lap=` feeds
   the ticker six racers with the leader on that lap.
+
+## Racers who have finished, the commentator's hits, the bots' names
+
+- A racer who has finished is out of the fight: nothing targets it (missiles' locks, the bots' item decisions, the
+  eagle), and nothing hits or pushes it (`on_hit`, `apply_blast_impulse`, the lightning's slow, the shockwave, bomb
+  blasts; a missile flies on past it, a dropped bomb doesn't go off under it).
+- The spectator camera after the player has finished follows the racers still going and, once everyone has finished,
+  stays on the last one it watched (`_spectate_fallback`): it went back to the player's own car. The cycle keys skip
+  the player's car once all have finished; the number keys still pick any car.
+- `RaceCommentator.call_shockwave`: the shockwave's victims (collected on the server, passed with
+  `client_play_shockwave`, so every peer calls it) get a line like the missile, bomb and lightning hits; it had none.
+- The bots (`BotRoster.gd`): each a different car drawn from every preset (PlayerCart.CAR_PRESETS, the humans' cars
+  left out while there are enough) and named after it. In a Grand Prix the line-up is drawn once at the start
+  (`NetworkManager.gp_bot_roster`, cleared wherever the GP's standings are) and kept: the standings are kept by name.
+  They had always been Viper, Shadow, Apex, Blaze and Nova on the first four cars.
 
 ## Announcer
 
@@ -1571,13 +1678,14 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   there): repeat a run before believing a big difference. In zsh a variable holding several `hide=` arguments
   isn't split, so `hide=a hide=b` in one variable hides nothing.
 - `CrowdPlacer.gd` builds the same people for other levels (cards, figures, `CrowdDetail.gd`, the shared
-  `generated/crowd_person.res`) from spots of [position, facing, seated], at a scale and with a skin mix of its
-  own (Lakeside's start). Nyota's generator still has its own copy of these numbers.
+  `generated/crowd_person.res`) from spots of [position, facing, seated, in a stand, pose (-1: drawn), size], at a
+  scale and with a skin mix of its own (Lakeside's start; its playground's children are size 0.58). Nyota's generator
+  still has its own copy of these numbers.
 - `res://scratch/crowd_preview.gd` (`-s`, windowed) renders the figures in memory in a second: `-- <dir> [rows=3]
   [seed=1] [cards=1] [skin=<g>] name:x,y,z:tx,ty,tz`, a column per pose 0..15 (2.6m apart), the cards in a row
   behind with `cards=1`. `nyota_shots` takes `detail=N` to try a Detail Level.
 
-## Camps (CampKit.gd: Lakeside Course and Bloombay Dunes)
+## Camps (CampKit.gd: Lakeside Meadows and Bloombay Dunes)
 
 - `CampKit.gd` holds the vehicle and tent builders that used to live in `regenerate_lakeside.gd`, built
   through a `PropKit` at life size (nose toward -z, y up) and placed by the caller with `set_frame` at
@@ -1953,6 +2061,58 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   renders a level with its lap (white), shortcuts (yellow) and other paths (cyan) drawn over it.
 - Still on the main laps (not shortcuts): Glacier Highway catches bots on a sign gantry's leg at the S-bend
   near 470m and at 790-850m; Lakeside loses a few round its lakes, scattered.
+
+## Bots off the course
+
+- A bot finds its way back to the road when it is off the course (beyond `_is_car_on_track_corridor`, on the ground,
+  on grass or on a surface named as road more than `AI_OFF_LAP_PLAN` (16m) from its route in plan: Glacier Highway's
+  other decks counted as road), or on grass inside the corridor with the way to its usual aim point blocked
+  (`_ai_line_drivable` looked at every `AI_BLOCK_CHECK`: just outside Pinecrest's guardrails, 8.5m off the line,
+  bots counted as on the course and drove along the rails for the road), and for as long as a way back is being
+  followed, until it is on the road again. `_ai_rejoin_goal`:
+  - a straight line first (`_ai_direct_rejoin`): road points from `AI_REJOIN_BACK` behind to `AI_REJOIN_AHEAD` ahead,
+    best first, the first whose line `_ai_line_drivable` passes, kept while its line stays drivable. A line is drivable
+    when, every `AI_LINE_STEP`, the ground under it (a ray down) is there, out of deep water (`_deep_water_at`), climbs
+    no more than `AI_LINE_MAX_RISE` a metre and drops no more than `AI_LINE_MAX_DROP`, and nothing long stands across
+    it at a cart's height: a narrow thing (`_ai_narrow_obstacle`: 1.8m either way along its face a short ray finds
+    nothing of it: a trunk, a post, a rock) the avoidance steers round; a rail, a fence or a wall bars it. (Testing
+    lines 1.6m either side instead let a guardrail met at a shallow angle pass as narrow.)
+  - else a way round (`RejoinPlanner.gd`): a Dijkstra search over a 3m grid round the bot, probing as it goes: a cell
+    is the ground a ray down finds there (from just over the height it was reached at, so a bridge overhead isn't the
+    ground), blocked in deep water, on a prop's top or too steep; a step between cells is blocked where it climbs more
+    than `CLIMB` a metre, drops more than `DROP` or meets something long at bumper height; a goal is a drivable cell on
+    the lap (within the road's half width of its line in plan: on the road, or on the ground where a stage has none),
+    one behind the bot costing `BEHIND_COST` a metre. The bot follows the way to its end (`_ai_follow_way_back`), and is
+    respawned when no road is in reach (`MAX_RADIUS` 80m). Probes and what each collider is are cached per level, and
+    all searches share `FRAME_USEC` (1.2ms) a physics frame. No boosting while finding a way back (it overshot every
+    turn of it).
+  - Before: the goal was the nearest road point whatever lay between, so bots ground along barriers, or took goals
+    behind and ahead in turn ("brake, turn round, drive back, hit a wall, turn again"); with the road up a bank they
+    wandered across country for the next gate.
+- Never count a bot as off the course for being high over its route: on a kicker's lip or in the air off it, a bot is
+  metres above the lap's line (the corridor allows 5m), and when height alone took it for lost, every bot braked on the
+  jumps and turned for a road point behind or beside it (all those ahead were drops) and drove off into the ponds.
+  `ai_race_test` prints each jump lip's crossing speeds (`LIP`, from TrackPath's `jump_lips`) and `REJOIN-ON-ROAD` when
+  a bot is in recovery while over the road; the recovery state is cleared whenever the bot is on the course.
+- `res://scratch/ai_rejoin_probe.tscn -- <level> x,z[,yaw] ... [auto=N] [rails=N] [seconds=25] [trace=1]` (headless) drops one
+  bot off the course at each spot, facing away from the road (`auto=N`: N spots along the lap 20-30m out on dry ground;
+  `rails=N`: N spots 3.5m outside the level's guardrails, facing the rail) and prints when it was back on the road or
+  respawned, how long it crawled (under 3 m/s: grinding or stuck), how far it drove, and the planner's time (in all and
+  its busiest frame). Against the first version (nearest road point): Pinecrest's guardrail spots 8/8 back (most in 1-4s,
+  the longest drives 100m round a rail to its end; two had been lost after 25s), Lakeside 9/10 within 3s (was 7/10, up
+  to 11s and 267m), Glacier Highway, the Canyon and Msitu Falls likewise (the jungle is the hardest: now and then a bot
+  crawls among the trunks and the "confined" rule respawns it).
+
+## Carts on the loop
+
+- On the loop (`is_on_loop`) the ground ray points at the loop's surface along its last normal (`_loop_last_normal`), not
+  down the model's up, and the model turns to that surface at `LOOP_ALIGN_RATE` (40 a second, once, not up then basis)
+  with its nose along the velocity: smoothed as on a hill the model ran 30-40 degrees behind the loop's turn, standing off
+  it, and the ray missed the surface (airborne: tumbling, landing sounds). No crash or landing sound from the loop's own
+  surface, and a contact facing the way the ground under the cart does is floor, not a wall (round the loop the floor
+  faces sideways and down, and played the crash every 0.6s). `res://scratch/loop_ai_probe.tscn` prints, at the end, the
+  angle between the model's up and the loop surface under it (now 3.5 degrees on average, the worst 12; was 31), frames
+  the ground ray missed and the bump/landing sounds played.
 
 ## Race cameras
 

@@ -49,13 +49,16 @@ var current_gp_stage: int = 0
 var gp_trophy_eligible: bool = true
 var gp_standings: Dictionary = {} # racer_name -> points
 var gp_last_pos: Dictionary = {} # racer_name -> finishing place in the latest race (breaks ties on points)
+## The bots of the Grand Prix under way ([{"name", "car_index"}], BotRoster.gd): drawn at its first stage, kept for the
+## rest (the standings are kept by name). Cleared wherever a GP begins.
+var gp_bot_roster: Array = []
 var time_trial_stage: String = "res://levels/LakesideLevel.tscn"
 
 var stage_votes: Dictionary = {} # peer_id -> stage_path or "random"
 var is_voting_active: bool = false
 
 const ALL_STAGES = [
-	{"name": "Meadow Circuit", "path": "res://levels/LakesideLevel.tscn"},
+	{"name": "Lakeside Meadows", "path": "res://levels/LakesideLevel.tscn"},
 	{"name": "Pinecrest Ridge", "path": "res://levels/PinecrestRidgeLevel.tscn"},
 	{"name": "Frostpeak Creek", "path": "res://levels/FrostpeakCreekLevel.tscn"},
 	{"name": "Glacier Highway", "path": "res://levels/GlacierHighwayLevel.tscn"},
@@ -209,6 +212,7 @@ func create_server(player_name: String):
 	players[1] = {"name": player_name, "car_index": local_car_index, "paint": local_paint, "ready": true}
 	gp_standings.clear()
 	gp_last_pos.clear()
+	gp_bot_roster.clear()
 	stage_votes.clear()
 	is_voting_active = false
 	
@@ -237,14 +241,14 @@ func start_inspect() -> int:
 func start_spectator() -> int:
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 	players.clear()
-	var bot_names = ["Viper", "Shadow", "Apex", "Blaze", "Nova", "Storm"]
-	var bot_cars = [0, 1, 2, 3, 1, 2]
+	# Six bots, each a different car named after it (BotRoster.gd).
+	var roster: Array = load("res://BotRoster.gd").make(6)
 	var paint_rng := RandomNumberGenerator.new()
 	paint_rng.randomize()
-	for i in range(6):
+	for i in range(roster.size()):
 		players[100 + i] = {
-			"name": bot_names[i],
-			"car_index": bot_cars[i],
+			"name": str(roster[i]["name"]),
+			"car_index": int(roster[i]["car_index"]),
 			"paint": CarPaint.random(paint_rng, ""),
 			"ready": true,
 			"is_ai": true

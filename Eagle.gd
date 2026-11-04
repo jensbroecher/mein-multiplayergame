@@ -778,6 +778,9 @@ func _pick_target_cart() -> RigidBody3D:
 			continue
 		if _outrunning(c):
 			continue
+		# Racers who have finished are out of the fight.
+		if c.get("is_finished_race") == true:
+			continue
 		candidates.append(c as RigidBody3D)
 	if candidates.is_empty():
 		return null

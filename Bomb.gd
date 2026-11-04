@@ -189,6 +189,9 @@ func _on_body_entered(body):
 	if body.is_in_group("player_carts"):
 		if body.name.to_int() == owner_id and owner_safety_timer > 0.0:
 			return
+		# A racer who has finished drives over it without setting it off.
+		if body.get("is_finished_race") == true:
+			return
 		_explode()
 
 func _explode():
@@ -200,6 +203,9 @@ func _explode():
 		var blast_radius = 8.0
 		var players = get_tree().get_nodes_in_group("player_carts")
 		for p in players:
+			# Racers who have finished are out of the fight.
+			if p.get("is_finished_race") == true:
+				continue
 			var dist = global_position.distance_to(p.global_position)
 			if dist <= blast_radius:
 				if p.has_method("on_hit"):

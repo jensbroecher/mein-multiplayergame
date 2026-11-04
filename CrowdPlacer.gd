@@ -5,8 +5,8 @@ extends RefCounted
 ## CrowdDetail.gd scales with the Detail Level. regenerate_nyota_stadium.gd builds its own (the same
 ## numbers); this is the part a level only adds people with.
 ##
-## A spot is [position, facing (horizontal), seated, in a stand (optional), pose (optional: one of the 16;
-## drawn from the odds otherwise)]: a standing one's position is the
+## A spot is [position, facing (horizontal), seated, in a stand (optional), pose (optional: one of the 16, or -1 to
+## draw it from the odds), size (optional: times `scale`; the Lakeside's playground children are 0.58)]: a standing one's position is the
 ## ground (or the stand's tread) under its feet, a seated one's the top of its seat. Only people in a stand
 ## wave flags: anywhere else a gazebo, a tent or a stall can hang over them, and the flag stood through it. `scale` takes Nyota's 1.86 times life size to the level's.
 ## `skin` weights the four groups crowd_common.gdshaderinc draws from INSTANCE_CUSTOM.g:
@@ -114,12 +114,13 @@ static func build(parent: Node, spots: Array, scale: float, skin: Array, seed_v:
 		# The figure faces its +z.
 		var z: Vector3 = Vector3(face.x, 0.0, face.z).normalized()
 		var x: Vector3 = Vector3.UP.cross(z).normalized()
-		var bs := Basis(x, Vector3.UP, z).rotated(Vector3.UP, rng.randf_range(-0.3, 0.3)).scaled(Vector3.ONE * scale)
+		var size: float = float(sp[5]) if sp.size() > 5 else 1.0
+		var bs := Basis(x, Vector3.UP, z).rotated(Vector3.UP, rng.randf_range(-0.3, 0.3)).scaled(Vector3.ONE * scale * size)
 		var pose: int = pick(rng, POSE_SEATED, 0) if seated else pick(rng, POSE_STAND_FANS if in_stand else POSE_STANDING, 7)
-		if sp.size() > 4:
+		if sp.size() > 4 and int(sp[4]) >= 0:
 			pose = int(sp[4])
 		var cust := Color(rng.randf(), skin_draw(rng, skin), (float(pose) + 0.5) / 16.0, rng.randf())
-		var card_at: Vector3 = pos + z * (CARD_FORWARD * scale) if seated else pos
+		var card_at: Vector3 = pos + z * (CARD_FORWARD * scale * size) if seated else pos
 		var key := Vector3i(floori(pos.x / CELL), floori(pos.z / CELL), card_class(pose))
 		if not cells.has(key):
 			cells[key] = [[], []]

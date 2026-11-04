@@ -28,6 +28,7 @@ const VenueKit = preload("res://VenueKit.gd")
 const CrowdPlacer = preload("res://CrowdPlacer.gd")
 const CarPaint = preload("res://CarPaint.gd")
 const RowboatCSG = preload("res://RowboatCSG.gd")
+const ParkKit = preload("res://ParkKit.gd")
 const WOODEN_RAMP := preload("res://WoodenRamp.tscn")
 const BOOST_PAD := preload("res://BoostPad.tscn")
 const LEVEL_PATH := "res://levels/LakesideLevel.tscn"
@@ -75,7 +76,7 @@ const ADS := [
 	["RC VIBE", "GRAND PRIX", Color(0.06, 0.10, 0.22), Color(1, 1, 1), Color(0.98, 0.55, 0.10), 0],
 	["SPEED", "HOBBY & MODEL SHOP", Color(0.98, 0.80, 0.12), Color(0.08, 0.08, 0.10), Color(0.85, 0.15, 0.12), 2],
 	["TURBO", "LIPO BATTERIES", Color(0.14, 0.08, 0.24), Color(1, 1, 1), Color(0.95, 0.20, 0.25), 1],
-	["BLOOMBAY GP", "LAKESIDE COURSE", Color(0.05, 0.45, 0.55), Color(1, 1, 1), Color(0.98, 0.80, 0.20), 0],
+	["BLOOMBAY GP", "LAKESIDE MEADOWS", Color(0.05, 0.45, 0.55), Color(1, 1, 1), Color(0.98, 0.80, 0.20), 0],
 	["RC VIBE", "", Color(0.97, 0.97, 0.95), Color(0.16, 0.55, 0.92), Color(0.95, 0.30, 0.55), 3],
 	["GRIPMAX", "RACING TYRES", Color(0.07, 0.07, 0.08), Color(0.98, 0.80, 0.12), Color(0.70, 0.70, 0.70), 0],
 	["NITRO FIZZ", "ICE COLD LEMONADE", Color(0.80, 0.10, 0.12), Color(1, 1, 1), Color(0.98, 0.82, 0.20), 1],
@@ -123,7 +124,7 @@ var _observer_spot: Array = []
 
 
 func _ready() -> void:
-	print("=== Lakeside Course dressing ===")
+	print("=== Lakeside Meadows dressing ===")
 	var t0 := Time.get_ticks_msec()
 	_kit = PropKit.new()
 	_kit.material_for = _material
@@ -181,20 +182,28 @@ func _ready() -> void:
 	_build_fences(root)
 	_build_barriers(root)
 	_build_tyre_walls(root)
+	_build_drop_rails(root)
 	_build_hay_and_cones(root)
 	_build_grandstand(root)
 	_build_campsite(root)
-	_build_spectators(root)
 	_move_old_props()
 	_fit_loop()
+	_build_loop_apron(root)
 	_lay_shortcuts()
 	_build_venue(root)
+	_build_lookout(root)
+	_build_playground(root)
+	_plan_trails()
+	_build_trails(root)
+	_build_spectators(root)
+	_build_airship(root)
 	_build_loop_sign(root)
 	_build_banked_turn(root)
 	var boat := _start_rowboat()
 	_build_wind_turbines(root)
 	_build_woodland(root)
 	_build_boulders(root)
+	_build_backdrop(root)
 	_build_ads(root)
 	# The loop's and the boat's CSG build their meshes on the next frame; the meadow reads them.
 	await get_tree().process_frame
@@ -275,8 +284,8 @@ func _build_sky() -> void:
 	env.fog_light_color = HAZE
 	env.fog_sun_scatter = 0.2
 	env.fog_density = 1.0
-	env.fog_depth_begin = 220.0
-	env.fog_depth_end = 1600.0
+	env.fog_depth_begin = BACK_FOG.x
+	env.fog_depth_end = BACK_FOG.y
 	env.fog_depth_curve = 1.2
 	env.fog_sky_affect = 0.05
 	env.fog_aerial_perspective = 0.3
@@ -396,6 +405,9 @@ func _plan_pads() -> PackedFloat32Array:
 		var c: Vector2 = t[0]
 		var h: Vector2 = t[1]
 		_add_pad(out, [c.x, c.y, h.x, h.y, float(t[2])], 11.0)
+	var pg := _playground_frame()
+	var pc: Vector2 = pg[0]
+	_add_pad(out, [pc.x, pc.y, PLAYGROUND_HALF.x, PLAYGROUND_HALF.y, float(pg[1])], PLAYGROUND_BLEND)
 	return out
 
 
@@ -439,6 +451,9 @@ func _plan_clearings() -> PackedFloat32Array:
 		var c: Vector2 = t[0]
 		var h: Vector2 = t[1]
 		rects.append([[c.x, c.y, h.x + 2.0, h.y + 2.0, float(t[2])], 6.0])
+	var pg := _playground_frame()
+	var pc: Vector2 = pg[0]
+	rects.append([[pc.x, pc.y, PLAYGROUND_HALF.x + 2.0, PLAYGROUND_HALF.y + 2.0, float(pg[1])], 5.0])
 	for r in rects:
 		var q: Array = r[0]
 		out.append_array(PackedFloat32Array([q[0], q[1], q[2], q[3], q[4], r[1]]))
@@ -1723,6 +1738,77 @@ func _build_tyre_walls(root: Node3D) -> void:
 				_note(nm, p, 0.5, 1.2)
 
 
+## W-beam guardrails along the deck's edges where the road crosses the inlet after the loop: the ground falls 15-18m
+## just past the curbs there, inside the 60 degree corner that follows the loop's exit. With the road running on through
+## the loop (no grass gap to slow them), bots left the loop at full speed and ran off that deck into the hollow. Each
+## run is [s0, s1, sides]; on each side named (-1 left, 1 right) a rail stands where the ground DROP_RAIL_OUT past the deck's edge is more than
+## DROP_RAIL_DEPTH under the road, posts on the curb's outer strip (DROP_RAIL_LAT), the beam facing the road.
+const DROP_RAILS := [[2690.0, 2805.0, [-1.0, 1.0]], [3270.0, 45.0, [-1.0]]]
+const DROP_RAIL_LAT := 7.75
+const DROP_RAIL_OUT := 2.5
+const DROP_RAIL_DEPTH := 2.0
+const DROP_RAIL_STEP := 2.5
+const DROP_RAIL_LEAD := 4
+
+func _build_drop_rails(root: Node3D) -> void:
+	var node := Node3D.new()
+	node.name = "Guardrails"
+	root.add_child(node)
+	var kit := {}
+	var k := _kit
+	k.reset_frame()
+	var boxes: Array = []
+	var rail_col := Color(0.76, 0.78, 0.80)
+	var post_col := Color(0.30, 0.32, 0.35)
+	var total := 0.0
+	for r in DROP_RAILS:
+		for side in r[2]:
+			var pts := _offset_run(float(r[0]), float(r[1]), float(side) * DROP_RAIL_LAT, DROP_RAIL_STEP)
+			# Which posts stand over a drop, the rail led in DROP_RAIL_LEAD posts before it (carts running wide reach the
+			# drop from the bank before it) and one past it, so it starts and ends on firm ground.
+			var over: Array[bool] = []
+			for p in pts:
+				var cp := _curve.get_closest_point(p)
+				var out := Vector3(p.x - cp.x, 0.0, p.z - cp.z).normalized()
+				var g := _ground(p.x + out.x * DROP_RAIL_OUT, p.z + out.z * DROP_RAIL_OUT)
+				over.append(_road_surface(p) - g > DROP_RAIL_DEPTH)
+			var keep: Array[bool] = []
+			for i in range(pts.size()):
+				var near := false
+				for j in range(maxi(i - 1, 0), mini(i + DROP_RAIL_LEAD, pts.size() - 1) + 1):
+					near = near or over[j]
+				keep.append(near)
+			for i in range(pts.size()):
+				if not keep[i]:
+					continue
+				var p: Vector3 = pts[i]
+				p.y = _road_surface(p)
+				k.beam(kit, "steel", p - Vector3(0, 0.3, 0), p + Vector3(0, 1.08, 0), 0.14, 0.12, post_col)
+				k.block(kit, "plastic", p + Vector3(-0.05, 1.08, -0.05), p + Vector3(0.05, 1.18, 0.05),
+						Color(0.92, 0.14, 0.10) if float(side) > 0.0 else Color(0.95, 0.95, 0.92))
+				_note("Guardrail", p, 0.15, -1.0)
+				if i == 0 or not keep[i - 1]:
+					continue
+				var q: Vector3 = pts[i - 1]
+				q.y = _road_surface(q)
+				var seg := p - q
+				seg.y = 0.0
+				if seg.length_squared() < 1e-4:
+					continue
+				var along := seg.normalized()
+				# Toward the road: the run is on side `side`, so the road is the other way.
+				var face: Vector3 = Vector3(-along.z, 0.0, along.x) * -float(side)
+				# Double corrugated W-beam: two ridges and the groove between, on the road's side of the posts.
+				k.beam(kit, "metal", q + Vector3(0, 0.88, 0) + face * 0.12, p + Vector3(0, 0.88, 0) + face * 0.12, 0.07, 0.14, rail_col, face)
+				k.beam(kit, "metal", q + Vector3(0, 0.72, 0) + face * 0.09, p + Vector3(0, 0.72, 0) + face * 0.09, 0.06, 0.12, rail_col.darkened(0.12), face)
+				k.beam(kit, "metal", q + Vector3(0, 0.56, 0) + face * 0.12, p + Vector3(0, 0.56, 0) + face * 0.12, 0.07, 0.14, rail_col, face)
+				boxes.append(_wall_box(q, p, 0.35, 1.15))
+				total += q.distance_to(p)
+	_commit(node, kit, "WBeamGuardrails", 600.0)
+	_boxes_body(node, "GuardrailBody", boxes)
+	print("  guardrails over the drops: %.0fm" % total)
+
+
 ## Big square bales round the first corner and loose cones along the verges by the gantry.
 func _build_hay_and_cones(root: Node3D) -> void:
 	var kit := {}
@@ -2239,7 +2325,7 @@ func _build_woodland(root: Node3D) -> void:
 				var cp: Vector3 = (c as Curve3D).get_closest_point(Vector3(px, 0.0, pz))
 				if Vector2(cp.x - px, cp.z - pz).length() < float(TREE_ROAD_CLEAR[kind]):
 					alt_ok = false
-			if not alt_ok or _kept_out(keep_out, px, pz, 4.0):
+			if not alt_ok or _kept_out(keep_out, px, pz, 4.0) or _on_trail(px, pz, 3.5):
 				continue
 			var ki: int = KINDS.find(kind)
 			var v: int = rng.randi() % 2
@@ -2367,7 +2453,8 @@ func _build_boulders(root: Node3D) -> void:
 			var shore: bool = g > -10.4 and g < -8.6
 			if rng.randf() > (0.5 if shore else 0.13) or g < -10.4:
 				continue
-			if _slope(cx, cz) > 0.65 or _road_distance(cx, cz) < 14.0 or _kept_out(keep_out, cx, cz, 3.0) or _on_shortcut(cx, cz, 4.0):
+			if _slope(cx, cz) > 0.65 or _road_distance(cx, cz) < 14.0 or _kept_out(keep_out, cx, cz, 3.0) or _on_shortcut(cx, cz, 4.0) \
+					or _on_trail(cx, cz, 3.0):
 				continue
 			var n: int = rng.randi_range(2, 5)
 			for k in range(n):
@@ -2474,7 +2561,7 @@ func _rock_mesh(variant: int, size: Vector3, mat: Material) -> Array:
 
 
 func _plant_shrub(px: float, pz: float, g: float, rng: RandomNumberGenerator, keep_out: Array, alts: Array, plants: Dictionary, counts: Dictionary) -> void:
-	if _slope(px, pz) > 0.7 or _road_distance(px, pz) < 11.0 or _kept_out(keep_out, px, pz, 2.0):
+	if _slope(px, pz) > 0.7 or _road_distance(px, pz) < 11.0 or _kept_out(keep_out, px, pz, 2.0) or _on_trail(px, pz, 2.0):
 		return
 	for c in alts:
 		var cp: Vector3 = (c as Curve3D).get_closest_point(Vector3(px, 0.0, pz))
@@ -3435,30 +3522,50 @@ func _build_spectators(root: Node3D) -> void:
 	# The race observer on the tower by race control, arms crossed.
 	if not _observer_spot.is_empty():
 		spots.append([_observer_spot[0], _observer_spot[1], false, false, CrowdPlacer.POSE_ARMS_CROSSED])
+	# The playground's children and parents and the walkers on the footpaths (CrowdPlacer spots with a size).
+	spots.append_array(_park_spots)
 	CrowdPlacer.build(root, spots, SPECTATOR_SCALE, SPECTATOR_SKIN, 7781, func(res: Resource, n: String) -> Resource: return _save_res(res, n))
 	print("  spectators: %d (%d seated)" % [spots.size(), seated])
 
 
 const LOOP_EXIT_LENGTH := 30.0
-## The road stops round the loop (TerrainGenerator.road_gaps): this far before the entry lane's start and
-## after the exit lane's end (m). The asphalt and curbs taper to a point over the TerrainGenerator's
-## road_gap_taper (12m) before the gap and widen again after it, so carts cross a short stretch of grass
-## into the loop and out of it; the lanes rise out of the grass and sink back into it.
-const LOOP_ROAD_GAP := Vector2(8.0, 10.0)
-const LOOP_END_SINK := 0.25
+## The loop stands on a platform of its own (_build_loop_apron): the road stops square at its ends (a road gap from
+## LOOP_APRON_LEAD before the entry lane's start to LOOP_APRON_LEAD past the exit lane's end, tapering over
+## LOOP_GAP_TAPER), and the concrete slab, flush with the road there, flares out to LOOP_APRON_HALF under both lanes,
+## whose ends lie on it LOOP_END_LIP up. Before, the road either tapered to a point into the grass either side of the
+## loop (the user found it ugly), or ran on under it with the lanes sinking into the asphalt, half on it (also ugly).
+const LOOP_APRON_LEAD := 5.0
+const LOOP_APRON_HALF := 11.2
+const LOOP_APRON_FLARE := 9.0
+const LOOP_APRON_DEPTH := 0.4
+const LOOP_GAP_TAPER := 0.05
+const LOOP_END_LIP := 0.05
+## The road's edge (its curbs' outer edge) where the platform meets it.
+const LOOP_APRON_ROAD_HALF := 8.0
 const LOOP_TRACK_WIDTH := 8.5
 const LOOP_SPIRAL_OFFSET := 10.5
 
-## The gap in the road round the loop, as TerrainGenerator.road_gaps: [s0, s1] along the lap. From the
-## loop's saved place (which _fit_loop only slides onto the road), so it's the same on every run.
+## The gap in the road under the loop's platform, as TerrainGenerator.road_gaps: [s0, s1] along the lap, from the loop's
+## saved place (which _fit_loop only slides onto the road), so it's the same on every run. Also sets the gap's square
+## end, the curbs stopping there and the ground graded under the platform's whole width.
 func _plan_road_gaps() -> PackedFloat32Array:
 	var loop := _level.get_node_or_null("Ramps/LoopCSG") as Node3D
 	if loop == null:
 		return PackedFloat32Array()
-	var off := _curve.get_closest_offset(loop.position)
+	_tg.set("road_gap_taper", LOOP_GAP_TAPER)
+	_tg.set("curbs_stop_at_gaps", true)
+	_tg.set("road_gap_half_width", LOOP_APRON_HALF + 1.5)
+	var ends := _loop_apron_span(loop)
+	return PackedFloat32Array([snappedf(ends.x, 0.1), snappedf(ends.y, 0.1)])
+
+
+## The platform's ends along the lap: LOOP_APRON_LEAD past the lanes' far ends.
+func _loop_apron_span(loop: Node3D) -> Vector2:
 	var z_in: float = -5.0 - float(loop.get("approach_length"))
 	var z_out: float = -5.0 + LOOP_EXIT_LENGTH
-	return PackedFloat32Array([snappedf(off + z_in - LOOP_ROAD_GAP.x, 0.1), snappedf(off + z_out + LOOP_ROAD_GAP.y, 0.1)])
+	var a := _curve.get_closest_offset(loop.transform * Vector3(0.0, 0.0, z_in))
+	var b := _curve.get_closest_offset(loop.transform * Vector3(0.0, 0.0, z_out))
+	return Vector2(minf(a, b) - LOOP_APRON_LEAD, maxf(a, b) + LOOP_APRON_LEAD)
 
 
 func _fit_loop() -> void:
@@ -3481,8 +3588,9 @@ func _fit_loop() -> void:
 	var road_in := _road_surface(loop.transform * Vector3(-half_shift, 0.0, z_in))
 	var road_out := _road_surface(loop.transform * Vector3(half_shift, 0.0, z_out))
 	loop.set("exit_length", LOOP_EXIT_LENGTH)
-	loop.set("entry_end_y", road_in - loop.position.y - LOOP_END_SINK)
-	loop.set("exit_end_y", road_out - loop.position.y - LOOP_END_SINK)
+	# On the platform, a lip up (it is level with the road along its line).
+	loop.set("entry_end_y", road_in - loop.position.y + LOOP_END_LIP)
+	loop.set("exit_end_y", road_out - loop.position.y + LOOP_END_LIP)
 	loop.set("road_grade", (road_out - road_in) / (z_out - z_in))
 	# The pylons down into the ground beside the road, which falls away there: they started at the origin.
 	var foot := 0.0
@@ -3493,6 +3601,126 @@ func _fit_loop() -> void:
 	loop.call("_rebuild")
 	print("  loop ends: entry %.2f, exit %.2f under the origin, grade %.3f; pylons down to %.2f" % [loop.get("entry_end_y"),
 			loop.get("exit_end_y"), loop.get("road_grade"), foot])
+
+
+## The loop's platform: a slab LOOP_APRON_DEPTH thick along the lap over the road gap, its top level with the road's
+## surface along the lap's line (so flush with the road at both ends), flat across, flaring from the road's edge
+## (LOOP_APRON_ROAD_HALF) to LOOP_APRON_HALF over LOOP_APRON_FLARE; sides and ends down into the graded ground. Drawn by
+## loop_apron.gdshader; solid ("LoopApronDeck": track, paved).
+func _build_loop_apron(root: Node3D) -> void:
+	var loop := _level.get_node_or_null("Ramps/LoopCSG") as Node3D
+	if loop == null:
+		return
+	var span := _loop_apron_span(loop)
+	var s0: float = span.x - 0.2
+	var s1: float = span.y + 0.2
+	# Rows about a metre apart along the lap, from end to end.
+	var rows: Array = []
+	var n := maxi(2, ceili(s1 - s0))
+	for i in range(n + 1):
+		var s: float = lerpf(s0, s1, float(i) / float(n))
+		var fr := _frame(s)
+		var t: float = minf(s - s0, s1 - s)
+		var hw: float = lerpf(LOOP_APRON_ROAD_HALF, LOOP_APRON_HALF, smoothstep(0.0, LOOP_APRON_FLARE, t))
+		var c: Vector3 = fr["pos"]
+		c.y += _road_y
+		rows.append([c, fr["right"], hw, s - s0])
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var cols := 9
+	# The top.
+	var top_rows: Array = []
+	for r in rows:
+		var c: Vector3 = r[0]
+		var rt: Vector3 = r[1]
+		var hw: float = r[2]
+		var row := PackedVector3Array()
+		for k in range(cols):
+			var lat: float = lerpf(-hw, hw, float(k) / float(cols - 1))
+			row.append(c + rt * lat)
+		top_rows.append(row)
+	var quad := func(a: Vector3, b: Vector3, c2: Vector3, d: Vector3, ua: Vector2, ub: Vector2, uc: Vector2, ud: Vector2, hw_a: float, hw_c: float, out: Vector3) -> void:
+		# Two triangles a-b-c, a-c-d wound to face `out` (Godot's front faces: (c - a) x (b - a) along it).
+		for tri in [[a, b, c2, ua, ub, uc, hw_a, hw_a, hw_c], [a, c2, d, ua, uc, ud, hw_a, hw_c, hw_c]]:
+			var p0: Vector3 = tri[0]
+			var p1: Vector3 = tri[1]
+			var p2: Vector3 = tri[2]
+			var order := [0, 1, 2]
+			if (p2 - p0).cross(p1 - p0).dot(out) < 0.0:
+				order = [0, 2, 1]
+			for o in order:
+				st.set_uv(tri[3 + o])
+				st.set_uv2(Vector2(float(tri[6 + o]), 0.0))
+				st.set_normal(out)
+				st.add_vertex(tri[o])
+	for i in range(rows.size() - 1):
+		var r0: Array = rows[i]
+		var r1: Array = rows[i + 1]
+		var a_row: PackedVector3Array = top_rows[i]
+		var b_row: PackedVector3Array = top_rows[i + 1]
+		for k in range(cols - 1):
+			var u0: float = lerpf(-float(r0[2]), float(r0[2]), float(k) / float(cols - 1))
+			var u1: float = lerpf(-float(r0[2]), float(r0[2]), float(k + 1) / float(cols - 1))
+			var w0: float = lerpf(-float(r1[2]), float(r1[2]), float(k) / float(cols - 1))
+			var w1: float = lerpf(-float(r1[2]), float(r1[2]), float(k + 1) / float(cols - 1))
+			quad.call(a_row[k], a_row[k + 1], b_row[k + 1], b_row[k], Vector2(u0, r0[3]), Vector2(u1, r0[3]), Vector2(w1, r1[3]), Vector2(w0, r1[3]),
+					float(r0[2]), float(r1[2]), Vector3.UP)
+		# The sides, down into the ground.
+		for side in [0, cols - 1]:
+			var pa: Vector3 = a_row[side]
+			var pb: Vector3 = b_row[side]
+			var rt0: Vector3 = r0[1]
+			var out: Vector3 = rt0 * (1.0 if side > 0 else -1.0)
+			var down := Vector3.DOWN * LOOP_APRON_DEPTH
+			quad.call(pa, pb, pb + down, pa + down, Vector2(0, r0[3]), Vector2(0, r1[3]), Vector2(-LOOP_APRON_DEPTH, r1[3]), Vector2(-LOOP_APRON_DEPTH, r0[3]),
+					0.0, 0.0, out)
+	# The ends, down into the ground (hidden by the road but for a seam).
+	for e in [[0, -1.0], [rows.size() - 1, 1.0]]:
+		var row: PackedVector3Array = top_rows[e[0]]
+		var fr2 := _frame(span.x - 0.2 if e[0] == 0 else span.y + 0.2)
+		var out2: Vector3 = (fr2["fwd"] as Vector3) * float(e[1])
+		var down2 := Vector3.DOWN * LOOP_APRON_DEPTH
+		quad.call(row[0], row[cols - 1], row[cols - 1] + down2, row[0] + down2, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO, 0.0, 0.0, out2)
+	st.generate_tangents()
+	var slab: ArrayMesh = st.commit()
+	var node := Node3D.new()
+	node.name = "LoopApron"
+	root.add_child(node)
+	var mi := MeshInstance3D.new()
+	mi.name = "LoopApronSlab"
+	mi.mesh = _save_res(slab, "loop_apron")
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://loop_apron.gdshader")
+	mat.set_shader_parameter("concrete_tex", load("res://materials/concrete.png"))
+	mat.set_shader_parameter("concrete_normal", load("res://materials/concrete_normal.png"))
+	mat.set_shader_parameter("road_half", LOOP_APRON_ROAD_HALF)
+	# A mid grey between the asphalt and the lanes' black: the texture's own brightness drew it almost white.
+	mat.set_shader_parameter("concrete_tint", Color(0.50, 0.50, 0.48))
+	# The entry lane's line across the platform and where it starts along it.
+	var half_shift: float = float(loop.get("spiral_offset")) * 0.5
+	var z_in: float = -5.0 - float(loop.get("approach_length"))
+	var lane_start: Vector3 = loop.transform * Vector3(-half_shift, 0.0, z_in)
+	var s_lane := _curve.get_closest_offset(lane_start)
+	var fl := _frame(s_lane)
+	var lat_lane: float = (lane_start - (fl["pos"] as Vector3)).dot(fl["right"])
+	mat.set_shader_parameter("entry_lat", lat_lane)
+	mat.set_shader_parameter("entry_v", s_lane - s0)
+	mat.set_shader_parameter("lane_half", float(loop.get("track_width")) * 0.5)
+	mi.material_override = _save_res(mat, "mat_loop_apron")
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	node.add_child(mi)
+	var body := StaticBody3D.new()
+	body.name = "LoopApronDeck"
+	body.set_meta("surface", "asphalt")
+	var cs := CollisionShape3D.new()
+	var shape := ConcavePolygonShape3D.new()
+	shape.set_faces(slab.get_faces())
+	shape.backface_collision = true
+	cs.shape = shape
+	body.add_child(cs)
+	node.add_child(body)
+	print("  loop platform: s %.0f-%.0f, %.1fm wide at most, entry lane %.1fm %s of the line" % [s0, s1, LOOP_APRON_HALF * 2.0, absf(lat_lane),
+			"left" if lat_lane < 0.0 else "right"])
 
 
 ## A warning sign before the loop, right of the road: a yellow board on two posts with a black loop
@@ -3706,3 +3934,1675 @@ func _set_owner_recursive(node: Node, scene_root: Node) -> void:
 		if child.owner != null and child.owner != scene_root:
 			continue
 		_set_owner_recursive(child, scene_root)
+
+
+# ======================================================================================
+#  The country round the Lakeside Meadows and Bloombay on its horizon
+# ======================================================================================
+# The terrain falls into the sea from 880m out (TerrainGenerator's edge falloff), which made the stage an island. Past it a
+# ring of ground (BACK_R0 to BACK_R1) carries the land on away from the lake: across LAND_HALF either side of LAND_BEARING
+# (opposite the big lake and the long bridge, which lie to the north-west) the country rolls on into farmland and woods,
+# rising to ranges on the horizon, with Bloombay's skyline on a plain CITY_DIST out; elsewhere it falls into the sea and
+# a low far shore closes the horizon. The first ring takes the terrain's own heights; inside BACK_NEAR it is drawn in
+# the terrain's grass material (its UVs are world x and z, as the terrain's), so where the two overlap round the rim
+# nothing shows; past it in vertex colour. Solid where land, out to BACK_SOLID.
+const BACK_R0 := 830.0
+const BACK_R1 := 3800.0
+const BACK_SEGS := 480
+const BACK_NEAR := 1300.0
+const BACK_SOLID := 1500.0
+const LAND_BEARING := 48.0
+const LAND_HALF := 105.0
+const CITY_DIST := 2350.0
+const CITY_R := 620.0
+## The fog now runs out past the city and the ranges (it ended at 1.6km, where the island's rim was).
+const BACK_FOG := Vector2(300.0, 4600.0)
+
+var _back_hills: FastNoiseLite
+var _back_ridge: FastNoiseLite
+var _back_patch: FastNoiseLite
+var _back_rim := PackedFloat32Array()
+
+
+## 1 across the land, 0 over the sea, by bearing (x = cos, z = sin, degrees).
+func _land_weight(x: float, z: float) -> float:
+	var d: float = absf(wrapf(rad_to_deg(atan2(z, x)) - LAND_BEARING, -180.0, 180.0))
+	return 1.0 - smoothstep(LAND_HALF - 30.0, LAND_HALF + 10.0, d)
+
+
+func _city_centre() -> Vector2:
+	var a := deg_to_rad(LAND_BEARING)
+	return Vector2(cos(a), sin(a)) * CITY_DIST
+
+
+func _city_weight(x: float, z: float) -> float:
+	return 1.0 - smoothstep(CITY_R * 0.75, CITY_R * 1.35, Vector2(x, z).distance_to(_city_centre()))
+
+
+## The country's own height (rolling farmland, woods on the rises, ranges far out), the city's plain flattened in.
+func _country(x: float, z: float, r: float) -> float:
+	var h: float = 4.0 + _back_hills.get_noise_2d(x, z) * 34.0
+	h += smoothstep(2300.0, 3500.0, r) * (70.0 + 170.0 * clampf(_back_ridge.get_noise_2d(x, z) + 0.5, 0.0, 1.5))
+	return lerpf(h, 9.0, _city_weight(x, z))
+
+
+## The ground at (x, z), r from the centre, `rim` the terrain's height at BACK_R0 on that bearing.
+func _back_height(x: float, z: float, r: float, rim: float) -> float:
+	var w := _land_weight(x, z)
+	var land: float = lerpf(rim, _country(x, z, r), smoothstep(BACK_R0, 1250.0, r))
+	var sea: float = lerpf(rim - 1.0, -34.0, smoothstep(BACK_R0, 1000.0, r))
+	# The far shore across the water: low hills from 2.9km.
+	sea = lerpf(sea, 6.0 + 60.0 * clampf(_back_ridge.get_noise_2d(x * 1.3, z * 1.3) + 0.5, 0.0, 1.2), smoothstep(2900.0, 3500.0, r))
+	return lerpf(sea, land, w)
+
+
+func _back_colour(p: Vector3, n: Vector3, r: float, grass: Color) -> Color:
+	var slope := 1.0 - n.y
+	var c := grass
+	var fp: float = _back_patch.get_noise_2d(p.x, p.z)
+	# Fields in a patchwork (squares of the patch noise sampled on a coarse grid), woods where the hills' noise is high.
+	var cell := Vector2(floor(p.x / 140.0), floor(p.z / 110.0))
+	var fh: float = fposmod(sin(cell.dot(Vector2(12.9898, 78.233))) * 43758.5453, 1.0)
+	if fh < 0.35:
+		c = c.lerp(Color(0.58, 0.56, 0.30), 0.55)
+	elif fh < 0.5:
+		c = c.lerp(Color(0.40, 0.50, 0.20), 0.5)
+	if _back_hills.get_noise_2d(p.x, p.z) > 0.12 or fp > 0.35:
+		c = Color(0.13, 0.22, 0.11)
+	c = c.lerp(Color(0.42, 0.40, 0.36), smoothstep(0.35, 0.7, slope))
+	c = c.lerp(Color(0.46, 0.45, 0.43), _city_weight(p.x, p.z) * 0.85)
+	if p.y < -9.0:
+		c = Color(0.36, 0.34, 0.28)
+	return c
+
+
+## The grass texture's mean colour (times the material's tint), so the far ground meets the near in the same green.
+func _grass_mean() -> Color:
+	var gm := _tg.get("grass_material") as ShaderMaterial
+	var fallback := Color(0.30, 0.44, 0.17)
+	if gm == null:
+		return fallback
+	var tex := gm.get_shader_parameter("albedo_texture") as Texture2D
+	var img: Image = tex.get_image() if tex else null
+	if img == null or img.is_empty():
+		return fallback
+	if img.is_compressed():
+		img.decompress()
+	img.resize(8, 8, Image.INTERPOLATE_BILINEAR)
+	var acc := Color(0, 0, 0)
+	for y in 8:
+		for x in 8:
+			acc += img.get_pixel(x, y)
+	acc /= 64.0
+	var tint: Color = gm.get_shader_parameter("albedo")
+	return Color(acc.r * tint.r, acc.g * tint.g, acc.b * tint.b)
+
+
+func _build_backdrop(root: Node3D) -> void:
+	var t0 := Time.get_ticks_msec()
+	_back_hills = FastNoiseLite.new()
+	_back_hills.seed = 5501
+	_back_hills.frequency = 1.0 / 620.0
+	_back_hills.fractal_octaves = 4
+	_back_ridge = FastNoiseLite.new()
+	_back_ridge.seed = 5502
+	_back_ridge.frequency = 1.0 / 1100.0
+	_back_ridge.fractal_octaves = 3
+	_back_patch = FastNoiseLite.new()
+	_back_patch.seed = 5503
+	_back_patch.frequency = 1.0 / 380.0
+	_back_patch.fractal_type = FastNoiseLite.FRACTAL_NONE
+	var node := Node3D.new()
+	node.name = "Countryside"
+	root.add_child(node)
+	var radii := PackedFloat32Array()
+	var r := BACK_R0
+	while r < 1300.0:
+		radii.append(r)
+		r += 6.0
+	while r < BACK_R1:
+		radii.append(r)
+		r *= 1.035
+	radii.append(BACK_R1)
+	var nr := radii.size()
+	_back_rim.resize(BACK_SEGS)
+	for j in range(BACK_SEGS):
+		var a := TAU * j / BACK_SEGS
+		_back_rim[j] = _ground(cos(a) * BACK_R0, sin(a) * BACK_R0)
+	var pts := PackedVector3Array()
+	pts.resize(nr * BACK_SEGS)
+	for i in range(nr):
+		for j in range(BACK_SEGS):
+			var a := TAU * j / BACK_SEGS
+			var x := cos(a) * radii[i]
+			var z := sin(a) * radii[i]
+			var h := _back_height(x, z, radii[i], _back_rim[j])
+			# The first ring a hair under the terrain's own surface, which it meets.
+			if i == 0:
+				h -= 0.1
+			pts[i * BACK_SEGS + j] = Vector3(x, h, z)
+	var grass := _grass_mean()
+	var near_st := SurfaceTool.new()
+	near_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var far_st := SurfaceTool.new()
+	far_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var faces := PackedVector3Array()
+	for i in range(nr):
+		for j in range(BACK_SEGS):
+			var p := pts[i * BACK_SEGS + j]
+			var pl := pts[i * BACK_SEGS + (j + BACK_SEGS - 1) % BACK_SEGS]
+			var pr := pts[i * BACK_SEGS + (j + 1) % BACK_SEGS]
+			var pi := pts[maxi(i - 1, 0) * BACK_SEGS + j]
+			var po := pts[mini(i + 1, nr - 1) * BACK_SEGS + j]
+			var n := (po - pi).cross(pr - pl).normalized()
+			if n.y < 0.0:
+				n = -n
+			var c := _back_colour(p, n, radii[i], grass)
+			for st2 in [near_st, far_st]:
+				st2.set_normal(n)
+				st2.set_color(c)
+				st2.set_uv(Vector2(p.x, p.z))
+				st2.add_vertex(p)
+	for i in range(nr - 1):
+		for j in range(BACK_SEGS):
+			var ia := i * BACK_SEGS + j
+			var ib := i * BACK_SEGS + (j + 1) % BACK_SEGS
+			var ic := (i + 1) * BACK_SEGS + j
+			var id := (i + 1) * BACK_SEGS + (j + 1) % BACK_SEGS
+			for tri in [[ia, ib, ic], [ib, id, ic]]:
+				var pa := pts[tri[0]]
+				var pb := pts[tri[1]]
+				var pc := pts[tri[2]]
+				# Front faces wind clockwise seen from above: (c - a) x (b - a) points up.
+				if (pc - pa).cross(pb - pa).y < 0.0:
+					tri = [tri[0], tri[2], tri[1]]
+				var st: SurfaceTool = near_st if radii[i + 1] <= BACK_NEAR else far_st
+				for k in tri:
+					st.add_index(k)
+				var mid: Vector3 = (pa + pb + pc) / 3.0
+				if radii[i + 1] <= BACK_SOLID and _land_weight(mid.x, mid.z) > 0.15 and mid.y > -12.0:
+					faces.append(pts[tri[0]])
+					faces.append(pts[tri[1]])
+					faces.append(pts[tri[2]])
+	var mesh := near_st.commit()
+	mesh.surface_set_material(0, _tg.get("grass_material"))
+	far_st.commit(mesh)
+	var mat := StandardMaterial3D.new()
+	mat.vertex_color_use_as_albedo = true
+	mat.vertex_color_is_srgb = true
+	mat.roughness = 0.95
+	mesh.surface_set_material(1, _save_res(mat, "country_mat"))
+	var body := StaticBody3D.new()
+	body.name = "CountryGround"
+	body.set_meta(&"surface", "grass")
+	node.add_child(body)
+	var mi := MeshInstance3D.new()
+	mi.name = "CountryGroundMesh"
+	mi.mesh = _save_res(mesh, "country_ground")
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	body.add_child(mi)
+	var shape := ConcavePolygonShape3D.new()
+	shape.set_faces(faces)
+	var cs := CollisionShape3D.new()
+	cs.shape = _save_res(shape, "country_collision")
+	body.add_child(cs)
+	_build_country_woods(node)
+	_build_bloombay(node)
+	print("  countryside: %d rings x %d, %.1fs" % [nr, BACK_SEGS, (Time.get_ticks_msec() - t0) / 1000.0])
+
+
+## The ground of the countryside at (x, z), from the same function its mesh was built with.
+func _country_ground(x: float, z: float) -> float:
+	var r := Vector2(x, z).length()
+	var j := int(round(fposmod(atan2(z, x), TAU) / TAU * BACK_SEGS)) % BACK_SEGS
+	return _back_height(x, z, r, _back_rim[j])
+
+
+## The woods carried on over the countryside: the woods' own far stand-ins (cards: oak, lime, birch, spruce), clumped
+## by the hills' noise, thinning out to 2.6km, kept off the city, the water and the steep.
+func _build_country_woods(node: Node3D) -> void:
+	var kinds := ["oak", "lime", "birch", "spruce"]
+	var meshes: Array = []
+	for k in kinds:
+		meshes.append(load("res://generated/" + RES_PREFIX + "tree_%s_0_far.res" % k))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 8821
+	var cells := {}
+	var count := 0
+	var step := 15.0
+	var x := -2700.0
+	while x < 2700.0:
+		var z := -2700.0
+		while z < 2700.0:
+			var px := x + rng.randf_range(-0.45, 0.45) * step
+			var pz := z + rng.randf_range(-0.45, 0.45) * step
+			var roll := rng.randf()
+			z += step
+			var r := Vector2(px, pz).length()
+			if r < 870.0 or r > 2600.0:
+				continue
+			var w := _land_weight(px, pz)
+			if w < 0.6 or _city_weight(px, pz) > 0.05:
+				continue
+			var woods: float = smoothstep(0.02, 0.22, _back_hills.get_noise_2d(px, pz)) + smoothstep(0.3, 0.5, _back_patch.get_noise_2d(px, pz))
+			var dens: float = clampf(woods, 0.0, 1.0) * 0.8 * (1.0 - smoothstep(1500.0, 2600.0, r) * 0.6)
+			if roll > dens:
+				continue
+			var g := _country_ground(px, pz)
+			if g < -8.5:
+				continue
+			var slope := absf(_country_ground(px + 4.0, pz) - g) / 4.0 + absf(_country_ground(px, pz + 4.0) - g) / 4.0
+			if slope > 0.9:
+				continue
+			var kind: int = 3 if (g > 40.0 or rng.randf() < 0.3) else rng.randi() % 3
+			var sc := rng.randf_range(0.9, 1.3)
+			var key := Vector3i(int(floor(px / 500.0)), int(floor(pz / 500.0)), kind)
+			if not cells.has(key):
+				cells[key] = []
+			cells[key].append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(sc, sc * rng.randf_range(0.9, 1.1), sc)), Vector3(px, g - 0.4, pz)))
+			count += 1
+		x += step
+	# Named as the woods' deep far cells, so a JungleDetail of its own thins them with the Detail Level (its DEEP
+	# shares: none at Off and Low, 30% at Medium, 70% at High, all at Ultra; 2.3ms of an M1's frame at 4320x2700 drawn
+	# whole), each cell's instances shuffled so the first N are spread evenly.
+	for key in cells.keys():
+		var xfs: Array = cells[key]
+		for i in range(xfs.size() - 1, 0, -1):
+			var j := rng.randi_range(0, i)
+			var tmp = xfs[i]
+			xfs[i] = xfs[j]
+			xfs[j] = tmp
+		var mmi := _multimesh(meshes[key.z], xfs, "TreeDeepFar_country_%d_%d_%d" % [key.x, key.y, key.z])
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mmi.visibility_range_end = 3200.0
+		node.add_child(mmi)
+	var detail := Node3D.new()
+	detail.name = "CountryDetail"
+	detail.set_script(load("res://JungleDetail.gd"))
+	node.add_child(detail)
+	print("  country woods: %d trees in %d cells" % [count, cells.size()])
+
+
+## Bloombay on its plain: blocks of three to seven storeys in a grid along the bearing, taller toward the middle,
+## downtown's glass towers in the middle (BloombayCity.gd), a few landmark towers. Drawn to the far plane.
+func _build_bloombay(node: Node3D) -> void:
+	var city = load("res://BloombayCity.gd").new()
+	city.begin()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 2408
+	var c := _city_centre()
+	var a := deg_to_rad(LAND_BEARING)
+	var along := Vector2(cos(a), sin(a))
+	var across := Vector2(-along.y, along.x)
+	var yaw := atan2(along.x, along.y)
+	var bx := 78.0
+	var bz := 64.0
+	var u := -CITY_R * 1.2
+	while u < CITY_R * 1.2:
+		var v := -CITY_R * 1.2
+		while v < CITY_R * 1.2:
+			var p: Vector2 = c + along * (u + bx * 0.5) + across * (v + bz * 0.5)
+			v += bz
+			var cw := _city_weight(p.x, p.y)
+			if cw < 0.15 or rng.randf() > cw * 1.1:
+				continue
+			var dt: float = exp(-pow(p.distance_to(c) / (CITY_R * 0.42), 2.0))
+			if rng.randf() < dt * 0.55:
+				var g0 := _country_ground(p.x, p.y)
+				city.tower(p.x, p.y, g0, rng.randf_range(24.0, 36.0), rng.randi_range(14, 34), rng)
+				continue
+			# A block of two to four buildings round its edge.
+			var lots := rng.randi_range(2, 4)
+			for l in range(lots):
+				var lw: float = (bx - 12.0) / float(lots)
+				var q: Vector2 = p + along * ((float(l) + 0.5) * lw - (bx - 12.0) * 0.5) + across * rng.randf_range(-8.0, 8.0)
+				var g := _country_ground(q.x, q.y)
+				var storeys: int = rng.randi_range(3, 6) + int(dt * 6.0)
+				var col: Color = city.WALL_PAINTS[rng.randi() % city.WALL_PAINTS.size()]
+				city.building(q.x, q.y, g, lw - rng.randf_range(2.0, 5.0), rng.randf_range(24.0, 40.0), yaw, storeys, col,
+						2 if storeys > 7 else rng.randi() % 2, rng.randi() % 4)
+		u += bx
+	var mesh: ArrayMesh = city.commit(_save_res(city.wall_material(Color(0.17, 0.41, 0.82), Color(0.70, 0.82, 0.93), Color(0.34, 0.40, 0.32),
+			Color(1.0, 0.99, 0.96)), "city_walls_mat"), _save_res(city.roof_material(), "city_roofs_mat"))
+	var mi := MeshInstance3D.new()
+	mi.name = "BloombaySkyline"
+	mi.mesh = _save_res(mesh, "bloombay_skyline")
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	node.add_child(mi)
+	print("  Bloombay: %d buildings %.0fm out" % [city.count, CITY_DIST])
+
+
+# ======================================================================================
+#  The lookout tower (the user's models/lookout_tower.blend)
+# ======================================================================================
+# A timber fire-lookout tower (about 30m, a glazed cabin on a braced frame with stairs) on a rise beside the course:
+# the best-scoring free spot (_spot_ok: clear of the road, the shortcut and every footprint, level ground) by how far it
+# stands over the ground round it, within LOOKOUT_REACH of the road. The .blend's own ground pad, lights and cameras are
+# left out; its meshes are merged per material, the glass drawn front faces only (Blender exports double-sided), and
+# its frame's own triangles are its collider.
+const LOOKOUT_MODEL := "res://models/lookout_tower.blend"
+const LOOKOUT_REACH := Vector2(30.0, 140.0)
+const LOOKOUT_SCALE := 1.0
+## How far the tower keeps from the start/finish gantry: it is a landmark out on the lap, not part of the venue.
+const LOOKOUT_FINISH_CLEAR := 450.0
+
+## Whether (x, z) is within `margin` of a graded pad or its blend (the paddock, the grandstand's footing, the camp's
+## terraces: the upper terrace's pitches note no footprints, and the tower first stood among its motorhomes).
+func _on_pad(x: float, z: float, margin: float) -> bool:
+	var pads: PackedFloat32Array = _tg.get("flat_pads")
+	for o in range(0, pads.size() - 6, 7):
+		var c := cos(pads[o + 4])
+		var sn := sin(pads[o + 4])
+		var dx := x - pads[o]
+		var dz := z - pads[o + 1]
+		# World to local: the inverse of Basis(UP, yaw).
+		var lx := dx * c - dz * sn
+		var lz := dx * sn + dz * c
+		var m: float = margin + pads[o + 6]
+		if absf(lx) < pads[o + 2] + m and absf(lz) < pads[o + 3] + m:
+			return true
+	return false
+
+
+func _build_lookout(root: Node3D) -> void:
+	var best := Vector3.ZERO
+	var best_score := -INF
+	var finish := _level.get_node_or_null("FinishLine") as Node3D
+	var finish_xz := Vector2(finish.position.x, finish.position.z) if finish else Vector2.ZERO
+	var x := -900.0
+	while x < 900.0:
+		var z := -900.0
+		while z < 900.0:
+			z += 12.0
+			if Vector2(x, z).length() > 780.0 or Vector2(x, z).distance_to(finish_xz) < LOOKOUT_FINISH_CLEAR:
+				continue
+			var rd := _road_distance(x, z)
+			if rd < LOOKOUT_REACH.x or rd > LOOKOUT_REACH.y:
+				continue
+			if not _spot_ok(x, z, 8.0) or _on_pad(x, z, 10.0):
+				continue
+			var g := _ground(x, z)
+			if g < -6.0:
+				continue
+			var ring := 0.0
+			for k in range(12):
+				var ang := TAU * k / 12.0
+				ring += _ground(x + cos(ang) * 45.0, z + sin(ang) * 45.0)
+			var score: float = g - ring / 12.0 - rd * 0.02
+			if score > best_score:
+				best_score = score
+				best = Vector3(x, g, z)
+		x += 12.0
+	if best_score == -INF:
+		push_error("lookout tower: no free spot")
+		return
+	var y := _ground_min(best.x, best.z, 6.0)
+	var p := _curve.get_closest_point(Vector3(best.x, 0.0, best.z))
+	var face := atan2(p.x - best.x, p.z - best.z)
+	var src: Node3D = (load(LOOKOUT_MODEL) as PackedScene).instantiate()
+	var groups := {}
+	var mats := {}
+	var faces := PackedVector3Array()
+	for m in src.find_children("*", "MeshInstance3D", true, false):
+		var mi: MeshInstance3D = m
+		if String(mi.name).begins_with("ground_pad"):
+			continue
+		var t := Transform3D.IDENTITY
+		var n: Node = mi
+		while n != src and n != null:
+			if n is Node3D:
+				t = (n as Node3D).transform * t
+			n = n.get_parent()
+		var nb := t.basis.inverse().transposed()
+		for si in mi.mesh.get_surface_count():
+			var mat: Material = mi.get_active_material(si)
+			var mk: String = String(mat.resource_name) if mat else "none"
+			if not mats.has(mk):
+				var mm: Material = mat.duplicate() if mat else StandardMaterial3D.new()
+				if mm is StandardMaterial3D and mk.to_lower().contains("glass"):
+					(mm as StandardMaterial3D).cull_mode = BaseMaterial3D.CULL_BACK
+				mats[mk] = _save_res(mm, "lookout_mat_" + mk.to_lower())
+			var arr: Array = mi.mesh.surface_get_arrays(si)
+			var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+			var norms = arr[Mesh.ARRAY_NORMAL]
+			var uvs = arr[Mesh.ARRAY_TEX_UV]
+			var idx = arr[Mesh.ARRAY_INDEX]
+			if not groups.has(mk):
+				groups[mk] = [PackedVector3Array(), PackedVector3Array(), PackedVector2Array(), PackedInt32Array()]
+			var g: Array = groups[mk]
+			var base: int = (g[0] as PackedVector3Array).size()
+			for k in range(verts.size()):
+				g[0].append(t * verts[k])
+				g[1].append((nb * (norms[k] as Vector3)).normalized() if norms != null and k < (norms as PackedVector3Array).size() else Vector3.UP)
+				g[2].append((uvs as PackedVector2Array)[k] if uvs != null and k < (uvs as PackedVector2Array).size() else Vector2.ZERO)
+			var ids: PackedInt32Array = idx if idx != null and (idx as PackedInt32Array).size() > 0 else PackedInt32Array(range(verts.size()))
+			for k2 in ids:
+				g[3].append(base + k2)
+			if not mk.to_lower().contains("glass"):
+				for k3 in ids:
+					faces.append(t * verts[k3])
+	src.free()
+	var mesh := ArrayMesh.new()
+	for mk in groups.keys():
+		var g: Array = groups[mk]
+		var arrs := []
+		arrs.resize(Mesh.ARRAY_MAX)
+		arrs[Mesh.ARRAY_VERTEX] = g[0]
+		arrs[Mesh.ARRAY_NORMAL] = g[1]
+		arrs[Mesh.ARRAY_TEX_UV] = g[2]
+		arrs[Mesh.ARRAY_INDEX] = g[3]
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrs)
+		mesh.surface_set_material(mesh.get_surface_count() - 1, mats[mk])
+	var xf := Transform3D(Basis(Vector3.UP, face).scaled(Vector3.ONE * LOOKOUT_SCALE), Vector3(best.x, y, best.z))
+	var body := StaticBody3D.new()
+	body.name = "LookoutTower"
+	body.transform = xf
+	root.add_child(body)
+	var tmi := MeshInstance3D.new()
+	tmi.name = "LookoutTowerMesh"
+	tmi.mesh = _save_res(mesh, "lookout_tower")
+	body.add_child(tmi)
+	var shape := ConcavePolygonShape3D.new()
+	shape.set_faces(faces)
+	shape.backface_collision = true
+	var cs := CollisionShape3D.new()
+	cs.shape = _save_res(shape, "lookout_collision")
+	body.add_child(cs)
+	_note("lookout", Vector3(best.x, y, best.z), 8.0 * LOOKOUT_SCALE, 5.0)
+	print("  lookout tower at (%.0f, %.1f, %.0f), %.0fm from the road, %.1fm over the ground round it" % [best.x, y, best.z,
+			_road_distance(best.x, best.z), best_score + _road_distance(best.x, best.z) * 0.02])
+
+
+# ======================================================================================
+#  The playground by the marquee
+# ======================================================================================
+# On a pad of its own (graded with the others before the bake) PLAYGROUND_AWAY past the marquee's anchor, away from the
+# road, its front (local -z) toward the road: ParkKit's swing set, slide tower, seesaw, roundabout, climbing dome and
+# sandpit inside a rail fence with a gate at the front, benches for the parents, a bin, safety mats, a fingerpost by the
+# gate where the footpath starts. Children (CrowdPlacer's people at PLAYGROUND_CHILD of their size) on the swings, the
+# slide, the seesaw, the roundabout and round the sandpit; parents on the benches and watching. Positions in the pad's
+# frame are world metres; the props are life size at PROP_SCALE. Each piece has its own box colliders (DressingColliders
+# skips the dressing: "lake").
+const PLAYGROUND_FROM := Vector2(-83.2, -511.6)
+const PLAYGROUND_AWAY := 34.0
+const PLAYGROUND_HALF := Vector2(14.0, 12.0)
+const PLAYGROUND_BLEND := 8.0
+const PLAYGROUND_CHILD := 0.58
+const PLAYGROUND_CLIPS := ["res://sounds/playground_ambience.wav", "res://sounds/playground_ambience2.wav"]
+const PLAYGROUND_RMS := [-36.9, -42.1]
+const PLAYGROUND_LEVEL := -27.0
+const PLAYGROUND_SOUND_UNIT := 10.0
+
+var _park: ParkKit
+## People for _build_spectators: the playground's and the walkers' (CrowdPlacer spots, with a size).
+var _park_spots: Array = []
+## The playground's gate (world) and its frame, for the footpath that starts there.
+var _playground_gate := Vector3.ZERO
+var _playground_xf := Transform3D.IDENTITY
+
+
+## [centre (x, z), yaw] of the playground's pad: its front (-z) faces the road past the marquee.
+func _playground_frame() -> Array:
+	var cp := _curve.get_closest_point(Vector3(PLAYGROUND_FROM.x, 0.0, PLAYGROUND_FROM.y))
+	var away := Vector2(PLAYGROUND_FROM.x - cp.x, PLAYGROUND_FROM.y - cp.z).normalized()
+	var c := PLAYGROUND_FROM + away * PLAYGROUND_AWAY
+	return [c, atan2(away.x, away.y)]
+
+
+func _build_playground(root: Node3D) -> void:
+	if _park == null:
+		_park = ParkKit.new(_kit, _venue)
+	var fr := _playground_frame()
+	var c: Vector2 = fr[0]
+	var yaw: float = fr[1]
+	var y := _ground(c.x, c.y)
+	var base := Transform3D(Basis(Vector3.UP, yaw), Vector3(c.x, y, c.y))
+	_playground_xf = base
+	var b := base.basis
+	var node := Node3D.new()
+	node.name = "Playground"
+	root.add_child(node)
+	var kit := {}
+	var boxes: Array = []
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4242
+	var s := PROP_SCALE
+	# [world position in the pad's frame, turn]: each item's frame.
+	var at := func(p: Vector3, turn: float) -> Transform3D:
+		return base * Transform3D(Basis(Vector3.UP, turn).scaled(Vector3.ONE * s), p)
+	var spots: Array = []
+	var child := PLAYGROUND_CHILD
+	# Safety mats under the swings, the slide's foot and the dome.
+	_kit.set_frame(base)
+	_park.safety_mat(kit, Vector2(-11.0, 1.5), Vector2(-2.0, 7.5), Color(0.62, 0.16, 0.12))
+	_park.safety_mat(kit, Vector2(3.4, -9.6), Vector2(10.6, -4.2), Color(0.18, 0.42, 0.20))
+	# The swing set.
+	var sw: Transform3D = at.call(Vector3(-6.5, 0.0, 4.5), 0.0)
+	_kit.set_frame(sw)
+	var seats: Array = _park.swing_set(kit, Color(0.10, 0.45, 0.25), [Color(0.95, 0.75, 0.10), Color(0.15, 0.45, 0.90)])
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			boxes.append([sw * Vector3(sx * 2.4, 1.1, sz * 0.5), Vector3(0.2, 2.3, 1.2) * s, b])
+	boxes.append([sw * Vector3(0.0, 2.35, 0.0), Vector3(5.0, 0.15, 0.15) * s, b])
+	for i in range(seats.size()):
+		var seat: Vector3 = sw * (seats[i] as Vector3)
+		if i == 0:
+			spots.append([seat, b * Vector3(0, 0, -1), true, false, [0, 1, 5][rng.randi() % 3], child])
+		else:
+			# A parent pushing the other swing, behind it.
+			spots.append([sw * Vector3(seats[i].x, 0.0, 0.85), b * Vector3(0, 0, -1), false, false, 7, 1.0])
+			spots.append([seat, b * Vector3(0, 0, -1), true, false, 5, child])
+	# The slide tower, its slide toward the front.
+	var sl: Transform3D = at.call(Vector3(6.5, 0.0, 4.0), 0.0)
+	_kit.set_frame(sl)
+	var deck: Vector3 = sl * _park.slide_tower(kit, Color(0.85, 0.20, 0.15), Color(0.98, 0.70, 0.08))
+	boxes.append([sl * Vector3(0.0, 1.4, 0.0), Vector3(1.5, 2.8, 1.5) * s, b])
+	boxes.append([sl * Vector3(0.0, 0.5, -2.4), Vector3(0.7, 1.0, 3.4) * s, b])
+	boxes.append([sl * Vector3(0.0, 0.8, 1.1), Vector3(0.7, 1.6, 0.8) * s, b])
+	spots.append([deck + b * Vector3(0.0, 0.0, -0.3), b * Vector3(0, 0, -1), false, false, 9, child])
+	spots.append([sl * Vector3(0.0, 0.0, -4.6), b * Vector3(0, 0, 1), false, false, 14, child])
+	# The seesaw, along x.
+	var ss: Transform3D = at.call(Vector3(-6.5, 0.0, -6.0), 0.0)
+	_kit.set_frame(ss)
+	var ends: Array = _park.seesaw(kit, Color(0.20, 0.55, 0.95))
+	boxes.append([ss * Vector3(0.0, 0.45, 0.0), Vector3(3.6, 0.5, 0.45) * s, b])
+	for i in range(ends.size()):
+		var e: Vector3 = ends[i]
+		spots.append([ss * e, b * Vector3(-signf(e.x), 0, 0), true, false, [0, 5][i], child])
+	# The roundabout.
+	var rb: Transform3D = at.call(Vector3(0.0, 0.0, -1.5), 0.0)
+	_kit.set_frame(rb)
+	_park.roundabout(kit, Color(0.95, 0.45, 0.10), Color(0.15, 0.35, 0.80))
+	boxes.append([rb * Vector3(0.0, 0.2, 0.0), Vector3(2.0, 0.4, 2.0) * s, b])
+	for a in [0.4, 2.6]:
+		spots.append([rb * Vector3(cos(a) * 0.62, 0.3, sin(a) * 0.62), b * Vector3(-sin(a), 0, cos(a)), false, false, [9, 14][rng.randi() % 2], child])
+	# The climbing dome.
+	var dm: Transform3D = at.call(Vector3(7.0, 0.0, -7.0), 0.0)
+	_kit.set_frame(dm)
+	_park.climbing_dome(kit, Color(0.85, 0.15, 0.55))
+	boxes.append([dm * Vector3(0.0, 0.8, 0.0), Vector3(2.4, 1.6, 2.4) * s, b])
+	spots.append([dm * Vector3(1.9, 0.0, 0.6), b * Vector3(-1, 0, 0), false, false, 14, child])
+	# The sandpit, children round it.
+	var sp: Transform3D = at.call(Vector3(-0.5, 0.0, 8.0), 0.0)
+	_kit.set_frame(sp)
+	_park.sandpit(kit, rng)
+	boxes.append([sp * Vector3(0.0, 0.1, 0.0), Vector3(3.4, 0.2, 3.4) * s, b])
+	spots.append([sp * Vector3(-1.6, 0.24, 0.3), b * Vector3(1, 0, 0), true, false, 3, child])
+	spots.append([sp * Vector3(0.4, 0.24, -1.6), b * Vector3(0, 0, 1), true, false, 0, child])
+	spots.append([sp * Vector3(0.6, 0.12, 0.5), b * Vector3(-1, 0, -0.3), false, false, 7, child * 0.92])
+	# Benches along the sides, facing in, with parents on them; a bin by the gate.
+	for e in [[Vector3(-12.6, 0.0, -1.0), PI * 0.5], [Vector3(12.6, 0.0, 1.0), -PI * 0.5], [Vector3(4.0, 0.0, 10.9), PI]]:
+		var bx: Transform3D = at.call(e[0], e[1])
+		_kit.set_frame(bx)
+		_park.park_bench(kit)
+		boxes.append([bx * Vector3(0.0, 0.45, 0.0), Vector3(1.9, 0.9, 0.6) * s, b * Basis(Vector3.UP, e[1])])
+		var face: Vector3 = (b * Basis(Vector3.UP, float(e[1]))) * Vector3(0, 0, -1)
+		spots.append([bx * Vector3(rng.randf_range(-0.5, 0.5), 0.45, -0.05), face, true, false, [0, 3, 6][rng.randi() % 3], 1.0])
+	var bn: Transform3D = at.call(Vector3(3.0, 0.0, -11.2), 0.0)
+	_kit.set_frame(bn)
+	_park.bin(kit)
+	boxes.append([bn * Vector3(0.0, 0.5, 0.0), Vector3(0.45, 1.0, 0.45) * s, b])
+	# Parents watching from inside the fence, and two chatting at the gate.
+	spots.append([base * Vector3(-3.0, 0.0, 1.0), b * Vector3(-0.6, 0, 1), false, false, 11, 1.0])
+	spots.append([base * Vector3(2.0, 0.0, -5.5), b * Vector3(0.5, 0, -1), false, false, 13, 1.0])
+	spots.append([base * Vector3(-1.2, 0.0, -13.6), b * Vector3(1, 0, 0.2), false, false, 7, 1.0])
+	spots.append([base * Vector3(0.0, 0.0, -13.7), b * Vector3(-1, 0, 0.1), false, false, 15, 1.0])
+	spots.append([base * Vector3(-0.6, 0.0, -14.4), b * Vector3(0.2, 0, 1), false, false, 7, child])
+	# The fence round the pad's edge, a gate gap at the front, and the fingerpost outside it.
+	var fx := PLAYGROUND_HALF.x - 1.0
+	var fz := PLAYGROUND_HALF.y - 1.0
+	_kit.set_frame(base * Transform3D(Basis.from_scale(Vector3.ONE), Vector3.ZERO))
+	var fence_col := Color(0.55, 0.42, 0.28)
+	var runs := [[Vector3(-fx, 0, -fz), Vector3(-1.6, 0, -fz)], [Vector3(1.6, 0, -fz), Vector3(fx, 0, -fz)], [Vector3(fx, 0, -fz), Vector3(fx, 0, fz)],
+			[Vector3(fx, 0, fz), Vector3(-fx, 0, fz)], [Vector3(-fx, 0, fz), Vector3(-fx, 0, -fz)]]
+	for r in runs:
+		_park.fence_run(kit, r[0], r[1], fence_col)
+		boxes.append(_wall_box(base * (r[0] as Vector3), base * (r[1] as Vector3), 0.15, 1.0))
+	var post: Transform3D = at.call(Vector3(-2.6, 0.0, -fz - 1.2), 0.0)
+	_kit.set_frame(post)
+	_park.fingerpost(kit, [0.6, -1.9])
+	boxes.append([post * Vector3(0.0, 1.0, 0.0), Vector3(0.2, 2.2, 0.2) * s, b])
+	_playground_gate = base * Vector3(0.0, 0.0, -fz - 2.0)
+	_kit.reset_frame()
+	var mi := MeshInstance3D.new()
+	mi.name = "PlaygroundKit"
+	mi.mesh = _save_res(_venue.finish(kit), "playground")
+	mi.visibility_range_end = 420.0
+	node.add_child(mi)
+	_boxes_body(node, "PlaygroundBody", boxes)
+	# Children playing: the user's two recordings from two corners (the swings and slide, the seesaw and sandpit), each
+	# levelled by its RMS to PLAYGROUND_LEVEL at PLAYGROUND_SOUND_UNIT metres.
+	for k in range(PLAYGROUND_CLIPS.size()):
+		var amb := AudioStreamPlayer3D.new()
+		amb.name = "PlaygroundSound%d" % k
+		amb.stream = load(PLAYGROUND_CLIPS[k])
+		amb.volume_db = PLAYGROUND_LEVEL - float(PLAYGROUND_RMS[k])
+		amb.unit_size = PLAYGROUND_SOUND_UNIT
+		amb.max_distance = 160.0
+		amb.bus = &"SFX"
+		amb.autoplay = true
+		amb.position = base * ([Vector3(0.0, 2.0, 5.0), Vector3(-4.0, 2.0, -4.0)][k] as Vector3)
+		node.add_child(amb)
+	_note("playground", Vector3(c.x, y, c.y), 4.0, 5.0)
+	_park_spots.append_array(spots)
+	print("  playground at (%.0f, %.1f, %.0f), %.0fm off the road, %d people" % [c.x, y, c.y, _road_distance(c.x, c.y), spots.size()])
+
+
+# ======================================================================================
+#  The paths: the bike path round the country south and east of the lap, the footpaths in the meadows north of it
+# ======================================================================================
+# Each path is routed between anchors (TRAILS: [name, kind, anchors (x, z), closed]) on a TRAIL_CELL grid by AStarGrid2D:
+# solid in the water (and a shore margin), on the road and its verges (only under a bridge high over the ground may a
+# path pass), on the pads, the footprints and the shortcut, past TRAIL_REACH and on ground steeper than TRAIL_MAX_SLOPE;
+# dearer on slopes and near the road. An anchor in a solid cell moves to the nearest open one. The cells are smoothed
+# (Chaikin) and resampled every metre, and a ribbon (trail_path.gdshader, "Trail_*": no collider, DressingColliders'
+# "trail") lies on the ground along each, its vertices on the ground across it. The woods, shrubs and boulders keep off
+# them (_on_trail). Riders (Cyclists.gd) ride the closed bike path both ways; walkers (CrowdPlacer) stand along the
+# footpaths in ones and twos, and sit on benches at the viewpoints (ParkKit.park_bench beside the path).
+const TRAIL_CELL := 6.0
+const TRAIL_REACH := 790.0
+const TRAIL_MAX_SLOPE := 0.85
+const TRAIL_WATER := -8.6
+const TRAIL_ROAD_CLEAR := 9.0
+const BIKE_PATH_WIDTH := 4.2
+const FOOTPATH_WIDTH := 2.4
+const TRAILS := [
+	["BikeEast", 1, [Vector2(-560.0, 560.0), Vector2(-180.0, 430.0), Vector2(170.0, 400.0), Vector2(430.0, 250.0), Vector2(560.0, -60.0),
+			Vector2(590.0, -320.0), Vector2(720.0, -140.0), Vector2(710.0, 260.0), Vector2(500.0, 520.0), Vector2(200.0, 720.0),
+			Vector2(-160.0, 780.0), Vector2(-430.0, 690.0)], true],
+	["BikeSouth", 1, [Vector2(-520.0, 600.0), Vector2(-260.0, 470.0), Vector2(-206.0, 318.0), Vector2(-94.0, 318.0), Vector2(-30.0, 322.0),
+			Vector2(40.0, 324.0), Vector2(60.0, 430.0), Vector2(300.0, 560.0), Vector2(120.0, 760.0),
+			Vector2(-240.0, 740.0)], true],
+	["MeadowWalk", 0, [Vector2(-110.0, -640.0), Vector2(60.0, -640.0), Vector2(210.0, -770.0), Vector2(20.0, -850.0), Vector2(-200.0, -760.0),
+			Vector2(-230.0, -650.0)], true],
+	["PlaygroundWalk", 0, [Vector2.INF, Vector2(-110.0, -640.0)], false],
+	["CampWalk", 0, [Vector2(95.0, 40.0), Vector2(250.0, 120.0), Vector2(430.0, 250.0)], false],
+]
+## Legs of a path that are bridges, not routed ([path, leg]: anchor `leg` to the next): straight between their anchors,
+## level from one bank to the other (the deck at the banks' heights, LERP along it), built by _build_trail_bridge. The
+## south bike loop crosses the pond beside the lap's own bridge over it (s ~2700) on a 112m trestle, 18m from the road's
+## middle, and runs on along the bottom straight 25-30m off it, so the riders pass close by the race (the loops had kept
+## 150m off it).
+const TRAIL_BRIDGES := [["BikeSouth", 2]]
+## Walkers along the footpaths: one group every so many metres.
+const WALKER_EVERY := 70.0
+const BENCH_EVERY := 260.0
+const RIDERS := 14
+
+var _trails: Array = []       # [name, kind, points (PackedVector3Array, on the ground), closed]
+var _trail_hash := {}         # Vector2i(10m cell) -> PackedVector3Array of (x, z, half width + margin) along the paths
+
+
+func _plan_trails() -> void:
+	var t0 := Time.get_ticks_msec()
+	var n := int(ceil(TRAIL_REACH * 2.0 / TRAIL_CELL)) + 1
+	var org := -TRAIL_REACH
+	# The road's distance and height over each cell, from samples along the lap.
+	var rd := PackedFloat32Array()
+	rd.resize(n * n)
+	rd.fill(1e9)
+	var ry := PackedFloat32Array()
+	ry.resize(n * n)
+	var s := 0.0
+	var reach := int(ceil(60.0 / TRAIL_CELL))
+	while s < _length:
+		var p := _curve.sample_baked(s)
+		var ci := int(round((p.x - org) / TRAIL_CELL))
+		var cj := int(round((p.z - org) / TRAIL_CELL))
+		for j in range(maxi(cj - reach, 0), mini(cj + reach, n - 1) + 1):
+			for i in range(maxi(ci - reach, 0), mini(ci + reach, n - 1) + 1):
+				var x := org + i * TRAIL_CELL
+				var z := org + j * TRAIL_CELL
+				var d := Vector2(x - p.x, z - p.z).length()
+				var k := j * n + i
+				if d < rd[k]:
+					rd[k] = d
+					ry[k] = p.y + _road_y
+		s += 2.0
+	var astar := AStarGrid2D.new()
+	astar.region = Rect2i(0, 0, n, n)
+	astar.cell_size = Vector2(TRAIL_CELL, TRAIL_CELL)
+	astar.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
+	astar.default_compute_heuristic = AStarGrid2D.HEURISTIC_EUCLIDEAN
+	astar.default_estimate_heuristic = AStarGrid2D.HEURISTIC_EUCLIDEAN
+	astar.update()
+	var keep := _woodland_keep_out()
+	var solid := 0
+	var why := {"out": 0, "water": 0, "road": 0, "kept": 0, "slope": 0}
+	for j in range(n):
+		for i in range(n):
+			var x := org + i * TRAIL_CELL
+			var z := org + j * TRAIL_CELL
+			var cell := Vector2i(i, j)
+			var g := _ground(x, z)
+			var blocked := x * x + z * z > TRAIL_REACH * TRAIL_REACH
+			if blocked:
+				why["out"] += 1
+			if not blocked:
+				for o in [Vector2(0, 0), Vector2(4.5, 0), Vector2(-4.5, 0), Vector2(0, 4.5), Vector2(0, -4.5), Vector2(3.2, 3.2), Vector2(-3.2, 3.2),
+						Vector2(3.2, -3.2), Vector2(-3.2, -3.2)]:
+					if _ground(x + o.x, z + o.y) < TRAIL_WATER:
+						blocked = true
+						why["water"] += 1
+						break
+			var k := j * n + i
+			var weight := 1.0
+			if not blocked and rd[k] < ROAD_HALF + TRAIL_ROAD_CLEAR:
+				# Under a bridge (the road well over the ground) a path may pass; anywhere else it may not cross.
+				if ry[k] - g > 5.5:
+					weight += 6.0
+				else:
+					blocked = true
+					why["road"] += 1
+			if not blocked and (_kept_out(keep, x, z, 2.0) or _on_shortcut(x, z, 3.0)):
+				blocked = true
+				why["kept"] += 1
+			var sl := 0.0
+			if not blocked:
+				sl = maxf(absf(_ground(x + 3.0, z) - _ground(x - 3.0, z)), absf(_ground(x, z + 3.0) - _ground(x, z - 3.0))) / 6.0
+				if sl > TRAIL_MAX_SLOPE:
+					blocked = true
+					why["slope"] += 1
+			if blocked:
+				astar.set_point_solid(cell, true)
+				solid += 1
+				continue
+			weight += 14.0 * sl * sl
+			if rd[k] < 45.0:
+				weight += 2.5 * (45.0 - rd[k]) / 45.0
+			astar.set_point_weight_scale(cell, weight)
+	print("  paths: grid %d x %d, %d solid %s (%.1fs)" % [n, n, solid, why, (Time.get_ticks_msec() - t0) / 1000.0])
+	# The open cells' connected regions (8-neighbour, as the paths move), so a path's anchors can all be put in one.
+	var label := PackedInt32Array()
+	label.resize(n * n)
+	label.fill(-1)
+	var sizes: Array[int] = []
+	for j0 in range(n):
+		for i0 in range(n):
+			if label[j0 * n + i0] >= 0 or astar.is_point_solid(Vector2i(i0, j0)):
+				continue
+			var id := sizes.size()
+			var count := 0
+			var stack: Array[Vector2i] = [Vector2i(i0, j0)]
+			label[j0 * n + i0] = id
+			while not stack.is_empty():
+				var c: Vector2i = stack.pop_back()
+				count += 1
+				for dj in range(-1, 2):
+					for di in range(-1, 2):
+						var q := c + Vector2i(di, dj)
+						if q.x < 0 or q.y < 0 or q.x >= n or q.y >= n or label[q.y * n + q.x] >= 0 or astar.is_point_solid(q):
+							continue
+						# Diagonal steps only where both sides are open (AStarGrid2D's ONLY_IF_NO_OBSTACLES).
+						if di != 0 and dj != 0 and (astar.is_point_solid(Vector2i(c.x + di, c.y)) or astar.is_point_solid(Vector2i(c.x, c.y + dj))):
+							continue
+						label[q.y * n + q.x] = id
+						stack.append(q)
+			sizes.append(count)
+	_trail_label = label
+	_trail_sizes = sizes
+	_trails.clear()
+	_trail_hash.clear()
+	var used := {}
+	for t in TRAILS:
+		var anchors: Array = (t[2] as Array).duplicate()
+		for a in range(anchors.size()):
+			if anchors[a] == Vector2.INF:
+				anchors[a] = Vector2(_playground_gate.x, _playground_gate.z)
+		var closed: bool = t[3]
+		# The region most of the anchors' nearest open cells lie in (the bigger one on a tie); every anchor goes to
+		# its nearest cell there.
+		var votes := {}
+		for a in anchors:
+			var lab: int = label[_trail_cell_id(_trail_open(astar, a, org, n, -1), n)]
+			votes[lab] = int(votes.get(lab, 0)) + 1
+		var region := -1
+		for lab in votes:
+			if region < 0 or int(votes[lab]) > int(votes[region]) or (int(votes[lab]) == int(votes[region]) and sizes[lab] > sizes[region]):
+				region = lab
+		var moved := PackedStringArray()
+		for a in anchors:
+			var c := _trail_open(astar, a, org, n, region)
+			var w := Vector2(org + c.x * TRAIL_CELL, org + c.y * TRAIL_CELL)
+			if w.distance_to(a) > 25.0:
+				moved.append("%s->%s" % [a, w])
+		if not moved.is_empty():
+			print("  path %s (region of %d cells): anchors moved %s" % [t[0], sizes[region], ", ".join(moved)])
+		var cells: Array[Vector2i] = []
+		var legs := anchors.size() if closed else anchors.size() - 1
+		var ok := true
+		var bridges: Array = []
+		var cur_region := region
+		for a in range(legs):
+			var b_anchor: Vector2 = anchors[(a + 1) % anchors.size()]
+			if TRAIL_BRIDGES.has([t[0], a]):
+				# A bridge: straight across, every cell on the line (no routing: it crosses the water). The legs after it
+				# are routed in the region its far end lies in (the far bank can be land of its own).
+				var wa: Vector2 = anchors[a]
+				var steps := maxi(1, ceili(wa.distance_to(b_anchor) / (TRAIL_CELL * 0.5)))
+				for k in range(steps + 1):
+					var q2: Vector2 = wa.lerp(b_anchor, float(k) / float(steps))
+					var cq := Vector2i(clampi(int(round((q2.x - org) / TRAIL_CELL)), 0, n - 1), clampi(int(round((q2.y - org) / TRAIL_CELL)), 0, n - 1))
+					if cells.is_empty() or cells[cells.size() - 1] != cq:
+						cells.append(cq)
+				bridges.append([Vector3(wa.x, _ground(wa.x, wa.y), wa.y), Vector3(b_anchor.x, _ground(b_anchor.x, b_anchor.y), b_anchor.y)])
+				var end_cell := _trail_open(astar, b_anchor, org, n, -1)
+				cur_region = label[_trail_cell_id(end_cell, n)]
+				continue
+			var from := _trail_open(astar, anchors[a], org, n, cur_region)
+			var to := _trail_open(astar, b_anchor, org, n, cur_region)
+			var leg := astar.get_id_path(from, to)
+			if leg.is_empty():
+				push_error("Lakeside path %s: no way from %s to %s" % [t[0], anchors[a], anchors[(a + 1) % anchors.size()]])
+				ok = false
+				break
+			for c in leg:
+				if cells.is_empty() or cells[cells.size() - 1] != c:
+					cells.append(c)
+			# Later legs (and later paths) keep off the ground this one took: an out-and-back to an anchor ran
+			# down the same corridor twice and the two ribbons overlapped.
+			for c in leg:
+				for dj in range(-3, 4):
+					for di in range(-3, 4):
+						var q := c + Vector2i(di, dj)
+						if q.x < 0 or q.y < 0 or q.x >= n or q.y >= n or used.has(q) or astar.is_point_solid(q):
+							continue
+						used[q] = true
+						astar.set_point_weight_scale(q, astar.get_point_weight_scale(q) + 12.0)
+		if not ok:
+			continue
+		if closed and cells.size() > 1 and cells[0] == cells[cells.size() - 1]:
+			cells.remove_at(cells.size() - 1)
+		cells = _trail_cut_excursions(cells, closed)
+		var pts := PackedVector2Array()
+		for c in cells:
+			pts.append(Vector2(org + c.x * TRAIL_CELL, org + c.y * TRAIL_CELL))
+		pts = _trail_smooth(pts, closed)
+		if not closed and (t[2] as Array)[0] == Vector2.INF:
+			# From the playground's gate itself (inside the pad's keep-out, so the grid starts outside it).
+			var gate := Vector2(_playground_gate.x, _playground_gate.z)
+			var lead := PackedVector2Array()
+			var steps := int(gate.distance_to(pts[0]))
+			for k in range(steps):
+				lead.append(gate.lerp(pts[0], float(k) / maxf(steps, 1)))
+			lead.append_array(pts)
+			pts = lead
+		var width: float = BIKE_PATH_WIDTH if int(t[1]) == 1 else FOOTPATH_WIDTH
+		var p3 := PackedVector3Array()
+		var flags := PackedByteArray()
+		var wet := 0
+		var on_road := 0
+		var under := 0
+		for p in pts:
+			var g := _ground(p.x, p.y)
+			# On a bridge: its deck, level from bank to bank, above the ground under it.
+			var on_bridge := false
+			for br in bridges:
+				var w3: Vector3 = br[0]
+				var e3: Vector3 = br[1]
+				var ab := Vector2(e3.x - w3.x, e3.z - w3.z)
+				var tt: float = clampf(Vector2(p.x - w3.x, p.y - w3.z).dot(ab) / maxf(ab.length_squared(), 1e-4), 0.0, 1.0)
+				var on := Vector2(w3.x, w3.z) + ab * tt
+				if on.distance_to(p) < 3.0 and tt > 0.0 and tt < 1.0:
+					g = maxf(lerpf(w3.y, e3.y, tt), g)
+					on_bridge = true
+			flags.append(1 if on_bridge else 0)
+			# Under the water (its plane at -10, Water_Surface) or within 30cm of it.
+			if g < -9.7 and not on_bridge:
+				wet += 1
+			var cp := _curve.get_closest_point(Vector3(p.x, g, p.y))
+			if Vector2(cp.x - p.x, cp.z - p.y).length() < ROAD_HALF + 3.0:
+				if cp.y + _road_y - g > 5.0:
+					under += 1
+				else:
+					on_road += 1
+			p3.append(Vector3(p.x, g, p.y))
+		var bad := wet + on_road
+		var length := 0.0
+		for i in range(1, p3.size()):
+			length += p3[i].distance_to(p3[i - 1])
+		_trails.append([t[0], int(t[1]), p3, closed, width, flags, bridges])
+		for p in p3:
+			var key := Vector2i(floori(p.x / 10.0), floori(p.z / 10.0))
+			if not _trail_hash.has(key):
+				_trail_hash[key] = PackedVector3Array()
+			(_trail_hash[key] as PackedVector3Array).append(Vector3(p.x, p.z, width * 0.5))
+		print("  path %s: %.0fm, %d points under a bridge%s" % [t[0], length, under, (", %d in the water, %d on the road" % [wet, on_road]) if bad > 0 else ""])
+		if bad > 0:
+			push_error("Lakeside path %s: %d points in the water or on the road" % [t[0], bad])
+
+
+## Cuts out-and-back excursions from a path's cells: where the sequence comes back to within a cell of where it was,
+## the stretch between goes (an anchor in a cul-de-sac between lakes was reached and left by the same strip, and the
+## two ribbons overlapped). A closed loop is turned half round first, so its join is looked at too.
+static func _trail_cut_excursions(cells: Array[Vector2i], closed: bool) -> Array[Vector2i]:
+	var cur: Array[Vector2i] = cells.duplicate()
+	if closed and cur.size() > 8:
+		var half := cur.size() / 2
+		var rot: Array[Vector2i] = []
+		rot.append_array(cur.slice(half))
+		rot.append_array(cur.slice(0, half))
+		cur = rot
+	var i := 0
+	while i < cur.size():
+		var cut := -1
+		var j := cur.size() - 1
+		while j > i + 4:
+			# On a loop the cells either side of its join are neighbours too: only a return far both ways round counts.
+			if closed and cur.size() - (j - i) <= 4:
+				j -= 1
+				continue
+			var d: Vector2i = cur[j] - cur[i]
+			if absi(d.x) <= 1 and absi(d.y) <= 1:
+				cut = j
+				break
+			j -= 1
+		if cut > 0:
+			var keep: Array[Vector2i] = []
+			keep.append_array(cur.slice(0, i + 1))
+			keep.append_array(cur.slice(cut))
+			cur = keep
+		i += 1
+	return cur
+
+
+var _trail_label := PackedInt32Array()
+var _trail_sizes: Array[int] = []
+
+
+func _trail_cell_id(c: Vector2i, n: int) -> int:
+	return c.y * n + c.x
+
+
+## The grid cell of (x, z), or the nearest open one to it (in region `region`, if not -1).
+func _trail_open(astar: AStarGrid2D, at: Vector2, org: float, n: int, region: int) -> Vector2i:
+	var c := Vector2i(clampi(int(round((at.x - org) / TRAIL_CELL)), 0, n - 1), clampi(int(round((at.y - org) / TRAIL_CELL)), 0, n - 1))
+	for r in range(0, 80):
+		for dj in range(-r, r + 1):
+			for di in range(-r, r + 1):
+				if maxi(absi(di), absi(dj)) != r:
+					continue
+				var q := c + Vector2i(di, dj)
+				if q.x >= 0 and q.y >= 0 and q.x < n and q.y < n and not astar.is_point_solid(q) \
+						and (region < 0 or _trail_label[q.y * n + q.x] == region):
+					return q
+	return c
+
+
+## Chaikin's corner cutting (four rounds), then resampled every metre and eased by a running mean.
+func _trail_smooth(pts: PackedVector2Array, closed: bool) -> PackedVector2Array:
+	var cur := pts
+	for round_i in range(4):
+		var nxt := PackedVector2Array()
+		var m := cur.size()
+		if not closed:
+			nxt.append(cur[0])
+		for i in range(m if closed else m - 1):
+			var a := cur[i]
+			var b := cur[(i + 1) % m]
+			nxt.append(a.lerp(b, 0.25))
+			nxt.append(a.lerp(b, 0.75))
+		if not closed:
+			nxt.append(cur[m - 1])
+		cur = nxt
+	# Resample every metre.
+	var out := PackedVector2Array()
+	var m2 := cur.size()
+	var acc := 0.0
+	out.append(cur[0])
+	for i in range(1, m2 + (1 if closed else 0)):
+		var a := cur[i - 1]
+		var b := cur[i % m2]
+		var seg := a.distance_to(b)
+		var t := 1.0 - acc
+		while t <= seg:
+			out.append(a.lerp(b, t / maxf(seg, 1e-5)))
+			t += 1.0
+		acc = seg - (t - 1.0)
+	if closed and out.size() > 2 and out[out.size() - 1].distance_to(out[0]) < 0.5:
+		out.remove_at(out.size() - 1)
+	# A running mean over 9m takes the grid's last kinks out.
+	var eased := PackedVector2Array()
+	eased.resize(out.size())
+	var w := 4
+	for i in range(out.size()):
+		var sum := Vector2.ZERO
+		var cnt := 0
+		for d in range(-w, w + 1):
+			var j := i + d
+			if closed:
+				j = posmod(j, out.size())
+			elif j < 0 or j >= out.size():
+				continue
+			sum += out[j]
+			cnt += 1
+		eased[i] = sum / cnt
+	return eased
+
+
+## Places where two stretches of path (of one path more than 30m apart along it, or of two paths away from where one
+## joins the other) come closer than their half widths: overlapping ribbons fight and leave holes. Prints and returns them.
+func _trail_overlaps() -> int:
+	var grid := {}
+	for ti in range(_trails.size()):
+		var pts: PackedVector3Array = _trails[ti][2]
+		for i in range(pts.size()):
+			var key := Vector2i(floori(pts[i].x / 6.0), floori(pts[i].z / 6.0))
+			if not grid.has(key):
+				grid[key] = []
+			grid[key].append(Vector2i(ti, i))
+	var hits := 0
+	var where := PackedStringArray()
+	for ti in range(_trails.size()):
+		var pts: PackedVector3Array = _trails[ti][2]
+		var closed: bool = _trails[ti][3]
+		var w: float = _trails[ti][4]
+		for i in range(0, pts.size(), 3):
+			var p := pts[i]
+			var key := Vector2i(floori(p.x / 6.0), floori(p.z / 6.0))
+			var found := false
+			for dz in range(-1, 2):
+				for dx in range(-1, 2):
+					for o in grid.get(key + Vector2i(dx, dz), []):
+						var other: Vector2i = o
+						var q: Vector3 = (_trails[other.x][2] as PackedVector3Array)[other.y]
+						var reach: float = (w + float(_trails[other.x][4])) * 0.5 + 0.3
+						if Vector2(q.x - p.x, q.z - p.z).length() > reach:
+							continue
+						if other.x == ti:
+							var gap := absi(other.y - i)
+							if closed:
+								gap = mini(gap, pts.size() - gap)
+							if gap < 30:
+								continue
+						elif i < 40 or i > pts.size() - 40 or other.y < 40 or other.y > (_trails[other.x][2] as PackedVector3Array).size() - 40:
+							# Where a spur leaves or joins another path.
+							continue
+						found = true
+			if found:
+				hits += 1
+				if where.size() < 6:
+					where.append("%s@(%.0f, %.0f)" % [_trails[ti][0], p.x, p.z])
+	print("  paths overlapping: %d%s" % [hits, (" at " + ", ".join(where)) if hits > 0 else ""])
+	return hits
+
+
+## Whether (x, z) is within `margin` of a path's edge.
+func _on_trail(x: float, z: float, margin: float) -> bool:
+	var cx := floori(x / 10.0)
+	var cz := floori(z / 10.0)
+	for dz in range(-1, 2):
+		for dx in range(-1, 2):
+			var key := Vector2i(cx + dx, cz + dz)
+			if not _trail_hash.has(key):
+				continue
+			for q in (_trail_hash[key] as PackedVector3Array):
+				var d := Vector2(q.x - x, q.y - z).length()
+				if d < q.z + margin:
+					return true
+	return false
+
+
+func _trail_material() -> ShaderMaterial:
+	if _materials.has("trail"):
+		return _materials["trail"]
+	var m := ShaderMaterial.new()
+	m.shader = load("res://trail_path.gdshader")
+	m.set_shader_parameter("dirt_tex", load("res://materials/dirt.png"))
+	m.set_shader_parameter("dirt_normal", load("res://materials/dirt_normal.png"))
+	m = _save_res(m, "mat_trail")
+	_materials["trail"] = m
+	return m
+
+
+func _build_trails(root: Node3D) -> void:
+	if _park == null:
+		_park = ParkKit.new(_kit, _venue)
+	_trail_overlaps()
+	var node := Node3D.new()
+	node.name = "Paths"
+	root.add_child(node)
+	var mat := _trail_material()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 777
+	var bench_kit := {}
+	var boxes: Array = []
+	var walkers := 0
+	var benches := 0
+	for t in _trails:
+		var tname: String = t[0]
+		var kind: int = t[1]
+		var pts: PackedVector3Array = t[2]
+		var closed: bool = t[3]
+		var width: float = t[4]
+		var flags: PackedByteArray = t[5]
+		var m := pts.size()
+		# The ribbon, in pieces of `chunk` points (a closed path comes back round to its first point); none where a bridge's
+		# deck carries the path.
+		var order := PackedInt32Array()
+		for i in range(m):
+			order.append(i)
+		if closed:
+			order.append(0)
+		var chunk := 120
+		var piece := 0
+		var start := 0
+		while start < order.size() - 1:
+			var end := mini(start + chunk, order.size() - 1)
+			var st := SurfaceTool.new()
+			st.begin(Mesh.PRIMITIVE_TRIANGLES)
+			var across := 5
+			for oi in range(start, end + 1):
+				var i: int = order[oi]
+				var p := pts[i]
+				var pa := pts[(i - 1 + m) % m] if (closed or i > 0) else p
+				var pb := pts[(i + 1) % m] if (closed or i < m - 1) else p
+				var d := Vector3(pb.x - pa.x, 0.0, pb.z - pa.z)
+				if d.length_squared() < 1e-6:
+					d = Vector3(0, 0, 1)
+				d = d.normalized()
+				var right := Vector3(-d.z, 0.0, d.x)
+				for a in range(across):
+					var u := float(a) / float(across - 1)
+					var w := p + right * (u - 0.5) * width
+					w.y = _ground(w.x, w.z) + 0.035
+					st.set_color(Color(float(kind), 0.0, 0.0))
+					st.set_uv(Vector2(u, float(oi)))
+					st.set_normal(Vector3.UP)
+					st.add_vertex(w)
+			var rows := end - start + 1
+			for r in range(rows - 1):
+				if flags[order[start + r]] == 1 and flags[order[start + r + 1]] == 1:
+					continue
+				for a in range(across - 1):
+					var i0 := r * across + a
+					var i1 := i0 + 1
+					var i2 := i0 + across
+					var i3 := i2 + 1
+					# Clockwise seen from above (Godot's front faces: (c - a) x (b - a) points up). The columns run
+					# from the path's left (+right * -w/2) to its right, the rows along it.
+					st.add_index(i0); st.add_index(i2); st.add_index(i1)
+					st.add_index(i1); st.add_index(i2); st.add_index(i3)
+			st.generate_normals()
+			st.generate_tangents()
+			var mi := MeshInstance3D.new()
+			mi.name = "Trail_%s_%d" % [tname, piece]
+			mi.mesh = _save_res(st.commit(), "trail_%s_%d" % [tname.to_snake_case(), piece])
+			mi.material_override = mat
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			mi.visibility_range_end = 400.0
+			mi.visibility_range_end_margin = 20.0
+			mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+			node.add_child(mi)
+			start = end
+			piece += 1
+		# The bridges: each run of the path's bridge points.
+		var span_pts := PackedVector3Array()
+		for oi in range(order.size()):
+			var i: int = order[oi]
+			if flags[i] == 1:
+				span_pts.append(pts[i])
+			elif span_pts.size() > 1:
+				_build_trail_bridge(node, span_pts, width, "%s%d" % [tname, oi])
+				span_pts = PackedVector3Array()
+			else:
+				span_pts = PackedVector3Array()
+		if span_pts.size() > 1:
+			_build_trail_bridge(node, span_pts, width, "%sEnd" % tname)
+		if kind == 1:
+			continue
+		# Footpaths: walkers in ones and twos, benches with people at the viewpoints.
+		var next_walk := rng.randf_range(20.0, WALKER_EVERY)
+		var next_bench := rng.randf_range(80.0, BENCH_EVERY)
+		var run := 0.0
+		for i in range(1, m - 1):
+			run += pts[i].distance_to(pts[i - 1])
+			var d := pts[i + 1] - pts[i - 1]
+			d.y = 0.0
+			d = d.normalized()
+			var right := Vector3(-d.z, 0.0, d.x)
+			if run >= next_walk:
+				next_walk = run + rng.randf_range(WALKER_EVERY * 0.6, WALKER_EVERY * 1.4)
+				var way := d if rng.randf() < 0.5 else -d
+				var count := 1 if rng.randf() < 0.45 else 2
+				for k in range(count):
+					var p := pts[i] + right * ((k - 0.5 * (count - 1)) * 0.75 + rng.randf_range(-0.2, 0.2)) * PROP_SCALE * 0.6
+					p.y = _ground(p.x, p.z)
+					var size := 1.0 if rng.randf() > 0.15 else PLAYGROUND_CHILD
+					_park_spots.append([p, way, false, false, [7, 7, 7, 10, 13, 15, 11][rng.randi() % 7], size])
+					walkers += 1
+			if run >= next_bench:
+				next_bench = run + rng.randf_range(BENCH_EVERY * 0.7, BENCH_EVERY * 1.3)
+				var side := 1.0 if rng.randf() < 0.5 else -1.0
+				var at := pts[i] + right * side * (width * 0.5 + 1.6)
+				if _ground_min(at.x, at.z, 1.5) < TRAIL_WATER + 0.8 or _road_distance(at.x, at.z) < ROAD_HALF + 8.0:
+					continue
+				at.y = _ground_min(at.x, at.z, 1.4)
+				# Its back to the path, looking out.
+				var face := right * side
+				var yaw := _yaw_to(face)
+				var bx := _place(at, yaw)
+				_kit.set_frame(bx)
+				_park.park_bench(bench_kit)
+				boxes.append([bx * Vector3(0.0, 0.45, 0.0), Vector3(1.9, 0.9, 0.6) * PROP_SCALE, Basis(Vector3.UP, yaw)])
+				_note("bench", at, 1.6, 2.0)
+				benches += 1
+				if rng.randf() < 0.75:
+					var who := 1 if rng.randf() < 0.5 else 2
+					for k in range(who):
+						_park_spots.append([bx * Vector3(-0.35 + 0.7 * k, 0.45, -0.05), face, true, false, [0, 3, 6, 4][rng.randi() % 4], 1.0])
+						walkers += 1
+	# A fingerpost where the camp's path leaves.
+	for t in _trails:
+		if t[0] == "CampWalk":
+			var p0: Vector3 = (t[2] as PackedVector3Array)[3]
+			var post := _place(Vector3(p0.x + 2.2, _ground(p0.x + 2.2, p0.z), p0.z), 0.4)
+			_kit.set_frame(post)
+			_park.fingerpost(bench_kit, [0.3, 2.2])
+			boxes.append([post * Vector3(0.0, 1.0, 0.0), Vector3(0.2, 2.2, 0.2) * PROP_SCALE, Basis()])
+	_kit.reset_frame()
+	if not bench_kit.is_empty():
+		var bm := MeshInstance3D.new()
+		bm.name = "PathBenches"
+		bm.mesh = _save_res(_venue.finish(bench_kit), "path_benches")
+		bm.visibility_range_end = 300.0
+		node.add_child(bm)
+		_boxes_body(node, "PathBenchesBody", boxes)
+	print("  paths: %d walkers and sitters, %d benches" % [walkers, benches])
+	_build_cyclists(node)
+
+
+## The riders' sounds (the user's recordings, levelled by their measured RMS in dBFS to a level at BIKE_SOUND_UNIT
+## metres): the tyres rolling on the path, one clip each in turn, and the pedalling under it.
+const BIKE_ROLL_CLIPS := ["res://sounds/bicycle1.wav", "res://sounds/bicycle2.wav"]
+const BIKE_ROLL_RMS := [-43.9, -47.2]
+const BIKE_ROLL_LEVEL := -30.0
+const BIKE_PEDAL_CLIP := "res://sounds/bicycle_pedalling.wav"
+const BIKE_PEDAL_RMS := -45.2
+const BIKE_PEDAL_LEVEL := -33.0
+const BIKE_SOUND_UNIT := 7.0
+
+## A wooden trestle bridge carrying a path along `pts` (its deck's middle, the riders' line): planks across three
+## stringers, a trestle bent every BRIDGE_BENT metres down to the ground under it (the pond's bed), braced across, and a
+## railing either side; ends a little onto the banks. Life-size timbers in world metres (hut_wood.gdshader, "timber").
+## Solid: the deck and the railings as boxes ("PondBoardwalk": no track word, off-road wood).
+const BRIDGE_BENT := 6.0
+const BRIDGE_RAIL_H := 1.35
+
+func _build_trail_bridge(parent: Node3D, pts: PackedVector3Array, width: float, tag: String) -> void:
+	var kit := {}
+	_kit.reset_frame()
+	var boxes: Array = []
+	var deck_w: float = width + 0.6
+	var hw: float = deck_w * 0.5
+	var wood := Color(0.56, 0.45, 0.33)
+	var dark := Color(0.40, 0.31, 0.22)
+	# Extend the deck 1.5m onto each bank along the line.
+	var d0 := (pts[1] - pts[0])
+	d0.y = 0.0
+	d0 = d0.normalized()
+	var d1 := (pts[pts.size() - 1] - pts[pts.size() - 2])
+	d1.y = 0.0
+	d1 = d1.normalized()
+	var line := PackedVector3Array([pts[0] - d0 * 1.5])
+	line.append_array(pts)
+	line.append(pts[pts.size() - 1] + d1 * 1.5)
+	# Cumulative length, for planks, bents and posts at even spacings.
+	var cum := PackedFloat32Array([0.0])
+	for i in range(1, line.size()):
+		cum.append(cum[i - 1] + line[i].distance_to(line[i - 1]))
+	var total: float = cum[cum.size() - 1]
+	var at := func(dist: float) -> Array:
+		var k := 1
+		while k < line.size() - 1 and cum[k] < dist:
+			k += 1
+		var seg: float = maxf(cum[k] - cum[k - 1], 1e-4)
+		var u: float = clampf((dist - cum[k - 1]) / seg, 0.0, 1.0)
+		var p: Vector3 = line[k - 1].lerp(line[k], u)
+		var f: Vector3 = line[k] - line[k - 1]
+		f.y = 0.0
+		f = f.normalized()
+		return [p, f, Vector3(-f.z, 0.0, f.x)]
+	# Planks across.
+	var x := 0.15
+	while x < total - 0.1:
+		var a: Array = at.call(x)
+		var p: Vector3 = a[0]
+		var r: Vector3 = a[2]
+		_venue.timber(kit, p - r * hw + Vector3.DOWN * 0.035, p + r * hw + Vector3.DOWN * 0.035, 0.28, 0.07, wood.darkened(randf() * 0.12), Vector3.UP)
+		x += 0.32
+	# Stringers under them, a piece every 3m.
+	x = 0.0
+	while x < total - 0.01:
+		var x1: float = minf(x + 3.0, total)
+		var a0: Array = at.call(x)
+		var a1: Array = at.call(x1)
+		for lat in [-hw + 0.45, 0.0, hw - 0.45]:
+			var pa: Vector3 = (a0[0] as Vector3) + (a0[2] as Vector3) * lat + Vector3.DOWN * 0.24
+			var pb: Vector3 = (a1[0] as Vector3) + (a1[2] as Vector3) * lat + Vector3.DOWN * 0.24
+			_venue.timber(kit, pa, pb, 0.22, 0.32, dark, Vector3.UP)
+		boxes.append(_wall_box((a0[0] as Vector3) + Vector3.DOWN * 0.3, (a1[0] as Vector3) + Vector3.DOWN * 0.3, deck_w, 0.3))
+		x = x1
+	# Trestle bents: two posts down to the ground, a cap, crossed braces in tiers.
+	x = BRIDGE_BENT * 0.5
+	while x < total:
+		var a: Array = at.call(x)
+		var p: Vector3 = a[0]
+		var r: Vector3 = a[2]
+		var lowest := INF
+		for lat in [-hw + 0.3, hw - 0.3]:
+			var q: Vector3 = p + r * lat
+			lowest = minf(lowest, _ground(q.x, q.z))
+		if p.y - lowest > 0.9:
+			var top: float = p.y - 0.42
+			var foot: float = lowest - 0.6
+			var posts: Array = []
+			for lat in [-hw + 0.3, hw - 0.3]:
+				var q2: Vector3 = p + r * lat
+				posts.append(Vector3(q2.x, 0.0, q2.z))
+				_venue.timber(kit, Vector3(q2.x, foot, q2.z), Vector3(q2.x, top, q2.z), 0.3, 0.3, dark, r)
+			_venue.timber(kit, p - r * (hw + 0.2) + Vector3.UP * (top - p.y), p + r * (hw + 0.2) + Vector3.UP * (top - p.y), 0.3, 0.26, dark, Vector3.UP)
+			var y0: float = top
+			while y0 - foot > 1.5:
+				var y1: float = maxf(y0 - 4.0, foot + 0.3)
+				var pl: Vector3 = posts[0]
+				var pr: Vector3 = posts[1]
+				_venue.timber(kit, Vector3(pl.x, y0 - 0.2, pl.z), Vector3(pr.x, y1, pr.z), 0.16, 0.08, wood, Vector3.UP.cross(r))
+				_venue.timber(kit, Vector3(pr.x, y0 - 0.2, pr.z), Vector3(pl.x, y1, pl.z), 0.16, 0.08, wood, Vector3.UP.cross(r))
+				_venue.timber(kit, Vector3(pl.x, y1, pl.z), Vector3(pr.x, y1, pr.z), 0.18, 0.1, wood, Vector3.UP)
+				y0 = y1
+		x += BRIDGE_BENT
+	# The railings: posts every 2.4m, a top rail and a middle one, each side.
+	for sgn in [-1.0, 1.0]:
+		var prev: Vector3 = Vector3.INF
+		x = 0.3
+		while x <= total - 0.2:
+			var a: Array = at.call(x)
+			var q: Vector3 = (a[0] as Vector3) + (a[2] as Vector3) * (sgn * (hw - 0.08))
+			_venue.timber(kit, q + Vector3.DOWN * 0.3, q + Vector3.UP * BRIDGE_RAIL_H, 0.12, 0.12, dark, a[2])
+			if prev != Vector3.INF:
+				for h in [BRIDGE_RAIL_H, BRIDGE_RAIL_H * 0.5]:
+					_venue.timber(kit, prev + Vector3.UP * h, q + Vector3.UP * h, 0.13, 0.07, wood, Vector3.UP)
+				boxes.append(_wall_box(prev, q, 0.15, BRIDGE_RAIL_H))
+			prev = q
+			x += 2.4
+	var mi := MeshInstance3D.new()
+	mi.name = "BikeBoardwalk_%s" % tag
+	mi.mesh = _save_res(_venue.finish(kit), "bike_boardwalk_%s" % tag.to_snake_case())
+	mi.visibility_range_end = 700.0
+	parent.add_child(mi)
+	var body := _boxes_body(parent, "PondBoardwalk_%s" % tag, boxes)
+	body.set_meta("surface", "wood")
+	var mid: Vector3 = line[line.size() / 2]
+	print("  bike bridge %s: %.0fm, deck %.1fm over the ground at most, %.0fm from the road's middle" % [tag, total,
+			_max_drop(line), _road_distance(mid.x, mid.z)])
+
+
+func _max_drop(line: PackedVector3Array) -> float:
+	var m := 0.0
+	for p in line:
+		m = maxf(m, p.y - _ground(p.x, p.z))
+	return m
+
+
+## Riders on the bike paths (Cyclists.gd): in ones, twos and threes, both ways round each loop (shared by their length),
+## each in its own colours.
+func _build_cyclists(parent: Node3D) -> void:
+	var loops: Array = []
+	for t in _trails:
+		if int(t[1]) == 1 and t[3]:
+			loops.append(t)
+	if loops.is_empty():
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3131
+	var lengths: Array[float] = []
+	var total := 0.0
+	for t in loops:
+		var route: PackedVector3Array = t[2]
+		var length := 0.0
+		for i in range(route.size()):
+			length += route[i].distance_to(route[(i + 1) % route.size()])
+		lengths.append(length)
+		total += length
+	var node := Node3D.new()
+	node.name = "Cyclists"
+	node.set_script(load("res://Cyclists.gd"))
+	var routes: Array[PackedVector3Array] = []
+	for t in loops:
+		var on := PackedVector3Array()
+		for p in (t[2] as PackedVector3Array):
+			on.append(p + Vector3(0, 0.035, 0))
+		routes.append(on)
+	var riders: Array[Vector4] = []
+	var bodies: Array[Mesh] = []
+	var thighs: Array[Mesh] = []
+	var shins: Array[Mesh] = []
+	var jerseys := [Color(0.90, 0.15, 0.12), Color(0.12, 0.40, 0.85), Color(0.98, 0.80, 0.10), Color(0.10, 0.60, 0.35), Color(0.95, 0.95, 0.95),
+			Color(0.95, 0.45, 0.10), Color(0.55, 0.20, 0.70), Color(0.10, 0.75, 0.80), Color(0.95, 0.40, 0.65), Color(0.20, 0.22, 0.25)]
+	var frames := [Color(0.85, 0.10, 0.10), Color(0.08, 0.08, 0.09), Color(0.90, 0.90, 0.92), Color(0.10, 0.30, 0.75), Color(0.20, 0.55, 0.30),
+			Color(0.95, 0.55, 0.05)]
+	var skins := [Color(0.93, 0.78, 0.66), Color(0.86, 0.66, 0.52), Color(0.72, 0.52, 0.38), Color(0.45, 0.30, 0.20), Color(0.96, 0.84, 0.74)]
+	var hairs := [Color(0.20, 0.13, 0.08), Color(0.55, 0.38, 0.18), Color(0.85, 0.70, 0.40), Color(0.08, 0.07, 0.06)]
+	var wheel_kit := {}
+	_kit.reset_frame()
+	_park.bike_wheel(wheel_kit, Color(0.75, 0.76, 0.78))
+	var wheel := _save_res(_kit.commit(wheel_kit), "bike_wheel")
+	var crank_kit := {}
+	_park.bike_crank(crank_kit)
+	var crank := _save_res(_kit.commit(crank_kit), "bike_crank")
+	var group_at := 0.0
+	var i := 0
+	var route_i := 0
+	var placed_on := 0.0
+	while i < RIDERS:
+		var size := 1 + (1 if rng.randf() < 0.45 else 0) + (1 if rng.randf() < 0.2 else 0)
+		var speed := rng.randf_range(5.0, 7.5) * (1.0 if rng.randf() < 0.55 else -1.0)
+		# Each loop gets riders in proportion to its length.
+		if placed_on >= float(RIDERS) * lengths[route_i] / total and route_i < loops.size() - 1:
+			route_i += 1
+			placed_on = 0.0
+			group_at = 0.0
+		var length: float = lengths[route_i]
+		group_at += length / 4.0 * rng.randf_range(0.6, 1.3)
+		for k in range(size):
+			if i >= RIDERS:
+				break
+			var jersey: Color = jerseys[i % jerseys.size()]
+			var shorts := Color(0.08, 0.08, 0.10) if rng.randf() < 0.7 else Color(0.15, 0.20, 0.35)
+			var skin: Color = skins[rng.randi() % skins.size()]
+			var female := rng.randf() < 0.45
+			var bk := {}
+			_park.cyclist_body(bk, frames[rng.randi() % frames.size()], jersey, shorts, skin, [Color(0.95, 0.95, 0.95), jersey, Color(0.1, 0.1, 0.1)][rng.randi() % 3],
+					hairs[rng.randi() % hairs.size()], female)
+			bodies.append(_save_res(_kit.commit(bk), "cyclist_%d" % i))
+			var tk := {}
+			_park.bike_thigh(tk, shorts, skin)
+			thighs.append(_save_res(_kit.commit(tk), "cyclist_thigh_%d" % i))
+			var sk := {}
+			var shoe: Color = [Color(0.95, 0.95, 0.95), Color(0.1, 0.1, 0.1), jersey][rng.randi() % 3]
+			_park.bike_shin(sk, skin, Color(0.95, 0.95, 0.95), shoe)
+			shins.append(_save_res(_kit.commit(sk), "cyclist_shin_%d" % i))
+			# Single file, a bike length and a half apart.
+			riders.append(Vector4(float(route_i), fposmod(group_at - k * 4.2 * signf(speed), length), speed, 1.05 * PROP_SCALE * 0.7))
+			placed_on += 1.0
+			i += 1
+	node.set("routes", routes)
+	node.set("riders", riders)
+	node.set("body_meshes", bodies)
+	node.set("thigh_meshes", thighs)
+	node.set("shin_meshes", shins)
+	node.set("wheel_mesh", wheel)
+	node.set("crank_mesh", crank)
+	node.set("prop_scale", PROP_SCALE)
+	var rolls: Array[AudioStream] = []
+	var roll_db: Array[float] = []
+	for k in range(BIKE_ROLL_CLIPS.size()):
+		rolls.append(load(BIKE_ROLL_CLIPS[k]))
+		roll_db.append(BIKE_ROLL_LEVEL - float(BIKE_ROLL_RMS[k]))
+	node.set("roll_sounds", rolls)
+	node.set("roll_db", roll_db)
+	node.set("pedal_sound", load(BIKE_PEDAL_CLIP))
+	node.set("pedal_db", BIKE_PEDAL_LEVEL - BIKE_PEDAL_RMS)
+	node.set("sound_unit", BIKE_SOUND_UNIT)
+	parent.add_child(node)
+	print("  cyclists: %d on %d bike loops (%.0fm)" % [riders.size(), loops.size(), total])
+
+
+# ======================================================================================
+#  The airship
+# ======================================================================================
+# ParkKit.airship at AIRSHIP_SCALE, flying an ellipse round the course (Airship.gd, on the wall clock) with RC VIBE GP on
+# both sides of its envelope (Label3Ds, alpha cut) and its propellers spinning.
+const AIRSHIP_SCALE := 1.1
+const AIRSHIP_CENTRE := Vector3(-160.0, 0.0, -120.0)
+const AIRSHIP_RADII := Vector2(560.0, 470.0)
+const AIRSHIP_ALTITUDE := 165.0
+const AIRSHIP_ENGINE_CLIP := "res://sounds/airship_engine.wav"
+const AIRSHIP_ENGINE_RMS := -15.8
+const AIRSHIP_ENGINE_LEVEL := -17.0
+const AIRSHIP_ENGINE_UNIT := 120.0
+const AIRSHIP_ENGINE_REACH := 800.0
+
+## Where the logo lies on the envelope (ParkKit's frame, h toward the nose): between the orange bands (h -14 to -11.5
+## and 17 to 19), centred a little above the side's middle (the gondola hangs below), its height from the picture's.
+const AIRSHIP_LOGO_H := Vector2(-10.5, 15.5)
+const AIRSHIP_LOGO_UP := 0.12
+const AIRSHIP_LOGO_PROUD := 0.18
+
+## The logo's picture (images/logo_transparent.png) halved, its transparent edge pixels given their neighbours' colour
+## (or the mipmaps fringe it dark), mipmapped, saved lossless.
+func _airship_logo_texture() -> Texture2D:
+	var img: Image = (load("res://images/logo_transparent.png") as Texture2D).get_image()
+	img.decompress()
+	img.convert(Image.FORMAT_RGBA8)
+	img.resize(1024, int(round(1024.0 * float(img.get_height()) / float(img.get_width()))), Image.INTERPOLATE_LANCZOS)
+	img.fix_alpha_edges()
+	img.generate_mipmaps()
+	var tex := PortableCompressedTexture2D.new()
+	# Kept, or a headless save writes the texture empty (CLAUDE.md, procedural cars).
+	tex.keep_compressed_buffer = true
+	tex.create_from_image(img, PortableCompressedTexture2D.COMPRESSION_MODE_LOSSLESS)
+	return _save_res(tex, "airship_logo_tex")
+
+
+## The logo's patch on one side (`side` +1 the +x side) of the envelope at scale 1: a grid following the envelope's
+## radius AIRSHIP_LOGO_PROUD out, across AIRSHIP_LOGO_H along it and as far round as the picture's proportions ask,
+## reading left to right seen from that side (toward the nose on +x, the tail on -x), front faces outward.
+func _airship_logo_mesh(side: float) -> ArrayMesh:
+	var aspect := 2247.0 / 860.0
+	var h0: float = AIRSHIP_LOGO_H.x
+	var h1: float = AIRSHIP_LOGO_H.y
+	var r_mid := ParkKit.ship_radius((h0 + h1) * 0.5)
+	var span: float = (h1 - h0) / aspect / r_mid
+	var nu := 32
+	var nv := 14
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for j in range(nv + 1):
+		var v := float(j) / nv
+		var phi: float = AIRSHIP_LOGO_UP + (v - 0.5) * span
+		for i in range(nu + 1):
+			var u := float(i) / nu
+			# Left to right as seen from this side: toward the nose (h up) on +x, toward the tail on -x.
+			var h: float = lerpf(h0, h1, u) if side > 0.0 else lerpf(h1, h0, u)
+			var r := ParkKit.ship_radius(h) + AIRSHIP_LOGO_PROUD
+			var out := Vector3(side * cos(phi), sin(phi), 0.0)
+			st.set_normal(out)
+			st.set_uv(Vector2(u, 1.0 - v))
+			# The nose is toward -z: h along -z.
+			st.add_vertex(out * r + Vector3(0.0, 0.0, -h))
+	for j in range(nv):
+		for i in range(nu):
+			var a := j * (nu + 1) + i
+			var b := a + 1
+			var c := a + (nu + 1)
+			var d := c + 1
+			for t in [[a, b, c], [b, d, c]]:
+				st.add_index(t[0])
+				st.add_index(t[1])
+				st.add_index(t[2])
+	var arrays := st.commit_to_arrays()
+	# Godot's front faces wind clockwise ((c - a) x (b - a) along the outside): wind every triangle to face out.
+	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var norms: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	var idx: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+	for k in range(0, idx.size(), 3):
+		var pa := verts[idx[k]]
+		var pb := verts[idx[k + 1]]
+		var pc := verts[idx[k + 2]]
+		if (pc - pa).cross(pb - pa).dot(norms[idx[k]]) < 0.0:
+			var tmp := idx[k + 1]
+			idx[k + 1] = idx[k + 2]
+			idx[k + 2] = tmp
+	arrays[Mesh.ARRAY_INDEX] = idx
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
+
+
+func _build_airship(root: Node3D) -> void:
+	if _park == null:
+		_park = ParkKit.new(_kit, _venue)
+	var node := Node3D.new()
+	node.name = "Airship"
+	node.set_script(load("res://Airship.gd"))
+	node.set("centre", AIRSHIP_CENTRE)
+	node.set("radii", AIRSHIP_RADII)
+	node.set("altitude", AIRSHIP_ALTITUDE)
+	node.set("speed", 13.0)
+	node.set("phase", 1.3)
+	root.add_child(node)
+	var white := Color(0.94, 0.95, 0.96)
+	var navy := Color(0.06, 0.12, 0.30)
+	var orange := Color(0.98, 0.50, 0.10)
+	var kit := {}
+	_kit.reset_frame()
+	_park.airship(kit, white, orange, navy)
+	var body := MeshInstance3D.new()
+	body.name = "Envelope"
+	body.mesh = _save_res(_kit.commit(kit), "airship")
+	body.scale = Vector3.ONE * AIRSHIP_SCALE
+	node.add_child(body)
+	var pk := {}
+	_park.ship_prop(pk, navy)
+	var prop_mesh := _save_res(_kit.commit(pk), "airship_prop")
+	var k := 0
+	for c in ParkKit.ship_prop_centres():
+		var pr := MeshInstance3D.new()
+		pr.name = "Prop%d" % k
+		pr.mesh = prop_mesh
+		pr.position = (c as Vector3) * AIRSHIP_SCALE
+		pr.scale = Vector3.ONE * AIRSHIP_SCALE
+		node.add_child(pr)
+		k += 1
+	# The RC Vibe GP logo on both sides, between the orange bands, laid on the envelope's curve.
+	var logo_mat := StandardMaterial3D.new()
+	logo_mat.albedo_texture = _airship_logo_texture()
+	logo_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	logo_mat.roughness = 0.35
+	logo_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	logo_mat = _save_res(logo_mat, "airship_logo_mat")
+	for side in [-1.0, 1.0]:
+		var lm := MeshInstance3D.new()
+		lm.name = "Logo%s" % ("L" if side < 0.0 else "R")
+		lm.mesh = _save_res(_airship_logo_mesh(side), "airship_logo_%s" % ("l" if side < 0.0 else "r"))
+		lm.material_override = logo_mat
+		lm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		lm.scale = Vector3.ONE * AIRSHIP_SCALE
+		node.add_child(lm)
+	# The engines: the user's recording, levelled so it is AIRSHIP_ENGINE_LEVEL at AIRSHIP_ENGINE_UNIT metres: about
+	# -20 dBFS as it passes 165m overhead, a drone heard across the course, gone past AIRSHIP_ENGINE_REACH. No distance
+	# low-pass (Godot's default muffles it -24 dB at the top): at -38 dBFS and filtered the user heard nothing under it.
+	var eng := AudioStreamPlayer3D.new()
+	eng.name = "EngineSound"
+	eng.stream = load(AIRSHIP_ENGINE_CLIP)
+	eng.volume_db = AIRSHIP_ENGINE_LEVEL - AIRSHIP_ENGINE_RMS
+	eng.unit_size = AIRSHIP_ENGINE_UNIT
+	eng.max_distance = AIRSHIP_ENGINE_REACH
+	eng.bus = &"SFX"
+	eng.attenuation_filter_db = 0.0
+	eng.autoplay = true
+	eng.position = (ParkKit.ship_prop_centres()[0] as Vector3) * Vector3(0.0, 1.0, 1.0) * AIRSHIP_SCALE
+	node.add_child(eng)
+	print("  airship: %.0fm long, %.0fm up, round %.0f x %.0fm" % [ParkKit.SHIP_LENGTH * AIRSHIP_SCALE, AIRSHIP_ALTITUDE, AIRSHIP_RADII.x * 2.0, AIRSHIP_RADII.y * 2.0])

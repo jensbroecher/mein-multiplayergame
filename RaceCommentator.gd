@@ -95,6 +95,17 @@ const SELF_MISSILE_LINES: PackedStringArray = [
 	"%s caught their own missile blast!",
 	"%s took themselves out with a rocket!",
 ]
+const SHOCKWAVE_LINES: PackedStringArray = [
+	"%s blasts %s away with a shockwave!",
+	"Shockwave from %s! %s goes flying!",
+	"%s sends %s flying with a shockwave!",
+	"%s's shockwave knocks %s right off line!",
+]
+const SHOCKWAVE_MULTI_LINES: PackedStringArray = [
+	"%s's shockwave scatters the pack!",
+	"Huge shockwave from %s, racers everywhere!",
+	"%s clears the way with a shockwave!",
+]
 const EXPLOSION_COOLDOWN := 2.5
 
 var _active := false
@@ -247,6 +258,24 @@ func call_explosion(attacker_name: String, victim_name: String, weapon: String =
 		else:
 			text = EXPLOSION_LINES[randi() % EXPLOSION_LINES.size()] % [a, v]
 
+	_last_explosion_call = _clock
+	_queue(text, 0.2)
+
+
+## A shockwave that threw one or more racers (PlayerCart.client_play_shockwave, on every peer).
+func call_shockwave(attacker_name: String, victim_names: Array) -> void:
+	if not _active or victim_names.is_empty():
+		return
+	if _clock - _last_explosion_call < EXPLOSION_COOLDOWN:
+		return
+	if _is_speaking():
+		return
+	var a := _clean_name(attacker_name)
+	var text := ""
+	if victim_names.size() > 1:
+		text = SHOCKWAVE_MULTI_LINES[randi() % SHOCKWAVE_MULTI_LINES.size()] % a
+	else:
+		text = SHOCKWAVE_LINES[randi() % SHOCKWAVE_LINES.size()] % [a, _clean_name(str(victim_names[0]))]
 	_last_explosion_call = _clock
 	_queue(text, 0.2)
 

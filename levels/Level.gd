@@ -230,23 +230,29 @@ func _ready():
 		NetworkManager.player_disconnected.connect(_on_server_player_disconnected)
 
 		if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP or (NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP and NetworkManager.is_coop_gp):
-			var bot_names = ["Viper", "Shadow", "Apex", "Blaze", "Nova"]
-			var bot_cars = [1, 2, 3, 0, 1]
 			# Bots fill the grid up to MAX_PLAYERS, so splitscreen GP gets one bot fewer.
 			var humans := 0
+			var human_cars: Array = []
 			for pid in NetworkManager.players.keys():
 				if NetworkManager.players[pid].get("is_ai", false):
 					NetworkManager.players.erase(pid)
 				else:
 					humans += 1
+					human_cars.append(int(NetworkManager.players[pid].get("car_index", 0)))
+			# Each bot a different car from every car there is, named after it (BotRoster.gd), drawn once a Grand Prix:
+			# the standings are kept by name.
+			var need := clampi(NetworkManager.MAX_PLAYERS - humans, 0, 5)
+			if NetworkManager.gp_bot_roster.size() < need:
+				NetworkManager.gp_bot_roster = load("res://BotRoster.gd").make(need, human_cars)
+			var roster: Array = NetworkManager.gp_bot_roster
 			# Bots get a fresh paint job each race (it only shows on the procedural cars).
 			var paint_rng := RandomNumberGenerator.new()
 			paint_rng.randomize()
-			for i in range(clampi(NetworkManager.MAX_PLAYERS - humans, 0, bot_names.size())):
+			for i in range(mini(need, roster.size())):
 				var bot_id = 100 + i
 				NetworkManager.players[bot_id] = {
-					"name": bot_names[i],
-					"car_index": bot_cars[i],
+					"name": str(roster[i]["name"]),
+					"car_index": int(roster[i]["car_index"]),
 					"paint": CarPaint.random(paint_rng, ""),
 					"ready": true,
 					"is_ai": true
