@@ -148,8 +148,9 @@ static func window(pk: PropKit, kit: Dictionary, c: Vector3, out: Vector3, w: fl
 						basis, Vector3(w * 0.46, 0.04, 0.03), shutter.darkened(0.25))
 
 
-## A double door with a transom, stone steps and a lantern: `c` the middle of the sill on the wall's face.
-static func door(pk: PropKit, kit: Dictionary, c: Vector3, out: Vector3, w: float, h: float, steps := true) -> void:
+## A double door with a transom, stone steps and a lantern: `c` the middle of the sill on the wall's face. The steps
+## run down to `ground_y` (by default two steps' height under the sill), each tread 0.3m deeper than the one above.
+static func door(pk: PropKit, kit: Dictionary, c: Vector3, out: Vector3, w: float, h: float, steps := true, ground_y := NAN) -> void:
 	var across: Vector3 = out.cross(Vector3.UP).normalized()
 	var basis := Basis(across, Vector3.UP, out)
 	var fw := 0.14
@@ -163,13 +164,22 @@ static func door(pk: PropKit, kit: Dictionary, c: Vector3, out: Vector3, w: floa
 	# Frame, a glazed transom over the door and a stone lintel.
 	for sx in [-1.0, 1.0]:
 		box_at(pk, kit, "painted", c + across * (sx * (w * 0.5 + fw * 0.5)) + Vector3(0, h * 0.5 + 0.3, 0) + out * 0.06, basis, Vector3(fw, h + 0.6, 0.1), TRIM)
-	box_at(pk, kit, "painted", c + Vector3(0, h + 0.03, 0) + out * 0.06, basis, Vector3(w + 2.0 * fw, 0.1, 0.1), TRIM)
+	# The bars across stand 3cm prouder than the posts (their fronts had shared a plane and flickered).
+	box_at(pk, kit, "painted", c + Vector3(0, h + 0.03, 0) + out * 0.075, basis, Vector3(w + 2.0 * fw, 0.1, 0.13), TRIM)
 	box_at(pk, kit, "glass", c + Vector3(0, h + 0.33, 0) + out * 0.04, basis, Vector3(w, 0.5, 0.04), GLASS_COL)
-	box_at(pk, kit, "painted", c + Vector3(0, h + 0.63, 0) + out * 0.06, basis, Vector3(w + 2.0 * fw, 0.1, 0.1), TRIM)
+	box_at(pk, kit, "painted", c + Vector3(0, h + 0.63, 0) + out * 0.075, basis, Vector3(w + 2.0 * fw, 0.1, 0.13), TRIM)
 	box_at(pk, kit, "stone", c + Vector3(0, h + 0.82, 0) + out * 0.1, basis, Vector3(w + 0.9, 0.24, 0.26), STONE.lightened(0.05))
 	if steps:
-		box_at(pk, kit, "stone", c + Vector3(0, 0.07, 0) + out * 0.5, basis, Vector3(w + 0.8, 0.14, 1.0), STONE)
-		box_at(pk, kit, "stone", c + Vector3(0, 0.21, 0) + out * 0.35, basis, Vector3(w + 0.6, 0.14, 0.7), STONE.lightened(0.06))
+		var g: float = c.y - 0.28 if is_nan(ground_y) else ground_y
+		var rise: float = c.y - g
+		var n: int = maxi(1, int(ceil(rise / 0.2 - 0.01)))
+		var sh: float = rise / float(n)
+		# From the top tread down: each one a block from the ground up to its tread, a step's depth further out.
+		for k in range(n):
+			var top: float = c.y - sh * float(k)
+			var depth: float = 0.4 + 0.3 * float(k)
+			box_at(pk, kit, "stone", c + Vector3(0, (top - c.y + (g - c.y)) * 0.5, 0) + out * (depth * 0.5 + 0.01 * float(k)), basis,
+					Vector3(w + 0.6 + 0.2 * float(k), top - g, depth), STONE.lightened(0.06 - 0.03 * float(k)))
 
 
 ## A cast-iron lamp post: a flared foot, a fluted shaft, a bracket and a glowing lantern. `p` on the ground.

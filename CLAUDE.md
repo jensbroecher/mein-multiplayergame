@@ -2483,6 +2483,26 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
   - `res://scratch/yard_preview.gd` (`-s`, windowed, `-- <dir> [set=station|factory|all] [stock=1] name:x,y,z:tx,ty,tz[:fov]`)
     renders the station (at the origin, the platform track at z -37.2) and the cooperative (at (150, 0, -150)) on flat
     ground in seconds.
+- The town and the plaza (`TownKit.gd`, extends YardKit, life size at PROP_SCALE, `_build_town`, `_build_plaza`, pads 1 and 2
+  in `_pads`): across the road from the station a row of six buildings facing the road (`TownKit.STREET`: a gabled house,
+  Cantina La Via with a false front and a timber portal, a grocer's (Abarrotes) with a striped awning, the two-storey Hostal
+  La Estacion with a balcony, an adobe house with vigas, a ramada and a clothesline, a farmacia with a lit green cross),
+  a pavement with lamps and benches; between the station and the road a plaza of dressed stone with a fountain
+  (`fountain_water.gdshader`: pools rippling out from where the water lands, sheets streaking down, all from TIME,
+  `_build_fountain_water`, node `FountainSpray`: named "...Water" it was taken for the level's sea and every engine
+  flooded; its sound `sounds/Gentle_flowing_water.wav`, looped in its import), four planters with WoodlandBuilder cottonwoods at `PLAZA_TREE_SCALE` (each under a body with a
+  trunk cylinder), benches, a bus shelter, a flagpole, bollards. Detail: wall lanterns (a scrolled bracket, a hexagonal lantern), clay pots with agaves or flowering shrubs, window
+  boxes of geraniums, rejas (window grilles), gutters and downpipes, rafter tails, a door canopy, meter boxes, AC units,
+  satellite dishes, an aerial, the cantina's beer sign and string lights, the grocer's blade sign, a clothesline with
+  pegged washing, and on every back a door, windows and bins. Roof slopes are boarded underneath over their whole width
+  (over the gables the sky had shown through from below). Eaves, awnings and balconies have undersides; door steps
+  run down to the ground (`YardKit.door`'s `ground_y`). Both are single meshes, so DressingColliders makes them solid.
+- Rock clusters on the road (`ROAD_ROCKS`: [s, side]): KnockableRocks on one half of five straights, clear of the crossings,
+  jumps, gates and pads, for carts to crash into and shove aside.
+- Tunnel portals are solid (`TunnelPortalWall_<n>`, their own triangles via `PropKit.kit_triangles`): DressingColliders
+  skipped them ("line" in their mesh's name).
+- Plants and rocks keep apart (`_plant_clear`, `_plant_note`: footprints in an 8m grid, the clusters first), here and in
+  Mina's flora (`_plant_fits`): a cactus grew out of a sagebrush.
 - `hut_roof_iron.gdshader` fades its ribs and laps to their average by the pixel's size in metres (`fwidth` of the UV): sharp,
   the 17cm ribs aliased into rings that crawled across a distant roof (it is also Msitu Falls' ranger post's shader).
 - The rocks (`FreightKit.boulder`, `_pick_rock`, `_rock_xf` in `_build_flora`): weathered boulders (an icosphere dented by

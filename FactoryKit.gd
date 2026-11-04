@@ -268,7 +268,7 @@ static func head_house(pk: PropKit, kit: Dictionary, labels: Array) -> void:
 	labels.append(["COOPERATIVA GRANERA", Vector3(0, 19.2, hz + 0.3), Vector3(0, 0, 1), 0.85, Color(0.95, 0.90, 0.72), 9.3])
 	# The loading door at the foot of the front (for sacks): a roller door under a lintel.
 	sliding_door(pk, kit, Vector3(-3.5, pl, hz), Vector3(0, 0, 1), 3.2, 3.6, Color(0.5, 0.52, 0.5))
-	door(pk, kit, Vector3(3.2, pl, hz), Vector3(0, 0, 1), 1.6, 2.6, true)
+	door(pk, kit, Vector3(3.2, pl, hz), Vector3(0, 0, 1), 1.6, 2.6, true, 0.0)
 	# The roof deck and parapet.
 	blk(pk, kit, "concrete", Vector3(-hx - 0.3, HH_H, -hz - 0.3), Vector3(hx + 0.3, HH_H + 0.4, hz + 0.3), tone.darkened(0.1))
 	blk(pk, kit, "concrete", Vector3(-hx - 0.3, HH_H + 0.4, hz - 0.1), Vector3(hx + 0.3, HH_H + 1.1, hz + 0.3), tone.darkened(0.04))
@@ -486,12 +486,14 @@ static func warehouse(pk: PropKit, kit: Dictionary, x0: float, x1: float, z0: fl
 	# The canopy over the dock: its roof rests on the girder on posts standing on the dock slab.
 	canopy(pk, kit, x0 + 0.5, x1 - 0.5, z1, wall_h - 0.8, 3.6, 0.45, 1.0, DOCK_H)
 	# The back: clerestory windows and two man doors.
+	# None over the doors: a window's sill there shared the plane of the door's lintel and flickered.
 	var wx: float = x0 + 3.0
 	while wx < x1 - 2.0:
-		slit_window(pk, kit, Vector3(wx, 4.6, z0), Vector3(0, 0, -1), 1.6, 0.9)
+		if absf(wx - (x0 + 12.0)) > 2.6 and absf(wx - (x1 - 12.0)) > 2.6:
+			slit_window(pk, kit, Vector3(wx, 4.6, z0), Vector3(0, 0, -1), 1.6, 0.9)
 		wx += 5.0
-	door(pk, kit, Vector3(x0 + 12.0, 0.4, z0), Vector3(0, 0, -1), 1.6, 2.6, true)
-	door(pk, kit, Vector3(x1 - 12.0, 0.4, z0), Vector3(0, 0, -1), 1.6, 2.6, true)
+	door(pk, kit, Vector3(x0 + 12.0, 0.4, z0), Vector3(0, 0, -1), 1.6, 2.6, true, 0.0)
+	door(pk, kit, Vector3(x1 - 12.0, 0.4, z0), Vector3(0, 0, -1), 1.6, 2.6, true, 0.0)
 	# The sign on the east gable.
 	box_at(pk, kit, "paint", Vector3(x1 + 0.1, 5.4, zm), Basis(Vector3.UP, PI * 0.5), Vector3(6.4, 1.3, 0.1), Color(0.10, 0.27, 0.19))
 	labels.append(["ALMACEN", Vector3(x1 + 0.17, 5.4, zm), Vector3(1, 0, 0), 0.7, Color(0.95, 0.90, 0.72), 5.8])
@@ -523,7 +525,7 @@ static func hut(pk: PropKit, kit: Dictionary, x0: float, x1: float, z0: float, z
 	roof(pk, kit, "iron", Vector3(x0 - 0.5, ey, z1 + oh), Vector3(x1 + 0.5, ey, z1 + oh), Vector3(x1 + 0.5, ridge, zm), Vector3(x0 - 0.5, ridge, zm), SHEET_GREEN, Vector3(0, 1.0, pitch).normalized())
 	roof(pk, kit, "iron", Vector3(x1 + 0.5, ey, z0 - oh), Vector3(x0 - 0.5, ey, z0 - oh), Vector3(x0 - 0.5, ridge, zm), Vector3(x1 + 0.5, ridge, zm), SHEET_GREEN, Vector3(0, 1.0, -pitch).normalized())
 	pk.beam(kit, "steel", Vector3(x0 - 0.6, ridge + 0.05, zm), Vector3(x1 + 0.6, ridge + 0.05, zm), 0.4, 0.2, SHEET_GREEN.darkened(0.3), Vector3(0, 0, 1))
-	door(pk, kit, Vector3(x0 + 1.2, 0.35, z1), Vector3(0, 0, 1), 0.9, 2.1, true)
+	door(pk, kit, Vector3(x0 + 1.2, 0.35, z1), Vector3(0, 0, 1), 0.9, 2.1, true, 0.0)
 	window(pk, kit, Vector3((x0 + x1) * 0.5 + 0.4, 1.9, z1), Vector3(0, 0, 1), 1.2, 1.1, Color(0, 0, 0, 0))
 	window(pk, kit, Vector3(x1 - 1.2, 1.9, z1), Vector3(0, 0, 1), 1.0, 1.1, Color(0, 0, 0, 0))
 	window(pk, kit, Vector3(x1, 1.9, zm), Vector3(1, 0, 0), 1.0, 1.1, Color(0, 0, 0, 0))

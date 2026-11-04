@@ -132,15 +132,22 @@ func _build() -> void:
 		pk.set_frame(Transform3D.IDENTITY)
 		pk.beam(kit, "steel", Vector3(0, 0, 0), Vector3(0, MAST_H, 0), 0.36, 0.36, Color(0.86, 0.86, 0.84))
 		pk.beam(kit, "steel", Vector3(0, 0, 0), Vector3(0, 0.5, 0), 0.9, 0.9, Color(0.35, 0.35, 0.35))
-		# The crossbuck: two white boards crossed, edged red.
+		# The crossbuck: two white boards crossed, each edged red. One board, its red edges standing 2.5cm proud of it,
+		# and the second board 12cm in front of the first: three boards stacked 1-2cm apart, crossed in one plane, had
+		# flickered at a distance.
 		var cb := Vector3(0, MAST_H - 0.9, 0.25)
+		var bi := 0
 		for ang in [0.62, -0.62]:
-			var d := Vector3(sin(ang), cos(ang) * 0.0 + 0.0, 0.0)
-			var a: Vector3 = cb + Vector3(-1.5 * cos(ang), -1.5 * sin(ang), 0.0)
-			var b: Vector3 = cb + Vector3(1.5 * cos(ang), 1.5 * sin(ang), 0.0)
-			pk.beam(kit, "paint", a, b, 0.62, 0.1, white, Vector3(0, 0, 1))
-			pk.beam(kit, "paint", a, b, 0.4, 0.14, red, Vector3(0, 0, 1))
-			pk.beam(kit, "paint", a, b, 0.26, 0.16, white, Vector3(0, 0, 1))
+			var bz: float = cb.z + 0.12 * float(bi)
+			var dir := Vector3(cos(ang), sin(ang), 0.0)
+			var nrm := Vector3(-sin(ang), cos(ang), 0.0)
+			var a: Vector3 = Vector3(cb.x, cb.y, bz) - dir * 1.5
+			var b: Vector3 = Vector3(cb.x, cb.y, bz) + dir * 1.5
+			pk.beam(kit, "paint", a, b, 0.62, 0.08, white, nrm)
+			for e in [-1.0, 1.0]:
+				var off: Vector3 = nrm * (e * 0.25) + Vector3(0, 0, 0.055)
+				pk.beam(kit, "paint", a + off + dir * 0.06, b + off - dir * 0.06, 0.08, 0.03, red, nrm)
+			bi += 1
 		# The light bar and its two lamps, a black backing disc each.
 		var bar_y: float = MAST_H - 2.35
 		pk.beam(kit, "steel", Vector3(-1.2, bar_y, 0.0), Vector3(1.2, bar_y, 0.0), 0.2, 0.2, Color(0.12, 0.12, 0.12))

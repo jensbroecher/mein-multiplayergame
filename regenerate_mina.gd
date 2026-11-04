@@ -2469,6 +2469,28 @@ func _flora_ok(p: Vector2, clear := 2.5) -> bool:
 	return true
 
 
+## Plants and rocks keep apart (a cactus grew out of a sagebrush): each placed one's footprint in a grid of 8m cells,
+## checked after its random draws so the rest of the layout stays put.
+var _plant_grid := {}
+
+func _plant_fits(p: Vector2, mesh: Mesh, xf: Transform3D) -> bool:
+	var ab: AABB = mesh.get_aabb()
+	var r: float = maxf(maxf(absf(ab.position.x), absf(ab.end.x)), maxf(absf(ab.position.z), absf(ab.end.z))) * xf.basis.get_scale().x
+	var reach: int = int(ceil((r + 4.0) / 8.0))
+	var cx: int = floori(p.x / 8.0)
+	var cz: int = floori(p.y / 8.0)
+	for i in range(cx - reach, cx + reach + 1):
+		for j in range(cz - reach, cz + reach + 1):
+			for q in _plant_grid.get(Vector2i(i, j), []):
+				if p.distance_to(q[0]) < (r + float(q[1])) * 0.9:
+					return false
+	var key := Vector2i(cx, cz)
+	if not _plant_grid.has(key):
+		_plant_grid[key] = []
+	_plant_grid[key].append([p, r])
+	return true
+
+
 func _build_flora(level: Node3D) -> void:
 	var root := Node3D.new()
 	root.name = "Desert"
@@ -2527,12 +2549,19 @@ func _build_flora(level: Node3D) -> void:
 			pos.y = _ground_at(pos.x, pos.z) - 0.05
 			var roll: float = rng.randf()
 			if roll < 0.62:
-				add.call("sage_%d" % rng.randi_range(0, 2), Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * rng.randf_range(0.9, 2.0)), pos))
+				var sv: int = rng.randi_range(0, 2)
+				var sxf := Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * rng.randf_range(0.9, 2.0)), pos)
+				if not _plant_fits(p2, sage[sv], sxf):
+					continue
+				add.call("sage_%d" % sv, sxf)
 			elif roll < 0.82:
 				var tall: bool = rng.randf() < 0.35 and absf(lat) > 14.0
 				var h: float = rng.randf_range(0.8, 2.2) if tall else rng.randf_range(0.25, 0.7)
 				var rk: String = ("rock_t%d" if tall else "rock_l%d") % rng.randi_range(0, 3)
-				add.call(rk, _rock_xf(h, rng.randf() * TAU, pos, rocks[rk]))
+				var rxf: Transform3D = _rock_xf(h, rng.randf() * TAU, pos, rocks[rk])
+				if not _plant_fits(p2, rocks[rk], rxf):
+					continue
+				add.call(rk, rxf)
 			else:
 				var pl: Array = plants[rng.randi_range(0, plants.size() - 1)]
 				if rng.randf() > float(pl[3]) * 3.0:
@@ -2540,7 +2569,10 @@ func _build_flora(level: Node3D) -> void:
 				var kind: String = "%s_%d" % [pl[0], rng.randi_range(0, int(pl[1]) - 1)]
 				var mh: float = maxf((meshes[kind] as ArrayMesh).get_aabb().size.y, 0.1)
 				var sc: float = rng.randf_range((pl[2] as Vector2).x, (pl[2] as Vector2).y) / mh
-				add.call(kind, Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * sc), pos))
+				var cxf := Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * sc), pos)
+				if not _plant_fits(p2, meshes[kind], cxf):
+					continue
+				add.call(kind, cxf)
 			placed += 1
 		s += 6.0
 	# Fallen blocks in the pit: along the toes of the benches and scattered on the floor, off the road.

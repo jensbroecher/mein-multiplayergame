@@ -34,6 +34,7 @@ const FreightKit = preload("res://FreightKit.gd")
 const TrainKit = preload("res://TrainKit.gd")
 const CactusKit = preload("res://CactusKit.gd")
 const PropKit = preload("res://PropKit.gd")
+const TownKit = preload("res://TownKit.gd")
 const YardKit = preload("res://YardKit.gd")
 const FactoryKit = preload("res://FactoryKit.gd")
 
@@ -136,6 +137,10 @@ const BIG_JUMP_BOOST := 26.0
 ## eases back, and the pad's height (set from the plain's mean under it by _plan_pads).
 var _pads: Array = [
 	{"c": Vector2(-130.0, 166.0), "half": Vector2(175.0, 56.0), "blend": 16.0, "h": 0.0},
+	# The plaza in front of the station, at the depot's height (h_of), out to the road's verge.
+	{"c": Vector2(-148.0, 230.5), "half": Vector2(36.0, 8.5), "blend": 3.0, "h": 0.0, "h_of": 0},
+	# The town across the road.
+	{"c": Vector2(-175.0, 282.0), "half": Vector2(67.0, 17.0), "blend": 7.0, "h": 0.0},
 ]
 
 var _lap: Dictionary = {}
@@ -727,10 +732,15 @@ func _plan_pads() -> void:
 				z += 8.0
 			x += 8.0
 		pd["h"] = sum / float(cnt)
+	for pd in _pads:
+		if pd.has("h_of"):
+			pd["h"] = _pads[int(pd["h_of"])]["h"]
 
 
 ## The pad weight (1 on the pad, easing to 0 over its blend) and its height at (x, z).
 func _pad_at(x: float, z: float) -> Vector2:
+	# The pad weighing most here (the plaza's pad overlaps the depot's blend).
+	var best := Vector2(0.0, 0.0)
 	for pd in _pads:
 		var c: Vector2 = pd["c"]
 		var half: Vector2 = pd["half"]
@@ -739,8 +749,10 @@ func _pad_at(x: float, z: float) -> Vector2:
 		var out: float = Vector2(maxf(dx, 0.0), maxf(dz, 0.0)).length()
 		var blend: float = pd["blend"]
 		if out < blend:
-			return Vector2(1.0 - smoothstep(0.0, blend, out), pd["h"])
-	return Vector2(0.0, 0.0)
+			var wgt: float = 1.0 - smoothstep(0.0, blend, out) if blend > 0.0 else 1.0
+			if wgt > best.x:
+				best = Vector2(wgt, pd["h"])
+	return best
 
 
 func _add_samples() -> void:
@@ -1487,8 +1499,22 @@ func _build_portals(level_scene: Node3D) -> void:
 		pk.reset_frame()
 		var kit := {}
 		FreightKit.portal(pk, kit, pd["wing_l"], pd["wing_r"], pd["top"])
+		# Solid: the facade, its wings and the lining, as their own triangles (the mesh's name has "line" in it, which
+		# DressingColliders skips as a power or rail line, so the portals had no collision at all).
+		var ptris: PackedVector3Array = PropKit.kit_triangles(kit)
 		var mesh: ArrayMesh = _save_baked_resource(pk.commit(kit), "portal_%d" % count) as ArrayMesh
 		_instance_mesh(root, "Portal_%s_%d" % [_rails[ri]["name"], count], mesh, xf)
+		var pbody := StaticBody3D.new()
+		pbody.name = "TunnelPortalWall_%d" % count
+		pbody.set_meta(&"surface", "rock")
+		pbody.transform = xf
+		var pshape := ConcavePolygonShape3D.new()
+		pshape.set_faces(ptris)
+		pshape.backface_collision = true
+		var pcs := CollisionShape3D.new()
+		pcs.shape = _save_baked_resource(pshape, "portal_%d_shape" % count)
+		pbody.add_child(pcs)
+		root.add_child(pbody)
 		var fk := {}
 		FreightKit.tunnel_fog(pk, fk)
 		var fog: MeshInstance3D = _instance_mesh(root, "TunnelFog_%d" % count, _save_baked_resource(pk.commit(fk), "tunnel_fog") as ArrayMesh, xf)
@@ -1969,7 +1995,179 @@ func _build_depot(level_scene: Node3D) -> void:
 	# Stock standing on the yard: the yard switcher with three grain hoppers on the factory track, the first one under
 	# the loadout's spout. (The platform is the local's: see _build_local_train.)
 	_park_train(root, "LoadingHoppers", 1, ["hopper", "hopper:1", "hopper", "loco:2"], 0.0, false, FACTORY_X)
+	_build_plaza(root, Vector3(STATION_X, h, z_p + STATION_BACK))
+	_build_town(root)
 	print("  depot built on a pad at %.1fm (station at x %.0f, z %.0f; cooperative at x %.0f, z %.0f)" % [h, STATION_X, z_p + STATION_BACK, FACTORY_X, origin.z])
+
+
+## The plaza between the station's front and the road (TownKit.plaza), in the station's frame, on the plaza's pad.
+const PLAZA_DEPTH := 19.5
+
+func _build_plaza(root: Node3D, origin: Vector3) -> void:
+	var pk := YardKit.new_kit(PROP_SCALE)
+	var kit := {}
+	var labels: Array = []
+	TownKit.plaza(pk, kit, -1.5, 41.5, PLAZA_DEPTH, labels)
+	_instance_mesh(root, "StationPlaza", _save_baked_resource(YardKit.commit(pk, kit), "plaza", YARD_PREFIX), Transform3D(Basis(), origin))
+	_yard_labels(root, labels, origin)
+	_build_plaza_trees(root, origin)
+	_build_fountain_water(root, origin + TownKit.fountain_centre(-1.5, 41.5, PLAZA_DEPTH) * PROP_SCALE)
+
+
+## The plaza's four trees: WoodlandBuilder's cottonwood (a broad, spreading desert-river tree) at PLAZA_TREE_SCALE,
+## each under a body with a trunk cylinder (a lone tree mesh would get a trimesh of its leaf cards from
+## DressingColliders).
+const PLAZA_TREE_SCALE := 0.36
+
+func _build_plaza_trees(root: Node3D, origin: Vector3) -> void:
+	var w = load("res://WoodlandBuilder.gd").new()
+	w.save_res = func(res: Resource, n: String) -> Resource: return _save_baked_resource(res, n, YARD_PREFIX)
+	var leaf: ShaderMaterial = w.leaf_material(0, 0.1, 5.0)
+	leaf.set_shader_parameter("backlight_color", Color(0.44, 0.48, 0.28))
+	leaf = _save_baked_resource(leaf, "plaza_leaf", YARD_PREFIX)
+	var bark: ShaderMaterial = _save_baked_resource(w.bark_material("cottonwood", 0), "plaza_bark", YARD_PREFIX)
+	var meshes: Array = []
+	for v in 2:
+		meshes.append(_save_baked_resource(w.broadleaf_mesh("cottonwood", v, 0, bark, leaf), "plaza_tree_%d" % v, YARD_PREFIX))
+	var k := 0
+	for spot in TownKit.plaza_tree_spots(-1.5, 41.5, PLAZA_DEPTH):
+		var body := StaticBody3D.new()
+		body.name = "PlazaTree_%d" % k
+		body.set_meta(&"surface", "wood")
+		body.position = origin + (spot as Vector3) * PROP_SCALE
+		var mi := MeshInstance3D.new()
+		mi.mesh = meshes[k % 2]
+		mi.transform = Transform3D(Basis(Vector3.UP, 1.3 * float(k)).scaled(Vector3.ONE * PLAZA_TREE_SCALE), Vector3.ZERO)
+		mi.visibility_range_end = 700.0
+		body.add_child(mi)
+		var cs := CollisionShape3D.new()
+		var cyl := CylinderShape3D.new()
+		cyl.radius = 0.35
+		cyl.height = 3.0
+		cs.shape = cyl
+		cs.position = Vector3(0, 1.5, 0)
+		body.add_child(cs)
+		root.add_child(body)
+		k += 1
+
+
+## The fountain's water (fountain_water.gdshader, animated in the shader): the basin's pool and the bowl's, the sheet
+## falling from the bowl's rim into the basin and the trickle from the finial into the bowl. Life-size, at PROP_SCALE,
+## round `c` (the fountain's foot, world).
+func _build_fountain_water(root: Node3D, c: Vector3) -> void:
+	var holder := Node3D.new()
+	# Not "...Water": PlayerCart takes any node so named for the level's sea (everything flooded).
+	holder.name = "FountainSpray"
+	holder.transform = Transform3D(Basis.from_scale(Vector3.ONE * PROP_SCALE), c)
+	root.add_child(holder)
+	var sh: Shader = load("res://fountain_water.gdshader")
+	var pool_mat := ShaderMaterial.new()
+	pool_mat.shader = sh
+	pool_mat.set_shader_parameter("mode", 0)
+	var sheet_mat := ShaderMaterial.new()
+	sheet_mat.shader = sh
+	sheet_mat.set_shader_parameter("mode", 1)
+	var add := func(nm: String, mesh: Mesh, mat: Material, y: float, fall_r: float) -> void:
+		var m: ShaderMaterial = mat.duplicate() if fall_r > 0.0 else mat
+		if fall_r > 0.0:
+			m.set_shader_parameter("fall_r", fall_r)
+		var mi := MeshInstance3D.new()
+		mi.name = nm
+		mi.mesh = mesh
+		mi.material_override = m
+		mi.position = Vector3(0, y, 0)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		holder.add_child(mi)
+	var basin := CylinderMesh.new()
+	basin.top_radius = 2.79
+	basin.bottom_radius = 2.79
+	basin.height = 0.02
+	basin.radial_segments = 40
+	basin.rings = 1
+	add.call("BasinPool", basin, pool_mat, 0.55, 1.22)
+	var bowl := CylinderMesh.new()
+	bowl.top_radius = 1.08
+	bowl.bottom_radius = 1.08
+	bowl.height = 0.02
+	bowl.radial_segments = 28
+	bowl.rings = 1
+	add.call("BowlPool", bowl, pool_mat, 2.4, 0.12)
+	var sheet := CylinderMesh.new()
+	sheet.top_radius = 1.16
+	sheet.bottom_radius = 1.26
+	sheet.height = 1.86
+	sheet.radial_segments = 32
+	sheet.rings = 4
+	sheet.cap_top = false
+	sheet.cap_bottom = false
+	add.call("FallingSheet", sheet, sheet_mat, 0.56 + 0.93, 0.0)
+	var jet := CylinderMesh.new()
+	jet.top_radius = 0.07
+	jet.bottom_radius = 0.42
+	jet.height = 0.72
+	jet.radial_segments = 16
+	jet.rings = 3
+	jet.cap_top = false
+	jet.cap_bottom = false
+	add.call("Trickle", jet, sheet_mat, 2.4 + 0.36, 0.0)
+	# Its sound: sounds/Gentle_flowing_water.wav (RMS -32 dBFS, looped in its import), from the bowl, heard across the
+	# plaza and faintly from the road.
+	var snd := AudioStreamPlayer3D.new()
+	snd.name = "FountainSound"
+	snd.stream = load("res://sounds/Gentle_flowing_water.wav")
+	snd.bus = &"SFX"
+	snd.volume_db = 10.0
+	snd.unit_size = 6.0
+	snd.max_distance = 70.0
+	snd.autoplay = true
+	snd.position = Vector3(0, 1.5, 0)
+	holder.add_child(snd)
+
+
+## The town across the road from the station (TownKit.STREET): its buildings in a row facing the road, a pavement in
+## front of them, on the town's pad. Each building in its own frame (turned to face north, the road), the signs turned
+## with it. TOWN_FRONT is the line of their fronts.
+const TOWN_FRONT := 271.5
+const TOWN_X := -175.0
+
+func _build_town(root: Node3D) -> void:
+	var h: float = _pads[2]["h"]
+	var pk := YardKit.new_kit(PROP_SCALE)
+	var kit := {}
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4401
+	var length: float = TownKit.street_length()
+	var face := Basis(Vector3.UP, PI)
+	var street_xf := Transform3D(face.scaled(Vector3.ONE * PROP_SCALE), Vector3(TOWN_X, h, TOWN_FRONT))
+	var all_labels: Array = []
+	var x := -length * 0.5
+	for b in TownKit.STREET:
+		var w: float = b[1]
+		var bxf: Transform3D = street_xf * Transform3D(Basis(), Vector3(x + w * 0.5, 0.0, 0.0))
+		pk.set_frame(bxf)
+		var labels: Array = []
+		TownKit.building(pk, kit, b[0], w, b[2], b[3], b[4], labels, rng)
+		for l in labels:
+			all_labels.append([l, bxf])
+		x += w + TownKit.GAP
+	pk.set_frame(street_xf)
+	TownKit.pavement(pk, kit, -length * 0.5 - 2.0, length * 0.5 + 2.0, 3.5)
+	_instance_mesh(root, "Town", _save_baked_resource(YardKit.commit(pk, kit), "town", YARD_PREFIX), Transform3D.IDENTITY)
+	for e in all_labels:
+		var l: Array = e[0]
+		var xf: Transform3D = e[1]
+		var lab := Label3D.new()
+		lab.text = l[0]
+		lab.font_size = 64
+		lab.pixel_size = _fit_pixel(l[0], 64, float(l[3]) * PROP_SCALE / 44.8, float(l[5]) * PROP_SCALE if l.size() > 5 else 0.0)
+		lab.modulate = l[4]
+		lab.outline_size = 4
+		lab.outline_modulate = Color(0.05, 0.05, 0.05)
+		lab.double_sided = false
+		var n: Vector3 = (xf.basis.orthonormalized() * (l[2] as Vector3)).normalized()
+		lab.transform = Transform3D(Basis.looking_at(-n, Vector3.UP), xf * (l[1] as Vector3))
+		root.add_child(lab)
+	print("  town: %d buildings along %.0fm" % [TownKit.STREET.size(), length * PROP_SCALE])
 
 
 ## The pixel size at which `text` at `font_size` (Label3D's default font, which ThemeDB measures headless too) is no
@@ -2226,6 +2424,7 @@ func _build_flora(level_scene: Node3D) -> void:
 				var r_xf: Transform3D = _rock_xf(cluster_kind, rh, rng.randf() * TAU, rpos, cluster_mesh)
 				cluster_xfs.append(r_xf)
 				cluster_radii.append(rh * 0.7)
+				_plant_note(Vector2(rpos.x, rpos.z), _plant_radius(cluster_mesh, r_xf))
 
 			if cluster_xfs.size() >= 3:
 				var kr := MultiMeshInstance3D.new()
@@ -2252,6 +2451,7 @@ func _build_flora(level_scene: Node3D) -> void:
 						var anchor_kind: String = "rock_t%d" % rng.randi_range(0, 3)
 						var anchor_h: float = rng.randf_range(1.4, 2.2)
 						var anchor_xf: Transform3D = _rock_xf(anchor_kind, anchor_h, rng.randf() * TAU, anchor_pos, rock_meshes[anchor_kind])
+						_plant_note(Vector2(anchor_pos.x, anchor_pos.z), _plant_radius(rock_meshes[anchor_kind], anchor_xf))
 						large_boulders_xfs.append([anchor_xf, anchor_kind])
 						var akey := "rock_large_%s|%d|%d" % [anchor_kind, floori(anchor_pos.x / 160.0), floori(anchor_pos.z / 160.0)]
 						if not cells.has(akey):
@@ -2260,6 +2460,39 @@ func _build_flora(level_scene: Node3D) -> void:
 						placed += 1
 
 		cluster_s += rng.randf_range(48.0, 72.0)
+
+	# Rock clusters on the road itself, as obstacles a cart crashes into and shoves aside: each on one half of a
+	# straight (sides alternate, the other half clear), away from the crossings, jumps, gates and pads.
+	for ri2 in range(ROAD_ROCKS.size()):
+		var rr: Array = ROAD_ROCKS[ri2]
+		var rs: float = rr[0]
+		var rside: float = rr[1]
+		var rmesh: ArrayMesh = rock_meshes["rock_l%d" % (ri2 % 4)]
+		var rxfs: Array[Transform3D] = []
+		var rradii: Array[float] = []
+		var n_r: int = rng.randi_range(5, 7)
+		for k in range(n_r):
+			var along: float = rng.randf_range(-2.6, 2.6)
+			var lat_r: float = rside * rng.randf_range(1.2, ROAD_HALF - 1.2)
+			var rp: Vector3 = (_spot(rs + along, lat_r, 0.0)["pos"] as Vector3)
+			var rh2: float = rng.randf_range(0.45, 0.8)
+			var rxf: Transform3D = _rock_xf("rock_l%d" % (ri2 % 4), rh2, rng.randf() * TAU, rp, rmesh)
+			rxfs.append(rxf)
+			rradii.append(rh2 * 0.7)
+		var rkn := MultiMeshInstance3D.new()
+		rkn.name = "RoadRocks_%d" % ri2
+		rkn.set_script(load("res://KnockableRocks.gd"))
+		var rmm := MultiMesh.new()
+		rmm.transform_format = MultiMesh.TRANSFORM_3D
+		rmm.mesh = rmesh
+		rmm.instance_count = rxfs.size()
+		rmm.buffer = PropKit.transform_buffer(rxfs)
+		rkn.multimesh = rmm
+		rkn.set("rock_transforms", rxfs)
+		rkn.set("rock_radii", rradii)
+		rkn.set("cluster_drag", 7.5)
+		rkn.set_meta(&"skip_dressing_colliders", true)
+		clusters_parent.add_child(rkn)
 
 	# Candidate spots along the lap: both sides, closer in more of them.
 	var s := 0.0
@@ -2287,11 +2520,7 @@ func _build_flora(level_scene: Node3D) -> void:
 				scl = rk["h"]
 				rock_xf = _rock_xf(r_kind, scl, rng.randf() * TAU, pos, rock_meshes[r_kind])
 				is_rock = true
-				if scl >= 1.0:
-					kind = "rock_large_" + r_kind
-					large_boulders_xfs.append([rock_xf, r_kind])
-				else:
-					kind = r_kind
+				kind = ("rock_large_" + r_kind) if scl >= 1.0 else r_kind
 			else:
 				var pl: Array = plants[rng.randi_range(0, plants.size() - 1)]
 				if rng.randf() > float(pl[3]) * 5.0:
@@ -2301,10 +2530,24 @@ func _build_flora(level_scene: Node3D) -> void:
 				var mesh_h: float = maxf((meshes[kind] as ArrayMesh).get_aabb().size.y, 0.1)
 				scl = rng.randf_range((pl[2] as Vector2).x, (pl[2] as Vector2).y) / mesh_h
 			var basis := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * scl)
+			var pxf: Transform3D = rock_xf if is_rock else Transform3D(basis, pos)
+			var pmesh: Mesh
+			if is_rock:
+				pmesh = rock_meshes[kind.trim_prefix("rock_large_")]
+			elif kind.begins_with("sage"):
+				pmesh = sage_meshes[int(kind.substr(5))]
+			else:
+				pmesh = meshes[kind]
+			var pr: float = _plant_radius(pmesh, pxf)
+			if not _plant_clear(p2, pr):
+				continue
+			_plant_note(p2, pr)
+			if kind.begins_with("rock_large_"):
+				large_boulders_xfs.append([rock_xf, kind.trim_prefix("rock_large_")])
 			var key := "%s|%d|%d" % [kind, floori(pos.x / 160.0), floori(pos.z / 160.0)]
 			if not cells.has(key):
 				cells[key] = []
-			cells[key].append(rock_xf if is_rock else Transform3D(basis, pos))
+			cells[key].append(pxf)
 			placed += 1
 		s += 6.0
 	# Small stones right beside the road, where a cart that runs wide meets them.
@@ -2318,11 +2561,15 @@ func _build_flora(level_scene: Node3D) -> void:
 			if _flora_ok(Vector2(pos2.x, pos2.z)):
 				var h2: float = rng.randf_range(0.2, 0.55)
 				var kind2: String = "rock_l%d" % rng.randi_range(0, 3)
-				var key2 := "%s|%d|%d" % [kind2, floori(pos2.x / 160.0), floori(pos2.z / 160.0)]
-				if not cells.has(key2):
-					cells[key2] = []
-				cells[key2].append(_rock_xf(kind2, h2, rng.randf() * TAU, pos2, rock_meshes[kind2]))
-				placed += 1
+				var xf2: Transform3D = _rock_xf(kind2, h2, rng.randf() * TAU, pos2, rock_meshes[kind2])
+				var r2: float = _plant_radius(rock_meshes[kind2], xf2)
+				if _plant_clear(Vector2(pos2.x, pos2.z), r2):
+					_plant_note(Vector2(pos2.x, pos2.z), r2)
+					var key2 := "%s|%d|%d" % [kind2, floori(pos2.x / 160.0), floori(pos2.z / 160.0)]
+					if not cells.has(key2):
+						cells[key2] = []
+					cells[key2].append(xf2)
+					placed += 1
 		s += 5.0
 	for key in cells.keys():
 		var parts: PackedStringArray = String(key).split("|")
@@ -2436,6 +2683,39 @@ func _rock_xf(_kind: String, h: float, yaw: float, pos: Vector3, mesh: ArrayMesh
 
 
 ## Whether flora may stand at `p`: off the road, the rails, the hills, the depot and steep ground.
+## Rock clusters on the road: [s, side (+1 right of travel)], on straights clear of the crossings (1075, 1612, 2592),
+## the big jumps' run-ups and landings, the gates and the boost pads.
+const ROAD_ROCKS := [[600.0, 1.0], [820.0, -1.0], [1350.0, 1.0], [1790.0, -1.0], [2260.0, 1.0]]
+
+## Plants and rocks keep apart: each placed one's footprint (radius in plan) in a grid of 8m cells. A cactus grew out
+## of a sagebrush before. Checked after a plant's random draws, so the rest of the layout stays where it was.
+var _plant_grid := {}
+
+func _plant_radius(mesh: Mesh, xf: Transform3D) -> float:
+	var ab: AABB = mesh.get_aabb()
+	var r: float = maxf(maxf(absf(ab.position.x), absf(ab.end.x)), maxf(absf(ab.position.z), absf(ab.end.z)))
+	return r * xf.basis.get_scale().x
+
+
+func _plant_clear(p: Vector2, r: float) -> bool:
+	var reach: int = int(ceil((r + 4.0) / 8.0))
+	var cx: int = floori(p.x / 8.0)
+	var cz: int = floori(p.y / 8.0)
+	for i in range(cx - reach, cx + reach + 1):
+		for j in range(cz - reach, cz + reach + 1):
+			for q in _plant_grid.get(Vector2i(i, j), []):
+				if p.distance_to(q[0]) < (r + float(q[1])) * 0.9:
+					return false
+	return true
+
+
+func _plant_note(p: Vector2, r: float) -> void:
+	var key := Vector2i(floori(p.x / 8.0), floori(p.y / 8.0))
+	if not _plant_grid.has(key):
+		_plant_grid[key] = []
+	_plant_grid[key].append([p, r])
+
+
 func _flora_ok(p: Vector2) -> bool:
 	if p.x < FINE_X.x + 40.0 or p.x > FINE_X.y - 40.0 or p.y < FINE_Z.x + 40.0 or p.y > FINE_Z.y - 40.0:
 		return false
