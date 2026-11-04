@@ -65,7 +65,7 @@ const ALL_STAGES = [
 	{"name": "Mountain Pass", "path": "res://levels/MountainLevel.tscn"},
 	{"name": "Arco del Viento", "path": "res://levels/CanyonLevel.tscn"},
 	{"name": "Tolvanera Gulch", "path": "res://levels/CanyonChasmLevel.tscn"},
-	{"name": "Freight Line", "path": "res://levels/FreightLevel.tscn"},
+	{"name": "Estación Seca", "path": "res://levels/FreightLevel.tscn"},
 	{"name": "Mina del Viento", "path": "res://levels/MinaLevel.tscn"},
 	{"name": "Desert Wadi", "path": "res://levels/DesertWadiLevel.tscn"},
 	{"name": "South Beach", "path": "res://levels/BloombayDunesLevel.tscn"},

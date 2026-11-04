@@ -1567,8 +1567,8 @@ const GULL_FLOCKS := [
 # measured: each is brought to GULL_CALL_LEVEL at GULL_CALL_UNIT metres (no louder nearer), a few dB over
 # the engine at 80m. The loudest peak then just reaches full scale overhead.
 const GULL_CALLS := ["res://sounds/beach/Seagulls_1.wav", "res://sounds/beach/Seagulls_2.wav",
-		"res://sounds/beach/Seagulls_3.wav", "res://sounds/beach/Seagulls_4.wav"]
-const GULL_CALL_RMS := [-30.7, -28.9, -37.5, -39.5]
+		"res://sounds/beach/Seagulls_3.wav", "res://sounds/beach/Seagulls_4.wav", "res://sounds/beach/Seagulls_5.wav"]
+const GULL_CALL_RMS := [-30.7, -28.9, -37.5, -39.5, -21.4]
 const GULL_CALL_LEVEL := -23.0
 const GULL_CALL_UNIT := 30.0
 

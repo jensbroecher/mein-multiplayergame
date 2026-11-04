@@ -1,6 +1,6 @@
 extends RefCounted
 ## Freight Line's yard buildings (regenerate_freight_line.gd), built through a PropKit at life size and grown by
-## the caller (PROP_SCALE): the station, Estación del Viento (a stuccoed building under a tile roof with a clock
+## the caller (PROP_SCALE): the station, Estación Seca (a stuccoed building under a tile roof with a clock
 ## tower, a front portico, shuttered windows, a long canopy over the platform on cast-iron columns, a freight
 ## shed, the platform with its furniture), and the grain cooperative (silos with their gallery, a head house, the
 ## loadout gantry over the factory track, a warehouse, tanks).
@@ -226,7 +226,7 @@ static func clock_face(pk: PropKit, kit: Dictionary, c: Vector3, out: Vector3, r
 ## Labels are [text, position, outward normal, cap height, colour, (the width they must fit, 0 or left out: any)] in the
 ## kit's own (life size) units; the generator shrinks a label that would run past its board.
 ##
-## Estación del Viento: x in [0, 40], the front (road) on z = 0 facing +z, the back (platform) on z = -12;
+## Estación Seca: x in [0, 40], the front (road) on z = 0 facing +z, the back (platform) on z = -12;
 ## plinth to y = 0.9, stucco walls to 5.9 under a gabled tile roof (ridge at y = 9.2 over z = -6), a clock tower on
 ## the ridge, a columned portico on the front, six shuttered windows a side, quoins, a cornice, two chimneys, and
 ## a long iron canopy over the platform on cast-iron columns. `labels` collects [text, position, outward normal,
@@ -376,7 +376,7 @@ static func station(pk: PropKit, kit: Dictionary, labels: Array) -> void:
 	canopy(pk, kit, 1.0, 39.0, -D, 4.9)
 	# The name across the portico's entablature (a navy board with cream letters) and on the platform side.
 	box_at(pk, kit, "paint", Vector3(20.0, 4.225, 3.53), Basis(), Vector3(5.7, 0.55, 0.05), Color(0.08, 0.20, 0.42))
-	labels.append(["ESTACION DEL VIENTO", Vector3(20.0, 4.225, 3.57), Vector3(0, 0, 1), 0.3, Color(0.96, 0.94, 0.86), 5.3])
+	labels.append(["ESTACION SECA", Vector3(20.0, 4.225, 3.57), Vector3(0, 0, 1), 0.3, Color(0.96, 0.94, 0.86), 5.3])
 
 
 ## A canopy: x in [x0, x1], from the wall at z = wall_z (the roof's top edge at y = wall_y) out `depth` toward `dir`
@@ -600,8 +600,8 @@ static func platform(pk: PropKit, kit: Dictionary, x0: float, x1: float, z_wall:
 		var bx: float = x0 + span * (float(k) + 0.5) / float(nb)
 		bench(pk, kit, Vector3(bx + 6.0, top, z_wall - 0.55), Vector3(0, 0, -1))
 		lamp_post(pk, kit, Vector3(bx - 5.0, top, z_edge + 3.0), 3.7)
-	name_board(pk, kit, Vector3(x0 + 9.0, top, z_edge + 1.4), Vector3(0, 0, -1), 3.6, "ESTACION DEL VIENTO", labels)
-	name_board(pk, kit, Vector3(x1 - 9.0, top, z_edge + 1.4), Vector3(0, 0, -1), 3.6, "ESTACION DEL VIENTO", labels)
+	name_board(pk, kit, Vector3(x0 + 9.0, top, z_edge + 1.4), Vector3(0, 0, -1), 3.6, "ESTACION SECA", labels)
+	name_board(pk, kit, Vector3(x1 - 9.0, top, z_edge + 1.4), Vector3(0, 0, -1), 3.6, "ESTACION SECA", labels)
 	# A pillar box, a notice board and a bin by the station's doors.
 	var tx: float = x0 + span * 0.5
 	trolley(pk, kit, Vector3(tx - 11.0, top, z_wall - 2.2), 0.15)
@@ -643,7 +643,7 @@ static func sliding_door(pk: PropKit, kit: Dictionary, c: Vector3, out: Vector3,
 	box_at(pk, kit, "painted", c + Vector3(0, h + 0.05, 0) + out * 0.05, basis, Vector3(w + 0.5, 0.2, 0.08), TRIM)
 
 
-## Estación del Viento's goods shed: x in [x0, x1], z in [-12, 0] like the station (front on z = 0): red weatherboard
+## Estación Seca's goods shed: x in [x0, x1], z in [-12, 0] like the station (front on z = 0): red weatherboard
 ## walls on a stone plinth, a corrugated iron gable roof with a ridge lantern, sliding doors and a deep loading canopy on
 ## the platform side, windows and a loading door on the road side.
 static func goods_shed(pk: PropKit, kit: Dictionary, x0: float, x1: float, labels: Array) -> void:

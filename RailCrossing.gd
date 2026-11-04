@@ -3,6 +3,7 @@ extends Node3D
 ## driven by the timetable of the Train that runs over it. The node stands on the road where the rails cross
 ## it, turned like a checkpoint gate (-z the way of travel, +x right), at the rails' top height.
 ##
+## A freight going by plays a recorded pass-by here (PASSBY_CLIPS), its swell timed to the train.
 ## The lights start `warn_lead` seconds before the first car (with the horn), the arms are down
 ## `arm_delay` seconds after that, and everything stays on until `hold` seconds after the last car. The
 ## barriers are not solid: a cart that runs one is judged by the train alone. Warning is worked out from the
@@ -33,6 +34,21 @@ const FreightKit = preload("res://FreightKit.gd")
 ## How far short of the crossing a bot stops for a train (further where a kicker lies before it).
 @export var ai_stop_short := 15.0
 
+## A freight train going by (sounds/cargo_train*.wav, recorded pass-bys: a swell to the train and away), played at
+## the crossing for each pass of a train carrying freight, timed off the timetable so the clip's loudest moment
+## comes PASSBY_PEAK_AFTER seconds after the first car reaches the crossing. Per clip: [path, where to start in it,
+## its loudest moment, where to stop (a fade over the last second), gain (dB: the swell's loudest second brought
+## to about -14 dBFS)]. Each pass picks its clip by hash of the crossing, the train and the pass's number.
+const PASSBY_CLIPS := [
+	["res://sounds/cargo_train.wav", 8.0, 18.0, 25.0, -2.0],
+	["res://sounds/cargo_train2.wav", 0.0, 7.0, 14.5, 8.0],
+	["res://sounds/cargo_train3.wav", 10.0, 17.0, 25.0, 5.0],
+]
+const PASSBY_PEAK_AFTER := 2.5
+const PASSBY_FADE_IN := 0.8
+## Cars that make a train a freight.
+const FREIGHT_CARS := ["box", "tank", "hopper", "flat", "flat_load", "caboose"]
+
 const OPEN_ANGLE := deg_to_rad(82.0)
 const ARM_LEN := 9.2
 const MAST_H := 5.4
@@ -42,6 +58,10 @@ var _arms: Array[Node3D] = []
 var _lamp_mats: Array[StandardMaterial3D] = []
 var _bell: AudioStreamPlayer3D
 var _horn: AudioStreamPlayer3D
+var _passby: AudioStreamPlayer3D
+var _passby_streams: Array = []
+## The pass playing (or played): "train:pass:cycle", so each pass plays once.
+var _passby_key := ""
 var _arm := 0.0
 var _was_warning := false
 var warning := false
@@ -178,6 +198,14 @@ func _build() -> void:
 	_horn.max_distance = 700.0
 	_horn.position = Vector3(0, 6.0, 0)
 	add_child(_horn, false, Node.INTERNAL_MODE_BACK)
+	_passby = AudioStreamPlayer3D.new()
+	_passby.bus = &"SFX"
+	_passby.unit_size = 30.0
+	_passby.max_distance = 450.0
+	_passby.position = Vector3(0, 2.0, 0)
+	add_child(_passby, false, Node.INTERNAL_MODE_BACK)
+	for c in PASSBY_CLIPS:
+		_passby_streams.append(load(c[0]))
 	_set_arm(0.0)
 
 
@@ -207,6 +235,7 @@ func _physics_process(delta: float) -> void:
 				if x >= float(win[0]) - warn_lead and x <= float(win[1]) + hold:
 					warning = true
 					since = maxf(since, x - (float(win[0]) - warn_lead))
+	_update_passby()
 	var target: float = 1.0 if warning and since >= arm_delay else 0.0
 	_arm = move_toward(_arm, target, delta / lower_time)
 	_set_arm(_arm)
@@ -225,6 +254,53 @@ func _physics_process(delta: float) -> void:
 		if _bell.playing:
 			_bell.stop()
 	_was_warning = warning
+
+
+## Starts a freight's pass-by when its swell is due (part way in, if the clip should already be playing: a peer
+## that just loaded, a train out of a tunnel close by).
+func _update_passby() -> void:
+	if _passby == null or _passby_streams.is_empty():
+		return
+	for t in _trains:
+		if not _is_freight(t):
+			continue
+		var tt: float = t.cycle_time()
+		var period: float = t.period
+		var wins: Array = _windows(t)
+		for wi in wins.size():
+			var w0: float = wins[wi][0]
+			for cyc in [0, -1, 1]:
+				var x: float = tt + float(cyc) * period
+				# Which pass: the cycle's number on the train's own clock, less `cyc` (the window in the next cycle or the
+				# last). It picks the clip, so every peer plays the same one and each pass may sound different.
+				var cycle_no: int = int(round((float(t.call("_clock")) - t.phase - tt) / period)) - cyc
+				var key := "%s:%d:%d" % [t.name, wi, cycle_no]
+				var k: int = absi(hash("%s:%s" % [name, key])) % PASSBY_CLIPS.size()
+				var clip: Array = PASSBY_CLIPS[k]
+				var at: float = float(clip[2]) + (x - (w0 + PASSBY_PEAK_AFTER))
+				if at < float(clip[1]) or at >= float(clip[3]) - 1.0:
+					continue
+				if key == _passby_key:
+					continue
+				_passby_key = key
+				_passby.stream = _passby_streams[k]
+				var gain: float = clip[4]
+				_passby.volume_db = gain - 24.0
+				_passby.play(at)
+				var tw := _passby.create_tween()
+				tw.tween_property(_passby, "volume_db", gain, PASSBY_FADE_IN)
+				tw.tween_interval(maxf(float(clip[3]) - at - PASSBY_FADE_IN - 1.0, 0.0))
+				tw.tween_property(_passby, "volume_db", gain - 30.0, 1.0)
+				tw.tween_callback(_passby.stop)
+				return
+
+
+func _is_freight(t: Node) -> bool:
+	for c in t.get("consist"):
+		var kind: String = String(c).trim_prefix("~").split(":")[0]
+		if FREIGHT_CARS.has(kind):
+			return true
+	return false
 
 
 ## Whether a cart that reaches the crossing `eta` seconds from now would meet the train: the pass, widened a

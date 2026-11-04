@@ -55,7 +55,22 @@ const STAGES := {
 	"NorthlightCavernsLevel": [["blizzard", -33.0]],
 }
 
+## The crowd's roar (a 13s swell that dies away), on the stages with a stadium crowd: at the green light and when
+## the first racer finishes (`roar()`, from Level). Its measured RMS and the level it is brought to.
+const ROAR := "res://sounds/Huge_stadium_crowd.wav"
+const ROAR_DB := -15.1
+const ROAR_LEVEL := -21.0
+
+## Grandstands (a node named "Grandstand": Lakeside, Bloombay Dunes, Mina del Viento's at the finish) cheer at the same
+## moments, in 3D from the stand's middle: a smaller crowd than a stadium's, heard from the start or the finish
+## beside it (Mina's stands 4.7km from the start, so only its finish hears it).
+const CHEER := "res://sounds/Fans_cheering.wav"
+const CHEER_DB := -1.0
+const CHEER_UNIT := 35.0
+
 var _layers: Array = []
+var _roar: AudioStreamPlayer
+var _cheers: Array[AudioStreamPlayer3D] = []
 
 
 ## The layers for the stage at `level_path`, or none.
@@ -79,11 +94,65 @@ func setup(level_path: String) -> void:
 			add_child(ap)
 			players.append(ap)
 		_layers.append({"clips": clips, "streams": streams, "next": 0, "level": float(l[1]), "players": players, "on": 0})
+		if l[0] == "stadium" and _roar == null:
+			_roar = AudioStreamPlayer.new()
+			_roar.stream = load(ROAR)
+			_roar.bus = &"SFX"
+			# The stadium layer's own level sets how loud its crowd roars (Mtaa's club is quieter than Nyota's bowl).
+			_roar.volume_db = ROAR_LEVEL - ROAR_DB + (float(l[1]) + 27.0)
+			add_child(_roar)
+
+
+## The crowd roars, where there is one; a roar already under way isn't cut short.
+func roar() -> void:
+	if _roar != null and not _roar.playing:
+		_roar.play()
+	for ap in _cheers:
+		if not ap.playing:
+			ap.pitch_scale = randf_range(0.94, 1.06)
+			ap.play()
+
+
+## Where the grandstands' cheers come from (for tests).
+func cheer_spots() -> Array:
+	return _cheers.map(func(ap: AudioStreamPlayer3D) -> Vector3: return ap.global_position)
 
 
 func _ready() -> void:
 	for layer in _layers:
 		_start_next(layer, 0.0)
+	_find_grandstands(get_parent())
+
+
+func _find_grandstands(level: Node) -> void:
+	if level == null:
+		return
+	var stream: AudioStream = null
+	for g in level.find_children("Grandstand", "Node3D", true, false):
+		# Its middle: the meshes under it (or it), which are often built in world space round an origin elsewhere.
+		var box := AABB()
+		var any := false
+		var meshes: Array = g.find_children("*", "MeshInstance3D", true, false)
+		if g is MeshInstance3D:
+			meshes.append(g)
+		for m in meshes:
+			var mi := m as MeshInstance3D
+			if mi.mesh == null:
+				continue
+			var b: AABB = mi.global_transform * mi.mesh.get_aabb()
+			box = b if not any else box.merge(b)
+			any = true
+		if stream == null:
+			stream = load(CHEER)
+		var ap := AudioStreamPlayer3D.new()
+		ap.stream = stream
+		ap.bus = &"SFX"
+		ap.volume_db = CHEER_DB
+		ap.unit_size = CHEER_UNIT
+		ap.max_distance = 400.0
+		add_child(ap)
+		ap.global_position = box.get_center() if any else (g as Node3D).global_position
+		_cheers.append(ap)
 
 
 func _process(_delta: float) -> void:

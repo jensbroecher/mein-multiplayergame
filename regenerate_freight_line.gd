@@ -1,6 +1,6 @@
 # regenerate_freight_line.gd
 #
-# Builds levels/FreightLevel.tscn - Freight Line, third stage of the Sierra del Viento GP: a high-desert
+# Builds levels/FreightLevel.tscn - Estación Seca (once Freight Line), third stage of the Sierra del Viento GP: a high-desert
 # railroad plain at midday, with two railways crossing the lap.
 #
 # The lap is a closed loop of straights and arcs (LAP: corner points and radii, filleted) round a plain
@@ -124,6 +124,13 @@ const COARSE_MAX := 160.0
 const CENTRE := Vector2(0.0, -150.0)
 
 const FINISH_S := 160.0
+## The big trestle jumps (WoodenRamp, as on Mina del Viento's plateau): [name, s of the toe], on the two straights with
+## no crossing ahead: the start straight past the station (150m from the grid) and the top straight past checkpoint 4
+## (a gate under the flight would be hit: carts fly 7-11m up). BIG_JUMP is [length, height, curve]; each has a boost
+## pad BIG_JUMP_BOOST before its toe.
+const BIG_JUMPS := [["StationJump", 300.0], ["TopJump", 1880.0]]
+const BIG_JUMP := [26.0, 6.0, 0.55]
+const BIG_JUMP_BOOST := 26.0
 
 ## Level pads for the depot: centre x, z, half length (x), half width (z), the blend over which the ground
 ## eases back, and the pad's height (set from the plain's mean under it by _plan_pads).
@@ -1660,7 +1667,7 @@ func _consist_length(consist: Array) -> float:
 
 
 ## The local passenger train: a diesel at each end (the rear one turned round) and two coaches. It comes out of the
-## west tunnel along the Main Line, takes turnout T1 onto the yard's lead and runs round into Estación del Viento's
+## west tunnel along the Main Line, takes turnout T1 onto the yard's lead and runs round into Estación Seca's
 ## platform, stands there, then backs out the way it came, onto the Main Line and away into the tunnel. Its path is
 ## the Main Line from its west end to T1 and the lead on to the buffer stop; it keeps a timetable of its own
 ## (Train.gd's `legs`) every LOCAL_PERIOD seconds, two of the Main Line's: in while the line between the tunnel and
@@ -2406,12 +2413,16 @@ func _place_gameplay(level_scene: Node3D) -> void:
 		checkpoints_container.add_child(gate)
 		print("  checkpoint %d at %.0fm" % [i + 1, cp_offs[i]])
 
-	# Boost pads: out of the first corner, the far side of each crossing, and the finish straight.
+	_build_big_jumps(level_scene)
+	# Boost pads: out of the first corner, the far side of each crossing, before each big jump, and the west straight
+	# (none leading into a crossing: a boosting cart can't brake for a closed one).
 	var boost_scene: PackedScene = load("res://BoostPad.tscn")
 	var boost_container := Node3D.new()
 	boost_container.name = "BoostPads"
 	level_scene.add_child(boost_container)
-	var bp_defs: Array = [["Boost_Start", FINISH_S + 330.0, 0.0]]
+	var bp_defs: Array = [["Boost_Start", FINISH_S + 330.0, 0.0], ["Boost_West", 2140.0, 0.0]]
+	for bj in BIG_JUMPS:
+		bp_defs.append(["Boost_%s" % bj[0], float(bj[1]) - BIG_JUMP_BOOST, 0.0])
 	var bi := 0
 	for c in _crossings:
 		bi += 1
@@ -2423,6 +2434,32 @@ func _place_gameplay(level_scene: Node3D) -> void:
 		bp.position = sp2["pos"]
 		bp.rotation_degrees = Vector3(0, sp2["yaw"], 0)
 		boost_container.add_child(bp)
+
+
+## The big trestle jumps, and their lips in the TrackPath's jump_lips (for scratch/nyota_jump_test).
+func _build_big_jumps(level_scene: Node3D) -> void:
+	var lips: Array = []
+	for bj in BIG_JUMPS:
+		var toe: float = bj[1]
+		var length: float = BIG_JUMP[0]
+		var h: float = BIG_JUMP[1]
+		var j: Node3D = (load("res://WoodenRamp.tscn") as PackedScene).instantiate()
+		j.name = bj[0]
+		var sp: Dictionary = _spot(toe, 0.0, 0.0)
+		j.position = sp["pos"]
+		j.rotation_degrees = Vector3(0, sp["yaw"], 0)
+		j.set("length", length)
+		j.set("height", h)
+		j.set("curve", BIG_JUMP[2])
+		j.set("width", ROAD_HALF * 2.0)
+		j.set("trestle", true)
+		j.set("wood_color", Color(0.62, 0.48, 0.33))
+		level_scene.add_child(j)
+		var lp: Dictionary = _spot(toe + length, 0.0, 0.0)
+		var slope: float = h / length * (1.0 + float(BIG_JUMP[2]))
+		var lip: Vector3 = (lp["pos"] as Vector3) + Vector3(0, h + (_road_height_at_s(toe) - _road_height_at_s(toe + length)), 0)
+		lips.append({"name": bj[0], "lip": lip, "dir": ((lp["fwd"] as Vector3) + Vector3(0, slope, 0)).normalized()})
+	(level_scene.get_node("TrackPath") as Node).set_meta(&"jump_lips", lips)
 
 
 # ======================================================================================

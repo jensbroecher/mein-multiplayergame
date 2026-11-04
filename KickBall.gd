@@ -35,8 +35,9 @@ const KICK_GAP := 0.15
 ## (a deceleration in m/s^2 while it rolls slowly along the ground: a beach ball sits in the sand, where
 ## the beach's slope pulls at it with about 0.45, instead of rolling off down into the sea).
 const STYLES := {
-	# A size 5 football (22cm) at the stadium's scale (its people are 1.86 times life size).
-	Style.FOOTBALL: {"radius": 0.205, "mass": 4.0, "gravity": 2.6, "damp": 0.45, "spin_damp": 0.6,
+	# A size 5 football (22cm) at the stadium's scale (its people are 1.86 times life size), grown again
+	# by 1.75 (0.72m across): at 0.41m it was hard to see from the chase camera and easy to miss.
+	Style.FOOTBALL: {"radius": 0.36, "mass": 5.0, "gravity": 2.6, "damp": 0.45, "spin_damp": 0.6,
 		"bounce": 0.62, "friction": 0.7, "kick": 1.5, "lift": 0.16, "slow": 0.1, "float": 0.5,
 		"top": 62.0, "drag": 0.0, "roll": 0.25, "pitch": 1.0},
 	# A 56cm beach ball at Bloombay's PROP_SCALE (1.6).

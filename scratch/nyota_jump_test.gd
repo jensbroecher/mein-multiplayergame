@@ -42,6 +42,9 @@ func _ready() -> void:
 		for v in speeds:
 			var r: Dictionary = await _run(level, lip, v)
 			line += "  %d: air %.2fs land %+.1fm peak %.1fm keep %.0f%s" % [int(v), r.air, r.land, r.peak, r.keep, "" if r.ok else " STUCK"]
+			# A paper banner on the way (Nyota's Drop-In): how much of it is left after each run.
+			for b in get_tree().get_nodes_in_group("paper_banners"):
+				line += " [banner %d cells left, %d scraps]" % [b.intact_cells(), b.scrap_count()]
 		print("JUMP %-16s%s" % [lip["name"], line])
 	get_tree().quit()
 

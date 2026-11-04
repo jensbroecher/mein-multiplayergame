@@ -80,8 +80,9 @@ var cars: Array[Car] = []
 var train_length := 0.0
 var _path_length := 0.0
 var _prev_pos := {}      # cart instance id -> position at the last tick
-var _engine_audio: AudioStreamPlayer3D
-var _clatter_audio: AudioStreamPlayer3D
+## The recorded loops on the train: {players: [two AudioStreamPlayer3D], on, gain, engine}. Each recording plays
+## through and crossfades (LOOP_XFADE) into itself on the other player before it ends: they aren't seamless loops.
+var _loops: Array = []
 
 
 func _ready() -> void:
@@ -171,6 +172,14 @@ func _update_bodies(moving: bool) -> void:
 			car.body.collision_layer = layer
 
 
+## The locomotives' diesel (two recordings: each train picks one by its name) and the wheels on the track, with
+## the gain that brings each to the level of the synthesised loops they replaced (FreightKit.diesel at -3dB,
+## clatter at -2dB: -17.7 and -20.4 dBFS; the recordings' RMS measured, scratch/train_sound_levels.gd).
+const DIESEL_CLIPS := [["res://sounds/diesel_locomotive.wav", 4.3], ["res://sounds/diesel_locomotive2.wav", 3.1]]
+const TRACK_CLIP := ["res://sounds/train_track_sound.wav", -4.8]
+const LOOP_XFADE := 1.5
+
+
 func _add_sounds() -> void:
 	var loco: Car = null
 	var mid: Car = null
@@ -182,13 +191,20 @@ func _add_sounds() -> void:
 		if car.offset > train_length * 0.45 and mid == null:
 			mid = car
 	if loco != null:
-		_engine_audio = _player(FreightKit.diesel(), -3.0, 30.0)
-		_engine_audio.position = Vector3(0, 3.0, 0)
-		loco.node.add_child(_engine_audio)
+		var clip: Array = DIESEL_CLIPS[absi(hash(String(name))) % DIESEL_CLIPS.size()]
+		_add_loop(loco.node, load(clip[0]), float(clip[1]), 30.0, Vector3(0, 3.0, 0), true)
 	if mid != null:
-		_clatter_audio = _player(FreightKit.clatter(), -2.0, 40.0)
-		_clatter_audio.position = Vector3(0, 1.0, 0)
-		mid.node.add_child(_clatter_audio)
+		_add_loop(mid.node, load(TRACK_CLIP[0]), float(TRACK_CLIP[1]), 40.0, Vector3(0, 1.0, 0), false)
+
+
+func _add_loop(parent: Node3D, stream: AudioStream, gain: float, unit: float, at: Vector3, engine: bool) -> void:
+	var players: Array = []
+	for i in 2:
+		var p := _player(stream, gain, unit)
+		p.position = at
+		parent.add_child(p)
+		players.append(p)
+	_loops.append({"players": players, "on": 0, "gain": gain, "engine": engine})
 
 
 func _player(stream: AudioStream, db: float, unit: float) -> AudioStreamPlayer3D:
@@ -368,16 +384,30 @@ func _update_sounds() -> void:
 	if not legs.is_empty():
 		var tc := cycle_time()
 		rolling = absf(_leg_head(tc) - _leg_head(fposmod(tc - 0.5, period))) > 0.5
-	for pair in [[_engine_audio, "loco"], [_clatter_audio, ""]]:
-		var pl: AudioStreamPlayer3D = pair[0]
-		if pl == null:
-			continue
+	for lp in _loops:
+		var players: Array = lp["players"]
+		var pl: AudioStreamPlayer3D = players[lp["on"]]
 		var node := pl.get_parent() as MeshInstance3D
-		var on: bool = node != null and node.visible and (rolling or pl == _engine_audio)
-		if on and not pl.playing:
-			pl.play()
-		elif not on and pl.playing:
-			pl.stop()
+		var on: bool = node != null and node.visible and (rolling or lp["engine"])
+		if not on:
+			for p in players:
+				if (p as AudioStreamPlayer3D).playing:
+					(p as AudioStreamPlayer3D).stop()
+			continue
+		var gain: float = lp["gain"]
+		if not pl.playing:
+			# Coming into view: anywhere in the recording, so two trains never play in step.
+			pl.volume_db = gain
+			pl.play(randf() * maxf(pl.stream.get_length() - LOOP_XFADE * 2.0, 0.0))
+		elif pl.get_playback_position() > pl.stream.get_length() - LOOP_XFADE:
+			lp["on"] = 1 - int(lp["on"])
+			var nx: AudioStreamPlayer3D = players[lp["on"]]
+			nx.volume_db = gain - 30.0
+			nx.play(0.0)
+			nx.create_tween().tween_property(nx, "volume_db", gain, LOOP_XFADE)
+			var tw := pl.create_tween()
+			tw.tween_property(pl, "volume_db", gain - 30.0, LOOP_XFADE)
+			tw.tween_callback(pl.stop)
 
 
 # ======================================================================================

@@ -421,6 +421,8 @@ const STAGE_TRACKS := {
 		"res://music/africa/Nairobi_at_Top_Speed.mp3",
 		"res://music/africa/Red_Clay_Drift.mp3",
 	],
+	# Mina del Viento (Sierra del Viento's finale): its own track, kept out of the canyon stages' shuffle.
+	"mina": ["res://music/canyon/Sun_Scorched_Horizon.mp3"],
 }
 
 ## Stage categories that shuffle their own folder (and the root folder if it's empty).
@@ -440,6 +442,8 @@ static func _stage_track_key(path_lower: String) -> String:
 		return "msitu"
 	if path_lower.contains("mtaa"):
 		return "mtaa"
+	if path_lower.get_file().begins_with("mina"):
+		return "mina"
 	return ""
 
 ## Picks the stage's tracks and starts loading the first one in the background. Level calls it when
@@ -480,7 +484,7 @@ func load_playlist_for_level(scene_path: String):
 	_clear_playlist()
 	_current_level_key = level_key
 	if STAGE_TRACKS.has(level_key):
-		# Matumaini GP stages: their own tracks only.
+		# Matumaini GP stages and Mina del Viento: their own tracks only.
 		_add_tracks(STAGE_TRACKS[level_key])
 	elif level_key == "beach":
 		# Bloombay Dunes: only music/beach/.
@@ -518,6 +522,10 @@ func load_playlist_for_level(scene_path: String):
 		])
 	elif STAGE_FOLDERS.has(level_key):
 		_add_folder(music_folder + STAGE_FOLDERS[level_key])
+		# A track a stage has to itself (Mina's in music/canyon/) stays out of the folder's shuffle.
+		for own in STAGE_TRACKS.values():
+			for path in own:
+				playlist.erase(path)
 	if playlist.is_empty():
 		_add_folder(music_folder)
 	_refill_and_shuffle_queue()

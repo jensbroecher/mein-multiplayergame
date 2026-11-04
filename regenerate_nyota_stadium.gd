@@ -51,6 +51,7 @@ const StreetLampKit = preload("res://StreetLampKit.gd")
 const FoodTruckKit = preload("res://FoodTruckKit.gd")
 const MarketStallKit = preload("res://MarketStallKit.gd")
 const CrowdKit = preload("res://CrowdKit.gd")
+const PaperBannerScript = preload("res://PaperBanner.gd")
 const MESH_CHUNK_CELL := 80.0
 
 ## The cart: PlayerCart.GRAVITY plus the engine's 9.8, its fall speed cap, sphere centre over the
@@ -126,12 +127,42 @@ const DROP_HILL_TOP_Y := 6.2
 const DROP_HILL_END_X := 116.0
 
 const FINISH_S := 30.0
-## Where the football waits: x along lane 4 (flat from the Kibo double's landing to the exit ramp),
-## metres right of the line.
-const FOOTBALL_X := 78.0
-const FOOTBALL_LAT := 1.6
+## Return jumps (WoodenRamp kickers) outside the street barriers, for a cart that jumped out into the city or
+## the fan zone: run at one and it throws you back over the barrier onto the road. [name, where, side]:
+## "drop" is 5m before the Drop-In's run-up straight (fan zone and market plaza: they land you in the jump back
+## into the bowl), else [segment, x or z along it]. side +1 right of travel. Each is RETURN_ANGLE off the road's
+## heading, so the cart crosses the barrier steeply and lands heading on along the lap.
+const RETURN_JUMPS := [
+	["FanZone", "drop", 1.0],
+	["Market", "drop", -1.0],
+	["AvenueInfield", [SEG_AVENUE, 58.0], 1.0],
+	["AvenueCity", [SEG_AVENUE, 110.0], -1.0],
+	["CarPark", [SEG_L4, 255.0], -1.0],
+]
+const RETURN_LEN := 9.0
+const RETURN_H := 2.7
+const RETURN_W := 5.0
+const RETURN_ANGLE := 50.0
+## The paper banner over the Drop-In stands this far past the kicker's lip (the wall is 5.6m past it).
+const BANNER_PAST_LIP := 3.5
+## Where the footballs wait: [lane segment, x along it, metres right of the line], each on a flat run
+## between a lane's jumps (lane 1 after the Grandstand Table, lane 2 after the triple, lane 3 after the
+## Rhythm double, two on lane 4 between the exit table and the exit boost).
+const FOOTBALLS := [
+	[SEG_L1, -9.0, -2.0],
+	[SEG_L2, 64.0, 2.0],
+	[SEG_L3, -66.0, -2.2],
+	[SEG_L4, 78.0, 1.6],
+	[SEG_L4, 90.0, -2.2],
+]
 
 var _segs: Array = []
+## Every building's tiers as [poly, y0, y1], for their colliders.
+var _city_solids: Array = []
+## Solid boxes for the precinct's props (tents, TV trucks, camera towers): [centre, size, yaw].
+var _precinct_solids: Array = []
+## The return jumps: {s, side, lip: Vector3, dir: Vector3, toe: Vector3, yaw}.
+var _return_jumps: Array = []
 var _lap_len := 0.0
 ## Height profile pieces: [s0, s1, kind, h0, h1, n] sorted by s0.
 var _pieces: Array = []
@@ -1091,6 +1122,19 @@ func _build_walls(parent: Node, concrete: Material, net_mat: Material) -> void:
 						var qm: Vector2 = (qa + qc) * 0.5
 						var qdir: Vector2 = (qc - qa).normalized()
 						_box_body(root, "CornerParapet", Vector3(qm.x, STREET_Y + 2.0, qm.y), Vector3(qa.distance_to(qc), 4.0, 0.5), -atan2(qdir.y, qdir.x))
+	# The yards' edge beside each stand's end, from the floor up to the paving: the paving is one-sided, so from
+	# the arena, looking past a stand's end over its low front rows, the fans in the yard stood on nothing.
+	# Behind the corner wall (its arena face would z-fight) and 5cm off the stand's own end.
+	for st in STANDS:
+		var depth: float = float(_stand_section(st[4])["depth"])
+		var half: float = st[3]
+		for end in [-1.0, 1.0]:
+			var a0: float = end * (half + 0.05)
+			var a1: float = end * (half + 0.6)
+			var q0: Vector3 = _stand_point(st, (a0 + a1) * 0.5, (0.85 + depth) * 0.5, 0.0)
+			var out2: Vector2 = st[2]
+			var yaw: float = atan2(out2.x, out2.y)
+			b.box(Vector3(q0.x, (FLOOR_Y + STREET_Y - 0.02) * 0.5, q0.z), Vector3(0.55, STREET_Y - 0.02 - FLOOR_Y, depth - 0.85), yaw, wall_col, 0.25, true)
 	var mi := MeshInstance3D.new()
 	mi.name = "WallMesh"
 	mi.mesh = _save_baked_resource(b.commit(), "walls")
@@ -2119,7 +2163,21 @@ func _build_cutting(parent: Node, concrete: Material) -> void:
 			var c := Color(0.76, 0.75, 0.72)
 			b.quad(pts[0][0], pts[1][0], pts[1][1], pts[0][1], inner, c, 0.25)
 			b.quad(pts[0][1], pts[1][1], pts[1][2], pts[0][2], Vector3.UP, c * 0.9, 0.25)
+			# The parapet's back, down to the yard's paving: with only the road's face the wall vanished seen
+			# from the street (one-sided faces are culled from behind) and the road showed through it.
+			var o0: Vector3 = pts[0][2]
+			var o1: Vector3 = pts[1][2]
+			var foot := Vector3(0.0, STREET_Y - 0.05 - o0.y, 0.0)
+			b.quad(o0 + foot, o1 + foot, o1, o0, -inner, c * 0.95, 0.25)
 			faces.append_array([pts[0][0], pts[1][0], pts[1][1], pts[0][0], pts[1][1], pts[0][1]])
+			faces.append_array([o0 + foot, o1 + foot, o1, o0 + foot, o1, o0])
+			# Its end at the top of the cutting, where it is only a parapet over the road.
+			if sb >= s1 - 0.01:
+				var fwd2: Vector2 = _dir_of(float(_plan_at(sb)["th"]))
+				var e: Array = pts[1]
+				var efoot := Vector3(e[2].x, STREET_Y - 0.05, e[2].z)
+				b.quad(e[0], efoot, e[2], e[1], Vector3(fwd2.x, 0.0, fwd2.y), c * 0.9, 0.25)
+				faces.append_array([e[0], efoot, e[2], e[0], e[2], e[1]])
 		s = sb
 	var mi := MeshInstance3D.new()
 	mi.name = "CuttingWalls"
@@ -2168,6 +2226,15 @@ func _build_street_barriers(parent: Node, concrete: Material, net_mat: Material)
 				ring.append(pts)
 				ring.append(r2 * side)
 			var inner2: Vector2 = -ring[1]
+			# Close the barrier's ends: open, its profile showed as a hollow shell from the top of the cutting
+			# and the Drop-In's run-up.
+			for end in [[sa <= s0 + 0.01, ring[0], -1.0, sa], [sb >= s1 - 0.01, ring[2], 1.0, sb]]:
+				if not end[0]:
+					continue
+				var f2: Vector2 = _dir_of(float(_plan_at(float(end[3]))["th"])) * float(end[2])
+				var ep: Array = end[1]
+				for k in range(1, ep.size() - 1):
+					b.tri(ep[0], ep[k], ep[k + 1], Vector3(f2.x, 0.0, f2.y), col)
 			for k in range(ring[0].size() - 1):
 				var a0: Vector3 = ring[0][k]
 				var a1: Vector3 = ring[0][k + 1]
@@ -2181,9 +2248,11 @@ func _build_street_barriers(parent: Node, concrete: Material, net_mat: Material)
 				b.quad(a0, a1, b1, b0, hint, c, 0.3)
 				if k < 4:
 					faces.append_array([a0, a1, b1, a0, b1, b0])
-			# Fence over the barrier.
+			# Fence over the barrier, none where a return jump crosses it.
 			var t0: Vector3 = (ring[0][3] + ring[0][4]) * 0.5
 			var t1: Vector3 = (ring[2][3] + ring[2][4]) * 0.5
+			if _near_return_jump(Vector2((t0.x + t1.x) * 0.5, (t0.z + t1.z) * 0.5), 2.5, true):
+				continue
 			net.quad(t0, t1, t1 + Vector3(0, 2.8, 0), t0 + Vector3(0, 2.8, 0), Vector3(inner2.x, 0, inner2.y), Color.WHITE, 1.0)
 			if stripe % 3 == 0:
 				b.box(t0 + Vector3(0, 1.45, 0), Vector3(0.12, 2.9, 0.12), 0.0, Color(0.3, 0.31, 0.33))
@@ -2364,6 +2433,7 @@ func _tier(b: Builder, poly: PackedVector2Array, y0: float, y1: float, col: Colo
 
 ## A box along the edge i of `poly`, `along` long (centred, or from the start with `from_start`), `depth` out
 ## from the wall (negative: in), `height` tall from `y`; for cornices, parapets, canopies and balconies.
+## Its underside is drawn too: the shop awnings, balcony slabs and cornices are seen from the street below.
 func _edge_box(b: Builder, poly: PackedVector2Array, i: int, y: float, height: float, depth: float, col: Color, grow := 0.0, margin := 0.0, inner := 0.0) -> void:
 	var a: Vector2 = poly[i]
 	var c: Vector2 = poly[(i + 1) % poly.size()]
@@ -2378,7 +2448,7 @@ func _edge_box(b: Builder, poly: PackedVector2Array, i: int, y: float, height: f
 	var mid_off: float = (depth - inner) * 0.5
 	var centre2: Vector2 = (a + c) * 0.5 + o * mid_off
 	var length: float = len - 2.0 * margin + 2.0 * grow
-	b.box(Vector3(centre2.x, y + height * 0.5, centre2.y), Vector3(length, height, thick), -atan2(d.y, d.x), col)
+	b.box(Vector3(centre2.x, y + height * 0.5, centre2.y), Vector3(length, height, thick), -atan2(d.y, d.x), col, 0.25, true)
 
 
 ## True where edge i of `poly` lies along an edge of one of `others` (a wall shared with another tier).
@@ -2486,6 +2556,8 @@ func _building_massed(b: Builder, d: Builder, lot: Rect2, fp: Rect2, top: float,
 		elif storeys >= 3 and roll < 0.62 and minf(fp.size.x, fp.size.y) > 16.0:
 			kind = 3
 	var tiers := _massing(lot, fp, top, storeys, kind, rng)
+	for t in tiers:
+		_city_solids.append([t["poly"], float(t["y0"]), float(t["y1"])])
 	# The window style, in UV2.y: 0 punched, 1 ribbon, 2 a narrow pair, 3 tall (city_building.gdshader).
 	var runs := {"bays": 0, "shops": 0, "style": rng.randi_range(0, 3)}
 	var trim := Color(minf(col.r + 0.14, 1.0), minf(col.g + 0.14, 1.0), minf(col.b + 0.14, 1.0), A_PLAIN)
@@ -2789,6 +2861,7 @@ func _build_city(parent: Node) -> void:
 	var root := Node3D.new()
 	root.name = "City"
 	parent.add_child(root)
+	_build_city_solids(root)
 	var shell_tris := 0
 	var detail_tris := 0
 	for key in cells:
@@ -2818,6 +2891,39 @@ func _build_city(parent: Node) -> void:
 		root.add_child(mi2)
 		detail_tris += b3.verts.size() / 3
 	print("  city: %d buildings in %d cells (%d triangles, %d in the detail)" % [count, cells.size(), shell_tris, detail_tris])
+
+
+## Every building solid: each tier a convex prism (an L split in two), one body per city cell. The cells'
+## meshes are 400m across, and DressingColliders leaves anything that size alone, so a cart that jumped the
+## barriers drove through the houses round the stadium.
+func _build_city_solids(root: Node3D) -> void:
+	var bodies := {}
+	var shapes := 0
+	for so in _city_solids:
+		var poly: PackedVector2Array = so[0]
+		var y0: float = so[1]
+		var y1: float = minf(so[2], STREET_Y + 40.0)
+		if y1 <= y0:
+			continue
+		var key := Vector2i(floori(poly[0].x / CITY_CELL), floori(poly[0].y / CITY_CELL))
+		if not bodies.has(key):
+			var body := StaticBody3D.new()
+			body.name = "CitySolid_%d_%d" % [key.x, key.y]
+			body.set_meta(&"surface", "rock")
+			root.add_child(body)
+			bodies[key] = body
+		for piece in Geometry2D.decompose_polygon_in_convex(poly):
+			var pts := PackedVector3Array()
+			for q in piece:
+				pts.append(Vector3(q.x, y0, q.y))
+				pts.append(Vector3(q.x, y1, q.y))
+			var shape := ConvexPolygonShape3D.new()
+			shape.points = pts
+			var cs := CollisionShape3D.new()
+			cs.shape = shape
+			(bodies[key] as StaticBody3D).add_child(cs)
+			shapes += 1
+	print("  city solids: %d shapes in %d bodies" % [shapes, bodies.size()])
 
 
 ## The block inside the lap's streets, between Soko Street and the avenue: shops on every side,
@@ -3650,6 +3756,11 @@ func _matatu_lap_distance(pos: Vector3, yaw: float) -> float:
 ## A gazebo tent: four legs and a pyramid roof.
 func _tent(b: Builder, pos: Vector3, size: float, col: Color) -> void:
 	var h := 4.6
+	# Solid: the legs, and the roof from the valance's hem to the apex (carts drive under it between the legs).
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			_precinct_solids.append([pos + Vector3(sx * size * 0.47, h * 0.5, sz * size * 0.47), Vector3(0.35, h, 0.35), 0.0])
+	_precinct_solids.append([pos + Vector3(0, h + 0.5, 0), Vector3(size, 2.2, size), 0.0])
 	for sx in [-1.0, 1.0]:
 		for sz in [-1.0, 1.0]:
 			b.box(pos + Vector3(sx * size * 0.47, h * 0.5, sz * size * 0.47), Vector3(0.18, h, 0.18), 0.0, Color(0.85, 0.85, 0.85))
@@ -3772,11 +3883,14 @@ func _build_precinct_dressing(parent: Node) -> Array:
 		b.box(tv + Vector3(-2.0, 6.4, 0), Vector3(0.3, 1.2, 0.3), 0.0, Color(0.5, 0.5, 0.5))
 		var dish: Vector3 = tv + Vector3(-2.0, 7.6, 0)
 		b.box(dish, Vector3(2.6, 2.6, 0.3), 0.6, Color(0.95, 0.95, 0.95))
+		_precinct_solids.append([tv + Vector3(0, 3.2, 0), Vector3(14.0, 5.6, 4.6), 0.0])
+		_precinct_solids.append([tv + Vector3(8.0, 2.6, 0), Vector3(3.6, 4.4, 4.4), 0.0])
 	for corner in [Vector2(-128.0, 84.0), Vector2(-128.0, -84.0), Vector2(128.0, 84.0)]:
 		var base := Vector3(corner.x, STREET_Y, corner.y)
 		for sx in [-1.0, 1.0]:
 			for sz2 in [-1.0, 1.0]:
 				b.box(base + Vector3(sx * 1.6, 6.0, sz2 * 1.6), Vector3(0.2, 12.0, 0.2), 0.0, Color(0.7, 0.7, 0.72))
+				_precinct_solids.append([base + Vector3(sx * 1.6, 6.0, sz2 * 1.6), Vector3(0.35, 12.0, 0.35), 0.0])
 		b.box(base + Vector3(0, 12.1, 0), Vector3(4.2, 0.3, 4.2), 0.0, Color(0.45, 0.32, 0.20))
 		b.box(base + Vector3(0, 13.4, 0), Vector3(1.2, 1.2, 2.2), 0.0, Color(0.08, 0.08, 0.09))
 	# Streetlights along the lap's streets, behind the barriers: one StreetLampKit mesh, instanced per cell.
@@ -3789,10 +3903,23 @@ func _build_precinct_dressing(parent: Node) -> Array:
 			var base2: Vector3 = lp["pos"]
 			base2.y = STREET_Y
 			var inward: Vector3 = -lp["right"] * side
+			if _near_return_jump(Vector2(base2.x, base2.z), 2.0):
+				continue
 			# The kit's arm reaches along +x.
 			lamp_xf.append(Transform3D(Basis(Vector3.UP, atan2(-inward.z, inward.x)), base2))
 		sl += 24.0
 	_build_street_lamps(parent, lamp_xf)
+	var solid := StaticBody3D.new()
+	solid.name = "PrecinctSolids"
+	solid.set_meta(&"surface", "rock")
+	parent.add_child(solid)
+	for ps in _precinct_solids:
+		var cs := CollisionShape3D.new()
+		var bx := BoxShape3D.new()
+		bx.size = ps[1]
+		cs.shape = bx
+		cs.transform = Transform3D(Basis(Vector3.UP, float(ps[2])), ps[0])
+		solid.add_child(cs)
 	var mi := MeshInstance3D.new()
 	mi.name = "PrecinctProps"
 	mi.mesh = _save_baked_resource(b.commit(), "precinct_props")
@@ -3875,6 +4002,49 @@ func _build_lane_dividers(parent: Node) -> void:
 #  Gameplay
 # ======================================================================================
 
+## Where each return jump stands: its lip clear of the barrier's outer foot by its half width's reach.
+func _plan_return_jumps() -> void:
+	_return_jumps.clear()
+	var a: float = deg_to_rad(RETURN_ANGLE)
+	for rj in RETURN_JUMPS:
+		var s: float
+		if typeof(rj[1]) == TYPE_STRING:
+			s = float(_segs[SEG_DROP]["s0"]) - 5.0
+		else:
+			var seg: int = rj[1][0]
+			s = _s_at_x(seg, float(rj[1][1])) if seg == SEG_L4 else _s_at_z(seg, float(rj[1][1]))
+		var side: float = rj[2]
+		var sp: Dictionary = _spot(s, 0.0, 0.0)
+		var fwd: Vector3 = sp["fwd"]
+		fwd.y = 0.0
+		fwd = fwd.normalized()
+		var right: Vector3 = sp["right"]
+		right.y = 0.0
+		right = right.normalized()
+		var outer: float = _half_at(s) + 2.55
+		# The lip's nearest corner 0.4m off the barrier's outer foot.
+		var lat: float = outer + 0.4 + RETURN_W * 0.5 * cos(a)
+		var lip: Vector3 = (sp["pos"] as Vector3) + right * side * lat
+		lip.y = STREET_Y
+		var dir: Vector3 = (fwd * cos(a) - right * side * sin(a)).normalized()
+		var toe: Vector3 = lip - dir * RETURN_LEN
+		_return_jumps.append({"name": rj[0], "s": s, "side": side, "lip": lip, "dir": dir, "toe": toe})
+		print("  return jump %s: toe (%.1f, %.1f) lip (%.1f, %.1f)" % [rj[0], toe.x, toe.z, lip.x, lip.z])
+
+
+## True within `margin` of a return jump's footprint (and, with `over`, of the way over the barrier past its lip).
+func _near_return_jump(p: Vector2, margin: float, over := false) -> bool:
+	for rj in _return_jumps:
+		var t3: Vector3 = rj["toe"]
+		var l3: Vector3 = (rj["lip"] as Vector3) + (rj["dir"] as Vector3) * (4.5 if over else 0.5)
+		var a := Vector2(t3.x, t3.z)
+		var c := Vector2(l3.x, l3.z)
+		var t: float = clampf((p - a).dot(c - a) / (c - a).length_squared(), 0.0, 1.0)
+		if p.distance_to(a + (c - a) * t) < RETURN_W * 0.5 + margin:
+			return true
+	return false
+
+
 func _place_gameplay(level_scene: Node3D) -> void:
 	var gate_scene: PackedScene = load("res://CheckpointGate.tscn")
 	var spawn_scene: PackedScene = load("res://SpawnIndicator.tscn")
@@ -3909,10 +4079,12 @@ func _place_gameplay(level_scene: Node3D) -> void:
 	var checkpoints_container := Node3D.new()
 	checkpoints_container.name = "Checkpoints"
 	level_scene.add_child(checkpoints_container)
+	# The hairpin gates stand well down the lane (38-40m past the hairpin's exit): 16m past it, a cart
+	# drifting out of the bermed turn wide at speed went round the gate's area and missed it. Lane 3 has none
+	# (too many gates in the bowl): the lane dividers are walls, so nobody gets from lane 2 to lane 4 without it.
 	var cp_offs: Array = [
-		_s_at_x(SEG_L2, -104.0),
-		_s_at_x(SEG_L3, 104.0),
-		_s_at_x(SEG_L4, -104.0),
+		_s_at_x(SEG_L2, -80.0),
+		_s_at_x(SEG_L4, -82.0),
 		_s_at_z(SEG_AVENUE, 75.0),
 		_s_at_z(SEG_SOKO, 118.0),
 	]
@@ -3963,14 +4135,49 @@ func _place_gameplay(level_scene: Node3D) -> void:
 			item_container.add_child(ib)
 			item_idx += 1
 
-	# The football (KickBall.gd: carts kick it about and lose a little speed to it), resting on lane
-	# 4's flat run before the exit boost, a little off the line.
-	var ball := RigidBody3D.new()
-	ball.name = "Football"
-	ball.set_script(load("res://KickBall.gd"))
-	var bs: Dictionary = _spot(_s_at_x(SEG_L4, FOOTBALL_X), FOOTBALL_LAT, float(KickBall.STYLES[KickBall.Style.FOOTBALL]["radius"]) + 0.02)
-	ball.position = bs["pos"]
-	level_scene.add_child(ball)
+	# The return jumps, outside the street barriers.
+	var rj_root := Node3D.new()
+	rj_root.name = "ReturnJumps"
+	level_scene.add_child(rj_root)
+	var ramp_scene: PackedScene = load("res://WoodenRamp.tscn")
+	for rj in _return_jumps:
+		var ramp: Node3D = ramp_scene.instantiate()
+		ramp.name = "ReturnJump_%s" % rj["name"]
+		ramp.set("length", RETURN_LEN)
+		ramp.set("height", RETURN_H)
+		ramp.set("width", RETURN_W)
+		ramp.set("curve", 0.8)
+		ramp.set("tail_length", 0.0)
+		ramp.set("trim_color", Color(0.98, 0.80, 0.10))
+		# Across the street's line, not along it.
+		ramp.set("face_lap", false)
+		var dir3: Vector3 = rj["dir"]
+		ramp.transform = Transform3D(Basis.looking_at(dir3, Vector3.UP), rj["toe"])
+		rj_root.add_child(ramp)
+
+	# The paper run-through banner (PaperBanner.gd) over the Drop-In: just past the kicker's lip, standing on the
+	# yard's paving where it runs on to the wall, so the field bursts through it on the way back into the bowl.
+	PaperBannerScript.bake_texture()
+	var lip_at: Dictionary = _spot(float(_named_s["drop_lip"]) + BANNER_PAST_LIP, 0.0, 0.0)
+	var banner: Node3D = PaperBannerScript.new()
+	banner.name = "RunThroughBanner"
+	var bpos: Vector3 = lip_at["pos"]
+	bpos.y = STREET_Y
+	var bfwd: Vector3 = lip_at["fwd"]
+	banner.transform = Transform3D(Basis.looking_at(Vector3(bfwd.x, 0.0, bfwd.z).normalized(), Vector3.UP), bpos)
+	level_scene.add_child(banner)
+	print("  run-through banner at (%.1f, %.1f, %.1f)" % [bpos.x, bpos.y, bpos.z])
+
+	# The footballs (KickBall.gd: carts kick them about and lose a little speed to them), resting on
+	# flat runs in the lanes, a little off the line.
+	for i in range(FOOTBALLS.size()):
+		var fb: Array = FOOTBALLS[i]
+		var ball := RigidBody3D.new()
+		ball.name = "Football_%d" % (i + 1)
+		ball.set_script(load("res://KickBall.gd"))
+		var bs: Dictionary = _spot(_s_at_x(int(fb[0]), float(fb[1])), float(fb[2]), float(KickBall.STYLES[KickBall.Style.FOOTBALL]["radius"]) + 0.02)
+		ball.position = bs["pos"]
+		level_scene.add_child(ball)
 
 
 # ======================================================================================
@@ -4101,6 +4308,7 @@ func _ready() -> void:
 	_plan_profile()
 	_verify_layout()
 	_verify_jumps()
+	_plan_return_jumps()
 
 	# 2. Track.
 	main_curve = _build_main_curve()
@@ -4161,7 +4369,8 @@ func _ready() -> void:
 	_build_street_trees(streets)
 	_build_facades(stadium, concrete)
 	_build_drop_gantry(streets)
-	var plaza_people: Array = _build_precinct_dressing(streets)
+	var plaza_people: Array = _build_precinct_dressing(streets).filter(func(pp: Array) -> bool:
+		return not _near_return_jump(Vector2((pp[0] as Vector3).x, (pp[0] as Vector3).z), 1.5))
 	_build_crowd(streets, plaza_people)
 	_build_cutting(streets, concrete)
 	_build_street_barriers(streets, concrete, net_mat)

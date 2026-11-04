@@ -621,6 +621,13 @@ in front of the water while driving (Msitu Falls, Bloombay Dunes). `canyon_river
   An earlier version set off as soon as a cart fell fast with water below, and fired for carts that landed
   short. Test harnesses that make an AI cart the local player must set `camera_pivot.top_level` as
   PlayerCart's setup does, or the cart drags the pivot along.
+- The stages with a stadium crowd layer (Nyota, Mtaa) roar at the green light and when the first racer finishes
+  (`StageAmbience.roar()`, `ROAR`: `sounds/Huge_stadium_crowd.wav`, a 13s swell; Level's `_crowd_roar_rpc`).
+  The stages with a grandstand (a node named "Grandstand": Lakeside, Bloombay Dunes, Mina del Viento) cheer at the same
+  moments (`sounds/Fans_cheering.wav`), in 3D from the middle of the stand's meshes (`_find_grandstands`): Mina's
+  stands at the finish, so only the finish hears it; Lakeside's across the first corner, 150m from the line.
+  `res://scratch/crowd_cheer_check.tscn` (headless) lists what each stage plays. Nyota's paper banner cheers too
+  when the first cart bursts it.
 - `StageAmbience.gd` (added by Level) plays the recorded backgrounds in `sounds/<kind>/` per stage (`STAGES`),
   under the levels' own baked ambiences, crossfading random clips. Each clip is levelled by its measured
   RMS (`CLIP_DB`): they range from -12 to -49 dBFS. Measure a new clip before adding it. The deserts
@@ -1353,13 +1360,44 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   saves what the screen's own camera sees (`jumbo_view.png`) apart from how the quad shows it, which tells a
   camera problem from a mapping or occlusion one.
 
-- The football (`Football`, a `KickBall.gd`, see "Kick balls") waits on lane 4's flat run before the exit boost
-  (`FOOTBALL_X`, `FOOTBALL_LAT`), placed by `_place_gameplay`.
+- The footballs (`Football_1`..`5`, `KickBall.gd`, see "Kick balls") wait on flat runs in all four lanes, between the
+  jumps (`FOOTBALLS`: lane, x, lateral), placed by `_place_gameplay`.
+- The bowl's checkpoints stand 38-40m down the lane after their hairpin (lane 2 x -80 in the whoops, lane 4 x -82 at the
+  Kibo double's foot): 16m out, carts drifting wide out of the bermed turn went round the gate's area. Lane 3 has none
+  (the user found the bowl had too many): the lane dividers are 1.3m walls, so lanes 2 and 4's gates keep the lap honest.
+- Beside each stand's end a wall closes the yard's edge from the floor to the paving (`_build_walls`): the paving is
+  one-sided, and from the arena, past a stand's end over its low front rows, the yard's fans stood on nothing.
+- Everything in the city is solid: each building's tiers are convex prisms (`_city_solids`, `_build_city_solids`, an L
+  split by `decompose_polygon_in_convex`), one body per city cell (`CitySolid_*`): the cells' meshes are 400m across,
+  which DressingColliders skips. The fan zone's tents (legs, and the roof from the valance up), the TV trucks and the
+  camera towers are boxes (`_precinct_solids`, `PrecinctSolids`): their mesh is chunked. `_edge_box` draws undersides
+  (awnings, balcony slabs and cornices had none, invisible from the street below).
+- Return jumps (`RETURN_JUMPS`, `_plan_return_jumps`, `ReturnJumps/ReturnJump_*`): WoodenRamp kickers outside the
+  street barriers, `RETURN_ANGLE` off the road's heading, the lip's corner 0.4m off the barrier, for a cart that jumped
+  out: in the fan zone and the market plaza onto the Drop-In's run-up (straight into the jump back into the bowl), from
+  the infield and the city onto the avenue, from the car park onto lane 4's street. Lamps and people keep off them and
+  the fence stops over them (`_near_return_jump`). `res://scratch/return_jump_test.tscn -- [speeds=13,16,22,28]
+  [only=Market]` (headless) drives a real cart at each and prints where it lands: on the road from 13 to 28 m/s.
+- The paper run-through banner (`PaperBanner.gd`, node `RunThroughBanner`, `BANNER_PAST_LIP` 3.5m past the Drop-In's
+  lip, standing on the yard's paving before the wall): a 17 x 6.6m sheet on two posts and a top bar, printed with
+  `images/posters/forestrun.jpeg` between orange bands and chequered panels (`PaperBanner.bake_texture()`, run by the
+  generator, read straight from the JPEG, saved as `generated/paper_banner_texture.res`; `paper_banner.gdshader`, both
+  sides printed, the torn edges bare paper). The sheet is a grid of jittered cells; a cart crossing its plane (its
+  position, from frame to frame, every cart this peer sees) tears out an ellipse round where it hit (`HOLE`) with
+  rips running out of it (`SLITS`), and the cells no longer joined to the top bar or a post fall too. Each torn cell
+  is a scrap moved by the script (thrown with the cart, air drag, flutter, a ray to land on), lying 7-10s before
+  shrinking away. One sheet a race: never replaced. Later carts go through the hole or tear more. Local scenery, not
+  synced, costs no speed; its script moves things, so DressingColliders leaves its meshes alone (the frame has its
+  own boxes). `res://scratch/paper_banner_shots.tscn -- <dir> [speed=34] [lat=0] [carts=1] [times=...] [cam=...]`
+  (windowed, `--fixed-fps 60`) drives real carts through it and saves frames; `nyota_jump_test ... only=DropIn` prints
+  the cells left after each run.
+- The exit cutting's walls (`_build_cutting`) have a back face down to the yard's paving and a cap at the top end,
+  and the street barriers capped ends: with only the road's face, the north wall vanished seen from the street.
 
 ## Kick balls (KickBall.gd)
 
 - `KickBall.gd` (`@tool` RigidBody3D) is a ball the carts kick about: `Style.FOOTBALL` (Nyota Stadium: a size 5
-  ball at the stadium's 1.86 times life size, 0.41m across, about a fifth of a car's length) and `Style.BEACH`
+  ball at the stadium's 1.86 times life size grown again by 1.75, 0.72m across: at 0.41m it was hard to see) and `Style.BEACH`
   (Bloombay: 0.9m, light, floaty). It builds its sphere and shape as internal children from `STYLES` (radius,
   mass, gravity, damping, bounce, kick, lift, slow, float, drag, roll), so a level stores the transform, the
   style, `water_y` and `drift`. `kick_ball.gdshader` draws both: the football's 32 panels of a truncated
@@ -1704,7 +1742,9 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   Mtaa Road (tarmac, then murram through the estate), the park, Mwangaza Road into Club Kilele (an open-air club: its lane
   crosses the LED dancefloor), Kanisa Road (murram, past the church) and back. Music: `Green_Canopy_Dash`,
   `Nairobi_at_Top_Speed`, `Red_Clay_Drift` (`MusicManager.STAGE_TRACKS["mtaa"]`; Mara Crossing shuffles the other
-  three unused africa tracks with its own).
+  three unused africa tracks with its own). Mina del Viento has its own: `STAGE_TRACKS["mina"]`,
+  `music/canyon/Sun_Scorched_Horizon.mp3`, which the canyon folder's shuffle leaves out
+  (`res://scratch/stage_playlist_check.tscn` prints each stage's playlist).
 - Every road is a path of straights and arcs (`_fillet`: corner points and radii; `MAIN`, the forks `YARD`, `LAWN`,
   `BACKSTAGE`, the dressing-only `SIDE_STREETS`); everything is placed by (path, s). No road mesh: one heightfield
   (`GRID` 2m, in `TILE` tiles) carries per vertex the distance to the nearest road's edge (a smooth minimum, so junction
@@ -2241,7 +2281,10 @@ The menus call this stage Tolvanera Gulch (a dust devil, for its tornado); files
 
 
 
-## Freight Line (Sierra del Viento GP, stage 3)
+## Estación Seca (Freight Line, Sierra del Viento GP, stage 3)
+
+The menus call it Estación Seca (it was Freight Line), after its station; files and code keep "freight" (`FreightLevel.tscn`,
+`regenerate_freight_line.gd`). Lap records are keyed by the file, so a rename keeps them.
 
 A high-desert railroad plain at midday; the gimmick is two railways crossing the lap, with trains on the wall clock
 that destroy any cart they touch. `regenerate_freight_line.gd` (`regenerate_freight_line.tscn`, headless, about 8s) builds
@@ -2357,6 +2400,13 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
   try the kicker. Waiting bots bunch up and get shot. A crossing closes for each pass of each train on its own (`_windows`:
   `pass_windows`, so the local closes it twice a cycle, not for the minutes between). A boosting bot (a pad or an item)
   can't brake for a closed crossing.
+- Two big trestle jumps (`BIG_JUMPS`, `_build_big_jumps`: Mina's plateau jump, 26m to a 6m lip, as wide as the road)
+  on the straights with no crossing ahead: the start straight past the station (toe at s 300) and the top straight
+  past checkpoint 4 (toe 1880; a gate under the flight would be hit, carts fly 7-11m up), each with a boost pad
+  `BIG_JUMP_BOOST` before it; their lips are the TrackPath's `jump_lips` (`nyota_jump_test ...
+  level=res://levels/FreightLevel.tscn ground=1`: 25-83m out at 30-60 m/s, all keep their speed). Another pad starts
+  the west straight (`Boost_West`). No pad may lead into a crossing. `res://scratch/lap_layout_scan.gd` (`-s`,
+  headless, `-- [level=] [min=120]`) lists a lap's straights and where its gates, pads, ramps and crossings stand.
 - Every crossing has the flatcar kicker (`KICKER_*`, `_build_kicker`, a WoodenRamp whose lip is 11m before the rails): at
   35-40 m/s a cart is 4.4-4.8m over the road (centre) over the rails, clearing a 2.2m flatcar and not a boxcar (6.3m), a
   log car, a hopper or a coach. The lines' freights carry runs of empty flatcars (four in a row) to jump over.
@@ -2447,8 +2497,16 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
     rock colliders: a cart's sphere rolls up the low ones, bumping it into the air.
 - Dressing: telegraph poles and wires along the rails (`_build_poles`, solid cylinder colliders), advance warning signs (`_build_crossing_signs`),
   saguaros and other cacti (CactusKit, two detail levels swapped at 150m), sagebrush shrubs (`Sagebrush_*`, wobbling vegetation)
-  and boulders (`_build_flora`). Wind loop `PlainsWind`; the trains have synthesised diesel and clatter loops, the crossings a
-  bell and a horn (`FreightKit.bell/horn/diesel/clatter`).
+  and boulders (`_build_flora`). Wind loop `PlainsWind`; the crossings a bell and a horn (`FreightKit.bell/horn`). The trains play recordings
+  (`Train.DIESEL_CLIPS`: `sounds/diesel_locomotive*.wav`, one per train by its name, on the leading diesel;
+  `TRACK_CLIP`, `sounds/train_track_sound.wav`, the wheels), each through two players crossfading into itself over
+  `LOOP_XFADE` before it ends, levelled to the synthesised `FreightKit.diesel/clatter` they replaced
+  (`scratch/train_sound_levels.gd`); Mina del Viento's rail loop too. `res://scratch/train_loop_probe.tscn --
+  [level=] [seconds=]` (headless) prints each train's loops. `sounds/cargo_train*.wav` are recorded pass-bys (a swell and a
+  fade): each crossing plays one for every pass of a freight (`RailCrossing.PASSBY_CLIPS`: where to start in the
+  clip, its loudest moment, where to stop, gain), timed off the timetable so the swell peaks `PASSBY_PEAK_AFTER`
+  (2.5s) after the first car reaches it, the clip picked by the pass's number so every peer hears the same one.
+  `res://scratch/passby_probe.tscn -- [seconds=150]` (headless, real time) logs each pass-by against the warning.
 - AI races (`scratch/ai_race_test`, speed=1 only: the trains run on the real clock, not the engine's) finish three laps in
   about 250s; a few bots a race are blown up queueing at a closed crossing (missiles), rarely run into a train (a boosting
   bot can't brake for one). `noitems=1` doesn't take every item away here: a bot was still blown up with it. With the local

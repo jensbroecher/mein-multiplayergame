@@ -110,6 +110,8 @@ const LAP_RECORDS_PATH := "user://lap_records.cfg"
 var _gantry: Node = null
 ## Speaks the race calls by racer name (RaceCommentator.gd); fed the standings on every peer.
 var _commentator: Node = null
+## The stage's recorded background (StageAmbience.gd), which also roars at the start and the first finish.
+var _ambience: Node = null
 
 var spawn_points: Array = []
 @onready var players_container = $Players
@@ -215,6 +217,7 @@ func _ready():
 	var ambience = STAGE_AMBIENCE.new()
 	ambience.setup(scene_file_path)
 	add_child(ambience)
+	_ambience = ambience
 	_setup_gantry_ticker()
 
 	# Canyon Chasm: fill the first hill-jump pit with murky reflective water
@@ -607,6 +610,14 @@ func _check_finish(id: int):
 		# Start 30s timer if this is the first finisher
 		if end_timer <= 0.0:
 			end_timer = 30.0
+			_crowd_roar_rpc.rpc()
+
+## The crowd roars for the winner on every peer (_check_finish runs on the server).
+@rpc("authority", "call_local", "reliable")
+func _crowd_roar_rpc() -> void:
+	if _ambience:
+		_ambience.roar()
+
 
 @rpc("authority", "call_local", "reliable")
 func show_player_finished_rpc(place: int = 0):
@@ -937,6 +948,8 @@ func start_race():
 		ui.show_message("GO!", 2.0)
 	_show_start_lights(4)
 	MusicManager.play_voice("go")
+	if _ambience:
+		_ambience.roar()
 	_race_go_msec = Time.get_ticks_msec()
 	# Boosts only for the first seconds: the grid is still bunched up. Then the boxes still standing
 	# show (and hold) an item of their own.
