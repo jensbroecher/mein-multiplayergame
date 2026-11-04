@@ -2,12 +2,13 @@ extends SceneTree
 ## Renders WoodenRamp.gd's three kinds side by side on a flat grey road in a second or two: a kicker, a
 ## table-top and a roller (the Lakeside bridge's shapes). Windowed:
 ##   Godot --path . --resolution 1600x900 -s res://scratch/wooden_ramp_preview.gd -- <dir> name:x,y,z:tx,ty,tz ...
-## The ramps' toes are at z = 0, x = -18, 0 and 18; they rise toward -z. Prints each one's triangles.
+## The ramps' toes are at z = 0, x = -18, 0, 18 and 45 (the big open trestle kicker); they rise toward -z. Prints each one's triangles.
 
 const KINDS := [
 	["kicker", Vector3(-18, 0, 0), {"length": 7.0, "height": 1.4, "width": 15.0, "curve": 0.6}],
 	["table", Vector3(0, 0, 0), {"length": 6.0, "height": 1.2, "width": 15.0, "curve": 0.5, "table_length": 5.0, "tail_length": 6.0}],
 	["roller", Vector3(18, 0, 0), {"length": 5.0, "height": 0.9, "width": 15.0, "curve": 0.7, "tail_length": 5.0}],
+	["big trestle kicker (Mina del Viento's)", Vector3(45, 0, 0), {"length": 26.0, "height": 6.0, "width": 15.0, "curve": 0.55, "trestle": true}],
 ]
 
 

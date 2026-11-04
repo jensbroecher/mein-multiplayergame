@@ -14,9 +14,9 @@ extends Node3D
 ## blowing along the ground (mina_ground.gdshader's `storm`); sheets of dust roll past the camera, sand snakes over the
 ## road. Nothing streaks across the lens and nothing flashes: the user finds a swinging, flickering view hard to take.
 
-## Peak sideways push of a gust, in m/s^2: with a cart's grip of about 5 it walks it 3-4 m/s sideways until the
-## driver steers into it. The share of it along the cart's travel (a head or tail wind) is `along_share`.
-@export var gust_accel := 19.0
+## Peak sideways push of a gust, in m/s^2: against a cart's grip of about 5 it slides it about 8 m/s sideways in a
+## full crosswind until the driver steers into it (19, 3-4 m/s, was too gentle to notice). The share of it along the cart's travel (a head or tail wind) is `along_share`.
+@export var gust_accel := 42.0
 @export var along_share := 0.3
 ## Where the wind blows toward (x, z), unit.
 @export var wind_dir := Vector2(-0.62, -0.78)

@@ -958,8 +958,11 @@ exists, on the plane through its corners' hits, 1cm under so the toe shows no ed
 along the nearest lap path; the Snap To Ground button does the drop in the editor (the saved colliders, else
 the meshes under it). It is in the `ramps` group with `surface` wood, so it is track whatever it is called and
 the AI never steers round it: make it as wide as the road. `lip_info()` gives a `jump_lips` entry.
+`trestle` leaves the sides and back open: joists under the planks (`TRESTLE_JOIST_GAP` apart), and every `TRESTLE_BENT` a bent
+across the run (a sill, a post under each joist, a cap beam, diagonal braces in one or two tiers with a girt), the sides
+braced between the bents; for big ramps, where boarded sides read as one solid block (the collision is the same).
 `res://scratch/wooden_ramp_preview.gd` (`-s`, windowed, `-- <dir> name:x,y,z:tx,ty,tz`) renders a kicker, a
-table-top and a roller on a flat road.
+table-top and a roller on a flat road, and Mina del Viento's big trestle kicker at x 45.
 
 ## Item boxes
 
@@ -2490,11 +2493,46 @@ Rebuilt on 2026-11-02 (Gemini's first version had a pit unrelated to its road, t
   floor's straights, two staggered in the mouth, none within `BUMP_KEEP` of a gate or boost pad. Raised into the
   heightfield (the pit's 2.5m grid) and painted paler (UV.y, the drift channel; the bodies don't change).
 - The rope shovel's crawlers (`MinaKit._crawler`): a chain of shoes (grouser outside, drive lug inside) round the drive
-  sprocket (rear, its teeth showing) and the idler, the side frame between the runs with ribs, lower and carrier rollers,
-  hubs with bolt circles, the propel gearbox; a toothed swing ring, ribbed house walls, a door, roof cabinets, work lamps,
+  sprocket (rear, its teeth showing) and the idler, the side frame between the runs with ribs, flanged rollers in pairs
+  either side of the drive lugs, running on the shoes' plates (the lower ones under the frame on brackets from its foot,
+  the carriers on posts under the top run: they had hung beside the frame in the air), hubs with bolt circles, the propel gearbox; a toothed swing ring, ribbed house walls, a door, roof cabinets, work lamps,
   a boarding stair, the boom's plates, walkway rail and lamps. The trucks flickered where faces lay in one plane (the
   body's front wall and its lining, the canopy and the deck against it, the cab front and its trim):
   `scratch/zfight_scan.gd -- res://generated/minaprop_haul_truck_1.res ...` lists what's left (railing posts, hidden).
+- The light towers (`MinaKit.light_tower`) are mining light plants: a single-axle trailer chassis on leaf springs with
+  mudguards, an A-frame drawbar with a hitch eye, jockey wheel and safety chains, the generator canopy (chamfered roof,
+  louvred door vents, handles, the control panel and e-stop at the back, exhaust, lifting eye, amber beacon, hazard stripes
+  along the skirt, `_hazard_band`), four outriggers on screw jacks, and a three-stage telescopic mast (pivot bracket, ram,
+  winch, cable spiralling down) with four finned LED floods on yokes along a crossbar. They had been a box on a pole.
+- The plateau jump (`PLATEAU_JUMP`, `_build_plateau_jump`): a WoodenRamp across the start straight (toe at s 205, 26m to
+  a 6m lip, `trestle` on), the boost pad at 168 feeding it; carts land on the straight before the sweeper. Its lip is in
+  the TrackPath's `jump_lips` (`_plateau_jump_lip`): 26m out at 30 m/s to 75m at 60, 1.5-5.5m over the lip, all keep
+  their speed. Named "PlateauJump", not "...Ramp" (Level.gd bakes a second collider under any "ramp").
+- The drills (`MinaKit.drill_rig`, `_drill_track`): crawler tracks of shoes round a sprocket and idler with rollers, a
+  railed deck on levelling jacks, the power pack (louvred doors, radiator grille, exhausts, air cleaners, hydraulic tank,
+  beacon), a dust collector piped to the hood, the glazed cab under a ROPS roof with lamps, mirror and ladder, and the
+  lattice mast (crown block, pivot and raise rams, rotary head with hoses, drill pipe, centraliser, dust hood, rod
+  carousel, work lamps). Solid as the carrier and the mast. They had been two blocks and a box under a mast.
+- The gate (`_build_gate`, `_plan_gate_pads`): its legs and the boom's post stand on pads at the road's height (the left
+  leg had stood on air where the bank falls away), and the guard house (`MinaKit.guard_house`, `GUARD_HOUSE_AT` in the
+  gate's frame) is a prop of its own on a pad beside it, its front to the road: a rendered block house on a plinth with
+  steps, framed windows all round, a door, a canopy on columns with CONTROL DE ACCESO on its fascia, an air-conditioner,
+  a water tank, a radio mast, a solar panel, a floodlight, a bench and a bin.
+- Under the trucks and the conveyors: a haul truck is solid where it is (`TRUCK_SOLIDS`: the wheels, the rear axle's
+  housing, the frame rails, the engine house, the bumper, the body over 3.7m life size), so a cart drives under it
+  between the wheels, across it or along it; a conveyor's low run is solid as its belt frame and each support's two legs
+  (where `conveyor_run` stands them), not a wall down to the ground. `res://scratch/drive_under_check.tscn` (headless)
+  sweeps a cart-sized sphere under every truck both ways and across the conveyor's runs, and checks every sign is solid.
+  `res://scratch/mina_prop_positions.gd` (`-s`, headless, `-- [match=]`) lists where the signs, gate, trucks, drills and
+  light towers stand, for aiming shots.
+- Signs (`_plan_signs`, before the heights; `_sign_at`): each is solid (its posts and board) and keeps
+  `SIGN_CONVEYOR_CLEAR` (9m) from a conveyor's line and clear of the guard house, moving along the road or across it
+  (PLANTA stood in the conveyor by the mouth). Each stands `SIGN_LAT` (10.9m) out on its side on a small pad of
+  its own at the road's height (`SIGN_PAD`, `SIGN_PAD_BLEND`; none by the sump), cut into the bank or built up from it:
+  the road's grading falls or climbs steeply from about 9.5m out, and at a fixed 11-12m the signs had one post in the air
+  and the other buried. A sign stands on the lower of its posts' ground (it prints any whose posts differ by over 0.3m).
+  `res://scratch/mina_verge_profile.gd` (`-s`, headless, `-- <s> ... [lats=...]`) prints the ground across the road against
+  its height, from the generator's own heights.
 - Safety berms (`BERMS`, `_build_berms`, `mina_rubble.gdshader`): rubble windrows on the drop side of the shelf road and down
   the ramp, their collider a steeper, taller wall than the heap (a cart glances off instead of riding over the edge).
 - Set pieces are `MinaKit.gd` (life size, grown by `PROP_SCALE` 1.6; balloons 1.5, dishes 1.25), meshes and materials
@@ -2517,7 +2555,8 @@ Rebuilt on 2026-11-02 (Gemini's first version had a pit unrelated to its road, t
   closes in to `storm_fog_end` (230m, depth fog; aerial perspective off), the sun dims to a pale disc, sheets of dust roll
   past (faded within 30m of the lens) and sand snakes low over the ground; nothing streaks across the view (motion
   comfort). Gust fronts sweep downwind (`gust_at`, position and wall clock) and push the carts this peer drives across their
-  line at up to `gust_accel` (19 m/s^2: 3-4 m/s of slide on a grip of 5), a little along it. From the plateau it is the
+  line at up to `gust_accel` (42 m/s^2: about 8 m/s of slide in a full crosswind on a grip of 5; 19 was too gentle to
+  notice), a little along it. From the plateau it is the
   `DustWall`: curtains along the edge (`DUST_CURTAINS`, `mina_dust_wall.gdshader`) that fade as you near them, at grazing
   angles, and once you are inside the storm (`inside`). A blast siren wails at the gate; "HABOOB!" on the HUD once.
 - `Tumbleweeds.gd` (a MultiMesh, in DressingColliders' SELF_MOVING): weeds roll across the shelf road on paths of their own
@@ -2527,8 +2566,8 @@ Rebuilt on 2026-11-02 (Gemini's first version had a pit unrelated to its road, t
   (`_finish_offset`); after the finish carts brake to a stop in the run-out. RaceUI shows `STAGE: n%`, the minimap an open
   line with start and finish.
 - Tests: `scratch/ai_race_test.tscn -- res://levels/MinaLevel.tscn seconds=200 speed=2` (6/6 finish in about 115-135s, no
-  respawns but items); `scratch/nyota_jump_test.tscn -- level=res://levels/MinaLevel.tscn speeds=40,46 ground=1` (the wash's
-  crest: 14-23m); `scratch/route_ai_probe.tscn -- [level=] start=<s> [speed=30]` (headless) traces one bot from any point
+  respawns but items); `scratch/nyota_jump_test.tscn -- level=res://levels/MinaLevel.tscn speeds=30,40,50,60 ground=1` (the
+  wash's crest: 13-46m from 40 m/s; the plateau jump, above); `scratch/route_ai_probe.tscn -- [level=] start=<s> [speed=30]` (headless) traces one bot from any point
   of a route with what it touches; `scratch/route_surface_scan.tscn -- <level> x0,z0 x1,z1` raycasts a line for steps;
   `scratch/inspect_mina_stuck.gd` (`-s`, `-- <s> ...`) prints where the route is at given distances;
   `scratch/race_cam_shots.tscn -- <dir> level=res://levels/MinaLevel.tscn every=5 count=22` rides through the storm.

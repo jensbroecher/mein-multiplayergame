@@ -329,18 +329,37 @@ static func _crawler(pk: PropKit, kit: Dictionary, sx: float, length: float, hw:
 	# (The outline is drawn along z, so it is extruded in a frame turned to put the kit's x along z.)
 	var bf: Transform3D = pk.xf
 	pk.set_frame(bf * Transform3D(Basis(Vector3.UP, -PI * 0.5), Vector3(sx, 0.0, 0.0)))
-	pk.extrude(kit, "steel", PackedVector2Array([Vector2(zf - 0.4, 1.0), Vector2(zr + 0.4, 1.0), Vector2(zr - 0.2, 2.35), Vector2(zf + 0.2, 2.35)]),
+	pk.extrude(kit, "steel", PackedVector2Array([Vector2(zf - 0.4, 0.82), Vector2(zr + 0.4, 0.82), Vector2(zr - 0.2, 2.35), Vector2(zf + 0.2, 2.35)]),
 			-fw, fw, 0.05, frame_col)
 	pk.set_frame(bf)
 	for k in range(9):
 		var zz: float = lerpf(zf + 0.6, zr - 0.6, float(k) / 8.0)
-		pk.block(kit, "steel", Vector3(sx + out * fw - 0.08, 1.0, zz - 0.09), Vector3(sx + out * fw + 0.08, 2.35, zz + 0.09), frame_col.lightened(0.05))
-	# Lower rollers on the bottom run, two carrier rollers under the top run.
+		pk.block(kit, "steel", Vector3(sx + out * fw - 0.08, 0.82, zz - 0.09), Vector3(sx + out * fw + 0.08, 2.35, zz + 0.09), frame_col.lightened(0.05))
+	# The rollers run on the shoes' plates (the bottom run's top at yc - r_path + 0.15), in pairs either side of the
+	# drive lugs down the middle, as a real crawler's flanged rollers straddle them: the lower ones under the frame
+	# (which they hold up, on brackets down from its foot), the carriers on posts over it under the top run.
+	var roll_col := Color(0.34, 0.33, 0.31)
+	var plate_lo: float = yc - r_path + 0.15
+	var plate_hi: float = yc + r_path - 0.15
+	var rr := 0.3
 	for k in range(7):
 		var zz2: float = lerpf(zf + 0.9, zr - 0.9, float(k) / 6.0)
-		pk.tube(kit, "metal", Vector3(sx + out * (fw + 0.02), 0.62, zz2), Vector3(sx + out * (fw + 0.22), 0.62, zz2), 0.36, 0.3, 12, Color(0.32, 0.31, 0.3))
+		var ry: float = plate_lo + rr
+		for side in [-1.0, 1.0]:
+			pk.tube(kit, "metal", Vector3(sx + side * 0.42, ry, zz2), Vector3(sx + side * 1.0, ry, zz2), rr, rr, 14, roll_col)
+			# The flanges.
+			for fx in [0.44, 0.98]:
+				pk.tube(kit, "metal", Vector3(sx + side * (fx - 0.02), ry, zz2), Vector3(sx + side * (fx + 0.02), ry, zz2), rr + 0.05, rr + 0.05, 14, roll_col.darkened(0.15))
+			# A bracket from the frame's foot down to the axle, outboard of the roller.
+			pk.block(kit, "steel", Vector3(sx + side * 1.0 - 0.07, ry - 0.08, zz2 - 0.16), Vector3(sx + side * 1.0 + 0.07, 0.86, zz2 + 0.16), frame_col)
+		pk.tube(kit, "steel", Vector3(sx - 1.08, ry, zz2), Vector3(sx + 1.08, ry, zz2), 0.09, 0.09, 8, Color(0.22, 0.22, 0.22))
+	var cr := 0.2
 	for zz3 in [lerpf(zf, zr, 0.33), lerpf(zf, zr, 0.67)]:
-		pk.tube(kit, "metal", Vector3(sx - fw, 2.52, zz3), Vector3(sx + fw, 2.52, zz3), 0.24, 0.24, 10, Color(0.3, 0.3, 0.3))
+		var cy: float = plate_hi - cr
+		for side in [-1.0, 1.0]:
+			pk.tube(kit, "metal", Vector3(sx + side * 0.42, cy, zz3), Vector3(sx + side * 1.0, cy, zz3), cr, cr, 12, roll_col)
+			pk.block(kit, "steel", Vector3(sx + side * 1.04 - 0.06, 2.3, zz3 - 0.12), Vector3(sx + side * 1.04 + 0.06, cy + 0.06, zz3 + 0.12), frame_col)
+		pk.tube(kit, "steel", Vector3(sx - 1.1, cy, zz3), Vector3(sx + 1.1, cy, zz3), 0.07, 0.07, 8, Color(0.22, 0.22, 0.22))
 	# The sprocket (with its teeth showing past the chain's edge) and the idler, their hubs on the outside.
 	for wz in [zf, zr]:
 		var drive: bool = wz == zr
@@ -756,44 +775,400 @@ static func balloon_inflating(pk: PropKit, kit: Dictionary, style: int) -> void:
 #  Pit equipment and small things
 # ======================================================================================
 
-## A mobile light tower: a generator trailer, its outriggers, the mast and four lamps (lit), aimed toward -z.
+## A mobile light plant at life size (front, drawbar and lamps toward -z): a single-axle trailer chassis on leaf
+## springs with mudguards, an A-frame drawbar with its hitch eye and jockey wheel, the generator canopy (chamfered
+## roof, louvred vents, door seams and handles, the control panel at the back, exhaust stack, lifting eye, amber
+## beacon, hazard stripes), four outriggers on screw jacks, and a three-stage telescopic mast with its winch and
+## cable carrying a crossbar of four finned LED floods, tilted down toward -z.
 static func light_tower(pk: PropKit, kit: Dictionary) -> void:
 	var y := MINE_YELLOW
-	pk.block(kit, "paint", Vector3(-0.9, 0.7, -1.7), Vector3(0.9, 2.1, 1.7), dusty(y, 0.7, 2.0))
-	for sx in [-1.05, 1.05]:
-		pk.tyre(kit, "rubber", Vector3(sx, 0.4, 0.6), 0.18, 0.4, 0.26, 12, Color(0.08, 0.08, 0.08), Basis(Vector3.FORWARD, PI * 0.5))
-	pk.beam(kit, "steel", Vector3(0, 0.6, -1.7), Vector3(0, 0.45, -3.0), 0.12, 0.12, FRAME_BLACK)
-	for c in [Vector3(-1.9, 0.0, -1.4), Vector3(1.9, 0.0, -1.4), Vector3(-1.9, 0.0, 1.4), Vector3(1.9, 0.0, 1.4)]:
-		pk.beam(kit, "steel", Vector3(c.x * 0.45, 0.9, c.z), c + Vector3(0, 0.15, 0), 0.12, 0.12, FRAME_BLACK)
-		pk.block(kit, "steel", c - Vector3(0.2, 0.0, 0.2), c + Vector3(0.2, 0.08, 0.2), FRAME_BLACK)
-	pk.beam(kit, "steel", Vector3(0, 2.1, 0.9), Vector3(0, 9.2, 0.9), 0.22, 0.22, Color(0.7, 0.7, 0.68))
-	pk.beam(kit, "steel", Vector3(-1.6, 9.2, 0.9), Vector3(1.6, 9.2, 0.9), 0.14, 0.14, Color(0.3, 0.3, 0.3))
-	var aim := Basis(Vector3.RIGHT, deg_to_rad(28.0))
-	for lx in [-1.3, -0.45, 0.45, 1.3]:
-		var c2 := Vector3(lx, 9.05, 0.7)
-		pk.box(kit, "steel", Transform3D(aim, c2), Vector3(0.7, 0.5, 0.3), Color(0.25, 0.25, 0.25))
-		pk.box(kit, "lamp", Transform3D(aim, c2 + aim * Vector3(0, 0, -0.16)), Vector3(0.62, 0.42, 0.03), Color(1.0, 0.97, 0.9))
+	var black := FRAME_BLACK
+	var grey := Color(0.62, 0.63, 0.62)
+	var dark := Color(0.06, 0.06, 0.07)
+	# --- Chassis -------------------------------------------------------------------------------------------------
+	for rx in [-0.55, 0.55]:
+		pk.block(kit, "steel", Vector3(rx - 0.05, 0.52, -1.95), Vector3(rx + 0.05, 0.68, 1.95), dusty(black, 0.5, 1.5, 0.6))
+		# The leaf spring under the rail, its shackles at each end.
+		pk.block(kit, "steel", Vector3(rx - 0.04, 0.4, -0.35), Vector3(rx + 0.04, 0.46, 0.75), Color(0.15, 0.15, 0.15))
+		for sz in [-0.33, 0.73]:
+			pk.block(kit, "steel", Vector3(rx - 0.05, 0.42, sz - 0.03), Vector3(rx + 0.05, 0.54, sz + 0.03), Color(0.15, 0.15, 0.15))
+	for cz in [-1.85, -0.9, 0.0, 0.9, 1.85]:
+		pk.block(kit, "steel", Vector3(-0.6, 0.55, cz - 0.04), Vector3(0.6, 0.66, cz + 0.04), dusty(black, 0.5, 1.5, 0.6))
+	pk.tube(kit, "steel", Vector3(-1.0, 0.37, 0.2), Vector3(1.0, 0.37, 0.2), 0.05, 0.05, 10, Color(0.14, 0.14, 0.14))
+	for sx in [-1.0, 1.0]:
+		var wc := Vector3(sx, 0.37, 0.2)
+		var turn := Basis(Vector3.FORWARD, PI * 0.5)
+		pk.tyre(kit, "rubber", wc, 0.2, 0.37, 0.22, 18, Color(0.07, 0.07, 0.07), turn)
+		pk.tube(kit, "paint", wc - Vector3(sx * 0.1, 0, 0), wc + Vector3(sx * 0.1, 0, 0), 0.2, 0.2, 18, Color(0.82, 0.82, 0.8), false)
+		pk.tube(kit, "paint", wc + Vector3(sx * 0.08, 0, 0), wc + Vector3(sx * 0.12, 0, 0), 0.19, 0.17, 18, Color(0.82, 0.82, 0.8))
+		pk.tube(kit, "steel", wc + Vector3(sx * 0.12, 0, 0), wc + Vector3(sx * 0.17, 0, 0), 0.07, 0.06, 10, Color(0.3, 0.3, 0.3))
+		for k in range(5):
+			var a: float = TAU * float(k) / 5.0
+			var bp: Vector3 = wc + Vector3(sx * 0.12, sin(a) * 0.11, cos(a) * 0.11)
+			pk.tube(kit, "steel", bp, bp + Vector3(sx * 0.03, 0, 0), 0.015, 0.015, 6, Color(0.25, 0.25, 0.25))
+		# The mudguard: an arc of plates over the tyre, on a stay from the rail.
+		var segs := 7
+		for k in range(segs):
+			var a0: float = lerpf(-1.35, 1.35, float(k) / segs)
+			var a1: float = lerpf(-1.35, 1.35, float(k + 1) / segs)
+			var p0: Vector3 = wc + Vector3(0, cos(a0), sin(a0)) * 0.45
+			var p1: Vector3 = wc + Vector3(0, cos(a1), sin(a1)) * 0.45
+			pk.beam(kit, "paint", p0, p1, 0.3, 0.025, dusty(black, 0.7, 1.2, 0.5), Vector3.RIGHT)
+		pk.beam(kit, "steel", Vector3(sx * 0.6, 0.6, 0.2), Vector3(sx * 0.95, 0.8, 0.2), 0.05, 0.05, black)
+	# --- Drawbar, hitch eye, jockey wheel, safety chains ---------------------------------------------------------
+	for rx in [-0.5, 0.5]:
+		pk.beam(kit, "steel", Vector3(rx, 0.6, -1.9), Vector3(0.0, 0.55, -3.0), 0.09, 0.11, dusty(y, 0.5, 1.5, 0.6))
+	pk.block(kit, "steel", Vector3(-0.07, 0.5, -3.15), Vector3(0.07, 0.6, -2.95), Color(0.2, 0.2, 0.2))
+	pk.tyre(kit, "steel", Vector3(0, 0.55, -3.27), 0.05, 0.11, 0.05, 14, Color(0.25, 0.25, 0.25))
+	pk.tube(kit, "steel", Vector3(0.22, 0.25, -2.55), Vector3(0.22, 0.95, -2.55), 0.045, 0.045, 10, black)
+	pk.block(kit, "steel", Vector3(0.12, 0.6, -2.62), Vector3(0.18, 0.66, -2.48), black)
+	pk.beam(kit, "steel", Vector3(0.22, 0.95, -2.55), Vector3(0.38, 0.95, -2.55), 0.03, 0.03, Color(0.6, 0.1, 0.08))
+	pk.tyre(kit, "rubber", Vector3(0.22, 0.1, -2.55), 0.03, 0.1, 0.06, 12, Color(0.07, 0.07, 0.07), Basis(Vector3.FORWARD, PI * 0.5))
+	for cx in [-0.12, 0.12]:
+		for k in range(5):
+			var c: Vector3 = Vector3(cx * (1.0 - k * 0.15), 0.52 - 0.06 * sin(PI * k / 4.0), -2.95 + k * 0.12)
+			pk.tyre(kit, "steel", c, 0.012, 0.03, 0.012, 6, Color(0.5, 0.5, 0.5), Basis(Vector3.RIGHT, PI * 0.5 * float(k % 2)))
+	# --- Generator canopy -----------------------------------------------------------------------------------------
+	var hw := 0.8
+	var top := 1.95
+	pk.extrude(kit, "paint", PackedVector2Array([Vector2(-hw, 0.7), Vector2(hw, 0.7), Vector2(hw, top - 0.14), Vector2(hw - 0.14, top),
+			Vector2(-hw + 0.14, top), Vector2(-hw, top - 0.14)]), -1.8, 1.8, 0.03, dusty(y, 0.7, 2.2, 0.45))
+	for side in [-1.0, 1.0]:
+		var fx: float = side * (hw + 0.004)
+		# Two doors: seams, hinges and a handle each.
+		for dz in [[-1.55, -0.05], [0.05, 1.55]]:
+			for zz in dz:
+				pk.block(kit, "matte", Vector3(fx - 0.006, 0.8, zz - 0.012), Vector3(fx + 0.006, top - 0.2, zz + 0.012), dark)
+			pk.block(kit, "matte", Vector3(fx - 0.006, top - 0.21, dz[0]), Vector3(fx + 0.006, top - 0.19, dz[1]), dark)
+			pk.block(kit, "matte", Vector3(fx - 0.006, 0.79, dz[0]), Vector3(fx + 0.006, 0.81, dz[1]), dark)
+			pk.block(kit, "metal", Vector3(fx - 0.01, 1.2, dz[1] - 0.16), Vector3(fx + side * 0.04, 1.32, dz[1] - 0.12), Color(0.2, 0.2, 0.2))
+			# The louvred vent in the door's upper half.
+			var v0: float = dz[0] + 0.25
+			var v1: float = dz[1] - 0.3
+			pk.block(kit, "matte", Vector3(fx - 0.006, 1.35, v0), Vector3(fx + 0.006, 1.68, v1), dark)
+			for k in range(6):
+				var vy: float = 1.38 + 0.05 * k
+				pk.box(kit, "paint", Transform3D(Basis(Vector3.FORWARD, side * 0.6), Vector3(fx + side * 0.012, vy, (v0 + v1) * 0.5)),
+						Vector3(0.012, 0.045, v1 - v0), y.darkened(0.15))
+		# Hazard stripes along the skirt, a fuel cap on the right.
+		_hazard_band(pk, kit, Vector3(fx + side * 0.004, 0.0, 0.0), Vector3(0, 0, 1), Vector3(side, 0, 0), -1.8, 1.8, 0.71, 0.82)
+		if side > 0.0:
+			pk.tube(kit, "metal", Vector3(fx, 1.05, -1.3), Vector3(fx + 0.06, 1.05, -1.3), 0.06, 0.06, 12, Color(0.2, 0.2, 0.2))
+	# The control panel at the back, behind a window, its displays lit, and an e-stop.
+	pk.block(kit, "matte", Vector3(-0.55, 0.95, 1.8), Vector3(0.55, 1.7, 1.81), dark)
+	pk.block(kit, "glassdark", Vector3(-0.5, 1.0, 1.81), Vector3(0.5, 1.65, 1.82), GLASS)
+	for k in range(3):
+		pk.block(kit, "lamp", Vector3(-0.4 + k * 0.3, 1.42, 1.805), Vector3(-0.22 + k * 0.3, 1.52, 1.81), Color(0.4, 0.9, 0.5))
+	pk.tube(kit, "paint", Vector3(0.35, 1.15, 1.8), Vector3(0.35, 1.15, 1.86), 0.05, 0.05, 12, Color(0.85, 0.1, 0.08))
+	_hazard_band(pk, kit, Vector3(0.0, 0.0, 1.804), Vector3(-1, 0, 0), Vector3(0, 0, 1), -0.8, 0.8, 0.71, 0.82)
+	# Roof: exhaust stack with its rain flap, a lifting eye, the amber beacon.
+	pk.tube(kit, "metal", Vector3(0.45, top, -1.25), Vector3(0.45, top + 0.55, -1.25), 0.05, 0.05, 10, Color(0.25, 0.24, 0.23))
+	pk.box(kit, "metal", Transform3D(Basis(Vector3.RIGHT, -0.35), Vector3(0.45, top + 0.57, -1.23)), Vector3(0.12, 0.01, 0.12), Color(0.25, 0.24, 0.23))
+	pk.tyre(kit, "steel", Vector3(0, top + 0.1, -0.4), 0.05, 0.1, 0.03, 12, Color(0.2, 0.2, 0.2), Basis(Vector3.FORWARD, PI * 0.5))
+	pk.block(kit, "steel", Vector3(-0.08, top, -0.45), Vector3(0.08, top + 0.03, -0.35), Color(0.2, 0.2, 0.2))
+	pk.tube(kit, "matte", Vector3(-0.55, top, -1.5), Vector3(-0.55, top + 0.05, -1.5), 0.08, 0.08, 12, dark)
+	pk.tube(kit, "lamp", Vector3(-0.55, top + 0.05, -1.5), Vector3(-0.55, top + 0.2, -1.5), 0.065, 0.05, 12, Color(1.0, 0.55, 0.1))
+	# --- Outriggers on screw jacks ----------------------------------------------------------------------------------
+	for c in [Vector3(-1.85, 0.0, -1.45), Vector3(1.85, 0.0, -1.45), Vector3(-1.85, 0.0, 1.45), Vector3(1.85, 0.0, 1.45)]:
+		var sgn: float = signf(c.x)
+		pk.block(kit, "steel", Vector3(minf(sgn * 0.5, sgn * 1.0), 0.57, c.z - 0.07), Vector3(maxf(sgn * 0.5, sgn * 1.0), 0.71, c.z + 0.07), dusty(y, 0.6, 1.5, 0.6))
+		pk.block(kit, "steel", Vector3(minf(sgn * 0.95, c.x), 0.59, c.z - 0.055), Vector3(maxf(sgn * 0.95, c.x), 0.69, c.z + 0.055), Color(0.55, 0.56, 0.56))
+		for pz in [-0.03, 0.03]:
+			pk.block(kit, "steel", Vector3(c.x - 0.002, 0.58, c.z + pz - 0.01), Vector3(c.x + 0.002, 0.72, c.z + pz + 0.01), Color(0.2, 0.2, 0.2))
+		pk.tube(kit, "steel", Vector3(c.x, 0.1, c.z), Vector3(c.x, 0.95, c.z), 0.055, 0.055, 10, dusty(y, 0.4, 1.2, 0.6))
+		pk.tube(kit, "metal", Vector3(c.x, 0.06, c.z), Vector3(c.x, 0.35, c.z), 0.03, 0.03, 8, Color(0.6, 0.6, 0.6))
+		pk.block(kit, "steel", Vector3(c.x - 0.2, 0.0, c.z - 0.2), Vector3(c.x + 0.2, 0.05, c.z + 0.2), dusty(black, 0.0, 0.5, 0.8))
+		pk.beam(kit, "steel", Vector3(c.x, 0.97, c.z), Vector3(c.x + sgn * 0.18, 0.97, c.z), 0.025, 0.025, black)
+		pk.tube(kit, "matte", Vector3(c.x + sgn * 0.18, 0.97, c.z), Vector3(c.x + sgn * 0.18, 1.08, c.z), 0.02, 0.02, 6, dark)
+	# --- Mast: three telescoping sections on a pivot bracket at the back, a winch and its cable ---------------------
+	var mz := 1.35
+	pk.block(kit, "steel", Vector3(-0.22, top, mz - 0.22), Vector3(0.22, top + 0.12, mz + 0.22), black)
+	for bx in [-0.2, 0.2]:
+		pk.block(kit, "steel", Vector3(bx - 0.025, top + 0.1, mz - 0.18), Vector3(bx + 0.025, top + 0.45, mz + 0.18), black)
+	pk.tube(kit, "metal", Vector3(-0.26, top + 0.32, mz), Vector3(0.26, top + 0.32, mz), 0.035, 0.035, 8, Color(0.6, 0.6, 0.6))
+	var sections := [[top + 0.12, 4.7, 0.26], [4.5, 7.2, 0.2], [7.0, 9.25, 0.15]]
+	for sec in sections:
+		var w: float = sec[2]
+		pk.block(kit, "metal", Vector3(-w * 0.5, sec[0], mz - w * 0.5), Vector3(w * 0.5, sec[1], mz + w * 0.5), grey.lightened(0.08 * (w < 0.2 as int)))
+		# The collar at the top of each section, where the next one slides out.
+		pk.block(kit, "steel", Vector3(-w * 0.5 - 0.025, sec[1] - 0.14, mz - w * 0.5 - 0.025), Vector3(w * 0.5 + 0.025, sec[1], mz + w * 0.5 + 0.025), Color(0.3, 0.3, 0.3))
+	# A hydraulic ram that raised the mast, from the roof to the first section.
+	pk.tube(kit, "paint", Vector3(0, top + 0.05, mz - 0.75), Vector3(0, 2.9, mz - 0.15), 0.06, 0.06, 10, dark)
+	pk.tube(kit, "metal", Vector3(0, 2.6, mz - 0.33), Vector3(0, 3.2, mz - 0.13), 0.035, 0.035, 8, Color(0.75, 0.75, 0.75))
+	# The winch on the mast's side: drum, gear case, crank.
+	pk.tube(kit, "steel", Vector3(0.14, 2.65, mz), Vector3(0.36, 2.65, mz), 0.09, 0.09, 14, Color(0.3, 0.3, 0.3))
+	pk.block(kit, "paint", Vector3(0.36, 2.52, mz - 0.1), Vector3(0.44, 2.78, mz + 0.1), y)
+	pk.beam(kit, "steel", Vector3(0.44, 2.65, mz), Vector3(0.5, 2.65, mz), 0.03, 0.03, black)
+	pk.beam(kit, "steel", Vector3(0.5, 2.65, mz), Vector3(0.5, 2.45, mz - 0.1), 0.03, 0.03, black)
+	pk.tube(kit, "matte", Vector3(0.25, 2.75, mz + 0.06), Vector3(0.0, 9.2, mz + 0.09), 0.012, 0.012, 5, Color(0.5, 0.5, 0.5), false)
+	# The power cable spirals loosely down the mast.
+	var prev := Vector3(-0.12, 9.1, mz)
+	for k in range(1, 26):
+		var cy: float = lerpf(9.1, top + 0.3, float(k) / 25.0)
+		var a: float = float(k) * 1.1
+		var cr: float = lerpf(0.11, 0.18, float(k) / 25.0)
+		var q := Vector3(-cos(a) * cr, cy, mz + sin(a) * cr)
+		pk.tube(kit, "rubber", prev, q, 0.018, 0.018, 5, dark, false)
+		prev = q
+	# --- The lamp head: a crossbar, a junction box and four LED floods on yokes, tilted down toward -z -------------
+	var hy := 9.35
+	pk.block(kit, "steel", Vector3(-1.38, hy - 0.06, mz - 0.06), Vector3(1.38, hy + 0.06, mz + 0.06), Color(0.28, 0.28, 0.28))
+	pk.block(kit, "steel", Vector3(-0.2, hy - 0.18, mz - 0.1), Vector3(0.2, hy - 0.06, mz + 0.1), Color(0.3, 0.3, 0.3))
+	pk.block(kit, "paint", Vector3(-0.14, hy - 0.4, mz + 0.08), Vector3(0.14, hy - 0.18, mz + 0.2), Color(0.85, 0.85, 0.82))
+	var aim := Basis(Vector3.RIGHT, deg_to_rad(-22.0))
+	for lx in [-1.12, -0.37, 0.37, 1.12]:
+		var hc := Vector3(lx, hy + 0.32, mz - 0.05)
+		# Yoke: two arms up from the bar to the housing's pivots.
+		for yx in [-0.33, 0.33]:
+			pk.block(kit, "steel", Vector3(lx + yx - 0.02, hy + 0.06, mz - 0.08), Vector3(lx + yx + 0.02, hc.y + 0.04, mz - 0.02), Color(0.22, 0.22, 0.22))
+			pk.tube(kit, "metal", Vector3(lx + yx - 0.04, hc.y, hc.z), Vector3(lx + yx + 0.04, hc.y, hc.z), 0.04, 0.04, 8, Color(0.5, 0.5, 0.5))
+		var hx := Transform3D(aim, hc)
+		pk.box(kit, "paint", hx, Vector3(0.6, 0.46, 0.1), Color(0.18, 0.18, 0.19))
+		# Cooling fins on the back.
+		for k in range(9):
+			var fx: float = lerpf(-0.26, 0.26, float(k) / 8.0)
+			pk.box(kit, "steel", hx * Transform3D(Basis(), Vector3(fx, 0.0, 0.08)), Vector3(0.015, 0.42, 0.07), Color(0.24, 0.24, 0.25))
+		# Bezel, lens, a 4 x 3 grid of LEDs behind it, and the visor over it.
+		pk.box(kit, "steel", hx * Transform3D(Basis(), Vector3(0, 0, -0.055)), Vector3(0.6, 0.46, 0.012), Color(0.1, 0.1, 0.1))
+		pk.box(kit, "glassdark", hx * Transform3D(Basis(), Vector3(0, 0, -0.062)), Vector3(0.52, 0.38, 0.004), Color(0.3, 0.3, 0.32))
+		for gx in range(4):
+			for gy in range(3):
+				var lp := Vector3(lerpf(-0.18, 0.18, gx / 3.0), lerpf(-0.12, 0.12, gy / 2.0), -0.068)
+				pk.box(kit, "lamp", hx * Transform3D(Basis(), lp), Vector3(0.075, 0.075, 0.006), Color(1.0, 0.97, 0.9))
+		pk.box(kit, "paint", hx * Transform3D(Basis(Vector3.RIGHT, deg_to_rad(-25.0)), Vector3(0, 0.255, -0.1)), Vector3(0.6, 0.012, 0.16), Color(0.18, 0.18, 0.19))
+		pk.tube(kit, "rubber", Vector3(lx, hc.y - 0.2, hc.z + 0.12), Vector3(lx * 0.3, hy - 0.2, mz + 0.14), 0.012, 0.012, 5, dark, false)
 
 
-## A blast-hole drill: crawlers, a deck with its cab and power pack, and the mast standing up with the drill string.
+## A black band from `a0` to `a1` along `along` (on the plane through `o`, facing `n`), between heights `y0` and
+## `y1`, with yellow stripes slanting across it: the hazard marking along a machine's skirt.
+static func _hazard_band(pk: PropKit, kit: Dictionary, o: Vector3, along: Vector3, n: Vector3, a0: float, a1: float, y0: float, y1: float) -> void:
+	var at := func(a: float, yy: float, lift: float) -> Vector3: return o + along * a + Vector3(0, yy, 0) + n * lift
+	pk.panel(kit, "paint", [at.call(a0, y0, 0.0), at.call(a0, y1, 0.0), at.call(a1, y1, 0.0), at.call(a1, y0, 0.0)], n, Color(0.05, 0.05, 0.05), Color(0.05, 0.05, 0.05))
+	var h: float = y1 - y0
+	var w := 0.07
+	var a: float = a0 - h
+	while a < a1:
+		var b0: float = clampf(a, a0, a1)
+		var b1: float = clampf(a + w, a0, a1)
+		var t0: float = clampf(a + h, a0, a1)
+		var t1: float = clampf(a + w + h, a0, a1)
+		if b1 > b0 or t1 > t0:
+			pk.panel(kit, "paint", [at.call(b0, y0, 0.003), at.call(t0, y1, 0.003), at.call(t1, y1, 0.003), at.call(b1, y0, 0.003)], n,
+					MINE_YELLOW, MINE_YELLOW)
+		a += w * 2.0
+
+
+## A blast-hole drill at life size (mast end toward -z): two crawler tracks (shoes round a sprocket and an idler,
+## rollers, the frame), a railed deck on them with four levelling jacks, the power pack (louvred engine house, radiator
+## grille, exhausts, air cleaners, hydraulic tank), a dust collector, the operator's cab (glazed all round, a ROPS roof
+## with lamps, mirrors, a ladder up to the deck), and the drill mast: a lattice tower on its pivot with two raise rams,
+## a crown block on top, the rotary head part way up with its hoses, the drill pipe down through the centraliser into the
+## dust hood on the ground, a rod carousel beside it, work lamps and hazard stripes.
 static func drill_rig(pk: PropKit, kit: Dictionary) -> void:
 	var c := Color(0.92, 0.36, 0.10)
-	for sx in [-1.9, 1.9]:
-		pk.block(kit, "steel", Vector3(sx - 0.55, 0.0, -3.6), Vector3(sx + 0.55, 1.1, 3.6), dusty(FRAME_BLACK, 0.0, 1.2, 0.7))
-	pk.block(kit, "paint", Vector3(-2.6, 1.1, -3.4), Vector3(2.6, 1.6, 4.2), dusty(c, 1.2, 2.5))
-	pk.block(kit, "paint", Vector3(-2.4, 1.6, 0.6), Vector3(2.4, 3.6, 4.0), c)
-	pk.block(kit, "paint", Vector3(-2.5, 1.6, -3.2), Vector3(-0.4, 4.2, -0.8), Color(0.95, 0.95, 0.92))
-	pk.block(kit, "glassdark", Vector3(-2.4, 2.6, -3.24), Vector3(-0.5, 3.9, -3.2), GLASS)
-	var mast_base := Vector3(0.8, 1.6, -3.4)
-	for mx in [0.3, 1.3]:
-		for mz in [-3.6, -3.0]:
-			pk.beam(kit, "paint", Vector3(mx, 1.6, mz), Vector3(mx, 17.0, mz), 0.16, 0.16, c)
-	for k in range(12):
-		var my: float = 2.5 + float(k) * 1.2
-		pk.beam(kit, "paint", Vector3(0.3, my, -3.6), Vector3(1.3, my + 0.6, -3.0), 0.08, 0.08, c)
-		pk.beam(kit, "paint", Vector3(1.3, my, -3.6), Vector3(0.3, my + 0.6, -3.0), 0.08, 0.08, c)
-	pk.tube(kit, "metal", Vector3(0.8, 0.0, -3.3), Vector3(0.8, 16.5, -3.3), 0.14, 0.14, 8, Color(0.6, 0.6, 0.6))
-	pk.beam(kit, "paint", mast_base + Vector3(0, 0, 2.0), Vector3(0.8, 9.0, -3.3), 0.25, 0.25, c)
+	var dark := Color(0.13, 0.13, 0.13)
+	var steel := Color(0.42, 0.43, 0.44)
+	var white := Color(0.93, 0.92, 0.88)
+	# --- Crawlers -------------------------------------------------------------------------------------------------
+	for sx in [-1.95, 1.95]:
+		_drill_track(pk, kit, sx, 7.4, 0.42)
+	# The carbody between the tracks.
+	pk.block(kit, "steel", Vector3(-1.5, 0.55, -1.6), Vector3(1.5, 1.15, 1.6), dusty(dark, 0.6, 1.5, 0.6))
+	# --- Deck: a frame, chequer plate on it, rails round its edge, levelling jacks at its corners ----------------------
+	pk.block(kit, "steel", Vector3(-2.55, 1.15, -3.7), Vector3(2.55, 1.5, 4.3), dusty(c.darkened(0.25), 1.2, 2.5))
+	pk.block(kit, "metal", Vector3(-2.5, 1.5, -3.65), Vector3(2.5, 1.53, 4.25), Color(0.5, 0.5, 0.5))
+	_hazard_band(pk, kit, Vector3(0, 0, 4.302), Vector3(-1, 0, 0), Vector3(0, 0, 1), -2.55, 2.55, 1.18, 1.47)
+	for jc in [Vector3(-2.35, 0, -3.4), Vector3(2.35, 0, -3.4), Vector3(-2.35, 0, 4.0), Vector3(2.35, 0, 4.0)]:
+		var jsx: float = signf(jc.x)
+		var jx: float = jc.x + jsx * 0.55
+		pk.block(kit, "paint", Vector3(minf(jc.x, jx) - 0.05, 1.05, jc.z - 0.22), Vector3(maxf(jc.x, jx) + 0.05, 1.45, jc.z + 0.22), c)
+		pk.tube(kit, "paint", Vector3(jx, 0.55, jc.z), Vector3(jx, 1.45, jc.z), 0.16, 0.16, 12, c)
+		pk.tube(kit, "metal", Vector3(jx, 0.12, jc.z), Vector3(jx, 0.6, jc.z), 0.1, 0.1, 10, Color(0.8, 0.8, 0.78))
+		pk.block(kit, "steel", Vector3(jx - 0.32, 0.0, jc.z - 0.32), Vector3(jx + 0.32, 0.12, jc.z + 0.32), dusty(dark, 0.0, 0.6, 0.8))
+	_railing(pk, kit, [Vector3(0.2, 1.53, 4.2), Vector3(2.45, 1.53, 4.2), Vector3(2.45, 1.53, -0.6)], 1.05, Color(0.98, 0.8, 0.1))
+	_railing(pk, kit, [Vector3(-2.45, 1.53, -0.6), Vector3(-2.45, 1.53, 0.2)], 1.05, Color(0.98, 0.8, 0.1))
+	# --- The power pack and compressor house -------------------------------------------------------------------------
+	var hx0 := -2.2
+	var hx1 := 2.0
+	var hz0 := 0.5
+	var hz1 := 4.0
+	pk.extrude(kit, "paint", PackedVector2Array([Vector2(hx0, 1.53), Vector2(hx1, 1.53), Vector2(hx1, 3.75), Vector2(hx1 - 0.25, 4.0),
+			Vector2(hx0 + 0.25, 4.0), Vector2(hx0, 3.75)]), hz0, hz1, 0.03, dusty(c, 1.6, 4.0, 0.4))
+	for side in [-1.0, 1.0]:
+		var fx: float = hx0 - 0.004 if side < 0.0 else hx1 + 0.004
+		for dz in [[0.65, 2.15], [2.3, 3.85]]:
+			for zz in dz:
+				pk.block(kit, "matte", Vector3(fx - 0.006, 1.65, zz - 0.012), Vector3(fx + 0.006, 3.65, zz + 0.012), dark)
+			pk.block(kit, "matte", Vector3(fx - 0.006, 2.6, dz[0] + 0.2), Vector3(fx + 0.006, 3.4, dz[1] - 0.2), dark)
+			for k in range(7):
+				pk.box(kit, "paint", Transform3D(Basis(Vector3.FORWARD, side * 0.6), Vector3(fx + side * 0.015, 2.66 + 0.11 * k, (dz[0] + dz[1]) * 0.5)),
+						Vector3(0.015, 0.09, dz[1] - dz[0] - 0.4), c.darkened(0.12))
+			pk.block(kit, "metal", Vector3(fx - 0.02, 2.2, dz[1] - 0.2), Vector3(fx + side * 0.05, 2.32, dz[1] - 0.12), dark)
+	# The radiator grille at the back: a dark core behind bars.
+	pk.block(kit, "matte", Vector3(-1.7, 1.8, hz1), Vector3(1.5, 3.6, hz1 + 0.01), Color(0.05, 0.05, 0.05))
+	for k in range(14):
+		var gx: float = lerpf(-1.62, 1.42, float(k) / 13.0)
+		pk.block(kit, "metal", Vector3(gx - 0.025, 1.8, hz1 + 0.01), Vector3(gx + 0.025, 3.6, hz1 + 0.05), Color(0.3, 0.3, 0.3))
+	# On the roof: two exhaust stacks, two air cleaners, the hydraulic tank, a beacon.
+	for ex in [0.9, 1.3]:
+		pk.tube(kit, "metal", Vector3(ex, 4.0, 3.1), Vector3(ex, 4.9, 3.1), 0.08, 0.08, 10, Color(0.25, 0.24, 0.22))
+		pk.box(kit, "metal", Transform3D(Basis(Vector3.RIGHT, -0.4), Vector3(ex, 4.92, 3.12)), Vector3(0.18, 0.012, 0.18), Color(0.25, 0.24, 0.22))
+	for ax in [-1.4, -0.8]:
+		pk.tube(kit, "paint", Vector3(ax, 4.0, 1.4), Vector3(ax, 4.55, 1.4), 0.24, 0.24, 14, dark)
+		pk.tube(kit, "paint", Vector3(ax, 4.55, 1.4), Vector3(ax, 4.62, 1.4), 0.2, 0.12, 14, dark)
+	pk.tube(kit, "paint", Vector3(-0.2, 4.25, 0.8), Vector3(1.7, 4.25, 0.8), 0.25, 0.25, 14, white)
+	pk.tube(kit, "matte", Vector3(1.5, 4.0, 3.7), Vector3(1.5, 4.05, 3.7), 0.08, 0.08, 10, dark)
+	pk.tube(kit, "lamp", Vector3(1.5, 4.05, 3.7), Vector3(1.5, 4.2, 3.7), 0.065, 0.05, 10, Color(1.0, 0.55, 0.1))
+	# The dust collector beside the cab: a filter drum on legs, its hose to the hood at the mast's foot.
+	pk.tube(kit, "paint", Vector3(1.55, 2.0, -1.1), Vector3(1.55, 3.6, -1.1), 0.55, 0.55, 18, white)
+	pk.tube(kit, "paint", Vector3(1.55, 1.53, -1.1), Vector3(1.55, 2.0, -1.1), 0.2, 0.55, 18, white.darkened(0.1))
+	pk.tube(kit, "paint", Vector3(1.55, 3.6, -1.1), Vector3(1.55, 3.75, -1.1), 0.55, 0.45, 18, white.darkened(0.05))
+	for k in range(5):
+		var hy: float = lerpf(2.2, 1.3, float(k) / 4.0)
+		var hz: float = lerpf(-1.6, -3.4, float(k) / 4.0)
+		var hy2: float = lerpf(2.2, 1.3, float(k + 1) / 4.0) if k < 4 else 0.6
+		var hz2: float = lerpf(-1.6, -3.4, float(k + 1) / 4.0) if k < 4 else -4.0
+		pk.tube(kit, "rubber", Vector3(1.4, hy, hz), Vector3(1.2, hy2, hz2), 0.12, 0.12, 10, dark, false)
+	# --- The operator's cab, front left -------------------------------------------------------------------------------
+	var cx0 := -2.45
+	var cx1 := -0.35
+	var cz0 := -2.9
+	var cz1 := -0.55
+	var cy0 := 1.53
+	var cy1 := 4.0
+	pk.block(kit, "paint", Vector3(cx0, cy0, cz0), Vector3(cx1, cy0 + 0.9, cz1), c)
+	for post in [Vector2(cx0, cz0), Vector2(cx1, cz0), Vector2(cx0, cz1), Vector2(cx1, cz1)]:
+		pk.block(kit, "paint", Vector3(post.x - 0.06, cy0 + 0.9, post.y - 0.06), Vector3(post.x + 0.06, cy1, post.y + 0.06), white)
+	pk.block(kit, "glassdark", Vector3(cx0 + 0.06, cy0 + 0.9, cz0 + 0.03), Vector3(cx1 - 0.06, cy1 - 0.05, cz0 + 0.06), GLASS)
+	pk.block(kit, "glassdark", Vector3(cx0 + 0.06, cy0 + 0.9, cz1 - 0.06), Vector3(cx1 - 0.06, cy1 - 0.05, cz1 - 0.03), GLASS)
+	pk.block(kit, "glassdark", Vector3(cx0 + 0.03, cy0 + 0.9, cz0 + 0.06), Vector3(cx0 + 0.06, cy1 - 0.05, cz1 - 0.06), GLASS)
+	pk.block(kit, "glassdark", Vector3(cx1 - 0.06, cy0 + 0.9, cz0 + 0.06), Vector3(cx1 - 0.03, cy1 - 0.05, cz1 - 0.06), GLASS)
+	pk.block(kit, "paint", Vector3(cx0 - 0.12, cy1, cz0 - 0.15), Vector3(cx1 + 0.12, cy1 + 0.16, cz1 + 0.12), white)
+	pk.block(kit, "steel", Vector3(cx0 - 0.08, cy1 + 0.16, cz0 - 0.1), Vector3(cx1 + 0.08, cy1 + 0.24, cz1 + 0.08), dark)
+	for lx in [cx0 + 0.3, cx1 - 0.3]:
+		pk.box(kit, "steel", Transform3D(Basis(Vector3.RIGHT, -0.35), Vector3(lx, cy1 + 0.36, cz0 + 0.05)), Vector3(0.3, 0.2, 0.14), dark)
+		pk.box(kit, "lamp", Transform3D(Basis(Vector3.RIGHT, -0.35), Vector3(lx, cy1 + 0.36, cz0 - 0.03)), Vector3(0.24, 0.14, 0.02), Color(1.0, 0.97, 0.9))
+	pk.beam(kit, "steel", Vector3(cx0 + 0.6, cy1 - 0.15, cz0 + 0.04), Vector3(cx0 + 1.1, cy0 + 1.2, cz0 + 0.03), 0.03, 0.02, dark)
+	for mz in [cz0 + 0.2]:
+		pk.beam(kit, "steel", Vector3(cx0, 3.4, mz), Vector3(cx0 - 0.35, 3.5, mz - 0.1), 0.04, 0.04, dark)
+		pk.block(kit, "matte", Vector3(cx0 - 0.42, 3.25, mz - 0.25), Vector3(cx0 - 0.36, 3.75, mz + 0.0), dark)
+	# The ladder up the side to the deck.
+	for lz in [-0.25, 0.25]:
+		pk.beam(kit, "paint", Vector3(-2.75, 0.1, lz), Vector3(-2.58, 1.53, lz), 0.05, 0.05, Color(0.98, 0.8, 0.1))
+	for k in range(5):
+		var ly: float = 0.35 + 0.27 * k
+		pk.beam(kit, "steel", Vector3(-2.73 + 0.03 * k, ly, -0.25), Vector3(-2.73 + 0.03 * k, ly, 0.25), 0.04, 0.04, steel)
+	# --- The mast -------------------------------------------------------------------------------------------------------
+	var mx := 0.55
+	var mz := -3.35
+	var mh := 17.5
+	var half := 0.42
+	var chords: Array = []
+	for ox in [-half, half]:
+		for oz in [-half, half]:
+			chords.append(Vector2(mx + ox, mz + oz))
+	for ch in chords:
+		pk.block(kit, "paint", Vector3(ch.x - 0.07, 1.53, ch.y - 0.07), Vector3(ch.x + 0.07, mh, ch.y + 0.07), c)
+	var bay := 1.1
+	var nb: int = int((mh - 2.0) / bay)
+	for k in range(nb):
+		var y0: float = 2.0 + bay * k
+		var y1: float = y0 + bay
+		for f in range(4):
+			var a2: Vector2 = chords[[0, 1, 3, 2][f]]
+			var b2: Vector2 = chords[[1, 3, 2, 0][f]]
+			var flip: bool = (k + f) % 2 == 0
+			pk.beam(kit, "paint", Vector3(a2.x, y0 if flip else y1, a2.y), Vector3(b2.x, y1 if flip else y0, b2.y), 0.06, 0.06, c.darkened(0.08))
+			pk.beam(kit, "paint", Vector3(a2.x, y0, a2.y), Vector3(b2.x, y0, b2.y), 0.06, 0.06, c.darkened(0.08))
+	# The crown block on top: a sheave in a frame under a cap.
+	pk.block(kit, "paint", Vector3(mx - 0.55, mh, mz - 0.55), Vector3(mx + 0.55, mh + 0.25, mz + 0.55), c)
+	pk.tube(kit, "metal", Vector3(mx - 0.15, mh + 0.6, mz), Vector3(mx + 0.15, mh + 0.6, mz), 0.38, 0.38, 16, steel)
+	for sx2 in [-0.22, 0.22]:
+		pk.block(kit, "paint", Vector3(mx + sx2 - 0.04, mh + 0.25, mz - 0.4), Vector3(mx + sx2 + 0.04, mh + 1.05, mz + 0.4), c)
+	pk.block(kit, "paint", Vector3(mx - 0.3, mh + 1.05, mz - 0.45), Vector3(mx + 0.3, mh + 1.15, mz + 0.45), white)
+	# Mast pivot on the deck and the two raise rams.
+	pk.block(kit, "paint", Vector3(mx - 0.7, 1.53, mz + 0.35), Vector3(mx + 0.7, 2.3, mz + 0.95), c.darkened(0.15))
+	pk.tube(kit, "metal", Vector3(mx - 0.75, 2.0, mz + 0.65), Vector3(mx + 0.75, 2.0, mz + 0.65), 0.12, 0.12, 10, steel)
+	for rx in [-0.35, 0.35]:
+		pk.tube(kit, "paint", Vector3(mx + rx * 2.0, 1.6, -0.7), Vector3(mx + rx, 4.6, mz + 0.5), 0.14, 0.14, 10, c.darkened(0.1))
+		pk.tube(kit, "metal", Vector3(mx + rx * 1.5, 3.2, mz + 1.6), Vector3(mx + rx, 6.4, mz + 0.45), 0.08, 0.08, 10, Color(0.85, 0.85, 0.82))
+	# The rotary head on the mast's face, its hoses looping down, the pipe below it into the ground.
+	var head_y := 9.0
+	pk.block(kit, "paint", Vector3(mx - 0.5, head_y - 0.6, mz - 0.95), Vector3(mx + 0.5, head_y + 0.6, mz - 0.45), dark)
+	pk.tube(kit, "paint", Vector3(mx, head_y + 0.6, mz - 0.7), Vector3(mx, head_y + 1.1, mz - 0.7), 0.25, 0.25, 12, c)
+	pk.tube(kit, "metal", Vector3(mx, 0.0, mz - 0.7), Vector3(mx, head_y - 0.6, mz - 0.7), 0.1, 0.1, 12, Color(0.55, 0.55, 0.55))
+	var hp := Vector3(mx + 0.3, head_y + 0.9, mz - 0.6)
+	for k in range(8):
+		var t1: float = float(k + 1) / 8.0
+		var q := Vector3(mx + 0.3 + sin(t1 * PI) * 1.1, lerpf(head_y + 0.9, 2.0, t1) + sin(t1 * PI) * 1.4, lerpf(mz - 0.6, mz + 1.0, t1))
+		pk.tube(kit, "rubber", hp, q, 0.07, 0.07, 8, dark, false)
+		hp = q
+	# The centraliser at the mast's foot and the dust hood (a skirt of rubber curtain) round the hole.
+	pk.block(kit, "paint", Vector3(mx - 0.45, 1.0, mz - 1.0), Vector3(mx + 0.45, 1.25, mz - 0.4), c.darkened(0.15))
+	pk.tube(kit, "rubber", Vector3(mx, 0.0, mz - 0.7), Vector3(mx, 0.75, mz - 0.7), 0.8, 0.65, 18, Color(0.08, 0.08, 0.08))
+	pk.tube(kit, "paint", Vector3(mx, 0.75, mz - 0.7), Vector3(mx, 0.95, mz - 0.7), 0.66, 0.66, 18, c)
+	# The rod carousel beside the mast: five rods in a cage.
+	for k in range(5):
+		var a3: float = TAU * float(k) / 5.0
+		var rp := Vector2(mx + 1.0 + cos(a3) * 0.28, mz + sin(a3) * 0.28)
+		pk.tube(kit, "metal", Vector3(rp.x, 1.6, rp.y), Vector3(rp.x, 9.6, rp.y), 0.08, 0.08, 8, Color(0.5, 0.5, 0.5))
+	for cy in [1.8, 5.5, 9.4]:
+		pk.tube(kit, "paint", Vector3(mx + 1.0, cy, mz), Vector3(mx + 1.0, cy + 0.15, mz), 0.42, 0.42, 14, c)
+	# Work lamps up the mast, hazard stripes on its foot.
+	for ly2 in [6.0, 12.0]:
+		pk.box(kit, "steel", Transform3D(Basis(Vector3.RIGHT, 0.5), Vector3(mx - half - 0.15, ly2, mz - half - 0.1)), Vector3(0.3, 0.22, 0.14), dark)
+		pk.box(kit, "lamp", Transform3D(Basis(Vector3.RIGHT, 0.5), Vector3(mx - half - 0.15, ly2, mz - half - 0.18)), Vector3(0.24, 0.16, 0.02), Color(1.0, 0.97, 0.9))
+	_hazard_band(pk, kit, Vector3(0, 0, mz - half - 0.075), Vector3(1, 0, 0), Vector3(0, 0, -1), mx - half - 0.07, mx + half + 0.07, 1.6, 2.4)
+
+
+## A drill's crawler at x `sx`: `length` long, its shoes `hw` either side, round a sprocket (rear) and an idler (front),
+## rollers under its frame and a carrier on top.
+static func _drill_track(pk: PropKit, kit: Dictionary, sx: float, length: float, hw: float) -> void:
+	var r := 0.5
+	var yc := 0.55
+	var zf: float = -length * 0.5 + r
+	var zr: float = length * 0.5 - r
+	var run: float = zr - zf
+	var perim: float = 2.0 * run + TAU * r
+	var n: int = int(round(perim / 0.3))
+	var shoe := Color(0.18, 0.18, 0.17)
+	for k in range(n):
+		var u: float = perim * float(k) / float(n)
+		var p: Vector3
+		var t: Vector3
+		if u < run:
+			p = Vector3(sx, yc - r, zf + u)
+			t = Vector3(0, 0, 1)
+		elif u < run + PI * r:
+			var a1: float = (u - run) / r
+			p = Vector3(sx, yc - cos(a1) * r, zr + sin(a1) * r)
+			t = Vector3(0, sin(a1), cos(a1))
+		elif u < 2.0 * run + PI * r:
+			p = Vector3(sx, yc + r, zr - (u - run - PI * r))
+			t = Vector3(0, 0, -1)
+		else:
+			var a2: float = (u - 2.0 * run - PI * r) / r
+			p = Vector3(sx, yc + cos(a2) * r, zf - sin(a2) * r)
+			t = Vector3(0, -sin(a2), -cos(a2))
+		var nrm: Vector3 = Vector3.RIGHT.cross(t).normalized() * -1.0
+		if nrm.dot(p - Vector3(sx, yc, clampf(p.z, zf, zr))) < 0.0:
+			nrm = -nrm
+		var b := Basis(Vector3.RIGHT, nrm, t)
+		var col: Color = dusty(shoe, p.y, 1.5, 0.7).darkened(0.05 * float(k % 3))
+		pk.box(kit, "steel", Transform3D(b, p + nrm * 0.03), Vector3(hw * 2.0, 0.08, 0.27), col)
+		pk.box(kit, "steel", Transform3D(b, p + nrm * 0.09), Vector3(hw * 2.0 - 0.04, 0.05, 0.06), col.darkened(0.1))
+	# The frame between the runs, the rollers under it, the carrier, the sprocket and the idler.
+	var fc: Color = dusty(Color(0.16, 0.16, 0.16), 0.5, 1.5, 0.6)
+	pk.block(kit, "steel", Vector3(sx - hw * 0.6, yc - 0.18, zf), Vector3(sx + hw * 0.6, yc + 0.32, zr), fc)
+	for k in range(6):
+		var zz: float = lerpf(zf + 0.4, zr - 0.4, float(k) / 5.0)
+		pk.tube(kit, "metal", Vector3(sx - hw * 0.7, yc - r + 0.2, zz), Vector3(sx + hw * 0.7, yc - r + 0.2, zz), 0.13, 0.13, 10, Color(0.3, 0.3, 0.3))
+	pk.tube(kit, "metal", Vector3(sx - hw * 0.5, yc + r - 0.15, 0.0), Vector3(sx + hw * 0.5, yc + r - 0.15, 0.0), 0.1, 0.1, 10, Color(0.3, 0.3, 0.3))
+	for wz in [zf, zr]:
+		pk.tube(kit, "steel", Vector3(sx - hw * 0.75, yc, wz), Vector3(sx + hw * 0.75, yc, wz), r - 0.06, r - 0.06, 16, Color(0.2, 0.2, 0.2))
+		var out: float = signf(sx)
+		pk.tube(kit, "metal", Vector3(sx + out * hw * 0.75, yc, wz), Vector3(sx + out * (hw * 0.75 + 0.08), yc, wz), 0.22, 0.18, 12, Color(0.35, 0.34, 0.32))
+	pk.block(kit, "paint", Vector3(sx - 0.25, yc - 0.1, zr + 0.1), Vector3(sx + 0.25, yc + 0.35, zr + 0.6), Color(0.2, 0.2, 0.2))
 
 
 ## A tumbleweed (radius about 0.45m): a tangle of dry twigs round a hollow, its stem broken off. `seed_v` varies it.
@@ -818,12 +1193,16 @@ static func tumbleweed(pk: PropKit, kit: Dictionary, seed_v: int) -> void:
 
 ## A sign: a board on two posts, `kind` "warn" (yellow, black border), "info" (white on green), "mine" (orange).
 ## Its text is a Label3D the generator adds (`board_face` gives where): the board faces -z at `c`, turned by `yaw`.
-static func sign_board(pk: PropKit, kit: Dictionary, c: Vector3, yaw: float, kind: String, w := 3.2, h := 1.6, post := 2.2) -> void:
+## `drops` (x the post at -x, y the one at +x) runs a post that much further down, to ground lower than the origin's.
+static func sign_board(pk: PropKit, kit: Dictionary, c: Vector3, yaw: float, kind: String, w := 3.2, h := 1.6, post := 2.2, drops := Vector2.ZERO) -> void:
 	var base: Transform3D = pk.xf
 	pk.set_frame(base * Transform3D(Basis(Vector3.UP, yaw), c))
 	var face := {"warn": Color(0.96, 0.78, 0.10), "info": Color(0.08, 0.40, 0.24), "mine": Color(0.94, 0.46, 0.10)}.get(kind, Color.WHITE) as Color
 	for px in [-w * 0.36, w * 0.36]:
-		pk.beam(kit, "steel", Vector3(px, 0.0, 0.05), Vector3(px, post + h, 0.05), 0.1, 0.1, Color(0.55, 0.55, 0.55))
+		var foot: float = -(drops.x if px < 0.0 else drops.y) - 0.25
+		pk.beam(kit, "steel", Vector3(px, foot, 0.05), Vector3(px, post + h, 0.05), 0.1, 0.1, Color(0.55, 0.55, 0.55))
+		# A concrete footing round the post where it goes into the ground.
+		pk.block(kit, "matte", Vector3(px - 0.14, foot + 0.25 - 0.05, -0.09), Vector3(px + 0.14, foot + 0.25 + 0.08, 0.19), Color(0.62, 0.6, 0.56))
 	pk.block(kit, "paint", Vector3(-w * 0.5, post, -0.02), Vector3(w * 0.5, post + h, 0.02), Color(0.08, 0.08, 0.08))
 	pk.block(kit, "paint", Vector3(-w * 0.5 + 0.08, post + 0.08, -0.05), Vector3(w * 0.5 - 0.08, post + h - 0.08, -0.02), face)
 	pk.set_frame(base)
@@ -843,12 +1222,7 @@ static func mine_gate(pk: PropKit, kit: Dictionary, labels: Array, half_w := 11.
 	pk.block(kit, "paint", Vector3(-half_w + 0.5, 6.15, 0.45), Vector3(half_w - 0.5, 7.45, 0.5), o)
 	labels.append(["MINA DEL VIENTO", Vector3(0, 6.8, 0.53), Vector3(0, 0, 1), 0.8, Color(0.08, 0.08, 0.08), half_w * 1.7])
 	labels.append(["MINA DEL VIENTO", Vector3(0, 6.8, -0.48), Vector3(0, 0, -1), 0.8, Color(0.9, 0.9, 0.88), half_w * 1.7])
-	# The guard hut on the right, its window to the road, and the boom (raised) on a post at the road's edge.
-	var hx: float = half_w + 3.6
-	pk.block(kit, "paint", Vector3(hx - 1.8, 0.0, 2.0), Vector3(hx + 1.8, 2.8, 5.6), white)
-	pk.block(kit, "paint", Vector3(hx - 2.0, 2.8, 1.8), Vector3(hx + 2.0, 3.05, 5.8), o)
-	pk.block(kit, "glassdark", Vector3(hx - 1.84, 1.1, 2.6), Vector3(hx - 1.8, 2.3, 5.0), GLASS)
-	pk.block(kit, "glassdark", Vector3(hx - 1.4, 1.1, 1.96), Vector3(hx + 1.4, 2.3, 2.0), GLASS)
+	# The boom (raised) on a post at the road's edge; the guard house beside it is a prop of its own (guard_house).
 	pk.block(kit, "paint", Vector3(half_w - 0.3, 0.0, 2.6), Vector3(half_w + 0.3, 1.2, 3.2), white)
 	var pivot := Vector3(half_w, 1.05, 2.9)
 	var boom_tip: Vector3 = pivot + Vector3(-0.35, 7.0, 0.0)
@@ -856,6 +1230,104 @@ static func mine_gate(pk: PropKit, kit: Dictionary, labels: Array, half_w := 11.
 		var a: Vector3 = pivot.lerp(boom_tip, float(k) / 7.0)
 		var b: Vector3 = pivot.lerp(boom_tip, float(k + 1) / 7.0)
 		pk.beam(kit, "paint", a, b, 0.14, 0.14, Color(0.9, 0.12, 0.1) if k % 2 == 0 else white)
+
+
+## The guard house at the mine's gate, life size, its front (and the window to the road) toward -z: a rendered
+## block house on a plinth with steps, framed windows all round (a sliding hatch to the road), a door, a canopy on
+## two columns over the front with the post's name on its fascia, an air-conditioner, a water tank on the roof, a
+## radio mast, a solar panel and a floodlight, a bench and a bin. Labels go into `labels`.
+static func guard_house(pk: PropKit, kit: Dictionary, labels: Array) -> void:
+	var wall := Color(0.9, 0.88, 0.83)
+	var o := Color(0.94, 0.46, 0.10)
+	var frame := Color(0.25, 0.26, 0.27)
+	var conc := Color(0.62, 0.6, 0.56)
+	var dark := Color(0.08, 0.08, 0.08)
+	var hx := 3.0
+	var hz := 2.0
+	var fy := 0.35
+	var wy := 3.0
+	# Plinth and the steps up to the door (front right).
+	pk.block(kit, "matte", Vector3(-hx - 0.15, 0.0, -hz - 0.15), Vector3(hx + 0.15, fy, hz + 0.15), conc)
+	pk.block(kit, "matte", Vector3(-hx - 0.15, 0.0, -3.4), Vector3(hx + 0.15, fy, -hz - 0.15), conc.lightened(0.05))
+	pk.block(kit, "matte", Vector3(-hx - 0.15, 0.0, -3.7), Vector3(hx + 0.15, fy * 0.5, -3.4), conc.darkened(0.05))
+	# The walls, a darker skirt along their foot.
+	pk.block(kit, "paint", Vector3(-hx, fy, -hz), Vector3(hx, wy, hz), wall)
+	pk.block(kit, "matte", Vector3(-hx - 0.02, fy, -hz - 0.02), Vector3(hx + 0.02, fy + 0.4, hz + 0.02), Color(0.55, 0.5, 0.44))
+	# Windows: [centre along the wall, width] on each wall; the front has the hatch to the road.
+	var wins := [
+		[Vector3(0, 0, -1), [[-1.2, 2.0], [1.45, 0.9]]],
+		[Vector3(-1, 0, 0), [[0.0, 1.8]]],
+		[Vector3(1, 0, 0), [[0.0, 1.6]]],
+		[Vector3(0, 0, 1), [[-1.0, 1.2], [1.2, 1.2]]],
+	]
+	for wv in wins:
+		var n: Vector3 = wv[0]
+		var along := Vector3(-n.z, 0, n.x)
+		var face: float = hz if absf(n.z) > 0.5 else hx
+		for w in wv[1]:
+			var c: Vector3 = n * face + along * float(w[0])
+			var ww: float = w[1]
+			var y0: float = 1.25
+			var y1: float = 2.45
+			var lo: Vector3 = c + along * (-ww * 0.5) + Vector3(0, y0, 0)
+			var hi: Vector3 = c + along * (ww * 0.5) + Vector3(0, y1, 0)
+			# Glass 1.5cm proud, the frame round it 4cm proud, a sill under it.
+			pk.block(kit, "glassdark", Vector3(minf(lo.x, hi.x), y0, minf(lo.z, hi.z)) + n * 0.005, Vector3(maxf(lo.x, hi.x), y1, maxf(lo.z, hi.z)) + n * 0.015, GLASS)
+			for e in [[lo, Vector3(hi.x, y0 + 0.08, hi.z) if absf(n.z) > 0.5 else Vector3(hi.x, y0 + 0.08, hi.z)],
+					[Vector3(lo.x, y1 - 0.08, lo.z), hi]]:
+				var a: Vector3 = e[0]
+				var b: Vector3 = e[1]
+				pk.block(kit, "steel", Vector3(minf(a.x, b.x), a.y, minf(a.z, b.z)) + n * 0.015, Vector3(maxf(a.x, b.x), b.y, maxf(a.z, b.z)) + n * 0.04, frame)
+			for t in [-0.5, 0.0, 0.5]:
+				var m: Vector3 = c + along * (ww * t)
+				var m0: Vector3 = m - along * 0.035
+				var m1: Vector3 = m + along * 0.035
+				pk.block(kit, "steel", Vector3(minf(m0.x, m1.x), y0, minf(m0.z, m1.z)) + n * 0.015, Vector3(maxf(m0.x, m1.x), y1, maxf(m0.z, m1.z)) + n * 0.04, frame)
+			var s0: Vector3 = c + along * (-ww * 0.5 - 0.08)
+			var s1: Vector3 = c + along * (ww * 0.5 + 0.08)
+			pk.block(kit, "matte", Vector3(minf(s0.x, s1.x), y0 - 0.1, minf(s0.z, s1.z)), Vector3(maxf(s0.x, s1.x), y0, maxf(s0.z, s1.z)) + n * 0.12, conc)
+	# The door, front right, with its frame and handle.
+	pk.block(kit, "paint", Vector3(2.15, fy, -hz - 0.02), Vector3(2.85, 2.45, -hz), Color(0.3, 0.45, 0.55))
+	pk.block(kit, "steel", Vector3(2.08, fy, -hz - 0.04), Vector3(2.15, 2.52, -hz), frame)
+	pk.block(kit, "steel", Vector3(2.85, fy, -hz - 0.04), Vector3(2.92, 2.52, -hz), frame)
+	pk.block(kit, "steel", Vector3(2.08, 2.45, -hz - 0.04), Vector3(2.92, 2.52, -hz), frame)
+	pk.block(kit, "metal", Vector3(2.22, 1.3, -hz - 0.07), Vector3(2.3, 1.36, -hz - 0.02), Color(0.7, 0.7, 0.7))
+	# The roof slab, its canopy out over the front on two columns, an orange fascia all round with the name.
+	pk.block(kit, "matte", Vector3(-hx - 0.3, wy, -3.7), Vector3(hx + 0.3, wy + 0.18, hz + 0.3), conc.lightened(0.1))
+	pk.block(kit, "paint", Vector3(-hx - 0.34, wy - 0.05, -3.74), Vector3(hx + 0.34, wy + 0.42, -3.7), o)
+	pk.block(kit, "paint", Vector3(-hx - 0.34, wy - 0.05, hz + 0.3), Vector3(hx + 0.34, wy + 0.42, hz + 0.34), o)
+	for sx in [-1.0, 1.0]:
+		pk.block(kit, "paint", Vector3(sx * (hx + 0.3) - 0.02, wy - 0.05, -3.7), Vector3(sx * (hx + 0.3) + 0.02, wy + 0.42, hz + 0.3), o)
+		pk.block(kit, "steel", Vector3(sx * (hx - 0.1) - 0.09, fy, -3.55), Vector3(sx * (hx - 0.1) + 0.09, wy, -3.37), frame)
+	labels.append(["CONTROL DE ACCESO", Vector3(0, wy + 0.19, -3.76), Vector3(0, 0, -1), 0.26, Color(0.08, 0.08, 0.08), 2.0 * hx])
+	# Lamps under the canopy.
+	for lx in [-1.4, 1.4]:
+		pk.block(kit, "lamp", Vector3(lx - 0.3, wy - 0.03, -3.0), Vector3(lx + 0.3, wy, -2.85), Color(1.0, 0.97, 0.9))
+	# On the roof: the water tank on a stand, the radio mast, a solar panel, the floodlight.
+	pk.block(kit, "steel", Vector3(-2.2, wy + 0.18, 0.4), Vector3(-1.0, wy + 0.5, 1.6), frame)
+	pk.tube(kit, "paint", Vector3(-1.6, wy + 0.5, 1.0), Vector3(-1.6, wy + 1.75, 1.0), 0.58, 0.55, 18, dark)
+	pk.tube(kit, "paint", Vector3(-1.6, wy + 1.75, 1.0), Vector3(-1.6, wy + 1.95, 1.0), 0.55, 0.2, 18, dark)
+	pk.tube(kit, "metal", Vector3(2.4, wy + 0.18, 1.5), Vector3(2.4, wy + 5.2, 1.5), 0.04, 0.03, 8, Color(0.7, 0.7, 0.7))
+	for k in range(3):
+		var ay: float = wy + 3.6 + 0.5 * k
+		pk.beam(kit, "metal", Vector3(2.4, ay, 1.5), Vector3(2.4 + 0.5 - 0.1 * k, ay, 1.5), 0.02, 0.02, Color(0.7, 0.7, 0.7))
+	var sp := Basis(Vector3.RIGHT, deg_to_rad(25.0))
+	pk.box(kit, "steel", Transform3D(sp, Vector3(0.6, wy + 0.6, 0.8)), Vector3(1.6, 0.05, 1.0), Color(0.6, 0.6, 0.62))
+	pk.box(kit, "glassdark", Transform3D(sp, Vector3(0.6, wy + 0.63, 0.8)), Vector3(1.5, 0.01, 0.9), Color(0.08, 0.12, 0.25))
+	pk.beam(kit, "steel", Vector3(0.6, wy + 0.18, 1.1), Vector3(0.6, wy + 0.45, 1.1), 0.05, 0.05, frame)
+	pk.box(kit, "steel", Transform3D(Basis(Vector3.RIGHT, 0.5), Vector3(2.7, wy + 0.5, -1.7)), Vector3(0.5, 0.35, 0.2), frame)
+	pk.box(kit, "lamp", Transform3D(Basis(Vector3.RIGHT, 0.5), Vector3(2.7, wy + 0.47, -1.8)), Vector3(0.42, 0.27, 0.02), Color(1.0, 0.97, 0.9))
+	# The air-conditioner on the side wall, its pipes up the wall.
+	pk.block(kit, "paint", Vector3(hx + 0.02, 1.5, 0.3), Vector3(hx + 0.32, 2.1, 1.3), Color(0.92, 0.92, 0.9))
+	pk.tube(kit, "matte", Vector3(hx + 0.031, 1.8, 0.8), Vector3(hx + 0.031, 1.8, 0.8), 0.22, 0.22, 16, Color(0.3, 0.3, 0.3))
+	for k in range(6):
+		pk.block(kit, "matte", Vector3(hx + 0.32, 1.55 + 0.09 * k, 0.4), Vector3(hx + 0.33, 1.6 + 0.09 * k, 1.2), Color(0.35, 0.35, 0.35))
+	pk.tube(kit, "metal", Vector3(hx + 0.06, 2.1, 1.2), Vector3(hx + 0.06, 2.8, 1.2), 0.025, 0.025, 6, Color(0.85, 0.85, 0.85))
+	# A bench and a bin under the canopy.
+	pk.block(kit, "steel", Vector3(-2.6, fy + 0.42, -2.9), Vector3(-1.0, fy + 0.47, -2.5), Color(0.55, 0.4, 0.25))
+	for bx in [-2.5, -1.1]:
+		pk.block(kit, "steel", Vector3(bx - 0.03, fy, -2.85), Vector3(bx + 0.03, fy + 0.42, -2.55), frame)
+	pk.tube(kit, "paint", Vector3(0.6, fy, -2.9), Vector3(0.6, fy + 0.8, -2.9), 0.25, 0.27, 14, Color(0.15, 0.4, 0.2))
 
 
 ## The in-pit crusher: a steel tower over the gyratory crusher, the dump pocket's concrete walls where the trucks back

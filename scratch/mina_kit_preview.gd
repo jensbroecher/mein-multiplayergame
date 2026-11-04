@@ -9,7 +9,7 @@ const MinaKit = preload("res://MinaKit.gd")
 ## [name, x position] for each piece the preview can build.
 const SPOTS := {
 	"truck": 0.0, "truckload": 30.0, "shovel": 70.0, "dish": 130.0, "balloon": 190.0, "balloonlow": 230.0,
-	"conveyor": 280.0, "light": 330.0, "drill": 360.0, "tumbleweed": 390.0, "watertruck": 420.0, "gate": 460.0,
+	"conveyor": 280.0, "light": 330.0, "drill": 360.0, "tumbleweed": 390.0, "watertruck": 420.0, "gate": 460.0, "guardhouse": 500.0,
 	"crusher": 520.0, "shop": 600.0, "stockpile": 700.0, "signs": 780.0,
 }
 
@@ -40,6 +40,8 @@ func _build(which: String, sc: float) -> Node3D:
 			MinaKit.tumbleweed(pk, kit, 3)
 		"gate":
 			MinaKit.mine_gate(pk, kit, [])
+		"guardhouse":
+			MinaKit.guard_house(pk, kit, [])
 		"crusher":
 			MinaKit.crusher(pk, kit, [])
 		"shop":

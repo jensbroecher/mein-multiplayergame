@@ -1153,7 +1153,7 @@ func _build_track_curve() -> Curve3D:
 ## Fixed checkpoints down to the ramp; those on the floor, in the mouth and the valley follow the route (`_checkpoints`).
 const CHECKPOINTS_S := [640.0, 1180.0, 1600.0, 2120.0, 2560.0, 2870.0]
 ## [s, lat]: out of the fiesta's sweeper, onto the shelf, the north wall, the mouth and the valley.
-const BOOSTS := [[250.0, -2.6], [1300.0, 2.6], [2430.0, 0.0]]
+const BOOSTS := [[168.0, -2.6], [1300.0, 2.6], [2430.0, 0.0]]
 
 
 func _checkpoints() -> Array:
@@ -1229,6 +1229,42 @@ func _place_gameplay(level_scene: Node3D) -> void:
 		bp.position = sp2["pos"]
 		bp.rotation_degrees = Vector3(0, sp2["yaw"], 0)
 		pads.add_child(bp)
+
+
+# ======================================================================================
+#  The big jump on the start straight
+# ======================================================================================
+
+## A big wooden kicker across the start straight (WoodenRamp.tscn, open trestle underneath), fed by the boost pad
+## before it: carts leave the lip about 10m up at racing speed and land on the straight before the sweeper. [toe s,
+## length, height, curve]. Named "...Jump", not "ramp" (Level.gd bakes a second collider under any "ramp").
+const PLATEAU_JUMP := [205.0, 26.0, 6.0, 0.55]
+
+
+func _build_plateau_jump(level_scene: Node3D) -> void:
+	var j: Node3D = (load("res://WoodenRamp.tscn") as PackedScene).instantiate()
+	j.name = "PlateauJump"
+	var sp: Dictionary = _spot(PLATEAU_JUMP[0], 0.0, 0.0)
+	j.position = sp["pos"]
+	j.rotation_degrees = Vector3(0, sp["yaw"], 0)
+	j.set("length", PLATEAU_JUMP[1])
+	j.set("height", PLATEAU_JUMP[2])
+	j.set("curve", PLATEAU_JUMP[3])
+	j.set("width", ROAD_HALF * 2.0)
+	j.set("trestle", true)
+	j.set("wood_color", Color(0.62, 0.48, 0.33))
+	level_scene.add_child(j)
+
+
+## The jump's lip for scratch/nyota_jump_test (the TrackPath's jump_lips).
+func _plateau_jump_lip() -> Dictionary:
+	var toe: float = PLATEAU_JUMP[0]
+	var length: float = PLATEAU_JUMP[1]
+	var h: float = PLATEAU_JUMP[2]
+	var sp: Dictionary = _spot(toe + length, 0.0, 0.0)
+	var slope: float = h / length * (1.0 + float(PLATEAU_JUMP[3]))
+	var lip: Vector3 = sp["pos"] + Vector3(0, h + (_road_y(toe) - _road_y(toe + length)), 0)
+	return {"name": "PlateauJump", "lip": lip, "dir": ((sp["fwd"] as Vector3) + Vector3(0, slope, 0)).normalized()}
 
 
 # ======================================================================================
@@ -1758,6 +1794,107 @@ func _signs() -> Array:
 	return out
 
 
+## Signs stand SIGN_LAT out from the centreline on the side asked, each on a little pad of its own graded at the
+## road's height (`_plan_signs`, before the heights: SIGN_PAD half size, SIGN_PAD_BLEND): the road's grading falls
+## away or climbs steeply from about 9.5m out, so a sign there had one post in the air and the other in the bank.
+## The board's posts are SIGN_POST either side of its middle (the board is 3.2m, life size, the posts at 0.36 of it).
+const SIGN_LAT := 10.9
+const SIGN_PAD := 3.4
+const SIGN_PAD_BLEND := 5.0
+const SIGN_POST := 3.2 * 0.36 * PROP_SCALE
+## How far (in plan) a sign's middle keeps from a conveyor's line: its gallery and supports are 2-3m either side, the
+## sign's board 2.6m.
+const SIGN_CONVEYOR_CLEAR := 9.0
+
+
+## The distance in plan from `p` to the nearest conveyor's line.
+func _conveyor_dist(p: Vector2) -> float:
+	var best := 1e9
+	for def in [CONVEYOR_A, CONVEYOR_B]:
+		for i in range(def.size() - 1):
+			var a := Vector2(float(def[i][0]), float(def[i][1]))
+			var b := Vector2(float(def[i + 1][0]), float(def[i + 1][1]))
+			best = minf(best, p.distance_to(Geometry2D.get_closest_point_to_segment(p, a, b)))
+	return best
+
+
+## The gate's frame (x across the road, right +; -z the way of travel) at GATE_S, on the road.
+func _gate_xform() -> Transform3D:
+	var sp: Dictionary = _spot(GATE_S, 0.0, 0.0)
+	var pos: Vector3 = sp["pos"]
+	pos.y = _road_y(GATE_S) - 0.05
+	return Transform3D(Basis(Vector3.UP, sp["yaw"] * PI / 180.0), pos)
+
+
+## The guard house beside the gate, in the gate's frame: off the road's right, before the arch, its front (the
+## canopy and the hatch) toward the road.
+const GUARD_HOUSE_AT := Vector3(19.5, 0.0, 8.5)
+var _guard_house_xz := Vector2(1e9, 1e9)
+
+## Level pads for the gate's legs, the boom's post and the guard house, at the road's height: the left leg had stood
+## on air where the bank falls away, and the hut sat on the slope.
+func _plan_gate_pads() -> void:
+	var gx: Transform3D = _gate_xform()
+	var y: float = gx.origin.y
+	for at in [[Vector3(-11.5, 0, 0), 2.0, 4.0], [Vector3(11.5, 0, 0), 2.0, 4.0], [Vector3(11.5, 0, 4.64), 1.2, 3.0],
+			[GUARD_HOUSE_AT, 9.5, 6.0]]:
+		var w: Vector3 = gx * (at[0] as Vector3)
+		_pads.append([w.x, w.z, at[1], at[1], at[2], y])
+	var h: Vector3 = gx * GUARD_HOUSE_AT
+	_guard_house_xz = Vector2(h.x, h.z)
+## [pos (y unset), yaw, s] per sign, in _signs()' order.
+var _sign_spots: Array = []
+
+
+func _plan_signs() -> void:
+	_sign_spots.clear()
+	_plan_gate_pads()
+	for sg in _signs():
+		var s: float = sg[0]
+		var side: float = signf(float(sg[1]))
+		# Clear of the conveyors (their galleries and supports) and the gate's guard house: along the road a little,
+		# or across it.
+		var ss: Dictionary = {}
+		for k in range(13):
+			var ds: float = 8.0 * float((k + 1) / 2) * (1.0 if k % 2 == 1 else -1.0)
+			for sd in [side, -side]:
+				var cand: Dictionary = _spot(s + ds, sd * SIGN_LAT, 0.0)
+				var c2 := Vector2((cand["pos"] as Vector3).x, (cand["pos"] as Vector3).z)
+				if _conveyor_dist(c2) > SIGN_CONVEYOR_CLEAR and c2.distance_to(_guard_house_xz) > 16.0:
+					ss = cand
+					if absf(ds) > 0.0 or sd != side:
+						print("  sign '%s' moved %+.0fm along the road%s, clear of the conveyors" % [sg[3], ds, "" if sd == side else " and across it"])
+					break
+			if not ss.is_empty():
+				break
+		if ss.is_empty():
+			ss = _spot(s, side * SIGN_LAT, 0.0)
+			push_error("sign '%s' found no spot clear of the conveyors" % sg[3])
+		var p: Vector3 = ss["pos"]
+		_sign_spots.append([p, _yaw_to(-(ss["fwd"] as Vector3)), s])
+		# No pad by the sump (it would fill it in): the floor is level there anyway.
+		if Vector2(p.x, p.z).distance_to(SUMP) < SUMP_R + SIGN_PAD + SIGN_PAD_BLEND + 2.0:
+			continue
+		_pads.append([p.x, p.z, SIGN_PAD, SIGN_PAD, SIGN_PAD_BLEND, _road_y(s) - 0.03])
+
+
+## Where sign `i` stands, on the built ground: {pos, yaw, drops, relief}. It stands on the lower of its posts'
+## ground, so neither post floats; the other reaches that much further into the ground.
+func _sign_at(i: int) -> Dictionary:
+	var spot: Array = _sign_spots[i]
+	var p: Vector3 = spot[0]
+	var yaw: float = spot[1]
+	var b := Basis(Vector3.UP, yaw)
+	var ql: Vector3 = p + b * Vector3(-SIGN_POST, 0, 0)
+	var qr: Vector3 = p + b * Vector3(SIGN_POST, 0, 0)
+	var gl: float = _ground_at(ql.x, ql.z)
+	var gr: float = _ground_at(qr.x, qr.z)
+	p.y = minf(gl, gr)
+	if absf(gl - gr) > 0.3:
+		print("  sign at %.0f: its posts' ground differs by %.2fm" % [float(spot[2]), absf(gl - gr)])
+	return {"pos": p, "yaw": yaw, "drops": Vector2.ZERO, "relief": absf(gl - gr)}
+
+
 func _build_gate(level: Node3D) -> void:
 	var root := Node3D.new()
 	root.name = "MineGate"
@@ -1770,23 +1907,38 @@ func _build_gate(level: Node3D) -> void:
 	var yaw: float = sp["yaw"] * PI / 180.0
 	var hw := 11.5
 	var body := _prop(root, "Gate", gate, pos, yaw, [[Vector3(-hw, 5.9, 0), Vector3(1.6, 11.8, 1.6)], [Vector3(hw, 5.9, 0), Vector3(1.6, 11.8, 1.6)],
-			[Vector3(hw + 5.8, 2.3, 6.1), Vector3(5.8, 4.6, 5.8)]], 0.0)
+			[Vector3(hw, 1.0, 4.64), Vector3(1.0, 2.0, 1.0)]], 0.0)
 	_labels(root, labels, body.transform, PROP_SCALE)
+	# The guard house on its pad, its front to the road (the house's -z along the gate's -x).
+	var hlabels: Array = []
+	var house: ArrayMesh = _mesh("guard_house", PROP_SCALE, func(pk, kit): MinaKit.guard_house(pk, kit, hlabels))
+	var hpos: Vector3 = body.transform * GUARD_HOUSE_AT
+	var hyaw: float = yaw + PI * 0.5
+	hpos.y = _seat("guard house", hpos, hyaw, Vector2(3.3, 3.0) * PROP_SCALE, 0.3)
+	var s2 := PROP_SCALE
+	var hbody := _prop(root, "GuardHouse", house, hpos, hyaw, [[Vector3(0, 1.7, 0) * s2, Vector3(6.3, 3.4, 4.3) * s2],
+			[Vector3(0, 3.2, -0.7) * s2, Vector3(6.7, 0.5, 6.1) * s2], [Vector3(-2.9, 1.6, -3.46) * s2, Vector3(0.2, 2.7, 0.2) * s2],
+			[Vector3(2.9, 1.6, -3.46) * s2, Vector3(0.2, 2.7, 0.2) * s2]], 10.0)
+	_labels(root, hlabels, hbody.transform, PROP_SCALE)
 	var signs: Array = _signs()
 	for i in range(signs.size()):
 		var sg: Array = signs[i]
-		var ss: Dictionary = _spot(sg[0], sg[1], 0.0)
-		var sp2: Vector3 = ss["pos"]
-		sp2.y = _ground_at(sp2.x, sp2.z)
 		var kind: String = sg[2]
-		var smesh: ArrayMesh = _mesh("sign_" + kind, PROP_SCALE, func(pk, kit): MinaKit.sign_board(pk, kit, Vector3.ZERO, 0.0, kind))
-		# Facing the drivers coming toward it.
-		var syaw: float = _yaw_to(-(ss["fwd"] as Vector3))
-		var mi := MeshInstance3D.new()
-		mi.name = "Sign_%d" % i
-		mi.mesh = smesh
-		mi.transform = Transform3D(Basis(Vector3.UP, syaw), sp2)
-		root.add_child(mi)
+		var plan: Dictionary = _sign_at(i)
+		var sp2: Vector3 = plan["pos"]
+		var drops: Vector2 = plan["drops"]
+		var smesh: ArrayMesh
+		if drops.length() < 0.05:
+			smesh = _mesh("sign_" + kind, PROP_SCALE, func(pk, kit): MinaKit.sign_board(pk, kit, Vector3.ZERO, 0.0, kind))
+		else:
+			smesh = _mesh("sign_%s_%d" % [kind, i], PROP_SCALE, func(pk, kit): MinaKit.sign_board(pk, kit, Vector3.ZERO, 0.0, kind,
+					3.2, 1.6, 2.2, drops / PROP_SCALE))
+		# Facing the drivers coming toward it; solid: its posts and its board.
+		var syaw: float = plan["yaw"]
+		var sc := PROP_SCALE
+		_prop(root, "Sign_%d" % i, smesh, sp2, syaw, [[Vector3(-SIGN_POST, 1.9 * sc, 0.05 * sc), Vector3(0.16 * sc, 3.8 * sc, 0.16 * sc)],
+				[Vector3(SIGN_POST, 1.9 * sc, 0.05 * sc), Vector3(0.16 * sc, 3.8 * sc, 0.16 * sc)],
+				[Vector3(0, 3.0 * sc, 0), Vector3(3.2 * sc, 1.6 * sc, 0.12 * sc)]], 0.0, "metal")
 		var ink := Color(0.06, 0.06, 0.06) if kind == "warn" else Color(0.97, 0.97, 0.95)
 		var face: Vector3 = Basis(Vector3.UP, syaw) * Vector3(0, 0, -1)
 		_label(root, sg[3], sp2 + Vector3.UP * (2.2 + 1.1) * PROP_SCALE + face * 0.1, face, 0.42 * PROP_SCALE, ink, 2.9 * PROP_SCALE)
@@ -1840,13 +1992,27 @@ func _truck_mesh(loaded: bool, kind: String) -> ArrayMesh:
 	return _mesh("haul_truck_%d" % int(loaded), PROP_SCALE, func(pk, kit): MinaKit.haul_truck(pk, kit, MinaKit.MINE_YELLOW, loaded, 0.3 + 0.4 * float(loaded)))
 
 
-## A haul truck parked at (x, z) facing `yaw`: solid as two boxes (the body over the wheels, the deck in front).
+## A haul truck parked at (x, z) facing `yaw`. Solid where it is (life size, in its frame: x across, -z its front),
+## open where it isn't: a cart (a 1.5m sphere) drives under it, between the wheels, under the frame rails (2.3m up)
+## and the rear axle's housing (1.9m), the dump body 6m over the ground.
+const TRUCK_SOLIDS := [
+	[Vector3(-3.75, 2.0, -3.4), Vector3(1.45, 4.0, 4.0)], [Vector3(3.75, 2.0, -3.4), Vector3(1.45, 4.0, 4.0)],   # front wheels
+	[Vector3(-3.275, 2.0, 3.8), Vector3(3.0, 4.0, 4.0)], [Vector3(3.275, 2.0, 3.8), Vector3(3.0, 4.0, 4.0)],    # rear duals
+	[Vector3(0.0, 2.0, 3.8), Vector3(3.3, 1.64, 1.64)],      # the rear axle's housing
+	[Vector3(0.0, 2.1, -0.55), Vector3(2.94, 1.3, 12.3)],    # the frame rails
+	[Vector3(0.0, 3.275, -5.825), Vector3(3.9, 2.55, 2.25)], # the engine house
+	[Vector3(0.0, 1.725, -7.175), Vector3(6.5, 1.15, 0.65)], # the bumper
+	[Vector3(0.0, 5.95, -0.8), Vector3(9.9, 4.5, 13.6)],     # the body, the deck and the cab
+]
 func _truck(parent: Node3D, node_name: String, x: float, z: float, yaw: float, loaded: bool, kind := "haul") -> void:
 	var s := PROP_SCALE
 	var pos := Vector3(x, 0.0, z)
 	_check_clear(node_name, pos, yaw, Vector2(4.9, 7.8) * s, PIT_CLEAR)
 	pos.y = _seat(node_name, pos, yaw, Vector2(5.0, 8.0) * s, 0.5) - 0.05
-	_prop(parent, node_name, _truck_mesh(loaded, kind), pos, yaw, [[Vector3(0, 4.3, 0.2) * s, Vector3(9.8, 7.8, 15.4) * s]], 16.0)
+	var boxes: Array = []
+	for b in TRUCK_SOLIDS:
+		boxes.append([(b[0] as Vector3) * s, (b[1] as Vector3) * s])
+	_prop(parent, node_name, _truck_mesh(loaded, kind), pos, yaw, boxes, 16.0)
 
 
 func _build_pit(level: Node3D) -> void:
@@ -1884,9 +2050,10 @@ func _build_pit(level: Node3D) -> void:
 		var lt: Array = LIGHT_TOWERS[i]
 		var lp := Vector3(lt[0], 0.0, lt[1])
 		var ly: float = deg_to_rad(float(lt[2]))
-		_check_clear("light tower %d" % i, lp, ly, Vector2(2.0, 2.0) * s, PIT_CLEAR)
+		_check_clear("light tower %d" % i, lp, ly, Vector2(2.1, 2.6) * s, PIT_CLEAR)
 		lp.y = _seat("light %d" % i, lp, ly, Vector2(2.0, 2.0) * s, 0.4)
-		_prop(root, "LightTower_%d" % i, light, lp, ly, [[Vector3(0, 1.3, 0) * s, Vector3(2.2, 2.6, 3.6) * s]], 5.0)
+		_prop(root, "LightTower_%d" % i, light, lp, ly, [[Vector3(0, 1.3, 0) * s, Vector3(4.2, 2.6, 3.6) * s],
+				[Vector3(0, 5.7, 1.35) * s, Vector3(0.35, 7.4, 0.35) * s]], 5.0)
 	var drill: ArrayMesh = _mesh("drill_rig", s, func(pk, kit): MinaKit.drill_rig(pk, kit))
 	for i in range(DRILLS.size()):
 		var dr: Array = DRILLS[i]
@@ -1894,7 +2061,8 @@ func _build_pit(level: Node3D) -> void:
 		var dyaw: float = deg_to_rad(float(dr[2]))
 		_check_clear("drill %d" % i, dp, dyaw, Vector2(2.7, 4.0) * s, PIT_CLEAR)
 		dp.y = _seat("drill %d" % i, dp, dyaw, Vector2(2.7, 4.0) * s, 0.4)
-		_prop(root, "DrillRig_%d" % i, drill, dp, dyaw, [[Vector3(0, 2.0, 0.4) * s, Vector3(5.4, 4.2, 7.8) * s]], 8.0)
+		_prop(root, "DrillRig_%d" % i, drill, dp, dyaw, [[Vector3(0, 2.0, 0.3) * s, Vector3(5.6, 4.0, 8.0) * s],
+				[Vector3(0.55, 10.0, -3.35) * s, Vector3(1.0, 16.0, 1.0) * s]], 8.0)
 	# The in-pit crusher by the mouth, a truck backed up to its pocket.
 	var clabels: Array = []
 	var cmesh: ArrayMesh = _mesh("crusher", s, func(pk, kit): MinaKit.crusher(pk, kit, clabels))
@@ -1984,10 +2152,20 @@ func _build_conveyors(level: Node3D) -> void:
 					var gy: float = _ground_at(e.x, e.z)
 					_box_shape(body, Transform3D(basis, Vector3(e.x, (gy + e.y) * 0.5, e.z)), Vector3(5.4 * s, e.y - gy, 3.6 * s))
 				continue
-			var low_y: float = minf(a.y, b.y)
-			var g_mid: float = _ground_at(mid.x, mid.z)
-			if low_y - g_mid < 6.0:
-				_box_shape(body, Transform3D(basis, Vector3(mid.x, (g_mid + mid.y) * 0.5, mid.z)), Vector3(2.6 * s, mid.y - g_mid + 0.6, flat.length()))
+			# Solid where it is: the belt's frame, and each support's two legs (where conveyor_run stands them, every
+			# 12m of life size), so a cart drives under the belt between the supports.
+			_box_shape(body, Transform3D(Basis.looking_at(dir.normalized(), Vector3.UP), mid + Vector3.UP * 0.1 * s),
+					Vector3(2.4 * s, 0.9 * s, dir.length()))
+			var n: int = maxi(int(floor(dir.length() / s / 12.0)), 1)
+			var side: Vector3 = Vector3(dir.z, 0.0, -dir.x).normalized()
+			for k in range(n + 1):
+				if (k == 0 and i > 0) or (k == n and bridges.has(i + 1)):
+					continue
+				var p: Vector3 = a.lerp(b, float(k) / float(n))
+				for sd in [-1.0, 1.0]:
+					var leg: Vector3 = p + side * sd * 1.15 * s
+					var gy2: float = _ground_at(leg.x, leg.z)
+					_box_shape(body, Transform3D(basis, Vector3(leg.x, (gy2 + p.y) * 0.5, leg.z)), Vector3(0.4 * s, p.y - gy2, 0.4 * s))
 		for i in bridges:
 			var a2: Vector3 = pts[i]
 			var b2: Vector3 = pts[i + 1]
@@ -2743,8 +2921,10 @@ func _ready() -> void:
 	var lip: Vector3 = _spot(lip_s, 0.0, 0.0)["pos"]
 	var rise: float = _road_y(lip_s) - _road_y(lip_s - 2.0)
 	var lip_fwd: Vector3 = _spot(lip_s, 0.0, 0.0)["fwd"]
-	track_path.set_meta(&"jump_lips", [{"name": "Wash", "lip": lip, "dir": (lip_fwd * 2.0 + Vector3(0, rise, 0)).normalized()}])
+	var big: Dictionary = _plateau_jump_lip()
+	track_path.set_meta(&"jump_lips", [{"name": "Wash", "lip": lip, "dir": (lip_fwd * 2.0 + Vector3(0, rise, 0)).normalized()}, big])
 	_plan_pads()
+	_plan_signs()
 	_plan_bumps()
 	_build_heights()
 	print("  heights built (%.1fs)" % ((Time.get_ticks_msec() - t_start) / 1000.0))
@@ -2755,6 +2935,7 @@ func _ready() -> void:
 	_build_terrain(terrain_root, _ground_mat)
 	print("  terrain built (%.1fs)" % ((Time.get_ticks_msec() - t_start) / 1000.0))
 	_build_berms(level_scene)
+	_build_plateau_jump(level_scene)
 	_build_fiesta(level_scene)
 	_build_array(level_scene)
 	_build_gate(level_scene)

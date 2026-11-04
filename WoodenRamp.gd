@@ -83,6 +83,12 @@ static var _built := {}      # shape key -> [mesh, collision shape]
 	set(v):
 		trim_color = v
 		_rebuild()
+## Open underneath: the deck on joists over bents of posts with cross-bracing (and the sides braced between
+## them), instead of boarded sides and back. For big ramps, where a boarded side reads as one solid block.
+@export var trestle: bool = false:
+	set(v):
+		trestle = v
+		_rebuild()
 
 @export_group("Editor Tools")
 ## Drop this ramp onto the surface under it (editor). Prefer the button; the checkbox is a backup.
@@ -187,8 +193,8 @@ func _deck_points() -> Array:
 # ======================================================================================
 
 func _shape_key() -> String:
-	return "%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%s|%s" % [length, height, width, curve, table_length, tail_length,
-			wood_color.to_html(), trim_color.to_html()]
+	return "%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%s|%s|%s" % [length, height, width, curve, table_length, tail_length,
+			wood_color.to_html(), trim_color.to_html(), str(trestle)]
 
 
 func _rebuild() -> void:
@@ -249,6 +255,8 @@ func _build_mesh() -> ArrayMesh:
 			if pts[i + 1].y < PLANK_T + STRINGER_D:
 				continue
 			venue.timber(mk, _p(a.x, a.y, x), _p(b.x, b.y, x), STRINGER_W, STRINGER_D, frame_col, Vector3.RIGHT)
+			if trestle:
+				continue
 			# The side's boards: from under the ground up to the stringer, upright boards along the run.
 			var ya := pts[i].y - PLANK_T - STRINGER_D
 			var yb := pts[i + 1].y - PLANK_T - STRINGER_D
@@ -258,6 +266,8 @@ func _build_mesh() -> ArrayMesh:
 			var q := [_p(pts[i].x, -SINK, x), _p(pts[i + 1].x, -SINK, x), _p(pts[i + 1].x, maxf(yb, 0.0), x), _p(pts[i].x, maxf(ya, 0.0), x)]
 			kit.quad(mk, "battens", q, out, side_col, [Vector2(pts[i].x, -SINK), Vector2(pts[i + 1].x, -SINK),
 					Vector2(pts[i + 1].x, maxf(yb, 0.0)), Vector2(pts[i].x, maxf(ya, 0.0))])
+		if trestle:
+			continue
 		# A sill along the ground and posts up to the stringer, where there is room for them.
 		var xo: float = side * (hw - STRINGER_W * 0.5 + POST * 0.5 + 0.005)
 		var d_from := _first_d_over(STRINGER_D + PLANK_T + 0.2)
@@ -273,7 +283,9 @@ func _build_mesh() -> ArrayMesh:
 	# A kicker's back: boards from the ground up to a header under the last plank. The header stands 1.5cm
 	# proud of the boards and the stringers' ends, and the boards stop under it: flush, their faces shared a
 	# plane along the top of the back and flickered.
-	if tail_length <= 0.0:
+	if trestle:
+		_build_trestle(kit, venue, mk, pts, frame_col)
+	elif tail_length <= 0.0:
 		var d := run()
 		var y := height - PLANK_T
 		var yb := y - STRINGER_D
@@ -285,6 +297,88 @@ func _build_mesh() -> ArrayMesh:
 			var xc: float = sx * (hw - POST * 0.5)
 			venue.timber(mk, _p(d - POST * 0.5 - 0.005, -SINK, xc), _p(d - POST * 0.5 - 0.005, y - STRINGER_D, xc), POST, POST, frame_col, Vector3.BACK)
 	return kit.commit(mk)
+
+
+## The trestle under an open ramp: joists along the run under the planks (between the two edge stringers), and
+## every TRESTLE_BENT a bent across it where there is room: a sill on the ground, a post under each joist, a cap
+## beam under the joists, diagonal braces between the posts (two tiers where it is tall, with a girt between),
+## and on the outside faces, braces from each bent's foot to the next one's head and a girt along the side.
+const TRESTLE_BENT := 2.2
+const TRESTLE_JOIST_GAP := 2.4
+const TRESTLE_POST := 0.16
+const TRESTLE_CAP := 0.18
+const TRESTLE_BRACE := Vector2(0.18, 0.05)
+const TRESTLE_ROOM := 0.45
+
+func _build_trestle(kit: PropKit, venue, mk: Dictionary, pts: Array[Vector2], frame_col: Color) -> void:
+	var hw := width * 0.5
+	var edge: float = hw - STRINGER_W * 0.5 - 0.01
+	var n_gap := maxi(1, ceili(2.0 * edge / TRESTLE_JOIST_GAP))
+	var xs: Array[float] = []
+	for k in range(n_gap + 1):
+		xs.append(lerpf(-edge, edge, float(k) / n_gap))
+	var brace_col := frame_col.lightened(0.06)
+	var post_col := frame_col.darkened(0.05)
+	# Inner joists (the outer two are the stringers).
+	for k in range(1, xs.size() - 1):
+		for i in range(pts.size() - 1):
+			if pts[i + 1].y < PLANK_T + STRINGER_D:
+				continue
+			var a: Vector2 = pts[i] - Vector2(0.0, PLANK_T + STRINGER_D * 0.5)
+			var b: Vector2 = pts[i + 1] - Vector2(0.0, PLANK_T + STRINGER_D * 0.5)
+			venue.timber(mk, _p(a.x, a.y, xs[k]), _p(b.x, b.y, xs[k]), STRINGER_W, STRINGER_D, frame_col, Vector3.RIGHT)
+	# The bents, from where there is room under the joists to the end (a kicker's last stands at its back).
+	var d0 := _first_d_over(PLANK_T + STRINGER_D + TRESTLE_CAP + TRESTLE_ROOM)
+	var d1: float = run() - TRESTLE_POST * 0.5 - 0.02 if tail_length <= 0.0 else _last_d_over(PLANK_T + STRINGER_D + TRESTLE_CAP + TRESTLE_ROOM)
+	if d1 <= d0:
+		return
+	var n_bents := maxi(1, ceili((d1 - d0) / TRESTLE_BENT))
+	var heads: Array[float] = []
+	var ds: Array[float] = []
+	for j in range(n_bents + 1):
+		var d := lerpf(d0, d1, float(j) / n_bents)
+		# Under the joists' lowest edge across the post's width (the deck rises along it).
+		var top: float = minf(deck_y(d - TRESTLE_POST), deck_y(d + TRESTLE_POST)) - PLANK_T - STRINGER_D - 0.005
+		var cap_y: float = top - TRESTLE_CAP * 0.5
+		ds.append(d)
+		heads.append(top - TRESTLE_CAP)
+		venue.timber(mk, _p(d, cap_y, -hw), _p(d, cap_y, hw), TRESTLE_POST, TRESTLE_CAP, frame_col, Vector3.BACK)
+		venue.timber(mk, _p(d, 0.06 - SINK, -hw), _p(d, 0.06 - SINK, hw), TRESTLE_POST + 0.08, 0.12 + SINK, post_col.darkened(0.1), Vector3.BACK)
+		var head: float = top - TRESTLE_CAP
+		for x in xs:
+			venue.timber(mk, _p(d, 0.06, x), _p(d, head, x), TRESTLE_POST, TRESTLE_POST, post_col, Vector3.BACK)
+		# Braces across the bent on its front face, alternating, in one or two tiers.
+		var tiers := 2 if head > 3.2 else 1
+		var bz: float = d - TRESTLE_POST * 0.5 - TRESTLE_BRACE.y * 0.5 - 0.004
+		for t in range(tiers):
+			var y0: float = lerpf(0.25, head - 0.15, float(t) / tiers)
+			var y1: float = lerpf(0.25, head - 0.15, float(t + 1) / tiers)
+			if y1 - y0 < 0.4:
+				continue
+			for k in range(xs.size() - 1):
+				var up_right := (k + t + j) % 2 == 0
+				var xa: float = xs[k]
+				var xb: float = xs[k + 1]
+				venue.timber(mk, _p(bz, y0 if up_right else y1, xa), _p(bz, y1 if up_right else y0, xb), TRESTLE_BRACE.x, TRESTLE_BRACE.y, brace_col, Vector3.UP)
+			if t > 0:
+				venue.timber(mk, _p(bz, y0, -hw), _p(bz, y0, hw), TRESTLE_BRACE.x, TRESTLE_BRACE.y, brace_col, Vector3.UP)
+	# The sides: braces between neighbouring bents and a girt at half height, just outside the posts.
+	for side in [-1.0, 1.0]:
+		var xo: float = side * (edge + TRESTLE_POST * 0.5 + TRESTLE_BRACE.y * 0.5 + 0.004)
+		for j in range(ds.size() - 1):
+			var lo: float = 0.3
+			var hi: float = minf(heads[j], heads[j + 1]) - 0.1
+			if hi - lo < 0.5:
+				continue
+			var forward := j % 2 == 0
+			venue.timber(mk, _p(ds[j], lo if forward else hi, xo), _p(ds[j + 1], hi if forward else lo, xo), TRESTLE_BRACE.x, TRESTLE_BRACE.y, brace_col, Vector3(side, 0, 0))
+			var gy: float = 0.5 * minf(heads[j], heads[j + 1])
+			if gy > 0.8:
+				venue.timber(mk, _p(ds[j], gy, xo + side * 0.06), _p(ds[j + 1], gy, xo + side * 0.06), TRESTLE_BRACE.x, TRESTLE_BRACE.y, brace_col, Vector3(side, 0, 0))
+	# A kicker's back: the last bent's header under the lip plank, painted like the trim.
+	if tail_length <= 0.0:
+		var y := height - PLANK_T - STRINGER_D * 0.5
+		venue.timber(mk, _p(run() - STRINGER_W * 0.5 + 0.015, y, -hw), _p(run() - STRINGER_W * 0.5 + 0.015, y, hw), STRINGER_W, STRINGER_D, frame_col, Vector3.FORWARD)
 
 
 ## The first and last place along the run where the deck stands `h` over the ground.
