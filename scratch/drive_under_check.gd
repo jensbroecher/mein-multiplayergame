@@ -3,7 +3,7 @@ extends Node
 # Mina del Viento: can a cart get under the haul trucks and the conveyors? Sweeps a sphere the size of a cart's
 # (PlayerCart: 0.75m) through the level's collision, 0.85m over the ground: across each truck between its axles and
 # along it between its inner wheels, and across each conveyor's low run midway between two supports. Also checks
-# that every sign is solid. Headless:
+# that every sign is solid, the gate's footings stand on the ground and the guard house is solid. Headless:
 #   Godot --headless --path . res://scratch/drive_under_check.tscn
 
 const R := 0.75
@@ -50,6 +50,31 @@ func _ready() -> void:
 			fails += 1
 			print("  FAIL  %s has no collider" % n.name)
 	print("signs solid: %d" % level.find_children("Sign_*", "StaticBody3D", true, false).size())
+	# The gate's legs and the boom's post stand on ground: under each corner of their footings, the ground no more than
+	# 0.15m below the footing's foot.
+	var gate := level.find_child("Gate", true, false) as Node3D
+	if gate:
+		var t: Transform3D = gate.global_transform
+		for foot in [[Vector3(-11.5, 0, 0), 1.44], [Vector3(11.5, 0, 0), 1.44], [Vector3(11.5, 0, 4.64), 0.48]]:
+			var worst := 0.0
+			for cx in [-1.0, 1.0]:
+				for cz in [-1.0, 1.0]:
+					var c: Vector3 = t * ((foot[0] as Vector3) + Vector3(cx, 0, cz) * float(foot[1]))
+					worst = maxf(worst, c.y - _ground_excluding(c, gate))
+			var ok: bool = worst < 0.15
+			if not ok:
+				fails += 1
+			print("  %s  gate footing at %s: its foot up to %.2fm over the ground" % ["ok  " if ok else "FAIL", str(foot[0]), worst])
+	# The guard house is solid: a ray at a cart's height toward its middle from the road side meets it.
+	var house := level.find_child("GuardHouse", true, false) as Node3D
+	if house:
+		var hc: Vector3 = house.global_transform * Vector3(0, 1.0, 0)
+		var from: Vector3 = house.global_transform * Vector3(0, 1.0, -14.0)
+		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(from, hc))
+		var ok2: bool = hit and hit["collider"] == house
+		if not ok2:
+			fails += 1
+		print("  %s  guard house solid (ray met %s)" % ["ok  " if ok2 else "FAIL", str(hit["collider"].name) if hit else "nothing"])
 	print("RESULT: %s (%d failed)" % ["PASS" if fails == 0 else "FAIL", fails])
 	get_tree().quit()
 
@@ -90,6 +115,15 @@ func _sweep(sphere: SphereShape3D, what: String, from: Vector3, to: Vector3) -> 
 			return
 		prev = p
 	print("  ok    %s" % what)
+
+
+## The ground under `c` with `skip`'s body left out (the footing's own collider).
+func _ground_excluding(c: Vector3, skip: Node) -> float:
+	var q := PhysicsRayQueryParameters3D.create(c + Vector3.UP * 3.0, c - Vector3.UP * 30.0)
+	if skip is CollisionObject3D:
+		q.exclude = [(skip as CollisionObject3D).get_rid()]
+	var hit := space.intersect_ray(q)
+	return (hit["position"] as Vector3).y if hit else -1e9
 
 
 func _at(sphere: SphereShape3D, p: Vector3) -> PhysicsShapeQueryParameters3D:

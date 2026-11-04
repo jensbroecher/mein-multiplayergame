@@ -43,7 +43,8 @@ func _ready() -> void:
 	var offsets: Array = []
 	for a in args.slice(2):
 		if a.begins_with("clock="):
-			for ch in level.get_children():
+			# Any Train in the level, however deep (Mina del Viento's is under RailLoop).
+			for ch in level.find_children("*", "Node3D", true, false):
 				if "clock_override" in ch:
 					ch.clock_override = float(a.substr(6))
 	var path: Path3D = level.get_node_or_null("TrackPath")

@@ -1622,6 +1622,7 @@ func _barriers(parent: Node3D, node_name: String, xfs: Array) -> void:
 	parent.add_child(body)
 	for xf in xfs:
 		var t: Transform3D = xf
+		_flora_blockers.append([Vector2(t.origin.x, t.origin.z), 2.4])
 		pk.set_frame(t.scaled_local(Vector3.ONE * PROP_SCALE))
 		camp.crowd_barrier(kit)
 		var cs := CollisionShape3D.new()
@@ -1674,6 +1675,137 @@ const DISH_EL := 0.92
 const FAR_ARMS := [[-0.55, 7], [2.6, 6]]
 
 
+# ======================================================================================
+#  The rail loop: a freight train circling the plateau north of the start straight
+# ======================================================================================
+
+## A balloon loop on the plateau north of the start straight and the fiesta, clear of the road and the far dishes:
+## [x0, z0, x1, z1, corner radius]. The mine's trains of copper concentrate and acid circle it for ever (Train.gd
+## `looped`), so none appears or vanishes at a track's end. The radio array's double track it replaced ran under
+## the dishes and nowhere else.
+const RAIL_LOOP := [-2600.0, -1450.0, -1350.0, -720.0, 260.0]
+const RAIL_STEP := 3.0
+const RAIL_TRAIN_SPEED := 13.0
+## Two diesels, covered hoppers of concentrate, tank cars of sulphuric acid, a diesel pushing at the tail.
+const RAIL_CONSIST := ["loco", "loco", "hopper", "hopper", "hopper", "hopper", "hopper", "hopper", "hopper", "hopper",
+		"hopper", "hopper", "hopper", "hopper", "tank:1", "tank:1", "tank:1", "tank:1", "tank:1", "tank:1", "~loco"]
+
+
+## The loop's centre line in plan, every RAIL_STEP metres, closed (the last point comes back round to the first).
+func _rail_loop_line() -> Array:
+	var x0: float = RAIL_LOOP[0]
+	var z0: float = RAIL_LOOP[1]
+	var x1: float = RAIL_LOOP[2]
+	var z1: float = RAIL_LOOP[3]
+	var r: float = RAIL_LOOP[4]
+	var out: Array = []
+	var line := func(a: Vector2, b: Vector2) -> void:
+		var n: int = maxi(1, int(round(a.distance_to(b) / RAIL_STEP)))
+		for k in range(n):
+			out.append(a.lerp(b, float(k) / n))
+	var arc := func(c: Vector2, a0: float, a1: float) -> void:
+		var n: int = maxi(2, int(round(absf(a1 - a0) * r / RAIL_STEP)))
+		for k in range(n):
+			var a: float = lerpf(a0, a1, float(k) / n)
+			out.append(c + Vector2(cos(a), sin(a)) * r)
+	line.call(Vector2(x0 + r, z0), Vector2(x1 - r, z0))
+	arc.call(Vector2(x1 - r, z0 + r), -PI * 0.5, 0.0)
+	line.call(Vector2(x1, z0 + r), Vector2(x1, z1 - r))
+	arc.call(Vector2(x1 - r, z1 - r), 0.0, PI * 0.5)
+	line.call(Vector2(x1 - r, z1), Vector2(x0 + r, z1))
+	arc.call(Vector2(x0 + r, z1 - r), PI * 0.5, PI)
+	line.call(Vector2(x0, z1 - r), Vector2(x0, z0 + r))
+	arc.call(Vector2(x0 + r, z0 + r), PI, PI * 1.5)
+	return out
+
+
+func _build_rail_loop(level: Node3D) -> void:
+	var root := Node3D.new()
+	root.name = "RailLoop"
+	level.add_child(root)
+	var line: Array = _rail_loop_line()
+	var n: int = line.size()
+	var raw := PackedFloat32Array()
+	for q in line:
+		raw.append(_ground_at((q as Vector2).x, (q as Vector2).y))
+	# The rail tops: the ground smoothed round the loop, never under it, 0.55m up (ballast under the sleepers).
+	var top := PackedFloat32Array()
+	top.resize(n)
+	for k in range(n):
+		var sum := 0.0
+		for j in range(-13, 14):
+			sum += raw[(k + j + n) % n]
+		top[k] = maxf(sum / 27.0, raw[k]) + 0.55
+	var pts: Array = []
+	for k in range(n):
+		pts.append(Vector3((line[k] as Vector2).x, top[k], (line[k] as Vector2).y))
+	# The track in pieces of 32 samples (each mitred into its neighbours), and the bed's collision.
+	var faces: Array = []
+	const PIECE := 32
+	var piece := 0
+	for k0 in range(0, n, PIECE):
+		var seg: Array = []
+		var bed: Array = []
+		for j in range(PIECE + 1):
+			var k: int = (k0 + j) % n
+			seg.append(pts[k])
+			bed.append(top[k] - raw[k] < 1.2)
+		var mi := MeshInstance3D.new()
+		mi.name = "LoopTrack_%d" % piece
+		mi.mesh = FreightKit.track_piece(seg, bed, 41 + piece, faces, pts[(k0 - 1 + n) % n], pts[(k0 + PIECE + 1) % n])
+		mi.visibility_range_end = 1600.0
+		_prop_meshes["loop_track_%d" % piece] = mi.mesh
+		root.add_child(mi)
+		piece += 1
+	var bed_body := StaticBody3D.new()
+	bed_body.name = "RailBed_Loop"
+	bed_body.set_meta(&"surface", "gravel")
+	root.add_child(bed_body)
+	var bshape := ConcavePolygonShape3D.new()
+	bshape.set_faces(PackedVector3Array(faces))
+	var bcs := CollisionShape3D.new()
+	bcs.shape = bshape
+	bed_body.add_child(bcs)
+	_prop_meshes["loop_bed_shape"] = bshape
+	# Timber trestles where the track stands more than a metre over a dip.
+	var tkit := {}
+	var tpk: PropKit = MinaKit.new_kit(1.0)
+	for k in range(0, n, 2):
+		var lift: float = top[k] - raw[k]
+		if lift < 1.0:
+			continue
+		var a2: Vector2 = line[(k + 1) % n] - line[(k - 1 + n) % n]
+		var right := Vector3(-a2.y, 0.0, a2.x).normalized()
+		var c := Vector3((line[k] as Vector2).x, 0.0, (line[k] as Vector2).y)
+		for e in [-1.3, 1.3]:
+			var f: Vector3 = c + right * e
+			tpk.beam(tkit, "wood", Vector3(f.x, raw[k] - 0.3, f.z), Vector3(f.x, top[k] - 0.3, f.z), 0.3, 0.3, Color(0.45, 0.34, 0.24))
+		tpk.beam(tkit, "wood", c + Vector3(0, top[k] - 0.35, 0) - right * 1.5, c + Vector3(0, top[k] - 0.35, 0) + right * 1.5, 0.3, 0.3, Color(0.42, 0.32, 0.22))
+	if not tkit.is_empty():
+		var tmi := MeshInstance3D.new()
+		tmi.name = "LoopTrestles"
+		tmi.mesh = tpk.commit(tkit)
+		_prop_meshes["loop_trestles"] = tmi.mesh
+		root.add_child(tmi)
+	# Plants and rocks keep off the track.
+	for q in line:
+		_flora_blockers.append([q, 5.5])
+	# The train, circling for ever on the wall clock.
+	var curve := Curve3D.new()
+	for p in pts:
+		curve.add_point(p)
+	curve.add_point(pts[0])
+	var train := Node3D.new()
+	train.name = "LoopFreight"
+	train.set_script(load("res://Train.gd"))
+	train.set("path", curve)
+	train.set("consist", PackedStringArray(RAIL_CONSIST))
+	train.set("speed", RAIL_TRAIN_SPEED)
+	train.set("looped", true)
+	root.add_child(train)
+	print("  rail loop: %.0fm of track, a %d-car train at %.0f km/h" % [curve.get_baked_length(), RAIL_CONSIST.size(), RAIL_TRAIN_SPEED * 3.6])
+
+
 func _build_array(level: Node3D) -> void:
 	var root := Node3D.new()
 	root.name = "RadioArray"
@@ -1681,68 +1813,7 @@ func _build_array(level: Node3D) -> void:
 	var straight: Dictionary = _at(800.0)
 	var dir2: Vector2 = _dir_of(float(straight["th"]))
 	var origin2: Vector2 = (straight["p"] as Vector2) + _right_of(float(straight["th"])) * ARRAY_LAT
-	var dir := Vector3(dir2.x, 0.0, dir2.y)
-	var right := Vector3(-dir2.y, 0.0, dir2.x)
-	# The double track: rail tops on the ground smoothed along it (so it bridges the wash on a trestle).
-	var n: int = int((ARRAY_S1 - ARRAY_S0) / 3.0)
-	var line: Array = []
-	var raw := PackedFloat32Array()
-	for k in range(n + 1):
-		var u: float = ARRAY_S0 + float(k) * 3.0 - 800.0
-		var q: Vector2 = origin2 + dir2 * u
-		line.append(q)
-		raw.append(_ground_at(q.x, q.y))
-	var smooth := PackedFloat32Array()
-	for k in range(raw.size()):
-		var sum := 0.0
-		var cnt := 0
-		for j in range(maxi(k - 13, 0), mini(k + 14, raw.size())):
-			sum += raw[j]
-			cnt += 1
-		smooth.append(maxf(sum / float(cnt), raw[k]) + 0.55)
-	var bed_faces: Array = []
-	for side in [-3.6, 3.6]:
-		var pts: Array = []
-		var bed: Array = []
-		for k in range(line.size()):
-			var q2: Vector2 = line[k] + Vector2(right.x, right.z) * side
-			pts.append(Vector3(q2.x, smooth[k], q2.y))
-			bed.append(smooth[k] - raw[k] < 1.2)
-		var mi := MeshInstance3D.new()
-		mi.name = "ArrayRails_%d" % int(side > 0.0)
-		mi.mesh = FreightKit.track_piece(pts, bed, 31 + int(side), bed_faces)
-		_prop_meshes["array_rails_%d" % int(side > 0.0)] = mi.mesh
-		root.add_child(mi)
-	# Where the track crosses the wash it stands on timber trestles.
-	var tkit := {}
-	var tpk: PropKit = MinaKit.new_kit(1.0)
-	for k in range(0, line.size(), 2):
-		var lift: float = smooth[k] - raw[k]
-		if lift < 1.0:
-			continue
-		for side2 in [-3.6, 3.6]:
-			var c: Vector2 = line[k] + Vector2(right.x, right.z) * side2
-			for e in [-1.3, 1.3]:
-				var f: Vector2 = c + Vector2(right.x, right.z) * e
-				tpk.beam(tkit, "wood", Vector3(f.x, raw[k] - 0.3, f.y), Vector3(f.x, smooth[k] - 0.3, f.y), 0.3, 0.3, Color(0.45, 0.34, 0.24))
-			tpk.beam(tkit, "wood", Vector3(c.x, smooth[k] - 0.35, c.y) - right * 1.5, Vector3(c.x, smooth[k] - 0.35, c.y) + right * 1.5, 0.3, 0.3, Color(0.42, 0.32, 0.22))
-	if not tkit.is_empty():
-		var tmi := MeshInstance3D.new()
-		tmi.name = "WashTrestle"
-		tmi.mesh = tpk.commit(tkit)
-		_prop_meshes["wash_trestle"] = tmi.mesh
-		root.add_child(tmi)
-	var bed_body := StaticBody3D.new()
-	bed_body.name = "ArrayRailBed"
-	bed_body.set_meta(&"surface", "gravel")
-	root.add_child(bed_body)
-	var bshape := ConcavePolygonShape3D.new()
-	bshape.set_faces(PackedVector3Array(bed_faces))
-	var bcs := CollisionShape3D.new()
-	bcs.shape = bshape
-	bed_body.add_child(bcs)
-	_prop_meshes["array_bed_shape"] = bshape
-	# The dishes, on pads over the track, all looking at one spot in the sky.
+	# The dishes, each on its own pad, all looking at one spot in the sky.
 	var dish: ArrayMesh = _mesh("radio_dish", DISH_SCALE, func(pk, kit): MinaKit.radio_dish(pk, kit, 0.0, DISH_EL))
 	var placed := 0
 	for ds in ARRAY_DISHES:
@@ -1836,7 +1907,7 @@ var _guard_house_xz := Vector2(1e9, 1e9)
 func _plan_gate_pads() -> void:
 	var gx: Transform3D = _gate_xform()
 	var y: float = gx.origin.y
-	for at in [[Vector3(-11.5, 0, 0), 2.0, 4.0], [Vector3(11.5, 0, 0), 2.0, 4.0], [Vector3(11.5, 0, 4.64), 1.2, 3.0],
+	for at in [[Vector3(-11.5, 0, 0), 4.5, 5.0], [Vector3(11.5, 0, 0), 4.5, 5.0], [Vector3(11.5, 0, 4.64), 3.0, 4.0],
 			[GUARD_HOUSE_AT, 9.5, 6.0]]:
 		var w: Vector3 = gx * (at[0] as Vector3)
 		_pads.append([w.x, w.z, at[1], at[1], at[2], y])
@@ -1918,7 +1989,11 @@ func _build_gate(level: Node3D) -> void:
 	var s2 := PROP_SCALE
 	var hbody := _prop(root, "GuardHouse", house, hpos, hyaw, [[Vector3(0, 1.7, 0) * s2, Vector3(6.3, 3.4, 4.3) * s2],
 			[Vector3(0, 3.2, -0.7) * s2, Vector3(6.7, 0.5, 6.1) * s2], [Vector3(-2.9, 1.6, -3.46) * s2, Vector3(0.2, 2.7, 0.2) * s2],
-			[Vector3(2.9, 1.6, -3.46) * s2, Vector3(0.2, 2.7, 0.2) * s2]], 10.0)
+			[Vector3(2.9, 1.6, -3.46) * s2, Vector3(0.2, 2.7, 0.2) * s2],
+			[Vector3(0, 0.175, -0.8) * s2, Vector3(6.3, 0.35, 5.9) * s2],                  # the plinth and its step
+			[Vector3(-2.9, 0.55, -4.15) * s2, Vector3(0.22, 1.1, 0.22) * s2], [Vector3(2.9, 0.55, -4.15) * s2, Vector3(0.22, 1.1, 0.22) * s2],
+			[Vector3(-3.7, 1.25, -4.3) * s2, Vector3(0.1, 2.5, 0.1) * s2],                 # the PARE sign's post
+			[Vector3(-3.9, 3.5, 2.4) * s2, Vector3(0.12, 7.0, 0.12) * s2]], 10.0)          # the flagpole
 	_labels(root, hlabels, hbody.transform, PROP_SCALE)
 	var signs: Array = _signs()
 	for i in range(signs.size()):
@@ -1951,8 +2026,10 @@ func _build_gate(level: Node3D) -> void:
 
 ## The shovel digs the north wall's toe, its muck pile against the face, a truck beside it to load.
 const SHOVEL_AT := Vector2(70.0, -104.0)
-const MUCK_AT := Vector2(70.0, -124.0)
-const MUCK_HALF := Vector2(30.0, 7.0)
+## The muck pile's toe runs in under the shovel's crawlers (its half depth reaches past them), so no gap is left between
+## the two for a cart to wedge in; its collision is its own surface (MinaKit.muck_height), as drawn.
+const MUCK_AT := Vector2(70.0, -122.5)
+const MUCK_HALF := Vector2(30.0, 9.0)
 const MUCK_H := 8.0
 const CRUSHER_AT := Vector2(0.0, 98.0)
 ## Trucks: [x, z, heading (degrees, 0 toward -z), loaded, kind ("haul" or "water")]. Several stand on the insides of
@@ -2025,15 +2102,25 @@ func _build_pit(level: Node3D) -> void:
 	var mpos := Vector3(MUCK_AT.x, FLOOR_Y - 0.4, MUCK_AT.y)
 	# Its steep side (the kit's +z) against the north wall.
 	var mbody := _prop(root, "MuckPile", muck, mpos, PI, [], 30.0)
-	var hull := ConvexPolygonShape3D.new()
-	var hp := PackedVector3Array()
-	for u in [-1.0, -0.5, 0.0, 0.5, 1.0]:
-		for v in [-1.0, -0.5, 0.0, 0.5, 1.0]:
-			var dome: float = maxf(1.0 - pow(absf(u), 3.0) - pow(absf(v - 0.25) / 1.25, 2.0), 0.0)
-			hp.append(Vector3(u * MUCK_HALF.x, MUCK_H * pow(dome, 0.7) * 0.85, v * MUCK_HALF.y))
-	hull.points = hp
+	var faces := PackedVector3Array()
+	var gx := 40
+	var gz := 18
+	var hpt := func(i: int, j: int) -> Vector3:
+		var x: float = lerpf(-MUCK_HALF.x, MUCK_HALF.x, float(i) / gx)
+		var z: float = lerpf(-MUCK_HALF.y, MUCK_HALF.y, float(j) / gz)
+		return Vector3(x, MinaKit.muck_height(x, z, MUCK_HALF, MUCK_H, 0.4, false), z)
+	for i in range(gx):
+		for j in range(gz):
+			var q00: Vector3 = hpt.call(i, j)
+			var q10: Vector3 = hpt.call(i + 1, j)
+			var q11: Vector3 = hpt.call(i + 1, j + 1)
+			var q01: Vector3 = hpt.call(i, j + 1)
+			faces.append_array([q00, q10, q11, q00, q11, q01])
+	var trimesh := ConcavePolygonShape3D.new()
+	trimesh.set_faces(faces)
+	trimesh.backface_collision = true
 	var hcs := CollisionShape3D.new()
-	hcs.shape = hull
+	hcs.shape = trimesh
 	mbody.add_child(hcs)
 	var shovel: ArrayMesh = _mesh("rope_shovel", s, func(pk, kit): MinaKit.rope_shovel(pk, kit, 0.0, 0.75, 4.0))
 	var spos := Vector3(SHOVEL_AT.x, 0.0, SHOVEL_AT.y)
@@ -2308,9 +2395,32 @@ func _build_valley(level: Node3D) -> void:
 #  Plants and rocks
 # ======================================================================================
 
-## Whether flora may stand at `p`: off the road and its verges, the mine, the pads and everything placed.
+## Small things flora keeps clear of: every crowd barrier panel and every spectator ([xz, radius]), in 8m cells.
+var _flora_blockers: Array = []
+var _blocker_cells: Dictionary = {}
+
+func _blocked_by_crowd(p: Vector2, clear: float) -> bool:
+	if _blocker_cells.is_empty():
+		for b in _flora_blockers + _people.map(func(pp: Array) -> Array: return [Vector2((pp[0] as Vector3).x, (pp[0] as Vector3).z), 1.3]):
+			var c := Vector2i(floori((b[0] as Vector2).x / 8.0), floori((b[0] as Vector2).y / 8.0))
+			if not _blocker_cells.has(c):
+				_blocker_cells[c] = []
+			_blocker_cells[c].append(b)
+	var c0 := Vector2i(floori(p.x / 8.0), floori(p.y / 8.0))
+	for dx in range(-1, 2):
+		for dz in range(-1, 2):
+			for b in _blocker_cells.get(c0 + Vector2i(dx, dz), []):
+				if p.distance_to(b[0]) < float(b[1]) + clear:
+					return true
+	return false
+
+
+## Whether flora may stand at `p`: off the road and its verges, the mine, the pads and everything placed (the crowd
+## barriers and the spectators too: plants grew through them at the finish).
 func _flora_ok(p: Vector2, clear := 2.5) -> bool:
 	if _route_dist(p) < ROAD_HALF + 4.5:
+		return false
+	if _blocked_by_crowd(p, clear):
 		return false
 	if _base(p.x, p.y).y > 0.6:
 		return false
@@ -2936,6 +3046,7 @@ func _ready() -> void:
 	print("  terrain built (%.1fs)" % ((Time.get_ticks_msec() - t_start) / 1000.0))
 	_build_berms(level_scene)
 	_build_plateau_jump(level_scene)
+	_build_rail_loop(level_scene)
 	_build_fiesta(level_scene)
 	_build_array(level_scene)
 	_build_gate(level_scene)

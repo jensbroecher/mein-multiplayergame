@@ -8,7 +8,7 @@ extends Node
 ## (what a cart can reach). Instances drawn twice (a near and a far MultiMesh of the same instances)
 ## are made solid once. Skipped: ground cover (grass, meadow tufts, flowers, pebbles: under MIN_HEIGHT
 ## or named in SOFT), the crowd, flags and tyre stacks (SpringProps), knockable props (KnockableProps),
-## icicles, skid marks and shadow-only stand-ins.
+## icicles, skid marks and shadow-only stand-ins. Standing spectators are solid as a cylinder each (`_cover_crowd`).
 ##
 ## A MultiMesh with the meta `hull_collider` gets the convex hull of its mesh (scaled by each instance) instead of
 ## a box, so a rock is as wide as it looks and a low one is a bump a cart rides up and over, hopping if it is
@@ -82,6 +82,9 @@ func build(level: Node) -> void:
 		var mmi := node as MultiMeshInstance3D
 		if mmi.multimesh == null or mmi.multimesh.mesh == null or mmi.multimesh.instance_count == 0:
 			continue
+		if _crowd_cards(mmi) >= 2:
+			_cover_crowd(level, mmi)
+			continue
 		if _soft(mmi):
 			continue
 		var info: Dictionary = _mesh_shape(mmi.multimesh.mesh)
@@ -152,9 +155,52 @@ func build(level: Node) -> void:
 	for e in _wobble:
 		if e[8]:
 			brush_count += 1
-	print("[DressingColliders] %d colliders, %d plants wobble, %d of them brush driven through (%d ms)" % [
-		shapes_made, _wobble.size(), brush_count, Time.get_ticks_msec() - t0])
+	print("[DressingColliders] %d colliders (%d spectators), %d plants wobble, %d of them brush driven through (%d ms)" % [
+		shapes_made, crowd_made, _wobble.size(), brush_count, Time.get_ticks_msec() - t0])
 	_cover_meshes.call_deferred(level)
+
+
+## A crowd's card cells (CrowdPlacer's and Nyota Stadium's `Crowd_<x>_<z>_<class>`, which hold every spectator at
+## every Detail Level; the 3D figures near the lap, `CrowdNear_*`, draw the same people): the card class, or -1 for
+## anything else. Classes 0 and 1 sit (in stands, which are solid themselves), 2 to 4 stand.
+static func _crowd_cards(mmi: MultiMeshInstance3D) -> int:
+	var parts := String(mmi.name).split("_")
+	if parts.size() != 4 or parts[0] != "Crowd":
+		return -1
+	return int(parts[3])
+
+
+## Standing spectators are solid: a cylinder the size of the figure (3.2m tall and 0.42m round at its own scale of
+## 1, the stadium's 1.86 times life size; the instance's scale brings it to the level's), from its feet up. Not a
+## wobble: people don't spring back like plants.
+var crowd_made := 0
+
+func _cover_crowd(level: Node, mmi: MultiMeshInstance3D) -> void:
+	var mm: MultiMesh = mmi.multimesh
+	var buf: PackedFloat32Array = mm.buffer
+	var stride: int = 12 + (4 if mm.use_colors else 0) + (4 if mm.use_custom_data else 0)
+	if mm.transform_format != MultiMesh.TRANSFORM_3D or buf.size() < stride * mm.instance_count:
+		return
+	var to_world: Transform3D = mmi.global_transform
+	for i in range(mm.instance_count):
+		var xf: Transform3D = to_world * _buffer_transform(buf, i * stride)
+		var sc: float = xf.basis.get_scale().y
+		var key := "p%d:%d" % [roundi(sc * 100.0), 0]
+		var cyl: CylinderShape3D = _shape_cache.get(key)
+		if cyl == null:
+			cyl = CylinderShape3D.new()
+			cyl.radius = PERSON_RADIUS * sc
+			cyl.height = PERSON_HEIGHT * sc
+			_shape_cache[key] = cyl
+		var body: StaticBody3D = _body_at(level, xf.origin, true)
+		var owner_id: int = body.create_shape_owner(body)
+		body.shape_owner_add_shape(owner_id, cyl)
+		body.shape_owner_set_transform(owner_id, body.global_transform.affine_inverse() * Transform3D(Basis(), xf.origin + Vector3.UP * cyl.height * 0.5))
+		crowd_made += 1
+		shapes_made += 1
+
+const PERSON_HEIGHT := 3.2
+const PERSON_RADIUS := 0.42
 
 
 func _add_wobbler(entry: Array) -> void:

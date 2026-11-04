@@ -39,6 +39,9 @@ const FreightKit = preload("res://FreightKit.gd")
 ## Runs from the path's end to its start.
 @export var reverse := false
 @export var kills := true
+## A closed path (its last point back on its first): the train circles it for ever at `speed`, never leaving it
+## (`period` is the lap's time then, worked out from the path), as on Mina del Viento's rail loop.
+@export var looped := false
 ## A fraction of the cart's radius that has to reach into a car's box to count as a hit.
 @export var hit_share := 0.85
 ## The locomotive's diesel and the clatter of the wheels, in 3D on the train (off for tests and shots).
@@ -111,7 +114,9 @@ func _ready() -> void:
 		off += car.length
 		cars.append(car)
 	train_length = off
-	if legs.is_empty() and period * speed < _path_length + train_length:
+	if looped:
+		period = _path_length / maxf(speed, 0.01)
+	elif legs.is_empty() and period * speed < _path_length + train_length:
 		push_warning("Train %s: period %.0fs at %.0f m/s is too short to clear a %.0fm path with a %.0fm train" % [name, period, speed, _path_length, train_length])
 	if sounds:
 		_add_sounds()
@@ -206,6 +211,8 @@ func _clock() -> float:
 
 ## Where the head is along the path, `t` seconds into the day (negative before it enters).
 func head_at(t: float) -> float:
+	if looped:
+		return fposmod((t - phase) * speed, _path_length)
 	if not legs.is_empty():
 		return _leg_head(fposmod(t - phase, period))
 	return fposmod(t - phase, period) * speed
@@ -271,6 +278,8 @@ const PASS_GAP := 12.0
 
 ## A point `s` metres along the path, running on past either end along its end tangents.
 func _point(s: float) -> Vector3:
+	if looped:
+		return path.sample_baked(fposmod(s, _path_length))
 	if s >= 0.0 and s <= _path_length:
 		return path.sample_baked(s)
 	var end_s := 0.0 if s < 0.0 else _path_length
@@ -292,7 +301,7 @@ func _place(t: float) -> void:
 		car.prev_present = car.present
 		var s_front := head - car.offset
 		var s_back := s_front - car.length
-		car.present = s_front > 0.0 and s_back < _path_length
+		car.present = looped or (s_front > 0.0 and s_back < _path_length)
 		if car.node == null:
 			continue
 		car.node.visible = car.present

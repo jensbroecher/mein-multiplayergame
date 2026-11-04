@@ -457,7 +457,7 @@ The menus call it Arco del Viento (it was Canyon Drift / CANYON COURSE); files a
   at `escape_speed_share` (0.88) of its top speed outruns it: never picked, and a dive breaks off.
   `part_8` (a stray feather over the head) is hidden. `res://scratch/eagle_preview.tscn -- <dir> [yaw=]
   [pitch=]` renders the wing poses through a beat.
-- `res://scratch/lap_shots.tscn -- <level> <dir> [every=N] [s=<m>] [high=1]` renders chase views along any
+- `res://scratch/lap_shots.tscn -- <level> <dir> [every=N] [s=<m>] [high=1] [clock=<s>: every Train held]` renders chase views along any
   lap; `scratch/canyon_props_preview.gd` (`-s`, windowed, `-- <dir> set=rocks|forms|cacti [far=1]
   name:x,y,z:tx,ty,tz`) renders the cacti and rocks in memory in seconds; `scratch/dress_list.gd` (`-s`,
   headless, `-- [match=Near_saguaro] [count=8] [max=60]`) lists where a level's MultiMesh dressing stands
@@ -739,7 +739,11 @@ in front of the water while driving (Msitu Falls, Bloombay Dunes). `canyon_river
     `surface` meta), shapes added through shape owners, not nodes. Instances drawn twice (near and far
     MultiMeshes) are solid once. Transforms come from `multimesh.buffer`: on the dummy renderer (a headless
     server, whose bots still drive into things) `get_instance_transform()` returns zeros.
-  - Not solid: ground cover under `MIN_HEIGHT` (0.5m), anything named in `SOFT` (grass, meadow, crowd,
+  - Spectators: every standing one (CrowdPlacer's and Nyota's card cells `Crowd_<x>_<z>_<class>`, classes 2-4, which
+    hold everyone at every Detail Level) is a cylinder the figure's size (`_cover_crowd`, `PERSON_HEIGHT`,
+    `PERSON_RADIUS` at the figure's scale 1); the seated ones sit in stands that are solid already. Mtaa Nights about
+    1,960, Nyota Stadium 1,720, Mina 300, Lakeside 100.
+  - Not solid: ground cover under `MIN_HEIGHT` (0.5m), anything named in `SOFT` (grass, meadow, crowd's figures,
     flags and tyre stacks, which are SpringProps, knockable props, icicles, skid marks, shadow-only
     stand-ins), and MultiMeshes run by a script that moves its own instances (`SELF_MOVING`: KnockablePoles,
     KnockableIce, KnockableProps, SpringProps). The poles' MultiMesh is named `MarkerPosts`/`SnowPoles`,
@@ -2315,7 +2319,8 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
     the hood's slope. A tapering bullet nose had read as Bloombay's monorail. Its livery (teal, a gold line, cream, the line
     sweeping down the nose) is `_banded_shell`: the rings cut at the livery's heights into bands lofted apart, each one
     colour, so the lines run clean however coarse the rings (one loft coloured quad by quad stepped them into teeth).
-  `Train.gd` runs a train along a Curve3D on the wall clock: `consist` ("loco", "box:1", "flat", "flat_load", "hopper",
+  `Train.gd` runs a train along a Curve3D on the wall clock (`looped`: round a closed path for ever, Mina del Viento's
+  rail loop): `consist` ("loco", "box:1", "flat", "flat_load", "hopper",
   "tank", "caboose", "ploco", "coach", "obs", "gap:20" for an opening, which only the tests use now, and "~" before a car
   to turn it round), `speed`, `period` (>= (line + train) / speed), `phase`. Hits are a swept test of each cart this peer
   drives against each car's box in the car's own frame (a car is solid from the rail down 1.2m to its height: a flatcar is
@@ -2518,6 +2523,24 @@ Rebuilt on 2026-11-02 (Gemini's first version had a pit unrelated to its road, t
   gate's frame) is a prop of its own on a pad beside it, its front to the road: a rendered block house on a plinth with
   steps, framed windows all round, a door, a canopy on columns with CONTROL DE ACCESO on its fascia, an air-conditioner,
   a water tank, a radio mast, a solar panel, a floodlight, a bench and a bin.
+- The guard house's detail (`_guard_house_details`): coping, gutters and downpipes, window grilles and awnings, the
+  service counter and intercom at the road window, the glazed door, column bases and caps, striped bollards, yellow
+  nosings, a fire extinguisher cabinet, an electrical box, wall lamps, a CCTV camera, the PARE and SOLO PERSONAL
+  AUTORIZADO signs, potted cacti, a roof hatch and vent, the tank's straps, a flagpole; solid as the house, its plinth,
+  columns, bollards, the PARE post and the flagpole.
+- The muck pile at the shovel (`MinaKit.muck_height`, `muck_pile`, `MUCK_*`): blasted rock against the north wall, a
+  crest that rises and falls, the slope of repose down to the shovel, steep ends and back, the dipper's bite out of its
+  front, boulders; its collision is the same surface as a trimesh (it had been a convex hull 15% under the mesh, which
+  carts sank into), and its toe runs in under the shovel's crawlers so no gap is left to wedge in.
+- The rail loop (`RAIL_LOOP`, `_build_rail_loop`): a 3.55km balloon loop on the plateau north of the start straight (clear
+  of the road, the fiesta and the far dishes) where a freight (`RAIL_CONSIST`: two diesels, covered hoppers of
+  concentrate, acid tank cars, a diesel at the tail) circles for ever at `RAIL_TRAIN_SPEED` (Train.gd `looped`), so it
+  never appears or vanishes at a track's end. Track in 32-sample pieces (`FreightKit.track_piece`), rail tops on the
+  ground smoothed round the loop, trestles over dips, its bed solid (`RailBed_Loop`); the train destroys a cart it
+  touches, as on Freight Line. It replaced the radio array's double track, which ran under the dishes and nowhere.
+  `res://scratch/mina_line_profile.gd` (`-s`, headless, `-- x0,z0 x1,z1 ... [step=]`) prints the ground along a line.
+- Flora keeps off the crowd barriers and the spectators (`_flora_blockers`, `_blocked_by_crowd`, 8m cells) and the rail
+  loop: plants grew through the finish's fences and people.
 - Under the trucks and the conveyors: a haul truck is solid where it is (`TRUCK_SOLIDS`: the wheels, the rear axle's
   housing, the frame rails, the engine house, the bumper, the body over 3.7m life size), so a cart drives under it
   between the wheels, across it or along it; a conveyor's low run is solid as its belt frame and each support's two legs
@@ -2539,7 +2562,7 @@ Rebuilt on 2026-11-02 (Gemini's first version had a pit unrelated to its road, t
   saved under `minaprop_` (MeshChunker leaves them whole) by `_save_props`, each big prop under a StaticBody3D with its own
   boxes (`_prop`), so DressingColliders leaves it be: the haul trucks (`haul_truck`, `water_truck`, `mina_tyre.gdshader`
   chevron lugs), the rope shovel at the muck pile on the floor, the crusher by the mouth, drills, light towers, the radio
-  telescopes (`radio_dish`) on a double track (`FreightKit.track_piece`, a trestle over the wash), the balloons
+  telescopes (`radio_dish`, each on its own pad), the balloons
   (`balloon`, `balloon_inflating`, `mina_balloon.gdshader`, `mina_flame.gdshader`), the conveyors (`conveyor_run`: two
   galleries over the road, `CONVEYOR_A`/`B`; the generator errors if one clears the ground by under 9m), the stockpile,
   the truck shop, the concentrator and thickeners, the grandstand. `res://scratch/mina_kit_preview.gd` (`-s`, windowed,
