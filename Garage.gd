@@ -1,7 +1,8 @@
 extends Control
 ## The garage: a hall the player walks through (first person) to look at their cars, choose which ones
 ## the car select screen offers (the line-up, CarCollection.gd) and see the Grand Prix trophies they have
-## won (Trophies.gd). Built in code, in its own world in a SubViewport, like the podium; Main.gd adds it
+## won (Trophies.gd) and their time trial records (TimeTrialRecords.gd, a board per Grand Prix on the trophy
+## hall's side walls). Built in code, in its own world in a SubViewport, like the podium; Main.gd adds it
 ## from the main menu (GARAGE), calls start() once the loading screen has gone, and frees it on `finished`.
 ##
 ## Everything is at life size except the cars, which are large-scale RC cars: on the courses people and
@@ -29,6 +30,7 @@ signal finished
 const CarPaint = preload("res://CarPaint.gd")
 const CarCollection = preload("res://CarCollection.gd")
 const Trophies = preload("res://Trophies.gd")
+const TimeTrialRecords = preload("res://TimeTrialRecords.gd")
 const PodiumScript = preload("res://Podium.gd")
 const LogoFlag = preload("res://LogoFlag.gd")
 const CAR_PRESETS = preload("res://PlayerCart.gd").CAR_PRESETS
@@ -71,6 +73,11 @@ const CAR_TURN := 0.52
 const HALL_HALF := 9.0
 const HALL_D := 16.0
 const TROPHY_RING := 5.6
+## The time trial record boards on the trophy hall's side walls: size, centre height, spacing, a stage's row.
+const RECORD_BOARD_SIZE := Vector2(4.6, 2.5)
+const RECORD_BOARD_Y := 2.05
+const RECORD_BOARD_STEP := 5.15
+const RECORD_ROW := 0.43
 const PEDESTAL_H := 1.2
 ## The entrance doors' opening in the entrance wall.
 const ENTRY_HALF := 1.6
@@ -95,6 +102,16 @@ const EYE := 1.7
 const WALK_SPEED := 3.0
 const RUN_SPEED := 5.5
 const MOVE_RATE := 10.0
+## Walking: a footstep every STEP_LENGTH metres (STEP_LENGTH_RUN running), the head dipping BOB_DROP at each
+## (more running, BOB_RUN times) and swaying BOB_SWAY over the planted foot. Kept small, and no roll: swinging
+## views make the player dizzy.
+const STEP_LENGTH := 0.95
+const STEP_LENGTH_RUN := 1.55
+const BOB_DROP := 0.018
+const BOB_SWAY := 0.009
+const BOB_RUN := 1.6
+const STEP_SOUNDS := ["res://sounds/garage/footstep_1.mp3", "res://sounds/garage/footstep_2.mp3"]
+const STEP_DB := -10.0
 const MOUSE_LOOK := 0.0022
 const STICK_LOOK := 2.4
 const STICK_DEADZONE := 0.18
@@ -143,6 +160,9 @@ var _started := false
 var _yaw := 0.0
 var _pitch := 0.0
 var _move := Vector3.ZERO
+var _step_phase := 0.0   # in steps: a footstep as it passes each half
+var _bob := 0.0          # how much of the bob shows, 0..1 (eases in and out with the speed)
+var _step_foot := 0
 var _target := -1
 var _inspected := -1
 var _orbit_yaw := 0.0
@@ -245,6 +265,31 @@ func _physics_process(delta: float) -> void:
 	_player.move_and_slide()
 	if _player.is_on_floor():
 		_player.velocity.y = 0.0
+	_update_steps(delta)
+
+
+## The head bob and the footsteps, from how far the walker went.
+func _update_steps(delta: float) -> void:
+	var speed := Vector2(_player.velocity.x, _player.velocity.z).length()
+	var walking: bool = _mode == Mode.WALK and _player.is_on_floor() and speed > 0.4
+	var run_share: float = clampf((speed - WALK_SPEED) / (RUN_SPEED - WALK_SPEED), 0.0, 1.0)
+	_bob = move_toward(_bob, clampf(speed / WALK_SPEED, 0.0, 1.0) if walking else 0.0, delta * 3.0)
+	if walking:
+		var before := _step_phase
+		_step_phase += speed * delta / lerpf(STEP_LENGTH, STEP_LENGTH_RUN, run_share)
+		if floorf(before + 0.5) != floorf(_step_phase + 0.5):
+			_play_step(run_share)
+	# Lowest as a foot lands (each half step), over that foot.
+	var amp: float = _bob * lerpf(1.0, BOB_RUN, run_share)
+	var drop: float = BOB_DROP * amp * (1.0 - cos(TAU * _step_phase)) * 0.5
+	var sway: float = BOB_SWAY * amp * sin(PI * _step_phase)
+	_head.position = Vector3(sway, EYE - drop, 0.0)
+
+
+func _play_step(run_share: float) -> void:
+	_step_foot = 1 - _step_foot
+	MusicManager.play_sfx(STEP_SOUNDS[_step_foot], STEP_DB + run_share * 3.0 + randf_range(-1.5, 1.0),
+			randf_range(0.93, 1.07))
 
 
 func _input(event: InputEvent) -> void:
@@ -1561,6 +1606,89 @@ func _build_trophies() -> void:
 	_omni(Vector3(5.0, TALL_H - 1.2, centre.z), 0.8, 12.0)
 	# Over the hall's opening, on the concourse side, under the roof's slopes.
 	_sign(Vector3(0.0, 5.55, _spine_end + WALL_T * 0.5), 0.0, Vector2(3.6, 0.85), "HALL OF FAME", COL_GOLD, "", COL_GOLD)
+	_build_record_boards()
+
+
+## The time trial records: a board per Grand Prix on the hall's side walls, its stages' best runs and laps
+## (TimeTrialRecords). They read round the hall from the door: down the left wall, then the cups on the back
+## wall, then back up the right wall.
+func _build_record_boards() -> void:
+	var cups: Array = NetworkManager.GP_CUPS.keys()
+	var left_n: int = ceili(cups.size() * 0.5)
+	var mid_z: float = _spine_end - HALL_D * 0.5
+	var face: float = HALL_HALF - WALL_T * 0.5 - 0.01
+	for i in cups.size():
+		var on_left: bool = i < left_n
+		var n: int = left_n if on_left else cups.size() - left_n
+		var k: int = i if on_left else i - left_n
+		var along: float = (float(k) - (n - 1) * 0.5) * RECORD_BOARD_STEP
+		# Left: from the door toward the back (-z); right: from the back toward the door.
+		var z: float = mid_z - along if on_left else mid_z + along
+		var pos := Vector3(-face if on_left else face, RECORD_BOARD_Y, z)
+		_record_board(pos, PI * 0.5 if on_left else -PI * 0.5, cups[i])
+	_omni(Vector3(-HALL_HALF + 2.2, 3.4, mid_z), 0.5, 9.0)
+	_omni(Vector3(HALL_HALF - 2.2, 3.4, mid_z), 0.5, 9.0)
+
+
+func _record_board(pos: Vector3, yaw: float, cup_name: String) -> void:
+	var size := RECORD_BOARD_SIZE
+	var root := Node3D.new()
+	root.name = "Records_" + cup_name.validate_node_name()
+	root.position = pos
+	root.rotation.y = yaw
+	_world.add_child(root)
+	var hw: float = size.x * 0.5
+	var hh: float = size.y * 0.5
+	_box(root, Vector3(-hw, -hh, 0.0), Vector3(hw, hh, 0.06), _mat("board"), false)
+	_box(root, Vector3(-hw, hh - 0.035, 0.06), Vector3(hw, hh, 0.075), _glow_mat(COL_GOLD, 1.8), false)
+	var zt := 0.075
+	_text(root, cup_name.to_upper(), 0.22, COL_GOLD, Vector3(0.0, hh - 0.24, zt), size.x - 0.4)
+	_text(root, "TIME TRIAL RECORDS", 0.075, COL_DIM, Vector3(0.0, hh - 0.44, zt), size.x - 0.4, _font_bold)
+	var x_stage: float = -hw + 0.2
+	var x_run: float = 0.55
+	var x_lap: float = 1.45
+	var x_car: float = 1.62
+	var y: float = hh - 0.66
+	_col_text(root, "STAGE", 0.065, COL_DIM, Vector3(x_stage, y, zt), 0, 1.9)
+	_col_text(root, "BEST RUN", 0.065, COL_DIM, Vector3(x_run, y, zt), 2, 0.8)
+	_col_text(root, "BEST LAP", 0.065, COL_DIM, Vector3(x_lap, y, zt), 2, 0.8)
+	_col_text(root, "CAR", 0.065, COL_DIM, Vector3(x_car, y, zt), 0, hw - 0.12 - x_car)
+	_box(root, Vector3(-hw + 0.15, y - 0.08, 0.06), Vector3(hw - 0.15, y - 0.07, 0.07), _glow_mat(COL_DIM, 0.6), false)
+	y -= 0.3
+	for path in NetworkManager.GP_CUPS[cup_name]["stages"]:
+		var rec: Dictionary = TimeTrialRecords.stage(TimeTrialRecords.key_of(path))
+		var any: bool = int(rec["run_ms"]) > 0 or int(rec["lap_ms"]) > 0
+		var name_col: Color = COL_TEXT if any else Color(COL_DIM, 0.75)
+		_col_text(root, _stage_name(path).to_upper(), 0.12, name_col, Vector3(x_stage, y, zt), 0, 1.9)
+		var run: int = int(rec["run_ms"])
+		var lap: int = int(rec["lap_ms"])
+		_col_text(root, TimeTrialRecords.format_ms(run) if run > 0 else "-", 0.12, COL_GOLD if run > 0 else COL_OFF,
+				Vector3(x_run, y, zt), 2, 0.8)
+		_col_text(root, TimeTrialRecords.format_ms(lap) if lap > 0 else "-", 0.12, COL_TEXT if lap > 0 else COL_OFF,
+				Vector3(x_lap, y, zt), 2, 0.8)
+		var car: String = str(rec["run_car"]) if run > 0 else str(rec["lap_car"])
+		_col_text(root, car.to_upper() if car != "" else "", 0.085, COL_DIM, Vector3(x_car, y, zt), 0, hw - 0.12 - x_car)
+		var sub := "NOT RUN YET"
+		if any:
+			var runs: int = int(rec["runs"])
+			var date: String = str(rec["run_date"]) if run > 0 else str(rec["lap_date"])
+			sub = "SET %s  ·  %d RUN%s" % [date, runs, "" if runs == 1 else "S"]
+		_col_text(root, sub, 0.055, Color(COL_DIM, 0.8), Vector3(x_stage, y - 0.13, zt), 0, 1.9)
+		y -= RECORD_ROW
+
+
+## Text in a column: `align` 0 starts at `pos`, 2 ends there (1 centres, as `_text`).
+func _col_text(parent: Node3D, text: String, height: float, color: Color, pos: Vector3, align: int, max_w: float) -> Label3D:
+	var l := _text(parent, text, height, color, pos, max_w, _font_bold)
+	l.horizontal_alignment = [HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_CENTER, HORIZONTAL_ALIGNMENT_RIGHT][align]
+	return l
+
+
+func _stage_name(path: String) -> String:
+	for st in NetworkManager.ALL_STAGES:
+		if st["path"] == path:
+			return str(st["name"])
+	return path.get_file().get_basename()
 
 
 func _build_pedestal(ped: Node3D, cup_name: String, rec: Dictionary) -> void:

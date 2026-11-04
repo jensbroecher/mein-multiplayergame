@@ -832,6 +832,65 @@ func _drift_at(s: float, lat: float) -> float:
 
 
 # ======================================================================================
+#  Bumps: ore spilled from the trucks, down the ramp and across the floor
+# ======================================================================================
+
+## A bump is half the road wide at most, on one side: take it for the air or steer round it. [height, half length,
+## half width across, how far off the middle].
+const BUMP := [1.0, 4.6, 3.8, 3.6]
+## Down the ramp, one every so far, sides alternating; none within BUMP_KEEP of a gate or a boost pad.
+const BUMP_EVERY := 115.0
+const BUMP_KEEP := 22.0
+
+var _bump_list: Array = []
+
+
+## [s, lat] of every bump: down the ramp, on the floor's straights, in the mouth.
+func _plan_bumps() -> void:
+	var cand: Array = []
+	var s: float = _ramp_s0 + 60.0
+	var side := 1.0
+	while s < _ramp_s1 - 40.0:
+		cand.append([s, side])
+		side = -side
+		s += BUMP_EVERY
+	var t: Array = _turns
+	cand.append([0.5 * (float(t[T_FLOOR]["s1"]) + float(t[T_FLOOR + 1]["s0"])) + 20.0, 1.0])
+	var north0: float = float(t[T_FLOOR + 3]["s1"])
+	var north1: float = float(t[T_SUMP_TURN]["s0"])
+	cand.append([lerpf(north0, north1, 0.45), -1.0])
+	cand.append([lerpf(north0, north1, 0.7), 1.0])
+	cand.append([0.5 * (float(t[T_SUMP_TURN]["s1"]) + float(t[T_FLOOR + 5]["s0"])), 1.0])
+	var m0: float = float(t[T_MOUTH]["s1"])
+	cand.append([m0 + 150.0, -1.0])
+	cand.append([m0 + 185.0, 1.0])
+	var keep: Array = _checkpoints()
+	for b in _boosts():
+		keep.append(float(b[0]))
+		keep.append(float(b[0]) + 25.0)
+	for c in cand:
+		var clear := true
+		for k in keep:
+			if absf(float(c[0]) - float(k)) < BUMP_KEEP:
+				clear = false
+		if clear:
+			_bump_list.append([c[0], float(c[1]) * float(BUMP[3])])
+	print("  bumps: %d" % _bump_list.size())
+
+
+func _bump_at(s: float, lat: float) -> float:
+	var best := 0.0
+	for b in _bump_list:
+		var u: float = absf(s - float(b[0])) / float(BUMP[1])
+		var v: float = absf(lat - float(b[1])) / float(BUMP[2])
+		if u >= 1.0 or v >= 1.0:
+			continue
+		var along: float = cos(u * PI * 0.5)
+		best = maxf(best, float(BUMP[0]) * along * along * (1.0 - smoothstep(0.55, 1.0, v)))
+	return best
+
+
+# ======================================================================================
 #  Terrain mesh and collision
 # ======================================================================================
 
@@ -949,7 +1008,7 @@ func _build_terrain(parent: Node, mat: Material) -> void:
 		for ix in range(nx):
 			var i: int = iz * nx + ix
 			if _road_d[i] < ROAD_HALF + 7.0:
-				_heights[i] += _drift_at(_vert_s[i], _vert_lat[i])
+				_heights[i] += _drift_at(_vert_s[i], _vert_lat[i]) + _bump_at(_vert_s[i], _vert_lat[i])
 				if _offroad_at(_vert_s[i]):
 					_heights[i] += FLOOR_LUMPS * _detail_noise.get_noise_2d(_grid_x[ix] * 4.0, _grid_z[iz] * 4.0)
 	for iz in range(nz):
@@ -980,6 +1039,8 @@ func _build_terrain(parent: Node, mat: Material) -> void:
 				var lat_enc: float = clampf(_vert_lat[i] / 24.0 + 0.5, 0.0, 1.0)
 				colors[i] = Color(rock, band, sand, lat_enc)
 				var drift: float = smoothstep(0.02, 0.3, _drift_at(_vert_s[i], _vert_lat[i]))
+				# The bumps are spilled ore, a little paler than the track.
+				drift = maxf(drift, 0.75 * smoothstep(0.05, 0.4, _bump_at(_vert_s[i], _vert_lat[i])))
 				uvs[i] = Vector2(mined, drift)
 				uv2s[i] = Vector2(_vert_s[i], -1.0 if _offroad_at(_vert_s[i]) else _paved_at(_vert_s[i]))
 			else:
@@ -2684,6 +2745,7 @@ func _ready() -> void:
 	var lip_fwd: Vector3 = _spot(lip_s, 0.0, 0.0)["fwd"]
 	track_path.set_meta(&"jump_lips", [{"name": "Wash", "lip": lip, "dir": (lip_fwd * 2.0 + Vector3(0, rise, 0)).normalized()}])
 	_plan_pads()
+	_plan_bumps()
 	_build_heights()
 	print("  heights built (%.1fs)" % ((Time.get_ticks_msec() - t_start) / 1000.0))
 	_ground_mat = _make_ground_material()

@@ -3,7 +3,8 @@ extends Node
 # Photographs the garage (Garage.gd), the whole window with its HUD, from where the walker stands or from
 # the orbit of an inspected car. Steps run in order:
 #   Godot --path . --resolution 1600x900 res://scratch/garage_shots.tscn -- <dir>
-#       [trophies=demo]                        record made-up trophies first (user://trophies.cfg is backed up and put back)
+#       [trophies=demo]                        record made-up trophies and time trial records first (user://trophies.cfg
+#                                              and user://time_trial_records.cfg are backed up and put back)
 #       walk:<name>:x,z:yaw_deg[:pitch_deg]    stand the walker there and shoot (yaw 0 looks down the hall, toward -z)
 #       inspect:<name>:<car>[:yaw_deg:pitch_deg:dist]   lift that car, orbit it, shoot once it is up
 #       lower                                  end the inspection
@@ -29,7 +30,24 @@ func _ready() -> void:
 			dir = a
 	DirAccess.make_dir_recursive_absolute(dir)
 	var backup := ""
+	var tt_backup := ""
+	const TT_FILE := "user://time_trial_records.cfg"
 	if demo:
+		tt_backup = FileAccess.get_file_as_string(TT_FILE) if FileAccess.file_exists(TT_FILE) else ""
+		var R = load("res://TimeTrialRecords.gd")
+		var demo_runs := {"LakesideLevel": [61234, 60122, 59876], "PinecrestRidgeLevel": [73401, 71988, 72300],
+				"BloombayDunesLevel": [55870, 54321, 54990], "GlacierHighwayLevel": [88012, 86655, 87001],
+				"CanyonLevel": [66543, 65002, 64870], "MinaLevel": [138765]}
+		var cars := ["Trailblazer", "Nocturne", "Titan", "Sandstorm", "Fulmine", "Apex"]
+		var ci := 0
+		for key in demo_runs:
+			var laps: Array = demo_runs[key]
+			var total := 0
+			for v in laps:
+				total += int(v)
+				R.submit_lap(key, int(v), [int(v) / 2, int(v)], cars[ci % cars.size()])
+			R.submit_run(key, laps, total, cars[ci % cars.size()], true)
+			ci += 1
 		backup = FileAccess.get_file_as_string("user://trophies.cfg") if FileAccess.file_exists("user://trophies.cfg") else ""
 		var T = load("res://Trophies.gd")
 		T.record_gp("Bloombay GP", [{"name": "Me", "car_index": 16, "is_bot": false}], ["Me"])
@@ -43,6 +61,7 @@ func _ready() -> void:
 	garage.start()
 	for i in 30:
 		await get_tree().process_frame
+	print("hall: concourse ends (trophy hall's front wall) at z %.2f, hall %.0fm deep" % [garage._spine_end, garage.HALL_D])
 	for step in steps:
 		var p: PackedStringArray = step.split(":")
 		match p[0]:
@@ -131,6 +150,12 @@ func _ready() -> void:
 	for ti in _toggled:
 		garage._toggle_lineup(ti)
 	if demo:
+		if tt_backup == "":
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(TT_FILE))
+		else:
+			var tf := FileAccess.open(TT_FILE, FileAccess.WRITE)
+			tf.store_string(tt_backup)
+			tf.close()
 		if backup == "":
 			DirAccess.remove_absolute(ProjectSettings.globalize_path("user://trophies.cfg"))
 		else:

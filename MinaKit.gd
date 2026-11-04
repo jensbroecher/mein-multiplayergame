@@ -111,7 +111,7 @@ static func haul_truck(pk: PropKit, kit: Dictionary, body_col := MINE_YELLOW, lo
 	# --- Frame, axles and suspension -------------------------------------------------------------------------
 	for sz in [-1.15, 1.15]:
 		pk.block(kit, "steel", Vector3(-5.6, 1.45, sz - 0.32), Vector3(6.7, 2.75, sz + 0.32), dusty(FRAME_BLACK, 1.5))
-	pk.block(kit, "steel", Vector3(-5.4, 1.7, -1.5), Vector3(-4.9, 2.4, 1.5), dusty(FRAME_BLACK, 1.5))
+	pk.block(kit, "steel", Vector3(-5.5, 1.7, -1.5), Vector3(-4.9, 2.4, 1.5), dusty(FRAME_BLACK, 1.5))
 	pk.block(kit, "steel", Vector3(5.6, 1.7, -1.5), Vector3(6.1, 2.4, 1.5), dusty(FRAME_BLACK, 1.5))
 	pk.tube(kit, "steel", Vector3(axle_r, r_out, -1.65), Vector3(axle_r, r_out, 1.65), 0.82, 0.82, 16, dusty(Color(0.16, 0.16, 0.15), 1.0))
 	for sz in [-1.0, 1.0]:
@@ -133,7 +133,7 @@ static func haul_truck(pk: PropKit, kit: Dictionary, body_col := MINE_YELLOW, lo
 	for lz in [-2.7, -2.15, 2.15, 2.7]:
 		pk.block(kit, "lamp", Vector3(7.5, 1.85, lz - 0.2), Vector3(7.56, 2.12, lz + 0.2), Color(1.0, 0.97, 0.88))
 	# --- Upper deck over the radiator, its railings, the cab on the left, air cleaners on the right -------------
-	pk.block(kit, "steel", Vector3(3.6, 4.55, -4.75), Vector3(7.25, 4.8, 4.75), dusty(Color(0.30, 0.30, 0.30), 4.0, 5.0, 0.3))
+	pk.block(kit, "steel", Vector3(3.97, 4.55, -4.75), Vector3(7.25, 4.8, 4.75), dusty(Color(0.30, 0.30, 0.30), 4.0, 5.0, 0.3))
 	for dz in [-4.4, -2.0, 2.0, 4.4]:
 		pk.beam(kit, "paint", Vector3(4.0, 2.6, dz * 0.62), Vector3(4.2, 4.55, dz), 0.3, 0.3, dusty(y_c, 3.0))
 		pk.beam(kit, "paint", Vector3(6.6, 2.4, dz * 0.45), Vector3(6.9, 4.55, dz), 0.25, 0.25, dusty(y_c, 3.0))
@@ -148,7 +148,7 @@ static func haul_truck(pk: PropKit, kit: Dictionary, body_col := MINE_YELLOW, lo
 	pk.block(kit, "glassdark", Vector3(6.7, 5.55, -4.25), Vector3(6.74, 6.8, -2.25), GLASS)
 	pk.block(kit, "glassdark", Vector3(4.4, 5.55, -4.49), Vector3(6.5, 6.8, -4.45), GLASS)
 	pk.block(kit, "glassdark", Vector3(4.4, 5.55, -2.05), Vector3(6.5, 6.8, -2.01), GLASS)
-	pk.block(kit, "matte", Vector3(4.2, 4.8, -4.5), Vector3(6.7, 5.0, -2.0), Color(0.12, 0.12, 0.12))
+	pk.block(kit, "matte", Vector3(4.2, 4.82, -4.5), Vector3(6.66, 5.0, -2.0), Color(0.12, 0.12, 0.12))
 	for mz in [-4.85, 4.85]:
 		pk.beam(kit, "steel", Vector3(7.1, 5.9, mz * 0.97), Vector3(7.5, 6.3, mz * 1.03), 0.08, 0.08, FRAME_BLACK)
 		pk.block(kit, "matte", Vector3(7.4, 6.2, mz * 1.03 - 0.25), Vector3(7.55, 6.95, mz * 1.03 + 0.25), FRAME_BLACK)
@@ -191,10 +191,11 @@ static func haul_truck(pk: PropKit, kit: Dictionary, body_col := MINE_YELLOW, lo
 	for bz in [-3.0, -1.2, 1.2, 3.0]:
 		pk.block(kit, "steel", Vector3(-6.0, 3.7, bz - 0.15), Vector3(3.5, 4.1, bz + 0.15), dusty(FRAME_BLACK, 2.5))
 	for bz in [-1.15, 1.15]:
-		pk.block(kit, "steel", Vector3(-5.6, 2.6, bz - 0.25), Vector3(-4.9, 3.95, bz + 0.25), dusty(FRAME_BLACK, 2.5))
+		pk.block(kit, "steel", Vector3(-5.55, 2.6, bz - 0.25), Vector3(-4.9, 3.95, bz + 0.25), dusty(FRAME_BLACK, 2.5))
 	pk.block(kit, "paint", Vector3(3.6, 4.1, -4.8), Vector3(3.95, 7.85, 4.8), y_c)
-	pk.block(kit, "paint", Vector3(3.6, 7.75, -4.85), Vector3(7.35, 8.1, 4.85), y_c)
-	pk.block(kit, "paint", Vector3(3.6, 4.35, -4.35), Vector3(3.62, 7.75, 4.35), inner)
+	pk.block(kit, "paint", Vector3(3.97, 7.75, -4.85), Vector3(7.35, 8.1, 4.85), y_c)
+	# The worn lining of the front wall, a few centimetres proud of it (flush, the two flickered).
+	pk.block(kit, "paint", Vector3(3.55, 4.35, -4.33), Vector3(3.58, 7.7, 4.33), inner)
 	pk.beam(kit, "paint", Vector3(7.3, 7.75, -4.7), Vector3(3.9, 5.6, -4.7), 0.3, 0.3, y_c)
 	pk.beam(kit, "paint", Vector3(7.3, 7.75, 4.7), Vector3(3.9, 5.6, 4.7), 0.3, 0.3, y_c)
 	# A beacon on the canopy and the rear lamps.
@@ -202,7 +203,7 @@ static func haul_truck(pk: PropKit, kit: Dictionary, body_col := MINE_YELLOW, lo
 	for tz in [-1.5, 1.5]:
 		pk.block(kit, "lamp", Vector3(-5.66, 2.0, tz - 0.22), Vector3(-5.6, 2.25, tz + 0.22), Color(0.9, 0.12, 0.08))
 	if load:
-		_ore_heap(pk, kit, Vector3(-1.2, 4.25, 0.0), Vector2(5.4, 3.9), 2.6, seed_v)
+		_ore_heap(pk, kit, Vector3(-1.3, 4.25, 0.0), Vector2(4.6, 3.9), 2.6, seed_v)
 	pk.set_frame(base)
 
 
@@ -283,6 +284,82 @@ static func _ore_heap(pk: PropKit, kit: Dictionary, c: Vector3, half: Vector2, h
 #  Electric rope shovel
 # ======================================================================================
 
+## One crawler track at x `sx`, `length` long, its shoes `hw` either side of its middle, `out` (+1/-1) toward its outer
+## side: a chain of shoes round the drive sprocket (rear, +z) and the idler (front, -z), each shoe a plate with a grouser
+## across its outside and a drive lug inside; the side frame between the runs with its stiffeners, lower and carrier
+## rollers, the sprocket's and the idler's hubs and the propel gearbox behind the sprocket.
+static func _crawler(pk: PropKit, kit: Dictionary, sx: float, length: float, hw: float, out: float) -> void:
+	var r_path := 1.42
+	var yc := 1.45
+	var zf: float = -length * 0.5 + 1.6
+	var zr: float = length * 0.5 - 1.6
+	var run: float = zr - zf
+	var perim: float = 2.0 * run + TAU * r_path
+	var n: int = int(round(perim / 0.62))
+	var shoe := Color(0.24, 0.23, 0.22)
+	for k in range(n):
+		var u: float = perim * float(k) / float(n)
+		var p: Vector3
+		var t: Vector3
+		if u < run:
+			p = Vector3(sx, yc - r_path, zf + u)
+			t = Vector3(0, 0, 1)
+		elif u < run + PI * r_path:
+			var a1: float = (u - run) / r_path
+			p = Vector3(sx, yc - cos(a1) * r_path, zr + sin(a1) * r_path)
+			t = Vector3(0, sin(a1), cos(a1))
+		elif u < 2.0 * run + PI * r_path:
+			p = Vector3(sx, yc + r_path, zr - (u - run - PI * r_path))
+			t = Vector3(0, 0, -1)
+		else:
+			var a2: float = (u - 2.0 * run - PI * r_path) / r_path
+			p = Vector3(sx, yc + cos(a2) * r_path, zf - sin(a2) * r_path)
+			t = Vector3(0, -sin(a2), -cos(a2))
+		var nrm: Vector3 = Vector3.RIGHT.cross(t).normalized() * -1.0
+		if nrm.dot(p - Vector3(sx, yc, clampf(p.z, zf, zr))) < 0.0:
+			nrm = -nrm
+		var b := Basis(Vector3.RIGHT, nrm, t)
+		var col: Color = dusty(shoe, p.y, 3.0, 0.65).darkened(0.05 * float(k % 3))
+		pk.box(kit, "steel", Transform3D(b, p), Vector3(hw * 2.0, 0.3, 0.56), col)
+		pk.box(kit, "steel", Transform3D(b, p + nrm * 0.2), Vector3(hw * 2.0 - 0.1, 0.12, 0.13), col.darkened(0.12))
+		pk.box(kit, "steel", Transform3D(b, p - nrm * 0.22), Vector3(0.7, 0.16, 0.34), col.darkened(0.2))
+	# The side frame inside the chain, sloping in at its ends, ribs down its outer face.
+	var fw := 1.15
+	var frame_col: Color = dusty(Color(0.18, 0.18, 0.17), 1.0, 3.0, 0.5)
+	# (The outline is drawn along z, so it is extruded in a frame turned to put the kit's x along z.)
+	var bf: Transform3D = pk.xf
+	pk.set_frame(bf * Transform3D(Basis(Vector3.UP, -PI * 0.5), Vector3(sx, 0.0, 0.0)))
+	pk.extrude(kit, "steel", PackedVector2Array([Vector2(zf - 0.4, 1.0), Vector2(zr + 0.4, 1.0), Vector2(zr - 0.2, 2.35), Vector2(zf + 0.2, 2.35)]),
+			-fw, fw, 0.05, frame_col)
+	pk.set_frame(bf)
+	for k in range(9):
+		var zz: float = lerpf(zf + 0.6, zr - 0.6, float(k) / 8.0)
+		pk.block(kit, "steel", Vector3(sx + out * fw - 0.08, 1.0, zz - 0.09), Vector3(sx + out * fw + 0.08, 2.35, zz + 0.09), frame_col.lightened(0.05))
+	# Lower rollers on the bottom run, two carrier rollers under the top run.
+	for k in range(7):
+		var zz2: float = lerpf(zf + 0.9, zr - 0.9, float(k) / 6.0)
+		pk.tube(kit, "metal", Vector3(sx + out * (fw + 0.02), 0.62, zz2), Vector3(sx + out * (fw + 0.22), 0.62, zz2), 0.36, 0.3, 12, Color(0.32, 0.31, 0.3))
+	for zz3 in [lerpf(zf, zr, 0.33), lerpf(zf, zr, 0.67)]:
+		pk.tube(kit, "metal", Vector3(sx - fw, 2.52, zz3), Vector3(sx + fw, 2.52, zz3), 0.24, 0.24, 10, Color(0.3, 0.3, 0.3))
+	# The sprocket (with its teeth showing past the chain's edge) and the idler, their hubs on the outside.
+	for wz in [zf, zr]:
+		var drive: bool = wz == zr
+		pk.tube(kit, "steel", Vector3(sx - hw + 0.2, yc, wz), Vector3(sx + hw - 0.2, yc, wz), 1.2, 1.2, 20, Color(0.2, 0.2, 0.2))
+		pk.tube(kit, "metal", Vector3(sx + out * (hw - 0.2), yc, wz), Vector3(sx + out * (hw + 0.15), yc, wz), 0.75, 0.6, 16, Color(0.36, 0.35, 0.33))
+		for kb in range(8):
+			var ab: float = TAU * float(kb) / 8.0
+			var bp := Vector3(sx + out * (hw + 0.16), yc + sin(ab) * 0.48, wz + cos(ab) * 0.48)
+			pk.tube(kit, "steel", bp, bp + Vector3(out * 0.08, 0, 0), 0.06, 0.06, 6, Color(0.2, 0.2, 0.2))
+		if drive:
+			for kt in range(13):
+				var at: float = TAU * float(kt) / 13.0
+				var tp := Vector3(sx + out * (hw - 0.1), yc + sin(at) * 1.22, wz + cos(at) * 1.22)
+				pk.box(kit, "metal", Transform3D(Basis(Vector3.RIGHT, -at), tp), Vector3(0.18, 0.2, 0.24), Color(0.4, 0.38, 0.35))
+			# The propel gearbox and motor behind the sprocket.
+			pk.block(kit, "paint", Vector3(sx + out * 0.3 - 0.6, 1.6, zr + 0.6), Vector3(sx + out * 0.3 + 0.6, 2.8, zr + 2.1), Color(0.9, 0.88, 0.84).darkened(0.1))
+			pk.tube(kit, "paint", Vector3(sx + out * 0.3, 2.2, zr + 2.1), Vector3(sx + out * 0.3, 2.2, zr + 2.7), 0.45, 0.45, 12, Color(0.62, 0.12, 0.10))
+
+
 ## A mining rope shovel at life size: crawlers, the revolving house with its cab, gantry and counterweight, the
 ## boom raised forward with its point sheaves, the dipper handle through the saddle block and the dipper on it,
 ## hanging from the hoist ropes. The house is turned `swing` radians about the centre pin (0: boom toward -z, the
@@ -292,19 +369,17 @@ static func rope_shovel(pk: PropKit, kit: Dictionary, swing := 0.0, reach := 0.6
 	var white := Color(0.90, 0.88, 0.84)
 	var red := Color(0.62, 0.12, 0.10)
 	var dark := Color(0.16, 0.16, 0.16)
-	# --- Crawlers: two tracks of pads, the car body between them ---------------------------------------------
+	# --- Crawlers: two tracks of shoes round a sprocket and an idler, the car body between them -----------------
 	for sx in [-4.8, 4.8]:
-		var len_t := 13.5
-		pk.block(kit, "steel", Vector3(sx - 1.6, 0.6, -len_t * 0.5 + 0.8), Vector3(sx + 1.6, 2.6, len_t * 0.5 - 0.8), dusty(dark, 1.0, 2.6, 0.6))
-		for e in [-1.0, 1.0]:
-			pk.tube(kit, "steel", Vector3(sx - 1.65, 1.6, e * (len_t * 0.5 - 1.3)), Vector3(sx + 1.65, 1.6, e * (len_t * 0.5 - 1.3)), 1.3, 1.3, 16, dusty(dark, 0.5, 2.6, 0.6))
-		var pads: int = 26
-		for k in range(pads):
-			var z: float = -len_t * 0.5 + 1.3 + (len_t - 2.6) * float(k) / float(pads - 1)
-			pk.block(kit, "steel", Vector3(sx - 1.7, 0.0, z - 0.24), Vector3(sx + 1.7, 0.35, z + 0.24), dusty(Color(0.22, 0.21, 0.2), 0.0, 1.0, 0.7))
-			pk.block(kit, "steel", Vector3(sx - 1.7, 2.6, z - 0.24), Vector3(sx + 1.7, 2.9, z + 0.24), dusty(Color(0.22, 0.21, 0.2), 1.0, 3.0, 0.55))
+		_crawler(pk, kit, sx, 13.5, 1.7, -1.0 if sx < 0.0 else 1.0)
 	pk.block(kit, "steel", Vector3(-3.3, 1.2, -3.2), Vector3(3.3, 3.4, 3.2), dusty(dark, 1.5, 3.4, 0.5))
-	pk.tube(kit, "steel", Vector3(0, 3.4, 0), Vector3(0, 4.0, 0), 4.6, 4.6, 24, dark)
+	for cz in [-2.4, 2.4]:
+		pk.block(kit, "steel", Vector3(-3.6, 1.5, cz - 0.7), Vector3(3.6, 2.7, cz + 0.7), dusty(dark.lightened(0.04), 1.5, 3.0, 0.5))
+	pk.tube(kit, "steel", Vector3(0, 3.4, 0), Vector3(0, 4.0, 0), 4.6, 4.6, 32, dark)
+	# The swing rack: teeth round the roller circle.
+	for k in range(48):
+		var ta: float = TAU * float(k) / 48.0
+		pk.box(kit, "metal", Transform3D(Basis(Vector3.UP, -ta), Vector3(cos(ta) * 4.66, 3.55, sin(ta) * 4.66)), Vector3(0.14, 0.3, 0.22), Color(0.38, 0.37, 0.35))
 	# --- The revolving frame and house, turned by `swing` ------------------------------------------------------
 	pk.set_frame(base * Transform3D(Basis(Vector3.UP, swing), Vector3.ZERO))
 	pk.block(kit, "steel", Vector3(-5.6, 4.0, -6.5), Vector3(5.6, 4.8, 7.6), Color(0.25, 0.25, 0.25))
@@ -324,6 +399,19 @@ static func rope_shovel(pk: PropKit, kit: Dictionary, swing := 0.0, reach := 0.6
 	pk.block(kit, "steel", Vector3(-5.4, 6.6, -5.4), Vector3(-2.0, 6.8, -2.2), Color(0.3, 0.3, 0.3))
 	_railing(pk, kit, [Vector3(-5.4, 4.8, 7.6), Vector3(-5.4, 4.8, -2.3)], 1.1, Color(0.92, 0.75, 0.15))
 	_railing(pk, kit, [Vector3(5.4, 4.8, -2.3), Vector3(5.4, 4.8, 7.6)], 1.1, Color(0.92, 0.75, 0.15))
+	# Ribs down the house's sides, a door, cabinets and lamps on the roof, the boarding stair.
+	for rz in range(-2, 8):
+		for sd in [-1.0, 1.0]:
+			pk.block(kit, "paint", Vector3(sd * 5.2 - 0.06, 4.8, float(rz) - 0.06), Vector3(sd * 5.2 + 0.06, 9.4, float(rz) + 0.06), white.darkened(0.1))
+	pk.block(kit, "paint", Vector3(-5.27, 4.85, 5.0), Vector3(-5.22, 7.1, 6.1), white.darkened(0.25))
+	pk.block(kit, "steel", Vector3(-5.29, 5.9, 5.85), Vector3(-5.27, 6.05, 5.95), Color(0.2, 0.2, 0.2))
+	for cab in [Vector3(-3.4, 11.2, 4.6), Vector3(3.2, 11.2, 5.2)]:
+		pk.block(kit, "paint", cab - Vector3(1.0, 0.0, 0.8), cab + Vector3(1.0, 1.5, 0.8), Color(0.72, 0.72, 0.70))
+	for lx in [-4.2, -1.4, 1.4, 4.2]:
+		pk.box(kit, "steel", Transform3D(Basis(Vector3.RIGHT, -0.3), Vector3(lx, 10.6, -2.6)), Vector3(0.5, 0.4, 0.3), Color(0.2, 0.2, 0.2))
+		pk.box(kit, "lamp", Transform3D(Basis(Vector3.RIGHT, -0.3), Vector3(lx, 10.55, -2.77)), Vector3(0.42, 0.32, 0.04), Color(1.0, 0.97, 0.9))
+	_stair(pk, kit, Vector3(-6.4, 1.1, 6.6), Vector3(-6.4, 4.8, 3.0), Color(0.92, 0.75, 0.15))
+	pk.block(kit, "steel", Vector3(-6.9, 4.7, 1.6), Vector3(-5.6, 4.8, 3.2), Color(0.3, 0.3, 0.3))
 	# The gantry on the roof: an A-frame whose back legs hold the boom's suspension ropes.
 	var g_top := Vector3(0.0, 21.0, 2.6)
 	for gx in [-3.2, 3.2]:
@@ -342,6 +430,18 @@ static func rope_shovel(pk: PropKit, kit: Dictionary, swing := 0.0, reach := 0.6
 		var hw: float = lerpf(1.3, 0.8, float(k) / 8.0) * 1.1
 		pk.beam(kit, "paint", p + Vector3(-hw, 0, 0), p + Vector3(hw, 0, 0), 0.3, 0.6, white.darkened(0.08))
 	pk.tube(kit, "paint", tip + Vector3(-1.4, 0, 0), tip + Vector3(1.4, 0, 0), 1.6, 1.6, 20, red)
+	# Top and bottom plates closing the box girder, a walkway rail along its top, lamps under the point.
+	pk.beam(kit, "paint", foot + Vector3(0, 1.15, 0), tip + Vector3(0, 1.15, 0), 2.2, 0.12, white.darkened(0.05), Vector3.RIGHT)
+	pk.beam(kit, "paint", foot - Vector3(0, 1.15, 0), tip - Vector3(0, 1.15, 0), 2.2, 0.12, white.darkened(0.15), Vector3.RIGHT)
+	var up_n: Vector3 = Vector3.RIGHT.cross(boom_dir).normalized() * -1.0
+	for k in range(9):
+		var rp: Vector3 = foot.lerp(tip, 0.08 + 0.84 * float(k) / 8.0) + Vector3(-1.1, 0, 0) + up_n * 1.25
+		pk.beam(kit, "paint", rp, rp + Vector3.UP * 1.0, 0.06, 0.06, Color(0.92, 0.75, 0.15))
+	var r0: Vector3 = foot.lerp(tip, 0.08) + Vector3(-1.1, 1.0, 0) + up_n * 1.25
+	var r1: Vector3 = foot.lerp(tip, 0.92) + Vector3(-1.1, 1.0, 0) + up_n * 1.25
+	pk.beam(kit, "paint", r0, r1, 0.07, 0.07, Color(0.92, 0.75, 0.15))
+	for lx2 in [-0.9, 0.9]:
+		pk.box(kit, "lamp", Transform3D(Basis(), tip + Vector3(lx2, -1.9, -0.6)), Vector3(0.5, 0.25, 0.5), Color(1.0, 0.97, 0.9))
 	# Suspension ropes from the gantry to the boom's point.
 	for bx in [-0.9, 0.9]:
 		pk.beam(kit, "steel", g_top + Vector3(bx, 0, 0), tip + Vector3(bx, 1.2, 0.6), 0.12, 0.12, Color(0.18, 0.18, 0.18))

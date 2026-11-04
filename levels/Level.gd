@@ -8,6 +8,7 @@ const CarPaint = preload("res://CarPaint.gd")
 const FX_WARMUP = preload("res://FxWarmup.gd")
 const STAGE_AMBIENCE = preload("res://StageAmbience.gd")
 const ITEM_BOX = preload("res://ItemBox.gd")
+const TimeTrialRecords = preload("res://TimeTrialRecords.gd")
 
 @export var checkpoints: Array[Area3D] = []
 @export var track_path: Path3D
@@ -400,7 +401,31 @@ func _on_checkpoint_entered(body: Node3D, cp_idx: int):
 	var id = body.name.to_int()
 	if id > 0 and player_stats.has(id):
 		_count_skipped_gate(id, cp_idx)
+		_catch_up_bot(id, cp_idx)
 		_grant_checkpoint(id, cp_idx)
+
+
+## A bot driving through a later gate than the one it still needs went round the one(s) between, and its racing-line
+## tracker lost the line (wide on open ground: Mina del Viento's pit floor): bots are credited by progress anyway, so
+## the gates between count, and the tracker takes up the line again at this gate. Without it the bot passed every gate
+## after, uncounted, ran off the end of a point-to-point stage and wandered.
+func _catch_up_bot(id: int, cp_idx: int) -> void:
+	if not multiplayer.is_server():
+		return
+	var stats: Dictionary = player_stats[id]
+	var cart = players_container.get_node_or_null(str(id))
+	if cart == null or not cart.get("is_ai") or stats["finished"] or stats.get("disqualified", false):
+		return
+	var next_idx: int = stats["next_checkpoint_idx"]
+	if cp_idx <= next_idx or cp_idx - next_idx > 3 or track_path == null or track_path.curve == null or cp_idx >= cp_offsets.size():
+		return
+	var t_len := maxf(track_length, 1.0)
+	var near: float = track_path.curve.get_closest_offset(track_path.to_local(cart.global_position))
+	if absf(fposmod(near - cp_offsets[cp_idx] + t_len * 0.5, t_len) - t_len * 0.5) > SKIPPED_GATE_REACH:
+		return
+	for k in range(next_idx, cp_idx):
+		_grant_checkpoint(id, k)
+	stats["path_off"] = cp_offsets[cp_idx]
 
 
 ## A human reached the gate after the one they still need: they went round the one in between and the
@@ -440,6 +465,13 @@ func _grant_checkpoint(id: int, cp_idx: int) -> void:
 	stats["next_checkpoint_idx"] += 1
 	stats["missed_idx"] = -1
 	stats["missed_run"] = 0
+	var split_ms: int = Time.get_ticks_msec() - int(stats.get("lap_start", _race_go_msec))
+	_lap_splits(stats)[cp_idx] = split_ms
+	var ends_run: bool = cp_idx == checkpoints.size() - 1 and stats["laps"] + 1 >= get_target_laps()
+	if _is_time_trial() and not ends_run:
+		_give_gate_boost(id)
+	if cp_idx < checkpoints.size() - 1:
+		_send_timing(id, &"timing_gate", [cp_idx, split_ms])
 
 	var cp = checkpoints[cp_idx]
 	var cart = players_container.get_node_or_null(str(id))
@@ -551,6 +583,12 @@ func _check_finish(id: int):
 		stats["finished"] = true
 		stats["pos"] = next_finish_pos
 		next_finish_pos += 1
+		# The laps run on from one another from the green light, so the run is their sum.
+		var total := 0
+		for t in stats.get("lap_times", []):
+			total += int(t)
+		stats["finish_ms"] = total if total > 0 else Time.get_ticks_msec() - _race_go_msec
+		_record_run(id)
 
 		var cart = players_container.get_node_or_null(str(id))
 		if cart and cart.has_method("set_finished_race"):
@@ -575,12 +613,16 @@ func show_player_finished_rpc(place: int = 0):
 	if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
 		# In co-op this is handled directly in _check_finish(), skip
 		return
-	race_ui.show_message("You Finished!", 5.0)
+	if not _is_time_trial():
+		# A time trial's finish shows the run's time instead (RaceUI.timing_finish).
+		race_ui.show_message("You Finished!", 5.0)
 	_set_local_cart_finished()
 	_announce_place(place)
 
 ## After the finish call, the announcer gives the place if it's on the podium.
 func _announce_place(place: int) -> void:
+	if _is_time_trial():
+		return
 	if place >= 1 and place <= MusicManager.PLACE_LINES.size():
 		get_tree().create_timer(1.15).timeout.connect(MusicManager.play_place_voice.bind(place))
 
@@ -850,7 +892,8 @@ func start_race():
 		return
 	race_state = RaceState.RACING
 	next_finish_pos = 1
-	if _commentator == null:
+	# A time trial is one racer against the clock: no race calls ("and they're off", the lead, the places).
+	if _commentator == null and not _is_time_trial():
 		_commentator = preload("res://RaceCommentator.gd").new()
 		_commentator.name = "RaceCommentator"
 		add_child(_commentator)
@@ -900,14 +943,16 @@ func start_race():
 	ITEM_BOX.boost_only_until = _race_go_msec + ITEM_BOX.START_BOOST_ONLY_SECONDS * 1000.0
 	if multiplayer.is_server():
 		get_tree().create_timer(ITEM_BOX.START_BOOST_ONLY_SECONDS).timeout.connect(_reroll_item_boxes)
-	_commentator.begin()
+	if _commentator:
+		_commentator.begin()
 	MusicManager.play_race_start_beep(true) # higher/longer 4th beep
 	MusicManager.load_playlist_for_level(scene_file_path)
 	MusicManager.play_race_music()
 	get_tree().call_group("player_carts", "on_race_started")
 	if _is_time_trial() and multiplayer.is_server():
 		for id in player_stats:
-			_give_lap_boosts(id)
+			_give_start_boost(id)
+	_start_lap_timers()
 	_spawn_start_finish_items_delayed()
 
 
@@ -1108,18 +1153,28 @@ func _start_end_timer_if_humans_done() -> void:
 ## a new lap record: saved, and the announcer calls it (only when it beats an earlier record).
 func _lap_completed(id: int) -> void:
 	var stats: Dictionary = player_stats[id]
-	if _is_time_trial() and stats["laps"] < get_target_laps():
-		_give_lap_boosts(id)
 	var now := Time.get_ticks_msec()
 	var lap_ms: int = now - int(stats.get("lap_start", _race_go_msec))
 	var clean: bool = stats.get("lap_clean", true)
+	var splits: Array = _lap_splits(stats)
 	stats["lap_start"] = now
 	stats["lap_clean"] = true
+	stats.erase("lap_splits")
+	var times: Array = stats.get("lap_times", [])
+	times.append(lap_ms)
+	stats["lap_times"] = times
 	# No cart averages 70 m/s: anything faster was a teleport (a test, a respawn glitch), not a lap.
-	if not clean or _race_go_msec <= 0 or lap_ms < int(track_length / 70.0 * 1000.0):
+	if _race_go_msec <= 0 or lap_ms < int(_lap_length() / 70.0 * 1000.0):
+		clean = false
+	if not clean:
+		stats["run_clean"] = false
+	_send_timing(id, &"timing_lap", [lap_ms, clean, splits])
+	if not clean:
 		return
 	if not NetworkManager.players.has(id) or NetworkManager.players[id].get("is_ai", false):
 		return
+	if _is_time_trial():
+		TimeTrialRecords.submit_lap(TimeTrialRecords.key_of(scene_file_path), lap_ms, splits, _car_name(id))
 	var cfg := ConfigFile.new()
 	cfg.load(LAP_RECORDS_PATH)
 	var key := scene_file_path.get_file().get_basename()
@@ -1418,6 +1473,11 @@ func _end_race():
 			"pos": stats["pos"],
 			"is_bot": is_bot,
 			"dq": stats.get("disqualified", false),
+			"finished": bool(stats.get("finished", false)),
+			"time_ms": int(stats.get("finish_ms", 0)) if stats.get("finished", false) else 0,
+			"laps_ms": stats.get("lap_times", []),
+			"prev_run_ms": int(stats.get("prev_run_ms", 0)),
+			"run_clean": bool(stats.get("run_clean", true)),
 		})
 	final_rankings.sort_custom(func(a, b): return a["pos"] < b["pos"])
 
@@ -1439,7 +1499,12 @@ func _end_race():
 			"pos": racer["pos"],
 			"dq": racer["dq"],
 			"round_points": round_pts,
-			"total_points": NetworkManager.gp_standings.get(racer["name"], round_pts)
+			"total_points": NetworkManager.gp_standings.get(racer["name"], round_pts),
+			"is_bot": racer["is_bot"],
+			"time_ms": racer["time_ms"],
+			"laps_ms": racer["laps_ms"],
+			"prev_run_ms": racer["prev_run_ms"],
+			"run_clean": racer["run_clean"],
 		})
 
 	end_race_rpc.rpc(results)
@@ -1484,13 +1549,94 @@ func _is_time_trial() -> bool:
 	return NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL
 
 
-## Time trial: every lap starts with TIME_TRIAL_BOOSTS boosts in the item slots, whatever was left.
-const TIME_TRIAL_BOOSTS := 2
-
-func _give_lap_boosts(id: int) -> void:
+## Time trial: the run starts with one boost in the item slots, and every gate that counts (the line on a
+## lap that isn't the last too) adds one, up to the two slots.
+func _give_start_boost(id: int) -> void:
 	var cart = players_container.get_node_or_null(str(id))
 	if cart and cart.has_method("set_lap_boosts"):
-		cart.set_lap_boosts(TIME_TRIAL_BOOSTS)
+		cart.set_lap_boosts(1)
+
+
+func _give_gate_boost(id: int) -> void:
+	var cart = players_container.get_node_or_null(str(id))
+	if cart and not cart.get("is_ai") and cart.has_method("give_boost"):
+		cart.give_boost()
+
+
+## The time at each gate of the lap under way, from its start (-1 for a gate not counted), by gate index.
+func _lap_splits(stats: Dictionary) -> Array:
+	var splits: Array = stats.get("lap_splits", [])
+	if splits.size() != checkpoints.size():
+		splits = []
+		splits.resize(checkpoints.size())
+		splits.fill(-1)
+		stats["lap_splits"] = splits
+	return splits
+
+
+## A lap's length along the racing line (a point-to-point stage's is to the finish).
+func _lap_length() -> float:
+	return _finish_offset() if is_point_to_point else track_length
+
+
+func _car_name(id: int) -> String:
+	var idx := 0
+	if NetworkManager.players.has(id):
+		idx = int(NetworkManager.players[id].get("car_index", 0))
+	var presets: Array = preload("res://PlayerCart.gd").CAR_PRESETS
+	return str(presets[clampi(idx, 0, presets.size() - 1)].name)
+
+
+## A human finished (server): in a time trial the run goes into TimeTrialRecords, and the HUD shows its time
+## against the best before it.
+func _record_run(id: int) -> void:
+	var stats: Dictionary = player_stats[id]
+	if not NetworkManager.players.has(id) or NetworkManager.players[id].get("is_ai", false):
+		return
+	var total: int = int(stats.get("finish_ms", 0))
+	var prev := 0
+	if _is_time_trial():
+		prev = TimeTrialRecords.submit_run(TimeTrialRecords.key_of(scene_file_path), stats.get("lap_times", []),
+				total, _car_name(id), bool(stats.get("run_clean", true)))
+		stats["prev_run_ms"] = prev
+	_send_timing(id, &"timing_finish", [total, prev, bool(stats.get("run_clean", true))])
+
+
+## Every HUD on this peer starts its lap timer at the green light (RaceUI.timing_start): the stage's lap
+## record and, in a time trial, the best run and the gates' times on the best lap to show splits against.
+func _start_lap_timers() -> void:
+	if NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR:
+		return
+	var key := TimeTrialRecords.key_of(scene_file_path)
+	var cfg := ConfigFile.new()
+	cfg.load(LAP_RECORDS_PATH)
+	var record: int = int(cfg.get_value("records", key, 0))
+	var tt: Dictionary = TimeTrialRecords.stage(key) if _is_time_trial() else {}
+	for ui in _all_race_uis():
+		if ui.has_method("timing_start"):
+			ui.timing_start(checkpoints.size(), get_target_laps(), record, tt, _is_time_trial())
+
+
+const _TIMING_CALLS := [&"timing_gate", &"timing_lap", &"timing_finish"]
+
+## A lap timer event for human `id`'s HUD (server): a gate's split, a lap, the finish.
+func _send_timing(id: int, method: StringName, args: Array) -> void:
+	if not NetworkManager.players.has(id) or NetworkManager.players[id].get("is_ai", false):
+		return
+	if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
+		var ui = race_ui if id == 1 else race_ui_p2
+		if ui and ui.has_method(method):
+			ui.callv(method, args)
+	elif id == multiplayer.get_unique_id():
+		_timing_rpc(method, args)
+	elif multiplayer.multiplayer_peer != null:
+		_timing_rpc.rpc_id(id, method, args)
+
+
+@rpc("authority", "call_local", "reliable")
+func _timing_rpc(method: StringName, args: Array) -> void:
+	if race_ui and _TIMING_CALLS.has(method) and race_ui.has_method(method):
+		race_ui.callv(method, args)
 
 
 func _setup_chasm_pit_water() -> void:

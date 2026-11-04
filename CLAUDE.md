@@ -553,7 +553,8 @@ The race calls are `voice/lola/` clips, listed per line with their takes in `Mus
 `play_voice(line)` picks a take at random. Level calls 3/2/1/go in the countdown, and at each gate the
 player is counted for (`_play_lap_cue`) the chime `sounds/checkpoint_passed.wav` plus a call: "checkpoint",
 "final lap" when they cross the line onto the last lap, "finish" at the line, and then the place if it's
-first to third (`_announce_place`). The podium calls each place as it's revealed.
+first to third (`_announce_place`). The podium calls each place as it's revealed. In a time trial there is no
+RaceCommentator (its "and they're off", the lead, the places) and no place call: one racer against the clock.
 - A human who drives on past the gate they need without being counted gets "checkpoint missed"
   (`_watch_missed_checkpoints`, server). It follows the cart along the racing line like the AI's gate
   credit does, and fires as the cart passes `MISS_DISTANCE` (14m; a gate's area is 8m deep) beyond the
@@ -574,6 +575,9 @@ first to third (`_announce_place`). The podium calls each place as it's revealed
   it keeps them in the race. Missing that one too, two in a row, disqualifies them (`_disqualify`: the
   "disqualified" call, the cart drives itself as after the finish, it ranks last as DQ and scores nothing).
   The line on the last lap can't be skipped. Once no human is still racing, the race ends 10s later.
+- A bot that drives through a later gate than the one it needs, near that gate on the lap, gets the gates between and
+  its racing-line tracker is put on that gate (`_catch_up_bot`): on Mina del Viento's open pit floor one went wide of a
+  gate, its tracker lost the line, and it passed every gate after uncounted and drove off the end of the stage.
 - Driving the wrong way (`_watch_wrong_way`, server, humans): velocity against every lap path within 14m
   (`_lap_tangents_near`: where a shortcut crosses the road either way is right) for 2.5s gives "wrong
   way" and an alert chime, again every 7s while it lasts.
@@ -973,8 +977,9 @@ table-top and a roller on a flat road.
 - `ItemSymbols.gd` holds the seven symbols (flame, rocket, rocket and reticle, shield, rings, bomb, bolt) as
   strokes in a -1..1 square; `ItemSymbolIcon.gd` draws them in the HUD's item slots and the kill feed (white
   over a soft dark edge). `res://scratch/item_symbols_preview.tscn -- <dir>` (windowed) shows boxes and icons.
-- Time trial: no boxes at all (Level frees the levels' own too), and each lap starts with two boosts in the
-  slots (`_give_lap_boosts`, `PlayerCart.set_lap_boosts`). `res://scratch/time_trial_items_check.tscn`.
+- Time trial: no boxes at all (Level frees the levels' own too). The run starts with one boost in the slots
+  (`_give_start_boost`) and every gate that counts adds one (`_give_gate_boost`, `PlayerCart.give_boost`, up to the two
+  slots; none at the final line). See "Time trial and lap times".
 - The glass is premultiplied: ALBEDO is the light it gives off, ALPHA how much it dims what's behind it. Back
   faces draw at 45%, which gives the far edges. Its even `fill` stays low because it lays cyan over the symbol.
 - The symbol turns about world up to face the camera in its vertex shader (BILLBOARD_FIXED_Y's matrix), so it
@@ -1902,7 +1907,16 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 - F (pad Y) lifts the car (`LIFT_TIME`): the carriages rise to its underside (`_underside`: the body's lowest vertex
   between the axles, not the wheels), then car and arms together by `LIFT_HEIGHT`, and the camera orbits it from any
   side and from below (kept over the plinth's top and out of the walls), an inspection lamp under it lit while it is
-  up. The camera blends between the eye and the orbit (`CAM_BLEND_TIME`); no head bob (motion comfort).
+  up. The camera blends between the eye and the orbit (`CAM_BLEND_TIME`).
+- Walking (`_update_steps`): a light head bob and footsteps (`sounds/garage/footstep_1/2.mp3`, alternating feet, pitch
+  and level varied), a step every `STEP_LENGTH` (0.95m; `STEP_LENGTH_RUN` 1.55m running: about 3 and 3.7 a second).
+  The head dips `BOB_DROP` (1.8cm; `BOB_RUN` times running) as each foot lands and sways `BOB_SWAY` over it, no roll,
+  easing in and out with the speed (motion comfort: the user asked for a light one). `res://scratch/garage_steps_test.tscn`
+  (headless, `--fixed-fps 60`) walks and runs with real key events and prints the cadence, dip and sway.
+- Time trial records (`TimeTrialRecords.gd`): a board per Grand Prix on the trophy hall's side walls
+  (`_build_record_boards`, `RECORD_BOARD_*`), each stage's best run and best lap, the car and date, reading round the
+  hall from the door (down the left wall, the cups, back up the right). `garage_shots ... trophies=demo` records
+  made-up runs too (and prints where the hall is).
 - Trophies (`Trophies.gd`, user://trophies.cfg): `Main._show_gp_podium_impl` records one per finished Grand Prix for
   the best local place in the top three (`Podium.local_names()`), only if it started from stage 1
   (`NetworkManager.gp_trophy_eligible`, cleared by GP TEST from a later stage). The hall shows a pedestal per cup
@@ -2471,6 +2485,16 @@ Rebuilt on 2026-11-02 (Gemini's first version had a pit unrelated to its road, t
   (PlayerCart's general water branch reads them now) keep it to the pond, or the mouth and the valley, which lie below
   its surface, would flood every engine. `res://scratch/pond_drop_test.tscn -- <level> x,z ...` (headless) drops a held
   cart at each spot and reports the water level, whether it went under and drowned. Bots don't drown there.
+- Bumps (`BUMP`, `_plan_bumps`, `_bump_at`): mounds of spilled ore, 1m high, about 9m long, covering half the road on one
+  side (sides alternate), so a driver takes one for the air or steers round it: down the ramp every `BUMP_EVERY`, on the
+  floor's straights, two staggered in the mouth, none within `BUMP_KEEP` of a gate or boost pad. Raised into the
+  heightfield (the pit's 2.5m grid) and painted paler (UV.y, the drift channel; the bodies don't change).
+- The rope shovel's crawlers (`MinaKit._crawler`): a chain of shoes (grouser outside, drive lug inside) round the drive
+  sprocket (rear, its teeth showing) and the idler, the side frame between the runs with ribs, lower and carrier rollers,
+  hubs with bolt circles, the propel gearbox; a toothed swing ring, ribbed house walls, a door, roof cabinets, work lamps,
+  a boarding stair, the boom's plates, walkway rail and lamps. The trucks flickered where faces lay in one plane (the
+  body's front wall and its lining, the canopy and the deck against it, the cab front and its trim):
+  `scratch/zfight_scan.gd -- res://generated/minaprop_haul_truck_1.res ...` lists what's left (railing posts, hidden).
 - Safety berms (`BERMS`, `_build_berms`, `mina_rubble.gdshader`): rubble windrows on the drop side of the shelf road and down
   the ramp, their collider a steeper, taller wall than the heap (a cart glances off instead of riding over the edge).
 - Set pieces are `MinaKit.gd` (life size, grown by `PROP_SCALE` 1.6; balloons 1.5, dishes 1.25), meshes and materials
@@ -2510,3 +2534,25 @@ Rebuilt on 2026-11-02 (Gemini's first version had a pit unrelated to its road, t
   `scratch/race_cam_shots.tscn -- <dir> level=res://levels/MinaLevel.tscn every=5 count=22` rides through the storm.
   The menu tile is `res://scratch/render_mina_shot.tscn` (windowed).
 - Cost (M1, scratch/bench.tscn, 1280x720): about 37ms GPU on average, 610 draws (Freight Line measured 64ms in the same run).
+
+## Time trial and lap times
+
+- `TimeTrialRecords.gd` (user://time_trial_records.cfg, per stage keyed by the level's file name): the best run
+  (total, its laps, car, date), the best lap with its gates' times (`lap_splits`, the last is the lap), and the
+  number of finished runs. Level records them for the human in a time trial (server): a lap when clean
+  (`_lap_completed`), a run at the finish when every lap was clean (`_record_run`). `lap_records.cfg` (the
+  announcer's "new lap record", any mode) is kept as before.
+- Level times every racer: `_grant_checkpoint` notes the split at each gate (`lap_splits`, by gate index, -1 for a
+  missed one), `_lap_completed` the lap (`lap_times`; a lap faster than 70 m/s along `_lap_length()` isn't clean),
+  `_check_finish` the run (`finish_ms`, the laps' sum). The human's HUD hears of each (`_send_timing`: a gate, a lap,
+  the finish; RPC'd to a remote player, straight to the right HUD in split screen), and every HUD starts its clock at
+  the green light (`_start_lap_timers`) with the stage's lap record and, in a time trial, the stored best lap's splits.
+- `RaceUI`'s lap timer (`timing_*`, under the minimap): the running lap (or stage) time in tabular figures, the delta
+  at each gate against the reference lap's split there (green faster, red slower; the reference is the stored time
+  trial best lap, then the session's best clean lap), the lap's delta or RECORD, LAST / BEST / RECORD, and in a time
+  trial RUN and BEST RUN. A time trial hides the position and the standings. The end screen shows TIME (the
+  winner's, then gaps) and BEST LAP (the race's fastest in green) per racer; a time trial's is a lap sheet: each lap,
+  the fastest marked, the total against the best run, the records.
+- `res://scratch/time_trial_items_check.tscn -- [res://levels/X.tscn] [lap=62]` (headless) runs a real time trial,
+  granting the gates with faked lap times: boosts, no boxes or commentator, the HUD's laps, the saved records and the
+  end screen's sheet (the player's records files are put back).

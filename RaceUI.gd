@@ -34,6 +34,7 @@ func set_terrain_clipped(is_clipped: bool):
 		terrain_clip_overlay.visible = false
 
 func _process(delta: float) -> void:
+	_update_timing()
 	if terrain_clip_overlay == null:
 		return
 	if absf(_terrain_clip_alpha - _terrain_clip_target) < 0.001 and _terrain_clip_target <= 0.0:
@@ -627,67 +628,11 @@ func display_race_results(results_data: Array):
 		for child in results_container.get_children():
 			child.queue_free()
 			
-	var header = HBoxContainer.new()
-	header.custom_minimum_size = Vector2(400, 0)
-	
-	var h_pos = Label.new()
-	h_pos.text = "POS"
-	h_pos.custom_minimum_size = Vector2(50, 0)
-	h_pos.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	header.add_child(h_pos)
-	
-	var h_name = Label.new()
-	h_name.text = "NAME"
-	h_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(h_name)
-	
-	if is_gp:
-		var h_pts = Label.new()
-		h_pts.text = "PTS"
-		h_pts.custom_minimum_size = Vector2(80, 0)
-		h_pts.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		header.add_child(h_pts)
-		
-		var h_total = Label.new()
-		h_total.text = "TOTAL"
-		h_total.custom_minimum_size = Vector2(80, 0)
-		h_total.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		header.add_child(h_total)
-		
-	results_container.add_child(header)
-	
-	var sep = HSeparator.new()
-	results_container.add_child(sep)
-	
-	for r in results_data:
-		var row = HBoxContainer.new()
-		
-		var r_pos = Label.new()
-		r_pos.text = "DQ" if r.get("dq", false) else "%d" % r["pos"]
-		r_pos.custom_minimum_size = Vector2(50, 0)
-		r_pos.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		row.add_child(r_pos)
-		
-		var r_name = Label.new()
-		r_name.text = r["name"]
-		r_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(r_name)
-		
-		if is_gp:
-			var r_pts = Label.new()
-			r_pts.text = "+%d" % r.get("round_points", 0)
-			r_pts.custom_minimum_size = Vector2(80, 0)
-			r_pts.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-			row.add_child(r_pts)
-			
-			var r_total = Label.new()
-			r_total.text = "%d" % r.get("total_points", 0)
-			r_total.custom_minimum_size = Vector2(80, 0)
-			r_total.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-			row.add_child(r_total)
-			
-		results_container.add_child(row)
-		
+	if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL:
+		_build_tt_results(results_data)
+	else:
+		_build_results_table(results_data, is_gp)
+
 	# Post-race track voting for multiplayer single stages:
 	if is_mp_single_stages:
 		_setup_track_voting_panel(vbox)
@@ -939,3 +884,406 @@ func _input(event: InputEvent):
 		if main and main.has_method("_input"):
 			main._input(event)
 
+
+
+# ============================================================================================
+#  The lap timer (Level.gd feeds it: timing_start at the green light, then a gate's split, a lap, the finish)
+# ============================================================================================
+
+const TTR = preload("res://TimeTrialRecords.gd")
+const COL_T_TEXT := Color(0.93, 0.95, 0.98)
+const COL_T_DIM := Color(0.62, 0.68, 0.76)
+const COL_T_GOLD := Color(1.0, 0.8, 0.25)
+const COL_T_FAST := Color(0.35, 0.95, 0.5)
+const COL_T_SLOW := Color(1.0, 0.38, 0.32)
+## How long a split or lap delta stays up (ms).
+const T_DELTA_SHOW := 3500
+
+var timing_panel: PanelContainer = null
+var _t_clock: Label
+var _t_delta: Label
+var _t_tag: Label
+var _t_rows := {}            # name -> value Label
+var _t_running := false
+var _t_finished := false
+var _t_lap_start := 0        # ticks msec, this machine's clock
+var _t_go := 0
+var _t_cp_count := 0
+var _t_laps := 1
+var _t_tt := false
+var _t_record := 0           # the stage's lap record (any mode)
+var _t_best := 0             # this session's best clean lap
+var _t_ref_lap := 0          # the lap the splits are against: the best of the record's and the session's
+var _t_ref_splits: Array = []
+var _t_best_run := 0         # time trial: the best run before this one
+var _t_delta_until := 0
+var _t_lap_times: Array = []
+var _t_lap_clean: Array = []
+var _t_total := 0
+
+
+## The lights went green. `tt` is the time trial's records for the stage (TimeTrialRecords.stage), or empty.
+func timing_start(cp_count: int, laps: int, record_ms: int, tt: Dictionary, is_tt: bool) -> void:
+	_t_cp_count = cp_count
+	_t_laps = maxi(1, laps)
+	_t_tt = is_tt
+	_t_record = record_ms
+	_t_best = 0
+	_t_ref_lap = 0
+	_t_ref_splits = []
+	_t_best_run = int(tt.get("run_ms", 0)) if int(tt.get("run_laps", 0)) == _t_laps else 0
+	var tt_lap := int(tt.get("lap_ms", 0))
+	var tt_splits: Array = tt.get("lap_splits", [])
+	if tt_lap > 0 and tt_splits.size() == cp_count:
+		_t_ref_lap = tt_lap
+		_t_ref_splits = tt_splits.duplicate()
+	_t_lap_times = []
+	_t_lap_clean = []
+	_t_total = 0
+	_t_finished = false
+	_t_go = Time.get_ticks_msec()
+	_t_lap_start = _t_go
+	_t_running = true
+	_t_delta_until = 0
+	_build_timing_panel()
+	timing_panel.show()
+	# One racer against the clock: no place to show.
+	var pos_box := get_node_or_null("HUDPanel/PositionContainer") as Control
+	if pos_box:
+		pos_box.visible = not is_tt
+	if standings_panel:
+		standings_panel.visible = not is_tt
+	_refresh_timing_rows()
+
+
+## A gate counted, `split_ms` into the lap: its split against the reference lap's at that gate.
+func timing_gate(cp_idx: int, split_ms: int) -> void:
+	if cp_idx >= 0 and cp_idx < _t_ref_splits.size() and int(_t_ref_splits[cp_idx]) > 0:
+		_show_delta(split_ms - int(_t_ref_splits[cp_idx]), "GATE %d" % (cp_idx + 1))
+
+
+## A lap ended (the server's time for it). `splits` are its gates' times, the line's last.
+func timing_lap(lap_ms: int, clean: bool, splits: Array) -> void:
+	var now := Time.get_ticks_msec()
+	_t_lap_start = now
+	_t_lap_times.append(lap_ms)
+	_t_lap_clean.append(clean)
+	var tag := "LAP %d" % _t_lap_times.size() if _t_laps > 1 else "STAGE"
+	if not clean:
+		_show_delta_text("MISSED GATE", COL_T_SLOW, tag)
+	elif _t_record <= 0 or lap_ms < _t_record:
+		_show_delta_text("RECORD " + TTR.format_delta(lap_ms - _t_record) if _t_record > 0 else "LAP RECORD", COL_T_GOLD, tag)
+	elif _t_ref_lap > 0:
+		_show_delta(lap_ms - _t_ref_lap, tag)
+	if clean:
+		if _t_best <= 0 or lap_ms < _t_best:
+			_t_best = lap_ms
+		if _t_record <= 0 or lap_ms < _t_record:
+			_t_record = lap_ms
+		if (_t_ref_lap <= 0 or lap_ms < _t_ref_lap) and splits.size() == _t_cp_count and not splits.has(-1):
+			_t_ref_lap = lap_ms
+			_t_ref_splits = splits.duplicate()
+	_refresh_timing_rows()
+
+
+## The run is over: `total_ms` from the green light; `prev_best` the best run before it (time trial, 0 none).
+func timing_finish(total_ms: int, prev_best: int, clean: bool) -> void:
+	_t_running = false
+	_t_finished = true
+	_t_total = total_ms
+	if _t_clock:
+		_t_clock.text = TTR.format_ms(total_ms)
+		_t_clock.modulate = COL_T_GOLD
+	if _t_tt:
+		var text := "FINISH  " + TTR.format_ms(total_ms)
+		if clean and (prev_best <= 0 or total_ms < prev_best):
+			_show_delta_text("BEST RUN" + ("  " + TTR.format_delta(total_ms - prev_best) if prev_best > 0 else ""), COL_T_GOLD, "RUN")
+			text += "\nNEW BEST RUN!"
+			_t_delta_until = Time.get_ticks_msec() + 600000
+		elif prev_best > 0:
+			_show_delta(total_ms - prev_best, "RUN")
+			_t_delta_until = Time.get_ticks_msec() + 600000
+		show_message(text, 6.0)
+		if clean and (_t_best_run <= 0 or total_ms < _t_best_run):
+			_t_best_run = total_ms
+	_refresh_timing_rows()
+
+
+func _show_delta(ms: int, tag: String) -> void:
+	_show_delta_text(TTR.format_delta(ms), COL_T_FAST if ms < 0 else COL_T_SLOW, tag)
+
+
+func _show_delta_text(text: String, col: Color, tag: String) -> void:
+	if _t_delta == null:
+		return
+	_t_delta.text = text
+	_t_delta.modulate = col
+	_t_tag.text = tag
+	_t_delta_until = Time.get_ticks_msec() + T_DELTA_SHOW
+
+
+func _update_timing() -> void:
+	if timing_panel == null or not timing_panel.visible:
+		return
+	var now := Time.get_ticks_msec()
+	if _t_running:
+		_t_clock.text = TTR.format_ms(maxi(1, now - _t_lap_start))
+		if _t_rows.has("RUN"):
+			(_t_rows["RUN"] as Label).text = TTR.format_ms(maxi(1, now - _t_go))
+	var show := now < _t_delta_until
+	_t_delta.visible = show
+	_t_tag.visible = show
+
+
+func _refresh_timing_rows() -> void:
+	if timing_panel == null:
+		return
+	var last: int = int(_t_lap_times[-1]) if not _t_lap_times.is_empty() else 0
+	_set_row("LAST", TTR.format_ms(last), COL_T_TEXT if _t_lap_clean.is_empty() or _t_lap_clean[-1] else COL_T_SLOW)
+	_set_row("BEST", TTR.format_ms(_t_best), COL_T_FAST if _t_best > 0 and _t_best <= _t_record else COL_T_TEXT)
+	_set_row("RECORD", TTR.format_ms(_t_record), COL_T_GOLD)
+	if _t_rows.has("RUN") and _t_finished:
+		_set_row("RUN", TTR.format_ms(_t_total), COL_T_GOLD)
+	if _t_rows.has("BEST RUN"):
+		_set_row("BEST RUN", TTR.format_ms(_t_best_run), COL_T_GOLD)
+
+
+func _set_row(row_name: String, text: String, col: Color) -> void:
+	if _t_rows.has(row_name):
+		var l: Label = _t_rows[row_name]
+		l.text = text
+		l.modulate = col
+
+
+func _timing_font() -> Font:
+	# Tabular figures, so the running clock doesn't jitter.
+	var fv := FontVariation.new()
+	fv.base_font = ThemeDB.fallback_font
+	var ts := TextServerManager.get_primary_interface()
+	fv.opentype_features = {ts.name_to_tag("tnum"): 1}
+	return fv
+
+
+func _build_timing_panel() -> void:
+	if timing_panel != null:
+		timing_panel.queue_free()
+	_t_rows = {}
+	var font := _timing_font()
+	timing_panel = PanelContainer.new()
+	timing_panel.name = "LapTimer"
+	timing_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	timing_panel.anchor_left = 1.0
+	timing_panel.anchor_right = 1.0
+	timing_panel.offset_left = -220.0
+	timing_panel.offset_right = -20.0
+	timing_panel.offset_top = 232.0
+	timing_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.04, 0.05, 0.07, 0.58)
+	style.border_color = Color(1.0, 0.7, 0.15, 0.32) if _t_tt else Color(0.0, 0.8, 1.0, 0.28)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(8)
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 6
+	style.content_margin_bottom = 8
+	timing_panel.add_theme_stylebox_override("panel", style)
+	var box := VBoxContainer.new()
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_theme_constant_override("separation", 0)
+	timing_panel.add_child(box)
+	var head := Label.new()
+	head.text = "TIME TRIAL" if _t_tt else ("STAGE TIME" if _t_laps <= 1 else "LAP TIME")
+	head.add_theme_font_size_override("font_size", 12)
+	head.modulate = COL_T_GOLD if _t_tt else COL_T_DIM
+	box.add_child(head)
+	_t_clock = Label.new()
+	_t_clock.text = TTR.format_ms(0)
+	_t_clock.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_t_clock.add_theme_font_override("font", font)
+	_t_clock.add_theme_font_size_override("font_size", 34)
+	_t_clock.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+	_t_clock.add_theme_constant_override("outline_size", 4)
+	box.add_child(_t_clock)
+	var drow := HBoxContainer.new()
+	drow.custom_minimum_size = Vector2(0, 24)
+	box.add_child(drow)
+	_t_tag = Label.new()
+	_t_tag.add_theme_font_size_override("font_size", 13)
+	_t_tag.modulate = COL_T_DIM
+	_t_tag.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_t_tag.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	drow.add_child(_t_tag)
+	_t_delta = Label.new()
+	_t_delta.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_t_delta.add_theme_font_override("font", font)
+	_t_delta.add_theme_font_size_override("font_size", 20)
+	_t_delta.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+	_t_delta.add_theme_constant_override("outline_size", 3)
+	drow.add_child(_t_delta)
+	box.add_child(HSeparator.new())
+	var rows: Array = ["LAST", "BEST", "RECORD"] if _t_laps > 1 else ["RECORD"]
+	if _t_tt and _t_laps > 1:
+		rows = ["RUN", "BEST RUN", "LAST", "BEST", "RECORD"]
+	elif _t_tt:
+		rows = ["BEST RUN"]
+	for r in rows:
+		var row := HBoxContainer.new()
+		box.add_child(row)
+		var k := Label.new()
+		k.text = r
+		k.add_theme_font_size_override("font_size", 13)
+		k.modulate = COL_T_DIM
+		k.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(k)
+		var v := Label.new()
+		v.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		v.add_theme_font_override("font", font)
+		v.add_theme_font_size_override("font_size", 16)
+		row.add_child(v)
+		_t_rows[r] = v
+	hud_panel.add_child(timing_panel)
+	_t_delta.visible = false
+	_t_tag.visible = false
+
+
+func _results_label(text: String, width: float, align := HORIZONTAL_ALIGNMENT_RIGHT, col := Color(1, 1, 1, 1),
+		size := 0, mono := false) -> Label:
+	var l := Label.new()
+	l.text = text
+	if width > 0.0:
+		l.custom_minimum_size = Vector2(width, 0)
+	else:
+		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	l.horizontal_alignment = align
+	l.modulate = col
+	if size > 0:
+		l.add_theme_font_size_override("font_size", size)
+	if mono:
+		l.add_theme_font_override("font", _timing_font())
+	return l
+
+
+## The race's table: place, name, time (the winner's, then the gap), best lap, and in a Grand Prix the points.
+func _build_results_table(results_data: Array, is_gp: bool) -> void:
+	var header := HBoxContainer.new()
+	header.custom_minimum_size = Vector2(640 if is_gp else 520, 0)
+	header.add_child(_results_label("POS", 50, HORIZONTAL_ALIGNMENT_CENTER, COL_T_DIM))
+	header.add_child(_results_label("NAME", 0, HORIZONTAL_ALIGNMENT_LEFT, COL_T_DIM))
+	header.add_child(_results_label("TIME", 120, HORIZONTAL_ALIGNMENT_RIGHT, COL_T_DIM))
+	header.add_child(_results_label("BEST LAP", 120, HORIZONTAL_ALIGNMENT_RIGHT, COL_T_DIM))
+	if is_gp:
+		header.add_child(_results_label("PTS", 60, HORIZONTAL_ALIGNMENT_RIGHT, COL_T_DIM))
+		header.add_child(_results_label("TOTAL", 70, HORIZONTAL_ALIGNMENT_RIGHT, COL_T_DIM))
+	results_container.add_child(header)
+	results_container.add_child(HSeparator.new())
+
+	var winner_ms := 0
+	var fastest := 0
+	for r in results_data:
+		if int(r.get("time_ms", 0)) > 0 and not r.get("dq", false) and (winner_ms <= 0 or int(r["time_ms"]) < winner_ms):
+			winner_ms = int(r["time_ms"])
+		var b := _best_of(r.get("laps_ms", []))
+		if b > 0 and (fastest <= 0 or b < fastest):
+			fastest = b
+	var me := multiplayer.get_unique_id() if multiplayer.multiplayer_peer != null else 1
+	for r in results_data:
+		var row := HBoxContainer.new()
+		var dq: bool = r.get("dq", false)
+		var col := Color(1, 1, 1, 1)
+		if not bool(r.get("is_bot", true)) and NetworkManager.players.has(me) and str(NetworkManager.players[me].get("name", "")) == str(r["name"]):
+			col = COL_T_GOLD
+		row.add_child(_results_label("DQ" if dq else "%d" % r["pos"], 50, HORIZONTAL_ALIGNMENT_CENTER, col))
+		row.add_child(_results_label(str(r["name"]), 0, HORIZONTAL_ALIGNMENT_LEFT, col))
+		var t := int(r.get("time_ms", 0))
+		var t_text := "DQ" if dq else ("DNF" if t <= 0 else (TTR.format_ms(t) if t == winner_ms else TTR.format_delta(t - winner_ms)))
+		row.add_child(_results_label(t_text, 120, HORIZONTAL_ALIGNMENT_RIGHT, col, 0, true))
+		var b := _best_of(r.get("laps_ms", []))
+		row.add_child(_results_label(TTR.format_ms(b) if b > 0 else "-", 120, HORIZONTAL_ALIGNMENT_RIGHT,
+				COL_T_FAST if b > 0 and b == fastest else col, 0, true))
+		if is_gp:
+			row.add_child(_results_label("+%d" % r.get("round_points", 0), 60, HORIZONTAL_ALIGNMENT_RIGHT, col))
+			row.add_child(_results_label("%d" % r.get("total_points", 0), 70, HORIZONTAL_ALIGNMENT_RIGHT, col))
+		results_container.add_child(row)
+
+
+func _best_of(laps: Array) -> int:
+	var best := 0
+	for v in laps:
+		if int(v) > 0 and (best <= 0 or int(v) < best):
+			best = int(v)
+	return best
+
+
+## A time trial's sheet: each lap (the fastest marked) and the total, against the stage's records as they are now.
+func _build_tt_results(results_data: Array) -> void:
+	var r: Dictionary = {}
+	for row in results_data:
+		if not bool(row.get("is_bot", false)):
+			r = row
+			break
+	if r.is_empty() and not results_data.is_empty():
+		r = results_data[0]
+	var stage_path: String = NetworkManager.time_trial_stage
+	var stage_name := stage_path.get_file().get_basename()
+	for st in NetworkManager.ALL_STAGES:
+		if st["path"] == stage_path:
+			stage_name = st["name"]
+	var title := get_node_or_null("EndPanel/VBoxContainer/LabelFinished") as Label
+	if title:
+		title.text = "TIME TRIAL · %s" % stage_name.to_upper()
+	var key := TTR.key_of(stage_path)
+	var rec: Dictionary = TTR.stage(key)
+	var cfg := ConfigFile.new()
+	cfg.load("user://lap_records.cfg")
+	var lap_record := int(cfg.get_value("records", key, 0))
+
+	var laps: Array = r.get("laps_ms", [])
+	var total := int(r.get("time_ms", 0))
+	var best := _best_of(laps)
+	var box := VBoxContainer.new()
+	box.custom_minimum_size = Vector2(460, 0)
+	box.add_theme_constant_override("separation", 4)
+	results_container.add_child(box)
+	if bool(r.get("dq", false)):
+		box.add_child(_results_label("DISQUALIFIED: two gates missed in a row", 0, HORIZONTAL_ALIGNMENT_CENTER, COL_T_SLOW, 20))
+	if laps.size() > 1:
+		for i in laps.size():
+			var row := HBoxContainer.new()
+			var v := int(laps[i])
+			row.add_child(_results_label("LAP %d" % (i + 1), 90, HORIZONTAL_ALIGNMENT_LEFT, COL_T_DIM, 20))
+			row.add_child(_results_label(TTR.format_ms(v), 0, HORIZONTAL_ALIGNMENT_RIGHT,
+					COL_T_FAST if v == best else Color(1, 1, 1, 1), 22, true))
+			var note := ""
+			if v == best and v > 0 and v <= lap_record:
+				note = "LAP RECORD"
+			elif v == best:
+				note = "FASTEST"
+			row.add_child(_results_label(note, 130, HORIZONTAL_ALIGNMENT_RIGHT, COL_T_GOLD if note == "LAP RECORD" else COL_T_FAST, 14))
+			box.add_child(row)
+		box.add_child(HSeparator.new())
+	var trow := HBoxContainer.new()
+	trow.add_child(_results_label("TOTAL", 90, HORIZONTAL_ALIGNMENT_LEFT, COL_T_GOLD, 22))
+	trow.add_child(_results_label(TTR.format_ms(total) if total > 0 else "DNF", 0, HORIZONTAL_ALIGNMENT_RIGHT, COL_T_GOLD, 30, true))
+	var prev := int(r.get("prev_run_ms", 0))
+	var tnote := ""
+	var tcol := COL_T_DIM
+	if total > 0 and not bool(r.get("run_clean", true)):
+		tnote = "GATE MISSED"
+		tcol = COL_T_SLOW
+	elif total > 0 and (prev <= 0 or total < prev):
+		tnote = "NEW BEST RUN" + ("\n" + TTR.format_delta(total - prev) if prev > 0 else "")
+		tcol = COL_T_GOLD
+	elif total > 0 and prev > 0:
+		tnote = TTR.format_delta(total - prev) + "\nVS BEST RUN"
+		tcol = COL_T_SLOW
+	trow.add_child(_results_label(tnote, 130, HORIZONTAL_ALIGNMENT_RIGHT, tcol, 14))
+	box.add_child(trow)
+	box.add_child(HSeparator.new())
+	var recs := HBoxContainer.new()
+	recs.add_child(_results_label("BEST RUN  %s" % TTR.format_ms(int(rec["run_ms"])), 0, HORIZONTAL_ALIGNMENT_LEFT, COL_T_DIM, 15, true))
+	recs.add_child(_results_label("LAP RECORD  %s" % TTR.format_ms(lap_record), 0, HORIZONTAL_ALIGNMENT_RIGHT, COL_T_DIM, 15, true))
+	box.add_child(recs)
+	var runs := int(rec["runs"])
+	var sub := "%d RUN%s ON THIS STAGE  ·  RECORDS IN THE GARAGE'S HALL OF FAME" % [runs, "" if runs == 1 else "S"]
+	box.add_child(_results_label(sub, 0, HORIZONTAL_ALIGNMENT_CENTER, Color(COL_T_DIM, 0.75), 12))

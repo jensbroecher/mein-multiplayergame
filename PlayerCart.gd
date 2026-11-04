@@ -5121,6 +5121,12 @@ func set_lap_boosts(count: int) -> void:
 	if is_local_player and race_ui:
 		race_ui.update_items(ItemType.keys()[current_item], ItemType.keys()[current_item_2])
 
+## Time trial: a gate's boost into the first empty slot (with both full, nothing changes: they hold boosts).
+func give_boost() -> void:
+	if current_item != ItemType.NONE and current_item_2 != ItemType.NONE:
+		return
+	give_item(ItemType.BOOST)
+
 @rpc("any_peer", "call_local", "reliable")
 func give_item_rpc(type: int):
 	give_item(type)
