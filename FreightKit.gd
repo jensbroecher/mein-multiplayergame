@@ -460,40 +460,123 @@ static func clatter() -> AudioStreamWAV:
 const DARK_HAND := Color(0.06, 0.06, 0.06)
 
 
-## A water tower: a tank on eight braced legs under a conical roof, with a ladder and a spout. Origin on the
-## ground at the middle, life size, 17m tall.
+## A railway water tower: a timber tank on eight raking legs, origin on the ground at the middle, life size, about 17m
+## tall. Everything is placed from the legs' own line (`_leg_r`): two rings of struts bolted to them, crossed iron
+## rods in every bay on the outer faces, joists under the tank on a ring beam over the legs' heads, a deck with a
+## railing round the tank's foot. A ladder runs up a leg to the deck and on up the tank to the roof. The spout is
+## the tank's outlet for filling steam locomotives' tenders: hinged on the tank's side toward -z (the track), swung up
+## and stowed, held by a chain over a pulley to a counterweight; a relic since the diesels came.
 static func water_tower(pk: PropKit, kit: Dictionary) -> void:
 	var tank_y := 11.0
 	var r := 3.9
+	var leg_col := Color(0.30, 0.20, 0.14)
+	var iron := Color(0.20, 0.19, 0.18)
+	var r0 := 5.2
+	var r1 := r - 0.5
+	var leg_r := func(h: float) -> float: return lerpf(r0, r1, h / tank_y)
+	var leg_at := func(k: int, h: float) -> Vector3:
+		var a: float = TAU * float(k) / 8.0
+		var rr: float = leg_r.call(h)
+		return Vector3(cos(a) * rr, h, sin(a) * rr)
+	# Concrete footings and the legs (square timbers, a face toward the middle).
 	for k in 8:
-		var a: float = TAU * k / 8.0
-		var foot := Vector3(cos(a) * 5.4, 0, sin(a) * 5.4)
-		var top := Vector3(cos(a) * (r - 0.3), tank_y, sin(a) * (r - 0.3))
-		pk.beam(kit, "steel", foot, top, 0.42, 0.42, Color(0.30, 0.20, 0.14))
+		var a: float = TAU * float(k) / 8.0
+		var tang := Vector3(-sin(a), 0, cos(a))
+		var foot: Vector3 = leg_at.call(k, 0.0)
+		pk.block(kit, "steel", foot + Vector3(-0.45, -0.3, -0.45), foot + Vector3(0.45, 0.35, 0.45), Color(0.62, 0.60, 0.56))
+		pk.beam(kit, "steel", foot + Vector3(0, 0.35, 0), leg_at.call(k, tank_y - 0.35), 0.42, 0.42, leg_col, tang)
+	# Struts in two rings, on the legs' inner faces, flat.
+	var levels := [3.6, 7.3]
+	for h in levels:
+		for k in 8:
+			var p0: Vector3 = leg_at.call(k, h)
+			var p1: Vector3 = leg_at.call((k + 1) % 8, h)
+			var inward0: Vector3 = -Vector3(p0.x, 0, p0.z).normalized() * 0.26
+			var inward1: Vector3 = -Vector3(p1.x, 0, p1.z).normalized() * 0.26
+			pk.beam(kit, "steel", p0 + inward0, p1 + inward1, 0.22, 0.26, leg_col.darkened(0.1), Vector3.UP)
+	# Crossed iron rods on the outer faces of each bay (ground to the first ring, and between the rings), with
+	# turnbuckles at their middles.
+	var bands := [[0.6, 3.6], [3.6, 7.3], [7.3, tank_y - 0.6]]
+	for band in bands:
+		for k in 8:
+			var lo0: Vector3 = leg_at.call(k, float(band[0]))
+			var hi1: Vector3 = leg_at.call((k + 1) % 8, float(band[1]))
+			var lo1: Vector3 = leg_at.call((k + 1) % 8, float(band[0]))
+			var hi0: Vector3 = leg_at.call(k, float(band[1]))
+			var mid_dir: Vector3 = (lo0 + lo1 + hi0 + hi1) * 0.25
+			var outward: Vector3 = Vector3(mid_dir.x, 0, mid_dir.z).normalized()
+			for pair in [[lo0, hi1, 0.24], [lo1, hi0, 0.3]]:
+				var pa: Vector3 = pair[0] + outward * float(pair[2])
+				var pb: Vector3 = pair[1] + outward * float(pair[2])
+				pk.tube(kit, "steel", pa, pb, 0.035, 0.035, 6, iron)
+				pk.tube(kit, "steel", (pa + pb) * 0.5 - (pb - pa).normalized() * 0.18, (pa + pb) * 0.5 + (pb - pa).normalized() * 0.18, 0.06, 0.06, 6, iron)
+	# The legs' heads carry a ring beam; joists across it carry the tank.
 	for k in 8:
-		var a0: float = TAU * k / 8.0
-		var a1: float = TAU * (k + 1) / 8.0
-		for h in [3.7, 7.2]:
-			var f: float = 1.0 - h / tank_y * 0.3
-			var p0 := Vector3(cos(a0) * 5.4 * f, h, sin(a0) * 5.4 * f)
-			var p1 := Vector3(cos(a1) * 5.4 * f, h, sin(a1) * 5.4 * f)
-			pk.beam(kit, "steel", p0, p1, 0.22, 0.22, Color(0.25, 0.22, 0.2))
-		# Diagonals.
-		var d0 := Vector3(cos(a0) * 5.4 * 0.95, 3.7, sin(a0) * 5.4 * 0.95)
-		var d1 := Vector3(cos(a1) * 5.4 * 0.9, 7.2, sin(a1) * 5.4 * 0.9)
-		pk.beam(kit, "steel", d0, d1, 0.12, 0.12, Color(0.25, 0.22, 0.2))
-	pk.tube(kit, "wood", Vector3(0, tank_y, 0), Vector3(0, tank_y + 5.0, 0), r, r, 20, Color(0.50, 0.35, 0.22), true)
-	for h in [0.6, 1.8, 3.0, 4.2]:
-		pk.tube(kit, "steel", Vector3(0, tank_y + h, 0), Vector3(0, tank_y + h + 0.12, 0), r + 0.06, r + 0.06, 20, Color(0.18, 0.18, 0.18), false)
-	pk.lathe(kit, "paint", Vector3(0, tank_y + 5.0, 0), [Vector2(r + 0.6, 0.0), Vector2(r * 0.6, 1.4), Vector2(0.001, 3.0)], 20, Color(0.44, 0.42, 0.40), false)
-	# Ladder up one side and the spout.
-	pk.beam(kit, "steel", Vector3(r + 0.1, 0.0, -0.3), Vector3(r + 0.1, tank_y + 5.0, -0.3), 0.08, 0.08, DARK_HAND)
-	pk.beam(kit, "steel", Vector3(r + 0.1, 0.0, 0.3), Vector3(r + 0.1, tank_y + 5.0, 0.3), 0.08, 0.08, DARK_HAND)
-	var y := 0.6
+		pk.beam(kit, "steel", leg_at.call(k, tank_y - 0.2), leg_at.call((k + 1) % 8, tank_y - 0.2), 0.36, 0.36, leg_col.darkened(0.15), Vector3.UP)
+	for j in range(-3, 4):
+		var z: float = float(j) * 0.95
+		var hx: float = sqrt(maxf(r1 * r1 - z * z, 0.0)) + 0.1
+		pk.beam(kit, "steel", Vector3(-hx, tank_y - 0.02, z), Vector3(hx, tank_y - 0.02, z), 0.2, 0.3, leg_col.darkened(0.2), Vector3.UP)
+	# The deck round the tank's foot, its underside, the railing.
+	var dr := r + 1.1
+	pk.lathe(kit, "wood", Vector3(0, tank_y + 0.13, 0), [Vector2(dr, 0.0), Vector2(dr, 0.12), Vector2(r - 0.1, 0.12)], 24, Color(0.46, 0.33, 0.22), true)
+	pk.lathe(kit, "wood", Vector3(0, tank_y + 0.13, 0), [Vector2(r - 0.1, 0.0), Vector2(dr, 0.0)], 24, Color(0.36, 0.25, 0.16), true)
+	for k in 24:
+		var a2: float = TAU * float(k) / 24.0
+		var a3: float = TAU * float(k + 1) / 24.0
+		var q0 := Vector3(cos(a2) * (dr - 0.08), tank_y + 0.25, sin(a2) * (dr - 0.08))
+		var q1 := Vector3(cos(a3) * (dr - 0.08), tank_y + 0.25, sin(a3) * (dr - 0.08))
+		pk.beam(kit, "steel", q0, q0 + Vector3(0, 1.05, 0), 0.05, 0.05, iron)
+		for ry in [0.5, 1.05]:
+			pk.beam(kit, "steel", q0 + Vector3(0, ry, 0), q1 + Vector3(0, ry, 0), 0.04, 0.04, iron)
+	# The tank: staves, iron hoops, a conical roof with a vent.
+	pk.tube(kit, "wood", Vector3(0, tank_y + 0.25, 0), Vector3(0, tank_y + 5.0, 0), r, r, 24, Color(0.50, 0.35, 0.22), true)
+	for h2 in [0.7, 1.7, 2.7, 3.7, 4.5]:
+		pk.tube(kit, "steel", Vector3(0, tank_y + h2, 0), Vector3(0, tank_y + h2 + 0.1, 0), r + 0.05, r + 0.05, 24, Color(0.18, 0.18, 0.18), false)
+	pk.lathe(kit, "paint", Vector3(0, tank_y + 5.0, 0), [Vector2(r + 0.4, 0.0), Vector2(r + 0.4, 0.12), Vector2(r * 0.5, 1.5), Vector2(0.001, 2.6)], 24, Color(0.44, 0.42, 0.40), false)
+	pk.lathe(kit, "paint", Vector3(0, tank_y + 4.98, 0), [Vector2(0.001, 0.0), Vector2(r + 0.4, 0.0)], 24, Color(0.30, 0.28, 0.26), true)
+	pk.lathe(kit, "steel", Vector3(0, tank_y + 7.5, 0), [Vector2(0.25, 0.0), Vector2(0.25, 0.4), Vector2(0.4, 0.45), Vector2(0.001, 0.7)], 10, iron)
+	# The ladder: up leg 1's outer face to the deck (rails parallel to the leg), then on the tank to the roof.
+	var lk := 1
+	var la: float = TAU * float(lk) / 8.0
+	var ltang := Vector3(-sin(la), 0, cos(la))
+	var lout := Vector3(cos(la), 0, sin(la))
+	var lb: Vector3 = leg_at.call(lk, 0.0) + lout * 0.45
+	var lt: Vector3 = leg_at.call(lk, tank_y + 0.25) + lout * 0.45
+	for sx in [-0.28, 0.28]:
+		pk.beam(kit, "steel", lb + ltang * sx, lt + ltang * sx, 0.06, 0.06, DARK_HAND)
+		var lt2: Vector3 = Vector3(cos(la) * (r + 0.15), tank_y + 0.25, sin(la) * (r + 0.15)) + ltang * sx
+		pk.beam(kit, "steel", lt2, lt2 + Vector3(0, 4.8, 0), 0.06, 0.06, DARK_HAND)
+	var steps: int = int((lt - lb).length() / 0.35)
+	for k in range(1, steps):
+		var q: Vector3 = lb.lerp(lt, float(k) / float(steps))
+		pk.beam(kit, "steel", q - ltang * 0.28, q + ltang * 0.28, 0.04, 0.04, DARK_HAND)
+	var y := tank_y + 0.6
 	while y < tank_y + 5.0:
-		pk.beam(kit, "steel", Vector3(r + 0.1, y, -0.3), Vector3(r + 0.1, y, 0.3), 0.06, 0.06, DARK_HAND)
-		y += 0.6
-	pk.tube(kit, "steel", Vector3(-r + 0.3, tank_y - 0.8, 0), Vector3(-r - 4.0, tank_y - 2.4, 0), 0.4, 0.4, 10, Color(0.2, 0.2, 0.2))
+		var c := Vector3(cos(la) * (r + 0.15), y, sin(la) * (r + 0.15))
+		pk.beam(kit, "steel", c - ltang * 0.28, c + ltang * 0.28, 0.04, 0.04, DARK_HAND)
+		y += 0.35
+	# The spout toward -z: a flanged outlet at the tank's foot, the hinge, the spout swung up (stowed), its mouth
+	# flared, a chain from the mouth over a pulley on the roof's edge down to a counterweight.
+	var out_dir := Vector3(0, 0, -1)
+	var hinge := Vector3(0, tank_y + 0.8, -r - 0.35)
+	pk.tube(kit, "steel", Vector3(0, tank_y + 0.8, -r + 0.2), hinge, 0.42, 0.42, 14, iron)
+	pk.tube(kit, "steel", hinge + out_dir * 0.02, hinge - out_dir * 0.08, 0.55, 0.55, 14, iron)
+	var up_ang := deg_to_rad(52.0)
+	var sdir: Vector3 = (out_dir * cos(up_ang) + Vector3.UP * sin(up_ang)).normalized()
+	var mouth: Vector3 = hinge + sdir * 4.2
+	pk.tube(kit, "steel", hinge, mouth, 0.36, 0.33, 14, iron)
+	pk.tube(kit, "steel", mouth, mouth + sdir * 0.5, 0.33, 0.5, 14, iron)
+	for k in range(3):
+		var bp: Vector3 = hinge + sdir * (1.0 + 1.2 * float(k))
+		pk.tube(kit, "steel", bp - sdir * 0.06, bp + sdir * 0.06, 0.4, 0.4, 14, Color(0.12, 0.12, 0.12))
+	var pulley := Vector3(0, tank_y + 5.2, -r - 0.5)
+	pk.tube(kit, "steel", pulley - Vector3(0.08, 0, 0), pulley + Vector3(0.08, 0, 0), 0.22, 0.22, 12, iron)
+	pk.beam(kit, "steel", pulley, pulley + Vector3(0, -0.25, 0.4), 0.06, 0.06, iron)
+	pk.tube(kit, "steel", mouth + sdir * 0.4, pulley, 0.025, 0.025, 4, iron)
+	var cw_top: Vector3 = pulley + Vector3(0, 0, 0.18)
+	pk.tube(kit, "steel", cw_top, cw_top - Vector3(0, 1.6, 0), 0.025, 0.025, 4, iron)
+	pk.block(kit, "steel", cw_top + Vector3(-0.22, -2.3, -0.12), cw_top + Vector3(0.22, -1.6, 0.12), Color(0.15, 0.15, 0.15))
 
 
 ## A telegraph pole: a tapering timber shaft, two crossarms with four insulators each. Origin on the ground,

@@ -316,11 +316,63 @@ static func _window_box(pk: PropKit, kit: Dictionary, c: Vector3, out: Vector3, 
 	var n: int = int(w / 0.2)
 	for k in range(n):
 		var p: Vector3 = c + out * 0.3 + across * (-w * 0.5 + 0.1 + (w - 0.2) * float(k) / float(maxi(n - 1, 1))) + Vector3(0, -0.16, 0)
-		pk.lathe(kit, "canvas", p, [Vector2(0.001, 0.0), Vector2(0.15, 0.08), Vector2(0.14, 0.22), Vector2(0.001, 0.28)], 8, Color(0.26, 0.44, 0.24))
-		for f in range(3):
-			var fa: float = float(k) * 1.7 + float(f) * 2.1
-			pk.lathe(kit, "canvas", p + Vector3(cos(fa) * 0.07, 0.24 + 0.04 * float(f), sin(fa) * 0.07), [Vector2(0.001, 0.0), Vector2(0.07, 0.04), Vector2(0.001, 0.1)], 6,
-					[Color(0.9, 0.12, 0.2), Color(0.95, 0.4, 0.55), Color(0.98, 0.95, 0.9)][(k + f) % 3])
+		_geranium(pk, kit, p, 1.0, [Color(0.86, 0.10, 0.16), Color(0.94, 0.36, 0.52), Color(0.97, 0.92, 0.9)][k % 3], k * 7 + int(absf(p.x * 13.0)))
+
+
+## A geranium at `base` (on the soil): a mound of round, scalloped leaves (each a flat fan of 7 triangles, tilted out,
+## a darker zone ring), and 2-4 flower heads on stalks rising over them, each a ball of 9-13 florets (five petals round
+## a pale eye). `s` scales it (1 is about 30cm tall).
+static func _geranium(pk: PropKit, kit: Dictionary, base: Vector3, s: float, bloom: Color, seed_v: int) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_v
+	var leaf := Color(0.24, 0.42, 0.20)
+	for k in range(9):
+		var a: float = TAU * float(k) / 9.0 + rng.randf_range(-0.2, 0.2)
+		var dist: float = rng.randf_range(0.03, 0.11) * s
+		var c: Vector3 = base + Vector3(cos(a) * dist, rng.randf_range(0.07, 0.16) * s, sin(a) * dist)
+		var lr: float = rng.randf_range(0.045, 0.065) * s
+		var tilt: float = rng.randf_range(0.3, 0.8)
+		var up: Vector3 = (Vector3(cos(a) * tilt, 1.0, sin(a) * tilt)).normalized()
+		var t1: Vector3 = up.cross(Vector3(0, 0, 1) if absf(up.z) < 0.9 else Vector3(1, 0, 0)).normalized()
+		var t2: Vector3 = up.cross(t1)
+		var col: Color = leaf.lightened(rng.randf_range(-0.05, 0.1))
+		pk.beam(kit, "canvas", base, c, 0.008 * s, 0.008 * s, leaf.darkened(0.2))
+		for j in range(7):
+			var b0: float = TAU * float(j) / 7.0
+			var b1: float = TAU * float(j + 1) / 7.0
+			var e0: float = lr * (1.0 + 0.12 * sin(b0 * 7.0 * 0.5 + 1.0))
+			var e1: float = lr * (1.0 + 0.12 * sin(b1 * 7.0 * 0.5 + 1.0))
+			var q0: Vector3 = c + (t1 * cos(b0) + t2 * sin(b0)) * e0
+			var q1: Vector3 = c + (t1 * cos(b1) + t2 * sin(b1)) * e1
+			var m0: Vector3 = c + (t1 * cos(b0) + t2 * sin(b0)) * e0 * 0.55 + up * 0.002
+			var m1: Vector3 = c + (t1 * cos(b1) + t2 * sin(b1)) * e1 * 0.55 + up * 0.002
+			pk.tri(kit, "canvas", c, q0, q1, up, up, up, col, up)
+			pk.tri(kit, "canvas", c, q1, q0, -up, -up, -up, col.darkened(0.2), -up)
+			pk.quad(kit, "canvas", [m0, m0.lerp(q0, 0.25) + up * 0.001, m1.lerp(q1, 0.25) + up * 0.001, m1], up, col.darkened(0.25))
+	var heads: int = rng.randi_range(2, 4)
+	for h in range(heads):
+		var a2: float = TAU * float(h) / float(heads) + rng.randf_range(-0.4, 0.4)
+		var top: Vector3 = base + Vector3(cos(a2) * 0.05 * s, rng.randf_range(0.24, 0.34) * s, sin(a2) * 0.05 * s)
+		pk.beam(kit, "canvas", base + Vector3(0, 0.05 * s, 0), top, 0.01 * s, 0.01 * s, leaf.darkened(0.1))
+		var n: int = rng.randi_range(9, 13)
+		for f in range(n):
+			# Florets over the upper half of a ball, each facing out.
+			var ph: float = acos(rng.randf_range(0.1, 1.0))
+			var th: float = rng.randf() * TAU
+			var dirf := Vector3(sin(ph) * cos(th), cos(ph), sin(ph) * sin(th))
+			var fc: Vector3 = top + dirf * 0.045 * s
+			var u1: Vector3 = dirf.cross(Vector3.UP if absf(dirf.y) < 0.95 else Vector3.RIGHT).normalized()
+			var u2: Vector3 = dirf.cross(u1)
+			var pr: float = 0.02 * s
+			var pc: Color = bloom.lightened(rng.randf_range(-0.05, 0.1))
+			for pi in range(5):
+				var pa: float = TAU * float(pi) / 5.0
+				var pd: Vector3 = u1 * cos(pa) + u2 * sin(pa)
+				var pw: Vector3 = (u1 * cos(pa + PI * 0.5) + u2 * sin(pa + PI * 0.5)) * pr * 0.45
+				var tip: Vector3 = fc + pd * pr
+				pk.quad(kit, "canvas", [fc, fc + pd * pr * 0.5 + pw, tip, fc + pd * pr * 0.5 - pw], dirf, pc)
+				pk.quad(kit, "canvas", [fc, fc + pd * pr * 0.5 - pw, tip, fc + pd * pr * 0.5 + pw], -dirf, pc.darkened(0.2))
+			pk.tri(kit, "canvas", fc + dirf * 0.002 + u1 * pr * 0.2, fc + dirf * 0.002 + u2 * pr * 0.2, fc + dirf * 0.002 - u1 * pr * 0.2, dirf, dirf, dirf, Color(0.98, 0.9, 0.85), dirf)
 
 
 ## An air-conditioner box on a wall at c facing `out`, on two brackets, with a grille and a drip pipe.
@@ -450,9 +502,11 @@ static func _cantina(pk: PropKit, kit: Dictionary, w: float, d: float, col: Colo
 	pk.beam(kit, "timber", Vector3(-w * 0.35 - 0.1, 1.0, pd + 1.6), Vector3(w * 0.35 + 0.1, 1.0, pd + 1.6), 0.1, 0.1, WOOD_DARK, Vector3(0, 0, 1))
 	_roof_tank(pk, kit, w * 0.25, -d * 0.6, h)
 	# A lit beer sign in the window, string lights along the portal's beam, a chalkboard by the door.
-	box_at(pk, kit, "steel", Vector3(-w * 0.3, 2.05, 0.09), Basis(), Vector3(1.0, 0.35, 0.04), CAST)
-	box_at(pk, kit, "lamp", Vector3(-w * 0.3, 2.05, 0.12), Basis(), Vector3(0.9, 0.06, 0.02), Color(1.0, 0.35, 0.2))
-	labels.append(["CERVEZA", Vector3(-w * 0.3, 2.07, 0.14), Vector3(0, 0, 1), 0.16, Color(1.4, 0.75, 0.3), 0.85])
+	# In the window's outer half: from the road a porch post stood in front of its middle.
+	var sgx: float = -w * 0.3 - 0.33
+	box_at(pk, kit, "steel", Vector3(sgx, 2.05, 0.11), Basis(), Vector3(0.72, 0.32, 0.04), CAST)
+	box_at(pk, kit, "lamp", Vector3(sgx, 1.93, 0.14), Basis(), Vector3(0.64, 0.04, 0.02), Color(1.0, 0.35, 0.2))
+	labels.append(["CERVEZA", Vector3(sgx, 2.08, 0.16), Vector3(0, 0, 1), 0.13, Color(1.4, 0.75, 0.3), 0.66])
 	var bulbs := 18
 	for k in range(bulbs + 1):
 		var t: float = float(k) / float(bulbs)
@@ -634,7 +688,7 @@ static func _farmacia(pk: PropKit, kit: Dictionary, w: float, d: float, col: Col
 ## The pavement along the town's front: concrete slabs in a 1.5m grid (joints 1.2cm up), a stone kerb on the road
 ## side, lamp posts, benches, a bin, from x0 to x1 (life size, the frame's x along the street), its front edge at
 ## z = depth (toward the road), its back at z = 0 under the buildings' fronts.
-static func pavement(pk: PropKit, kit: Dictionary, x0: float, x1: float, depth: float) -> void:
+static func pavement(pk: PropKit, kit: Dictionary, x0: float, x1: float, depth: float, keep_clear: Array = []) -> void:
 	blk(pk, kit, "concrete", Vector3(x0, -0.3, 0.0), Vector3(x1, 0.12, depth), CONCRETE)
 	var jx := x0 + 1.5
 	while jx < x1:
@@ -645,7 +699,11 @@ static func pavement(pk: PropKit, kit: Dictionary, x0: float, x1: float, depth: 
 	var k := 0
 	while lx < x1 - 2.0:
 		lamp_post(pk, kit, Vector3(lx, 0.12, depth - 0.5), 3.8)
-		if k % 2 == 1:
+		var free := true
+		for kc in keep_clear:
+			if lx + 2.2 > float(kc.x) - 1.2 and lx + 2.2 < float(kc.y) + 1.2:
+				free = false
+		if k % 2 == 1 and free:
 			bench(pk, kit, Vector3(lx + 2.2, 0.12, depth - 1.6), Vector3(0, 0, 1), 1.6)
 		lx += 11.0
 		k += 1

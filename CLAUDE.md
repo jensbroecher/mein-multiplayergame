@@ -2483,6 +2483,12 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
   - `res://scratch/yard_preview.gd` (`-s`, windowed, `-- <dir> [set=station|factory|all] [stock=1] name:x,y,z:tx,ty,tz[:fov]`)
     renders the station (at the origin, the platform track at z -37.2) and the cooperative (at (150, 0, -150)) on flat
     ground in seconds.
+- The water tower (`FreightKit.water_tower`, `TankTower`): everything placed from the legs' own line (`leg_r`), so the
+  strut rings sit on the legs and the crossed rods (with turnbuckles) on each bay's outer face; a ring beam and joists
+  under the tank, a railed deck round its foot, a ladder up a leg's face and on up the tank. The spout is a stowed
+  tender-filling spout (for the steam era), hinged on the tank's -z side (the track), swung up, its chain over a pulley
+  to a counterweight. Its braces had missed the legs (a scale factor, not the legs' slope) and the spout stuck out of
+  the tank in mid air.
 - The town and the plaza (`TownKit.gd`, extends YardKit, life size at PROP_SCALE, `_build_town`, `_build_plaza`, pads 1 and 2
   in `_pads`): across the road from the station a row of six buildings facing the road (`TownKit.STREET`: a gabled house,
   Cantina La Via with a false front and a timber portal, a grocer's (Abarrotes) with a striped awning, the two-storey Hostal
@@ -2492,7 +2498,7 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
   `_build_fountain_water`, node `FountainSpray`: named "...Water" it was taken for the level's sea and every engine
   flooded; its sound `sounds/Gentle_flowing_water.wav`, looped in its import), four planters with WoodlandBuilder cottonwoods at `PLAZA_TREE_SCALE` (each under a body with a
   trunk cylinder), benches, a bus shelter, a flagpole, bollards. Detail: wall lanterns (a scrolled bracket, a hexagonal lantern), clay pots with agaves or flowering shrubs, window
-  boxes of geraniums, rejas (window grilles), gutters and downpipes, rafter tails, a door canopy, meter boxes, AC units,
+  boxes of geraniums (`_geranium`: scalloped leaves with a dark zone, umbels of five-petal florets), rejas (window grilles), gutters and downpipes, rafter tails, a door canopy, meter boxes, AC units,
   satellite dishes, an aerial, the cantina's beer sign and string lights, the grocer's blade sign, a clothesline with
   pegged washing, and on every back a door, windows and bins. Roof slopes are boarded underneath over their whole width
   (over the gables the sky had shown through from below). Eaves, awnings and balconies have undersides; door steps

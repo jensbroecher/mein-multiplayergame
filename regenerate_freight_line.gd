@@ -2141,8 +2141,12 @@ func _build_town(root: Node3D) -> void:
 	var street_xf := Transform3D(face.scaled(Vector3.ONE * PROP_SCALE), Vector3(TOWN_X, h, TOWN_FRONT))
 	var all_labels: Array = []
 	var x := -length * 0.5
+	# No pavement bench under the cantina's porch, which runs out over the pavement (one sank into its floor).
+	var porch_x: Array = []
 	for b in TownKit.STREET:
 		var w: float = b[1]
+		if b[0] == "cantina":
+			porch_x.append(Vector2(x, x + w))
 		var bxf: Transform3D = street_xf * Transform3D(Basis(), Vector3(x + w * 0.5, 0.0, 0.0))
 		pk.set_frame(bxf)
 		var labels: Array = []
@@ -2151,7 +2155,7 @@ func _build_town(root: Node3D) -> void:
 			all_labels.append([l, bxf])
 		x += w + TownKit.GAP
 	pk.set_frame(street_xf)
-	TownKit.pavement(pk, kit, -length * 0.5 - 2.0, length * 0.5 + 2.0, 3.5)
+	TownKit.pavement(pk, kit, -length * 0.5 - 2.0, length * 0.5 + 2.0, 3.5, porch_x)
 	_instance_mesh(root, "Town", _save_baked_resource(YardKit.commit(pk, kit), "town", YARD_PREFIX), Transform3D.IDENTITY)
 	for e in all_labels:
 		var l: Array = e[0]
