@@ -1275,7 +1275,11 @@ func _ready():
 						water_surface_y = water_node.position.y
 					else:
 						water_surface_y = WATER_LEVEL
-					water_bounds_active = false
+					# A pond (Mina del Viento's sump) says where it is: water only over that rectangle (x, z).
+					water_bounds_active = water_node.has_meta("water_bounds_min") and water_node.has_meta("water_bounds_max")
+					if water_bounds_active:
+						water_bounds_min = water_node.get_meta("water_bounds_min")
+						water_bounds_max = water_node.get_meta("water_bounds_max")
 				else:
 					stage_has_water = false
 

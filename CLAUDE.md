@@ -2436,14 +2436,14 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
 ## Mina del Viento (Sierra del Viento GP, stage 4, the finale)
 
 A point-to-point rally sprint (one run, no laps): `regenerate_mina.gd` (`regenerate_mina.tscn`, headless, about 15s) builds
-`levels/MinaLevel.tscn`, 4.2km from a plateau at dawn (+54m) down into an open-pit copper mine and out into the valley (-34m).
+`levels/MinaLevel.tscn`, 4.75km from a plateau at dawn (+54m) down into an open-pit copper mine and out into the valley (-34m).
 Rebuilt on 2026-11-02 (Gemini's first version had a pit unrelated to its road, trucks in walls, a storm that never ended).
 
-- The route is an open path of straights and arcs (`_fillet_open`: HEAD corners, the pit's three, TAIL), measured from the
+- The route is an open path of straights and arcs (`_fillet_open`: HEAD corners, the pit's three, FLOOR, TAIL), measured from the
   path's start (`_at(s)`, `_spot(s, lat, lift)`). Sections: the plateau, tarmac (0-1.26km: the start in the balloon fiesta,
   the radio array's arm, the dry wash's crest jump `WASH_SHAPE` at 820m), the mine's gate (`GATE_S`, tarmac ends), the shelf
   road cut into the escarpment's face (to 1.77km), the notch through the pit's rim, the haul ramp three quarters of the way
-  round the pit (1.87-3.01km, 5.5%), the floor, the mouth (a benched cut through the south wall), the valley (concrete
+  round the pit (1.87-3.01km, 5.5%), the floor (off-road, below), the mouth (a benched cut through the south wall), the valley (concrete
   again from `PAVED_AGAIN`), the finish (`FINISH_RUNOUT` before the path's end). The road's height is `_prof` (HEAD_PROFILE and
   stations from the solved route, linear, smoothed, the wash added).
 - The pit is one function, `_pit_d` (distance outside a rounded rectangle, the floor): benches are its contours
@@ -2459,6 +2459,18 @@ Rebuilt on 2026-11-02 (Gemini's first version had a pit unrelated to its road, t
   body), blowing sand along the ground (`storm`, `wind_dir`, set by HaboobWeather). UV.x is how deep the mine cut (the ore's
   rock and rubble); the sump's stain is limited to `sump` (xz, radius), or the mouth's floor (below the sump's water) went
   teal. Bodies: `MinaRoad`, `MinaHaulRoad`, `MinaSandRoad` (track), `MinaGround`, `MinaPitGround`, `MinaRockFace`.
+- The pit floor (`FLOOR` corners, `T_FLOOR`..`T_MOUTH`; `_offroad_at`) is off-road: a serpentine of 90-degree turns
+  (radius 18-24m) between parked trucks standing on the insides of its bends, along the north wall beside the shovel's
+  crawlers and its truck, hard left at `T_SUMP_TURN` with the sump straight on, then down the west side into the mouth
+  (about 730m). Its road triangles are `MinaPitGround` (no "road" in the name, so PlayerCart counts it off-road), lumpy
+  (`FLOOR_LUMPS`), painted as wheel ruts in the rubble (UV2.y -1). A boost pad starts the north leg. `_check_clear` errors
+  on any pit machine within `PIT_CLEAR` of the track's edge. Adding corners: keep `T_MOUTH`/`T_VALLEY` (constants) in step
+  (`_solve_route` errors if not); the later checkpoints, boosts, signs, the paving and the grandstand follow the route.
+- The sump (`SUMP`, `SUMP_R`, `SUMP_DEPTH`) is real water, `SumpWater` at `SUMP_WATER_Y`: dug 5.5m, deep enough to drown
+  a cart. PlayerCart takes the first node named "...Water" for the level's water; its `water_bounds_min`/`max` metas
+  (PlayerCart's general water branch reads them now) keep it to the pond, or the mouth and the valley, which lie below
+  its surface, would flood every engine. `res://scratch/pond_drop_test.tscn -- <level> x,z ...` (headless) drops a held
+  cart at each spot and reports the water level, whether it went under and drowned. Bots don't drown there.
 - Safety berms (`BERMS`, `_build_berms`, `mina_rubble.gdshader`): rubble windrows on the drop side of the shelf road and down
   the ramp, their collider a steeper, taller wall than the heap (a cart glances off instead of riding over the edge).
 - Set pieces are `MinaKit.gd` (life size, grown by `PROP_SCALE` 1.6; balloons 1.5, dishes 1.25), meshes and materials
@@ -2473,8 +2485,6 @@ Rebuilt on 2026-11-02 (Gemini's first version had a pit unrelated to its road, t
   builds each and prints its triangles.
 - `BalloonFiesta.gd`: the balloons aloft loop slowly over the plateau on the wall clock; every burner fires now and then
   (the `burn` instance uniform).
-- Never name a node in this level "...Water": PlayerCart takes the first such node for the sea, and the sump's
-  ("SumpWater", y -31) flooded every cart in the mouth and the valley, which lie below it. It is `SumpPool`.
 - The haboob (`HaboobWeather.gd`): a place, not a schedule. `intensity_at(p)` is the storm's cover there (a grid the
   generator bakes, `_storm_cover`: the escarpment's band from `STORM_FROM` north of its edge to `STORM_TO` out over the
   valley, and the pit) less the shelter of lying below the land's natural height (the pit, the notch, the mouth). So it
@@ -2492,7 +2502,7 @@ Rebuilt on 2026-11-02 (Gemini's first version had a pit unrelated to its road, t
   holds the grid's SpawnPoints and the start lights and ticker); the HUD's stage progress is measured to the finish line
   (`_finish_offset`); after the finish carts brake to a stop in the run-out. RaceUI shows `STAGE: n%`, the minimap an open
   line with start and finish.
-- Tests: `scratch/ai_race_test.tscn -- res://levels/MinaLevel.tscn seconds=150 speed=2` (6/6 finish in about 100-120s, no
+- Tests: `scratch/ai_race_test.tscn -- res://levels/MinaLevel.tscn seconds=200 speed=2` (6/6 finish in about 115-135s, no
   respawns but items); `scratch/nyota_jump_test.tscn -- level=res://levels/MinaLevel.tscn speeds=40,46 ground=1` (the wash's
   crest: 14-23m); `scratch/route_ai_probe.tscn -- [level=] start=<s> [speed=30]` (headless) traces one bot from any point
   of a route with what it touches; `scratch/route_surface_scan.tscn -- <level> x0,z0 x1,z1` raycasts a line for steps;

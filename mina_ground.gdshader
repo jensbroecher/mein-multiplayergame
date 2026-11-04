@@ -10,7 +10,8 @@ render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 //   COLOR.a - on the road band: signed metres across the road, as a / 24 + 0.5
 //   UV.x    - how deep the mine has cut here (0 natural ground, 1 a metre or two down): the pit's rock and rubble
 //   UV.y    - sand the haboob has drifted over the road
-//   UV2.x   - metres along the route; UV2.y - 1 where the road is paved, 0 on gravel
+//   UV2.x   - metres along the route; UV2.y - 1 where the road is paved, 0 on gravel, -1 on the pit floor's
+//             off-road track (rubble rutted by the trucks, no made road)
 // `storm` (0..1, set by HaboobWeather.gd every frame) blows sand across the ground along `wind_dir`.
 
 uniform sampler2D sand_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
@@ -215,10 +216,19 @@ void fragment() {
 		g *= 1.0 - 0.18 * ruts;
 
 		vec3 road = mix(g, tar, paved);
-		float on_road = mix(on_grav, on_tar, paved) * band;
+		float offroad = 1.0 - smoothstep(-0.6, -0.4, road_uv.y);
+		float on_road = mix(on_grav, on_tar, paved) * band * (1.0 - 0.65 * offroad);
 		float dust = (1.0 - smoothstep(g_edge, g_edge + 4.0 + wob * 2.0, a)) * band * (1.0 - paved * 0.6);
 		albedo = mix(albedo, mix(albedo, g, 0.45), dust * (1.0 - rock_w * 0.5));
 		albedo = mix(albedo, road, on_road);
+		// Off the made roads: wheel tracks pressed into the rubble, the trucks' wide and the carts' narrow.
+		if (offroad > 0.01) {
+			float tr = max(smoothstep(0.8, 0.15, abs(a - 1.5 + wob)), smoothstep(0.8, 0.15, abs(a - 4.4 + wob * 0.6)));
+			tr = max(tr, smoothstep(1.0, 0.25, abs(a - 6.8 + wob)) * 0.7);
+			tr *= on_grav * band * (0.55 + 0.45 * cs_fbm(xz * 0.25)) * offroad;
+			albedo = mix(albedo, albedo * vec3(0.70, 0.66, 0.62), tr * 0.8);
+			rough = mix(rough, 0.85, tr);
+		}
 		rough = mix(rough, mix(mix(0.9, 0.8, ruts), 0.86, paved), on_road);
 		rock_h *= 1.0 - on_road;
 		on_road_w = on_road;

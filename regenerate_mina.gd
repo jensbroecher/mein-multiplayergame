@@ -67,6 +67,13 @@ const HEAD := [
 	[-1030.0, 110.0, 300.0],   # out of the radio array onto the shelf
 	[-300.0, 330.0, 60.0],     # the notch
 ]
+## The pit's floor, off-road: from the foot of the ramp a serpentine between the trucks and the shovel, along the
+## north wall past the drills, hard left by the sump (a late braker runs on into it) and back down the west side into
+## the mouth. [x, z, radius].
+const FLOOR := [
+	[60.0, 124.0, 18.0], [60.0, 30.0, 18.0], [128.0, 30.0, 18.0], [128.0, -82.0, 20.0], [-84.0, -82.0, 24.0],
+	[-84.0, 55.0, 22.0],
+]
 ## And after it: the turn into the mouth, the turn into the valley, the end of the run-out.
 const TAIL := [
 	[MOUTH_X, PIT_HZ - 8.0, 34.0],
@@ -80,8 +87,12 @@ const T_NOTCH := 2
 const T_NW := 3
 const T_NE := 4
 const T_SE := 5
-const T_MOUTH := 6
-const T_VALLEY := 7
+const T_FLOOR := 6
+## T_FLOOR + FLOOR.size(), and one on.
+const T_MOUTH := 12
+const T_VALLEY := 13
+## The north leg's corner, where the sump waits beyond.
+const T_SUMP_TURN := 10
 
 ## The road's height: [s, y] stations, linear between and smoothed. The ramp's and the tail's are added by
 ## `_build_profile` from the solved route.
@@ -97,7 +108,8 @@ const WASH_SHAPE := [
 ]
 ## Tarmac on the plateau, gravel from the mine's gate, concrete again past the plant.
 const PAVED_END := 1262.0
-const PAVED_AGAIN := 3690.0
+## From here the valley's road is concrete again (set from the route: just out of the valley's bend).
+var _paved_again := 0.0
 
 ## The run's start and finish (s), and the run-out past the finish.
 const START_S := 46.0
@@ -246,6 +258,7 @@ func _corners(ds: Array) -> Array:
 	out.append([-(PIT_HX + ds[0]), -(PIT_HZ + ds[0]), PIT_RC + ds[0]])
 	out.append([PIT_HX + ds[1], -(PIT_HZ + ds[1]), PIT_RC + ds[1]])
 	out.append([PIT_HX + ds[2], PIT_HZ + ds[2], PIT_RC + ds[2]])
+	out.append_array(FLOOR.duplicate(true))
 	out.append_array(TAIL.duplicate(true))
 	return out
 
@@ -269,6 +282,9 @@ func _solve_route() -> void:
 	_ramp_s0 = _turns[T_NOTCH]["s1"]
 	_ramp_s1 = _turns[T_SE]["s1"]
 	_finish_s = float(_route["len"]) - FINISH_RUNOUT
+	if _turns.size() != T_VALLEY + 1:
+		push_error("route: %d turns, but T_VALLEY is %d" % [_turns.size(), T_VALLEY])
+	_paved_again = float(_turns[T_VALLEY]["s1"]) + 59.0
 	print("  route %.0fm; pit corners at offsets %.1f, %.1f, %.1f; ramp %.0f-%.0fm (%.0fm at %.1f%%); finish at %.0fm" % [
 		_route["len"], ds[0], ds[1], ds[2], _ramp_s0, _ramp_s1, _ramp_s1 - _ramp_s0,
 		100.0 * (RAMP_TOP_Y - FLOOR_Y) / (_ramp_s1 - _ramp_s0), _finish_s])
@@ -442,8 +458,8 @@ func _mine_cut(x: float, z: float) -> float:
 	var d: float = _pit_d(x, z) + _bench_noise.get_noise_2d(x, z) * 1.3
 	if d < 140.0:
 		h = FLOOR_Y + _benches(d, BENCH_H, BENCH_W)
-		# The sump: the floor's low corner, where the water gathers.
-		h -= 2.6 * (1.0 - smoothstep(18.0, 44.0, Vector2(x - SUMP.x, z - SUMP.y).length()))
+		# The sump: the floor's low corner, where the water gathers, deep enough to drown a cart.
+		h -= SUMP_DEPTH * (1.0 - smoothstep(SUMP_R - 14.0, SUMP_R + 4.0, Vector2(x - SUMP.x, z - SUMP.y).length()))
 	if z > PIT_HZ - 30.0 and z < 640.0:
 		var dm: float = absf(x - MOUTH_X) - MOUTH_HALF + _bench_noise.get_noise_2d(x + 400.0, z) * 1.0
 		var floor_y: float = lerpf(FLOOR_Y - 0.4, VALLEY_Y + 0.6, smoothstep(PIT_HZ, 520.0, z))
@@ -451,8 +467,14 @@ func _mine_cut(x: float, z: float) -> float:
 	return h
 
 
-const SUMP := Vector2(-150.0, -88.0)
-const SUMP_WATER_Y := FLOOR_Y - 1.2
+## The sump: its middle, its radius at the waterline (about), how deep it is dug, its water. It lies straight on
+## from the north leg's corner (T_SUMP_TURN): a cart that brakes late runs into it and drowns.
+const SUMP := Vector2(-130.0, -95.0)
+const SUMP_R := 28.0
+const SUMP_DEPTH := 5.5
+const SUMP_WATER_Y := FLOOR_Y - 1.0
+## The pit floor's track: how lumpy (metres up and down).
+const FLOOR_LUMPS := 0.2
 
 
 ## The dry wash: distance from its line and how far along it.
@@ -834,7 +856,12 @@ const B_ROCK := 5
 func _paved_at(s: float) -> float:
 	if s < PAVED_END:
 		return 1.0 - smoothstep(PAVED_END - 30.0, PAVED_END, s)
-	return smoothstep(PAVED_AGAIN, PAVED_AGAIN + 30.0, s)
+	return smoothstep(_paved_again, _paved_again + 30.0, s)
+
+
+## The pit floor's track, from the foot of the ramp to the mouth: off-road.
+func _offroad_at(s: float) -> bool:
+	return s > _ramp_s1 + 8.0 and s < float(_turns[T_MOUTH]["s0"]) - 4.0
 
 
 func _compact_mesh(verts: PackedVector3Array, normals: PackedVector3Array, colors: PackedColorArray, uvs: PackedVector2Array,
@@ -892,6 +919,9 @@ func _ground_kind(tri: Array, verts: PackedVector3Array) -> int:
 		var s: float = s_sum / 3.0
 		if _drift_at(s, lat_sum / 3.0) > 0.12:
 			return B_SAND
+		# The pit floor's track is off-road: rubble the trucks have rutted, not a made road.
+		if _offroad_at(s):
+			return B_PIT
 		return B_ROAD if _paved_at(s) > 0.5 else B_HAUL
 	var n: Vector3 = (verts[tri[2]] - verts[tri[0]]).cross(verts[tri[1]] - verts[tri[0]]).normalized()
 	if rock > 1.8 or absf(n.y) < 0.62:
@@ -914,10 +944,14 @@ func _build_terrain(parent: Node, mat: Material) -> void:
 	uvs.resize(count)
 	uv2s.resize(count)
 	_vert_rock.resize(count)
-	# The drifts first: they lift the ground the normals are taken from.
-	for i in range(count):
-		if _road_d[i] < ROAD_HALF + 7.0:
-			_heights[i] += _drift_at(_vert_s[i], _vert_lat[i])
+	# The drifts first: they lift the ground the normals are taken from. The pit floor's track is lumpy with rubble.
+	for iz in range(nz):
+		for ix in range(nx):
+			var i: int = iz * nx + ix
+			if _road_d[i] < ROAD_HALF + 7.0:
+				_heights[i] += _drift_at(_vert_s[i], _vert_lat[i])
+				if _offroad_at(_vert_s[i]):
+					_heights[i] += FLOOR_LUMPS * _detail_noise.get_noise_2d(_grid_x[ix] * 4.0, _grid_z[iz] * 4.0)
 	for iz in range(nz):
 		for ix in range(nx):
 			var i: int = iz * nx + ix
@@ -947,7 +981,7 @@ func _build_terrain(parent: Node, mat: Material) -> void:
 				colors[i] = Color(rock, band, sand, lat_enc)
 				var drift: float = smoothstep(0.02, 0.3, _drift_at(_vert_s[i], _vert_lat[i]))
 				uvs[i] = Vector2(mined, drift)
-				uv2s[i] = Vector2(_vert_s[i], _paved_at(_vert_s[i]))
+				uv2s[i] = Vector2(_vert_s[i], -1.0 if _offroad_at(_vert_s[i]) else _paved_at(_vert_s[i]))
 			else:
 				colors[i] = Color(1.0 - smoothstep(0.62, 0.8, nrm.y), 0.0, 0.0, 0.5)
 				uvs[i] = Vector2(mined, 0.0)
@@ -1055,9 +1089,30 @@ func _build_track_curve() -> Curve3D:
 #  The race: start, checkpoints, finish, boost pads
 # ======================================================================================
 
-const CHECKPOINTS_S := [640.0, 1180.0, 1600.0, 2120.0, 2560.0, 2870.0, 3330.0, 3790.0]
+## Fixed checkpoints down to the ramp; those on the floor, in the mouth and the valley follow the route (`_checkpoints`).
+const CHECKPOINTS_S := [640.0, 1180.0, 1600.0, 2120.0, 2560.0, 2870.0]
 ## [s, lat]: out of the fiesta's sweeper, onto the shelf, the north wall, the mouth and the valley.
-const BOOSTS := [[250.0, -2.6], [1300.0, 2.6], [2430.0, 0.0], [3236.0, 0.0], [3690.0, -2.6]]
+const BOOSTS := [[250.0, -2.6], [1300.0, 2.6], [2430.0, 0.0]]
+
+
+func _checkpoints() -> Array:
+	var out: Array = CHECKPOINTS_S.duplicate()
+	# The floor's first leg north, the north leg by the shovel, the mouth, the valley.
+	out.append(0.5 * (float(_turns[T_FLOOR]["s1"]) + float(_turns[T_FLOOR + 1]["s0"])))
+	out.append(float(_turns[T_FLOOR + 3]["s1"]) + 60.0)
+	out.append(float(_turns[T_MOUTH]["s1"]) + 90.0)
+	out.append(float(_turns[T_VALLEY]["s1"]) + 160.0)
+	return out
+
+
+## [s, lat]: the fixed ones, then onto the floor's north leg (straight at the sump's corner: brake!), the mouth and
+## the valley's straight.
+func _boosts() -> Array:
+	var out: Array = BOOSTS.duplicate(true)
+	out.append([float(_turns[T_FLOOR + 3]["s1"]) + 8.0, 0.0])
+	out.append([float(_turns[T_MOUTH]["s1"]) + 30.0, 0.0])
+	out.append([float(_turns[T_VALLEY]["s1"]) + 60.0, -2.6])
+	return out
 
 
 func _gate(parent: Node, gate_name: String, s: float, finish: bool, scene: PackedScene) -> Node3D:
@@ -1097,17 +1152,19 @@ func _place_gameplay(level_scene: Node3D) -> void:
 	var cps := Node3D.new()
 	cps.name = "Checkpoints"
 	level_scene.add_child(cps)
-	for i in range(CHECKPOINTS_S.size()):
-		_gate(cps, "Checkpoint_%d" % (i + 1), CHECKPOINTS_S[i], false, gate_scene)
+	var cp_s: Array = _checkpoints()
+	for i in range(cp_s.size()):
+		_gate(cps, "Checkpoint_%d" % (i + 1), cp_s[i], false, gate_scene)
 	_gate(level_scene, "FinishLine", _finish_s, true, gate_scene)
 	var boost_scene: PackedScene = load("res://BoostPad.tscn")
 	var pads := Node3D.new()
 	pads.name = "BoostPads"
 	level_scene.add_child(pads)
-	for i in range(BOOSTS.size()):
+	var boosts: Array = _boosts()
+	for i in range(boosts.size()):
 		var bp: Node3D = boost_scene.instantiate()
 		bp.name = "Boost_%d" % (i + 1)
-		var sp2: Dictionary = _spot(BOOSTS[i][0], BOOSTS[i][1], 0.08)
+		var sp2: Dictionary = _spot(boosts[i][0], boosts[i][1], 0.08)
 		bp.position = sp2["pos"]
 		bp.rotation_degrees = Vector3(0, sp2["yaw"], 0)
 		pads.add_child(bp)
@@ -1628,8 +1685,16 @@ const SIGNS := [
 	[1745.0, -12.0, "warn", "CURVA", "PELIGROSA"],
 	[1920.0, -11.8, "mine", "RAMPA PRINCIPAL", "NIVEL 3200"],
 	[2560.0, -11.8, "mine", "NIVEL 3160", "BANCO 6"],
-	[3330.0, -12.5, "info", "PLANTA", "TALLER  -  OFICINAS"],
 ]
+
+
+## The fixed signs and those that follow the route: onto the floor, the sump's corner, the plant.
+func _signs() -> Array:
+	var out: Array = SIGNS.duplicate(true)
+	out.append([_ramp_s1 + 15.0, -12.0, "warn", "TRAFICO PESADO", "VEHICULOS MINEROS"])
+	out.append([float(_turns[T_SUMP_TURN]["s0"]) - 45.0, 12.0, "warn", "PELIGRO", "AGUA PROFUNDA"])
+	out.append([float(_turns[T_MOUTH]["s1"]) + 40.0, -12.5, "info", "PLANTA", "TALLER  -  OFICINAS"])
+	return out
 
 
 func _build_gate(level: Node3D) -> void:
@@ -1646,8 +1711,9 @@ func _build_gate(level: Node3D) -> void:
 	var body := _prop(root, "Gate", gate, pos, yaw, [[Vector3(-hw, 5.9, 0), Vector3(1.6, 11.8, 1.6)], [Vector3(hw, 5.9, 0), Vector3(1.6, 11.8, 1.6)],
 			[Vector3(hw + 5.8, 2.3, 6.1), Vector3(5.8, 4.6, 5.8)]], 0.0)
 	_labels(root, labels, body.transform, PROP_SCALE)
-	for i in range(SIGNS.size()):
-		var sg: Array = SIGNS[i]
+	var signs: Array = _signs()
+	for i in range(signs.size()):
+		var sg: Array = signs[i]
 		var ss: Dictionary = _spot(sg[0], sg[1], 0.0)
 		var sp2: Vector3 = ss["pos"]
 		sp2.y = _ground_at(sp2.x, sp2.z)
@@ -1670,19 +1736,41 @@ func _build_gate(level: Node3D) -> void:
 #  The pit: the shovel at the face, trucks, the crusher, light towers, the sump
 # ======================================================================================
 
-const SHOVEL_AT := Vector2(110.0, -44.0)
-const MUCK_AT := Vector2(170.0, -40.0)
-const CRUSHER_AT := Vector2(-112.0, 62.0)
-## Trucks: [x, z, heading (degrees, 0 toward -z), loaded, kind ("haul" or "water")].
+## The shovel digs the north wall's toe, its muck pile against the face, a truck beside it to load.
+const SHOVEL_AT := Vector2(70.0, -104.0)
+const MUCK_AT := Vector2(70.0, -124.0)
+const MUCK_HALF := Vector2(30.0, 7.0)
+const MUCK_H := 8.0
+const CRUSHER_AT := Vector2(0.0, 98.0)
+## Trucks: [x, z, heading (degrees, 0 toward -z), loaded, kind ("haul" or "water")]. Several stand on the insides of
+## the floor's bends, so its turns go round them.
 const PIT_TRUCKS := [
-	[126.0, -6.0, 90.0, true, "haul"],
-	[52.0, 34.0, -70.0, false, "haul"],
-	[-112.0, 38.0, 0.0, true, "haul"],
-	[-58.0, -48.0, 160.0, false, "water"],
-	[12.0, -18.0, -40.0, true, "haul"],
+	[114.0, -108.0, 90.0, true, "haul"],
+	[165.0, 40.0, 0.0, true, "haul"],
+	[165.0, -25.0, 180.0, false, "water"],
+	[90.0, 100.0, 90.0, false, "haul"],
+	[88.0, 58.0, -90.0, false, "haul"],
+	[100.0, 2.0, 0.0, true, "haul"],
+	[0.0, 76.0, 0.0, true, "haul"],
+	[-25.0, 15.0, 120.0, false, "haul"],
+	[20.0, -35.0, -60.0, true, "haul"],
 ]
-const LIGHT_TOWERS := [[150.0, 30.0, 70.0], [-30.0, -108.0, 180.0], [-150.0, 20.0, -60.0], [70.0, 100.0, 20.0], [-80.0, 112.0, 0.0]]
-const DRILLS := [[30.0, -112.0, 180.0], [58.0, -110.0, 170.0], [-10.0, -114.0, 190.0]]
+const LIGHT_TOWERS := [[150.0, -60.0, 90.0], [-110.0, -30.0, 0.0], [30.0, 60.0, 20.0], [140.0, 110.0, 0.0], [-120.0, 30.0, 0.0]]
+const DRILLS := [[-5.0, -112.0, 180.0], [-40.0, -114.0, 170.0]]
+## How far a pit machine's footprint keeps off the floor track's edge.
+const PIT_CLEAR := 2.5
+
+
+## Errors when a footprint (centre, yaw, half sizes) comes within `margin` of the route's edge.
+func _check_clear(what: String, c: Vector3, yaw: float, half: Vector2, margin: float) -> void:
+	var b := Basis(Vector3.UP, yaw)
+	var nearest := 1e9
+	for u in [-1.0, -0.5, 0.0, 0.5, 1.0]:
+		for v in [-1.0, -0.5, 0.0, 0.5, 1.0]:
+			var p: Vector3 = c + b * Vector3(u * half.x, 0.0, v * half.y)
+			nearest = minf(nearest, _route_dist(Vector2(p.x, p.z)))
+	if nearest < ROAD_HALF + margin:
+		push_error("%s stands %.1fm from the road's middle (keep %.1f)" % [what, nearest, ROAD_HALF + margin])
 
 
 func _truck_mesh(loaded: bool, kind: String) -> ArrayMesh:
@@ -1695,6 +1783,7 @@ func _truck_mesh(loaded: bool, kind: String) -> ArrayMesh:
 func _truck(parent: Node3D, node_name: String, x: float, z: float, yaw: float, loaded: bool, kind := "haul") -> void:
 	var s := PROP_SCALE
 	var pos := Vector3(x, 0.0, z)
+	_check_clear(node_name, pos, yaw, Vector2(4.9, 7.8) * s, PIT_CLEAR)
 	pos.y = _seat(node_name, pos, yaw, Vector2(5.0, 8.0) * s, 0.5) - 0.05
 	_prop(parent, node_name, _truck_mesh(loaded, kind), pos, yaw, [[Vector3(0, 4.3, 0.2) * s, Vector3(9.8, 7.8, 15.4) * s]], 16.0)
 
@@ -1705,22 +1794,24 @@ func _build_pit(level: Node3D) -> void:
 	level.add_child(root)
 	var s := PROP_SCALE
 	# The face being dug: the muck pile against the east wall, the shovel facing it.
-	var muck: ArrayMesh = _mesh("muck_pile", 1.0, func(pk, kit): MinaKit.muck_pile(pk, kit, Vector2(34.0, 17.0), 11.0, 0.4))
+	var muck: ArrayMesh = _mesh("muck_pile", 1.0, func(pk, kit): MinaKit.muck_pile(pk, kit, MUCK_HALF, MUCK_H, 0.4))
 	var mpos := Vector3(MUCK_AT.x, FLOOR_Y - 0.4, MUCK_AT.y)
-	var mbody := _prop(root, "MuckPile", muck, mpos, PI * 0.5, [], 30.0)
+	# Its steep side (the kit's +z) against the north wall.
+	var mbody := _prop(root, "MuckPile", muck, mpos, PI, [], 30.0)
 	var hull := ConvexPolygonShape3D.new()
 	var hp := PackedVector3Array()
 	for u in [-1.0, -0.5, 0.0, 0.5, 1.0]:
 		for v in [-1.0, -0.5, 0.0, 0.5, 1.0]:
 			var dome: float = maxf(1.0 - pow(absf(u), 3.0) - pow(absf(v - 0.25) / 1.25, 2.0), 0.0)
-			hp.append(Vector3(u * 34.0, 11.0 * pow(dome, 0.7) * 0.85, v * 17.0))
+			hp.append(Vector3(u * MUCK_HALF.x, MUCK_H * pow(dome, 0.7) * 0.85, v * MUCK_HALF.y))
 	hull.points = hp
 	var hcs := CollisionShape3D.new()
 	hcs.shape = hull
 	mbody.add_child(hcs)
 	var shovel: ArrayMesh = _mesh("rope_shovel", s, func(pk, kit): MinaKit.rope_shovel(pk, kit, 0.0, 0.75, 4.0))
 	var spos := Vector3(SHOVEL_AT.x, 0.0, SHOVEL_AT.y)
-	var syaw := -PI * 0.5
+	var syaw := 0.0
+	_check_clear("shovel", spos, syaw, Vector2(6.5, 7.0) * s, PIT_CLEAR)
 	spos.y = _seat("shovel", spos, syaw, Vector2(6.5, 7.0) * s, 0.5) - 0.05
 	_prop(root, "RopeShovel", shovel, spos, syaw, [[Vector3(0, 1.5, 0) * s, Vector3(13.0, 3.0, 13.5) * s], [Vector3(0, 7.5, 2.4) * s, Vector3(10.8, 7.5, 11.0) * s]], 30.0)
 	_label(root, "MINA DEL VIENTO", spos + Basis(Vector3.UP, syaw) * (Vector3(5.24, 9.7, 2.4) * s), Basis(Vector3.UP, syaw) * Vector3.RIGHT, 0.55 * s, Color(0.96, 0.96, 0.94), 9.0 * s)
@@ -1732,6 +1823,7 @@ func _build_pit(level: Node3D) -> void:
 		var lt: Array = LIGHT_TOWERS[i]
 		var lp := Vector3(lt[0], 0.0, lt[1])
 		var ly: float = deg_to_rad(float(lt[2]))
+		_check_clear("light tower %d" % i, lp, ly, Vector2(2.0, 2.0) * s, PIT_CLEAR)
 		lp.y = _seat("light %d" % i, lp, ly, Vector2(2.0, 2.0) * s, 0.4)
 		_prop(root, "LightTower_%d" % i, light, lp, ly, [[Vector3(0, 1.3, 0) * s, Vector3(2.2, 2.6, 3.6) * s]], 5.0)
 	var drill: ArrayMesh = _mesh("drill_rig", s, func(pk, kit): MinaKit.drill_rig(pk, kit))
@@ -1739,29 +1831,35 @@ func _build_pit(level: Node3D) -> void:
 		var dr: Array = DRILLS[i]
 		var dp := Vector3(dr[0], 0.0, dr[1])
 		var dyaw: float = deg_to_rad(float(dr[2]))
+		_check_clear("drill %d" % i, dp, dyaw, Vector2(2.7, 4.0) * s, PIT_CLEAR)
 		dp.y = _seat("drill %d" % i, dp, dyaw, Vector2(2.7, 4.0) * s, 0.4)
 		_prop(root, "DrillRig_%d" % i, drill, dp, dyaw, [[Vector3(0, 2.0, 0.4) * s, Vector3(5.4, 4.2, 7.8) * s]], 8.0)
 	# The in-pit crusher by the mouth, a truck backed up to its pocket.
 	var clabels: Array = []
 	var cmesh: ArrayMesh = _mesh("crusher", s, func(pk, kit): MinaKit.crusher(pk, kit, clabels))
 	var cpos := Vector3(CRUSHER_AT.x, 0.0, CRUSHER_AT.y)
+	_check_clear("crusher", cpos + Vector3(0, 0, 5.0 * s), 0.0, Vector2(12.0, 7.0) * s, PIT_CLEAR)
 	cpos.y = _seat("crusher", cpos, 0.0, Vector2(12.0, 7.0) * s, 0.6) - 0.1
 	var cbody := _prop(root, "Crusher", cmesh, cpos, 0.0, [[Vector3(0, 3.6, 4.0) * s, Vector3(24.0, 7.2, 12.0) * s], [Vector3(0, 16.0, 5.5) * s, Vector3(16.0, 20.0, 13.0) * s]], 24.0)
 	_labels(root, clabels, cbody.transform, s)
-	# The sump: still water in the floor's low corner, blue-green with copper.
-	# Not "...Water": PlayerCart takes any node so named for the sea, and the mouth and the valley lie below this.
+	# The sump: still water in the floor's low corner, blue-green with copper, deep enough to drown a cart. PlayerCart
+	# takes the first node named "...Water" for the level's water: its bounds keep it to the sump, or the mouth and the
+	# valley, which lie below its surface, would flood every engine.
 	var water := MeshInstance3D.new()
-	water.name = "SumpPool"
+	water.name = "SumpWater"
+	water.set_meta(&"water_surface_y", SUMP_WATER_Y)
+	water.set_meta(&"water_bounds_min", SUMP - Vector2.ONE * (SUMP_R + 6.0))
+	water.set_meta(&"water_bounds_max", SUMP + Vector2.ONE * (SUMP_R + 6.0))
 	var disc := CylinderMesh.new()
-	disc.top_radius = 40.0
-	disc.bottom_radius = 40.0
+	disc.top_radius = SUMP_R + 8.0
+	disc.bottom_radius = SUMP_R + 8.0
 	disc.height = 0.05
 	disc.radial_segments = 48
 	water.mesh = disc
 	var wm := ShaderMaterial.new()
 	wm.shader = load("res://still_water.gdshader")
-	wm.set_shader_parameter("water_color", Color(0.03, 0.16, 0.14))
-	wm.set_shader_parameter("sky_tint", Color(0.40, 0.62, 0.60))
+	wm.set_shader_parameter("water_color", Color(0.04, 0.30, 0.28))
+	wm.set_shader_parameter("sky_tint", Color(0.35, 0.72, 0.66))
 	wm.set_shader_parameter("ripple_strength", 0.12)
 	water.material_override = _save_baked_resource(wm, "sump_water_material", PROP_PREFIX)
 	water.position = Vector3(SUMP.x, SUMP_WATER_Y, SUMP.y)
@@ -1775,9 +1873,8 @@ func _build_pit(level: Node3D) -> void:
 
 ## The belt's line, world metres (y up from the ground under each point, added by `_conveyor_points`), and which
 ## segments are galleries over the road.
-const CONVEYOR_A := [[-112.0, 88.0, 3.0], [-70.0, 112.0, 3.2], [-55.5, 150.0, 3.2], [-55.5, 360.0, 4.2], [-55.5, 392.0, 13.5],
-		[-22.0, 422.0, 13.5], [-8.0, 438.0, 9.0], [6.0, 452.0, 7.0]]
-const CONVEYOR_A_BRIDGES := [4]
+const CONVEYOR_A := [[0.0, 119.0, 3.0], [-26.5, 121.0, 3.2], [-26.5, 395.0, 4.2], [-8.0, 438.0, 7.0], [6.0, 452.0, 7.0]]
+const CONVEYOR_A_BRIDGES := []
 const CONVEYOR_B := [[70.0, 470.0, 4.0], [128.0, 490.0, 9.0], [150.0, 498.0, 14.0], [168.0, 572.0, 14.0], [182.0, 592.0, 9.0], [200.0, 610.0, 6.0]]
 const CONVEYOR_B_BRIDGES := [2]
 const STOCKPILE_AT := Vector2(38.0, 456.0)
@@ -1876,7 +1973,8 @@ const SHOP_AT := Vector2(330.0, 468.0)
 const CONC_AT := Vector2(232.0, 640.0)
 const THICKENERS := [Vector2(300.0, 655.0), Vector2(345.0, 640.0)]
 const SHOP_TRUCKS := [[300.0, 515.0, 0.0, false], [340.0, 512.0, 10.0, false], [230.0, 500.0, -80.0, true]]
-const STAND_S := 4060.0
+## The grandstand's middle, this far past the finish line.
+const STAND_PAST := 16.0
 const STAND_LAT := 22.0
 
 
@@ -1933,7 +2031,8 @@ func _build_valley(level: Node3D) -> void:
 	# The finish: a grandstand beside the line, spectators along both sides behind barriers.
 	var seats: Array = []
 	var stand: ArrayMesh = _mesh("grandstand", s, func(pk, kit): MinaKit.grandstand(pk, kit, 44.0, seats))
-	var fs: Dictionary = _spot(STAND_S, STAND_LAT, 0.0)
+	var stand_s: float = _finish_s + STAND_PAST
+	var fs: Dictionary = _spot(stand_s, STAND_LAT, 0.0)
 	var fpos: Vector3 = fs["pos"]
 	# The stand's front (-z) toward the road.
 	var fyaw: float = _yaw_to(-(fs["right"] as Vector3))
@@ -1947,7 +2046,7 @@ func _build_valley(level: Node3D) -> void:
 	rng.seed = 4242
 	while ss < _finish_s + 40.0:
 		for side in [-1.0, 1.0]:
-			if side > 0.0 and absf(ss - STAND_S) < 40.0:
+			if side > 0.0 and absf(ss - stand_s) < 40.0:
 				continue
 			var bp: Dictionary = _spot(ss, side * 12.5, 0.0)
 			var bpos: Vector3 = bp["pos"]
@@ -2543,7 +2642,7 @@ func _make_ground_material() -> ShaderMaterial:
 	m.set_shader_parameter("floor_y", FLOOR_Y)
 	m.set_shader_parameter("rim_y", PLATEAU_Y)
 	m.set_shader_parameter("sump_y", SUMP_WATER_Y)
-	m.set_shader_parameter("sump", Vector3(SUMP.x, SUMP.y, 60.0))
+	m.set_shader_parameter("sump", Vector3(SUMP.x, SUMP.y, SUMP_R + 14.0))
 	m.set_shader_parameter("face_slope", 0.0)
 	return _save_baked_resource(m, "ground_material") as ShaderMaterial
 
