@@ -24,6 +24,14 @@ const RAIL_TOP := Color(0.66, 0.65, 0.63)
 const DECK := Color(0.19, 0.18, 0.17)
 
 static var _streams := {}
+## While an Array, track_piece and turnout append the triangles they draw (ballast, sleepers, rails) to it: the track's
+## solid surface, so a cart runs over the sleepers and the rails (Estación Seca's RailSurface bodies). Null: none.
+static var solid_sink = null
+## The bed hump's top under the rails' tops (_bed_faces). -0.15 covers the ballast and the sleepers (Mina del Viento,
+## whose track mesh is solid anyway); Estación Seca sets -0.4, under the ballast's top (-0.33), so with its solid
+## track surface a cart runs over the sleepers and rails while the hump still eases the ballast's steep lower
+## shoulders (from 3.3m out).
+static var bed_top := -0.15
 static var _mats := {}
 
 
@@ -145,7 +153,7 @@ static func _sleeper(pk: PropKit, kit: Dictionary, c: Vector3, along: Vector3, a
 ## 17-degree one launched them like a kicker. The rails' heads stand 15cm proud of it.
 static func _bed_faces(faces: Array, a: Vector3, b: Vector3, right_a: Vector3, right_b: Vector3) -> void:
 	var foot: float = GAUGE_HALF + 5.4
-	var prof: Array = [[-foot, -0.8], [-GAUGE_HALF, -0.15], [GAUGE_HALF, -0.15], [foot, -0.8]]
+	var prof: Array = [[-foot, -0.8], [-GAUGE_HALF, bed_top], [GAUGE_HALF, bed_top], [foot, -0.8]]
 	for k in range(prof.size() - 1):
 		var p0a: Vector3 = a + right_a * float(prof[k][0]) + Vector3(0, float(prof[k][1]), 0)
 		var p1a: Vector3 = a + right_a * float(prof[k + 1][0]) + Vector3(0, float(prof[k + 1][1]), 0)
@@ -229,6 +237,8 @@ static func track_piece(pts: Array, bed: Array, seed_v: int = 0, faces = null, b
 			_sleeper(pk, kit, Vector3(c.x, sy + 0.0525 * K, c.z), dir, right, SLEEPER_HALF, 0.13 * K, 0.085 * K, SLEEPER * (0.85 + rng.randf() * 0.3), rng.randf() * 40.0)
 			sleeper_at += SLEEPER_SPACING
 		sleeper_at -= length
+	if solid_sink is Array:
+		(solid_sink as Array).append_array(PropKit.kit_triangles(kit))
 	return pk.commit(kit)
 
 
@@ -1121,6 +1131,8 @@ static func turnout(through: Array, branch: Array, side: float, info: Dictionary
 	info["stand_reach"] = 0.9 * K
 	info["stand_dir"] = dir
 	info["stand_out"] = right * (-side)
+	if solid_sink is Array:
+		(solid_sink as Array).append_array(PropKit.kit_triangles(kit))
 	return pk.commit(kit)
 
 

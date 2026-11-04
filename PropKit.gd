@@ -350,6 +350,24 @@ static func _signed_area(poly: PackedVector2Array) -> float:
 
 
 ## Commits a kit into one ArrayMesh, a surface per material key (empty surfaces skipped).
+## The kit's triangles as they stand (every surface, in the kit's frame), read on the CPU before `commit`: solid
+## geometry for a collider, which works headless where a committed mesh's arrays read back empty.
+static func kit_triangles(kit: Dictionary) -> PackedVector3Array:
+	var out := PackedVector3Array()
+	for key in kit.keys():
+		var s: SurfaceTool = kit[key]
+		s.index()
+		var arr: Array = s.commit_to_arrays()
+		var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+		var idx = arr[Mesh.ARRAY_INDEX]
+		if idx == null or (idx as PackedInt32Array).is_empty():
+			out.append_array(verts)
+		else:
+			for i in (idx as PackedInt32Array):
+				out.append(verts[i])
+	return out
+
+
 func commit(kit: Dictionary) -> ArrayMesh:
 	var mesh := ArrayMesh.new()
 	var keys: Array = kit.keys()

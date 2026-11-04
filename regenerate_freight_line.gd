@@ -1508,7 +1508,11 @@ func _build_portals(level_scene: Node3D) -> void:
 			if pts.size() > 1:
 				bed.append(true)
 			d2 += SAMPLE_STEP
+		# Inside the tunnels: no solid surface (nobody drives in there).
+		var sink = FreightKit.solid_sink
+		FreightKit.solid_sink = null
 		_instance_mesh(root, "PortalTrackBed_%d" % count, FreightKit.track_piece(pts, bed, 900 + count), Transform3D.IDENTITY)
+		FreightKit.solid_sink = sink
 		count += 1
 	print("  %d tunnel portals" % count)
 
@@ -1652,6 +1656,7 @@ func _flush_spur_track(root: Node3D, si: int, piece: Array, bed: Array, piece_no
 ## shoulders and on over the rails), gravel to its tyres. Its name keeps clear of "track", "road", "ramp" and "deck",
 ## which PlayerCart takes for the lap's own surface.
 func _bed_body(parent: Node3D, body_name: String, faces: Array) -> void:
+	_rail_surface_body(parent, body_name.replace("RailBed", "RailSurface"))
 	if faces.is_empty():
 		return
 	var body := StaticBody3D.new()
@@ -1666,6 +1671,51 @@ func _bed_body(parent: Node3D, body_name: String, faces: Array) -> void:
 	cs.name = "Shape"
 	cs.shape = _save_baked_resource(shape, body_name.to_snake_case() + "_shape")
 	body.add_child(cs)
+
+
+## The track's own surface as a solid body: the triangles FreightKit.track_piece and turnout drew since the last one
+## (FreightKit.solid_sink: the ballast's shoulders, the sleepers, the rails), so a cart crossing a track off the road
+## jolts over the sleepers and the rails as on Mina del Viento's rail loop, instead of gliding over the bed's smooth
+## hump (which still lies under them, 15cm under the rails' tops, the hump's 7 degrees from 5.4m out, and keeps a cart
+## from falling into the gaps). Gravel to the tyres, named clear of PlayerCart's track words. Not over the level
+## crossings (RAIL_SURFACE_SKIP of each): the road's cars run on the planked deck there, flush with the rails.
+const RAIL_SURFACE_SKIP := 13.0
+
+func _rail_surface_body(parent: Node3D, body_name: String) -> void:
+	var tris = FreightKit.solid_sink
+	FreightKit.solid_sink = []
+	if not (tris is Array) or (tris as Array).is_empty():
+		return
+	var faces := PackedVector3Array()
+	var arr: Array = tris
+	for i in range(0, arr.size() - 2, 3):
+		var a: Vector3 = arr[i]
+		var b: Vector3 = arr[i + 1]
+		var c: Vector3 = arr[i + 2]
+		var m := Vector2((a.x + b.x + c.x) / 3.0, (a.z + b.z + c.z) / 3.0)
+		var skip := false
+		for cr in _crossings:
+			var q: Vector2 = cr["pos"]
+			if m.distance_to(q) < RAIL_SURFACE_SKIP:
+				skip = true
+				break
+		if not skip:
+			faces.append_array([a, b, c])
+	if faces.is_empty():
+		return
+	var body := StaticBody3D.new()
+	body.name = body_name
+	body.set_meta(&"surface", "gravel")
+	body.set_meta(&"dust_color", Color(0.62, 0.58, 0.52, 0.5))
+	parent.add_child(body)
+	var shape := ConcavePolygonShape3D.new()
+	shape.set_faces(faces)
+	shape.backface_collision = true
+	var cs := CollisionShape3D.new()
+	cs.name = "Shape"
+	cs.shape = _save_baked_resource(shape, body_name.to_snake_case() + "_shape")
+	body.add_child(cs)
+	print("  %s: %d triangles" % [body_name, faces.size() / 3])
 
 
 func info_of(ri: int) -> Dictionary:
@@ -2614,6 +2664,8 @@ func _set_owner_recursive(node: Node, scene_root: Node) -> void:
 
 
 func _ready() -> void:
+	FreightKit.solid_sink = []
+	FreightKit.bed_top = -0.4
 	print("=== Freight Line (Sierra del Viento) Level Generation ===")
 	var t_start: int = Time.get_ticks_msec()
 

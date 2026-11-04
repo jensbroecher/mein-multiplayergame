@@ -2335,6 +2335,13 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
   the face in world space (the meshes have no tangents). Sleepers are hut_wood's squared timber (`_sleeper`: UVs in metres,
   the grain along v); rails have rusty sides and a bright running surface (keys "rail", "railtop"). Every point's "across"
   is mitred between its segments (`before`/`after` carry it over a piece's ends), so curves have no seams.
+  - The track itself is solid (`RailSurface_<line>`, gravel): every triangle FreightKit.track_piece and turnout draw
+    (the ballast's top and shoulders, the sleepers, the rails), collected through `FreightKit.solid_sink` and left out
+    for `RAIL_SURFACE_SKIP` (13m) round each level crossing (the planked deck). A cart runs over the sleepers and rails
+    as on Mina del Viento's rail loop, whose track mesh is solid by accident (Level.gd bakes trimeshes under any node
+    named "loop": `RailLoop`). With only the hump below, cars glided over the track as if hovering. The hump's top is
+    `FreightKit.bed_top`: -0.4 here (under the ballast's top), -0.15 elsewhere; it now only eases the ballast's steep
+    lower shoulders. `track_cross_test`: hops of 0.4-0.6m at 21-34 m/s, speed kept.
   - Collision: every bed is a body `RailBed_<line>` (`_bed_body`, surface gravel; the name keeps clear of PlayerCart's track
     words) of `_bed_faces`: a low, wide hump rising 7 degrees from under the ground to 15cm under the rails' tops. A cart
     crossing at full speed comes off it about 4 m/s up (a hop of a few tens of centimetres) and keeps its speed. PlayerCart
