@@ -2670,6 +2670,8 @@ const HARBOR_SEABED_Y := -7.5
 const HARBOR_DECK_Y := 3.55
 const HARBOR_PIER_W := 16.0
 const HARBOR_PIER_THICK := 2.55
+## The sea plane's side: past the fog's end on every side of the harbour.
+const HARBOR_SEA_SIZE := 4400.0
 
 
 ## Murky green/brown water filling the first hill-jump pit on Canyon Chasm.
@@ -3056,51 +3058,38 @@ func add_harbor_water() -> void:
 	if existing != null:
 		existing.free()
 
+	# Out past the fog's end (regenerate_harbor_pier.gd: 1.9km), so the sea runs to the horizon with no edge.
 	var water := MeshInstance3D.new()
 	water.name = "HarborWater"
 	var plane := PlaneMesh.new()
-	plane.size = Vector2(1400.0, 1400.0)
-	plane.subdivide_width = 48
-	plane.subdivide_depth = 48
+	plane.size = Vector2(HARBOR_SEA_SIZE, HARBOR_SEA_SIZE)
+	plane.subdivide_width = 200
+	plane.subdivide_depth = 200
 	water.mesh = plane
 	water.position = Vector3(0.0, HARBOR_WATER_Y, 0.0)
 	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var half := HARBOR_SEA_SIZE * 0.5
 	water.set_meta("water_surface_y", HARBOR_WATER_Y)
-	water.set_meta("water_half_xz", Vector2(700.0, 700.0))
+	water.set_meta("water_half_xz", Vector2(half, half))
 	water.set_meta("water_center_xz", Vector2.ZERO)
-	water.set_meta("water_bounds_min", Vector2(-700.0, -700.0))
-	water.set_meta("water_bounds_max", Vector2(700.0, 700.0))
+	water.set_meta("water_bounds_min", Vector2(-half, -half))
+	water.set_meta("water_bounds_max", Vector2(half, half))
 
 	var mat := ShaderMaterial.new()
-	mat.shader = load("res://water.gdshader")
+	mat.shader = load("res://harbor_water.gdshader")
 	var noise := FastNoiseLite.new()
 	noise.seed = 17
-	noise.frequency = 0.016
+	noise.frequency = 0.03
 	noise.fractal_type = FastNoiseLite.FRACTAL_FBM
 	noise.fractal_octaves = 4
 	var noise_tex := NoiseTexture2D.new()
 	noise_tex.seamless = true
 	noise_tex.as_normal_map = true
+	noise_tex.bump_strength = 6.0
 	noise_tex.width = 512
 	noise_tex.height = 512
 	noise_tex.noise = noise
 	mat.set_shader_parameter("noise_tex", noise_tex)
-	# Dark, oily harbor water — low transparency so it reads almost black-green.
-	mat.set_shader_parameter("water_color", Color(0.018, 0.03, 0.035))
-	mat.set_shader_parameter("shallow_color", Color(0.05, 0.08, 0.075))
-	mat.set_shader_parameter("deep_water_color", Color(0.008, 0.014, 0.018))
-	mat.set_shader_parameter("sky_tint", Color(0.42, 0.48, 0.50))
-	mat.set_shader_parameter("sky_reflect", 0.28)
-	mat.set_shader_parameter("transparency", 0.10)
-	mat.set_shader_parameter("metallic", 0.48)
-	mat.set_shader_parameter("roughness", 0.22)
-	mat.set_shader_parameter("wave_speed", 0.018)
-	mat.set_shader_parameter("wave_strength", 0.42)
-	mat.set_shader_parameter("wave_height", 0.22)
-	mat.set_shader_parameter("wave_scale", 0.85)
-	mat.set_shader_parameter("enable_water_edge_fade", true)
-	mat.set_shader_parameter("water_fade_start", 520.0)
-	mat.set_shader_parameter("water_fade_end", 780.0)
 	water.material_override = mat
 	add_child(water)
 	if Engine.is_editor_hint() and get_tree():
@@ -3204,75 +3193,46 @@ func _add_harbor_seabed() -> void:
 	body.add_child(col)
 
 
-func _harbor_deck_mat() -> StandardMaterial3D:
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.62, 0.58, 0.50)
-	var tex: Texture2D = load("res://materials/brick.png") as Texture2D
-	if tex:
-		mat.albedo_texture = tex
-		mat.uv1_scale = Vector3(0.35, 0.35, 0.35)
-		mat.uv1_triplanar = true
-	mat.roughness = 0.92
-	mat.metallic = 0.0
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+## The quays' materials: harbor_quay.gdshader in its modes (concrete quay, piles, timber, steel, barrier), one
+## ShaderMaterial per mode shared by every box, drawn from the world position (the boxes' own UVs are per face).
+var _harbor_mats := {}
+
+func _harbor_quay_mat(mode: int) -> ShaderMaterial:
+	if _harbor_mats.has(mode):
+		return _harbor_mats[mode]
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://harbor_quay.gdshader")
+	mat.set_shader_parameter("mode", mode)
+	mat.set_shader_parameter("concrete_tex", load("res://materials/concrete.png"))
+	mat.set_shader_parameter("concrete_nrm", load("res://materials/concrete_normal.png"))
+	mat.set_shader_parameter("water_y", HARBOR_WATER_Y)
+	mat.set_shader_parameter("deck_y", HARBOR_DECK_Y)
+	_harbor_mats[mode] = mat
 	return mat
 
 
-func _harbor_side_mat() -> StandardMaterial3D:
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.38, 0.36, 0.33)
-	var tex: Texture2D = load("res://materials/brick.png") as Texture2D
-	if tex:
-		mat.albedo_texture = tex
-		mat.uv1_scale = Vector3(0.18, 0.18, 0.18)
-		mat.uv1_triplanar = true
-	mat.roughness = 0.96
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	return mat
+func _harbor_deck_mat() -> ShaderMaterial:
+	return _harbor_quay_mat(0)
 
 
-func _harbor_wood_mat() -> StandardMaterial3D:
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.42, 0.30, 0.20)
-	var tex: Texture2D = load("res://materials/dirt.png") as Texture2D
-	if tex:
-		mat.albedo_texture = tex
-		mat.uv1_scale = Vector3(0.45, 0.45, 0.45)
-		mat.uv1_triplanar = true
-	mat.roughness = 0.88
-	return mat
+func _harbor_side_mat() -> ShaderMaterial:
+	return _harbor_quay_mat(0)
 
 
-func _harbor_steel_mat() -> StandardMaterial3D:
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.28, 0.30, 0.32)
-	mat.metallic = 0.65
-	mat.roughness = 0.40
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	return mat
+func _harbor_pile_mat() -> ShaderMaterial:
+	return _harbor_quay_mat(1)
 
 
-func _harbor_container_mat(albedo: Color) -> StandardMaterial3D:
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = albedo
-	mat.metallic = 0.35
-	mat.roughness = 0.55
-	return mat
+func _harbor_wood_mat() -> ShaderMaterial:
+	return _harbor_quay_mat(2)
 
 
-func _harbor_warehouse_mat() -> StandardMaterial3D:
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.45, 0.38, 0.30)
-	mat.roughness = 0.90
-	return mat
+func _harbor_steel_mat() -> ShaderMaterial:
+	return _harbor_quay_mat(3)
 
 
-func _harbor_barrier_mat() -> StandardMaterial3D:
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.88, 0.72, 0.16) # Industrial safety amber-yellow
-	mat.metallic = 0.60
-	mat.roughness = 0.35
-	return mat
+func _harbor_barrier_mat() -> ShaderMaterial:
+	return _harbor_quay_mat(4)
 
 
 func _harbor_add_box(parent: Node, box_name: String, center: Vector3, size: Vector3, yaw: float, mat: Material, group: String = "track_surface") -> StaticBody3D:
@@ -3366,9 +3326,7 @@ func _harbor_add_railing(parent: Node, rail_name: String, p0: Vector3, p1: Vecto
 
 
 func _harbor_add_piles(parent: Node, x0: float, x1: float, z0: float, z1: float, along_x: bool) -> void:
-	var pile_mat := StandardMaterial3D.new()
-	pile_mat.albedo_color = Color(0.22, 0.18, 0.14)
-	pile_mat.roughness = 0.95
+	var pile_mat := _harbor_pile_mat()
 	var step := 11.0
 	if along_x:
 		var z_edges := [minf(z0, z1), maxf(z0, z1)]
@@ -3455,9 +3413,7 @@ func _harbor_add_corner_junction(parent: Node, junc_name: String, center: Vector
 	
 	# 4 Corner support piles
 	var h_w: float = width * 0.5 - 1.8
-	var pile_mat := StandardMaterial3D.new()
-	pile_mat.albedo_color = Color(0.22, 0.18, 0.14)
-	pile_mat.roughness = 0.95
+	var pile_mat := _harbor_pile_mat()
 	var corner_offsets := [
 		Vector2(-h_w, -h_w), Vector2(h_w, -h_w),
 		Vector2(-h_w, h_w), Vector2(h_w, h_w)
@@ -3494,9 +3450,7 @@ func _harbor_add_dock_platform(parent: Node, plat_name: String, x_min: float, x_
 	_harbor_add_visual_box(parent, plat_name + "_Hull", Vector3(cx, deck_y - thick * 0.5 - 0.08, cz), Vector3(len_x - 0.4, thick + 0.15, len_z - 0.4), 0.0, side_mat)
 	
 	# Platform support piles on a grid
-	var pile_mat := StandardMaterial3D.new()
-	pile_mat.albedo_color = Color(0.22, 0.18, 0.14)
-	pile_mat.roughness = 0.95
+	var pile_mat := _harbor_pile_mat()
 	var step_x := 12.0
 	var step_z := 12.0
 	var x: float = x_min + 3.0
@@ -3521,36 +3475,6 @@ func _harbor_add_dock_platform(parent: Node, plat_name: String, x_min: float, x_
 			parent.add_child(cyl)
 			z += step_z
 		x += step_x
-
-
-func _harbor_add_container(parent: Node, c_name: String, center: Vector3, size: Vector3, yaw: float, color: Color) -> void:
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
-	mat.metallic = 0.4
-	mat.roughness = 0.5
-	var body := _harbor_add_box(parent, c_name, center, size, yaw, mat, "")
-	
-	# Corner posts detail
-	var frame_mat := StandardMaterial3D.new()
-	frame_mat.albedo_color = color.darkened(0.35)
-	frame_mat.metallic = 0.7
-	frame_mat.roughness = 0.4
-	var post_w := 0.22
-	var hx: float = size.x * 0.5 - post_w * 0.5
-	var hz: float = size.z * 0.5 - post_w * 0.5
-	var corner_pos := [
-		Vector3(-hx, 0.0, -hz), Vector3(hx, 0.0, -hz),
-		Vector3(-hx, 0.0, hz), Vector3(hx, 0.0, hz)
-	]
-	for idx in range(corner_pos.size()):
-		var c_pos = corner_pos[idx]
-		var post := MeshInstance3D.new()
-		var p_mesh := BoxMesh.new()
-		p_mesh.size = Vector3(post_w, size.y + 0.04, post_w)
-		post.mesh = p_mesh
-		post.material_override = frame_mat
-		post.position = c_pos
-		body.add_child(post)
 
 
 func _harbor_add_elevated_viaduct(parent: Node, deck_mat: Material, side_mat: Material, steel_mat: Material) -> void:
@@ -3844,15 +3768,8 @@ func _add_harbor_piers() -> void:
 	var side_mat := _harbor_side_mat()
 	var wood_mat := _harbor_wood_mat()
 	var steel_mat := _harbor_steel_mat()
-	var warehouse_mat := _harbor_warehouse_mat()
 	var barrier_mat := _harbor_barrier_mat()
 
-	# Container colors
-	var col_blue := Color(0.12, 0.28, 0.58)
-	var col_red := Color(0.68, 0.16, 0.14)
-	var col_orange := Color(0.82, 0.42, 0.10)
-	var col_green := Color(0.18, 0.48, 0.28)
-	var col_yellow := Color(0.78, 0.65, 0.18)
 
 	# ── 1. Corner Junctions (Gapless 16x16 dock blocks at all turns) ──
 	_harbor_add_corner_junction(root, "Junction_NE", Vector2(185.0, -95.0), HARBOR_PIER_W, deck_mat, side_mat, false)
@@ -3950,61 +3867,12 @@ func _add_harbor_piers() -> void:
 			Vector3(-175.0, bridge_pillar_cy, z_p2),
 			Vector3(1.4, bridge_pillar_h, 1.4), 0.0, steel_mat, "")
 
-	# ── 6. Grounded Dock Platforms (Solid foundations under all warehouses and containers) ──
-	# A. North Wharf Platform
+	# ── 6. Grounded Dock Platforms (the decks the warehouses and container stacks stand on) ──
+	# Their buildings, cargo and the breakwaters round the harbour are regenerate_harbor_pier.gd's (PortScenery).
 	_harbor_add_dock_platform(root, "Platform_NorthWharf", -160.0, 50.0, -132.0, -95.0, deck_mat, side_mat)
-	# North Warehouses resting squarely on platform
-	var wh_x_list := [-135.0, -85.0, -30.0, 25.0]
-	for idx in range(wh_x_list.size()):
-		_harbor_add_box(root, "HarborWarehouse_N_%d" % idx,
-			Vector3(wh_x_list[idx], HARBOR_DECK_Y + 4.2, -114.0),
-			Vector3(22.0, 8.4, 16.0), 0.0, warehouse_mat, "")
-
-	# North Wharf Container Stacks
-	_harbor_add_container(root, "CargoN_0", Vector3(-108.0, HARBOR_DECK_Y + 1.3, -107.0), Vector3(12.0, 2.6, 2.4), 0.0, col_blue)
-	_harbor_add_container(root, "CargoN_1", Vector3(-108.0, HARBOR_DECK_Y + 3.9, -107.0), Vector3(12.0, 2.6, 2.4), 0.0, col_red)
-	_harbor_add_container(root, "CargoN_2", Vector3(-58.0, HARBOR_DECK_Y + 1.3, -107.0), Vector3(12.0, 2.6, 2.4), 0.0, col_orange)
-	_harbor_add_container(root, "CargoN_3", Vector3(-58.0, HARBOR_DECK_Y + 3.9, -107.0), Vector3(12.0, 2.6, 2.4), 0.0, col_green)
-	_harbor_add_container(root, "CargoN_4", Vector3(-58.0, HARBOR_DECK_Y + 6.5, -107.0), Vector3(12.0, 2.6, 2.4), 0.0, col_blue)
-	_harbor_add_container(root, "CargoN_5", Vector3(-3.0, HARBOR_DECK_Y + 1.3, -107.0), Vector3(12.0, 2.6, 2.4), 0.0, col_yellow)
-	_harbor_add_container(root, "CargoN_6", Vector3(-3.0, HARBOR_DECK_Y + 3.9, -107.0), Vector3(12.0, 2.6, 2.4), 0.0, col_red)
-
-	# B. East Basin Cargo Terminal Platform
 	_harbor_add_dock_platform(root, "Platform_EastBasin", 96.0, 145.0, 25.0, 90.0, deck_mat, side_mat)
-	_harbor_add_box(root, "HarborWarehouse_East_0",
-		Vector3(124.0, HARBOR_DECK_Y + 3.8, 45.0), Vector3(18.0, 7.6, 14.0), 0.0, warehouse_mat, "")
-	_harbor_add_box(root, "HarborWarehouse_East_1",
-		Vector3(124.0, HARBOR_DECK_Y + 3.8, 70.0), Vector3(18.0, 7.6, 14.0), 0.0, warehouse_mat, "")
-	_harbor_add_container(root, "CargoE_0", Vector3(104.0, HARBOR_DECK_Y + 1.3, 40.0), Vector3(2.4, 2.6, 12.0), 0.0, col_blue)
-	_harbor_add_container(root, "CargoE_1", Vector3(104.0, HARBOR_DECK_Y + 3.9, 40.0), Vector3(2.4, 2.6, 12.0), 0.0, col_green)
-	_harbor_add_container(root, "CargoE_2", Vector3(104.0, HARBOR_DECK_Y + 1.3, 75.0), Vector3(2.4, 2.6, 12.0), 0.0, col_orange)
-	_harbor_add_container(root, "CargoE_3", Vector3(104.0, HARBOR_DECK_Y + 3.9, 75.0), Vector3(2.4, 2.6, 12.0), 0.0, col_red)
-
-	# C. West Basin Logistics Apron Platform
 	_harbor_add_dock_platform(root, "Platform_WestBasin", -95.0, -48.0, 20.0, 75.0, deck_mat, side_mat)
-	_harbor_add_container(root, "CargoW_0", Vector3(-68.0, HARBOR_DECK_Y + 1.3, 35.0), Vector3(12.0, 2.6, 2.4), 0.0, col_red)
-	_harbor_add_container(root, "CargoW_1", Vector3(-68.0, HARBOR_DECK_Y + 3.9, 35.0), Vector3(12.0, 2.6, 2.4), 0.0, col_yellow)
-	_harbor_add_container(root, "CargoW_2", Vector3(-68.0, HARBOR_DECK_Y + 1.3, 60.0), Vector3(12.0, 2.6, 2.4), 0.0, col_blue)
-	_harbor_add_container(root, "CargoW_3", Vector3(-68.0, HARBOR_DECK_Y + 3.9, 60.0), Vector3(12.0, 2.6, 2.4), 0.0, col_green)
-
-	# D. Finger Pier Docks
 	_harbor_add_dock_platform(root, "Platform_FingerA", -45.0, 35.0, -48.0, -22.0, deck_mat, side_mat)
-	_harbor_add_box(root, "HarborWarehouse_FingerA",
-		Vector3(-20.0, HARBOR_DECK_Y + 3.6, -35.0),
-		Vector3(16.0, 7.2, 10.0), 0.0, warehouse_mat, "")
-
-	# ── 7. Perimeter Breakwater Walls ──
-	var wall_mat := StandardMaterial3D.new()
-	wall_mat.albedo_color = Color(0.34, 0.35, 0.36)
-	wall_mat.roughness = 0.97
-	_harbor_add_box(root, "HarborBreakwater_N",
-		Vector3(0.0, 2.1, -210.0), Vector3(460.0, 4.2, 6.0), 0.0, wall_mat, "")
-	_harbor_add_box(root, "HarborBreakwater_S",
-		Vector3(0.0, 2.1, 220.0), Vector3(460.0, 4.2, 6.0), 0.0, wall_mat, "")
-	_harbor_add_box(root, "HarborBreakwater_E",
-		Vector3(280.0, 2.1, 5.0), Vector3(6.0, 4.2, 430.0), 0.0, wall_mat, "")
-	_harbor_add_box(root, "HarborBreakwater_W",
-		Vector3(-270.0, 2.1, 5.0), Vector3(6.0, 4.2, 430.0), 0.0, wall_mat, "")
 
 	# ── 8. Safety Crash Railings & Catch Barriers ──
 	# A. South-East Corner Catch Barriers (catches cars off viaduct descent before/at turn)

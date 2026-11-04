@@ -1,0 +1,8 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://generated/harbor_boat_sail_red.res" id="1_ra4se"]
+
+[node name="Boat" type="Node3D" unique_id=2013175158]
+
+[node name="Hull" type="MeshInstance3D" parent="." unique_id=1200826177]
+mesh = ExtResource("1_ra4se")

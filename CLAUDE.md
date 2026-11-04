@@ -317,6 +317,63 @@ the others re-bakes it (see Lakeside Course below).
   summit road bends (the guardrail's gap is now only the lane and 1.5m a side); one wedges now and then inside
   switchback 4 (969m) and at switchback 1's exit (375m).
 
+## Harbor Pier (Bloombay GP, stage 3)
+
+- `regenerate_harbor_pier.gd` (`regenerate_harbor_pier.tscn`, headless, about 5s) builds `levels/HarborPierLevel.tscn`:
+  Bloombay's port at 17:24 on a clear afternoon. The lap, the piers, jumps, skyway, gates and pads are the old layout,
+  untouched: TerrainGenerator's `harbor_pier` code still builds the piers, junctions, platforms, ramps, bridges, the
+  skyway and the barriers as boxes (their collision), now drawn by `harbor_quay.gdshader` from the world position and
+  normal (`mode`: 0 the quays' concrete, decks in slabs and walls with the tide line, a worn yellow coping edge only at
+  deck height; 1 piles; 2 the ramps' planks; 3 the bridges' chequer plate; 4 the barriers' chevrons; 5 the land). The
+  water is `harbor_water.gdshader` on a 4.4km plane (`HARBOR_SEA_SIZE`, past the fog): ripples in world metres, Godot's
+  own sky and sun reflections, lapping where the depth texture says something stands in it. The weather controller
+  is gone (its overcast washed the stage out): the sky is `sky_tropical_cumulus.gdshader`, the sun low in the WSW.
+- Everything round the lap is under `PortScenery` (props at PROP_SCALE 1.6, `PortKit.gd` and `ShipKit.gd`, both on
+  YardKit's helpers and materials). Keep "harbor", "pier", "deck", "road", "track", "ramp", "bridge", "jump", "gate"
+  out of its node names (PlayerCart counts them as road) and "Water" (the sea). DressingColliders skips every single
+  mesh on this level ("pier" is in the level's name, within its three ancestors), so each prop has its own colliders
+  (`_solid`, `_box_shape`, `_cyl_shape`); only the hill trees (MultiMesh) get DressingColliders' trunks.
+  - The wharves (`WAREHOUSES`, `STACKS`): brick sheds (`PortKit.warehouse`: pilasters, gables with round vents, roller
+    doors, a canopy, the sign band in Label3Ds) and corrugated containers (`PortKit.container`, `shipping_container.gdshader`:
+    UV.x carries the face as 100 x its id). Quay furniture (`_build_quay_furniture`) goes only on free edges, read off
+    TerrainGenerator's bodies (`_read_quays`, `_free_edges`): water beyond, no barrier, 17m clear of every corner block
+    (the racing line cuts their insides), 7m of the ramps, clear of gates and pads.
+  - The shores (`_land_d`, `_land_h`, `QUAY_*`): mainland north of z -142, the old town's hill west of x -352, the
+    container terminal east of x 268, one heightfield whose grid lines run along the quays (vertical quay walls); land
+    vertex alpha: 0 grown, 0.5 asphalt, 1 concrete slabs. The town (`_build_city`, `_add_building`): city_building.gdshader
+    facades under tile and slate hip roofs, merged per 450m tile; the harbour front row, the city grid with downtown to the
+    north-east, the old town's pastel houses up the west hill. Breakwaters (`WEST_BREAKWATER`, `EAST_MOLE`): granite
+    mounds, crown walls, tetrapods and armour stone, the red (west) and green (east) entrance lights. The terminal:
+    the feeder ship BLOOMBAY STAR alongside (`ShipKit.container_ship`, bow north), three ship-to-shore cranes
+    (`PortKit.sts_crane`, one boom raised), the yard and two RTGs. The marina below the old town (pontoons, moored
+    yachts and trawlers), trawlers at the fish market, boats under way (SeaBoat.gd with the boats saved as
+    `generated/harbor_boat_*.tscn`; keep every loop clear of the pontoons, which end at x -278: the inner trawler's
+    once ran through the last one), gull flocks.
+  - Downtown's towers (`_add_tower`, `_prism`, `_plan_shape`): a podium, then a blue glass shaft (square, chamfered,
+    octagonal or round) stepping back once or twice, a plain crown, some with a mast; the city material's far glass
+    (`sky_reflect`, `glass_dark`) is blue, as Bloombay looks from South Beach.
+  - The cathedral (`PortKit.cathedral`, `CATHEDRAL_AT`) on the west hill, its front facing south over the old town to
+    the marina and the south pier (facing east it stood dark against the low sun): twin towers with copper spires, a
+    rose window over three portals, nave and aisles with flying buttresses, a transept, a dome on a drum, an apse, on a
+    podium with steps (its floor halfway between the ground in front and behind). Parts with no UVs use the plain
+    vertex-colour keys "stonetrim", "slatetrim", "copper"; the hut shaders' keys need UVs in metres and tangents.
+  - The trees (`_build_trees`) are WoodlandBuilder's oak, lime, birch and spruce (one shape each: eight would split
+    every 300m cell eight ways), `Tree_`/`TreeShadow_` near cells under JungleDetail and `Trees_far_` stand-in cells,
+    all holding the same shuffled instances so HarborDetail thins them alike.
+  - The cruise liners (`CRUISE_SHIPS`, models/boats/*_CruiseShip.glb, 360m, bows toward -z in the files, waterline in
+    the boot-topping band at 10.8m): one at anchor off the harbour mouth, one cruising past. `_cruise_scene` merges each
+    file's ~1,500 meshes into one surface per material (turned bow +z for SeaBoat) plus a far mesh without the parts
+    under `CRUISE_SMALL`, past `CRUISE_NEAR`.
+  - Signs are Label3Ds with `alpha_cut` DISCARD: blended, the ship's name sorted against the water and lost pieces.
+    Anything laid on a wall stands 6cm (life) proud: the roller doors at 2cm flickered against the brick.
+- `HarborDetail.gd` (on PortScenery) follows the Detail Level: High draws what the generator built, Ultra the extra
+  fifth of the trees and every draw distance 25-30% further, the lower levels thin the trees and armour and pull
+  distances in (`base_range` meta on each node; each cell's instances are shuffled). Cost (M1, 4320x2700, `ab_bench`):
+  9.5ms GPU along the lap (the trees 1.3ms, boats and liners 0.2ms); Off saves 1.45ms, Ultra adds 0.36ms.
+- AI races (`scratch/ai_race_test`, speed=2) finish every lap; the falls are the old ones (jump 2's gap at 862-891m,
+  jump 1's, a bot flying the catch rail off the skyway's descent). `scratch/collision_audit ... reach=30` lists only
+  gulls, the flag, the sheds' canopies (10m up), the wall fenders and the skyway's hull skirt.
+
 ## Arco del Viento (the Canyon Course, Sierra del Viento, stage 1)
 
 The menus call it Arco del Viento (it was Canyon Drift / CANYON COURSE); files and code keep "canyon"
