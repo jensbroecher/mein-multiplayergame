@@ -1114,6 +1114,13 @@ static func turnout(through: Array, branch: Array, side: float, info: Dictionary
 	rod_to.y = _table_at(ty, 1.4 * K) - 0.12 * K
 	var rod_from := Vector3(st.x, base_y + 0.25 * K, st.z)
 	pk.beam(kit, "steel", rod_from, Vector3(rod_to.x, rod_from.y, rod_to.z), 0.05 * K, 0.05 * K, STEEL_DARK, dir)
+	# Where the stand is, for its collider (the bed's mesh has none of its own): its base's middle, its height, the
+	# lever's reach and the track's heading.
+	info["stand"] = Vector3(st.x, base_y, st.z)
+	info["stand_h"] = 1.62 * K
+	info["stand_reach"] = 0.9 * K
+	info["stand_dir"] = dir
+	info["stand_out"] = right * (-side)
 	return pk.commit(kit)
 
 

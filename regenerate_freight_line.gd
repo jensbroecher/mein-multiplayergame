@@ -1620,6 +1620,24 @@ func _build_yard(level_scene: Node3D) -> void:
 		var mesh: ArrayMesh = FreightKit.turnout(through, branch, float(t["side"]), info, tfaces)
 		_instance_mesh(root, "TurnoutTrackBed_%s" % t["name"], _save_baked_resource(mesh, "turnout_%s" % String(t["name"]).to_lower()) as ArrayMesh, Transform3D.IDENTITY)
 		_bed_body(root, "RailBed_%s" % t["name"], tfaces)
+		# The switch stand beside the toe is solid: its base and post, and the lever reaching out over them (the bed's
+		# mesh is skipped by DressingColliders, named for the track).
+		if info.has("stand"):
+			var sb := StaticBody3D.new()
+			sb.name = "SwitchStand_%s" % t["name"]
+			sb.set_meta(&"surface", "rock")
+			# x out from the track (the way the lever reaches), y up.
+			var sout: Vector3 = (info["stand_out"] as Vector3).normalized()
+			var h: float = info["stand_h"]
+			var lever: float = info["stand_reach"]
+			sb.transform = Transform3D(Basis(sout, Vector3.UP, sout.cross(Vector3.UP)), info["stand"])
+			var cs := CollisionShape3D.new()
+			var bx := BoxShape3D.new()
+			bx.size = Vector3(lever + 0.9, h, 0.9)
+			cs.shape = bx
+			cs.position = Vector3(lever * 0.5, h * 0.5, 0.0)
+			sb.add_child(cs)
+			root.add_child(sb)
 		print("  turnout %s at x %.0f: zone %.1fm (the builder says %.1fm)" % [t["name"], x0, float(t["zone_end"]), float(info.get("zone_end", -1.0))])
 
 
@@ -1679,7 +1697,7 @@ const LOCAL_PERIOD := 250.0
 const LOCAL_STOP_SHORT := 7.0
 ## [start, end, ramp] of the run in and of the run out, seconds into its cycle.
 const LOCAL_IN := [20.0, 82.0, 14.0]
-const LOCAL_OUT := [191.0, 247.0, 12.0]
+const LOCAL_OUT := [198.0, 246.0, 12.0]
 
 func _build_local_train(level_scene: Node3D) -> void:
 	var curve := Curve3D.new()
@@ -1709,34 +1727,58 @@ func _build_local_train(level_scene: Node3D) -> void:
 	_verify_local(stop, t1_s)
 
 
-## Errors if the local and the Main Line's own trains are ever on the line between its west end and T1 together (the
-## local's leading end and its tail both counted, two Main Line cycles round), or if the local would not fit its legs.
+## Errors if the local and the Main Line's own trains are ever on the line between its west end and T1, or past T1
+## where the yard lead still runs beside the main line (LOCAL_FOUL: closer than two cars' width and a margin), together
+## (the local's leading end and its tail both counted, two Main Line cycles round). Without the stretch past T1 the
+## Express's observation car and the local's rear diesel brushed each other there as the local backed out. On a clash
+## it lists the starts of the run out (and in) that would be clear, keeping each run's length.
+const LOCAL_FOUL := 60.0
+
 func _verify_local(stop: float, t1_s: float) -> void:
+	var clashes := _local_clashes(LOCAL_IN, LOCAL_OUT, stop, t1_s, true)
+	print("  local checked against the Main Line's trains to %.0fm past T1: %d clashes" % [LOCAL_FOUL, clashes])
+	if clashes == 0:
+		return
+	# [start, length] of runs out that would be clear, the run in as it is, slowest first.
+	var ok_out: Array = []
+	var dur := float(LOCAL_OUT[1]) - float(LOCAL_OUT[0])
+	while dur >= 26.0 and ok_out.size() < 12:
+		var st := float(LOCAL_IN[1]) + 5.0
+		while st + dur <= LOCAL_PERIOD - 2.0:
+			if _local_clashes(LOCAL_IN, [st, st + dur, LOCAL_OUT[2]], stop, t1_s, false) == 0:
+				ok_out.append("%.0f+%.0fs (%.0f m/s on average)" % [st, dur, stop / (dur - float(LOCAL_OUT[2]))])
+			st += 1.0
+		dur -= 2.0
+	print("  the run out is %.0fm; clear runs out (start+length): %s" % [stop, ", ".join(ok_out)])
+
+
+func _local_clashes(leg_in: Array, leg_out: Array, stop: float, t1_s: float, report: bool) -> int:
 	var length: float = _consist_length(LOCAL_CONSIST)
 	var trains: Array = _rails[0]["trains"]
+	var zone: float = t1_s + LOCAL_FOUL
 	var clashes := 0
 	var t := 0.0
 	while t < LOCAL_PERIOD:
-		var head: float = _local_head(t, stop)
-		# The part of the local on the shared stretch [0, t1_s].
+		var head: float = _local_head(t, stop, leg_in, leg_out)
+		# The part of the local on the shared stretch and beside the main line past T1.
 		var a: float = maxf(head - length, 0.0)
-		var b: float = minf(head, t1_s)
+		var b: float = minf(head, zone)
 		if b > a:
 			for tr in trains:
 				var th: float = fposmod(t - float(tr["phase"]), float(tr["period"])) * float(tr["speed"])
 				var ta: float = maxf(th - _consist_length(tr["consist"]), 0.0)
-				var tb: float = minf(th, t1_s)
+				var tb: float = minf(th, zone)
 				if tb > ta and ta < b + 20.0 and a < tb + 20.0:
 					clashes += 1
-					if clashes < 4:
+					if report and clashes < 4:
 						push_error("the local meets the %s at %.1fs (local %.0f-%.0fm, it %.0f-%.0fm)" % [tr["name"], t, a, b, ta, tb])
 		t += 0.25
-	print("  local checked against the Main Line's trains: %d clashes" % clashes)
+	return clashes
 
 
 ## The local's head along its path `t` seconds into its cycle (as Train.gd's legs).
-func _local_head(t: float, stop: float) -> float:
-	var legs: Array = [[LOCAL_IN[0], LOCAL_IN[1], 0.0, stop, LOCAL_IN[2]], [LOCAL_OUT[0], LOCAL_OUT[1], stop, 0.0, LOCAL_OUT[2]]]
+func _local_head(t: float, stop: float, leg_in: Array = LOCAL_IN, leg_out: Array = LOCAL_OUT) -> float:
+	var legs: Array = [[leg_in[0], leg_in[1], 0.0, stop, leg_in[2]], [leg_out[0], leg_out[1], stop, 0.0, leg_out[2]]]
 	var head := 0.0
 	for lg in legs:
 		if t < float(lg[0]):

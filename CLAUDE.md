@@ -2350,8 +2350,13 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
     flip and throw over the rails at speed (24.5 m/s) made the carts shake and tumble, and the user preferred Mina's.
     On the bed the tyres roll on gravel (the bodies' surface).
 - `TrainKit.gd` builds the rolling stock through a PropKit at SCALE 1.5 (`KINDS`: loco 19m, box 15, tank 14, flat 16,
-  flat_load 16, hopper 16, caboose 10, ploco 20, coach 26, obs 26, in life-size metres): a hood-unit diesel (`loco:2` is
-  the yellow yard switcher), boxcars and tank cars in four colourways, an open flatcar, the log car (`_flat_car` with
+  flat_load 16, hopper 16, caboose 10, ploco 20, coach 26, obs 26, in life-size metres): a hood-unit diesel (`_road_diesel`: a six-axle road unit in maroon with a gold band, a rounded
+  short hood with gold chevrons and twin headlights, a windscreen of two panes, the cab under a black roof, the long
+  hood's louvred doors, dynamic-brake housing, twin exhausts, radiator grilles and three fans, walkways with white
+  handrails, gold-striped pilots (`_pilot`, shared) and a plough; `loco:1` has a black roof over its radiators; `loco:2` is
+  the yard switcher, `_switcher`: an end-cab diesel in safety yellow on a black frame, a rounded long hood with
+  louvred doors, the radiator grille and twin headlights on its front, fans and exhaust on top, white handrails,
+  corner steps, black-and-yellow chevrons on the pilots; `scratch/train_preview.gd ... consist=loco:2`), boxcars and tank cars in four colourways, an open flatcar, the log car (`_flat_car` with
   `_log_load`: bulkheads, three layers of 17/16/17 crosswise logs, stakes and chains; every log `_log` has eight bark
   ridges and a cut face with rim, sapwood, heartwood rings and pith), a covered grain hopper with three roof hatches
   (`_hopper`), a caboose, the passenger cab unit (`_cab_unit`), coaches and the observation car (`_coach`: windows every
@@ -2385,8 +2390,12 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
 - The local (`_build_local_train`, `LOCAL_*`, node `MainLineLocalTrain`): a diesel at each end (the rear one "~ploco") and two
   coaches. Its path is the Main Line from its west end to T1 and the yard lead on to the buffer stop; every 250s (two of the
   Main Line's turns) it comes out of the west tunnel, takes T1 round into the platform (in at 20-82s), stands at the station,
-  and backs out the same way into the tunnel (191-247s), in the gaps the Freight and the Express leave on that stretch.
-  `_verify_local` errors if they ever meet there. The west crossing listens to it too: `res://scratch/crossing_windows_probe.gd`
+  and backs out the same way into the tunnel (198-246s), in the gaps the Freight and the Express leave on that stretch.
+  `_verify_local` errors if they ever meet there or within `LOCAL_FOUL` (60m) past T1, where the lead still runs
+  beside the main line (checked only to T1, the Express's observation car and the local's rear diesel brushed each
+  other there as the local backed out at 191s), and then lists the runs out that would be clear.
+  `res://scratch/train_clearance_probe.tscn -- [step=0.5] [warn=3]` (headless) steps every train of a level through
+  1500s together and prints how close each pair of trains comes (cars as capsules in plan), and any overlap. The west crossing listens to it too: `res://scratch/crossing_windows_probe.gd`
   (`-s`, headless, `-- [at=40,60]`) lists every crossing's trains and passes, and with `at=` holds the trains' clocks to print
   what a bot would hear.
   `res://scratch/train_kill_test.tscn` (headless) puts a real cart through a crossing at the middle of each car, in a gap
@@ -2424,6 +2433,8 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
   where the blades lie on the through rails (level by 12m), and the branch's own track starts at the very sample they reach
   (it had started a sample later, leaving bare rails over the ground and gaps in the ballast). The ground grading and
   the flora keep off the spurs (`_spur_distance`).
+  The switch stand beside each turnout's toe is solid (`SwitchStand_<name>`, a box over its base, post and lever from
+  `FreightKit.turnout`'s `info["stand"]`): it is in the track bed's mesh, which DressingColliders skips.
   `FreightKit.buffer_stop` is a slab and an anchor block under a red-and-white buffer beam on two H-section uprights, two
   buffer heads on hydraulic cylinders, diagonal braces, white rail ends with a tie bar, a red lamp, a plate, and a heap
   of ballast behind (`_ballast_heap`: a lumpy mound of facets with loose stones; it had been a flat-coloured earth bank).

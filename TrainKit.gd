@@ -889,8 +889,13 @@ static func _caboose(pk: PropKit, kit: Dictionary) -> void:
 	pk.tube(kit, "steel", Vector3(0.6, 3.9, 1.8), Vector3(0.6, 4.6, 1.8), 0.14, 0.14, 8, DARK)
 
 
-## `variant` 2 is the yard switcher: safety yellow with black chevron-coloured trim instead of the maroon and gold.
+## `variant` 2 is the yard switcher (`_switcher`); the rest the road diesel in maroon and gold.
 static func _loco(pk: PropKit, kit: Dictionary, variant := 0) -> void:
+	if variant == 2:
+		_switcher(pk, kit)
+		return
+	_road_diesel(pk, kit, variant)
+	return
 	var body_col: Color = MAROON if variant != 2 else Color(0.90, 0.68, 0.08)
 	var trim_col: Color = GOLD if variant != 2 else Color(0.08, 0.08, 0.09)
 	var hl := 9.5
@@ -936,3 +941,341 @@ static func _loco(pk: PropKit, kit: Dictionary, variant := 0) -> void:
 		for z in [-1.6, 1.4, 4.4, 7.4, 9.2]:
 			pk.block(kit, "steel", Vector3(sx * 1.7 - 0.02, 1.4, z - 0.02), Vector3(sx * 1.7 + 0.02, 2.45, z + 0.02), Color(0.55, 0.55, 0.5))
 		_ladder(pk, kit, sx, -3.0, 0.9, 2.6)
+
+
+const SAFETY_YELLOW := Color(0.93, 0.70, 0.07)
+const RAIL_WHITE := Color(0.88, 0.88, 0.84)
+
+
+## A rounded rectangle in the x-y plane (x across, y up), counter-clockwise from +z: hw half wide, y0 to y1, its top
+## corners rounded by r (`crown` raises the middle of the top), for PropKit.extrude along z.
+static func _round_top(hw: float, y0: float, y1: float, r: float, crown := 0.0, segs := 5) -> PackedVector2Array:
+	var pts := PackedVector2Array([Vector2(-hw, y0), Vector2(hw, y0)])
+	for i in range(segs + 1):
+		var a: float = PI * 0.5 * float(i) / float(segs)
+		pts.append(Vector2(hw - r + r * cos(a), y1 - r + r * sin(a)))
+	if crown > 0.0:
+		pts.append(Vector2(0.0, y1 + crown))
+	for i in range(segs + 1):
+		var a2: float = PI * 0.5 + PI * 0.5 * float(i) / float(segs)
+		pts.append(Vector2(-hw + r + r * cos(a2), y1 - r + r * sin(a2)))
+	return pts
+
+
+## The yard switcher: an end-cab diesel (the cab at +z), safety yellow on a black frame. A long hood with a rounded
+## top, panelled doors, louvres and the radiator grille at its front, fans and the exhaust on top; the cab with
+## windows all round under a crowned black roof, a beacon and horns; walkways round the hood with white handrails,
+## steps at the corners, black-and-yellow chevrons across both ends, twin headlights, ditch and marker lights,
+## air tanks and the fuel tank under the frame, hoses at the couplers. Life size, the length of a "loco" (19m).
+static func _switcher(pk: PropKit, kit: Dictionary) -> void:
+	var hl := 9.5
+	var deck := 1.38
+	_underframe(pk, kit, hl, 0.95, deck, DARK)
+	_bogie(pk, kit, -5.6, [-1.15, 1.15])
+	_bogie(pk, kit, 5.6, [-1.15, 1.15])
+	# Under the frame: the fuel tank (rounded, with a gauge), two air tanks along the sides.
+	pk.extrude(kit, "steel", _round_top(1.15, 0.42, 0.95, 0.2, 0.0, 3), -3.4, 2.4, 0.05, IRON)
+	pk.block(kit, "steel", Vector3(1.16, 0.7, -0.4), Vector3(1.2, 0.85, 0.2), RAIL_WHITE)
+	for sx in [-1.0, 1.0]:
+		pk.tube(kit, "steel", Vector3(sx * 1.05, 0.78, 2.9), Vector3(sx * 1.05, 0.78, 4.4), 0.2, 0.2, 10, IRON)
+	# --- The ends: a pilot under each end sill in yellow with black chevrons, the end sill's edge yellow too.
+	for sz in [-1.0, 1.0]:
+		_pilot(pk, kit, hl, sz, SAFETY_YELLOW, DARK)
+	# --- The walkway (diamond plate) round the hood, the steps at the corners.
+	for sx in [-1.0, 1.0]:
+		pk.block(kit, "steel", Vector3(sx * 1.17 - 0.0 if sx > 0.0 else -1.58, deck, -hl), Vector3(1.58 if sx > 0.0 else -1.17, deck + 0.04, 3.4), IRON.lightened(0.08))
+		for sz in [-1.0, 1.0]:
+			var z0: float = sz * (hl - 0.05)
+			var z1: float = sz * (hl - 0.75)
+			for k in 2:
+				var ty: float = 0.5 + 0.42 * float(k)
+				pk.block(kit, "steel", Vector3(sx * 1.2 if sx > 0.0 else -1.62, ty, minf(z0, z1)), Vector3(1.62 if sx > 0.0 else -1.2, ty + 0.05, maxf(z0, z1)), IRON)
+				pk.block(kit, "paint", Vector3(sx * 1.58 if sx > 0.0 else -1.63, ty + 0.05, minf(z0, z1)), Vector3(1.63 if sx > 0.0 else -1.58, ty + 0.08, maxf(z0, z1)), SAFETY_YELLOW)
+			pk.block(kit, "steel", Vector3(sx * 1.58 if sx > 0.0 else -1.62, 0.45, minf(z0, z1) - 0.03), Vector3(1.62 if sx > 0.0 else -1.58, deck, minf(z0, z1)), DARK)
+			pk.block(kit, "steel", Vector3(sx * 1.58 if sx > 0.0 else -1.62, 0.45, maxf(z0, z1)), Vector3(1.62 if sx > 0.0 else -1.58, deck, maxf(z0, z1) + 0.03), DARK)
+	# --- The long hood: rounded top, from the front end to the cab.
+	var hood_hw := 1.12
+	var hood_top := 3.5
+	var hz0 := -9.0
+	var hz1 := 3.4
+	pk.extrude(kit, "paint", _round_top(hood_hw, deck, hood_top, 0.32), hz0, hz1, 0.04, SAFETY_YELLOW)
+	# Doors down both sides (seams, handles), louvres on the ones by the radiator, a black band along the sill.
+	for sx in [-1.0, 1.0]:
+		var fx: float = sx * (hood_hw + 0.012)
+		var z := hz0 + 0.5
+		var door := 0
+		while z < hz1 - 0.6:
+			pk.block(kit, "paint", Vector3(fx - 0.012, 1.6, z - 0.015), Vector3(fx + 0.012, 3.15, z + 0.015), SAFETY_YELLOW.darkened(0.35))
+			pk.block(kit, "steel", Vector3(fx + sx * 0.02 - 0.02, 2.3, z + 0.55), Vector3(fx + sx * 0.02 + 0.02, 2.36, z + 0.75), RAIL_WHITE)
+			if door < 3:
+				var y := 2.45
+				while y < 3.05:
+					pk.block(kit, "paint", Vector3(fx - 0.02, y, z + 0.2), Vector3(fx + 0.02, y + 0.05, z + 1.2), DARK)
+					y += 0.12
+			z += 1.45
+			door += 1
+		pk.block(kit, "paint", Vector3(sx * hood_hw - 0.02, deck + 0.04, hz0), Vector3(sx * hood_hw + 0.02, deck + 0.2, hz1), DARK)
+	# The radiator grille on the hood's front, framed, with bars; number boards and twin headlights over it.
+	var fz := hz0 - 0.02
+	pk.block(kit, "steel", Vector3(-0.85, 1.6, fz - 0.03), Vector3(0.85, 3.0, fz), DARK)
+	var gy := 1.7
+	while gy < 2.95:
+		pk.block(kit, "steel", Vector3(-0.8, gy, fz - 0.06), Vector3(0.8, gy + 0.04, fz - 0.03), IRON.lightened(0.15))
+		gy += 0.11
+	for sx in [-1.0, 1.0]:
+		pk.block(kit, "steel", Vector3(sx * 0.62 - 0.22, 3.12, fz - 0.03), Vector3(sx * 0.62 + 0.22, 3.36, fz), DARK)
+		pk.block(kit, "lamp", Vector3(sx * 0.62 - 0.18, 3.15, fz - 0.05), Vector3(sx * 0.62 + 0.18, 3.33, fz - 0.03), RAIL_WHITE)
+	for sx in [-0.2, 0.2]:
+		pk.tube(kit, "steel", Vector3(sx, 3.25, fz), Vector3(sx, 3.25, fz - 0.12), 0.13, 0.13, 12, DARK)
+		pk.tube(kit, "lamp", Vector3(sx, 3.25, fz - 0.12), Vector3(sx, 3.25, fz - 0.14), 0.1, 0.1, 12, LAMP)
+	# On top: two radiator fans, the exhaust stack, an air intake, sand fillers, lifting eyes.
+	for z2 in [-7.6, -6.2]:
+		pk.tube(kit, "steel", Vector3(0, hood_top - 0.02, z2), Vector3(0, hood_top + 0.1, z2), 0.55, 0.55, 18, DARK)
+		pk.tube(kit, "steel", Vector3(0, hood_top + 0.1, z2), Vector3(0, hood_top + 0.12, z2), 0.5, 0.5, 18, IRON.lightened(0.2), false)
+		for k in 4:
+			var ang: float = PI * 0.25 * float(k)
+			var d2 := Vector3(cos(ang), 0, sin(ang)) * 0.48
+			pk.beam(kit, "steel", Vector3(z2 * 0.0, hood_top + 0.13, z2) - d2, Vector3(0, hood_top + 0.13, z2) + d2, 0.04, 0.02, DARK)
+	pk.tube(kit, "steel", Vector3(0.0, hood_top, -2.2), Vector3(0.0, hood_top + 0.55, -2.2), 0.17, 0.15, 10, DARK)
+	pk.block(kit, "paint", Vector3(-0.55, hood_top - 0.02, 0.4), Vector3(0.55, hood_top + 0.28, 1.8), SAFETY_YELLOW.darkened(0.08))
+	for sx in [-1.0, 1.0]:
+		pk.block(kit, "steel", Vector3(sx * 0.45 - 0.2, hood_top + 0.18, 0.55), Vector3(sx * 0.45 + 0.2, hood_top + 0.3, 1.65), DARK)
+		pk.tube(kit, "steel", Vector3(sx * 0.7, hood_top - 0.1, -8.6), Vector3(sx * 0.7, hood_top + 0.08, -8.6), 0.1, 0.1, 8, DARK)
+	# --- The cab: full width, a crowned black roof with drip rails, windows all round, a door at the back.
+	var cz0 := 3.4
+	var cz1 := 8.9
+	var cab_hw := 1.5
+	var cab_top := 4.55
+	pk.extrude(kit, "paint", _round_top(cab_hw, deck, cab_top, 0.18), cz0, cz1, 0.04, SAFETY_YELLOW)
+	pk.extrude(kit, "steel", _round_top(cab_hw + 0.06, cab_top - 0.02, cab_top + 0.12, 0.1, 0.1), cz0 - 0.1, cz1 + 0.1, 0.03, DARK)
+	# Front windows over the hood, side sliders, rear windows either side of the door; dark rubber frames.
+	for sx in [-1.0, 1.0]:
+		var wx0: float = sx * 0.3
+		var wx1: float = sx * 1.3
+		pk.block(kit, "steel", Vector3(minf(wx0, wx1) - 0.05, 3.62, cz0 - 0.03), Vector3(maxf(wx0, wx1) + 0.05, 4.4, cz0), DARK)
+		pk.block(kit, "glass", Vector3(minf(wx0, wx1), 3.67, cz0 - 0.05), Vector3(maxf(wx0, wx1), 4.35, cz0 - 0.03), GLASS)
+		var sxf: float = sx * (cab_hw + 0.0)
+		for wz in [[4.0, 5.6], [5.9, 7.4]]:
+			pk.block(kit, "steel", Vector3(sxf - 0.03, 3.05, float(wz[0]) - 0.05), Vector3(sxf + 0.03, 4.25, float(wz[1]) + 0.05), DARK)
+			pk.block(kit, "glass", Vector3(sxf - 0.05, 3.1, float(wz[0])), Vector3(sxf + 0.05, 4.2, float(wz[1])), GLASS)
+		pk.block(kit, "steel", Vector3(sxf - 0.04, 3.62, 5.69), Vector3(sxf + 0.04, 3.68, 7.41), DARK)
+		# A visor over the side windows, the grab irons up the cab's corner.
+		pk.block(kit, "steel", Vector3(minf(sxf, sxf + sx * 0.22), 4.3, 3.9), Vector3(maxf(sxf, sxf + sx * 0.22), 4.34, 7.5), DARK)
+		pk.block(kit, "steel", Vector3(sxf + sx * 0.05 - 0.02, 1.6, 8.75), Vector3(sxf + sx * 0.05 + 0.02, 3.6, 8.79), RAIL_WHITE)
+		pk.block(kit, "steel", Vector3(sx * 0.95 - 0.35, 3.3, cz1), Vector3(sx * 0.95 + 0.35, 4.15, cz1 + 0.03), DARK)
+		pk.block(kit, "glass", Vector3(sx * 0.95 - 0.3, 3.35, cz1 + 0.03), Vector3(sx * 0.95 + 0.3, 4.1, cz1 + 0.05), GLASS)
+	pk.block(kit, "paint", Vector3(-0.38, 1.5, cz1), Vector3(0.38, 3.95, cz1 + 0.03), SAFETY_YELLOW.darkened(0.15))
+	pk.block(kit, "glass", Vector3(-0.25, 3.0, cz1 + 0.03), Vector3(0.25, 3.75, cz1 + 0.05), GLASS)
+	pk.block(kit, "steel", Vector3(0.22, 2.4, cz1 + 0.03), Vector3(0.3, 2.5, cz1 + 0.09), RAIL_WHITE)
+	# A black band round the cab at the window sills, the builder's plate.
+	for sx in [-1.0, 1.0]:
+		pk.block(kit, "paint", Vector3(sx * cab_hw - 0.015, 2.85, cz0), Vector3(sx * cab_hw + 0.015, 2.95, cz1), DARK)
+		pk.block(kit, "steel", Vector3(sx * cab_hw - 0.02, 2.2, 4.3), Vector3(sx * cab_hw + 0.02, 2.5, 4.8), Color(0.75, 0.6, 0.25))
+	# Rear headlights and number boards; markers and ditch lights at both ends.
+	for sx in [-0.25, 0.25]:
+		pk.tube(kit, "steel", Vector3(sx, 4.25, cz1), Vector3(sx, 4.25, cz1 + 0.12), 0.11, 0.11, 12, DARK)
+		pk.tube(kit, "lamp", Vector3(sx, 4.25, cz1 + 0.12), Vector3(sx, 4.25, cz1 + 0.14), 0.08, 0.08, 12, LAMP)
+	for sz in [-1.0, 1.0]:
+		var ez: float = sz * (hl + 0.27)
+		for sx in [-1.0, 1.0]:
+			pk.block(kit, "lamp", Vector3(sx * 1.15 - 0.12, 1.12, ez), Vector3(sx * 1.15 + 0.12, 1.3, ez + sz * 0.05), LAMP)
+	# The roof: an amber beacon, the horns, the bell and an antenna.
+	pk.tube(kit, "steel", Vector3(0.0, cab_top + 0.2, 6.2), Vector3(0.0, cab_top + 0.28, 6.2), 0.14, 0.14, 10, DARK)
+	pk.tube(kit, "lamp", Vector3(0.0, cab_top + 0.28, 6.2), Vector3(0.0, cab_top + 0.5, 6.2), 0.11, 0.09, 10, Color(1.0, 0.55, 0.05))
+	for k in 3:
+		var hx: float = -0.7 + 0.18 * float(k)
+		pk.tube(kit, "steel", Vector3(hx, cab_top + 0.25, 4.6), Vector3(hx, cab_top + 0.25, 4.6 - 0.35 - 0.1 * float(k)), 0.03, 0.08, 8, IRON.lightened(0.3))
+	pk.tube(kit, "steel", Vector3(0.75, cab_top + 0.2, 7.6), Vector3(0.75, cab_top + 0.9, 7.6), 0.012, 0.012, 4, DARK)
+	pk.lathe(kit, "steel", Vector3(-0.9, hood_top, 2.6), [Vector2(0.0, 0.0), Vector2(0.12, 0.02), Vector2(0.14, 0.22), Vector2(0.09, 0.3), Vector2(0.0, 0.32)], 10, Color(0.75, 0.6, 0.25))
+	# --- Handrails: stanchions along both walkways and across the ends (open in the middle for the steps), white.
+	for sx in [-1.0, 1.0]:
+		var rx: float = sx * 1.56
+		for z3 in [-9.3, -7.3, -5.3, -3.3, -1.3, 0.7, 2.7]:
+			pk.block(kit, "steel", Vector3(rx - 0.025, deck, z3 - 0.025), Vector3(rx + 0.025, deck + 1.1, z3 + 0.025), RAIL_WHITE)
+		for ry in [deck + 0.55, deck + 1.08]:
+			pk.tube(kit, "steel", Vector3(rx, ry, -9.3), Vector3(rx, ry, 3.4), 0.025, 0.025, 6, RAIL_WHITE, false)
+			pk.tube(kit, "steel", Vector3(rx, ry, -9.3), Vector3(sx * 0.45, ry, -9.3), 0.025, 0.025, 6, RAIL_WHITE, false)
+		pk.block(kit, "steel", Vector3(sx * 0.45 - 0.025, deck, -9.325), Vector3(sx * 0.45 + 0.025, deck + 1.1, -9.275), RAIL_WHITE)
+		for ry2 in [deck + 0.55, deck + 1.08]:
+			pk.tube(kit, "steel", Vector3(rx, ry2, 9.3), Vector3(sx * 0.5, ry2, 9.3), 0.025, 0.025, 6, RAIL_WHITE, false)
+		pk.block(kit, "steel", Vector3(rx - 0.025, deck, 9.275), Vector3(rx + 0.025, deck + 1.1, 9.325), RAIL_WHITE)
+		pk.block(kit, "steel", Vector3(sx * 0.5 - 0.025, deck, 9.275), Vector3(sx * 0.5 + 0.025, deck + 1.1, 9.325), RAIL_WHITE)
+
+
+## A pilot under the end sill at `sz` (-1 the front): a plate in `col` and the sill's edge above it, striped at 45 degrees
+## in `stripe` (painted on, 2.5cm proud, clipped to each plate), hoses and the cut lever.
+static func _pilot(pk: PropKit, kit: Dictionary, hl: float, sz: float, col: Color, stripe: Color) -> void:
+	var zf: float = sz * (hl + 0.24)
+	pk.block(kit, "paint", Vector3(-1.45, 0.42, sz * (hl + 0.02)), Vector3(1.45, 0.95, zf), col)
+	pk.block(kit, "paint", Vector3(-1.42, 1.0, zf), Vector3(1.42, 1.42, zf + sz * 0.02), col)
+	for band in [[0.42, 0.95, zf + sz * 0.025], [1.0, 1.42, zf + sz * 0.045]]:
+		var y0: float = band[0]
+		var y1: float = band[1]
+		var pz: float = band[2]
+		var x := -1.4 - (y1 - y0)
+		while x < 1.4:
+			var xs := [x, x + 0.22, x + 0.22 + (y1 - y0), x + (y1 - y0)]
+			var pts: Array = []
+			for k in 4:
+				pts.append(Vector3(clampf(float(xs[k]), -1.38, 1.38), y0 if k < 2 else y1, pz))
+			if (pts[1] as Vector3).x - (pts[0] as Vector3).x > 0.01 or (pts[2] as Vector3).x - (pts[3] as Vector3).x > 0.01:
+				pk.quad(kit, "paint", pts, Vector3(0, 0, sz), stripe)
+			x += 0.5
+	for hx in [-0.6, 0.6]:
+		pk.tube(kit, "steel", Vector3(hx, 0.9, zf), Vector3(hx, 0.45, zf + sz * 0.25), 0.04, 0.04, 6, DARK)
+	pk.beam(kit, "steel", Vector3(-1.3, 1.25, zf + sz * 0.08), Vector3(0.0, 1.25, zf + sz * 0.08), 0.04, 0.04, RAIL_WHITE)
+
+
+## Hood doors down one side of a hood from z0 to z1 (face at |x| = fx): seams and handles, louvres on the first
+## `louvres` doors from z0's end.
+static func _hood_doors(pk: PropKit, kit: Dictionary, fx: float, sx: float, z0: float, z1: float, col: Color, louvres: int, pitch := 1.45) -> void:
+	var z := z0 + 0.4
+	var door := 0
+	while z < z1 - 0.5:
+		pk.block(kit, "paint", Vector3(fx - 0.012, 1.6, z - 0.015), Vector3(fx + 0.012, 3.1, z + 0.015), col.darkened(0.35))
+		pk.block(kit, "steel", Vector3(fx + sx * 0.02 - 0.02, 2.3, z + 0.55), Vector3(fx + sx * 0.02 + 0.02, 2.36, z + 0.75), RAIL_WHITE)
+		if door < louvres:
+			var y := 2.45
+			while y < 3.0:
+				pk.block(kit, "paint", Vector3(fx - 0.02, y, z + 0.2), Vector3(fx + 0.02, y + 0.05, z + pitch - 0.25), DARK)
+				y += 0.12
+		z += pitch
+		door += 1
+
+
+## The road diesel (the freights' locomotives): a six-axle hood unit in maroon with a gold band. A short hood with a
+## rounded top and gold chevrons on its nose ahead of the cab, a windscreen of two panes over it; the cab under a
+## crowned black roof with horns and a bell; the long hood with panelled, louvred doors, a raised dynamic-brake
+## housing with its grilles and fan, twin exhausts, and the radiator section at the back with mesh grilles down both
+## sides and three fans on top; walkways round the hoods with white handrails, steps at the corners, pilots striped in
+## gold, a plough under the front one, twin headlights and ditch lights at both ends, the fuel tank and air tanks
+## underneath. `variant` 1 has a black roof over the long hood's radiators (a later batch). Life size, 19m.
+static func _road_diesel(pk: PropKit, kit: Dictionary, variant: int) -> void:
+	var hl := 9.5
+	var deck := 1.38
+	var body := MAROON
+	var gold := GOLD
+	_underframe(pk, kit, hl, 0.95, deck, DARK)
+	_bogie(pk, kit, -6.2, [-1.8, 0.0, 1.8])
+	_bogie(pk, kit, 6.2, [-1.8, 0.0, 1.8])
+	# Underneath: the fuel tank (rounded, a gold stripe and a gauge) and the air tanks.
+	pk.extrude(kit, "steel", _round_top(1.2, 0.35, 0.95, 0.24, 0.0, 3), -3.8, 3.2, 0.06, DARK)
+	for sx in [-1.0, 1.0]:
+		pk.block(kit, "paint", Vector3(sx * 1.2 - 0.015, 0.7, -3.7), Vector3(sx * 1.2 + 0.015, 0.78, 3.1), gold)
+		pk.tube(kit, "steel", Vector3(sx * 1.05, 0.78, 3.4), Vector3(sx * 1.05, 0.78, 4.6), 0.2, 0.2, 10, IRON)
+	pk.block(kit, "steel", Vector3(1.21, 0.5, -0.4), Vector3(1.25, 0.66, 0.2), RAIL_WHITE)
+	# Pilots, striped gold on maroon; a plough under the front one.
+	_pilot(pk, kit, hl, -1.0, body, gold)
+	_pilot(pk, kit, hl, 1.0, body, gold)
+	for sx in [-1.0, 1.0]:
+		pk.beam(kit, "steel", Vector3(sx * 1.45, 0.25, -hl - 0.3), Vector3(0.0, 0.25, -hl - 0.95), 0.36, 0.06, DARK, Vector3.UP)
+	# Walkways and the corner steps (gold edges).
+	for sx in [-1.0, 1.0]:
+		pk.block(kit, "steel", Vector3(1.12 if sx > 0.0 else -1.58, deck, -hl), Vector3(1.58 if sx > 0.0 else -1.12, deck + 0.04, hl), IRON.lightened(0.08))
+		pk.block(kit, "paint", Vector3(sx * 1.46 - 0.02, 1.1, -hl), Vector3(sx * 1.46 + 0.02, 1.3, hl), gold)
+		for sz in [-1.0, 1.0]:
+			var z0: float = minf(sz * (hl - 0.05), sz * (hl - 0.75))
+			var z1: float = maxf(sz * (hl - 0.05), sz * (hl - 0.75))
+			for k in 2:
+				var ty: float = 0.5 + 0.42 * float(k)
+				pk.block(kit, "steel", Vector3(1.2 if sx > 0.0 else -1.62, ty, z0), Vector3(1.62 if sx > 0.0 else -1.2, ty + 0.05, z1), IRON)
+				pk.block(kit, "paint", Vector3(1.58 if sx > 0.0 else -1.63, ty + 0.05, z0), Vector3(1.63 if sx > 0.0 else -1.58, ty + 0.08, z1), gold)
+			pk.block(kit, "steel", Vector3(1.58 if sx > 0.0 else -1.62, 0.45, z0 - 0.03), Vector3(1.62 if sx > 0.0 else -1.58, deck, z0), DARK)
+			pk.block(kit, "steel", Vector3(1.58 if sx > 0.0 else -1.62, 0.45, z1), Vector3(1.62 if sx > 0.0 else -1.58, deck, z1 + 0.03), DARK)
+	# --- The short hood (the nose): rounded, gold chevrons on its face, the headlights and number boards at its top.
+	var sh_z0 := -9.0
+	var sh_z1 := -5.4
+	var sh_top := 3.25
+	pk.extrude(kit, "paint", _round_top(1.1, deck, sh_top, 0.3), sh_z0, sh_z1, 0.05, body)
+	var nz := sh_z0 - 0.025
+	for k in 3:
+		var yb: float = 1.55 + 0.42 * float(k)
+		for sx in [-1.0, 1.0]:
+			pk.quad(kit, "paint", [Vector3(0.0, yb, nz), Vector3(sx * 1.02, yb + 0.55, nz), Vector3(sx * 1.02, yb + 0.75, nz), Vector3(0.0, yb + 0.2, nz)], Vector3(0, 0, -1), gold)
+	for sx in [-1.0, 1.0]:
+		pk.block(kit, "steel", Vector3(sx * 0.68 - 0.24, 2.92, nz - 0.02), Vector3(sx * 0.68 + 0.24, 3.12, nz), DARK)
+		pk.block(kit, "lamp", Vector3(sx * 0.68 - 0.2, 2.95, nz - 0.04), Vector3(sx * 0.68 + 0.2, 3.09, nz - 0.02), RAIL_WHITE)
+		pk.tube(kit, "steel", Vector3(sx * 0.2, 2.95, nz), Vector3(sx * 0.2, 2.95, nz - 0.12), 0.13, 0.13, 12, DARK)
+		pk.tube(kit, "lamp", Vector3(sx * 0.2, 2.95, nz - 0.12), Vector3(sx * 0.2, 2.95, nz - 0.14), 0.1, 0.1, 12, LAMP)
+		# Ditch lights on the pilot's corners, and the nose's grab irons.
+		pk.block(kit, "lamp", Vector3(sx * 1.2 - 0.13, 1.5, -hl - 0.3), Vector3(sx * 1.2 + 0.13, 1.72, -hl - 0.26), LAMP)
+		pk.block(kit, "steel", Vector3(sx * 0.55 - 0.18, 2.55, nz - 0.08), Vector3(sx * 0.55 + 0.18, 2.58, nz - 0.05), RAIL_WHITE)
+	# The nose door on the right, a bell on the hood.
+	pk.block(kit, "paint", Vector3(1.11, 1.55, -8.4), Vector3(1.13, 3.0, -7.4), body.darkened(0.25))
+	pk.lathe(kit, "steel", Vector3(0.0, sh_top - 0.02, -6.4), [Vector2(0.0, 0.0), Vector2(0.12, 0.02), Vector2(0.14, 0.22), Vector2(0.09, 0.3), Vector2(0.0, 0.32)], 10, gold.darkened(0.1))
+	# --- The cab: full width, a windscreen of two panes over the nose, side windows, a black roof with horns.
+	var cz0 := -5.4
+	var cz1 := -1.7
+	var cab_top := 4.5
+	pk.extrude(kit, "paint", _round_top(1.5, deck, cab_top, 0.2), cz0, cz1, 0.04, body)
+	pk.extrude(kit, "steel", _round_top(1.56, cab_top - 0.02, cab_top + 0.12, 0.1, 0.1), cz0 - 0.1, cz1 + 0.1, 0.03, DARK)
+	for sx in [-1.0, 1.0]:
+		pk.block(kit, "steel", Vector3(minf(sx * 0.12, sx * 1.32), 3.4, cz0 - 0.03), Vector3(maxf(sx * 0.12, sx * 1.32), 4.3, cz0), DARK)
+		pk.block(kit, "glass", Vector3(minf(sx * 0.17, sx * 1.27), 3.45, cz0 - 0.05), Vector3(maxf(sx * 0.17, sx * 1.27), 4.25, cz0 - 0.03), GLASS)
+		var fx: float = sx * 1.5
+		for wz in [[-5.1, -4.0], [-3.8, -2.2]]:
+			pk.block(kit, "steel", Vector3(fx - 0.03, 3.1, float(wz[0]) - 0.05), Vector3(fx + 0.03, 4.2, float(wz[1]) + 0.05), DARK)
+			pk.block(kit, "glass", Vector3(fx - 0.05, 3.15, float(wz[0])), Vector3(fx + 0.05, 4.15, float(wz[1])), GLASS)
+		pk.block(kit, "steel", Vector3(minf(fx, fx + sx * 0.2), 4.27, -5.2), Vector3(maxf(fx, fx + sx * 0.2), 4.31, -2.1), DARK)
+		# The gold band along the cab's sides, the number under the windows.
+		pk.block(kit, "paint", Vector3(fx - 0.015, 1.65, cz0), Vector3(fx + 0.015, 1.95, cz1), gold)
+		pk.block(kit, "paint", Vector3(fx - 0.02, 2.45, -3.6), Vector3(fx + 0.02, 2.85, -2.6), gold)
+	for k in 3:
+		var hx: float = 0.3 + 0.18 * float(k)
+		pk.tube(kit, "steel", Vector3(hx, cab_top + 0.25, -3.0), Vector3(hx, cab_top + 0.25, -3.0 + 0.35 + 0.1 * float(k)), 0.03, 0.08, 8, IRON.lightened(0.3))
+	pk.tube(kit, "steel", Vector3(-0.8, cab_top + 0.2, -2.4), Vector3(-0.8, cab_top + 0.9, -2.4), 0.012, 0.012, 4, DARK)
+	pk.block(kit, "steel", Vector3(-0.3, cab_top + 0.12, -4.2), Vector3(0.3, cab_top + 0.3, -3.4), DARK)
+	# --- The long hood: rounded, doors with louvres behind the cab, the dynamic brake housing, the radiator section.
+	var lh_z0 := -1.7
+	var lh_z1 := 9.1
+	var lh_top := 3.5
+	pk.extrude(kit, "paint", _round_top(1.12, deck, lh_top, 0.32), lh_z0, lh_z1, 0.05, body)
+	for sx in [-1.0, 1.0]:
+		var fx2: float = sx * 1.132
+		_hood_doors(pk, kit, fx2, sx, lh_z0, 5.6, body, 2)
+		pk.block(kit, "paint", Vector3(fx2 - 0.015, 1.65, lh_z0), Vector3(fx2 + 0.015, 1.95, lh_z1), gold)
+		# The radiator grilles: dark mesh panels in frames down both sides of the back.
+		pk.block(kit, "steel", Vector3(fx2 - 0.02, 2.2, 5.9), Vector3(fx2 + 0.02, 3.3, 8.8), DARK)
+		var gz := 6.0
+		while gz < 8.75:
+			pk.block(kit, "steel", Vector3(fx2 + sx * 0.02 - 0.015, 2.25, gz), Vector3(fx2 + sx * 0.02 + 0.015, 3.25, gz + 0.04), IRON.lightened(0.18))
+			gz += 0.16
+	# The dynamic brake housing: raised, wider, with a grille strip each side and a fan.
+	pk.extrude(kit, "paint", _round_top(1.18, lh_top - 0.6, lh_top + 0.32, 0.25), -0.9, 2.1, 0.04, body)
+	for sx in [-1.0, 1.0]:
+		pk.block(kit, "steel", Vector3(sx * 1.18 - 0.02, 3.15, -0.7), Vector3(sx * 1.18 + 0.02, 3.6, 1.9), DARK)
+	pk.tube(kit, "steel", Vector3(0, lh_top + 0.3, 0.6), Vector3(0, lh_top + 0.38, 0.6), 0.5, 0.5, 18, DARK)
+	# Twin exhausts, then the radiator fans (on a black roof on variant 1).
+	for z2 in [3.0, 3.8]:
+		pk.tube(kit, "steel", Vector3(0, lh_top - 0.05, z2), Vector3(0, lh_top + 0.35, z2), 0.16, 0.14, 10, DARK)
+	if variant == 1:
+		pk.extrude(kit, "steel", _round_top(1.0, lh_top - 0.02, lh_top + 0.04, 0.2), 6.0, 9.0, 0.02, DARK)
+	for z3 in [6.5, 7.5, 8.5]:
+		pk.tube(kit, "steel", Vector3(0, lh_top - 0.02, z3), Vector3(0, lh_top + 0.1, z3), 0.45, 0.45, 16, DARK)
+		pk.tube(kit, "steel", Vector3(0, lh_top + 0.1, z3), Vector3(0, lh_top + 0.12, z3), 0.41, 0.41, 16, IRON.lightened(0.2), false)
+		for k in 4:
+			var ang: float = PI * 0.25 * float(k)
+			var d2 := Vector3(cos(ang), 0, sin(ang)) * 0.4
+			pk.beam(kit, "steel", Vector3(0, lh_top + 0.13, z3) - d2, Vector3(0, lh_top + 0.13, z3) + d2, 0.04, 0.02, DARK)
+	# The long hood's end: twin headlights, number boards, gold chevrons, ditch lights on the rear pilot.
+	var ez := lh_z1 + 0.025
+	for k in 3:
+		var yb2: float = 1.55 + 0.42 * float(k)
+		for sx in [-1.0, 1.0]:
+			pk.quad(kit, "paint", [Vector3(0.0, yb2, ez), Vector3(0.0, yb2 + 0.2, ez), Vector3(sx * 1.02, yb2 + 0.75, ez), Vector3(sx * 1.02, yb2 + 0.55, ez)], Vector3(0, 0, 1), gold)
+	for sx in [-1.0, 1.0]:
+		pk.tube(kit, "steel", Vector3(sx * 0.2, 3.15, ez), Vector3(sx * 0.2, 3.15, ez + 0.12), 0.12, 0.12, 12, DARK)
+		pk.tube(kit, "lamp", Vector3(sx * 0.2, 3.15, ez + 0.12), Vector3(sx * 0.2, 3.15, ez + 0.14), 0.09, 0.09, 12, LAMP)
+		pk.block(kit, "lamp", Vector3(sx * 1.2 - 0.13, 1.5, hl + 0.26), Vector3(sx * 1.2 + 0.13, 1.72, hl + 0.3), Color(0.9, 0.12, 0.08))
+	# --- Handrails along both walkways and across the ends (open in the middle), white.
+	for sx in [-1.0, 1.0]:
+		var rx: float = sx * 1.56
+		for z4 in [-9.3, -7.4, -5.5, -1.6, 0.6, 2.8, 5.0, 7.2, 9.3]:
+			pk.block(kit, "steel", Vector3(rx - 0.025, deck, z4 - 0.025), Vector3(rx + 0.025, deck + 1.1, z4 + 0.025), RAIL_WHITE)
+		for ry in [deck + 0.55, deck + 1.08]:
+			pk.tube(kit, "steel", Vector3(rx, ry, -9.3), Vector3(rx, ry, -5.5), 0.025, 0.025, 6, RAIL_WHITE, false)
+			pk.tube(kit, "steel", Vector3(rx, ry, -1.6), Vector3(rx, ry, 9.3), 0.025, 0.025, 6, RAIL_WHITE, false)
+			for zz in [-9.3, 9.3]:
+				pk.tube(kit, "steel", Vector3(rx, ry, zz), Vector3(sx * 0.45, ry, zz), 0.025, 0.025, 6, RAIL_WHITE, false)
+		for zz2 in [-9.3, 9.3]:
+			pk.block(kit, "steel", Vector3(sx * 0.45 - 0.025, deck, zz2 - 0.025), Vector3(sx * 0.45 + 0.025, deck + 1.1, zz2 + 0.025), RAIL_WHITE)
