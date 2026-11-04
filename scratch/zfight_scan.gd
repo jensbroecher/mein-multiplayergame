@@ -3,17 +3,24 @@ extends SceneTree
 # Finds z-fighting in saved meshes: triangles lying in the same plane (within `tol` metres) that
 # overlap by more than a sliver. For double-sided surfaces, faces back to back count too.
 #   Godot --headless --path . -s res://scratch/zfight_scan.gd -- res://generated/x.res ... [tol=0.002]
-# Prints each clash once per pair of colours/surfaces, with where it is.
+# Prints each clash once per pair of colours/surfaces, with where it is. `detail=1` prints both triangles' middles and
+# the plane's normal; `unit=1.5` divides the positions (TrainKit's meshes are life size times 1.5).
 
 var tol := 0.002
+var detail := false
+var unit := 1.0
 
 
 func _initialize() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("tol="):
 			tol = float(a.substr(4))
+		elif a == "detail=1":
+			detail = true
+		elif a.begins_with("unit="):
+			unit = float(a.substr(5))
 	for a in OS.get_cmdline_user_args():
-		if not a.begins_with("tol="):
+		if not a.contains("="):
 			_scan(a)
 	quit()
 
@@ -83,7 +90,11 @@ func _scan(path: String) -> void:
 				seen[tag] = true
 				clashes += 1
 				var at := ((p[0] as Vector3) + (p[1] as Vector3) + (p[2] as Vector3)) / 3.0
-				print("  %s at %s %s" % [tag, at.snappedf(0.01), "back-to-back" if back else ""])
+				if detail:
+					var at2 := ((q[0] as Vector3) + (q[1] as Vector3) + (q[2] as Vector3)) / 3.0
+					print("  %s at %s / %s facing %s %s" % [tag, (at / unit).snappedf(0.01), (at2 / unit).snappedf(0.01), (p[3] as Vector3).snappedf(0.01), "back-to-back" if back else ""])
+				else:
+					print("  %s at %s %s" % [tag, at.snappedf(0.01), "back-to-back" if back else ""])
 	print("%s: %d triangles, %d clashing colour pairs" % [path.get_file(), tris.size(), clashes])
 
 

@@ -2488,6 +2488,13 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
   Canopy columns are evenly spaced end to end, with no brace past the girder's ends. Sliding doors' rails stand prouder
   than their stiles (they had shared a plane where they crossed and flickered). Lamp posts and lanterns close every
   part and overlap their joints. The passenger cab unit's pilot has a back face.
+- Rolling stock and turnouts are kept free of coplanar faces: `scratch/train_mesh_dump.gd` (`-s`, headless, `-- <dir>
+  [kinds=ploco:0,coach:0,...]`) saves TrainKit's cars as .res and `scratch/zfight_scan.gd ... tol=0.004 detail=1 unit=1.5`
+  lists any two faces in one plane with both triangles' middles (life size) and the facing. Every car scans clean except
+  the passenger cab unit's frame faces hidden inside its body. Parts that touch end a centimetre short or stand a
+  centimetre proud: the frame slab inside the end beams, coupler tops under the beam's, ladder rails clear of the body
+  (`_ladder`'s `side_x`) with rungs inside them, switch blades and wing rails slimmer than the rails they lie on
+  (`_rail_beams`'s `slim`), fan blades and plough halves stepped.
 - The water tower (`FreightKit.water_tower`, `TankTower`): everything placed from the legs' own line (`leg_r`), so the
   strut rings sit on the legs and the crossed rods (with turnbuckles) on each bay's outer face; a ring beam and joists
   under the tank, a railed deck round its foot, a ladder up a leg's face and on up the tank. The spout is a stowed

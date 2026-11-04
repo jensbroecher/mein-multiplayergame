@@ -113,10 +113,12 @@ static func ballast_colour(p: Vector3) -> Color:
 
 ## One rail between two points on its top centre line: foot and web as beams, the head as its two sides (rusty)
 ## and its top, the running surface (bright); `side_vec` is across the rail.
-static func _rail_beams(pk: PropKit, kit: Dictionary, a: Vector3, b: Vector3, side_vec: Vector3, col: Color) -> void:
-	pk.beam(kit, "rail", a + Vector3(0, -0.155 * K, 0), b + Vector3(0, -0.155 * K, 0), 0.15 * K, 0.03 * K, col.darkened(0.15), side_vec)
-	pk.beam(kit, "rail", a + Vector3(0, -0.095 * K, 0), b + Vector3(0, -0.095 * K, 0), 0.045 * K, 0.1 * K, col, side_vec)
-	var s: Vector3 = Vector3(side_vec.x, 0.0, side_vec.z).normalized() * (0.0425 * K)
+## `slim` (< 1) narrows it: switch blades and wing rails lie against other rails, and at the same width their sides
+## shared planes and flickered.
+static func _rail_beams(pk: PropKit, kit: Dictionary, a: Vector3, b: Vector3, side_vec: Vector3, col: Color, slim := 1.0) -> void:
+	pk.beam(kit, "rail", a + Vector3(0, -0.155 * K, 0), b + Vector3(0, -0.155 * K, 0), 0.15 * K * slim, 0.03 * K, col.darkened(0.15), side_vec)
+	pk.beam(kit, "rail", a + Vector3(0, -0.095 * K, 0), b + Vector3(0, -0.095 * K, 0), 0.045 * K * slim, 0.1 * K, col, side_vec)
+	var s: Vector3 = Vector3(side_vec.x, 0.0, side_vec.z).normalized() * (0.0425 * K * slim)
 	var hb := Vector3(0, -0.045 * K, 0)
 	pk.quad(kit, "railtop", [a - s, a + s, b + s, b - s], Vector3.UP, RAIL_TOP)
 	for sd in [-1.0, 1.0]:
@@ -1137,7 +1139,8 @@ static func turnout(through: Array, branch: Array, side: float, info: Dictionary
 			for sd in [-1.0, 1.0]:
 				var pa: Vector3 = (b["p"] as Vector3) + (b["r"] as Vector3) * (sd * GAUGE_HALF) + lift_a
 				var pb: Vector3 = (n["p"] as Vector3) + (n["r"] as Vector3) * (sd * GAUGE_HALF) + lift_b
-				_rail_beams(pk, kit, pa, pb, b["r"], col_r)
+				# Slimmer while they still lie close along the through rails (to 14m).
+				_rail_beams(pk, kit, pa, pb, b["r"], col_r, 0.82 if float(b["t"]) < 14.0 else 1.0)
 		# The inner rail of the branch (the one nearer the through track).
 		inner_pts.append((b["p"] as Vector3) - (b["r"] as Vector3) * (side * GAUGE_HALF))
 	# Stretcher bars between the blades, heel blocks where the blades end.
@@ -1181,11 +1184,12 @@ static func turnout(through: Array, branch: Array, side: float, info: Dictionary
 		var fa: Vector3 = frog_pos - frog_dir * 0.7 * K
 		var fb: Vector3 = frog_pos + frog_dir * 1.3 * K
 		pk.beam(kit, "steel", fa + Vector3(0, -0.01 * K, 0), fb + Vector3(0, -0.01 * K, 0), 0.5 * K, 0.1 * K, STEEL_DARK, Vector3(-frog_dir.z, 0, frog_dir.x))
-		pk.beam(kit, "steel", fa + Vector3(0, 0.02 * K, 0), fb + Vector3(0, 0.02 * K, 0), 0.2 * K, 0.06 * K, STEEL_DARK.lightened(0.15), Vector3(-frog_dir.z, 0, frog_dir.x))
+		# The insert stops short of the plate's ends (flush, their end faces had flickered).
+		pk.beam(kit, "steel", fa + frog_dir * 0.05 + Vector3(0, 0.02 * K, 0), fb - frog_dir * 0.05 + Vector3(0, 0.02 * K, 0), 0.2 * K, 0.06 * K, STEEL_DARK.lightened(0.15), Vector3(-frog_dir.z, 0, frog_dir.x))
 		# Wing rails either side of the nose, and the check rail inside the opposite through rail.
 		for sd in [-1.0, 1.0]:
 			var wo: Vector3 = Vector3(-frog_dir.z, 0, frog_dir.x) * (sd * 0.42 * K)
-			_rail_beams(pk, kit, fa + wo + Vector3(0, 0.0, 0), fb + wo + Vector3(0, 0.0, 0), Vector3(-frog_dir.z, 0, frog_dir.x), RAIL)
+			_rail_beams(pk, kit, fa + wo + Vector3(0, 0.004 * K, 0), fb + wo + Vector3(0, 0.004 * K, 0), Vector3(-frog_dir.z, 0, frog_dir.x), RAIL, 0.82)
 		var tf: float = Vector3(frog_pos.x - a.x, 0.0, frog_pos.z - a.z).dot(dir)
 		var cy: float = _table_at(ty, tf)
 		var cpos: Vector3 = a + dir * tf + right * (-side * (GAUGE_HALF - 0.2 * K))

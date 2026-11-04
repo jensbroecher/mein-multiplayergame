@@ -178,22 +178,25 @@ static func _bogie(pk: PropKit, kit: Dictionary, z: float, axles: Array = [-0.85
 
 ## The frame under a car: a deck slab between `y0` and `y1` with end beams and couplers.
 static func _underframe(pk: PropKit, kit: Dictionary, half_len: float, y0: float, y1: float, col: Color) -> void:
-	pk.block(kit, "steel", Vector3(-1.45, y0, -half_len), Vector3(1.45, y1, half_len), col)
+	# The slab's ends 1cm inside the end beams (flush, the two shared a face).
+	pk.block(kit, "steel", Vector3(-1.45, y0, -half_len + 0.01), Vector3(1.45, y1, half_len - 0.01), col)
 	for sz in [-1.0, 1.0]:
 		pk.block(kit, "steel", Vector3(-1.4, y0 - 0.05, sz * half_len), Vector3(1.4, y1 + 0.12, sz * (half_len + 0.22)), IRON)
 		# Coupler shank and knuckle.
-		pk.block(kit, "steel", Vector3(-0.17, y0 + 0.05, sz * (half_len + 0.2)), Vector3(0.17, y0 + 0.35, sz * (half_len + 0.85)), DARK)
+		pk.block(kit, "steel", Vector3(-0.17, y0 + 0.05, sz * (half_len + 0.2)), Vector3(0.17, y0 + 0.32, sz * (half_len + 0.85)), DARK)
 		pk.block(kit, "steel", Vector3(-0.3, y0 + 0.02, sz * (half_len + 0.75)), Vector3(0.3, y0 + 0.38, sz * (half_len + 1.0)), DARK)
 
 
 ## A ladder on a car's corner: two rails and rungs, up the end `sz` of side `sx`.
-static func _ladder(pk: PropKit, kit: Dictionary, sx: float, z: float, y0: float, y1: float) -> void:
-	var x := sx * 1.52
+## `side_x`: the rails' middle across the car (1.52, on a 1.5 wide body). The rungs stop inside the rails' outer faces
+## (ending on them, the two shared a plane at both ends and flickered).
+static func _ladder(pk: PropKit, kit: Dictionary, sx: float, z: float, y0: float, y1: float, side_x := 1.52) -> void:
+	var x := sx * side_x
 	pk.block(kit, "steel", Vector3(x - 0.03, y0, z - 0.2), Vector3(x + 0.03, y1, z - 0.15), IRON)
 	pk.block(kit, "steel", Vector3(x - 0.03, y0, z + 0.15), Vector3(x + 0.03, y1, z + 0.2), IRON)
 	var y := y0 + 0.25
 	while y < y1:
-		pk.block(kit, "steel", Vector3(x - 0.04, y, z - 0.2), Vector3(x + 0.04, y + 0.05, z + 0.2), IRON)
+		pk.block(kit, "steel", Vector3(x - 0.04, y, z - 0.18), Vector3(x + 0.04, y + 0.05, z + 0.18), IRON)
 		y += 0.38
 
 
@@ -216,14 +219,14 @@ static func _box_car(pk: PropKit, kit: Dictionary, variant: int, rng: RandomNumb
 	var z := -hl + 0.5
 	while z < hl - 0.3:
 		for sx in [-1.0, 1.0]:
-			pk.block(kit, "paint", Vector3(sx * 1.5 - 0.04, 1.25, z - 0.05), Vector3(sx * 1.5 + 0.04, 3.8, z + 0.05), _jit(rib, rng))
+			pk.block(kit, "paint", Vector3(sx * 1.5 - 0.04, 1.25, z - 0.05), Vector3(sx * 1.5 + 0.04, 3.76, z + 0.05), _jit(rib, rng))
 		z += 0.95
 	# Sliding doors, a track above them and a stripe along the sill.
 	for sx in [-1.0, 1.0]:
-		pk.block(kit, "paint", Vector3(sx * 1.5 - 0.07, 1.3, -1.3), Vector3(sx * 1.5 + 0.07, 3.8, 1.3), col.lightened(0.07))
-		pk.block(kit, "steel", Vector3(sx * 1.5 - 0.1, 3.78, -2.2), Vector3(sx * 1.5 + 0.1, 3.86, 2.2), IRON)
+		pk.block(kit, "paint", Vector3(sx * 1.5 - 0.07, 1.3, -1.3), Vector3(sx * 1.5 + 0.07, 3.79, 1.3), col.lightened(0.07))
+		pk.block(kit, "steel", Vector3(sx * 1.5 - 0.1, 3.78, -2.22), Vector3(sx * 1.5 + 0.1, 3.86, 2.22), IRON)
 		pk.block(kit, "steel", Vector3(sx * 1.5 - 0.09, 2.3, 1.1), Vector3(sx * 1.5 + 0.09, 2.5, 1.2), IRON)
-		pk.block(kit, "paint", Vector3(sx * 1.5 - 0.05, 1.2, -hl), Vector3(sx * 1.5 + 0.05, 1.32, hl), col.darkened(0.3))
+		pk.block(kit, "paint", Vector3(sx * 1.5 - 0.05, 1.19, -hl + 0.02), Vector3(sx * 1.5 + 0.05, 1.32, hl - 0.02), col.darkened(0.3))
 		# The reporting mark: a pale band in place of lettering.
 		pk.block(kit, "paint", Vector3(sx * 1.5 - 0.06, 3.0, -6.6), Vector3(sx * 1.5 + 0.06, 3.14, -3.2), Color(0.85, 0.82, 0.74))
 		pk.block(kit, "paint", Vector3(sx * 1.5 - 0.06, 2.72, -6.6), Vector3(sx * 1.5 + 0.06, 2.8, -4.4), Color(0.85, 0.82, 0.74))
@@ -231,7 +234,7 @@ static func _box_car(pk: PropKit, kit: Dictionary, variant: int, rng: RandomNumb
 	pk.block(kit, "wood", Vector3(-0.3, 4.17, -hl + 0.3), Vector3(0.3, 4.24, hl - 0.3), WOOD)
 	for sz in [-1.0, 1.0]:
 		for sx in [-1.0, 1.0]:
-			_ladder(pk, kit, sx, sz * (hl - 0.45), 1.3, 3.9)
+			_ladder(pk, kit, sx, sz * (hl - 0.45), 1.3, 3.9, 1.535)
 		pk.block(kit, "steel", Vector3(-0.05, 1.3, sz * (hl + 0.04)), Vector3(0.05, 3.0, sz * (hl + 0.1)), IRON)
 
 
@@ -246,7 +249,7 @@ static func _flat_car(pk: PropKit, kit: Dictionary, loaded: bool, rng: RandomNum
 	pk.block(kit, "wood", Vector3(-1.46, 1.2, -hl), Vector3(1.46, 1.3, hl), _jit(WOOD, rng, 0.03))
 	var z := -hl + 0.45
 	while z < hl:
-		pk.block(kit, "wood", Vector3(-1.465, 1.28, z), Vector3(1.465, 1.3, z + 0.02), WOOD.darkened(0.3))
+		pk.block(kit, "wood", Vector3(-1.465, 1.28, z), Vector3(1.465, 1.312, z + 0.02), WOOD.darkened(0.3))
 		z += 0.45
 	# Stake pockets along both edges, and a low end rail.
 	z = -hl + 0.8
@@ -403,11 +406,11 @@ static func _hopper(pk: PropKit, kit: Dictionary, variant: int) -> void:
 		pk.beam(kit, "steel", Vector3(0.55, 0.86, bz), Vector3(1.05, 0.86, bz), 0.1, 0.1, IRON)
 	# End platforms with a brake wheel on a post, and ladders.
 	for sz in [-1.0, 1.0]:
-		pk.block(kit, "steel", Vector3(-1.5, 1.22, sz * hl), Vector3(1.5, 1.3, sz * (hl + 0.9)), IRON)
+		pk.block(kit, "steel", Vector3(-1.5, 1.22, sz * (hl + 0.01)), Vector3(1.5, 1.3, sz * (hl + 0.9)), IRON)
 		pk.tube(kit, "steel", Vector3(1.0, 1.3, sz * (hl - 0.6)), Vector3(1.0, 2.2, sz * (hl - 0.6)), 0.05, 0.05, 6, IRON)
 		pk.tube(kit, "steel", Vector3(1.0, 2.2, sz * (hl - 0.6)), Vector3(1.0, 2.24, sz * (hl - 0.6)), 0.32, 0.32, 12, IRON, false)
 		for sx in [-1.0, 1.0]:
-			_ladder(pk, kit, sx, sz * (hl - 0.45), 1.3, 3.8)
+			_ladder(pk, kit, sx, sz * (hl - 0.45), 1.3, 3.8, 1.585)
 
 
 # ======================================================================================
@@ -723,7 +726,8 @@ static func _cab_unit(pk: PropKit, kit: Dictionary) -> void:
 		for door in [[-4.75, -3.85]]:
 			pk.block(kit, "steel", Vector3(x - 0.02 if sx > 0 else x - 0.03, 1.35, door[0]), Vector3(x + 0.03 if sx > 0 else x + 0.02, 3.68, door[0] + 0.05), Color(0.1, 0.1, 0.11))
 			pk.block(kit, "steel", Vector3(x - 0.02 if sx > 0 else x - 0.03, 1.35, door[1] - 0.05), Vector3(x + 0.03 if sx > 0 else x + 0.02, 3.68, door[1]), Color(0.1, 0.1, 0.11))
-			pk.block(kit, "steel", Vector3(x - 0.02 if sx > 0 else x - 0.03, 3.63, door[0]), Vector3(x + 0.03 if sx > 0 else x + 0.02, 3.68, door[1]), Color(0.1, 0.1, 0.11))
+			# The head, 1cm prouder than the posts (flush, their faces met in one plane at the corners).
+			pk.block(kit, "steel", Vector3(x - 0.02 if sx > 0 else x - 0.04, 3.63, door[0]), Vector3(x + 0.04 if sx > 0 else x + 0.02, 3.68, door[1]), Color(0.1, 0.1, 0.11))
 			pk.block(kit, "glass", Vector3(x - 0.02 if sx > 0 else x - 0.045, 3.0, door[0] + 0.15), Vector3(x + 0.045 if sx > 0 else x + 0.02, 3.55, door[1] - 0.15), PGLASS)
 			pk.tube(kit, "steel", Vector3(x + sx * 0.08, 1.6, door[0] - 0.15), Vector3(x + sx * 0.08, 3.3, door[0] - 0.15), 0.025, 0.025, 6, Color(0.75, 0.76, 0.77), true)
 		# Portholes along the engine room, in the cream band, and louvred grilles toward the rear.
@@ -767,7 +771,8 @@ static func _cab_unit(pk: PropKit, kit: Dictionary) -> void:
 		pk.tube(kit, "steel", Vector3(0.0, 4.4, fz), Vector3(0.0, 4.43, fz), 0.48, 0.48, 14, Color(0.35, 0.36, 0.37), false)
 	pk.block(kit, "paint", Vector3(-0.9, 4.28, 6.0), Vector3(0.9, 4.58, 9.4), ROOF_GREY.darkened(0.15))
 	for sx in [-1.0, 1.0]:
-		_ladder(pk, kit, sx, 9.0, 1.3, 2.6)
+		# Clear of the body's side (1.55): at 1.52 the rails' outer faces lay in it.
+		_ladder(pk, kit, sx, 9.0, 1.3, 2.6, 1.6)
 
 
 ## A coach: a long rounded body with a window band (nine windows a side), a vestibule door at each end, a
@@ -801,7 +806,7 @@ static func _coach(pk: PropKit, kit: Dictionary, observation: bool) -> void:
 	, true, true)
 	# The gold pinstripe along each side, over the teal skirt's top edge.
 	for sx in [-1.0, 1.0]:
-		pk.block(kit, "paint", Vector3(sx * 1.5 - 0.02, 2.05, -z_end), Vector3(sx * 1.5 + 0.02, 2.15, z_end - (3.4 if observation else 0.0)), PGOLD)
+		pk.block(kit, "paint", Vector3(sx * 1.5 - 0.02, 2.05, -z_end + 0.02), Vector3(sx * 1.5 + 0.02, 2.15, z_end - (3.4 if observation else 0.02)), PGOLD)
 	# Windows along both sides: dark glass set a hair proud with a bright frame bar over and under it.
 	var wz := -z_end + 3.0
 	var last_w: float = z_end - 3.0 - (3.6 if observation else 0.0)
@@ -826,7 +831,8 @@ static func _coach(pk: PropKit, kit: Dictionary, observation: bool) -> void:
 		pk.block(kit, "steel", Vector3(-0.5, 4.55, az - 0.8), Vector3(0.5, 4.6, az + 0.8), Color(0.40, 0.42, 0.43))
 	# Under the floor: a battery box each side, an air tank between.
 	for sx in [-1.0, 1.0]:
-		pk.block(kit, "steel", Vector3(sx * 1.0 - 0.45, 0.55, -3.2), Vector3(sx * 1.0 + 0.45, 1.0, -0.9), Color(0.20, 0.20, 0.21))
+		# Inside the frame's side (1.45): flush with it, the two had flickered.
+		pk.block(kit, "steel", Vector3(sx * 0.98 - 0.4, 0.55, -3.2), Vector3(sx * 0.98 + 0.4, 1.0, -0.9), Color(0.20, 0.20, 0.21))
 	pk.tube(kit, "steel", Vector3(0.0, 0.7, 1.5), Vector3(0.0, 0.7, 5.5), 0.28, 0.28, 10, Color(0.24, 0.24, 0.25), true)
 	if observation:
 		# The tail lamp, a drumhead sign over it, a gold rail round the platform edge.
@@ -857,7 +863,7 @@ static func _tank_car(pk: PropKit, kit: Dictionary, variant: int) -> void:
 	for sx in [-1.0, 1.0]:
 		pk.block(kit, "steel", Vector3(sx * 0.62 - 0.02, cy + r + 0.55, -hl + 0.5), Vector3(sx * 0.62 + 0.02, cy + r + 0.6, hl - 0.5), IRON)
 		for z in [-4.8, -2.4, 0.0, 2.4, 4.8]:
-			pk.block(kit, "steel", Vector3(sx * 0.62 - 0.02, cy + r, z - 0.02), Vector3(sx * 0.62 + 0.02, cy + r + 0.6, z + 0.02), IRON)
+			pk.block(kit, "steel", Vector3(sx * 0.62 - 0.015, cy + r, z - 0.02), Vector3(sx * 0.62 + 0.015, cy + r + 0.58, z + 0.02), IRON)
 		_ladder(pk, kit, sx, 6.9, 1.3, 3.2)
 	# A hazard-coloured band along the middle.
 	pk.tube(kit, "paint", Vector3(0, cy, 1.4), Vector3(0, cy, 2.1), r + 0.015, r + 0.015, 24, GOLD, false)
@@ -881,17 +887,17 @@ static func _caboose(pk: PropKit, kit: Dictionary) -> void:
 		# Side windows and the gold sill stripe.
 		for z in [-2.9, -0.9, 1.1, 3.0]:
 			pk.block(kit, "glass", Vector3(sx * 1.45 - 0.04, 2.4, z - 0.4), Vector3(sx * 1.45 + 0.04, 3.3, z + 0.4), GLASS)
-		pk.block(kit, "paint", Vector3(sx * 1.45 - 0.05, 1.5, -hl), Vector3(sx * 1.45 + 0.05, 1.75, hl), GOLD)
+		pk.block(kit, "paint", Vector3(sx * 1.45 - 0.05, 1.5, -hl + 0.02), Vector3(sx * 1.45 + 0.05, 1.75, hl - 0.02), GOLD)
 	# End platforms, rails and the marker lamps.
 	for sz in [-1.0, 1.0]:
-		pk.block(kit, "steel", Vector3(-1.4, 1.2, sz * hl), Vector3(1.4, 1.3, sz * (hl + 1.1)), IRON)
+		pk.block(kit, "steel", Vector3(-1.42, 1.2, sz * hl), Vector3(1.42, 1.3, sz * (hl + 1.1)), IRON)
 		for sx in [-1.0, 1.0]:
-			pk.block(kit, "steel", Vector3(sx * 1.35 - 0.03, 1.3, sz * (hl + 1.05)), Vector3(sx * 1.35 + 0.03, 2.3, sz * (hl + 1.1)), IRON)
-		pk.block(kit, "steel", Vector3(-1.38, 2.25, sz * (hl + 1.05)), Vector3(1.38, 2.3, sz * (hl + 1.1)), IRON)
+			pk.block(kit, "steel", Vector3(sx * 1.35 - 0.03, 1.3, sz * (hl + 1.05)), Vector3(sx * 1.35 + 0.03, 2.28, sz * (hl + 1.1)), IRON)
+		pk.block(kit, "steel", Vector3(-1.4, 2.25, sz * (hl + 1.04)), Vector3(1.4, 2.3, sz * (hl + 1.115)), IRON)
 		pk.block(kit, "lamp", Vector3(-1.2, 3.0, sz * hl + sz * 0.02), Vector3(-0.9, 3.25, sz * hl + sz * 0.1), Color(0.9, 0.12, 0.08))
 		pk.block(kit, "lamp", Vector3(0.9, 3.0, sz * hl + sz * 0.02), Vector3(1.2, 3.25, sz * hl + sz * 0.1), Color(0.9, 0.12, 0.08))
 	# A smokestack.
-	pk.tube(kit, "steel", Vector3(0.6, 3.9, 1.8), Vector3(0.6, 4.6, 1.8), 0.14, 0.14, 8, DARK)
+	pk.tube(kit, "steel", Vector3(0.6, 3.95, 1.8), Vector3(0.6, 4.6, 1.8), 0.14, 0.14, 8, DARK)
 
 
 ## `variant` 2 is the yard switcher (`_switcher`); the rest the road diesel in maroon and gold.
@@ -1040,7 +1046,8 @@ static func _switcher(pk: PropKit, kit: Dictionary) -> void:
 		for k in 4:
 			var ang: float = PI * 0.25 * float(k)
 			var d2 := Vector3(cos(ang), 0, sin(ang)) * 0.48
-			pk.beam(kit, "steel", Vector3(z2 * 0.0, hood_top + 0.13, z2) - d2, Vector3(0, hood_top + 0.13, z2) + d2, 0.04, 0.02, DARK)
+			# Each blade a few millimetres over the last: crossing at one height, they shared their faces at the hub.
+			pk.beam(kit, "steel", Vector3(0, hood_top + 0.13 + 0.005 * float(k), z2) - d2, Vector3(0, hood_top + 0.13 + 0.005 * float(k), z2) + d2, 0.04, 0.02, DARK)
 	pk.tube(kit, "steel", Vector3(0.0, hood_top, -2.2), Vector3(0.0, hood_top + 0.55, -2.2), 0.17, 0.15, 10, DARK)
 	pk.block(kit, "paint", Vector3(-0.55, hood_top - 0.02, 0.4), Vector3(0.55, hood_top + 0.28, 1.8), SAFETY_YELLOW.darkened(0.08))
 	for sx in [-1.0, 1.0]:
@@ -1096,15 +1103,15 @@ static func _switcher(pk: PropKit, kit: Dictionary) -> void:
 	for sx in [-1.0, 1.0]:
 		var rx: float = sx * 1.56
 		for z3 in [-9.3, -7.3, -5.3, -3.3, -1.3, 0.7, 2.7]:
-			pk.block(kit, "steel", Vector3(rx - 0.025, deck, z3 - 0.025), Vector3(rx + 0.025, deck + 1.1, z3 + 0.025), RAIL_WHITE)
+			pk.block(kit, "steel", Vector3(rx - 0.025, deck + 0.04, z3 - 0.025), Vector3(rx + 0.025, deck + 1.09, z3 + 0.025), RAIL_WHITE)
 		for ry in [deck + 0.55, deck + 1.08]:
 			pk.tube(kit, "steel", Vector3(rx, ry, -9.3), Vector3(rx, ry, 3.4), 0.025, 0.025, 6, RAIL_WHITE, false)
 			pk.tube(kit, "steel", Vector3(rx, ry, -9.3), Vector3(sx * 0.45, ry, -9.3), 0.025, 0.025, 6, RAIL_WHITE, false)
-		pk.block(kit, "steel", Vector3(sx * 0.45 - 0.025, deck, -9.325), Vector3(sx * 0.45 + 0.025, deck + 1.1, -9.275), RAIL_WHITE)
+		pk.block(kit, "steel", Vector3(sx * 0.45 - 0.025, deck, -9.325), Vector3(sx * 0.45 + 0.025, deck + 1.09, -9.275), RAIL_WHITE)
 		for ry2 in [deck + 0.55, deck + 1.08]:
 			pk.tube(kit, "steel", Vector3(rx, ry2, 9.3), Vector3(sx * 0.5, ry2, 9.3), 0.025, 0.025, 6, RAIL_WHITE, false)
-		pk.block(kit, "steel", Vector3(rx - 0.025, deck, 9.275), Vector3(rx + 0.025, deck + 1.1, 9.325), RAIL_WHITE)
-		pk.block(kit, "steel", Vector3(sx * 0.5 - 0.025, deck, 9.275), Vector3(sx * 0.5 + 0.025, deck + 1.1, 9.325), RAIL_WHITE)
+		pk.block(kit, "steel", Vector3(rx - 0.025, deck, 9.275), Vector3(rx + 0.025, deck + 1.09, 9.325), RAIL_WHITE)
+		pk.block(kit, "steel", Vector3(sx * 0.5 - 0.025, deck, 9.275), Vector3(sx * 0.5 + 0.025, deck + 1.09, 9.325), RAIL_WHITE)
 
 
 ## A pilot under the end sill at `sz` (-1 the front): a plate in `col` and the sill's edge above it, striped at 45 degrees
@@ -1112,8 +1119,8 @@ static func _switcher(pk: PropKit, kit: Dictionary) -> void:
 static func _pilot(pk: PropKit, kit: Dictionary, hl: float, sz: float, col: Color, stripe: Color) -> void:
 	var zf: float = sz * (hl + 0.24)
 	pk.block(kit, "paint", Vector3(-1.45, 0.42, sz * (hl + 0.02)), Vector3(1.45, 0.95, zf), col)
-	pk.block(kit, "paint", Vector3(-1.42, 1.0, zf), Vector3(1.42, 1.42, zf + sz * 0.02), col)
-	for band in [[0.42, 0.95, zf + sz * 0.025], [1.0, 1.42, zf + sz * 0.045]]:
+	pk.block(kit, "paint", Vector3(-1.42, 1.01, zf), Vector3(1.42, 1.42, zf + sz * 0.02), col)
+	for band in [[0.42, 0.95, zf + sz * 0.025], [1.01, 1.42, zf + sz * 0.045]]:
 		var y0: float = band[0]
 		var y1: float = band[1]
 		var pz: float = band[2]
@@ -1128,7 +1135,7 @@ static func _pilot(pk: PropKit, kit: Dictionary, hl: float, sz: float, col: Colo
 			x += 0.5
 	for hx in [-0.6, 0.6]:
 		pk.tube(kit, "steel", Vector3(hx, 0.9, zf), Vector3(hx, 0.45, zf + sz * 0.25), 0.04, 0.04, 6, DARK)
-	pk.beam(kit, "steel", Vector3(-1.3, 1.25, zf + sz * 0.08), Vector3(0.0, 1.25, zf + sz * 0.08), 0.04, 0.04, RAIL_WHITE)
+	pk.beam(kit, "steel", Vector3(-1.3, 1.22, zf + sz * 0.08), Vector3(0.0, 1.22, zf + sz * 0.08), 0.04, 0.04, RAIL_WHITE)
 
 
 ## Hood doors down one side of a hood from z0 to z1 (face at |x| = fx): seams and handles, louvres on the first
@@ -1173,10 +1180,11 @@ static func _road_diesel(pk: PropKit, kit: Dictionary, variant: int) -> void:
 	_pilot(pk, kit, hl, -1.0, body, gold)
 	_pilot(pk, kit, hl, 1.0, body, gold)
 	for sx in [-1.0, 1.0]:
-		pk.beam(kit, "steel", Vector3(sx * 1.45, 0.25, -hl - 0.3), Vector3(0.0, 0.25, -hl - 0.95), 0.36, 0.06, DARK, Vector3.UP)
+		# The two halves a centimetre apart in height (meeting at the tip, they shared a plane there).
+		pk.beam(kit, "steel", Vector3(sx * 1.45, 0.25 + 0.005 * sx, -hl - 0.3), Vector3(0.0, 0.25 + 0.005 * sx, -hl - 0.95), 0.36, 0.06, DARK, Vector3.UP)
 	# Walkways and the corner steps (gold edges).
 	for sx in [-1.0, 1.0]:
-		pk.block(kit, "steel", Vector3(1.12 if sx > 0.0 else -1.58, deck, -hl), Vector3(1.58 if sx > 0.0 else -1.12, deck + 0.04, hl), IRON.lightened(0.08))
+		pk.block(kit, "steel", Vector3(1.12 if sx > 0.0 else -1.58, deck - 0.006, -hl), Vector3(1.58 if sx > 0.0 else -1.12, deck + 0.04, hl), IRON.lightened(0.08))
 		pk.block(kit, "paint", Vector3(sx * 1.46 - 0.02, 1.1, -hl), Vector3(sx * 1.46 + 0.02, 1.3, hl), gold)
 		for sz in [-1.0, 1.0]:
 			var z0: float = minf(sz * (hl - 0.05), sz * (hl - 0.75))
@@ -1261,7 +1269,7 @@ static func _road_diesel(pk: PropKit, kit: Dictionary, variant: int) -> void:
 		for k in 4:
 			var ang: float = PI * 0.25 * float(k)
 			var d2 := Vector3(cos(ang), 0, sin(ang)) * 0.4
-			pk.beam(kit, "steel", Vector3(0, lh_top + 0.13, z3) - d2, Vector3(0, lh_top + 0.13, z3) + d2, 0.04, 0.02, DARK)
+			pk.beam(kit, "steel", Vector3(0, lh_top + 0.13 + 0.005 * float(k), z3) - d2, Vector3(0, lh_top + 0.13 + 0.005 * float(k), z3) + d2, 0.04, 0.02, DARK)
 	# The long hood's end: twin headlights, number boards, gold chevrons, ditch lights on the rear pilot.
 	var ez := lh_z1 + 0.025
 	for k in 3:
@@ -1276,11 +1284,11 @@ static func _road_diesel(pk: PropKit, kit: Dictionary, variant: int) -> void:
 	for sx in [-1.0, 1.0]:
 		var rx: float = sx * 1.56
 		for z4 in [-9.3, -7.4, -5.5, -1.6, 0.6, 2.8, 5.0, 7.2, 9.3]:
-			pk.block(kit, "steel", Vector3(rx - 0.025, deck, z4 - 0.025), Vector3(rx + 0.025, deck + 1.1, z4 + 0.025), RAIL_WHITE)
+			pk.block(kit, "steel", Vector3(rx - 0.025, deck + 0.04, z4 - 0.025), Vector3(rx + 0.025, deck + 1.09, z4 + 0.025), RAIL_WHITE)
 		for ry in [deck + 0.55, deck + 1.08]:
 			pk.tube(kit, "steel", Vector3(rx, ry, -9.3), Vector3(rx, ry, -5.5), 0.025, 0.025, 6, RAIL_WHITE, false)
 			pk.tube(kit, "steel", Vector3(rx, ry, -1.6), Vector3(rx, ry, 9.3), 0.025, 0.025, 6, RAIL_WHITE, false)
 			for zz in [-9.3, 9.3]:
 				pk.tube(kit, "steel", Vector3(rx, ry, zz), Vector3(sx * 0.45, ry, zz), 0.025, 0.025, 6, RAIL_WHITE, false)
 		for zz2 in [-9.3, 9.3]:
-			pk.block(kit, "steel", Vector3(sx * 0.45 - 0.025, deck, zz2 - 0.025), Vector3(sx * 0.45 + 0.025, deck + 1.1, zz2 + 0.025), RAIL_WHITE)
+			pk.block(kit, "steel", Vector3(sx * 0.45 - 0.025, deck + 0.04, zz2 - 0.025), Vector3(sx * 0.45 + 0.025, deck + 1.09, zz2 + 0.025), RAIL_WHITE)
