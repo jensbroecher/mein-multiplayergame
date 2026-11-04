@@ -93,10 +93,16 @@ static func wall(pk: PropKit, kit: Dictionary, key: String, a: Vector3, b: Vecto
 
 
 ## A roof plane: p0 and p1 along the eave (u), p3 up the slope from p0 (v), p2 above p1.
-static func roof(pk: PropKit, kit: Dictionary, key: String, p0: Vector3, p1: Vector3, p2: Vector3, p3: Vector3, col: Color, out: Vector3) -> void:
+## With `under` (the default) its underside too, 4cm below, darker: one-sided, a roof vanished from below and what hung
+## under its eaves (purlins, ridge beams) floated in the air.
+static func roof(pk: PropKit, kit: Dictionary, key: String, p0: Vector3, p1: Vector3, p2: Vector3, p3: Vector3, col: Color, out: Vector3, under := true) -> void:
 	var lu: float = (p1 - p0).length()
 	var lv: float = (p3 - p0).length()
-	pk.quad(kit, key, [p0, p1, p2, p3], out, col, [Vector2(0, 0), Vector2(lu, 0) * uvk, Vector2(lu, lv) * uvk, Vector2(0, lv) * uvk])
+	var uv := [Vector2(0, 0), Vector2(lu, 0) * uvk, Vector2(lu, lv) * uvk, Vector2(0, lv) * uvk]
+	pk.quad(kit, key, [p0, p1, p2, p3], out, col, uv)
+	if under:
+		var dn := Vector3(0, -0.04, 0)
+		pk.quad(kit, key, [p0 + dn, p1 + dn, p2 + dn, p3 + dn], -out, col.darkened(0.45), uv)
 
 
 ## A triangle of wall (a gable end) facing `out`, UVs in metres.
@@ -191,7 +197,8 @@ static func lamp_post(pk: PropKit, kit: Dictionary, p: Vector3, height := 3.6) -
 		var a: float = TAU * float(k) / 8.0
 		var d := Vector3(cos(a), 0, sin(a))
 		pk.beam(kit, "steel", p + d * 0.205 + Vector3(0, 0.12, 0), p + d * 0.205 + Vector3(0, 0.3, 0), 0.04, 0.03, CAST, Vector3(-d.z, 0, d.x))
-	pk.tube(kit, "steel", p + Vector3(0, 0.6, 0), p + Vector3(0, height - 0.3, 0), 0.085, 0.065, 12, CAST, false)
+	# The shaft runs 5cm into the foot and the capital: a hairline of sky had shown at both joints.
+	pk.tube(kit, "steel", p + Vector3(0, 0.55, 0), p + Vector3(0, height - 0.24, 0), 0.085, 0.065, 12, CAST, false)
 	for y in [1.0, 1.08, height * 0.62]:
 		pk.tube(kit, "steel", p + Vector3(0, y, 0), p + Vector3(0, y + 0.06, 0), 0.11, 0.11, 12, CAST, true)
 	# The ladder bar (lamplighters leant their ladders on it).
@@ -199,8 +206,9 @@ static func lamp_post(pk: PropKit, kit: Dictionary, p: Vector3, height := 3.6) -
 	for sx in [-1.0, 1.0]:
 		pk.lathe(kit, "steel", p + Vector3(sx * 0.32, height - 0.65, 0), [Vector2(0.045, -0.04), Vector2(0.045, 0.04), Vector2(0.001, 0.07)], 8, CAST, true)
 	# The capital: a flared collar the lantern stands on.
-	pk.lathe(kit, "steel", p + Vector3(0, height - 0.3, 0), [Vector2(0.07, 0.0), Vector2(0.16, 0.22), Vector2(0.18, 0.3), Vector2(0.001, 0.3)], 12, CAST, true)
-	lantern(pk, kit, p + Vector3(0, height, 0), 1.0)
+	pk.lathe(kit, "steel", p + Vector3(0, height - 0.3, 0), [Vector2(0.001, 0.0), Vector2(0.075, 0.0), Vector2(0.16, 0.22), Vector2(0.18, 0.3), Vector2(0.001, 0.3)], 12, CAST, true)
+	# The lantern sinks 1cm into the capital's top, so they never part.
+	lantern(pk, kit, p + Vector3(0, height - 0.01, 0), 1.0)
 
 
 ## A four-sided lantern standing on `base` (the middle of its foot), `s` its scale (1: 0.85m tall): a stepped base, four
@@ -209,13 +217,15 @@ static func lamp_post(pk: PropKit, kit: Dictionary, p: Vector3, height := 3.6) -
 static func lantern(pk: PropKit, kit: Dictionary, base: Vector3, s := 1.0, hanging := false) -> void:
 	var glow := Color(1.0, 0.86, 0.55)
 	var rot := Basis(Vector3.UP, PI * 0.25)
-	pk.lathe(kit, "steel", base, [Vector2(0.09 * s, 0.0), Vector2(0.15 * s, 0.03 * s), Vector2(0.15 * s, 0.07 * s), Vector2(0.12 * s, 0.08 * s), Vector2(0.001, 0.08 * s)], 4, CAST, true, rot)
+	# Every part is closed (its profile starts and ends on the axis) and overlaps the next by a centimetre: open ends
+	# had shown the sky through the lantern from below.
+	pk.lathe(kit, "steel", base, [Vector2(0.001, 0.0), Vector2(0.12 * s, 0.0), Vector2(0.15 * s, 0.03 * s), Vector2(0.15 * s, 0.07 * s), Vector2(0.12 * s, 0.09 * s), Vector2(0.001, 0.09 * s)], 4, CAST, true, rot)
 	var y0: float = 0.08 * s
 	var y1: float = 0.5 * s
 	var w0: float = 0.11 * s
 	var w1: float = 0.16 * s
 	# The panes: a glowing body with flat sides (a 4-sided lathe turned square to the axes), slightly inside the posts.
-	pk.lathe(kit, "lamp", base + Vector3(0, y0, 0), [Vector2(w0 * 1.38, 0.0), Vector2(w1 * 1.38, y1 - y0), Vector2(0.001, y1 - y0)], 4, glow, true, rot)
+	pk.lathe(kit, "lamp", base + Vector3(0, y0 - 0.005 * s, 0), [Vector2(0.001, 0.0), Vector2(w0 * 1.38, 0.0), Vector2(w1 * 1.38, y1 - y0 + 0.015 * s), Vector2(0.001, y1 - y0 + 0.015 * s)], 4, glow, true, rot)
 	for k in 4:
 		var a: float = PI * 0.5 * float(k)
 		var c := Vector3(cos(a), 0, sin(a))
@@ -236,7 +246,7 @@ static func lantern(pk: PropKit, kit: Dictionary, base: Vector3, s := 1.0, hangi
 	if hanging:
 		pk.tube(kit, "steel", base + Vector3(-0.05 * s, hy + 0.47 * s, 0), base + Vector3(0.05 * s, hy + 0.47 * s, 0), 0.05 * s, 0.05 * s, 8, CAST)
 	# A drop under the foot.
-	pk.lathe(kit, "steel", base - Vector3(0, 0.08 * s, 0), [Vector2(0.001, 0.0), Vector2(0.04 * s, 0.05 * s), Vector2(0.06 * s, 0.08 * s), Vector2(0.001, 0.08 * s)], 8, CAST, true)
+	pk.lathe(kit, "steel", base - Vector3(0, 0.07 * s, 0), [Vector2(0.001, 0.0), Vector2(0.04 * s, 0.05 * s), Vector2(0.06 * s, 0.08 * s), Vector2(0.001, 0.08 * s)], 8, CAST, true)
 
 
 ## A station bench: a slatted seat and back on cast-iron ends, `c` the middle of the seat's front edge on the
@@ -445,7 +455,7 @@ static func canopy(pk: PropKit, kit: Dictionary, x0: float, x1: float, wall_z: f
 	var eave_y: float = wall_y - drop
 	var slope: float = (wall_y - eave_y) / depth
 	var nrm := Vector3(0.0, depth, dir * drop).normalized()
-	roof(pk, kit, "iron", Vector3(x0 - 0.6, eave_y, out_z), Vector3(x1 + 0.6, eave_y, out_z), Vector3(x1 + 0.6, wall_y, wall_z), Vector3(x0 - 0.6, wall_y, wall_z), IRON_GREEN, nrm)
+	roof(pk, kit, "iron", Vector3(x0 - 0.6, eave_y, out_z), Vector3(x1 + 0.6, eave_y, out_z), Vector3(x1 + 0.6, wall_y, wall_z), Vector3(x0 - 0.6, wall_y, wall_z), IRON_GREEN, nrm, false)
 	# Under the roof: a flat soffit so the underside is not see-through.
 	pk.quad(kit, "paint", [Vector3(x0 - 0.6, eave_y - 0.03, out_z), Vector3(x0 - 0.6, wall_y - 0.03, wall_z), Vector3(x1 + 0.6, wall_y - 0.03, wall_z), Vector3(x1 + 0.6, eave_y - 0.03, out_z)],
 			Vector3.DOWN, Color(0.80, 0.78, 0.70))
@@ -456,6 +466,9 @@ static func canopy(pk: PropKit, kit: Dictionary, x0: float, x1: float, wall_z: f
 	blk(pk, kit, "steel", Vector3(x0 - 0.5, gy_top - 0.06, gz - 0.2), Vector3(x1 + 0.5, gy_top, gz + 0.2), IRON_GREEN.darkened(0.25))
 	blk(pk, kit, "steel", Vector3(x0 - 0.5, gy_top - 0.68, gz - 0.2), Vector3(x1 + 0.5, gy_top - 0.62, gz + 0.2), IRON_GREEN.darkened(0.25))
 	var col_top: float = gy_top - 0.68
+	# Columns evenly spaced from end to end (about 4m), so the girder ends over one.
+	var bays: int = maxi(int(ceil((x1 - x0) / 4.0 - 0.01)), 1)
+	var step: float = (x1 - x0) / float(bays)
 	var x := x0
 	while x <= x1 + 0.01:
 		# Column: foot, shaft, collar and capital up to the girder's underside.
@@ -465,10 +478,13 @@ static func canopy(pk: PropKit, kit: Dictionary, x0: float, x1: float, wall_z: f
 		pk.tube(kit, "steel", Vector3(x, col_top - 0.3, gz), Vector3(x, col_top, gz), 0.2, 0.16, 12, CAST, true)
 		blk(pk, kit, "steel", Vector3(x - 0.24, col_top - 0.04, gz - 0.24), Vector3(x + 0.24, col_top + 0.02, gz + 0.24), CAST)
 		# Brackets: a pair of braces from the shaft up to the girder either side, and a scroll.
+		# None reaching out past the girder's ends (they had ended in the air at the end columns).
 		for sx in [-1.0, 1.0]:
+			if (x < x0 + 0.01 and sx < 0.0) or (x > x1 - 0.01 and sx > 0.0):
+				continue
 			pk.beam(kit, "steel", Vector3(x, col_top - 0.55, gz), Vector3(x + sx * 0.95, col_top, gz), 0.07, 0.07, CAST, Vector3(0, 0, 1))
-			pk.tube(kit, "steel", Vector3(x + sx * 0.5, col_top - 0.22, gz - 0.05), Vector3(x + sx * 0.5, col_top - 0.22, gz + 0.05), 0.2, 0.2, 10, CAST, false)
-		x += 4.0
+			pk.tube(kit, "steel", Vector3(x + sx * 0.5, col_top - 0.22, gz - 0.05), Vector3(x + sx * 0.5, col_top - 0.22, gz + 0.05), 0.2, 0.2, 10, CAST, true)
+		x += step
 	# The valance along the front edge, hanging below the girder: a board with a scalloped lower edge.
 	var vy_top: float = gy_top - 0.02
 	var vz: float = out_z + dir * 0.0
@@ -682,10 +698,12 @@ static func sliding_door(pk: PropKit, kit: Dictionary, c: Vector3, out: Vector3,
 	box_at(pk, kit, "painted", c + Vector3(0, h * 0.5, 0) + out * 0.08, basis, Vector3(w, h, 0.07), col)
 	for sx in [-1.0, 1.0]:
 		box_at(pk, kit, "painted", c + across * (sx * (w * 0.5 - 0.1)) + Vector3(0, h * 0.5, 0) + out * 0.13, basis, Vector3(0.2, h, 0.05), col.lightened(0.12))
+	# The rails 3cm prouder than the stiles, the brace prouder again: level with each other they shared a plane where
+	# they crossed, and the corners flickered.
 	for y in [0.14, h * 0.5, h - 0.14]:
-		box_at(pk, kit, "painted", c + Vector3(0, y, 0) + out * 0.13, basis, Vector3(w, 0.2, 0.05), col.lightened(0.12))
+		box_at(pk, kit, "painted", c + Vector3(0, y, 0) + out * 0.16, basis, Vector3(w, 0.2, 0.05), col.lightened(0.16))
 	var d: Vector3 = Vector3(across.x * (w * 0.5 - 0.1), 0.0, across.z * (w * 0.5 - 0.1))
-	pk.beam(kit, "painted", c - d + Vector3(0, 0.2, 0) + out * 0.14, c + d + Vector3(0, h - 0.2, 0) + out * 0.14, 0.2, 0.05, col.lightened(0.12), out)
+	pk.beam(kit, "painted", c - d + Vector3(0, 0.2, 0) + out * 0.145, c + d + Vector3(0, h - 0.2, 0) + out * 0.145, 0.2, 0.03, col.lightened(0.12), out)
 	# The rail over it, two hangers and the stop at the end.
 	var rail_y: float = h + 0.35
 	pk.beam(kit, "steel", c - across * (w * 1.1) + Vector3(0, rail_y, 0) + out * 0.2, c + across * (w * 1.1) + Vector3(0, rail_y, 0) + out * 0.2, 0.1, 0.07, CAST, Vector3.UP)

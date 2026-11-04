@@ -2483,6 +2483,11 @@ tower is "TankTower", and when it was "WaterTower" every road dip under its heig
   - `res://scratch/yard_preview.gd` (`-s`, windowed, `-- <dir> [set=station|factory|all] [stock=1] name:x,y,z:tx,ty,tz[:fov]`)
     renders the station (at the origin, the platform track at z -37.2) and the cooperative (at (150, 0, -150)) on flat
     ground in seconds.
+- `YardKit.roof` draws a darker underside 4cm under every roof slope (`under`, off where a roof has its own soffit: the
+  platform canopy, TownKit's boarded gables): seen from below, the warehouse's roof had vanished and its beams floated.
+  Canopy columns are evenly spaced end to end, with no brace past the girder's ends. Sliding doors' rails stand prouder
+  than their stiles (they had shared a plane where they crossed and flickered). Lamp posts and lanterns close every
+  part and overlap their joints. The passenger cab unit's pilot has a back face.
 - The water tower (`FreightKit.water_tower`, `TankTower`): everything placed from the legs' own line (`leg_r`), so the
   strut rings sit on the legs and the crossed rods (with turnbuckles) on each bay's outer face; a ring beam and joists
   under the tank, a railed deck round its foot, a ladder up a leg's face and on up the tank. The spout is a stowed

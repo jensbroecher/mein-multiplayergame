@@ -452,9 +452,9 @@ static func warehouse(pk: PropKit, kit: Dictionary, x0: float, x1: float, z0: fl
 	var roof_col := Color(0.55, 0.57, 0.55)
 	roof(pk, kit, "iron", Vector3(x0 - 0.7, ey, z1 + oh), Vector3(x1 + 0.7, ey, z1 + oh), Vector3(x1 + 0.7, ridge, zm), Vector3(x0 - 0.7, ridge, zm), roof_col, Vector3(0, 1.0, pitch).normalized())
 	roof(pk, kit, "iron", Vector3(x1 + 0.7, ey, z0 - oh), Vector3(x0 - 0.7, ey, z0 - oh), Vector3(x0 - 0.7, ridge, zm), Vector3(x1 + 0.7, ridge, zm), roof_col, Vector3(0, 1.0, -pitch).normalized())
-	pk.beam(kit, "steel", Vector3(x0 - 0.8, ridge + 0.06, zm), Vector3(x1 + 0.8, ridge + 0.06, zm), 0.55, 0.24, roof_col.darkened(0.3), Vector3(0, 0, 1))
+	pk.beam(kit, "steel", Vector3(x0 - 0.7, ridge + 0.06, zm), Vector3(x1 + 0.7, ridge + 0.06, zm), 0.55, 0.24, roof_col.darkened(0.3), Vector3(0, 0, 1))
 	for zz in [z1 + oh, z0 - oh]:
-		pk.beam(kit, "steel", Vector3(x0 - 0.8, ey - 0.04, zz), Vector3(x1 + 0.8, ey - 0.04, zz), 0.12, 0.3, STEELWORK, Vector3(0, 0, 1))
+		pk.beam(kit, "steel", Vector3(x0 - 0.7, ey - 0.04, zz), Vector3(x1 + 0.7, ey - 0.04, zz), 0.12, 0.3, STEELWORK, Vector3(0, 0, 1))
 	# Wind-driven ventilators on the ridge: a drum with fins and a cap, their feet in the roof.
 	var vx: float = x0 + 6.0
 	while vx < x1 - 4.0:
@@ -484,7 +484,8 @@ static func warehouse(pk: PropKit, kit: Dictionary, x0: float, x1: float, z0: fl
 		# Numbers over the doors.
 		box_at(pk, kit, "paint", Vector3(dx, DOCK_H + 4.9, z1 + 0.06), Basis(), Vector3(0.6, 0.6, 0.04), SAFETY_YELLOW)
 	# The canopy over the dock: its roof rests on the girder on posts standing on the dock slab.
-	canopy(pk, kit, x0 + 0.5, x1 - 0.5, z1, wall_h - 0.8, 3.6, 0.45, 1.0, DOCK_H)
+	# 3.0m deep: its columns stand 0.25m in from its edge, so at 3.6 they stood past the dock's edge (3.2m), over the drop.
+	canopy(pk, kit, x0 + 0.5, x1 - 0.5, z1, wall_h - 0.8, 3.0, 0.4, 1.0, DOCK_H)
 	# The back: clerestory windows and two man doors.
 	# None over the doors: a window's sill there shared the plane of the door's lintel and flickered.
 	var wx: float = x0 + 3.0

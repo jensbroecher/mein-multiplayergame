@@ -750,8 +750,13 @@ static func _cab_unit(pk: PropKit, kit: Dictionary) -> void:
 	var pz1 := -10.75
 	var pcol := Color(0.26, 0.27, 0.28)
 	pk.quad(kit, "steel", [Vector3(-1.32, pt0, pz0), Vector3(1.32, pt0, pz0), Vector3(1.2, pt1, pz1), Vector3(-1.2, pt1, pz1)], Vector3(0, -0.8, -1.0).normalized(), pcol)
+	# Its back, 4cm behind (the plate had one face: from behind, the rear unit's pilot wasn't there), and a bottom edge.
+	var pb := Vector3(0, 0.03, 0.03)
+	pk.quad(kit, "steel", [Vector3(-1.32, pt0, pz0) + pb, Vector3(1.32, pt0, pz0) + pb, Vector3(1.2, pt1, pz1) + pb, Vector3(-1.2, pt1, pz1) + pb], Vector3(0, 0.8, 1.0).normalized(), pcol.darkened(0.3))
+	pk.quad(kit, "steel", [Vector3(-1.2, pt1, pz1), Vector3(1.2, pt1, pz1), Vector3(1.2, pt1, pz1) + pb, Vector3(-1.2, pt1, pz1) + pb], Vector3(0, -1, -0.3).normalized(), pcol.darkened(0.2))
 	for sx in [-1.0, 1.0]:
 		pk.tri(kit, "steel", Vector3(sx * 1.32, pt0, pz0), Vector3(sx * 1.2, pt1, pz1), Vector3(sx * 1.32, pt1, pz0), Vector3(sx, 0, 0), Vector3(sx, 0, 0), Vector3(sx, 0, 0), pcol.darkened(0.2), Vector3(sx, 0, 0))
+		pk.tri(kit, "steel", Vector3(sx * 1.32, pt0, pz0), Vector3(sx * 1.2, pt1, pz1), Vector3(sx * 1.32, pt1, pz0), Vector3(-sx, 0, 0), Vector3(-sx, 0, 0), Vector3(-sx, 0, 0), pcol.darkened(0.35), Vector3(-sx, 0, 0))
 	for k in range(5):
 		var bx: float = -0.9 + 0.45 * float(k)
 		pk.beam(kit, "steel", Vector3(bx, pt0 - 0.08, pz0 - 0.1), Vector3(bx * 0.95, pt1 + 0.08, pz1 + 0.06), 0.06, 0.06, pcol.darkened(0.35), Vector3(1, 0, 0))

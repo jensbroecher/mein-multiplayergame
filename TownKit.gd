@@ -95,12 +95,12 @@ static func _gable_roof(pk: PropKit, kit: Dictionary, w: float, d: float, h: flo
 	var ey: float = h - pitch * oh
 	var tile_col := TERRACOTTA
 	# The two slopes, and under each the soffit (a board face looking down, 4cm below).
-	roof(pk, kit, "tile", Vector3(x0, ey, oh), Vector3(x1, ey, oh), Vector3(x1, ridge, zm), Vector3(x0, ridge, zm), tile_col, Vector3(0, 1.0, pitch).normalized())
-	roof(pk, kit, "tile", Vector3(x1, ey, -d - oh), Vector3(x0, ey, -d - oh), Vector3(x0, ridge, zm), Vector3(x1, ridge, zm), tile_col, Vector3(0, 1.0, -pitch).normalized())
+	roof(pk, kit, "tile", Vector3(x0, ey, oh), Vector3(x1, ey, oh), Vector3(x1, ridge, zm), Vector3(x0, ridge, zm), tile_col, Vector3(0, 1.0, pitch).normalized(), false)
+	roof(pk, kit, "tile", Vector3(x1, ey, -d - oh), Vector3(x0, ey, -d - oh), Vector3(x0, ridge, zm), Vector3(x1, ridge, zm), tile_col, Vector3(0, 1.0, -pitch).normalized(), false)
 	# The slopes' undersides, boarded, 5cm under the tiles over their whole width: seen from below where the roof
 	# runs out past the walls (the eaves, and over the gables, where the sky had shown through).
-	roof(pk, kit, "lapboards", Vector3(x0, ey - 0.05, oh), Vector3(x1, ey - 0.05, oh), Vector3(x1, ridge - 0.05, zm), Vector3(x0, ridge - 0.05, zm), WOOD_MID, Vector3(0, -1.0, -pitch).normalized())
-	roof(pk, kit, "lapboards", Vector3(x1, ey - 0.05, -d - oh), Vector3(x0, ey - 0.05, -d - oh), Vector3(x0, ridge - 0.05, zm), Vector3(x1, ridge - 0.05, zm), WOOD_MID, Vector3(0, -1.0, pitch).normalized())
+	roof(pk, kit, "lapboards", Vector3(x0, ey - 0.05, oh), Vector3(x1, ey - 0.05, oh), Vector3(x1, ridge - 0.05, zm), Vector3(x0, ridge - 0.05, zm), WOOD_MID, Vector3(0, -1.0, -pitch).normalized(), false)
+	roof(pk, kit, "lapboards", Vector3(x1, ey - 0.05, -d - oh), Vector3(x0, ey - 0.05, -d - oh), Vector3(x0, ridge - 0.05, zm), Vector3(x1, ridge - 0.05, zm), WOOD_MID, Vector3(0, -1.0, pitch).normalized(), false)
 	# Rafter tails under the eaves, a gutter along each and a downpipe at its ends.
 	var rx := x0 + 0.3
 	while rx < x1 - 0.2:
