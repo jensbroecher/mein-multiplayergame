@@ -217,7 +217,7 @@ func _explode():
 					var dir = (p.global_position - global_position).normalized()
 					if dir.length_squared() < 0.01:
 						dir = Vector3.UP
-					var impulse = dir * 8.0 * p.mass + Vector3.UP * 4.0 * p.mass
+					var impulse = (dir * 8.0 + Vector3.UP * 4.0) * 1200.0  # the same push for every car: a heavy one is thrown less
 					var is_real_peer = p.name.to_int() > 0 and not p.get("is_ai")
 					if p.has_method("apply_blast_impulse"):
 						if multiplayer.multiplayer_peer != null and is_real_peer:

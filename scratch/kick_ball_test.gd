@@ -9,6 +9,7 @@ const KickBall := preload("res://KickBall.gd")
 #   Godot --headless --path . res://scratch/kick_ball_test.tscn -- [level=res://levels/NyotaStadiumLevel.tscn]
 #       [index=0 | spawn=football|beach s=300] [speed=30] [aside=0] [watch=4] [trace=1]
 # aside: how far off the ball's centre the cart's line passes (m, + to the right), for glancing hits.
+# weight=<w>: the cart weighs that (PlayerCart.weight, its mass with it), to see CartWeight's effect.
 
 
 func _ready() -> void:
@@ -20,6 +21,7 @@ func _ready() -> void:
 	var aside := 0.0
 	var watch := 4.0
 	var trace := false
+	var cart_weight := -1.0
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("level="): level_path = a.substr(6)
 		elif a.begins_with("index="): index = int(a.substr(6))
@@ -29,6 +31,7 @@ func _ready() -> void:
 		elif a.begins_with("aside="): aside = float(a.substr(6))
 		elif a.begins_with("watch="): watch = float(a.substr(6))
 		elif a == "trace=1": trace = true
+		elif a.begins_with("weight="): cart_weight = float(a.substr(7))
 	AudioServer.set_bus_mute(0, true)
 	NetworkManager.current_game_mode = NetworkManager.GameMode.SPECTATOR
 	NetworkManager.start_spectator()
@@ -67,6 +70,10 @@ func _ready() -> void:
 	fwd = fwd.normalized()
 	var right := fwd.cross(Vector3.UP)
 	var cart: RigidBody3D = get_tree().get_nodes_in_group("player_carts")[0]
+	if cart_weight > 0.0:
+		cart.set("weight", cart_weight)
+		cart.mass = 1200.0 * cart_weight
+	print("CART weight %.2f mass %.0f" % [float(cart.get("weight")), cart.mass])
 	var wait := 0.0
 	while not cart.can_move and wait < 30.0:
 		await get_tree().physics_frame

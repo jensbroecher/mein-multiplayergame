@@ -43,6 +43,7 @@ const CAR_PRESETS = [
 		"grip": 5.4,
 		"braking": 46.0,
 		"offroad": 6.0,
+		"weight": 1.1,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
@@ -58,6 +59,7 @@ const CAR_PRESETS = [
 		"grip": 4.5,
 		"braking": 32.0,
 		"offroad": 4.0,
+		"weight": 0.9,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
@@ -73,6 +75,7 @@ const CAR_PRESETS = [
 		"grip": 5.5,
 		"braking": 52.0,
 		"offroad": 8.0,
+		"weight": 1.12,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
@@ -88,6 +91,7 @@ const CAR_PRESETS = [
 		"grip": 6.0,
 		"braking": 46.0,
 		"offroad": 5.0,
+		"weight": 1.1,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
@@ -103,6 +107,7 @@ const CAR_PRESETS = [
 		"grip": 4.0,
 		"braking": 35.0,
 		"offroad": 3.0,
+		"weight": 0.95,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
@@ -118,6 +123,7 @@ const CAR_PRESETS = [
 		"grip": 5.0,
 		"braking": 44.0,
 		"offroad": 9.5,
+		"weight": 1.15,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
@@ -133,6 +139,7 @@ const CAR_PRESETS = [
 		"grip": 3.5,
 		"braking": 40.0,
 		"offroad": 8.0,
+		"weight": 1.18,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
@@ -148,6 +155,7 @@ const CAR_PRESETS = [
 		"grip": 5.5,
 		"braking": 48.0,
 		"offroad": 6.5,
+		"weight": 0.88,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
@@ -163,6 +171,7 @@ const CAR_PRESETS = [
 		"grip": 5.2,
 		"braking": 45.0,
 		"offroad": 8.5,
+		"weight": 0.95,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
@@ -178,6 +187,7 @@ const CAR_PRESETS = [
 		"grip": 4.4,
 		"braking": 42.0,
 		"offroad": 9.0,
+		"weight": 0.95,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
@@ -193,6 +203,7 @@ const CAR_PRESETS = [
 		"grip": 6.2,
 		"braking": 48.0,
 		"offroad": 1.5,
+		"weight": 0.87,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
@@ -208,6 +219,7 @@ const CAR_PRESETS = [
 		"grip": 5.8,
 		"braking": 49.0,
 		"offroad": 7.5,
+		"weight": 1.0,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
@@ -223,6 +235,7 @@ const CAR_PRESETS = [
 		"grip": 5.4,
 		"braking": 48.0,
 		"offroad": 9.2,
+		"weight": 0.92,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
@@ -238,6 +251,7 @@ const CAR_PRESETS = [
 		"grip": 4.3,
 		"braking": 44.0,
 		"offroad": 9.8,
+		"weight": 1.25,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
@@ -253,6 +267,7 @@ const CAR_PRESETS = [
 		"grip": 4.9,
 		"braking": 46.0,
 		"offroad": 9.6,
+		"weight": 1.08,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
@@ -268,6 +283,7 @@ const CAR_PRESETS = [
 		"grip": 5.0,
 		"braking": 47.0,
 		"offroad": 9.7,
+		"weight": 1.05,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	},
 	{
@@ -283,11 +299,16 @@ const CAR_PRESETS = [
 		"grip": 6.4,
 		"braking": 50.0,
 		"offroad": 2.5,
+		"weight": 0.85,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 
 var max_speed = 40.0
+## How heavy the car is against the fleet's middle (its preset's "weight"): its mass is BASE_MASS times it. Every driving
+## force here scales with the mass, so it drives the same; it tells in contact (CartWeight.gd).
+var weight := 1.0
+const BASE_MASS := 1200.0
 var reverse_speed = 19.0
 var acceleration = 65.0
 var braking = 40.0
@@ -439,6 +460,17 @@ var ai_brake_dist_bias: float = 0.0
 var ai_lookahead_mult: float = 1.0
 var ai_racing_line_weight: float = 0.75
 var ai_drift_threshold: float = 0.32
+## Whether it drifts a corner it could, decided once a corner (_ai_drift_corner) with this chance.
+var ai_drift_chance: float = 0.5
+var _ai_drift_corner := -1
+var _ai_drift_this_corner := false
+## A drift is held through a corner while the road within 20m still turns this much (radians), or the bot steers hard.
+const AI_DRIFT_HOLD_ANGLE := 0.3
+## The longest a bot's drift lasts, whatever its charge (seconds since it began).
+const AI_DRIFT_MAX_AGE := 3.0
+var _drift_age := 0.0
+## How far inside the road's edge a bot must be to start or keep a drift (`_ai_drift_room`).
+const AI_DRIFT_EDGE := 2.0
 var ai_overtake_bias: float = 0.0
 var _ai_overtake_lock_timer: float = 0.0
 var _ai_start_grid_lane: float = 0.0
@@ -1054,6 +1086,8 @@ func _ready():
 	steer_speed = preset.steer_speed
 	grip = preset.grip
 	braking = preset.get("braking", 40.0)
+	weight = float(preset.get("weight", 1.0))
+	mass = BASE_MASS * weight
 	
 	# Replace default model with selected model
 	var cart_model = get_node_or_null("Visuals/CartModel")
@@ -2742,6 +2776,7 @@ func _physics_process(delta):
 		drift_mode = true
 		drift_right = input_dir.x > 0.0
 		_drift_charge_time = 0.0
+		_drift_age = 0.0
 		_drift_counter_steer_timer = 0.0
 		_drift_straight_timer = 0.0
 		_drift_input_buffer = 0.0
@@ -2912,6 +2947,7 @@ func _physics_process(delta):
 			# - they release brake (input_dir.y < 0.1)
 			# - car comes to a stop (current_speed < 3.0)
 			if drift_mode:
+				_drift_age += delta
 				# Accumulate drift charge while sliding at speed on ground
 				if on_ground and current_speed > 4.0:
 					_drift_charge_time += delta
@@ -2942,10 +2978,19 @@ func _physics_process(delta):
 				# 5. Fully released all controls (hands off keyboard/gamepad)
 				var controls_released: bool = absf(input_dir.y) < 0.08 and absf(input_dir.x) < 0.15
 				# 6. AI drift safety exits: corner ended or max duration reached
+				# And by the clock (AI_DRIFT_MAX_AGE): the charge only builds on the ground over 4 m/s, so a bot sliding
+				# slower, or in the air, held its drift without end and turned in circles (91s of drifting in one race).
 				var ai_drift_exit: bool = is_ai and (
 					(_drift_charge_time > 0.35 and not _ai_want_drift) or
-					_drift_charge_time > 2.2
+					(_drift_age > 0.6 and not _ai_want_drift) or
+					_drift_charge_time > 2.2 or _drift_age > AI_DRIFT_MAX_AGE
 				)
+				# A bot ends its drift itself (ai_drift_exit: the corner is done, or 2.2s): its steering swings to and fro as
+				# the car slides, and the player's counter-steer and straighten-out exits cut every AI drift short.
+				if is_ai:
+					counter_steer_exit = false
+					straighten_exit = false
+					controls_released = false
 				if speed_too_low or counter_steer_exit or straighten_exit or manual_tap_exit or controls_released or ai_drift_exit:
 					var is_accelerating: bool = false
 					if is_ai:
@@ -3419,6 +3464,8 @@ func _get_ground_visual_offset() -> float:
 
 ## How fast the model turns to the loop's surface while on it (per second, exponential).
 const LOOP_ALIGN_RATE := 40.0
+## How far the nose may turn off the way the cart goes round the loop (the steering's room there).
+const LOOP_STEER_ANGLE := 0.45
 
 func _update_visuals_alignment(delta: float) -> void:
 	if is_exploding:
@@ -3508,8 +3555,19 @@ func _update_visuals_alignment(delta: float) -> void:
 	var current_basis = visuals.global_transform.basis.orthonormalized()
 	var forward = -current_basis.z
 	if on_loop_vis and linear_velocity.length() > 3.0:
-		# Round the loop the nose follows the way the cart goes.
-		forward = linear_velocity.normalized()
+		# Round the loop the nose follows the way the cart goes, turned off it by what the steering has turned it, up to
+		# LOOP_STEER_ANGLE: along the velocity alone, the steering (which turns the nose, and the drive pushes along the
+		# nose) did nothing on the loop. The nose alone (projected onto the surface) lags the loop's turn and stands off it.
+		var v: Vector3 = linear_velocity.normalized()
+		var up_n: Vector3 = target_up.normalized()
+		var vp: Vector3 = (v - up_n * v.dot(up_n)).normalized()
+		var fp: Vector3 = (forward - up_n * forward.dot(up_n))
+		if vp.length_squared() > 0.5 and fp.length_squared() > 1e-4:
+			fp = fp.normalized()
+			var ang: float = atan2(vp.cross(fp).dot(up_n), vp.dot(fp))
+			forward = vp.rotated(up_n, clampf(ang, -LOOP_STEER_ANGLE, LOOP_STEER_ANGLE))
+		else:
+			forward = v
 
 	var target_forward = (forward - target_up * forward.dot(target_up)).normalized()
 	if target_forward.length_squared() < 0.001:
@@ -5260,7 +5318,9 @@ func _activate_shockwave():
 				var vn := str(p.get("player_name"))
 				victims.append(vn if vn != "" and vn != "<null>" else str(p.name))
 				var dir = (p.global_position - global_position).normalized()
-				var impulse = dir * 54.0 * p.mass + Vector3.UP * 27.0 * p.mass
+				# The same push for every car, so a heavy one is thrown less (CartWeight: the speed it gets goes as one over
+				# its weight).
+				var impulse = (dir * 54.0 + Vector3.UP * 27.0) * BASE_MASS
 				if p.has_method("apply_blast_impulse"):
 					var is_real_peer = p.name.to_int() > 0 and not p.get("is_ai")
 					if multiplayer.multiplayer_peer != null and is_real_peer:
@@ -6429,6 +6489,8 @@ func _init_ai_personality() -> void:
 		ai_lane_span = rng.randf_range(1.1, 1.8)
 
 	ai_shortcut_chance = clampf(lerpf(0.10, 0.75, ai_aggression) * rng.randf_range(0.85, 1.15), 0.05, 0.80)
+	# How often it drifts a corner it could (decided once a corner): attackers most, rookies least.
+	ai_drift_chance = clampf(lerpf(0.25, 0.85, ai_aggression) * rng.randf_range(0.85, 1.15), 0.15, 0.9)
 	ai_overtake_bias = rng.randf_range(-1.0, 1.0)
 	# Never overshoot on mountain cliffs; only a tiny minority on wide tracks.
 	_ai_may_overshoot = false if _mountain_stage else (rng.randf() < (0.04 + ai_aggression * 0.06))
@@ -6831,8 +6893,11 @@ func _get_ai_input(delta: float) -> Vector2:
 	# bank too steep: _ai_line_drivable, looked at every AI_BLOCK_CHECK): just outside Pinecrest's guardrails (8.5m off
 	# the line, inside the 16m corridor) bots counted as on the course, aimed through the rail and ground along it. And
 	# for as long as a way back planned (RejoinPlanner) is being followed, until the bot is on the road again.
+	# Not on the lap's own ground (within the road's half width of its line: Pinecrest's forest trail, a stage with no
+	# road): there the line to the aim point can pass a tree beside a winding trail, and bots on it went into recovery,
+	# crawled and were respawned as stuck.
 	var aim_blocked := false
-	if is_offroad and was_on_ground and on_course and space_state:
+	if is_offroad and was_on_ground and on_course and space_state and _ai_plan_distance_to_lap() > _ai_road_half():
 		_ai_block_check -= delta
 		if _ai_block_check <= 0.0:
 			_ai_block_check = AI_BLOCK_CHECK
@@ -6991,6 +7056,13 @@ func _get_ai_input(delta: float) -> Vector2:
 		# Commit full power through stunt loops — never brake or drift mid-loop!
 		_ai_want_drift = false
 		input.y = -1.0
+	elif _ai_back_turn(is_target_behind, on_course, speed, delta):
+		# Off the course, the way on behind it and its nose against something (a rail, a wall, a bank): back away turning
+		# toward it (arcade reverse: steering right turns the nose right). Turning forward on full lock, bots ground along
+		# Pinecrest's rails, nose in, for seconds on end.
+		_ai_want_drift = false
+		input.y = 0.85
+		input.x = signf(side_dist) if absf(side_dist) > 0.02 else 1.0
 	elif is_target_behind:
 		# Target is behind: decelerate firmly so turning radius shrinks (~2.5m) to pivot cleanly towards target!
 		_ai_want_drift = false
@@ -7005,6 +7077,15 @@ func _get_ai_input(delta: float) -> Vector2:
 			input.y = clampf((speed - 7.5) / 4.0, 0.30, 0.75)
 		else:
 			input.y = -0.65
+	elif not _ai_rejoin_path.is_empty() or _ai_rejoin_job != null:
+		# Following a way back (RejoinPlanner): at most AI_WAY_BACK_SPEED, slower into a sharp turn of it. At full speed
+		# on the grass (25-30 m/s) bots overshot its turns among the trees, left it and planned again, round and round.
+		_ai_want_drift = false
+		var cap: float = AI_WAY_BACK_SPEED * lerpf(1.0, 0.55, clampf(absf(angle_to_target) / 1.2, 0.0, 1.0))
+		if speed > cap + 1.5:
+			input.y = clampf((speed - cap) / 6.0, 0.25, 0.8)
+		else:
+			input.y = -0.85
 	elif is_offroad and not on_course:
 		# When genuinely off-track and facing target, power forward toward the checkpoint/road
 		_ai_want_drift = false
@@ -7067,10 +7148,17 @@ func _get_ai_input(delta: float) -> Vector2:
 				# Decisive, firm braking when overspeed
 				input.y = clampf(overspeed / 2.5, 0.40, 1.0)
 				
-				# Drift decision (never drift on mountain summit hairpin to avoid spinning off)
-				if (not _harbor_stage) and (not _mountain_stage or not is_hairpin) and speed > 11.0 and corner_factor > ai_drift_threshold and abs(input.x) > 0.24 and _ai_upcoming_turn_dist < 22.0:
-					_ai_want_drift = true
-					input.y = maxf(input.y, 0.45)
+				# Drift decision: once a corner, with the bot's ai_drift_chance, so they drift some corners and not others.
+				# Never a hairpin, on any stage: drifted, Pinecrest's switchbacks threw bots over their edges (six falls a
+				# race, none with drifting off).
+				if (not _harbor_stage) and (not is_hairpin) and _ai_drift_room() and speed > 11.0 and corner_factor > ai_drift_threshold and abs(input.x) > 0.24 and _ai_upcoming_turn_dist < 22.0:
+					var corner_id: int = int(floor((current_offset + _ai_upcoming_turn_dist) / 40.0))
+					if corner_id != _ai_drift_corner:
+						_ai_drift_corner = corner_id
+						_ai_drift_this_corner = randf() < ai_drift_chance
+					if _ai_drift_this_corner:
+						_ai_want_drift = true
+						input.y = maxf(input.y, 0.45)
 			else:
 				# Maintenance / exit throttle approaching or inside the corner
 				var speed_deficit = maxf(target_corner_speed - speed, 0.0)
@@ -7078,6 +7166,17 @@ func _get_ai_input(delta: float) -> Vector2:
 		else:
 			# On straights and gentle bends: 100% full throttle!
 			input.y = -1.0
+
+		# Once drifting, hold it through the corner as a player does: while the road just ahead still turns hard (or it
+		# steers hard into it) power-slide on the throttle, then straighten out of it, which releases the drift (and its
+		# boost, held 0.55s or more). Let go of as soon as braking stopped, the AI's drifts lasted a third of a second
+		# each and nobody saw them. Not into a hairpin (a drift begun in the bend before carried bots wide out of
+		# Pinecrest's summit hairpin and over its tyre wall), nor near the road's edge (`_ai_drift_room`).
+		if drift_mode and not _harbor_stage and not _mountain_stage and speed > 9.0 and _drift_charge_time < 2.0 and not is_hairpin and _ai_drift_room():
+			var near_turn: float = float(turn_info.get("near_angle", 0.0))
+			if near_turn > AI_DRIFT_HOLD_ANGLE or absf(input.x) > 0.4:
+				_ai_want_drift = true
+				input.y = minf(input.y, -0.75)
 
 		if _harbor_stage:
 			_ai_want_drift = false
@@ -7510,11 +7609,19 @@ var _ai_rejoin_job = null
 var _ai_rejoin_path := PackedVector3Array()
 var _ai_rejoin_idx := 0
 var _ai_road_half_cached := -1.0
+var _ai_way_back_stall := 0.0
+var _ai_way_back_idx := -1
+var _ai_way_back_best := INF
+const AI_WAY_BACK_STALL := 2.0
 ## On grass inside the corridor: whether the line to the usual aim point is blocked, looked at every AI_BLOCK_CHECK.
 var _ai_aim_blocked := false
 var _ai_block_check := 0.0
 const AI_BLOCK_CHECK := 0.5
 const AI_WAY_BACK_REACHED := 5.0
+const AI_WAY_BACK_SPEED := 13.0
+## How long a bot backs away from what it faces, off the course with its way on behind it (`_ai_back_turn`).
+const AI_BACK_TURN_TIME := 1.1
+var _ai_back_turn_left := 0.0
 const AI_WAY_BACK_LEAVE := 14.0
 const RejoinPlanner = preload("res://RejoinPlanner.gd")
 
@@ -7545,11 +7652,12 @@ func _ai_rejoin_goal(delta: float, space: PhysicsDirectSpaceState3D) -> Vector3:
 		if job.found:
 			_ai_rejoin_path = job.path
 			_ai_rejoin_idx = 0
+			_ai_way_back_idx = -1
 			var first := _ai_follow_way_back()
 			_ai_recover_goal = first
 			return first
 		print("AI Cart ", name, " off the course with no way back to the road within ", RejoinPlanner.MAX_RADIUS, "m (",
-				job.expanded, " cells searched). Respawning.")
+				job.expanded, " cells searched) at ", global_position.snapped(Vector3.ONE * 0.1), ". Respawning.")
 		_ai_recover_goal = Vector3.ZERO
 		if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 			respawn_rpc.rpc(last_checkpoint_transform)
@@ -7614,11 +7722,69 @@ func _ai_follow_way_back() -> Vector3:
 	var d: float = flat.call(_ai_rejoin_path[_ai_rejoin_idx])
 	if d > AI_WAY_BACK_LEAVE:
 		return Vector3.ZERO
+	# Stalled on the way (a gap the planner thought open, a cluster of rocks): no metre nearer the point it is heading for
+	# in AI_WAY_BACK_STALL seconds (by its distance, not its speed: wedged between a rail and a board behind it, a bot
+	# scraped along at 0.5-2.5 m/s for seconds). That step is closed for every search on the level and a new way is
+	# planned. Before, bots drove the same way into the same stall again and again.
+	if _ai_rejoin_idx != _ai_way_back_idx or d < _ai_way_back_best - 1.0:
+		_ai_way_back_idx = _ai_rejoin_idx
+		_ai_way_back_best = d
+		_ai_way_back_stall = 0.0
+	else:
+		_ai_way_back_stall += get_physics_process_delta_time()
+		if _ai_way_back_stall > AI_WAY_BACK_STALL:
+			_ai_way_back_stall = 0.0
+			_ai_way_back_idx = -1
+			var from: Vector3 = _ai_rejoin_path[_ai_rejoin_idx - 1] if _ai_rejoin_idx > 0 else global_position
+			RejoinPlanner.close_step(from, _ai_rejoin_path[_ai_rejoin_idx])
+			_ai_rejoin_path = PackedVector3Array()
+			return Vector3.ZERO
 	if _ai_rejoin_idx >= n - 1 and d < AI_WAY_BACK_REACHED:
 		return Vector3.ZERO
 	if _ai_rejoin_idx < n - 1 and d < AI_WAY_BACK_REACHED + 2.5:
 		return _ai_rejoin_path[_ai_rejoin_idx + 1]
 	return _ai_rejoin_path[_ai_rejoin_idx]
+
+
+## Whether to back away turning (see its use in `_get_ai_input`): off the course, slow, the way on behind, and something
+## solid (not track, or ground too steep to climb) within 2.6m of the nose at bumper height. Once started it runs for
+## AI_BACK_TURN_TIME, so it doesn't flick between backing and turning forward.
+func _ai_back_turn(target_behind: bool, on_course: bool, speed: float, delta: float) -> bool:
+	if _ai_back_turn_left > 0.0:
+		_ai_back_turn_left -= delta
+		return not on_course
+	if on_course or not target_behind or speed > 5.0 or is_finished_race:
+		return false
+	var space := get_world_3d().direct_space_state
+	var fwd: Vector3 = -visuals.global_transform.basis.z
+	fwd.y = 0.0
+	if space == null or fwd.length_squared() < 1e-4:
+		return false
+	fwd = fwd.normalized()
+	for h in [0.1, 0.5]:
+		var o: Vector3 = global_position + Vector3.UP * h
+		var q := PhysicsRayQueryParameters3D.create(o, o + fwd * 2.6)
+		q.exclude = [get_rid()]
+		q.collision_mask = 1
+		var hit := space.intersect_ray(q)
+		if hit.is_empty() or hit.collider.is_in_group("player_carts"):
+			continue
+		var gap_flag := _on_road_gap_ground
+		var track := _is_track_surface(hit.collider)
+		_on_road_gap_ground = gap_flag
+		if track and (hit.normal as Vector3).y > 0.4:
+			continue
+		if _is_world_terrain_collider(hit.collider) and (hit.normal as Vector3).y > 0.6:
+			continue
+		_ai_back_turn_left = AI_BACK_TURN_TIME
+		return true
+	return false
+
+
+## Whether a drift has room: the bot is more than AI_DRIFT_EDGE inside the road's edge (in plan, from its route's line).
+## A drift carries the car wide; one that has carried it near the edge is let go of, and none is started there.
+func _ai_drift_room() -> bool:
+	return _ai_plan_distance_to_lap() < _ai_road_half() - AI_DRIFT_EDGE
 
 
 ## The road's half width (its TerrainGenerator's road_width, else 7.5m), for the planner's goals.
@@ -7690,44 +7856,73 @@ func _ai_line_drivable_steps(space: PhysicsDirectSpaceState3D, from: Vector3, to
 		# longer (a wall, a rail, a fence) is. Through the jungle every line met a trunk and bots were respawned; testing
 		# lines 1.6m either side of the step instead let a guardrail met at a shallow angle pass as narrow (the lines
 		# beside meet it in another step), and bots outside Pinecrest's rails drove along them for the road.
-		var block := _ai_step_hit(space, prev, g)
-		if not block.is_empty() and not _ai_narrow_obstacle(space, block):
+		if _ai_step_barred(space, prev, g):
 			return false
 		prev = g
 	return true
 
 
-## What solid thing but track and ground stands across the step from `a` to `b` (ground points) at a cart's height: the
-## ray's hit, or empty.
-func _ai_step_hit(space: PhysicsDirectSpaceState3D, a: Vector3, b: Vector3) -> Dictionary:
-	var across := PhysicsRayQueryParameters3D.create(a + Vector3.UP * 0.7, b + Vector3.UP * 0.7)
-	across.exclude = [get_rid()]
-	across.collision_mask = 1
-	var block := space.intersect_ray(across)
-	if not block.is_empty() and not _is_track_surface(block.collider) and not _is_world_terrain_collider(block.collider) \
-			and not block.collider.is_in_group("player_carts") and (block.normal as Vector3).y < 0.55:
-		return block
-	return {}
+## Whether something long stands across the step from `a` to `b` (ground points) at a cart's height, at two heights
+## (0.35 and 0.8m: one ray at 0.7m over a step from higher ground passed over a guardrail at its low end). Narrow things
+## on the way (a trunk, a post, a chevron board: `_ai_narrow_obstacle`) are looked past, the ray going on from behind
+## each: stopping at the first, a chevron board in front of Pinecrest's summit tyre wall hid the wall, and bots drove
+## into it at the end of their way back again and again.
+func _ai_step_barred(space: PhysicsDirectSpaceState3D, a: Vector3, b: Vector3) -> bool:
+	for h in [0.35, 0.8]:
+		var from: Vector3 = a + Vector3.UP * h
+		var to: Vector3 = b + Vector3.UP * h
+		for _i in range(4):
+			var across := PhysicsRayQueryParameters3D.create(from, to)
+			across.exclude = [get_rid()]
+			across.collision_mask = 1
+			across.hit_back_faces = false
+			var block := space.intersect_ray(across)
+			if block.is_empty() or _is_track_surface(block.collider) or _is_world_terrain_collider(block.collider) \
+					or block.collider.is_in_group("player_carts") or (block.normal as Vector3).y >= 0.55:
+				break
+			if not _ai_narrow_obstacle(space, block, to - from):
+				return true
+			var hp: Vector3 = block.position
+			if hp.distance_to(to) < 0.8:
+				break
+			from = hp + (to - hp).normalized() * 0.6
+	return false
 
 
-## Whether the thing hit (`block`, a ray's result) is narrow: 1.8m either way along its face, a short ray into where its
-## face would be finds nothing on both sides (a trunk, a post, a rock), where a rail, a fence or a wall goes on.
-func _ai_narrow_obstacle(space: PhysicsDirectSpaceState3D, block: Dictionary) -> bool:
-	var n: Vector3 = block.normal
+## Whether the thing hit (`block`, a ray's result) is narrow with room to pass it: 2.2m either way along its face, a short
+## ray into where its face would be finds nothing solid (but track and ground) on both sides (a lone trunk, a post, a
+## rock), where a rail, a fence, a wall or a cluster of boulders goes on. Looking for the same collider only, Pinecrest's
+## boulders (one body for all of them) passed as narrow in clusters, gaps narrower than a cart between them. With the
+## ray's direction `dir`, it is also tested across that: a ray into the notch where two of a guardrail's boxes meet on a
+## bend hit one box's end face, along which nothing goes on, and the rail passed for a post.
+func _ai_narrow_obstacle(space: PhysicsDirectSpaceState3D, block: Dictionary, dir := Vector3.ZERO) -> bool:
+	var h: Vector3 = block.position
+	if not _ai_narrow_across(space, h, block.normal):
+		return false
+	dir.y = 0.0
+	if dir.length_squared() > 1e-4 and not _ai_narrow_across(space, h, -dir):
+		return false
+	return true
+
+
+func _ai_narrow_across(space: PhysicsDirectSpaceState3D, h: Vector3, n: Vector3) -> bool:
 	n.y = 0.0
 	if n.length_squared() < 1e-4:
 		return false
 	n = n.normalized()
 	var along := Vector3(-n.z, 0.0, n.x)
-	var h: Vector3 = block.position
 	for sgn in [-1.0, 1.0]:
-		var o: Vector3 = h + along * (1.8 * sgn)
-		var q := PhysicsRayQueryParameters3D.create(o + n * 0.6, o - n * 0.6)
+		var o: Vector3 = h + along * (2.2 * sgn)
+		var q := PhysicsRayQueryParameters3D.create(o + n * 0.8, o - n * 0.8)
 		q.exclude = [get_rid()]
 		q.collision_mask = 1
 		var r := space.intersect_ray(q)
-		if not r.is_empty() and r.collider == block.collider:
-			return false
+		if not r.is_empty() and not _is_world_terrain_collider(r.collider) and not r.collider.is_in_group("player_carts"):
+			var gap_flag := _on_road_gap_ground
+			var track := _is_track_surface(r.collider)
+			_on_road_gap_ground = gap_flag
+			if not track:
+				return false
 	return true
 
 

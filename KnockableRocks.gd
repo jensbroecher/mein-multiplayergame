@@ -1,4 +1,6 @@
 extends MultiMeshInstance3D
+
+const CartWeight = preload("res://CartWeight.gd")
 ## Rock clusters that carts can push through: the rocks get pushed aside and tumble away,
 ## while significantly slowing the cart down through momentum loss and heavy drag.
 ##
@@ -139,7 +141,8 @@ func _physics_process(delta: float) -> void:
 					# Heavy immediate momentum loss on striking a solid stone
 					var has_auth: bool = not cart.has_method("has_physics_authority") or cart.has_physics_authority()
 					if has_auth and cspeed > 3.0:
-						var hit_loss: float = clampf(1.0 - (b.mass / 1200.0) * 0.42, 0.65, 0.82)
+						# A heavy car loses less to it (CartWeight).
+						var hit_loss: float = 1.0 - clampf((b.mass / 1200.0) * 0.42, 0.18, 0.35) * CartWeight.loss_share(cart)
 						cart.linear_velocity *= hit_loss
 						cart.angular_velocity += Vector3(randf_range(-1.5, 1.5), randf_range(-0.8, 0.8), randf_range(-1.5, 1.5))
 
@@ -147,7 +150,7 @@ func _physics_process(delta: float) -> void:
 				var push_dir := (bpos - cpos)
 				push_dir.y = 0.12
 				push_dir = push_dir.normalized()
-				var push_force: float = clampf(cspeed * 0.28, 1.2, 5.5)
+				var push_force: float = clampf(cspeed * 0.28, 1.2, 5.5) * CartWeight.push_share(cart)
 				b.apply_central_impulse(push_dir * (b.mass * push_force * delta * 15.0) + Vector3.UP * (b.mass * 0.2))
 
 				# Sound on hard impact
@@ -164,10 +167,10 @@ func _physics_process(delta: float) -> void:
 			var has_auth: bool = not cart.has_method("has_physics_authority") or cart.has_physics_authority()
 			if has_auth:
 				# Heavy drag resistance
-				var drag: float = clampf(cluster_drag * delta, 0.0, 0.85)
+				var drag: float = clampf(cluster_drag * delta * CartWeight.loss_share(cart), 0.0, 0.85)
 				cart.linear_velocity *= (1.0 - drag)
 				# Opposing deceleration force from plowing heavy rocks
-				cart.apply_central_force(-cvel.normalized() * cart.mass * 36.0)
+				cart.apply_central_force(-cvel.normalized() * cart.mass * 36.0 * CartWeight.loss_share(cart))
 			if cart.has_method("jolt"):
 				cart.jolt(randf_range(-0.45, 0.55), randf_range(-0.35, 0.35), randf_range(-0.4, 0.4))
 			if cart.has_method("jolt"):

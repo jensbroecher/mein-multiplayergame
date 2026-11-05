@@ -1,7 +1,8 @@
 extends Node
 ## Puts one AI cart off the course at each given spot during a spectator race and watches it find its way back
 ## (headless):
-##   Godot --headless --path . res://scratch/ai_rejoin_probe.tscn -- <level> x,z[,yaw] ... [auto=N] [rails=N] [seconds=25] [speed=1] [trace=1]
+##   Godot --headless --path . res://scratch/ai_rejoin_probe.tscn -- <level> x,z[,yaw] ... [auto=N] [rails=N] [rails_steep=1]
+##       [forest=N] [seconds=25] [speed=1] [trace=1]
 ## yaw in degrees (0 faces -z); without it the cart faces away from the road (the worst case: it has to turn round).
 ## Per spot it prints when the cart was back on the road (within the road's half width plus 2m of the lap, on the
 ## ground, at the road's height), or respawned (or drowned: pick dry spots), or neither when time ran out; how long it crawled (under 3 m/s with the
@@ -14,6 +15,8 @@ var trace := false
 var spots: Array = []
 var auto_n := 0
 var rails_n := 0
+var rails_steep := false
+var forest_n := 0
 
 
 func _ready() -> void:
@@ -30,6 +33,10 @@ func _ready() -> void:
 			auto_n = int(a.substr(5))
 		elif a.begins_with("rails="):
 			rails_n = int(a.substr(6))
+		elif a == "rails_steep=1":
+			rails_steep = true
+		elif a.begins_with("forest="):
+			forest_n = int(a.substr(7))
 		elif a.contains(","):
 			var v := a.split(",")
 			spots.append([float(v[0]), float(v[1]), float(v[2]) if v.size() > 2 else NAN])
@@ -78,11 +85,42 @@ func _ready() -> void:
 			var at := c + away * 3.5
 			var hq := PhysicsRayQueryParameters3D.create(Vector3(at.x, c.y + 6.0, at.z), Vector3(at.x, c.y - 30.0, at.z))
 			var h := space.intersect_ray(hq)
-			if h.is_empty() or (h.position as Vector3).y < water_y0 + 0.3 or (h.normal as Vector3).y < 0.75:
+			if h.is_empty() or (h.position as Vector3).y < water_y0 + 0.3 or (h.normal as Vector3).y < (0.5 if rails_steep else 0.75):
 				continue
 			# Facing the rail (toward the road).
 			spots.append([at.x, at.z, rad_to_deg(atan2(away.x, away.z))])
 		print("rails: %d guardrail boxes, %d spots" % [boxes.size(), spots.size()])
+	# forest=N: N spots 35-60m off the lap among trees (a solid thing within 6m of the spot), on dry ground, facing away.
+	if forest_n > 0:
+		var length2: float = track.curve.get_baked_length()
+		var water_y2: float = float(cart.water_surface_y)
+		var tries2 := 0
+		var found2 := 0
+		while found2 < forest_n and tries2 < forest_n * 40:
+			tries2 += 1
+			var off2: float = fposmod(length2 * (float(tries2) * 0.618), length2)
+			var p2: Vector3 = track.to_global(track.curve.sample_baked(off2))
+			var a2: Vector3 = track.to_global(track.curve.sample_baked(fposmod(off2 + 2.0, length2)))
+			var f2 := Vector3(a2.x - p2.x, 0.0, a2.z - p2.z).normalized()
+			var side2 := 1.0 if tries2 % 2 == 0 else -1.0
+			var at2 := p2 + Vector3(-f2.z, 0.0, f2.x) * side2 * (35.0 + 25.0 * fposmod(float(tries2) * 0.37, 1.0))
+			var h2 := space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(at2.x, p2.y + 80.0, at2.z), Vector3(at2.x, p2.y - 80.0, at2.z)))
+			if h2.is_empty() or (h2.position as Vector3).y < water_y2 + 0.3 or (h2.normal as Vector3).y < 0.7:
+				continue
+			var g2: Vector3 = h2.position
+			var cp3: Vector3 = track.to_global(track.curve.get_closest_point(track.to_local(g2)))
+			if Vector2(g2.x - cp3.x, g2.z - cp3.z).length() < 30.0:
+				continue
+			var shape := SphereShape3D.new()
+			shape.radius = 6.0
+			var sq := PhysicsShapeQueryParameters3D.new()
+			sq.shape = shape
+			sq.transform = Transform3D(Basis(), g2 + Vector3.UP * 7.0)
+			if space.intersect_shape(sq, 4).is_empty():
+				continue
+			spots.append([g2.x, g2.z, NAN])
+			found2 += 1
+		print("forest: %d spots" % found2)
 	# auto=N: N spots along the lap, 20-30m out to alternating sides, on dry ground under 6m below the road (where a
 	# cart that ran wide ends up), facing away from the road.
 	if auto_n > 0:

@@ -1,4 +1,6 @@
 extends MultiMeshInstance3D
+
+const CartWeight = preload("res://CartWeight.gd")
 ## Loose props carts can shove out of the way: beach loungers, cool boxes, parasols, sand toys.
 ##
 ## Drawn as one MultiMesh. At runtime each prop gets a rigid body made of `boxes`, frozen where it
@@ -103,14 +105,15 @@ func _physics_process(_delta: float) -> void:
 	for c in get_tree().get_nodes_in_group("player_carts"):
 		var rb := c as RigidBody3D
 		if rb:
-			carts.append([rb.global_position, rb.linear_velocity.length()])
+			carts.append([rb.global_position, rb.linear_velocity.length(), CartWeight.push_share(rb)])
 	var r2 := release_radius * release_radius
 	for i in range(_bodies.size()):
 		var b: RigidBody3D = _bodies[i]
 		if _state[i] == 0:
 			var o: Vector3 = b.global_position
 			for c in carts:
-				if (c[0] as Vector3).distance_squared_to(o) < r2 and float(c[1]) > push_speed:
+				# A heavy car frees it at a lower speed (CartWeight); the contact itself is physics, by the masses.
+				if (c[0] as Vector3).distance_squared_to(o) < r2 and float(c[1]) > push_speed / float(c[2]):
 					b.freeze = false
 					b.collision_layer = PROP_LAYER
 					_state[i] = 1

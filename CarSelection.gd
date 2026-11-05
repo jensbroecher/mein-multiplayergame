@@ -266,7 +266,11 @@ const STATS := [
 	["HANDLING", "steer_speed", 1.5, 4.0],
 	["GRIP", "grip", 2.5, 7.0],
 	["OFFROAD", "offroad", 0.0, 10.0],
+	# PlayerCart's own presets (CartWeight.gd: how it shoves and is shoved).
+	["WEIGHT", "weight", 0.78, 1.28],
 ]
+## The race presets, for what this screen's own list doesn't carry (the weight).
+const RACE_PRESETS = preload("res://PlayerCart.gd").CAR_PRESETS
 
 # The main menu's palette.
 const COL_TEAL := Color(0.15, 0.75, 0.92)
@@ -447,7 +451,8 @@ func update_car_selection() -> void:
 	_counter.text = "%d / %d" % [maxi(_lineup.find(current_car_index), 0) + 1, _lineup.size()]
 	for k in STATS.size():
 		var st: Array = STATS[k]
-		var v: float = inverse_lerp(st[2], st[3], float(preset.get(st[1], st[2])))
+		var src: Dictionary = RACE_PRESETS[current_car_index] if st[1] == "weight" else preset
+		var v: float = inverse_lerp(st[2], st[3], float(src.get(st[1], 1.0 if st[1] == "weight" else st[2])))
 		_stat_bars[k].set_value(clampf(v, 0.05, 1.0), accent)
 	_apply_accent(accent)
 	_place_reel(is_visible_in_tree())

@@ -1,6 +1,8 @@
 @tool
 class_name KickBall
 extends RigidBody3D
+
+const CartWeight = preload("res://CartWeight.gd")
 ## A ball the carts kick about: Nyota Stadium's football (Style.FOOTBALL), Bloombay's beach balls
 ## (Style.BEACH). It builds its sphere and shape as internal children from STYLES, so a level stores
 ## only its transform, its style and its water.
@@ -213,7 +215,9 @@ func _entry_face(local: Vector3, rel: Vector3) -> Vector3:
 func _kick(cart: RigidBody3D, n: Vector3, cvel: Vector3, closing: float) -> void:
 	var vel := linear_velocity
 	var rel_t := (cvel - vel) - n * (cvel - vel).dot(n)
-	vel += n * closing * float(_p["kick"]) + rel_t * 0.25 + Vector3.UP * closing * float(_p["lift"])
+	# A heavy car kicks it further and is checked less (CartWeight).
+	var push: float = CartWeight.push_share(cart)
+	vel += n * closing * float(_p["kick"]) * push + rel_t * 0.25 + Vector3.UP * closing * float(_p["lift"]) * push
 	var top: float = _p["top"]
 	if vel.length() > top:
 		vel = vel.normalized() * top
@@ -227,7 +231,7 @@ func _kick(cart: RigidBody3D, n: Vector3, cvel: Vector3, closing: float) -> void
 			nh = nh.normalized()
 			var along := cart.linear_velocity.dot(nh)
 			if along > 0.0:
-				cart.linear_velocity -= nh * minf(along, closing) * float(_p["slow"])
+				cart.linear_velocity -= nh * minf(along, closing) * float(_p["slow"]) * CartWeight.loss_share(cart)
 	_sfx.volume_db = clampf(-24.0 + closing * 0.55, -24.0, -3.0)
 	_sfx.pitch_scale = float(_p["pitch"]) * randf_range(0.9, 1.1)
 	_sfx.play()

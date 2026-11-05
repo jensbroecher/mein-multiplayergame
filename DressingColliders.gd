@@ -1,4 +1,6 @@
 extends Node
+
+const CartWeight = preload("res://CartWeight.gd")
 ## Makes every plant and object a level draws as MultiMesh instances solid, near the road or far off it,
 ## and lets the smaller plants wobble when a cart runs into them. Level.gd adds it once its own runtime
 ## colliders are built, on every course, so no level needs regenerating for it.
@@ -558,7 +560,7 @@ func _physics_process(delta: float) -> void:
 							continue
 						now_in[idx] = true
 						if drags and not was_in.has(idx):
-							(c as RigidBody3D).linear_velocity *= 1.0 - BRUSH_DRAG
+							(c as RigidBody3D).linear_velocity *= 1.0 - BRUSH_DRAG * CartWeight.loss_share(c)
 					# Tip away from the cart, about the horizontal axis across the push; brush goes over
 					# along the cart's travel, the way a cart flattens it.
 					var push := Vector3(d.x, 0.0, d.y).normalized() if d.length() > 0.05 else Vector3(vel.x, 0.0, vel.z).normalized()
@@ -568,7 +570,7 @@ func _physics_process(delta: float) -> void:
 					var kick: float = BRUSH_KICK if brush else KICK
 					if float(e[7]) * (axis.dot(e[5]) if (e[5] as Vector3).length() > 0.5 else 1.0) < speed * kick * 0.5:
 						e[5] = axis
-						e[7] = float(e[7]) + speed * kick
+						e[7] = float(e[7]) + speed * kick * CartWeight.push_share(c)
 						_moving[idx] = true
 		_brush_in[cid] = now_in
 	var done: Array = []

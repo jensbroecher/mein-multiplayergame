@@ -4,6 +4,7 @@ extends Node
 # happened) and how far each cart got. cars= picks each bot's car (CAR_PRESETS indices).
 #   Godot --headless --path . res://scratch/ai_race_test.tscn -- res://levels/X.tscn [seconds=300] [speed=4]
 #       [weather=0..1] [cars=5,5,0,1,2,3] [noitems=1] [hide=<node name>]
+# nodrift=1 sets every bot's ai_drift_chance to 0 (to tell what drifting does to a race).
 # noitems=1 frees every item box (to tell what an item box does to a lap from what the course does).
 # It prints each jump lip's crossing speeds (TrackPath's "jump_lips"), and REJOIN-ON-ROAD when a bot goes into
 # off-course recovery while it is over the road (that once made every bot brake on the kickers).
@@ -13,6 +14,7 @@ var speed := 4.0
 var weather := -1.0
 var cars: PackedStringArray = []
 var no_items := false
+var no_drift := false
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
@@ -28,6 +30,8 @@ func _ready() -> void:
 			cars = a.substr(5).split(",")
 		elif a == "noitems=1":
 			no_items = true
+		elif a == "nodrift=1":
+			no_drift = true
 	AudioServer.set_bus_mute(0, true)
 	NetworkManager.current_game_mode = NetworkManager.GameMode.SPECTATOR
 	NetworkManager.start_spectator()
@@ -60,6 +64,13 @@ func _ready() -> void:
 	var lip_speeds := {}
 	var lip_last := {}
 	var rejoin_warned := {}
+	# Drifts: how many each cart began and how long it held them.
+	var drifts := {}
+	var fin_at := {}
+	var fin_rest := {}
+	var drift_time := {}
+	var was_drift := {}
+	var drift_start := {}
 	var t := 0.0
 	var next_report := 20.0
 	while t < seconds:
@@ -71,9 +82,24 @@ func _ready() -> void:
 				was_tele[c] = false
 				respawns[c] = []
 				best_prog[c] = 0.0
+				if no_drift:
+					c.set("ai_drift_chance", 0.0)
 		for c in carts:
 			if not is_instance_valid(c):
 				continue
+			# Where each cart is when it finishes, and where it comes to rest after.
+			if c.is_finished_race and not fin_at.has(c):
+				fin_at[c] = c.global_position
+				var fl: Node3D = level.get_node_or_null("FinishLine")
+				if fl == null:
+					fl = level.get_node_or_null("StartLine")
+				var to_line: float = -1.0
+				if fl:
+					to_line = Vector2(c.global_position.x - fl.global_position.x, c.global_position.z - fl.global_position.z).length()
+				print("FINISHED %s at %s, %.1f m/s, %.0fm from the finish gate" % [c.name, c.global_position, c.linear_velocity.length(), to_line])
+			elif fin_at.has(c) and not fin_rest.has(c) and c.linear_velocity.length() < 0.5:
+				fin_rest[c] = c.global_position
+				print("AT REST %s at %s, %.1fm on from where it finished" % [c.name, c.global_position, c.global_position.distance_to(fin_at[c])])
 			var route: String = str(c.active_path.name) if c.on_alternative_path and c.active_path else ""
 			if route != str(on_route.get(c, "")):
 				if route != "":
@@ -89,9 +115,22 @@ func _ready() -> void:
 				for k in range(maxi(0, tr0.size() - 90), tr0.size(), 10):
 					print("    ", tr0[k])
 			was_tele[c] = tele
+			var dr: bool = c.get("drift_mode") == true
+			if dr and not was_drift.get(c, false):
+				drifts[c] = int(drifts.get(c, 0)) + 1
+				drift_start[c] = t
+			if dr:
+				drift_time[c] = float(drift_time.get(c, 0.0)) + get_physics_process_delta_time()
+				# A drift held over 4s is stuck on (a bot circling in it): say where, every 2s it lasts.
+				var held: float = t - float(drift_start.get(c, t))
+				if held > 4.0 and fmod(held, 2.0) < get_physics_process_delta_time() * 1.01:
+					print("LONG DRIFT %s %.0fs at %s %.1f m/s, charge %.2f, offset %.0fm" % [c.name, held, c.global_position.snapped(Vector3.ONE * 0.1),
+						c.linear_velocity.length(), float(c.get("_drift_charge_time")), track.curve.get_closest_offset(track.to_local(c.global_position))])
+			was_drift[c] = dr
 			if not tele:
 				for li in range(lips.size()):
-					var lip: Vector3 = lips[li]["lip"]
+					# A lip is a dictionary with its place, or (Canyon) just its distance along the lap.
+					var lip: Vector3 = lips[li]["lip"] if lips[li] is Dictionary else track.to_global(track.curve.sample_baked(float(lips[li])))
 					var key := "%s/%d" % [c.name, li]
 					if Vector2(lip.x - c.global_position.x, lip.z - c.global_position.z).length() < 4.0 and t - float(lip_last.get(key, -99.0)) > 4.0:
 						lip_last[key] = t
@@ -152,5 +191,6 @@ func _ready() -> void:
 		print("LIP %s: %d crossings, %.1f m/s on average, slowest %.1f" % [lips[li]["name"], sp.size(), sum / sp.size(), lo])
 	for c in carts:
 		var st: Dictionary = level.player_stats.get(c.name.to_int(), {})
-		print("CART %s car=%d laps=%d finished=%s respawns=%d %s" % [c.name, c.car_index, st.get("laps", 0), st.get("finished", false), respawns[c].size(), respawns[c]])
+		print("CART %s car=%d laps=%d finished=%s respawns=%d %s drifts=%d (%.1fs)" % [c.name, c.car_index, st.get("laps", 0), st.get("finished", false),
+				respawns[c].size(), respawns[c], int(drifts.get(c, 0)), float(drift_time.get(c, 0.0))])
 	get_tree().quit()

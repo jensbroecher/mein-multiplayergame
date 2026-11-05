@@ -177,6 +177,7 @@ func _ready():
 
 	if not track_path:
 		track_path = get_node_or_null("TrackPath")
+	_close_lap_path()
 
 	var alt_paths_container = get_node_or_null("AlternativePaths")
 	if alt_paths_container:
@@ -339,6 +340,26 @@ func _load_spawn_points():
 	if not spawn_points.is_empty():
 		print("Loaded %d spawn points from scene tree." % spawn_points.size())
 
+## A circuit's TrackPath must run all the way round. Some stop short of their first point (Tolvanera Gulch 64m, Pinecrest
+## Ridge 30m, Mountain Pass 25m), where TerrainGenerator lays the road on round to it (its world curve appends the first
+## point again). Past the path's end the bots had no line: on Tolvanera Gulch they drove in circles just before the
+## finish (one never finished a lap), and progress along the lap jumped from the end to the start, which credited
+## Pinecrest's finish 31m early. The first point is appended here the same way, on a copy of the curve.
+const LAP_CLOSE_GAP := 1.0
+func _close_lap_path() -> void:
+	if is_point_to_point or track_path == null or track_path.curve == null:
+		return
+	var src: Curve3D = track_path.curve
+	var n := src.point_count
+	if n < 3 or src.get_point_position(0).distance_to(src.get_point_position(n - 1)) < LAP_CLOSE_GAP:
+		return
+	var c: Curve3D = src.duplicate()
+	c.add_point(src.get_point_position(0), src.get_point_in(0), src.get_point_out(0))
+	c.set_point_tilt(n, src.get_point_tilt(0))
+	track_path.curve = c
+	print("[Level] closed the lap path: %.1fm from its end back to its start" % src.get_point_position(0).distance_to(src.get_point_position(n - 1)))
+
+
 func _setup_checkpoints():
 	# Rebuild checkpoints list from scene tree to prevent inspector array desync
 	var fl = get_node_or_null("FinishLine")
@@ -431,6 +452,11 @@ func _catch_up_bot(id: int, cp_idx: int) -> void:
 	var t_len := maxf(track_length, 1.0)
 	var near: float = track_path.curve.get_closest_offset(track_path.to_local(cart.global_position))
 	if absf(fposmod(near - cp_offsets[cp_idx] + t_len * 0.5, t_len) - t_len * 0.5) > SKIPPED_GATE_REACH:
+		return
+	# Only past the gate it still needs, along the lap: before it, the gate it drove through comes earlier in its lap.
+	# On Mtaa Nights the grid stands 20m behind the finish line; after the green light every bot drove through it
+	# needing gate 1, was given every gate and the line, and so a lap, and the human was last however they drove.
+	if not is_point_to_point and fposmod(near - cp_offsets[next_idx], t_len) > fposmod(cp_offsets[next_idx] - near, t_len):
 		return
 	for k in range(next_idx, cp_idx):
 		_grant_checkpoint(id, k)
@@ -577,14 +603,52 @@ func _credit_passed_checkpoints(id: int, cart: Node3D, stats: Dictionary) -> voi
 	var now_off: float = _track_cart_curve_offset(cart, stats)
 	if prev_off < 0.0:
 		return
+	# A gate passed by progress counts once the cart is past the gate's own plane (`_past_gate`). Where a lap's path
+	# doesn't close (Pinecrest's stops 30m short of the start line), its end is the finish's offset (0, the length round
+	# again): the finish was credited 31m before the gantry, and the bots, finished, braked to a stop short of it. A
+	# crossing not yet past the plane waits (`cp_pending`) until it is.
+	var pending: int = int(stats.get("cp_pending", -1))
+	if pending >= 0:
+		if pending != int(stats["next_checkpoint_idx"]):
+			stats["cp_pending"] = -1
+		elif _past_gate(cart, pending):
+			stats["cp_pending"] = -1
+			_grant_checkpoint(id, pending)
+			prev_off = cp_offsets[pending]
+		else:
+			return
 	for _i in range(3):
 		var next_idx: int = int(stats["next_checkpoint_idx"])
 		if next_idx < 0 or next_idx >= cp_offsets.size():
 			return
 		if not _crossed_curve_offset(prev_off, now_off, cp_offsets[next_idx], t_len):
 			return
+		if not _past_gate(cart, next_idx):
+			stats["cp_pending"] = next_idx
+			return
 		_grant_checkpoint(id, next_idx)
 		prev_off = cp_offsets[next_idx]
+
+
+## Whether `cart` is past gate `idx`'s plane (through the gate, along the lap's heading there), or more than
+## PAST_GATE_REACH from it (lost: progress is all there is).
+const PAST_GATE_REACH := 80.0
+func _past_gate(cart: Node3D, idx: int) -> bool:
+	if idx >= checkpoints.size() or not is_instance_valid(checkpoints[idx]):
+		return true
+	var gate: Node3D = checkpoints[idx]
+	var curve: Curve3D = track_path.curve
+	var off: float = cp_offsets[idx]
+	var a: Vector3 = track_path.to_global(curve.sample_baked(maxf(off - 2.0, 0.0)))
+	var b: Vector3 = track_path.to_global(curve.sample_baked(minf(off + 2.0, curve.get_baked_length())))
+	var fwd := Vector3(b.x - a.x, 0.0, b.z - a.z)
+	if fwd.length_squared() < 1e-6:
+		return true
+	var d: Vector3 = cart.global_position - gate.global_position
+	d.y = 0.0
+	if d.length() > PAST_GATE_REACH:
+		return true
+	return d.dot(fwd.normalized()) >= -0.5
 
 func _check_finish(id: int):
 	var stats = player_stats[id]

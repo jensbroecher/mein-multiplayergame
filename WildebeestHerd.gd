@@ -1,4 +1,6 @@
 extends Node3D
+
+const CartWeight = preload("res://CartWeight.gd")
 ## The great migration crossing the road on Mara Crossing: a stream of galloping wildebeest that
 ## runs across the track in waves, so a racer either times the gap or threads the herd.
 ##
@@ -309,7 +311,9 @@ func _bump(cart: RigidBody3D, i: int, xf: Transform3D) -> void:
 	var shove: Vector3 = (_dir * 0.7 + away * 0.6).normalized() * HIT_SHOVE
 	var v: Vector3 = cart.linear_velocity
 	var hv := Vector3(v.x, 0.0, v.z)
-	cart.linear_velocity = hv * HIT_KEEP + shove + Vector3.UP * HIT_HOP
+	# A heavy car keeps more of its speed and is shoved less (CartWeight).
+	var loss: float = CartWeight.loss_share(cart)
+	cart.linear_velocity = hv * CartWeight.keep(cart, HIT_KEEP) + shove * loss + Vector3.UP * HIT_HOP * loss
 	bump_count += 1
 	if cart.has_method("_play_crash_sound"):
 		cart.call("_play_crash_sound")

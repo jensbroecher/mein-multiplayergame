@@ -23,22 +23,32 @@ extends RefCounted
 
 const CELL := 3.0
 const MAX_RADIUS := 80.0
-const MAX_EXPAND := 2600
+const MAX_EXPAND := 6000
 const FRAME_USEC := 1200
 const CLIMB := 0.72
 const DROP := 3.5
-const BUMPER := 0.7
+const BUMPER := 0.8
+const BUMPER_LOW := 0.35
 const BEHIND_COST := 1.2
 ## How far over the height a cell was reached at its ray starts (a 3m step can't climb more than about 2.2m).
 const PROBE_UP := 4.0
 const LAP_BUCKET := 6.0
 const PROBE_DOWN := 14.0
+## A ground cell with something standing within TIGHT_R of a cart there (a sphere TIGHT_R round where the cart's body would
+## be) costs TIGHT_COST times as much to cross: ways keep to open ground. Every 3m cell open, a way ran between a guardrail
+## and the chevron boards 2m behind it (the cart is 2.7m across) and the bot wedged there.
+const TIGHT_R := 1.25
+const TIGHT_COST := 3.0
 
-## [kind, ground y, lap offset] by Vector3i(ix, iz, height bucket): kind 0 blocked, 1 ground, 2 road (a goal), 3 other
-## track (driven on, not a goal: a ramp, a deck off the lap).
+## [kind, ground y, lap offset, tight] by Vector3i(ix, iz, height bucket): kind 0 blocked, 1 ground, 2 road (a goal), 3
+## other track (driven on, not a goal: a ramp, a deck off the lap); tight 1 where something stands close (TIGHT_R).
 static var _cells := {}
 ## Whether a step is open, by Vector4i(ix, iz, height bucket, direction).
 static var _steps := {}
+## Steps and cells closed where a cart stalled (close_step, close_at), by key, until a Time.get_ticks_msec().
+static var _step_closed := {}
+static var _cell_closed := {}
+const CLOSE_MSEC := 20000
 static var _level_id := 0
 static var _frame := -1
 static var _usec_left := 0
@@ -70,7 +80,8 @@ var _parent := {}              # key -> key
 var _closed := {}
 var _best_goal = null
 var _best_cost := INF
-var _lap_hash := {}            # Vector2i(LAP_BUCKET cell) -> Array of Vector4(x, y, z, lap offset)
+var _lap_hash := {}
+static var _tight_shape: SphereShape3D = null            # Vector2i(LAP_BUCKET cell) -> Array of Vector4(x, y, z, lap offset)
 
 
 func _init(cart: Node, space: PhysicsDirectSpaceState3D, lap: Path3D, road_half: float) -> void:
@@ -87,6 +98,8 @@ func _init(cart: Node, space: PhysicsDirectSpaceState3D, lap: Path3D, road_half:
 		_level_id = id
 		_cells.clear()
 		_steps.clear()
+		_step_closed.clear()
+		_cell_closed.clear()
 		_kinds.clear()
 	for c in cart.get_tree().get_nodes_in_group("player_carts"):
 		if c is CollisionObject3D:
@@ -105,10 +118,41 @@ func _init(cart: Node, space: PhysicsDirectSpaceState3D, lap: Path3D, road_half:
 	var key: Vector3i = _key_at(_start, _start.y - 0.6)
 	var cell = _probe(key, _start.y + 1.0 - PROBE_UP)
 	if cell == null:
-		cell = PackedFloat32Array([1.0, _start.y - 0.75, -1.0])
+		cell = PackedFloat32Array([1.0, _start.y - 0.75, -1.0, 0.0])
 		_cells[key] = cell
 	_g[key] = 0.0
 	_push(0.0, key)
+
+
+## Closes the cell at `p` (a point of a way back the cart stalled short of) for every search on this level for the
+## next CLOSE_MSEC.
+static func close_at(p: Vector3) -> void:
+	var ix := floori(p.x / CELL)
+	var iz := floori(p.z / CELL)
+	var iy := floori(p.y / 4.0)
+	var until := Time.get_ticks_msec() + CLOSE_MSEC
+	for b in range(iy - 2, iy + 3):
+		_cell_closed[Vector3i(ix, iz, b)] = until
+
+
+## Closes the step from `a` to `b` (two points of a way back: the cart stalled between them) both ways round for every
+## search on this level for the next CLOSE_MSEC; a cell, `b`'s, if they aren't neighbours. Not for good: the stall may
+## have been another cart in the way, and over a race closed steps sealed a bot in behind Pinecrest's summit tyre wall.
+static func close_step(a: Vector3, b: Vector3) -> void:
+	var ka := Vector2i(floori(a.x / CELL), floori(a.z / CELL))
+	var kb := Vector2i(floori(b.x / CELL), floori(b.z / CELL))
+	var d := kb - ka
+	var di := DIRS.find(d)
+	if di < 0:
+		close_at(b)
+		return
+	var dr := DIRS.find(-d)
+	var ba := floori(a.y / 4.0)
+	var bb := floori(b.y / 4.0)
+	var until := Time.get_ticks_msec() + CLOSE_MSEC
+	for band in range(-2, 3):
+		_step_closed[Vector4i(ka.x, ka.y, ba + band, di)] = until
+		_step_closed[Vector4i(kb.x, kb.y, bb + band, dr)] = until
 
 
 ## Runs the search on with what is left of this frame's rays; true once it is done (`found` says whether it found a way).
@@ -172,6 +216,8 @@ func _run(until: int) -> bool:
 			var ncell = _probe(nkey, cell[1])
 			if ncell == null or int(ncell[0]) == 0:
 				continue
+			if _cell_closed.has(nkey) and Time.get_ticks_msec() < int(_cell_closed[nkey]):
+				continue
 			var there := _centre(nkey, ncell[1])
 			if Vector2(there.x - _start.x, there.z - _start.z).length() > MAX_RADIUS:
 				continue
@@ -182,6 +228,8 @@ func _run(until: int) -> bool:
 			var w: float = run * (1.0 + 2.0 * maxf(rise, 0.0) + 0.8 * maxf(-rise - 0.4, 0.0))
 			if int(ncell[0]) >= 2:
 				w *= 0.85
+			elif ncell[3] > 0.5:
+				w *= TIGHT_COST
 			var ng: float = cost + w
 			if ng < float(_g.get(nkey, INF)):
 				_g[nkey] = ng
@@ -268,7 +316,7 @@ func _probe(key: Vector3i, from_y: float):
 	q.exclude = _exclude
 	q.collision_mask = 1
 	var hit := _space.intersect_ray(q)
-	var out := PackedFloat32Array([0.0, from_y, -1.0])
+	var out := PackedFloat32Array([0.0, from_y, -1.0, 0.0])
 	if not hit.is_empty():
 		var p: Vector3 = hit.position
 		var n: Vector3 = hit.normal
@@ -288,8 +336,30 @@ func _probe(key: Vector3i, from_y: float):
 					and absf(near.y - p.y) < 3.0:
 				out[0] = 2.0
 				out[2] = near.w
+		if int(out[0]) == 1 and _tight(p):
+			out[3] = 1.0
 	_cells[key] = out
 	return out
+
+
+## Whether something but track, ground and carts stands within TIGHT_R of a cart's body on the ground at `p`.
+func _tight(p: Vector3) -> bool:
+	if _tight_shape == null:
+		_tight_shape = SphereShape3D.new()
+		_tight_shape.radius = TIGHT_R
+	var q := PhysicsShapeQueryParameters3D.new()
+	q.shape = _tight_shape
+	q.transform = Transform3D(Basis(), p + Vector3.UP * (TIGHT_R + 0.3))
+	q.exclude = _exclude
+	q.collision_mask = 1
+	for r in _space.intersect_shape(q, 6):
+		var c: Object = r.collider
+		if c == null or _cart._is_world_terrain_collider(c):
+			continue
+		if _kind_of(c) == 1:
+			continue
+		return true
+	return false
 
 
 ## Whether a cart can drive from cell `a` to its neighbour in direction `di` (cached either way round).
@@ -301,20 +371,41 @@ func _step_open(a: Vector3i, di: int, ca: PackedFloat32Array, cb: PackedFloat32A
 	if ca[1] - cb[1] > DROP:
 		return false
 	var skey := Vector4i(a.x, a.y, a.z, di)
+	if _step_closed.has(skey) and Time.get_ticks_msec() < int(_step_closed[skey]):
+		return false
 	if _steps.has(skey):
 		return _steps[skey]
-	var q := PhysicsRayQueryParameters3D.create(pa + Vector3.UP * BUMPER, pb + Vector3.UP * BUMPER)
-	q.exclude = _exclude
-	q.collision_mask = 1
-	var hit := _space.intersect_ray(q)
+	# Two heights over the ground (BUMPER_LOW and BUMPER): with the ground on one side higher than on the other (a cut
+	# bank above Pinecrest's road), one ray at 0.7m passed over the guardrail at the low end, the step was taken for
+	# open, and bots drove into the rail at the end of their way back and stopped there.
 	var open := true
-	if not hit.is_empty():
-		var kind := _kind_of(hit.collider)
-		if kind != 1 and not _cart._is_world_terrain_collider(hit.collider) and (hit.normal as Vector3).y < 0.55:
+	for h in [BUMPER_LOW, BUMPER]:
+		var from: Vector3 = pa + Vector3.UP * h
+		var to: Vector3 = pb + Vector3.UP * h
+		for _i in range(4):
+			var q := PhysicsRayQueryParameters3D.create(from, to)
+			q.exclude = _exclude
+			q.collision_mask = 1
+			q.hit_back_faces = false
+			var hit := _space.intersect_ray(q)
+			if hit.is_empty():
+				break
+			var kind := _kind_of(hit.collider)
+			if kind == 1 or _cart._is_world_terrain_collider(hit.collider) or (hit.normal as Vector3).y >= 0.55:
+				break
 			# A narrow thing (a trunk, a post, a rock: PlayerCart._ai_narrow_obstacle) is no bar, the obstacle avoidance
 			# steers round it; only a long one is (a rail, a fence, a wall). Every trunk blocking, ways back through the
-			# jungle wove from tree to tree.
-			open = _cart._ai_narrow_obstacle(_space, hit)
+			# jungle wove from tree to tree. The ray goes on from behind it: a chevron board in front of Pinecrest's
+			# summit tyre wall hid the wall, and bots drove into it at the end of their way back again and again.
+			if not _cart._ai_narrow_obstacle(_space, hit, to - from):
+				open = false
+				break
+			var hp: Vector3 = hit.position
+			if hp.distance_to(to) < 0.8:
+				break
+			from = hp + (to - hp).normalized() * 0.6
+		if not open:
+			break
 	_steps[skey] = open
 	return open
 

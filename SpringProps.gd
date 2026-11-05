@@ -1,4 +1,6 @@
 extends MultiMeshInstance3D
+
+const CartWeight = preload("res://CartWeight.gd")
 ## Props that give when a cart hits them and settle again, without being knocked flying:
 ##   - flags on spring bases (feather and chequered flags): a cart drives through, the flag bends over
 ##     away from it and wobbles back upright, and the cart loses a little speed; with `deflect` it is also
@@ -112,12 +114,14 @@ func _physics_process(delta: float) -> void:
 			var dir := Vector2(vel.x, vel.z).normalized() if vel.length() > 0.5 else away.normalized()
 			if not _touching.has(key):
 				_touching[key] = true
-				_tip_vel[i] += dir * into * tip_per_speed * spring
-				_shove_vel[i] += dir * into * shove_per_speed * slide_friction
+				# A heavy car tips and shoves it further and loses less to it (CartWeight).
+				var push: float = CartWeight.push_share(cart)
+				_tip_vel[i] += dir * into * tip_per_speed * spring * push
+				_shove_vel[i] += dir * into * shove_per_speed * slide_friction * push
 				_active[i] = true
 				var authority: bool = cart.has_method("has_physics_authority") and cart.has_physics_authority()
 				if drag > 0.0 and authority:
-					cart.linear_velocity *= 1.0 - drag
+					cart.linear_velocity *= 1.0 - drag * CartWeight.loss_share(cart)
 				if deflect > 0.0 and authority:
 					_throw_aside(cart, global_transform.basis * Vector3(dx, 0.0, dz))
 				if boing and into > 1.5:

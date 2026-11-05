@@ -1,4 +1,6 @@
 extends MultiMeshInstance3D
+
+const CartWeight = preload("res://CartWeight.gd")
 ## Tumbleweeds blowing across Mina del Viento's shelf road in the haboob (regenerate_mina.gd). Each rolls along a path
 ## of its own (`paths`: start and end, the ground's height at PATH_SAMPLES points between, berms included), bounding
 ## and spinning, once every `period` seconds on the wall clock, so LAN peers see the same weeds. A cart that runs into
@@ -102,6 +104,6 @@ func _process(delta: float) -> void:
 				var kick: Vector3 = vel2 * 0.85 + Vector3.UP * 7.0 + dir * 3.0
 				_kicked[i] = [t, st[2], p, kick, (vel2.cross(Vector3.UP) + Vector3(0.2, 0.1, 0.0)).normalized()]
 				if c.has_method("has_physics_authority") and c.has_physics_authority() and c is RigidBody3D:
-					(c as RigidBody3D).linear_velocity *= HIT_KEEP
+					(c as RigidBody3D).linear_velocity *= CartWeight.keep(c, HIT_KEEP)
 				break
 		multimesh.set_instance_transform(i, xf)

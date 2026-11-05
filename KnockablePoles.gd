@@ -1,4 +1,6 @@
 extends MultiMeshInstance3D
+
+const CartWeight = preload("res://CartWeight.gd")
 ## Trailside poles that carts can knock over.
 ##
 ## They are drawn as one MultiMesh, so a few hundred of them cost one draw call. At runtime each
@@ -81,6 +83,7 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	var carts: Array[Vector3] = []
 	var cart_vel: Array[Vector3] = []
+	var cart_push: Array[float] = []
 	var seen := {}
 	for c in get_tree().get_nodes_in_group("player_carts"):
 		var p: Vector3 = (c as Node3D).global_position
@@ -95,6 +98,7 @@ func _physics_process(delta: float) -> void:
 		seen[id] = true
 		carts.append(p)
 		cart_vel.append(v)
+		cart_push.append(CartWeight.push_share(c))
 	for id in _cart_prev.keys():
 		if not seen.has(id):
 			_cart_prev.erase(id)
@@ -110,7 +114,7 @@ func _physics_process(delta: float) -> void:
 			continue
 		if _released[i] == 1 and b.linear_velocity.length() > 2.0:
 			_released[i] = 2
-			_launch(b, carts, cart_vel)
+			_launch(b, carts, cart_vel, cart_push)
 			_bonk.global_position = b.global_position
 			_bonk.pitch_scale = randf_range(0.9, 1.25)
 			_bonk.play()
@@ -124,7 +128,7 @@ func _physics_process(delta: float) -> void:
 
 
 ## Throws a pole the nearest cart has just hit: away from the cart and along its travel, up, tumbling.
-func _launch(b: RigidBody3D, carts: Array[Vector3], cart_vel: Array[Vector3]) -> void:
+func _launch(b: RigidBody3D, carts: Array[Vector3], cart_vel: Array[Vector3], cart_push: Array[float]) -> void:
 	var best := -1
 	var best_d := INF
 	for k in range(carts.size()):
@@ -144,7 +148,8 @@ func _launch(b: RigidBody3D, carts: Array[Vector3], cart_vel: Array[Vector3]) ->
 	away.y = 0.0
 	away = away.normalized() if away.length_squared() > 1e-4 else along
 	var dir: Vector3 = (along + away).normalized()
-	var out: float = maxf(speed * LAUNCH_SPEED_SHARE, Vector3(b.linear_velocity.x, 0.0, b.linear_velocity.z).length())
+	# A heavy car throws it further (CartWeight).
+	var out: float = maxf(speed * LAUNCH_SPEED_SHARE * cart_push[best], Vector3(b.linear_velocity.x, 0.0, b.linear_velocity.z).length())
 	b.linear_velocity = dir * out + Vector3.UP * minf(speed * LAUNCH_UP_SHARE, LAUNCH_UP_MAX)
 	var tumble: Vector3 = Vector3.UP.cross(dir) * randf_range(LAUNCH_SPIN.x, LAUNCH_SPIN.y) * (1.0 if randf() < 0.75 else -1.0)
 	b.angular_velocity = tumble + dir * randf_range(-3.0, 3.0)

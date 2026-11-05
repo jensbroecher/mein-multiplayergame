@@ -732,6 +732,23 @@ gaps and tapers (`_in_road_gap`), so the ground there is grass, off-road, with i
   The rays are nudged off the gate line because a ray straight down a terrain grid line can miss.
 - The feet's colliders are 2.5m walls. A cart that clips the top edge of a low block gets launched,
   because PlayerCart only smooths edges up to `STEP_SMOOTH_MAX_HEIGHT`.
+- Bots are also credited a gate by their progress along the lap's path (`_credit_passed_checkpoints`: they can fly over
+  a gate's trigger on a jump), but only once they are past the gate's own plane (`_past_gate`, along the lap's heading
+  there, unless more than `PAST_GATE_REACH` from it); a crossing short of it waits (`cp_pending`). Pinecrest's path
+  stops 30m short of its start line, so the path's end is the finish's offset: bots were credited the finish 31m before
+  the gantry and, finished, braked to a stop short of it. `ai_race_test` prints where each cart finished (`FINISHED`)
+  and came to rest (`AT REST`).
+- The grid's slot markings (`SpawnIndicator.tscn`, a 2m quad under each spawn point, which hangs off the finish gate's
+  node) lie down on the surface under them once the level's collision exists (`SpawnIndicator.gd`: four rays at the
+  corners for the plane, looking past the carts on the grid, `LIFT` 3.5cm over it). Placed flat 5cm over the spawn
+  point they floated 6-50cm on most stages (Harbor Pier's half a metre) or stood off a sloping grid.
+  `res://scratch/grid_ground_probe.tscn -- <level>` (headless) prints the worst gap between the slots and the ground,
+  before and after.
+- A circuit's TrackPath is closed at load (`Level._close_lap_path`: the first point appended again on a copy of the
+  curve, as TerrainGenerator's world curve does for the road) where its end lies more than `LAP_CLOSE_GAP` from its
+  start: Tolvanera Gulch's stopped 64m short (bots lost the line there and drove in circles just before the finish, one
+  never completing a lap), Pinecrest Ridge's 30m, Mountain Pass's 25m. Every other level's closes (a scan of the saved
+  paths found none else).
 - `res://scratch/gate_shots.tscn -- <level> <dir> [carts=N] [fov=75] [lap=N] [all=x,y,z:tx,ty,tz]
   name:gate:x,y,z:tx,ty,tz[:step[:scroll]]` renders gates from cameras in gate space (X across the road,
   grid on +Z), with any start-light step (-1 for none) and the ticker `scroll` LEDs along. `lap=` feeds
@@ -783,6 +800,11 @@ RaceCommentator (its "and they're off", the lead, the places) and no place call:
 - A bot that drives through a later gate than the one it needs, near that gate on the lap, gets the gates between and
   its racing-line tracker is put on that gate (`_catch_up_bot`): on Mina del Viento's open pit floor one went wide of a
   gate, its tracker lost the line, and it passed every gate after uncounted and drove off the end of the stage.
+  Only when it is past the gate it still needs along the lap (nearer having passed it than reaching it): on Mtaa Nights
+  the grid stands 20m behind the finish line, every bot drove through it after the green light needing gate 1 and was
+  given a lap, and the human ranked last however they drove. `res://scratch/position_probe.tscn -- [level=]
+  [seconds=40] [step=0.6]` (headless) carries the human along the lap in a GP against the bots and prints everyone's
+  laps, next gate and position every 2s.
 - Driving the wrong way (`_watch_wrong_way`, server, humans): velocity against every lap path within 14m
   (`_lap_tangents_near`: where a shortcut crosses the road either way is right) for 2.5s gives "wrong
   way" and an alert chime, again every 7s while it lasts.
@@ -2068,24 +2090,40 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   on grass or on a surface named as road more than `AI_OFF_LAP_PLAN` (16m) from its route in plan: Glacier Highway's
   other decks counted as road), or on grass inside the corridor with the way to its usual aim point blocked
   (`_ai_line_drivable` looked at every `AI_BLOCK_CHECK`: just outside Pinecrest's guardrails, 8.5m off the line,
-  bots counted as on the course and drove along the rails for the road), and for as long as a way back is being
-  followed, until it is on the road again. `_ai_rejoin_goal`:
+  bots counted as on the course and drove along the rails for the road; not checked within the road's half width of the
+  line, the lap's own ground: on Pinecrest's forest trail a tree beside a bend blocked the line, and bots on the trail
+  went into recovery, crawled and were respawned as stuck), and for as long as a way back is being followed, until it
+  is on the road again. `_ai_rejoin_goal`:
   - a straight line first (`_ai_direct_rejoin`): road points from `AI_REJOIN_BACK` behind to `AI_REJOIN_AHEAD` ahead,
     best first, the first whose line `_ai_line_drivable` passes, kept while its line stays drivable. A line is drivable
     when, every `AI_LINE_STEP`, the ground under it (a ray down) is there, out of deep water (`_deep_water_at`), climbs
     no more than `AI_LINE_MAX_RISE` a metre and drops no more than `AI_LINE_MAX_DROP`, and nothing long stands across
-    it at a cart's height: a narrow thing (`_ai_narrow_obstacle`: 1.8m either way along its face a short ray finds
-    nothing of it: a trunk, a post, a rock) the avoidance steers round; a rail, a fence or a wall bars it. (Testing
-    lines 1.6m either side instead let a guardrail met at a shallow angle pass as narrow.)
+    it at a cart's height (`_ai_step_barred`: rays at 0.35 and 0.8m over the ground; one at 0.7m passed over a
+    guardrail from the higher side of a cut). A narrow thing (`_ai_narrow_obstacle`: 2.2m either way along its face,
+    and across the ray's own direction, a short ray finds nothing solid but track and ground: a lone trunk, a post, a
+    rock) the avoidance steers round, and the ray goes on from behind it; a rail, a fence, a wall or a cluster of
+    boulders bars it. What went wrong before: testing lines 1.6m either side let a guardrail met at a shallow angle pass;
+    looking for the same collider only let Pinecrest's boulders (one body) pass in clusters; stopping at the first hit,
+    a chevron board hid the summit tyre wall behind it; and along the face only, a ray into the notch where two of a
+    guardrail's boxes meet on a bend hit an end face and the rail passed for a post.
   - else a way round (`RejoinPlanner.gd`): a Dijkstra search over a 3m grid round the bot, probing as it goes: a cell
     is the ground a ray down finds there (from just over the height it was reached at, so a bridge overhead isn't the
     ground), blocked in deep water, on a prop's top or too steep; a step between cells is blocked where it climbs more
     than `CLIMB` a metre, drops more than `DROP` or meets something long at bumper height; a goal is a drivable cell on
     the lap (within the road's half width of its line in plan: on the road, or on the ground where a stage has none),
-    one behind the bot costing `BEHIND_COST` a metre. The bot follows the way to its end (`_ai_follow_way_back`), and is
-    respawned when no road is in reach (`MAX_RADIUS` 80m). Probes and what each collider is are cached per level, and
-    all searches share `FRAME_USEC` (1.2ms) a physics frame. No boosting while finding a way back (it overshot every
-    turn of it).
+    one behind the bot costing `BEHIND_COST` a metre. A ground cell with something standing within `TIGHT_R` of a cart
+    there costs `TIGHT_COST` times as much (`_tight`): a way had run between a guardrail and the chevron boards 2m behind
+    it (the cart is 2.7m across) and the bot wedged there. The bot follows the way to its end (`_ai_follow_way_back`) at
+    most `AI_WAY_BACK_SPEED` (13 m/s, slower into its sharp turns: at full speed bots overshot its turns and circled), and
+    is respawned when no road is in reach (`MAX_RADIUS` 80m, `MAX_EXPAND` 6000 cells: at 2600 searches on Pinecrest's
+    summit hillside, where cells stack in height bands, gave up with a way there). A bot that gets no metre nearer the point it is heading for
+    in `AI_WAY_BACK_STALL` (2s) closes that step for every search on the level for `CLOSE_MSEC` (20s:
+    `RejoinPlanner.close_step`) and plans again. Closed for good, steps closed where another cart was in the way sealed
+    bots in behind Pinecrest's summit tyre wall over a race. Probes and what each collider is are cached per level, and all searches share `FRAME_USEC` (1.2ms) a physics
+    frame. No boosting while finding a way back (it overshot every turn of it).
+  - Off the course with the way on behind it and something solid within 2.6m of its nose (`_ai_back_turn`), a bot backs
+    away turning toward it for `AI_BACK_TURN_TIME` (arcade reverse: steering right turns the nose right). Turning forward
+    on full lock, bots nosed into Pinecrest's rails ground along them for seconds.
   - Before: the goal was the nearest road point whatever lay between, so bots ground along barriers, or took goals
     behind and ahead in turn ("brake, turn round, drive back, hit a wall, turn again"); with the road up a bank they
     wandered across country for the next gate.
@@ -2094,20 +2132,55 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   jumps and turned for a road point behind or beside it (all those ahead were drops) and drove off into the ponds.
   `ai_race_test` prints each jump lip's crossing speeds (`LIP`, from TrackPath's `jump_lips`) and `REJOIN-ON-ROAD` when
   a bot is in recovery while over the road; the recovery state is cleared whenever the bot is on the course.
-- `res://scratch/ai_rejoin_probe.tscn -- <level> x,z[,yaw] ... [auto=N] [rails=N] [seconds=25] [trace=1]` (headless) drops one
-  bot off the course at each spot, facing away from the road (`auto=N`: N spots along the lap 20-30m out on dry ground;
-  `rails=N`: N spots 3.5m outside the level's guardrails, facing the rail) and prints when it was back on the road or
+- `res://scratch/ai_rejoin_probe.tscn -- <level> x,z[,yaw] ... [auto=N] [rails=N] [rails_steep=1] [forest=N] [seconds=25]
+  [trace=1]` (headless) drops one bot off the course at each spot, facing away from the road (`auto=N`: N spots along the
+  lap 20-30m out on dry ground; `rails=N`: N spots 3.5m outside the level's guardrails, facing the rail, `rails_steep=1`
+  where the ground behind them is steepest; `forest=N`: N spots among the trees) and prints when it was back on the road or
   respawned, how long it crawled (under 3 m/s: grinding or stuck), how far it drove, and the planner's time (in all and
   its busiest frame). Against the first version (nearest road point): Pinecrest's guardrail spots 8/8 back (most in 1-4s,
   the longest drives 100m round a rail to its end; two had been lost after 25s), Lakeside 9/10 within 3s (was 7/10, up
   to 11s and 267m), Glacier Highway, the Canyon and Msitu Falls likewise (the jungle is the hardest: now and then a bot
-  crawls among the trunks and the "confined" rule respawns it).
+  crawls among the trunks and the "confined" rule respawns it). Pinecrest with `rails=10 rails_steep=1 forest=8`: 15 of
+  18 back within 10s, the rest respawned within 3s (before the fixes above: two timeouts, bots circling outside the
+  rails and wedged behind the summit tyre wall).
+  `res://scratch/rejoin_plan_probe.tscn -- <level> x,y,z ...` (headless) prints the way the planner finds from each spot
+  and, for each step, what the bumper rays meet and whether each counted as narrow (and what its side rays found);
+  `scratch/rail_boxes_near.gd` (`-s`, headless, `-- <level> x,z [radius=10] [match=Guardrail]`) lists a body's boxes
+  near a spot with their ends, to see where a run of rail stops.
+
+## AI drifting
+
+- Bots drift some corners: braking for a corner they could drift (fast enough, sharp enough, steering into it), they
+  decide once a corner (`_ai_drift_corner`, 40m buckets of the lap) with their `ai_drift_chance` (0.25-0.85 by
+  aggression) and then hold the slide as a player does: on the throttle while the road just ahead still turns more than
+  `AI_DRIFT_HOLD_ANGLE` or they steer hard, until it straightens (or the charge reaches 2s), which releases it and its
+  boost. The release paths a player has (counter-steer, straightening the wheel, letting go of the controls) don't end an
+  AI's drift. Before, the drift ended as soon as braking did: a third of a second each, which nobody saw. Never on Harbor
+  Pier, never into a hairpin (`is_hairpin`) on any stage, decided or held, and never within `AI_DRIFT_EDGE` (2m) of the
+  road's edge (`_ai_drift_room`): drifting Pinecrest's switchbacks threw six bots a race over their edges and the summit
+  tyre wall. `ai_race_test` prints each cart's drifts and their time (Bloombay 7-26 a race, Pinecrest 10-27) and takes
+  `nodrift=1`. Pinecrest at speed 2: every bot finishes, one or two respawns a race that aren't items, mostly at
+  switchback 2 (about 488m) and the summit hairpin (608-670m), with or without drifting.
+
+## Car weights
+
+- Each preset has a `weight` (0.85 Fulmine to 1.25 Titan; trucks and crawlers heavy, coupés, buggies and the sand rail
+  light) and the cart's mass is `PlayerCart.BASE_MASS` (1200) times it. Every driving force in PlayerCart scales with the
+  mass, so a car drives the same whatever it weighs; what changes is contact (`CartWeight.gd`): cart against cart
+  (physics: a heavy car shoves a light one), props that are rigid bodies (KnockableProps, freed at `push_speed` / weight),
+  and the scripted knocks: KickBall (kicked `push_share` harder, `loss_share` of the slow), SpringProps' flags and tyre
+  stacks, DressingColliders' brush and plant wobble, Tumbleweeds, KnockableRocks, KnockablePoles' launch, the
+  wildebeest herd. The shockwave and missile and bomb blasts give every car the same push (`BASE_MASS` times the old
+  speed), so the speed it gets goes as one over the weight. Gusts, the tornado and the haboob scale with the mass and
+  treat every car alike. About 15-25% either way: felt, not race-deciding. CarSelection shows it as a WEIGHT bar (read
+  from PlayerCart's presets). `kick_ball_test` takes `weight=`.
 
 ## Carts on the loop
 
 - On the loop (`is_on_loop`) the ground ray points at the loop's surface along its last normal (`_loop_last_normal`), not
   down the model's up, and the model turns to that surface at `LOOP_ALIGN_RATE` (40 a second, once, not up then basis)
-  with its nose along the velocity: smoothed as on a hill the model ran 30-40 degrees behind the loop's turn, standing off
+  with its nose along the velocity, turned off it by what the steering turned it up to `LOOP_STEER_ANGLE` (0.45 rad:
+  with the nose along the velocity alone, steering did nothing on the loop, since the drive pushes along the nose): smoothed as on a hill the model ran 30-40 degrees behind the loop's turn, standing off
   it, and the ray missed the surface (airborne: tumbling, landing sounds). No crash or landing sound from the loop's own
   surface, and a contact facing the way the ground under the cart does is floor, not a wall (round the loop the floor
   faces sideways and down, and played the crash every 0.6s). `res://scratch/loop_ai_probe.tscn` prints, at the end, the
@@ -2414,8 +2487,8 @@ its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set th
   `build_body`, `build_wheel`, `_detail_shapes`/`_detail_at`, `PAINT_LAYOUT`, `WHEEL_POSITIONS`,
   `ANTENNA_POS`), add it to `regenerate_cars.gd`'s `CARS` and its factory paint to `CarPaint.FACTORY`, then
   point the preset in both PlayerCart and CarSelection at `generated/cars/<Name>.tscn`. A new car (not a
-  rebuild) also needs a preset appended to both lists (they're indexed, so append), a `CAR_ACCENTS` colour and its
-  name in `Lobby.CAR_NAMES`.
+  rebuild) also needs a preset appended to both lists (they're indexed, so append), a `weight` in PlayerCart's (see
+  "Car weights"), a `CAR_ACCENTS` colour and its name in `Lobby.CAR_NAMES`.
 - The Apex overrides `section()` to cut its wheel wells as notches (the bottom steps up an inner wall
   `x_well` to the arch's ceiling, then out round the fender's lip), instead of lifting the whole bottom over
   each wheel like the other cars. That lets its open bed's floor sit below the arches, between the rear
