@@ -10,8 +10,11 @@
 #   - the deep forest (TreeDeep*): trees far from the road, seen only as canopy from afar
 #   - the ground cover (GroundCover_*): ferns and herbs carpeting the verges
 #   - the rain's particle count (JungleRain.particle_scale)
-#   - the ground's fine detail (wheel tracks, the soil's bump, the cut banks' triplanar earth)
-#   - at Off and Low, the canopy's shadows altogether
+#   - the ground's fine detail (wheel tracks, the soil's bump, the cut banks' triplanar earth), only at Off
+#   - at Off, the canopy's shadows altogether
+# Auto moves between Low and Ultra, so nothing it does may change the light: at Low the forest kept no
+# canopy shadows (and flatter ground), and on a slower setup (4x MSAA) Auto stepping down at the start turned
+# the shaded jungle floor and road bright and washed out. Low keeps the stand-in's shadows and the ground.
 #   - the impostor forest on the far hills (Pinecrest Ridge, tree_impostor.gdshader): a share of its trees
 # Instances in every MultiMesh are stored in random order, so drawing the first N of them thins a
 # cell evenly. Nothing here is synced or saved: every peer picks its own detail.
@@ -25,8 +28,8 @@ const DEEP := [0.0, 0.0, 0.3, 0.7, 1.0]
 const COVER := [0.0, 0.0, 0.0, 0.55, 1.0]
 const RAIN := [0.4, 0.55, 0.8, 1.0, 1.0]
 const LIANAS := [false, false, true, true, true]
-const FINE_GROUND := [0.0, 0.3, 1.0, 1.0, 1.0]
-const TREE_SHADOWS := [false, false, true, true, true]
+const FINE_GROUND := [0.0, 1.0, 1.0, 1.0, 1.0]
+const TREE_SHADOWS := [false, true, true, true, true]
 const IMPOSTORS := [0.4, 0.55, 0.8, 1.0, 1.0]
 
 ## The LOD materials every tree shares (tree_lod.gdshaderinc): the crossfade band moves with

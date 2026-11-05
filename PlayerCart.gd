@@ -468,6 +468,8 @@ var _ai_drift_this_corner := false
 const AI_DRIFT_HOLD_ANGLE := 0.3
 ## The longest a bot's drift lasts, whatever its charge (seconds since it began).
 const AI_DRIFT_MAX_AGE := 3.0
+## How far the ground outside a corner may lie under the road for a bot to drift it (`_ai_drift_safe`).
+const AI_DRIFT_DROP := 1.5
 var _drift_age := 0.0
 ## How far inside the road's edge a bot must be to start or keep a drift (`_ai_drift_room`).
 const AI_DRIFT_EDGE := 2.0
@@ -605,10 +607,19 @@ var _chase_yaw: float = NAN
 var _chase_yaw_vel: float = 0.0
 var _chase_y: float = NAN
 var is_carried_by_eagle: bool = false
+## The start's camera move (StartIntroCamera.gd): held at its first pose from `prepare_intro` (under the loading
+## screen, once the grid has settled) and run by `start_intro_animation`. The race camera keeps running under it
+## from its own last pose (`_intro_race_pos`/`_intro_race_look`), and the move ends on it.
+const START_INTRO := preload("res://StartIntroCamera.gd")
 var is_intro_active: bool = false
-var intro_time: float = 0.0
-const INTRO_DURATION: float = 3.5
-var intro_orbit_center: Vector3 = Vector3.ZERO
+const INTRO_DURATION: float = 4.0
+var _intro_holding: bool = false
+var _intro_plan: Dictionary = {}
+var _intro_centre: Vector3 = Vector3.ZERO
+var _intro_t: float = 0.0
+var _intro_duration: float = INTRO_DURATION
+var _intro_race_pos: Vector3 = Vector3(NAN, NAN, NAN)
+var _intro_race_look: Vector3 = Vector3.ZERO
 var hop_cooldown: float = 0.0
 var drift_mode: bool = false
 var drift_right: bool = false
@@ -1651,15 +1662,13 @@ func _process(delta):
 				_camera_excludes.append(cart.get_rid())
 		var excludes = _camera_excludes
 
-		if is_intro_active:
-			intro_time -= delta
-			if intro_time <= 0.0:
-				is_intro_active = false
-				camera_look_at = visuals.global_position
-			else:
-				_update_intro_camera(delta)
-		
-		if not is_intro_active:
+		# The start's intro: the race camera runs on under it from its own last pose, and the intro ends on it.
+		var intro_on: bool = is_intro_active or _intro_holding
+		if intro_on and not is_nan(_intro_race_pos.x):
+			camera_pivot.global_position = _intro_race_pos
+			camera_look_at = _intro_race_look
+
+		if true:
 			if is_finished_race and finish_spectate_delay <= 0.0:
 				# Bird's-eye overview camera: Follow cars still in the race, cycling every ~10s and moving smoothly between them
 				var all_carts = get_tree().get_nodes_in_group("player_carts")
@@ -1833,9 +1842,11 @@ func _process(delta):
 				var target_look = visuals.global_position + cam_fwd * (look_ahead_dist + 0.5) + Vector3(0, 0.6 + downhill_amount * 0.4, 0)
 				camera_look_at = camera_look_at.lerp(target_look, 12.0 * delta)
 				camera_pivot.look_at(camera_look_at, Vector3.UP)
-		else:
-			_fade_out_all_xray(delta)
-		
+		if intro_on:
+			_intro_race_pos = camera_pivot.global_position
+			_intro_race_look = camera_look_at
+			_apply_intro_camera(delta)
+
 		# Smoothly lerp camera FOV based on is_isometric, is_finished_race, is_carried_by_eagle, and is_boosting
 		var target_fov = 75.0
 		if is_finished_race and finish_spectate_delay <= 0.0:
@@ -7155,7 +7166,8 @@ func _get_ai_input(delta: float) -> Vector2:
 					var corner_id: int = int(floor((current_offset + _ai_upcoming_turn_dist) / 40.0))
 					if corner_id != _ai_drift_corner:
 						_ai_drift_corner = corner_id
-						_ai_drift_this_corner = randf() < ai_drift_chance
+						_ai_drift_this_corner = randf() < ai_drift_chance \
+								and _ai_drift_safe(current_offset + _ai_upcoming_turn_dist, signf(input.x))
 					if _ai_drift_this_corner:
 						_ai_want_drift = true
 						input.y = maxf(input.y, 0.45)
@@ -7781,6 +7793,38 @@ func _ai_back_turn(target_behind: bool, on_course: bool, speed: float, delta: fl
 	return false
 
 
+## Whether the corner at lap offset `corner_off`, turned toward `steer_sign` (+1 right), is safe to drift: the ground
+## just outside the road on its outside (the side a drift carries the car), at the apex and over the 36m after it, is
+## there, not more than AI_DRIFT_DROP under the road and not deep water. Drifting every corner they could, bots slid
+## off Glacier Highway's and Frostpeak Creek's drops (14 and 8 falls a race, against 1 and 2 without drifting).
+func _ai_drift_safe(corner_off: float, steer_sign: float) -> bool:
+	var pth: Path3D = active_path if (active_path and active_path.curve) else track_path
+	if pth == null or pth.curve == null or steer_sign == 0.0:
+		return false
+	var space := get_world_3d().direct_space_state
+	if space == null:
+		return false
+	var curve := pth.curve
+	var length: float = maxf(curve.get_baked_length(), 1.0)
+	var reach: float = _ai_road_half() + 3.0
+	for k in [0.0, 12.0, 24.0, 36.0]:
+		var o: float = fposmod(corner_off + k, length)
+		var p: Vector3 = pth.to_global(curve.sample_baked(o))
+		var t: Vector3 = pth.to_global(curve.sample_baked(fposmod(o + 2.0, length))) - p
+		t.y = 0.0
+		if t.length_squared() < 1e-4:
+			continue
+		var out: Vector3 = -t.normalized().cross(Vector3.UP) * steer_sign
+		var at: Vector3 = p + out * reach
+		var q := PhysicsRayQueryParameters3D.create(at + Vector3.UP * 4.0, at + Vector3.DOWN * 24.0)
+		q.exclude = [get_rid()]
+		q.collision_mask = 1
+		var hit := space.intersect_ray(q)
+		if hit.is_empty() or (hit.position as Vector3).y < p.y - AI_DRIFT_DROP or _deep_water_at(hit.position):
+			return false
+	return true
+
+
 ## Whether a drift has room: the bot is more than AI_DRIFT_EDGE inside the road's edge (in plan, from its route's line).
 ## A drift carries the car wide; one that has carried it near the edge is let go of, and none is started there.
 func _ai_drift_room() -> bool:
@@ -8150,32 +8194,90 @@ func _process_ai_items(delta: float):
 	if should_use:
 		_use_item()
 
-func start_intro_animation():
-	if is_local_player:
-		is_intro_active = true
-		intro_time = INTRO_DURATION
-		intro_orbit_center = visuals.global_position
-		_update_intro_camera(0.0)
+## Plans the start's camera move (StartIntroCamera.choose: the start that sees the car best, round the houses and
+## trees beside the grid) and holds the camera at its first pose. Level calls it once the grid has settled, under the
+## loading screen, so the stage opens on the move's first frame.
+func prepare_intro() -> void:
+	if not is_local_player or not is_inside_tree():
+		return
+	_intro_centre = visuals.global_position
+	var target: Array = _intro_race_target()
+	var t0 := Time.get_ticks_usec()
+	_intro_plan = START_INTRO.choose(get_world_3d().direct_space_state, _intro_centre, target[0], target[1], _intro_excludes())
+	print("[Intro] %s (blocked %.2f of %d views, %.1f ms)" % [str(_intro_plan.get("name", "?")), float(_intro_plan.get("cost", 0.0)),
+		START_INTRO.SAMPLES, (Time.get_ticks_usec() - t0) / 1000.0])
+	_intro_t = 0.0
+	_intro_holding = true
+	# The race camera under the move starts on its rest pose: it was following the cart's drop onto the grid.
+	_intro_race_pos = target[0]
+	_intro_race_look = target[1]
+	_apply_intro_camera(0.0)
 
-func _update_intro_camera(_delta: float):
-	var progress = (INTRO_DURATION - intro_time) / INTRO_DURATION
-	var t = sin(progress * PI / 2.0)
-	
-	var base_angle = atan2(20.0, -20.0)
-	var start_angle = base_angle - PI
-	
-	var current_angle = lerp(start_angle, base_angle, t)
-	var current_dist = lerp(65.0, 28.28, t)
-	var current_height = lerp(35.0, 20.0, t)
-	
-	var offset = Vector3(
-		cos(current_angle) * current_dist,
-		current_height,
-		sin(current_angle) * current_dist
-	)
-	
-	camera_pivot.global_position = intro_orbit_center + offset
-	camera_pivot.look_at(intro_orbit_center, Vector3.UP)
+
+func start_intro_animation(duration: float = INTRO_DURATION) -> void:
+	if not is_local_player:
+		return
+	if _intro_plan.is_empty():
+		prepare_intro()
+	_intro_duration = maxf(duration, 0.5)
+	_intro_t = 0.0
+	_intro_holding = false
+	is_intro_active = true
+
+
+## Where the race camera will settle with the cart at rest (for planning the move: the move itself ends on the race
+## camera's live pose).
+func _intro_race_target() -> Array:
+	var c: Vector3 = visuals.global_position
+	var nose: Vector3 = -visuals.global_transform.basis.z
+	nose.y = 0.0
+	nose = nose.normalized() if nose.length_squared() > 0.0001 else Vector3.FORWARD
+	if is_isometric:
+		var lead: Vector3 = _fit_topdown_lead(nose * TOPDOWN_LEAD_BASE)
+		return [c + lead + TOPDOWN_OFFSET, c + lead]
+	if is_high_chase:
+		var yaw: float = atan2(nose.x, nose.z)
+		return [c + Vector3(-sin(yaw) * CHASE_BACK, CHASE_UP, -cos(yaw) * CHASE_BACK), c + Vector3.UP * 0.6 + nose * CHASE_LOOK_AHEAD]
+	return [c - nose * 5.2 + Vector3.UP * 2.2, c + nose * 6.5 + Vector3.UP * 0.6]
+
+
+## The carts and the gates (their trusses and the start gantry over the grid) don't block the intro's view.
+func _intro_excludes() -> Array:
+	var out: Array = [get_rid()]
+	for cart in get_tree().get_nodes_in_group("player_carts"):
+		if cart is CollisionObject3D:
+			out.append((cart as CollisionObject3D).get_rid())
+	var lvl = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
+	if lvl and "checkpoints" in lvl:
+		for cp in lvl.checkpoints:
+			if is_instance_valid(cp):
+				if cp is CollisionObject3D:
+					out.append(cp.get_rid())
+				for sb in cp.find_children("*", "CollisionObject3D", true, false):
+					out.append((sb as CollisionObject3D).get_rid())
+	return out
+
+
+## Puts the camera on the move (advancing it while it runs) and ends it on the race camera's pose.
+func _apply_intro_camera(delta: float) -> void:
+	if _intro_plan.is_empty():
+		return
+	if is_intro_active:
+		_intro_t = minf(_intro_t + delta / _intro_duration, 1.0)
+	var race_pos: Vector3 = _intro_race_pos
+	var race_look: Vector3 = _intro_race_look
+	if is_nan(race_pos.x):
+		var target: Array = _intro_race_target()
+		race_pos = target[0]
+		race_look = target[1]
+	var pr: Array = START_INTRO.pose(_intro_plan, _intro_centre, race_pos, race_look, _intro_t)
+	camera_pivot.global_position = pr[0]
+	if (pr[1] as Vector3).distance_squared_to(pr[0]) > 0.01:
+		camera_pivot.look_at(pr[1], Vector3.UP)
+	if is_intro_active and _intro_t >= 1.0:
+		is_intro_active = false
+		_intro_plan = {}
+		camera_look_at = race_look
 
 
 func _on_camera_mode_setting_changed(mode: int) -> void:
@@ -8303,7 +8405,7 @@ func _fit_topdown_lead(lead: Vector3) -> Vector3:
 ## spectator view follows other carts) and in the eagle's grip.
 func _update_xray_globals() -> void:
 	var slot: String = "b" if input_prefix == "p2_" else "a"
-	var on: bool = (is_isometric or is_high_chase) and not is_intro_active and not is_carried_by_eagle \
+	var on: bool = (is_isometric or is_high_chase) and not is_intro_active and not _intro_holding and not is_carried_by_eagle \
 			and not (is_finished_race and finish_spectate_delay <= 0.0)
 	var cam_pos: Vector3 = camera.global_position
 	var car_pos: Vector3 = visuals.global_position + Vector3.UP * 0.6

@@ -988,6 +988,13 @@ in front of the water while driving (Msitu Falls, Bloombay Dunes). `canyon_river
     through, bends it right over (`BRUSH_LEAN`, `BRUSH_KICK`, along its travel) and loses `BRUSH_DRAG`
     (3.5%) of its speed entering each one (carts this peer has physics authority over, as SpringProps'
     flags do); one the Detail Level doesn't draw slows nobody. Solid, the ferns stopped carts dead.
+    Entering one at `BRUSH_BREAK_SPEED` (6 m/s) or more tears it apart (`_tear`, Msitu Falls and Pinecrest Ridge): its
+    instance collapses in every MultiMesh drawing it, for the race, and `FernShreds.gd` throws its fronds off (out from
+    its middle, a share of the cart's travel, up), tumbling, and shrinks them away over a second or so; the user wanted
+    them to come apart into their leaves, not fly off whole. Each fern mesh is split once into its fronds (connected
+    pieces, grouped by bearing, re-centred) and each frond drawn through a MultiMesh of `POOL` instances in the fern's own
+    material: the ferns' own pipeline, so the first fern torn compiles nothing. `res://scratch/fern_parts_dump.gd` (`-s`,
+    headless) lists a fern mesh's pieces.
   - The Detail Level: an instance a MultiMesh doesn't draw (past `visible_instance_count`, or hidden) has
     its collider switched off, checked every half second, so nobody hits a plant they can't see.
   - Single meshes (`_cover_meshes`, a few physics frames later): every visible MeshInstance3D gets a
@@ -2015,6 +2022,16 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 
 ## Msitu Falls (Matumaini GP, stage 3)
 
+- Auto's Detail Level steps (MusicManager `_check_auto_grass_quality`, Low to Ultra) must never change the light. At
+  Low, JungleDetail turned the canopy's shadows off and flattened the ground (`TREE_SHADOWS`, `FINE_GROUND`): where 4x
+  MSAA (or anything slower) pushed Auto down around the green light, the shaded forest floor and road went bright and
+  washed out; at 2x and FXAA Auto stayed at Medium. Low now keeps the stand-in's shadows and the ground; only Off (a
+  manual setting) drops them. Auto also remembers the level it settled on per stage and display setup
+  (`user://auto_detail.cfg`, `_auto_memory_key`: stage, anti-aliasing, resolution, render scale, window mode,
+  renderer) and starts there, not at High every race. `res://scratch/msaa_brightness_probe.tscn -- [<dir>] [level=]
+  [aa=2] [detail=N] [noread]` (windowed) runs a GP race at an anti-aliasing setting and logs the phase, frame rate and
+  the frame's brightness (saving frames with a dir).
+
 - The sky is `sky_tropical_cumulus.gdshader`, static like the others (no `TIME`). The storm transition
   is driven smoothly per frame by `JungleRain.gd` via the `rain_sky_blend` global shader parameter, blending
   `sky_top`, `sky_horizon`, `cloud_*`, `sun_glow` and `sky_energy` toward storm values without triggering
@@ -2159,7 +2176,13 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   Pier, never into a hairpin (`is_hairpin`) on any stage, decided or held, and never within `AI_DRIFT_EDGE` (2m) of the
   road's edge (`_ai_drift_room`): drifting Pinecrest's switchbacks threw six bots a race over their edges and the summit
   tyre wall. `ai_race_test` prints each cart's drifts and their time (Bloombay 7-26 a race, Pinecrest 10-27) and takes
-  `nodrift=1`. Pinecrest at speed 2: every bot finishes, one or two respawns a race that aren't items, mostly at
+  `nodrift=1`. A bot drifts only a corner whose outside is safe (`_ai_drift_safe`: just past the road's edge on the
+  outside, at the apex and over the 36m after it, the ground is there, not more than `AI_DRIFT_DROP` (1.5m) under the
+  road and not deep water): drifting wherever it could, bots slid off Glacier Highway (14 falls a race against 1 with
+  drifting off) and Frostpeak Creek (8 against 2); with the check Glacier had 5. A drift also ends by the clock
+  (`_drift_age`, `AI_DRIFT_MAX_AGE` 3s) and once the bot no longer wants it after 0.6s: the charge only builds on the
+  ground over 4 m/s, so a slow or airborne drift never ended (91s of drifting in one Tolvanera race, turning in circles).
+  `ai_race_test` prints `LONG DRIFT` for any held over 4s. Pinecrest at speed 2: every bot finishes, one or two respawns a race that aren't items, mostly at
   switchback 2 (about 488m) and the summit hairpin (608-670m), with or without drifting.
 
 ## Car weights
@@ -2186,6 +2209,47 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   faces sideways and down, and played the crash every 0.6s). `res://scratch/loop_ai_probe.tscn` prints, at the end, the
   angle between the model's up and the loop surface under it (now 3.5 degrees on average, the worst 12; was 31), frames
   the ground ray missed and the bump/landing sounds played.
+
+## Breakable chevron signs (BreakableSigns.gd)
+
+- The chevron boards round the corners (Msitu Falls' `Chevrons/ChevronBoards` and `ChevronPosts`, Pinecrest Ridge's
+  `Chevrons/ChevronSigns`) break off when hit. Level.gd adds `BreakableSigns.gd` with its runtime colliders, before
+  DressingColliders; no level needs regenerating. The generators merge every board of a level into one mesh, so at load
+  its triangles are split per sign (middles within `LINK` in plan; 38 on Msitu, 34 on Pinecrest), each sign a node of
+  its own with its meshes re-centred and a convex hull (`SignBody`); the merged meshes and Pinecrest's
+  `ChevronSignsBody` boxes are freed.
+- A cart over `BREAK_SPEED` (5 m/s) coming at a sign knocks it off a step before it would touch (its speed from how far
+  it moved, so every peer breaks the signs it sees hit; nothing synced): the collider goes, the cart loses `DRAG` (5%),
+  the sign flies along the cart's travel with a hop, tumbling end over end about its long axis, bounces and eases down
+  lying face up or down, and stays for the race. Slower, it is solid. The knock is `crate_crash` for Msitu's timber
+  boards, the clank for Pinecrest's steel. Its landing ray skips plant, rock and trunk colliders (a sign came to rest on
+  a shrub's box 1.8m up).
+- `res://scratch/break_test.tscn -- [<dir>] [kind=sign|fern] [level=] [index=0] [speed=22]` drives a real cart into a
+  sign or a fern near the lap and logs the flight (windowed with a dir: frames from beside it).
+
+## The race start: grid, reveal and intro
+
+- The stage opens on the intro's first frame with the grid already landed. Main sets the level's
+  `hold_start_for_reveal` before adding it, waits after the collisions for `Level.wait_for_grid()` (the carts' 5m spawn
+  drop over, `GRID_SETTLE_MAX`; every local cart has planned its intro, `prepare_intro`, and holds its first pose), hides
+  the loading screen, then calls `screen_revealed()`; the race starts `REVEAL_HOLD` later, as the swipe clears. A test
+  harness that instantiates a level itself never sets the hold and starts 0.4s after the grid lands. Before, the race
+  started 0.4s after `_ready`, so the reveal showed the carts falling onto the grid, then the orbit began.
+- The intro (`StartIntroCamera.gd`, PlayerCart's `prepare_intro`, `start_intro_animation`, `_apply_intro_camera`,
+  `Level.INTRO_SECONDS` 4s): a path in polar coordinates about the player's car on one smootherstep, from a wide high
+  start round to the race camera, ending exactly on it. The race camera keeps running under the move from its own last
+  pose (`_intro_race_pos`), put on its rest pose when the move is planned (it had been following the drop and swung
+  the sweep with it), and the last quarter blends onto it: no snap at the hand-over. The old orbit was always the same
+  180 degrees in world axes, starting at full speed, ending at a fixed world offset the race camera snapped from.
+- `choose` scores each start (both sides, sweeps of 150/100/60 degrees at two heights, straight in from far behind and
+  low, a crane from 58m up) along its path: the line of sight blocked, the camera inside something or under the ground,
+  and trees (crowns have no collider: a trunk body within `CROWN_R` of the ground under a low point of the line counts).
+  Lakeside and most stages take the 150-degree sweep; Mtaa Nights' street between houses comes straight in down the
+  street from 80m back, 16m up (the crane looked straight down into it). It prints `[Intro] <start> (blocked ...)`.
+- `res://scratch/start_intro_test.tscn -- [<dir>] [cup=] [stage=] [mode=chase|top|follow] [trace] [shots=0,0.25,...]`
+  (windowed, `--fixed-fps 60`) runs Main's real start-up: FAIL if a cart is seen dropping after the reveal, and the
+  camera's top speed, turn rate and worst velocity jump through the move (Lakeside: 46 m/s, 68 deg/s, 66 m/s^2, 0 at the
+  hand-over).
 
 ## Race cameras
 

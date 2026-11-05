@@ -181,14 +181,14 @@ func _ready() -> void:
 	for li in range(lips.size()):
 		var sp: Array = lip_speeds.get(li, [])
 		if sp.is_empty():
-			print("LIP %s: no cart crossed it" % lips[li]["name"])
+			print("LIP %s: no cart crossed it" % (lips[li]["name"] if lips[li] is Dictionary else "at %.0fm" % float(lips[li])))
 			continue
 		var lo := 999.0
 		var sum := 0.0
 		for v in sp:
 			lo = minf(lo, v)
 			sum += v
-		print("LIP %s: %d crossings, %.1f m/s on average, slowest %.1f" % [lips[li]["name"], sp.size(), sum / sp.size(), lo])
+		print("LIP %s: %d crossings, %.1f m/s on average, slowest %.1f" % [lips[li]["name"] if lips[li] is Dictionary else "at %.0fm" % float(lips[li]), sp.size(), sum / sp.size(), lo])
 	for c in carts:
 		var st: Dictionary = level.player_stats.get(c.name.to_int(), {})
 		print("CART %s car=%d laps=%d finished=%s respawns=%d %s drifts=%d (%.1fs)" % [c.name, c.car_index, st.get("laps", 0), st.get("finished", false),

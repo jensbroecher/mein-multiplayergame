@@ -978,9 +978,9 @@ func set_grass_setting(setting_idx: int, save: bool = true) -> void:
 	_low_fps_duration = 0.0
 	_auto_grass_warmup = 3.0
 	if grass_quality_setting == 0:
-		# Auto: start at High and follow the machine (_check_auto_grass_quality).
+		# Auto: start where it settled last time here (else High) and follow the machine (_check_auto_grass_quality).
 		_reset_auto_quality()
-		set_grass_quality(AUTO_START_QUALITY, false)
+		set_grass_quality(_auto_start_quality(), false)
 	else:
 		# Manual: 1: Off (0), 2: Low (1), 3: Medium (2), 4: High (3), 5: Ultra (4)
 		set_grass_quality(grass_quality_setting - 1, false)
@@ -1048,6 +1048,7 @@ func _check_auto_grass_quality(delta: float) -> void:
 			print("[MusicManager] Auto detail level: %d FPS, GPU %.1fms of %.1fms. Down to %s." % [
 				int(fps), gpu_ms, budget_ms, GRASS_QUALITY_NAMES[grass_quality_index - 1]])
 			set_grass_quality(grass_quality_index - 1, false)
+			_remember_auto_quality()
 			_auto_over = 0.0
 			_auto_block_up = AUTO_UP_BLOCK
 			_auto_grass_warmup = 1.0
@@ -1058,6 +1059,7 @@ func _check_auto_grass_quality(delta: float) -> void:
 			print("[MusicManager] Auto detail level: %d FPS, GPU %.1fms of %.1fms. Up to %s." % [
 				int(fps), gpu_ms, budget_ms, GRASS_QUALITY_NAMES[grass_quality_index + 1]])
 			set_grass_quality(grass_quality_index + 1, false)
+			_remember_auto_quality()
 			_auto_spare = 0.0
 			_auto_grass_warmup = 2.0
 	else:
@@ -1069,6 +1071,42 @@ func _check_auto_grass_quality(delta: float) -> void:
 func _auto_target_fps() -> float:
 	var cap: int = MAX_FPS_VALUES[clampi(max_fps_index, 0, MAX_FPS_VALUES.size() - 1)]
 	return float(clampi(cap, 30, 60)) if cap > 0 else 60.0
+
+
+## Auto remembers the level it settled on per stage and display setup (AUTO_MEMORY_FILE), and starts the next race
+## there: starting every race at High, a slower setup stepped down twice in the first seconds, and each step showed.
+const AUTO_MEMORY_FILE := "user://auto_detail.cfg"
+var _auto_key := ""
+
+
+## The stage on show and what sets the GPU's load (anti-aliasing, resolution, render scale, window or full screen).
+func _auto_memory_key() -> String:
+	if not is_inside_tree():
+		return ""
+	var level: Node = get_tree().get_first_node_in_group("level")
+	if level == null or str(level.scene_file_path).is_empty():
+		return ""
+	return "%s|aa%d|res%d|rs%d|win%d|r%s" % [str(level.scene_file_path).get_file().get_basename(), anti_aliasing,
+		resolution_index, render_scale_index, window_mode, get_current_rendering_method()]
+
+
+func _auto_start_quality() -> int:
+	_auto_key = _auto_memory_key()
+	if _auto_key.is_empty():
+		return AUTO_START_QUALITY
+	var cfg := ConfigFile.new()
+	if cfg.load(AUTO_MEMORY_FILE) != OK:
+		return AUTO_START_QUALITY
+	return clampi(int(cfg.get_value("auto_detail", _auto_key, AUTO_START_QUALITY)), AUTO_MIN_QUALITY, AUTO_MAX_QUALITY)
+
+
+func _remember_auto_quality() -> void:
+	if _auto_key.is_empty() or _auto_key != _auto_memory_key():
+		return
+	var cfg := ConfigFile.new()
+	cfg.load(AUTO_MEMORY_FILE)
+	cfg.set_value("auto_detail", _auto_key, grass_quality_index)
+	cfg.save(AUTO_MEMORY_FILE)
 
 
 func _reset_auto_quality() -> void:
@@ -1145,7 +1183,7 @@ func refresh_level_graphics() -> void:
 	set_shadow_quality(shadow_quality_index, false)
 	if grass_quality_setting == 0:
 		_reset_auto_quality()
-		set_grass_quality(AUTO_START_QUALITY, false)
+		set_grass_quality(_auto_start_quality(), false)
 	else:
 		set_grass_quality(grass_quality_index, false)
 	set_anisotropic(anisotropic_index, false)

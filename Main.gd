@@ -315,6 +315,7 @@ func start_game(is_host: bool):
 	if loading_screen:
 		loading_screen.set_progress(0.7)
 		loading_screen.set_status("Preparing track")
+	_hold_start_for_reveal(level)
 	add_child(level)
 	# Apply shadow/quality settings to newly spawned lights & carts
 	MusicManager.refresh_level_graphics()
@@ -327,10 +328,12 @@ func start_game(is_host: bool):
 	else:
 		await get_tree().process_frame
 		await get_tree().process_frame
+	await _wait_for_grid(level)
 	if loading_screen:
 		loading_screen.set_progress(0.98)
 	await get_tree().process_frame
 	await _hide_loading()
+	_reveal_level(level)
 	# Clients will get the level spawned automatically by MultiplayerSpawner
 
 ## Called from RaceUI (child of Level). Must not free Level mid-callback.
@@ -359,6 +362,7 @@ func _load_gp_stage_impl(stage_idx: int) -> void:
 		loading_screen.set_status("Loading stage %d" % (stage_idx + 1))
 		loading_screen.set_progress(0.4)
 
+	var gp_level: Node = null
 	var gp_data = NetworkManager.get_gp_cup(NetworkManager.current_gp_name)
 	if gp_data and stage_idx < gp_data["stages"].size():
 		NetworkManager.current_gp_stage = stage_idx
@@ -378,6 +382,7 @@ func _load_gp_stage_impl(stage_idx: int) -> void:
 			loading_screen.set_progress(0.75)
 			loading_screen.set_status("Preparing track")
 		var next_level = next_level_scene.instantiate()
+		_hold_start_for_reveal(next_level)
 		add_child(next_level)
 		MusicManager.refresh_level_graphics()
 		if loading_screen:
@@ -388,6 +393,8 @@ func _load_gp_stage_impl(stage_idx: int) -> void:
 		else:
 			await get_tree().process_frame
 			await get_tree().process_frame
+		await _wait_for_grid(next_level)
+		gp_level = next_level
 		if loading_screen:
 			loading_screen.set_progress(0.98)
 		await get_tree().process_frame
@@ -403,6 +410,7 @@ func _load_gp_stage_impl(stage_idx: int) -> void:
 		return
 
 	await _hide_loading()
+	_reveal_level(gp_level)
 	_level_swap_in_progress = false
 	process_mode = Node.PROCESS_MODE_INHERIT
 
@@ -485,6 +493,7 @@ func _load_stage_impl(stage_path: String, status_title: String) -> void:
 		loading_screen.set_progress(0.65)
 		loading_screen.set_status("Preparing track")
 	var next_level = next_level_scene.instantiate()
+	_hold_start_for_reveal(next_level)
 	add_child(next_level)
 	MusicManager.refresh_level_graphics()
 	if loading_screen:
@@ -495,10 +504,12 @@ func _load_stage_impl(stage_path: String, status_title: String) -> void:
 	else:
 		await get_tree().process_frame
 		await get_tree().process_frame
+	await _wait_for_grid(next_level)
 	if loading_screen:
 		loading_screen.set_progress(0.98)
 	await get_tree().process_frame
 	await _hide_loading()
+	_reveal_level(next_level)
 	_level_swap_in_progress = false
 	process_mode = Node.PROCESS_MODE_INHERIT
 
@@ -670,6 +681,25 @@ func _restart_race_impl() -> void:
 
 
 ## The loading screen comes in behind the swipe's panel, which is its colour, then fades off it.
+## A race level waits for the loading screen to go before it starts (Level.hold_start_for_reveal): the stage then
+## opens on the intro's first frame, with the grid already landed, instead of on carts dropping onto it.
+func _hold_start_for_reveal(level: Node) -> void:
+	if level != null and "hold_start_for_reveal" in level:
+		level.hold_start_for_reveal = true
+
+
+func _wait_for_grid(level: Node) -> void:
+	if is_instance_valid(level) and level.has_method("wait_for_grid"):
+		if loading_screen:
+			loading_screen.set_status("Lining up the grid")
+		await level.wait_for_grid()
+
+
+func _reveal_level(level: Node) -> void:
+	if is_instance_valid(level) and level.has_method("screen_revealed"):
+		level.screen_revealed()
+
+
 func _show_loading(message: String) -> void:
 	if loading_screen == null:
 		return

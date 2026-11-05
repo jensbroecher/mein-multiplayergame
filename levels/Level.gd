@@ -985,12 +985,11 @@ func start_race():
 		var hp = ui.get_node_or_null("HUDPanel")
 		if hp: hp.show()
 
-	# Start camera intro on all carts
-	get_tree().call_group("player_carts", "start_intro_animation")
+	# The intro's camera move on every local cart (planned and held since the grid landed: _run_race_countdown)
+	get_tree().call_group("player_carts", "start_intro_animation", INTRO_SECONDS)
 	_show_start_lights(0)
 
-	# Wait for intro animation (3.5 seconds)
-	await get_tree().create_timer(3.5).timeout
+	await get_tree().create_timer(INTRO_SECONDS).timeout
 
 	# Start countdown: voice (3/2/1/GO) + one short beep each (4 total).
 	# Uses a generated single tone — the warning.ogg sample is a multi-beep clip.
@@ -1601,11 +1600,73 @@ func end_race_rpc(results_data: Array):
 	if race_ui and race_ui.has_method("display_race_results"):
 		race_ui.display_race_results(results_data)
 
+## The start, under the loading screen: the level's collision, then the grid's carts landed from their drop
+## (GRID_SETTLE_MAX at most), then every local cart plans its intro and holds its first pose (`grid_ready`). Then,
+## when Main has said it is revealing the stage (`hold_start_for_reveal`, `screen_revealed`; a test harness that
+## instantiates the level itself never sets it), the race starts: the reveal opens on the intro's first frame, not
+## on carts falling onto the grid.
 func _run_race_countdown():
 	await get_tree().process_frame
-	await get_tree().create_timer(0.4).timeout
+	await wait_for_collisions()
+	await _wait_for_grid_landed()
+	if not is_inside_tree():
+		return
+	get_tree().call_group("player_carts", "prepare_intro")
+	_grid_ready = true
+	grid_ready.emit()
+	if hold_start_for_reveal:
+		var t0 := Time.get_ticks_msec()
+		while not _revealed and Time.get_ticks_msec() - t0 < int(REVEAL_WAIT_MAX * 1000.0):
+			await get_tree().process_frame
+		# The move starts as the swipe clears (ScreenTransition.REVEAL_TIME): its first pose is seen still first.
+		await get_tree().create_timer(REVEAL_HOLD).timeout
+	else:
+		await get_tree().create_timer(0.4).timeout
 	if multiplayer.is_server():
 		start_race.rpc()
+
+
+signal grid_ready
+## Set by Main before it adds the level: the race waits for `screen_revealed` before it starts.
+var hold_start_for_reveal: bool = false
+var _revealed: bool = false
+var _grid_ready: bool = false
+const GRID_SETTLE_MAX := 4.0
+const REVEAL_WAIT_MAX := 60.0
+const REVEAL_HOLD := 0.6
+## The intro's camera move before the countdown (PlayerCart.start_intro_animation).
+const INTRO_SECONDS := 4.0
+
+
+## Main, as the loading screen goes: start the race.
+func screen_revealed() -> void:
+	_revealed = true
+
+
+## Main, before it reveals the stage: returns once the grid has landed and the intros hold their first pose.
+func wait_for_grid() -> void:
+	var t0 := Time.get_ticks_msec()
+	while not _grid_ready and is_inside_tree() and Time.get_ticks_msec() - t0 < int((GRID_SETTLE_MAX + 2.0) * 1000.0):
+		await get_tree().process_frame
+
+
+func _wait_for_grid_landed() -> void:
+	var t0 := Time.get_ticks_msec()
+	# The spawns happen in _ready; give the drop a few frames to begin.
+	for i in 3:
+		await get_tree().physics_frame
+	while is_inside_tree() and Time.get_ticks_msec() - t0 < int(GRID_SETTLE_MAX * 1000.0):
+		var falling := false
+		for cart in players_container.get_children():
+			if cart.get("is_landing"):
+				falling = true
+				break
+		if not falling:
+			break
+		await get_tree().physics_frame
+	# A couple more frames so the cameras following the carts have caught up.
+	for i in 2:
+		await get_tree().process_frame
 
 func on_player_exploded(is_local: bool):
 	if is_local:
@@ -1791,6 +1852,14 @@ func _build_runtime_collisions_deferred() -> void:
 	for child in get_tree().root.get_children():
 		if "regenerate" in str(child.name).to_lower():
 			in_generator = true
+	# The corner chevron boards break off when hit (BreakableSigns.gd): split per sign first, so DressingColliders
+	# doesn't make the old merged mesh solid.
+	if not in_generator and not has_node("BreakableSigns") and not find_children("Chevrons", "Node3D", true, false).is_empty():
+		var bs := Node3D.new()
+		bs.name = "BreakableSigns"
+		bs.set_script(load("res://BreakableSigns.gd"))
+		add_child(bs)
+		bs.build(self)
 	if not in_generator and not has_node("DressingColliders"):
 		var dc := Node.new()
 		dc.name = "DressingColliders"

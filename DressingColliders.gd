@@ -45,6 +45,9 @@ const BRUSH_NOT := ["tree_fern", "treefern"]
 const BRUSH_LEAN := 1.05
 const BRUSH_KICK := 0.25
 const BRUSH_DRAG := 0.035
+## A cart entering a fern at this speed or more tears it apart: the fern's gone and its fronds fly off and shrink
+## away (FernShreds.gd). Slower, it only bends it over.
+const BRUSH_BREAK_SPEED := 6.0
 ## The spring: stiffness, damping, how far it can lean (radians), how hard a cart's speed kicks it.
 const SPRING_K := 55.0
 const SPRING_DAMP := 4.5
@@ -60,7 +63,7 @@ var _bodies := {}
 ## Per MultiMesh that owns instances: [mmi, [[body, owner id] per instance index or null], last count].
 var _owned: Array = []
 ## Wobbling plants: entries [mmis (Array), index, rest Transform3D, foot Vector3, radius, axis, angle, speed,
-## brush bool];
+## brush bool, torn bool (a fern torn apart: gone for the race)];
 ## the cells hold indices into it, and so does the set of those moving (an Array as a key hashes by
 ## its contents, which change as it swings).
 var _wobble: Array = []
@@ -123,7 +126,7 @@ func build(level: Node) -> void:
 				seen[key] = []
 				continue
 			if brush:
-				var be: Array = [[mmi], i, local, xf.origin, float(info["r"]) * maxf(sc.x, sc.z), Vector3.ZERO, 0.0, 0.0, true]
+				var be: Array = [[mmi], i, local, xf.origin, float(info["r"]) * maxf(sc.x, sc.z), Vector3.ZERO, 0.0, 0.0, true, false]
 				_add_wobbler(be)
 				seen[key] = be
 				continue
@@ -145,7 +148,7 @@ func build(level: Node) -> void:
 			shapes_made += 1
 			any = true
 			if not rocky and height <= WOBBLE_MAX_HEIGHT:
-				var entry: Array = [[mmi], i, local, xf.origin, float(info["r"]) * maxf(sc.x, sc.z), Vector3.ZERO, 0.0, 0.0, false]
+				var entry: Array = [[mmi], i, local, xf.origin, float(info["r"]) * maxf(sc.x, sc.z), Vector3.ZERO, 0.0, 0.0, false, false]
 				_add_wobbler(entry)
 				seen[key] = entry
 			else:
@@ -223,6 +226,32 @@ static func _brush(mesh: Mesh) -> bool:
 		if file.contains(w):
 			return true
 	return false
+
+
+## Tears fern `idx` apart: its instance is collapsed in every MultiMesh that draws it, and FernShreds throws its
+## fronds off.
+var _shreds: Node3D = null
+
+func _tear(idx: int, cart_vel: Vector3) -> void:
+	var e: Array = _wobble[idx]
+	e[9] = true
+	_moving.erase(idx)
+	var mmi: MultiMeshInstance3D = e[0][0]
+	if not is_instance_valid(mmi):
+		return
+	var rest: Transform3D = e[2]
+	var gone := Transform3D(Basis().scaled(Vector3.ONE * 0.0001), rest.origin + Vector3.DOWN * 50.0)
+	for m in e[0]:
+		if is_instance_valid(m):
+			(m as MultiMeshInstance3D).multimesh.set_instance_transform(int(e[1]), gone)
+	if _shreds == null:
+		_shreds = preload("res://FernShreds.gd").new()
+		_shreds.name = "FernShreds"
+		add_child(_shreds)
+	var mat: Material = mmi.material_override
+	if mat == null and mmi.multimesh.mesh.get_surface_count() > 0:
+		mat = mmi.multimesh.mesh.surface_get_material(0)
+	_shreds.shred(mmi.multimesh.mesh, mat, mmi.global_transform * rest, cart_vel)
 
 
 ## Whether the Detail Level draws instance `index` of `mmi` (brush it doesn't draw doesn't slow anyone).
@@ -555,12 +584,17 @@ func _physics_process(delta: float) -> void:
 					if d.length() > float(e[4]) + CART_RADIUS or absf(pos.y - foot.y) > 4.0:
 						continue
 					var brush: bool = e[8]
+					if e[9]:
+						continue
 					if brush:
 						if not _drawn(e[0][0], int(e[1])):
 							continue
 						now_in[idx] = true
 						if drags and not was_in.has(idx):
 							(c as RigidBody3D).linear_velocity *= 1.0 - BRUSH_DRAG * CartWeight.loss_share(c)
+						if not was_in.has(idx) and speed >= BRUSH_BREAK_SPEED:
+							_tear(idx, vel)
+							continue
 					# Tip away from the cart, about the horizontal axis across the push; brush goes over
 					# along the cart's travel, the way a cart flattens it.
 					var push := Vector3(d.x, 0.0, d.y).normalized() if d.length() > 0.05 else Vector3(vel.x, 0.0, vel.z).normalized()
