@@ -2,13 +2,13 @@
 
 [ext_resource type="ArrayMesh" path="res://generated/rheinuferprop_ship_ferry.res" id="1_mks1y"]
 
-[node name="Vessel" type="Node3D" unique_id=1580277871]
+[node name="Vessel" type="Node3D" unique_id=2137812818]
 
-[node name="Hull" type="MeshInstance3D" parent="." unique_id=1580306279]
+[node name="Hull" type="MeshInstance3D" parent="." unique_id=507402181]
 visibility_range_end = 2600.0
 mesh = ExtResource("1_mks1y")
 
-[node name="@Label3D@1230" type="Label3D" parent="." unique_id=1601020200]
+[node name="@Label3D@1230" type="Label3D" parent="." unique_id=625493326]
 transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 5.376, 2.4, 0)
 visibility_range_end = 600.0
 pixel_size = 0.010714286
@@ -19,7 +19,7 @@ text = "RHEINFÄHRE KRONBURG"
 font_size = 64
 outline_size = 4
 
-[node name="@Label3D@1231" type="Label3D" parent="." unique_id=1941416243]
+[node name="@Label3D@1231" type="Label3D" parent="." unique_id=943647736]
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 10.144, 2.4, 0)
 visibility_range_end = 600.0
 pixel_size = 0.010714286
@@ -30,7 +30,7 @@ text = "RHEINFÄHRE KRONBURG"
 font_size = 64
 outline_size = 4
 
-[node name="@Label3D@1232" type="Label3D" parent="." unique_id=276153283]
+[node name="@Label3D@1232" type="Label3D" parent="." unique_id=215587457]
 transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -10.448001, 0.99200004, 0)
 visibility_range_end = 600.0
 pixel_size = 0.008571428
@@ -41,7 +41,7 @@ text = "FÄHRE VENNHOVEN"
 font_size = 64
 outline_size = 4
 
-[node name="@Label3D@1233" type="Label3D" parent="." unique_id=1352596524]
+[node name="@Label3D@1233" type="Label3D" parent="." unique_id=2041151518]
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 10.448001, 0.99200004, 0)
 visibility_range_end = 600.0
 pixel_size = 0.008571428

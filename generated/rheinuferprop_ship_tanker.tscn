@@ -2,13 +2,13 @@
 
 [ext_resource type="ArrayMesh" path="res://generated/rheinuferprop_ship_tanker.res" id="1_deqkg"]
 
-[node name="Vessel" type="Node3D" unique_id=860389253]
+[node name="Vessel" type="Node3D" unique_id=1604460190]
 
-[node name="Hull" type="MeshInstance3D" parent="." unique_id=641363358]
+[node name="Hull" type="MeshInstance3D" parent="." unique_id=1065888123]
 visibility_range_end = 2600.0
 mesh = ExtResource("1_deqkg")
 
-[node name="@Label3D@1201" type="Label3D" parent="." unique_id=1403588176]
+[node name="@Label3D@1201" type="Label3D" parent="." unique_id=1549942207]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 2.08, -68.848)
 visibility_range_end = 600.0
 pixel_size = 0.012857143
@@ -19,7 +19,7 @@ text = "Lippestrom"
 font_size = 64
 outline_size = 4
 
-[node name="@Label3D@1202" type="Label3D" parent="." unique_id=1304403546]
+[node name="@Label3D@1202" type="Label3D" parent="." unique_id=1839891545]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 1.328, -68.848)
 visibility_range_end = 600.0
 pixel_size = 0.007857143
@@ -30,7 +30,7 @@ text = "VENNHOVEN"
 font_size = 64
 outline_size = 4
 
-[node name="@Label3D@1203" type="Label3D" parent="." unique_id=1494671542]
+[node name="@Label3D@1203" type="Label3D" parent="." unique_id=210947522]
 transform = Transform3D(0.06294482, -0.1439281, -0.9875843, 0, 0.98954654, -0.14421406, 0.998017, 0.0090775285, 0.062286828, -8.87817, 1.4930778, 54.402992)
 visibility_range_end = 600.0
 pixel_size = 0.015
@@ -41,7 +41,7 @@ text = "Lippestrom"
 font_size = 64
 outline_size = 4
 
-[node name="@Label3D@1204" type="Label3D" parent="." unique_id=1309958314]
+[node name="@Label3D@1204" type="Label3D" parent="." unique_id=1316211222]
 transform = Transform3D(0.06294482, 0.1439281, 0.9875843, 0, 0.98954654, -0.14421406, -0.998017, 0.0090775285, 0.062286828, 8.87817, 1.4930778, 54.402992)
 visibility_range_end = 600.0
 pixel_size = 0.015

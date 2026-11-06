@@ -828,6 +828,11 @@ const OB_FLOOD_PIER := 3.4
 const OB_FACE_Z := 13.2
 const OB_LAMPS := [178.0, 150.0, 110.0, 55.0, -55.0, -110.0, -150.0, -178.0, -232.0, -268.0, -300.0]
 
+## How far under the road the piers' and the abutment's feet stop at the most, wherever the ground stands that high.
+const OB_FOOT_UNDER := 0.3
+## A flood arch with less rise than this over the ground is buried in the dyke: filled with masonry instead.
+const OB_FLOOD_MIN_RISE := 1.5
+
 ## The tie girder's middle under the deck.
 const OB_TIE_MID := (OB_TIE_TOP - OB_TIE_BOT) * 0.5
 
@@ -1231,10 +1236,16 @@ static func _ob_end_piers(pk: PropKit, kit: Dictionary, deck: Callable, ground: 
 		var xw: float = xp + 0.6 * side
 		var xe: float = xp + (6.0 if side > 0.0 else 5.1) * side
 		var hz: float = OB_TOWER_Z0 - 0.13
-		# The shelf (river side) up to the cap, a cornice along its front.
-		_blk(pk, kit, "ashlar", Vector3(xf, g - 2.5, -hz), Vector3(xw, cap - 0.6, hz), SANDSTONE, MUV)
-		_blk(pk, kit, "ashlar", Vector3(xf - 0.45 * side, cap - 0.6, -hz), Vector3(xw, cap, hz), SANDSTONE.lightened(0.07), MUV)
-		_blk(pk, kit, "ashlar", Vector3(xf - 0.25 * side, g - 0.6, -hz - 0.01), Vector3(xw - 0.5 * side, g + 1.2, hz + 0.01), BASALT, MUV)
+		# The shelf (river side) up to the cap, a cornice along its front: none where the bank stands as high as the cap
+		# (the east head, on the town's quay terrace).
+		if cap - 0.6 > g - 2.5 + 0.3:
+			_blk(pk, kit, "ashlar", Vector3(xf, g - 2.5, -hz), Vector3(xw, cap - 0.6, hz), SANDSTONE, MUV)
+			_blk(pk, kit, "ashlar", Vector3(xf - 0.45 * side, cap - 0.6, -hz), Vector3(xw, cap, hz), SANDSTONE.lightened(0.07), MUV)
+		# The basalt plinth at the foot, kept under the road (OB_FOOT_UNDER): with the bank at the road's height it stood
+		# 1.1m up across it at the east head.
+		var plinth: float = minf(g + 1.2, minf(float(deck.call(xf)), float(deck.call(xw))) - OB_FOOT_UNDER)
+		if plinth > g - 0.3:
+			_blk(pk, kit, "ashlar", Vector3(xf - 0.25 * side, g - 0.6, -hz - 0.01), Vector3(xw - 0.5 * side, plinth, hz + 0.01), BASALT, MUV)
 		# The ballast wall and the block behind, up to the road.
 		var top: float = minf(float(deck.call(xw)), float(deck.call(xe))) - 0.08
 		_blk(pk, kit, "ashlar", Vector3(xw - 0.3 * side, g - 2.5, -hz + 0.02), Vector3(xe, top, hz - 0.02), SANDSTONE, MUV)
@@ -1266,6 +1277,14 @@ static func _ob_flood_arches(pk: PropKit, kit: Dictionary, deck: Callable, groun
 		var rise: float = yc - ys
 		var r: float = (rise * rise + span * span * 0.25) / (2.0 * rise)
 		arches.append([xe, xw, ys, yc, r])
+	# Arches from the east while they rise clear of the ground; the rest (the dyke's foot at the west end) are one
+	# masonry fill: with the ground over the crown, an arch turned upside down and stood up through the road.
+	var n_open := 0
+	for a in arches:
+		if float(a[3]) - float(a[2]) < OB_FLOOD_MIN_RISE:
+			break
+		n_open += 1
+	var x_fill: float = OB_FLOOD_X0 if n_open == 0 else float((arches[n_open - 1] as Array)[1])
 	var K := 14
 	# Each arch's intrados points, east springing to west springing.
 	var arcs: Array = []
@@ -1289,7 +1308,11 @@ static func _ob_flood_arches(pk: PropKit, kit: Dictionary, deck: Callable, groun
 		var poly := PackedVector2Array()
 		for x in _stations(OB_FLOOD_X0, OB_FLOOD_X1, 6.0):
 			poly.append(Vector2(float(x), float(deck.call(float(x))) - 0.55))
-		for i in range(OB_FLOOD_N - 1, -1, -1):
+		# Along the ground under the filled stretch, from the abutment back to the last open arch.
+		if n_open < OB_FLOOD_N:
+			for x in _stations(OB_FLOOD_X1, x_fill, 4.0):
+				poly.append(Vector2(float(x), minf(float(ground.call(float(x))) - 1.0, float(deck.call(float(x))) - 1.2)))
+		for i in range(n_open - 1, -1, -1):
 			var pts: Array = arcs[i]
 			for k in range(K, -1, -1):
 				poly.append(pts[k])
@@ -1307,7 +1330,7 @@ static func _ob_flood_arches(pk: PropKit, kit: Dictionary, deck: Callable, groun
 			pk.tri(kit, "kbrick", Vector3(a.x, a.y, zf), Vector3(b.x, b.y, zf), Vector3(c.x, c.y, zf), out, out, out, BRICK, out,
 					a * uk, b * uk, c * uk)
 		# Voussoirs round each arch, 6cm proud, alternating in tone, and a keystone.
-		for i in OB_FLOOD_N:
+		for i in n_open:
 			var a: Array = arches[i]
 			var xm: float = (float(a[0]) + float(a[1])) * 0.5
 			var cy: float = float(a[3]) - float(a[4])
@@ -1340,7 +1363,7 @@ static func _ob_flood_arches(pk: PropKit, kit: Dictionary, deck: Callable, groun
 					var tn := Vector3(-ds.y, ds.x, 0) * (-1.0 if k == 0 else 1.0)
 					pk.quad(kit, "ashlar", [e0, e1, e1 + back, e0 + back], tn, col.darkened(0.1))
 		# Piers: ashlar pilasters on the faces; upstream (+z) a pointed cutwater under a hood.
-		for i in range(1, OB_FLOOD_N):
+		for i in range(1, n_open):
 			var xpw: float = (arches[i - 1] as Array)[1]
 			var xpe: float = (arches[i] as Array)[0]
 			var xc: float = (xpw + xpe) * 0.5
@@ -1364,7 +1387,7 @@ static func _ob_flood_arches(pk: PropKit, kit: Dictionary, deck: Callable, groun
 			else:
 				_blk(pk, kit, "ashlar", Vector3(xpe - 0.12, gp, -OB_FACE_Z - 0.12), Vector3(xpw + 0.12, top, -OB_FACE_Z + 0.05), SANDSTONE, MUV)
 	# Under each arch: the vault (brick) and the piers' faces (ashlar) between the spandrels.
-	for i in OB_FLOOD_N:
+	for i in n_open:
 		var pts: Array = arcs[i]
 		var a: Array = arches[i]
 		var xm: float = (float(a[0]) + float(a[1])) * 0.5
@@ -1381,8 +1404,8 @@ static func _ob_flood_arches(pk: PropKit, kit: Dictionary, deck: Callable, groun
 					Vector2(run, OB_FACE_Z) * uk])
 			run += l
 		for e in [0, 1]:
-			# The first arch's east face is the end pier's; the last arch's west face the abutment's.
-			if (i == 0 and e == 0) or (i == OB_FLOOD_N - 1 and e == 1):
+			# The first arch's east face is the end pier's; the last open arch's west face the fill's or the abutment's.
+			if (i == 0 and e == 0) or (i == n_open - 1 and e == 1):
 				continue
 			var x: float = a[e]
 			var nx := Vector3(-1, 0, 0) if e == 0 else Vector3(1, 0, 0)
@@ -1390,12 +1413,20 @@ static func _ob_flood_arches(pk: PropKit, kit: Dictionary, deck: Callable, groun
 			var ys: float = a[2]
 			pk.quad(kit, "ashlar", [Vector3(x, gx, -OB_FACE_Z), Vector3(x, ys, -OB_FACE_Z), Vector3(x, ys, OB_FACE_Z), Vector3(x, gx, OB_FACE_Z)], nx, SANDSTONE_DK,
 					[Vector2(-OB_FACE_Z, gx) * uk, Vector2(-OB_FACE_Z, ys) * uk, Vector2(OB_FACE_Z, ys) * uk, Vector2(OB_FACE_Z, gx) * uk])
-	# The west abutment.
+	# The buried arches' fill, 5cm inside the spandrel faces.
+	if n_open < OB_FLOOD_N:
+		var gf: float = 1e9
+		for x in _stations(OB_FLOOD_X1, x_fill, 4.0):
+			gf = minf(gf, float(ground.call(float(x))))
+		var tf: float = minf(float(deck.call(x_fill)), float(deck.call(OB_FLOOD_X1))) - 0.55
+		_blk(pk, kit, "ashlar", Vector3(OB_FLOOD_X1, gf - 1.5, -OB_FACE_Z + 0.05), Vector3(x_fill, tf, OB_FACE_Z - 0.05), SANDSTONE_DK, MUV)
+	# The west abutment; its basalt plinth kept under the road (it stood 0.7m up across it on the dyke).
 	var xa0: float = OB_FLOOD_X1
 	var xa1: float = OB_FLOOD_X1 - 6.0
 	var ga: float = minf(float(ground.call(xa0)), float(ground.call(xa1))) - 1.5
 	_blk(pk, kit, "ashlar", Vector3(xa1, ga, -OB_FACE_Z), Vector3(xa0, float(deck.call(xa0)) - 0.55, OB_FACE_Z), SANDSTONE, MUV)
-	_blk(pk, kit, "ashlar", Vector3(xa1 - 0.3, ga, -OB_FACE_Z - 0.3), Vector3(xa0 + 0.3, float(ground.call(xa0)) + 0.8, OB_FACE_Z + 0.3), BASALT, MUV)
+	var pa: float = minf(float(ground.call(xa0)) + 0.8, minf(float(deck.call(xa0)), float(deck.call(xa1))) - OB_FOOT_UNDER)
+	_blk(pk, kit, "ashlar", Vector3(xa1 - 0.3, ga, -OB_FACE_Z - 0.3), Vector3(xa0 + 0.3, pa, OB_FACE_Z + 0.3), BASALT, MUV)
 	# Cornice, parapet and coping, the walkway paving, from the towers to the bridge's end.
 	var xs: Array = _stations(OB_FLOOD_X0 + 0.05, OB_WEST, 4.0)
 	var fr: Array = _x_frames(xs, deck)

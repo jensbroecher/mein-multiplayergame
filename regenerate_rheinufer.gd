@@ -1931,11 +1931,29 @@ func _build_bridges(root: Node3D) -> void:
 	if _has_fn(_bridge_kit, "old_bridge"):
 		_add_prop_game("old_bridge", _bridge_kit, Transform3D(Basis(), Vector3(0, 0, OLD_BRIDGE_Z)), func(pk, kit, labels):
 			_bridge_kit.old_bridge(pk, kit, labels, old_deck_fn, old_ground))
+		_check_old_bridge(old_deck_fn, old_ground)
 	var harp_fn := func(x: float) -> float: return harp_deck(x)
 	var harp_ground := func(x: float) -> float: return _ground_at(x, A47_AXIS)
 	if _has_fn(_bridge_kit, "harp_bridge"):
 		_add_prop_game("harp_bridge", _bridge_kit, Transform3D(Basis(), Vector3(0, 0, A47_AXIS)), func(pk, kit, labels):
 			_bridge_kit.harp_bridge(pk, kit, labels, harp_fn, harp_ground))
+
+
+## Builds the old bridge again on its own (its frame, the real ground) and errors on anything standing over the road
+## (RheinBridgeKit.check_clearance, OB_BANDS): its end piers' plinths and the last flood arch, buried in the dyke, had stood
+## up across the road at both heads.
+func _check_old_bridge(deck_fn: Callable, ground_fn: Callable) -> void:
+	if not _has_fn(_bridge_kit, "check_clearance"):
+		return
+	var pk: PropKit = _bridge_kit.new_kit(1.0)
+	var kit := {}
+	pk.set_frame(Transform3D())
+	_bridge_kit.old_bridge(pk, kit, [], deck_fn, ground_fn)
+	var res: Array = _bridge_kit.check_clearance(kit, deck_fn, _bridge_kit.OB_BANDS, _bridge_kit.OB_WEST - 3.0, _bridge_kit.OB_EAST + 3.0)
+	if int(res[0]) > 0:
+		push_error("Alte Rheinbrücke: %d triangles over the road: %s" % [res[0], ", ".join(res[1])])
+	else:
+		print("  old bridge: the road is clear")
 
 
 ## Box colliders along the lap from s0 to s1 at `lat` (right of the line), `h` high over the road.

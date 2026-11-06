@@ -3744,6 +3744,14 @@ The Lower Rhine at the edge of Kronburg on a summer evening (sun low in the WSW)
   the A 58 both ways, the A 47 westbound and its closed eastbound ends, the Kreuz's four loops `Schleife*` with lead lanes,
   the country road on west, the promenade's continuation) share the grading (`_seg_a/_seg_b`, `_grade`) and are solid as
   `Autobahn<name>Body`. Never name anything "loop" or "ramp" here: Level.gd bakes extra trimeshes under such names.
+- The Alte Rheinbrücke's feet stay under the road (`RheinBridgeKit.OB_FOOT_UNDER`): the east end pier stands on the town's
+  quay terrace and the west abutment on the dyke, both at the road's height, and their basalt plinths stood 1.1m and 0.7m
+  up across the road; a flood arch with under `OB_FLOOD_MIN_RISE` over the ground (the last one, in the dyke) is filled
+  with masonry (it had turned upside down and stood up through the road as a band of brick). `_check_old_bridge` builds
+  the bridge again on the real ground and errors on anything over the road (`check_clearance`, `OB_BANDS`).
+  `res://scratch/lap_overhead_probe.gd` (`-s`, headless, `-- <level> [half=7.5] [low=0.3] [cart=6] [high=14] [skip=...]
+  [detail=<name part>] [mm=1]`) lists, for any level, what is drawn over its lap and how low; `res://scratch/mesh_tris_in_box.gd`
+  (`-s`, headless, `-- <level> <name part> x0,y0,z0 x1,y1,z1`) which triangles of a merged prop reach into a box.
 - Structures: the generator's own girders (`_plan_decks`, `_girder`) for the overpasses over the A 58, the A 47's viaduct
   onto the Harfenbrücke, the exit ramp's viaduct and the A 47 east of the river; RheinBridgeKit's `viaduct_pier`
   (cap BEARING_H under the girder) and `abutment` (its shelf 2.8m under the road; given the road's height its ballast
