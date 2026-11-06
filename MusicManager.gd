@@ -424,7 +424,9 @@ const STAGE_TRACKS := {
 	# Mina del Viento (Sierra del Viento's finale): its own track, kept out of the canyon stages' shuffle.
 	"mina": ["res://music/canyon/Sun_Scorched_Horizon.mp3"],
 	# Marina Nights (Al-Raihana's finale): the night folder, which no stage played.
-	"marina": ["res://music/night/Midnight_Overdrive.mp3", "res://music/night/Apex_Drift.mp3"],
+	"marina": ["res://music/al-raihana/Midnight_Sprint.mp3", "res://music/night/Apex_Drift.mp3"],
+	# Ramlat Hamra (Al-Raihana GP stage 3): its own track.
+	"ramlat": ["res://music/al-raihana/Red_Sands_Pursuit.mp3"],
 	# Wadi al-Ghaf (Al-Raihana GP): its own track, from music/al-raihana/.
 	"wadi": ["res://music/al-raihana/Racing_the_Mirage.mp3"],
 }
@@ -450,6 +452,8 @@ static func _stage_track_key(path_lower: String) -> String:
 		return "marina"
 	if path_lower.contains("wadi"):
 		return "wadi"
+	if path_lower.contains("ramlat"):
+		return "ramlat"
 	if path_lower.get_file().begins_with("mina"):
 		return "mina"
 	return ""

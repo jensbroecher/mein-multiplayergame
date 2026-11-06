@@ -3209,7 +3209,8 @@ call the stages Jebel Sahar and Wadi al-Ghaf; files and code keep "mountain" and
     off within 100m of the middle): the reshaped road stood on concrete walls there. The road's side walls are
     sandy dressed stone (`_stone_road_sides`).
 - Music: Wadi al-Ghaf plays its own track (`MusicManager.STAGE_TRACKS["wadi"]`, `music/al-raihana/Racing_the_Mirage.mp3`),
-  Marina Nights `music/night/`; Jebel Sahar and Ramlat Hamra still shuffle `music/mountain/`. New Al-Raihana tracks go in
+  Ramlat Hamra `Red_Sands_Pursuit.mp3` ("ramlat"), Marina Nights `Midnight_Sprint.mp3` and `music/night/Apex_Drift.mp3`;
+  Jebel Sahar still shuffles `music/mountain/`. New Al-Raihana tracks go in
   `music/al-raihana/` with an entry in STAGE_TRACKS and `_stage_track_key`. `res://scratch/stage_track_key_check.gd`
   (`-s`, headless) prints which key each stage gets.
 - `regenerate_desert_wadi.gd` (the old generator) lays the lap again from LakesideLevel.tscn's template and drops the
@@ -3242,6 +3243,13 @@ call the stages Jebel Sahar and Wadi al-Ghaf; files and code keep "mountain" and
   `arabian_ground`'s `salt_height` (crust in patches, polygon ridges). Camels (`ArabianKit.camel`), two Bedouin camps
   between corridor A's lanes, reflector posts (none on the crossings), ghaf, grass and broom, the ranges to the west,
   the city to the north-east. AI races (speed=2): every bot finishes three laps, the only respawns item blasts.
+  - The canyon road (`SNAKE`): corridor A's south lane leaves its straight at x 265 and winds south of it between
+    red sandstone formations (`_build_canyon_rocks`: ChasmRock.gd shapes, `palette` 2, on the inside and outside of
+    each bend) back to the lane at x -200; the kicker (`SabkhaKicker`) is after it, at x -245. The straight off-road
+    alternative (`AlternativePaths/DuneBypass`, `BYPASS_X0`..`BYPASS_X1`, 470m against the road's 565m, flat sand)
+    runs on along the lane's line: off-road cars lose less there. Plants, camels and rocks keep off it
+    (`_on_bypass`), and no gate stands on the canyon road (a bot on the bypass would miss it).
+    `scratch/shortcut_probe ... chance=1.0`: taken 22 times, rejoins cleanly, the only respawns item blasts.
 - Wadi al-Ghaf's water is wadeable everywhere (`WADI_RIVER_BED_Y` 1.25 under a 1.7 surface; within the water's
   reach the ground never lies under the bed) and the ford's road no lower than `FORD_Y` (1.2,
   `regenerate_wadi_dressing._raise_ford`): the water slows a cart (PlayerCart's shallow drag), the strip of land
@@ -3287,5 +3295,5 @@ call the stages Jebel Sahar and Wadi al-Ghaf; files and code keep "mountain" and
   - The marina east of the creek's mouth (`_build_marina`): pontoons with finger berths (`ArabianKit.pontoon`), ShipKit's
     sailing yachts and `ArabianKit.superyacht`s (lit decks and portholes, blue light under the stern), three
     superyachts on the outer pontoon, two cruising offshore (SeaBoat, scenes in `generated/marina_nights_boat_*.tscn`).
-  - Music `MusicManager.STAGE_TRACKS["marina"]` (music/night, which no stage played), ambience city and harbour.
+  - Music `MusicManager.STAGE_TRACKS["marina"]` (Midnight_Sprint and Apex_Drift), ambience city and harbour.
   - AI races (speed=2): every bot finishes three laps, the only respawns item blasts.

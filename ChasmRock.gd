@@ -51,7 +51,8 @@ enum { SLAB, BALL }
 	set(v):
 		rock_seed = v
 		_changed()
-## 0 the Canyon Chasm's salmon sandstone (and pale limestone for MOSSY), 1 Jebel Sahar's dark brown rock.
+## 0 the Canyon Chasm's salmon sandstone (and pale limestone for MOSSY), 1 Jebel Sahar's dark brown rock, 2 Ramlat
+## Hamra's red sandstone.
 @export var palette := 0:
 	set(v):
 		palette = v
@@ -402,7 +403,12 @@ static func _material(mossy: bool, pal := 0) -> ShaderMaterial:
 	m.set_shader_parameter("rock_tex", load("res://materials/dark_rock.png"))
 	m.set_shader_parameter("rock_normal", load("res://generated/canyon_rock_normal.res"))
 	m.set_shader_parameter("vertex_occlusion", false)
-	if pal == 1:
+	if pal == 2:
+		# Ramlat Hamra: red sandstone, the sand sea's own colour, darker.
+		m.set_shader_parameter("tint_amount", 0.9)
+		m.set_shader_parameter("tint", Color(0.72, 0.38, 0.24))
+		m.set_shader_parameter("sand_tint", Color(0.90, 0.54, 0.32))
+	elif pal == 1:
 		# The jebel: brown-grey, its beds still showing, sand caught on the ledges.
 		m.set_shader_parameter("tint_amount", 0.85)
 		m.set_shader_parameter("tint", Color(0.50, 0.40, 0.33) if not mossy else Color(0.56, 0.50, 0.44))

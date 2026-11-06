@@ -99,6 +99,8 @@ func _ready() -> void:
 	_build_camps(root)
 	_build_camels(root)
 	_build_posts(root)
+	_build_bypass()
+	_build_canyon_rocks(root)
 	_build_flora(root)
 	d.backdrop(root, 868.0, 3900.0, PI * 0.9, 0.7, 260.0, Color(0.88, 0.50, 0.30), Color(0.40, 0.30, 0.24))
 	d.skyline(root, Vector2(2400.0, 1400.0), 0.0, 18)
@@ -240,8 +242,11 @@ func _place_gates(curve: Curve3D) -> void:
 	for cp in level.get_node("Checkpoints").get_children():
 		if shares.has(str(cp.name)):
 			var o: float = length * float(shares[str(cp.name)])
-			# Not on a crossing (a gate on a dune's crest): on to the corridor past it.
-			while _in_gap(o, 25.0) and o < length - 5.0:
+			# Not on a crossing (a gate on a dune's crest), nor on the canyon road the bypass skips (a bot taking the
+			# bypass would never pass it): on past it.
+			var sn0: float = curve.get_closest_offset(Vector3(BYPASS_X0, ROAD_Y, LANE_AS)) - 25.0
+			var sn1: float = curve.get_closest_offset(Vector3(BYPASS_X1, ROAD_Y, LANE_AS)) + 25.0
+			while (_in_gap(o, 25.0) or (o > sn0 and o < sn1)) and o < length - 5.0:
 				o += 5.0
 			(cp as Node3D).position = curve.sample_baked(o)
 	level._align_checkpoints_to_track()
@@ -257,7 +262,7 @@ func _place_jumps_and_pads(path: Path3D) -> void:
 		if old:
 			level.remove_child(old)
 			old.free()
-	var toe_s: float = curve.get_closest_offset(Vector3(40.0, ROAD_Y, LANE_AS))
+	var toe_s: float = curve.get_closest_offset(Vector3(-245.0, ROAD_Y, LANE_AS))
 	var ramps := Node3D.new()
 	ramps.name = "Jumps"
 	level.add_child(ramps)
@@ -414,7 +419,7 @@ func _build_camels(root: Node3D) -> void:
 		var count: int = r.randi_range(4, 9)
 		for k in range(count):
 			var q: Vector2 = hc + Vector2(r.randf_range(-24.0, 24.0), r.randf_range(-8.0, 8.0))
-			if d.road_dist(q.x, q.y, 40.0) < d.road_half + 12.0 or not d.is_free(q, 2.0):
+			if d.road_dist(q.x, q.y, 40.0) < d.road_half + 12.0 or not d.is_free(q, 2.0) or _on_bypass(q, 6.0):
 				continue
 			var couched: bool = hi >= 6 or r.randf() < 0.3
 			var v: int = (2 if couched else 0) + (1 if r.randf() < 0.3 else 0)
@@ -476,11 +481,11 @@ func _build_flora(root: Node3D) -> void:
 			if d.road_dist(q.x, q.y, 20.0) < d.road_half + 1.5 or not d.is_free(q, 1.0):
 				continue
 			tufts[r.randi() % 3].append(d.stand(q.x, q.y, r.randf_range(0.9, 1.6), 0.06))
-		if r.randf() < 0.3 and d.road_dist(c.x, c.y, 20.0) > d.road_half + 3.0:
+		if r.randf() < 0.3 and d.road_dist(c.x, c.y, 20.0) > d.road_half + 3.0 and not _on_bypass(c, 4.0):
 			brooms[r.randi() % 2].append(d.stand(c.x, c.y, r.randf_range(0.8, 1.3), 0.1))
 	for k in range(500):
 		var c := Vector2(r.randf_range(-860, 860), r.randf_range(-860, 860))
-		if c.length() > 860.0 or d.slope(c.x, c.y) > 0.25 or d.road_dist(c.x, c.y, 30.0) < d.road_half + 8.0 or not d.is_free(c, 4.0):
+		if c.length() > 860.0 or d.slope(c.x, c.y) > 0.25 or d.road_dist(c.x, c.y, 30.0) < d.road_half + 8.0 or not d.is_free(c, 4.0) or _on_bypass(c, 8.0):
 			continue
 		if ArabianTerrain.sabkha(c.x, c.y) > 0.5 and r.randf() < 0.7:
 			continue
@@ -504,3 +509,107 @@ func _build_flora(root: Node3D) -> void:
 		d.scatter(root, nm, ghaf[v], "TallNear_ghaf%d" % v, 120.0, 140.0, 0.0, true, false)
 		d.scatter(root, fm, ghaf[v], "Tall_ghaf%d" % v, 120.0, 1400.0, 90.0)
 	print("Flora: ", tufts[0].size() + tufts[1].size() + tufts[2].size(), " tufts, ", ghaf[0].size() + ghaf[1].size(), " ghaf")
+
+
+
+## Whether (x, z) is within `r` of the bypass's line (the AI's line and the sand either side a cart drives on).
+func _on_bypass(c: Vector2, r: float) -> bool:
+	return c.x < BYPASS_X0 + r and c.x > BYPASS_X1 - r and absf(c.y - LANE_AS) < 9.0 + r
+
+
+## The straight off-road bypass of the canyon road: an AlternativePaths route (Level collects it; bots take it by
+## `ai_shortcut_chance`) along the lane's line over the flat sand, its ends on the lap.
+func _build_bypass() -> void:
+	var holder := level.get_node_or_null("AlternativePaths")
+	if holder == null:
+		holder = Node3D.new()
+		holder.name = "AlternativePaths"
+		level.add_child(holder)
+		holder.owner = level
+	for c in holder.get_children():
+		holder.remove_child(c)
+		c.free()
+	var path := Path3D.new()
+	path.name = "DuneBypass"
+	var curve := Curve3D.new()
+	curve.bake_interval = 0.5
+	var x := BYPASS_X0
+	while x >= BYPASS_X1 - 0.1:
+		curve.add_point(Vector3(x, d.ground(x, LANE_AS) + 0.3, LANE_AS))
+		x -= 30.0
+	if curve.get_point_position(curve.point_count - 1).x > BYPASS_X1 + 1.0:
+		curve.add_point(Vector3(BYPASS_X1, d.ground(BYPASS_X1, LANE_AS) + 0.3, LANE_AS))
+	path.curve = curve
+	holder.add_child(path)
+	path.owner = level
+	var lo := INF
+	var hi := -INF
+	for i in range(curve.point_count):
+		lo = minf(lo, curve.get_point_position(i).y)
+		hi = maxf(hi, curve.get_point_position(i).y)
+	print("Dune bypass: ", curve.get_baked_length(), "m (ground ", lo, "..", hi, "); canyon road ",
+			d.curve.get_closest_offset(Vector3(BYPASS_X1, ROAD_Y, LANE_AS)) - d.curve.get_closest_offset(Vector3(BYPASS_X0, ROAD_Y, LANE_AS)), "m")
+
+
+## Big red sandstone formations (ChasmRock.gd, palette 2) on the inside of each of the canyon road's bends and along
+## its outside against the ridge's foot, clear of the road and the bypass; solid (their own triangles).
+const CANYON_ROCKS := [[0, 2, Vector3(1.5, 1.7, 1.4)], [1, 3, Vector3(1.6, 2.0, 1.5)], [0, 4, Vector3(1.2, 2.2, 1.2)], [1, 5, Vector3(1.3, 1.6, 1.3)],
+	[2, 1, Vector3(1.4, 1.5, 1.3)], [0, 6, Vector3(1.8, 1.4, 1.6)]]
+
+func _build_canyon_rocks(root: Node3D) -> void:
+	var Rock = load("res://ChasmRock.gd")
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://generated/canyon_chasm_rocks/"))
+	var shapes: Array = []
+	for f in CANYON_ROCKS:
+		var r: Node3D = Node3D.new()
+		r.set_script(Rock)
+		r.set("kind", f[0])
+		r.set("rock_seed", f[1])
+		r.set("stretch", f[2])
+		var bp: String = r.call("bake_path")
+		if not ResourceLoader.exists(bp):
+			ResourceSaver.save(r.call("build_mesh"), bp, ResourceSaver.FLAG_COMPRESS)
+		var aabb: AABB = (load(bp) as Mesh).get_aabb()
+		shapes.append([f, maxf(aabb.size.x, aabb.size.z) * 0.5])
+		r.free()
+	var node := Node3D.new()
+	node.name = "CanyonRocks"
+	root.add_child(node)
+	node.owner = level
+	var spots: Array = []
+	# The inside of each bend first, then the outside.
+	for i in range(1, SNAKE.size() - 1):
+		var p: Vector2 = SNAKE[i]
+		var inside: float = 1.0 if p.y < (SNAKE[i - 1] as Vector2).y else -1.0   # +z inside of a north-bulging bend
+		spots.append([p, inside])
+		spots.append([p, -inside])
+	var placed := 0
+	var k := 0
+	for sp in spots:
+		var p: Vector2 = sp[0]
+		var sh: Array = shapes[k % shapes.size()]
+		k += 1
+		var rad: float = sh[1]
+		var found := false
+		for step in range(30):
+			var c: Vector2 = p + Vector2(d.rng.randf_range(-12.0, 12.0), float(sp[1]) * (rad + d.road_half + 4.0 + step * 1.5))
+			if d.road_dist(c.x, c.y, rad + 40.0) < rad * 0.85 + d.road_half + 3.0 or _on_bypass(c, rad * 0.85 + 3.0) or not d.is_free(c, rad * 0.8):
+				continue
+			var rel: Vector2 = d.relief(c.x, c.y, rad * 0.4)
+			var r2: Node3D = Node3D.new()
+			r2.set_script(Rock)
+			r2.name = "CanyonRock_%d" % placed
+			r2.set("kind", sh[0][0])
+			r2.set("rock_seed", sh[0][1])
+			r2.set("stretch", sh[0][2])
+			r2.set("palette", 2)
+			r2.transform = Transform3D(Basis(Vector3.UP, d.rng.randf() * TAU), Vector3(c.x, rel.x - 0.5, c.y))
+			node.add_child(r2)
+			r2.owner = level
+			d.note(c, rad * 0.8)
+			placed += 1
+			found = true
+			break
+		if not found:
+			print("  no room for a rock at ", p)
+	print("Canyon rocks: ", placed)
