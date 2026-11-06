@@ -40,6 +40,15 @@ const BROADLEAF := {
 	"willow": {"h": 9.5, "r": 0.26, "cr": 4.4, "under": 0.16, "fork": 0.14, "leader": 0.3, "limbs": 8,
 		"clusters": 34, "cl_r": 1.35, "shell": 0.42, "cards": 8, "card": Vector2(1.6, 2.6), "cell": CELL_BIRCH,
 		"tint": Color(0.74, 0.82, 0.64), "droop": 0.5, "bark": "alder"},
+	# The Al-Raihana GP (ArabianDresser.gd): a ghaf, the desert's evergreen, a broad low dome of fine grey-green
+	# foliage drooping to a browse line on a short, twisting trunk; and a samr (umbrella thorn), a flat-topped
+	# crown held up high on a few crooked limbs.
+	"ghaf": {"h": 9.0, "r": 0.4, "cr": 5.6, "under": 0.2, "fork": 0.22, "leader": 0.3, "limbs": 7,
+		"clusters": 42, "cl_r": 1.55, "shell": 0.45, "cards": 9, "card": Vector2(1.8, 2.6), "cell": CELL_BIRCH,
+		"tint": Color(0.60, 0.62, 0.54), "droop": 0.42, "bark": "ghaf"},
+	"samr": {"h": 6.8, "r": 0.24, "cr": 5.2, "under": 0.6, "fork": 0.3, "leader": 0.0, "limbs": 5,
+		"clusters": 30, "cl_r": 1.45, "shell": 0.55, "cards": 8, "card": Vector2(1.9, 1.9), "cell": CELL_BIRCH,
+		"tint": Color(0.64, 0.64, 0.50), "droop": 0.05, "bark": "ghaf"},
 }
 const SPRUCE := {"h": 22.0, "r": 0.36, "base_r": 4.4, "whorls": 26, "per_whorl": 8}
 const PINE := {"h": 22.5, "r": 0.42, "cr": 5.4, "under": 0.48}
@@ -58,6 +67,7 @@ const BARKS := {
 	"larch": [Color(0.54, 0.44, 0.35), Color(0.22, 0.15, 0.11), 0.38, 0.035, 2.8, Color(0.82, 0.78, 0.74)],
 	"alder": [Color(0.48, 0.46, 0.42), Color(0.22, 0.20, 0.18), 0.26, 0.018, 3.0, Color(0.80, 0.80, 0.78)],
 	"cottonwood": [Color(0.66, 0.63, 0.58), Color(0.24, 0.21, 0.18), 0.46, 0.05, 2.2, Color(0.84, 0.82, 0.78)],
+	"ghaf": [Color(0.44, 0.38, 0.32), Color(0.17, 0.13, 0.10), 0.42, 0.045, 1.8, Color(0.80, 0.77, 0.73)],
 }
 
 ## The canopy crossfades from the detailed trees to their stand-ins round TREE_NEAR (JungleDetail.gd

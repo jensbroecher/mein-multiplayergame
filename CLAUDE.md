@@ -32,9 +32,10 @@ self-checks (`_verify_ramp_junction`, `_verify_bridge_alignment`) that `push_err
 still save the level. You can ignore these at exit: "Node not found: Players/PlayerSpawner" (`Level.gd` runs
 outside a game), "Leaked instance dependency", and RID/ObjectDB leak messages.
 
-`LakesideLevel.tscn` and `MountainLevel.tscn` can each be written by several generators (`regenerate_both`,
-`regenerate_custom_path`, `regenerate_desert`, ...). Don't regenerate them unless you know which one made the
-current file. `LakesideLevel.tscn` (Lakeside Meadows) is dressed by `regenerate_lakeside.gd`: run that after any of
+`LakesideLevel.tscn` can be written by several generators (`regenerate_both`, `regenerate_custom_path`,
+`regenerate_desert`, ...). Don't regenerate it unless you know which one made the current file. `MountainLevel.tscn`
+(Jebel Sahar) is now made by `regenerate_mountain_dressing.gd` alone, which re-bakes its ground too: the old
+`regenerate_mountain`/`regenerate_both`/`regenerate_custom_path` would bring back neither its pads nor its dressing. `LakesideLevel.tscn` (Lakeside Meadows) is dressed by `regenerate_lakeside.gd`: run that after any of
 the others re-bakes it (see Lakeside Meadows below).
 
 ## Lakeside Meadows (Bloombay GP, stage 1)
@@ -3144,3 +3145,147 @@ Rebuilt on 2026-11-02 (Gemini's first version had a pit unrelated to its road, t
 - `res://scratch/time_trial_items_check.tscn -- [res://levels/X.tscn] [lap=62]` (headless) runs a real time trial,
   granting the gates with faked lap times: boosts, no boxes or commentator, the HUD's laps, the saved records and the
   end screen's sheet (the player's records files are put back).
+
+
+## Al-Raihana GP (Jebel Sahar and Wadi al-Ghaf)
+
+A fictional Gulf country: orange dune sand, the dark brown rock of the jebel, mud-brick forts and wind towers, date
+palms and ghaf trees, a modern city on the horizon. Not the Sierra's red sandstone, cacti and Spanish adobe. The menus
+call the stages Jebel Sahar and Wadi al-Ghaf; files and code keep "mountain" and "desert_wadi" (`MountainLevel.tscn`,
+`DesertWadiLevel.tscn`). Neither uses any imported model now (the 24 FBX/GLB Mountain Pass alone used are deleted).
+
+- `ArabianTerrain.gd` replaces both levels' FBM noise in `TerrainGenerator._get_terrain_height` (prefixes "mountain"
+  and "desert_wadi"): `dunes()` (transverse dunes across the shamal, `WIND`: gentle windward slope, sharp crest, slip
+  face `SLIP_SHARE`, crests wandering and breaking into segments, small dunes riding on them), `serir()` (gravel pans
+  where the sand runs thin) and `jebel()` (spurs and gullies running down the cone, warped polar ridged noise, faded
+  near the summit). Mountain Pass keeps its bridges and its 3D road query where the old noise had them
+  (`bridge_ref_h`: the old base height): measured against the new ground the spiral's closest-point query picked the
+  wrong leg and new spurs stood up through spans (sand over the road). Desert Wadi has no bridge test at all (an
+  off-road lap). `res://scratch/arabian_terrain_preview.gd` (`-s`, headless, `-- <level> <out.png> [step=] [half=]`)
+  draws a level's base shapes as a hillshaded map with the lap in red, without a bake.
+- `arabian_ground.gdshader` is both levels' ground: sand with wind ripples (faded by `fwidth`, none on slip faces),
+  rock on cliffs and over `rock_height` (the jebel), steep sand below it stays sand (a pad's graded bank read as a dark
+  cliff), gravel pans in specks, the piste, yards, wet sand by `water_y`. `ground_map` (`generated/<prefix>_ground_map.res`)
+  carries what it can't work out: R the piste as a distance (1 - metres / `piste_reach`; ruts at set distances from the
+  line), G gravel, B yards (the pads).
+- `regenerate_mountain_dressing.gd` / `regenerate_wadi_dressing.gd` (headless, about a minute each: the bake is most
+  of it) plan pads on the natural ground (`flat_pads`), re-bake (`generate_world`), then build `MountainDressing` /
+  `WadiDressing` from scratch (both under `CanyonDetail.gd`: Plants_/Tall_/Rocks_ cells, `TallNear_` the palms' and
+  trees' near models, no `base_range`). They replace the weather controller with the stage's own sky
+  (`ArabianDresser.environment`). `_align_start_and_spawns_to_track` moves the grid under FinishLine and owns it only
+  in the editor: the dresser owns it, or the level saves without spawns and no cart starts.
+- `ArabianDresser.gd`: what both share (exact ground on the generator's triangles, the lap's distance in plan from a
+  grid index, notes for keeping apart, the sky, the ground map and material, plant and rock meshes, MultiMesh
+  cells, the country past the rim `backdrop` and the `skyline`).
+- `ArabianKit.gd` (PropKit, life size, grown by 1.6): `fort` (battered mud walls, stepped merlons, round towers, a
+  square tower, a keep, the gatehouse), `watchtower`, `house` (courtyard house, poles, carved doors, a `wind_tower`),
+  `barasti` (palm-frond hut), `bedouin_tent` (black goat hair, carpets, a `dallah`), `road_lamp`, `skyline_tower`.
+  Mud is hut_masonry 3; COLOR.a is how much its plaster flakes (keep it low: at 1 the forts were blotched white).
+  Single meshes: DressingColliders gives each a trimesh at race time. Keep "line" out of names that should be solid
+  ("Skyline" is skipped on purpose), and "gate", "light", "lake".
+- `DatePalmKit.gd`: date palms (stiff blue-green fronds, a clad trunk, offshoots, date bunches) on Bloombay's palm
+  shaders with an atlas of their own. WoodlandBuilder has `ghaf` and `samr` (umbrella thorn); their leaves are
+  `acacia_leaves.gdshader` with `desaturate` (0 by default, so other levels are unchanged).
+- Jebel Sahar: the fort Qal'at as-Sahar on the summit (its own pad), watchtowers on spurs, a village on one broad
+  terrace north of the start (houses on their own pads on the dunes stood in cut-and-fill pits) with its date gardens,
+  a Bedouin camp to the west, the road's lamps on the outside of the bends (or the inside where the outside falls
+  away), the summit's chevron board (`ArrowSign.tscn`), the ranges to the south and the city to the north-east.
+  - The lap was reshaped once (`_reshape_lap`, marked by the TrackPath's `town_route` meta; 2.82km to 3.25km): the
+    summit road (`SUMMIT`) swings round the fort 57m from its middle (it ran 100m off), the fort's pad at `FORT_Y`
+    a few metres over it and its gate (`FORT_YAW`) toward the hairpin; after the plunge the lap turns into the
+    village (`TOWN`, on the terrace's height) through tight hairpins between the houses and out to the finish
+    straight. The grid and gates are where they were.
+  - No tarmac in the town: it is a road gap (`_plan_road_gaps`, like Bloombay's sand), off-road sand, its lanes the
+    ground shader's piste (`piste_map`, its own texture: the ground map's R carries the rock here), garden walls
+    along the street (`TownWalls`, solid) where no house fronts it. The houses face the street (`house`'s yard left
+    off where the next lane runs behind).
+  - Sand drifts over the road (`DRIFTS`, three road gaps with `road_gap_drift`, the asphalt crumbling into sand
+    toward them through `road_crumble.gdshader`) and sand blowing across them (`SandFx`: `sand_drift.gdshader`
+    streamers in two layers on a strip over the road, and GPU grains off the crest). No lamps stand in a gap.
+  - The rock is the ground map's R (`_rock_at`: the slope over 6m and the height, `map_rock`): read per triangle,
+    the 2m grid drew the rock's edge as a saw-tooth down every slope. Rock formations (`RockFormations`, 34 of
+    `ChasmRock.gd`'s cluster, tor and arch shapes in the jebel's brown, `palette` 1, baked to
+    `generated/canyon_chasm_rocks/`) stand on the steep faces. The summit has no bridge test (`bridge_factor`
+    off within 100m of the middle): the reshaped road stood on concrete walls there. The road's side walls are
+    sandy dressed stone (`_stone_road_sides`).
+- Music: Wadi al-Ghaf plays its own track (`MusicManager.STAGE_TRACKS["wadi"]`, `music/al-raihana/Racing_the_Mirage.mp3`),
+  Marina Nights `music/night/`; Jebel Sahar and Ramlat Hamra still shuffle `music/mountain/`. New Al-Raihana tracks go in
+  `music/al-raihana/` with an entry in STAGE_TRACKS and `_stage_track_key`. `res://scratch/stage_track_key_check.gd`
+  (`-s`, headless) prints which key each stage gets.
+- `regenerate_desert_wadi.gd` (the old generator) lays the lap again from LakesideLevel.tscn's template and drops the
+  dressing: run `regenerate_wadi_dressing.gd` after it.
+- Wadi al-Ghaf: the piste (`PISTE_IN`/`PISTE_OUT`) and rally marker flags (soft: "flag" in their names) along the
+  lap, the oasis's palms round the lake and the old river's bed, Husn al-Wadi on the dunes, the village by the oasis,
+  watchtowers, the camp in the western bowl.
+- Jebel Sahar's town has a checkpoint (`HalfwayTown`, `_town_checkpoint`, in the level's `checkpoints` before the
+  finish), or the town could be cut. The summit's chevron board points down the plunge (ArrowSign's arrow is its
+  +x). Forts and watchtowers stand on rubble footings 6m (life) deep (`ArabianKit.round_tower`, `fort`, `watchtower`):
+  at a pad's edge they had stood on air. The town walls carry a coping and merlons along their line.
+- The Al-Raihana heightfields split each cell along the diagonal joining its closer heights
+  (`TerrainGenerator.adaptive_diagonal`, `split_00_11`; `ArabianDresser.ground` matches): one fixed diagonal sawed
+  steep slopes into teeth.
+- AI races (`scratch/ai_race_test`, speed=2): Jebel Sahar (the town route) and Wadi al-Ghaf, every bot finishes
+  three laps, the only respawns item blasts.
+- Ramlat Hamra (stage 3, `regenerate_ramlat_hamra.gd`, headless, 45s, `levels/RamlatHamraLevel.tscn`, prefix
+  "ramlat_hamra"): sunset in a sand sea of seif dunes (`ArabianTerrain.megadunes`: ridges `MEGA_HEIGHT` 50m high along
+  x, `MEGA_SPACING` apart, flat salt corridors between, `MEGA_SADDLES` lowering the middle ridge a little where the lap
+  crosses it, a star dune `MEGA_PEAK`). Jebel Sahar's scene is its template (gates, grid, spawners; its road gaps,
+  road material and `town_route` meta are replaced). The lap (`_lap_curve`, Catmull-Rom): east along corridor A's
+  north lane from the start, off-road north over the middle ridge (`CROSS_MID`, crest about 20m up) and down straight
+  at Qasr al-Hamra's front (`PALACE_AT`, square to the crossing), east along its court on corridor B, off-road south
+  over the east ridge (`CROSS_E`), west along corridor A's south lane over the `SabkhaKicker` (WoodenRamp, a boost
+  pad before it, the TrackPath's `jump_lips`), a hairpin at the west end. The crossings are road gaps
+  (`_plan_gaps`: wherever the line leaves the corridors' level, Surfaces' "gap" sand), the curve following the dune
+  (`_dune_y`), the asphalt crumbling into sand at their feet (`road_crumble`). Gates are kept off the crossings. The
+  palace (`ArabianKit.palace`: a domed hall over an arcade, crenellated wings with wind towers, domed corner towers, a
+  pool court) is cut into the next ridge's foot on a pad whose blend stops short of the road. Salt flats are
+  `arabian_ground`'s `salt_height` (crust in patches, polygon ridges). Camels (`ArabianKit.camel`), two Bedouin camps
+  between corridor A's lanes, reflector posts (none on the crossings), ghaf, grass and broom, the ranges to the west,
+  the city to the north-east. AI races (speed=2): every bot finishes three laps, the only respawns item blasts.
+- Wadi al-Ghaf's water is wadeable everywhere (`WADI_RIVER_BED_Y` 1.25 under a 1.7 surface; within the water's
+  reach the ground never lies under the bed) and the ford's road no lower than `FORD_Y` (1.2,
+  `regenerate_wadi_dressing._raise_ford`): the water slows a cart (PlayerCart's shallow drag), the strip of land
+  between the lake and the river is the quick line. A metre deep, bots drowned at the ford a dozen times a race,
+  and the rejoin planner (`_deep_water_at`: 0.6m under the surface) found no way back from beside it. The water's
+  colours are set in `TerrainGenerator.add_wadi_river_water` (it rebuilds the water at runtime): clear green-teal.
+- Marina Nights (stage 4, the finale; `regenerate_marina_nights.gd`, headless, about a minute,
+  `levels/MarinaNightsLevel.tscn`, prefix "marina_nights"): a night street race through the city the other three stages
+  see on their horizon. Ramlat Hamra's scene is its template. Ground: `ArabianTerrain.marina_height` (flat land at
+  `MARINA_LAND`, the sea south of `coast_z`, the creek along `creek_x` to `MARINA_CREEK_HEAD`, quays dropping to the
+  bed), drawn by `marina_ground.gdshader` (sandstone slabs, the corniche's promenade from the ground map's R, palm
+  beds G, dressed stone on the quay faces), the sea `MarinaWater` (a plane at y 0, PlayerCart's general water branch).
+  The ground and road meshes are chunked (80m, `generated/marina_nights_chunks/`) so each takes in only the lamps near
+  it. The lap (`_lap_curve`): the corniche east over the creek's mouth on a low bridge, north up the avenue between the
+  towers, west over the creek on the arch bridge (`CreekArch`, not "...Bridge"), the souk's tight lanes, the palm
+  avenue south to the sea. The road rises over the creek (`_road_y`) high enough that TerrainGenerator's 2.8m hull
+  side walls don't reach the water; the bridges have parapets (in `QuayRailBody`, boxes; a bot had fallen off the
+  corniche bridge into the creek) and the quays a balustrade.
+  - The city is `GulfCity.gd` (BloombayCity's facade machinery): `gulf_block` (stucco, stepped merlons, a setback top
+    floor, a wind tower, a dome or a pergola on the roof) and `gulf_tower` (sail, twisted, stepped spire, lattice
+    crown, twins with a sky bridge). `city_building.gdshader`'s `gulf` (off everywhere else) draws pointed-arch
+    windows, mashrabiya screens over half of them, an arcade of pointed arches with warm shops along the ground floor
+    instead of neon sign bands, vertical bronze fins on the towers. The user found the first version (BloombayCity's
+    boxes) too like Mtaa Nights'.
+  - The souk: ArabianKit houses packed along the lanes (`_build_souk`, fronts a pavement's width off the road) with
+    awnings and lanterns, festoons of coloured bulbs across the lanes every 12m and a warm light under every other one
+    (`_souk_festoons`). Tarmac stays: a road gap counts as off-road and slowed every car through it.
+  - 64 street lamps with real lights (OmniLights faded past 150m, `no_shadow`), palms along the corniche and the
+    avenues, dhows moored in the creek (`ArabianKit.dhow`, festoons from the masthead), a lit city past the terrain's
+    edge (`FarCity`), a night sky with a moonlight `SunLight`.
+  - `Fireworks.gd` (node `Fireworks`): shells over the sea on the wall clock (LAN peers agree), pooled GPUParticles3D
+    bursts (peony, ring, willow), a flash light per burst, a synthesised boom delayed by the distance; none headless.
+  - The roundabout (`RB_C`, `RB_R`) where the avenue meets the north road: the lap goes three quarters round it (in
+    from the south, out to the west). Its island (`RoundaboutIsland`, a cylinder collider, `ArabianKit.fountain`: a
+    kerb, palms, the basin, a three-tiered fountain) and `FountainShow.gd` (the basin's water, a central jet, a ring of
+    jets arching in, sheets off the bowls, coloured lights; colours and a jet sequence on the wall clock).
+  - Bab al-Lulu, the Pearl Ring (`_plan_ring`, `_build_ring`, `ArabianKit.pearl_ring`): a gilded ring with LED strips and
+    a glowing pearl over the corniche, `RING_PAST_LIP` (10m) past the `PearlKicker` (WoodenRamp, lip 4.65m up, a boost
+    pad 28m before it; the TrackPath's `jump_lips`). Its opening's bottom is 4.3m up and its rim 1.1m over the road, so
+    only the jump goes through. Capsule colliders round the torus (`PearlRing`), cylinders for the pylons.
+    `nyota_jump_test ... level=res://levels/MarinaNightsLevel.tscn ground=1`: 22-60 m/s all through, speed kept; with
+    the ring 20m past the lip, carts under 30 m/s came down short of it.
+  - The marina east of the creek's mouth (`_build_marina`): pontoons with finger berths (`ArabianKit.pontoon`), ShipKit's
+    sailing yachts and `ArabianKit.superyacht`s (lit decks and portholes, blue light under the stern), three
+    superyachts on the outer pontoon, two cruising offshore (SeaBoat, scenes in `generated/marina_nights_boat_*.tscn`).
+  - Music `MusicManager.STAGE_TRACKS["marina"]` (music/night, which no stage played), ambience city and harbour.
+  - AI races (speed=2): every bot finishes three laps, the only respawns item blasts.

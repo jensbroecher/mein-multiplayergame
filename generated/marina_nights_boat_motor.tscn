@@ -1,0 +1,9 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://generated/marina_nights_yacht_motor.res" id="1_vv2lh"]
+
+[node name="Boat" type="Node3D" unique_id=1158319897]
+
+[node name="Hull" type="MeshInstance3D" parent="." unique_id=459757834]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
+mesh = ExtResource("1_vv2lh")

@@ -28,6 +28,11 @@ uniform float refl_base = 0.11;
 uniform float lit_share = 0.0;
 uniform vec3 lit_color : source_color = vec3(1.0, 0.78, 0.50);
 uniform float lit_energy = 1.4;
+// Marina Nights' Gulf facades (0 everywhere else, unchanged): pointed-arch windows, some behind mashrabiya lattice
+// screens that glow from the lit room behind, a shaded arcade of pointed arches along the ground floor with warm
+// lit shops deep inside it (no neon sign bands), stucco with a fine sandy grain; the towers' curtain walls in
+// vertical bronze fins.
+uniform bool gulf = false;
 
 varying vec3 w_pos;
 varying vec3 w_nrm;
@@ -111,23 +116,44 @@ void fragment() {
 		vec2 g = vec2(UV.x / (bay * 0.5), UV.y / 4.0);  // two panels a bay: a mullion falls on every corner
 		vec2 f = fract(g);
 		float mull = step(0.06, f.x) * step(0.08, f.y);
+		if (gulf) {
+			// Vertical bronze fins every half panel, no horizontal transoms: the towers read tall.
+			mull = step(0.16, fract(g.x * 2.0)) * step(0.03, f.y);
+		}
 		float floor_v = hash21(vec2(floor(g.y), vkey.r * 13.0));
 		// Dark glass, mirror-like: a reflected sky scaled by the Fresnel term (and a glint from the real specular).
 		vec3 tint = mix(vec3(0.05, 0.08, 0.12), vec3(0.04, 0.10, 0.09), step(0.55, hash21(vec2(floor(g.y), vkey.g * 29.0))));
 		vec3 glass = tint * (0.8 + 0.8 * floor_v) + paint * 0.04;
-		col = mix(paint * 0.6, glass, mull);
+		col = mix(gulf ? vec3(0.42, 0.30, 0.18) : paint * 0.6, glass, mull);
 		rough = mix(0.5, 0.04, mull);
 		spec = mix(0.5, 1.0, mull);
 		emis = reflected_sky(refl_dir) * clamp(fresnel * 1.5, 0.0, 1.0) * (0.7 + 0.5 * floor_v) * mull * detail;
 		col = mix(col, mix(glass_dark.rgb, sky_reflect.rgb, 0.4) * (0.8 + paint * 0.4), 1.0 - detail);
 		// Offices still at work: whole floors lit, cool white, a few panels dark.
 		float office = step(hash21(vec2(floor(g.y), vkey.b * 41.0)), lit_share) * step(0.25, hash21(floor(g) * 1.3));
-		emis += vec3(0.80, 0.88, 1.0) * lit_energy * 0.4 * office * mull * mix(0.3, 1.0, detail);
+		vec3 office_col = gulf ? mix(vec3(1.0, 0.82, 0.6), vec3(0.8, 0.88, 1.0), step(0.6, hash21(floor(g) * 2.9))) * 0.45 : vec3(0.80, 0.88, 1.0);
+		emis += office_col * lit_energy * 0.4 * office * mull * mix(0.3, 1.0, detail);
 	} else {
 		float y = UV.y;
 		vec2 cellid = vec2(floor(UV.x / bay), floor((y - shop_h) / storey));
 		float rnd = hash21(cellid + vkey.rg * 31.0);
-		if (y < shop_h) {
+		if (gulf && y < shop_h) {
+			// The arcade: pointed arches a bay apart, deep shadow under them, the shops' warm light inside.
+			float u = fract(UV2.x / (bay * 1.5));
+			float ax = abs(u - 0.5) * 2.0;       // 0 middle of the arch, 1 the pier
+			float spring = shop_h - 2.6;
+			// The pointed head: two circle arcs meeting at the apex.
+			float head = spring + 1.9 * sqrt(max(0.0, 1.0 - pow(ax * 0.82 + 0.18, 2.0))) / sqrt(1.0 - 0.0324);
+			float opening = step(ax, 0.82) * step(y, mix(spring, head, step(spring, y)));
+			float shop_rnd = hash21(vec2(floor(UV2.x / (bay * 1.5)), vkey.b * 17.0));
+			vec3 inside = mix(vec3(0.05, 0.04, 0.035), vec3(0.20, 0.16, 0.12), shop_rnd);
+			float glow_in = step(hash21(vec2(shop_rnd * 7.0, vkey.g * 3.0)), lit_share * 1.5) * smoothstep(0.2, 2.2, y) * (1.0 - smoothstep(spring - 0.6, spring + 0.4, y));
+			// A carved band over the arches, slightly lighter.
+			float band = step(shop_h - 0.55, y) * step(y, shop_h - 0.15);
+			col = mix(col, col * 1.12, band * detail);
+			col = mix(col, inside, opening * detail);
+			emis += lit_color * 1.6 * lit_energy * opening * glow_in * detail;
+		} else if (y < shop_h) {
 			// Ground floor: shop fronts behind rolled-up shutters, a sign band over them.
 			float u = fract(UV2.x / (bay * 1.5));
 			float opening = step(0.08, u) * step(u, 0.92) * step(0.2, y) * step(y, shop_h - 1.6);
@@ -162,6 +188,20 @@ void fragment() {
 				wx0 = 0.14; wx1 = 0.86; wy0 = 0.26; wy1 = 0.86;
 			}
 			float win = step(wx0, f.x) * step(f.x, wx1) * step(wy0, f.y) * step(f.y, wy1) * min(pair_gap, 1.0);
+			float lattice = 0.0;
+			if (gulf) {
+				// Pointed arch heads: the top corners cut off by two arcs meeting at the apex.
+				float wx = (f.x - wx0) / max(wx1 - wx0, 0.01) * 2.0 - 1.0;
+				float hh = (wy1 - wy0) * 0.32;
+				float top = wy1 - hh + hh * sqrt(max(0.0, 1.0 - pow(abs(wx) * 0.85 + 0.15, 2.0))) / 0.9887;
+				win *= step(f.y, top);
+				// Half the windows behind a mashrabiya: a diamond lattice of turned wood over the glass.
+				if (hash21(cellid * 3.7 + vkey.rg * 5.0) < 0.5) {
+					vec2 lq = vec2(UV.x * 7.0, (y - shop_h) * 7.0);
+					vec2 dq = abs(fract(vec2(lq.x + lq.y, lq.x - lq.y) * 0.5) - 0.5);
+					lattice = win * (1.0 - smoothstep(0.08, 0.16, min(dq.x, dq.y))) * smoothstep(0.08, 0.02, length(fwidth(lq)) * 0.1);
+				}
+			}
 			// Glass: dark, with a tint (blue, green, bronze, grey), reflecting the sky. A pane with a curtain is dull.
 			float tint_pick = hash21(cellid * 1.7 + vkey.b * 53.0);
 			vec3 tint = tint_pick < 0.45 ? vec3(0.05, 0.09, 0.14) : (tint_pick < 0.70 ? vec3(0.04, 0.11, 0.10) : (tint_pick < 0.88 ? vec3(0.12, 0.09, 0.06) : vec3(0.08, 0.09, 0.10)));
@@ -198,6 +238,11 @@ void fragment() {
 			vec3 room_light = mix(lit_color, vec3(0.75, 0.85, 1.0), step(0.7, hash21(cellid * 4.7)));
 			room_light = mix(room_light, glass * 1.6 + lit_color * 0.25, curtain);
 			emis += room_light * lit_energy * (0.55 + 0.45 * hash21(cellid * 9.1)) * lit * win * (1.0 - 0.5 * reveal) * detail;
+			if (gulf) {
+				// The lattice's wood over the light: dark bars with the glow between them.
+				col = mix(col, vec3(0.16, 0.10, 0.06), lattice * detail);
+				emis *= 1.0 - lattice * 0.85;
+			}
 			// Rain streaks down from the roof line, darker under the windows.
 			float streak = hash21(vec2(floor(UV.x * 1.3), vkey.g * 7.0));
 			col *= 1.0 - 0.12 * streak * (1.0 - win) * detail;

@@ -40,12 +40,14 @@ const STAGE_INFO := {
 	"res://levels/GlacierHighwayLevel.tscn": {"title": "GLACIER HIGHWAY", "subtitle": "Multi-tier concrete expressway, tunnels, and icy on-ramps", "file": "tile_glacier_highway.jpg", "color": COL_SNOW},
 	"res://levels/NorthlightCavernsLevel.tscn": {"title": "NORTHLIGHT CAVERNS", "subtitle": "Night race under the aurora, through a glacier and over an ice arch", "file": "tile_northlight_caverns.jpg", "color": COL_SNOW},
 	"res://levels/FrostfallGorgeLevel.tscn": {"title": "FROSTFALL GORGE", "subtitle": "Off-road along a river gorge: gully jumps, a frozen waterfall, and a mega-jump", "file": "tile_frostfall_gorge.jpg", "color": COL_SNOW},
-	"res://levels/MountainLevel.tscn": {"title": "MOUNTAIN COURSE", "subtitle": "Dunes and high desert ridges", "file": "tile_mountain.jpg", "color": COL_MOUNTAIN},
+	"res://levels/MountainLevel.tscn": {"title": "JEBEL SAHAR", "subtitle": "A lamplit road spirals up the jebel past watchtowers to the fort on the summit, then plunges back to the oasis", "file": "tile_mountain.jpg", "color": COL_MOUNTAIN},
 	"res://levels/CanyonLevel.tscn": {"title": "ARCO DEL VIENTO", "subtitle": "A truss bridge, a shelf road up the canyon wall, a knife-edge ridge, a slot canyon and a ford", "file": "tile_canyon.jpg", "color": COL_CANYON},
 	"res://levels/CanyonChasmLevel.tscn": {"title": "TOLVANERA GULCH", "subtitle": "A narrow run over the drop, where a dust devil roams", "file": "tile_canyon_chasm.jpg", "color": COL_CHASM},
 	"res://levels/FreightLevel.tscn": {"title": "ESTACIÓN SECA", "subtitle": "Two railways cross the lap: wait for the gap, jump the flatcars, or lose the race to a train", "file": "tile_freight_line.jpg", "color": COL_FREIGHT},
 	"res://levels/MinaLevel.tscn": {"title": "MINA DEL VIENTO", "subtitle": "A downhill rally sprint: the radio array, the dawn balloon fiesta, the haboob, and the open-pit copper mine", "file": "tile_mina_del_viento.jpg", "color": COL_CANYON},
-	"res://levels/DesertWadiLevel.tscn": {"title": "DESERT WADI", "subtitle": "Dry riverbed sand and heat", "file": "tile_desert_wadi.jpg", "color": COL_WADI},
+	"res://levels/DesertWadiLevel.tscn": {"title": "WADI AL-GHAF", "subtitle": "Off-road rally piste through the dunes: the date palm oasis, the ford and the fort over the valley", "file": "tile_desert_wadi.jpg", "color": COL_WADI},
+	"res://levels/RamlatHamraLevel.tscn": {"title": "RAMLAT HAMRA", "subtitle": "Sunset in the red sands: salt flats between 50m dunes, over two saddles and a crest jump, past Qasr al-Hamra and the camel herds", "file": "tile_ramlat_hamra.jpg", "color": COL_WADI},
+	"res://levels/MarinaNightsLevel.tscn": {"title": "MARINA NIGHTS", "subtitle": "The finale at night in the city: the corniche, the towers, the arch over the creek and its dhows, the souk's lanes, fireworks over the sea", "file": "tile_marina_nights.jpg", "color": COL_MAGENTA},
 	"res://levels/MaraCrossingLevel.tscn": {"title": "MARA CROSSING", "subtitle": "Murram road across the savanna: the migration, Pride Rock, and the croc jump", "file": "tile_mara_crossing.jpg", "color": COL_SAVANNA},
 	"res://levels/NyotaStadiumLevel.tscn": {"title": "NYOTA STADIUM", "subtitle": "Stadium supercross: doubles, whoops and a triple, a lap of the streets, and the Drop-In", "file": "tile_nyota_stadium.jpg", "color": COL_SAVANNA},
 	"res://levels/MtaaNightsLevel.tscn": {"title": "MTAA NIGHTS", "subtitle": "Evening in the city: market streets, murram back roads, the park and Club Kilele's dancefloor. Tarmac or dirt: pick your route", "file": "tile_mtaa_nights.jpg", "color": COL_MAGENTA},
@@ -303,7 +305,7 @@ func show_sub_menu(menu_name: String) -> void:
 			_add_tile("SVARTFJELL GP", "Frostpeak  •  Glacier Highway  •  Northlight  •  Frostfall Gorge", "tile_svartfjell_gp.jpg", COL_SNOW, func():
 				_on_cup_selected("Svartfjell GP")
 			)
-			_add_tile("AL-RAIHANA GP", "Mountain Pass  •  Desert Wadi", "tile_al_raihana_gp.jpg", COL_BRONZE, func():
+			_add_tile("AL-RAIHANA GP", "Jebel Sahar  •  Wadi al-Ghaf  •  Ramlat Hamra  •  Marina Nights", "tile_al_raihana_gp.jpg", COL_BRONZE, func():
 				_on_cup_selected("Al-Raihana GP")
 			)
 			_add_tile("SIERRA DEL VIENTO GP", "Arco del Viento  •  Tolvanera Gulch  •  Estación Seca  •  Mina del Viento", "tile_sierra_del_viento_gp.jpg", COL_CANYON, func():

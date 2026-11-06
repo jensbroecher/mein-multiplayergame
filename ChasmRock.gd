@@ -51,6 +51,11 @@ enum { SLAB, BALL }
 	set(v):
 		rock_seed = v
 		_changed()
+## 0 the Canyon Chasm's salmon sandstone (and pale limestone for MOSSY), 1 Jebel Sahar's dark brown rock.
+@export var palette := 0:
+	set(v):
+		palette = v
+		_changed()
 
 const BAKE_DIR := "res://generated/canyon_chasm_rocks/"
 const KIND_NAMES := ["cluster", "tor", "arch", "mossy"]
@@ -94,7 +99,7 @@ func _show() -> void:
 	body.add_child(shape)
 	var mi := MeshInstance3D.new()
 	mi.mesh = shown
-	mi.material_override = _material(kind == Kind.MOSSY)
+	mi.material_override = _material(kind == Kind.MOSSY, palette)
 	body.add_child(mi)
 
 ## Builds the rock's surface (seconds: the field is sampled in GDScript).
@@ -387,19 +392,26 @@ func _surface(f: PackedFloat32Array, g0: Vector3, nx: int, ny: int, nz: int) -> 
 	im.generate_lods(60.0, 25.0, [])
 	return im.get_mesh()
 
-static func _material(mossy: bool) -> ShaderMaterial:
-	if _materials.has(mossy):
-		return _materials[mossy]
+static func _material(mossy: bool, pal := 0) -> ShaderMaterial:
+	var key: int = int(mossy) + pal * 2
+	if _materials.has(key):
+		return _materials[key]
 	var m := ShaderMaterial.new()
 	m.shader = load("res://canyon_rock.gdshader")
 	m.set_shader_parameter("sand_tex", load("res://materials/sand.png"))
 	m.set_shader_parameter("rock_tex", load("res://materials/dark_rock.png"))
 	m.set_shader_parameter("rock_normal", load("res://generated/canyon_rock_normal.res"))
 	m.set_shader_parameter("vertex_occlusion", false)
-	# The FBX were pale: salmon sandstone, and a near white limestone.
-	m.set_shader_parameter("tint_amount", 1.0 if mossy else 0.8)
-	m.set_shader_parameter("tint", Color(0.70, 0.68, 0.62) if mossy else Color(0.88, 0.67, 0.55))
-	if mossy:
-		m.set_shader_parameter("moss", 0.9)
-	_materials[mossy] = m
+	if pal == 1:
+		# The jebel: brown-grey, its beds still showing, sand caught on the ledges.
+		m.set_shader_parameter("tint_amount", 0.85)
+		m.set_shader_parameter("tint", Color(0.50, 0.40, 0.33) if not mossy else Color(0.56, 0.50, 0.44))
+		m.set_shader_parameter("sand_tint", Color(0.86, 0.60, 0.40))
+	else:
+		# The FBX were pale: salmon sandstone, and a near white limestone.
+		m.set_shader_parameter("tint_amount", 1.0 if mossy else 0.8)
+		m.set_shader_parameter("tint", Color(0.70, 0.68, 0.62) if mossy else Color(0.88, 0.67, 0.55))
+		if mossy:
+			m.set_shader_parameter("moss", 0.9)
+	_materials[key] = m
 	return m

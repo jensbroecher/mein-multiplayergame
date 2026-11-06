@@ -15,6 +15,8 @@ render_mode cull_disabled, diffuse_burley, specular_schlick_ggx;
 
 uniform sampler2D leaf_tex : source_color, filter_linear_mipmap, repeat_disable;
 uniform float alpha_cut : hint_range(0.0, 1.0) = 0.5;
+// Pulls the leaves toward their grey (0: as drawn): the Al-Raihana GP's ghaf and thorn trees are dusty grey-green.
+uniform float desaturate : hint_range(0.0, 1.0) = 0.0;
 uniform vec4 backlight_color : source_color = vec4(0.62, 0.66, 0.30, 1.0);
 // Metres the canopy sways at its top, and the height that sways fully.
 uniform float sway = 0.15;
@@ -49,6 +51,7 @@ void fragment() {
 	vec3 tint = COLOR.rgb * 1.25 * mix(vec3(0.94, 1.02, 1.04), vec3(1.06, 1.0, 0.86), tree_seed);
 	float shade = COLOR.a;
 	ALBEDO = tex.rgb * tint * mix(0.42, 1.0, shade);
+	ALBEDO = mix(ALBEDO, vec3(dot(ALBEDO, vec3(0.3, 0.55, 0.15))) * vec3(1.0, 1.02, 0.9), desaturate);
 	// The crown's normal on both faces of a card.
 	if (!FRONT_FACING) {
 		NORMAL = -NORMAL;

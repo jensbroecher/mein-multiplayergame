@@ -423,6 +423,10 @@ const STAGE_TRACKS := {
 	],
 	# Mina del Viento (Sierra del Viento's finale): its own track, kept out of the canyon stages' shuffle.
 	"mina": ["res://music/canyon/Sun_Scorched_Horizon.mp3"],
+	# Marina Nights (Al-Raihana's finale): the night folder, which no stage played.
+	"marina": ["res://music/night/Midnight_Overdrive.mp3", "res://music/night/Apex_Drift.mp3"],
+	# Wadi al-Ghaf (Al-Raihana GP): its own track, from music/al-raihana/.
+	"wadi": ["res://music/al-raihana/Racing_the_Mirage.mp3"],
 }
 
 ## Stage categories that shuffle their own folder (and the root folder if it's empty).
@@ -442,6 +446,10 @@ static func _stage_track_key(path_lower: String) -> String:
 		return "msitu"
 	if path_lower.contains("mtaa"):
 		return "mtaa"
+	if path_lower.contains("marina"):
+		return "marina"
+	if path_lower.contains("wadi"):
+		return "wadi"
 	if path_lower.get_file().begins_with("mina"):
 		return "mina"
 	return ""
@@ -466,7 +474,7 @@ func load_playlist_for_level(scene_path: String):
 	elif path_lower.contains("frost") or path_lower.contains("snow") or path_lower.contains("glacier") or path_lower.contains("arctic") \
 			or path_lower.contains("northlight") or path_lower.contains("cavern"):
 		level_key = "frost"
-	elif path_lower.contains("mountain") or path_lower.contains("wadi") or path_lower.contains("mara"):
+	elif path_lower.contains("mountain") or path_lower.contains("wadi") or path_lower.contains("ramlat") or path_lower.contains("mara"):
 		level_key = "mountain"
 	elif path_lower.contains("msitu") or path_lower.contains("jungle"):
 		level_key = "forest"

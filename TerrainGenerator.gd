@@ -3,6 +3,8 @@ extends Node3D
 
 enum TrackLayoutType { DEFAULT, MOUNTAIN, CANYON }
 
+const ArabianTerrain = preload("res://ArabianTerrain.gd")
+
 ## Frostpeak Creek: Z where the central creek ravine stops being cut. It has to reach past the
 ## Glade Timber Bridge (Z=204) or the bridge spans dry snowfield; 25m of fade afterwards puts
 ## the ravine bed back at grade before the trunk road's southern loop (Z=225+).
@@ -431,11 +433,22 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 		radial_offset = mountain_shape * mountain_height
 
 	var base_terrain_height: float
+	# What the bridge test below measures the road against: the ground's own height, except on Mountain
+	# Pass, whose shapes changed (ArabianTerrain) but whose bridges must stay where the old noise put them.
+	var bridge_ref_h: float = NAN
 	if track_layout_type == TrackLayoutType.MOUNTAIN:
 		base_terrain_height = radial_offset + h_noise
+		if level_prefix == "mountain":
+			bridge_ref_h = base_terrain_height
+			var m_share: float = radial_offset / 145.0
+			base_terrain_height = radial_offset + h_noise * 0.12 \
+					+ ArabianTerrain.jebel(px, pz, Vector2.ZERO, smoothstep(0.04, 0.45, m_share)) \
+					+ ArabianTerrain.dunes(px, pz, 1.0 - smoothstep(0.08, 0.4, m_share))
 		# Cap valley floor height near start gate area to prevent hills from blocking the bridge crossover
 		if px > -110.0 and px < 60.0 and pz > -370.0 and pz < -230.0:
 			base_terrain_height = min(base_terrain_height, 10.0)
+			if not is_nan(bridge_ref_h):
+				bridge_ref_h = min(bridge_ref_h, 10.0)
 	elif track_layout_type == TrackLayoutType.CANYON:
 		# Canyon plateau: low flat ground with gentle noise ripples (lowered to 24.0 so camera doesn't clip/occlude in isometric mode)
 		base_terrain_height = 24.0 + h_noise * 0.4
@@ -453,9 +466,10 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 		).length()
 		var bowl_t: float = clampf(d_valley, 0.0, 1.0)
 		var bowl_shape: float = bowl_t * bowl_t * (3.0 - 2.0 * bowl_t)
-		var dune_ring: float = lerpf(0.6, 26.0, bowl_shape)
-		var dune_noise: float = h_noise * lerpf(0.15, 1.0, bowl_shape)
-		base_terrain_height = dune_ring + dune_noise
+		var dune_ring: float = lerpf(0.6, 22.0, bowl_shape)
+		# Real dunes (ArabianTerrain) on the ring, a little of the old noise under them for the swell.
+		var dune_noise: float = h_noise * lerpf(0.05, 0.18, bowl_shape)
+		base_terrain_height = dune_ring + dune_noise + ArabianTerrain.dunes(px, pz, lerpf(0.15, 1.0, bowl_shape))
 	elif level_prefix == "pinecrest_ridge":
 		# Massive single-sided mountain hill on the north flank (rising from Z=80 to Z=-320 up to +90m)
 		var hill_progress: float = clampf((-pz + 80.0) / 380.0, 0.0, 1.0)
@@ -524,6 +538,12 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			var hollow: float = east_t * east_t * (3.0 - 2.0 * east_t) * (1.0 - rim_t * rim_t * (3.0 - 2.0 * rim_t))
 			base_terrain_height = maxf(base_terrain_height, lerpf(1.5, -2.5, hollow))
 		base_terrain_height = bloombay_north_coast(px, pz, base_terrain_height)
+	elif level_prefix == "marina_nights":
+		# Marina Nights: the city's flat ground, the creek and the sea (ArabianTerrain.marina_height).
+		base_terrain_height = ArabianTerrain.marina_height(px, pz)
+	elif level_prefix == "ramlat_hamra":
+		# Ramlat Hamra (Al-Raihana GP): seif dunes and salt corridors (ArabianTerrain.megadunes).
+		base_terrain_height = ArabianTerrain.megadunes(px, pz) + h_noise * 0.06
 	else:
 		base_terrain_height = h_noise
 
@@ -538,7 +558,7 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 				var lake_blend = clampf((lake_radius - dist_to_lake) / 25.0, 0.0, 1.0)
 				lake_blend = lake_blend * lake_blend * (3.0 - 2.0 * lake_blend)
 				base_terrain_height = lerpf(base_terrain_height, depth, lake_blend)
-		elif level_prefix == "bloombay_dunes":
+		elif level_prefix == "bloombay_dunes" or level_prefix == "marina_nights":
 			pass
 		else:
 			var lake_center = Vector2(-450, -500)
@@ -558,10 +578,11 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			var river_t: float = _wadi_river_influence(px, pz)
 			if river_t > 0.001:
 				var bed_y: float = WADI_RIVER_BED_Y
-				var target_bed: float = lerpf(bed_y, bed_y - 0.7, river_t * river_t * 0.5)
+				var target_bed: float = lerpf(bed_y, bed_y - 0.05, river_t * river_t * 0.5)
 				height = lerp(height, target_bed, clampf(river_t, 0.0, 1.0))
+				height = maxf(height, lerpf(height, target_bed, clampf(river_t * 4.0, 0.0, 1.0)))
 	else:
-		var query_y = -200.0 if (track_layout_type == TrackLayoutType.CANYON) else base_terrain_height
+		var query_y = -200.0 if (track_layout_type == TrackLayoutType.CANYON) else (base_terrain_height if is_nan(bridge_ref_h) else bridge_ref_h)
 		var closest_pos: Vector3
 		if road_height_from_plan:
 			closest_pos = _plan_foot(curve, px, pz)
@@ -642,13 +663,21 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			# Bridge detection: when road is elevated far above base terrain,
 			# attenuate blending so terrain stays low (preserves bridge gap).
 			# Ramps from 0 (normal road, <4m above ground) to 1 (bridge, >12m above ground).
-			var elevation_diff = road_h - base_terrain_height
+			var elevation_diff = road_h - (base_terrain_height if is_nan(bridge_ref_h) else bridge_ref_h)
 			var bridge_factor = 0.0
 			if level_prefix == "frostpeak_creek":
 				bridge_factor = _frostpeak_bridge_factor(px, pz)
-			elif level_prefix != "pinecrest_ridge" and level_prefix != "bloombay_dunes":
+			elif level_prefix != "pinecrest_ridge" and level_prefix != "bloombay_dunes" and level_prefix != "desert_wadi" and level_prefix != "ramlat_hamra":
 				bridge_factor = clampf((elevation_diff - 4.0) / 8.0, 0.0, 1.0)
+			# Jebel Sahar's summit road crosses nothing: no bridge there (the test found spans the reshaped lap
+			# doesn't need, and stood them on concrete walls).
+			if level_prefix == "mountain":
+				bridge_factor *= smoothstep(100.0, 125.0, Vector2(px, pz).length())
 			clearing_blend *= (1.0 - bridge_factor)
+			# Under a bridge the ground stays as low as the old noise had it (Mountain Pass's new ridges
+			# must not stand up through a span the old ground left open).
+			if not is_nan(bridge_ref_h) and bridge_factor > 0.0:
+				base_terrain_height = lerpf(base_terrain_height, minf(base_terrain_height, bridge_ref_h), bridge_factor)
 
 			height = lerp(base_terrain_height, road_h, clearing_blend)
 
@@ -679,8 +708,11 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 					var away_from_road: float = smoothstep(sand_edge + 1.5, sand_edge + 22.0, dist)
 					var carve: float = river_t * away_from_road
 					var lake_center_boost: float = river_t * river_t * 0.5
-					var target_bed: float = lerpf(bed_y, bed_y - 0.7, lake_center_boost)
+					var target_bed: float = lerpf(bed_y, bed_y - 0.05, lake_center_boost)
 					height = lerp(height, target_bed, clampf(carve, 0.0, 1.0))
+					# Nowhere under the water lower than its bed (the valley's floor beside the ford was a metre
+					# deeper: bots that left the line there drowned, or the way back counted as deep water).
+					height = maxf(height, lerpf(height, target_bed, clampf(river_t * 4.0, 0.0, 1.0)))
 
 	height = _apply_flat_pads(px, pz, height)
 	height = _carve_under_extra_roads(px, pz, height, for_collision)
@@ -1272,6 +1304,8 @@ func generate_world():
 		add_wadi_river_water()
 	elif level_prefix == "bloombay_dunes":
 		add_bloombay_water()
+	elif level_prefix == "marina_nights":
+		pass    # regenerate_marina_nights.gd lays its own sea (MarinaWater)
 	elif not no_water:
 		_generate_water()
 
@@ -1536,6 +1570,17 @@ func _set_owner_recursive(node: Node):
 		child.owner = root
 		_set_owner_recursive(child)
 
+## Whether this level's heightfield picks each cell's diagonal by its heights (adaptive) or always runs it from
+## (x+1, z) to (x, z+1). Anything sampling the ground on its triangles must split the same way (`split_00_11`).
+func adaptive_diagonal() -> bool:
+	return level_prefix in ["mountain", "desert_wadi", "ramlat_hamra", "marina_nights"]
+
+
+## For a cell's four heights: true when it is split from (x, z) to (x+1, z+1).
+func split_00_11(h00: float, h10: float, h01: float, h11: float) -> bool:
+	return adaptive_diagonal() and absf(h00 - h11) < absf(h10 - h01)
+
+
 func _generate_mesh(for_collision: bool) -> ArrayMesh:
 	var noise = FastNoiseLite.new()
 	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
@@ -1627,6 +1672,16 @@ func _generate_mesh(for_collision: bool) -> ArrayMesh:
 				continue
 
 			var i = y * (res + 1) + x
+			# The Al-Raihana GP's stages split each cell along the diagonal joining its closer heights (as Northlight
+			# Caverns does): one fixed diagonal sawed steep slopes that cross it into teeth (the "zig-zag cliffs").
+			if adaptive_diagonal() and absf(heights[i] - heights[i + res + 2]) < absf(heights[i + 1] - heights[i + res + 1]):
+				st.add_index(i)
+				st.add_index(i + 1)
+				st.add_index(i + res + 2)
+				st.add_index(i)
+				st.add_index(i + res + 2)
+				st.add_index(i + res + 1)
+				continue
 			st.add_index(i)
 			st.add_index(i + 1)
 			st.add_index(i + res + 1)
@@ -2551,7 +2606,9 @@ const CHASM_PIT_HALF_EXTENTS := Vector2(45.0, 58.0) # XZ half-size of water volu
 
 ## Desert Wadi — wide valley lake + river ford filling the whole valley basin.
 const WADI_RIVER_WATER_Y := 1.70
-const WADI_RIVER_BED_Y := -0.20
+## Wadeable everywhere (about a metre of water at the deepest): the water slows a cart (PlayerCart's shallow drag),
+## the strip of land between the lake and the river is the quick way; deeper, bots that left the ford drowned.
+const WADI_RIVER_BED_Y := 1.25
 ## River ribbon half-width for terrain carve + water shape.
 const WADI_RIVER_HALF_WIDTH := 65.0
 ## Main river/ford channel through the low valley.
@@ -2705,13 +2762,17 @@ func add_wadi_river_water() -> void:
 	noise_tex.height = 512
 	noise_tex.noise = noise
 	mat.set_shader_parameter("noise_tex", noise_tex)
-	mat.set_shader_parameter("water_color", Color(0.08, 0.18, 0.2))
-	mat.set_shader_parameter("shallow_color", Color(0.32, 0.42, 0.28))
+	# Half a metre of clear oasis water over sand (WADI_RIVER_BED_Y): green-teal, the bed showing through, little
+	# mirror (the deep-water settings read as a pale grey sheet at a grazing angle).
+	mat.set_shader_parameter("water_color", Color(0.06, 0.20, 0.18))
+	mat.set_shader_parameter("shallow_color", Color(0.30, 0.62, 0.52))
+	mat.set_shader_parameter("deep_water_color", Color(0.08, 0.26, 0.22))
+	mat.set_shader_parameter("depth_fade_distance", 1.6)
 	mat.set_shader_parameter("sky_tint", Color(0.72, 0.8, 0.88))
-	mat.set_shader_parameter("sky_reflect", 0.62)
-	mat.set_shader_parameter("transparency", 0.32)
-	mat.set_shader_parameter("metallic", 0.58)
-	mat.set_shader_parameter("roughness", 0.1)
+	mat.set_shader_parameter("sky_reflect", 0.3)
+	mat.set_shader_parameter("transparency", 0.7)
+	mat.set_shader_parameter("metallic", 0.25)
+	mat.set_shader_parameter("roughness", 0.12)
 	mat.set_shader_parameter("wave_speed", 0.028)
 	mat.set_shader_parameter("wave_strength", 0.48)
 	mat.set_shader_parameter("wave_height", 0.38)

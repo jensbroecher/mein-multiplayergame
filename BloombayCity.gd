@@ -205,6 +205,9 @@ func commit(wall_mat: Material, roof_mat: Material) -> ArrayMesh:
 	mesh.surface_set_material(0, wall_mat)
 	roofs.index()
 	roofs.generate_normals()
+	var before := mesh.get_surface_count()
 	roofs.commit(mesh)
-	mesh.surface_set_material(mesh.get_surface_count() - 1, roof_mat)
+	# No hipped roof at all (every building flat-topped): no roof surface, and the walls keep their material.
+	if mesh.get_surface_count() > before:
+		mesh.surface_set_material(mesh.get_surface_count() - 1, roof_mat)
 	return mesh

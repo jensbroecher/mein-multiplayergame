@@ -65,12 +65,14 @@ const ALL_STAGES = [
 	{"name": "Northlight Caverns", "path": "res://levels/NorthlightCavernsLevel.tscn"},
 	{"name": "Frostfall Gorge", "path": "res://levels/FrostfallGorgeLevel.tscn"},
 	{"name": "Harbor Pier", "path": "res://levels/HarborPierLevel.tscn"},
-	{"name": "Mountain Pass", "path": "res://levels/MountainLevel.tscn"},
+	{"name": "Jebel Sahar", "path": "res://levels/MountainLevel.tscn"},
 	{"name": "Arco del Viento", "path": "res://levels/CanyonLevel.tscn"},
 	{"name": "Tolvanera Gulch", "path": "res://levels/CanyonChasmLevel.tscn"},
 	{"name": "Estación Seca", "path": "res://levels/FreightLevel.tscn"},
 	{"name": "Mina del Viento", "path": "res://levels/MinaLevel.tscn"},
-	{"name": "Desert Wadi", "path": "res://levels/DesertWadiLevel.tscn"},
+	{"name": "Wadi al-Ghaf", "path": "res://levels/DesertWadiLevel.tscn"},
+	{"name": "Ramlat Hamra", "path": "res://levels/RamlatHamraLevel.tscn"},
+	{"name": "Marina Nights", "path": "res://levels/MarinaNightsLevel.tscn"},
 	{"name": "South Beach", "path": "res://levels/BloombayDunesLevel.tscn"},
 	{"name": "Mara Crossing", "path": "res://levels/MaraCrossingLevel.tscn"},
 	{"name": "Nyota Stadium", "path": "res://levels/NyotaStadiumLevel.tscn"},
@@ -102,6 +104,8 @@ const GP_CUPS = {
 		"stages": [
 			"res://levels/MountainLevel.tscn",
 			"res://levels/DesertWadiLevel.tscn",
+			"res://levels/RamlatHamraLevel.tscn",
+			"res://levels/MarinaNightsLevel.tscn",
 		]
 	},
 	"Sierra del Viento GP": {

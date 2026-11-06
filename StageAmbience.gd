@@ -56,6 +56,7 @@ const STAGES := {
 	"NyotaStadiumLevel": [["stadium", -27.0]],
 	"MsituFallsLevel": [["rainforest", -30.0]],
 	"MtaaNightsLevel": [["stadium", -36.0]],
+	"MarinaNightsLevel": [["city", -36.0], ["harbor", -38.0]],
 	"FrostpeakCreekLevel": [["blizzard", -37.0]],
 	"GlacierHighwayLevel": [["blizzard", -37.0]],
 	"FrostfallGorgeLevel": [["blizzard", -36.0]],
