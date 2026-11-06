@@ -11,6 +11,7 @@ extends Node3D
 @export var ring_jets := 20
 @export var ring_radius := 13.5
 @export var centre_height := 26.0       # the central jet's height (metres)
+@export var base_y := 0.0               # the bowls' heights (and the jets') stand this much higher (the basin's floor)
 
 const PALETTE := [Color(1.0, 0.75, 0.35), Color(0.25, 0.85, 1.0), Color(1.0, 0.35, 0.75), Color(0.45, 0.55, 1.0),
 	Color(1.0, 1.0, 1.0), Color(0.35, 1.0, 0.65)]
@@ -38,7 +39,7 @@ func _ready() -> void:
 	_drop_mat.vertex_color_use_as_albedo = true
 	_drop_mat.albedo_texture = _dot()
 	_drop_mat.disable_fog = true
-	_centre = _jet(Vector3(0, 11.5, 0), Vector3.UP, 600, 1.6)
+	_centre = _jet(Vector3(0, 11.5 + base_y, 0), Vector3.UP, 600, 1.6)
 	for i in range(ring_jets):
 		var a: float = TAU * i / ring_jets
 		var p := Vector3(cos(a), 0, sin(a)) * ring_radius + Vector3(0, water_y, 0)
@@ -47,7 +48,7 @@ func _ready() -> void:
 		_ring.append(_jet(p, dir, 70, 1.4))
 	# Sheets falling from the three bowls' lips (a ring emitter each).
 	for t in [[2.2, 6.0], [5.8, 3.8], [9.4, 2.2]]:
-		var f := _jet(Vector3(0, float(t[0]), 0), Vector3.DOWN, 260, 0.9)
+		var f := _jet(Vector3(0, float(t[0]) + base_y, 0), Vector3.DOWN, 260, 0.9)
 		var pm: ParticleProcessMaterial = f.process_material
 		pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_RING
 		pm.emission_ring_axis = Vector3.UP

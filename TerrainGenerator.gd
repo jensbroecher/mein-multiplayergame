@@ -539,8 +539,10 @@ func _get_terrain_height(px: float, pz: float, noise: FastNoiseLite, curve: Curv
 			base_terrain_height = maxf(base_terrain_height, lerpf(1.5, -2.5, hollow))
 		base_terrain_height = bloombay_north_coast(px, pz, base_terrain_height)
 	elif level_prefix == "marina_nights":
-		# Marina Nights: the city's flat ground, the creek and the sea (ArabianTerrain.marina_height).
-		base_terrain_height = ArabianTerrain.marina_height(px, pz)
+		# Marina Nights: the city's flat ground, the creek and the sea (ArabianTerrain.marina_height), nothing graded
+		# toward the lap: regenerate_marina_nights.gd lays its own roads and decks over it. (Graded up to the old road's
+		# height, the ground had cut through the souk's houses a quarter of a metre above their floors.)
+		return ArabianTerrain.marina_height(px, pz)
 	elif level_prefix == "ramlat_hamra":
 		# Ramlat Hamra (Al-Raihana GP): seif dunes and salt corridors (ArabianTerrain.megadunes).
 		base_terrain_height = ArabianTerrain.megadunes(px, pz) + h_noise * 0.06
@@ -1724,6 +1726,9 @@ func _generate_road_and_sand():
 	# Desert Wadi is a sand wash: keep the carved trough in the terrain, but do
 	# not emit asphalt, curbs, or a separate road collision slab.
 	if level_prefix == "desert_wadi":
+		return
+	# Marina Nights builds its own roads, decks and plaza (regenerate_marina_nights.gd, _build_roads).
+	if level_prefix == "marina_nights":
 		return
 	var curve = _get_world_curve()
 	var length = curve.get_baked_length()

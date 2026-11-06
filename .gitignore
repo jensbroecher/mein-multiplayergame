@@ -58,3 +58,8 @@ models/ramps/*.fbx
 
 # Blender keeps the previous save as .blend1 next to a .blend
 *.blend1
+# Local secrets written by `elevenlabs onboard`
+/.env.local
+
+# The ElevenLabs sound-effects tool's packages (npm install in tools/elevenlabs)
+tools/elevenlabs/node_modules/

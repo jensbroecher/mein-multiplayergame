@@ -32,6 +32,13 @@ const VILLAGE_HALF := Vector2(70.0, 42.0)
 const VILLAGE_BLEND := 24.0
 const VILLAGE_HOUSES := 10
 const TOWERS := 4
+## The villa (ArabianKit.villa, from the user's picture of a sandstone house among boulders): its pad's half size and
+## blend (game metres), and how far its middle stands from the lap's line.
+const VILLA_HALF := Vector2(44.0, 52.0)
+const VILLA_BLEND := 16.0
+const VILLA_ROAD := Vector2(95.0, 175.0)
+## Palms in the villa's courtyard, in its own (life-size) frame.
+const VILLA_PALMS := [Vector2(-21.0, -10.0), Vector2(20.0, -12.0), Vector2(-8.0, -27.0), Vector2(12.0, -26.0), Vector2(14.0, -18.0)]
 const GATE_CLEAR := 16.0
 ## The piste: full within PISTE_IN of the line, gone by PISTE_OUT.
 const PISTE_IN := 6.0
@@ -86,11 +93,15 @@ func _ready() -> void:
 	_build_fort(root)
 	_build_towers(root)
 	_build_village(root)
+	_build_villa(root)
 	_build_camp(root)
 	_build_oasis(root)
 	_build_flags(root)
 	_build_flora(root)
 	_build_rocks(root)
+	# Airliners: arrivals down past the lap's south-east flank to the city, departures out past its north-west and
+	# round to the east, away from the ranges to the north-east.
+	d.airliners(root, Vector2(-2200.0, 1500.0), -1.0, 0.6, 0.8, 0.0, 300.0, 550.0, 115.0, 6000.0)
 	d.backdrop(root, 868.0, 3900.0, -PI * 0.35, 0.9, 360.0, Color(0.90, 0.66, 0.44), Color(0.40, 0.32, 0.26))
 	d.skyline(root, Vector2(-2200.0, 1500.0), 0.0, 22)
 
@@ -157,7 +168,8 @@ func _pad(c: Vector2, half: Vector2, yaw: float, blend: float) -> float:
 
 func _plan_sites() -> void:
 	# The fort: on the dunes over the valley, the highest clear spot within reach of the lake.
-	var fhalf: float = FORT_SIDE * 0.5 * PS + 8.0
+	# Room for the corner towers (they reach 4.4m past the walls, life size) and 6m of level ground round them.
+	var fhalf: float = FORT_SIDE * 0.5 * PS + 14.0
 	var best := Vector2.INF
 	var best_y := -INF
 	for k in range(2500):
@@ -207,6 +219,32 @@ func _plan_sites() -> void:
 				houses.append([c, vy, face + d.rng.randf_range(-0.15, 0.15), rad, w, dd])
 				d.note(c, rad)
 	sites["houses"] = houses
+	# The villa: a sandstone house among boulders on a pad of its own, its front toward the lap, near enough to be
+	# seen from it, on the flattest ground it can find.
+	var vb := Vector2.INF
+	var vscore := INF
+	var vyaw := 0.0
+	var vreach: float = maxf(VILLA_HALF.x, VILLA_HALF.y) + VILLA_BLEND
+	for k in range(3000):
+		var c := Vector2(d.rng.randf_range(-430.0, 470.0), d.rng.randf_range(-430.0, 370.0))
+		var near: Array = d.road_near(c.x, c.y, VILLA_ROAD.y + 20.0)
+		var rd: float = near[0]
+		if rd < VILLA_ROAD.x or rd > VILLA_ROAD.y or not d.is_free(c, vreach) or _lake_d(c) < 1.35:
+			continue
+		if not _rect_clear(c, Vector2(vreach, vreach), d.road_half + 6.0):
+			continue
+		var rel: Vector2 = d.relief(c.x, c.y, VILLA_HALF.y, true)
+		var score: float = (rel.y - rel.x) + absf(rd - 120.0) * 0.06
+		if score < vscore:
+			vscore = score
+			vb = c
+			var np: Vector3 = near[1]
+			vyaw = atan2(-(np.x - c.x), -(np.z - c.y))
+	if vb != Vector2.INF:
+		var vfy := _pad(vb, VILLA_HALF, vyaw, VILLA_BLEND)
+		sites["villa"] = [vb, vfy, vyaw]
+		d.note(vb, VILLA_HALF.length())
+		print("Villa at ", vb, " y ", vfy, " facing ", rad_to_deg(vyaw), " score ", vscore)
 	# Watchtowers on the dune crests round the valley.
 	var towers: Array = []
 	var tries := 0
@@ -287,7 +325,7 @@ func _build_fort(root: Node3D) -> void:
 	var r := RandomNumberGenerator.new()
 	r.seed = 3131
 	d.building(root, "FortWadi", c.x, c.y, float(s[1]), float(s[2]), func(pk, kit) -> void:
-		ArabianKit.fort(pk, kit, r, FORT_SIDE, 7.5), 2600.0)
+		ArabianKit.fort(pk, kit, r, FORT_SIDE, 7.5, 1), 2600.0)
 
 
 func _build_towers(root: Node3D) -> void:
@@ -296,7 +334,7 @@ func _build_towers(root: Node3D) -> void:
 		var c: Vector2 = t[0]
 		var h: float = d.rng.randf_range(9.0, 12.0)
 		d.building(root, "Watchtower_%d" % i, c.x, c.y, float(t[1]) - 0.1, float(t[2]), func(pk, kit) -> void:
-			ArabianKit.watchtower(pk, kit, h, d.rng.randf_range(2.6, 3.1)), 1800.0)
+			ArabianKit.watchtower(pk, kit, h, d.rng.randf_range(2.6, 3.1), 1), 1800.0)
 		i += 1
 
 
@@ -305,16 +343,48 @@ func _build_village(root: Node3D) -> void:
 	node.name = "Village"
 	root.add_child(node)
 	node.owner = level
+	# Najdi houses; the plot nearest the village's middle holds its mosque.
+	var mosque_i := -1
+	if sites.has("village") and not (sites["houses"] as Array).is_empty():
+		var vc: Vector2 = sites["village"][0]
+		var best_d := INF
+		for k in range((sites["houses"] as Array).size()):
+			var dd: float = ((sites["houses"][k] as Array)[0] as Vector2).distance_to(vc)
+			if dd < best_d:
+				best_d = dd
+				mosque_i = k
 	var i := 0
 	for h in sites["houses"]:
 		var c: Vector2 = h[0]
 		var r := RandomNumberGenerator.new()
 		r.seed = 1500 + i
-		var storeys: int = 2 if r.randf() < 0.35 else 1
-		var key: String = "mud" if r.randf() < 0.65 else "lime"
-		d.building(node, "House_%d" % i, c.x, c.y, float(h[1]), float(h[2]), func(pk, kit) -> void:
-			ArabianKit.house(pk, kit, r, float(h[4]), float(h[5]), storeys, key, r.randf() < 0.75, true), 1100.0)
+		var storeys: int = 2 if r.randf() < 0.45 else 1
+		if i == mosque_i:
+			d.building(node, "Mosque", c.x, c.y, float(h[1]), float(h[2]), func(pk, kit) -> void:
+				ArabianKit.mosque(pk, kit, r, 10.0, 8.0, 1), 1400.0)
+		else:
+			d.building(node, "House_%d" % i, c.x, c.y, float(h[1]), float(h[2]), func(pk, kit) -> void:
+				ArabianKit.house_najdi(pk, kit, r, float(h[4]), float(h[5]), storeys, true), 1100.0)
 		i += 1
+
+
+func _build_villa(root: Node3D) -> void:
+	if not sites.has("villa"):
+		return
+	var s: Array = sites["villa"]
+	var c: Vector2 = s[0]
+	var r := RandomNumberGenerator.new()
+	r.seed = 4242
+	d.building(root, "VillaWadi", c.x, c.y, float(s[1]), float(s[2]), func(pk, kit) -> void:
+		ArabianKit.villa(pk, kit, r), 2600.0)
+
+
+## Where a point of the villa's own (life-size) frame lies on the ground.
+func _villa_point(local: Vector2) -> Vector2:
+	var s: Array = sites["villa"]
+	var yaw: float = s[2]
+	var v := Basis(Vector3.UP, yaw) * Vector3(local.x * PS, 0.0, local.y * PS)
+	return (s[0] as Vector2) + Vector2(v.x, v.z)
 
 
 func _build_camp(root: Node3D) -> void:
@@ -380,6 +450,15 @@ func _build_oasis(root: Node3D) -> void:
 			lists[v].append(d.stand(q.x, q.y, r.randf_range(0.9, 1.15), 0.25, 0.05))
 			d.note(q, 2.5)
 			placed += 1
+	# The villa's courtyard.
+	if sites.has("villa"):
+		for lp in VILLA_PALMS:
+			var q: Vector2 = _villa_point(lp)
+			var v: int = r.randi() % 5
+			if not lists.has(v):
+				lists[v] = []
+			lists[v].append(d.stand(q.x, q.y, r.randf_range(1.0, 1.2), 0.25, 0.04))
+			placed += 1
 	for v in lists:
 		var nm: ArrayMesh = d.save(palms.mesh(v, 0, near_mats), "datepalm_%d" % v) as ArrayMesh
 		var fm: ArrayMesh = d.save(palms.mesh(v, 1, far_mats), "datepalm_far_%d" % v) as ArrayMesh
@@ -397,7 +476,7 @@ func _build_flags(root: Node3D) -> void:
 		var kit := {}
 		var col: Color = [Color(1.0, 0.42, 0.08), Color(0.96, 0.95, 0.92)][v]
 		pk.tube(kit, "matte", Vector3(0, -0.3, 0), Vector3(0, 2.6, 0), 0.035, 0.025, 5, Color(0.2, 0.2, 0.2))
-		pk.panel(kit, "cloth", [Vector3(0, 2.55, 0), Vector3(0.9, 2.3, 0), Vector3(0.9, 1.95, 0), Vector3(0, 1.75, 0)], Vector3(0, 0, 1), col, col.darkened(0.1))
+		pk.panel(kit, "awning", [Vector3(0, 2.55, 0), Vector3(0.9, 2.3, 0), Vector3(0.9, 1.95, 0), Vector3(0, 1.75, 0)], Vector3(0, 0, 1), col, col.darkened(0.1))
 		meshes.append(d.save(ArabianKit.commit(pk, kit), "marker_flag_%d" % v))
 	var lists: Array = [[], []]
 	var s := 8.0

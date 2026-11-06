@@ -55,6 +55,9 @@ static func make_material(key: String) -> Material:
 			var f := ShaderMaterial.new()
 			f.shader = load("res://mina_flame.gdshader")
 			return f
+	if key == "lamp":
+		# Lit at dawn (the light towers, the trucks, the gate): CampKit's "lamp" gives off no light (LampGlow.gd).
+		return load("res://LampGlow.gd").material()
 	return CampKit.make_material(key)
 
 

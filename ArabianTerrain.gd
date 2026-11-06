@@ -190,13 +190,27 @@ static func creek_x(z: float) -> float:
 	return 60.0 + 28.0 * sin(z / 110.0)
 
 
-## How far (x, z) lies inside the water (negative on land), in metres: the sea, the creek and its rounded head.
+## Jazirat al-Fanous, the island off the palm avenue (the suspended railway's far end, Burj al-Fanous on it): its middle
+## and its radius, the shore wandering a little round it.
+const MARINA_ISLAND := Vector2(-300.0, 795.0)
+const MARINA_ISLAND_R := 165.0
+
+## How far (x, z) lies outside the island's shore (negative on it).
+static func marina_island_d(x: float, z: float) -> float:
+	var d := Vector2(x, z) - MARINA_ISLAND
+	var a: float = atan2(d.y, d.x)
+	var r: float = MARINA_ISLAND_R * (1.0 + 0.10 * sin(3.0 * a + 0.7) + 0.06 * sin(5.0 * a + 2.1))
+	return d.length() - r
+
+
+## How far (x, z) lies inside the water (negative on land), in metres: the sea, the creek and its rounded head, less
+## the island.
 static func marina_water_d(x: float, z: float) -> float:
 	var sea: float = z - coast_z(x)
 	var cz: float = maxf(z, MARINA_CREEK_HEAD)
 	var across: float = absf(x - creek_x(cz))
 	var creek: float = MARINA_CREEK_HALF - Vector2(across, z - cz).length()
-	return maxf(sea, creek)
+	return minf(maxf(sea, creek), marina_island_d(x, z))
 
 
 static func marina_height(x: float, z: float) -> float:

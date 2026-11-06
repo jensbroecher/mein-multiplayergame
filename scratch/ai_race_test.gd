@@ -1,7 +1,8 @@
 extends Node
 
 # Races 6 AI carts around a level headless and reports lap times, respawns (with where they
-# happened) and how far each cart got. cars= picks each bot's car (CAR_PRESETS indices).
+# happened) and how far each cart got, and each cart's laps in game seconds (FLYING LAPS: the mean of the laps after the
+# first). cars= picks each bot's car (CAR_PRESETS indices).
 #   Godot --headless --path . res://scratch/ai_race_test.tscn -- res://levels/X.tscn [seconds=300] [speed=4]
 #       [weather=0..1] [cars=5,5,0,1,2,3] [noitems=1] [hide=<node name>]
 # nodrift=1 sets every bot's ai_drift_chance to 0 (to tell what drifting does to a race).
@@ -68,6 +69,9 @@ func _ready() -> void:
 	var drifts := {}
 	var fin_at := {}
 	var fin_rest := {}
+	# Each cart's laps in game time (the physics delta summed), from the green light (race_state RACING).
+	var lap_marks := {}
+	var go_t := -1.0
 	var drift_time := {}
 	var was_drift := {}
 	var drift_start := {}
@@ -84,9 +88,17 @@ func _ready() -> void:
 				best_prog[c] = 0.0
 				if no_drift:
 					c.set("ai_drift_chance", 0.0)
+		if go_t < 0.0 and level.get("race_state") == level.RaceState.RACING:
+			go_t = t
 		for c in carts:
 			if not is_instance_valid(c):
 				continue
+			if go_t >= 0.0:
+				var lp: int = int(level.player_stats.get(c.name.to_int(), {}).get("laps", 0))
+				if not lap_marks.has(c):
+					lap_marks[c] = [go_t]
+				while (lap_marks[c] as Array).size() - 1 < lp:
+					(lap_marks[c] as Array).append(t)
 			# Where each cart is when it finishes, and where it comes to rest after.
 			if c.is_finished_race and not fin_at.has(c):
 				fin_at[c] = c.global_position
@@ -189,8 +201,22 @@ func _ready() -> void:
 			lo = minf(lo, v)
 			sum += v
 		print("LIP %s: %d crossings, %.1f m/s on average, slowest %.1f" % [lips[li]["name"] if lips[li] is Dictionary else "at %.0fm" % float(lips[li]), sp.size(), sum / sp.size(), lo])
+	var all_laps: Array = []
 	for c in carts:
 		var st: Dictionary = level.player_stats.get(c.name.to_int(), {})
-		print("CART %s car=%d laps=%d finished=%s respawns=%d %s drifts=%d (%.1fs)" % [c.name, c.car_index, st.get("laps", 0), st.get("finished", false),
-				respawns[c].size(), respawns[c], int(drifts.get(c, 0)), float(drift_time.get(c, 0.0))])
+		var lt: Array = []
+		var marks: Array = lap_marks.get(c, [])
+		for i in range(1, marks.size()):
+			lt.append("%.1f" % (float(marks[i]) - float(marks[i - 1])))
+			if i > 1:
+				all_laps.append(float(marks[i]) - float(marks[i - 1]))
+		print("CART %s car=%d laps=%d finished=%s respawns=%d %s drifts=%d (%.1fs) laps_s=[%s]" % [c.name, c.car_index, st.get("laps", 0), st.get("finished", false),
+				respawns[c].size(), respawns[c], int(drifts.get(c, 0)), float(drift_time.get(c, 0.0)), ", ".join(lt)])
+	# The flying laps (each cart's second and third: the first starts from the grid), in game seconds.
+	if not all_laps.is_empty():
+		all_laps.sort()
+		var sum := 0.0
+		for v in all_laps:
+			sum += v
+		print("FLYING LAPS %d: mean %.1fs, median %.1fs, best %.1fs" % [all_laps.size(), sum / all_laps.size(), all_laps[all_laps.size() / 2], all_laps[0]])
 	get_tree().quit()

@@ -1,0 +1,9 @@
+{
+  "name": "rc-vibe-gp-sfx",
+  "private": true,
+  "type": "module",
+  "description": "Generates the game's sound effects with ElevenLabs (text to sound effects, SFX v3). Run from the project root: node --env-file=.env.local tools/elevenlabs/generate_sfx.mjs [--force] [--list] [name ...]",
+  "dependencies": {
+    "@elevenlabs/elevenlabs-js": "^2.76.0"
+  }
+}

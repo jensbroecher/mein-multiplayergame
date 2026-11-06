@@ -449,6 +449,11 @@ var _ai_want_drift: bool = false
 var _ai_upcoming_turn_angle: float = 0.0
 var _ai_upcoming_turn_dist: float = 40.0
 var _ai_upcoming_turn_dir: float = 0.0
+## The share of a car's steering (its top yaw rate, `steer_speed`) the AI plans a corner's speed with: the rest is for
+## corrections (see the safe speed in _get_ai_input).
+const AI_YAW_USE := 0.5
+## Where along its route the AI last measured the turn ahead (for the boost's longer look; -1 before it has).
+var _ai_turn_offset: float = -1.0
 var _ai_approaching_loop: bool = false
 var _ai_post_respawn_no_boost_timer: float = 0.0
 ## AI Personality parameters
@@ -6758,6 +6763,7 @@ func _get_ai_input(delta: float) -> Vector2:
 		ai_lane_offset = clampf(ai_lane_offset, -0.75, 0.75)
 	
 	var turn_info: Dictionary = _ai_measure_upcoming_turn(current_offset, speed)
+	_ai_turn_offset = current_offset
 	_ai_upcoming_turn_angle = float(turn_info.get("angle", 0.0))
 	_ai_upcoming_turn_dist = float(turn_info.get("dist", 40.0))
 	_ai_upcoming_turn_dir = float(turn_info.get("dir", 0.0))
@@ -6785,7 +6791,10 @@ func _get_ai_input(delta: float) -> Vector2:
 	if corner_factor > lerpf(0.55, 0.78, style) and _ai_upcoming_turn_dist < 16.0:
 		look_ahead = minf(look_ahead, lerpf(11.0, 16.0, style))
 	var near_ang: float = float(turn_info.get("near_angle", 0.0))
-	var is_hairpin: bool = near_ang > 1.05 or _ai_upcoming_turn_angle > 1.25
+	# A hairpin: sharp within 20m, or turning a lot ahead *and* tight (under 25m). On the turn ahead's angle alone every
+	# 90-degree bend counted, a 75m sweeper too, and was taken at 10 m/s.
+	var turn_kappa: float = float(turn_info.get("kappa", 0.0))
+	var is_hairpin: bool = near_ang > 1.05 or (_ai_upcoming_turn_angle > 1.25 and turn_kappa > 1.0 / 25.0)
 	if is_hairpin:
 		look_ahead = minf(look_ahead, clampf(_ai_upcoming_turn_dist * 0.45, 6.0, 10.0))
 	if _mountain_stage:
@@ -7117,8 +7126,20 @@ func _get_ai_input(delta: float) -> Vector2:
 		var grip_speed_cap: float = lerpf(max_speed, (10.5 if _mountain_stage else 12.8) * agility_mult, pow(corner_factor, 0.60))
 		var safe_speed: float = minf(lerpf(max_speed, max_speed * min_corner_speed, corner_factor), grip_speed_cap)
 		
-		if is_hairpin:
+		# What the corner's own radius allows: a cart's heading turns at most `steer_speed` rad/s (above 10 m/s), so at v
+		# its path's radius can be as small as v / steer_speed; it holds a corner of radius R up to about
+		# AI_YAW_USE x steer_speed x R, keeping the rest of the steering for corrections. The heading's change alone
+		# (corner_factor) took a 75m sweeper as slowly as a 12m corner, and the bots braked for bends they could take
+		# flat out. A hairpin keeps its own cap, but a tight right angle may go a little faster than one.
+		var radius_speed: float = INF
+		if turn_kappa > 0.0005:
+			radius_speed = AI_YAW_USE * steer_speed * sqrt(surface_grip) / turn_kappa
+		if not is_hairpin:
+			safe_speed = maxf(safe_speed, minf(radius_speed, max_speed))
+		else:
 			safe_speed = minf(safe_speed, (8.5 if _mountain_stage else 10.0) * agility_mult)
+			if _ai_upcoming_turn_angle < 1.9 and near_ang < 1.6:
+				safe_speed = maxf(safe_speed, minf(radius_speed * 0.85, max_speed))
 
 		# Curves gentler than ~20-25 deg are driven flat out; sharp corners trigger braking
 		var react_corner: float = 0.32 if _harbor_stage else (0.28 if _mountain_stage else lerpf(0.35, 0.45, style))
@@ -8071,8 +8092,8 @@ func _ai_update_recovery(_delta: float, current_offset: float) -> void:
 	_ai_recovering = true
 
 
-func _ai_measure_upcoming_turn(offset: float, speed: float) -> Dictionary:
-	var look: float = clampf(speed * 1.8, 30.0, 80.0)
+func _ai_measure_upcoming_turn(offset: float, speed: float, look_override := -1.0) -> Dictionary:
+	var look: float = look_override if look_override > 0.0 else clampf(speed * 1.8, 30.0, 80.0)
 	var p0: Vector3 = _ai_route_local(offset)
 	var p0b: Vector3 = _ai_route_local(offset + 1.5)
 	var h0: Vector3 = p0b - p0
@@ -8087,6 +8108,10 @@ func _ai_measure_upcoming_turn(offset: float, speed: float) -> Dictionary:
 	var turn_start_dist: float = look
 	var found_turn_start: bool = false
 	var near_ang: float = 0.0
+	# The tightest curvature ahead (1 / radius): the heading's change over 6m, from the samples either side.
+	var max_kappa: float = 0.0
+	var h_prev2: Vector3 = Vector3.ZERO
+	var h_prev: Vector3 = h0
 	var d: float = 3.0
 	while d <= look:
 		var p1: Vector3 = _ai_route_local(offset + d)
@@ -8095,6 +8120,10 @@ func _ai_measure_upcoming_turn(offset: float, speed: float) -> Dictionary:
 		h1.y = 0.0
 		if h1.length_squared() > 1e-6:
 			h1 = h1.normalized()
+			if h_prev2 != Vector3.ZERO:
+				max_kappa = maxf(max_kappa, absf(h_prev2.angle_to(h1)) / 6.0)
+			h_prev2 = h_prev
+			h_prev = h1
 			var ang: float = h0.signed_angle_to(h1, Vector3.UP)
 			if absf(ang) > absf(worst_ang):
 				worst_ang = ang
@@ -8107,7 +8136,7 @@ func _ai_measure_upcoming_turn(offset: float, speed: float) -> Dictionary:
 				near_ang = ang
 		d += 3.0
 	var effective_dist: float = turn_start_dist if found_turn_start else worst_dist
-	return {"angle": absf(worst_ang), "dir": worst_dir, "dist": effective_dist, "near_angle": absf(near_ang)}
+	return {"angle": absf(worst_ang), "dir": worst_dir, "dist": effective_dist, "near_angle": absf(near_ang), "kappa": max_kappa}
 
 
 ## The AI's route `d` metres from the start of its active path, in that path's local space. On a
@@ -8155,6 +8184,13 @@ func _process_ai_items(delta: float):
 				# 2. Straightaway / corner exit boost:
 				# Use boost when on an open section, not heading into a sharp corner
 				var upcoming_sharp_turn: bool = _ai_upcoming_turn_angle > 0.48 and _ai_upcoming_turn_dist < 26.0
+				# A boost carries a cart 80-120m, further than the turn ahead is measured at low speed: not with a corner
+				# of more than 50 degrees within that (out of one of Marina Nights' souk corners, bots fired one and met
+				# the next at 60 m/s).
+				if _ai_turn_offset >= 0.0 and active_path and active_path.curve:
+					var far: Dictionary = _ai_measure_upcoming_turn(_ai_turn_offset, 0.0, 110.0)
+					if float(far.get("angle", 0.0)) > 0.9 and float(far.get("dist", 999.0)) < 105.0:
+						upcoming_sharp_turn = true
 				var road_open_ahead: bool = not upcoming_sharp_turn and _ai_upcoming_turn_dist > 16.0
 				var steer_reasonable: bool = absf(current_steer) < 0.55 and absf(sync_steer) < 0.55
 				

@@ -12,6 +12,7 @@ const DatePalmKit = preload("res://DatePalmKit.gd")
 const Woodland = preload("res://WoodlandBuilder.gd")
 const FreightKit = preload("res://FreightKit.gd")
 const BloombayCity = preload("res://BloombayCity.gd")
+const Airliners = preload("res://Airliners.gd")
 
 const PROP_SCALE := 1.6
 const ROAD_CELL := 24.0
@@ -290,6 +291,11 @@ func ground_material(map: Texture2D, half: float, params: Dictionary) -> ShaderM
 #  Plants and rocks
 # ======================================================================================
 
+var _back := {}
+var _ridge: FastNoiseLite
+## Airfields graded level into the country past the rim: [middle (x, z), along (unit), half length, half width, height].
+var airfields: Array = []
+var _air_checks: Array = []
 var _palms: DatePalmKit
 var _wood: Woodland
 var _rock_mat: ShaderMaterial
@@ -461,12 +467,7 @@ func backdrop(root: Node3D, r0: float, r1: float, range_bearing: float, range_ha
 		rings.append(r)
 		r += maxf(8.0, r * 0.03)
 	rings.append(r1)
-	var ridge := FastNoiseLite.new()
-	ridge.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	ridge.fractal_type = FastNoiseLite.FRACTAL_RIDGED
-	ridge.fractal_octaves = 4
-	ridge.frequency = 0.0016
-	ridge.seed = 8181
+	_back = {"r0": r0, "bearing": range_bearing, "half": range_half, "h": range_h}
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var grid: Array = []
@@ -480,14 +481,7 @@ func backdrop(root: Node3D, r0: float, r1: float, range_bearing: float, range_ha
 			if ri == 0:
 				y = tg.natural_height(p.x, p.y) - 0.15
 			else:
-				var fade: float = clampf((rr - r0) / 120.0, 0.0, 1.0)
-				var near_y: float = tg.natural_height(p.x, p.y) if rr < r0 + 140.0 else 0.0
-				var dunes: float = ArabianTerrain.dunes(p.x, p.y, 1.0)
-				var da: float = absf(wrapf(a - range_bearing, -PI, PI))
-				var in_range: float = (1.0 - smoothstep(range_half * 0.6, range_half, da)) * smoothstep(r0 + 400.0, r0 + 1500.0, rr)
-				var mtn: float = (ridge.get_noise_2d(p.x, p.y) * 0.5 + 0.5)
-				mtn = pow(mtn, 1.6) * range_h * in_range
-				y = lerpf(near_y, dunes + 2.0, fade) + mtn
+				y = _backdrop_y(p, rr)
 			var rockish: float = clampf(y / maxf(range_h * 0.25, 1.0), 0.0, 1.0)
 			var col: Color = sand.lerp(rock, smoothstep(0.15, 0.6, rockish))
 			row.append([Vector3(p.x, y, p.y), col])
@@ -523,6 +517,54 @@ func backdrop(root: Node3D, r0: float, r1: float, range_bearing: float, range_ha
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	root.add_child(mi)
 	mi.owner = level
+	# The airliners' routes (planned before, so their runways are graded into it) against the country.
+	for c in _air_checks:
+		_check_route(c[0], c[1], c[2])
+
+
+## The country's height past the rim (the backdrop's own: dunes carried on, the ranges, and any `airfields` graded
+## level), for anything that must clear it: Airliners' routes.
+func _backdrop_y(p: Vector2, rr: float) -> float:
+	if _ridge == null:
+		_ridge = FastNoiseLite.new()
+		_ridge.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+		_ridge.fractal_type = FastNoiseLite.FRACTAL_RIDGED
+		_ridge.fractal_octaves = 4
+		_ridge.frequency = 0.0016
+		_ridge.seed = 8181
+	var r0: float = _back.get("r0", 868.0)
+	var fade: float = clampf((rr - r0) / 120.0, 0.0, 1.0)
+	var near_y: float = tg.natural_height(p.x, p.y) if rr < r0 + 140.0 else 0.0
+	var dunes: float = ArabianTerrain.dunes(p.x, p.y, 1.0)
+	var a: float = atan2(p.y, p.x)
+	var da: float = absf(wrapf(a - float(_back.get("bearing", 0.0)), -PI, PI))
+	var half: float = _back.get("half", 0.0)
+	var in_range: float = (1.0 - smoothstep(half * 0.6, half, da)) * smoothstep(r0 + 400.0, r0 + 1500.0, rr)
+	var mtn: float = (_ridge.get_noise_2d(p.x, p.y) * 0.5 + 0.5)
+	mtn = pow(mtn, 1.6) * float(_back.get("h", 0.0)) * in_range
+	var y: float = lerpf(near_y, dunes + 2.0, fade) + mtn
+	for af in airfields:
+		var w: float = airfield_weight(af, p)
+		if w > 0.0:
+			y = lerpf(y, float(af[4]), w)
+	return y
+
+
+## The ground's height anywhere: the terrain's own inside the rim, the country's past it.
+func country_height(x: float, z: float) -> float:
+	var rr: float = Vector2(x, z).length()
+	if _back.is_empty() or rr < float(_back.r0):
+		return tg.natural_height(x, z)
+	return _backdrop_y(Vector2(x, z), rr)
+
+
+## How much an airfield ([middle (x, z), along (unit), half length, half width, height]) levels the country at p.
+static func airfield_weight(af: Array, p: Vector2) -> float:
+	var d: Vector2 = p - (af[0] as Vector2)
+	var along: Vector2 = af[1]
+	var x: float = absf(d.dot(along))
+	var y: float = absf(d.dot(Vector2(-along.y, along.x)))
+	return (1.0 - smoothstep(float(af[2]), float(af[2]) + 300.0, x)) * (1.0 - smoothstep(float(af[3]), float(af[3]) + 260.0, y))
 
 
 ## The city on the horizon at `centre` (world xz, 2-3km out): a cluster of towers, tallest in the middle, low
@@ -556,6 +598,156 @@ func skyline(root: Node3D, centre: Vector2, base_y: float, count: int) -> void:
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	root.add_child(mi)
 	mi.owner = level
+
+
+## Airliners over the stage (Airliners.gd) coming and going at the city's airport `city` (world xz) lies by. An
+## arrival comes down a 3-degree final approach that passes `lat_a` metres beside the lap on side `side` (+1 the
+## right, looking from the lap toward the city) and 650m beside the city's towers, to a runway 1.6km past the city,
+## out of the cameras' reach; a departure lifts off just short of the city on its other side and climbs out past the
+## lap `lat_d` metres off, on and away. Each turns in and out of its line far off, at `entry_turn` / `exit_turn`
+## radians (signed: + to the right); the arrival onto a final `final_len` long (shorter where ranges stand behind the
+## lap: it turns in from the open side, nearer). A flight on each every `every` seconds, the departures half a beat after the
+## arrivals. Call it before `backdrop`, which grades both runways into the country (`_runway`) and then checks both
+## routes against it (`country_height`) and the towers, printing how they pass the lap.
+func airliners(root: Node3D, city: Vector2, side: float, entry_turn: float, exit_turn: float, night := 0.0,
+		lat_a := 300.0, lat_d := 550.0, every := 115.0, final_len := 9000.0) -> Node3D:
+	var old := root.get_node_or_null("Airliners")
+	if old:
+		root.remove_child(old)
+		old.free()
+	var o := Vector2.ZERO
+	for p in _pts:
+		o += Vector2(p.x, p.z)
+	o /= float(maxi(_pts.size(), 1))
+	var u: Vector2 = (city - o).normalized()
+	var v := Vector2(-u.y, u.x)
+	# The arrival's line: beside the lap, beside the city, to a threshold past it.
+	var p1: Vector2 = o + v * (side * lat_a)
+	var p2: Vector2 = city + v * (side * 650.0)
+	var ha: Vector2 = (p2 - p1).normalized()
+	var th: Vector2 = p2 + ha * 1600.0
+	var faf: Vector2 = th - ha * final_len
+	var entry: Vector2 = faf - ha.rotated(entry_turn) * 7000.0
+	var entry_y: float = 15.0 + final_len * tan(deg_to_rad(3.0)) + 7000.0 * 0.055
+	var arr: Dictionary = Airliners.arrival(Vector3(th.x, 0.0, th.y), ha,
+			[[Vector3(entry.x, entry_y, entry.y), 170.0]], final_len, every, 0.0, 2600.0)
+	# The departure's: from the far side of the city past the lap's other flank.
+	var p3: Vector2 = city - v * (side * 700.0)
+	var p4: Vector2 = o - v * (side * lat_d)
+	var hd: Vector2 = (p4 - p3).normalized()
+	var start: Vector2 = p3 - hd * 3200.0
+	var x1: Vector2 = p4 + hd * 4200.0
+	var x2: Vector2 = x1 + hd.rotated(exit_turn) * 7000.0
+	var lift_y: float = 3500.0 * tan(deg_to_rad(7.0))
+	var dep: Dictionary = Airliners.departure(Vector3(start.x, 0.0, start.y), hd,
+			[[Vector3(x1.x, lift_y + 900.0, x1.y), 182.0], [Vector3(x2.x, lift_y + 2100.0, x2.y), 210.0]], 2800.0, every, 0.0, 2600.0)
+	# The departure rolls when the arrival before it has touched down and cleared (they never share the sky).
+	var built_a: Dictionary = Airliners.build_route(arr)
+	dep["phase"] = fposmod(float(built_a.t[_ground_index(built_a)]) + every * 0.5, every)
+	var node := Node3D.new()
+	node.name = "Airliners"
+	node.set_script(Airliners)
+	node.set("routes", [arr, dep])
+	node.set("night", night)
+	root.add_child(node)
+	node.owner = level
+	# Both runways' ground graded level into the country (call this before `backdrop`) and drawn on it.
+	_runway(root, th - ha * 300.0, th + ha * 2900.0)
+	_runway(root, start - hd * 300.0, start + hd * 3100.0)
+	for rt in [arr, dep]:
+		_air_checks.append([rt, city, o])
+	return node
+
+
+## A runway from a to b (world xz) at sea level, like the city: graded level into the country past the rim (an
+## airfield `backdrop` reads) and drawn on it: dark asphalt, white edge lines, centre-line dashes, threshold bars at
+## both ends. Named "...Ground" (DressingColliders leaves it alone).
+func _runway(root: Node3D, a: Vector2, b: Vector2) -> void:
+	var along: Vector2 = (b - a).normalized()
+	var L: float = a.distance_to(b)
+	airfields.append([(a + b) * 0.5, along, L * 0.5 + 150.0, 230.0, 0.0])
+	var across := Vector2(-along.y, along.x)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var quad := func(s0: float, s1: float, l0: float, l1: float, col: Color, y: float) -> void:
+		var p := [a + along * s0 + across * l0, a + along * s1 + across * l0, a + along * s1 + across * l1, a + along * s0 + across * l1]
+		# Godot's front faces wind clockwise seen from their front: this order faces up.
+		for k in [0, 1, 2, 0, 2, 3]:
+			var q: Vector2 = p[k]
+			st.set_color(col)
+			st.set_normal(Vector3.UP)
+			st.add_vertex(Vector3(q.x, y, q.y))
+	var half := 36.0
+	quad.call(-60.0, L + 60.0, -half - 22.0, half + 22.0, Color(0.56, 0.50, 0.42), 0.04)
+	quad.call(0.0, L, -half, half, Color(0.16, 0.16, 0.17), 0.07)
+	var white := Color(0.92, 0.92, 0.9)
+	for sd in [-1.0, 1.0]:
+		quad.call(0.0, L, sd * (half - 1.6), sd * (half - 0.6), white, 0.09)
+	var dash := 60.0
+	while dash < L - 60.0:
+		quad.call(dash, dash + 36.0, -0.6, 0.6, white, 0.09)
+		dash += 72.0
+	for end_s in [6.0, L - 46.0]:
+		for k in range(8):
+			var l0: float = -half + 3.0 + float(k) * 8.6 + (6.0 if k >= 4 else 0.0) - (3.0 if k >= 4 else 0.0)
+			quad.call(end_s, end_s + 40.0, l0, l0 + 3.6, white, 0.09)
+	var mesh := st.commit()
+	var m := StandardMaterial3D.new()
+	m.vertex_color_use_as_albedo = true
+	m.vertex_color_is_srgb = true
+	m.roughness = 0.9
+	mesh.surface_set_material(0, m)
+	var mi := MeshInstance3D.new()
+	mi.name = "AirportGround_%d" % airfields.size()
+	mi.mesh = save(mesh, "airport_ground_%d" % airfields.size())
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(mi)
+	mi.owner = level
+
+
+func _ground_index(rt: Dictionary) -> int:
+	var sv: PackedFloat32Array = rt.s
+	for j in range(sv.size()):
+		if sv[j] >= float(rt.s_ground):
+			return j
+	return sv.size() - 1
+
+
+## Prints how a route passes the lap and errors where it comes within 60m of the country or a tower (away from its
+## own runway's last and first 2.5km).
+func _check_route(rt: Dictionary, city: Vector2, o: Vector2) -> void:
+	var b: Dictionary = Airliners.build_route(rt)
+	var pos: PackedVector3Array = b.pos
+	var lowest := 1e9
+	var low_at := Vector3.ZERO
+	var nearest := 1e9
+	var near_at := Vector3.ZERO
+	var sv: PackedFloat32Array = b.s
+	var s_ground: float = b.s_ground
+	for j in range(pos.size()):
+		var q: Vector3 = pos[j]
+		var p2 := Vector2(q.x, q.z)
+		var d: float = p2.distance_to(o)
+		if d < nearest:
+			nearest = d
+			near_at = q
+		# Its own runway's approach or climb-out (2.5km either side of where it touches down or lifts off) is meant
+		# to be low; past the country's edge there is nothing to hit.
+		if absf(sv[j] - s_ground) < 2500.0 or d > 3900.0:
+			continue
+		var g: float = country_height(q.x, q.z)
+		var dc: float = p2.distance_to(city)
+		if dc < 420.0:
+			g = maxf(g, 660.0)
+		elif dc < 680.0:
+			g = maxf(g, 40.0)
+		if q.y - g < lowest:
+			lowest = q.y - g
+			low_at = q
+	print("Airliners %s: %.1fkm, %.0fs; nearest the lap's middle %.0fm, %.0fm up; lowest over the country %.0fm at (%.0f, %.0f, %.0f)" % [
+			rt.kind, float(b.s[b.s.size() - 1]) / 1000.0, float(b.total), nearest, near_at.y, lowest, low_at.x, low_at.y, low_at.z])
+	if lowest < 60.0:
+		push_error("Airliners %s pass %.0fm over the ground at (%.0f, %.0f, %.0f)" % [rt.kind, lowest, low_at.x, low_at.y, low_at.z])
 
 
 ## A built thing: `build(pk, kit)` lays it out at life size in its own frame, which is placed at (x, z) on

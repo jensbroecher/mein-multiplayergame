@@ -9,12 +9,18 @@ extends "res://BloombayCity.gd"
 ##                tower (a square shaft under an open lattice crown) and a pair of slender twins joined by a sky bridge
 ## Domes go into the roofs surface (vertex colour, the roof material): pale stucco or gilded.
 
+## Far away (Marina's skyline past the terrain, 1-2.6km off): no merlons or roof pergolas, which are under a pixel
+## there. With them the far city was 1.7 million triangles and a 133MB file, over GitHub's 100MB limit.
+var far := false
+
 const SAND_WALLS := [Color(0.90, 0.80, 0.64), Color(0.86, 0.74, 0.58), Color(0.94, 0.88, 0.76), Color(0.80, 0.68, 0.52), Color(0.92, 0.84, 0.70)]
 const GLASS_GULF := [Color(0.32, 0.40, 0.46), Color(0.44, 0.40, 0.32), Color(0.30, 0.42, 0.40), Color(0.40, 0.44, 0.48)]
 
 
 ## Stepped merlons along every edge of a plan's top at `y` (plain stucco, COLOR.a 0.7).
 func merlon_rim(x: float, z: float, plan: PackedVector2Array, yaw: float, y: float, street: float, col: Color, pitch := 1.8) -> void:
+	if far:
+		return
 	var b := Basis(Vector3.UP, yaw)
 	var n := plan.size()
 	for i in range(n):
@@ -88,7 +94,7 @@ func gulf_block(x: float, z: float, ground: float, w: float, d: float, yaw: floa
 		var r: float = minf(w, d) * rng.randf_range(0.16, 0.26)
 		prism(x, z, plan_shape(3, r), yaw, up_top, up_top + 1.4, ground, trim, 0.7, 0)
 		dome(x, z, up_top + 1.4, r, Color(0.86, 0.66, 0.30) if gold else Color(0.94, 0.90, 0.82))
-	elif pick < 0.7:
+	elif pick < 0.7 and not far:
 		# A roof terrace's pergola: posts and slats.
 		var pw: float = w * 0.35
 		var pd: float = d * 0.35

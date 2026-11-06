@@ -1925,7 +1925,9 @@ func _vehicle_kit() -> PropKit:
 	var kit := PropKit.new()
 	kit.material_for = func(key: String) -> Material:
 		if not _vehicle_mats.has(key):
-			_vehicle_mats[key] = _save_res(MatatuKit.make_material(key), "matatu_" + key)
+			# The lamps glow (an evening stage): MatatuKit's "lamp" gives off no light (LampGlow.gd).
+			var vm: Material = load("res://LampGlow.gd").material() if key == "lamp" else MatatuKit.make_material(key)
+			_vehicle_mats[key] = _save_res(vm, "matatu_" + key)
 		return _vehicle_mats[key]
 	kit.set_frame(Transform3D(Basis().scaled(Vector3.ONE * MATATU_SCALE), Vector3.ZERO))
 	return kit

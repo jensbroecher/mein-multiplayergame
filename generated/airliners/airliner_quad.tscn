@@ -1,0 +1,35 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://generated/airliners/airliner_quad_body.res" id="1_pu7og"]
+[ext_resource type="ArrayMesh" path="res://generated/airliners/airliner_quad_gearmainr.res" id="2_bkd64"]
+[ext_resource type="ArrayMesh" path="res://generated/airliners/airliner_quad_gearmainl.res" id="3_fi1fh"]
+[ext_resource type="ArrayMesh" path="res://generated/airliners/airliner_quad_gearnose.res" id="4_qgkxe"]
+[ext_resource type="ArrayMesh" path="res://generated/airliners/airliner_quad_lights.res" id="5_x8svv"]
+
+[node name="Airliner_quad" type="Node3D" unique_id=2055282486]
+
+[node name="Body" type="MeshInstance3D" parent="." unique_id=1666773170]
+mesh = ExtResource("1_pu7og")
+
+[node name="GearMainR" type="MeshInstance3D" parent="." unique_id=97657461]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.6, -2.2, 2.6)
+mesh = ExtResource("2_bkd64")
+metadata/fold_axis = Vector3(0, 0, 1)
+metadata/fold_angle = -1.5707963267948966
+
+[node name="GearMainL" type="MeshInstance3D" parent="." unique_id=140034768]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.6, -2.2, 2.6)
+mesh = ExtResource("3_fi1fh")
+metadata/fold_axis = Vector3(0, 0, 1)
+metadata/fold_angle = 1.5707963267948966
+
+[node name="GearNose" type="MeshInstance3D" parent="." unique_id=1333598329]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2.4, -27.4)
+mesh = ExtResource("4_qgkxe")
+metadata/fold_axis = Vector3(1, 0, 0)
+metadata/fold_angle = 1.5707963267948966
+
+[node name="Lights" type="MeshInstance3D" parent="." unique_id=350981414]
+cast_shadow = 0
+extra_cull_margin = 80.0
+mesh = ExtResource("5_x8svv")

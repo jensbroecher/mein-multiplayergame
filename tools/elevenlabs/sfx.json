@@ -1,0 +1,122 @@
+[
+  {
+    "name": "jet_approach",
+    "path": "sounds/airliners/jet_approach_loop.wav",
+    "text": "A large passenger jet airliner flying past overhead on its approach to land, a steady deep turbofan roar and low rumble, heard from the ground outdoors, continuous, no doppler sweep",
+    "duration": 10.0,
+    "loop": true,
+    "influence": 0.55
+  },
+  {
+    "name": "jet_climb",
+    "path": "sounds/airliners/jet_climb_loop.wav",
+    "text": "A large passenger jet airliner climbing out after takeoff, powerful jet engine roar with a high turbofan whine on top, heard from the ground outdoors, continuous, no doppler sweep",
+    "duration": 10.0,
+    "loop": true,
+    "influence": 0.55
+  },
+  {
+    "name": "suspended_train",
+    "path": "sounds/muallaq/suspended_train_loop.wav",
+    "text": "A suspended monorail train gliding along an overhead steel rail, smooth electric motor hum, soft rhythmic clicks of the wheels over rail joints, gentle sway creaks, continuous",
+    "duration": 8.0,
+    "loop": true,
+    "influence": 0.5
+  },
+  {
+    "name": "station_chime",
+    "path": "sounds/muallaq/station_chime.wav",
+    "text": "A gentle three-note electronic chime at a train station announcing a departure, clean and bright, short",
+    "duration": 3.0,
+    "loop": false,
+    "influence": 0.7
+  },
+  {
+    "name": "souk_arcade",
+    "path": "sounds/arcade/souk_arcade_loop.wav",
+    "text": "A busy covered Arabian market arcade at night, indoor crowd murmur and chatter, footsteps on stone floors, shopkeepers calling softly, cups clinking, faint oud music from a shop, reverberant hall, continuous",
+    "duration": 22.0,
+    "loop": true,
+    "influence": 0.45
+  },
+  {
+    "name": "crowd_cheer_1",
+    "path": "sounds/crowd/promenade_cheer_1.wav",
+    "text": "An excited crowd of spectators lining a street race at night bursts into cheers and whistles as the racers go past, short and lively, outdoors, no engine sounds",
+    "duration": 4.5,
+    "loop": false,
+    "influence": 0.5
+  },
+  {
+    "name": "crowd_cheer_2",
+    "path": "sounds/crowd/promenade_cheer_2.wav",
+    "text": "A grandstand crowd roars and applauds, a rising cheer that settles, outdoor night race, no vehicles",
+    "duration": 5.0,
+    "loop": false,
+    "influence": 0.5
+  },
+  {
+    "name": "crowd_cheer_3",
+    "path": "sounds/crowd/promenade_cheer_3.wav",
+    "text": "Spectators behind barriers clapping, shouting and whooping as racers speed by, a couple of air horns, outdoors, no engines",
+    "duration": 4.5,
+    "loop": false,
+    "influence": 0.5
+  },
+  {
+    "name": "crowd_cheer_4",
+    "path": "sounds/crowd/promenade_cheer_4.wav",
+    "text": "A seaside promenade crowd cheering loudly, whistles and shouts of encouragement, a short burst, no engines",
+    "duration": 4.0,
+    "loop": false,
+    "influence": 0.5
+  },
+  {
+    "name": "crowd_cheer_5",
+    "path": "sounds/crowd/promenade_cheer_5.wav",
+    "text": "A crowd gasps and then erupts into excited cheering and applause, outdoors at night, no vehicles",
+    "duration": 4.5,
+    "loop": false,
+    "influence": 0.5
+  },
+  {
+    "name": "crowd_cheer_6",
+    "path": "sounds/crowd/promenade_cheer_6.wav",
+    "text": "Festive fans cheering and clapping along to a darbuka drum, whistles, a short joyful burst, outdoors at night, no engines",
+    "duration": 5.0,
+    "loop": false,
+    "influence": 0.5
+  },
+  {
+    "name": "suspended_train_run",
+    "path": "sounds/muallaq/suspended_train_run_loop.wav",
+    "text": "A suspended monorail train running along an overhead steel girder track, a deep metallic rumble of steel wheels on the rail, the girder resonating and humming, an electric motor whine, continuous",
+    "duration": 10.0,
+    "loop": true,
+    "influence": 0.6
+  },
+  {
+    "name": "suspended_passby_1",
+    "path": "sounds/muallaq/suspended_passby_1.wav",
+    "text": "A suspended railway train passes close overhead: a rising rumble and squeal of steel wheels on the rail, the steel girder booming as it goes by, then fading away into the distance, no horn, no voices",
+    "duration": 7.0,
+    "loop": false,
+    "influence": 0.6
+  },
+  {
+    "name": "suspended_passby_2",
+    "path": "sounds/muallaq/suspended_passby_2.wav",
+    "text": "An overhead hanging monorail train rushes past above the street, rattling steel wheels and a booming girder swelling and then fading away, no horn, no voices",
+    "duration": 7.0,
+    "loop": false,
+    "influence": 0.6
+  },
+  {
+    "name": "suspended_brakes",
+    "path": "sounds/muallaq/suspended_brakes.wav",
+    "text": "An electric train braking smoothly to a stop at an elevated station, a soft brake squeal and a hiss of air, short",
+    "duration": 4.0,
+    "loop": false,
+    "influence": 0.6
+  }
+]

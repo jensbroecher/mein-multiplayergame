@@ -27,6 +27,8 @@ Regenerate headless from the project root (the scene saves the level and quits b
 "/f/Godot/Godot_v4.8-beta2_win64_console.exe" --headless --path . res://regenerate_frostpeak_creek.tscn
 ```
 
+Close the Godot editor while regenerating: with it open, one regeneration's `generated/mountain_track_collision_shape.res`
+came out truncated (corrupt; the level failed to load its track) and a regeneration with the editor closed wrote it whole.
 Afterwards, check the output for `ERROR:` lines from the generator. Generators like Frostpeak Creek run
 self-checks (`_verify_ramp_junction`, `_verify_bridge_alignment`) that `push_error` on bad geometry but
 still save the level. You can ignore these at exit: "Node not found: Players/PlayerSpawner" (`Level.gd` runs
@@ -707,6 +709,16 @@ gaps and tapers (`_in_road_gap`), so the ground there is grass, off-road, with i
   asphalt down to its point) and eases the gap's grading in inside the taper, so `road_gap_ground` (default
   `ROAD_GAP_GROUND`) can bring the ground up to a few centimetres under the asphalt: Pinecrest Ridge, 6cm.
 
+## TerrainGenerator's bridge pillars
+
+`generate_bridge_supports` (on by default) stands a concrete pillar with a box collider every 30m wherever the road's
+curve is 5m over sea level (`_generate_bridge_supports`; MOUNTAIN and CANYON layouts skip it). That suits a bridge over
+water and nothing else: on a dune or a hillside the pillar stands buried under the road. Off on Wadi al-Ghaf,
+Frostpeak Creek, Pinecrest Ridge and Ramlat Hamra (one poked out of a dune crossing, which is bare sand). Lakeside's 68
+are its long bridge's piers but 12 on the climb to it, Bloombay Dunes' 32 are all under its dune road: under paved road
+they don't show. `res://scratch/bridge_support_check.gd` (`-s`, headless, `-- <level>`) lists a level's pillars with
+the natural ground under each (`natural_height`, the ground before the road is graded in) and which hold nothing up.
+
 ## Race gates
 
 - Every level's FinishLine and checkpoints are instances of `CheckpointGate.tscn`. `CheckpointGate.gd`
@@ -867,6 +879,24 @@ in front of the water while driving (Msitu Falls, Bloombay Dunes). `canyon_river
   cart), `unused_alert` (wrong way). The double beep (an item in hand) was too distracting and is gone.
   The odd-named loops in `sounds/enginesounds/` (`cccc`, `kkk`, ...) are spares no car uses.
   The screech and the squeal (`SFX_BrakeDrift`) only play on paved road: see Surfaces below.
+
+## Sound effects from ElevenLabs (tools/elevenlabs)
+
+- `tools/elevenlabs/generate_sfx.mjs` makes sound effects with ElevenLabs' text to sound effects (SFX v3,
+  `eleven_text_to_sound_v3`) from the jobs in `tools/elevenlabs/sfx.json` (name, the file under the project, the prompt,
+  seconds, whether it loops seamlessly, prompt influence), as 44.1kHz WAV; it skips files already made (`--force`,
+  `--list`, names to make only those). From the project root: `node --env-file=.env.local tools/elevenlabs/generate_sfx.mjs`.
+  The key is the user's, in `.env.local` (git ignores it; written by `npx @elevenlabs/cli onboard`): never print it or put
+  it in code, the SDK reads `ELEVENLABS_API_KEY`. The folder has its own package.json (`npm install` there for
+  `@elevenlabs/elevenlabs-js`; node_modules is git-ignored) and a `.gdignore`, so Godot never scans it. Each run spends
+  the account's credits.
+- After making clips: import them (`Godot --headless --path . --import`), set `edit/loop_mode=2` in a looping clip's
+  `.import` and import again, and measure them (`res://scratch/measure_clip_rms.gd`, `-s`, headless: length, RMS, peak
+  and loudest second in dBFS, read from the WAV itself) to level them by their RMS like the recorded clips elsewhere.
+- Made so far: the airliners' approach and climb-out roars (Airliners.gd); the suspended railway's run, pass-by bursts,
+  brakes and station chime (SuspendedTrains.gd; its first soft glide loop is unused now); Qaysariyyat al-Manara's market
+  murmur and the start promenade's six cheers (Marina Nights, CrowdCheers.gd). One-shots are levelled by their loudest
+  second, loops by their RMS.
 
 ## Surfaces: skid marks, sliding sounds and spray
 
@@ -1400,7 +1430,8 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 - `_verify_jumps()` flies carts over the gully gaps and the mega-jump at 30 m/s^2 gravity and prints
   landing distance and impact; `_verify_trail_ground()` checks grade and cross slope along the trail.
 - `res://scratch/ai_race_test.tscn -- res://levels/X.tscn seconds=330 speed=4` races 6 AI carts
-  headless and lists every respawn with where it happened. `res://scratch/water_drop_test.tscn` drops a
+  headless and lists every respawn with where it happened, and each cart's laps in game seconds (`laps_s`; `FLYING
+  LAPS`: the laps after the first, to compare AI changes with `cars=` fixed and `noitems=1`). `res://scratch/water_drop_test.tscn` drops a
   cart at given points and reports whether it drowns.
 - Spruces swap to their far mesh one tree at a time: `spruce.gdshader` dithers each tree between LODs
   (`lod_mode`). The cells' visibility ranges are padded by half a cell diagonal, so a whole cell never
@@ -1731,6 +1762,22 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 - A vehicle's awning side is its +x, which a layout turns to terrace -x: space a row of awning vehicles
   7m apart plus the gap, not the 4m body width.
 - Pads are the only level ground. A 12m vehicle on a slope floats at one end, so camps stay on their pad.
+- CampKit's "lamp" gives off no light (see "Lamps on the night and dusk stages").
+
+## Lamps on the night and dusk stages
+
+- CampKit's and MatatuKit's "lamp" is a StandardMaterial3D with emission MULTIPLY and no emission texture: the texture's
+  default is black, so it gives off no light and lanterns, lamp lenses and bulbs read as paint (a StandardMaterial3D
+  can't glow in its vertex colour either). `res://scratch/lamp_material_probe.gd` (`-s`, windowed) measures it (0.05
+  against a glowing 1.0); `res://scratch/lamp_survey.gd` (`-s`, headless, `-- [levels]`) lists each level's sun (its
+  elevation, energy and colour) and its dead lamp surfaces and the files that hold them.
+- On the night and dusk stages lamps glow: `LampGlow.gd` (`material()`: `lamp_glow.gdshader`, unshaded, the vertex colour
+  times `energy`; `is_dead`, `fix_mesh`). Marina Nights (MarinaKit's keys, its sailboats), Mtaa Nights (the vehicles'
+  lamp, `generated/mtaa_matatu_lamp.res`), Ramlat Hamra (`ArabianKit.lamps_glow`, set by its generator: the palace's and
+  the reflector posts') and Mina del Viento at dawn (MinaKit's "lamp", `generated/minaprop_mat_lamp.res`). Their saved
+  files were patched in place by `res://scratch/fix_lamp_glow.gd` (`-s`, headless, `-- <levels> [energy=] [dry=1]`: a
+  dead lamp material in a file of its own is replaced at its path, one embedded in a mesh is swapped and the mesh
+  saved), and their generators build them so. The day stages keep CampKit's (lamps lit at noon would look wrong).
 
 ## Bloombay Dunes (beach stage)
 
@@ -2165,6 +2212,29 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   and, for each step, what the bumper rays meet and whether each counted as narrow (and what its side rays found);
   `scratch/rail_boxes_near.gd` (`-s`, headless, `-- <level> x,z [radius=10] [match=Guardrail]`) lists a body's boxes
   near a spot with their ends, to see where a run of rail stops.
+
+## AI corner speeds
+
+- A cart's heading turns at most `steer_speed` rad/s (above 10 m/s) and its grip only damps its sideways velocity
+  (`-lat_vel x grip`, no lateral-g limit), so the path's radius can be as small as v / steer_speed. The AI plans a corner
+  by its radius: `_ai_measure_upcoming_turn` also returns the tightest curvature ahead (`kappa`: the heading's change
+  over 6m), and the safe speed is at least `AI_YAW_USE` (0.5) x `steer_speed` x R (times the root of the surface's
+  grip), up to the top speed. By the heading's change alone (`corner_factor`) a 75m sweeper was taken as slowly as a
+  12m corner, about 13-16 m/s.
+- `is_hairpin` (shorter aim, the lane offset damped, a 10 m/s cap, a longer braking window, no drifting) is a corner sharp
+  within 20m or turning over 72 degrees ahead *and* tighter than 25m: on the angle alone every 90-degree bend counted.
+  A right angle (under 110 degrees) may still go at 0.85 of its radius' speed; true hairpins keep the cap.
+- Measured (`scratch/ai_race_test ... speed=2 cars=5,16,0,3,8,12 noitems=1`, flying laps' mean): Marina Nights 75.2s ->
+  72.7s, Glacier Highway 59.2 -> 53.1 (non-item falls 13 -> 7), Pinecrest Ridge and Lakeside Meadows the same within the
+  noise, no new respawns. At 0.6 Glacier Highway's falls tripled.
+
+## AI boosts
+
+- A bot fires a boost item when recovering (slow or off the road) or on an open stretch (`_process_ai_items`), never with a
+  sharp turn within 26m, and not while a corner of more than 50 degrees (0.9 rad) lies within 105m of its route
+  (`_ai_measure_upcoming_turn` with a 110m look, from `_ai_turn_offset`): a boost carries a cart 80-120m, and the turn
+  ahead is measured only `speed` x 1.8 metres out (30m out of a slow corner), so out of one of Marina Nights' souk
+  corners bots fired one and met the next at 60 m/s.
 
 ## AI drifting
 
@@ -3136,7 +3206,8 @@ Rebuilt on 2026-11-02 (Gemini's first version had a pit unrelated to its road, t
   `_check_finish` the run (`finish_ms`, the laps' sum). The human's HUD hears of each (`_send_timing`: a gate, a lap,
   the finish; RPC'd to a remote player, straight to the right HUD in split screen), and every HUD starts its clock at
   the green light (`_start_lap_timers`) with the stage's lap record and, in a time trial, the stored best lap's splits.
-- `RaceUI`'s lap timer (`timing_*`, under the minimap): the running lap (or stage) time in tabular figures, the delta
+- `RaceUI`'s lap timer (`timing_*`, under the minimap), shown in a time trial only (a GP or a single race times every lap
+  but shows no clock): the running lap (or stage) time in tabular figures, the delta
   at each gate against the reference lap's split there (green faster, red slower; the reference is the stored time
   trial best lap, then the session's best clean lap), the lap's delta or RECORD, LAST / BEST / RECORD, and in a time
   trial RUN and BEST RUN. A time trial hides the position and the standings. The end screen shows TIME (the
@@ -3177,12 +3248,37 @@ call the stages Jebel Sahar and Wadi al-Ghaf; files and code keep "mountain" and
 - `ArabianDresser.gd`: what both share (exact ground on the generator's triangles, the lap's distance in plan from a
   grid index, notes for keeping apart, the sky, the ground map and material, plant and rock meshes, MultiMesh
   cells, the country past the rim `backdrop` and the `skyline`).
-- `ArabianKit.gd` (PropKit, life size, grown by 1.6): `fort` (battered mud walls, stepped merlons, round towers, a
-  square tower, a keep, the gatehouse), `watchtower`, `house` (courtyard house, poles, carved doors, a `wind_tower`),
-  `barasti` (palm-frond hut), `bedouin_tent` (black goat hair, carpets, a `dallah`), `road_lamp`, `skyline_tower`.
+- `ArabianKit.gd` (PropKit, life size, grown by 1.6): `fort` and `watchtower` in two styles, `house` (courtyard house,
+  poles, carved doors, a `wind_tower`), `house_najdi`, `mosque`, `villa`, `barasti` (palm-frond hut), `bedouin_tent`
+  (black goat hair, carpets, a `dallah`), `road_lamp`, `skyline_tower`, `palace` (Ramlat Hamra).
   Mud is hut_masonry 3; COLOR.a is how much its plaster flakes (keep it low: at 1 the forts were blotched white).
+  - Style 0, Omani (Jebel Sahar, and Marina's souk watchtower): `fort_omani`, battered walls dressed outside by
+    `wall_dress` (lime bands, buttresses, two rows of loopholes, waterspouts, machicolations), `tiered_tower`s (drums
+    stepping back, each with a band, loopholes, poles, merlons on its ledge), a square tower, a three-tier keep with a
+    lookout `kiosk`, the gatehouse (the door in a recessed two-centred pointed arch, `arch_opening` filled with darker
+    mud, a lattice fanlight, nested frames, a machicolation, two `cannon`s), arcaded rooms, stairs, a whitewashed
+    `mosque` with a round minaret, the well. Style 1, Najdi (Wadi al-Ghaf): `fort_najdi` in redder mud (`MUD_RED`),
+    walls leaning in hard, a white band under the walkway painted with `triangles`, rows of triangular vents, square
+    tapering towers (`_najdi_tower`), the murabba'a (a tall square keep), the gate block with a `najdi_door`, the
+    mosque with a square minaret. `watchtower(…, style)` follows them (its door's face leaves out the shutter there).
+  - White trim is "stucco" (hut_masonry 4): "lime" (style 1) paints brown patches where its wash has gone whatever
+    COLOR.a says, which read as dirt on bands and on a white mosque. `najdi_door`: teak leaves with painted sawtooth
+    bands and diamonds, laid 1.2cm proud (a full grid of primaries read as a toy); shutters are `NAJDI_SHUTTER`'s muted
+    colours. `door(…, gable=false)` inside an arch: its own pointed gable left a black triangle under the arch's head.
+  - `national_flag`: Al-Raihana's (fictional): a maroon field, a gold band at the hoist, a gold eight-pointed star, as
+    on the flag carrier's tails (AirlinerKit "raihana"). The user chose it over an emblem they had drawn in Gemini.
+    The first flags were banded tricolours that were real countries' flags.
+  - `villa` (Wadi al-Ghaf's `VillaWadi`, from a picture the user liked): a sandstone house on a terrace among boulders,
+    built mirrored so the dome stands on the right seen from the front: the hall (a great pointed arch over a balconied
+    window and a round-arched porch, `arch_bay`; turrets with little domes; a belvedere of arches on the roof), a
+    half-round loggia (`curved_arcade`, `column`), the domed drum with a curved arcade, a round tower, `stairs` with
+    stepped cheeks, a round pool and majlis (`ring_wall`, `disc_slab`: UVs in metres, or hut_masonry's foot term darkens
+    them), `sand_boulder`s. `res://scratch/arabian_buildings_preview.gd` (`-s`, windowed, `-- <dir>
+    set=fort|tower|houses|mosque|villa style=0|1 name:x,y,z:tx,ty,tz[:fov]`) renders any of them in seconds.
+  - Tower footings flare out under the ground (a rubble talus): where a pad's edge falls away one had shown as a cube.
   Single meshes: DressingColliders gives each a trimesh at race time. Keep "line" out of names that should be solid
-  ("Skyline" is skipped on purpose), and "gate", "light", "lake".
+  ("Skyline" is skipped on purpose), and "gate", "light", "lake". "cloth" is drawn from both sides (for single faces);
+  `PropKit.panel` lays a back face of its own, so panels take "awning" (one-sided), or the two faces z-fight.
 - `DatePalmKit.gd`: date palms (stiff blue-green fronds, a clad trunk, offshoots, date bunches) on Bloombay's palm
   shaders with an atlas of their own. WoodlandBuilder has `ghaf` and `samr` (umbrella thorn); their leaves are
   `acacia_leaves.gdshader` with `desaturate` (0 by default, so other levels are unchanged).
@@ -3208,6 +3304,44 @@ call the stages Jebel Sahar and Wadi al-Ghaf; files and code keep "mountain" and
     `generated/canyon_chasm_rocks/`) stand on the steep faces. The summit has no bridge test (`bridge_factor`
     off within 100m of the middle): the reshaped road stood on concrete walls there. The road's side walls are
     sandy dressed stone (`_stone_road_sides`).
+- Airliners over all four stages (`Airliners.gd`, `AirlinerKit.gd`; the user asked for passenger jets coming to and from
+  the city): procedural airframes, generic shapes of no real type, "twin" (a wide-body twin-jet, 64.5m) and "quad"
+  (four engines, 71m), at life size, nose -z; one mesh with every part (COLOR.r the part, `P_*`) and no livery in it:
+  `airliner_body.gdshader` paints the livery from uniforms (`AirlinerKit.LIVERIES`, fictional carriers: Raihana the
+  flag carrier, Raihana Cargo, Bloombay Air, Matumaini Airways, Viento, Sahar Air) and draws the cabin windows, doors,
+  cockpit glazing, cheatlines, belly, tail art (SDF stars, sun, waves, band, crescent) and the tail's colour sweeping
+  over the rear fuselage from the model position; what differs between airframes comes per instance (`door_z`,
+  `win_z`, `art_c`, `nose_z`). Gear legs are meshes of their own built about their hinges (meta "fold_axis",
+  "fold_angle"), lights a mesh of sprites (`airliner_lights.gdshader`: corners all at the light, opened out facing the
+  camera and never under a few pixels across; nav, strobes, beacons, landing lights by `landing`). At night the cabins
+  glow and the tail is floodlit (`night`). Both fade by dither toward the cameras' far plane and at their routes' ends
+  (`vis`). `regenerate_airliners.tscn` (headless, seconds) bakes `generated/airliners/airliner_<frame>.tscn`;
+  `res://scratch/airliner_preview.gd` (`-s`, windowed, `-- <dir> [frame=twin|quad] [livery=] [gear=0] [night=1] [all=1]
+  name:x,y,z:tx,ty,tz[:fov]`) renders them in memory.
+  - `Airliners.gd` (a node with `routes`, `fleet`, `night`) flies them at SCALE 1.6 on the wall clock (seconds into the
+    UTC day, LAN peers agree; `clock_override` for lap_shots' clock=): a flight leaves each route's start every `every`
+    seconds, its airframe and livery drawn from `fleet` by its number; pooled planes; nothing on a headless server. A
+    route (`arrival`, `departure`, `build_route`) is a plan polyline rounded to `radius`, heights and speeds by distance
+    (heights smoothed except on the ground), the main wheels' path. It banks into turns (as a life-size jet would, 25
+    degrees at most), flares and lowers its nose on landing, rotates on take-off, lowers its gear `GEAR_DOWN_AT` over the
+    runway and folds it after lift-off. The engines are recorded loops (`CLIPS`: `sounds/airliners/jet_approach_loop.wav`,
+    `jet_climb_loop.wav`, made with tools/elevenlabs; gains from their measured RMS), louder on take-off and reverse
+    thrust; `jet_roar` (synthesised) if a clip is missing.
+  - The desert stages (`ArabianDresser.airliners`, called before `backdrop`): an arrival's 3-degree final passes `lat_a`
+    (300m) beside the lap on one side and 650m beside the city's towers to a runway 1.6km past the city (out of reach),
+    a departure lifts off short of the city on its other side and climbs out `lat_d` (550m) past the lap: over the lap at
+    about 250m and 390m. Each turns in and out of its line far off (`entry_turn`, `exit_turn`), away from the stage's
+    ranges; where ranges stand behind the lap (Jebel Sahar's south, Wadi's north-east) the final is shorter (`final_len`
+    6km) or it flew into a peak. Both runways are graded into the country as airfields (`airfields`, `_backdrop_y`) and
+    drawn (`_runway`, "AirportGround": DressingColliders leaves it). `backdrop` then checks both routes against the country
+    (`country_height`) and the towers and prints how they pass the lap (it errors under 60m, away from their runways'
+    last and first 2.5km). `res://scratch/airliner_map.gd` (`-s`, headless, `-- <level> <out.png> [half=5500] [px=10]`)
+    maps a level's skies (the ground, ranges, city, lap, the cameras' 4km reach, the routes darker the higher);
+    `res://scratch/airliner_times.gd` (`-s`, headless, `-- <level> [k=100]`) prints when each flight is where (the
+    clock= to aim a shot); `res://scratch/airliner_shots.gd` (`-s`, windowed, `-- <level> <dir> clock=<s>
+    name:x,y,z:plane0[:fov]`) photographs them there, aiming at a flight by its number. lap_shots shoots too soon on a
+    heavy level: the airliners' new shaders compile in the background and draw nothing until ready (the race's loading
+    and intro cover that in the game).
 - Music: Wadi al-Ghaf plays its own track (`MusicManager.STAGE_TRACKS["wadi"]`, `music/al-raihana/Racing_the_Mirage.mp3`),
   Ramlat Hamra `Red_Sands_Pursuit.mp3` ("ramlat"), Marina Nights `Midnight_Sprint.mp3` and `music/night/Apex_Drift.mp3`;
   Jebel Sahar still shuffles `music/mountain/`. New Al-Raihana tracks go in
@@ -3217,11 +3351,22 @@ call the stages Jebel Sahar and Wadi al-Ghaf; files and code keep "mountain" and
   dressing: run `regenerate_wadi_dressing.gd` after it.
 - Wadi al-Ghaf: the piste (`PISTE_IN`/`PISTE_OUT`) and rally marker flags (soft: "flag" in their names) along the
   lap, the oasis's palms round the lake and the old river's bed, Husn al-Wadi on the dunes, the village by the oasis,
-  watchtowers, the camp in the western bowl.
-- Jebel Sahar's town has a checkpoint (`HalfwayTown`, `_town_checkpoint`, in the level's `checkpoints` before the
-  finish), or the town could be cut. The summit's chevron board points down the plunge (ArrowSign's arrow is its
-  +x). Forts and watchtowers stand on rubble footings 6m (life) deep (`ArabianKit.round_tower`, `fort`, `watchtower`):
-  at a pad's edge they had stood on air. The town walls carry a coping and merlons along their line.
+  watchtowers, the camp in the western bowl. Its buildings are Najdi (style 1, above), unlike Jebel Sahar's Omani
+  ones: the village's houses are `house_najdi` and the plot nearest its middle is the mosque. The fort's pad holds its
+  corner towers and 6m round them. The villa (`_plan_sites`: `VILLA_HALF`, `VILLA_BLEND`, `VILLA_ROAD` from the lap,
+  the flattest ground found, its front toward the nearest road point; `VILLA_PALMS` in its courtyard) stands 115m off
+  the lap at (-413, 99), over a dune crest from it.
+- Jebel Sahar's summit pad is 30m with a 12m blend: one of its diagonals points at the summit road (bearing -95, 61m
+  out), and at 35m its corner raised the ground over the asphalt's edge (`scratch/pinecrest_road_probe.gd
+  level=res://levels/MountainLevel.tscn`). Behind the fort, where no road runs, the summit stands higher than the pad.
+- Jebel Sahar's town has two checkpoints (`_town_checkpoint`, both in the level's `checkpoints` before the finish), or
+  the town could be cut: `HalfwayTownEntry` at its entrance (s 2696, between `TOWN[2]` and `TOWN[3]`) and `HalfwayTown`
+  among the houses (s 3000), 305m apart (it errors under 53m). `res://scratch/gate_offsets.gd` (`-s`, headless,
+  `-- <level>`) reads a saved level's checkpoint order from the .tscn and prints each gate's distance along the lap: the
+  order must rise with it. Ramlat Hamra, made from Jebel Sahar's scene, drops both town gates (they stood on its lap out
+  of order) and sets its own order. The summit's chevron board points down the plunge (ArrowSign's arrow is its
+  +x). Forts and watchtowers stand on rubble footings 6m (life) deep (`ArabianKit.round_tower`, `fort`, `watchtower`),
+  flaring out below the ground: at a pad's edge they had stood on air. The town walls carry a coping and merlons.
 - The Al-Raihana heightfields split each cell along the diagonal joining its closer heights
   (`TerrainGenerator.adaptive_diagonal`, `split_00_11`; `ArabianDresser.ground` matches): one fixed diagonal sawed
   steep slopes into teeth.
@@ -3242,14 +3387,28 @@ call the stages Jebel Sahar and Wadi al-Ghaf; files and code keep "mountain" and
   pool court) is cut into the next ridge's foot on a pad whose blend stops short of the road. Salt flats are
   `arabian_ground`'s `salt_height` (crust in patches, polygon ridges). Camels (`ArabianKit.camel`), two Bedouin camps
   between corridor A's lanes, reflector posts (none on the crossings), ghaf, grass and broom, the ranges to the west,
-  the city to the north-east. AI races (speed=2): every bot finishes three laps, the only respawns item blasts.
+  the city to the north-east. AI races (speed=2): every bot finishes three laps, the only respawns item blasts. No
+  bridge pillars (`generate_bridge_supports` off): TerrainGenerator stood 11 under the dune crossings, buried in the
+  sand, and where the dune dips under the line the crossing follows one poked out of the east ridge.
   - The canyon road (`SNAKE`): corridor A's south lane leaves its straight at x 265 and winds south of it between
     red sandstone formations (`_build_canyon_rocks`: ChasmRock.gd shapes, `palette` 2, on the inside and outside of
     each bend) back to the lane at x -200; the kicker (`SabkhaKicker`) is after it, at x -245. The straight off-road
     alternative (`AlternativePaths/DuneBypass`, `BYPASS_X0`..`BYPASS_X1`, 470m against the road's 565m, flat sand)
-    runs on along the lane's line: off-road cars lose less there. Plants, camels and rocks keep off it
-    (`_on_bypass`), and no gate stands on the canyon road (a bot on the bypass would miss it).
+    runs on along the lane's line: off-road cars lose less there. Plants, grass tufts, reflector posts, camels and
+    rocks keep off it (`_on_bypass`; the tufts and posts had stood on it), and no gate stands on the canyon road (a bot
+    on the bypass would miss it). `res://scratch/flora_on_road.gd` (`-s`, headless, `-- res://levels/X.tscn
+    [half=7.5]`) lists every MultiMesh instance within `half` of any lap path, shortcuts included (none on the four
+    Al-Raihana stages).
     `scratch/shortcut_probe ... chance=1.0`: taken 22 times, rejoins cleanly, the only respawns item blasts.
+  - Saif al-Hamra (`_plan_sword_gate`, `_build_sword_gate`, `ArabianKit.sword_gate`; `SWORD_X` 215 on corridor B, s 829):
+    two giant scimitars crossed over the palace's avenue, as Mombasa's tusks are, each hilt standing in a pedestal
+    beside the road (`SWORD_SPAN` + 2.5 out, its foot on the ground). A blade is a circular arc from the guard (9m up,
+    leaving at 72 degrees) through the crossing (24m over the road's middle): a chrome edge on the arc's outside, a
+    darker fuller, gold lozenges, a glowing line along the spine; a gold crossguard with langets, a banded maroon grip,
+    a pommel with a red gem. The pedestals are mud brick on stone with merlons, gold star medallions and the name; the
+    blades pass 1.5m apart where they cross. Solid as boxes (the pedestals) and capsules along the blades, in one body
+    named without "gate" (`SaifAlHamra`: a "gate" collider counts as road). Uplights at each foot. Gates and plants
+    keep off its feet.
 - Wadi al-Ghaf's water is wadeable everywhere (`WADI_RIVER_BED_Y` 1.25 under a 1.7 surface; within the water's
   reach the ground never lies under the bed) and the ford's road no lower than `FORD_Y` (1.2,
   `regenerate_wadi_dressing._raise_ford`): the water slows a cart (PlayerCart's shallow drag), the strip of land
@@ -3258,42 +3417,186 @@ call the stages Jebel Sahar and Wadi al-Ghaf; files and code keep "mountain" and
   colours are set in `TerrainGenerator.add_wadi_river_water` (it rebuilds the water at runtime): clear green-teal.
 - Marina Nights (stage 4, the finale; `regenerate_marina_nights.gd`, headless, about a minute,
   `levels/MarinaNightsLevel.tscn`, prefix "marina_nights"): a night street race through the city the other three stages
-  see on their horizon. Ramlat Hamra's scene is its template. Ground: `ArabianTerrain.marina_height` (flat land at
-  `MARINA_LAND`, the sea south of `coast_z`, the creek along `creek_x` to `MARINA_CREEK_HEAD`, quays dropping to the
-  bed), drawn by `marina_ground.gdshader` (sandstone slabs, the corniche's promenade from the ground map's R, palm
-  beds G, dressed stone on the quay faces), the sea `MarinaWater` (a plane at y 0, PlayerCart's general water branch).
-  The ground and road meshes are chunked (80m, `generated/marina_nights_chunks/`) so each takes in only the lamps near
-  it. The lap (`_lap_curve`): the corniche east over the creek's mouth on a low bridge, north up the avenue between the
-  towers, west over the creek on the arch bridge (`CreekArch`, not "...Bridge"), the souk's tight lanes, the palm
-  avenue south to the sea. The road rises over the creek (`_road_y`) high enough that TerrainGenerator's 2.8m hull
-  side walls don't reach the water; the bridges have parapets (in `QuayRailBody`, boxes; a bot had fallen off the
-  corniche bridge into the creek) and the quays a balustrade.
+  see on their horizon. Ramlat Hamra's scene is its template (gates, grid, spawners; its AlternativePaths are dropped).
+  Ground: `ArabianTerrain.marina_height` (flat land at `MARINA_LAND`, the sea south of `coast_z`, the creek along
+  `creek_x` to `MARINA_CREEK_HEAD`, quays dropping to the bed), which TerrainGenerator returns as it is: nothing graded
+  toward the lap (graded up to the old road's height, the ground had cut through the souk's houses 24cm over their
+  floors). Drawn by `marina_ground.gdshader` (sandstone slabs, promenades from the ground map's R, palm beds G, dressed
+  stone on the quay faces); the sea is `MarinaWater` (a plane at y 0, PlayerCart's general water branch). The ground is
+  chunked (80m), and every other mesh here is built in pieces, for the Mobile renderer's per-mesh light limit.
+  - No TerrainGenerator road (`_generate_road_and_sand` returns for the prefix). The lap is straights and arcs (`CORNERS`,
+    `_fillet`, `_at(s)`; heights `_lap_y`: the land plus `ROAD_LIFT` 5cm, the bridges' humps, the tube's deck), the
+    TrackPath sampled from it every 4m and closed on itself. `_build_roads` lays a ribbon per section (`_road_sections`:
+    [s0, s1, kind, half width, body name]) in `marina_road.gdshader`: UV x across, y along, UV2.x the kind (0 the city's
+    asphalt with lane lines, studs and kerb stones, 1 the souk's setts, 2 the palm avenue's pavers in a diagonal bond,
+    3 the bridge decks with blue LED studs breathing, 4 the tube's resin deck with LED edge lines, 5 the plaza, polar
+    about `plaza_c`), a stone threshold (a steel joint on decks) where the kind changes (COLOR.r). Its vertices are pulled
+    toward the eye (as the skid marks'), so a ribbon 5cm over the ground wins the depth test. Every triangle the lap
+    runs on (the ribbons, the decks, the plaza's paving) is one body, `LapRoad` (`_build_lap_body`: track, surface
+    asphalt): split into pieces, a cart's sphere caught the next piece's leading edge on the corniche bridge's slopes and
+    was thrown a metre up (`res://scratch/lap_hop_probe.tscn -- [level=] [lat=] [from=] [seconds=]`, headless, drives a
+    real cart along the lap and lists every hop with what it left). `road_width` stays 15 (the AI's road half).
+  - The lap (2.6km): the corniche east (the start, the Pearl Ring's jump), Jisr al-Qamar over the creek's mouth, right
+    into Mamar al-Bahr, the glass tube out over the sea round the marina and back to the avenue's foot (its portals 290m
+    apart), Al-Manara Avenue north, the north road west across the fountain plaza and over the creek under the
+    `CreekArch`, the souk's nine sharp corners (12m, a hairpin), the palm avenue south to the sea. Gates (placed by spot,
+    in lap order): in the tube (or the marina walk would cut it), on the avenue, on the north road, on the souk's long
+    lane (Ramlat's HalfwayTown is the fifth), on the palm avenue.
+  - Jisr al-Qamar (`_build_arc_bridge`): the deck humps `ARC_H` (7m) over `ARC_HALF` either side of the creek's axis
+    (cos², at most 14%), on two arch ribs of white stone springing from the quays, spandrel columns, lines of light along
+    the ribs' outer faces and the slab's fascia (`ledchase`: colours drifting slowly), lanterns on the balustrade,
+    uplights at the springings. `_deck_edges` (both bridges): walkways flush with the deck (off-road; at 15cm their kerb stood at the road's edge),
+    the balustrade (boxes),
+    retaining walls where the deck stands over the land, and wing walls flaring out at the way in: two bots had slipped
+    past the balustrade's end and wedged beside the creek bridge's ramp.
+  - Mamar al-Bahr (`_build_tube`): deck `TUBE_HALF` (9m) a side, `TUBE_Y` over the sea rising to `TUBE_CREST` at the far
+    straight; the vault a circle through the deck's edges and the crown `TUBE_CROWN` (13.5m, so the High Chase camera
+    rides inside it); steel ribs every 6m (`marina_rib.gdshader`) with LED strips (`ribled`: marina_led with `cam_fade`),
+    both dithered away within 2.5-6m of the camera; purlins; the glazing one sheet (`marina_glass.gdshader`: Fresnel, a
+    made-up night reflection, mullions; render_priority 2, after the sea); upstands with LED lines, a box girder with a
+    lit fascia, piers every 24m lit at the waterline, stone portals with the name, lamps under the crown every 32m. Solid:
+    the deck (`TubeDeck_n`, track) and walls 3.4m high inside the glass (`TubeWalls`; the meshes are under it, so
+    DressingColliders leaves them). Round the outside of the right turn into it a wall with glowing chevrons
+    (`_build_turn_wall`): off the bridge's crest one bot in eighteen ran wide onto the promenade and stuck.
+  - The fountain plaza (`_build_plaza`, `PLAZA_C` on the north road): the road stops at its paving (each ribbon's end cut
+    to its circle, `_row_on_circle`; the paving a centimetre higher) and starts again past it; the lap rounds the
+    fountain's north side, the south way is as short. Paving in four quarters (`FountainPlazaDeck_n`, track).
+    `MarinaKit.plaza_fountain`: three marble steps with a band of eight-point stars before them (the shader), a basin of
+    blue tiles lit under the water, the column and three bowls (FountainShow, `base_y` the basin's floor). A ring of
+    planters with palms and lit bollards closes it but where the roads come in; outside it café tables under parasols,
+    benches, lantern posts, people (CrowdPlacer, a Gulf mix of skins).
+  - The souk (`_build_souk`): houses along both sides of every lane (fronts 9.2m off the line, 2.3m further where it turns,
+    `_corner_room`: a bot wedged against the fronts out of a corner), the blocks behind packed from big houses to small
+    (`_foot`: oriented boxes, `_obb_hit`; none overlap, so no roofs or plinths at one height z-fight), mud walls along the
+    lanes wherever no house fronts them, the market hall Souk al-Lulu (`MarinaKit.souk_hall`) on the long lane, a
+    watchtower, strings of bulbs across the straight runs (named "...Light...", soft). 40m cells, one mesh each
+    (DressingColliders makes them solid). The first souk flickered: its awnings were `PropKit.panel` (two faces) in
+    ArabianKit's two-sided "cloth", which z-fought with itself; "awning" is the one-sided key for panels (Wadi al-Ghaf's
+    rally flags had the same).
+  - Dawwar al-Bahr (`_build_wheel`, `FerrisWheel.gd`): a 136m wheel on an island east of the marina with a footbridge,
+    facing the start (from the grid it stands inside the Pearl Ring); bands of LEDs on the rims' faces (thin strips round
+    their outsides didn't show from the start), lit spokes, 36 glowing cabins kept level (a MultiMesh, set on the physics
+    tick: from `_process` physics interpolation warned), on the wall clock.
+  - Light: MarinaKit's "led", "ledchase", "glasslit" and "lamp" are `marina_led.gdshader` (unshaded, vertex colour times
+    `energy`). CampKit's "lamp" gives off no light at all (see "Lamps on the night and dusk stages"), so this generator
+    builds through `MarinaKit.new_kit` only, and ShipKit's sailboats go through `LampGlow.fix_mesh`. About 95 real OmniLights, no shadows, faded past
+    150m: the street lamps (none in the tube, the plaza, the souk or on the bridges), the souk's strings, the plaza, the
+    bridge's lanterns and uplights, the tube.
   - The city is `GulfCity.gd` (BloombayCity's facade machinery): `gulf_block` (stucco, stepped merlons, a setback top
     floor, a wind tower, a dome or a pergola on the roof) and `gulf_tower` (sail, twisted, stepped spire, lattice
     crown, twins with a sky bridge). `city_building.gdshader`'s `gulf` (off everywhere else) draws pointed-arch
     windows, mashrabiya screens over half of them, an arcade of pointed arches with warm shops along the ground floor
     instead of neon sign bands, vertical bronze fins on the towers. The user found the first version (BloombayCity's
-    boxes) too like Mtaa Nights'.
-  - The souk: ArabianKit houses packed along the lanes (`_build_souk`, fronts a pavement's width off the road) with
-    awnings and lanterns, festoons of coloured bulbs across the lanes every 12m and a warm light under every other one
-    (`_souk_festoons`). Tarmac stays: a road gap counts as off-road and slowed every car through it.
-  - 64 street lamps with real lights (OmniLights faded past 150m, `no_shadow`), palms along the corniche and the
-    avenues, dhows moored in the creek (`ArabianKit.dhow`, festoons from the masthead), a lit city past the terrain's
-    edge (`FarCity`), a night sky with a moonlight `SunLight`.
-  - `Fireworks.gd` (node `Fireworks`): shells over the sea on the wall clock (LAN peers agree), pooled GPUParticles3D
-    bursts (peony, ring, willow), a flash light per burst, a synthesised boom delayed by the distance; none headless.
-  - The roundabout (`RB_C`, `RB_R`) where the avenue meets the north road: the lap goes three quarters round it (in
-    from the south, out to the west). Its island (`RoundaboutIsland`, a cylinder collider, `ArabianKit.fountain`: a
-    kerb, palms, the basin, a three-tiered fountain) and `FountainShow.gd` (the basin's water, a central jet, a ring of
-    jets arching in, sheets off the bowls, coloured lights; colours and a jet sequence on the wall clock).
+    boxes) too like Mtaa Nights'. Cells 55m within 90m of the lap (each takes in only the lights near it), 220m beyond;
+    none on the plaza, the marina walk, the souk or the wheel's shore. A lit city past the terrain's edge
+    (`_build_far_city`, `FarSkyline_<x>_<z>` in `FAR_CELL` 1.3km cells, GulfCity's `far`: no merlons or roof pergolas).
+    Whole and in full detail it was 1.7 million triangles in one 133MB file, which GitHub refuses (100MB a file) and
+    which hung the push; now 3MB in all. Keep every generated file well under 100MB.
+  - The marina walk (`_build_promenade`): where the corniche ran before the tube took the lap out to sea, a promenade from
+    the quay to the town (the ground map's R), with the corniche's sea front: lantern posts along the quay, benches
+    facing the sea, kiosks with café tables, people. The marina between the tube's legs (`_build_marina`): pontoons with
+    finger berths, ShipKit's sailing yachts and MarinaKit's yachts, three superyachts on the outer pontoon; a superyacht
+    and a motor yacht cruising outside the tube (SeaBoat, `generated/marina_nights_boat_*.tscn`). Dhows moored in the
+    creek.
+  - `MarinaKit.yacht(pk, kit, rng, length, style)` (metres, the bow toward +z: SeaBoat's convention): ShipKit's hull with
+    a boot stripe and a sheer stripe (`YACHT_STYLES`), lit windows along its topsides, anchors in their pockets, a swim
+    platform with steps and the tender garage's door; decks of rounded plan (`_rounded_plan`, `_house`: fronts raked
+    back, dark windscreens, a third of the side panes lit) each roofed by a wider slab (`_slab`: teak, a white fascia, an
+    LED line under it), chrome rails, a hardtop on pillars with the mast (radar domes, a scanner, lights), a hot tub and
+    sun pads forward, navigation lights (starboard green on -x), blue lights along the waterline aft (a glowing quad
+    under the stern, meant as light in the water, lay on the sea as an opaque blue slab). 44m: three decks (5.2k
+    triangles), 24m: two. `res://scratch/yacht_preview.gd` (`-s`, windowed, `-- <dir> [length=] [style=] [night=1]
+    name:x,y,z:tx,ty,tz`) renders one in seconds. (The first, `ArabianKit.superyacht`, was boxes; it is no longer used.)
+  - The start's promenade (`_build_start_promenade`): a grandstand opposite the finish line on the sea side
+    (`MarinaKit.grandstand`, `STAND_LAT`, `STAND_LEN`; a single mesh named "Grandstand", so StageAmbience cheers from it,
+    and DressingColliders makes it solid) under a tensile canopy, about 120 seated fans; people two deep behind crowd
+    barriers along both sides of the straight (`BARRIER_LAT`; the sea side's start is past the south-west corner's exit:
+    a bot run wide out of it stuck at the line's end), banner poles at the line, shade sails over benches, kiosks with
+    café tables, flower beds, strings of lights between the palms, a balloon seller, fishermen at the rail with their
+    rods, families out walking. `_in_stand` keeps palms and furniture off the stand. About 575 people on the stage.
+  - `Fireworks.gd` (node `Fireworks`): shells over the sea south of the tube and the boats on the wall clock (LAN peers
+    agree), pooled GPUParticles3D bursts (peony, ring, willow), a flash light per burst, a synthesised boom delayed by the
+    distance; none headless.
   - Bab al-Lulu, the Pearl Ring (`_plan_ring`, `_build_ring`, `ArabianKit.pearl_ring`): a gilded ring with LED strips and
-    a glowing pearl over the corniche, `RING_PAST_LIP` (10m) past the `PearlKicker` (WoodenRamp, lip 4.65m up, a boost
-    pad 28m before it; the TrackPath's `jump_lips`). Its opening's bottom is 4.3m up and its rim 1.1m over the road, so
-    only the jump goes through. Capsule colliders round the torus (`PearlRing`), cylinders for the pylons.
-    `nyota_jump_test ... level=res://levels/MarinaNightsLevel.tscn ground=1`: 22-60 m/s all through, speed kept; with
-    the ring 20m past the lip, carts under 30 m/s came down short of it.
-  - The marina east of the creek's mouth (`_build_marina`): pontoons with finger berths (`ArabianKit.pontoon`), ShipKit's
-    sailing yachts and `ArabianKit.superyacht`s (lit decks and portholes, blue light under the stern), three
-    superyachts on the outer pontoon, two cruising offshore (SeaBoat, scenes in `generated/marina_nights_boat_*.tscn`).
+    a glowing pearl over the corniche, `RING_PAST_LIP` (10m) past the `PearlKicker` (WoodenRamp, lip 4m over the road, a
+    boost pad 28m before it; the TrackPath's `jump_lips`). Its foot is 0.65m under the road, so the opening's bottom is
+    3.65m over the road (with the ring on the land, as the road was lowered 0.6m, carts at 22 m/s clipped it). Capsule
+    colliders round the torus (`PearlRing`), cylinders for the pylons. `nyota_jump_test ...
+    level=res://levels/MarinaNightsLevel.tscn ground=1`: 22-60 m/s all through, speed kept.
+  - Qaysariyyat al-Manara (`_build_arcade`, `ARCADE_Z0`..`ARCADE_Z1`, 300m of Al-Manara Avenue after the marina walk; the
+    user's "modern souk" the lap runs through): a hall `HALL_HALF` (16m) either side of the avenue's line in 10m bays
+    (`BAY`): two storeys of shops either side (`_arcade_front`: lit rooms behind pointed arches with carpets, lamps,
+    spices or gold in them and a lit ceiling panel, canopies over some, the gallery's balcony with a lattice balustrade
+    and a gold rail, an arched door above, the cornice with a line of light), patterned stone walkways with a kerb
+    (`_arcade_walk`), a pointed vault (`_vault_profile`: two arcs `VAULT_R` from their feet, springing at `SPRING`, the
+    crown about 34m up) of mashrabiya lattice (`marina_lattice.gdshader`, MarinaKit key "lattice": eight-pointed stars
+    cut out by discard, the bars backlit gold) between carved ribs with lines of light, lanterns hanging from the crown,
+    a portal at each end (`_arcade_portal`: the opening's stone frame, gold lines, a lattice band with the name, two
+    lantern towers). The lattice's light lies on the road and walkways (`arcade_floor_light.gdshader`: soft stars,
+    additive, pulled toward the eye further than the road so it wins the depth test). Café tables and planters on the
+    walkways, about 90 shoppers below and on the galleries, 10 real lights, the market's murmur from four players
+    (`sounds/arcade/souk_arcade_loop.wav`, made with tools/elevenlabs). Its footprint is reserved (`_reserve_landmarks`)
+    before the city is built; no street lamps or palms inside. Solid: the shop fronts (a box a side), the portals and
+    towers, the furniture. Halfway3's gate stands in it.
+  - Al-Mu'allaq (`_build_suspended`, `SuspendedTrains.gd`), a suspended railway after Wuppertal's, 933m: from its city
+    terminus north of the souk (Mahattat al-Madina, `STATION_CITY`, in a forecourt of its own) over the souk's roofs
+    (frames among the houses, reserved before the souk is packed), down the palm avenue's line (`LINE_X`) without a
+    stop (one over the street read as a train halting for nothing: no station shows from the road), over the corniche's
+    corner (a 66m span) and 650m of sea to Jazirat al-Fanous. The terminus has a hall under its platforms
+    (`_terminus_hall`: two stone wings with lit pointed windows and the line's name, a lower glazed hall under the tracks,
+    a grand entrance at each end with the station's name). Two tracks `TRACK_OFF` either side, each a box-truss girder (`_truss`) with the rail hung under
+    it on brackets (running surface `RAIL_Y`, 27m up) and a line of light; lattice portals over the street (`LEG_U`) and
+    piers on concrete caps in the sea (`SEA_LEG_U`), at `FRAME_Z`, clear of the cruising superyacht's lanes (it crosses
+    the line at z 435 and 575: the spans there are 66m). Stations (`_rail_station`): platforms at the cars' floor,
+    railings, benches, a canopy with the line's and the station's names, glazed lift towers down to the ground. The cars
+    (`MarinaKit.hanging_car`, life size, grown by PS: bogies on the rail, hangers, a rounded body, lit windows, a cab at
+    each end of a two-car train) hang 20m over the street, above the race cameras. `SuspendedTrains.gd` shuttles a train
+    on each track between the stations on the wall clock (accelerating to `cruise`, braking, `dwell` at each end, the two
+    half a turn apart), swings them fore and aft as they speed up and brake (a damped pendulum about the rail, local), and
+    sounds them (tools/elevenlabs): the run of wheels on the rail and the girder's hum (`suspended_train_run_loop.wav`,
+    with the speed), a pass-by burst once a pass when one comes within `PASSBY_NEAR` of the camera (`suspended_passby_*`),
+    the brakes into a station, a chime as one pulls out. Palms and lamps keep off its feet (`_near_rail_foot`).
+  - The start promenade's crowd cheers the racers by (`_build_cheers`, `CrowdCheers.gd`): a section behind each side's
+    barriers every 30m along the straight and a louder one at the grandstand; a cart within `reach` faster than
+    `min_speed` sets a section off, a random clip of six (`sounds/crowd/promenade_cheer_*.wav`, tools/elevenlabs, each
+    levelled by its loudest second), louder the faster, then it rests `cooldown` and a little more, so the cheers roll
+    along with the pack. Local to every peer. The souk's corner room (`_corner_room`) runs 32m past each corner: car 4
+    wedged in the houses 29m past the right-hander at (-230, -75) in two races of three before.
+  - Jazirat al-Fanous (`ArabianTerrain.MARINA_ISLAND`, `marina_island_d`: land in `marina_water_d`, so the terrain bakes
+    it with quay walls; the ground map paves it) off the palm avenue, past the fireworks, its north shore clear of the
+    superyacht's loop. Burj al-Fanous (`_build_island`, `MarinaKit.fanous_tower`, an original landmark, 307m to its
+    beacon): an octagonal podium, a drum with tall pointed windows, the lantern itself (an octagonal body bulging like a
+    fanous, `fanous_r`) of lattice ("lattice_big": dark burnished bars against a bright core inside, so the pattern
+    reads; with the bars glowing as brightly as the core it was a glowing egg), gold ribs and bands with lines of light,
+    an octagonal onion dome lit gold, a spire with three orbs and a red beacon. Floodlights round it, eight searchlights
+    (`SkyBeams.gd`: cones along their +y in `club_beam.gdshader`, turning in slow circles both ways and leaning, on the
+    wall clock), palms round the shore and up the walk from the railway's station, lantern posts, people.
+    `res://scratch/marina_landmark_preview.gd` (`-s`, windowed, `-- <dir> [set=fanous|car] name:x,y,z:tx,ty,tz`) renders the
+    tower or a train in memory at night.
+  - Airliners at night (`_build_airliners`, see "Airliners" under the Al-Raihana GP): arrivals from the west along the coast
+    1.25km offshore (beyond the island, 438m clear of the tower) to an airport east of the city, departures climbing out
+    west 1.95km offshore: landing lights, strobes, lit cabins and floodlit tails over the sea.
+  - The city's name in gold (`_build_raihana`, `RAIHANA_*`, node `RaihanaName`): الريحانة, 48 x 22m, on a stone plinth
+    in the sea 55m off the coast between the creek's mouth and the tube, facing the bridge's crest and the corniche past
+    the grandstand (which hides it from the grid). The word is Amiri Bold (`fonts/Amiri-Bold.ttf`, SIL Open Font
+    License, `fonts/Amiri-OFL.txt` beside it) through Godot's TextMesh, which shapes the joined Arabic itself, baked to a
+    mesh: no font at runtime. Reem Kufi, a variable font, broke TextMesh's triangulation (self-intersecting outlines).
+    TextMesh centres the line box, so the baseline is (descent - ascent) / 2 times `pixel_size`; the plinth's top is the
+    baseline, and under the ر's tail and the ي's two dots (all below the baseline, found from the mesh's vertices) its
+    front steps back into a bay so they hang free: on the top they would be buried, and ي without its dots is another
+    letter. `raihana_letters.gdshader` is polished gold that also lights itself (as if uplit, by the mesh's own height)
+    and reflects a made-up night by the reflected view ray, since the real uplights fade past 220m;
+    `raihana_glint.gdshader` lays streaks of glitter on the sea before it (value noise stretched along the way to the
+    viewer, drifting; a hash per column and ripple row had drawn a grid of dashes). "AL-RAIHANA" in Latin letters
+    (Label3D) on the plinth's face where nothing hangs. `res://scratch/arabic_text_preview.gd` (`-s`, windowed, `-- <dir>
+    font=<ttf> [font=...] [text=] [size=64] [depth=0.35] name:x,y,z:tx,ty,tz[:fov]`) extrudes a word in each font given,
+    one row per font, to compare them.
   - Music `MusicManager.STAGE_TRACKS["marina"]` (Midnight_Sprint and Apex_Drift), ambience city and harbour.
-  - AI races (speed=2): every bot finishes three laps, the only respawns item blasts.
+  - Cost (M1, 1280x720, `scratch/bench.tscn` samples=16): 11.5ms GPU on average along the lap, the worst 16.9ms, about
+    600 draws and 5.5M primitives; with the arcade, the railway, the island and the airliners 10.5ms, the worst 12.9ms,
+    656 draws, 5.6M (the M1's clock moves runs that much).
+  - AI races (speed=2): every bot finishes three laps, the only respawns item blasts (out of the souk's corners bots had
+    fired boosts into the next one: see "AI boosts"). With the arcade, the railway and the island, two races: every bot
+    finished both; one had a bot wedged once among the souk's houses 10m off a lane (2269m) and once beside the creek
+    bridge's ramp (1744m), the other only item blasts. Nothing on the avenue or the palm avenue. `res://scratch/unused_generated.gd -- marina_nights_` (`-s`,
+    headless) lists the generator's leftovers in generated/ that no scene loads any more.

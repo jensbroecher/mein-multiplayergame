@@ -98,6 +98,9 @@ func _ready() -> void:
 	_build_arrow_sign(root)
 	_build_rock_formations(root)
 	_build_sand_fx(root)
+	# Airliners: arrivals down past the lap's north-west flank to the city, departures out past its south-east, away
+	# from the ranges to the south.
+	d.airliners(root, Vector2(1700.0, -2300.0), -1.0, 0.6, 0.7, 0.0, 300.0, 550.0, 115.0, 6000.0)
 	d.backdrop(root, 868.0, 3900.0, PI * 0.5, 1.1, 420.0, Color(0.86, 0.62, 0.40), Color(0.36, 0.29, 0.24))
 	d.skyline(root, Vector2(1700.0, -2300.0), 0.0, 26)
 
@@ -155,7 +158,10 @@ func _pad(c: Vector2, half: Vector2, yaw: float, blend: float) -> float:
 func _plan_sites() -> void:
 	# The summit fort.
 	# Level with the summit road that now runs round it (SUMMIT), a couple of metres over it.
-	var fhalf := 27.0
+	# The pad holds the corner towers (all but their rubble plinths' flare, 44m out along its diagonals at game size).
+	# One diagonal points at the summit road (bearing -95, 61m out): at 35m the pad's corner and blend raised the ground
+	# over the asphalt's edge there; at 30m its blend has faded out before the road.
+	var fhalf := 30.0
 	var fy := FORT_Y
 	pads.append_array(PackedFloat32Array([FORT_AT.x, FORT_AT.y, fhalf, fhalf, FORT_YAW, fy, 12.0]))
 	sites["fort"] = [[FORT_AT, fy, FORT_YAW, fhalf]]
@@ -985,8 +991,8 @@ func _stone_road_sides() -> void:
 
 
 
-## A checkpoint in the middle of the town (HalfwayTown, between Halfway1 on the summit and the finish), so the town
-## can't be skipped by cutting across from the plunge's foot to the finish straight.
+## Checkpoints at the town's entrance (HalfwayTownEntry) and in its middle (HalfwayTown), between Halfway1 on the summit
+## and the finish, so the town can't be skipped by cutting across from the plunge's foot to the finish straight.
 func _town_checkpoint() -> void:
 	var cps: Node = level.get_node("Checkpoints")
 	var gate: Node3D = cps.get_node_or_null("HalfwayTown")
@@ -996,12 +1002,25 @@ func _town_checkpoint() -> void:
 		cps.add_child(gate)
 		gate.owner = level
 	gate.position = d.curve.sample_baked(d.curve.get_closest_offset(TOWN[11]))
+	# And one at the town's entrance, where the lap comes off the plunge into the first lane.
+	var entry: Node3D = cps.get_node_or_null("HalfwayTownEntry")
+	if entry == null:
+		entry = (load("res://CheckpointGate.tscn") as PackedScene).instantiate()
+		entry.name = "HalfwayTownEntry"
+		cps.add_child(entry)
+		entry.owner = level
+	entry.position = d.curve.sample_baked(d.curve.get_closest_offset((TOWN[2] as Vector3).lerp(TOWN[3], 0.55)))
 	level._align_checkpoints_to_track()
 	var order: Array[Area3D] = []
-	for n in ["Halfway4", "Halfway3", "Halfway2", "Halfway1", "HalfwayTown"]:
+	for n in ["Halfway4", "Halfway3", "Halfway2", "Halfway1", "HalfwayTownEntry", "HalfwayTown"]:
 		order.append(cps.get_node(n) as Area3D)
 	order.append(level.get_node("FinishLine") as Area3D)
 	level.checkpoints = order
-	gates.append(Vector2(gate.position.x, gate.position.z))
-	d.note(Vector2(gate.position.x, gate.position.z), 9.0)
-	print("Town checkpoint at ", gate.position)
+	for gn in [gate, entry]:
+		gates.append(Vector2(gn.position.x, gn.position.z))
+		d.note(Vector2(gn.position.x, gn.position.z), 9.0)
+	var s_entry: float = d.curve.get_closest_offset(entry.position)
+	var s_town: float = d.curve.get_closest_offset(gate.position)
+	print("Town checkpoints: entrance at s %.0f %s, middle at s %.0f %s (%.0fm apart)" % [s_entry, entry.position, s_town, gate.position, s_town - s_entry])
+	if s_town - s_entry < 53.0:
+		push_error("Town checkpoints only %.0fm apart" % (s_town - s_entry))

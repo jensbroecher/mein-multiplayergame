@@ -37,6 +37,9 @@ const CROSS_E := 430.0
 ## The palace at the foot of the next ridge, square to the middle crossing: the lap comes down the dune toward
 ## its front and turns along its court.
 const PALACE_AT := Vector2(40.0, 254.0)
+## Saif al-Hamra, the sword gate over the palace's avenue (corridor B): x of its middle.
+const SWORD_X := 215.0
+const SWORD_SPAN := 13.5
 const CAMP_Z := -162.5
 const GATE_CLEAR := 16.0
 
@@ -49,6 +52,8 @@ var pads := PackedFloat32Array()
 
 func _ready() -> void:
 	var t0 := Time.get_ticks_msec()
+	# Sunset: the lamps glow (the palace's, the reflector posts').
+	ArabianKit.lamps_glow = true
 	level = (load(TEMPLATE) as PackedScene).instantiate()
 	level.name = "RamlatHamraLevel"
 	add_child(level)
@@ -62,6 +67,9 @@ func _ready() -> void:
 	tg.set("track_layout_type", 0)
 	tg.set("terrain_resolution", 900)
 	tg.set("hill_height", 30.0)
+	# No bridge pillars: TerrainGenerator stands one every 30m wherever the road is 5m up, and here that is the dune
+	# crossings, the sand right under them (they stood buried in the dunes, one poking out of the east ridge).
+	tg.set("generate_bridge_supports", false)
 	tg.set("flat_pads", PackedFloat32Array())
 	var path: Path3D = level.get_node("TrackPath")
 	path.transform = Transform3D.IDENTITY
@@ -71,11 +79,15 @@ func _ready() -> void:
 	print("Lap: ", path.curve.get_baked_length(), "m")
 	_plan_gaps(path.curve)
 	_place_gates(path.curve)
+	_plan_sword_gate(path.curve)
 	_place_jumps_and_pads(path)
 
 	d.setup(level, tg, 7373)
 	for cp in level.get_node("Checkpoints").get_children():
 		gates.append(Vector2(cp.global_position.x, cp.global_position.z))
+	for sf in sword_feet:
+		gates.append(sf)
+		d.note(sf, 7.0)
 	var fl: Node3D = level.get_node("FinishLine")
 	gates.append(Vector2(fl.global_position.x, fl.global_position.z))
 	_plan_pads()
@@ -96,12 +108,16 @@ func _ready() -> void:
 	root.set_script(load("res://CanyonDetail.gd"))
 	_ground_and_sky()
 	_build_palace(root)
+	_build_sword_gate(root)
 	_build_camps(root)
 	_build_camels(root)
 	_build_posts(root)
 	_build_bypass()
 	_build_canyon_rocks(root)
 	_build_flora(root)
+	# Airliners at sunset (their lights half lit): arrivals down past the lap's north flank to the city, departures out
+	# past its south and round to the north-west, away from the ranges to the west.
+	d.airliners(root, Vector2(2400.0, 1400.0), -1.0, 0.6, 0.8, 0.55)
 	d.backdrop(root, 868.0, 3900.0, PI * 0.9, 0.7, 260.0, Color(0.88, 0.50, 0.30), Color(0.40, 0.30, 0.24))
 	d.skyline(root, Vector2(2400.0, 1400.0), 0.0, 18)
 
@@ -112,6 +128,86 @@ func _ready() -> void:
 		err = ResourceSaver.save(packed, LEVEL)
 	print("Saved RamlatHamraLevel.tscn: ", err, " in ", (Time.get_ticks_msec() - t0) / 1000.0, "s")
 	get_tree().quit(0 if err == OK else 1)
+
+
+## Saif al-Hamra (ArabianKit.sword_gate): two giant swords crossed over the palace's avenue, each on its pedestal (its foot
+## on the ground beside the road), lit from below; solid as the pedestals and capsules along the blades. Named without
+## "gate" (PlayerCart counts a "gate" collider as road).
+func _build_sword_gate(root: Node3D) -> void:
+	var feet: Array = []
+	for sf in sword_feet:
+		var g: float = d.ground((sf as Vector2).x, (sf as Vector2).y)
+		feet.append(g - sword_xf.origin.y)
+	var pk := ArabianKit.new_kit(1.0)
+	pk.set_frame(sword_xf)
+	var kit := {}
+	var lines: Array = ArabianKit.sword_gate(pk, kit, SWORD_SPAN, 9.0, 24.0, float(feet[0]), float(feet[1]))
+	var body := StaticBody3D.new()
+	body.name = "SaifAlHamra"
+	body.set_meta(&"surface", "rock")
+	root.add_child(body)
+	var mi := MeshInstance3D.new()
+	mi.name = "SaifAlHamraSwords"
+	mi.mesh = d.save(ArabianKit.commit(pk, kit), "saif_al_hamra")
+	body.add_child(mi)
+	# The pedestals.
+	for i in range(2):
+		var sd: float = -1.0 if i == 0 else 1.0
+		var c: Vector3 = sword_xf * Vector3(sd * (SWORD_SPAN + 2.5), 0.0, sd * 0.75)
+		var cs := CollisionShape3D.new()
+		var sh := BoxShape3D.new()
+		sh.size = Vector3(7.2, 9.0, 7.2)
+		cs.shape = sh
+		cs.transform = Transform3D(sword_xf.basis, Vector3(c.x, sword_xf.origin.y + float(feet[i]) + 3.0, c.z))
+		body.add_child(cs)
+		# Uplights at its foot, washing the blade.
+		for k in range(2):
+			var l := OmniLight3D.new()
+			l.name = "SaifUplight_%d_%d" % [i, k]
+			l.position = sword_xf * Vector3(sd * (SWORD_SPAN + 2.5) - sd * 4.0, float(feet[i]) + 0.8, sd * 0.75 + (float(k) - 0.5) * 5.0)
+			l.light_color = Color(1.0, 0.78, 0.5)
+			l.light_energy = 3.0
+			l.omni_range = 28.0
+			l.shadow_enabled = false
+			l.set_meta(&"no_shadow", true)
+			l.distance_fade_enabled = true
+			l.distance_fade_begin = 500.0
+			l.distance_fade_length = 80.0
+			root.add_child(l)
+			l.owner = level
+	# Capsules along the blades (nothing reaches them from the road, but a cart thrown up should meet them).
+	for line in lines:
+		var pts: Array = line
+		for j in range(0, pts.size() - 3, 3):
+			var a: Vector3 = sword_xf * (pts[j] as Vector3)
+			var b: Vector3 = sword_xf * (pts[j + 3] as Vector3)
+			var cs2 := CollisionShape3D.new()
+			var cap := CapsuleShape3D.new()
+			cap.radius = 1.0
+			cap.height = a.distance_to(b) + 2.0
+			cs2.shape = cap
+			var dir: Vector3 = (b - a).normalized()
+			var side: Vector3 = dir.cross(Vector3.UP).normalized() if absf(dir.y) < 0.99 else Vector3.RIGHT
+			cs2.transform = Transform3D(Basis(side, dir, side.cross(dir)).orthonormalized(), (a + b) * 0.5)
+			body.add_child(cs2)
+	# Its name on the pedestals, facing the road.
+	for i in range(2):
+		var sd2: float = -1.0 if i == 0 else 1.0
+		var lbl := Label3D.new()
+		lbl.name = "SaifName_%d" % i
+		lbl.text = "SAIF AL-HAMRA"
+		lbl.font_size = 64
+		lbl.pixel_size = 0.012
+		lbl.modulate = Color(1.3, 1.05, 0.6)
+		lbl.alpha_cut = Label3D.ALPHA_CUT_DISCARD
+		lbl.double_sided = false
+		var face_pos: Vector3 = sword_xf * Vector3(sd2 * (SWORD_SPAN + 2.5) - sd2 * 3.0 - sd2 * 0.06, float(feet[i]) + 2.3, sd2 * 0.75)
+		var toward_road: Vector3 = sword_xf.basis * Vector3(-sd2, 0, 0)
+		lbl.transform = Transform3D(Basis.looking_at(-toward_road, Vector3.UP), face_pos)
+		root.add_child(lbl)
+		lbl.owner = level
+	_own(body)
+	print("Saif al-Hamra built")
 
 
 func _own(n: Node) -> void:
@@ -249,7 +345,38 @@ func _place_gates(curve: Curve3D) -> void:
 			while (_in_gap(o, 25.0) or (o > sn0 and o < sn1)) and o < length - 5.0:
 				o += 5.0
 			(cp as Node3D).position = curve.sample_baked(o)
+	# Jebel Sahar's town gates (its scene is the template) have no place here: they had snapped onto this lap out of
+	# order (HalfwayTown at 1964m, before Halfway1 at 2116m, yet listed after it), so a player could never take them in turn.
+	var cps: Node = level.get_node("Checkpoints")
+	for town in ["HalfwayTown", "HalfwayTownEntry"]:
+		var tg_node := cps.get_node_or_null(town)
+		if tg_node:
+			cps.remove_child(tg_node)
+			tg_node.free()
+	var order: Array[Area3D] = []
+	for nm in ["Halfway4", "Halfway3", "Halfway2", "Halfway1"]:
+		order.append(cps.get_node(nm) as Area3D)
+	order.append(level.get_node("FinishLine") as Area3D)
+	level.checkpoints = order
 	level._align_checkpoints_to_track()
+
+
+## Where the sword gate stands: its frame on the lap's line on corridor B (x across the road, -z along the lap), and its
+## two pedestals in plan (kept clear of posts, camels and plants).
+var sword_xf := Transform3D()
+var sword_feet: Array = []
+
+func _plan_sword_gate(curve: Curve3D) -> void:
+	var o: float = curve.get_closest_offset(Vector3(SWORD_X, ROAD_Y, CORRIDOR_B))
+	var p := curve.sample_baked(o)
+	var f := curve.sample_baked(o + 2.0) - p
+	f.y = 0.0
+	sword_xf = Transform3D(Basis.looking_at(f.normalized(), Vector3.UP), p)
+	sword_feet = []
+	for sd in [-1.0, 1.0]:
+		var w: Vector3 = sword_xf * Vector3(sd * (SWORD_SPAN + 2.5), 0.0, sd * 0.75)
+		sword_feet.append(Vector2(w.x, w.z))
+	print("Sword gate at s %.0f (%.0f, %.0f)" % [o, p.x, p.z])
 
 
 ## The kicker on the south lane (WoodenRamp, as wide as the road; it settles and faces the lap itself) with a boost
@@ -453,7 +580,7 @@ func _build_posts(root: Node3D) -> void:
 		for sd in [-1.0, 1.0]:
 			var lp: Vector3 = p + right * sd * (d.road_half + 1.6)
 			var g: float = d.ground(lp.x, lp.z)
-			var ok: bool = absf(g - p.y) < 1.5 and d.road_dist(lp.x, lp.z, 20.0) > d.road_half + 1.0
+			var ok: bool = absf(g - p.y) < 1.5 and d.road_dist(lp.x, lp.z, 20.0) > d.road_half + 1.0 and not _on_bypass(Vector2(lp.x, lp.z), 1.0)
 			for gt in gates:
 				if Vector2(lp.x, lp.z).distance_to(gt) < 10.0:
 					ok = false
@@ -478,7 +605,8 @@ func _build_flora(root: Node3D) -> void:
 			continue
 		for j in range(r.randi_range(2, 7)):
 			var q: Vector2 = c + Vector2.from_angle(r.randf() * TAU) * r.randf_range(0.0, 5.0)
-			if d.road_dist(q.x, q.y, 20.0) < d.road_half + 1.5 or not d.is_free(q, 1.0):
+			# Off the road and off the DuneBypass's line too (tufts grew on it, 1.7m from its line).
+			if d.road_dist(q.x, q.y, 20.0) < d.road_half + 1.5 or not d.is_free(q, 1.0) or _on_bypass(q, 2.0):
 				continue
 			tufts[r.randi() % 3].append(d.stand(q.x, q.y, r.randf_range(0.9, 1.6), 0.06))
 		if r.randf() < 0.3 and d.road_dist(c.x, c.y, 20.0) > d.road_half + 3.0 and not _on_bypass(c, 4.0):

@@ -946,7 +946,9 @@ func timing_start(cp_count: int, laps: int, record_ms: int, tt: Dictionary, is_t
 	_t_running = true
 	_t_delta_until = 0
 	_build_timing_panel()
-	timing_panel.show()
+	# Only a time trial shows the lap timer: in a Grand Prix or a single race the place matters, not the clock (the race
+	# still times every lap, for the end screen and the records).
+	timing_panel.visible = is_tt
 	# One racer against the clock: no place to show.
 	var pos_box := get_node_or_null("HUDPanel/PositionContainer") as Control
 	if pos_box:
