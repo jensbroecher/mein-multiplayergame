@@ -12,6 +12,13 @@ render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 //   6  alpine slate / stone shingles (Ridgecrest's chalets): staggered courses up v, lichen and wear
 //   7  standing-seam zinc (Ridgecrest's modern houses): flat pans along v between raised seams across u
 //   8  board-formed concrete: smooth grey with the shuttering's board lines along u and tie holes
+//   9  German plain tiles (Biberschwanz, Kronburg): flat tiles with rounded tails in staggered courses up v, each
+//      tail's corners showing the course below, a shadow under every tail, lichen and moss; u along the eave
+//  10  coursed ashlar (dressed sandstone, Kronburg's church, town hall and gate): blocks of random length in courses up
+//      v, thin joints, tooled faces with darker arrises, soot and rain streaks
+//  11  slate scales (Kronburg's slate-hung walls, slate roofs and spires): style 9's lay, smaller and rounder, blue-grey
+//  12  Ruhr brick (Kronburg's colliery houses): running bond with grey mortar and the odd dark clinker
+// Styles 9 to 12 fade their fine pattern to its average by the pixel's size in metres (fwidth), as hut_roof_iron does.
 
 uniform int style = 0;
 
@@ -196,6 +203,112 @@ void fragment() {
 		// Rain streaks.
 		col *= 1.0 - 0.1 * smoothstep(0.55, 0.85, vnoise(vec2(q.x * 2.5, q.y * 0.15)));
 		rough = 0.85;
+	} else if (style == 9 || style == 11) {
+		// Plain tiles (style 9, Biberschwanz): tiles 0.29m wide (18cm at the stage's 1.6x), courses 0.24m up v, each
+		// course shifted half a tile; a tile's lower end is a rounded tail whose corners rise `dep` above the course line,
+		// and between two tails the tile of the course below shows. Slate scales (style 11, Schuppen): the same lay,
+		// smaller (0.3 x 0.15m courses) and rounder, blue-grey with a little sheen. Each tail shades the tile under it.
+		bool sl = style == 11;
+		float fw = length(fwidth(q));
+		float fade = smoothstep(sl ? 0.02 : 0.03, sl ? 0.08 : 0.12, fw);
+		float tw = sl ? 0.3 : 0.29;
+		float ch = sl ? 0.15 : 0.24;
+		float dep = sl ? 0.12 : 0.075;
+		float row = floor(q.y / ch);
+		float cx = fract(q.x / tw + 0.5 * mod(row, 2.0)) - 0.5;
+		float lift = dep * (1.0 - sqrt(max(0.0, 1.0 - 4.0 * cx * cx)));
+		// The tile seen here: this course's, or (between its rounded corners) the one below.
+		float trow = row - step(q.y - row * ch, lift);
+		float tsx = q.x / tw + 0.5 * mod(trow, 2.0);
+		float tcx = fract(tsx) - 0.5;
+		float tlift = dep * (1.0 - sqrt(max(0.0, 1.0 - 4.0 * tcx * tcx)));
+		float h = q.y - trow * ch - tlift;
+		// How far under the tail of the next course up (which lies on this tile).
+		float nrow = trow + 1.0;
+		float ncx = fract(q.x / tw + 0.5 * mod(nrow, 2.0)) - 0.5;
+		float below = nrow * ch + dep * (1.0 - sqrt(max(0.0, 1.0 - 4.0 * ncx * ncx))) - q.y;
+		float tid = hash12(vec2(floor(tsx), trow));
+		float tid2 = hash12(vec2(floor(tsx) + 31.7, trow - 5.3));
+		vec3 tile;
+		if (sl) {
+			// Slate: a few tones of blue-grey, now and then a greener or rustier one.
+			tile = tint * (0.78 + 0.32 * tid);
+			tile = mix(tile, tint * vec3(0.92, 1.0, 0.94), step(0.85, tid2) * 0.6);
+			tile = mix(tile, tint * vec3(1.08, 0.98, 0.9), step(tid2, 0.06) * 0.6);
+		} else {
+			// Clay fired a little differently: most the tint, some darker and browner, a few paler.
+			tile = tint * (0.8 + 0.34 * tid);
+			tile = mix(tile, tint * vec3(0.62, 0.55, 0.52), step(0.82, tid2) * 0.8);
+			tile = mix(tile, tint * vec3(1.12, 1.02, 0.9), step(tid2, 0.08) * 0.7);
+		}
+		// Broad weathering over the roof and a little grain.
+		tile *= 0.88 + 0.18 * vnoise(q * 0.45 + 2.0);
+		tile *= 0.94 + 0.12 * vnoise(q * 18.0) * (1.0 - fade);
+		float shade = 1.0 - (sl ? 0.6 : 0.5) * (1.0 - smoothstep(0.0, sl ? 0.035 : 0.05, below));
+		float edge = 1.0 - 0.28 * (1.0 - smoothstep(0.0, 0.014, h));
+		float side = 1.0 - 0.45 * (1.0 - smoothstep(0.0, 0.007, (0.5 - abs(tcx)) * tw)) * step(dep, h);
+		float pat = mix(shade * edge * side, 0.84, fade);
+		col = tile * pat;
+		// Lichen in a few pale spots; moss in the damp under the tails of the clay.
+		float lichen = smoothstep(0.8, 0.92, vnoise(q * 2.3 + 7.0)) * smoothstep(0.6, 0.8, vnoise(q * 13.0 + 3.0));
+		col = mix(col, srgb(vec3(0.62, 0.58, 0.42)), lichen * (sl ? 0.12 : 0.22));
+		if (!sl) {
+			float moss = smoothstep(0.62, 0.86, vnoise(q * 0.9 + 11.0)) * (1.0 - smoothstep(0.0, 0.07, below));
+			col = mix(col, srgb(vec3(0.25, 0.30, 0.14)), moss * 0.4 * (1.0 - fade));
+		}
+		rough = sl ? 0.55 : 0.82;
+		// Each tile lies steeper than the roof (its tail stands on the one below), its tail's edge turned down.
+		float tilt = mix(sl ? -0.16 : -0.22, 0.0, fade);
+		float bev = (1.0 - smoothstep(0.0, 0.016, h)) * (1.0 - fade);
+		NORMAL_MAP = normalize(vec3(tcx * 0.25 * (1.0 - fade), tilt - 0.9 * bev, 1.0)) * 0.5 + 0.5;
+		NORMAL_MAP_DEPTH = 1.0;
+	} else if (style == 12) {
+		// Ruhr brick (Kronburg's colliery houses): running bond, courses 0.133m (a 71mm brick and its joint at 1.6x), bricks
+		// 0.4m, each fired a little differently and now and then a dark clinker; grey mortar, faded to its average by the
+		// pixel's size so a long wall far off doesn't crawl with moiré.
+		float fw = length(fwidth(q));
+		float fade = smoothstep(0.015, 0.06, fw);
+		float bh = 0.133;
+		float bwid = 0.4;
+		float row = floor(q.y / bh);
+		float bx = q.x / bwid + 0.5 * mod(row, 2.0);
+		float fx = fract(bx);
+		float fy = fract(q.y / bh);
+		float id = hash12(vec2(floor(bx), row));
+		float id2 = hash12(vec2(floor(bx) + 7.7, row + 3.1));
+		float dj = min(min(fx, 1.0 - fx) * bwid, min(fy, 1.0 - fy) * bh);
+		float mortar = (1.0 - smoothstep(0.008, 0.016, dj)) * (1.0 - fade);
+		vec3 brick = tint * (0.84 + 0.26 * id) * (0.94 + 0.12 * vnoise(q * 22.0) * (1.0 - fade));
+		brick = mix(brick, tint * vec3(0.55, 0.48, 0.48), step(0.88, id2) * (1.0 - fade * 0.7));
+		vec3 mcol = srgb(vec3(0.50, 0.48, 0.44)) * mix(vec3(1.0), tint, 0.25);
+		col = mix(brick, mcol, mortar * 0.85);
+		// Far off: the bricks and their joints blended (the joints are about a sixth of the wall).
+		col = mix(col, mix(tint * 0.97, mcol, 0.16), fade * 0.6);
+		col *= 1.0 - 0.12 * smoothstep(0.6, 0.9, vnoise(vec2(q.x * 0.9, q.y * 0.15 + 2.0)));
+		rough = 0.88;
+	} else if (style == 10) {
+		// Coursed ashlar: courses 0.62m (about 39cm at 1.6x), blocks 0.9-1.7m long, each course's joints shifted.
+		float fw = length(fwidth(q));
+		float fade = smoothstep(0.03, 0.14, fw);
+		float ch = 0.62;
+		float row = floor(q.y / ch);
+		float bl = 0.95 + 0.7 * hash12(vec2(row, 4.0));
+		float bx = q.x / bl + hash12(vec2(row, 8.0));
+		float id = hash12(vec2(floor(bx), row));
+		float fx = fract(bx);
+		float fy = fract(q.y / ch);
+		float dj = min(min(fx, 1.0 - fx) * bl, min(fy, 1.0 - fy) * ch);
+		float joint = (1.0 - smoothstep(0.008, 0.022, dj)) * (1.0 - fade);
+		vec3 stone = tint * (0.88 + 0.17 * id) * (0.92 + 0.14 * vnoise(q * 3.0 + id * 9.0));
+		// Bedding in the stone, the tooling's fine diagonal strokes, worn darker arrises.
+		stone *= 0.95 + 0.1 * vnoise(vec2(q.x * 0.8, q.y * 7.0) + id * 5.0);
+		stone *= 1.0 - 0.05 * (0.5 + 0.5 * sin((q.x + q.y * 0.6) * 55.0 + id * 20.0)) * (1.0 - fade);
+		stone *= mix(0.9 + 0.1 * smoothstep(0.02, 0.1, dj), 0.96, fade);
+		col = mix(stone, srgb(vec3(0.52, 0.49, 0.44)) * mix(vec3(1.0), tint, 0.3), joint * 0.7);
+		// Rain streaks down the face and soot settled toward the foot of the wall.
+		col *= 1.0 - 0.22 * smoothstep(0.55, 0.9, vnoise(vec2(q.x * 1.8, q.y * 0.12 + 4.0)));
+		col *= 1.0 - 0.2 * (1.0 - smoothstep(0.0, 2.5, q.y)) * vnoise(q * 1.3 + 2.0);
+		rough = 0.9;
 	} else {
 		// Spanish terracotta barrel tiles (tejas): u across the slope, v up the slope.
 		float pitch = 0.42;

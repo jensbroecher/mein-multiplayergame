@@ -57,6 +57,14 @@ const STAGES := {
 	"MsituFallsLevel": [["rainforest", -30.0]],
 	"MtaaNightsLevel": [["stadium", -36.0]],
 	"MarinaNightsLevel": [["city", -36.0], ["harbor", -38.0]],
+	# Kronburger Hütte: the town round it and the birds in the fields; the works' own noise is 3D (the generator's).
+	"KronburgLevel": [["city", -40.0], ["insects_birds", -35.0]],
+	# Rheinufer: the meadows' birds and the town across the river; the river, ships, Autobahn, sheep and the Kirmes
+	# are 3D (the generator's).
+	"RheinuferLevel": [["insects_birds", -33.0], ["city", -42.0]],
+	# Zeche Kronprinz: a morning's birds over the scrub, the town far off; the Kokerei, the crows, the conveyor and the
+	# quench tower are 3D (the generator's).
+	"ZecheLevel": [["insects_birds", -32.0], ["city", -46.0]],
 	"FrostpeakCreekLevel": [["blizzard", -37.0]],
 	"GlacierHighwayLevel": [["blizzard", -37.0]],
 	"FrostfallGorgeLevel": [["blizzard", -36.0]],

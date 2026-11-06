@@ -78,6 +78,9 @@ const ALL_STAGES = [
 	{"name": "Nyota Stadium", "path": "res://levels/NyotaStadiumLevel.tscn"},
 	{"name": "Msitu Falls", "path": "res://levels/MsituFallsLevel.tscn"},
 	{"name": "Mtaa Nights", "path": "res://levels/MtaaNightsLevel.tscn"},
+	{"name": "Kronburger Hütte", "path": "res://levels/KronburgLevel.tscn"},
+	{"name": "Rheinufer", "path": "res://levels/RheinuferLevel.tscn"},
+	{"name": "Zeche Kronprinz", "path": "res://levels/ZecheLevel.tscn"},
 ]
 
 const GP_CUPS = {
@@ -124,6 +127,14 @@ const GP_CUPS = {
 			"res://levels/NyotaStadiumLevel.tscn",
 			"res://levels/MsituFallsLevel.tscn",
 			"res://levels/MtaaNightsLevel.tscn",
+		]
+	},
+	"Kronburg GP": {
+		"name": "Kronburg GP",
+		"stages": [
+			"res://levels/KronburgLevel.tscn",
+			"res://levels/RheinuferLevel.tscn",
+			"res://levels/ZecheLevel.tscn",
 		]
 	}
 }

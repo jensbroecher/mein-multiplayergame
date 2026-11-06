@@ -85,7 +85,7 @@ func _ready() -> void:
 			if c.get("is_landing"):
 				falling_seen += 1
 				if falling_seen == 1:
-					print("FALLING in view: %s at %.2fs" % [c.name, now])
+					print("FALLING in view: %s at %.2fs, at %s, velocity %s" % [c.name, now, str((c as Node3D).global_position), str(c.get("linear_velocity"))])
 		if cart.is_intro_active and intro_started < 0.0:
 			intro_started = now
 		if intro_started >= 0.0 and not cart.is_intro_active and intro_ended < 0.0:

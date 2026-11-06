@@ -1,0 +1,26 @@
+[
+  {
+    "name": "kronburg_schicht",
+    "path": "music/kronburg/Schichtwechsel.mp3",
+    "prompt": "Instrumental high-energy racing game track. Industrial electro with pounding four-on-the-floor drums, metallic clanging percussion like a steel mill, a gritty driving analog bass line, bright synth arpeggios and a soaring lead hook, big build-ups and drops. 138 BPM, confident and fast. No vocals, no lyrics, no voice samples.",
+    "seconds": 170
+  },
+  {
+    "name": "kronburg_rheinufer",
+    "path": "music/kronburg/Abendrot_am_Rhein.mp3",
+    "prompt": "Instrumental upbeat racing game track for a warm summer evening along a wide river. A krautrock-inspired motorik beat with modern electronic production, a pulsing bass, shimmering clean electric guitars and warm analog synth pads, an uplifting melodic lead that keeps building, euphoric and fast. 130 BPM. No vocals, no lyrics, no voice samples.",
+    "seconds": 170
+  },
+  {
+    "name": "kronburg_kleeblatt",
+    "path": "music/kronburg/Kleeblatt.mp3",
+    "prompt": "Instrumental energetic racing game track: German electronic dance music, a punchy kick and claps, a rolling analog synth bass, retro synth leads with a catchy riff, driving hi-hats and fast fills, the feeling of speeding along a motorway interchange. 134 BPM. No vocals, no lyrics, no voice samples.",
+    "seconds": 170
+  },
+  {
+    "name": "zeche_kohle_dampf",
+    "path": "music/kronburg/Kohle_und_Dampf.mp3",
+    "prompt": "Instrumental high-energy racing game track: gritty industrial rock with distorted electric guitars, pounding drums, a dark driving bass, anvil-like metallic hits and a heroic synth lead, the feeling of racing through an old coal mine and a steaming coking plant at dawn. 140 BPM. No vocals, no lyrics, no voice samples.",
+    "seconds": 170
+  }
+]

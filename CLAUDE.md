@@ -895,8 +895,13 @@ in front of the water while driving (Msitu Falls, Bloombay Dunes). `canyon_river
   and loudest second in dBFS, read from the WAV itself) to level them by their RMS like the recorded clips elsewhere.
 - Made so far: the airliners' approach and climb-out roars (Airliners.gd); the suspended railway's run, pass-by bursts,
   brakes and station chime (SuspendedTrains.gd; its first soft glide loop is unused now); Qaysariyyat al-Manara's market
-  murmur and the start promenade's six cheers (Marina Nights, CrowdCheers.gd). One-shots are levelled by their loudest
-  second, loops by their RMS.
+  murmur and the start promenade's six cheers (Marina Nights, CrowdCheers.gd); Rheinufer's ship horns and diesel, Autobahn
+  hum, Kirmes, sheep, river and windmill (`sounds/rheinufer/`). One-shots are levelled by their loudest second, loops by
+  their RMS.
+- Music: `tools/elevenlabs/generate_music.mjs` composes tracks with ElevenLabs Music (`client.music.compose`) from
+  `music.json` (name, path, prompt, seconds), always with `forceInstrumental` (the user wants no vocals or lyrics in the
+  game's music), as MP3 (mp3_44100_192), skipping files already made. The Kronburg GP's three (`music/kronburg/`:
+  Schichtwechsel, Abendrot am Rhein, Kleeblatt) were made so: `MusicManager.STAGE_TRACKS["kronburg"]` and `["rheinufer"]`.
 
 ## Surfaces: skid marks, sliding sounds and spray
 
@@ -3619,3 +3624,206 @@ call the stages Jebel Sahar and Wadi al-Ghaf; files and code keep "mountain" and
     finished both; one had a bot wedged once among the souk's houses 10m off a lane (2269m) and once beside the creek
     bridge's ramp (1744m), the other only item blasts. Nothing on the avenue or the palm avenue. `res://scratch/unused_generated.gd -- marina_nights_` (`-s`,
     headless) lists the generator's leftovers in generated/ that no scene loads any more.
+
+## Kronburger Hütte (Kronburg GP, stage 1)
+
+A fictional town in the Ruhrgebiet on a summer afternoon: the canal, the steelworks (the Kronburger Hütte), the colliery
+estate, the half-timbered old town on its hill under Burg Kronburg's ruin. Stage 1 of the Kronburg GP
+(`NetworkManager.GP_CUPS["Kronburg GP"]`; stage 2 is Rheinufer, stage 3 Zeche Kronprinz). Files and code keep "kronburg" (`KronburgLevel.tscn`, `regenerate_kronburg.gd`).
+
+- `regenerate_kronburg.gd` (`regenerate_kronburg.tscn`, headless, about 15s) builds `levels/KronburgLevel.tscn` from scratch.
+  The lap (3.0km) is straights and arcs (`CORNERS`, `_fillet`, `_at(s)`): the Kanalstraße east beside the canal (the start),
+  left through the works gate, right into the rolling mill hall (`HALL_X0`, `HALL_Z`, `HALL_LEN`: 240m straight through
+  it), left round the blast furnace, left onto the works' north road under the pipe bridges (the `SlagJump` kicker), up
+  through the colliery estate (10.5%, `MAX_GRADE`), through the town gate along the Hauptstraße, round the Marktplatz
+  (`C7`, r 22), down the Kirchberg and back onto the Kanalstraße.
+- Ground: `_natural` (the valley's side rising to the north-west by `_rise(u)`, u the distance up it; hills; the castle hill;
+  the far country; the canal's plain), then the pads (`WORKS_RECT`, `MARKT_RECT`, `SPORT_RECT`, the castle's top), the slag
+  heap (`HALDE_*`), the canal cut (`CANAL_Z`, `CANAL_HALF`, sloped stone-pitched banks) and the harbour basin
+  (`HARBOUR_RECT`). The canal and harbour only cut where they are (`dzc < CANAL_HALF`, `hd < 0`): as `min()` everywhere they
+  capped the whole map at the bank's height. The road's height is the natural ground along the lap smoothed, the square
+  held level (`MARKT_HOLD`), no grade over `MAX_GRADE` (`_plan_road_heights`); `_grade` lays the ground `GROUND_UNDER` under
+  the road across the ribbon and a verge, rounded shoulders beyond. `kronburg_ground.gdshader`: grass and dirt on banks;
+  vertex masks R sandstone (steep faces, the canal's riprap), G the works' slag and old concrete, B farmland (a patchwork
+  of fields in Voronoi cells: meadow, wheat, rapeseed, maize, ploughed, hedgerows on the borders), A woodland floor.
+  Bodies: KronburgMeadow (grass), WorksGround (gravel), KronburgCrag (rock).
+- Roads are ribbons (`_build_roads`, `kronburg_road.gdshader`, kinds by s in `_road_kinds`): 0 country asphalt with German
+  markings (6m dashes in 18m, edge lines, a gravel Bankett), 1 the old town's setts in segmental arcs (Bogenpflaster) with
+  a sett gutter, kerbs and sandstone flag pavements (`PAVEMENT` 3.4m on the ribbon), 2 the estate's asphalt with kerbs and
+  grey 30cm flags, 3 the works' concrete slabs, 4 the mill hall's floor, 5 the Marktplatz (world-space arcs, dark bands;
+  the square's own paving `_build_markt_paving` is drawn the same and coplanar), 6 the canal's towpath (dressing only).
+  Everything the lap runs on is one body, LapRoad. The shader's `stripe()` is box-filtered coverage: Marina's
+  fade-to-share version, used for a single centre line, whitened the whole road's width at a distance.
+- The old town (`_build_town`, `KronburgTownKit.gd` at PROP_SCALE): St. Lamberti on the square's north side, the Rathaus on
+  its west, the fountain, the Maibaum, the weekly market (`MARKET_STALLS`, CampKit gazebos), lime trees, rows round the
+  square (`_row`), gable houses along both sides of the Hauptstraße and the Kirchberg (`_frontage`, fronts on the
+  pavement's edge `FRONT_LAT`; `house_extent` says how far steps, jetties, awnings and signs reach out, up to 2.1m life),
+  back lanes (`LANES`, `_build_lanes`: cobbled ribbons off the lap with houses both sides), the Kronentor on the
+  Hauptstraße (its field side, +z, faces out of town), the wall with round towers (`_build_town_wall`, open where the lap
+  and the lanes pass), Burg Kronburg's ruin (`CASTLE_C`), garden trees. The colliery estate: brick terraces in their front
+  gardens along the climb and its back street (`ESTATE_STREETS`), the Trinkhalle on a corner.
+  - `KronburgTownKit.gd` (extends YardKit; life size, footings to -4): `fachwerk_house` (variants 0 white and black, 1
+    coloured on a stone ground floor, 2 Bergisch slate with green shutters, 3 a shop with its sign and awning, 4 eaves to
+    the street with dormers), `church`, `rathaus`, `market_fountain`, `town_gate`, `brick_terrace`, `trinkhalle`,
+    `litfass`, `ortsschild`, `peitschen_lamp`, `old_lantern_post`, `bus_stop`, `street_bench` (not `bench`: YardKit's has
+    another signature), `bollard`, `bike_rack`, `glass_containers`, `beer_crates`, `castle_ruin`, `allotment`,
+    `beer_garden`, `maibaum`. Its keys: `biber`, `ashlar`, `kslate`, `kbrick` (hut_masonry styles 9 plain tiles, 10
+    ashlar, 11 slate scales, 12 Ruhr brick, all fading their fine pattern by `fwidth`: style 2's mortar and style 6's
+    lichen read as moiré and blotches on long walls), `pane` (opaque glass), `gold`, `enamel`, `leaf`, `kwater`
+    (kronburg_water.gdshader), `hedge`. `res://scratch/kronburg_town_preview.gd` (`-s`, windowed, `-- <dir>
+    [set=houses|church|rathaus|gate|fountain|terrace|kiosk|street|castle|misc|all] [sheet=1] name:x,y,z:tx,ty,tz`) renders
+    them in seconds; `scratch/kronburg_town_dump.gd` saves them for `scratch/zfight_scan.gd`.
+- Props are batched (`_add_prop`): many props built into one kit per 140m cell (a mesh with a surface per material),
+  saved under `kronburgprop_` (MeshChunker leaves them whole, so DressingColliders makes them solid), materials saved once.
+  The node is the batch key in PascalCase, so keep DressingColliders' and PlayerCart's track words out of keys: the gates
+  are "kronentor" and "works_werkstor" (named "...Gate" they were skipped and carts drove through their towers), the
+  chimneys "works_chimneys" ("stack" is SOFT), the torpedo cars' rails "works_rails" ("track" is road).
+  Kit calls go through `_kit_call`, which skips (and warns once about) a builder a kit lacks. Every run first deletes
+  `generated/kronburg*` (renamed or dropped props leave nothing behind).
+- The works (`_build_works`, `SteelworksKit.gd` at PROP_SCALE): the rolling mill hall over the lap (`_hall_xf`: the kit's
+  -z along the lap), the blast furnace (`FURNACE_AT`: its skip incline runs 138m toward +z and first crossed the lap by
+  the hall's exit; after moving anything, check `generated/kronburgprop_works_*.res` AABBs against the lap), the hot blast
+  stoves and the hot-blast main to the furnace (`pipe_run` between their flanges), the gas holder, the cooling tower,
+  three stacks, two pipe bridges over the north road, the works gate, torpedo ladle cars on their track, the harbour's
+  ore crane, barges and stockpiles, the ore yard (`ORE_YARD`: a second ore bridge over long piles; a shorter
+  `rolling_hall` there showed its mill line's cooling bed sticking out of its end: the mill train is laid for 150m),
+  pipe runs on racks, the car park (`CAR_PARK`, CampKit cars), the steel crown on the slag heap, Zeche Kronprinz's
+  headframe above the estate. `_build_works_fx`: OmniLights and sparks at `SteelworksKit.hall_fx_spots` and
+  `works_fx_spots` (the tap hole, the pour), steam off the cooling tower, smoke from the stacks and stoves (`_plume`).
+  - `SteelworksKit.gd` (life size, footings to -3): `rolling_hall`, `blast_furnace`, `cowpers`, `gasometer`, `chimney`
+    (0 brick, 1 red and white), `cooling_tower`, `pipe_bridge` (+ `pipe_bridge_z`), `pipe_run`, `headframe`, `torpedo_car`,
+    `works_gate`, `steel_crown`, `ore_crane`, `barge` (bow +z, waterline y 0: SeaBoat's convention, `draft` 0),
+    `stockpile`. Shaders: hot_steel (vertex colour the heat), steel_glazing (inside face daylight), industrial_paint
+    (weathering by world position: keys rusty, corten, grime, floor, shell, roofing, heap), hazard_stripes, ruhr_brick.
+    Road corridors (checked on the triangles by `scratch/steelworks_corridor_check.gd`): the hall keeps |x| < 6 clear
+    below 12 (life) and its gateways 16m wide, 13m high; a pipe bridge nothing under its `clearance` over its span; the
+    gate nothing in |x| < 8 below 11. `res://scratch/steelworks_preview.gd` (`-s`, windowed, `-- <dir>
+    set=hall|furnace|cowpers|gasometer|stacks|pipes|headframe|torpedo|gate|crown|harbour|all name:x,y,z:tx,ty,tz`).
+- Ground masks: every vertex of the fine grid takes `_masks`, however far from the road (`_road_d` capped under 1e8:
+  past the grading's reach it read as the coarse land's and painted fields inside the works).
+- `res://scratch/kronburg_hide_shot.tscn -- <out.png> x,y,z:tx,ty,tz [hide=<node path> ...]` (windowed) renders the level
+  from one camera with nodes left out, to find what draws what.
+- Germany besides: the Autobahn viaduct across the valley west of town (`_build_autobahn`, `AUTOBAHN_*`, hillside to
+  hillside) with traffic (`AutobahnTraffic.gd`: CampKit vehicles on the wall clock, shrinking away at the ends),
+  Leitpfosten (knockable delineator posts, `_build_delineators`, KnockablePoles), traffic signs (`_traffic_sign`: Tempo 30
+  zone, warning triangles, the priority diamond), place-name signs, whip-arm street lamps, the allotments (`ALLOT_*`), the
+  beer garden, the red-ash football pitch (`_pitch`, SV Glückauf Kronburg), barges on the canal (SeaBoat: one cruising a
+  3.6km loop whose turns lie out in the haze, two moored in the harbour).
+- Sound: `sounds/kronburg/` (tools/elevenlabs): the mill's hum in the hall, the furnace's roar, St. Lamberti's bells every
+  150s on the wall clock and the crane horn (`PeriodicSound.gd`), the barge's diesel. StageAmbience: city and birds.
+  Music: `MusicManager.STAGE_TRACKS["kronburg"]` (the GP's own instrumental tracks, `music/kronburg/`).
+- AI races (`scratch/ai_race_test`, speed=2): every bot finishes three laps, the only respawns item blasts; flying laps
+  about 72s.
+- Cost (M1, 1280x720, `scratch/bench.tscn`): 9.9ms GPU on average along the lap, the worst 12.9ms (the old town and the
+  works); about 1.0M triangles of props, the town's houses most of them.
+- Menu tiles: `images/menu/tile_kronburg.jpg` (the mill's gateway) and `tile_kronburg_gp.jpg` (from over the canal),
+  rendered with `scratch/lap_shots.tscn` and cropped to 1376x768.
+
+## Rheinufer (Kronburg GP, stage 2)
+
+The Lower Rhine at the edge of Kronburg on a summer evening (sun low in the WSW). Files and code: `RheinuferLevel.tscn`,
+`regenerate_rheinufer.gd` (`regenerate_rheinufer.tscn`, headless, about 20s), `rheinufer*` in `generated/`.
+
+- The lap (2.94km, `CORNERS`, `_fillet_path`): south down the east bank's Rheinuferpromenade (the start, Gründerzeit houses,
+  plane trees), right between the bridge towers onto the Alte Rheinbrücke (z `OLD_BRIDGE_Z`), right onto the west bank's
+  dyke road (`DYKE_X`, the `DeichJump` kicker, the sheep's crossing), left off the dyke west over the A 58 on an
+  embankment, round the Anschlussstelle's loop ramp (two 73.5m arcs) onto the A 47 eastbound, over the A 58 at the
+  Autobahnkreuz, over the dyke and the Rhine on the Harfenbrücke, and down the curving exit ramp onto the promenade.
+  Segment order (the fillet's): promenade, E1, old bridge, W1, dyke, D1, west road, H1, H2, A 47, E0 (`_design_y_fixed`).
+- Heights are designed, not graded from the ground: `old_deck(x)` and `harp_deck(x)` (static: the bridge kit is built to
+  the same Callables), `_a2_y(x)` the A 47's profile, `_west_y`, Hermite pieces elsewhere (`_hermite`). Where the lap is
+  on a structure (`_lap_on_deck`) the ground is not graded under it.
+- Ground: `_raw_natural` (the river between ±`RIVER_HALF` at `WATER_Y` 0, the west beach and meadow at `FLOOD_Y`, the dyke,
+  the land behind it, the town's quay, lower promenade and terrace on the east bank), pads (`_plan_pads`: farms, the power
+  station; the Kirmes' `KIRMES_RECT`). `kronburg_ground.gdshader` with `g_beach` on (G is the Rhine's sand and gravel
+  beach, R basalt riprap via `rock_tint`; both uniforms off by default so Kronburger Hütte is unchanged). Bodies:
+  RheinMeadow, RheinBeach (sand), RheinRiprap (rock); no collider on the bed under the water.
+- Roads: the lap's ribbons by kind (`_road_kinds`: 7 Autobahn for the exit ramp's top, 2 the promenade with pavements, 8
+  the old bridge's town asphalt, 0 the dyke and west road, 7 the loop and the A 47; kinds 7 and 8 were added to
+  `kronburg_road.gdshader`), one body LapRoad. The dressing roads (`_plan_dressing_roads`, `_dress_road`/`_dress_from`:
+  the A 58 both ways, the A 47 westbound and its closed eastbound ends, the Kreuz's four loops `Schleife*` with lead lanes,
+  the country road on west, the promenade's continuation) share the grading (`_seg_a/_seg_b`, `_grade`) and are solid as
+  `Autobahn<name>Body`. Never name anything "loop" or "ramp" here: Level.gd bakes extra trimeshes under such names.
+- Structures: the generator's own girders (`_plan_decks`, `_girder`) for the overpasses over the A 58, the A 47's viaduct
+  onto the Harfenbrücke, the exit ramp's viaduct and the A 47 east of the river; RheinBridgeKit's `viaduct_pier`
+  (cap BEARING_H under the girder) and `abutment` (its shelf 2.8m under the road; given the road's height its ballast
+  wall stood 2.7m over the road and bots crashed into it), none where two decks meet.
+- Edge colliders: `_lap_edge_boxes` (old bridge kerbs, the Harfenbrücke's median and railing), `_barrier_runs` (the
+  median's Betonschutzwand and the Schutzplanke on the embankments, both from RheinBridgeKit, beams facing the road),
+  crowd barriers round the outside of E1 up to the bridge's head (bots ran wide there into the river), the quay's railing
+  (`QuayRailBody`, open where the lap crosses the quay onto the bridge: closed, it stopped every bot). Race closures
+  (`_build_closures`, `race_closure`) where roads leave the lap, each placed clear of the lap's bends (on the A 47's line
+  at the loop ramp and the exit the lap runs on the closed carriageway for tens of metres: `A47_EB_END`, `A47_EB_EAST`).
+  The old bridge's gate towers have their own boxes (DressingColliders skips anything named "bridge").
+- Kits: `RheinBridgeKit.gd` (the two bridges in game metres, Autobahn furniture and transmission towers at life size),
+  `RheinShipKit.gd` (Rhine ships, landing stage, groynes, km boards, buoys, gauge), `NiederrheinKit.gd` (tower windmill and
+  its sails, farmsteads, shepherd's cart, bales, tractor, the power station), `RheinStadtKit.gd` (Gründerzeit houses,
+  hotel, quay wall, Rheintreppe, promenade furniture, the Kirmes), each with a windowed preview in `scratch/`
+  (`rhein_bridge_preview.gd`, `rhein_ship_preview.gd`, `niederrhein_preview.gd`, `rhein_stadt_preview.gd`). The kits keep
+  their UV scale in statics (`uvk`), so `_add_prop_scaled` calls `new_kit(scale)` again before building into a batch.
+  `_add_prop_game` batches at scale 1 (the bridges); `_kit_mesh_life` builds ride parts at life size under nodes grown by
+  PROP_SCALE.
+- WoodlandBuilder gained "pollard" (Kopfweide), "poplar" and "plane" (`tree_mesh`, `rhein_leaf_material`, the Rhine
+  atlas); `_build_woods` uses them for the ditches, the west road and the promenade.
+- Life on it: ships on SeaBoat loops (lanes ±55, turns 4.6km out; horns, diesel, wakes), the excursion ship moored at the
+  landing with passengers (`excursion_seats`), `SheepFlock.gd` (36 sheep, shepherd and dog crossing the dyke road every
+  110s on the wall clock, bodies on layer 4, knocked aside by carts), the Kirmes (`KirmesWheel.gd`, `KirmesRide.gd`),
+  the windmill's sails (`Spinner.gd`), traffic on the A 58 and the A 47 westbound (`AutobahnTraffic.gd`, which now takes a
+  height profile, `heights`/`height_step`), steam over the power station's cooling towers.
+- AI races (`scratch/ai_race_test`, speed=2): every bot finishes three laps, the only respawns item blasts; flying laps
+  about 70s. Cost (M1, 1280x720, `scratch/bench.tscn`): 8.1ms GPU on average, the worst 10.3ms.
+- Menu tile `images/menu/tile_rheinufer.jpg` (the old bridge from the river, `scratch/look_shots.tscn` at 1376x768).
+
+## Zeche Kronprinz (Kronburg GP, stage 3)
+
+An off-road stage on a misty summer morning through the fictional colliery Zeche Kronprinz (founded 1871, closed 1986,
+now industrial heritage), the still-working Kokerei Kronprinz next door and the colliery's spoil heap. Files and code:
+`ZecheLevel.tscn`, `regenerate_zeche.gd` (`regenerate_zeche.tscn`, headless, about 17s), `zeche_`/`zecheprop_`/`zechefar_`
+in `generated/` (each run deletes them first).
+
+- The lap (3.0km, `CORNERS`, `_fillet_path`): east from the colliery yard (`YARD_RECT`, graded flat at `YARD_Y`; the
+  start, Schacht I's Malakoff tower, Schacht II's steel headframe and its winding houses, the Lohnhalle), under the coal
+  washer (`WASHER_X`: the lap drives through its passage), along the coke oven battery's coke side past the quench tower
+  (`BATTERY_X0`, `KOKS_Z`), left up the Halde's haul ramp (`RAMP_Z0` to `HALDE_Z0`, then the plateau at `HALDE_Y` 36m past
+  the Kronprinzenblick landmark, `SUMMIT_AT`), off its north end over the `HaldenSprung` kicker (a WoodenRamp whose lip is
+  the TrackPath's `jump_lips`) and down the flank (`DROP_Z1`, 26.6% at the steepest), west through the birch scrub over the
+  colliery railway, south through the settling ponds' ford, over the railway again and back onto the yard.
+- No road mesh: the lap is the ground graded flat across `ROAD_HALF` (`_grade`), its height designed (`_plan_road_heights`:
+  the base ground smoothed, the ramp, plateau and a Hermite descent on segment 0, the ford's dip). Bodies: KohlenTrack
+  (dirt) and ZechenplatzTrack (the yard, gravel) are track; HaldenGrund, ZechenGrund (gravel) and ZechenWiese (grass) are
+  off-road. `zeche_ground.gdshader` paints from the vertex masks (R spoil, G the works' slag and slabs, B the track, A the
+  woods' floor) and UV2.x (the distance to the lap: ruts, gravel at the edges, puddles). Flowers and shale fragments are
+  round flecks (`fleck`) that shrink away with the pixel's size: cells of a hash drew coloured squares. The works' ground
+  is painted only over `WORKS_PAINT` (the washer, the battery and its by-product plant), its edge wandering on noise;
+  `WORKS_RECT` is only graded: painted, it was a 550 x 260m black rectangle from the air.
+- The settling ponds (`PONDS`, `_build_ponds`): both at one level (`_pond_level`), one `KlaerteichWater` node with
+  `water_bounds_min`/`max` metas; the lap fords the east one `POND_DEPTH` (0.45m) under its surface, slowed but never
+  drowning. The water mesh's triangles go [centre, a0, a1] (clockwise from above): the other way round the ponds were
+  culled and showed no water at all.
+- The colliery railway (`RAIL`, a bent polyline: `_plan_rail`, `_build_railway`): FreightKit's track, Freight Line's
+  Train.gd (`ZechenbahnTrain`, a yard switcher and seven hoppers out and back every 344s, `legs`), RailCrossing.gd at both
+  crossings (lap 1317m and 2047m, 89 and 87 degrees), RailRumble, the loading bunker over it (`BUNKER_S`). Laid straight it
+  crossed the lap at 21 degrees, and a bot waiting at the closed crossing stood on the rails and was hit. A boosting bot
+  can't brake for a crossing: bots don't fire a boost with one within `PlayerCart.AI_BOOST_CROSSING_CLEAR` (180m) ahead
+  (`_ai_rail_crossing_ahead`), and no pad leads into one.
+- Kits (life size, grown by PROP_SCALE 1.6, batched through `_add_prop`): `ZechenKit.gd` (the Malakoff tower, the Doppelbock
+  headframe and its sheaves, winding houses, the Lohnhalle, the coal washer with its passage, conveyor galleries, the
+  bunker, mine carts, the summit landmark and its wheel, fences, floodlight masts, boards, buddleia and goldenrod; header
+  lists its material keys) and `KokereiKit.gd` (the battery in its own frame, see its header; the pusher machine, guide
+  car, quench car and loco, larry car, coal tower, quench tower, rails, by-product plant, flare), with stage 1's
+  SteelworksKit and KronburgTownKit. Previews and checks: `scratch/zechen_preview.gd`, `scratch/zechen_check.gd` (the
+  washer's and the bunker's clearances), `scratch/kokerei_preview.gd`, `scratch/kokerei_clearance_check.gd`,
+  `scratch/kokerei_mesh_dump.gd` (for zfight_scan).
+- Life on it: the quench tower's steam burst every 95s on the wall clock (`PeriodicBurst.gd`, with its hiss), smoke from
+  leaking oven doors, the open oven's glow, standpipe fires, the flare, steam over the by-product plant; the sheaves and the
+  summit wheel turn (`Spinner.gd`); walkers on the Halde, spectators at the start. Sounds (`sounds/zeche/`, tools/elevenlabs):
+  the Kokerei's hum, the conveyor, crows over the scrub, the quench burst. Music `MusicManager.STAGE_TRACKS["zeche"]`
+  (`Kohle_und_Dampf` and two of stage 1's).
+- The woods (`_build_woods`: birch, willow, oak, poplar, about 5,000 in 260m cells, the near meshes to 120m past a cell)
+  and the scrub plants (buddleia, goldenrod: DressingColliders' `BRUSH`, driven through). With 7,700 trees and a 170m
+  near range the stage cost 14.4ms.
+- AI races (`scratch/ai_race_test`, speed=2): every bot finishes three laps, no train hits, the respawns item blasts (and
+  now and then a fall near the second crossing, 2044m); flying laps about 80s. Cost (M1, 1280x720, `scratch/bench.tscn`):
+  12.2ms GPU on average, the worst 15.4ms. `res://scratch/zeche_ground_heights.gd` (`-s`, headless, `-- [level=] x,z ...`)
+  prints the ground under points (to aim look_shots' cameras).
+- Menu tile `images/menu/tile_zeche.jpg` (the yard with the Malakoff tower, the headframe and the washer, look_shots).

@@ -1,0 +1,86 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://generated/rheinuferprop_ship_excursion.res" id="1_giyra"]
+
+[node name="Vessel" type="Node3D" unique_id=24101592]
+
+[node name="Hull" type="MeshInstance3D" parent="." unique_id=948584964]
+visibility_range_end = 2600.0
+mesh = ExtResource("1_giyra")
+
+[node name="@Label3D@1212" type="Label3D" parent="." unique_id=1998377544]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8.944, 23.088001)
+visibility_range_end = 600.0
+pixel_size = 0.0028571428
+double_sided = false
+alpha_cut = 1
+modulate = Color(0.94, 0.94, 0.92, 1)
+text = "Stadt Kronburg"
+font_size = 64
+outline_size = 4
+
+[node name="@Label3D@1213" type="Label3D" parent="." unique_id=205653515]
+transform = Transform3D(0.1402405, -0.34070933, -0.92965037, 0, 0.9389293, -0.34411, 0.99011743, 0.048258163, 0.13167593, -7.818949, 1.5834827, 44.00632)
+visibility_range_end = 600.0
+pixel_size = 0.012857143
+double_sided = false
+alpha_cut = 1
+modulate = Color(0.08, 0.14, 0.34, 1)
+text = "Stadt Kronburg"
+font_size = 64
+outline_size = 4
+
+[node name="@Label3D@1214" type="Label3D" parent="." unique_id=1717066979]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -7.168, 7.968, -1.6)
+visibility_range_end = 600.0
+pixel_size = 0.007142857
+double_sided = false
+alpha_cut = 1
+modulate = Color(0.08, 0.14, 0.34, 1)
+text = "KRONBURGER RHEINFLOTTE"
+font_size = 64
+outline_size = 4
+
+[node name="@Label3D@1215" type="Label3D" parent="." unique_id=441667922]
+transform = Transform3D(0.1402405, 0.34070933, 0.92965037, 0, 0.9389293, -0.34411, -0.99011743, 0.048258163, 0.13167593, 7.818949, 1.5834827, 44.00632)
+visibility_range_end = 600.0
+pixel_size = 0.012857143
+double_sided = false
+alpha_cut = 1
+modulate = Color(0.08, 0.14, 0.34, 1)
+text = "Stadt Kronburg"
+font_size = 64
+outline_size = 4
+
+[node name="@Label3D@1216" type="Label3D" parent="." unique_id=628021132]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 7.168, 7.968, -1.6)
+visibility_range_end = 600.0
+pixel_size = 0.007142857
+double_sided = false
+alpha_cut = 1
+modulate = Color(0.08, 0.14, 0.34, 1)
+text = "KRONBURGER RHEINFLOTTE"
+font_size = 64
+outline_size = 4
+
+[node name="@Label3D@1217" type="Label3D" parent="." unique_id=391376665]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 1.52, -56.048)
+visibility_range_end = 600.0
+pixel_size = 0.010714286
+double_sided = false
+alpha_cut = 1
+modulate = Color(0.08, 0.14, 0.34, 1)
+text = "Stadt Kronburg"
+font_size = 64
+outline_size = 4
+
+[node name="@Label3D@1218" type="Label3D" parent="." unique_id=1769780117]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0.99200004, -56.048)
+visibility_range_end = 600.0
+pixel_size = 0.0064285714
+double_sided = false
+alpha_cut = 1
+modulate = Color(0.08, 0.14, 0.34, 1)
+text = "KRONBURG"
+font_size = 64
+outline_size = 4

@@ -1,0 +1,35 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://generated/kronburgprop_barge_1.res" id="1_nkyon"]
+
+[node name="Barge" type="Node3D" unique_id=130893967]
+
+[node name="Hull" type="MeshInstance3D" parent="." unique_id=1674853960]
+mesh = ExtResource("1_nkyon")
+
+[node name="@Label3D@222" type="Label3D" parent="." unique_id=28697373]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -7.6800003, 2.08, 27.2)
+pixel_size = 0.022142857
+double_sided = false
+alpha_cut = 1
+text = "KRONBURG"
+font_size = 64
+outline_size = 4
+
+[node name="@Label3D@223" type="Label3D" parent="." unique_id=1410824525]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 7.6800003, 2.08, 27.2)
+pixel_size = 0.022142857
+double_sided = false
+alpha_cut = 1
+text = "KRONBURG"
+font_size = 64
+outline_size = 4
+
+[node name="@Label3D@224" type="Label3D" parent="." unique_id=373110981]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 1.6, -48.048)
+pixel_size = 0.017857144
+double_sided = false
+alpha_cut = 1
+text = "KRONBURG"
+font_size = 64
+outline_size = 4

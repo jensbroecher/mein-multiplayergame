@@ -1,0 +1,53 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://generated/rheinuferprop_ship_cargo_boxes.res" id="1_q50rq"]
+
+[node name="Vessel" type="Node3D" unique_id=827153515]
+
+[node name="Hull" type="MeshInstance3D" parent="." unique_id=1945128413]
+visibility_range_end = 2600.0
+mesh = ExtResource("1_q50rq")
+
+[node name="@Label3D@1193" type="Label3D" parent="." unique_id=1692804860]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 2.08, -88.048)
+visibility_range_end = 600.0
+pixel_size = 0.012857143
+double_sided = false
+alpha_cut = 1
+modulate = Color(0.94, 0.94, 0.92, 1)
+text = "Rheinländer"
+font_size = 64
+outline_size = 4
+
+[node name="@Label3D@1194" type="Label3D" parent="." unique_id=1083968482]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 1.328, -88.048)
+visibility_range_end = 600.0
+pixel_size = 0.007857143
+double_sided = false
+alpha_cut = 1
+modulate = Color(0.94, 0.94, 0.92, 1)
+text = "KRONBURG"
+font_size = 64
+outline_size = 4
+
+[node name="@Label3D@1195" type="Label3D" parent="." unique_id=501767002]
+transform = Transform3D(0.064147666, -0.14840148, -0.98684454, 0, 0.98888123, -0.14870776, 0.9979404, 0.009539256, 0.06343442, -8.8756, 1.4728621, 73.60305)
+visibility_range_end = 600.0
+pixel_size = 0.015
+double_sided = false
+alpha_cut = 1
+modulate = Color(0.94, 0.94, 0.92, 1)
+text = "Rheinländer"
+font_size = 64
+outline_size = 4
+
+[node name="@Label3D@1196" type="Label3D" parent="." unique_id=851467567]
+transform = Transform3D(0.064147666, 0.14840148, 0.98684454, 0, 0.98888123, -0.14870776, -0.9979404, 0.009539256, 0.06343442, 8.8756, 1.4728621, 73.60305)
+visibility_range_end = 600.0
+pixel_size = 0.015
+double_sided = false
+alpha_cut = 1
+modulate = Color(0.94, 0.94, 0.92, 1)
+text = "Rheinländer"
+font_size = 64
+outline_size = 4

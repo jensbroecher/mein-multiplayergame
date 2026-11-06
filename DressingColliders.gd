@@ -40,7 +40,7 @@ const ROCKY := ["rock", "boulder", "block", "stone", "scree", "pebble", "mound",
 const WOBBLE_MAX_HEIGHT := 5.5
 ## Brush (ferns, by their mesh's file name; not tree ferns): not solid. A cart drives through it, bends
 ## it right over and loses BRUSH_DRAG of its speed entering each one.
-const BRUSH := ["fern"]
+const BRUSH := ["fern", "buddleia", "goldenrod"]
 const BRUSH_NOT := ["tree_fern", "treefern"]
 const BRUSH_LEAN := 1.05
 const BRUSH_KICK := 0.25

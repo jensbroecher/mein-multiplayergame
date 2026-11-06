@@ -29,6 +29,7 @@ const COL_SNOW := Color(0.45, 0.82, 0.98)
 const COL_BEACH := Color(0.96, 0.78, 0.40)
 const COL_SAVANNA := Color(0.95, 0.47, 0.22)
 const COL_JUNGLE := Color(0.32, 0.80, 0.42)
+const COL_KRONBURG := Color(0.88, 0.36, 0.26)
 
 ## Every course's tile: title, one-line description, picture and accent colour.
 const STAGE_INFO := {
@@ -51,10 +52,13 @@ const STAGE_INFO := {
 	"res://levels/MaraCrossingLevel.tscn": {"title": "MARA CROSSING", "subtitle": "Murram road across the savanna: the migration, Pride Rock, and the croc jump", "file": "tile_mara_crossing.jpg", "color": COL_SAVANNA},
 	"res://levels/NyotaStadiumLevel.tscn": {"title": "NYOTA STADIUM", "subtitle": "Stadium supercross: doubles, whoops and a triple, a lap of the streets, and the Drop-In", "file": "tile_nyota_stadium.jpg", "color": COL_SAVANNA},
 	"res://levels/MtaaNightsLevel.tscn": {"title": "MTAA NIGHTS", "subtitle": "Evening in the city: market streets, murram back roads, the park and Club Kilele's dancefloor. Tarmac or dirt: pick your route", "file": "tile_mtaa_nights.jpg", "color": COL_MAGENTA},
+	"res://levels/KronburgLevel.tscn": {"title": "KRONBURGER HÜTTE", "subtitle": "The canal, through the steelworks' rolling mill hall and round the blast furnace, up through the colliery estate into the half-timbered old town and over its cobbled market square", "file": "tile_kronburg.jpg", "color": COL_KRONBURG},
+	"res://levels/RheinuferLevel.tscn": {"title": "RHEINUFER", "subtitle": "Down the Rhine promenade, over the old steel-arch bridge, along the dyke past the sheep and the fun fair, round the Autobahn's loop ramp and back over the river on the cable-stayed bridge", "file": "tile_rheinufer.jpg", "color": COL_KRONBURG},
+	"res://levels/ZecheLevel.tscn": {"title": "ZECHE KRONPRINZ", "subtitle": "Off-road through the old colliery: under the coal washer, past the coke ovens and the steaming quench tower, up the spoil heap, a leap off its plateau, through the birch scrub and the settling ponds, over the pit railway", "file": "tile_zeche.jpg", "color": COL_KRONBURG},
 	"res://levels/MsituFallsLevel.tscn": {"title": "MSITU FALLS", "subtitle": "Rainforest hairpins, a mud bend, a rope bridge over the brink, behind the falls, and tropical downpours", "file": "tile_msitu_falls.jpg", "color": COL_JUNGLE},
 }
 ## Section header colour per cup on the course lists (same accents as the cup tiles).
-const CUP_COLORS := {"Bloombay GP": COL_GREEN, "Svartfjell GP": COL_SNOW, "Al-Raihana GP": COL_BRONZE, "Sierra del Viento GP": COL_CANYON, "Matumaini GP": COL_SAVANNA}
+const CUP_COLORS := {"Bloombay GP": COL_GREEN, "Svartfjell GP": COL_SNOW, "Al-Raihana GP": COL_BRONZE, "Sierra del Viento GP": COL_CANYON, "Matumaini GP": COL_SAVANNA, "Kronburg GP": COL_KRONBURG}
 ## Tiles per row in a cup section: one cup per row.
 const SECTION_COLUMNS := 4
 
@@ -313,6 +317,9 @@ func show_sub_menu(menu_name: String) -> void:
 			)
 			_add_tile("MATUMAINI GP", "Mara Crossing  •  Nyota Stadium  •  Msitu Falls", "tile_matumaini_gp.jpg", COL_SAVANNA, func():
 				_on_cup_selected("Matumaini GP")
+			)
+			_add_tile("KRONBURG GP", "Kronburger Hütte  •  Rheinufer  •  Zeche Kronprinz", "tile_kronburg_gp.jpg", COL_KRONBURG, func():
+				_on_cup_selected("Kronburg GP")
 			)
 		"stage_select":
 			if NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR:

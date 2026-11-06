@@ -429,6 +429,24 @@ const STAGE_TRACKS := {
 	"ramlat": ["res://music/al-raihana/Red_Sands_Pursuit.mp3"],
 	# Wadi al-Ghaf (Al-Raihana GP): its own track, from music/al-raihana/.
 	"wadi": ["res://music/al-raihana/Racing_the_Mirage.mp3"],
+	# The Kronburg GP: its own instrumental tracks (music/kronburg/, composed with ElevenLabs Music:
+	# tools/elevenlabs/music.json), shuffled.
+	"kronburg": [
+		"res://music/kronburg/Schichtwechsel.mp3",
+		"res://music/kronburg/Kleeblatt.mp3",
+		"res://music/kronburg/Abendrot_am_Rhein.mp3",
+		"res://music/kronburg/Kohle_und_Dampf.mp3",
+	],
+	"zeche": [
+		"res://music/kronburg/Kohle_und_Dampf.mp3",
+		"res://music/kronburg/Schichtwechsel.mp3",
+		"res://music/kronburg/Kleeblatt.mp3",
+	],
+	"rheinufer": [
+		"res://music/kronburg/Abendrot_am_Rhein.mp3",
+		"res://music/kronburg/Kleeblatt.mp3",
+		"res://music/kronburg/Schichtwechsel.mp3",
+	],
 }
 
 ## Stage categories that shuffle their own folder (and the root folder if it's empty).
@@ -456,6 +474,12 @@ static func _stage_track_key(path_lower: String) -> String:
 		return "ramlat"
 	if path_lower.get_file().begins_with("mina"):
 		return "mina"
+	if path_lower.contains("kronburg"):
+		return "kronburg"
+	if path_lower.contains("rheinufer"):
+		return "rheinufer"
+	if path_lower.get_file().begins_with("zeche"):
+		return "zeche"
 	return ""
 
 ## Picks the stage's tracks and starts loading the first one in the background. Level calls it when

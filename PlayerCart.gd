@@ -7543,6 +7543,30 @@ const AI_CROSSING_LOOK := 140.0
 const AI_CROSSING_BRAKE := 11.0
 var _ai_crossing_hold := false
 
+## A bot keeps its boost while a level crossing lies within this far ahead on its way.
+const AI_BOOST_CROSSING_CLEAR := 180.0
+
+## Whether a level crossing lies on the bot's way within `reach` metres (along its heading, the road's way).
+func _ai_rail_crossing_ahead(reach: float) -> bool:
+	var fwd: Vector3 = -visuals.global_transform.basis.z
+	fwd.y = 0.0
+	if fwd.length_squared() < 1e-6:
+		return false
+	fwd = fwd.normalized()
+	for c in get_tree().get_nodes_in_group("rail_crossings"):
+		var cn: Node3D = c as Node3D
+		var to: Vector3 = cn.global_position - global_position
+		to.y = 0.0
+		var ahead: float = to.dot(fwd)
+		if ahead < -2.0 or ahead > reach:
+			continue
+		var road_fwd: Vector3 = -cn.global_transform.basis.z
+		if absf(to.dot(fwd.cross(Vector3.UP))) > 30.0 or fwd.dot(road_fwd) < 0.5:
+			continue
+		return true
+	return false
+
+
 func _ai_rail_crossing_override(input: Vector2, speed: float) -> Vector2:
 	_ai_crossing_hold = false
 	var crossings := get_tree().get_nodes_in_group("rail_crossings")
@@ -8210,6 +8234,9 @@ func _process_ai_items(delta: float):
 						upcoming_sharp_turn = true
 				var road_open_ahead: bool = not upcoming_sharp_turn and _ai_upcoming_turn_dist > 16.0
 				var steer_reasonable: bool = absf(current_steer) < 0.55 and absf(sync_steer) < 0.55
+				# Never with a rail crossing in reach: a boosting bot can't brake for a train (Zeche Kronprinz, Freight Line).
+				if _ai_rail_crossing_ahead(AI_BOOST_CROSSING_CLEAR):
+					return
 				
 				if recovering:
 					# Do not boost if facing a sharp turn or cliff ahead

@@ -49,6 +49,12 @@ const BROADLEAF := {
 	"samr": {"h": 6.8, "r": 0.24, "cr": 5.2, "under": 0.6, "fork": 0.3, "leader": 0.0, "limbs": 5,
 		"clusters": 30, "cl_r": 1.45, "shell": 0.55, "cards": 8, "card": Vector2(1.9, 1.9), "cell": CELL_BIRCH,
 		"tint": Color(0.64, 0.64, 0.50), "droop": 0.05, "bark": "ghaf"},
+	# Rheinufer (Kronburg GP, stage 2): a London plane, the promenade's avenue tree: a clear stem pruned up to the
+	# crown, a broad domed crown of big palmate leaves, mottled bark. Its "cell" is RHEIN_CELL_PLANE in the Rhine atlas:
+	# draw it with rhein_leaf_material(), not leaf_material().
+	"plane": {"h": 21.0, "r": 0.5, "cr": 7.6, "under": 0.24, "fork": 0.28, "leader": 0.55, "limbs": 6,
+		"clusters": 50, "cl_r": 2.0, "shell": 0.5, "cards": 10, "card": Vector2(2.4, 3.2), "cell": 2,
+		"tint": Color(0.86, 0.90, 0.76), "droop": 0.04, "bark": "plane"},
 }
 const SPRUCE := {"h": 22.0, "r": 0.36, "base_r": 4.4, "whorls": 26, "per_whorl": 8}
 const PINE := {"h": 22.5, "r": 0.42, "cr": 5.4, "under": 0.48}
@@ -68,6 +74,11 @@ const BARKS := {
 	"alder": [Color(0.48, 0.46, 0.42), Color(0.22, 0.20, 0.18), 0.26, 0.018, 3.0, Color(0.80, 0.80, 0.78)],
 	"cottonwood": [Color(0.66, 0.63, 0.58), Color(0.24, 0.21, 0.18), 0.46, 0.05, 2.2, Color(0.84, 0.82, 0.78)],
 	"ghaf": [Color(0.44, 0.38, 0.32), Color(0.17, 0.13, 0.10), 0.42, 0.045, 1.8, Color(0.80, 0.77, 0.73)],
+	# Rheinufer: an old pollarded willow's deeply furrowed grey bark; a poplar's grey-brown, ridged trunk; a plane's
+	# bark flaking in patches (the "fissures" here are the olive-grey patches between buff ones, flat, nearly square).
+	"pollard": [Color(0.60, 0.57, 0.52), Color(0.24, 0.21, 0.18), 0.38, 0.05, 2.2, Color(0.84, 0.82, 0.78)],
+	"poplar": [Color(0.56, 0.54, 0.50), Color(0.20, 0.18, 0.16), 0.36, 0.04, 3.4, Color(0.82, 0.81, 0.78)],
+	"plane": [Color(0.80, 0.76, 0.58), Color(0.47, 0.50, 0.40), 0.5, 0.004, 1.15, Color(0.88, 0.86, 0.80)],
 }
 
 ## The canopy crossfades from the detailed trees to their stand-ins round TREE_NEAR (JungleDetail.gd
@@ -79,6 +90,8 @@ const TREE_FADE_JITTER := 12.0
 ## (res, name) -> the saved resource; set by the generator.
 var save_res: Callable
 var _atlas: Texture2D
+## The Rhine atlas (rhein_atlas()): the Rheinufer kinds' leaves, its own texture so the classic atlas stays as it was.
+var _rhein_atlas: Texture2D
 
 
 # ======================================================================================
@@ -1063,6 +1076,442 @@ func alpine_shrub_mesh(variant: int, bark_mat: Material, leaf_mat: Material) -> 
 			var cpos: Vector3 = mid.lerp(tip, 0.50 + 0.50 * float(j)) + Vector3(rng.randf_range(-0.22, 0.22), 0.1, rng.randf_range(-0.22, 0.22))
 			lb = cluster_cards(leaf_st, lb, cpos, r * 0.36, 5, Vector2(r * 0.68, r * 0.88), crown_c, r, 0.0, hgt * 1.1,
 					CELL_SPRUCE, tint, rng)
+	var mesh: ArrayMesh = st.commit()
+	mesh.surface_set_material(0, bark_mat)
+	leaf_st.commit(mesh)
+	mesh.surface_set_material(1, leaf_mat)
+	return mesh
+
+
+# ======================================================================================
+#  Rheinufer: the pollarded willow, the poplar and the plane (their own leaf atlas)
+# ======================================================================================
+
+## The Rhine atlas's cells (rhein_atlas(), 2 x 2 like the classic one): 0 a sheaf of straight willow rods with narrow
+## leaves, drawn upright from the cell's foot; 1 a spray of a poplar's deltoid leaves; 2 a spray of a plane's palmate
+## leaves; 3 a tuft of narrow willow leaves radiating from the middle.
+const RHEIN_CELL_RODS := 0
+const RHEIN_CELL_POPLAR := 1
+const RHEIN_CELL_PLANE := 2
+const RHEIN_CELL_WILLOW := 3
+## The kinds whose leaves are in the Rhine atlas: draw them with rhein_leaf_material().
+const RHEIN_KINDS := ["pollard", "poplar", "plane"]
+## A pollard (Kopfweide): the head's height, the trunk's radius, how many rods and how long.
+const POLLARD := {"head": 2.4, "r": 0.36, "rods": 34, "rod_len": 3.6}
+## A poplar: height, trunk radius, the crown's widest radius, where the crown starts, ascending limbs.
+const POPLAR := {"h": 26.0, "r": 0.44, "cr": 3.0, "base": 2.6, "limbs": 22}
+
+
+## True for a kind whose leaves are in the Rhine atlas (rhein_leaf_material) rather than the classic one.
+static func uses_rhein_atlas(kind: String) -> bool:
+	return RHEIN_KINDS.has(kind)
+
+
+## Any kind's tree in one call: the broadleaves (BROADLEAF, "plane" among them), "spruce", "pine", "fir", "larch",
+## "pollard" and "poplar". `lod` 1 is the far stand-in.
+func tree_mesh(kind: String, variant: int, lod: int, bark_mat: Material, leaf_mat: Material) -> ArrayMesh:
+	match kind:
+		"spruce":
+			return spruce_mesh(variant, lod, bark_mat, leaf_mat)
+		"pine":
+			return pine_mesh(variant, lod, bark_mat, leaf_mat)
+		"fir":
+			return fir_mesh(variant, lod, bark_mat, leaf_mat)
+		"larch":
+			return larch_mesh(variant, lod, bark_mat, leaf_mat)
+		"pollard":
+			return pollard_mesh(variant, lod, bark_mat, leaf_mat)
+		"poplar":
+			return poplar_mesh(variant, lod, bark_mat, leaf_mat)
+	return broadleaf_mesh(kind, variant, lod, bark_mat, leaf_mat)
+
+
+## The leaves of the Rhine kinds: leaf_material() with the Rhine atlas (saved through save_res as "leaf_atlas_rhein").
+func rhein_leaf_material(lod_mode: int, sway: float, sway_height: float) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = load("res://acacia_leaves.gdshader")
+	m.set_shader_parameter("leaf_tex", rhein_atlas())
+	m.set_shader_parameter("backlight_color", Color(0.62, 0.72, 0.34))
+	m.set_shader_parameter("sway", sway)
+	m.set_shader_parameter("sway_height", sway_height)
+	set_lod(m, lod_mode)
+	return m
+
+
+## The Rhine atlas, 2 x 2 cells of 512 (see RHEIN_CELL_*), drawn like atlas() and mipmapped to keep its coverage.
+func rhein_atlas() -> Texture2D:
+	if _rhein_atlas:
+		return _rhein_atlas
+	const W := 1024
+	const C := 512
+	var cv := LeafCanvas.new(W, Color(0.14, 0.20, 0.08))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 2718
+	# --- 0: willow rods: a sheaf of straight young shoots fanning up from the cell's foot, narrow lanceolate leaves
+	# along each pointing up and out, dark grey-green above, a third turned to show their silvery undersides.
+	var foot := Vector2(C * 0.5, C - 6.0)
+	for k in range(7):
+		var a0: float = -PI * 0.5 + lerpf(-0.36, 0.36, (float(k) + 0.5) / 7.0) + rng.randf_range(-0.05, 0.05)
+		var d := Vector2(cos(a0), sin(a0))
+		var p: Vector2 = foot + Vector2(rng.randf_range(-26.0, 26.0), rng.randf_range(-12.0, 0.0))
+		var length: float = rng.randf_range(400.0, 490.0)
+		var gone := 0.0
+		var side := 1.0
+		while gone < length:
+			var seg: float = rng.randf_range(12.0, 17.0)
+			d = (d + Vector2(rng.randf_range(-0.02, 0.02), 0.0)).normalized()
+			var q: Vector2 = p + d * seg
+			if q.y < 6.0 or q.x < 6.0 or q.x > C - 6.0:
+				break
+			var t: float = gone / length
+			cv.line(p, q, lerpf(2.4, 1.0, t), lerpf(2.2, 0.9, t), Color(0.52, 0.44, 0.22).lerp(Color(0.42, 0.33, 0.20), rng.randf()))
+			if gone > 26.0:
+				side = -side
+				var la: float = d.angle() + side * rng.randf_range(0.35, 0.65)
+				var silver: bool = rng.randf() < 0.32
+				var g: Color = Color(0.56, 0.62, 0.50).lerp(Color(0.62, 0.66, 0.56), rng.randf()) if silver else Color(0.26, 0.37, 0.15).lerp(Color(0.34, 0.44, 0.18), rng.randf())
+				cv.leaf(q, Vector2(cos(la), sin(la)), rng.randf_range(44.0, 58.0) * lerpf(1.0, 0.72, t), rng.randf_range(4.5, 6.2), g, g.lightened(0.18), 0.0, 0.04, 0.0)
+			p = q
+			gone += seg
+	# --- 1: poplar: deltoid leaves, broad at the base and pointed, on long stalks along the twigs.
+	_spray(cv, rng, Vector2(C * 1.5, C * 0.5), C, 11, Vector2(150.0, 205.0),
+			func(p: Vector2, d: Vector2, s: float, g: Color) -> void:
+				_deltoid_leaf(cv, p, d, 36.0 * s, g),
+			[Color(0.20, 0.33, 0.10), Color(0.28, 0.42, 0.13), Color(0.36, 0.48, 0.17)])
+	# --- 2: plane: big palmate leaves, three main lobes and two small ones, coarsely toothed.
+	_spray(cv, rng, Vector2(C * 0.5, C * 1.5), C, 8, Vector2(140.0, 190.0),
+			func(p: Vector2, d: Vector2, s: float, g: Color) -> void:
+				_palmate_leaf(cv, p, d, 50.0 * s, g),
+			[Color(0.25, 0.39, 0.11), Color(0.33, 0.47, 0.14), Color(0.30, 0.42, 0.12)])
+	# --- 3: a willow tuft: narrow leaves radiating on fine twigs, for the crown's fill and the far stand-ins.
+	_spray(cv, rng, Vector2(C * 1.5, C * 1.5), C, 12, Vector2(160.0, 215.0),
+			func(p: Vector2, d: Vector2, s: float, g: Color) -> void:
+				cv.leaf(p, d, 52.0 * s, 5.4 * s + 1.0, g, g.lightened(0.18), 0.0, 0.04, 0.0),
+			[Color(0.27, 0.38, 0.16), Color(0.34, 0.44, 0.19), Color(0.54, 0.60, 0.46)])
+	var img := _coverage_mipmaps(cv, 0.5)
+	_rhein_atlas = save_res.call(ImageTexture.create_from_image(img), "leaf_atlas_rhein")
+	return _rhein_atlas
+
+
+## A poplar leaf on its stalk: a triangle broad at its base and pointed, the stalk running back from it.
+static func _deltoid_leaf(cv: LeafCanvas, base: Vector2, dir: Vector2, length: float, col: Color) -> void:
+	var d: Vector2 = dir.normalized()
+	var perp := Vector2(-d.y, d.x)
+	cv.line(base, base + d * length * 0.32, 1.2, 1.0, Color(0.40, 0.36, 0.18))
+	var b0: Vector2 = base + d * length * 0.3
+	var reach: float = length + 2.0
+	for y in range(maxi(0, int(b0.y - reach)), mini(cv.w - 1, int(b0.y + reach) + 1)):
+		for x in range(maxi(0, int(b0.x - reach)), mini(cv.w - 1, int(b0.x + reach) + 1)):
+			var q := Vector2(x + 0.5, y + 0.5) - b0
+			var along: float = q.dot(d) / length
+			if along < -0.04 or along > 1.0:
+				continue
+			var across: float = q.dot(perp)
+			var half: float = length * 0.5 * minf(maxf(along + 0.04, 0.0) / 0.14, 1.0) * pow(1.0 - clampf(along, 0.0, 1.0), 1.05)
+			var a: float = clampf(half - absf(across) + 0.5, 0.0, 1.0)
+			if a <= 0.0:
+				continue
+			var c: Color = col.lerp(col.lightened(0.22), clampf(along, 0.0, 1.0) * 0.5)
+			c = c.darkened(0.16 * absf(across) / maxf(half, 0.001))
+			c = c.lerp(col.lightened(0.3), clampf(1.2 - absf(across) / 0.9, 0.0, 1.0) * 0.45)
+			cv._put(y * cv.w + x, a, c)
+
+
+## A plane's leaf: five lobes from one base, the middle three long and pointed, coarsely toothed.
+static func _palmate_leaf(cv: LeafCanvas, base: Vector2, dir: Vector2, size: float, col: Color) -> void:
+	var a: float = dir.angle()
+	cv.line(base - dir.normalized() * size * 0.25, base, 1.4, 1.2, Color(0.42, 0.38, 0.20))
+	for lobe in [[1.45, 0.42, 0.2], [-1.45, 0.42, 0.2], [0.72, 0.84, 0.27], [-0.72, 0.84, 0.27], [0.0, 1.0, 0.3]]:
+		var la: float = a + float(lobe[0])
+		cv.leaf(base, Vector2(cos(la), sin(la)), size * float(lobe[1]), size * float(lobe[2]), col, col.lightened(0.2), 0.0, 0.12, 0.0)
+
+
+## bark_tube with a gnarled surface: every ring point pushed out or in by `bump` (a share of the radius) on smooth noise
+## round and along the tube, and, where `cleft` says (x the angle round it, y the half width in radians, z and w the
+## heights it runs between; zero for none), a deep groove darkened inside: an old pollard's split, hollow-looking trunk.
+static func gnarled_tube(st: SurfaceTool, base: int, pts: Array, radii: Array, sides: int, col: Color, cell: float,
+		shade: Vector2, seed_v: int, cleft := Vector4.ZERO, bump := 0.15) -> int:
+	var n: int = pts.size()
+	var period: float = maxf(3.0, roundf(TAU * float(radii[0]) / cell))
+	var grid: Array = []
+	var darks: Array = []
+	var vs := PackedFloat32Array()
+	var along := 0.0
+	var t0: Vector3 = ((pts[1] as Vector3) - (pts[0] as Vector3)).normalized()
+	var u: Vector3 = t0.cross(Vector3.UP if absf(t0.y) < 0.95 else Vector3.RIGHT).normalized()
+	var sf: float = float(seed_v)
+	for k in range(n):
+		var t: Vector3 = ((pts[mini(k + 1, n - 1)] as Vector3) - (pts[maxi(k - 1, 0)] as Vector3)).normalized()
+		u = (u - t * u.dot(t)).normalized()
+		var w: Vector3 = t.cross(u)
+		if k > 0:
+			along += (pts[k] as Vector3).distance_to(pts[k - 1])
+		vs.append(along / cell)
+		var y: float = (pts[k] as Vector3).y
+		var ring := PackedVector3Array()
+		var dk := PackedFloat32Array()
+		for s in range(sides + 1):
+			var ang: float = TAU * float(s % sides) / float(sides)
+			var nb: float = sin(ang * 3.0 + sf + along * 2.3) * 0.5 + sin(ang * 5.0 - sf * 0.7 + along * 4.1) * 0.3 + sin(ang * 2.0 + along * 1.3 + sf * 1.9) * 0.4
+			var rr: float = float(radii[k]) * (1.0 + bump * nb)
+			var dark := 0.0
+			if cleft.y > 0.0 and y > cleft.z and y < cleft.w:
+				var da: float = absf(wrapf(ang - cleft.x, -PI, PI))
+				var c: float = 1.0 - smoothstep(cleft.y * 0.35, cleft.y, da)
+				var fade: float = smoothstep(cleft.z, cleft.z + 0.35, y) * (1.0 - smoothstep(cleft.w - 0.35, cleft.w, y))
+				rr *= 1.0 - 0.6 * c * fade
+				dark = c * fade
+			ring.append((pts[k] as Vector3) + (u * cos(ang) + w * sin(ang)) * rr)
+			dk.append(dark)
+		grid.append(ring)
+		darks.append(dk)
+	for k in range(n):
+		var c: Vector3 = pts[k]
+		var a_sh: float = 1.0 - 0.5 * smoothstep(shade.x, shade.y, c.y)
+		for s in range(sides + 1):
+			var si: int = s % sides
+			var around: Vector3 = (grid[k][(si + 1) % sides] as Vector3) - (grid[k][(si - 1 + sides) % sides] as Vector3)
+			var length_dir: Vector3 = (grid[mini(k + 1, n - 1)][si] as Vector3) - (grid[maxi(k - 1, 0)][si] as Vector3)
+			var nrm: Vector3 = around.cross(length_dir).normalized()
+			var p: Vector3 = grid[k][s]
+			if nrm.dot(p - c) < 0.0:
+				nrm = -nrm
+			st.set_normal(nrm)
+			st.set_color(Color(col.r, col.g, col.b, a_sh * (1.0 - 0.8 * float(darks[k][s]))))
+			st.set_uv(Vector2(float(s) / float(sides) * period, vs[k]))
+			st.set_uv2(Vector2(period, 0.0))
+			st.add_vertex(p)
+	# Front faces outward: clockwise, face normal (c - a) x (b - a).
+	var p0: Vector3 = grid[0][0]
+	var p1: Vector3 = grid[0][1]
+	var p2: Vector3 = grid[1][1]
+	var flip: bool = (p2 - p0).cross(p1 - p0).dot(p0 - (pts[0] as Vector3)) < 0.0
+	for k in range(n - 1):
+		for s in range(sides):
+			var a: int = base + k * (sides + 1) + s
+			var b: int = a + 1
+			var c2: int = a + sides + 2
+			var d: int = a + sides + 1
+			if flip:
+				for idx in [a, c2, b, a, d, c2]:
+					st.add_index(idx)
+			else:
+				for idx in [a, b, c2, a, c2, d]:
+					st.add_index(idx)
+	return base + n * (sides + 1)
+
+
+## Leaf cards standing along a shoot: at `p`, the cell's foot toward the shoot's base and its top along `axis`, `w` wide
+## and `l` long, two crossed (or one) and turned at random about the shoot. Normals and shade as cluster_cards'.
+static func rod_cards(st: SurfaceTool, base: int, p: Vector3, axis: Vector3, w: float, l: float, crown_c: Vector3, crown_r: float,
+		under: float, top: float, cell: int, tint: Color, rng: RandomNumberGenerator, crossed := true) -> int:
+	var uvr: Rect2 = cell_uv(cell)
+	var ax: Vector3 = axis.normalized()
+	var t1: Vector3 = ax.cross(Vector3.UP if absf(ax.y) < 0.9 else Vector3.RIGHT).normalized().rotated(ax, rng.randf() * TAU)
+	var uvs: Array = [uvr.position + Vector2(0, uvr.size.y), uvr.position + uvr.size, uvr.position + Vector2(uvr.size.x, 0), uvr.position]
+	for c in range(2 if crossed else 1):
+		var side: Vector3 = t1.rotated(ax, PI * 0.5 * float(c))
+		var corners: Array = [p - side * w * 0.5 - ax * l * 0.5, p + side * w * 0.5 - ax * l * 0.5, p + side * w * 0.5 + ax * l * 0.5, p - side * w * 0.5 + ax * l * 0.5]
+		var bright: float = rng.randf_range(0.9, 1.08)
+		for j in range(4):
+			var v: Vector3 = corners[j]
+			var cn: Vector3 = v - crown_c
+			cn = Vector3(cn.x / maxf(crown_r, 0.1), cn.y / maxf((top - under) * 0.7, 0.1), cn.z / maxf(crown_r, 0.1)).normalized()
+			var shade: float = clampf(0.3 + 0.7 * smoothstep(under - 0.5, top - 0.5, v.y), 0.25, 1.0)
+			shade *= lerpf(0.75, 1.0, clampf(Vector2(v.x - crown_c.x, v.z - crown_c.z).length() / maxf(crown_r, 0.1), 0.0, 1.0))
+			st.set_normal((cn + Vector3.UP * 0.5).normalized())
+			st.set_color(Color(tint.r * bright, tint.g * bright, tint.b * bright, shade))
+			st.set_uv(uvs[j])
+			st.add_vertex(v)
+		for idx in [0, 1, 2, 0, 2, 3]:
+			st.add_index(base + idx)
+		base += 4
+	return base
+
+
+## A pollarded willow (Kopfweide), as along the Lower Rhine's ditches: a short, thick, gnarled trunk (`variant` even: split
+## and hollow-looking on one side) leaning a little, swelling into a knobbly head about 2-2.8m up, and from the head's
+## knuckles a crown of straight young rods fanning up and out, dressed in narrow willow leaves (Rhine atlas: draw with
+## rhein_leaf_material()). About 6-7m tall, 5-6m across. `lod` 1: the trunk and head, a dozen big cards.
+func pollard_mesh(variant: int, lod: int, bark_mat: Material, leaf_mat: Material) -> ArrayMesh:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5151 + variant * 211
+	var head_y: float = float(POLLARD["head"]) * rng.randf_range(0.85, 1.17)
+	var r0: float = float(POLLARD["r"]) * rng.randf_range(0.88, 1.15)
+	var rod_len: float = float(POLLARD["rod_len"]) * (1.0 if variant % 2 == 0 else 0.72)
+	var lean := Vector3(rng.randf_range(-0.45, 0.45), 0.0, rng.randf_range(-0.45, 0.45))
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var bi := 0
+	var bark: Color = BARKS["pollard"][5]
+	var shade := Vector2(head_y + 0.4, head_y + 3.5)
+	var trunk: Array = []
+	var radii: Array = []
+	var n := 7
+	for k in range(n + 1):
+		var t: float = float(k) / float(n)
+		var y: float = lerpf(-0.6, head_y, t)
+		var lt: float = clampf(y / head_y, 0.0, 1.0)
+		trunk.append(lean * lt * lt + Vector3(sin(lt * 3.0 + float(variant)) * 0.08, y, cos(lt * 2.4 + float(variant) * 1.7) * 0.08))
+		var flare: float = 1.0 + 0.42 * (1.0 - smoothstep(-0.6, 0.6, y))
+		var swell: float = 1.0 + 0.34 * smoothstep(0.55, 1.0, lt)
+		radii.append(r0 * flare * swell * (1.0 + 0.06 * sin(lt * 9.0 + float(variant))))
+	var cleft := Vector4.ZERO
+	if variant % 2 == 0:
+		cleft = Vector4(rng.randf() * TAU, 0.5, 0.15, head_y * 0.8)
+	bi = gnarled_tube(st, bi, trunk, radii, 12 if lod == 0 else 7, bark, 0.36, shade, 31 + variant * 7, cleft, 0.16 if lod == 0 else 0.1)
+	var head: Vector3 = trunk[n]
+	var hr: float = radii[n]
+	# The head: a cap closing the trunk and knuckles round it, from whose ends the rods spring.
+	bi = gnarled_tube(st, bi, [head - Vector3(0, 0.12, 0), head + Vector3(0, hr * 0.32, 0), head + Vector3(0, hr * 0.55, 0)],
+			[hr * 1.03, hr * 0.78, 0.02], 10 if lod == 0 else 6, bark, 0.36, shade, 57 + variant, Vector4.ZERO, 0.12)
+	var tips: Array = []
+	var nk: int = rng.randi_range(5, 7)
+	for k in range(nk):
+		var a: float = TAU * float(k) / float(nk) + rng.randf_range(-0.3, 0.3)
+		var d := Vector3(cos(a), rng.randf_range(0.45, 1.0), sin(a)).normalized()
+		var p0: Vector3 = head + Vector3(0, -0.12, 0)
+		var p1: Vector3 = head + d * hr * rng.randf_range(0.95, 1.3)
+		var kr: float = hr * rng.randf_range(0.38, 0.55)
+		if lod == 0:
+			bi = gnarled_tube(st, bi, [p0, p0.lerp(p1, 0.6), p1, p1 + d * kr * 0.55], [kr * 1.15, kr, kr * 0.85, kr * 0.2], 7, bark, 0.36, shade,
+					77 + k * 13 + variant, Vector4.ZERO, 0.22)
+		tips.append([p1, d, kr])
+	var leaf_st := SurfaceTool.new()
+	leaf_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var lb := 0
+	var crown_c: Vector3 = head + Vector3(0, rod_len * 0.62, 0)
+	var crown_r: float = rod_len * 0.72
+	var under: float = head.y
+	var top: float = head.y + rod_len * 1.15
+	var tint := Color(0.86, 0.90, 0.80)
+	var rod_tint := Color(0.98, 0.84, 0.54)
+	if lod == 0:
+		var n_rods: int = int(POLLARD["rods"]) + rng.randi_range(-6, 6)
+		for k in range(n_rods):
+			var tip: Array = tips[k % tips.size()]
+			var tp: Vector3 = tip[0]
+			var td: Vector3 = tip[1]
+			var base_p: Vector3 = tp + td * float(tip[2]) * 0.3 + Vector3(rng.randf_range(-0.1, 0.1), 0.0, rng.randf_range(-0.1, 0.1))
+			var out_d := Vector3(td.x, 0.0, td.z).normalized().rotated(Vector3.UP, rng.randf_range(-0.45, 0.45))
+			var tilt: float = rng.randf_range(0.1, 0.6)
+			var dir: Vector3 = (Vector3.UP * cos(tilt) + out_d * sin(tilt)).normalized()
+			var length: float = rod_len * rng.randf_range(0.6, 1.2)
+			var mid: Vector3 = base_p + dir * length * 0.5 + out_d * length * 0.04
+			var end: Vector3 = base_p + dir * length + out_d * length * 0.13 - Vector3(0, length * 0.03, 0)
+			var rr: float = rng.randf_range(0.024, 0.04)
+			bi = bark_tube(st, bi, [base_p - dir * 0.08, mid, end], [rr, rr * 0.7, rr * 0.25], 4, rod_tint, 0.3, shade)
+			# Leafy sheaves along the rod's upper two thirds.
+			for t2 in [0.42, 0.68, 0.92]:
+				var cp: Vector3 = base_p.lerp(end, float(t2) + rng.randf_range(-0.06, 0.06))
+				var cw: float = length * rng.randf_range(0.26, 0.34)
+				lb = rod_cards(leaf_st, lb, cp, (end - base_p) + Vector3(rng.randf_range(-0.3, 0.3), 0.0, rng.randf_range(-0.3, 0.3)), cw, length * 0.52,
+						crown_c, crown_r, under, top, RHEIN_CELL_RODS, Color(tint.r * rng.randf_range(0.95, 1.05), tint.g, tint.b * rng.randf_range(0.92, 1.06)), rng)
+		# Fill: tufts through the crown's upper half, so it reads as one mass from afar.
+		for k in range(14):
+			var a2: float = TAU * float(k) / 14.0 + rng.randf_range(-0.25, 0.25)
+			var cp2: Vector3 = crown_c + Vector3(cos(a2) * crown_r * rng.randf_range(0.35, 0.8), rng.randf_range(-0.2, 1.0) * rod_len * 0.4, sin(a2) * crown_r * rng.randf_range(0.35, 0.8))
+			lb = cluster_cards(leaf_st, lb, cp2, rod_len * 0.3, 4, Vector2(rod_len * 0.42, rod_len * 0.55), crown_c, crown_r, under, top,
+					RHEIN_CELL_WILLOW, tint, rng)
+	else:
+		# The stand-in: big sheaves fanning up out of the head, a few tufts over them.
+		for k in range(11):
+			var a3: float = TAU * float(k) / 11.0 + rng.randf_range(-0.2, 0.2)
+			var od := Vector3(cos(a3), 0.0, sin(a3))
+			var ax: Vector3 = (Vector3.UP + od * rng.randf_range(0.4, 0.8)).normalized()
+			lb = rod_cards(leaf_st, lb, head + ax * rod_len * 0.6, ax, rod_len * 0.85, rod_len * 1.15, crown_c, crown_r, under, top,
+					RHEIN_CELL_RODS, tint, rng, k % 2 == 0)
+		lb = cluster_cards(leaf_st, lb, crown_c + Vector3(0, rod_len * 0.2, 0), crown_r * 0.7, 6, Vector2(rod_len * 0.8, rod_len * 1.0), crown_c, crown_r,
+				under, top, RHEIN_CELL_WILLOW, tint, rng)
+	var mesh: ArrayMesh = st.commit()
+	mesh.surface_set_material(0, bark_mat)
+	leaf_st.commit(mesh)
+	mesh.surface_set_material(1, leaf_mat)
+	return mesh
+
+
+## A poplar for rows along roads and ditches: `variant` even a Lombardy poplar (a narrow column 24-28m tall, its limbs
+## climbing steeply from low on the trunk), odd a hybrid (black) poplar, shorter and broader, its crown an open oval.
+## Deltoid leaves from the Rhine atlas (rhein_leaf_material()). `lod` 1: the trunk and stacks of big cards.
+func poplar_mesh(variant: int, lod: int, bark_mat: Material, leaf_mat: Material) -> ArrayMesh:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 6161 + variant * 173
+	var hybrid: bool = variant % 2 == 1
+	var h: float = float(POPLAR["h"]) * rng.randf_range(0.9, 1.1) * (0.86 if hybrid else 1.0)
+	var r0: float = float(POPLAR["r"]) * rng.randf_range(0.9, 1.1) * (1.1 if hybrid else 1.0)
+	var cr: float = float(POPLAR["cr"]) * rng.randf_range(0.9, 1.1) * (2.0 if hybrid else 1.0)
+	var yb: float = float(POPLAR["base"]) * rng.randf_range(0.8, 1.2) * (1.9 if hybrid else 1.0)
+	var ex: float = 0.5 if hybrid else 0.65
+	var env := func(y: float) -> float:
+		var s: float = clampf((y - yb) / (h - yb), 0.0, 1.0)
+		return cr * pow(sin(PI * pow(s, 0.8)), ex) + 0.3
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var bi := 0
+	var bark: Color = BARKS["poplar"][5]
+	var shade := Vector2(yb, h)
+	var trunk: Array = []
+	var radii: Array = []
+	var sway := Vector2(rng.randf_range(-0.3, 0.3), rng.randf_range(-0.3, 0.3))
+	for k in range(9):
+		var t: float = float(k) / 8.0
+		var y: float = lerpf(-0.7, h - 0.6, t)
+		trunk.append(Vector3(sway.x * sin(t * 2.6 + float(variant)) * t, y, sway.y * sin(t * 2.1 + 1.3) * t))
+		radii.append(r0 * lerpf(1.0, 0.08, pow(t, 0.9)) * (1.0 + 0.4 * (1.0 - smoothstep(0.0, 0.08, t))))
+	bi = bark_tube(st, bi, trunk, radii, 8 if lod == 0 else 5, bark, 0.4, shade)
+	var leaf_st := SurfaceTool.new()
+	leaf_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var lb := 0
+	var crown_c := Vector3(0.0, (yb + h) * 0.5, 0.0)
+	var tint := Color(0.84, 0.90, 0.74)
+	if lod == 0:
+		# Limbs climbing steeply from low on the trunk to the crown's outline (mostly hidden: the woody frame seen through
+		# its gaps), then the foliage filling the whole outline in rings of clusters up the tree.
+		var n_limbs: int = int(POPLAR["limbs"]) - (6 if hybrid else 4)
+		for k in range(n_limbs):
+			var ty: float = lerpf(yb, h - 4.0, pow((float(k) + rng.randf()) / float(n_limbs), 0.95))
+			var a: float = float(k) * 2.39996 + rng.randf_range(-0.3, 0.3)
+			var out_d := Vector3(cos(a), 0.0, sin(a))
+			var tilt: float = rng.randf_range(0.6, 0.85) if hybrid else rng.randf_range(0.26, 0.42)
+			var dir: Vector3 = (Vector3.UP * cos(tilt) + out_d * sin(tilt)).normalized()
+			var reach: float = float(env.call(ty + 2.5)) * rng.randf_range(0.7, 0.92)
+			var length: float = minf(reach / sin(tilt), (h - 0.8 - ty) / cos(tilt))
+			var a_pt: Vector3 = _trunk_at(trunk, ty)
+			var tip: Vector3 = a_pt + dir * length
+			# Keep the tip inside the crown's outline.
+			var lim: float = float(env.call(tip.y)) * 0.88
+			var flat := Vector2(tip.x, tip.z)
+			if flat.length() > lim:
+				flat = flat.normalized() * lim
+				tip = Vector3(flat.x, tip.y, flat.y)
+			var mid: Vector3 = a_pt.lerp(tip, 0.5) + out_d * length * 0.04
+			var lr: float = r0 * lerpf(0.3, 0.12, float(k) / float(n_limbs))
+			bi = bark_tube(st, bi, [a_pt, mid, tip], [lr, lr * 0.65, lr * 0.18], 5, bark, 0.4, shade)
+		var cl_r: float = 1.5 if hybrid else 1.05
+		var card := Vector2(2.0, 2.7) if hybrid else Vector2(1.5, 2.1)
+		var y: float = yb + 0.6
+		var ring := 0
+		while y < h - 0.4:
+			var e: float = env.call(y)
+			var n_ring: int = maxi(2, int(ceil(TAU * e * 0.72 / (cl_r * 1.6))))
+			var a0: float = rng.randf() * TAU + float(ring) * 0.9
+			for j in range(n_ring):
+				var a4: float = a0 + TAU * float(j) / float(n_ring) + rng.randf_range(-0.2, 0.2)
+				var rr: float = e * rng.randf_range(0.5, 0.82)
+				var cp: Vector3 = _trunk_at(trunk, y) + Vector3(cos(a4) * rr, rng.randf_range(-0.3, 0.3), sin(a4) * rr)
+				lb = cluster_cards(leaf_st, lb, cp, cl_r, 4, card, crown_c, cr, yb, h, RHEIN_CELL_POPLAR,
+						Color(tint.r * rng.randf_range(0.95, 1.05), tint.g, tint.b * rng.randf_range(0.92, 1.05)), rng)
+			y += cl_r * (1.25 if hybrid else 1.1)
+			ring += 1
+		# The leader's tip.
+		for j in range(2):
+			lb = cluster_cards(leaf_st, lb, _trunk_at(trunk, h - 0.9 - 1.3 * float(j)), 0.7 + 0.3 * float(j), 4, Vector2(1.3, 1.9), crown_c, cr, yb, h, RHEIN_CELL_POPLAR, tint, rng)
+	else:
+		var y := yb + 1.2
+		while y < h - 0.5:
+			var e: float = env.call(y)
+			lb = cluster_cards(leaf_st, lb, _trunk_at(trunk, y), e * 0.42, 6, Vector2(e * 1.6, e * 2.0), crown_c, cr, yb, h, RHEIN_CELL_POPLAR, tint, rng)
+			y += maxf(e * 0.75, 1.6)
 	var mesh: ArrayMesh = st.commit()
 	mesh.surface_set_material(0, bark_mat)
 	leaf_st.commit(mesh)

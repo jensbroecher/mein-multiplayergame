@@ -118,5 +118,165 @@
     "duration": 4.0,
     "loop": false,
     "influence": 0.6
+  },
+  {
+    "name": "rolling_mill",
+    "path": "sounds/kronburg/rolling_mill_loop.wav",
+    "text": "Inside a huge steel rolling mill hall, a deep industrial hum, heavy rollers turning, a hot steel slab grinding through the mill stands with rumbling and occasional metallic clanks and booms echoing in the big hall, steam hiss, continuous",
+    "duration": 12.0,
+    "loop": true,
+    "influence": 0.5
+  },
+  {
+    "name": "blast_furnace",
+    "path": "sounds/kronburg/blast_furnace_loop.wav",
+    "text": "A blast furnace at a steelworks heard from outside nearby, a deep steady roar of hot air blowing, low rumbling, distant industrial machinery, continuous",
+    "duration": 10.0,
+    "loop": true,
+    "influence": 0.5
+  },
+  {
+    "name": "church_bells",
+    "path": "sounds/kronburg/church_bells.wav",
+    "text": "Large bronze church bells ringing from a stone church tower in a small German town, several bells pealing together, heard from the market square, natural reverb",
+    "duration": 14.0,
+    "loop": false,
+    "influence": 0.6
+  },
+  {
+    "name": "crane_horn",
+    "path": "sounds/kronburg/crane_warning.wav",
+    "text": "An overhead travelling crane warning horn in a factory hall, two short electric horn honks echoing",
+    "duration": 3.0,
+    "loop": false,
+    "influence": 0.65
+  },
+  {
+    "name": "barge_engine",
+    "path": "sounds/kronburg/barge_engine_loop.wav",
+    "text": "A large inland cargo barge on a canal, a slow heavy diesel engine thumping, water churning at the stern, heard from the canal bank, continuous",
+    "duration": 10.0,
+    "loop": true,
+    "influence": 0.5
+  },
+  {
+    "name": "rhein_ship_horn",
+    "path": "sounds/rheinufer/ship_horn_long.wav",
+    "text": "A large inland cargo ship's horn on a wide river, one long deep blast that echoes across the water and fades, heard from the river bank",
+    "duration": 5.0,
+    "loop": false,
+    "influence": 0.6
+  },
+  {
+    "name": "rhein_ship_horn2",
+    "path": "sounds/rheinufer/ship_horn_double.wav",
+    "text": "Two short deep blasts of a river cargo ship's horn on a wide river, echoing across the water",
+    "duration": 4.0,
+    "loop": false,
+    "influence": 0.6
+  },
+  {
+    "name": "rhein_ship_engine",
+    "path": "sounds/rheinufer/ship_engine_loop.wav",
+    "text": "A large river cargo ship passing slowly, a deep diesel engine throbbing and water rushing along its hull, heard from the river bank, continuous",
+    "duration": 10.0,
+    "loop": true,
+    "influence": 0.5
+  },
+  {
+    "name": "autobahn_hum",
+    "path": "sounds/rheinufer/autobahn_traffic_loop.wav",
+    "text": "Motorway traffic heard from a meadow beside it: a steady hum of tyres, cars and lorries swooshing past in both directions, continuous, no horns",
+    "duration": 12.0,
+    "loop": true,
+    "influence": 0.45
+  },
+  {
+    "name": "kirmes_fair",
+    "path": "sounds/rheinufer/kirmes_loop.wav",
+    "text": "A German fun fair heard from across a meadow: a cheerful fairground organ playing an instrumental tune, rides whirring and clanking, a bell ringing, people laughing and a crowd murmuring without clear words, continuous",
+    "duration": 15.0,
+    "loop": true,
+    "influence": 0.45
+  },
+  {
+    "name": "sheep_bleat_1",
+    "path": "sounds/rheinufer/sheep_bleat_1.wav",
+    "text": "A single sheep bleating once in a meadow, close",
+    "duration": 1.6,
+    "loop": false,
+    "influence": 0.7
+  },
+  {
+    "name": "sheep_bleat_2",
+    "path": "sounds/rheinufer/sheep_bleat_2.wav",
+    "text": "A lamb bleating twice in a field, close",
+    "duration": 1.8,
+    "loop": false,
+    "influence": 0.7
+  },
+  {
+    "name": "sheep_bleat_3",
+    "path": "sounds/rheinufer/sheep_bleat_3.wav",
+    "text": "An old ewe giving a low hoarse bleat in a pasture, close",
+    "duration": 1.6,
+    "loop": false,
+    "influence": 0.7
+  },
+  {
+    "name": "sheep_flock",
+    "path": "sounds/rheinufer/sheep_flock_loop.wav",
+    "text": "A flock of sheep grazing on a river dyke: soft bleats here and there, hooves on grass, a bell on one sheep, continuous",
+    "duration": 12.0,
+    "loop": true,
+    "influence": 0.5
+  },
+  {
+    "name": "river_lap",
+    "path": "sounds/rheinufer/river_lap_loop.wav",
+    "text": "A wide fast river flowing past a pebble beach and stone groynes: water lapping and gurgling against the stones, gentle and continuous",
+    "duration": 12.0,
+    "loop": true,
+    "influence": 0.45
+  },
+  {
+    "name": "windmill_turn",
+    "path": "sounds/rheinufer/windmill_loop.wav",
+    "text": "An old wooden tower windmill turning slowly in a steady wind: the sails whooshing past, wooden gears creaking and knocking, continuous",
+    "duration": 10.0,
+    "loop": true,
+    "influence": 0.5
+  },
+  {
+    "name": "quench_burst",
+    "path": "sounds/zeche/quench_burst.wav",
+    "text": "A coking plant's quench tower: water floods a car of red-hot coke, a huge roaring hiss of steam rising into the air, then slowly dying away, heard from a road nearby",
+    "duration": 9.0,
+    "loop": false,
+    "influence": 0.55
+  },
+  {
+    "name": "kokerei_hum",
+    "path": "sounds/zeche/kokerei_loop.wav",
+    "text": "A working coking plant heard from beside it: a low industrial hum, steam hissing from pipes, heavy machinery clanking now and then, a distant rumble, continuous",
+    "duration": 12.0,
+    "loop": true,
+    "influence": 0.45
+  },
+  {
+    "name": "crows_morning",
+    "path": "sounds/zeche/crows_loop.wav",
+    "text": "Crows and jackdaws calling in birch trees on a quiet misty summer morning, a few caws here and there, soft wind, continuous",
+    "duration": 12.0,
+    "loop": true,
+    "influence": 0.45
+  },
+  {
+    "name": "conveyor_rattle",
+    "path": "sounds/zeche/conveyor_loop.wav",
+    "text": "An old coal conveyor belt running high up in a steel gallery: rollers rattling and squeaking, coal rumbling along, continuous",
+    "duration": 10.0,
+    "loop": true,
+    "influence": 0.5
   }
 ]

@@ -1,0 +1,53 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://generated/rheinuferprop_ship_ferry.res" id="1_mks1y"]
+
+[node name="Vessel" type="Node3D" unique_id=1580277871]
+
+[node name="Hull" type="MeshInstance3D" parent="." unique_id=1580306279]
+visibility_range_end = 2600.0
+mesh = ExtResource("1_mks1y")
+
+[node name="@Label3D@1230" type="Label3D" parent="." unique_id=1601020200]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 5.376, 2.4, 0)
+visibility_range_end = 600.0
+pixel_size = 0.010714286
+double_sided = false
+alpha_cut = 1
+modulate = Color(0.1, 0.3, 0.22, 1)
+text = "RHEINFÄHRE KRONBURG"
+font_size = 64
+outline_size = 4
+
+[node name="@Label3D@1231" type="Label3D" parent="." unique_id=1941416243]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 10.144, 2.4, 0)
+visibility_range_end = 600.0
+pixel_size = 0.010714286
+double_sided = false
+alpha_cut = 1
+modulate = Color(0.1, 0.3, 0.22, 1)
+text = "RHEINFÄHRE KRONBURG"
+font_size = 64
+outline_size = 4
+
+[node name="@Label3D@1232" type="Label3D" parent="." unique_id=276153283]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -10.448001, 0.99200004, 0)
+visibility_range_end = 600.0
+pixel_size = 0.008571428
+double_sided = false
+alpha_cut = 1
+modulate = Color(0.94, 0.94, 0.92, 1)
+text = "FÄHRE VENNHOVEN"
+font_size = 64
+outline_size = 4
+
+[node name="@Label3D@1233" type="Label3D" parent="." unique_id=1352596524]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 10.448001, 0.99200004, 0)
+visibility_range_end = 600.0
+pixel_size = 0.008571428
+double_sided = false
+alpha_cut = 1
+modulate = Color(0.94, 0.94, 0.92, 1)
+text = "FÄHRE VENNHOVEN"
+font_size = 64
+outline_size = 4
