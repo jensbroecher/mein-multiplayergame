@@ -245,6 +245,19 @@ const CAR_PRESETS = [
 		"offroad": 2.5,
 		"desc": "Glass-canopy hypercar. The fastest car on tarmac, out of its depth on dirt.",
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Basilisk",
+		"model_path": "res://generated/cars/Basilisk.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 42.0,
+		"acceleration": 76.0,
+		"steer_speed": 2.4,
+		"grip": 5.6,
+		"braking": 46.0,
+		"offroad": 7.0,
+		"desc": "Electric super-crossover on turbine rims. Coupé pace on tarmac, the ride height for gravel and the weight to shove its way through.",
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 
@@ -257,7 +270,7 @@ const CAR_ACCENTS := {
 	"Inferno": Color(1.0, 0.22, 0.20), "Nocturne": Color(0.62, 0.86, 1.0), "Vortex": Color(0.55, 0.92, 0.15),
 	"Zephyr": Color(0.85, 0.55, 0.25), "Titan": Color(0.62, 0.95, 0.18),
 	"Sandstorm": Color(1.0, 0.55, 0.16), "Obsidian": Color(0.82, 0.62, 0.38),
-	"Fulmine": Color(0.32, 0.95, 0.46),
+	"Fulmine": Color(0.32, 0.95, 0.46), "Basilisk": Color(0.84, 0.86, 0.45),
 }
 ## Stat bars: caption, preset key, and the values at an empty and a full bar (spanning the fleet).
 const STATS := [

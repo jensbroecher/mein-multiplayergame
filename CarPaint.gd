@@ -24,7 +24,8 @@ const PALETTE := [
 	["Hot Pink", Color(0.95, 0.24, 0.55)], ["Snow White", Color(0.94, 0.94, 0.92)],
 	["Silver", Color(0.70, 0.72, 0.74)], ["Gunmetal", Color(0.23, 0.25, 0.27)],
 	["Jet Black", Color(0.03, 0.03, 0.035)], ["Sand", Color(0.82, 0.70, 0.48)],
-	["Olive", Color(0.36, 0.40, 0.20)], ["Chocolate", Color(0.32, 0.18, 0.10)],
+	["Olive", Color(0.36, 0.40, 0.20)], ["Basilisk Olive", Color(0.50, 0.53, 0.33)],
+	["Chocolate", Color(0.32, 0.18, 0.10)],
 	["Strikeforce Lime", Color(0.62, 0.78, 0.24)], ["Graphite", Color(0.36, 0.38, 0.41)],
 	["Shadow Violet", Color(0.46, 0.20, 0.82)],
 ]
@@ -88,6 +89,9 @@ const FACTORY := {
 	"Fulmine": {"pattern": 0, "finish": 1, "primary": Color(0.08, 0.42, 0.16),
 		"secondary": Color(0.04, 0.04, 0.045), "accent": Color(0.90, 0.68, 0.18),
 		"rim": Color(0.82, 0.60, 0.22), "number": 88},
+	"Basilisk": {"pattern": 0, "finish": 1, "primary": Color(0.50, 0.53, 0.33),
+		"secondary": Color(0.04, 0.04, 0.045), "accent": Color(0.95, 0.80, 0.10),
+		"rim": Color(0.76, 0.77, 0.79), "number": 26},
 }
 const FALLBACK := {"pattern": 0, "finish": 0, "primary": Color(0.80, 0.07, 0.05),
 	"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.98, 0.78, 0.07),

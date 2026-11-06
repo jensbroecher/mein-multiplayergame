@@ -32,6 +32,7 @@ const CARS := [
 	{"name": "Sandstorm", "prefix": "sandstorm", "builder": preload("res://SandstormBuilder.gd")},
 	{"name": "Obsidian", "prefix": "obsidian", "builder": preload("res://ObsidianBuilder.gd")},
 	{"name": "Fulmine", "prefix": "fulmine", "builder": preload("res://FulmineBuilder.gd")},
+	{"name": "Basilisk", "prefix": "basilisk", "builder": preload("res://BasiliskBuilder.gd")},
 ]
 
 

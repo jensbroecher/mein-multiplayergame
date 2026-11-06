@@ -1,0 +1,19 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://car_body.gdshader" id="1_775t7"]
+[ext_resource type="Texture2D" path="res://generated/cars/basilisk_detail.res" id="2_egcil"]
+
+[resource]
+render_priority = -1
+shader = ExtResource("1_775t7")
+shader_parameter/detail_map = ExtResource("2_egcil")
+shader_parameter/nose_z = -1.15
+shader_parameter/tail_z = 1.15
+shader_parameter/belt_y = 0.462
+shader_parameter/side_x = 0.5
+shader_parameter/door_roundel = Vector2(-0.16, 0.335)
+shader_parameter/roundel_r = 0.075
+shader_parameter/hood_z = -0.82
+shader_parameter/hood_r = 0.065
+shader_parameter/stripe_w = 0.07
+shader_parameter/stripe_gap = 0.024

@@ -301,6 +301,23 @@ const CAR_PRESETS = [
 		"offroad": 2.5,
 		"weight": 0.85,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Basilisk",
+		# An electric super-crossover: the unused futuristic motor loop, levelled by its RMS (-15.1 dBFS).
+		"engine_sound": "res://sounds/enginesounds/engine_future_04.wav",
+		"engine_gain_db": 5.4,
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Basilisk.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 42.0,
+		"acceleration": 76.0,
+		"steer_speed": 2.4,
+		"grip": 5.6,
+		"braking": 46.0,
+		"offroad": 7.0,
+		"weight": 1.18,
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 

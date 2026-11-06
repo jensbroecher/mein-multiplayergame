@@ -2673,6 +2673,25 @@ its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set th
 - `CarDesign._shell_shade(p)` (default 1) writes a grey into the shell's vertex colours; car_body.gdshader multiplies the
   body's colour by it and takes the gloss and clearcoat off with it, so a recess reads as a cavity (the Fulmine's
   intakes and cockpit tub). Every other car's shell is white, so nothing changes for them.
+- The Basilisk (`BasiliskBuilder.gd`, an electric super-crossover, an SUV coupé; an original design with a made-up name,
+  from a concept picture the user liked, kept fictional and deliberately unlike the Nocturne and Fulmine): tall on big
+  wheels in black arch cladding (`build_fender` with `fender_mat` M_DARK; arches lifted into the bottom as on the
+  Interceptor). Its `section()`: the side steps in round the lower door's air channel (`_groove`: black and shaded
+  inside, deepest behind the front wheel, fading along the door) and leans in toward its top (`SIDE_TUCK`, `_side_lean`:
+  the shoulder carries the lean on), then a shoulder rolling in to S, a run from S to the corner K and K's rounding and
+  a crowned top (KEYS). Over the bonnet K stands above S, so the fender tops fall away from two creases converging on
+  the badge: a raised V, the opposite of the Fulmine's humps over a sunken bonnet. The greenhouse is the detail map's,
+  by arc length along the upper curve (`_upper_s`, as the Interceptor's): black pillars and rails, a semi-gloss black
+  glass roof (`ROOF_GLOSS`: as clear glass it mirrored the sky and read blue), a black vent slashing down each C-pillar.
+  - A nearly flat cap face (the nose's exponent 5 up and down) gets almost no detail map round its tip: the u table is
+    linear in z, and the face's rings all lie within 2mm of the tip, so a painted grille crept up the fan of triangles
+    there as a dark tent. The nose's openings (brow, lamp housings, corner intakes, grille) and the tail's lower bumper
+    are patches on the face (`_face_patch`: a grid through `face_frame`, `PATCH_OUT` proud, its border tucked under the
+    surface over `PATCH_BEVEL`); `shell_z` bisects to the surface (CarDesign's 2mm steps put a point on a flat face up
+    to 2mm behind it, and patches sank into the paint); `stations()` adds rings close to each tip; each tip sits under a
+    part (the badge, the bumper patch). At exponent 5 the tail's face rippled: it uses 3.
+  - Its motor is `engine_future_04.wav`, one of four unused loops in `sounds/enginesounds/`, +5.4 dB from its -15.1 dBFS
+    RMS. The paint shop's "Basilisk Olive" is its factory colour (the shop names the nearest palette entry).
 
 ## Canyon Chasm dirt ramps, rocks, signs, tornado and houses
 
