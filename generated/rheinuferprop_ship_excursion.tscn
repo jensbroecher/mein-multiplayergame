@@ -2,13 +2,13 @@
 
 [ext_resource type="ArrayMesh" path="res://generated/rheinuferprop_ship_excursion.res" id="1_giyra"]
 
-[node name="Vessel" type="Node3D" unique_id=53044929]
+[node name="Vessel" type="Node3D" unique_id=1761719977]
 
-[node name="Hull" type="MeshInstance3D" parent="." unique_id=1348506077]
+[node name="Hull" type="MeshInstance3D" parent="." unique_id=1087520913]
 visibility_range_end = 2600.0
 mesh = ExtResource("1_giyra")
 
-[node name="@Label3D@1212" type="Label3D" parent="." unique_id=2048201377]
+[node name="@Label3D@1212" type="Label3D" parent="." unique_id=179890349]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8.944, 23.088001)
 visibility_range_end = 600.0
 pixel_size = 0.0028571428
@@ -19,7 +19,7 @@ text = "Stadt Kronburg"
 font_size = 64
 outline_size = 4
 
-[node name="@Label3D@1213" type="Label3D" parent="." unique_id=165814251]
+[node name="@Label3D@1213" type="Label3D" parent="." unique_id=1417692304]
 transform = Transform3D(0.1402405, -0.34070933, -0.92965037, 0, 0.9389293, -0.34411, 0.99011743, 0.048258163, 0.13167593, -7.818949, 1.5834827, 44.00632)
 visibility_range_end = 600.0
 pixel_size = 0.012857143
@@ -30,7 +30,7 @@ text = "Stadt Kronburg"
 font_size = 64
 outline_size = 4
 
-[node name="@Label3D@1214" type="Label3D" parent="." unique_id=1705365410]
+[node name="@Label3D@1214" type="Label3D" parent="." unique_id=354689768]
 transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -7.168, 7.968, -1.6)
 visibility_range_end = 600.0
 pixel_size = 0.007142857
@@ -41,7 +41,7 @@ text = "KRONBURGER RHEINFLOTTE"
 font_size = 64
 outline_size = 4
 
-[node name="@Label3D@1215" type="Label3D" parent="." unique_id=1052271720]
+[node name="@Label3D@1215" type="Label3D" parent="." unique_id=1667455232]
 transform = Transform3D(0.1402405, 0.34070933, 0.92965037, 0, 0.9389293, -0.34411, -0.99011743, 0.048258163, 0.13167593, 7.818949, 1.5834827, 44.00632)
 visibility_range_end = 600.0
 pixel_size = 0.012857143
@@ -52,7 +52,7 @@ text = "Stadt Kronburg"
 font_size = 64
 outline_size = 4
 
-[node name="@Label3D@1216" type="Label3D" parent="." unique_id=1221367939]
+[node name="@Label3D@1216" type="Label3D" parent="." unique_id=1664312498]
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 7.168, 7.968, -1.6)
 visibility_range_end = 600.0
 pixel_size = 0.007142857
@@ -63,7 +63,7 @@ text = "KRONBURGER RHEINFLOTTE"
 font_size = 64
 outline_size = 4
 
-[node name="@Label3D@1217" type="Label3D" parent="." unique_id=1103085207]
+[node name="@Label3D@1217" type="Label3D" parent="." unique_id=2143560669]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 1.52, -56.048)
 visibility_range_end = 600.0
 pixel_size = 0.010714286
@@ -74,7 +74,7 @@ text = "Stadt Kronburg"
 font_size = 64
 outline_size = 4
 
-[node name="@Label3D@1218" type="Label3D" parent="." unique_id=1230750853]
+[node name="@Label3D@1218" type="Label3D" parent="." unique_id=1571923572]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0.99200004, -56.048)
 visibility_range_end = 600.0
 pixel_size = 0.0064285714

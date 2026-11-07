@@ -2333,9 +2333,10 @@ func _post_mesh() -> ArrayMesh:
 	var black := Color(0.06, 0.06, 0.06)
 	var prof := PackedVector2Array([Vector2(-0.06, 0.0), Vector2(0.06, 0.0), Vector2(0.06, 0.06), Vector2(0.0, 0.11), Vector2(-0.06, 0.06)])
 	pk.set_frame(Transform3D(Basis(Vector3.RIGHT, Vector3.BACK, Vector3.DOWN) * Basis.from_scale(Vector3.ONE * sc), Vector3.ZERO))
-	pk.extrude(kit, "paint", prof, -1.0, -0.73, 0.0, white)
-	pk.extrude(kit, "paint", prof, -0.73, -0.98, 0.0, black)
-	pk.extrude(kit, "paint", prof, -0.98, -1.0, 0.0, white)
+	# Frame z is down: the post runs from z 0 (its foot) to -1 (its top), white with a black band near the top.
+	pk.extrude(kit, "paint", prof, -0.73, 0.0, 0.0, white)
+	pk.extrude(kit, "paint", prof, -0.98, -0.73, 0.0, black)
+	pk.extrude(kit, "paint", prof, -1.0, -0.98, 0.0, white)
 	pk.set_frame(Transform3D(Basis.from_scale(Vector3.ONE * sc), Vector3.ZERO))
 	pk.block(kit, "lamp", Vector3(-0.025, 0.80, -0.012), Vector3(0.025, 0.90, -0.002), Color(0.95, 0.95, 0.9))
 	return pk.commit(kit)

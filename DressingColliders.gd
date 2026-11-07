@@ -36,7 +36,7 @@ const SELF_MOVING := ["res://KnockablePoles.gd", "res://KnockableIce.gd", "res:/
 	"res://Tumbleweeds.gd"]
 ## Rigid: rocks and built things (they never wobble).
 const ROCKY := ["rock", "boulder", "block", "stone", "scree", "pebble", "mound", "ridge", "divider", "lamp",
-	"butte", "spire", "hoodoo", "formation", "slab", "crate", "barrier", "pole", "post", "mast", "telegraph"]
+	"butte", "spire", "hoodoo", "formation", "slab", "crate", "barrier", "pole", "post", "mast", "telegraph", "parked"]
 const WOBBLE_MAX_HEIGHT := 5.5
 ## Brush (ferns, by their mesh's file name; not tree ferns): not solid. A cart drives through it, bends
 ## it right over and loses BRUSH_DRAG of its speed entering each one.

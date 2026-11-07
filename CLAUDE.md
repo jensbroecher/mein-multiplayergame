@@ -959,6 +959,24 @@ in front of the water while driving (Msitu Falls, Bloombay Dunes). `canyon_river
   classification counts there). `res://scratch/skid_shots.tscn -- <dir>` (windowed) photographs marks the
   AI laid; `res://scratch/spray_shots.tscn -- <dir> level=...` shoots carts raising dust.
 
+## Rain puddles
+
+- `Puddles.gd` works out again on the CPU the puddles the shaders draw (the same `hash12`/`vnoise` on the integer lattice,
+  the same formulas): Quer durch Kronburg's haul road (BaustrasseTrack, `stadt_road` kind 11: in the ruts, by the lap's
+  lateral and distance), scrapyard slabs (SchrottplatzTrack, kind 13) and site mud (BaustellenMatsch, `stadt_ground`), and
+  Zeche Kronprinz's track (KohlenTrack). Msitu Falls' come from a noise texture and aren't covered. PlayerCart
+  (`_update_puddle`, the car this peer drives) takes PUDDLE_DRAG (0.7) of its speed a second while in one, throws a little
+  muddy spray off the rear wheels (the grit's particle set-up, so nothing new compiles) and splashes on entering at speed
+  (`sounds/surfaces/puddle_splash_*.wav`). A top-down render against the computed map matched blob for blob.
+
+## The shield
+
+- PlayerCart's `_update_shield_visual` runs it from `is_shielded`'s changes on every peer: it forms (grows out of the car
+  with an overshoot and a flash, `sounds/items/shield_up.wav`), flickers its last SHIELD_WARN (2s), and fades out when it
+  runs out (`shield_down.wav`) or bursts when a hit breaks it (`shield_break.wav`). Respawns clear it with no animation.
+- A bot waits AI_ITEM_GAP (2.5s) after using an item before the next: checked every 0.25s, one holding two shockwaves set
+  off the second a quarter of a second after the first, which looked like one shockwave firing twice.
+
 ## The RC Vibe GP flag (LogoFlag.gd)
 
 - `LogoFlag.gd` (`@tool` Node3D) builds a 14m white pole (`pole_height`) on a concrete foot with a gilt ball, its
@@ -1880,6 +1898,14 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   the hit, carrying like a cart's knock (unit_size 20). At -10dB and unit_size 8 they were lost under the
   engine. `res://scratch/knock_sound_dump.gd` (`-s`, headless, `-- <dir>`) writes them and the balls' kicks
   out as .wav with their levels.
+- Traffic cones (anything knockable with "cone" in its name) thud (`KnockableProps.Sound.THUD`, `_synth_thud`: a body
+  note gliding 125 to 62Hz, a low-passed thump, two smaller thuds as it lands, at `THUD_DB`). A recording the user
+  tried first began with 164ms of silence (heard as a delay). Every KnockableProps node plays through a pool of
+  `VOICES` players, and a prop hit again (its speed jumping `REHIT_DV`, `REHIT_GAP` apart) sounds again: with one
+  player and one sound per prop, a cart through a row of cones was heard once. `scratch/knock_sound_dump.gd` writes the
+  thud out too. CampKit's cone base is a deeper orange (`CONE_BASE`; the user disliked the
+  near-black one); the saved cone meshes of Lakeside, Bloombay Dunes and Pinecrest Ridge were recoloured in place by
+  `res://scratch/recolor_cone_base.gd` (`-s`, headless, `-- <mesh.res> ...`).
 - Loungers, cool boxes and parasols are knockable (`KnockableProps.gd`). Each design is one MultiMesh,
   and each prop a frozen rigid body that a cart faster than `push_speed` frees as it nears. At 22 m/s
   a cart keeps ~88% of its speed and flings a lounger clear; a slower cart stops against it.
@@ -3705,6 +3731,25 @@ estate, the half-timbered old town on its hill under Burg Kronburg's ruin. Stage
     below 12 (life) and its gateways 16m wide, 13m high; a pipe bridge nothing under its `clearance` over its span; the
     gate nothing in |x| < 8 below 11. `res://scratch/steelworks_preview.gd` (`-s`, windowed, `-- <dir>
     set=hall|furnace|cowpers|gasometer|stacks|pipes|headframe|torpedo|gate|crown|harbour|all name:x,y,z:tx,ty,tz`).
+- The Marktplatz: the lap goes anticlockwise round the fountain (C7-C11: up its east side, behind it past a checkpoint,
+  down its west side, back along its south side past the market) and right down the Kirchberg. The way in and the way
+  out only meet at the square's corner (`MARKT_JUNCTION`, about 19m apart). A first version went clockwise and crossed
+  its own way in there: a human driving round it the other way was taken by the missed-gate watch for past the market
+  gate, heard "checkpoint missed", and the gate then never counted. The square's paving is all one, so the lap shows
+  only by a line of knockable cones (`_build_markt_cones`, `MARKT_CONES_FROM`/`TO`, "MarktCones": KnockableProps, the
+  thud) from the market's east end through the corner onto the old corner's verge, the way the user drew it: it keeps
+  the way in and the way out apart and marks the corner straight onto the Kirchberg (left open: the user didn't want it
+  blocked). The square's height and paving run from `MARKT_IN` to `MARKT_OUT`; the weekly market stands inside the
+  loop facing the fountain, the maypole, Litfaßsäule and two limes in the square's north-east corner.
+  `scratch/human_skip_test ... level=res://levels/KronburgLevel.tscn skip=-1 gates_after=6` drives a real cart round
+  it: the market gate counts, nothing said.
+- The works' car park is "ParkplatzWerk" and its MultiMeshes "ParkedCars_*" (DressingColliders' ROCKY "parked": solid,
+  no wobble): as "Werksparkplatz" it held "spark", one of DressingColliders' SOFT words, and the cars had no collider.
+  The stockpiles are batched per 200m cell (`_pile_key`): as one mesh 524m across DressingColliders skipped it as ground
+  (it gives no single mesh over 400m a collider) and carts drove through every heap. `res://scratch/wide_prop_meshes.gd`
+  (`-s`, headless, `-- <level> [limit=400]`) lists a level's meshes that wide.
+- The Leitpfosten (all three Kronburg GP stages) were built upside down (the frame's z points down; the bands' z ranges
+  were the wrong way round): only their top 43cm, white and black overlapping, floating 1.2m up.
 - Ground masks: every vertex of the fine grid takes `_masks`, however far from the road (`_road_d` capped under 1e8:
   past the grading's reach it read as the coarse land's and painted fields inside the works).
 - `res://scratch/kronburg_hide_shot.tscn -- <out.png> x,y,z:tx,ty,tz [hide=<node path> ...]` (windowed) renders the level
@@ -3899,6 +3944,10 @@ each run deletes first).
 - The water for the carts is `StadtWater.gd`, the level's "RiverWater" node (`surface_at`, as Northlight Caverns'): the
   moat and the canal (deep enough to drown in) and the lily pond (about 1m, waded), each at its own level. PlayerCart had
   taken only the first "...Water" node, the moat, so a cart drove over the pond's and the canal's dry beds.
+- The scrapyard is open: the bale walls are short runs with gaps, and wrecked cars (`ScrapKit.wreck`, some two high;
+  `_build_scrap_wrecks`) stand staggered along the lane's edges (3.9-5.2m out, a little askew: nearer the middle and turned
+  across it, the bots crawled into them until respawned) and scattered over the yard, each a box the bots' rays see. The
+  crane's dropped car lies 2.2s, under PlayerCart's 2.8s stuck check.
 - The building site's haul road (`stadt_road.gdshader` kind 11) has no steel road plates any more: one lay under the
   wrecking ball and read as its hit zone.
 - The water: the moat (deep enough to drown in: `water_bounds_min`/`max`), the lily pond and the canal, wound clockwise
@@ -3909,6 +3958,16 @@ each run deletes first).
   section's triangles: they had been appended to a copy of the dictionary's PackedVector3Array (a packed array read out of
   a Dictionary is a copy), so the route had no road collision, only the graded ground under it, and at the terrace the
   carts fell through the drawn road.
+- The building site's parcours (corners 20-24, the user's idea): from the yard road south, a U to the right past the
+  excavator (`EXCAVATOR_AT`, its arm over the first leg's south half), north up a straight over the dirt kicker
+  (`KICKER_AT`), a U to the left along the north fence over a dirt table-top (`TABLE_AT`, `TABLE`) and through its
+  checkpoint (`PARCOURS_GATE`), then west through the car park. Tyre walls round each corner's outside
+  (`_build_parcours`, `PARCOURS_TYRES`: TyreStacks over box colliders, ScrapKit's "tyre"), the Leitbaken along both edges.
+  The gate may be missed once like any other (the user's rule): the field isn't fenced off. The jumps are the route's
+  profile (the ribbon is their top) with the ground left at the road's level under them (`_jump_spans`) and spoil-heap
+  sides of their own (`_build_spoil_jumps`, `SpoilHeapsBody`, off-road dirt): graded up under the run-up, the kicker had
+  stood as a sheet of road over a low bank, with no sides. No boost into the kicker: boosted off its lip a cart lands
+  in the hairpin after it.
 - The terrace's drop is a flight of stairs (`TERRACE_FACE` 9m, `TERRACE_STEPS` 15, `_build_terrace_stairs`, parapets
   either side, solid), after the kicker: the road's collision runs straight down the nosings and its ribbon isn't drawn
   there. Below it the road runs sunk between grass banks to the garden's exit; boost pads stand on the banks

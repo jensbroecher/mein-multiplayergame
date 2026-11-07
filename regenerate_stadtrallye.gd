@@ -43,6 +43,7 @@ const PropKit = preload("res://PropKit.gd")
 const CampKit = preload("res://CampKit.gd")
 const CrowdPlacer = preload("res://CrowdPlacer.gd")
 const FreightKit = preload("res://FreightKit.gd")
+const TyreStacks = preload("res://TyreStacks.gd")
 
 const MESH_CHUNK_CELL := 80.0
 const PROP_SCALE := 1.6
@@ -76,7 +77,13 @@ const CORNERS := [
 	[330.0, 430.0, 22.0],    # 17: south into the scrapyard
 	[330.0, 680.0, 18.0],    # 18: west down its lanes
 	[-30.0, 680.0, 16.0],    # 19: south to the building site
-	[-30.0, 900.0, 20.0],    # 20: west through the site to the gasworks
+	# 20-24: the building site's parcours (PARCOURS): a U to the right past the excavator, north up the kicker's straight,
+	# a U to the left along the north fence over the table-top and through its checkpoint, then west.
+	[-30.0, 965.0, 18.0],    # 20: west along the site's south side, past the excavator
+	[-140.0, 965.0, 16.0],   # 21: north up the kicker's straight
+	[-140.0, 825.0, 16.0],   # 22: west along the north fence, over the table-top
+	[-250.0, 825.0, 16.0],   # 23: south
+	[-250.0, 900.0, 18.0],   # 24: west through the car park to the gasworks
 	[-780.0, 900.0, 0.0],
 ]
 
@@ -146,8 +153,11 @@ const BELVEDERE_AT := Vector2(882.0, -470.0)
 const BALL_X := 520.0
 ## The material handler's slew ring: its stick reaches 29m, so its magnet hangs over the lane (z 680) at slew 0.
 const HANDLER_AT := Vector2(150.0, 709.0)
-const EXCAVATOR_AT := Vector2(-140.0, 921.0)
-const KICKER_X := -240.0
+## The excavator 21m south of the parcours' first leg (z 965), its arm swinging over the leg's south half.
+const EXCAVATOR_AT := Vector2(-85.0, 986.0)
+## The kicker's lip, on the parcours' straight north (x -140), and the table-top's first lip, on its leg west (z 825).
+const KICKER_AT := Vector2(-140.0, 900.0)
+const TABLE_AT := Vector2(-182.0, 825.0)
 const CARPARK_X := Vector2(-380.0, -482.0)
 const ROLLER_X := -548.0
 const GASWORKS_C := Vector2(-850.0, 960.0)
@@ -336,12 +346,15 @@ var s_exit := 0.0
 var s_under2 := 0.0
 var s_ball := 0.0
 var s_kicker := 0.0
+var s_table := 0.0
 var s_carpark0 := 0.0
 var s_carpark1 := 0.0
 var s_roller := 0.0
 
 ## The kicker on the building site (a heap of spoil shaped into a jump): [length up, height, length down].
 const KICKER := [24.0, 3.3, 8.0]
+## The table-top on the parcours (spoil too): [length up, height, table, length down].
+const TABLE := [10.0, 1.8, 9.0, 10.0]
 ## The terrace's kicker before its drop: [length, rise].
 const TERRACE_KICK := [14.0, 0.9]
 ## The flight of stairs from the kicker's lip down to the road below the terrace: its run (m along the route) and steps.
@@ -366,7 +379,8 @@ func _plan_profile() -> void:
 	s_exit = _closest_s(GARDEN_EXIT)
 	s_under2 = _closest_s(Vector2(840.0, RAIL_Z))
 	s_ball = _closest_s(Vector2(BALL_X, 430.0))
-	s_kicker = _closest_s(Vector2(KICKER_X, 900.0))
+	s_kicker = _closest_s(KICKER_AT)
+	s_table = _closest_s(TABLE_AT)
 	s_carpark0 = _closest_s(Vector2(CARPARK_X.x, 900.0))
 	s_carpark1 = _closest_s(Vector2(CARPARK_X.y, 900.0))
 	s_roller = _closest_s(Vector2(ROLLER_X, 900.0))
@@ -454,18 +468,44 @@ func _plan_profile() -> void:
 				y += float(KICKER[1]) * (0.35 * u2 + 0.65 * u2 * u2)
 			else:
 				y += float(KICKER[1]) * (1.0 - (s - s_kicker) / float(KICKER[2]))
+		# The table-top: up to its lip, level over the table, down a rounded landing slope.
+		var td: float = s - (s_table - float(TABLE[0]))
+		var t_end: float = s_table + float(TABLE[2]) + float(TABLE[3])
+		if td > 0.0 and s < t_end:
+			if s <= s_table:
+				var u3: float = td / float(TABLE[0])
+				y += float(TABLE[1]) * (0.35 * u3 + 0.65 * u3 * u3)
+			elif s <= s_table + float(TABLE[2]):
+				y += float(TABLE[1])
+			else:
+				var v3: float = (s - s_table - float(TABLE[2])) / float(TABLE[3])
+				y += float(TABLE[1]) * 0.5 * (1.0 + cos(PI * v3))
 		cur[i] = y
 	_road_y = cur
 	var steep := 0.0
 	var at := 0.0
 	for i in range(n - 1):
 		var g: float = absf(cur[i + 1] - cur[i])
-		if g > steep and (float(i) < s_terrace - 4.0 or float(i) > s_terrace + TERRACE_FACE + 4.0) and absf(float(i) - s_kicker) > 8.0:
+		if g > steep and (float(i) < s_terrace - 4.0 or float(i) > s_terrace + TERRACE_FACE + 4.0) and _jump_span_at(float(i), 4.0).is_empty():
 			steep = g
 			at = float(i)
 	print("  route %.0fm, finish at %.0fm; road %.1f to %.1fm; steepest %.1f%% at %.0fm (off the jumps)" % [route_len, _finish_s, _min(cur), _max(cur), steep * 100.0, at])
-	print("  moat %.0f, underpass %.0f, Ring %.0f, gate %.0f, Palmenhaus %.0f, pond %.0f, terrace %.0f, exit %.0f, underpass %.0f, ball %.0f, kicker %.0f, car park %.0f-%.0f, roller %.0f" % [
-		s_moat, s_under1, s_ring, s_gate, s_palm, s_pond, s_terrace, s_exit, s_under2, s_ball, s_kicker, s_carpark0, s_carpark1, s_roller])
+	print("  moat %.0f, underpass %.0f, Ring %.0f, gate %.0f, Palmenhaus %.0f, pond %.0f, terrace %.0f, exit %.0f, underpass %.0f, ball %.0f, kicker %.0f, table-top %.0f, car park %.0f-%.0f, roller %.0f" % [
+		s_moat, s_under1, s_ring, s_gate, s_palm, s_pond, s_terrace, s_exit, s_under2, s_ball, s_kicker, s_table, s_carpark0, s_carpark1, s_roller])
+
+
+## The site's spoil jumps as [s where the heap starts, s where it ends]: the kicker and the table-top.
+func _jump_spans() -> Array:
+	return [[s_kicker - float(KICKER[0]), s_kicker + float(KICKER[2])],
+		[s_table - float(TABLE[0]), s_table + float(TABLE[2]) + float(TABLE[3])]]
+
+
+## The jump span s lies in (within `pad` of it), or [].
+func _jump_span_at(s: float, pad := 0.0) -> Array:
+	for sp in _jump_spans():
+		if s > float(sp[0]) - pad and s < float(sp[1]) + pad:
+			return sp
+	return []
 
 
 func _min(a: PackedFloat32Array) -> float:
@@ -704,11 +744,17 @@ func _add_samples() -> void:
 	while s <= route_len:
 		var p: Vector3 = _pt(s)
 		# Under the jumps' lips the ground keeps to the lowest road near it, so it never stands over the road's drop.
-		if absf(s - s_terrace) < 8.0 or absf(s - s_kicker) < 12.0:
+		var span: Array = _jump_span_at(s, 3.0)
+		if absf(s - s_terrace) < 8.0:
 			var lo: float = p.y
 			for k in range(-6, 7):
 				lo = minf(lo, _lap_y(s + float(k)))
 			p.y = lo
+		elif not span.is_empty():
+			# Under the spoil jumps the ground stays at the road's level either side of them: their heaps' sides are
+			# meshes of their own (`_build_spoil_jumps`), which a 5m grid can't hold. Graded up under the run-up, the
+			# kicker had stood as a sheet of road over a low bank with no sides.
+			p.y = minf(_lap_y(float(span[0]) - 4.0), _lap_y(float(span[1]) + 4.0))
 		pts.append(p)
 		rights.append(_rt(s))
 		var w: float = _half_at(s)
@@ -1162,7 +1208,6 @@ func _road_kinds() -> Array:
 	var t16: Dictionary = _turn(16)
 	var t18: Dictionary = _turn(18)
 	var t19: Dictionary = _turn(19)
-	var t20: Dictionary = _turn(20)
 	var pb: float = float(POND_BRIDGE[0]) * PROP_SCALE * 0.5 + 2.0
 	var palm_half: float = 32.0 * PROP_SCALE + 3.0
 	_kinds_cache = [
@@ -1182,8 +1227,8 @@ func _road_kinds() -> Array:
 		[float(t16["s0"]) - 20.0, s_ball + 140.0, 11],
 		[s_ball + 140.0, float(t18["s0"]), 3],
 		[float(t18["s0"]), float(t19["s0"]), 13],
-		[float(t19["s0"]), float(t20["s1"]) + 10.0, 3],
-		[float(t20["s1"]) + 10.0, s_carpark0 - 6.0, 11],
+		[float(t19["s0"]), _closest_s(Vector2(-30.0, 890.0)), 3],
+		[_closest_s(Vector2(-30.0, 890.0)), s_carpark0 - 6.0, 11],
 		[s_carpark0 - 6.0, s_carpark1 + 6.0, 4],
 		[s_carpark1 + 6.0, _finish_s - 70.0, 11],
 		[_finish_s - 70.0, route_len + 1.0, 5],
@@ -1526,7 +1571,7 @@ func _build_water(root: Node3D) -> void:
 
 ## Checkpoints by s: down the Kaiserstraße, over the moat, the pedestrian zone, south of the railway, toward the Ring,
 ## the garden's gate, the pergola, the Alpinum, the summit, below the terrace, the Hafenstraße, the demolition site,
-## the scrapyard, the building site twice.
+## the scrapyard, the building site's way in, its parcours (after the table-top), before the car park.
 func _checkpoints() -> Array:
 	var out: Array = [420.0, 700.0, 960.0, 1290.0, 1720.0, s_gate + 30.0]
 	out.append(float(_turn(6)["s1"]) + 90.0)
@@ -1539,13 +1584,15 @@ func _checkpoints() -> Array:
 	# Before the scrapyard's handler, clear of its swing (at +150 the car on its magnet swept through the gate's truss).
 	out.append(float(_turn(18)["s1"]) + 80.0)
 	out.append(float(_turn(19)["s1"]) + 90.0)
-	out.append(s_kicker + 130.0)
+	out.append(_closest_s(PARCOURS_GATE))
+	out.append(s_carpark0 - 40.0)
 	return out
 
 
-## [s, lat]: the Kaiserstraße, the long north street, down the Hafenstraße, into the kicker.
+## [s, lat]: the Kaiserstraße, the long north street, down the Hafenstraße, out of the parcours' last corner onto the run
+## through the car park. Not into the kicker any more: boosted off its lip, a cart lands in the hairpin after it.
 func _boosts() -> Array:
-	return [[270.0, -2.6], [1170.0, 2.6], [s_under2 + 60.0, 0.0], [s_kicker - float(KICKER[0]) - 40.0, 0.0]]
+	return [[270.0, -2.6], [1170.0, 2.6], [s_under2 + 60.0, 0.0], [float(_turn(24)["s1"]) + 12.0, 0.0]]
 
 
 func _gate(parent: Node, gate_name: String, s: float, finish: bool, scene: PackedScene) -> Node3D:
@@ -1635,6 +1682,63 @@ func _add_hazard_gate(node: Node3D, gate: Node3D) -> void:
 		gate.free()
 
 
+## Wrecked cars through the scrapyard (ScrapKit.wreck): staggered on the lane, one side then the other, so there is always
+## a way past but never a straight line; and scattered over the yard either side (some two high), off everything noted.
+## Each a box (SchrottBody), so the bots' rays see them and steer round.
+func _build_scrap_wrecks(node: Node3D, body: StaticBody3D, rng: RandomNumberGenerator, s_h: float) -> void:
+	var t18: Dictionary = _turn(18)
+	var t19: Dictionary = _turn(19)
+	var s0: float = float(t18["s1"]) + 30.0
+	var s1: float = float(t19["s0"]) - 25.0
+	var cps: Array = _checkpoints()
+	var placed := 0
+	var side := 1.0
+	var s: float = s0
+	while s < s1:
+		var near_gate := false
+		for cp in cps:
+			if absf(s - float(cp)) < 16.0:
+				near_gate = true
+		# Clear of the handler's drop (its car lands across the middle) and the gates.
+		if absf(s - s_h) > 26.0 and not near_gate:
+			# Toward the edge, a little askew: the bots keep to the middle, and wrecks 2.6m out turned across it stopped them
+			# dead (they crawled into them until the stuck check respawned them).
+			var lat: float = side * rng.randf_range(3.9, 5.2)
+			var sp: Dictionary = _spot(s, lat, 0.0)
+			var yaw: float = rng.randf_range(-0.3, 0.3)
+			if _place_wreck(node, body, rng, sp["pos"], (sp["fwd"] as Vector3).rotated(Vector3.UP, yaw), false):
+				placed += 1
+			side = -side
+		s += rng.randf_range(17.0, 26.0)
+	# The yard: either side of the lane, out to the heaps.
+	var yard := 0
+	var tries := 0
+	while yard < 34 and tries < 400:
+		tries += 1
+		var ss: float = rng.randf_range(s0 - 10.0, s1 + 10.0)
+		var off: float = (1.0 if rng.randf() < 0.5 else -1.0) * rng.randf_range(ROAD_HALF + 6.0, ROAD_HALF + 40.0)
+		var sp2: Dictionary = _spot(ss, off, 0.0)
+		var p: Vector3 = sp2["pos"]
+		if _route_dist(p.x, p.z) < ROAD_HALF + 5.0 or _occupied(p.x, p.z) or p.x < -50.0 or p.x > 390.0 or p.z < 612.0 or p.z > 748.0:
+			continue
+		var dir := Vector3(1, 0, 0).rotated(Vector3.UP, rng.randf() * TAU)
+		if _place_wreck(node, body, rng, p, dir, rng.randf() < 0.3):
+			yard += 1
+	print("  scrapyard wrecks: %d on the lane, %d in the yard" % [placed, yard])
+
+
+func _place_wreck(node: Node3D, body: StaticBody3D, rng: RandomNumberGenerator, at: Vector3, fwd: Vector3, stacked: bool) -> bool:
+	fwd.y = 0.0
+	fwd = fwd.normalized()
+	var g: float = _ground_at(at.x, at.z)
+	var xf := Transform3D(Basis.looking_at(fwd, Vector3.UP), Vector3(at.x, g - 0.03, at.z))
+	var seed_v: int = rng.randi()
+	_add_prop(_cell_key("wrecks", xf.origin, 160.0), _scrap, xf, func(pk, kit, _labels): _kit_call(_scrap, "wreck", [pk, kit, seed_v, stacked]), 1200.0)
+	_solids(body, _kit_call(_scrap, "wreck_solids", [seed_v, stacked]), xf)
+	_note_rect(Vector2(at.x, at.z), 5.0, 5.0, 0.0, 0.5)
+	return true
+
+
 ## [s past the terrace's lip, lateral]: boost pads on the sunken road's banks, left and right in turn, clear of the
 ## checkpoint (35m) and the garden's exit gate (155m).
 const BANK_BOOSTS := [[70.0, -12.0], [90.0, 12.0], [114.0, -12.0]]
@@ -1654,6 +1758,8 @@ func _jump_lips() -> Array:
 	out.append({"name": "Terrace", "lip": tl, "dir": (_pt(s_terrace - 0.2) - _pt(s_terrace - 3.0)).normalized()})
 	var kl: Vector3 = _pt(s_kicker)
 	out.append({"name": "SiteKicker", "lip": kl, "dir": (_pt(s_kicker) - _pt(s_kicker - 3.0)).normalized()})
+	var tl2: Vector3 = _pt(s_table)
+	out.append({"name": "SiteTableTop", "lip": tl2, "dir": (_pt(s_table) - _pt(s_table - 3.0)).normalized()})
 	return out
 
 
@@ -3779,7 +3885,8 @@ func _build_scrapyard(node: Node3D, rng: RandomNumberGenerator) -> void:
 	_add_prop("schrott_office", _scrap, wxf, func(pk, kit, labels): _kit_call(_scrap, "weighbridge", [pk, kit, labels]), 1200.0)
 	_solids(body, _kit_call(_scrap, "weighbridge_solids", []), wxf)
 	_note_xf(wxf, -3.0 * PROP_SCALE, 3.0 * PROP_SCALE, -8.0 * PROP_SCALE, 8.0 * PROP_SCALE)
-	# The bale walls either side of the lane, open round the handler.
+	# The bale walls either side of the lane, open round the handler, in short runs with gaps between (the yard is open:
+	# a cart can leave the lane among the wrecks, `_build_scrap_wrecks`).
 	var lane_s0: float = float(t18["s1"]) + 4.0
 	var lane_s1: float = float(t19["s0"]) - 4.0
 	var gap0: float = s_h - 34.0
@@ -3789,7 +3896,7 @@ func _build_scrapyard(node: Node3D, rng: RandomNumberGenerator) -> void:
 		for side in [-1.0, 1.0]:
 			var s: float = run[0]
 			while s < float(run[1]) - 8.0:
-				var l: float = minf(24.0, float(run[1]) - s)
+				var l: float = minf(rng.randf_range(9.0, 15.0), float(run[1]) - s)
 				var sp: Dictionary = _spot(s, side * (ROAD_HALF + 2.2), 0.0)
 				var a: Vector3 = sp["pos"]
 				var fwd: Vector3 = sp["fwd"]
@@ -3805,7 +3912,7 @@ func _build_scrapyard(node: Node3D, rng: RandomNumberGenerator) -> void:
 				var mid: Vector3 = a + fwd * (l * 0.5) - face * 1.6
 				_box(body, Transform3D(Basis(fwd, Vector3.UP, fwd.cross(Vector3.UP)).orthonormalized(), Vector3(mid.x, g + 1.6, mid.z)), Vector3(l, 3.2 + float(layers - 3) * 0.9, 3.4))
 				walls += 1
-				s += l + 0.6
+				s += l + rng.randf_range(8.0, 14.0)
 	# Scrap heaps behind the walls.
 	for hp in [[Vector2(250.0, 640.0), 22.0, 14.0, 7.0], [Vector2(40.0, 638.0), 20.0, 13.0, 6.0], [Vector2(240.0, 726.0), 20.0, 14.0, 6.5],
 			[Vector2(30.0, 728.0), 18.0, 12.0, 6.0], [Vector2(150.0, 742.0), 24.0, 16.0, 8.0]]:
@@ -3863,7 +3970,8 @@ func _build_scrapyard(node: Node3D, rng: RandomNumberGenerator) -> void:
 	slew.set("dwell", 3.0)
 	slew.set("hover", 0.8)
 	slew.set("drop", drop)
-	slew.set("lie", 3.5)
+	# Under PlayerCart's 2.8s stuck check: a bot that meets it waits it out instead of being respawned.
+	slew.set("lie", 2.2)
 	slew.set("lift", 1.6)
 	slew.set("hang", NodePath("Hang"))
 	slew.set("car", NodePath("Hang/Car"))
@@ -3900,7 +4008,7 @@ func _build_scrapyard(node: Node3D, rng: RandomNumberGenerator) -> void:
 		wmi.mesh = wm
 		wmi.scale = Vector3.ONE * PROP_SCALE
 		car_node.add_child(wmi)
-	print("  magnet crane: drops its car %.1fm onto the road (cycle %.1fs)" % [drop, 2.0 * 5.0 + 3.0 + 0.8 + sqrt(2.0 * drop / 24.0) + 3.5 + 1.6])
+	print("  magnet crane: drops its car %.1fm onto the road (cycle %.1fs)" % [drop, 2.0 * 5.0 + 3.0 + 0.8 + sqrt(2.0 * drop / 24.0) + 2.2 + 1.6])
 	node.add_child(slew)
 	_note_rect(HANDLER_AT, 14.0, 14.0, 0.0)
 	var gate := Node3D.new()
@@ -3914,6 +4022,7 @@ func _build_scrapyard(node: Node3D, rng: RandomNumberGenerator) -> void:
 	gate.set("road_half", ROAD_HALF)
 	gate.set("reach", 5.0)
 	_add_hazard_gate(node, gate)
+	_build_scrap_wrecks(node, body, rng, s_h)
 	# The yard's corrugated fence round its pad, open where the route comes in and goes out.
 	var pr: Array = []
 	for p in PADS:
@@ -4011,7 +4120,7 @@ func _build_building_site(node: Node3D, rng: RandomNumberGenerator) -> void:
 	var gate := Node3D.new()
 	gate.name = "ExcavatorGate"
 	gate.set_script(load("res://HazardGate.gd"))
-	var s_ex: float = _closest_s(Vector2(EXCAVATOR_AT.x, 900.0))
+	var s_ex: float = _closest_s(EXCAVATOR_AT)
 	var gsp: Dictionary = _spot(s_ex, 0.0, 0.0)
 	gate.position = gsp["pos"]
 	gate.rotation_degrees = Vector3(0, gsp["yaw"], 0)
@@ -4095,6 +4204,7 @@ func _build_building_site(node: Node3D, rng: RandomNumberGenerator) -> void:
 		tmi.scale = Vector3.ONE * PROP_SCALE
 		top.add_child(tmi)
 	node.add_child(top)
+	_build_parcours(node)
 	_site_materials(node, body, rng)
 	_build_leitbaken(node)
 	# The site's Bauzaun along both sides of the road from its gate, open across the route.
@@ -4105,6 +4215,147 @@ func _build_building_site(node: Node3D, rng: RandomNumberGenerator) -> void:
 	_site_fence_line(node, body, Vector2(pr[0], pr[1]), Vector2(pr[2], pr[1]), rng)
 	_site_fence_line(node, body, Vector2(pr[0], pr[3]), Vector2(pr[2], pr[3]), rng)
 	_site_fence_line(node, body, Vector2(pr[2], pr[1]), Vector2(pr[2], pr[3]), rng)
+
+
+## The building site's parcours (corners 20-24): tyre walls round the outside of each corner, and the spoil jumps' sides.
+## Its checkpoint stands on the leg west along the north fence, after the table-top (PARCOURS_GATE): like every gate it may
+## be missed once (the user's rule), so the walls only show the way, they don't fence the field off.
+const PARCOURS_GATE := Vector2(-216.0, 825.0)
+## [corner, metres of wall before its arc, after it].
+const PARCOURS_TYRES := [[20, 10.0, 16.0], [21, 12.0, 16.0], [22, 10.0, 16.0], [23, 12.0, 14.0], [24, 10.0, 16.0]]
+## The walls' line, right of the route's (outside the Leitbaken at ROAD_HALF + 0.9).
+const PARCOURS_TYRE_LAT := ROAD_HALF + 1.9
+const TYRE_STEP := 0.99
+
+func _build_parcours(node: Node3D) -> void:
+	if _scrap == null:
+		return
+	var pk: PropKit = _scrap.new_kit(1.0)
+	var designs: Array = TyreStacks.meshes(pk, "tyre", 7311)
+	for d in range(designs.size()):
+		_share_materials(designs[d])
+		designs[d] = _save_res(designs[d], "parcours_tyre_%d" % d, PROP_PREFIX)
+	var body := _body(node, "ParcoursTyreWalls", "rock")
+	var walls := 0
+	var count := 0
+	for spec in PARCOURS_TYRES:
+		var t: Dictionary = _turn(int(spec[0]))
+		# The outside of the corner: left of the way for a right turn (a positive turn), right for a left one.
+		var lat: float = -signf(float(t["turn"])) * PARCOURS_TYRE_LAT
+		var pts := PackedVector3Array()
+		var s: float = float(t["s0"]) - float(spec[1])
+		var last := Vector3(INF, 0, INF)
+		while s <= float(t["s1"]) + float(spec[2]):
+			var q: Vector3 = _pt(s) + _rt(s) * lat
+			if Vector2(q.x - last.x, q.z - last.z).length() >= TYRE_STEP:
+				# Nothing on another stretch of road.
+				if _route_dist(q.x, q.z) > PARCOURS_TYRE_LAT - 0.8:
+					q.y = _ground_at(q.x, q.z)
+					pts.append(q)
+					last = q
+			s += 0.1
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 7400 + int(spec[0])
+		var stacks: Array = []
+		for i in range(pts.size()):
+			stacks.append([Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * PROP_SCALE), pts[i]), TyreStacks.design(i, rng)])
+			# A box over every four stacks (and the last few): the stacks only rock, the boxes stop the cart.
+			if i > 0 and (i % 4 == 0 or i == pts.size() - 1):
+				var a: Vector3 = pts[maxi(i - 4, 4 * ((i - 1) / 4))]
+				var b: Vector3 = pts[i]
+				var along := Vector3(b.x - a.x, 0.0, b.z - a.z)
+				var length: float = along.length()
+				if length > 0.05:
+					var z := along / length
+					var x := Vector3.UP.cross(z).normalized()
+					var h: float = 0.62 * PROP_SCALE
+					var mid: Vector3 = (a + b) * 0.5 + Vector3(0, h * 0.5, 0)
+					_box(body, Transform3D(Basis(x, Vector3.UP, z), mid), Vector3(0.62 * PROP_SCALE, h + absf(a.y - b.y), length + 0.62 * PROP_SCALE))
+		node.add_child(TyreStacks.spring_node("ParcoursTyres%d" % int(spec[0]), designs, stacks, PROP_SCALE))
+		for q in pts:
+			_note_rect(Vector2(q.x, q.z), 1.0, 1.0, 0.0, 0.5)
+		walls += 1
+		count += pts.size()
+	_build_spoil_jumps(node)
+	print("  parcours: %d tyre walls, %d stacks; checkpoint at %.0fm" % [walls, count, _closest_s(PARCOURS_GATE)])
+
+
+## The spoil jumps' sides (the kicker, the table-top): the road's ribbon is their top, and each side is a slope of spoil
+## from just under the ribbon's edge, rounded over, down at about the angle of repose into the ground (sunk 30cm under it).
+## Their own body (off-road dirt) holds their triangles; the mesh is under it, so DressingColliders leaves it be.
+const SPOIL_SLOPE := 1.35
+const SPOIL_STEP := 0.75
+
+func _build_spoil_jumps(node: Node3D) -> void:
+	if _baustelle == null:
+		return
+	var pk: PropKit = _baustelle.new_kit(1.0)
+	pk.reset_frame()
+	var kit := {}
+	var faces := PackedVector3Array()
+	for span in _jump_spans():
+		var s0: float = float(span[0]) - 1.0
+		var s1: float = float(span[1]) + 1.0
+		var base: float = minf(_lap_y(s0 - 3.0), _lap_y(s1 + 3.0))
+		var n: int = ceili((s1 - s0) / SPOIL_STEP)
+		for side in [-1.0, 1.0]:
+			var grid: Array = []
+			for i in range(n + 1):
+				var sv: float = lerpf(s0, s1, float(i) / float(n))
+				var c: Vector3 = _pt(sv)
+				var r: Vector3 = _rt(sv) * side
+				var top: float = _lap_y(sv)
+				var h: float = maxf(top - base, 0.0)
+				var run: float = h * SPOIL_SLOPE
+				var lats: Array = [ROAD_HALF - 0.15, ROAD_HALF + 0.3, ROAD_HALF + 0.3 + run * 0.5, ROAD_HALF + 0.3 + run + 0.9]
+				var row: Array = []
+				for j in range(lats.size()):
+					var p: Vector3 = c + r * float(lats[j])
+					match j:
+						0: p.y = top - 0.035
+						1: p.y = top - 0.06 - h * 0.04
+						2: p.y = base + h * 0.52
+						_: p.y = _ground_at(p.x, p.z) - 0.3
+					row.append(p)
+				grid.append(row)
+			var out_dir := func(i: int) -> Vector3:
+				return (_rt(lerpf(s0, s1, float(i) / float(n))) * side + Vector3.UP).normalized()
+			var nrm := func(i: int, j: int) -> Vector3:
+				var a: Vector3 = grid[maxi(i - 1, 0)][j]
+				var b: Vector3 = grid[mini(i + 1, n)][j]
+				var cc: Vector3 = grid[i][maxi(j - 1, 0)]
+				var d: Vector3 = grid[i][mini(j + 1, 3)]
+				var nn: Vector3 = (d - cc).cross(b - a).normalized()
+				return nn if nn.dot(out_dir.call(i)) > 0.0 else -nn
+			for i in range(n):
+				for j in range(3):
+					var p00: Vector3 = grid[i][j]
+					var p10: Vector3 = grid[i + 1][j]
+					var p01: Vector3 = grid[i][j + 1]
+					var p11: Vector3 = grid[i + 1][j + 1]
+					# Spoil, darker in the rounded edge under the ribbon; one colour a band (a colour a quad read as a
+					# chequerboard), the heap material's weathering varies it.
+					var col: Color = [Color(0.34, 0.26, 0.19), Color(0.41, 0.32, 0.23), Color(0.43, 0.34, 0.25)][j]
+					var o: Vector3 = out_dir.call(i)
+					pk.tri(kit, "heap", p00, p10, p11, nrm.call(i, j), nrm.call(i + 1, j), nrm.call(i + 1, j + 1), col, o)
+					pk.tri(kit, "heap", p00, p11, p01, nrm.call(i, j), nrm.call(i + 1, j + 1), nrm.call(i, j + 1), col, o)
+					faces.append_array(PackedVector3Array([p00, p10, p11, p00, p11, p01]))
+	if kit.is_empty():
+		return
+	var mesh: ArrayMesh = _baustelle.commit(pk, kit)
+	_share_materials(mesh)
+	var body := _body(node, "SpoilHeapsBody", "dirt")
+	var mi := MeshInstance3D.new()
+	mi.name = "SpoilHeaps"
+	mi.mesh = _save_res(mesh, "spoil_jumps", PROP_PREFIX)
+	mi.visibility_range_end = 1400.0
+	body.add_child(mi)
+	var shape := ConcavePolygonShape3D.new()
+	shape.backface_collision = true
+	shape.set_faces(faces)
+	var cs := CollisionShape3D.new()
+	cs.shape = shape
+	body.add_child(cs)
 
 
 ## Stacks of materials round the site: rebar, formwork, bricks, concrete pipes, a cable drum, sand, the mixer truck, a
@@ -4154,7 +4405,7 @@ func _build_leitbaken(node: Node3D) -> void:
 	var s: float = float(_turn(19)["s1"]) + 60.0
 	while s < _finish_s - 90.0:
 		var k: int = _kind_at(kinds, s)
-		if k == 11 and absf(s - s_kicker) > 40.0 and absf(s - s_roller) > 30.0 and absf(s - _closest_s(EXCAVATOR_AT)) > 26.0:
+		if k == 11 and _jump_span_at(s, 8.0).is_empty() and absf(s - s_roller) > 30.0 and absf(s - _closest_s(EXCAVATOR_AT)) > 26.0:
 			for side in [-1.0, 1.0]:
 				var sp: Dictionary = _spot(s, side * (ROAD_HALF + 0.9), 0.0)
 				var pos: Vector3 = sp["pos"]

@@ -2,7 +2,7 @@
 
 [ext_resource type="ArrayMesh" path="res://generated/stadtrallyeprop_barge_1.res" id="1_nr8x0"]
 
-[node name="Barge" type="Node3D" unique_id=1298830474]
+[node name="Barge" type="Node3D" unique_id=1791426956]
 
-[node name="Hull" type="MeshInstance3D" parent="." unique_id=1543458523]
+[node name="Hull" type="MeshInstance3D" parent="." unique_id=1314976558]
 mesh = ExtResource("1_nr8x0")

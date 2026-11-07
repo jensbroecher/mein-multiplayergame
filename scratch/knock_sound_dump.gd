@@ -1,6 +1,6 @@
 extends SceneTree
 
-# Writes the knock sounds KnockableProps.gd synthesises (plastic, parasol) and KickBall.gd's kicks
+# Writes the knock sounds KnockableProps.gd synthesises (plastic, parasol, the cones' thud) and KickBall.gd's kicks
 # (football, beach ball) out as .wav, with each one's peak and RMS in dBFS, to listen to them:
 #   Godot --headless --path . -s res://scratch/knock_sound_dump.gd -- <dir>
 
@@ -14,6 +14,7 @@ func _init() -> void:
 	var sounds := {
 		"knock_plastic": kp._synth_sound(1),
 		"knock_parasol": kp._synth_sound(2),
+		"knock_cone_thud": kp._synth_sound(3),
 		"kick_football": kb._thump(0),
 		"kick_beachball": kb._thump(1),
 	}

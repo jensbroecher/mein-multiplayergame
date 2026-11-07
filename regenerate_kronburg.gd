@@ -54,8 +54,15 @@ const CORNERS := [
 	[Vector2(580.0, -150.0), 50.0],   # C4: left onto the north road
 	[Vector2(120.0, -150.0), 60.0],   # C5: out of the works, up into the estate
 	[Vector2(-200.0, -230.0), 45.0],  # C6: the town gate
-	[Vector2(-450.0, -230.0), 22.0],  # C7: the Marktplatz
-	[Vector2(-470.0, 40.0), 60.0],    # C8: down the Kirchberg
+	# The Marktplatz: anticlockwise round the fountain (up its east side, behind it past a checkpoint, down its west
+	# side, back along its south side past the market), then right down the Kirchberg. The way in and the way out only
+	# meet at the square's corner (MARKT_JUNCTION), where a line of cones keeps them apart.
+	[Vector2(-452.0, -230.0), 12.0],  # C7: right, up the fountain's east side
+	[Vector2(-468.0, -290.0), 16.0],  # C8: left, behind the fountain
+	[Vector2(-524.0, -290.0), 16.0],  # C9: left, down its west side
+	[Vector2(-524.0, -233.0), 16.0],  # C10: left, back along its south side
+	[Vector2(-470.0, -233.0), 14.0],  # C11: right, down the Kirchberg
+	[Vector2(-470.0, 40.0), 60.0],    # C12: down the Kirchberg
 ]
 
 ## The valley's floor (the canal's plain and the works) and the canal.
@@ -93,6 +100,12 @@ const COARSE_MAX := 180.0
 const FINISH_X := -420.0
 ## The square's stretch of road held level (either side of its corner), and the steepest grade anywhere else.
 const MARKT_HOLD := 30.0
+## Where the lap comes into the square and leaves it, and the corner where the two meet.
+const MARKT_IN := Vector2(-434.0, -230.0)
+const MARKT_OUT := Vector2(-470.0, -205.0)
+const MARKT_JUNCTION := Vector2(-461.0, -231.0)
+## The old corner's point: the square's height is the natural ground's there.
+const MARKT_LEVEL_AT := Vector2(-450.0, -230.0)
 const MAX_GRADE := 0.105
 
 var level: Node3D
@@ -386,12 +399,16 @@ func _plan_road_heights() -> void:
 			out[i] = acc / float(2 * reach + 1)
 		cur = out
 	# The market square held level, eased in and out.
-	var s7: float = _corner_s(7)
+	var sq_in: float = _closest_s(MARKT_IN)
+	var sq_out: float = _closest_s(MARKT_OUT)
 	var hold := PackedByteArray()
 	hold.resize(n)
 	for i in range(n):
 		var s: float = float(i)
-		var d: float = absf(fposmod(s - s7 + lap_len * 0.5, lap_len) - lap_len * 0.5)
+		# The distance (along the lap) outside the square's stretch.
+		var d: float = 0.0 if s >= sq_in and s <= sq_out else minf(
+				absf(fposmod(s - sq_in + lap_len * 0.5, lap_len) - lap_len * 0.5),
+				absf(fposmod(s - sq_out + lap_len * 0.5, lap_len) - lap_len * 0.5))
 		var w: float = 1.0 - smoothstep(MARKT_HOLD, MARKT_HOLD + 70.0, d)
 		cur[i] = lerpf(cur[i], _markt_y, w)
 		hold[i] = 1 if d < MARKT_HOLD else 0
@@ -919,17 +936,19 @@ func _road_kinds() -> Array:
 	var s_h1: float = _closest_s(Vector2(HALL_X0 + HALL_LEN, HALL_Z))
 	var s_works_out: float = _closest_s(Vector2(-5.0, -164.0))
 	var s_town_gate: float = _closest_s(TOWN_GATE)
-	var s7: float = _corner_s(7)
-	var s_kirch: float = _closest_s(Vector2(-452.0, -95.0))
+	# The square's paving from about where it began before the lap went round the fountain.
+	var s_sq0: float = _closest_s(MARKT_IN + Vector2(27.0, 0.0))
+	var s_sq1: float = _closest_s(MARKT_OUT + Vector2(0.0, 5.0))
+	var s_kirch: float = _closest_s(Vector2(-471.0, -95.0))
 	_kinds_cache = [
 		[0.0, s_gate, 0],
 		[s_gate, s_h0 - 2.0, 3],
 		[s_h0 - 2.0, s_h1 + 2.0, 4],
 		[s_h1 + 2.0, s_works_out, 3],
 		[s_works_out, s_town_gate, 2],
-		[s_town_gate, s7 - 38.0, 1],
-		[s7 - 38.0, s7 + 30.0, 5],
-		[s7 + 30.0, s_kirch, 1],
+		[s_town_gate, s_sq0, 1],
+		[s_sq0, s_sq1, 5],
+		[s_sq1, s_kirch, 1],
 		[s_kirch, lap_len, 0],
 	]
 	return _kinds_cache
@@ -1136,7 +1155,9 @@ func _place_gameplay(root: Node3D) -> void:
 		_closest_s(Vector2(330.0, -150.0)),
 		_closest_s(Vector2(-60.0, -186.0)),
 		_closest_s(Vector2(-330.0, -230.0)),
-		_closest_s(Vector2(-462.0, -60.0)),
+		# Behind the fountain: the lap goes round it, and the square's corner (MARKT_JUNCTION) would cut it.
+		_closest_s(Vector2(-496.0, -290.0)),
+		_closest_s(Vector2(-471.0, -60.0)),
 	]
 	for i in range(at.size()):
 		var c: Dictionary = _spot(at[i], 0.0, 0.08)
@@ -1315,7 +1336,7 @@ func _ready() -> void:
 
 	_init_noise()
 	_fillet(CORNERS)
-	_markt_y = _raw_natural(CORNERS[7][0].x, CORNERS[7][0].y) + GROUND_UNDER
+	_markt_y = _raw_natural(MARKT_LEVEL_AT.x, MARKT_LEVEL_AT.y) + GROUND_UNDER
 	_castle_y = _raw_natural(CASTLE_C.x, CASTLE_C.y)
 	_sport_y = _raw_natural((float(SPORT_RECT[0]) + float(SPORT_RECT[2])) * 0.5, (float(SPORT_RECT[1]) + float(SPORT_RECT[3])) * 0.5)
 	print("  market square at %.1fm, castle at %.1fm" % [_markt_y, _castle_y])
@@ -1388,6 +1409,7 @@ func _build_dressing(root: Node3D) -> void:
 	_build_leisure()
 	_build_town_people()
 	_build_weekly_market(root)
+	_build_markt_cones(root)
 	CrowdPlacer.build(root, _people, SPECTATOR_SCALE, SPECTATOR_SKIN, 8121, func(res: Resource, n: String) -> Resource: return _save_res(res, n, "kronburgcrowd_"))
 	_flush_batches(root)
 	_build_sounds(root)
@@ -1617,9 +1639,10 @@ func _post_mesh() -> ArrayMesh:
 	# A post 1m tall (life), its face toward -z (the road), its back rounded off as two bevels.
 	var prof := PackedVector2Array([Vector2(-0.06, 0.0), Vector2(0.06, 0.0), Vector2(0.06, 0.06), Vector2(0.0, 0.11), Vector2(-0.06, 0.06)])
 	pk.set_frame(Transform3D(Basis(Vector3.RIGHT, Vector3.BACK, Vector3.DOWN) * Basis.from_scale(Vector3.ONE * s), Vector3.ZERO))
-	pk.extrude(kit, "paint", prof, -1.0, -0.73, 0.0, white)
-	pk.extrude(kit, "paint", prof, -0.73, -0.98, 0.0, black)
-	pk.extrude(kit, "paint", prof, -0.98, -1.0, 0.0, white)
+	# Frame z is down: the post runs from z 0 (its foot) to -1 (its top), white with a black band near the top.
+	pk.extrude(kit, "paint", prof, -0.73, 0.0, 0.0, white)
+	pk.extrude(kit, "paint", prof, -0.98, -0.73, 0.0, black)
+	pk.extrude(kit, "paint", prof, -1.0, -0.98, 0.0, white)
 	pk.set_frame(Transform3D(Basis.from_scale(Vector3.ONE * s), Vector3.ZERO))
 	# The reflector on the black band, facing the oncoming traffic.
 	pk.block(kit, "lamp", Vector3(-0.025, 0.80, -0.012), Vector3(0.025, 0.90, -0.002), Color(0.95, 0.95, 0.9))
@@ -1825,7 +1848,7 @@ func _build_woods(root: Node3D) -> void:
 			add.call("birch" if roll2 < 0.3 else ("oak" if roll2 < 0.5 else "lime"), px3, pz3, rng.randf_range(0.55, 0.85))
 		gx += 9.0
 	# Lime trees on the market square, clear of the racing line.
-	for lt in [Vector2(-508.0, -298.5), Vector2(-472.0, -298.5), Vector2(-500.0, -223.0), Vector2(-526.0, -223.0)]:
+	for lt in [Vector2(-510.0, -302.5), Vector2(-476.0, -302.5), Vector2(-445.0, -280.0), Vector2(-445.0, -247.0)]:
 		var lp: Vector2 = lt
 		add.call("lime", lp.x, lp.y, 1.15)
 		_note_rect(lp, 6.0, 6.0, 0.0, 0.0)
@@ -1956,9 +1979,8 @@ func _row(a: Vector3, b: Vector3, face: Vector3, rng: RandomNumberGenerator) -> 
 func _build_town(_root: Node3D) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 6620
-	var s7: float = _corner_s(7)
 	var s_tg: float = _closest_s(TOWN_GATE)
-	var s_kirch: float = _closest_s(Vector2(-452.0, -95.0))
+	var s_kirch: float = _closest_s(Vector2(-471.0, -95.0))
 	var y: float = _markt_y
 	# The market square first (its landmarks take their places before the streets fill in).
 	# St. Lamberti on the north side: its west tower facing west, the nave running east along the square.
@@ -1974,12 +1996,12 @@ func _build_town(_root: Node3D) -> void:
 	var fx := _facing(Vector3(1, 0, 0), Vector3(-498.0, y, -268.0))
 	_add_prop("markt_fountain", _town, fx, func(pk, kit, _labels): _kit_call(_town, "market_fountain", [pk, kit]))
 	_note_rect(Vector2(-498.0, -268.0), 14.0, 14.0, 0.0)
-	# The maypole on the square's north side, between the lime trees in front of the church.
-	_add_prop("markt_maibaum", _town, _facing(Vector3(0, 0, 1), Vector3(-490.0, y, -292.0)), func(pk, kit, _labels): _kit_call(_town, "maibaum", [pk, kit]))
-	_note_rect(Vector2(-490.0, -292.0), 5.0, 5.0, 0.0)
+	# The maypole in the square's north-east corner, outside the lap's loop round the fountain.
+	_add_prop("markt_maibaum", _town, _facing(Vector3(-1, 0, 0), Vector3(-446.0, y, -297.0)), func(pk, kit, _labels): _kit_call(_town, "maibaum", [pk, kit]))
+	_note_rect(Vector2(-446.0, -297.0), 5.0, 5.0, 0.0)
 	# The square's east side (facing west) and its south-west side (facing north).
 	_row(Vector3(-441.0, y, -305.0), Vector3(-441.0, y, -243.0), Vector3(-1, 0, 0), rng)
-	_row(Vector3(-461.5, y, -217.0), Vector3(-536.0, y, -217.0), Vector3(0, 0, -1), rng)
+	_row(Vector3(-486.0, y, -217.0), Vector3(-536.0, y, -217.0), Vector3(0, 0, -1), rng)
 	# The square's west side either side of the Rathaus, facing east.
 	_row(Vector3(-541.5, y, -282.5), Vector3(-541.5, y, -308.0), Vector3(1, 0, 0), rng)
 	_row(Vector3(-541.5, y, -213.0), Vector3(-541.5, y, -242.5), Vector3(1, 0, 0), rng)
@@ -1989,10 +2011,12 @@ func _build_town(_root: Node3D) -> void:
 	var gate_xf := _facing(-(gs["fwd"] as Vector3), gs["pos"])
 	_add_prop("kronentor", _town, gate_xf, func(pk, kit, labels): _kit_call(_town, "town_gate", [pk, kit, labels]))
 	_note_xf(gate_xf, -22.0 * PROP_SCALE, 22.0 * PROP_SCALE, -8.0 * PROP_SCALE, 8.0 * PROP_SCALE, 0.5)
-	_frontage(s_tg + 16.0, s7 - 26.0, 1.0, rng)
-	_frontage(s_tg + 16.0, s7 - 40.0, -1.0, rng)
-	_frontage(s7 + 24.0, s_kirch, 1.0, rng)
-	_frontage(s7 + 40.0, s_kirch, -1.0, rng)
+	# The Hauptstraße's houses stop at the square (the south side at the corner the cones mark), the Kirchberg's start
+	# below it.
+	_frontage(s_tg + 16.0, _closest_s(Vector2(-418.0, -230.0)), 1.0, rng)
+	_frontage(s_tg + 16.0, _closest_s(Vector2(-430.0, -230.0)), -1.0, rng)
+	_frontage(_closest_s(Vector2(-470.0, -198.0)), s_kirch, 1.0, rng)
+	_frontage(_closest_s(Vector2(-470.0, -196.0)), s_kirch, -1.0, rng)
 	_build_lanes(rng)
 	_build_town_wall()
 	print("  old town: %d houses" % _house_count)
@@ -2098,7 +2122,7 @@ func _build_street_furniture(rng: RandomNumberGenerator) -> void:
 		var sub: String = at[2]
 		_add_prop(_cell_key("signs", p4, 300.0), _town, _facing(-(sp4["fwd"] as Vector3), p4), func(pk, kit, labels): _kit_call(_town, "ortsschild", [pk, kit, labels, txt, sub]), 400.0)
 	# A Litfaßsäule on the square, a bus stop on the Kanalstraße by the start.
-	var lp := Vector3(-468.0, _markt_y, -292.0)
+	var lp := Vector3(-446.0, _markt_y, -262.0)
 	_add_prop("markt_litfass", _town, _facing(Vector3(0, 0, 1), lp), func(pk, kit, _labels): _kit_call(_town, "litfass", [pk, kit]), 400.0)
 	var sb: Dictionary = _spot(_closest_s(Vector2(-300.0, 250.0)), -(ROAD_HALF + 3.0), 0.0)
 	var pb: Vector3 = sb["pos"]
@@ -2189,7 +2213,7 @@ func _build_works(_root: Node3D) -> void:
 	_add_prop("works_orecrane", _works, _works_xf(Vector2(hx, float(HARBOUR_RECT[1]) - 6.0), Vector3(0, 0, 1)), func(pk, kit, _labels): _kit_call(_works, "ore_crane", [pk, kit]))
 	for px in [200.0, 302.0]:
 		var coal: bool = px > 250.0
-		_add_prop("works_stockpiles", _works, _works_xf(Vector2(px, 160.0), Vector3(0, 0, 1)), func(pk, kit, _labels): _kit_call(_works, "stockpile", [pk, kit, 58.0, 22.0, 9.0, coal]))
+		_add_prop(_pile_key(Vector2(px, 160.0)), _works, _works_xf(Vector2(px, 160.0), Vector3(0, 0, 1)), func(pk, kit, _labels): _kit_call(_works, "stockpile", [pk, kit, 58.0, 22.0, 9.0, coal]))
 		_note_rect(Vector2(px, 160.0), 96.0, 40.0, 0.0)
 	# The slag heap's crown.
 	var top := Vector3(HALDE_C.x, _ground_at(HALDE_C.x, HALDE_C.y), HALDE_C.y)
@@ -2499,12 +2523,12 @@ func _traffic_sign(pk: PropKit, kit: Dictionary, labels: Array, kind: String, te
 
 func _build_traffic_signs() -> void:
 	var s_tg: float = _closest_s(TOWN_GATE)
-	var s7: float = _corner_s(7)
+	var s_out: float = _closest_s(MARKT_OUT)
 	var s_c1: float = _corner_s(1)
 	var s_fin: float = _closest_s(Vector2(FINISH_X, 250.0))
 	var defs: Array = [
 		[s_tg - 40.0, "limit", "30", "ZONE"],
-		[s7 + 58.0, "warn", "10%", ""],
+		[s_out + 35.0, "warn", "10%", ""],
 		[s_c1 - 150.0, "warn", "!", "Werksverkehr"],
 		[s_fin + 150.0, "priority", "", ""],
 	]
@@ -2986,8 +3010,9 @@ func _build_town_people() -> void:
 	var groups: Array = [
 		# [from, to, facing, count]
 		[Vector3(-528.0, y, -305.5), Vector3(-462.0, y, -305.5), Vector3(0, 0, 1), 16],
-		[Vector3(-523.0, y, -292.0), Vector3(-523.0, y, -240.0), Vector3(1, 0, 0), 10],
+		[Vector3(-536.5, y, -292.0), Vector3(-536.5, y, -240.0), Vector3(1, 0, 0), 10],
 		[Vector3(-508.0, y, -258.0), Vector3(-488.0, y, -258.0), Vector3(0.3, 0, 1), 5],
+		[Vector3(-446.0, y, -300.0), Vector3(-446.0, y, -250.0), Vector3(-1, 0, 0), 7],
 	]
 	for g in groups:
 		var a: Vector3 = g[0]
@@ -3014,10 +3039,10 @@ func _build_town_people() -> void:
 
 
 
-## The weekly market (Wochenmarkt) on the square's west side, between the fountain and the Rathaus: CampKit's gazebos in
-## white and red-and-white over folding tables of crates, shoppers between them. Away from the racing line.
-const MARKET_STALLS := [Vector2(-530.0, -298.0), Vector2(-530.0, -286.0), Vector2(-530.0, -248.0), Vector2(-530.0, -236.0),
-	Vector2(-516.0, -298.0), Vector2(-516.0, -236.0)]
+## The weekly market (Wochenmarkt) inside the lap's loop round the fountain, along its south side facing the fountain:
+## CampKit's gazebos in white and red-and-white over folding tables of crates, shoppers in front. Away from the racing line.
+const MARKET_STALLS := [Vector2(-510.0, -250.0), Vector2(-499.0, -250.0), Vector2(-488.0, -250.0), Vector2(-477.0, -250.0)]
+const MARKET_FACE := Vector3(0, 0, -1)
 
 func _build_weekly_market(root: Node3D) -> void:
 	var pk := PropKit.new()
@@ -3030,7 +3055,7 @@ func _build_weekly_market(root: Node3D) -> void:
 	var produce := [Color(0.85, 0.20, 0.12), Color(0.95, 0.70, 0.10), Color(0.35, 0.60, 0.18), Color(0.55, 0.30, 0.55), Color(0.92, 0.85, 0.70)]
 	for i in range(MARKET_STALLS.size()):
 		var c: Vector2 = MARKET_STALLS[i]
-		var xf := _facing(Vector3(1, 0, 0), Vector3(c.x, y, c.y))
+		var xf := _facing(MARKET_FACE, Vector3(c.x, y, c.y))
 		pk.set_frame(xf.scaled_local(Vector3.ONE * PROP_SCALE))
 		camp.gazebo(kit, Color(0.95, 0.95, 0.93) if i % 2 == 0 else Color(0.82, 0.12, 0.10), false)
 		pk.set_frame(Transform3D(xf.basis * Basis.from_scale(Vector3.ONE * PROP_SCALE), xf.origin + xf.basis.z * 0.6))
@@ -3043,14 +3068,73 @@ func _build_weekly_market(root: Node3D) -> void:
 		_note_rect(c, 6.0, 6.0, 0.0, 0.2)
 		# A shopper or two in front.
 		for k in range(rng.randi_range(1, 2)):
-			var pp := Vector3(c.x + 4.2 + rng.randf_range(0.0, 1.5), y, c.y + rng.randf_range(-2.0, 2.0))
-			_people.append([pp, Vector3(-1, 0, rng.randf_range(-0.3, 0.3)).normalized(), false, false, -1, rng.randf_range(0.85, 1.05)])
+			var side := Vector3(-MARKET_FACE.z, 0.0, MARKET_FACE.x)
+			var pp := Vector3(c.x, y, c.y) + MARKET_FACE * (4.2 + rng.randf_range(0.0, 1.5)) + side * rng.randf_range(-2.0, 2.0)
+			_people.append([pp, (-MARKET_FACE + side * rng.randf_range(-0.3, 0.3)).normalized(), false, false, -1, rng.randf_range(0.85, 1.05)])
 	pk.reset_frame()
 	var mi := MeshInstance3D.new()
 	mi.name = "Wochenmarkt"
 	mi.mesh = _save_res(pk.commit(kit), "weekly_market", PROP_PREFIX)
 	mi.visibility_range_end = 600.0
 	root.add_child(mi)
+
+
+
+## Traffic cones on the market square: one line from the market's east end, through the corner where the way in and the
+## way out meet (MARKT_JUNCTION), onto the old corner's verge. It keeps the two apart, the way in (heading for the
+## fountain's east side) on its right and the way out (from the fountain's south side to the Kirchberg) on its right
+## going the other way, and shows that the corner straight onto the Kirchberg is not the way. Knockable
+## (KnockableProps: a cart drives through them, they thud), not a barrier: the user wanted the corner left open.
+const MARKT_CONE_GAP := 2.2
+const MARKT_CONES_FROM := Vector2(-472.0, -249.0)
+const MARKT_CONES_TO := Vector2(-445.0, -207.0)
+
+func _build_markt_cones(root: Node3D) -> void:
+	var pts: Array[Vector2] = []
+	var n_cones: int = maxi(1, roundi(MARKT_CONES_FROM.distance_to(MARKT_CONES_TO) / MARKT_CONE_GAP))
+	for i in range(n_cones + 1):
+		pts.append(MARKT_CONES_FROM.lerp(MARKT_CONES_TO, float(i) / float(n_cones)))
+	# The line must keep clear of the lap's line on both sides (its road's half width and a little).
+	var worst := 1e9
+	for q in pts:
+		worst = minf(worst, _lap_dist(q.x, q.y))
+	if worst < ROAD_HALF + 0.5:
+		push_error("Kronburg: a market square cone stands %.1fm from the lap's line" % worst)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7711
+	var xfs: Array[Transform3D] = []
+	for q in pts:
+		# On the square's paving its surface (level with the road), else the ground.
+		var y: float = _ground_at(q.x, q.y)
+		if _in_rect(q.x, q.y, MARKT_RECT, 0.0) or _lap_dist(q.x, q.y) < _ribbon_half(5) + 0.3:
+			y = maxf(y, _markt_y)
+		xfs.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU), Vector3(q.x, y, q.y)))
+	var pk := PropKit.new()
+	pk.material_for = func(key: String) -> Material: return _camp_material(key)
+	var camp := CampKit.new(pk)
+	var ck := {}
+	pk.set_frame(Transform3D(Basis().scaled(Vector3.ONE * PROP_SCALE), Vector3.ZERO))
+	camp.cone(ck)
+	pk.reset_frame()
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = _save_res(pk.commit(ck), "markt_cone", PROP_PREFIX)
+	mm.instance_count = xfs.size()
+	mm.buffer = PropKit.transform_buffer(xfs)
+	var mmi := MultiMeshInstance3D.new()
+	# "Cone" in the name: KnockableProps' thud, and DressingColliders leaves it be.
+	mmi.name = "MarktCones"
+	mmi.set_script(load("res://KnockableProps.gd"))
+	mmi.set("prop_transforms", xfs)
+	mmi.set("boxes", [[Vector3(0, 0.03, 0) * PROP_SCALE, Vector3(0.38, 0.06, 0.38) * PROP_SCALE], [Vector3(0, 0.36, 0) * PROP_SCALE, Vector3(0.2, 0.62, 0.2) * PROP_SCALE]])
+	mmi.set("prop_mass", 6.0)
+	mmi.set("push_speed", 1.5)
+	mmi.set("release_radius", 3.2)
+	mmi.set("centre_of_mass_y", 0.06)
+	mmi.multimesh = mm
+	mmi.visibility_range_end = 500.0
+	root.add_child(mmi)
+	print("  market square cones: %d" % xfs.size())
 
 
 
@@ -3143,13 +3227,19 @@ const WORKS_PILES := [[Vector2(610.0, 200.0), 40.0, 18.0, 9.0, true],
 	[Vector2(120.0, -220.0), 50.0, 20.0, 8.0, false], [Vector2(592.0, -202.0), 36.0, 18.0, 7.0, true]]
 const CAR_PARK := [Vector2(70.0, 130.0), Vector2(144.0, 245.0)]
 
+## The stockpiles' batch per 200m cell: as one mesh they spanned 524 x 495m, and DressingColliders gives a single mesh
+## over 400m across no collider (it takes it for ground), so carts drove through every heap.
+func _pile_key(at: Vector2) -> String:
+	return _cell_key("works_stockpiles", Vector3(at.x, 0.0, at.y), 200.0)
+
+
 func _build_works_fill() -> void:
 	# The ore yard: an ore bridge over two long stockpiles (iron ore and coal), their length along z.
 	_add_prop("works_oreyard", _works, _works_xf(ORE_YARD, Vector3(0, 0, 1)), func(pk, kit, _labels): _kit_call(_works, "ore_crane", [pk, kit]))
 	for k in range(2):
 		var pc := Vector2(ORE_YARD.x - 20.0 + 42.0 * float(k), ORE_YARD.y)
 		var coal_pile: bool = k == 1
-		_add_prop("works_stockpiles", _works, _works_xf(pc, Vector3(1, 0, 0)), func(pk, kit, _labels): _kit_call(_works, "stockpile", [pk, kit, 56.0, 19.0, 9.0, coal_pile]))
+		_add_prop(_pile_key(pc), _works, _works_xf(pc, Vector3(1, 0, 0)), func(pk, kit, _labels): _kit_call(_works, "stockpile", [pk, kit, 56.0, 19.0, 9.0, coal_pile]))
 		_note_rect(pc, 34.0, 94.0, 0.0)
 	_note_rect(ORE_YARD, 110.0, 100.0, 0.0)
 	for wp in WORKS_PILES:
@@ -3158,7 +3248,7 @@ func _build_works_fill() -> void:
 		var w: float = wp[2]
 		var h: float = wp[3]
 		var coal: bool = wp[4]
-		_add_prop("works_stockpiles", _works, _works_xf(at, Vector3(0, 0, 1)), func(pk, kit, _labels): _kit_call(_works, "stockpile", [pk, kit, l, w, h, coal]))
+		_add_prop(_pile_key(at), _works, _works_xf(at, Vector3(0, 0, 1)), func(pk, kit, _labels): _kit_call(_works, "stockpile", [pk, kit, l, w, h, coal]))
 		_note_rect(at, l * PROP_SCALE + 4.0, w * PROP_SCALE + 4.0, 0.0)
 	# Pipe runs on racks along the north road's south side and up the east side of the pad.
 	var runs: Array = [
@@ -3209,7 +3299,8 @@ func _build_car_park() -> void:
 		z += 13.0 if row % 2 == 0 else 9.0
 		row += 1
 	var node := Node3D.new()
-	node.name = "Werksparkplatz"
+	# Not "Werksparkplatz": DressingColliders takes any name with "spark" in it for an effect and left the cars soft.
+	node.name = "ParkplatzWerk"
 	level.add_child(node)
 	for key in groups.keys():
 		var parts: PackedStringArray = String(key).split("_")
@@ -3217,7 +3308,7 @@ func _build_car_park() -> void:
 		pk.set_frame(Transform3D(Basis.from_scale(Vector3.ONE * PROP_SCALE), Vector3.ZERO))
 		camp.vehicle(kit, parts[0], paints[int(parts[1])])
 		var mesh: Mesh = _save_res(pk.commit(kit), "carpark_" + String(key), PROP_PREFIX)
-		var mmi := _multimesh(node, "Cars_" + String(key), mesh, groups[key], 700.0, true)
+		var mmi := _multimesh(node, "ParkedCars_" + String(key), mesh, groups[key], 700.0, true)
 		mmi.visibility_range_end_margin = 40.0
 	_note_rect((CAR_PARK[0] + CAR_PARK[1]) * 0.5, CAR_PARK[1].x - CAR_PARK[0].x, CAR_PARK[1].y - CAR_PARK[0].y, 0.0)
 	print("  works car park: %d cars in %d models" % [cars, groups.size()])

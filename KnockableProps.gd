@@ -15,16 +15,25 @@ const CartWeight = preload("res://CartWeight.gd")
 ## the carts' ground probes don't see. Like KnockablePoles.gd, they're local scenery: nothing is
 ## synced over the network.
 ## Knocked loose, a prop sounds as what it is (Sound, `bonk_sound`, by default from the node's name):
-## a wooden crash for loungers, a hollow plastic tok-tok-tok tumbling away for cones, cool boxes and sand
-## toys, a canvas whump and a pole's ping for parasols. The two made ones are synthesised once
+## a wooden crash for loungers, a deep thud for traffic cones, a hollow plastic tok-tok-tok tumbling away for cool boxes
+## and sand toys, a canvas whump and a pole's ping for parasols. The made ones are synthesised once
 ## (_synth). They carry like a cart's knock (unit_size 20): at -10dB and unit_size 8 they were lost
-## under the engine from the chase camera.
+## under the engine from the chase camera. A prop sounds again when it is hit again (a jump in its speed of REHIT_DV,
+## REHIT_GAP apart), through a pool of VOICES players: with one player and one sound per prop, a cart through a row of
+## cones was heard once (each knock restarting the last).
 
 const PROP_LAYER := 1 << 4
 const BONK := preload("res://sounds/crate_crash.mp3")
-enum Sound { CRATE, PLASTIC, PARASOL }
-## Name fragments that pick a sound when bonk_sound is -1.
-const PLASTIC_NAMES := ["cone", "coolbox", "bucket", "spade", "swimring"]
+## Traffic cones: a deep thud, synthesised (the recording the user tried first began with 164ms of silence, heard as a
+## delay).
+const THUD_DB := -8.0
+const VOICES := 4
+const REHIT_DV := 4.0
+const REHIT_GAP := 0.3
+enum Sound { CRATE, PLASTIC, PARASOL, THUD }
+## Name fragments that pick a sound when bonk_sound is -1 ("cone" first: cones thud).
+const THUD_NAMES := ["cone"]
+const PLASTIC_NAMES := ["coolbox", "bucket", "spade", "swimring"]
 
 static var _synth := {}
 
@@ -45,7 +54,13 @@ static var _synth := {}
 
 var _bodies: Array[RigidBody3D] = []
 var _state: PackedByteArray = PackedByteArray()   # 0 frozen, 1 released, 2 knocked (sound played)
-var _bonk: AudioStreamPlayer3D
+var _bonks: Array[AudioStreamPlayer3D] = []
+var _next_voice := 0
+var _stream: AudioStream
+var _base := 0.0
+## Each prop's speed last physics frame and when it last sounded (msec), for a second knock.
+var _prev_speed := PackedFloat32Array()
+var _last_sound := PackedInt64Array()
 
 
 func _ready() -> void:
@@ -90,14 +105,21 @@ func _ready() -> void:
 	multimesh.instance_count = prop_transforms.size()
 	for i in range(prop_transforms.size()):
 		multimesh.set_instance_transform(i, prop_transforms[i])
-	_bonk = AudioStreamPlayer3D.new()
 	var kind := _sound_kind()
-	_bonk.stream = BONK if kind == Sound.CRATE else _synth_sound(kind)
-	_bonk.bus = &"SFX"
-	_bonk.volume_db = 0.0 if kind == Sound.CRATE else -2.0
-	_bonk.unit_size = 20.0
-	_bonk.max_distance = 140.0
-	add_child(_bonk, false, Node.INTERNAL_MODE_BACK)
+	_stream = BONK if kind == Sound.CRATE else _synth_sound(kind)
+	_base = 0.0 if kind == Sound.CRATE else (THUD_DB if kind == Sound.THUD else -2.0)
+	_prev_speed.resize(_bodies.size())
+	_prev_speed.fill(0.0)
+	_last_sound.resize(_bodies.size())
+	_last_sound.fill(-100000)
+	for v in range(VOICES):
+		var p := AudioStreamPlayer3D.new()
+		p.stream = _stream
+		p.bus = &"SFX"
+		p.unit_size = 20.0
+		p.max_distance = 140.0
+		add_child(p, false, Node.INTERNAL_MODE_BACK)
+		_bonks.append(p)
 
 
 func _physics_process(_delta: float) -> void:
@@ -119,13 +141,14 @@ func _physics_process(_delta: float) -> void:
 					_state[i] = 1
 					break
 			continue
-		if _state[i] == 1 and b.linear_velocity.length() > 2.0:
+		var speed: float = b.linear_velocity.length()
+		if _state[i] == 1 and speed > 2.0:
 			_state[i] = 2
-			_bonk.global_position = b.global_position
-			_bonk.pitch_scale = randf_range(0.85, 1.15)
-			# Louder the harder it was hit.
-			_bonk.volume_db = (0.0 if _bonk.stream == BONK else -2.0) + clampf((b.linear_velocity.length() - 8.0) * 0.25, -6.0, 3.0)
-			_bonk.play()
+			_knock(i, b, speed)
+		elif _state[i] == 2 and speed - _prev_speed[i] > REHIT_DV and Time.get_ticks_msec() - _last_sound[i] > int(REHIT_GAP * 1000.0):
+			# Hit again (a cart or another prop): it sounds again.
+			_knock(i, b, speed)
+		_prev_speed[i] = speed
 		if b.sleeping:
 			continue
 		if b.global_position.y < -40.0:
@@ -134,10 +157,25 @@ func _physics_process(_delta: float) -> void:
 		multimesh.set_instance_transform(i, b.transform)
 
 
+## Plays the knock from the prop, on the next voice of the pool (the oldest).
+func _knock(i: int, b: RigidBody3D, speed: float) -> void:
+	_last_sound[i] = Time.get_ticks_msec()
+	var p: AudioStreamPlayer3D = _bonks[_next_voice]
+	_next_voice = (_next_voice + 1) % _bonks.size()
+	p.global_position = b.global_position
+	p.pitch_scale = randf_range(0.88, 1.12)
+	# Louder the harder it was hit.
+	p.volume_db = _base + clampf((speed - 8.0) * 0.25, -6.0, 3.0)
+	p.play()
+
+
 func _sound_kind() -> int:
 	if bonk_sound >= 0:
 		return bonk_sound
 	var n := String(name).to_lower()
+	for w in THUD_NAMES:
+		if n.contains(w):
+			return Sound.THUD
 	for w in PLASTIC_NAMES:
 		if n.contains(w):
 			return Sound.PLASTIC
@@ -150,6 +188,9 @@ func _sound_kind() -> int:
 ## bounces as it tumbles), or a parasol (its canopy's whump, the pole's ring, the thud as it lands).
 static func _synth_sound(kind: int) -> AudioStreamWAV:
 	if _synth.has(kind):
+		return _synth[kind]
+	if kind == Sound.THUD:
+		_synth[kind] = _synth_thud()
 		return _synth[kind]
 	var rate := 22050
 	# Hits: [time, amplitude, modes [[Hz, decay s, amplitude]], click decay, click amplitude, noise low-pass].
@@ -195,4 +236,58 @@ static func _synth_sound(kind: int) -> AudioStreamWAV:
 	wav.stereo = false
 	wav.data = data
 	_synth[kind] = wav
+	return wav
+
+
+## A traffic cone knocked flying: a deep thud from the first sample (a body note gliding from 125 down to 62Hz, its
+## second partial, a soft low-passed thump of noise), then the cone landing and rolling over (two smaller, higher
+## thuds). Rubbery, not the hollow plastic tok of a cool box.
+static func _synth_thud() -> AudioStreamWAV:
+	var rate := 22050
+	var length := 0.55
+	var n := int(rate * length)
+	var buf := PackedFloat32Array()
+	buf.resize(n)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4711
+	# [time s, amplitude, start Hz, end Hz, glide s, decay s, noise amplitude]
+	var hits := [[0.0, 1.0, 125.0, 62.0, 0.09, 0.13, 0.55], [0.21, 0.32, 170.0, 110.0, 0.05, 0.06, 0.4],
+		[0.33, 0.18, 190.0, 130.0, 0.04, 0.045, 0.35]]
+	for h in hits:
+		var i0 := int(float(h[0]) * rate)
+		var amp: float = h[1]
+		var f0: float = h[2]
+		var f1: float = h[3]
+		var glide: float = h[4]
+		var decay: float = h[5]
+		var phase := 0.0
+		var phase2 := 0.0
+		var lp := 0.0
+		var lp2 := 0.0
+		for i in range(i0, n):
+			var t := float(i - i0) / rate
+			var f: float = f1 + (f0 - f1) * exp(-t / glide)
+			phase += TAU * f / rate
+			phase2 += TAU * f * 2.3 / rate
+			var env := exp(-t / decay) * minf(t / 0.0015, 1.0)
+			var v := sin(phase) * env + sin(phase2) * 0.28 * exp(-t / (decay * 0.35))
+			# The thump: noise through two one-pole low-passes, dying in a few milliseconds.
+			lp += (rng.randf_range(-1.0, 1.0) - lp) * 0.18
+			lp2 += (lp - lp2) * 0.18
+			v += lp2 * float(h[6]) * 4.0 * exp(-t / 0.012)
+			buf[i] += v * amp
+	var peak := 0.001
+	for v in buf:
+		peak = maxf(peak, absf(v))
+	var data := PackedByteArray()
+	data.resize(n * 2)
+	for i in n:
+		# A soft knee so the thump's peak doesn't clip the body note quieter.
+		var x: float = buf[i] / peak
+		data.encode_s16(i * 2, int(clampf(tanh(x * 1.3) / tanh(1.3) * 0.92, -1.0, 1.0) * 32767.0))
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = rate
+	wav.stereo = false
+	wav.data = data
 	return wav

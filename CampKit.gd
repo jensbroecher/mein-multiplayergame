@@ -1477,9 +1477,12 @@ func crowd_barrier(kit: Dictionary) -> void:
 
 
 ## A traffic cone at life size (0.7m) on its square base, two reflective bands.
+const CONE_BASE := Color(0.78, 0.25, 0.04)
+
 func cone(kit: Dictionary) -> void:
 	var k := _kit
-	k.block(kit, "rubber", Vector3(-0.19, 0.0, -0.19), Vector3(0.19, 0.04, 0.19), Color(0.08, 0.08, 0.08))
+	# The base in a deeper orange than the cone (the user disliked a near-black one).
+	k.block(kit, "plastic", Vector3(-0.19, 0.0, -0.19), Vector3(0.19, 0.04, 0.19), CONE_BASE)
 	var orange := Color(0.98, 0.36, 0.05)
 	var white := Color(0.95, 0.95, 0.95)
 	var prof := [[0.04, 0.15, orange], [0.30, 0.115, white], [0.38, 0.103, orange], [0.47, 0.09, white], [0.53, 0.082, orange], [0.70, 0.03, orange]]

@@ -422,5 +422,45 @@
     "duration": 20.0,
     "loop": true,
     "influence": 0.45
+  },
+  {
+    "name": "shield_up",
+    "path": "sounds/items/shield_up.wav",
+    "text": "A futuristic energy force field powering up around a small vehicle: a rising electric whoosh that blooms into a bright shimmering hum, sci-fi arcade game power-up, clean, short",
+    "duration": 1.4,
+    "loop": false,
+    "influence": 0.6
+  },
+  {
+    "name": "shield_down",
+    "path": "sounds/items/shield_down.wav",
+    "text": "A futuristic energy force field running out and fading away: a few stuttering electric flickers then a falling soft power-down whoosh, sci-fi arcade game, clean, short",
+    "duration": 1.4,
+    "loop": false,
+    "influence": 0.6
+  },
+  {
+    "name": "shield_break",
+    "path": "sounds/items/shield_break.wav",
+    "text": "A futuristic energy shield shattering when hit: a sharp crackling electric burst with a glassy crystalline shatter and a quick fizzle, sci-fi arcade game, punchy, short",
+    "duration": 1.0,
+    "loop": false,
+    "influence": 0.6
+  },
+  {
+    "name": "puddle_splash_1",
+    "path": "sounds/surfaces/puddle_splash_1.wav",
+    "text": "A small toy car driving fast through a shallow rain puddle on a road, a short light watery splash and spray, close up, outdoors, no engine",
+    "duration": 0.8,
+    "loop": false,
+    "influence": 0.6
+  },
+  {
+    "name": "puddle_splash_2",
+    "path": "sounds/surfaces/puddle_splash_2.wav",
+    "text": "A car tyre rolling quickly through a shallow muddy puddle, a brief soft swish of splashing water, close up, outdoors, no engine",
+    "duration": 0.8,
+    "loop": false,
+    "influence": 0.6
   }
 ]

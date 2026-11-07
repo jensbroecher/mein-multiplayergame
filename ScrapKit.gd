@@ -570,6 +570,35 @@ const CAR_KINDS := [
 const CAR_CLEAR := 0.28
 
 
+## A wreck left in the yard (Quer durch Kronburg's scrapyard, to drive round): a car of a random CAR_KINDS shape, battered,
+## its roof pushed in a little, a wheel or two gone (it sits low on that corner), the nose toward -z, its middle at the
+## origin on the ground; with `stacked` another dumped on top of it, crushed flatter and turned. `wreck_solids` gives its
+## box for the same arguments.
+static func wreck(pk: PropKit, kit: Dictionary, seed_v: int, stacked := false) -> void:
+	var rng := _rng(seed_v, 211)
+	var kind: int = rng.randi() % CAR_KINDS.size()
+	var gone: int = rng.randi_range(0, 3)
+	var wheels: int = 15 & ~(1 << gone) if rng.randf() < 0.6 else 15
+	# Sunk on the corner whose wheel is gone.
+	var sx: float = -1.0 if gone % 2 == 0 else 1.0
+	var sz: float = -1.0 if gone < 2 else 1.0
+	var tilt: float = 0.06 if wheels != 15 else 0.0
+	var b := Basis(Vector3.BACK, sx * tilt) * Basis(Vector3.RIGHT, -sz * tilt * 0.6)
+	_car(pk, kit, "scrap", Transform3D(b, Vector3(0, -tilt * 0.8, 0)), kind, CAR_PAINTS[rng.randi() % CAR_PAINTS.size()],
+			rng.randf_range(0.5, 0.95), rng.randf_range(0.05, 0.35), rng.randi(), wheels)
+	if stacked:
+		var kind2: int = rng.randi() % CAR_KINDS.size()
+		var top: Basis = Basis(Vector3.UP, rng.randf_range(-0.5, 0.5)) * Basis(Vector3.BACK, rng.randf_range(-0.05, 0.05))
+		_car(pk, kit, "scrap", Transform3D(top, Vector3(rng.randf_range(-0.15, 0.15), 1.05, rng.randf_range(-0.3, 0.3))), kind2,
+				CAR_PAINTS[rng.randi() % CAR_PAINTS.size()], rng.randf_range(0.6, 0.95), rng.randf_range(0.5, 0.8), rng.randi(), 0)
+
+
+## The wreck's box (life, its frame): the longest shape's length, its width, its height (two cars' with `stacked`).
+static func wreck_solids(_seed_v: int, stacked := false) -> Array:
+	var h: float = 2.3 if stacked else 1.4
+	return [[Transform3D(Basis(), Vector3(0, h * 0.5, 0)), Vector3(1.8, h, 4.6)]]
+
+
 ## A car (a generic shape of no make) in `t` (its middle on the ground, the nose toward -z): `kind` a CAR_KINDS index, the
 ## body in `key` ("scrap" or, moving, "scrapm") painted `col` worn by `wear` (scrap_metal.gdshader's alpha), crumpled by
 ## `wear` and its roof squashed down by `crush` (0..1), windows dark; `wheels` a mask of the four wheels (1 front left, 2

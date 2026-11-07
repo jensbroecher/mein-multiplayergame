@@ -174,8 +174,8 @@ func _collider_span(sy: float) -> Vector2:
 	if multimesh == null or multimesh.mesh == null:
 		return Vector2(0.125 - (pole_height - 0.25) * 0.5, 0.125 + (pole_height - 0.25) * 0.5)
 	var ab: AABB = multimesh.mesh.get_aabb()
-	# Kronburger Hütte's and Rheinufer's Leitpfosten meshes report bounds over only their top 43cm: where the bounds are
-	# far shorter than `pole_height`, the pole stands on its origin, `pole_height` tall.
+	# Where a mesh's bounds are far shorter than `pole_height` (the Kronburg GP's Leitpfosten were built upside down,
+	# only their top 43cm, until their generators were fixed), the pole stands on its origin, `pole_height` tall.
 	if ab.size.y * sy < pole_height * 0.6:
 		return Vector2(0.0, pole_height)
 	var lo: float = ab.position.y * sy

@@ -574,6 +574,38 @@ var _teleport_tween: Tween = null
 var _teleport_fx: CPUParticles3D = null
 var _teleport_base_scales: Dictionary = {}
 var is_shielded: bool = false
+## Rain puddles (Puddles.gd: the ones the ground and road shaders draw): a cart in one loses PUDDLE_DRAG of its speed a
+## second, throws a little muddy spray off its rear wheels and splashes on entering it at speed (not the deep water's
+## splash). The car this peer drives only.
+const Puddles = preload("res://Puddles.gd")
+const PUDDLE_DRAG := 0.7
+const PUDDLE_SPLASH_MIN_SPEED := 6.0
+const PUDDLE_SPLASH := [[preload("res://sounds/surfaces/puddle_splash_1.wav"), 2.0], [preload("res://sounds/surfaces/puddle_splash_2.wav"), -4.0]]
+var _puddle_stage := "?"
+var _puddle_body := ""
+var _puddle_wet := false
+var _puddle_tick := 0
+var _puddle_lat := 0.0
+var _puddle_s := 0.0
+var _puddle_spray: Array = []
+var _puddle_sfx: AudioStreamPlayer3D
+## The shield's look over its life (`_update_shield_visual`): it forms (grows out of the car with an overshoot and a flash,
+## `shield_up.wav`), hums, flickers its last SHIELD_WARN seconds, and fades out when it runs out (`shield_down.wav`) or
+## bursts when a hit breaks it (`shield_break.wav`). Every peer runs it from `is_shielded`'s changes.
+const SHIELD_TIME := 10.0
+const SHIELD_FORM := 0.45
+const SHIELD_WARN := 2.0
+const SHIELD_FADE := 0.55
+const SHIELD_BURST := 0.32
+const SHIELD_UP_SOUND := preload("res://sounds/items/shield_up.wav")
+const SHIELD_DOWN_SOUND := preload("res://sounds/items/shield_down.wav")
+const SHIELD_BREAK_SOUND := preload("res://sounds/items/shield_break.wav")
+var _shield_prev := false
+## Seconds since it formed, and since it went (negative: not going).
+var _shield_age := 0.0
+var _shield_gone := -1.0
+var _shield_broken := false
+var _shield_sfx: AudioStreamPlayer3D
 var was_shocked: bool = false
 var camera_look_at: Vector3 = Vector3.ZERO
 var camera_clip_distance_mult: float = 1.0
@@ -2681,9 +2713,11 @@ func _physics_process(delta):
 
 	is_offroad = false
 	var on_snow_surface: bool = false
+	_puddle_body = ""
 	if on_ground and not on_loop:
 		var collider = ground_collider if ground_collider else ground_ray.get_collider()
 		if collider:
+			_puddle_body = str((collider as Node).name)
 			is_offroad = not _is_track_surface(collider)
 			var cur: Node = collider as Node
 			while cur:
@@ -2706,6 +2740,7 @@ func _physics_process(delta):
 	if on_ground and _snow_drift_depth > 0:
 		surface = Surfaces.SNOW
 	sync_surface = surface if on_ground else -1
+	_update_puddle(delta, on_ground and not on_loop)
 	_update_snow_plough_depth()
 
 	if _snow_drift_depth > 0 and not is_offroad:
@@ -4151,6 +4186,193 @@ func client_start_pad_boost(strength: float = 1.0, duration: float = 2.0):
 	ap.play()
 	ap.finished.connect(ap.queue_free)
 
+## Whether the car stands in a rain puddle (Puddles.gd), and what that does: drag, spray, a splash on entering.
+func _update_puddle(delta: float, grounded: bool) -> void:
+	if _puddle_stage == "?":
+		var lvl: Node = _cached_level if is_instance_valid(_cached_level) else get_tree().get_first_node_in_group("level")
+		if lvl == null:
+			return
+		_puddle_stage = Puddles.stage_of(lvl)
+	if _puddle_stage == "":
+		return
+	var p := 0.0
+	if grounded and Puddles.has_puddles(_puddle_stage, _puddle_body):
+		# The lap's lateral and distance (the shaders' UV), every fourth step: the ruts' puddles follow the line.
+		_puddle_tick += 1
+		if _puddle_tick % 4 == 1 and track_path != null and track_path.curve != null:
+			var c: Curve3D = track_path.curve
+			var lp: Vector3 = track_path.to_local(global_position)
+			var off: float = c.get_closest_offset(lp)
+			var a: Vector3 = c.sample_baked(off)
+			var fw: Vector3 = c.sample_baked(minf(off + 1.0, c.get_baked_length())) - a
+			fw.y = 0.0
+			if fw.length() > 0.01:
+				_puddle_lat = (lp - a).dot(fw.normalized().cross(Vector3.UP))
+			_puddle_s = off
+		p = Puddles.at(_puddle_stage, _puddle_body, global_position, _puddle_lat, _puddle_s)
+	var wet: bool = p > Puddles.WET
+	var speed: float = linear_velocity.length()
+	if wet and can_move and not is_exploding:
+		var k: float = clampf(PUDDLE_DRAG * delta, 0.0, 0.5)
+		linear_velocity.x *= 1.0 - k
+		linear_velocity.z *= 1.0 - k
+	if wet and not _puddle_wet and speed > PUDDLE_SPLASH_MIN_SPEED:
+		_puddle_splash(speed)
+	_puddle_wet = wet
+	var spray: bool = wet and speed > 4.0
+	if spray and _puddle_spray.is_empty():
+		_make_puddle_spray()
+	for g in _puddle_spray:
+		if not is_instance_valid(g):
+			continue
+		if spray:
+			var pivot = g.get_meta("pivot", null)
+			if is_instance_valid(pivot):
+				_attach_dirt_emitter(g, pivot)
+			g.initial_velocity_max = clampf(2.0 + speed * 0.15, 3.0, 7.0)
+		g.emitting = spray
+
+
+func _puddle_splash(speed: float) -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	if _puddle_sfx == null:
+		_puddle_sfx = AudioStreamPlayer3D.new()
+		_puddle_sfx.name = "SFX_Puddle"
+		_puddle_sfx.bus = &"SFX"
+		_puddle_sfx.unit_size = 10.0
+		_puddle_sfx.max_distance = 80.0
+		visuals.add_child(_puddle_sfx)
+	var pick: Array = PUDDLE_SPLASH[randi() % PUDDLE_SPLASH.size()]
+	_puddle_sfx.stream = pick[0]
+	_puddle_sfx.volume_db = float(pick[1]) + lerpf(-8.0, 0.0, clampf(speed / 35.0, 0.0, 1.0))
+	_puddle_sfx.pitch_scale = randf_range(0.9, 1.15)
+	_puddle_sfx.play()
+
+
+## A small spray of muddy water off each rear wheel: the grit's particle set-up (same material flags, so nothing new to
+## compile), lighter, falling back fast.
+func _make_puddle_spray() -> void:
+	for wn in ["RL", "RR"]:
+		var pivot = get_node_or_null("Visuals/WheelPivot" + wn)
+		if not pivot:
+			continue
+		var g := CPUParticles3D.new()
+		g.name = wn + "_PuddleSpray"
+		g.emitting = false
+		g.amount = 28
+		g.lifetime = 0.45
+		g.randomness = 0.5
+		g.lifetime_randomness = 0.3
+		g.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+		g.emission_sphere_radius = 0.12
+		var quad := QuadMesh.new()
+		quad.size = Vector2(0.07, 0.07)
+		g.mesh = quad
+		g.local_coords = false
+		g.top_level = true
+		g.set_meta("pivot", pivot)
+		var mat := StandardMaterial3D.new()
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+		mat.alpha_scissor_threshold = 0.5
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		mat.vertex_color_use_as_albedo = true
+		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		mat.albedo_texture = _get_grit_texture()
+		g.material_override = mat
+		g.color = Color(0.66, 0.62, 0.54)
+		g.direction = Vector3(0.0, 1.0, 0.8).normalized()
+		g.spread = 35.0
+		g.gravity = Vector3(0, -16.0, 0)
+		g.initial_velocity_min = 1.5
+		g.initial_velocity_max = 4.0
+		g.scale_amount_min = 0.6
+		g.scale_amount_max = 1.4
+		visuals.add_child(g)
+		_puddle_spray.append(g)
+
+
+## The shield's mesh, hum and sounds from `is_shielded` (see SHIELD_TIME).
+func _update_shield_visual(delta: float) -> void:
+	if is_shielded and not _shield_prev:
+		_shield_age = 0.0
+		_shield_gone = -1.0
+		_play_shield_sfx(SHIELD_UP_SOUND, 9.0)
+	elif not is_shielded and _shield_prev:
+		# Ran out, or broken by a hit before its time.
+		_shield_broken = _shield_age < SHIELD_TIME - 0.4
+		_shield_gone = 0.0
+		_play_shield_sfx(SHIELD_BREAK_SOUND if _shield_broken else SHIELD_DOWN_SOUND, 0.0 if _shield_broken else 2.0)
+	_shield_prev = is_shielded
+	var mat := shield_mesh.material_override as StandardMaterial3D
+	var time: float = Time.get_ticks_msec() * 0.001
+	if is_shielded:
+		_shield_age += delta
+		shield_mesh.visible = true
+		# Forming: out of the car to a little past full size and back (an elastic ease), bright at first.
+		var f: float = clampf(_shield_age / SHIELD_FORM, 0.0, 1.0)
+		var grow: float = 1.0 - pow(1.0 - f, 3.0) * cos(f * PI * 2.5) if f < 1.0 else 1.0
+		var flash: float = 1.0 - f
+		# Buzzing scale oscillation
+		var scale_osc: float = 1.0 + 0.04 * sin(time * 25.0) + 0.015 * cos(time * 47.0)
+		shield_mesh.scale = Vector3.ONE * maxf(scale_osc * grow, 0.05)
+		if mat:
+			var alpha_osc: float = 0.35 + 0.15 * sin(time * 35.0) + 0.45 * flash
+			var energy_osc: float = 1.2 + 0.4 * sin(time * 30.0) + 0.2 * cos(time * 60.0) + 5.0 * flash
+			# Running out: it flickers, faster toward the end.
+			var left: float = SHIELD_TIME - _shield_age
+			if left < SHIELD_WARN:
+				var rate: float = lerpf(5.0, 12.0, 1.0 - left / SHIELD_WARN)
+				var on: float = 1.0 if fmod(time * rate, 1.0) < 0.6 else 0.25
+				alpha_osc *= on
+				energy_osc *= on
+			mat.albedo_color.a = alpha_osc
+			mat.emission_energy_multiplier = energy_osc
+		# Play and modulate shield sound — deep low hum with very slow wobble
+		if not sfx_shield_loop.playing:
+			sfx_shield_loop.play()
+		sfx_shield_loop.pitch_scale = 0.28 + 0.04 * sin(time * 2.5)
+		sfx_shield_loop.volume_db = 4.0 + 1.5 * cos(time * 3.0)
+		return
+	if sfx_shield_loop.playing:
+		sfx_shield_loop.stop()
+	if _shield_gone < 0.0:
+		shield_mesh.visible = false
+		shield_mesh.scale = Vector3.ONE
+		return
+	# Going: broken, it bursts outward in a flash; run out, it swells a little and fades.
+	_shield_gone += delta
+	var dur: float = SHIELD_BURST if _shield_broken else SHIELD_FADE
+	var u: float = clampf(_shield_gone / dur, 0.0, 1.0)
+	if u >= 1.0:
+		_shield_gone = -1.0
+		shield_mesh.visible = false
+		shield_mesh.scale = Vector3.ONE
+		return
+	shield_mesh.visible = true
+	var out: float = 1.0 - pow(1.0 - u, 2.0)
+	shield_mesh.scale = Vector3.ONE * (1.0 + (0.8 if _shield_broken else 0.3) * out)
+	if mat:
+		mat.albedo_color.a = (0.75 if _shield_broken else 0.4) * (1.0 - u)
+		mat.emission_energy_multiplier = (7.0 if _shield_broken else 2.0) * (1.0 - u)
+
+
+func _play_shield_sfx(stream: AudioStream, db: float) -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	if _shield_sfx == null:
+		_shield_sfx = AudioStreamPlayer3D.new()
+		_shield_sfx.name = "SFX_ShieldFx"
+		_shield_sfx.bus = &"SFX"
+		_shield_sfx.unit_size = 18.0
+		_shield_sfx.max_distance = 120.0
+		visuals.add_child(_shield_sfx)
+	_shield_sfx.stream = stream
+	_shield_sfx.volume_db = db
+	_shield_sfx.play()
+
+
 @rpc("any_peer", "call_local", "reliable")
 func client_start_shield():
 	_activate_shield()
@@ -4162,37 +4384,8 @@ func client_break_shield():
 	shield_mesh.scale = Vector3.ONE
 
 func _update_visual_states(delta):
-	# Sync shield visual and audio
-	if shield_mesh.visible != is_shielded:
-		shield_mesh.visible = is_shielded
-		if not is_shielded:
-			shield_mesh.scale = Vector3.ONE
-	
-	if not is_shielded:
-		if sfx_shield_loop.playing:
-			sfx_shield_loop.stop()
-	
-	if is_shielded:
-		var time = Time.get_ticks_msec() * 0.001
-		# Buzzing scale oscillation
-		var scale_osc = 1.0 + 0.04 * sin(time * 25.0) + 0.015 * cos(time * 47.0)
-		shield_mesh.scale = Vector3(scale_osc, scale_osc, scale_osc)
-		
-		# Modulate the duplicated material
-		var mat = shield_mesh.material_override as StandardMaterial3D
-		if mat:
-			var alpha_osc = 0.35 + 0.15 * sin(time * 35.0)
-			mat.albedo_color.a = alpha_osc
-			
-			var energy_osc = 1.2 + 0.4 * sin(time * 30.0) + 0.2 * cos(time * 60.0)
-			mat.emission_energy_multiplier = energy_osc
+	_update_shield_visual(delta)
 
-		# Play and modulate shield sound — deep low hum with very slow wobble
-		if not sfx_shield_loop.playing:
-			sfx_shield_loop.play()
-		sfx_shield_loop.pitch_scale = 0.28 + 0.04 * sin(time * 2.5)
-		sfx_shield_loop.volume_db = 4.0 + 1.5 * cos(time * 3.0)
-	
 	# Explosion visual details (parts physics and fade out)
 	if is_exploding:
 		explosion_time += delta
@@ -4610,6 +4803,8 @@ func drown():
 	
 	# Force-clear the shield — it must not persist into the respawn
 	is_shielded = false
+	_shield_prev = false
+	_shield_gone = -1.0
 	shield_mesh.visible = false
 	shield_mesh.scale = Vector3.ONE
 	sfx_shield_loop.stop()
@@ -4903,6 +5098,8 @@ func _apply_respawn_pose() -> void:
 	visuals.visible = true
 	# Clear shield in case it was active when the player drowned
 	is_shielded = false
+	_shield_prev = false
+	_shield_gone = -1.0
 	shield_mesh.visible = false
 	shield_mesh.scale = Vector3.ONE
 	sfx_shield_loop.stop()
@@ -5313,8 +5510,8 @@ func _spawn_missile_rpc(spawn_pos: Vector3, spawn_rot: Vector3, shooter_id: int,
 func _activate_shield():
 	is_shielded = true
 	shield_mesh.visible = true
-	# Shield lasts 10 seconds
-	get_tree().create_timer(10.0).timeout.connect(_on_shield_timeout.bind())
+	# Shield lasts SHIELD_TIME seconds
+	get_tree().create_timer(SHIELD_TIME).timeout.connect(_on_shield_timeout.bind())
 
 func _on_shield_timeout():
 	is_shielded = false
@@ -8221,6 +8418,9 @@ func _ai_route_local(d: float) -> Vector3:
 	return active_path.to_local(p)
 
 
+## Seconds a bot waits after using an item before it may use the next.
+const AI_ITEM_GAP := 2.5
+
 func _process_ai_items(delta: float):
 	if current_item == ItemType.NONE:
 		return
@@ -8298,6 +8498,9 @@ func _process_ai_items(delta: float):
 			
 	if should_use:
 		_use_item()
+		# A pause before the second slot's item: checked again every 0.25s, a bot holding two shockwaves (or bombs) fired
+		# the second a quarter of a second after the first, which looked like one shockwave going off twice.
+		ai_item_timer = -AI_ITEM_GAP
 
 ## Plans the start's camera move (StartIntroCamera.choose: the start that sees the car best, round the houses and
 ## trees beside the grid) and holds the camera at its first pose. Level calls it once the grid has settled, under the
