@@ -196,6 +196,7 @@ func build_body(b) -> void:
 	_suspension(b, AXLE_R, false)
 	_frame_side(b)
 	_fin(b, 0.280)
+	_engine_side(b)
 	b.mirror_x(v0, i0)
 	_cage_centre(b)
 	_windscreen(b)
@@ -203,6 +204,7 @@ func build_body(b) -> void:
 	_chassis(b)
 	_front_parts(b)
 	_rear_parts(b)
+	_engine_centre(b)
 
 
 ## Right-hand trim on the body: lamps, inner wheel well liner.
@@ -446,7 +448,7 @@ func _front_parts(b) -> void:
 				Color(1, 1, 1), true, true)
 
 
-## The tail: rear bumper under the cowl, twin bronze exhausts, diffuser.
+## The tail: rear bumper under the cowl and its struts, diffuser (the exhausts are the engine's).
 func _rear_parts(b) -> void:
 	b.tube(_rounded([Vector3(-0.300, 0.440, 0.820), Vector3(-0.260, 0.420, 0.940), Vector3(0.260, 0.420, 0.940),
 			Vector3(0.300, 0.440, 0.820)], 0.07), 0.015, 10, CB.M_DARK, C_PLASTIC, true, true)
@@ -455,12 +457,110 @@ func _rear_parts(b) -> void:
 				CB.M_DARK, C_PLASTIC, false, false)
 		b.tube(PackedVector3Array([Vector3(0.100 * sx, 0.230, 0.880), Vector3(0.100 * sx, 0.420, 0.940)]), 0.010, 8,
 				CB.M_DARK, C_PLASTIC, false, false)
-		var ez: float = 0.950
-		b.tube(_rounded([Vector3(0.090 * sx, 0.330, 0.700), Vector3(0.110 * sx, 0.480, 0.840),
-				Vector3(0.110 * sx, 0.510, ez)], 0.05), 0.020, 14, CB.M_ALLOY, C_BRONZE, false, false)
-		b.disc(Vector3(0.110 * sx, 0.510, ez - 0.004), Vector3.BACK, 0.018, 0.0, 14, CB.M_DARK, C_DARKER)
 	b.rbox(Transform3D(Basis(Vector3.RIGHT, -0.45), Vector3(0.0, 0.240, 0.920)), Vector3(0.130, 0.008, 0.070), 0.005, 1,
 			CB.M_ALLOY, C_ALLOY_DARK)
+
+
+## The engine, right half: a flat-six slung under the rear cowl between the seats and the rear axle
+## (ENGINE_Z0..Z1), its crankcase on the spine. Three finned cylinders out to the side, a head with
+## spark plugs and a valve cover in the accent colour, intake runners from the plenum on top, and
+## headers from under the head into a collector that runs back past the rear gearbox (above the half
+## shaft, under the upper arm's pivot) into the silencer.
+const ENGINE_Z := [0.395, 0.470, 0.545]       # the cylinders' axes
+const ENGINE_Y := 0.330
+const ENGINE_HEAD_X := 0.212
+
+
+func _engine_side(b) -> void:
+	for z in ENGINE_Z:
+		# Barrel and its cooling fins.
+		b.tube(PackedVector3Array([Vector3(0.080, ENGINE_Y, z), Vector3(0.190, ENGINE_Y, z)]), 0.030, 14, CB.M_ALLOY,
+				C_ALLOY_DARK, false, false)
+		for k in 7:
+			var fx: float = 0.098 + 0.0135 * k
+			b.tube(PackedVector3Array([Vector3(fx - 0.0022, ENGINE_Y, z), Vector3(fx + 0.0022, ENGINE_Y, z)]), 0.0355,
+					14, CB.M_ALLOY, C_ALLOY, true, true)
+		# Spark plug and its boot on top of the head.
+		b.tube(PackedVector3Array([Vector3(ENGINE_HEAD_X, ENGINE_Y + 0.030, z + 0.018),
+				Vector3(ENGINE_HEAD_X, ENGINE_Y + 0.058, z + 0.018)]), 0.0075, 8, CB.M_DARK, C_DARKER, false, true)
+		b.tube(PackedVector3Array([Vector3(ENGINE_HEAD_X, ENGINE_Y + 0.056, z + 0.018), Vector3(0.150, 0.402, z + 0.030),
+				Vector3(0.050, 0.404, z + 0.034)]), 0.0032, 5, CB.M_TAILLAMP, C_TAILLAMP, false, false)
+		# Intake runner from the plenum down onto the head.
+		b.tube(_rounded([Vector3(0.020, 0.398, z - 0.016), Vector3(0.150, 0.396, z - 0.016),
+				Vector3(ENGINE_HEAD_X - 0.010, ENGINE_Y + 0.030, z - 0.016)], 0.03, 5), 0.011, 10, CB.M_ALLOY,
+				C_ALLOY, false, false)
+		# Header: out of the head's underside, down and back into the collector.
+		b.tube(_rounded([Vector3(ENGINE_HEAD_X, ENGINE_Y - 0.030, z), Vector3(0.214, 0.262, z + 0.018),
+				Vector3(0.190, 0.258, 0.600), Vector3(0.175, 0.262, 0.625)], 0.025, 5), 0.0105, 10, CB.M_ALLOY,
+				C_BRONZE, false, false)
+	# Cylinder head and the valve cover on it.
+	b.rbox(Transform3D(Basis(), Vector3(ENGINE_HEAD_X, ENGINE_Y, 0.470)), Vector3(0.022, 0.034, 0.112), 0.010, 2,
+			CB.M_ALLOY, C_ALLOY_DARK)
+	b.rbox(Transform3D(Basis(), Vector3(ENGINE_HEAD_X + 0.026, ENGINE_Y, 0.470)), Vector3(0.010, 0.030, 0.104), 0.008, 2,
+			CB.M_ANODISED, Color(1, 1, 1))
+	for k in 5:
+		b.rbox(Transform3D(Basis(), Vector3(ENGINE_HEAD_X + 0.037, ENGINE_Y - 0.020 + 0.010 * k, 0.470)),
+				Vector3(0.002, 0.0025, 0.090), 0.0015, 1, CB.M_ANODISED, Color(1, 1, 1))
+	for z in [0.375, 0.565]:
+		b.tube(PackedVector3Array([Vector3(ENGINE_HEAD_X + 0.034, ENGINE_Y + 0.022, z),
+				Vector3(ENGINE_HEAD_X + 0.040, ENGINE_Y + 0.022, z)]), 0.004, 6, CB.M_CHROME, C_CHROME, false, true)
+	# Collector: back past the gearbox, over the half shaft, into the silencer's front.
+	b.tube(_rounded([Vector3(0.175, 0.262, 0.625), Vector3(0.172, 0.300, 0.690), Vector3(0.168, 0.322, 0.760),
+			Vector3(0.150, 0.330, 0.822)], 0.03, 5), 0.0145, 12, CB.M_ALLOY, C_BRONZE, true, false)
+	# Tailpipe out of the silencer's back, under the bumper, with a rolled tip.
+	var tp0 := Vector3(0.145, 0.333, 0.880)
+	var tp1 := Vector3(0.145, 0.345, 0.985)
+	b.tube(PackedVector3Array([tp0, tp1]), 0.017, 14, CB.M_ALLOY, C_BRONZE, false, false)
+	b.tube(PackedVector3Array([tp1 - Vector3(0.0, 0.002, 0.030), tp1 + Vector3(0.0, 0.0, 0.004)]), 0.0215, 16, CB.M_ALLOY,
+			C_BRONZE_DARK, true, false)
+	b.disc(tp1 + Vector3(0.0, 0.0, 0.0045), Vector3.BACK, 0.019, 0.0, 16, CB.M_DARK, C_DARKER)
+	# Engine mount: a block from the crankcase's flank onto the spine.
+	b.rbox(Transform3D(Basis(), Vector3(0.090, 0.272, 0.470)), Vector3(0.016, 0.014, 0.030), 0.005, 1, CB.M_DARK, C_DARK)
+
+
+## The engine's parts on the centre line: crankcase, sump, plenum and its air filter, the pulley at
+## the front, the silencer behind the gearbox.
+func _engine_centre(b) -> void:
+	b.rbox(Transform3D(Basis(), Vector3(0.0, ENGINE_Y, 0.470)), Vector3(0.085, 0.060, 0.125), 0.025, 3, CB.M_ALLOY,
+			C_ALLOY_DARK)
+	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.272, 0.480)), Vector3(0.070, 0.016, 0.100), 0.010, 2, CB.M_DARK, C_DARK)
+	for k in 5:
+		b.rbox(Transform3D(Basis(), Vector3(0.0, 0.265, 0.400 + 0.035 * k)), Vector3(0.068, 0.012, 0.0025), 0.002, 1,
+				CB.M_DARK, C_DARKER)
+	# Crankcase seam.
+	b.rbox(Transform3D(Basis(), Vector3(0.0, ENGINE_Y, 0.470)), Vector3(0.0035, 0.062, 0.127), 0.002, 1, CB.M_ALLOY,
+			C_ALLOY)
+	# Plenum along the top and the air filter on its back end.
+	b.tube(PackedVector3Array([Vector3(0.0, 0.400, 0.365), Vector3(0.0, 0.400, 0.580)]), 0.022, 16, CB.M_ALLOY, C_ALLOY,
+			true, false)
+	b.tube(PackedVector3Array([Vector3(0.0, 0.400, 0.580), Vector3(0.0, 0.400, 0.600)]), 0.016, 12, CB.M_ALLOY,
+			C_ALLOY_DARK, false, false)
+	var fc := Vector3(0.0, 0.398, 0.600)
+	b.lathe(fc, Vector3.BACK, PackedVector2Array([Vector2(0.0, 0.018), Vector2(0.006, 0.030), Vector2(0.050, 0.026),
+			Vector2(0.056, 0.020), Vector2(0.058, 0.0)]), 16, CB.M_ANODISED, Color(1, 1, 1))
+	for k in 4:
+		var rz: float = 0.616 + 0.011 * k
+		b.tube(PackedVector3Array([fc + Vector3(0.0, 0.0, rz - 0.600 - 0.002), fc + Vector3(0.0, 0.0, rz - 0.600 + 0.002)]),
+				0.030 - 0.0007 * k, 16, CB.M_DARK, C_DARKER, false, false)
+	# Pulley and belt on the front, behind the seats.
+	b.disc(Vector3(0.0, 0.318, 0.343), Vector3.FORWARD, 0.030, 0.0, 16, CB.M_DARK, C_DARK)
+	b.tube(PackedVector3Array([Vector3(0.0, 0.318, 0.336), Vector3(0.0, 0.318, 0.344)]), 0.031, 16, CB.M_ALLOY,
+			C_ALLOY, true, true)
+	b.tube(PackedVector3Array([Vector3(0.045, 0.372, 0.338), Vector3(0.045, 0.372, 0.346)]), 0.016, 12, CB.M_ALLOY,
+			C_ALLOY, true, true)
+	b.rbox(Transform3D(Basis(Vector3.FORWARD, -0.86), Vector3(0.023, 0.345, 0.340)), Vector3(0.006, 0.040, 0.0035),
+			0.002, 1, CB.M_DARK, C_DARKER)
+	# The silencer across the back, behind the gearbox, in heat-wrap bands.
+	var s0 := Vector3(-0.170, 0.333, 0.852)
+	var s1 := Vector3(0.170, 0.333, 0.852)
+	b.tube(PackedVector3Array([s0, s1]), 0.038, 18, CB.M_ALLOY, C_BRONZE, false, false)
+	for sx in [-1.0, 1.0]:
+		var e := Vector3(0.170 * sx, 0.333, 0.852)
+		b.tube(PackedVector3Array([e - Vector3(0.012 * sx, 0, 0), e + Vector3(0.004 * sx, 0, 0)]), 0.041, 18, CB.M_ALLOY,
+				C_BRONZE_DARK, false, true)
+		for bx in [0.060, 0.120]:
+			b.tube(PackedVector3Array([Vector3(bx * sx - 0.004, 0.333, 0.852), Vector3(bx * sx + 0.004, 0.333, 0.852)]),
+					0.0395, 18, CB.M_DARK, C_DARK, false, false)
 
 
 ## A wheel centred on the origin, axle along X: a tall mud-terrain tyre with aggressive directional
