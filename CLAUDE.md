@@ -3835,3 +3835,53 @@ in `generated/` (each run deletes them first).
   12.2ms GPU on average, the worst 15.4ms. `res://scratch/zeche_ground_heights.gd` (`-s`, headless, `-- [level=] x,z ...`)
   prints the ground under points (to aim look_shots' cameras).
 - Menu tile `images/menu/tile_zeche.jpg` (the yard with the Malakoff tower, the headframe and the washer, look_shots).
+
+## Quer durch Kronburg (Kronburg GP, stage 4, the finale)
+
+A point-to-point rally sprint (one run, no laps) of about 6km straight across Kronburg on a late-summer morning. Files and
+code keep "stadtrallye" (`StadtrallyeLevel.tscn`, `regenerate_stadtrallye.gd`, `stadtrallye*` in `generated/`, which
+each run deletes first).
+
+- `regenerate_stadtrallye.gd` (`regenerate_stadtrallye.tscn`, headless, about 65s, a 2GB peak; its header explains the
+  route, the profile, the grading, the kits and the hazards): the Kaiserstraße start before the Hauptbahnhof, the moat
+  bridge, the pedestrian zone past Kaufhaus Krone, under the railway, across the Ring between its traffic and trams, the
+  Botanischer Garten (the parterre, through the Palmenhaus, the rose pergola, the lily pond's bridge, the Alpinum's
+  hairpins, the belvedere, the leap off the terrace), down the Hafenstraße into the docks (the demolition site's wrecking
+  ball, the scrapyard's magnet crane, the building site's excavator, dirt kicker, car park and road roller) to the finish
+  at the old gasworks.
+- Kits (life size, grown by PROP_SCALE 1.6, batched by `_add_prop`): the generator calls builders by name through
+  `_kit_call`, which warns once and skips one that is missing, also through wrappers (`_garden_prop`, the Ring's vehicle
+  list, the site's material list, the scrapyard's bins), so grep for both when checking a kit is complete.
+  `StadtKit.gd` (the Hauptbahnhof, the railway's bridges and walled embankment, Kaufhaus Krone, the fountain, café
+  terraces, the U-Bahn entrance, trams and the Ring's cars, buses and trucks, the tram stop, catenary masts, traffic
+  lights, the temporary grandstand), `GardenKit.gd` (the Palmenhaus, plants, gates and fences, beds, the stone bridges,
+  the belvedere, terrace walls, steps, balustrades, hedges, the Alpinum's stones and cushions, the parterre fountain),
+  `ScrapKit.gd` (the crawler crane and its wrecking ball, the ruined office block, rubble and scrap heaps, bale walls, the
+  magnet handler, the baler, the yard's office, weighbridge, fence, skips and bins), `BaustelleKit.gd` (the tower crane,
+  the excavator, the road roller, the site's gear). Windowed previews: `scratch/stadt_preview.gd`, `garden_preview.gd`,
+  `scrap_preview.gd`, `baustelle_preview.gd`; `scratch/scrap_contract_check.gd` (headless) builds ScrapKit's props as
+  their call sites do. The stone bridges are driven over: their decks lie 5cm (life) under the road's ribbon, on
+  `GardenKit.bridge_deck_y`, the generator's own crest profile.
+- The hazards run on the wall clock (CrossTraffic.gd, WreckingBall.gd, SlewHazard.gd, ShuttleProp.gd). Each one the
+  route meets has a HazardGate.gd (group "rail_crossings", so bots wait at it as at a level crossing), which opens only
+  for an arrival with the road clear from `lead` + 1s before to `trail` + 1s after. The free-swinging ball was clear of
+  the road for 3.6s of every 10s, the gate never opened and every bot sat at it for good: the ball is now held still for
+  `hold` (BALL_HOLD, 4.5s) at the far end of its swing. `res://scratch/hazard_gate_probe.gd` (`-s`, headless, `--
+  [level=]`) prints each gate's cycle, when its hazard covers the road and the share of arrivals it lets through (the
+  Ring 23%, the ball 25%, the magnet crane 38%, the excavator 31%): 0% holds the bots for good.
+- PlayerCart's 2.8s stuck check starts its window again while a bot is held at a crossing or gate (`_ai_crossing_hold`):
+  checked only at the window's end, a bot let go just before it had barely moved off the line and was respawned 200m back.
+- The water: the moat (deep enough to drown in: `water_bounds_min`/`max`), the lily pond and the canal, wound clockwise
+  from above (`_water_strips`, the pond's fan): wound the other way all three were culled and showed no water. The
+  bridges' spans are `_deck_zones`, left to the natural ground by `_grade`: the last graded sample's flat band and
+  shoulders had wrapped round into the spans and dammed the moat and the pond, burying the side arches.
+- The terrace: the pads "terrace" (10cm under the walls' coping) and "terrace_below" (the steps' foot) meet at
+  `_terrace_cut`, inside the retaining walls' thickness, on terrain grid lines of their own (`_with_line`; the grid is
+  5m, too coarse to hold the step); beside the drop each side is graded only from the road on its own level
+  (`_grade`'s `terrace_side`), or the lawn banked up half the walls' height. The route runs due south there (the cut
+  assumes it, and errors if not).
+- `_build_city_blocks` once never advanced `bx`: the runaway filled the system disk with swap (everything stopped,
+  "disk full") and then rebooted the Mac. Run this generator, as any, under a watchdog on the process's footprint
+  (`top -stats mem`), swap and the system disk's free space: RSS stays low once macOS swaps the process out.
+- AI races (`scratch/ai_race_test`, speed=1 only: the hazards run on the wall clock; `noitems=1`): every bot finishes,
+  in 190-265s. Music `MusicManager.STAGE_TRACKS["stadtrallye"]`; its sounds are in `sounds/stadtrallye/` (tools/elevenlabs).

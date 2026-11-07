@@ -65,6 +65,9 @@ const STAGES := {
 	# Zeche Kronprinz: a morning's birds over the scrub, the town far off; the Kokerei, the crows, the conveyor and the
 	# quench tower are 3D (the generator's).
 	"ZecheLevel": [["insects_birds", -32.0], ["city", -46.0]],
+	# Quer durch Kronburg: the city all round, birds in the garden; the Ring's traffic, the trams, the sites' machines and
+	# the wrecking ball are 3D (the generator's and the hazards' own).
+	"StadtrallyeLevel": [["city", -36.0], ["insects_birds", -40.0]],
 	"FrostpeakCreekLevel": [["blizzard", -37.0]],
 	"GlacierHighwayLevel": [["blizzard", -37.0]],
 	"FrostfallGorgeLevel": [["blizzard", -36.0]],

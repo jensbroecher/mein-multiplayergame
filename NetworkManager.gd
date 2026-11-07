@@ -81,6 +81,7 @@ const ALL_STAGES = [
 	{"name": "Kronburger Hütte", "path": "res://levels/KronburgLevel.tscn"},
 	{"name": "Rheinufer", "path": "res://levels/RheinuferLevel.tscn"},
 	{"name": "Zeche Kronprinz", "path": "res://levels/ZecheLevel.tscn"},
+	{"name": "Quer durch Kronburg", "path": "res://levels/StadtrallyeLevel.tscn"},
 ]
 
 const GP_CUPS = {
@@ -135,6 +136,7 @@ const GP_CUPS = {
 			"res://levels/KronburgLevel.tscn",
 			"res://levels/RheinuferLevel.tscn",
 			"res://levels/ZecheLevel.tscn",
+			"res://levels/StadtrallyeLevel.tscn",
 		]
 	}
 }

@@ -278,5 +278,149 @@
     "duration": 10.0,
     "loop": true,
     "influence": 0.5
+  },
+  {
+    "name": "sr_tram_bell_1",
+    "path": "sounds/stadtrallye/tram_bell_1.wav",
+    "text": "A modern German city tram's warning gong: two quick bright metallic dings, outdoors on a street",
+    "duration": 2.0,
+    "loop": false,
+    "influence": 0.7
+  },
+  {
+    "name": "sr_tram_bell_2",
+    "path": "sounds/stadtrallye/tram_bell_2.wav",
+    "text": "A city tram driver ringing the tram's warning bell three times urgently, bright metallic gong, outdoors",
+    "duration": 2.5,
+    "loop": false,
+    "influence": 0.7
+  },
+  {
+    "name": "sr_car_horn_1",
+    "path": "sounds/stadtrallye/car_horn_1.wav",
+    "text": "A small European hatchback car honking its horn once, short and annoyed, outdoors on a city street",
+    "duration": 1.2,
+    "loop": false,
+    "influence": 0.7
+  },
+  {
+    "name": "sr_car_horn_2",
+    "path": "sounds/stadtrallye/car_horn_2.wav",
+    "text": "An angry driver leaning on the car horn, a long continuous honk then two short ones, city street",
+    "duration": 2.0,
+    "loop": false,
+    "influence": 0.7
+  },
+  {
+    "name": "sr_car_horn_3",
+    "path": "sounds/stadtrallye/car_horn_3.wav",
+    "text": "A city bus or delivery truck sounding its deep horn, one long blast, city street",
+    "duration": 1.8,
+    "loop": false,
+    "influence": 0.7
+  },
+  {
+    "name": "sr_tram_pass",
+    "path": "sounds/stadtrallye/tram_pass_loop.wav",
+    "text": "A modern low-floor tram rolling along a city street: electric motor whine, steel wheels on grooved rails, soft rumble and clicks over rail joints, continuous",
+    "duration": 8.0,
+    "loop": true,
+    "influence": 0.5
+  },
+  {
+    "name": "sr_ring_traffic",
+    "path": "sounds/stadtrallye/ring_traffic_loop.wav",
+    "text": "Busy four-lane city ring road traffic heard from the pavement: cars, vans and buses passing continuously at fifty kilometres an hour, tyre noise and engines, no horns, continuous",
+    "duration": 20.0,
+    "loop": true,
+    "influence": 0.45
+  },
+  {
+    "name": "sr_ball_crash_1",
+    "path": "sounds/stadtrallye/wrecking_ball_crash_1.wav",
+    "text": "A heavy steel wrecking ball smashing into a concrete building wall: a huge crash, concrete cracking and crumbling, rubble and debris falling, dust",
+    "duration": 4.0,
+    "loop": false,
+    "influence": 0.6
+  },
+  {
+    "name": "sr_ball_crash_2",
+    "path": "sounds/stadtrallye/wrecking_ball_crash_2.wav",
+    "text": "A demolition wrecking ball hitting a reinforced concrete facade: deep booming impact, glass and concrete shattering, chunks tumbling down",
+    "duration": 4.0,
+    "loop": false,
+    "influence": 0.6
+  },
+  {
+    "name": "sr_ball_clang",
+    "path": "sounds/stadtrallye/wrecking_ball_clang.wav",
+    "text": "A heavy swinging steel wrecking ball hitting a small car: a loud metallic clang and a crunch of bent metal",
+    "duration": 2.0,
+    "loop": false,
+    "influence": 0.65
+  },
+  {
+    "name": "sr_ball_whoosh",
+    "path": "sounds/stadtrallye/wrecking_ball_whoosh.wav",
+    "text": "A huge steel wrecking ball on a chain swinging past close by: a deep heavy whoosh of air and the rattle of the steel chain",
+    "duration": 3.0,
+    "loop": false,
+    "influence": 0.6
+  },
+  {
+    "name": "sr_handler",
+    "path": "sounds/stadtrallye/handler_hydraulics_loop.wav",
+    "text": "A scrapyard material handler crane slewing: diesel engine revving under load and a whining hydraulic pump, steel creaking, continuous",
+    "duration": 8.0,
+    "loop": true,
+    "influence": 0.5
+  },
+  {
+    "name": "sr_magnet_clang",
+    "path": "sounds/stadtrallye/magnet_clang.wav",
+    "text": "Heavy scrap metal clanging: a crushed car swinging on a crane magnet bangs into steel, loud metallic clang and rattle",
+    "duration": 2.0,
+    "loop": false,
+    "influence": 0.6
+  },
+  {
+    "name": "sr_excavator",
+    "path": "sounds/stadtrallye/excavator_loop.wav",
+    "text": "A large tracked excavator working on a building site: diesel engine under load, hydraulic arm whine, the bucket scraping soil, continuous",
+    "duration": 8.0,
+    "loop": true,
+    "influence": 0.5
+  },
+  {
+    "name": "sr_roller",
+    "path": "sounds/stadtrallye/roller_loop.wav",
+    "text": "A vibratory road roller compacting a gravel road: diesel engine and a deep rhythmic thrumming drum vibration, continuous",
+    "duration": 8.0,
+    "loop": true,
+    "influence": 0.5
+  },
+  {
+    "name": "sr_beeper",
+    "path": "sounds/stadtrallye/reverse_beeper_loop.wav",
+    "text": "A construction vehicle's reversing alarm: a steady electronic beep beep beep, continuous",
+    "duration": 4.0,
+    "loop": true,
+    "influence": 0.7
+  },
+  {
+    "name": "sr_site",
+    "path": "sounds/stadtrallye/site_ambience_loop.wav",
+    "text": "A busy construction site in a city: distant hammering, a circular saw now and then, a concrete mixer turning, machines rumbling, workers' tools clanking, continuous",
+    "duration": 20.0,
+    "loop": true,
+    "influence": 0.45
+  },
+  {
+    "name": "sr_scrapyard",
+    "path": "sounds/stadtrallye/scrapyard_ambience_loop.wav",
+    "text": "A scrapyard at work: scrap metal being dropped and clattering onto piles, a crane's engine, steel creaking and banging, continuous",
+    "duration": 20.0,
+    "loop": true,
+    "influence": 0.45
   }
 ]

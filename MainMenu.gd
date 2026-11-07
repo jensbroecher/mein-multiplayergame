@@ -54,6 +54,7 @@ const STAGE_INFO := {
 	"res://levels/MtaaNightsLevel.tscn": {"title": "MTAA NIGHTS", "subtitle": "Evening in the city: market streets, murram back roads, the park and Club Kilele's dancefloor. Tarmac or dirt: pick your route", "file": "tile_mtaa_nights.jpg", "color": COL_MAGENTA},
 	"res://levels/KronburgLevel.tscn": {"title": "KRONBURGER HÜTTE", "subtitle": "The canal, through the steelworks' rolling mill hall and round the blast furnace, up through the colliery estate into the half-timbered old town and over its cobbled market square", "file": "tile_kronburg.jpg", "color": COL_KRONBURG},
 	"res://levels/RheinuferLevel.tscn": {"title": "RHEINUFER", "subtitle": "Down the Rhine promenade, over the old steel-arch bridge, along the dyke past the sheep and the fun fair, round the Autobahn's loop ramp and back over the river on the cable-stayed bridge", "file": "tile_rheinufer.jpg", "color": COL_KRONBURG},
+	"res://levels/StadtrallyeLevel.tscn": {"title": "QUER DURCH KRONBURG", "subtitle": "The finale, one run across town: over the moat bridge, through the pedestrian zone, across the Ring between cars and trams, through the Palmenhaus and up the botanical garden's Alpinum, past the wrecking ball, the scrapyard's magnet and the building site to the old gasworks", "file": "tile_stadtrallye.jpg", "color": COL_KRONBURG},
 	"res://levels/ZecheLevel.tscn": {"title": "ZECHE KRONPRINZ", "subtitle": "Off-road through the old colliery: under the coal washer, past the coke ovens and the steaming quench tower, up the spoil heap, a leap off its plateau, through the birch scrub and the settling ponds, over the pit railway", "file": "tile_zeche.jpg", "color": COL_KRONBURG},
 	"res://levels/MsituFallsLevel.tscn": {"title": "MSITU FALLS", "subtitle": "Rainforest hairpins, a mud bend, a rope bridge over the brink, behind the falls, and tropical downpours", "file": "tile_msitu_falls.jpg", "color": COL_JUNGLE},
 }
@@ -318,7 +319,7 @@ func show_sub_menu(menu_name: String) -> void:
 			_add_tile("MATUMAINI GP", "Mara Crossing  •  Nyota Stadium  •  Msitu Falls", "tile_matumaini_gp.jpg", COL_SAVANNA, func():
 				_on_cup_selected("Matumaini GP")
 			)
-			_add_tile("KRONBURG GP", "Kronburger Hütte  •  Rheinufer  •  Zeche Kronprinz", "tile_kronburg_gp.jpg", COL_KRONBURG, func():
+			_add_tile("KRONBURG GP", "Kronburger Hütte  •  Rheinufer  •  Zeche Kronprinz  •  Quer durch Kronburg", "tile_kronburg_gp.jpg", COL_KRONBURG, func():
 				_on_cup_selected("Kronburg GP")
 			)
 		"stage_select":

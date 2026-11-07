@@ -2018,6 +2018,12 @@ func _physics_process(delta):
 
 	# AI Stuck & Off-Track Fall Detection
 	if is_ai and can_move and not is_exploding and not is_finished_race and respawn_indicator_time <= 0.0 and has_physics_authority:
+		# Waiting at a crossing or hazard gate: the window starts again from the line once it lets the bot go. Checked
+		# only at the window's end, a bot let go just before it had barely moved off the line and was respawned 200m
+		# back (Quer durch Kronburg's magnet crane, whose gate opens every 18s).
+		if _ai_crossing_hold:
+			ai_stuck_position_timer = 0.0
+			ai_last_stuck_position = global_position
 		ai_stuck_position_timer += delta
 		if ai_stuck_position_timer >= 2.8:
 			ai_stuck_position_timer = 0.0

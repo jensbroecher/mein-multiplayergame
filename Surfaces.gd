@@ -34,6 +34,7 @@ const LEVELS := {
 		"dust": {GRAVEL: Color(0.80, 0.56, 0.42, 0.6)}},
 	"CanyonLevel": {"road": ASPHALT, "ground": GRAVEL},
 	"KronburgLevel": {"road": ASPHALT, "ground": GRASS, "dust": {GRAVEL: Color(0.36, 0.33, 0.31, 0.65)}},
+	"StadtrallyeLevel": {"road": ASPHALT, "ground": GRASS, "dust": {DIRT: Color(0.46, 0.36, 0.26, 0.7), GRAVEL: Color(0.70, 0.64, 0.54, 0.6), MUD: Color(0.40, 0.31, 0.22, 0.7)}},
 	"ZecheLevel": {"road": DIRT, "ground": GRASS, "dust": {DIRT: Color(0.36, 0.31, 0.26, 0.6), GRAVEL: Color(0.30, 0.28, 0.27, 0.6)}},
 	"RheinuferLevel": {"road": ASPHALT, "ground": GRASS, "dust": {SAND: Color(0.66, 0.60, 0.48, 0.55)}},
 	"FreightLevel": {"road": ASPHALT, "ground": GRAVEL, "dust": {GRAVEL: Color(0.84, 0.72, 0.54, 0.6)}},

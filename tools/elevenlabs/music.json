@@ -22,5 +22,17 @@
     "path": "music/kronburg/Kohle_und_Dampf.mp3",
     "prompt": "Instrumental high-energy racing game track: gritty industrial rock with distorted electric guitars, pounding drums, a dark driving bass, anvil-like metallic hits and a heroic synth lead, the feeling of racing through an old coal mine and a steaming coking plant at dawn. 140 BPM. No vocals, no lyrics, no voice samples.",
     "seconds": 170
+  },
+  {
+    "name": "stadtrallye_endspurt",
+    "path": "music/kronburg/Endspurt.mp3",
+    "prompt": "Instrumental triumphant high-energy racing game finale track: a fast rally across a city, driving breakbeat drums with big tom fills, a punchy distorted synth bass, bright brass-like synth stabs and a soaring heroic lead melody, urban electronic rock with a festive grand-finale feel, relentless momentum, rising key changes into the last chorus. 142 BPM. No vocals, no lyrics, no voice samples.",
+    "seconds": 175
+  },
+  {
+    "name": "stadtrallye_quer",
+    "path": "music/kronburg/Quer_durch_Kronburg.mp3",
+    "prompt": "Instrumental upbeat racing game track for a sunny late-summer morning rally through a German city and a botanical garden into an old industrial harbour: bouncy electro-funk groove, slap-style synth bass, crisp drums with shuffled hi-hats, bright guitar chops, playful synth leads that build into a big euphoric drop. 136 BPM. No vocals, no lyrics, no voice samples.",
+    "seconds": 170
   }
 ]

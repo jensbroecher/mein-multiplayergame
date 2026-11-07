@@ -442,6 +442,12 @@ const STAGE_TRACKS := {
 		"res://music/kronburg/Schichtwechsel.mp3",
 		"res://music/kronburg/Kleeblatt.mp3",
 	],
+	# Quer durch Kronburg (the GP's finale): its own two, then the stage-1 anthem.
+	"stadtrallye": [
+		"res://music/kronburg/Endspurt.mp3",
+		"res://music/kronburg/Quer_durch_Kronburg.mp3",
+		"res://music/kronburg/Schichtwechsel.mp3",
+	],
 	"rheinufer": [
 		"res://music/kronburg/Abendrot_am_Rhein.mp3",
 		"res://music/kronburg/Kleeblatt.mp3",
@@ -474,6 +480,8 @@ static func _stage_track_key(path_lower: String) -> String:
 		return "ramlat"
 	if path_lower.get_file().begins_with("mina"):
 		return "mina"
+	if path_lower.get_file().begins_with("stadtrallye"):
+		return "stadtrallye"
 	if path_lower.contains("kronburg"):
 		return "kronburg"
 	if path_lower.contains("rheinufer"):
