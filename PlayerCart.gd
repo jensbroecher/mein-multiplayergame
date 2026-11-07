@@ -338,9 +338,11 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Meteor",
-		# A supercharged straight-eight (tools/elevenlabs, engine_meteor), levelled by its RMS (-13.6 dBFS).
+		# A supercharged straight-eight (tools/elevenlabs, engine_meteor), levelled by its RMS (-13.3 dBFS). The clip
+		# revs up to its end: scratch/make_engine_loop.py rebuilt it so its last second loops on its own at top speed.
 		"engine_sound": "res://sounds/enginesounds/engine_meteor_loop.wav",
-		"engine_gain_db": 3.9,
+		"engine_gain_db": 3.6,
+		"engine_top_loop": 1.0,
 		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
 		"model_path": "res://generated/cars/Meteor.tscn",
 		"model_y_rotation": PI,
@@ -911,6 +913,14 @@ var original_cart_model_transform: Transform3D
 var damage_override: Dictionary = {}
 ## This car's engine loop's loudness trim (its preset's engine_gain_db).
 var _engine_gain_db := 0.0
+## A preset's "engine_top_loop" (seconds): at top speed the engine loops only that last stretch of its clip, below it the
+## whole clip. The Meteor's clip revs up to its end (scratch/make_engine_loop.py lays it out so every join is seamless).
+## The frame the top-speed loop starts at (0: the car has none), and whether it is on.
+var _engine_top_begin := 0
+var _engine_at_top := false
+## The speed (a share of max_speed) the top-speed loop comes on at, and the one it goes off below.
+const ENGINE_TOP_ON := 0.94
+const ENGINE_TOP_OFF := 0.86
 ## The car's body mesh node, the key its pieces are cached under (CarDebris.prepare()) and the paint
 ## its pieces are given.
 var _debris_body: MeshInstance3D
@@ -2027,6 +2037,7 @@ func _process(delta):
 				engine_sound.play()
 				engine_sound.volume_db = -32.0 + _engine_gain_db
 			var speed_ratio = clamp(linear_velocity.length() / max_speed, 0.0, 1.0)
+			_update_engine_top_loop(speed_ratio)
 			var target_vol = lerp(-32.0, -22.0, speed_ratio) + _engine_gain_db
 			if is_boosting:
 				target_vol += 2.0
@@ -3303,6 +3314,9 @@ func _setup_engine_sound() -> void:
 			frames = int(wav.data.size() / (4 if wav.stereo else 2))
 		if frames > 0:
 			wav.loop_end = frames
+		var top_s: float = float(preset.get("engine_top_loop", 0.0))
+		_engine_top_begin = maxi(frames - int(round(top_s * wav.mix_rate)), 0) if top_s > 0.0 and frames > 0 else 0
+		_engine_at_top = false
 	elif engine_stream is AudioStreamMP3:
 		(engine_stream as AudioStreamMP3).loop = true
 	elif engine_stream is AudioStreamOggVorbis:
@@ -3314,6 +3328,21 @@ func _setup_engine_sound() -> void:
 	engine_sound.max_distance = 45.0
 	engine_sound.attenuation_filter_cutoff_hz = 16000.0
 	engine_sound.bus = &"SFX"
+
+
+## At top speed the engine's stream loops only its last stretch (the preset's engine_top_loop), below it the whole clip.
+## Only the loop's start moves: the playback runs on to the clip's end and the next pass starts there, so the change
+## never cuts the sound.
+func _update_engine_top_loop(speed_ratio: float) -> void:
+	if _engine_top_begin <= 0:
+		return
+	var at_top: bool = speed_ratio >= (ENGINE_TOP_OFF if _engine_at_top else ENGINE_TOP_ON)
+	if at_top == _engine_at_top:
+		return
+	_engine_at_top = at_top
+	var wav := engine_sound.stream as AudioStreamWAV
+	if wav != null:
+		wav.loop_begin = _engine_top_begin if at_top else 0
 
 
 func _is_blocking_prop(collider: Object) -> bool:

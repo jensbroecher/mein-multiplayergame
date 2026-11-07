@@ -2536,6 +2536,16 @@ its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set th
 The loop's end is the clip's length times its rate (`get_length() * mix_rate`): the imports are QOA, and the data's
 bytes counted as 16-bit frames had ended every car's loop about a fifth of the way through its clip, with a seam.
 A clip that comes out quiet (the bubble car's at -37.7 dBFS) is raised in the file (`scratch/normalize_wav.py`) first.
+- A preset's `engine_top_loop` (seconds): at top speed (`ENGINE_TOP_ON`, off below `ENGINE_TOP_OFF`, shares of
+  max_speed) the stream loops only its last stretch, below it the whole clip (`_update_engine_top_loop` moves only
+  `loop_begin`, so the playback runs on to the end before the next pass starts there: no cut). The Meteor's ElevenLabs
+  clip revved up through its 8s (its main pitch 262 to 314 Hz) after an unsteady first 1.75s, so every loop dropped back
+  with a hiccup: `scratch/make_engine_loop.py` rebuilt it (from the generated clip: make it again with `--force` and
+  re-run the script, `--from=1.75 --tail=1.0`) as the steady part, its head cross-faded so the file's end runs into its
+  start, then its last second as a loop of its own, every join seamless. Imported as PCM (`compress/mode=0`) for exact
+  loop points. `scratch/find_loop_point.py` prints a clip's level along it and how its end joins its start;
+  `res://scratch/engine_top_loop_test.tscn -- [cars=19,...] [seconds=60]` (headless; it makes a bot the local player,
+  since only that cart plays its engine) logs each wrap of the playback and whether it went where it should.
 
 ## Procedural cars
 
