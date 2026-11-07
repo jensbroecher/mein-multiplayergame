@@ -38,6 +38,8 @@ func _ready() -> void:
 	var frame_t := 0.0
 	var wraps_top := 0
 	var wraps_top_bad := 0
+	var wraps_raced := 0
+	var toggled_at := -10.0
 	while frame_t < seconds:
 		await get_tree().process_frame
 		frame_t += get_process_delta_time()
@@ -49,14 +51,26 @@ func _ready() -> void:
 				print("  %.2fs top %s at pos %.3f (speed %.2f)" % [frame_t, c._engine_at_top, p2,
 						c.linear_velocity.length() / c.max_speed])
 				last_top = c._engine_at_top
-			if p2 < last_pos - 0.3:
+				toggled_at = frame_t
+			if p2 < last_pos - 0.3 and last_pos < st2.get_length() - 0.15:
+				# Not near the clip's end: the engine was started again from the top (play(), after a respawn).
+				print("  %.2fs restart %.3f -> %.3f" % [frame_t, last_pos, p2])
+				settled_at = -1.0
+			elif p2 < last_pos - 0.3:
+				# The audio thread mixes a little ahead: a wrap just after the loop start moved may still take the old one
+				# (harmless: every join is seamless). Only one well after a switch counts against it.
 				var to_tail: bool = p2 >= tf - 0.05
+				var raced: bool = frame_t - toggled_at < 0.2
 				print("  %.2fs wrap %.3f -> %.3f (top %s)%s" % [frame_t, last_pos, p2, c._engine_at_top,
-						"" if to_tail == c._engine_at_top else "  <-- unexpected"])
+						"" if to_tail == c._engine_at_top else ("  (%.2fs after the switch)" % (frame_t - toggled_at) if raced
+						else "  <-- unexpected")])
 				if c._engine_at_top:
 					wraps_top += 1
 					if not to_tail:
-						wraps_top_bad += 1
+						if raced:
+							wraps_raced += 1
+						else:
+							wraps_top_bad += 1
 			last_pos = p2
 		if frame_t < next_log:
 			continue
@@ -94,6 +108,7 @@ func _ready() -> void:
 					c._engine_at_top, st.loop_begin, pos, st.get_length(), tail_from, c.engine_sound.playing])
 	print("AT TOP %.1fs; once settled in the tail: %d samples in it, %d outside; below top, %d samples before the tail" % [
 			top_time, in_tail, out_tail, below_full])
-	print("wraps at top speed: %d, %d of them back to the clip's start" % [wraps_top, wraps_top_bad])
+	print("wraps at top speed: %d, %d of them back to the clip's start (%d more within 0.2s of the switch)" % [wraps_top,
+			wraps_top_bad, wraps_raced])
 	print("RESULT: %s" % ("PASS" if wraps_top > 0 and wraps_top_bad == 0 else "FAIL"))
 	get_tree().quit()

@@ -338,11 +338,12 @@ const CAR_PRESETS = [
 	},
 	{
 		"name": "Meteor",
-		# A supercharged straight-eight (tools/elevenlabs, engine_meteor), levelled by its RMS (-13.3 dBFS). The clip
-		# revs up to its end: scratch/make_engine_loop.py rebuilt it so its last second loops on its own at top speed.
+		# A supercharged straight-eight (tools/elevenlabs, engine_meteor), levelled by its RMS (-13.1 dBFS). The clip
+		# revs up: scratch/make_engine_loop.py rebuilt it to end on a stretch that holds its pitch, which loops on its
+		# own at top speed.
 		"engine_sound": "res://sounds/enginesounds/engine_meteor_loop.wav",
-		"engine_gain_db": 3.6,
-		"engine_top_loop": 1.0,
+		"engine_gain_db": 3.4,
+		"engine_top_loop": 0.65,
 		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
 		"model_path": "res://generated/cars/Meteor.tscn",
 		"model_y_rotation": PI,

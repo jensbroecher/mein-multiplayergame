@@ -2539,10 +2539,12 @@ A clip that comes out quiet (the bubble car's at -37.7 dBFS) is raised in the fi
 - A preset's `engine_top_loop` (seconds): at top speed (`ENGINE_TOP_ON`, off below `ENGINE_TOP_OFF`, shares of
   max_speed) the stream loops only its last stretch, below it the whole clip (`_update_engine_top_loop` moves only
   `loop_begin`, so the playback runs on to the end before the next pass starts there: no cut). The Meteor's ElevenLabs
-  clip revved up through its 8s (its main pitch 262 to 314 Hz) after an unsteady first 1.75s, so every loop dropped back
+  clip revved up through its 8s (its main pitch 262 to 315 Hz) after an unsteady first 1.75s, so every loop dropped back
   with a hiccup: `scratch/make_engine_loop.py` rebuilt it (from the generated clip: make it again with `--force` and
-  re-run the script, `--from=1.75 --tail=1.0`) as the steady part, its head cross-faded so the file's end runs into its
-  start, then its last second as a loop of its own, every join seamless. Imported as PCM (`compress/mode=0`) for exact
+  re-run the script, `--from=1.75 --to=5.81 --tail=0.65 --fade=0.12 --wrap=0.30`) as the steady part, its head
+  cross-faded so the file's end runs into its start, then a loop of its own, every join seamless. The top loop must be a
+  stretch that holds its pitch: its last second still climbed 4% and sounded like a rev-up every pass, so the clip now
+  ends at 5.81s, on 0.65s that hold 285-288 Hz (its end at its start's pitch). Imported as PCM (`compress/mode=0`) for exact
   loop points. `scratch/find_loop_point.py` prints a clip's level along it and how its end joins its start;
   `res://scratch/engine_top_loop_test.tscn -- [cars=19,...] [seconds=60]` (headless; it makes a bot the local player,
   since only that cart plays its engine) logs each wrap of the playback and whether it went where it should.

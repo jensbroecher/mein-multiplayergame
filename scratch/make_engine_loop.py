@@ -2,7 +2,7 @@
 file, for PlayerCart's "engine_top_loop": the whole file loops while the car is below top speed, and only its last
 `--tail` seconds once it is at top speed.
 
-The file is P then Q, from the clip's steady part S (from `--from` seconds to the end):
+The file is P then Q, from the clip's steady part S (from `--from` seconds to `--to`, or the end):
   Q: S's last `--tail` seconds, made a seamless loop of its own: its last `--fade` seconds cross-fade into the audio
      just before its start, so its end runs on into its beginning.
   P: S up to where Q's material starts, so P's end runs on into Q's start as the clip did; its first `--wrap` seconds
@@ -12,7 +12,12 @@ So every join is seamless: P to Q (playing through), Q to Q (the top-speed loop)
 Cross-fades are equal-power (cos/sin: engine noise a second apart is uncorrelated). Prints the frames, and the
 length of Q to put in the preset. 16-bit PCM in and out, any channels.
 
-Usage: python3 scratch/make_engine_loop.py in.wav out.wav [--from=1.75] [--tail=1.0] [--fade=0.15] [--wrap=0.35]
+Pick Q where the clip holds its pitch: a stretch that still revs up sounds like a rev-up every pass, however short.
+The Meteor's kept climbing to its very end (302 to 315 Hz over its last second) but held 285-288 Hz from 5.16 to 5.81s,
+so its S ends there: --from=1.75 --to=5.81 --tail=0.65 (from the clip ElevenLabs made).
+
+Usage: python3 scratch/make_engine_loop.py in.wav out.wav [--from=1.75] [--to=<end>] [--tail=1.0] [--fade=0.15]
+    [--wrap=0.35]
 """
 import sys
 import wave
@@ -34,7 +39,8 @@ def main():
         if w.getsampwidth() != 2:
             raise SystemExit("only 16-bit PCM")
         x = np.frombuffer(w.readframes(w.getnframes()), dtype="<i2").astype(np.float64).reshape(-1, ch) / 32768.0
-    s = x[int(start * rate):]
+    end = float(opts["to"]) if "to" in opts else x.shape[0] / rate
+    s = x[int(start * rate):int(round(end * rate))]
     n = s.shape[0]
     t_n = int(round(tail * rate))
     f_n = int(round(fade * rate))
