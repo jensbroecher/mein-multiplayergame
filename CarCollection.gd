@@ -20,7 +20,7 @@ const CATEGORIES := [
 	{"name": "4x4 & Monsters", "color": Color(0.55, 0.92, 0.28),
 		"cars": ["Strikeforce", "Phantom", "Mudrunner", "Titan", "Basilisk"]},
 	{"name": "Classics", "color": Color(0.98, 0.78, 0.32),
-		"cars": ["Bootlegger"]},
+		"cars": ["Bootlegger", "Meteor"]},
 ]
 const NEW_ARRIVALS := {"name": "New Arrivals", "color": Color(0.86, 0.52, 1.0)}
 

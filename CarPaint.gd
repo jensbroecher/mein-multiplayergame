@@ -95,6 +95,9 @@ const FACTORY := {
 	"Bootlegger": {"pattern": 4, "finish": 0, "primary": Color(0.03, 0.03, 0.035),
 		"secondary": Color(0.80, 0.07, 0.05), "accent": Color(0.96, 0.42, 0.06),
 		"rim": Color(0.75, 0.08, 0.06), "number": 32},
+	"Meteor": {"pattern": 7, "finish": 1, "primary": Color(0.70, 0.72, 0.74),
+		"secondary": Color(0.80, 0.07, 0.05), "accent": Color(0.03, 0.03, 0.035),
+		"rim": Color(0.76, 0.77, 0.79), "number": 4},
 }
 const FALLBACK := {"pattern": 0, "finish": 0, "primary": Color(0.80, 0.07, 0.05),
 	"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.98, 0.78, 0.07),

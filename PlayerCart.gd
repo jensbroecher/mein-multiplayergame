@@ -335,6 +335,23 @@ const CAR_PRESETS = [
 		"offroad": 2.0,
 		"weight": 1.12,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Meteor",
+		# A supercharged straight-eight (tools/elevenlabs, engine_meteor), levelled by its RMS (-13.6 dBFS).
+		"engine_sound": "res://sounds/enginesounds/engine_meteor_loop.wav",
+		"engine_gain_db": 3.9,
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Meteor.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 44.0,
+		"acceleration": 62.0,
+		"steer_speed": 2.9,
+		"grip": 4.6,
+		"braking": 34.0,
+		"offroad": 3.5,
+		"weight": 0.9,
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 
