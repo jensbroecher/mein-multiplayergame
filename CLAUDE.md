@@ -991,11 +991,17 @@ in front of the water while driving (Msitu Falls, Bloombay Dunes). `canyon_river
   Bloombay and Pinecrest all build their tyre walls through it. Bloombay's corner cones are KnockableProps.
 - `res://scratch/spring_props_test.tscn -- <dir> [level=] [props=Flags|Stacks] [index=N] [speed=25]` (windowed)
   drives a cart through one prop and logs the tip and slide.
-- Marker poles (`KnockablePoles.gd`: Msitu Falls, Frostfall Gorge, Mara Crossing) are rigid bodies frozen until
+- Marker poles (`KnockablePoles.gd`: Msitu Falls, Frostfall Gorge, Mara Crossing, the Leitpfosten of Kronburger Hütte and
+  Rheinufer, Quer durch Kronburg's Leitbaken) are rigid bodies frozen until
   a cart comes within `RELEASE_RADIUS`. On the hit (`_launch`) a pole is thrown: away from the cart and
   along its travel at `LAUNCH_SPEED_SHARE` of its speed (from how far it moved, so remote carts count), a
   hop up (`LAUNCH_UP_*`), tumbling. Left to the contact, the cart's sphere only tipped it over and rolled
   on top of it (0.2m up at most); now 5-23m out and up to 5m high at 30 m/s.
+  Each pole's collider spans its drawn mesh (`_collider_span`: the mesh's height at the pole's scale, less 10cm sunk into
+  the ground; where the mesh's bounds are far shorter than `pole_height`, as the Leitpfosten's are, the pole stands on its
+  origin, `pole_height` tall), and the bodies are never scaled (the drawing keeps the scale). A fixed span centred 12cm
+  over the origin hung most of a pole whose origin is its foot into the ground: released as a cart came near, it was
+  pushed up out of it and stood floating.
   `res://scratch/pole_launch_test.tscn -- [level=] [index=40] [speed=22]` (headless) drives a real cart
   into one and logs where the pole went, and anything else solid at its foot.
 
@@ -3862,19 +3868,53 @@ each run deletes first).
   `scrap_preview.gd`, `baustelle_preview.gd`; `scratch/scrap_contract_check.gd` (headless) builds ScrapKit's props as
   their call sites do. The stone bridges are driven over: their decks lie 5cm (life) under the road's ribbon, on
   `GardenKit.bridge_deck_y`, the generator's own crest profile.
-- The hazards run on the wall clock (CrossTraffic.gd, WreckingBall.gd, SlewHazard.gd, ShuttleProp.gd). Each one the
-  route meets has a HazardGate.gd (group "rail_crossings", so bots wait at it as at a level crossing), which opens only
-  for an arrival with the road clear from `lead` + 1s before to `trail` + 1s after. The free-swinging ball was clear of
-  the road for 3.6s of every 10s, the gate never opened and every bot sat at it for good: the ball is now held still for
-  `hold` (BALL_HOLD, 4.5s) at the far end of its swing. `res://scratch/hazard_gate_probe.gd` (`-s`, headless, `--
-  [level=]`) prints each gate's cycle, when its hazard covers the road and the share of arrivals it lets through (the
-  Ring 23%, the ball 25%, the magnet crane 38%, the excavator 31%): 0% holds the bots for good.
+- The hazards run on the wall clock (CrossTraffic.gd, WreckingBall.gd, CarDropCrane.gd, SlewHazard.gd, ShuttleProp.gd).
+  The bots take their chances and some get blown up: the user found waiting at gates held them up too long, so the
+  generator no longer adds the gates (`HAZARD_GATES` false; they are still set up, and the gate, margin and probe notes
+  below hold if they come back). With it on, each one the route meets has a HazardGate.gd (group "rail_crossings", so
+  bots wait at it as at a level crossing), which opens only for an arrival with the road clear from `lead` + a margin before to `trail` + the margin after (the margin
+  PlayerCart's 1.6s, or the gate's `own_margin`). `res://scratch/hazard_gate_probe.gd` (`-s`, headless, `-- [level=]`)
+  prints each gate's cycle, when its hazard covers the road and the share of arrivals it lets through: 0% holds the bots
+  for good.
+  - The wrecking ball swings free and fast (`BALL_GRAVITY` 28: 7.2s a swing, 13 m/s over the road) and destroys a cart it
+    meets (`kills`). Its gaps are short, so its gate has tight margins (`lead` 0.3, `trail` 0.6, `own_margin` 0.5) and counts
+    only the ball over the bot's lane (`road_half` 3.5). Free at gravity 14 with the whole road counted it never opened; a
+    4.5s hold at the far end was the first fix, and the user wanted it faster without the pause.
+  - The magnet crane (`CarDropCrane.gd`, `ScrapKit.material_handler` with its stick raised, `HANDLER_TIP`; the magnet
+    built without its wreck, `scrap_magnet(..., false)`, and the wreck alone, `magnet_car`) carries the car 5.7m over the
+    lane, drops it on the road (destroying a cart under it), leaves it lying there as a solid obstacle (an AnimatableBody3D
+    box on layer 1 only then) and pulls it back up. Swinging low across the lane, the car had passed through the
+    checkpoint's truss; that checkpoint now stands before the handler.
+  - SlewHazard, CarDropCrane and ShuttleProp move themselves in `_ready`, which also runs in the generator: the level was
+    saved with them already turned or moved to wherever the clock had them, and the game measured their swing from that
+    (the crane dropped its car beside the road, the excavator's gate saw nothing). Each keeps its first heading or place in
+    a meta (`base_basis`, `home`) and reads it back.
+  - A bot well past a crossing's stop line (`AI_CROSSING_COMMITTED`, 4m) drives on whatever the gate says: one let through
+    just before the Ring's traffic came stopped where it was, in the outer lane, and was run down.
+  - DressingColliders skips the traffic's MultiMeshes (CrossTraffic's and AutobahnTraffic's, meta
+    `skip_dressing_colliders`): it had frozen a collider where each vehicle stood at load, and its wobble then drew the
+    car standing there while the stream drove through it (an invisible car in the Ring that appeared when hit).
 - PlayerCart's 2.8s stuck check starts its window again while a bot is held at a crossing or gate (`_ai_crossing_hold`):
   checked only at the window's end, a bot let go just before it had barely moved off the line and was respawned 200m back.
+- The water for the carts is `StadtWater.gd`, the level's "RiverWater" node (`surface_at`, as Northlight Caverns'): the
+  moat and the canal (deep enough to drown in) and the lily pond (about 1m, waded), each at its own level. PlayerCart had
+  taken only the first "...Water" node, the moat, so a cart drove over the pond's and the canal's dry beds.
+- The building site's haul road (`stadt_road.gdshader` kind 11) has no steel road plates any more: one lay under the
+  wrecking ball and read as its hit zone.
 - The water: the moat (deep enough to drown in: `water_bounds_min`/`max`), the lily pond and the canal, wound clockwise
   from above (`_water_strips`, the pond's fan): wound the other way all three were culled and showed no water. The
   bridges' spans are `_deck_zones`, left to the natural ground by `_grade`: the last graded sample's flat band and
   shoulders had wrapped round into the spans and dammed the moat and the pond, burying the side arches.
+- The route's road collision (`CityRoad`, `GartenwegTrack`, `BaustrasseTrack`, `SchrottplatzTrack`) is built from each
+  section's triangles: they had been appended to a copy of the dictionary's PackedVector3Array (a packed array read out of
+  a Dictionary is a copy), so the route had no road collision, only the graded ground under it, and at the terrace the
+  carts fell through the drawn road.
+- The terrace's drop is a flight of stairs (`TERRACE_FACE` 9m, `TERRACE_STEPS` 15, `_build_terrace_stairs`, parapets
+  either side, solid), after the kicker: the road's collision runs straight down the nosings and its ribbon isn't drawn
+  there. Below it the road runs sunk between grass banks to the garden's exit; boost pads stand on the banks
+  (`BANK_BOOSTS`, settled onto the slope), and the checkpoint stands at the stairs' foot, out of their line. More stand on
+  the Hafenstraße's banks below the second railway underpass (`HAFEN_BANK_BOOSTS`); each pad reserves its spot and the
+  bank ahead of it (`_note_rect`) so the dressing keeps off. The garden's furniture stops 30m before the terrace.
 - The terrace: the pads "terrace" (10cm under the walls' coping) and "terrace_below" (the steps' foot) meet at
   `_terrace_cut`, inside the retaining walls' thickness, on terrain grid lines of their own (`_with_line`; the grid is
   5m, too coarse to hold the step); beside the drop each side is graded only from the road on its own level

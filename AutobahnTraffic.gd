@@ -43,6 +43,8 @@ func _ready() -> void:
 		mm.instance_count = counts[i]
 		var mmi := MultiMeshInstance3D.new()
 		mmi.multimesh = mm
+		# The vehicles move: DressingColliders would freeze a collider (and its wobble, drawing the car) where each stood at load.
+		mmi.set_meta(&"skip_dressing_colliders", true)
 		var top := 12.0
 		for h in heights:
 			top = maxf(top, h + 12.0)

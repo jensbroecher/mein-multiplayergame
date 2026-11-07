@@ -1,7 +1,8 @@
 extends SceneTree
 # Lists every HazardGate.gd of a level (Quer durch Kronburg's hazards) with its hazard's period, when in the cycle the
 # hazard covers the road there, and how much of the cycle a bot arriving at the gate would find it open (HazardGate's
-# own test: clear from `lead` + 1s before its arrival to `trail` + 1s after). A gate open 0% of the time holds the bots
+# own test: clear from `lead` + its margin before its arrival to `trail` + the margin after; the margin is the gate's
+# `own_margin`, else the 1.6s PlayerCart asks for). A gate open 0% of the time holds the bots
 # for good, as the wrecking ball's did. Headless, no race (the level's own script is taken off, so nothing spawns):
 #   Godot --headless --path . -s res://scratch/hazard_gate_probe.gd -- [level=res://levels/StadtrallyeLevel.tscn]
 
@@ -31,8 +32,10 @@ func _run() -> void:
 			continue
 		var period: float = float(hz.get("period"))
 		var iv: Array = hz.cover_intervals(g)
-		var lead: float = float(g.get("lead")) + 1.0
-		var trail: float = float(g.get("trail")) + 1.0
+		# The gate's own margin, else the one PlayerCart asks for (1.6s).
+		var m: float = float(g.get("own_margin")) if g.get("own_margin") != null and float(g.get("own_margin")) >= 0.0 else 1.6
+		var lead: float = float(g.get("lead")) + m
+		var trail: float = float(g.get("trail")) + m
 		var open := 0
 		var steps := 0
 		var run := 0.0

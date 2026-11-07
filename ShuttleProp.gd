@@ -26,7 +26,13 @@ var _beep_player: AudioStreamPlayer3D
 
 func _ready() -> void:
 	sync_to_physics = false
-	_home = transform
+	# Its place before it ever moved: _apply moves it at once, and a level saved by its generator keeps the moved transform
+	# (wherever the clock had it then), so it is kept in a meta the first time and read back from it after.
+	if has_meta(&"home"):
+		_home = get_meta(&"home")
+	else:
+		_home = transform
+		set_meta(&"home", _home)
 	var run: float = distance / maxf(speed, 0.1)
 	period = 2.0 * (run + dwell)
 	for c in get_children():

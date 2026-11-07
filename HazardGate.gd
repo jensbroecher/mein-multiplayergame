@@ -17,6 +17,9 @@ extends Node3D
 ## Seconds before and after the bot's arrival the road must be clear (it is not a point: the bot takes a while to cross).
 @export var lead := 0.8
 @export var trail := 1.6
+## The slack either side of that window (seconds); negative: what the bot asks for (PlayerCart passes 1.6). A fast hazard
+## with short gaps (the wrecking ball) needs less, or the gate never opens.
+@export var own_margin := -1.0
 
 var _hz: Node
 
@@ -33,6 +36,8 @@ func is_closed_for(eta: float, margin := 1.0) -> bool:
 	var period: float = float(_hz.get("period"))
 	if period <= 0.0:
 		return false
+	if own_margin >= 0.0:
+		margin = own_margin
 	var tt: float = _hz.cycle_time()
 	var a: float = tt + eta - lead - margin
 	var b: float = tt + eta + trail + margin

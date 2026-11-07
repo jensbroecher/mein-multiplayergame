@@ -123,6 +123,8 @@ func _ready() -> void:
 			var mmi := MultiMeshInstance3D.new()
 			mmi.name = "Traffic%d" % i
 			mmi.multimesh = mm
+			# The vehicles move: DressingColliders would freeze a collider (and its wobble, drawing the car) where each stood at load.
+			mmi.set_meta(&"skip_dressing_colliders", true)
 			var lo: float = -12.0
 			var hi: float = 14.0
 			for h in heights:

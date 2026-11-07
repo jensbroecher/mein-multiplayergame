@@ -48,7 +48,13 @@ func _ready() -> void:
 	_headless = DisplayServer.get_name() == "headless"
 	period = 2.0 * (move + dwell)
 	_hang = get_node_or_null(hang) as Node3D
-	_base_basis = transform.basis.orthonormalized()
+	# Its heading before it ever turned: _apply turns it at once, and a level saved by its generator keeps that turned basis
+	# (at whatever the clock said then), so it is kept in a meta the first time and read back from it after.
+	if has_meta(&"base_basis"):
+		_base_basis = get_meta(&"base_basis")
+	else:
+		_base_basis = transform.basis.orthonormalized()
+		set_meta(&"base_basis", _base_basis)
 	if not _headless:
 		if motor != null:
 			_motor_player = AudioStreamPlayer3D.new()

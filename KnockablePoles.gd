@@ -32,6 +32,8 @@ const LAUNCH_SPIN := Vector2(7.0, 13.0)
 @export var pole_mass := 4.0
 
 var _bodies: Array[RigidBody3D] = []
+## Each pole's scale (the drawing's: the bodies themselves are never scaled).
+var _draw_scale: Array[Vector3] = []
 var _released: PackedByteArray = PackedByteArray()
 var _bonk: AudioStreamPlayer3D
 ## Cart instance id -> its position last tick, for its velocity (remote carts' bodies don't carry one).
@@ -42,10 +44,6 @@ func _ready() -> void:
 	if Engine.is_editor_hint():
 		return
 	add_to_group("knockable_props")
-	var shape := CylinderShape3D.new()
-	# A little fatter than the drawn pole, so a fast cart cannot slip past between physics steps.
-	shape.radius = 0.15
-	shape.height = pole_height - 0.25
 	for i in range(pole_transforms.size()):
 		var b := RigidBody3D.new()
 		b.name = "Pole_%d" % i
@@ -57,11 +55,18 @@ func _ready() -> void:
 		b.freeze_mode = RigidBody3D.FREEZE_MODE_STATIC
 		b.freeze = true
 		var cs := CollisionShape3D.new()
+		var sc: Vector3 = pole_transforms[i].basis.get_scale()
+		var span: Vector2 = _collider_span(sc.y)
+		var shape := CylinderShape3D.new()
+		# A little fatter than the drawn pole, so a fast cart cannot slip past between physics steps.
+		shape.radius = 0.15
+		shape.height = span.y - span.x
 		cs.shape = shape
-		# The drawn pole is sunk 10cm into the snow; the collider starts at ground level.
-		cs.position.y = 0.125
+		cs.position.y = (span.x + span.y) * 0.5
 		b.add_child(cs)
-		b.transform = pole_transforms[i]
+		# The body unscaled (a scaled rigid body misbehaves); the drawing keeps the scale.
+		b.transform = Transform3D(pole_transforms[i].basis.orthonormalized(), pole_transforms[i].origin)
+		_draw_scale.append(sc)
 		# Internal: built fresh on every load, never saved into the level (this also runs while the
 		# generator assembles the scene).
 		add_child(b, false, Node.INTERNAL_MODE_BACK)
@@ -70,7 +75,7 @@ func _ready() -> void:
 	_released.fill(0)
 	multimesh.instance_count = pole_transforms.size()
 	for i in range(pole_transforms.size()):
-		multimesh.set_instance_transform(i, pole_transforms[i])
+		multimesh.set_instance_transform(i, _drawn(i))
 	_bonk = AudioStreamPlayer3D.new()
 	_bonk.stream = BONK
 	_bonk.bus = &"SFX"
@@ -124,7 +129,7 @@ func _physics_process(delta: float) -> void:
 		if b.global_position.y < -40.0:
 			b.freeze = true
 			continue
-		multimesh.set_instance_transform(i, b.transform)
+		multimesh.set_instance_transform(i, _drawn(i))
 
 
 ## Throws a pole the nearest cart has just hit: away from the cart and along its travel, up, tumbling.
@@ -153,3 +158,28 @@ func _launch(b: RigidBody3D, carts: Array[Vector3], cart_vel: Array[Vector3], ca
 	b.linear_velocity = dir * out + Vector3.UP * minf(speed * LAUNCH_UP_SHARE, LAUNCH_UP_MAX)
 	var tumble: Vector3 = Vector3.UP.cross(dir) * randf_range(LAUNCH_SPIN.x, LAUNCH_SPIN.y) * (1.0 if randf() < 0.75 else -1.0)
 	b.angular_velocity = tumble + dir * randf_range(-3.0, 3.0)
+
+
+## The pole's drawn transform: its body's, scaled as the level placed it.
+func _drawn(i: int) -> Transform3D:
+	var b: RigidBody3D = _bodies[i]
+	return Transform3D(b.transform.basis.scaled_local(_draw_scale[i]), b.transform.origin)
+
+
+## The collider's bottom and top along the pole (body frame, metres) for a pole drawn at scale `sy`: the drawn mesh's own
+## height, less the 10cm a pole sunk below its origin stands in the ground. A fixed span (centred 12cm over the origin)
+## suited poles whose origin is their middle, and hung most of a pole whose origin is its foot (the Leitbaken and
+## Leitpfosten) into the ground: released by a cart coming near, it was pushed up out of it and stood on that, floating.
+func _collider_span(sy: float) -> Vector2:
+	if multimesh == null or multimesh.mesh == null:
+		return Vector2(0.125 - (pole_height - 0.25) * 0.5, 0.125 + (pole_height - 0.25) * 0.5)
+	var ab: AABB = multimesh.mesh.get_aabb()
+	# Kronburger Hütte's and Rheinufer's Leitpfosten meshes report bounds over only their top 43cm: where the bounds are
+	# far shorter than `pole_height`, the pole stands on its origin, `pole_height` tall.
+	if ab.size.y * sy < pole_height * 0.6:
+		return Vector2(0.0, pole_height)
+	var lo: float = ab.position.y * sy
+	var hi: float = ab.end.y * sy
+	if lo < -0.05:
+		lo += 0.1
+	return Vector2(lo, maxf(hi, lo + 0.3))

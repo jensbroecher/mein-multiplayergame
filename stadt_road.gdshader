@@ -7,7 +7,8 @@
 //     the kerbs are lowered and the pavement is asphalt.
 //  10 the Botanischer Garten's paths: a pale water-bound gravel surface (wassergebundene Wegedecke), worn by the race
 //     into tyre tracks, granite edging stones along both edges
-//  11 the building site's haul road: compacted earth, ruts, puddles, gravel patches, steel road plates every so often
+//  11 the building site's haul road: compacted earth, ruts, puddles, gravel patches (its steel road plates are gone: one
+//     lay under the wrecking ball and read as a marked hit zone)
 //  12 the palm house's floor: stone and terracotta tiles in a pattern laid in world space
 //  13 the scrapyard: oily concrete slabs half under mud, rust and swarf
 //  14 the pedestrian zone: concrete paving stones in a herringbone, granite bands every 6m, a drainage channel, no kerbs
@@ -320,7 +321,7 @@ void fragment() {
 		col = mix(col, ec * (1.0 - 0.5 * ej), eg);
 		rough = mix(rough, 0.8, eg);
 	} else if (v_kind == 11) {
-		// The building site's haul road: compacted earth, ruts, puddles, gravel, steel road plates.
+		// The building site's haul road: compacted earth, ruts, puddles, gravel.
 		vec3 d11 = texture(dirt_tex, xz / 4.0).rgb;
 		vec3 earth = lin(vec3(0.43, 0.34, 0.25)) * (0.62 + 0.7 * dot(d11, vec3(0.33)));
 		earth *= 0.85 + 0.25 * vnoise(xz / 7.0);
@@ -343,17 +344,6 @@ void fragment() {
 		rough = mix(rough, 0.04, pud);
 		spec = mix(spec, 0.7, pud);
 		nw = normalize(mix(nw, normalize(w_nrm), pud));
-		// Steel road plates (Baustraßenplatten): two side by side, 4m long, every 46m.
-		float py = fract((y + 9.0) / 46.0) * 46.0;
-		float plate = step(py, 4.0) * step(ax, 4.6);
-		vec2 pc = vec2(fract(x / 2.3) * 2.3, py);
-		float diamond = step(0.5, fract((pc.x + pc.y) * 3.0)) * step(0.5, fract((pc.x - pc.y) * 3.0));
-		vec3 steel = lin(vec3(0.24, 0.22, 0.20)) * (0.8 + 0.3 * vnoise(xz * 2.0)) * (1.0 + 0.12 * diamond * (1.0 - smoothstep(0.02, 0.05, fw)));
-		steel = mix(steel, lin(vec3(0.40, 0.22, 0.12)), smoothstep(0.55, 0.8, vnoise(xz * 0.9)) * 0.5);
-		float pedge = stripe((fract(x / 2.3) - 0.5) * 2.3, 0.04, fx);
-		col = mix(col, steel * (1.0 - 0.6 * clamp(pedge, 0.0, 1.0)), plate);
-		rough = mix(rough, 0.55, plate);
-		spec = mix(spec, 0.6, plate);
 	} else if (v_kind == 12) {
 		// The palm house: 0.5m terracotta tiles with small slate insets at their corners, in world space; a sandstone
 		// border along the beds.

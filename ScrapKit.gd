@@ -2334,11 +2334,12 @@ static func _bike(pk: PropKit, kit: Dictionary, key: String, t: Transform3D, rng
 ## The slewing ring's top over the ground: SlewHazard.gd's node, the upper (material_handler_upper) turns about the y axis
 ## through (0, HANDLER_RING_Y, 0) of the base.
 const HANDLER_RING_Y := 3.0
-## The stick's tip pin in the upper's frame (the boom toward -z), 15m out: the magnet's hanging node (scrap_magnet hangs
-## down its -y from it).
-const HANDLER_TIP := Vector3(0, 1.45, -15.0)
+## The stick's tip pin in the upper's frame (the boom toward -z), 18.1m out and raised (the stick the same 10.8m from the
+## boom's tip): the magnet's hanging node (scrap_magnet hangs down its -y from it). Raised so the wreck is carried well
+## over the cars (Quer durch Kronburg drops it on the road); at 1.45 up it swept the lane 0.6m over the ground.
+const HANDLER_TIP := Vector3(0, 4.5, -18.1)
 ## The wreck under the magnet, as a box in the hanging node's frame (centre, half size): its roof 2.47 under the pin, its
-## tyres 3.87 under it, 0.58 over the ground at the end of the reach.
+## tyres 3.87 under it, 3.6 over the ground at the end of the reach.
 const MAGNET_HIT_C := Vector3(0, -3.17, 0)
 const MAGNET_HIT_HALF := Vector3(0.96, 0.74, 2.3)
 const MAGNET_CAR_TOP := -2.47
@@ -2614,8 +2615,9 @@ static func _handler_arm(pk: PropKit, kit: Dictionary, green: Color, dark: Color
 ## The scrap magnet hanging from the stick's tip pin (the origin; built down -y): a shackle round the pin, a swivel, three
 ## chains to the lugs of a 1.7m lifting magnet (ribs, the terminal box, the cable looping up to the stick), and a wreck held
 ## under it by its roof (MAGNET_CAR_TOP; MAGNET_HIT_C/HALF its box), bits of scrap stuck round the magnet's rim. `variant`
-## seeds the wreck. Moving: "scrapm" and vertex colours only.
-static func scrap_magnet(pk: PropKit, kit: Dictionary, variant: int) -> void:
+## seeds the wreck. Without `with_car` the wreck is left out (`magnet_car` builds it alone, in the same frame, for a
+## caller that drops it). Moving: "scrapm" and vertex colours only.
+static func scrap_magnet(pk: PropKit, kit: Dictionary, variant: int, with_car := true) -> void:
 	var rng := _rng(variant, 81)
 	var steel := worn(Color(0.2, 0.2, 0.2), 0.3)
 	_link(pk, kit, "scrapm", Vector3(0, -0.1, 0), UP, Vector3.FORWARD, 0.2, 0.13, 0.04, steel)
@@ -2640,19 +2642,33 @@ static func scrap_magnet(pk: PropKit, kit: Dictionary, variant: int) -> void:
 	_box(pk, kit, "scrapm", tb, Basis(), Vector3(0.3, 0.2, 0.24), worn(Color(0.95, 0.72, 0.1), 0.2))
 	_rods(pk, kit, "rubber", [tb + Vector3(0, 0.1, 0), tb + Vector3(0.05, 0.5, 0.15), Vector3(0.35, -0.9, 0.55), Vector3(0.4, -0.35, 0.45), Vector3(0.25, 0.05, 0.3)], 0.045, 6,
 			Color(0.04, 0.04, 0.04))
-	# The wreck, its roof against the magnet's face, tipped a little.
-	var crush := 0.15
-	var roof: float = 0.9 + 0.5 * (1.0 - crush * 0.75)
-	var b := Basis(Vector3.BACK, rng.randf_range(-0.04, 0.04)) * Basis(Vector3.RIGHT, rng.randf_range(-0.03, 0.03))
-	var wheels: int = 15 & ~(1 << rng.randi_range(0, 3))
-	_car(pk, kit, "scrapm", Transform3D(b, Vector3(0, MAGNET_CAR_TOP - roof, 0)), 0, CAR_PAINTS[rng.randi() % CAR_PAINTS.size()], rng.randf_range(0.45, 0.7), crush,
-			rng.randi(), wheels)
+	# The wreck, its roof against the magnet's face, tipped a little (its draws are made either way, so the rim's scrap
+	# stays put).
+	_magnet_wreck(pk, kit, rng, with_car)
 	# Scrap stuck round the rim.
 	for c in range(5):
 		var a3: float = rng.randf() * TAU
 		var p := Vector3(cos(a3) * 0.8, -2.42 + rng.randf_range(-0.05, 0.1), sin(a3) * 0.8)
 		_chunk(pk, kit, "scrapm", p, Basis(Vector3(rng.randf(), rng.randf(), rng.randf()).normalized(), rng.randf() * TAU), Vector3(0.22, 0.06, 0.16) * rng.randf_range(0.8, 1.6),
 				0.4, rng, worn(RUST.lerp(Color(0.3, 0.3, 0.3), rng.randf()), 0.9))
+
+
+## The wreck `scrap_magnet` holds, alone, in the magnet's hanging frame (its roof at MAGNET_CAR_TOP), for the same
+## `variant`.
+static func magnet_car(pk: PropKit, kit: Dictionary, variant: int) -> void:
+	_magnet_wreck(pk, kit, _rng(variant, 81), true)
+
+
+static func _magnet_wreck(pk: PropKit, kit: Dictionary, rng: RandomNumberGenerator, build: bool) -> void:
+	var crush := 0.15
+	var roof: float = 0.9 + 0.5 * (1.0 - crush * 0.75)
+	var b := Basis(Vector3.BACK, rng.randf_range(-0.04, 0.04)) * Basis(Vector3.RIGHT, rng.randf_range(-0.03, 0.03))
+	var wheels: int = 15 & ~(1 << rng.randi_range(0, 3))
+	var paint: Color = CAR_PAINTS[rng.randi() % CAR_PAINTS.size()]
+	var rust: float = rng.randf_range(0.45, 0.7)
+	var seed_v: int = rng.randi()
+	if build:
+		_car(pk, kit, "scrapm", Transform3D(b, Vector3(0, MAGNET_CAR_TOP - roof, 0)), 0, paint, rust, crush, seed_v, wheels)
 
 
 # ======================================================================================

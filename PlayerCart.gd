@@ -7547,6 +7547,10 @@ func _get_ai_input(delta: float) -> Vector2:
 ## or the jumps. While it waits, the stuck checks leave it alone (`_ai_crossing_hold`).
 const AI_CROSSING_LOOK := 140.0
 const AI_CROSSING_BRAKE := 11.0
+## How far past a crossing's stop line a bot counts as committed: it drives on whatever the crossing says.
+const AI_CROSSING_COMMITTED := 4.0
+## The acceleration a bot is taken to have pulling away from a crossing (m/s^2), for when it would get there.
+const AI_CROSSING_ACCEL := 12.0
 var _ai_crossing_hold := false
 
 ## A bot keeps its boost while a level crossing lies within this far ahead on its way.
@@ -7592,11 +7596,26 @@ func _ai_rail_crossing_override(input: Vector2, speed: float) -> Vector2:
 		var road_fwd: Vector3 = -cn.global_transform.basis.z
 		if absf(to.dot(fwd.cross(Vector3.UP))) > 30.0 or fwd.dot(road_fwd) < 0.5:
 			continue
-		var eta: float = maxf(ahead, 0.0) / maxf(speed, 6.0)
-		if not cn.is_closed_for(eta + 0.5, 1.6):
+		var room: float = ahead - float(cn.get("ai_stop_short")) - 3.0
+		# Well past the stop line already (it was open when the bot got there): drive on. Stopping there stood bots in the
+		# Ring's outer lane, where its traffic ran them down.
+		if room < -AI_CROSSING_COMMITTED:
+			continue
+		# When it gets there: between flat out from here (AI_CROSSING_ACCEL) and rolling on at its speed (6 m/s at least).
+		# The slow guess alone put a bot waiting at the line 2s late, and the Ring's traffic met it in the lanes.
+		var d: float = maxf(ahead, 0.0)
+		var eta_slow: float = d / maxf(speed, 6.0)
+		var v0: float = maxf(speed, 0.0)
+		var eta_fast: float = minf((sqrt(v0 * v0 + 2.0 * AI_CROSSING_ACCEL * d) - v0) / AI_CROSSING_ACCEL, eta_slow)
+		var closed := false
+		var n_eta: int = ceili((eta_slow - eta_fast) / 0.5)
+		for k in range(n_eta + 1):
+			if cn.is_closed_for(lerpf(eta_fast, eta_slow, float(k) / float(maxi(n_eta, 1))) + 0.5, 1.6):
+				closed = true
+				break
+		if not closed:
 			continue
 		_ai_crossing_hold = true
-		var room: float = ahead - float(cn.get("ai_stop_short")) - 3.0
 		if room <= 0.5:
 			# At the line: hold still (a brake at a standstill would reverse).
 			input.y = 0.6 if speed > 1.0 else 0.0

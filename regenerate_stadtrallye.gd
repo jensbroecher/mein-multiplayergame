@@ -25,7 +25,7 @@
 #    under PROP_PREFIX (MeshChunker leaves them whole, so DressingColliders makes them solid at race time). Things that
 #    stand by the road add their own boxes (`_solids`).
 # 4. The hazards run on the wall clock: CrossTraffic.gd (the Ring), WreckingBall.gd, SlewHazard.gd (the magnet crane, the
-#    excavator, the tower crane), ShuttleProp.gd (the road roller). Each one the route meets has a HazardGate.gd, so the
+#    excavator, the tower crane), ShuttleProp.gd (the road roller). Each one the route meets can have a HazardGate.gd (HAZARD_GATES, off), so the
 #    bots wait for it as they do at a level crossing.
 #
 # The generator runs headless and cannot render; scratch/lap_shots.tscn renders the route.
@@ -144,7 +144,8 @@ const BELVEDERE_AT := Vector2(882.0, -470.0)
 ## The docks: the demolition site's wrecking ball over the route, the scrapyard's magnet crane, the building site's
 ## excavator, kicker, car park and road roller, the finish at the gasworks.
 const BALL_X := 520.0
-const HANDLER_AT := Vector2(150.0, 702.0)
+## The material handler's slew ring: its stick reaches 29m, so its magnet hangs over the lane (z 680) at slew 0.
+const HANDLER_AT := Vector2(150.0, 709.0)
 const EXCAVATOR_AT := Vector2(-140.0, 921.0)
 const KICKER_X := -240.0
 const CARPARK_X := Vector2(-380.0, -482.0)
@@ -343,7 +344,10 @@ var s_roller := 0.0
 const KICKER := [24.0, 3.3, 8.0]
 ## The terrace's kicker before its drop: [length, rise].
 const TERRACE_KICK := [14.0, 0.9]
-const TERRACE_FACE := 3.0
+## The flight of stairs from the kicker's lip down to the road below the terrace: its run (m along the route) and steps.
+## The road's collision runs straight down their nosings; the stairs are drawn (`_build_terrace_stairs`), not the ribbon.
+const TERRACE_FACE := 9.0
+const TERRACE_STEPS := 15
 
 
 static func _cos2(u: float) -> float:
@@ -438,7 +442,7 @@ func _plan_profile() -> void:
 		if kd > 0.0 and s < s_terrace:
 			var u: float = kd / float(TERRACE_KICK[0])
 			y += float(TERRACE_KICK[1]) * u * u
-		# The drop below the lip: down the wall over TERRACE_FACE metres.
+		# The stairs below the lip: down their nosings over TERRACE_FACE metres.
 		if s >= s_terrace and s < s_terrace + TERRACE_FACE:
 			var top2: float = CITY_Y + 23.3 + float(TERRACE_KICK[1])
 			y = lerpf(top2, cur[i], (s - s_terrace) / TERRACE_FACE)
@@ -456,7 +460,7 @@ func _plan_profile() -> void:
 	var at := 0.0
 	for i in range(n - 1):
 		var g: float = absf(cur[i + 1] - cur[i])
-		if g > steep and absf(float(i) - s_terrace) > 4.0 and absf(float(i) - s_kicker) > 8.0:
+		if g > steep and (float(i) < s_terrace - 4.0 or float(i) > s_terrace + TERRACE_FACE + 4.0) and absf(float(i) - s_kicker) > 8.0:
 			steep = g
 			at = float(i)
 	print("  route %.0fm, finish at %.0fm; road %.1f to %.1fm; steepest %.1f%% at %.0fm (off the jumps)" % [route_len, _finish_s, _min(cur), _max(cur), steep * 100.0, at])
@@ -1255,6 +1259,9 @@ func _build_roads(root: Node3D) -> void:
 			if (ROUTE_BODIES[bk][1] as Array).has(kind):
 				body_key = bk
 		var n_steps: int = maxi(1, ceili(s1 - s0))
+		# This section's solid triangles. A PackedVector3Array is copied when read out of the dictionary: appending
+		# through `_route_faces[key] as PackedVector3Array` filled a copy, and the route had no road collision at all.
+		var sec_faces := PackedVector3Array()
 		var r0 := 0
 		while r0 < n_steps:
 			var r1: int = mini(r0 + 48, n_steps)
@@ -1265,6 +1272,8 @@ func _build_roads(root: Node3D) -> void:
 				var sb: float = lerpf(s0, s1, float(i + 1) / float(n_steps))
 				var w: float = _half_at((sa + sb) * 0.5)
 				var lats: Array = [-w, -ROAD_HALF, -ROAD_HALF * 0.5, 0.0, ROAD_HALF * 0.5, ROAD_HALF, w] if w > ROAD_HALF + 0.1 else [-w, -w * 0.5, 0.0, w * 0.5, w]
+				# Over the terrace's stairs the ribbon is solid but not drawn: the stairs are.
+				var drawn: bool = not ((sa + sb) * 0.5 > s_terrace and (sa + sb) * 0.5 < s_terrace + TERRACE_FACE)
 				for j in range(lats.size() - 1):
 					var quad: Array = [[sa, lats[j]], [sa, lats[j + 1]], [sb, lats[j]], [sb, lats[j + 1]]]
 					for t in [[0, 2, 1], [1, 2, 3]]:
@@ -1282,9 +1291,10 @@ func _build_roads(root: Node3D) -> void:
 							st.set_color(Color(clampf(edge / 4.0, 0.0, 1.0), 0.0, 0.0, 1.0))
 							st.set_uv(Vector2(lv, sv))
 							st.set_uv2(Vector2(float(kind), ROAD_HALF))
-							st.add_vertex(pos)
+							if drawn:
+								st.add_vertex(pos)
 							if body_key != "":
-								(_route_faces[body_key] as PackedVector3Array).append(pos)
+								sec_faces.append(pos)
 			var mesh: ArrayMesh = st.commit()
 			mesh.surface_set_material(0, _road_mat)
 			var mi := MeshInstance3D.new()
@@ -1293,6 +1303,10 @@ func _build_roads(root: Node3D) -> void:
 			node.add_child(mi)
 			piece += 1
 			r0 = r1
+		if body_key != "":
+			var all_faces: PackedVector3Array = _route_faces[body_key]
+			all_faces.append_array(sec_faces)
+			_route_faces[body_key] = all_faces
 	_build_ring_road(node)
 	print("  roads: %d pieces" % piece)
 
@@ -1489,6 +1503,21 @@ func _build_water(root: Node3D) -> void:
 	canal.position = Vector3(0, CANAL_WATER, 0)
 	canal.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	root.add_child(canal)
+	# Every water body for the carts (StadtWater.gd as the level's "RiverWater"): PlayerCart took only the moat, and a cart
+	# in the pond or the canal drove over a dry bed under the drawn water.
+	var sw := Node3D.new()
+	sw.name = "RiverWater"
+	sw.set_script(load("res://StadtWater.gd"))
+	var moat_r: Array = [MOAT_X.x - 26.0, MOAT_Z - MOAT_HALF - 8.0, MOAT_X.y + 26.0, MOAT_Z + MOAT_HALF + 8.0, MOAT_WATER]
+	var canal_r: Array = [-2600.0, CANAL_Z - CANAL_HALF - 2.0, 2600.0, CANAL_Z + CANAL_HALF + 2.0, CANAL_WATER]
+	sw.set("rects", [moat_r, canal_r])
+	sw.set("ellipses", [[POND_C.x, POND_C.y, rx, rz, _pond_y]])
+	var wb := Rect2(Vector2(moat_r[0], moat_r[1]), Vector2.ZERO)
+	for r in [moat_r, canal_r]:
+		wb = wb.expand(Vector2(r[0], r[1])).expand(Vector2(r[2], r[3]))
+	wb = wb.expand(Vector2(POND_C.x - rx, POND_C.y - rz)).expand(Vector2(POND_C.x + rx, POND_C.y + rz))
+	sw.set("water_bounds", wb)
+	level.add_child(sw)
 
 
 # ======================================================================================
@@ -1503,10 +1532,12 @@ func _checkpoints() -> Array:
 	out.append(float(_turn(6)["s1"]) + 90.0)
 	out.append(0.5 * (float(_turn(10)["s1"]) + float(_turn(11)["s0"])))
 	out.append(float(_turn(13)["s0"]) - 40.0)
-	out.append(s_terrace + 110.0)
+	# At the stairs' foot, before the boost pads on the sunken road's banks (its feet stand in their line further on).
+	out.append(s_terrace + 35.0)
 	out.append(float(_turn(15)["s1"]) + 60.0)
 	out.append(s_ball + 120.0)
-	out.append(float(_turn(18)["s1"]) + 150.0)
+	# Before the scrapyard's handler, clear of its swing (at +150 the car on its magnet swept through the gate's truss).
+	out.append(float(_turn(18)["s1"]) + 80.0)
 	out.append(float(_turn(19)["s1"]) + 90.0)
 	out.append(s_kicker + 130.0)
 	return out
@@ -1570,6 +1601,46 @@ func _place_gameplay(root: Node3D) -> void:
 		bp.position = sp2["pos"]
 		bp.rotation_degrees = Vector3(0, sp2["yaw"], 0)
 		pads.add_child(bp)
+	# On the grass banks of the sunken road below the terrace (the user's idea): ride up the bank for a boost. Each stands on
+	# the bank's slope (BoostPad settles onto it and tilts with it) and faces along the route.
+	var bank_pads: Array = []
+	for bb in BANK_BOOSTS:
+		bank_pads.append([s_terrace + float(bb[0]), float(bb[1])])
+	for bb in HAFEN_BANK_BOOSTS:
+		bank_pads.append([s_under2 + float(bb[0]), float(bb[1])])
+	for i in range(bank_pads.size()):
+		var bb: Array = bank_pads[i]
+		var sp3: Dictionary = _spot(float(bb[0]), float(bb[1]), 0.0)
+		var bpos: Vector3 = sp3["pos"]
+		# Reserved, so the dressing built after (lamps, trees, signs) keeps off it and the run along the bank past it.
+		_note_rect(Vector2(bpos.x, bpos.z), 7.0, 7.0, 0.0)
+		var ahead: Dictionary = _spot(float(bb[0]) + 14.0, float(bb[1]), 0.0)
+		_note_rect(Vector2((ahead["pos"] as Vector3).x, (ahead["pos"] as Vector3).z), 7.0, 14.0, 0.0)
+		var bpad: Node3D = boost_scene.instantiate()
+		bpad.name = "BankBoost_%d" % (i + 1)
+		bpad.position = Vector3(bpos.x, _ground_at(bpos.x, bpos.z) + 0.08, bpos.z)
+		bpad.rotation_degrees = Vector3(0, sp3["yaw"], 0)
+		pads.add_child(bpad)
+
+
+## Whether the hazards get a HazardGate.gd, which holds the bots short of a hazard until it is clear. Off: the user found the
+## waits too long and wants the bots to take their chances (some get blown up). The gates are still set up, only not added.
+const HAZARD_GATES := false
+
+
+func _add_hazard_gate(node: Node3D, gate: Node3D) -> void:
+	if HAZARD_GATES:
+		node.add_child(gate)
+	else:
+		gate.free()
+
+
+## [s past the terrace's lip, lateral]: boost pads on the sunken road's banks, left and right in turn, clear of the
+## checkpoint (35m) and the garden's exit gate (155m).
+const BANK_BOOSTS := [[70.0, -12.0], [90.0, 12.0], [114.0, -12.0]]
+## [s past the second railway underpass, lateral]: more on the Hafenstraße's banks down to the docks (the road runs in a
+## cutting there, the banks rising from 10m out to 3m at 16m).
+const HAFEN_BANK_BOOSTS := [[172.0, -13.0], [212.0, 13.0], [262.0, -13.0], [302.0, 13.0], [352.0, -13.0]]
 
 
 ## The jumps' lips for scratch/nyota_jump_test (the TrackPath's jump_lips): the moat bridge's crest, the terrace, the
@@ -2594,7 +2665,9 @@ func _build_city_blocks(root: Node3D) -> void:
 				# The row in houses of 12-20m, each its own height and colour.
 				var dir: Vector2 = (b - a).normalized()
 				var total: float = a.distance_to(b)
-				var u := 0.0
+				# A row starts one house deep in from its corner: the row before it fills the corner. Both filled it, and
+				# their walls (and gables) lay in one plane there and flickered.
+				var u := 14.0
 				while u < total - 4.0:
 					var w: float = minf(rng.randf_range(12.0, 20.0), total - u)
 					var pa: Vector2 = a + dir * u
@@ -2848,7 +2921,7 @@ func _build_ring(root: Node3D) -> void:
 	gate.set("ai_stop_short", RING_HALF + 3.0)
 	gate.set("road_half", ROAD_HALF)
 	gate.set("reach", RING_HALF)
-	node.add_child(gate)
+	_add_hazard_gate(node, gate)
 	print("  Ring: %d vehicles a cycle of %.0fs (%d kinds)" % [slots.size() / 4, RING_PERIOD, meshes.size()])
 	_build_catenary(node)
 	_build_ring_furniture(node, body, rng)
@@ -3331,6 +3404,99 @@ func _build_terrace(body: StaticBody3D) -> void:
 	mi.name = "TerraceLipFaces"
 	mi.mesh = _save_res(mesh, "terrace_lip", PROP_PREFIX)
 	level.add_child(mi)
+	_build_terrace_stairs(body)
+
+
+## The flight of stairs from the kicker's lip down to the road below (TERRACE_FACE, TERRACE_STEPS), as wide as the road:
+## each tread level with the road's (collision) line at its front edge, so that line runs down the nosings; a parapet
+## along each side with a coping, solid.
+func _build_terrace_stairs(body: StaticBody3D) -> void:
+	var tk: Script = _town
+	if tk == null:
+		return
+	var pk: PropKit = tk.new_kit(1.0)
+	var kit := {}
+	var tread_col := Color(0.82, 0.77, 0.68)
+	var riser_col := Color(0.66, 0.6, 0.52)
+	var nose_col := Color(0.9, 0.87, 0.8)
+	var top: float = CITY_Y + 23.3
+	var w: float = ROAD_HALF
+	var run: float = TERRACE_FACE / float(TERRACE_STEPS)
+	var prev_y: float = _lap_y(s_terrace)
+	for k in range(TERRACE_STEPS):
+		var s0: float = s_terrace + float(k) * run
+		var s1: float = s0 + run
+		var y: float = _lap_y(s1)
+		var f: Vector3 = _rt(s0)
+		var a0: Vector3 = _pt(s0) - f * w
+		var b0: Vector3 = _pt(s0) + f * w
+		var a1: Vector3 = _pt(s1) - f * w
+		var b1: Vector3 = _pt(s1) + f * w
+		var fwd: Vector3 = (_pt(s1) - _pt(s0)).normalized()
+		# The riser at the tread's back, from the step above down to this tread (facing down the flight).
+		pk.quad(kit, "ashlar", [Vector3(a0.x, y, a0.z), Vector3(b0.x, y, b0.z), Vector3(b0.x, prev_y, b0.z), Vector3(a0.x, prev_y, a0.z)], fwd, riser_col,
+				[Vector2(-w, y - top), Vector2(w, y - top), Vector2(w, prev_y - top), Vector2(-w, prev_y - top)])
+		# The tread, its front 6cm a lighter nosing.
+		var sn: float = s1 - 0.06
+		var an: Vector3 = _pt(sn) - f * w
+		var bn: Vector3 = _pt(sn) + f * w
+		pk.quad(kit, "ashlar", [Vector3(a0.x, y, a0.z), Vector3(an.x, y, an.z), Vector3(bn.x, y, bn.z), Vector3(b0.x, y, b0.z)], Vector3.UP, tread_col,
+				[Vector2(-w, s0), Vector2(-w, sn), Vector2(w, sn), Vector2(w, s0)])
+		pk.quad(kit, "ashlar", [Vector3(an.x, y, an.z), Vector3(a1.x, y, a1.z), Vector3(b1.x, y, b1.z), Vector3(bn.x, y, bn.z)], Vector3.UP, nose_col,
+				[Vector2(-w, sn), Vector2(-w, s1), Vector2(w, s1), Vector2(w, sn)])
+		prev_y = y
+	# The parapets: from the lip to the foot, 0.6m wide outside the road's edge, standing 0.55m over the nosings' line.
+	var ps0: float = s_terrace - 0.5
+	var ps1: float = s_terrace + TERRACE_FACE + 0.5
+	var stone := Color(0.78, 0.72, 0.62)
+	for side in [-1.0, 1.0]:
+		var pts: Array = []
+		var s: float = ps0
+		while s <= ps1 + 0.01:
+			pts.append(s)
+			s += 0.5
+		for i in range(pts.size() - 1):
+			var sa: float = pts[i]
+			var sb: float = pts[i + 1]
+			var ra: Vector3 = _rt(sa) * side
+			var rb: Vector3 = _rt(sb) * side
+			var ia: Vector3 = _pt(sa) + ra * (w + 0.02)
+			var ib: Vector3 = _pt(sb) + rb * (w + 0.02)
+			var oa: Vector3 = _pt(sa) + ra * (w + 0.62)
+			var ob: Vector3 = _pt(sb) + rb * (w + 0.62)
+			var ta: float = maxf(_lap_y(sa), _lap_y(clampf(sa, s_terrace, ps1))) + 0.55
+			var tb: float = maxf(_lap_y(sb), _lap_y(clampf(sb, s_terrace, ps1))) + 0.55
+			var ba: float = minf(_ground_at(oa.x, oa.z), _lap_y(sa)) - 0.6
+			var bb: float = minf(_ground_at(ob.x, ob.z), _lap_y(sb)) - 0.6
+			var ua: float = sa - s_terrace
+			var ub: float = sb - s_terrace
+			# Outer face, inner face (down to the treads), the coping on top.
+			pk.quad(kit, "ashlar", [Vector3(oa.x, ba, oa.z), Vector3(ob.x, bb, ob.z), Vector3(ob.x, tb, ob.z), Vector3(oa.x, ta, oa.z)], ra, stone,
+					[Vector2(ua, ba - top), Vector2(ub, bb - top), Vector2(ub, tb - top), Vector2(ua, ta - top)])
+			pk.quad(kit, "ashlar", [Vector3(ia.x, _lap_y(sa) - 0.5, ia.z), Vector3(ib.x, _lap_y(sb) - 0.5, ib.z), Vector3(ib.x, tb, ib.z), Vector3(ia.x, ta, ia.z)], -ra, stone,
+					[Vector2(ua, -1.0), Vector2(ub, -1.0), Vector2(ub, 0.0), Vector2(ua, 0.0)])
+			pk.quad(kit, "ashlar", [Vector3(ia.x, ta + 0.08, ia.z), Vector3(ib.x, tb + 0.08, ib.z), Vector3(ob.x, tb + 0.08, ob.z), Vector3(oa.x, ta + 0.08, oa.z)], Vector3.UP,
+					nose_col, [Vector2(ua, 0.0), Vector2(ub, 0.0), Vector2(ub, 0.6), Vector2(ua, 0.6)])
+			pk.quad(kit, "ashlar", [Vector3(ia.x, ta, ia.z), Vector3(ib.x, tb, ib.z), Vector3(ib.x, tb + 0.08, ib.z), Vector3(ia.x, ta + 0.08, ia.z)], -ra, nose_col)
+			pk.quad(kit, "ashlar", [Vector3(oa.x, ta, oa.z), Vector3(ob.x, tb, ob.z), Vector3(ob.x, tb + 0.08, ob.z), Vector3(oa.x, ta + 0.08, oa.z)], ra, nose_col)
+		# Solid: a box along each parapet, tilted down the flight.
+		var p0: Vector3 = _pt(s_terrace) + _rt(s_terrace) * side * (w + 0.32)
+		var p1: Vector3 = _pt(s_terrace + TERRACE_FACE) + _rt(s_terrace + TERRACE_FACE) * side * (w + 0.32)
+		p0.y = _lap_y(s_terrace) + 0.27
+		p1.y = _lap_y(s_terrace + TERRACE_FACE) + 0.27
+		var zax: Vector3 = (p1 - p0).normalized()
+		var xax: Vector3 = _rt(s_terrace)
+		var yax: Vector3 = zax.cross(xax).normalized()
+		if yax.y < 0.0:
+			xax = -xax
+			yax = -yax
+		_box(body, Transform3D(Basis(xax, yax, zax), (p0 + p1) * 0.5 - yax * 0.84), Vector3(0.6, 2.4, p0.distance_to(p1) + 0.6))
+	var mesh: ArrayMesh = tk.commit(pk, kit)
+	_share_materials(mesh)
+	var mi := MeshInstance3D.new()
+	mi.name = "TerraceStairs"
+	mi.mesh = _save_res(mesh, "terrace_stairs", PROP_PREFIX)
+	level.add_child(mi)
 
 
 ## Benches and lanterns along the paths, botanical labels, a sundial, urns, a statue, the plan by the gate.
@@ -3341,7 +3507,9 @@ func _build_garden_furniture(body: StaticBody3D, rng: RandomNumberGenerator) -> 
 	var labels_txt: Array = ["Ginkgo biloba", "Quercus robur", "Tilia cordata", "Magnolia kobus", "Rosa gallica", "Dahlia pinnata",
 		"Salvia splendens", "Begonia semperflorens", "Aster amellus", "Lavandula angustifolia", "Gentiana acaulis", "Saxifraga paniculata"]
 	while s < s_exit - 20.0:
-		if _kind_at(_road_kinds(), s) == 10 and absf(_at(s)["k"]) < 0.03 and absf(s - s_terrace) > 30.0:
+		# None from the terrace on: below it the road is sunk between banks with boost pads on them (BANK_BOOSTS), and a lamp
+		# and a bench stood in the first pad's way.
+		if _kind_at(_road_kinds(), s) == 10 and absf(_at(s)["k"]) < 0.03 and s < s_terrace - 30.0:
 			var sp: Dictionary = _spot(s, side * (ROAD_HALF + 2.2), 0.0)
 			var p: Vector3 = sp["pos"]
 			var face: Vector3 = -(sp["right"] as Vector3) * side
@@ -3502,8 +3670,10 @@ func _build_demolition(node: Node3D, rng: RandomNumberGenerator) -> void:
 	wb.set("ball_radius", ball_r)
 	wb.set("wall_deg", wall)
 	wb.set("out_deg", outd)
-	# Held at the far end so the road stays clear long enough for the bots' gate (see WreckingBall.gd).
-	wb.set("hold", BALL_HOLD)
+	# Fast and free (the user wanted it quicker, no pause, and deadly): its gate gets tight margins instead.
+	wb.set("gravity", BALL_GRAVITY)
+	wb.set("hold", 0.0)
+	wb.set("kills", true)
 	wb.set("crash", _streams(["res://sounds/stadtrallye/wrecking_ball_crash_1.wav", "res://sounds/stadtrallye/wrecking_ball_crash_2.wav"]))
 	wb.set("clang", _stream("res://sounds/stadtrallye/wrecking_ball_clang.wav"))
 	wb.set("whoosh", _stream("res://sounds/stadtrallye/wrecking_ball_whoosh.wav"))
@@ -3528,8 +3698,14 @@ func _build_demolition(node: Node3D, rng: RandomNumberGenerator) -> void:
 	gate.set("ai_stop_short", 14.0)
 	gate.set("road_half", ROAD_HALF)
 	gate.set("reach", ball_r + 1.5)
-	node.add_child(gate)
-	print("  wrecking ball: line %.1fm, wall %.1f, out %.1f degrees (cycle %.1fs with a %.1fs hold)" % [length, wall, outd, (TAU - 2.0 * acos(wall / outd)) / sqrt(14.0 / length) + BALL_HOLD, BALL_HOLD])
+	# Its clear gaps are short: the bot's crossing takes under a second there, and a bot keeps to the middle of the road,
+	# so only the ball over its lane (3.5m a side) counts. Over the whole road's width it was open 0.7s a swing.
+	gate.set("lead", 0.3)
+	gate.set("trail", 0.6)
+	gate.set("own_margin", 0.5)
+	gate.set("road_half", 3.5)
+	_add_hazard_gate(node, gate)
+	print("  wrecking ball: line %.1fm, wall %.1f, out %.1f degrees (cycle %.1fs)" % [length, wall, outd, (TAU - 2.0 * acos(wall / outd)) / sqrt(BALL_GRAVITY / length)])
 	# Rubble heaps against the ruin and along the site, skips, a parked excavator with its grapple.
 	for rh in [[Vector2(BALL_X - 44.0, ruin_front + 14.0), 16.0, 12.0, 4.5], [Vector2(BALL_X + 46.0, ruin_front + 8.0), 12.0, 9.0, 3.2],
 			[Vector2(BALL_X - 110.0, 470.0), 14.0, 10.0, 3.6], [Vector2(BALL_X + 110.0, 474.0), 18.0, 12.0, 4.0], [Vector2(BALL_X - 70.0, 392.0), 12.0, 8.0, 2.8]]:
@@ -3560,8 +3736,8 @@ func _build_demolition(node: Node3D, rng: RandomNumberGenerator) -> void:
 	_site_fence_line(node, body, Vector2(380.0, 372.0), Vector2(700.0, 372.0), rng)
 
 const RUIN_GAP := ROAD_HALF + 10.0
-## Seconds the wrecking ball is held at the far end of its swing (WreckingBall.hold).
-const BALL_HOLD := 4.5
+## The wrecking ball's pendulum gravity (WreckingBall.gravity): 28 swings it in 7.2s, 13 m/s over the road.
+const BALL_GRAVITY := 28.0
 
 
 ## A Bauzaun (BaustelleKit.site_fence) along a line, in pieces on the ground, open where the route crosses it.
@@ -3672,20 +3848,30 @@ func _build_scrapyard(node: Node3D, rng: RandomNumberGenerator) -> void:
 	var hb: Transform3D = Transform3D(Basis(), Vector3(HANDLER_AT.x, g0, HANDLER_AT.y))
 	_add_prop("schrott_handler", _scrap, hb, func(pk, kit, labels): _kit_call(_scrap, "material_handler", [pk, kit, labels]), 2000.0)
 	_solids(body, _kit_call(_scrap, "material_handler_solids", []), hb)
+	# The upper (CarDropCrane.gd) slews the magnet out over the lane, drops its wreck on the road, lets it lie, pulls it back up.
 	var slew := Node3D.new()
 	slew.name = "MagnetCrane"
-	slew.set_script(load("res://SlewHazard.gd"))
+	slew.set_script(load("res://CarDropCrane.gd"))
 	slew.position = Vector3(HANDLER_AT.x, g0 + ring_y, HANDLER_AT.y)
+	var hang_w: Vector3 = slew.position + tipv
+	var road_y: float = _lap_y(_closest_s(Vector2(hang_w.x, hang_w.z)))
+	var car_bottom: float = hang_w.y + hit_c.y - hit_h.y
+	var drop: float = car_bottom - road_y - 0.03
 	slew.set("centre_deg", 0.0)
-	slew.set("amplitude_deg", 82.0)
-	slew.set("move", 5.5)
-	slew.set("dwell", 3.5)
-	slew.set("hits", true)
-	slew.set("hit_centre", hit_c)
-	slew.set("hit_half", hit_h)
+	slew.set("pile_deg", 82.0)
+	slew.set("move", 5.0)
+	slew.set("dwell", 3.0)
+	slew.set("hover", 0.8)
+	slew.set("drop", drop)
+	slew.set("lie", 3.5)
+	slew.set("lift", 1.6)
 	slew.set("hang", NodePath("Hang"))
+	slew.set("car", NodePath("Hang/Car"))
+	slew.set("car_centre", hit_c)
+	slew.set("car_half", hit_h)
 	slew.set("motor", _stream("res://sounds/stadtrallye/handler_hydraulics_loop.wav"))
 	slew.set("clang", _stream("res://sounds/stadtrallye/magnet_clang.wav"))
+	slew.set("crash", _stream("res://sounds/stadtrallye/wrecking_ball_crash_2.wav"))
 	var um: ArrayMesh = _kit_mesh(_scrap, "handler_upper", func(pk, kit): _kit_call(_scrap, "material_handler_upper", [pk, kit]))
 	if um != null:
 		var umi := MeshInstance3D.new()
@@ -3697,13 +3883,24 @@ func _build_scrapyard(node: Node3D, rng: RandomNumberGenerator) -> void:
 	hang.name = "Hang"
 	hang.position = tipv
 	slew.add_child(hang)
-	var mm: ArrayMesh = _kit_mesh(_scrap, "scrap_magnet", func(pk, kit): _kit_call(_scrap, "scrap_magnet", [pk, kit, 3]))
+	var mm: ArrayMesh = _kit_mesh(_scrap, "scrap_magnet", func(pk, kit): _kit_call(_scrap, "scrap_magnet", [pk, kit, 3, false]))
 	if mm != null:
 		var mmi := MeshInstance3D.new()
 		mmi.name = "Magnet"
 		mmi.mesh = mm
 		mmi.scale = Vector3.ONE * PROP_SCALE
 		hang.add_child(mmi)
+	var car_node := Node3D.new()
+	car_node.name = "Car"
+	hang.add_child(car_node)
+	var wm: ArrayMesh = _kit_mesh(_scrap, "magnet_car", func(pk, kit): _kit_call(_scrap, "magnet_car", [pk, kit, 3]))
+	if wm != null:
+		var wmi := MeshInstance3D.new()
+		wmi.name = "Wreck"
+		wmi.mesh = wm
+		wmi.scale = Vector3.ONE * PROP_SCALE
+		car_node.add_child(wmi)
+	print("  magnet crane: drops its car %.1fm onto the road (cycle %.1fs)" % [drop, 2.0 * 5.0 + 3.0 + 0.8 + sqrt(2.0 * drop / 24.0) + 3.5 + 1.6])
 	node.add_child(slew)
 	_note_rect(HANDLER_AT, 14.0, 14.0, 0.0)
 	var gate := Node3D.new()
@@ -3716,7 +3913,7 @@ func _build_scrapyard(node: Node3D, rng: RandomNumberGenerator) -> void:
 	gate.set("ai_stop_short", 16.0)
 	gate.set("road_half", ROAD_HALF)
 	gate.set("reach", 5.0)
-	node.add_child(gate)
+	_add_hazard_gate(node, gate)
 	# The yard's corrugated fence round its pad, open where the route comes in and goes out.
 	var pr: Array = []
 	for p in PADS:
@@ -3822,7 +4019,7 @@ func _build_building_site(node: Node3D, rng: RandomNumberGenerator) -> void:
 	gate.set("ai_stop_short", 14.0)
 	gate.set("road_half", ROAD_HALF)
 	gate.set("reach", 5.0)
-	node.add_child(gate)
+	_add_hazard_gate(node, gate)
 	# The car park under construction the route drives through.
 	var cp0: Dictionary = _spot(s_carpark0, 0.0, 0.0)
 	var cp_at: Vector3 = cp0["pos"]
@@ -3835,7 +4032,11 @@ func _build_building_site(node: Node3D, rng: RandomNumberGenerator) -> void:
 	_note_xf(pxf, -20.0 * PROP_SCALE, 20.0 * PROP_SCALE, -plen * PROP_SCALE, 0.0, 1.0)
 	# The road roller (ShuttleProp.gd) up and down the road's north half after the car park.
 	var rs: float = s_roller
-	var rsp: Dictionary = _spot(rs, 3.6, 0.0)
+	var rm: ArrayMesh = _kit_mesh(_baustelle, "road_roller", func(pk, kit): _kit_call(_baustelle, "road_roller", [pk, kit]))
+	# Against the road's edge (its side 0.3m in), so it leaves the road's middle free: 3.6m out it stood over the middle,
+	# where the bots drive, and they crawled behind it until the stuck check respawned them.
+	var r_half: float = (rm.get_aabb().size.x * PROP_SCALE * 0.5) if rm != null else 1.8
+	var rsp: Dictionary = _spot(rs, ROAD_HALF - r_half - 0.3, 0.0)
 	var rat: Vector3 = rsp["pos"]
 	rat.y = _lap_y(rs) + 0.02
 	var roller := AnimatableBody3D.new()
@@ -3848,7 +4049,6 @@ func _build_building_site(node: Node3D, rng: RandomNumberGenerator) -> void:
 	roller.set("dwell", 3.0)
 	roller.set("motor", _stream("res://sounds/stadtrallye/roller_loop.wav"))
 	roller.set("beeper", _stream("res://sounds/stadtrallye/reverse_beeper_loop.wav"))
-	var rm: ArrayMesh = _kit_mesh(_baustelle, "road_roller", func(pk, kit): _kit_call(_baustelle, "road_roller", [pk, kit]))
 	if rm != null:
 		var rmi := MeshInstance3D.new()
 		rmi.name = "Body"

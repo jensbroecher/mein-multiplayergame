@@ -8,14 +8,14 @@ extends Node3D
 ## The swing is a pendulum that strikes the building: it leaves the wall at `wall_deg` (from the vertical, toward +z)
 ## swinging out, crosses under the hang point (over the road) to `out_deg` on the far side, comes back and strikes the
 ## wall again: a free pendulum (gravity `gravity` along a line `length` long) between strikes, so it slows at the far
-## end and is fastest over the road. At the far end it is held still for `hold` seconds (the operator braking it on the
-## drag line), where it stops anyway, so the road stays clear long enough to cross: free, it was off the road for 3.6s
-## of every 10s and the bots' HazardGate, which wants about 4.4s, never opened. At each strike: a burst of dust and
-## debris off the wall and a crash (`crash`).
+## end and is fastest over the road. `hold` can keep it still at the far end for a while (the operator braking it on the
+## drag line); Quer durch Kronburg swings it free and fast (`gravity` 28) and gives its gate tighter margins instead. At
+## each strike: a burst of dust and debris off the wall and a crash (`crash`).
 ##
-## The ball's sphere (`ball_radius`, its centre `length` down the line) throws a cart it meets (this peer's carts only):
-## along the ball's way, up, and spinning (PlayerCart.apply_blast_impulse), and with a clang (`clang`). Not destroyed:
-## a cart can drive on. `cover_intervals(gate)` (for HazardGate.gd) says when in the cycle the ball is over the road.
+## The ball's sphere (`ball_radius`, its centre `length` down the line) destroys a cart it meets (`kills`, this peer's
+## carts only), with a clang (`clang`); with `kills` off it throws the cart instead: along the ball's way, up, and
+## spinning (PlayerCart.apply_blast_impulse). `cover_intervals(gate)` (for HazardGate.gd) says when in the cycle the ball
+## is over the road.
 
 @export var length := 48.0
 @export var ball_radius := 1.7
@@ -37,6 +37,8 @@ extends Node3D
 ## Seconds into the day; set to hold the ball still for tests and shots (negative: the wall clock).
 @export var clock_override := -1.0
 @export var hits := true
+## Destroy a cart the ball meets (as the Ring's traffic does); off, it throws the cart.
+@export var kills := true
 
 signal cart_hit(cart: Node)
 
@@ -206,7 +208,12 @@ func _check_hits(t: float) -> void:
 		var dv: Vector3 = dir * maxf(absf(w_speed) * throw_gain, 8.0) + Vector3.UP * throw_up
 		print("WreckingBall %s hit cart %s (%.1f m/s)" % [name, cart.name, absf(w_speed)])
 		cart_hit.emit(cart)
-		if cart.has_method("apply_blast_impulse"):
+		if kills and cart.has_method("explode"):
+			if multiplayer.multiplayer_peer != null:
+				cart.explode_rpc.rpc(0, "wrecking_ball")
+			else:
+				cart.explode(0, "wrecking_ball")
+		elif cart.has_method("apply_blast_impulse"):
 			cart.apply_blast_impulse(dv * cart.mass)
 		else:
 			cart.apply_central_impulse(dv * cart.mass)
