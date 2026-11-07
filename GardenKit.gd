@@ -3185,10 +3185,11 @@ static func stone_bridge(pk: PropKit, kit: Dictionary, length: float, rise: floa
 		var xb: float = maxf(xin, xout)
 		var f_in: int = 2 if sx5 > 0.0 else 1
 		var f_out: int = 1 if sx5 > 0.0 else 2
-		# The string course: the road's line on the face, 9cm proud.
+		# The string course: the road's line on the face, 9cm proud. Its ends stop 4cm inside the end newels (ending at
+		# the bridge's ends, they lay in the newels' end faces and flickered).
 		var sa: float = minf(sx5 * (W - 0.02), sx5 * (W + 0.09))
 		var sb: float = maxf(sx5 * (W - 0.02), sx5 * (W + 0.09))
-		_hump_band(pk, kit, "ashlar", length, rise, -L2, L2, sa, sb, -0.14, 0.1, trim, f_out | 4 | 8 | 16)
+		_hump_band(pk, kit, "ashlar", length, rise, -L2 + 0.04, L2 - 0.04, sa, sb, -0.14, 0.1, trim, f_out | 4 | 8 | 16)
 		if style == 0:
 			_hump_band(pk, kit, "ashlar", length, rise, -L2 + 0.7, L2 - 0.7, xa, xb, -BRIDGE_UNDER - 0.06, 0.9, stone, f_in | f_out)
 			var ca: float = minf(sx5 * half, sx5 * (W + 0.06))
@@ -3208,13 +3209,18 @@ static func stone_bridge(pk: PropKit, kit: Dictionary, length: float, rise: floa
 					bp.append(Vector3(xm, bridge_deck_y(zz, length, rise) + 0.29, zz))
 				_balustrade_run(pk, kit, bp, 0.72, SAND_LIGHT, 3.2, 0, 0, 0.44, 0.5, false)
 		for e5 in [-1.0, 1.0]:
-			_bridge_pedestal(pk, kit, length, rise, e5 * (L2 - 0.375), half, W, sx5, 1.3, 0.75, trim, style, true)
-			# The wing wall, splaying out from the newel's outer side into the bank.
+			# The end newel stops 1.5cm short of the bridge's end, whose face below the road (the end wall) lay in its own.
+			_bridge_pedestal(pk, kit, length, rise, e5 * (L2 - 0.39), half, W, sx5, 1.3, 0.75, trim, style, true)
+			# The wing wall, splaying out from the newel's outer side into the bank: a footing slab with the sloped wall
+			# on it under a coping. The footing stands 1.5cm proud of the wall on both faces and runs 2.5cm past its
+			# outer end (so does the coping): the same thickness, their faces shared a plane wherever the wall's foot
+			# dips under the footing's top (2cm at the newel, 57cm at the bank), and it flickered.
 			var wa := Vector3(sx5 * (W - 0.1), 0, e5 * (L2 - 0.3))
 			var wb := Vector3(sx5 * (W + 2.0), 0, e5 * (L2 + 2.2))
-			_slab(pk, kit, "ashlar", wa, wb, 0.45, ybot, 0.25, stone, false, true)
+			var past: Vector3 = (wb - wa).normalized() * 0.025
+			_slab(pk, kit, "ashlar", wa, wb + past, 0.48, ybot, 0.25, stone, true, true)
 			_sloped(pk, kit, "ashlar", wa + Vector3(0, 0.95, 0), wb + Vector3(0, 0.4, 0), 0.45, 0.72, stone, false, true)
-			_sloped(pk, kit, "ashlar", wa + Vector3(0, 1.05, 0), wb + Vector3(0, 0.5, 0), 0.55, 0.12, trim, true, true)
+			_sloped(pk, kit, "ashlar", wa + Vector3(0, 1.05, 0), wb + past + Vector3(0, 0.5, 0), 0.55, 0.12, trim, true, true)
 
 
 ## One voussoir of an arch on a face: the ring between radius ri and ro from angle t0 to t1 about (zc, cy) (in the
@@ -3321,7 +3327,7 @@ static func stone_bridge_solids(length: float, rise: float, half: float, wy: flo
 			out.append([Transform3D(Basis(Vector3.RIGHT, yv, al), Vector3(sx * (half + W) * 0.5, (da + db) * 0.5 + (top - 0.3) * 0.5, (za + zb) * 0.5)),
 					Vector3(W - half, top + 0.3, l + 0.05)])
 		for e in [-1.0, 1.0]:
-			out.append([Transform3D(Basis(), Vector3(sx * (half + W + 0.15) * 0.5, 0.45, e * (L2 - 0.375))), Vector3(W + 0.15 - half, 1.9, 0.75)])
+			out.append([Transform3D(Basis(), Vector3(sx * (half + W + 0.15) * 0.5, 0.45, e * (L2 - 0.39))), Vector3(W + 0.15 - half, 1.9, 0.75)])
 			var wa := Vector3(sx * (W - 0.1), 0, e * (L2 - 0.3))
 			var wb := Vector3(sx * (W + 2.0), 0, e * (L2 + 2.2))
 			var wd: Vector3 = (wb - wa).normalized()

@@ -4012,7 +4012,12 @@ each run deletes first).
   the excavator, the road roller, the site's gear). Windowed previews: `scratch/stadt_preview.gd`, `garden_preview.gd`,
   `scrap_preview.gd`, `baustelle_preview.gd`; `scratch/scrap_contract_check.gd` (headless) builds ScrapKit's props as
   their call sites do. The stone bridges are driven over: their decks lie 5cm (life) under the road's ribbon, on
-  `GardenKit.bridge_deck_y`, the generator's own crest profile.
+  `GardenKit.bridge_deck_y`, the generator's own crest profile. Its wing walls (a footing slab under a sloped wall)
+  had the same thickness, so their faces shared a plane wherever the wall's foot dipped under the footing's top, with
+  the courses running opposite ways on one face: the pond bridge flickered beside its entry. The footing now stands
+  1.5cm proud and runs 2.5cm past the wall's end (as does the coping), the end newels stop 1.5cm short of the bridge's
+  end wall and the string course 4cm inside them. `scratch/zfight_scan.gd -- res://generated/stadtrallyeprop_pond_bridge.res`
+  lists what is left (the balustrade's ends and plinth inside its pedestals, hidden).
 - The hazards run on the wall clock (CrossTraffic.gd, WreckingBall.gd, CarDropCrane.gd, SlewHazard.gd, ShuttleProp.gd).
   The bots take their chances and some get blown up: the user found waiting at gates held them up too long, so the
   generator no longer adds the gates (`HAZARD_GATES` false; they are still set up, and the gate, margin and probe notes
