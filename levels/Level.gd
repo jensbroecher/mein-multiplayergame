@@ -123,6 +123,8 @@ var _split_cameras: Array = []  # SubViewport cameras for splitscreen
 var spectator_camera: Node3D = null
 var player_stats = {} # id -> {"laps": 0, "next_checkpoint_idx": 0, "finished": false, "pos": 0}
 var end_timer = 0.0
+## _end_race_now has queued the end (so a second call doesn't end it twice).
+var _race_ending := false
 var next_finish_pos: int = 1
 
 func get_target_laps() -> int:
@@ -677,8 +679,12 @@ func _check_finish(id: int):
 			elif NetworkManager.players.has(id) and not NetworkManager.players[id].get("is_ai", false):
 				show_player_finished_rpc.rpc_id(id, stats["pos"])
 
-		# Start 30s timer if this is the first finisher
-		if end_timer <= 0.0:
+		# A time trial has nobody else to wait for: the run ends at the line and the lap sheet comes up at once.
+		# Otherwise the first finisher starts the 30s for the rest.
+		if _is_time_trial():
+			_crowd_roar_rpc.rpc()
+			_end_race_now()
+		elif end_timer <= 0.0:
 			end_timer = 30.0
 			_crowd_roar_rpc.rpc()
 
@@ -1227,8 +1233,21 @@ func _start_end_timer_if_humans_done() -> void:
 	for id in player_stats:
 		if NetworkManager.players.has(id) and not NetworkManager.players[id].get("is_ai", false) and not player_stats[id]["finished"]:
 			return
+	if _is_time_trial():
+		_end_race_now()
+		return
 	if end_timer <= 0.0 or end_timer > 10.0:
 		end_timer = 10.0
+
+
+## Ends the race on the next frame, with no countdown (a time trial's finish or disqualification): deferred, so the
+## gate or finish that called it has sent its own timing to the HUD first.
+func _end_race_now() -> void:
+	end_timer = 0.0
+	if race_state != RaceState.RACING or _race_ending:
+		return
+	_race_ending = true
+	_end_race.call_deferred()
 
 
 ## A racer completed a lap (in time trial the next one starts with its boosts). A human's clean lap (no gate missed) faster than the stage's record is

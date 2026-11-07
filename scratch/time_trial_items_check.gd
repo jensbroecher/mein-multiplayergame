@@ -97,9 +97,12 @@ func _ready() -> void:
 	print("  saved: %s" % str(rec))
 	_check(int(rec["run_ms"]) == int(stats["finish_ms"]) and int(rec["runs"]) == 1, "run saved")
 	_check(int(rec["lap_ms"]) > 0 and rec["lap_splits"].size() == cps, "best lap and its splits saved")
-	level._end_race()
+	# The run ends at the line by itself: no 30s countdown, the end screen on the next frame.
+	_check(float(level.end_timer) <= 0.0, "no end countdown")
 	await get_tree().process_frame
 	await get_tree().process_frame
+	_check(level.race_state == level.RaceState.FINISHED, "the race ended at the line")
+	_check(ui.end_panel.visible, "the end screen is up")
 	print("  end screen: %s" % ui.get_node("EndPanel/VBoxContainer/LabelFinished").text)
 	for row in ui.results_container.get_children():
 		_print_texts(row, "    ")
