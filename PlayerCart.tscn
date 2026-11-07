@@ -240,9 +240,16 @@ emission_energy_multiplier = 1.5
 
 [sub_resource type="SphereMesh" id="SphereMesh_tip"]
 material = SubResource("StandardMaterial3D_tip")
-radius = 0.04
-height = 0.08
+radius = 0.02
+height = 0.04
 radial_segments = 8
+rings = 6
+
+[sub_resource type="SphereMesh" id="SphereMesh_mount"]
+material = SubResource("StandardMaterial3D_rod")
+radius = 0.014
+height = 0.028
+radial_segments = 10
 rings = 6
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_sync"]
@@ -410,6 +417,9 @@ mesh = SubResource("CylinderMesh_rod")
 [node name="Tip" type="MeshInstance3D" parent="Visuals/Antenna" unique_id=1367687176]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
 mesh = SubResource("SphereMesh_tip")
+
+[node name="Mount" type="MeshInstance3D" parent="Visuals/Antenna" unique_id=1367687177]
+mesh = SubResource("SphereMesh_mount")
 
 [node name="NameTag" type="Label3D" parent="Visuals" unique_id=1335975530]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.35, 0)

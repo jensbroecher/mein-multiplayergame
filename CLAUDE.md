@@ -2635,6 +2635,12 @@ A clip that comes out quiet (the bubble car's at -37.7 dBFS) is raised in the fi
   `res://scratch/car_live_shot.tscn -- <dir> [level=...] [cars=5,5,0,1,2,3] [carts=100,101]
   [fx=shock,respawn,teleport,fade]` shoots carts in a live race. `scratch/ai_race_test` takes `cars=`, and
   `scratch/menu_shot` takes `car:<index>[:<pattern>]` for the paint shop (it saves nothing).
+- The antenna (a paint shop option) is PlayerCart.tscn's `Visuals/Antenna`: a dark mount ball (round, so it looks the
+  same as the rod sways about its foot), the 0.8m rod and a 2cm glowing tip, stood on the car's `AntennaPlacement`
+  (the builder's `ANTENNA_POS`). Each foot sits 4mm into the surface, a little more on a slope.
+  `scratch/antenna_check.gd` (`-s`, headless, `-- [cars=...]`) measures every car's foot against its body and anything
+  in the rod's way; `scratch/car_preview.gd ... antenna=1` renders the antenna on the car. Ten cars' feet floated up to
+  9cm, one was sunk 5.6cm and the Titan's rod grazed its bed rail before they were set by it.
 - A builder with `build_rear_wheel()` gets its own rear wheel meshes (`<prefix>_rear_wheel_l/r.res`) on `Wheel_RL`/`RR`;
   the others share one wheel mesh at all four corners.
 - The Nocturne (a 917K-style short-tail coupé on slicks) keys its section like the Inferno's, but above the side runs a

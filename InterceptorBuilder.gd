@@ -113,7 +113,7 @@ const PAINT_LAYOUT := {
 	"door_z": -0.06, "door_y": 0.31, "roundel_r": 0.085,
 	"hood_z": -0.85, "hood_r": 0.08, "stripe_w": 0.075, "stripe_gap": 0.03,
 }
-const ANTENNA_POS := Vector3(0.16, 0.805, 0.55)
+const ANTENNA_POS := Vector3(0.16, 0.796, 0.55)
 var _curve_cache := {}                    # z -> the upper curve's samples, for _upper_s()
 
 const WHEEL_POSITIONS := {

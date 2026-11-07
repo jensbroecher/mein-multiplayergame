@@ -67,7 +67,7 @@ const PAINT_LAYOUT := {
 	"door_z": 0.0, "door_y": 0.49, "roundel_r": 0.105,
 	"hood_z": -0.50, "hood_r": 0.095, "stripe_w": 0.07, "stripe_gap": 0.028,
 }
-const ANTENNA_POS := Vector3(-0.10, 0.905, -0.10)
+const ANTENNA_POS := Vector3(-0.10, 0.922, 0.05)
 const WHEEL_POSITIONS := {
 	"FL": Vector3(-WHEEL_X, HUB_Y, AXLE_F), "FR": Vector3(WHEEL_X, HUB_Y, AXLE_F),
 	"RL": Vector3(-WHEEL_X, HUB_Y, AXLE_R), "RR": Vector3(WHEEL_X, HUB_Y, AXLE_R),
