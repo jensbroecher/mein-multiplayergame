@@ -542,5 +542,13 @@
     "duration": 6.0,
     "loop": true,
     "influence": 0.6
+  },
+  {
+    "name": "lightplane_engine",
+    "path": "sounds/kronburg/light_plane_loop.wav",
+    "text": "A small single-engine four-seat propeller aeroplane cruising overhead, the steady buzzing drone of a four-cylinder piston engine and propeller heard from the ground, continuous, constant pitch, no doppler sweep, no wind gusts",
+    "duration": 8.0,
+    "loop": true,
+    "influence": 0.6
   }
 ]

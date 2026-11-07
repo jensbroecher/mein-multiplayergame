@@ -108,8 +108,13 @@ const RAIL_TRACK_OFF := 3.0
 const EMBANK_UNDER := 0.95
 ## The first run starts at -1100, where `_natural` stops the earth embankment: it began at -860, under the Hauptbahnhof's
 ## east half, and the tracks west of the station stood on nothing.
-const WALLED := [[-1100.0, -60.0], [40.0, 160.0], [770.0, 910.0]]
+## The second run reaches on past the Ring bridge to x 300: there the garden's parterre comes so close below the line
+## that an earth bank had no room, and the grading had cut it into a 12m rock-painted cliff under the track's edge.
+const WALLED := [[-1100.0, -60.0], [40.0, 300.0], [770.0, 910.0]]
 const EMBANK_HALF := 12.8
+## The earth embankment's flat crown, either side of the line: the tracks' ballast reaches about 6.8m out. At 6.5 (and
+## with the garden route's grading cutting into its south flank) the track's edge hung over the slope.
+const EMBANK_CROWN := 8.5
 
 ## The Ring: north-south along RING_X, from RING_Z0 to the tunnel's portal at RING_PORTAL_Z (its ramp down from
 ## RING_RAMP_Z). Its cross-section: the median (tram) to 5.5, two lanes to 16.7, the pavement to RING_HALF.
@@ -619,7 +624,7 @@ func _natural(x: float, z: float) -> float:
 		var dr: float = absf(z - RAIL_Z)
 		if dr < 60.0:
 			var top: float = _rail_top(x) - EMBANK_UNDER
-			var ridge: float = top - maxf(dr - 6.5, 0.0) * 0.62
+			var ridge: float = top - maxf(dr - EMBANK_CROWN, 0.0) * 0.62
 			var wall: float = 0.0
 			for w in WALLED:
 				var e: float = minf(x - float(w[0]), float(w[1]) - x)
@@ -925,8 +930,23 @@ func _build_heights() -> void:
 				_road_d[i] = 1e9
 				continue
 			var g: Vector2 = _grade(h, x, z)
+			# The earth embankment's crown and the top of its flanks stay whole where no road is near: the garden route's
+			# grading below it had cut its south flank 2.7m down under the track's edge.
+			if g.y > ROAD_HALF + 6.0:
+				g.x = maxf(g.x, _embank_floor(x, z))
 			_heights[i] = g.x
 			_road_d[i] = minf(g.y, 1.0e7)
+
+
+## The least height the earth embankment keeps at (x, z): its crown and the first metres of its flanks (-INF elsewhere,
+## and where it is walled: the walls and the bridges stand there).
+func _embank_floor(x: float, z: float) -> float:
+	var dr: float = absf(z - RAIL_Z)
+	# Right up to a wall's end and 6m in behind it (hidden in the brickwork; the ground grid is 5m): from 8m off, the
+	# track hung over a gap where the wall stopped.
+	if dr > EMBANK_CROWN + 3.0 or x < RAIL_X.x or x > RAIL_X.y or _walled(x, -6.0) or (x > -1100.0 and x < -760.0):
+		return -INF
+	return _rail_top(x) - EMBANK_UNDER - maxf(dr - EMBANK_CROWN, 0.0) * 0.62
 
 
 ## Ground height at any (x, z) on the mesh's own triangles (each cell split along the diagonal joining its closer heights).
@@ -1932,6 +1952,8 @@ func _ready() -> void:
 	print("  dressing built (%.1fs)" % ((Time.get_ticks_msec() - t_start) / 1000.0))
 
 	level.set("track_path", track_path)
+	# A four-seat touring plane on sightseeing loops over the stage (LightPlane.gd, fitted round the lap at runtime).
+	load("res://LightPlane.gd").add_to(level, "Rundflug", 4.4, true)
 	level._setup_checkpoints()
 	var chunked: int = MeshChunker.chunk_scene(level, "res://generated/" + RES_PREFIX, "res://generated/stadtrallye_chunks", MESH_CHUNK_CELL)
 	print("  chunked %d large meshes" % chunked)
@@ -3025,7 +3047,11 @@ func _build_ring(root: Node3D) -> void:
 		ke.append(int(engine_of.get(k, -1)))
 	traffic.set("engine_sounds", _streams(["res://sounds/stadtrallye/city_car_loop.wav", "res://sounds/stadtrallye/city_suv_loop.wav",
 		"res://sounds/stadtrallye/city_van_loop.wav", "res://sounds/stadtrallye/city_bus_loop.wav"]))
-	traffic.set("engine_rms", PackedFloat32Array([-39.2, -31.9, -33.6, -36.2]))
+	traffic.set("engine_rms", PackedFloat32Array([-16.0, -17.5, -18.5, -19.5]))
+	traffic.set("engine_level", -16.0)
+	# The tram's rumble (raised to -17.2 dBFS RMS: AudioStreamPlayer3D caps a voice at +3 dB, and at -31.6 played at -10
+	# nobody heard it; it had not looped either).
+	traffic.set("tram_db", -1.0)
 	traffic.set("kind_engine", ke)
 	node.add_child(traffic)
 	var gate := Node3D.new()

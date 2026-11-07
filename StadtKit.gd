@@ -697,8 +697,10 @@ static func _bridge_abutment(pk: PropKit, kit: Dictionary, labels: Array, s: flo
 	var bwx: float = fx + s * (BR_BEAR + 0.05)
 	ZK._mq(pk, kit, "brick", Vector3(bwx, 0, -s * BR_HW), along, out, 0.0, BR_HW * 2.0, shelf, h, BRICK)
 	var wfe := ZK._wf(p0, along, out)
-	KT._prism(pk, kit, "ashlar", wfe, PackedVector2Array([Vector2(0.0, shelf - 0.4), Vector2(BR_HW * 2.0, shelf - 0.4), Vector2(BR_HW * 2.0, shelf),
-			Vector2(0.0, shelf)]), -0.2, 0.32, SAND, Vector2(0, 1), false)
+	# The sandstone band under the shelf, running 4cm past both sides (ending flush, its ends lay in the brick side walls'
+	# planes and flickered).
+	KT._prism(pk, kit, "ashlar", wfe, PackedVector2Array([Vector2(-0.04, shelf - 0.4), Vector2(BR_HW * 2.0 + 0.04, shelf - 0.4), Vector2(BR_HW * 2.0 + 0.04, shelf),
+			Vector2(-0.04, shelf)]), -0.2, 0.32, SAND, Vector2(0, 1), false)
 	pk.quad(kit, "ashlar", [Vector3(fx + s * 0.2, shelf, -BR_HW), Vector3(fx + s * 0.2, shelf, BR_HW), Vector3(bwx, shelf, BR_HW), Vector3(bwx, shelf, -BR_HW)],
 			UP, SAND.darkened(0.05))
 	for gz in [-BR_GZ, BR_GZ]:
@@ -708,22 +710,31 @@ static func _bridge_abutment(pk: PropKit, kit: Dictionary, labels: Array, s: flo
 		var po: Vector3 = Vector3(bx, 0, sz * BR_HW) if sz * s > 0.0 else Vector3(fx, 0, sz * BR_HW)
 		var al: Vector3 = Vector3(-s, 0, 0) if sz * s > 0.0 else Vector3(s, 0, 0)
 		ZK._mq(pk, kit, "brick", po, al, Vector3(0, 0, sz), 0.0, BR_ABUT, -1.5, h - 0.35, BRICK)
-		KT._prism(pk, kit, "ashlar", ZK._wf(po, al, Vector3(0, 0, sz)), PackedVector2Array([Vector2(0.0, h - 0.35), Vector2(BR_ABUT, h - 0.35),
-				Vector2(BR_ABUT, h + 0.15), Vector2(0.0, h + 0.15)]), -0.6, 0.2, SAND, Vector2(0, 1), true)
+		# The coping runs 4cm past the bridge's face (flush, its end lay in the face and the wing wall and flickered).
+		# (From po along al: with sz * s > 0 it starts at the back and ends at the face, u = BR_ABUT; else it starts at the face.)
+		var c0: float = 0.0 if sz * s > 0.0 else -0.04
+		var c1: float = BR_ABUT + 0.04 if sz * s > 0.0 else BR_ABUT
+		KT._prism(pk, kit, "ashlar", ZK._wf(po, al, Vector3(0, 0, sz)), PackedVector2Array([Vector2(c0, h - 0.35), Vector2(c1, h - 0.35),
+				Vector2(c1, h + 0.15), Vector2(c0, h + 0.15)]), -0.6, 0.2, SAND, Vector2(0, 1), true)
 	pk.quad(kit, "grime", [Vector3(bwx, h, -BR_HW + 0.6), Vector3(bwx, h, BR_HW - 0.6), Vector3(bx, h, BR_HW - 0.6), Vector3(bx, h, -BR_HW + 0.6)], UP,
 			Color(0.36, 0.34, 0.31))
 	for sz2 in [-1.0, 1.0]:
 		ZK._mq(pk, kit, "brick", Vector3(bx, 0, sz2 * 7.6), Vector3(0, 0, sz2), Vector3(s, 0, 0), 0.0, 1.0, -1.5, h - 0.35, BRICK)
 	# The wing walls, in the face's plane, falling to BR_WING_TOP, 0.9 thick, with a sloped coping and quoins at the end.
 	for sz3 in [-1.0, 1.0]:
-		var u0: float = BR_HW * 2.0 if sz3 * s > 0.0 else -BR_WING
-		var u1: float = BR_HW * 2.0 + BR_WING if sz3 * s > 0.0 else 0.0
+		# Starting 5cm inside the abutment: flush, the wing's end and its coping's end lay in the abutment's side face
+		# (z = +-BR_HW) and flickered against its brick.
+		var u0: float = BR_HW * 2.0 - 0.05 if sz3 * s > 0.0 else -BR_WING
+		var u1: float = BR_HW * 2.0 + BR_WING if sz3 * s > 0.0 else 0.05
 		var top0: float = h - 0.2 if sz3 * s > 0.0 else BR_WING_TOP
 		var top1: float = BR_WING_TOP if sz3 * s > 0.0 else h - 0.2
 		KT._prism(pk, kit, "brick", wfe, PackedVector2Array([Vector2(u0, -1.5), Vector2(u1, -1.5), Vector2(u1, top1), Vector2(u0, top0)]), -0.9, 0.0, BRICK,
 				Vector2(0, 1), true, true)
-		KT._prism(pk, kit, "ashlar", wfe, PackedVector2Array([Vector2(u0, top0 - 0.3), Vector2(u1, top1 - 0.3), Vector2(u1, top1 + 0.12),
-				Vector2(u0, top0 + 0.12)]), -1.0, 0.12, SAND, Vector2(0, 1), true)
+		# The sloped coping, 4cm past the wing's free end (flush, its end lay in the brick's end and flickered).
+		var cu0: float = u0 if sz3 * s > 0.0 else u0 - 0.04
+		var cu1: float = u1 + 0.04 if sz3 * s > 0.0 else u1
+		KT._prism(pk, kit, "ashlar", wfe, PackedVector2Array([Vector2(cu0, top0 - 0.3), Vector2(cu1, top1 - 0.3), Vector2(cu1, top1 + 0.12),
+				Vector2(cu0, top0 + 0.12)]), -1.0, 0.12, SAND, Vector2(0, 1), true)
 		var endz: float = sz3 * (BR_HW + BR_WING)
 		_quoins(pk, kit, Vector3(fx, 0, endz), Vector3(s, 0, 0), Vector3(0, 0, -sz3), -1.5, BR_WING_TOP - 0.3, 0.9, 0.9)
 		if sz3 > 0.0 and s > 0.0:

@@ -1374,6 +1374,8 @@ func _ready() -> void:
 	_build_dressing(level)
 
 	level.set("track_path", track_path)
+	# A four-seat touring plane on sightseeing loops over the stage (LightPlane.gd, fitted round the lap at runtime).
+	load("res://LightPlane.gd").add_to(level, "Rundflug", 0.0, false)
 	level._setup_checkpoints()
 	var chunked: int = MeshChunker.chunk_scene(level, "res://generated/" + RES_PREFIX, "res://generated/kronburg_chunks", MESH_CHUNK_CELL)
 	print("  chunked %d large meshes" % chunked)
@@ -2446,10 +2448,10 @@ func _build_autobahn_traffic() -> void:
 	for h in ["res://sounds/rheinufer/traffic_horn_long.wav", "res://sounds/rheinufer/traffic_horn_deep.wav", "res://sounds/stadtrallye/car_horn_2.wav", "res://sounds/stadtrallye/car_horn_3.wav"]:
 		hs.append(load(h))
 	t.set("engine_sounds", es)
-	t.set("engine_rms", PackedFloat32Array([-19.8, -16.5, -20.0, -36.5]))
+	t.set("engine_rms", PackedFloat32Array([-19.8, -16.5, -20.0, -16.0]))
 	t.set("kind_engine", PackedInt32Array([2, 1, 0, 3, 2]))
 	t.set("horns", hs)
-	t.set("horn_rms", PackedFloat32Array([-16.5, -13.5, -31.2, -17.2]))
+	t.set("horn_rms", PackedFloat32Array([-16.5, -13.5, -15.5, -17.2]))
 	level.add_child(t)
 ## One bay of the viaduct in its pier's frame (life size): the pier pair at the origin, the box girder on toward -z for
 ## `span`, its deck's top `deck` over the ground. The road on top, its barriers, the deck's cornices.

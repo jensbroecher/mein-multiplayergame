@@ -1176,6 +1176,8 @@ func _ready() -> void:
 	_build_dressing(level)
 
 	level.set("track_path", track_path)
+	# A four-seat touring plane on sightseeing loops over the stage (LightPlane.gd, fitted round the lap at runtime).
+	load("res://LightPlane.gd").add_to(level, "Rundflug", 3.1, false)
 	level._setup_checkpoints()
 	var chunked: int = MeshChunker.chunk_scene(level, "res://generated/" + RES_PREFIX, "res://generated/zeche_chunks", MESH_CHUNK_CELL)
 	print("  chunked %d large meshes" % chunked)

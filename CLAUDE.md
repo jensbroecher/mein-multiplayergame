@@ -3770,6 +3770,17 @@ estate, the half-timbered old town on its hill under Burg Kronburg's ruin. Stage
 - Menu tiles: `images/menu/tile_kronburg.jpg` (the mill's gateway) and `tile_kronburg_gp.jpg` (from over the canal),
   rendered with `scratch/lap_shots.tscn` and cropped to 1376x768.
 
+- A four-seat touring plane (`LightPlane.gd`, node `Rundflug`, added by all four Kronburg GP generators through
+  `LightPlane.add_to`): an original high-wing design built in code at life size and grown by 1.6 (white, a red
+  cheatline laid by each section's own height, the windows the same way, red wing tips, a striped fin, struts, fixed
+  gear with fairings, nav lights, the registration D-EKRB, a propeller that spins). It flies an ellipse fitted round the
+  level's TrackPath at runtime (`fit_share`, `fit_margin`, `fit_min`/`fit_max`), `altitude` (150m) over the lap's
+  highest point, rising and sinking 22m, banked by its speed and the turn's tightness, on the wall clock. Its engine
+  (`sounds/kronburg/light_plane_loop.wav`, tools/elevenlabs, levelled by its RMS) takes the full Doppler shift from its
+  velocity and the camera's. `res://scratch/light_plane_preview.gd` (`-s`, windowed) renders the model standing;
+  `res://scratch/light_plane_shots.gd -- <level> <dir>` (`-s`, windowed) photographs it in a level where the clock has
+  it and prints how high it is.
+
 ## Rheinufer (Kronburg GP, stage 2)
 
 The Lower Rhine at the edge of Kronburg on a summer evening (sun low in the WSW). Files and code: `RheinuferLevel.tscn`,
@@ -4039,6 +4050,18 @@ each run deletes first).
   fictional operator's push-pull set in red, a diesel locomotive, double-deck coaches with their low floor between the
   bogies, a cab car on the upper deck, side buffers); it had been the Sierra's American cab units and coaches.
   `scratch/train_preview.gd ... consist=re_loco,re_dosto,re_dosto,~re_cab` renders it.
+- The railway's earth embankment keeps its crown (`EMBANK_CROWN` 8.5m a side: the ballast reaches about 6.8m) and the
+  top of its flanks wherever no road is near (`_embank_floor`, applied after the grading, right up to a wall's end and
+  6m in behind it), and the brick-walled run past the Ring bridge goes on to x 300 (`WALLED`): the garden's parterre lies
+  so close below the line that the grading had cut the bank into a 12m rock-painted cliff, and the track hung over it.
+  StadtKit's railway bridge: the sandstone shelf band, the side copings and the wing walls' copings run 4cm past the
+  brick faces they end on (flush, they flickered), and the wing walls start 5cm inside the abutment.
+- Sound levels: AudioStreamPlayer3D caps a voice at `max_db` (+3dB, +6 at most), so a quiet clip levelled by its RMS
+  came out up to 16dB too soft. Quiet clips are raised in place instead: `scratch/normalize_wav.py [--rms=-16] [--peak=-1]
+  file.wav ...` (16-bit PCM; prints the levels before and after; it drops any loop chunk, so set `loop_mode=2` in the
+  .import). Done for the city engines, the tram's rumble, two car horns, Rheinufer's motorhome and the light plane. The
+  stage's own loops (excavator, site, scrapyard, roller, reverse beeper, the Ring's traffic bed, the tram) had imported
+  with `loop_mode` 0 and played once: now forward.
 - The Ring's cars, vans, trucks and bus have engines (CrossTraffic's `engine_sounds`, `kind_engine`: city-driving loops
   `sounds/stadtrallye/city_*_loop.wav`, tools/elevenlabs, levelled by their RMS) on the six nearest the camera, their
   Doppler shift scaled down (`doppler_share` 0.5: a few percent at town speeds, not the motorway's swoop); the trams

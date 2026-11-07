@@ -2145,6 +2145,8 @@ func _ready() -> void:
 	_build_dressing(level)
 
 	level.set("track_path", track_path)
+	# A four-seat touring plane on sightseeing loops over the stage (LightPlane.gd, fitted round the lap at runtime).
+	load("res://LightPlane.gd").add_to(level, "Rundflug", 1.7, true)
 	level._setup_checkpoints()
 	var chunked: int = MeshChunker.chunk_scene(level, "res://generated/" + RES_PREFIX, "res://generated/rheinufer_chunks", MESH_CHUNK_CELL)
 	print("  chunked %d large meshes" % chunked)
@@ -2576,9 +2578,9 @@ func _build_traffic(root: Node3D) -> void:
 ## The traffic's sounds (tools/elevenlabs, sounds/rheinufer/traffic_*): engine loops by vehicle kind (`kind_engine`:
 ## 0 petrol car, 1 V6 SUV, 2 diesel van, 3 motorhome), levelled by their measured RMS, and horns by their loudest second.
 const TRAFFIC_ENGINES := [["res://sounds/rheinufer/traffic_car_petrol_loop.wav", -19.8], ["res://sounds/rheinufer/traffic_suv_loop.wav", -16.5],
-	["res://sounds/rheinufer/traffic_van_diesel_loop.wav", -20.0], ["res://sounds/rheinufer/traffic_motorhome_loop.wav", -36.5]]
+	["res://sounds/rheinufer/traffic_van_diesel_loop.wav", -20.0], ["res://sounds/rheinufer/traffic_motorhome_loop.wav", -16.0]]
 const TRAFFIC_HORNS := [["res://sounds/rheinufer/traffic_horn_long.wav", -16.5], ["res://sounds/rheinufer/traffic_horn_deep.wav", -13.5],
-	["res://sounds/stadtrallye/car_horn_2.wav", -31.2], ["res://sounds/stadtrallye/car_horn_3.wav", -17.2]]
+	["res://sounds/stadtrallye/car_horn_2.wav", -15.5], ["res://sounds/stadtrallye/car_horn_3.wav", -17.2]]
 
 func _traffic_sound(t: Node, kind_engine: PackedInt32Array) -> void:
 	var es: Array[AudioStream] = []

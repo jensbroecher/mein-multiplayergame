@@ -64,7 +64,8 @@ func _init() -> void:
 				for en in traffic.get("_engines"):
 					if en[1] != null:
 						var pl: AudioStreamPlayer3D = en[0]
-						line2 += "  %s %.0fm p%.2f" % [pl.stream.resource_path.get_file().get_basename(), pl.global_position.distance_to(cam.global_position), pl.pitch_scale]
+						line2 += "  %s %.0fm p%.2f %+.0fdB%s" % [pl.stream.resource_path.get_file().get_basename(), pl.global_position.distance_to(cam.global_position),
+								pl.pitch_scale, pl.volume_db, "" if pl.playing else " SILENT"]
 				print(line2)
 			continue
 		var voices: Array = traffic.get("_voices")
