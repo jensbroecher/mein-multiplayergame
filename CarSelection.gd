@@ -258,6 +258,19 @@ const CAR_PRESETS = [
 		"offroad": 7.0,
 		"desc": "Electric super-crossover on turbine rims. Coupé pace on tarmac, the ride height for gravel and the weight to shove its way through.",
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Bootlegger",
+		"model_path": "res://generated/cars/Bootlegger.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 42.5,
+		"acceleration": 86.0,
+		"steer_speed": 2.3,
+		"grip": 4.2,
+		"braking": 38.0,
+		"offroad": 2.0,
+		"desc": "Chopped highboy hot rod with a blown V8 out in the open. Brutal off the line and quick down the straights, a handful in the corners and lost on dirt.",
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 
@@ -271,6 +284,7 @@ const CAR_ACCENTS := {
 	"Zephyr": Color(0.85, 0.55, 0.25), "Titan": Color(0.62, 0.95, 0.18),
 	"Sandstorm": Color(1.0, 0.55, 0.16), "Obsidian": Color(0.82, 0.62, 0.38),
 	"Fulmine": Color(0.32, 0.95, 0.46), "Basilisk": Color(0.84, 0.86, 0.45),
+	"Bootlegger": Color(1.0, 0.48, 0.14),
 }
 ## Stat bars: caption, preset key, and the values at an empty and a full bar (spanning the fleet).
 const STATS := [

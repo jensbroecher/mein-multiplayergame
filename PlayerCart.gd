@@ -318,6 +318,23 @@ const CAR_PRESETS = [
 		"offroad": 7.0,
 		"weight": 1.18,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Bootlegger",
+		# A blown V8 hot rod (tools/elevenlabs, engine_bootlegger), levelled by its RMS (-15.5 dBFS).
+		"engine_sound": "res://sounds/enginesounds/engine_bootlegger_loop.wav",
+		"engine_gain_db": 5.8,
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Bootlegger.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 42.5,
+		"acceleration": 86.0,
+		"steer_speed": 2.3,
+		"grip": 4.2,
+		"braking": 38.0,
+		"offroad": 2.0,
+		"weight": 1.12,
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 
@@ -3243,19 +3260,14 @@ func _setup_engine_sound() -> void:
 		var wav := engine_stream as AudioStreamWAV
 		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
 		wav.loop_begin = 0
-		# loop_end is in frames; -1 is unreliable after compress/import on some builds
-		var bytes_per_sample := 2
-		match wav.format:
-			AudioStreamWAV.FORMAT_8_BITS:
-				bytes_per_sample = 1
-			AudioStreamWAV.FORMAT_16_BITS:
-				bytes_per_sample = 2
-			_:
-				bytes_per_sample = 2
-		if wav.stereo:
-			bytes_per_sample *= 2
-		if wav.data.size() > 0 and bytes_per_sample > 0:
-			wav.loop_end = int(wav.data.size() / bytes_per_sample)
+		# loop_end is in frames; -1 is unreliable after compress/import on some builds. The clip's
+		# length times its rate: the imports are QOA-compressed, and their data's bytes counted as
+		# 16-bit frames ended every car's loop about a fifth of the way through its clip (with a seam).
+		var frames: int = int(round(wav.get_length() * wav.mix_rate))
+		if frames <= 0 and wav.format == AudioStreamWAV.FORMAT_16_BITS:
+			frames = int(wav.data.size() / (4 if wav.stereo else 2))
+		if frames > 0:
+			wav.loop_end = frames
 	elif engine_stream is AudioStreamMP3:
 		(engine_stream as AudioStreamMP3).loop = true
 	elif engine_stream is AudioStreamOggVorbis:

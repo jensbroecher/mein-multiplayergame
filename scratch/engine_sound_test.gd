@@ -22,6 +22,6 @@ func _ready() -> void:
 		var st := c.engine_sound.stream as AudioStreamWAV
 		print("%-12s loop %5.2fs  mode=%d end=%d/%d frames  gain %+5.1f dB  playing=%s vol=%+5.1f pitch=%.2f speed=%.0f" % [
 			c.CAR_PRESETS[c.car_index]["name"], st.get_length(), st.loop_mode, st.loop_end,
-			st.data.size() / (4 if st.stereo else 2), c._engine_gain_db, c.engine_sound.playing,
+			int(round(st.get_length() * st.mix_rate)), c._engine_gain_db, c.engine_sound.playing,
 			c.engine_sound.volume_db, c.engine_sound.pitch_scale, c.linear_velocity.length()])
 	get_tree().quit()

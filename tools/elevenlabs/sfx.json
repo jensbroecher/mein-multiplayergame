@@ -550,5 +550,29 @@
     "duration": 8.0,
     "loop": true,
     "influence": 0.6
+  },
+  {
+    "name": "engine_bootlegger",
+    "path": "sounds/enginesounds/engine_bootlegger_loop.wav",
+    "text": "A supercharged big-block V8 hot rod engine held at a steady mid-high RPM, deep loud lumpy rumble from open exhaust headers with the high mechanical whine of a roots supercharger on top, recorded close, constant engine speed, no revving, no gear changes, continuous drone",
+    "duration": 8.0,
+    "loop": true,
+    "influence": 0.6
+  },
+  {
+    "name": "engine_meteor",
+    "path": "sounds/enginesounds/engine_meteor_loop.wav",
+    "text": "A vintage 1930s supercharged straight-eight Grand Prix racing car engine held at a steady high RPM, raw metallic exhaust bark with a shrill screaming supercharger wail, open pipes, recorded close, constant engine speed, no revving, no gear changes, continuous drone",
+    "duration": 8.0,
+    "loop": true,
+    "influence": 0.6
+  },
+  {
+    "name": "engine_bubble",
+    "path": "sounds/enginesounds/engine_bubblecar_loop.wav",
+    "text": "A tiny 1950s single-cylinder two-stroke microcar engine held at a steady high RPM, buzzy rattly ring-ding-ding putter like a moped, tinny exhaust, recorded close, constant engine speed, no revving, continuous drone",
+    "duration": 8.0,
+    "loop": true,
+    "influence": 0.6
   }
 ]

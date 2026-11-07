@@ -1,0 +1,40 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://generated/cars/bootlegger_body.res" id="1_hpgfh"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/bootlegger_wheel_l.res" id="2_pfe75"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/bootlegger_wheel_r.res" id="3_5ilvv"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/bootlegger_rear_wheel_l.res" id="4_dlik4"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/bootlegger_rear_wheel_r.res" id="5_ab40u"]
+
+[node name="Bootlegger" type="Node3D" unique_id=1366015926]
+metadata/procedural_car = true
+
+[node name="Model" type="Node3D" parent="." unique_id=1513917413]
+transform = Transform3D(-0.5, 0, -4.371139e-08, 0, 0.5, 0, 4.371139e-08, 0, -0.5, 0, 0, 0)
+
+[node name="Body" type="MeshInstance3D" parent="Model" unique_id=1788599153]
+mesh = ExtResource("1_hpgfh")
+metadata/car_shader = true
+
+[node name="Wheel_FL" type="MeshInstance3D" parent="Model" unique_id=1431146850]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0.165, -0.98)
+mesh = ExtResource("2_pfe75")
+metadata/car_shader = true
+
+[node name="Wheel_FR" type="MeshInstance3D" parent="Model" unique_id=1416638601]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.165, -0.98)
+mesh = ExtResource("3_5ilvv")
+metadata/car_shader = true
+
+[node name="Wheel_RL" type="MeshInstance3D" parent="Model" unique_id=740426324]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.56, 0.27, 0.55)
+mesh = ExtResource("4_dlik4")
+metadata/car_shader = true
+
+[node name="Wheel_RR" type="MeshInstance3D" parent="Model" unique_id=261208877]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.56, 0.27, 0.55)
+mesh = ExtResource("5_ab40u")
+metadata/car_shader = true
+
+[node name="AntennaPlacement" type="Node3D" parent="Model" unique_id=850221670]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.2, 0.62, 0.66)
