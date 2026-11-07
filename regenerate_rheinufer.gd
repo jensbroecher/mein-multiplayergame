@@ -728,6 +728,7 @@ func _plan_dressing_roads() -> void:
 		return _hermite(x, COUNTRY_X0, HAIRPIN_Y, 0.0, -900.0, _natural(-900.0, z) + GROUND_UNDER, 0.0) if x > -900.0 else _natural(x, z) + GROUND_UNDER
 	_dress_road("CountryWest", [[Vector2(COUNTRY_X0, WEST_ROAD_Z), 0.0], [Vector2(-1500.0, WEST_ROAD_Z), 0.0], [Vector2(-2400.0, -60.0), 0.0]], ROAD_HALF, ROAD_HALF, 0, west_y, no_deck)
 	_dress_road("PromenadeSouth", [[Vector2(PROMENADE_X, 206.0), 0.0], [Vector2(PROMENADE_X, 700.0), 0.0]], ROAD_HALF + PAVEMENT, ROAD_HALF, 2, func(x: float, _z: float, _s: float) -> float: return _town_ground(x) + GROUND_UNDER, no_deck)
+	_plan_stadt_streets(at_grade, no_deck)
 	# The Kreuz's loops (one in each quadrant, single-lane ramps from the A 58 at grade up to the A 47).
 	var lo: float = LAND_Y + GROUND_UNDER
 	var off: float = 12.0 + KREUZ_R
@@ -2179,6 +2180,7 @@ func _build_dressing(root: Node3D) -> void:
 	_build_start(root)
 	_build_quay(root)
 	_build_town(root)
+	_build_stadtviertel(root)
 	_build_kirmes(root)
 	_build_windmill(root)
 	_build_sheep(root)
@@ -2882,6 +2884,9 @@ func _build_woods(root: Node3D) -> void:
 				kind = "birch"
 			add.call(kind, px, pz, rng.randf_range(1.0, 1.3))
 		x += step
+	# The town's own trees (the church square's limes, the courtyards, the allotments: `_stadt_trees`).
+	for t in _stadt_trees:
+		add.call(String(t[0]), float(t[1]), float(t[2]), float(t[3]))
 	# Pollarded willows in rows along the field ditches west of the dyke, and poplar rows along the country roads.
 	var ditch_rng := RandomNumberGenerator.new()
 	ditch_rng.seed = 8842
@@ -3021,6 +3026,9 @@ func _add_prop_scaled(key: String, kit_script: Script, xf: Transform3D, build: C
 		(b["labels"] as Array).append(out)
 
 
+## Per batch key: "begin" (its visibility_range_begin: a far stand-in drawn only past where the detailed one stops) and
+## "own_solid" (the generator gave it colliders: DressingColliders leaves it be).
+var _batch_flags := {}
 var _missing := {}
 
 func _kit_call(script: Script, fn: String, args: Array) -> void:
@@ -3066,6 +3074,12 @@ func _flush_batches(root: Node3D) -> void:
 		if float(b["range"]) > 0.0:
 			mi.visibility_range_end = float(b["range"])
 			mi.visibility_range_end_margin = float(b["range"]) * 0.08
+		var fl: Dictionary = _batch_flags.get(key, {})
+		if fl.has("begin"):
+			mi.visibility_range_begin = float(fl["begin"])
+			mi.visibility_range_begin_margin = float(fl["begin"]) * 0.08
+		if fl.get("own_solid", false):
+			mi.set_meta(&"skip_dressing_colliders", true)
 		node.add_child(mi)
 		for l in b["labels"]:
 			var lab := Label3D.new()
@@ -3460,7 +3474,8 @@ func _build_town(_root: Node3D) -> void:
 	var church := Vector3(PROMENADE_X + 140.0, 0.0, -40.0)
 	church.y = _ground_at(church.x, church.z)
 	_add_prop("kirche", _town, _facing(Vector3(-1, 0, 0), church), func(pk, kit, labels): _kit_call(_town, "church", [pk, kit, labels]), 3000.0)
-	_note_rect(Vector2(church.x, church.y), 40.0, 70.0, 0.0)
+	# Its tower's front at x (facing west), the nave and apse running 61m (life) east of it.
+	_note_rect(Vector2(church.x + 61.0 * PROP_SCALE * 0.5, church.z), 61.0 * PROP_SCALE + 6.0, 30.0, 0.0)
 	# The promenade's walk: lamps, benches and bins between the plane trees, a café pavilion and two kiosks.
 	var zl: float = TOWN_Z.x + 37.0
 	while zl < TOWN_Z.y - 12.0:
@@ -3482,6 +3497,350 @@ func _build_town(_root: Node3D) -> void:
 		_add_prop(_cell_key("promenade", kp, 200.0), st, _facing(Vector3(-1, 0, 0), kp), func(pk, kit, labels): _kit_call(st, "kiosk", [pk, kit, labels, kind]), 900.0)
 		_note_rect(Vector2(kp.x, kp.z), 6.0, 6.0, 0.0)
 	print("  town: %d houses" % count)
+
+
+# ======================================================================================
+#  The town behind the promenade (Stadtviertel): streets, blocks of Gründerzeit houses, the church square, the
+#  allotments and the noise wall along the A 47. Between the church and the motorway it had been one bare meadow.
+# ======================================================================================
+
+## The street grid east of the back row (world x, z): Friedrichstraße along STADT_FRIEDRICH (the back row faces it), the
+## cross streets STADT_EW from it to STADT_EAST, the side streets STADT_NS between them. A street is 7m of asphalt with
+## kerbs and 3m flagged pavements (kind 2).
+const STADT_FRIEDRICH := 318.0
+const STADT_FRIEDRICH_Z := Vector2(-262.0, 190.0)
+const STADT_EW := [-255.0, -135.0, 25.0, 120.0]
+const STADT_NS := [500.0, 640.0]
+const STADT_EAST := 730.0
+const STADT_HALF := 6.5
+const STADT_CW := 3.5
+## The houses: 13m deep (life), their fronts on the pavement's edge; the detailed ones drawn to STADT_NEAR, the far
+## stand-ins (RheinStadtKit.gruenderzeit_house_far) from there to STADT_FAR.
+const STADT_DEPTH := 13.0
+const STADT_NEAR := 210.0
+const STADT_FAR := 2400.0
+## The church (KronburgTownKit.church, its tower at x 372 facing west, its nave running ~100m east): its block (column 0,
+## the second cross street's band) is the church square, built up only along its cross streets.
+const STADT_CHURCH_BLOCK := Vector2(0, 1)
+## The block south of it stays open (a lawn with trees round its edge), and the church square has no row on its south
+## side: from the exit ramp and the park the church is seen across them (built up, the view to it was gone).
+const STADT_OPEN_BLOCK := Vector2(0, 0)
+
+var _stadt_trees: Array = []
+
+
+func _plan_stadt_streets(at_grade: Callable, no_deck: Callable) -> void:
+	var e := STADT_HALF
+	_dress_road("Friedrichstrasse", [[Vector2(STADT_FRIEDRICH, STADT_FRIEDRICH_Z.x), 0.0], [Vector2(STADT_FRIEDRICH, STADT_FRIEDRICH_Z.y), 0.0]], e, STADT_CW, 2, at_grade, no_deck)
+	for z in STADT_EW:
+		_dress_road("Querstrasse%d" % int(absf(z)), [[Vector2(STADT_FRIEDRICH + e, z), 0.0], [Vector2(STADT_EAST, z), 0.0]], e, STADT_CW, 2, at_grade, no_deck)
+	# The side streets in pieces between the cross streets (ending at their pavements: no two ribbons overlap).
+	for x in STADT_NS:
+		for k in STADT_EW.size() - 1:
+			var z0: float = float(STADT_EW[k]) + e
+			var z1: float = float(STADT_EW[k + 1]) - e
+			_dress_road("Seitenstrasse%d_%d" % [int(x), k], [[Vector2(x, z0), 0.0], [Vector2(x, z1), 0.0]], e, STADT_CW, 2, at_grade, no_deck)
+
+
+func _build_stadtviertel(root: Node3D) -> void:
+	if _stadt_kit == null or not _has_fn(_stadt_kit, "gruenderzeit_house_far"):
+		return
+	var st: Script = _stadt_kit
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7411
+	var body := StaticBody3D.new()
+	body.name = "StadtviertelBody"
+	body.set_meta(&"surface", "rock")
+	root.add_child(body)
+	var xs: Array = [STADT_FRIEDRICH] + STADT_NS + [STADT_EAST + STADT_HALF]
+	var houses := 0
+	var dg: float = STADT_DEPTH * PROP_SCALE
+	for ci in xs.size() - 1:
+		for ri in STADT_EW.size():
+			var x0: float = float(xs[ci]) + STADT_HALF
+			var x1: float = float(xs[ci + 1]) - STADT_HALF
+			var z0: float = float(STADT_EW[ri]) + STADT_HALF
+			var z1: float = (float(STADT_EW[ri + 1]) - STADT_HALF) if ri + 1 < STADT_EW.size() else STADT_FRIEDRICH_Z.y - 5.0
+			if x1 - x0 < 30.0 or z1 - z0 < 30.0:
+				continue
+			var last_row: bool = ri + 1 >= STADT_EW.size()
+			# Fewer storeys out toward the edge of town.
+			var fl_hi: int = 5 if ci == 0 else (4 if ci == 1 else 3)
+			var church: bool = Vector2(ci, ri) == STADT_CHURCH_BLOCK
+			if Vector2(ci, ri) == STADT_OPEN_BLOCK:
+				_stadt_lawn(x0, x1, z0, z1)
+				continue
+			var sides: Array = []
+			if not church:
+				sides.append([Vector3(x0, 0, z0), Vector3(x1, 0, z0), Vector3(0, 0, -1)])
+			if not last_row:
+				sides.append([Vector3(x0, 0, z1), Vector3(x1, 0, z1), Vector3(0, 0, 1)])
+			if not church:
+				var za: float = z0 + dg
+				var zb: float = z1 - (0.0 if last_row else dg)
+				if zb - za > 18.0:
+					sides.append([Vector3(x0, 0, za), Vector3(x0, 0, zb), Vector3(-1, 0, 0)])
+					if ci + 1 < xs.size() - 1:
+						sides.append([Vector3(x1, 0, za), Vector3(x1, 0, zb), Vector3(1, 0, 0)])
+			for sd in sides:
+				houses += _stadt_row(st, rng, body, sd[0], sd[1], sd[2], fl_hi)
+			# The block's courtyard: a few trees (a church square of limes round the church).
+			var inner := Rect2(x0 + dg + 4.0, z0 + dg + 4.0, (x1 - x0) - 2.0 * dg - 8.0, (z1 - z0) - 2.0 * dg - 8.0)
+			if church:
+				inner = Rect2(x0 + 4.0, z0 + 6.0, x1 - x0 - 8.0, (z1 - z0) - dg - 12.0)
+			if inner.size.x > 6.0 and inner.size.y > 6.0:
+				var n_t: int = clampi(int(inner.size.x * inner.size.y / (260.0 if church else 520.0)), 1, 30)
+				var tries := 0
+				var placed := 0
+				while placed < n_t and tries < n_t * 8:
+					tries += 1
+					var px: float = rng.randf_range(inner.position.x, inner.end.x)
+					var pz: float = rng.randf_range(inner.position.y, inner.end.y)
+					if _occupied(px, pz):
+						continue
+					# Clear of the church's portal: its forecourt runs from the tower west to the street.
+					if church and px < PROMENADE_X + 140.0 + 4.0 and absf(pz + 40.0) < 15.0:
+						continue
+					# ...and of the view to it from the south-west (the ramp, the park): limes only north of the church.
+					if church and pz < -40.0:
+						continue
+					_stadt_trees.append(["lime" if church or rng.randf() < 0.5 else ("plane" if rng.randf() < 0.5 else "birch"), px, pz, rng.randf_range(0.9, 1.2)])
+					_note_rect(Vector2(px, pz), 6.0, 6.0, 0.0)
+					placed += 1
+			if church:
+				_stadt_square(st, x0, x1, z0, z1 - dg)
+	_stadt_park(st, rng)
+	_stadt_allotments()
+	_stadt_noise_wall()
+	_stadt_street_furniture(st)
+	print("  Stadtviertel: %d houses, %d trees" % [houses, _stadt_trees.size()])
+
+
+## A row of houses along a block's side from a to b (their fronts on that line, `out` toward the street), each its
+## detailed version near and its far stand-in beyond, and a box collider. Returns how many.
+func _stadt_row(st: Script, rng: RandomNumberGenerator, body: StaticBody3D, a: Vector3, b: Vector3, out: Vector3, fl_hi: int) -> int:
+	var lx: Vector3 = Vector3.UP.cross(out).normalized()
+	var start: Vector3 = a if (b - a).dot(lx) > 0.0 else b
+	var length: float = a.distance_to(b)
+	var n: int = maxi(1, roundi(length / (15.5 * PROP_SCALE)))
+	var ws: Array = []
+	var sum := 0.0
+	for i in n:
+		var w0: float = rng.randf_range(0.8, 1.2)
+		ws.append(w0)
+		sum += w0
+	var along := 0.0
+	for i in n:
+		var w: float = length * float(ws[i]) / sum
+		var w_life: float = w / PROP_SCALE
+		var o: Vector3 = start + lx * along
+		o.y = _ground_at(o.x + out.x * 2.0 + lx.x * w * 0.5, o.z + out.z * 2.0 + lx.z * w * 0.5)
+		var xf := _facing(out, o)
+		var floors: int = rng.randi_range(3, fl_hi)
+		var variant: int = rng.randi_range(0, 3)
+		var hseed: int = rng.randi()
+		var mid: Vector3 = o + lx * (w * 0.5) - out * (STADT_DEPTH * PROP_SCALE * 0.5)
+		var near_key: String = _cell_key("stadtnah", mid, 140.0)
+		var far_key: String = _cell_key("stadtfern", mid, 360.0)
+		_batch_flags[near_key] = {"own_solid": true}
+		_batch_flags[far_key] = {"own_solid": true, "begin": STADT_NEAR}
+		_add_prop(near_key, st, xf, func(pk, kit, labels):
+			var r := RandomNumberGenerator.new()
+			r.seed = hseed
+			_kit_call(st, "gruenderzeit_house", [pk, kit, labels, w_life, floors, variant, r, STADT_DEPTH, 0, true]), STADT_NEAR + 20.0)
+		_add_prop(far_key, st, xf, func(pk, kit, _labels):
+			var r := RandomNumberGenerator.new()
+			r.seed = hseed
+			_kit_call(st, "gruenderzeit_house_far", [pk, kit, w_life, floors, variant, r, STADT_DEPTH]), STADT_FAR)
+		var h: float = (float(floors) * 3.4 + 4.5) * PROP_SCALE
+		var cs := CollisionShape3D.new()
+		var bx := BoxShape3D.new()
+		bx.size = Vector3(w, h, STADT_DEPTH * PROP_SCALE)
+		cs.shape = bx
+		cs.transform = Transform3D(xf.basis, mid + Vector3(0, o.y - mid.y + h * 0.5 - 1.0, 0))
+		body.add_child(cs)
+		_note_rect(Vector2(mid.x, mid.z), w if absf(out.z) > 0.5 else STADT_DEPTH * PROP_SCALE, STADT_DEPTH * PROP_SCALE if absf(out.z) > 0.5 else w, 0.0, 1.0)
+		along += w
+	return n
+
+
+## The open block south of the church square: a lawn with a ring of limes 5m inside its edges and benches facing in,
+## the middle left open so the church is seen across it.
+func _stadt_lawn(x0: float, x1: float, z0: float, z1: float) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7414
+	var inset := 5.0
+	var pts: Array = []
+	var x: float = x0 + inset
+	while x <= x1 - inset:
+		pts.append(Vector2(x, z0 + inset))
+		pts.append(Vector2(x, z1 - inset))
+		x += 16.0
+	var z: float = z0 + inset + 16.0
+	while z < z1 - inset - 8.0:
+		pts.append(Vector2(x1 - inset, z))
+		z += 16.0
+	for p in pts:
+		_stadt_trees.append(["lime", p.x + rng.randf_range(-1.0, 1.0), p.y + rng.randf_range(-1.0, 1.0), rng.randf_range(0.95, 1.15)])
+		_note_rect(p, 6.0, 6.0, 0.0)
+	for k in 4:
+		var bp := Vector3(lerpf(x0 + 30.0, x1 - 30.0, float(k) / 3.0), 0.0, z0 + inset + 4.0)
+		bp.y = _ground_at(bp.x, bp.z)
+		_add_prop(_cell_key("kirchplatz", bp, 200.0), _town, _facing(Vector3(0, 0, 1), bp), func(pk, kit, _l): _kit_call(_town, "street_bench", [pk, kit]), 700.0)
+
+
+## The church square: benches and lamps along paths round the church, a bin or two (the limes are planted with the
+## courtyards' trees).
+func _stadt_square(st: Script, x0: float, x1: float, z0: float, z1: float) -> void:
+	var zc: float = (z0 + z1) * 0.5
+	for edge in [z0 + 5.0, z1 - 5.0]:
+		var x: float = x0 + 10.0
+		while x < x1 - 8.0:
+			var p := Vector3(x, 0.0, edge)
+			p.y = _ground_at(p.x, p.z)
+			var face := Vector3(0, 0, signf(zc - edge))
+			_add_prop(_cell_key("kirchplatz", p, 200.0), _town, _facing(face, p), func(pk, kit, _l): _kit_call(_town, "street_bench", [pk, kit]), 700.0)
+			var lp: Vector3 = p + Vector3(6.0, 0, 0)
+			lp.y = _ground_at(lp.x, lp.z)
+			_add_prop(_cell_key("kirchplatz", lp, 200.0), _town, _facing(face, lp), func(pk, kit, _l): _kit_call(_town, "old_lantern_post", [pk, kit]), 900.0)
+			x += 24.0
+
+
+## A little park (Stadtgarten) on the meadow between the exit ramp, the promenade's first houses and Friedrichstraße's
+## south end: planes and limes in loose clumps, benches under them facing the river.
+func _stadt_park(st: Script, rng: RandomNumberGenerator) -> void:
+	var r := Rect2(246.0, -322.0, STADT_FRIEDRICH - STADT_HALF - 4.0 - 246.0, -204.0 + 322.0)
+	var n := 0
+	var tries := 0
+	while n < 26 and tries < 400:
+		tries += 1
+		var px: float = rng.randf_range(r.position.x, r.end.x)
+		var pz: float = rng.randf_range(r.position.y, r.end.y)
+		if _occupied(px, pz) or _lap_dist(px, pz) < ROAD_HALF + 10.0 or _road_dist(px, pz, false) < STADT_HALF + 3.0:
+			continue
+		if pz < A47_AXIS + 21.7 + 6.0:
+			continue
+		if _in_church_view(Vector2(px, pz), 14.0):
+			continue
+		_stadt_trees.append(["plane" if rng.randf() < 0.6 else "lime", px, pz, rng.randf_range(1.0, 1.3)])
+		_note_rect(Vector2(px, pz), 7.0, 7.0, 0.0)
+		n += 1
+		if n % 4 == 0:
+			var bp := Vector3(px - 4.5, 0.0, pz)
+			if not _occupied(bp.x, bp.z) and _lap_dist(bp.x, bp.z) > ROAD_HALF + 8.0:
+				bp.y = _ground_at(bp.x, bp.z)
+				_add_prop(_cell_key("stadtgarten", bp, 200.0), _town, _facing(Vector3(-1, 0, 0), bp), func(pk, kit, _l): _kit_call(_town, "street_bench", [pk, kit]), 700.0)
+	print("  Stadtgarten: %d trees" % n)
+
+
+## Whether p lies within `clear` of the view from the exit ramp's upper part (where it comes off the bridge and the
+## church shows past the promenade's first houses) to the church tower: the park keeps its trees out of it.
+func _in_church_view(p: Vector2, clear: float) -> bool:
+	var tower := Vector2(PROMENADE_X + 140.0, -40.0)
+	for z in [-320.0, -295.0, -270.0]:
+		var a := Vector2(236.0, z)
+		var ab: Vector2 = tower - a
+		var t: float = clampf((p - a).dot(ab) / ab.length_squared(), 0.0, 1.0)
+		if p.distance_to(a + ab * t) < clear:
+			return true
+	return false
+
+
+## Allotment gardens (Kleingartenanlage) between the first cross street and the A 47's viaduct: two rows back to back.
+func _stadt_allotments() -> void:
+	var z_street: float = float(STADT_EW[0])
+	var w_life := 12.0
+	var d_life := 16.0
+	var w: float = w_life * PROP_SCALE
+	var d: float = d_life * PROP_SCALE
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7412
+	var n := 0
+	var x: float = STADT_FRIEDRICH + STADT_HALF + 4.0
+	while x + w < float(STADT_NS[1]) - STADT_HALF - 2.0:
+		if absf(x + w * 0.5 - float(STADT_NS[0])) < STADT_HALF + w * 0.5 + 1.0:
+			x = float(STADT_NS[0]) + STADT_HALF + 1.0
+			continue
+		for row in [0, 1]:
+			# Row 0 fronts the street (its gate toward +z), row 1 backs onto it, its gate on a path toward the viaduct.
+			var front_z: float = z_street - STADT_HALF - 1.0 if row == 0 else z_street - STADT_HALF - 1.0 - 2.0 * d - 3.0
+			var face := Vector3(0, 0, 1) if row == 0 else Vector3(0, 0, -1)
+			var o := Vector3(x if row == 0 else x + w, 0.0, front_z)
+			var mid: Vector3 = Vector3(x + w * 0.5, 0, front_z - face.z * d * 0.5)
+			if mid.z - d * 0.5 < A47_AXIS + 21.7 + 4.0:
+				continue
+			o.y = _ground_at(mid.x, mid.z)
+			var aseed: int = rng.randi()
+			_add_prop(_cell_key("kleingarten", mid, 200.0), _town, _facing(face, o), func(pk, kit, _l):
+				var r := RandomNumberGenerator.new()
+				r.seed = aseed
+				_kit_call(_town, "allotment", [pk, kit, w_life, d_life, r]), 1100.0)
+			_note_rect(Vector2(mid.x, mid.z), w, d, 0.0, 0.5)
+			if rng.randf() < 0.35:
+				_stadt_trees.append(["oak" if rng.randf() < 0.5 else "lime", mid.x + rng.randf_range(-4, 4), mid.z + face.z * d * 0.45, rng.randf_range(0.8, 1.05)])
+			n += 1
+		x += w
+	print("  allotments: %d" % n)
+
+
+## A noise wall on the A 47's viaduct along its south edge, over the allotments and the town, while the deck is high.
+func _stadt_noise_wall() -> void:
+	if _bridge_kit == null:
+		return
+	var bk: Script = _bridge_kit
+	var z: float = A47_AXIS + 21.2
+	var x: float = XOVER_E.y + 24.0
+	var piece := 12.0
+	var n := 0
+	while x + piece < 700.0:
+		var ya: float = _a2_y(x)
+		if ya - _natural(x, z) < 3.0:
+			break
+		var a := Vector3(x + piece, ya + 0.0, z)
+		a.y = _a2_y(a.x)
+		var b := Vector3(x, _a2_y(x), z)
+		# Built along its x from a to b (westward), its road face (+z) toward the motorway (-z).
+		var fwd: Vector3 = (b - a).normalized()
+		var z_ax := Vector3(0, 0, -1)
+		var y_ax: Vector3 = z_ax.cross(fwd).normalized()
+		if y_ax.y < 0.0:
+			y_ax = -y_ax
+		var life: float = piece / PROP_SCALE
+		_add_prop(_cell_key("laermschutz", a, 300.0), bk, Transform3D(Basis(fwd, y_ax, z_ax), a), func(pk, kit, _l): _kit_call(bk, "noise_wall", [pk, kit, life, 3.4, 0.25]), 2000.0)
+		x += piece
+		n += 1
+	print("  noise wall: %d pieces" % n)
+
+
+## Street lamps and a few odds and ends along the new streets' pavements.
+func _stadt_street_furniture(st: Script) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7413
+	var spots: Array = []
+	for z in STADT_EW:
+		var x: float = STADT_FRIEDRICH + 20.0
+		while x < STADT_EAST - 10.0:
+			for side in [-1.0, 1.0]:
+				spots.append([Vector3(x, 0, float(z) + side * (STADT_CW + 0.9)), Vector3(0, 0, -side)])
+			x += 34.0
+	var zf: float = STADT_FRIEDRICH_Z.x + 12.0
+	while zf < STADT_FRIEDRICH_Z.y - 6.0:
+		spots.append([Vector3(STADT_FRIEDRICH + STADT_CW + 0.9, 0, zf), Vector3(-1, 0, 0)])
+		zf += 34.0
+	var n := 0
+	for sp in spots:
+		var p: Vector3 = sp[0]
+		var face: Vector3 = sp[1]
+		var skip := false
+		for xn in STADT_NS:
+			if absf(p.x - float(xn)) < STADT_HALF + 3.0:
+				skip = true
+		if skip:
+			continue
+		p.y = _ground_at(p.x, p.z)
+		_add_prop(_cell_key("stadtlampe", p, 240.0), _town, _facing(face, p), func(pk, kit, _l): _kit_call(_town, "peitschen_lamp", [pk, kit]), 1000.0)
+		n += 1
+	print("  town street lamps: %d" % n)
 
 
 # ======================================================================================

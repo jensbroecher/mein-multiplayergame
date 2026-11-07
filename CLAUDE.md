@@ -3859,6 +3859,22 @@ The Lower Rhine at the edge of Kronburg on a summer evening (sun low in the WSW)
   near the listener now and then (`ambient_honk` 35s). Every vehicle in a lane runs at the lane's speed: each at its own,
   the faster ones drove into the ones ahead. `res://scratch/autobahn_sound_probe.gd` (`-s`, windowed, `--fixed-fps 60`,
   `-- [from=x,z] [speed=40] [seconds=14]`) rides a camera against the traffic and logs the voices' pitch and the honks.
+- The town behind the promenade (`_build_stadtviertel`, `STADT_*`): the east bank behind the two rows of houses had been
+  one bare meadow out to the fields, the church alone in it and the back row facing a street that wasn't there. Now:
+  Friedrichstraße and a grid of streets (`_plan_stadt_streets`, kind-2 dressing roads, the side streets in pieces
+  between the cross streets so no two ribbons overlap), perimeter blocks of RheinStadtKit's Gründerzeit houses
+  (`_stadt_row`: fronts on the pavement's edge, fewer storeys toward the edge of town), each the detailed house in
+  "stadtnah_" batches drawn to `STADT_NEAR` (210m) and its `gruenderzeit_house_far` stand-in in "stadtfern_" batches from
+  there (a batch's `visibility_range_begin` via `_batch_flags`) and one box collider per house (`StadtviertelBody`; the
+  batches carry `skip_dressing_colliders`, which DressingColliders now honours on single meshes too, or it would have
+  built trimeshes of 2M triangles). Trees in the courtyards (`_stadt_trees`, planted by `_build_woods`), the church's
+  block a square of limes (its portal's forecourt kept clear), a park between the exit ramp and Friedrichstraße
+  (`_stadt_park`), allotments between the first cross street and the A 47 (`_stadt_allotments`), a noise wall on the
+  viaduct over them (`_stadt_noise_wall`), whip-arm street lamps. The church's footprint is now noted where it stands
+  (it had been noted at its height as z). The view from the exit ramp to the church is kept open (the user missed it once
+  the blocks went up): the block south of the church square is a lawn ringed by limes (`STADT_OPEN_BLOCK`,
+  `_stadt_lawn`), the square has no row on its south side and its limes stand north of the church, and the park's trees
+  keep out of the sightlines (`_in_church_view`). 125 houses; 0.1ms of GPU along the lap (M1, `ab_bench ... hide=Stadtnah`).
 - Autobahn traffic uses CampKit's `motorhome_road` (awning rolled in, entry step stowed; Kronburger Hütte's viaduct too):
   the camp's motorhome drove with its awning out and door step down. `res://scratch/camp_vehicle_preview.gd` (`-s`,
   windowed, `-- <dir> [kinds=motorhome:0,motorhome_road:0] name:x,y,z:tx,ty,tz`) renders CampKit's vehicles side by side.

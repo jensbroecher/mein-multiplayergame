@@ -291,6 +291,9 @@ func _cover_meshes(level: Node) -> void:
 		var mi := node as MeshInstance3D
 		if mi.mesh == null or not mi.is_visible_in_tree() or _under_body(mi) or _named_path(mi, MESH_SKIP):
 			continue
+		# A generator that gave a mesh colliders of its own says so (Rheinufer's town blocks: a box per house).
+		if mi.get_meta(&"skip_dressing_colliders", false):
+			continue
 		if mi.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY or _see_through(mi):
 			continue
 		var box: AABB = mi.global_transform * mi.mesh.get_aabb()
