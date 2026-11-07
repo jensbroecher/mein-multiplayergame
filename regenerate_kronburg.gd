@@ -2438,6 +2438,18 @@ func _build_autobahn_traffic() -> void:
 	t.set("length", _autobahn_span.x - _autobahn_span.y)
 	# Lanes (x in the node's frame, + is east): northbound on the east carriageway.
 	t.set("lanes", PackedFloat32Array([5.4, 10.6, -5.4, -10.6]))
+	# Engines by kind (0 petrol car, 1 V6 SUV, 2 diesel van, 3 motorhome) and horns: Rheinufer's (see its _traffic_sound).
+	var es: Array[AudioStream] = []
+	for e in ["traffic_car_petrol_loop", "traffic_suv_loop", "traffic_van_diesel_loop", "traffic_motorhome_loop"]:
+		es.append(load("res://sounds/rheinufer/%s.wav" % e))
+	var hs: Array[AudioStream] = []
+	for h in ["res://sounds/rheinufer/traffic_horn_long.wav", "res://sounds/rheinufer/traffic_horn_deep.wav", "res://sounds/stadtrallye/car_horn_2.wav", "res://sounds/stadtrallye/car_horn_3.wav"]:
+		hs.append(load(h))
+	t.set("engine_sounds", es)
+	t.set("engine_rms", PackedFloat32Array([-19.8, -16.5, -20.0, -36.5]))
+	t.set("kind_engine", PackedInt32Array([2, 1, 0, 3, 2]))
+	t.set("horns", hs)
+	t.set("horn_rms", PackedFloat32Array([-16.5, -13.5, -31.2, -17.2]))
 	level.add_child(t)
 ## One bay of the viaduct in its pier's frame (life size): the pier pair at the origin, the box girder on toward -z for
 ## `span`, its deck's top `deck` over the ground. The road on top, its barriers, the deck's cornices.

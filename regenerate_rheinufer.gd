@@ -1518,7 +1518,9 @@ func _build_xover_slab(root: Node3D) -> void:
 	var node := Node3D.new()
 	node.name = "XoverSlab"
 	root.add_child(node)
-	var x0: float = XOVER_E.x
+	# From where the ramp's arc leaves the bridge's line: there its outer edge curves away from the median's kerb and left
+	# a sliver open over the water before the slab began at the bridge's end.
+	var x0: float = XOVER_E.x - 8.0
 	var x1: float = XOVER_E.y
 	var z_n: float = A47_AXIS - 4.0
 	var nx: int = ceili((x1 - x0) / 2.0)
@@ -1528,9 +1530,11 @@ func _build_xover_slab(root: Node3D) -> void:
 	for i in nx + 1:
 		var x: float = lerpf(x0, x1, float(i) / float(nx))
 		var z_s: float = _ramp_outer_z(x) + 1.5
+		# Over the bridge (x < its end) only from the median's kerb (5.5 off the axis, 10cm under it) to the ramp.
+		var zn_row: float = z_n if x >= XOVER_E.x - 0.01 else A47_AXIS + 5.4
 		var row: Array = []
 		for j in nz + 1:
-			var z: float = lerpf(z_n, z_s, float(j) / float(nz))
+			var z: float = lerpf(zn_row, z_s, float(j) / float(nz))
 			row.append(Vector3(x, _xover_y(x, z), z))
 		grid.append(row)
 	var top := SurfaceTool.new()
@@ -1542,8 +1546,8 @@ func _build_xover_slab(root: Node3D) -> void:
 	for i in nx:
 		var ra: Array = grid[i]
 		var rb: Array = grid[i + 1]
-		var hwa: float = absf((ra[nz] as Vector3).z - z_n) * 0.5
-		var hwb: float = absf((rb[nz] as Vector3).z - z_n) * 0.5
+		var hwa: float = absf((ra[nz] as Vector3).z - (ra[0] as Vector3).z) * 0.5
+		var hwb: float = absf((rb[nz] as Vector3).z - (rb[0] as Vector3).z) * 0.5
 		for j in nz:
 			var q: Array = [ra[j], ra[j + 1], rb[j], rb[j + 1]]
 			var hw: Array = [hwa, hwa, hwb, hwb]
@@ -1553,7 +1557,8 @@ func _build_xover_slab(root: Node3D) -> void:
 					var p: Vector3 = q[k]
 					top.set_normal(Vector3.UP)
 					top.set_color(Color(1, 0, 0, 1))
-					top.set_uv(Vector2(p.z - z_n - float(hw[k]), p.x))
+					var z0row: float = ((ra if k < 2 else rb)[0] as Vector3).z
+					top.set_uv(Vector2(p.z - z0row - float(hw[k]), p.x))
 					top.set_uv2(Vector2(3.0, float(hw[k])))
 					top.add_vertex(p)
 					faces.append(p)
@@ -1619,6 +1624,21 @@ func _build_xover_slab(root: Node3D) -> void:
 			e_rts.append(Vector3(-1, 0, 0))
 	if e_pts.size() > 1:
 		_edge_boxes(fence, e_pts, e_rts, -0.25, 1.15)
+		# A guardrail along it, its beam toward the slab (RheinBridgeKit's, as along the ramp it joins).
+		var a2: Vector3 = e_pts[0] + Vector3(-0.4, -0.03, 0)
+		var b2: Vector3 = e_pts[e_pts.size() - 1] + Vector3(-0.4, -0.03, 0)
+		var n_p: int = maxi(1, roundi(a2.distance_to(b2) / (4.0 * PROP_SCALE)))
+		for k in n_p:
+			var pa: Vector3 = a2.lerp(b2, float(k) / float(n_p))
+			var pb: Vector3 = a2.lerp(b2, float(k + 1) / float(n_p))
+			var fwd: Vector3 = (pb - pa).normalized()
+			var z_ax := Vector3(-1, 0, 0)
+			var y_ax: Vector3 = z_ax.cross(fwd).normalized()
+			if y_ax.y < 0.0:
+				y_ax = -y_ax
+			var life: float = pa.distance_to(pb) / PROP_SCALE
+			var bk: Script = _kit_script("res://RheinBridgeKit.gd")
+			_add_prop(_cell_key("leitplanke", pa, 300.0), bk, Transform3D(Basis(fwd, y_ax, z_ax), pa), func(pk, kit, _l): _kit_call(bk, "guardrail", [pk, kit, life]))
 	# One pier under its middle, on the quay.
 	var mid: Vector3 = grid[nx / 2][nz / 2]
 	_pier(node, fence, _kit_script("res://RheinBridgeKit.gd"), mid, Vector3(0, 0, 1), mid.y - thick - BEARING_H, _ground_at(mid.x, mid.z), 9.0)
@@ -1642,11 +1662,12 @@ func _max_y(f: PackedVector3Array) -> float:
 ## Whether a deck's edge point `e` opens onto the east crossover slab: the A 47 westbound's girder's median edge (l1) and
 ## the exit ramp's outer edge (l0) between the Harfenbrücke's end and XOVER_E.y.
 func _xover_edge_open(deck_name: String, e: Vector3, is_l1: bool) -> bool:
-	if e.x < XOVER_E.x - 0.5 or e.x > XOVER_E.y - 0.5:
+	if e.x > XOVER_E.y - 0.5:
 		return false
 	if is_l1:
-		return deck_name.begins_with("A47EastWB")
-	return deck_name.begins_with("AusfahrtSpan")
+		return e.x >= XOVER_E.x - 0.5 and deck_name.begins_with("A47EastWB")
+	# The ramp's outer edge from where the slab begins under it (8m before the bridge's end).
+	return e.x >= XOVER_E.x - 8.5 and deck_name.begins_with("AusfahrtSpan")
 
 
 func _build_decks(root: Node3D) -> void:
@@ -2392,10 +2413,8 @@ func _build_barriers(root: Node3D) -> void:
 			var sm: float = minf(s + piece * 0.5, s1)
 			# Guardrails stand only on embankments; the median's concrete barrier runs on over the overpass's deck too
 			# (missing there, the median read as open and drivable, but its collider stood across it).
+			# On a deck a guardrail stands on the girder's cantilever (the exit ramp's outside had only a 30cm cornice).
 			var on_deck: bool = _lap_on_deck(fposmod(sm, lap_len))
-			if on_deck and kind == "guardrail":
-				s += piece
-				continue
 			var drop: Vector3 = Vector3(0, -0.06, 0) if on_deck else Vector3.ZERO
 			var a: Vector3 = _pt(s) + _rt(s) * lat + drop
 			var b: Vector3 = _pt(minf(s + piece, s1)) + _rt(minf(s + piece, s1)) * lat + drop
@@ -2525,6 +2544,7 @@ func _build_traffic(root: Node3D) -> void:
 	a58.set("length", 5000.0)
 	a58.set("per_lane", 22)
 	a58.set("lanes", PackedFloat32Array([6.6, 10.4, 14.1, -6.6, -10.4, -14.1]))
+	_traffic_sound(a58, PackedInt32Array([2, 1, 0, 3, 2, 0, 1]))
 	node.add_child(a58)
 	# The A 47 westbound, from the town east of the river to the west country: the node turned so its -z runs west.
 	var x_start := 1500.0
@@ -2545,9 +2565,35 @@ func _build_traffic(root: Node3D) -> void:
 	wb.set("lanes", PackedFloat32Array([8.1, 11.9, 15.6]))
 	# The race may take this carriageway against the traffic (the Gegenfahrbahn): a vehicle destroys a cart it touches.
 	wb.set("kills", true)
+	_traffic_sound(wb, PackedInt32Array([2, 1, 0, 3, 2, 0, 1]))
 	wb.set("heights", hs)
 	wb.set("height_step", 10.0)
 	node.add_child(wb)
+
+
+## The traffic's sounds (tools/elevenlabs, sounds/rheinufer/traffic_*): engine loops by vehicle kind (`kind_engine`:
+## 0 petrol car, 1 V6 SUV, 2 diesel van, 3 motorhome), levelled by their measured RMS, and horns by their loudest second.
+const TRAFFIC_ENGINES := [["res://sounds/rheinufer/traffic_car_petrol_loop.wav", -19.8], ["res://sounds/rheinufer/traffic_suv_loop.wav", -16.5],
+	["res://sounds/rheinufer/traffic_van_diesel_loop.wav", -20.0], ["res://sounds/rheinufer/traffic_motorhome_loop.wav", -36.5]]
+const TRAFFIC_HORNS := [["res://sounds/rheinufer/traffic_horn_long.wav", -16.5], ["res://sounds/rheinufer/traffic_horn_deep.wav", -13.5],
+	["res://sounds/stadtrallye/car_horn_2.wav", -31.2], ["res://sounds/stadtrallye/car_horn_3.wav", -17.2]]
+
+func _traffic_sound(t: Node, kind_engine: PackedInt32Array) -> void:
+	var es: Array[AudioStream] = []
+	var er := PackedFloat32Array()
+	for e in TRAFFIC_ENGINES:
+		es.append(load(e[0]))
+		er.append(e[1])
+	var hs: Array[AudioStream] = []
+	var hr := PackedFloat32Array()
+	for h in TRAFFIC_HORNS:
+		hs.append(load(h[0]))
+		hr.append(h[1])
+	t.set("engine_sounds", es)
+	t.set("engine_rms", er)
+	t.set("kind_engine", kind_engine)
+	t.set("horns", hs)
+	t.set("horn_rms", hr)
 
 
 # ======================================================================================

@@ -3847,6 +3847,18 @@ The Lower Rhine at the edge of Kronburg on a summer evening (sun low in the WSW)
   solid (`RheinBridgeKit.old_bridge_solids`/`harp_bridge_solids`, `RheinPfeilerBody`); the kit's meshes are "..._bridge",
   which DressingColliders skips, and carts drove through them. The westbound's railing and median face on the bridge
   have edge boxes (`_x_edge_boxes`).
+- The crossover slab starts 8m before the bridge's end, between the median's kerb and the ramp (the ramp's arc curving
+  away from the kerb had left a sliver open over the water). Guardrails are drawn on decks too (on the girders'
+  cantilevers, 6cm down), so the exit ramp's outside has one all the way down, and one runs along the slab's open east
+  edge: there had been only the girders' 30cm cornice.
+- AutobahnTraffic's sound (both Rheinufer carriageways and Kronburger Hütte's viaduct): `voices` (6) players follow the
+  vehicles nearest the camera, each kind's engine loop (`engine_sounds`, `kind_engine`; `sounds/rheinufer/traffic_*_loop.wav`,
+  tools/elevenlabs, made without a Doppler sweep of their own) levelled by its RMS, pitched by the Doppler shift worked
+  out from the vehicle's and the camera's velocities (AudioStreamPlayer3D's own needs the camera's `doppler_tracking`);
+  a vehicle honks at a cart in its own lane ahead of it about half the time (`honk_share`, then `honk_gap` 14s), and one
+  near the listener now and then (`ambient_honk` 35s). Every vehicle in a lane runs at the lane's speed: each at its own,
+  the faster ones drove into the ones ahead. `res://scratch/autobahn_sound_probe.gd` (`-s`, windowed, `--fixed-fps 60`,
+  `-- [from=x,z] [speed=40] [seconds=14]`) rides a camera against the traffic and logs the voices' pitch and the honks.
 - Autobahn traffic uses CampKit's `motorhome_road` (awning rolled in, entry step stowed; Kronburger Hütte's viaduct too):
   the camp's motorhome drove with its awning out and door step down. `res://scratch/camp_vehicle_preview.gd` (`-s`,
   windowed, `-- <dir> [kinds=motorhome:0,motorhome_road:0] name:x,y,z:tx,ty,tz`) renders CampKit's vehicles side by side.

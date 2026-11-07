@@ -2,13 +2,13 @@
 
 [ext_resource type="ArrayMesh" path="res://generated/rheinuferprop_ship_convoy.res" id="1_juj5v"]
 
-[node name="Vessel" type="Node3D" unique_id=1338254147]
+[node name="Vessel" type="Node3D" unique_id=779806220]
 
-[node name="Hull" type="MeshInstance3D" parent="." unique_id=726363774]
+[node name="Hull" type="MeshInstance3D" parent="." unique_id=2112939374]
 visibility_range_end = 2600.0
 mesh = ExtResource("1_juj5v")
 
-[node name="@Label3D@1548" type="Label3D" parent="." unique_id=1282693628]
+[node name="@Label3D@1548" type="Label3D" parent="." unique_id=1561248489]
 transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -9.168, 0.99200004, 38)
 visibility_range_end = 600.0
 pixel_size = 0.011428571
@@ -19,7 +19,7 @@ text = "KRB 2104"
 font_size = 64
 outline_size = 4
 
-[node name="@Label3D@1549" type="Label3D" parent="." unique_id=1652529371]
+[node name="@Label3D@1549" type="Label3D" parent="." unique_id=2021928093]
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 9.168, 0.99200004, 38)
 visibility_range_end = 600.0
 pixel_size = 0.011428571
@@ -30,7 +30,7 @@ text = "KRB 2104"
 font_size = 64
 outline_size = 4
 
-[node name="@Label3D@1550" type="Label3D" parent="." unique_id=2125284993]
+[node name="@Label3D@1550" type="Label3D" parent="." unique_id=117354357]
 transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -9.168, 0.99200004, -84.8)
 visibility_range_end = 600.0
 pixel_size = 0.011428571
@@ -41,7 +41,7 @@ text = "KRB 2121"
 font_size = 64
 outline_size = 4
 
-[node name="@Label3D@1551" type="Label3D" parent="." unique_id=372535323]
+[node name="@Label3D@1551" type="Label3D" parent="." unique_id=1681604177]
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 9.168, 0.99200004, -84.8)
 visibility_range_end = 600.0
 pixel_size = 0.011428571
@@ -52,7 +52,7 @@ text = "KRB 2121"
 font_size = 64
 outline_size = 4
 
-[node name="@Label3D@1552" type="Label3D" parent="." unique_id=371431112]
+[node name="@Label3D@1552" type="Label3D" parent="." unique_id=1307756943]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 2.8799999, -150.848)
 visibility_range_end = 600.0
 pixel_size = 0.012142858
@@ -63,7 +63,7 @@ text = "KRONBURG IV"
 font_size = 64
 outline_size = 4
 
-[node name="@Label3D@1553" type="Label3D" parent="." unique_id=1435986001]
+[node name="@Label3D@1553" type="Label3D" parent="." unique_id=397332888]
 transform = Transform3D(-0.0015193013, -0.0033833, -0.9999932, 0, 0.9999944, -0.0033833038, 0.99999887, -5.140258e-06, -0.0015192927, -9.163161, 1.9198378, -102.80007)
 visibility_range_end = 600.0
 pixel_size = 0.014285714
@@ -74,7 +74,7 @@ text = "KRONBURG IV"
 font_size = 64
 outline_size = 4
 
-[node name="@Label3D@1554" type="Label3D" parent="." unique_id=1049755950]
+[node name="@Label3D@1554" type="Label3D" parent="." unique_id=505415324]
 transform = Transform3D(-0.0015193013, 0.0033833, 0.9999932, 0, 0.9999944, -0.0033833038, -0.99999887, -5.140258e-06, -0.0015192927, 9.163161, 1.9198378, -102.80007)
 visibility_range_end = 600.0
 pixel_size = 0.014285714

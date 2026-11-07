@@ -462,5 +462,53 @@
     "duration": 0.8,
     "loop": false,
     "influence": 0.6
+  },
+  {
+    "name": "ab_car_petrol",
+    "path": "sounds/rheinufer/traffic_car_petrol_loop.wav",
+    "text": "A modern petrol family car cruising at steady motorway speed, engine hum and tyre roar on asphalt, recorded close beside the car moving along with it, constant pitch, no passing, no doppler, no wind gusts",
+    "duration": 6.0,
+    "loop": true,
+    "influence": 0.6
+  },
+  {
+    "name": "ab_suv_v6",
+    "path": "sounds/rheinufer/traffic_suv_loop.wav",
+    "text": "A large SUV with a V6 petrol engine cruising at steady motorway speed, a deeper throaty engine note and wide tyres humming on asphalt, recorded close alongside, constant pitch, no doppler, no passing",
+    "duration": 6.0,
+    "loop": true,
+    "influence": 0.6
+  },
+  {
+    "name": "ab_van_diesel",
+    "path": "sounds/rheinufer/traffic_van_diesel_loop.wav",
+    "text": "A diesel delivery van cruising at steady motorway speed, clattering diesel engine drone and tyre noise, recorded close alongside, constant pitch, no doppler, no passing",
+    "duration": 6.0,
+    "loop": true,
+    "influence": 0.6
+  },
+  {
+    "name": "ab_motorhome",
+    "path": "sounds/rheinufer/traffic_motorhome_loop.wav",
+    "text": "A heavy motorhome camper on a truck chassis cruising on the motorway, low turbo diesel rumble, rattling body, big tyres on asphalt, recorded close alongside, constant pitch, no doppler, no passing",
+    "duration": 6.0,
+    "loop": true,
+    "influence": 0.6
+  },
+  {
+    "name": "ab_horn_long",
+    "path": "sounds/rheinufer/traffic_horn_long.wav",
+    "text": "An angry long car horn blast on a motorway, a single sustained honk about one second long, clear, close",
+    "duration": 1.4,
+    "loop": false,
+    "influence": 0.6
+  },
+  {
+    "name": "ab_horn_truck",
+    "path": "sounds/rheinufer/traffic_horn_deep.wav",
+    "text": "A deep loud two-tone horn of a motorhome or small truck, two short honks, close, outdoors",
+    "duration": 1.6,
+    "loop": false,
+    "influence": 0.6
   }
 ]
