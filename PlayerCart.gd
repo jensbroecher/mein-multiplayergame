@@ -6928,7 +6928,8 @@ func _get_ai_input(delta: float) -> Vector2:
 			var ahead: bool = to_start.dot(-visuals.global_transform.basis.z) > 0.0
 			if dist < AI_ROUTE_DECIDE and (ahead or dist < 12.0):
 				if not alt_path_decisions.has(alt_path):
-					alt_path_decisions[alt_path] = randf() < ai_shortcut_chance
+					# A route may lower the odds ("ai_chance_scale": Rheinufer's Gegenfahrbahn, against the traffic).
+					alt_path_decisions[alt_path] = randf() < ai_shortcut_chance * float(alt_path.get_meta(&"ai_chance_scale", 1.0))
 					if alt_path_decisions[alt_path]:
 						_ai_pending_route = alt_path
 				if _ai_pending_route == alt_path and (dist < 12.0 or not ahead):

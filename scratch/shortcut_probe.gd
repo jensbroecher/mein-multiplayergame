@@ -3,7 +3,9 @@ extends Node
 # Checks a level's AI shortcuts (the Path3D children of AlternativePaths) and races bots that always
 # take them. Headless:
 #   Godot --headless --path . res://scratch/shortcut_probe.tscn -- res://levels/X.tscn [seconds=180] [speed=2]
-#       [static=1] [chance=1.0] [trace=<shortcut name>]
+#       [static=1] [chance=1.0] [trace=<shortcut name>] [harmless=1]
+# A shortcut's own "ai_chance_scale" meta (Rheinufer's Gegenfahrbahn: 0) is set to 1 for the race, so the bots take it.
+# harmless=1 turns the traffic's kills off (AutobahnTraffic, CrossTraffic), to see whether a route is drivable at all.
 # trace= logs every 0.2s, for carts on that shortcut: the distance along it, how far off its line
 # (+ right), the speed and the AI's lane offset.
 # Static part, per shortcut: its length, how its ends meet the lap (distance, height, heading), and
@@ -23,7 +25,9 @@ func _ready() -> void:
 	var static_only := false
 	var chance := 1.0
 	var trace := ""
+	var harmless := false
 	for a in args:
+		if a == "harmless=1": harmless = true
 		if a.begins_with("seconds="): seconds = float(a.substr(8))
 		elif a.begins_with("speed="): speed = float(a.substr(6))
 		elif a.begins_with("static="): static_only = a.substr(7) == "1"
@@ -46,6 +50,12 @@ func _ready() -> void:
 			track.curve.get_baked_length(), "%.1f" % water_y if water_y > -INF else "none found"])
 	for alt in level.alternative_paths:
 		_check(level, track, alt, water_y)
+		alt.set_meta(&"ai_chance_scale", 1.0)
+	if harmless:
+		for n in level.find_children("*", "Node3D", true, false):
+			if "kills" in n:
+				n.set("kills", false)
+				n.set_physics_process(false)
 	if static_only:
 		get_tree().quit()
 		return

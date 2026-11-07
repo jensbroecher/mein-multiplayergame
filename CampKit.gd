@@ -47,6 +47,7 @@ func _init(kit: PropKit) -> void:
 ## Camp layouts in terrace coordinates (metres; x along the terrace, z across it, +z toward the track,
 ## so vehicles nose toward +z). Each item is [kind, x, z, yaw offset, colour, variant or second colour]:
 ##   motorhome / caravan / van / suv   colour, variant (0 awning out, 1 out, 2 stowed; the caravan 1 stowed)
+##   motorhome_road                    the motorhome under way (Autobahn traffic): awning in, entry step stowed
 ##   dome / ridge / tunnel             fly colour, inner or accent colour
 ##   gazebo                            canopy colour (with its table and three chairs)
 ##   bbq, cooler                       (the cooler: body colour)
@@ -239,6 +240,9 @@ func vehicle(kit: Dictionary, kind: String, col: Color, variant := 0) -> Vector3
 	match kind:
 		"motorhome":
 			size = _motorhome(kit, col, variant)
+		"motorhome_road":
+			# Under way on the road (Autobahn traffic): the awning rolled in, the entry step stowed under the door.
+			size = _motorhome(kit, col, variant, true)
 		"caravan":
 			size = _caravan(kit, col, variant)
 		"van":
@@ -409,7 +413,7 @@ func _rv_awning(kit: Dictionary, x0: float, x1: float, y_top: float, hw: float, 
 ## over-cab Luton sleeper alcove with panoramic window, wider coach body with graphics, habitation
 ## door & step on the camp side, service vents on the off-side, rooftop A/C & solar, rear ladder,
 ## bike rack and multi-lens tail lights.
-func _motorhome(kit: Dictionary, col: Color, variant := 0) -> Vector3:
+func _motorhome(kit: Dictionary, col: Color, variant := 0, driving := false) -> Vector3:
 	var k := _kit
 	var hw := 1.16
 	var hw_cab := 0.99
@@ -490,9 +494,13 @@ func _motorhome(kit: Dictionary, col: Color, variant := 0) -> Vector3:
 	_hab_window(kit, 0.54, 0.96, 1.48, 2.16, hw + 0.014, 1.0, 0.20, false)
 	k.block(kit, "chrome", Vector3(0.47, 1.24, zd + 0.01), Vector3(0.54, 1.36, zd + 0.04), Color(0.86, 0.88, 0.90))
 	k.block(kit, "lamp", Vector3(0.58, 2.44, hw), Vector3(0.92, 2.50, hw + 0.035), Color(1.0, 0.94, 0.78))
-	# Deployed metal entry step under the habitation door.
-	k.block(kit, "metal", Vector3(0.44, 0.26, hw - 0.05), Vector3(1.06, 0.32, hw + 0.24), GALV)
-	k.block(kit, "rubber", Vector3(0.46, 0.32, hw + 0.02), Vector3(1.04, 0.335, hw + 0.22), RUB_TRIM)
+	if driving:
+		# The entry step slid in: its dark pocket flush under the door.
+		k.block(kit, "matte", Vector3(0.44, 0.40, hw - 0.04), Vector3(1.06, 0.50, hw + 0.012), RUB_TRIM)
+	else:
+		# Deployed metal entry step under the habitation door.
+		k.block(kit, "metal", Vector3(0.44, 0.26, hw - 0.05), Vector3(1.06, 0.32, hw + 0.24), GALV)
+		k.block(kit, "rubber", Vector3(0.46, 0.32, hw + 0.02), Vector3(1.04, 0.335, hw + 0.22), RUB_TRIM)
 	# Camp-side habitation windows and rear garage hatch.
 	_hab_window(kit, -1.18, 0.14, 1.48, 2.22, hw, 1.0, 0.25, true)
 	_hab_window(kit, -3.15, -1.95, 1.54, 2.22, hw, 1.0, 0.28, true)
@@ -500,7 +508,7 @@ func _motorhome(kit: Dictionary, col: Color, variant := 0) -> Vector3:
 		k.beam(kit, "plastic", Vector3(float(edge[0]), float(edge[1]), hw + 0.016), Vector3(float(edge[2]), float(edge[3]), hw + 0.016), 0.026, 0.014, RUB_TRIM, nd)
 	k.block(kit, "chrome", Vector3(-2.68, 0.58, hw + 0.014), Vector3(-2.58, 0.64, hw + 0.032), Color(0.85, 0.86, 0.88))
 	# Awning on the camp side (deployed on main terrace motorhomes).
-	_rv_awning(kit, -3.25, 1.32, 2.98, hw, 1.0, variant < 2, acc1)
+	_rv_awning(kit, -3.25, 1.32, 2.98, hw, 1.0, variant < 2 and not driving, acc1)
 	# 6. Driver / service side (-z = -1): windows, twin louvred fridge vents, service hatch & garage door.
 	_hab_window(kit, -0.88, 0.48, 1.48, 2.22, hw, -1.0, 0.25, true)
 	_hab_window(kit, -3.15, -1.95, 1.54, 2.22, hw, -1.0, 0.28, true)

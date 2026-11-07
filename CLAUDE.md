@@ -2682,7 +2682,7 @@ its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set th
   copies of the section about that height, so the edge lies on the same ring points all over the
   face. A boundary crossing a cap at another height came out wavy. The side is split at the sill line
   for the same reason.
-- The Obsidian (`ObsidianBuilder.gd`, a futuristic matte-black desert raider, an original design with a made-up name) features a low sculpted hood with extraction vents and an LED light bar, an open-wheel front with long A-arms, a chrome-framed cockpit canopy with tan bucket seats, a central cylindrical sensor pod on the roll hoop, exposed underfloor bronze power cylinders clamped along the sills, and a sculpted rear cowl that arches over the rear tyres, finished with twin aerodynamic winglet fins. Its balloon mud-terrain tyres ride on deep-dish gold/bronze beadlock rims.
+- The Obsidian (`ObsidianBuilder.gd`, a futuristic matte-black desert raider, an original design with a made-up name) features a low sculpted hood with extraction vents and an LED light bar, an open-wheel front with long A-arms, a chrome-framed cockpit canopy with tan bucket seats, a central cylindrical sensor pod on the roll hoop, exposed underfloor bronze power cylinders clamped along the sills, and a sculpted rear cowl that arches over the rear tyres, finished with twin aerodynamic winglet fins. Its balloon mud-terrain tyres ride on deep-dish gold/bronze beadlock rims. Under the rear cowl, between the seats and the rear axle, sits a flat-six (`_engine_side`, `_engine_centre`, `ENGINE_*`): a crankcase on the spine, finned cylinders, heads with valve covers in the accent colour, red plug leads, intake runners off a plenum with a filter, headers into collectors that run back past the gearbox (over the half shafts, under the upper arms' pivots) into a silencer across the tail, and two tailpipes out under the bumper; the exhausts had come out of nothing in an empty cavity.
 - The Fulmine (`FulmineBuilder.gd`, a mid-engined hypercar, an original design with a made-up name) is built on the
   Nocturne's section (wells cut as notches, fender humps over a sunken bonnet and tail) with the Inferno's flank intake
   (`_scoop()`) carved ahead of each rear wheel, 10cm deep. Beside the cockpit B drops deep below A, so the shell is an
@@ -3829,8 +3829,29 @@ The Lower Rhine at the edge of Kronburg on a summer evening (sun low in the WSW)
   110s on the wall clock, bodies on layer 4, knocked aside by carts), the Kirmes (`KirmesWheel.gd`, `KirmesRide.gd`),
   the windmill's sails (`Spinner.gd`), traffic on the A 58 and the A 47 westbound (`AutobahnTraffic.gd`, which now takes a
   height profile, `heights`/`height_step`), steam over the power station's cooling towers.
+- The Gegenfahrbahn (`XOVER_W`, `XOVER_E`, `SHOULDER`, `_build_gegenfahrbahn`, `GEGEN_PADS`): after the last gate before
+  the Harfenbrücke the median is paved (`MittelXover`, a kind-3 dressing road) and a player may cross onto the A 47
+  westbound and take the bridge against its traffic (`AutobahnTraffic.kills`: a vehicle destroys a cart it touches, a
+  swept box test, no bodies), with boost pads only on that side; past the bridge's east end a concrete slab
+  (`_build_xover_slab`, `XoverSlabDeck`, on one pier) carries it across the median and the closed eastbound onto the exit
+  ramp (it filled a hole there; `_xover_edge_open` flattens the girders' upstands and drops their edge boxes along it).
+  The westbound's stretch between them is a track body of its own (`Gegenfahrbahn...Track`, a road's `track_x`); the
+  rest of the dressing roads stay off-road "Autobahn...Body". Their ribbon meshes are named "...Road_n": DressingColliders
+  had given each a second, off-road trimesh. It is `AlternativePaths/Gegenfahrbahn` (wrong-way watch, pads' facing) with
+  `ai_chance_scale` 0 (PlayerCart multiplies a route's chance by it): the vehicles fill the lanes to the shoulder and bots
+  can't see them, and nearly every bot that took it was blown up. Checkpoint 6 moved off the bridge to the ramp's foot.
+  `scratch/shortcut_probe ... chance=1 harmless=1` forces bots onto it with the traffic harmless (18 of 18 rejoined).
+- The median's concrete barrier is drawn over the A 58 overpass too (its collider stood there invisible, the median
+  reading as open). Under both Rhine bridges the piers, flood-arch piers and vaults (sliced along the intrados, so the
+  arches stay open), the Harfenbrücke's girder (a metre or two over the dyke) and its pylon, piers and abutment are
+  solid (`RheinBridgeKit.old_bridge_solids`/`harp_bridge_solids`, `RheinPfeilerBody`); the kit's meshes are "..._bridge",
+  which DressingColliders skips, and carts drove through them. The westbound's railing and median face on the bridge
+  have edge boxes (`_x_edge_boxes`).
+- Autobahn traffic uses CampKit's `motorhome_road` (awning rolled in, entry step stowed; Kronburger Hütte's viaduct too):
+  the camp's motorhome drove with its awning out and door step down. `res://scratch/camp_vehicle_preview.gd` (`-s`,
+  windowed, `-- <dir> [kinds=motorhome:0,motorhome_road:0] name:x,y,z:tx,ty,tz`) renders CampKit's vehicles side by side.
 - AI races (`scratch/ai_race_test`, speed=2): every bot finishes three laps, the only respawns item blasts; flying laps
-  about 70s. Cost (M1, 1280x720, `scratch/bench.tscn`): 8.1ms GPU on average, the worst 10.3ms.
+  about 67s. Cost (M1, 1280x720, `scratch/bench.tscn`): 8.1ms GPU on average, the worst 10.3ms.
 - Menu tile `images/menu/tile_rheinufer.jpg` (the old bridge from the river, `scratch/look_shots.tscn` at 1376x768).
 
 ## Zeche Kronprinz (Kronburg GP, stage 3)

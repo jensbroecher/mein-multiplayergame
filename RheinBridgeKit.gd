@@ -2703,3 +2703,119 @@ static func conductor(pk: PropKit, kit: Dictionary, a: Vector3, b: Vector3, sag:
 		side = Vector3.RIGHT
 	var f: Array = _path_frames(pts, side.normalized())
 	_sweep(pk, kit, "cable", f[0], f[1], f[2], tri, CABLE, true, true)
+
+
+# ======================================================================================
+#  Colliders for what stands under the two Rhine bridges' decks (in the bridges' own frames, game metres)
+# ======================================================================================
+
+## The solid parts of the Alte Rheinbrücke under its road, as axis-aligned boxes [centre, size] in its frame (x along the
+## bridge, z across, the road's middle at z 0): the river piers, the end piers' blocks, the flood arches' piers, the
+## masonry over each arch's vault (in slices that follow the intrados down to its springings, so a cart still drives
+## through the arches) and the filled arches and abutment at the dyke's foot. The props are batched into "old_bridge"
+## meshes, which DressingColliders skips ("bridge"): without these a cart drove straight through the flood arches' piers.
+static func old_bridge_solids(deck: Callable, ground: Callable) -> Array:
+	var out: Array = []
+	for xc in OB_RIVER_PIERS:
+		var cap: float = minf(float(deck.call(xc - 1.6)), float(deck.call(xc + 1.6))) - OB_CAP_DROP
+		var bed: float = ground.call(xc)
+		out.append([Vector3(xc, (bed - 3.0 + cap) * 0.5, 0.0), Vector3(9.0, cap - bed + 3.0, 2.0 * 19.0)])
+	for side in [1.0, -1.0]:
+		var xp: float = 200.0 * side
+		var g: float = minf(float(ground.call(xp - 4.0 * side)), float(ground.call(xp)))
+		var xf: float = xp - 4.0 * side
+		var xe: float = xp + (6.0 if side > 0.0 else 5.1) * side
+		var top: float = minf(float(deck.call(xp - 4.0 * side)), float(deck.call(xe))) - 0.12
+		if top - (g - 2.5) > 0.5:
+			out.append([Vector3((xf + xe) * 0.5, (g - 2.5 + top) * 0.5, 0.0), Vector3(absf(xe - xf), top - g + 2.5, 2.0 * (OB_TOWER_Z0 - 0.13))])
+	# The flood arches (as _ob_flood_arches lays them out).
+	var total: float = absf(OB_FLOOD_X1 - OB_FLOOD_X0)
+	var span: float = (total - float(OB_FLOOD_N - 1) * OB_FLOOD_PIER) / float(OB_FLOOD_N)
+	var arches: Array = []
+	for i in OB_FLOOD_N:
+		var xe2: float = OB_FLOOD_X0 - float(i) * (span + OB_FLOOD_PIER)
+		var xw2: float = xe2 - span
+		var xm: float = (xe2 + xw2) * 0.5
+		var yc: float = float(deck.call(xm)) - 1.6
+		var ys: float = maxf(float(ground.call(xm)) + 1.2, yc - 0.45 * span)
+		var rise: float = yc - ys
+		var r: float = (rise * rise + span * span * 0.25) / (2.0 * rise)
+		arches.append([xe2, xw2, ys, yc, r])
+	var n_open := 0
+	for a in arches:
+		if float(a[3]) - float(a[2]) < OB_FLOOD_MIN_RISE:
+			break
+		n_open += 1
+	var zw: float = 2.0 * OB_FACE_Z
+	var slab := func(x0: float, x1: float, y0: float) -> void:
+		var y1: float = minf(float(deck.call(x0)), float(deck.call(x1))) - 0.12
+		var g2: float = minf(float(ground.call(x0)), float(ground.call(x1))) - 2.0
+		var lo: float = maxf(y0, g2)
+		if y1 - lo > 0.2:
+			out.append([Vector3((x0 + x1) * 0.5, (lo + y1) * 0.5, 0.0), Vector3(absf(x1 - x0), y1 - lo, zw)])
+	for i in n_open:
+		var a: Array = arches[i]
+		var xe3: float = a[0]
+		var xw3: float = a[1]
+		var yc2: float = a[3]
+		var r2: float = a[4]
+		var xm2: float = (xe3 + xw3) * 0.5
+		# The pier west of this arch (to the next arch's east springing), down into the ground.
+		if i < OB_FLOOD_N - 1:
+			slab.call(xw3 - OB_FLOOD_PIER, xw3, -1e9)
+		# The vault and the spandrel over it, in slices whose underside is the intrados' lower end.
+		var n_sl := 8
+		for k in n_sl:
+			var xa: float = lerpf(xw3, xe3, float(k) / float(n_sl))
+			var xb: float = lerpf(xw3, xe3, float(k + 1) / float(n_sl))
+			var ya: float = yc2 - r2 + sqrt(maxf(r2 * r2 - (xa - xm2) * (xa - xm2), 0.0))
+			var yb: float = yc2 - r2 + sqrt(maxf(r2 * r2 - (xb - xm2) * (xb - xm2), 0.0))
+			slab.call(xa, xb, minf(ya, yb))
+	# The filled arches and the abutment, from the last open arch's west springing to the bridge's end.
+	var x_fill: float = OB_FLOOD_X0 if n_open == 0 else float((arches[n_open - 1] as Array)[1])
+	if n_open > 0 and n_open < OB_FLOOD_N:
+		x_fill -= OB_FLOOD_PIER
+	slab.call(OB_WEST - 2.0, x_fill, -1e9)
+	return out
+
+
+## The solid parts of the Harfenbrücke under (and through) its deck, as boxes [centre, size] in its frame (x along the
+## bridge, z across from the motorway's median): the box girder and the cantilevers' underside in 7.5m pieces, the
+## pylon's river pier, shaft and crossbeam and its tower over the median, the auxiliary piers, the east end pier and the
+## west abutment on the dyke. The girder's underside stands a metre or two over the dyke's crown at the west end: carts
+## drove through it, and through the piers on the floodplain.
+static func harp_bridge_solids(deck: Callable, ground: Callable) -> Array:
+	var out: Array = []
+	var xs: Array = _stations(HB_X0, HB_X1, 7.5)
+	for i in xs.size() - 1:
+		var x0: float = xs[i]
+		var x1: float = xs[i + 1]
+		var dk: float = minf(float(deck.call(x0)), float(deck.call(x1)))
+		var xm: float = (x0 + x1) * 0.5
+		out.append([Vector3(xm, dk - 0.45 - (HB_BOX_D - 0.45) * 0.5, 0.0), Vector3(x1 - x0, HB_BOX_D - 0.45, 2.0 * (HB_BOX_BOT + HB_BOX_TOP) * 0.5)])
+		out.append([Vector3(xm, dk - 0.75, 0.0), Vector3(x1 - x0, 0.6, 2.0 * HB_EDGE)])
+	var px: float = HB_PYLON_X
+	var bed: float = ground.call(px)
+	var d0: float = deck.call(px)
+	var cb_top: float = d0 - HB_BOX_D - BEARING_H
+	out.append([Vector3(px, (bed - 3.0 + 4.5) * 0.5, 0.0), Vector3(14.0, 4.5 - bed + 3.0, 2.0 * (12.0 + 6.0))])
+	out.append([Vector3(px, (4.4 + cb_top) * 0.5, 0.0), Vector3(8.4, cb_top - 4.4, 6.4)])
+	out.append([Vector3(px, cb_top - 1.5, 0.0), Vector3(8.0, 3.0, 21.0)])
+	out.append([Vector3(px, (cb_top + d0 + HB_PYLON_TOP) * 0.5, 0.0), Vector3(6.4, d0 + HB_PYLON_TOP - cb_top, 5.0)])
+	for x in HB_AUX:
+		var top: float = float(deck.call(x)) - HB_BOX_D - BEARING_H
+		var g: float = ground.call(x)
+		out.append([Vector3(x, (g - 2.0 + top) * 0.5, 0.0), Vector3(2.4, top - g + 2.0, 2.0 * clampf(12.0 * 0.18, 1.1, 2.6))])
+		out.append([Vector3(x, top - 1.3, 0.0), Vector3(2.4, 2.6, 2.0 * 12.0 * 0.7)])
+	var xe: float = HB_X1 - 1.6
+	var ge: float = ground.call(xe)
+	var te: float = float(deck.call(xe)) - HB_BOX_D - BEARING_H
+	if te - ge > 0.5:
+		out.append([Vector3(xe, (ge - 2.0 + te) * 0.5, 0.0), Vector3(3.4, te - ge + 2.0, 18.0)])
+	out.append([Vector3(xe, te - 1.2, 0.0), Vector3(4.0, 2.4, 24.0)])
+	var xa: float = HB_X0 + 1.0
+	var ga: float = ground.call(xa)
+	var ra: float = float(deck.call(xa)) - 0.12
+	if ra - ga > 0.5:
+		out.append([Vector3(xa - 1.2, (ga - 1.5 + ra) * 0.5, 0.0), Vector3(2.4, ra - ga + 1.5, 2.0 * (HB_EDGE + 0.5))])
+	return out

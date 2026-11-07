@@ -2424,7 +2424,7 @@ func _build_autobahn_traffic() -> void:
 	pk.material_for = func(key: String) -> Material: return _camp_material(key)
 	var camp := CampKit.new(pk)
 	var meshes: Array[Mesh] = []
-	var kinds := [["van", Color(0.92, 0.92, 0.90)], ["suv", Color(0.16, 0.18, 0.22)], ["suv", Color(0.62, 0.10, 0.10)], ["motorhome", Color(0.94, 0.94, 0.92)], ["van", Color(0.20, 0.32, 0.55)]]
+	var kinds := [["van", Color(0.92, 0.92, 0.90)], ["suv", Color(0.16, 0.18, 0.22)], ["suv", Color(0.62, 0.10, 0.10)], ["motorhome_road", Color(0.94, 0.94, 0.92)], ["van", Color(0.20, 0.32, 0.55)]]
 	for k in kinds:
 		var kit := {}
 		pk.set_frame(Transform3D(Basis.from_scale(Vector3.ONE * PROP_SCALE), Vector3.ZERO))

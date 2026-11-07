@@ -100,7 +100,16 @@ const COUNTRY_X0 := -752.0
 ## The A 47 eastbound west of the loop ramp ends (closed) clear of the ramp's last bend, which runs on its line.
 const A47_EB_END := -742.0
 ## East of the exit ramp the closed eastbound carriageway (and its girder's edge) begins clear of the ramp's bend.
-const A47_EB_EAST := 218.0
+const A47_EB_EAST := 238.0
+## The Gegenfahrbahn: the lap may cross the median after the last gate before the Harfenbrücke (XOVER_W, a paved
+## crossover over the median, x along the A 47) and take the westbound carriageway over the river against the traffic,
+## which destroys a cart it touches (AutobahnTraffic `kills`), with boost pads only on that side; past the bridge's east
+## end a slab (XOVER_E, `_build_xover_slab`) carries it back across the median and the closed eastbound onto the exit
+## ramp. The AI route (AlternativePaths/Gegenfahrbahn) keeps to the hard shoulder (SHOULDER from the median's axis),
+## clear of the outer lane's traffic.
+const XOVER_W := Vector2(-436.0, -345.0)
+const XOVER_E := Vector2(180.0, 238.0)
+const SHOULDER := 18.9
 const KREUZ_R := 45.0
 const LOOP_HALF := 4.0
 
@@ -704,7 +713,13 @@ func _plan_dressing_roads() -> void:
 		if x > A47_VIADUCT.x and x <= HARP_X.y:
 			return true
 		return x > HARP_X.y and _a2_y(x) - _natural(x, A47_WB) > 2.2
-	_dress_road("A47West", [[Vector2(1700.0, A47_WB), 0.0], [Vector2(-2600.0, A47_WB), 0.0]], ROAD_HALF, ROAD_HALF, 7, a2y, a2_deck)
+	var wb: Dictionary = _dress_road("A47West", [[Vector2(1700.0, A47_WB), 0.0], [Vector2(-2600.0, A47_WB), 0.0]], ROAD_HALF, ROAD_HALF, 7, a2y, a2_deck)
+	# Its stretch from the west crossover to the east slab is the Gegenfahrbahn's: track (its own body).
+	wb["track_x"] = Vector2(XOVER_W.x - 4.0, XOVER_E.y + 2.0)
+	# The paved crossover over the median before the Harfenbrücke (the works' concrete slabs, yellow edge lines).
+	var xo: Dictionary = _dress_road("MittelXover", [[Vector2(XOVER_W.x, A47_AXIS), 0.0], [Vector2(XOVER_W.y - 2.0, A47_AXIS), 0.0]], A47_Z - A47_AXIS - ROAD_HALF,
+			A47_Z - A47_AXIS - ROAD_HALF, 3, a2y, a2_deck)
+	xo["track_x"] = Vector2(-1e9, 1e9)
 	# The A 47 eastbound west of the loop ramp's merge (closed for the race) and east of the exit (closed too).
 	_dress_road("A47EastW", [[Vector2(-2600.0, A47_Z), 0.0], [Vector2(A47_EB_END, A47_Z), 0.0]], ROAD_HALF, ROAD_HALF, 7, a2y, a2_deck)
 	_dress_road("A47EastE", [[Vector2(A47_EB_EAST, A47_Z), 0.0], [Vector2(1700.0, A47_Z), 0.0]], ROAD_HALF, ROAD_HALF, 7, a2y, a2_deck)
@@ -1260,23 +1275,43 @@ func _build_dress_ribbons(root: Node3D) -> void:
 			var mesh: ArrayMesh = st.commit()
 			mesh.surface_set_material(0, _road_mat)
 			var mi := MeshInstance3D.new()
-			mi.name = "%s_%d" % [road["name"], i0]
+			# "Road" in the mesh's name: DressingColliders gave every ribbon a second, unnamed trimesh (off-road to the carts).
+			mi.name = "%sRoad_%d" % [road["name"], i0]
 			mi.mesh = _save_res(mesh, "%s_%d" % [String(road["name"]).to_snake_case(), i0], "rheinuferroad_")
 			mi.visibility_range_end = 2600.0
 			node.add_child(mi)
 			pieces += 1
 			i0 = i1
 		if bool(road["solid"]):
-			var body := StaticBody3D.new()
-			body.name = "Autobahn%sBody" % road["name"]
-			body.set_meta(&"surface", "asphalt")
-			var cs := CollisionShape3D.new()
-			var sh := ConcavePolygonShape3D.new()
-			sh.backface_collision = true
-			sh.set_faces(faces)
-			cs.shape = _save_res(sh, "%s_shape" % String(road["name"]).to_snake_case())
-			body.add_child(cs)
-			node.add_child(body)
+			# A stretch the race may drive (`track_x`: the Gegenfahrbahn and its crossover) is a body of its own named as
+			# track ("...Track"), the rest "Autobahn...Body" (not the lap: off-road to PlayerCart).
+			var parts: Array = [[faces, "Autobahn%sBody" % road["name"], String(road["name"]).to_snake_case() + "_shape"]]
+			if road.has("track_x"):
+				var tx: Vector2 = road["track_x"]
+				var on := PackedVector3Array()
+				var off := PackedVector3Array()
+				for t in range(0, faces.size(), 3):
+					var cx: float = (faces[t].x + faces[t + 1].x + faces[t + 2].x) / 3.0
+					var dst: PackedVector3Array = on if cx >= tx.x and cx <= tx.y else off
+					dst.append(faces[t])
+					dst.append(faces[t + 1])
+					dst.append(faces[t + 2])
+				parts = [[off, "Autobahn%sBody" % road["name"], String(road["name"]).to_snake_case() + "_shape"],
+					[on, "Gegenfahrbahn%sTrack" % road["name"], String(road["name"]).to_snake_case() + "_track_shape"]]
+			for part in parts:
+				var pf: PackedVector3Array = part[0]
+				if pf.is_empty():
+					continue
+				var body := StaticBody3D.new()
+				body.name = part[1]
+				body.set_meta(&"surface", "asphalt")
+				var cs := CollisionShape3D.new()
+				var sh := ConcavePolygonShape3D.new()
+				sh.backface_collision = true
+				sh.set_faces(pf)
+				cs.shape = _save_res(sh, part[2])
+				body.add_child(cs)
+				node.add_child(body)
 	print("  dressing ribbons: %d pieces" % pieces)
 
 
@@ -1318,17 +1353,23 @@ func _build_main_curve() -> Curve3D:
 ## A concrete box girder under a deck that follows a polyline: `pts` along its middle (the road surface), `rts` right of
 ## travel, from `l0` to `l1` across (right +), `depth` deep, its top `top_drop` under the surface. Its cornices stand
 ## 0.3m over the surface at both edges. Added to `st` (the "concrete" mesh) with UVs in metres.
-func _girder(st: SurfaceTool, pts: PackedVector3Array, rts: PackedVector3Array, l0: float, l1: float, depth: float, top_drop := 0.06) -> void:
+func _girder(st: SurfaceTool, pts: PackedVector3Array, rts: PackedVector3Array, l0: float, l1: float, depth: float, top_drop := 0.06,
+		open0 := PackedByteArray(), open1 := PackedByteArray()) -> void:
 	var n: int = pts.size()
-	# The section (lateral, height under the surface): a deck slab with cantilevers, a box below, cornice upstands.
+	# The section (lateral, height under the surface): a deck slab with cantilevers, a box below, cornice upstands. Where
+	# an edge is open (`open0`/`open1` per point: the deck runs on into the crossover slab) its upstand lies flat.
 	var w: float = l1 - l0
 	var box0: float = l0 + w * 0.22
 	var box1: float = l1 - w * 0.22
-	var sec := [
-		Vector2(l0, 0.3), Vector2(l0, -0.55), Vector2(box0, -0.75), Vector2(box0 + 0.6, -depth), Vector2(box1 - 0.6, -depth),
-		Vector2(box1, -0.75), Vector2(l1, -0.55), Vector2(l1, 0.3), Vector2(l1 - 0.45, 0.3), Vector2(l1 - 0.45, -top_drop),
-		Vector2(l0 + 0.45, -top_drop), Vector2(l0 + 0.45, 0.3),
-	]
+	var sec_at := func(i: int) -> Array:
+		var u0: float = -top_drop if i < open0.size() and open0[i] == 1 else 0.3
+		var u1: float = -top_drop if i < open1.size() and open1[i] == 1 else 0.3
+		return [
+			Vector2(l0, u0), Vector2(l0, -0.55), Vector2(box0, -0.75), Vector2(box0 + 0.6, -depth), Vector2(box1 - 0.6, -depth),
+			Vector2(box1, -0.75), Vector2(l1, -0.55), Vector2(l1, u1), Vector2(l1 - 0.45, u1), Vector2(l1 - 0.45, -top_drop),
+			Vector2(l0 + 0.45, -top_drop), Vector2(l0 + 0.45, u0),
+		]
+	var sec: Array = sec_at.call(0)
 	var m: int = sec.size()
 	var run := 0.0
 	for i in range(n - 1):
@@ -1339,13 +1380,15 @@ func _girder(st: SurfaceTool, pts: PackedVector3Array, rts: PackedVector3Array, 
 		var u0: float = run
 		var u1: float = run + a0.distance_to(a1)
 		run = u1
+		var sa: Array = sec_at.call(i)
+		var sb: Array = sec_at.call(i + 1)
 		for k in range(m):
-			var ka: Vector2 = sec[k]
-			var kb: Vector2 = sec[(k + 1) % m]
+			var ka: Vector2 = sa[k]
+			var kb: Vector2 = sa[(k + 1) % m]
 			var p00: Vector3 = a0 + r0 * ka.x + Vector3(0, ka.y, 0)
 			var p01: Vector3 = a0 + r0 * kb.x + Vector3(0, kb.y, 0)
-			var p10: Vector3 = a1 + r1 * ka.x + Vector3(0, ka.y, 0)
-			var p11: Vector3 = a1 + r1 * kb.x + Vector3(0, kb.y, 0)
+			var p10: Vector3 = a1 + r1 * (sb[k] as Vector2).x + Vector3(0, (sb[k] as Vector2).y, 0)
+			var p11: Vector3 = a1 + r1 * (sb[(k + 1) % m] as Vector2).x + Vector3(0, (sb[(k + 1) % m] as Vector2).y, 0)
 			var v: float = ka.distance_to(kb)
 			# The section runs counter-clockwise seen from behind (looking along travel, right on the right): this order
 			# faces out ((c - a) x (b - a) = fwd x the section's edge, its outward side).
@@ -1354,6 +1397,7 @@ func _girder(st: SurfaceTool, pts: PackedVector3Array, rts: PackedVector3Array, 
 	for e in [0, n - 1]:
 		var a: Vector3 = pts[e]
 		var r: Vector3 = rts[e]
+		sec = sec_at.call(e)
 		var poly := PackedVector2Array()
 		for k in range(m):
 			poly.append(sec[k])
@@ -1447,6 +1491,164 @@ func _plan_decks() -> void:
 	print("  decks: %d" % _decks.size())
 
 
+## The exit ramp's outer (left) edge in z at x (its arc round the corner at (232, -347), radius 60), the slab's south
+## boundary.
+func _ramp_outer_z(x: float) -> float:
+	var arc: Dictionary = segs[10]
+	var c := Vector2(232.0 - 60.0, -347.0 + 60.0)
+	var r: float = 60.0 + ROAD_HALF
+	var dx: float = clampf(x - c.x, -r, r)
+	return c.y - sqrt(maxf(r * r - dx * dx, 0.0)) if arc.size() > 0 else c.y
+
+
+## The east crossover slab's road height at (x, z): the A 47's along the westbound's edge, the exit ramp's along its outer
+## edge, blended across by the distances to both (3cm under them, so their ribbons and the ramp girder's cantilever win).
+func _xover_y(x: float, z: float) -> float:
+	var d1: float = maxf(0.0, z - (A47_WB + ROAD_HALF))
+	var s: float = _closest_s(Vector2(x, z))
+	var d2: float = maxf(0.0, Vector2(x, z).distance_to(_at(s)["p"]) - ROAD_HALF)
+	var w: float = d1 / maxf(d1 + d2, 1e-3)
+	return lerpf(_a2_y(x), _lap_y(s), w) - 0.03
+
+
+## The east crossover: a concrete slab past the Harfenbrücke's east end from the westbound carriageway across the
+## median and the closed eastbound carriageway onto the exit ramp (it filled the hole that was there), on one pier.
+## Its top is one body named as track ("...Deck"), its open east edge fenced.
+func _build_xover_slab(root: Node3D) -> void:
+	var node := Node3D.new()
+	node.name = "XoverSlab"
+	root.add_child(node)
+	var x0: float = XOVER_E.x
+	var x1: float = XOVER_E.y
+	var z_n: float = A47_AXIS - 4.0
+	var nx: int = ceili((x1 - x0) / 2.0)
+	var nz := 14
+	var thick := 1.2
+	var grid: Array = []
+	for i in nx + 1:
+		var x: float = lerpf(x0, x1, float(i) / float(nx))
+		var z_s: float = _ramp_outer_z(x) + 1.5
+		var row: Array = []
+		for j in nz + 1:
+			var z: float = lerpf(z_n, z_s, float(j) / float(nz))
+			row.append(Vector3(x, _xover_y(x, z), z))
+		grid.append(row)
+	var top := SurfaceTool.new()
+	top.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var under := SurfaceTool.new()
+	under.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var faces := PackedVector3Array()
+	var dn := Vector3(0, -thick, 0)
+	for i in nx:
+		var ra: Array = grid[i]
+		var rb: Array = grid[i + 1]
+		var hwa: float = absf((ra[nz] as Vector3).z - z_n) * 0.5
+		var hwb: float = absf((rb[nz] as Vector3).z - z_n) * 0.5
+		for j in nz:
+			var q: Array = [ra[j], ra[j + 1], rb[j], rb[j + 1]]
+			var hw: Array = [hwa, hwa, hwb, hwb]
+			# Seen from above with x east and z south, (a, c, b) runs clockwise: the front face is up.
+			for t in [[0, 2, 1], [1, 2, 3]]:
+				for k in t:
+					var p: Vector3 = q[k]
+					top.set_normal(Vector3.UP)
+					top.set_color(Color(1, 0, 0, 1))
+					top.set_uv(Vector2(p.z - z_n - float(hw[k]), p.x))
+					top.set_uv2(Vector2(3.0, float(hw[k])))
+					top.add_vertex(p)
+					faces.append(p)
+			for t in [[0, 1, 2], [1, 3, 2]]:
+				for k in t:
+					var p2: Vector3 = (q[k] as Vector3) + dn
+					under.set_color(GIRDER_GREY)
+					under.set_uv(Vector2(p2.x, p2.z))
+					under.add_vertex(p2)
+	# The edges: the west end (under the bridge's end), the south edge (under the ramp's cantilever), the east edge with a
+	# cornice upstand like the girders'.
+	var edge := func(a: Vector3, b: Vector3, out: Vector3, up: float) -> void:
+		var a2: Vector3 = a + dn
+		var b2: Vector3 = b + dn
+		var at := a + Vector3(0, up, 0)
+		var bt := b + Vector3(0, up, 0)
+		var pts: Array = [a2, b2, bt, a2, bt, at] if (b - a).cross(Vector3.UP).dot(out) < 0.0 else [a2, bt, b2, a2, at, bt]
+		for p in pts:
+			under.set_color(GIRDER_GREY)
+			under.set_uv(Vector2((p as Vector3).x + (p as Vector3).z, (p as Vector3).y))
+			under.add_vertex(p)
+	for j in nz:
+		edge.call(grid[0][j], grid[0][j + 1], Vector3(-1, 0, 0), 0.0)
+		edge.call(grid[nx][j], grid[nx][j + 1], Vector3(1, 0, 0), 0.3)
+	for i in nx:
+		edge.call(grid[i][nz], grid[i + 1][nz], Vector3(0, 0, 1), 0.0)
+	under.generate_normals()
+	var um: ArrayMesh = under.commit()
+	um.surface_set_material(0, _concrete())
+	var umi := MeshInstance3D.new()
+	umi.name = "XoverSlabDeckGirder"
+	umi.mesh = _save_res(um, "xover_slab_girder")
+	node.add_child(umi)
+	var tm: ArrayMesh = top.commit()
+	tm.surface_set_material(0, _road_mat)
+	var tmi := MeshInstance3D.new()
+	tmi.name = "XoverSlabRoadSurface"
+	tmi.mesh = _save_res(tm, "xover_slab_surface", "rheinuferroad_")
+	node.add_child(tmi)
+	var body := StaticBody3D.new()
+	body.name = "XoverSlabDeck"
+	body.set_meta(&"surface", "asphalt")
+	var cs := CollisionShape3D.new()
+	var sh := ConcavePolygonShape3D.new()
+	sh.backface_collision = true
+	sh.set_faces(faces)
+	cs.shape = _save_res(sh, "xover_slab_shape")
+	body.add_child(cs)
+	node.add_child(body)
+	# Its east edge is open over the quay south of the eastbound viaduct: fenced (the eastbound's girder meets the rest).
+	var fence := StaticBody3D.new()
+	fence.name = "XoverSlabEdges"
+	fence.set_meta(&"surface", "rock")
+	node.add_child(fence)
+	var z_viaduct: float = A47_Z + ROAD_HALF + 1.2
+	var e_pts := PackedVector3Array()
+	var e_rts := PackedVector3Array()
+	var last: Array = grid[nx]
+	for j in nz + 1:
+		var p3: Vector3 = last[j]
+		if p3.z >= z_viaduct - 0.5:
+			e_pts.append(p3)
+			e_rts.append(Vector3(-1, 0, 0))
+	if e_pts.size() > 1:
+		_edge_boxes(fence, e_pts, e_rts, -0.25, 1.15)
+	# One pier under its middle, on the quay.
+	var mid: Vector3 = grid[nx / 2][nz / 2]
+	_pier(node, fence, _kit_script("res://RheinBridgeKit.gd"), mid, Vector3(0, 0, 1), mid.y - thick - BEARING_H, _ground_at(mid.x, mid.z), 9.0)
+	print("  crossover slab: %d triangles, from %.1f to %.1fm" % [faces.size() / 3, _min_y(faces), _max_y(faces)])
+
+
+func _min_y(f: PackedVector3Array) -> float:
+	var m := INF
+	for p in f:
+		m = minf(m, p.y)
+	return m
+
+
+func _max_y(f: PackedVector3Array) -> float:
+	var m := -INF
+	for p in f:
+		m = maxf(m, p.y)
+	return m
+
+
+## Whether a deck's edge point `e` opens onto the east crossover slab: the A 47 westbound's girder's median edge (l1) and
+## the exit ramp's outer edge (l0) between the Harfenbrücke's end and XOVER_E.y.
+func _xover_edge_open(deck_name: String, e: Vector3, is_l1: bool) -> bool:
+	if e.x < XOVER_E.x - 0.5 or e.x > XOVER_E.y - 0.5:
+		return false
+	if is_l1:
+		return deck_name.begins_with("A47EastWB")
+	return deck_name.begins_with("AusfahrtSpan")
+
+
 func _build_decks(root: Node3D) -> void:
 	var node := Node3D.new()
 	node.name = "Viaducts"
@@ -1465,7 +1667,13 @@ func _build_decks(root: Node3D) -> void:
 			continue
 		var st := SurfaceTool.new()
 		st.begin(Mesh.PRIMITIVE_TRIANGLES)
-		_girder(st, pts, rts, l0, l1, 2.4)
+		# Edges open onto the east crossover slab: no upstand, no barrier collider.
+		var open0 := PackedByteArray()
+		var open1 := PackedByteArray()
+		for i in pts.size():
+			open0.append(1 if _xover_edge_open(String(d[0]), pts[i] + rts[i] * l0, false) else 0)
+			open1.append(1 if _xover_edge_open(String(d[0]), pts[i] + rts[i] * l1, true) else 0)
+		_girder(st, pts, rts, l0, l1, 2.4, 0.06, open0, open1)
 		st.generate_normals()
 		st.generate_tangents()
 		var mesh: ArrayMesh = st.commit()
@@ -1475,8 +1683,8 @@ func _build_decks(root: Node3D) -> void:
 		mi.mesh = _save_res(mesh, "girder_" + String(d[0]).to_snake_case())
 		node.add_child(mi)
 		# Barrier colliders along both edges (the cornices' upstands, 1.1m over the road).
-		_edge_boxes(body, pts, rts, l0 + 0.25, 1.15)
-		_edge_boxes(body, pts, rts, l1 - 0.25, 1.15)
+		_edge_boxes(body, pts, rts, l0 + 0.25, 1.15, open0)
+		_edge_boxes(body, pts, rts, l1 - 0.25, 1.15, open1)
 		# Piers every `spacing` metres (not at the ends: the abutments), down to the ground; and the abutments.
 		var spacing: float = d[5]
 		var total: float = 0.0
@@ -1514,11 +1722,14 @@ func _build_decks(root: Node3D) -> void:
 			_abutment(node, body, bridge_kit, mid2, away, (l1 - l0) * 0.5, p2.y, _ground_at(mid2.x, mid2.z))
 
 
-func _edge_boxes(body: StaticBody3D, pts: PackedVector3Array, rts: PackedVector3Array, lat: float, h: float) -> void:
+func _edge_boxes(body: StaticBody3D, pts: PackedVector3Array, rts: PackedVector3Array, lat: float, h: float, open := PackedByteArray()) -> void:
 	var i := 0
 	var n: int = pts.size()
 	while i < n - 1:
 		var j: int = mini(i + 4, n - 1)
+		if i < open.size() and j < open.size() and open[i] == 1 and open[j] == 1:
+			i = j
+			continue
 		var a: Vector3 = pts[i] + rts[i] * lat
 		var b: Vector3 = pts[j] + rts[j] * lat
 		var len: float = a.distance_to(b)
@@ -1615,7 +1826,8 @@ func _place_gameplay(root: Node3D) -> void:
 		_closest_s(Vector2(-470.0, WEST_ROAD_Z)),
 		_closest_s(Vector2(-840.0, -273.5)),
 		_closest_s(Vector2(-450.0, A47_Z)),
-		_closest_s(Vector2(80.0, A47_Z)),
+		# Off the Harfenbrücke (the Gegenfahrbahn runs beside it there): on the exit ramp's foot.
+		_closest_s(Vector2(PROMENADE_X, -235.0)),
 	]
 	for i in range(at.size()):
 		var c: Dictionary = _spot(at[i], 0.0, 0.08)
@@ -1643,6 +1855,82 @@ func _place_gameplay(root: Node3D) -> void:
 		b.rotation_degrees = Vector3(0, sp2["yaw"], 0)
 		bps.add_child(b)
 	_build_jump(root)
+	_build_gegenfahrbahn(root, bps, boost_scene)
+
+
+## The Gegenfahrbahn as an AlternativePaths route (Level collects it; bots take it at a share of their shortcut chance,
+## `ai_chance_scale`, and keep to the hard shoulder): from the lap after the last gate before the Harfenbrücke across
+## the paved median (XOVER_W) onto the westbound's shoulder, over the river against the traffic, and back across the
+## crossover slab (XOVER_E) onto the exit ramp. Boost pads only on that side (GEGEN_PADS: [x, lateral from the median's
+## axis toward the westbound]), staggered over its three lanes and the shoulder.
+const GEGEN_PADS := [[-398.0, 2.0], [-318.0, SHOULDER], [-268.0, 11.9], [-215.0, 8.1], [-160.0, 15.6], [-112.0, SHOULDER], [-62.0, 11.9],
+	[-8.0, 8.1], [40.0, 15.6], [70.0, SHOULDER]]
+
+func _build_gegenfahrbahn(root: Node3D, pads: Node3D, boost_scene: PackedScene) -> void:
+	var holder := Node3D.new()
+	holder.name = "AlternativePaths"
+	root.add_child(holder)
+	var path := Path3D.new()
+	path.name = "Gegenfahrbahn"
+	# Bots never take it: the traffic fills the lanes edge to edge, the shoulder leaves a cart a few tens of centimetres,
+	# and its AI can't see the vehicles (no bodies) to dodge them: they were blown up on nearly every run.
+	path.set_meta(&"ai_chance_scale", 0.0)
+	var zs: float = A47_AXIS - SHOULDER
+	var pts: Array = []
+	var s0: float = _closest_s(Vector2(XOVER_W.x + 6.0, A47_Z))
+	pts.append(_pt(s0))
+	# Across the median to the shoulder: a smooth S over the crossover.
+	var xa: float = XOVER_W.x + 6.0
+	var xb: float = XOVER_W.y - 6.0
+	for k in range(1, 9):
+		var t: float = float(k) / 8.0
+		var x: float = lerpf(xa, xb, t)
+		var e: float = t * t * (3.0 - 2.0 * t)
+		pts.append(Vector3(x, _a2_y(x), lerpf(A47_Z, zs, e)))
+	var x2: float = xb + 30.0
+	while x2 < XOVER_E.x - 12.0:
+		pts.append(Vector3(x2, _a2_y(x2), zs))
+		x2 += 30.0
+	# Back across the slab onto the ramp: a quarter turn from east to south, ending on the ramp's line.
+	var s_end: float = lap_len + 8.0
+	var p_end: Vector3 = _pt(fposmod(s_end, lap_len))
+	var a := Vector3(XOVER_E.x - 12.0, _a2_y(XOVER_E.x - 12.0), zs)
+	var c := Vector3(p_end.x, 0.0, zs)
+	for k in range(0, 9):
+		var t2: float = float(k) / 8.0
+		var u: float = 1.0 - t2
+		var q2: Vector3 = a * (u * u) + c * (2.0 * u * t2) + p_end * (t2 * t2)
+		var y: float
+		if q2.x <= XOVER_E.x:
+			y = _a2_y(q2.x)
+		else:
+			y = _xover_y(q2.x, q2.z) + 0.03
+		if t2 > 0.95:
+			y = p_end.y
+		pts.append(Vector3(q2.x, y, q2.z))
+	pts.append(_pt(fposmod(s_end + 12.0, lap_len)))
+	var curve := Curve3D.new()
+	curve.bake_interval = 0.5
+	for i in pts.size():
+		var p: Vector3 = (pts[i] as Vector3) + Vector3(0, 0.02, 0)
+		var prv: Vector3 = pts[maxi(i - 1, 0)]
+		var nxt: Vector3 = pts[mini(i + 1, pts.size() - 1)]
+		var hnd: Vector3 = (nxt - prv) / 6.0
+		curve.add_point(p, -hnd, hnd)
+	path.curve = curve
+	holder.add_child(path)
+	var lap_part: float = (lap_len - s0) + 8.0 + 12.0
+	print("  Gegenfahrbahn: %.0fm against the lap's %.0fm" % [curve.get_baked_length(), lap_part])
+	for i in GEGEN_PADS.size():
+		var gp: Array = GEGEN_PADS[i]
+		var x3: float = gp[0]
+		var b = boost_scene.instantiate()
+		b.name = "Boost_Gegen_%d" % (i + 1)
+		var z3: float = A47_AXIS - float(gp[1])
+		b.position = Vector3(x3, _a2_y(x3) + 0.08, z3)
+		# Facing east (along the route; BoostPad turns it onto the nearest lap path at runtime too): the pad's front is -z.
+		b.rotation_degrees = Vector3(0, -90, 0)
+		pads.add_child(b)
 
 
 ## The kicker on the dyke road: a timber jump as wide as the road (heading north).
@@ -1829,6 +2117,7 @@ func _ready() -> void:
 	_build_lap_body(level)
 	_plan_decks()
 	_build_decks(level)
+	_build_xover_slab(level)
 	_build_environment(level)
 	_place_gameplay(level)
 	_build_dressing(level)
@@ -1915,6 +2204,10 @@ func _build_bridges(root: Node3D) -> void:
 	var s_h1: float = s9 + (HARP_X.y - float((segs[9]["p0"] as Vector2).x))
 	_lap_edge_boxes(body, s_h0, s_h1, ROAD_HALF + 0.5, 1.3)
 	_lap_edge_boxes(body, s_h0, s_h1, -ROAD_HALF - 0.85, 1.1)
+	# The westbound carriageway (the Gegenfahrbahn): its outer railing and its side of the median barrier.
+	_x_edge_boxes(body, HARP_X.x, HARP_X.y, A47_AXIS - 21.15, 1.3)
+	_x_edge_boxes(body, HARP_X.x, HARP_X.y, A47_AXIS - 5.05, 1.1)
+	_build_bridge_solids(root)
 	for tx in [200.0, -200.0]:
 		for tz in [-14.5, 14.5]:
 			var g: float = _ground_at(tx, OLD_BRIDGE_Z + tz)
@@ -1937,6 +2230,56 @@ func _build_bridges(root: Node3D) -> void:
 	if _has_fn(_bridge_kit, "harp_bridge"):
 		_add_prop_game("harp_bridge", _bridge_kit, Transform3D(Basis(), Vector3(0, 0, A47_AXIS)), func(pk, kit, labels):
 			_bridge_kit.harp_bridge(pk, kit, labels, harp_fn, harp_ground))
+
+
+## Box colliders along the Harfenbrücke from x0 to x1 at world z, `h` over its deck.
+func _x_edge_boxes(body: StaticBody3D, x0: float, x1: float, z: float, h: float) -> void:
+	var x: float = x0
+	while x < x1 - 0.5:
+		var xb: float = minf(x + 6.0, x1)
+		var a := Vector3(x, harp_deck(x), z)
+		var b := Vector3(xb, harp_deck(xb), z)
+		var len: float = a.distance_to(b)
+		var cs := CollisionShape3D.new()
+		var bx := BoxShape3D.new()
+		bx.size = Vector3(len + 0.3, h + 0.6, 0.5)
+		cs.shape = bx
+		var fwd: Vector3 = (b - a) / len
+		cs.transform = Transform3D(Basis(fwd, Vector3(0, 0, 1).cross(fwd).normalized(), Vector3(0, 0, 1)).orthonormalized(), (a + b) * 0.5 + Vector3(0, h * 0.5 - 0.3, 0))
+		body.add_child(cs)
+		x = xb
+
+
+## What stands under both Rhine bridges' decks, solid (RheinBridgeKit's `old_bridge_solids`, `harp_bridge_solids`): their
+## props are batched as "..._bridge" meshes, which DressingColliders skips, and carts drove through the flood arches'
+## piers, the Harfenbrücke's girder over the dyke and its piers on the floodplain. Named without "bridge" (PlayerCart
+## would take it for road).
+func _build_bridge_solids(root: Node3D) -> void:
+	if _bridge_kit == null or not _has_fn(_bridge_kit, "old_bridge_solids"):
+		return
+	var body := StaticBody3D.new()
+	body.name = "RheinPfeilerBody"
+	body.set_meta(&"surface", "rock")
+	root.add_child(body)
+	var sets: Array = [
+		[Vector3(0, 0, OLD_BRIDGE_Z), _bridge_kit.old_bridge_solids(func(x: float) -> float: return old_deck(x), func(x: float) -> float: return _ground_at(x, OLD_BRIDGE_Z))],
+		[Vector3(0, 0, A47_AXIS), _bridge_kit.harp_bridge_solids(func(x: float) -> float: return harp_deck(x), func(x: float) -> float: return _ground_at(x, A47_AXIS))],
+	]
+	var n := 0
+	for st in sets:
+		var o: Vector3 = st[0]
+		for b in st[1]:
+			var size: Vector3 = b[1]
+			if size.x < 0.05 or size.y < 0.05 or size.z < 0.05:
+				continue
+			var cs := CollisionShape3D.new()
+			var bx := BoxShape3D.new()
+			bx.size = size
+			cs.shape = bx
+			cs.position = o + (b[0] as Vector3)
+			body.add_child(cs)
+			n += 1
+	print("  bridge solids: %d boxes" % n)
 
 
 ## Builds the old bridge again on its own (its frame, the real ground) and errors on anything standing over the road
@@ -1993,7 +2336,7 @@ func _barrier_runs() -> Array:
 	var runs: Array = []
 	# The A 47: the median's concrete barrier all the way from the loop ramp to the Harfenbrücke, the guardrail outside
 	# on the embankments.
-	runs.append([a47.call(-686.0), a47.call(HARP_X.x), -ROAD_HALF - 0.85, "concrete"])
+	runs.append([a47.call(-686.0), a47.call(XOVER_W.x), -ROAD_HALF - 0.85, "concrete"])
 	runs.append([a47.call(-686.0), a47.call(OVER_A58.x), ROAD_HALF + 0.9, "guardrail"])
 	runs.append([a47.call(OVER_A58.y), a47.call(A47_VIADUCT.x), ROAD_HALF + 0.9, "guardrail"])
 	# The loop ramp, both sides (from where the west road leaves the overpass).
@@ -2005,7 +2348,8 @@ func _barrier_runs() -> Array:
 	# The exit ramp from the Harfenbrücke's end down to the promenade (beyond its viaduct).
 	var ramp_end: float = RAMP_END - 30.0
 	runs.append([s9e + 6.0, lap_len + ramp_end, ROAD_HALF + 0.9, "guardrail"])
-	runs.append([s9e + 6.0, lap_len + ramp_end, -ROAD_HALF - 0.9, "guardrail"])
+	# Its left (outer) side only from where it leaves the crossover slab.
+	runs.append([_xover_e_s(), lap_len + ramp_end, -ROAD_HALF - 0.9, "guardrail"])
 	var out: Array = []
 	for r in runs:
 		var s0: float = r[0]
@@ -2016,6 +2360,18 @@ func _barrier_runs() -> Array:
 			s1 = t
 		out.append([s0, s1, r[2], r[3]])
 	return out
+
+
+## Where the exit ramp's outer (left) edge leaves the east crossover slab (XOVER_E.y in x): from here on it is fenced.
+func _xover_e_s() -> float:
+	var s: float = float(segs[10]["s0"])
+	var s_end: float = lap_len + 60.0
+	while s < s_end:
+		var e: Vector3 = _pt(fposmod(s, lap_len)) - _rt(fposmod(s, lap_len)) * ROAD_HALF
+		if e.x >= XOVER_E.y - 0.5:
+			return s
+		s += 0.5
+	return s_end
 
 
 func _build_barriers(root: Node3D) -> void:
@@ -2034,11 +2390,15 @@ func _build_barriers(root: Node3D) -> void:
 		var s: float = s0
 		while s < s1 - 0.5:
 			var sm: float = minf(s + piece * 0.5, s1)
-			if _lap_on_deck(fposmod(sm, lap_len)):
+			# Guardrails stand only on embankments; the median's concrete barrier runs on over the overpass's deck too
+			# (missing there, the median read as open and drivable, but its collider stood across it).
+			var on_deck: bool = _lap_on_deck(fposmod(sm, lap_len))
+			if on_deck and kind == "guardrail":
 				s += piece
 				continue
-			var a: Vector3 = _pt(s) + _rt(s) * lat
-			var b: Vector3 = _pt(minf(s + piece, s1)) + _rt(minf(s + piece, s1)) * lat
+			var drop: Vector3 = Vector3(0, -0.06, 0) if on_deck else Vector3.ZERO
+			var a: Vector3 = _pt(s) + _rt(s) * lat + drop
+			var b: Vector3 = _pt(minf(s + piece, s1)) + _rt(minf(s + piece, s1)) * lat + drop
 			var len: float = a.distance_to(b)
 			if len < 0.5:
 				break
@@ -2147,7 +2507,7 @@ func _build_traffic(root: Node3D) -> void:
 	var camp := CampKit.new(pk)
 	var meshes: Array[Mesh] = []
 	var kinds := [["van", Color(0.92, 0.92, 0.90)], ["suv", Color(0.16, 0.18, 0.22)], ["suv", Color(0.62, 0.10, 0.10)],
-		["motorhome", Color(0.94, 0.94, 0.92)], ["van", Color(0.20, 0.32, 0.55)], ["suv", Color(0.75, 0.76, 0.78)], ["suv", Color(0.10, 0.22, 0.40)]]
+		["motorhome_road", Color(0.94, 0.94, 0.92)], ["van", Color(0.20, 0.32, 0.55)], ["suv", Color(0.75, 0.76, 0.78)], ["suv", Color(0.10, 0.22, 0.40)]]
 	for k in kinds:
 		var kit := {}
 		pk.set_frame(Transform3D(Basis.from_scale(Vector3.ONE * PROP_SCALE), Vector3.ZERO))
@@ -2181,8 +2541,10 @@ func _build_traffic(root: Node3D) -> void:
 	wb.rotation_degrees = Vector3(0, 90, 0)
 	wb.set("meshes", meshes)
 	wb.set("length", length)
-	wb.set("per_lane", 16)
+	wb.set("per_lane", 18)
 	wb.set("lanes", PackedFloat32Array([8.1, 11.9, 15.6]))
+	# The race may take this carriageway against the traffic (the Gegenfahrbahn): a vehicle destroys a cart it touches.
+	wb.set("kills", true)
 	wb.set("heights", hs)
 	wb.set("height_step", 10.0)
 	node.add_child(wb)
