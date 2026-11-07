@@ -17,6 +17,7 @@ extends RigidBody3D
 var paint: Dictionary = {}
 
 const CarPaint = preload("res://CarPaint.gd")
+const CarAntenna = preload("res://CarAntenna.gd")
 const CarDebris = preload("res://CarDebris.gd")
 const Surfaces = preload("res://Surfaces.gd")
 const SkidMarksScript = preload("res://SkidMarks.gd")
@@ -1246,10 +1247,14 @@ func _ready():
 			antenna_placement = _find_node_by_name(new_model, "AntennaPlacement")
 		if antenna_placement:
 			antenna.position = visuals.to_local(antenna_placement.global_position)
-		# The antenna is an option in the paint shop (procedural cars only).
-		antenna.visible = CarPaint.has_antenna(_debris_paint) if CarPaint.is_paintable(new_model) else false
-		if CarPaint.is_paintable(new_model):
-			_paint_antenna_tip(_debris_paint["accent"])
+		# The antenna is an option in the paint shop (procedural cars only): off, a round tip or a flag.
+		var style: int = CarPaint.antenna_style(_debris_paint) if CarPaint.is_paintable(new_model) else 0
+		CarAntenna.dress(antenna, style, _debris_paint.get("accent", Color(1, 0.2, 0)))
+		# A flash that ran before the paint arrived has already copied the old colours.
+		for part in ["Tip", "Flag"]:
+			var n := antenna.get_node_or_null(part)
+			if n:
+				_fx_base.erase(n.get_instance_id())
 
 	ground_ray.add_exception(self)
 	if MusicManager and not MusicManager.camera_mode_changed.is_connected(_on_camera_mode_setting_changed):
@@ -5330,20 +5335,6 @@ static func _car_fade_material(base: Material) -> Material:
 ## car_body.gdshader's instance uniforms): the mesh's material, copied once, with emission on from
 ## the start, black if it had none. A flash then only changes values. Switching emission or
 ## transparency on and off swaps the material's shader, and the first swap compiled it mid-race.
-## The antenna's tip glows in the paint job's accent colour.
-func _paint_antenna_tip(accent: Color) -> void:
-	var tip := antenna.get_node_or_null("Tip") as MeshInstance3D
-	if tip == null:
-		return
-	var src := (tip.material_override if tip.material_override else tip.mesh.surface_get_material(0)) as StandardMaterial3D
-	if src == null:
-		return
-	var mat := src.duplicate() as StandardMaterial3D
-	mat.albedo_color = accent
-	mat.emission = accent
-	tip.material_override = mat
-	# A flash that ran before the paint arrived has already copied the old colour.
-	_fx_base.erase(tip.get_instance_id())
 
 
 func _fx_material(node: MeshInstance3D) -> StandardMaterial3D:

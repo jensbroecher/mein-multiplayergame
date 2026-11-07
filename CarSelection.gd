@@ -390,6 +390,9 @@ var _number_row: Control
 ## The RC antenna on the showroom car (PlayerCart's own is a separate node), shown with the paint's
 ## "antenna" option.
 var _showroom_antenna: Node3D
+## The race's antenna (PlayerCart.tscn's Visuals/Antenna), copied once for the showroom.
+static var _antenna_template: Node3D
+const CarAntenna = preload("res://CarAntenna.gd")
 var _pills: Array[Button] = []          # one per car in _lineup, in its order
 ## The preset indices this screen offers: CarCollection.lineup().
 var _lineup: Array = []
@@ -610,50 +613,25 @@ func _show_model(preset: Dictionary) -> void:
 	_add_showroom_antenna()
 
 
-## PlayerCart's antenna (same rod and tip), stood on the car's AntennaPlacement. Added after the
-## car is measured, so it doesn't change the framing. Shown by _paint_changed().
+## PlayerCart's antenna (a copy of PlayerCart.tscn's own: mount, rod, tip, flag), stood on the car's AntennaPlacement.
+## Added after the car is measured, so it doesn't change the framing. Dressed by _paint_changed().
 func _add_showroom_antenna() -> void:
 	var placement := rotating_model.find_child("AntennaPlacement", true, false) as Node3D
 	if placement == null:
 		return
-	_showroom_antenna = Node3D.new()
+	if _antenna_template == null:
+		var cart: Node = (load("res://PlayerCart.tscn") as PackedScene).instantiate()
+		_antenna_template = cart.get_node("Visuals/Antenna").duplicate() as Node3D
+		cart.free()
+	_showroom_antenna = _antenna_template.duplicate() as Node3D
 	_showroom_antenna.name = "ShowroomAntenna"
+	_showroom_antenna.transform = Transform3D.IDENTITY
 	# Upright and life size in the pivot's frame, as PlayerCart has it in Visuals: undo whatever the
 	# placement inherits (the scene's Model node is 0.5 and the car x2, so usually nothing).
 	var inherited: Vector3 = (_model_pivot.global_transform.affine_inverse() * placement.global_transform).basis.get_scale()
 	_showroom_antenna.scale = Vector3.ONE / inherited
 	placement.add_child(_showroom_antenna)
-	var rod_mat := StandardMaterial3D.new()
-	rod_mat.albedo_color = Color(0.2, 0.2, 0.2)
-	rod_mat.metallic = 1.0
-	rod_mat.roughness = 0.3
-	var rod_mesh := CylinderMesh.new()
-	rod_mesh.top_radius = 0.005
-	rod_mesh.bottom_radius = 0.01
-	rod_mesh.height = 0.8
-	rod_mesh.radial_segments = 6
-	rod_mesh.material = rod_mat
-	var rod := MeshInstance3D.new()
-	rod.mesh = rod_mesh
-	rod.position.y = 0.4
-	_showroom_antenna.add_child(rod)
-	var tip_mat := StandardMaterial3D.new()
-	tip_mat.albedo_color = current_paint.get("accent", Color(1, 0.2, 0))
-	tip_mat.roughness = 0.2
-	tip_mat.emission_enabled = true
-	tip_mat.emission = current_paint.get("accent", Color(1, 0.2, 0))
-	tip_mat.emission_energy_multiplier = 1.5
-	var tip_mesh := SphereMesh.new()
-	tip_mesh.radius = 0.04
-	tip_mesh.height = 0.08
-	tip_mesh.radial_segments = 8
-	tip_mesh.rings = 6
-	tip_mesh.material = tip_mat
-	var tip := MeshInstance3D.new()
-	tip.mesh = tip_mesh
-	tip.position.y = 0.8
-	_showroom_antenna.add_child(tip)
-	_showroom_antenna.visible = CarPaint.has_antenna(current_paint)
+	CarAntenna.dress(_showroom_antenna, CarPaint.antenna_style(current_paint), current_paint.get("accent", Color(1, 0.2, 0)))
 
 
 ## The bounds of every mesh under `node`, in `space`'s frame.
@@ -1273,13 +1251,10 @@ func _paint_changed(save := true) -> void:
 	_paint_values["number"].text = str(current_paint["number"])
 	# Only the Racer and Rally patterns show a number.
 	_number_row.visible = CarPaint.PATTERNS[current_paint["pattern"]] in ["Racer", "Rally"]
-	_paint_values["antenna"].text = "ON" if CarPaint.has_antenna(current_paint) else "OFF"
+	_paint_values["antenna"].text = str(CarPaint.ANTENNAS[CarPaint.antenna_style(current_paint)]).to_upper()
 	if _showroom_antenna:
-		_showroom_antenna.visible = CarPaint.has_antenna(current_paint)
-		var tip := _showroom_antenna.get_child(1) as MeshInstance3D
-		var tip_mat := (tip.mesh as SphereMesh).material as StandardMaterial3D
-		tip_mat.albedo_color = current_paint.get("accent", Color(1, 0.2, 0))
-		tip_mat.emission = current_paint.get("accent", Color(1, 0.2, 0))
+		CarAntenna.dress(_showroom_antenna, CarPaint.antenna_style(current_paint),
+				current_paint.get("accent", Color(1, 0.2, 0)))
 	if save:
 		_save_paint()
 
@@ -1307,7 +1282,7 @@ func _cycle(key: String, step: int) -> void:
 		"number":
 			current_paint["number"] = posmod(current_paint["number"] + step, 100)
 		"antenna":
-			current_paint["antenna"] = not CarPaint.has_antenna(current_paint)
+			current_paint["antenna"] = posmod(CarPaint.antenna_style(current_paint) + step, CarPaint.ANTENNAS.size())
 		_:
 			var list: Array = CarPaint.RIMS if key == "rim" else CarPaint.PALETTE
 			var k: int = posmod(_nearest(list, current_paint[key]) + step, list.size())
@@ -1318,14 +1293,14 @@ func _cycle(key: String, step: int) -> void:
 func _on_paint_random() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
-	var antenna: bool = CarPaint.has_antenna(current_paint)
+	var antenna: int = CarPaint.antenna_style(current_paint)
 	current_paint = CarPaint.random(rng, CAR_PRESETS[current_car_index].name)
 	current_paint["antenna"] = antenna
 	_paint_changed()
 
 
 func _on_paint_reset() -> void:
-	var antenna: bool = CarPaint.has_antenna(current_paint)
+	var antenna: int = CarPaint.antenna_style(current_paint)
 	current_paint = CarPaint.factory(CAR_PRESETS[current_car_index].name)
 	current_paint["antenna"] = antenna
 	_paint_changed()

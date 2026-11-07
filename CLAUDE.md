@@ -2635,9 +2635,12 @@ A clip that comes out quiet (the bubble car's at -37.7 dBFS) is raised in the fi
   `res://scratch/car_live_shot.tscn -- <dir> [level=...] [cars=5,5,0,1,2,3] [carts=100,101]
   [fx=shock,respawn,teleport,fade]` shoots carts in a live race. `scratch/ai_race_test` takes `cars=`, and
   `scratch/menu_shot` takes `car:<index>[:<pattern>]` for the paint shop (it saves nothing).
-- The antenna (a paint shop option) is PlayerCart.tscn's `Visuals/Antenna`: a dark mount ball (round, so it looks the
-  same as the rod sways about its foot), the 0.8m rod and a 2cm glowing tip, stood on the car's `AntennaPlacement`
-  (the builder's `ANTENNA_POS`). Each foot sits 4mm into the surface, a little more on a slope.
+- The antenna (a paint shop option: `CarPaint.ANTENNAS` off, round, flag; the paint's "antenna" is that index, an older
+  bool reads as off/round) is PlayerCart.tscn's `Visuals/Antenna`: a dark mount ball (round, so it looks the same as the
+  rod sways about its foot), the 0.8m rod and a 2cm glowing tip, stood on the car's `AntennaPlacement` (the builder's
+  `ANTENNA_POS`). `CarAntenna.dress` (free of autoloads, so tools can use it) shows the tip or a pennant trailing back
+  from the rod's top (made in code, shared), in the accent colour; PlayerCart dresses its own and the car select
+  screen a copy of the same node (it had built its own with the old 4cm tip). `scratch/antenna_style_check.gd`. Each foot sits 4mm into the surface, a little more on a slope.
   `scratch/antenna_check.gd` (`-s`, headless, `-- [cars=...]`) measures every car's foot against its body and anything
   in the rod's way; `scratch/car_preview.gd ... antenna=1` renders the antenna on the car. Ten cars' feet floated up to
   9cm, one was sunk 5.6cm and the Titan's rod grazed its bed rail before they were set by it.

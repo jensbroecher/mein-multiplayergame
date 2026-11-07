@@ -6,8 +6,9 @@ extends SceneTree
 #   Godot --path . --resolution 1400x900 -s res://scratch/car_preview.gd -- <out_dir> [car=Mudrunner]
 #       [orig=<imported car .tscn>] [scene=res://generated/cars/Mudrunner.tscn]
 #       [paint=<pattern>,<finish>,<primary>,<secondary>,<accent>,<rim>,<number>] [fov=40] [yaw=0]
-#       [sun=<pitch>,<yaw>] [antenna=1] name:x,y,z:tx,ty,tz[:ux,uy,uz] ...
-# antenna=1 adds the race's antenna (PlayerCart.tscn) on the car's AntennaPlacement.
+#       [sun=<pitch>,<yaw>] [antenna=1|2] name:x,y,z:tx,ty,tz[:ux,uy,uz] ...
+# antenna=1 adds the race's antenna (PlayerCart.tscn) on the car's AntennaPlacement with its round tip, antenna=2 with
+# its flag (CarPaint.ANTENNAS), in the paint's accent colour.
 # orig renders an imported model instead, placed the way PlayerCart places it (x2, half turn);
 # scene loads a saved car. Colours in paint= are hex (e.g. 2,1,cc2211,f0f0e8,ffcc00,c0c0c0,53).
 const RegenCars = preload("res://regenerate_cars.gd")
@@ -24,7 +25,7 @@ func _init() -> void:
 	var fov := 40.0
 	var yaw := 0.0
 	var steer_deg := 0.0
-	var with_antenna := false
+	var antenna_style := 0
 	var sun_rot := Vector3(-48.0, 38.0, 0.0)
 	var shots := []
 	for a in args.slice(1):
@@ -42,8 +43,8 @@ func _init() -> void:
 			yaw = deg_to_rad(float(a.substr(4)))
 		elif a.begins_with("steer="):
 			steer_deg = float(a.substr(6))
-		elif a == "antenna=1":
-			with_antenna = true
+		elif a.begins_with("antenna="):
+			antenna_style = int(a.substr(8))
 		elif a.begins_with("sun="):
 			var f := a.substr(4).split(",")
 			sun_rot = Vector3(float(f[0]), float(f[1]), 0.0)
@@ -79,7 +80,7 @@ func _init() -> void:
 			paint["rim"] = Color.html(f[5])
 			paint["number"] = int(f[6])
 		CarPaint.apply(car, paint)
-	if with_antenna:
+	if antenna_style > 0:
 		# The race's antenna (PlayerCart.tscn's Visuals/Antenna: mount, rod, tip) on the car's AntennaPlacement, as
 		# PlayerCart places it (its visuals are the cart frame, as the preview's world is at yaw 0).
 		var cart: Node = (load("res://PlayerCart.tscn") as PackedScene).instantiate()
@@ -97,6 +98,8 @@ func _init() -> void:
 		for c in chain:
 			xf = xf * (c as Node3D).transform
 		ant.position = xf * place.position if place else Vector3.ZERO
+		var accent: Color = Color.html(paint_arg.split(",")[4]) if not paint_arg.is_empty() else CarPaint.factory(car_name)["accent"]
+		preload("res://CarAntenna.gd").dress(ant, antenna_style, accent)
 	if steer_deg != 0.0:
 		for corner in ["FL", "FR"]:
 			var w: Node3D = car.find_child("Wheel_" + corner, true, false)

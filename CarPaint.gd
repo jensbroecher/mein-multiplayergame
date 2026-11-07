@@ -2,7 +2,8 @@
 #
 # Paint jobs for the procedural cars (regenerate_cars.gd). A paint job is a small Dictionary:
 #   {"pattern": int, "finish": int, "primary": Color, "secondary": Color, "accent": Color,
-#    "rim": Color, "number": int, "antenna": bool}
+#    "rim": Color, "number": int, "antenna": int}
+# "antenna" is ANTENNAS' index (0 none, 1 the round tip, 2 a flag); older settings stored a bool (true: round).
 # The player picks it in CarSelection (saved per car in user://settings.cfg), NetworkManager
 # carries it in the player's info, Level passes it to the spawned cart, and apply() writes it as
 # per-instance parameters of car_body.gdshader on every mesh tagged "car_shader". Anything that
@@ -13,6 +14,8 @@ extends RefCounted
 const PATTERNS := ["Solid", "Racing Stripes", "Two-Tone", "Side Stripe", "Flames", "Checkered", "Camo",
 	"Racer", "Fade", "Splinter", "Tiger", "Rally", "Streaks", "Claw"]
 const FINISHES := ["Gloss", "Metallic", "Matte", "Pearl", "Chrome"]
+## The RC antenna's styles: none, a rod with a round glowing tip, a rod with a pennant (both in the accent colour).
+const ANTENNAS := ["Off", "Round", "Flag"]
 
 ## The paint shop's colours (sRGB).
 const PALETTE := [
@@ -109,7 +112,7 @@ const FALLBACK := {"pattern": 0, "finish": 0, "primary": Color(0.80, 0.07, 0.05)
 
 static func factory(car_name: String) -> Dictionary:
 	var out: Dictionary = (FACTORY.get(car_name, FALLBACK) as Dictionary).duplicate()
-	out["antenna"] = false
+	out["antenna"] = 0
 	return out
 
 
@@ -127,7 +130,9 @@ static func clean(value: Variant) -> Dictionary:
 	if d.get("number") is int:
 		out["number"] = clampi(d["number"], 0, 99)
 	if d.get("antenna") is bool:
-		out["antenna"] = d["antenna"]
+		out["antenna"] = 1 if d["antenna"] else 0
+	elif d.get("antenna") is int:
+		out["antenna"] = clampi(d["antenna"], 0, ANTENNAS.size() - 1)
 	for key in ["primary", "secondary", "accent", "rim"]:
 		if d.get(key) is Color:
 			var c: Color = d[key]
@@ -158,9 +163,17 @@ static func apply(root: Node, paint: Dictionary) -> void:
 		apply(c, paint)
 
 
-## Does the paint job give the cart its RC antenna? (Off by default unless enabled.)
+## The paint job's antenna style (ANTENNAS' index; off by default). A bool from older settings is round or off.
+static func antenna_style(paint: Dictionary) -> int:
+	var v: Variant = paint.get("antenna", 0)
+	if v is bool:
+		return 1 if v else 0
+	return clampi(int(v), 0, ANTENNAS.size() - 1)
+
+
+## Does the paint job give the cart its RC antenna at all?
 static func has_antenna(paint: Dictionary) -> bool:
-	return bool(paint.get("antenna", false))
+	return antenna_style(paint) > 0
 
 
 ## Is this model paintable (a procedural car)?
@@ -193,7 +206,7 @@ static func random(rng: RandomNumberGenerator, car_name: String) -> Dictionary:
 	p["rim"] = RIMS[rng.randi() % RIMS.size()][1]
 	p["number"] = rng.randi_range(1, 99)
 	# AI carts (and the paint shop's dice, which keeps the player's own choice) run without one.
-	p["antenna"] = false
+	p["antenna"] = 0
 	return p
 
 
