@@ -35,6 +35,7 @@ const CARS := [
 	{"name": "Basilisk", "prefix": "basilisk", "builder": preload("res://BasiliskBuilder.gd")},
 	{"name": "Bootlegger", "prefix": "bootlegger", "builder": preload("res://BootleggerBuilder.gd")},
 	{"name": "Meteor", "prefix": "meteor", "builder": preload("res://MeteorBuilder.gd")},
+	{"name": "Kugelblitz", "prefix": "kugelblitz", "builder": preload("res://KugelblitzBuilder.gd")},
 ]
 
 

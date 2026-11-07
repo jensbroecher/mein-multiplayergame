@@ -1,0 +1,19 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://car_body.gdshader" id="1_365bg"]
+[ext_resource type="Texture2D" path="res://generated/cars/kugelblitz_detail.res" id="2_84qgi"]
+
+[resource]
+render_priority = -1
+shader = ExtResource("1_365bg")
+shader_parameter/detail_map = ExtResource("2_84qgi")
+shader_parameter/nose_z = -0.88
+shader_parameter/tail_z = 0.86
+shader_parameter/belt_y = 0.392
+shader_parameter/side_x = 0.3
+shader_parameter/door_roundel = Vector2(-0.08, 0.262)
+shader_parameter/roundel_r = 0.072
+shader_parameter/hood_z = -0.64
+shader_parameter/hood_r = 0.05
+shader_parameter/stripe_w = 0.045
+shader_parameter/stripe_gap = 0.016

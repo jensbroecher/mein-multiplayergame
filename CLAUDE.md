@@ -896,8 +896,8 @@ in front of the water while driving (Msitu Falls, Bloombay Dunes). `canyon_river
 - Made so far: the airliners' approach and climb-out roars (Airliners.gd); the suspended railway's run, pass-by bursts,
   brakes and station chime (SuspendedTrains.gd; its first soft glide loop is unused now); Qaysariyyat al-Manara's market
   murmur and the start promenade's six cheers (Marina Nights, CrowdCheers.gd); Rheinufer's ship horns and diesel, Autobahn
-  hum, Kirmes, sheep, river and windmill (`sounds/rheinufer/`). One-shots are levelled by their loudest second, loops by
-  their RMS.
+  hum, Kirmes, sheep, river and windmill (`sounds/rheinufer/`); the Classics' engines (`engine_bootlegger`,
+  `engine_meteor`, `engine_bubble`). One-shots are levelled by their loudest second, loops by their RMS.
 - Music: `tools/elevenlabs/generate_music.mjs` composes tracks with ElevenLabs Music (`client.music.compose`) from
   `music.json` (name, path, prompt, seconds), always with `forceInstrumental` (the user wants no vocals or lyrics in the
   game's music), as MP3 (mp3_44100_192), skipping files already made. The Kronburg GP's three (`music/kronburg/`:
@@ -2533,6 +2533,9 @@ keeps it: the loops were made at very different levels (the electric motor needs
 the rest -3dB). `_setup_engine_sound` loads the preset's file; speed moves its pitch from 0.8 to 1.35 and
 its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set the gain to
 20*log10(0.328/rms). `res://scratch/engine_sound_test.tscn -- cars=0,1,...` lists each car's loop.
+The loop's end is the clip's length times its rate (`get_length() * mix_rate`): the imports are QOA, and the data's
+bytes counted as 16-bit frames had ended every car's loop about a fifth of the way through its clip, with a seam.
+A clip that comes out quiet (the bubble car's at -37.7 dBFS) is raised in the file (`scratch/normalize_wav.py`) first.
 
 ## Procedural cars
 
@@ -2729,6 +2732,28 @@ its volume from -32 to -22dB, plus the gain. Measure a new loop's RMS and set th
     part (the badge, the bumper patch). At exponent 5 the tail's face rippled: it uses 3.
   - Its motor is `engine_future_04.wav`, one of four unused loops in `sounds/enginesounds/`, +5.4 dB from its -15.1 dBFS
     RMS. The paint shop's "Basilisk Olive" is its factory colour (the shop names the nearest palette entry).
+- The Classics (CarCollection's gallery of that name; original designs with made-up names, each with its own engine
+  loop made with tools/elevenlabs):
+  - The Bootlegger (`BootleggerBuilder.gd`, a hot rod): the shell is only a chopped coupé's cab and turtle deck (the
+    firewall is its flat nose cap, satin black in the detail map so the engine stands out); its section above the side
+    is the glass leaning in, the roof corner and a crowned top, the glass shrinking to millimetres over the cowl and
+    the deck. Painted frame rails (`_frame_rail`, a sweep in M_PAINT, so the patterns run onto them) carry an exposed V8
+    (valve covers, roots blower and belt, bug catcher scoop, plug wires, zoomies), an arched grille shell and bucket
+    headlamps. Big and little wheels (`build_rear_wheel`): the hubs sit at each tyre's radius, so it rakes forward.
+    Its flames start at the firewall (`nose_z` -0.33).
+  - The Meteor (`MeteorBuilder.gd`, a 1930s-style Grand Prix single-seater): its section above the side is a shoulder
+    (a quarter ellipse), a rim, a wall, a corner and a crowned top, keyed along the car: a dome over the bonnet, a
+    trough for the cockpit (as the Centurion's), and behind it the wall leaning in as the headrest fairing's flank. The
+    grille's chrome ring follows the nose's face (`shell_z` per point). The aero screen is `build_glass` with both
+    faces (car_glass culls back faces). Wire wheels: forty spokes laced from two hub flanges. The exhaust is on the
+    left only (built outside the mirrored parts).
+  - The Kugelblitz (`KugelblitzBuilder.gd`, a 1950s-style bubble car): the Meteor's section, the cabin a trough under a
+    glass bubble (`build_glass`, `_bubble_ring` after the Fulmine's canopy) sitting on the rim; arches lifted into the
+    bottom over each wheel (`_bot_knots`, as the Interceptor's) with dark liners, the front ones clear of the tyres at
+    full lock. Parts on its round nose lie on it: the grille smile's dark core is a grid at `shell_z` (a flat polygon
+    stood 8cm off the nose at its ends), the bumpers' path follows the face (kept within x 0.24, or `shell_z` found the
+    face behind the arch). Through the bubble the dark cabin reads grey under a bright sky: that is the glass's
+    reflection, not the detail map.
 
 ## Canyon Chasm dirt ramps, rocks, signs, tornado and houses
 
@@ -3266,7 +3291,8 @@ Rebuilt on 2026-11-02 (Gemini's first version had a pit unrelated to its road, t
   but shows no clock): the running lap (or stage) time in tabular figures, the delta
   at each gate against the reference lap's split there (green faster, red slower; the reference is the stored time
   trial best lap, then the session's best clean lap), the lap's delta or RECORD, LAST / BEST / RECORD, and in a time
-  trial RUN and BEST RUN. A time trial hides the position and the standings. The end screen shows TIME (the
+  trial RUN and BEST RUN. A time trial hides the position and the standings. A time trial ends at the line (or a
+  disqualification) on the next frame (`_end_race_now`): no 30s countdown. The end screen shows TIME (the
   winner's, then gaps) and BEST LAP (the race's fastest in green) per racer; a time trial's is a lap sheet: each lap,
   the fastest marked, the total against the best run, the records.
 - `res://scratch/time_trial_items_check.tscn -- [res://levels/X.tscn] [lap=62]` (headless) runs a real time trial,

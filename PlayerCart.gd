@@ -352,6 +352,24 @@ const CAR_PRESETS = [
 		"offroad": 3.5,
 		"weight": 0.9,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Kugelblitz",
+		# A buzzing two-stroke (tools/elevenlabs, engine_bubble), raised to -17.7 dBFS RMS in the file
+		# (scratch/normalize_wav.py: it came out at -37.7) and levelled from there.
+		"engine_sound": "res://sounds/enginesounds/engine_bubblecar_loop.wav",
+		"engine_gain_db": 8.0,
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Kugelblitz.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 37.0,
+		"acceleration": 72.0,
+		"steer_speed": 3.6,
+		"grip": 5.4,
+		"braking": 50.0,
+		"offroad": 4.5,
+		"weight": 0.8,
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 

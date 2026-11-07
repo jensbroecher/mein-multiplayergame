@@ -284,6 +284,19 @@ const CAR_PRESETS = [
 		"offroad": 3.5,
 		"desc": "A Grand Prix single-seater from the age of leather helmets, with a supercharged straight-eight. Slippery and fast down a long straight; the skinny tyres and drum brakes want planning ahead.",
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Kugelblitz",
+		"model_path": "res://generated/cars/Kugelblitz.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 37.0,
+		"acceleration": 72.0,
+		"steer_speed": 3.6,
+		"grip": 5.4,
+		"braking": 50.0,
+		"offroad": 4.5,
+		"desc": "A 1950s bubble car with a glass dome, a suitcase on the back and a two-stroke that buzzes like an angry hornet. The slowest thing on the grid, the quickest to turn, and the easiest to shove around.",
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 
@@ -297,7 +310,7 @@ const CAR_ACCENTS := {
 	"Zephyr": Color(0.85, 0.55, 0.25), "Titan": Color(0.62, 0.95, 0.18),
 	"Sandstorm": Color(1.0, 0.55, 0.16), "Obsidian": Color(0.82, 0.62, 0.38),
 	"Fulmine": Color(0.32, 0.95, 0.46), "Basilisk": Color(0.84, 0.86, 0.45),
-	"Bootlegger": Color(1.0, 0.48, 0.14), "Meteor": Color(0.86, 0.88, 0.92),
+	"Bootlegger": Color(1.0, 0.48, 0.14), "Meteor": Color(0.86, 0.88, 0.92), "Kugelblitz": Color(0.45, 0.88, 0.76),
 }
 ## Stat bars: caption, preset key, and the values at an empty and a full bar (spanning the fleet).
 const STATS := [
