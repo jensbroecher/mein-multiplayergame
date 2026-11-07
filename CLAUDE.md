@@ -3909,9 +3909,13 @@ in `generated/` (each run deletes them first).
   drowning. The water mesh's triangles go [centre, a0, a1] (clockwise from above): the other way round the ponds were
   culled and showed no water at all.
 - The colliery railway (`RAIL`, a bent polyline: `_plan_rail`, `_build_railway`): FreightKit's track, Freight Line's
-  Train.gd (`ZechenbahnTrain`, a yard switcher and seven hoppers out and back every 344s, `legs`), RailCrossing.gd at both
+  Train.gd (`ZechenbahnTrain`, a yard switcher and seven hoppers out and back every 209s at `RAIL_SPEED` 19 with short
+  `RAIL_STANDS`, `legs`: at 13 m/s with long stands it came once in about six minutes and the user never met it in a
+  race), RailCrossing.gd at both
   crossings (lap 1317m and 2047m, 89 and 87 degrees), RailRumble, the loading bunker over it (`BUNKER_S`). Laid straight it
-  crossed the lap at 21 degrees, and a bot waiting at the closed crossing stood on the rails and was hit. A boosting bot
+  crossed the lap at 21 degrees, and a bot waiting at the closed crossing stood on the rails and was hit. The ground
+  dips about 24cm under the rails at a crossing; each deck has a box collider at its mats' height
+  (`BahnuebergangDeck<n>`, track), or carts sank into the mats. A boosting bot
   can't brake for a crossing: bots don't fire a boost with one within `PlayerCart.AI_BOOST_CROSSING_CLEAR` (180m) ahead
   (`_ai_rail_crossing_ahead`), and no pad leads into one.
 - Kits (life size, grown by PROP_SCALE 1.6, batched through `_add_prop`): `ZechenKit.gd` (the Malakoff tower, the Doppelbock
@@ -4031,5 +4035,14 @@ each run deletes first).
 - `_build_city_blocks` once never advanced `bx`: the runaway filled the system disk with swap (everything stopped,
   "disk full") and then rebooted the Mac. Run this generator, as any, under a watchdog on the process's footprint
   (`top -stats mem`), swap and the system disk's free space: RSS stays low once macOS swaps the process out.
+- The S-Bahn over the city (`SBAHN_CONSIST`) is TrainKit's German Regional-Express (`re_loco`, `re_dosto`, `~re_cab`: a
+  fictional operator's push-pull set in red, a diesel locomotive, double-deck coaches with their low floor between the
+  bogies, a cab car on the upper deck, side buffers); it had been the Sierra's American cab units and coaches.
+  `scratch/train_preview.gd ... consist=re_loco,re_dosto,re_dosto,~re_cab` renders it.
+- The Ring's cars, vans, trucks and bus have engines (CrossTraffic's `engine_sounds`, `kind_engine`: city-driving loops
+  `sounds/stadtrallye/city_*_loop.wav`, tools/elevenlabs, levelled by their RMS) on the six nearest the camera, their
+  Doppler shift scaled down (`doppler_share` 0.5: a few percent at town speeds, not the motorway's swoop); the trams
+  keep their own rumble. `scratch/autobahn_sound_probe.gd -- level=res://levels/StadtrallyeLevel.tscn
+  node=Ring/RingTraffic from=82,-200 speed=0 y=36` logs the voices beside the Ring.
 - AI races (`scratch/ai_race_test`, speed=1 only: the hazards run on the wall clock; `noitems=1`): every bot finishes,
   in 190-265s. Music `MusicManager.STAGE_TRACKS["stadtrallye"]`; its sounds are in `sounds/stadtrallye/` (tools/elevenlabs).

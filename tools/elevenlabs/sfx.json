@@ -510,5 +510,37 @@
     "duration": 1.6,
     "loop": false,
     "influence": 0.6
+  },
+  {
+    "name": "city_car",
+    "path": "sounds/stadtrallye/city_car_loop.wav",
+    "text": "A small petrol hatchback driving through a city street at about 40 km/h, light engine hum in a middle gear, tyres on asphalt, recorded close alongside, steady, no passing, no doppler, no horn",
+    "duration": 6.0,
+    "loop": true,
+    "influence": 0.6
+  },
+  {
+    "name": "city_suv",
+    "path": "sounds/stadtrallye/city_suv_loop.wav",
+    "text": "A family SUV rolling along a busy city street at moderate speed, a soft engine note and an easy gear change, tyres on asphalt, recorded close alongside, steady, no passing, no doppler",
+    "duration": 6.0,
+    "loop": true,
+    "influence": 0.6
+  },
+  {
+    "name": "city_van",
+    "path": "sounds/stadtrallye/city_van_loop.wav",
+    "text": "A diesel delivery van driving slowly through town traffic, rattling diesel at low revs, a gear change, recorded close alongside, steady, no passing, no doppler",
+    "duration": 6.0,
+    "loop": true,
+    "influence": 0.6
+  },
+  {
+    "name": "city_bus",
+    "path": "sounds/stadtrallye/city_bus_loop.wav",
+    "text": "A city bus driving along a street at low speed, deep diesel drone, air brakes hiss softly once, heavy tyres, recorded close alongside, steady, no passing, no doppler",
+    "duration": 6.0,
+    "loop": true,
+    "influence": 0.6
   }
 ]

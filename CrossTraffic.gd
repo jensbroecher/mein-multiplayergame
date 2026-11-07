@@ -43,6 +43,18 @@ extends Node3D
 @export var horn_db := -6.0
 @export var tram_db := -10.0
 @export var sound_unit := 30.0
+## Engines: city-driving loops (`engine_sounds`, made without a Doppler sweep, each levelled from its measured RMS
+## `engine_rms` to `engine_level`), one per vehicle kind (`kind_engine`, -1 none: the trams rumble on their own), on the
+## `engine_voices` vehicles nearest the camera within `engine_reach`. The Doppler shift is the real one times
+## `doppler_share`: at town speeds a gentle rise and fall, not the motorway's swoop.
+@export var engine_sounds: Array[AudioStream] = []
+@export var engine_rms := PackedFloat32Array()
+@export var kind_engine := PackedInt32Array()
+@export var engine_level := -20.0
+@export var engine_unit := 16.0
+@export var engine_reach := 170.0
+@export var engine_voices := 6
+@export var doppler_share := 0.5
 
 signal cart_hit(cart: Node)
 
@@ -76,6 +88,12 @@ var _intervals: Array = []
 var _players: Array[AudioStreamPlayer3D] = []
 var _next_player := 0
 var _rng := RandomNumberGenerator.new()
+## Engine voices: [player, the vehicle it follows (null free), its pitch].
+var _engines: Array = []
+var _veh_pitch := {}
+var _listener_prev := Vector3.ZERO
+var _listener_vel := Vector3.ZERO
+var _listener_ok := false
 
 
 func _ready() -> void:
@@ -215,6 +233,7 @@ func _physics_process(_delta: float) -> void:
 		_check_hits()
 	if not _headless:
 		_update_sounds(t)
+		_update_engines(get_physics_process_delta_time())
 
 
 # ======================================================================================
@@ -334,6 +353,90 @@ func longest_gap() -> float:
 # ======================================================================================
 #  Sounds
 # ======================================================================================
+
+func _update_engines(delta: float) -> void:
+	if engine_sounds.is_empty():
+		return
+	if _engines.is_empty():
+		for j in engine_voices:
+			var p := AudioStreamPlayer3D.new()
+			p.name = "Engine%d" % j
+			p.unit_size = engine_unit
+			p.max_distance = engine_reach + 30.0
+			p.attenuation_filter_cutoff_hz = 9000.0
+			p.attenuation_filter_db = -8.0
+			p.bus = &"SFX" if AudioServer.get_bus_index(&"SFX") >= 0 else &"Master"
+			add_child(p, false, Node.INTERNAL_MODE_BACK)
+			_engines.append([p, null, 1.0])
+	var cam: Camera3D = get_viewport().get_camera_3d()
+	if cam == null:
+		return
+	var lp: Vector3 = cam.global_position
+	if _listener_ok and delta > 0.0:
+		var lv: Vector3 = (lp - _listener_prev) / delta
+		_listener_vel = _listener_vel.lerp(lv, clampf(delta * 6.0, 0.0, 1.0)) if lv.length() < 150.0 else Vector3.ZERO
+	_listener_prev = lp
+	_listener_ok = true
+	var gx: Transform3D = global_transform
+	var near: Array = []
+	var reach2: float = engine_reach * engine_reach
+	for veh in _insts:
+		if not veh.present or veh.is_tram:
+			continue
+		var e: int = kind_engine[veh.kind] if veh.kind < kind_engine.size() else -1
+		if e < 0 or e >= engine_sounds.size():
+			continue
+		var wp: Vector3 = gx * Vector3(veh.x, veh.y + 1.0, veh.z_nose + veh.dir * veh.length * 0.5)
+		var d2: float = wp.distance_squared_to(lp)
+		if d2 < reach2:
+			near.append([d2, veh, wp])
+	near.sort_custom(func(a, b): return a[0] < b[0])
+	if near.size() > _engines.size():
+		near.resize(_engines.size())
+	var wanted := {}
+	for n in near:
+		wanted[n[1]] = n[2]
+	for en in _engines:
+		if en[1] != null and not wanted.has(en[1]):
+			en[1] = null
+			(en[0] as AudioStreamPlayer3D).stop()
+	for n in near:
+		var veh: Veh = n[1]
+		var has := false
+		for en in _engines:
+			if en[1] == veh:
+				has = true
+		if has:
+			continue
+		for en in _engines:
+			if en[1] == null:
+				var e2: int = kind_engine[veh.kind]
+				var pl: AudioStreamPlayer3D = en[0]
+				pl.stream = engine_sounds[e2]
+				pl.volume_db = engine_level - (engine_rms[e2] if e2 < engine_rms.size() else -20.0)
+				if not _veh_pitch.has(veh):
+					_veh_pitch[veh] = _rng.randf_range(0.92, 1.08)
+				en[1] = veh
+				en[2] = float(_veh_pitch[veh])
+				pl.play(_rng.randf_range(0.0, maxf(pl.stream.get_length() - 0.1, 0.0)))
+				break
+	var fwd: Vector3 = gx.basis.z.normalized()
+	for en in _engines:
+		if en[1] == null:
+			continue
+		var veh: Veh = en[1]
+		var at: Vector3 = wanted[veh]
+		var pl: AudioStreamPlayer3D = en[0]
+		pl.global_position = at
+		var vel: Vector3 = fwd * (-veh.dir * veh.speed)
+		var u: Vector3 = (lp - at)
+		u = u / maxf(u.length(), 0.01)
+		var dop: float = (343.0 - _listener_vel.dot(u)) / maxf(343.0 - vel.dot(u), 1.0)
+		dop = 1.0 + (dop - 1.0) * doppler_share
+		var target: float = float(_veh_pitch[veh]) * clampf(dop, 0.8, 1.25)
+		en[2] = lerpf(float(en[2]), target, clampf(delta * 8.0, 0.0, 1.0))
+		pl.pitch_scale = en[2]
+
 
 func _update_sounds(t: float) -> void:
 	var carts := get_tree().get_nodes_in_group("player_carts")

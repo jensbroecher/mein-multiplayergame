@@ -2409,7 +2409,8 @@ func _bridge_abutment() -> float:
 
 
 const RAIL_STEP := 3.0
-const SBAHN_CONSIST := ["ploco", "coach", "coach", "~ploco"]
+## The Regional-Express (TrainKit's German push-pull set): the diesel locomotive, two double-deck coaches and the cab car.
+const SBAHN_CONSIST := ["re_loco", "re_dosto", "re_dosto", "~re_cab"]
 
 func _build_tracks(node: Node3D) -> void:
 	var curves: Array = []
@@ -3016,6 +3017,16 @@ func _build_ring(root: Node3D) -> void:
 	traffic.set("bells", _streams(["res://sounds/stadtrallye/tram_bell_1.wav", "res://sounds/stadtrallye/tram_bell_2.wav"]))
 	traffic.set("horns", _streams(["res://sounds/stadtrallye/car_horn_1.wav", "res://sounds/stadtrallye/car_horn_2.wav", "res://sounds/stadtrallye/car_horn_3.wav"]))
 	traffic.set("tram_sound", _stream("res://sounds/stadtrallye/tram_pass_loop.wav"))
+	# Engines in town (tools/elevenlabs, levelled by their RMS): hatchbacks the small car, saloons the SUV's softer note,
+	# the vans and the camp's stand-ins the diesel van, trucks and the bus the bus; the trams none (their own rumble).
+	var engine_of := {"hatchback": 0, "saloon": 1, "delivery_van": 2, "van": 2, "suv": 1, "box_truck": 3, "city_bus": 3}
+	var ke := PackedInt32Array()
+	for k in kinds:
+		ke.append(int(engine_of.get(k, -1)))
+	traffic.set("engine_sounds", _streams(["res://sounds/stadtrallye/city_car_loop.wav", "res://sounds/stadtrallye/city_suv_loop.wav",
+		"res://sounds/stadtrallye/city_van_loop.wav", "res://sounds/stadtrallye/city_bus_loop.wav"]))
+	traffic.set("engine_rms", PackedFloat32Array([-39.2, -31.9, -33.6, -36.2]))
+	traffic.set("kind_engine", ke)
 	node.add_child(traffic)
 	var gate := Node3D.new()
 	gate.name = "RingCrossingGate"

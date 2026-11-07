@@ -30,6 +30,11 @@ const KINDS := {
 	"ploco": {"len": 20.0, "width": 3.2, "height": 4.5},
 	"coach": {"len": 26.0, "width": 3.0, "height": 4.6},
 	"obs": {"len": 26.0, "width": 3.0, "height": 4.6},
+	# The Kronburg GP's Regional-Express (a German push-pull set): a diesel locomotive, double-deck coaches and a
+	# double-deck cab car (Steuerwagen) that leads the train back.
+	"re_loco": {"len": 18.9, "width": 2.96, "height": 4.3},
+	"re_dosto": {"len": 26.8, "width": 2.8, "height": 4.62},
+	"re_cab": {"len": 26.8, "width": 2.8, "height": 4.62},
 }
 
 const OXIDE := [Color(0.42, 0.17, 0.12), Color(0.17, 0.27, 0.21), Color(0.52, 0.41, 0.27), Color(0.30, 0.31, 0.34)]
@@ -113,6 +118,12 @@ static func build(kind: String, variant: int = 0, with_bogies := true) -> ArrayM
 			_coach(pk, kit, false)
 		"obs":
 			_coach(pk, kit, true)
+		"re_loco":
+			_re_loco(pk, kit)
+		"re_dosto":
+			_re_double(pk, kit, false)
+		"re_cab":
+			_re_double(pk, kit, true)
 	var mesh := pk.commit(kit)
 	_cache[key] = mesh
 	if not with_bogies:
@@ -839,6 +850,196 @@ static func _coach(pk: PropKit, kit: Dictionary, observation: bool) -> void:
 		pk.block(kit, "lamp", Vector3(-0.22, 2.0, z_end - 0.02), Vector3(0.22, 2.4, z_end + 0.12), Color(1.0, 0.18, 0.12))
 		pk.block(kit, "lamp", Vector3(-0.6, 3.5, z_end - 0.6), Vector3(0.6, 3.95, z_end - 0.4), Color(1.0, 0.86, 0.55))
 		pk.block(kit, "steel", Vector3(-0.75, 3.95, z_end - 0.7), Vector3(0.75, 4.0, z_end - 0.3), PGOLD)
+
+
+# ======================================================================================
+#  The Regional-Express (Kronburg GP): a fictional operator's push-pull set in red with a light grey skirt and a white
+#  line, German in its details (side buffers and a screw coupling, a raked windscreen, double-deck coaches with a low
+#  floor between the bogies, a cab car on the upper deck), not the Sierra's American stock.
+# ======================================================================================
+
+const RE_RED := Color(0.70, 0.07, 0.08)
+const RE_SKIRT := Color(0.74, 0.75, 0.75)
+const RE_WHITE := Color(0.93, 0.93, 0.91)
+const RE_ROOF := Color(0.42, 0.43, 0.44)
+const RE_DOOR := Color(0.80, 0.81, 0.80)
+const RE_FRAME := Color(0.09, 0.09, 0.10)
+
+
+## Side buffers (two round plates on their sleeves) and a screw coupling's hook on the headstock at z (`sz` the way out).
+static func _re_buffers(pk: PropKit, kit: Dictionary, z: float, sz: float) -> void:
+	pk.block(kit, "steel", Vector3(-1.3, 0.86, minf(z, z + sz * 0.12)), Vector3(1.3, 1.26, maxf(z, z + sz * 0.12)), Color(0.14, 0.14, 0.15))
+	for sx in [-1.0, 1.0]:
+		pk.tube(kit, "steel", Vector3(sx * 0.875, 1.06, z + sz * 0.1), Vector3(sx * 0.875, 1.06, z + sz * 0.45), 0.13, 0.13, 10, Color(0.18, 0.18, 0.19), false)
+		pk.tube(kit, "steel", Vector3(sx * 0.875, 1.06, z + sz * 0.45), Vector3(sx * 0.875, 1.06, z + sz * 0.56), 0.23, 0.23, 14, Color(0.62, 0.63, 0.63), true)
+	pk.block(kit, "steel", Vector3(-0.09, 0.98, minf(z, z + sz * 0.5)), Vector3(0.09, 1.12, maxf(z, z + sz * 0.5)), Color(0.18, 0.18, 0.19))
+
+
+## A raked windscreen of two panes in dark frames on the slope from `foot` to `head` (x 0 on the car's middle), facing
+## the way out of the car's end `sz`.
+static func _re_windscreen(pk: PropKit, kit: Dictionary, foot: Vector3, head: Vector3, half: float, sz: float) -> void:
+	var up_slope: Vector3 = (head - foot).normalized()
+	# Out of the slope, up and away from the car.
+	var n := Vector3(0.0, absf(up_slope.z), up_slope.y * sz).normalized()
+	for sx in [-1.0, 1.0]:
+		var xa: float = sx * 0.06
+		var xb: float = sx * half
+		var b0: Vector3 = foot + up_slope * 0.08
+		var t0: Vector3 = head - up_slope * 0.08
+		pk.quad(kit, "steel", [b0 + Vector3(xa, 0, 0) + n * 0.02, b0 + Vector3(xb, 0, 0) + n * 0.02, t0 + Vector3(xb, 0, 0) + n * 0.02,
+				t0 + Vector3(xa, 0, 0) + n * 0.02], n, RE_FRAME)
+		var g0: Vector3 = b0 + up_slope * 0.06
+		var g1: Vector3 = t0 - up_slope * 0.06
+		var xi: float = xa + sx * 0.05
+		var xo: float = xb - sx * 0.06
+		pk.quad(kit, "glass", [g0 + Vector3(xi, 0, 0) + n * 0.04, g0 + Vector3(xo, 0, 0) + n * 0.04, g1 + Vector3(xo, 0, 0) + n * 0.04,
+				g1 + Vector3(xi, 0, 0) + n * 0.04], n, PGLASS)
+
+
+## A lamp on an end face: a dark bezel and the lens, pointing along `sz`.
+static func _re_lamp(pk: PropKit, kit: Dictionary, c: Vector3, sz: float, r: float, col: Color) -> void:
+	pk.tube(kit, "steel", c, c + Vector3(0, 0, sz * 0.05), r + 0.04, r + 0.04, 12, RE_FRAME, true)
+	pk.tube(kit, "lamp", c + Vector3(0, 0, sz * 0.05), c + Vector3(0, 0, sz * 0.065), r, r, 12, col, true)
+
+
+## The diesel locomotive (a modern four-axle diesel-electric, boxy, a cab at each end): raked windscreens, three
+## headlights a end, cab doors and windows, louvred machine-room grilles, roof fans and the exhaust, a fuel tank between
+## the bogies, side buffers.
+static func _re_loco(pk: PropKit, kit: Dictionary) -> void:
+	var hl := 9.45
+	_bogie(pk, kit, -5.1, [-1.3, 1.3])
+	_bogie(pk, kit, 5.1, [-1.3, 1.3])
+	pk.block(kit, "steel", Vector3(-1.38, 1.0, -hl + 0.1), Vector3(1.38, 1.12, hl - 0.1), RE_FRAME)
+	const WS_FOOT := Vector2(-9.3, 3.02)
+	const WS_HEAD := Vector2(-8.78, 3.9)
+	var front: Array = [
+		[-hl, 1.30, 1.12, 2.30, 0.32],
+		[-9.4, 1.42, 1.10, 2.86, 0.40],
+		[WS_FOOT.x, 1.47, 1.10, WS_FOOT.y, 0.42],
+		[WS_HEAD.x, 1.48, 1.10, WS_HEAD.y, 0.45],
+		[-8.55, 1.48, 1.10, 4.0, 0.45],
+	]
+	var sections: Array = front.duplicate()
+	for k in range(front.size() - 1, -1, -1):
+		var f: Array = front[k]
+		sections.append([-float(f[0]), f[1], f[2], f[3], f[4]])
+	var rings: Array = []
+	for sc in sections:
+		rings.append(_rrect(sc[1], sc[2], sc[3], sc[4], sc[0], 8))
+	_banded_shell(pk, kit, "paint", rings, func(_z: float) -> Array: return [1.52, 1.6], [RE_SKIRT, RE_WHITE, RE_RED], [26, 3, 40])
+	for sz in [-1.0, 1.0]:
+		_re_windscreen(pk, kit, Vector3(0, WS_FOOT.y, sz * -WS_FOOT.x), Vector3(0, WS_HEAD.y, sz * -WS_HEAD.x), 1.12, sz)
+		var zf: float = sz * (hl + 0.0)
+		for sx in [-1.0, 1.0]:
+			_re_lamp(pk, kit, Vector3(sx * 0.82, 1.78, zf - sz * 0.06), sz, 0.11, LAMP)
+			_re_lamp(pk, kit, Vector3(sx * 1.08, 1.78, zf - sz * 0.07), sz, 0.06, Color(1.0, 0.12, 0.08))
+		_re_lamp(pk, kit, Vector3(0, 2.62, sz * 9.44 - sz * 0.06), sz, 0.1, LAMP)
+		_re_buffers(pk, kit, sz * hl, sz)
+		for sx in [-1.0, 1.0]:
+			var x: float = sx * 1.48
+			# The cab door, its window and the cab's side window.
+			pk.block(kit, "steel", Vector3(x - (0.0 if sx > 0 else 0.02), 1.3, sz * 7.95 - 0.42), Vector3(x + (0.02 if sx > 0 else 0.0), 3.55, sz * 7.95 + 0.42), RE_FRAME)
+			pk.block(kit, "glass", Vector3(x - (0.0 if sx > 0 else 0.035), 2.65, sz * 7.95 - 0.3), Vector3(x + (0.035 if sx > 0 else 0.0), 3.4, sz * 7.95 + 0.3), PGLASS)
+			pk.block(kit, "glass", Vector3(x - (0.0 if sx > 0 else 0.03), 2.75, sz * 8.6 - 0.28), Vector3(x + (0.03 if sx > 0 else 0.0), 3.45, sz * 8.6 + 0.28), PGLASS)
+			pk.tube(kit, "steel", Vector3(x + sx * 0.06, 1.4, sz * 7.4), Vector3(x + sx * 0.06, 3.2, sz * 7.4), 0.025, 0.025, 6, Color(0.8, 0.8, 0.8), true)
+	# The machine room: louvred grilles and two small windows a side.
+	for sx in [-1.0, 1.0]:
+		var x: float = sx * 1.48
+		for gz in [[-6.6, -4.2], [-3.4, -1.0], [1.6, 4.0], [4.6, 6.6]]:
+			pk.block(kit, "steel", Vector3(x - (0.0 if sx > 0 else 0.02), 2.15, gz[0]), Vector3(x + (0.02 if sx > 0 else 0.0), 3.45, gz[1]), Color(0.22, 0.05, 0.06))
+			var lz: float = gz[0] + 0.12
+			while lz < gz[1] - 0.1:
+				pk.block(kit, "steel", Vector3(x - (0.0 if sx > 0 else 0.04), 2.22, lz), Vector3(x + (0.04 if sx > 0 else 0.0), 3.38, lz + 0.06), RE_FRAME)
+				lz += 0.18
+		pk.block(kit, "glass", Vector3(x - (0.0 if sx > 0 else 0.03), 2.6, 0.0), Vector3(x + (0.03 if sx > 0 else 0.0), 3.1, 0.9), PGLASS)
+	# Roof: the cooling fans, the exhaust and its silencer, hatches.
+	for fz in [2.2, 4.0]:
+		pk.tube(kit, "steel", Vector3(0, 3.98, fz), Vector3(0, 4.1, fz), 0.62, 0.62, 16, RE_ROOF, true)
+		pk.tube(kit, "steel", Vector3(0, 4.1, fz), Vector3(0, 4.13, fz), 0.52, 0.52, 16, RE_FRAME, false)
+	pk.block(kit, "steel", Vector3(-0.55, 3.98, -2.6), Vector3(0.55, 4.28, -0.8), RE_ROOF)
+	pk.tube(kit, "steel", Vector3(0.2, 4.28, -1.7), Vector3(0.2, 4.55, -1.7), 0.12, 0.12, 8, Color(0.2, 0.19, 0.18), true)
+	pk.block(kit, "steel", Vector3(-0.7, 3.98, 5.4), Vector3(0.7, 4.12, 7.4), RE_ROOF.lightened(0.1))
+	# The fuel tank between the bogies.
+	pk.block(kit, "steel", Vector3(-1.05, 0.55, -2.9), Vector3(1.05, 1.0, 2.9), Color(0.16, 0.16, 0.17))
+
+
+## A double-deck coach (Doppelstockwagen) 26.8m long: the floor between the bogies dropped low, two rows of windows
+## there (the lower deck's and the upper's), single windows over the bogies at the middle level, a pair of sliding doors
+## at each end of the low part, gangway bellows at the ends, side buffers. With `cab` its front end (-z) is a driving
+## trailer's: the cab on the upper deck behind a raked windscreen, headlights and tail lights.
+static func _re_double(pk: PropKit, kit: Dictionary, cab: bool) -> void:
+	var hl := 13.4
+	var hw := 1.4
+	var top := 4.62
+	var r := 0.75
+	_bogie(pk, kit, -11.0, [-1.25, 1.25])
+	_bogie(pk, kit, 11.0, [-1.25, 1.25])
+	var low := 0.55
+	var high := 1.15
+	var bottom := func(z: float) -> float:
+		return lerpf(low, high, smoothstep(9.2, 9.8, absf(z)))
+	var zs: Array = []
+	if cab:
+		zs = [[-13.45, 1.22, 2.4, 0.42], [-13.36, 1.34, 3.0, 0.55], [-13.25, 1.39, 3.25, 0.6], [-12.45, hw, 4.42, r], [-12.15, hw, top, r]]
+	else:
+		zs = [[-hl, 1.33, top - 0.14, r], [-13.1, hw, top, r]]
+	for z in [-9.8, -9.6, -9.4, -9.2, 9.2, 9.4, 9.6, 9.8, 13.1]:
+		zs.append([z, hw, top, r])
+	zs.append([hl, 1.33, top - 0.14, r])
+	var rings: Array = []
+	for e in zs:
+		var z: float = e[0]
+		rings.append(_rrect(e[1], bottom.call(z), e[2], e[3], z, 8))
+	var cuts := func(z: float) -> Array:
+		var b: float = bottom.call(z)
+		return [b + 0.34, b + 0.42]
+	_banded_shell(pk, kit, "paint", rings, cuts, [RE_SKIRT, RE_WHITE, RE_RED], [26, 3, 40])
+	var side := func(sx: float, z0: float, z1: float, y0: float, y1: float, key: String, col: Color, proud: float) -> void:
+		var x: float = sx * hw
+		pk.block(kit, key, Vector3(x - (0.0 if sx > 0 else proud), y0, z0), Vector3(x + (proud if sx > 0 else 0.0), y1, z1), col)
+	for sx in [-1.0, 1.0]:
+		# The upper deck's windows the length of the low part, the lower deck's under them (not by the doors).
+		var wz: float = -8.4
+		while wz <= 8.45:
+			side.call(sx, wz - 0.82, wz + 0.82, 2.88, 3.86, "steel", RE_FRAME, 0.015)
+			side.call(sx, wz - 0.74, wz + 0.74, 2.94, 3.8, "glass", PGLASS, 0.03)
+			# Clear of the doors (their frames from |z| 7.0).
+			if absf(wz) < 6.0:
+				side.call(sx, wz - 0.82, wz + 0.82, 1.18, 2.12, "steel", RE_FRAME, 0.015)
+				side.call(sx, wz - 0.74, wz + 0.74, 1.24, 2.06, "glass", PGLASS, 0.03)
+			wz += 1.87
+		# Over the bogies: one window at the middle level (the stairs and the vestibule).
+		for ez in [-11.7, 11.7]:
+			if cab and ez < 0.0:
+				continue
+			side.call(sx, ez - 0.66, ez + 0.66, 2.1, 3.05, "steel", RE_FRAME, 0.015)
+			side.call(sx, ez - 0.58, ez + 0.58, 2.16, 2.99, "glass", PGLASS, 0.03)
+		# The doors: a pair of sliding leaves with windows, in the low part's ends.
+		for dz in [-8.25 + 0.0, 8.25]:
+			var dc: float = dz + (0.55 if dz < 0.0 else -0.55)
+			side.call(sx, dc - 0.68, dc + 0.68, low + 0.12, 2.6, "steel", RE_FRAME, 0.012)
+			for lf in [-1.0, 1.0]:
+				side.call(sx, dc + (lf * 0.33) - 0.31, dc + (lf * 0.33) + 0.31, low + 0.16, 2.56, "paint", RE_DOOR, 0.022)
+				side.call(sx, dc + (lf * 0.33) - 0.22, dc + (lf * 0.33) + 0.22, 1.5, 2.4, "glass", PGLASS, 0.032)
+	# The ends: gangway bellows and buffers (the cab end: buffers and lamps, no gangway).
+	for sz in [-1.0, 1.0]:
+		var z_e: float = sz * hl
+		_re_buffers(pk, kit, z_e, sz)
+		pk.block(kit, "steel", Vector3(-hw + 0.08, 0.98, minf(z_e - sz * 3.4, z_e - sz * 0.02)), Vector3(hw - 0.08, 1.16, maxf(z_e - sz * 3.4, z_e - sz * 0.02)), RE_FRAME)
+		if cab and sz < 0.0:
+			continue
+		pk.block(kit, "steel", Vector3(-0.55, 1.35, minf(z_e - sz * 0.02, z_e + sz * 0.22)), Vector3(0.55, 3.75, maxf(z_e - sz * 0.02, z_e + sz * 0.22)), Color(0.12, 0.12, 0.13))
+	if cab:
+		_re_windscreen(pk, kit, Vector3(0, 3.25, -13.25), Vector3(0, 4.42, -12.45), 1.08, -1.0)
+		for sx in [-1.0, 1.0]:
+			_re_lamp(pk, kit, Vector3(sx * 0.8, 1.72, -13.45 + 0.06), -1.0, 0.11, LAMP)
+			_re_lamp(pk, kit, Vector3(sx * 1.05, 1.72, -13.45 + 0.07), -1.0, 0.065, Color(1.0, 0.12, 0.08))
+			# The cab's side window and the door under it.
+			side.call(sx, -12.25, -11.35, 3.1, 3.8, "glass", PGLASS, 0.03)
+		_re_lamp(pk, kit, Vector3(0, 2.62, -13.42 + 0.06), -1.0, 0.1, LAMP)
+	# Roof vents along the middle.
+	for vz in [-6.0, 0.0, 6.0]:
+		pk.block(kit, "steel", Vector3(-0.45, top - 0.02, vz - 0.9), Vector3(0.45, top + 0.16, vz + 0.9), RE_ROOF)
 
 
 static func _tank_car(pk: PropKit, kit: Dictionary, variant: int) -> void:

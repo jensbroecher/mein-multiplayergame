@@ -671,7 +671,12 @@ const RAIL_LIFT := 0.55
 const DECK_HALF_LEN := 9.0
 const DECK_HALF_W := 3.2
 const RAIL_SURFACE_SKIP := 13.0
+## The shunter and its coal hoppers, out and back. RAIL_SPEED and the short stands (RAIL_STANDS: before the run out, at
+## the far end, home) bring it past a crossing about every lap: at 13 m/s with long stands it came once in about six
+## minutes, and the user never met it in a race.
 const RAIL_CONSIST := ["~loco:2", "hopper", "hopper:1", "hopper", "hopper", "hopper:1", "hopper", "hopper"]
+const RAIL_SPEED := 19.0
+const RAIL_STANDS := [6.0, 10.0, 8.0]
 
 var _rail_segs: Array = []
 var _rail_total := 0.0
@@ -868,16 +873,20 @@ func _build_railway(root: Node3D) -> void:
 	train.set_script(load("res://Train.gd"))
 	train.set("path", curve)
 	train.set("consist", PackedStringArray(RAIL_CONSIST))
-	train.set("speed", 13.0)
+	train.set("speed", RAIL_SPEED)
 	var head_home: float = BUNKER_S + 70.0
 	var head_far: float = len_r - 10.0
-	var run_t: float = (head_far - head_home) / 13.0 + 8.0
-	var legs := PackedFloat32Array([30.0, 30.0 + run_t, head_home, head_far, 7.0,
-		30.0 + run_t + 25.0, 30.0 + run_t * 2.0 + 25.0, head_far, head_home, 7.0])
+	var run_t: float = (head_far - head_home) / RAIL_SPEED + 6.0
+	var s0: float = RAIL_STANDS[0]
+	var s1: float = RAIL_STANDS[1]
+	var s2: float = RAIL_STANDS[2]
+	var legs := PackedFloat32Array([s0, s0 + run_t, head_home, head_far, 6.0,
+		s0 + run_t + s1, s0 + run_t * 2.0 + s1, head_far, head_home, 6.0])
 	train.set("legs", legs)
-	train.set("period", 30.0 + run_t * 2.0 + 25.0 + 20.0)
+	var period: float = s0 + run_t * 2.0 + s1 + s2
+	train.set("period", period)
 	node.add_child(train)
-	print("  Zechenbahn: %.0fm, the train out and back every %.0fs" % [len_r, 30.0 + run_t * 2.0 + 45.0])
+	print("  Zechenbahn: %.0fm, the train out and back every %.0fs" % [len_r, period])
 	# The crossings: a planked deck, the barriers and lights (RailCrossing.gd).
 	var ci := 0
 	for c in _crossings:
@@ -890,6 +899,18 @@ func _build_railway(root: Node3D) -> void:
 		deck.name = "Bahnuebergang%d" % ci
 		deck.mesh = _save_res(FreightKit.crossing_deck(Vector3(sp["pos"].x, float(c["road_y"]) + 0.08, sp["pos"].z), rail_dir3, DECK_HALF_LEN / skew, DECK_HALF_W), "crossing_deck_%d" % ci)
 		node.add_child(deck)
+		# The deck is solid at its mats' height: the ground dips under the rails there, and carts sank into the mats.
+		var deck_body := StaticBody3D.new()
+		deck_body.name = "BahnuebergangDeck%d" % ci
+		deck_body.set_meta(&"surface", "asphalt")
+		var dcs := CollisionShape3D.new()
+		var dbx := BoxShape3D.new()
+		dbx.size = Vector3(DECK_HALF_W * 2.0, 0.6, DECK_HALF_LEN / skew * 2.0)
+		dcs.shape = dbx
+		var across := Vector3(rail_dir3.z, 0.0, -rail_dir3.x)
+		dcs.transform = Transform3D(Basis(across, Vector3.UP, rail_dir3), Vector3(sp["pos"].x, float(c["road_y"]) + 0.03 - 0.3, sp["pos"].z))
+		deck_body.add_child(dcs)
+		node.add_child(deck_body)
 		var cn := Node3D.new()
 		cn.name = "RailCrossing%d" % ci
 		cn.set_script(load("res://RailCrossing.gd"))
