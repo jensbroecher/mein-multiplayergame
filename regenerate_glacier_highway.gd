@@ -34,11 +34,49 @@ const BARRIER_PROFILE := [
 	Vector2(0.00, -0.06), # back foot
 ]
 const BARRIER_VERTS := 6
+## Dusk: the sky overhead, along the horizon and the haze the fog and the far mountains fade into.
+const DUSK_SKY_TOP := Color(0.035, 0.075, 0.21)
+const DUSK_SKY_HORIZON := Color(0.40, 0.45, 0.60)
+const DUSK_HAZE := Color(0.30, 0.36, 0.50)
+## Where the valley opens out southward (z): from the lap's south end to the map's edge.
+const VALLEY_OPEN_Z := Vector2(260.0, 560.0)
+## The highway carrying on south from the lap's south hairpin, behind a closure: scenery (no route uses it). Corner
+## points of an open Catmull-Rom curve, the first just past the hairpin's outer barrier.
+const FAR_SOUTH := [Vector3(-110.0, 2.8, 345.0), Vector3(-109.0, 2.8, 420.0), Vector3(-98.0, 2.6, 520.0),
+		Vector3(-72.0, 2.2, 660.0), Vector3(-30.0, 1.8, 860.0), Vector3(25.0, 1.2, 1120.0), Vector3(80.0, 0.8, 1450.0),
+		Vector3(115.0, 0.4, 1850.0), Vector3(125.0, 0.0, 2350.0), Vector3(110.0, -0.4, 2900.0), Vector3(80.0, -0.8, 3500.0)]
+## Streetlights cast light only this far along the far highway; past it their lamps just glow.
+const FAR_LIT_REACH := 360.0
+## The streetlights: warm white, a touch of sodium.
+const LAMP_COLOR := Color(1.0, 0.80, 0.56)
+## The barriers' collision is an upright wall this high over the deck, PARAPET_INSET in from the deck's edge (just
+## behind the Jersey profile's road-side toe, which stands 0.6 in).
+const PARAPET_H := 1.6
+const PARAPET_INSET := 0.5
 ## Metres over which a barrier run tapers down to deck level at an open end, so a
 ## gap reads as a real sloped terminal instead of a sliver poking out of the road.
 const BARRIER_TERMINAL := 2.4
 ## Clearance the main barrier keeps from a ramp deck before it may close again.
 const GORE_CLEARANCE := 2.5
+## How far the ramp's deck has to have left the trunk's before both close their barriers on the gore. The decks tile
+## edge to edge while they can be crossed; once a gap opens between them nothing crosses it, and with the trunk's
+## barrier open until GORE_CLEARANCE that gap was a slot bots fell into.
+const GORE_CLOSE := 0.4
+## The trunk's barrier opens beside a ramp only where the ramp's deck reaches this far past the trunk's edge.
+const GAP_OUTER_MIN := 1.2
+## The same where a ramp joins the trunk (its second half): the ramp's outer barrier runs on until it has all but met the
+## trunk's edge and the trunk's starts again behind it. At GAP_OUTER_MIN there too the trunk's barrier began 1.2m inside
+## the narrowing ramp, its blunt end facing the traffic merging along the ramp's outside (the Gorge Cut's merge).
+const GAP_MERGE_MIN := 0.15
+
+## How far past the trunk's edge a ramp's deck must reach before the trunk's barrier opens, `along` metres into a ramp
+## `length` long: where it leaves the trunk (its first half) or where it joins it.
+func _gap_outer_min(along: float, length: float) -> float:
+	return GAP_OUTER_MIN if along < length * 0.5 else GAP_MERGE_MIN
+## How far inside the paving's edge (or the trunk's, before its barrier opens) the bots' path over a ramp keeps.
+const AI_ROUTE_EDGE := 1.8
+## How far past a ramp's own span the trunk's barrier gap reaches.
+const GAP_PAD := 1.0
 
 ## Trunk carriageway and ramp widths. A ramp nose is placed exactly one trunk half width
 ## off the centreline, which is what lets the two decks tile without overlapping.
@@ -66,6 +104,10 @@ const ALPINE_TERRAIN_RES := 220
 const ALPINE_TERRAIN_CENTER := Vector2(10.0, -20.0)
 ## Horizontal reach of a graded road corridor, and the cell size of the carriageway index.
 const ROAD_CORRIDOR_RADIUS := 48.0
+## The ground under an at-grade deck and DECK_FILL_OUT past its edges (a verge) lies DECK_FILL_UNDER under the road's
+## line, so there is no room under the deck for a cart's sphere (see _apply_road_corridors).
+const DECK_FILL_UNDER := 0.32
+const DECK_FILL_OUT := 3.0
 const ROAD_CELL := 48.0
 ## Tunnel massif footprint and bore, shared with the portal placement. The footprint's Z edges
 ## are a whole number of cells away from the portal planes so a cell row lands exactly on each
@@ -86,6 +128,11 @@ const TUNNEL_LINER_TOP := 9.8
 var ROAD_CURVES: Array = []
 var _road_xz := PackedVector2Array()
 var _road_y := PackedFloat32Array()
+## Each sample's carriageway half width (MAIN_HALF_W for the trunk and the far highway, the ramps' otherwise).
+var _road_hw := PackedFloat32Array()
+## Each sample's carriageway (its index in ROAD_CURVES).
+var _road_id := PackedInt32Array()
+var _far_curve: Curve3D
 var _road_cells := Dictionary()
 var _base_noise := FastNoiseLite.new()
 var _detail_noise := FastNoiseLite.new()
@@ -405,7 +452,10 @@ func _junction_gap_intervals(alt_curve: Curve3D, ramp_half_w: float, main_half_w
 		var p: Vector3 = alt_curve.sample_baked(minf(t, alt_len))
 		var lat: float = _lateral_offset(main_track_curve, p)
 		var ext: Vector2 = _ramp_deck_extents(lat, ramp_half_w, main_half_w)
-		var alongside: bool = ext.x < main_half_w + GORE_CLEARANCE
+		# Open only once the ramp's deck reaches GAP_OUTER_MIN past the trunk's edge: the ramps leave and join the trunk
+		# along its edge, and the Ridge Bypass's centreline hugged it for 20m, its deck there centimetres wide, so the
+		# trunk stood open over a 16m drop that bots heading for the bypass cut straight across.
+		var alongside: bool = ext.x < main_half_w + GORE_CLOSE and ext.y - main_half_w >= _gap_outer_min(t, alt_len)
 		var main_off: float = main_track_curve.get_closest_offset(p)
 		if alongside:
 			run_end = main_off
@@ -419,7 +469,9 @@ func _junction_gap_intervals(alt_curve: Curve3D, ramp_half_w: float, main_half_w
 
 	var padded: Array = []
 	for span in open_spans:
-		padded.append(Vector2(maxf(span.x - 6.0, 0.0), minf(span.y + 6.0, main_len)))
+		# A metre either side of the ramp's own span: padded 6m, the trunk stood open past every merge's nose onto the
+		# snow (a dead-end pocket beside the tunnel's portal) or the drop under a viaduct.
+		padded.append(Vector2(maxf(span.x - GAP_PAD, 0.0), minf(span.y + GAP_PAD, main_len)))
 	return _merge_intervals(padded)
 
 func _ready() -> void:
@@ -451,35 +503,69 @@ func _ready() -> void:
 
 	add_child(level_scene)
 
-	# 1. Environment & Lighting (Crisp High-Arctic Atmosphere)
+	# 1. Environment & Lighting: dusk. The sun is just down behind the ridges to the south-south-west, the sky over it
+	# orange fading through mauve to a deep blue overhead, the clouds lit pink from below; the valley is in the blue
+	# shadow of the mountains and the highway's lights are on.
 	var env_node := WorldEnvironment.new()
 	env_node.name = "WorldEnvironment"
 	var env := Environment.new()
 	env.background_mode = Environment.BG_SKY
 	var sky := Sky.new()
-	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color(0.22, 0.48, 0.88)
-	sky_mat.sky_horizon_color = Color(0.70, 0.82, 0.94)
-	sky_mat.ground_bottom_color = Color(0.86, 0.91, 0.97)
-	sky_mat.ground_horizon_color = Color(0.76, 0.86, 0.95)
-	sky_mat.sun_angle_max = 30.0
+	var sky_mat := ShaderMaterial.new()
+	sky_mat.shader = load("res://sky_tropical_cumulus.gdshader")
+	sky_mat.set_shader_parameter("sky_top", DUSK_SKY_TOP)
+	sky_mat.set_shader_parameter("sky_horizon", DUSK_SKY_HORIZON)
+	sky_mat.set_shader_parameter("ground_horizon", Color(0.24, 0.27, 0.36))
+	sky_mat.set_shader_parameter("ground_bottom", Color(0.07, 0.08, 0.13))
+	sky_mat.set_shader_parameter("sky_curve", 0.55)
+	sky_mat.set_shader_parameter("sky_energy", 0.7)
+	sky_mat.set_shader_parameter("horizon_haze", DUSK_HAZE)
+	sky_mat.set_shader_parameter("haze_strength", 0.55)
+	sky_mat.set_shader_parameter("haze_height", 0.10)
+	sky_mat.set_shader_parameter("sun_tint", Color(1.0, 0.60, 0.34))
+	sky_mat.set_shader_parameter("sun_disc_degrees", 1.4)
+	sky_mat.set_shader_parameter("sun_glow", 0.6)
+	sky_mat.set_shader_parameter("sun_horizon_tint", Color(1.0, 0.48, 0.22))
+	sky_mat.set_shader_parameter("sun_horizon_glow", 0.9)
+	sky_mat.set_shader_parameter("sun_horizon_height", 0.15)
+	sky_mat.set_shader_parameter("cloud_lit", Color(0.66, 0.46, 0.44))
+	sky_mat.set_shader_parameter("cloud_shade", Color(0.11, 0.13, 0.24))
+	sky_mat.set_shader_parameter("cloud_coverage", 0.34)
+	sky_mat.set_shader_parameter("cloud_opacity", 0.75)
+	sky_mat.set_shader_parameter("cloud_scale", 1.6)
+	sky_mat.set_shader_parameter("cloud_seed", 12.4)
 	sky.sky_material = sky_mat
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_sky_contribution = 0.55
-	env.ambient_light_color = Color(0.85, 0.92, 1.0)
+	env.ambient_light_sky_contribution = 0.6
+	env.ambient_light_color = Color(0.30, 0.36, 0.56)
+	env.ambient_light_energy = 0.8
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
+	env.tonemap_exposure = 1.05
 	env.glow_enabled = true
-	env.glow_intensity = 0.22
-	env.glow_bloom = 0.10
+	env.glow_intensity = 0.55
+	env.glow_bloom = 0.08
+	env.glow_hdr_threshold = 1.0
+	env.fog_enabled = true
+	env.fog_mode = Environment.FOG_MODE_DEPTH
+	env.fog_light_color = DUSK_HAZE
+	env.fog_light_energy = 0.8
+	env.fog_sun_scatter = 0.25
+	env.fog_density = 1.0
+	env.fog_depth_begin = 160.0
+	env.fog_depth_end = 4800.0
+	env.fog_depth_curve = 1.6
+	env.fog_sky_affect = 0.05
+	env.fog_aerial_perspective = 0.3
 	env_node.environment = env
 	level_scene.add_child(env_node)
 
 	var sun := DirectionalLight3D.new()
 	sun.name = "SunLight"
-	sun.rotation_degrees = Vector3(-42.0, 38.0, 0.0)
-	sun.light_color = Color(1.0, 0.96, 0.91)
-	sun.light_energy = 1.35
+	# Low in the south-south-west, the light running north-north-east up the valley.
+	sun.rotation_degrees = Vector3(-4.5, -20.0, 0.0)
+	sun.light_color = Color(1.0, 0.60, 0.34)
+	sun.light_energy = 0.5
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 550.0
 	sun.directional_shadow_split_1 = 0.10
@@ -541,7 +627,7 @@ func _ready() -> void:
 	grad_tex.fill_from = Vector2(0.5, 0.5)
 	grad_tex.fill_to = Vector2(0.5, 0.0)
 	fall_snow_mat.albedo_texture = grad_tex
-	fall_snow_mat.albedo_color = Color(0.96, 0.98, 1.0, 0.9)
+	fall_snow_mat.albedo_color = Color(0.60, 0.62, 0.74, 0.85)
 	snow_quad.material = fall_snow_mat
 	snow_particles.draw_pass_1 = snow_quad
 	level_scene.add_child(snow_particles)
@@ -676,7 +762,8 @@ func _ready() -> void:
 		Vector3(-23.0, 10.50, -50.0),  # high scenic viaduct apex
 		Vector3(3.0, 7.00, -100.0),    # off-ramp descent, safely east of the trunk
 	], 15.0, 15.0)
-	alt1_path.curve = alt1_curve
+	alt1_path.curve = _ai_route_curve(alt1_curve)
+	alt1_path.set_meta(&"ai_lane_ends", _ai_lane_ends(alt1_path.curve))
 	alt_container.add_child(alt1_path)
 
 	# --- DIVERGENCE 2: Glacier Gorge Service Cut (drops into the crevasse and climbs out) ---
@@ -687,7 +774,8 @@ func _ready() -> void:
 		Vector3(84.0, 2.60, -332.0),    # still down in the cut
 		Vector3(96.0, 6.50, -356.0),    # smooth ascending on-ramp
 	], 15.0, 15.0)
-	alt2_path.curve = alt2_curve
+	alt2_path.curve = _ai_route_curve(alt2_curve)
+	alt2_path.set_meta(&"ai_lane_ends", _ai_lane_ends(alt2_path.curve))
 	alt_container.add_child(alt2_path)
 
 	# --- DIVERGENCE 3: Twin Overpass Ridge Bypass (outer scenic viaduct) ---
@@ -697,7 +785,8 @@ func _ready() -> void:
 		Vector3(-112.0, 13.00, -100.0),# panoramic descent along the west flank
 		Vector3(-126.0, 9.20, -22.0),  # long descending grade
 	], 15.0, 15.0)
-	alt3_path.curve = alt3_curve
+	alt3_path.curve = _ai_route_curve(alt3_curve)
+	alt3_path.set_meta(&"ai_lane_ends", _ai_lane_ends(alt3_path.curve))
 	alt_container.add_child(alt3_path)
 
 	# A ramp centreline that strayed inside the trunk deck would collapse its own deck onto the
@@ -730,12 +819,22 @@ func _ready() -> void:
 	_build_highway_road_mesh(level_scene, curve, MAIN_WIDTH, "MainHighway", highway_mat, barrier_mat, girder_mat,
 			true, true, 0, 0.0, main_left_gaps, main_right_gaps)
 	_verify_barrier_gaps(alt1_curve, alt2_curve, alt3_curve, main_left_gaps, main_right_gaps)
-	# (junction guidance decals were removed - the gantry signs mark the splits)
+	# (no junction guidance decals or signs: the user didn't want the sign gantries, which also caught bots)
 
 	# 7. Ramp decks (tiled against the trunk shoulder, gore barrier only where they separate)
 	_build_highway_road_mesh(level_scene, alt1_curve, RAMP_WIDTH, "ExpressFlyoverRoad", highway_mat, barrier_mat, girder_mat, true, true, 1, MAIN_HALF_W)
 	_build_highway_road_mesh(level_scene, alt2_curve, RAMP_WIDTH, "GorgeServiceRoad", highway_mat, barrier_mat, girder_mat, true, false, 1, MAIN_HALF_W)
 	_build_highway_road_mesh(level_scene, alt3_curve, RAMP_WIDTH, "RidgeBypassRoad", highway_mat, barrier_mat, girder_mat, true, true, -1, MAIN_HALF_W)
+
+	# 7b. The highway carrying on south down the valley (FAR_SOUTH), closed off where it leaves the lap's hairpin. Its own
+	# copy of the road material, with no clear zone at its start (the lap's is the start/finish line's).
+	var far_curve := _open_curve(FAR_SOUTH)
+	_far_curve = far_curve
+	var far_mat: ShaderMaterial = highway_mat.duplicate()
+	far_mat.set_shader_parameter("clear_zone", 0.0)
+	far_mat.set_shader_parameter("circuit_length", 0.0)
+	_build_highway_road_mesh(level_scene, far_curve, MAIN_WIDTH, "FarHighwaySouth", far_mat, barrier_mat, girder_mat, true, false)
+	_build_closure(level_scene, far_curve, barrier_mat)
 
 	# 8. Build the Tunnel Underpass System (Z = -180m to Z = -240m, X = 0m, Y = 2.8m, Length = 60m)
 	_build_tunnel_underpass(level_scene, Vector3(0, 2.8, -210.0), 60.0, 18.5, barrier_mat, girder_mat)
@@ -745,6 +844,7 @@ func _ready() -> void:
 	ROAD_CURVES.append(alt1_curve)
 	ROAD_CURVES.append(alt2_curve)
 	ROAD_CURVES.append(alt3_curve)
+	ROAD_CURVES.append(far_curve)
 	_build_road_index()
 	var terrain_container := Node3D.new()
 	terrain_container.name = "TerrainEnvironment"
@@ -855,8 +955,10 @@ func _ready() -> void:
 			# Gorge Service Cut Booster (Divergence 2)
 			["Boost_Gorge_Launch", Vector3(74.2, 2.15, -319.4), -40.0],
 			# High Overpass Viaduct Boosters (Section 5 Crossing)
-			["Boost_Overpass_L", Vector3(5.0, 16.5, -178.0), -90.0],
-			["Boost_Overpass_R", Vector3(5.0, 16.5, -182.0), -90.0],
+			# At the start of the straight (x 120), so the boost is spent before the west bend and the Ridge Bypass's split:
+			# at x 5 bots reached the split at 45 m/s and went off into the gore.
+			["Boost_Overpass_L", Vector3(120.0, 16.5, -178.0), -90.0],
+			["Boost_Overpass_R", Vector3(120.0, 16.5, -182.0), -90.0],
 			# West Ridge Descent Booster
 			["Boost_RidgeDescent", Vector3(-165.3, 8.3, 0.5), -165.0],
 			# Scenic Bypass Viaduct Booster
@@ -901,8 +1003,8 @@ func _ready() -> void:
 	var props_container := Node3D.new()
 	props_container.name = "HighwayProps"
 	level_scene.add_child(props_container)
-	_build_highway_gantries(props_container)
 	_build_highway_streetlights(props_container, curve, main_left_gaps, main_right_gaps)
+	_build_highway_streetlights(props_container, far_curve, [], [], FAR_LIT_REACH, "FarStreetlight")
 	_build_jumbotron(props_container)
 
 	# 15. Setup Checkpoints & Level wiring
@@ -1052,14 +1154,19 @@ func _build_highway_road_mesh(parent: Node, curve: Curve3D, width: float, node_n
 			# the trunk, and it moved those decks bodily out from under their own piers.
 			var seam: float = clampf((absf(lat_here) - (main_half_w + half_w)) / 6.0, 0.0, 1.0)
 			y_bias = clampf(frame_info["pos"].y - p.y, -0.35, 0.35) * (1.0 - seam)
-			# Gore-side barrier only comes up once the ramp deck has opened the same clearance
-			# the trunk barrier uses to close (GORE_CLEARANCE). Tying the two together is what
-			# keeps the whole junction barrier-free: raise the ramp's gore barrier any earlier and
-			# it stands in the middle of the gore, cutting the crossing window down to a few
-			# metres even though the trunk looks open.
-			var gore_h: float = clampf((ext.x - main_half_w - GORE_CLEARANCE) / 3.0, 0.0, 1.0)
+			# The gore-side barrier rises as soon as the ramp's deck has left the trunk's, and the outboard one stays up
+			# until the ramp's deck is all but gone. Rising over GORE_CLEARANCE + 3m and falling from 3.5m wide, they left a
+			# slot between the decks (16m deep under the Ridge Bypass's split) and a pocket past the Express Flyover's
+			# merge, beside the tunnel's portal, that bots fell into or wedged in.
+			var gore_h: float = clampf((ext.x - main_half_w - GORE_CLOSE) / 0.8, 0.0, 1.0)
 			var outer_w: float = ext.y - ext.x
-			var outer_h: float = clampf((outer_w - 1.3) / 2.2, 0.0, 1.0)
+			# Up a little before the trunk's barrier opens (GAP_OUTER_MIN), so one of them always stands; at a merge down to
+			# where the ramp has all but met the trunk's edge (GAP_MERGE_MIN).
+			var outer_h: float
+			if cum < total_len * 0.5:
+				outer_h = clampf((outer_w - (GAP_OUTER_MIN - 0.6)) / 0.3, 0.0, 1.0)
+			else:
+				outer_h = clampf((outer_w - 0.02) / 0.1, 0.0, 1.0)
 			if side > 0:
 				b_l = gore_h
 				b_r = outer_h
@@ -1262,7 +1369,9 @@ func _build_highway_road_mesh(parent: Node, curve: Curve3D, width: float, node_n
 
 	# --- Pass 6: viaduct piers --------------------------------------------------------
 	var pier_root := Node3D.new()
-	pier_root.name = node_name + "_Pylons"
+	# No "road" or "pier" in these names: PlayerCart counts a body under such a name as track, and the AI's obstacle
+	# and line checks skip track, so bots on the valley floor planned their way back straight through the columns.
+	pier_root.name = node_name.replace("Road", "") + "_Pylons"
 	parent.add_child(pier_root)
 	if has_piers:
 		var last_pier_dist: float = -100.0
@@ -1339,15 +1448,43 @@ func _build_highway_road_mesh(parent: Node, curve: Curve3D, width: float, node_n
 	col_shape.shape = _save_baked_resource(r_trimesh, "%s_deck_collision" % node_name)
 	static_body.add_child(col_shape)
 
-	var col_barrier := CollisionShape3D.new()
-	col_barrier.name = "BarrierCollision"
-	var b_trimesh: Shape3D = barrier_mesh.create_trimesh_shape()
-	if b_trimesh is ConcavePolygonShape3D:
-		(b_trimesh as ConcavePolygonShape3D).backface_collision = true
-	col_barrier.shape = _save_baked_resource(b_trimesh, "%s_barrier_collision" % node_name)
-	static_body.add_child(col_barrier)
-
 	parent.add_child(static_body)
+
+	# The barriers' collision: an upright wall PARAPET_H high just behind each barrier's road-side toe, in a body of its
+	# own that isn't track. As the Jersey profile's own trimesh it was part of the road body: a cart's sphere rode up
+	# the sloped face and over it (most of the falls off the viaducts), and the AI's line and step checks skip track,
+	# so bots planning a way back drove straight into the barriers.
+	var walls := PackedVector3Array()
+	for wside in [-1, 1]:
+		for i in range(n_rings - 1):
+			var f0: float = bar_left[i] if wside < 0 else bar_right[i]
+			var f1: float = bar_left[i + 1] if wside < 0 else bar_right[i + 1]
+			if f0 < 0.15 or f1 < 0.15:
+				continue
+			var q: Array = []
+			for j in [i, i + 1]:
+				var pj: Vector3 = ring_pos[j] + Vector3.UP * ring_y_bias[j]
+				var fr: Vector3 = ring_frame[j]
+				var lat: float = (deck_left[j] + PARAPET_INSET) if wside < 0 else (deck_right[j] - PARAPET_INSET)
+				var base: Vector3 = pj + fr * (lat - ring_lat[j])
+				# Full height to its end (a blunt end, as a crash cushion): following the barrier's terminal taper, the
+				# wall's sloping top was a ramp up and over into the gore.
+				q.append(base + Vector3.DOWN * 0.3)
+				q.append(base + Vector3.UP * PARAPET_H)
+			for v in [q[0], q[2], q[1], q[1], q[2], q[3]]:
+				walls.append(v)
+	if walls.size() > 0:
+		var wall_body := StaticBody3D.new()
+		wall_body.name = node_name.replace("Road", "") + "_Parapets"
+		wall_body.set_meta(&"surface", "asphalt")
+		var wall_shape := ConcavePolygonShape3D.new()
+		wall_shape.backface_collision = true
+		wall_shape.set_faces(walls)
+		var wall_col := CollisionShape3D.new()
+		wall_col.name = "ParapetCollision"
+		wall_col.shape = _save_baked_resource(wall_shape, "%s_parapet_collision" % node_name)
+		wall_body.add_child(wall_col)
+		parent.add_child(wall_body)
 
 
 ## True when `dist` metres along a curve falls inside one of the [start, end] intervals.
@@ -1392,7 +1529,7 @@ func _emit_barrier_cap(st: SurfaceTool, first_index: int, profile: PackedVector3
 ## Builds a heavy concrete viaduct bent with crosshead beam and dual cylindrical columns.
 func _build_viaduct_pier(parent: Node, pos: Vector3, fwd: Vector3, right: Vector3, half_w: float, height: float, mat: Material) -> void:
 	var pier := StaticBody3D.new()
-	pier.name = "Pier_%d_%d" % [int(pos.x), int(pos.z)]
+	pier.name = "Column_%d_%d" % [int(pos.x), int(pos.z)]
 	pier.position = pos
 
 	var rot_y := rad_to_deg(atan2(-fwd.x, -fwd.z))
@@ -1816,22 +1953,22 @@ func _alpine_height(px: float, pz: float) -> float:
 	# The valley axis meanders gently north-south.
 	var axis_x: float = 10.0 + sin(pz * 0.0042) * 42.0
 	var dx: float = absf(px - axis_x)
-	var flank: float = maxf(smoothstep(120.0, 380.0, dx), smoothstep(320.0, 640.0, dx) * 0.0)
-	# North closes in behind the basin; the south stays open around start/finish.
+	# South of the lap the valley widens and runs on out of the map toward the lowlands, the highway carrying on down it
+	# (regenerate_glacier_dressing.gd's country continues it past the heightfield's edge). It used to close in a wall of
+	# mountains all round.
+	var open_s: float = smoothstep(VALLEY_OPEN_Z.x, VALLEY_OPEN_Z.y, pz)
+	var flank: float = smoothstep(120.0 + open_s * 140.0, 380.0 + open_s * 260.0, dx)
+	# North closes in behind the basin.
 	var north: float = smoothstep(340.0, 640.0, -(pz + 20.0))
-	var south: float = smoothstep(430.0, 720.0, pz + 20.0)
-	var mask: float = maxf(maxf(flank, north), south)
+	var mask: float = maxf(flank, north)
 
 	# Ridged multifractal: sharp crests and rounded gullies instead of lumpy blobs.
 	var ridge: float = clampf(_ridge_noise.get_noise_2d(px, pz) * 0.5 + 0.5, 0.0, 1.0)
 	var h_mountains: float = mask * 18.0 + pow(mask, 2.2) * 128.0 + mask * 42.0 * ridge
 	h += h_mountains
 
-	# The heightfield has to end somewhere, so the last stretch before the footprint edge
-	# climbs hard enough to close the horizon. Without this the flat cut edge of the mesh is
-	# visible from any elevated camera as a straight line against the sky.
-	var edge_r: float = maxf(absf(px - ALPINE_TERRAIN_CENTER.x), absf(pz - ALPINE_TERRAIN_CENTER.y)) / (ALPINE_TERRAIN_SIZE * 0.5)
-	h += smoothstep(0.84, 1.0, edge_r) * 95.0
+	# No wall at the heightfield's edge any more: the country round it (regenerate_glacier_dressing.gd) carries this same
+	# ground on from the edge.
 	return h
 
 ## Cuts the Gorge Cut's crevasse: a raised ice rim with a trough dropped well below the
@@ -1846,7 +1983,10 @@ func _apply_crevasse(h: float, px: float, pz: float, gorge_curve: Curve3D) -> fl
 	var d: float = Vector2(px - c.x, pz - c.z).length()
 	if d > 120.0:
 		return h
-	var depth: float = 1.8 + 6.2 * smoothstep(10.0, 48.0, off)
+	# The floor beside the road comes up to just under it: the cut is a cutting between ice walls. Dug 1.8-8m under the
+	# road it was a pit the road bridged, and bots that left the road there drove round in it for minutes; on the road's
+	# shelf (0.8m under the deck) a cart beside the deck slid in under it, jammed and was pushed out through the ground.
+	var depth: float = DECK_FILL_UNDER + 0.08
 	# Raise an ice rim either side of the cut, then drop the trough under the service road.
 	var rim: float = smoothstep(30.0, 95.0, d) * 9.0
 	var with_rim: float = h + rim
@@ -1865,6 +2005,93 @@ func _girder_depth(deck_y: float) -> float:
 func _shelf_y(deck_y: float) -> float:
 	return deck_y - 0.12 - _girder_depth(deck_y)
 
+## The bots' path over a ramp (its AlternativePath). The ramps leave and join the trunk along its edge and their decks
+## widen only as they pull away, so a bot on the ramp's own centreline ran off the paving (and over the Ridge Bypass's
+## split, 16m down). This path is the ramp's centreline wherever that lies AI_ROUTE_EDGE inside the paving: in the
+## trunk's outer lane until the trunk's barrier opens beside the ramp, then AI_ROUTE_EDGE inside the ramp's widening
+## outer edge until the centreline is. (Kept RAMP_HALF_W inside that edge it moved out at twice the ramp's rate, and
+## bots met a 70 degree turn at the Gorge Cut's split, braked and slid back onto the trunk.)
+func _ai_route_curve(rc: Curve3D) -> Curve3D:
+	var length: float = rc.get_baked_length()
+	var pts: Array = []
+	var s := 0.0
+	while true:
+		var p: Vector3 = rc.sample_baked(minf(s, length))
+		var fi: Dictionary = _trunk_frame_at(main_track_curve, p)
+		var lat: float = fi["lat"]
+		if absf(lat) < MAIN_HALF_W + RAMP_HALF_W and absf(p.y - (fi["pos"] as Vector3).y) < 2.0:
+			var ext: Vector2 = _ramp_deck_extents(lat, RAMP_HALF_W, MAIN_HALF_W)
+			var open: bool = ext.y - MAIN_HALF_W >= _gap_outer_min(s, length)
+			var cap: float = (ext.y - AI_ROUTE_EDGE) if open else (MAIN_HALF_W - AI_ROUTE_EDGE)
+			var want: float = signf(lat) * minf(absf(lat), cap)
+			p += (fi["right"] as Vector3) * (want - lat)
+		pts.append(p)
+		if s >= length:
+			break
+		s = minf(s + 4.0, length)
+	return _open_curve(pts)
+
+## How many metres at each end of a bots' ramp path lie alongside the trunk (until the ramp's deck is clear of it, 2m
+## to spare): PlayerCart holds a bot to the path's line there (meta `ai_lane_ends`).
+func _ai_lane_ends(c: Curve3D) -> Vector2:
+	var length: float = c.get_baked_length()
+	var first := -1.0
+	var last := -1.0
+	var s := 0.0
+	while s <= length:
+		var p: Vector3 = c.sample_baked(s)
+		var fi: Dictionary = _trunk_frame_at(main_track_curve, p)
+		var clear: bool = absf(fi["lat"]) >= MAIN_HALF_W + RAMP_HALF_W + 2.0 or absf(p.y - (fi["pos"] as Vector3).y) >= 2.0
+		if clear:
+			if first < 0.0:
+				first = s
+			last = s
+		s += 2.0
+	if first < 0.0:
+		return Vector2.ZERO
+	print("  bots held to the line over a ramp path's first %.0fm and last %.0fm" % [first, length - last])
+	return Vector2(first, length - last)
+
+## An open curve through `pts` with Catmull-Rom handles (the ends' handles along their first and last chords).
+func _open_curve(pts: Array) -> Curve3D:
+	var c := Curve3D.new()
+	c.bake_interval = 2.0
+	var n := pts.size()
+	for i in range(n):
+		var p: Vector3 = pts[i]
+		var prev: Vector3 = pts[maxi(i - 1, 0)]
+		var nxt: Vector3 = pts[mini(i + 1, n - 1)]
+		var t: Vector3 = (nxt - prev) / 6.0
+		if i == 0 or i == n - 1:
+			t = (nxt - prev) / 3.0
+		c.add_point(p, -t, t)
+	return c
+
+
+## The far highway's closure where it leaves the lap's hairpin: a row of concrete barriers across its start, solid.
+func _build_closure(parent: Node, curve: Curve3D, mat: Material) -> void:
+	var p0: Vector3 = curve.sample_baked(3.0)
+	var fwd: Vector3 = (curve.sample_baked(6.0) - p0).normalized()
+	var right := Vector3(-fwd.z, 0.0, fwd.x).normalized()
+	var body := StaticBody3D.new()
+	body.name = "FarHighwayClosure"
+	body.transform = Transform3D(Basis(right, Vector3.UP, -Vector3(fwd.x, 0.0, fwd.z).normalized()), p0)
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(MAIN_WIDTH, 0.85, 0.6)
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.material_override = mat
+	mi.position = Vector3(0, 0.42, 0)
+	body.add_child(mi)
+	var cs := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(MAIN_WIDTH, PARAPET_H, 0.6)
+	cs.shape = shape
+	cs.position = Vector3(0, PARAPET_H * 0.5, 0)
+	body.add_child(cs)
+	parent.add_child(body)
+
+
 ## Builds a horizontal index of every carriageway sample.
 ##
 ## Corridor shaping has to work on *horizontal* distance, not Curve3D.get_closest_offset(): the
@@ -1873,16 +2100,30 @@ func _shelf_y(deck_y: float) -> float:
 func _build_road_index() -> void:
 	_road_xz = PackedVector2Array()
 	_road_y = PackedFloat32Array()
+	_road_hw = PackedFloat32Array()
+	_road_id = PackedInt32Array()
 	_road_cells.clear()
-	for road in ROAD_CURVES:
+	for ri in ROAD_CURVES.size():
+		var road: Curve3D = ROAD_CURVES[ri]
 		var rc: Curve3D = road
+		var is_ramp: bool = not (rc == main_track_curve or rc == _far_curve)
+		var hw: float = RAMP_WIDTH * 0.5 if is_ramp else MAIN_HALF_W
 		var length: float = rc.get_baked_length()
 		var steps: int = int(length / 2.0)
 		for i in range(steps + 1):
 			var p: Vector3 = rc.sample_baked(minf(float(i) * 2.0, length))
 			var idx: int = _road_xz.size()
 			_road_xz.append(Vector2(p.x, p.z))
-			_road_y.append(p.y)
+			# A ramp's deck is laid at the trunk's height where it tiles against it (up to 0.35m off its own curve: see
+			# y_bias in _build_highway_road_mesh); the ground under it is graded to the deck, not the curve.
+			var deck_y: float = p.y
+			if is_ramp:
+				var fi: Dictionary = _trunk_frame_at(main_track_curve, p)
+				var seam: float = clampf((absf(fi["lat"]) - (MAIN_HALF_W + RAMP_HALF_W)) / 6.0, 0.0, 1.0)
+				deck_y += clampf((fi["pos"] as Vector3).y - p.y, -0.35, 0.35) * (1.0 - seam)
+			_road_y.append(deck_y)
+			_road_hw.append(hw)
+			_road_id.append(ri)
 			var key: int = _road_cell_key(int(floor(p.x / ROAD_CELL)), int(floor(p.z / ROAD_CELL)))
 			var bucket: PackedInt32Array = _road_cells.get(key, PackedInt32Array())
 			bucket.append(idx)
@@ -1906,6 +2147,8 @@ func _apply_road_corridors(h: float, px: float, pz: float) -> float:
 	var shelf: float = h
 	var weight: float = -1.0
 	var ceiling: float = 1e9
+	# Per carriageway, its nearest at-grade sample within its deck and verge: [distance, height].
+	var fill_near := {}
 	for gz in range(cz - 1, cz + 2):
 		for gx in range(cx - 1, cx + 2):
 			var bucket: PackedInt32Array = _road_cells.get(_road_cell_key(gx, gz), PackedInt32Array())
@@ -1923,6 +2166,11 @@ func _apply_road_corridors(h: float, px: float, pz: float) -> float:
 					if d < 14.0:
 						ceiling = minf(ceiling, s_shelf)
 					continue
+				if d < _road_hw[s] + DECK_FILL_OUT:
+					var rid: int = _road_id[s]
+					var prev: Vector2 = fill_near.get(rid, Vector2(1e9, 0.0))
+					if d < prev.x:
+						fill_near[rid] = Vector2(d, road_y)
 				var t: float = 1.0 - smoothstep(13.0, ROAD_CORRIDOR_RADIUS, d)
 				t = t * t * (3.0 - 2.0 * t)
 				if t > 0.0 and (t > weight or (is_equal_approx(t, weight) and s_shelf < shelf)):
@@ -1930,6 +2178,15 @@ func _apply_road_corridors(h: float, px: float, pz: float) -> float:
 					shelf = s_shelf
 	if weight > 0.0:
 		h = lerpf(h, shelf, weight)
+	# Under an at-grade deck and its verge the ground comes up to DECK_FILL_UNDER under the road there (the lowest road
+	# wins where two meet): on the shelf, 0.73m under the deck's thin collision, a cart beside the deck slid in under it
+	# and jammed, and in the Gorge Cut was pushed out through the ground. Each road's nearest sample: the lowest sample
+	# in reach sat several metres down a sloping ramp.
+	if not fill_near.is_empty():
+		var fill_cap: float = 1e9
+		for rid in fill_near:
+			fill_cap = minf(fill_cap, (fill_near[rid] as Vector2).y - DECK_FILL_UNDER)
+		h = maxf(h, fill_cap)
 	return minf(h, ceiling)
 
 ## Heightfield -> smooth-shaded ArrayMesh with world-space UVs for triplanar mapping.
@@ -2133,6 +2390,7 @@ func _alpine_material() -> ShaderMaterial:
 			mat.set_shader_parameter("rock_normal", rock_n)
 		mat.set_shader_parameter("rock_tint", Color(1.45, 1.48, 1.58))
 		mat.set_shader_parameter("snow_color", Color(0.78, 0.825, 0.90))
+		mat.set_shader_parameter("horizon_color", DUSK_HAZE)
 	return mat
 
 ## Writes a generated mesh/shape to res://generated/ and returns the loaded resource, so the
@@ -2254,117 +2512,24 @@ func _build_jumbotron(parent: Node) -> void:
 
 	parent.add_child(screen)
 
-## Builds highway overhead gantry signs spanning across the 4-lane concrete highway.
-func _build_highway_gantries(parent: Node) -> void:
-	var gantry_defs = [
-		[Vector3(-85.0, 2.8, 220.0), 0.0, "GLACIER HIGHWAY GP • SPEED LIMIT: NONE"],
-		[Vector3(-83.5, 2.8, 85.0), 0.0, "RIGHT LANE: EXPRESS FLYOVER ↗ • ELEVATED BYPASS"],
-		[Vector3(0.0, 2.8, -173.0), 0.0, "TUNNEL APPROACH • CLEARANCE 6.0M • LOW BEAM LIGHTS"],
-		[Vector3(0.0, 2.8, -265.0), 0.0, "RIGHT LANE: GLACIER GORGE CUT ↘ • CANYON RUN"],
-		[Vector3(0.0, 16.5, -180.0), -90.0, "GLACIER OVERPASS VIADUCT • HIGH SUMMIT CROSSING"],
-		[Vector3(-50.0, 16.5, -180.0), -90.0, "LEFT LANE: RIDGE BYPASS ↖ • SCENIC VIADUCT"]
-	]
-
-	var steel_mat := StandardMaterial3D.new()
-	steel_mat.albedo_color = Color(0.42, 0.45, 0.49)
-	steel_mat.metallic = 0.85
-	steel_mat.roughness = 0.35
-
-	for i in range(gantry_defs.size()):
-		var g_info = gantry_defs[i]
-		var g_pos: Vector3 = g_info[0]
-		var g_yaw: float = g_info[1]
-
-		var gantry := StaticBody3D.new()
-		gantry.name = "HighwayGantry_%d" % (i + 1)
-		gantry.position = g_pos
-		gantry.rotation_degrees = Vector3(0, g_yaw, 0)
-
-		# Horizontal Truss Span across road (width = 19m, clearance height = 6.2m)
-		var span := MeshInstance3D.new()
-		span.name = "TrussSpan"
-		var sm := BoxMesh.new()
-		sm.size = Vector3(19.0, 1.1, 1.2)
-		span.mesh = sm
-		span.material_override = steel_mat
-		span.position = Vector3(0, 6.2, 0)
-		gantry.add_child(span)
-
-		var span_col := CollisionShape3D.new()
-		span_col.name = "SpanCol"
-		var span_shape := BoxShape3D.new()
-		span_shape.size = sm.size
-		span_col.shape = span_shape
-		span_col.position = span.position
-		gantry.add_child(span_col)
-
-		# Left and Right Vertical Support Columns
-		for side in [-1.0, 1.0]:
-			var col := MeshInstance3D.new()
-			col.name = "Support_" + ("L" if side < 0 else "R")
-			var cm := CylinderMesh.new()
-			cm.top_radius = 0.40
-			cm.bottom_radius = 0.45
-			cm.height = 6.8
-			col.mesh = cm
-			col.material_override = steel_mat
-			col.position = Vector3(side * 9.2, 3.4, 0)
-			gantry.add_child(col)
-
-			var col_col := CollisionShape3D.new()
-			col_col.name = "SupportCol_" + ("L" if side < 0 else "R")
-			var col_shape := CylinderShape3D.new()
-			col_shape.radius = 0.45
-			col_shape.height = 6.8
-			col_col.shape = col_shape
-			col_col.position = col.position
-			gantry.add_child(col_col)
-
-		# Overhead Green Interstate Sign Board
-		var sign_board := MeshInstance3D.new()
-		sign_board.name = "SignBoard"
-		var sbm := BoxMesh.new()
-		sbm.size = Vector3(14.0, 1.8, 0.20)
-		sign_board.mesh = sbm
-		var sign_mat := StandardMaterial3D.new()
-		sign_mat.albedo_color = Color(0.04, 0.32, 0.16) # Interstate highway green
-		sign_mat.emission_enabled = true
-		sign_mat.emission = Color(0.08, 0.42, 0.22)
-		sign_mat.emission_energy_multiplier = 0.4
-		sign_board.material_override = sign_mat
-		sign_board.position = Vector3(0, 6.2, 0.65)
-		gantry.add_child(sign_board)
-
-		# Legend on the sign face. Sized to wrap inside the 14m x 1.8m board.
-		var sign_text := Label3D.new()
-		sign_text.name = "SignText"
-		sign_text.text = g_info[2]
-		sign_text.font_size = 96
-		sign_text.pixel_size = 0.0085
-		sign_text.width = 1650
-		sign_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		sign_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		sign_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		sign_text.modulate = Color(0.94, 0.96, 0.98)
-		sign_text.outline_size = 0
-		sign_text.no_depth_test = false
-		sign_text.double_sided = false
-		sign_text.position = Vector3(0, 6.2, 0.78)
-		gantry.add_child(sign_text)
-
-		parent.add_child(gantry)
-
-
-## Builds highway streetlights along the outer barrier edges with illuminating spotlights.
-func _build_highway_streetlights(parent: Node, curve: Curve3D, left_gaps: Array = [], right_gaps: Array = []) -> void:
+## Streetlights along `curve`, alternating sides every step: a pole on the barrier, an arm, a glowing head and a spot
+## light down onto the road; past `lit_reach` metres along the curve the heads only glow (the far highway's).
+func _build_highway_streetlights(parent: Node, curve: Curve3D, left_gaps: Array = [], right_gaps: Array = [],
+		lit_reach := INF, name_prefix := "Streetlight") -> void:
 	var total_len := curve.get_baked_length()
-	var step_dist := 65.0
+	var step_dist := 42.0
 	var count := int(total_len / step_dist)
 
 	var pole_mat := StandardMaterial3D.new()
 	pole_mat.albedo_color = Color(0.65, 0.68, 0.72)
 	pole_mat.metallic = 0.75
 	pole_mat.roughness = 0.4
+	# The lamp's lens glows (HDR, so it blooms at dusk); one material for every head.
+	var lamp_mat := StandardMaterial3D.new()
+	lamp_mat.albedo_color = Color(0.20, 0.17, 0.12)
+	lamp_mat.emission_enabled = true
+	lamp_mat.emission = LAMP_COLOR
+	lamp_mat.emission_energy_multiplier = 7.0
 
 	for i in range(count):
 		var dist = i * step_dist
@@ -2395,7 +2560,7 @@ func _build_highway_streetlights(parent: Node, curve: Curve3D, left_gaps: Array 
 		var pole_pos = p + right * (side * 7.9)
 
 		var light_node := StaticBody3D.new()
-		light_node.name = "Streetlight_%d" % i
+		light_node.name = "%s_%d" % [name_prefix, i]
 		light_node.position = pole_pos
 
 		var rot_y := rad_to_deg(atan2(-fwd.x, -fwd.z))
@@ -2439,10 +2604,7 @@ func _build_highway_streetlights(parent: Node, curve: Curve3D, left_gaps: Array 
 		var hm := BoxMesh.new()
 		hm.size = Vector3(0.9, 0.2, 0.4)
 		head.mesh = hm
-		var head_mat := StandardMaterial3D.new()
-		head_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		head_mat.albedo_color = Color(0.92, 0.96, 1.0)
-		head.material_override = head_mat
+		head.material_override = lamp_mat
 		head.position = Vector3(2.8, pole_base + 8.4, 0)
 		light_node.add_child(head)
 
@@ -2451,12 +2613,17 @@ func _build_highway_streetlights(parent: Node, curve: Curve3D, left_gaps: Array 
 		spot.name = "Spot"
 		spot.position = Vector3(2.8, pole_base + 8.3, 0)
 		spot.rotation_degrees = Vector3(-90, 0, 0)
-		spot.light_color = Color(0.88, 0.94, 1.0) # Cool winter LED
-		spot.light_energy = 1.6
-		spot.spot_range = 22.0
-		spot.spot_angle = 50.0
+		spot.light_color = LAMP_COLOR
+		spot.light_energy = 9.0
+		spot.spot_range = 30.0
+		spot.spot_angle = 58.0
 		spot.spot_attenuation = 1.1
-		light_node.add_child(spot)
+		# Unshadowed (MusicManager's shadow settings skip it): forty shadowed spots would cost several ms.
+		spot.set_meta(&"no_shadow", true)
+		if dist <= lit_reach:
+			light_node.add_child(spot)
+		else:
+			spot.free()
 
 		parent.add_child(light_node)
 

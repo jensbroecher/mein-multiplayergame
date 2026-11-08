@@ -41,6 +41,8 @@ outside a game), "Leaked instance dependency", and RID/ObjectDB leak messages.
 the others re-bakes it (see Lakeside Meadows below).
 `FrostpeakCreekLevel.tscn` is dressed by `regenerate_frostpeak_dressing.gd`: run it after `regenerate_frostpeak_creek.gd`
 (see Frostpeak Creek below).
+`GlacierHighwayLevel.tscn` is dressed by `regenerate_glacier_dressing.gd`: run it after `regenerate_glacier_highway.gd`
+(see Glacier Highway below).
 
 ## Lakeside Meadows (Bloombay GP, stage 1)
 
@@ -731,6 +733,62 @@ The menus call it Arco del Viento (it was Canyon Drift / CANYON COURSE); files a
 - Trunk control-point handles are made collinear after the curve is built, except at the jump lips and
   landings. A non-collinear pair is a corner in the road, and the road ribbon folds on its inside.
 
+## Glacier Highway (Svartfjell GP, stage 2)
+
+- `regenerate_glacier_highway.gd` (`regenerate_glacier_highway.tscn`, headless, about 20s) builds
+  `levels/GlacierHighwayLevel.tscn` from scratch: the trunk (a closed figure of eight at 2.8m and 16.5m, through the
+  tunnel and back over it on the high overpass), three ramps (the Express Flyover, the Gorge Cut down through the
+  crevasse, the Ridge Bypass), the valley heightfield and the tunnel's massif. `regenerate_glacier_dressing.gd`
+  (`regenerate_glacier_dressing.tscn`, headless, about 10s) dresses the saved level and must run after it.
+- Dusk (`DUSK_*`, `sky_tropical_cumulus.gdshader`): a deep blue overhead, a warm glow low on the sun's side (SSW, 4.5
+  degrees up), rose-grey clouds, blue snow in the shade and alpenglow on the peaks; the ambient and exposure are low
+  enough that the streetlights' pools read (`_build_highway_streetlights`: every 42m, an emissive head and a
+  SpotLight3D, `no_shadow`). A first pass at pinker, brighter values read as lavender. The sign gantries are gone (the
+  user didn't like them).
+- Barriers: the Jersey barriers are drawn; their collision is an upright wall `PARAPET_H` high, `PARAPET_INSET` in from
+  the deck's edge, in a body of its own (`<Road>_Parapets`, not track): as the profile's own trimesh it was a ramp the
+  cart's sphere rode up and over, and the AI's line checks skip track. Full height to their ends. Beside a ramp the
+  trunk's barrier opens only where the ramp's deck reaches `GAP_OUTER_MIN` past the trunk's edge
+  (`_junction_gap_intervals`), and the ramp's outer barrier rises just before that: the ramps leave and join along the
+  trunk's edge, and the Ridge Bypass's centreline hugged it for 20m with its deck centimetres wide there, the trunk
+  standing open over a 16m drop that bots cut straight across. `scratch/wall_ray_probe.gd` (`-s`, headless, `-- <level>
+  dir=x,z len= y= x,z ... [line=x0,z0,x1,z1,step]`) casts horizontal rays across a road and names the walls it meets.
+- The ground under an at-grade deck (`_apply_road_corridors`) lies `DECK_FILL_UNDER` (0.32m) under it, out to
+  `DECK_FILL_OUT` past its edges, graded to each road's nearest point (a ramp's at its deck's height: it is lifted up to
+  0.35m toward the trunk's where they tile). On the old shelf, 0.73m under the deck's thin collision (the cart's sphere
+  is 0.75m in radius), a cart beside a deck slid in under it and jammed (the finish straight, the tunnel's mouth); in
+  the Gorge Cut it was pushed out through the ground. The crevasse's floor is the same height under its road.
+  `scratch/ray_stack_probe.gd` (`-s`, headless, `-- <level> x,z ... [line=x0,z0,x1,z1,step]`) lists everything a vertical
+  ray meets, top to bottom (one body's surfaces count once: the trunk's overpass hides its deck under it).
+- The bots' paths over the ramps (`_ai_route_curve`, the AlternativePaths) are not the ramps' centrelines: in the
+  trunk's outer lane until the trunk's barrier opens beside the ramp, then `AI_ROUTE_EDGE` inside the ramp's widening
+  outer edge, then its centreline. Each carries `ai_lane_ends` (`_ai_lane_ends`: the metres at its start and end beside
+  the trunk), and PlayerCart holds a bot to the path's line there (`AI_LANE_ENDS_HOLD`). Kept half a ramp inside the
+  paving the path moved out at twice the ramp's rate, and bots met a 70 degree turn at the Gorge Cut's split, braked
+  and slid back onto the trunk. `scratch/alt_path_lateral.gd` (`-s`, headless, `-- <level> [step=4] [max=80]
+  [only=<name>]`) prints a level's shortcuts' lateral from the lap and height over it along their ends.
+- The valley opens to the south (`VALLEY_OPEN_Z` in `_alpine_height`) and a carriageway runs on down it, only to be
+  seen (`FAR_SOUTH`, `FarHighwaySouth`, lit as far as `FAR_LIT_REACH`): from the turnaround the highway reads as going
+  somewhere, not an oval. A barrier closes its near end (`FarHighwayClosure`).
+- The dressing (`GlacierDressing`, every run replaces it and deletes `generated/glacier_dress_*` first):
+  - The country (`_build_country`): rows of ground step out from the 1.1km heightfield's edge (the first on its edge's
+    own vertices) carrying the generator's `_alpine_height` (an instance of its script, not in the tree) on into far
+    ranges (`COUNTRY_BLEND`), the valley open down the far highway; drawn in the valley's ground out to `NEAR_D`, then
+    in `fjord_mountain.gdshader`; solid out to `SOLID_D`.
+  - The ground: `frostpeak_ground.gdshader` on the valley, the massif and the near country (its own ground map),
+    `snow_slope` 0.62 (the walls lie near 45 degrees: at Frostpeak's 0.7 whole hillsides came out mottled), and two
+    uniforms added for it whose defaults leave Frostpeak Creek as it was: `face_weight` (0 on the country, whose
+    triangles are tens of metres across and turned to rock one by one), `block_shade`/`fine_blocks` (smaller,
+    quieter rock blocks on the massif's faces over the overpass).
+  - The woods: SnowTreeKit's spruce and birch (about 3,400) on the lower slopes, off the roads and steep ground,
+    SnowWoodsDetail thinning them below Ultra, as on Frostpeak Creek.
+- PlayerCart respawns a bot off the course for `AI_OFF_COURSE_GIVE_UP` (15s) at its last checkpoint: one in the
+  Gorge Cut's old crevasse kept moving and so never counted as stuck.
+- AI races (`scratch/ai_race_test`, speed=2, `noitems=1`): 1-3 falls a race (round the Ridge Bypass's split and its
+  descent, 1340-1460m), flying laps 46-49s; before this work 10-16 a race (the finish straight under the deck, the
+  Ridge Bypass's split, the Gorge Cut's split and merge, the tunnel's mouth), 57-63s. `scratch/shortcut_probe ...
+  chance=1.0` sends every bot over every ramp.
+
 ## Curbs
 
 `curb_stripes.gdshader` draws the red/white kerb only where the curb mesh's vertex colour red channel is
@@ -808,7 +866,7 @@ the natural ground under each (`natural_height`, the ground before the road is g
   it (Canyon's Halfway1). Once the level has built its runtime collision, `_settle_on_ground()` stands
   the gate on the road under its centre and puts the feet on the ground.
   It also lowers a checkpoint (down to 4.6m) under anything more than 3m above the road, such as
-  Glacier Highway's sign gantries. Lower hits come from props' collision hulls reaching over the road.
+  a sign gantry. Lower hits come from props' collision hulls reaching over the road.
   The rays are nudged off the gate line because a ray straight down a terrain grid line can miss.
 - The feet's colliders are 2.5m walls. A cart that clips the top edge of a low block gets launched,
   because PlayerCart only smooths edges up to `STEP_SMOOTH_MAX_HEIGHT`.
@@ -2243,6 +2301,12 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   (18 m/s, boost or not), aiming 10-16m ahead, steering against sliding across the line (`AI_TIGHT_DAMP`; on
   the ice, aiming the nose alone swung bots 5m either side of the weave into the holes), and ignoring the
   layer-4 markers it's laid to clear. 40 of 55 bots had drowned there; now about 1 in 20.
+- A route's `ai_lane_ends` meta (Vector2: metres at its start and at its end) holds a bot to its line there
+  (`AI_LANE_ENDS_HOLD`, easing out over `AI_LANE_ENDS_EASE`), at full speed: Glacier Highway's ramps, whose ends share
+  the trunk's paving and leave it through a gap in its barrier. Switching onto a ramp, bots had kept their own lane
+  offset (up to 3.2m) and missed the gap.
+- A bot respawned while on a shortcut doesn't take that shortcut again for `AI_ROUTE_SHUN_MSEC` (60s, `_ai_route_shunned`):
+  re-rolling at every respawn, one fell off Glacier Highway's Ridge Bypass five times running.
 - A boost no longer skips braking for a sharp corner ("let the boost rip" only for bends under 1.6 times
   `react_corner`): a boosted bot met Glacier Highway's Ridge Bypass fork, 84 degrees, at 60 m/s.
 - `res://scratch/shortcut_probe.tscn -- <level> [seconds=180] [speed=2] [static=1] [chance=1.0] [trace=<name>]`
@@ -2252,8 +2316,7 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   -- <level> x,y,z ... [radius=3] [route=<path>:<s0>:<s1>[:half]]` lists what is solid at a spot, and what a
   ray down a route meets. `res://scratch/path_overlay_shots.tscn -- <level> <dir> name:x,y,z:tx,ty,tz[:fov]`
   renders a level with its lap (white), shortcuts (yellow) and other paths (cyan) drawn over it.
-- Still on the main laps (not shortcuts): Glacier Highway catches bots on a sign gantry's leg at the S-bend
-  near 470m and at 790-850m; Lakeside loses a few round its lakes, scattered.
+- Still on the main laps (not shortcuts): Lakeside loses a few round its lakes, scattered.
 
 ## Bots off the course
 

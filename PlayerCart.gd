@@ -628,6 +628,16 @@ var _ai_steep_hill_stuck_timer: float = 0.0
 var _ai_slope_rollback_timer: float = 0.0
 var _ai_offroad_anchor_pos: Vector3 = Vector3.ZERO
 var _ai_offroad_stuck_timer: float = 0.0
+## Seconds an AI cart has been off the course without getting back onto it, however much it moves: past
+## AI_OFF_COURSE_GIVE_UP it is respawned. Driving round and round in a pit (Glacier Highway's crevasse, under a
+## bridge), following ways back that never reached the road, a bot moved too much for the stuck and confined checks
+## and lost three minutes a lap.
+var _ai_off_course_time: float = 0.0
+## How far off its line a bot may drive at a route's shared ends (see `ai_lane_ends`), and over how many metres past
+## them that eases back to the usual 3.2m.
+const AI_LANE_ENDS_HOLD := 0.3
+const AI_LANE_ENDS_EASE := 15.0
+const AI_OFF_COURSE_GIVE_UP := 15.0
 var _ai_offroad_max_dist: float = 0.0
 var _ai_circle_yaw_accum: float = 0.0
 var _ai_circle_prev_yaw: float = 0.0
@@ -638,6 +648,10 @@ var alternative_paths: Array[Path3D] = []
 var active_path: Path3D = null
 var on_alternative_path: bool = false
 var alt_path_decisions: Dictionary = {} # Path3D -> bool
+## Shortcuts a bot fell off or got stuck on: Path3D -> Time.get_ticks_msec() until which it doesn't take them again
+## (AI_ROUTE_SHUN_MSEC). Re-rolling at every respawn, one bot fell off Glacier Highway's Ridge Bypass five times running.
+var _ai_route_shunned: Dictionary = {}
+const AI_ROUTE_SHUN_MSEC := 60000
 ## On a shortcut: the lap distance where it rejoins the lap (its end's nearest point), so the AI's route
 ## runs on along the lap past the shortcut's end (_ai_route_local).
 var _ai_rejoin_offset: float = 0.0
@@ -2249,6 +2263,16 @@ func _physics_process(delta):
 		# Detects when a car tries to climb up a slope and rolls back repeatedly (e.g. in a pond or ditch)
 		var is_on_corridor: bool = _is_car_on_track_corridor()
 		if not is_on_corridor:
+			_ai_off_course_time += delta
+			if _ai_off_course_time >= AI_OFF_COURSE_GIVE_UP:
+				print("AI Cart ", name, " off the course for ", AI_OFF_COURSE_GIVE_UP, "s without getting back. Respawning.")
+				_ai_off_course_time = 0.0
+				_ai_offroad_stuck_timer = 0.0
+				_ai_offroad_max_dist = 0.0
+				if multiplayer.multiplayer_peer != null and multiplayer.is_server():
+					respawn_rpc.rpc(last_checkpoint_transform)
+				else:
+					respawn()
 			if _ai_offroad_stuck_timer <= 0.001:
 				_ai_offroad_anchor_pos = global_position
 				_ai_offroad_max_dist = 0.0
@@ -2288,6 +2312,7 @@ func _physics_process(delta):
 					respawn()
 		else:
 			# Within the racing corridor: reset off-track timers
+			_ai_off_course_time = 0.0
 			_ai_offroad_stuck_timer = 0.0
 			_ai_offroad_max_dist = 0.0
 			_ai_slope_rollback_timer = maxf(0.0, _ai_slope_rollback_timer - delta * 0.5)
@@ -5171,6 +5196,8 @@ func _apply_respawn_pose() -> void:
 	last_splash_time = -999.0
 	was_on_ground = true
 	air_time = 0.0
+	if is_ai and on_alternative_path and active_path != null and active_path != track_path:
+		_ai_route_shunned[active_path] = Time.get_ticks_msec() + AI_ROUTE_SHUN_MSEC
 	on_alternative_path = false
 	_ai_pending_route = null
 	active_path = track_path
@@ -7053,6 +7080,8 @@ func _get_ai_input(delta: float) -> Vector2:
 				if not alt_path_decisions.has(alt_path):
 					# A route may lower the odds ("ai_chance_scale": Rheinufer's Gegenfahrbahn, against the traffic).
 					alt_path_decisions[alt_path] = randf() < ai_shortcut_chance * float(alt_path.get_meta(&"ai_chance_scale", 1.0))
+					if Time.get_ticks_msec() < int(_ai_route_shunned.get(alt_path, 0)):
+						alt_path_decisions[alt_path] = false
 					if alt_path_decisions[alt_path]:
 						_ai_pending_route = alt_path
 				if _ai_pending_route == alt_path and (dist < 12.0 or not ahead):
@@ -7105,6 +7134,17 @@ func _get_ai_input(delta: float) -> Vector2:
 		ai_lane_offset = clampf(ai_lane_offset, -0.55, 0.55)
 	elif _mountain_stage:
 		ai_lane_offset = clampf(ai_lane_offset, -0.75, 0.75)
+	# A route whose ends share the lap's paving (meta `ai_lane_ends`: the metres at its start and at its end, Glacier
+	# Highway's ramps) holds the bot to its line there, easing out over AI_LANE_ENDS_EASE: a bot switching onto a ramp
+	# with its own lane offset (up to 3.2m) missed the gap in the barrier where the ramp parts from the trunk.
+	var route_end_lim := INF
+	if on_alternative_path and active_path and active_path.has_meta(&"ai_lane_ends"):
+		var ends: Vector2 = active_path.get_meta(&"ai_lane_ends")
+		var rl: float = active_path.curve.get_baked_length()
+		if current_offset <= rl:
+			var inside: float = minf(current_offset - ends.x, rl - current_offset - ends.y)
+			route_end_lim = lerpf(AI_LANE_ENDS_HOLD, 3.2, clampf(inside / AI_LANE_ENDS_EASE, 0.0, 1.0))
+			ai_lane_offset = clampf(ai_lane_offset, -route_end_lim, route_end_lim)
 	
 	var turn_info: Dictionary = _ai_measure_upcoming_turn(current_offset, speed)
 	_ai_turn_offset = current_offset
@@ -7209,6 +7249,7 @@ func _get_ai_input(delta: float) -> Vector2:
 	var max_safe_span: float = 1.4 if _harbor_stage else (1.0 if _mountain_stage else 3.2)
 	if corner_factor > 0.35:
 		max_safe_span = minf(max_safe_span, 0.5 if _mountain_stage else 2.0)
+	max_safe_span = minf(max_safe_span, route_end_lim)
 	var actual_lane_offset = clampf(combined_offset, -max_safe_span, max_safe_span)
 	var on_course: bool = _is_car_on_track_corridor()
 

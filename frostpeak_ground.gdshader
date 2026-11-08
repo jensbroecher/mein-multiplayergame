@@ -36,6 +36,12 @@ uniform float rock_scale : hint_range(0.005, 2.0) = 0.16;
 uniform float snow_slope : hint_range(0.0, 1.0) = 0.70;
 // 0 at the Detail Level's Off: the fine pattern (litter specks, grit, crust ripples) is left out.
 uniform float fine_detail : hint_range(0.0, 1.0) = 1.0;
+// How far the triangle's own facing decides the snow (1: the steeper of it and the vertex normal, for a fine grid that
+// stands up in spikes; 0: the vertex normal alone, for coarse meshes whose triangles would turn to rock one by one).
+uniform float face_weight : hint_range(0.0, 1.0) = 1.0;
+// How much the rock's blocks differ in shade, and a second, finer set of blocks and cracks for rock seen up close.
+uniform float block_shade : hint_range(0.0, 1.0) = 0.3;
+uniform float fine_blocks : hint_range(0.0, 1.0) = 0.0;
 
 varying vec3 w_pos;
 varying vec3 w_nrm;
@@ -178,7 +184,7 @@ void fragment() {
 	// The steeper of the vertex normal and the triangle's own face: where the terrain's grid meets a road's
 	// side wall its triangles stand up in spikes that the averaged vertex normals call gentle.
 	vec3 fnrm = normalize(cross(dFdx(w_pos), dFdy(w_pos)));
-	float face_ny = abs(fnrm.y);
+	float face_ny = mix(n.y, abs(fnrm.y), face_weight);
 	float snow = smoothstep(snow_slope - 0.16, snow_slope + 0.10, min(n.y, face_ny) + breakup);
 
 	// --- Rock ------------------------------------------------------------------------------
@@ -203,7 +209,12 @@ void fragment() {
 		blocks = cl.z;
 		float crack = 1.0 - smoothstep(0.0, 0.05, cl.y - cl.x);
 		crack *= 0.4 + 0.6 * vnoise3(w_pos * 1.3);
-		rock *= (0.82 + blocks * 0.3) * (1.0 - crack * 0.32 * detail);
+		rock *= (0.82 + blocks * block_shade) * (1.0 - crack * 0.32 * detail);
+		if (fine_blocks > 0.0) {
+			vec3 cf = cells3(w_pos * vec3(1.15, 2.0, 1.15) + (vec3(vnoise3(w_pos * 1.7), vnoise3(w_pos * 1.7 + 3.3), 0.0) - 0.5) * 0.5);
+			float fcrack = 1.0 - smoothstep(0.0, 0.06, cf.y - cf.x);
+			rock *= mix(1.0, (0.88 + cf.z * 0.24) * (1.0 - fcrack * 0.3 * detail), fine_blocks);
+		}
 		// Blasted road cuttings show the drill holes' half pipes: grooves straight down the face every 0.8m,
 		// in broken lengths. Only near a road (the creek's ravine is natural rock).
 		float along = abs(fnrm.x) > abs(fnrm.z) ? w_pos.z : w_pos.x;
