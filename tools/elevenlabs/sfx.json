@@ -574,5 +574,61 @@
     "duration": 8.0,
     "loop": true,
     "influence": 0.6
+  },
+  {
+    "name": "garage_lift_motor",
+    "path": "sounds/garage/lift_motor_loop.wav",
+    "text": "An electro-hydraulic two-post car lift raising a car in a quiet showroom workshop: steady electric motor hum with a smooth hydraulic pump whine, constant, no starts or stops, no clicks, seamless loop",
+    "duration": 4.0,
+    "loop": true,
+    "influence": 0.6
+  },
+  {
+    "name": "garage_lift_lower",
+    "path": "sounds/garage/lift_lower_loop.wav",
+    "text": "A hydraulic car lift lowering slowly: a steady soft hiss of hydraulic fluid flowing back through a release valve with a faint low hum, constant, no starts or stops, no clicks, seamless loop",
+    "duration": 4.0,
+    "loop": true,
+    "influence": 0.6
+  },
+  {
+    "name": "garage_lift_top",
+    "path": "sounds/garage/lift_top.wav",
+    "text": "A car lift reaching full height: the electric motor stops and the carriages settle onto the steel safety locks with one heavy solid metallic clunk, short, dry workshop",
+    "duration": 1.5,
+    "loop": false,
+    "influence": 0.6
+  },
+  {
+    "name": "garage_lift_release",
+    "path": "sounds/garage/lift_release.wav",
+    "text": "Car lift safety locks releasing before lowering: a short pneumatic hiss and two steel latches clacking open together, dry workshop",
+    "duration": 1.2,
+    "loop": false,
+    "influence": 0.6
+  },
+  {
+    "name": "garage_lift_bottom",
+    "path": "sounds/garage/lift_bottom.wav",
+    "text": "Car lift arms settling down at the bottom: a soft heavy metallic thud as the arms come to rest, then the hydraulic hiss stops with a short sigh, dry workshop",
+    "duration": 1.4,
+    "loop": false,
+    "influence": 0.6
+  },
+  {
+    "name": "garage_lineup_on",
+    "path": "sounds/garage/lineup_on.wav",
+    "text": "A powerful showroom spotlight and an LED light strip powering on: a solid relay clunk at once, followed straight away by a clear rising electric hum and a soft bright sparkle that swells up and settles, satisfying, clean, no music, close and dry indoors",
+    "duration": 1.8,
+    "loop": false,
+    "influence": 0.7
+  },
+  {
+    "name": "garage_lineup_off",
+    "path": "sounds/garage/lineup_off.wav",
+    "text": "A powerful showroom spotlight and an LED light strip powering off: a solid relay clunk at once, followed straight away by a clear electric hum sinking in pitch and fading out, clean, no music, close and dry indoors",
+    "duration": 1.8,
+    "loop": false,
+    "influence": 0.7
   }
 ]

@@ -79,6 +79,19 @@ const RECORD_BOARD_Y := 2.05
 const RECORD_BOARD_STEP := 5.15
 const RECORD_ROW := 0.43
 const PEDESTAL_H := 1.2
+## A trophy's glass case on its column: the glass's radius and top over the column's top, the foot ring's top (the
+## case's floor), the cup's round dais's top.
+const CASE_R := 0.56
+const CASE_TOP := 1.17
+const CASE_FOOT := 0.06
+const CASE_DAIS := 0.09
+## The plaque on the column's front: a glass plate (size, thickness) leaning back RECLINE (radians) in a chrome clamp on
+## a steel ledge (its top PLAQUE_LEDGE over the floor, PLAQUE_LEDGE_W wide).
+const PLAQUE_SIZE := Vector2(0.86, 0.38)
+const PLAQUE_T := 0.012
+const PLAQUE_RECLINE := 0.2
+const PLAQUE_LEDGE := 0.56
+const PLAQUE_LEDGE_W := 0.72
 ## The entrance doors' opening in the entrance wall.
 const ENTRY_HALF := 1.6
 const ENTRY_H := 3.3
@@ -112,6 +125,25 @@ const BOB_SWAY := 0.009
 const BOB_RUN := 1.6
 const STEP_SOUNDS := ["res://sounds/garage/footstep_1.mp3", "res://sounds/garage/footstep_2.mp3"]
 const STEP_DB := -10.0
+## The lifts' and the line-up's sounds (sounds/garage/: tools/elevenlabs' garage_* jobs readied by
+## scratch/garage_sound_prep.py; the lock clack synthesised by scratch/garage_lock_click.py) and their levels in dB for
+## the files as prepared, each played in 3D at its bay (SOUND_UNIT): the power unit's hum while a lift rises and the
+## fluid's hiss through the valve while one lowers (loops, louder and a little higher with the carriage's speed, fading
+## over HUM_FADE), a safety lock clacking every LOCK_STEP of a carriage's rise, the locks releasing as one starts down, a
+## clunk at the top, a thud at the bottom; the plinth's lights switching on or off as a car joins or leaves the line-up.
+const GARAGE_SOUNDS := {
+	"motor": ["res://sounds/garage/lift_motor_loop.wav", -13.0],
+	"lower": ["res://sounds/garage/lift_lower_loop.wav", -15.0],
+	"lock": ["res://sounds/garage/lift_lock_click.wav", -15.0],
+	"top": ["res://sounds/garage/lift_top.wav", -8.0],
+	"release": ["res://sounds/garage/lift_release.wav", -9.0],
+	"bottom": ["res://sounds/garage/lift_bottom.wav", -8.0],
+	"lineup_on": ["res://sounds/garage/lineup_on.wav", -3.0],
+	"lineup_off": ["res://sounds/garage/lineup_off.wav", -4.0],
+}
+const SOUND_UNIT := 3.0
+const HUM_FADE := 0.15
+const LOCK_STEP := 0.13
 const MOUSE_LOOK := 0.0022
 const STICK_LOOK := 2.4
 const STICK_DEADZONE := 0.18
@@ -176,6 +208,7 @@ var _pad := false
 var _time := 0.0
 
 var _mats := {}
+var _sounds := {}
 var _font_bold: FontVariation
 var _font_title: FontVariation
 var _hud_count: Label
@@ -432,7 +465,7 @@ func _toggle_lineup(i: int) -> void:
 	if not CarCollection.set_in_lineup(idx, on):
 		_show_toast("%s is the only car left in the line-up" % car_name)
 		return
-	MusicManager.play_sfx(MusicManager.UI_CONFIRM_SOUND, 0.0, 1.0 if on else 0.82)
+	_play_at(bay["root"], Vector3(0.0, DAIS_H, 0.0), "lineup_on" if on else "lineup_off")
 	_show_toast(("%s joins the line-up" if on else "%s leaves the line-up") % car_name)
 	_show_lineup_state(i, true)
 	_refresh_count()
@@ -468,10 +501,92 @@ func _show_lineup_state(i: int, animate: bool) -> void:
 func _update_lifts(delta: float) -> void:
 	for bay in _bays:
 		var goal: float = 1.0 if bay["up"] else 0.0
-		if is_equal_approx(bay["lift"], goal):
+		var was: float = bay["lift"]
+		if not is_equal_approx(was, goal):
+			bay["lift"] = move_toward(was, goal, delta / LIFT_TIME)
+			_pose_lift(bay)
+		_lift_sounds(bay, was, delta)
+
+
+## A lift's sounds from how it moved this frame (`was`: its travel before), as GARAGE_SOUNDS says.
+func _lift_sounds(bay: Dictionary, was: float, delta: float) -> void:
+	var now: float = bay["lift"]
+	var dir: int = 0 if is_equal_approx(now, was) else (1 if now > was else -1)
+	var last: int = bay.get("dir", 0)
+	if dir == 0 and last == 0 and not bay.get("humming", false):
+		return
+	var root: Node3D = bay["root"]
+	var travel: float = (bay["carriage"] as Node3D).position.y - float(bay["car_y"]) - LIFT_REST
+	var at := Vector3(0.0, float(bay["car_y"]) + travel + LIFT_REST, 0.0)
+	if dir != last:
+		if dir > 0:
+			bay["lock_next"] = (floorf(travel / LOCK_STEP) + 1.0) * LOCK_STEP
+		elif dir < 0:
+			_play_at(root, at, "release")
+		bay["dir"] = dir
+	if dir > 0:
+		# The safety locks on the posts, a clack as the carriage passes each (none just under the top: the clunk).
+		var full: float = float(bay["contact"]) - PAD_TOP + LIFT_HEIGHT - LIFT_REST
+		while travel >= float(bay["lock_next"]):
+			if float(bay["lock_next"]) < full - LOCK_STEP * 0.4:
+				var side: float = 1.0 if bay.get("lock_side", false) else -1.0
+				bay["lock_side"] = side < 0.0
+				_play_at(root, Vector3(side * float(bay["post_x"]), at.y + CARRIAGE_H * 0.5, 0.0), "lock",
+						randf_range(-1.5, 0.5), randf_range(0.94, 1.06))
+			bay["lock_next"] = float(bay["lock_next"]) + LOCK_STEP
+	if dir != 0 and is_equal_approx(now, 1.0 if dir > 0 else 0.0):
+		_play_at(root, at, "top" if dir > 0 else "bottom")
+	# The hums: the running one louder and higher as the carriage speeds up (smoothstep's slope, 1.5 at its most).
+	var speed: float = 6.0 * now * (1.0 - now) / 1.5 if dir != 0 else 0.0
+	var any := false
+	for key in ["motor", "lower"]:
+		var on: bool = dir == (1 if key == "motor" else -1)
+		var gains: Dictionary = bay.get_or_add("hum_gain", {})
+		var gain: float = move_toward(gains.get(key, 0.0), lerpf(0.45, 1.0, speed) if on else 0.0, delta / HUM_FADE)
+		gains[key] = gain
+		var players: Dictionary = bay.get_or_add("hums", {})
+		var p: AudioStreamPlayer3D = players.get(key)
+		if gain <= 0.0:
+			if p and p.playing:
+				p.stop()
 			continue
-		bay["lift"] = move_toward(bay["lift"], goal, delta / LIFT_TIME)
-		_pose_lift(bay)
+		any = true
+		if p == null:
+			p = _sound_player(key)
+			p.position = Vector3(float(bay["post_x"]), DAIS_H + 0.3, 0.0)
+			root.add_child(p)
+			players[key] = p
+		if not p.playing:
+			p.play(randf() * p.stream.get_length())
+		p.volume_db = float(GARAGE_SOUNDS[key][1]) + linear_to_db(gain)
+		p.pitch_scale = lerpf(0.9, 1.04, speed) if key == "motor" else lerpf(0.95, 1.03, speed)
+	bay["humming"] = any
+
+
+## A 3D player for one of GARAGE_SOUNDS, at its level, not yet in the tree.
+func _sound_player(key: String) -> AudioStreamPlayer3D:
+	if not _sounds.has(key):
+		_sounds[key] = load(GARAGE_SOUNDS[key][0])
+	var p := AudioStreamPlayer3D.new()
+	p.stream = _sounds[key]
+	p.bus = &"SFX"
+	p.volume_db = GARAGE_SOUNDS[key][1]
+	p.unit_size = SOUND_UNIT
+	p.attenuation_filter_db = 0.0
+	return p
+
+
+## One of GARAGE_SOUNDS once, at `pos` in `parent`'s frame (a bay's), `shift` dB over its level.
+func _play_at(parent: Node3D, pos: Vector3, key: String, shift := 0.0, pitch := 1.0) -> void:
+	var p := _sound_player(key)
+	if p.stream == null:
+		return
+	p.volume_db += shift
+	p.pitch_scale = pitch
+	p.position = pos
+	parent.add_child(p)
+	p.finished.connect(p.queue_free)
+	p.play()
 
 
 func _pose_lift(bay: Dictionary) -> void:
@@ -504,7 +619,6 @@ func _begin_inspect(i: int) -> void:
 	_blend = 0.0
 	_orbit_cam.global_transform = _blend_from
 	_orbit_cam.current = true
-	MusicManager.play_sfx(MusicManager.UI_CONFIRM_SOUND, -4.0, 0.7)
 	_hint.text = _hint_text()
 	_refresh_prompt()
 
@@ -837,12 +951,30 @@ func _mat(key: String) -> Material:
 			m.albedo_color = Color(0.9, 0.9, 0.92)
 			m.metallic = 1.0
 			m.roughness = 0.12
-		"glass":
+		"case_back", "case_front":
+			# A trophy case's glass in two draws round the cup: its far side (the back faces) before a ghost cup
+			# (render priority 0), its near side after, so they layer the same way from every side. Drawn as one
+			# double-sided glass with the ghost, all three swapped places as the camera moved.
 			m.albedo_color = Color(0.75, 0.85, 0.95, 0.10)
 			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			m.metallic = 0.2
 			m.roughness = 0.04
-			m.cull_mode = BaseMaterial3D.CULL_DISABLED
+			m.rim_enabled = true
+			m.rim = 0.35
+			m.cull_mode = BaseMaterial3D.CULL_FRONT if key == "case_back" else BaseMaterial3D.CULL_BACK
+			m.render_priority = -1 if key == "case_back" else 1
+		"plaque_glass":
+			# Frosted a little and pale, so the plate reads against the dark column; its text draws after it.
+			m.albedo_color = Color(0.82, 0.9, 0.98, 0.2)
+			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			m.roughness = 0.18
+			m.rim_enabled = true
+			m.rim = 0.6
+			m.rim_tint = 0.2
+			m.render_priority = 1
+		"velvet":
+			m.albedo_color = Color(0.035, 0.04, 0.07)
+			m.roughness = 1.0
 		"roof_glass":
 			m.albedo_color = Color(0.8, 0.9, 0.95, 0.07)
 			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -857,6 +989,7 @@ func _mat(key: String) -> Material:
 			m.albedo_color = Color(0.25, 0.27, 0.3, 0.35)
 			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			m.roughness = 0.5
+			m.render_priority = 0
 		"asphalt":
 			m.albedo_color = Color(0.11, 0.115, 0.12)
 			m.roughness = 0.92
@@ -1426,7 +1559,7 @@ func _build_bay(index: int, g: Dictionary, pos: Vector3, yaw: float) -> void:
 		"index": index, "lamp": lamp, "gallery": g["name"], "color": color, "root": root, "car": car,
 		"car_y": DAIS_H, "centre": Vector3(0.0, size.y * 0.45, 0.0), "radius": size.z * 0.5 + 0.4,
 		"contact": maxf(contact, LIFT_REST + PAD_TOP + 0.005), "carriage": carriage, "blob": blob,
-		"rim_mat": rim_mat, "spot": spot, "status": status, "lift": 0.0, "up": false,
+		"rim_mat": rim_mat, "spot": spot, "status": status, "lift": 0.0, "up": false, "post_x": px,
 	}
 	_bays.append(bay)
 	_pose_lift(bay)
@@ -1717,10 +1850,31 @@ func _build_pedestal(ped: Node3D, cup_name: String, rec: Dictionary) -> void:
 	ped.add_child(band)
 	var body := StaticBody3D.new()
 	ped.add_child(body)
-	_solid(Vector3(-0.7, 0.0, -0.7), Vector3(0.7, PEDESTAL_H + 1.2, 0.7), body)
-	# The cup (Podium's), or a ghost of it.
+	_solid(Vector3(-0.7, 0.0, -0.7), Vector3(0.7, PEDESTAL_H + CASE_TOP + 0.05, 0.7), body)
+	_solid(Vector3(-0.47, 0.0, 0.55), Vector3(0.47, PLAQUE_LEDGE + PLAQUE_SIZE.y, 0.82), body)
+	# The case: a dark steel foot on the column's top (its floor), the cup on a velvet dais, a glass cylinder, a lid
+	# with a ring of light under it. No two faces share a plane (the old glass box's floor lay on the column's top and
+	# flickered against it): the foot, the dais and the glass have no bottom faces and start inside what they stand on.
+	var y0: float = PEDESTAL_H
+	_cyl(ped, CASE_R + 0.025, y0 - 0.01, y0 + CASE_FOOT, _mat("alu"), true, false)
+	_cyl(ped, 0.4, y0 + CASE_FOOT - 0.004, y0 + CASE_DAIS, _mat("velvet"), true, false)
+	for key in ["case_back", "case_front"]:
+		_cyl(ped, CASE_R, y0 + CASE_FOOT - 0.02, y0 + CASE_TOP, _mat(key), false, false, false)
+	_cyl(ped, CASE_R + 0.025, y0 + CASE_TOP, y0 + CASE_TOP + 0.05, _mat("alu"))
+	var ring := MeshInstance3D.new()
+	var rt := TorusMesh.new()
+	rt.inner_radius = 0.44
+	rt.outer_radius = 0.46
+	rt.rings = 48
+	rt.ring_segments = 6
+	ring.mesh = rt
+	ring.position.y = y0 + CASE_TOP - 0.006
+	ring.material_override = _glow_mat(Color(1.0, 0.95, 0.86), 2.2)
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	ped.add_child(ring)
+	# The cup (Podium's), or a ghost of it, its foot sunk 3mm into the dais.
 	var holder := Node3D.new()
-	holder.position.y = PEDESTAL_H + 0.02
+	holder.position.y = y0 + CASE_DAIS - 0.003
 	holder.scale = Vector3.ONE * 0.9
 	ped.add_child(holder)
 	var mat: Material
@@ -1753,12 +1907,26 @@ func _build_pedestal(ped: Node3D, cup_name: String, rec: Dictionary) -> void:
 		handle.position = Vector3(side * 0.43, 0.8, 0.0)
 		handle.material_override = mat
 		holder.add_child(handle)
-	_box(ped, Vector3(-0.58, PEDESTAL_H, -0.58), Vector3(0.58, PEDESTAL_H + 1.15, 0.58), _mat("glass"), false)
-	# The plaque on the column's front.
+	# The plaque: a glass plate on the column's front, leaning back in a chrome clamp along a steel ledge that comes out
+	# of the column, the text on the glass (it had stood in the air before the round column, 5 to 35cm off it).
+	var r_ledge: float = _column_r(PLAQUE_LEDGE)
+	var lw: float = PLAQUE_LEDGE_W * 0.5
+	var foot_z: float = r_ledge + 0.09
+	var ledge_back: float = sqrt(r_ledge * r_ledge - lw * lw) - 0.03
+	_box(ped, Vector3(-lw, PLAQUE_LEDGE - 0.035, ledge_back), Vector3(lw, PLAQUE_LEDGE, foot_z + 0.04), _mat("post"))
+	_box(ped, Vector3(-lw + 0.02, PLAQUE_LEDGE - 0.004, foot_z - 0.022), Vector3(lw - 0.02, PLAQUE_LEDGE + 0.035, foot_z + 0.022),
+			_mat("chrome"), false)
 	var plaque := Node3D.new()
-	plaque.position = Vector3(0.0, PEDESTAL_H * 0.62, 0.7)
+	plaque.position = Vector3(0.0, PLAQUE_LEDGE, foot_z)
+	plaque.rotation.x = -PLAQUE_RECLINE
 	ped.add_child(plaque)
-	_text(plaque, cup_name.to_upper(), 0.15, col.lightened(0.2) if won else COL_DIM, Vector3(0.0, 0.18, 0.0), 1.1)
+	var pw: float = PLAQUE_SIZE.x * 0.5
+	# Its foot 4mm into the clamp and the ledge (it is wider than they are, and deeper it hung under them).
+	_box(plaque, Vector3(-pw, -0.004, -PLAQUE_T * 0.5), Vector3(pw, PLAQUE_SIZE.y - 0.004, PLAQUE_T * 0.5),
+			_mat("plaque_glass"), false)
+	var zt: float = PLAQUE_T * 0.5 + 0.002
+	var tw: float = PLAQUE_SIZE.x - 0.1
+	_on_glass(_text(plaque, cup_name.to_upper(), 0.13, col.lightened(0.2) if won else COL_DIM, Vector3(0.0, 0.29, zt), tw))
 	var line := "NOT YET WON"
 	var sub := ""
 	if won:
@@ -1770,9 +1938,9 @@ func _build_pedestal(ped: Node3D, cup_name: String, rec: Dictionary) -> void:
 		line = "  ·  ".join(parts)
 		if str(rec["car"]) != "":
 			sub = "BEST: %s WITH THE %s" % [PLACE_NAMES[best], str(rec["car"]).to_upper()]
-	_text(plaque, line, 0.11, COL_TEXT if won else Color(COL_DIM, 0.7), Vector3(0.0, 0.02, 0.0), 1.1, _font_bold)
+	_on_glass(_text(plaque, line, 0.1, COL_TEXT if won else Color(COL_DIM, 0.8), Vector3(0.0, 0.172, zt), tw, _font_bold))
 	if sub != "":
-		_text(plaque, sub, 0.075, COL_DIM, Vector3(0.0, -0.11, 0.0), 1.1, _font_bold)
+		_on_glass(_text(plaque, sub, 0.068, COL_DIM, Vector3(0.0, 0.085, zt), tw, _font_bold))
 	var spot := SpotLight3D.new()
 	ped.add_child(spot)
 	spot.position = Vector3(0.0, TALL_H - 0.4, 3.0)
@@ -1781,6 +1949,38 @@ func _build_pedestal(ped: Node3D, cup_name: String, rec: Dictionary) -> void:
 	spot.spot_range = 10.0
 	spot.light_energy = 9.0 if won else 2.5
 	spot.light_color = Color(1.0, 0.95, 0.85)
+
+
+## The trophy column's radius `y` over the floor (it tapers from 0.7 to 0.62).
+func _column_r(y: float) -> float:
+	return lerpf(0.7, 0.62, y / PEDESTAL_H)
+
+
+## Text on a glass plate: drawn after the glass (transparent things of one priority sort by distance, and text 2mm in
+## front of its plate would swap places with it as the camera moved).
+func _on_glass(l: Label3D) -> void:
+	l.render_priority = 2
+
+
+## An upright cylinder in `parent`'s frame, radius `r`, from `y0` up to `y1`, with or without its end faces.
+func _cyl(parent: Node3D, r: float, y0: float, y1: float, mat: Material, top := true, bottom := true,
+		shadow := true) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var c := CylinderMesh.new()
+	c.top_radius = r
+	c.bottom_radius = r
+	c.height = y1 - y0
+	c.radial_segments = 64
+	c.rings = 1
+	c.cap_top = top
+	c.cap_bottom = bottom
+	mi.mesh = c
+	mi.position.y = (y0 + y1) * 0.5
+	mi.material_override = mat
+	if not shadow:
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mi)
+	return mi
 
 
 func _build_player() -> void:

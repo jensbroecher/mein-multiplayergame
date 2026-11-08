@@ -897,7 +897,9 @@ in front of the water while driving (Msitu Falls, Bloombay Dunes). `canyon_river
   brakes and station chime (SuspendedTrains.gd; its first soft glide loop is unused now); Qaysariyyat al-Manara's market
   murmur and the start promenade's six cheers (Marina Nights, CrowdCheers.gd); Rheinufer's ship horns and diesel, Autobahn
   hum, Kirmes, sheep, river and windmill (`sounds/rheinufer/`); the Classics' engines (`engine_bootlegger`,
-  `engine_meteor`, `engine_bubble`). One-shots are levelled by their loudest second, loops by their RMS.
+  `engine_meteor`, `engine_bubble`); the garage's lifts and line-up (`garage_*`, `sounds/garage/`). One-shots are
+  levelled by their loudest second, loops by their RMS. Very short one-shots (a single clack under a second) come back
+  as smeared noise, take after take: synthesise those (`scratch/garage_lock_click.py`).
 - Music: `tools/elevenlabs/generate_music.mjs` composes tracks with ElevenLabs Music (`client.music.compose`) from
   `music.json` (name, path, prompt, seconds), always with `forceInstrumental` (the user wants no vocals or lyrics in the
   game's music), as MP3 (mp3_44100_192), skipping files already made. The Kronburg GP's three (`music/kronburg/`:
@@ -2473,6 +2475,21 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   (`NetworkManager.gp_trophy_eligible`, cleared by GP TEST from a later stage). The hall shows a pedestal per cup
   (`NetworkManager.GP_CUPS`) with the best trophy (Podium's cup mesh) in a glass case or a grey ghost, the counts and
   the car, and the tally under the logo.
+  - The case (`CASE_*`, `_build_pedestal`): a round glass case on a steel foot, the cup on a velvet dais, a lid with a
+    ring of light under it. The old one was a glass box whose floor lay in the column's top plane and flickered: the
+    foot, the dais and the glass have no bottom faces (`_cyl`) and start inside what they stand on. The glass draws in
+    two (`case_back` before the ghost cup, `case_front` after, by render priority), or the three swapped places as the
+    camera moved. The plaque (`PLAQUE_*`) is a frosted glass plate leaning back in a chrome clamp on a steel ledge out of
+    the column, its text drawn after the glass (`_on_glass`, render priority 2); before, the text stood in the air 5-35cm
+    in front of the round column. `garage_shots ... cam:` two views 2cm apart and a diff showed the old floor's stripes.
+- Sounds (`GARAGE_SOUNDS`, 3D at each bay, `SOUND_UNIT`): a lift rising runs the power unit's hum and one lowering the
+  fluid's hiss (loops, louder and higher with the carriage's speed, `HUM_FADE`), a safety lock clacks every `LOCK_STEP`
+  of the rise (alternate posts), the locks release as it starts down, a clunk at the top, a thud at the bottom; reversed
+  mid-way the hums hand over. A car joining or leaving the line-up switches its plinth's lights on or off (they replaced
+  the UI confirm, and the lift replaced the F press's UI blip). Made with tools/elevenlabs (`garage_*` jobs) and readied
+  by `scratch/garage_sound_prep.py` (mono, the lead-in cut, raised: they came 25-45 dB quiet); the clack is synthesised
+  (`scratch/garage_lock_click.py`). `res://scratch/garage_sound_check.tscn` (headless, `--fixed-fps 60`) runs a lift up,
+  down and reversed and the line-up out and in, and prints every sound with its level and place.
 - Cost (M1, 2880x1800): 60 fps, 6.8-10.9ms GPU (the most at the entrance, looking through the roof). Touch has no
   controls in it yet.
 - `res://scratch/garage_shots.tscn -- <dir> [trophies=demo] walk:<name>:x,z:yaw[:pitch] inspect:<name>:<car>[:yaw:pitch:dist]
