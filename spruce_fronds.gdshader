@@ -19,6 +19,9 @@ uniform float needle_boost : hint_range(0.5, 4.0) = 1.7;
 uniform float alpha_cut : hint_range(0.0, 1.0) = 0.5;
 uniform vec4 snow_color : source_color = vec4(0.86, 0.90, 0.97, 1.0);
 uniform float snow_amount : hint_range(0.0, 1.0) = 0.9;
+// Raises the cover a frond needs before snow lies on it: up to 0.3, only the tops of the branches carry it
+// and the dark needles show between (Frostpeak Creek; 0 is Frostfall Gorge's thick coat).
+uniform float snow_cover_shift : hint_range(0.0, 0.4) = 0.0;
 uniform float sway : hint_range(0.0, 0.3) = 0.06;
 uniform float sway_height = 11.0;
 
@@ -80,7 +83,7 @@ void fragment() {
 	float clump_snow = vnoise3(local_pos * vec3(2.6, 3.4, 2.6) + 3.1);
 	float fine = vnoise3(vec3(UV * 64.0, tree_seed * 7.0));
 	float cover = clump_snow * 0.50 + spine * 0.20 + fine * 0.15 + up * 0.55;
-	float snow = COLOR.a * smoothstep(0.62 - snow_amount * 0.45, 0.88 - snow_amount * 0.30, cover);
+	float snow = COLOR.a * smoothstep(0.62 - snow_amount * 0.45 + snow_cover_shift, 0.88 - snow_amount * 0.30 + snow_cover_shift, cover);
 	// A few small gaps, from noise, so the snow is not a uniform coat. (Not from the texture: its needle
 	// strokes showed through as dark lines on the upper side of every branch.)
 	snow *= 1.0 - smoothstep(0.62, 0.92, fine) * 0.55;

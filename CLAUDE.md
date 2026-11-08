@@ -39,6 +39,8 @@ outside a game), "Leaked instance dependency", and RID/ObjectDB leak messages.
 (Jebel Sahar) is now made by `regenerate_mountain_dressing.gd` alone, which re-bakes its ground too: the old
 `regenerate_mountain`/`regenerate_both`/`regenerate_custom_path` would bring back neither its pads nor its dressing. `LakesideLevel.tscn` (Lakeside Meadows) is dressed by `regenerate_lakeside.gd`: run that after any of
 the others re-bakes it (see Lakeside Meadows below).
+`FrostpeakCreekLevel.tscn` is dressed by `regenerate_frostpeak_dressing.gd`: run it after `regenerate_frostpeak_creek.gd`
+(see Frostpeak Creek below).
 
 ## Lakeside Meadows (Bloombay GP, stage 1)
 
@@ -648,6 +650,71 @@ The menus call it Arco del Viento (it was Canyon Drift / CANYON COURSE); files a
   headless, `-- [match=Near_saguaro] [count=8] [max=60]`) lists where a level's MultiMesh dressing stands
   (to aim a camera at it); `scratch/asset_sheet.gd` (windowed) a contact sheet of a model folder;
   `scratch/lod_probe.gd` and `scratch/asset_survey.gd` (headless) a model's LOD chain and triangles/textures.
+
+## Frostpeak Creek (Svartfjell GP, stage 1)
+
+- `regenerate_frostpeak_creek.gd` builds the lap, terrain, bridges, shortcuts and gates; `regenerate_frostpeak_dressing.gd`
+  (`regenerate_frostpeak_dressing.tscn`, headless, about 10s) dresses the saved level and must run after it. Each run replaces
+  `FrostpeakDressing`, sets the materials below again and first deletes its own `generated/frostpeak_dress_*` (after loading
+  the level, which points at them). The terrain's shape and the lap are untouched. Before it the stage was a flat white
+  material, an empty `Vegetation` node and fog closing in at 520m.
+- The ground (`frostpeak_ground.gdshader` on Terrain_Visual): wind crust and drifts, the plough's grey spray and a brighter
+  windrow along every road's edge, needle litter under the woods (`_bake_ground_map`: R the distance to the nearest road's
+  edge, G the woods), shore ice and wet stones at the waterline, and on steep faces grey gneiss in 3D cellular blocks,
+  drill-hole grooves within about 10m of a road and curtains of frozen seepage. Steepness is the steeper of the vertex and
+  the face normal (the grid stands up in spikes against the road walls). The rock is in a dynamic branch that takes no
+  derivatives (the face normal is worked out before it).
+- The road walls (`frostpeak_wall.gdshader`, `WALLS`: Visual_Road_Sides and the shortcuts' embankments): granite ashlar in
+  world space with frost on each course. They had the asphalt's darkened texture, which read as brown earth once the fog
+  stopped hiding it. Their vertex normals lean up toward the road, so the shader takes the face's own facing.
+- The overpass (`_build_overpasses`): where the Jump 2 approach crosses the start straight TerrainGenerator draws nothing under
+  the road, and from below the curbs' 17m ribbon was a white slab. A concrete soffit with girders and fascias goes wherever the
+  road mesh stands `OVERPASS_CLEAR` over the ground on its line and both curbs, outside TerrainGenerator's timber-bridge zones.
+- The fjord (`_build_backdrop`): the island stands in a fjord running north and south (`_fjord_axis`, `_fjord_half`: narrowing
+  to its head at `FJORD_HEAD_Z`, opening toward the sea in the south), its walls rising from the shore to shoulders and peaks,
+  and at its head Svartfjell (`SVART_*`), a black horn with concave faces, four ridges and three shoulders, straight ahead down
+  the start straight. One polar ring from under the island's rim (`BACK_R0`) to `BACK_R1`, 720 round, in `BACK_SECTORS`
+  meshes `BackdropGround_n` (DressingColliders skips "ground"), drawn by `fjord_mountain.gdshader`: snow by slope, couloirs,
+  forest up to a ragged tree line, wet rock and an ice rim at the water's edge, the bed dark; vertex colour g is how black the
+  rock is. Every pattern is world-space (3D) noise: coordinates turned with the normal swirled like marble, and snow on
+  ledges across the faces read as brush strokes. `_svart` returns -500 off its foot: at 0 the smooth maximum that sets it into
+  the fjord lifted the whole bed to the waterline and the fjord read as a snowfield (`kronburg_hide_shot ... hide=` showed
+  it). TerrainGenerator's water plane is stretched to 9km, its edge fade off and its finish darker and less metallic (at
+  metallic 0.65 the deep water mirrored the pale sky and read as ice). The fog runs out to `FOG` with curve 1.8.
+- The woods (`_plan_woods`, `_build_woods`, `SnowTreeKit.gd`): about 4,100 snowy spruce (Frostfall Gorge's, copied into
+  the kit) on the flanks and 1,330 bare winter birch (WoodlandBuilder's birch with `twig_atlas()` sprays through
+  `winter_twigs.gdshader`) by the creek and on the woods' edges. Crowns keep `TREE_CLEAR` off every road's edge, out of the
+  water, off steep ground and mostly out of `RESERVED`: the start's west side (for a race venue), the south shore (the
+  village) and the view to it from the south loop. Saved as the Detail Level's Ultra draws them: every tree, the rich spruce (Frostfall's full tree and stand-in),
+  the detailed trees casting their own shadows. `SnowWoodsDetail.gd` draws less below it: a share of the trees by rank
+  (`TREE_SHARE`: Off 1,520, Low 2,180, Medium 2,900, High 3,570; trees by the roads rank low, `RANK_NEAR_ROAD`, and go
+  last), the light meshes (a cell's metas `rich_mesh`/`light_mesh`; a stand-in of 6 flat whorls read as a bare pole, so the
+  light one has 8), shadows from the TreeShadow_ stand-ins. Each cell's instances are in rank order with the ranks in its
+  meta `ranks`, so the near, far and shadow cells (which group trees differently) draw the same trees; the trunk colliders
+  within 40m of a road (meta `rank`, reaching 0.7 of the skirt) switch off with them. `spruce_fronds.gdshader`'s
+  `snow_cover_shift` (0 for Frostfall) leaves the dark needles showing between the snow.
+- Svartvik, the fishing village on the south shore (`_plan_village` before the woods, `_build_village`,
+  `FjordVillageKit.gd`, life size at `PROP_SCALE` 1.6 through YardKit's kit plus a plain "snow" key): painted timber houses
+  (`house`: battens, white trim and corner boards, a gabled porch over the door, slate under snow, a chimney) every
+  `HOUSE_STEP` along both sides of the street (`LANES[0]`, trodden snow in the ground map's B), each skipped where its
+  footprint is near a road (`VILLAGE_ROAD_CLEAR`), in the water, too steep (`HOUSE_MAX_DROP`, else a stone foundation takes
+  up the fall) or taken; a white long church on the east terrace (`CHURCH_AT`, its axis along z, the tower and spire at the
+  north end toward the lap); rorbuer on stilts and tarred boathouses (`naust`) along the waterline (`_shore_z`, `SHORE_X`); a
+  timber quay at `QUAY_X` with two ShipKit fishing boats, one rafted outside the other; stockfish racks (`hjell`);
+  woodpiles and kick-sleds (`spark`) by the doors; wood smoke from every chimney (`_build_smoke`, one GPUParticles3D each,
+  shared material). Batched by 120m of x into `Svartvik_n` meshes, which DressingColliders makes solid; the trees keep off
+  the buildings and lanes (`_in_village`) and thin out in `RESERVED`'s view from the south loop. About 70k triangles, 0.1ms.
+  `res://scratch/fjord_village_preview.gd` (`-s`, windowed, `-- <dir> name:x,y,z:tx,ty,tz`) renders every building on a flat
+  snowfield in seconds. A generator scene whose script fails to parse sits idle instead of quitting: check new code with
+  `res://scratch/parse_check.gd` (`-s`, headless, `-- res://a.gd ...`) first.
+- Cost (M1, `ab_bench`, 1280x720 window): the woods about 4ms at High; Off -3.4, Low -2.3, Medium -0.95, Ultra +7.2 (its own
+  tree shadows about a third of that); the fjord 0.5ms. Separate `bench.tscn` runs of one level drifted between 16 and
+  21ms on the GPU's clock alone: compare with ab_bench.
+- AI races (`scratch/ai_race_test`, speed=2): every bot finishes three laps; the falls (off the Alpine bridge at 509-515m,
+  and at 1270m) happen on the undressed level too.
+- `res://scratch/meshes_at.gd` (`-s`, headless, `-- <level> x,y,z ...`) lists the meshes whose bounds hold a point;
+  `scratch/kronburg_hide_shot.tscn` takes `level=`; `res://scratch/terrain_height_grid.gd` (`-s`, headless, `-- <level>
+  [cell=50] [half=450]`) prints a level's terrain heights round its lap.
 
 ## Frostpeak Creek road joints
 
