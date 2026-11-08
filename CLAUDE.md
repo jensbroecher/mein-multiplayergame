@@ -897,7 +897,7 @@ in front of the water while driving (Msitu Falls, Bloombay Dunes). `canyon_river
   brakes and station chime (SuspendedTrains.gd; its first soft glide loop is unused now); Qaysariyyat al-Manara's market
   murmur and the start promenade's six cheers (Marina Nights, CrowdCheers.gd); Rheinufer's ship horns and diesel, Autobahn
   hum, Kirmes, sheep, river and windmill (`sounds/rheinufer/`); the Classics' engines (`engine_bootlegger`,
-  `engine_meteor`, `engine_bubble`); the garage's lifts and line-up (`garage_*`, `sounds/garage/`). One-shots are
+  `engine_meteor`, `engine_bubble`) and the Sandpiper's (`engine_sandpiper`); the garage's lifts and line-up (`garage_*`, `sounds/garage/`). One-shots are
   levelled by their loudest second, loops by their RMS. Very short one-shots (a single clack under a second) come back
   as smeared noise, take after take: synthesise those (`scratch/garage_lock_click.py`).
 - Music: `tools/elevenlabs/generate_music.mjs` composes tracks with ElevenLabs Music (`client.music.compose`) from
@@ -2792,6 +2792,22 @@ A clip that comes out quiet (the bubble car's at -37.7 dBFS) is raised in the fi
     stood 8cm off the nose at its ends), the bumpers' path follows the face (kept within x 0.24, or `shell_z` found the
     face behind the arch). Through the bubble the dark cabin reads grey under a bright sky: that is the glass's
     reflection, not the detail map.
+- The Sandpiper (`SandpiperBuilder.gd`, in the Buggies gallery): a 1960s-style beach buggy, an original design with a
+  made-up name, picked to stand apart from the other buggies (the Shadow, the Centurion, the Vortex: all caged, all
+  winged): rounded and low, no cage or wing, the fenders part of the body, the engine bare at the back. Its section is
+  the Nocturne's (wells cut as notches, a roll onto the crest, the fender top falling to A, a wall to B, a top to the
+  centre line), keyed through five regions: fender humps over a domed bonnet, the cowl (B over A), the cockpit (the wall
+  runs down inside the tub to the floor), the rear deck behind the seats, the engine bay (another trough, between the
+  broad rear fenders). A tail cap shrinking toward a point closed over the bay (the U section isn't star-shaped about
+  any point), so `_cap()` is overridden for the tail: it only squashes the section toward `TAIL_LINE_Y` (the bay's floor
+  line), and the rear fenders curl down to it while the bay stays open. The fender's crest must stay 1.5cm over its
+  arch (`_ceiling` caps the arch under the belt): check a new KEYS row's belt against the well's height there, or the
+  tyre pokes through. Its air-cooled flat-four (chrome fan shroud, alternator and belt, twin carbs, finned barrels),
+  muffler and upswept pipes sit in the bay and hang out over the tail. Narrow ribbed fronts, fat block-tread rears
+  (`build_rear_wheel`), eight-spoke rims with chrome lips. Its engine loop (`engine_sandpiper`) had a 0.064 jump at its
+  seam: `scratch/seamless_loop.py in.wav out.wav [--fade=0.15]` cross-fades a steady clip's head into its end (for one
+  that revs up, `make_engine_loop.py`). Factory paint "Surf Turquoise" (gloss) with white stripes and a white roll bar
+  (the accent).
 
 ## Canyon Chasm dirt ramps, rocks, signs, tornado and houses
 

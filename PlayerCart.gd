@@ -374,6 +374,24 @@ const CAR_PRESETS = [
 		"offroad": 4.5,
 		"weight": 0.8,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Sandpiper",
+		# An air-cooled flat-four beach buggy (tools/elevenlabs, engine_sandpiper), its seam cross-faded
+		# (scratch/seamless_loop.py), levelled by its RMS (-18.0 dBFS).
+		"engine_sound": "res://sounds/enginesounds/engine_sandpiper_loop.wav",
+		"engine_gain_db": 8.3,
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Sandpiper.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 39.0,
+		"acceleration": 70.0,
+		"steer_speed": 3.3,
+		"grip": 4.6,
+		"braking": 42.0,
+		"offroad": 8.8,
+		"weight": 0.86,
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 

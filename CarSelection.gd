@@ -297,6 +297,19 @@ const CAR_PRESETS = [
 		"offroad": 4.5,
 		"desc": "A 1950s bubble car with a glass dome, a suitcase on the back and a two-stroke that buzzes like an angry hornet. The slowest thing on the grid, the quickest to turn, and the easiest to shove around.",
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Sandpiper",
+		"model_path": "res://generated/cars/Sandpiper.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 39.0,
+		"acceleration": 70.0,
+		"steer_speed": 3.3,
+		"grip": 4.6,
+		"braking": 42.0,
+		"offroad": 8.8,
+		"desc": "A fibreglass beach buggy with an air-cooled flat-four out in the open and fat tyres for the sand. Light and nimble, at home on dunes and dirt; on tarmac the tail likes to step out.",
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 
@@ -311,6 +324,7 @@ const CAR_ACCENTS := {
 	"Sandstorm": Color(1.0, 0.55, 0.16), "Obsidian": Color(0.82, 0.62, 0.38),
 	"Fulmine": Color(0.32, 0.95, 0.46), "Basilisk": Color(0.84, 0.86, 0.45),
 	"Bootlegger": Color(1.0, 0.48, 0.14), "Meteor": Color(0.86, 0.88, 0.92), "Kugelblitz": Color(0.45, 0.88, 0.76),
+	"Sandpiper": Color(0.22, 0.84, 0.88),
 }
 ## Stat bars: caption, preset key, and the values at an empty and a full bar (spanning the fleet).
 const STATS := [

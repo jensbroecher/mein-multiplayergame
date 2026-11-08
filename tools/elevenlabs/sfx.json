@@ -576,6 +576,14 @@
     "influence": 0.6
   },
   {
+    "name": "engine_sandpiper",
+    "path": "sounds/enginesounds/engine_sandpiper_loop.wav",
+    "text": "An air-cooled flat-four boxer engine in a 1960s beach buggy held at a steady high RPM, a raspy clattery throaty burble from a short open exhaust with the whir of the cooling fan, recorded close, constant engine speed, no revving, no gear changes, continuous drone",
+    "duration": 8.0,
+    "loop": true,
+    "influence": 0.6
+  },
+  {
     "name": "garage_lift_motor",
     "path": "sounds/garage/lift_motor_loop.wav",
     "text": "An electro-hydraulic two-post car lift raising a car in a quiet showroom workshop: steady electric motor hum with a smooth hydraulic pump whine, constant, no starts or stops, no clicks, seamless loop",
