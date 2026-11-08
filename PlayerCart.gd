@@ -392,6 +392,43 @@ const CAR_PRESETS = [
 		"offroad": 8.8,
 		"weight": 0.86,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Samurai",
+		# A high-revving straight-six through open pipes (tools/elevenlabs, engine_samurai), its seam cross-faded
+		# (scratch/seamless_loop.py --fade=0.3), levelled by its RMS (-17.5 dBFS).
+		"engine_sound": "res://sounds/enginesounds/engine_samurai_loop.wav",
+		"engine_gain_db": 7.8,
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Samurai.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 42.0,
+		"acceleration": 72.0,
+		"steer_speed": 3.0,
+		"grip": 4.8,
+		"braking": 46.0,
+		"offroad": 3.0,
+		"weight": 0.92,
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Ninja",
+		# A small high-revving turbo four with its whistle (tools/elevenlabs, engine_ninja, the second take: the
+		# first wandered in pitch and came out at -42 dBFS), its seam cross-faded (scratch/seamless_loop.py
+		# --fade=0.25), levelled by its RMS (-19.8 dBFS).
+		"engine_sound": "res://sounds/enginesounds/engine_ninja_loop.wav",
+		"engine_gain_db": 10.1,
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Ninja.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 40.5,
+		"acceleration": 78.0,
+		"steer_speed": 3.5,
+		"grip": 5.6,
+		"braking": 50.0,
+		"offroad": 3.5,
+		"weight": 0.78,
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 

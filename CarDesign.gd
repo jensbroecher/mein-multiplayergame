@@ -699,6 +699,47 @@ func sweep(b, path: PackedVector3Array, across: Vector3, up_hint: Vector3, profi
 	b.poly(rings[n - 1], tangents[n - 1], mat, col)
 
 
+## A strip across the nose (or the tail) at height y, following the face in plan and wrapping round its
+## corners out to |x| = half: the profile (up, out) laid along it, smooth along the path, its ends capped
+## (bumper blades, light bars, trim lines). The path runs 4mm (+ sink) inside the face, along each point's
+## own outward direction: sweep() takes one, which won't do round a corner.
+func face_strip(b, y: float, front: bool, half: float, profile: PackedVector2Array, mat: int, col: Color,
+		sink := 0.0) -> void:
+	var path := PackedVector3Array()
+	var outs: Array = []
+	var n := 29
+	for k in n:
+		var x: float = lerpf(-half, half, float(k) / (n - 1))
+		var fr: Array = face_frame(x, y, front)
+		var nrm: Vector3 = fr[1]
+		var flat := Vector3(nrm.x, 0.0, nrm.z).normalized()
+		path.append((fr[0] as Vector3) - flat * (0.004 + sink))
+		outs.append(flat)
+	var rows := []
+	for i in n:
+		var ring := PackedVector3Array()
+		for q in profile:
+			ring.append(path[i] + Vector3.UP * q.x + (outs[i] as Vector3) * q.y)
+		rows.append(ring)
+	var vb: int = b.vertex_count()
+	var ib: int = b.index_count()
+	b.grid(rows, mat, col, false, true)
+	# Outward: away from each ring's own middle.
+	var s := 0.0
+	var m: int = profile.size()
+	for k in range(vb, b.vertex_count()):
+		var ring: PackedVector3Array = rows[(k - vb) / m]
+		var mid := Vector3.ZERO
+		for p in ring:
+			mid += p
+		mid /= m
+		s += b._n[k].dot(b._v[k] - mid)
+	if s < 0.0:
+		b.flip(vb, ib)
+	b.poly(rows[0], (path[0] - path[1]).normalized(), mat, col)
+	b.poly(rows[n - 1], (path[n - 1] - path[n - 2]).normalized(), mat, col)
+
+
 ## A flat plate across x: a convex outline in side view (z, y), `th` thick, centred on x.
 func slab(b, outline: PackedVector2Array, x: float, th: float, mat: int, col: Color) -> void:
 	var outer := PackedVector3Array()

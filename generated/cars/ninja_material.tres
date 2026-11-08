@@ -1,0 +1,19 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://car_body.gdshader" id="1_kcxia"]
+[ext_resource type="Texture2D" path="res://generated/cars/ninja_detail.res" id="2_r8t3w"]
+
+[resource]
+render_priority = -1
+shader = ExtResource("1_kcxia")
+shader_parameter/detail_map = ExtResource("2_r8t3w")
+shader_parameter/nose_z = -1.0
+shader_parameter/tail_z = 0.96
+shader_parameter/belt_y = 0.435
+shader_parameter/side_x = 0.56
+shader_parameter/door_roundel = Vector2(-0.02, 0.3)
+shader_parameter/roundel_r = 0.062
+shader_parameter/hood_z = -0.74
+shader_parameter/hood_r = 0.062
+shader_parameter/stripe_w = 0.06
+shader_parameter/stripe_gap = 0.035

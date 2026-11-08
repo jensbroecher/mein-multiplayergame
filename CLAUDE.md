@@ -2808,6 +2808,40 @@ A clip that comes out quiet (the bubble car's at -37.7 dBFS) is raised in the fi
   seam: `scratch/seamless_loop.py in.wav out.wav [--fade=0.15]` cross-fades a steady clip's head into its end (for one
   that revs up, `make_engine_loop.py`). Factory paint "Surf Turquoise" (gloss) with white stripes and a white roll bar
   (the accent).
+- The Samurai (`SamuraiBuilder.gd`, in the Classics gallery): a 1970s Japanese fastback coupé in "kaido racer" street
+  trim, an original design with a made-up name, picked to stand apart from the fleet (no other road coupé of the era; the
+  Interceptor's flares are painted on a winged hatchback). The Interceptor's keyed greenhouse section (`_corner`,
+  `_upper_segments`, `_upper_s`) on a long flat bonnet, the cabin set back, a fastback to a short deck with a ducktail
+  (KEYS' kick at z 1.03); arches lifted into the bottom (`_bot_knots`) under black overfenders (`build_fender` with
+  `fender_mat` M_DARK and a box `_fender_section`) with chrome rivets round their faces (`_rivets`, along the same spine);
+  the belt rises over the front wheel so the flare's top stays under it. Quad round headlamps and taillamps on the cap
+  faces (`face_frame`), a black grille with a crest of crossed blades in the accent colour (`_crest`), chrome blade
+  bumpers that follow the faces round their corners (`CarDesign.face_strip`: a profile laid along per-point outward
+  directions, since `sweep` takes one), chrome drip rails along the greenhouse's corner, chrome window surrounds in the detail map
+  (B), louvres over the rear glass (slats swept across along `top_y`), a chin spoiler in the paint with an oil cooler
+  behind it, fender mirrors, and two chrome takeyari exhausts that bend up behind the tail and splay into a V. Deep-dish
+  eight-spoke rims, a polished lip and dish in chrome, the spokes in the rim colour. Factory paint: Two-Tone, "Samurai
+  Vermilion" over white with a gold pinline, gold rims, number 47; PAINT_LAYOUT's `belt_y` is the two-tone's split
+  (0.345), low on the side, not the window line. Its engine (`engine_samurai`, tools/elevenlabs: a straight-six through
+  open pipes, steady at 112-117 Hz) had its seam cross-faded with `scratch/seamless_loop.py --fade=0.3` (the clip faded
+  in over its first quarter second).
+- The Ninja (`NinjaBuilder.gd`, in the Hypercars gallery): the Samurai's opposite, a compact modern Japanese track car,
+  an original design with a made-up name: 1.96m on a 1.18m wheelbase, the shortest after the Kugelblitz, rounded and
+  hooded where the fleet's other dark cars are angular. CarDesign's own section (a side, then one `_upper` cubic, keyed
+  through KEYS: low and wide over the bonnet and the deck, a tall dome over the cabin) with `segment_counts` and
+  `_upper_segments` returning the cubic as one segment: resampled as one curve the ring points slid and the shell came out
+  crumpled like a cloth cover. `w` swells over each wheel and pinches at the doors (the haunches carry the arches, lifted
+  into the bottom as on the Samurai; no separate fenders). The glass is only a visor band of height round the cabin in the
+  detail map (`_visor_d`, `VISOR_*`, narrowing to a point behind the doors), the "eye slit" of a hood. A light slit across
+  the nose (`face_strip`, M_TAILLAMP in white) over a black lower face (detail map) with an accent line under it, a red
+  slit across the tail over a black diffuser, a blade fin down the middle from the roof to the tail (`sweep` of a tapered
+  profile reaching `FIN_DEPTH` into the body along a spine rising to `FIN_H` over the deck, a chrome edge swept along its
+  ridge), vented engine covers either side of it, a diagonal intake slashed into each haunch (`_slash_d`), camera-pod
+  mirrors. Its `shell_z` bisects to the surface (as the Basilisk's): CarDesign's 3mm march sank the light slits into the
+  nose. The wheels are throwing stars (`_star_blade`: four curved blades tapering to points at the rim, flat-faced quads
+  along a curve, round a boss with a dark hole). Factory paint: Side Stripe in matte "Ninja Indigo" with a black sash edged
+  in crimson round the waist (`belt_y` 0.435 puts the stripe there), silver rims. Its engine (`engine_ninja`: a small turbo
+  four with its whistle) is the second take: the first wandered 255-273 Hz and came out at -42 dBFS.
 
 ## Canyon Chasm dirt ramps, rocks, signs, tornado and houses
 

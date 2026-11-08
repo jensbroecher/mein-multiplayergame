@@ -12,7 +12,7 @@ const CAR_PRESETS = preload("res://PlayerCart.gd").CAR_PRESETS
 ## one, NEW_ARRIVALS, which only exists while it holds a car.
 const CATEGORIES := [
 	{"name": "Hypercars", "color": Color(0.98, 0.32, 0.30),
-		"cars": ["Fulmine", "Nocturne", "Mirage", "Inferno", "Zephyr"]},
+		"cars": ["Fulmine", "Nocturne", "Mirage", "Inferno", "Zephyr", "Ninja"]},
 	{"name": "Rally & Raid", "color": Color(1.0, 0.62, 0.18),
 		"cars": ["Interceptor", "Sandstorm", "Obsidian", "Trailblazer", "Apex"]},
 	{"name": "Buggies", "color": Color(0.30, 0.82, 0.98),
@@ -20,7 +20,7 @@ const CATEGORIES := [
 	{"name": "4x4 & Monsters", "color": Color(0.55, 0.92, 0.28),
 		"cars": ["Strikeforce", "Phantom", "Mudrunner", "Titan", "Basilisk"]},
 	{"name": "Classics", "color": Color(0.98, 0.78, 0.32),
-		"cars": ["Bootlegger", "Meteor", "Kugelblitz"]},
+		"cars": ["Bootlegger", "Meteor", "Kugelblitz", "Samurai"]},
 ]
 const NEW_ARRIVALS := {"name": "New Arrivals", "color": Color(0.86, 0.52, 1.0)}
 

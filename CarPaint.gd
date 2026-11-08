@@ -31,6 +31,7 @@ const PALETTE := [
 	["Chocolate", Color(0.32, 0.18, 0.10)],
 	["Strikeforce Lime", Color(0.62, 0.78, 0.24)], ["Graphite", Color(0.36, 0.38, 0.41)],
 	["Shadow Violet", Color(0.46, 0.20, 0.82)], ["Surf Turquoise", Color(0.04, 0.58, 0.68)],
+	["Samurai Vermilion", Color(0.84, 0.19, 0.07)], ["Ninja Indigo", Color(0.09, 0.11, 0.24)],
 ]
 const RIMS := [
 	["Silver", Color(0.76, 0.77, 0.79)], ["Titanium", Color(0.46, 0.47, 0.49)], ["Gunmetal", Color(0.22, 0.23, 0.25)],
@@ -107,6 +108,12 @@ const FACTORY := {
 	"Sandpiper": {"pattern": 1, "finish": 0, "primary": Color(0.04, 0.58, 0.68),
 		"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.94, 0.94, 0.92),
 		"rim": Color(0.76, 0.77, 0.79), "number": 62},
+	"Samurai": {"pattern": 2, "finish": 0, "primary": Color(0.94, 0.94, 0.92),
+		"secondary": Color(0.84, 0.19, 0.07), "accent": Color(0.86, 0.63, 0.24),
+		"rim": Color(0.86, 0.63, 0.24), "number": 47},
+	"Ninja": {"pattern": 3, "finish": 2, "primary": Color(0.09, 0.11, 0.24),
+		"secondary": Color(0.03, 0.03, 0.035), "accent": Color(0.80, 0.06, 0.12),
+		"rim": Color(0.76, 0.77, 0.79), "number": 9},
 }
 const FALLBACK := {"pattern": 0, "finish": 0, "primary": Color(0.80, 0.07, 0.05),
 	"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.98, 0.78, 0.07),

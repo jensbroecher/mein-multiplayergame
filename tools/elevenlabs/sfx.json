@@ -584,6 +584,22 @@
     "influence": 0.6
   },
   {
+    "name": "engine_samurai",
+    "path": "sounds/enginesounds/engine_samurai_loop.wav",
+    "text": "A tuned 1970s Japanese straight-six sports coupe engine held at a steady high RPM through short straight-through open exhaust pipes, a sharp raspy metallic howl with carburettor intake roar, recorded close, constant engine speed, no revving, no gear changes, no backfires, continuous drone",
+    "duration": 8.0,
+    "loop": true,
+    "influence": 0.6
+  },
+  {
+    "name": "engine_ninja",
+    "path": "sounds/enginesounds/engine_ninja_loop.wav",
+    "text": "A small high-revving turbocharged four-cylinder engine in a modern lightweight Japanese track car held at a steady high RPM, a tight buzzing rasp with a constant high turbocharger whistle and spool whine over it, recorded close, constant engine speed, no revving, no gear changes, no blow-off valve, continuous drone",
+    "duration": 8.0,
+    "loop": true,
+    "influence": 0.6
+  },
+  {
     "name": "garage_lift_motor",
     "path": "sounds/garage/lift_motor_loop.wav",
     "text": "An electro-hydraulic two-post car lift raising a car in a quiet showroom workshop: steady electric motor hum with a smooth hydraulic pump whine, constant, no starts or stops, no clicks, seamless loop",
