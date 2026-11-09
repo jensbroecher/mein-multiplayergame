@@ -38,6 +38,7 @@
 #    soffit. The terrain is not graded under any of it (_no_grade).
 extends Node
 
+const IceSculptureKit = preload("res://IceSculptureKit.gd")
 const LEVEL_NAME := "NorthlightCavernsLevel"
 const LEVEL_PATH := "res://levels/NorthlightCavernsLevel.tscn"
 const RES_PREFIX := "northlight_"
@@ -148,6 +149,35 @@ const CAVERN_RIDGE_HEIGHT := 58.0
 const CAVERN_SUMMIT := 26.0
 ## Broad low apron tying the massif into the icefield, so it does not read as a dropped lump.
 const CAVERN_APRON := 17.0
+## The ice sculpture exhibition (IceSculptureKit.gd): a pair of each design tops the junction pylons, one design a
+## junction in the routes' order (start and end), their uplights' colours; the sculpture garden on the frozen lake
+## beside the start straight ([design, distance along the trunk from the finish line, side (+1 right of travel),
+## colour]), SCULPTURE_GARDEN_LAT from the road's middle on ice pedestals; the festival's sign by the finish.
+const SCULPTURE_PYLONS := [["owl", Color(0.55, 0.85, 1.0)], ["reindeer", Color(0.75, 0.55, 1.0)], ["whale", Color(0.3, 1.0, 0.75)],
+		["swan", Color(1.0, 0.55, 0.85)], ["bear", Color(0.5, 0.75, 1.0)], ["snowflake", Color(0.65, 1.0, 0.95)]]
+const SCULPTURE_GARDEN := [["spiral", 30.0, -1.0, Color(1.0, 0.8, 0.45)], ["fox", 52.0, 1.0, Color(0.9, 0.6, 1.0)],
+		["wave", 78.0, -1.0, Color(0.4, 0.8, 1.0)], ["bear", 102.0, 1.0, Color(0.55, 1.0, 0.8)],
+		["snowflake", 124.0, -1.0, Color(1.0, 0.6, 0.75)], ["owl", 146.0, 1.0, Color(0.7, 0.75, 1.0)]]
+const SCULPTURE_GARDEN_LAT := 24.0
+const SCULPTURE_VOXEL := 0.075
+## How big the sculptures stand on the pylons and in the garden (IceSculptureKit's are about 4.5-5m tall).
+const SCULPTURE_PYLON_SCALE := 1.5
+const SCULPTURE_GARDEN_SCALE := 1.8
+var _sign_mat: ShaderMaterial
+var _sculpture_meshes := {}
+var _sculpture_mat: ShaderMaterial
+## The one mountain over the cavern (_mountain_full): its summit's height over the icefield and its horn, how far it
+## reaches east and west and past the portals, how concave its flanks are, how much its spurs swell, where its summit
+## sits along the passage (z from the span's middle), and over how many metres past the gallery's edge it rises to
+## full height (the cap carries it over the passage).
+const MOUNT_PEAK := 104.0
+const MOUNT_HORN := 26.0
+const MOUNT_HALF_W := 170.0
+const MOUNT_END_REACH := 70.0
+const MOUNT_CONCAVE := 1.35
+const MOUNT_SPURS := 0.16
+const MOUNT_SUMMIT_SHIFT := -8.0
+const MOUNT_INNER_RISE := 11.0
 ## Crevasse crossed by the ice arch, as a slot in the ice: a centre, a direction, and a
 ## half-length that tapers to nothing at both tips so the slot never ends on a flat wall.
 const CREVASSE_CENTER := Vector2(212.0, -242.0)
@@ -1940,12 +1970,14 @@ func _build_cavern(parent: Node, ice_mat: Material, vein_light_mat: Color) -> vo
 
 
 ## Half width of the cap laid over the cavern shell; its edges sink into the massif's flanks.
-const CAP_HALF_W := 36.0
+const CAP_HALF_W := 46.0
 ## Depth of snow and rock over the shell's crown.
 const CAP_COVER := 6.0
 ## How far the cap starts behind each portal plane. The portal face leans back across this gap,
 ## from the arch outline to the cap, so the mouth is a sloped face rather than a sheer cut.
 const CAP_FACE_SETBACK := 8.0
+## How far the cap stands over the heightfield where both carry the mountain.
+const CAP_LIFT := 0.35
 const CAP_LAT_SAMPLES := 45
 const CAP_FACE_ROWS := 5
 
@@ -1988,27 +2020,27 @@ func _cap_section(off: float) -> PackedVector3Array:
 	var f: Dictionary = _frame_at_offset(main_track_curve, off)
 	var p: Vector3 = f["pos"]
 	var right: Vector3 = f["right"]
-	# Near the mouths the cap is a low hood over the arch; further in it fills the saddle up toward
-	# the flanks' height, so the two flanks and the cap read as one mountain, not two peaks with a
-	# trench between them.
-	var inward: float = minf(off - _cavern_range.x, _cavern_range.y - off)
-	var edge_l: Vector3 = p - right * CAP_HALF_W
-	var edge_r: Vector3 = p + right * CAP_HALF_W
-	var flank: float = minf(_terrain_height_at(edge_l.x, edge_l.z), _terrain_height_at(edge_r.x, edge_r.z)) - p.y
+	# The mountain carried over the passage at its own height (near the mouths, where the portals' faces cut it down,
+	# a hood CAP_COVER over the shell), so the heightfield either side and the cap are one mountain.
 	var hood: float = 15.4 + CAP_COVER
-	var crown_base: float = maxf(hood, lerpf(hood, flank * 0.9, smoothstep(12.0, 75.0, inward)))
 	var out := PackedVector3Array()
 	for k in range(CAP_LAT_SAMPLES):
 		var u: float = lerpf(-CAP_HALF_W, CAP_HALF_W, float(k) / float(CAP_LAT_SAMPLES - 1))
 		var q: Vector3 = p + right * u
 		var ground: float = _terrain_height_at(q.x, q.z) - p.y
 		var t: float = absf(u) / CAP_HALF_W
-		var crown: float = crown_base + _detail_noise.get_noise_2d(q.x * 0.7, q.z * 0.7) * 2.5
-		var arch: float = crown * pow(maxf(1.0 - t * t, 0.0), 0.6)
+		# The mountain's own height here, as if the passage weren't cut through it (the heightfield beside the
+		# passage carries the same mountain), never under a hood of CAP_COVER over the shell.
+		var mountain: float = _icefield_natural(q.x, q.z) - _cavern_mass(q.x, q.z) + _cavern_mass(q.x, q.z, true) - p.y
+		var hood_t: float = hood * pow(maxf(1.0 - t * t, 0.0), 0.6)
+		# A little over the heightfield where both carry the mountain (CAP_LIFT), so they never share a plane.
+		var arch: float = maxf(mountain + CAP_LIFT, hood_t) + _detail_noise.get_noise_2d(q.x * 0.7, q.z * 0.7) * 0.6
 		if absf(u) <= CAVERN_HALF_WIDTH:
 			arch = maxf(arch, _shell_top_at(u) + 1.5)
-		# Out at the edges the cap dives under the flank, so there is no seam to see between them.
-		var y: float = lerpf(ground - 2.5, arch, 1.0 - smoothstep(0.6, 1.0, t))
+		# Out at the edges the cap dives gently under the flank (the heightfield is at the mountain's height by
+		# then), so the two meet at a shallow angle with no crease to see. Diving from 60% of its half width, where
+		# the heightfield was still climbing out of the passage's corridor, it left a crease up either side.
+		var y: float = lerpf(ground - 1.6, arch, 1.0 - smoothstep(0.7, 1.0, t))
 		out.append(q + Vector3.UP * y)
 	return out
 
@@ -2404,7 +2436,7 @@ func _cavern_nearest(px: float, pz: float) -> Vector2:
 ##
 ## So the profile is a single smooth dome per flank, the ribbing is a gentle undulation whose
 ## gradient is bounded, and nothing here is allowed to exceed a slope the grid can represent.
-func _cavern_mass(px: float, pz: float) -> float:
+func _cavern_mass(px: float, pz: float, over_passage := false) -> float:
 	if _cavern_line.size() < 2:
 		return 0.0
 	# The massif is measured off the cavern's own axis (due north along X = 0, between the portal
@@ -2425,36 +2457,15 @@ func _cavern_mass(px: float, pz: float) -> float:
 	if along <= 0.0:
 		return 0.0
 
-	# A plain dome rather than a flat-topped plateau. The shoulders roll off over the feather,
-	# which is what stops the whole massif reading as a wall with a lid.
-	var perp: float = 1.0 - smoothstep(CAVERN_MASS_HALF_W, CAVERN_MASS_HALF_W + CAVERN_MASS_FEATHER, lat)
-	var dome: float = perp * perp * (3.0 - 2.0 * perp)
-
-	var rocky: float = clampf(_ridge_noise.get_noise_2d(px * 0.35, pz * 0.35) * 0.5 + 0.5, 0.0, 1.0)
-	var crest: float = CAVERN_RIDGE_HEIGHT * (0.86 + 0.28 * rocky)
-	# A summit partway along the span, so the ridge has a peak instead of a constant height.
-	var peak: float = 1.0 - clampf(absf(pz - (z_s + z_n) * 0.5) / maxf((z_s - z_n) * 0.55, 1.0), 0.0, 1.0)
-	crest += CAVERN_SUMMIT * peak * peak * (0.75 + 0.35 * rocky)
-
-	# Zero at the gallery edge, full height across the inner flank. A single smoothstep over
-	# 15-48m: at 29m lateral (where the audit probes the wall) it is already a third of the way
-	# up, and the gradient over the whole span stays near 2.0, which the 6.25m grid carries as a
-	# steep but coherent face.
-	#
-	# Two ways this was broken before: squeezing the full 70m rise into the corridor's own 15m
-	# reach (85-degree facets, the chevrons), and the opposite - spreading it over 15-70m with a
-	# double smoothing, which left the wall at 8% height where it is measured and reported the
-	# mountain as absent while standing in front of it.
-	var rise: float = smoothstep(GLACIER_GALLERY_HALF_W, CAVERN_MASS_HALF_W, lat)
-	var massif: float = crest * along * dome * rise
-
-	# Ribbing, as a bounded undulation rather than a crease. The previous form used
-	# 1 - |2n - 1|, which folds a sharp valley along every zero crossing of the noise, and sampled
-	# it at 2.6:0.35 - a 7:1 stretch, so all those valleys ran parallel and converged with the
-	# dome's radial falloff into the chevrons. Squaring the raw noise gives soft crests instead,
-	# and matching the two axes' frequency stops them lining up with the dome at all.
-	var rib: float = _sastrugi_noise.get_noise_2d(px * 0.55, pz * 0.55)
-	massif += rib * CAVERN_RIDGE_HEIGHT * 0.09 * along * perp * rise
+	# One mountain over the cavern: its summit over the passage's middle, the flanks falling away east and west and
+	# rounding off into the icefield, gentle spurs radiating from the top, a horn at the summit. It used to be two
+	# ridges, one either side of the passage (the height rose away from the axis), with the cap filling the saddle
+	# between them to 90% of the lower: from the road it read as two humps with a dome between.
+	var massif: float = _mountain_full(px, pz) * along
+	# Zero at the gallery's edge, full height a few metres further out: the passage's corridor stays clear, and the
+	# cap (_cap_section) carries the mountain over it at the same height.
+	var rise: float = 1.0 if over_passage else smoothstep(GLACIER_GALLERY_HALF_W, GLACIER_GALLERY_HALF_W + MOUNT_INNER_RISE, lat)
+	massif *= rise
 
 	# Apron tying the base into the icefield over a much longer span than the ridge itself. It has
 	# to be *ramped in* away from the mouths: the first version used a fade that evaluated to
@@ -2463,6 +2474,37 @@ func _cavern_mass(px: float, pz: float) -> float:
 	var clear_of_mouths: float = smoothstep(4.0, 90.0, inward)
 	var apron: float = CAVERN_APRON * clear_of_mouths * rise * (1.0 - smoothstep(150.0, 340.0, lat))
 	return maxf(massif, 0.0) + apron
+
+
+## The mountain's distance from its summit, 0 there and 1 at its foot (an ellipse: MOUNT_HALF_W east and west, half the
+## span between the portals plus MOUNT_END_REACH north and south).
+func _mountain_r(px: float, pz: float) -> float:
+	var z_s: float = maxf(_cavern_portal_z.x, _cavern_portal_z.y)
+	var z_n: float = minf(_cavern_portal_z.x, _cavern_portal_z.y)
+	var zc: float = (z_s + z_n) * 0.5 + MOUNT_SUMMIT_SHIFT
+	var dz: float = (pz - zc) / ((z_s - z_n) * 0.5 + MOUNT_END_REACH)
+	var dx: float = px / MOUNT_HALF_W
+	return sqrt(dx * dx + dz * dz)
+
+
+## The mountain over the cavern at full height (before the portals' faces and the passage's corridor are cut into
+## it): concave flanks up to MOUNT_PEAK, spurs radiating from the summit, a horn on top. The cap over the passage
+## (_cap_section) is laid at this height, so the mountain is one piece across it.
+func _mountain_full(px: float, pz: float) -> float:
+	var r: float = _mountain_r(px, pz)
+	if r >= 1.0:
+		return 0.0
+	var z_s: float = maxf(_cavern_portal_z.x, _cavern_portal_z.y)
+	var z_n: float = minf(_cavern_portal_z.x, _cavern_portal_z.y)
+	var zc: float = (z_s + z_n) * 0.5 + MOUNT_SUMMIT_SHIFT
+	var cone: float = pow(1.0 - r, MOUNT_CONCAVE)
+	# Spurs: the height swells and dips round the summit, the ridges wandering a little, gone at the summit and the foot.
+	var th: float = atan2(px, (pz - zc) * 1.4)
+	var wander: float = _detail_noise.get_noise_2d(px * 0.012, pz * 0.012) * 2.4
+	var spurs: float = 1.0 + MOUNT_SPURS * sin(th * 5.0 + wander) * smoothstep(0.12, 0.4, r) * (1.0 - smoothstep(0.7, 0.98, r))
+	var rocky: float = clampf(_ridge_noise.get_noise_2d(px * 0.35, pz * 0.35) * 0.5 + 0.5, 0.0, 1.0)
+	var horn: float = MOUNT_HORN * pow(maxf(1.0 - r / 0.24, 0.0), 1.6)
+	return MOUNT_PEAK * cone * spurs * (0.92 + 0.16 * rocky) + horn
 
 
 ## Natural polar ground: a wind-worked icefield, a dead-flat frozen lake on the start straight,
@@ -3550,6 +3592,7 @@ func _build_junction_pylons(parent: Node, ice_mat: Material, routes: Array) -> v
 			group.name = "Pylons_%s_%d" % [label, int(trunk_off)]
 			group.position = f["pos"]
 			group.rotation_degrees = Vector3(0.0, rad_to_deg(atan2(-f["fwd"].x, -f["fwd"].z)), 0.0)
+			var piece: Array = SCULPTURE_PYLONS[root.get_child_count() % SCULPTURE_PYLONS.size()]
 			for s in [-1.0, 1.0]:
 				var lat2: float = float(s) * (MAIN_HALF_W + 3.4)
 				var body := StaticBody3D.new()
@@ -3569,14 +3612,17 @@ func _build_junction_pylons(parent: Node, ice_mat: Material, routes: Array) -> v
 				mi.position = Vector3(0.0, 5.0, 0.0)
 				mi.rotation_degrees = Vector3(0.0, float(s) * 11.0, float(s) * 3.5)
 				body.add_child(mi)
+				# A glowing plinth on top, and on it an ice sculpture facing the oncoming cars, turned a little to
+				# the road, lit by its uplight's colour.
 				var cap := MeshInstance3D.new()
 				cap.name = "CapMesh"
 				var cm := BoxMesh.new()
-				cm.size = Vector3(2.3, 0.6, 2.3)
+				cm.size = Vector3(4.2, 0.45, 4.2)
 				cap.mesh = cm
 				cap.material_override = glow_mat
-				cap.position = Vector3(0.0, 10.7, 0.0)
+				cap.position = Vector3(0.0, 10.75, 0.0)
 				body.add_child(cap)
+				_add_sculpture(body, String(piece[0]), piece[1], Transform3D(Basis(Vector3.UP, -float(s) * 0.4).scaled(Vector3.ONE * SCULPTURE_PYLON_SCALE), Vector3(0.0, 10.97, 0.0)))
 				var cs := CollisionShape3D.new()
 				cs.name = "PylonCollision"
 				var shp := BoxShape3D.new()
@@ -3586,6 +3632,139 @@ func _build_junction_pylons(parent: Node, ice_mat: Material, routes: Array) -> v
 				body.add_child(cs)
 				group.add_child(body)
 			root.add_child(group)
+
+
+## An ice sculpture (IceSculptureKit's `design`, meshed once and saved) under `parent` at `xf`, glowing `col`, with a
+## small light of that colour at its foot (no shadow).
+func _add_sculpture(parent: Node3D, design: String, col: Color, xf: Transform3D) -> MeshInstance3D:
+	if _sculpture_mat == null:
+		_sculpture_mat = ShaderMaterial.new()
+		_sculpture_mat.shader = load("res://ice_sculpture.gdshader")
+		_sculpture_mat = _save_baked_resource(_sculpture_mat, "sculpture_mat")
+	if not _sculpture_meshes.has(design):
+		var t0 := Time.get_ticks_msec()
+		# Saved outside RES_PREFIX: MeshChunker splits every big "northlight_" mesh on its grid about the local origin,
+		# which cut each sculpture (modelled round its own) into four pieces.
+		var sculpture: ArrayMesh = IceSculptureKit.mesh(design, SCULPTURE_VOXEL)
+		var path := "res://generated/icesculpture_%s.res" % design
+		sculpture.take_over_path(path)
+		ResourceSaver.save(sculpture, path)
+		_sculpture_meshes[design] = load(path)
+		print("  ice sculpture %s meshed (%.1fs)" % [design, (Time.get_ticks_msec() - t0) / 1000.0])
+	var mi := MeshInstance3D.new()
+	mi.name = "IceSculpture_%s" % design
+	mi.mesh = _sculpture_meshes[design]
+	mi.material_override = _sculpture_mat
+	mi.transform = xf
+	mi.set_instance_shader_parameter("glow", col)
+	mi.visibility_range_end = 420.0
+	parent.add_child(mi)
+	var light := OmniLight3D.new()
+	light.name = "SculptureLight"
+	light.light_color = col
+	light.light_energy = 1.5
+	light.omni_range = 9.0
+	light.shadow_enabled = false
+	light.set_meta(&"no_shadow", true)
+	light.transform = xf * Transform3D(Basis(), Vector3(0.0, 0.6, 1.8))
+	parent.add_child(light)
+	return mi
+
+
+## The sign's ice: the sculptures' shader, darker and bluer (deep clear ice), so its glowing letters stand out.
+func _sign_ice_material() -> ShaderMaterial:
+	if _sign_mat == null:
+		_sign_mat = (_sculpture_mat if _sculpture_mat else ShaderMaterial.new()).duplicate() as ShaderMaterial
+		_sign_mat.shader = load("res://ice_sculpture.gdshader")
+		_sign_mat.set_shader_parameter("ice", Color(0.16, 0.3, 0.5))
+		_sign_mat.set_shader_parameter("glow_energy", 0.6)
+		_sign_mat = _save_baked_resource(_sign_mat, "sign_ice_mat")
+	return _sign_mat
+
+
+## The sculpture garden on the frozen lake beside the start straight (SCULPTURE_GARDEN): each sculpture on an ice
+## pedestal SCULPTURE_GARDEN_LAT off the road's middle, facing the road, a solid block; and the festival's sign by the
+## finish line, glowing letters on an ice slab.
+func _build_sculpture_garden(parent: Node) -> void:
+	var root := Node3D.new()
+	root.name = "SculptureGarden"
+	parent.add_child(root)
+	for g in SCULPTURE_GARDEN:
+		# Along the trunk from its start (the finish line), down the lake straight.
+		var off: float = float(g[1])
+		var f: Dictionary = _frame_at_offset(main_track_curve, off)
+		var side: float = g[2]
+		var at: Vector3 = f["pos"] + f["right"] * (side * SCULPTURE_GARDEN_LAT)
+		at.y = LAKE_SURFACE_Y
+		var body := StaticBody3D.new()
+		body.name = "SculpturePedestal_%s_%d" % [g[0], int(off)]
+		body.position = at
+		# Facing the road: its +z toward the road's middle.
+		var to_road: Vector3 = -(f["right"] as Vector3) * side
+		body.basis = Basis.looking_at(-to_road, Vector3.UP)
+		var ped := MeshInstance3D.new()
+		var pm := BoxMesh.new()
+		pm.size = Vector3(5.6, 1.4, 4.4)
+		ped.mesh = pm
+		ped.material_override = _sculpture_mat if _sculpture_mat else null
+		ped.position = Vector3(0, 0.5, 0)
+		body.add_child(ped)
+		var cs := CollisionShape3D.new()
+		var bs := BoxShape3D.new()
+		bs.size = Vector3(5.6, 9.0, 4.4)
+		cs.shape = bs
+		cs.position = Vector3(0, 4.5, 0)
+		body.add_child(cs)
+		root.add_child(body)
+		var mi := _add_sculpture(body, String(g[0]), g[3], Transform3D(Basis.from_scale(Vector3.ONE * SCULPTURE_GARDEN_SCALE), Vector3(0, 1.2, 0)))
+		if ped.material_override == null:
+			ped.material_override = _sculpture_mat
+		ped.set_instance_shader_parameter("glow", g[3])
+	# The sign: an ice slab on two blocks beside the road just past the finish line, the festival's name glowing on it.
+	var f0: Dictionary = _frame_at_offset(main_track_curve, 16.0)
+	var sp: Vector3 = f0["pos"] + f0["right"] * (-(MAIN_HALF_W + 14.0))
+	sp.y = LAKE_SURFACE_Y
+	var sign_body := StaticBody3D.new()
+	sign_body.name = "SculptureFestivalSign"
+	sign_body.position = sp
+	sign_body.basis = Basis.looking_at(-(f0["right"] as Vector3), Vector3.UP)
+	var slab := MeshInstance3D.new()
+	var sm := BoxMesh.new()
+	sm.size = Vector3(11.0, 3.2, 0.6)
+	slab.mesh = sm
+	slab.material_override = _sign_ice_material()
+	slab.position = Vector3(0, 3.6, 0)
+	sign_body.add_child(slab)
+	slab.set_instance_shader_parameter("glow", Color(0.45, 0.9, 1.0))
+	for bx in [-4.0, 4.0]:
+		var blk := MeshInstance3D.new()
+		var bm2 := BoxMesh.new()
+		bm2.size = Vector3(1.6, 2.2, 1.2)
+		blk.mesh = bm2
+		blk.material_override = _sign_ice_material()
+		blk.position = Vector3(bx, 1.1, 0)
+		sign_body.add_child(blk)
+		blk.set_instance_shader_parameter("glow", Color(0.45, 0.9, 1.0))
+	var cs2 := CollisionShape3D.new()
+	var bs2 := BoxShape3D.new()
+	bs2.size = Vector3(11.0, 5.2, 1.2)
+	cs2.shape = bs2
+	cs2.position = Vector3(0, 2.6, 0)
+	sign_body.add_child(cs2)
+	for l in [["NORTHLIGHT", 4.3, 1.15 / 44.8], ["ICE SCULPTURE FESTIVAL", 3.0, 0.5 / 44.8]]:
+		var lab := Label3D.new()
+		lab.text = l[0]
+		lab.font_size = 64
+		lab.pixel_size = float(l[2])
+		lab.modulate = Color(0.75, 0.97, 1.0) * 2.2
+		lab.outline_size = 0
+		lab.shaded = false
+		lab.double_sided = false
+		lab.alpha_cut = Label3D.ALPHA_CUT_DISCARD
+		lab.position = Vector3(0, float(l[1]), 0.33)
+		sign_body.add_child(lab)
+	root.add_child(sign_body)
+	print("  sculpture garden: %d pieces and the festival's sign" % SCULPTURE_GARDEN.size())
 
 
 ## Dark water filling the crevasse slot under the ice arch.
@@ -4167,6 +4346,10 @@ func _set_owner_recursive(node: Node, scene_root: Node) -> void:
 ## lake - with the road receding to a vanishing point under a glowing arch, because that silhouette
 ## is what makes the tile legible at the 128px the menu actually draws it at.
 func _build_menu_tile() -> void:
+	# The tile in the repository is a rendered view of the stage, made since: drawn over by this placeholder on every
+	# regeneration. Only draw it where there is none.
+	if FileAccess.file_exists("res://images/menu/tile_northlight_caverns.jpg"):
+		return
 	const SIZE := 512
 	var img := Image.create(SIZE, SIZE, false, Image.FORMAT_RGB8)
 	var ridge := FastNoiseLite.new()
@@ -4919,6 +5102,7 @@ func _ready() -> void:
 		[Vector3(26.0, 3.30, -354.0), 12.0, 11.0, 2.0, 14.0],
 	])
 	_build_junction_pylons(props_container, serac_mat, routes)
+	_build_sculpture_garden(props_container)
 	_build_crevasse_lights(props_container)
 	_build_crevasse_water(props_container)
 	_build_thin_ice(props_container, ground_mat, thin_edge_mat, serac_mat)

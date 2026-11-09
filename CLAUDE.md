@@ -1566,6 +1566,27 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 
 ## Northlight Caverns (Svartfjell GP, night stage)
 
+- The cavern's mountain is one peak (`_mountain_full`, `MOUNT_*`): its summit over the passage's middle, concave flanks
+  falling away east and west, spurs radiating from the top, a horn on it; cut down by the portals' faces as before
+  (`_cavern_mass`'s `along`). The heightfield rises to it `MOUNT_INNER_RISE` past the gallery's edge, and the cap over the
+  passage (`_cap_section`) is laid at the mountain's own height (`_cavern_mass(..., true)`: no corridor cut),
+  `CAP_LIFT` over the heightfield where both carry it, diving gently under it at its edges (`CAP_HALF_W` 46). It had been
+  two ridges either side of the passage (the height rose away from the axis) with the cap filling the saddle to 90%
+  of the lower: from the road, two humps with a dome between; the user disliked it. Diving from 60% of its width, the cap
+  left a crease up either side. The audit (`_audit_cavern`) still checks the gallery and its walls.
+- The ice sculpture exhibition (`IceSculptureKit.gd`, `ice_sculpture.gdshader`): carved-ice sculptures modelled as signed
+  distance fields (smooth-blended ellipsoids, tapering capsules, chains) and meshed by surface nets
+  (`IceSculptureKit.mesh(design, voxel)`, normals from the field's gradient; 1-4s a design at `SCULPTURE_VOXEL`; saved as
+  `generated/icesculpture_<design>.res`, outside the `northlight_` prefix, or MeshChunker cut each into four); the
+  designs: owl, reindeer, whale (its tail rising from a wave), swan, bear, snowflake, spiral, wave, fox (all made up). A
+  pair tops each junction pylon (`SCULPTURE_PYLONS`, one design a junction, facing the oncoming cars, turned a little to
+  the road, `SCULPTURE_PYLON_SCALE`, on a wider glowing plinth), the garden stands on ice pedestals on the frozen lake
+  beside the start straight (`SCULPTURE_GARDEN`, `_build_sculpture_garden`, solid boxes), and the festival's sign
+  (NORTHLIGHT ICE SCULPTURE FESTIVAL, made up; `_sign_ice_material`: darker ice so its letters read) stands by the finish.
+  Each sculpture glows in its uplight's colour (instance uniform `glow`, strongest at its silhouette and foot) with a
+  small light (`no_shadow`); the shader bumps chisel scoops into it (Worley, no tangents needed) and is opaque.
+  `res://scratch/ice_sculpture_preview.gd` (`-s`, windowed, `-- <dir> [only=owl,...] [voxel=] name:x,y,z:tx,ty,tz[:fov]`)
+  meshes the designs in a row 6m apart and renders them in seconds.
 - The aurora sky reads the `aurora_clock` global shader uniform (`[shader_globals]` in project.godot,
   advanced by `AuroraClock.gd`), never `TIME`. A sky shader that uses `TIME` rebuilds the radiance
   cubemap every frame (2.5ms here); a global float moves the visible sky without touching it.
