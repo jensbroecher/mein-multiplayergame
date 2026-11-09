@@ -28,6 +28,37 @@ change the courses again: re-render a stage's tile after a big change rather tha
 generator writes a tile. `res://scratch/lap_points.gd` (`-s`, headless, `-- <level> [every=250]`) prints where a
 lap runs, to aim a focus.
 
+## The main menu's mode tiles are live 3D scenes
+
+The mode tiles (Single Player, Splitscreen, Multiplayer, Spectator, Inspect, Options, and Grand Prix, Time Trial and
+VS Race under them) are no longer AI pictures: `MainMenu._add_tile` with a `scene:<kind>` file puts a
+`MenuTileStage.gd` (a TextureRect drawing its own SubViewport and World3D, built in code) where the picture was. The
+cars are the game's own in factory paint, and the Mudrunner (the game's "main character") is in every scene with cars.
+The Garage tile stays a render (`tile_garage.jpg`); GP Test and the course tiles keep their pictures.
+- The cars stand still on a road that slides under them (`menu_tile_road.gdshader`'s `scroll`, set from the script), with
+  marker posts, bushes and trees (Harbor Pier's saved far tree meshes) wrapping along it; hills round the horizon. Every
+  motion is a function of the clock (`seek`).
+- `_frame` frames each camera on what it shows (a centre, its extent across and up) into the part of the tile above the
+  caption's fade, whatever the tile's shape: 4:1 on the main screen, nearly square under Single Player.
+- Kinds: single (the Mudrunner from the front), splitscreen (two viewports sharing one world, each chasing its car, P1
+  and P2 badges), multiplayer (seen from behind, the Mudrunner as P1 chasing three others under name tags), spectator (a
+  broadcast's high side view, LIVE and lap badges), vs (two side by side, head on), time_trial (a hologram ghost,
+  `menu_ghost.gdshader`, and a running lap time and gap), grand_prix (the podium at night under a chequered banner,
+  confetti), inspect (`Drone.gd`, no cars), options (`MenuPropKit.build_bench`: a workbench with a laptop whose screen
+  is a live 2D settings page with telemetry, a pro pistol-grip transmitter whose wheel steers the Mudrunner on its set-up
+  stand, a pegboard wall, hex drivers, a LiPo).
+- Cost: each tile costs about 2ms of an M1's GPU whatever its size, MSAA or shadows (the trees' near meshes 2ms more,
+  so the far ones are used). So only the tile under the pointer or focus renders every frame; the others take turns
+  (`IDLE_EVERY` by Detail Level: every 2nd frame at High and Ultra, 4th at Low), nothing renders while the menu is hidden,
+  and at Detail Level Off a tile renders for `WARMUP` frames and holds still. The main screen holds 60 fps on the M1 at
+  2880x1800. `res://scratch/menu_tile_bench.tscn -- [screens=main,sp_modes] [frames=300] [dbg=<switch>:<value> ...]`
+  (windowed) prints frame times and each tile's GPU time; the `dbg` switches (`MenuTileStage.dbg`: msaa, glow, shadows,
+  trees, far_trees, sky, scale) price the parts. `res://scratch/menu_shot.tscn -- <dir> main sp_modes coop_config`
+  photographs the screens.
+- `Drone.gd` (a camera drone at game scale, about 1.3m across, nose toward -z: body with a livery band, carbon arms,
+  motors, spinning props with faint discs, skids, a gimbal camera, nav lights and a strobe) runs itself with
+  `auto_animate`, so it can fly over the races later as a broadcast drone.
+
 ## Levels are generated, not hand-edited
 
 Each level in `levels/*Level.tscn` (plus its meshes in `generated/*.res`) is written by a generator script

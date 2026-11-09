@@ -10,6 +10,7 @@ signal quit_pressed
 const SHOW_GP_TEST_MENU := true
 
 const TILE_DIR := "res://images/menu/"
+const MenuTileStage = preload("res://MenuTileStage.gd")
 
 const COL_TEAL := Color(0.15, 0.75, 0.92)
 const COL_ORANGE := Color(1.0, 0.55, 0.16)
@@ -251,28 +252,28 @@ func show_sub_menu(menu_name: String) -> void:
 			screen_title.text = "SELECT MODE"
 			screen_subtitle.text = "Choose how you want to race"
 			tile_grid.columns = 2
-			_add_tile("SINGLE PLAYER", "Grand Prix or Time Trial against the clock", "tile_single_player.jpg", COL_TEAL, func():
+			_add_tile("SINGLE PLAYER", "Grand Prix or Time Trial against the clock", "scene:single", COL_TEAL, func():
 				NetworkManager.current_game_mode = NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL
 				show_sub_menu("sp_modes")
 			)
-			_add_tile("SPLITSCREEN", "Two racers, one screen", "tile_splitscreen.jpg", COL_ORANGE, func():
+			_add_tile("SPLITSCREEN", "Two racers, one screen", "scene:splitscreen", COL_ORANGE, func():
 				show_sub_menu("coop_config")
 			)
-			_add_tile("MULTIPLAYER", "Host or join a LAN race", "tile_multiplayer.jpg", COL_MAGENTA, _on_multiplayer_pressed)
+			_add_tile("MULTIPLAYER", "Host or join a LAN race", "scene:multiplayer", COL_MAGENTA, _on_multiplayer_pressed)
 			_add_tile("GARAGE", "Walk your collection, pick the line-up, see your trophies", "tile_garage.jpg", COL_BRONZE, func():
 				garage_pressed.emit()
 			)
-			_add_tile("SPECTATOR", "Watch 6 AI racers — pick any course", "tile_grand_prix.jpg", COL_CYAN, func():
+			_add_tile("SPECTATOR", "Watch 6 AI racers — pick any course", "scene:spectator", COL_CYAN, func():
 				NetworkManager.current_game_mode = NetworkManager.GameMode.SPECTATOR
 				NetworkManager.inspect_mode = false
 				show_sub_menu("stage_select")
 			)
-			_add_tile("INSPECT", "No cars — fly a free camera round any course", "tile_grand_prix.jpg", COL_TEAL, func():
+			_add_tile("INSPECT", "No cars — fly a free camera round any course", "scene:inspect", COL_TEAL, func():
 				NetworkManager.current_game_mode = NetworkManager.GameMode.SPECTATOR
 				NetworkManager.inspect_mode = true
 				show_sub_menu("stage_select")
 			)
-			_add_tile("OPTIONS", "Graphics, sound, and controls", "tile_options.jpg", COL_GOLD, _on_options_pressed)
+			_add_tile("OPTIONS", "Graphics, sound, and controls", "scene:options", COL_GOLD, _on_options_pressed)
 			if SHOW_GP_TEST_MENU:
 				_add_tile("GP TEST", "Dev: play any GP stage with bots", "tile_grand_prix.jpg", COL_GOLD, func():
 					show_sub_menu("gp_test")
@@ -287,10 +288,10 @@ func show_sub_menu(menu_name: String) -> void:
 			screen_title.text = "SINGLE PLAYER"
 			screen_subtitle.text = "Pick a championship or a single course"
 			tile_grid.columns = 2
-			_add_tile("GRAND PRIX", "Race a cup of tracks against bots", "tile_grand_prix.jpg", COL_GOLD, func():
+			_add_tile("GRAND PRIX", "Race a cup of tracks against bots", "scene:grand_prix", COL_GOLD, func():
 				show_sub_menu("cup_select")
 			)
-			_add_tile("TIME TRIAL", "Solo laps on any course", "tile_time_trial.jpg", COL_CYAN, func():
+			_add_tile("TIME TRIAL", "Solo laps on any course", "scene:time_trial", COL_CYAN, func():
 				show_sub_menu("stage_select")
 			)
 		"coop_config":
@@ -298,8 +299,8 @@ func show_sub_menu(menu_name: String) -> void:
 			screen_subtitle.text = "Set Player 2's name, then pick a mode"
 			extra_row.visible = true
 			tile_grid.columns = 2
-			_add_tile("GRAND PRIX", "Share a cup with bots in the field", "tile_grand_prix.jpg", COL_GOLD, _on_coop_gp_pressed)
-			_add_tile("VS RACE", "Head-to-head on a single course", "tile_time_trial.jpg", COL_ORANGE, _on_coop_vs_pressed)
+			_add_tile("GRAND PRIX", "Share a cup with bots in the field", "scene:grand_prix", COL_GOLD, _on_coop_gp_pressed)
+			_add_tile("VS RACE", "Head-to-head on a single course", "scene:vs", COL_ORANGE, _on_coop_vs_pressed)
 		"cup_select":
 			screen_title.text = "SELECT CUP"
 			screen_subtitle.text = "Each cup is a series of courses"
@@ -416,7 +417,10 @@ func _add_tile(title: String, subtitle: String, file_name: String, accent: Color
 	btn.focus_mode = Control.FOCUS_ALL
 	_apply_tile_styles(btn, accent)
 
-	var tex := TextureRect.new()
+	# "scene:<kind>" is a live 3D scene (MenuTileStage.gd) instead of a picture.
+	var tex: TextureRect = MenuTileStage.new() if file_name.begins_with("scene:") else TextureRect.new()
+	if file_name.begins_with("scene:"):
+		(tex as MenuTileStage).setup(file_name.substr(6), accent)
 	tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	tex.offset_left = 4
 	tex.offset_top = 4
@@ -426,7 +430,7 @@ func _add_tile(title: String, subtitle: String, file_name: String, accent: Color
 	tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var tex_path := TILE_DIR + file_name
-	if ResourceLoader.exists(tex_path):
+	if not file_name.begins_with("scene:") and ResourceLoader.exists(tex_path):
 		tex.texture = load(tex_path)
 	btn.add_child(tex)
 
