@@ -19,6 +19,7 @@ const SnowTreeKit = preload("res://SnowTreeKit.gd")
 const SnowWoodsDetail = preload("res://SnowWoodsDetail.gd")
 const PropKit = preload("res://PropKit.gd")
 const HighwayGen = preload("res://regenerate_glacier_highway.gd")
+const BaustelleKit = preload("res://BaustelleKit.gd")
 
 const LEVEL_PATH := "res://levels/GlacierHighwayLevel.tscn"
 const DRESSING := "GlacierDressing"
@@ -61,6 +62,23 @@ const TREE_SOLID_SHARE := 0.7
 const RANK_NEAR_ROAD := 0.55
 const RANK_ROAD := Vector2(30.0, 110.0)
 const MESH_KINDS := ["spruce", "spruce", "birch", "birch"]
+
+# --- The works: the far highway being carried on north over the hairpin ---
+## People-sized things (the crane, machines, cabins) are built at life size and grown by this, as on every stage.
+const PROP_SCALE := 1.6
+## The new viaduct's line north of the hairpin (x) and its deck's height (the far highway's tip, FAR_SOUTH's first point,
+## is its end south of the hairpin): the next pier carrying a balanced cantilever WORKS_T_HALF either way, then a pier
+## with only its crosshead, one half poured, a footing with its starter bars, across the hairpin's infield.
+const WORKS_X := -110.0
+const WORKS_DECK_Y := 16.5
+const WORKS_T_Z := 298.0
+const WORKS_T_HALF := 12.0
+const WORKS_PIERS := [[264.0, "cap"], [230.0, "half"], [196.0, "footing"]]
+## The works' pieces keep this far (in plan) from any lap's edge; trees keep out of WORKS_KEEP (x, z, half x, half z).
+const WORKS_LAP_CLEAR := 5.0
+const WORKS_KEEP := [Vector4(-110.0, 250.0, 13.0, 70.0), Vector4(-106.0, 385.0, 46.0, 48.0)]
+const STEEL_RED := Color(0.72, 0.16, 0.10)
+const PLY := Color(0.78, 0.62, 0.30)
 
 var _level: Node3D
 var _gen
@@ -111,6 +129,7 @@ func _ready() -> void:
 	_level.add_child(root)
 
 	_build_country(root)
+	_build_works(root)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	_plan_woods()
@@ -532,6 +551,8 @@ func _plan_woods() -> void:
 			var rd := _road_edge_d(px, pz, 40.0)
 			if rd < crown + TREE_CLEAR:
 				continue
+			if _in_works(px, pz, crown):
+				continue
 			var lean := Basis(Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1)).normalized(), rng.randf_range(0.0, 0.04))
 			var xf := Transform3D(lean * Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(sc, sc * rng.randf_range(0.92, 1.12), sc)),
 					hp + Vector3.DOWN * 0.3)
@@ -659,3 +680,418 @@ func _build_woods(root: Node3D) -> void:
 	node.add_child(detail)
 	print("  woods: %d near cells, %d far, %d trunk colliders (%.1fs)" % [near.size(), far.size(), trunks.size(),
 			(Time.get_ticks_msec() - t0) / 1000.0])
+
+
+# ======================================================================================
+#  The works: the far highway carried on north over the hairpin
+# ======================================================================================
+
+## Inside one of WORKS_KEEP's rectangles, grown by `margin`.
+func _in_works(x: float, z: float, margin: float) -> bool:
+	for r in WORKS_KEEP:
+		if absf(x - r.x) < r.z + margin and absf(z - r.y) < r.w + margin:
+			return true
+	return false
+
+
+## The far highway (FAR_SOUTH) is being carried on north over the lap's hairpin. Its new viaduct ends in the air south of
+## the hairpin; on the far side, in the hairpin's infield, the next pier stands with its balanced cantilever reaching out
+## both ways, and beyond it a pier with only its crosshead, one half poured and a footing. A form traveller hangs off each
+## deck end over the gap with the next segment's formwork and reinforcement in it, starter bars stick out of the ends, and
+## temporary railings line the bare deck. South of the hairpin the tower crane, the yard (cabins, materials, a mixer
+## truck, a dumper), an excavator at the footing, floodlights and the project's board. Everything stands clear of the
+## lap (`_check_works_clear`).
+func _build_works(root: Node3D) -> void:
+	var t0 := Time.get_ticks_msec()
+	var node := Node3D.new()
+	node.name = "Anlegg"
+	root.add_child(node)
+	var conc: Material = null
+	var cap := _level.find_child("CrossheadBeam", true, false) as MeshInstance3D
+	if cap:
+		conc = cap.material_override
+	var foot_pts: Array = []
+	# --- The spans, at the bridge's own scale ---
+	var pkb: PropKit = BaustelleKit.new_kit(1.0)
+	var kb := {}
+	var tip: Vector3 = _far.sample_baked(0.0)
+	var back: Vector3 = _far.sample_baked(4.0) - tip
+	back.y = 0.0
+	back = back.normalized()
+	# The tip's frame: -z out over the gap, x across the deck, y up from the road's surface.
+	var xf_tip := Transform3D(Basis(Vector3(-back.z, 0.0, back.x), Vector3.UP, back), tip)
+	pkb.set_frame(xf_tip)
+	_deck_end(pkb, kb, 8.0, 1.15)
+	_traveller(pkb, kb)
+	_temp_rails_far(pkb, kb)
+	var xf_t := Transform3D(Basis(), Vector3(WORKS_X, WORKS_DECK_Y, WORKS_T_Z))
+	pkb.set_frame(xf_t)
+	_cantilever(pkb, kb, WORKS_T_HALF)
+	for dir in [-1.0, 1.0]:
+		# Each tip's frame: -z out over the next span.
+		var b := Basis() if dir < 0.0 else Basis(Vector3.UP, PI)
+		pkb.set_frame(xf_t * Transform3D(b, Vector3(0, 0, dir * WORKS_T_HALF)))
+		_deck_end(pkb, kb, 8.0, 1.2)
+		_traveller(pkb, kb)
+	foot_pts.append([Vector2(WORKS_X, WORKS_T_Z), 8.5])
+	_gen.call("_build_viaduct_pier", node, Vector3(WORKS_X, WORKS_DECK_Y, WORKS_T_Z), Vector3(0, 0, -1), Vector3(1, 0, 0), 8.0,
+			WORKS_DECK_Y, conc)
+	for pr in WORKS_PIERS:
+		var z: float = pr[0]
+		foot_pts.append([Vector2(WORKS_X, z), 7.0])
+		match String(pr[1]):
+			"cap":
+				_gen.call("_build_viaduct_pier", node, Vector3(WORKS_X, WORKS_DECK_Y, z), Vector3(0, 0, -1), Vector3(1, 0, 0), 8.0,
+						WORKS_DECK_Y, conc)
+			"half":
+				_half_pier(node, pkb, kb, z, conc)
+			"footing":
+				_footing(node, pkb, kb, z, conc)
+	pkb.reset_frame()
+	var mi := MeshInstance3D.new()
+	mi.name = "Anlegg_Spenn"
+	mi.mesh = _save_res(BaustelleKit.commit(pkb, kb), "works_spans")
+	node.add_child(mi)
+	var body := StaticBody3D.new()
+	body.name = "Anlegg_Spenn_Solid"
+	node.add_child(body)
+	# The cantilever's deck and the deck ends' formwork platforms: a cart flying the gap meets concrete.
+	_box_shape(body, xf_t * Transform3D(Basis(), Vector3(0, -0.75, 0)), Vector3(16.0, 1.5, WORKS_T_HALF * 2.0 + 5.0))
+	# --- The site, at life size ---
+	_build_site(node, foot_pts)
+	_check_works_clear(foot_pts)
+	print("  works: the far highway's new viaduct and its site (%.1fs)" % ((Time.get_ticks_msec() - t0) / 1000.0))
+
+
+func _box_shape(body: StaticBody3D, xf: Transform3D, size: Vector3) -> void:
+	var cs := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = size
+	cs.shape = bs
+	cs.transform = xf
+	body.add_child(cs)
+
+
+## A deck's end in its frame (-z out over the gap, the road's surface at y 0): the construction joint's face, set 3cm back
+## so it never shares a plane with the deck's own end, and the starter bars sticking out of the slab and the box's webs.
+func _deck_end(pk: PropKit, kit: Dictionary, half: float, depth: float) -> void:
+	BaustelleKit._blk(pk, kit, "concrete", Vector3(-half + 0.02, -0.32, 0.03), Vector3(half - 0.02, -0.05, 0.4), Color(0.70, 0.70, 0.69))
+	BaustelleKit._blk(pk, kit, "concrete", Vector3(-3.9, -depth, 0.03), Vector3(3.9, -0.32, 0.4), Color(0.66, 0.66, 0.65))
+	var rust := Color(0.42, 0.22, 0.12)
+	var x := -half + 0.3
+	while x <= half - 0.3:
+		for y in [-0.1, -0.25]:
+			BaustelleKit._bar(pk, kit, "rusty", Vector3(x, y, 0.1), Vector3(x, y, -1.3), 0.03, 0.03, rust)
+		x += 0.35
+	x = -3.6
+	while x <= 3.6:
+		for y in [-0.55, -0.85]:
+			BaustelleKit._bar(pk, kit, "rusty", Vector3(x, y, 0.1), Vector3(x, y, -1.1), 0.03, 0.03, rust)
+		x += 0.4
+
+
+## A form traveller on a deck's end (its frame as _deck_end's): two red triangular frames on rails along the deck, their
+## front post at the end and their noses reaching out over the gap, cross beams, hangers carrying the next segment's
+## formwork under it (the bottom platform, the webs' and the slab's forms with the reinforcement mat in them), railings
+## round the platforms.
+func _traveller(pk: PropKit, kit: Dictionary) -> void:
+	var red := STEEL_RED
+	var dark := Color(0.16, 0.16, 0.17)
+	for sx in [-1.0, 1.0]:
+		var x: float = sx * 4.4
+		BaustelleKit._blk(pk, kit, "steel", Vector3(x - 0.25, 0.0, 7.5), Vector3(x + 0.25, 0.18, -0.6), dark)
+		BaustelleKit._bar(pk, kit, "bpaint", Vector3(x, 0.4, 7.2), Vector3(x, 0.4, -5.2), 0.45, 0.45, red)
+		BaustelleKit._bar(pk, kit, "bpaint", Vector3(x, 0.2, -0.5), Vector3(x, 4.2, -0.5), 0.45, 0.45, red)
+		BaustelleKit._bar(pk, kit, "bpaint", Vector3(x, 4.2, -0.5), Vector3(x, 0.6, 7.0), 0.35, 0.35, red)
+		BaustelleKit._bar(pk, kit, "bpaint", Vector3(x, 4.2, -0.5), Vector3(x, 0.6, -5.0), 0.35, 0.35, red)
+		BaustelleKit._blk(pk, kit, "concrete", Vector3(x - 0.6, 0.18, 6.4), Vector3(x + 0.6, 1.0, 7.6), Color(0.6, 0.6, 0.6))
+	BaustelleKit._bar(pk, kit, "bpaint", Vector3(-6.2, 0.85, -5.0), Vector3(6.2, 0.85, -5.0), 0.5, 0.5, red)
+	BaustelleKit._bar(pk, kit, "bpaint", Vector3(-5.0, 0.85, 6.9), Vector3(5.0, 0.85, 6.9), 0.4, 0.4, red)
+	BaustelleKit._bar(pk, kit, "bpaint", Vector3(-4.4, 4.2, -0.5), Vector3(4.4, 4.2, -0.5), 0.3, 0.3, red)
+	# Hangers from the front beam down past the forms to the bottom platform.
+	for hx in [-5.6, -2.0, 2.0, 5.6]:
+		BaustelleKit._rod(pk, kit, "steel", Vector3(hx, 0.6, -4.9), Vector3(hx, -2.75, -4.9), 0.05, 6, dark)
+		BaustelleKit._rod(pk, kit, "steel", Vector3(hx, -0.05, 0.6), Vector3(hx, -2.75, 0.6), 0.05, 6, dark)
+	# The bottom platform under the next segment, and its railings.
+	BaustelleKit._blk(pk, kit, "steel", Vector3(-6.0, -2.85, 1.0), Vector3(6.0, -2.7, -5.4), Color(0.3, 0.3, 0.31))
+	for z in [-5.35]:
+		_rail_run(pk, kit, Vector3(-6.0, -2.7, z), Vector3(6.0, -2.7, z), 1.1)
+	for sx in [-1.0, 1.0]:
+		_rail_run(pk, kit, Vector3(sx * 5.95, -2.7, 0.9), Vector3(sx * 5.95, -2.7, -5.3), 1.1)
+	# The next segment's forms: the webs' faces, the slab's soffit and edge boards, plywood on red walers.
+	for sx in [-1.0, 1.0]:
+		BaustelleKit._blk(pk, kit, "timber", Vector3(sx * 3.95, -1.15, -0.1), Vector3(sx * 4.05, -0.34, -4.6), PLY)
+		BaustelleKit._blk(pk, kit, "timber", Vector3(sx * 7.9, -0.38, -0.1), Vector3(sx * 8.0, 0.02, -4.6), PLY)
+		for z in [-1.0, -2.3, -3.6]:
+			BaustelleKit._bar(pk, kit, "bpaint", Vector3(sx * 4.12, -1.1, z), Vector3(sx * 4.12, -0.4, z), 0.12, 0.12, red)
+	BaustelleKit._blk(pk, kit, "timber", Vector3(-7.9, -0.42, -0.1), Vector3(7.9, -0.36, -4.6), PLY)
+	BaustelleKit._blk(pk, kit, "timber", Vector3(-3.95, -1.2, -0.1), Vector3(3.95, -1.14, -4.6), PLY)
+	# The slab's reinforcement in its form: a mat of bars, and bars along.
+	pk.quad(kit, "brebar", [Vector3(-7.8, -0.2, -0.05), Vector3(7.8, -0.2, -0.05), Vector3(7.8, -0.2, -4.55), Vector3(-7.8, -0.2, -4.55)],
+			Vector3.UP, Color(0.42, 0.22, 0.12), [Vector2(0, 0), Vector2(15.6, 0), Vector2(15.6, 4.5), Vector2(0, 4.5)])
+	# Railings along the slab form's edges.
+	for sx in [-1.0, 1.0]:
+		_rail_run(pk, kit, Vector3(sx * 7.85, 0.02, -0.2), Vector3(sx * 7.85, 0.02, -4.6), 1.1)
+	_rail_run(pk, kit, Vector3(-7.85, 0.02, -4.6), Vector3(7.85, 0.02, -4.6), 1.1)
+
+
+## A temporary railing from a to b standing `h` high: posts every 2m, a top and a knee rail in red and white, a toe board.
+func _rail_run(pk: PropKit, kit: Dictionary, a: Vector3, b: Vector3, h: float) -> void:
+	var length := a.distance_to(b)
+	var n := maxi(1, int(ceil(length / 2.0)))
+	var stripe := BaustelleKit._a(Color(0.9, 0.1, 0.08), 0.2)
+	for i in range(n + 1):
+		var p := a.lerp(b, float(i) / float(n))
+		BaustelleKit._rod(pk, kit, "steel", p, p + Vector3.UP * h, 0.03, 5, Color(0.55, 0.56, 0.57))
+	BaustelleKit._bar(pk, kit, "bpaint", a + Vector3.UP * h, b + Vector3.UP * h, 0.06, 0.06, stripe)
+	BaustelleKit._bar(pk, kit, "bpaint", a + Vector3.UP * h * 0.5, b + Vector3.UP * h * 0.5, 0.05, 0.05, stripe)
+	BaustelleKit._bar(pk, kit, "timber", a + Vector3.UP * 0.08, b + Vector3.UP * 0.08, 0.03, 0.15, Color(0.8, 0.66, 0.36), Vector3.UP)
+
+
+## Temporary railings along both edges of the far highway's bare first FAR_BARE metres (it has no barriers yet).
+func _temp_rails_far(pk: PropKit, kit: Dictionary) -> void:
+	pk.reset_frame()
+	for sx in [-1.0, 1.0]:
+		var prev := Vector3.INF
+		var s := 0.3
+		while s <= HighwayGen.FAR_BARE + 2.0:
+			var c: Vector3 = _far.sample_baked(s)
+			var f: Vector3 = _far.sample_baked(s + 1.0) - c
+			f.y = 0.0
+			f = f.normalized()
+			var p: Vector3 = c + Vector3(-f.z, 0.0, f.x) * (sx * 7.7) + Vector3.UP * 0.02
+			if prev != Vector3.INF:
+				_rail_run(pk, kit, prev, p, 1.1)
+			prev = p
+			s += 6.0
+
+
+## The balanced cantilever over the next pier, in its frame (the deck's top at y 0, x across, z along the line): the top
+## slab with its wings and the box below it deepening toward the pier, bare concrete, temporary railings along it.
+func _cantilever(pk: PropKit, kit: Dictionary, half: float) -> void:
+	var slab := PackedVector2Array([Vector2(-half, -0.3), Vector2(half, -0.3), Vector2(half, 0.0), Vector2(-half, 0.0)])
+	BaustelleKit._side_prism(pk, kit, "concrete", slab, -8.0, 8.0, Color(0.72, 0.72, 0.71))
+	var box := PackedVector2Array()
+	box.append(Vector2(-half, -0.29))
+	box.append(Vector2(half, -0.29))
+	var n := 12
+	for i in range(n + 1):
+		var z: float = lerpf(half, -half, float(i) / float(n))
+		var t: float = 1.0 - absf(z) / half
+		box.append(Vector2(z, -1.2 - 0.45 * t * t))
+	BaustelleKit._side_prism(pk, kit, "concrete", box, -3.9, 3.9, Color(0.68, 0.68, 0.67))
+	for sx in [-1.0, 1.0]:
+		_rail_run(pk, kit, Vector3(sx * 7.7, 0.0, half - 0.2), Vector3(sx * 7.7, 0.0, -half + 0.2), 1.1)
+
+
+## A pier half poured: its two columns 8m up from their footings, the starter bars of the rest sticking out of their tops,
+## a climbing form's platform round each top and a scaffold up to it.
+func _half_pier(node: Node3D, pk: PropKit, kit: Dictionary, z: float, mat: Material) -> void:
+	var body := StaticBody3D.new()
+	body.name = "Anlegg_Soyle_%d" % int(z)
+	node.add_child(body)
+	for sx in [-1.0, 1.0]:
+		var x: float = WORKS_X + sx * 4.4
+		var g := _ground_y(x, z)
+		var h := 8.0
+		var cm := CylinderMesh.new()
+		cm.top_radius = 1.0
+		cm.bottom_radius = 1.15
+		cm.height = h + 1.0
+		cm.radial_segments = 16
+		var ci := MeshInstance3D.new()
+		ci.mesh = cm
+		ci.material_override = mat
+		ci.position = Vector3(x, g - 1.0 + (h + 1.0) * 0.5, z)
+		body.add_child(ci)
+		var cs := CollisionShape3D.new()
+		var cy := CylinderShape3D.new()
+		cy.radius = 1.1
+		cy.height = h + 1.0
+		cs.shape = cy
+		cs.position = ci.position
+		body.add_child(cs)
+		pk.reset_frame()
+		var top := Vector3(x, g + h, z)
+		for k in range(14):
+			var a := TAU * float(k) / 14.0
+			var o := Vector3(cos(a), 0, sin(a)) * 0.82
+			BaustelleKit._bar(pk, kit, "rusty", top + o + Vector3.DOWN * 0.3, top + o + Vector3.UP * 2.4, 0.035, 0.035, Color(0.42, 0.22, 0.12))
+		# The climbing form's platform and its railing.
+		BaustelleKit._blk(pk, kit, "steel", top + Vector3(-1.9, -0.75, -1.9), top + Vector3(1.9, -0.6, 1.9), Color(0.3, 0.3, 0.31))
+		for e in [[Vector3(-1.85, -0.6, -1.85), Vector3(1.85, -0.6, -1.85)], [Vector3(1.85, -0.6, -1.85), Vector3(1.85, -0.6, 1.85)],
+				[Vector3(1.85, -0.6, 1.85), Vector3(-1.85, -0.6, 1.85)], [Vector3(-1.85, -0.6, 1.85), Vector3(-1.85, -0.6, -1.85)]]:
+			_rail_run(pk, kit, top + e[0], top + e[1], 1.0)
+		BaustelleKit._blk(pk, kit, "concrete", Vector3(x - 1.6, g - 0.6, z - 1.6), Vector3(x + 1.6, g + 0.4, z + 1.6), Color(0.62, 0.62, 0.61))
+
+
+## A footing with the columns' starter cages standing out of it, waiting to be poured on.
+func _footing(node: Node3D, pk: PropKit, kit: Dictionary, z: float, mat: Material) -> void:
+	var body := StaticBody3D.new()
+	body.name = "Anlegg_Fundament_%d" % int(z)
+	node.add_child(body)
+	pk.reset_frame()
+	var g := _ground_y(WORKS_X, z)
+	BaustelleKit._blk(pk, kit, "concrete", Vector3(WORKS_X - 7.0, g - 0.8, z - 2.6), Vector3(WORKS_X + 7.0, g + 0.5, z + 2.6), Color(0.66, 0.66, 0.65))
+	_box_shape(body, Transform3D(Basis(), Vector3(WORKS_X, g - 0.15, z)), Vector3(14.0, 1.3, 5.2))
+	for sx in [-1.0, 1.0]:
+		var c := Vector3(WORKS_X + sx * 4.4, g + 0.5, z)
+		for k in range(14):
+			var a := TAU * float(k) / 14.0
+			var o := Vector3(cos(a), 0, sin(a)) * 0.85
+			BaustelleKit._bar(pk, kit, "rusty", c + o, c + o + Vector3.UP * 3.2, 0.035, 0.035, Color(0.42, 0.22, 0.12))
+		for hy in [0.8, 1.6, 2.4]:
+			for k in range(14):
+				var a0 := TAU * float(k) / 14.0
+				var a1 := TAU * float(k + 1) / 14.0
+				BaustelleKit._bar(pk, kit, "rusty", c + Vector3(cos(a0), 0, sin(a0)) * 0.85 + Vector3.UP * hy,
+						c + Vector3(cos(a1), 0, sin(a1)) * 0.85 + Vector3.UP * hy, 0.03, 0.03, Color(0.42, 0.22, 0.12))
+
+
+## The ground's height at (x, z).
+func _ground_y(x: float, z: float) -> float:
+	var hit := _ray(x, z)
+	return (hit.position as Vector3).y if not hit.is_empty() else 2.0
+
+
+## The site south of the hairpin and in its infield, at life size grown by PROP_SCALE: the tower crane (its top slewing
+## slowly over the gap: SlewHazard.gd, harmless), the yard's cabins, toilet, skip and materials, a mixer truck and a
+## dumper, the excavator at the footing, floodlights and the project's board. One mesh (DressingColliders makes it solid)
+## and the crane's top apart.
+func _build_site(node: Node3D, foot_pts: Array) -> void:
+	var pk: PropKit = BaustelleKit.new_kit(PROP_SCALE)
+	var kit := {}
+	var junk: Array = []
+	var place := func(x: float, z: float, yaw_deg: float, fn: Callable, r: float) -> void:
+		var g := _ground_y(x, z)
+		pk.set_frame(Transform3D(Basis(Vector3.UP, deg_to_rad(yaw_deg)).scaled(Vector3.ONE * PROP_SCALE), Vector3(x, g, z)))
+		fn.call()
+		foot_pts.append([Vector2(x, z), r])
+	# The crane, west of the far viaduct.
+	var crane := Vector2(-138.0, 372.0)
+	var mast_h := 30.0
+	place.call(crane.x, crane.y, 0.0, func(): BaustelleKit.tower_crane_mast(pk, kit, mast_h), 5.0)
+	var cg := _ground_y(crane.x, crane.y)
+	# The yard east of it.
+	place.call(-74.0, 372.0, 90.0, func(): BaustelleKit.site_cabin(pk, kit, junk, true), 6.0)
+	place.call(-74.0, 384.0, 90.0, func(): BaustelleKit.site_cabin(pk, kit, junk, false), 6.0)
+	place.call(-68.0, 394.0, 0.0, func(): BaustelleKit.portable_toilet(pk, kit), 2.0)
+	place.call(-80.0, 404.0, 15.0, func(): BaustelleKit.skip(pk, kit, 3), 4.0)
+	place.call(-92.0, 378.0, 90.0, func(): BaustelleKit.rebar_stack(pk, kit, 6.0), 6.0)
+	place.call(-90.0, 392.0, 0.0, func(): BaustelleKit.formwork_stack(pk, kit), 3.0)
+	place.call(-88.0, 402.0, 80.0, func(): BaustelleKit.formwork_stack(pk, kit), 3.0)
+	place.call(-70.0, 410.0, 0.0, func(): BaustelleKit.concrete_pipes(pk, kit, 5), 5.0)
+	place.call(-84.0, 418.0, 0.0, func(): BaustelleKit.sand_pile(pk, kit, 3.2, 1.8, 7), 6.0)
+	place.call(-76.0, 420.0, 0.0, func(): BaustelleKit.cable_drum(pk, kit), 2.0)
+	place.call(-97.0, 360.0, 180.0, func(): BaustelleKit.mixer_truck(pk, kit), 8.0)
+	place.call(-124.0, 402.0, 200.0, func(): BaustelleKit.dumper(pk, kit), 4.0)
+	place.call(-110.0, 181.0, 175.0, func(): BaustelleKit.excavator(pk, kit, junk); pk.set_frame(pk.xf * Transform3D(Basis(Vector3.UP, 0.6), Vector3(0, BaustelleKit.EXC_RING_Y, 0))); BaustelleKit.excavator_upper(pk, kit), 5.0)
+	place.call(-110.0, 214.0, 90.0, func(): BaustelleKit.rebar_stack(pk, kit, 5.0), 5.0)
+	# The board facing the hairpin, under the far viaduct's tip.
+	var board_at := Vector3(-123.0, _ground_y(-123.0, 352.0), 352.0)
+	foot_pts.append([Vector2(board_at.x, board_at.z), 4.0])
+	_project_board(node, pk, kit, board_at, deg_to_rad(205.0))
+	# Floodlight masts.
+	var lights := [Vector2(-96.0, 346.0), Vector2(-125.0, 360.0), Vector2(-110.0, 248.0), Vector2(-101.0, 205.0)]
+	for i in range(lights.size()):
+		var lp: Vector2 = lights[i]
+		foot_pts.append([lp, 1.5])
+		_floodlight(node, pk, kit, Vector3(lp.x, _ground_y(lp.x, lp.y), lp.y), i)
+	pk.reset_frame()
+	var mi := MeshInstance3D.new()
+	mi.name = "Anlegg_Plass"
+	mi.mesh = _save_res(BaustelleKit.commit(pk, kit), "works_site")
+	node.add_child(mi)
+	# The crane's top, turning slowly to and fro over the gap.
+	var top := Node3D.new()
+	top.name = "Anlegg_KranTopp"
+	top.set_script(load("res://SlewHazard.gd"))
+	top.position = Vector3(crane.x, cg + mast_h * PROP_SCALE, crane.y)
+	top.set("centre_deg", -32.0)
+	top.set("amplitude_deg", 38.0)
+	top.set("move", 34.0)
+	top.set("dwell", 16.0)
+	top.set("hits", false)
+	var tpk: PropKit = BaustelleKit.new_kit(PROP_SCALE)
+	var tkit := {}
+	BaustelleKit.tower_crane_top(tpk, tkit, [], "rebar")
+	var tmi := MeshInstance3D.new()
+	tmi.name = "Top"
+	tmi.mesh = _save_res(BaustelleKit.commit(tpk, tkit), "works_crane_top")
+	tmi.scale = Vector3.ONE * PROP_SCALE
+	top.add_child(tmi)
+	node.add_child(top)
+
+
+## The project's board on two posts (life size in `pk`'s units), facing `yaw`: SVARTFJELLVEGEN, the new bridge, its
+## builder (all made up).
+func _project_board(node: Node3D, pk: PropKit, kit: Dictionary, at: Vector3, yaw: float) -> void:
+	var b := Basis(Vector3.UP, yaw)
+	pk.set_frame(Transform3D(b.scaled(Vector3.ONE * PROP_SCALE), at))
+	for sx in [-1.0, 1.0]:
+		BaustelleKit._rod(pk, kit, "steel", Vector3(sx * 1.9, -0.5, 0.0), Vector3(sx * 1.9, 3.6, 0.0), 0.06, 8, Color(0.5, 0.52, 0.54))
+	BaustelleKit._blk(pk, kit, "bpaint", Vector3(-2.3, 1.4, -0.04), Vector3(2.3, 3.5, 0.04), Color(0.06, 0.22, 0.48))
+	BaustelleKit._blk(pk, kit, "bpaint", Vector3(-2.3, 1.25, -0.04), Vector3(2.3, 1.4, 0.04), Color(0.95, 0.72, 0.1))
+	var lines := [["SVARTFJELLVEGEN", 3.05, 0.34], ["NY BRU OVER DALEN", 2.55, 0.2], ["FERDIG 2028", 2.15, 0.2],
+			["SVARTFJELL ANLEGG AS", 1.6, 0.14]]
+	for l in lines:
+		var lab := Label3D.new()
+		lab.text = l[0]
+		lab.font_size = 64
+		lab.pixel_size = float(l[2]) * PROP_SCALE / 44.8
+		lab.modulate = Color(0.97, 0.97, 0.95) if l[0] != "SVARTFJELL ANLEGG AS" else Color(0.06, 0.06, 0.08)
+		if l[0] == "SVARTFJELL ANLEGG AS":
+			lab.modulate = Color(0.97, 0.97, 0.95)
+		lab.outline_size = 0
+		lab.double_sided = false
+		lab.alpha_cut = Label3D.ALPHA_CUT_DISCARD
+		lab.transform = Transform3D(b, at + b * Vector3(0, float(l[1]) * PROP_SCALE, 0.07 * PROP_SCALE))
+		lab.visibility_range_end = 400.0
+		node.add_child(lab)
+
+
+## A floodlight mast: a galvanised pole on a concrete block, a cross arm with four lamps, a real light (no shadow).
+func _floodlight(node: Node3D, pk: PropKit, kit: Dictionary, at: Vector3, i: int) -> void:
+	pk.set_frame(Transform3D(Basis(Vector3.UP, float(i) * 1.3).scaled(Vector3.ONE * PROP_SCALE), at))
+	BaustelleKit._blk(pk, kit, "concrete", Vector3(-0.5, -0.3, -0.5), Vector3(0.5, 0.35, 0.5), Color(0.6, 0.6, 0.6))
+	BaustelleKit._rod(pk, kit, "steel", Vector3(0, 0.3, 0), Vector3(0, 9.0, 0), 0.09, 8, Color(0.62, 0.64, 0.66))
+	BaustelleKit._bar(pk, kit, "steel", Vector3(-1.2, 9.0, 0), Vector3(1.2, 9.0, 0), 0.1, 0.1, Color(0.62, 0.64, 0.66))
+	for lx in [-1.05, -0.35, 0.35, 1.05]:
+		BaustelleKit._blk(pk, kit, "steel", Vector3(lx - 0.28, 9.05, -0.25), Vector3(lx + 0.28, 9.5, 0.12), Color(0.2, 0.2, 0.21))
+		BaustelleKit._blk(pk, kit, "lamp", Vector3(lx - 0.24, 9.09, -0.28), Vector3(lx + 0.24, 9.46, -0.24), Color(1.0, 0.95, 0.85))
+	var light := OmniLight3D.new()
+	light.name = "Anlegg_Lys_%d" % i
+	light.position = at + Vector3(0, 9.0 * PROP_SCALE - 1.0, 0)
+	light.light_color = Color(1.0, 0.94, 0.84)
+	light.light_energy = 2.4
+	light.omni_range = 38.0
+	light.shadow_enabled = false
+	light.set_meta(&"no_shadow", true)
+	node.add_child(light)
+
+
+## Every piece of the works stands WORKS_LAP_CLEAR (plus its own radius) from the lap's and the ramps' edges in plan (the
+## far highway itself is the works' own).
+func _check_works_clear(foot_pts: Array) -> void:
+	var lines: Array = [[(_level.get_node("TrackPath") as Path3D).curve, HighwayGen.MAIN_HALF_W]]
+	for ap in _level.get_node("AlternativePaths").get_children():
+		if ap is Path3D:
+			lines.append([(ap as Path3D).curve, HighwayGen.RAMP_HALF_W])
+	var bad := 0
+	for fp in foot_pts:
+		var p: Vector2 = fp[0]
+		var r: float = fp[1]
+		var d := 1e9
+		for l in lines:
+			var c: Curve3D = l[0]
+			var length := c.get_baked_length()
+			var s := 0.0
+			while s <= length:
+				var q := c.sample_baked(s)
+				d = minf(d, Vector2(q.x, q.z).distance_to(p) - float(l[1]))
+				s += 2.0
+		if d < r + WORKS_LAP_CLEAR:
+			push_error("works piece at (%.0f, %.0f) only %.1fm from a road's edge (needs %.1f)" % [p.x, p.y, d, r + WORKS_LAP_CLEAR])
+			bad += 1
+	if bad == 0:
+		print("  works: every piece clear of the roads")

@@ -768,8 +768,18 @@ The menus call it Arco del Viento (it was Canyon Drift / CANYON COURSE); files a
   and slid back onto the trunk. `scratch/alt_path_lateral.gd` (`-s`, headless, `-- <level> [step=4] [max=80]
   [only=<name>]`) prints a level's shortcuts' lateral from the lap and height over it along their ends.
 - The valley opens to the south (`VALLEY_OPEN_Z` in `_alpine_height`) and a carriageway runs on down it, only to be
-  seen (`FAR_SOUTH`, `FarHighwaySouth`, lit as far as `FAR_LIT_REACH`): from the turnaround the highway reads as going
-  somewhere, not an oval. A barrier closes its near end (`FarHighwayClosure`).
+  seen (`FAR_SOUTH`, `FarHighwaySouth`): from the turnaround the highway reads as going somewhere, not an oval. It is
+  being carried on north over the turnaround: its near end is a new viaduct climbing to 16.5m and stopping in the air
+  south of the hairpin (no barriers or lamps on its last `FAR_BARE` metres, no pier under its last `FAR_TIP_OVERHANG`,
+  lamps from `FAR_LIT_FROM`), and the dressing builds the works (`_build_works`, `Anlegg`): a form traveller, the next
+  segment's formwork and starter bars on each deck end, the next pier past the gap in the hairpin's infield with its
+  balanced cantilever (`WORKS_T_*`), a pier with only its crosshead, one half poured, a footing with its cages
+  (`WORKS_PIERS`), temporary railings, BaustelleKit's tower crane (its top slewing over the gap, SlewHazard.gd,
+  harmless), yard and machines at PROP_SCALE, floodlights and a board (SVARTFJELLVEGEN, made up). Every piece keeps
+  `WORKS_LAP_CLEAR` from the lap and the ramps (`_check_works_clear`); the trees keep out of `WORKS_KEEP`. It had ended
+  on the ground behind a barrier, joined to nothing, and the user disliked it. The bridge pieces are at game scale, so
+  BaustelleKit's `uvk` is set by calling `new_kit` again for each scale. `scratch/glacier_height_map.tscn` (headless,
+  `-- [cell=40] [x0= x1= z0= z1=]`) prints the natural ground with the lap and ramps marked.
 - The dressing (`GlacierDressing`, every run replaces it and deletes `generated/glacier_dress_*` first):
   - The country (`_build_country`): rows of ground step out from the 1.1km heightfield's edge (the first on its edge's
     own vertices) carrying the generator's `_alpine_height` (an instance of its script, not in the tree) on into far

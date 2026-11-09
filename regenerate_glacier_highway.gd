@@ -40,11 +40,22 @@ const DUSK_SKY_HORIZON := Color(0.40, 0.45, 0.60)
 const DUSK_HAZE := Color(0.30, 0.36, 0.50)
 ## Where the valley opens out southward (z): from the lap's south end to the map's edge.
 const VALLEY_OPEN_Z := Vector2(260.0, 560.0)
-## The highway carrying on south from the lap's south hairpin, behind a closure: scenery (no route uses it). Corner
-## points of an open Catmull-Rom curve, the first just past the hairpin's outer barrier.
-const FAR_SOUTH := [Vector3(-110.0, 2.8, 345.0), Vector3(-109.0, 2.8, 420.0), Vector3(-98.0, 2.6, 520.0),
+## The highway carrying on south from the lap's south hairpin: scenery (no route uses it). Corner points of an open
+## Catmull-Rom curve. It is being extended north over the hairpin: its first stretch is a new viaduct climbing from the
+## valley floor to the overpass's height and ending in the air FAR_TIP_GAP short of the hairpin's outer edge, the last
+## FAR_BARE metres a bare deck still under construction (regenerate_glacier_dressing.gd builds the works: the form
+## traveller at its tip, the next span's pier and cantilevers on the far side of the hairpin, the crane, the yard).
+## It used to end on the ground behind a barrier just past the hairpin, joined to nothing.
+const FAR_SOUTH := [Vector3(-110.0, 16.5, 342.0), Vector3(-110.0, 16.3, 385.0), Vector3(-108.0, 12.5, 440.0),
+		Vector3(-102.0, 6.5, 500.0), Vector3(-94.0, 2.8, 560.0),
 		Vector3(-72.0, 2.2, 660.0), Vector3(-30.0, 1.8, 860.0), Vector3(25.0, 1.2, 1120.0), Vector3(80.0, 0.8, 1450.0),
 		Vector3(115.0, 0.4, 1850.0), Vector3(125.0, 0.0, 2350.0), Vector3(110.0, -0.4, 2900.0), Vector3(80.0, -0.8, 3500.0)]
+## The far highway's unfinished stretch: no barriers or lamps on its first FAR_BARE metres (temporary railings instead),
+## no pier under its first FAR_TIP_OVERHANG (the new segment cantilevers out), lamps only from FAR_LIT_FROM (where it
+## is finished, back on the ground).
+const FAR_BARE := 40.0
+const FAR_TIP_OVERHANG := 14.0
+const FAR_LIT_FROM := 210.0
 ## Streetlights cast light only this far along the far highway; past it their lamps just glow.
 const FAR_LIT_REACH := 360.0
 ## The streetlights: warm white, a touch of sodium.
@@ -833,8 +844,8 @@ func _ready() -> void:
 	var far_mat: ShaderMaterial = highway_mat.duplicate()
 	far_mat.set_shader_parameter("clear_zone", 0.0)
 	far_mat.set_shader_parameter("circuit_length", 0.0)
-	_build_highway_road_mesh(level_scene, far_curve, MAIN_WIDTH, "FarHighwaySouth", far_mat, barrier_mat, girder_mat, true, false)
-	_build_closure(level_scene, far_curve, barrier_mat)
+	_build_highway_road_mesh(level_scene, far_curve, MAIN_WIDTH, "FarHighwaySouth", far_mat, barrier_mat, girder_mat, true, true,
+			0, 0.0, [Vector2(0.0, FAR_BARE)], [Vector2(0.0, FAR_BARE)])
 
 	# 8. Build the Tunnel Underpass System (Z = -180m to Z = -240m, X = 0m, Y = 2.8m, Length = 60m)
 	_build_tunnel_underpass(level_scene, Vector3(0, 2.8, -210.0), 60.0, 18.5, barrier_mat, girder_mat)
@@ -1004,7 +1015,7 @@ func _ready() -> void:
 	props_container.name = "HighwayProps"
 	level_scene.add_child(props_container)
 	_build_highway_streetlights(props_container, curve, main_left_gaps, main_right_gaps)
-	_build_highway_streetlights(props_container, far_curve, [], [], FAR_LIT_REACH, "FarStreetlight")
+	_build_highway_streetlights(props_container, far_curve, [], [], FAR_LIT_FROM + FAR_LIT_REACH, "FarStreetlight", FAR_LIT_FROM)
 	_build_jumbotron(props_container)
 
 	# 15. Setup Checkpoints & Level wiring
@@ -1391,7 +1402,9 @@ func _build_highway_road_mesh(parent: Node, curve: Curve3D, width: float, node_n
 					over_lower_road = true
 			if absf(p.x) < 13.0 and absf(p.z - (-180.0)) < 20.0:
 				over_lower_road = true
-			if p.y > 6.0 and not near_ramp_ends and not over_lower_road and (cum_i - last_pier_dist >= 24.0):
+			# The far highway's new segment cantilevers out past its last pier.
+			var in_overhang: bool = node_name == "FarHighwaySouth" and cum_i < FAR_TIP_OVERHANG
+			if p.y > 6.0 and not near_ramp_ends and not over_lower_road and not in_overhang and (cum_i - last_pier_dist >= 24.0):
 				last_pier_dist = cum_i
 				_build_viaduct_pier(pier_root, p, ring_fwd[i], ring_right[i], maxf(deck_right[i] - deck_left[i], 1.0) * 0.5, p.y, barrier_mat)
 
@@ -2068,29 +2081,6 @@ func _open_curve(pts: Array) -> Curve3D:
 	return c
 
 
-## The far highway's closure where it leaves the lap's hairpin: a row of concrete barriers across its start, solid.
-func _build_closure(parent: Node, curve: Curve3D, mat: Material) -> void:
-	var p0: Vector3 = curve.sample_baked(3.0)
-	var fwd: Vector3 = (curve.sample_baked(6.0) - p0).normalized()
-	var right := Vector3(-fwd.z, 0.0, fwd.x).normalized()
-	var body := StaticBody3D.new()
-	body.name = "FarHighwayClosure"
-	body.transform = Transform3D(Basis(right, Vector3.UP, -Vector3(fwd.x, 0.0, fwd.z).normalized()), p0)
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(MAIN_WIDTH, 0.85, 0.6)
-	var mi := MeshInstance3D.new()
-	mi.mesh = mesh
-	mi.material_override = mat
-	mi.position = Vector3(0, 0.42, 0)
-	body.add_child(mi)
-	var cs := CollisionShape3D.new()
-	var shape := BoxShape3D.new()
-	shape.size = Vector3(MAIN_WIDTH, PARAPET_H, 0.6)
-	cs.shape = shape
-	cs.position = Vector3(0, PARAPET_H * 0.5, 0)
-	body.add_child(cs)
-	parent.add_child(body)
-
 
 ## Builds a horizontal index of every carriageway sample.
 ##
@@ -2515,7 +2505,7 @@ func _build_jumbotron(parent: Node) -> void:
 ## Streetlights along `curve`, alternating sides every step: a pole on the barrier, an arm, a glowing head and a spot
 ## light down onto the road; past `lit_reach` metres along the curve the heads only glow (the far highway's).
 func _build_highway_streetlights(parent: Node, curve: Curve3D, left_gaps: Array = [], right_gaps: Array = [],
-		lit_reach := INF, name_prefix := "Streetlight") -> void:
+		lit_reach := INF, name_prefix := "Streetlight", from_dist := 0.0) -> void:
 	var total_len := curve.get_baked_length()
 	var step_dist := 42.0
 	var count := int(total_len / step_dist)
@@ -2533,6 +2523,8 @@ func _build_highway_streetlights(parent: Node, curve: Curve3D, left_gaps: Array 
 
 	for i in range(count):
 		var dist = i * step_dist
+		if dist < from_dist:
+			continue
 		var p := curve.sample_baked(dist)
 		# Skip lights inside the tunnel underpass (it has its own interior LED strip lights)
 		if p.z < -165.0 and p.z > -245.0 and p.y < 5.0:
