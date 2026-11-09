@@ -16,9 +16,17 @@ The `scratch/` folder contains permanent test, verification, look-dev, and audit
 
 ## Menu tiles
 
-The user is replacing every menu picture (`images/menu/*.jpg`) themselves. Don't render, save or update menu tiles
-for new or changed stages, and no generator writes one (Northlight Caverns' painted a placeholder over the rendered
-tile on every run). The notes below on how a tile was rendered are history.
+Every stage's menu tile (`images/menu/tile_*.jpg`, 1376x768, drawn cropped to about 5:3) is the same kind of picture:
+the stage from a bit far off and at an angle. `scratch/render_menu_tiles.sh [Lakeside ...]` renders them (all, or the
+stages named by their level file without "Level.tscn") through `res://scratch/menu_tile_shot.tscn` (windowed, one run a
+stage, about a minute each) and imports them; `OUT=<dir>` writes them there instead. The camera stands 30 degrees up,
+as near as the whole lap (with room round it) fits the frame, tipped up a little so the country shows above, on the
+bearing (every 15 degrees, never looking into the sun) that frames it nearest; the fog is pushed back by most of the
+camera's distance, falling snow and Mina's dust wall are hidden, shadows reach across the view. Per-stage overrides
+(`focus`/`radius` for the point-to-point routes, `zoom`, `az`, `elev`, ...) are `STAGES` in the script. The user may
+change the courses again: re-render a stage's tile after a big change rather than hand-placing a camera. No level
+generator writes a tile. `res://scratch/lap_points.gd` (`-s`, headless, `-- <level> [every=250]`) prints where a
+lap runs, to aim a focus.
 
 ## Levels are generated, not hand-edited
 
