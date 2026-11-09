@@ -14,6 +14,12 @@ The `scratch/` folder contains permanent test, verification, look-dev, and audit
 - **Do NOT exclude `scratch/` from git** (never add it to `.gitignore`).
 - **Do NOT delete or clean up files in `scratch/`**. Any new test scripts or probes created there are preserved so they can be re-run whenever needed.
 
+## Menu tiles
+
+The user is replacing every menu picture (`images/menu/*.jpg`) themselves. Don't render, save or update menu tiles
+for new or changed stages, and no generator writes one (Northlight Caverns' painted a placeholder over the rendered
+tile on every run). The notes below on how a tile was rendered are history.
+
 ## Levels are generated, not hand-edited
 
 Each level in `levels/*Level.tscn` (plus its meshes in `generated/*.res`) is written by a generator script
