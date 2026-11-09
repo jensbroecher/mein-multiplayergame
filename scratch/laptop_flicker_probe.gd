@@ -4,11 +4,17 @@ extends Node
 # still and then moving over the tile (real InputEventMouseMotion through the window). A screen that drops to
 # dark or jumps between frames flickers.
 # `dir=` also saves the laptop's corner of the tile's picture for each frame (laptop_<still|moving>_<n>.png).
-#   Godot --path . res://scratch/laptop_flicker_probe.tscn [-- frames=90] [dir=<out dir>]
+# `first=1` instead watches the laptop page's own texture from the menu's first frame (the menu built, as at
+# start-up) and prints, frame by frame, how much of it is drawn: the page drawn into a quarter of the screen on
+# alternate frames (size_2d_override, since replaced) showed as 25%. `fullscreen=1` goes fullscreen at once, as the
+# game does.
+#   Godot --path . res://scratch/laptop_flicker_probe.tscn [-- frames=90] [dir=<out dir>] [first=1]
 
 var frames := 90
 var dir := ""
 var _tag := "still"
+var _first := false
+var _fullscreen := false
 
 
 func _ready() -> void:
@@ -17,12 +23,27 @@ func _ready() -> void:
 			frames = int(a.substr(7))
 		elif a.begins_with("dir="):
 			dir = a.substr(4)
+		elif a == "first=1":
+			_first = true
+		elif a == "fullscreen=1":
+			_fullscreen = true
 	AudioServer.set_bus_mute(0, true)
 	var win := get_window()
 	win.mode = Window.MODE_WINDOWED
 	win.size = Vector2i(1600, 1000)
+	if _fullscreen:
+		win.mode = Window.MODE_FULLSCREEN
 	var menu = load("res://MainMenu.tscn").instantiate()
 	add_child(menu)
+	if _first:
+		# As at start-up: built hidden behind the title card for a moment, then shown.
+		menu.visible = false
+		for i in 20:
+			await get_tree().process_frame
+		menu.visible = true
+		await _watch_page(menu)
+		get_tree().quit()
+		return
 	for i in 60:
 		await get_tree().process_frame
 	var stage: Node = null
@@ -74,3 +95,30 @@ func _record(stage: Node, screen: MeshInstance3D, each: Callable) -> void:
 		line += "%.2f " % v
 	print(line)
 	print("  min %.2f max %.2f" % [lo, hi])
+
+
+func _watch_page(menu: Node) -> void:
+	var line := ""
+	var worst := 1.0
+	for i in frames:
+		await RenderingServer.frame_post_draw
+		var pages := menu.find_children("LaptopPage", "SubViewport", true, false)
+		if pages.is_empty():
+			line += "- "
+			continue
+		var img := (pages[0] as SubViewport).get_texture().get_image()
+		# The page's bottom-right quarter is its dark panel and graph; drawn into a quarter, the page leaves it the
+		# viewport's grey clear colour.
+		var n := 0
+		var drawn := 0
+		for y in range(img.get_height() / 2, img.get_height(), 2):
+			for x in range(img.get_width() / 2, img.get_width(), 2):
+				n += 1
+				var c := img.get_pixel(x, y)
+				if c.r + c.g + c.b < 0.75:
+					drawn += 1
+		var share := float(drawn) / maxf(float(n), 1.0)
+		worst = minf(worst, share)
+		line += "%d%% " % roundi(share * 100.0)
+	print("laptop page's lower right drawn, frame by frame: ", line)
+	print("  least %d%%" % roundi(worst * 100.0))

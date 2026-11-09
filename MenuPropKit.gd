@@ -244,21 +244,27 @@ static func _settings_screen() -> Dictionary:
 	var vp := SubViewport.new()
 	vp.name = "LaptopPage"
 	# Drawn at about the size it is seen at (a viewport texture has no mipmaps: at 800 x 500 shown 120px wide its
-	# text and lines shimmered as the camera drifted), laid out at 800 x 500.
+	# text and lines shimmered as the camera drifted). size_2d_override did the scaling at first, and on the menu's
+	# first frames it drew the page into a quarter of the screen every other frame.
 	vp.size = Vector2i(400, 250)
-	vp.size_2d_override = Vector2i(800, 500)
-	vp.size_2d_override_stretch = true
 	vp.transparent_bg = false
 	vp.render_target_update_mode = SubViewport.UPDATE_ONCE   # the tile asks for each frame
+	# Laid out at 800 x 500 and scaled down by a plain parent, so the page renders natively at the viewport's size.
+	var page := Control.new()
+	page.scale = Vector2(0.5, 0.5)
+	page.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vp.add_child(page)
 	vp.disable_3d = true
+	# The background fills the viewport itself, under the scaled page: no corner can show the clear colour.
 	var bg := ColorRect.new()
 	bg.color = Color(0.055, 0.065, 0.085)
-	bg.size = Vector2(800, 500)
+	bg.size = Vector2(vp.size)
 	vp.add_child(bg)
+	vp.move_child(bg, 0)
 	var side := ColorRect.new()
 	side.color = Color(0.085, 0.1, 0.13)
 	side.size = Vector2(200, 500)
-	vp.add_child(side)
+	page.add_child(side)
 	var teal := Color(0.18, 0.8, 0.7)
 	var items := ["GRAPHICS", "AUDIO", "CONTROLS", "CAR SETUP", "TELEMETRY"]
 	for i in items.size():
@@ -268,71 +274,71 @@ static func _settings_screen() -> Dictionary:
 			hl.color = Color(0.12, 0.3, 0.3)
 			hl.position = Vector2(0, y - 8)
 			hl.size = Vector2(200, 44)
-			vp.add_child(hl)
+			page.add_child(hl)
 			var bar := ColorRect.new()
 			bar.color = teal
 			bar.position = Vector2(0, y - 8)
 			bar.size = Vector2(5, 44)
-			vp.add_child(bar)
+			page.add_child(bar)
 		var l := _label(items[i], 22, Color(0.92, 0.95, 0.97) if i == 3 else Color(0.55, 0.6, 0.68))
 		l.position = Vector2(26, y)
-		vp.add_child(l)
+		page.add_child(l)
 	var logo := _label("RC VIBE  SETUP", 18, teal)
 	logo.position = Vector2(26, 18)
-	vp.add_child(logo)
+	page.add_child(logo)
 	var title := _label("MUDRUNNER  •  #53", 30, Color(0.95, 0.97, 1.0))
 	title.position = Vector2(232, 22)
-	vp.add_child(title)
+	page.add_child(title)
 	var sliders: Array = []
 	var names := ["STEERING RATE", "THROTTLE EXPO", "BRAKE BIAS", "DIFF LOCK"]
 	for i in names.size():
 		var y := 92.0 + float(i) * 56.0
 		var l := _label(names[i], 17, Color(0.62, 0.68, 0.76))
 		l.position = Vector2(232, y)
-		vp.add_child(l)
+		page.add_child(l)
 		var track := ColorRect.new()
 		track.color = Color(0.16, 0.18, 0.23)
 		track.position = Vector2(232, y + 30)
 		track.size = Vector2(420, 6)
-		vp.add_child(track)
+		page.add_child(track)
 		var fill := ColorRect.new()
 		fill.color = teal if i != 2 else Color(1.0, 0.55, 0.16)
 		fill.position = track.position
 		fill.size = Vector2(200, 6)
-		vp.add_child(fill)
+		page.add_child(fill)
 		var knob := ColorRect.new()
 		knob.color = Color(0.95, 0.97, 1.0)
 		knob.size = Vector2(14, 20)
-		vp.add_child(knob)
+		page.add_child(knob)
 		var val := _label("50%", 17, Color(0.92, 0.95, 0.97))
 		val.position = Vector2(672, y + 20)
-		vp.add_child(val)
+		page.add_child(val)
 		sliders.append({"fill": fill, "knob": knob, "value": val, "x": 232.0, "w": 420.0, "y": y + 30.0})
 	# Telemetry: steering (teal) and throttle (orange) over the last few seconds.
 	var panel := ColorRect.new()
 	panel.color = Color(0.07, 0.085, 0.11)
 	panel.position = Vector2(232, 330)
 	panel.size = Vector2(540, 150)
-	vp.add_child(panel)
+	page.add_child(panel)
 	for g in 4:
 		var gl := ColorRect.new()
 		gl.color = Color(0.13, 0.15, 0.19)
 		gl.position = Vector2(232, 330 + 30 * (g + 1))
 		gl.size = Vector2(540, 1)
-		vp.add_child(gl)
+		page.add_child(gl)
 	var steer_line := Line2D.new()
 	steer_line.width = 3.0
 	steer_line.default_color = teal
 	steer_line.antialiased = true
-	vp.add_child(steer_line)
+	page.add_child(steer_line)
 	var throttle_line := Line2D.new()
 	throttle_line.width = 3.0
 	throttle_line.default_color = Color(1.0, 0.55, 0.16)
 	throttle_line.antialiased = true
-	vp.add_child(throttle_line)
+	page.add_child(throttle_line)
 	var tl := _label("TELEMETRY  •  LIVE", 15, Color(0.55, 0.6, 0.68))
 	tl.position = Vector2(244, 336)
-	vp.add_child(tl)
+	page.add_child(tl)
 	return {"viewport": vp, "sliders": sliders, "steer": steer_line, "throttle": throttle_line,
 		"graph": Rect2(232, 330, 540, 150)}
 
@@ -479,47 +485,52 @@ static func _tx_screen(accent: Color) -> Dictionary:
 	var vp := SubViewport.new()
 	vp.name = "TxPage"
 	vp.size = Vector2i(72, 96)
-	vp.size_2d_override = Vector2i(180, 240)
-	vp.size_2d_override_stretch = true
 	vp.disable_3d = true
 	vp.render_target_update_mode = SubViewport.UPDATE_ONCE   # the tile asks for each frame
+	# Laid out at 180 x 240 and scaled down by a plain parent, so the page renders natively at the viewport's size.
+	var page := Control.new()
+	page.scale = Vector2(0.4, 0.4)
+	page.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vp.add_child(page)
+	# The background fills the viewport itself, under the scaled page: no corner can show the clear colour.
 	var bg := ColorRect.new()
 	bg.color = Color(0.05, 0.07, 0.1)
-	bg.size = Vector2(180, 240)
+	bg.size = Vector2(vp.size)
 	vp.add_child(bg)
+	vp.move_child(bg, 0)
 	var head := ColorRect.new()
 	head.color = accent.darkened(0.35)
 	head.size = Vector2(180, 34)
-	vp.add_child(head)
+	page.add_child(head)
 	var name_l := _label("MUDRUNNER", 18, Color.WHITE)
 	name_l.position = Vector2(10, 6)
-	vp.add_child(name_l)
+	page.add_child(name_l)
 	var bars: Array = []
 	var labels := ["ST", "TH"]
 	for i in 2:
 		var y := 70.0 + float(i) * 62.0
 		var l := _label(labels[i], 16, Color(0.6, 0.66, 0.74))
 		l.position = Vector2(10, y - 4)
-		vp.add_child(l)
+		page.add_child(l)
 		var track := ColorRect.new()
 		track.color = Color(0.15, 0.17, 0.22)
 		track.position = Vector2(44, y)
 		track.size = Vector2(122, 14)
-		vp.add_child(track)
+		page.add_child(track)
 		var mid := ColorRect.new()
 		mid.color = Color(0.4, 0.44, 0.5)
 		mid.position = Vector2(104, y - 3)
 		mid.size = Vector2(2, 20)
-		vp.add_child(mid)
+		page.add_child(mid)
 		var fill := ColorRect.new()
 		fill.color = accent if i == 0 else Color(1.0, 0.55, 0.16)
 		fill.position = Vector2(105, y)
 		fill.size = Vector2(1, 14)
-		vp.add_child(fill)
+		page.add_child(fill)
 		bars.append(fill)
 	var volt := _label("7.4V  ▮▮▮▯", 16, Color(0.4, 0.95, 0.5))
 	volt.position = Vector2(10, 196)
-	vp.add_child(volt)
+	page.add_child(volt)
 	return {"viewport": vp, "bars": bars}
 
 
