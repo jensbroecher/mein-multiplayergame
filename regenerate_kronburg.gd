@@ -865,7 +865,9 @@ func _build_canal(root: Node3D) -> void:
 			var b := Vector3(x1, 0.0, r[1])
 			var c := Vector3(x1, 0.0, r[3])
 			var d := Vector3(x0, 0.0, r[3])
-			for v in [a, c, b, a, d, c]:
+			# Clockwise seen from above (Godot's front faces): wound [a, c, b] the sheet faced down, was culled,
+			# and the canal showed its bed as if the water were clear.
+			for v in [a, b, c, a, c, d]:
 				st.set_normal(Vector3.UP)
 				st.set_uv(Vector2(v.x, v.z))
 				st.add_vertex(v)
@@ -2158,6 +2160,18 @@ func _works_xf(at: Vector2, face: Vector3) -> Transform3D:
 	return _facing(face, Vector3(at.x, _ground_at(at.x, at.y), at.y))
 
 
+## SteelworksKit.ore_crane's quay leg (its rail at the kit's x +2) and its rails' height: their tops lie at the kit's
+## y 0, which put them flush with the graded pad, and the two flickered. Stood ORE_CRANE_LIFT up, the rails and the
+## top of their concrete beds stand out of the paving.
+const ORE_CRANE_QUAY_LEG := 2.0
+const ORE_CRANE_LIFT := 0.3
+
+func _crane_xf(at: Vector2, face: Vector3) -> Transform3D:
+	var xf: Transform3D = _works_xf(at, face)
+	xf.origin.y += ORE_CRANE_LIFT
+	return xf
+
+
 func _build_works(_root: Node3D) -> void:
 	var y: float = WORKS_Y
 	# The rolling mill hall, the lap through it eastward: its frame's -z along the lap.
@@ -2210,13 +2224,19 @@ func _build_works(_root: Node3D) -> void:
 		_add_prop("works_torpedo", _works, txf, func(pk, kit, _labels): _kit_call(_works, "torpedo_car", [pk, kit]))
 	_works_track(Vector2(362.0, TORPEDO_TRACK_Z), Vector2(548.0, TORPEDO_TRACK_Z))
 	_note_rect(Vector2(455.0, TORPEDO_TRACK_Z), 190.0, 8.0, 0.0)
-	# The harbour: the ore unloader over the stockpiles, barges moored along the basin.
+	# The harbour: the ore unloader on the north quay, its girder out over the basin (the kit's +x, the water side, turned
+	# to +z: face -x), its rails along the quay (world x) on land, the barges moored under its grab; the stockpiles between
+	# its legs, along the quay. Its rails had run along z out over the basin through the barges, and the piles' ends
+	# reached 10m into the water.
 	var hx := float(HARBOUR_RECT[0]) + 90.0
-	_add_prop("works_orecrane", _works, _works_xf(Vector2(hx, float(HARBOUR_RECT[1]) - 6.0), Vector3(0, 0, 1)), func(pk, kit, _labels): _kit_call(_works, "ore_crane", [pk, kit]))
-	for px in [200.0, 302.0]:
-		var coal: bool = px > 250.0
-		_add_prop(_pile_key(Vector2(px, 160.0)), _works, _works_xf(Vector2(px, 160.0), Vector3(0, 0, 1)), func(pk, kit, _labels): _kit_call(_works, "stockpile", [pk, kit, 58.0, 22.0, 9.0, coal]))
-		_note_rect(Vector2(px, 160.0), 96.0, 40.0, 0.0)
+	var crane_z: float = float(HARBOUR_RECT[1]) - ORE_CRANE_QUAY_LEG * PROP_SCALE - 4.0
+	_add_prop("works_orecrane", _works, _crane_xf(Vector2(hx, crane_z), Vector3(-1, 0, 0)), func(pk, kit, _labels): _kit_call(_works, "ore_crane", [pk, kit]))
+	_note_rect(Vector2(hx, crane_z - 11.0 * PROP_SCALE), 130.0, 70.0, 0.0)
+	var pile_z: float = crane_z - 11.0 * PROP_SCALE
+	for px in [hx - 58.0, hx + 58.0]:
+		var coal: bool = px > hx
+		_add_prop(_pile_key(Vector2(px, pile_z)), _works, _works_xf(Vector2(px, pile_z), Vector3(1, 0, 0)), func(pk, kit, _labels): _kit_call(_works, "stockpile", [pk, kit, 48.0, 20.0, 8.0, coal]))
+		_note_rect(Vector2(px, pile_z), 80.0, 36.0, 0.0)
 	# The slag heap's crown.
 	var top := Vector3(HALDE_C.x, _ground_at(HALDE_C.x, HALDE_C.y), HALDE_C.y)
 	_add_prop("works_crown", _works, _facing(Vector3(-0.8, 0, 0.6), top), func(pk, kit, _labels): _kit_call(_works, "steel_crown", [pk, kit]))
@@ -2875,7 +2895,56 @@ func _build_pitch() -> void:
 	var c := Vector3((float(SPORT_RECT[0]) + float(SPORT_RECT[2])) * 0.5, _sport_y + 0.03, (float(SPORT_RECT[1]) + float(SPORT_RECT[3])) * 0.5)
 	var xf := _facing(Vector3(0, 0, 1), c)
 	_add_prop("leisure_pitch", _town, xf, func(pk, kit, labels): _pitch(pk, kit, labels), 900.0)
+	# The nets (GoalNet.gd: they give where the ball or a cart meets them, and catch the ball) and the ball on the
+	# centre spot (KickBall.gd, the football: life size at PROP_SCALE is Nyota's ball).
+	var pitch := Node3D.new()
+	pitch.name = "Bolzplatz"
+	level.add_child(pitch)
+	for sx in [-1.0, 1.0]:
+		var net := Node3D.new()
+		net.name = "GoalNet%s" % ("West" if sx < 0.0 else "East")
+		net.set_script(load("res://GoalNet.gd"))
+		net.set("half_width", GOAL_HALF * PROP_SCALE)
+		net.set("height", GOAL_H * PROP_SCALE)
+		net.set("top_depth", GOAL_TOP_DEPTH * PROP_SCALE)
+		net.set("depth", GOAL_DEPTH * PROP_SCALE)
+		# Its +z into the goal: the pitch's x times sx.
+		var gl: Vector3 = xf * Vector3(sx * 32.0 * PROP_SCALE, 0.0, 0.0)
+		net.transform = Transform3D(Basis(Vector3(0, 0, -sx), Vector3.UP, Vector3(sx, 0, 0)), gl)
+		pitch.add_child(net)
+	var ball := RigidBody3D.new()
+	ball.name = "Football"
+	ball.set_script(load("res://KickBall.gd"))
+	ball.position = c + Vector3(0, float(KickBall.STYLES[KickBall.Style.FOOTBALL]["radius"]) + 0.02, 0)
+	pitch.add_child(ball)
 	_note_rect(Vector2(c.x, c.z), float(SPORT_RECT[2]) - float(SPORT_RECT[0]), float(SPORT_RECT[3]) - float(SPORT_RECT[1]), 0.0, 0.0)
+
+
+## A goal's frame at the goal line x = gx, the net behind it on the side sx (life size, the pitch's frame): square white
+## posts and crossbar (12cm), the net's frame behind them (GOAL_TOP_DEPTH back at the crossbar's height, GOAL_DEPTH at the
+## ground: bars along the top and the ground, stanchions sloping down at the ends, ground bars back from the posts: nothing in the
+## net's middle, where the ball meets it). The net itself is GoalNet.gd's (it gives to the ball and the carts).
+const GOAL_HALF := 3.66
+const GOAL_H := 2.44
+const GOAL_TOP_DEPTH := 1.0
+const GOAL_DEPTH := 2.0
+
+func _goal_frame(pk: PropKit, kit: Dictionary, gx: float, sx: float, white: Color) -> void:
+	var grey := Color(0.82, 0.83, 0.84)
+	var b := 0.06
+	for gz in [-GOAL_HALF - b, GOAL_HALF + b]:
+		pk.block(kit, "paint", Vector3(gx - b, -0.2, gz - b), Vector3(gx + b, GOAL_H + b, gz + b), white)
+	pk.block(kit, "paint", Vector3(gx - b, GOAL_H - b, -GOAL_HALF - b * 2.0), Vector3(gx + b, GOAL_H + b, GOAL_HALF + b * 2.0), white)
+	var r := 0.025
+	var top_x: float = gx + sx * GOAL_TOP_DEPTH
+	var foot_x: float = gx + sx * GOAL_DEPTH
+	pk.tube(kit, "metal", Vector3(top_x, GOAL_H, -GOAL_HALF), Vector3(top_x, GOAL_H, GOAL_HALF), r, r, 6, grey)
+	pk.tube(kit, "metal", Vector3(foot_x, 0.03, -GOAL_HALF - 0.02), Vector3(foot_x, 0.03, GOAL_HALF + 0.02), r * 1.4, r * 1.4, 6, grey)
+	for gz in [-GOAL_HALF, GOAL_HALF]:
+		# The top arm back from the crossbar's end, the stanchion down, the ground bar back to the post.
+		pk.tube(kit, "metal", Vector3(gx, GOAL_H, gz), Vector3(top_x, GOAL_H, gz), r, r, 6, grey)
+		pk.tube(kit, "metal", Vector3(top_x, GOAL_H, gz), Vector3(foot_x, 0.03, gz), r, r, 6, grey)
+		pk.tube(kit, "metal", Vector3(gx + sx * b, 0.03, gz), Vector3(foot_x, 0.03, gz), r * 1.4, r * 1.4, 6, grey)
 
 
 ## Life size, centred: a 64 x 42m ash pitch along x.
@@ -2897,11 +2966,12 @@ func _pitch(pk: PropKit, kit: Dictionary, labels: Array) -> void:
 		pk.block(kit, "paint", Vector3(minf(gx, gx - sx * 12.0) - 0.0, 0.0, -12.0 - lw * 0.5), Vector3(maxf(gx, gx - sx * 12.0), ly, -12.0 + lw * 0.5), white)
 		pk.block(kit, "paint", Vector3(minf(gx, gx - sx * 12.0), 0.0, 12.0 - lw * 0.5), Vector3(maxf(gx, gx - sx * 12.0), ly, 12.0 + lw * 0.5), white)
 		pk.block(kit, "paint", Vector3(gx - sx * 12.0 - lw * 0.5, 0.0, -12.0), Vector3(gx - sx * 12.0 + lw * 0.5, ly, 12.0), white)
-		for gz in [-3.66, 3.66]:
-			pk.tube(kit, "paint", Vector3(gx, 0.0, gz), Vector3(gx, 2.44, gz), 0.06, 0.06, 8, white)
-		pk.tube(kit, "paint", Vector3(gx, 2.44, -3.66), Vector3(gx, 2.44, 3.66), 0.06, 0.06, 8, white)
-		pk.tube(kit, "metal", Vector3(gx + sx * 1.8, 0.0, -3.66), Vector3(gx + sx * 1.8, 2.0, -3.66), 0.03, 0.03, 6, Color(0.5, 0.5, 0.5))
-		pk.tube(kit, "metal", Vector3(gx + sx * 1.8, 0.0, 3.66), Vector3(gx + sx * 1.8, 2.0, 3.66), 0.03, 0.03, 6, Color(0.5, 0.5, 0.5))
+		_goal_frame(pk, kit, gx, sx, white)
+		# The goal area (5.5m) and the penalty spot.
+		pk.block(kit, "paint", Vector3(minf(gx, gx - sx * 5.5), 0.0, -9.16 - lw * 0.5), Vector3(maxf(gx, gx - sx * 5.5), ly, -9.16 + lw * 0.5), white)
+		pk.block(kit, "paint", Vector3(minf(gx, gx - sx * 5.5), 0.0, 9.16 - lw * 0.5), Vector3(maxf(gx, gx - sx * 5.5), ly, 9.16 + lw * 0.5), white)
+		pk.block(kit, "paint", Vector3(gx - sx * 5.5 - lw * 0.5, 0.0, -9.16), Vector3(gx - sx * 5.5 + lw * 0.5, ly, 9.16), white)
+		pk.block(kit, "paint", Vector3(gx - sx * 11.0 - 0.11, 0.0, -0.11), Vector3(gx - sx * 11.0 + 0.11, ly, 0.11), white)
 	# The centre circle (a ring of thin boxes).
 	for k in range(36):
 		var a0: float = TAU * float(k) / 36.0
@@ -3249,7 +3319,7 @@ func _pile_key(at: Vector2) -> String:
 
 func _build_works_fill() -> void:
 	# The ore yard: an ore bridge over two long stockpiles (iron ore and coal), their length along z.
-	_add_prop("works_oreyard", _works, _works_xf(ORE_YARD, Vector3(0, 0, 1)), func(pk, kit, _labels): _kit_call(_works, "ore_crane", [pk, kit]))
+	_add_prop("works_oreyard", _works, _crane_xf(ORE_YARD, Vector3(0, 0, 1)), func(pk, kit, _labels): _kit_call(_works, "ore_crane", [pk, kit]))
 	for k in range(2):
 		var pc := Vector2(ORE_YARD.x - 20.0 + 42.0 * float(k), ORE_YARD.y)
 		var coal_pile: bool = k == 1

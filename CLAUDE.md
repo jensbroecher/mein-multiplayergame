@@ -4088,6 +4088,18 @@ estate, the half-timbered old town on its hill under Burg Kronburg's ruin. Stage
   (`-s`, headless, `-- <level> [limit=400]`) lists a level's meshes that wide.
 - The Leitpfosten (all three Kronburg GP stages) were built upside down (the frame's z points down; the bands' z ranges
   were the wrong way round): only their top 43cm, white and black overlapping, floating 1.2m up.
+- The canal's water sheet is wound clockwise from above (`_build_canal`): wound the other way it was culled and the canal
+  read as clear water over its bed. The harbour's ore unloader stands on the north quay (`_crane_xf`, face -x: its girder
+  out over the basin, its rails along the quay on land, `ORE_CRANE_LIFT` up so the rail heads no longer lie flush with the
+  pad and flicker), the stockpiles along the quay between its legs; its rails had run out across the basin through the
+  moored barges and the piles' ends 10m into the water.
+- The football pitch's goals (`_goal_frame`: square posts and crossbar, the net's frame of top arms, sloping end
+  stanchions and ground bars, nothing in the net's middle) and their nets (`GoalNet.gd`, `goal_net.gdshader`, under
+  `Bolzplatz`): the net gives where the ball (any KickBall) or a cart presses it, springs back and wobbles; it catches the
+  ball (a spring and drag, `BALL_*`) so it drops into the goal; carts drive through it (soft). In or out of the goal
+  changes only across the mouth. A football waits on the centre spot. `res://scratch/goal_net_test.tscn -- [<dir>]
+  [goal=West] [speed=30] [up=7] [from=10] [lat=1.5] [cam=x,y,z] [frames=...]` (windowed for frames) shoots it into a goal
+  and logs the ball and the net's bulge.
 - Ground masks: every vertex of the fine grid takes `_masks`, however far from the road (`_road_d` capped under 1e8:
   past the grading's reach it read as the coarse land's and painted fields inside the works).
 - `res://scratch/kronburg_hide_shot.tscn -- <out.png> x,y,z:tx,ty,tz [hide=<node path> ...]` (windowed) renders the level
