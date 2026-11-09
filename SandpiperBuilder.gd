@@ -586,7 +586,7 @@ func _seat(b, at: Vector3) -> void:
 		var px: float = at.x - 0.092 + 0.046 * k
 		b.rbox(Transform3D(Basis(), Vector3(px, cush.y + 0.039, cush.z)), Vector3(0.0025, 0.003, 0.110), 0.002, 1,
 				CB.M_DARK, C_SEAT_PLEAT)
-	var rake := Basis(Vector3.RIGHT, -0.24)
+	var rake := Basis(Vector3.RIGHT, 0.24)  # top back toward +z (the tail)
 	var back_c := Vector3(at.x, at.y + 0.230, at.z + 0.150)
 	b.rbox(Transform3D(rake, back_c), Vector3(0.140, 0.170, 0.034), 0.030, 2, CB.M_DARK, C_SEAT)
 	for k in 5:
