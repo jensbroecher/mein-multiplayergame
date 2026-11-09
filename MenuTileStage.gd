@@ -22,6 +22,9 @@ const GHOST_SHADER = preload("res://menu_ghost.gdshader")
 const SKY_SHADER = preload("res://sky_tropical_cumulus.gdshader")
 
 const CAR_SCALE := 2.0
+## The Options bench's car: the garage's SHOW_SCALE (the game's people and props are 1.6 times life size).
+const BENCH_SHOW_SCALE := 1.0 / 1.6
+const BENCH_CAR_YAW := 0.55
 const MAX_WIDTH := 1400.0
 ## How often a tile not under the pointer or focus renders, by Detail Level (Off to Ultra): every 3rd frame at
 ## most, so a scene never reads as a still (every 4th, the road's 15 m/s judders).
@@ -261,7 +264,7 @@ func _build_environment(vp: SubViewport) -> void:
 	if night:
 		env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 		env.ambient_light_color = Color(0.32, 0.36, 0.46)
-		env.ambient_light_energy = 0.7
+		env.ambient_light_energy = 1.1 if kind == "options" else 0.7
 	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
 	env.tonemap_exposure = 1.0
@@ -551,7 +554,7 @@ static func _soft_dot() -> Texture2D:
 func _add_camera(vp: SubViewport, fov: float) -> Camera3D:
 	var cam := Camera3D.new()
 	cam.fov = fov
-	cam.near = 0.05 if kind == "options" else 0.2
+	cam.near = 0.1 if kind == "options" else 0.2
 	cam.far = 900.0
 	vp.add_child(cam)
 	cam.current = true
@@ -824,23 +827,38 @@ func _build_inspect() -> void:
 ## Options: a workbench; the laptop open on the car's settings, the pro transmitter beside it, the
 ## Mudrunner on its set-up stand behind, its front wheels steering as the transmitter's wheel turns.
 func _build_bench() -> void:
-	var bench := MenuPropKit.build_bench(accent)
+	# The car at the game's prop scale (its race size over PROP_SCALE 1.6, as in the garage: about 1.4m long), on
+	# a stand as high as its body's underside, so its wheels hang 3cm clear.
+	var car := _add_car("Mudrunner", Vector3.ZERO)
+	var s := CAR_SCALE * BENCH_SHOW_SCALE
+	var low := 0.12
+	if not car.is_empty():
+		var node: Node3D = car["node"]
+		var model := node.get_node_or_null("Model") as Node3D
+		var body := node.get_node_or_null("Model/Body") as MeshInstance3D
+		if model and body and body.mesh:
+			low = ((model.transform * body.transform) * body.mesh.get_aabb()).position.y
+	var stand_h := low * s + 0.03
+	var bench := MenuPropKit.build_bench(accent, stand_h, BENCH_CAR_YAW)
 	_world.add_child(bench)
 	_extra["bench"] = bench
-	# The car at RC scale (about 45cm long) on the stand.
-	var car := _add_car("Mudrunner", Vector3.ZERO)
 	if not car.is_empty():
-		var aabb := _bounds(car["node"])
-		car["rc_scale"] = 0.46 / maxf(aabb.size.z, 0.1)
-		car["home"] = bench.get_meta("stand_top")
-	(_extra["sun"] as DirectionalLight3D).directional_shadow_max_distance = 4.0
+		car["rc_scale"] = s
+		car["home"] = (bench.get_meta("stand_top") as Vector3) - Vector3(0.0, low * s, 0.0)
+	(_extra["sun"] as DirectionalLight3D).directional_shadow_max_distance = 8.0
 	(_extra["sun"] as DirectionalLight3D).light_energy = 0.9
 	var lamp := OmniLight3D.new()
 	lamp.light_color = Color(1.0, 0.86, 0.68)
-	lamp.light_energy = 2.2
-	lamp.omni_range = 3.0
-	lamp.position = Vector3(-0.3, 0.75, 0.45)
+	lamp.light_energy = 4.0
+	lamp.omni_range = 5.0
+	lamp.position = Vector3(-0.3, 1.4, 0.8)
 	_world.add_child(lamp)
+	var fill := OmniLight3D.new()
+	fill.light_color = accent.lerp(Color(0.8, 0.85, 1.0), 0.6)
+	fill.light_energy = 1.6
+	fill.omni_range = 4.0
+	fill.position = Vector3(-1.6, 1.2, -0.6)
+	_world.add_child(fill)
 
 
 static func _bounds(root: Node3D) -> AABB:
@@ -916,7 +934,7 @@ func _apply(t: float) -> void:
 					var w: Node3D = _cars[0]["wheels"][k]
 					if w:
 						w.rotation = Vector3(0, -steer * 0.6, 0)
-			_frame(0, Vector3(0.06, 0.12, -0.02), 0.52, 0.17, 22.0 + sin(t * 0.15) * 6.0, 24.0)
+			_frame(0, Vector3(-0.05, 0.4, -0.3), 1.0, 0.42, 22.0 + sin(t * 0.15) * 6.0, 18.0)
 
 
 ## Frames camera `i` on what it shows (`centre`, `rx` across and `ry` up from it on screen) seen from `yaw_deg` (round from +z toward +x) and
@@ -947,7 +965,7 @@ func _apply_car(c: Dictionary, t: float) -> void:
 	var home: Vector3 = c["home"]
 	var s: float = c["seed"]
 	if c.has("rc_scale"):
-		car.transform = Transform3D(Basis.from_euler(Vector3(0, 0.55, 0)).scaled(Vector3.ONE * float(c["rc_scale"])), home)
+		car.transform = Transform3D(Basis.from_euler(Vector3(0, BENCH_CAR_YAW, 0)).scaled(Vector3.ONE * float(c["rc_scale"])), home)
 		return
 	var moving := _speed > 0.0
 	var weave := 0.0

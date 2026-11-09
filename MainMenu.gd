@@ -105,7 +105,11 @@ func _create_tile_sections() -> void:
 	scroll.remove_child(tile_grid)
 	scroll.add_child(tile_sections)
 	tile_sections.add_child(tile_grid)
-
+	tile_sections.alignment = BoxContainer.ALIGNMENT_CENTER
+	tile_grid.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	# Lay the tiles out again whenever the area changes (the window going fullscreen at start-up, the Player 2
+	# name row showing), once the containers have sorted.
+	scroll.resized.connect(_relayout_tiles)
 
 ## Adds a titled section (header line plus its own tile grid) and returns the grid to fill.
 func _add_section(title: String, accent: Color) -> GridContainer:
@@ -344,7 +348,10 @@ func show_sub_menu(menu_name: String) -> void:
 func _relayout_tiles() -> void:
 	if tile_grid == null or (tile_grid.get_child_count() == 0 and section_grids.is_empty()):
 		return
-	var scroll: Control = tile_grid.get_parent()
+	# The ScrollContainer's own size: the VBox inside it (tile_grid's parent) is as big as its content, which is
+	# the last page's tiles, so measuring it sized each page from the one before (small at start-up, the two tiles
+	# under Single Player taller than the screen).
+	var scroll: Control = tile_sections.get_parent() if tile_sections else tile_grid.get_parent()
 	var area: Vector2 = scroll.size
 	if area.x < 8.0 or area.y < 8.0:
 		return
@@ -364,7 +371,8 @@ func _relayout_tiles() -> void:
 	var tw: float = (area.x - float(hsep * (cols - 1))) / float(cols)
 	var th: float = (area.y - float(vsep * (rows - 1))) / float(rows)
 	tw = maxf(tw, 280.0)
-	th = maxf(th, 190.0)
+	# No taller than about 5:3, centred in the area: two tiles side by side had filled the screen's height.
+	th = clampf(th, 190.0, maxf(tw * 0.6, 190.0))
 	for child in tile_grid.get_children():
 		if child is Control:
 			(child as Control).custom_minimum_size = Vector2(tw, th)

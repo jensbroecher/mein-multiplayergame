@@ -87,9 +87,13 @@ static func gantry(pk: PropKit, kit: Dictionary, c: Vector3, half: float, h: flo
 
 # --- the Options tile's bench (life size) -------------------------------------------------------------
 
-## The whole bench under one node. Metas: "stand_top" (where the car's origin goes), "wheel" (the
+## The whole bench under one node, for a car at the game's prop scale (about 1.4m long: the garage's size) on a
+## stand `stand_h` high turned `car_yaw`. Metas: "stand_top" (where the car's origin goes), "wheel" (the
 ## transmitter's wheel node, turned by `animate_bench`), "ui" (the laptop screen's controls).
-static func build_bench(accent: Color) -> Node3D:
+const WALL_Z := -1.45
+const STAND_AT := Vector3(0.3, 0.0, -0.55)
+
+static func build_bench(accent: Color, stand_h := 0.2, car_yaw := 0.55) -> Node3D:
 	var root := Node3D.new()
 	root.name = "Bench"
 	var pk := PropKit.new()
@@ -97,30 +101,33 @@ static func build_bench(accent: Color) -> Node3D:
 	var kit := {}
 
 	# The bench top (walnut-dark) and the mat on it.
-	pk.box(kit, "matte", Transform3D(Basis(), Vector3(0.0, -0.025, 0.0)), Vector3(3.0, 0.05, 1.6), Color(0.16, 0.11, 0.08))
+	pk.box(kit, "matte", Transform3D(Basis(), Vector3(0.0, -0.025, (WALL_Z + 0.7) * 0.5)), Vector3(14.0, 0.05, 0.7 - WALL_Z), Color(0.16, 0.11, 0.08))
 	var mat_mi := MeshInstance3D.new()
 	var mat_plane := PlaneMesh.new()
-	mat_plane.size = Vector2(1.3, 0.8)
+	mat_plane.size = Vector2(2.0, 1.25)
 	mat_mi.mesh = mat_plane
-	mat_mi.position = Vector3(0.02, 0.0015, 0.0)
+	mat_mi.position = Vector3(0.0, 0.0015, -0.25)
 	var mat_shader := ShaderMaterial.new()
 	mat_shader.shader = preload("res://menu_bench_mat.gdshader")
 	mat_shader.set_shader_parameter("line", accent)
+	mat_shader.set_shader_parameter("size", mat_plane.size)
 	mat_mi.material_override = mat_shader
 	root.add_child(mat_mi)
 
-	# The car's set-up stand: a round anodised column on a foot, a rubber pad on top.
-	var stand := Vector3(0.2, 0.0, -0.2)
+	# The car's stand: an anodised block on a foot under the chassis, a rubber pad on top, so the wheels hang
+	# a few centimetres clear of the mat and steer freely.
 	var anod := accent.darkened(0.25)
-	pk.lathe(kit, "metal", stand, [Vector2(0.075, 0.0), Vector2(0.075, 0.012), Vector2(0.06, 0.016), Vector2(0.03, 0.02)], 28, anod)
-	pk.lathe(kit, "metal", stand, [Vector2(0.03, 0.02), Vector2(0.026, 0.095), Vector2(0.045, 0.1), Vector2(0.045, 0.105)], 24, anod)
-	pk.lathe(kit, "rubber", stand, [Vector2(0.045, 0.105), Vector2(0.045, 0.112), Vector2(0.0, 0.112)], 24, Color(0.05, 0.05, 0.05))
-	root.set_meta("stand_top", stand + Vector3(0.0, 0.112 - 0.034, 0.0))
+	pk.set_frame(Transform3D(Basis.from_euler(Vector3(0, car_yaw, 0)), STAND_AT))
+	pk.box(kit, "metal", Transform3D(Basis(), Vector3(0, 0.012, 0)), Vector3(0.4, 0.024, 0.62), anod)
+	pk.box(kit, "metal", Transform3D(Basis(), Vector3(0, stand_h * 0.5, 0)), Vector3(0.22, stand_h - 0.02, 0.4), anod.lightened(0.08))
+	pk.box(kit, "rubber", Transform3D(Basis(), Vector3(0, stand_h - 0.008, 0)), Vector3(0.24, 0.016, 0.44), Color(0.05, 0.05, 0.05))
+	pk.reset_frame()
+	root.set_meta("stand_top", STAND_AT + Vector3(0.0, stand_h, 0.0))
 
 	_workshop_wall(pk, kit, accent)
-	_laptop(pk, kit, Transform3D(Basis.from_euler(Vector3(0, 0.38, 0)), Vector3(-0.3, 0.0, 0.05)), root)
-	_hex_drivers(pk, kit, Vector3(0.18, 0.0, 0.2), accent)
-	_lipo(pk, kit, Transform3D(Basis.from_euler(Vector3(0, -0.5, 0)), Vector3(-0.02, 0.0, 0.28)))
+	_laptop(pk, kit, Transform3D(Basis.from_euler(Vector3(0, 0.38, 0)), Vector3(-0.62, 0.0, -0.12)), root)
+	_hex_drivers(pk, kit, Vector3(-0.95, 0.0, -0.3), accent)
+	_lipo(pk, kit, Transform3D(Basis.from_euler(Vector3(0, -0.5, 0)), Vector3(-0.3, 0.0, 0.12)))
 	pk.reset_frame()
 
 	var mi := MeshInstance3D.new()
@@ -129,7 +136,7 @@ static func build_bench(accent: Color) -> Node3D:
 	root.add_child(mi)
 
 	var tx := _transmitter(accent)
-	tx.transform = Transform3D(Basis.from_euler(Vector3(0, 0.95, 0)), Vector3(0.43, 0.0, 0.16))
+	tx.transform = Transform3D(Basis.from_euler(Vector3(0, 0.95, 0)), Vector3(-0.08, 0.0, 0.05))
 	root.add_child(tx)
 	root.set_meta("wheel", tx.get_node("Wheel"))
 	root.set_meta("trigger", tx.get_node("Trigger"))
@@ -140,8 +147,9 @@ static func build_bench(accent: Color) -> Node3D:
 ## The wall behind the bench: painted block, a pegboard with tools hung on it, a shelf of spare wheels and a
 ## strip light along under the shelf.
 static func _workshop_wall(pk: PropKit, kit: Dictionary, accent: Color) -> void:
-	pk.reset_frame()
-	pk.box(kit, "matte", Transform3D(Basis(), Vector3(0.0, 0.9, -0.62)), Vector3(3.0, 1.9, 0.05), Color(0.2, 0.21, 0.23))
+	# Laid out with the wall's face at z -0.595, moved back to WALL_Z.
+	pk.set_frame(Transform3D(Basis(), Vector3(0.0, 0.0, WALL_Z + 0.62)))
+	pk.box(kit, "matte", Transform3D(Basis(), Vector3(0.0, 1.8, -0.62)), Vector3(14.0, 3.7, 0.05), Color(0.24, 0.25, 0.28))
 	var board := Color(0.36, 0.3, 0.22)
 	pk.box(kit, "matte", Transform3D(Basis(), Vector3(-0.15, 0.42, -0.585)), Vector3(1.2, 0.7, 0.012), board)
 	for i in 30:
@@ -214,7 +222,7 @@ static func _laptop(pk: PropKit, kit: Dictionary, xf: Transform3D, root: Node3D)
 	smat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	screen.material_override = smat
 	screen.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	screen.transform = xf * lid_xf * Transform3D(Basis(), Vector3(0, d * 0.5 + 0.004, 0.0004))
+	screen.transform = xf * lid_xf * Transform3D(Basis(), Vector3(0, d * 0.5 + 0.004, 0.0025))
 	root.add_child(screen)
 	root.set_meta("ui", page)
 	pk.reset_frame()
@@ -225,7 +233,11 @@ static func _laptop(pk: PropKit, kit: Dictionary, xf: Transform3D, root: Node3D)
 static func _settings_screen() -> Dictionary:
 	var vp := SubViewport.new()
 	vp.name = "LaptopPage"
-	vp.size = Vector2i(800, 500)
+	# Drawn at about the size it is seen at (a viewport texture has no mipmaps: at 800 x 500 shown 120px wide its
+	# text and lines shimmered as the camera drifted), laid out at 800 x 500.
+	vp.size = Vector2i(352, 220)
+	vp.size_2d_override = Vector2i(800, 500)
+	vp.size_2d_override_stretch = true
 	vp.transparent_bg = false
 	vp.render_target_update_mode = SubViewport.UPDATE_WHEN_PARENT_VISIBLE
 	vp.disable_3d = true
@@ -446,7 +458,7 @@ static func _transmitter(accent: Color) -> Node3D:
 	smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	smat.albedo_texture = (page["viewport"] as SubViewport).get_texture()
 	screen.material_override = smat
-	screen.transform = Transform3D(tilt, scr_c + tilt * Vector3(0, 0, 0.0042))
+	screen.transform = Transform3D(tilt, scr_c + tilt * Vector3(0, 0, 0.0058))
 	screen.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	root.add_child(screen)
 	root.set_meta("ui", page)
@@ -456,7 +468,9 @@ static func _transmitter(accent: Color) -> Node3D:
 static func _tx_screen(accent: Color) -> Dictionary:
 	var vp := SubViewport.new()
 	vp.name = "TxPage"
-	vp.size = Vector2i(180, 240)
+	vp.size = Vector2i(72, 96)
+	vp.size_2d_override = Vector2i(180, 240)
+	vp.size_2d_override_stretch = true
 	vp.disable_3d = true
 	vp.render_target_update_mode = SubViewport.UPDATE_WHEN_PARENT_VISIBLE
 	var bg := ColorRect.new()

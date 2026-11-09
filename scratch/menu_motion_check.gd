@@ -30,6 +30,8 @@ func _ready() -> void:
 	var b := await _grab(main)
 	for key in a.keys():
 		print("%-14s %5.1f%% of pixels changed" % [key, _changed(a[key], b[key]) * 100.0])
+	for btn in _tiles(main.get_node("MainMenu")):
+		print("tile %s" % (btn as Control).size)
 	get_tree().quit()
 
 

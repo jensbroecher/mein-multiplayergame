@@ -49,7 +49,15 @@ border). So no tile stands still.
   `menu_ghost.gdshader`, and a running lap time and gap), grand_prix (the podium at night under a chequered banner,
   confetti), inspect (`Drone.gd`, no cars), options (`MenuPropKit.build_bench`: a workbench with a laptop whose screen
   is a live 2D settings page with telemetry, a pro pistol-grip transmitter whose wheel steers the Mudrunner on its set-up
-  stand, a pegboard wall, hex drivers, a LiPo).
+  stand, a pegboard wall, hex drivers, a LiPo). The bench's car is at the game's prop scale (`BENCH_SHOW_SCALE`, the
+  garage's 1/1.6 of race size: about 1.4m beside a 32cm laptop; the user found an RC car's real 46cm too small for this
+  game's very large scale cars), its stand as high as its body's underside plus 3cm. The laptop's and transmitter's pages
+  render at about the size they are seen (`size_2d_override` keeps the layout): a viewport texture has no mipmaps, and
+  at 800 x 500 the page shimmered (the user saw it flicker); the screen stands 2mm off its bezel.
+- MainMenu's `_relayout_tiles` measures the ScrollContainer (the VBox inside it is as big as its content, so it had
+  sized each page from the last: small tiles at start-up, the two Single Player tiles taller than the screen), runs again
+  whenever the scroll area resizes, and caps a tile at about 5:3, the grid centred. `res://scratch/menu_layout_probe.tscn
+  -- [size=1728x1080] [start=<w>x<h>] [hidden=60]` (windowed) walks the pages and prints every tile's size.
 - Cost: each tile costs about 2ms of an M1's GPU whatever its size, MSAA or shadows (the trees' near meshes 2ms more,
   so the far ones are used). So only the tile under the pointer or focus renders every frame; the others take turns
   (`IDLE_EVERY` by Detail Level: every 2nd frame from Medium, every 3rd at Low and Off, never slower: at every 4th the
