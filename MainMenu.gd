@@ -10,6 +10,17 @@ signal quit_pressed
 const SHOW_GP_TEST_MENU := true
 
 const TILE_DIR := "res://images/menu/"
+## A page's tiles cascade in (`_cascade_in`) and the last page fades out (`_fade_out`); seconds and pixels.
+const CASCADE_STEP := 0.06
+const CASCADE_SPAN := 0.6
+const CASCADE_FADE := 0.32
+const CASCADE_MOVE := 0.42
+const CASCADE_RISE := 18.0
+const FADE_OUT_TIME := 0.16
+const FADE_OUT_RISE := 10.0
+## The tile frame's corners (`_apply_tile_styles`) and its picture's, 4px inside it.
+const TILE_RADIUS := 16
+const TILE_INNER_RADIUS := 12
 const MenuTileStage = preload("res://MenuTileStage.gd")
 const MenuTileDrift = preload("res://MenuTileDrift.gd")
 
@@ -77,6 +88,11 @@ var name_edit_p2: LineEdit
 var current_screen: String = "main"
 ## Holds tile_grid on ordinary screens, and the per-cup sections on the course lists.
 var tile_sections: VBoxContainer
+var _tile_scroll: ScrollContainer
+var _fade_layer: Control
+var _cascade: Array[Tween] = []
+var _cascade_serial := 0
+var _page_serial := 0
 var section_grids: Array[GridContainer] = []
 
 
@@ -93,23 +109,111 @@ func _ready() -> void:
 	show_sub_menu("main")
 
 
-## A ScrollContainer takes a single child, so tile_grid moves into a VBox that can also hold
-## section headers and their grids.
+## A ScrollContainer takes a single child, so the tiles live in a VBox that can also hold section headers and
+## their grids. Each page gets a fresh VBox and grid (`_new_tile_page`), so the last one can fade out whole.
 func _create_tile_sections() -> void:
-	var scroll: Control = tile_grid.get_parent()
+	_tile_scroll = tile_grid.get_parent() as ScrollContainer
+	_tile_scroll.remove_child(tile_grid)
+	tile_grid.queue_free()
+	_new_tile_page()
+	# Lay the tiles out again whenever the area changes (the window going fullscreen at start-up, the Player 2
+	# name row showing), once the containers have sorted.
+	_tile_scroll.resized.connect(_relayout_tiles)
+	# Where the last page's tiles fade out, over the tile area and clipped to it.
+	_fade_layer = Control.new()
+	_fade_layer.name = "TileFadeOut"
+	_fade_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fade_layer.clip_contents = true
+	add_child(_fade_layer)
+
+
+func _new_tile_page() -> void:
 	tile_sections = VBoxContainer.new()
 	tile_sections.name = "TileSections"
 	tile_sections.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tile_sections.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	tile_sections.add_theme_constant_override("separation", 14)
-	scroll.remove_child(tile_grid)
-	scroll.add_child(tile_sections)
-	tile_sections.add_child(tile_grid)
 	tile_sections.alignment = BoxContainer.ALIGNMENT_CENTER
+	tile_grid = GridContainer.new()
+	tile_grid.name = "TileGrid"
+	tile_grid.columns = 2
+	tile_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tile_grid.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	# Lay the tiles out again whenever the area changes (the window going fullscreen at start-up, the Player 2
-	# name row showing), once the containers have sorted.
-	scroll.resized.connect(_relayout_tiles)
+	tile_grid.add_theme_constant_override("h_separation", 22)
+	tile_grid.add_theme_constant_override("v_separation", 22)
+	tile_sections.add_child(tile_grid)
+	_tile_scroll.add_child(tile_sections)
+
+
+## The page's tiles (and a course list's section headers) come in one after another: each fades in while its
+## picture rises into its frame, CASCADE_STEP apart (less on a long course list, so the last is in by
+## CASCADE_SPAN), after `start` seconds.
+func _cascade_in(start := 0.0) -> void:
+	_kill_cascade()
+	var items: Array = []
+	for c in tile_sections.get_children():
+		if c is GridContainer:
+			if c.visible:
+				items.append_array(c.get_children())
+		elif c is Control:
+			items.append(c)
+	if items.is_empty():
+		return
+	for n in items:
+		(n as Control).modulate.a = 0.0
+		var content := (n as Control).get_node_or_null("Content") as Control
+		if content:
+			content.position.y = CASCADE_RISE
+	# The tweens start a frame later: the frame a page is built in is a long one, and the next frame's step would
+	# carry the first tiles most of the way in at once.
+	_cascade_serial += 1
+	var serial := _cascade_serial
+	await get_tree().process_frame
+	if serial != _cascade_serial:
+		return
+	var step := minf(CASCADE_STEP, CASCADE_SPAN / float(items.size()))
+	for i in items.size():
+		var n := items[i] as Control
+		if not is_instance_valid(n) or not n.is_inside_tree():
+			continue
+		var d := start + step * float(i)
+		var tw := n.create_tween().set_parallel(true)
+		tw.tween_property(n, "modulate:a", 1.0, CASCADE_FADE).set_delay(d).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		var content := n.get_node_or_null("Content") as Control
+		if content:
+			tw.tween_property(content, "position:y", 0.0, CASCADE_MOVE).set_delay(d).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		_cascade.append(tw)
+
+
+func _kill_cascade() -> void:
+	_cascade_serial += 1
+	for tw in _cascade:
+		if tw.is_valid():
+			tw.kill()
+	_cascade.clear()
+	if tile_sections:
+		for c in tile_sections.find_children("*", "Control", false, false):
+			(c as Control).modulate.a = 1.0
+		for b in tile_sections.find_children("Content", "Control", true, false):
+			(b as Control).position.y = 0.0
+
+
+## The last page fades out whole where it stood (over the new one's start), its tiles no longer pressable, and
+## is freed.
+func _fade_out(old: Control, at: Vector2, old_size: Vector2) -> void:
+	_fade_layer.position = _tile_scroll.global_position - global_position
+	_fade_layer.size = _tile_scroll.size
+	_fade_layer.add_child(old)
+	old.position = at - _tile_scroll.global_position
+	old.size = old_size
+	for b in old.find_children("*", "BaseButton", true, false):
+		(b as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+		(b as Control).focus_mode = Control.FOCUS_NONE
+	var tw := old.create_tween().set_parallel(true)
+	tw.tween_property(old, "modulate:a", 0.0, FADE_OUT_TIME).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tw.tween_property(old, "position:y", old.position.y - FADE_OUT_RISE, FADE_OUT_TIME).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tw.chain().tween_callback(old.queue_free)
+
 
 ## Adds a titled section (header line plus its own tile grid) and returns the grid to fill.
 func _add_section(title: String, accent: Color) -> GridContainer:
@@ -188,6 +292,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _on_visibility_changed() -> void:
 	if visible:
+		# The menu comes back behind the screen swipe: the tiles cascade in as it clears.
+		_cascade_in(0.3)
 		_load_player_name()
 		if name_edit_p2:
 			_load_p2_name()
@@ -245,9 +351,21 @@ func _on_p2_name_changed(new_name: String) -> void:
 	config.save("user://settings.cfg")
 
 
+## Shows a page: the last one fades out first (FADE_OUT_TIME), then this one is built and its tiles cascade in.
+## Built after the fade, not during it: building a page (its cars, its 3D scenes) takes one long frame, and the
+## fade's tween jumped across it. `current_screen` changes at once.
 func show_sub_menu(menu_name: String) -> void:
 	current_screen = menu_name
-	_clear_tiles()
+	_page_serial += 1
+	var serial := _page_serial
+	if _clear_tiles():
+		await get_tree().create_timer(FADE_OUT_TIME).timeout
+		if serial != _page_serial or not is_inside_tree():
+			return
+	_build_page(menu_name)
+
+
+func _build_page(menu_name: String) -> void:
 	extra_row.visible = false
 	btn_back.visible = menu_name != "main"
 	btn_quit.visible = menu_name == "main"
@@ -342,7 +460,12 @@ func show_sub_menu(menu_name: String) -> void:
 			_fill_stages_by_cup(func(_cup: String, _i: int, path: String):
 				_on_stage_selected(path)
 			, false)
+	# Sized at once (the scroll area is known) so the first tiles don't show at their default size for a frame,
+	# and again once the containers have sorted.
+	_relayout_tiles()
 	call_deferred("_relayout_tiles")
+	if is_visible_in_tree():
+		_cascade_in(0.0)
 
 
 func _relayout_tiles() -> void:
@@ -402,17 +525,24 @@ func _on_back_pressed() -> void:
 			show_sub_menu("main")
 
 
-func _clear_tiles() -> void:
-	for child in tile_grid.get_children():
-		tile_grid.remove_child(child)
-		child.queue_free()
-	if tile_sections:
-		for child in tile_sections.get_children():
-			if child != tile_grid:
-				tile_sections.remove_child(child)
-				child.queue_free()
+## Takes the page's tiles away, fading them out where they stood if the menu is on screen; true if it fades.
+func _clear_tiles() -> bool:
+	_kill_cascade()
 	section_grids.clear()
-	tile_grid.visible = true
+	var old := tile_sections
+	if old:
+		var at := old.global_position
+		var old_size := old.size
+		var had_tiles := old.find_children("*", "BaseButton", true, false).size() > 0
+		_tile_scroll.remove_child(old)
+		_new_tile_page()
+		if had_tiles and is_visible_in_tree():
+			_fade_out(old, at, old_size)
+			return true
+		old.queue_free()
+		return false
+	_new_tile_page()
+	return false
 
 
 func _add_tile(title: String, subtitle: String, file_name: String, accent: Color, on_press: Callable,
@@ -426,16 +556,30 @@ func _add_tile(title: String, subtitle: String, file_name: String, accent: Color
 	btn.focus_mode = Control.FOCUS_ALL
 	_apply_tile_styles(btn, accent)
 
-	# The picture's area, 4px inside the border. "scene:<kind>" is a live 3D scene (MenuTileStage.gd); any other
-	# file a picture that drifts and zooms slowly (MenuTileDrift.gd) inside a holder that clips it to the area.
-	var holder := Control.new()
+	# Everything inside the frame is under "Content" (the cascade slides it up into the frame). The picture's
+	# area is 4px inside the border, a Panel drawing a rounded rectangle that its children are clipped to
+	# (`clip_children`), so the picture, the caption's shade and the colour bar follow the frame's round corners.
+	# "scene:<kind>" is a live 3D scene (MenuTileStage.gd); any other file a picture that drifts and zooms slowly
+	# (MenuTileDrift.gd).
+	var content := Control.new()
+	content.name = "Content"
+	content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	btn.add_child(content)
+	var holder := Panel.new()
+	holder.name = "Picture"
 	holder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	holder.offset_left = 4
 	holder.offset_top = 4
 	holder.offset_right = -4
 	holder.offset_bottom = -4
-	holder.clip_contents = true
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var mask := StyleBoxFlat.new()
+	mask.bg_color = Color.WHITE
+	mask.set_corner_radius_all(TILE_INNER_RADIUS)
+	mask.anti_aliasing = true
+	holder.add_theme_stylebox_override("panel", mask)
+	holder.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
 	var tex: TextureRect
 	if file_name.begins_with("scene:"):
 		tex = MenuTileStage.new()
@@ -451,28 +595,24 @@ func _add_tile(title: String, subtitle: String, file_name: String, accent: Color
 	if not file_name.begins_with("scene:") and ResourceLoader.exists(tex_path):
 		tex.texture = load(tex_path)
 	holder.add_child(tex)
-	btn.add_child(holder)
+	content.add_child(holder)
 
 	var fade := ColorRect.new()
 	fade.color = Color(0.03, 0.035, 0.05, 0.78)
 	fade.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	fade.anchor_top = 0.52
-	fade.offset_left = 4
 	fade.offset_top = 0
-	fade.offset_right = -4
-	fade.offset_bottom = -4
+	fade.offset_bottom = 0
 	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	btn.add_child(fade)
+	holder.add_child(fade)
 
 	var accent_bar := ColorRect.new()
 	accent_bar.color = accent
 	accent_bar.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	accent_bar.offset_left = 4
-	accent_bar.offset_top = -8
-	accent_bar.offset_right = -4
-	accent_bar.offset_bottom = -4
+	accent_bar.offset_top = -4
+	accent_bar.offset_bottom = 0
 	accent_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	btn.add_child(accent_bar)
+	holder.add_child(accent_bar)
 
 	var caption := VBoxContainer.new()
 	caption.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
@@ -482,7 +622,7 @@ func _add_tile(title: String, subtitle: String, file_name: String, accent: Color
 	caption.offset_bottom = -16
 	caption.add_theme_constant_override("separation", 2)
 	caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	btn.add_child(caption)
+	content.add_child(caption)
 
 	var title_lbl := Label.new()
 	title_lbl.text = title
@@ -508,7 +648,7 @@ func _add_tile(title: String, subtitle: String, file_name: String, accent: Color
 func _apply_tile_styles(btn: Button, accent: Color) -> void:
 	var normal := StyleBoxFlat.new()
 	normal.bg_color = Color(0.06, 0.07, 0.1, 1)
-	normal.set_corner_radius_all(16)
+	normal.set_corner_radius_all(TILE_RADIUS)
 	normal.set_border_width_all(3)
 	normal.border_color = Color(accent.r, accent.g, accent.b, 0.5)
 	normal.shadow_color = Color(0, 0, 0, 0.4)

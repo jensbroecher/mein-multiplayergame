@@ -41,7 +41,8 @@ func _ready() -> void:
 			print("SHOT ", screen)
 			continue
 		menu.show_sub_menu(screen)
-		for i in 20:
+		# The tiles cascade in (MainMenu._cascade_in) over about a second.
+		for i in 75:
 			await get_tree().process_frame
 		var sc: ScrollContainer = menu.get_node("Root/VBox/TileScroll")
 		sc.scroll_vertical = scroll_px

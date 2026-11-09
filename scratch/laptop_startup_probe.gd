@@ -3,7 +3,8 @@ extends Node
 # The real start-up (Main.tscn as the running scene, so the title card plays), watched from a node on the root:
 # once the main menu shows, logs every frame the Options tile's laptop page viewport (its size, its 2D canvas
 # scale) and how much of its lower right is drawn. Any frame whose numbers differ from the rest is the
-# first-view flicker (the page drawn into a corner of the laptop's screen).
+# first-view flicker (the page drawn into a corner of the laptop's screen). Since the page is drawn on the screen in
+# 3D, not in a SubViewport, it prints "no page": it stays for the record.
 #   Godot --path . res://scratch/laptop_startup_probe.tscn [-- frames=120] [key=2.5]
 
 var frames := 120

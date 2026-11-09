@@ -53,7 +53,7 @@ func _grab(main: Node) -> Dictionary:
 
 func _tiles(n: Node) -> Array:
 	var out: Array = []
-	if n is Button and n.get_child_count() > 0 and n.get_child(0).get_child_count() > 0 and n.get_child(0).get_child(0) is TextureRect:
+	if n is Button and not n.find_children("*", "TextureRect", true, false).is_empty():
 		out.append(n)
 	for c in n.get_children():
 		out.append_array(_tiles(c))

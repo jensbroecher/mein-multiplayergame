@@ -52,12 +52,11 @@ border). So no tile stands still.
   stand, a pegboard wall, hex drivers, a LiPo). The bench's car is at the game's prop scale (`BENCH_SHOW_SCALE`, the
   garage's 1/1.6 of race size: about 1.4m beside a 32cm laptop; the user found an RC car's real 46cm too small for this
   game's very large scale cars), its stand as high as its body's underside plus 3cm. The laptop's and transmitter's pages
-  render at about the size they are seen, laid out at a design size under a plain Control scaled down (a viewport
-  texture has no mipmaps, and at 800 x 500 the page shimmered); their background fills the viewport itself. With
-  `size_2d_override` doing the scaling, the first view of the menu after start-up showed the page in a corner of the
-  laptop's screen on alternate frames (the user's screenshot; no probe here reproduced it). The screen stands 2mm off
-  its bezel. Those pages redraw only with their tile
-  (`_render` asks for each). The laptop is a 16-inch one (the user's choice). Options' camera is placed by hand (`_aim`, not `_frame`): low
+  are drawn on their screens in 3D (`MenuPropKit._settings_page`, `_tx_page`: flat quads, Label3Ds and ribbons laid
+  out in design pixels a fraction of a millimetre over the screen). As a SubViewport's texture the page shimmered
+  (no mipmaps), then, rendered with its tile, came out grey or drawn into a corner of the screen while the tile under
+  the pointer drew every frame (the user saw it every time; no probe here did, since reading a texture back makes the
+  GPU finish its work first). The laptop is a 16-inch one (the user's choice). Options' camera is placed by hand (`_aim`, not `_frame`): low
   and about 0.8m in front of the laptop from its left, a 54-degree lens, looking past it to the transmitter and the car;
   so the room is closed on the right (a side wall) and has a floor under the bench. The tiles' viewports have physics
   interpolation off: the project's is on, and with the camera and cars moved in `_process` the hovered tile (drawn every
@@ -66,6 +65,15 @@ border). So no tile stands still.
   frame by frame, or (`first=1`) watches the page from the menu's first frame; `res://scratch/laptop_startup_probe.tscn
   -- [frames=120] [key=2.5]` runs the real start-up (Main as the running scene, the title card skipped by a key) and logs
   the page's viewport every frame once the menu shows.
+- A tile's contents are under "Content" in a Panel ("Picture") 4px inside the frame whose rounded rectangle
+  (`TILE_INNER_RADIUS`) clips them (`clip_children`), so the picture, the caption's shade and the colour bar follow
+  the frame's round corners (`TILE_RADIUS`). A page's tiles cascade in (`_cascade_in`: each fades in as its picture rises
+  into the frame, `CASCADE_STEP` apart, a course list within `CASCADE_SPAN`; started a frame after the page is built,
+  whose frame is long), also when the menu comes back. Changing page fades the last page out whole where it stood
+  (`_fade_out`, `FADE_OUT_TIME`, on `TileFadeOut` over the tile area) and builds the new one only then
+  (`show_sub_menu` awaits it; `current_screen` changes at once): built at once, its long frame made the fade's tween
+  jump to the end. `res://scratch/menu_transition_shots.tscn -- <dir> [from=main] [to=sp_modes] [every=4] [count=12]`
+  (windowed) saves a contact sheet of the frames through a page change.
 - MainMenu's `_relayout_tiles` measures the ScrollContainer (the VBox inside it is as big as its content, so it had
   sized each page from the last: small tiles at start-up, the two Single Player tiles taller than the screen), runs again
   whenever the scroll area resizes, and caps a tile at about 5:3, the grid centred. `res://scratch/menu_layout_probe.tscn

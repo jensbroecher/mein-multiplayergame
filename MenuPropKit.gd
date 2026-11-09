@@ -1,7 +1,7 @@
 extends RefCounted
 ## The menu tiles' props (MenuTileStage.gd), built through a PropKit: the road's marker posts, cones and a
 ## start gantry at game scale, and the Options tile's workbench at life size (metres; the bench top at y 0):
-## an anti-static mat, a laptop open on the car's settings (a live 2D screen), a pro pistol-grip transmitter
+## an anti-static mat, a 16-inch laptop open on the car's settings (a live page drawn on its screen in 3D), a pro pistol-grip transmitter
 ## (graphite and the tile's colour, a foam wheel, a trigger, a colour touchscreen), a set-up stand for the
 ## car, hex drivers and a LiPo pack. Vertex-colour materials by key (`material`).
 
@@ -192,7 +192,7 @@ static func _workshop_wall(pk: PropKit, kit: Dictionary, accent: Color) -> void:
 
 
 ## A 16-inch laptop at `xf`, its back toward -z, the lid open ~110 degrees; the screen is a live 2D
-## settings page (`_settings_screen`).
+## settings page (`_settings_page`).
 static func _laptop(pk: PropKit, kit: Dictionary, xf: Transform3D, root: Node3D) -> void:
 	pk.set_frame(xf)
 	var shell := Color(0.18, 0.19, 0.21)
@@ -231,137 +231,158 @@ static func _laptop(pk: PropKit, kit: Dictionary, xf: Transform3D, root: Node3D)
 	pk.box(kit, "metal", lid_xf * Transform3D(Basis(), Vector3(0, d * 0.5, -0.004)), Vector3(w, d, 0.007), shell)
 	pk.box(kit, "matte", lid_xf * Transform3D(Basis(), Vector3(0, d * 0.5, -0.0002)), Vector3(w - 0.004, d - 0.004, 0.0008), Color(0.02, 0.02, 0.025))
 	pk.tube(kit, "metal", hinge + Vector3(-w * 0.42, 0, 0), hinge + Vector3(w * 0.42, 0, 0), 0.006, 0.006, 10, shell.darkened(0.2))
-	# The screen itself: its own mesh, so it can take the 2D page as its texture.
+	# The screen: a dark panel with the settings page laid on it in 3D (`_settings_page`). As a SubViewport's
+	# texture the page flickered while the tile under the pointer drew every frame (grey, or drawn into a corner).
 	var screen := MeshInstance3D.new()
 	screen.name = "LaptopScreen"
 	var q := QuadMesh.new()
 	q.size = Vector2(w - 0.022, (w - 0.022) * 10.0 / 16.0)
 	screen.mesh = q
-	var page := _settings_screen()
-	root.add_child(page["viewport"])
-	var smat := StandardMaterial3D.new()
-	smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	smat.albedo_texture = (page["viewport"] as SubViewport).get_texture()
-	smat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR   # a viewport texture has no mipmaps
-	screen.material_override = smat
+	screen.material_override = _flat(Color(0.055, 0.065, 0.085))
 	screen.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	screen.transform = xf * lid_xf * Transform3D(Basis(), Vector3(0, d * 0.5 + 0.004, 0.0025))
 	root.add_child(screen)
+	var page := _settings_page(q.size)
+	screen.add_child(page["node"])
 	root.set_meta("ui", page)
 	pk.reset_frame()
 
 
-## The laptop's page: a dark settings app on the car's set-up, its sliders and a live telemetry trace. The
-## controls are in the returned dictionary for `animate_bench`.
-static func _settings_screen() -> Dictionary:
-	var vp := SubViewport.new()
-	vp.name = "LaptopPage"
-	# Drawn at about the size it is seen at (a viewport texture has no mipmaps: at 800 x 500 shown 120px wide its
-	# text and lines shimmered as the camera drifted). size_2d_override did the scaling at first, and on the menu's
-	# first frames it drew the page into a quarter of the screen every other frame.
-	vp.size = Vector2i(400, 250)
-	vp.transparent_bg = false
-	vp.render_target_update_mode = SubViewport.UPDATE_ONCE   # the tile asks for each frame
-	# Laid out at 800 x 500 and scaled down by a plain parent, so the page renders natively at the viewport's size.
-	var page := Control.new()
-	page.scale = Vector2(0.5, 0.5)
-	page.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vp.add_child(page)
-	vp.disable_3d = true
-	# The background fills the viewport itself, under the scaled page: no corner can show the clear colour.
-	var bg := ColorRect.new()
-	bg.color = Color(0.055, 0.065, 0.085)
-	bg.size = Vector2(vp.size)
-	vp.add_child(bg)
-	vp.move_child(bg, 0)
-	var side := ColorRect.new()
-	side.color = Color(0.085, 0.1, 0.13)
-	side.size = Vector2(200, 500)
-	page.add_child(side)
+# --- pages drawn on the screens in 3D ------------------------------------------------------------------------
+# A page is laid out in design pixels (x right, y down from the top left, as a 2D screen would be) and drawn as
+# flat quads, Label3Ds and ribbons a fraction of a millimetre over its screen, `k` metres a pixel. Layers stand
+# PAGE_LAYER apart, the text above them all.
+
+const PAGE_LAYER := 0.00035
+static var _unit_quad: QuadMesh
+
+
+## An unshaded flat colour (the pages' panels), cached by colour.
+static func _flat(col: Color) -> StandardMaterial3D:
+	var key := "flat_" + col.to_html()
+	if _mats.has(key):
+		return _mats[key]
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.albedo_color = col
+	_mats[key] = m
+	return m
+
+
+static func _new_page(design: Vector2, screen: Vector2) -> Node3D:
+	var page := Node3D.new()
+	page.name = "Page"
+	page.set_meta("k", screen.x / design.x)
+	page.set_meta("design", design)
+	return page
+
+
+## A rectangle of the page at (x, y), w x h design pixels, on `layer`.
+static func _page_rect(page: Node3D, x: float, y: float, w: float, h: float, col: Color, layer: int) -> MeshInstance3D:
+	if _unit_quad == null:
+		_unit_quad = QuadMesh.new()
+		_unit_quad.size = Vector2.ONE
+	var mi := MeshInstance3D.new()
+	mi.mesh = _unit_quad
+	mi.material_override = _flat(col)
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.set_meta("layer", layer)
+	page.add_child(mi)
+	_set_page_rect(page, mi, x, y, w, h)
+	return mi
+
+
+static func _set_page_rect(page: Node3D, mi: MeshInstance3D, x: float, y: float, w: float, h: float) -> void:
+	var k: float = page.get_meta("k")
+	var design: Vector2 = page.get_meta("design")
+	mi.scale = Vector3(maxf(w, 0.01) * k, maxf(h, 0.01) * k, 1.0)
+	mi.position = Vector3((x + w * 0.5 - design.x * 0.5) * k, (design.y * 0.5 - y - h * 0.5) * k,
+		float(mi.get_meta("layer")) * PAGE_LAYER)
+
+
+## Text with its top left at (x, y), `size` design pixels tall.
+static func _page_label(page: Node3D, text: String, x: float, y: float, size: int, col: Color) -> Label3D:
+	var k: float = page.get_meta("k")
+	var design: Vector2 = page.get_meta("design")
+	var l := Label3D.new()
+	l.text = text
+	l.font_size = size * 4
+	l.pixel_size = k / 4.0
+	l.outline_size = 0
+	l.modulate = col
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	l.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	l.double_sided = false
+	l.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	l.position = Vector3((x - design.x * 0.5) * k, (design.y * 0.5 - y) * k, 5.0 * PAGE_LAYER)
+	page.add_child(l)
+	return l
+
+
+## A line through design-pixel points, `width` pixels wide, as a ribbon on the page (redrawn by `_draw_line`).
+static func _page_line(page: Node3D, col: Color) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.mesh = ImmediateMesh.new()
+	mi.material_override = _flat(col)
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	page.add_child(mi)
+	return mi
+
+
+static func _draw_line(page: Node3D, mi: MeshInstance3D, points: PackedVector2Array, width: float) -> void:
+	var k: float = page.get_meta("k")
+	var design: Vector2 = page.get_meta("design")
+	var im := mi.mesh as ImmediateMesh
+	im.clear_surfaces()
+	if points.size() < 2:
+		return
+	im.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP)
+	for i in points.size():
+		var a := points[maxi(i - 1, 0)]
+		var b := points[mini(i + 1, points.size() - 1)]
+		var dir := (b - a).normalized()
+		var n := Vector2(-dir.y, dir.x) * width * 0.5
+		for sgn in [1.0, -1.0]:
+			var p: Vector2 = points[i] + n * sgn
+			im.surface_set_normal(Vector3(0, 0, 1))
+			im.surface_add_vertex(Vector3((p.x - design.x * 0.5) * k, (design.y * 0.5 - p.y) * k, 4.0 * PAGE_LAYER))
+	im.surface_end()
+
+
+## The laptop's page: a dark settings app on the car's set-up, its sliders and a live telemetry trace, laid out at
+## 800 x 500. The moving parts are in the returned dictionary for `animate_bench`.
+static func _settings_page(screen: Vector2) -> Dictionary:
+	var page := _new_page(Vector2(800, 500), screen)
+	_page_rect(page, 0, 0, 200, 500, Color(0.085, 0.1, 0.13), 1)
 	var teal := Color(0.18, 0.8, 0.7)
 	var items := ["GRAPHICS", "AUDIO", "CONTROLS", "CAR SETUP", "TELEMETRY"]
 	for i in items.size():
 		var y := 70.0 + float(i) * 52.0
 		if i == 3:
-			var hl := ColorRect.new()
-			hl.color = Color(0.12, 0.3, 0.3)
-			hl.position = Vector2(0, y - 8)
-			hl.size = Vector2(200, 44)
-			page.add_child(hl)
-			var bar := ColorRect.new()
-			bar.color = teal
-			bar.position = Vector2(0, y - 8)
-			bar.size = Vector2(5, 44)
-			page.add_child(bar)
-		var l := _label(items[i], 22, Color(0.92, 0.95, 0.97) if i == 3 else Color(0.55, 0.6, 0.68))
-		l.position = Vector2(26, y)
-		page.add_child(l)
-	var logo := _label("RC VIBE  SETUP", 18, teal)
-	logo.position = Vector2(26, 18)
-	page.add_child(logo)
-	var title := _label("MUDRUNNER  •  #53", 30, Color(0.95, 0.97, 1.0))
-	title.position = Vector2(232, 22)
-	page.add_child(title)
+			_page_rect(page, 0, y - 8, 200, 44, Color(0.12, 0.3, 0.3), 2)
+			_page_rect(page, 0, y - 8, 5, 44, teal, 3)
+		_page_label(page, items[i], 26, y, 22, Color(0.92, 0.95, 0.97) if i == 3 else Color(0.55, 0.6, 0.68))
+	_page_label(page, "RC VIBE  SETUP", 26, 18, 18, teal)
+	_page_label(page, "MUDRUNNER  •  #53", 232, 22, 30, Color(0.95, 0.97, 1.0))
 	var sliders: Array = []
 	var names := ["STEERING RATE", "THROTTLE EXPO", "BRAKE BIAS", "DIFF LOCK"]
 	for i in names.size():
 		var y := 92.0 + float(i) * 56.0
-		var l := _label(names[i], 17, Color(0.62, 0.68, 0.76))
-		l.position = Vector2(232, y)
-		page.add_child(l)
-		var track := ColorRect.new()
-		track.color = Color(0.16, 0.18, 0.23)
-		track.position = Vector2(232, y + 30)
-		track.size = Vector2(420, 6)
-		page.add_child(track)
-		var fill := ColorRect.new()
-		fill.color = teal if i != 2 else Color(1.0, 0.55, 0.16)
-		fill.position = track.position
-		fill.size = Vector2(200, 6)
-		page.add_child(fill)
-		var knob := ColorRect.new()
-		knob.color = Color(0.95, 0.97, 1.0)
-		knob.size = Vector2(14, 20)
-		page.add_child(knob)
-		var val := _label("50%", 17, Color(0.92, 0.95, 0.97))
-		val.position = Vector2(672, y + 20)
-		page.add_child(val)
+		_page_label(page, names[i], 232, y, 17, Color(0.62, 0.68, 0.76))
+		_page_rect(page, 232, y + 30, 420, 6, Color(0.16, 0.18, 0.23), 1)
+		var fill := _page_rect(page, 232, y + 30, 200, 6, teal if i != 2 else Color(1.0, 0.55, 0.16), 2)
+		var knob := _page_rect(page, 425, y + 23, 14, 20, Color(0.95, 0.97, 1.0), 3)
+		var val := _page_label(page, "50%", 672, y + 20, 17, Color(0.92, 0.95, 0.97))
 		sliders.append({"fill": fill, "knob": knob, "value": val, "x": 232.0, "w": 420.0, "y": y + 30.0})
 	# Telemetry: steering (teal) and throttle (orange) over the last few seconds.
-	var panel := ColorRect.new()
-	panel.color = Color(0.07, 0.085, 0.11)
-	panel.position = Vector2(232, 330)
-	panel.size = Vector2(540, 150)
-	page.add_child(panel)
+	_page_rect(page, 232, 330, 540, 150, Color(0.07, 0.085, 0.11), 1)
 	for g in 4:
-		var gl := ColorRect.new()
-		gl.color = Color(0.13, 0.15, 0.19)
-		gl.position = Vector2(232, 330 + 30 * (g + 1))
-		gl.size = Vector2(540, 1)
-		page.add_child(gl)
-	var steer_line := Line2D.new()
-	steer_line.width = 3.0
-	steer_line.default_color = teal
-	steer_line.antialiased = true
-	page.add_child(steer_line)
-	var throttle_line := Line2D.new()
-	throttle_line.width = 3.0
-	throttle_line.default_color = Color(1.0, 0.55, 0.16)
-	throttle_line.antialiased = true
-	page.add_child(throttle_line)
-	var tl := _label("TELEMETRY  •  LIVE", 15, Color(0.55, 0.6, 0.68))
-	tl.position = Vector2(244, 336)
-	page.add_child(tl)
-	return {"viewport": vp, "sliders": sliders, "steer": steer_line, "throttle": throttle_line,
+		_page_rect(page, 232, 330 + 30 * (g + 1), 540, 1.5, Color(0.13, 0.15, 0.19), 2)
+	var steer_line := _page_line(page, teal)
+	var throttle_line := _page_line(page, Color(1.0, 0.55, 0.16))
+	_page_label(page, "TELEMETRY  •  LIVE", 244, 336, 15, Color(0.55, 0.6, 0.68))
+	return {"node": page, "sliders": sliders, "steer": steer_line, "throttle": throttle_line,
 		"graph": Rect2(232, 330, 540, 150)}
-
-
-static func _label(text: String, size: int, col: Color) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.add_theme_font_size_override("font_size", size)
-	l.add_theme_color_override("font_color", col)
-	return l
 
 
 ## Three hex drivers in a holder block: aluminium handles in the tile's colour, steel tips.
@@ -476,75 +497,35 @@ static func _transmitter(accent: Color) -> Node3D:
 	trigger.position = Vector3(0.0, 0.122, 0.006)
 	root.add_child(trigger)
 
-	# The screen's picture: a small live page (signal, battery, the steering and throttle bars).
-	var page := _tx_screen(accent)
-	root.add_child(page["viewport"])
+	# The screen: a small live page laid on it in 3D (signal, battery, the steering and throttle bars).
 	var screen := MeshInstance3D.new()
 	var q := QuadMesh.new()
 	q.size = Vector2(0.042, 0.056)
 	screen.mesh = q
-	var smat := StandardMaterial3D.new()
-	smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	smat.albedo_texture = (page["viewport"] as SubViewport).get_texture()
-	screen.material_override = smat
+	screen.material_override = _flat(Color(0.05, 0.07, 0.1))
 	screen.transform = Transform3D(tilt, scr_c + tilt * Vector3(0, 0, 0.0058))
 	screen.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	root.add_child(screen)
+	var page := _tx_page(accent, q.size)
+	screen.add_child(page["node"])
 	root.set_meta("ui", page)
 	return root
 
 
-static func _tx_screen(accent: Color) -> Dictionary:
-	var vp := SubViewport.new()
-	vp.name = "TxPage"
-	vp.size = Vector2i(72, 96)
-	vp.disable_3d = true
-	vp.render_target_update_mode = SubViewport.UPDATE_ONCE   # the tile asks for each frame
-	# Laid out at 180 x 240 and scaled down by a plain parent, so the page renders natively at the viewport's size.
-	var page := Control.new()
-	page.scale = Vector2(0.4, 0.4)
-	page.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vp.add_child(page)
-	# The background fills the viewport itself, under the scaled page: no corner can show the clear colour.
-	var bg := ColorRect.new()
-	bg.color = Color(0.05, 0.07, 0.1)
-	bg.size = Vector2(vp.size)
-	vp.add_child(bg)
-	vp.move_child(bg, 0)
-	var head := ColorRect.new()
-	head.color = accent.darkened(0.35)
-	head.size = Vector2(180, 34)
-	page.add_child(head)
-	var name_l := _label("MUDRUNNER", 18, Color.WHITE)
-	name_l.position = Vector2(10, 6)
-	page.add_child(name_l)
+static func _tx_page(accent: Color, screen: Vector2) -> Dictionary:
+	var page := _new_page(Vector2(180, 240), screen)
+	_page_rect(page, 0, 0, 180, 34, accent.darkened(0.35), 1)
+	_page_label(page, "MUDRUNNER", 10, 6, 18, Color.WHITE)
 	var bars: Array = []
 	var labels := ["ST", "TH"]
 	for i in 2:
 		var y := 70.0 + float(i) * 62.0
-		var l := _label(labels[i], 16, Color(0.6, 0.66, 0.74))
-		l.position = Vector2(10, y - 4)
-		page.add_child(l)
-		var track := ColorRect.new()
-		track.color = Color(0.15, 0.17, 0.22)
-		track.position = Vector2(44, y)
-		track.size = Vector2(122, 14)
-		page.add_child(track)
-		var mid := ColorRect.new()
-		mid.color = Color(0.4, 0.44, 0.5)
-		mid.position = Vector2(104, y - 3)
-		mid.size = Vector2(2, 20)
-		page.add_child(mid)
-		var fill := ColorRect.new()
-		fill.color = accent if i == 0 else Color(1.0, 0.55, 0.16)
-		fill.position = Vector2(105, y)
-		fill.size = Vector2(1, 14)
-		page.add_child(fill)
-		bars.append(fill)
-	var volt := _label("7.4V  ▮▮▮▯", 16, Color(0.4, 0.95, 0.5))
-	volt.position = Vector2(10, 196)
-	page.add_child(volt)
-	return {"viewport": vp, "bars": bars}
+		_page_label(page, labels[i], 10, y - 4, 16, Color(0.6, 0.66, 0.74))
+		_page_rect(page, 44, y, 122, 14, Color(0.15, 0.17, 0.22), 1)
+		_page_rect(page, 104, y - 3, 2, 20, Color(0.4, 0.44, 0.5), 3)
+		bars.append({"fill": _page_rect(page, 105, y, 1, 14, accent if i == 0 else Color(1.0, 0.55, 0.16), 2), "y": y})
+	_page_label(page, "7.4V  82%", 10, 196, 16, Color(0.4, 0.95, 0.5))
+	return {"node": page, "bars": bars}
 
 
 ## Moves the bench at `t`: the transmitter's wheel turned by `steer` (-1..1), the trigger squeezed and
@@ -556,22 +537,21 @@ static func animate_bench(bench: Node3D, t: float, steer: float) -> void:
 	var trig: Node3D = bench.get_meta("trigger")
 	trig.rotation = Vector3(-throttle * 0.28, 0, 0)
 	var tx_ui: Dictionary = bench.get_meta("tx_ui")
-	var bars: Array = tx_ui["bars"]
+	var tx_page: Node3D = tx_ui["node"]
 	for i in 2:
 		var v := steer if i == 0 else throttle * 2.0 - 1.0
-		var fill: ColorRect = bars[i]
+		var bar: Dictionary = tx_ui["bars"][i]
 		var len := absf(v) * 60.0
-		fill.size.x = maxf(len, 1.0)
-		fill.position.x = 105.0 if v >= 0.0 else 105.0 - len
+		_set_page_rect(tx_page, bar["fill"], 105.0 if v >= 0.0 else 105.0 - len, bar["y"], maxf(len, 1.0), 14.0)
 	var ui: Dictionary = bench.get_meta("ui")
+	var page: Node3D = ui["node"]
 	var sliders: Array = ui["sliders"]
 	for i in sliders.size():
-		var s: Dictionary = sliders[i]
+		var sd: Dictionary = sliders[i]
 		var v := 0.5 + 0.32 * sin(t * (0.21 + 0.07 * float(i)) + float(i) * 1.9)
-		(s["fill"] as ColorRect).size.x = float(s["w"]) * v
-		var knob: ColorRect = s["knob"]
-		knob.position = Vector2(float(s["x"]) + float(s["w"]) * v - 7.0, float(s["y"]) - 7.0)
-		(s["value"] as Label).text = "%d%%" % roundi(v * 100.0)
+		_set_page_rect(page, sd["fill"], sd["x"], sd["y"], float(sd["w"]) * v, 6.0)
+		_set_page_rect(page, sd["knob"], float(sd["x"]) + float(sd["w"]) * v - 7.0, float(sd["y"]) - 7.0, 14.0, 20.0)
+		(sd["value"] as Label3D).text = "%d%%" % roundi(v * 100.0)
 	var r: Rect2 = ui["graph"]
 	var steer_pts := PackedVector2Array()
 	var thr_pts := PackedVector2Array()
@@ -583,5 +563,5 @@ static func animate_bench(bench: Node3D, t: float, steer: float) -> void:
 		var x := r.position.x + u * r.size.x
 		steer_pts.append(Vector2(x, r.position.y + r.size.y * (0.5 - st * 0.8)))
 		thr_pts.append(Vector2(x, r.position.y + r.size.y * (0.92 - th * 0.75)))
-	(ui["steer"] as Line2D).points = steer_pts
-	(ui["throttle"] as Line2D).points = thr_pts
+	_draw_line(page, ui["steer"], steer_pts, 3.5)
+	_draw_line(page, ui["throttle"], thr_pts, 3.5)

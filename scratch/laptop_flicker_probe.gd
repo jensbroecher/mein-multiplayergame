@@ -4,7 +4,8 @@ extends Node
 # still and then moving over the tile (real InputEventMouseMotion through the window). A screen that drops to
 # dark or jumps between frames flickers.
 # `dir=` also saves the laptop's corner of the tile's picture for each frame (laptop_<still|moving>_<n>.png).
-# `first=1` instead watches the laptop page's own texture from the menu's first frame (the menu built, as at
+# (Since the page is drawn on the screen in 3D, not in a SubViewport, `first=1` finds no page: it stays for the
+# record.) `first=1` instead watches the laptop page's own texture from the menu's first frame (the menu built, as at
 # start-up) and prints, frame by frame, how much of it is drawn: the page drawn into a quarter of the screen on
 # alternate frames (size_2d_override, since replaced) showed as 25%. `fullscreen=1` goes fullscreen at once, as the
 # game does.
@@ -50,7 +51,9 @@ func _ready() -> void:
 	for n in menu.find_children("*", "TextureRect", true, false):
 		if n.get_script() == preload("res://MenuTileStage.gd") and n.kind == "options":
 			stage = n
-	var tile := stage.get_parent().get_parent() as Control
+	var tile := stage.get_parent() as Control
+	while tile != null and not (tile is BaseButton):
+		tile = tile.get_parent() as Control
 	var screen := stage.find_children("LaptopScreen", "MeshInstance3D", true, false)[0] as MeshInstance3D
 	print("mouse still, away:")
 	await _record(stage, screen, func(_i: int) -> void: pass)

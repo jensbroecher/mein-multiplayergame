@@ -69,7 +69,6 @@ var _trees: Array = []
 var _extra := {}
 var _built := false
 var _slot := 0
-var _pages: Array[SubViewport] = []
 
 
 func setup(tile_kind: String, tile_accent: Color) -> void:
@@ -107,16 +106,15 @@ func _process(delta: float) -> void:
 
 func _render() -> void:
 	_apply(_t)
-	# The bench's screens (the laptop's page, the transmitter's) redraw with the tile, never on their own.
-	for page in _pages:
-		page.render_target_update_mode = SubViewport.UPDATE_ONCE
 	for vp in _vps:
 		vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 
 func _active() -> bool:
-	var tile := get_parent().get_parent() as BaseButton
-	return tile != null and (tile.is_hovered() or tile.has_focus())
+	var n := get_parent()
+	while n != null and not (n is BaseButton):
+		n = n.get_parent()
+	return n != null and ((n as BaseButton).is_hovered() or (n as BaseButton).has_focus())
 
 
 ## Jumps the scene to `t` seconds.
@@ -850,8 +848,6 @@ func _build_bench() -> void:
 	var bench := MenuPropKit.build_bench(accent, stand_h, BENCH_CAR_YAW)
 	_world.add_child(bench)
 	_extra["bench"] = bench
-	for page in bench.find_children("*", "SubViewport", true, false):
-		_pages.append(page as SubViewport)
 	if not car.is_empty():
 		car["rc_scale"] = s
 		car["home"] = (bench.get_meta("stand_top") as Vector3) - Vector3(0.0, low * s, 0.0)
