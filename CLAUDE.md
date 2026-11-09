@@ -792,6 +792,15 @@ The menus call it Arco del Viento (it was Canyon Drift / CANYON COURSE); files a
     quieter rock blocks on the massif's faces over the overpass).
   - The woods: SnowTreeKit's spruce and birch (about 3,400) on the lower slopes, off the roads and steep ground,
     SnowWoodsDetail thinning them below Ultra, as on Frostpeak Creek.
+  - The glacier (`_build_glacier`, `GlacierTongue`, `glacier_tongue.gdshader`): a side valley cut into the north wall
+    behind the basin (the highway generator's `glacier_trough`, applied by `_alpine_height` and by the country's
+    `_country_h` after its blend, so it runs on into the ranges; `_alpine_base` is the ground without it): steep walls on
+    a broad floor (`glacier_floor`: a gentle tongue, the icefall up the wall, the firn basin, `GLACIER_SLOPES`,
+    `GLACIER_ICEFALL`), winding (`glacier_axis_x`), widest at its mouth (`glacier_half_w`). The ice is a convex sheet on
+    the floor, its margins tucked under the walls, thickening from a rounded, dirty snout; seracs heave up in the icefall
+    (COLOR.r), firn lies up high (COLOR.g); the shader draws the crevasses (in the icefall and along the margins only:
+    across the whole tongue they read as zebra stripes), ogives, a medial moraine and the margins' rubble, each fading by
+    the pixel's size. Seen from the lap down the run-out north of the tunnel, filling the notch between the peaks.
 - PlayerCart respawns a bot off the course for `AI_OFF_COURSE_GIVE_UP` (15s) at its last checkpoint: one in the
   Gorge Cut's old crevasse kept moving and so never counted as stuck.
 - AI races (`scratch/ai_race_test`, speed=2, `noitems=1`): 1-3 falls a race (round the Ridge Bypass's split and its

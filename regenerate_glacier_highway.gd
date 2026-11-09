@@ -40,6 +40,15 @@ const DUSK_SKY_HORIZON := Color(0.40, 0.45, 0.60)
 const DUSK_HAZE := Color(0.30, 0.36, 0.50)
 ## Where the valley opens out southward (z): from the lap's south end to the map's edge.
 const VALLEY_OPEN_Z := Vector2(260.0, 560.0)
+## The glacier's side valley (glacier_trough): its axis's x at its mouth, the mouth (z, where the cut fades out over 35m
+## northward), its floor's climb a metre north.
+const GLACIER_X := -24.0
+const GLACIER_MOUTH_Z := -445.0
+## The floor's slope on the tongue, up the icefall and in the firn basin, and where the icefall starts and ends (metres
+## up from the mouth).
+const GLACIER_SLOPES := Vector3(0.1, 0.62, 0.2)
+const GLACIER_ICEFALL := Vector2(140.0, 330.0)
+var _glacier_floor_table := PackedFloat32Array()
 ## The highway carrying on south from the lap's south hairpin: scenery (no route uses it). Corner points of an open
 ## Catmull-Rom curve. It is being extended north over the hairpin: its first stretch is a new viaduct climbing from the
 ## valley floor to the overpass's height and ending in the air FAR_TIP_GAP short of the hairpin's outer edge, the last
@@ -1953,7 +1962,56 @@ func _verify_tunnel_is_open(massif: ArrayMesh, valley: ArrayMesh) -> void:
 
 ## Natural alpine ground: a broad glacial valley along the circuit, foothills starting
 ## right at the valley shoulder, and ridged massifs rising beyond them.
+## The natural ground: the valley and its walls (_alpine_base) with the glacier's side valley cut into the north wall.
 func _alpine_height(px: float, pz: float) -> float:
+	return glacier_trough(_alpine_base(px, pz), px, pz)
+
+## The glacier's side valley in the north wall behind the basin (regenerate_glacier_dressing.gd lays the ice in it and
+## carries the cut on through the country past the heightfield): a U-shaped trough along glacier_axis_x(z), its floor
+## glacier_floor(z) climbing north, glacier_half_w(z) wide, fading out toward its mouth at GLACIER_MOUTH_Z.
+func glacier_trough(h: float, px: float, pz: float) -> float:
+	if pz > GLACIER_MOUTH_Z:
+		return h
+	var hw: float = glacier_half_w(pz)
+	var lat: float = absf(px - glacier_axis_x(pz))
+	if lat >= hw:
+		return h
+	var fl: float = glacier_floor(pz)
+	var t: float = lat / hw
+	# Steep walls on a broad floor: the U of a glacier's valley.
+	var carved: float = fl + (h - fl) * pow(t, 3.2)
+	var fade: float = 1.0 - smoothstep(GLACIER_MOUTH_Z - 35.0, GLACIER_MOUTH_Z, pz)
+	return minf(h, lerpf(h, carved, fade))
+
+func glacier_axis_x(pz: float) -> float:
+	var s: float = GLACIER_MOUTH_Z - pz
+	return GLACIER_X + sin(s * 0.0062) * 46.0 + sin(s * 0.017 + 1.3) * 12.0 - sin(1.3) * 12.0
+
+func glacier_half_w(pz: float) -> float:
+	var s: float = GLACIER_MOUTH_Z - pz
+	# Narrowest down the icefall, the valley opening out at its mouth where the tongue spreads.
+	return 62.0 + s * 0.06 + 26.0 * (1.0 - smoothstep(0.0, 110.0, s)) - 10.0 * smoothstep(120.0, 200.0, s) * (1.0 - smoothstep(320.0, 420.0, s))
+
+## The valley's floor climbing north from its mouth: a gentle tongue (GLACIER_SLOPES.x a metre), the icefall up the
+## wall (.y), the firn basin above it (.z), the slope easing from one to the next over 40m (a table summed once).
+func glacier_floor(pz: float) -> float:
+	if _glacier_floor_table.is_empty():
+		var y := 5.0
+		for i in range(1200):
+			_glacier_floor_table.append(y)
+			var s := float(i) * 2.0 + 1.0
+			var k: float = GLACIER_SLOPES.x + (GLACIER_SLOPES.y - GLACIER_SLOPES.x) * smoothstep(GLACIER_ICEFALL.x - 20.0, GLACIER_ICEFALL.x + 20.0, s) \
+					+ (GLACIER_SLOPES.z - GLACIER_SLOPES.y) * smoothstep(GLACIER_ICEFALL.y - 20.0, GLACIER_ICEFALL.y + 20.0, s)
+			y += k * 2.0
+	var t: float = clampf(maxf(0.0, GLACIER_MOUTH_Z - 12.0 - pz) / 2.0, 0.0, 1198.0)
+	var i0 := int(t)
+	return lerpf(_glacier_floor_table[i0], _glacier_floor_table[i0 + 1], t - float(i0))
+
+## The floor's slope at pz (rise a metre north).
+func glacier_floor_slope(pz: float) -> float:
+	return (glacier_floor(pz - 4.0) - glacier_floor(pz + 4.0)) / 8.0
+
+func _alpine_base(px: float, pz: float) -> float:
 	# Rolling snowfield on the valley floor: long dunes, medium drifts and wind-carved
 	# sastrugi so the glacier floor is not a featureless white sheet.
 	var h: float = 1.7

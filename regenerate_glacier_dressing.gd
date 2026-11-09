@@ -77,6 +77,16 @@ const WORKS_PIERS := [[264.0, "cap"], [230.0, "half"], [196.0, "footing"]]
 ## The works' pieces keep this far (in plan) from any lap's edge; trees keep out of WORKS_KEEP (x, z, half x, half z).
 const WORKS_LAP_CLEAR := 5.0
 const WORKS_KEEP := [Vector4(-110.0, 250.0, 13.0, 70.0), Vector4(-106.0, 385.0, 46.0, 48.0)]
+# --- The glacier ---
+## The ice in the glacier's valley (regenerate_glacier_highway.gd's glacier_trough): rows GLACIER_STEP apart from its
+## snout (GLACIER_SNOUT_BACK north of the valley's mouth) up to where the valley no longer cuts GLACIER_MIN_CUT deep, at
+## most GLACIER_MAX_LEN; GLACIER_COLS across GLACIER_WIDTH of the valley's width.
+const GLACIER_SNOUT_BACK := 16.0
+const GLACIER_STEP := 4.0
+const GLACIER_COLS := 40
+const GLACIER_WIDTH := 0.72
+const GLACIER_MAX_LEN := 900.0
+const GLACIER_MIN_CUT := 25.0
 const STEEL_RED := Color(0.72, 0.16, 0.10)
 const PLY := Color(0.78, 0.62, 0.30)
 
@@ -130,6 +140,7 @@ func _ready() -> void:
 
 	_build_country(root)
 	_build_works(root)
+	_build_glacier(root)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	_plan_woods()
@@ -259,9 +270,11 @@ func _far_h(x: float, z: float, far: Vector2) -> float:
 
 ## The country's height `d` metres out from the heightfield's edge at (x, z).
 func _country_h(x: float, z: float, d: float) -> float:
-	var near: float = _gen.call("_alpine_height", x, z)
+	var near: float = _gen.call("_alpine_base", x, z)
 	var far := _far_near(x, z)
 	var h := lerpf(near, _far_h(x, z, far), smoothstep(COUNTRY_BLEND.x, COUNTRY_BLEND.y, d))
+	# The glacier's valley runs on into the ranges (cut after the blend, so it doesn't fade with the valley's ground).
+	h = _gen.glacier_trough(h, x, z)
 	# The far highway's shelf.
 	if far.x < 60.0:
 		h = lerpf(h, far.y - ROAD_SHELF, 1.0 - smoothstep(14.0, 60.0, far.x))
@@ -478,7 +491,7 @@ func _build_ground() -> void:
 	m.set_shader_parameter("snow_normal", load("res://materials/sand_normal.png"))
 	m.set_shader_parameter("water_y", -500.0)
 	# The massif's faces stand right over the overpass: smaller blocks, less contrast between them.
-	m.set_shader_parameter("block_shade", 0.16)
+	m.set_shader_parameter("block_shade", 0.07)
 	# The valley's walls lie near 45 degrees, right at Frostpeak's 0.7: whole hillsides came out mottled.
 	m.set_shader_parameter("snow_slope", 0.62)
 	m.set_shader_parameter("face_weight", 0.4)
@@ -552,6 +565,8 @@ func _plan_woods() -> void:
 			if rd < crown + TREE_CLEAR:
 				continue
 			if _in_works(px, pz, crown):
+				continue
+			if _on_glacier(px, pz, crown + 6.0):
 				continue
 			var lean := Basis(Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1)).normalized(), rng.randf_range(0.0, 0.04))
 			var xf := Transform3D(lean * Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(sc, sc * rng.randf_range(0.92, 1.12), sc)),
@@ -1095,3 +1110,85 @@ func _check_works_clear(foot_pts: Array) -> void:
 			bad += 1
 	if bad == 0:
 		print("  works: every piece clear of the roads")
+
+
+# ======================================================================================
+#  The glacier
+# ======================================================================================
+
+## The ground before the glacier's valley is cut into it: the valley's own inside the heightfield, the country's past it.
+func _raw_ground(x: float, z: float) -> float:
+	var near: float = _gen.call("_alpine_base", x, z)
+	var dx := maxf(maxf(SQ_MIN.x - x, x - SQ_MAX.x), 0.0)
+	var dz := maxf(maxf(SQ_MIN.y - z, z - SQ_MAX.y), 0.0)
+	var d := Vector2(dx, dz).length()
+	if d <= 0.0:
+		return near
+	return lerpf(near, _far_h(x, z, _far_near(x, z)), smoothstep(COUNTRY_BLEND.x, COUNTRY_BLEND.y, d))
+
+
+## Within `margin` of the glacier's ice in plan.
+func _on_glacier(x: float, z: float, margin: float) -> bool:
+	if z > HighwayGen.GLACIER_MOUTH_Z + margin:
+		return false
+	return absf(x - _gen.glacier_axis_x(z)) < _gen.glacier_half_w(z) * GLACIER_WIDTH + margin
+
+
+## The glacier tongue in the north wall's side valley: a convex sheet of ice on the valley's floor, its margins tucked
+## under the valley's walls, thickening up the valley from a rounded snout; seracs heaved up where the wall steepens (the
+## icefall), firn up high. glacier_tongue.gdshader draws it from UV (across, metres up from the snout) and COLOR (r how
+## broken, g the snow).
+func _build_glacier(root: Node3D) -> void:
+	var t0 := Time.get_ticks_msec()
+	var z0: float = HighwayGen.GLACIER_MOUTH_Z - GLACIER_SNOUT_BACK
+	var serac := FastNoiseLite.new()
+	serac.seed = 4471
+	serac.frequency = 0.09
+	serac.fractal_type = FastNoiseLite.FRACTAL_NONE
+	serac.noise_type = FastNoiseLite.TYPE_CELLULAR
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var rows := 0
+	var along := 0.0
+	while along <= GLACIER_MAX_LEN:
+		var z: float = z0 - along
+		var ax: float = _gen.glacier_axis_x(z)
+		var hw: float = _gen.glacier_half_w(z) * GLACIER_WIDTH
+		var fl: float = _gen.glacier_floor(z)
+		# Stop where the valley is no longer cut deep: the ice would stand proud of the ground round it.
+		if along > 200.0 and _raw_ground(ax, z) < fl + GLACIER_MIN_CUT:
+			break
+		# The icefall, where the valley's floor steepens: the ice breaks up into seracs.
+		var broken: float = smoothstep(0.25, 0.5, _gen.glacier_floor_slope(z))
+		var thick: float = lerpf(8.0, 30.0, smoothstep(0.0, 300.0, along)) * sqrt(clampf(along / 18.0, 0.0, 1.0))
+		var snow: float = smoothstep(300.0, 460.0, along)
+		for j in range(GLACIER_COLS):
+			var u: float = -1.0 + 2.0 * float(j) / float(GLACIER_COLS - 1)
+			var prof: float = sqrt(maxf(0.0, 1.0 - u * u))
+			var x: float = ax + u * hw
+			var y: float = fl + thick * prof - 1.5 * (1.0 - prof)
+			y += broken * prof * (serac.get_noise_2d(x, z) * 0.5 + 0.5) * 4.5
+			st.set_color(Color(broken, snow, 0.0))
+			st.set_uv(Vector2(u, along))
+			st.add_vertex(Vector3(x, y, z))
+		rows += 1
+		along += GLACIER_STEP
+	# Rows run north (z falling), columns west to east: wound so the faces look up (Godot's front faces are clockwise).
+	for r in range(rows - 1):
+		for j in range(GLACIER_COLS - 1):
+			var a: int = r * GLACIER_COLS + j
+			var b: int = a + 1
+			var c: int = a + GLACIER_COLS
+			var d: int = c + 1
+			st.add_index(a); st.add_index(c); st.add_index(b)
+			st.add_index(b); st.add_index(c); st.add_index(d)
+	st.generate_normals()
+	var mesh := st.commit()
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://glacier_tongue.gdshader")
+	mesh.surface_set_material(0, _save_res(mat, "glacier_mat"))
+	var mi := MeshInstance3D.new()
+	mi.name = "GlacierTongue"
+	mi.mesh = _save_res(mesh, "glacier_mesh")
+	root.add_child(mi)
+	print("  glacier: %d rows, %.0fm from the snout (%.1fs)" % [rows, float(rows - 1) * GLACIER_STEP, (Time.get_ticks_msec() - t0) / 1000.0])
