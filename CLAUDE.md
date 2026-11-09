@@ -34,7 +34,10 @@ The mode tiles (Single Player, Splitscreen, Multiplayer, Spectator, Inspect, Opt
 VS Race under them) are no longer AI pictures: `MainMenu._add_tile` with a `scene:<kind>` file puts a
 `MenuTileStage.gd` (a TextureRect drawing its own SubViewport and World3D, built in code) where the picture was. The
 cars are the game's own in factory paint, and the Mudrunner (the game's "main character") is in every scene with cars.
-The Garage tile stays a render (`tile_garage.jpg`); GP Test and the course tiles keep their pictures.
+The Garage tile stays a render (`tile_garage.jpg`); GP Test, the cups and the courses keep their pictures, which drift
+and zoom slowly (`MenuTileDrift.gd`: zoomed in 8%, the zoom breathing, a drift of about 45 seconds inside the room the
+zoom leaves, leaning in under the pointer or focus, each tile on its own phase; in a holder that clips it inside the
+border). So no tile stands still.
 - The cars stand still on a road that slides under them (`menu_tile_road.gdshader`'s `scroll`, set from the script), with
   marker posts, bushes and trees (Harbor Pier's saved far tree meshes) wrapping along it; hills round the horizon. Every
   motion is a function of the clock (`seek`).
@@ -49,9 +52,10 @@ The Garage tile stays a render (`tile_garage.jpg`); GP Test and the course tiles
   stand, a pegboard wall, hex drivers, a LiPo).
 - Cost: each tile costs about 2ms of an M1's GPU whatever its size, MSAA or shadows (the trees' near meshes 2ms more,
   so the far ones are used). So only the tile under the pointer or focus renders every frame; the others take turns
-  (`IDLE_EVERY` by Detail Level: every 2nd frame at High and Ultra, 4th at Low), nothing renders while the menu is hidden,
-  and at Detail Level Off a tile renders for `WARMUP` frames and holds still. The main screen holds 60 fps on the M1 at
-  2880x1800. `res://scratch/menu_tile_bench.tscn -- [screens=main,sp_modes] [frames=300] [dbg=<switch>:<value> ...]`
+  (`IDLE_EVERY` by Detail Level: every 2nd frame from Medium, every 3rd at Low and Off, never slower: at every 4th the
+  road judders and the user read the tiles as still), and nothing renders while the menu is hidden. The main screen holds
+  60 fps on the M1 at 2880x1800. `res://scratch/menu_motion_check.tscn -- [detail=0..4] [screen=stage_select]` (windowed)
+  runs Main's real menu and prints how much of each tile changed in half a second (0%: a still tile). `res://scratch/menu_tile_bench.tscn -- [screens=main,sp_modes] [frames=300] [dbg=<switch>:<value> ...]`
   (windowed) prints frame times and each tile's GPU time; the `dbg` switches (`MenuTileStage.dbg`: msaa, glow, shadows,
   trees, far_trees, sky, scale) price the parts. `res://scratch/menu_shot.tscn -- <dir> main sp_modes coop_config`
   photographs the screens.

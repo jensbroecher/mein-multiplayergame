@@ -11,6 +11,7 @@ const SHOW_GP_TEST_MENU := true
 
 const TILE_DIR := "res://images/menu/"
 const MenuTileStage = preload("res://MenuTileStage.gd")
+const MenuTileDrift = preload("res://MenuTileDrift.gd")
 
 const COL_TEAL := Color(0.15, 0.75, 0.92)
 const COL_ORANGE := Color(1.0, 0.55, 0.16)
@@ -417,22 +418,32 @@ func _add_tile(title: String, subtitle: String, file_name: String, accent: Color
 	btn.focus_mode = Control.FOCUS_ALL
 	_apply_tile_styles(btn, accent)
 
-	# "scene:<kind>" is a live 3D scene (MenuTileStage.gd) instead of a picture.
-	var tex: TextureRect = MenuTileStage.new() if file_name.begins_with("scene:") else TextureRect.new()
+	# The picture's area, 4px inside the border. "scene:<kind>" is a live 3D scene (MenuTileStage.gd); any other
+	# file a picture that drifts and zooms slowly (MenuTileDrift.gd) inside a holder that clips it to the area.
+	var holder := Control.new()
+	holder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	holder.offset_left = 4
+	holder.offset_top = 4
+	holder.offset_right = -4
+	holder.offset_bottom = -4
+	holder.clip_contents = true
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var tex: TextureRect
 	if file_name.begins_with("scene:"):
+		tex = MenuTileStage.new()
 		(tex as MenuTileStage).setup(file_name.substr(6), accent)
+	else:
+		tex = MenuTileDrift.new()
+		(tex as MenuTileDrift).phase = float(hash(file_name) % 6283) * 0.001
 	tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	tex.offset_left = 4
-	tex.offset_top = 4
-	tex.offset_right = -4
-	tex.offset_bottom = -4
 	tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var tex_path := TILE_DIR + file_name
 	if not file_name.begins_with("scene:") and ResourceLoader.exists(tex_path):
 		tex.texture = load(tex_path)
-	btn.add_child(tex)
+	holder.add_child(tex)
+	btn.add_child(holder)
 
 	var fade := ColorRect.new()
 	fade.color = Color(0.03, 0.035, 0.05, 0.78)

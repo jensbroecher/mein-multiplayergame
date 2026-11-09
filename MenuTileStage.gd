@@ -10,8 +10,8 @@ extends TextureRect
 ##
 ## The cars stand still on a road that slides under them (`menu_tile_road.gdshader`'s `scroll`), so a scene
 ## loops for ever with nothing to wrap but the roadside posts and bushes. The viewport is sized to the
-## tile's pixels on screen (`_fit_viewport`), capped at MAX_WIDTH. At Detail Level Off the scene renders
-## for WARMUP frames and then holds still.
+## tile's pixels on screen (`_fit_viewport`), capped at MAX_WIDTH. Every tile always moves: the one under the
+## pointer or focus every frame, the others in turns (IDLE_EVERY), at every Detail Level.
 
 const CarPaint = preload("res://CarPaint.gd")
 const PropKit = preload("res://PropKit.gd")
@@ -23,9 +23,9 @@ const SKY_SHADER = preload("res://sky_tropical_cumulus.gdshader")
 
 const CAR_SCALE := 2.0
 const MAX_WIDTH := 1400.0
-const WARMUP := 45
-## How often a tile not under the pointer or focus renders, by Detail Level (Off holds a still).
-const IDLE_EVERY := [1, 4, 3, 2, 2]
+## How often a tile not under the pointer or focus renders, by Detail Level (Off to Ultra): every 3rd frame at
+## most, so a scene never reads as a still (every 4th, the road's 15 m/s judders).
+const IDLE_EVERY := [3, 3, 2, 2, 2]
 static var _slots := 0
 const WHEELS := ["Wheel_FL", "Wheel_FR", "Wheel_RL", "Wheel_RR"]
 ## Wheels turn no faster than this on screen (rad/s): at a real 16 m/s a rim's spokes strobe backwards.
@@ -94,10 +94,6 @@ func _process(delta: float) -> void:
 	if not is_visible_in_tree():
 		return
 	_frames += 1
-	if _still():
-		if _frames < WARMUP:
-			_render()
-		return
 	# Every tile has a fixed cost (about 2ms of an M1's GPU, whatever its size), so the one under the pointer
 	# or the focus renders every frame and the others take turns (`IDLE_EVERY` by Detail Level).
 	var every := 1 if _active() else int(IDLE_EVERY[_detail()])
@@ -112,7 +108,7 @@ func _render() -> void:
 
 
 func _active() -> bool:
-	var tile := get_parent() as BaseButton
+	var tile := get_parent().get_parent() as BaseButton
 	return tile != null and (tile.is_hovered() or tile.has_focus())
 
 
@@ -120,10 +116,6 @@ func _active() -> bool:
 func seek(t: float) -> void:
 	_t = t
 	_apply(_t)
-
-
-func _still() -> bool:
-	return not OS.has_feature("mobile") and MusicManager.grass_quality_index <= 0
 
 
 func _detail() -> int:
