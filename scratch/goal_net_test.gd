@@ -3,6 +3,8 @@ extends Node
 ##   Godot --path . --resolution 1280x720 res://scratch/goal_net_test.tscn -- [<dir>] [goal=West|East] [speed=22] [lat=0]
 ##       [up=3] [from=14] [cam=x,y,z] [frames=0.3,0.5,...]
 ## Headless (--headless, no dir) it only logs: the ball must end up inside the goal, short of the net's stretch.
+##   ... -- cart=front|back [speed=25]: drives a real cart (a spectator race's first) into the back of the net from inside
+##   the goal (front: in through the mouth) or from behind it, and prints how far it got (it must stay within the stretch).
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	var dir := ""
@@ -13,6 +15,15 @@ func _ready() -> void:
 	var from := 14.0
 	var cam_at := Vector3.INF
 	var frames := PackedFloat64Array([0.25, 0.45, 0.6, 0.8, 1.2, 2.0])
+	var cart_mode := ""
+	for a in args:
+		if a.begins_with("cart="): cart_mode = a.substr(5)
+	if cart_mode != "":
+		for a in args:
+			if a.begins_with("speed="): speed = a.substr(6).to_float()
+			elif a.begins_with("goal="): goal = a.substr(5)
+		_cart_test(cart_mode, goal, speed)
+		return
 	for a in args:
 		if a.begins_with("goal="): goal = a.substr(5)
 		elif a.begins_with("speed="): speed = a.substr(6).to_float()
@@ -65,4 +76,59 @@ func _ready() -> void:
 	var end: Vector3 = inv * ball.global_position
 	var inside: bool = end.z > 0.0 and absf(end.x) < float(net.get("half_width")) and end.y < float(net.get("height"))
 	print("RESULT ball end local=%s inside=%s max_net=%.2f" % [end, inside, max_amp])
+	get_tree().quit()
+
+
+func _cart_test(mode: String, goal: String, speed: float) -> void:
+	AudioServer.set_bus_mute(0, true)
+	NetworkManager.current_game_mode = NetworkManager.GameMode.SPECTATOR
+	NetworkManager.start_spectator()
+	var level: Node3D = (load("res://levels/KronburgLevel.tscn") as PackedScene).instantiate()
+	add_child(level)
+	await level.wait_for_collisions()
+	for i in 10:
+		await get_tree().physics_frame
+	var net: Node3D = level.get_node("Bolzplatz/GoalNet" + goal)
+	var xf: Transform3D = net.global_transform
+	var inv: Transform3D = xf.affine_inverse()
+	var cart: RigidBody3D = get_tree().get_nodes_in_group("player_carts")[0]
+	var wait := 0.0
+	while not cart.can_move and wait < 30.0:
+		await get_tree().physics_frame
+		wait += get_physics_process_delta_time()
+	# Inside: from 20m out in front, through the mouth to the back. Behind: from 20m behind, toward the goal.
+	# Not a bot (it would turn for the road and respawn), but driven here: still this peer's to move.
+	cart.set("is_ai", false)
+	cart.set("is_local_player", true)
+	var from_l := Vector3(1.0, 0.85, -20.0) if mode == "front" else Vector3(1.0, 0.85, float(net.get("depth")) + 20.0)
+	var dir_l := Vector3(0, 0, 1) if mode == "front" else Vector3(0, 0, -1)
+	var from: Vector3 = xf * from_l
+	var dir: Vector3 = (xf.basis * dir_l).normalized()
+	PhysicsServer3D.body_set_state(cart.get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM, Transform3D(Basis.looking_at(dir, Vector3.UP), from))
+	for i in 20:
+		cart.linear_velocity = Vector3(0.0, cart.linear_velocity.y, 0.0)
+		await get_tree().physics_frame
+	var t := 0.0
+	var touched := -1.0
+	var deepest := -INF
+	var limit: float = float(net.get("depth")) + 1.0 if mode == "front" else -INF
+	while t < 5.0:
+		await get_tree().physics_frame
+		t += get_physics_process_delta_time()
+		var lp: Vector3 = inv * cart.global_position
+		var amp := 0.0
+		for p in net.get("_pokes"):
+			amp = maxf(amp, absf(float(p["amp"])))
+		if touched < 0.0 and amp > 0.01:
+			touched = t
+			print("t=%.2f TOUCH at local %s, %.1f m/s" % [t, lp, cart.linear_velocity.length()])
+		if touched < 0.0 or t - touched < 1.5:
+			# Held at speed on its line until 1.5s after it meets the net: the net has to stop it against that.
+			cart.linear_velocity = Vector3(dir.x * speed, cart.linear_velocity.y, dir.z * speed) if touched < 0.0 else cart.linear_velocity
+		deepest = maxf(deepest, lp.z if mode == "front" else -lp.z)
+		if int(t * 60.0) % 6 == 0:
+			print("t=%.2f cart local=(%.2f, %.2f, %.2f) v=%.1f net=%.2f" % [t, lp.x, lp.y, lp.z, cart.linear_velocity.length(), amp])
+	var end: Vector3 = inv * cart.global_position
+	var through: bool = end.z > float(net.get("depth")) + 2.6 if mode == "front" else (end.z < 0.0)
+	print("RESULT %s: deepest %.2f, end local %s, through=%s" % [mode, deepest, end, through])
 	get_tree().quit()

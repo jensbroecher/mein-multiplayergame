@@ -1,7 +1,7 @@
 @tool
 extends Node3D
 ## A football goal's net that gives: the ball (any KickBall, group "kick_balls") sinks into it and is caught, a cart
-## pushes it out of shape and drives on through (it has no collider: soft, like the brush). The frame (posts, crossbar,
+## pushes it out of shape and is stopped by it (a spring, then a wall at CART_GIVE: it has no collider, so it can give). The frame (posts, crossbar,
 ## the net's bars) is the level's own mesh; this node draws only the net, as an internal child, so a level stores the
 ## transform and the sizes.
 ##
@@ -33,7 +33,12 @@ const BALL_RETURN := 0.12
 ## The cords dragging on the ball while it is in them (per second): it drops, it doesn't fly back out.
 const BALL_DRAG := 4.0
 const CART_R := 1.0
+## How far a cart can stretch the net, the spring that stops it (it stops a cart at 30 m/s within CART_GIVE, reaching
+## the limit only from about that fast), the damping while it stretches the net and the share it feels on the way back.
 const CART_GIVE := 1.3
+const CART_K := 120.0
+const CART_DAMP := 22.0
+const CART_RETURN := 0.2
 ## How near (m) a body must be to the goal's middle before it is looked at.
 const NEAR := 12.0
 const GRID := 0.32
@@ -233,19 +238,40 @@ func _physics_process(delta: float) -> void:
 			rb.global_position = global_transform * lp
 			rb.linear_velocity = global_transform.basis * lv
 	for cart in get_tree().get_nodes_in_group("player_carts"):
-		var c3 := cart as Node3D
-		if c3 == null or c3.global_position.distance_to(mid) > NEAR:
+		var cb := cart as RigidBody3D
+		if cb == null or cb.global_position.distance_to(mid) > NEAR:
 			continue
-		var lp: Vector3 = inv * c3.global_position
-		var key := "c%d" % c3.get_instance_id()
+		var lp: Vector3 = inv * cb.global_position
+		var key := "c%d" % cb.get_instance_id()
 		var ins: bool = _side(key, lp)
+		# Only the peer that drives a cart stops it; every peer draws the net giving.
+		var authority: bool = cb.has_method("has_physics_authority") and cb.has_physics_authority()
+		var lv: Vector3 = basis_inv * cb.linear_velocity
+		var hit := false
 		for f in _faces:
 			var pen: float = _penetration(f, lp, CART_R, ins)
-			if pen <= 0.0 or pen > CART_R + CART_GIVE:
+			if pen <= 0.0:
 				continue
 			var n: Vector3 = (f[1] as Vector3) * (1.0 if ins else -1.0)
+			if authority:
+				var vn: float = lv.dot(n)
+				var acc: float = CART_K * pen
+				if vn > 0.0:
+					acc += CART_DAMP * vn
+				else:
+					acc *= CART_RETURN
+				lv -= n * acc * delta
+				# Stretched as far as it goes: the net holds like a wall (and pulls the cart back to its limit).
+				if pen > CART_GIVE:
+					vn = lv.dot(n)
+					if vn > 0.0:
+						lv -= n * vn
+					lv -= n * minf((pen - CART_GIVE) / delta * 0.5, 6.0)
+				hit = true
 			_hold(key + str(f[2]), _contact(f, lp), n, minf(pen, CART_GIVE), delta)
 			touched[key + str(f[2])] = true
+		if hit:
+			cb.linear_velocity = global_transform.basis * lv
 	_spring(touched, delta)
 
 

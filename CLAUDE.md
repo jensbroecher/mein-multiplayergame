@@ -4096,10 +4096,12 @@ estate, the half-timbered old town on its hill under Burg Kronburg's ruin. Stage
 - The football pitch's goals (`_goal_frame`: square posts and crossbar, the net's frame of top arms, sloping end
   stanchions and ground bars, nothing in the net's middle) and their nets (`GoalNet.gd`, `goal_net.gdshader`, under
   `Bolzplatz`): the net gives where the ball (any KickBall) or a cart presses it, springs back and wobbles; it catches the
-  ball (a spring and drag, `BALL_*`) so it drops into the goal; carts drive through it (soft). In or out of the goal
+  ball (a spring and drag, `BALL_*`) so it drops into the goal, and stops a cart (`CART_*`: a spring, then a wall at
+  `CART_GIVE`; applied by the peer that drives the cart). It has no collider, so it can give. In or out of the goal
   changes only across the mouth. A football waits on the centre spot. `res://scratch/goal_net_test.tscn -- [<dir>]
   [goal=West] [speed=30] [up=7] [from=10] [lat=1.5] [cam=x,y,z] [frames=...]` (windowed for frames) shoots it into a goal
-  and logs the ball and the net's bulge.
+  and logs the ball and the net's bulge; `cart=front|back` (headless) drives a real cart into the net from inside the
+  goal or from behind and prints how far it got.
 - Ground masks: every vertex of the fine grid takes `_masks`, however far from the road (`_road_d` capped under 1e8:
   past the grading's reach it read as the coarse land's and painted fields inside the works).
 - `res://scratch/kronburg_hide_shot.tscn -- <out.png> x,y,z:tx,ty,tz [hide=<node path> ...]` (windowed) renders the level
