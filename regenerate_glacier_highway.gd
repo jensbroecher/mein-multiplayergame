@@ -1843,6 +1843,7 @@ func _build_alpine_terrain(parent: Node, gorge_curve: Curve3D) -> void:
 			var mx: int = clampi(int((px - start_x) / cell_x), 0, mask_res - 1)
 			if mask[mz * mask_res + mx] == 1:
 				h = _apply_road_corridors(h, px, pz)
+			h = _apply_pads(h, px, pz)
 			heights[idx] = h
 
 	var valley_mesh := _build_heightfield_mesh(heights, stride, res, start_x, start_z, step_x, step_z)
@@ -1962,6 +1963,22 @@ func _verify_tunnel_is_open(massif: ArrayMesh, valley: ArrayMesh) -> void:
 
 ## Natural alpine ground: a broad glacial valley along the circuit, foothills starting
 ## right at the valley shoulder, and ridged massifs rising beyond them.
+## Level pads for the dressing's buildings (regenerate_glacier_dressing.gd): [centre (x, z), half size (x, z), height, blend].
+## The mountain lodge's (its rest area east of the tunnel's approach).
+const PADS := [[Vector2(78.0, -104.0), Vector2(36.0, 24.0), 3.2, 12.0]]
+
+## The ground levelled to each of PADS, easing back over its blend.
+func _apply_pads(h: float, px: float, pz: float) -> float:
+	for pad in PADS:
+		var c: Vector2 = pad[0]
+		var hs: Vector2 = pad[1]
+		var dx: float = maxf(absf(px - c.x) - hs.x, 0.0)
+		var dz: float = maxf(absf(pz - c.y) - hs.y, 0.0)
+		var d: float = Vector2(dx, dz).length()
+		var t: float = 1.0 - smoothstep(0.0, float(pad[3]), d)
+		h = lerpf(h, float(pad[2]), t)
+	return h
+
 ## The natural ground: the valley and its walls (_alpine_base) with the glacier's side valley cut into the north wall.
 func _alpine_height(px: float, pz: float) -> float:
 	return glacier_trough(_alpine_base(px, pz), px, pz)

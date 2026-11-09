@@ -801,12 +801,27 @@ The menus call it Arco del Viento (it was Canyon Drift / CANYON COURSE); files a
     (COLOR.r), firn lies up high (COLOR.g); the shader draws the crevasses (in the icefall and along the margins only:
     across the whole tongue they read as zebra stripes), ogives, a medial moraine and the margins' rubble, each fading by
     the pixel's size. Seen from the lap down the run-out north of the tunnel, filling the notch between the peaks.
+  - The avalanche gallery (`_build_gallery`, `GALLERY_*`): 65m of cut-and-cover gallery over the lap where it runs
+    south in its cutting on the east flank: a wall on the uphill side (found from the natural ground, `_alpine_height`:
+    raycast through the colliders it came out mirrored), a roof slab on columns on the valley side with an edge beam,
+    lamps and lights under it, and the snow on the roof running on up the slope (the ground's material with a ground map
+    as if far from any road: over the road its map painted the plough's grit on it). The roof's underside is
+    `GALLERY_CLEAR` over the road, the tunnel's; roof, wall and columns are solid boxes (`AvalancheGallery`), so the race
+    camera comes down under it as in the tunnel. The streetlight that stood up through the roof is taken out.
+  - Snow poles (`_build_snow_poles`, `SnowPoles_*`): plough markers every `SNOW_POLE_STEP` just behind the barriers
+    wherever a road runs at ground level, in MultiMesh cells ("pole": DressingColliders makes them rigid posts).
+  - Svartfjell Fjellstue (`_build_rest_stop`, `LODGE_*`, made up): a mountain lodge in Falu red and its annex
+    (FjordVillageKit), the lot with cars and a motorhome (CampKit), ploughed snow round it, picnic tables (RoadsideKit),
+    lamp posts (YardKit) and lights, on the pad the highway generator levels (`PADS`, `_apply_pads`) on the valley floor
+    east of the tunnel's approach, seen from the overpass, the tunnel's approach and the express flyover.
 - PlayerCart respawns a bot off the course for `AI_OFF_COURSE_GIVE_UP` (15s) at its last checkpoint: one in the
   Gorge Cut's old crevasse kept moving and so never counted as stuck.
 - AI races (`scratch/ai_race_test`, speed=2, `noitems=1`): 1-3 falls a race (round the Ridge Bypass's split and its
   descent, 1340-1460m), flying laps 46-49s; before this work 10-16 a race (the finish straight under the deck, the
   Ridge Bypass's split, the Gorge Cut's split and merge, the tunnel's mouth), 57-63s. `scratch/shortcut_probe ...
   chance=1.0` sends every bot over every ramp.
+- Cost (M1, 1280x720 window, `ab_bench`): 19.9ms on average at High; the works 0.42ms, the gallery, the glacier, the lodge and
+  the snow poles under 0.1ms each.
 
 ## Curbs
 

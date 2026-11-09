@@ -20,6 +20,10 @@ const SnowWoodsDetail = preload("res://SnowWoodsDetail.gd")
 const PropKit = preload("res://PropKit.gd")
 const HighwayGen = preload("res://regenerate_glacier_highway.gd")
 const BaustelleKit = preload("res://BaustelleKit.gd")
+const FjordVillageKit = preload("res://FjordVillageKit.gd")
+const CampKit = preload("res://CampKit.gd")
+const RoadsideKit = preload("res://RoadsideKit.gd")
+const YardKit = preload("res://YardKit.gd")
 
 const LEVEL_PATH := "res://levels/GlacierHighwayLevel.tscn"
 const DRESSING := "GlacierDressing"
@@ -74,9 +78,35 @@ const WORKS_DECK_Y := 16.5
 const WORKS_T_Z := 298.0
 const WORKS_T_HALF := 12.0
 const WORKS_PIERS := [[264.0, "cap"], [230.0, "half"], [196.0, "footing"]]
-## The works' pieces keep this far (in plan) from any lap's edge; trees keep out of WORKS_KEEP (x, z, half x, half z).
+## The works' pieces keep this far (in plan) from any lap's edge; trees keep out of WORKS_KEEP (x, z, half x, half z): the
+## works, the yard and the avalanche gallery's snow-covered roof up the slope.
 const WORKS_LAP_CLEAR := 5.0
-const WORKS_KEEP := [Vector4(-110.0, 250.0, 13.0, 70.0), Vector4(-106.0, 385.0, 46.0, 48.0)]
+const WORKS_KEEP := [Vector4(-110.0, 250.0, 13.0, 70.0), Vector4(-106.0, 385.0, 46.0, 48.0), Vector4(226.0, -237.0, 20.0, 40.0), Vector4(78.0, -104.0, 42.0, 30.0)]
+# --- The avalanche gallery ---
+## Over the lap where it runs south along the east flank in its cutting (from the lap's nearest point to GALLERY_FROM to
+## its nearest to GALLERY_TO): the roof's underside GALLERY_CLEAR over the road (the tunnel's), its slab GALLERY_SLAB
+## thick, the uphill wall GALLERY_WALL past the road's edge, columns every GALLERY_BAY on the valley side.
+const GALLERY_FROM := Vector2(209.0, -268.0)
+const GALLERY_TO := Vector2(198.0, -206.0)
+const GALLERY_CLEAR := 9.5
+const GALLERY_SLAB := 0.9
+const GALLERY_WALL := 1.4
+const GALLERY_BAY := 7.0
+
+# --- The mountain lodge ---
+## Svartfjell Fjellstue's rest area on the valley floor east of the tunnel's approach (the highway generator's PADS[0]):
+## its frame's origin on the pad's middle, x along the lodge's front, +z from the lodge toward the lot and the road.
+const LODGE_AT := Vector2(78.0, -104.0)
+const LODGE_YAW := 0.0
+
+# --- The snow poles ---
+## Plough markers every SNOW_POLE_STEP along both sides of every road where it runs at ground level, SNOW_POLE_OUT past
+## its edge (just behind the barriers); not past SNOW_POLE_REACH from the heightfield's middle.
+const SNOW_POLE_STEP := 18.0
+const SNOW_POLE_OUT := 1.6
+const SNOW_POLE_REACH := 1100.0
+const SNOW_POLE_CELL := 240.0
+
 # --- The glacier ---
 ## The ice in the glacier's valley (regenerate_glacier_highway.gd's glacier_trough): rows GLACIER_STEP apart from its
 ## snout (GLACIER_SNOUT_BACK north of the valley's mouth) up to where the valley no longer cuts GLACIER_MIN_CUT deep, at
@@ -146,6 +176,9 @@ func _ready() -> void:
 	_plan_woods()
 	_build_ground()
 	_build_woods(root)
+	_build_snow_poles(root)
+	_build_gallery(root)
+	_build_rest_stop(root)
 
 	_set_owner_recursive(_level, _level)
 	remove_child(_level)
@@ -1192,3 +1225,405 @@ func _build_glacier(root: Node3D) -> void:
 	mi.mesh = _save_res(mesh, "glacier_mesh")
 	root.add_child(mi)
 	print("  glacier: %d rows, %.0fm from the snout (%.1fs)" % [rows, float(rows - 1) * GLACIER_STEP, (Time.get_ticks_msec() - t0) / 1000.0])
+
+
+# ======================================================================================
+#  The snow poles
+# ======================================================================================
+
+## Plough markers (as on mountain roads in the north): a slim grey pole with its top third orange and a reflector,
+## leaning a little this way or that, along both sides of every road at ground level (where the ground SNOW_POLE_OUT past
+## the deck's edge is the valley's or the country's, within 1.4m of the road's height, and no other road is there), in
+## MultiMesh cells. "pole" in the name: DressingColliders makes each a rigid post (behind the barriers, nobody reaches one).
+func _build_snow_poles(root: Node3D) -> void:
+	var t0 := Time.get_ticks_msec()
+	var pk: PropKit = BaustelleKit.new_kit(1.0)
+	var kit := {}
+	var grey := Color(0.78, 0.79, 0.80)
+	var orange := Color(0.95, 0.38, 0.08)
+	pk.tube(kit, "plastic", Vector3(0, -0.4, 0), Vector3(0, 2.1, 0), 0.045, 0.04, 6, grey, false)
+	pk.tube(kit, "plastic", Vector3(0, 2.1, 0), Vector3(0, 3.1, 0), 0.04, 0.035, 6, orange, true)
+	BaustelleKit._blk(pk, kit, "lamp", Vector3(-0.03, 2.55, 0.03), Vector3(0.03, 2.75, 0.05), Color(1.0, 0.9, 0.7))
+	var mesh: ArrayMesh = _save_res(BaustelleKit.commit(pk, kit), "snow_pole")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 6113
+	var cells := {}
+	var count := 0
+	var roads: Array = [[(_level.get_node("TrackPath") as Path3D).curve, HighwayGen.MAIN_HALF_W]]
+	for ap in _level.get_node("AlternativePaths").get_children():
+		if ap is Path3D:
+			roads.append([(ap as Path3D).curve, HighwayGen.RAMP_HALF_W])
+	roads.append([_far, HighwayGen.MAIN_HALF_W])
+	var centre := (SQ_MIN + SQ_MAX) * 0.5
+	for r in roads:
+		var c: Curve3D = r[0]
+		var half: float = r[1]
+		var length := c.get_baked_length()
+		var s := rng.randf() * SNOW_POLE_STEP
+		while s < length:
+			var p: Vector3 = c.sample_baked(s)
+			var f: Vector3 = c.sample_baked(minf(s + 1.0, length)) - p
+			s += SNOW_POLE_STEP
+			if Vector2(p.x, p.z).distance_to(centre) > SNOW_POLE_REACH:
+				continue
+			f.y = 0.0
+			if f.length_squared() < 1e-6:
+				continue
+			f = f.normalized()
+			var right := Vector3(-f.z, 0.0, f.x)
+			for sx in [-1.0, 1.0]:
+				var q: Vector3 = p + right * (sx * (half + SNOW_POLE_OUT))
+				if _road_edge_d(q.x, q.z, 6.0) < SNOW_POLE_OUT * 0.5 or _in_works(q.x, q.z, 2.0):
+					continue
+				var hit := _ray(q.x, q.z)
+				if hit.is_empty():
+					continue
+				var col_name := str((hit.collider as Node).name)
+				if not (col_name == "GlacierValley" or col_name == "CountrySolid" or col_name == "TunnelMassif"):
+					continue
+				var hp: Vector3 = hit.position
+				if absf(hp.y - p.y) > 1.4 or (hit.normal as Vector3).y < 0.8:
+					continue
+				var lean := Basis(Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1)).normalized(), rng.randf_range(0.0, 0.06))
+				var xf := Transform3D(lean * Basis(Vector3.UP, rng.randf() * TAU), hp)
+				var k := Vector2i(floori(hp.x / SNOW_POLE_CELL), floori(hp.z / SNOW_POLE_CELL))
+				if not cells.has(k):
+					cells[k] = []
+				cells[k].append(xf)
+				count += 1
+	var node := Node3D.new()
+	node.name = "SnowPoles"
+	root.add_child(node)
+	for k in cells:
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.mesh = mesh
+		mm.instance_count = (cells[k] as Array).size()
+		mm.buffer = PropKit.transform_buffer(cells[k])
+		var mmi := MultiMeshInstance3D.new()
+		mmi.name = "SnowPoles_%d_%d" % [k.x, k.y]
+		mmi.multimesh = mm
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mmi.visibility_range_end = 420.0 + SNOW_POLE_CELL * 0.7
+		node.add_child(mmi)
+	print("  snow poles: %d in %d cells (%.1fs)" % [count, cells.size(), (Time.get_ticks_msec() - t0) / 1000.0])
+
+
+# ======================================================================================
+#  The avalanche gallery
+# ======================================================================================
+
+## A cut-and-cover avalanche gallery over the lap on the east flank: a concrete wall on the uphill side, a roof slab
+## carried on columns on the valley side with a deep edge beam, lamps under it, and the snow lying on the roof running on
+## up the slope into the hillside (drawn in the valley's ground material, so it is the hillside's own snow: an avalanche
+## would pass over the road). The roof is solid (the race camera comes down under it as in the tunnel), as are the wall
+## and the columns, all outside the barriers.
+func _build_gallery(root: Node3D) -> void:
+	var t0 := Time.get_ticks_msec()
+	var lap: Curve3D = (_level.get_node("TrackPath") as Path3D).curve
+	var s0 := lap.get_closest_offset(Vector3(GALLERY_FROM.x, 14.0, GALLERY_FROM.y))
+	var s1 := lap.get_closest_offset(Vector3(GALLERY_TO.x, 14.0, GALLERY_TO.y))
+	if s1 < s0:
+		var tmp := s0
+		s0 = s1
+		s1 = tmp
+	var half := HighwayGen.MAIN_HALF_W
+	var pk: PropKit = BaustelleKit.new_kit(1.0)
+	var kit := {}
+	var conc := Color(0.66, 0.66, 0.65)
+	var snow_st := SurfaceTool.new()
+	snow_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var body := StaticBody3D.new()
+	body.name = "AvalancheGallery"
+	body.set_meta(&"surface", "rock")
+	var node := Node3D.new()
+	node.name = "AvalancheGallery"
+	root.add_child(node)
+	node.add_child(body)
+	# Which side is uphill: where the ground is higher 20m out.
+	var mid := lap.sample_baked((s0 + s1) * 0.5)
+	var mf := lap.sample_baked((s0 + s1) * 0.5 + 1.0) - mid
+	var mr := Vector3(-mf.z, 0.0, mf.x).normalized()
+	var ha: float = _gen.call("_alpine_height", mid.x + mr.x * 30.0, mid.z + mr.z * 30.0)
+	var hb: float = _gen.call("_alpine_height", mid.x - mr.x * 30.0, mid.z - mr.z * 30.0)
+	var up_side := 1.0 if ha > hb else -1.0
+	print("  avalanche gallery: the slope rises to the %s (%.0fm against %.0fm)" % ["right" if up_side > 0.0 else "left", maxf(ha, hb), minf(ha, hb)])
+	var w_in: float = half + 1.0
+	var rings: Array = []
+	var s := s0
+	while s <= s1 + 0.01:
+		var p := lap.sample_baked(s)
+		var f := lap.sample_baked(minf(s + 1.0, lap.get_baked_length())) - p
+		f.y = 0.0
+		f = f.normalized()
+		var r := Vector3(-f.z, 0.0, f.x) * up_side
+		rings.append([s, p, f, r])
+		s += 2.0
+	var n := rings.size()
+	var cols_rows := 0
+	var lamp_i := 0
+	for i in range(n):
+		var p: Vector3 = rings[i][1]
+		var r: Vector3 = rings[i][3]
+		var y_s: float = p.y + GALLERY_CLEAR
+		var y_t: float = y_s + GALLERY_SLAB
+		# The snow on the roof and up the slope: across from a cornice over the valley-side edge, over the roof, then up
+		# the hillside at 35 degrees until it meets the ground.
+		var row: Array = []
+		row.append(p - r * (w_in + 1.8) + Vector3.UP * (y_t - p.y + 0.15))
+		row.append(p - r * (w_in + 1.5) + Vector3.UP * (y_t - p.y + 0.55))
+		var lat := -w_in
+		while lat <= w_in + GALLERY_WALL + 0.01:
+			row.append(p + r * lat + Vector3.UP * (y_t - p.y + 0.6 + 0.15 * sin(lat * 0.7 + float(i) * 0.3)))
+			lat += 2.0
+		var ylast: float = y_t + 0.6
+		var lat2 := w_in + GALLERY_WALL + 2.0
+		for k in range(30):
+			var q := p + r * lat2
+			var g := _ground_y(q.x, q.z)
+			var y := ylast + 1.4
+			if y >= g:
+				row.append(Vector3(q.x, g - 0.3, q.z))
+				break
+			row.append(Vector3(q.x, y, q.z))
+			ylast = y
+			lat2 += 2.0
+		rings[i].append(row)
+	# The snow's mesh: rows of different lengths, stitched pairwise by the shorter one's count, its last point carried on.
+	for i in range(n - 1):
+		var a: Array = rings[i][4]
+		var b: Array = rings[i + 1][4]
+		var m := maxi(a.size(), b.size())
+		for k in range(m - 1):
+			var a0: Vector3 = a[mini(k, a.size() - 1)]
+			var a1: Vector3 = a[mini(k + 1, a.size() - 1)]
+			var b0: Vector3 = b[mini(k, b.size() - 1)]
+			var b1: Vector3 = b[mini(k + 1, b.size() - 1)]
+			_snow_quad(snow_st, a0, a1, b1, b0)
+	# The concrete: roof slab, uphill wall, the valley-side edge beam, columns, lamps.
+	for i in range(n - 1):
+		var pa: Vector3 = rings[i][1]
+		var pb: Vector3 = rings[i + 1][1]
+		var ra: Vector3 = rings[i][3]
+		var rb: Vector3 = rings[i + 1][3]
+		var ysa: float = pa.y + GALLERY_CLEAR
+		var ysb: float = pb.y + GALLERY_CLEAR
+		var e0 := -(w_in + 1.5)
+		var e1 := w_in + GALLERY_WALL
+		# Soffit (facing down), top, the valley-side fascia.
+		pk.quad(kit, "concrete", [pa + ra * e1 + Vector3.UP * (ysa - pa.y), pb + rb * e1 + Vector3.UP * (ysb - pb.y),
+				pb + rb * e0 + Vector3.UP * (ysb - pb.y), pa + ra * e0 + Vector3.UP * (ysa - pa.y)], Vector3.DOWN, conc)
+		pk.quad(kit, "concrete", [pa + ra * e0 + Vector3.UP * (ysa - pa.y + GALLERY_SLAB), pb + rb * e0 + Vector3.UP * (ysb - pb.y + GALLERY_SLAB),
+				pb + rb * e1 + Vector3.UP * (ysb - pb.y + GALLERY_SLAB), pa + ra * e1 + Vector3.UP * (ysa - pa.y + GALLERY_SLAB)], Vector3.UP, conc)
+		pk.quad(kit, "concrete", [pa + ra * e0 + Vector3.UP * (ysa - pa.y - 0.8), pb + rb * e0 + Vector3.UP * (ysb - pb.y - 0.8),
+				pb + rb * e0 + Vector3.UP * (ysb - pb.y + GALLERY_SLAB), pa + ra * e0 + Vector3.UP * (ysa - pa.y + GALLERY_SLAB)], -ra, conc)
+		# The edge beam's inner face and underside.
+		pk.quad(kit, "concrete", [pa + ra * (e0 + 0.8) + Vector3.UP * (ysa - pa.y), pb + rb * (e0 + 0.8) + Vector3.UP * (ysb - pb.y),
+				pb + rb * (e0 + 0.8) + Vector3.UP * (ysb - pb.y - 0.8), pa + ra * (e0 + 0.8) + Vector3.UP * (ysa - pa.y - 0.8)], ra, conc)
+		pk.quad(kit, "concrete", [pa + ra * e0 + Vector3.UP * (ysa - pa.y - 0.8), pa + ra * (e0 + 0.8) + Vector3.UP * (ysa - pa.y - 0.8),
+				pb + rb * (e0 + 0.8) + Vector3.UP * (ysb - pb.y - 0.8), pb + rb * e0 + Vector3.UP * (ysb - pb.y - 0.8)], Vector3.DOWN, conc)
+		# The uphill wall's road face, from below the road's surface up to the soffit.
+		pk.quad(kit, "concrete", [pa + ra * w_in + Vector3.DOWN * 0.6, pb + rb * w_in + Vector3.DOWN * 0.6,
+				pb + rb * w_in + Vector3.UP * (ysb - pb.y), pa + ra * w_in + Vector3.UP * (ysa - pa.y)], -ra, Color(0.6, 0.6, 0.6))
+		# Collision: the roof and the wall, piece by piece.
+		var c := (pa + pb) * 0.5
+		var fwd: Vector3 = (pb - pa)
+		fwd.y = 0.0
+		var seg := fwd.length()
+		var basis := Basis.looking_at(fwd.normalized(), Vector3.UP)
+		var roof_c: Vector3 = c + ((ra + rb) * 0.5) * ((e0 + e1) * 0.5) + Vector3.UP * ((ysa + ysb) * 0.5 - c.y + GALLERY_SLAB * 0.5)
+		_box_shape(body, Transform3D(basis, roof_c), Vector3(e1 - e0, GALLERY_SLAB + 0.8, seg + 0.3))
+		var wall_c: Vector3 = c + ((ra + rb) * 0.5) * (w_in + GALLERY_WALL * 0.5) + Vector3.UP * (GALLERY_CLEAR * 0.5 - 0.3)
+		_box_shape(body, Transform3D(basis, wall_c), Vector3(GALLERY_WALL, GALLERY_CLEAR + 0.6, seg + 0.3))
+		# Lamps along the soffit's middle, every fourth ring a real light.
+		if i % 2 == 0:
+			var lp: Vector3 = pa + ra * 1.5 + Vector3.UP * (ysa - pa.y - 0.12)
+			BaustelleKit._blk(pk, kit, "lamp", lp + Vector3(-0.35, -0.08, -0.35), lp + Vector3(0.35, 0.1, 0.35), Color(1.0, 0.86, 0.6))
+			if i % 8 == 0:
+				var light := OmniLight3D.new()
+				light.name = "GalleryLamp_%d" % lamp_i
+				light.position = lp + Vector3.DOWN * 0.6
+				light.light_color = Color(1.0, 0.84, 0.58)
+				light.light_energy = 1.6
+				light.omni_range = 16.0
+				light.shadow_enabled = false
+				light.set_meta(&"no_shadow", true)
+				node.add_child(light)
+				lamp_i += 1
+	# Columns on the valley side, every GALLERY_BAY.
+	var s_c := s0
+	var cl := lap.get_baked_length()
+	while s_c <= s1:
+		var p := lap.sample_baked(s_c)
+		var f := lap.sample_baked(minf(s_c + 1.0, cl)) - p
+		f.y = 0.0
+		f = f.normalized()
+		var r := Vector3(-f.z, 0.0, f.x) * up_side
+		var cc: Vector3 = p - r * (w_in + 1.1)
+		var g := _ground_y(cc.x, cc.z)
+		var top: float = p.y + GALLERY_CLEAR
+		var basis := Basis.looking_at(f, Vector3.UP)
+		pk.set_frame(Transform3D(basis, Vector3(cc.x, 0.0, cc.z)))
+		BaustelleKit._blk(pk, kit, "concrete", Vector3(-0.4, minf(g, p.y) - 0.8, -0.45), Vector3(0.4, top, 0.45), conc)
+		pk.reset_frame()
+		_box_shape(body, Transform3D(basis, Vector3(cc.x, (minf(g, p.y) - 0.8 + top) * 0.5, cc.z)), Vector3(0.8, top - minf(g, p.y) + 0.8, 0.9))
+		cols_rows += 1
+		s_c += GALLERY_BAY
+	# The two portals: the roof's and the wall's ends faced off.
+	for e in [0, n - 1]:
+		var p: Vector3 = rings[e][1]
+		var r: Vector3 = rings[e][3]
+		var f: Vector3 = rings[e][2] * (-1.0 if e == 0 else 1.0)
+		var ys: float = p.y + GALLERY_CLEAR
+		pk.quad(kit, "concrete", [p - r * (w_in + 1.5) + Vector3.UP * (ys - p.y - 0.8), p + r * (w_in + GALLERY_WALL) + Vector3.UP * (ys - p.y - 0.8),
+				p + r * (w_in + GALLERY_WALL) + Vector3.UP * (ys - p.y + GALLERY_SLAB), p - r * (w_in + 1.5) + Vector3.UP * (ys - p.y + GALLERY_SLAB)], f, Color(0.62, 0.62, 0.61))
+	var mi := MeshInstance3D.new()
+	mi.name = "AvalancheGallery_Concrete"
+	mi.mesh = _save_res(BaustelleKit.commit(pk, kit), "gallery")
+	node.add_child(mi)
+	snow_st.generate_normals()
+	var snow := MeshInstance3D.new()
+	snow.name = "AvalancheGallery_Snow"
+	snow.mesh = _save_res(snow_st.commit(), "gallery_snow")
+	# The ground's material, but as if far from any road: over the road its map would paint the plough's grit on it.
+	var snow_mat := _ground_mat.duplicate() as ShaderMaterial
+	var far_img := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+	far_img.set_pixel(0, 0, Color(1.0, 0.0, 0.0, 1.0))
+	snow_mat.set_shader_parameter("ground_map", ImageTexture.create_from_image(far_img))
+	snow.material_override = _save_res(snow_mat, "gallery_snow_mat")
+	node.add_child(snow)
+	# The highway's streetlights stood up through the roof: none under it.
+	var gone := 0
+	for lamp in _level.find_children("Streetlight*", "", true, false):
+		var lp: Vector3 = (lamp as Node3D).global_position
+		var off := lap.get_closest_offset(lp)
+		if off > s0 - 4.0 and off < s1 + 4.0 and Vector2(lp.x, lp.z).distance_to(Vector2(lap.sample_baked(off).x, lap.sample_baked(off).z)) < half + 6.0:
+			lamp.get_parent().remove_child(lamp)
+			lamp.free()
+			gone += 1
+	if gone > 0:
+		print("  avalanche gallery: %d streetlights under it taken away" % gone)
+	print("  avalanche gallery: %.0fm over the lap (%.0f to %.0f), %d columns (%.1fs)" % [s1 - s0, s0, s1, cols_rows, (Time.get_ticks_msec() - t0) / 1000.0])
+
+
+## A quad in the snow's mesh (a, b, c, d in order round it), wound so its front faces up.
+func _snow_quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> void:
+	var nrm := (b - a).cross(d - a)
+	if nrm.y > 0.0:
+		for v in [a, d, b, b, d, c]:
+			st.add_vertex(v)
+	else:
+		for v in [a, b, d, b, c, d]:
+			st.add_vertex(v)
+
+
+# ======================================================================================
+#  The mountain lodge
+# ======================================================================================
+
+## Svartfjell Fjellstue (made up): a two-storey lodge in Falu red with its café, a white annex with the toilets, on the
+## pad the highway generator levels (PADS); before them the lot (a dark slab with its bays painted) with cars and a
+## motorhome parked, ploughed snow heaped round its edges, picnic tables to the side, lamp posts and their lights, the
+## name on the lodge's front. Life size (FjordVillageKit, CampKit, RoadsideKit, YardKit) grown by PROP_SCALE; the lodge
+## and the rest are two meshes, which DressingColliders makes solid.
+func _build_rest_stop(root: Node3D) -> void:
+	var t0 := Time.get_ticks_msec()
+	var pad: Array = HighwayGen.PADS[0]
+	var y0: float = float(pad[2])
+	var frame := Transform3D(Basis(Vector3.UP, LODGE_YAW), Vector3(LODGE_AT.x, y0, LODGE_AT.y))
+	var node := Node3D.new()
+	node.name = "Fjellstue"
+	root.add_child(node)
+	# The buildings, at the lot's back (-z).
+	var vk: PropKit = FjordVillageKit.new_village_kit(PROP_SCALE)
+	var vkit := {}
+	var lodge_xf := frame * Transform3D(Basis(), Vector3(-6.0, 0.15, -10.0))
+	vk.set_frame(Transform3D(lodge_xf.basis.scaled(Vector3.ONE * PROP_SCALE), lodge_xf.origin))
+	var chim := FjordVillageKit.house(vk, vkit, 15.0, 9.0, 2.0, FjordVillageKit.PAINTS[1], 0.6, 0.15, 7)
+	var annex_xf := frame * Transform3D(Basis(Vector3.UP, -PI * 0.5), Vector3(20.0, 0.15, -8.0))
+	vk.set_frame(Transform3D(annex_xf.basis.scaled(Vector3.ONE * PROP_SCALE), annex_xf.origin))
+	FjordVillageKit.house(vk, vkit, 7.0, 5.0, 1.0, FjordVillageKit.PAINTS[0], 0.6, 0.0, 3)
+	# Ploughed snow heaped round the lot's sides and back.
+	vk.set_frame(Transform3D(frame.basis.scaled(Vector3.ONE * PROP_SCALE), frame.origin))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5150
+	for e in [[Vector3(-19.0, 0, 1.0), Vector3(-19.0, 0, 13.0)], [Vector3(19.5, 0, -2.0), Vector3(19.5, 0, 13.0)],
+			[Vector3(-19.0, 0, 13.5), Vector3(-6.0, 0, 13.5)], [Vector3(6.0, 0, 13.5), Vector3(19.5, 0, 13.5)]]:
+		var a: Vector3 = e[0]
+		var b: Vector3 = e[1]
+		var steps := int(a.distance_to(b) / 1.6)
+		for k in range(steps + 1):
+			var c: Vector3 = a.lerp(b, float(k) / float(maxi(steps, 1)))
+			var hr := rng.randf_range(0.5, 0.9)
+			vk.lathe(vkit, "snow", c + Vector3(rng.randf_range(-0.3, 0.3), -0.2, rng.randf_range(-0.3, 0.3)),
+					[Vector2(hr * 1.6, 0.0), Vector2(hr * 1.4, hr * 0.5), Vector2(hr * 0.8, hr * 0.95), Vector2(0.001, hr * 1.1)], 8, Color(0.92, 0.94, 0.97))
+	var lodge := MeshInstance3D.new()
+	lodge.name = "Fjellstue_Hus"
+	lodge.mesh = _save_res(FjordVillageKit.commit(vk, vkit), "lodge")
+	node.add_child(lodge)
+	# The lot, the cars, the tables and the lamps.
+	var pk: PropKit = BaustelleKit.new_kit(PROP_SCALE)
+	var kit := {}
+	pk.set_frame(Transform3D(frame.basis.scaled(Vector3.ONE * PROP_SCALE), frame.origin))
+	BaustelleKit._blk(pk, kit, "concrete", Vector3(-18.5, -0.3, -1.5), Vector3(18.5, 0.06, 13.0), Color(0.24, 0.24, 0.26))
+	for k in range(9):
+		var x := -14.0 + float(k) * 3.0
+		BaustelleKit._blk(pk, kit, "painted", Vector3(x - 0.06, 0.06, 1.0), Vector3(x + 0.06, 0.075, 6.0), Color(0.92, 0.92, 0.9))
+	var ck = CampKit.new(pk)
+	var cars := [["suv", Color(0.12, 0.2, 0.36), 0, -12.5], ["suv", Color(0.75, 0.76, 0.78), 0, -9.5], ["van", Color(0.92, 0.92, 0.9), 0, -3.5],
+			["suv", Color(0.45, 0.08, 0.07), 0, 2.5], ["motorhome_road", Color(0.95, 0.95, 0.93), 1, 10.0]]
+	for c in cars:
+		# Nose into the bay, toward the lodge (-z).
+		pk.set_frame(Transform3D(frame.basis.scaled(Vector3.ONE * PROP_SCALE), frame.origin) * Transform3D(Basis(), Vector3(float(c[3]), 0.07, 3.6 if c[0] != "motorhome_road" else 6.0)))
+		ck.vehicle(kit, String(c[0]), c[1], int(c[2]))
+	var rk = RoadsideKit.new(pk)
+	for t in [Vector3(-16.5, 0.07, 9.5), Vector3(-16.5, 0.07, 5.0)]:
+		pk.set_frame(Transform3D(frame.basis.scaled(Vector3.ONE * PROP_SCALE), frame.origin) * Transform3D(Basis(Vector3.UP, PI * 0.5), t))
+		rk.picnic_table(kit)
+	var lamp_spots := [Vector3(-18.0, 0.06, 12.5), Vector3(0.0, 0.06, 12.5), Vector3(18.0, 0.06, 12.5), Vector3(18.0, 0.06, 0.0)]
+	pk.set_frame(Transform3D(frame.basis.scaled(Vector3.ONE * PROP_SCALE), frame.origin))
+	YardKit.uvk = PROP_SCALE
+	for i in range(lamp_spots.size()):
+		var lp: Vector3 = lamp_spots[i]
+		YardKit.lamp_post(pk, kit, lp, 4.2)
+		if i % 2 == 0:
+			var light := OmniLight3D.new()
+			light.name = "Fjellstue_Lys_%d" % i
+			light.position = frame * (lp * PROP_SCALE) + Vector3.UP * (4.0 * PROP_SCALE)
+			light.light_color = Color(1.0, 0.82, 0.55)
+			light.light_energy = 1.8
+			light.omni_range = 26.0
+			light.shadow_enabled = false
+			light.set_meta(&"no_shadow", true)
+			node.add_child(light)
+	pk.reset_frame()
+	var lot := MeshInstance3D.new()
+	lot.name = "Fjellstue_Plass"
+	lot.mesh = _save_res(BaustelleKit.commit(pk, kit), "lodge_lot")
+	node.add_child(lot)
+	# Its name on the lodge's front, under the eaves, and a sign by the lot.
+	for l in [["SVARTFJELL FJELLSTUE", lodge_xf * Vector3(0.0, 4.2 * PROP_SCALE, 0.12), 0.5], ["KAFE", lodge_xf * Vector3(-3.6 * PROP_SCALE, 2.55 * PROP_SCALE, 0.12), 0.32]]:
+		var lab := Label3D.new()
+		lab.text = l[0]
+		lab.font_size = 64
+		lab.pixel_size = float(l[2]) * PROP_SCALE / 44.8
+		lab.modulate = Color(0.97, 0.95, 0.88)
+		lab.outline_size = 4
+		lab.outline_modulate = Color(0.1, 0.06, 0.05)
+		lab.double_sided = false
+		lab.alpha_cut = Label3D.ALPHA_CUT_DISCARD
+		lab.transform = Transform3D(lodge_xf.basis, l[1])
+		lab.visibility_range_end = 450.0
+		node.add_child(lab)
+	# Warm light in its windows at dusk: a few lights inside.
+	for wx in [-4.0, 4.0]:
+		var wl := OmniLight3D.new()
+		wl.name = "Fjellstue_Vindu_%d" % int(wx)
+		wl.position = lodge_xf * Vector3(wx * PROP_SCALE, 1.8 * PROP_SCALE, -1.5 * PROP_SCALE)
+		wl.light_color = Color(1.0, 0.72, 0.42)
+		wl.light_energy = 1.4
+		wl.omni_range = 9.0
+		wl.shadow_enabled = false
+		wl.set_meta(&"no_shadow", true)
+		node.add_child(wl)
+	print("  mountain lodge at (%.0f, %.0f) (%.1fs)" % [LODGE_AT.x, LODGE_AT.y, (Time.get_ticks_msec() - t0) / 1000.0])
