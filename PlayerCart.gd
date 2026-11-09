@@ -6971,6 +6971,20 @@ func _ai_evaluate_traffic(_delta: float, fwd_3d: Vector3, right_3d: Vector3) -> 
 	return traffic_result
 
 
+# One ray query a cart reuses for the AI's feelers (11 a tick in _get_ai_input), only its ends and mask set per ray:
+# a new PhysicsRayQueryParameters3D and exclude array for each cost 1.2us of a ray's 3.2us (scratch/ray_query_bench.gd).
+var _ai_feeler_query: PhysicsRayQueryParameters3D
+
+func _ai_feeler(from: Vector3, to: Vector3, mask: int) -> PhysicsRayQueryParameters3D:
+	if _ai_feeler_query == null:
+		_ai_feeler_query = PhysicsRayQueryParameters3D.new()
+		_ai_feeler_query.exclude = [get_rid()]
+	_ai_feeler_query.from = from
+	_ai_feeler_query.to = to
+	_ai_feeler_query.collision_mask = mask
+	return _ai_feeler_query
+
+
 func _get_ai_input(delta: float) -> Vector2:
 	var input = Vector2.ZERO
 	
@@ -7654,17 +7668,11 @@ func _get_ai_input(delta: float) -> Vector2:
 		# Downward probe rays to detect cliff drop-offs on the road edges
 		var left_probe_pos = my_pos + fwd_dir * 4.0 - right_dir * 2.2
 		var right_probe_pos = my_pos + fwd_dir * 4.0 + right_dir * 2.2
-		var q_left = PhysicsRayQueryParameters3D.create(left_probe_pos + Vector3.UP * 0.5, left_probe_pos + Vector3.DOWN * 4.0)
-		q_left.exclude = [self.get_rid()]
-		q_left.collision_mask = 1
-		var hit_l = space_state.intersect_ray(q_left)
+		var hit_l = space_state.intersect_ray(_ai_feeler(left_probe_pos + Vector3.UP * 0.5, left_probe_pos + Vector3.DOWN * 4.0, 1))
 		if hit_l.is_empty() or hit_l.normal.y < 0.40:
 			left_is_safe = false
-			
-		var q_right = PhysicsRayQueryParameters3D.create(right_probe_pos + Vector3.UP * 0.5, right_probe_pos + Vector3.DOWN * 4.0)
-		q_right.exclude = [self.get_rid()]
-		q_right.collision_mask = 1
-		var hit_r = space_state.intersect_ray(q_right)
+
+		var hit_r = space_state.intersect_ray(_ai_feeler(right_probe_pos + Vector3.UP * 0.5, right_probe_pos + Vector3.DOWN * 4.0, 1))
 		if hit_r.is_empty() or hit_r.normal.y < 0.40:
 			right_is_safe = false
 
@@ -7693,10 +7701,7 @@ func _get_ai_input(delta: float) -> Vector2:
 		var obstacle_count = 0
 		var tight_route: bool = on_alternative_path and active_path != null and active_path.has_meta(&"ai_lane_limit")
 		for ray in rays:
-			var query = PhysicsRayQueryParameters3D.create(ray["start"], ray["end"])
-			query.exclude = [self.get_rid()]
-			query.collision_mask = 1 | 4
-			var result = space_state.intersect_ray(query)
+			var result = space_state.intersect_ray(_ai_feeler(ray["start"], ray["end"], 1 | 4))
 			if result:
 				var collider = result.collider
 				# Track surface or terrain floor is NEVER an obstacle
