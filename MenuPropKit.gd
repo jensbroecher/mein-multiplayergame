@@ -125,7 +125,7 @@ static func build_bench(accent: Color, stand_h := 0.2, car_yaw := 0.55) -> Node3
 	root.set_meta("stand_top", STAND_AT + Vector3(0.0, stand_h, 0.0))
 
 	_workshop_wall(pk, kit, accent)
-	_laptop(pk, kit, Transform3D(Basis.from_euler(Vector3(0, 0.38, 0)), Vector3(-0.62, 0.0, -0.12)), root)
+	_laptop(pk, kit, Transform3D(Basis.from_euler(Vector3(0, -0.42, 0)), Vector3(-0.62, 0.0, -0.12)), root)
 	_hex_drivers(pk, kit, Vector3(-0.95, 0.0, -0.3), accent)
 	_lipo(pk, kit, Transform3D(Basis.from_euler(Vector3(0, -0.5, 0)), Vector3(-0.3, 0.0, 0.12)))
 	pk.reset_frame()
@@ -136,7 +136,7 @@ static func build_bench(accent: Color, stand_h := 0.2, car_yaw := 0.55) -> Node3
 	root.add_child(mi)
 
 	var tx := _transmitter(accent)
-	tx.transform = Transform3D(Basis.from_euler(Vector3(0, 0.95, 0)), Vector3(-0.08, 0.0, 0.05))
+	tx.transform = Transform3D(Basis.from_euler(Vector3(0, -2.2, 0)), Vector3(-0.12, 0.0, 0.06))
 	root.add_child(tx)
 	root.set_meta("wheel", tx.get_node("Wheel"))
 	root.set_meta("trigger", tx.get_node("Trigger"))
@@ -176,6 +176,19 @@ static func _workshop_wall(pk: PropKit, kit: Dictionary, accent: Color) -> void:
 			Basis(Vector3(0, 0, 1), Vector3(1, 0, 0), Vector3(0, 1, 0)))
 	pk.box(kit, "gloss", Transform3D(Basis(), Vector3(0.55, 0.96, -0.5)), Vector3(0.22, 0.1, 0.16), accent.darkened(0.3))
 	pk.box(kit, "led", Transform3D(Basis(), Vector3(0.2, 0.884, -0.42)), Vector3(1.4, 0.008, 0.02), Color(1.0, 0.93, 0.8))
+	# The side wall closing the corner on the right (the camera looks along the bench toward it): a band in the
+	# tile's colour, a shelf of spare bodies' wheels and a strip light.
+	var side_x := 1.75
+	var side_z := 0.615   # where the shelf is centred, in this frame (moved back with the wall)
+	pk.box(kit, "matte", Transform3D(Basis(), Vector3(side_x, 1.8, 3.2)), Vector3(0.05, 3.7, 7.2), Color(0.22, 0.23, 0.26))
+	pk.box(kit, "gloss", Transform3D(Basis(), Vector3(side_x - 0.03, 0.42, 3.2)), Vector3(0.01, 0.06, 7.2), accent.darkened(0.5))
+	# The workshop's floor under the bench, dark concrete.
+	pk.box(kit, "matte", Transform3D(Basis(), Vector3(0.0, -0.92, 3.0)), Vector3(14.0, 0.04, 8.0), Color(0.12, 0.125, 0.13))
+	pk.box(kit, "matte", Transform3D(Basis(), Vector3(side_x - 0.13, 0.85, side_z - 0.4)), Vector3(0.24, 0.025, 1.2), Color(0.22, 0.16, 0.1))
+	for k in 5:
+		var c := Vector3(side_x - 0.13, 0.863 + 0.055, side_z - 0.9 + 0.25 * k)
+		pk.tyre(kit, "rubber", c, 0.03, 0.055, 0.045, 24, Color(0.05, 0.05, 0.05), Basis(Vector3(0, 1, 0), Vector3(-1, 0, 0), Vector3(0, 0, 1)))
+	pk.box(kit, "led", Transform3D(Basis(), Vector3(side_x - 0.05, 0.834, side_z - 0.4)), Vector3(0.02, 0.008, 1.1), Color(1.0, 0.93, 0.8))
 
 
 ## A 16-inch laptop at `xf`, its back toward -z, the lid open ~110 degrees; the screen is a live 2D

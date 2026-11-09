@@ -191,7 +191,7 @@ func _build() -> void:
 			_add_camera(vp, 38.0)
 		"options":
 			_build_bench()
-			_add_camera(vp, 32.0)
+			_add_camera(vp, 54.0)
 	if _views.is_empty():
 		texture = vp.get_texture()
 	_built = true
@@ -944,7 +944,21 @@ func _apply(t: float) -> void:
 					var w: Node3D = _cars[0]["wheels"][k]
 					if w:
 						w.rotation = Vector3(0, -steer * 0.6, 0)
-			_frame(0, Vector3(-0.05, 0.4, -0.3), 1.0, 0.42, 22.0 + sin(t * 0.15) * 6.0, 18.0)
+			# Low and close in front of the laptop, from its left, looking past it to the transmitter and the
+			# car on its stand: a slow sway along the bench.
+			var sway := sin(t * 0.15)
+			_aim(0, Vector3(-1.18 + sway * 0.05, 0.3, 0.4 - sway * 0.03), Vector3(-0.1, 0.27, -0.52))
+
+
+## Puts camera `i` at `from` looking toward `at`, tipped down as `_frame` does so `at` sits a quarter of the way
+## down the picture, above the caption.
+func _aim(i: int, from: Vector3, at: Vector3) -> void:
+	if i >= _cams.size():
+		return
+	var cam := _cams[i]
+	cam.position = from
+	cam.look_at(at, Vector3.UP)
+	cam.rotate_object_local(Vector3.RIGHT, -atan(0.48 * tan(deg_to_rad(cam.fov * 0.5))))
 
 
 ## Frames camera `i` on what it shows (`centre`, `rx` across and `ry` up from it on screen) seen from `yaw_deg` (round from +z toward +x) and

@@ -57,7 +57,9 @@ border). So no tile stands still.
   `size_2d_override` doing the scaling, the first view of the menu after start-up showed the page in a corner of the
   laptop's screen on alternate frames (the user's screenshot; no probe here reproduced it). The screen stands 2mm off
   its bezel. Those pages redraw only with their tile
-  (`_render` asks for each). The laptop is a 16-inch one (the user's choice). The tiles' viewports have physics
+  (`_render` asks for each). The laptop is a 16-inch one (the user's choice). Options' camera is placed by hand (`_aim`, not `_frame`): low
+  and about 0.8m in front of the laptop from its left, a 54-degree lens, looking past it to the transmitter and the car;
+  so the room is closed on the right (a side wall) and has a floor under the bench. The tiles' viewports have physics
   interpolation off: the project's is on, and with the camera and cars moved in `_process` the hovered tile (drawn every
   frame) flickered on fine detail while the mouse moved. `res://scratch/laptop_flicker_probe.tscn -- [frames=90]
   [dir=<out>] [first=1] [fullscreen=1]` (windowed) moves the mouse over the Options tile and records the laptop screen
