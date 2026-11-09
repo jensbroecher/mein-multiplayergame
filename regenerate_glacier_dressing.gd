@@ -1027,7 +1027,9 @@ func _build_site(node: Node3D, foot_pts: Array) -> void:
 		foot_pts.append([Vector2(x, z), r])
 	# The crane, west of the far viaduct.
 	var crane := Vector2(-138.0, 372.0)
-	var mast_h := 30.0
+	# Tall enough that its load (BaustelleKit's hook block 14m and the load 17.6m under the jib, life) hangs well over the
+	# bridge's formwork and the spruces: on a 30m mast it hung at 22m and swung through both.
+	var mast_h := 40.0
 	place.call(crane.x, crane.y, 0.0, func(): BaustelleKit.tower_crane_mast(pk, kit, mast_h), 5.0)
 	var cg := _ground_y(crane.x, crane.y)
 	# The yard east of it.

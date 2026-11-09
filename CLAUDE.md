@@ -775,7 +775,10 @@ The menus call it Arco del Viento (it was Canyon Drift / CANYON COURSE); files a
   segment's formwork and starter bars on each deck end, the next pier past the gap in the hairpin's infield with its
   balanced cantilever (`WORKS_T_*`), a pier with only its crosshead, one half poured, a footing with its cages
   (`WORKS_PIERS`), temporary railings, BaustelleKit's tower crane (its top slewing over the gap, SlewHazard.gd,
-  harmless), yard and machines at PROP_SCALE, floodlights and a board (SVARTFJELLVEGEN, made up). Every piece keeps
+  harmless; on a 40m mast (life), since BaustelleKit's load hangs 17.6m under the jib and on 30m it swung through the
+  bridge's formwork and the spruces: `scratch/crane_clearance_probe.tscn` (headless) prints the load's height against
+  the tallest thing under the jib's swing), yard and machines at PROP_SCALE, floodlights and a board (SVARTFJELLVEGEN,
+  made up). Every piece keeps
   `WORKS_LAP_CLEAR` from the lap and the ramps (`_check_works_clear`); the trees keep out of `WORKS_KEEP`. It had ended
   on the ground behind a barrier, joined to nothing, and the user disliked it. The bridge pieces are at game scale, so
   BaustelleKit's `uvk` is set by calling `new_kit` again for each scale. `scratch/glacier_height_map.tscn` (headless,
