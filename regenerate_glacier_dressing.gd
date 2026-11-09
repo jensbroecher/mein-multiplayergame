@@ -98,6 +98,16 @@ const GALLERY_BAY := 7.0
 ## its frame's origin on the pad's middle, x along the lodge's front, +z from the lodge toward the lot and the road.
 const LODGE_AT := Vector2(78.0, -104.0)
 const LODGE_YAW := 0.0
+## The lodge's name board standing on its front roof slope (life size, in the house's frame: x along its front, z out of
+## it, the floor at y 0.5; the roof's front plane rises from y 6.2 at z 0 by FjordVillageKit.PITCH a metre in), and the
+## KAFE blade by the door, between the floors where no window is: their centres, sizes and thicknesses. On the wall
+## between the window rows the name ran across the windows.
+const LODGE_SIGN_C := Vector3(0.0, 8.15, -1.3)
+const LODGE_SIGN_SIZE := Vector2(10.2, 1.25)
+const LODGE_SIGN_T := 0.08
+const LODGE_BLADE_C := Vector3(3.95, 3.0, 0.62)
+const LODGE_BLADE_SIZE := Vector2(1.0, 0.62)
+const LODGE_BLADE_T := 0.05
 
 # --- The snow poles ---
 ## Plough markers every SNOW_POLE_STEP along both sides of every road where it runs at ground level, SNOW_POLE_OUT past
@@ -1540,6 +1550,7 @@ func _build_rest_stop(root: Node3D) -> void:
 	var lodge_xf := frame * Transform3D(Basis(), Vector3(-6.0, 0.15, -10.0))
 	vk.set_frame(Transform3D(lodge_xf.basis.scaled(Vector3.ONE * PROP_SCALE), lodge_xf.origin))
 	var chim := FjordVillageKit.house(vk, vkit, 15.0, 9.0, 2.0, FjordVillageKit.PAINTS[1], 0.6, 0.15, 7)
+	_lodge_signs(vk, vkit)
 	var annex_xf := frame * Transform3D(Basis(Vector3.UP, -PI * 0.5), Vector3(20.0, 0.15, -8.0))
 	vk.set_frame(Transform3D(annex_xf.basis.scaled(Vector3.ONE * PROP_SCALE), annex_xf.origin))
 	FjordVillageKit.house(vk, vkit, 7.0, 5.0, 1.0, FjordVillageKit.PAINTS[0], 0.6, 0.0, 3)
@@ -1601,20 +1612,31 @@ func _build_rest_stop(root: Node3D) -> void:
 	lot.name = "Fjellstue_Plass"
 	lot.mesh = _save_res(BaustelleKit.commit(pk, kit), "lodge_lot")
 	node.add_child(lot)
-	# Its name on the lodge's front, under the eaves, and a sign by the lot.
-	for l in [["SVARTFJELL FJELLSTUE", lodge_xf * Vector3(0.0, 4.2 * PROP_SCALE, 0.12), 0.5], ["KAFE", lodge_xf * Vector3(-3.6 * PROP_SCALE, 2.55 * PROP_SCALE, 0.12), 0.32]]:
+	# Its name on the board on the roof, KAFE on both faces of the blade by the door, a lamp on the board.
+	for l in [["SVARTFJELL FJELLSTUE", LODGE_SIGN_C + Vector3(0, 0, LODGE_SIGN_T * 0.5 + 0.03), Vector3.BACK, 0.54],
+			["KAFE", LODGE_BLADE_C + Vector3(LODGE_BLADE_T * 0.5 + 0.02, 0, 0), Vector3.RIGHT, 0.25],
+			["KAFE", LODGE_BLADE_C - Vector3(LODGE_BLADE_T * 0.5 + 0.02, 0, 0), Vector3.LEFT, 0.25]]:
 		var lab := Label3D.new()
 		lab.text = l[0]
 		lab.font_size = 64
-		lab.pixel_size = float(l[2]) * PROP_SCALE / 44.8
+		lab.pixel_size = float(l[3]) * PROP_SCALE / 44.8
 		lab.modulate = Color(0.97, 0.95, 0.88)
-		lab.outline_size = 4
-		lab.outline_modulate = Color(0.1, 0.06, 0.05)
+		lab.outline_size = 0
 		lab.double_sided = false
 		lab.alpha_cut = Label3D.ALPHA_CUT_DISCARD
-		lab.transform = Transform3D(lodge_xf.basis, l[1])
+		var n: Vector3 = lodge_xf.basis * (l[2] as Vector3)
+		lab.transform = Transform3D(Basis.looking_at(-n, Vector3.UP), lodge_xf * ((l[1] as Vector3) * PROP_SCALE))
 		lab.visibility_range_end = 450.0
 		node.add_child(lab)
+	var sign_light := OmniLight3D.new()
+	sign_light.name = "Fjellstue_Skiltlys"
+	sign_light.position = lodge_xf * ((LODGE_SIGN_C + Vector3(0, 0.4, 1.6)) * PROP_SCALE)
+	sign_light.light_color = Color(1.0, 0.86, 0.62)
+	sign_light.light_energy = 1.2
+	sign_light.omni_range = 10.0
+	sign_light.shadow_enabled = false
+	sign_light.set_meta(&"no_shadow", true)
+	node.add_child(sign_light)
 	# Warm light in its windows at dusk: a few lights inside.
 	for wx in [-4.0, 4.0]:
 		var wl := OmniLight3D.new()
@@ -1627,3 +1649,36 @@ func _build_rest_stop(root: Node3D) -> void:
 		wl.set_meta(&"no_shadow", true)
 		node.add_child(wl)
 	print("  mountain lodge at (%.0f, %.0f) (%.1fs)" % [LODGE_AT.x, LODGE_AT.y, (Time.get_ticks_msec() - t0) / 1000.0])
+
+
+## The lodge's signs in its frame (life size): the name board on three posts standing on the front roof slope, braced
+## back to it, a white frame round its dark green face; the KAFE blade on a bracket off the wall by the door.
+func _lodge_signs(pk: PropKit, kit: Dictionary) -> void:
+	var green := Color(0.10, 0.22, 0.16)
+	var white := Color(0.93, 0.93, 0.9)
+	var wood := Color(0.30, 0.22, 0.15)
+	var c := LODGE_SIGN_C
+	var hw := LODGE_SIGN_SIZE.x * 0.5
+	var hh := LODGE_SIGN_SIZE.y * 0.5
+	var t := LODGE_SIGN_T * 0.5
+	BaustelleKit._blk(pk, kit, "painted", c + Vector3(-hw, -hh, -t), c + Vector3(hw, hh, t), green)
+	# The frame, standing 2cm proud of the face.
+	for e in [[Vector3(-hw - 0.08, hh, t), Vector3(hw + 0.08, hh + 0.1, t + 0.03)], [Vector3(-hw - 0.08, -hh - 0.1, t), Vector3(hw + 0.08, -hh, t + 0.03)],
+			[Vector3(-hw - 0.08, -hh, t), Vector3(-hw, hh, t + 0.03)], [Vector3(hw, -hh, t), Vector3(hw + 0.08, hh, t + 0.03)]]:
+		BaustelleKit._blk(pk, kit, "painted", c + (e[0] as Vector3) + Vector3(0, 0, -t * 2.0 - 0.02), c + (e[1] as Vector3), white)
+	var roof_y := func(z: float) -> float: return 6.2 - z * FjordVillageKit.PITCH
+	for px in [-hw + 0.6, 0.0, hw - 0.6]:
+		var zb: float = c.z - t - 0.08
+		BaustelleKit._blk(pk, kit, "timber", Vector3(px - 0.07, roof_y.call(zb) - 0.2, zb - 0.07), Vector3(px + 0.07, c.y + hh, zb + 0.07), wood)
+		# A brace from the post's middle back to the roof.
+		var zr: float = zb - 1.0
+		BaustelleKit._bar(pk, kit, "timber", Vector3(px, c.y - 0.1, zb), Vector3(px, roof_y.call(zr) + 0.05, zr), 0.1, 0.1, wood)
+	# The KAFE blade: a board across the wall's normal on a bracket.
+	var b := LODGE_BLADE_C
+	var bw := LODGE_BLADE_SIZE.x * 0.5
+	var bh := LODGE_BLADE_SIZE.y * 0.5
+	var bt := LODGE_BLADE_T * 0.5
+	BaustelleKit._blk(pk, kit, "painted", b + Vector3(-bt, -bh, -bw), b + Vector3(bt, bh, bw), green)
+	BaustelleKit._blk(pk, kit, "painted", b + Vector3(-bt - 0.02, bh, -bw - 0.04), b + Vector3(bt + 0.02, bh + 0.06, bw + 0.04), white)
+	BaustelleKit._bar(pk, kit, "iron", Vector3(b.x, b.y + bh + 0.12, 0.03), Vector3(b.x, b.y + bh + 0.12, b.z + bw + 0.05), 0.05, 0.05, Color(0.12, 0.12, 0.12))
+	BaustelleKit._bar(pk, kit, "iron", Vector3(b.x, b.y - bh, 0.03), Vector3(b.x, b.y + bh + 0.12, b.z + bw * 0.6), 0.04, 0.04, Color(0.12, 0.12, 0.12))

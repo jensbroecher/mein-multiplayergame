@@ -813,7 +813,9 @@ The menus call it Arco del Viento (it was Canyon Drift / CANYON COURSE); files a
   - Svartfjell Fjellstue (`_build_rest_stop`, `LODGE_*`, made up): a mountain lodge in Falu red and its annex
     (FjordVillageKit), the lot with cars and a motorhome (CampKit), ploughed snow round it, picnic tables (RoadsideKit),
     lamp posts (YardKit) and lights, on the pad the highway generator levels (`PADS`, `_apply_pads`) on the valley floor
-    east of the tunnel's approach, seen from the overpass, the tunnel's approach and the express flyover.
+    east of the tunnel's approach, seen from the overpass, the tunnel's approach and the express flyover. Its name is on a
+    lit board standing on the front roof slope (`_lodge_signs`, `LODGE_SIGN_*`), KAFE on a blade by the door between
+    the floors (`LODGE_BLADE_*`): on the wall between the window rows the name ran across the windows.
 - PlayerCart respawns a bot off the course for `AI_OFF_COURSE_GIVE_UP` (15s) at its last checkpoint: one in the
   Gorge Cut's old crevasse kept moving and so never counted as stuck.
 - AI races (`scratch/ai_race_test`, speed=2, `noitems=1`): 1-3 falls a race (round the Ridge Bypass's split and its
