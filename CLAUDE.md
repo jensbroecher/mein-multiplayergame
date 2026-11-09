@@ -3046,6 +3046,26 @@ A clip that comes out quiet (the bubble car's at -37.7 dBFS) is raised in the fi
   along a curve, round a boss with a dark hole). Factory paint: Side Stripe in matte "Ninja Indigo" with a black sash edged
   in crimson round the waist (`belt_y` 0.435 puts the stripe there), silver rims. Its engine (`engine_ninja`: a small turbo
   four with its whistle) is the second take: the first wandered 255-273 Hz and came out at -42 dBFS.
+- The Crimson (`CrimsonBuilder.gd`, in the Hypercars gallery): a two-seat road-going racing speedster after a mid-1990s
+  concept car the user sent pictures of, asked for with "a very similar shape": its shape kept close, no maker's badge or
+  name (the user's call over the usual looser "inspired by"). The fleet's only car with open front wheels and a front wing.
+  Front wheels on exposed wishbones (`_front_suspension`) under black cycle fenders mounted on the body (`_front_fender`,
+  `_band_shell`: a rounded hood over the tread, which only swings sideways under it at full lock); the body is narrow enough
+  round the front axle (`W_KNOTS`) for a tyre at 0.5 rad of steer (PlayerCart's `current_steer * 0.5`). Its own
+  `section()` (`_segments`): a flat bottom, the lower side leaning out from a tucked-in sill to the crease (`w`, the widest
+  line), the upper side leaning in (`lean`), then the Meteor's keyed shoulder, rim, wall, corner and crowned top: the
+  hood's dome, the cockpit trough, and behind it the rim is a blade's broad top over a black louvred engine cover
+  (`_engine_cover`). No tail cap (`_cap` only does the nose): the tail is one flat black face (`build_shell`, triangulated
+  with `Geometry2D.triangulate_polygon`), and the blades run on past it as fins (`_fin`) lofted from the shell's last ring
+  (`FIN_FROM`..`FIN_TO`), rising to `FIN_TOP`, sweeping out to `FIN_X_TIP` over the rear tyres and closing to a point, a
+  wing between them; risen steeply they read as devil's horns. The black shield-shaped hood is the detail map
+  (`_hood_half`). The wraparound screen (`build_glass`, `_screen_base`, `_screen_edge`): its foot across the hood and back
+  along the cockpit's rim; its top edge raked back as a whole (a rake per point, front and sides apart, doubled the edge
+  back on itself round the corners) at a fixed height in front (`SCREEN_TOP_Y`; from the foot's height it followed every
+  dip of the hood), a black hoop along it. LED headlamps in pods on stalks, an LED line along the wing (M_TAILLAMP, pale
+  blue), deep black rear fenders, cross-spoke mesh wheels (twelve pairs of spokes crossing, the two sets 3mm apart so they
+  don't z-fight), wider tyres behind. Factory paint: Pearl "Crimson" flipping to orange, silver rims, number 96. Its engine
+  (`engine_crimson`: a V12 held at speed) had its seam cross-faded (`scratch/seamless_loop.py --fade=0.25`).
 
 ## Canyon Chasm dirt ramps, rocks, signs, tornado and houses
 

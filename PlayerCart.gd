@@ -429,6 +429,24 @@ const CAR_PRESETS = [
 		"offroad": 3.5,
 		"weight": 0.78,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Crimson",
+		# A naturally aspirated V12 held at speed (tools/elevenlabs, engine_crimson), its seam cross-faded
+		# (scratch/seamless_loop.py --fade=0.25), levelled by its RMS (-14.6 dBFS).
+		"engine_sound": "res://sounds/enginesounds/engine_crimson_loop.wav",
+		"engine_gain_db": 4.9,
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Crimson.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 44.0,
+		"acceleration": 70.0,
+		"steer_speed": 3.1,
+		"grip": 6.0,
+		"braking": 52.0,
+		"offroad": 2.2,
+		"weight": 0.88,
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 

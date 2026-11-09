@@ -336,6 +336,19 @@ const CAR_PRESETS = [
 		"offroad": 3.5,
 		"desc": "A small, hooded track car that sees the road through a visor slit, with a blade down its back and throwing stars for wheels. The lightest and sharpest-turning car on the grid: it wins in the twisty bits and gives a little away on the long straights.",
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Crimson",
+		"model_path": "res://generated/cars/Crimson.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 44.0,
+		"acceleration": 70.0,
+		"steer_speed": 3.1,
+		"grip": 6.0,
+		"braking": 52.0,
+		"offroad": 2.2,
+		"desc": "A racing car for the road: open front wheels under black cycle wings, a front wing with a line of light, a wraparound screen and a tail that splits into two blades. A V12 behind the seats makes it one of the fastest cars on tarmac; off it, it hates every bump.",
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 
@@ -351,7 +364,7 @@ const CAR_ACCENTS := {
 	"Fulmine": Color(0.32, 0.95, 0.46), "Basilisk": Color(0.84, 0.86, 0.45),
 	"Bootlegger": Color(1.0, 0.48, 0.14), "Meteor": Color(0.86, 0.88, 0.92), "Kugelblitz": Color(0.45, 0.88, 0.76),
 	"Sandpiper": Color(0.22, 0.84, 0.88), "Samurai": Color(0.98, 0.36, 0.20),
-	"Ninja": Color(0.95, 0.22, 0.34),
+	"Ninja": Color(0.95, 0.22, 0.34), "Crimson": Color(1.0, 0.18, 0.22),
 }
 ## Stat bars: caption, preset key, and the values at an empty and a full bar (spanning the fleet).
 const STATS := [

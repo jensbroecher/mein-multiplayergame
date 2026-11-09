@@ -32,6 +32,7 @@ const PALETTE := [
 	["Strikeforce Lime", Color(0.62, 0.78, 0.24)], ["Graphite", Color(0.36, 0.38, 0.41)],
 	["Shadow Violet", Color(0.46, 0.20, 0.82)], ["Surf Turquoise", Color(0.04, 0.58, 0.68)],
 	["Samurai Vermilion", Color(0.84, 0.19, 0.07)], ["Ninja Indigo", Color(0.09, 0.11, 0.24)],
+	["Crimson", Color(0.62, 0.04, 0.07)],
 ]
 const RIMS := [
 	["Silver", Color(0.76, 0.77, 0.79)], ["Titanium", Color(0.46, 0.47, 0.49)], ["Gunmetal", Color(0.22, 0.23, 0.25)],
@@ -114,6 +115,9 @@ const FACTORY := {
 	"Ninja": {"pattern": 3, "finish": 2, "primary": Color(0.09, 0.11, 0.24),
 		"secondary": Color(0.03, 0.03, 0.035), "accent": Color(0.80, 0.06, 0.12),
 		"rim": Color(0.76, 0.77, 0.79), "number": 9},
+	"Crimson": {"pattern": 0, "finish": 3, "primary": Color(0.62, 0.04, 0.07),
+		"secondary": Color(0.03, 0.03, 0.035), "accent": Color(0.98, 0.40, 0.12),
+		"rim": Color(0.76, 0.77, 0.79), "number": 96},
 }
 const FALLBACK := {"pattern": 0, "finish": 0, "primary": Color(0.80, 0.07, 0.05),
 	"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.98, 0.78, 0.07),

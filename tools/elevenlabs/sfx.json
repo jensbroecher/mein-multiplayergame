@@ -600,6 +600,14 @@
     "influence": 0.6
   },
   {
+    "name": "engine_crimson",
+    "path": "sounds/enginesounds/engine_crimson_loop.wav",
+    "text": "A naturally aspirated V12 engine in an open-wheel road racing car held at a steady high RPM, a smooth soaring metallic howl with a hard edge and intake roar, recorded close, constant engine speed, no revving, no gear changes, no backfires, continuous drone",
+    "duration": 8.0,
+    "loop": true,
+    "influence": 0.6
+  },
+  {
     "name": "garage_lift_motor",
     "path": "sounds/garage/lift_motor_loop.wav",
     "text": "An electro-hydraulic two-post car lift raising a car in a quiet showroom workshop: steady electric motor hum with a smooth hydraulic pump whine, constant, no starts or stops, no clicks, seamless loop",
