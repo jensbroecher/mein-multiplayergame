@@ -178,29 +178,39 @@ static func _workshop_wall(pk: PropKit, kit: Dictionary, accent: Color) -> void:
 	pk.box(kit, "led", Transform3D(Basis(), Vector3(0.2, 0.884, -0.42)), Vector3(1.4, 0.008, 0.02), Color(1.0, 0.93, 0.8))
 
 
-## A 14-inch laptop at `xf`, its back toward -z, the lid open ~110 degrees; the screen is a live 2D
+## A 16-inch laptop at `xf`, its back toward -z, the lid open ~110 degrees; the screen is a live 2D
 ## settings page (`_settings_screen`).
 static func _laptop(pk: PropKit, kit: Dictionary, xf: Transform3D, root: Node3D) -> void:
 	pk.set_frame(xf)
 	var shell := Color(0.18, 0.19, 0.21)
-	var w := 0.32
-	var d := 0.22
-	var t := 0.014
+	# A 16-inch machine (16:10 panel): 35.6 x 24.8cm, 1.7cm thick.
+	var w := 0.356
+	var d := 0.248
+	var t := 0.017
 	pk.box(kit, "metal", Transform3D(Basis(), Vector3(0, t * 0.5, 0)), Vector3(w, t, d), shell)
 	pk.box(kit, "rubber", Transform3D(Basis(), Vector3(0, 0.0015, 0)), Vector3(w - 0.02, 0.003, d - 0.02), Color(0.04, 0.04, 0.04))
-	# The keyboard: a well and rows of keys; the trackpad.
-	pk.box(kit, "matte", Transform3D(Basis(), Vector3(0, t + 0.0003, -0.035)), Vector3(0.285, 0.0008, 0.105), Color(0.06, 0.06, 0.07))
+	# The keyboard: a well and rows of keys (the last a space bar between modifiers); the trackpad below.
+	var well_z := -d * 0.15
+	var well_d := d * 0.47
+	pk.box(kit, "matte", Transform3D(Basis(), Vector3(0, t + 0.0003, well_z)), Vector3(w * 0.88, 0.0008, well_d), Color(0.06, 0.06, 0.07))
+	var kw := w * 0.85 / 14.0
+	var pitch := well_d / 6.0
+	var key_col := Color(0.11, 0.115, 0.13)
 	var rows := [14, 14, 13, 12, 11]
 	for r in rows.size():
 		var n: int = rows[r]
-		var kw := 0.0185
 		var row_w := float(n) * kw
+		var z := well_z - well_d * 0.5 + pitch * (float(r) + 0.75)
 		for k in n:
 			var x := -row_w * 0.5 + kw * (float(k) + 0.5)
-			var z := -0.08 + float(r) * 0.0195
-			pk.box(kit, "matte", Transform3D(Basis(), Vector3(x, t + 0.0015, z)), Vector3(kw - 0.0028, 0.0018, 0.0162), Color(0.11, 0.115, 0.13))
-	pk.box(kit, "matte", Transform3D(Basis(), Vector3(0, t + 0.0015, 0.0175 + 0.0195)), Vector3(0.1, 0.0018, 0.0162), Color(0.11, 0.115, 0.13))
-	pk.box(kit, "glass", Transform3D(Basis(), Vector3(0, t + 0.0004, 0.078)), Vector3(0.11, 0.0008, 0.06), Color(0.24, 0.25, 0.27))
+			pk.box(kit, "matte", Transform3D(Basis(), Vector3(x, t + 0.0015, z)), Vector3(kw - 0.003, 0.0018, pitch - 0.003), key_col)
+	var bottom_z := well_z - well_d * 0.5 + pitch * 5.75
+	pk.box(kit, "matte", Transform3D(Basis(), Vector3(0, t + 0.0015, bottom_z)), Vector3(kw * 5.5, 0.0018, pitch - 0.003), key_col)
+	for side in [-1.0, 1.0]:
+		for k in 3:
+			var x: float = side * (kw * 2.75 + kw * (float(k) + 0.5) + 0.002)
+			pk.box(kit, "matte", Transform3D(Basis(), Vector3(x, t + 0.0015, bottom_z)), Vector3(kw - 0.003, 0.0018, pitch - 0.003), key_col)
+	pk.box(kit, "glass", Transform3D(Basis(), Vector3(0, t + 0.0004, d * 0.31)), Vector3(w * 0.36, 0.0008, d * 0.27), Color(0.24, 0.25, 0.27))
 	# The lid, hinged at the back edge.
 	var hinge := Vector3(0, t, -d * 0.5)
 	var lid := Basis.from_euler(Vector3(-0.32, 0, 0))   # leaning back from upright
@@ -219,7 +229,7 @@ static func _laptop(pk: PropKit, kit: Dictionary, xf: Transform3D, root: Node3D)
 	var smat := StandardMaterial3D.new()
 	smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	smat.albedo_texture = (page["viewport"] as SubViewport).get_texture()
-	smat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	smat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR   # a viewport texture has no mipmaps
 	screen.material_override = smat
 	screen.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	screen.transform = xf * lid_xf * Transform3D(Basis(), Vector3(0, d * 0.5 + 0.004, 0.0025))
@@ -235,11 +245,11 @@ static func _settings_screen() -> Dictionary:
 	vp.name = "LaptopPage"
 	# Drawn at about the size it is seen at (a viewport texture has no mipmaps: at 800 x 500 shown 120px wide its
 	# text and lines shimmered as the camera drifted), laid out at 800 x 500.
-	vp.size = Vector2i(352, 220)
+	vp.size = Vector2i(400, 250)
 	vp.size_2d_override = Vector2i(800, 500)
 	vp.size_2d_override_stretch = true
 	vp.transparent_bg = false
-	vp.render_target_update_mode = SubViewport.UPDATE_WHEN_PARENT_VISIBLE
+	vp.render_target_update_mode = SubViewport.UPDATE_ONCE   # the tile asks for each frame
 	vp.disable_3d = true
 	var bg := ColorRect.new()
 	bg.color = Color(0.055, 0.065, 0.085)
@@ -472,7 +482,7 @@ static func _tx_screen(accent: Color) -> Dictionary:
 	vp.size_2d_override = Vector2i(180, 240)
 	vp.size_2d_override_stretch = true
 	vp.disable_3d = true
-	vp.render_target_update_mode = SubViewport.UPDATE_WHEN_PARENT_VISIBLE
+	vp.render_target_update_mode = SubViewport.UPDATE_ONCE   # the tile asks for each frame
 	var bg := ColorRect.new()
 	bg.color = Color(0.05, 0.07, 0.1)
 	bg.size = Vector2(180, 240)

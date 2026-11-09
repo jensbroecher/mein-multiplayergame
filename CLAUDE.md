@@ -53,7 +53,11 @@ border). So no tile stands still.
   garage's 1/1.6 of race size: about 1.4m beside a 32cm laptop; the user found an RC car's real 46cm too small for this
   game's very large scale cars), its stand as high as its body's underside plus 3cm. The laptop's and transmitter's pages
   render at about the size they are seen (`size_2d_override` keeps the layout): a viewport texture has no mipmaps, and
-  at 800 x 500 the page shimmered (the user saw it flicker); the screen stands 2mm off its bezel.
+  at 800 x 500 the page shimmered; the screen stands 2mm off its bezel. Those pages redraw only with their tile
+  (`_render` asks for each). The laptop is a 16-inch one (the user's choice). The tiles' viewports have physics
+  interpolation off: the project's is on, and with the camera and cars moved in `_process` the hovered tile (drawn every
+  frame) flickered on fine detail while the mouse moved. `res://scratch/laptop_flicker_probe.tscn -- [frames=90]
+  [dir=<out>]` (windowed) moves the mouse over the Options tile and records the laptop screen frame by frame.
 - MainMenu's `_relayout_tiles` measures the ScrollContainer (the VBox inside it is as big as its content, so it had
   sized each page from the last: small tiles at start-up, the two Single Player tiles taller than the screen), runs again
   whenever the scroll area resizes, and caps a tile at about 5:3, the grid centred. `res://scratch/menu_layout_probe.tscn

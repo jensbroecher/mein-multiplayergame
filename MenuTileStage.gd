@@ -69,6 +69,7 @@ var _trees: Array = []
 var _extra := {}
 var _built := false
 var _slot := 0
+var _pages: Array[SubViewport] = []
 
 
 func setup(tile_kind: String, tile_accent: Color) -> void:
@@ -106,6 +107,9 @@ func _process(delta: float) -> void:
 
 func _render() -> void:
 	_apply(_t)
+	# The bench's screens (the laptop's page, the transmitter's) redraw with the tile, never on their own.
+	for page in _pages:
+		page.render_target_update_mode = SubViewport.UPDATE_ONCE
 	for vp in _vps:
 		vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 
@@ -198,6 +202,10 @@ func _make_viewport() -> SubViewport:
 	vp.size = Vector2i(640, 384)
 	vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 	vp.audio_listener_enable_3d = false
+	# The project interpolates physics, but everything here moves in _process by the clock: interpolated, the
+	# camera and cars were drawn between two places on some frames, which showed as a flicker on fine detail (the
+	# laptop's screen) when the tile under the pointer drew every frame.
+	vp.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	var mode: int = MusicManager.anti_aliasing if not OS.has_feature("mobile") else 4
 	vp.msaa_3d = [Viewport.MSAA_DISABLED, Viewport.MSAA_2X, Viewport.MSAA_4X, Viewport.MSAA_4X, Viewport.MSAA_DISABLED][clampi(mode, 0, 4)]
 	vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA if mode == 4 else Viewport.SCREEN_SPACE_AA_DISABLED
@@ -842,6 +850,8 @@ func _build_bench() -> void:
 	var bench := MenuPropKit.build_bench(accent, stand_h, BENCH_CAR_YAW)
 	_world.add_child(bench)
 	_extra["bench"] = bench
+	for page in bench.find_children("*", "SubViewport", true, false):
+		_pages.append(page as SubViewport)
 	if not car.is_empty():
 		car["rc_scale"] = s
 		car["home"] = (bench.get_meta("stand_top") as Vector3) - Vector3(0.0, low * s, 0.0)
