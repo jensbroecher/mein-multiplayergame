@@ -4102,6 +4102,23 @@ estate, the half-timbered old town on its hill under Burg Kronburg's ruin. Stage
   [goal=West] [speed=30] [up=7] [from=10] [lat=1.5] [cam=x,y,z] [frames=...]` (windowed for frames) shoots it into a goal
   and logs the ball and the net's bulge; `cart=front|back` (headless) drives a real cart into the net from inside the
   goal or from behind and prints how far it got.
+- The Halde detour (`_plan_detour`, `DETOUR`, the user's idea, as if the organisers had sent the lap off the road): after
+  checkpoint 2 the lap leaves the straight north to the blast furnace (C3-C4) eastward, climbs the slag heap through its
+  birch woods, rounds the steel crown anticlockwise (a gate behind it, `DETOUR_GATES[0]`) and comes down the north-west
+  flank (a gate at the woods' edge, `[1]`, so the top can't be skipped) onto the north road after C4. No road: CORNERS and
+  the road ribbon are unchanged, only the TrackPath (`_spliced_curve`: the bots' line, the gates' order, the minimap) runs
+  over it, 690m off-road against the road's 201m (TrackPath 3733m, the road's lap 3228m). The ground there is off-road (it
+  isn't TerrainGenerator's, so PlayerCart's corridor rule doesn't call it road). Red-and-white marker poles with orange
+  pennants lead the way (`_build_detour_poles`, knockable, staggered every `DETOUR_POLE_EVERY`); the trees keep off a lane
+  `DETOUR_LANE` either side of the bots' line, the poles and the gates (`_keep_clear`, `_off_lap_clear`), dense
+  either side. AI races (speed=2, noitems): every bot finishes three laps, no falls or stuck carts; flying laps 94-110s
+  (about 72s before), so stage 1's lap records date from the shorter lap.
+- Shortcuts (`_build_shortcuts`, AlternativePaths, off-road, with boost pads): `Rasenschnitt` across the lawn inside the
+  hairpin before the start (`LAWN_CUT`, `LAWN_PADS`; the start's barriers are short, `START_BEFORE` 45m and
+  `START_AFTER` 40m, so it rejoins before them) and the hidden `Kleingartenweg` along the 5m walk between the allotments'
+  two rows of plots (`ALLOT_PATH`, `ALLOT_PADS`, `ai_chance_scale` 0.5). `scratch/shortcut_probe ... chance=1.0`: every bot
+  rejoins. The car park leaves out cars where the works gate's walls run through its rows (`_clear` against the walls'
+  note).
 - Ground masks: every vertex of the fine grid takes `_masks`, however far from the road (`_road_d` capped under 1e8:
   past the grading's reach it read as the coarse land's and painted fields inside the works).
 - `res://scratch/kronburg_hide_shot.tscn -- <out.png> x,y,z:tx,ty,tz [hide=<node path> ...]` (windowed) renders the level

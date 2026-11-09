@@ -1124,6 +1124,8 @@ const TOWN_GATE := Vector2(-236.0, -230.0)
 # ======================================================================================
 
 func _place_gameplay(root: Node3D) -> void:
+	_plan_detour()
+	(root.get_node("TrackPath") as Path3D).curve = _spliced_curve()
 	var gate_scene: PackedScene = load("res://CheckpointGate.tscn")
 	var spawn_scene: PackedScene = load("res://SpawnIndicator.tscn")
 	var s_fin: float = _closest_s(Vector2(FINISH_X, 250.0))
@@ -1161,14 +1163,21 @@ func _place_gameplay(root: Node3D) -> void:
 		_closest_s(Vector2(-496.0, -290.0)),
 		_closest_s(Vector2(-471.0, -60.0)),
 	]
+	var gates: Array = []
 	for i in range(at.size()):
 		var c: Dictionary = _spot(at[i], 0.0, 0.08)
+		gates.append([c["pos"], c["yaw"], "%.0fm along the road" % at[i]])
+	# The Halde's detour: behind the crown and at the forest's edge before the north road (Level orders the gates by
+	# their offsets along the TrackPath, which runs over the detour).
+	for dg in _detour_gates():
+		gates.insert(2, dg)
+	for i in range(gates.size()):
 		var g = gate_scene.instantiate()
 		g.name = "Checkpoint_%d" % (i + 1)
-		g.position = c["pos"]
-		g.rotation_degrees = Vector3(0, c["yaw"], 0)
+		g.position = gates[i][0]
+		g.rotation_degrees = Vector3(0, gates[i][1], 0)
 		cps.add_child(g)
-		print("  checkpoint %d at %.0fm" % [i + 1, at[i]])
+		print("  checkpoint %d: %s" % [i + 1, gates[i][2]])
 	var boost_scene: PackedScene = load("res://BoostPad.tscn")
 	var bps := Node3D.new()
 	bps.name = "BoostPads"
@@ -1186,6 +1195,8 @@ func _place_gameplay(root: Node3D) -> void:
 		b.position = sp2["pos"]
 		b.rotation_degrees = Vector3(0, sp2["yaw"], 0)
 		bps.add_child(b)
+	_build_shortcuts(root, bps, boost_scene)
+	_build_detour_poles(root)
 	_build_jump(root)
 
 
@@ -1560,8 +1571,10 @@ const SPECTATOR_SCALE := PROP_SCALE / 1.86
 ## A Ruhr crowd: mostly European, Turkish and Arab families, a few others ([African, South Asian, European, East Asian,
 ## Arab or mixed]).
 const SPECTATOR_SKIN := [0.05, 0.04, 0.72, 0.03, 0.16]
-const START_BEFORE := 150.0
-const START_AFTER := 90.0
+## How far the crowd barriers run either side of the line. Short, so the lawn inside the hairpin before the start
+## (LAWN_CUT) is open: off-road cars cut across it and rejoin before the barriers begin.
+const START_BEFORE := 45.0
+const START_AFTER := 40.0
 const BARRIER_LAT := ROAD_HALF + 3.6
 var _people: Array = []
 var _camp_mats := {}
@@ -1818,7 +1831,7 @@ func _build_woods(root: Node3D) -> void:
 				continue
 			if _in_rect(px, pz, WORKS_RECT, -4.0) or _in_rect(px, pz, TOWN_RECT) or _in_rect(px, pz, ESTATE_RECT):
 				continue
-			if _lap_dist(px, pz) < 19.0:
+			if _lap_dist(px, pz) < 19.0 or _off_lap_clear(px, pz) < 0.0:
 				continue
 			var g: float = _ground_at(px, pz)
 			var slope: float = Vector2(_ground_at(px + 3.0, pz) - g, _ground_at(px, pz + 3.0) - g).length() / 3.0
@@ -2215,6 +2228,8 @@ func _build_works(_root: Node3D) -> void:
 	var gxf := _facing(gs["fwd"], gs["pos"])
 	_add_prop("works_werkstor", _works, gxf, func(pk, kit, labels): _kit_call(_works, "works_gate", [pk, kit, labels]))
 	_note_xf(gxf, -16.0 * PROP_SCALE, 16.0 * PROP_SCALE, -6.0 * PROP_SCALE, 6.0 * PROP_SCALE, 0.5)
+	# Its brick walls with railings run 34m (life) off either side: the car park keeps off them.
+	_note_xf(gxf, -34.5 * PROP_SCALE, 34.5 * PROP_SCALE, -0.4 * PROP_SCALE, 0.4 * PROP_SCALE, 0.3)
 	# The old colliery's headframe up the hill behind the estate.
 	_add_prop("works_headframe", _works, _works_xf(HEADFRAME_AT, Vector3(0, 0, 1)), func(pk, kit, labels): _kit_call(_works, "headframe", [pk, kit, labels]))
 	_note_rect(HEADFRAME_AT, 70.0, 90.0, 0.0)
@@ -3368,6 +3383,7 @@ func _build_car_park() -> void:
 	var x1: float = CAR_PARK[1].x
 	var z: float = CAR_PARK[0].y
 	var cars := 0
+	var skipped := 0
 	var row := 0
 	while z < CAR_PARK[1].y:
 		var x: float = x0
@@ -3375,6 +3391,11 @@ func _build_car_park() -> void:
 			if rng.randf() < 0.78:
 				var face := Vector3(0, 0, 1) if row % 2 == 0 else Vector3(0, 0, -1)
 				var key := "%s_%d" % ["van" if rng.randf() < 0.18 else "suv", rng.randi_range(0, paints.size() - 1)]
+				# None where the gate's walls run through the rows (cars stood in them) or anything else noted stands.
+				if not _clear(Vector3(x, 0.0, z), Vector3(1, 0, 0), 3.4 + 2.0, 7.8 + 2.0):
+					x += 4.4
+					skipped += 1
+					continue
 				if not groups.has(key):
 					groups[key] = []
 				groups[key].append(_facing(face, Vector3(x, WORKS_Y + 0.02, z)))
@@ -3395,4 +3416,306 @@ func _build_car_park() -> void:
 		var mmi := _multimesh(node, "ParkedCars_" + String(key), mesh, groups[key], 700.0, true)
 		mmi.visibility_range_end_margin = 40.0
 	_note_rect((CAR_PARK[0] + CAR_PARK[1]) * 0.5, CAR_PARK[1].x - CAR_PARK[0].x, CAR_PARK[1].y - CAR_PARK[0].y, 0.0)
-	print("  works car park: %d cars in %d models" % [cars, groups.size()])
+	print("  works car park: %d cars in %d models (%d left out by walls)" % [cars, groups.size(), skipped])
+
+
+# ======================================================================================
+#  The Halde detour: up through the woods to the steel crown and back down to the north road
+# ======================================================================================
+#
+# The race organisers send the lap off the road: after the blast furnace it leaves the straight to the north (C3-C4) to
+# the east, climbs the slag heap through its birch woods, rounds the crown (a gate behind it, DETOUR_GATES[0]) and comes
+# back down the heap's north-west flank (a gate at the woods' edge, DETOUR_GATES[1], so the top can't be skipped) onto
+# the north road just after C4. No road is built: the road (CORNERS) stays as it was, and only the TrackPath (the racing
+# line the bots follow, the gates' order, the minimap) runs over the detour. Marker poles lead the way, the trees keep
+# off a lane DETOUR_LANE either side of the bots' line and round the poles and gates (dense woods either side).
+
+const DETOUR_LEAVE := Vector2(580.0, 28.0)
+const DETOUR_JOIN := Vector2(536.0, -150.0)
+## Control points in plan, from the straight to the north road (anticlockwise round the crown at 42m from its middle).
+const DETOUR := [
+	Vector2(588.0, 8.0), Vector2(615.0, -4.0), Vector2(660.0, -10.0), Vector2(705.0, -12.0), Vector2(745.0, -9.0),
+	Vector2(774.0, -19.0), Vector2(796.0, -1.0), Vector2(824.0, -1.0), Vector2(846.0, -19.0), Vector2(851.0, -47.0),
+	Vector2(842.0, -68.0), Vector2(820.0, -82.0), Vector2(792.0, -82.0), Vector2(765.0, -100.0), Vector2(728.0, -128.0),
+	Vector2(690.0, -153.0), Vector2(655.0, -167.0), Vector2(615.0, -168.0), Vector2(578.0, -160.0),
+]
+const DETOUR_GATES := [Vector2(843.0, -66.0), Vector2(660.0, -166.0)]
+const DETOUR_LANE := 3.6
+const DETOUR_POLE_EVERY := 24.0
+const DETOUR_POLE_LAT := 4.8
+
+var _s_leave := 0.0
+var _s_join := 0.0
+## The detour's line, every 3m, on the ground.
+var _detour := PackedVector3Array()
+var _detour_poles: Array[Vector3] = []
+## Lines the trees keep off: [points, half width].
+var _keep_clear: Array = []
+
+
+## A smooth line through `pts` (Curve3D, auto handles), sampled every `step` metres onto the ground.
+func _smooth_line(pts: Array, step: float, lift := 0.02) -> PackedVector3Array:
+	var c := Curve3D.new()
+	c.bake_interval = 0.5
+	for i in pts.size():
+		var prv: Vector3 = pts[maxi(i - 1, 0)]
+		var nxt: Vector3 = pts[mini(i + 1, pts.size() - 1)]
+		var h: Vector3 = (nxt - prv) / 6.0
+		c.add_point(pts[i], -h, h)
+	var out := PackedVector3Array()
+	var length: float = c.get_baked_length()
+	var n: int = maxi(int(ceil(length / step)), 2)
+	for i in range(n + 1):
+		var q: Vector3 = c.sample_baked(length * float(i) / float(n))
+		out.append(Vector3(q.x, _ground_at(q.x, q.z) + lift, q.z))
+	return out
+
+
+func _plan_detour() -> void:
+	_s_leave = _closest_s(DETOUR_LEAVE)
+	_s_join = _closest_s(DETOUR_JOIN)
+	if _s_join <= _s_leave:
+		push_error("Kronburg: the detour joins (%.0fm) before it leaves (%.0fm)" % [_s_join, _s_leave])
+	var pts: Array = [_pt(_s_leave - 12.0), _pt(_s_leave)]
+	for q in DETOUR:
+		pts.append(Vector3(q.x, _ground_at(q.x, q.y), q.y))
+	pts.append(_pt(_s_join))
+	pts.append(_pt(_s_join + 12.0))
+	var line: PackedVector3Array = _smooth_line(pts, 3.0)
+	# Only from the road's leaving point to its joining point (the first and last points are only there for the ends'
+	# headings).
+	var a := 0
+	var b: int = line.size() - 1
+	var pl: Vector3 = _pt(_s_leave)
+	var pj: Vector3 = _pt(_s_join)
+	for i in line.size():
+		if Vector2(line[i].x - pl.x, line[i].z - pl.z).length() < Vector2(line[a].x - pl.x, line[a].z - pl.z).length():
+			a = i
+		if Vector2(line[i].x - pj.x, line[i].z - pj.z).length() < Vector2(line[b].x - pj.x, line[b].z - pj.z).length():
+			b = i
+	_detour = line.slice(a, b + 1)
+	# On the road at both ends: its height there, not the verge's.
+	_detour[0] = pl
+	_detour[_detour.size() - 1] = pj
+	var length := 0.0
+	for i in range(1, _detour.size()):
+		length += Vector2(_detour[i].x - _detour[i - 1].x, _detour[i].z - _detour[i - 1].z).length()
+	var top := -INF
+	for q in _detour:
+		top = maxf(top, q.y)
+	print("  Halde detour: %.0fm off the road from %.0fm to %.0fm (the road's %.0fm), up to %.1fm" % [length, _s_leave, _s_join, _s_join - _s_leave, top])
+	_keep_clear.append([_detour, DETOUR_LANE])
+	# Nothing noted (props, piles) on the bots' line.
+	for i in range(0, _detour.size(), 2):
+		var q2: Vector3 = _detour[i]
+		if _occupied(q2.x, q2.z) and _lap_dist(q2.x, q2.z) > ROAD_HALF + 2.0:
+			push_error("Kronburg: the Halde detour runs through something noted at (%.0f, %.0f)" % [q2.x, q2.z])
+
+
+## The TrackPath: the road's lap with the detour in place of its stretch from _s_leave to _s_join.
+func _spliced_curve() -> Curve3D:
+	var pts: Array = []
+	var s := 0.0
+	while s < _s_leave - 2.0:
+		pts.append(_pt(s) + Vector3(0, 0.02, 0))
+		s += 4.0
+	for i in range(0, _detour.size(), 1):
+		if i % 2 == 0 or i == _detour.size() - 1:
+			pts.append(_detour[i] + Vector3(0, 0.02 if i == 0 or i == _detour.size() - 1 else 0.0, 0))
+	s = _s_join + 4.0
+	while s < lap_len - 2.0:
+		pts.append(_pt(s) + Vector3(0, 0.02, 0))
+		s += 4.0
+	var curve := Curve3D.new()
+	curve.bake_interval = 0.5
+	var n: int = pts.size()
+	for i in range(n + 1):
+		var k: int = i % n
+		var hnd: Vector3 = ((pts[(k + 1) % n] as Vector3) - (pts[(k - 1 + n) % n] as Vector3)) / 6.0
+		curve.add_point(pts[k], -hnd, hnd)
+	print("  TrackPath %.0fm (the road's lap %.0fm)" % [curve.get_baked_length(), lap_len])
+	return curve
+
+
+## The detour's gates: [position, yaw, label], each on the detour's line nearest its DETOUR_GATES point, facing along it.
+func _detour_gates() -> Array:
+	var out: Array = []
+	for gi in range(DETOUR_GATES.size() - 1, -1, -1):
+		var want: Vector2 = DETOUR_GATES[gi]
+		var best := 1
+		for i in range(1, _detour.size() - 1):
+			if Vector2(_detour[i].x, _detour[i].z).distance_to(want) < Vector2(_detour[best].x, _detour[best].z).distance_to(want):
+				best = i
+		var fwd: Vector3 = _detour[best + 1] - _detour[best - 1]
+		fwd.y = 0.0
+		fwd = fwd.normalized()
+		var at: Vector3 = _detour[best] + Vector3(0, 0.08, 0)
+		out.append([at, rad_to_deg(atan2(-fwd.x, -fwd.z)), "the Halde detour at (%.0f, %.0f)" % [at.x, at.z]])
+		_keep_clear.append([PackedVector3Array([at]), 11.0])
+	# Inserted at index 2 one after the other, so the crown's gate (0) must go in last.
+	return out
+
+
+## The detour's marker poles: red and white rally poles with an orange pennant, staggered left and right of the bots'
+## line every DETOUR_POLE_EVERY, a pair where it leaves the road. Knockable (KnockablePoles.gd).
+func _build_detour_poles(root: Node3D) -> void:
+	var xfs: Array[Transform3D] = []
+	var gate_pts: Array = []
+	for g in DETOUR_GATES:
+		gate_pts.append(g)
+	var dist := 0.0
+	var next := 10.0
+	var side := 1.0
+	var total := 0.0
+	for i in range(1, _detour.size()):
+		total += Vector2(_detour[i].x - _detour[i - 1].x, _detour[i].z - _detour[i - 1].z).length()
+	for i in range(1, _detour.size() - 1):
+		dist += Vector2(_detour[i].x - _detour[i - 1].x, _detour[i].z - _detour[i - 1].z).length()
+		if dist < next or dist > total - 12.0:
+			continue
+		next = dist + DETOUR_POLE_EVERY
+		var fwd: Vector3 = _detour[i + 1] - _detour[i - 1]
+		fwd.y = 0.0
+		fwd = fwd.normalized()
+		var right := Vector3(-fwd.z, 0.0, fwd.x)
+		var near_gate := false
+		for g in gate_pts:
+			if Vector2(_detour[i].x, _detour[i].z).distance_to(g) < 14.0:
+				near_gate = true
+		if near_gate:
+			continue
+		# The first ones as a pair, framing the way off the road; then staggered.
+		var sides: Array = [-1.0, 1.0] if dist < 40.0 else [side]
+		side = -side
+		for sd in sides:
+			var q: Vector3 = _detour[i] + right * (DETOUR_POLE_LAT * float(sd))
+			q.y = _ground_at(q.x, q.z)
+			xfs.append(Transform3D(Basis(Vector3.UP, atan2(fwd.x, fwd.z)), q))
+			_detour_poles.append(q)
+			_keep_clear.append([PackedVector3Array([q]), 2.6])
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = _save_res(_marker_pole_mesh(), "detour_pole", PROP_PREFIX)
+	mm.instance_count = xfs.size()
+	mm.buffer = PropKit.transform_buffer(xfs)
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = "HaldenStangen"
+	mmi.multimesh = mm
+	mmi.set_script(load("res://KnockablePoles.gd"))
+	mmi.set("pole_transforms", xfs)
+	mmi.set("pole_height", 3.0)
+	mmi.set("pole_mass", 3.0)
+	mmi.visibility_range_end = 450.0
+	root.add_child(mmi)
+	print("  Halde detour: %d marker poles" % xfs.size())
+
+
+## A rally marker pole (life size 1.9m, its foot at the origin): red and white bands, a cap, an orange pennant flying
+## toward +x, its fly end trimmed to a point.
+func _marker_pole_mesh() -> ArrayMesh:
+	var pk := PropKit.new()
+	pk.material_for = func(key: String) -> Material: return _camp_material(key)
+	var kit := {}
+	pk.set_frame(Transform3D(Basis.from_scale(Vector3.ONE * PROP_SCALE), Vector3.ZERO))
+	var red := Color(0.80, 0.08, 0.06)
+	var white := Color(0.94, 0.94, 0.92)
+	var h := 1.9
+	var bands := 6
+	for k in range(bands):
+		var y0: float = h * float(k) / float(bands)
+		var y1: float = h * float(k + 1) / float(bands)
+		pk.tube(kit, "paint", Vector3(0, y0 - (0.2 if k == 0 else 0.0), 0), Vector3(0, y1, 0), 0.03, 0.03, 8, red if k % 2 == 0 else white, k == bands - 1)
+	pk.tube(kit, "paint", Vector3(0, h, 0), Vector3(0, h + 0.05, 0), 0.04, 0.025, 8, Color(0.1, 0.1, 0.1))
+	var orange := Color(1.0, 0.45, 0.05)
+	var top: float = h - 0.04
+	var tail := 0.55
+	for sd in [-1.0, 1.0]:
+		var z: float = 0.006 * sd
+		pk.tri(kit, "paint", Vector3(0.03, top, z), Vector3(0.03 + tail, top - 0.17, z), Vector3(0.03, top - 0.34, z),
+				Vector3(0, 0, sd), Vector3(0, 0, sd), Vector3(0, 0, sd), orange, Vector3(0, 0, sd))
+	return pk.commit(kit)
+
+
+## How far (x, z) lies outside every line the trees keep off (negative: inside one).
+func _off_lap_clear(x: float, z: float) -> float:
+	var best := 1e9
+	for kc in _keep_clear:
+		var line: PackedVector3Array = kc[0]
+		var half: float = kc[1]
+		if line.size() == 1:
+			best = minf(best, Vector2(x - line[0].x, z - line[0].z).length() - half)
+			continue
+		for i in range(1, line.size()):
+			var a := Vector2(line[i - 1].x, line[i - 1].z)
+			var b := Vector2(line[i].x, line[i].z)
+			var ab: Vector2 = b - a
+			var t: float = clampf((Vector2(x, z) - a).dot(ab) / maxf(ab.length_squared(), 1e-6), 0.0, 1.0)
+			best = minf(best, (a + ab * t).distance_to(Vector2(x, z)) - half)
+	return best
+
+
+# ======================================================================================
+#  Shortcuts: across the lawn inside the hairpin before the start, and the hidden one through the allotments
+# ======================================================================================
+#
+# Both are off-road AlternativePaths (bots take them at a share of their shortcut chance) with boost pads on them. The
+# lawn cut leaves the diagonal down from the Kirchberg, cuts the hairpin (C0) across the lawn and rejoins the
+# Kanalstraße before the start's barriers (START_BEFORE). The allotment path leaves the Kanalstraße after the barriers,
+# runs along the 5m walk between the two rows of plots (Kleingärten) over its pads and comes back before the beer garden.
+
+const LAWN_CUT := [Vector2(-556.0, 146.0), Vector2(-552.0, 178.0), Vector2(-537.0, 216.0), Vector2(-513.0, 242.0), Vector2(-488.0, 250.0)]
+const LAWN_PADS := [Vector2(-546.0, 196.0)]
+const ALLOT_PATH := [Vector2(-376.0, 250.0), Vector2(-364.0, 236.0), Vector2(-356.0, 212.0), Vector2(-349.0, 196.0),
+	Vector2(-336.0, 190.0), Vector2(-280.0, 190.0), Vector2(-220.0, 190.0), Vector2(-170.0, 190.0), Vector2(-152.0, 199.0),
+	Vector2(-145.0, 222.0), Vector2(-136.0, 244.0), Vector2(-116.0, 250.0)]
+const ALLOT_PADS := [Vector2(-357.0, 218.0), Vector2(-300.0, 190.0), Vector2(-240.0, 190.0), Vector2(-185.0, 190.0)]
+
+func _build_shortcuts(root: Node3D, pads: Node3D, boost_scene: PackedScene) -> void:
+	var holder := Node3D.new()
+	holder.name = "AlternativePaths"
+	root.add_child(holder)
+	var defs: Array = [["Rasenschnitt", LAWN_CUT, LAWN_PADS, 1.0, 4.5], ["Kleingartenweg", ALLOT_PATH, ALLOT_PADS, 0.5, 0.0]]
+	for d in defs:
+		var ctrl: Array = d[1]
+		var s0: float = _closest_s(ctrl[0])
+		var s1: float = _closest_s(ctrl[ctrl.size() - 1])
+		var pts: Array = [_pt(s0 - 10.0), _pt(s0)]
+		for i in range(1, ctrl.size() - 1):
+			var q: Vector2 = ctrl[i]
+			pts.append(Vector3(q.x, _ground_at(q.x, q.y), q.y))
+		pts.append(_pt(s1))
+		pts.append(_pt(s1 + 10.0))
+		var line: PackedVector3Array = _smooth_line(pts, 3.0)
+		var curve := Curve3D.new()
+		curve.bake_interval = 0.5
+		var keep: Array = Array(line)
+		for i in keep.size():
+			var prv: Vector3 = keep[maxi(i - 1, 0)]
+			var nxt: Vector3 = keep[mini(i + 1, keep.size() - 1)]
+			var h: Vector3 = (nxt - prv) / 6.0
+			curve.add_point(keep[i], -h, h)
+		var path := Path3D.new()
+		path.name = d[0]
+		path.set_meta(&"ai_chance_scale", d[3])
+		path.curve = curve
+		holder.add_child(path)
+		var trimmed := PackedVector3Array()
+		var blocked := 0
+		for q3 in line:
+			trimmed.append(q3)
+			if _lap_dist(q3.x, q3.z) > ROAD_HALF + 3.0 and _occupied(q3.x, q3.z) and not _in_rect(q3.x, q3.z, [ALLOT_X.x, ALLOT_Z - 2.5, ALLOT_X.y, ALLOT_Z + 2.5]):
+				blocked += 1
+		_keep_clear.append([trimmed, 4.5])
+		print("  shortcut %s: %.0fm against the road's %.0fm (%.0fm to %.0fm), %d points through something noted" % [d[0], curve.get_baked_length() - 20.0, fposmod(s1 - s0, lap_len), s0, s1, blocked])
+		for k in range((d[2] as Array).size()):
+			var pp: Vector2 = d[2][k]
+			var off: float = curve.get_closest_offset(Vector3(pp.x, 0.0, pp.y))
+			var at: Vector3 = curve.sample_baked(off)
+			var fwd: Vector3 = curve.sample_baked(off + 2.0) - curve.sample_baked(off - 2.0)
+			fwd.y = 0.0
+			fwd = fwd.normalized()
+			var b = boost_scene.instantiate()
+			b.name = "Boost_%s_%d" % [d[0], k + 1]
+			b.position = Vector3(at.x, _ground_at(at.x, at.z) + 0.08, at.z)
+			b.rotation_degrees = Vector3(0, rad_to_deg(atan2(-fwd.x, -fwd.z)), 0)
+			pads.add_child(b)
