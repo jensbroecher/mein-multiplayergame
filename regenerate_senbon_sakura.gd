@@ -51,6 +51,8 @@ var s_bridge0 := 0.0
 var s_bridge1 := 0.0
 ## The two island bridges' spans along the lap: [[s0, s1], [s0, s1]].
 var island_spans: Array = []
+## Where the farmhouses' koinobori poles go.
+var _farm_spots: Array = []
 
 
 func _configure() -> void:
@@ -484,6 +486,7 @@ func _build_dressing(root: Node3D) -> void:
 	_periodic(root, "TempleBell", "res://sounds/miyoshino/temple_bell.wav", Vector3(bell.x, _ground_at(bell.x, bell.z) + 8.0, bell.z),
 			0.0, 80.0, 1600.0, 150.0, 37.0)
 	_build_valley(root, rng)
+	_build_koinobori(rng)
 	_build_petals(root)
 
 
@@ -911,6 +914,9 @@ func _build_valley(root: Node3D, rng: RandomNumberGenerator) -> void:
 		var xf := Transform3D(Basis(Vector3.UP, f.z), at)
 		if _put(_cell_key("farm", at), town_kit, xf, "kominka", [11.0, 7.5, rng], 900.0):
 			_note_rect(Vector2(f.x, f.y), 24.0, 18.0, f.z, 3.0)
+			# A koinobori pole in the yard in front of the house.
+			var yard: Vector3 = xf * Vector3(-4.0, 0.0, 14.0)
+			_farm_spots.append(Vector2(yard.x, yard.z))
 	# Cedar logs stacked at the forest road's edge on the descent.
 	for q in [Vector2(-455.0, -430.0), Vector2(-492.0, -110.0)]:
 		var s: float = _closest_s(q)
@@ -918,6 +924,28 @@ func _build_valley(root: Node3D, rng: RandomNumberGenerator) -> void:
 		lx = Transform3D(Basis(Vector3.UP, PI * 0.5) * lx.basis, lx.origin)
 		if _put(_cell_key("timber", lx.origin), river_kit, lx, "log_stack", [6, 6.0, rng], 500.0):
 			_note_circle(Vector2(lx.origin.x, lx.origin.z), 7.0)
+
+
+## Koinobori: carp streamers on poles in the park by the start and beside the farmhouses, streaming north up the
+## valley with the wind that carries the petals.
+const KOI_WIND := Vector3(0.25, 0.0, -1.0)
+
+func _build_koinobori(rng: RandomNumberGenerator) -> void:
+	# The park's at the lawn's front edge, tall enough for the carp to fly over the avenue's blossom (further back they
+	# were hidden behind it from the road); the farmhouses' in their yards.
+	var spots: Array = [[Vector2(-265.0, 100.0), 14.0], [Vector2(-185.0, 102.0), 14.0], [Vector2(-125.0, 100.0), 14.0], [Vector2(245.0, 100.0), 14.0]]
+	for f in _farm_spots:
+		spots.append([f, 10.0])
+	var n := 0
+	for sp in spots:
+		var qq: Vector2 = sp[0]
+		if _in_lake(qq.x, qq.y, 12.0) or _occupied(qq.x, qq.y) or _route_dist(qq.x, qq.y) < road_half + 12.0:
+			continue
+		var at := Vector3(qq.x, _ground_at(qq.x, qq.y), qq.y)
+		_put(_cell_key("koinobori_poles", at), prop_kit, Transform3D(Basis(), at), "koinobori_pole", [float(sp[1]) + rng.randf_range(-0.8, 0.8), 2 + n % 2, KOI_WIND, rng], 900.0)
+		_note_circle(qq, 7.0)
+		n += 1
+	print("  koinobori: %d poles" % n)
 
 
 ## Petals in the air, and gusts that blow them across the road on the climb's open stretches.

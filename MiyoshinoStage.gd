@@ -423,6 +423,7 @@ func _ready() -> void:
 		fine_step = maxf(fine_step, 8.0)
 	_build_heights()
 	print("  heights built (%.1fs)" % _secs())
+	_check_decks()
 	if _args.has("map"):
 		_save_map(String(_args["map"]))
 	if map_only:
@@ -673,6 +674,37 @@ func _plan_heights(r: Route, pin0 := NAN, pin1 := NAN) -> void:
 	r.ys = sm
 
 
+## Every bridge deck against the ground under it: where the built ground comes within 5cm of the deck's surface (or
+## over it) across the deck's width, the grass shows through the planks. Prints each span's worst places.
+func _check_decks() -> void:
+	for b in bridges:
+		var r: Route = _route_by_name.get(String(b[0]))
+		if r == null or (b.size() > 4 and bool(b[4])):
+			continue
+		var bad := 0
+		var worst := -INF
+		var worst_at := Vector3.ZERO
+		var s: float = float(b[1])
+		while s <= float(b[2]):
+			var h: float = _half_at(r, s)
+			var lat: float = -h
+			while lat <= h + 0.01:
+				var p: Vector3 = r.pt(s) + r.rt(s) * lat
+				var over: float = _ground_at(p.x, p.z) - (p.y - 0.05)
+				if over > 0.0:
+					bad += 1
+					if over > worst:
+						worst = over
+						worst_at = Vector3(s, lat, over)
+				lat += 1.0
+			s += 1.0
+		if bad > 0:
+			push_warning("%s: ground through the deck of %s's span %.0f-%.0f at %d points, worst %.2fm over it at s %.0f, lateral %.0f" % [
+					title, r.name, float(b[1]), float(b[2]), bad, worst, worst_at.x, worst_at.y])
+		else:
+			print("  deck %s %.0f-%.0f clear of the ground" % [r.name, float(b[1]), float(b[2])])
+
+
 func _wrap_i(i: int, n: int, is_closed: bool) -> int:
 	if is_closed:
 		return ((i % n) + n) % n
@@ -738,7 +770,26 @@ func _add_samples(r: Route) -> void:
 			var par: Array = _grade_params(r, mid).duplicate()
 			par.append(r == lap)
 			_add_seg(r.pt(s), r.pt(s2), par)
+		elif _cut_under(r, mid):
+			# Under a deck the ground may only be cut: DECK_CLEAR under it across its width and a little more, banking up
+			# beyond like a cutting (where a road crosses a ravine at a slant, the bank had stood up through the planks).
+			var h: float = _half_at(r, mid) + 1.5
+			var a: Vector3 = r.pt(s) - Vector3(0, DECK_CLEAR - GROUND_UNDER, 0)
+			var b: Vector3 = r.pt(s2) - Vector3(0, DECK_CLEAR - GROUND_UNDER, 0)
+			_add_seg(a, b, [h, h, 0.9, 0.0, false, true])
 		s = s2
+
+
+## How far the ground stays under a deck's surface.
+const DECK_CLEAR := 0.6
+
+
+## Whether the ground under a route's deck at s is cut down under it (not under the rafts, which lie on the water).
+func _cut_under(r: Route, s: float) -> bool:
+	for b in bridges:
+		if String(b[0]) == r.name and s > float(b[1]) and s < float(b[2]):
+			return not (b.size() > 4 and bool(b[4]))
+	return false
 
 
 func _add_seg(a: Vector3, b: Vector3, par: Array) -> void:
@@ -771,6 +822,7 @@ func _grade(h: float, x: float, z: float) -> Vector2:
 	var lap_y := NAN
 	var lap_lat := 1e9
 	var best_d := 1e9
+	var cut_touched := false
 	var seen := {}
 	var reach: int = ceili(GRADE_REACH / CELL)
 	for gz in range(cz - reach, cz + reach + 1):
@@ -787,14 +839,24 @@ func _grade(h: float, x: float, z: float) -> Vector2:
 				var l2: float = sx * sx + sz * sz
 				if l2 < 1e-6:
 					continue
-				var t: float = clampf(((x - a.x) * sx + (z - a.z) * sz) / l2, 0.0, 1.0)
+				var tu: float = ((x - a.x) * sx + (z - a.z) * sz) / l2
+				var t: float = clampf(tu, 0.0, 1.0)
+				# Beside the segment, not past its ends: only there does its flat band hold the ground at its height (past
+				# the end of the last segment before a deck, it had held the ground up through the deck's first metres).
+				var beside: bool = tu >= -0.02 and tu <= 1.02
 				var fx: float = x - (a.x + sx * t)
 				var fz: float = z - (a.z + sz * t)
 				var lateral: float = sqrt(fx * fx + fz * fz)
 				if lateral > GRADE_REACH:
 					continue
-				best_d = minf(best_d, lateral)
 				var par: Array = _seg_par[i]
+				if par.size() > 5 and bool(par[5]):
+					var cut_y: float = lerpf(a.y, b.y, t) - GROUND_UNDER
+					var over_c: float = maxf(0.0, lateral - float(par[0]))
+					upper = minf(upper, cut_y + over_c * over_c / (over_c + 4.0) * float(par[2]))
+					cut_touched = true
+					continue
+				best_d = minf(best_d, lateral)
 				# Right of travel is (-sz, sx).
 				var right: bool = (-sz * fx + sx * fz) >= 0.0
 				var flat: float = float(par[1]) if right else float(par[0])
@@ -804,20 +866,20 @@ func _grade(h: float, x: float, z: float) -> Vector2:
 				upper = minf(upper, foot_y + soft * float(par[2]))
 				lower = maxf(lower, foot_y - soft * float(par[3]))
 				touched = true
-				if lateral <= flat and lateral < flat_lat:
+				if beside and lateral <= flat and lateral < flat_lat:
 					flat_lat = lateral
 					flat_y = foot_y
-				if par.size() > 4 and bool(par[4]) and lateral <= flat and lateral < lap_lat:
+				if beside and par.size() > 4 and bool(par[4]) and lateral <= flat and lateral < lap_lat:
 					lap_lat = lateral
 					lap_y = foot_y
 	if not touched:
-		return Vector2(h, best_d)
+		return Vector2(minf(h, upper) if cut_touched else h, best_d)
 	# On the lap's own flat band the lap's height wins: where a shortcut joins it at a grade, the shortcut's flat band
 	# (nearer in plan) had lifted the ground up through the lap's road.
 	if not is_nan(lap_y):
-		return Vector2(lap_y, best_d)
+		return Vector2(minf(lap_y, upper) if cut_touched else lap_y, best_d)
 	if not is_nan(flat_y):
-		return Vector2(flat_y, best_d)
+		return Vector2(minf(flat_y, upper) if cut_touched else flat_y, best_d)
 	var res: float = upper if lower > upper else clampf(h, lower, upper)
 	return Vector2(res, best_d)
 

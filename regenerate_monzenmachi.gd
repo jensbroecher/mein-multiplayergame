@@ -265,6 +265,10 @@ func _build_dressing(root: Node3D) -> void:
 	_build_precinct(root, rng)
 	_build_streets(root, rng, fin)
 	_build_alley(root, rng)
+	for q in [Vector2(-320.0, -45.0), Vector2(-80.0, -40.0)]:
+		if not _occupied(q.x, q.y):
+			var at := Vector3(q.x, _ground_at(q.x, q.y), q.y)
+			_put(_cell_key("koinobori_poles", at), prop_kit, Transform3D(Basis(), at), "koinobori_pole", [9.0, 2, Vector3(1.0, 0.0, 0.3), rng], 900.0)
 	var pg := Node3D.new()
 	pg.name = "PetalGusts"
 	pg.set_script(load("res://PetalGusts.gd"))

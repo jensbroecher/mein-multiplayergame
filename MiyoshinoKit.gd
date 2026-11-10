@@ -22,6 +22,7 @@ extends "res://YardKit.gd"
 ##   "washi"      paper lit from inside (lanterns, shoji screens, andon): by day a plain matte paper, at dusk
 ##                (`night` true before the first new_kit) lamp_glow.gdshader, the vertex colour times `glow_energy`
 ##   "neon"       always self-lit (vending machines' fronts, signs' lamps): lamp_glow at 1.6
+##   "koi"        the carp streamers' cloth (koinobori.gdshader); only MiyoshinoPropKit's koinobori builders write it
 ## CampKit's "lamp" gives off no light: use "washi" or "neon" for anything that should glow.
 ##
 ## Faces never share a plane: trim stands 2.5cm (TP) proud of what carries it, panes 2cm, labels' boards 3cm; parts that
@@ -140,6 +141,11 @@ static func make_material(key: String) -> Material:
 			return p
 		"neon":
 			return LampGlow.material(1.6 if night else 1.0)
+		"koi":
+			# The carp streamers' cloth (koinobori.gdshader: it waves and paints them; MiyoshinoPropKit.koinobori_*).
+			var k := ShaderMaterial.new()
+			k.shader = load("res://koinobori.gdshader")
+			return k
 	return YardKitBase.make_material(key)
 
 

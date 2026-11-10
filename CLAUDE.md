@@ -4530,6 +4530,12 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   On the lap's own flat band the lap's height wins the grading (`_grade`): a shortcut joining at a grade had pushed the
   ground up through the lap's road. The automatic guardrails leave the mouths of shortcuts open (`_route_mouths`), and a
   shortcut that can't reach the lap's height at either end within its grade is warned about (a step in the road).
+  Under a deck the ground is cut, never filled: at least `DECK_CLEAR` (0.6m) under it across its width and 1.5m more,
+  banking up beyond like a cutting (a cut-only segment, `_cut_under`; a bridge entry's fifth field true leaves it alone:
+  the rafts). A road segment holds the ground flat only beside it, not past its ends: past the last one before a deck
+  it had held the ground at its own height into the span, and on the ravine's slanting crossing on Senbon Sakura Pass
+  the hillside stood up to 77cm through the planks (the user saw grass on the bridge). `_check_decks` warns about any
+  deck the ground comes within 5cm of; every run prints each deck clear or not.
 - Shaders: `miyoshino_ground.gdshader` (masks R rock, G bare ground, B cherry groves' fallen petals, A cedar forest
   floor; UV2.y wet; past `canopy_from` the grove and forest masks become the canopies' colours), `miyoshino_road.gdshader`
   (kinds 0 asphalt with white edge lines, an orange centre line and a gutter, 1 ishidatami paving, 2 the dirt trail, 3
@@ -4552,6 +4558,16 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   matsu, tsutsuji; `scratch/miyoshino_trees_preview.gd`. It added BARKS entries, and uniforms to `acacia_leaves`
   (`backlight_albedo`, `seed_tint_a/b`, `glow`) and `tree_bark` (`node_spacing`, `node_color`) whose defaults leave the
   other stages as they were (`scratch/miyoshino_trees_regress.gd` hashes the old kinds).
+- Koinobori (the carp streamers of Children's Day): `MiyoshinoPropKit.koinobori_pole` (a pole with a gilt ball and an
+  arrow wheel, the five-coloured streamer, the black and red carp and two or three children, halyard and guy ropes) and
+  `koinobori_line` (carp on a rope between two masts, as hung across rivers), `koinobori_carp` the open cloth tube.
+  `koinobori.gdshader` (key "koi", MiyoshinoKit) ripples each carp across the wind and dips it, more toward the tail,
+  and paints scales, eyes, head band, belly and tail and cuts the tail's fork; its data is in the vertices (UV along and
+  round, COLOR the colour and design, CUSTOM0 the sway axis, phase and length: the "koi" SurfaceTool is made with a
+  custom format). On Senbon Sakura Pass on 14m poles at the park's front edge (lower, behind the cherry avenue, they
+  didn't show from the road) and in the farmhouses' yards; on Yoshino Rapids three lines across the river (below the
+  timber bridge, mid-river, above the ford) and poles on the village's river side; two poles in Monzenmachi's gardens.
+  `scratch/miyoshino_prop_preview.gd ... set=koi`.
 - `PetalGusts.gd`: petals falling round the camera and, at `spots`, gusts on the wall clock that blow petals across the
   road and push the carts this peer drives (`mist`: wisps of cloud instead, the Yamabushi Trail's upper mountain).
 - Senbon Sakura Pass (3.4km, a spring morning): the hanami park's start straight, then (the user's idea) right over a

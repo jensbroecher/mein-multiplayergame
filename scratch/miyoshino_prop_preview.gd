@@ -3,7 +3,7 @@ extends SceneTree
 ## the stages' PROP_SCALE (1.6) with stand-in people (2.9m) and an RC car (2.2m) for scale, prints each prop's triangles
 ## and life size, and saves a PNG per camera. Windowed:
 ##   Godot --path . --resolution 1400x850 -s res://scratch/miyoshino_prop_preview.gd -- <out_dir>
-##       [set=shrine|lanterns|road|hanami|fences|nice|all] [night=1] [each=1] [only=<name part>] [seed=N]
+##       [set=shrine|lanterns|road|hanami|fences|nice|koi|all] [night=1] [each=1] [only=<name part>] [seed=N]
 ##       name:x,y,z:tx,ty,tz[:fov] ...
 ## Without cameras a set gets an overview; `each=1` adds a three-quarter close-up of every prop (`only=` just those whose
 ## name holds the text). `night=1` sets MiyoshinoKit.night before the first kit and renders under a dusk sky, so the
@@ -92,6 +92,9 @@ func _build_set(which: String, seed_v: int) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_v
 	match which:
+		"koi":
+			_add("koinobori_pole", 16.0, func(pk, kit, labels): K.koinobori_pole(pk, kit, 9.0, 2, Vector3(0, 0, 1), rng))
+			_add("koinobori_line", 30.0, func(pk, kit, labels): K.koinobori_line(pk, kit, Vector3(-8, 0, -2), Vector3(8, 0, -2), 7, Vector3(0, 0, 1), 1.3, rng, 8.0))
 		"shrine":
 			_add("torii_0", 9.0, func(pk, kit, labels): K.torii(pk, kit, 0))
 			_add("torii_1", 9.0, func(pk, kit, labels): K.torii(pk, kit, 1))

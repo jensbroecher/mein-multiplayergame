@@ -1630,3 +1630,171 @@ static func kei_truck(pk: PropKit, kit: Dictionary, col := Color(0.93, 0.93, 0.9
 	pk.block(kit, "gloss", Vector3(-1.71, 0.67, -hw + 0.02), Vector3(-1.67, 0.96, hw - 0.02), col)
 	pk.block(kit, "metal", Vector3(0.44, 1.66, -hw + 0.06), Vector3(0.48, 1.7, hw - 0.06), dark)
 	pk.set_frame(old)
+
+
+# ======================================================================================
+#  Koinobori: the carp streamers of Children's Day
+# ======================================================================================
+
+## The carps' colours: the black father (magoi), the red mother (higoi), then the children (blue, green, orange, pink).
+const KOI_BLACK := Color(0.07, 0.07, 0.08)
+const KOI_RED := Color(0.86, 0.12, 0.08)
+const KOI_KIDS := [Color(0.12, 0.32, 0.82), Color(0.10, 0.58, 0.30), Color(0.96, 0.52, 0.10), Color(0.95, 0.45, 0.62)]
+
+
+## The "koi" surface: its SurfaceTool carries CUSTOM0 (the sway axis, the phase, the length) for koinobori.gdshader.
+static func _koi_st(kit: Dictionary) -> SurfaceTool:
+	if not kit.has("koi"):
+		var st := SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		st.set_custom_format(0, SurfaceTool.CUSTOM_RGBA_FLOAT)
+		kit["koi"] = st
+	return kit["koi"]
+
+
+## One carp (or, `streamer`, the five-coloured fukinagashi) as an open tube in the kit's frame: its mouth's middle at
+## `mouth`, its body trailing along `wind` (level, local), `length` long, `r` at its widest, sagging a little toward the
+## tail. 18 rings of 12. The hoop at its mouth is a thin ring of metal.
+static func koinobori_carp(pk: PropKit, kit: Dictionary, mouth: Vector3, wind: Vector3, length: float, r: float, col: Color,
+		phase: float, streamer := false) -> void:
+	var st := _koi_st(kit)
+	var ax: Vector3 = Vector3(wind.x, 0.0, wind.z).normalized()
+	var side: Vector3 = Vector3.UP.cross(ax).normalized()
+	var rings := 18
+	var segs := 12
+	# Its sway axis and length as the shader sees them (world, after the frame).
+	var w_side: Vector3 = pk.xf.basis * side
+	w_side.y = 0.0
+	w_side = w_side.normalized()
+	var scale: float = (pk.xf.basis * ax).length()
+	var custom := Color(w_side.x, w_side.z, phase, length * scale)
+	var pts: Array = []
+	var nrm: Array = []
+	var uvs: Array = []
+	for i in range(rings + 1):
+		var u: float = float(i) / float(rings)
+		var rad: float
+		var ry: float
+		var rz: float
+		if streamer:
+			rad = r * (1.0 - 0.25 * u)
+			ry = rad
+			rz = rad
+		else:
+			# Full in the body, narrowing behind it, the tail flattened upright into a fan.
+			rad = r * (0.86 + 0.18 * sin(minf(u / 0.55, 1.0) * PI * 0.5)) * (1.0 - 0.5 * smoothstep(0.5, 0.88, u))
+			var flat: float = smoothstep(0.78, 1.0, u)
+			ry = rad * (1.0 + 0.9 * flat)
+			rz = rad * (1.0 - 0.8 * flat)
+		var c: Vector3 = mouth + ax * (u * length) - Vector3.UP * (0.06 * length * u * u)
+		for k in range(segs + 1):
+			var v: float = float(k) / float(segs)
+			var a: float = v * TAU
+			# v 0 on the back (up), 0.5 under the belly.
+			var off: Vector3 = Vector3.UP * cos(a) * ry + side * sin(a) * rz
+			pts.append(c + off)
+			nrm.append((Vector3.UP * cos(a) / maxf(ry, 0.01) + side * sin(a) / maxf(rz, 0.01)).normalized())
+			uvs.append(Vector2(u, v))
+	var col_a := Color(col.r, col.g, col.b, 1.0 if streamer else 0.0)
+	var nb: Basis = pk.xf.basis.inverse().transposed()
+	for i in range(rings):
+		for k in range(segs):
+			var i0: int = i * (segs + 1) + k
+			var i1: int = i0 + 1
+			var i2: int = i0 + segs + 1
+			var i3: int = i2 + 1
+			for tri in [[i0, i2, i1], [i1, i2, i3]]:
+				var wa: Vector3 = pk.xf * (pts[tri[0]] as Vector3)
+				var wb: Vector3 = pk.xf * (pts[tri[1]] as Vector3)
+				var wc: Vector3 = pk.xf * (pts[tri[2]] as Vector3)
+				var out: Vector3 = (nb * ((nrm[tri[0]] as Vector3) + (nrm[tri[1]] as Vector3) + (nrm[tri[2]] as Vector3))).normalized()
+				var order: Array = tri
+				# Front face outward: (c - a) x (b - a) along the outward normal.
+				if (wc - wa).cross(wb - wa).dot(out) < 0.0:
+					order = [tri[0], tri[2], tri[1]]
+				for j in order:
+					st.set_color(col_a)
+					st.set_normal((nb * (nrm[j] as Vector3)).normalized())
+					st.set_uv(uvs[j])
+					st.set_custom(0, custom)
+					st.add_vertex(pk.xf * (pts[j] as Vector3))
+	# The hoop round its mouth.
+	var hoop: Array = []
+	for k in range(segs + 1):
+		var a2: float = float(k) / float(segs) * TAU
+		hoop.append(mouth + Vector3.UP * cos(a2) * r * 0.86 + side * sin(a2) * r * 0.86)
+	_strand(pk, kit, "metal", hoop, 0.012, 4, GOLD.darkened(0.2))
+
+
+## A koinobori pole (life size, its foot at the origin): a tall pole `h` high with a gilt ball and an arrow wheel
+## (yaguruma) on top, the five-coloured streamer under it, then the black carp, the red carp and `kids` children, all
+## streaming along `wind` (level, local) off a short arm, the halyard down the pole, three guy ropes to stakes, a stone
+## foot. The carps' sizes go down the pole; their phases come from `rng`.
+static func koinobori_pole(pk: PropKit, kit: Dictionary, h := 9.0, kids := 2, wind := Vector3(1, 0, 0), rng: RandomNumberGenerator = null) -> void:
+	var r0: float = rng.randf() * TAU if rng else 0.0
+	var ax: Vector3 = Vector3(wind.x, 0.0, wind.z).normalized()
+	var side: Vector3 = Vector3.UP.cross(ax).normalized()
+	# The pole: a stone foot, a tapering painted pole, a gilt ball.
+	pk.block(kit, "ishi", Vector3(-0.45, -0.6, -0.45), Vector3(0.45, 0.25, 0.45), GRANITE)
+	pk.tube(kit, "painted", Vector3(0, 0.2, 0), Vector3(0, h, 0), 0.09, 0.05, 8, Color(0.92, 0.92, 0.88))
+	pk.lathe(kit, "gold", Vector3(0, h, 0), [Vector2(0.0, 0.0), Vector2(0.12, 0.08), Vector2(0.14, 0.2), Vector2(0.1, 0.32), Vector2(0.0, 0.36)], 10, GOLD)
+	# The arrow wheel: eight arrows round a hub, in two crossed wheels, just under the ball.
+	var hub := Vector3(0, h - 0.25, 0)
+	for wheel in range(2):
+		var plane_a: Vector3 = ax if wheel == 0 else side
+		for k in range(8):
+			var a: float = float(k) / 8.0 * TAU + r0
+			var d: Vector3 = (Vector3.UP * cos(a) + plane_a * sin(a))
+			pk.tube(kit, "painted", hub + d * 0.06, hub + d * 0.55, 0.012, 0.012, 4, Color(0.95, 0.95, 0.92))
+			pk.tube(kit, "urushi", hub + d * 0.42, hub + d * 0.6, 0.035, 0.0, 4, VERMILION if k % 2 == 0 else Color(0.15, 0.3, 0.75))
+	pk.lathe(kit, "gold", hub - Vector3(0, 0.05, 0), [Vector2(0.0, 0.0), Vector2(0.06, 0.0), Vector2(0.06, 0.1), Vector2(0.0, 0.1)], 8, GOLD)
+	# The streamer and the carps, each off a short arm of the pole.
+	var y: float = h - 0.85
+	var fams: Array = [[true, 4.0, 0.36, Color(1, 1, 1)], [false, 3.8, 0.52, KOI_BLACK], [false, 3.2, 0.45, KOI_RED]]
+	for k in range(kids):
+		fams.append([false, 2.6 - 0.35 * float(k), 0.37 - 0.04 * float(k), KOI_KIDS[k % KOI_KIDS.size()]])
+	var ph := 0.0
+	for f in fams:
+		var rr: float = f[2]
+		var mouth: Vector3 = Vector3(0, y - rr, 0) + ax * (0.22 + rr * 0.86)
+		pk.tube(kit, "metal", Vector3(0, y, 0), Vector3(0, y, 0) + ax * 0.24, 0.015, 0.015, 4, GOLD.darkened(0.3))
+		koinobori_carp(pk, kit, mouth, ax, f[1], rr, f[3], ph + (rng.randf() * 0.6 if rng else 0.0), f[0])
+		ph += 0.9
+		y -= rr * 2.0 + 0.55
+	# The halyard down the pole, guy ropes to three stakes.
+	pk.tube(kit, "rope", Vector3(0.1, 0.9, 0), Vector3(0.07, h - 0.6, 0), 0.008, 0.008, 3, STRAW.darkened(0.2))
+	for k in range(3):
+		var a2: float = float(k) / 3.0 * TAU + 0.5
+		var stake := Vector3(cos(a2) * h * 0.42, 0.0, sin(a2) * h * 0.42)
+		pk.tube(kit, "rope", Vector3(0, h * 0.62, 0), stake + Vector3(0, 0.25, 0), 0.01, 0.01, 3, STRAW.darkened(0.25))
+		pk.tube(kit, "timber", stake + Vector3(0, -0.5, 0), stake + Vector3(0, 0.35, 0), 0.04, 0.035, 5, CEDAR)
+
+
+## A line of koinobori on a rope between two masts, as hung across a river: masts at `a` and `b` (their feet, life
+## size, local), the rope from their tops sagging `sag`, `n` carps hanging off it by short cords, streaming along `wind`.
+static func koinobori_line(pk: PropKit, kit: Dictionary, a: Vector3, b: Vector3, n: int, wind := Vector3(1, 0, 0), sag := 1.4,
+		rng: RandomNumberGenerator = null, mast_h := 10.0) -> void:
+	var ax: Vector3 = Vector3(wind.x, 0.0, wind.z).normalized()
+	var top_a: Vector3 = a + Vector3(0, mast_h, 0)
+	var top_b: Vector3 = b + Vector3(0, mast_h, 0)
+	for m in [a, b]:
+		pk.block(kit, "ishi", m + Vector3(-0.4, -0.6, -0.4), m + Vector3(0.4, 0.2, 0.4), GRANITE)
+		pk.tube(kit, "timber", m + Vector3(0, -0.6, 0), m + Vector3(0, mast_h + 0.3, 0), 0.13, 0.09, 8, CEDAR)
+		# A guy rope back from each mast, away from the line.
+		var away: Vector3 = (m - (b if m == a else a))
+		away.y = 0.0
+		away = away.normalized()
+		pk.tube(kit, "rope", m + Vector3(0, mast_h * 0.9, 0), m + away * mast_h * 0.5 + Vector3(0, 0.2, 0), 0.012, 0.012, 3, STRAW.darkened(0.25))
+		pk.tube(kit, "timber", m + away * mast_h * 0.5 + Vector3(0, -0.5, 0), m + away * mast_h * 0.5 + Vector3(0, 0.35, 0), 0.05, 0.04, 5, CEDAR)
+	var rope: Array = _sag(top_a, top_b, sag, 24)
+	_strand(pk, kit, "rope", rope, 0.016, 4, STRAW.darkened(0.2))
+	var cols: Array = [KOI_BLACK, KOI_RED] + KOI_KIDS
+	for i in range(n):
+		var t: float = (float(i) + 0.5) / float(n)
+		var p: Vector3 = top_a.lerp(top_b, t) - Vector3.UP * (sag * 4.0 * t * (1.0 - t))
+		var length: float = 3.2 + (rng.randf_range(-0.4, 0.5) if rng else 0.0)
+		var rr: float = length * 0.14
+		var mouth: Vector3 = p - Vector3(0, 0.25 + rr, 0) + ax * rr * 0.86
+		pk.tube(kit, "rope", p, mouth + Vector3(0, rr * 0.86, 0) - ax * rr * 0.86, 0.008, 0.008, 3, STRAW.darkened(0.2))
+		var col: Color = cols[(i + (rng.randi_range(0, 5) if rng else 0)) % cols.size()]
+		koinobori_carp(pk, kit, mouth, ax, length, rr, col, (rng.randf() * TAU) if rng else float(i) * 0.7)

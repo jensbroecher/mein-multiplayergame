@@ -203,7 +203,7 @@ func _plan_routes() -> void:
 		s += 1.0
 	raft_s0 = a
 	raft_s1 = b
-	bridges.append(["RaftCrossing", raft_s0, raft_s1, 0.0])
+	bridges.append(["RaftCrossing", raft_s0, raft_s1, 0.0, true])
 	var r: Route = _add_route("RaftCrossing", pts, 4.6, true, 0.16)
 	_report_profile(r)
 	print("  the raft crossing: on the water from %.0f to %.0fm of %.0fm" % [raft_s0, raft_s1, r.length])
@@ -442,6 +442,7 @@ func _build_dressing(root: Node3D) -> void:
 	_build_forest_road(root, rng)
 	_build_slide(root)
 	_build_ford(root, rng)
+	_build_koinobori(rng)
 	_auto_guardrails(root, lap, 0.0, lap.length, 2.8, [[s_chute0 - 10.0, s_chute1 + 10.0], [s_south - 80.0, s_south + 20.0]])
 	var pg := Node3D.new()
 	pg.name = "PetalGusts"
@@ -681,3 +682,39 @@ func _build_ford(root: Node3D, rng: RandomNumberGenerator) -> void:
 	for q in [Vector2(FORD_X, -70.0), Vector2(FORD_X, 62.0)]:
 		var mx: Transform3D = _beside(lap, _closest_s(q), road_half + 3.0)
 		_put(_cell_key("wayside", mx.origin), prop_kit, mx, "stone_lantern", [0], 400.0)
+
+
+## Koinobori: lines of carp across the river (as Japanese river towns hang them in May), streaming downstream, and
+## poles on the village's river side.
+func _build_koinobori(rng: RandomNumberGenerator) -> void:
+	var wind := Vector3(-1.0, 0.0, 0.08)
+	var lines := 0
+	# Just downstream of the timber bridge (seen from it and from the rafts), mid-river, and above the ford.
+	for x in [-385.0, 175.0, 480.0]:
+		var zc: float = _river_z(x)
+		var hw: float = _river_half(x) + 9.0
+		var a := Vector3(x, 0.0, zc - hw)
+		var b := Vector3(x, 0.0, zc + hw)
+		a.y = _ground_at(a.x, a.z)
+		b.y = _ground_at(b.x, b.z)
+		if _occupied(a.x, a.z) or _occupied(b.x, b.z):
+			continue
+		var n: int = int(a.distance_to(b) / 5.4)
+		_put_world("koinobori_river", a, prop_kit, "koinobori_line", [_life(a), _life(b), n, wind, 1.6, rng, 10.5], 1400.0)
+		_note_circle(Vector2(a.x, a.z), 3.0)
+		_note_circle(Vector2(b.x, b.z), 3.0)
+		lines += 1
+	var poles := 0
+	for q in [Vector2(430.0, 0.0), Vector2(60.0, 0.0), Vector2(-220.0, 0.0)]:
+		var s_q: float = _closest_s(Vector2(q.x, 125.0))
+		var at: Vector3 = lap.spot(s_q, road_half + 16.0, 0.0)["pos"]
+		if _water_d_ok(at) and not _occupied(at.x, at.z):
+			at.y = _ground_at(at.x, at.z)
+			_put(_cell_key("koinobori_poles", at), prop_kit, Transform3D(Basis(), at), "koinobori_pole", [12.0, 2 + poles % 2, wind, rng], 900.0)
+			_note_circle(Vector2(at.x, at.z), 7.0)
+			poles += 1
+	print("  koinobori: %d lines over the river, %d poles" % [lines, poles])
+
+
+func _water_d_ok(p: Vector3) -> bool:
+	return _shore_d(p.x, p.z) > 12.0
