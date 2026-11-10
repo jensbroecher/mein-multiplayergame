@@ -304,6 +304,7 @@ func _build_dressing(root: Node3D) -> void:
 ## The start in the forest: a cedar torii over the trail, the pilgrims' lodge, lanterns, spectators.
 func _build_start(root: Node3D, rng: RandomNumberGenerator) -> void:
 	_build_start_crowd(root, start_s - 60.0, start_s + 70.0, road_half + 2.6, start_s - 8.0, start_s + 8.0, seed_base + 11)
+	_logo_flag(root, start_s + 24.0, -(road_half + 15.0))
 	var gx: Transform3D = _across(lap, start_s + 110.0)
 	gx.origin.y -= 0.05
 	_put("start_torii", prop_kit, gx, "torii", [2, 10.6, 7.4], 900.0)

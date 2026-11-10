@@ -4527,9 +4527,25 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   batches (`_put`, `_put_world` with `_life()` for builders that take points, `LBL` for the labels array), automatic
   guardrails where the ground falls away, shortcuts as AlternativePaths (`shortcuts`), point-to-point stages.
   `-- maponly=1 map=<png> [profile=1]` saves a plan of the stage (hillshade, roads, a dot every 100m) in seconds.
-  On the lap's own flat band the lap's height wins the grading (`_grade`): a shortcut joining at a grade had pushed the
-  ground up through the lap's road. The automatic guardrails leave the mouths of shortcuts open (`_route_mouths`), and a
-  shortcut that can't reach the lap's height at either end within its grade is warned about (a step in the road).
+  Under the lap's road and `LAP_GROUND_OWN` (0.5m) past its edge the lap's height wins the grading (`_grade`): a shortcut
+  joining at a grade had pushed the ground up through the lap's road; across the lap's whole flat band, its verge held the
+  ground up through a shortcut's near edge meeting it at a slant. The automatic guardrails leave the mouths of shortcuts
+  open (`_route_mouths`), and a shortcut that can't reach the lap's height at either end within its grade is warned
+  about (a step in the road).
+- Where a shortcut meets the lap (the user saw the torii path's end hovering and lying over the road's edge):
+  - Its ribbon's ends follow the road's edge: a section's fifth field (1 its start, 2 its end, 3 both) trims each of its
+    five columns to `_off_lap_column` (where that column leaves the lap's road for good, `OFF_LAP_MARGIN` 0.2m off its
+    edge; a route may start beside the road and cross it at a slant, as the raft crossing does). Cut square it lay over
+    the edge, or held back until both edges were clear it left a wedge of grass.
+  - Its heights: pinned to the lap's at each sample's nearest point while the centre is within `lap.half + 2.5`
+    (`_plan_heights`), and leaning across with the lap's grade there (`Route.tilt`, `surf`; the torii path 8-9%: held
+    level, one edge stood 35cm over the road and the other sank under the ground graded to it), easing out over
+    `TILT_FADE`; the grading leans with it (`_seg_tilt`). Past the pins a cubic eases into the climb over `END_EASE`
+    (16m): pinned, the path turned 25% within a metre and the ground cut across the sag. Shortcuts are graded from 1.5m
+    samples and the grid is halved (2m) within `END_REFINE` of their ends (`_refine_axis`).
+  - What the 2m grid still cuts across (a few cm), the paving is lifted over: never less than `RIBBON_OVER_GROUND` (4cm)
+    over the built ground (`_build_roads` prints how much). `_check_shortcuts_ground` prints where the ground comes within
+    3cm of a shortcut's surface and warns past 12cm.
   Under a deck the ground is cut, never filled: at least `DECK_CLEAR` (0.6m) under it across its width and 1.5m more,
   banking up beyond like a cutting (a cut-only segment, `_cut_under`; a bridge entry's fifth field true leaves it alone:
   the rafts). A road segment holds the ground flat only beside it, not past its ends: past the last one before a deck
@@ -4568,6 +4584,11 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   didn't show from the road) and in the farmhouses' yards; on Yoshino Rapids three lines across the river (below the
   timber bridge, mid-river, above the ford) and poles on the village's river side; two poles in Monzenmachi's gardens.
   `scratch/miyoshino_prop_preview.gd ... set=koi`.
+- Nobody stands inside a prop: `_put` notes the footprint of every solid prop it places (`SOLID_FOOT`, `_note_solid`:
+  benches, lanterns, stalls, halls...) and `_clear_people_from_props` drops any spectator whose feet fall in one before
+  CrowdPlacer builds them (prints how many; the user found one stuck in a bench).
+- The RC Vibe GP flag is each stage's own (`_logo_flag(root, s, lat)`: a `LogoFlag` by the start, streaming away from
+  the road): left to Level.gd it stood under Senbon Sakura Pass's power lines. On Senbon on the park side by the koinobori.
 - `PetalGusts.gd`: petals falling round the camera and, at `spots`, gusts on the wall clock that blow petals across the
   road and push the carts this peer drives (`mist`: wisps of cloud instead, the Yamabushi Trail's upper mountain).
 - Senbon Sakura Pass (3.4km, a spring morning): the hanami park's start straight, then (the user's idea) right over a

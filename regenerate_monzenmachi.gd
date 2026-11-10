@@ -119,7 +119,8 @@ func _plan_routes() -> void:
 
 func _sections(r: Route) -> Array:
 	if r.name == "Alley":
-		return [[46.0, r.length - 46.0, K_STONE, r.half]]
+		var off: Vector2 = _off_lap_range(r)
+		return [[off.x, off.y, K_STONE, r.half, 3]]
 	return [[0.0, s_gate - 14.0, K_STONE, r.half], [s_gate - 14.0, s_gate + 14.0, K_STONE, 6.5], [s_gate + 14.0, s_steps0, K_STONE, r.half],
 			[s_steps0, s_steps1, K_STEPS, r.half], [s_steps1, s_prec1, K_PRECINCT, r.half], [s_prec1, s_chic0, K_STONE, r.half],
 			[s_chic0, s_chic1, K_DIRT, r.half], [s_chic1, r.length, K_STONE, r.half]]
@@ -260,6 +261,8 @@ func _build_dressing(root: Node3D) -> void:
 	root.add_child(_lights)
 	var fin: float = _finish_s()
 	_build_start_crowd(root, fin - 80.0, fin + 60.0, road_half + 1.6, fin - 8.0, fin + 8.0, seed_base + 11)
+	# The shop street is lined with houses: the flag stands outside the town's west corner, seen coming onto the street.
+	_logo_flag(root, _closest_s(Vector2(-470.0, 40.0)), road_half + 26.0)
 	_build_gate(root)
 	_build_steps(root)
 	_build_precinct(root, rng)

@@ -260,7 +260,8 @@ func _plan_routes() -> void:
 
 func _sections(r: Route) -> Array:
 	if r.name == "ToriiPath":
-		return [[road_half + 0.6, r.length - road_half - 0.6, K_FOOTPATH, r.half]]
+		var off: Vector2 = _off_lap_range(r)
+		return [[off.x, off.y, K_FOOTPATH, r.half, 3]]
 	var spans: Array = [[s_bridge0, s_bridge1]] + island_spans
 	spans.sort_custom(func(a, b): return float(a[0]) < float(b[0]))
 	var out: Array = []
@@ -277,7 +278,7 @@ func _sections(r: Route) -> Array:
 
 func _grade_params(r: Route, _s: float) -> Array:
 	if r.name == "ToriiPath":
-		return [r.half + 1.0, r.half + 1.0, 0.9, 0.8]
+		return [r.half + 2.0, r.half + 2.0, 0.9, 0.8]
 	return [r.half + 2.0, r.half + 2.0, cut_slope, fill_slope]
 
 
@@ -385,11 +386,16 @@ func _place_gameplay(root: Node3D) -> void:
 		s_bridge0 - 46.0,                      # before the ravine's bridge
 		_closest_s(Vector2(-470.0, -45.0)),    # the valley's edge
 	])
+	# The torii path's pad lies wholly on its paving, just past where both its edges leave the road.
+	var tp: Route = _route_by_name["ToriiPath"]
+	var tp_in := 0.0
+	for lv in [-tp.half, tp.half]:
+		tp_in = maxf(tp_in, _off_lap_column(tp, lv).x)
 	_boosts([
 		["Boost_Park", fin + 30.0, 0.0],
 		["Boost_Leg2", _closest_s(Vector2(150.0, -228.0)), 2.5],
 		["Boost_Ridge", _closest_s(Vector2(-150.0, -473.0)), 0.0],
-		["Boost_Torii", 12.0, 0.0, "ToriiPath"],
+		["Boost_Torii", maxf(12.0, tp_in + 4.0), 0.0, "ToriiPath"],
 	])
 	# A timber kicker on the ridge straight, past the teahouse.
 	_kicker(root, "RidgeJump", lap, _closest_s(Vector2(-330.0, -485.0)), 13.0, 1.9, 0.4)
@@ -469,6 +475,8 @@ func _build_dressing(root: Node3D) -> void:
 	rng.seed = seed_base + 77
 	var fin: float = _finish_s()
 	_build_start_crowd(root, fin - 55.0, fin + 95.0, road_half + 3.0, fin - 8.0, fin + 8.0, seed_base + 11)
+	# The flag on the park's side, away from the power lines along the hill's side of the road.
+	_logo_flag(root, fin - 22.0, road_half + 22.0)
 	_build_avenues(rng)
 	_build_park(root, rng, fin)
 	_build_roadside(root, rng)
@@ -661,6 +669,11 @@ func _build_torii_path(root: Node3D) -> void:
 	while s < r.length - road_half - 2.0:
 		var xf: Transform3D = _across(r, s)
 		xf.origin.y -= 0.05
+		# Its pillars stand on the ground either side of the path, which leans with the lap near the path's ends: set it
+		# on the lower one, so neither stands on air.
+		for side in [-1.0, 1.0]:
+			var leg: Vector3 = xf.origin + xf.basis.x * side * 3.15 * PROP_SCALE
+			xf.origin.y = minf(xf.origin.y, _ground_at(leg.x, leg.z) - 0.02)
 		_put("torii_tunnel", prop_kit, xf, "torii", [0, 6.3, 4.5], 900.0)
 		s += 5.4
 		n += 1
@@ -681,7 +694,8 @@ func _build_ridge(root: Node3D, rng: RandomNumberGenerator) -> void:
 	if _put("ridge_chaya", town_kit, cx, "chaya", [LBL], 900.0):
 		_note_frame(cx, Vector2(-1.0, -7.0), Vector2(10.0, 3.5), 2.0)
 	for i in range(5):
-		var at: Vector3 = cx * (Vector3(rng.randf_range(1.0, 8.0), 0.0, rng.randf_range(1.2, 3.2)) * PROP_SCALE)
+		# In front of the benches along the teahouse's front, not among them.
+		var at: Vector3 = cx * (Vector3(rng.randf_range(1.0, 8.0), 0.0, rng.randf_range(3.6, 5.2)) * PROP_SCALE)
 		at.y = _ground_at(at.x, at.z)
 		_person(at, cx.basis.z + cx.basis.x * rng.randf_range(-0.6, 0.6), rng.randf_range(0.9, 1.05))
 	# The viewpoint on the valley side: benches, banners, a drinks machine, people at the edge.

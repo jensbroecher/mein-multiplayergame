@@ -212,7 +212,8 @@ func _plan_routes() -> void:
 
 func _sections(r: Route) -> Array:
 	if r.name == "RaftCrossing":
-		return [[road_half + 0.6, raft_s0, K_DIRT, r.half], [raft_s1, r.length - road_half - 0.6, K_DIRT, r.half]]
+		var off: Vector2 = _off_lap_range(r)
+		return [[off.x, raft_s0, K_DIRT, r.half, 1], [raft_s1, off.y, K_DIRT, r.half, 2]]
 	return [[0.0, s_bridge0, K_ASPHALT, r.half], [s_bridge0, s_bridge1, K_PLANKS, r.half], [s_bridge1, s_chute0, K_GRAVEL, r.half],
 			[s_chute0, s_chute1, K_PLANKS, r.half], [s_chute1, s_south, K_GRAVEL, r.half], [s_south, r.length, K_ASPHALT, r.half]]
 
@@ -435,6 +436,8 @@ func _build_dressing(root: Node3D) -> void:
 	rng.seed = seed_base + 77
 	var fin: float = _finish_s()
 	_build_start_crowd(root, fin - 95.0, fin + 85.0, road_half + 3.0, fin - 8.0, fin + 8.0, seed_base + 11)
+	# The flag on the river side (the poles and their wires are on the houses' side).
+	_logo_flag(root, fin - 24.0, road_half + 17.0)
 	_build_village(root, rng, fin)
 	_build_bridge(root)
 	_build_rafts(root, rng)

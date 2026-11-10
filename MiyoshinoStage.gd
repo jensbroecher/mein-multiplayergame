@@ -14,7 +14,8 @@ extends Node
 ##    to every route (`_grade`): GROUND_UNDER under the road across its flat band (which may differ left and right: a
 ##    cliff walkway's valley side has none), then rounded shoulders rising at the cut slope and falling at the fill
 ##    slope (`_grade_params`). Bridges (`bridges`: [route name, s0, s1]) are not graded under.
-## 3. The roads are ribbons over the ground (miyoshino_road.gdshader; `_sections(route)`: [s0, s1, kind, half width]),
+## 3. The roads are ribbons over the ground (miyoshino_road.gdshader; `_sections(route)`: [s0, s1, kind, half width,
+##    (clip: 1 the start, 2 the end, 3 both trimmed column by column to the lap's road edge, `_off_lap_column`)]),
 ##    their triangles the track's collision, one body per surface ("LapRoadAsphalt", "LapRoadDirt", ...: the names
 ##    say "road", so PlayerCart counts them as track; the `surface` meta says what the tyres are on).
 ##    The ground's bodies are off-road ("MeadowGround", "EarthGround", "CragGround", "WoodsGround").
@@ -77,6 +78,13 @@ class Route:
 	var to_s := 0.0
 	## Its own steepest grade (0: the stage's max_grade).
 	var grade_max := 0.0
+	## A shortcut's cross fall at each end (metres up per metre right of travel), held to `tilt_in` metres from its start
+	## and `tilt_out` from its end, then easing out over TILT_FADE: see `tilt`.
+	var tilt0 := 0.0
+	var tilt1 := 0.0
+	var tilt_in := 0.0
+	var tilt_out := 0.0
+	const TILT_FADE := 14.0
 
 	static func dir_of(th: float) -> Vector2:
 		return Vector2(cos(th), sin(th))
@@ -185,6 +193,20 @@ class Route:
 		var r: Vector2 = right_of(float(at(s)["th"]))
 		return Vector3(r.x, 0.0, r.y)
 
+	## The cross fall at s: a shortcut meeting the lap at a slant where the lap climbs leans with the lap's slope at its
+	## ends, so both its edges lie on the road's height (held level across, one corner stood over the road's edge and
+	## the other sank into the ground graded to it).
+	func tilt(s: float) -> float:
+		if tilt0 == 0.0 and tilt1 == 0.0:
+			return 0.0
+		var w0: float = 1.0 - smoothstep(tilt_in, tilt_in + TILT_FADE, s)
+		var w1: float = 1.0 - smoothstep(tilt_out, tilt_out + TILT_FADE, length - s)
+		return tilt0 * w0 + tilt1 * w1
+
+	## A point on the road's surface: `lat` right of the centreline, with the cross fall.
+	func surf(s: float, lat: float) -> Vector3:
+		return pt(s) + rt(s) * lat + Vector3(0.0, tilt(s) * lat, 0.0)
+
 	func fw(s: float) -> Vector3:
 		var f: Vector2 = dir_of(float(at(s)["th"]))
 		return Vector3(f.x, 0.0, f.y)
@@ -193,7 +215,7 @@ class Route:
 	func spot(s: float, lat: float, lift: float) -> Dictionary:
 		var fwd: Vector3 = fw(s)
 		var right: Vector3 = rt(s)
-		var pos: Vector3 = pt(s) + right * lat + Vector3(0, lift, 0)
+		var pos: Vector3 = surf(s, lat) + Vector3(0, lift, 0)
 		return {"pos": pos, "yaw": rad_to_deg(atan2(-fwd.x, -fwd.z)), "fwd": fwd, "right": right}
 
 	## The s nearest to q in plan (a coarse walk, then a fine one).
@@ -269,6 +291,8 @@ var _seg_a := PackedVector3Array()
 var _seg_b := PackedVector3Array()
 ## Per graded segment: the flat band left and right of the line, the cut and fill slopes.
 var _seg_par: Array = []
+## Per graded segment: the road's cross fall there (Route.tilt), metres up per metre right of the line.
+var _seg_tilt := PackedFloat32Array()
 var _seg_cells := {}
 
 var _grid_x := PackedFloat32Array()
@@ -424,6 +448,7 @@ func _ready() -> void:
 	_build_heights()
 	print("  heights built (%.1fs)" % _secs())
 	_check_decks()
+	_check_shortcuts_ground()
 	if _args.has("map"):
 		_save_map(String(_args["map"]))
 	if map_only:
@@ -493,6 +518,7 @@ func _ready() -> void:
 	prop_kit = _kit_script("res://MiyoshinoPropKit.gd")
 	river_kit = _kit_script("res://MiyoshinoRiverKit.gd")
 	_build_dressing(level)
+	_clear_people_from_props()
 	if not _people.is_empty():
 		CrowdPlacer.build(level, _people, SPECTATOR_SCALE, SPECTATOR_SKIN, seed_base + 21,
 				func(res: Resource, n: String) -> Resource: return _save_res(res, n, stem + "crowd_"))
@@ -635,15 +661,42 @@ func _plan_heights(r: Route, pin0 := NAN, pin1 := NAN) -> void:
 	var mg: float = r.grade_max if r.grade_max > 0.0 else max_grade
 	# A pinned route (a shortcut) is level with the lap across the lap's own width at both ends.
 	var hold: int = 0
+	var hold1: int = 0
+	var pins := {}
 	if not is_nan(pin0):
-		hold = mini(int(lap.half) + 1, n / 3)
+		# Where it lies on or beside the lap's road, each sample takes the lap's height at its nearest point: pinned to
+		# the height at the lap's centreline, a path meeting the lap at a slant stood over the road's edge or under it.
+		var reach: float = lap.half + 2.5
+		while hold < n / 3 and _lap_offset(r.at(float(hold))["p"]) < reach:
+			pins[hold] = lap.y(lap.closest_s(r.at(float(hold))["p"]))
+			hold += 1
+		while hold1 < n / 3 and _lap_offset(r.at(float(n - 1 - hold1))["p"]) < reach:
+			pins[n - 1 - hold1] = lap.y(lap.closest_s(r.at(float(n - 1 - hold1))["p"]))
+			hold1 += 1
+		hold = maxi(hold - 1, 0)
+		hold1 = maxi(hold1 - 1, 0)
+		pin0 = pins.get(hold, pin0)
+		pin1 = pins.get(n - 1 - hold1, pin1)
+		# Across its width each end leans with the lap's grade where it meets it.
+		for e in [0, 1]:
+			var se: float = 0.0 if e == 0 else r.length
+			var sl: float = lap.closest_s(r.at(se)["p"])
+			var t_l: Vector3 = lap.fw(sl)
+			var lean: float = lap.grade(sl) * r.rt(se).dot(t_l)
+			if e == 0:
+				r.tilt0 = lean
+				r.tilt_in = float(hold) + 1.0
+			else:
+				r.tilt1 = lean
+				r.tilt_out = float(hold1) + 1.0
+		if absf(r.tilt0) > 0.005 or absf(r.tilt1) > 0.005:
+			print("  %s leans with the lap's grade at its ends: %.1f%% and %.1f%% across" % [r.name, r.tilt0 * 100.0, r.tilt1 * 100.0])
 		var d0: float = pin0 - cur[hold]
-		var d1: float = pin1 - cur[n - 1 - hold]
+		var d1: float = pin1 - cur[n - 1 - hold1]
 		for i in range(n):
-			cur[i] += d0 * (1.0 - smoothstep(float(hold), float(hold) + 40.0, float(i))) + d1 * (1.0 - smoothstep(float(hold), float(hold) + 40.0, float(n - 1 - i)))
-		for i in range(hold + 1):
-			cur[i] = pin0
-			cur[n - 1 - i] = pin1
+			cur[i] += d0 * (1.0 - smoothstep(float(hold), float(hold) + 40.0, float(i))) + d1 * (1.0 - smoothstep(float(hold1), float(hold1) + 40.0, float(n - 1 - i)))
+		for i in pins:
+			cur[i] = pins[i]
 	# No grade over the limit: relax both ways round.
 	for iter in range(3 if r.closed else 2):
 		for i in range(1, n):
@@ -663,15 +716,78 @@ func _plan_heights(r: Route, pin0 := NAN, pin1 := NAN) -> void:
 			acc2 += cur[_wrap_i(i + k, n, r.closed)]
 		sm[i] = acc2 / float(rh * 2 + 1)
 	if not is_nan(pin0):
-		for i in range(hold + 1):
-			sm[i] = pin0
-			sm[n - 1 - i] = pin1
+		for i in pins:
+			sm[i] = pins[i]
+		# Round the sag (or crest) where the level end meets the climb: the pins end in a kink (a footpath climbing away
+		# turned 25% within a metre), which the ground, graded from samples metres apart on a 4m grid, cut across and came
+		# up through the paving. Only where an edge is on the lap's own ground (`LAP_GROUND_OWN`) must it keep the lap's
+		# height; from there a cubic eases into the profile `END_EASE` metres on, matching both slopes.
+		var own: float = lap.half + LAP_GROUND_OWN + 0.25
+		for e in [0, 1]:
+			var hb := 0
+			while hb < n / 3 and _nearest_lap_edge(r, float(hb if e == 0 else n - 1 - hb)) <= own:
+				hb += 1
+			hb = maxi(hb, 1)
+			var ee: int = mini(hb + END_EASE, n / 2)
+			if ee - hb < 4:
+				continue
+			var ia: int = hb if e == 0 else n - 1 - hb
+			var ib: int = ee if e == 0 else n - 1 - ee
+			var stp: int = 1 if e == 0 else -1
+			var ya: float = sm[ia]
+			var yb: float = sm[ib]
+			var ga: float = sm[ia] - sm[ia - stp]
+			var gb: float = (sm[ib + stp] - sm[ib - stp]) * 0.5
+			var L: float = float(ee - hb)
+			for k in range(1, ee - hb):
+				var t: float = float(k) / L
+				var t2: float = t * t
+				var t3: float = t2 * t
+				sm[ia + k * stp] = (2.0 * t3 - 3.0 * t2 + 1.0) * ya + (t3 - 2.0 * t2 + t) * ga * L + (-2.0 * t3 + 3.0 * t2) * yb + (t3 - t2) * gb * L
 		# After the grade clamp a pinned end may not meet the lap: that would be a step in the road.
-		if absf(cur[hold + 1] - pin0) > 0.3 or absf(cur[n - 2 - hold] - pin1) > 0.3:
+		if absf(cur[hold + 1] - pin0) > 0.3 or absf(cur[n - 2 - hold1] - pin1) > 0.3:
 			push_warning("%s: %s can't reach the lap's height within its grade: %.1fm off at its start, %.1fm at its end" % [
-					title, r.name, cur[hold + 1] - pin0, cur[n - 2 - hold] - pin1])
+					title, r.name, cur[hold + 1] - pin0, cur[n - 2 - hold1] - pin1])
 	_shape_heights(r, sm)
 	r.ys = sm
+
+
+## A shortcut against the ground: where the built ground comes within 3cm of its surface (or over it), grass shows
+## through the paving. Prints the worst place.
+func _check_shortcuts_ground() -> void:
+	for sc in shortcuts:
+		var r: Route = _route_by_name.get(String(sc[0]))
+		if r == null:
+			continue
+		var bad := 0
+		var worst := -INF
+		var worst_at := Vector3.ZERO
+		var s := 0.0
+		while s <= r.length:
+			var h: float = _half_at(r, s)
+			var lat: float = -h
+			while lat <= h + 0.01:
+				var k: int = _kind_at(r, s)
+				if k >= 0 and not _on_bridge(r, s):
+					var c: Vector2 = _off_lap_column(r, lat)
+					if s >= c.x and s <= c.y:
+						var p: Vector3 = r.surf(s, lat)
+						var over: float = _ground_at(p.x, p.z) - (p.y - 0.03)
+						if over > 0.0:
+							bad += 1
+							if over > worst:
+								worst = over
+								worst_at = Vector3(s, lat, over)
+				lat += h * 0.5
+			s += 0.5
+		if bad > 0 and worst > 0.12:
+			push_warning("%s: ground through %s's paving at %d points, worst %.2fm over it at s %.1f, lateral %.1f" % [
+					title, r.name, bad, worst, worst_at.x, worst_at.y])
+		elif bad > 0:
+			print("  %s: the ground within 3cm of its paving at %d points (worst %.2fm over, s %.1f, lateral %.1f): lifted there" % [
+					r.name, bad, worst, worst_at.x, worst_at.y])
+		else:
+			print("  %s clear of the ground" % r.name)
 
 
 ## Every bridge deck against the ground under it: where the built ground comes within 5cm of the deck's surface (or
@@ -703,6 +819,85 @@ func _check_decks() -> void:
 					title, r.name, float(b[1]), float(b[2]), bad, worst, worst_at.x, worst_at.y])
 		else:
 			print("  deck %s %.0f-%.0f clear of the ground" % [r.name, float(b[1]), float(b[2])])
+
+
+## Distance in plan from a point to the lap's centreline.
+func _lap_offset(q: Vector2) -> float:
+	return (lap.at(lap.closest_s(q))["p"] as Vector2).distance_to(q)
+
+
+## How near a route's row at s comes to the lap's centreline in plan: the nearer of its centre and its edges.
+func _nearest_lap_edge(r: Route, s: float) -> float:
+	var a: Dictionary = r.at(s)
+	var c: Vector2 = a["p"]
+	var rt2: Vector2 = Route.right_of(float(a["th"]))
+	return minf(_lap_offset(c), minf(_lap_offset(c + rt2 * r.half), _lap_offset(c - rt2 * r.half)))
+
+
+## How far a shortcut's profile eases from its level ends into its climb (`_plan_heights`).
+const END_EASE := 16
+
+
+
+var _off_lap_cache := {}
+
+## How far a shortcut's ribbon stays off the lap's road where it meets it.
+const OFF_LAP_MARGIN := 0.2
+
+## Where a column of a shortcut's ribbon (at lateral `lv`) starts and ends: the first and last s at which it is `margin`
+## clear of the lap's road.
+func _off_lap_column(r: Route, lv: float, margin := OFF_LAP_MARGIN) -> Vector2:
+	var key: String = "%s/%.3f/%.3f" % [r.name, lv, margin]
+	if _off_lap_cache.has(key):
+		return _off_lap_cache[key]
+	var off_at := func(s: float) -> float:
+		var q: Vector3 = r.pt(s) + r.rt(s) * lv
+		return _lap_offset(Vector2(q.x, q.z))
+	var need: float = lap.half + margin
+	var ends: Array = []
+	for dir in [1.0, -1.0]:
+		var s0: float = 0.0 if dir > 0.0 else r.length
+		var mid: float = r.length * 0.5
+		# The last time the column is on the road (a route may start beside the road and cross it at a slant), until it
+		# is well clear of it.
+		var last_bad := NAN
+		var s: float = s0
+		while (s <= mid if dir > 0.0 else s >= mid):
+			var o: float = off_at.call(s)
+			if o < need:
+				last_bad = s
+			elif o > need + 20.0:
+				break
+			s += 0.5 * dir
+		if is_nan(last_bad):
+			ends.append(s0)
+			continue
+		var lo: float = last_bad
+		var hi: float = clampf(last_bad + 0.5 * dir, 0.0, r.length)
+		for _i in 6:
+			var m: float = (lo + hi) * 0.5
+			if off_at.call(m) >= need:
+				hi = m
+			else:
+				lo = m
+		ends.append(hi)
+	var v := Vector2(ends[0], ends[1])
+	_off_lap_cache[key] = v
+	return v
+
+
+## Where a shortcut's own surface starts and ends: from where its first column leaves the lap's road to where its last
+## reaches it. A section marked to clip (its fifth field: 1 its start, 2 its end, 3 both) then trims each column to its own `_off_lap_column`, so the
+## ribbon's end follows the road's edge: cut square, it lay over the road's edge meeting the lap at a slant, or (held
+## back until both edges were clear) left a wedge of grass between them.
+func _off_lap_range(r: Route, margin := OFF_LAP_MARGIN) -> Vector2:
+	var a: float = INF
+	var b: float = -INF
+	for lv in [-r.half, -r.half * 0.5, 0.0, r.half * 0.5, r.half]:
+		var c: Vector2 = _off_lap_column(r, lv, margin)
+		a = minf(a, c.x)
+		b = maxf(b, c.y)
+	return Vector2(a, b)
 
 
 func _wrap_i(i: int, n: int, is_closed: bool) -> int:
@@ -764,12 +959,13 @@ func _closest_s(q: Vector2) -> float:
 func _add_samples(r: Route) -> void:
 	var s := 0.0
 	while s < r.length:
-		var s2: float = minf(s + SAMPLE_STEP, r.length)
+		# A shortcut is graded from finer samples: its eased ends curve over a few metres.
+		var s2: float = minf(s + (SAMPLE_STEP if r == lap or r.length > 600.0 else 1.5), r.length)
 		var mid: float = (s + s2) * 0.5
 		if not _on_bridge(r, mid, 1.0):
 			var par: Array = _grade_params(r, mid).duplicate()
 			par.append(r == lap)
-			_add_seg(r.pt(s), r.pt(s2), par)
+			_add_seg(r.pt(s), r.pt(s2), par, r.tilt(mid))
 		elif _cut_under(r, mid):
 			# Under a deck the ground may only be cut: DECK_CLEAR under it across its width and a little more, banking up
 			# beyond like a cutting (where a road crosses a ravine at a slant, the bank had stood up through the planks).
@@ -783,6 +979,12 @@ func _add_samples(r: Route) -> void:
 ## How far the ground stays under a deck's surface.
 const DECK_CLEAR := 0.6
 
+## A shortcut's paving lies at least this far over the built ground (`_build_roads`).
+const RIBBON_OVER_GROUND := 0.04
+
+## How far past its road's edge the lap alone sets the ground (`_grade`).
+const LAP_GROUND_OWN := 0.5
+
 
 ## Whether the ground under a route's deck at s is cut down under it (not under the rafts, which lie on the water).
 func _cut_under(r: Route, s: float) -> bool:
@@ -792,7 +994,8 @@ func _cut_under(r: Route, s: float) -> bool:
 	return false
 
 
-func _add_seg(a: Vector3, b: Vector3, par: Array) -> void:
+func _add_seg(a: Vector3, b: Vector3, par: Array, tilt := 0.0) -> void:
+	_seg_tilt.append(tilt)
 	_seg_a.append(a)
 	_seg_b.append(b)
 	_seg_par.append(par)
@@ -861,6 +1064,8 @@ func _grade(h: float, x: float, z: float) -> Vector2:
 				var right: bool = (-sz * fx + sx * fz) >= 0.0
 				var flat: float = float(par[1]) if right else float(par[0])
 				var foot_y: float = lerpf(a.y, b.y, t) - GROUND_UNDER
+				if _seg_tilt[i] != 0.0:
+					foot_y += _seg_tilt[i] * clampf(lateral if right else -lateral, -float(par[0]), float(par[1]))
 				var over: float = maxf(0.0, lateral - flat)
 				var soft: float = over * over / (over + 4.0)
 				upper = minf(upper, foot_y + soft * float(par[2]))
@@ -869,13 +1074,15 @@ func _grade(h: float, x: float, z: float) -> Vector2:
 				if beside and lateral <= flat and lateral < flat_lat:
 					flat_lat = lateral
 					flat_y = foot_y
-				if beside and par.size() > 4 and bool(par[4]) and lateral <= flat and lateral < lap_lat:
+				if beside and par.size() > 4 and bool(par[4]) and lateral <= minf(flat, lap.half + LAP_GROUND_OWN) and lateral < lap_lat:
 					lap_lat = lateral
 					lap_y = foot_y
 	if not touched:
 		return Vector2(minf(h, upper) if cut_touched else h, best_d)
-	# On the lap's own flat band the lap's height wins: where a shortcut joins it at a grade, the shortcut's flat band
-	# (nearer in plan) had lifted the ground up through the lap's road.
+	# Under the lap's road and LAP_GROUND_OWN past its edge the lap's height wins: where a shortcut joins it at a grade,
+	# the shortcut's flat band (nearer in plan) had lifted the ground up through the lap's road. Only that far: across
+	# its whole flat band the lap's verge held the ground at its height under a shortcut meeting it at a slant, and the
+	# grass came up through the shortcut's near edge.
 	if not is_nan(lap_y):
 		return Vector2(minf(lap_y, upper) if cut_touched else lap_y, best_d)
 	if not is_nan(flat_y):
@@ -943,9 +1150,46 @@ func _grid_axis(fine: Vector2) -> PackedFloat32Array:
 	return out
 
 
+## The grid's lines halved inside `ranges` (Vector2 from, to): round the shortcuts' ends, whose paving eases from the
+## lap's height into a climb within a few metres, which 4m cells cut across.
+func _refine_axis(axis: PackedFloat32Array, ranges: Array) -> PackedFloat32Array:
+	if ranges.is_empty():
+		return axis
+	var out := PackedFloat32Array()
+	for i in range(axis.size()):
+		out.append(axis[i])
+		if i + 1 < axis.size():
+			var m: float = (axis[i] + axis[i + 1]) * 0.5
+			if axis[i + 1] - axis[i] > fine_step * 0.75:
+				continue
+			for rg in ranges:
+				if m > (rg as Vector2).x and m < (rg as Vector2).y:
+					out.append(m)
+					break
+	return out
+
+
+## Where the grid is halved: a square `END_REFINE` either side of each shortcut's ends.
+const END_REFINE := 26.0
+
+func _end_refine_ranges() -> Array:
+	var xs: Array = []
+	var zs: Array = []
+	for sc in shortcuts:
+		var r: Route = _route_by_name.get(String(sc[0]))
+		if r == null:
+			continue
+		for se in [0.0, r.length]:
+			var p: Vector2 = r.at(se)["p"]
+			xs.append(Vector2(p.x - END_REFINE, p.x + END_REFINE))
+			zs.append(Vector2(p.y - END_REFINE, p.y + END_REFINE))
+	return [xs, zs]
+
+
 func _build_heights() -> void:
-	_grid_x = _grid_axis(fine_x)
-	_grid_z = _grid_axis(fine_z)
+	var refine: Array = _end_refine_ranges()
+	_grid_x = _refine_axis(_grid_axis(fine_x), refine[0])
+	_grid_z = _refine_axis(_grid_axis(fine_z), refine[1])
 	var nx: int = _grid_x.size()
 	var nz: int = _grid_z.size()
 	print("  terrain grid %d x %d = %d vertices" % [nx, nz, nx * nz])
@@ -1210,22 +1454,47 @@ func _build_roads(root: Node3D) -> void:
 				_road_faces[surface] = PackedVector3Array()
 			var faces: PackedVector3Array = _road_faces[surface]
 			var lats: Array = [-w, -w * 0.5, 0.0, w * 0.5, w]
+			# Each column runs from its own start to its own end: trimmed to the lap's road edge where the section says
+			# (fifth field: 1 its start, 2 its end, 3 both), else the section's.
+			var clip: int = int(sec[4]) if sec.size() > 4 else 0
+			var col_a: Array = []
+			var col_b: Array = []
+			for lv in lats:
+				var c := Vector2(s0, s1)
+				if clip != 0:
+					c = _off_lap_column(r, lv)
+				col_a.append(maxf(s0, c.x) if clip & 1 else s0)
+				col_b.append(minf(s1, c.y) if clip & 2 else s1)
+			if clip != 0:
+				print("  %s meets the lap's road edge: its columns start at %s and end at %s" % [r.name,
+						", ".join(col_a.map(func(v): return "%.1f" % v)), ", ".join(col_b.map(func(v): return "%.1f" % v))])
 			var n_steps: int = maxi(1, ceili(s1 - s0))
+			var lifted := 0.0
 			var r0 := 0
 			while r0 < n_steps:
 				var r1: int = mini(r0 + 48, n_steps)
 				var st := SurfaceTool.new()
 				st.begin(Mesh.PRIMITIVE_TRIANGLES)
 				for i in range(r0, r1):
-					var sa: float = lerpf(s0, s1, float(i) / float(n_steps))
-					var sb: float = lerpf(s0, s1, float(i + 1) / float(n_steps))
+					var ta: float = float(i) / float(n_steps)
+					var tb: float = float(i + 1) / float(n_steps)
 					for j in range(lats.size() - 1):
-						var quad: Array = [[sa, lats[j]], [sa, lats[j + 1]], [sb, lats[j]], [sb, lats[j + 1]]]
+						var quad: Array = [
+								[lerpf(col_a[j], col_b[j], ta), lats[j]], [lerpf(col_a[j + 1], col_b[j + 1], ta), lats[j + 1]],
+								[lerpf(col_a[j], col_b[j], tb), lats[j]], [lerpf(col_a[j + 1], col_b[j + 1], tb), lats[j + 1]]]
 						for t in [[0, 2, 1], [1, 2, 3]]:
 							for k in t:
 								var sv: float = quad[k][0]
 								var lv: float = quad[k][1]
-								var pos: Vector3 = r.pt(sv) + r.rt(sv) * lv
+								var pos: Vector3 = r.surf(sv, lv)
+								if r != lap and not _on_bridge(r, sv):
+									# Where a shortcut eases from the lap's height into a climb within a few metres, the
+									# ground's grid cut across the sag and stood up to 8cm through the paving: never
+									# under the ground and RIBBON_OVER_GROUND.
+									var gy: float = _ground_at(pos.x, pos.z) + RIBBON_OVER_GROUND
+									if gy > pos.y:
+										lifted = maxf(lifted, gy - pos.y)
+										pos.y = gy
 								var edge: float = INF
 								for bb in bounds:
 									edge = minf(edge, absf(sv - float(bb)))
@@ -1246,6 +1515,8 @@ func _build_roads(root: Node3D) -> void:
 					node.add_child(mi)
 					piece += 1
 				r0 = r1
+			if lifted > 0.0:
+				print("  %s %.0f-%.0f: the paving lifted over the ground by up to %.2fm" % [r.name, s0, s1, lifted])
 			_road_faces[surface] = faces
 	# Decks have sides and an underside (a ribbon alone is a sheet of paper from beside a bridge).
 	for b in bridges:
@@ -1808,6 +2079,54 @@ func _jp(text: String) -> String:
 	return String(JP.get(text, text))
 
 
+## Footprints (life size, in the prop's frame) of the props people are placed round, by builder; "machiya" is its
+## frontage zone in front of the facade only when it is the sweet shop (variant 4: a bench and a parasol out front).
+const SOLID_FOOT := {"red_bench": Rect2(-1.0, -0.7, 2.0, 1.3), "stone_lantern": Rect2(-0.65, -0.65, 1.3, 1.3),
+	"bonbori": Rect2(-0.3, -0.3, 0.6, 0.6), "komainu": Rect2(-0.5, -0.7, 1.0, 1.4), "vending_machine": Rect2(-0.55, -0.45, 1.1, 0.95),
+	"nobori": Rect2(-0.2, -0.2, 0.9, 0.4), "hokora": Rect2(-0.55, -0.5, 1.1, 1.05), "stone_marker": Rect2(-0.25, -0.25, 0.5, 0.5),
+	"wood_lantern_post": Rect2(-0.3, -0.3, 0.6, 0.85), "yatai": Rect2(-0.2, -1.95, 3.1, 2.25), "chozuya": Rect2(-1.9, -1.7, 3.8, 3.4),
+	"ema_rack": Rect2(-1.6, -0.5, 3.2, 1.0), "kei_truck": Rect2(-0.95, -1.8, 1.9, 3.6), "utility_pole": Rect2(-0.3, -0.3, 0.6, 0.6),
+	"koinobori_pole": Rect2(-0.5, -0.5, 1.0, 1.0), "chaya": Rect2(-1.6, -7.1, 12.2, 10.0), "curve_mirror": Rect2(-0.5, -0.3, 1.0, 0.6),
+	"cairn": Rect2(-0.45, -0.45, 0.9, 0.9), "sake_barrels": Rect2(-1.5, -0.4, 3.0, 0.8), "bell_tower": Rect2(-4.2, -4.0, 8.4, 8.0),
+	"shrine_hall": Rect2(-4.7, -7.4, 9.4, 10.1), "main_hall": Rect2(-13.2, -19.7, 26.4, 28.0), "summit_shrine": Rect2(-2.6, -2.6, 5.2, 5.2)}
+## [frame, life-size rect] for every prop people must not stand in.
+var _solids: Array = []
+
+func _note_solid(fn: String, xf: Transform3D, args: Array) -> void:
+	if fn == "machiya":
+		if args.size() > 3 and int(args[3]) == 4:
+			_solids.append([xf, Rect2(0.0, 0.0, float(args[0]), 3.3)])
+		return
+	if fn == "jizo_row" and args.size() > 0:
+		var n: float = float(args[0])
+		_solids.append([xf, Rect2(-0.25 * n - 0.4, -0.45, 0.5 * n + 0.8, 0.9)])
+		return
+	if SOLID_FOOT.has(fn):
+		_solids.append([xf, SOLID_FOOT[fn]])
+
+
+## Drops the spectators standing inside a prop (a person by a bench, a lantern, a shop's front had come out inside it).
+func _clear_people_from_props() -> void:
+	var keep: Array = []
+	var dropped := 0
+	for person in _people:
+		var p: Vector3 = person[0]
+		var inside := false
+		for sd in _solids:
+			var xf: Transform3D = sd[0]
+			var q: Vector3 = xf.affine_inverse() * p / PROP_SCALE
+			var rect: Rect2 = (sd[1] as Rect2).grow(0.3 * float(person[5]))
+			if rect.has_point(Vector2(q.x, q.z)) and absf(q.y) < 4.0:
+				inside = true
+				break
+		if inside:
+			dropped += 1
+		else:
+			keep.append(person)
+	_people = keep
+	print("  people: %d kept, %d dropped from inside props" % [keep.size(), dropped])
+
+
 ## Stands for the labels array in _put's argument list.
 const LBL := "@labels"
 
@@ -1819,6 +2138,7 @@ func _put(key: String, kit_script: Script, xf: Transform3D, fn: String, args: Ar
 			_missing[fn] = true
 			push_warning("%s: %s has no %s() yet" % [title, kit_script.resource_path.get_file() if kit_script else "(a kit that is missing)", fn])
 		return false
+	_note_solid(fn, xf, args)
 	_add_prop(key, kit_script, xf, func(pk: PropKit, kit: Dictionary, labels: Array) -> void:
 		var a: Array = [pk, kit]
 		for v in args:
@@ -2106,6 +2426,23 @@ func _player(parent: Node3D, node_name: String, path: String, at: Vector3, db: f
 	p.position = at
 	parent.add_child(p)
 	return p
+
+
+## The RC Vibe GP flag (LogoFlag.gd builds its pole and flag) at s on the lap, `lat` right of its line, streaming away
+## from the road so the grid sees it broadside. Placed by Level.gd beside the gantry it had stood by the power lines.
+func _logo_flag(root: Node3D, s: float, lat: float, pole := 14.0) -> void:
+	var sp: Dictionary = lap.spot(s, lat, 0.0)
+	var at: Vector3 = sp["pos"]
+	at.y = _ground_at(at.x, at.z)
+	var fly: Vector3 = (sp["right"] as Vector3) * signf(lat)
+	var flag := Node3D.new()
+	flag.name = "LogoFlag"
+	flag.set_script(load("res://LogoFlag.gd"))
+	flag.set("pole_height", pole)
+	flag.transform = Transform3D(Basis(fly, Vector3.UP, fly.cross(Vector3.UP)), at)
+	root.add_child(flag)
+	_note_circle(Vector2(at.x, at.z), 3.0)
+	_solids.append([Transform3D(Basis(), at), Rect2(-0.6, -0.6, 1.2, 1.2)])
 
 
 ## A one-shot struck every `every` seconds on the wall clock (PeriodicSound.gd: LAN peers hear it together).
