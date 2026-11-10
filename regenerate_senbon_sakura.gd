@@ -479,6 +479,10 @@ func _build_dressing(root: Node3D) -> void:
 	_build_approach_rails(root)
 	_build_island(root, rng)
 	_build_shore(root, rng)
+	# The bell tower on the island's east end is struck every two and a half minutes, heard across the lake.
+	var bell := Vector3(174.0, 0.0, 205.0)
+	_periodic(root, "TempleBell", "res://sounds/miyoshino/temple_bell.wav", Vector3(bell.x, _ground_at(bell.x, bell.z) + 8.0, bell.z),
+			0.0, 80.0, 1600.0, 150.0, 37.0)
 	_build_valley(root, rng)
 	_build_petals(root)
 

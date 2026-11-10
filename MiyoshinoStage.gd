@@ -2046,6 +2046,25 @@ func _player(parent: Node3D, node_name: String, path: String, at: Vector3, db: f
 	return p
 
 
+## A one-shot struck every `every` seconds on the wall clock (PeriodicSound.gd: LAN peers hear it together).
+func _periodic(parent: Node3D, node_name: String, path: String, at: Vector3, db: float, unit: float, max_d: float, every: float, phase: float) -> void:
+	if not ResourceLoader.exists(path):
+		push_warning("%s: sound %s is missing" % [title, path])
+		return
+	var p := AudioStreamPlayer3D.new()
+	p.set_script(load("res://PeriodicSound.gd"))
+	p.name = node_name
+	p.stream = load(path)
+	p.volume_db = db
+	p.unit_size = unit
+	p.max_distance = max_d
+	p.bus = &"SFX"
+	p.position = at
+	p.set("every", every)
+	p.set("phase", phase)
+	parent.add_child(p)
+
+
 func _camp_material(key: String) -> Material:
 	if not _camp_mats.has(key):
 		_camp_mats[key] = _save_res(CampKit.make_material(key), "camp_mat_" + key, stem + "prop_")

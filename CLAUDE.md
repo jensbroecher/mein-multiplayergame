@@ -4588,6 +4588,12 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   chain fences on the drops, the summit shrine. `CloudLayer.gd` sets every viewer's fog and sun by their camera's height
   (the band 96-150m: fog to 85m inside it), `cloud_sea.gdshader` the sheet seen from above. Bots take 114-130s.
 - Music `MusicManager.STAGE_TRACKS` "senbon", "yoshino", "monzen", "yamabushi" (`music/miyoshino/`, instrumental,
-  tools/elevenlabs); StageAmbience has entries for all four; no sounds of their own yet (river, temple bell, wind).
+  tools/elevenlabs). Their ambience is their own (`sounds/miyoshino/<bed>/`, tools/elevenlabs `miyo_*` jobs, three
+  takes a bed, prompted without insects or near birds): the user found Lakeside's insects-and-birds bed, which they had
+  borrowed, too full of bees and birdsong. Senbon a breeze in the blossoms, Yoshino the river under it, Monzenmachi the
+  temple town's quiet dusk, the Yamabushi Trail mountain wind; a temple bell (`temple_bell.wav`, PeriodicSound via
+  `MiyoshinoStage._periodic`) from the island's bell tower every 150s and the precinct's every 120s.
+  `scratch/miyoshino_sound_check.gd` (`-s`, headless) lists each stage's layers and bells. Checked by numbers, not by
+  ear: chirp and steady above-4kHz frames are near zero, against 4-44% and 25-70% in the Lakeside clips.
 - Not checked yet: GPU cost on any of the four, the gusts and the cloud in a real race, the raft crossing and the Alley
   with bots forced onto them (`scratch/shortcut_probe ... chance=1.0`), collision_audit, the jump tests.

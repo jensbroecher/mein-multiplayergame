@@ -376,6 +376,9 @@ func _build_precinct(root: Node3D, rng: RandomNumberGenerator) -> void:
 	_put("precinct", town_kit, bx, "bell_tower", [], 1000.0)
 	_note_circle(Vector2(282.0, -62.0), 6.0)
 	_lamp(Vector3(282.0, py + 5.0, -54.0), LAMP_WARM, 1.8, 18.0)
+	# The bell is struck every two minutes; the town hears it.
+	_periodic(level, "TempleBell", "res://sounds/miyoshino/temple_bell.wav", Vector3(282.0, py + 6.0, -62.0),
+			0.0, 80.0, 1600.0, 120.0, 11.0)
 	var cx := _facing(Vector3(1, 0, 0), Vector3(288.0, py, 104.0))
 	_put("precinct", prop_kit, cx, "chozuya", [], 1000.0)
 	_note_circle(Vector2(288.0, 104.0), 5.0)

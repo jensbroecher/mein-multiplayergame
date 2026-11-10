@@ -662,5 +662,109 @@
     "duration": 1.8,
     "loop": false,
     "influence": 0.7
+  },
+  {
+    "name": "miyo_spring_breeze_1",
+    "path": "sounds/miyoshino/spring_breeze/spring_breeze_1.wav",
+    "text": "A calm spring morning on a quiet Japanese mountain slope: a soft breeze drifting through blossoming cherry trees, gentle rustling of leaves and petals, airy and spacious, now and then one distant bird call far away, mostly quiet. No insects, no bees, no buzzing, no music, no voices.",
+    "duration": 28.0,
+    "loop": true,
+    "influence": 0.45
+  },
+  {
+    "name": "miyo_spring_breeze_2",
+    "path": "sounds/miyoshino/spring_breeze/spring_breeze_2.wav",
+    "text": "Gentle spring wind in an open grove of cherry trees on a hillside, slow swells of soft rustling and calm lulls between them, a faint far-off bird once or twice, peaceful and wide. No insects, no bees, no buzzing, no music, no voices.",
+    "duration": 28.0,
+    "loop": true,
+    "influence": 0.45
+  },
+  {
+    "name": "miyo_spring_breeze_3",
+    "path": "sounds/miyoshino/spring_breeze/spring_breeze_3.wav",
+    "text": "A light breeze over a park by a calm lake in spring: leaves whispering in the trees, a faint lapping of water at a shore, very sparse distant birdsong, serene and open air. No insects, no bees, no buzzing, no music, no voices.",
+    "duration": 28.0,
+    "loop": true,
+    "influence": 0.45
+  },
+  {
+    "name": "miyo_river_1",
+    "path": "sounds/miyoshino/river/river_1.wav",
+    "text": "A clear mountain river flowing steadily over stones close by, soft rushing and babbling water, a light breeze in the trees on the bank. No insects, no bees, no buzzing, no music, no voices.",
+    "duration": 28.0,
+    "loop": true,
+    "influence": 0.45
+  },
+  {
+    "name": "miyo_river_2",
+    "path": "sounds/miyoshino/river/river_2.wav",
+    "text": "A wide shallow river running over a shingle bed in a valley, continuous gentle water rush with small splashes, a soft wind, calm and natural. No insects, no bees, no buzzing, no music, no voices.",
+    "duration": 28.0,
+    "loop": true,
+    "influence": 0.45
+  },
+  {
+    "name": "miyo_river_3",
+    "path": "sounds/miyoshino/river/river_3.wav",
+    "text": "River rapids heard from the bank a little way off: a steady soft roar of flowing water over rocks, breeze in cedar trees, open air. No insects, no bees, no buzzing, no music, no voices.",
+    "duration": 28.0,
+    "loop": true,
+    "influence": 0.45
+  },
+  {
+    "name": "miyo_temple_dusk_1",
+    "path": "sounds/miyoshino/temple_dusk/temple_dusk_1.wav",
+    "text": "Dusk in a quiet traditional Japanese temple town in spring: a soft evening breeze, paper lanterns creaking gently on their cords, a distant soft murmur of a few people far away, a frog croaking faintly from a pond now and then. No insects, no bees, no buzzing, no music, no clear words.",
+    "duration": 28.0,
+    "loop": true,
+    "influence": 0.45
+  },
+  {
+    "name": "miyo_temple_dusk_2",
+    "path": "sounds/miyoshino/temple_dusk/temple_dusk_2.wav",
+    "text": "Early evening on an old stone-paved street of wooden houses in Japan: calm air, a faint wooden clack of a door far off, quiet distant murmur, soft breeze through cherry blossoms, a few frogs far away, peaceful. No insects, no bees, no buzzing, no music, no clear words.",
+    "duration": 28.0,
+    "loop": true,
+    "influence": 0.45
+  },
+  {
+    "name": "miyo_temple_dusk_3",
+    "path": "sounds/miyoshino/temple_dusk/temple_dusk_3.wav",
+    "text": "A temple precinct at nightfall: a gentle breeze in pine and cherry trees, gravel crunching softly far away, a distant quiet murmur of visitors, faint frogs from a pond, serene and still. No insects, no bees, no buzzing, no music, no clear words.",
+    "duration": 28.0,
+    "loop": true,
+    "influence": 0.45
+  },
+  {
+    "name": "miyo_mountain_wind_1",
+    "path": "sounds/miyoshino/mountain_wind/mountain_wind_1.wav",
+    "text": "High on a mountain at dawn above the clouds: cold wind gusting softly across a rocky ridge, airy hollow whoosh, cedar branches creaking now and then, wide and empty. No insects, no bees, no buzzing, no music, no voices.",
+    "duration": 28.0,
+    "loop": true,
+    "influence": 0.45
+  },
+  {
+    "name": "miyo_mountain_wind_2",
+    "path": "sounds/miyoshino/mountain_wind/mountain_wind_2.wav",
+    "text": "A misty mountain trail in thick cloud: damp still air with soft gusts of wind through tall cedar trees, dripping water now and then, muffled and quiet. No insects, no bees, no buzzing, no music, no voices.",
+    "duration": 28.0,
+    "loop": true,
+    "influence": 0.45
+  },
+  {
+    "name": "miyo_mountain_wind_3",
+    "path": "sounds/miyoshino/mountain_wind/mountain_wind_3.wav",
+    "text": "Wind on a high mountain summit: steady cool breeze with slow swells, a faint whistle over rocks, cloth prayer streamers fluttering softly, vast and calm. No insects, no bees, no buzzing, no music, no voices.",
+    "duration": 28.0,
+    "loop": true,
+    "influence": 0.45
+  },
+  {
+    "name": "miyo_temple_bell",
+    "path": "sounds/miyoshino/temple_bell.wav",
+    "text": "A single deep strike of a large bronze Japanese temple bell (bonsho) struck with a wooden beam, heard from across a lake, a long rich resonant hum slowly fading away, no other sounds",
+    "duration": 12.0,
+    "loop": false,
+    "influence": 0.6
   }
 ]

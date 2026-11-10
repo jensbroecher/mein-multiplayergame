@@ -41,6 +41,20 @@ const CLIP_DB := {
 	"res://sounds/stadium/stadium_ambiance_2.wav": -37.3,
 	"res://sounds/stadium/stadium_ambiance_3.wav": -15.0,
 	"res://sounds/stadium/stadium_ambiance_4.wav": -14.9,
+	# The Miyoshino GP's own (tools/elevenlabs, made without insects or near birds: the user found Lakeside's bed too
+	# full of bees and birdsong for these stages).
+	"res://sounds/miyoshino/spring_breeze/spring_breeze_1.wav": -49.3,
+	"res://sounds/miyoshino/spring_breeze/spring_breeze_2.wav": -50.5,
+	"res://sounds/miyoshino/spring_breeze/spring_breeze_3.wav": -49.2,
+	"res://sounds/miyoshino/river/river_1.wav": -39.2,
+	"res://sounds/miyoshino/river/river_2.wav": -34.6,
+	"res://sounds/miyoshino/river/river_3.wav": -39.0,
+	"res://sounds/miyoshino/temple_dusk/temple_dusk_1.wav": -43.5,
+	"res://sounds/miyoshino/temple_dusk/temple_dusk_2.wav": -43.7,
+	"res://sounds/miyoshino/temple_dusk/temple_dusk_3.wav": -46.5,
+	"res://sounds/miyoshino/mountain_wind/mountain_wind_1.wav": -38.2,
+	"res://sounds/miyoshino/mountain_wind/mountain_wind_2.wav": -46.2,
+	"res://sounds/miyoshino/mountain_wind/mountain_wind_3.wav": -32.2,
 }
 
 ## Per stage (the level file's name): [kind, level in dBFS] layers. Stages not listed have none
@@ -65,11 +79,12 @@ const STAGES := {
 	# Zeche Kronprinz: a morning's birds over the scrub, the town far off; the Kokerei, the crows, the conveyor and the
 	# quench tower are 3D (the generator's).
 	"ZecheLevel": [["insects_birds", -32.0], ["city", -46.0]],
-	# The Miyoshino GP: spring birdsong in the groves and the cedars; the temple town has its evening's murmur under it.
-	"SenbonSakuraLevel": [["insects_birds", -30.0], ["forest", -38.0]],
-	"YoshinoRapidsLevel": [["forest", -31.0], ["insects_birds", -36.0]],
-	"MonzenmachiLevel": [["city", -40.0], ["insects_birds", -40.0]],
-	"YamabushiLevel": [["forest", -34.0]],
+	# The Miyoshino GP (sounds/miyoshino/): a breeze in the blossoms, the river under a breeze, the temple town's quiet
+	# dusk, wind on the mountain.
+	"SenbonSakuraLevel": [["miyoshino/spring_breeze", -32.0]],
+	"YoshinoRapidsLevel": [["miyoshino/river", -31.0], ["miyoshino/spring_breeze", -39.0]],
+	"MonzenmachiLevel": [["miyoshino/temple_dusk", -34.0]],
+	"YamabushiLevel": [["miyoshino/mountain_wind", -32.0]],
 	# Quer durch Kronburg: the city all round, birds in the garden; the Ring's traffic, the trams, the sites' machines and
 	# the wrecking ball are 3D (the generator's and the hazards' own).
 	"StadtrallyeLevel": [["city", -36.0], ["insects_birds", -40.0]],
