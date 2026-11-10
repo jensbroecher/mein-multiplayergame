@@ -12,7 +12,8 @@ TILE=(
 	Freight tile_freight_line Mina tile_mina_del_viento DesertWadi tile_desert_wadi RamlatHamra tile_ramlat_hamra
 	MarinaNights tile_marina_nights MaraCrossing tile_mara_crossing NyotaStadium tile_nyota_stadium
 	MtaaNights tile_mtaa_nights Kronburg tile_kronburg Rheinufer tile_rheinufer Stadtrallye tile_stadtrallye
-	Zeche tile_zeche MsituFalls tile_msitu_falls
+	Zeche tile_zeche MsituFalls tile_msitu_falls SenbonSakura tile_senbon_sakura YoshinoRapids tile_yoshino_rapids
+	Monzenmachi tile_monzenmachi Yamabushi tile_yamabushi
 )
 names=("$@")
 [ ${#names} -eq 0 ] && names=(${(k)TILE})

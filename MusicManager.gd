@@ -431,6 +431,11 @@ const STAGE_TRACKS := {
 	"wadi": ["res://music/al-raihana/Racing_the_Mirage.mp3"],
 	# The Kronburg GP: its own instrumental tracks (music/kronburg/, composed with ElevenLabs Music:
 	# tools/elevenlabs/music.json), shuffled.
+	# The Miyoshino GP: a track of its own per stage (music/miyoshino/, instrumental, made with tools/elevenlabs).
+	"senbon": ["res://music/miyoshino/Senbon_Zakura_Dash.mp3"],
+	"yoshino": ["res://music/miyoshino/Emerald_Rapids.mp3"],
+	"monzen": ["res://music/miyoshino/Lantern_Street.mp3"],
+	"yamabushi": ["res://music/miyoshino/Above_the_Clouds.mp3"],
 	"kronburg": [
 		"res://music/kronburg/Schichtwechsel.mp3",
 		"res://music/kronburg/Kleeblatt.mp3",
@@ -488,6 +493,9 @@ static func _stage_track_key(path_lower: String) -> String:
 		return "rheinufer"
 	if path_lower.get_file().begins_with("zeche"):
 		return "zeche"
+	for key in ["senbon", "yoshino", "monzen", "yamabushi"]:
+		if path_lower.get_file().begins_with(key):
+			return key
 	return ""
 
 ## Picks the stage's tracks and starts loading the first one in the background. Level calls it when

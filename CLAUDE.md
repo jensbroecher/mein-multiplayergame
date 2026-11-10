@@ -4506,3 +4506,68 @@ each run deletes first).
   node=Ring/RingTraffic from=82,-200 speed=0 y=36` logs the voices beside the Ring.
 - AI races (`scratch/ai_race_test`, speed=1 only: the hazards run on the wall clock; `noitems=1`): every bot finishes,
   in 190-265s. Music `MusicManager.STAGE_TRACKS["stadtrallye"]`; its sounds are in `sounds/stadtrallye/` (tools/elevenlabs).
+
+## Miyoshino GP (Senbon Sakura Pass, Yoshino Rapids, Monzenmachi, Yamabushi Trail)
+
+Japan: Yoshino's cherry-blossom mountains in spring (the cup's name is Yoshino's old poetic one). Four stages built in one
+night from the user's phone brainstorm; they asked for it without questions, so the design choices below are mine.
+Files: `SenbonSakuraLevel.tscn` (`regenerate_senbon_sakura.gd`, stem "senbon"), `YoshinoRapidsLevel.tscn`
+(`regenerate_yoshino_rapids.gd`, "yoshinogawa"), `MonzenmachiLevel.tscn` (`regenerate_monzenmachi.gd`, "monzen"),
+`YamabushiLevel.tscn` (`regenerate_yamabushi.gd`, "yamabushi": not "...Trail...", "trail" in a level's name is one of
+DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Each `regenerate_<x>.tscn` runs headless in
+11-21s and first deletes its stem's files in `generated/`.
+
+- `MiyoshinoStage.gd` is the generator all four extend (read its header): a `Route` class (straights and arcs through
+  filleted corners, heights per metre), `_plan_heights` (the natural ground along the route, bridges straight from bank
+  to bank, smoothed, clamped to `max_grade`), one heightfield of `_natural` graded to every route (`_grade`: the flat band
+  may differ left and right, with its own cut and fill slopes: a plank walk has no ground under its valley side), the
+  roads as ribbons with one collision body per surface (LapRoadAsphalt, LapRoadDirt, LapRoadWood, LapRoadGravel;
+  `K_FOOTPATH` is drawn as paving but its body, FootpathStones, is off-road rock; `K_STEPS` has collision and no ribbon),
+  gates, grid, pads, kickers (`_jump_lips`), sky (`_environment()` overrides), woods (`_tree_pick`, `extra_trees`), prop
+  batches (`_put`, `_put_world` with `_life()` for builders that take points, `LBL` for the labels array), automatic
+  guardrails where the ground falls away, shortcuts as AlternativePaths (`shortcuts`), point-to-point stages.
+  `-- maponly=1 map=<png> [profile=1]` saves a plan of the stage (hillshade, roads, a dot every 100m) in seconds.
+- Shaders: `miyoshino_ground.gdshader` (masks R rock, G bare ground, B cherry groves' fallen petals, A cedar forest
+  floor; UV2.y wet; past `canopy_from` the grove and forest masks become the canopies' colours), `miyoshino_road.gdshader`
+  (kinds 0 asphalt with white edge lines, an orange centre line and a gutter, 1 ishidatami paving, 2 the dirt trail, 3
+  planks, 4 gravel, 5 raked precinct gravel; COLOR.g fallen petals). `hut_masonry.gdshader` gained `tile_buff` (default
+  0.55, unchanged elsewhere): 0 for "kawara", which had come out orange and blue.
+- Kits (life size, PROP_SCALE 1.6; all extend `MiyoshinoKit.gd`, the shared palette and keys: "kawara", "hiwada",
+  "shikkui", "ishi", "urushi", "washi" (glows when `MiyoshinoKit.night` is set before the first `new_kit`), "neon"...):
+  `MiyoshinoTownKit.gd` (machiya in six variants, great_gate, main_hall, pagoda, temple_wall, wall_gate, chaya, yatai,
+  bell_tower, shrine_hall, kominka, mountain_hut), `MiyoshinoPropKit.gd` (torii in three styles, lanterns, chochin
+  strings, bonbori, utility poles and wires, guardrail, curve mirror, signs, nobori, jizo, komainu, fences, hanami sets,
+  vending machine, kei truck, summit shrine...), `MiyoshinoRiverKit.gd` (log rafts, sawmill and wheel, boats; in game
+  metres: road_bridge, suspension_bridge, ledge_walk, timber_chute, with `check_corridor`). Previews:
+  `scratch/miyoshino_town_preview.gd`, `miyoshino_prop_preview.gd`, `miyoshino_river_preview.gd` (`-s`, windowed).
+  No kanji anywhere: the project has no CJK font; signs are romaji and the emblem is a drawn five-petal crest.
+- Trees: `MiyoshinoTrees.gd` (extends WoodlandBuilder; its own atlas): sakura, yamazakura, shidare, sugi, momiji, take,
+  matsu, tsutsuji; `scratch/miyoshino_trees_preview.gd`. It added BARKS entries, and uniforms to `acacia_leaves`
+  (`backlight_albedo`, `seed_tint_a/b`, `glow`) and `tree_bark` (`node_spacing`, `node_color`) whose defaults leave the
+  other stages as they were (`scratch/miyoshino_trees_regress.gd` hashes the old kinds).
+- `PetalGusts.gd`: petals falling round the camera and, at `spots`, gusts on the wall clock that blow petals across the
+  road and push the carts this peer drives (`mist`: wisps of cloud instead, the Yamabushi Trail's upper mountain).
+- Senbon Sakura Pass (3.1km, a spring morning): the hanami park's start straight, three legs and two hairpins up the
+  cherry slope, the ridge (teahouse, a kicker), the shrine's turn-back, the cedar descent over the ravine's arch bridge.
+  The torii path cuts the upper hairpin (55m against 96m, off-road). Bots lap in about 80s; two fell at the upper
+  hairpin's exit (760m) in the one race run: not looked into.
+- Yoshino Rapids (2.6km, midday): the river is functions of x (`_river_z`, `_river_half`, `_water_y` falling at RAPIDS,
+  `_depth`), which carve the ground and build the water (RiverWater.gd with one strip, `river_water.gdshader`). The south
+  bank's village, the timber bridge, the lumber yard and sawmill (its wheel a Spinner), the forest road, the timber slide
+  (planks between log walls) and its kicker, the ford (0.36m deep). The raft train (`RaftCrossing`, RiverRafts.gd: the
+  rafts bob, their deck is still boxes; more rafts drift down the river) is 315m against the lap's 533m. Laps about 63s,
+  no respawns.
+- Monzenmachi (2.0km, dusk, `MK.night`): the shop street under lantern strings (key "lantern_lights": not solid), the
+  great gate (the road narrows to 6.5m through its 6.9m bay), the stone steps (treads whose nosings lie on the road's
+  line; the collision is that ramp), the precinct (hall, pagoda, bell tower), the back street, the bamboo chicane and the
+  walled Alley past it. 107 OmniLights without shadows; town batches in 60m cells for the Mobile renderer's light limit.
+  The first street run must start at s 4, not `closest_s` of a point before s 0 (it returned the lap's end and the shop
+  street stood empty). Laps about 50s, no respawns.
+- Yamabushi Trail (4.5km, point to point, dawn): a spiral of corners 1.6 times round a cone (`_spiral`, `_natural`), the
+  mountain always on the right; a suspension bridge over the gorge (in the cloud), plank walks (LEDGES) with chains,
+  chain fences on the drops, the summit shrine. `CloudLayer.gd` sets every viewer's fog and sun by their camera's height
+  (the band 96-150m: fog to 85m inside it), `cloud_sea.gdshader` the sheet seen from above. Bots take 114-130s.
+- Music `MusicManager.STAGE_TRACKS` "senbon", "yoshino", "monzen", "yamabushi" (`music/miyoshino/`, instrumental,
+  tools/elevenlabs); StageAmbience has entries for all four; no sounds of their own yet (river, temple bell, wind).
+- Not checked yet: GPU cost on any of the four, the gusts and the cloud in a real race, the raft crossing and the Alley
+  with bots forced onto them (`scratch/shortcut_probe ... chance=1.0`), collision_audit, the jump tests.

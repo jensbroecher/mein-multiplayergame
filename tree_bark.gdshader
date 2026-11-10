@@ -21,6 +21,10 @@ uniform float fissure_depth = 0.05;
 // Plates are this many times longer along the branch than across it.
 uniform float plate_stretch = 3.0;
 uniform float roughness_value : hint_range(0.0, 1.0) = 0.92;
+// Bamboo (the Miyoshino GP's moso): a node every `node_spacing` bark cells along the tube (0: none), a dark ridge with
+// a pale waxy ring under it, fading to their average once they are finer than a pixel.
+uniform float node_spacing = 0.0;
+uniform vec4 node_color : source_color = vec4(0.80, 0.84, 0.68, 1.0);
 
 varying float cam_dist;
 varying vec3 w_pos;
@@ -82,11 +86,22 @@ void fragment() {
 	vec3 col = mix(fissure_color.rgb, bark_color.rgb * (0.8 + n3 * 0.4), h);
 	// Pale weathered edges on the plates, and the odd lichen patch.
 	col = mix(col, col * 1.25, smoothstep(0.75, 0.95, n2) * h * 0.6);
+	float node_h = 0.0;
+	if (node_spacing > 0.0) {
+		float ny = UV.y / node_spacing;
+		float nf = fract(ny);
+		float fine = clamp(fwidth(ny) * 4.0, 0.0, 1.0);
+		float ridge = 1.0 - smoothstep(0.0, 0.035, min(nf, 1.0 - nf));
+		float wax = smoothstep(0.72, 0.96, nf) * (1.0 - ridge);
+		col = mix(col, node_color.rgb, mix(wax * 0.6, 0.1, fine));
+		col *= 1.0 - mix(ridge * 0.5, 0.03, fine);
+		node_h = ridge * 0.006 * (1.0 - fine);
+	}
 	col *= COLOR.rgb * 1.25;
 	ALBEDO = col * mix(0.45, 1.0, COLOR.a);
 	ROUGHNESS = roughness_value;
 	SPECULAR = 0.25;
 	AO = mix(0.5, 1.0, COLOR.a);
 	AO_LIGHT_AFFECT = 0.3;
-	NORMAL = b_bump(NORMAL, VERTEX, h * fissure_depth, mix(0.3, 1.0, detail));
+	NORMAL = b_bump(NORMAL, VERTEX, h * fissure_depth + node_h, mix(0.3, 1.0, detail));
 }

@@ -21,6 +21,8 @@ render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 // Styles 9 to 12 fade their fine pattern to its average by the pixel's size in metres (fwidth), as hut_roof_iron does.
 
 uniform int style = 0;
+// Style 5: how much sun-bleached buff clay is mixed into the tiles (0 for the Miyoshino GP's grey kawara).
+uniform float tile_buff = 0.55;
 
 // Colours below are written as sRGB and linearised here.
 vec3 srgb(vec3 c) {
@@ -325,7 +327,7 @@ void fragment() {
 		// Blend warm terracotta, sun-bleached buff clay, and deeper sienna per tile.
 		vec3 clay_a = tint * (0.82 + 0.32 * tile_id);
 		vec3 clay_b = srgb(vec3(0.76, 0.58, 0.44)) * (0.85 + 0.25 * tile_id2);
-		vec3 tile_col = mix(clay_a, clay_b, smoothstep(0.25, 0.85, tile_id2) * 0.55);
+		vec3 tile_col = mix(clay_a, clay_b, smoothstep(0.25, 0.85, tile_id2) * tile_buff);
 		// Fine clay grain and weathering along the barrel.
 		float grain = vnoise(vec2(q.x * 14.0, q.y * 6.0)) * 0.6 + vnoise(q * 2.2) * 0.4;
 		tile_col *= 0.86 + 0.26 * grain;

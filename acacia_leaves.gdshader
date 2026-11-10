@@ -18,6 +18,15 @@ uniform float alpha_cut : hint_range(0.0, 1.0) = 0.5;
 // Pulls the leaves toward their grey (0: as drawn): the Al-Raihana GP's ghaf and thorn trees are dusty grey-green.
 uniform float desaturate : hint_range(0.0, 1.0) = 0.0;
 uniform vec4 backlight_color : source_color = vec4(0.62, 0.66, 0.30, 1.0);
+// 1: what shines through a card is its own colour times backlight_color, not backlight_color alone (the Miyoshino
+// GP's blossom: a leaf green behind pale pink petals read as grey).
+uniform float backlight_albedo : hint_range(0.0, 1.0) = 0.0;
+// The colour drift from tree to tree (tree_seed 0 to 1): greener to more olive as it was; blossom sets whiter to pinker.
+uniform vec3 seed_tint_a = vec3(0.94, 1.02, 1.04);
+uniform vec3 seed_tint_b = vec3(1.06, 1.0, 0.86);
+// A share of the cards' own colour given off as light (0: none): blossom lights itself from petal to petal, and in
+// the tree's own shadow it stays pale instead of going the sky's blue-grey.
+uniform float glow : hint_range(0.0, 1.0) = 0.0;
 // Metres the canopy sways at its top, and the height that sways fully.
 uniform float sway = 0.15;
 uniform float sway_height = 16.0;
@@ -48,7 +57,7 @@ void fragment() {
 	ALPHA = tex.a;
 	ALPHA_SCISSOR_THRESHOLD = alpha_cut;
 	// Some trees greener, some greyer and more olive.
-	vec3 tint = COLOR.rgb * 1.25 * mix(vec3(0.94, 1.02, 1.04), vec3(1.06, 1.0, 0.86), tree_seed);
+	vec3 tint = COLOR.rgb * 1.25 * mix(seed_tint_a, seed_tint_b, tree_seed);
 	float shade = COLOR.a;
 	ALBEDO = tex.rgb * tint * mix(0.42, 1.0, shade);
 	ALBEDO = mix(ALBEDO, vec3(dot(ALBEDO, vec3(0.3, 0.55, 0.15))) * vec3(1.0, 1.02, 0.9), desaturate);
@@ -56,9 +65,10 @@ void fragment() {
 	if (!FRONT_FACING) {
 		NORMAL = -NORMAL;
 	}
+	EMISSION = ALBEDO * glow;
 	ROUGHNESS = 0.82;
 	SPECULAR = 0.22;
-	BACKLIGHT = backlight_color.rgb * 0.35 * shade;
+	BACKLIGHT = mix(backlight_color.rgb, backlight_color.rgb * tex.rgb * tint, backlight_albedo) * 0.35 * shade;
 	AO = mix(0.35, 1.0, shade);
 	AO_LIGHT_AFFECT = 0.25;
 }

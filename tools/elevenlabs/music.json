@@ -34,5 +34,29 @@
     "path": "music/kronburg/Quer_durch_Kronburg.mp3",
     "prompt": "Instrumental upbeat racing game track for a sunny late-summer morning rally through a German city and a botanical garden into an old industrial harbour: bouncy electro-funk groove, slap-style synth bass, crisp drums with shuffled hi-hats, bright guitar chops, playful synth leads that build into a big euphoric drop. 136 BPM. No vocals, no lyrics, no voice samples.",
     "seconds": 170
+  },
+  {
+    "name": "miyoshino_senbon",
+    "path": "music/miyoshino/Senbon_Zakura_Dash.mp3",
+    "prompt": "Instrumental upbeat racing game track for a bright spring morning drive up a Japanese mountain road through cherry blossoms: fast drum and bass breakbeat with a punchy synth bass, a lively koto and shamisen lead melody in a pentatonic scale, shakuhachi flute phrases, taiko drum hits on the accents, joyful and airy, builds into a big euphoric chorus. 168 BPM. No vocals, no lyrics, no voice samples.",
+    "seconds": 170
+  },
+  {
+    "name": "miyoshino_rapids",
+    "path": "music/miyoshino/Emerald_Rapids.mp3",
+    "prompt": "Instrumental driving racing game track for a race along an emerald Japanese mountain river: rolling taiko drums and a tight electronic beat, plucked shamisen riffs, a flowing koto arpeggio like running water, warm synth pads, a bold melodic lead, energetic and fresh with a strong forward pulse. 150 BPM. No vocals, no lyrics, no voice samples.",
+    "seconds": 170
+  },
+  {
+    "name": "miyoshino_lanterns",
+    "path": "music/miyoshino/Lantern_Street.mp3",
+    "prompt": "Instrumental night-festival racing game track for a street race at dusk through a Japanese temple town lit by paper lanterns: matsuri festival groove with taiko, hand bells and wood clappers over a modern funky electronic beat and deep bass, shamisen and bamboo flute trading catchy riffs, warm and exciting, a little mysterious. 132 BPM. No vocals, no lyrics, no voice samples.",
+    "seconds": 170
+  },
+  {
+    "name": "miyoshino_summit",
+    "path": "music/miyoshino/Above_the_Clouds.mp3",
+    "prompt": "Instrumental epic racing game finale track for a hill climb up a sacred Japanese mountain through fog to a sunrise above the clouds: starts tense and misty with low taiko and a distant conch-horn-like synth, grows into a soaring heroic theme with koto, shakuhachi, big orchestral strings and a fast driving electronic beat, triumphant final chorus. 146 BPM. No vocals, no lyrics, no voice samples.",
+    "seconds": 180
   }
 ]

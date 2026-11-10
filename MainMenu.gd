@@ -43,6 +43,7 @@ const COL_BEACH := Color(0.96, 0.78, 0.40)
 const COL_SAVANNA := Color(0.95, 0.47, 0.22)
 const COL_JUNGLE := Color(0.32, 0.80, 0.42)
 const COL_KRONBURG := Color(0.88, 0.36, 0.26)
+const COL_MIYOSHINO := Color(0.98, 0.62, 0.74)
 
 ## Every course's tile: title, one-line description, picture and accent colour.
 const STAGE_INFO := {
@@ -69,10 +70,14 @@ const STAGE_INFO := {
 	"res://levels/RheinuferLevel.tscn": {"title": "RHEINUFER", "subtitle": "Down the Rhine promenade, over the old steel-arch bridge, along the dyke past the sheep and the fun fair, round the Autobahn's loop ramp and back over the river on the cable-stayed bridge", "file": "tile_rheinufer.jpg", "color": COL_KRONBURG},
 	"res://levels/StadtrallyeLevel.tscn": {"title": "QUER DURCH KRONBURG", "subtitle": "The finale, one run across town: over the moat bridge, through the pedestrian zone, across the Ring between cars and trams, through the Palmenhaus and up the botanical garden's Alpinum, past the wrecking ball, the scrapyard's magnet and the building site to the old gasworks", "file": "tile_stadtrallye.jpg", "color": COL_KRONBURG},
 	"res://levels/ZecheLevel.tscn": {"title": "ZECHE KRONPRINZ", "subtitle": "Off-road through the old colliery: under the coal washer, past the coke ovens and the steaming quench tower, up the spoil heap, a leap off its plateau, through the birch scrub and the settling ponds, over the pit railway", "file": "tile_zeche.jpg", "color": COL_KRONBURG},
+	"res://levels/SenbonSakuraLevel.tscn": {"title": "SENBON SAKURA PASS", "subtitle": "A mountain road through a thousand cherry trees in bloom: from the hanami park up the hairpins, under the tunnel of torii, along the ridge past the teahouse, down through the cedars over the vermilion bridge", "file": "tile_senbon_sakura.jpg", "color": COL_MIYOSHINO},
+	"res://levels/YoshinoRapidsLevel.tscn": {"title": "YOSHINO RAPIDS", "subtitle": "Round the emerald river: the riverside village, the timber bridge, the sawmill's yard, a forest road through the cedars, down the log slide and through the ford; a raft train lies across the pool for the bold", "file": "tile_yoshino_rapids.jpg", "color": COL_MIYOSHINO},
+	"res://levels/MonzenmachiLevel.tscn": {"title": "MONZENMACHI", "subtitle": "The temple town at dusk under its paper lanterns: down the shop street, through the great gate, up the stone steps past the hall and the pagoda, the back street's slope and the bamboo grove's chicane", "file": "tile_monzenmachi.jpg", "color": COL_MIYOSHINO},
+	"res://levels/YamabushiLevel.tscn": {"title": "YAMABUSHI TRAIL", "subtitle": "The finale, one run up the pilgrims' mountain at dawn: from the cedar forest over the gorge's suspension bridge, through the cloud, along plank walks chained to the cliffs to the shrine on the summit", "file": "tile_yamabushi.jpg", "color": COL_MIYOSHINO},
 	"res://levels/MsituFallsLevel.tscn": {"title": "MSITU FALLS", "subtitle": "Rainforest hairpins, a mud bend, a rope bridge over the brink, behind the falls, and tropical downpours", "file": "tile_msitu_falls.jpg", "color": COL_JUNGLE},
 }
 ## Section header colour per cup on the course lists (same accents as the cup tiles).
-const CUP_COLORS := {"Bloombay GP": COL_GREEN, "Svartfjell GP": COL_SNOW, "Al-Raihana GP": COL_BRONZE, "Sierra del Viento GP": COL_CANYON, "Matumaini GP": COL_SAVANNA, "Kronburg GP": COL_KRONBURG}
+const CUP_COLORS := {"Bloombay GP": COL_GREEN, "Svartfjell GP": COL_SNOW, "Al-Raihana GP": COL_BRONZE, "Sierra del Viento GP": COL_CANYON, "Matumaini GP": COL_SAVANNA, "Kronburg GP": COL_KRONBURG, "Miyoshino GP": COL_MIYOSHINO}
 ## Tiles per row in a cup section: one cup per row.
 const SECTION_COLUMNS := 4
 
@@ -445,6 +450,9 @@ func _build_page(menu_name: String) -> void:
 			)
 			_add_tile("KRONBURG GP", "Kronburger Hütte  •  Rheinufer  •  Zeche Kronprinz  •  Quer durch Kronburg", "tile_kronburg_gp.jpg", COL_KRONBURG, func():
 				_on_cup_selected("Kronburg GP")
+			)
+			_add_tile("MIYOSHINO GP", "Senbon Sakura Pass  •  Yoshino Rapids  •  Monzenmachi  •  Yamabushi Trail", "tile_miyoshino_gp.jpg", COL_MIYOSHINO, func():
+				_on_cup_selected("Miyoshino GP")
 			)
 		"stage_select":
 			if NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR:

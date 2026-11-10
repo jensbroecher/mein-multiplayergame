@@ -82,6 +82,10 @@ const ALL_STAGES = [
 	{"name": "Rheinufer", "path": "res://levels/RheinuferLevel.tscn"},
 	{"name": "Zeche Kronprinz", "path": "res://levels/ZecheLevel.tscn"},
 	{"name": "Quer durch Kronburg", "path": "res://levels/StadtrallyeLevel.tscn"},
+	{"name": "Senbon Sakura Pass", "path": "res://levels/SenbonSakuraLevel.tscn"},
+	{"name": "Yoshino Rapids", "path": "res://levels/YoshinoRapidsLevel.tscn"},
+	{"name": "Monzenmachi", "path": "res://levels/MonzenmachiLevel.tscn"},
+	{"name": "Yamabushi Trail", "path": "res://levels/YamabushiLevel.tscn"},
 ]
 
 const GP_CUPS = {
@@ -137,6 +141,15 @@ const GP_CUPS = {
 			"res://levels/RheinuferLevel.tscn",
 			"res://levels/ZecheLevel.tscn",
 			"res://levels/StadtrallyeLevel.tscn",
+		]
+	},
+	"Miyoshino GP": {
+		"name": "Miyoshino GP",
+		"stages": [
+			"res://levels/SenbonSakuraLevel.tscn",
+			"res://levels/YoshinoRapidsLevel.tscn",
+			"res://levels/MonzenmachiLevel.tscn",
+			"res://levels/YamabushiLevel.tscn",
 		]
 	}
 }

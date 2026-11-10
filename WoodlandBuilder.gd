@@ -79,6 +79,14 @@ const BARKS := {
 	"pollard": [Color(0.60, 0.57, 0.52), Color(0.24, 0.21, 0.18), 0.38, 0.05, 2.2, Color(0.84, 0.82, 0.78)],
 	"poplar": [Color(0.56, 0.54, 0.50), Color(0.20, 0.18, 0.16), 0.36, 0.04, 3.4, Color(0.82, 0.81, 0.78)],
 	"plane": [Color(0.80, 0.76, 0.58), Color(0.47, 0.50, 0.40), 0.5, 0.004, 1.15, Color(0.88, 0.86, 0.80)],
+	# The Miyoshino GP (MiyoshinoTrees.gd): a cherry's near-black bark banded with pale lenticels (the "fissures" are the
+	# bands: paler, raised, lying across the stem); a cedar's red-brown bark in long fibrous strips; a bamboo culm, smooth
+	# and green (no fissures; MiyoshinoTrees.bark_material adds the node rings); a maple's smooth grey; a garden pine's plates.
+	"sakura": [Color(0.15, 0.12, 0.12), Color(0.40, 0.33, 0.30), 0.34, -0.004, 0.16, Color(0.80, 0.78, 0.78)],
+	"sugi": [Color(0.52, 0.30, 0.20), Color(0.25, 0.13, 0.09), 0.42, 0.02, 9.0, Color(0.84, 0.78, 0.74)],
+	"take": [Color(0.36, 0.52, 0.20), Color(0.30, 0.44, 0.16), -0.4, 0.0, 6.0, Color(0.80, 0.80, 0.80)],
+	"momiji": [Color(0.50, 0.50, 0.45), Color(0.32, 0.31, 0.27), 0.22, 0.008, 5.0, Color(0.80, 0.80, 0.78)],
+	"matsu": [Color(0.50, 0.30, 0.20), Color(0.16, 0.10, 0.08), 0.40, 0.04, 1.6, Color(0.86, 0.78, 0.72)],
 }
 
 ## The canopy crossfades from the detailed trees to their stand-ins round TREE_NEAR (JungleDetail.gd

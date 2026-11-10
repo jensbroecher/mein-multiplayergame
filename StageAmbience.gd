@@ -65,6 +65,11 @@ const STAGES := {
 	# Zeche Kronprinz: a morning's birds over the scrub, the town far off; the Kokerei, the crows, the conveyor and the
 	# quench tower are 3D (the generator's).
 	"ZecheLevel": [["insects_birds", -32.0], ["city", -46.0]],
+	# The Miyoshino GP: spring birdsong in the groves and the cedars; the temple town has its evening's murmur under it.
+	"SenbonSakuraLevel": [["insects_birds", -30.0], ["forest", -38.0]],
+	"YoshinoRapidsLevel": [["forest", -31.0], ["insects_birds", -36.0]],
+	"MonzenmachiLevel": [["city", -40.0], ["insects_birds", -40.0]],
+	"YamabushiLevel": [["forest", -34.0]],
 	# Quer durch Kronburg: the city all round, birds in the garden; the Ring's traffic, the trams, the sites' machines and
 	# the wrecking ball are 3D (the generator's and the hazards' own).
 	"StadtrallyeLevel": [["city", -36.0], ["insects_birds", -40.0]],
