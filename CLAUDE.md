@@ -4540,7 +4540,11 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   vending machine, kei truck, summit shrine...), `MiyoshinoRiverKit.gd` (log rafts, sawmill and wheel, boats; in game
   metres: road_bridge, suspension_bridge, ledge_walk, timber_chute, with `check_corridor`). Previews:
   `scratch/miyoshino_town_preview.gd`, `miyoshino_prop_preview.gd`, `miyoshino_river_preview.gd` (`-s`, windowed).
-  No kanji anywhere: the project has no CJK font; signs are romaji and the emblem is a drawn five-petal crest.
+  The kits and the stages write their signs in romaji; `MiyoshinoStage._jp` (the `JP` table) turns the ones it knows into
+  Japanese, drawn in Yuji Syuku (`fonts/YujiSyuku-Regular.ttf`, SIL Open Font License, `fonts/YujiSyuku-OFL.txt`), both
+  for texts passed to a builder through `_put` (a way-stone stacks its characters) and for the labels a kit emits. A new
+  sign text needs an entry there or it stays romaji. `scratch/label_positions.gd` (`-s`, headless, `-- <level>`) lists a
+  level's Label3Ds and where they are. The emblem is a drawn five-petal crest.
 - Trees: `MiyoshinoTrees.gd` (extends WoodlandBuilder; its own atlas): sakura, yamazakura, shidare, sugi, momiji, take,
   matsu, tsutsuji; `scratch/miyoshino_trees_preview.gd`. It added BARKS entries, and uniforms to `acacia_leaves`
   (`backlight_albedo`, `seed_tint_a/b`, `glow`) and `tree_bark` (`node_spacing`, `node_color`) whose defaults leave the

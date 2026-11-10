@@ -1713,6 +1713,26 @@ func _kit_value(script: Script, fn: String, args: Array, fallback: Variant) -> V
 	return script.callv(fn, args)
 
 
+## The signs' Japanese (the kits and the stages write romaji; `_jp` turns what it knows into this, drawn in Yuji Syuku,
+## fonts/YujiSyuku-Regular.ttf, SIL Open Font License). A text not listed stays as it is.
+const JP_FONT := "res://fonts/YujiSyuku-Regular.ttf"
+const JP := {"CHAYA": "茶屋", "DANGO": "だんご", "HASHI": "箸", "ICHI NO NABIKI": "一の靡", "NI NO NABIKI": "二の靡",
+	"SAN NO NABIKI": "三の靡", "YON NO NABIKI": "四の靡", "KAMI SENBON": "上千本", "NAKA SENBON": "中千本",
+	"SHIMO SENBON": "下千本", "KANMI": "甘味", "KINGYO": "金魚", "KURA": "蔵", "KUZU": "葛", "MIYAGE": "みやげ", "MOCHI": "餅",
+	"OKUGAKE": "奥駈道", "OMEN": "お面", "RINGO AME": "りんご飴", "RYOKAN HANAMINE": "旅館 花峰", "RYOKAN KINPU": "旅館 金峰",
+	"RYOKAN SAKURAYA": "旅館 桜屋", "SAKE": "酒", "SANJO": "山上", "SOBA": "そば", "STOP": "止まれ", "TAKOYAKI": "たこ焼き",
+	"TOFU": "豆腐", "UDON": "うどん", "WASHI": "和紙", "YADO YOSHINO": "宿 吉野", "YAMAGOYA": "山小屋",
+	"YOSHINO SEIZAI": "吉野製材", "YOSHINO SUGI": "吉野杉"}
+var _jp_font: Font
+
+func _jp(text: String) -> String:
+	if _jp_font == null:
+		_jp_font = load(JP_FONT) if ResourceLoader.exists(JP_FONT) else ThemeDB.fallback_font
+	if _jp_font == ThemeDB.fallback_font:
+		return text
+	return String(JP.get(text, text))
+
+
 ## Stands for the labels array in _put's argument list.
 const LBL := "@labels"
 
@@ -1729,6 +1749,8 @@ func _put(key: String, kit_script: Script, xf: Transform3D, fn: String, args: Ar
 		for v in args:
 			if v is String and v == LBL:
 				a.append(labels)
+			elif v is String:
+				a.append(_jp(v))
 			else:
 				a.append(v)
 		kit_script.callv(fn, a), range_end)
@@ -1833,9 +1855,11 @@ func _flush_batches(root: Node3D) -> void:
 		node.add_child(mi)
 		for l in b["labels"]:
 			var lab := Label3D.new()
-			lab.text = l[0]
+			lab.text = _jp(String(l[0]))
+			if _jp_font != null and _jp_font != ThemeDB.fallback_font:
+				lab.font = _jp_font
 			lab.font_size = 64
-			lab.pixel_size = _fit_pixel(l[0], 64, float(l[3]) / 44.8, float(l[5]))
+			lab.pixel_size = _fit_pixel(lab.text, 64, float(l[3]) / 44.8, float(l[5]))
 			lab.modulate = l[4]
 			lab.outline_size = 4
 			lab.outline_modulate = Color(0.05, 0.05, 0.05)
@@ -1852,7 +1876,8 @@ func _flush_batches(root: Node3D) -> void:
 func _fit_pixel(text: String, font_size: int, pixel: float, max_w: float) -> float:
 	if max_w <= 0.0:
 		return pixel
-	var w: float = ThemeDB.fallback_font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	var f: Font = _jp_font if _jp_font != null else ThemeDB.fallback_font
+	var w: float = f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 	if w * pixel <= max_w:
 		return pixel
 	return max_w / maxf(w, 1.0)
