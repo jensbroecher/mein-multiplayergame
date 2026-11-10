@@ -665,8 +665,10 @@ func _plan_heights(r: Route, pin0 := NAN, pin1 := NAN) -> void:
 		for i in range(hold + 1):
 			sm[i] = pin0
 			sm[n - 1 - i] = pin1
-		if absf(cur[0] - pin0) > 0.3:
-			push_warning("%s: %s can't reach the lap's height at its start within its grade (%.1fm off)" % [title, r.name, cur[0] - pin0])
+		# After the grade clamp a pinned end may not meet the lap: that would be a step in the road.
+		if absf(cur[hold + 1] - pin0) > 0.3 or absf(cur[n - 2 - hold] - pin1) > 0.3:
+			push_warning("%s: %s can't reach the lap's height within its grade: %.1fm off at its start, %.1fm at its end" % [
+					title, r.name, cur[hold + 1] - pin0, cur[n - 2 - hold] - pin1])
 	_shape_heights(r, sm)
 	r.ys = sm
 
@@ -733,7 +735,9 @@ func _add_samples(r: Route) -> void:
 		var s2: float = minf(s + SAMPLE_STEP, r.length)
 		var mid: float = (s + s2) * 0.5
 		if not _on_bridge(r, mid, 1.0):
-			_add_seg(r.pt(s), r.pt(s2), _grade_params(r, mid))
+			var par: Array = _grade_params(r, mid).duplicate()
+			par.append(r == lap)
+			_add_seg(r.pt(s), r.pt(s2), par)
 		s = s2
 
 
@@ -764,6 +768,8 @@ func _grade(h: float, x: float, z: float) -> Vector2:
 	var touched := false
 	var flat_y := NAN
 	var flat_lat := 1e9
+	var lap_y := NAN
+	var lap_lat := 1e9
 	var best_d := 1e9
 	var seen := {}
 	var reach: int = ceili(GRADE_REACH / CELL)
@@ -801,8 +807,15 @@ func _grade(h: float, x: float, z: float) -> Vector2:
 				if lateral <= flat and lateral < flat_lat:
 					flat_lat = lateral
 					flat_y = foot_y
+				if par.size() > 4 and bool(par[4]) and lateral <= flat and lateral < lap_lat:
+					lap_lat = lateral
+					lap_y = foot_y
 	if not touched:
 		return Vector2(h, best_d)
+	# On the lap's own flat band the lap's height wins: where a shortcut joins it at a grade, the shortcut's flat band
+	# (nearer in plan) had lifted the ground up through the lap's road.
+	if not is_nan(lap_y):
+		return Vector2(lap_y, best_d)
 	if not is_nan(flat_y):
 		return Vector2(flat_y, best_d)
 	var res: float = upper if lower > upper else clampf(h, lower, upper)
@@ -1768,6 +1781,27 @@ func _life(p: Vector3) -> Vector3:
 	return p / PROP_SCALE
 
 
+## Where other routes (shortcuts, side roads) leave or join `r`: [s0, s1, side] along `r`, the mouth's width and a
+## margin either side, on the side the other route lies.
+func _route_mouths(r: Route) -> Array:
+	var out: Array = []
+	if r != lap:
+		return out
+	for o in routes:
+		if o == r or o.closed:
+			continue
+		for end in [[0.0, 1.0, o.from_s], [o.length, -1.0, o.to_s]]:
+			# A point on the other route just past the lap's road edge.
+			var probe_s: float = float(end[0]) + float(end[1]) * (r.half + 2.0)
+			var q: Vector3 = o.pt(probe_s)
+			var s_m: float = r.closest_s(Vector2(q.x, q.z))
+			var rel: Vector3 = q - r.pt(s_m)
+			var side: float = 1.0 if rel.dot(r.rt(s_m)) >= 0.0 else -1.0
+			var w: float = o.half + 7.0
+			out.append([s_m - w, s_m + w, side])
+	return out
+
+
 ## White guardrails wherever the ground falls away beside a route (more than `drop` under the road within 10m of its
 ## edge), with colliders: [[s0, s1, side]] of what was built.
 func _auto_guardrails(root: Node3D, r: Route, s_from: float, s_to: float, drop := 2.4, skip: Array = []) -> Array:
@@ -1798,6 +1832,31 @@ func _auto_guardrails(root: Node3D, r: Route, s_from: float, s_to: float, drop :
 					runs.append([run0 - 6.0, s + 2.0, side])
 				run0 = -1.0
 			s += 4.0
+	# Cut the runs open where a shortcut leaves or joins this route (a guardrail had closed the torii path's exit).
+	var mouths: Array = _route_mouths(r)
+	var cut: Array = []
+	for run in runs:
+		var pieces: Array = [[float(run[0]), float(run[1])]]
+		for m in mouths:
+			if float(m[2]) != float(run[2]):
+				continue
+			var next: Array = []
+			for pc in pieces:
+				var a0: float = pc[0]
+				var a1: float = pc[1]
+				var m0: float = float(m[0])
+				var m1: float = float(m[1])
+				if m1 <= a0 or m0 >= a1:
+					next.append(pc)
+					continue
+				if m0 - a0 >= 6.0:
+					next.append([a0, m0])
+				if a1 - m1 >= 6.0:
+					next.append([m1, a1])
+			pieces = next
+		for pc in pieces:
+			cut.append([pc[0], pc[1], run[2]])
+	runs = cut
 	var count := 0
 	for run in runs:
 		var side: float = run[2]

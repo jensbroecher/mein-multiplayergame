@@ -4527,6 +4527,9 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   batches (`_put`, `_put_world` with `_life()` for builders that take points, `LBL` for the labels array), automatic
   guardrails where the ground falls away, shortcuts as AlternativePaths (`shortcuts`), point-to-point stages.
   `-- maponly=1 map=<png> [profile=1]` saves a plan of the stage (hillshade, roads, a dot every 100m) in seconds.
+  On the lap's own flat band the lap's height wins the grading (`_grade`): a shortcut joining at a grade had pushed the
+  ground up through the lap's road. The automatic guardrails leave the mouths of shortcuts open (`_route_mouths`), and a
+  shortcut that can't reach the lap's height at either end within its grade is warned about (a step in the road).
 - Shaders: `miyoshino_ground.gdshader` (masks R rock, G bare ground, B cherry groves' fallen petals, A cedar forest
   floor; UV2.y wet; past `canopy_from` the grove and forest masks become the canopies' colours), `miyoshino_road.gdshader`
   (kinds 0 asphalt with white edge lines, an orange centre line and a gutter, 1 ishidatami paving, 2 the dirt trail, 3
@@ -4551,10 +4554,23 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   other stages as they were (`scratch/miyoshino_trees_regress.gd` hashes the old kinds).
 - `PetalGusts.gd`: petals falling round the camera and, at `spots`, gusts on the wall clock that blow petals across the
   road and push the carts this peer drives (`mist`: wisps of cloud instead, the Yamabushi Trail's upper mountain).
-- Senbon Sakura Pass (3.1km, a spring morning): the hanami park's start straight, three legs and two hairpins up the
-  cherry slope, the ridge (teahouse, a kicker), the shrine's turn-back, the cedar descent over the ravine's arch bridge.
-  The torii path cuts the upper hairpin (55m against 96m, off-road). Bots lap in about 80s; two fell at the upper
-  hairpin's exit (760m) in the one race run: not looked into.
+- Senbon Sakura Pass (3.4km, a spring morning): the hanami park's start straight, then (the user's idea) right over a
+  timber bridge with vermilion railings onto the temple island, round the hall on the temple's stone paving (K_STONE;
+  the hall faces the park across the water, two halls as its wings, a pagoda at the island's west end, a bell tower at
+  its east end) and back over the second bridge; three legs and two hairpins up the cherry slope, the ridge (teahouse, a
+  kicker), the shrine's turn-back, the cedar descent over the ravine's arch bridge. The lake is a smooth union of
+  ellipses with points of land cut out and a wandering shore (`LAKE_BLOBS`, `LAKE_POINTS`, `_lake_d`, `_island_d`,
+  `_water_d`: negative in the water), which carves the ground and builds the water (a grid of 5m cells near it). The
+  island has two gates one after the other: driving round the lake instead misses both, which disqualifies.
+  - The turn onto the first bridge comes after a 330m straight (the start line is at x -300 and the boost pad 30m past
+    it: nearer the turn, bots still at 40-50 m/s on lap 1 ran wide onto the grass before the railing began, drove down
+    the verge behind it and dropped into the lake at the bank). Vermilion railings run round the whole outside of the
+    turns onto and off the bridges and a little way along the causeways' insides (`_build_approach_rails`); their
+    colliders and the island bridges' are 2.6m high. `scratch/ai_race_test ... history=400` prints the last frames
+    before a respawn (how a bot got where it fell).
+  - The torii path cuts the upper hairpin (55m against 96m, footpath: off-road). Its exit had been closed by a guardrail
+    and a 1.2m step (it couldn't climb the 9m between the legs within 20%; now 30%). Bots lap in about 85s; in four
+    races after these fixes none fell on the island (only item blasts).
 - Yoshino Rapids (2.6km, midday): the river is functions of x (`_river_z`, `_river_half`, `_water_y` falling at RAPIDS,
   `_depth`), which carve the ground and build the water (RiverWater.gd with one strip, `river_water.gdshader`). The south
   bank's village, the timber bridge, the lumber yard and sawmill (its wheel a Spinner), the forest road, the timber slide

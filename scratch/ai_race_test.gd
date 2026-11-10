@@ -5,6 +5,7 @@ extends Node
 # first). cars= picks each bot's car (CAR_PRESETS indices).
 #   Godot --headless --path . res://scratch/ai_race_test.tscn -- res://levels/X.tscn [seconds=300] [speed=4]
 #       [weather=0..1] [cars=5,5,0,1,2,3] [noitems=1] [hide=<node name>]
+# history=<frames> keeps that many physics frames of each cart's trail and prints every 10th at a respawn (default 90).
 # nodrift=1 sets every bot's ai_drift_chance to 0 (to tell what drifting does to a race).
 # noitems=1 frees every item box (to tell what an item box does to a lap from what the course does).
 # It prints each jump lip's crossing speeds (TrackPath's "jump_lips"), and REJOIN-ON-ROAD when a bot goes into
@@ -16,6 +17,10 @@ var weather := -1.0
 var cars: PackedStringArray = []
 var no_items := false
 var no_drift := false
+
+## How many physics frames of each cart's trail to keep and print (every 10th) at a respawn: history=<frames>.
+var history := 90
+
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
@@ -33,6 +38,8 @@ func _ready() -> void:
 			no_items = true
 		elif a == "nodrift=1":
 			no_drift = true
+		elif a.begins_with("history="):
+			history = int(a.substr(8))
 	AudioServer.set_bus_mute(0, true)
 	NetworkManager.current_game_mode = NetworkManager.GameMode.SPECTATOR
 	NetworkManager.start_spectator()
@@ -124,7 +131,7 @@ func _ready() -> void:
 				respawns[c].append("%.0fm(%s y%.0f)" % [off, "drown" if c.is_drowned else ("boom" if c.is_exploding else "fall"), p.y])
 				print("RESPAWN %s from %.0fm%s; last moments:" % [c.name, off, " (blown up)" if c.is_exploding else ""])
 				var tr0: Array = trail.get(c, [])
-				for k in range(maxi(0, tr0.size() - 90), tr0.size(), 10):
+				for k in range(maxi(0, tr0.size() - history), tr0.size(), 10):
 					print("    ", tr0[k])
 			was_tele[c] = tele
 			var dr: bool = c.get("drift_mode") == true
@@ -169,7 +176,7 @@ func _ready() -> void:
 				var tr: Array = trail.get(c, [])
 				var gc = c.ground_ray.get_collider() if c.ground_ray.is_colliding() else null
 				tr.append("%s v%s ground=%s grip=%.2f" % [c.global_position, c.linear_velocity, gc.name if gc else "-", c.surface_grip])
-				if tr.size() > 90:
+				if tr.size() > history:
 					tr.pop_front()
 				trail[c] = tr
 				# First moment a cart is underneath a road deck: where it got in.
