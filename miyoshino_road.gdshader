@@ -27,6 +27,8 @@ uniform vec3 petal_color : source_color = vec3(0.97, 0.72, 0.80);
 uniform vec3 centre_line : source_color = vec3(0.95, 0.58, 0.10);
 uniform vec3 earth_tint : source_color = vec3(0.52, 0.45, 0.36);
 uniform vec3 plank_tint : source_color = vec3(0.58, 0.46, 0.34);
+// The temple precinct's gravel (kind 5).
+uniform vec3 precinct_gravel : source_color = vec3(0.80, 0.78, 0.72);
 // Wet look (the misty trail): darker, glossier.
 uniform float wetness = 0.0;
 
@@ -263,7 +265,7 @@ void fragment() {
 		// ---- Temple precinct: fine raked gravel.
 		vec3 gr = texture(gravel_tex, xz / 1.3).rgb;
 		float gl = dot(gr, vec3(0.33));
-		col = lin(vec3(0.80, 0.78, 0.72)) * (0.62 + gl * 0.9);
+		col = lin(precinct_gravel) * (0.62 + gl * 0.9);
 		float rake = sin(x * 22.0) * 0.5 + 0.5;
 		col *= 1.0 - 0.14 * rake * (1.0 - smoothstep(0.004, 0.03, fw));
 		col *= 0.92 + 0.14 * vnoise(xz / 6.0);

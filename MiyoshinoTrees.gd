@@ -9,6 +9,7 @@ extends "res://WoodlandBuilder.gd"
 ##   sugi        Japanese cedar: a straight red-brown stem, a narrow dark cone of upswept sprays (variant even: the
 ##               forest form, bare below with dead stubs; odd: the edge form, branched low and fuller)
 ##   momiji      Japanese maple in spring: a low, wide crown in flat tiers of yellow-green (variant odd: twin stems)
+##   momiji_red  the same, red-leaved (a deshojo, scarlet in spring): its leaf cards tinted red
 ##   take        a clump of moso bamboo: green culms with node rings, arching over, feathery sprays in the top third
 ##   matsu       a garden pine: a twisted leaning trunk, needles in flat cloud pads
 ##   tsutsuji    an azalea bush in flower (variant even magenta, odd white)
@@ -18,7 +19,7 @@ extends "res://WoodlandBuilder.gd"
 ## miyo_bark_key() for bark_material(). miyo_mesh() builds any of them; lod 1 is the far stand-in (under 150 triangles).
 ## Sizes are game metres; the tree stands on y = 0, its roots a little below.
 
-const MIYO_KINDS := ["sakura", "yamazakura", "shidare", "sugi", "momiji", "take", "matsu", "tsutsuji"]
+const MIYO_KINDS := ["sakura", "yamazakura", "shidare", "sugi", "momiji", "momiji_red", "take", "matsu", "tsutsuji"]
 
 ## The atlas's cells, row by row. Cells with a direction are drawn upright, their base at the cell's foot (v = 1),
 ## but the weeping cherry's strands, which hang from the cell's top and tile downward (BODY over BODY over TAIL).
@@ -93,7 +94,7 @@ func miyo_bark_key(kind: String) -> String:
 	match kind:
 		"sakura", "yamazakura", "shidare":
 			return "sakura"
-		"tsutsuji":
+		"tsutsuji", "momiji_red":
 			return "momiji"
 	return kind
 
@@ -133,8 +134,8 @@ func miyo_mesh(kind: String, variant: int, lod: int, bark_mat: Material, leaf_ma
 			return _cherry_mesh(kind, variant, lod, bark_mat, leaf_mat)
 		"sugi":
 			return _sugi_mesh(variant, lod, bark_mat, leaf_mat)
-		"momiji":
-			return _momiji_mesh(variant, lod, bark_mat, leaf_mat)
+		"momiji", "momiji_red":
+			return _momiji_mesh(variant, lod, bark_mat, leaf_mat, kind == "momiji_red")
 		"take":
 			return _take_mesh(variant, lod, bark_mat, leaf_mat)
 		"matsu":
@@ -1307,7 +1308,8 @@ func _sugi_mesh(variant: int, lod: int, bark_mat: Material, leaf_mat: Material) 
 #  Momiji
 # ======================================================================================
 
-func _momiji_mesh(variant: int, lod: int, bark_mat: Material, leaf_mat: Material) -> ArrayMesh:
+## `red`: a red-leaved maple (a deshojo, scarlet in spring): the same spray tinted red.
+func _momiji_mesh(variant: int, lod: int, bark_mat: Material, leaf_mat: Material, red := false) -> ArrayMesh:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 33011 + variant * 149
 	var h: float = rng.randf_range(6.0, 8.0)
@@ -1349,7 +1351,7 @@ func _momiji_mesh(variant: int, lod: int, bark_mat: Material, leaf_mat: Material
 	crown.lift = 0.8
 	crown.floor_shade = 0.5
 	crown.axis_shade = 0.8
-	var tint := Color(0.80, 0.80, 0.78)
+	var tint := Color(1.0, 0.22, 0.2) if red else Color(0.80, 0.80, 0.78)
 	const TIER_R := [0.8, 1.0, 0.9, 0.68, 0.4]
 	for tier in range(5):
 		var ty: float = h * lerpf(0.36, 0.9, float(tier) / 4.0)

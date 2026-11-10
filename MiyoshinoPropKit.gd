@@ -1170,6 +1170,36 @@ static func koran(pk: PropKit, kit: Dictionary, a: Vector3, b: Vector3, h := 1.1
 	pk.beam(kit, "urushi", a + Vector3(0, 0.12, 0), b + Vector3(0, 0.12, 0), 0.09, 0.07, col.darkened(0.08))
 
 
+## A dry-stone retaining wall (ishigaki) along a terrace's edge from a to b (its top edge, the terrace's level): its face
+## toward `out` (level), battered back `batter` per metre, dropping `drop` to the ground and running on 1m under it; a
+## granite coping along the top, flush with the terrace. Segments of a curve meet at their ends.
+static func ishigaki(pk: PropKit, kit: Dictionary, a: Vector3, b: Vector3, out: Vector3, drop: float, batter := 0.22) -> void:
+	var o: Vector3 = Vector3(out.x, 0.0, out.z).normalized()
+	var l: float = (b - a).length()
+	if l < 0.05:
+		return
+	var h: float = drop + 1.0
+	var down := Vector3(0, -h, 0) + o * (h * batter)
+	var top_a: Vector3 = a + Vector3(0, -0.28, 0)
+	var top_b: Vector3 = b + Vector3(0, -0.28, 0)
+	var n: Vector3 = (o + Vector3(0, batter, 0)).normalized()
+	pk.quad(kit, "ishi", [top_a + down, top_b + down, top_b, top_a], n, GRANITE.darkened(0.12),
+			[Vector2(0.0, 0.0), Vector2(l, 0.0) * uvk, Vector2(l, h) * uvk, Vector2(0.0, h) * uvk])
+	# Moss and weather streaks low on the wall: a second, darker band over its foot.
+	var band: float = minf(0.9, h * 0.5)
+	var lift := Vector3(0, band, 0) + o * (-band * batter)
+	pk.quad(kit, "ishi", [top_a + down + o * 0.01, top_b + down + o * 0.01, top_b + down + lift + o * 0.01, top_a + down + lift + o * 0.01], n,
+			GRANITE_MOSSY.darkened(0.2), [Vector2(0.0, 0.0), Vector2(l, 0.0) * uvk, Vector2(l, band) * uvk, Vector2(0.0, band) * uvk])
+	# The coping: a course of long granite blocks, 0.6 deep, its top the terrace's level, standing 4cm out.
+	var c0a: Vector3 = a + o * 0.04
+	var c0b: Vector3 = b + o * 0.04
+	var c1a: Vector3 = a - o * 0.6
+	var c1b: Vector3 = b - o * 0.6
+	pk.quad(kit, "ishi", [c1a, c1b, c0b, c0a], Vector3.UP, GRANITE.lightened(0.05), [Vector2(0.0, 0.0), Vector2(l, 0.0) * uvk, Vector2(l, 0.64) * uvk, Vector2(0.0, 0.64) * uvk])
+	pk.quad(kit, "ishi", [c0a + Vector3(0, -0.3, 0), c0b + Vector3(0, -0.3, 0), c0b, c0a], o, GRANITE, [Vector2(0.0, 0.0), Vector2(l, 0.0) * uvk, Vector2(l, 0.3) * uvk, Vector2(0.0, 0.3) * uvk])
+	pk.quad(kit, "ishi", [c0a + Vector3(0, -0.3, 0), c0b + Vector3(0, -0.3, 0), top_b + o * 0.0, top_a], Vector3.DOWN, GRANITE.darkened(0.3))
+
+
 ## A pilgrim trail's chain fence from a to b: iron posts every 3m with a knob, two chains hanging between them.
 static func chain_fence(pk: PropKit, kit: Dictionary, a: Vector3, b: Vector3, h := 1.0) -> void:
 	var ln: float = (b - a).length()
@@ -1589,6 +1619,49 @@ static func stone_steps(pk: PropKit, kit: Dictionary, w: float, n: int, rise := 
 				[Vector3(x0, top_y + 0.13, top_z), Vector3(x1, top_y + 0.13, top_z), Vector3(x1, top_y - 0.6, top_z), Vector3(x0, top_y - 0.6, top_z)]], STONE_B, true, true, 1)
 
 
+## A shrine's grand stairway (ishidan) of `n` granite treads `w` wide climbing toward -z from the origin (the first
+## riser at z 0), each a solid block down to FOOT, so it stands on a slope or out from a terrace's wall whatever the
+## ground under it does; cheek walls either side whose coping runs with the nosings 0.4 over them, a landing slab at
+## the top (`landing` deep). Its head is at z = -run * n - landing, y = rise * n.
+static func grand_stairs(pk: PropKit, kit: Dictionary, w: float, n: int, rise := 0.17, run := 0.34, landing := 1.2) -> void:
+	var hw: float = w * 0.5
+	for k in range(n):
+		var top: float = rise * float(k + 1)
+		var tone: float = 0.5 + 0.5 * sin(float(k) * 2.3)
+		var z0: float = -run * float(k)
+		var z1: float = -run * float(k + 1) - (landing if k == n - 1 else 0.0)
+		pk.box(kit, "ishi", Transform3D(Basis(), Vector3(0, (top + FOOT) * 0.5, (z0 + z1) * 0.5 - 0.01)), Vector3(w, top - FOOT, z0 - z1 + 0.02),
+				STONE_A.lerp(STONE_B, tone), uvk, true, Vector2(float(k) * 0.37, 0.0))
+	var top_z: float = -run * float(n)
+	var top_y: float = rise * float(n)
+	var end_z: float = top_z - landing
+	var cw := 0.45
+	for sx: float in [-1.0, 1.0]:
+		var x0: float = sx * (hw + 0.005)
+		var x1: float = sx * (hw + cw)
+		# The cheek wall: a sloping coping over a solid wall down to FOOT, level along the landing.
+		# The outline in (z, y).
+		var ol := PackedVector2Array([Vector2(0.25, FOOT), Vector2(end_z, FOOT), Vector2(end_z, top_y + 0.4), Vector2(top_z, top_y + 0.4), Vector2(0.25, 0.42)])
+		var ccw: bool = PropKit._signed_area(ol) > 0.0
+		for i in range(ol.size()):
+			var a2: Vector2 = ol[i]
+			var b2: Vector2 = ol[(i + 1) % ol.size()]
+			var e: Vector2 = b2 - a2
+			var o2: Vector2 = (Vector2(e.y, -e.x) if ccw else Vector2(-e.y, e.x)).normalized()
+			pk.quad(kit, "ishi", [Vector3(x0, a2.y, a2.x), Vector3(x0, b2.y, b2.x), Vector3(x1, b2.y, b2.x), Vector3(x1, a2.y, a2.x)],
+					Vector3(0, o2.y, o2.x), STONE_B.darkened(0.05),
+					[Vector2(0.0, 0.0), Vector2(e.length(), 0.0) * uvk, Vector2(e.length(), cw) * uvk, Vector2(0.0, cw) * uvk])
+		var tris: PackedInt32Array = Geometry2D.triangulate_polygon(ol)
+		for i in range(0, tris.size(), 3):
+			for xx in [x0, x1]:
+				var nrm := Vector3(sx if xx == x1 else -sx, 0, 0)
+				var pa: Vector2 = ol[tris[i]]
+				var pb: Vector2 = ol[tris[i + 1]]
+				var pc: Vector2 = ol[tris[i + 2]]
+				pk.tri(kit, "ishi", Vector3(xx, pa.y, pa.x), Vector3(xx, pb.y, pb.x), Vector3(xx, pc.y, pc.x), nrm, nrm, nrm, STONE_B.darkened(0.08), nrm,
+						Vector2(pa.x, pa.y) * uvk, Vector2(pb.x, pb.y) * uvk, Vector2(pc.x, pc.y) * uvk)
+
+
 ## The little white farm pickup (kei truck), centred, its nose toward -z: 3.4 long, 1.48 wide, 1.75 high; a cab-over
 ## cab, a flat bed with drop sides behind a guard frame, small wheels, a yellow plate.
 static func kei_truck(pk: PropKit, kit: Dictionary, col := Color(0.93, 0.93, 0.90)) -> void:
@@ -1629,6 +1702,53 @@ static func kei_truck(pk: PropKit, kit: Dictionary, col := Color(0.93, 0.93, 0.9
 				Vector3.LEFT, Color(0.75, 0.1, 0.08))
 	pk.block(kit, "gloss", Vector3(-1.71, 0.67, -hw + 0.02), Vector3(-1.67, 0.96, hw - 0.02), col)
 	pk.block(kit, "metal", Vector3(0.44, 1.66, -hw + 0.06), Vector3(0.48, 1.7, hw - 0.06), dark)
+	pk.set_frame(old)
+
+
+## A tall-box kei car (a "kei wagon", the little upright city car), centred, its nose toward -z: 3.4 long, 1.48 wide,
+## 1.75 high; a short sloping nose, a tall glasshouse with near-upright pillars, a flat roof, sliding rear doors' rails,
+## small wheels. `two_tone`: a white roof over the colour.
+static func kei_car(pk: PropKit, kit: Dictionary, col := Color(0.82, 0.86, 0.90), two_tone := false) -> void:
+	var old := _push(pk, Transform3D(Basis(Vector3.UP, PI * 0.5), Vector3.ZERO))
+	var hw := 0.74
+	var dark := Color(0.12, 0.12, 0.13)
+	var glass := Color(0.09, 0.12, 0.15)
+	var roof_col: Color = Color(0.94, 0.94, 0.92) if two_tone else col
+	# The body below the windows: a short nose, upright flanks, a square tail; the roof over the glasshouse.
+	pk.extrude(kit, "gloss", PackedVector2Array([Vector2(-1.7, 0.32), Vector2(1.6, 0.32), Vector2(1.7, 0.5), Vector2(1.7, 0.82), Vector2(1.28, 1.0), Vector2(-1.68, 1.0), Vector2(-1.7, 0.8)]),
+			-hw, hw, 0.04, col)
+	pk.extrude(kit, "gloss", PackedVector2Array([Vector2(-1.66, 1.62), Vector2(0.9, 1.62), Vector2(0.96, 1.75), Vector2(-1.62, 1.75)]), -hw + 0.04, hw - 0.04, 0.03, roof_col)
+	pk.block(kit, "matte", Vector3(-1.72, 0.22, -hw + 0.06), Vector3(1.72, 0.36, hw - 0.06), dark)
+	# Pillars, with the glass between them standing in a little.
+	for sz: float in [-1.0, 1.0]:
+		var zz: float = sz * (hw - 0.05)
+		for px in [-1.62, -0.36, 0.42]:
+			pk.block(kit, "gloss", Vector3(px - 0.04, 1.0, zz - 0.04), Vector3(px + 0.04, 1.63, zz + 0.04), roof_col if two_tone else col)
+		pk.quad(kit, "pane", [Vector3(-1.58, 1.04, sz * (hw - 0.03)), Vector3(1.2, 1.04, sz * (hw - 0.03)), Vector3(0.9, 1.6, sz * (hw - 0.03)), Vector3(-1.58, 1.6, sz * (hw - 0.03))],
+				Vector3(0, 0, sz), glass)
+		# The sliding door's rail, the mirror, the handles.
+		pk.block(kit, "matte", Vector3(-1.4, 0.98, sz * hw - 0.01), Vector3(-0.4, 1.0, sz * hw + 0.015), dark)
+		pk.block(kit, "matte", Vector3(1.0, 1.02, sz * (hw + 0.02)), Vector3(1.1, 1.14, sz * (hw + 0.12)), dark)
+		for hx in [-0.5, 0.35]:
+			pk.block(kit, "matte", Vector3(hx, 0.86, sz * hw), Vector3(hx + 0.14, 0.89, sz * (hw + 0.015)), dark)
+		# Wheels.
+		for wx: float in [1.12, -1.15]:
+			var c := Vector3(wx, 0.28, sz * (hw - 0.1))
+			pk.tube(kit, "matte", c - Vector3(0, 0, 0.09), c + Vector3(0, 0, 0.09), 0.28, 0.28, 10, Color(0.07, 0.07, 0.08), true)
+			_disc(pk, kit, "metal", _pl(c + Vector3(0, 0, sz * 0.09), Vector3(0, 0, sz)), Vector2.ZERO, 0.17, 8, 0.012, GALV)
+		# Lamps: the headlamps round the nose's corners, tall tail lamps.
+		pk.quad(kit, "gloss", [Vector3(1.55, 0.82, sz * 0.5 - 0.15), Vector3(1.55, 0.82, sz * 0.5 + 0.15), Vector3(1.3, 0.97, sz * 0.5 + 0.15), Vector3(1.3, 0.97, sz * 0.5 - 0.15)],
+				Vector3(0.6, 1.0, 0).normalized(), Color(0.95, 0.95, 0.88))
+		pk.quad(kit, "gloss", [Vector3(-1.705, 0.62, sz * 0.62 - 0.07), Vector3(-1.705, 0.62, sz * 0.62 + 0.07), Vector3(-1.705, 1.2, sz * 0.62 + 0.07), Vector3(-1.705, 1.2, sz * 0.62 - 0.07)],
+				Vector3.LEFT, Color(0.80, 0.10, 0.08))
+	# The windscreen, steep, and the rear window.
+	var wn := Vector3(0.88, 0.48, 0).normalized()
+	pk.quad(kit, "pane", [Vector3(1.26, 1.02, -0.66) + wn * 0.02, Vector3(1.26, 1.02, 0.66) + wn * 0.02, Vector3(0.94, 1.6, 0.66) + wn * 0.02, Vector3(0.94, 1.6, -0.66) + wn * 0.02], wn, glass)
+	pk.quad(kit, "pane", [Vector3(-1.71, 1.06, -0.6), Vector3(-1.71, 1.06, 0.6), Vector3(-1.71, 1.56, 0.6), Vector3(-1.71, 1.56, -0.6)], Vector3.LEFT, glass)
+	# Grille, plates, bumpers.
+	pk.block(kit, "matte", Vector3(1.68, 0.4, -0.45), Vector3(1.73, 0.6, 0.45), dark)
+	pk.quad(kit, "paint", [Vector3(1.745, 0.42, -0.17), Vector3(1.745, 0.42, 0.17), Vector3(1.745, 0.54, 0.17), Vector3(1.745, 0.54, -0.17)], Vector3.RIGHT, SIGN_YELLOW)
+	pk.quad(kit, "paint", [Vector3(-1.725, 0.42, -0.17), Vector3(-1.725, 0.42, 0.17), Vector3(-1.725, 0.54, 0.17), Vector3(-1.725, 0.54, -0.17)], Vector3.LEFT, SIGN_YELLOW)
 	pk.set_frame(old)
 
 

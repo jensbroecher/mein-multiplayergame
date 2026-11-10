@@ -4620,6 +4620,19 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   walled Alley past it. 107 OmniLights without shadows; town batches in 60m cells for the Mobile renderer's light limit.
   The first street run must start at s 4, not `closest_s` of a point before s 0 (it returned the lap's end and the shop
   street stood empty). Laps about 50s, no respawns.
+- Yamabushi Trail's summit (the user's idea, from two pictures): the cone's top is a gentle dome (`_summit_h`, `DOME_K`)
+  meeting the trail where it ends (it had finished in a 17m cutting under a bare top), a walled terrace on it
+  (`PRECINCT_R`, `PRECINCT_Y`, the drop inside the wall's line, `TERRACE_SLOPE_W`) with a precinct (`_build_summit`):
+  `MiyoshinoTownKit.summit_hall` (vermilion, veranda, karahafu, lanterns), the five-storey pagoda, bell tower, water
+  pavilion, a small Shinto hall, lanterns, banners, cherries, red maples (`MiyoshinoTrees` "momiji_red": the maple's
+  cards tinted red), raked gravel and paths (the road shader's kinds 5 and 1 on meshes of their own, `precinct_gravel`
+  warmer), `MiyoshinoPropKit.ishigaki` round it and a vermilion fence, `grand_stairs` up from a paved approach under two
+  torii. The old summit shrine stands past the run-out's end behind a bamboo fence (the stop wall), the stone torii over
+  the trail before the finish. The trail is asphalt to the trailhead torii (`_trail_from`), then stone paving (it was
+  earth); the valley road (`_plan_routes`, a route pinned to the lap only at its start: `_add_route(..., pin_far_end
+  false)`) runs 1km on north past the trailhead car park (`_build_trailhead`, `PARK_*`, kei cars and trucks:
+  `MiyoshinoPropKit.kei_car`). A stage can halve its ground grid in places (`_extra_refine`; the shortcut-end halving
+  only works since the fix in `_refine_axis`: the other three stages' saved levels predate it). Not raced yet.
 - Yamabushi Trail (4.5km, point to point, dawn): a spiral of corners 1.6 times round a cone (`_spiral`, `_natural`), the
   mountain always on the right; a suspension bridge over the gorge (in the cloud), plank walks (LEDGES) with chains,
   chain fences on the drops, the summit shrine. `CloudLayer.gd` sets every viewer's fog and sun by their camera's height

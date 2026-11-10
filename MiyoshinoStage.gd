@@ -596,7 +596,9 @@ func _init_noise() -> void:
 
 ## Another road: a shortcut or a side road, open, its ends on the lap where `pin` says (the lap's height there).
 ## `pts` are [point, radius] corners; the first and last are its ends.
-func _add_route(route_name: String, pts: Array, half: float, pin_ends := true, grade_max := 0.0) -> Route:
+## `pin_ends`: the route leaves and joins the lap, level with it at both ends; `pin_far_end` false: only its start
+## does (a side road running on from the lap's end).
+func _add_route(route_name: String, pts: Array, half: float, pin_ends := true, grade_max := 0.0, pin_far_end := true) -> Route:
 	var r := Route.new()
 	r.name = route_name
 	r.half = half
@@ -608,7 +610,7 @@ func _add_route(route_name: String, pts: Array, half: float, pin_ends := true, g
 		r.from_s = lap.closest_s(pts[0][0])
 		r.to_s = lap.closest_s(pts[pts.size() - 1][0])
 		pin0 = lap.y(r.from_s)
-		pin1 = lap.y(r.to_s)
+		pin1 = lap.y(r.to_s) if pin_far_end else NAN
 	_plan_heights(r, pin0, pin1)
 	routes.append(r)
 	_route_by_name[route_name] = r
@@ -670,7 +672,8 @@ func _plan_heights(r: Route, pin0 := NAN, pin1 := NAN) -> void:
 		while hold < n / 3 and _lap_offset(r.at(float(hold))["p"]) < reach:
 			pins[hold] = lap.y(lap.closest_s(r.at(float(hold))["p"]))
 			hold += 1
-		while hold1 < n / 3 and _lap_offset(r.at(float(n - 1 - hold1))["p"]) < reach:
+		var far_pinned: bool = not is_nan(pin1)
+		while far_pinned and hold1 < n / 3 and _lap_offset(r.at(float(n - 1 - hold1))["p"]) < reach:
 			pins[n - 1 - hold1] = lap.y(lap.closest_s(r.at(float(n - 1 - hold1))["p"]))
 			hold1 += 1
 		hold = maxi(hold - 1, 0)
@@ -678,7 +681,7 @@ func _plan_heights(r: Route, pin0 := NAN, pin1 := NAN) -> void:
 		pin0 = pins.get(hold, pin0)
 		pin1 = pins.get(n - 1 - hold1, pin1)
 		# Across its width each end leans with the lap's grade where it meets it.
-		for e in [0, 1]:
+		for e in ([0, 1] if far_pinned else [0]):
 			var se: float = 0.0 if e == 0 else r.length
 			var sl: float = lap.closest_s(r.at(se)["p"])
 			var t_l: Vector3 = lap.fw(sl)
@@ -692,7 +695,7 @@ func _plan_heights(r: Route, pin0 := NAN, pin1 := NAN) -> void:
 		if absf(r.tilt0) > 0.005 or absf(r.tilt1) > 0.005:
 			print("  %s leans with the lap's grade at its ends: %.1f%% and %.1f%% across" % [r.name, r.tilt0 * 100.0, r.tilt1 * 100.0])
 		var d0: float = pin0 - cur[hold]
-		var d1: float = pin1 - cur[n - 1 - hold1]
+		var d1: float = pin1 - cur[n - 1 - hold1] if far_pinned else 0.0
 		for i in range(n):
 			cur[i] += d0 * (1.0 - smoothstep(float(hold), float(hold) + 40.0, float(i))) + d1 * (1.0 - smoothstep(float(hold1), float(hold1) + 40.0, float(n - 1 - i)))
 		for i in pins:
@@ -723,7 +726,7 @@ func _plan_heights(r: Route, pin0 := NAN, pin1 := NAN) -> void:
 		# up through the paving. Only where an edge is on the lap's own ground (`LAP_GROUND_OWN`) must it keep the lap's
 		# height; from there a cubic eases into the profile `END_EASE` metres on, matching both slopes.
 		var own: float = lap.half + LAP_GROUND_OWN + 0.25
-		for e in [0, 1]:
+		for e in ([0, 1] if not is_nan(pin1) else [0]):
 			var hb := 0
 			while hb < n / 3 and _nearest_lap_edge(r, float(hb if e == 0 else n - 1 - hb)) <= own:
 				hb += 1
@@ -745,7 +748,7 @@ func _plan_heights(r: Route, pin0 := NAN, pin1 := NAN) -> void:
 				var t3: float = t2 * t
 				sm[ia + k * stp] = (2.0 * t3 - 3.0 * t2 + 1.0) * ya + (t3 - 2.0 * t2 + t) * ga * L + (-2.0 * t3 + 3.0 * t2) * yb + (t3 - t2) * gb * L
 		# After the grade clamp a pinned end may not meet the lap: that would be a step in the road.
-		if absf(cur[hold + 1] - pin0) > 0.3 or absf(cur[n - 2 - hold1] - pin1) > 0.3:
+		if absf(cur[hold + 1] - pin0) > 0.3 or (not is_nan(pin1) and absf(cur[n - 2 - hold1] - pin1) > 0.3):
 			push_warning("%s: %s can't reach the lap's height within its grade: %.1fm off at its start, %.1fm at its end" % [
 					title, r.name, cur[hold + 1] - pin0, cur[n - 2 - hold1] - pin1])
 	_shape_heights(r, sm)
@@ -1160,7 +1163,8 @@ func _refine_axis(axis: PackedFloat32Array, ranges: Array) -> PackedFloat32Array
 		out.append(axis[i])
 		if i + 1 < axis.size():
 			var m: float = (axis[i] + axis[i + 1]) * 0.5
-			if axis[i + 1] - axis[i] > fine_step * 0.75:
+			# Only the fine cells (the coarse ones grow away from the fine area).
+			if axis[i + 1] - axis[i] > fine_step * 1.25:
 				continue
 			for rg in ranges:
 				if m > (rg as Vector2).x and m < (rg as Vector2).y:
@@ -1169,12 +1173,18 @@ func _refine_axis(axis: PackedFloat32Array, ranges: Array) -> PackedFloat32Array
 	return out
 
 
-## Where the grid is halved: a square `END_REFINE` either side of each shortcut's ends.
+## More places a stage wants its grid halved: [x ranges, z ranges] (Vector2 from, to); none by default.
+func _extra_refine() -> Array:
+	return [[], []]
+
+
+## Where the grid is halved: a square `END_REFINE` either side of each shortcut's ends (and `_extra_refine`).
 const END_REFINE := 26.0
 
 func _end_refine_ranges() -> Array:
-	var xs: Array = []
-	var zs: Array = []
+	var extra: Array = _extra_refine()
+	var xs: Array = (extra[0] as Array).duplicate()
+	var zs: Array = (extra[1] as Array).duplicate()
 	for sc in shortcuts:
 		var r: Route = _route_by_name.get(String(sc[0]))
 		if r == null:
@@ -1859,12 +1869,12 @@ var tree_step := 11.0
 var tree_margin := 0.0
 ## Trunks keep this far from a road's line: [kind -> metres], default `tree_clear`.
 var tree_clear := 14.0
-var tree_clear_kind := {"sakura": 13.0, "yamazakura": 13.0, "shidare": 13.0, "sugi": 11.5, "momiji": 12.0, "take": 11.0}
+var tree_clear_kind := {"sakura": 13.0, "yamazakura": 13.0, "shidare": 13.0, "sugi": 11.5, "momiji": 12.0, "momiji_red": 12.0, "take": 11.0}
 ## Trees placed one by one: [kind, x, z, scale, variant]; they are planted whatever stands near.
 var extra_trees: Array = []
 ## Where every tree was planted: Vector3(x, scale, z).
 var _tree_spots: Array = []
-const TREE_FALLBACK := {"sakura": "lime", "yamazakura": "birch", "shidare": "alder", "sugi": "spruce", "momiji": "alder", "take": "poplar"}
+const TREE_FALLBACK := {"sakura": "lime", "yamazakura": "birch", "shidare": "alder", "sugi": "spruce", "momiji": "alder", "momiji_red": "alder", "take": "poplar"}
 
 func _build_woods(root: Node3D) -> void:
 	var t0 := Time.get_ticks_msec()
@@ -2066,7 +2076,7 @@ const JP := {"CHAYA": "茶屋", "DANGO": "だんご", "HASHI": "箸", "ICHI NO N
 	"SAN NO NABIKI": "三の靡", "YON NO NABIKI": "四の靡", "KAMI SENBON": "上千本", "NAKA SENBON": "中千本",
 	"SHIMO SENBON": "下千本", "KANMI": "甘味", "KINGYO": "金魚", "KURA": "蔵", "KUZU": "葛", "MIYAGE": "みやげ", "MOCHI": "餅",
 	"OKUGAKE": "奥駈道", "OMEN": "お面", "RINGO AME": "りんご飴", "RYOKAN HANAMINE": "旅館 花峰", "RYOKAN KINPU": "旅館 金峰",
-	"RYOKAN SAKURAYA": "旅館 桜屋", "SAKE": "酒", "SANJO": "山上", "SOBA": "そば", "STOP": "止まれ", "TAKOYAKI": "たこ焼き",
+	"RYOKAN SAKURAYA": "旅館 桜屋", "SAKE": "酒", "SANJO": "山上", "SOBA": "そば", "TOZANGUCHI": "登山口", "STOP": "止まれ", "TAKOYAKI": "たこ焼き",
 	"TOFU": "豆腐", "UDON": "うどん", "WASHI": "和紙", "YADO YOSHINO": "宿 吉野", "YAMAGOYA": "山小屋",
 	"YOSHINO SEIZAI": "吉野製材", "YOSHINO SUGI": "吉野杉"}
 var _jp_font: Font
@@ -2088,7 +2098,8 @@ const SOLID_FOOT := {"red_bench": Rect2(-1.0, -0.7, 2.0, 1.3), "stone_lantern": 
 	"ema_rack": Rect2(-1.6, -0.5, 3.2, 1.0), "kei_truck": Rect2(-0.95, -1.8, 1.9, 3.6), "utility_pole": Rect2(-0.3, -0.3, 0.6, 0.6),
 	"koinobori_pole": Rect2(-0.5, -0.5, 1.0, 1.0), "chaya": Rect2(-1.6, -7.1, 12.2, 10.0), "curve_mirror": Rect2(-0.5, -0.3, 1.0, 0.6),
 	"cairn": Rect2(-0.45, -0.45, 0.9, 0.9), "sake_barrels": Rect2(-1.5, -0.4, 3.0, 0.8), "bell_tower": Rect2(-4.2, -4.0, 8.4, 8.0),
-	"shrine_hall": Rect2(-4.7, -7.4, 9.4, 10.1), "main_hall": Rect2(-13.2, -19.7, 26.4, 28.0), "summit_shrine": Rect2(-2.6, -2.6, 5.2, 5.2)}
+	"shrine_hall": Rect2(-4.7, -7.4, 9.4, 10.1), "main_hall": Rect2(-13.2, -19.7, 26.4, 28.0), "summit_shrine": Rect2(-2.6, -2.6, 5.2, 5.2),
+	"summit_hall": Rect2(-10.0, -15.3, 20.0, 19.0), "pagoda": Rect2(-5.6, -5.6, 11.2, 12.6)}
 ## [frame, life-size rect] for every prop people must not stand in.
 var _solids: Array = []
 

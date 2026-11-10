@@ -2637,6 +2637,169 @@ static func shrine_hall(pk: PropKit, kit: Dictionary, labels: Array) -> void:
 		labels.append(["", Vector3.ZERO, Vector3(0, 0, 1), 0.2, GOLD, 1.0])
 
 
+## The summit's hall (the Yamabushi Trail's precinct): a vermilion hall of worship on a granite podium, front z = 0
+## facing +z, x centred (+-9.4), the back at -14.6; six steps before it (to z +2.4) under a step canopy whose front is a
+## curved gable board (karahafu) with a gold crest, on two posts at z +3.0. A veranda all round behind a vermilion
+## railing, the body three bays by two of vermilion columns with white plaster and lattice under bracket clusters, a
+## hip-and-gable roof of dark tiles with gold crests, red lanterns hanging along the front, a bell and its rope over the
+## offering box. About 13m high.
+const SUMMIT_HALL_ROOF := Color(0.19, 0.20, 0.22)
+
+static func summit_hall(pk: PropKit, kit: Dictionary, labels: Array) -> void:
+	var red: Color = VERMILION.lerp(VERMILION_OLD, 0.3)
+	var roofc: Color = SUMMIT_HALL_ROOF
+	var py := 1.2
+	_mblock(pk, kit, "ishi", Vector3(-9.4, FOOT, -14.6), Vector3(9.4, py, 0.0), GRANITE)
+	_mblock(pk, kit, "ishi", Vector3(-9.55, FOOT, -14.75), Vector3(9.55, 0.25, 0.15), GRANITE.darkened(0.08))
+	var fy: float = py + 0.12
+	_slab(pk, kit, "sugi", Transform3D.IDENTITY, -9.15, 9.15, -14.35, -0.25, py - 0.01, fy, Color(0.52, 0.40, 0.28))
+	# The steps: six granite treads between two cheek walls.
+	var sw := 2.6
+	for i in range(1, 7):
+		_mblock(pk, kit, "ishi", Vector3(-sw, FOOT, 0.02 + 0.4 * float(i - 1)), Vector3(sw, py - 0.2 * float(i), 0.02 + 0.4 * float(i)), GRANITE.lightened(0.03 * float(i % 2)))
+	for sx in [-1.0, 1.0]:
+		var cf := _wf(Vector3(sx * sw if sx > 0.0 else sx * (sw + 0.45), 0, 0.0), Vector3(1, 0, 0))
+		_prism(pk, kit, "ishi", cf, PackedVector2Array([Vector2(-2.5, FOOT), Vector2(-0.02, FOOT), Vector2(-0.02, py + 0.25), Vector2(-0.45, py + 0.25), Vector2(-2.5, 0.35)]), 0.0, 0.45,
+				GRANITE.darkened(0.05), true)
+	# The body: four by three vermilion columns.
+	var xs: Array = [-6.3, -2.1, 2.1, 6.3]
+	var zs: Array = [-11.6, -7.3, -3.0]
+	var y1 := 5.4
+	_temple_storey(pk, kit, xs, zs, fy, y1, {"key": "urushi", "col": red, "r": 0.3, "beam": 0.3, "base_r": 0.42},
+			{"front": ["renji", "door", "renji"], "back": ["plaster", "plaster", "plaster"], "left": ["plaster", "renji"], "right": ["renji", "plaster"]})
+	for f in [[Vector3(-6.3, 0, -3.0), Vector3(0, 0, 1), 12.6], [Vector3(6.3, 0, -11.6), Vector3(0, 0, -1), 12.6], [Vector3(6.3, 0, -3.0), Vector3(1, 0, 0), 8.6],
+			[Vector3(-6.3, 0, -11.6), Vector3(-1, 0, 0), 8.6]]:
+		_rect(pk, kit, "urushi", _wf(f[0], f[1]), 0.2, 4.0, float(f[2]) - 0.2, 4.22, 0.0, 0.2, red.darkened(0.06))
+	var bsc := 0.8
+	_bracket_ring(pk, kit, "urushi", xs, zs, y1, bsc, red)
+	var ptop: float = y1 + 1.04 * bsc
+	# The veranda's railing all round, open at the steps.
+	_koran(pk, kit, "urushi", Vector3(-9.0, fy, -0.42), Vector3(-sw - 0.55, fy, -0.42), 0.9, red)
+	_koran(pk, kit, "urushi", Vector3(sw + 0.55, fy, -0.42), Vector3(9.0, fy, -0.42), 0.9, red)
+	_koran(pk, kit, "urushi", Vector3(-9.0, fy, -14.2), Vector3(9.0, fy, -14.2), 0.9, red)
+	_koran(pk, kit, "urushi", Vector3(-9.0, fy, -14.2), Vector3(-9.0, fy, -0.42), 0.9, red)
+	_koran(pk, kit, "urushi", Vector3(9.0, fy, -14.2), Vector3(9.0, fy, -0.42), 0.9, red)
+	# The roof: hip-and-gable, dark tiles, the gables on the sides.
+	var zc := -7.3
+	var s := roof_spec(R_IRIMOYA, Vector3(0, 0, zc), 10.4, 8.0, 5.8, "kawara", roofc)
+	s.sori = 0.55
+	s.lift = 0.85
+	s.thick = 0.36
+	s.tb = 0.5
+	s.gable_in = 0.8
+	s.n = 14
+	s.m = 6
+	s.wall_hx = 6.3
+	s.wall_zf = 4.3
+	s.wall_zb = 4.3
+	s.raft = 0.45
+	s.raft_col = red.darkened(0.1)
+	s.raft_end = GOLD
+	s.raft_w = 0.1
+	s.raft_d = 0.14
+	s.under_col = red.darkened(0.35)
+	s.hafu_col = roofc.lightened(0.1)
+	s.ridge_h = 0.55
+	s.ridge_col = roofc.darkened(0.1)
+	s.crest = GOLD
+	s.c = Vector3(0, ptop + 0.4 - _rf_front(s, 0.0, 4.3 + 0.8 * bsc) + 0.005, zc)
+	jroof(pk, kit, s)
+	# The step canopy (kohai): dark tiles from under the front eave out over the steps, on two posts.
+	var kz := -1.0
+	var kd := 4.4
+	var ks := pent_spec(-4.3, 4.3, kz, 0.0, kd, 1.45, "kawara", roofc)
+	ks.thick = 0.28
+	ks.lift = 0.3
+	ks.sori = 0.35
+	ks.n = 8
+	ks.m = 3
+	ks.raft = 0.45
+	ks.raft_col = red.darkened(0.1)
+	ks.raft_end = GOLD
+	ks.raft_w = 0.09
+	ks.raft_d = 0.12
+	ks.under_col = red.darkened(0.35)
+	var edge_z: float = zc + 8.0
+	var want: float = roof_under_y(s, Vector3(0, 0, edge_z)) - 0.05
+	ks.c = Vector3(0, want - _rf_front(ks, 0.0, edge_z - kz), kz)
+	jroof(pk, kit, ks)
+	var pz := 3.0
+	var bt: float = roof_under_y(ks, Vector3(3.5, 0, pz)) - 0.12
+	for sx in [-1.0, 1.0]:
+		var px: float = sx * 3.5
+		_mblock(pk, kit, "ishi", Vector3(px - 0.38, FOOT, pz - 0.38), Vector3(px + 0.38, 0.3, pz + 0.38), GRANITE.darkened(0.05))
+		_column(pk, kit, px, pz, 0.3, bt - 0.36, 0.25, red, "urushi", 10, 0.34)
+		var hy: float = roof_under_y(ks, Vector3(px, 0, -2.6)) - 0.35
+		_beam(pk, kit, "urushi", Vector3(px, bt - 0.58, pz), Vector3(px, minf(hy, y1 - 0.2), -3.0), 0.2, 0.28, red, Vector3(1, 0, 0))
+		_bracket(pk, kit, "urushi", Vector3(px, bt - 0.36, pz), Vector3(0, 0, 1), 0.45, red, 1)
+	_beam(pk, kit, "urushi", Vector3(-4.0, bt - 0.58, pz), Vector3(4.0, bt - 0.58, pz), 0.24, 0.38, red, Vector3(0, 0, 1))
+	_beam(pk, kit, "urushi", Vector3(-4.2, bt - 0.08, pz), Vector3(4.2, bt - 0.08, pz), 0.18, 0.14, red.darkened(0.08), Vector3(0, 0, 1))
+	# The karahafu: a curved gable board across the canopy's front, bowed up in the middle and swept down at its ends,
+	# black lacquer edged in gold, a gold crest at its crown.
+	var zf: float = kz + kd
+	var hump := 1.15
+	var half := 4.5
+	var segs := 18
+	var prev_lo := Vector3.ZERO
+	var prev_hi := Vector3.ZERO
+	for i in range(segs + 1):
+		var t: float = lerpf(-1.0, 1.0, float(i) / float(segs))
+		var x: float = t * half
+		var ey: float = roof_y(ks, Vector3(clampf(x, -4.2, 4.2), 0, zf - 0.15))
+		var bow: float = hump * pow(1.0 - t * t, 1.6)
+		var lo := Vector3(x, ey - 0.2 + bow * 0.85, zf + 0.06)
+		var hi := Vector3(x, ey + 0.3 + bow, zf + 0.06)
+		if i > 0:
+			var n: Vector3 = Vector3(0, 0, 1)
+			pk.quad(kit, "urushi", [prev_lo, lo, hi, prev_hi], n, Color(0.07, 0.06, 0.06))
+			pk.quad(kit, "urushi", [prev_lo + Vector3(0, 0, -0.14), lo + Vector3(0, 0, -0.14), hi + Vector3(0, 0, -0.14), prev_hi + Vector3(0, 0, -0.14)], -n, Color(0.07, 0.06, 0.06))
+			pk.quad(kit, "urushi", [prev_hi, hi, hi + Vector3(0, 0, -0.14), prev_hi + Vector3(0, 0, -0.14)], Vector3.UP, roofc)
+			pk.tube(kit, "gold", prev_hi + Vector3(0, -0.04, 0.03), hi + Vector3(0, -0.04, 0.03), 0.035, 0.035, 4, GOLD, false)
+			pk.tube(kit, "gold", prev_lo + Vector3(0, 0.04, 0.03), lo + Vector3(0, 0.04, 0.03), 0.03, 0.03, 4, GOLD, false)
+		prev_lo = lo
+		prev_hi = hi
+	var crown_y: float = roof_y(ks, Vector3(0, 0, zf - 0.15)) + hump * 0.85 - 0.2
+	sakura_crest(pk, kit, "gold", Vector3(0, crown_y - 0.32, zf + 0.12), Vector3(0, 0, 1), 0.34, GOLD)
+	# Gold crests on the side gables and over the doors.
+	sakura_crest(pk, kit, "gold", Vector3(0, 4.7, -3.0 + 0.36), Vector3(0, 0, 1), 0.4, GOLD)
+	# Red lanterns hanging along the front under the main eave and from the canopy's beam.
+	for lx in [-7.6, -4.2, 4.2, 7.6]:
+		var top_y: float = roof_under_y(s, Vector3(lx, 0, -1.2)) - 0.05
+		var cy: float = minf(top_y - 1.25, 4.3)
+		pk.tube(kit, "rope", Vector3(lx, top_y, -1.2), Vector3(lx, cy + 0.42, -1.2), 0.012, 0.012, 3, Color(0.1, 0.08, 0.06), false)
+		chochin(pk, kit, Vector3(lx, cy, -1.2), 0.34, 0.85, PAPER_RED, 10, Color(0.08, 0.06, 0.05), Vector3(0, 0, 1))
+	for lx2 in [-2.2, 2.2]:
+		chochin(pk, kit, Vector3(lx2, bt - 1.15, pz), 0.3, 0.76, PAPER_RED, 10, Color(0.08, 0.06, 0.05), Vector3(0, 0, 1))
+		pk.tube(kit, "rope", Vector3(lx2, bt - 0.58 - 0.19, pz), Vector3(lx2, bt - 0.77, pz), 0.012, 0.012, 3, Color(0.1, 0.08, 0.06), false)
+	# The shimenawa across the canopy, the bell and its rope, the offering box at the head of the steps.
+	var prev := Vector3.ZERO
+	for i in range(11):
+		var t2: float = float(i) / 10.0
+		var p := Vector3(lerpf(-3.2, 3.2, t2), bt - 0.86 - 0.32 * sin(t2 * PI), pz + 0.16)
+		if i > 0:
+			pk.tube(kit, "rope", prev, p, 0.08 + 0.04 * sin((t2 - 0.05) * PI), 0.08 + 0.04 * sin(t2 * PI), 6, STRAW, i == 1 or i == 10)
+		prev = p
+	for k in range(5):
+		var t3: float = (float(k) + 0.5) / 5.0
+		var q := Vector3(lerpf(-3.2, 3.2, t3), bt - 0.98 - 0.32 * sin(t3 * PI), pz + 0.2)
+		var zx := 0.0
+		for j in range(3):
+			var x0: float = q.x - 0.06 + zx
+			pk.quad(kit, "cloth", [Vector3(x0, q.y - 0.16 * float(j + 1), q.z + 0.01 * float(j)), Vector3(x0 + 0.12, q.y - 0.16 * float(j + 1), q.z + 0.01 * float(j)),
+					Vector3(x0 + 0.12, q.y - 0.16 * float(j), q.z + 0.01 * float(j)), Vector3(x0, q.y - 0.16 * float(j), q.z + 0.01 * float(j))], Vector3(0, 0, 1), PAPER)
+			zx += 0.07 if j % 2 == 0 else -0.07
+	var bell_top := Vector3(0, bt - 0.8, 1.6)
+	pk.lathe(kit, "gold", bell_top + Vector3(0, -0.55, 0), [Vector2(0.001, 0.0), Vector2(0.2, 0.05), Vector2(0.27, 0.22), Vector2(0.2, 0.4), Vector2(0.001, 0.45)], 10, GOLD.darkened(0.1))
+	for k in range(3):
+		var a: float = float(k) * 0.07 - 0.07
+		pk.tube(kit, "cloth", bell_top + Vector3(a, -0.6, 0), bell_top + Vector3(a, -2.45, 0.05), 0.035, 0.035, 5, [PAPER_RED, PAPER, PAPER_RED][k], true)
+	_slab(pk, kit, "sugi", Transform3D.IDENTITY, -0.9, 0.9, -0.9, -0.42, fy, fy + 0.6, Color(0.30, 0.20, 0.13))
+	for k in range(8):
+		_slab(pk, kit, "hinoki", Transform3D.IDENTITY, -0.86 + 0.22 * float(k), -0.76 + 0.22 * float(k), -0.88, -0.44, fy + 0.6, fy + 0.65, Color(0.36, 0.25, 0.16))
+	if labels != null and false:
+		labels.append(["", Vector3.ZERO, Vector3(0, 0, 1), 0.3, GOLD, 2.0])
+
+
 ## A farmhouse (kominka): front z = 0 facing +z, x 0..w, back -d (about 12 x 7.5): earthen walls in a dark timber
 ## frame under a thick hipped roof of thatch (1.1 out all round), a veranda (engawa) along the front before paper
 ## screens, a woodpile under the eaves at the right end.
