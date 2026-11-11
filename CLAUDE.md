@@ -4571,7 +4571,9 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   sign text needs an entry there or it stays romaji. `scratch/label_positions.gd` (`-s`, headless, `-- <level>`) lists a
   level's Label3Ds and where they are. The emblem is a drawn five-petal crest.
 - Trees: `MiyoshinoTrees.gd` (extends WoodlandBuilder; its own atlas): sakura, yamazakura, shidare, sugi, momiji, take,
-  matsu, tsutsuji; `scratch/miyoshino_trees_preview.gd`. It added BARKS entries, and uniforms to `acacia_leaves`
+  matsu, tsutsuji; `scratch/miyoshino_trees_preview.gd`. The sugi's far stand-in (the user found it a plain cone) is three
+  cards crossing on the stem with the crown painted as the near tree grows (`_sugi_far`: ragged tiers, short lowest
+  boughs, sky between the tiers), its stem stopping just inside the crown. It added BARKS entries, and uniforms to `acacia_leaves`
   (`backlight_albedo`, `seed_tint_a/b`, `glow`) and `tree_bark` (`node_spacing`, `node_color`) whose defaults leave the
   other stages as they were (`scratch/miyoshino_trees_regress.gd` hashes the old kinds).
 - Koinobori (the carp streamers of Children's Day): `MiyoshinoPropKit.koinobori_pole` (a pole with a gilt ball and an

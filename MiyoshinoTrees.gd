@@ -674,28 +674,54 @@ func _sugi_plume(cv: LeafCanvas, rng: RandomNumberGenerator, o: Vector2, foot: V
 	_sugi_shoot(cv, rng, o, foot, Vector2(0.0, -1.0), height, thick, 0)
 
 
-## A whole cedar crown from the side: tiers of upswept shoots from the stem, wide at the cell's foot, a tip at its top.
+## A whole cedar crown from the side, as the near tree grows it: tiers of boughs from the stem, each drooping out and
+## sweeping up into a tuft, their reach short at the very foot, longest a sixth of the way up and nothing at the tip,
+## each tier a little different and a few missing, so the outline is ragged with sky between the tiers (painted as a
+## smooth triangle, the stand-in read as a cone: the user saw it).
 func _sugi_far(cv: LeafCanvas, rng: RandomNumberGenerator, o: Vector2) -> void:
 	var axis: float = o.x + 256.0
-	# The dark inside.
-	for k in range(1500):
-		var y: float = rng.randf_range(26.0, 500.0)
-		var hw: float = 222.0 * pow((y - 14.0) / 490.0, 0.85) * 0.86
-		var q := Vector2(axis + rng.randf_range(-hw, hw), o.y + y)
-		var r: float = rng.randf_range(7.0, 13.0)
-		if _fits(o, q, r + 2.0):
-			cv.dot(q, r, Color(0.04, 0.09, 0.05).lerp(Color(0.07, 0.15, 0.07), rng.randf()))
-	var y2 := 498.0
-	while y2 > 30.0:
-		var hw2: float = 226.0 * pow((y2 - 14.0) / 490.0, 0.85)
-		var n: int = maxi(1, int(hw2 / 30.0))
+	var top: float = o.y + 20.0
+	var foot: float = o.y + 494.0
+	var span: float = foot - top
+	var tiers := 26
+	var rows: Array = []
+	for w in range(tiers):
+		var t: float = clampf((float(w) + rng.randf_range(-0.3, 0.3)) / float(tiers), 0.0, 0.96)
+		var reach: float = 226.0 * pow(1.0 - t, 0.8) * lerpf(0.55, 1.0, smoothstep(0.0, 0.18, t)) * rng.randf_range(0.8, 1.06) + 12.0
+		rows.append([foot - span * t, reach, t])
+	# The dark inside round the stem, tier by tier (no band along the foot).
+	for r in rows:
+		var y: float = r[0]
+		var reach: float = r[1]
+		for k in range(int(6.0 + reach * 0.06)):
+			var q := Vector2(axis + rng.randf_range(-reach, reach) * 0.42, y + rng.randf_range(-14.0, 6.0))
+			var rad: float = rng.randf_range(7.0, 12.0)
+			if _fits(o, q, rad + 2.0):
+				cv.dot(q, rad, Color(0.04, 0.09, 0.05).lerp(Color(0.07, 0.15, 0.07), rng.randf()))
+	# The boughs: a limb out each side, shoots along it sweeping outward and up, a tuft standing up at its end.
+	for r in rows:
+		var y: float = r[0]
+		var reach: float = r[1]
+		var t: float = r[2]
 		for s in [-1.0, 1.0]:
+			if rng.randf() < 0.1 and t > 0.1:
+				continue
+			var out: float = reach * rng.randf_range(0.82, 1.0)
+			var end := Vector2(axis + float(s) * out, y - out * rng.randf_range(0.05, 0.18))
+			var start := Vector2(axis + float(s) * 3.0, y + 4.0)
+			if _fits(o, end, 14.0):
+				cv.line(start, end, 3.0, 1.4, Color(0.10, 0.11, 0.07))
+			var n: int = maxi(1, int(out / 34.0))
 			for j in range(n):
-				var f: float = (float(j) + rng.randf()) / float(n)
-				var from := Vector2(axis + float(s) * hw2 * f * 0.55, o.y + y2 + rng.randf_range(-5.0, 5.0))
-				_sugi_shoot(cv, rng, o, from, Vector2(float(s) * 0.95, -0.2), hw2 * (1.0 - f * 0.55) * rng.randf_range(0.75, 1.0) + 10.0, 5.0, 1 if hw2 > 80.0 else 0)
-		y2 -= lerpf(17.0, 30.0, (y2 - 14.0) / 490.0)
-	_sugi_shoot(cv, rng, o, Vector2(axis, o.y + 70.0), Vector2(0.0, -1.0), 52.0, 4.0, 0)
+				var f: float = (float(j) + rng.randf_range(0.2, 0.8)) / float(n)
+				var from: Vector2 = start.lerp(end, f * 0.85)
+				var room: float = out * (1.0 - f * 0.8)
+				_sugi_shoot(cv, rng, o, from, Vector2(float(s), 0.12).rotated(rng.randf_range(-0.12, 0.12)), room * rng.randf_range(0.55, 0.8) + 12.0,
+						lerpf(5.5, 3.6, t), 1 if room > 70.0 else 0)
+			# The tuft: the lump of the outline at the bough's end.
+			_sugi_shoot(cv, rng, o, end + Vector2(-float(s) * 6.0, 4.0), Vector2(float(s) * 0.35, -1.0), clampf(out * 0.35, 18.0, 48.0), 4.2, 0)
+	# The leader.
+	_sugi_shoot(cv, rng, o, Vector2(axis, top + 70.0), Vector2(0.0, -1.0), 54.0, 4.0, 0)
 
 
 ## A pad of pine: shoots ending in bursts of long needles, mostly upward, a pale candle in each.
@@ -1221,37 +1247,52 @@ func _sugi_mesh(variant: int, lod: int, bark_mat: Material, leaf_mat: Material) 
 	var trunk: Array = []
 	var radii: Array = []
 	var n_tr: int = 8 if lod == 0 else 2
+	# The stand-in's stem stops a little into the crown: its cards cross on the stem, and a stem to the tip showed as a
+	# line up the middle of every far cedar.
+	var stem_top: float = h - 0.4 if lod == 0 else base_y + 2.5
 	for k in range(n_tr + 1):
 		var t: float = float(k) / float(n_tr)
-		trunk.append(Vector3(sin(t * 2.4 + float(variant)) * 0.04, lerpf(-0.8, h - 0.4, t), cos(t * 2.0) * 0.04))
-		radii.append(r0 * lerpf(1.0, 0.07, pow(t, 1.15)) * (1.0 + 0.42 * (1.0 - smoothstep(0.0, 0.07, t))))
+		var tt: float = t * (stem_top + 0.8) / (h - 0.4 + 0.8)
+		trunk.append(Vector3(sin(tt * 2.4 + float(variant)) * 0.04, lerpf(-0.8, stem_top, t), cos(tt * 2.0) * 0.04))
+		radii.append(r0 * lerpf(1.0, 0.07, pow(tt, 1.15)) * (1.0 + 0.42 * (1.0 - smoothstep(0.0, 0.07, tt))))
 	bi = bark_tube(st, bi, trunk, radii, 8 if lod == 0 else 4, bark, 0.4, Vector2(base_y, base_y + 6.0))
 	var tint := Color(0.78, 0.84, 0.78)
 	var span: float = h - base_y
 	if lod == 1:
-		# The stand-in: crown silhouettes leaning in to the tip, five round the stem and five between them.
+		# The stand-in: three cards crossing on the stem, 60 degrees apart, the crown painted on them (its ragged tiers show
+		# against the sky from every side; ten cards leaning in to the tip had made a smooth cone). Each card is split down
+		# the stem so its halves are lit as the crown's sides: normals leaning out from the stem and up, more up higher.
 		var rot: float = rng.randf() * TAU
 		var uvr: Rect2 = miyo_uv(CELL_SUGI_FAR)
-		for layer in range(2):
-			for i in range(5):
-				var a: float = rot + TAU * (float(i) + 0.5 * float(layer)) / 5.0
-				var out := Vector3(cos(a), 0.0, sin(a))
-				var side := Vector3(-sin(a), 0.0, cos(a))
-				var hw: float = cr * (1.04 if layer == 0 else 0.9)
-				var foot: Vector3 = out * cr * (0.26 if layer == 0 else 0.1) + Vector3(0.0, base_y - 0.6, 0.0)
-				var tip := Vector3(0.0, h + 0.5, 0.0)
-				var corners: Array = [foot - side * hw, foot + side * hw, tip + side * hw, tip - side * hw]
-				var uvs: Array = [Vector2(uvr.position.x, uvr.end.y), uvr.end, Vector2(uvr.end.x, uvr.position.y), uvr.position]
-				for j in range(4):
-					var sgn: float = -1.0 if j == 0 or j == 3 else 1.0
-					var low: bool = j < 2
-					leaf_st.set_normal((out * (0.75 if low else 0.5) + side * sgn * (0.55 if low else 0.3) + Vector3.UP * (0.3 if low else 0.75)).normalized())
-					leaf_st.set_color(Color(tint.r, tint.g, tint.b, 0.6 if low else 1.0))
-					leaf_st.set_uv(uvs[j])
-					leaf_st.add_vertex(corners[j])
-				for idx in [0, 1, 2, 0, 2, 3]:
-					leaf_st.add_index(lb + idx)
-				lb += 4
+		var mid_u: float = uvr.position.x + uvr.size.x * 0.5
+		var y0: float = base_y - 0.6
+		var y1: float = h + 0.5
+		var hw: float = cr * 1.12
+		var levels: Array = [0.0, 0.35, 0.7, 1.0]
+		for i in range(3):
+			var a: float = rot + PI * float(i) / 3.0
+			var across := Vector3(cos(a), 0.0, sin(a))
+			for sgn in [-1.0, 1.0]:
+				for lv in levels:
+					var v: float = float(lv)
+					var y: float = lerpf(y0, y1, v)
+					var tv: float = lerpf(uvr.end.y, uvr.position.y, v)
+					var shade: float = lerpf(0.42, 0.88, v)
+					var up: float = lerpf(0.25, 0.75, v)
+					# At the stem, then at the card's edge.
+					leaf_st.set_normal((across * float(sgn) * 0.3 + Vector3.UP * (0.5 + up)).normalized())
+					leaf_st.set_color(Color(tint.r, tint.g, tint.b, shade * 0.85))
+					leaf_st.set_uv(Vector2(mid_u, tv))
+					leaf_st.add_vertex(Vector3(0.0, y, 0.0))
+					leaf_st.set_normal((across * float(sgn) * 0.9 + Vector3.UP * up).normalized())
+					leaf_st.set_color(Color(tint.r, tint.g, tint.b, shade))
+					leaf_st.set_uv(Vector2(uvr.end.x if sgn > 0.0 else uvr.position.x, tv))
+					leaf_st.add_vertex(across * float(sgn) * hw + Vector3(0.0, y, 0.0))
+				for k in range(levels.size() - 1):
+					var b0: int = lb + k * 2
+					for idx in [b0, b0 + 1, b0 + 3, b0, b0 + 3, b0 + 2]:
+						leaf_st.add_index(idx)
+				lb += levels.size() * 2
 		return _commit(st, leaf_st, bark_mat, leaf_mat)
 	# Dead stubs on the bare stem of a forest tree.
 	if not edge:
