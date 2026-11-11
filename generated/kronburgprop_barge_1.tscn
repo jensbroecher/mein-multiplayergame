@@ -2,12 +2,12 @@
 
 [ext_resource type="ArrayMesh" path="res://generated/kronburgprop_barge_1.res" id="1_nkyon"]
 
-[node name="Barge" type="Node3D" unique_id=985204393]
+[node name="Barge" type="Node3D" unique_id=280946336]
 
-[node name="Hull" type="MeshInstance3D" parent="." unique_id=715246891]
+[node name="Hull" type="MeshInstance3D" parent="." unique_id=1930293712]
 mesh = ExtResource("1_nkyon")
 
-[node name="@Label3D@204" type="Label3D" parent="." unique_id=1875403663]
+[node name="@Label3D@204" type="Label3D" parent="." unique_id=1738206793]
 transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -7.6800003, 2.08, 27.2)
 pixel_size = 0.022142857
 double_sided = false
@@ -16,7 +16,7 @@ text = "KRONBURG"
 font_size = 64
 outline_size = 4
 
-[node name="@Label3D@205" type="Label3D" parent="." unique_id=1950371734]
+[node name="@Label3D@205" type="Label3D" parent="." unique_id=453127761]
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 7.6800003, 2.08, 27.2)
 pixel_size = 0.022142857
 double_sided = false
@@ -25,7 +25,7 @@ text = "KRONBURG"
 font_size = 64
 outline_size = 4
 
-[node name="@Label3D@206" type="Label3D" parent="." unique_id=383460429]
+[node name="@Label3D@206" type="Label3D" parent="." unique_id=188859008]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 1.6, -48.048)
 pixel_size = 0.017857144
 double_sided = false

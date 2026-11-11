@@ -2,13 +2,13 @@
 
 [ext_resource type="ArrayMesh" path="res://generated/rheinuferprop_ship_cargo_gravel.res" id="1_xrv18"]
 
-[node name="Vessel" type="Node3D" unique_id=544502345]
+[node name="Vessel" type="Node3D" unique_id=704212019]
 
-[node name="Hull" type="MeshInstance3D" parent="." unique_id=2051212990]
+[node name="Hull" type="MeshInstance3D" parent="." unique_id=1468428512]
 visibility_range_end = 2600.0
 mesh = ExtResource("1_xrv18")
 
-[node name="@Label3D@1676" type="Label3D" parent="." unique_id=160517437]
+[node name="@Label3D@1676" type="Label3D" parent="." unique_id=2036161142]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 2.08, -88.048)
 visibility_range_end = 600.0
 pixel_size = 0.012857143
@@ -19,7 +19,7 @@ text = "Johanna B"
 font_size = 64
 outline_size = 4
 
-[node name="@Label3D@1677" type="Label3D" parent="." unique_id=1365012862]
+[node name="@Label3D@1677" type="Label3D" parent="." unique_id=593309439]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 1.328, -88.048)
 visibility_range_end = 600.0
 pixel_size = 0.007857143
@@ -30,7 +30,7 @@ text = "KRONBURG"
 font_size = 64
 outline_size = 4
 
-[node name="@Label3D@1678" type="Label3D" parent="." unique_id=275603677]
+[node name="@Label3D@1678" type="Label3D" parent="." unique_id=666703539]
 transform = Transform3D(0.064147666, -0.14840148, -0.98684454, 0, 0.98888123, -0.14870776, 0.9979404, 0.009539256, 0.06343442, -8.8756, 1.4728621, 73.60305)
 visibility_range_end = 600.0
 pixel_size = 0.015
@@ -41,7 +41,7 @@ text = "Johanna B"
 font_size = 64
 outline_size = 4
 
-[node name="@Label3D@1679" type="Label3D" parent="." unique_id=391058740]
+[node name="@Label3D@1679" type="Label3D" parent="." unique_id=1228294313]
 transform = Transform3D(0.064147666, 0.14840148, 0.98684454, 0, 0.98888123, -0.14870776, -0.9979404, 0.009539256, 0.06343442, 8.8756, 1.4728621, 73.60305)
 visibility_range_end = 600.0
 pixel_size = 0.015

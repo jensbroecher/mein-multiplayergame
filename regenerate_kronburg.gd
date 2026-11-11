@@ -1318,6 +1318,9 @@ func _set_owner_recursive(node: Node, scene_root: Node) -> void:
 
 
 func _ready() -> void:
+	# Every shop and café on the stage a name of its own (ShopNames), drawn in an order of this stage's.
+	# Shop names unique across the Kronburg GP: the other stages' names (generated/kronburg_shop_names.json) are taken.
+	preload("res://ShopNames.gd").reset(1, "kronburg")
 	print("=== Kronburger Hütte (Kronburg GP) Level Generation ===")
 	var t_start: int = Time.get_ticks_msec()
 	# Every file a run writes is written again: clear the old ones, so props renamed or dropped leave nothing behind.
@@ -1400,6 +1403,7 @@ func _ready() -> void:
 		push_error("Failed to pack %s: %d" % [LEVEL_PATH, err])
 		get_tree().quit(1)
 		return
+	preload("res://ShopNames.gd").save()
 	err = ResourceSaver.save(packed, LEVEL_PATH)
 	if err != OK:
 		push_error("Failed to save %s: %d" % [LEVEL_PATH, err])

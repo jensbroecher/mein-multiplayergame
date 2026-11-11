@@ -2,7 +2,7 @@ extends SceneTree
 ## Look-dev for the Kronburg finale's city kit (StadtKit.gd): builds a set in memory at SCALE 1.6 on a flat ground under a
 ## late-morning sun with shadows, waits for the shaders to compile, and saves a PNG per camera. Windowed:
 ##   Godot --path . --resolution 1600x900 -s res://scratch/stadt_preview.gd -- <out_dir>
-##       [set=furniture|fountain|ring|ubahn|stand|vehicles|kaufhaus|hbf|all] [sun=<pitch>,<yaw>] [notext=1] [solids=1]
+##       [set=furniture|fountain|ring|ubahn|stand|vehicles|kaufhaus|hbf|brauerei|all] [sun=<pitch>,<yaw>] [notext=1] [solids=1]
 ##       name:x,y,z:tx,ty,tz[:fov] ...
 ## Headless (`--headless ... -- headless=1 [set=...]`): builds every prop of the set(s), prints each one's triangles, surfaces
 ## and AABB (game metres) and quits.
@@ -24,6 +24,7 @@ const SPOTS := {
 	"vehicles": Vector3(300, 0, 300),
 	"kaufhaus": Vector3(0, 0, -400),
 	"hbf": Vector3(600, 0, -500),
+	"brauerei": Vector3(-600, 0, 400),
 }
 
 var show_solids := false
@@ -117,6 +118,13 @@ func _default_shots(s: String) -> Array:
 		"kaufhaus":
 			list = [["kh", Vector3(-40, 12, 45), Vector3(0, 18, -20), 60.0], ["kh_street", Vector3(25, 3, 20), Vector3(0, 6, 0), 60.0],
 					["kh_side", Vector3(70, 25, -30), Vector3(0, 18, -30), 55.0], ["kh_door", Vector3(0, 3, 9), Vector3(0, 3, 0), 60.0]]
+		"brauerei":
+			# BreweryKit's Kronburger Brauerei (game metres; the Hafenstraße runs along x about 40m in front of it).
+			list = [["br_road", Vector3(75, 3, 46), Vector3(0, 12, 0), 60.0], ["br_front", Vector3(0, 9, 75), Vector3(2, 14, 0), 62.0],
+					["br_bottle", Vector3(36, 5, 26), Vector3(29.6, 15, 3), 60.0], ["br_tower", Vector3(62, 28, 34), Vector3(42, 36, -4), 55.0],
+					["br_gate", Vector3(-38, 4, 34), Vector3(-32, 6, 0), 60.0], ["br_garden", Vector3(9, 3.2, 22), Vector3(0, 3.5, 6), 65.0],
+					["br_gable", Vector3(4, 22, 22), Vector3(0, 28, 0), 55.0], ["br_back", Vector3(-40, 45, -100), Vector3(0, 10, -30), 55.0],
+					["br_north", Vector3(80, 10, -40), Vector3(46, 18, -12), 60.0]]
 		"hbf":
 			list = [["hbf", Vector3(-80, 22, 110), Vector3(0, 18, -40), 60.0], ["hbf_front", Vector3(0, 4, 40), Vector3(0, 16, 0), 65.0],
 					["hbf_side", Vector3(140, 40, -60), Vector3(0, 15, -80), 55.0], ["hbf_top", Vector3(-60, 60, -10), Vector3(0, 14, -90), 55.0],
@@ -196,6 +204,11 @@ func _build_set(s: String, notext: bool) -> int:
 			# The pedestrian zone's corridor: the store's front 18 game metres off the route's line, the corridor 10.9 from it.
 			_clear_box(o + Vector3(0, 0, 18.0), 10.9, 140.0)
 			_scale_figures(o + Vector3(8, 0, 8))
+		"brauerei":
+			var bk: Script = load("res://BreweryKit.gd")
+			parts.append(["Brauerei", Transform3D.IDENTITY, func(pk, kit, labels): bk.brewery(pk, kit, labels), bk.brewery_solids()])
+			parts.append(["Biergarten", Transform3D.IDENTITY, func(pk, kit, labels): bk.garden(pk, kit, labels, 4711), bk.garden_solids()])
+			_scale_figures(o + Vector3(6, 0, 30))
 		"hbf":
 			parts.append(["Hauptbahnhof", Transform3D.IDENTITY, func(pk, kit, labels): _k("hauptbahnhof", [pk, kit, labels]), _k("hauptbahnhof_solids", [])])
 			# The Kaiserstraße's corridor: its centre line `HBF_STREET` game metres in front of the facade.

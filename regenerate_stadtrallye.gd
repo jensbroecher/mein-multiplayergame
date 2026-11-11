@@ -659,6 +659,8 @@ const PADS := [
 	["scrapyard", [-60.0, 600.0, 400.0, 760.0], 30.0],
 	["building_site", [-620.0, 800.0, 40.0, 1000.0], 30.0],
 	["gasworks", [-1000.0, 860.0, -640.0, 1050.0], 30.0],
+	# The Kronburger Brauerei and its beer garden (`_build_brewery`), a little under the Hafenstraße beside it.
+	["brauerei", [740.0, -100.0, 826.0, -7.0], 8.0],
 ]
 var _pad_y := {}
 ## The terrace pad's edge (z): full height to x, none from y.
@@ -700,6 +702,7 @@ func _plan_pads() -> void:
 	for k in ["demolition", "scrapyard", "building_site", "gasworks"]:
 		_pad_y[k] = DOCK_Y + 0.25
 	_pad_y["kaiserplatz"] = CITY_Y - GROUND_UNDER
+	_pad_y["brauerei"] = _lap_y(_closest_s(Vector2(840.0, BREWERY_AT.y))) - 0.3
 	print("  pads: %s" % str(_pad_y))
 
 
@@ -1878,6 +1881,9 @@ func _set_owner_recursive(node: Node, scene_root: Node) -> void:
 
 
 func _ready() -> void:
+	# Every shop and café on the stage a name of its own (ShopNames), drawn in an order of this stage's.
+	# Shop names unique across the Kronburg GP: the other stages' names (generated/kronburg_shop_names.json) are taken.
+	preload("res://ShopNames.gd").reset(4, "stadtrallye")
 	print("=== Quer durch Kronburg (Kronburg GP) Level Generation ===")
 	var t_start: int = Time.get_ticks_msec()
 	var gen := DirAccess.open("res://generated/")
@@ -1965,6 +1971,7 @@ func _ready() -> void:
 		push_error("Failed to pack %s: %d" % [LEVEL_PATH, err])
 		get_tree().quit(1)
 		return
+	preload("res://ShopNames.gd").save()
 	err = ResourceSaver.save(packed, LEVEL_PATH)
 	if err != OK:
 		push_error("Failed to save %s: %d" % [LEVEL_PATH, err])
@@ -2594,6 +2601,7 @@ func _build_city(root: Node3D) -> void:
 	_build_pedestrian_zone(rng)
 	_build_moat()
 	_build_street_furniture(rng)
+	_build_brewery()
 	_build_city_blocks(root)
 
 
@@ -2738,174 +2746,171 @@ func _build_street_furniture(rng: RandomNumberGenerator) -> void:
 
 
 # ======================================================================================
-#  The city behind: plain blocks of flats round courtyards (city_building.gdshader), cheap, for the views over the roofs
+#  Die Kronburger Brauerei (BreweryKit.gd), home of Kronburger Pilsner: in the Hafenviertel between its last blocks and
+#  the Hafenstraße, on what was an empty field west of the road down from the railway; the giant bottle on the Sudhaus's
+#  front and the painted advert on its north wall face the road. Built before the blocks, which keep clear of it.
+# ======================================================================================
+
+## The Brauhaus's front middle (the kit's origin, life 0, 0, 0); its front faces the Hafenstraße (+x), its beer garden's
+## fence 24.5m in front of it, about 15m from the route's line.
+const BREWERY_AT := Vector2(800.0, -52.0)
+const BREWERY_SEED := 4711
+
+func _build_brewery() -> void:
+	var bk: Script = _kit_script("res://BreweryKit.gd")
+	if bk == null:
+		return
+	var flat: Transform3D = _facing(Vector3(1, 0, 0), Vector3(BREWERY_AT.x, 0.0, BREWERY_AT.y))
+	# Level with the highest ground under the buildings and the garden (the pad levels nearly all of it), so nothing is
+	# buried; the plinths and the garden's edge reach down to the rest.
+	var lo := INF
+	var hi := -INF
+	var kx := -27.0
+	while kx <= 29.0:
+		var kz := -36.0
+		while kz <= 15.6:
+			var p: Vector3 = flat * (Vector3(kx, 0.0, kz) * PROP_SCALE)
+			var g: float = _ground_at(p.x, p.z)
+			lo = minf(lo, g)
+			hi = maxf(hi, g)
+			kz += 1.5
+		kx += 1.5
+	var xf: Transform3D = flat
+	xf.origin.y = hi + 0.02
+	var near := INF
+	for q in [Vector2(-27.0, 15.6), Vector2(0.0, 15.6), Vector2(29.0, 15.6)]:
+		var wp: Vector3 = flat * (Vector3(q.x, 0.0, q.y) * PROP_SCALE)
+		near = minf(near, _route_dist(wp.x, wp.z))
+	print("  brewery: ground %.2f..%.2f under it, its fence %.1fm from the route's line" % [lo, hi, near])
+	_add_prop("brauerei", bk, xf, func(pk, kit, labels): _kit_call(bk, "brewery", [pk, kit, labels]), 2400.0)
+	_add_prop("brauerei_garten", bk, xf, func(pk, kit, labels): _kit_call(bk, "garden", [pk, kit, labels, BREWERY_SEED]), 900.0)
+	var body := _body(level, "BrauereiBody", "rock")
+	_solids(body, _kit_call(bk, "brewery_solids", []), xf)
+	_solids(body, _kit_call(bk, "garden_solids", []), xf)
+	# The beer garden's patrons on the benches, a few standing at the gate and the portal.
+	var prng := RandomNumberGenerator.new()
+	prng.seed = BREWERY_SEED
+	var people: Array = _kit_call(bk, "garden_people", [BREWERY_SEED])
+	for pp in people:
+		var pos: Vector3 = xf * ((pp[0] as Vector3) * PROP_SCALE)
+		var fc: Vector3 = (xf.basis * (pp[1] as Vector3)).normalized()
+		_people.append([pos, fc, bool(pp[2]), false, -1, prng.randf_range(0.92, 1.06)])
+	_note_xf(xf, -29.0 * PROP_SCALE, 31.0 * PROP_SCALE, -38.0 * PROP_SCALE, 17.0 * PROP_SCALE, 1.0)
+
+
+# ======================================================================================
+#  The city behind: Gründerzeit rows round courtyards (RheinStadtKit's houses, as along the route: the detailed house near
+#  the route, its far stand-in beyond), for the views over the roofs; east of the Ring the Hafenviertel round the brewery.
+#  They were boxes with city_building.gdshader's facades, their windows cut off by the eaves (the user found them too
+#  plain).
 # ======================================================================================
 
 const BLOCK_X := Vector2(-1500.0, 40.0)
 const BLOCK_Z := Vector2(-620.0, 360.0)
 const BLOCK_STEP := Vector2(118.0, 104.0)
 const BLOCK_STREET := 22.0
+## The Hafenviertel: east of the Ring's houses, south of the railway's embankment, west of the Hafenstraße (the brewery
+## stands between its last blocks and the road), north of the terrace's edge. It was an empty field.
+const EAST_BLOCK_X := Vector2(150.0, 740.0)
+const EAST_BLOCK_Z := Vector2(-104.0, 312.0)
+## Block houses within this of the route (in plan) get the detailed house near the camera; the rest only the far one.
+const BLOCK_DETAIL := 230.0
+## How far a block house's footprint keeps from the route's line.
+const BLOCK_ROUTE_CLEAR := 24.0
 
-func _build_city_blocks(root: Node3D) -> void:
-	var mat := ShaderMaterial.new()
-	mat.shader = load("res://city_building.gdshader")
-	mat.set_shader_parameter("concrete_tex", load("res://materials/concrete.png"))
-	mat.set_shader_parameter("storey", 5.4)
-	mat.set_shader_parameter("bay", 4.8)
-	mat.set_shader_parameter("shop_h", 6.4)
-	var smat: Material = _save_res(mat, "block_material", FAR_PREFIX)
-	var roof_mat := StandardMaterial3D.new()
-	roof_mat.vertex_color_use_as_albedo = true
-	roof_mat.vertex_color_is_srgb = true
-	roof_mat.roughness = 0.8
-	var rmat: Material = _save_res(roof_mat, "block_roof_material", FAR_PREFIX)
+func _build_city_blocks(_root: Node3D) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7302
-	var cells := {}
-	var count := 0
-	var palette: Array = [Color(0.86, 0.80, 0.66), Color(0.80, 0.70, 0.60), Color(0.76, 0.78, 0.74), Color(0.88, 0.84, 0.76),
-		Color(0.72, 0.62, 0.52), Color(0.82, 0.76, 0.62), Color(0.70, 0.72, 0.70), Color(0.90, 0.86, 0.80)]
-	var bx: float = BLOCK_X.x
-	while bx < BLOCK_X.y:
-		var bz: float = BLOCK_Z.x
-		while bz < BLOCK_Z.y:
-			var x0: float = bx + BLOCK_STREET * 0.5
-			var x1: float = bx + BLOCK_STEP.x - BLOCK_STREET * 0.5
-			var z0: float = bz + BLOCK_STREET * 0.5
-			var z1: float = bz + BLOCK_STEP.y - BLOCK_STREET * 0.5
-			bz += BLOCK_STEP.y
-			var c := Vector2((x0 + x1) * 0.5, (z0 + z1) * 0.5)
-			if absf(c.y - RAIL_Z) < 70.0 or _in_moat_park(c.x, c.y) or c.y > _edge_z(c.x) - 70.0:
-				continue
-			if c.x > STATION_X - 140.0 and c.x < STATION_X + 140.0 and c.y < 30.0 and c.y > -260.0:
-				continue
-			# Each side of the block is a row of houses 14m deep unless the route's frontage stands there.
-			var sides: Array = [[Vector2(x0, z0), Vector2(x1, z0), Vector2(0, -1)], [Vector2(x1, z0), Vector2(x1, z1), Vector2(1, 0)],
-				[Vector2(x1, z1), Vector2(x0, z1), Vector2(0, 1)], [Vector2(x0, z1), Vector2(x0, z0), Vector2(-1, 0)]]
-			for sd in sides:
-				var a: Vector2 = sd[0]
-				var b: Vector2 = sd[1]
-				var out: Vector2 = sd[2]
-				var mid: Vector2 = (a + b) * 0.5
-				if _route_dist(mid.x, mid.y) < 46.0 or _route_dist(a.x, a.y) < 34.0 or _route_dist(b.x, b.y) < 34.0:
+	var tally := Vector2i.ZERO
+	for grid in [[BLOCK_X, BLOCK_Z, false], [EAST_BLOCK_X, EAST_BLOCK_Z, true]]:
+		var gx: Vector2 = grid[0]
+		var gz: Vector2 = grid[1]
+		var east: bool = grid[2]
+		var bx: float = gx.x
+		while bx < gx.y - 1.0:
+			var bz: float = gz.x
+			while bz < gz.y - 1.0:
+				var x0: float = bx + BLOCK_STREET * 0.5
+				var x1: float = bx + BLOCK_STEP.x - BLOCK_STREET * 0.5
+				var z0: float = bz + BLOCK_STREET * 0.5
+				var z1: float = bz + BLOCK_STEP.y - BLOCK_STREET * 0.5
+				bz += BLOCK_STEP.y
+				var c := Vector2((x0 + x1) * 0.5, (z0 + z1) * 0.5)
+				if absf(c.y - RAIL_Z) < 70.0 or _in_moat_park(c.x, c.y) or c.y > _edge_z(c.x) - 70.0:
 					continue
-				if absf(mid.x - RING_X) < RING_HALF + 30.0 and mid.y < RING_PORTAL_Z + 40.0:
+				if c.x > STATION_X - 140.0 and c.x < STATION_X + 140.0 and c.y < 30.0 and c.y > -260.0:
 					continue
-				# The row in houses of 12-20m, each its own height and colour.
-				var dir: Vector2 = (b - a).normalized()
-				var total: float = a.distance_to(b)
-				# A row starts one house deep in from its corner: the row before it fills the corner. Both filled it, and
-				# their walls (and gables) lay in one plane there and flickered.
-				var u := 14.0
-				while u < total - 4.0:
-					var w: float = minf(rng.randf_range(12.0, 20.0), total - u)
-					var pa: Vector2 = a + dir * u
-					var pb: Vector2 = a + dir * (u + w)
-					var h: float = rng.randf_range(15.0, 23.0)
-					var col: Color = palette[rng.randi_range(0, palette.size() - 1)]
-					col.a = 0.0
-					var g: float = minf(_ground_at(pa.x, pa.y), _ground_at(pb.x, pb.y)) - 0.5
-					var key := Vector2i(floori(pa.x / 300.0), floori(pa.y / 300.0))
-					if not cells.has(key):
-						cells[key] = [SurfaceTool.new(), SurfaceTool.new()]
-						(cells[key][0] as SurfaceTool).begin(Mesh.PRIMITIVE_TRIANGLES)
-						(cells[key][1] as SurfaceTool).begin(Mesh.PRIMITIVE_TRIANGLES)
-					_block_house(cells[key][0], cells[key][1], pa, pb, -out, 14.0, g, h, col, rng.randf())
-					u += w
-					count += 1
-		# Without this the loop never ended: it ate the memory, filled the disk with swap and took the Mac down twice.
-		bx += BLOCK_STEP.x
-	var node := Node3D.new()
-	node.name = "Stadtbloecke"
-	root.add_child(node)
-	for key in cells.keys():
-		var wall: ArrayMesh = (cells[key][0] as SurfaceTool).commit()
-		wall.surface_set_material(0, smat)
-		var mi := MeshInstance3D.new()
-		mi.name = "Block_%d_%d" % [key.x, key.y]
-		var both := ArrayMesh.new()
-		var arr: Array = wall.surface_get_arrays(0)
-		both.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
-		both.surface_set_material(0, smat)
-		var roofs: ArrayMesh = (cells[key][1] as SurfaceTool).commit()
-		if roofs.get_surface_count() > 0:
-			both.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, roofs.surface_get_arrays(0))
-			both.surface_set_material(1, rmat)
-		mi.mesh = _save_res(both, "block_%d_%d" % [key.x, key.y], FAR_PREFIX)
-		mi.visibility_range_end = 3200.0
-		node.add_child(mi)
-	print("  city blocks: %d houses in %d cells" % [count, cells.size()])
+				# Each side of the block is a row of houses unless the route's frontage stands there.
+				var sides: Array = [[Vector2(x0, z0), Vector2(x1, z0), Vector2(0, -1)], [Vector2(x1, z0), Vector2(x1, z1), Vector2(1, 0)],
+					[Vector2(x1, z1), Vector2(x0, z1), Vector2(0, 1)], [Vector2(x0, z1), Vector2(x0, z0), Vector2(-1, 0)]]
+				for sd in sides:
+					var a: Vector2 = sd[0]
+					var b: Vector2 = sd[1]
+					var mid: Vector2 = (a + b) * 0.5
+					if _route_dist(mid.x, mid.y) < 46.0 or _route_dist(a.x, a.y) < 34.0 or _route_dist(b.x, b.y) < 34.0:
+						continue
+					if not east and absf(mid.x - RING_X) < RING_HALF + 30.0 and mid.y < RING_PORTAL_Z + 40.0:
+						continue
+					tally += _block_row(a, b, sd[2], rng)
+			bx += BLOCK_STEP.x
+	print("  city blocks: %d houses, %d of them detailed near the route" % [tally.x, tally.y])
 
 
-## One plain house of a block row: its front from pa to pb facing away from the courtyard (`inward` points into it),
-## `d` deep, walls to `h` over `g`, a mansard-ish roof. Walls: UV (metres along, metres up), city_building's block facade.
-func _block_house(walls: SurfaceTool, roofs: SurfaceTool, pa: Vector2, pb: Vector2, inward: Vector2, d: float, g: float, h: float, col: Color, style: float) -> void:
-	var a := Vector3(pa.x, g, pa.y)
-	var b := Vector3(pb.x, g, pb.y)
-	var inn := Vector3(inward.x, 0.0, inward.y)
-	var c: Vector3 = b + inn * d
-	var e: Vector3 = a + inn * d
-	var top := Vector3(0, h, 0)
-	var corners: Array = [a, b, c, e]
-	var run := 0.0
-	for k in range(4):
-		var p: Vector3 = corners[k]
-		var q: Vector3 = corners[(k + 1) % 4]
-		var length: float = p.distance_to(q)
-		var n: Vector3 = (q - p).cross(Vector3.UP).normalized()
-		# The quad faces out of the house: its normal away from the middle.
-		var mid: Vector3 = (a + b + c + e) * 0.25
-		if n.dot((p + q) * 0.5 - mid) < 0.0:
-			n = -n
-		var quad: Array = [p, q, q + top, p + top]
-		var uvs: Array = [Vector2(run, 0), Vector2(run + length, 0), Vector2(run + length, h + 0.5), Vector2(run, h + 0.5)]
-		for t in [[0, 1, 2], [0, 2, 3]]:
-			var v0: Vector3 = quad[t[0]]
-			var v1: Vector3 = quad[t[1]]
-			var v2: Vector3 = quad[t[2]]
-			var order: Array = t
-			if (v2 - v0).cross(v1 - v0).dot(n) < 0.0:
-				order = [t[0], t[2], t[1]]
-			for idx in order:
-				walls.set_normal(n)
-				walls.set_color(col)
-				walls.set_uv(uvs[idx])
-				walls.set_uv2(Vector2((uvs[idx] as Vector2).x, style))
-				walls.add_vertex(quad[idx])
-		run += length
-	# The roof: a mansard, its slopes rising from the eaves to a ridge along the front's middle line, slate grey.
-	var slate := Color(0.30, 0.31, 0.34)
-	var r_up: float = 4.2
-	var ridge_a: Vector3 = (a + e) * 0.5 + top + Vector3(0, r_up, 0)
-	var ridge_b: Vector3 = (b + c) * 0.5 + top + Vector3(0, r_up, 0)
-	var faces: Array = [[a + top, b + top, ridge_b, ridge_a], [c + top, e + top, ridge_a, ridge_b]]
-	for f in faces:
-		var n2: Vector3 = ((f[1] as Vector3) - (f[0] as Vector3)).cross((f[3] as Vector3) - (f[0] as Vector3)).normalized()
-		if n2.y < 0.0:
-			n2 = -n2
-		for t in [[0, 1, 2], [0, 2, 3]]:
-			var v0: Vector3 = f[t[0]]
-			var v1: Vector3 = f[t[1]]
-			var v2: Vector3 = f[t[2]]
-			var order: Array = t
-			if (v2 - v0).cross(v1 - v0).dot(n2) < 0.0:
-				order = [t[0], t[2], t[1]]
-			for idx in order:
-				roofs.set_normal(n2)
-				roofs.set_color(slate)
-				roofs.add_vertex(f[idx])
-	for tri in [[a + top, ridge_a, e + top], [b + top, c + top, ridge_b]]:
-		var n3: Vector3 = ((tri[2] as Vector3) - (tri[0] as Vector3)).cross((tri[1] as Vector3) - (tri[0] as Vector3)).normalized()
-		var outward: Vector3 = ((tri[0] as Vector3) - (a + b + c + e) * 0.25)
-		outward.y = 0.0
-		var order2: Array = [0, 1, 2]
-		if n3.dot(outward) < 0.0:
-			order2 = [0, 2, 1]
-			n3 = -n3
-		for idx in order2:
-			roofs.set_normal(n3)
-			roofs.set_color(slate)
-			roofs.add_vertex(tri[idx])
+## A block's row along a side from `a` to `b` (the fronts on it, facing `out`), starting one house deep in from `a` (the
+## row before it fills that corner with its last house) and running to `b`: the widths are drawn, then scaled so the
+## last house ends on the corner. Returns (houses, detailed ones).
+func _block_row(a: Vector2, b: Vector2, out: Vector2, rng: RandomNumberGenerator) -> Vector2i:
+	var d: float = HOUSE_DEPTH * PROP_SCALE
+	var dir: Vector2 = (b - a).normalized()
+	var u0: float = d + 0.5
+	var length: float = a.distance_to(b) - u0
+	var placed := Vector2i.ZERO
+	if length < 10.5 * PROP_SCALE:
+		return placed
+	var n: int = maxi(1, int(round(length / (13.2 * PROP_SCALE))))
+	var ws: Array = []
+	var sum := 0.0
+	for i in range(n):
+		var r: float = rng.randf_range(0.82, 1.18)
+		ws.append(r)
+		sum += r
+	var u: float = u0
+	var face := Vector3(out.x, 0.0, out.y)
+	for i in range(n):
+		var w: float = length * float(ws[i]) / sum
+		var mid: Vector2 = a + dir * (u + w * 0.5)
+		u += w
+		var centre: Vector2 = mid - out * (d * 0.5)
+		var g: Vector2 = _ground_range(centre, w, d, atan2(-dir.y, dir.x))
+		var front := Vector3(mid.x, g.x + 0.02, mid.y)
+		var xf: Transform3D = _facing(face, front)
+		xf.origin -= xf.basis.x * (w * 0.5)
+		if not _clear(Vector3(centre.x, front.y, centre.y), xf.basis.x, w, d):
+			continue
+		var near_route := false
+		var bad := false
+		for q in [Vector2(0, 0), Vector2(w, 0), Vector2(w, -d), Vector2(0, -d), Vector2(w * 0.5, -d * 0.5)]:
+			var pq: Vector3 = xf * Vector3(q.x, 0.0, q.y)
+			if _route_dist(pq.x, pq.z) < BLOCK_ROUTE_CLEAR:
+				bad = true
+		if bad:
+			continue
+		near_route = _route_far_dist(mid.x, mid.y) < BLOCK_DETAIL
+		_house(xf, w / PROP_SCALE, rng, false, near_route)
+		_note_xf(xf, 0.0, w, -d, 0.0, 0.2)
+		placed += Vector2i(1, 1 if near_route else 0)
+	return placed
+
+
+## The distance in plan from (x, z) to the route's line, however far (every 8th sample: to the nearest few metres).
+func _route_far_dist(x: float, z: float) -> float:
+	var best := INF
+	var i := 0
+	while i < _route_rs:
+		var p: Vector3 = _rs_pos[i]
+		best = minf(best, Vector2(p.x - x, p.z - z).length())
+		i += 8
+	return best
 
 
 ## A row of houses along a straight line from `a` toward `b` (their fronts on it), facing `face`; detailed within

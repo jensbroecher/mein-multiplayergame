@@ -76,6 +76,7 @@ const ZK = preload("res://ZechenKit.gd")
 const CampKit = preload("res://CampKit.gd")
 const LampGlow = preload("res://LampGlow.gd")
 const MK = preload("res://MatatuKit.gd")
+const ShopNames = preload("res://ShopNames.gd")
 
 static var uvk := 1.6
 static var _mats := {}
@@ -546,7 +547,9 @@ static func _arch_infill(pk: PropKit, kit: Dictionary, labels: Array, back: Vect
 		_face(pk, kit, "painted", wf, cu - w * 0.5 + 0.1, v0 + 0.1, du - dw * 0.5 - 0.12, v0 + 0.6, 0.04, fascia.darkened(0.3))
 	# The fascia with the name across the springing, a fanlight in the arch over it.
 	_rect(pk, kit, "enamel", wf, cu - half + 0.05, top, cu + half - 0.05, top + 0.5, 0.0, 0.07, fascia)
-	_lbl(labels, String(shop[0]), wf * Vector3(cu, top + 0.25, 0.085), out, 0.24, Color(0.96, 0.95, 0.9), half * 2.0 - 0.4)
+	# A store is a store ("Lager"); every workshop has a name of its own (ShopNames).
+	var sname: String = String(shop[0]) if String(shop[0]) == "Lager" else ShopNames.unique(String(shop[1]), String(shop[0]))
+	_lbl(labels, sname, wf * Vector3(cu, top + 0.25, 0.085), out, 0.24, Color(0.96, 0.95, 0.9), half * 2.0 - 0.4)
 	var round_arch: bool = absf(rise - half) < 0.01
 	var arc: PackedVector2Array = KT._arch(cu, spring, half - 0.12, "round" if round_arch else "seg", 8, maxf(rise - 0.12, 0.2))
 	var fan := PackedVector2Array([Vector2(cu - half + 0.12, top + 0.55), Vector2(cu + half - 0.12, top + 0.55)])

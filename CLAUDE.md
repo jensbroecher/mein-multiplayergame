@@ -4544,6 +4544,42 @@ each run deletes first).
   node=Ring/RingTraffic from=82,-200 speed=0 y=36` logs the voices beside the Ring.
 - AI races (`scratch/ai_race_test`, speed=1 only: the hazards run on the wall clock; `noitems=1`): every bot finishes,
   in 190-265s. Music `MusicManager.STAGE_TRACKS["stadtrallye"]`; its sounds are in `sounds/stadtrallye/` (tools/elevenlabs).
+  Not re-run since the city blocks and the brewery came in (the run was stopped).
+- The city behind the route (`_build_city_blocks`, `_block_row`): rows of RheinStadtKit's Gründerzeit houses round
+  courtyards on two grids, the old city west of the Ring (`BLOCK_X`/`BLOCK_Z`) and the Hafenviertel east of it
+  (`EAST_BLOCK_X`/`EAST_BLOCK_Z`, an empty field before). They were boxes with `city_building.gdshader` facades whose
+  windows the eaves cut off (the user found them too plain). A row runs from one house deep in from its corner to the
+  next (the row before fills the corner), its widths scaled to fit; a house keeps `BLOCK_ROUTE_CLEAR` off the route's
+  line, and those within `BLOCK_DETAIL` (230m, `_route_far_dist`) get the detailed house near the camera, the rest only
+  the far one. 690 houses, 256 detailed. Every block corner shows a firewall: RheinStadtKit's `BRICK` was lightened (at
+  0.34, 0.20, 0.16 it read black in shade). Cost: the props' triangles visible along the route went from 1.14M mean /
+  1.80M worst to 1.53M / 2.23M (`res://scratch/visible_tris_probe.gd`, `-s`, headless, `-- <level> [step=200]
+  [under=Stadt]`, prints MEAN and WORST); lower `BLOCK_DETAIL` if that is too much.
+- Die Kronburger Brauerei (`BreweryKit.gd`, `_build_brewery`, `BREWERY_AT`), home of Kronburger Pilsner (the user's
+  idea, all fictional), on the field west of the Hafenstraße just south of the second railway underpass, facing the
+  road, on a pad of its own ("brauerei", 30cm under the road) and built before the blocks, which keep clear of it. Red
+  brick and sandstone among the flats, not a works: the Brauhaus (the tavern's round-arched windows, a balcony over the
+  portal, a volute gable with the name, a clock, Kronburg's arms and a gilded crown, a hipped slate roof with dormers),
+  the taller Sudhaus with the giant bottle (13.5m life, label lettered a Label3D per letter round its front, `_wrap_text`)
+  on a corbelled console in a blue niche, its tower with clocks and a copper cupola, a painted advert on its north wall
+  (seen coming down from the railway), the gate wing (BRAUEREIHOF) under a stepped gable, the Lagerhaus across the yard;
+  in front the beer garden (gravel, two chestnuts, beer tables, parasols, strings of lights, a brick fence with railings,
+  the BIERGARTEN gate, barrels and crates) with CrowdPlacer patrons on the benches (`garden_people`). Two batches
+  ("brauerei" to 2400m, "brauerei_garten" to 900m), about 31k + 27k triangles; box colliders (`brewery_solids`,
+  `garden_solids`). `scratch/stadt_preview.gd ... set=brauerei` renders it in memory in seconds.
+
+## Shop names in the Kronburg GP (ShopNames.gd)
+
+- Every café, shop, restaurant, workshop, kiosk and fair stall on the four Kronburg stages is named through
+  `ShopNames.unique(kind, wanted)` (RheinStadtKit, KronburgTownKit, StadtKit): the hand-picked name if it is free, else
+  one made from the kind's patterns (surnames, places, café and brewhouse words, Italian words, inn signs). The same
+  "Café Rheinblick" had turned up several times down one street (the user noticed). A name's word (Rheinblick, Venezia)
+  is used once, surnames are spread, each kind starts its draw somewhere of its own.
+- The names are unique across the GP: each generator calls `reset(salt, stage)` first, which takes the other stages'
+  names (and their words) from `generated/kronburg_shop_names.json`, and `save()` before saving its level, which writes
+  its own. Regenerating a stage can shift its names (it keeps off the others' current ones). Generated in the order
+  Rheinufer, Kronburger Hütte, Zeche, Quer durch Kronburg, Café Rheinblick is Rheinufer's.
+- `res://scratch/shop_names_check.gd` (`-s`, headless) draws a stage's worth of names and prints any drawn twice.
 
 ## Test Track (a proving ground, no cup)
 

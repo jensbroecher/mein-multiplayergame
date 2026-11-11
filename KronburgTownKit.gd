@@ -34,6 +34,7 @@ extends "res://YardKit.gd"
 ## overlapping. Godot's front faces wind clockwise: PropKit.tri winds every triangle for the `out` it is given.
 
 const YardKitBase = preload("res://YardKit.gd")
+const ShopNames = preload("res://ShopNames.gd")
 
 ## Extra keys: "biber" (hut_masonry style 9, plain tiles), "ashlar" (style 10, dressed sandstone), "kslate" (style 11, slate
 ## scales: the slate-hung walls, slate roofs and spires), "kbrick" (style 12, Ruhr brick), "pane" (opaque glossy
@@ -1395,7 +1396,8 @@ static func _shop_front(pk: PropKit, kit: Dictionary, w: float, _d: float, s: Di
 	var fx1: float = maxf(wx1, dx1) + 0.3
 	_rect(pk, kit, "painted", fwf, fx0, top + 0.18, fx1, top + 0.62, 0.0, 0.08, sc)
 	_rect(pk, kit, "painted", fwf, fx0 + 0.06, top + 0.24, fx1 - 0.06, top + 0.56, 0.08, 0.095, sc.darkened(0.25))
-	labels.append([shop[0], Vector3((fx0 + fx1) * 0.5, top + 0.4, 0.13), Vector3(0, 0, 1), 0.2, KR_GOLD.lightened(0.15), fx1 - fx0 - 0.4])
+	labels.append([ShopNames.unique(String(shop[1]), String(shop[0])), Vector3((fx0 + fx1) * 0.5, top + 0.4, 0.13), Vector3(0, 0, 1), 0.2,
+			KR_GOLD.lightened(0.15), fx1 - fx0 - 0.4])
 	# The awning over the shop window: stripes sloping out, a valance, its arms.
 	var stripes: Array = shop[2]
 	var ay0: float = top + 0.14

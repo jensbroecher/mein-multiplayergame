@@ -56,6 +56,7 @@ const T = preload("res://KronburgTownKit.gd")
 const YK = preload("res://YardKit.gd")
 const CampKit = preload("res://CampKit.gd")
 const LampGlow = preload("res://LampGlow.gd")
+const ShopNames = preload("res://ShopNames.gd")
 
 static var uvk := 1.6
 static var _mats := {}
@@ -74,7 +75,8 @@ const GLASS := Color(0.07, 0.10, 0.13)
 const IRON := Color(0.10, 0.11, 0.11)
 const SLATE := Color(0.29, 0.30, 0.33)
 const ZINC := Color(0.56, 0.58, 0.59)
-const BRICK := Color(0.34, 0.20, 0.16)
+## The firewalls' and chimneys' brick: at 0.34, 0.20, 0.16 it read black in shade wherever a block's corner showed a firewall.
+const BRICK := Color(0.52, 0.29, 0.21)
 const RENDER := Color(0.60, 0.58, 0.54)
 const GOLD := Color(0.92, 0.72, 0.22)
 const REAR := Color(0.72, 0.69, 0.63)
@@ -674,7 +676,9 @@ static func _gz_ground(pk: PropKit, kit: Dictionary, labels: Array, wf: Transfor
 	# The fascia over the shop windows with the shop's name, and an awning over them.
 	T._rect(pk, kit, "painted", wf, run0 - 0.25, 3.32, run1 + 0.25, 3.98, 0.0, 0.08, fascia)
 	T._rect(pk, kit, "painted", wf, run0 - 0.17, 3.38, run1 + 0.17, 3.92, 0.08, 0.1, fascia.darkened(0.3))
-	_label(labels, String(shop[0]), wf * Vector3((run0 + run1) * 0.5, 3.65, 0.12), wf.basis.z, 0.3, GOLD.lightened(0.15), run1 - run0 + 0.1)
+	# Each shop's own name (ShopNames): SHOPS' were drawn at random and the same café stood down the street three times.
+	_label(labels, ShopNames.unique(String(shop[1]), String(shop[0])), wf * Vector3((run0 + run1) * 0.5, 3.65, 0.12), wf.basis.z, 0.3,
+			GOLD.lightened(0.15), run1 - run0 + 0.1)
 	var kind: String = shop[1]
 	if kind != "shop" or drng.randf() < 0.5:
 		_awning(pk, kit, wf, run0 - 0.15, run1 + 0.15, 3.28, 1.9, 0.55, shop[2])
@@ -2195,7 +2199,7 @@ static func pavilion_cafe(pk: PropKit, kit: Dictionary, labels: Array) -> void:
 	T._wblock(pk, kit, "painted", Vector3(-oh - 0.06, top - 0.1, -D - 0.6), Vector3(-oh + 0.02, top + 0.42, oh + 0.06), cream)
 	T._wblock(pk, kit, "painted", Vector3(W + oh - 0.02, top - 0.1, -D - 0.6), Vector3(W + oh + 0.06, top + 0.42, oh + 0.06), cream)
 	T._wblock(pk, kit, "painted", Vector3(-oh - 0.04, top + 0.42, oh - 0.02), Vector3(W + oh + 0.04, top + 0.46, oh + 0.07), Color(0.12, 0.30, 0.26))
-	_label(labels, "Café am Strom", Vector3(W * 0.5, top + 0.16, oh + 0.09), Vector3(0, 0, 1), 0.36, Color(0.12, 0.30, 0.26), W)
+	_label(labels, ShopNames.unique("cafe", "Café am Strom"), Vector3(W * 0.5, top + 0.16, oh + 0.09), Vector3(0, 0, 1), 0.36, Color(0.12, 0.30, 0.26), W)
 	var lx := -0.8
 	while lx < W + 0.9:
 		for lz in [0.9, -D - 0.1]:
@@ -2302,7 +2306,7 @@ static func kiosk(pk: PropKit, kit: Dictionary, labels: Array, kind: String) -> 
 	# The roof: a slab overhanging 30cm, its fascia in the accent colour, the name board over the hatch.
 	T._wblock(pk, kit, "painted", Vector3(-hw - 0.3, hgt, -hd - 0.3), Vector3(hw + 0.3, hgt + 0.18, hd + 0.3), accent, true, true)
 	T._wblock(pk, kit, "painted", Vector3(-hw + 0.05, hgt + 0.18, hd + 0.05), Vector3(hw - 0.05, hgt + 0.78, hd + 0.15), Color(0.97, 0.96, 0.92))
-	_label(labels, name_text, Vector3(0, hgt + 0.48, hd + 0.18), Vector3(0, 0, 1), 0.2, accent.darkened(0.2), hw * 2.0 - 0.3)
+	_label(labels, ShopNames.unique("kiosk", name_text), Vector3(0, hgt + 0.48, hd + 0.18), Vector3(0, 0, 1), 0.2, accent.darkened(0.2), hw * 2.0 - 0.3)
 	match kind:
 		"eis":
 			# The cone on the roof and its scoops.
@@ -3120,8 +3124,10 @@ static func stall(pk: PropKit, kit: Dictionary, labels: Array, kind: String) -> 
 		for j in range(nb):
 			var q: Vector2 = a.lerp(b, float(j) / float(nb))
 			T._blob(pk, kit, "bulb", swf * Vector3(q.x, q.y, 0.08), Vector3.ONE * 0.06, BULB if (k4 + j) % 2 == 0 else BULB_COLS[1])
-	_label(labels, String(spec[0]), Vector3(0, sy0 + 0.47, -0.1 + 0.1), Vector3(0, 0, 1), 0.28, body.darkened(0.25), 4.0)
-	_label(labels, String(spec[0]), Vector3(0, sy0 + 0.47, -0.1 - 0.1), Vector3(0, 0, -1), 0.28, trim, 4.0)
+	# Each stall its own showman's name (ShopNames), the same on both faces of its sign.
+	var sname: String = ShopNames.unique("stall_" + kind, String(spec[0]))
+	_label(labels, sname, Vector3(0, sy0 + 0.47, -0.1 + 0.1), Vector3(0, 0, 1), 0.28, body.darkened(0.25), 4.0)
+	_label(labels, sname, Vector3(0, sy0 + 0.47, -0.1 - 0.1), Vector3(0, 0, -1), 0.28, trim, 4.0)
 	# A door at the back, its step.
 	var bwf := T._wf(Vector3(hw, 0, -D), Vector3(0, 0, -1))
 	T._rect(pk, kit, "paint", bwf, 0.6, 0.35, 1.5, 2.3, 0.0, 0.03, body.darkened(0.2))
