@@ -142,7 +142,8 @@ void vertex() {
 	else if (style == 3) show = hair == 3;
 	else if (style == 4) show = hair == 4;
 	else if (style == 5) show = hair == 5;
-	else if (style == 6) show = dress;
+	else if (style == 6) show = dress && !crowd_yukata(cd);
+	else if (style == 10) show = crowd_yukata(cd) && !sitting;
 	else if (style == 7) show = pose == 2 || pose == 10;
 	else if (style == 8) show = pose == 6 || pose == 15;
 	else if (style == 9) show = pose == 12;
@@ -208,7 +209,7 @@ void vertex() {
 			wave_r = sin(tp * 5.2 + ph + 2.0) * 0.22 * b;
 			head_pitch = -0.18 * b;
 			shift *= 1.0 - b;
-			vec2 hop = pose == 9 ? crowd_hop(cd, burst) : vec2(0.0);
+			vec2 hop = pose == 9 && !crowd_yukata(cd) ? crowd_hop(cd, burst) : vec2(0.0);
 			if (hop.x + hop.y > 0.0) {
 				crouch = hop.x;
 				bob += 0.34 * hop.y;

@@ -3,8 +3,8 @@ extends SceneTree
 # Look-dev for Nyota Stadium's crowd: builds the spectators in memory (no regeneration needed) and renders them.
 # Run windowed:
 #   Godot --path . --resolution 1400x900 -s res://scratch/crowd_preview.gd -- <out_dir> [rows=3] [seed=1]
-#       [cards=1] [skin=<g>] [fov=40] [sun=<pitch>,<yaw>] [car=x,y,z] [time=<s>] name:x,y,z:tx,ty,tz ...
-# `car=` stands player one's car there (the spectators near it watch it), `time=` waits for the clock.
+#       [cards=1] [skin=<g>] [fov=40] [sun=<pitch>,<yaw>] [car=x,y,z] [time=<s>] [yukata=1] name:x,y,z:tx,ty,tz ...
+# `yukata=1` dresses every other row in yukata; `car=` stands player one's car there (the spectators near it watch it), `time=` waits for the clock.
 # A row per variant, a column per pose 0..15 (2.6m apart, x = 0 .. 39), facing +z; the camera looks along -z.
 # Seated poses (0-6) are on seat blocks. `cards=1` puts the far level of detail (the card) in a row behind,
 # `skin=<g>` forces the skin draw (0 .. 1) for every spectator.
@@ -18,6 +18,8 @@ const SPACING := 2.6
 var _mm_colors := true
 ## `time=<s>`: wait until the shaders' clock has run that long before the first shot (bursts are seconds long).
 var _time := 0.0
+## `yukata=1`: every other row in yukata (the skin draw's g + 2, as CrowdPlacer flags it).
+var _yukata := false
 
 
 func _init() -> void:
@@ -44,6 +46,8 @@ func _init() -> void:
 		elif a.begins_with("car="):
 			var f := a.substr(4).split(",")
 			RenderingServer.global_shader_parameter_set("xray_car_a", Vector4(float(f[0]), float(f[1]), float(f[2]), 1.0))
+		elif a == "yukata=1":
+			_yukata = true
 		elif a.begins_with("time="):
 			_time = float(a.substr(5))
 		elif a.begins_with("mmcol="):
@@ -73,7 +77,7 @@ func _init() -> void:
 			var g := skin if skin >= 0.0 else rng.randf()
 			var y := 0.84 if p < 7 else 0.0
 			transforms.append(Transform3D(Basis(), Vector3(float(p) * SPACING, y, -float(r) * 3.4)))
-			customs.append(Color(rng.randf(), g, (float(p) + 0.5) / 16.0, rng.randf()))
+			customs.append(Color(rng.randf(), g + (2.0 if _yukata and r % 2 == 1 else 0.0), (float(p) + 0.5) / 16.0, rng.randf()))
 	_multimesh(mesh, transforms, customs)
 	# Seat blocks under the seated poses.
 	var seat := MeshInstance3D.new()

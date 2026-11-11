@@ -2,7 +2,7 @@ extends Node
 
 # Look-dev shots of a level with RC carts standing in for scale. Run windowed:
 #   Godot --path . res://scratch/look_shots.tscn -- <level.tscn> <out_dir> [car=x,z,yaw_deg ...]
-#       [weather=0..1] name:x,y,z:tx,ty,tz[:fov] ...
+#       [weather=0..1] [quality=0..4] [hide=<word> ...] name:x,y,z:tx,ty,tz[:fov] ...
 # A cart is dropped onto the ground at each car= spot. A shot named herd* first waits until the
 # Mara Crossing herd is streaming across the road. weather= pins Northlight Caverns' blizzard or
 # Msitu Falls' rain.
@@ -58,9 +58,20 @@ func _ready() -> void:
 	for a in args.slice(2):
 		if a.begins_with("quality="):
 			MusicManager.set_grass_setting(int(a.substr(8)) + 1, false)
+	# hide=<word> hides every node whose name holds the word (water, to see what is under it).
+	for a in args.slice(2):
+		if a.begins_with("hide="):
+			var word := a.substr(5).to_lower()
+			var stack: Array = [level]
+			while not stack.is_empty():
+				var nd: Node = stack.pop_back()
+				stack.append_array(nd.get_children())
+				if nd is Node3D and word in String(nd.name).to_lower():
+					(nd as Node3D).visible = false
+					print("HIDDEN ", level.get_path_to(nd))
 	var herd: Node = level.get_node_or_null("MigrationHerd")
 	for a in args.slice(2):
-		if a.begins_with("car=") or a.begins_with("weather=") or a.begins_with("quality="):
+		if a.begins_with("car=") or a.begins_with("weather=") or a.begins_with("quality=") or a.begins_with("hide="):
 			continue
 		var parts := a.split(":")
 		var p := parts[1].split(",")

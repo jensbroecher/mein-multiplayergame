@@ -45,6 +45,7 @@ const S_DRESS := 6
 const S_PHONE := 7
 const S_BOTTLE := 8
 const S_FLAG := 9
+const S_ROBE := 10    ## a yukata's skirt, to the ankles round both legs (standing only)
 
 const HIP_Y := 1.65
 const KNEE_Y := 0.88
@@ -250,6 +251,11 @@ func _build_body() -> void:
 	# A dress: a flared skirt from the waist to the knee.
 	var skirt := [[1.10, 0.40, 0.38, 0.0, 0.0], [1.45, 0.35, 0.31, 0.0, 0.0], [1.92, 0.28, 0.21, 0.0, 0.0]]
 	_loft(skirt, 9, P_BODY, func(_y: float) -> int: return R_DRESS, S_DRESS, Vector2.ZERO, Vector2.ZERO)
+	# A yukata's robe below the obi: straight to the ankles round both legs, the hem a little out. Robed legs apart
+	# read as pyjamas.
+	var robe := [[0.20, 0.31, 0.24, 0.0, 0.01], [0.32, 0.30, 0.23, 0.0, 0.01], [0.95, 0.31, 0.22, 0.0, 0.0],
+		[1.50, 0.335, 0.215, 0.0, 0.0], [1.80, 0.30, 0.205, 0.0, 0.0]]
+	_loft(robe, 12, P_BODY, func(_y: float) -> int: return R_DRESS, S_ROBE, Vector2.ZERO, Vector2.ZERO, true, false)
 
 
 func _build_head() -> void:

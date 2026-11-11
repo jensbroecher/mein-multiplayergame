@@ -40,7 +40,7 @@ void vertex() {
 	// The 3D figure's bursts (crowd_common's crowd_burst): arms up and hops only in a burst.
 	vec2 burst = crowd_burst(cd, TIME);
 	float bob = 0.012 * sin(TIME * 1.7 + ph);
-	if (pose == 9) {
+	if (pose == 9 && !crowd_yukata(cd)) {
 		vec2 hop = crowd_hop(cd, burst);
 		bob += 0.34 * hop.y - 0.18 * hop.x;
 	}
@@ -67,7 +67,7 @@ void vertex() {
 		// A yukata: the robe (pattern 8) to the ankles, long sleeves, the obi as the second colour; no skirt.
 		v_shirt = vec4(mix(yukata_robe(cd), yukata_figure(cd), 0.18), 8.0);
 		v_shirt2 = vec4(yukata_obi(cd), 1.0);
-		v_trousers = vec4(v_shirt.rgb, 1.0);
+		v_trousers = vec4(v_shirt.rgb, 2.0);   // 2: a robe to the ankles
 		v_hair.w = 0.0;
 	}
 	v_misc = vec4(hs, build, float(pose), ph);
@@ -144,7 +144,11 @@ void fragment() {
 			legs = sd_seg(m, vec2(lx, -0.05), vec2(lx, -1.52), 0.12);
 			shoes = sd_box(m - vec2(lx, -1.56), vec2(0.10, 0.08), 0.05);
 			if (dress) {
-				skirt = sd_box(q - vec2(0.0, -0.45), vec2(0.36, 0.35), 0.08);
+				// From the waist, as the 3D figure's: from the hip down it left a band of trousers and the thighs
+				// showing over it.
+				skirt = sd_box(q - vec2(0.0, -0.27), vec2(0.36, 0.54), 0.08);
+			} else if (v_trousers.w > 1.5) {
+				skirt = sd_box(q - vec2(0.0, -0.78), vec2(0.33, 0.80), 0.06);
 			}
 		} else {
 			legs = min(sd_box(m - vec2(lx + 0.01, -0.10), vec2(0.15, 0.12), 0.08), sd_seg(m, vec2(lx + 0.01, -0.18), vec2(lx + 0.01, -0.70), 0.095));
@@ -183,7 +187,7 @@ void fragment() {
 		col *= 1.0 - 0.22 * smoothstep(0.2, 0.40, abs(q.x));
 		// Trousers over the waist.
 		if (q.y < 0.15) {
-			col = v_trousers.rgb;
+			col = dress ? v_shirt2.rgb : v_trousers.rgb;
 		}
 	}
 	if (neck < 0.0 || head < 0.0) {
@@ -205,7 +209,7 @@ void fragment() {
 		if (dress && standing) col = skin;
 	}
 	if (skirt < 0.0) {
-		col = v_shirt2.rgb;
+		col = v_trousers.w > 1.5 ? v_trousers.rgb : v_shirt2.rgb;
 	}
 	if (shoes < 0.0) {
 		col = v_acc.w > 0.5 ? vec3(0.85, 0.85, 0.83) : vec3(0.07, 0.06, 0.06);

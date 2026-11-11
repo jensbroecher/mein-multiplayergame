@@ -73,8 +73,10 @@ const TEA_HOUSE := Vector2(-196.0, 40.0)
 ## The park run: a shortcut for the bots (and anyone brave) off the start straight, across the promenade and the lawns,
 ## over the park's little drum bridge, along the river meadow onto the raft crossing. [point, corner radius]; the first
 ## is moved onto the lap's line. Everything keeps PARK_RUN_CLEAR off its line.
-const PARK_RUN := [[Vector2(-74.0, 116.0), 0.0], [Vector2(-100.0, 104.0), 18.0], [Vector2(-106.0, 86.0), 14.0], [Vector2(-120.0, 75.0), 14.0],
-		[Vector2(-138.0, 57.0), 12.0], [Vector2(-182.0, 54.0), 16.0], [Vector2(-205.0, 60.0), 20.0], [Vector2(-322.5, 57.5), 14.0], [Vector2(-325.2, 30.0), 0.0]]
+## The first corner is a long sweep (45m): bots come off the start straight flat out, and at 18m a third of them ran
+## straight on past it.
+const PARK_RUN := [[Vector2(-74.0, 116.0), 0.0], [Vector2(-102.0, 103.0), 45.0], [Vector2(-138.0, 57.0), 24.0],
+		[Vector2(-182.0, 54.0), 16.0], [Vector2(-205.0, 60.0), 20.0], [Vector2(-322.5, 57.5), 14.0], [Vector2(-325.2, 30.0), 0.0]]
 const PARK_RUN_CLEAR := 5.5
 ## The cherry-blossom fair on the promenade: from these metres past the finish line to these.
 const FAIR := Vector2(16.0, 98.0)
@@ -1772,7 +1774,8 @@ func _build_koi(root: Node3D, rng: RandomNumberGenerator) -> void:
 	var pats: Array = [0, 1, 0, 2, 3, 0, 4, 2, 1, 0, 3, 0]
 	for i in range(5):
 		kinds.append(0)
-		a_pts.append(Vector3(GARDEN_POOL.x, pool_y - 0.22 - 0.05 * float(i % 2), GARDEN_POOL.y))
+		# Near the surface: deeper, the creek water's colour all but hid them.
+		a_pts.append(Vector3(GARDEN_POOL.x, pool_y - 0.12 - 0.04 * float(i % 2), GARDEN_POOL.y))
 		b_pts.append(Vector3(lerpf(0.9, 2.1, float(i) / 4.0), 0.0, 0.0))
 		var sp: float = rng.randf_range(0.35, 0.7) * (1.0 if i % 2 == 0 else -1.0)
 		speeds.append(sp)
@@ -1790,8 +1793,8 @@ func _build_koi(root: Node3D, rng: RandomNumberGenerator) -> void:
 		var a: Vector2 = gp[i2 - 3]
 		var b: Vector2 = gp[i2 + 3]
 		kinds.append(1)
-		a_pts.append(Vector3(a.x, lv[i2 - 3] - 0.2, a.y))
-		b_pts.append(Vector3(b.x, lv[i2 + 3] - 0.2, b.y))
+		a_pts.append(Vector3(a.x, lv[i2 - 3] - 0.13, a.y))
+		b_pts.append(Vector3(b.x, lv[i2 + 3] - 0.13, b.y))
 		speeds.append(rng.randf_range(0.15, 0.3))
 		phases.append(rng.randf() * TAU)
 		sizes.append(PROP_SCALE * rng.randf_range(0.8, 1.05))

@@ -12,9 +12,12 @@ extends Node3D
 @export var flight := PackedVector3Array()
 @export var fly_speed := 10.0
 
-const GREY := Color(0.55, 0.58, 0.62)
-const GREY_DARK := Color(0.30, 0.32, 0.36)
-const WHITE := Color(0.90, 0.90, 0.88)
+## In full sun on the river the first greys read as an egret's white: the back and wings are a darker blue-grey, the
+## neck a pale grey, only the face white.
+const GREY := Color(0.42, 0.45, 0.50)
+const GREY_DARK := Color(0.22, 0.24, 0.28)
+const NECK := Color(0.70, 0.71, 0.72)
+const WHITE := Color(0.86, 0.86, 0.84)
 const BLACK := Color(0.06, 0.06, 0.07)
 const BEAK := Color(0.88, 0.68, 0.22)
 const LEG := Color(0.55, 0.46, 0.28)
@@ -225,7 +228,7 @@ func _build() -> void:
 	# The body, tilted up toward the chest, the short tail, the dark shoulder.
 	_part("Body", _model, func(st: SurfaceTool) -> void:
 		var tilt := Basis(Vector3.RIGHT, -0.35)
-		_ellipsoid(st, Vector3(0.0, 0.66, 0.0), Vector3(0.11, 0.12, 0.27), tilt, GREY, WHITE.darkened(0.1))
+		_ellipsoid(st, Vector3(0.0, 0.66, 0.0), Vector3(0.11, 0.12, 0.27), tilt, GREY, NECK)
 		_ellipsoid(st, Vector3(0.0, 0.58, -0.25), Vector3(0.07, 0.04, 0.12), Basis(Vector3.RIGHT, 0.2), GREY_DARK, GREY)
 		_ellipsoid(st, Vector3(0.0, 0.73, 0.14), Vector3(0.085, 0.07, 0.08), Basis(), WHITE, GREY))
 	# The legs, a pivot at the hip so they trail behind in flight.
@@ -245,14 +248,14 @@ func _build() -> void:
 	_model.add_child(_neck, false, Node.INTERNAL_MODE_FRONT)
 	_part("NeckMesh", _neck, func(st: SurfaceTool) -> void:
 		var spine: Array = [Vector3(0, 0.0, 0.0), Vector3(0, 0.08, 0.08), Vector3(0, 0.16, 0.06), Vector3(0, 0.24, 0.0), Vector3(0, 0.31, 0.03), Vector3(0, 0.35, 0.09)]
-		_tube(st, spine, [0.05, 0.042, 0.036, 0.033, 0.032, 0.03], WHITE)
+		_tube(st, spine, [0.05, 0.042, 0.036, 0.033, 0.032, 0.03], NECK)
 		var head := Vector3(0.0, 0.37, 0.11)
 		_ellipsoid(st, head, Vector3(0.035, 0.035, 0.055), Basis(), WHITE, WHITE.darkened(0.1), 5, 7)
 		_tube(st, [head + Vector3(0.0, 0.025, -0.02), head + Vector3(0.0, 0.03, -0.12), head + Vector3(0.0, 0.0, -0.2)], [0.012, 0.008, 0.002], BLACK, 4)
 		for sx in [-1.0, 1.0]:
 			_ellipsoid(st, head + Vector3(sx * 0.03, 0.012, 0.0), Vector3(0.008, 0.012, 0.04), Basis(), BLACK, BLACK, 3, 5)
 		_tube(st, [head + Vector3(0.0, -0.005, 0.045), head + Vector3(0.0, -0.01, 0.13), head + Vector3(0.0, -0.015, 0.2)], [0.017, 0.01, 0.0015], BEAK, 6)
-		_tube(st, [Vector3(0.0, 0.2, 0.08), Vector3(0.0, 0.08, 0.13)], [0.012, 0.006], GREY_DARK, 4))
+		_tube(st, [Vector3(0.0, 0.2, 0.08), Vector3(0.0, 0.08, 0.13)], [0.012, 0.006], BLACK, 4))
 	# The wings, each hinged at its shoulder: span out along x, the black flight feathers at the tip and trailing edge.
 	for side in [-1.0, 1.0]:
 		var w := Node3D.new()

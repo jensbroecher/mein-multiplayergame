@@ -4674,14 +4674,21 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
     (`_in_park`). The ground's grid is halved round the garden stream and the brook (`_extra_refine`): on 4m cells their
     channels showed as patches of water. A three-storey pagoda stands on the hill behind (`_build_hill_pagoda`). The
     props went from about 275k to 515k triangles (the second row of houses most of it): not yet measured on a GPU.
-  - The user's picks from my ideas (not yet checked in a render or a race when committed): a cherry-blossom fair on
-    the promenade past the finish (`FAIR`, `_build_fair`: yatai, `festival_pole`s with chochin strings across and
-    along), picnics on the park's lawns (`_build_picnics`), people in yukata (`_person`'s `yukata`; CrowdPlacer's spot
-    field 6 adds 2 to the skin draw, `crowd_yukata` in crowd_common.gdshaderinc; `crowd_yukata` share of the start's
-    crowd), koi in the garden pool and stream (`KoiFish.gd`, `koi.gdshader`, `_build_koi`), a grey heron at the ford
-    that flies off when a cart comes near (`Heron.gd`, built in code, `HERON_AT`), and the park run (`PARK_RUN`, an AI
-    path over the lawns and the park's little drum bridge onto the raft crossing, `_build_shortcut_paths`; everything
-    keeps `PARK_RUN_CLEAR` off its line, `_run_d`).
+  - The user's picks from my ideas: a cherry-blossom fair on the promenade past the finish (`FAIR`, `_build_fair`:
+    yatai, `festival_pole`s with chochin strings across and along), picnics on the park's lawns (`_build_picnics`),
+    people in yukata (`_person`'s `yukata`; CrowdPlacer's spot field 6 adds 2 to the skin draw, `crowd_yukata` in
+    crowd_common.gdshaderinc; `crowd_yukata` share of the start's crowd: the robe to the ankles round both legs, CrowdKit's
+    `S_ROBE`, standing only, the obi above it, geta; with each leg robed apart they read as pyjamas; no hops), koi in the
+    garden pool and stream (`KoiFish.gd`, `koi.gdshader`, `_build_koi`; 12-16cm under the surface: deeper, the creek
+    water's colour all but hid them), a grey heron at the ford that flies off when a cart comes near (`Heron.gd`, built
+    in code, `HERON_AT`; its first light greys read as an egret's white in the sun), and the park run (`PARK_RUN`, an AI
+    path over the lawns and the park's little drum bridge onto the raft crossing, `_build_shortcut_paths`, its
+    `ai_chance_scale` 0.35; everything keeps `PARK_RUN_CLEAR` off its line, `_run_d`). The run's first corner is a 45m
+    sweep: at 18m a third of the bots, flat out off the start straight, ran straight on past it. `shortcut_probe ...
+    chance=1.0` (speed 2, 240s): taken 18 times, all rejoined, no respawns.
+  - `res://scratch/node_where.gd` (`-s`, headless, `-- <level> word ... [max=40]`) prints where a level's nodes are (their
+    bounds, a path's points), to aim a camera; `look_shots` takes `hide=<word>` (e.g. `hide=millracesurface` to see the
+    koi under the creek water).
   - The forest road (the user wanted it more exciting: sharp turns, ups and downs, more props): four sharp bends (radii
     24-30m) climbing from the yard (3m) over a crest (26m), down a dip (24m) and up to the slide's top (29m); curve
     mirrors and warning signs at the bends, jizo, a cedar torii near the top, way-stones, log stacks, a timber sledge, a
