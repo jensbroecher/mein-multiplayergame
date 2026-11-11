@@ -4612,8 +4612,26 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   `_depth`), which carve the ground and build the water (RiverWater.gd with one strip, `river_water.gdshader`). The south
   bank's village, the timber bridge, the lumber yard and sawmill (its wheel a Spinner), the forest road, the timber slide
   (planks between log walls) and its kicker, the ford (0.36m deep). The raft train (`RaftCrossing`, RiverRafts.gd: the
-  rafts bob, their deck is still boxes; more rafts drift down the river) is 315m against the lap's 533m. Laps about 63s,
-  no respawns.
+  rafts bob, their deck is still boxes) is 315m against the lap's 533m. Laps about 63s, no respawns (before the forest
+  road below was reshaped).
+  - The mill race (the user saw the wheel with no water, its flume coming from nowhere and going nowhere, the mill too far
+    from the road): `_plan_race()` (from `_init_noise`, before the ground) lays it out and `_race_cut` cuts its channels
+    into `_natural` (`_natural_base` is the ground without them). The sawmill stands `MILL_GAP` (4m) off the yard road's
+    edge; a creek down the north hill feeds the mill pond (`_pond`, found up the hill where the ground can hold it at the
+    flume's height), a sluice, the flume on trestles (`MiyoshinoRiverKit.flume`, `FLUME_*`) into the sawmill's own trough
+    (`sawmill_flume()`; the sawmill is built `with_water` false), the water falling over the wheel (`_build_wheel_fall`,
+    waterfall.gdshader), the pit, a culvert under the road (`culvert_head` at both mouths: the road's grading fills the
+    channel within about 5m of its flat band), the brook in two small falls into the log pond. The channels' water is
+    ribbons on their levels (`_levels`: never rising downstream, never less than `free` under the ground), the river's
+    shader with its own settings. Two water sounds (Gentle_flowing_water.wav) at the wheel and the brook.
+  - The log pond (`BAY_C`, `BAY_R`): a bay of the north bank in `_natural_base` and `_shore_d`, its water a grid fading
+    out over the river's own (COLOR.b) and three RiverWater pools. The rafts that drifted down the river went through the
+    timber bridge and the raft train (the user saw them collide): three rafts with loads lie moored in the pond instead
+    ("Moored_bay_*", bobbing with the train), tied to posts on its bank.
+  - The forest road (the user wanted it more exciting: sharp turns, ups and downs, more props): four sharp bends (radii
+    24-30m) climbing from the yard (3m) over a crest (26m), down a dip (24m) and up to the slide's top (29m); curve
+    mirrors and warning signs at the bends, jizo, a cedar torii near the top, way-stones, log stacks, a timber sledge, a
+    woodcutters' hut with its kei truck, banners.
 - Monzenmachi (2.0km, dusk, `MK.night`): the shop street under lantern strings (key "lantern_lights": not solid), the
   great gate (the road narrows to 6.5m through its 6.9m bay), the stone steps (treads whose nosings lie on the road's
   line; the collision is that ramp), the precinct (hall, pagoda, bell tower), the back street, the bamboo chicane and the

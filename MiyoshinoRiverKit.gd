@@ -17,8 +17,10 @@ extends "res://MiyoshinoKit.gd"
 ##   log_stack(pk, kit, base := 6, length := 6.0, rng := null)   a pyramid on two bearers between four stakes, logs along z
 ##   log_pile(pk, kit, n := 9, length := 4.0, rng := null)       a loose jumble, mostly along z
 ##   plank_stack(pk, kit, w := 1.2, h := 1.4, length := 4.0)     stickered boards along z under a weighted tin sheet
-##   sawmill(pk, kit, labels)            front z = 0 facing +z, x 0..16, 9 deep (sawmill_size()); its wheel is a mesh of its
-##       own, water_wheel(pk, kit, r := 2.4, w := 1.1) (centred on its axle, the axle along x), at sawmill_wheel_at()
+##   sawmill(pk, kit, labels, with_water := true)   front z = 0 facing +z, x 0..16, 9 deep (sawmill_size()); its wheel is
+##       a mesh of its own, water_wheel(pk, kit, r := 2.4, w := 1.1) (centred on its axle, the axle along x), at
+##       sawmill_wheel_at(); its flume's trough is sawmill_flume() (a stage can carry it on: flume() below)
+##   mooring_post(pk, kit, h := 1.5), mooring_rope(pk, kit, a, b, sag := 0.35)   a post on a bank, a line to a raft
 ##   river_boat(pk, kit, variant := 0)   7 x 1.3m, bow toward +z, waterline y 0: 0 empty with its pole, 1 a fisherman's
 ##       (baskets, a hat on a post), 2 a roofed pleasure boat with paper lanterns
 ##   yana(pk, kit, w := 9.0)             a bamboo fish weir: the slatted platform rising toward +z, a watch hut on stilts
@@ -35,6 +37,9 @@ extends "res://MiyoshinoKit.gd"
 ##   ledge_walk(pk, kit, pts, rights, hw, side, ground_y)           along world points (the kit's frame the identity);
 ##       `ground_y.call(x, z)` the rock's height at a world point; `side` +1: the drop is on the right
 ##   timber_chute(pk, kit, pts, rights, hw, ground_y)               log walls either side, bents under the deck
+##   flume(pk, kit, pts, ground_y, iw, wh, bay)   a raised trough on trestles along world points (the floor's top)
+##   culvert_head(pk, kit, w, h, ow, oh, depth)   a stone headwall with a dark barrel, +z out of it
+##   sluice(pk, kit, iw, wh)                      a mill pond's gate over a flume's mouth, +z downstream
 ##   check_corridor(kit or mesh, span, hw, deck_y) and check_path_corridor(kit or mesh, pts, rights, hw) -> int
 ##
 ## Faces never share a plane (parts stand proud of or are cut to each other), posts and struts reach the ground or the
@@ -567,8 +572,9 @@ static func water_wheel(pk: PropKit, kit: Dictionary, r := 2.4, w := 1.1) -> voi
 ## 12.5), in it a frame saw driven by a shaft and crank from the wheel's axle, a log half sawn on its carriage, a stack
 ## of planks, a sawdust heap; a boarded lean-to office with a sliding door at its +x end; at its -x end the wheel's
 ## stone pit and timber frame, and a flume on trestles coming in from behind (z = -9, its water 5.65m up) over the wheel.
-## The wheel is water_wheel()'s mesh, placed at sawmill_wheel_at().
-static func sawmill(pk: PropKit, kit: Dictionary, labels: Array) -> void:
+## The wheel is water_wheel()'s mesh, placed at sawmill_wheel_at(). `with_water` false leaves the still water out of the flume
+## (a stage that runs its own flowing water through it: Yoshino Rapids).
+static func sawmill(pk: PropKit, kit: Dictionary, labels: Array, with_water := true) -> void:
 	var ax := MILL_AXLE
 	var r := MILL_WHEEL_R
 	var tim := AGED
@@ -606,15 +612,16 @@ static func sawmill(pk: PropKit, kit: Dictionary, labels: Array) -> void:
 	while fzc < fz1 - 0.3:
 		_bar(pk, kit, "hinoki", Vector3(fxa - 0.09, fy + 0.385, fzc), Vector3(fxb + 0.09, fy + 0.385, fzc), 0.07, 0.05, tim, Vector3.BACK)
 		fzc += 1.1
-	pk.quad(kit, "pane", [Vector3(fxa, fy + 0.24, fz1), Vector3(fxa, fy + 0.24, fz0), Vector3(fxb, fy + 0.24, fz0), Vector3(fxb, fy + 0.24, fz1)], Vector3.UP, WATER_COL)
-	var lip0 := Vector3(0, fy + 0.24, fz1)
-	var lip1 := Vector3(0, fy + 0.1, fz1 + 0.16)
-	var lip2 := Vector3(0, fy - 0.2, fz1 + 0.26)
-	for seg in [[lip0, lip1], [lip1, lip2]]:
-		var sa: Vector3 = seg[0]
-		var sb: Vector3 = seg[1]
-		var nn := Vector3(0, sb.z - sa.z, sa.y - sb.y).normalized()
-		pk.panel(kit, "pane", [sa + Vector3(fxa + 0.03, 0, 0), sa + Vector3(fxb - 0.03, 0, 0), sb + Vector3(fxb - 0.03, 0, 0), sb + Vector3(fxa + 0.03, 0, 0)], nn, WATER_COL.lightened(0.25), WATER_COL)
+	if with_water:
+		pk.quad(kit, "pane", [Vector3(fxa, fy + 0.24, fz1), Vector3(fxa, fy + 0.24, fz0), Vector3(fxb, fy + 0.24, fz0), Vector3(fxb, fy + 0.24, fz1)], Vector3.UP, WATER_COL)
+		var lip0 := Vector3(0, fy + 0.24, fz1)
+		var lip1 := Vector3(0, fy + 0.1, fz1 + 0.16)
+		var lip2 := Vector3(0, fy - 0.2, fz1 + 0.26)
+		for seg in [[lip0, lip1], [lip1, lip2]]:
+			var sa: Vector3 = seg[0]
+			var sb: Vector3 = seg[1]
+			var nn := Vector3(0, sb.z - sa.z, sa.y - sb.y).normalized()
+			pk.panel(kit, "pane", [sa + Vector3(fxa + 0.03, 0, 0), sa + Vector3(fxb - 0.03, 0, 0), sb + Vector3(fxb - 0.03, 0, 0), sb + Vector3(fxa + 0.03, 0, 0)], nn, WATER_COL.lightened(0.25), WATER_COL)
 	for z in [-8.75, -7.9]:
 		_bar(pk, kit, "hinoki", Vector3(0.55, fy - 0.09, z), Vector3(2.05, fy - 0.09, z), 0.16, 0.18, tim, Vector3.BACK)
 		for sx in [-1.0, 1.0]:
@@ -1598,6 +1605,181 @@ static func timber_chute(pk: PropKit, kit: Dictionary, pts: PackedVector3Array, 
 				var dz: Vector3 = (fr[i][0] as Vector3) * 0.2
 				_bar(pk, kit, "hinoki", ta - Vector3(0, 0.3, 0) + dz, Vector3(tb.x, tb.y - hgt + 0.3, tb.z) + dz, 0.1, 0.18, AGED_DARK.lightened(0.1), fr[i][0])
 				_bar(pk, kit, "hinoki", tb - Vector3(0, 0.3, 0) - dz, Vector3(ta.x, ta.y - hgt + 0.3, ta.z) - dz, 0.1, 0.18, AGED_DARK.lightened(0.1), fr[i][0])
+
+
+# ======================================================================================
+#  Part B: the mill race (game metres)
+# ======================================================================================
+
+## The sawmill's own flume in its life-size frame: [the trough's middle x, its inside half width, its floor's top y, the
+## back end's z (where a longer flume carries on), the lip's z (over the wheel)], for a stage that brings the water in.
+static func sawmill_flume() -> Array:
+	var fy: float = MILL_AXLE.y + MILL_WHEEL_R + 0.07 + 0.2
+	return [1.3, 0.27, fy + 0.045, -9.0, MILL_AXLE.z + 0.45]
+
+
+## A raised wooden flume (kakehi) along the world points `pts` (the trough floor's top on its middle line, the water
+## running toward the last point): the sawmill's trough at game size (inside `iw` wide, walls `wh` high, boarded), cleats
+## across its top, and every `bay` metres a trestle from `ground_y.call(x, z)` up under it: two splayed legs on stone pads, a
+## cap, X braces and long ledgers where it stands tall, a sleeper where it lies on the ground. Its ends are open.
+static func flume(pk: PropKit, kit: Dictionary, pts: PackedVector3Array, ground_y: Callable, iw := 0.86, wh := 0.58, bay := 3.6) -> void:
+	var n := pts.size()
+	if n < 2:
+		return
+	var wt := 0.08
+	var ft := 0.08
+	var board := CEDAR.lightened(0.12)
+	var tim := AGED
+	var hw: float = iw * 0.5
+	for i in n - 1:
+		var a: Vector3 = pts[i]
+		var b: Vector3 = pts[i + 1]
+		var d := Vector3(b.x - a.x, 0.0, b.z - a.z).normalized()
+		var r := d.cross(Vector3.UP).normalized()
+		var up := Vector3.UP
+		# The floor: its top inside the walls, its underside across them.
+		_planks(pk, kit, "sugi", [a - r * hw + up * 0.0, b - r * hw, b + r * hw, a + r * hw], Vector3.UP, board.darkened(0.35))
+		_planks(pk, kit, "sugi", [a + r * (hw + wt) - up * ft, b + r * (hw + wt) - up * ft, b - r * (hw + wt) - up * ft, a - r * (hw + wt) - up * ft], Vector3.DOWN, board.darkened(0.3))
+		for sx in [-1.0, 1.0]:
+			var ri: Vector3 = r * (sx * hw)
+			var ro: Vector3 = r * (sx * (hw + wt))
+			var out: Vector3 = r * sx
+			# Outside and inside faces of the wall, its top edge.
+			_planks(pk, kit, "sugi", [a + ro - up * ft, b + ro - up * ft, b + ro + up * wh, a + ro + up * wh], out, board)
+			_planks(pk, kit, "sugi", [a + ri, b + ri, b + ri + up * wh, a + ri + up * wh], -out, board.darkened(0.25))
+			pk.quad(kit, "wood", [a + ri + up * wh, b + ri + up * wh, b + ro + up * wh, a + ro + up * wh], Vector3.UP, board)
+		# A cleat across the top every 1.8m.
+		var seg_len: float = Vector2(b.x - a.x, b.z - a.z).length()
+		var t := 0.9
+		while t < seg_len:
+			var c: Vector3 = a.lerp(b, t / seg_len) + up * (wh + 0.05)
+			_bar(pk, kit, "hinoki", c - r * (hw + wt + 0.14), c + r * (hw + wt + 0.14), 0.11, 0.08, tim, d)
+			t += 1.8
+	# The trestles, every `bay` along its length.
+	var total := 0.0
+	var lens := PackedFloat32Array([0.0])
+	for i in n - 1:
+		total += Vector2(pts[i + 1].x - pts[i].x, pts[i + 1].z - pts[i].z).length()
+		lens.append(total)
+	var prev_mid: Array = []
+	var k := 0
+	var s := 0.6
+	while s <= total - 0.4:
+		var j := 0
+		while j < n - 2 and lens[j + 1] < s:
+			j += 1
+		var u: float = (s - lens[j]) / maxf(lens[j + 1] - lens[j], 0.001)
+		var p: Vector3 = pts[j].lerp(pts[j + 1], u)
+		var d := Vector3(pts[j + 1].x - pts[j].x, 0.0, pts[j + 1].z - pts[j].z).normalized()
+		var r := d.cross(Vector3.UP).normalized()
+		var cap_y: float = p.y - ft - 0.12
+		var g_mid: float = float(ground_y.call(p.x, p.z))
+		if cap_y - g_mid < 0.5:
+			# On the ground: a sleeper log under it.
+			_log(pk, kit, Vector3(p.x, cap_y - 0.06, p.z) - r * (hw + 0.5), Vector3(p.x, cap_y - 0.06, p.z) + r * (hw + 0.5), 0.13, 0.12, 6, true, 3, 0.1, 0, d)
+			prev_mid = []
+			s += bay
+			k += 1
+			continue
+		_bar(pk, kit, "hinoki", Vector3(p.x, cap_y, p.z) - r * (hw + 0.45), Vector3(p.x, cap_y, p.z) + r * (hw + 0.45), 0.2, 0.22, tim, d)
+		var legs: Array = []
+		for sx in [-1.0, 1.0]:
+			var top: Vector3 = Vector3(p.x, cap_y - 0.1, p.z) + r * (sx * (hw + 0.25))
+			var h_est: float = top.y - g_mid
+			var foot_xz: Vector3 = top + r * (sx * (0.35 + h_est * 0.09))
+			var g: float = float(ground_y.call(foot_xz.x, foot_xz.z))
+			var foot := Vector3(foot_xz.x, g - 0.15, foot_xz.z)
+			_bar(pk, kit, "hinoki", foot, top, 0.2, 0.2, tim.darkened(0.06), d, false)
+			pk.block(kit, "ishi", Vector3(foot.x - 0.3, g - 0.35, foot.z - 0.3), Vector3(foot.x + 0.3, g + 0.12, foot.z + 0.3), GRANITE_MOSSY, uvk)
+			legs.append([foot, top])
+		var hgt: float = cap_y - g_mid
+		if hgt > 2.2:
+			# X braces across the bent, a little in front of and behind the legs.
+			var la: Array = legs[0]
+			var lb: Array = legs[1]
+			var lo := 0.25
+			var hi := 0.85
+			var dz: Vector3 = d * 0.13
+			_bar(pk, kit, "hinoki", (la[0] as Vector3).lerp(la[1], lo) + dz, (lb[0] as Vector3).lerp(lb[1], hi) + dz, 0.08, 0.16, AGED_DARK.lightened(0.1), d)
+			_bar(pk, kit, "hinoki", (lb[0] as Vector3).lerp(lb[1], lo) - dz, (la[0] as Vector3).lerp(la[1], hi) - dz, 0.08, 0.16, AGED_DARK.lightened(0.1), d)
+			if hgt > 4.5:
+				_bar(pk, kit, "hinoki", (la[0] as Vector3).lerp(la[1], 0.5), (lb[0] as Vector3).lerp(lb[1], 0.5), 0.14, 0.16, tim, d)
+		# Ledgers to the last bent along each side where it stands tall.
+		var mids: Array = []
+		for l in legs:
+			mids.append((l[0] as Vector3).lerp(l[1], 0.55))
+		if hgt > 3.0 and prev_mid.size() == 2:
+			for q in 2:
+				_bar(pk, kit, "hinoki", prev_mid[q], mids[q], 0.12, 0.14, tim.darkened(0.04), r)
+		prev_mid = mids if hgt > 3.0 else []
+		s += bay
+		k += 1
+
+
+## A culvert's stone headwall across a channel (game metres; the frame's origin on the channel's middle at its bed, +z out of
+## the culvert, x across): a wall `w` wide rising `h` over the bed, a squared opening `ow` wide and `oh` high under a
+## lintel, a dark barrel `depth` deep behind it, a coping on top.
+static func culvert_head(pk: PropKit, kit: Dictionary, w := 4.4, h := 2.2, ow := 1.6, oh := 1.2, depth := 4.0) -> void:
+	var col := GRANITE_MOSSY
+	var t := 0.7
+	var hw: float = w * 0.5
+	var ho: float = ow * 0.5
+	for sx in [-1.0, 1.0]:
+		var x0: float = sx * ho
+		var x1: float = sx * hw
+		pk.block(kit, "ishi", Vector3(minf(x0, x1), -0.6, -t), Vector3(maxf(x0, x1), h, 0.0), col.lightened(0.03 * sx), uvk)
+	# The lintel and the wall over it.
+	pk.block(kit, "ishi", Vector3(-ho - 0.25, oh, -t - 0.02), Vector3(ho + 0.25, oh + 0.38, 0.06), GRANITE, uvk)
+	if h > oh + 0.38:
+		pk.block(kit, "ishi", Vector3(-ho, oh + 0.38, -t), Vector3(ho, h, 0.0), col, uvk)
+	# The coping, proud of the wall.
+	pk.block(kit, "ishi", Vector3(-hw - 0.08, h, -t - 0.1), Vector3(hw + 0.08, h + 0.22, 0.12), GRANITE.darkened(0.05), uvk)
+	# The barrel: dark inside faces.
+	var dark := Color(0.07, 0.07, 0.06)
+	var z0 := -0.02
+	var z1: float = -depth
+	pk.quad(kit, "ishi", [Vector3(-ho, -0.3, z0), Vector3(-ho, -0.3, z1), Vector3(-ho, oh, z1), Vector3(-ho, oh, z0)], Vector3.RIGHT, dark)
+	pk.quad(kit, "ishi", [Vector3(ho, -0.3, z1), Vector3(ho, -0.3, z0), Vector3(ho, oh, z0), Vector3(ho, oh, z1)], Vector3.LEFT, dark)
+	pk.quad(kit, "ishi", [Vector3(-ho, oh, z0), Vector3(-ho, oh, z1), Vector3(ho, oh, z1), Vector3(ho, oh, z0)], Vector3.DOWN, dark)
+	pk.quad(kit, "ishi", [Vector3(-ho, -0.3, z1), Vector3(ho, -0.3, z1), Vector3(ho, oh, z1), Vector3(-ho, oh, z1)], Vector3.BACK, Color(0.02, 0.02, 0.02))
+	# Stones on the bed in front of it.
+	for k in 5:
+		var fx: float = (float(k) - 2.0) * ow * 0.32
+		_stone(pk, kit, Vector3(fx, -0.25, 0.5 + 0.35 * float(k % 2)), 0.22 + 0.05 * float(k % 3), GRANITE_MOSSY.darkened(0.1 * float(k % 2)))
+
+
+## A mill pond's sluice (game metres; the frame's origin on the flume's floor at its mouth, +z downstream, x across): two
+## grooved posts either side of the trough, a beam across them, the gate board drawn up on its rack and a stone sill.
+static func sluice(pk: PropKit, kit: Dictionary, iw := 0.86, wh := 0.58) -> void:
+	var tim := AGED
+	var hw: float = iw * 0.5
+	var top: float = wh + 1.5
+	for sx in [-1.0, 1.0]:
+		var x: float = sx * (hw + 0.2)
+		_bar(pk, kit, "hinoki", Vector3(x, -1.2, 0.0), Vector3(x, top, 0.0), 0.24, 0.24, tim.darkened(0.05), Vector3.RIGHT, true)
+	_bar(pk, kit, "hinoki", Vector3(-hw - 0.45, top - 0.12, 0.0), Vector3(hw + 0.45, top - 0.12, 0.0), 0.22, 0.24, tim, Vector3.BACK)
+	# The gate board, raised: the water runs under it.
+	pk.block(kit, "hinoki", Vector3(-hw - 0.02, wh * 0.55, -0.05), Vector3(hw + 0.02, wh + 0.75, 0.05), AGED_DARK, uvk)
+	# Its rack: a toothed stem up through the beam, a wheel on a spindle.
+	_bar(pk, kit, "hinoki", Vector3(0.0, wh + 0.7, 0.0), Vector3(0.0, top + 0.35, 0.0), 0.12, 0.12, tim.lightened(0.05), Vector3.RIGHT)
+	pk.block(kit, "steel", Vector3(-0.09, top - 0.02, -0.15), Vector3(0.09, top + 0.12, 0.15), IRON)
+	pk.lathe(kit, "metal", Vector3(0.0, top + 0.08, 0.2), [Vector2(0.28, -0.03), Vector2(0.28, 0.03), Vector2(0.0, 0.03)], 10, IRON.lightened(0.1), false, Basis(Vector3(1, 0, 0), Vector3(0, 0, 1), Vector3(0, -1, 0)))
+	pk.block(kit, "ishi", Vector3(-hw - 0.6, -0.5, -0.4), Vector3(hw + 0.6, -0.06, 0.4), GRANITE_MOSSY, uvk)
+
+
+## A mooring post (life size, its foot at the origin): a peeled log driven into the bank, `h` standing, a few turns of rope.
+static func mooring_post(pk: PropKit, kit: Dictionary, h := 1.5) -> void:
+	_log(pk, kit, Vector3(0, -0.9, 0), Vector3(0, h, 0), 0.12, 0.1, 7, false, 2, 0.1, 0, Vector3.RIGHT)
+	_lash(pk, kit, Vector3(0, h - 0.35, 0), Vector3.UP, 0.135, 0.16, ROPE)
+
+
+## A rope between two life-size points (a mooring line), sagging `sag` in its middle.
+static func mooring_rope(pk: PropKit, kit: Dictionary, a: Vector3, b: Vector3, sag := 0.35) -> void:
+	var pts: Array = []
+	for k in 9:
+		var t: float = float(k) / 8.0
+		pts.append(a.lerp(b, t) - Vector3(0, sag * 4.0 * t * (1.0 - t), 0))
+	_pipe(pk, kit, "rope", pts, 0.028, 5, ROPE, 0)
 
 
 # ======================================================================================
