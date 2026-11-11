@@ -1989,7 +1989,7 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   distances: a **card** (`stadium_crowd.gdshader`, a flat figure drawn in the shader, the old look, now with legs)
   and, within reach of the lap, a **3D figure** (`CrowdKit.gd` mesh, `stadium_person.gdshader`). They swap by dither
   between 34 and 44m (`tree_lod.gdshaderinc`: `lod_mode` 1 on the figure, 2 on the card).
-- `CrowdKit.gd` is one mesh (about 1.8k triangles, 1k of them drawn) in a standing rest pose at 1.86 times life
+- `CrowdKit.gd` is one mesh (about 2.3k triangles, 1.3k of them drawn) in a standing rest pose at 1.86 times life
   size (3.3m, the stands' scale), carrying every hair style, a dress and the props. Per vertex: COLOR the part
   (limb), region (skin, shirt, trousers, ...) and style (which hair or prop); UV/UV2 the limb's two joints (they all
   lie in the plane z = 0) or a head part's head-unit position. The vertex shader bends the joints per pose, hides
@@ -2003,12 +2003,30 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   10% cheer, 17% in the main stand's middle). Flags (pose 12) only in the stands: `POSE_STANDING_PLAZA` has none
   (they stood up through the fan zone's tents and the stalls' tarps), and a fan under less than `FLAG_HEADROOM` of
   the roof (`_roof_underside`: the upper tier's back rows) cheers instead.
-- The shoulder joint (`SHOULDER_X` 0.34) is just inside the torso's side, with a deltoid on the upper arm: out at
-  0.40, beside the chest, a raised arm swung about a point outside the body and stood off the shoulder with a gap.
-  (A deltoid turning only part of the way with the arm stuck out as a lump under a raised arm.) The cap is a crown
+- The shoulder joint (`SHOULDER_X` 0.34) is just inside the torso's side: out at 0.40, beside the chest, a raised arm
+  swung about a point outside the body and stood off the shoulder with a gap. The shoulder is a ball centred on the
+  joint (and the elbow and knee balls on theirs), so it looks the same however the limb turns and always covers the
+  join: a deltoid placed off the joint swung out with a raised arm as a lump over a gap (the user saw arms "not even
+  attached"). The torso's shoulder line runs up to the balls (from a flat shelf at 2.62 they stood up like pads), the
+  thighs' tops are inside the seat (open and wider, their edge showed as a flap over each hip), and the hands are a
+  palm, curled fingers and a thumb (`_build_hand`, palm toward the thigh), no longer an egg. Limbs are 9-10 sided,
+  the torso 12. Crossed arms (4, 11) turn the upper arms in (`TWIST` 80) so the forearms lie across the chest: the
+  old yaw swung the elbows to the middle and the hands out past the other side. The cap is a crown
   cut on a slant (at the brows in front, mid-head at the back) with a curved bill from its front edge
   (`_build_cap`); the short hair is on the head's own 6 x 12 grid, since on a coarser one the head's corners poked
   through it. `res://scratch/crowd_preview.gd` is the way to check a pose.
+- Animation (the vertex shader, and the card's arms and hops to match): nobody keeps going. `crowd_common`'s
+  `crowd_cycle` gives each person bursts on a cycle of their own (`crowd_burst`: about 11s, 42% of it in a burst, a
+  quarter either way; the mouth opens only in one): cheering, clapping and waving come in bursts with the arms down
+  between them (to the seated hands-on-thighs or the standing idle arms), two in five cheerers hop two or three times
+  at the start of a burst with a crouch before and after (`crowd_hop`), the rest bounce on their toes or in their
+  seat; flag wavers wave hard in a burst and sway between; filmers lower the phone now and then (`PHONE_DOWN`),
+  drinkers sip now and then and hold the drink low between (`HOLD_SIT`, `HOLD_STAND`); talkers turn to a neighbour
+  and gesture. The idle look round in held glances (`crowd_look`), and the standing shift their weight from foot to
+  foot (`shift`: the legs lean from the ankles, the free knee eases, the shoulders counter). Pose 9 used to jump
+  without a pause. Near player one's car (`xray_car_a`, PlayerCart's camera x-ray global: w > 0 in a race) they
+  watch it go by: within 55m, gone at 95m, never round behind them; the head takes most of it, the shoulders the
+  rest (filmers more, so the phone follows; talkers and drinkers less).
 - The figure stands on y = 0; a seated one's pelvis drops to `SEAT_HIP` over it. In the stands the origin is the seat
   cushion's top (`CROWD_SEAT_H`), so a standing fan stands on the seat; the people in the plazas, round the stalls
   and in the yards behind the barriers (`standing_only` spots) stand on the ground and have legs.
@@ -2036,8 +2054,16 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   scale and with a skin mix of its own (Lakeside's start; its playground's children are size 0.58). Nyota's generator
   still has its own copy of these numbers.
 - `res://scratch/crowd_preview.gd` (`-s`, windowed) renders the figures in memory in a second: `-- <dir> [rows=3]
-  [seed=1] [cards=1] [skin=<g>] name:x,y,z:tx,ty,tz`, a column per pose 0..15 (2.6m apart), the cards in a row
-  behind with `cards=1`. `nyota_shots` takes `detail=N` to try a Detail Level.
+  [seed=1] [cards=1] [skin=<g>] [car=x,y,z] [time=<s>] name:x,y,z:tx,ty,tz`, a column per pose 0..15 (2.6m apart),
+  the cards in a row behind with `cards=1`, player one's car at `car=` for the watchers, the clock run to `time=`
+  first (bursts are seconds long). `nyota_shots` takes `detail=N` to try a Detail Level.
+- The figure is the shared `generated/crowd_person.res`, which every level with spectators loads:
+  `res://scratch/rebuild_crowd_person.gd` (`-s`, headless) rebuilds it from CrowdKit keeping its material, so a change
+  to the figure needs no level regenerated (regenerate_nyota_stadium writes it too).
+- The Compatibility renderer (Godot 4.8-beta2, `--rendering-driver opengl3`, as the cloud renders) loses a mesh's
+  vertex colours on a MultiMesh with custom data and no instance colours: every figure drew as a rest-pose doll in
+  skin, every style shown. The preview gives its MultiMeshes white instance colours (`mmcol=0` leaves them out); the
+  levels' crowds look like that in a Compatibility render (Vulkan is fine).
 
 ## Camps (CampKit.gd: Lakeside Meadows and Bloombay Dunes)
 

@@ -31,15 +31,20 @@ varying flat vec4 v_trousers; // trousers rgb, long trousers (0 or 1)
 varying flat vec4 v_misc;     // height scale, build, pose, wave phase
 varying flat vec4 v_acc;      // cap or headscarf rgb, flag colour index
 varying float cam_dist;
+varying flat float v_act;     // how far into a burst (arms up, waving)
 
 void vertex() {
 	vec4 cd = INSTANCE_CUSTOM;
 	int pose = crowd_pose(cd);
 	float ph = cd.a * 6.2831;
+	// The 3D figure's bursts (crowd_common's crowd_burst): arms up and hops only in a burst.
+	vec2 burst = crowd_burst(cd, TIME);
 	float bob = 0.012 * sin(TIME * 1.7 + ph);
 	if (pose == 9) {
-		bob += abs(sin(TIME * 3.3 + ph)) * 0.34;
+		vec2 hop = crowd_hop(cd, burst);
+		bob += 0.34 * hop.y - 0.18 * hop.x;
 	}
+	v_act = burst.x;
 	VERTEX.y += bob;
 	cam_dist = lod_distance(MODEL_MATRIX[3].xyz, CAMERA_POSITION_WORLD);
 
@@ -115,10 +120,12 @@ void fragment() {
 	// Arms: down, they are in the torso's outline; raised, a V (or one arm waving, the other down).
 	float arm = 10.0;
 	float wave = sin(TIME * 5.2 + v_misc.w * 6.0) * 0.12;
-	if (pose == 5 || pose == 9) {
-		arm = sd_seg(m, vec2(0.36, 0.96), vec2(0.95 + wave, 1.95), 0.085);
-	} else if (pose == 12 || pose == 14) {
-		arm = sd_seg(q, vec2(-0.36, 0.96), vec2(-0.90 - wave, 1.90), 0.085);
+	// Between bursts the arms come down into the torso's outline, as the 3D figure's do (the flag stays up).
+	float up = pose == 12 ? 1.0 : v_act;
+	if ((pose == 5 || pose == 9) && up > 0.02) {
+		arm = sd_seg(m, vec2(0.36, 0.96), mix(vec2(0.28, 0.20), vec2(0.95 + wave, 1.95), up), 0.085);
+	} else if ((pose == 12 || pose == 14) && up > 0.02) {
+		arm = sd_seg(q, vec2(-0.36, 0.96), mix(vec2(-0.28, 0.20), vec2(-0.90 - wave, 1.90), up), 0.085);
 	}
 	d = min(d, arm);
 	float flag = 10.0;

@@ -26,6 +26,57 @@ bool pose_standing(int p) {
 	return p >= 7;
 }
 
+// A spectator's bursts of something (cheering, clapping, a sip), on a cycle of their own: `period` seconds and
+// `share` of it in a burst on average, each person's a quarter either way and at their own phase (`salt` keeps
+// one cycle apart from another). x: 0 between bursts, 1 in one (0.45s ramps); y: seconds since the burst
+// began, -1 between. Nobody keeps going: the crowd used to clap, cheer and jump without a pause.
+vec2 crowd_cycle(vec4 cd, float t, float salt, float period, float share) {
+	float pr = period * (0.75 + 0.5 * crowd_rand(cd, salt));
+	float len = pr * share * (0.75 + 0.5 * crowd_rand(cd, salt + 1.0));
+	float on = fract(t / pr + crowd_rand(cd, salt + 2.0)) * pr;
+	float x = smoothstep(0.0, 0.45, on) * (1.0 - smoothstep(len - 0.45, len, on));
+	return vec2(x, on < len ? on : -1.0);
+}
+
+// Excitement, the burst every pose but the flag, the phone and the drink keeps (cheer, clap, wave, talk).
+vec2 crowd_burst(vec4 cd, float t) {
+	return crowd_cycle(cd, t, 40.0, 11.0, 0.42);
+}
+
+// A cheering jumper's hops at the start of each burst: 2 or 3 (about two in five cheerers jump at all), each
+// 0.64s: x the crouch (before take-off and after landing), y how high in the hop (0..1).
+vec2 crowd_hop(vec4 cd, vec2 burst) {
+	if (burst.y < 0.0 || crowd_rand(cd, 33.0) > 0.40) {
+		return vec2(0.0);
+	}
+	float k = (burst.y - 0.15) / 0.64;
+	float hops = crowd_rand(cd, 34.0) < 0.5 ? 2.0 : 3.0;
+	if (k < 0.0 || k >= hops + 0.3) {
+		return vec2(0.0);
+	}
+	float f = fract(k);
+	if (k >= hops) {
+		// Landing from the last hop: a last crouch.
+		return vec2(sin(f / 0.3 * 3.14159), 0.0);
+	}
+	if (f < 0.3) {
+		return vec2(sin(f / 0.3 * 3.14159), 0.0);
+	}
+	float g = (f - 0.3) / 0.7;
+	return vec2(0.0, 4.0 * g * (1.0 - g));
+}
+
+// Where a spectator is looking (radians, + to their left), when nothing else holds their eye: a glance one way
+// held a few seconds, then another, the turn eased.
+float crowd_look(vec4 cd, float t) {
+	float hold = 2.6 + 2.2 * crowd_rand(cd, 36.0);
+	float k = t / hold + crowd_rand(cd, 37.0) * 7.0;
+	float i = floor(k);
+	float a = hash11(i * 3.17 + cd.r * 41.3) * 2.0 - 1.0;
+	float b = hash11((i + 1.0) * 3.17 + cd.r * 41.3) * 2.0 - 1.0;
+	return mix(a, b, smoothstep(0.78, 1.0, fract(k))) * 0.55;
+}
+
 // Arms up: the poses a card draws with raised arms.
 bool pose_arms_up(int p) {
 	return p == 5 || p == 9 || p == 12 || p == 14;

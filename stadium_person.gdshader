@@ -29,14 +29,14 @@ const vec4 ARM_L[16] = vec4[](
 	vec4(42.0, 0.0, 60.0, 34.0),   // 1 sit clap
 	vec4(12.0, 8.0, 72.0, 0.0),    // 2 sit film
 	vec4(14.0, 10.0, 70.0, 0.0),   // 3 sit talk
-	vec4(28.0, 0.0, 68.0, 56.0),   // 4 sit arms crossed
+	vec4(28.0, 5.0, 86.0, 0.0),    // 4 sit arms crossed (the upper arm turned in: TWIST)
 	vec4(10.0, 150.0, 8.0, 0.0),   // 5 sit cheer
 	vec4(12.0, 8.0, 72.0, 0.0),    // 6 sit drink
 	vec4(4.0, 6.0, 14.0, 0.0),     // 7 stand idle
 	vec4(48.0, 0.0, 56.0, 34.0),   // 8 stand clap
 	vec4(10.0, 152.0, 6.0, 0.0),   // 9 stand cheer
 	vec4(6.0, 8.0, 18.0, 0.0),     // 10 stand film
-	vec4(30.0, 0.0, 70.0, 56.0),   // 11 stand arms crossed
+	vec4(28.0, 5.0, 86.0, 0.0),    // 11 stand arms crossed
 	vec4(-6.0, 45.0, 88.0, 0.0),   // 12 stand flag: hand on the hip
 	vec4(-8.0, 46.0, 88.0, 0.0),   // 13 hands on hips
 	vec4(4.0, 6.0, 14.0, 0.0),     // 14 stand wave
@@ -47,14 +47,14 @@ const vec4 ARM_R[16] = vec4[](
 	vec4(42.0, 0.0, 60.0, 34.0),
 	vec4(72.0, -4.0, 88.0, 26.0),
 	vec4(14.0, 10.0, 70.0, 0.0),
-	vec4(38.0, 0.0, 66.0, 56.0),
+	vec4(23.0, 2.0, 92.0, 0.0),
 	vec4(10.0, 150.0, 8.0, 0.0),
 	vec4(58.0, -6.0, 118.0, 40.0),
 	vec4(4.0, 6.0, 14.0, 0.0),
 	vec4(48.0, 0.0, 56.0, 34.0),
 	vec4(10.0, 152.0, 6.0, 0.0),
 	vec4(76.0, -4.0, 84.0, 26.0),
-	vec4(38.0, 0.0, 70.0, 56.0),
+	vec4(23.0, 2.0, 92.0, 0.0),
 	vec4(6.0, 150.0, 6.0, 0.0),
 	vec4(-8.0, 46.0, 88.0, 0.0),
 	vec4(6.0, 142.0, 28.0, 0.0),
@@ -63,11 +63,18 @@ const vec4 ARM_R[16] = vec4[](
 // Per pose: how far each upper arm (left, right) turns in about its own length before the shoulder swings it
 // (degrees). A hand on the hip needs it: the elbow only bends forward, so without the turn the forearm
 // pointed ahead and the hand stood off beside the hip.
+// Crossed arms need it too: turned in, the forearms lie across the chest (yawing the whole arm in had swung the
+// elbows to the middle and the hands out past the other side).
 const vec2 TWIST[16] = vec2[](
-	vec2(0.0), vec2(0.0), vec2(0.0), vec2(0.0), vec2(0.0), vec2(0.0), vec2(0.0),
-	vec2(0.0), vec2(0.0), vec2(0.0), vec2(0.0), vec2(0.0),
+	vec2(0.0), vec2(0.0), vec2(0.0), vec2(0.0), vec2(80.0, 80.0), vec2(0.0), vec2(0.0),
+	vec2(0.0), vec2(0.0), vec2(0.0), vec2(0.0), vec2(80.0, 80.0),
 	vec2(90.0, 0.0), vec2(90.0, 90.0), vec2(0.0), vec2(90.0, 0.0)
 );
+// The right arm holding a drink between sips (seated, standing).
+const vec4 HOLD_SIT = vec4(16.0, 4.0, 58.0, 14.0);
+const vec4 HOLD_STAND = vec4(8.0, 6.0, 52.0, 14.0);
+// The right arm with the phone lowered to the chest, looking at what it filmed.
+const vec4 PHONE_DOWN = vec4(24.0, 2.0, 66.0, 22.0);
 // Per pose: hip and knee bend for the left and the right leg (degrees). Seated poses bend both to a right angle.
 const vec4 LEGS[16] = vec4[](
 	vec4(88.0, 88.0, 84.0, 90.0), vec4(88.0, 88.0, 84.0, 90.0), vec4(86.0, 90.0, 90.0, 86.0), vec4(88.0, 88.0, 94.0, 96.0),
@@ -82,6 +89,11 @@ varying float cam_dist;
 varying vec4 vcol;
 varying vec3 head_p;
 varying vec3 rest_pos;
+varying flat float v_burst;
+
+// Player one's car (PlayerCart's camera x-ray feed: xyz where it is, w > 0 while a race runs): spectators near it
+// turn their heads, and some their shoulders, to follow it past.
+global uniform vec4 xray_car_a;
 
 mat3 rot_x(float a) {
 	float c = cos(a);
@@ -144,44 +156,113 @@ void vertex() {
 		float ph = cd.a * 6.2831853;
 		float tp = TIME + cd.a * 23.0;
 
-		// Pose and animation.
+		// Pose and animation. Everyone moves on cycles of their own (crowd_common's crowd_cycle): a cheer, a round
+		// of clapping or a wave comes in bursts and the arms come down between them, a jumper hops two or three
+		// times at the start of a burst, the idle shift their weight and look round, and near player one's car
+		// they watch it go by.
 		vec4 al = ARM_L[pose];
 		vec4 ar = ARM_R[pose];
 		vec4 lg = LEGS[pose];
-		float head_yaw = 0.0;
+		vec4 calm_l = sitting ? ARM_L[0] : ARM_L[7];
+		vec4 calm_r = sitting ? ARM_R[0] : ARM_R[7];
+		vec2 burst = crowd_burst(cd, TIME);
+		float b = burst.x;
+		v_burst = b;
+		float look = crowd_look(cd, TIME);
+		float head_yaw = look;
 		float head_pitch = 0.0;
-		float lean = sitting ? -0.05 : 0.0;
+		float lean = (sitting ? -0.05 : 0.0) + sin(tp * 0.8) * 0.012;
 		float twist = 0.0;
-		float bob = 0.012 * sin(tp * 1.7);
+		float bob = 0.008 * sin(tp * 1.7);
 		float wave_l = 0.0;
 		float wave_r = 0.0;
 		float clap = 0.0;
-		if (pose == 0 || pose == 7) {
-			head_yaw = sin(tp * 0.45) * 0.28;
-			lean += sin(tp * 0.8) * 0.018;
+		float crouch = 0.0;
+		float attention = 1.0;
+		float body_watch = 0.25;
+		// Standing: the weight on one foot, then the other (+: over the left), held a while between.
+		float shift = sitting ? 0.0 : clamp(sin(TIME * (0.17 + 0.10 * crowd_rand(cd, 45.0)) + ph * 3.0) * 1.8, -1.0, 1.0) * 0.055;
+		if (pose == 0 || pose == 7 || pose == 13) {
+			head_yaw = look * 1.3;
 		} else if (pose == 1 || pose == 8) {
-			clap = sin(tp * 8.0 + ph);
-			head_pitch = -0.05;
+			al = mix(calm_l, al, b);
+			ar = mix(calm_r, ar, b);
+			clap = sin(tp * 8.0 + ph) * smoothstep(0.6, 1.0, b);
+			head_pitch = -0.05 * b;
+			shift *= 1.0 - b;
 		} else if (pose == 3) {
-			head_yaw = sin(tp * 0.7) * 0.55;
-			twist = sin(tp * 0.45) * 0.14;
+			// Talking to the neighbour, turned their way, the right hand making the point.
+			float nb = crowd_rand(cd, 46.0) < 0.5 ? 1.0 : -1.0;
+			head_yaw = mix(look, nb * 0.75 + sin(tp * 0.9) * 0.12, b);
+			twist = nb * 0.12 * b;
+			ar.x += b * (18.0 + 10.0 * sin(tp * 2.3));
+			ar.z += b * (30.0 + 18.0 * sin(tp * 3.1 + 1.0));
+			attention = 0.35;
+		} else if (pose == 4 || pose == 11) {
+			head_yaw = look * 0.8;
+			attention = 0.8;
 		} else if (pose == 5 || pose == 9) {
-			wave_l = sin(tp * 5.2 + ph) * 0.22;
-			wave_r = sin(tp * 5.2 + ph + 2.0) * 0.22;
-			head_pitch = -0.18;
-			if (pose == 9) bob += abs(sin(tp * 3.3 + ph)) * 0.34;
+			al = mix(calm_l, al, b);
+			ar = mix(calm_r, ar, b);
+			wave_l = sin(tp * 5.2 + ph) * 0.22 * b;
+			wave_r = sin(tp * 5.2 + ph + 2.0) * 0.22 * b;
+			head_pitch = -0.18 * b;
+			shift *= 1.0 - b;
+			vec2 hop = pose == 9 ? crowd_hop(cd, burst) : vec2(0.0);
+			if (hop.x + hop.y > 0.0) {
+				crouch = hop.x;
+				bob += 0.34 * hop.y;
+			} else {
+				// The rest bounce on their toes or in their seat.
+				bob += (sitting ? 0.03 : 0.045) * abs(sin(tp * 5.6 + ph)) * b;
+			}
 		} else if (pose == 12) {
-			wave_r = sin(tp * 4.0 + ph) * 0.20;
-			head_pitch = -0.1;
+			// The flag stays up; waved hard in a burst, swayed between.
+			wave_r = sin(tp * mix(2.4, 4.4, b) + ph) * mix(0.07, 0.30, b);
+			head_pitch = -0.1 * b;
 		} else if (pose == 14) {
-			wave_r = sin(tp * 6.5 + ph) * 0.30;
-			head_yaw = sin(tp * 0.8) * 0.2;
+			al = mix(calm_l, al, b);
+			ar = mix(calm_r, ar, b);
+			wave_r = sin(tp * 6.5 + ph) * 0.30 * b;
 		} else if (pose == 2 || pose == 10) {
-			head_pitch = 0.12;
-			head_yaw = sin(tp * 0.5) * 0.12;
+			// Filming, the phone now and then lowered to look at it.
+			float down = crowd_cycle(cd, TIME, 50.0, 13.0, 0.25).x;
+			ar = mix(ar, PHONE_DOWN, down);
+			head_pitch = mix(0.12, 0.30, down);
+			head_yaw = look * 0.3;
+			body_watch = 0.6;
 		} else if (pose == 6 || pose == 15) {
-			head_pitch = -0.22;
+			// A sip now and then; between them the drink is held low.
+			float sip = crowd_cycle(cd, TIME, 52.0, 9.0, 0.22).x;
+			ar = mix(sitting ? HOLD_SIT : HOLD_STAND, ar, sip);
+			head_pitch = -0.22 * sip;
+			head_yaw = look * (1.0 - sip);
+			attention = 1.0 - sip;
 		}
+		// Watching player one's car go by: within 55m fully, gone at 95m, never round behind them.
+		if (xray_car_a.w > 0.0) {
+			vec3 to = xray_car_a.xyz - origin;
+			mat3 basis = mat3(MODEL_MATRIX);
+			float s2 = max(dot(basis[0], basis[0]), 1e-4);
+			vec3 d = transpose(basis) * to / s2;
+			d.y -= sitting ? 1.5 : 3.0;
+			float yaw = atan(d.x, d.z);
+			float w = attention * (1.0 - smoothstep(55.0, 95.0, length(to))) * (1.0 - smoothstep(1.6, 2.2, abs(yaw)));
+			float yc = clamp(yaw, -1.25, 1.25);
+			head_yaw = mix(head_yaw, yc * (1.0 - body_watch), w);
+			twist += yc * body_watch * w;
+			head_pitch = mix(head_pitch, clamp(-atan(d.y, length(d.xz)), -0.35, 0.40), w * 0.8);
+		}
+		// A crouch (before and after a hop) bends the knees and hips and drops the body.
+		if (crouch > 0.0) {
+			lg += vec4(30.0, 58.0, 30.0, 58.0) * crouch;
+			bob -= 0.18 * crouch;
+			lean += 0.16 * crouch;
+		}
+		// The free leg (away from the weight) eases at the knee.
+		if (shift > 0.0) lg.zw += vec2(5.0, 12.0) * (shift / 0.055);
+		if (shift < 0.0) lg.xy += vec2(5.0, 12.0) * (-shift / 0.055);
+		vec2 tw = TWIST[pose];
 
 		// Flag cloth waves.
 		if (style == 9 && vcol.a > 0.0 && int(floor(vcol.g * 16.0 + 0.5)) == 9) {
@@ -197,7 +278,7 @@ void vertex() {
 			float roll = a.y * DEG + (left ? wave_l : wave_r);
 			float elbow = a.z * DEG;
 			float yaw = a.w * DEG;
-			float arm_twist = (left ? TWIST[pose].x : TWIST[pose].y) * DEG;
+			float arm_twist = (left ? tw.x : tw.y) * DEG;
 			if (clap != 0.0) {
 				elbow += clap * 0.10;
 				yaw += clap * 0.16;
@@ -226,6 +307,13 @@ void vertex() {
 			mat3 Rh = rot_x(-l.x * DEG);
 			v = hip + Rh * (v - hip);
 			n = Rh * n;
+			// The weight on one foot: the legs lean from the ankles so the hips stand over it.
+			if (shift != 0.0) {
+				vec3 ankle = vec3(UV.x, 0.17, 0.0);
+				mat3 Ra = rot_z(-shift / 1.48);
+				v = ankle + Ra * (v - ankle);
+				n = Ra * n;
+			}
 		} else if (part == 1) {
 			vec3 neck = vec3(0.0, NECK_Y, 0.0);
 			mat3 Rn = rot_y(head_yaw) * rot_x(head_pitch);
@@ -235,9 +323,10 @@ void vertex() {
 		// Everything above the hips leans and twists with the body.
 		if (part < 6) {
 			vec3 hipc = vec3(0.0, HIP_Y, 0.0);
-			mat3 Rb = rot_x(lean) * rot_y(twist);
+			mat3 Rb = rot_z(shift * 0.9) * rot_x(lean) * rot_y(twist);
 			v = hipc + Rb * (v - hipc);
 			n = Rb * n;
+			v.x += shift;
 		}
 		// Seated: the whole figure drops until the pelvis is on the seat.
 		if (sitting) v.y -= HIP_Y - SEAT_HIP;
@@ -358,7 +447,7 @@ void fragment() {
 		col *= 0.88 + 0.12 * h.z;
 		col = mix(col, col * vec3(1.06, 0.92, 0.90), front * smoothstep(0.35, 0.0, length(vec2(ax - 0.52, p.y + 0.18))) * 0.5);
 		float t = TIME + cd.a * 31.0;
-		bool open = pose == 5 || pose == 9 || pose == 12 || pose == 14 || (pose == 3 && sin(t * 5.0) > 0.4) || ((pose == 1 || pose == 8) && sin(t * 4.0) > 0.0);
+		bool open = (v_burst > 0.5 && (pose == 5 || pose == 9 || pose == 12 || pose == 14 || (pose == 3 && sin(t * 5.0) > 0.4) || ((pose == 1 || pose == 8) && sin(t * 4.0) > 0.0)));
 		// Eyes: white, an iris, a lid line above.
 		vec2 eye_c = vec2(0.40, 0.10);
 		float e = ellipse(vec2(ax, p.y) - eye_c, vec2(0.17, 0.095));

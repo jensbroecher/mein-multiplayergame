@@ -237,14 +237,16 @@ func _box(lo: Vector3, hi: Vector3, part: int, region: int, style: int, ja: Vect
 
 func _build_body() -> void:
 	# Torso: trousers to the hem at 1.80, shirt above, a neck.
+	# The shoulders carry on up to where the arms' shoulder balls sit (at 2.62 the balls stood up off a flat shelf
+	# like pads), and the seat is full enough to hold the thighs' tops.
 	var torso := [
-		[1.50, 0.23, 0.17, 0.0, 0.0], [1.64, 0.29, 0.20, 0.0, 0.0], [1.80, 0.27, 0.19, 0.0, 0.0],
-		[2.20, 0.30, 0.21, 0.0, 0.0], [2.48, 0.35, 0.21, 0.0, 0.0], [2.62, 0.34, 0.18, 0.0, 0.0],
-		[2.72, 0.22, 0.14, 0.0, 0.0], [2.80, 0.10, 0.10, 0.0, 0.0],
+		[1.46, 0.26, 0.18, 0.0, 0.0], [1.62, 0.30, 0.205, 0.0, 0.0], [1.80, 0.28, 0.19, 0.0, 0.0],
+		[2.20, 0.30, 0.21, 0.0, 0.0], [2.48, 0.35, 0.21, 0.0, 0.0], [2.64, 0.335, 0.19, 0.0, 0.0],
+		[2.74, 0.20, 0.14, 0.0, 0.0], [2.82, 0.10, 0.10, 0.0, 0.0],
 	]
-	_loft(torso, 9, P_BODY, func(y: float) -> int: return R_TROUSERS if y < 1.80 else R_SHIRT, S_ALWAYS, Vector2.ZERO, Vector2.ZERO, true, false)
+	_loft(torso, 12, P_BODY, func(y: float) -> int: return R_TROUSERS if y < 1.80 else R_SHIRT, S_ALWAYS, Vector2.ZERO, Vector2.ZERO, true, false)
 	var neck := [[2.76, 0.085, 0.085, 0.0, 0.01], [2.90, 0.078, 0.078, 0.0, 0.015], [3.02, 0.076, 0.076, 0.0, 0.015]]
-	_loft(neck, 7, P_BODY, func(_y: float) -> int: return R_SKIN, S_ALWAYS, Vector2.ZERO, Vector2.ZERO)
+	_loft(neck, 8, P_BODY, func(_y: float) -> int: return R_SKIN, S_ALWAYS, Vector2.ZERO, Vector2.ZERO)
 	# A dress: a flared skirt from the waist to the knee.
 	var skirt := [[1.10, 0.40, 0.38, 0.0, 0.0], [1.45, 0.35, 0.31, 0.0, 0.0], [1.92, 0.28, 0.21, 0.0, 0.0]]
 	_loft(skirt, 9, P_BODY, func(_y: float) -> int: return R_DRESS, S_DRESS, Vector2.ZERO, Vector2.ZERO)
@@ -349,17 +351,37 @@ func _build_arms() -> void:
 		var sh := Vector2(side * SHOULDER_X, SHOULDER_Y)
 		var el := Vector2(side * SHOULDER_X, ELBOW_Y)
 		var x: float = side * SHOULDER_X
-		# Upper arm: the sleeve to y = 2.30, then bare or long sleeve.
-		var upper := [[2.62, 0.100, 0.100, x, 0.0], [2.45, 0.098, 0.098, x, 0.0], [2.30, 0.092, 0.092, x, 0.0], [2.06, 0.080, 0.080, x, 0.0]]
-		_loft(upper, 7, up_part, func(y: float) -> int: return R_SHIRT if y > 2.30 else R_SLEEVE, S_ALWAYS, sh, el, false, false)
-		_ellipsoid(Vector3(x, 2.58, 0.0), Vector3(0.102, 0.102, 0.102), 3, 7, up_part, R_SHIRT, S_ALWAYS, sh, el, Callable(), false)
-		# The deltoid over the joint, a little proud of the arm.
-		_ellipsoid(Vector3(side * 0.35, 2.53, 0.0), Vector3(0.11, 0.14, 0.115), 4, 8, up_part, R_SHIRT, S_ALWAYS, sh, el, Callable(), false)
-		# Forearm and hand.
-		var fore := [[2.06, 0.080, 0.080, x, 0.0], [1.80, 0.071, 0.071, x, 0.0], [WRIST_Y, 0.058, 0.058, x, 0.0]]
-		_loft(fore, 7, lo_part, func(_y: float) -> int: return R_SLEEVE, S_ALWAYS, sh, el)
-		_ellipsoid(Vector3(x, 1.47, 0.02), Vector3(0.070, 0.115, 0.055), 3, 6, lo_part, R_SKIN, S_ALWAYS, sh, el, Callable(), false)
-		_ellipsoid(Vector3(x, 2.06, 0.0), Vector3(0.085, 0.085, 0.085), 3, 6, lo_part, R_SLEEVE, S_ALWAYS, sh, el, Callable(), false)
+		# The shoulder: a ball centred on the joint, so it looks the same however the arm swings and always
+		# covers where the arm meets the torso. The old deltoid stood off the joint and swung out with a raised arm
+		# as a separate lump over a gap.
+		_ellipsoid(Vector3(x, SHOULDER_Y, 0.0), Vector3(0.112, 0.112, 0.112), 5, 10, up_part, R_SHIRT, S_ALWAYS, sh, el, Callable(), false)
+		# Upper arm: from inside the ball, fuller at the deltoid, the sleeve to y = 2.30, then bare or a long sleeve.
+		var upper := [[2.66, 0.100, 0.104, x, 0.0], [2.50, 0.104, 0.108, x, 0.0], [2.36, 0.094, 0.098, x, 0.0],
+			[2.22, 0.084, 0.088, x, 0.0], [ELBOW_Y, 0.078, 0.080, x, 0.0]]
+		_loft(upper, 10, up_part, func(y: float) -> int: return R_SHIRT if y > 2.30 else R_SLEEVE, S_ALWAYS, sh, el, false, false)
+		# The elbow: a ball on the joint, moving with the forearm, so a bent arm has no notch.
+		_ellipsoid(Vector3(x, ELBOW_Y, 0.0), Vector3(0.081, 0.081, 0.081), 4, 8, lo_part, R_SLEEVE, S_ALWAYS, sh, el, Callable(), false)
+		# Forearm: fuller below the elbow, a flatter wrist.
+		var fore := [[ELBOW_Y, 0.078, 0.080, x, 0.0], [1.94, 0.078, 0.076, x, 0.0], [1.76, 0.066, 0.062, x, 0.0],
+			[WRIST_Y + 0.02, 0.052, 0.046, x, 0.0]]
+		_loft(fore, 10, lo_part, func(_y: float) -> int: return R_SLEEVE, S_ALWAYS, sh, el)
+		_build_hand(x, side, lo_part, sh, el)
+
+
+## A hand hanging from the wrist, its palm toward the thigh (-side along x): a palm, fingers curled in a little
+## and a thumb on the front. It was a small egg.
+func _build_hand(x: float, side: float, part: int, sh: Vector2, el: Vector2) -> void:
+	var skin := func(_y: float) -> int: return R_SKIN
+	var palm := [[WRIST_Y + 0.03, 0.040, 0.046, x, 0.0], [WRIST_Y - 0.03, 0.043, 0.060, x, 0.006],
+		[WRIST_Y - 0.10, 0.040, 0.062, x - side * 0.004, 0.010]]
+	_loft(palm, 8, part, skin, S_ALWAYS, sh, el, false, false)
+	var fingers := [[WRIST_Y - 0.10, 0.036, 0.058, x - side * 0.004, 0.010], [WRIST_Y - 0.16, 0.031, 0.054, x - side * 0.014, 0.012],
+		[WRIST_Y - 0.205, 0.024, 0.044, x - side * 0.026, 0.010]]
+	_loft(fingers, 8, part, skin, S_ALWAYS, sh, el, false, true)
+	_ellipsoid(Vector3(x - side * 0.028, WRIST_Y - 0.205, 0.010), Vector3(0.022, 0.016, 0.042), 2, 8, part, R_SKIN, S_ALWAYS, sh, el, Callable(), false)
+	var thumb := [[WRIST_Y - 0.01, 0.022, 0.022, x - side * 0.006, 0.040], [WRIST_Y - 0.06, 0.020, 0.020, x - side * 0.016, 0.060],
+		[WRIST_Y - 0.11, 0.016, 0.016, x - side * 0.024, 0.068]]
+	_loft(thumb, 6, part, skin, S_ALWAYS, sh, el, false, true)
 
 
 func _build_legs() -> void:
@@ -370,11 +392,12 @@ func _build_legs() -> void:
 		var hip := Vector2(side * HIP_X, HIP_Y)
 		var knee := Vector2(side * HIP_X, KNEE_Y)
 		var x: float = side * HIP_X
-		var thigh := [[1.62, 0.155, 0.155, x, 0.0], [1.26, 0.132, 0.132, x, 0.0], [KNEE_Y + 0.02, 0.106, 0.106, x, 0.0]]
-		_loft(thigh, 7, up_part, func(_y: float) -> int: return R_THIGH, S_ALWAYS, hip, knee)
+		# The top inside the seat: open and wider, it showed its edge as a flap over the hip.
+		var thigh := [[1.66, 0.13, 0.13, x, 0.0], [1.50, 0.152, 0.152, x, 0.0], [1.26, 0.132, 0.132, x, 0.0], [KNEE_Y + 0.02, 0.106, 0.106, x, 0.0]]
+		_loft(thigh, 9, up_part, func(_y: float) -> int: return R_THIGH, S_ALWAYS, hip, knee)
 		var shin := [[KNEE_Y + 0.02, 0.104, 0.104, x, 0.0], [0.52, 0.083, 0.083, x, 0.0], [ANKLE_Y, 0.066, 0.066, x, 0.0]]
-		_loft(shin, 7, lo_part, func(_y: float) -> int: return R_SHIN, S_ALWAYS, hip, knee)
-		_ellipsoid(Vector3(x, KNEE_Y, 0.01), Vector3(0.112, 0.112, 0.112), 3, 7, lo_part, R_SHIN, S_ALWAYS, hip, knee, Callable(), false)
+		_loft(shin, 9, lo_part, func(_y: float) -> int: return R_SHIN, S_ALWAYS, hip, knee)
+		_ellipsoid(Vector3(x, KNEE_Y, 0.0), Vector3(0.105, 0.105, 0.105), 3, 9, lo_part, R_SHIN, S_ALWAYS, hip, knee, Callable(), false)
 		_ellipsoid(Vector3(x, 0.088, 0.13), Vector3(0.088, 0.088, 0.225), 3, 7, lo_part, R_SHOE, S_ALWAYS, hip, knee, Callable(), false)
 
 
@@ -383,7 +406,7 @@ func _build_props() -> void:
 	var x := -SHOULDER_X
 	var sh := Vector2(x, SHOULDER_Y)
 	var el := Vector2(x, ELBOW_Y)
-	_box(Vector3(x - 0.07, 1.30, 0.05), Vector3(x + 0.07, 1.58, 0.075), P_ARM_LO_R, R_PROP, S_PHONE, sh, el)
+	_box(Vector3(x - 0.07, 1.30, 0.072), Vector3(x + 0.07, 1.58, 0.097), P_ARM_LO_R, R_PROP, S_PHONE, sh, el)
 	var bottle := [[1.28, 0.050, 0.050, x, 0.05], [1.44, 0.052, 0.052, x, 0.05], [1.58, 0.030, 0.030, x, 0.05], [1.66, 0.022, 0.022, x, 0.05]]
 	_loft(bottle, 7, P_ARM_LO_R, func(_y: float) -> int: return R_PROP, S_BOTTLE, sh, el, true, true)
 	# A flag: a pole along the arm's line and a cloth at its end, waving in the shader (aux is how far

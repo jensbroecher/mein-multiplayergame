@@ -3,13 +3,21 @@ extends SceneTree
 # Look-dev for Nyota Stadium's crowd: builds the spectators in memory (no regeneration needed) and renders them.
 # Run windowed:
 #   Godot --path . --resolution 1400x900 -s res://scratch/crowd_preview.gd -- <out_dir> [rows=3] [seed=1]
-#       [cards=1] [skin=<g>] [fov=40] [sun=<pitch>,<yaw>] name:x,y,z:tx,ty,tz ...
+#       [cards=1] [skin=<g>] [fov=40] [sun=<pitch>,<yaw>] [car=x,y,z] [time=<s>] name:x,y,z:tx,ty,tz ...
+# `car=` stands player one's car there (the spectators near it watch it), `time=` waits for the clock.
 # A row per variant, a column per pose 0..15 (2.6m apart, x = 0 .. 39), facing +z; the camera looks along -z.
 # Seated poses (0-6) are on seat blocks. `cards=1` puts the far level of detail (the card) in a row behind,
 # `skin=<g>` forces the skin draw (0 .. 1) for every spectator.
 const CrowdKit = preload("res://CrowdKit.gd")
 
 const SPACING := 2.6
+
+## The MultiMeshes also carry instance colours (white; `mmcol=0` leaves them out): the Compatibility renderer
+## (Godot 4.8-beta2, `--rendering-driver opengl3`) loses the mesh's vertex colours on a MultiMesh with custom data
+## and no colours, so every part drew as a rest-pose figure in skin.
+var _mm_colors := true
+## `time=<s>`: wait until the shaders' clock has run that long before the first shot (bursts are seconds long).
+var _time := 0.0
 
 
 func _init() -> void:
@@ -33,6 +41,13 @@ func _init() -> void:
 			skin = float(a.substr(5))
 		elif a.begins_with("fov="):
 			fov = float(a.substr(4))
+		elif a.begins_with("car="):
+			var f := a.substr(4).split(",")
+			RenderingServer.global_shader_parameter_set("xray_car_a", Vector4(float(f[0]), float(f[1]), float(f[2]), 1.0))
+		elif a.begins_with("time="):
+			_time = float(a.substr(5))
+		elif a.begins_with("mmcol="):
+			_mm_colors = a.substr(6) == "1"
 		elif a.begins_with("sun="):
 			var f := a.substr(4).split(",")
 			sun_rot = Vector3(float(f[0]), float(f[1]), 0.0)
@@ -114,6 +129,8 @@ func _init() -> void:
 	cam.make_current()
 	for i in 40:
 		await process_frame
+	while Time.get_ticks_msec() * 0.001 < _time:
+		await process_frame
 	for a in shots:
 		var parts := (a as String).split(":")
 		var p := parts[1].split(",")
@@ -132,11 +149,14 @@ func _multimesh(mesh: Mesh, transforms: Array, customs: Array) -> void:
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.use_custom_data = true
+	mm.use_colors = _mm_colors
 	mm.mesh = mesh
 	mm.instance_count = transforms.size()
 	for i in range(transforms.size()):
 		mm.set_instance_transform(i, transforms[i])
 		mm.set_instance_custom_data(i, customs[i])
+		if _mm_colors:
+			mm.set_instance_color(i, Color.WHITE)
 	var mmi := MultiMeshInstance3D.new()
 	mmi.multimesh = mm
 	root.add_child(mmi)
