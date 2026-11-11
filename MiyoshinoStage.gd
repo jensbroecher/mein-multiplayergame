@@ -2492,8 +2492,11 @@ func _camp_material(key: String) -> Material:
 
 
 ## A spectator: [position, facing, seated, in a stand, pose (-1: drawn), size].
-func _person(pos: Vector3, face: Vector3, size := 1.0, seated := false, pose := -1) -> void:
-	_people.append([pos, face.normalized(), seated, false, pose, size])
+## The share of the start's crowd in yukata (a stage's festival: Yoshino Rapids).
+var crowd_yukata := 0.0
+
+func _person(pos: Vector3, face: Vector3, size := 1.0, seated := false, pose := -1, yukata := false) -> void:
+	_people.append([pos, face.normalized(), seated, false, pose, size, yukata])
 
 
 ## Crowd barriers with people behind them along both sides of the lap from s0 to s1 (the start).
@@ -2542,7 +2545,7 @@ func _build_start_crowd(root: Node3D, s0: float, s1: float, lat: float, skip_fro
 				pp.y = _stand_y(pp.x, pp.z)
 				var face: Vector3 = -(ps["right"] as Vector3) * side
 				face = (face + (ps["fwd"] as Vector3) * rng.randf_range(-0.5, 0.5)).normalized()
-				_person(pp, face, rng.randf_range(0.9, 1.08))
+				_person(pp, face, rng.randf_range(0.9, 1.08), false, -1, crowd_yukata > 0.0 and rng.randf() < crowd_yukata)
 		s += step
 	pk.reset_frame()
 	var bmi := MeshInstance3D.new()

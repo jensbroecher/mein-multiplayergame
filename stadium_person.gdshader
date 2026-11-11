@@ -332,6 +332,21 @@ void fragment() {
 		col = mix(col, shirt, step(0.5, fract(rest_pos.y * 2.5)) * float(pattern == 3));
 	}
 
+	// A yukata: the robe over the body, the arms (wide sleeves to the wrist) and the legs to the ankles, the obi round
+	// the waist, wooden geta.
+	if (crowd_yukata(cd)) {
+		vec3 robe = mix(yukata_robe(cd), yukata_figure(cd), yukata_pattern(rest_pos.xy + rest_pos.zz * 0.7, cd));
+		if (region == 1 || region == 2 || region == 3 || region == 4 || region == 10 || region == 11) {
+			col = robe;
+		}
+		if (region == 1 && rest_pos.y > 1.76 && rest_pos.y < 2.02) {
+			col = yukata_obi(cd);
+		}
+		if (region == 5) {
+			col = vec3(0.42, 0.30, 0.18);
+		}
+	}
+
 	// The face: eyes, brows, nose, mouth, an ear, stubble and sunglasses, painted on the head's skin.
 	if (part == 1 && region == 0) {
 		vec3 h = head_p;

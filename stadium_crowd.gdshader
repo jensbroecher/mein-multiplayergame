@@ -58,6 +58,13 @@ void vertex() {
 	v_shirt = vec4(shirt_at(shirt_i), float(int(floor(crowd_rand(cd, 15.0) * 8.0))));
 	v_shirt2 = vec4(shirt_at(shirt_i + 5), crowd_rand(cd, 13.0) > 0.62 ? 1.0 : 0.0);
 	v_trousers = vec4(crowd_trousers(cd), crowd_rand(cd, 14.0) > 0.18 ? 1.0 : 0.0);
+	if (crowd_yukata(cd)) {
+		// A yukata: the robe (pattern 8) to the ankles, long sleeves, the obi as the second colour; no skirt.
+		v_shirt = vec4(mix(yukata_robe(cd), yukata_figure(cd), 0.18), 8.0);
+		v_shirt2 = vec4(yukata_obi(cd), 1.0);
+		v_trousers = vec4(v_shirt.rgb, 1.0);
+		v_hair.w = 0.0;
+	}
 	v_misc = vec4(hs, build, float(pose), ph);
 	v_acc = vec4(hair == 5 ? shirt_at(shirt_i + 7) : shirt_at(shirt_i + 3), float(int(floor(crowd_rand(cd, 17.0) * 3.0))));
 }
@@ -161,6 +168,9 @@ void fragment() {
 			col = mix(shirt, v_shirt2.rgb, step(0.5, fract(q.x * 5.5 + 0.25)));
 		} else if (pattern == 5) {
 			col = mix(shirt, v_shirt2.rgb, step(0.63, q.y) * step(q.y, 0.86));
+		} else if (pattern == 8) {
+			// The yukata's obi.
+			col = mix(shirt, v_shirt2.rgb, step(0.15, q.y) * step(q.y, 0.34));
 		}
 		col *= 0.80 + 0.20 * smoothstep(0.0, 1.0, q.y);
 		col *= 1.0 - 0.22 * smoothstep(0.2, 0.40, abs(q.x));

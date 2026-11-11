@@ -1,7 +1,7 @@
 // Shared by Nyota Stadium's two crowd levels: stadium_person.gdshader (a real 3D spectator, near) and
 // stadium_crowd.gdshader (a flat card, far). Both read the same INSTANCE_CUSTOM, so a spectator is the same
 // person at either distance:
-//   r - a seed (shirt, trousers, build, hair, ...),  g - the draw for skin tone,
+//   r - a seed (shirt, trousers, build, hair, ...),  g - the draw for skin tone (2 more: in a yukata, crowd_yukata),
 //   b - the pose, (id + 0.5) / 16,                   a - a second seed and the animation phase.
 //
 // Poses: 0-6 sit (0 idle, 1 clap, 2 film on a phone, 3 talk, 4 arms crossed, 5 cheer, 6 drink), 7-15 stand
@@ -34,7 +34,7 @@ bool pose_arms_up(int p) {
 // Skin: about 80% of the crowd is African (dark to medium brown), the rest South Asian, European, East
 // Asian and Arab or mixed. `group`: 0 African, 1 South Asian, 2 European, 3 East Asian, 4 Arab or mixed.
 vec3 crowd_skin(vec4 cd, out int group) {
-	float g = cd.g;
+	float g = cd.g >= 1.5 ? cd.g - 2.0 : cd.g;
 	float v = crowd_rand(cd, 3.0);
 	vec3 c;
 	if (g < 0.80) {
@@ -83,6 +83,48 @@ vec3 crowd_shirt(vec4 cd) {
 
 vec3 crowd_trousers(vec4 cd) {
 	return clothes_tone(TROUSERS[int(floor(crowd_rand(cd, 2.0) * 8.0)) % 8]);
+}
+
+// A yukata (the summer kimono of a festival: Yoshino Rapids' cherry-blossom fair): the spectator's skin draw carries 2
+// more. The robe to the ankles in one of YUKATA's colours with a small pattern of YUKATA_FIGURE's, wide sleeves, an
+// obi round the waist.
+bool crowd_yukata(vec4 cd) {
+	return cd.g >= 1.5;
+}
+
+const vec3 YUKATA[8] = vec3[](
+	vec3(0.12, 0.17, 0.42), vec3(0.93, 0.92, 0.88), vec3(0.95, 0.62, 0.72), vec3(0.08, 0.10, 0.20),
+	vec3(0.72, 0.12, 0.16), vec3(0.62, 0.52, 0.80), vec3(0.20, 0.42, 0.40), vec3(0.98, 0.86, 0.52));
+const vec3 YUKATA_FIGURE[8] = vec3[](
+	vec3(0.93, 0.93, 0.90), vec3(0.16, 0.25, 0.55), vec3(0.85, 0.20, 0.35), vec3(0.95, 0.60, 0.70),
+	vec3(0.98, 0.90, 0.70), vec3(0.95, 0.95, 0.92), vec3(0.95, 0.75, 0.30), vec3(0.80, 0.25, 0.20));
+const vec3 OBI[6] = vec3[](
+	vec3(0.85, 0.20, 0.16), vec3(0.95, 0.78, 0.25), vec3(0.10, 0.10, 0.12), vec3(0.30, 0.50, 0.75),
+	vec3(0.95, 0.55, 0.70), vec3(0.55, 0.20, 0.45));
+
+int yukata_i(vec4 cd) {
+	return int(floor(crowd_rand(cd, 21.0) * 8.0)) % 8;
+}
+
+vec3 yukata_robe(vec4 cd) {
+	return clothes_tone(YUKATA[yukata_i(cd)]);
+}
+
+vec3 yukata_figure(vec4 cd) {
+	return clothes_tone(YUKATA_FIGURE[yukata_i(cd)]);
+}
+
+vec3 yukata_obi(vec4 cd) {
+	return clothes_tone(OBI[int(floor(crowd_rand(cd, 22.0) * 6.0)) % 6]);
+}
+
+// The robe's pattern at a point of the figure (metres, about): small round flowers on a staggered grid.
+float yukata_pattern(vec2 p, vec4 cd) {
+	float k = 6.0 + 4.0 * crowd_rand(cd, 23.0);
+	vec2 q = p * k;
+	q.x += 0.5 * mod(floor(q.y), 2.0);
+	vec2 f = fract(q) - 0.5;
+	return 1.0 - smoothstep(0.16, 0.24, length(f));
 }
 
 // Hair: 0 bald, 1 short, 2 afro, 3 long, 4 cap, 5 headscarf. African hair is black and tightly curled

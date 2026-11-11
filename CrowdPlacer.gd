@@ -7,7 +7,8 @@ extends RefCounted
 ##
 ## A spot is [position, facing (horizontal), seated, in a stand (optional), pose (optional: one of the 16, or -1 to
 ## draw it from the odds), size (optional: times `scale`; the Lakeside's playground children are 0.58)]: a standing one's position is the
-## ground (or the stand's tread) under its feet, a seated one's the top of its seat. Only people in a stand
+## ground (or the stand's tread) under its feet, a seated one's the top of its seat. A seventh field true dresses them in
+## a yukata (crowd_common.gdshaderinc's crowd_yukata: their skin draw carries 2 more). Only people in a stand
 ## wave flags: anywhere else a gazebo, a tent or a stall can hang over them, and the flag stood through it. `scale` takes Nyota's 1.86 times life size to the level's.
 ## `skin` weights the four groups crowd_common.gdshaderinc draws from INSTANCE_CUSTOM.g:
 ## [African, South Asian, European, East Asian, Arab or mixed].
@@ -120,6 +121,8 @@ static func build(parent: Node, spots: Array, scale: float, skin: Array, seed_v:
 		if sp.size() > 4 and int(sp[4]) >= 0:
 			pose = int(sp[4])
 		var cust := Color(rng.randf(), skin_draw(rng, skin), (float(pose) + 0.5) / 16.0, rng.randf())
+		if sp.size() > 6 and bool(sp[6]):
+			cust.g += 2.0
 		var card_at: Vector3 = pos + z * (CARD_FORWARD * scale * size) if seated else pos
 		var key := Vector3i(floori(pos.x / CELL), floori(pos.z / CELL), card_class(pose))
 		if not cells.has(key):

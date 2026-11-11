@@ -35,6 +35,7 @@ extends "res://MiyoshinoKit.gd"
 ##   bike_rack(pk, kit, n)          a galvanised rack of n hoops along x, 0.7 apart
 ##   park_bench(pk, kit)            slatted timber on two granite legs, facing +z
 ##   garden_rock(pk, kit, r, h, seed_v)  a lumpy granite boulder for a garden or a stream's edge, set into the ground
+##   festival_pole(pk, kit, h)      a bamboo pole on a stone block, to hang lantern strings from its top (h)
 ##
 ## Faces never share a plane: trim, paint and emblems stand 1.5-2.5cm proud of what carries them, parts that meet run
 ## into each other. Thin sheets (banners, shide papers, bibs, the parasol) are "cloth", one face seen from both sides.
@@ -2075,3 +2076,16 @@ static func garden_rock(pk: PropKit, kit: Dictionary, r := 0.8, h := 0.6, seed_v
 	_turn(pk, kit, "matte", Vector3(0, -0.3, 0), [Vector2(0.0, 0.0), Vector2(r * 0.9, 0.02), Vector2(r * rng.randf_range(0.9, 1.05), 0.3 + h * 0.25),
 			Vector2(r * rng.randf_range(0.7, 0.85), 0.3 + h * 0.7), Vector2(r * rng.randf_range(0.3, 0.45), 0.3 + h * 0.97), Vector2(0.0, 0.3 + h)], 7, col, true, rng.randf() * TAU, rot)
 	_turn(pk, kit, "leaf", Vector3(0, -0.02, 0), [Vector2(r * 0.97, 0.0), Vector2(r * 0.99, 0.08), Vector2(r * 0.9, 0.12)], 7, MOSS.darkened(0.2), true, 0.0, rot)
+
+
+## A festival pole, centred, `h` tall: a bamboo culm with its nodes on a squared stone block, a short crosspiece at the
+## top that lantern strings hang from (chochin_string from its ends), a rope lashing.
+static func festival_pole(pk: PropKit, kit: Dictionary, h := 4.2) -> void:
+	pk.block(kit, "ishi", Vector3(-0.22, -0.6, -0.22), Vector3(0.22, 0.25, 0.22), GRANITE, uvk)
+	pk.tube(kit, "matte", Vector3(0, 0.2, 0), Vector3(0, h + 0.15, 0), 0.06, 0.05, 8, BAMBOO_DRY, true)
+	var y := 0.6
+	while y < h:
+		_turn(pk, kit, "matte", Vector3(0, y, 0), [Vector2(0.06, -0.015), Vector2(0.068, 0.0), Vector2(0.06, 0.015)], 8, BAMBOO_DRY.darkened(0.2))
+		y += 0.45
+	pk.tube(kit, "matte", Vector3(-0.35, h - 0.05, 0), Vector3(0.35, h - 0.05, 0), 0.03, 0.03, 6, BAMBOO_DRY.darkened(0.08), true)
+	pk.tube(kit, "rope", Vector3(0, h - 0.12, 0), Vector3(0, h + 0.02, 0), 0.075, 0.075, 6, Color(0.66, 0.55, 0.36), false)
