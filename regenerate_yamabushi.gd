@@ -496,29 +496,67 @@ func _build_trailhead(root: Node3D, rng: RandomNumberGenerator) -> void:
 	print("  trailhead car park: %d cars" % parked)
 
 
-func _bridge_frame(s0: float) -> Transform3D:
-	return _facing(-lap.fw(s0), lap.pt(s0))
-
-
-## The gorge's two bridges: a suspension bridge low down, a timber trestle near its head; their sides solid.
+## The gorge's two bridges: a suspension bridge low down, a timber trestle near its head; their sides solid. A bridge is
+## straight and the trail curves round the mountain over the gorge, so each is laid along the chord between its ends,
+## shifted and widened to hold the trail's whole width all the way across: laid along the trail's heading at its start,
+## the trail ran off the deck and out past the netting toward its far end (the user saw the planks behind the railings).
+## Its side colliders follow its own railings.
 func _build_bridges(root: Node3D) -> void:
 	var body: StaticBody3D = _body(root, "GorgeRailsBody")
 	for i in range(_bridge_s.size()):
 		var s0: float = _bridge_s[i][0]
 		var s1: float = _bridge_s[i][1]
-		var o: Vector3 = lap.pt(s0)
-		var span: float = s1 - s0
-		var deck := func(t: float) -> float: return lap.y(s0 + t) - o.y
+		var a: Vector3 = lap.pt(s0)
+		var e: Vector3 = lap.pt(s1)
+		var chord := Vector3(e.x - a.x, 0.0, e.z - a.z)
+		var span: float = chord.length()
+		var frame: Transform3D = _facing(-chord / span, a)
+		# The trail's edges across the frame.
+		var inv: Transform3D = frame.affine_inverse()
+		var lo := INF
+		var hi := -INF
+		var s: float = s0
+		while s <= s1:
+			var x: float = (inv * lap.pt(s)).x
+			lo = minf(lo, x - road_half)
+			hi = maxf(hi, x + road_half)
+			s += 1.0
+		var shift: float = (lo + hi) * 0.5
+		var hw: float = (hi - lo) * 0.5 + 0.1
+		frame.origin += frame.basis.x * shift
+		var o: Vector3 = frame.origin
+		var deck := func(t: float) -> float: return lap.y(s0 + (s1 - s0) * clampf(t / span, 0.0, 1.0)) - a.y
 		var ground := func(x: float, t: float) -> float:
-			var p: Vector3 = lap.pt(s0 + t) + lap.rt(s0 + t) * -x
+			var p: Vector3 = frame * Vector3(x, 0.0, -t)
 			return _ground_at(p.x, p.z) - o.y
 		var fn: String = "suspension_bridge" if i == 0 else "road_bridge"
-		var args: Array = [span, road_half, deck, ground] if i == 0 else [span, road_half, deck, ground, 0]
-		_add_prop_game("gorge_span_%d" % i, river_kit, _bridge_frame(s0), func(pk: PropKit, kit: Dictionary, _labels: Array) -> void:
+		var args: Array = [span, hw, deck, ground] if i == 0 else [span, hw, deck, ground, 0]
+		_add_prop_game("gorge_span_%d" % i, river_kit, frame, func(pk: PropKit, kit: Dictionary, _labels: Array) -> void:
 			_kit_call(river_kit, fn, [pk, kit] + args), 1500.0)
 		for side in [-1.0, 1.0]:
-			_edge_boxes(body, lap, s0 - 3.0, s1 + 3.0, side * (road_half + 0.3), 1.7, 0.4)
-		print("  bridge %d: %.0fm at %.0fm, %.0fm over the gorge" % [i, span, s0, lap.y((s0 + s1) * 0.5) - _ground_at(lap.pt((s0 + s1) * 0.5).x, lap.pt((s0 + s1) * 0.5).z)])
+			_bridge_side_boxes(body, frame, span, side * (hw + 0.3), deck, 1.7, 0.4)
+		var mid: Vector3 = lap.pt((s0 + s1) * 0.5)
+		print("  bridge %d: %.0fm at %.0fm (%.0f, %.0f, %.0f) toward (%.0f, %.0f), %.0fm over the gorge, the trail %.2fm to %.2fm across it (half width %.2f, shifted %.2f)" % [i, span, s0, o.x, o.y, o.z, e.x, e.z,
+				lap.y((s0 + s1) * 0.5) - _ground_at(mid.x, mid.z), lo, hi, hw, shift])
+
+
+## Solid sides along a straight bridge in `frame` (z = 0 to -span) at x = lat, `h` over its deck.
+func _bridge_side_boxes(body: StaticBody3D, frame: Transform3D, span: float, lat: float, deck: Callable, h: float, thick: float) -> void:
+	var t := -3.0
+	while t < span + 3.0:
+		var tb: float = minf(t + 6.0, span + 3.0)
+		var pa: Vector3 = frame * Vector3(lat, float(deck.call(t)), -t)
+		var pb: Vector3 = frame * Vector3(lat, float(deck.call(tb)), -tb)
+		var l: float = pa.distance_to(pb)
+		var cs := CollisionShape3D.new()
+		var bx := BoxShape3D.new()
+		bx.size = Vector3(thick, h + 0.6, l + 0.3)
+		cs.shape = bx
+		var fwd: Vector3 = (pb - pa) / l
+		var x: Vector3 = Vector3.UP.cross(fwd).normalized()
+		cs.transform = Transform3D(Basis(x, fwd.cross(x).normalized(), fwd).orthonormalized(), (pa + pb) * 0.5 + Vector3(0, h * 0.5 - 0.3, 0))
+		body.add_child(cs)
+		t = tb
 
 
 ## The plank walks: joists, struts and chains from the kit; a kerb and the chain solid on the valley side.

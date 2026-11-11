@@ -4782,7 +4782,9 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   `MiyoshinoPropKit.kei_car`). A stage can halve its ground grid in places (`_extra_refine`; the shortcut-end halving
   only works since the fix in `_refine_axis`: the other three stages' saved levels predate it). Not raced yet.
 - Yamabushi Trail (4.5km, point to point, dawn): a spiral of corners 1.6 times round a cone (`_spiral`, `_natural`), the
-  mountain always on the right; a suspension bridge over the gorge (in the cloud), plank walks (LEDGES) with chains,
+  mountain always on the right; a suspension bridge over the gorge (in the cloud: laid along the chord between its
+  ends, shifted and widened to hold the curving trail, its side colliders along its netting; along the trail's heading
+  at its start the trail's planks ran out past the netting toward the far end), plank walks (LEDGES) with chains,
   chain fences on the drops, the summit shrine. `CloudLayer.gd` sets every viewer's fog and sun by their camera's height
   (the band 96-150m: fog to 85m inside it), `cloud_sea.gdshader` the sheet seen from above. Bots take 114-130s.
 - Music `MusicManager.STAGE_TRACKS` "senbon", "yoshino", "monzen", "yamabushi" (`music/miyoshino/`, instrumental,
