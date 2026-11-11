@@ -326,18 +326,25 @@ func show_explosion_notice(attacker_name: String, victim_name: String, attacker_
 	if hud_panel == null or killfeed_container == null:
 		return
 	
-	# Determine if local player is involved
+	# Is this HUD's own player involved? Only a human driven on this peer counts: in a single race every cart (the bots
+	# too) holds the one RaceUI as its `race_ui`, so "the first cart whose race_ui is this" picked whichever came first
+	# in the group, often a bot, and the feed called that bot "(YOU)". In split screen each player's RaceUI is injected.
 	var my_id := 0
 	var my_name := ""
 	for c in get_tree().get_nodes_in_group("player_carts"):
-		if c.get("race_ui") == self or (c.get("is_local_player") == true and int(c.get("device_id")) <= 0):
-			my_id = c.name.to_int()
-			if c.get("player_name"):
-				my_name = str(c.get("player_name"))
-			break
-	
-	var is_local_attacker := (attacker_id > 0 and attacker_id == my_id) or (my_name != "" and attacker_name == my_name)
-	var is_local_victim := (victim_id > 0 and victim_id == my_id) or (my_name != "" and victim_name == my_name)
+		if c.get("is_ai") == true or c.get("is_local_player") != true:
+			continue
+		var injected = c.get("injected_race_ui")
+		if injected != null and injected != self:
+			continue
+		my_id = c.name.to_int()
+		if c.get("player_name"):
+			my_name = str(c.get("player_name"))
+		break
+
+	# Ids decide; the name only when a notice came without them (a bot can share a human's name).
+	var is_local_attacker := (attacker_id > 0 and attacker_id == my_id) or (attacker_id <= 0 and my_name != "" and attacker_name == my_name)
+	var is_local_victim := (victim_id > 0 and victim_id == my_id) or (victim_id <= 0 and my_name != "" and victim_name == my_name)
 	var is_self_blowup := (attacker_id == victim_id or attacker_id <= 0 or attacker_name == victim_name or attacker_name == "" or attacker_name == "Someone")
 	
 	var weapon_norm := weapon.to_upper().strip_edges()
