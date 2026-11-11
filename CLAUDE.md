@@ -4545,6 +4545,27 @@ each run deletes first).
 - AI races (`scratch/ai_race_test`, speed=1 only: the hazards run on the wall clock; `noitems=1`): every bot finishes,
   in 190-265s. Music `MusicManager.STAGE_TRACKS["stadtrallye"]`; its sounds are in `sounds/stadtrallye/` (tools/elevenlabs).
 
+## Test Track (a proving ground, no cup)
+
+- `regenerate_test_track.gd` (`regenerate_test_track.tscn`, headless, about 12s) builds `levels/TestTrackLevel.tscn` on
+  MiyoshinoStage.gd: a 1.6km clockwise lap for trying the cars. A 580m start straight (distance boards 300/200/100 before
+  the first corner, two boost pads out of the last corner), a fast right-hander, the south leg, a 16m hairpin (cones on
+  its apex), a table-top (`_ramp`: WoodenRamp with a table and a tail), a chicane between cones, the surface strip, and
+  the hill on the west leg (`HILL_*`, max grade 14%) with a kicker before its crest and a boost pad before that.
+  Guardrails round the outside of the four corners (`_rails`, MiyoshinoPropKit.guardrail and box colliders), the start
+  venue's barriers and spectators, a paddock (CampKit gazebos, tables and vehicles) north of the straight, cedars and
+  maples from 70m off the road out.
+- The surface strip (`STRIP`, `_build_strip`): nine 24m patches with 6m of asphalt between, on the leg west of the
+  chicane: sand, snow, ice, mud, grass, gravel, dirt, wood, cobbles (rock to the tyres). Each is a ribbon over the road
+  `STRIP_LIFT` up, drawn by `test_surface.gdshader` (`kind`; UV in metres along and across), in its own body
+  "TestStrip<Surface>Road" (track to PlayerCart) with its `surface` meta; the word painted on the road at its start
+  and a board beside it. A bright ice mirrored the sky and read as white as the snow: it is a darker blue-grey.
+- In NetworkManager's ALL_STAGES with `"test": true`: under "Other Courses" in the course lists (Time Trial, Spectator,
+  Inspect, VS), never the random pick or the next stage. Its menu tile is `tile_test_track.jpg` (render_menu_tiles.sh
+  knows it as TestTrack).
+- AI races (`scratch/ai_race_test`, speed=2): every bot finishes, no falls (the respawns are bombs and missiles), flying
+  laps 36-44s.
+
 ## Miyoshino GP (Senbon Sakura Pass, Yoshino Rapids, Monzenmachi, Yamabushi Trail)
 
 Japan: Yoshino's cherry-blossom mountains in spring (the cup's name is Yoshino's old poetic one). Four stages built in one

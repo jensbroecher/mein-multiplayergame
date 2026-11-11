@@ -86,6 +86,9 @@ const ALL_STAGES = [
 	{"name": "Yoshino Rapids", "path": "res://levels/YoshinoRapidsLevel.tscn"},
 	{"name": "Monzenmachi", "path": "res://levels/MonzenmachiLevel.tscn"},
 	{"name": "Yamabushi Trail", "path": "res://levels/YamabushiLevel.tscn"},
+	# A proving ground for trying the cars (regenerate_test_track.gd): listed under "Other Courses", never picked at
+	# random or as the next stage ("test").
+	{"name": "Test Track", "path": "res://levels/TestTrackLevel.tscn", "test": true},
 ]
 
 const GP_CUPS = {
@@ -217,7 +220,7 @@ static func get_next_course(stage_path: String) -> String:
 			if not order.has(path):
 				order.append(path)
 	for st in ALL_STAGES:
-		if not order.has(st["path"]):
+		if not order.has(st["path"]) and not st.get("test", false):
 			order.append(st["path"])
 	var idx := order.find(stage_path)
 	return order[(idx + 1) % order.size()]
@@ -491,7 +494,7 @@ func resolve_and_launch_voted_stage() -> String:
 	if random_votes > max_votes or candidates.is_empty():
 		var pool: Array = []
 		for s in ALL_STAGES:
-			if s["path"] != current_single_stage:
+			if s["path"] != current_single_stage and not s.get("test", false):
 				pool.append(s["path"])
 		if pool.is_empty():
 			for s in ALL_STAGES:
