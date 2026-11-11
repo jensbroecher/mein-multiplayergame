@@ -118,7 +118,7 @@ bool is_female(vec4 c) {
 }
 
 void vertex() {
-	cd = INSTANCE_CUSTOM;
+	cd = crowd_data(INSTANCE_CUSTOM);
 	vcol = COLOR;
 	rest_pos = VERTEX;
 	head_p = vec3(UV, UV2.x);

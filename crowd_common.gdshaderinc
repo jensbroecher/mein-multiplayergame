@@ -14,7 +14,48 @@ float hash11(float p) {
 	return fract(p);
 }
 
+// A spectator whose seed is 2 or more (a game's are under 1) has its outfit spelled out: r = 2 + its number in
+// `crowd_lineup`, a code whose bits are the draws below (scratch/human_lineup.gd, the test line-up, dresses every
+// figure so; its lineup_code() is the other half of this). Everything else about it is drawn from the phase, a. The
+// number goes through the instance data (half floats in the Compatibility renderer: exact only up to 2048), the code
+// through the material; crowd_data() swaps one for the other, so from then on cd.r = 2 + the code.
+//   0-3 shirt colour (0-11)   4 female   5 dress   6 long sleeves   7 long trousers   8-10 shirt pattern (0-7)
+//   11 white shoes   12-13 flag (0-2)   14 beard   15 sunglasses   16-18 hair (0-5)   19 child
+//   20-22 trousers and yukata colour (0-7); the obi is the shirt's colour of OBI's six
+uniform int crowd_lineup[96];
+
+vec4 crowd_data(vec4 c) {
+	if (c.r >= 1.5) {
+		c.r = 2.0 + float(crowd_lineup[clamp(int(c.r - 2.0 + 0.5), 0, 95)]);
+	}
+	return c;
+}
+
+bool crowd_explicit(vec4 cd) {
+	return cd.r >= 1.5;
+}
+
+int crowd_bits(vec4 cd, int shift, int mask) {
+	return (int(cd.r - 2.0 + 0.5) >> shift) & mask;
+}
+
 float crowd_rand(vec4 cd, float k) {
+	if (crowd_explicit(cd)) {
+		if (k == 1.0) return (float(crowd_bits(cd, 0, 15)) + 0.5) / 12.0;
+		if (k == 2.0) return (float(crowd_bits(cd, 20, 7)) + 0.5) / 8.0;
+		if (k == 8.0) return crowd_bits(cd, 19, 1) == 1 ? 0.97 : 0.5;
+		if (k == 9.0) return 0.5;
+		if (k == 10.0) return crowd_bits(cd, 4, 1) == 1 ? 0.2 : 0.8;
+		if (k == 11.0) return crowd_bits(cd, 5, 1) == 1 ? 0.9 : 0.1;
+		if (k == 13.0) return crowd_bits(cd, 6, 1) == 1 ? 0.9 : 0.1;
+		if (k == 14.0) return crowd_bits(cd, 7, 1) == 1 ? 0.9 : 0.05;
+		if (k == 15.0) return (float(crowd_bits(cd, 8, 7)) + 0.5) / 8.0;
+		if (k == 16.0) return crowd_bits(cd, 11, 1) == 1 ? 0.9 : 0.1;
+		if (k == 17.0) return (float(crowd_bits(cd, 12, 3)) + 0.5) / 3.0;
+		if (k == 21.0) return crowd_bits(cd, 14, 1) == 1 ? 0.95 : 0.1;
+		if (k == 22.0) return crowd_bits(cd, 15, 1) == 1 ? 0.97 : 0.1;
+		return hash11(cd.a * 311.71 + k * 17.31 + 5.17);
+	}
 	return hash11(cd.r * 127.13 + cd.a * 311.71 + k * 17.31);
 }
 
@@ -72,8 +113,9 @@ float crowd_look(vec4 cd, float t) {
 	float hold = 2.6 + 2.2 * crowd_rand(cd, 36.0);
 	float k = t / hold + crowd_rand(cd, 37.0) * 7.0;
 	float i = floor(k);
-	float a = hash11(i * 3.17 + cd.r * 41.3) * 2.0 - 1.0;
-	float b = hash11((i + 1.0) * 3.17 + cd.r * 41.3) * 2.0 - 1.0;
+	float seed = crowd_rand(cd, 38.0) * 41.3;
+	float a = hash11(i * 3.17 + seed) * 2.0 - 1.0;
+	float b = hash11((i + 1.0) * 3.17 + seed) * 2.0 - 1.0;
 	return mix(a, b, smoothstep(0.78, 1.0, fract(k))) * 0.55;
 }
 
@@ -154,6 +196,9 @@ const vec3 OBI[6] = vec3[](
 	vec3(0.95, 0.55, 0.70), vec3(0.55, 0.20, 0.45));
 
 int yukata_i(vec4 cd) {
+	if (crowd_explicit(cd)) {
+		return crowd_bits(cd, 20, 7);
+	}
 	return int(floor(crowd_rand(cd, 21.0) * 8.0)) % 8;
 }
 
@@ -166,6 +211,9 @@ vec3 yukata_figure(vec4 cd) {
 }
 
 vec3 yukata_obi(vec4 cd) {
+	if (crowd_explicit(cd)) {
+		return clothes_tone(OBI[crowd_bits(cd, 0, 15) % 6]);
+	}
 	return clothes_tone(OBI[int(floor(crowd_rand(cd, 22.0) * 6.0)) % 6]);
 }
 
@@ -181,6 +229,9 @@ float yukata_pattern(vec2 p, vec4 cd) {
 // Hair: 0 bald, 1 short, 2 afro, 3 long, 4 cap, 5 headscarf. African hair is black and tightly curled
 // (short or an afro); the others vary, and a few have gone grey.
 int crowd_hair_style(vec4 cd, int group, bool female) {
+	if (crowd_explicit(cd)) {
+		return min(crowd_bits(cd, 16, 7), 5);
+	}
 	float h = crowd_rand(cd, 5.0);
 	if (female) {
 		if (h < 0.05) return 5;
@@ -204,8 +255,8 @@ vec3 crowd_hair_colour(vec4 cd, int group) {
 	} else if (group == 4) {
 		c = vec3(0.07, 0.05, 0.04);
 	}
-	// A few have gone grey.
-	if (crowd_rand(cd, 7.0) > 0.93) {
+	// A few adults have gone grey (the test line-up showed a grey-haired child).
+	if (crowd_rand(cd, 7.0) > 0.93 && crowd_rand(cd, 8.0) <= 0.94) {
 		c = mix(c, vec3(0.62, 0.62, 0.62), 0.8);
 	}
 	return c;

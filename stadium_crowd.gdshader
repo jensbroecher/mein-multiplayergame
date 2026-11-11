@@ -34,7 +34,7 @@ varying float cam_dist;
 varying flat float v_act;     // how far into a burst (arms up, waving)
 
 void vertex() {
-	vec4 cd = INSTANCE_CUSTOM;
+	vec4 cd = crowd_data(INSTANCE_CUSTOM);
 	int pose = crowd_pose(cd);
 	float ph = cd.a * 6.2831;
 	// The 3D figure's bursts (crowd_common's crowd_burst): arms up and hops only in a burst.

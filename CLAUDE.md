@@ -2057,6 +2057,18 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   [seed=1] [cards=1] [skin=<g>] [car=x,y,z] [time=<s>] name:x,y,z:tx,ty,tz`, a column per pose 0..15 (2.6m apart),
   the cards in a row behind with `cards=1`, player one's car at `car=` for the watchers, the clock run to `time=`
   first (bursts are seconds long). `nyota_shots` takes `detail=N` to try a Detail Level.
+- `scratch/human_lineup.tscn` (`human_lineup.gd`, a tool script: open it in the editor, or run it with F6 to fly round:
+  WASD/QE, right mouse, 1-9 sections, C the car, L the labels) stands the game's people in one line, numbered and
+  described: every pose with its prop, every hairstyle, shirt pattern, sleeves, trousers, shorts, dresses, shoes,
+  sunglasses and beards, the skin groups, children, yukata, the flags, then the far cards of the 16 poses; a car drives
+  up and down in front (the spectators watch it: it sets `xray_car_a`), and the Lakeside's cyclists ride a loop behind
+  it when it runs. Its outfits are spelled out, not drawn: a seed of 2 or more is `2 + n`, the n-th of the material's
+  `crowd_lineup` codes (`lineup_code`; crowd_common's `crowd_data` swaps the number for the code, `crowd_rand` and
+  `crowd_hair_style` answer from its bits, everything else from the phase). The number, not the code, goes through the
+  instance data: the Compatibility renderer keeps instance custom data as half floats (exact only up to 2048), and
+  every code came out as a yellow shirt and grey shorts. `res://scratch/human_lineup_shots.gd` (`-s`, windowed, `--
+  <dir> [time=<s>] [nocar=1] name:x,y,z:tx,ty,tz[:fov]`) photographs it. It showed children with grey hair (no
+  more: only adults go grey).
 - The figure is the shared `generated/crowd_person.res`, which every level with spectators loads:
   `res://scratch/rebuild_crowd_person.gd` (`-s`, headless) rebuilds it from CrowdKit keeping its material, so a change
   to the figure needs no level regenerated (regenerate_nyota_stadium writes it too).
