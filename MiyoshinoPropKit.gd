@@ -29,6 +29,12 @@ extends "res://MiyoshinoKit.gd"
 ##   vending_machine(pk, kit, variant)
 ##   arched_bridge(pk, kit, span, width, rise), summit_shrine(pk, kit, labels, text), ema_rack(pk, kit, w), chozuya(pk, kit),
 ##   stone_steps(pk, kit, w, n, rise, run), kei_truck(pk, kit, col)
+##   street_lantern(pk, kit, h)     a town street lamp: a black post, a lantern head of paper panes under a little roof
+##   planter(pk, kit, variant, rng) a glazed pot on the pavement: 0 a clipped pine, 1 a flowering azalea, 2 a maple
+##   bicycle(pk, kit, col)          a town bicycle (mamachari) standing on its kickstand, along x, front basket at +x
+##   bike_rack(pk, kit, n)          a galvanised rack of n hoops along x, 0.7 apart
+##   park_bench(pk, kit)            slatted timber on two granite legs, facing +z
+##   garden_rock(pk, kit, r, h, seed_v)  a lumpy granite boulder for a garden or a stream's edge, set into the ground
 ##
 ## Faces never share a plane: trim, paint and emblems stand 1.5-2.5cm proud of what carries them, parts that meet run
 ## into each other. Thin sheets (banners, shide papers, bibs, the parasol) are "cloth", one face seen from both sides.
@@ -1918,3 +1924,154 @@ static func koinobori_line(pk: PropKit, kit: Dictionary, a: Vector3, b: Vector3,
 		pk.tube(kit, "rope", p, mouth + Vector3(0, rr * 0.86, 0) - ax * rr * 0.86, 0.008, 0.008, 3, STRAW.darkened(0.2))
 		var col: Color = cols[(i + (rng.randi_range(0, 5) if rng else 0)) % cols.size()]
 		koinobori_carp(pk, kit, mouth, ax, length, rr, col, (rng.randf() * TAU) if rng else float(i) * 0.7)
+
+
+# ======================================================================================
+#  The town's street and park furniture (Yoshino Rapids' village)
+# ======================================================================================
+
+## A town street lamp, centred, `h` to its finial: a black iron post on a granite foot, a collar and a cross-arm, and on
+## top a square lantern of paper panes ("washi": lit at dusk) in a black frame under a little hipped roof with a finial.
+static func street_lantern(pk: PropKit, kit: Dictionary, h := 4.2) -> void:
+	var q := sqrt(2.0)
+	pk.block(kit, "ishi", Vector3(-0.2, -0.6, -0.2), Vector3(0.2, 0.18, 0.2), GRANITE, uvk)
+	_turn(pk, kit, "metal", Vector3(0, 0.18, 0), [Vector2(0.11, 0.0), Vector2(0.11, 0.12), Vector2(0.06, 0.3), Vector2(0.05, 0.31)], 8, IRON)
+	var top: float = h - 0.95
+	pk.tube(kit, "metal", Vector3(0, 0.3, 0), Vector3(0, top, 0), 0.05, 0.04, 8, IRON, false)
+	for y in [1.2, top - 0.25]:
+		_turn(pk, kit, "metal", Vector3(0, y, 0), [Vector2(0.045, 0.0), Vector2(0.07, 0.02), Vector2(0.07, 0.06), Vector2(0.045, 0.08)], 8, IRON)
+	# The lantern's floor, its four paper panes in a frame, the roof and finial.
+	var c := Vector3(0, top, 0)
+	pk.block(kit, "metal", c + Vector3(-0.2, 0.0, -0.2), c + Vector3(0.2, 0.05, 0.2), IRON)
+	_turn(pk, kit, "washi", c + Vector3(0, 0.05, 0), [Vector2(0.15 * q, 0.0), Vector2(0.17 * q, 0.5)], 4, PAPER_WARM, true, PI * 0.25)
+	for sx: float in [-1.0, 1.0]:
+		for sz: float in [-1.0, 1.0]:
+			pk.beam(kit, "metal", c + Vector3(sx * 0.16, 0.04, sz * 0.16), c + Vector3(sx * 0.18, 0.56, sz * 0.18), 0.035, 0.035, IRON, Vector3.RIGHT)
+		pk.beam(kit, "metal", c + Vector3(sx * 0.17, 0.3, -0.15), c + Vector3(sx * 0.17, 0.3, 0.15), 0.016, 0.022, IRON, Vector3.UP)
+		pk.beam(kit, "metal", c + Vector3(-0.15, 0.3, sx * 0.17), c + Vector3(0.15, 0.3, sx * 0.17), 0.016, 0.022, IRON, Vector3.UP)
+	_turn(pk, kit, "metal", c + Vector3(0, 0.55, 0), [Vector2(0.0, 0.0), Vector2(0.33 * q, 0.0), Vector2(0.33 * q, 0.03), Vector2(0.08 * q, 0.24), Vector2(0.0, 0.26)], 4, IRON, true, PI * 0.25)
+	_turn(pk, kit, "metal", c + Vector3(0, 0.8, 0), [Vector2(0.0, 0.0), Vector2(0.04, 0.0), Vector2(0.05, 0.06), Vector2(0.0, 0.14)], 6, IRON)
+
+
+## A glazed pot on the pavement, centred, about 0.5 across: 0 a clipped pine (a crooked trunk, three cloud pads),
+## 1 a flowering azalea (a dome of leaves dotted pink), 2 a little maple (a fan of red-green leaves).
+static func planter(pk: PropKit, kit: Dictionary, variant := 0, rng: RandomNumberGenerator = null) -> void:
+	var r := rng if rng != null else RandomNumberGenerator.new()
+	var glaze: Color = [INDIGO.lightened(0.15), Color(0.42, 0.24, 0.14), Color(0.22, 0.30, 0.26)][posmod(variant + r.randi_range(0, 2), 3)]
+	_turn(pk, kit, "urushi", Vector3.ZERO, [Vector2(0.18, -0.05), Vector2(0.2, 0.0), Vector2(0.27, 0.22), Vector2(0.3, 0.42), Vector2(0.28, 0.45), Vector2(0.25, 0.44)], 12, glaze)
+	_turn(pk, kit, "matte", Vector3(0, 0.4, 0), [Vector2(0.255, 0.0), Vector2(0.0, 0.01)], 12, Color(0.20, 0.14, 0.10))
+	var green := Color(0.17, 0.32, 0.14)
+	match posmod(variant, 3):
+		0:
+			var pts: Array = [Vector3(0, 0.4, 0), Vector3(0.06, 0.75, 0.02), Vector3(-0.05, 1.05, -0.03), Vector3(0.04, 1.3, 0.0)]
+			for i in range(pts.size() - 1):
+				pk.tube(kit, "hinoki", pts[i], pts[i + 1], 0.05 - 0.01 * i, 0.04 - 0.01 * i, 6, CEDAR_DARK, false)
+			for pad in [[Vector3(0.22, 0.85, 0.05), 0.3], [Vector3(-0.2, 1.08, -0.04), 0.26], [Vector3(0.05, 1.36, 0.02), 0.22]]:
+				var pc: Vector3 = pad[0]
+				var pr: float = pad[1]
+				_turn(pk, kit, "leaf", pc, [Vector2(0.0, -0.05), Vector2(pr * 0.8, -0.04), Vector2(pr, 0.03), Vector2(pr * 0.6, 0.11), Vector2(0.0, 0.13)], 7, green.darkened(0.15), false, r.randf() * TAU)
+		1:
+			_turn(pk, kit, "leaf", Vector3(0, 0.4, 0), [Vector2(0.24, 0.0), Vector2(0.4, 0.15), Vector2(0.38, 0.38), Vector2(0.2, 0.55), Vector2(0.0, 0.58)], 9, green.lightened(0.05), false, r.randf() * TAU)
+			for k in range(26):
+				var a: float = r.randf() * TAU
+				var e: float = r.randf_range(0.1, 1.2)
+				var p := Vector3(cos(a) * cos(e) * 0.39, 0.42 + sin(e) * 0.5, sin(a) * cos(e) * 0.39)
+				_octa(pk, kit, "leaf", p, Vector3(0.05, 0.035, 0.05), Color(0.95, 0.42, 0.62).darkened(r.randf() * 0.15))
+		_:
+			pk.tube(kit, "hinoki", Vector3(0, 0.4, 0), Vector3(0.02, 0.85, 0), 0.03, 0.02, 5, CEDAR_DARK, false)
+			for k in range(7):
+				var a2: float = TAU * float(k) / 7.0 + r.randf() * 0.4
+				var c := Vector3(cos(a2) * 0.22, 0.85 + r.randf_range(-0.05, 0.1), sin(a2) * 0.22)
+				_turn(pk, kit, "leaf", c, [Vector2(0.0, -0.03), Vector2(0.17, 0.0), Vector2(0.0, 0.05)], 5, Color(0.70, 0.22, 0.12).lerp(Color(0.40, 0.45, 0.15), r.randf() * 0.5), true, r.randf() * TAU)
+
+
+## A town bicycle (a mamachari) on its kickstand, along x with its front (the basket) toward +x, about 1.8 long: two
+## 0.33 wheels with spokes, a step-through frame, a sprung saddle, swept-back bars, a wire basket, a rear rack, mudguards
+## and a chain guard in the frame's colour `col`.
+static func bicycle(pk: PropKit, kit: Dictionary, col := Color(0.70, 0.72, 0.74)) -> void:
+	var wr := 0.33
+	var ax := Basis(Vector3(1, 0, 0), Vector3(0, 0, 1), Vector3(0, -1, 0))
+	var fw := Vector3(0.56, wr, 0)
+	var bw := Vector3(-0.56, wr, 0)
+	for w in [fw, bw]:
+		pk.tyre(kit, "matte", w, wr - 0.04, wr, 0.045, 14, INK, ax)
+		_turn(pk, kit, "metal", w, [Vector2(0.03, -0.03), Vector2(0.03, 0.03)], 6, GALV, false, 0.0, ax)
+		for k in range(8):
+			var a: float = TAU * float(k) / 8.0
+			pk.beam(kit, "metal", w, w + Vector3(cos(a), sin(a), 0) * (wr - 0.04), 0.006, 0.006, GALV, Vector3.FORWARD)
+		# The mudguard over the wheel's top.
+		var mg: Array = []
+		for j in range(7):
+			var aa: float = lerpf(0.25, 2.9, float(j) / 6.0)
+			mg.append(w + Vector3(cos(aa), sin(aa), 0) * (wr + 0.04))
+		for j in range(mg.size() - 1):
+			pk.beam(kit, "metal", mg[j], mg[j + 1], 0.05, 0.012, col.lightened(0.1), Vector3.BACK)
+	var crank := Vector3(-0.08, 0.3, 0)
+	var seat := Vector3(-0.28, 0.8, 0)
+	var head := Vector3(0.42, 0.78, 0)
+	# A low step-through frame: down tube curving from the head to the crank, seat tube, stays to the rear axle.
+	for seg in [[head, Vector3(0.18, 0.42, 0)], [Vector3(0.18, 0.42, 0), crank], [crank, seat + Vector3(0.04, -0.12, 0)], [crank, bw], [seat + Vector3(0.03, -0.1, 0), bw]]:
+		pk.tube(kit, "urushi", seg[0], seg[1], 0.022, 0.022, 6, col, false)
+	pk.tube(kit, "urushi", head + Vector3(-0.02, -0.1, 0), head + Vector3(0.03, 0.12, 0), 0.025, 0.025, 6, col, false)
+	pk.tube(kit, "metal", head + Vector3(0.0, -0.1, 0), fw, 0.015, 0.015, 5, GALV, false)
+	# The bars swept back, grips, the saddle on its post.
+	var bar := head + Vector3(0.03, 0.14, 0)
+	for sz: float in [-1.0, 1.0]:
+		pk.tube(kit, "metal", bar, bar + Vector3(-0.16, 0.04, sz * 0.27), 0.012, 0.012, 5, GALV, false)
+		pk.tube(kit, "matte", bar + Vector3(-0.16, 0.04, sz * 0.27), bar + Vector3(-0.22, 0.04, sz * 0.3), 0.018, 0.018, 5, INK, true)
+	pk.tube(kit, "metal", seat + Vector3(0.04, -0.12, 0), seat, 0.013, 0.013, 5, GALV, false)
+	pk.block(kit, "matte", seat + Vector3(-0.12, 0.0, -0.08), seat + Vector3(0.1, 0.06, 0.08), Color(0.12, 0.10, 0.09))
+	# The chain guard, the pedals, the kickstand.
+	pk.block(kit, "urushi", Vector3(-0.56, 0.25, 0.05), Vector3(-0.05, 0.36, 0.07), col.darkened(0.2))
+	for sz: float in [-1.0, 1.0]:
+		pk.block(kit, "matte", crank + Vector3(-0.04 + sz * 0.08, -0.17 * sz, sz * 0.1 - 0.03), crank + Vector3(0.05 + sz * 0.08, -0.15 * sz, sz * 0.1 + 0.03), INK)
+	pk.beam(kit, "metal", bw + Vector3(0.06, -0.02, 0.0), Vector3(-0.42, -0.02, 0.18), 0.015, 0.015, GALV)
+	# The front basket and the rear rack.
+	var bc := Vector3(0.66, 0.72, 0)
+	pk.block(kit, "metal", bc + Vector3(-0.13, -0.12, -0.16), bc + Vector3(0.13, -0.11, 0.16), GALV)
+	for sz: float in [-1.0, 1.0]:
+		pk.beam(kit, "metal", bc + Vector3(-0.13, -0.12, sz * 0.16), bc + Vector3(-0.13, 0.08, sz * 0.16), 0.01, 0.01, GALV)
+		pk.beam(kit, "metal", bc + Vector3(0.13, -0.12, sz * 0.16), bc + Vector3(0.13, 0.08, sz * 0.16), 0.01, 0.01, GALV)
+		pk.beam(kit, "metal", bc + Vector3(-0.13, 0.08, sz * 0.16), bc + Vector3(0.13, 0.08, sz * 0.16), 0.012, 0.012, GALV)
+		pk.beam(kit, "metal", bc + Vector3(sz * 0.13, 0.08, -0.16), bc + Vector3(sz * 0.13, 0.08, 0.16), 0.012, 0.012, GALV)
+		pk.beam(kit, "metal", Vector3(-0.78, 0.66, sz * 0.09), Vector3(-0.32, 0.66, sz * 0.09), 0.014, 0.014, GALV)
+		pk.beam(kit, "metal", Vector3(-0.7, 0.66, sz * 0.09), bw + Vector3(0, 0, sz * 0.03), 0.01, 0.01, GALV)
+
+
+## A galvanised bicycle rack, `n` low hoops along x 0.7 apart, centred, on a rail sunk in the pavement.
+static func bike_rack(pk: PropKit, kit: Dictionary, n := 4) -> void:
+	var x0: float = -0.35 * float(n - 1)
+	pk.beam(kit, "metal", Vector3(x0 - 0.2, 0.03, 0), Vector3(-x0 + 0.2, 0.03, 0), 0.06, 0.06, GALV)
+	for i in range(n):
+		var x: float = x0 + 0.7 * float(i)
+		var pts: Array = []
+		for k in range(9):
+			var a: float = PI * float(k) / 8.0
+			pts.append(Vector3(x, 0.03 + sin(a) * 0.32, cos(a) * 0.25))
+		for k in range(pts.size() - 1):
+			pk.tube(kit, "metal", pts[k], pts[k + 1], 0.016, 0.016, 5, GALV, false)
+
+
+## A park bench facing +z, 1.8 long: three timber slats on two granite legs, a slatted back.
+static func park_bench(pk: PropKit, kit: Dictionary) -> void:
+	var wood: Color = CEDAR.lightened(0.12)
+	for sx: float in [-1.0, 1.0]:
+		pk.block(kit, "ishi", Vector3(sx * 0.7 - 0.1, -0.4, -0.25), Vector3(sx * 0.7 + 0.1, 0.4, 0.22), GRANITE, uvk)
+		pk.block(kit, "ishi", Vector3(sx * 0.7 - 0.08, 0.4, -0.27), Vector3(sx * 0.7 + 0.08, 0.85, -0.17), GRANITE, uvk)
+	for k in range(3):
+		var z: float = -0.2 + 0.15 * float(k)
+		_bar(pk, kit, "hinoki", Vector3(-0.9, 0.44, z), Vector3(0.9, 0.44, z), 0.12, 0.05, wood, Vector3.BACK)
+	for k in range(2):
+		_bar(pk, kit, "hinoki", Vector3(-0.9, 0.6 + 0.17 * float(k), -0.24), Vector3(0.9, 0.6 + 0.17 * float(k), -0.24), 0.1, 0.04, wood, Vector3.UP)
+
+
+## A garden boulder, centred, `r` across and `h` high above the ground (its foot 0.3 into it): a lumpy granite stone
+## turned from a ragged profile, a mossy band low down.
+static func garden_rock(pk: PropKit, kit: Dictionary, r := 0.8, h := 0.6, seed_v := 1) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_v
+	var rot := Basis(Vector3.UP, rng.randf() * TAU) * Basis.from_scale(Vector3(1.0, 1.0, rng.randf_range(0.6, 0.9)))
+	var col: Color = STONE_A.lerp(STONE_B, rng.randf()).darkened(rng.randf() * 0.15)
+	_turn(pk, kit, "matte", Vector3(0, -0.3, 0), [Vector2(0.0, 0.0), Vector2(r * 0.9, 0.02), Vector2(r * rng.randf_range(0.9, 1.05), 0.3 + h * 0.25),
+			Vector2(r * rng.randf_range(0.7, 0.85), 0.3 + h * 0.7), Vector2(r * rng.randf_range(0.3, 0.45), 0.3 + h * 0.97), Vector2(0.0, 0.3 + h)], 7, col, true, rng.randf() * TAU, rot)
+	_turn(pk, kit, "leaf", Vector3(0, -0.02, 0), [Vector2(r * 0.97, 0.0), Vector2(r * 0.99, 0.08), Vector2(r * 0.9, 0.12)], 7, MOSS.darkened(0.2), true, 0.0, rot)

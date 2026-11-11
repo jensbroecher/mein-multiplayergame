@@ -1258,6 +1258,12 @@ func _slope_at(x: float, z: float, span := 3.0) -> float:
 
 
 ## The lowest and highest ground under a footprint (a w x d rectangle at c turned yaw), sampled every 2m.
+## Where something standing at (x, z) stands: the built ground, unless the stage laid something over it there (Yoshino
+## Rapids' village sidewalk). `_beside` and the start's crowd stand on it.
+func _stand_y(x: float, z: float) -> float:
+	return _ground_at(x, z)
+
+
 func _ground_range(c: Vector2, w: float, d: float, yaw: float) -> Vector2:
 	var lo := INF
 	var hi := -INF
@@ -2107,6 +2113,9 @@ func _note_solid(fn: String, xf: Transform3D, args: Array) -> void:
 	if fn == "machiya":
 		if args.size() > 3 and int(args[3]) == 4:
 			_solids.append([xf, Rect2(0.0, 0.0, float(args[0]), 3.3)])
+		# The house itself (a spectator in front of a house had stood half inside its wall).
+		if args.size() > 1:
+			_solids.append([xf, Rect2(0.0, -float(args[1]), float(args[0]), float(args[1]) + 0.25)])
 		return
 	if fn == "jizo_row" and args.size() > 0:
 		var n: float = float(args[0])
@@ -2363,11 +2372,12 @@ func _facing(face: Vector3, at: Vector3) -> Transform3D:
 	return Transform3D(Basis(x, Vector3.UP, z), at)
 
 
-## A frame beside a route: at s, `lat` right of the line (on the built ground), its +z (front) toward the road.
+## A frame beside a route: at s, `lat` right of the line (on the built ground, or what the stage laid over it:
+## `_stand_y`), its +z (front) toward the road.
 func _beside(r: Route, s: float, lat: float, lift := 0.0) -> Transform3D:
 	var sp: Dictionary = r.spot(s, lat, 0.0)
 	var pos: Vector3 = sp["pos"]
-	pos.y = _ground_at(pos.x, pos.z) + lift
+	pos.y = _stand_y(pos.x, pos.z) + lift
 	var face: Vector3 = -(sp["right"] as Vector3) * signf(lat) if absf(lat) > 0.01 else (sp["fwd"] as Vector3)
 	return _facing(face, pos)
 
@@ -2487,9 +2497,10 @@ func _person(pos: Vector3, face: Vector3, size := 1.0, seated := false, pose := 
 
 
 ## Crowd barriers with people behind them along both sides of the lap from s0 to s1 (the start).
-func _build_start_crowd(root: Node3D, s0: float, s1: float, lat: float, skip_from: float, skip_to: float, seed_v: int) -> void:
+func _build_start_crowd(root: Node3D, s0: float, s1: float, lat: float, skip_from: float, skip_to: float, seed_v: int,
+		sides: Array = [-1.0, 1.0]) -> void:
 	var node := Node3D.new()
-	node.name = "StartVenue"
+	node.name = "StartVenue" if sides.size() == 2 else ("StartVenueLeft" if float(sides[0]) < 0.0 else "StartVenueRight")
 	root.add_child(node)
 	var pk := PropKit.new()
 	pk.material_for = func(key: String) -> Material: return _camp_material(key)
@@ -2504,12 +2515,12 @@ func _build_start_crowd(root: Node3D, s0: float, s1: float, lat: float, skip_fro
 	var s: float = s0
 	var count := 0
 	while s < s1:
-		for side in [-1.0, 1.0]:
+		for side in sides:
 			if s > skip_from and s < skip_to:
 				continue
 			var sp: Dictionary = lap.spot(s, side * lat, 0.0)
 			var pos: Vector3 = sp["pos"]
-			pos.y = _ground_at(pos.x, pos.z)
+			pos.y = _stand_y(pos.x, pos.z)
 			var fwd: Vector3 = sp["fwd"]
 			var xf := Transform3D(Basis(fwd, Vector3.UP, fwd.cross(Vector3.UP)), pos)
 			pk.set_frame(xf.scaled_local(Vector3.ONE * PROP_SCALE))
@@ -2528,7 +2539,7 @@ func _build_start_crowd(root: Node3D, s0: float, s1: float, lat: float, skip_fro
 				var plat: float = side * (lat + 1.6 + float(row) * 1.5 + rng.randf_range(0.0, 0.7))
 				var ps: Dictionary = lap.spot(s + rng.randf_range(-1.2, 1.2), plat, 0.0)
 				var pp: Vector3 = ps["pos"]
-				pp.y = _ground_at(pp.x, pp.z)
+				pp.y = _stand_y(pp.x, pp.z)
 				var face: Vector3 = -(ps["right"] as Vector3) * side
 				face = (face + (ps["fwd"] as Vector3) * rng.randf_range(-0.5, 0.5)).normalized()
 				_person(pp, face, rng.randf_range(0.9, 1.08))
@@ -2536,7 +2547,7 @@ func _build_start_crowd(root: Node3D, s0: float, s1: float, lat: float, skip_fro
 	pk.reset_frame()
 	var bmi := MeshInstance3D.new()
 	bmi.name = "Barriers"
-	bmi.mesh = _save_res(pk.commit(bkit), "start_barriers", stem + "prop_")
+	bmi.mesh = _save_res(pk.commit(bkit), "start_barriers" + ("" if sides.size() == 2 else ("_l" if float(sides[0]) < 0.0 else "_r")), stem + "prop_")
 	bmi.visibility_range_end = 700.0
 	node.add_child(bmi)
 	print("  start: %d barriers, %d spectators so far" % [count, _people.size()])

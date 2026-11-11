@@ -45,6 +45,31 @@ const FLUME_FALL := 0.01
 ## The mill pond's radius and depth.
 const POND_R := 7.0
 const POND_DEPTH := 1.3
+## The village (the start straight, the user's picture of a Japanese town): the sidewalk along the houses' side (this
+## wide from the road's edge, its kerb this high over the road), the riverside promenade (its middle this far right of
+## the lap's line, this wide), the back lane behind the first row of houses (its middle this far left).
+const SIDE_W := 6.0
+const KERB := 0.16
+const PROM_LAT := 20.0
+const PROM_W := 4.0
+const LANE_LAT := 34.5
+const LANE_W := 3.6
+## The riverside park between these x, from the promenade to the river: the garden stream from its spring pool under the
+## drum bridge to the river, paths, two plazas, the tea house.
+const PARK_X := Vector2(-236.0, -84.0)
+const GARDEN_POOL := Vector3(-125.0, 98.0, 3.0)
+const GARDEN_STREAM := [Vector2(-127.0, 95.5), Vector2(-131.0, 90.0), Vector2(-138.0, 82.0), Vector2(-146.0, 73.0), Vector2(-153.0, 63.0),
+		Vector2(-162.0, 53.0), Vector2(-170.0, 42.0), Vector2(-175.0, 28.0), Vector2(-179.0, 12.0), Vector2(-184.0, -4.0), Vector2(-189.0, -28.0)]
+const PARK_PATHS := [
+	[Vector2(-92.0, 95.0), Vector2(-95.0, 80.0), Vector2(-104.0, 68.0)],
+	[Vector2(-118.0, 58.0), Vector2(-140.0, 56.0), Vector2(-160.2, 55.1), Vector2(-178.0, 54.0), Vector2(-188.0, 46.0), Vector2(-189.0, 30.0), Vector2(-197.0, 8.0)],
+	[Vector2(-205.0, 7.0), Vector2(-208.0, 25.0), Vector2(-213.0, 50.0), Vector2(-217.0, 75.0), Vector2(-220.0, 94.0)],
+]
+const PARK_PATH_HALF := 1.4
+## [centre, radius] of the plazas: one round a weeping cherry, one looking out over the river.
+const PARK_PLAZAS := [[Vector2(-110.0, 62.0), 9.0], [Vector2(-202.0, 2.0), 7.0]]
+## The tea house on the stream's west bank (its middle), facing east across the water.
+const TEA_HOUSE := Vector2(-196.0, 40.0)
 
 var s_bridge0 := 0.0
 var s_bridge1 := 0.0
@@ -59,14 +84,19 @@ var _raw_route: Route
 ## (PackedVector2Array, downstream), "lv" (the water's level at each point), "hw" (the bed's half width), "depth" (bed under
 ## the water), "bank" (how steeply the sides rise, m per m), "box" (Rect2, where it can cut), "wet" (false: a dry notch).
 var _race: Array = []
-## The mill pond: x, its water level, z, its radius.
+## The mill pond: x, its water level, z, its radius; and every pond the race's pieces start from (the mill pond, the
+## park's spring pool).
 var _pond := Vector4.ZERO
+var _ponds: Array[Vector4] = []
 ## The sawmill's frame, the flume's floor (its top, on the middle line) from the pond's sluice to where it meets the
 ## sawmill's own trough, and the culverts under the yard road: [their bed's middle, the way out of them].
 var _mill_xf := Transform3D.IDENTITY
 var _flume_pts := PackedVector3Array()
 var _culverts: Array = []
 var _pit_level := 0.0
+## The village's stretch of the lap (s), set before the dressing: the sidewalk runs along it.
+var _sv0 := -1.0
+var _sv1 := -1.0
 
 
 func _configure() -> void:
@@ -253,6 +283,7 @@ func _plan_race() -> void:
 	var pond_level: float = start.y + FLUME_WATER + 0.12
 	var pc := Vector2(wx - 0.8, start.z - 0.4 - POND_R)
 	_pond = Vector4(pc.x, pond_level, pc.y, POND_R)
+	_ponds.append(_pond)
 	# A notch through the pond's bank for the flume's mouth (dry: its water is in the trough).
 	_race.append(_race_piece("intake", [Vector2(wx, start.z - 1.2), Vector2(wx, start.z + 5.0)], [start.y - 0.1, start.y - 0.12], 0.75, 0.0, 1.3, false))
 	# The creek down the hill into the pond: a wandering line, its water a little under the ground and never rising.
@@ -268,6 +299,16 @@ func _plan_race() -> void:
 		c_ctrl.append(INF)
 	c_ctrl[c_ctrl.size() - 1] = pond_level
 	_race.append(_race_piece("creek", creek, _levels(creek, c_ctrl, 0.55, pond_level), 0.9, 0.4, 0.9))
+	# The park's garden stream: from its spring pool by the promenade, under the drum bridge, down through the park.
+	var garden: Array = GARDEN_STREAM.duplicate()
+	var g_ctrl: Array = []
+	for q in garden:
+		g_ctrl.append(INF)
+	var g_end: Vector2 = garden[garden.size() - 1]
+	var g_lv: Array = _levels(garden, g_ctrl, 0.45, _water_y(g_end.x) - 0.05)
+	_ponds.append(Vector4(GARDEN_POOL.x, float(g_lv[0]), GARDEN_POOL.y, GARDEN_POOL.z))
+	_race.append(_race_piece("garden", garden, g_lv, 1.2, 0.45, 0.7))
+	print("  the garden stream: %.0fm from its pool (%.1fm) to the river" % [_poly_len(garden), float(g_lv[0])])
 	print("  the mill race: the flume %.0fm from the pond (water %.1fm) to the wheel, the pit's water %.1fm, the brook %.0fm" % [
 			d + absf(float(fl[3]) - float(fl[4])) * ms, pond_level, _pit_level, _poly_len(brook)])
 
@@ -362,21 +403,22 @@ func _race_cut(x: float, z: float) -> float:
 		else:
 			c = bed + depth * 0.35 + (d - hw) * float(pc["bank"])
 		cap = minf(cap, c)
-	if _pond.w > 0.0:
-		var dp: float = Vector2(x - _pond.x, z - _pond.z).length()
-		if dp < _pond.w + 25.0:
-			var pb: float = _pond.y - POND_DEPTH
-			if dp < _pond.w:
-				cap = minf(cap, pb + POND_DEPTH * 0.75 * pow(dp / _pond.w, 2.0))
+	for pd in _ponds:
+		var dp: float = Vector2(x - pd.x, z - pd.z).length()
+		if dp < pd.w + 25.0:
+			var pb: float = pd.y - POND_DEPTH
+			if dp < pd.w:
+				cap = minf(cap, pb + POND_DEPTH * 0.75 * pow(dp / pd.w, 2.0))
 			else:
-				cap = minf(cap, pb + POND_DEPTH * 0.75 + (dp - _pond.w) * 1.1)
+				cap = minf(cap, pb + POND_DEPTH * 0.75 + (dp - pd.w) * 1.1)
 	return cap
 
 
 ## The surface of the race's water at (x, z) (the pond, a wet channel), or NAN.
 func _race_water_at(x: float, z: float) -> float:
-	if _pond.w > 0.0 and Vector2(x - _pond.x, z - _pond.z).length() < _pond.w + 0.6:
-		return _pond.y
+	for pd in _ponds:
+		if Vector2(x - pd.x, z - pd.z).length() < pd.w + 0.6:
+			return pd.y
 	for pc in _race:
 		if not bool(pc["wet"]):
 			continue
@@ -401,8 +443,8 @@ func _race_d(x: float, z: float) -> float:
 		var nr: Array = _race_near(pc, x, z)
 		if not nr.is_empty():
 			best = minf(best, float(nr[0]) - _race_half_water(pc))
-	if _pond.w > 0.0:
-		best = minf(best, Vector2(x - _pond.x, z - _pond.z).length() - _pond.w)
+	for pd in _ponds:
+		best = minf(best, Vector2(x - pd.x, z - pd.z).length() - pd.w)
 	if _flume_pts.size() > 1:
 		var a: Vector3 = _flume_pts[0]
 		var b: Vector3 = _flume_pts[_flume_pts.size() - 1]
@@ -538,6 +580,8 @@ func _tree_pick(x: float, z: float, roll: float, rng: RandomNumberGenerator) -> 
 	if sd < 5.0 or _in_rect(x, z, YARD_RECT, 4.0) or _race_d(x, z) < 3.5:
 		return []
 	if _in_rect(x, z, VILLAGE_RECT, -6.0) and z > 132.0:
+		return []
+	if _in_park(x, z):
 		return []
 	var g: float = _grove_w(x, z)
 	var f: float = _forest_w(x, z) * (1.0 - g)
@@ -806,15 +850,15 @@ func _build_race_water(root: Node3D, river_mat: ShaderMaterial) -> void:
 				_water_tri(st, rows[i][k], rows[i][k + 1], rows[i + 1][k])
 				_water_tri(st, rows[i][k + 1], rows[i + 1][k + 1], rows[i + 1][k])
 	# The mill pond: a disc, nearly still.
-	if _pond.w > 0.0:
+	for pd in _ponds:
 		var segs := 24
-		var pr: float = _pond.w + 0.5
-		var cv := [Vector3(_pond.x, _pond.y, _pond.z), Color(0.0, 0.12, 0.0, 1.0), Vector2(0.5, 0.0)]
+		var pr: float = pd.w + 0.5
+		var cv := [Vector3(pd.x, pd.y, pd.z), Color(0.0, 0.12, 0.0, 1.0), Vector2(0.5, 0.0)]
 		for k in range(segs):
 			var a0: float = TAU * float(k) / float(segs)
 			var a1: float = TAU * float(k + 1) / float(segs)
-			var va := [Vector3(_pond.x + cos(a0) * pr, _pond.y, _pond.z + sin(a0) * pr), Color(0.0, 0.12, 0.0, 1.0), Vector2(0.5 + 0.5 * cos(a0), pr * sin(a0))]
-			var vb := [Vector3(_pond.x + cos(a1) * pr, _pond.y, _pond.z + sin(a1) * pr), Color(0.0, 0.12, 0.0, 1.0), Vector2(0.5 + 0.5 * cos(a1), pr * sin(a1))]
+			var va := [Vector3(pd.x + cos(a0) * pr, pd.y, pd.z + sin(a0) * pr), Color(0.0, 0.12, 0.0, 1.0), Vector2(0.5 + 0.5 * cos(a0), pr * sin(a0))]
+			var vb := [Vector3(pd.x + cos(a1) * pr, pd.y, pd.z + sin(a1) * pr), Color(0.0, 0.12, 0.0, 1.0), Vector2(0.5 + 0.5 * cos(a1), pr * sin(a1))]
 			_water_tri(st, cv, va, vb)
 	# The flume: the water in its trough from the sluice to the lip over the wheel (the sawmill's own trough included).
 	# (The kits are loaded after the water is built: ask the river kit's script itself.)
@@ -922,7 +966,11 @@ func _build_dressing(root: Node3D) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_base + 77
 	var fin: float = _finish_s()
-	_build_start_crowd(root, fin - 95.0, fin + 85.0, road_half + 3.0, fin - 8.0, fin + 8.0, seed_base + 11)
+	_sv0 = _closest_s(Vector2(500.0, 125.0))
+	_sv1 = _closest_s(Vector2(-372.0, 125.0))
+	# The crowd: behind barriers on the river side's verge, and on the sidewalk along the houses.
+	_build_start_crowd(root, fin - 95.0, fin + 85.0, road_half + 3.0, fin - 8.0, fin + 8.0, seed_base + 11, [1.0])
+	_build_start_crowd(root, fin - 95.0, fin + 85.0, road_half + 0.45, fin - 8.0, fin + 8.0, seed_base + 12, [-1.0])
 	# The flag on the river side (the poles and their wires are on the houses' side).
 	_logo_flag(root, fin - 24.0, road_half + 17.0)
 	_build_village(root, rng, fin)
@@ -941,60 +989,62 @@ func _build_dressing(root: Node3D) -> void:
 	root.add_child(pg)
 
 
-## The riverside village along the start straight: houses on the landward side, the river side open under an avenue
-## of cherries, lamps and banners, boats drawn up on the shingle.
+## The village's sidewalk top at s, `lat` (negative: the houses' side) across it: KERB over the road at the kerb, falling
+## toward the road 1 in 100.
+func _side_top(s: float, lat: float) -> float:
+	return lap.y(s) + KERB + (absf(lat) - road_half) * 0.01
+
+
+## Things on the sidewalk stand on it.
+func _stand_y(x: float, z: float) -> float:
+	var g: float = _ground_at(x, z)
+	if _sv0 < 0.0 or x > 520.0 or x < -392.0 or z < 80.0 or z > 175.0:
+		return g
+	var s: float = lap.closest_s(Vector2(x, z))
+	if s < _sv0 or s > _sv1:
+		return g
+	var lat: float = (Vector3(x, 0.0, z) - lap.pt(s)).dot(lap.rt(s))
+	if lat <= -road_half + 0.05 and lat >= -(road_half + SIDE_W) - 0.05:
+		return maxf(g, _side_top(s, lat))
+	return g
+
+
+## The riverside village along the start straight (after the user's picture of a Japanese town): a granite sidewalk
+## along the houses' side with street lamps, potted pines and bicycles; the machiya in one row along it, alleys to a back
+## lane and a second row behind; on the river side a hedge, a cherry avenue and a stone-paved promenade along the river
+## with lamps and benches, and the park: the garden stream under the vermilion drum bridge, paths, plazas, the tea house.
 func _build_village(root: Node3D, rng: RandomNumberGenerator, fin: float) -> void:
-	var s0: float = _closest_s(Vector2(500.0, 125.0))
-	var s1: float = _closest_s(Vector2(-370.0, 125.0))
-	# Heading west the river is on the right: houses on the left.
-	var s: float = s0
-	var k := 0
-	while s < s1:
-		var variant: int = [0, 1, 0, 3, 2, 0, 4, 1, 5, 0][k % 10]
-		var def: Vector3 = _kit_value(town_kit, "machiya_default", [variant], Vector3(7.2, 9.0, 2.0))
-		var w: float = def.x * PROP_SCALE
-		var ext: float = float(_kit_value(town_kit, "machiya_extent", [variant], 1.5)) * PROP_SCALE
-		if absf(s + w * 0.5 - fin) > 16.0 and rng.randf() < 0.86:
-			var sp: Dictionary = lap.spot(s + w, -(road_half + 3.2 + ext), 0.0)
-			var pos: Vector3 = sp["pos"]
-			var gr: Vector2 = _ground_range(Vector2(pos.x, pos.z + 6.0), w, 14.0, 0.0)
-			pos.y = gr.y
-			# The house's x runs along the street from its left corner as seen from the road: its front faces the road.
-			var xf: Transform3D = _facing(sp["right"], pos)
-			if _put(_cell_key("village", pos), town_kit, xf, "machiya", [def.x, def.y, int(def.z), variant, rng, LBL], 1100.0):
-				_note_frame(xf, Vector2(-0.5, -def.y - 0.5), Vector2(def.x + 0.5, 2.0), 1.0)
-		s += w + rng.randf_range(1.0, 6.0)
-		k += 1
-	# The river side: an avenue of cherries, lamps between them, banners, benches looking at the water.
-	s = s0 + 6.0
-	k = 0
-	while s < s1:
-		var sp2: Dictionary = lap.spot(s, road_half + 6.0, 0.0)
-		var p: Vector3 = sp2["pos"]
-		if absf(s - fin) > 12.0 and _shore_d(p.x, p.z) > 5.0:
-			extra_trees.append(["sakura", p.x, p.z, rng.randf_range(0.95, 1.15), k % 2])
-			_note_circle(Vector2(p.x, p.z), 2.0)
-		if k % 2 == 0:
-			var lx: Transform3D = _beside(lap, s + 8.0, road_half + 4.2)
-			_put(_cell_key("riverside", lx.origin), prop_kit, lx, "bonbori", [], 420.0)
-		if k % 5 == 2:
-			var bx: Transform3D = _beside(lap, s + 8.0, road_half + 9.5)
-			bx = Transform3D(Basis(Vector3.UP, PI) * bx.basis, bx.origin)
-			if _shore_d(bx.origin.x, bx.origin.z) > 6.0:
-				_put(_cell_key("riverside", bx.origin), prop_kit, bx, "red_bench", [k % 10 == 2], 420.0)
-				_note_circle(Vector2(bx.origin.x, bx.origin.z), 3.0)
-				_person(bx.origin + bx.basis.z * 2.0, bx.basis.z, rng.randf_range(0.88, 1.05))
-		s += 16.0
-		k += 1
-	for ds in [-60.0, -30.0, 30.0, 60.0]:
-		var nx: Transform3D = _beside(lap, fin + ds, road_half + 5.0)
-		_put(_cell_key("riverside", nx.origin), prop_kit, nx, "nobori", [Color(0.20, 0.30, 0.55)], 420.0)
-	# Utility poles behind the houses' eaves... along the river side's verge, with their wires.
+	_build_sidewalk(root)
+	var paving := SurfaceTool.new()
+	paving.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var alleys: Array = _build_house_rows(rng, fin)
+	_build_street_furniture(rng, fin, alleys)
+	# The back lane and the alleys onto it.
+	var lane_s0: float = _sv0 + 30.0
+	var lane_s1: float = _sv1 - 30.0
+	_pave_offset(paving, lane_s0, lane_s1, -LANE_LAT, LANE_W * 0.5)
+	for al in alleys:
+		var c0: Vector3 = lap.spot(float(al), -(road_half + SIDE_W - 0.3), 0.0)["pos"]
+		var c1: Vector3 = lap.spot(float(al), -(LANE_LAT - LANE_W * 0.5 + 0.3), 0.0)["pos"]
+		_pave_line(paving, [Vector2(c0.x, c0.z), Vector2(c1.x, c1.z)], 1.9)
+	# The river side.
+	var cross_s: float = _promenade_and_avenue(paving, rng, fin)
+	_build_park(root, paving, rng, cross_s)
+	var mesh: ArrayMesh = paving.commit()
+	if mesh.get_surface_count() > 0:
+		mesh.surface_set_material(0, _road_mat)
+		var mi := MeshInstance3D.new()
+		# "Ground": DressingColliders gives it no collider (the ground under it is solid).
+		mi.name = "VillagePavingGround"
+		mi.mesh = _save_res(mesh, "village_paving")
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		root.add_child(mi)
+	# Utility poles along the sidewalk's kerb, with their wires.
 	var prev := Vector3.INF
-	s = s0 + 30.0
-	k = 0
-	while s < s1:
-		var px: Transform3D = _beside(lap, s, -(road_half + 1.9))
+	var s: float = _sv0 + 30.0
+	var k := 0
+	while s < _sv1:
+		var px: Transform3D = _beside(lap, s, -(road_half + 1.2))
 		_put(_cell_key("poles", px.origin), prop_kit, px, "utility_pole", [9.5, k % 3], 500.0)
 		var top: Vector3 = px.origin + Vector3(0, 9.0 * PROP_SCALE, 0)
 		if prev != Vector3.INF:
@@ -1009,9 +1059,604 @@ func _build_village(root: Node3D, rng: RandomNumberGenerator, fin: float) -> voi
 		var at := Vector3(x, _water_y(x) if i % 2 == 0 else _ground_at(x, z) + 0.15, z)
 		var bxf := Transform3D(Basis(Vector3.UP, rng.randf_range(1.2, 1.9)), at)
 		_put(_cell_key("boats", at), river_kit, bxf, "river_boat", [i % 3], 600.0)
-	# A drinks machine by the line.
-	var vx: Transform3D = _beside(lap, fin + 70.0, -(road_half + 2.4))
-	_put(_cell_key("riverside", vx.origin), prop_kit, vx, "vending_machine", [1], 300.0)
+	_build_hill_pagoda(rng)
+
+
+## The sidewalk: granite flags (the road shader's paving, kind 1, its kerb stones along both edges) from the road's edge
+## SIDE_W out, KERB over the road, a kerb face down into the road's gutter and an edge down into the ground; solid
+## ("SidewalkStones": off the course, paved under the tyres).
+func _build_sidewalk(root: Node3D) -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var faces := PackedVector3Array()
+	var hw: float = SIDE_W * 0.5
+	var lats: Array = [-(road_half + 0.02), -(road_half + SIDE_W * 0.33), -(road_half + SIDE_W * 0.67), -(road_half + SIDE_W)]
+	var s0: float = _sv0 + 2.0
+	var s1: float = _sv1 - 2.0
+	var n: int = int(ceil((s1 - s0) / 2.0))
+	var rows: Array = []
+	for i in range(n + 1):
+		var s: float = lerpf(s0, s1, float(i) / float(n))
+		var row: Array = []
+		for lat in lats:
+			var p: Vector3 = lap.spot(s, float(lat), 0.0)["pos"]
+			p.y = _side_top(s, float(lat))
+			row.append(p)
+		# The kerb's foot in the gutter, the outer edge's foot in the ground.
+		var kf: Vector3 = lap.spot(s, -(road_half + 0.02), 0.0)["pos"]
+		kf.y = lap.y(s) - 0.04
+		var of: Vector3 = row[row.size() - 1]
+		of.y = minf(_ground_at(of.x, of.z), of.y) - 0.25
+		rows.append([row, kf, of, s])
+	var put := func(a: Vector3, b: Vector3, c: Vector3, ua: Vector2, ub: Vector2, uc: Vector2, solid: bool) -> void:
+		var tri: Array = [[a, ua], [b, ub], [c, uc]]
+		var nrm: Vector3 = (c - a).cross(b - a)
+		if nrm.length_squared() < 1e-10:
+			return
+		for v in tri:
+			st.set_normal(Vector3.UP)
+			st.set_color(Color(1.0, _petals_at((v[0] as Vector3).x, (v[0] as Vector3).z) * 0.6, 0.0, 1.0))
+			st.set_uv(v[1])
+			st.set_uv2(Vector2(1.0, hw))
+			st.add_vertex(v[0])
+		if solid:
+			faces.append_array(PackedVector3Array([a, b, c]))
+	for i in range(n):
+		var r0: Array = rows[i]
+		var r1: Array = rows[i + 1]
+		var sa: float = r0[3]
+		var sb: float = r1[3]
+		for j in range(lats.size() - 1):
+			var a0: Vector3 = r0[0][j]
+			var a1: Vector3 = r0[0][j + 1]
+			var b0: Vector3 = r1[0][j]
+			var b1: Vector3 = r1[0][j + 1]
+			var ua0 := Vector2(float(lats[j]) + road_half + hw, sa)
+			var ua1 := Vector2(float(lats[j + 1]) + road_half + hw, sa)
+			var ub0 := Vector2(float(lats[j]) + road_half + hw, sb)
+			var ub1 := Vector2(float(lats[j + 1]) + road_half + hw, sb)
+			# Clockwise from above: (c - a) x (b - a) points up.
+			for t in [[a0, a1, b0, ua0, ua1, ub0], [a1, b1, b0, ua1, ub1, ub0]]:
+				var ta: Vector3 = t[0]
+				var tb: Vector3 = t[1]
+				var tc: Vector3 = t[2]
+				if (tc - ta).cross(tb - ta).y < 0.0:
+					put.call(ta, tc, tb, t[3], t[5], t[4], true)
+				else:
+					put.call(ta, tb, tc, t[3], t[4], t[5], true)
+		# The kerb's face toward the road, the outer edge's face toward the houses.
+		var faces_q: Array = [[r0[0][0], r1[0][0], r1[1], r0[1], -lap.rt(sa)], [r0[0][lats.size() - 1], r1[0][lats.size() - 1], r1[2], r0[2], lap.rt(sa)]]
+		for fq in faces_q:
+			var q0: Vector3 = fq[0]
+			var q1: Vector3 = fq[1]
+			var q2: Vector3 = fq[2]
+			var q3: Vector3 = fq[3]
+			var out: Vector3 = fq[4]
+			var uvq := [Vector2(-hw, sa), Vector2(-hw, sb), Vector2(-hw + 0.2, sb), Vector2(-hw + 0.2, sa)]
+			var sol: bool = out.dot(lap.rt(sa)) > 0.0
+			for t2 in [[q0, q1, q2, 0, 1, 2], [q0, q2, q3, 0, 2, 3]]:
+				var ta2: Vector3 = t2[0]
+				var tb2: Vector3 = t2[1]
+				var tc2: Vector3 = t2[2]
+				if (tc2 - ta2).cross(tb2 - ta2).dot(-out) < 0.0:
+					put.call(ta2, tc2, tb2, uvq[t2[3]], uvq[t2[5]], uvq[t2[4]], sol)
+				else:
+					put.call(ta2, tb2, tc2, uvq[t2[3]], uvq[t2[4]], uvq[t2[5]], sol)
+	var mesh: ArrayMesh = st.commit()
+	mesh.surface_set_material(0, _road_mat)
+	var body := StaticBody3D.new()
+	body.name = "SidewalkStones"
+	body.set_meta(&"surface", "asphalt")
+	root.add_child(body)
+	var mi := MeshInstance3D.new()
+	mi.name = "SidewalkPaving"
+	mi.mesh = _save_res(mesh, "sidewalk")
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	body.add_child(mi)
+	var shape := ConcavePolygonShape3D.new()
+	shape.set_faces(faces)
+	shape.backface_collision = true
+	var cs := CollisionShape3D.new()
+	cs.shape = _save_res(shape, "sidewalk_shape")
+	body.add_child(cs)
+	print("  the sidewalk: %.0fm, %d triangles" % [s1 - s0, faces.size() / 3])
+
+
+## The machiya along the sidewalk, one row nearly wall to wall, alleys every five to seven houses; the back lane's second
+## row of houses, storehouses and farmhouses with gardens between. Returns the alleys' s.
+func _build_house_rows(rng: RandomNumberGenerator, fin: float) -> Array:
+	var alleys: Array = []
+	var s: float = _sv0 + 6.0
+	var k := 0
+	var since := 0
+	var front: float = road_half + SIDE_W + 0.25
+	while s < _sv1 - 8.0:
+		if since >= 5 + k % 3 and absf(s - fin) > 30.0:
+			alleys.append(s + 2.9)
+			_note_rect(_xz(lap.spot(s + 2.9, -(front + 8.0), 0.0)["pos"]), 5.8, 16.0, _yaw_at(s), 0.0)
+			s += 5.8
+			since = 0
+			continue
+		var variant: int = [0, 1, 0, 3, 2, 0, 4, 1, 5, 0, 2, 1][k % 12]
+		var def: Vector3 = _kit_value(town_kit, "machiya_default", [variant], Vector3(7.2, 9.0, 2.0))
+		var w: float = def.x * PROP_SCALE
+		var ext: float = float(_kit_value(town_kit, "machiya_extent", [variant], 1.5)) * PROP_SCALE
+		if absf(s + w * 0.5 - fin) > 16.0 and rng.randf() < 0.96:
+			var push: float = maxf(0.0, ext - 2.7)
+			var sp: Dictionary = lap.spot(s, -(front + push), 0.0)
+			var pos: Vector3 = sp["pos"]
+			var xf: Transform3D = _facing(sp["right"], pos)
+			var back: Vector3 = xf * Vector3(w * 0.5, 0.0, -def.y * PROP_SCALE * 0.5)
+			var gr: Vector2 = _ground_range(Vector2(back.x, back.z), w, def.y * PROP_SCALE, _yaw_at(s))
+			pos.y = maxf(_side_top(s + w * 0.5, -(road_half + SIDE_W)), gr.y - 0.3)
+			xf.origin = pos
+			if _put(_cell_key("village", pos), town_kit, xf, "machiya", [def.x, def.y, int(def.z), variant, rng, LBL], 1100.0):
+				_note_frame(xf, Vector2(-0.3, -def.y - 0.3), Vector2(def.x + 0.3, 0.6), 0.5)
+		s += w + rng.randf_range(0.25, 0.9)
+		k += 1
+		since += 1
+	# The second row, across the back lane, facing it.
+	var s2: float = _sv0 + 40.0
+	var k2 := 0
+	var front2: float = LANE_LAT + LANE_W * 0.5 + 0.8
+	while s2 < _sv1 - 40.0:
+		var pick: float = rng.randf()
+		var sp2: Dictionary
+		if pick < 0.22:
+			# A thatched farmhouse in its yard.
+			var kw := 12.0
+			var kd := 7.5
+			sp2 = lap.spot(s2, -(front2 + 3.0), 0.0)
+			var kxf: Transform3D = _facing(sp2["right"], sp2["pos"])
+			var kc: Vector3 = kxf * Vector3(kw * PROP_SCALE * 0.5, 0.0, -kd * PROP_SCALE * 0.5)
+			kxf.origin.y = _ground_range(Vector2(kc.x, kc.z), kw * PROP_SCALE, kd * PROP_SCALE, _yaw_at(s2)).x
+			if not _occupied(kc.x, kc.z) and _put(_cell_key("village2", kxf.origin), town_kit, kxf, "kominka", [kw, kd, rng], 800.0):
+				_note_frame(kxf, Vector2(-1.5, -kd - 1.5), Vector2(kw + 1.5, 1.5), 0.5)
+			s2 += kw * PROP_SCALE + rng.randf_range(4.0, 9.0)
+		elif pick < 0.82:
+			var v2: int = [0, 5, 1, 0, 3, 5, 2][k2 % 7]
+			var d2: Vector3 = _kit_value(town_kit, "machiya_default", [v2], Vector3(7.2, 9.0, 2.0))
+			var w2: float = d2.x * PROP_SCALE
+			sp2 = lap.spot(s2, -front2, 0.0)
+			var mxf: Transform3D = _facing(sp2["right"], sp2["pos"])
+			var mc: Vector3 = mxf * Vector3(w2 * 0.5, 0.0, -d2.y * PROP_SCALE * 0.5)
+			mxf.origin.y = _ground_range(Vector2(mc.x, mc.z), w2, d2.y * PROP_SCALE, _yaw_at(s2)).x + 0.05
+			if not _occupied(mc.x, mc.z) and _put(_cell_key("village2", mxf.origin), town_kit, mxf, "machiya", [d2.x, d2.y, int(d2.z), v2, rng, LBL], 800.0):
+				_note_frame(mxf, Vector2(-0.3, -d2.y - 0.3), Vector2(d2.x + 0.3, 0.6), 0.5)
+			s2 += w2 + rng.randf_range(0.4, 3.0)
+			k2 += 1
+		else:
+			# A garden: a pine and a maple behind a bamboo fence along the lane.
+			var gw: float = rng.randf_range(10.0, 16.0)
+			var fa: Vector3 = lap.spot(s2, -(front2 + 0.3), 0.0)["pos"]
+			var fb: Vector3 = lap.spot(s2 + gw, -(front2 + 0.3), 0.0)["pos"]
+			fa.y = _ground_at(fa.x, fa.z)
+			fb.y = _ground_at(fb.x, fb.z)
+			_put_world("village2", fa, prop_kit, "bamboo_fence", [_life(fa), _life(fb), 1.3], 600.0)
+			var t1: Vector3 = lap.spot(s2 + gw * 0.3, -(front2 + 6.0), 0.0)["pos"]
+			var t2: Vector3 = lap.spot(s2 + gw * 0.72, -(front2 + 9.0), 0.0)["pos"]
+			extra_trees.append(["matsu", t1.x, t1.z, rng.randf_range(0.8, 1.0), k2 % 2])
+			extra_trees.append(["momiji_red" if rng.randf() < 0.4 else "momiji", t2.x, t2.z, rng.randf_range(0.8, 1.0)])
+			_note_circle(Vector2(t1.x, t1.z), 4.0)
+			_note_circle(Vector2(t2.x, t2.z), 4.0)
+			s2 += gw
+	print("  the village: %d alleys" % alleys.size())
+	return alleys
+
+
+## Where someone sits on a park_bench placed at `xf` (the top of its seat), `along` metres (life) along it.
+func _bench_seat(xf: Transform3D, along: float) -> Vector3:
+	return xf.origin + xf.basis.x.normalized() * along * PROP_SCALE + xf.basis.z.normalized() * (-0.05 * PROP_SCALE) + Vector3(0, 0.47 * PROP_SCALE, 0)
+
+
+func _xz(p: Vector3) -> Vector2:
+	return Vector2(p.x, p.z)
+
+
+## The lap's heading at s as the yaw _note_rect and _ground_range take (x along the road).
+func _yaw_at(s: float) -> float:
+	var f: Vector3 = lap.fw(s)
+	return atan2(-f.z, f.x)
+
+
+## The sidewalk's furniture: street lamps by the kerb, potted pines, maples and azaleas against the houses, bicycle racks
+## with bicycles at the alleys' mouths, a drinks machine.
+func _build_street_furniture(rng: RandomNumberGenerator, fin: float, alleys: Array) -> void:
+	var poles: Array = []
+	var ps: float = _sv0 + 30.0
+	while ps < _sv1:
+		poles.append(ps)
+		ps += 46.0
+	var near_pole := func(s: float, r: float) -> bool:
+		for q in poles:
+			if absf(float(q) - s) < r:
+				return true
+		return false
+	var s: float = _sv0 + 14.0
+	while s < _sv1 - 6.0:
+		if not near_pole.call(s, 4.0) and absf(s - fin) > 10.0:
+			var lx: Transform3D = _beside(lap, s, -(road_half + 0.8))
+			_put(_cell_key("street", lx.origin), prop_kit, lx, "street_lantern", [4.2], 450.0)
+			_note_circle(_xz(lx.origin), 1.0)
+		s += 30.0
+	# Pot plants against the houses' fronts.
+	s = _sv0 + 10.0
+	var k := 0
+	while s < _sv1 - 6.0:
+		var lat: float = -(road_half + SIDE_W - 0.55)
+		var px: Transform3D = _beside(lap, s, lat)
+		if rng.randf() < 0.55 and not _occupied(px.origin.x, px.origin.z):
+			_put(_cell_key("street", px.origin), prop_kit, px, "planter", [k % 3, rng], 300.0)
+			if rng.randf() < 0.5:
+				var px2: Transform3D = _beside(lap, s + 1.1, lat)
+				_put(_cell_key("street", px2.origin), prop_kit, px2, "planter", [(k + 1) % 3, rng], 300.0)
+			k += 1
+		s += rng.randf_range(6.0, 12.0)
+	# Bicycles at the alleys' mouths: a rack along the kerb side of the sidewalk, bicycles in it and one leaning by a door.
+	var cols: Array = [Color(0.70, 0.72, 0.74), Color(0.85, 0.85, 0.82), Color(0.15, 0.30, 0.55), Color(0.60, 0.12, 0.12), Color(0.16, 0.36, 0.22)]
+	var m := 0
+	for al in alleys:
+		var a: float = float(al)
+		# Not where the crowd stands on race day.
+		var rx: Transform3D = _beside(lap, a, -(road_half + 2.6))
+		if absf(a - fin) > 90.0 and not near_pole.call(a, 3.0):
+			_put(_cell_key("street", rx.origin), prop_kit, rx, "bike_rack", [4], 300.0)
+			for b in range(3):
+				if rng.randf() < 0.25:
+					continue
+				# Each in a hoop, across the sidewalk, its basket toward the road.
+				var bx := Transform3D(rx.basis * Basis(Vector3.UP, -PI * 0.5), rx.origin + rx.basis.x.normalized() * (-1.05 + 0.7 * float(b)) * PROP_SCALE)
+				_put(_cell_key("street", bx.origin), prop_kit, bx, "bicycle", [cols[(m + b) % cols.size()]], 300.0)
+			_note_circle(_xz(rx.origin), 3.0)
+		# A drinks machine on the alley's corner, against the next house.
+		if m % 2 == 0:
+			var vx: Transform3D = _beside(lap, a + 4.0, -(road_half + SIDE_W - 0.8))
+			if not _occupied(vx.origin.x, vx.origin.z):
+				_put(_cell_key("street", vx.origin), prop_kit, vx, "vending_machine", [m % 3], 300.0)
+				_note_circle(_xz(vx.origin), 1.2)
+		m += 1
+
+
+## A ribbon of the road shader's stone paving (kind 1) laid on the ground along the lap at `lat` (right of its line),
+## `hw` either side, from s0 to s1, into `st`.
+func _pave_offset(st: SurfaceTool, s0: float, s1: float, lat: float, hw: float) -> void:
+	var pts: Array = []
+	var s: float = s0
+	while s < s1:
+		pts.append(_xz(lap.spot(s, lat, 0.0)["pos"]))
+		s += 3.0
+	pts.append(_xz(lap.spot(s1, lat, 0.0)["pos"]))
+	_pave_line(st, pts, hw)
+
+
+## A ribbon of stone paving along the plan points `pts`, `hw` either side, draped on the ground 5cm over it.
+func _pave_line(st: SurfaceTool, pts: Array, hw: float) -> void:
+	var line: Array = []
+	for i in range(pts.size() - 1):
+		var a: Vector2 = pts[i]
+		var b: Vector2 = pts[i + 1]
+		var m: int = maxi(1, int(ceil(a.distance_to(b) / 1.5)))
+		for k in range(m):
+			line.append(a.lerp(b, float(k) / float(m)))
+	line.append(pts[pts.size() - 1])
+	var cols: Array = [-1.0, -0.5, 0.0, 0.5, 1.0]
+	var rows: Array = []
+	var dist := 0.0
+	for i in range(line.size()):
+		var pa: Vector2 = line[maxi(i - 1, 0)]
+		var pb: Vector2 = line[mini(i + 1, line.size() - 1)]
+		var dir: Vector2 = (pb - pa).normalized()
+		var right := Vector2(-dir.y, dir.x)
+		if i > 0:
+			dist += (line[i] as Vector2).distance_to(line[i - 1])
+		var row: Array = []
+		for c in cols:
+			var q: Vector2 = (line[i] as Vector2) + right * float(c) * hw
+			row.append([Vector3(q.x, _ground_at(q.x, q.y) + 0.05, q.y), Vector2(float(c) * hw, dist)])
+		rows.append(row)
+	for i in range(rows.size() - 1):
+		for j in range(cols.size() - 1):
+			_pave_tri(st, rows[i][j], rows[i][j + 1], rows[i + 1][j], hw)
+			_pave_tri(st, rows[i][j + 1], rows[i + 1][j + 1], rows[i + 1][j], hw)
+
+
+## A disc of stone paving (a plaza) on the ground at `c`, radius `r`: flags in courses across it, no kerb band.
+func _pave_disc(st: SurfaceTool, c: Vector2, r: float) -> void:
+	var rings: int = maxi(2, int(ceil(r / 1.5)))
+	var segs := 28
+	var vtx := func(ri: int, si: int) -> Array:
+		var rr: float = r * float(ri) / float(rings)
+		var a: float = TAU * float(si) / float(segs)
+		var q: Vector2 = c + Vector2(cos(a), sin(a)) * rr
+		return [Vector3(q.x, _ground_at(q.x, q.y) + 0.06, q.y), q - c]
+	for ri in range(rings):
+		for si in range(segs):
+			var a0: Array = vtx.call(ri, si)
+			var a1: Array = vtx.call(ri, si + 1)
+			var b0: Array = vtx.call(ri + 1, si)
+			var b1: Array = vtx.call(ri + 1, si + 1)
+			if ri > 0:
+				_pave_tri(st, a0, a1, b0, 99.0)
+			_pave_tri(st, a1, b1, b0, 99.0)
+
+
+func _pave_tri(st: SurfaceTool, a: Array, b: Array, c: Array, hw: float) -> void:
+	var order: Array = [a, b, c]
+	if ((c[0] as Vector3) - (a[0] as Vector3)).cross((b[0] as Vector3) - (a[0] as Vector3)).y < 0.0:
+		order = [a, c, b]
+	for v in order:
+		var p: Vector3 = v[0]
+		st.set_normal(Vector3.UP)
+		st.set_color(Color(1.0, _petals_at(p.x, p.z) * 0.7, 0.0, 1.0))
+		st.set_uv(v[1])
+		st.set_uv2(Vector2(1.0, hw))
+		st.add_vertex(p)
+
+
+## The river side of the street: a hedge of azaleas along the verge, the cherry avenue, the promenade (stone paving PROM_W
+## wide, the drum bridge where the garden stream crosses it) with lamps and benches, a second row of cherries outside
+## the park. Returns the s where the stream crosses the promenade.
+func _promenade_and_avenue(paving: SurfaceTool, rng: RandomNumberGenerator, fin: float) -> float:
+	var p0: float = _sv0 + 14.0
+	var p1: float = _closest_s(Vector2(-250.0, 118.0))
+	# Where the garden stream crosses the promenade's line.
+	var cross_s := -1.0
+	for i in range(GARDEN_STREAM.size() - 1):
+		var a: Vector2 = GARDEN_STREAM[i]
+		var b: Vector2 = GARDEN_STREAM[i + 1]
+		for k in range(20):
+			var q: Vector2 = a.lerp(b, float(k) / 20.0)
+			var sq: float = lap.closest_s(q)
+			var lat: float = (Vector3(q.x, 0.0, q.y) - lap.pt(sq)).dot(lap.rt(sq))
+			if absf(lat - PROM_LAT) < 0.6 and cross_s < 0.0:
+				cross_s = sq
+	var gap: float = 7.6
+	if cross_s > 0.0:
+		_pave_offset(paving, p0, cross_s - gap, PROM_LAT, PROM_W * 0.5)
+		_pave_offset(paving, cross_s + gap, p1, PROM_LAT, PROM_W * 0.5)
+		# The drum bridge carrying the promenade over the stream.
+		var bc: Vector3 = lap.spot(cross_s, PROM_LAT, 0.0)["pos"]
+		var f: Vector3 = lap.fw(cross_s)
+		var ga: Vector3 = lap.spot(cross_s - gap, PROM_LAT, 0.0)["pos"]
+		var gb: Vector3 = lap.spot(cross_s + gap, PROM_LAT, 0.0)["pos"]
+		bc.y = maxf(_ground_at(ga.x, ga.z), _ground_at(gb.x, gb.z)) - 0.05
+		var bxf := Transform3D(Basis(f, Vector3.UP, f.cross(Vector3.UP).normalized()), bc)
+		_put("drum_bridge", prop_kit, bxf, "arched_bridge", [9.4, 3.0, 1.7], 900.0)
+		_note_rect(_xz(bc), 16.0, 6.0, _yaw_at(cross_s), 1.0)
+		print("  the drum bridge: the promenade over the garden stream at %.0fm" % cross_s)
+	else:
+		_pave_offset(paving, p0, p1, PROM_LAT, PROM_W * 0.5)
+	var s: float = p0
+	while s < p1:
+		_note_rect(_xz(lap.spot(s, PROM_LAT, 0.0)["pos"]), 10.0, PROM_W + 1.0, _yaw_at(s), 0.0)
+		s += 8.0
+	var far_from := func(sq: float, r: float) -> bool:
+		return cross_s < 0.0 or absf(sq - cross_s) > r
+	var pool := Vector2(GARDEN_POOL.x, GARDEN_POOL.y)
+	# The hedge along the verge (not where the crowd stands on race day).
+	s = p0
+	while s < p1:
+		var hp: Vector3 = lap.spot(s, road_half + 2.4, 0.0)["pos"]
+		if (s < fin - 98.0 or s > fin + 88.0) and _xz(hp).distance_to(pool) > GARDEN_POOL.z + 3.0 and far_from.call(s, 9.0):
+			extra_trees.append(["tsutsuji", hp.x, hp.z, rng.randf_range(0.7, 0.85), 0 if rng.randf() < 0.5 else 1])
+		s += 2.4
+	# The cherry avenue between the verge and the promenade, and lamps between the trees.
+	s = p0 + 4.0
+	var k := 0
+	while s < p1:
+		var cp: Vector3 = lap.spot(s, road_half + 6.0, 0.0)["pos"]
+		if absf(s - fin) > 12.0 and _shore_d(cp.x, cp.z) > 5.0 and _xz(cp).distance_to(pool) > GARDEN_POOL.z + 5.0 and far_from.call(s, 11.0):
+			extra_trees.append(["sakura", cp.x, cp.z, rng.randf_range(0.95, 1.15), k % 2])
+			_note_circle(_xz(cp), 2.0)
+		if k % 2 == 1 and far_from.call(s, 10.0):
+			var lx: Transform3D = _beside(lap, s, PROM_LAT - PROM_W * 0.5 - 0.7)
+			_put(_cell_key("riverside", lx.origin), prop_kit, lx, "street_lantern", [4.2], 450.0)
+			_note_circle(_xz(lx.origin), 1.0)
+		# Benches on the promenade's river side, looking at the water.
+		if k % 3 == 1 and far_from.call(s, 12.0):
+			var bx: Transform3D = _beside(lap, s + 4.0, PROM_LAT + PROM_W * 0.5 + 0.9)
+			bx = Transform3D(Basis(Vector3.UP, PI) * bx.basis, bx.origin)
+			if _shore_d(bx.origin.x, bx.origin.z) > 6.0 and not _occupied(bx.origin.x, bx.origin.z):
+				_put(_cell_key("riverside", bx.origin), prop_kit, bx, "park_bench", [], 420.0)
+				_note_circle(_xz(bx.origin), 2.5)
+				if rng.randf() < 0.6:
+					_person(_bench_seat(bx, rng.randf_range(-0.6, 0.6)), bx.basis.z, rng.randf_range(0.88, 1.05), true)
+		# A second row of cherries past the promenade, outside the park.
+		if k % 2 == 0:
+			var cp2: Vector3 = lap.spot(s + 6.0, PROM_LAT + PROM_W * 0.5 + 5.0, 0.0)["pos"]
+			if not _in_park(cp2.x, cp2.z) and _shore_d(cp2.x, cp2.z) > 6.0 and not _occupied(cp2.x, cp2.z):
+				extra_trees.append(["yamazakura" if k % 4 == 0 else "sakura", cp2.x, cp2.z, rng.randf_range(0.9, 1.15), k % 2])
+				_note_circle(_xz(cp2), 3.0)
+		s += 16.0
+		k += 1
+	for ds in [-60.0, -30.0, 30.0, 60.0]:
+		var nx: Transform3D = _beside(lap, fin + ds, road_half + 4.5)
+		_put(_cell_key("riverside", nx.origin), prop_kit, nx, "nobori", [Color(0.20, 0.30, 0.55)], 420.0)
+	# People strolling on the promenade.
+	s = p0 + 8.0
+	while s < p1:
+		if rng.randf() < 0.45 and far_from.call(s, 9.0):
+			var wp: Vector3 = lap.spot(s, PROM_LAT + rng.randf_range(-1.4, 1.4), 0.0)["pos"]
+			wp.y = _ground_at(wp.x, wp.z)
+			var face: Vector3 = lap.fw(s) * (1.0 if rng.randf() < 0.5 else -1.0)
+			_person(wp, face, rng.randf_range(0.88, 1.05))
+		s += rng.randf_range(14.0, 30.0)
+	return cross_s
+
+
+## The riverside park (after the user's picture): stone paths and two plazas, the garden stream with rocks and purple
+## irises along it, a second little drum bridge where a path crosses it, the tea house on its west bank, benches and
+## lanterns, weeping cherries, cherries, maples, a pine, azalea hedges along the paths.
+func _build_park(root: Node3D, paving: SurfaceTool, rng: RandomNumberGenerator, cross_s: float) -> void:
+	for path in PARK_PATHS:
+		_pave_line(paving, path, PARK_PATH_HALF)
+	for pz in PARK_PLAZAS:
+		_pave_disc(paving, pz[0], float(pz[1]))
+	var near_path := func(q: Vector2, r: float) -> bool:
+		for path in PARK_PATHS:
+			for i in range((path as Array).size() - 1):
+				var a: Vector2 = path[i]
+				var b: Vector2 = path[i + 1]
+				var t: float = clampf((q - a).dot(b - a) / maxf((b - a).length_squared(), 1e-4), 0.0, 1.0)
+				if q.distance_to(a.lerp(b, t)) < r + PARK_PATH_HALF:
+					return true
+		for pz in PARK_PLAZAS:
+			if q.distance_to(pz[0]) < float(pz[1]) + r:
+				return true
+		return false
+	# The path's own little drum bridge over the stream.
+	var path1: Array = PARK_PATHS[1]
+	var b2: Vector2 = path1[2]
+	var bd: Vector2 = ((path1[3] as Vector2) - (path1[1] as Vector2)).normalized()
+	var bf := Vector3(bd.x, 0.0, bd.y)
+	var b2y: float = maxf(_ground_at(b2.x - bd.x * 5.5, b2.y - bd.y * 5.5), _ground_at(b2.x + bd.x * 5.5, b2.y + bd.y * 5.5)) - 0.05
+	_put("park_bridge", prop_kit, Transform3D(Basis(bf, Vector3.UP, bf.cross(Vector3.UP).normalized()), Vector3(b2.x, b2y, b2.y)), "arched_bridge", [6.8, 2.2, 1.1], 800.0)
+	_note_circle(b2, 6.0)
+	# The tea house facing east across the stream, its bench and parasol toward the water.
+	var tf := Vector3(1.0, 0.0, 0.0)
+	var tx: Transform3D = _facing(tf, Vector3.ZERO)
+	var torg: Vector3 = Vector3(TEA_HOUSE.x, 0.0, TEA_HOUSE.y) - tx.basis.x.normalized() * 4.5 * PROP_SCALE + tf * 2.75 * PROP_SCALE
+	torg.y = _ground_range(TEA_HOUSE, 9.0, 15.0, 0.0).x
+	tx.origin = torg
+	if _put("park_teahouse", town_kit, tx, "chaya", [LBL], 900.0):
+		_note_frame(tx, Vector2(-1.2, -6.7), Vector2(10.2, 2.8), 1.0)
+	# Benches round the weeping cherry's plaza, facing in; benches on the river plaza facing the water; lanterns.
+	var c1: Vector2 = PARK_PLAZAS[0][0]
+	var r1: float = PARK_PLAZAS[0][1]
+	extra_trees.append(["shidare", c1.x, c1.y, 1.25, 0])
+	for k in range(4):
+		var a: float = TAU * float(k) / 4.0 + 0.4
+		var bp: Vector2 = c1 + Vector2(cos(a), sin(a)) * (r1 - 2.0)
+		var bxf: Transform3D = _facing(Vector3(c1.x - bp.x, 0.0, c1.y - bp.y), Vector3(bp.x, _ground_at(bp.x, bp.y) + 0.06, bp.y))
+		_put("park_furniture", prop_kit, bxf, "park_bench", [], 500.0)
+		if rng.randf() < 0.6:
+			_person(_bench_seat(bxf, rng.randf_range(-0.6, 0.6)), bxf.basis.z, rng.randf_range(0.88, 1.05), true)
+		var la: float = a + PI * 0.25
+		var lp: Vector2 = c1 + Vector2(cos(la), sin(la)) * (r1 + 1.4)
+		_put("park_furniture", prop_kit, _facing(Vector3(c1.x - lp.x, 0.0, c1.y - lp.y), Vector3(lp.x, _ground_at(lp.x, lp.y), lp.y)), "stone_lantern", [k % 2, 2.0], 500.0)
+	var c2: Vector2 = PARK_PLAZAS[1][0]
+	var r2: float = PARK_PLAZAS[1][1]
+	var to_river := Vector2(0.0, -1.0)
+	for k in range(3):
+		var bp2: Vector2 = c2 + to_river * (r2 - 2.2) + Vector2(1.0, 0.0) * (float(k) - 1.0) * 3.4
+		var bx2: Transform3D = _facing(Vector3(0.0, 0.0, -1.0), Vector3(bp2.x, _ground_at(bp2.x, bp2.y) + 0.06, bp2.y))
+		_put("park_furniture", prop_kit, bx2, "park_bench", [], 500.0)
+		if rng.randf() < 0.7:
+			_person(_bench_seat(bx2, rng.randf_range(-0.6, 0.6)), bx2.basis.z, rng.randf_range(0.88, 1.05), true)
+	for sx in [-1.0, 1.0]:
+		var lp2: Vector2 = c2 + Vector2(sx * (r2 + 1.2), 1.0)
+		_put("park_furniture", prop_kit, Transform3D(Basis(), Vector3(lp2.x, _ground_at(lp2.x, lp2.y), lp2.y)), "stone_lantern", [1, 2.2], 500.0)
+	extra_trees.append(["sakura", c2.x + 9.0, c2.y + 7.0, 1.2, 1])
+	# Street lamps along the paths.
+	for path in PARK_PATHS:
+		var acc := 0.0
+		for i in range((path as Array).size() - 1):
+			var a: Vector2 = path[i]
+			var b: Vector2 = path[i + 1]
+			var l: float = a.distance_to(b)
+			var d: Vector2 = (b - a) / maxf(l, 0.001)
+			var t := 9.0 - fmod(acc, 18.0)
+			while t < l:
+				var q: Vector2 = a + d * t + Vector2(-d.y, d.x) * (PARK_PATH_HALF + 0.8)
+				if not _occupied(q.x, q.y) and _race_d(q.x, q.y) > 2.0:
+					_put("park_furniture", prop_kit, _facing(Vector3(d.y, 0.0, -d.x), Vector3(q.x, _ground_at(q.x, q.y), q.y)), "street_lantern", [3.8], 500.0)
+					_note_circle(q, 1.0)
+				t += 18.0
+			acc += l
+	# Azaleas along both sides of the paths, in runs.
+	for path in PARK_PATHS:
+		for i in range((path as Array).size() - 1):
+			var a: Vector2 = path[i]
+			var b: Vector2 = path[i + 1]
+			var l: float = a.distance_to(b)
+			var d: Vector2 = (b - a) / maxf(l, 0.001)
+			var t := 1.5
+			while t < l - 1.0:
+				for sd in [-1.0, 1.0]:
+					var q: Vector2 = a + d * t + Vector2(-d.y, d.x) * sd * (PARK_PATH_HALF + 1.3)
+					if fmod(t + sd * 7.0, 14.0) < 9.0 and not _occupied(q.x, q.y) and _race_d(q.x, q.y) > 1.2 and not near_path.call(q, 0.6):
+						extra_trees.append(["tsutsuji", q.x, q.y, rng.randf_range(0.6, 0.8), rng.randi_range(0, 1)])
+				t += 2.4
+	# Trees on the lawns, clear of the paths, the stream and the tea house.
+	var lawn: Array = [Vector2(-100.0, 45.0), Vector2(-128.0, 40.0), Vector2(-140.0, 72.0), Vector2(-118.0, 82.0), Vector2(-175.0, 70.0), Vector2(-196.0, 80.0),
+			Vector2(-160.0, 30.0), Vector2(-140.0, 18.0), Vector2(-110.0, 22.0), Vector2(-226.0, 40.0), Vector2(-228.0, 68.0), Vector2(-150.0, 92.0),
+			Vector2(-92.0, 62.0), Vector2(-198.0, 24.0), Vector2(-122.0, 98.0)]
+	var kinds: Array = ["sakura", "yamazakura", "sakura", "shidare", "momiji", "sakura", "matsu", "sakura", "yamazakura", "sakura", "momiji_red", "matsu", "sakura", "momiji", "sakura"]
+	var planted := 0
+	for i in range(lawn.size()):
+		var q: Vector2 = lawn[i]
+		if near_path.call(q, 4.0) or _race_d(q.x, q.y) < 3.5 or _occupied(q.x, q.y) or _shore_d(q.x, q.y) < 6.0:
+			continue
+		extra_trees.append([kinds[i], q.x, q.y, rng.randf_range(0.95, 1.15), i % 2])
+		_note_circle(q, 3.0)
+		planted += 1
+	# The garden stream: rocks along its banks, purple irises in patches, two yukimi lanterns by the pool.
+	var gpc: Dictionary = {}
+	for pc in _race:
+		if String(pc["name"]) == "garden":
+			gpc = pc
+	var iris_xfs: Array = []
+	if not gpc.is_empty():
+		var gp: PackedVector2Array = gpc["pts"]
+		var lv: PackedFloat32Array = gpc["lv"]
+		var hw: float = _race_half_water(gpc)
+		for i in range(1, gp.size() - 1):
+			var q: Vector2 = gp[i]
+			if _shore_d(q.x, q.y) < 3.0:
+				break
+			var dir: Vector2 = (gp[i + 1] - gp[i - 1]).normalized()
+			var right := Vector2(-dir.y, dir.x)
+			if i % 4 == 0:
+				var side: float = 1.0 if (i / 4) % 2 == 0 else -1.0
+				var rq: Vector2 = q + right * side * (hw + rng.randf_range(0.1, 0.5))
+				if not near_path.call(rq, 0.5) and not _occupied(rq.x, rq.y):
+					var rs: float = rng.randf_range(0.45, 0.85)
+					_put(_cell_key("park_rocks", Vector3(rq.x, 0, rq.y)), prop_kit, Transform3D(Basis(), Vector3(rq.x, minf(_ground_at(rq.x, rq.y), lv[i] + 0.2), rq.y)), "garden_rock", [rs, rs * 0.7, i * 31 + 7], 400.0)
+			for sd in [-1.0, 1.0]:
+				if sin(float(i) * 0.45 + sd * 1.7) < -0.1:
+					continue
+				var iq: Vector2 = q + right * sd * (hw + rng.randf_range(0.2, 0.9))
+				if near_path.call(iq, 0.3):
+					continue
+				var iy: float = _ground_at(iq.x, iq.y)
+				iris_xfs.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * rng.randf_range(1.3, 1.7)), Vector3(iq.x, iy - 0.05, iq.y)))
+	var gpool := Vector2(GARDEN_POOL.x, GARDEN_POOL.y)
+	for k in range(9):
+		var a: float = TAU * float(k) / 9.0
+		var iq2: Vector2 = gpool + Vector2(cos(a), sin(a)) * (GARDEN_POOL.z + 0.7)
+		iris_xfs.append(Transform3D(Basis(Vector3.UP, a).scaled(Vector3.ONE * 1.5), Vector3(iq2.x, _ground_at(iq2.x, iq2.y) - 0.05, iq2.y)))
+		if k % 3 == 1:
+			var rq2: Vector2 = gpool + Vector2(cos(a + 0.35), sin(a + 0.35)) * (GARDEN_POOL.z + 0.4)
+			_put(_cell_key("park_rocks", Vector3(rq2.x, 0, rq2.y)), prop_kit, Transform3D(Basis(), Vector3(rq2.x, _ground_at(rq2.x, rq2.y), rq2.y)), "garden_rock", [0.7, 0.5, k * 17 + 3], 400.0)
+	var lq: Vector2 = gpool + Vector2(-GARDEN_POOL.z - 1.6, 1.0)
+	_put("park_furniture", prop_kit, _facing(Vector3(1.0, 0.0, 0.0), Vector3(lq.x, _ground_at(lq.x, lq.y), lq.y)), "stone_lantern", [1, 1.9], 500.0)
+	if not iris_xfs.is_empty():
+		var reed := ShaderMaterial.new()
+		reed.shader = load("res://dune_grass.gdshader")
+		reed.set_shader_parameter("sway", 0.08)
+		reed.set_shader_parameter("speed", 1.0)
+		var PondKitS: Script = load("res://PondKit.gd")
+		var imesh: ArrayMesh = PondKitS.iris(1, _save_res(reed, "iris_material"), Color(0.45, 0.28, 0.78))
+		_multimesh(root, "ParkIrisGrass", _save_res(imesh, "park_iris"), iris_xfs, 260.0, false)
+	print("  the park: %d trees on the lawns, %d iris clumps" % [planted, iris_xfs.size()])
+
+
+## A three-storey pagoda on the hill behind the village, over the roofs from the start straight, with stone lanterns and
+## maples round it in a clearing of the woods.
+func _build_hill_pagoda(rng: RandomNumberGenerator) -> void:
+	var c := Vector2(-30.0, 232.0)
+	var at := Vector3(c.x, _ground_range(c, 16.0, 16.0, 0.0).x, c.y)
+	var face: Vector3 = Vector3(0.0, 0.0, -1.0)
+	if _put("hill_pagoda", town_kit, _facing(face, at), "pagoda", [3], 2500.0):
+		_note_circle(c, 18.0)
+		for sx in [-1.0, 1.0]:
+			var lp := Vector3(c.x + sx * 7.0, 0.0, c.y - 12.0)
+			lp.y = _ground_at(lp.x, lp.z)
+			_put("hill_pagoda", prop_kit, _facing(face, lp), "stone_lantern", [0, 2.4], 900.0)
+		for k in range(5):
+			var a: float = PI * (0.15 + 0.7 * float(k) / 4.0)
+			var tp: Vector2 = c + Vector2(cos(a), -sin(a)) * 15.0
+			extra_trees.append(["momiji" if k % 2 == 0 else "yamazakura", tp.x, tp.y, rng.randf_range(0.95, 1.1)])
 
 
 ## The timber bridge with vermilion railings (the kit builds all but the deck), its railings solid.
@@ -1325,15 +1970,26 @@ func _build_koinobori(rng: RandomNumberGenerator) -> void:
 		_note_circle(Vector2(b.x, b.z), 3.0)
 		lines += 1
 	var poles := 0
-	for q in [Vector2(430.0, 0.0), Vector2(60.0, 0.0), Vector2(-220.0, 0.0)]:
+	for q in [Vector2(430.0, 0.0), Vector2(60.0, 0.0), Vector2(250.0, 0.0)]:
 		var s_q: float = _closest_s(Vector2(q.x, 125.0))
-		var at: Vector3 = lap.spot(s_q, road_half + 16.0, 0.0)["pos"]
+		var at: Vector3 = lap.spot(s_q, PROM_LAT + PROM_W * 0.5 + 11.0, 0.0)["pos"]
 		if _water_d_ok(at) and not _occupied(at.x, at.z):
 			at.y = _ground_at(at.x, at.z)
 			_put(_cell_key("koinobori_poles", at), prop_kit, Transform3D(Basis(), at), "koinobori_pole", [12.0, 2 + poles % 2, wind, rng], 900.0)
 			_note_circle(Vector2(at.x, at.z), 7.0)
 			poles += 1
 	print("  koinobori: %d lines over the river, %d poles" % [lines, poles])
+
+
+## The ground's grid halved (2m) round the garden stream and the mill's tailrace and brook: on the 4m grid their channels,
+## a few metres wide, came out as a row of pits with the water showing in patches.
+func _extra_refine() -> Array:
+	return [[Vector2(-196.0, -118.0), Vector2(-285.0, -250.0)], [Vector2(-32.0, 106.0), Vector2(-182.0, -92.0)]]
+
+
+## In the riverside park (its own planting): between PARK_X, from the river's shingle up to the promenade.
+func _in_park(x: float, z: float) -> bool:
+	return x > PARK_X.x - 6.0 and x < PARK_X.y + 6.0 and z < 100.0 and _shore_d(x, z) > 4.0
 
 
 func _water_d_ok(p: Vector3) -> bool:

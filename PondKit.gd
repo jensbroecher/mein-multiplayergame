@@ -116,7 +116,8 @@ static func rushes(variant: int, mat: Material) -> ArrayMesh:
 
 ## A clump of yellow flag irises: a fan of stiff sword leaves and two or three flowers on stalks (three
 ## falls hanging out and down, three smaller standards up).
-static func iris(variant: int, mat: Material) -> ArrayMesh:
+## `petal`: the flowers' colour (yellow flags by default; Yoshino Rapids' garden stream has purple Japanese irises).
+static func iris(variant: int, mat: Material, petal := IRIS) -> ArrayMesh:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7500 + variant * 23
 	var st := SurfaceTool.new()
@@ -136,7 +137,7 @@ static func iris(variant: int, mat: Material) -> ArrayMesh:
 			var ps := Vector3(-pd.z, 0.0, pd.x)
 			var fall_tip := head + pd * 0.09 - Vector3(0, 0.05, 0)
 			var std_tip := head + pd.rotated(Vector3.UP, PI / 3.0) * 0.03 + Vector3(0, 0.07, 0)
-			var c := Color(IRIS.r, IRIS.g, IRIS.b, 0.95)
+			var c := Color(petal.r, petal.g, petal.b, 0.95)
 			_tri(st, head + ps * 0.02, head - ps * 0.02, fall_tip, (pd + Vector3.UP).normalized(), c, c, c.darkened(0.15))
 			_tri(st, head + ps * 0.012, head - ps * 0.012, std_tip, (pd + Vector3.UP * 0.3).normalized(), c, c, c)
 	var mesh := st.commit()

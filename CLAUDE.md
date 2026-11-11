@@ -4630,6 +4630,24 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
     out over the river's own (COLOR.b) and three RiverWater pools. The rafts that drifted down the river went through the
     timber bridge and the raft train (the user saw them collide): three rafts with loads lie moored in the pond instead
     ("Moored_bay_*", bobbing with the train), tied to posts on its bank.
+  - The village (the start straight, after a picture the user sent of a Japanese town: a row of dark-tiled houses, a
+    paved sidewalk with lamps and planters, the road, a park with paths, a stream, a red bridge and a tea house):
+    `_build_village`. The sidewalk (`_build_sidewalk`, `SIDE_W` 6m, `KERB` 16cm over the road, the road shader's paving,
+    kind 1) is solid (`SidewalkStones`: off the course, asphalt under the tyres) and anything standing on it stands on it
+    (`_stand_y`, a hook in MiyoshinoStage that `_beside` and `_build_start_crowd` use; its default is the ground). The
+    machiya stand nearly wall to wall at its outer edge (`_build_house_rows`), alleys every five to seven houses lead to
+    a back lane (`LANE_LAT`) and a second row (machiya, kura, thatched kominka, gardens behind bamboo fences). On the
+    sidewalk: `MiyoshinoPropKit.street_lantern`, `planter`, `bike_rack` and `bicycle` at the alleys, the utility poles
+    by the kerb. The start's crowd stands behind barriers on the river verge and on the sidewalk (`_build_start_crowd`'s
+    `sides`). The river side: an azalea hedge, the cherry avenue, a promenade (`PROM_LAT`, paving drawn on the ground,
+    `VillagePavingGround`) with lamps and `park_bench`es. The park (`PARK_X`, `_build_park`): the garden stream (a
+    `_race` piece from its spring pool, `GARDEN_POOL`, `GARDEN_STREAM`) under the promenade's drum bridge
+    (`arched_bridge`) and a path's smaller one, paths and two plazas (`PARK_PATHS`, `PARK_PLAZAS`), the tea house
+    (`chaya`, `TEA_HOUSE`), weeping cherries, maples, pines, azaleas along the paths (MiyoshinoTrees' tsutsuji), purple
+    irises (PondKit.iris with a colour) and `garden_rock`s along the stream; `_tree_pick` plants nothing of its own there
+    (`_in_park`). The ground's grid is halved round the garden stream and the brook (`_extra_refine`): on 4m cells their
+    channels showed as patches of water. A three-storey pagoda stands on the hill behind (`_build_hill_pagoda`). The
+    props went from about 275k to 515k triangles (the second row of houses most of it): not yet measured on a GPU.
   - The forest road (the user wanted it more exciting: sharp turns, ups and downs, more props): four sharp bends (radii
     24-30m) climbing from the yard (3m) over a crest (26m), down a dip (24m) and up to the slide's top (29m); curve
     mirrors and warning signs at the bends, jizo, a cedar torii near the top, way-stones, log stacks, a timber sledge, a
