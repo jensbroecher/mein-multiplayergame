@@ -57,6 +57,12 @@ const TYRE_F := [[-0.040, 0.130], [-0.044, 0.142], [-0.046, 0.160], [-0.045, 0.1
 const TYRE_R := [[-0.112, 0.150], [-0.122, 0.165], [-0.128, 0.190], [-0.127, 0.214], [-0.120, 0.234], [-0.104, 0.248],
 	[-0.070, 0.2545], [-0.030, 0.255], [0.0, 0.255]]
 
+## The mirrors' turn in about y: -0.45 puts the glass's normal halfway between straight back and the driver's head.
+const MIRROR_YAW := -0.45
+## And tipped up (the glass's normal 13 degrees over level): the eye, the driver's or the chase camera's, looks down on
+## it, and a level glass reflected the sky's dark ground, so it read as a black panel; tipped, it shows the sky.
+const MIRROR_TILT := -0.22
+
 const C_RUBBER := Color(0.17, 0.17, 0.18)
 const C_DARK := Color(0.07, 0.07, 0.075)
 const C_DARKER := Color(0.035, 0.035, 0.04)
@@ -180,8 +186,12 @@ func _side_parts(b) -> void:
 	# Mirror on a stalk off the hoop's brace.
 	b.tube(PackedVector3Array([Vector3(0.235, 0.52, -0.20), Vector3(0.30, 0.58, -0.24)]), 0.006, 6, CB.M_DARK, C_DARK, false,
 			false)
-	b.rbox(Transform3D(Basis(Vector3.UP, -0.25), Vector3(0.315, 0.59, -0.245)), Vector3(0.030, 0.020, 0.006), 0.005, 1,
-			CB.M_PAINT, Color(1, 1, 1))
+	# The housing is turned in (MIRROR_YAW) halfway between straight back and the driver's head, so its glass, on the
+	# back (+z) face, shows the driver what's behind; chrome, it reflects the sky and the country round it.
+	var mir_xf := Transform3D(Basis(Vector3.UP, MIRROR_YAW) * Basis(Vector3.RIGHT, MIRROR_TILT), Vector3(0.315, 0.59, -0.245))
+	b.rbox(mir_xf, Vector3(0.032, 0.021, 0.008), 0.006, 1, CB.M_PAINT, Color(1, 1, 1))
+	b.rbox(mir_xf * Transform3D(Basis(), Vector3(0.0, 0.0, 0.0085)), Vector3(0.027, 0.016, 0.0015), 0.0015, 1,
+			CB.M_CHROME, C_CHROME)
 
 
 ## A point on the duct's rim at angle `a` (0 to the right, PI/2 at the top), at z.
@@ -421,47 +431,58 @@ func build_prop(b) -> void:
 	b.orient_away_from(vb2, ib2, Vector3(0, 0, 0.02))
 
 
-## Front wheels: a skinny ribbed tyre round a five-spoke alloy rim.
+## Front wheels: a skinny ribbed tyre round a five-spoke alloy rim, the rim's face the same on both sides (built on
+## the +x side, mirrored across), so the wheel reads alike from inside the car and out.
 func build_wheel(b, side: float) -> void:
 	tyre(b, TYRE_F, 40, C_RUBBER)
 	for k in 3:
 		var x: float = (k - 1) * 0.022
 		wheel_lathe(b, PackedVector2Array([Vector2(x - 0.004, 0.199), Vector2(x - 0.002, 0.204), Vector2(x + 0.002, 0.204),
 				Vector2(x + 0.004, 0.199)]), 40, CB.M_RUBBER, C_RUBBER, "out")
+	# The barrel between the two faces.
+	wheel_lathe(b, PackedVector2Array([Vector2(-0.031, 0.105), Vector2(0.031, 0.105)]), 36, CB.M_RIM, Color(0.6, 0.6, 0.62),
+			"in")
+	var v0: int = b.vertex_count()
+	var i0: int = b.index_count()
 	wheel_lathe(b, PackedVector2Array([Vector2(0.030, 0.128), Vector2(0.038, 0.130), Vector2(0.042, 0.124),
 			Vector2(0.040, 0.110)]), 36, CB.M_RIM, C_RIM, "out", Vector3(0.02, 0.0, 0.0))
 	wheel_lathe(b, PackedVector2Array([Vector2(0.040, 0.110), Vector2(0.030, 0.104)]), 36, CB.M_RIM, C_RIM, "+x")
-	b.disc(Vector3(0.010, 0.0, 0.0), Vector3.RIGHT, 0.12, 0.0, 28, CB.M_DARK, C_DARKER)
+	b.disc(Vector3(0.012, 0.0, 0.0), Vector3.RIGHT, 0.106, 0.0, 28, CB.M_DARK, C_DARKER)
 	wheel_lathe(b, PackedVector2Array([Vector2(0.026, 0.034), Vector2(0.040, 0.032), Vector2(0.044, 0.026)]), 18, CB.M_RIM,
 			C_RIM, "out", Vector3(0.03, 0.0, 0.0))
 	b.disc(Vector3(0.0445, 0.0, 0.0), Vector3.RIGHT, 0.026, 0.0, 16, CB.M_ANODISED, Color(1, 1, 1))
 	for k in 5:
 		spoke(b, TAU * k / 5.0, 0.12, 0.030, 0.106, 0.040, 0.034, 0.012, 0.020, 0.010, CB.M_RIM, C_RIM)
+	b.mirror_x(v0, i0)
 	if side < 0.0:
 		b.mirror_in_place()
 
 
-## Rear wheels: a fat smooth sand tyre (two shallow grooves round it) on a deep-dished beadlock rim: the clamp ring's
-## bolts round its face.
+## Rear wheels: a fat smooth sand tyre (two shallow grooves round it) on a deep-dished beadlock rim, the clamp ring's
+## bolts round its face; the dish, bolts and cap the same on both sides (mirrored across).
 func build_rear_wheel(b, side: float) -> void:
 	tyre(b, TYRE_R, 48, C_RUBBER)
 	for x in [-0.045, 0.045]:
 		wheel_lathe(b, PackedVector2Array([Vector2(x - 0.006, 0.2552), Vector2(x - 0.003, 0.2525), Vector2(x + 0.003, 0.2525),
 				Vector2(x + 0.006, 0.2552)]), 48, CB.M_DARK, C_DARKER, "out")
+	# The barrel between the two dishes.
+	wheel_lathe(b, PackedVector2Array([Vector2(-0.036, 0.145), Vector2(0.036, 0.145)]), 44, CB.M_RIM, Color(0.6, 0.6, 0.62),
+			"in")
+	var v0: int = b.vertex_count()
+	var i0: int = b.index_count()
 	wheel_lathe(b, PackedVector2Array([Vector2(0.100, 0.150), Vector2(0.114, 0.153), Vector2(0.122, 0.147),
 			Vector2(0.122, 0.128)]), 44, CB.M_RIM, C_RIM, "out", Vector3(0.09, 0.0, 0.0))
 	wheel_lathe(b, PackedVector2Array([Vector2(0.122, 0.128), Vector2(0.104, 0.124), Vector2(0.040, 0.112)]), 44, CB.M_RIM,
 			C_RIM, "+x")
-	wheel_lathe(b, PackedVector2Array([Vector2(0.040, 0.112), Vector2(0.035, 0.145), Vector2(-0.100, 0.148)]), 44, CB.M_RIM,
-			Color(0.6, 0.6, 0.62), "in")
-	b.disc(Vector3(0.0, 0.0, 0.0), Vector3.RIGHT, 0.14, 0.0, 32, CB.M_DARK, C_DARKER)
+	wheel_lathe(b, PackedVector2Array([Vector2(0.040, 0.112), Vector2(0.036, 0.145)]), 44, CB.M_RIM, Color(0.6, 0.6, 0.62),
+			"in")
 	# The beadlock ring's bolts.
 	for k in 16:
 		var a: float = TAU * k / 16.0
 		var f: Array = wheel_frame(a)
 		var p: Vector3 = Vector3(0.123, 0.0, 0.0) + (f[0] as Vector3) * 0.139
 		b.tube(PackedVector3Array([p, p + Vector3(0.007, 0, 0)]), 0.0045, 6, CB.M_CHROME, C_CHROME, false, true)
-	# The dish's face: a disc with eight round holes' worth of darker pockets, a hub cap.
+	# The dish's face: eight dark pockets round a hub cap.
 	b.disc(Vector3(0.041, 0.0, 0.0), Vector3.RIGHT, 0.112, 0.04, 32, CB.M_RIM, C_RIM)
 	for k in 8:
 		var a: float = TAU * (k + 0.5) / 8.0
@@ -472,6 +493,7 @@ func build_rear_wheel(b, side: float) -> void:
 	b.lathe(Vector3(0.042, 0.0, 0.0), Vector3.RIGHT, PackedVector2Array([Vector2(0.0, 0.040), Vector2(0.008, 0.034),
 			Vector2(0.014, 0.020), Vector2(0.016, 0.0)]), 16, CB.M_ANODISED, Color(1, 1, 1))
 	b.orient_away_from(vb, ib, Vector3(0.03, 0.0, 0.0))
+	b.mirror_x(v0, i0)
 	if side < 0.0:
 		b.mirror_in_place()
 

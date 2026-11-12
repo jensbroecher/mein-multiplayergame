@@ -3234,6 +3234,11 @@ A clip that comes out quiet (the bubble car's at -37.7 dBFS) is raised in the fi
   part periodic in 2s so the loop has no seam, rolled off from 1.3 kHz and cut over 4 kHz so it never turns shrill, levelled
   to -18 dBFS); `tools/elevenlabs/sfx.json`'s `engine_typhoon` job is ready to make an ElevenLabs take beside it
   (`engine_typhoon_elevenlabs_loop.wav`) to swap in once made.
+  - Its wheels' faces (spokes or beadlock dish, bolts, hub) are built on +x and mirrored (`mirror_x`) onto the inside,
+    with a barrel between: the inside was a plain dark disc and the user saw the wheels look different from each side.
+  - The wing mirrors have chrome glass on the back of the housing, turned in toward the driver (`MIRROR_YAW`) and tipped
+    up (`MIRROR_TILT`): level, the glass reflected the sky's dark ground under the horizon, both from the driver's eye
+    and the chase camera, and read as a black panel. Mirror glass on other cars wants the same tip up.
 
 ## Canyon Chasm dirt ramps, rocks, signs, tornado and houses
 
