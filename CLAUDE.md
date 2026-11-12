@@ -3242,6 +3242,11 @@ A clip that comes out quiet (the bubble car's at -37.7 dBFS) is raised in the fi
   - The roll hoop's forward braces bend down onto foot plates bolted to the cowl (`BRACE_FOOT`, with a gusset): they had
     ended square at the sill's height 2cm outboard of it, in the air. `res://scratch/mesh_ray_probe.gd` (`-s`, headless,
     `-- <mesh.res> x,z ...`) prints every height a downward ray meets on a mesh, to seat a part on a body.
+  - Coil-overs: the fronts stand on a bar across the lower wishbone's legs (they ended between them) with their top
+    mounts down on the cowl's deck; the rears' tops are on the hoop's rear brace (they hung between it and the hoop's
+    leg); the upper rear link has a clevis on the tub. Lights (`_spotlight`: a can, a chrome bezel, a lens, a stem and
+    bracket): two spotlights on the hoop's top bar, two headlamps standing on the nose's bumper hoop (the old ones were
+    inside the nose, unseen), and bigger taillamps on the duct's lower rim.
 
 ## Canyon Chasm dirt ramps, rocks, signs, tornado and houses
 

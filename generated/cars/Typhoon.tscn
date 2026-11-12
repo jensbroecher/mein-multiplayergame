@@ -8,41 +8,41 @@
 [ext_resource type="ArrayMesh" path="res://generated/cars/typhoon_prop.res" id="6_1wt2h"]
 [ext_resource type="Script" path="res://CarSpinner.gd" id="7_10yy6"]
 
-[node name="Typhoon" type="Node3D" unique_id=866638984]
+[node name="Typhoon" type="Node3D" unique_id=658258776]
 metadata/procedural_car = true
 
-[node name="Model" type="Node3D" parent="." unique_id=834558038]
+[node name="Model" type="Node3D" parent="." unique_id=1604029625]
 transform = Transform3D(-0.5, 0, -4.371139e-08, 0, 0.5, 0, 4.371139e-08, 0, -0.5, 0, 0, 0)
 
-[node name="Body" type="MeshInstance3D" parent="Model" unique_id=276543466]
+[node name="Body" type="MeshInstance3D" parent="Model" unique_id=1434492483]
 mesh = ExtResource("1_nmf6p")
 metadata/car_shader = true
 
-[node name="Wheel_FL" type="MeshInstance3D" parent="Model" unique_id=1890434616]
+[node name="Wheel_FL" type="MeshInstance3D" parent="Model" unique_id=751688322]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.6, 0.2, -0.82)
 mesh = ExtResource("2_6w7e1")
 metadata/car_shader = true
 
-[node name="Wheel_FR" type="MeshInstance3D" parent="Model" unique_id=953462220]
+[node name="Wheel_FR" type="MeshInstance3D" parent="Model" unique_id=1698580118]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.6, 0.2, -0.82)
 mesh = ExtResource("3_pwfye")
 metadata/car_shader = true
 
-[node name="Wheel_RL" type="MeshInstance3D" parent="Model" unique_id=1846925145]
+[node name="Wheel_RL" type="MeshInstance3D" parent="Model" unique_id=540540964]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.58, 0.255, 0.4)
 mesh = ExtResource("4_v604q")
 metadata/car_shader = true
 
-[node name="Wheel_RR" type="MeshInstance3D" parent="Model" unique_id=1386029035]
+[node name="Wheel_RR" type="MeshInstance3D" parent="Model" unique_id=967259784]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.58, 0.255, 0.4)
 mesh = ExtResource("5_nl4v8")
 metadata/car_shader = true
 
-[node name="Prop" type="MeshInstance3D" parent="Model" unique_id=789100484]
+[node name="Prop" type="MeshInstance3D" parent="Model" unique_id=640821169]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0.79)
 mesh = ExtResource("6_1wt2h")
 script = ExtResource("7_10yy6")
 metadata/car_shader = true
 
-[node name="AntennaPlacement" type="Node3D" parent="Model" unique_id=590476172]
+[node name="AntennaPlacement" type="Node3D" parent="Model" unique_id=1857552858]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.2, 0.85, 0.16)
