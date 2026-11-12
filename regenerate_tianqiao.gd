@@ -140,6 +140,8 @@ func _find_anchors() -> void:
 	a["jump1"] = _s_after(Vector2(YUNLANG_X.y, 0.0), 0.0)
 	a["land1"] = a["jump1"] + 30.0
 	a["b_exit"] = _s_after(Vector2(440.0, B_C.y + B_HALF), a["land1"])
+	a["e0"] = _s_after(Vector2(440.0, E_C.y - E_HALF - 1.0), a["b_exit"])
+	a["e1"] = _s_after(Vector2(440.0, E_C.y + E_HALF + 1.0), a["e0"])
 	a["spiral0"] = _s_after(Vector2(440.0, 300.0), a["b_exit"])
 	# One full turn round, then a quarter more: the second time past the spiral's start, and on to its south point.
 	a["spiral_turn"] = a["spiral0"] + TAU * SPIRAL_R
@@ -220,7 +222,13 @@ func _sections(r: Route) -> Array:
 	var a: Dictionary = _a
 	return [
 		[0.0, a["jump1"], K_ASPHALT, r.half],
-		[a["land1"], a["jump2"], K_ASPHALT, r.half],
+		[a["land1"], a["b_exit"], K_ASPHALT, r.half],
+		[a["b_exit"], a["e0"], K_ASPHALT, r.half],
+		[a["e0"], a["e1"], K_ASPHALT, r.half],
+		[a["e1"], a["spiral0"], K_ASPHALT, r.half],
+		[a["spiral0"], a["spiral1"] + 6.0, K_ASPHALT, r.half],
+		[a["spiral1"] + 6.0, a["d0"], K_ASPHALT, r.half],
+		[a["d0"], a["jump2"], K_ASPHALT, r.half],
 		[a["land2"], a["leg1"], K_ASPHALT, r.half],
 		[a["leg1"], a["aqua0"], K_STONE, r.half],
 		[a["aqua0"], a["aqua1"], K_STONE, r.half],
@@ -239,7 +247,9 @@ func _build_deck_slab(_node: Node3D, _r: Route, _s0: float, _s1: float, _idx: in
 
 func _place_gameplay(root: Node3D) -> void:
 	var a: Dictionary = _a
-	_checkpoints([float(a["land1"]) + 14.0, float(a["spiral0"]) - 40.0, float(a["d0"]) + 10.0, float(a["land2"]) + 30.0,
+	# The gates after the jumps stand well past the landings (cars flew over them on tower B's roof): on the glass skyway
+	# leaving tower B, and on the mall's roof by the first corner.
+	_checkpoints([float(a["b_exit"]) + 25.0, float(a["spiral0"]) - 40.0, float(a["d0"]) + 10.0, float(a["land2"]) + 58.0,
 		(float(a["leg2"]) + float(a["leg2_end"])) * 0.5, float(a["mall_out"]) + 40.0, float(a["street"]) + 120.0])
 	_boosts([["Boost_Yunlang", float(a["jump1"]) - 70.0, 0.0], ["Boost_Tower_D", float(a["jump2"]) - 40.0, 0.0],
 		["Boost_Leg2", float(a["leg2"]) + 60.0, -2.5], ["Boost_Aqua", float(a["aqua0"]) + 10.0, 0.0], ["Boost_Street", float(a["street"]) + 40.0, 2.5]])
@@ -255,6 +265,7 @@ func _place_gameplay(root: Node3D) -> void:
 
 func _build_dressing(root: Node3D) -> void:
 	_load_cjk_font()
+	_glass_roads(root)
 	_rails = _body(root, "SkyRailsBody")
 	_rails.set_meta(&"surface", "rock")
 	_sample_route()
@@ -267,6 +278,7 @@ func _build_dressing(root: Node3D) -> void:
 	_build_skyway_s2()
 	_build_tower_d()
 	_build_mall()
+	_build_library()
 	_build_hall()
 	_build_aquarium(root)
 	_build_flyover()
@@ -276,6 +288,36 @@ func _build_dressing(root: Node3D) -> void:
 	_build_skyline(root)
 	_build_crowds()
 	print("  dressing: %d buildings, %d people" % [_bid, _people.size()])
+
+
+## The skyways from tower B down to the spiral and from the spiral to tower D are glass (the user's wish): their road
+## ribbons (sections of their own, see `_sections`) are drawn in glass_deck.gdshader instead of the road's material,
+## and their decks have no slab (`_deck(..., glass)`).
+func _glass_roads(root: Node3D) -> void:
+	var ranges: Array = [[float(_a["b_exit"]), float(_a["e0"])], [float(_a["e1"]), float(_a["spiral0"])], [float(_a["spiral1"]) + 6.0, float(_a["d0"])]]
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://glass_deck.gdshader")
+	var mat_s: Material = _save_res(mat, "glass_deck_material")
+	var roads: Node = root.get_node_or_null("Roads")
+	if roads == null:
+		return
+	var n := 0
+	for mi in roads.get_children():
+		if not mi is MeshInstance3D or (mi as MeshInstance3D).mesh == null:
+			continue
+		var uvs: PackedVector2Array = (mi as MeshInstance3D).mesh.surface_get_arrays(0)[Mesh.ARRAY_TEX_UV]
+		if uvs.is_empty():
+			continue
+		var lo := INF
+		var hi := -INF
+		for uv in uvs:
+			lo = minf(lo, uv.y)
+			hi = maxf(hi, uv.y)
+		for r in ranges:
+			if lo >= float(r[0]) - 0.01 and hi <= float(r[1]) + 0.01:
+				(mi as MeshInstance3D).material_override = mat_s
+				n += 1
+	print("  glass skyways: %d road pieces" % n)
 
 
 # ---- The Yunhai Center: the supertall, the start on its roof -------------------------------------------------------
@@ -392,10 +434,11 @@ func _build_tower_b() -> void:
 func _build_skyway_s1() -> void:
 	var s0: float = float(_a["b_exit"])
 	var s1: float = float(_a["spiral0"])
-	var e0: float = _s_after(Vector2(440.0, E_C.y - E_HALF - 1.0), s0)
-	var e1: float = _s_after(Vector2(440.0, E_C.y + E_HALF + 1.0), e0)
-	_deck("deck_skyway_s1", s0, e0, 2.6, Color(0.95, 0.4, 1.0, 0.7), 0.0)
-	_deck("deck_skyway_s1", e1, s1, 2.6, Color(0.95, 0.4, 1.0, 0.7), 0.0)
+	var e0: float = _a["e0"]
+	var e1: float = _a["e1"]
+	# Glass skyways (the user's wish): see `_glass_roads`.
+	_deck("deck_skyway_s1", s0, e0, 2.6, Color(0.95, 0.4, 1.0, 0.7), 0.0, [true, true], 0.0, false, true)
+	_deck("deck_skyway_s1", e1, s1, 2.6, Color(0.95, 0.4, 1.0, 0.7), 0.0, [true, true], 0.0, false, true)
 	# Inside the lobby: the floor, glass sides (the rails), LED along the ceiling.
 	_deck("deck_lobby_e", e0, e1, 1.0, Color(1.0, 0.85, 0.5, 0.0), 0.0)
 
@@ -465,7 +508,7 @@ func _build_spiral() -> void:
 # ---- Skyway S2 to tower D, the second jump ---------------------------------------------------------------------------
 
 func _build_skyway_s2() -> void:
-	_deck("deck_skyway_s2", float(_a["spiral1"]) + 6.0, float(_a["d0"]), 2.4, Color(1.0, 0.75, 0.3, 0.0), 48.0)
+	_deck("deck_skyway_s2", float(_a["spiral1"]) + 6.0, float(_a["d0"]), 2.4, Color(1.0, 0.75, 0.3, 0.0), 48.0, [true, true], 0.0, false, true)
 
 
 func _build_tower_d() -> void:
@@ -533,18 +576,6 @@ func _build_mall() -> void:
 		MCK.neon_sign(pk, kit, labels, Vector3(m.get_center().x - 60.0, 48.0, m.position.y - 0.6), Vector3(0, 0, -1), 46.0, 12.0, "星河汇", Color(1.0, 0.35, 0.8))
 		MCK.neon_sign(pk, kit, labels, Vector3(m.get_center().x + 50.0, 48.0, m.end.y + 0.6), Vector3(0, 0, 1), 46.0, 12.0, "星河汇", Color(1.0, 0.35, 0.8))
 		MCK.neon_sign(pk, kit, labels, Vector3(m.end.x + 0.6, 40.0, m.get_center().y), Vector3(1, 0, 0), 30.0, 9.0, "海洋馆", Color(0.3, 0.8, 1.0))
-		# The roof: a car park (bays, a few cars), lamp posts.
-		var rng := RandomNumberGenerator.new()
-		rng.seed = 4401
-		for bx in range(int(m.position.x) + 14, int(m.end.x) - 14, 6):
-			for bz in [m.position.y + 12.0, m.position.y + 24.0]:
-				if absf(float(bx) - 300.0) < 12.0:
-					continue
-				MCK.led_line(pk, kit, Vector3(bx, Y_MALL - 0.03, bz - 2.5), Vector3(bx, Y_MALL - 0.03, bz + 2.5), Color(0.8, 0.8, 0.8, 0.0), 0.08)
-				if rng.randf() < 0.45:
-					var col := Color.from_hsv(rng.randf(), rng.randf_range(0.2, 0.8), rng.randf_range(0.3, 0.9))
-					pk.block(kit, "gloss", Vector3(bx + 0.6, Y_MALL, bz - 2.2), Vector3(bx + 2.6, Y_MALL + 1.2, bz + 2.2), col)
-					pk.block(kit, "gloss", Vector3(bx + 0.8, Y_MALL + 1.2, bz - 1.2), Vector3(bx + 2.4, Y_MALL + 1.8, bz + 1.0), col.darkened(0.5))
 	, 3800.0)
 	# The roof, all but the hall's footprint (whose vault stands over it), open where the cars come in off the jump.
 	var roof_n := Rect2(m.position.x, m.position.y, m.size.x, HALL.position.y - m.position.y)
@@ -557,6 +588,149 @@ func _build_mall() -> void:
 				Vector2(side[0], HALL.end.y)])
 			MCK.flat(pk, kit, strip, Y_MALL - 0.06, Vector3.UP, Color(0.3, 0.3, 0.33), MCK.STYLE_CONCRETE)
 	, 3800.0)
+
+
+# ---- The Xinghe Library on the mall's roof ----------------------------------------------------------------------------
+
+## Where the car park was (the user wanted a futuristic structure of the mall's complex there): the Xinghe Library
+## (星河图书馆), a twisting stack of elliptical glass floors on the roof's west part, white fins round it, a lit book core,
+## terraces with readers, a glass dome with a roof garden; on the east part a white lattice shell over a sky garden; and
+## a tunnel of LED rings over the lap where it runs east across the roof.
+const LIB_C := Vector2(228.0, 572.0)
+const LIB_R := Vector2(52.0, 28.0)
+const LIB_FLOOR := 4.6
+const LIB_TIERS := 5
+
+
+func _ellipse(c: Vector2, r: Vector2, rot: float, n: int) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for k in range(n):
+		var a: float = TAU * float(k) / float(n)
+		var p := Vector2(cos(a) * r.x, sin(a) * r.y).rotated(rot)
+		out.append(c + p)
+	return out
+
+
+func _build_library() -> void:
+	var id := _id()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7171
+	_reserved.append(Rect2(LIB_C - LIB_R - Vector2(4, 4), LIB_R * 2.0 + Vector2(8, 8)))
+	_city("library", func(pk: PropKit, kit: Dictionary, labels: Array) -> void:
+		var y0: float = Y_MALL - 0.2
+		var white := Color(0.92, 0.93, 0.95)
+		for t in range(LIB_TIERS):
+			var f: float = float(t) / float(LIB_TIERS - 1)
+			var rot: float = 0.09 * float(t)
+			var r: Vector2 = LIB_R * (1.0 - 0.1 * f)
+			var yb: float = y0 + LIB_FLOOR * float(t)
+			# The floor's glass wall, set in from its slab, lit like an office; the slab's white edge with an LED line.
+			var wall_plan := _ellipse(LIB_C, r * 0.9, rot, 40)
+			MCK.prism(pk, kit, wall_plan, yb + 0.5, yb + LIB_FLOOR, Color(0.55, 0.62, 0.66), MCK.STYLE_OFFICE, id + t, false)
+			var slab := _ellipse(LIB_C, r, rot, 40)
+			MCK.prism(pk, kit, slab, yb, yb + 0.5, white, MCK.STYLE_CONCRETE, id, true)
+			for k in range(40):
+				var a: Vector2 = slab[k]
+				var b: Vector2 = slab[(k + 1) % 40]
+				MCK.led_line(pk, kit, Vector3(a.x, yb + 0.25, a.y), Vector3(b.x, yb + 0.25, b.y), Color(0.55, 0.85, 1.0, 0.0), 0.12)
+				# A glass balustrade round each terrace (the wall stands back from the slab's edge).
+				if k % 2 == 0:
+					MCK.glass_rail(pk, kit, Vector3(a.x, yb + 0.5, a.y), Vector3(b.x, yb + 0.5, b.y), 1.1, Color(0.55, 0.85, 1.0, 0.0))
+		# White fins round the stack: tall curved blades leaning with its twist, every other one lit along its edge.
+		for k2 in range(28):
+			var a2: float = TAU * float(k2) / 28.0
+			var top_h: float = y0 + LIB_FLOOR * float(LIB_TIERS) + 3.0
+			var p0 := LIB_C + Vector2(cos(a2) * LIB_R.x * 1.06, sin(a2) * LIB_R.y * 1.06)
+			var p1 := LIB_C + Vector2(cos(a2 + 0.36) * LIB_R.x * 0.92, sin(a2 + 0.36) * LIB_R.y * 0.92)
+			var mid := LIB_C + Vector2(cos(a2 + 0.18) * LIB_R.x * 1.1, sin(a2 + 0.18) * LIB_R.y * 1.1)
+			var pts: Array = [Vector3(p0.x, y0, p0.y), Vector3(mid.x, (y0 + top_h) * 0.5, mid.y), Vector3(p1.x, top_h, p1.y)]
+			for j in range(2):
+				pk.beam(kit, "gloss", pts[j], pts[j + 1], 0.35, 1.2, white)
+				if k2 % 2 == 0:
+					MCK.led_line(pk, kit, (pts[j] as Vector3) + Vector3(0, 0, 0), pts[j + 1], Color(1.0, 0.45, 0.85, 0.5), 0.12)
+		# The book core: a drum of lit shelves through the middle, seen through the glass.
+		var core := _ellipse(LIB_C, LIB_R * 0.38, 0.0, 24)
+		MCK.prism(pk, kit, core, y0, y0 + LIB_FLOOR * float(LIB_TIERS), Color(0.95, 0.85, 0.7), MCK.STYLE_INTERIOR, id + 9, false)
+		# The roof: a garden ring round a glass dome with ribs and an LED crown.
+		var ry: float = y0 + LIB_FLOOR * float(LIB_TIERS)
+		var roof := _ellipse(LIB_C, LIB_R * 0.9 * 0.9, 0.36, 40)
+		MCK.flat(pk, kit, roof, ry + 0.02, Vector3.UP, Color(0.18, 0.28, 0.16), MCK.STYLE_CONCRETE)
+		var dome_c := Vector3(LIB_C.x, ry, LIB_C.y)
+		var prof: Array = []
+		for k3 in range(9):
+			var an: float = PI * 0.5 * float(k3) / 8.0
+			prof.append(Vector2(maxf(cos(an) * 14.0, 0.001), sin(an) * 9.0))
+		pk.lathe(kit, "glass", dome_c, prof, 24, Color(1, 1, 1), true)
+		for k4 in range(12):
+			var an2: float = TAU * float(k4) / 12.0
+			var prev := Vector3.ZERO
+			for k5 in range(9):
+				var q: Vector2 = prof[k5]
+				var pp: Vector3 = dome_c + Vector3(cos(an2) * q.x, q.y + 0.05, sin(an2) * q.x)
+				if k5 > 0:
+					MCK.led_line(pk, kit, prev, pp, Color(0.95, 0.9, 0.75, 0.0), 0.12)
+				prev = pp
+		for k6 in range(16):
+			var an3: float = TAU * float(k6) / 16.0
+			var tp := Vector3(LIB_C.x + cos(an3) * LIB_R.x * 0.62, ry, LIB_C.y + sin(an3) * LIB_R.y * 0.62)
+			pk.lathe(kit, "matte", tp, [Vector2(0.001, 0.0), Vector2(1.6, 0.8), Vector2(1.9, 2.0), Vector2(1.1, 3.0), Vector2(0.001, 3.3)], 8, Color(0.12, 0.22, 0.12))
+		# Its name on the stack's north face, toward the jump's landing.
+		MCK.neon_sign(pk, kit, labels, Vector3(LIB_C.x, ry + 2.2, LIB_C.y - LIB_R.y * 0.85), Vector3(0, 0, -1), 20.0, 3.4, "星河图书馆", Color(0.55, 0.85, 1.0))
+		# The sky garden's lattice shell east of the lap (x 312-425, z 537-562): arches of white tubes, lit at the joints.
+		var gx0 := 316.0
+		var gx1 := 420.0
+		var gz := 549.0
+		var arch_n := 14
+		for k7 in range(arch_n):
+			var x: float = lerpf(gx0, gx1, float(k7) / float(arch_n - 1))
+			var hgt: float = 9.0 + 4.0 * sin(float(k7) / float(arch_n - 1) * PI)
+			var prev2 := Vector3.ZERO
+			for k8 in range(11):
+				var an4: float = PI * float(k8) / 10.0
+				var lean: float = 3.0 * sin(float(k7) * 0.7)
+				var pp2 := Vector3(x + lean * sin(an4), Y_MALL + sin(an4) * hgt, gz - cos(an4) * 11.0)
+				if k8 > 0:
+					pk.beam(kit, "gloss", prev2, pp2, 0.3, 0.3, white)
+				if k8 % 2 == 0:
+					pk.block(kit, "neon", pp2 - Vector3(0.18, 0.18, 0.18), pp2 + Vector3(0.18, 0.18, 0.18), Color(0.7, 0.9, 1.0))
+				prev2 = pp2
+		for k9 in range(10):
+			var tp2 := Vector3(rng.randf_range(gx0 + 4.0, gx1 - 4.0), Y_MALL, gz + rng.randf_range(-7.0, 7.0))
+			pk.lathe(kit, "matte", tp2, [Vector2(0.001, 0.0), Vector2(1.4, 1.2), Vector2(1.8, 2.6), Vector2(1.0, 3.8), Vector2(0.001, 4.2)], 8, Color(0.1, 0.2, 0.11))
+			pk.tube(kit, "paint", tp2, tp2 + Vector3(0, 1.4, 0), 0.15, 0.12, 6, Color(0.25, 0.18, 0.12))
+		# A tunnel of LED rings over the lap where it runs east across the roof (their feet off the road).
+		var s_r0: float = _s_after(Vector2(330.0, 575.0), float(_a["land2"]))
+		for k10 in range(5):
+			var sr: float = s_r0 + 14.0 * float(k10)
+			var c: Vector3 = lap.pt(sr) + Vector3(0, 2.0, 0)
+			var rt: Vector3 = lap.rt(sr)
+			var prev3 := Vector3.ZERO
+			for k11 in range(25):
+				var an5: float = PI * float(k11) / 24.0
+				var pp3: Vector3 = c + rt * cos(an5) * 11.5 + Vector3(0, sin(an5) * 10.0, 0)
+				if k11 > 0:
+					MCK.led_line(pk, kit, prev3, pp3, Color.from_hsv(0.55 + 0.08 * float(k10), 0.7, 1.0, 0.6), 0.45)
+				prev3 = pp3
+	, 3000.0)
+	# Solid: the stack as slices of boxes (its mesh holds glass, so DressingColliders leaves it soft).
+	var body := _body(level, "LibraryBody")
+	for k13 in range(-5, 6):
+		var x0: float = float(k13) / 5.5
+		var depth: float = 2.0 * LIB_R.y * sqrt(maxf(1.0 - x0 * x0, 0.0))
+		if depth < 2.0:
+			continue
+		_box_shape(body, Transform3D(Basis(), Vector3(LIB_C.x + x0 * LIB_R.x, Y_MALL + LIB_FLOOR * float(LIB_TIERS) * 0.5, LIB_C.y)),
+				Vector3(LIB_R.x * 2.0 / 11.0, LIB_FLOOR * float(LIB_TIERS), depth))
+	# Readers on the terraces.
+	for t2 in range(1, LIB_TIERS):
+		var yb2: float = Y_MALL - 0.2 + LIB_FLOOR * float(t2) + 0.5
+		var r2: Vector2 = LIB_R * (1.0 - 0.1 * float(t2) / float(LIB_TIERS - 1)) * 0.95
+		for k12 in range(10):
+			if rng.randf() < 0.4:
+				continue
+			var an6: float = rng.randf() * TAU
+			var pp4 := Vector2(cos(an6) * r2.x, sin(an6) * r2.y).rotated(0.09 * float(t2)) + LIB_C
+			_person(Vector3(pp4.x, yb2, pp4.y), Vector3(pp4.x - LIB_C.x, 0, pp4.y - LIB_C.y).normalized(), rng.randf_range(0.92, 1.06))
 
 
 func _build_hall() -> void:
@@ -812,7 +986,6 @@ func _build_fish(root: Node3D, rng: RandomNumberGenerator) -> void:
 		["Fish_small", 1.0, 0.45, 0.18, Color(1.0, 0.75, 0.2), 140, Vector2(6.0, 18.0), 3.0],
 		["Fish_blue", 1.4, 0.6, 0.2, Color(0.3, 0.55, 1.0), 90, Vector2(8.0, 24.0), 2.2],
 		["Fish_ray", 3.2, 0.35, 3.0, Color(0.55, 0.5, 0.45), 10, Vector2(14.0, 28.0), 0.9],
-		["Fish_whaleshark", 12.0, 2.6, 2.4, Color(0.35, 0.4, 0.48), 2, Vector2(24.0, 28.0), 0.4],
 	]
 	for kd in kinds:
 		var mesh := _fish_mesh(float(kd[1]), float(kd[2]), float(kd[3]), kd[4], String(kd[0]) == "Fish_ray")
@@ -884,6 +1057,26 @@ func _fish_mesh(length: float, height: float, width: float, col: Color, ray: boo
 		st.set_color(col.darkened(0.1))
 		st.set_normal(Vector3.RIGHT)
 		st.add_vertex(v2)
+	# Eyes: a white disc and a black pupil each side of the head, a hair proud of the body.
+	if not ray:
+		var ez: float = length * 0.32
+		var tt: float = 0.5 - ez / length
+		var rr: float = sin(tt * PI) * (1.0 - 0.45 * tt)
+		var ex: float = width * 0.5 * rr * 0.97
+		var ey: float = height * 0.1
+		var re: float = height * 0.14
+		for side in [-1.0, 1.0]:
+			var n := Vector3(side, 0, 0)
+			for disc in [[re, 0.01, Color(0.92, 0.92, 0.88)], [re * 0.58, 0.018, Color(0.02, 0.02, 0.03)]]:
+				var c0 := Vector3(side * (ex + float(disc[1]) * width), ey, ez)
+				var rad: float = disc[0]
+				for k in range(10):
+					var a0: float = TAU * float(k) / 10.0
+					var a1: float = TAU * float(k + 1) / 10.0
+					for v3 in [c0, c0 + Vector3(0, sin(a0), cos(a0)) * rad, c0 + Vector3(0, sin(a1), cos(a1)) * rad]:
+						st.set_color(disc[2])
+						st.set_normal(n)
+						st.add_vertex(v3)
 	return st.commit()
 
 

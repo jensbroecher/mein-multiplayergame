@@ -4845,6 +4845,18 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   the tank, its name over it); the walls' tops over the roof are clad outside with an LED line; the south walkways (and
   their shoppers and signs) stop 14m short of the door below the floor the last ramp passes (they hung 3.5m over the
   road, as the user found).
+- The skyways from tower B to the spiral and from the spiral to tower D are glass (the user's wish): their stretches
+  are sections of their own, and `_glass_roads` puts `glass_deck.gdshader` (panes on a steel grid, the city showing
+  through, LED edges) on those road pieces (found by their UV.y, metres along the lap); `_deck(..., glass)` builds no
+  slab under them, only steel girders, stringers and ribs. Collision is the road's as usual.
+- The gates after the jumps stand well past the landings: the user flew over the one on tower B's roof. One is on the
+  glass skyway 25m past tower B's edge, the other 58m past the mall roof's landing.
+- The mall roof's car park is gone (the user wanted a futuristic part of the mall complex there): the Xinghe Library
+  (`_build_library`, 星河图书馆: five elliptical glass floors twisting up, white fins, terraces with readers, a lit book
+  core, a glass dome in a roof garden; box slices as its collider, `LibraryBody`, since its mesh holds glass), a lattice
+  shell over a sky garden east of the lap, and five LED rings over the lap where it runs east across the roof.
+- The fish: no whale sharks (the user didn't like them); the fish have eyes (`_fish_mesh`: a white disc and a pupil
+  each side of the head).
 - MultiMesh buffers are written by hand (`_build_fish`): on the headless renderer `set_instance_transform` stores
   nothing and the saved fish were all at the origin. `scratch/tianqiao_fish_probe.gd` (`-s`) prints them.
 - Falling off: PlayerCart respawns a cart (human or bot) once it is more than the level root's `fall_respawn_drop` meta
@@ -4898,7 +4910,7 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
 ## Wangjiang (Yunhai GP, stage 3)
 
 - `regenerate_wangjiang.gd` (`regenerate_wangjiang.tscn`, headless, about 20s) builds `levels/WangjiangLevel.tscn`: one
-  4.5km run at night from the plateau (80m) down to the river (5m). The user asked for two of the ideas offered for
+  4km run at night from the plateau (80m) down to the river and over it to the far bank. The user asked for two of the ideas offered for
   stage 2 together (racing the monorail through a block of flats, the cliff town of stilt houses by the river) as a
   longer point-to-point race.
 - The run: Wangjiang Road east from Wangjiang station with the monorail's beam beside it (`MONO_SIDE` north,
@@ -4906,7 +4918,19 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   on down the slope); through the Jiayuan Building (`FLATS`), whose hole (`FLATS_HOLE_Z`, walls cut by `_z_wall`) the road
   and the line share; through Chaoyang station, its two halves either side of a cross street (`STATION_2A`/`2B`), a
   kicker and a 28m gap between them (`JUMP_LIP`); south down Jiefang Road; four legs along the slope (`LEGS`) joined by
-  hairpins (r20, 40m apart, the legs falling 12-13m each, the hairpins flat); the quay west to the finish plaza.
+  hairpins (r20, 40m apart, the legs falling 12-13m each, the hairpins flat); the quay west to the Yunhai Bridge; over
+  the river; the finish in the Yunhai Plaza on the far bank. The user had the legs halved (they were 380m) and the run
+  carried over the river to a grand plaza.
+- The Yunhai Bridge (`_build_bridge`, 云海大桥, along `BRIDGE_X`): up a 12% ramp off the quay, level over the main span
+  between two A-shaped white pylons (`PYLONS`, 118m, LED legs, red lights), down a ramp into the plaza; fans of steel
+  stays (lit faintly: bright, they glowed into broad white bars across the view from the deck); no piers under the main
+  span (`_col_blocked`); the pylons' feet are boxes (`BridgePylonsBody`). The quay's railing, lanterns and stalls stop
+  where the road crosses the promenade.
+- The Yunhai Plaza (`_build_plaza`, 云海广场, `PLAZA2`): paving with LED rings, a lit arch where the bridge comes down,
+  grandstands both sides of the finish straight (`_grandstand`: ten rows, seats in the cup's colours, a cantilevered
+  roof, LED boards along the front, about 1,400 people seated), a concert stage at the end (LED screens, a truss roof,
+  speakers, spots and lasers into the sky, a crowd before it), fountains, nine illuminated towers round it with lit
+  crowns, barriers along the finish straight and across the road's end.
 - Heights: `KNOTS` along the run; every stretch more than 3m over `_natural` (and the hole) is an ungraded bridge.
   The city's towers stand on the lowest ground under their plots (`YunhaiStage._plot_ground`), so they rise out of the
   gully and step down the slope.
@@ -4919,8 +4943,8 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   (`_arcade`, its windows on the faces the drivers see), houses up the slope above the first leg, pavilions at the
   hairpins. Window colours are kept dim (neon_emissive at energy 4 burns pale colours to white blobs).
 - The quay (`_build_quay`): the river wall, a railed promenade with lanterns and food stalls, shophouses at the hill's
-  foot, four LED-outlined tour boats, the finish's lantern gate (望江码头). The cableway over the river (`CableCar.gd`:
+  foot, four LED-outlined tour boats, a lantern gate (望江码头) at the bridge's foot. The cableway over the river (`CableCar.gd`:
   two cabins on sagging ropes shuttling on the wall clock, a jig-back) runs from the plateau's edge (`CABLE_A`) to the
   far bank.
-- AI races (`scratch/ai_race_test`, speed=2): every bot finishes in 97-123s; the kicker is crossed at 47-56 m/s.
+- AI races (`scratch/ai_race_test`, speed=2): every bot finishes in 91-117s; the kicker is crossed at 47-56 m/s.
 - `fall_respawn_drop` 11m (the legs are 12-13m apart, so a cart off an upper leg lands on the one below and drives on).

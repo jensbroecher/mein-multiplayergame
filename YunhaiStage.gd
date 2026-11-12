@@ -202,7 +202,10 @@ func _city(key: String, build: Callable, range_end := 0.0) -> void:
 ## A deck under the lap from s0 to s1: a slab `depth` deep a little wider than the road (its top just under the ribbon),
 ## glass balustrades with LED feet on both sides (colliders along them), LED strips along its edges below, and columns
 ## to the ground every `col_step` metres (0: none).
-func _deck(key: String, s0: float, s1: float, depth: float, led: Color, col_step := 0.0, rails := [true, true], col_floor := 0.0, solid_side := false) -> void:
+## `glass`: a glass floor (the stage draws the road's ribbon in glass, see Tianqiao's `_glass_roads`): no slab under it,
+## only steel edge girders, a rib across every 4m and two stringers, so the city shows through.
+func _deck(key: String, s0: float, s1: float, depth: float, led: Color, col_step := 0.0, rails := [true, true], col_floor := 0.0, solid_side := false,
+		glass := false) -> void:
 	var w: float = road_half + 0.6
 	_city(key, func(pk: PropKit, kit: Dictionary, _l: Array) -> void:
 		var s: float = s0
@@ -213,6 +216,19 @@ func _deck(key: String, s0: float, s1: float, depth: float, led: Color, col_step
 			var ra: Vector3 = lap.rt(s)
 			var rb: Vector3 = lap.rt(sb)
 			var dn := Vector3(0, -depth, 0)
+			if glass:
+				var steel := Color(0.32, 0.34, 0.38)
+				for side in [-1.0, 1.0]:
+					var pa: Vector3 = a + ra * w * side
+					var pb: Vector3 = b + rb * w * side
+					pk.beam(kit, "steel", pa - ra * side * 0.3 - Vector3(0, 0.45, 0), pb - rb * side * 0.3 - Vector3(0, 0.45, 0), 0.6, 0.9, steel)
+					MCK.led_line(pk, kit, pa + Vector3(0, -0.45, 0) + ra * side * 0.02, pb + Vector3(0, -0.45, 0) + rb * side * 0.02, led, 0.14)
+					pk.beam(kit, "steel", a + ra * w * 0.45 * side - Vector3(0, 0.35, 0), b + rb * w * 0.45 * side - Vector3(0, 0.35, 0), 0.25, 0.5, steel)
+					if rails[0 if side < 0.0 else 1]:
+						MCK.glass_rail(pk, kit, pa - ra * side * 0.25, pb - rb * side * 0.25, 1.3, led)
+				pk.beam(kit, "steel", a - ra * w - Vector3(0, 0.3, 0), a + ra * w - Vector3(0, 0.3, 0), 0.2, 0.4, steel)
+				s = sb
+				continue
 			for side in [-1.0, 1.0]:
 				var pa: Vector3 = a + ra * w * side
 				var pb: Vector3 = b + rb * w * side

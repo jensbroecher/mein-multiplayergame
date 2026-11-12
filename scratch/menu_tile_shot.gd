@@ -54,8 +54,8 @@ const STAGES := {
 	"TianqiaoLevel": {"focus": "300,70,330", "radius": 330, "zoom": 0.85},
 	# Panlong Interchange: the coil, the ring expressway over it.
 	"PanlongLevel": {"focus": "-20,10,-20", "radius": 380},
-	# Wangjiang: the cliff town's legs and the quay, the river in front.
-	"WangjiangLevel": {"focus": "1000,30,520", "radius": 340, "az": 0},
+	# Wangjiang: from over the plaza, the bridge over the river to the cliff town.
+	"WangjiangLevel": {"focus": "880,30,900", "radius": 560, "az": 0},
 }
 
 var opts := {}

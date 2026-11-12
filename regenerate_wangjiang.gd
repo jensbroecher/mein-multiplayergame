@@ -22,13 +22,25 @@ extends "res://YunhaiStage.gd"
 const KNOTS := [
 	[Vector2(-20.0, 0.0), 80.0], [Vector2(500.0, 0.0), 79.0], [Vector2(880.0, 0.0), 76.5], [Vector2(990.0, 0.0), 80.0],
 	[Vector2(1150.0, 0.0), 80.0], [Vector2(1240.0, 150.0), 74.0], [Vector2(1240.0, 400.0), 61.0], [Vector2(1200.0, 480.0), 60.0],
-	[Vector2(900.0, 480.0), 47.5], [Vector2(900.0, 520.0), 47.0], [Vector2(1240.0, 520.0), 35.5], [Vector2(1240.0, 560.0), 35.0],
-	[Vector2(900.0, 560.0), 23.5], [Vector2(900.0, 600.0), 23.0], [Vector2(1270.0, 600.0), 11.0], [Vector2(1300.0, 645.0), 7.0],
-	[Vector2(1260.0, 660.0), 5.0], [Vector2(240.0, 660.0), 5.0],
+	[Vector2(1090.0, 480.0), 47.5], [Vector2(1090.0, 520.0), 47.0], [Vector2(1240.0, 520.0), 35.5], [Vector2(1240.0, 560.0), 35.0],
+	[Vector2(1090.0, 560.0), 23.5], [Vector2(1090.0, 600.0), 23.0], [Vector2(1270.0, 600.0), 11.0], [Vector2(1300.0, 645.0), 7.0],
+	[Vector2(1260.0, 660.0), 5.0], [Vector2(800.0, 660.0), 5.0],
+	# The Yunhai Bridge: up the north ramp, level over the main span, down the south ramp into the plaza.
+	[Vector2(BRIDGE_X, 700.0), 6.0], [Vector2(BRIDGE_X, 880.0), 28.0], [Vector2(BRIDGE_X, 1120.0), 30.0], [Vector2(BRIDGE_X, 1300.0), 7.0],
+	[Vector2(BRIDGE_X, 1345.0), 6.0], [Vector2(BRIDGE_X, 1520.0), 6.0],
 ]
 ## The cliff town's legs: [plan point at one end, plan point at the other] (lap order), and the hairpins between.
-const LEGS := [[Vector2(1200.0, 480.0), Vector2(900.0, 480.0)], [Vector2(900.0, 520.0), Vector2(1240.0, 520.0)],
-	[Vector2(1240.0, 560.0), Vector2(900.0, 560.0)], [Vector2(900.0, 600.0), Vector2(1270.0, 600.0)]]
+const LEGS := [[Vector2(1200.0, 480.0), Vector2(1090.0, 480.0)], [Vector2(1090.0, 520.0), Vector2(1240.0, 520.0)],
+	[Vector2(1240.0, 560.0), Vector2(1090.0, 560.0)], [Vector2(1090.0, 600.0), Vector2(1270.0, 600.0)]]
+## The Yunhai Bridge (云海大桥) over the river along x BRIDGE_X: its two pylons' z, their height over the water.
+const BRIDGE_X := 760.0
+const PYLONS := [880.0, 1120.0]
+const PYLON_TOP := 118.0
+## The Yunhai Plaza (云海广场) on the far bank, where the race ends: its paving, the grandstands' reach along the road,
+## the stage at its south end.
+const PLAZA2 := Rect2(560.0, 1320.0, 400.0, 260.0)
+const STANDS_Z := Vector2(1345.0, 1470.0)
+const STAGE_Z := 1548.0
 ## The gap at Chaoyang station: the lip's plan point, the gap, the kicker.
 const JUMP_LIP := Vector2(1045.0, 0.0)
 const JUMP_GAP := 28.0
@@ -57,10 +69,10 @@ const QUAY_Z := 660.0
 const QUAY_EDGE := 692.0
 const PLAZA := Rect2(170.0, 640.0, 240.0, 52.0)
 ## The cableway: the ropes' ends (top station on the hill's edge, bottom across the river).
-const CABLE_A := Vector3(600.0, 104.0, 360.0)
-const CABLE_B := Vector3(600.0, 34.0, 1400.0)
+const CABLE_A := Vector3(450.0, 104.0, 360.0)
+const CABLE_B := Vector3(450.0, 34.0, 1400.0)
 ## The cliff town's area (on the ground shader's lawns, off the city's blocks).
-const TOWN := Rect2(830.0, 380.0, 520.0, 300.0)
+const TOWN := Rect2(1030.0, 380.0, 320.0, 300.0)
 
 var _a := {}
 
@@ -76,20 +88,21 @@ func _configure() -> void:
 	closed = false
 	point_to_point = true
 	start_s = 50.0
-	finish_runout = 90.0
+	finish_runout = 100.0
 	corners = [
 		[Vector2(-20.0, 0.0), 0.0],
 		[Vector2(1240.0, 0.0), 70.0],
 		[Vector2(1240.0, 480.0), 20.0],
-		[Vector2(880.0, 480.0), 20.0],
-		[Vector2(880.0, 520.0), 20.0],
+		[Vector2(1070.0, 480.0), 20.0],
+		[Vector2(1070.0, 520.0), 20.0],
 		[Vector2(1260.0, 520.0), 20.0],
 		[Vector2(1260.0, 560.0), 20.0],
-		[Vector2(880.0, 560.0), 20.0],
-		[Vector2(880.0, 600.0), 20.0],
+		[Vector2(1070.0, 560.0), 20.0],
+		[Vector2(1070.0, 600.0), 20.0],
 		[Vector2(1300.0, 600.0), 30.0],
 		[Vector2(1300.0, 660.0), 30.0],
-		[Vector2(160.0, 660.0), 0.0],
+		[Vector2(BRIDGE_X, 660.0), 40.0],
+		[Vector2(BRIDGE_X, 1520.0), 0.0],
 	]
 	fine_x = Vector2(-450.0, 1850.0)
 	fine_z = Vector2(-350.0, 1000.0)
@@ -188,6 +201,9 @@ func _shape_heights(r: Route, ys: PackedFloat32Array) -> void:
 		_a["leg%d_0" % li] = lap.closest_s(LEGS[li][0])
 		_a["leg%d_1" % li] = lap.closest_s(LEGS[li][1])
 	_a["quay"] = lap.closest_s(Vector2(1260.0, QUAY_Z))
+	_a["quay_end"] = lap.closest_s(Vector2(BRIDGE_X + 40.0, QUAY_Z))
+	_a["bridge0"] = lap.closest_s(Vector2(BRIDGE_X, QUAY_EDGE))
+	_a["bridge1"] = lap.closest_s(Vector2(BRIDGE_X, 1300.0))
 	_a["flats0"] = lap.closest_s(Vector2(FLATS.position.x - 4.0, 0.0))
 	_a["flats1"] = lap.closest_s(Vector2(FLATS.end.x + 4.0, 0.0))
 	_a["turn"] = lap.closest_s(Vector2(1240.0, 150.0))
@@ -213,8 +229,9 @@ func _sections(r: Route) -> Array:
 	if r != lap or _a.is_empty():
 		return [[0.0, r.length, K_ASPHALT, r.half]]
 	var q: float = _a["quay"]
+	var qe: float = _a["quay_end"]
 	return [[0.0, float(_a["lip"]), K_ASPHALT, r.half], [float(_a["land"]), float(_a["leg0_0"]) - 30.0, K_ASPHALT, r.half],
-		[float(_a["leg0_0"]) - 30.0, q, K_STONE, r.half], [q, r.length, K_STONE, r.half]]
+		[float(_a["leg0_0"]) - 30.0, q, K_STONE, r.half], [q, qe, K_STONE, r.half], [qe, r.length, K_ASPHALT, r.half]]
 
 
 func _build_deck_slab(_node: Node3D, _r: Route, _s0: float, _s1: float, _idx: int) -> void:
@@ -250,14 +267,14 @@ func _environment() -> Dictionary:
 
 func _place_gameplay(root: Node3D) -> void:
 	var cps: Array = []
-	for q in [Vector2(420.0, 0.0), Vector2(1110.0, 0.0), Vector2(1240.0, 260.0), Vector2(1050.0, 480.0), Vector2(1080.0, 520.0),
-			Vector2(1050.0, 560.0), Vector2(1080.0, 600.0), Vector2(1000.0, QUAY_Z), Vector2(620.0, QUAY_Z)]:
+	for q in [Vector2(420.0, 0.0), Vector2(1110.0, 0.0), Vector2(1240.0, 260.0), Vector2(1160.0, 480.0), Vector2(1160.0, 520.0),
+			Vector2(1160.0, 560.0), Vector2(1170.0, 600.0), Vector2(1000.0, QUAY_Z), Vector2(BRIDGE_X, 1000.0)]:
 		cps.append(lap.closest_s(q))
 	_checkpoints(cps)
 	var lip: float = _a["lip"]
 	_boosts([["Boost_Road", lap.closest_s(Vector2(300.0, 0.0)), 0.0], ["Boost_Station", lip - 55.0, 0.0],
 		["Boost_Jiefang", lap.closest_s(Vector2(1240.0, 120.0)), 2.5], ["Boost_Quay1", lap.closest_s(Vector2(1150.0, QUAY_Z)), -2.5],
-		["Boost_Quay2", lap.closest_s(Vector2(760.0, QUAY_Z)), 2.5]])
+		["Boost_Bridge", lap.closest_s(Vector2(BRIDGE_X, 1150.0)), 0.0]])
 	_kicker(root, "Jump_Chaoyang", lap, lip - KICK_LEN, KICK_LEN, KICK_H, 0.5, false, Color(0.25, 0.27, 0.3))
 
 
@@ -276,6 +293,7 @@ func _build_dressing(root: Node3D) -> void:
 	_reserved.append(FLATS.grow(12.0))
 	_reserved.append(Rect2(CABLE_A.x - 30.0, CABLE_A.z - 40.0, 60.0, CABLE_B.z - CABLE_A.z + 80.0))
 	_reserved.append(Rect2(STATION_1[0].x - 20.0, -50.0, STATION_1[0].y - STATION_1[0].x + 40.0, 60.0))
+	_reserved.append(Rect2(PLAZA2.position.x - 120.0, PLAZA2.position.y - 30.0, PLAZA2.size.x + 240.0, PLAZA2.size.y + 200.0))
 	_build_road_decks()
 	_build_lamps()
 	_build_monorail(root)
@@ -284,6 +302,8 @@ func _build_dressing(root: Node3D) -> void:
 	_build_cliff_town()
 	_build_quay()
 	_build_cableway(root)
+	_build_bridge()
+	_build_plaza()
 	_build_city()
 	_build_skyline(root)
 	_build_crowds()
@@ -326,7 +346,8 @@ func _build_lamps() -> void:
 				continue
 			var side: float = 1.0 if k % 2 == 0 else -1.0
 			var b: Vector3 = lap.pt(s) + lap.rt(s) * side * (road_half + 0.7) + Vector3(0, 1.1, 0)
-			if s < town0:
+			var city_lamp: bool = s < town0 or s > float(_a["bridge0"]) - 20.0
+			if city_lamp:
 				# The city's roads: tall lamps over the carriageway (the monorail's side has none).
 				if side > 0.0:
 					pk.tube(kit, "steel", b, b + Vector3(0, 9.0, 0), 0.15, 0.1, 6, Color(0.4, 0.41, 0.44))
@@ -337,7 +358,7 @@ func _build_lamps() -> void:
 				# The old town and the quay: lantern posts on the parapets.
 				pk.tube(kit, "paint", b, b + Vector3(0, 3.4, 0), 0.09, 0.09, 6, Color(0.2, 0.08, 0.06))
 				MCK.lantern(pk, kit, b + Vector3(0, 3.0, 0), 0.8)
-			s += 32.0 if s < town0 else 14.0
+			s += 32.0 if city_lamp else 14.0
 			k += 1
 	, 1400.0)
 
@@ -677,9 +698,9 @@ func _build_cliff_town() -> void:
 	# Houses scattered up the slope above the first leg (between it and the plateau's edge), off Jiefang Road.
 	var slope_houses: Array = []
 	var tries := 0
-	while slope_houses.size() < 26 and tries < 400:
+	while slope_houses.size() < 16 and tries < 400:
 		tries += 1
-		var hx: float = rng.randf_range(850.0, 1320.0)
+		var hx: float = rng.randf_range(1040.0, 1320.0)
 		var hz: float = rng.randf_range(395.0, 452.0)
 		if absf(hx - 1240.0) < 26.0:
 			continue
@@ -696,12 +717,12 @@ func _build_cliff_town() -> void:
 			_stilt_house(pk, kit, labels, Vector3(float(hsd[0]), fy, fz), Vector3(0, 0, 1), float(hsd[2]), 10.0, int(hsd[3]), hsd[4], "")
 	, 1800.0)
 	# Pavilions and lantern posts round the hairpins' outsides, a cluster of houses at each.
-	var hp := [Vector2(880.0, 500.0), Vector2(1260.0, 540.0), Vector2(880.0, 580.0), Vector2(1300.0, 630.0)]
+	var hp := [Vector2(1070.0, 500.0), Vector2(1260.0, 540.0), Vector2(1070.0, 580.0), Vector2(1300.0, 630.0)]
 	for i in range(hp.size()):
 		var c: Vector2 = hp[i]
 		var s_c: float = lap.closest_s(c)
 		var p2: Vector3 = lap.pt(s_c)
-		var outx: float = -1.0 if c.x < 1000.0 else 1.0
+		var outx: float = -1.0 if c.x < 1150.0 else 1.0
 		_city("town_hairpins", func(pk: PropKit, kit: Dictionary, labels: Array) -> void:
 			var pv := Vector3(c.x + outx * 34.0, 0.0, c.y)
 			pv.y = _ground_at(pv.x, pv.z)
@@ -870,9 +891,15 @@ func _build_quay() -> void:
 		MCK.wall(pk, kit, Vector3(x0, 0, QUAY_EDGE), Vector3(x1, 0, QUAY_EDGE), -10.5, 4.0, Vector3(0, 0, 1), Color(0.5, 0.47, 0.42), MCK.STYLE_CONCRETE, 82)
 		pk.quad(kit, "tower", [Vector3(x0, 4.0, QUAY_Z + road_half + 1.0), Vector3(x1, 4.0, QUAY_Z + road_half + 1.0), Vector3(x1, 4.0, QUAY_EDGE),
 				Vector3(x0, 4.0, QUAY_EDGE)], Vector3.UP, Color(0.42, 0.4, 0.38, float(MCK.STYLE_CONCRETE) / 8.0))
-		MCK.glass_rail(pk, kit, Vector3(x0, 4.0, QUAY_EDGE - 0.3), Vector3(x1, 4.0, QUAY_EDGE - 0.3), 1.1, Color(1.0, 0.6, 0.25, 0.0))
+		# The railing stops either side of the bridge's foot, where the road crosses the promenade.
+		var gap := Vector2(BRIDGE_X - road_half - 4.0, BRIDGE_X + road_half + 4.0)
+		MCK.glass_rail(pk, kit, Vector3(x0, 4.0, QUAY_EDGE - 0.3), Vector3(gap.x, 4.0, QUAY_EDGE - 0.3), 1.1, Color(1.0, 0.6, 0.25, 0.0))
+		MCK.glass_rail(pk, kit, Vector3(gap.y, 4.0, QUAY_EDGE - 0.3), Vector3(x1, 4.0, QUAY_EDGE - 0.3), 1.1, Color(1.0, 0.6, 0.25, 0.0))
 		var x: float = x0 + 6.0
 		while x < x1:
+			if x > gap.x - 2.0 and x < gap.y + 2.0:
+				x += 16.0
+				continue
 			var lp := Vector3(x, 4.0, QUAY_EDGE - 0.6)
 			pk.tube(kit, "paint", lp, lp + Vector3(0, 3.8, 0), 0.1, 0.1, 6, Color(0.2, 0.08, 0.06))
 			MCK.lantern(pk, kit, lp + Vector3(0, 3.4, 0), 0.85)
@@ -889,7 +916,7 @@ func _build_quay() -> void:
 		# Food stalls along the promenade.
 		var fx: float = 330.0
 		while fx < 1220.0:
-			if rng.randf() < 0.6:
+			if rng.randf() < 0.6 and absf(fx - BRIDGE_X) > 40.0:
 				var c := Vector3(fx, 4.0, QUAY_Z + road_half + 6.0)
 				pk.block(kit, "paint", c + Vector3(-1.6, 0.0, -0.8), c + Vector3(1.6, 1.1, 0.8), Color(0.5, 0.15, 0.1))
 				pk.block(kit, "neon", c + Vector3(-1.5, 1.1, -0.7), c + Vector3(1.5, 1.2, 0.7), Color(1.0, 0.8, 0.5))
@@ -897,8 +924,8 @@ func _build_quay() -> void:
 				for dx in [-1.6, 1.6]:
 					pk.beam(kit, "steel", c + Vector3(dx, 0, 0.9), c + Vector3(dx, 2.5, 0.9), 0.06, 0.06, Color(0.4, 0.4, 0.4))
 			fx += 14.0
-		# The finish plaza: a red lantern gate over the road, its name in gold.
-		var s_gate: float = lap.length - finish_runout - 12.0
+		# A red lantern gate over the road at the bridge's foot, its name in gold.
+		var s_gate: float = float(_a["bridge0"]) - 20.0
 		var g: Vector3 = lap.pt(s_gate)
 		var rt: Vector3 = lap.rt(s_gate)
 		var fw: Vector3 = lap.fw(s_gate)
@@ -913,7 +940,7 @@ func _build_quay() -> void:
 			MCK.lantern(pk, kit, g + rt * (float(j) * 2.2) + Vector3(0, 11.2, 0) - fw * 0.9, 0.8)
 	, 1800.0)
 	# Tour boats moored along the wall: two-deck river boats outlined in LED.
-	var boats: Array = [[420.0, 70.0], [690.0, 60.0], [980.0, 80.0], [1250.0, 55.0]]
+	var boats: Array = [[380.0, 70.0], [580.0, 60.0], [990.0, 80.0], [1230.0, 55.0]]
 	for bt in boats:
 		var bx: float = bt[0]
 		var bl: float = bt[1]
@@ -938,6 +965,226 @@ func _build_quay() -> void:
 				var b2: Vector2 = hull[(e2 + 1) % 5]
 				MCK.led_line(pk, kit, Vector3(a2.x, 2.55, a2.y), Vector3(b2.x, 2.55, b2.y), Color(0.3, 0.8, 1.0, 0.4), 0.25)
 		, 2400.0)
+
+
+# ---- The Yunhai Bridge -------------------------------------------------------------------------------------------------
+
+## No piers under the main span between the pylons (the stays carry it).
+func _col_blocked(p: Vector3, _g: float) -> bool:
+	return absf(p.x - BRIDGE_X) < 30.0 and p.z > float(PYLONS[0]) + 8.0 and p.z < float(PYLONS[1]) - 8.0
+
+
+## A cable-stayed bridge: two A-shaped white pylons rising 118m out of the river either side of the deck, joined under
+## it by a cross beam, LED along their legs, red lights on their tops, fans of stays lit white from each pylon's head to
+## both edges of the deck toward the middle and toward the banks, its name on the pylons.
+func _build_bridge() -> void:
+	_city("bridge_yunhai", func(pk: PropKit, kit: Dictionary, labels: Array) -> void:
+		var white := Color(0.88, 0.89, 0.92)
+		for zp in PYLONS:
+			var z: float = zp
+			var yd: float = lap.y(lap.closest_s(Vector2(BRIDGE_X, z)))
+			var top := Vector3(BRIDGE_X, PYLON_TOP, z)
+			for side in [-1.0, 1.0]:
+				var foot := Vector3(BRIDGE_X + side * 21.0, -11.0, z)
+				var head := Vector3(BRIDGE_X + side * 1.6, PYLON_TOP - 4.0, z)
+				pk.beam(kit, "gloss", foot, head, 3.4, 4.6, white)
+				MCK.led_line(pk, kit, foot + Vector3(side * 1.75, 0, 0), head + Vector3(side * 1.75, 0, 0), Color(0.4, 0.85, 1.0, 0.0), 0.3)
+				pk.block(kit, "tower", foot + Vector3(-5.0, 0.0, -5.0), foot + Vector3(5.0, 11.5, 5.0), Color(0.55, 0.55, 0.57, float(MCK.STYLE_CONCRETE) / 8.0))
+			pk.box(kit, "gloss", Transform3D(Basis(), Vector3(BRIDGE_X, yd - 3.4, z)), Vector3(34.0, 2.6, 4.4), white)
+			pk.box(kit, "gloss", Transform3D(Basis(), top + Vector3(0, -2.0, 0)), Vector3(6.0, 8.0, 5.0), white)
+			pk.block(kit, "neon", top + Vector3(-0.6, 2.0, -0.6), top + Vector3(0.6, 3.2, 0.6), Color(1.0, 0.08, 0.04))
+			for face in [-1.0, 1.0]:
+				MCK.neon_sign(pk, kit, labels, Vector3(BRIDGE_X, PYLON_TOP - 30.0, z + face * 2.6), Vector3(0, 0, face), 3.4, 14.0, "云海大桥",
+						Color(1.0, 0.85, 0.4), true, 0.3)
+			# The stays: from the head, ten to each edge of the deck each way along it.
+			for dirz in [-1.0, 1.0]:
+				for k in range(10):
+					var dz: float = 22.0 + 10.5 * float(k)
+					var zd: float = z + dirz * dz
+					var yy: float = lap.y(lap.closest_s(Vector2(BRIDGE_X, zd)))
+					for side2 in [-1.0, 1.0]:
+						var anchor := Vector3(BRIDGE_X + side2 * 1.4, PYLON_TOP - 8.0 - 3.2 * float(k), z + dirz * 1.2)
+						var deck_pt := Vector3(BRIDGE_X + side2 * (road_half + 1.1), yy + 0.2, zd)
+						# Steel, faintly lit (bright, they glowed into broad white bars across the view from the deck).
+						pk.beam(kit, "steel", anchor, deck_pt, 0.18, 0.18, Color(0.55, 0.57, 0.6))
+						MCK.led_line(pk, kit, anchor.lerp(deck_pt, 0.02), anchor.lerp(deck_pt, 0.85), Color(0.22, 0.26, 0.34, 0.0), 0.06)
+	, 4000.0)
+	# The pylons' legs are solid near the water (boats aside, nothing reaches their tops).
+	var body := _body(level, "BridgePylonsBody")
+	for zp2 in PYLONS:
+		for side3 in [-1.0, 1.0]:
+			_box_shape(body, Transform3D(Basis(), Vector3(BRIDGE_X + side3 * 17.0, 10.0, float(zp2))), Vector3(5.0, 40.0, 5.0))
+
+
+# ---- The Yunhai Plaza: the finish -------------------------------------------------------------------------------------
+
+func _build_plaza() -> void:
+	var p: Rect2 = PLAZA2
+	var gy := 6.0
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5151
+	var cx: float = BRIDGE_X
+	var mid_z: float = (STANDS_Z.x + STANDS_Z.y) * 0.5
+	_city("plaza", func(pk: PropKit, kit: Dictionary, labels: Array) -> void:
+		# The paving, rings of LED set in it round the finish.
+		MCK.flat(pk, kit, PackedVector2Array([p.position, Vector2(p.end.x, p.position.y), p.end, Vector2(p.position.x, p.end.y)]), gy + 0.03, Vector3.UP,
+				Color(0.62, 0.6, 0.58), MCK.STYLE_CONCRETE)
+		for rr in [40.0, 75.0, 110.0, 150.0]:
+			var prev := Vector3.ZERO
+			for k in range(65):
+				var an: float = TAU * float(k) / 64.0
+				var q := Vector3(cx + cos(an) * rr, gy + 0.06, mid_z + sin(an) * rr * 0.8)
+				if k > 0 and p.has_point(Vector2(q.x, q.z)) and p.has_point(Vector2(prev.x, prev.z)):
+					MCK.led_line(pk, kit, prev, q, Color(0.4, 0.8, 1.0, 0.6), 0.25)
+				prev = q
+		# The entrance arch over the road where the bridge comes down: a ring of light and the plaza's name.
+		var za: float = p.position.y + 14.0
+		var prev2 := Vector3.ZERO
+		for k2 in range(33):
+			var an2: float = PI * float(k2) / 32.0
+			var q2 := Vector3(cx + cos(an2) * 15.0, gy + sin(an2) * 15.0, za)
+			if k2 > 0:
+				pk.beam(kit, "gloss", prev2, q2, 0.7, 0.7, Color(0.9, 0.9, 0.92))
+				MCK.led_line(pk, kit, prev2 + Vector3(0, 0, -0.4), q2 + Vector3(0, 0, -0.4), Color(1.0, 0.35, 0.8, 0.0), 0.35)
+			prev2 = q2
+		MCK.neon_sign(pk, kit, labels, Vector3(cx, gy + 12.4, za - 0.6), Vector3(0, 0, -1), 12.0, 2.2, "云海广场", Color(1.0, 0.85, 0.35))
+		# The grandstands either side of the finish straight.
+		for side in [-1.0, 1.0]:
+			_grandstand(pk, kit, labels, side, gy)
+		# The stage at the south end: a platform, a big LED screen, side screens, a truss roof, speakers, lasers.
+		var sz: float = STAGE_Z
+		pk.block(kit, "tower", Vector3(cx - 26.0, gy, sz - 9.0), Vector3(cx + 26.0, gy + 1.8, sz + 9.0), Color(0.1, 0.1, 0.12, float(MCK.STYLE_CLADDING) / 8.0))
+		MCK.led_line(pk, kit, Vector3(cx - 26.0, gy + 1.8, sz - 9.05), Vector3(cx + 26.0, gy + 1.8, sz - 9.05), Color(1.0, 0.3, 0.8, 0.0), 0.2)
+		MCK.wall(pk, kit, Vector3(cx + 22.0, 0, sz + 8.0), Vector3(cx - 22.0, 0, sz + 8.0), gy + 2.0, gy + 20.0, Vector3(0, 0, -1), Color(0.1, 0.1, 0.12), MCK.STYLE_MEDIA, _id())
+		for sx in [-1.0, 1.0]:
+			var e0 := Vector3(cx + sx * 31.0, 0, sz + 2.0)
+			var e1 := Vector3(cx + sx * 25.0, 0, sz + 7.0)
+			MCK.wall(pk, kit, e1 if sx < 0.0 else e0, e0 if sx < 0.0 else e1, gy + 4.0, gy + 14.0, Vector3(-sx * 0.6, 0, -0.8).normalized(), Color(0.1, 0.1, 0.12), MCK.STYLE_MEDIA, _id())
+			# Speaker stacks.
+			for k3 in range(4):
+				pk.block(kit, "paint", Vector3(cx + sx * 28.5 - 1.5, gy + 1.8 * float(k3), sz - 8.0), Vector3(cx + sx * 28.5 + 1.5, gy + 1.8 * float(k3) + 1.7, sz - 5.5),
+						Color(0.05, 0.05, 0.06))
+			# Truss towers.
+			for zz in [sz - 8.0, sz + 7.0]:
+				pk.tube(kit, "steel", Vector3(cx + sx * 24.0, gy, zz), Vector3(cx + sx * 24.0, gy + 24.0, zz), 0.4, 0.4, 6, Color(0.6, 0.6, 0.62))
+		for zz2 in [sz - 8.0, sz + 7.0]:
+			pk.beam(kit, "steel", Vector3(cx - 24.0, gy + 24.0, zz2), Vector3(cx + 24.0, gy + 24.0, zz2), 0.6, 0.6, Color(0.6, 0.6, 0.62))
+		for k4 in range(7):
+			var lx: float = cx - 21.0 + 7.0 * float(k4)
+			pk.beam(kit, "steel", Vector3(lx, gy + 24.0, sz - 8.0), Vector3(lx, gy + 24.0, sz + 7.0), 0.4, 0.4, Color(0.6, 0.6, 0.62))
+			var spot := Vector3(lx, gy + 23.4, sz - 7.6)
+			var col := Color.from_hsv(float(k4) / 7.0, 0.8, 1.0)
+			pk.block(kit, "neon", spot - Vector3(0.4, 0.4, 0.4), spot + Vector3(0.4, 0.4, 0.4), col)
+			# A laser into the sky from each spot, fanned.
+			var dir := Vector3(sin(float(k4 - 3) * 0.22), 1.0, -0.35).normalized()
+			MCK.led_line(pk, kit, spot, spot + dir * 260.0, Color(col.r, col.g, col.b, 0.0), 0.12)
+		MCK.neon_sign(pk, kit, labels, Vector3(cx, gy + 22.0, sz - 8.4), Vector3(0, 0, -1), 24.0, 3.0, "云海之夜", Color(1.0, 0.4, 0.85))
+		# Fountains either side, outside the stands.
+		for fx in [cx - 140.0, cx + 140.0]:
+			var fc := Vector3(fx, gy, mid_z)
+			pk.lathe(kit, "tower", fc, [Vector2(15.0, 0.0), Vector2(16.0, 0.0), Vector2(16.0, 0.7), Vector2(15.0, 0.7), Vector2(15.0, 0.1), Vector2(0.001, 0.1)], 32,
+					Color(0.6, 0.58, 0.55, float(MCK.STYLE_CONCRETE) / 8.0))
+			pk.lathe(kit, "neon", fc + Vector3(0, 0.45, 0), [Vector2(0.001, 0.0), Vector2(14.8, 0.0)], 32, Color(0.05, 0.25, 0.45))
+			for k5 in range(16):
+				var an3: float = TAU * float(k5) / 16.0
+				var jp: Vector3 = fc + Vector3(cos(an3) * 10.0, 0.45, sin(an3) * 10.0)
+				pk.tube(kit, "neon", jp, jp + Vector3(0, 3.0 + 2.0 * float(k5 % 3), 0), 0.12, 0.05, 5, Color(0.7, 0.9, 1.0))
+			pk.tube(kit, "neon", fc, fc + Vector3(0, 12.0, 0), 0.4, 0.1, 6, Color(0.8, 0.95, 1.0))
+	, 1600.0)
+	# The towers round the plaza: illuminated high-rises, media facades and lit crowns.
+	var towers := [[Vector2(505.0, 1370.0), 180.0], [Vector2(505.0, 1460.0), 230.0], [Vector2(505.0, 1550.0), 160.0], [Vector2(1015.0, 1370.0), 200.0],
+		[Vector2(1015.0, 1460.0), 260.0], [Vector2(1015.0, 1550.0), 170.0], [Vector2(640.0, 1650.0), 150.0], [Vector2(760.0, 1670.0), 210.0],
+		[Vector2(880.0, 1650.0), 150.0]]
+	for i in range(towers.size()):
+		var t: Array = towers[i]
+		var c: Vector2 = t[0]
+		var h: float = t[1]
+		var id := _id()
+		var style: int = MCK.STYLE_MEDIA if i % 3 == 1 else MCK.STYLE_OFFICE
+		var tint := Color.from_hsv(0.55 + 0.05 * float(i % 3), 0.25, 0.6)
+		var led := Color.from_hsv(float(i) / 9.0, 0.7, 1.0, 0.0)
+		_city("plaza_towers", func(pk: PropKit, kit: Dictionary, labels: Array) -> void:
+			MCK.tower(pk, kit, c, 22.0, 22.0, gy - 1.0, gy + h, tint, style, id, 5.0, 14.0, true, led, true)
+			for k6 in range(3):
+				var ry: float = gy + h + 2.0 + 5.0 * float(k6)
+				var rr2: float = 14.0 - 3.5 * float(k6)
+				var prev3 := Vector3.ZERO
+				for k7 in range(25):
+					var an4: float = TAU * float(k7) / 24.0
+					var q3 := Vector3(c.x + cos(an4) * rr2, ry, c.y + sin(an4) * rr2)
+					if k7 > 0:
+						MCK.led_line(pk, kit, prev3, q3, led, 0.35)
+					prev3 = q3
+		, 4000.0)
+	# The crowd: seated in the stands, standing before the stage and round the fountains.
+	for side in [-1.0, 1.0]:
+		for row in range(STAND_ROWS):
+			var lat: float = STAND_FRONT + 0.6 + float(row) * STAND_DEPTH
+			var y: float = gy + STAND_RISE * float(row + 1)
+			var z: float = STANDS_Z.x + 1.0
+			while z < STANDS_Z.y - 1.0:
+				if rng.randf() < 0.62:
+					_person(Vector3(cx + side * lat, y, z), Vector3(-side, 0, 0), rng.randf_range(0.92, 1.06), true)
+				z += 1.15
+	var sz2: float = STAGE_Z - 12.0
+	for k8 in range(140):
+		var pp := Vector3(cx + rng.randf_range(-24.0, 24.0), gy, sz2 - rng.randf_range(0.0, 10.0))
+		_person(pp, Vector3(rng.randf_range(-0.3, 0.3), 0, 1), rng.randf_range(0.92, 1.06))
+	for fx2 in [cx - 140.0, cx + 140.0]:
+		for k9 in range(26):
+			var an5: float = rng.randf() * TAU
+			var pp2 := Vector3(fx2 + cos(an5) * 18.5, gy, mid_z + sin(an5) * 18.5)
+			_person(pp2, Vector3(fx2 - pp2.x, 0, mid_z - pp2.z), rng.randf_range(0.92, 1.06))
+	# Barriers: along the finish straight in front of the stands and across the road's end before the stage's crowd.
+	var body := _body(level, "PlazaBarriersBody")
+	var fs: float = lap.length - finish_runout
+	for side2 in [-1.0, 1.0]:
+		_edge_boxes(body, lap, fs - 90.0, lap.length, side2 * (road_half + 2.0), 1.2, 0.4)
+	var end_p: Vector3 = lap.pt(lap.length)
+	_box_shape(body, Transform3D(Basis(), end_p + Vector3(0, 0.6, 3.0)), Vector3(2.0 * road_half + 6.0, 1.2, 0.6))
+
+
+## The grandstands' make: STAND_ROWS rows of seats rising STAND_RISE a row from STAND_FRONT off the road's middle.
+const STAND_ROWS := 10
+const STAND_FRONT := 12.5
+const STAND_DEPTH := 1.0
+const STAND_RISE := 0.6
+
+
+func _grandstand(pk: PropKit, kit: Dictionary, labels: Array, side: float, gy: float) -> void:
+	var cx: float = BRIDGE_X
+	var z0: float = STANDS_Z.x
+	var z1: float = STANDS_Z.y
+	var conc := Color(0.55, 0.55, 0.57, float(MCK.STYLE_CONCRETE) / 8.0)
+	for row in range(STAND_ROWS):
+		var l0: float = STAND_FRONT + float(row) * STAND_DEPTH
+		var y: float = gy + STAND_RISE * float(row + 1)
+		var xa: float = cx + side * l0
+		var xb: float = cx + side * (l0 + STAND_DEPTH)
+		pk.block(kit, "tower", Vector3(minf(xa, xb), gy, z0), Vector3(maxf(xa, xb), y, z1), conc)
+		# The seats' backs, in bands of the cup's colours.
+		var seat_x: float = cx + side * (l0 + STAND_DEPTH * 0.8)
+		var col: Color = [Color(0.85, 0.15, 0.45), Color(0.2, 0.45, 0.85), Color(0.9, 0.9, 0.92)][row % 3]
+		pk.block(kit, "paint", Vector3(seat_x - 0.12, y, z0), Vector3(seat_x + 0.12, y + 0.45, z1), col)
+	# The back wall, the roof on columns along it, cantilevered over the rows, LED along its edge; boards along the front.
+	var back: float = cx + side * (STAND_FRONT + STAND_DEPTH * float(STAND_ROWS))
+	var top_y: float = gy + STAND_RISE * float(STAND_ROWS)
+	MCK.wall(pk, kit, Vector3(back, 0, z0 if side > 0.0 else z1), Vector3(back, 0, z1 if side > 0.0 else z0), gy, top_y + 6.0, Vector3(side, 0, 0),
+			Color(0.2, 0.21, 0.25), MCK.STYLE_CLADDING, 85)
+	var roof_y: float = top_y + 6.0
+	var front_x: float = cx + side * (STAND_FRONT + 1.0)
+	pk.quad(kit, "tower", [Vector3(back, roof_y, z0), Vector3(back, roof_y, z1), Vector3(front_x, roof_y + 1.2, z1), Vector3(front_x, roof_y + 1.2, z0)], Vector3.UP,
+			Color(0.85, 0.86, 0.9, float(MCK.STYLE_CLADDING) / 8.0))
+	pk.quad(kit, "tower", [Vector3(back, roof_y - 0.1, z0), Vector3(back, roof_y - 0.1, z1), Vector3(front_x, roof_y + 1.1, z1), Vector3(front_x, roof_y + 1.1, z0)],
+			Vector3.DOWN, Color(0.26, 0.27, 0.31, float(MCK.STYLE_CLADDING) / 8.0))
+	MCK.led_line(pk, kit, Vector3(front_x, roof_y + 1.15, z0), Vector3(front_x, roof_y + 1.15, z1), Color(0.4, 0.85, 1.0, 0.0), 0.3)
+	var z: float = z0
+	while z <= z1 + 0.1:
+		pk.tube(kit, "steel", Vector3(back - side * 0.4, gy, z), Vector3(back - side * 0.4, roof_y, z), 0.3, 0.3, 6, Color(0.5, 0.52, 0.56))
+		z += 25.0
+	var fx: float = cx + side * (STAND_FRONT - 0.3)
+	MCK.wall(pk, kit, Vector3(fx, 0, z1 if side > 0.0 else z0), Vector3(fx, 0, z0 if side > 0.0 else z1), gy, gy + 1.2, Vector3(-side, 0, 0), Color(0.1, 0.1, 0.14),
+			MCK.STYLE_MEDIA, 86)
 
 
 # ---- The cableway over the river ---------------------------------------------------------------------------------------
@@ -1006,19 +1253,9 @@ func _build_crowds() -> void:
 		var y: float = (lap.y(0.0) if xr.x < 0.0 else lap.y(lap.closest_s(Vector2((xr.x + xr.y) * 0.5, 0.0)))) + MONO_UP + 0.3
 		_crowd_line(Vector3(xr.x + 4.0, y, -MONO_SIDE - 4.5), Vector3(xr.y - 4.0, y, -MONO_SIDE - 4.5), Vector3(0, 0, 1), 2.0, rng, 0.55)
 	# Along the quay's promenade and at the finish.
-	_crowd_line(Vector3(300.0, 4.0, QUAY_Z + road_half + 3.0), Vector3(1200.0, 4.0, QUAY_Z + road_half + 3.0), Vector3(0, 0, -1), 4.0, rng, 0.45)
-	var fs: float = lap.length - finish_runout
-	var s2: float = fs - 60.0
-	while s2 < fs + 30.0:
-		for side2 in [-1.0, 1.0]:
-			for row2 in range(2):
-				if rng.randf() < 0.3:
-					continue
-				var pp: Vector3 = lap.pt(s2) + lap.rt(s2) * side2 * (road_half + 3.0 + float(row2) * 1.6 + rng.randf() * 0.6)
-				pp.y = _ground_at(pp.x, pp.z)
-				_person(pp, -lap.rt(s2) * side2, rng.randf_range(0.92, 1.06))
-		s2 += 2.4
-
+	_crowd_line(Vector3(BRIDGE_X + 30.0, 4.0, QUAY_Z + road_half + 3.0), Vector3(1200.0, 4.0, QUAY_Z + road_half + 3.0), Vector3(0, 0, -1), 4.0, rng, 0.45)
+	# The finish's crowd is the plaza's (`_build_plaza`).
+	pass
 
 func _tree_pick(x: float, z: float, roll: float, rng: RandomNumberGenerator) -> Array:
 	# Banyan-like dark trees and bamboo on the cliff town's slope between the legs.
