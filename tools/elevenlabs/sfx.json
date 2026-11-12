@@ -1,778 +1,794 @@
 [
-  {
-    "name": "jet_approach",
-    "path": "sounds/airliners/jet_approach_loop.wav",
-    "text": "A large passenger jet airliner flying past overhead on its approach to land, a steady deep turbofan roar and low rumble, heard from the ground outdoors, continuous, no doppler sweep",
-    "duration": 10.0,
-    "loop": true,
-    "influence": 0.55
-  },
-  {
-    "name": "jet_climb",
-    "path": "sounds/airliners/jet_climb_loop.wav",
-    "text": "A large passenger jet airliner climbing out after takeoff, powerful jet engine roar with a high turbofan whine on top, heard from the ground outdoors, continuous, no doppler sweep",
-    "duration": 10.0,
-    "loop": true,
-    "influence": 0.55
-  },
-  {
-    "name": "suspended_train",
-    "path": "sounds/muallaq/suspended_train_loop.wav",
-    "text": "A suspended monorail train gliding along an overhead steel rail, smooth electric motor hum, soft rhythmic clicks of the wheels over rail joints, gentle sway creaks, continuous",
-    "duration": 8.0,
-    "loop": true,
-    "influence": 0.5
-  },
-  {
-    "name": "station_chime",
-    "path": "sounds/muallaq/station_chime.wav",
-    "text": "A gentle three-note electronic chime at a train station announcing a departure, clean and bright, short",
-    "duration": 3.0,
-    "loop": false,
-    "influence": 0.7
-  },
-  {
-    "name": "souk_arcade",
-    "path": "sounds/arcade/souk_arcade_loop.wav",
-    "text": "A busy covered Arabian market arcade at night, indoor crowd murmur and chatter, footsteps on stone floors, shopkeepers calling softly, cups clinking, faint oud music from a shop, reverberant hall, continuous",
-    "duration": 22.0,
-    "loop": true,
-    "influence": 0.45
-  },
-  {
-    "name": "crowd_cheer_1",
-    "path": "sounds/crowd/promenade_cheer_1.wav",
-    "text": "An excited crowd of spectators lining a street race at night bursts into cheers and whistles as the racers go past, short and lively, outdoors, no engine sounds",
-    "duration": 4.5,
-    "loop": false,
-    "influence": 0.5
-  },
-  {
-    "name": "crowd_cheer_2",
-    "path": "sounds/crowd/promenade_cheer_2.wav",
-    "text": "A grandstand crowd roars and applauds, a rising cheer that settles, outdoor night race, no vehicles",
-    "duration": 5.0,
-    "loop": false,
-    "influence": 0.5
-  },
-  {
-    "name": "crowd_cheer_3",
-    "path": "sounds/crowd/promenade_cheer_3.wav",
-    "text": "Spectators behind barriers clapping, shouting and whooping as racers speed by, a couple of air horns, outdoors, no engines",
-    "duration": 4.5,
-    "loop": false,
-    "influence": 0.5
-  },
-  {
-    "name": "crowd_cheer_4",
-    "path": "sounds/crowd/promenade_cheer_4.wav",
-    "text": "A seaside promenade crowd cheering loudly, whistles and shouts of encouragement, a short burst, no engines",
-    "duration": 4.0,
-    "loop": false,
-    "influence": 0.5
-  },
-  {
-    "name": "crowd_cheer_5",
-    "path": "sounds/crowd/promenade_cheer_5.wav",
-    "text": "A crowd gasps and then erupts into excited cheering and applause, outdoors at night, no vehicles",
-    "duration": 4.5,
-    "loop": false,
-    "influence": 0.5
-  },
-  {
-    "name": "crowd_cheer_6",
-    "path": "sounds/crowd/promenade_cheer_6.wav",
-    "text": "Festive fans cheering and clapping along to a darbuka drum, whistles, a short joyful burst, outdoors at night, no engines",
-    "duration": 5.0,
-    "loop": false,
-    "influence": 0.5
-  },
-  {
-    "name": "suspended_train_run",
-    "path": "sounds/muallaq/suspended_train_run_loop.wav",
-    "text": "A suspended monorail train running along an overhead steel girder track, a deep metallic rumble of steel wheels on the rail, the girder resonating and humming, an electric motor whine, continuous",
-    "duration": 10.0,
-    "loop": true,
-    "influence": 0.6
-  },
-  {
-    "name": "suspended_passby_1",
-    "path": "sounds/muallaq/suspended_passby_1.wav",
-    "text": "A suspended railway train passes close overhead: a rising rumble and squeal of steel wheels on the rail, the steel girder booming as it goes by, then fading away into the distance, no horn, no voices",
-    "duration": 7.0,
-    "loop": false,
-    "influence": 0.6
-  },
-  {
-    "name": "suspended_passby_2",
-    "path": "sounds/muallaq/suspended_passby_2.wav",
-    "text": "An overhead hanging monorail train rushes past above the street, rattling steel wheels and a booming girder swelling and then fading away, no horn, no voices",
-    "duration": 7.0,
-    "loop": false,
-    "influence": 0.6
-  },
-  {
-    "name": "suspended_brakes",
-    "path": "sounds/muallaq/suspended_brakes.wav",
-    "text": "An electric train braking smoothly to a stop at an elevated station, a soft brake squeal and a hiss of air, short",
-    "duration": 4.0,
-    "loop": false,
-    "influence": 0.6
-  },
-  {
-    "name": "rolling_mill",
-    "path": "sounds/kronburg/rolling_mill_loop.wav",
-    "text": "Inside a huge steel rolling mill hall, a deep industrial hum, heavy rollers turning, a hot steel slab grinding through the mill stands with rumbling and occasional metallic clanks and booms echoing in the big hall, steam hiss, continuous",
-    "duration": 12.0,
-    "loop": true,
-    "influence": 0.5
-  },
-  {
-    "name": "blast_furnace",
-    "path": "sounds/kronburg/blast_furnace_loop.wav",
-    "text": "A blast furnace at a steelworks heard from outside nearby, a deep steady roar of hot air blowing, low rumbling, distant industrial machinery, continuous",
-    "duration": 10.0,
-    "loop": true,
-    "influence": 0.5
-  },
-  {
-    "name": "church_bells",
-    "path": "sounds/kronburg/church_bells.wav",
-    "text": "Large bronze church bells ringing from a stone church tower in a small German town, several bells pealing together, heard from the market square, natural reverb",
-    "duration": 14.0,
-    "loop": false,
-    "influence": 0.6
-  },
-  {
-    "name": "crane_horn",
-    "path": "sounds/kronburg/crane_warning.wav",
-    "text": "An overhead travelling crane warning horn in a factory hall, two short electric horn honks echoing",
-    "duration": 3.0,
-    "loop": false,
-    "influence": 0.65
-  },
-  {
-    "name": "barge_engine",
-    "path": "sounds/kronburg/barge_engine_loop.wav",
-    "text": "A large inland cargo barge on a canal, a slow heavy diesel engine thumping, water churning at the stern, heard from the canal bank, continuous",
-    "duration": 10.0,
-    "loop": true,
-    "influence": 0.5
-  },
-  {
-    "name": "rhein_ship_horn",
-    "path": "sounds/rheinufer/ship_horn_long.wav",
-    "text": "A large inland cargo ship's horn on a wide river, one long deep blast that echoes across the water and fades, heard from the river bank",
-    "duration": 5.0,
-    "loop": false,
-    "influence": 0.6
-  },
-  {
-    "name": "rhein_ship_horn2",
-    "path": "sounds/rheinufer/ship_horn_double.wav",
-    "text": "Two short deep blasts of a river cargo ship's horn on a wide river, echoing across the water",
-    "duration": 4.0,
-    "loop": false,
-    "influence": 0.6
-  },
-  {
-    "name": "rhein_ship_engine",
-    "path": "sounds/rheinufer/ship_engine_loop.wav",
-    "text": "A large river cargo ship passing slowly, a deep diesel engine throbbing and water rushing along its hull, heard from the river bank, continuous",
-    "duration": 10.0,
-    "loop": true,
-    "influence": 0.5
-  },
-  {
-    "name": "autobahn_hum",
-    "path": "sounds/rheinufer/autobahn_traffic_loop.wav",
-    "text": "Motorway traffic heard from a meadow beside it: a steady hum of tyres, cars and lorries swooshing past in both directions, continuous, no horns",
-    "duration": 12.0,
-    "loop": true,
-    "influence": 0.45
-  },
-  {
-    "name": "kirmes_fair",
-    "path": "sounds/rheinufer/kirmes_loop.wav",
-    "text": "A German fun fair heard from across a meadow: a cheerful fairground organ playing an instrumental tune, rides whirring and clanking, a bell ringing, people laughing and a crowd murmuring without clear words, continuous",
-    "duration": 15.0,
-    "loop": true,
-    "influence": 0.45
-  },
-  {
-    "name": "sheep_bleat_1",
-    "path": "sounds/rheinufer/sheep_bleat_1.wav",
-    "text": "A single sheep bleating once in a meadow, close",
-    "duration": 1.6,
-    "loop": false,
-    "influence": 0.7
-  },
-  {
-    "name": "sheep_bleat_2",
-    "path": "sounds/rheinufer/sheep_bleat_2.wav",
-    "text": "A lamb bleating twice in a field, close",
-    "duration": 1.8,
-    "loop": false,
-    "influence": 0.7
-  },
-  {
-    "name": "sheep_bleat_3",
-    "path": "sounds/rheinufer/sheep_bleat_3.wav",
-    "text": "An old ewe giving a low hoarse bleat in a pasture, close",
-    "duration": 1.6,
-    "loop": false,
-    "influence": 0.7
-  },
-  {
-    "name": "sheep_flock",
-    "path": "sounds/rheinufer/sheep_flock_loop.wav",
-    "text": "A flock of sheep grazing on a river dyke: soft bleats here and there, hooves on grass, a bell on one sheep, continuous",
-    "duration": 12.0,
-    "loop": true,
-    "influence": 0.5
-  },
-  {
-    "name": "river_lap",
-    "path": "sounds/rheinufer/river_lap_loop.wav",
-    "text": "A wide fast river flowing past a pebble beach and stone groynes: water lapping and gurgling against the stones, gentle and continuous",
-    "duration": 12.0,
-    "loop": true,
-    "influence": 0.45
-  },
-  {
-    "name": "windmill_turn",
-    "path": "sounds/rheinufer/windmill_loop.wav",
-    "text": "An old wooden tower windmill turning slowly in a steady wind: the sails whooshing past, wooden gears creaking and knocking, continuous",
-    "duration": 10.0,
-    "loop": true,
-    "influence": 0.5
-  },
-  {
-    "name": "quench_burst",
-    "path": "sounds/zeche/quench_burst.wav",
-    "text": "A coking plant's quench tower: water floods a car of red-hot coke, a huge roaring hiss of steam rising into the air, then slowly dying away, heard from a road nearby",
-    "duration": 9.0,
-    "loop": false,
-    "influence": 0.55
-  },
-  {
-    "name": "kokerei_hum",
-    "path": "sounds/zeche/kokerei_loop.wav",
-    "text": "A working coking plant heard from beside it: a low industrial hum, steam hissing from pipes, heavy machinery clanking now and then, a distant rumble, continuous",
-    "duration": 12.0,
-    "loop": true,
-    "influence": 0.45
-  },
-  {
-    "name": "crows_morning",
-    "path": "sounds/zeche/crows_loop.wav",
-    "text": "Crows and jackdaws calling in birch trees on a quiet misty summer morning, a few caws here and there, soft wind, continuous",
-    "duration": 12.0,
-    "loop": true,
-    "influence": 0.45
-  },
-  {
-    "name": "conveyor_rattle",
-    "path": "sounds/zeche/conveyor_loop.wav",
-    "text": "An old coal conveyor belt running high up in a steel gallery: rollers rattling and squeaking, coal rumbling along, continuous",
-    "duration": 10.0,
-    "loop": true,
-    "influence": 0.5
-  },
-  {
-    "name": "sr_tram_bell_1",
-    "path": "sounds/stadtrallye/tram_bell_1.wav",
-    "text": "A modern German city tram's warning gong: two quick bright metallic dings, outdoors on a street",
-    "duration": 2.0,
-    "loop": false,
-    "influence": 0.7
-  },
-  {
-    "name": "sr_tram_bell_2",
-    "path": "sounds/stadtrallye/tram_bell_2.wav",
-    "text": "A city tram driver ringing the tram's warning bell three times urgently, bright metallic gong, outdoors",
-    "duration": 2.5,
-    "loop": false,
-    "influence": 0.7
-  },
-  {
-    "name": "sr_car_horn_1",
-    "path": "sounds/stadtrallye/car_horn_1.wav",
-    "text": "A small European hatchback car honking its horn once, short and annoyed, outdoors on a city street",
-    "duration": 1.2,
-    "loop": false,
-    "influence": 0.7
-  },
-  {
-    "name": "sr_car_horn_2",
-    "path": "sounds/stadtrallye/car_horn_2.wav",
-    "text": "An angry driver leaning on the car horn, a long continuous honk then two short ones, city street",
-    "duration": 2.0,
-    "loop": false,
-    "influence": 0.7
-  },
-  {
-    "name": "sr_car_horn_3",
-    "path": "sounds/stadtrallye/car_horn_3.wav",
-    "text": "A city bus or delivery truck sounding its deep horn, one long blast, city street",
-    "duration": 1.8,
-    "loop": false,
-    "influence": 0.7
-  },
-  {
-    "name": "sr_tram_pass",
-    "path": "sounds/stadtrallye/tram_pass_loop.wav",
-    "text": "A modern low-floor tram rolling along a city street: electric motor whine, steel wheels on grooved rails, soft rumble and clicks over rail joints, continuous",
-    "duration": 8.0,
-    "loop": true,
-    "influence": 0.5
-  },
-  {
-    "name": "sr_ring_traffic",
-    "path": "sounds/stadtrallye/ring_traffic_loop.wav",
-    "text": "Busy four-lane city ring road traffic heard from the pavement: cars, vans and buses passing continuously at fifty kilometres an hour, tyre noise and engines, no horns, continuous",
-    "duration": 20.0,
-    "loop": true,
-    "influence": 0.45
-  },
-  {
-    "name": "sr_ball_crash_1",
-    "path": "sounds/stadtrallye/wrecking_ball_crash_1.wav",
-    "text": "A heavy steel wrecking ball smashing into a concrete building wall: a huge crash, concrete cracking and crumbling, rubble and debris falling, dust",
-    "duration": 4.0,
-    "loop": false,
-    "influence": 0.6
-  },
-  {
-    "name": "sr_ball_crash_2",
-    "path": "sounds/stadtrallye/wrecking_ball_crash_2.wav",
-    "text": "A demolition wrecking ball hitting a reinforced concrete facade: deep booming impact, glass and concrete shattering, chunks tumbling down",
-    "duration": 4.0,
-    "loop": false,
-    "influence": 0.6
-  },
-  {
-    "name": "sr_ball_clang",
-    "path": "sounds/stadtrallye/wrecking_ball_clang.wav",
-    "text": "A heavy swinging steel wrecking ball hitting a small car: a loud metallic clang and a crunch of bent metal",
-    "duration": 2.0,
-    "loop": false,
-    "influence": 0.65
-  },
-  {
-    "name": "sr_ball_whoosh",
-    "path": "sounds/stadtrallye/wrecking_ball_whoosh.wav",
-    "text": "A huge steel wrecking ball on a chain swinging past close by: a deep heavy whoosh of air and the rattle of the steel chain",
-    "duration": 3.0,
-    "loop": false,
-    "influence": 0.6
-  },
-  {
-    "name": "sr_handler",
-    "path": "sounds/stadtrallye/handler_hydraulics_loop.wav",
-    "text": "A scrapyard material handler crane slewing: diesel engine revving under load and a whining hydraulic pump, steel creaking, continuous",
-    "duration": 8.0,
-    "loop": true,
-    "influence": 0.5
-  },
-  {
-    "name": "sr_magnet_clang",
-    "path": "sounds/stadtrallye/magnet_clang.wav",
-    "text": "Heavy scrap metal clanging: a crushed car swinging on a crane magnet bangs into steel, loud metallic clang and rattle",
-    "duration": 2.0,
-    "loop": false,
-    "influence": 0.6
-  },
-  {
-    "name": "sr_excavator",
-    "path": "sounds/stadtrallye/excavator_loop.wav",
-    "text": "A large tracked excavator working on a building site: diesel engine under load, hydraulic arm whine, the bucket scraping soil, continuous",
-    "duration": 8.0,
-    "loop": true,
-    "influence": 0.5
-  },
-  {
-    "name": "sr_roller",
-    "path": "sounds/stadtrallye/roller_loop.wav",
-    "text": "A vibratory road roller compacting a gravel road: diesel engine and a deep rhythmic thrumming drum vibration, continuous",
-    "duration": 8.0,
-    "loop": true,
-    "influence": 0.5
-  },
-  {
-    "name": "sr_beeper",
-    "path": "sounds/stadtrallye/reverse_beeper_loop.wav",
-    "text": "A construction vehicle's reversing alarm: a steady electronic beep beep beep, continuous",
-    "duration": 4.0,
-    "loop": true,
-    "influence": 0.7
-  },
-  {
-    "name": "sr_site",
-    "path": "sounds/stadtrallye/site_ambience_loop.wav",
-    "text": "A busy construction site in a city: distant hammering, a circular saw now and then, a concrete mixer turning, machines rumbling, workers' tools clanking, continuous",
-    "duration": 20.0,
-    "loop": true,
-    "influence": 0.45
-  },
-  {
-    "name": "sr_scrapyard",
-    "path": "sounds/stadtrallye/scrapyard_ambience_loop.wav",
-    "text": "A scrapyard at work: scrap metal being dropped and clattering onto piles, a crane's engine, steel creaking and banging, continuous",
-    "duration": 20.0,
-    "loop": true,
-    "influence": 0.45
-  },
-  {
-    "name": "shield_up",
-    "path": "sounds/items/shield_up.wav",
-    "text": "A futuristic energy force field powering up around a small vehicle: a rising electric whoosh that blooms into a bright shimmering hum, sci-fi arcade game power-up, clean, short",
-    "duration": 1.4,
-    "loop": false,
-    "influence": 0.6
-  },
-  {
-    "name": "shield_down",
-    "path": "sounds/items/shield_down.wav",
-    "text": "A futuristic energy force field running out and fading away: a few stuttering electric flickers then a falling soft power-down whoosh, sci-fi arcade game, clean, short",
-    "duration": 1.4,
-    "loop": false,
-    "influence": 0.6
-  },
-  {
-    "name": "shield_break",
-    "path": "sounds/items/shield_break.wav",
-    "text": "A futuristic energy shield shattering when hit: a sharp crackling electric burst with a glassy crystalline shatter and a quick fizzle, sci-fi arcade game, punchy, short",
-    "duration": 1.0,
-    "loop": false,
-    "influence": 0.6
-  },
-  {
-    "name": "puddle_splash_1",
-    "path": "sounds/surfaces/puddle_splash_1.wav",
-    "text": "A small toy car driving fast through a shallow rain puddle on a road, a short light watery splash and spray, close up, outdoors, no engine",
-    "duration": 0.8,
-    "loop": false,
-    "influence": 0.6
-  },
-  {
-    "name": "puddle_splash_2",
-    "path": "sounds/surfaces/puddle_splash_2.wav",
-    "text": "A car tyre rolling quickly through a shallow muddy puddle, a brief soft swish of splashing water, close up, outdoors, no engine",
-    "duration": 0.8,
-    "loop": false,
-    "influence": 0.6
-  },
-  {
-    "name": "ab_car_petrol",
-    "path": "sounds/rheinufer/traffic_car_petrol_loop.wav",
-    "text": "A modern petrol family car cruising at steady motorway speed, engine hum and tyre roar on asphalt, recorded close beside the car moving along with it, constant pitch, no passing, no doppler, no wind gusts",
-    "duration": 6.0,
-    "loop": true,
-    "influence": 0.6
-  },
-  {
-    "name": "ab_suv_v6",
-    "path": "sounds/rheinufer/traffic_suv_loop.wav",
-    "text": "A large SUV with a V6 petrol engine cruising at steady motorway speed, a deeper throaty engine note and wide tyres humming on asphalt, recorded close alongside, constant pitch, no doppler, no passing",
-    "duration": 6.0,
-    "loop": true,
-    "influence": 0.6
-  },
-  {
-    "name": "ab_van_diesel",
-    "path": "sounds/rheinufer/traffic_van_diesel_loop.wav",
-    "text": "A diesel delivery van cruising at steady motorway speed, clattering diesel engine drone and tyre noise, recorded close alongside, constant pitch, no doppler, no passing",
-    "duration": 6.0,
-    "loop": true,
-    "influence": 0.6
-  },
-  {
-    "name": "ab_motorhome",
-    "path": "sounds/rheinufer/traffic_motorhome_loop.wav",
-    "text": "A heavy motorhome camper on a truck chassis cruising on the motorway, low turbo diesel rumble, rattling body, big tyres on asphalt, recorded close alongside, constant pitch, no doppler, no passing",
-    "duration": 6.0,
-    "loop": true,
-    "influence": 0.6
-  },
-  {
-    "name": "ab_horn_long",
-    "path": "sounds/rheinufer/traffic_horn_long.wav",
-    "text": "An angry long car horn blast on a motorway, a single sustained honk about one second long, clear, close",
-    "duration": 1.4,
-    "loop": false,
-    "influence": 0.6
-  },
-  {
-    "name": "ab_horn_truck",
-    "path": "sounds/rheinufer/traffic_horn_deep.wav",
-    "text": "A deep loud two-tone horn of a motorhome or small truck, two short honks, close, outdoors",
-    "duration": 1.6,
-    "loop": false,
-    "influence": 0.6
-  },
-  {
-    "name": "city_car",
-    "path": "sounds/stadtrallye/city_car_loop.wav",
-    "text": "A small petrol hatchback driving through a city street at about 40 km/h, light engine hum in a middle gear, tyres on asphalt, recorded close alongside, steady, no passing, no doppler, no horn",
-    "duration": 6.0,
-    "loop": true,
-    "influence": 0.6
-  },
-  {
-    "name": "city_suv",
-    "path": "sounds/stadtrallye/city_suv_loop.wav",
-    "text": "A family SUV rolling along a busy city street at moderate speed, a soft engine note and an easy gear change, tyres on asphalt, recorded close alongside, steady, no passing, no doppler",
-    "duration": 6.0,
-    "loop": true,
-    "influence": 0.6
-  },
-  {
-    "name": "city_van",
-    "path": "sounds/stadtrallye/city_van_loop.wav",
-    "text": "A diesel delivery van driving slowly through town traffic, rattling diesel at low revs, a gear change, recorded close alongside, steady, no passing, no doppler",
-    "duration": 6.0,
-    "loop": true,
-    "influence": 0.6
-  },
-  {
-    "name": "city_bus",
-    "path": "sounds/stadtrallye/city_bus_loop.wav",
-    "text": "A city bus driving along a street at low speed, deep diesel drone, air brakes hiss softly once, heavy tyres, recorded close alongside, steady, no passing, no doppler",
-    "duration": 6.0,
-    "loop": true,
-    "influence": 0.6
-  },
-  {
-    "name": "lightplane_engine",
-    "path": "sounds/kronburg/light_plane_loop.wav",
-    "text": "A small single-engine four-seat propeller aeroplane cruising overhead, the steady buzzing drone of a four-cylinder piston engine and propeller heard from the ground, continuous, constant pitch, no doppler sweep, no wind gusts",
-    "duration": 8.0,
-    "loop": true,
-    "influence": 0.6
-  },
-  {
-    "name": "engine_bootlegger",
-    "path": "sounds/enginesounds/engine_bootlegger_loop.wav",
-    "text": "A supercharged big-block V8 hot rod engine held at a steady mid-high RPM, deep loud lumpy rumble from open exhaust headers with the high mechanical whine of a roots supercharger on top, recorded close, constant engine speed, no revving, no gear changes, continuous drone",
-    "duration": 8.0,
-    "loop": true,
-    "influence": 0.6
-  },
-  {
-    "name": "engine_meteor",
-    "path": "sounds/enginesounds/engine_meteor_loop.wav",
-    "text": "A vintage 1930s supercharged straight-eight Grand Prix racing car engine held at a steady high RPM, raw metallic exhaust bark with a shrill screaming supercharger wail, open pipes, recorded close, constant engine speed, no revving, no gear changes, continuous drone",
-    "duration": 8.0,
-    "loop": true,
-    "influence": 0.6
-  },
-  {
-    "name": "engine_bubble",
-    "path": "sounds/enginesounds/engine_bubblecar_loop.wav",
-    "text": "A tiny 1950s single-cylinder two-stroke microcar engine held at a steady high RPM, buzzy rattly ring-ding-ding putter like a moped, tinny exhaust, recorded close, constant engine speed, no revving, continuous drone",
-    "duration": 8.0,
-    "loop": true,
-    "influence": 0.6
-  },
-  {
-    "name": "engine_sandpiper",
-    "path": "sounds/enginesounds/engine_sandpiper_loop.wav",
-    "text": "An air-cooled flat-four boxer engine in a 1960s beach buggy held at a steady high RPM, a raspy clattery throaty burble from a short open exhaust with the whir of the cooling fan, recorded close, constant engine speed, no revving, no gear changes, continuous drone",
-    "duration": 8.0,
-    "loop": true,
-    "influence": 0.6
-  },
-  {
-    "name": "engine_samurai",
-    "path": "sounds/enginesounds/engine_samurai_loop.wav",
-    "text": "A tuned 1970s Japanese straight-six sports coupe engine held at a steady high RPM through short straight-through open exhaust pipes, a sharp raspy metallic howl with carburettor intake roar, recorded close, constant engine speed, no revving, no gear changes, no backfires, continuous drone",
-    "duration": 8.0,
-    "loop": true,
-    "influence": 0.6
-  },
-  {
-    "name": "engine_ninja",
-    "path": "sounds/enginesounds/engine_ninja_loop.wav",
-    "text": "A small high-revving turbocharged four-cylinder engine in a modern lightweight Japanese track car held at a steady high RPM, a tight buzzing rasp with a constant high turbocharger whistle and spool whine over it, recorded close, constant engine speed, no revving, no gear changes, no blow-off valve, continuous drone",
-    "duration": 8.0,
-    "loop": true,
-    "influence": 0.6
-  },
-  {
-    "name": "engine_crimson",
-    "path": "sounds/enginesounds/engine_crimson_loop.wav",
-    "text": "A naturally aspirated V12 engine in an open-wheel road racing car held at a steady high RPM, a smooth soaring metallic howl with a hard edge and intake roar, recorded close, constant engine speed, no revving, no gear changes, no backfires, continuous drone",
-    "duration": 8.0,
-    "loop": true,
-    "influence": 0.6
-  },
-  {
-    "name": "garage_lift_motor",
-    "path": "sounds/garage/lift_motor_loop.wav",
-    "text": "An electro-hydraulic two-post car lift raising a car in a quiet showroom workshop: steady electric motor hum with a smooth hydraulic pump whine, constant, no starts or stops, no clicks, seamless loop",
-    "duration": 4.0,
-    "loop": true,
-    "influence": 0.6
-  },
-  {
-    "name": "garage_lift_lower",
-    "path": "sounds/garage/lift_lower_loop.wav",
-    "text": "A hydraulic car lift lowering slowly: a steady soft hiss of hydraulic fluid flowing back through a release valve with a faint low hum, constant, no starts or stops, no clicks, seamless loop",
-    "duration": 4.0,
-    "loop": true,
-    "influence": 0.6
-  },
-  {
-    "name": "garage_lift_top",
-    "path": "sounds/garage/lift_top.wav",
-    "text": "A car lift reaching full height: the electric motor stops and the carriages settle onto the steel safety locks with one heavy solid metallic clunk, short, dry workshop",
-    "duration": 1.5,
-    "loop": false,
-    "influence": 0.6
-  },
-  {
-    "name": "garage_lift_release",
-    "path": "sounds/garage/lift_release.wav",
-    "text": "Car lift safety locks releasing before lowering: a short pneumatic hiss and two steel latches clacking open together, dry workshop",
-    "duration": 1.2,
-    "loop": false,
-    "influence": 0.6
-  },
-  {
-    "name": "garage_lift_bottom",
-    "path": "sounds/garage/lift_bottom.wav",
-    "text": "Car lift arms settling down at the bottom: a soft heavy metallic thud as the arms come to rest, then the hydraulic hiss stops with a short sigh, dry workshop",
-    "duration": 1.4,
-    "loop": false,
-    "influence": 0.6
-  },
-  {
-    "name": "garage_lineup_on",
-    "path": "sounds/garage/lineup_on.wav",
-    "text": "A powerful showroom spotlight and an LED light strip powering on: a solid relay clunk at once, followed straight away by a clear rising electric hum and a soft bright sparkle that swells up and settles, satisfying, clean, no music, close and dry indoors",
-    "duration": 1.8,
-    "loop": false,
-    "influence": 0.7
-  },
-  {
-    "name": "garage_lineup_off",
-    "path": "sounds/garage/lineup_off.wav",
-    "text": "A powerful showroom spotlight and an LED light strip powering off: a solid relay clunk at once, followed straight away by a clear electric hum sinking in pitch and fading out, clean, no music, close and dry indoors",
-    "duration": 1.8,
-    "loop": false,
-    "influence": 0.7
-  },
-  {
-    "name": "miyo_spring_breeze_1",
-    "path": "sounds/miyoshino/spring_breeze/spring_breeze_1.wav",
-    "text": "A calm spring morning on a quiet Japanese mountain slope: a soft breeze drifting through blossoming cherry trees, gentle rustling of leaves and petals, airy and spacious, now and then one distant bird call far away, mostly quiet. No insects, no bees, no buzzing, no music, no voices.",
-    "duration": 28.0,
-    "loop": true,
-    "influence": 0.45
-  },
-  {
-    "name": "miyo_spring_breeze_2",
-    "path": "sounds/miyoshino/spring_breeze/spring_breeze_2.wav",
-    "text": "Gentle spring wind in an open grove of cherry trees on a hillside, slow swells of soft rustling and calm lulls between them, a faint far-off bird once or twice, peaceful and wide. No insects, no bees, no buzzing, no music, no voices.",
-    "duration": 28.0,
-    "loop": true,
-    "influence": 0.45
-  },
-  {
-    "name": "miyo_spring_breeze_3",
-    "path": "sounds/miyoshino/spring_breeze/spring_breeze_3.wav",
-    "text": "A light breeze over a park by a calm lake in spring: leaves whispering in the trees, a faint lapping of water at a shore, very sparse distant birdsong, serene and open air. No insects, no bees, no buzzing, no music, no voices.",
-    "duration": 28.0,
-    "loop": true,
-    "influence": 0.45
-  },
-  {
-    "name": "miyo_river_1",
-    "path": "sounds/miyoshino/river/river_1.wav",
-    "text": "A clear mountain river flowing steadily over stones close by, soft rushing and babbling water, a light breeze in the trees on the bank. No insects, no bees, no buzzing, no music, no voices.",
-    "duration": 28.0,
-    "loop": true,
-    "influence": 0.45
-  },
-  {
-    "name": "miyo_river_2",
-    "path": "sounds/miyoshino/river/river_2.wav",
-    "text": "A wide shallow river running over a shingle bed in a valley, continuous gentle water rush with small splashes, a soft wind, calm and natural. No insects, no bees, no buzzing, no music, no voices.",
-    "duration": 28.0,
-    "loop": true,
-    "influence": 0.45
-  },
-  {
-    "name": "miyo_river_3",
-    "path": "sounds/miyoshino/river/river_3.wav",
-    "text": "River rapids heard from the bank a little way off: a steady soft roar of flowing water over rocks, breeze in cedar trees, open air. No insects, no bees, no buzzing, no music, no voices.",
-    "duration": 28.0,
-    "loop": true,
-    "influence": 0.45
-  },
-  {
-    "name": "miyo_temple_dusk_1",
-    "path": "sounds/miyoshino/temple_dusk/temple_dusk_1.wav",
-    "text": "Dusk in a quiet traditional Japanese temple town in spring: a soft evening breeze, paper lanterns creaking gently on their cords, a distant soft murmur of a few people far away, a frog croaking faintly from a pond now and then. No insects, no bees, no buzzing, no music, no clear words.",
-    "duration": 28.0,
-    "loop": true,
-    "influence": 0.45
-  },
-  {
-    "name": "miyo_temple_dusk_2",
-    "path": "sounds/miyoshino/temple_dusk/temple_dusk_2.wav",
-    "text": "Early evening on an old stone-paved street of wooden houses in Japan: calm air, a faint wooden clack of a door far off, quiet distant murmur, soft breeze through cherry blossoms, a few frogs far away, peaceful. No insects, no bees, no buzzing, no music, no clear words.",
-    "duration": 28.0,
-    "loop": true,
-    "influence": 0.45
-  },
-  {
-    "name": "miyo_temple_dusk_3",
-    "path": "sounds/miyoshino/temple_dusk/temple_dusk_3.wav",
-    "text": "A temple precinct at nightfall: a gentle breeze in pine and cherry trees, gravel crunching softly far away, a distant quiet murmur of visitors, faint frogs from a pond, serene and still. No insects, no bees, no buzzing, no music, no clear words.",
-    "duration": 28.0,
-    "loop": true,
-    "influence": 0.45
-  },
-  {
-    "name": "miyo_mountain_wind_1",
-    "path": "sounds/miyoshino/mountain_wind/mountain_wind_1.wav",
-    "text": "High on a mountain at dawn above the clouds: cold wind gusting softly across a rocky ridge, airy hollow whoosh, cedar branches creaking now and then, wide and empty. No insects, no bees, no buzzing, no music, no voices.",
-    "duration": 28.0,
-    "loop": true,
-    "influence": 0.45
-  },
-  {
-    "name": "miyo_mountain_wind_2",
-    "path": "sounds/miyoshino/mountain_wind/mountain_wind_2.wav",
-    "text": "A misty mountain trail in thick cloud: damp still air with soft gusts of wind through tall cedar trees, dripping water now and then, muffled and quiet. No insects, no bees, no buzzing, no music, no voices.",
-    "duration": 28.0,
-    "loop": true,
-    "influence": 0.45
-  },
-  {
-    "name": "miyo_mountain_wind_3",
-    "path": "sounds/miyoshino/mountain_wind/mountain_wind_3.wav",
-    "text": "Wind on a high mountain summit: steady cool breeze with slow swells, a faint whistle over rocks, cloth prayer streamers fluttering softly, vast and calm. No insects, no bees, no buzzing, no music, no voices.",
-    "duration": 28.0,
-    "loop": true,
-    "influence": 0.45
-  },
-  {
-    "name": "miyo_temple_bell",
-    "path": "sounds/miyoshino/temple_bell.wav",
-    "text": "A single deep strike of a large bronze Japanese temple bell (bonsho) struck with a wooden beam, heard from across a lake, a long rich resonant hum slowly fading away, no other sounds",
-    "duration": 12.0,
-    "loop": false,
-    "influence": 0.6
-  },
-  {
-    "name": "engine_typhoon",
-    "path": "sounds/enginesounds/engine_typhoon_elevenlabs_loop.wav",
-    "text": "A fan buggy: a small twin-cylinder aircraft engine driving a large ducted propeller, held at a steady medium-high RPM, a warm rounded throaty drone with the deep whoosh of the propeller blades, recorded close, mellow and not shrill, constant engine speed, no revving, no gear changes, continuous drone",
-    "duration": 8.0,
-    "loop": true,
-    "influence": 0.6
-  }
+ {
+  "name": "jet_approach",
+  "path": "sounds/airliners/jet_approach_loop.wav",
+  "text": "A large passenger jet airliner flying past overhead on its approach to land, a steady deep turbofan roar and low rumble, heard from the ground outdoors, continuous, no doppler sweep",
+  "duration": 10.0,
+  "loop": true,
+  "influence": 0.55
+ },
+ {
+  "name": "jet_climb",
+  "path": "sounds/airliners/jet_climb_loop.wav",
+  "text": "A large passenger jet airliner climbing out after takeoff, powerful jet engine roar with a high turbofan whine on top, heard from the ground outdoors, continuous, no doppler sweep",
+  "duration": 10.0,
+  "loop": true,
+  "influence": 0.55
+ },
+ {
+  "name": "suspended_train",
+  "path": "sounds/muallaq/suspended_train_loop.wav",
+  "text": "A suspended monorail train gliding along an overhead steel rail, smooth electric motor hum, soft rhythmic clicks of the wheels over rail joints, gentle sway creaks, continuous",
+  "duration": 8.0,
+  "loop": true,
+  "influence": 0.5
+ },
+ {
+  "name": "station_chime",
+  "path": "sounds/muallaq/station_chime.wav",
+  "text": "A gentle three-note electronic chime at a train station announcing a departure, clean and bright, short",
+  "duration": 3.0,
+  "loop": false,
+  "influence": 0.7
+ },
+ {
+  "name": "souk_arcade",
+  "path": "sounds/arcade/souk_arcade_loop.wav",
+  "text": "A busy covered Arabian market arcade at night, indoor crowd murmur and chatter, footsteps on stone floors, shopkeepers calling softly, cups clinking, faint oud music from a shop, reverberant hall, continuous",
+  "duration": 22.0,
+  "loop": true,
+  "influence": 0.45
+ },
+ {
+  "name": "crowd_cheer_1",
+  "path": "sounds/crowd/promenade_cheer_1.wav",
+  "text": "An excited crowd of spectators lining a street race at night bursts into cheers and whistles as the racers go past, short and lively, outdoors, no engine sounds",
+  "duration": 4.5,
+  "loop": false,
+  "influence": 0.5
+ },
+ {
+  "name": "crowd_cheer_2",
+  "path": "sounds/crowd/promenade_cheer_2.wav",
+  "text": "A grandstand crowd roars and applauds, a rising cheer that settles, outdoor night race, no vehicles",
+  "duration": 5.0,
+  "loop": false,
+  "influence": 0.5
+ },
+ {
+  "name": "crowd_cheer_3",
+  "path": "sounds/crowd/promenade_cheer_3.wav",
+  "text": "Spectators behind barriers clapping, shouting and whooping as racers speed by, a couple of air horns, outdoors, no engines",
+  "duration": 4.5,
+  "loop": false,
+  "influence": 0.5
+ },
+ {
+  "name": "crowd_cheer_4",
+  "path": "sounds/crowd/promenade_cheer_4.wav",
+  "text": "A seaside promenade crowd cheering loudly, whistles and shouts of encouragement, a short burst, no engines",
+  "duration": 4.0,
+  "loop": false,
+  "influence": 0.5
+ },
+ {
+  "name": "crowd_cheer_5",
+  "path": "sounds/crowd/promenade_cheer_5.wav",
+  "text": "A crowd gasps and then erupts into excited cheering and applause, outdoors at night, no vehicles",
+  "duration": 4.5,
+  "loop": false,
+  "influence": 0.5
+ },
+ {
+  "name": "crowd_cheer_6",
+  "path": "sounds/crowd/promenade_cheer_6.wav",
+  "text": "Festive fans cheering and clapping along to a darbuka drum, whistles, a short joyful burst, outdoors at night, no engines",
+  "duration": 5.0,
+  "loop": false,
+  "influence": 0.5
+ },
+ {
+  "name": "suspended_train_run",
+  "path": "sounds/muallaq/suspended_train_run_loop.wav",
+  "text": "A suspended monorail train running along an overhead steel girder track, a deep metallic rumble of steel wheels on the rail, the girder resonating and humming, an electric motor whine, continuous",
+  "duration": 10.0,
+  "loop": true,
+  "influence": 0.6
+ },
+ {
+  "name": "suspended_passby_1",
+  "path": "sounds/muallaq/suspended_passby_1.wav",
+  "text": "A suspended railway train passes close overhead: a rising rumble and squeal of steel wheels on the rail, the steel girder booming as it goes by, then fading away into the distance, no horn, no voices",
+  "duration": 7.0,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "suspended_passby_2",
+  "path": "sounds/muallaq/suspended_passby_2.wav",
+  "text": "An overhead hanging monorail train rushes past above the street, rattling steel wheels and a booming girder swelling and then fading away, no horn, no voices",
+  "duration": 7.0,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "suspended_brakes",
+  "path": "sounds/muallaq/suspended_brakes.wav",
+  "text": "An electric train braking smoothly to a stop at an elevated station, a soft brake squeal and a hiss of air, short",
+  "duration": 4.0,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "rolling_mill",
+  "path": "sounds/kronburg/rolling_mill_loop.wav",
+  "text": "Inside a huge steel rolling mill hall, a deep industrial hum, heavy rollers turning, a hot steel slab grinding through the mill stands with rumbling and occasional metallic clanks and booms echoing in the big hall, steam hiss, continuous",
+  "duration": 12.0,
+  "loop": true,
+  "influence": 0.5
+ },
+ {
+  "name": "blast_furnace",
+  "path": "sounds/kronburg/blast_furnace_loop.wav",
+  "text": "A blast furnace at a steelworks heard from outside nearby, a deep steady roar of hot air blowing, low rumbling, distant industrial machinery, continuous",
+  "duration": 10.0,
+  "loop": true,
+  "influence": 0.5
+ },
+ {
+  "name": "church_bells",
+  "path": "sounds/kronburg/church_bells.wav",
+  "text": "Large bronze church bells ringing from a stone church tower in a small German town, several bells pealing together, heard from the market square, natural reverb",
+  "duration": 14.0,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "crane_horn",
+  "path": "sounds/kronburg/crane_warning.wav",
+  "text": "An overhead travelling crane warning horn in a factory hall, two short electric horn honks echoing",
+  "duration": 3.0,
+  "loop": false,
+  "influence": 0.65
+ },
+ {
+  "name": "barge_engine",
+  "path": "sounds/kronburg/barge_engine_loop.wav",
+  "text": "A large inland cargo barge on a canal, a slow heavy diesel engine thumping, water churning at the stern, heard from the canal bank, continuous",
+  "duration": 10.0,
+  "loop": true,
+  "influence": 0.5
+ },
+ {
+  "name": "rhein_ship_horn",
+  "path": "sounds/rheinufer/ship_horn_long.wav",
+  "text": "A large inland cargo ship's horn on a wide river, one long deep blast that echoes across the water and fades, heard from the river bank",
+  "duration": 5.0,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "rhein_ship_horn2",
+  "path": "sounds/rheinufer/ship_horn_double.wav",
+  "text": "Two short deep blasts of a river cargo ship's horn on a wide river, echoing across the water",
+  "duration": 4.0,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "rhein_ship_engine",
+  "path": "sounds/rheinufer/ship_engine_loop.wav",
+  "text": "A large river cargo ship passing slowly, a deep diesel engine throbbing and water rushing along its hull, heard from the river bank, continuous",
+  "duration": 10.0,
+  "loop": true,
+  "influence": 0.5
+ },
+ {
+  "name": "autobahn_hum",
+  "path": "sounds/rheinufer/autobahn_traffic_loop.wav",
+  "text": "Motorway traffic heard from a meadow beside it: a steady hum of tyres, cars and lorries swooshing past in both directions, continuous, no horns",
+  "duration": 12.0,
+  "loop": true,
+  "influence": 0.45
+ },
+ {
+  "name": "kirmes_fair",
+  "path": "sounds/rheinufer/kirmes_loop.wav",
+  "text": "A German fun fair heard from across a meadow: a cheerful fairground organ playing an instrumental tune, rides whirring and clanking, a bell ringing, people laughing and a crowd murmuring without clear words, continuous",
+  "duration": 15.0,
+  "loop": true,
+  "influence": 0.45
+ },
+ {
+  "name": "sheep_bleat_1",
+  "path": "sounds/rheinufer/sheep_bleat_1.wav",
+  "text": "A single sheep bleating once in a meadow, close",
+  "duration": 1.6,
+  "loop": false,
+  "influence": 0.7
+ },
+ {
+  "name": "sheep_bleat_2",
+  "path": "sounds/rheinufer/sheep_bleat_2.wav",
+  "text": "A lamb bleating twice in a field, close",
+  "duration": 1.8,
+  "loop": false,
+  "influence": 0.7
+ },
+ {
+  "name": "sheep_bleat_3",
+  "path": "sounds/rheinufer/sheep_bleat_3.wav",
+  "text": "An old ewe giving a low hoarse bleat in a pasture, close",
+  "duration": 1.6,
+  "loop": false,
+  "influence": 0.7
+ },
+ {
+  "name": "sheep_flock",
+  "path": "sounds/rheinufer/sheep_flock_loop.wav",
+  "text": "A flock of sheep grazing on a river dyke: soft bleats here and there, hooves on grass, a bell on one sheep, continuous",
+  "duration": 12.0,
+  "loop": true,
+  "influence": 0.5
+ },
+ {
+  "name": "river_lap",
+  "path": "sounds/rheinufer/river_lap_loop.wav",
+  "text": "A wide fast river flowing past a pebble beach and stone groynes: water lapping and gurgling against the stones, gentle and continuous",
+  "duration": 12.0,
+  "loop": true,
+  "influence": 0.45
+ },
+ {
+  "name": "windmill_turn",
+  "path": "sounds/rheinufer/windmill_loop.wav",
+  "text": "An old wooden tower windmill turning slowly in a steady wind: the sails whooshing past, wooden gears creaking and knocking, continuous",
+  "duration": 10.0,
+  "loop": true,
+  "influence": 0.5
+ },
+ {
+  "name": "quench_burst",
+  "path": "sounds/zeche/quench_burst.wav",
+  "text": "A coking plant's quench tower: water floods a car of red-hot coke, a huge roaring hiss of steam rising into the air, then slowly dying away, heard from a road nearby",
+  "duration": 9.0,
+  "loop": false,
+  "influence": 0.55
+ },
+ {
+  "name": "kokerei_hum",
+  "path": "sounds/zeche/kokerei_loop.wav",
+  "text": "A working coking plant heard from beside it: a low industrial hum, steam hissing from pipes, heavy machinery clanking now and then, a distant rumble, continuous",
+  "duration": 12.0,
+  "loop": true,
+  "influence": 0.45
+ },
+ {
+  "name": "crows_morning",
+  "path": "sounds/zeche/crows_loop.wav",
+  "text": "Crows and jackdaws calling in birch trees on a quiet misty summer morning, a few caws here and there, soft wind, continuous",
+  "duration": 12.0,
+  "loop": true,
+  "influence": 0.45
+ },
+ {
+  "name": "conveyor_rattle",
+  "path": "sounds/zeche/conveyor_loop.wav",
+  "text": "An old coal conveyor belt running high up in a steel gallery: rollers rattling and squeaking, coal rumbling along, continuous",
+  "duration": 10.0,
+  "loop": true,
+  "influence": 0.5
+ },
+ {
+  "name": "sr_tram_bell_1",
+  "path": "sounds/stadtrallye/tram_bell_1.wav",
+  "text": "A modern German city tram's warning gong: two quick bright metallic dings, outdoors on a street",
+  "duration": 2.0,
+  "loop": false,
+  "influence": 0.7
+ },
+ {
+  "name": "sr_tram_bell_2",
+  "path": "sounds/stadtrallye/tram_bell_2.wav",
+  "text": "A city tram driver ringing the tram's warning bell three times urgently, bright metallic gong, outdoors",
+  "duration": 2.5,
+  "loop": false,
+  "influence": 0.7
+ },
+ {
+  "name": "sr_car_horn_1",
+  "path": "sounds/stadtrallye/car_horn_1.wav",
+  "text": "A small European hatchback car honking its horn once, short and annoyed, outdoors on a city street",
+  "duration": 1.2,
+  "loop": false,
+  "influence": 0.7
+ },
+ {
+  "name": "sr_car_horn_2",
+  "path": "sounds/stadtrallye/car_horn_2.wav",
+  "text": "An angry driver leaning on the car horn, a long continuous honk then two short ones, city street",
+  "duration": 2.0,
+  "loop": false,
+  "influence": 0.7
+ },
+ {
+  "name": "sr_car_horn_3",
+  "path": "sounds/stadtrallye/car_horn_3.wav",
+  "text": "A city bus or delivery truck sounding its deep horn, one long blast, city street",
+  "duration": 1.8,
+  "loop": false,
+  "influence": 0.7
+ },
+ {
+  "name": "sr_tram_pass",
+  "path": "sounds/stadtrallye/tram_pass_loop.wav",
+  "text": "A modern low-floor tram rolling along a city street: electric motor whine, steel wheels on grooved rails, soft rumble and clicks over rail joints, continuous",
+  "duration": 8.0,
+  "loop": true,
+  "influence": 0.5
+ },
+ {
+  "name": "sr_ring_traffic",
+  "path": "sounds/stadtrallye/ring_traffic_loop.wav",
+  "text": "Busy four-lane city ring road traffic heard from the pavement: cars, vans and buses passing continuously at fifty kilometres an hour, tyre noise and engines, no horns, continuous",
+  "duration": 20.0,
+  "loop": true,
+  "influence": 0.45
+ },
+ {
+  "name": "sr_ball_crash_1",
+  "path": "sounds/stadtrallye/wrecking_ball_crash_1.wav",
+  "text": "A heavy steel wrecking ball smashing into a concrete building wall: a huge crash, concrete cracking and crumbling, rubble and debris falling, dust",
+  "duration": 4.0,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "sr_ball_crash_2",
+  "path": "sounds/stadtrallye/wrecking_ball_crash_2.wav",
+  "text": "A demolition wrecking ball hitting a reinforced concrete facade: deep booming impact, glass and concrete shattering, chunks tumbling down",
+  "duration": 4.0,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "sr_ball_clang",
+  "path": "sounds/stadtrallye/wrecking_ball_clang.wav",
+  "text": "A heavy swinging steel wrecking ball hitting a small car: a loud metallic clang and a crunch of bent metal",
+  "duration": 2.0,
+  "loop": false,
+  "influence": 0.65
+ },
+ {
+  "name": "sr_ball_whoosh",
+  "path": "sounds/stadtrallye/wrecking_ball_whoosh.wav",
+  "text": "A huge steel wrecking ball on a chain swinging past close by: a deep heavy whoosh of air and the rattle of the steel chain",
+  "duration": 3.0,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "sr_handler",
+  "path": "sounds/stadtrallye/handler_hydraulics_loop.wav",
+  "text": "A scrapyard material handler crane slewing: diesel engine revving under load and a whining hydraulic pump, steel creaking, continuous",
+  "duration": 8.0,
+  "loop": true,
+  "influence": 0.5
+ },
+ {
+  "name": "sr_magnet_clang",
+  "path": "sounds/stadtrallye/magnet_clang.wav",
+  "text": "Heavy scrap metal clanging: a crushed car swinging on a crane magnet bangs into steel, loud metallic clang and rattle",
+  "duration": 2.0,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "sr_excavator",
+  "path": "sounds/stadtrallye/excavator_loop.wav",
+  "text": "A large tracked excavator working on a building site: diesel engine under load, hydraulic arm whine, the bucket scraping soil, continuous",
+  "duration": 8.0,
+  "loop": true,
+  "influence": 0.5
+ },
+ {
+  "name": "sr_roller",
+  "path": "sounds/stadtrallye/roller_loop.wav",
+  "text": "A vibratory road roller compacting a gravel road: diesel engine and a deep rhythmic thrumming drum vibration, continuous",
+  "duration": 8.0,
+  "loop": true,
+  "influence": 0.5
+ },
+ {
+  "name": "sr_beeper",
+  "path": "sounds/stadtrallye/reverse_beeper_loop.wav",
+  "text": "A construction vehicle's reversing alarm: a steady electronic beep beep beep, continuous",
+  "duration": 4.0,
+  "loop": true,
+  "influence": 0.7
+ },
+ {
+  "name": "sr_site",
+  "path": "sounds/stadtrallye/site_ambience_loop.wav",
+  "text": "A busy construction site in a city: distant hammering, a circular saw now and then, a concrete mixer turning, machines rumbling, workers' tools clanking, continuous",
+  "duration": 20.0,
+  "loop": true,
+  "influence": 0.45
+ },
+ {
+  "name": "sr_scrapyard",
+  "path": "sounds/stadtrallye/scrapyard_ambience_loop.wav",
+  "text": "A scrapyard at work: scrap metal being dropped and clattering onto piles, a crane's engine, steel creaking and banging, continuous",
+  "duration": 20.0,
+  "loop": true,
+  "influence": 0.45
+ },
+ {
+  "name": "shield_up",
+  "path": "sounds/items/shield_up.wav",
+  "text": "A futuristic energy force field powering up around a small vehicle: a rising electric whoosh that blooms into a bright shimmering hum, sci-fi arcade game power-up, clean, short",
+  "duration": 1.4,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "shield_down",
+  "path": "sounds/items/shield_down.wav",
+  "text": "A futuristic energy force field running out and fading away: a few stuttering electric flickers then a falling soft power-down whoosh, sci-fi arcade game, clean, short",
+  "duration": 1.4,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "shield_break",
+  "path": "sounds/items/shield_break.wav",
+  "text": "A futuristic energy shield shattering when hit: a sharp crackling electric burst with a glassy crystalline shatter and a quick fizzle, sci-fi arcade game, punchy, short",
+  "duration": 1.0,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "puddle_splash_1",
+  "path": "sounds/surfaces/puddle_splash_1.wav",
+  "text": "A small toy car driving fast through a shallow rain puddle on a road, a short light watery splash and spray, close up, outdoors, no engine",
+  "duration": 0.8,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "puddle_splash_2",
+  "path": "sounds/surfaces/puddle_splash_2.wav",
+  "text": "A car tyre rolling quickly through a shallow muddy puddle, a brief soft swish of splashing water, close up, outdoors, no engine",
+  "duration": 0.8,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "ab_car_petrol",
+  "path": "sounds/rheinufer/traffic_car_petrol_loop.wav",
+  "text": "A modern petrol family car cruising at steady motorway speed, engine hum and tyre roar on asphalt, recorded close beside the car moving along with it, constant pitch, no passing, no doppler, no wind gusts",
+  "duration": 6.0,
+  "loop": true,
+  "influence": 0.6
+ },
+ {
+  "name": "ab_suv_v6",
+  "path": "sounds/rheinufer/traffic_suv_loop.wav",
+  "text": "A large SUV with a V6 petrol engine cruising at steady motorway speed, a deeper throaty engine note and wide tyres humming on asphalt, recorded close alongside, constant pitch, no doppler, no passing",
+  "duration": 6.0,
+  "loop": true,
+  "influence": 0.6
+ },
+ {
+  "name": "ab_van_diesel",
+  "path": "sounds/rheinufer/traffic_van_diesel_loop.wav",
+  "text": "A diesel delivery van cruising at steady motorway speed, clattering diesel engine drone and tyre noise, recorded close alongside, constant pitch, no doppler, no passing",
+  "duration": 6.0,
+  "loop": true,
+  "influence": 0.6
+ },
+ {
+  "name": "ab_motorhome",
+  "path": "sounds/rheinufer/traffic_motorhome_loop.wav",
+  "text": "A heavy motorhome camper on a truck chassis cruising on the motorway, low turbo diesel rumble, rattling body, big tyres on asphalt, recorded close alongside, constant pitch, no doppler, no passing",
+  "duration": 6.0,
+  "loop": true,
+  "influence": 0.6
+ },
+ {
+  "name": "ab_horn_long",
+  "path": "sounds/rheinufer/traffic_horn_long.wav",
+  "text": "An angry long car horn blast on a motorway, a single sustained honk about one second long, clear, close",
+  "duration": 1.4,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "ab_horn_truck",
+  "path": "sounds/rheinufer/traffic_horn_deep.wav",
+  "text": "A deep loud two-tone horn of a motorhome or small truck, two short honks, close, outdoors",
+  "duration": 1.6,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "city_car",
+  "path": "sounds/stadtrallye/city_car_loop.wav",
+  "text": "A small petrol hatchback driving through a city street at about 40 km/h, light engine hum in a middle gear, tyres on asphalt, recorded close alongside, steady, no passing, no doppler, no horn",
+  "duration": 6.0,
+  "loop": true,
+  "influence": 0.6
+ },
+ {
+  "name": "city_suv",
+  "path": "sounds/stadtrallye/city_suv_loop.wav",
+  "text": "A family SUV rolling along a busy city street at moderate speed, a soft engine note and an easy gear change, tyres on asphalt, recorded close alongside, steady, no passing, no doppler",
+  "duration": 6.0,
+  "loop": true,
+  "influence": 0.6
+ },
+ {
+  "name": "city_van",
+  "path": "sounds/stadtrallye/city_van_loop.wav",
+  "text": "A diesel delivery van driving slowly through town traffic, rattling diesel at low revs, a gear change, recorded close alongside, steady, no passing, no doppler",
+  "duration": 6.0,
+  "loop": true,
+  "influence": 0.6
+ },
+ {
+  "name": "city_bus",
+  "path": "sounds/stadtrallye/city_bus_loop.wav",
+  "text": "A city bus driving along a street at low speed, deep diesel drone, air brakes hiss softly once, heavy tyres, recorded close alongside, steady, no passing, no doppler",
+  "duration": 6.0,
+  "loop": true,
+  "influence": 0.6
+ },
+ {
+  "name": "lightplane_engine",
+  "path": "sounds/kronburg/light_plane_loop.wav",
+  "text": "A small single-engine four-seat propeller aeroplane cruising overhead, the steady buzzing drone of a four-cylinder piston engine and propeller heard from the ground, continuous, constant pitch, no doppler sweep, no wind gusts",
+  "duration": 8.0,
+  "loop": true,
+  "influence": 0.6
+ },
+ {
+  "name": "engine_bootlegger",
+  "path": "sounds/enginesounds/engine_bootlegger_loop.wav",
+  "text": "A supercharged big-block V8 hot rod engine held at a steady mid-high RPM, deep loud lumpy rumble from open exhaust headers with the high mechanical whine of a roots supercharger on top, recorded close, constant engine speed, no revving, no gear changes, continuous drone",
+  "duration": 8.0,
+  "loop": true,
+  "influence": 0.6
+ },
+ {
+  "name": "engine_meteor",
+  "path": "sounds/enginesounds/engine_meteor_loop.wav",
+  "text": "A vintage 1930s supercharged straight-eight Grand Prix racing car engine held at a steady high RPM, raw metallic exhaust bark with a shrill screaming supercharger wail, open pipes, recorded close, constant engine speed, no revving, no gear changes, continuous drone",
+  "duration": 8.0,
+  "loop": true,
+  "influence": 0.6
+ },
+ {
+  "name": "engine_bubble",
+  "path": "sounds/enginesounds/engine_bubblecar_loop.wav",
+  "text": "A tiny 1950s single-cylinder two-stroke microcar engine held at a steady high RPM, buzzy rattly ring-ding-ding putter like a moped, tinny exhaust, recorded close, constant engine speed, no revving, continuous drone",
+  "duration": 8.0,
+  "loop": true,
+  "influence": 0.6
+ },
+ {
+  "name": "engine_sandpiper",
+  "path": "sounds/enginesounds/engine_sandpiper_loop.wav",
+  "text": "An air-cooled flat-four boxer engine in a 1960s beach buggy held at a steady high RPM, a raspy clattery throaty burble from a short open exhaust with the whir of the cooling fan, recorded close, constant engine speed, no revving, no gear changes, continuous drone",
+  "duration": 8.0,
+  "loop": true,
+  "influence": 0.6
+ },
+ {
+  "name": "engine_samurai",
+  "path": "sounds/enginesounds/engine_samurai_loop.wav",
+  "text": "A tuned 1970s Japanese straight-six sports coupe engine held at a steady high RPM through short straight-through open exhaust pipes, a sharp raspy metallic howl with carburettor intake roar, recorded close, constant engine speed, no revving, no gear changes, no backfires, continuous drone",
+  "duration": 8.0,
+  "loop": true,
+  "influence": 0.6
+ },
+ {
+  "name": "engine_ninja",
+  "path": "sounds/enginesounds/engine_ninja_loop.wav",
+  "text": "A small high-revving turbocharged four-cylinder engine in a modern lightweight Japanese track car held at a steady high RPM, a tight buzzing rasp with a constant high turbocharger whistle and spool whine over it, recorded close, constant engine speed, no revving, no gear changes, no blow-off valve, continuous drone",
+  "duration": 8.0,
+  "loop": true,
+  "influence": 0.6
+ },
+ {
+  "name": "engine_crimson",
+  "path": "sounds/enginesounds/engine_crimson_loop.wav",
+  "text": "A naturally aspirated V12 engine in an open-wheel road racing car held at a steady high RPM, a smooth soaring metallic howl with a hard edge and intake roar, recorded close, constant engine speed, no revving, no gear changes, no backfires, continuous drone",
+  "duration": 8.0,
+  "loop": true,
+  "influence": 0.6
+ },
+ {
+  "name": "garage_lift_motor",
+  "path": "sounds/garage/lift_motor_loop.wav",
+  "text": "An electro-hydraulic two-post car lift raising a car in a quiet showroom workshop: steady electric motor hum with a smooth hydraulic pump whine, constant, no starts or stops, no clicks, seamless loop",
+  "duration": 4.0,
+  "loop": true,
+  "influence": 0.6
+ },
+ {
+  "name": "garage_lift_lower",
+  "path": "sounds/garage/lift_lower_loop.wav",
+  "text": "A hydraulic car lift lowering slowly: a steady soft hiss of hydraulic fluid flowing back through a release valve with a faint low hum, constant, no starts or stops, no clicks, seamless loop",
+  "duration": 4.0,
+  "loop": true,
+  "influence": 0.6
+ },
+ {
+  "name": "garage_lift_top",
+  "path": "sounds/garage/lift_top.wav",
+  "text": "A car lift reaching full height: the electric motor stops and the carriages settle onto the steel safety locks with one heavy solid metallic clunk, short, dry workshop",
+  "duration": 1.5,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "garage_lift_release",
+  "path": "sounds/garage/lift_release.wav",
+  "text": "Car lift safety locks releasing before lowering: a short pneumatic hiss and two steel latches clacking open together, dry workshop",
+  "duration": 1.2,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "garage_lift_bottom",
+  "path": "sounds/garage/lift_bottom.wav",
+  "text": "Car lift arms settling down at the bottom: a soft heavy metallic thud as the arms come to rest, then the hydraulic hiss stops with a short sigh, dry workshop",
+  "duration": 1.4,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "garage_lineup_on",
+  "path": "sounds/garage/lineup_on.wav",
+  "text": "A powerful showroom spotlight and an LED light strip powering on: a solid relay clunk at once, followed straight away by a clear rising electric hum and a soft bright sparkle that swells up and settles, satisfying, clean, no music, close and dry indoors",
+  "duration": 1.8,
+  "loop": false,
+  "influence": 0.7
+ },
+ {
+  "name": "garage_lineup_off",
+  "path": "sounds/garage/lineup_off.wav",
+  "text": "A powerful showroom spotlight and an LED light strip powering off: a solid relay clunk at once, followed straight away by a clear electric hum sinking in pitch and fading out, clean, no music, close and dry indoors",
+  "duration": 1.8,
+  "loop": false,
+  "influence": 0.7
+ },
+ {
+  "name": "miyo_spring_breeze_1",
+  "path": "sounds/miyoshino/spring_breeze/spring_breeze_1.wav",
+  "text": "A calm spring morning on a quiet Japanese mountain slope: a soft breeze drifting through blossoming cherry trees, gentle rustling of leaves and petals, airy and spacious, now and then one distant bird call far away, mostly quiet. No insects, no bees, no buzzing, no music, no voices.",
+  "duration": 28.0,
+  "loop": true,
+  "influence": 0.45
+ },
+ {
+  "name": "miyo_spring_breeze_2",
+  "path": "sounds/miyoshino/spring_breeze/spring_breeze_2.wav",
+  "text": "Gentle spring wind in an open grove of cherry trees on a hillside, slow swells of soft rustling and calm lulls between them, a faint far-off bird once or twice, peaceful and wide. No insects, no bees, no buzzing, no music, no voices.",
+  "duration": 28.0,
+  "loop": true,
+  "influence": 0.45
+ },
+ {
+  "name": "miyo_spring_breeze_3",
+  "path": "sounds/miyoshino/spring_breeze/spring_breeze_3.wav",
+  "text": "A light breeze over a park by a calm lake in spring: leaves whispering in the trees, a faint lapping of water at a shore, very sparse distant birdsong, serene and open air. No insects, no bees, no buzzing, no music, no voices.",
+  "duration": 28.0,
+  "loop": true,
+  "influence": 0.45
+ },
+ {
+  "name": "miyo_river_1",
+  "path": "sounds/miyoshino/river/river_1.wav",
+  "text": "A clear mountain river flowing steadily over stones close by, soft rushing and babbling water, a light breeze in the trees on the bank. No insects, no bees, no buzzing, no music, no voices.",
+  "duration": 28.0,
+  "loop": true,
+  "influence": 0.45
+ },
+ {
+  "name": "miyo_river_2",
+  "path": "sounds/miyoshino/river/river_2.wav",
+  "text": "A wide shallow river running over a shingle bed in a valley, continuous gentle water rush with small splashes, a soft wind, calm and natural. No insects, no bees, no buzzing, no music, no voices.",
+  "duration": 28.0,
+  "loop": true,
+  "influence": 0.45
+ },
+ {
+  "name": "miyo_river_3",
+  "path": "sounds/miyoshino/river/river_3.wav",
+  "text": "River rapids heard from the bank a little way off: a steady soft roar of flowing water over rocks, breeze in cedar trees, open air. No insects, no bees, no buzzing, no music, no voices.",
+  "duration": 28.0,
+  "loop": true,
+  "influence": 0.45
+ },
+ {
+  "name": "miyo_temple_dusk_1",
+  "path": "sounds/miyoshino/temple_dusk/temple_dusk_1.wav",
+  "text": "Dusk in a quiet traditional Japanese temple town in spring: a soft evening breeze, paper lanterns creaking gently on their cords, a distant soft murmur of a few people far away, a frog croaking faintly from a pond now and then. No insects, no bees, no buzzing, no music, no clear words.",
+  "duration": 28.0,
+  "loop": true,
+  "influence": 0.45
+ },
+ {
+  "name": "miyo_temple_dusk_2",
+  "path": "sounds/miyoshino/temple_dusk/temple_dusk_2.wav",
+  "text": "Early evening on an old stone-paved street of wooden houses in Japan: calm air, a faint wooden clack of a door far off, quiet distant murmur, soft breeze through cherry blossoms, a few frogs far away, peaceful. No insects, no bees, no buzzing, no music, no clear words.",
+  "duration": 28.0,
+  "loop": true,
+  "influence": 0.45
+ },
+ {
+  "name": "miyo_temple_dusk_3",
+  "path": "sounds/miyoshino/temple_dusk/temple_dusk_3.wav",
+  "text": "A temple precinct at nightfall: a gentle breeze in pine and cherry trees, gravel crunching softly far away, a distant quiet murmur of visitors, faint frogs from a pond, serene and still. No insects, no bees, no buzzing, no music, no clear words.",
+  "duration": 28.0,
+  "loop": true,
+  "influence": 0.45
+ },
+ {
+  "name": "miyo_mountain_wind_1",
+  "path": "sounds/miyoshino/mountain_wind/mountain_wind_1.wav",
+  "text": "High on a mountain at dawn above the clouds: cold wind gusting softly across a rocky ridge, airy hollow whoosh, cedar branches creaking now and then, wide and empty. No insects, no bees, no buzzing, no music, no voices.",
+  "duration": 28.0,
+  "loop": true,
+  "influence": 0.45
+ },
+ {
+  "name": "miyo_mountain_wind_2",
+  "path": "sounds/miyoshino/mountain_wind/mountain_wind_2.wav",
+  "text": "A misty mountain trail in thick cloud: damp still air with soft gusts of wind through tall cedar trees, dripping water now and then, muffled and quiet. No insects, no bees, no buzzing, no music, no voices.",
+  "duration": 28.0,
+  "loop": true,
+  "influence": 0.45
+ },
+ {
+  "name": "miyo_mountain_wind_3",
+  "path": "sounds/miyoshino/mountain_wind/mountain_wind_3.wav",
+  "text": "Wind on a high mountain summit: steady cool breeze with slow swells, a faint whistle over rocks, cloth prayer streamers fluttering softly, vast and calm. No insects, no bees, no buzzing, no music, no voices.",
+  "duration": 28.0,
+  "loop": true,
+  "influence": 0.45
+ },
+ {
+  "name": "miyo_temple_bell",
+  "path": "sounds/miyoshino/temple_bell.wav",
+  "text": "A single deep strike of a large bronze Japanese temple bell (bonsho) struck with a wooden beam, heard from across a lake, a long rich resonant hum slowly fading away, no other sounds",
+  "duration": 12.0,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "engine_typhoon",
+  "path": "sounds/enginesounds/engine_typhoon_elevenlabs_loop.wav",
+  "text": "A fan buggy: a small twin-cylinder aircraft engine driving a large ducted propeller, held at a steady medium-high RPM, a warm rounded throaty drone with the deep whoosh of the propeller blades, recorded close, mellow and not shrill, constant engine speed, no revving, no gear changes, continuous drone",
+  "duration": 8.0,
+  "loop": true,
+  "influence": 0.6
+ },
+ {
+  "name": "hq_door_open",
+  "path": "sounds/garage/sliding_door_open.wav",
+  "text": "Automatic sliding glass doors of a modern office lobby opening: a soft electric motor whirr and a smooth rubber-wheeled glide along an overhead track, ending in a gentle soft stop, recorded close, clean, no voices, no beeps",
+  "duration": 2.0,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "hq_door_close",
+  "path": "sounds/garage/sliding_door_close.wav",
+  "text": "Automatic sliding glass doors of a modern office lobby closing: a soft electric motor whirr and a smooth glide along an overhead track, the two glass leaves meeting with a soft rubber-sealed thud, recorded close, clean, no voices, no beeps",
+  "duration": 2.0,
+  "loop": false,
+  "influence": 0.6
+ }
 ]

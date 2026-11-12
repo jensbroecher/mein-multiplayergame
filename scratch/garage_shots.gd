@@ -3,6 +3,7 @@ extends Node
 # Photographs the garage (Garage.gd), the whole window with its HUD, from where the walker stands or from
 # the orbit of an inspected car. Steps run in order:
 #   Godot --path . --resolution 1600x900 res://scratch/garage_shots.tscn -- <dir>
+#       [detail=0..4]                          build at that Detail Level (the plaza's trees follow it)
 #       [trophies=demo]                        record made-up trophies and time trial records first (user://trophies.cfg
 #                                              and user://time_trial_records.cfg are backed up and put back)
 #       walk:<name>:x,z:yaw_deg[:pitch_deg]    stand the walker there and shoot (yaw 0 looks down the hall, toward -z)
@@ -24,6 +25,9 @@ func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a == "trophies=demo":
 			demo = true
+		elif a.begins_with("detail="):
+			# The Detail Level the headquarters is built at (0 Off .. 4 Ultra), not saved.
+			MusicManager.grass_quality_index = int(a.substr(7))
 		elif a.contains(":"):
 			steps.append(a)
 		else:

@@ -9,8 +9,8 @@ extends Control
 ## props stand at 1.6 times life size beside the cars (PROP_SCALE), so here a car is its race size over 1.6
 ## (SHOW_SCALE), about 1.4m long. Each stands on a plinth on a two-post lift of its own size.
 ##
-## The hall, looking down it from the entrance doors (glass, locked, in a glazed front: outside, the plaza, a road and
-## lawns under the sky, _build_plaza): the foyer with the player's own car on a turntable, then the concourse under a glass gable
+## The hall, looking down it from the entrance doors (glass, sliding open as the walker comes near, in a glazed front:
+## outside, the plaza and its grounds, a road and lawns under the sky, _build_plaza): the foyer with the player's own car on a turntable, then the concourse under a glass gable
 ## roof (the sky's sun lights only what is on SUN_LAYER), with a gallery per category
 ## (CarCollection.galleries()) off either side in pairs, and the trophy hall at its end. A gallery's cars
 ## stand in two rows either side of its aisle, angled toward the way in, each with a placard and a
@@ -97,6 +97,14 @@ const PLAQUE_LEDGE_W := 0.72
 ## The entrance doors' opening in the entrance wall.
 const ENTRY_HALF := 1.6
 const ENTRY_H := 3.3
+## The automatic doors: how far inside the frame the leaves run, how far each slides open, how near the walker
+## (in plan, from the doorway's middle) opens them, how long a full travel takes, the sound's level.
+const DOOR_LEAF_IN := 0.16
+const DOOR_SLIDE := 1.5
+const DOOR_REACH := 4.0
+const DOOR_TIME := 0.75
+const DOOR_DB := -6.0
+const DOOR_SOUNDS := ["res://sounds/garage/sliding_door_open.wav", "res://sounds/garage/sliding_door_close.wav"]
 ## The foyer's glazed front: the doors in the middle of it, glass either side and over them.
 const FRONT_GLASS_HALF := 4.1
 const FRONT_GLASS_H := 4.85
@@ -108,6 +116,8 @@ const PLAZA_AVENUE_X := 14.0
 const PLAZA_AVENUE := [8.0, 18.0, 28.0, 38.0]
 const PLAZA_FOUNTAIN_Z := 19.0
 const PLAZA_LOGO_Z := 33.0
+## How far either side of the axis the walker may go outside (hedges mark it).
+const GROUNDS_HALF := 56.0
 ## The sun lights only what is on this render layer as well: the concourse, the foyer and the outside, so it
 ## never reaches into the galleries through their roofs when shadows are off.
 const SUN_LAYER := 2
@@ -196,6 +206,13 @@ var _galleries: Array = []
 ## Per gallery: {name, color, cars, side, rect (Rect2 in x/z of its floor), door_z}.
 var _rooms: Array = []
 var _spine_end := 0.0
+var _door_leaves: Array[Node3D] = []
+var _door_shapes: Array[CollisionShape3D] = []
+var _door_rest: Array[float] = []
+var _door_open := 0.0      # 0 shut .. 1 open
+var _door_wanted := false
+var _door_sound: AudioStreamPlayer3D
+var _bays_shown := true
 ## The trophy hall's depth: deep enough for its side walls to hold a record board per cup (_build_hall).
 var _hall_d := HALL_D_MIN
 ## Per car on show: see _build_bay.
@@ -314,6 +331,42 @@ func _physics_process(delta: float) -> void:
 	if _player.is_on_floor():
 		_player.velocity.y = 0.0
 	_update_steps(delta)
+	_update_doors(delta)
+	_update_bays_shown()
+
+
+## The cars on show (each with its shadowed spotlight) are hidden while the walker is outside the building: none can be
+## seen from the grounds, and drawn they cost about 8ms of an M1 at 1600x1000 looking back across the plaza.
+func _update_bays_shown() -> void:
+	var p: Vector3 = _player.global_position
+	var z_back: float = -FOYER - (SLOT - GALLERY_W) * 0.5
+	var inside: bool = (absf(p.x) < SPINE_HALF + WALL_T and p.z < ENTRANCE_Z + 0.1) or p.z < z_back
+	if inside == _bays_shown:
+		return
+	_bays_shown = inside
+	for bay in _bays:
+		(bay["root"] as Node3D).visible = inside
+
+
+## The entrance's sliding doors open while the walker is near them in plan and close behind them, eased; the
+## leaves' colliders follow them.
+func _update_doors(delta: float) -> void:
+	if _door_leaves.is_empty():
+		return
+	var p: Vector3 = _player.global_position
+	var near: bool = absf(p.x) < DOOR_REACH and absf(p.z - ENTRANCE_Z) < DOOR_REACH
+	if near != _door_wanted:
+		_door_wanted = near
+		if _started:
+			_door_sound.stream = load(DOOR_SOUNDS[0 if near else 1])
+			_door_sound.play()
+	_door_open = move_toward(_door_open, 1.0 if _door_wanted else 0.0, delta / DOOR_TIME)
+	var t: float = _door_open * _door_open * (3.0 - 2.0 * _door_open)
+	for i in _door_leaves.size():
+		var s: float = signf(_door_rest[i])
+		var x: float = _door_rest[i] + s * DOOR_SLIDE * t
+		_door_leaves[i].position.x = x
+		_door_shapes[i].position.x = x
 
 
 ## The head bob and the footsteps, from how far the walker went.
@@ -995,6 +1048,11 @@ func _mat(key: String) -> Material:
 			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			m.roughness = 0.05
 			m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		"frost":
+			m.albedo_color = Color(0.92, 0.95, 0.97, 0.55)
+			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			m.roughness = 0.6
+			m.cull_mode = BaseMaterial3D.CULL_DISABLED
 		"door_glass":
 			m.albedo_color = Color(0.7, 0.85, 0.85, 0.16)
 			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -1265,7 +1323,8 @@ func _build_hall() -> void:
 		var x_out: float = side * (SPINE_HALF + length)
 		(left_doors if side < 0.0 else right_doors).append(Vector3(zc - DOOR_W * 0.5, zc + DOOR_W * 0.5, DOOR_H))
 		_room(minf(x_in, x_out), maxf(x_in, x_out), z_bot, z_top, WALL_H)
-		_wall(true, z_top, x_in, x_out + side * WALL_T * 0.5)
+		# The first pair's front walls face the plaza's grounds: in the sun (their inside faces away from it).
+		_wall(true, z_top, x_in, x_out + side * WALL_T * 0.5, [], WALL_H, slot == 0)
 		_wall(true, z_bot, x_in, x_out + side * WALL_T * 0.5)
 		_wall(false, x_out, z_bot - WALL_T * 0.5, z_top + WALL_T * 0.5)
 		_rooms.append({"name": g["name"], "color": g["color"], "cars": g["cars"], "side": side,
@@ -1284,8 +1343,8 @@ func _build_hall() -> void:
 	# The concourse (its roof is _build_roof's), its walls with the galleries' doors, the entrance wall
 	# (its doors are _build_entrance's), and the trophy hall, whose front wall closes the roof's gable.
 	_room(-SPINE_HALF, SPINE_HALF, _spine_end, ENTRANCE_Z, 0.0, true)
-	_wall(false, -SPINE_HALF, _spine_end, ENTRANCE_Z, left_doors)
-	_wall(false, SPINE_HALF, _spine_end, ENTRANCE_Z, right_doors)
+	_wall(false, -SPINE_HALF, _spine_end, ENTRANCE_Z, left_doors, WALL_H, true)
+	_wall(false, SPINE_HALF, _spine_end, ENTRANCE_Z, right_doors, WALL_H, true)
 	_wall(true, ENTRANCE_Z, -SPINE_HALF - WALL_T * 0.5, SPINE_HALF + WALL_T * 0.5,
 			[Vector3(-FRONT_GLASS_HALF, FRONT_GLASS_HALF, FRONT_GLASS_H)], TALL_H, true)
 	var hall_back: float = _spine_end - _hall_d
@@ -1296,7 +1355,7 @@ func _build_hall() -> void:
 	_wall(false, -HALL_HALF, hall_back, _spine_end, [], TALL_H)
 	_wall(false, HALL_HALF, hall_back, _spine_end, [], TALL_H)
 	# The floor's collision, under everything, outside too.
-	_solid(Vector3(-200.0, -1.0, hall_back - 10.0), Vector3(200.0, 0.0, ENTRANCE_Z + 40.0))
+	_solid(Vector3(-200.0, -1.0, hall_back - 10.0), Vector3(200.0, 0.0, ENTRANCE_Z + PLAZA_DEPTH + 40.0))
 
 	# Lamps along the concourse for the parts the sun doesn't reach.
 	var z := ENTRANCE_Z - 3.0
@@ -1387,8 +1446,8 @@ func _build_roof() -> void:
 
 
 ## The entrance: glazed double doors in an aluminium frame with a transom over them, pull handles, a mat,
-## an EXIT sign, in a glazed front across the foyer; outside, a canopy and the plaza (_build_plaza). The doors
-## are locked (solid), but it all reads as the way out.
+## an EXIT sign, in a glazed front across the foyer; outside, a canopy, the name over it and the plaza (_build_plaza).
+## The doors' leaves slide open as the walker comes near (_update_doors).
 func _build_entrance() -> void:
 	var z := ENTRANCE_Z
 	var door := Node3D.new()
@@ -1397,27 +1456,47 @@ func _build_entrance() -> void:
 	var alu := _mat("alu")
 	var f := 0.07
 	var transom := 2.6
-	# Jambs, head, transom bar, the meeting stiles and each leaf's rails.
+	# The frame: jambs, head, the transom bar and the glass over it.
 	for s in [-1.0, 1.0]:
 		_box(door, Vector3(s * ENTRY_HALF - f, 0.0, z - 0.07), Vector3(s * ENTRY_HALF + f, ENTRY_H, z + 0.07), alu)
-		_box(door, Vector3(s * 0.06 - 0.035, 0.0, z - 0.05), Vector3(s * 0.06 + 0.035, transom, z + 0.05), alu)
-		var x0: float = minf(s * 0.06, s * (ENTRY_HALF - f))
-		var x1: float = maxf(s * 0.06, s * (ENTRY_HALF - f))
-		_box(door, Vector3(x0, 0.0, z - 0.05), Vector3(x1, 0.16, z + 0.05), alu)
-		_box(door, Vector3(x0, transom - 0.08, z - 0.05), Vector3(x1, transom, z + 0.05), alu)
-		# Pull handles, inside and out, by the meeting stiles.
-		for side_z in [-1.0, 1.0]:
-			var hz: float = z + side_z * 0.1
-			var hx: float = s * 0.2
-			_box(door, Vector3(hx - 0.015, 0.8, hz - 0.015), Vector3(hx + 0.015, 1.7, hz + 0.015), _mat("chrome"))
-			for y in [0.88, 1.62]:
-				_box(door, Vector3(hx - 0.01, y - 0.01, minf(hz, z)), Vector3(hx + 0.01, y + 0.01, maxf(hz, z)), _mat("chrome"))
 	_box(door, Vector3(-ENTRY_HALF, ENTRY_H - 0.1, z - 0.07), Vector3(ENTRY_HALF, ENTRY_H, z + 0.07), alu)
 	_box(door, Vector3(-ENTRY_HALF, transom, z - 0.06), Vector3(ENTRY_HALF, transom + 0.08, z + 0.06), alu)
 	var glass := _mat("door_glass")
-	_box(door, Vector3(-ENTRY_HALF + f, 0.16, z - 0.004), Vector3(ENTRY_HALF - f, transom - 0.08, z + 0.004), glass, false)
 	_box(door, Vector3(-ENTRY_HALF + f, transom + 0.08, z - 0.004), Vector3(ENTRY_HALF - f, ENTRY_H - 0.1, z + 0.004), glass, false)
-	_solid(Vector3(-ENTRY_HALF, 0.0, z - 0.2), Vector3(ENTRY_HALF, ENTRY_H, z + 0.2))
+	# The automatic sliding leaves, just inside the frame: each slides out behind the side glass as the walker comes
+	# near (_update_doors), on a track under the transom. Each has a collider of its own on the walls' body that
+	# moves with it.
+	var zl: float = z - DOOR_LEAF_IN
+	_box(door, Vector3(-ENTRY_HALF - DOOR_SLIDE - 0.1, transom, zl - 0.09), Vector3(ENTRY_HALF + DOOR_SLIDE + 0.1, transom + 0.16, zl + 0.06), alu)
+	var lw: float = ENTRY_HALF - 0.02
+	for s in [-1.0, 1.0]:
+		var leaf := Node3D.new()
+		leaf.name = "DoorLeaf_%s" % ("L" if s < 0.0 else "R")
+		leaf.position = Vector3(s * lw * 0.5, 0.0, zl)
+		door.add_child(leaf)
+		var h: float = lw * 0.5
+		for sx in [-1.0, 1.0]:
+			_box(leaf, Vector3(sx * h - (0.07 if sx > 0.0 else 0.0), 0.0, -0.04), Vector3(sx * h + (0.0 if sx > 0.0 else 0.07), transom - 0.01, 0.04), alu)
+		_box(leaf, Vector3(-h, 0.0, -0.04), Vector3(h, 0.16, 0.04), alu)
+		_box(leaf, Vector3(-h, transom - 0.09, -0.04), Vector3(h, transom - 0.01, 0.04), alu)
+		_box(leaf, Vector3(-h + 0.07, 0.16, -0.004), Vector3(h - 0.07, transom - 0.09, 0.004), glass, false)
+		# A frosted band at eye height, so the glass reads as a door.
+		_box(leaf, Vector3(-h + 0.07, 1.42, -0.006), Vector3(h - 0.07, 1.52, 0.006), _mat("frost"), false)
+		var cs := CollisionShape3D.new()
+		var shape := BoxShape3D.new()
+		shape.size = Vector3(lw, transom, 0.2)
+		cs.shape = shape
+		cs.position = leaf.position + Vector3(0.0, transom * 0.5, 0.0)
+		_walls.add_child(cs)
+		_door_leaves.append(leaf)
+		_door_shapes.append(cs)
+		_door_rest.append(leaf.position.x)
+	_door_sound = AudioStreamPlayer3D.new()
+	_door_sound.name = "DoorSound"
+	_door_sound.position = Vector3(0.0, transom, z)
+	_door_sound.unit_size = SOUND_UNIT
+	_door_sound.volume_db = DOOR_DB
+	_world.add_child(_door_sound)
 	_sunlit(door)
 	# Inside: the mat and the EXIT sign.
 	_box(_world, Vector3(-1.4, 0.0, z - 1.5), Vector3(1.4, 0.012, z - 0.25), _mat("rubber"), false)
@@ -1457,6 +1536,16 @@ func _build_entrance() -> void:
 	_box(out, Vector3(-3.2, 3.6, zo), Vector3(3.2, 3.75, zo + 3.6), _mat("steel"))
 	for s in [-1.0, 1.0]:
 		_box(out, Vector3(s * 3.0 - 0.07, 0.0, zo + 3.3), Vector3(s * 3.0 + 0.07, 3.6, zo + 3.44), _mat("steel"))
+		_solid(Vector3(s * 3.0 - 0.1, 0.0, zo + 3.27), Vector3(s * 3.0 + 0.1, 3.6, zo + 3.47))
+	# The name over the canopy, on the front wall above the glass: the logo and HEADQUARTERS under it.
+	var logo_scene := load(LOGO_PATH) as PackedScene
+	if logo_scene:
+		var logo := logo_scene.instantiate() as Node3D
+		logo.position = Vector3(0.0, 6.55, zo + 0.06)
+		logo.scale = Vector3.ONE * 0.2
+		out.add_child(logo)
+	_text(out, "HEADQUARTERS", 0.42, COL_TEXT, Vector3(0.0, 5.42, zo + 0.02), 7.6, _font_bold)
+	_box(out, Vector3(-3.9, 5.08, zo), Vector3(3.9, 5.12, zo + 0.03), _glow_mat(COL_GOLD, 1.6), false)
 	_build_plaza(out, zo)
 	_sunlit(out)
 
@@ -1466,8 +1555,8 @@ func _build_entrance() -> void:
 ## between them, a round fountain on the axis (fountain_water.gdshader, as Estación Seca's), the RC Vibe GP logo on a
 ## plinth beyond it facing the doors, weeping cherries flanking it, Japanese maples in stone planters either side of
 ## the doors with azaleas round them, beds of azaleas along the plaza's edges, flags at the road, birches on the lawns.
-## The trees are the courses' own detailed ones, baked by regenerate_headquarters_trees.gd. Nobody walks out here (the
-## doors are locked), so nothing is solid.
+## The trees are the courses' own detailed ones, baked by regenerate_headquarters_trees.gd. The walker can come out
+## here (the doors slide open), so what stands on it is solid and hedges (and the kerb) bound the grounds.
 func _build_plaza(out: Node3D, zo: float) -> void:
 	var z_road: float = zo + PLAZA_DEPTH
 	var half: float = PLAZA_HALF
@@ -1480,21 +1569,41 @@ func _build_plaza(out: Node3D, zo: float) -> void:
 	for x in range(-12, 13, 4):
 		_box(out, Vector3(x - 0.15, 0.003, z_road + 3.92), Vector3(x + 1.6, 0.012, z_road + 4.08), _mat("line"), false)
 	_tiles_in(out, -140.0, 140.0, z_road + 8.3, z_road + 150.0, _mat("lawn"), 0.0)
-	for s in [-1.0, 1.0]:
-		var x0: float = s * half
-		var x1: float = s * 140.0
-		_tiles_in(out, minf(x0, x1), maxf(x0, x1), zo - 40.0, z_road, _mat("lawn"), 0.0)
+	# Lawn round the building and either side of the plaza, a little under the floors and the paving.
+	_tiles_in(out, -140.0, 140.0, _spine_end - _hall_d - 30.0, z_road, _mat("lawn"), -0.03)
 	var trees := {}
-	var tree := func(kind: String, pos: Vector3, yaw: float, sc: float) -> void:
+	# The trees follow the Detail Level (MusicManager.grass_quality_index, read once as the headquarters is built):
+	# Ultra, every tree casts its own detailed shadow; High, the plaza's trees cast theirs through their far stand-ins
+	# (the detailed crowns' leaf cards cost about 3ms of an M1 at 1600x1000 in the shadow pass) and the birches on the
+	# lawns none; Medium, only the planes' and the cherries' stand-ins; Low, no tree shadows; Off, nor the trees across
+	# the road. `plaza` false: a tree on the lawns or across the road.
+	var q: int = MusicManager.grass_quality_index
+	var tree := func(kind: String, pos: Vector3, yaw: float, sc: float, plaza := true) -> void:
+		if q <= 0 and pos.z > z_road:
+			return
 		if not trees.has(kind):
-			trees[kind] = load("res://generated/headquarters_tree_%s.res" % kind) if ResourceLoader.exists(
-					"res://generated/headquarters_tree_%s.res" % kind) else null
+			var path: String = "res://generated/headquarters_tree_%s.res" % kind
+			trees[kind] = load(path) if ResourceLoader.exists(path) else null
 		if trees[kind] == null:
 			return
 		var mi := MeshInstance3D.new()
 		mi.mesh = trees[kind]
 		mi.transform = Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * sc), pos)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if q >= 4 else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		out.add_child(mi)
+		var big: bool = kind.begins_with("plane") or kind.begins_with("shidare")
+		if not plaza or q >= 4 or q <= 1 or (q == 2 and not big):
+			return
+		var sk: String = kind + "_shadow"
+		if not trees.has(sk):
+			var sp: String = "res://generated/headquarters_tree_%s.res" % sk
+			trees[sk] = load(sp) if ResourceLoader.exists(sp) else null
+		if trees[sk] != null:
+			var sh := MeshInstance3D.new()
+			sh.mesh = trees[sk]
+			sh.transform = mi.transform
+			sh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+			out.add_child(sh)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 2611
 
@@ -1505,16 +1614,22 @@ func _build_plaza(out: Node3D, zo: float) -> void:
 			var tx: float = s * PLAZA_AVENUE_X
 			tree.call("plane_%d" % (k % 2), Vector3(tx, -0.05, tz), rng.randf() * TAU, rng.randf_range(0.82, 0.95))
 			_tree_grate(out, Vector3(tx, 0.0, tz))
+			_solid_post(Vector3(tx, 0.0, tz), 0.45, 4.0)
 			if k + 1 < PLAZA_AVENUE.size():
 				var mz: float = zo + (float(PLAZA_AVENUE[k]) + float(PLAZA_AVENUE[k + 1])) * 0.5
 				_bench(out, Vector3(s * (PLAZA_AVENUE_X - 2.2), 0.0, mz), -s * PI * 0.5)
+				_solid(Vector3(s * (PLAZA_AVENUE_X - 2.2) - 0.35, 0.0, mz - 1.08), Vector3(s * (PLAZA_AVENUE_X - 2.2) + 0.35, 0.9, mz + 1.08))
 				_lamp_post(out, Vector3(tx, 0.0, mz))
+				_solid_post(Vector3(tx, 0.0, mz), 0.12, 5.0)
 	# The fountain on the axis.
 	_fountain(out, Vector3(0.0, 0.0, zo + PLAZA_FOUNTAIN_Z))
+	_solid_post(Vector3(0.0, 0.0, zo + PLAZA_FOUNTAIN_Z), 5.1, 0.7)
+	_solid_post(Vector3(0.0, 0.0, zo + PLAZA_FOUNTAIN_Z), 0.65, 3.0)
 	# The logo on its plinth beyond, facing the doors, a weeping cherry either side.
 	var lz: float = zo + PLAZA_LOGO_Z
 	_box(out, Vector3(-3.6, 0.0, lz - 0.7), Vector3(3.6, 1.1, lz + 0.7), _mat("granite"))
 	_box(out, Vector3(-3.75, 1.1, lz - 0.85), Vector3(3.75, 1.22, lz + 0.85), _mat("granite_dark"))
+	_solid(Vector3(-3.75, 0.0, lz - 0.85), Vector3(3.75, 4.6, lz + 0.85))
 	var logo_scene := load(LOGO_PATH) as PackedScene
 	if logo_scene:
 		var logo := logo_scene.instantiate() as Node3D
@@ -1525,6 +1640,7 @@ func _build_plaza(out: Node3D, zo: float) -> void:
 	for s in [-1.0, 1.0]:
 		var cp := Vector3(s * 7.6, 0.0, lz + 0.5)
 		_round_planter(out, cp, 2.6, 0.55)
+		_solid_post(cp, 2.6, 1.2)
 		tree.call("shidare_0", cp + Vector3(0.0, 0.45, 0.0), rng.randf() * TAU, 1.0)
 		for k in 7:
 			var a: float = TAU * k / 7.0 + rng.randf() * 0.3
@@ -1533,6 +1649,7 @@ func _build_plaza(out: Node3D, zo: float) -> void:
 	for s in [-1.0, 1.0]:
 		var mp := Vector3(s * 7.0, 0.0, zo + 4.2)
 		_square_planter(out, mp, Vector2(4.4, 3.4), 0.6)
+		_solid(mp - Vector3(2.2, 0.0, 1.7), mp + Vector3(2.2, 1.2, 1.7))
 		tree.call("momiji_red_%d" % (0 if s < 0.0 else 1), mp + Vector3(0.0, 0.5, 0.0), rng.randf() * TAU, 0.95)
 		for k in 6:
 			var px: float = lerpf(-1.75, 1.75, float(k) / 5.0)
@@ -1542,6 +1659,7 @@ func _build_plaza(out: Node3D, zo: float) -> void:
 	for s in [-1.0, 1.0]:
 		var bp := Vector3(s * (half - 6.0), 0.0, z_road - 4.5)
 		_square_planter(out, bp, Vector2(9.0, 4.0), 0.45)
+		_solid(bp - Vector3(4.5, 0.0, 2.0), bp + Vector3(4.5, 1.2, 2.0))
 		tree.call("momiji_0", bp + Vector3(s * 2.2, 0.4, 0.0), rng.randf() * TAU, 0.9)
 		for k in 9:
 			var px: float = lerpf(-4.0, 1.0, float(k) / 8.0) * s
@@ -1560,15 +1678,134 @@ func _build_plaza(out: Node3D, zo: float) -> void:
 		if absf(bx) > 2.5:
 			_bollard(out, Vector3(bx, 0.0, z_road - 0.8))
 		bx += 2.4
+	# The grounds end at the kerb (an invisible rail between the bollards), hedges along the lawns' edge by the road,
+	# hedges down either side, and hedges from the first galleries' far corners out to the side ones.
+	_solid(Vector3(-GROUNDS_HALF, 0.0, z_road - 1.0), Vector3(GROUNDS_HALF, 2.5, z_road - 0.6))
+	var z_back: float = -FOYER - (SLOT - GALLERY_W) * 0.5
+	for s in [-1.0, 1.0]:
+		_hedge(out, Vector3(s * half, 0.0, z_road - 1.6), Vector3(s * GROUNDS_HALF, 1.0, z_road - 0.6))
+		_hedge(out, Vector3(s * GROUNDS_HALF - 0.5, 0.0, z_back), Vector3(s * GROUNDS_HALF + 0.5, 1.3, z_road - 0.6))
+		var corner: float = SPINE_HALF
+		for r in _rooms:
+			var rect: Rect2 = r["rect"]
+			if signf(r["side"]) == s and absf(rect.end.y - z_back) < 0.01:
+				corner = maxf(absf(rect.position.x), absf(rect.end.x)) + WALL_T * 0.5
+		_hedge(out, Vector3(s * corner, 0.0, z_back - 0.5), Vector3(s * GROUNDS_HALF, 1.3, z_back + 0.5))
+	# The building's faces on the grounds: the first galleries' fronts (their names on them) and the concourse's
+	# sides between them and the foyer's front.
+	var face_z: float = z_back + WALL_T * 0.5
+	for r in _rooms:
+		var rect: Rect2 = r["rect"]
+		if absf(rect.end.y - z_back) > 0.01:
+			continue
+		var sd: float = signf(r["side"])
+		_facade(out, Vector3(sd * (SPINE_HALF + WALL_T * 0.5), 0.0, face_z), Vector3(sd * (maxf(absf(rect.position.x),
+				absf(rect.end.x)) + WALL_T * 0.5), 0.0, face_z), Vector3(0, 0, 1), str(r["name"]).to_upper(), r["color"])
+	for sd in [-1.0, 1.0]:
+		var fx: float = sd * (SPINE_HALF + WALL_T * 0.5)
+		_facade(out, Vector3(fx, 0.0, face_z), Vector3(fx, 0.0, ENTRANCE_Z - WALL_T * 0.5), Vector3(sd, 0, 0), "", COL_GOLD)
 	# Birches on the lawns either side of the plaza and across the road; planes further off.
 	for i in 22:
 		var side: float = -1.0 if i % 2 == 0 else 1.0
 		var p := Vector3(side * rng.randf_range(half + 5.0, half + 40.0), -0.05, zo + rng.randf_range(-6.0, PLAZA_DEPTH - 4.0))
-		tree.call("birch_%d" % (i % 2), p, rng.randf() * TAU, rng.randf_range(0.8, 1.05))
+		tree.call("birch_%d" % (i % 2), p, rng.randf() * TAU, rng.randf_range(0.8, 1.05), false)
+		_solid_post(p, 0.25, 4.0)
+	# Two maples and azaleas in each lawn between the foyer and the first galleries.
+	for s in [-1.0, 1.0]:
+		for k in 2:
+			var mp := Vector3(s * (9.0 + k * 6.5), -0.03, zo - 5.0 - k * 4.5)
+			tree.call("momiji_0" if k == 0 else "momiji_red_1", mp, rng.randf() * TAU, 0.85)
+			_solid_post(mp, 0.25, 3.0)
+			for j in 5:
+				var a: float = TAU * j / 5.0 + rng.randf()
+				tree.call("tsutsuji_%d" % (j % 2), mp + Vector3(cos(a) * 2.4, 0.0, sin(a) * 2.4), rng.randf() * TAU, 0.65)
 	for i in 26:
 		var p := Vector3(rng.randf_range(-70.0, 70.0), -0.05, z_road + rng.randf_range(16.0, 75.0))
 		var kind: String = "birch_%d" % (i % 2) if i % 3 != 0 else "plane_%d" % (i % 2)
-		tree.call(kind, p, rng.randf() * TAU, rng.randf_range(0.8, 1.05))
+		tree.call(kind, p, rng.randf() * TAU, rng.randf_range(0.8, 1.05), false)
+
+
+## Dresses a stretch of the building's outside face, from `a` to `b` on the ground, facing `n`: aluminium pilasters
+## about every 3.5m up to a fascia along the top, an accent line in `color` under it, and `label` across the middle.
+func _facade(out: Node3D, a: Vector3, b: Vector3, n: Vector3, label: String, color: Color) -> void:
+	# A right-handed frame: x along the face as seen from outside, y up, z out of it.
+	var x_axis: Vector3 = Vector3.UP.cross(n).normalized()
+	var ta: float = a.dot(x_axis)
+	var tb: float = b.dot(x_axis)
+	var length: float = absf(tb - ta)
+	if length < 0.5:
+		return
+	var root := Node3D.new()
+	root.position = a if ta < tb else b
+	root.basis = Basis(x_axis, Vector3.UP, n.normalized())
+	out.add_child(root)
+	var alu := _mat("alu")
+	var count: int = maxi(1, roundi(length / 3.5))
+	for k in count + 1:
+		var x: float = clampf(length * float(k) / count, 0.2, length - 0.2)
+		_box(root, Vector3(x - 0.2, 0.0, 0.0), Vector3(x + 0.2, WALL_H + 0.3, 0.22), alu)
+	_box(root, Vector3(0.0, WALL_H - 0.35, 0.0), Vector3(length, WALL_H + 0.3, 0.26), alu)
+	_box(root, Vector3(0.0, WALL_H - 0.47, 0.0), Vector3(length, WALL_H - 0.41, 0.05), _glow_mat(color, 1.8), false)
+	if label != "":
+		_text(root, label, 0.55, color.lightened(0.25), Vector3(length * 0.5, 3.0, 0.24), length - 1.4, _font_bold)
+
+
+## A cylinder collider standing on the ground at `p`.
+func _solid_post(p: Vector3, r: float, h: float) -> void:
+	var cs := CollisionShape3D.new()
+	var shape := CylinderShape3D.new()
+	shape.radius = r
+	shape.height = h
+	cs.shape = shape
+	cs.position = Vector3(p.x, h * 0.5, p.z)
+	_walls.add_child(cs)
+
+
+## A clipped hedge filling the box from `a` to `b` (hedge.gdshader: UVs in metres on every face, the colour the
+## foliage's tint), solid.
+func _hedge(out: Node3D, a: Vector3, b: Vector3) -> void:
+	var lo := Vector3(minf(a.x, b.x), minf(a.y, b.y), minf(a.z, b.z))
+	var hi := Vector3(maxf(a.x, b.x), maxf(a.y, b.y), maxf(a.z, b.z))
+	if not _mats.has("hedge_leaf"):
+		var hm := ShaderMaterial.new()
+		hm.shader = load("res://hedge.gdshader")
+		_mats["hedge_leaf"] = hm
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var col := Color(0.42, 0.6, 0.3)
+	# Five faces (no bottom), each [corner, edge u, edge v], wound so they face out.
+	var size: Vector3 = hi - lo
+	var faces := [
+		[Vector3(lo.x, hi.y, lo.z), Vector3(size.x, 0, 0), Vector3(0, 0, size.z)],
+		[Vector3(lo.x, lo.y, hi.z), Vector3(size.x, 0, 0), Vector3(0, size.y, 0)],
+		[Vector3(hi.x, lo.y, lo.z), Vector3(-size.x, 0, 0), Vector3(0, size.y, 0)],
+		[Vector3(hi.x, lo.y, hi.z), Vector3(0, 0, -size.z), Vector3(0, size.y, 0)],
+		[Vector3(lo.x, lo.y, lo.z), Vector3(0, 0, size.z), Vector3(0, size.y, 0)],
+	]
+	for f in faces:
+		var o: Vector3 = f[0]
+		var u: Vector3 = f[1]
+		var v: Vector3 = f[2]
+		var n: Vector3 = v.cross(u).normalized()
+		if n.dot((o + (u + v) * 0.5) - (lo + hi) * 0.5) < 0.0:
+			n = -n
+		var q := [o, o + u, o + u + v, o + v]
+		var uv := [Vector2(0, 0), Vector2(u.length(), 0), Vector2(u.length(), v.length()), Vector2(0, v.length())]
+		var order: Array = [0, 1, 2, 0, 2, 3]
+		# Clockwise seen from outside: flip the order if (q1-q0)x(q2-q0) points along n.
+		if (q[1] - q[0]).cross(q[2] - q[0]).dot(n) > 0.0:
+			order = [0, 2, 1, 0, 3, 2]
+		for idx in order:
+			st.set_color(col)
+			st.set_normal(n)
+			st.set_uv(Vector2(uv[idx].x, -uv[idx].y))
+			st.add_vertex(q[idx])
+	st.generate_tangents()
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = _mats["hedge_leaf"]
+	out.add_child(mi)
+	_solid(lo, hi)
 
 
 ## Floor tiles under `parent` (not the world), at most 8m each.
@@ -2304,7 +2541,8 @@ func _cyl(parent: Node3D, r: float, y0: float, y1: float, mat: Material, top := 
 func _build_player() -> void:
 	_player = CharacterBody3D.new()
 	_player.name = "Walker"
-	_player.position = Vector3(0.0, 0.05, ENTRANCE_Z - 1.8)
+	# Just out of the doors' reach, so they don't open as the hall comes up.
+	_player.position = Vector3(0.0, 0.05, ENTRANCE_Z - DOOR_REACH - 0.2)
 	var cs := CollisionShape3D.new()
 	var cap := CapsuleShape3D.new()
 	cap.radius = 0.32

@@ -2811,8 +2811,23 @@ The menus call it the Headquarters (the main menu's tile, its HUD title, the loa
   and its sound), the RC Vibe GP logo on a plinth facing the doors between two weeping cherries, Japanese maples in
   planters either side of the doors, azalea beds, two RC Vibe GP flags and bollards at the kerb, birches on the lawns.
   The trees are the courses' own (WoodlandBuilder, MiyoshinoTrees) baked by `regenerate_headquarters_trees.gd` (`-s`,
-  headless, 10s) into `generated/headquarters_tree_*.res`; they had been spheres on cylinders. Nothing outside is
-  solid (nobody walks out there).
+  headless, 10s) into `generated/headquarters_tree_*.res`, each with its far stand-in (`*_shadow`); they had been
+  spheres on cylinders.
+  - The grounds are walkable: the entrance's leaves slide open behind the side glass while the walker is within
+    `DOOR_REACH` of the doorway (`_update_doors`, their colliders moving with them; `sounds/garage/sliding_door_open/
+    close.wav`, tools/elevenlabs' `hq_door_*`, raised in the files by normalize_wav.py). The fountain, plinth, planters,
+    trunks, benches, lamps and canopy posts are solid (`_solid`, `_solid_post`); hedges (`_hedge`, hedge.gdshader)
+    bound the grounds at `GROUNDS_HALF` and from the first galleries' far corners, an invisible rail runs along the
+    kerb. The floor's collider must reach past the kerb: it stopped at z 44 and the walker fell through the ground
+    under the rail. The building's faces on the grounds are dressed (`_facade`: pilasters, a fascia, an accent line,
+    the first galleries' names; the logo and HEADQUARTERS over the canopy).
+  - The cars on show are hidden while the walker is outside (`_update_bays_shown`): drawn with their shadowed
+    spotlights they cost about 8ms of an M1 at 1600x1000 looking back across the plaza.
+  - The trees follow the Detail Level (read once at build): Ultra, every tree casts its own detailed shadow; High, the
+    plaza's through their stand-ins (SHADOWS_ONLY), the lawn birches none; Medium only the planes' and cherries'; Low
+    none; Off also drops the trees across the road. 7-11ms GPU at every level and viewpoint (M1, 1600x1000; separate runs
+    move by 3ms with the clock: alternate them). `garage_shots` takes `detail=0..4`; `res://scratch/hq_walk_out_test.tscn`
+    (headless, `--fixed-fps 60`) walks out through the doors with real keys and into each obstacle and prints PASS/FAIL.
 - `garage_sky.gdshader` is two skies: the radiance cubemap (`AT_CUBEMAP_PASS`: reflections and ambient) is the car
   select screen's studio, so the paint keeps its soft-box highlights in the closed galleries; what the eye sees through
   the roof and the doors is a summer sky with cumulus and the sun. The sun (a DirectionalLight) lights only

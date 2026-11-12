@@ -1,8 +1,9 @@
 extends SceneTree
 ## Bakes the trees of the headquarters' plaza (Garage.gd's _build_plaza) into generated/headquarters_tree_*.res: the
 ## courses' own detailed trees (WoodlandBuilder's London planes and birches, MiyoshinoTrees' weeping cherry, Japanese
-## maples and azaleas), at life size, each mesh holding its bark and leaf materials (lod_mode 0: always the detailed
-## tree, no far stand-in: the plaza is small). The headquarters is built at run time and only loads these. Run headless:
+## maples and azaleas), at life size, each mesh holding its bark and leaf materials (lod_mode 0: always drawn), and
+## each one's far stand-in (`*_shadow`), which casts its shadow in its place. The headquarters is built at run time
+## and only loads these. Run headless:
 ##   Godot --headless --path . -s res://regenerate_headquarters_trees.gd
 ## Then reopen the headquarters (no level to regenerate).
 
@@ -20,6 +21,13 @@ func _save(res: Resource, n: String) -> Resource:
 	if err != OK:
 		push_error("couldn't save %s: %d" % [path, err])
 	return load(path)
+
+
+func _tris(mesh: ArrayMesh) -> int:
+	var n := 0
+	for si in mesh.get_surface_count():
+		n += mesh.surface_get_array_index_len(si) / 3
+	return n
 
 
 func _init() -> void:
@@ -43,10 +51,18 @@ func _init() -> void:
 		else:
 			var leaf: ShaderMaterial = leaf_rhein if w.uses_rhein_atlas(kind) else leaf_classic
 			mesh = w.tree_mesh(kind, variant, 0, barks[bark_key], leaf)
-		var tris := 0
-		for si in mesh.get_surface_count():
-			tris += mesh.surface_get_array_index_len(si) / 3
 		_save(mesh, "%s_%d" % [kind, variant])
-		print("%s_%d: %d triangles, %.1fm tall" % [kind, variant, tris, mesh.get_aabb().end.y])
+		# The far stand-in, only to cast the tree's shadow (Garage.gd draws it SHADOWS_ONLY): the detailed crowns'
+		# leaf cards in the shadow pass cost about 5ms of an M1 at 1600x1000.
+		var far: ArrayMesh
+		if miyo:
+			far = w.miyo_mesh(kind, variant, 1, barks[bark_key], leaf_miyo)
+		else:
+			var leaf_f: ShaderMaterial = leaf_rhein if w.uses_rhein_atlas(kind) else leaf_classic
+			far = w.tree_mesh(kind, variant, 1, barks[bark_key], leaf_f)
+		if far:
+			_save(far, "%s_%d_shadow" % [kind, variant])
+		print("%s_%d: %d triangles (stand-in %d), %.1fm tall" % [kind, variant, _tris(mesh), _tris(far) if far else 0,
+				mesh.get_aabb().end.y])
 	print("baked in %.1fs" % ((Time.get_ticks_msec() - t0) / 1000.0))
 	quit()
