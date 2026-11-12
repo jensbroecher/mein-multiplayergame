@@ -77,6 +77,7 @@ const STAGE_INFO := {
 	"res://levels/TianqiaoLevel.tscn": {"title": "TIANQIAO", "subtitle": "Yunhai at night: from the roof of the supertall along the sky gallery, a leap to the next tower, down the spiral, through the mall's atrium and the aquarium's tunnel to the park at street level", "file": "tile_tianqiao.jpg", "color": COL_YUNHAI},
 	"res://levels/PanlongLevel.tscn": {"title": "PANLONG INTERCHANGE", "subtitle": "Laps of a five-level motorway knot at the blue hour: up round the coil, over and under your own road, across the unfinished ramp's gap, the ring expressway's traffic streaming overhead", "file": "tile_panlong.jpg", "color": COL_YUNHAI},
 	"res://levels/WangjiangLevel.tscn": {"title": "WANGJIANG", "subtitle": "A long run down to the river at night: race the monorail through a block of flats, leap between the halves of Chaoyang station, wind down the lantern-lit cliff town of stilt houses, cross the river on the Yunhai Bridge and finish in the grand plaza", "file": "tile_wangjiang.jpg", "color": COL_YUNHAI},
+	"res://levels/ShuangjiangLevel.tscn": {"title": "SHUANGJIANG", "subtitle": "Dawn after the night race, where the two rivers meet: over the red Jiangxin arch, along the gravel shore under the towers in the morning fog, a jump over a moored sand barge, then loop up onto the Shuangjiang suspension bridge as the mist lifts", "file": "tile_shuangjiang.jpg", "color": COL_YUNHAI},
 	"res://levels/YamabushiLevel.tscn": {"title": "YAMABUSHI TRAIL", "subtitle": "The finale, one run up the pilgrims' mountain at dawn: from the cedar forest over the gorge's suspension bridge, through the cloud, along plank walks chained to the cliffs to the shrine on the summit", "file": "tile_yamabushi.jpg", "color": COL_MIYOSHINO},
 	"res://levels/TestTrackLevel.tscn": {"title": "TEST TRACK", "subtitle": "Try the cars: a 580m top-speed straight, a hairpin, a table-top, a chicane, a strip of every surface (sand, snow, ice, mud, grass, gravel, dirt, wood, cobbles) and a hill with a crest jump", "file": "tile_test_track.jpg", "color": COL_GOLD},
 	"res://levels/MsituFallsLevel.tscn": {"title": "MSITU FALLS", "subtitle": "Rainforest hairpins, a mud bend, a rope bridge over the brink, behind the falls, and tropical downpours", "file": "tile_msitu_falls.jpg", "color": COL_JUNGLE},
@@ -459,7 +460,7 @@ func _build_page(menu_name: String) -> void:
 			_add_tile("MIYOSHINO GP", "Senbon Sakura Pass  •  Yoshino Rapids  •  Monzenmachi  •  Yamabushi Trail", "tile_miyoshino_gp.jpg", COL_MIYOSHINO, func():
 				_on_cup_selected("Miyoshino GP")
 			)
-			_add_tile("YUNHAI GP", "Tianqiao  •  Panlong Interchange  •  Wangjiang", "tile_yunhai_gp.jpg", COL_YUNHAI, func():
+			_add_tile("YUNHAI GP", "Tianqiao  •  Panlong Interchange  •  Wangjiang  •  Shuangjiang", "tile_yunhai_gp.jpg", COL_YUNHAI, func():
 				_on_cup_selected("Yunhai GP")
 			)
 		"stage_select":

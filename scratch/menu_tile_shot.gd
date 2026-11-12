@@ -56,6 +56,8 @@ const STAGES := {
 	"PanlongLevel": {"focus": "-20,10,-20", "radius": 380},
 	# Wangjiang: from over the plaza, the bridge over the river to the cliff town.
 	"WangjiangLevel": {"focus": "880,30,900", "radius": 560, "az": 0},
+	# Shuangjiang: the confluence, both bridges, from over the south bank.
+	"ShuangjiangLevel": {"focus": "-100,20,-20", "radius": 620},
 }
 
 var opts := {}

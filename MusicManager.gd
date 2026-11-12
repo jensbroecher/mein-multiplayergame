@@ -440,6 +440,8 @@ const STAGE_TRACKS := {
 	"tianqiao": ["res://music/night/Midnight_Overdrive.mp3", "res://music/night/Apex_Drift.mp3"],
 	"panlong": ["res://music/night/Apex_Drift.mp3", "res://music/night/Midnight_Overdrive.mp3"],
 	"wangjiang": ["res://music/night/Midnight_Overdrive.mp3", "res://music/night/Apex_Drift.mp3"],
+	# Dawn in the fog: the misty mountain track, then the city one.
+	"shuangjiang": ["res://music/miyoshino/Above_the_Clouds.mp3", "res://music/city/Engines_at_the_Gate.mp3"],
 	"kronburg": [
 		"res://music/kronburg/Schichtwechsel.mp3",
 		"res://music/kronburg/Kleeblatt.mp3",
@@ -479,6 +481,8 @@ static func _stage_track_key(path_lower: String) -> String:
 		return "panlong"
 	if path_lower.contains("wangjiang"):
 		return "wangjiang"
+	if path_lower.contains("shuangjiang"):
+		return "shuangjiang"
 	if path_lower.contains("mara"):
 		return "mara"
 	if path_lower.contains("nyota"):

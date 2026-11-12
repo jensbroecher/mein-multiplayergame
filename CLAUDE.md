@@ -4948,3 +4948,38 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   far bank.
 - AI races (`scratch/ai_race_test`, speed=2): every bot finishes in 91-117s; the kicker is crossed at 47-56 m/s.
 - `fall_respawn_drop` 11m (the legs are 12-13m apart, so a cart off an upper leg lands on the one below and drives on).
+
+## Shuangjiang (Yunhai GP, stage 4)
+
+- `regenerate_shuangjiang.gd` (`regenerate_shuangjiang.tscn`, headless, about 20s) builds `levels/ShuangjiangLevel.tscn`:
+  laps (about 3.85km, 85-115s) at dawn after the night race, where the main river (along z 0, banks at |z|
+  `RIVER_HALF_W` 205m) meets a tributary (along `TRIB_X`, `TRIB_HALF` 150m wide each side) from the north. The last of
+  the four ideas offered for the cup's second stage.
+- The lap: the start on the south bank's avenue (`START_AT`) heading west past the riverside park (`RIVERSIDE`); north
+  over the Jiangxin Bridge (江心大桥, `_build_arch_bridge`, a red steel through-arch along `ARCH_X`: ribs, chords, webs,
+  hangers, wind bracing over the deck, LED); down off the peninsula onto the shore road (gravel, `_sections`) at the
+  water's edge under the bluff, a kicker and a 36m jump over a sand barge moored in an inlet (`JUMP_LIP`, `INLET`); a
+  loop up over the shore road at the confluence's beach (the bluff turns north from `BLUFF_X0`, `BLUFF_RECEDE`) onto
+  the Shuangjiang Bridge (双江大桥, `_build_suspension_bridge`, along `SUSP_X`: white towers at z +-`SUSP_TOWER_Z`,
+  main cables `_cable_y` self-anchored on the deck's edges at `SUSP_END_Z`, hangers, no piers under the main span,
+  `_col_blocked`); down onto the avenue. Every stretch more than 3m over `_natural` is a bridge on hammerhead piers.
+  The loop was first tight (r60) and in a cutting into the bluff: bots flew off its bends and one drove round under it
+  for the rest of the race; it now has r80 corners on the open beach and no boost before it.
+- Fog: the environment starts in thick morning fog (`_environment`: fog 25-850m, a low warm sun in the east, a pale
+  sky). `FogLift.gd` (a child of the level) lifts it once the race starts (Level's `race_state` past the lobby) over
+  `lift_time` (210s) to 160-2600m, and thins the river mist (`_build_mist`: `river_mist.gdshader` sheets, children
+  named "Mist...", drifting wisps that fade near the camera and where they meet things) to `end_mist` of its density;
+  each peer on its own clock. `res://scratch/fog_lift_check.tscn -- [level=] [lift=4]` (headless) prints it lifting.
+- The ground: `megacity_ground.gdshader`'s `shore_y` (3.4 here: under it gravel and mud, wetter and glossier toward
+  the water, no streets or their lamp pools or gloss) and `slope_grass` (steep ground above the shore is grass and
+  rock). Their defaults leave the other stages as they were. The roads have a little dew (`wetness`).
+- Dressing: Tianqiao's landmarks on the peninsula's heights looming out of the fog (`_build_landmarks`: the Liangjiang
+  towers with their sky gallery 云廊, the Yunhai Center supertall); the shore (`_build_shore`: a retaining wall along the
+  bluff, boulders, beached sampans, sand heaps, fishermen); the confluence's beach (`_build_beach`); barges, a container
+  barge and river cruisers (`_build_barges`); the riverside park's promenade, lamps and benches, mostly green trees
+  (`_tree_pick`); lamps along the lap; the start crowd. Mornings dim the city's windows and LEDs (the shared
+  `MCK.material` values set in `_build_dressing`). `MCK.rock_heap` is the aquarium's dark "tank" material: the boulders
+  here are `_boulders` ("paint").
+- AI races (`scratch/ai_race_test`, speed=2): every bot finishes; the only respawns are from items. The barge jump is
+  crossed at 43-50 m/s. `fall_respawn_drop` 9m.
+- Music: `STAGE_TRACKS["shuangjiang"]` (Above the Clouds, then Engines at the Gate). Menu tile: `tile_shuangjiang.jpg`.

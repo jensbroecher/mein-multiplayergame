@@ -6,7 +6,7 @@
 set -e
 SRC=${SRC:-/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc}
 TXT=$(mktemp)
-python3 - "$TXT" YunhaiStage.gd regenerate_tianqiao.gd regenerate_panlong.gd regenerate_wangjiang.gd <<'PY'
+python3 - "$TXT" YunhaiStage.gd regenerate_tianqiao.gd regenerate_panlong.gd regenerate_wangjiang.gd regenerate_shuangjiang.gd <<'PY'
 import sys, os
 chars = set()
 for f in sys.argv[2:]:

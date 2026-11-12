@@ -15,6 +15,10 @@ uniform sampler2D asphalt_tex : source_color, filter_linear_mipmap_anisotropic, 
 uniform sampler2D grass_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D concrete_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform float lamp_energy = 1.4;
+// Shuangjiang: ground under `shore_y` is a river's shore (gravel and mud, wetter toward the water, no streets), and with
+// `slope_grass` steep ground is grass and rock. The defaults leave the other stages as they were.
+uniform float shore_y = -1000.0;
+uniform float slope_grass = 0.0;
 
 varying vec3 w_pos;
 
@@ -52,12 +56,23 @@ void fragment() {
 	float in_park = step(park.x, w_pos.x) * step(w_pos.x, park.z) * step(park.y, w_pos.z) * step(w_pos.z, park.w);
 	vec3 grass = texture(grass_tex, w_pos.xz / 4.0).rgb * 0.5;
 	col = mix(col, grass, in_park);
+	// The shore and the slopes.
+	float shore = 1.0 - smoothstep(shore_y - 0.6, shore_y, w_pos.y);
+	vec3 gravel = texture(concrete_tex, w_pos.xz / 2.5).rgb * vec3(0.5, 0.46, 0.4);
+	vec3 mud = texture(asphalt_tex, w_pos.xz / 4.0).rgb * vec3(0.32, 0.28, 0.22);
+	vec3 shore_col = mix(mud, gravel, smoothstep(0.6, 2.2, w_pos.y));
+	vec3 wn = normalize((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz);
+	float steep = slope_grass * (1.0 - smoothstep(0.72, 0.86, wn.y)) * smoothstep(shore_y, shore_y + 1.0, w_pos.y);
+	vec3 bank = mix(grass * 0.85, texture(concrete_tex, w_pos.xz / 5.0).rgb * vec3(0.42, 0.4, 0.36), smoothstep(0.55, 0.4, wn.y));
+	col = mix(col, shore_col, shore);
+	col = mix(col, bank, steep);
+	in_park = max(in_park, max(shore, steep));
 	// Street lights: warm pools along the pavements' street edge every 28m.
 	vec2 lp = vec2(mod(p.x, 28.0) - 14.0, mod(p.y, 28.0) - 14.0);
 	float near_edge = (1.0 - on_street) * (1.0 - in_park);
 	float pool = exp(-dot(lp, lp) / 60.0) * pave;
 	vec3 emi = vec3(1.0, 0.78, 0.5) * pool * lamp_energy * 0.25 + vec3(1.0, 0.8, 0.55) * on_street * 0.015;
 	ALBEDO = col;
-	EMISSION = emi * near_edge + emi * on_street;
-	ROUGHNESS = mix(0.85, 0.55, on_street);
+	EMISSION = (emi * near_edge + emi * on_street) * (1.0 - max(shore, steep));
+	ROUGHNESS = mix(mix(0.85, 0.55, on_street), mix(0.95, 0.6, 1.0 - smoothstep(0.3, 1.2, w_pos.y)), max(shore, steep));
 }
