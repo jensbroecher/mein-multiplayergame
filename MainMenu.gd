@@ -45,6 +45,8 @@ const COL_JUNGLE := Color(0.32, 0.80, 0.42)
 const COL_KRONBURG := Color(0.88, 0.36, 0.26)
 const COL_MIYOSHINO := Color(0.98, 0.62, 0.74)
 const COL_YUNHAI := Color(0.95, 0.30, 0.78)
+const COL_ARENA := Color(0.36, 0.86, 0.38)
+const COL_ARENA_CTF := Color(0.98, 0.32, 0.30)
 
 ## Every course's tile: title, one-line description, picture and accent colour.
 const STAGE_INFO := {
@@ -383,6 +385,8 @@ func _build_page(menu_name: String) -> void:
 
 	match menu_name:
 		"main":
+			# Back at the top: whatever was picked last, a race again unless an ARENA page picks a game.
+			NetworkManager.arena = {}
 			screen_title.text = "SELECT MODE"
 			screen_subtitle.text = "Choose how you want to race"
 			tile_grid.columns = 2
@@ -428,6 +432,9 @@ func _build_page(menu_name: String) -> void:
 			_add_tile("TIME TRIAL", "Solo laps on any course", "scene:time_trial", COL_CYAN, func():
 				show_sub_menu("stage_select")
 			)
+			_add_tile("ARENA", "Football in the Hex Bowl or Capture the Flag, against bots", "tile_arena_football.jpg", COL_ARENA, func():
+				show_sub_menu("arena_select")
+			)
 		"coop_config":
 			screen_title.text = "SPLITSCREEN"
 			screen_subtitle.text = "Set Player 2's name, then pick a mode"
@@ -435,6 +442,27 @@ func _build_page(menu_name: String) -> void:
 			tile_grid.columns = 2
 			_add_tile("GRAND PRIX", "Share a cup with bots in the field", "scene:grand_prix", COL_GOLD, _on_coop_gp_pressed)
 			_add_tile("VS RACE", "Head-to-head on a single course", "scene:vs", COL_ORANGE, _on_coop_vs_pressed)
+			_add_tile("ARENA", "Football or Capture the Flag, with bots filling the field", "tile_arena_football.jpg", COL_ARENA, func():
+				NetworkManager.current_game_mode = NetworkManager.GameMode.LOCAL_COOP
+				NetworkManager.is_coop_gp = false
+				show_sub_menu("arena_select")
+			)
+		"arena_select":
+			screen_title.text = "ARENA"
+			screen_subtitle.text = "Pick a game: every player for themselves, or two teams"
+			tile_grid.columns = 2
+			_add_tile("FOOTBALL  •  ALL VS ALL", "The Hex Bowl: six goals, one each. Score in the others' and guard your own", "tile_arena_football.jpg", COL_ARENA, func():
+				_on_arena_selected("football", false)
+			)
+			_add_tile("FOOTBALL  •  TEAMS", "The Hex Bowl: red against blue, three goals each", "tile_arena_football.jpg", COL_ARENA, func():
+				_on_arena_selected("football", true)
+			)
+			_add_tile("CAPTURE THE FLAG  •  ALL VS ALL", "Grab the flag in the middle and claim bases with it: every base you hold scores", "tile_arena_ctf.jpg", COL_ARENA_CTF, func():
+				_on_arena_selected("ctf", false)
+			)
+			_add_tile("CAPTURE THE FLAG  •  TEAMS", "Red against blue: claim the bases, hold them, ram the carrier to steal the flag", "tile_arena_ctf.jpg", COL_ARENA_CTF, func():
+				_on_arena_selected("ctf", true)
+			)
 		"cup_select":
 			screen_title.text = "SELECT CUP"
 			screen_subtitle.text = "Each cup is a series of courses"
@@ -538,6 +566,11 @@ func _on_back_pressed() -> void:
 				show_sub_menu("sp_modes")
 		"gp_test":
 			show_sub_menu("main")
+		"arena_select":
+			if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
+				show_sub_menu("coop_config")
+			else:
+				show_sub_menu("sp_modes")
 		_:
 			show_sub_menu("main")
 
@@ -721,6 +754,15 @@ func _on_stage_selected(stage_path: String) -> void:
 			and NetworkManager.current_game_mode != NetworkManager.GameMode.SPECTATOR:
 		NetworkManager.current_game_mode = NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL
 	NetworkManager.time_trial_stage = stage_path
+	start_pressed.emit()
+
+
+## An arena game from the single player or splitscreen pages: the arena's level is the one course to load.
+func _on_arena_selected(kind: String, teams: bool) -> void:
+	if NetworkManager.current_game_mode != NetworkManager.GameMode.LOCAL_COOP:
+		NetworkManager.current_game_mode = NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL
+	NetworkManager.arena = {"kind": kind, "teams": teams}
+	NetworkManager.time_trial_stage = NetworkManager.arena_level()
 	start_pressed.emit()
 
 

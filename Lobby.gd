@@ -83,6 +83,9 @@ func _setup_mode_options():
 	option_mode.clear()
 	option_mode.add_item("Single Stages (Vote Next Track)", NetworkManager.MultiplayerMode.SINGLE_STAGES)
 	option_mode.add_item("Full Grand Prix (Championship)", NetworkManager.MultiplayerMode.GRAND_PRIX)
+	# The arena games (ArenaGame.gd): ids past the multiplayer modes, read by `_arena_of`.
+	for i in ARENA_MODES.size():
+		option_mode.add_item(str(ARENA_MODES[i][0]), ARENA_ID0 + i)
 	option_mode.select(0)
 	
 	option_cup.clear()
@@ -92,6 +95,16 @@ func _setup_mode_options():
 		cup_idx += 1
 	option_cup.select(0)
 	option_cup.visible = false
+
+## The lobby's arena entries: [label, kind, teams], their ids ARENA_ID0 on.
+const ARENA_ID0 := 100
+const ARENA_MODES := [
+	["Arena: Football (All vs All)", "football", false],
+	["Arena: Football (Teams)", "football", true],
+	["Arena: Capture the Flag (All vs All)", "ctf", false],
+	["Arena: Capture the Flag (Teams)", "ctf", true],
+]
+
 
 func show_connection_view():
 	is_in_room = false
@@ -114,6 +127,8 @@ func enter_room_view():
 		room_title.text = "HOST LOBBY"
 		room_status.text = "Hosting match"
 		button_start.text = "START GRAND PRIX" if NetworkManager.multiplayer_mode == NetworkManager.MultiplayerMode.GRAND_PRIX else "START RACE"
+		# The mode list's pick again (the menu's main page clears an arena game).
+		_on_mode_selected(option_mode.selected)
 	else:
 		room_title.text = "RACE LOBBY"
 		room_status.text = "Connected to Host"
@@ -202,6 +217,14 @@ func _on_start_race_pressed():
 
 func _on_mode_selected(index: int):
 	var mode = option_mode.get_item_id(index)
+	if mode >= ARENA_ID0:
+		var am: Array = ARENA_MODES[mode - ARENA_ID0]
+		option_cup.visible = false
+		button_start.text = "START MATCH"
+		NetworkManager.set_multiplayer_mode(NetworkManager.MultiplayerMode.SINGLE_STAGES, option_cup.get_item_text(option_cup.selected))
+		NetworkManager.set_arena(str(am[1]), bool(am[2]))
+		return
+	NetworkManager.set_arena("", false)
 	option_cup.visible = (mode == NetworkManager.MultiplayerMode.GRAND_PRIX)
 	button_start.text = "START GRAND PRIX" if mode == NetworkManager.MultiplayerMode.GRAND_PRIX else "START RACE"
 	var cup_name = option_cup.get_item_text(option_cup.selected)
@@ -217,7 +240,10 @@ func _on_multiplayer_mode_changed(mode: int, cup_name: String):
 	_update_client_mode_label()
 
 func _update_client_mode_label():
-	if NetworkManager.multiplayer_mode == NetworkManager.MultiplayerMode.GRAND_PRIX:
+	if not NetworkManager.arena.is_empty():
+		var kind: String = "Football" if str(NetworkManager.arena.get("kind", "")) == "football" else "Capture the Flag"
+		client_mode_label.text = "Mode: Arena - %s (%s)" % [kind, "Teams" if bool(NetworkManager.arena.get("teams", false)) else "All vs All"]
+	elif NetworkManager.multiplayer_mode == NetworkManager.MultiplayerMode.GRAND_PRIX:
 		client_mode_label.text = "Mode: Grand Prix - %s" % NetworkManager.selected_mp_cup
 	else:
 		client_mode_label.text = "Mode: Single Stages (Vote Next Track)"

@@ -19,7 +19,7 @@ const CartWeight = preload("res://CartWeight.gd")
 ## ball back ashore). Lost (fallen out of the world, or left at rest away from where it started with
 ## no cart near for RESET_IDLE seconds, or adrift far out) it comes back to where it started.
 
-enum Style { FOOTBALL, BEACH }
+enum Style { FOOTBALL, BEACH, ARENA }
 
 const SHADER := preload("res://kick_ball.gdshader")
 const LAYER := 1 << 5
@@ -46,6 +46,10 @@ const STYLES := {
 	Style.BEACH: {"radius": 0.45, "mass": 0.8, "gravity": 0.85, "damp": 0.5, "spin_damp": 0.8,
 		"bounce": 0.78, "friction": 0.5, "kick": 1.25, "lift": 0.42, "slow": 0.03, "float": 0.12,
 		"top": 38.0, "drag": 0.035, "roll": 0.9, "pitch": 1.0},
+	# The arena's ball (ArenaGame.gd, the Hex Bowl): 1.9m across, light and lively, seams glowing.
+	Style.ARENA: {"radius": 0.95, "mass": 4.0, "gravity": 1.6, "damp": 0.22, "spin_damp": 0.5,
+		"bounce": 0.74, "friction": 0.6, "kick": 1.45, "lift": 0.24, "slow": 0.06, "float": 0.5,
+		"top": 52.0, "drag": 0.0, "roll": 0.5, "pitch": 0.7},
 }
 
 @export var style: Style = Style.FOOTBALL:
@@ -76,6 +80,11 @@ var _last_kick := {}
 var _idle := 0.0
 var _g := 9.8
 var _afloat := false
+## A client's view of a ball the host runs (ArenaGame.gd): frozen, placed from the host's state, nothing simulated.
+var remote_driven := false:
+	set(v):
+		remote_driven = v
+		freeze = v
 
 
 func _ready() -> void:
@@ -133,7 +142,7 @@ func _build() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if Engine.is_editor_hint():
+	if Engine.is_editor_hint() or remote_driven:
 		return
 	_update_carts(delta)
 	var r: float = _p["radius"]
@@ -285,6 +294,13 @@ func _watch_lost(delta: float, nearest: float) -> void:
 		return
 	if (_idle > RESET_IDLE and away > 4.0) or (afloat and away > ADRIFT):
 		_reset()
+
+
+## Back where it started, still (ArenaGame.gd's kick-off).
+func reset_home(home: Transform3D = Transform3D()) -> void:
+	if home != Transform3D():
+		_home = home
+	_reset()
 
 
 func _reset() -> void:

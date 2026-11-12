@@ -70,6 +70,9 @@ const STAGES := {
 	"NyotaStadiumLevel": [["stadium", -27.0]],
 	"MsituFallsLevel": [["rainforest", -30.0]],
 	"MtaaNightsLevel": [["stadium", -36.0]],
+	# The arenas (ArenaGame.gd): the Hex Bowl's full stands; Flag Hill's birds in the valley.
+	"ArenaHexBowlLevel": [["stadium", -26.0]],
+	"ArenaCtfLevel": [["insects_birds", -32.0]],
 	"MarinaNightsLevel": [["city", -36.0], ["harbor", -38.0]],
 	# Kronburger Hütte: the town round it and the birds in the fields; the works' own noise is 3D (the generator's).
 	"KronburgLevel": [["city", -40.0], ["insects_birds", -35.0]],

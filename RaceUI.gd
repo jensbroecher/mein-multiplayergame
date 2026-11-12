@@ -622,8 +622,11 @@ func display_race_results(results_data: Array):
 			or (NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP and NetworkManager.is_coop_gp) \
 			or (NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER and NetworkManager.multiplayer_mode == NetworkManager.MultiplayerMode.GRAND_PRIX)
 
+	var is_arena: bool = not results_data.is_empty() and bool((results_data[0] as Dictionary).get("arena", false))
 	var is_mp_single_stages: bool = NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER \
 			and NetworkManager.multiplayer_mode == NetworkManager.MultiplayerMode.SINGLE_STAGES
+	if is_arena:
+		is_gp = false
 
 	var vbox = $EndPanel/VBoxContainer
 	if results_container == null:
@@ -635,13 +638,15 @@ func display_race_results(results_data: Array):
 		for child in results_container.get_children():
 			child.queue_free()
 			
-	if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL:
+	if is_arena:
+		_build_arena_results(results_data)
+	elif NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL:
 		_build_tt_results(results_data)
 	else:
 		_build_results_table(results_data, is_gp)
 
-	# Post-race track voting for multiplayer single stages:
-	if is_mp_single_stages:
+	# Post-race track voting for multiplayer single stages (not after an arena match):
+	if is_mp_single_stages and not is_arena:
 		_setup_track_voting_panel(vbox)
 		
 	if action_button == null:
@@ -674,7 +679,7 @@ func display_race_results(results_data: Array):
 		action_button.text = "RETURN TO LOBBY"
 		action_button.disabled = false
 	elif _is_offline_single_race():
-		action_button.text = "NEXT RACE"
+		action_button.text = "PLAY AGAIN" if is_arena else "NEXT RACE"
 		action_button.disabled = false
 	else:
 		action_button.text = "RETURN TO MENU"
@@ -866,7 +871,9 @@ func _on_action_button_pressed():
 			menu_button.disabled = true
 		var main_scene = get_tree().current_scene
 		if main_scene and main_scene.has_method("restart_race"):
-			NetworkManager.time_trial_stage = NetworkManager.get_next_course(NetworkManager.time_trial_stage)
+			# An arena game again on the same arena; after a race, the next course.
+			if NetworkManager.arena.is_empty():
+				NetworkManager.time_trial_stage = NetworkManager.get_next_course(NetworkManager.time_trial_stage)
 			main_scene.restart_race()
 			return
 
@@ -1213,6 +1220,38 @@ func _build_results_table(results_data: Array, is_gp: bool) -> void:
 		if is_gp:
 			row.add_child(_results_label("+%d" % r.get("round_points", 0), 60, HORIZONTAL_ALIGNMENT_RIGHT, col))
 			row.add_child(_results_label("%d" % r.get("total_points", 0), 70, HORIZONTAL_ALIGNMENT_RIGHT, col))
+		results_container.add_child(row)
+
+
+## An arena match's table (ArenaGame.gd's results): place, name, team, the score and what earned it (goals or bases
+## claimed), the winning team's line first in a team game.
+func _build_arena_results(results_data: Array) -> void:
+	var first: Dictionary = results_data[0]
+	if str(first.get("headline", "")) != "":
+		var head := _results_label(str(first["headline"]), 0, HORIZONTAL_ALIGNMENT_CENTER, COL_T_GOLD)
+		head.add_theme_font_size_override("font_size", 26)
+		results_container.add_child(head)
+	var header := HBoxContainer.new()
+	header.custom_minimum_size = Vector2(600, 0)
+	header.add_child(_results_label("POS", 50, HORIZONTAL_ALIGNMENT_CENTER, COL_T_DIM))
+	header.add_child(_results_label("NAME", 0, HORIZONTAL_ALIGNMENT_LEFT, COL_T_DIM))
+	header.add_child(_results_label("TEAM", 90, HORIZONTAL_ALIGNMENT_LEFT, COL_T_DIM))
+	header.add_child(_results_label(str(first.get("stat_name", "GOALS")), 90, HORIZONTAL_ALIGNMENT_RIGHT, COL_T_DIM))
+	header.add_child(_results_label("SCORE", 90, HORIZONTAL_ALIGNMENT_RIGHT, COL_T_DIM))
+	results_container.add_child(header)
+	results_container.add_child(HSeparator.new())
+	var me := multiplayer.get_unique_id() if multiplayer.multiplayer_peer != null else 1
+	for r in results_data:
+		var row := HBoxContainer.new()
+		var col := Color(1, 1, 1, 1)
+		if not bool(r.get("is_bot", true)) and NetworkManager.players.has(me) and str(NetworkManager.players[me].get("name", "")) == str(r["name"]):
+			col = COL_T_GOLD
+		var team_col: Color = r.get("team_color", Color(1, 1, 1))
+		row.add_child(_results_label("%d" % int(r["pos"]), 50, HORIZONTAL_ALIGNMENT_CENTER, col))
+		row.add_child(_results_label(str(r["name"]), 0, HORIZONTAL_ALIGNMENT_LEFT, col))
+		row.add_child(_results_label(str(r.get("team_name", "")), 90, HORIZONTAL_ALIGNMENT_LEFT, team_col))
+		row.add_child(_results_label("%d" % int(r.get("stat", 0)), 90, HORIZONTAL_ALIGNMENT_RIGHT, col, 0, true))
+		row.add_child(_results_label("%d" % int(r.get("score", 0)), 90, HORIZONTAL_ALIGNMENT_RIGHT, col, 0, true))
 		results_container.add_child(row)
 
 

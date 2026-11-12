@@ -12,6 +12,12 @@ var start_line_pos: Vector2 = Vector2.ZERO
 var has_start_line: bool = false
 
 var time_elapsed: float = 0.0
+## An arena's map (ArenaGame.gd): its outlines in plan instead of a lap, its own markers drawn over them
+## (`minimap_draw`: the flag and who carries it, the bases, the ball, the goals) and the carts in team colours.
+var arena: Node = null
+var arena_outlines: Array = []
+var _arena_min := Vector2.ZERO
+var _arena_max := Vector2.ZERO
 var _redraw_frame: int = 0
 
 func _ready() -> void:
@@ -21,6 +27,9 @@ func _ready() -> void:
 func _initialize_track() -> void:
 	level = get_tree().get_first_node_in_group("level")
 	if not level:
+		return
+	if level.get("arena") != null:
+		_init_arena(level.get("arena"))
 		return
 		
 	var track_path = level.track_path
@@ -80,6 +89,24 @@ func _initialize_track() -> void:
 				
 	_update_scale(min_pos, max_pos)
 
+func _init_arena(a: Node) -> void:
+	if not a.has_method("minimap_outline"):
+		return
+	arena = a
+	arena_outlines = a.minimap_outline()
+	_arena_min = Vector2(INF, INF)
+	_arena_max = Vector2(-INF, -INF)
+	for loop in arena_outlines:
+		for p in loop:
+			_arena_min = _arena_min.min(p)
+			_arena_max = _arena_max.max(p)
+	_update_scale(_arena_min, _arena_max)
+
+
+func to_map(p3: Vector3) -> Vector2:
+	return (Vector2(p3.x, p3.z) - track_center) * track_scale + size * 0.5
+
+
 func _update_scale(min_pos: Vector2, max_pos: Vector2) -> void:
 	if min_pos.x == INF:
 		return
@@ -97,6 +124,9 @@ func _update_scale(min_pos: Vector2, max_pos: Vector2) -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED:
+		if arena != null:
+			_update_scale(_arena_min, _arena_max)
+			return
 		# Recalculate scale on resize
 		if level:
 			var track_path = level.track_path
@@ -114,7 +144,7 @@ func _notification(what: int) -> void:
 
 func _process(delta: float) -> void:
 	time_elapsed += delta
-	if track_points.is_empty():
+	if track_points.is_empty() and arena == null:
 		_initialize_track()
 	# Throttle redraws to every 5 frames (~12 fps) – cart positions don't need 60 fps updates
 	_redraw_frame += 1
@@ -123,6 +153,9 @@ func _process(delta: float) -> void:
 		queue_redraw()
 
 func _draw() -> void:
+	if arena != null and is_instance_valid(arena):
+		_draw_arena()
+		return
 	if track_points.is_empty():
 		return
 		
@@ -205,6 +238,36 @@ func _draw() -> void:
 		draw_polygon(tri_points, [cart_color])
 		# Dark contour outline for visibility
 		draw_polyline(PackedVector2Array([front, back_right, back_left, front]), Color(0.06, 0.06, 0.08, 0.9), 1.0, true)
+
+func _draw_arena() -> void:
+	for loop in arena_outlines:
+		var pts := PackedVector2Array()
+		for p in loop:
+			pts.append((p - track_center) * track_scale + size * 0.5)
+		if pts.size() > 1:
+			pts.append(pts[0])
+			draw_polyline(pts, Color(1, 1, 1, 0.08), 5.0, true)
+			draw_polyline(pts, Color(0.0, 0.8, 1.0, 0.7), 2.0, true)
+	arena.minimap_draw(self, time_elapsed, false)
+	for cart in get_tree().get_nodes_in_group("player_carts"):
+		if not is_instance_valid(cart):
+			continue
+		var p := to_map(cart.global_position)
+		var is_local = cart.get("is_local_player") == true
+		if is_local:
+			var pulse_r = 7.0 + sin(time_elapsed * 7.0) * 3.0
+			draw_circle(p, pulse_r, Color(1.0, 1.0, 1.0, 0.25 - sin(time_elapsed * 7.0) * 0.08))
+		var fwd_3d = -cart.global_transform.basis.z
+		var dir := Vector2(fwd_3d.x, fwd_3d.z).normalized()
+		if cart.linear_velocity.length_squared() > 1.0:
+			dir = Vector2(cart.linear_velocity.x, cart.linear_velocity.z).normalized()
+		var right := Vector2(-dir.y, dir.x)
+		var k := 1.25 if is_local else 1.0
+		var tri := PackedVector2Array([p + dir * 7.0 * k, p - dir * 4.2 * k + right * 5.0 * k, p - dir * 4.2 * k - right * 5.0 * k])
+		draw_polygon(tri, [arena.cart_color(cart)])
+		draw_polyline(PackedVector2Array([tri[0], tri[1], tri[2], tri[0]]), Color(1, 1, 1, 0.9) if is_local else Color(0.06, 0.06, 0.08, 0.9), 1.2, true)
+	arena.minimap_draw(self, time_elapsed, true)
+
 
 func _get_cart_color(cart: Node) -> Color:
 	if cart.get("is_local_player") == true:

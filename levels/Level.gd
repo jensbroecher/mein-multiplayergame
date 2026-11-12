@@ -108,6 +108,8 @@ const WRONG_WAY_ALERT := "res://sounds/unused_alert.wav"
 const LAP_RECORDS_PATH := "user://lap_records.cfg"
 ## The start gantry (CheckpointGate's finish line), fed the standings for its ticker.
 var _gantry: Node = null
+## The arena game on an arena level (ArenaGame.gd, a child named "ArenaGame"): it runs the match instead of the laps.
+var arena: Node = null
 ## Speaks the race calls by racer name (RaceCommentator.gd); fed the standings on every peer.
 var _commentator: Node = null
 ## The stage's recorded background (StageAmbience.gd), which also roars at the start and the first finish.
@@ -189,6 +191,7 @@ func _ready():
 
 
 	add_to_group("level")
+	arena = get_node_or_null("ArenaGame")
 	player_spawner.spawn_function = _spawn_custom
 	if NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP:
 		_setup_splitscreen()  # creates race_ui, race_ui_p2 inside SubViewports
@@ -232,7 +235,9 @@ func _ready():
 		NetworkManager.player_connected.connect(_on_server_player_connected)
 		NetworkManager.player_disconnected.connect(_on_server_player_disconnected)
 
-		if NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP or (NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP and NetworkManager.is_coop_gp):
+		if arena != null:
+			_fill_arena_bots()
+		elif NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_GP or (NetworkManager.current_game_mode == NetworkManager.GameMode.LOCAL_COOP and NetworkManager.is_coop_gp):
 			# Bots fill the grid up to MAX_PLAYERS, so splitscreen GP gets one bot fewer.
 			var humans := 0
 			var human_cars: Array = []
@@ -283,6 +288,39 @@ func _ready():
 
 	if multiplayer.is_server():
 		_run_race_countdown()
+
+
+## An arena game always has a full field: bots (BotRoster.gd, a fresh draw each match) fill the places the humans
+## leave, in every mode (single player, splitscreen, a LAN game's host).
+func _fill_arena_bots() -> void:
+	var humans := 0
+	var human_cars: Array = []
+	for pid in NetworkManager.players.keys():
+		if NetworkManager.players[pid].get("is_ai", false):
+			NetworkManager.players.erase(pid)
+		else:
+			humans += 1
+			human_cars.append(int(NetworkManager.players[pid].get("car_index", 0)))
+	var need := clampi(NetworkManager.MAX_PLAYERS - humans, 0, NetworkManager.MAX_PLAYERS)
+	var roster: Array = load("res://BotRoster.gd").make(need, human_cars)
+	var paint_rng := RandomNumberGenerator.new()
+	paint_rng.randomize()
+	for i in range(mini(need, roster.size())):
+		NetworkManager.players[100 + i] = {
+			"name": str(roster[i]["name"]),
+			"car_index": int(roster[i]["car_index"]),
+			"paint": CarPaint.random(paint_rng, ""),
+			"ready": true,
+			"is_ai": true
+		}
+
+
+## The arena game's end (ArenaGame.gd, server): the results on every peer.
+func end_arena(results: Array) -> void:
+	if race_state != RaceState.RACING:
+		return
+	race_state = RaceState.FINISHED
+	end_race_rpc.rpc(results)
 
 
 ## Inspection mode: nobody is on the course, a free camera starts above the finish line looking
@@ -980,7 +1018,7 @@ func start_race():
 	race_state = RaceState.RACING
 	next_finish_pos = 1
 	# A time trial is one racer against the clock: no race calls ("and they're off", the lead, the places).
-	if _commentator == null and not _is_time_trial():
+	if _commentator == null and not _is_time_trial() and arena == null:
 		_commentator = preload("res://RaceCommentator.gd").new()
 		_commentator.name = "RaceCommentator"
 		add_child(_commentator)
@@ -1037,6 +1075,9 @@ func start_race():
 	MusicManager.load_playlist_for_level(scene_file_path)
 	MusicManager.play_race_music()
 	get_tree().call_group("player_carts", "on_race_started")
+	if arena != null:
+		arena.on_race_started()
+		return
 	if _is_time_trial() and multiplayer.is_server():
 		for id in player_stats:
 			_give_start_boost(id)
@@ -1130,6 +1171,8 @@ func _process(delta):
 	if not Engine.is_editor_hint():
 		_update_grass_cart_positions()
 	if Engine.is_editor_hint():
+		return
+	if arena != null:
 		return
 	if multiplayer.is_server():
 		if race_state == RaceState.RACING:
@@ -1614,7 +1657,7 @@ func _end_race():
 func end_race_rpc(results_data: Array):
 	for ui in _all_race_uis():
 		ui.hide_end_countdown()
-		ui.show_message("Race Over!", 5.0)
+		ui.show_message("Match Over!" if arena != null else "Race Over!", 5.0)
 	_disable_local_cart()
 	if race_ui and race_ui.has_method("display_race_results"):
 		race_ui.display_race_results(results_data)
@@ -1709,7 +1752,7 @@ func _reroll_item_boxes() -> void:
 
 
 func _is_time_trial() -> bool:
-	return NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL
+	return NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL and arena == null
 
 
 ## Time trial: the run starts with one boost in the item slots, and every gate that counts (the line on a
@@ -1928,6 +1971,16 @@ func wait_for_collisions(timeout_sec: float = 90.0) -> void:
 
 
 func _spawn_item_boxes():
+	# An arena's boxes stand where it says (ArenaGame.item_spots).
+	if arena != null:
+		var i := 0
+		for at in arena.item_spots():
+			var abox = ITEM_BOX_SCENE.instantiate()
+			abox.name = "ItemBox_Arena_%d" % i
+			add_child(abox)
+			abox.global_position = at
+			i += 1
+		return
 	# Spawn a row of 3 items across each checkpoint gate and the finish line
 	var cp_idx = 0
 	for cp in checkpoints:

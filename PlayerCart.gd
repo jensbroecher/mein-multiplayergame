@@ -592,6 +592,16 @@ var ai_lane_change_timer: float = 0.0
 var ai_stuck_position_timer: float = 0.0
 var ai_last_stuck_position: Vector3 = Vector3.ZERO
 var _ai_want_drift: bool = false
+## Arena games (ArenaGame.gd): the cart's team (-1: none, every player for themselves) and, for a bot, the point it
+## drives at (set by the arena every frame; not finite: race the lap as usual) and whether to slow on arriving there.
+var arena_team := -1
+var arena_target := Vector3.INF
+var arena_arrive := false
+var _arena_stuck := 0.0
+## After an arena launch (`arena_launch`: a fan, a bumper) the edge-pop softening keeps out of it for a moment: on the
+## heightfield's creases it took the launch for a pop off a step and capped it at a hop.
+var _launch_grace := 0.0
+var _arena_reverse := 0.0
 var _ai_upcoming_turn_angle: float = 0.0
 var _ai_upcoming_turn_dist: float = 40.0
 var _ai_upcoming_turn_dir: float = 0.0
@@ -1713,7 +1723,21 @@ func _integrate_forces(state: PhysicsDirectBodyState3D):
 			return
 
 
+## An arena fan or bumper flings the cart (ArenaFan.gd, ArenaBumper.gd): its velocity set outright, with nothing of the
+## cart's own taking the lift off it for a moment.
+func arena_launch(v: Vector3) -> void:
+	linear_velocity = v
+	_launch_grace = 0.45
+	_step_climb_time = 0.0
+	hop_cooldown = maxf(hop_cooldown, 1.2)
+	_ground_settle = 0.0
+
+
 func _soften_edge_pops(state: PhysicsDirectBodyState3D) -> void:
+	if _launch_grace > 0.0:
+		_launch_grace -= state.step
+		_step_climb_time = 0.0
+		return
 	# The chassis is one sphere, so running into any lip (a curb, a seam between two road meshes, a
 	# 1cm step) deflects it upward by speed * sin * cos of the contact angle, which at racing speed
 	# is a launch. For low edges, keep only the upward speed needed to lift the sphere onto the top.
@@ -2220,7 +2244,8 @@ func _physics_process(delta):
 			ai_stuck_position_timer = 0.0
 			var dist = global_position.distance_to(ai_last_stuck_position)
 			# While recovering, keep circling — don't warp out just for sitting near a pillar.
-			if dist < 2.5 and not _ai_crossing_hold:
+			# An arena bot holding its spot (a keeper on its line) is waiting, not stuck.
+			if dist < 2.5 and not _ai_crossing_hold and not (arena_target.is_finite() and arena_arrive):
 				print("AI Cart ", name, " detected stuck (distance traveled in 2.8s: ", dist, "m). Respawning.")
 				if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 					respawn_rpc.rpc(last_checkpoint_transform)
@@ -2230,7 +2255,8 @@ func _physics_process(delta):
 
 		# AI Circle Detection & Breaker:
 		# Detects when a bot gets trapped driving in endless circles (e.g. orbiting a waypoint, stuck in a drift, or offset oscillation)
-		if not is_on_loop and not _ai_approaching_loop:
+		# A bot in an arena circles the ball by design: no circle breaker.
+		if not is_on_loop and not _ai_approaching_loop and not arena_target.is_finite():
 			var cur_yaw: float = visuals.global_transform.basis.get_euler().y
 			var yaw_diff: float = cur_yaw - _ai_circle_prev_yaw
 			while yaw_diff > PI:
@@ -7012,6 +7038,42 @@ func _ai_evaluate_traffic(_delta: float, fwd_3d: Vector3, right_3d: Vector3) -> 
 # a new PhysicsRayQueryParameters3D and exclude array for each cost 1.2us of a ray's 3.2us (scratch/ray_query_bench.gd).
 var _ai_feeler_query: PhysicsRayQueryParameters3D
 
+## An arena bot's driving (ArenaGame.gd sets `arena_target`): at the point, flat out, slowing for a turn it can't
+## make or as it arrives (`arena_arrive`); a target close behind is reached by backing round; held up (throttling,
+## hardly moving) it reverses out for a moment.
+func _arena_ai_input(delta: float) -> Vector2:
+	_ai_want_drift = false
+	var xf: Transform3D = visuals.global_transform
+	var local: Vector3 = xf.basis.inverse() * (arena_target - global_position)
+	var flat := Vector2(local.x, -local.z)
+	var dist := flat.length()
+	var ang := atan2(flat.x, flat.y)
+	var speed: float = linear_velocity.dot(-xf.basis.z)
+	if _arena_reverse > 0.0:
+		_arena_reverse -= delta
+		return Vector2(-signf(ang) if absf(ang) > 0.25 else 0.0, 1.0)
+	if linear_velocity.length() < 1.6 and is_on_ground and dist > 3.0:
+		_arena_stuck += delta
+		if _arena_stuck > 1.1:
+			_arena_stuck = 0.0
+			_arena_reverse = 0.9
+	else:
+		_arena_stuck = maxf(0.0, _arena_stuck - delta)
+	if absf(ang) > 2.3 and dist < 12.0:
+		return Vector2(-signf(ang), 1.0)
+	var want := 1.0
+	if arena_arrive:
+		want = clampf(dist / 16.0, 0.2, 1.0)
+	if absf(ang) > 1.0 and speed > 14.0:
+		want = minf(want, 0.25)
+	return Vector2(clampf(ang * 2.2, -1.0, 1.0), -want)
+
+
+## In an arena game, a cart on this one's team (bots don't fire at their own side).
+func _arena_teammate(cart: Node) -> bool:
+	return arena_team >= 0 and int(cart.get("arena_team")) == arena_team
+
+
 func _ai_feeler(from: Vector3, to: Vector3, mask: int) -> PhysicsRayQueryParameters3D:
 	if _ai_feeler_query == null:
 		_ai_feeler_query = PhysicsRayQueryParameters3D.new()
@@ -7023,6 +7085,8 @@ func _ai_feeler(from: Vector3, to: Vector3, mask: int) -> PhysicsRayQueryParamet
 
 
 func _get_ai_input(delta: float) -> Vector2:
+	if arena_target.is_finite():
+		return _arena_ai_input(delta)
 	var input = Vector2.ZERO
 	
 	# Circle breaker intervention: force wheels straight and drive ahead to break circular orbit
@@ -8698,7 +8762,7 @@ func _process_ai_items(delta: float):
 			var fwd = -visuals.global_transform.basis.z
 			for cart in get_tree().get_nodes_in_group("player_carts"):
 				# Racers who have finished are out of the fight.
-				if cart == self or cart.get("is_finished_race"): continue
+				if cart == self or cart.get("is_finished_race") or _arena_teammate(cart): continue
 				var to_cart = cart.global_position - global_position
 				if to_cart.length() < 40.0 and fwd.dot(to_cart.normalized()) > 0.8:
 					should_use = true
@@ -8706,7 +8770,7 @@ func _process_ai_items(delta: float):
 		ItemType.BOMB, ItemType.SHOCKWAVE:
 			var fwd = -visuals.global_transform.basis.z
 			for cart in get_tree().get_nodes_in_group("player_carts"):
-				if cart == self or cart.get("is_finished_race"): continue
+				if cart == self or cart.get("is_finished_race") or _arena_teammate(cart): continue
 				var to_cart = cart.global_position - global_position
 				if to_cart.length() < 18.0 and fwd.dot(to_cart.normalized()) < -0.5:
 					should_use = true
@@ -8715,7 +8779,7 @@ func _process_ai_items(delta: float):
 			should_use = true
 		ItemType.LIGHTNING:
 			for cart in get_tree().get_nodes_in_group("player_carts"):
-				if cart == self or cart.get("is_finished_race"): continue
+				if cart == self or cart.get("is_finished_race") or _arena_teammate(cart): continue
 				var dist = global_position.distance_to(cart.global_position)
 				if dist < 25.0:
 					should_use = true

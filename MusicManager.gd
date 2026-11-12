@@ -442,6 +442,9 @@ const STAGE_TRACKS := {
 	"wangjiang": ["res://music/night/Midnight_Overdrive.mp3", "res://music/night/Apex_Drift.mp3"],
 	# Dawn in the fog: the misty mountain track, then the city one.
 	"shuangjiang": ["res://music/miyoshino/Above_the_Clouds.mp3", "res://music/city/Engines_at_the_Gate.mp3"],
+	# The arenas (ArenaGame.gd): the party folder in the Hex Bowl, the festival's on Flag Hill.
+	"arena_football": ["res://music/party/First_Place_Sprint.mp3", "res://music/party/Tarmac_Triumph.mp3", "res://music/party/Apex_Corner_Drift.mp3"],
+	"arena_ctf": ["res://music/festival/Midday_Main_Stage.mp3", "res://music/festival/Gold_on_the_Cobblestone.mp3", "res://music/festival/Main_Stage_Sunset.mp3"],
 	"kronburg": [
 		"res://music/kronburg/Schichtwechsel.mp3",
 		"res://music/kronburg/Kleeblatt.mp3",
@@ -483,6 +486,10 @@ static func _stage_track_key(path_lower: String) -> String:
 		return "wangjiang"
 	if path_lower.contains("shuangjiang"):
 		return "shuangjiang"
+	if path_lower.contains("arenahexbowl"):
+		return "arena_football"
+	if path_lower.contains("arenactf"):
+		return "arena_ctf"
 	if path_lower.contains("mara"):
 		return "mara"
 	if path_lower.contains("nyota"):

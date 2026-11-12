@@ -31,6 +31,7 @@ var _level_swap_in_progress: bool = false
 
 func _ready():
 	_apply_platform_performance()
+	_register_spawnable_levels()
 	main_menu.start_pressed.connect(_on_menu_start_pressed)
 	main_menu.options_pressed.connect(_on_menu_options_pressed)
 	main_menu.garage_pressed.connect(_on_menu_garage_pressed)
@@ -77,6 +78,26 @@ func _ready():
 ## The title card the game opens with, over the menu (SplashScreen.gd: the 3D logo and some of the cars).
 ## Any key skips it; when it is over a swipe takes its place with the menu. Once a launch, and only when
 ## Main is the running scene, not a test that has instantiated it (SplashScreen.should_play).
+## Every course and arena may be loaded in a LAN game, and the LevelSpawner replicates only the scenes it lists: Main.tscn
+## lists the first ten courses, so every later one (and the arenas) is added here.
+func _register_spawnable_levels() -> void:
+	var spawner := get_node_or_null("LevelSpawner") as MultiplayerSpawner
+	if spawner == null:
+		return
+	var listed := {}
+	for i in spawner.get_spawnable_scene_count():
+		listed[spawner.get_spawnable_scene(i)] = true
+	var paths: Array = []
+	for st in NetworkManager.ALL_STAGES:
+		paths.append(str(st["path"]))
+	for p in NetworkManager.ARENAS.values():
+		paths.append(str(p))
+	for p in paths:
+		if not listed.has(p) and ResourceLoader.exists(p):
+			spawner.add_spawnable_scene(p)
+			listed[p] = true
+
+
 func _play_splash() -> void:
 	main_menu.hide()
 	var canvas := CanvasLayer.new()
@@ -287,6 +308,10 @@ func start_game(is_host: bool):
 			if gp_data and gp_data["stages"].size() > 0:
 				status = "Loading GP stage 1"
 				level_scene = load(gp_data["stages"][0])
+		elif not NetworkManager.arena.is_empty():
+			status = "Loading arena"
+			NetworkManager.set_arena(str(NetworkManager.arena["kind"]), bool(NetworkManager.arena.get("teams", false)))
+			level_scene = load(NetworkManager.arena_level())
 		else:
 			status = "Loading track"
 			level_scene = load(NetworkManager.current_single_stage)

@@ -54,6 +54,32 @@ var gp_last_pos: Dictionary = {} # racer_name -> finishing place in the latest r
 var gp_bot_roster: Array = []
 var time_trial_stage: String = "res://levels/LakesideLevel.tscn"
 
+## The arena game being played (ArenaGame.gd), empty for a race: {"kind": "football" or "ctf", "teams": bool}. Set by the
+## menu's ARENA pages (single player and splitscreen, which load `ARENAS[kind]` as their one course) or the lobby's
+## mode list (multiplayer), cleared on the menu's main page. The host sends it to every client (`sync_arena`).
+var arena: Dictionary = {}
+const ARENAS := {
+	"football": "res://levels/ArenaHexBowlLevel.tscn",
+	"ctf": "res://levels/ArenaCtfLevel.tscn",
+}
+
+
+## The arena's level for `arena` (empty for a race).
+func arena_level() -> String:
+	return str(ARENAS.get(str(arena.get("kind", "")), ""))
+
+
+func set_arena(kind: String, teams: bool) -> void:
+	arena = {} if kind.is_empty() else {"kind": kind, "teams": teams}
+	if multiplayer.multiplayer_peer != null and multiplayer.is_server() and not multiplayer.multiplayer_peer is OfflineMultiplayerPeer:
+		sync_arena.rpc(arena)
+
+
+@rpc("authority", "call_remote", "reliable")
+func sync_arena(a: Dictionary) -> void:
+	arena = a
+	multiplayer_mode_changed.emit(multiplayer_mode, selected_mp_cup)
+
 var stage_votes: Dictionary = {} # peer_id -> stage_path or "random"
 var is_voting_active: bool = false
 
@@ -381,6 +407,7 @@ func register_player(info: Dictionary):
 	
 	# Also send current multiplayer mode & cup to the new client
 	sync_multiplayer_mode.rpc_id(id, multiplayer_mode, selected_mp_cup)
+	sync_arena.rpc_id(id, arena)
 	print("NetworkManager: Server registered player ", id, ", info: ", info)
 
 @rpc("authority", "call_local", "reliable")

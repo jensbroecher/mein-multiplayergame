@@ -1212,6 +1212,50 @@ in front of the water while driving (Msitu Falls, Bloombay Dunes). `canyon_river
   muddy spray off the rear wheels (the grit's particle set-up, so nothing new compiles) and splashes on entering at speed
   (`sounds/surfaces/puddle_splash_*.wav`). A top-down render against the computed map matched blob for blob.
 
+## Arena games (football and capture the flag)
+
+- A mode beside the races: Single Player and Splitscreen have an ARENA tile (MainMenu's "arena_select" page: football or
+  capture the flag, all against all or two teams), the multiplayer lobby four "Arena: ..." entries in its mode list
+  (ids from `Lobby.ARENA_ID0`). The choice is `NetworkManager.arena` ({"kind", "teams"}; the host sends it with
+  `set_arena`/`sync_arena`; the menu's main page clears it), its level `NetworkManager.ARENAS[kind]`, loaded as the one
+  course (`time_trial_stage` offline, `current_single_stage`'s place in a LAN game). Main registers every course and
+  arena with the LevelSpawner at start-up (`_register_spawnable_levels`): Main.tscn lists only the first ten courses, so
+  a LAN game on any later one never reached the clients.
+- `ArenaGame.gd` (a child "ArenaGame" of an arena level) runs the match: Level.gd finds it (`arena`) and then fills the
+  field with bots in every mode (`_fill_arena_bots`), skips the laps, gates, timing and commentator, spawns the item
+  boxes at its "ItemSpots", calls `on_race_started` at the green light, ends with `end_arena(results)` (RaceUI's
+  `_build_arena_results`, PLAY AGAIN offline). See ArenaGame.gd's header for the rules, the sync (the host runs the rules,
+  the bots and the balls; state about 12 times a second, events reliably) and what each peer draws (the flag and beams,
+  the bases' rings and letters, team pips over the cars, name tags in team colours, the arrow over each local player's
+  car pointing at the flag or its carrier, the scoreboard over each race HUD, the minimap's markers through
+  `minimap_outline`/`minimap_draw`/`cart_color`, Minimap.gd's arena view).
+- Bots: PlayerCart's `arena_target`/`arena_arrive` (set every frame by the arena) switch `_get_ai_input` to
+  `_arena_ai_input` (straight at the point, backing round when it's close behind, reversing out when held up); no circle
+  breaker, and a bot holding its spot isn't respawned as stuck. Bots fire no items at their own team (`_arena_teammate`).
+  In capture the flag they drive by the generator's graph (metas "nav_points", "nav_links").
+- `ArenaBumper.gd` (pinball pop bumpers and slingshot bars) and `ArenaFan.gd` (launch fans; `land_at` aims one onto a
+  ledge, timed by the carts' fall `CART_G` 39.8 m/s^2 and the share of a launch they keep, `LAUNCH_KEPT`, the speed
+  across held for the flight) build themselves from their exports. Both fling a cart through `PlayerCart.arena_launch`:
+  `_soften_edge_pops` took a launch off the heightfield's creases for a pop off a step and capped it at a hop.
+  `res://scratch/arena_fan_probe.tscn -- <level> [speed=16] [only=<name>]` (headless) coasts a bot over each fan and
+  prints how high it went and where it landed.
+- The Hex Bowl (`regenerate_arena_hexbowl.gd` on `ArenaStage.gd`, about 1s): a hexagonal pitch under floodlights
+  (`arena_pitch.gdshader`), a goal (GoalNet) in each side's middle, padded walls with glass and an invisible screen up to
+  the lid, slingshot bars across the corners, three pop bumpers, six launch fans, full stands (CrowdPlacer, about 2,600),
+  light towers. The ball is KickBall's ARENA style (1.9m, its seams glowing; `remote_driven` on a client).
+- Flag Hill (`regenerate_arena_ctf.gd`, about 2s): a round valley, the flag on a mesa with four ramps, five bases (A a
+  hilltop, B a bowl, C an island ringed by a cliff and a moat with one lane up and an aimed fan onto it, D a deck on
+  pillars with a ramp and an aimed fan, E a ring of bumpers), kickers, fans, a heightfield ground (`arena_ground.gdshader`,
+  dirt tracks along the bots' graph). `res://scratch/arena_ctf_map.gd` (`-s`, headless, `-- <out.png>`) draws its plan
+  hillshaded with the graph over it.
+- `res://scratch/arena_match_test.tscn -- <football|ctf> [teams=1] [seconds=120] [speed=3] [every=10]` (headless) plays a
+  match of six bots and prints the clock, scores, balls or flag and bases, respawns and the result;
+  `res://scratch/arena_hud_shot.tscn -- <football|ctf> <dir> [teams=1] [at=8,30] [drive=1]` (windowed) plays one as a
+  single player and saves the screen with the HUD. Music: `STAGE_TRACKS["arena_football"]`/`["arena_ctf"]`; the Hex
+  Bowl's stands roar for a goal (StageAmbience). Menu tiles: `tile_arena_football.jpg`, `tile_arena_ctf.jpg`.
+- `res://scratch/parse_check_scene.tscn -- res://a.gd ...` parse-checks scripts that use the autoloads (the `-s`
+  parse_check can't load those).
+
 ## Blasts' tumble
 
 - `apply_blast_impulse` (shockwaves, bombs, missiles) gives the car a push and a tumble (`air_angular_velocity`), which

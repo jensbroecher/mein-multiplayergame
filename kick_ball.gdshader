@@ -9,6 +9,8 @@ render_mode blend_mix, cull_back, depth_draw_opaque;
 // dot(n, centre) / that face's distance from the middle (pentagons stand a little further out than
 // hexagons). Seams where the best two are close, sized in pixels so they stay thin from afar.
 // style 1, a beach ball: six vinyl gores round its axis, white caps at both poles.
+// style 2, the arena ball (ArenaGame.gd's football): the football's panels, navy and white, its seams glowing lime so
+// it reads across the bowl.
 
 uniform int style = 0;
 uniform vec3 dirt : source_color = vec3(0.45, 0.33, 0.22);
@@ -50,7 +52,8 @@ void fragment() {
 	vec3 n = normalize(v_dir);
 	vec3 col;
 	float rough;
-	if (style == 0) {
+	vec3 emit = vec3(0.0);
+	if (style == 0 || style == 2) {
 		// Icosahedron vertices (pentagons) are the cyclic permutations of (0, +-1, +-phi); its faces'
 		// centres (hexagons) its dual's vertices: (+-1, +-1, +-1) and the cyclic permutations of
 		// (+-1/phi, 0, +-phi), the other way round.
@@ -86,6 +89,13 @@ void fragment() {
 		float d = smoothstep(0.45, 0.85, vnoise(n * 5.0) * 0.7 + vnoise(n * 13.0) * 0.3);
 		col = mix(col, dirt, d * dirt_amount * (pent ? 0.3 : 1.0));
 		rough = mix(0.42, 0.75, d) + seam * 0.2;
+		if (style == 2) {
+			float glow = 1.0 - smoothstep(0.004, 0.004 + w * 3.0 + 0.012, gap);
+			col = pent ? vec3(0.03, 0.05, 0.14) : vec3(0.93, 0.95, 0.97);
+			col = mix(col, vec3(0.5, 1.0, 0.2), glow);
+			emit = vec3(0.5, 1.0, 0.18) * glow * 2.2 + (pent ? vec3(0.0) : vec3(0.08));
+			rough = 0.35;
+		}
 	} else {
 		const vec3 GORES[6] = vec3[](vec3(0.88, 0.10, 0.10), vec3(0.97, 0.97, 0.95), vec3(0.98, 0.78, 0.08),
 			vec3(0.08, 0.36, 0.86), vec3(0.97, 0.97, 0.95), vec3(0.10, 0.66, 0.30));
@@ -103,6 +113,7 @@ void fragment() {
 		rough = 0.22;
 	}
 	ALBEDO = col;
+	EMISSION = emit;
 	ROUGHNESS = rough;
 	SPECULAR = 0.5;
 }
