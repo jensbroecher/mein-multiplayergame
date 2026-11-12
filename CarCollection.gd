@@ -16,7 +16,7 @@ const CATEGORIES := [
 	{"name": "Rally & Raid", "color": Color(1.0, 0.62, 0.18),
 		"cars": ["Interceptor", "Sandstorm", "Obsidian", "Trailblazer", "Apex"]},
 	{"name": "Buggies", "color": Color(0.30, 0.82, 0.98),
-		"cars": ["Shadow", "Centurion", "Vortex", "Sandpiper"]},
+		"cars": ["Shadow", "Centurion", "Vortex", "Sandpiper", "Typhoon"]},
 	{"name": "4x4 & Monsters", "color": Color(0.55, 0.92, 0.28),
 		"cars": ["Strikeforce", "Phantom", "Mudrunner", "Titan", "Basilisk"]},
 	{"name": "Classics", "color": Color(0.98, 0.78, 0.32),

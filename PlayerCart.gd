@@ -447,6 +447,25 @@ const CAR_PRESETS = [
 		"offroad": 2.2,
 		"weight": 0.88,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Typhoon",
+		# A twin-cylinder aero engine turning a ducted propeller, synthesised (scratch/synth_engine_typhoon.py: a
+		# seamless 2s loop, rolled off from 1.3kHz so it is never shrill), levelled by its RMS (-18.0 dBFS). An
+		# ElevenLabs take (tools/elevenlabs/sfx.json, engine_typhoon) can replace it.
+		"engine_sound": "res://sounds/enginesounds/engine_typhoon_loop.wav",
+		"engine_gain_db": 8.3,
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes, the propeller its own spinning part.
+		"model_path": "res://generated/cars/Typhoon.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 40.0,
+		"acceleration": 64.0,
+		"steer_speed": 3.2,
+		"grip": 4.4,
+		"braking": 40.0,
+		"offroad": 9.2,
+		"weight": 0.80,
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 

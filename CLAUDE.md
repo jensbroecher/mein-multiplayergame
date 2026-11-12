@@ -3221,6 +3221,20 @@ A clip that comes out quiet (the bubble car's at -37.7 dBFS) is raised in the fi
   don't z-fight), wider tyres behind. Factory paint: Pearl "Crimson" flipping to orange, silver rims, number 96. Its engine
   (`engine_crimson`: a V12 held at speed) had its seam cross-faded (`scratch/seamless_loop.py --fade=0.25`).
 
+- The Typhoon (`TyphoonBuilder.gd`, in the Buggies gallery): a fan buggy, an original design with a made-up name, picked
+  to stand apart from the other buggies (caged and winged, or the Sandpiper's rounded tub): a slim single-seat kayak tub
+  (the Centurion's keyed section: a deck over the nose, a trough over the cockpit, a short deck behind), skinny ribbed
+  fronts on long wishbones splayed out ahead, fat smooth sand tyres on beadlock rims (`build_rear_wheel`) on trailing arms,
+  a roll hoop, and behind it a flat-twin aero engine (finned barrels, red cone filters, exhausts curling under) driving a
+  three-bladed propeller inside a round duct in the paint, a guard grille behind the blades and two rudders in the paint.
+  The propeller is its own mesh (`build_prop`): regenerate_cars.gd puts any builder's `build_prop()` under a "Prop" node at
+  its `PROP_POS` with `CarSpinner.gd`, which spins it about z faster with the cart's speed (idling in the menus). Factory
+  paint "Typhoon Yellow" with black stripes, blue accents, black rims, number 88. Its engine loop is synthesised
+  (`scratch/synth_engine_typhoon.py`: a twin's soft firing pulses at 83 Hz with the prop's 100 Hz hum and duct air, every
+  part periodic in 2s so the loop has no seam, rolled off from 1.3 kHz and cut over 4 kHz so it never turns shrill, levelled
+  to -18 dBFS); `tools/elevenlabs/sfx.json`'s `engine_typhoon` job is ready to make an ElevenLabs take beside it
+  (`engine_typhoon_elevenlabs_loop.wav`) to swap in once made.
+
 ## Canyon Chasm dirt ramps, rocks, signs, tornado and houses
 
 The menus call this stage Tolvanera Gulch (a dust devil, for its tornado); files and code keep "CanyonChasm".

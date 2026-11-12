@@ -766,5 +766,13 @@
     "duration": 12.0,
     "loop": false,
     "influence": 0.6
+  },
+  {
+    "name": "engine_typhoon",
+    "path": "sounds/enginesounds/engine_typhoon_elevenlabs_loop.wav",
+    "text": "A fan buggy: a small twin-cylinder aircraft engine driving a large ducted propeller, held at a steady medium-high RPM, a warm rounded throaty drone with the deep whoosh of the propeller blades, recorded close, mellow and not shrill, constant engine speed, no revving, no gear changes, continuous drone",
+    "duration": 8.0,
+    "loop": true,
+    "influence": 0.6
   }
 ]

@@ -349,6 +349,19 @@ const CAR_PRESETS = [
 		"offroad": 2.2,
 		"desc": "A racing car for the road: open front wheels under black cycle wings, a front wing with a line of light, a wraparound screen and a tail that splits into two blades. A V12 behind the seats makes it one of the fastest cars on tarmac; off it, it hates every bump.",
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Typhoon",
+		"model_path": "res://generated/cars/Typhoon.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 40.0,
+		"acceleration": 64.0,
+		"steer_speed": 3.2,
+		"grip": 4.4,
+		"braking": 40.0,
+		"offroad": 9.2,
+		"desc": "A fan buggy: a slim one-seat tub on skinny front wheels and fat sand tyres, with a big ducted propeller and two rudders behind the driver. The best thing on the grid in sand and dirt and light on its feet; on tarmac it floats wide in the corners.",
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 
@@ -364,7 +377,7 @@ const CAR_ACCENTS := {
 	"Fulmine": Color(0.32, 0.95, 0.46), "Basilisk": Color(0.84, 0.86, 0.45),
 	"Bootlegger": Color(1.0, 0.48, 0.14), "Meteor": Color(0.86, 0.88, 0.92), "Kugelblitz": Color(0.45, 0.88, 0.76),
 	"Sandpiper": Color(0.22, 0.84, 0.88), "Samurai": Color(0.98, 0.36, 0.20),
-	"Ninja": Color(0.95, 0.22, 0.34), "Crimson": Color(1.0, 0.18, 0.22),
+	"Ninja": Color(0.95, 0.22, 0.34), "Crimson": Color(1.0, 0.18, 0.22), "Typhoon": Color(1.0, 0.72, 0.10),
 }
 ## Stat bars: caption, preset key, and the values at an empty and a full bar (spanning the fleet).
 const STATS := [

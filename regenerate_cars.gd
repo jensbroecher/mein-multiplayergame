@@ -40,6 +40,7 @@ const CARS := [
 	{"name": "Samurai", "prefix": "samurai", "builder": preload("res://SamuraiBuilder.gd")},
 	{"name": "Ninja", "prefix": "ninja", "builder": preload("res://NinjaBuilder.gd")},
 	{"name": "Crimson", "prefix": "crimson", "builder": preload("res://CrimsonBuilder.gd")},
+	{"name": "Typhoon", "prefix": "typhoon", "builder": preload("res://TyphoonBuilder.gd")},
 ]
 
 
@@ -80,6 +81,12 @@ static func build_car(builder_script: Script) -> Dictionary:
 		out["rear_wheel_r"] = rr.commit(mat)
 		out["rear_wheel_l"] = rl.commit(mat)
 		out["triangles"] += rr.triangle_count() + rl.triangle_count() - wr.triangle_count() - wl.triangle_count()
+	# A part that spins on its own (the Typhoon's propeller): its own mesh, under a CarSpinner.gd node at PROP_POS.
+	if design.has_method("build_prop"):
+		var pb := CB.new()
+		design.build_prop(pb)
+		out["prop"] = pb.commit(mat)
+		out["triangles"] += pb.triangle_count()
 	if design.has_method("build_glass"):
 		var gb := CB.new()
 		design.build_glass(gb)
@@ -128,6 +135,14 @@ static func assemble(car_name: String, parts: Dictionary) -> Node3D:
 		glass.set_meta("car_shader", true)
 		glass.set_meta("car_glass", true)
 		model.add_child(glass)
+	if parts.has("prop"):
+		var prop := MeshInstance3D.new()
+		prop.name = "Prop"
+		prop.mesh = parts["prop"]
+		prop.position = design.PROP_POS
+		prop.set_script(load("res://CarSpinner.gd"))
+		prop.set_meta("car_shader", true)
+		model.add_child(prop)
 	var ant := Node3D.new()
 	ant.name = "AntennaPlacement"
 	ant.position = design.ANTENNA_POS
@@ -168,7 +183,7 @@ func _ready() -> void:
 		var mat: ShaderMaterial = parts["material"]
 		mat.set_shader_parameter("detail_map", tex)
 		mat = _save(mat, prefix + "_material.tres")
-		for key in ["body", "wheel_l", "wheel_r", "rear_wheel_l", "rear_wheel_r"]:
+		for key in ["body", "wheel_l", "wheel_r", "rear_wheel_l", "rear_wheel_r", "prop"]:
 			if not parts.has(key):
 				continue
 			var mesh: ArrayMesh = parts[key]
