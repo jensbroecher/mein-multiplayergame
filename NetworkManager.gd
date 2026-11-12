@@ -86,6 +86,7 @@ const ALL_STAGES = [
 	{"name": "Yoshino Rapids", "path": "res://levels/YoshinoRapidsLevel.tscn"},
 	{"name": "Monzenmachi", "path": "res://levels/MonzenmachiLevel.tscn"},
 	{"name": "Yamabushi Trail", "path": "res://levels/YamabushiLevel.tscn"},
+	{"name": "Tianqiao", "path": "res://levels/TianqiaoLevel.tscn"},
 	# A proving ground for trying the cars (regenerate_test_track.gd): listed under "Other Courses", never picked at
 	# random or as the next stage ("test").
 	{"name": "Test Track", "path": "res://levels/TestTrackLevel.tscn", "test": true},
@@ -153,6 +154,13 @@ const GP_CUPS = {
 			"res://levels/YoshinoRapidsLevel.tscn",
 			"res://levels/MonzenmachiLevel.tscn",
 			"res://levels/YamabushiLevel.tscn",
+		]
+	},
+	# The Yunhai GP (云海): a made-up river megacity at night after Chongqing. Stage 1 so far.
+	"Yunhai GP": {
+		"name": "Yunhai GP",
+		"stages": [
+			"res://levels/TianqiaoLevel.tscn",
 		]
 	}
 }

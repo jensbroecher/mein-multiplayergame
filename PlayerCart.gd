@@ -2193,7 +2193,7 @@ func _physics_process(delta):
 	if is_teleporting:
 		return
 
-	if global_position.y < -50 and not is_finished_race:
+	if (global_position.y < -50 or _fallen_off_heights(delta)) and not is_finished_race:
 		if multiplayer.multiplayer_peer != null and multiplayer.is_server():
 			respawn_rpc.rpc(last_checkpoint_transform)
 		elif is_local_player or (is_ai and multiplayer.multiplayer_peer == null):
@@ -5029,6 +5029,32 @@ func respawn_rpc(custom_checkpoint_transform: Transform3D = Transform3D()):
 	if custom_checkpoint_transform != Transform3D():
 		last_checkpoint_transform = custom_checkpoint_transform
 	respawn()
+
+## Levels high over the ground (Tianqiao's rooftops: the street is 150m under the start) say through the level root's
+## meta `fall_respawn_drop` how far under the nearest point of the lap (in 3D) counts as fallen off: the y < -50 rule
+## never fires there, and a cart that dropped off a tower stood on the street. Checked every FALL_CHECK_EVERY seconds.
+const FALL_CHECK_EVERY := 0.2
+var _fall_drop := -1.0
+var _fall_check_t := 0.0
+
+
+func _fallen_off_heights(delta: float) -> bool:
+	if _fall_drop == 0.0 or track_path == null or track_path.curve == null:
+		return false
+	if _fall_drop < 0.0:
+		var root: Node = track_path.owner if track_path.owner != null else track_path.get_parent()
+		_fall_drop = float(root.get_meta(&"fall_respawn_drop", 0.0)) if root != null else 0.0
+		if _fall_drop <= 0.0:
+			_fall_drop = 0.0
+			return false
+	_fall_check_t += delta
+	if _fall_check_t < FALL_CHECK_EVERY:
+		return false
+	_fall_check_t = 0.0
+	var c: Curve3D = track_path.curve
+	var p: Vector3 = track_path.to_global(c.sample_baked(c.get_closest_offset(track_path.to_local(global_position))))
+	return global_position.y < p.y - _fall_drop
+
 
 func respawn():
 	_snow_drift_depth = 0

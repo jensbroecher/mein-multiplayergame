@@ -4797,3 +4797,45 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   ear: chirp and steady above-4kHz frames are near zero, against 4-44% and 25-70% in the Lakeside clips.
 - Not checked yet: GPU cost on any of the four, the gusts and the cloud in a real race, the raft crossing and the Alley
   with bots forced onto them (`scratch/shortcut_probe ... chance=1.0`), collision_audit, the jump tests.
+
+## Tianqiao (Yunhai GP, stage 1)
+
+- The Yunhai GP (云海, `NetworkManager.GP_CUPS["Yunhai GP"]`, `MainMenu.COL_YUNHAI`) is a made-up river megacity at night
+  after Chongqing; only stage 1 exists so far. `regenerate_tianqiao.gd` (`regenerate_tianqiao.tscn`, headless, about 15s)
+  builds `levels/TianqiaoLevel.tscn` on the Miyoshino stage base (`MiyoshinoStage.gd`): one point-to-point run of 3.2km
+  from the roof of the Yunhai Center (the supertall, start at 150m) along the Yunlang sky gallery's roof, a kicker and a
+  30m gap onto tower B (138m), a skyway through tower E's sky lobby, the spiral round tower C (1.25 turns, 122 to 92m),
+  a skyway to tower D, the second 30m gap onto the Xinghe Hui mall's roof (70m), three ramps cascading down its atrium
+  hall (hairpins at the ends), the aquarium's acrylic tunnel through the tanks (fish MultiMeshes,
+  `aquarium_fish.gdshader`; the tanks `aquarium_tank.gdshader`), out of a portal in the mall's south front
+  (`MALL_PORTAL`) onto a flyover down into the night-market street and along it to the finish in the Yunhai Park. The
+  user's idea and choices: one run top to park, night with neon and haze, drive through the mall and the aquarium.
+- Heights: `_shape_heights` lays the lap's heights from knots at anchors found along it (`_find_anchors`, `_s_after`:
+  the lap crosses itself round the spiral, so nearest points are searched past an s), rounded except across the jumps'
+  gaps; everything down to the street is one ungraded "bridge". The road ribbon must stay above the roofs: the roofs'
+  colliders (`RoofDeck_*`, track, asphalt) are 0.2m under the road's height, and the road holds its height until 6m
+  past tower B's edge (it had dipped 8cm under the roof there by the rounding, and bots stopped at the edge).
+- Buildings are `MegacityKit.gd` (game metres, world space, one `PropKit` per key) drawn by `megacity_tower.gdshader`
+  (styles by COLOR.a x 8: office glass, flats, LED media facade, shop fronts, the mall's lit interior, concrete, cladding
+  with an LED line; UV.x carries the building's number x 1000), neon by `neon_emissive.gdshader` and Label3D signs in
+  Noto Sans CJK SC (`fonts/NotoSansSC-Tianqiao.otf`, a subset of only the characters the generator uses, made with
+  pyftsubset from the system's NotoSansCJK-Bold.ttc, font number 2; OFL text in `fonts/NotoSansCJK-OFL.txt`; new
+  characters in signs need a new subset). The generator reads the .otf into a FontFile and saves it as
+  `generated/tianqiao_cjk_font.res` (in `_build_dressing`: the run clears the stage's old files after `_configure`).
+- Runtime colliders: DressingColliders makes every prop mesh solid unless its name holds a skip word, and Level's
+  collision builder gives anything named "ramp" or "loop" a convex hull (a "hall_ramp" prop became one blob filling the
+  atrium). So every deck prop's key starts with "deck" or holds it (`deck_skyway_s1`, `hall_decks`, `roof_deck`, ...)
+  and has its own rails (`_edge_boxes` on `SkyRailsBody`, parapet boxes in `_roof`); `MCK.tower(..., roof_parapet)` is off
+  for the towers the lap crosses (their parapets in `_roof` have gaps where the lap passes: `open` stretches run along
+  each side clockwise from above, the south side from its east end). Building walls are solid, so the lap's way out of
+  the mall is a real hole in its south front and in the tanks' ends.
+- MultiMesh buffers are written by hand (`_build_fish`): on the headless renderer `set_instance_transform` stores
+  nothing and the saved fish were all at the origin. `scratch/tianqiao_fish_probe.gd` (`-s`) prints them.
+- Falling off: PlayerCart respawns a cart (human or bot) once it is more than the level root's `fall_respawn_drop` meta
+  (18m here) under the nearest point of the lap in 3D (`_fallen_off_heights`, every 0.2s); the y < -50 rule never fired
+  150m over the street.
+- AI races (`scratch/ai_race_test`, speed=2): every bot finishes in 76-89s; jump lips at 46-54 m/s. A bot knocked
+  sideways in the air off tower D's kicker falls now and then.
+- Music: the night folder's two tracks (`MusicManager.STAGE_TRACKS["tianqiao"]`) until the stage has its own.
+- The menu tiles: `tile_tianqiao.jpg` (`menu_tile_shot`'s `STAGES` focus on the towers, spiral and mall) and
+  `tile_yunhai_gp.jpg` (a copy of it until the cup has more stages).

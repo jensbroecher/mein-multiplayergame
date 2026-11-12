@@ -44,6 +44,7 @@ const COL_SAVANNA := Color(0.95, 0.47, 0.22)
 const COL_JUNGLE := Color(0.32, 0.80, 0.42)
 const COL_KRONBURG := Color(0.88, 0.36, 0.26)
 const COL_MIYOSHINO := Color(0.98, 0.62, 0.74)
+const COL_YUNHAI := Color(0.95, 0.30, 0.78)
 
 ## Every course's tile: title, one-line description, picture and accent colour.
 const STAGE_INFO := {
@@ -73,12 +74,13 @@ const STAGE_INFO := {
 	"res://levels/SenbonSakuraLevel.tscn": {"title": "SENBON SAKURA PASS", "subtitle": "A mountain road through a thousand cherry trees in bloom: from the hanami park up the hairpins, under the tunnel of torii, along the ridge past the teahouse, down through the cedars over the vermilion bridge", "file": "tile_senbon_sakura.jpg", "color": COL_MIYOSHINO},
 	"res://levels/YoshinoRapidsLevel.tscn": {"title": "YOSHINO RAPIDS", "subtitle": "Round the emerald river: the riverside village, the timber bridge, the sawmill's yard, a forest road through the cedars, down the log slide and through the ford; a raft train lies across the pool for the bold", "file": "tile_yoshino_rapids.jpg", "color": COL_MIYOSHINO},
 	"res://levels/MonzenmachiLevel.tscn": {"title": "MONZENMACHI", "subtitle": "The temple town at dusk under its paper lanterns: down the shop street, through the great gate, up the stone steps past the hall and the pagoda, the back street's slope and the bamboo grove's chicane", "file": "tile_monzenmachi.jpg", "color": COL_MIYOSHINO},
+	"res://levels/TianqiaoLevel.tscn": {"title": "TIANQIAO", "subtitle": "Yunhai at night: from the roof of the supertall along the sky gallery, a leap to the next tower, down the spiral, through the mall's atrium and the aquarium's tunnel to the park at street level", "file": "tile_tianqiao.jpg", "color": COL_YUNHAI},
 	"res://levels/YamabushiLevel.tscn": {"title": "YAMABUSHI TRAIL", "subtitle": "The finale, one run up the pilgrims' mountain at dawn: from the cedar forest over the gorge's suspension bridge, through the cloud, along plank walks chained to the cliffs to the shrine on the summit", "file": "tile_yamabushi.jpg", "color": COL_MIYOSHINO},
 	"res://levels/TestTrackLevel.tscn": {"title": "TEST TRACK", "subtitle": "Try the cars: a 580m top-speed straight, a hairpin, a table-top, a chicane, a strip of every surface (sand, snow, ice, mud, grass, gravel, dirt, wood, cobbles) and a hill with a crest jump", "file": "tile_test_track.jpg", "color": COL_GOLD},
 	"res://levels/MsituFallsLevel.tscn": {"title": "MSITU FALLS", "subtitle": "Rainforest hairpins, a mud bend, a rope bridge over the brink, behind the falls, and tropical downpours", "file": "tile_msitu_falls.jpg", "color": COL_JUNGLE},
 }
 ## Section header colour per cup on the course lists (same accents as the cup tiles).
-const CUP_COLORS := {"Bloombay GP": COL_GREEN, "Svartfjell GP": COL_SNOW, "Al-Raihana GP": COL_BRONZE, "Sierra del Viento GP": COL_CANYON, "Matumaini GP": COL_SAVANNA, "Kronburg GP": COL_KRONBURG, "Miyoshino GP": COL_MIYOSHINO}
+const CUP_COLORS := {"Bloombay GP": COL_GREEN, "Svartfjell GP": COL_SNOW, "Al-Raihana GP": COL_BRONZE, "Sierra del Viento GP": COL_CANYON, "Matumaini GP": COL_SAVANNA, "Kronburg GP": COL_KRONBURG, "Miyoshino GP": COL_MIYOSHINO, "Yunhai GP": COL_YUNHAI}
 ## Tiles per row in a cup section: one cup per row.
 const SECTION_COLUMNS := 4
 
@@ -454,6 +456,9 @@ func _build_page(menu_name: String) -> void:
 			)
 			_add_tile("MIYOSHINO GP", "Senbon Sakura Pass  •  Yoshino Rapids  •  Monzenmachi  •  Yamabushi Trail", "tile_miyoshino_gp.jpg", COL_MIYOSHINO, func():
 				_on_cup_selected("Miyoshino GP")
+			)
+			_add_tile("YUNHAI GP", "Tianqiao", "tile_yunhai_gp.jpg", COL_YUNHAI, func():
+				_on_cup_selected("Yunhai GP")
 			)
 		"stage_select":
 			if NetworkManager.current_game_mode == NetworkManager.GameMode.SPECTATOR:

@@ -50,6 +50,8 @@ const STAGES := {
 	"GlacierHighwayLevel": {"zoom": 0.8},
 	"RamlatHamraLevel": {"zoom": 0.85},
 	"FrostfallGorgeLevel": {"zoom": 0.85},
+	# Tianqiao: the towers, the spiral and the mall, from the supertall down (the city fills the rest).
+	"TianqiaoLevel": {"focus": "300,70,330", "radius": 330, "zoom": 0.85},
 }
 
 var opts := {}
