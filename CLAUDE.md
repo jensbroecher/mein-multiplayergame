@@ -4982,4 +4982,5 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   here are `_boulders` ("paint").
 - AI races (`scratch/ai_race_test`, speed=2): every bot finishes; the only respawns are from items. The barge jump is
   crossed at 43-50 m/s. `fall_respawn_drop` 9m.
-- Music: `STAGE_TRACKS["shuangjiang"]` (Above the Clouds, then Engines at the Gate). Menu tile: `tile_shuangjiang.jpg`.
+- Music: `STAGE_TRACKS["shuangjiang"]` (Above the Clouds, then Engines at the Gate). Menu tile: `tile_shuangjiang.jpg`, for now a
+  look shot of the arch bridge (the user skipped the tile render); `render_menu_tiles.sh Shuangjiang` makes the usual one.
