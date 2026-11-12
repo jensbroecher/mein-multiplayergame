@@ -70,5 +70,17 @@
     "path": "music/headquarters/Afternoon_Light.mp3",
     "prompt": "Instrumental calm downtempo ambient track for a relaxed afternoon in a glass-roofed showroom beside a fountain and blossoming trees. Soft brushed drums and a slow head-nodding beat, warm muted bass, dreamy vibraphone and mellow piano melodies over lush evolving synth pads, a light breezy summer feel, peaceful and chill, never building to anything loud. 76 BPM. No vocals, no lyrics, no voice samples.",
     "seconds": 180
+  },
+  {
+    "name": "menu_main_theme",
+    "path": "music/menu/RC_Vibe_GP_Main_Theme.mp3",
+    "prompt": "Instrumental main title theme for a colourful arcade RC car racing game. It opens with about twenty seconds of a cinematic build: shimmering atmospheric synth pads, a soft rising pulse and a few distant guitar swells, slowly gathering anticipation, then lands on a confident, feel-good groove: punchy but relaxed drums, a funky slap-style bass line, bright synthwave leads with a catchy, memorable hook, sparkling arpeggios and clean funk guitar chops. Upbeat, optimistic and cool rather than aggressive, perfect to sit on in a menu. 112 BPM. No vocals, no lyrics, no voice samples.",
+    "seconds": 200
+  },
+  {
+    "name": "menu_garage_groove",
+    "path": "music/menu/Pit_Lane_Lounge.mp3",
+    "prompt": "Instrumental menu music for an arcade RC car racing game: a sunny, upbeat but easy-going electro-funk groove, crisp drums with a light swing, a warm bouncy bass, glossy synth chords, a playful lead melody on a bright analog synth answered by funky guitar, a few retro game-like sparkles, steady and loopable without big drops, inviting and fun. 108 BPM. No vocals, no lyrics, no voice samples.",
+    "seconds": 180
   }
 ]

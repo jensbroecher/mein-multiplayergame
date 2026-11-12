@@ -53,7 +53,7 @@ func _ready() -> void:
 	print("after Esc: leaving=%s garage=%s busy=%s" % [str(g._leaving) if is_instance_valid(g) else "freed", str(main.garage), str(main.screen_transition.busy)])
 	await get_tree().create_timer(3.0).timeout
 	_check(main.garage == null and main.main_menu.visible, "Esc went back to the menu")
-	_check(not MusicManager.active_player.playing and not MusicManager.inactive_player.playing, "its music stopped on leaving")
+	_check(MusicManager.is_menu_music_playing(), "back to the menu's music on leaving (%s)" % MusicManager.active_player.stream.resource_path)
 	# The car select screen offers the line-up only.
 	main.car_selection.show()
 	await _frames(5)

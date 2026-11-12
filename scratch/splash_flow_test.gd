@@ -43,7 +43,9 @@ func _process(_delta: float) -> bool:
 	var menu: Control = main.get_node("MainMenu")
 	var splash_up := main.has_node("SplashCanvas")
 	if splash_up != _last_splash or menu.visible != _last_menu:
-		print("%.2fs: splash %s, menu %s" % [t, "on screen" if splash_up else "gone", "visible" if menu.visible else "hidden"])
+		var mm = root.get_node_or_null("MusicManager")
+		var music: String = mm.active_player.stream.resource_path.get_file() if mm and mm.active_player and mm.active_player.playing and mm.active_player.stream else "none"
+		print("%.2fs: splash %s, menu %s, music %s" % [t, "on screen" if splash_up else "gone", "visible" if menu.visible else "hidden", music])
 		_last_splash = splash_up
 		_last_menu = menu.visible
 	if not splash_up and _splash_gone_at < 0.0 and t > 0.5:

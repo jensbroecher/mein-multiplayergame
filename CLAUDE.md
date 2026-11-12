@@ -1501,6 +1501,20 @@ Godot --headless --path . res://regenerate_logo.tscn                         # L
   is read straight from the file at start-up, not through the import system. The title card fades in from
   near black, so the two meet.
 
+## The menus' music
+
+- `MusicManager.play_menu_music(theme_first)` plays `music/menu/` (ElevenLabs Music, instrumental, `menu_*` jobs in
+  `music.json`): the main theme (`MENU_MAIN_THEME`, RC Vibe GP Main Theme: a cinematic build of about 20s, near
+  silent at first, under the title card, then a funky synthwave groove at 112 BPM) and Pit Lane Lounge (electro-funk,
+  108 BPM), shuffled after the theme. Main starts it in `_ready` (on the title card's first frame), and again on
+  returning to the menu (`_return_to_menu_now`) or to the lobby; it does nothing while it already plays, so car
+  select, options and the lobby keep it. The headquarters crossfades to its own and back. Level fades it out in
+  `_ready` (`fade_out_music`), under the loading screen, since the race's music starts only at GO.
+- A crossfade still running is killed before the next starts (`MusicManager._xfade`): its closing `stop()` was bound
+  to the player the next track had just started on, and left silence (the headquarters left within 2s of opening).
+- `res://scratch/menu_music_test.tscn` (headless) checks the theme at start, car select, the headquarters' handover
+  both ways, the fade as a race loads and the race's music at GO; `splash_flow_test` prints what plays on the card.
+
 ## First-use freezes
 
 - A shader compiles when the first thing using it enters the scene, so an effect whose material
@@ -2877,8 +2891,8 @@ The menus call it the Headquarters (the main menu's tile, its HUD title, the loa
   down and reversed and the line-up out and in, and prints every sound with its level and place.
 - Music: its own laid-back playlist while it is open (`MUSIC_FOLDER`, `music/headquarters/`: Showroom Drift, a chillhop
   groove with Rhodes, and Afternoon Light, downtempo with vibraphone; ElevenLabs Music, instrumental, `hq_*` jobs in
-  `music.json`, RMS -16 and -19 dBFS against the race tracks' -12 to -14), started in `start()`, stopped as it is
-  freed; the menu has none. `garage_flow_test` checks both.
+  `music.json`, RMS -16 and -19 dBFS against the race tracks' -12 to -14), crossfading from the menus' music in
+  `start()` and back to it as it is freed. `garage_flow_test` checks both.
 - Cost (M1, 2880x1800): 60 fps, 6.8-10.9ms GPU (the most at the entrance, looking through the roof). Touch has no
   controls in it yet.
 - `res://scratch/garage_shots.tscn -- <dir> [trophies=demo] walk:<name>:x,z:yaw[:pitch] inspect:<name>:<car>[:yaw:pitch:dist]

@@ -212,6 +212,9 @@ func _ready():
 
 	# Apply user graphics settings (shadows on lights, etc.) after the level tree exists
 	MusicManager.refresh_level_graphics()
+	# The menus' music fades out under the loading screen (the race's starts at GO).
+	if MusicManager.is_menu_music_playing():
+		MusicManager.fade_out_music(1.0)
 	# Pick the stage's music now, so its first track loads in the background before GO.
 	MusicManager.load_playlist_for_level(scene_file_path)
 	# Compile the shaders of effects that first show up mid-race (lightning, missiles, splashes)

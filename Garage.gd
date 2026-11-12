@@ -276,7 +276,8 @@ func _ready() -> void:
 func start() -> void:
 	_started = true
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	# Its own laid-back music (music/headquarters/, ElevenLabs Music, instrumental), shuffled; the menu has none.
+	# Its own laid-back music (music/headquarters/, ElevenLabs Music, instrumental), shuffled, crossfading from the
+	# menus' (and back to it on leaving).
 	MusicManager._load_playlist(MUSIC_FOLDER)
 	MusicManager.play_next()
 
@@ -284,7 +285,7 @@ func start() -> void:
 func _exit_tree() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	if _started:
-		MusicManager.stop_music()
+		MusicManager.play_menu_music()
 
 
 func _process(delta: float) -> void:

@@ -105,6 +105,8 @@ var current_track_index = -1
 var player1: AudioStreamPlayer
 var player2: AudioStreamPlayer
 var active_player: AudioStreamPlayer
+## The crossfade or fade out under way (play_next, fade_out_music).
+var _xfade: Tween
 var inactive_player: AudioStreamPlayer
 
 var fps_layer: CanvasLayer
@@ -603,6 +605,43 @@ func load_playlist_for_level(scene_path: String):
 		_add_folder(music_folder)
 	_refill_and_shuffle_queue()
 
+## The menus' music (music/menu/, ElevenLabs Music, instrumental): from the title card on, through the menus, car select
+## and the lobby, until a level loads (Level fades it out) or the headquarters plays its own. `theme_first` starts on
+## the main theme, whose opening builds under the title card; after it the folder shuffles. Nothing changes while it
+## is already playing.
+const MENU_MUSIC_FOLDER := "res://music/menu/"
+const MENU_MAIN_THEME := "res://music/menu/RC_Vibe_GP_Main_Theme.mp3"
+
+
+func play_menu_music(theme_first := false) -> void:
+	if is_menu_music_playing():
+		return
+	_load_playlist(MENU_MUSIC_FOLDER)
+	if theme_first and _playback_queue.has(MENU_MAIN_THEME):
+		_playback_queue.erase(MENU_MAIN_THEME)
+		_playback_queue.push_front(MENU_MAIN_THEME)
+	play_next()
+
+
+func is_menu_music_playing() -> bool:
+	return active_player != null and active_player.playing and active_player.stream != null \
+			and active_player.stream.resource_path.begins_with(MENU_MUSIC_FOLDER)
+
+
+## Fades whatever music plays out over `seconds`, then stops it.
+func fade_out_music(seconds := 1.0) -> void:
+	if _xfade and _xfade.is_valid():
+		_xfade.kill()
+	if not ((active_player and active_player.playing) or (inactive_player and inactive_player.playing)):
+		return
+	_xfade = create_tween().set_parallel()
+	for p in [active_player, inactive_player]:
+		if p == null or not p.playing:
+			continue
+		_xfade.tween_property(p, "volume_db", -80.0, seconds)
+		_xfade.tween_callback(p.stop).set_delay(seconds)
+
+
 func play_race_music(force_new: bool = false):
 	var current: AudioStream = active_player.stream if active_player else null
 	if force_new or active_player == null or not active_player.playing or current == null or not playlist.has(current.resource_path):
@@ -652,11 +691,14 @@ func play_next():
 		return
 	active_player.play()
 
-	# Crossfade tween
-	var tween = create_tween()
-	tween.tween_property(inactive_player, "volume_db", -80.0, 2.0)
-	tween.parallel().tween_property(active_player, "volume_db", -10.0, 2.0)
-	tween.tween_callback(inactive_player.stop)
+	# Crossfade tween. A crossfade (or fade out) still running is dropped: its closing stop() was bound to the player
+	# that has just started this track, and silenced it (the headquarters left within 2s of opening).
+	if _xfade and _xfade.is_valid():
+		_xfade.kill()
+	_xfade = create_tween()
+	_xfade.tween_property(inactive_player, "volume_db", -80.0, 2.0)
+	_xfade.parallel().tween_property(active_player, "volume_db", -10.0, 2.0)
+	_xfade.tween_callback(inactive_player.stop)
 
 func _prefetch_next_track() -> void:
 	if not _playback_queue.is_empty():
@@ -1526,6 +1568,8 @@ func set_default_keyboard_bindings(player_index: int):
 			save_action_event(action, default_event)
 
 func stop_music():
+	if _xfade and _xfade.is_valid():
+		_xfade.kill()
 	if active_player:
 		active_player.stop()
 	if inactive_player:

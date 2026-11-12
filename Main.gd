@@ -71,6 +71,8 @@ func _ready():
 	screen_transition.name = "ScreenTransition"
 	add_child(screen_transition)
 
+	# The menus' music, from the title card's first frame (its main theme builds under it).
+	MusicManager.play_menu_music(true)
 	if SPLASH_SCREEN_SCRIPT.should_play(self):
 		_play_splash()
 
@@ -556,6 +558,7 @@ func _return_to_lobby_impl():
 	if NetworkManager.current_game_mode == NetworkManager.GameMode.MULTIPLAYER and multiplayer.multiplayer_peer != null:
 		lobby.show()
 		lobby.enter_room_view()
+		MusicManager.play_menu_music()
 	else:
 		_on_server_disconnected()
 
@@ -647,7 +650,7 @@ func _return_to_menu_now():
 	lobby.hide()
 	car_selection.hide()
 	main_menu.show()
-	MusicManager.stop_music()
+	MusicManager.play_menu_music()
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
