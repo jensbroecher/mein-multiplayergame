@@ -565,14 +565,45 @@ func _build_hall() -> void:
 	var s_in: float = _s_after(Vector2(412.0, hr.position.y), float(_a["land2"]))
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 5501
+	var entry_x: float = lap.pt(s_in).x
 	_city("hall", func(pk: PropKit, kit: Dictionary, labels: Array) -> void:
 		# The hall's walls inside: six floors of shops (the interior style), facing in; outside, the vault's ends glazed.
+		# The north wall has an opening where the lap comes in off the roof, the south wall the aquarium's entrance.
 		var x0: float = hr.position.x
 		var x1: float = hr.end.x
 		var z0: float = hr.position.y
 		var z1: float = hr.end.y
-		MCK.wall(pk, kit, Vector3(x1, 0, z0), Vector3(x0, 0, z0), HALL_FLOOR, Y_MALL + 4.0, Vector3(0, 0, 1), Color(0.92, 0.88, 0.8), MCK.STYLE_INTERIOR, id)
-		MCK.wall(pk, kit, Vector3(x0, 0, z1), Vector3(x1, 0, z1), HALL_FLOOR, Y_MALL + 4.0, Vector3(0, 0, -1), Color(0.92, 0.88, 0.8), MCK.STYLE_INTERIOR, id + 1)
+		var entry := [entry_x - road_half - 2.4, entry_x + road_half + 2.4, Y_MALL - 4.0, Y_MALL + 4.0]
+		var aqua_door := [MALL_PORTAL.x, MALL_PORTAL.y, MALL_PORTAL_Y.x, MALL_PORTAL_Y.y]
+		_x_wall(pk, kit, z0, x1, x0, HALL_FLOOR, Y_MALL + 4.0, 1.0, Color(0.92, 0.88, 0.8), MCK.STYLE_INTERIOR, id, entry)
+		_x_wall(pk, kit, z1, x0, x1, HALL_FLOOR, Y_MALL + 4.0, -1.0, Color(0.92, 0.88, 0.8), MCK.STYLE_INTERIOR, id + 1, aqua_door)
+		# Outside, the walls' tops stand 4m over the mall's roof round the vault: clad, an LED line along them (from the
+		# roof they had shown only their backs, which aren't drawn, and the hall stood open).
+		var y_out0: float = Y_MALL - 0.3
+		var y_out1: float = Y_MALL + 4.0
+		_x_wall(pk, kit, z0 - 0.05, x0, x1, y_out0, y_out1, -1.0, Color(0.2, 0.21, 0.25), MCK.STYLE_CLADDING, id + 6, entry)
+		_x_wall(pk, kit, z1 + 0.05, x1, x0, y_out0, y_out1, 1.0, Color(0.2, 0.21, 0.25), MCK.STYLE_CLADDING, id + 6, [])
+		MCK.wall(pk, kit, Vector3(x0 - 0.05, 0, z1), Vector3(x0 - 0.05, 0, z0), y_out0, y_out1, Vector3(-1, 0, 0), Color(0.2, 0.21, 0.25), MCK.STYLE_CLADDING, id + 6)
+		MCK.wall(pk, kit, Vector3(x1 + 0.05, 0, z0), Vector3(x1 + 0.05, 0, z1), y_out0, y_out1, Vector3(1, 0, 0), Color(0.2, 0.21, 0.25), MCK.STYLE_CLADDING, id + 6)
+		for e in [[Vector3(x0, y_out1 + 0.05, z0 - 0.1), Vector3(entry[0], y_out1 + 0.05, z0 - 0.1)], [Vector3(entry[1], y_out1 + 0.05, z0 - 0.1), Vector3(x1, y_out1 + 0.05, z0 - 0.1)],
+				[Vector3(x0, y_out1 + 0.05, z1 + 0.1), Vector3(x1, y_out1 + 0.05, z1 + 0.1)], [Vector3(x0 - 0.1, y_out1 + 0.05, z0), Vector3(x0 - 0.1, y_out1 + 0.05, z1)],
+				[Vector3(x1 + 0.1, y_out1 + 0.05, z0), Vector3(x1 + 0.1, y_out1 + 0.05, z1)]]:
+			MCK.led_line(pk, kit, e[0], e[1], Color(1.0, 0.4, 0.85, 0.5), 0.3)
+		# The aquarium's entrance: a lit frame round the door, dark reveals through the wall to the tank, its name over it.
+		var d0: float = MALL_PORTAL.x
+		var d1: float = MALL_PORTAL.y
+		var dy0: float = MALL_PORTAL_Y.x
+		var dy1: float = MALL_PORTAL_Y.y
+		for gx in [d0, d1]:
+			var o3: float = 1.0 if gx == d0 else -1.0
+			MCK.wall(pk, kit, Vector3(gx, 0, z1 + 2.0 if o3 > 0.0 else z1 - 0.05), Vector3(gx, 0, z1 - 0.05 if o3 > 0.0 else z1 + 2.0), dy0, dy1, Vector3(o3, 0, 0),
+					Color(0.08, 0.1, 0.14), MCK.STYLE_CLADDING, id + 7)
+		pk.quad(kit, "tower", [Vector3(d0, dy1, z1 - 0.05), Vector3(d1, dy1, z1 - 0.05), Vector3(d1, dy1, z1 + 2.0), Vector3(d0, dy1, z1 + 2.0)], Vector3.DOWN,
+				Color(0.08, 0.1, 0.14, float(MCK.STYLE_CLADDING) / 8.0))
+		var fz: float = z1 - 0.15
+		for e2 in [[Vector3(d0, dy0, fz), Vector3(d0, dy1, fz)], [Vector3(d0, dy1, fz), Vector3(d1, dy1, fz)], [Vector3(d1, dy1, fz), Vector3(d1, dy0, fz)]]:
+			MCK.led_line(pk, kit, e2[0], e2[1], Color(0.25, 0.75, 1.0, 0.0), 0.7)
+		MCK.neon_sign(pk, kit, labels, Vector3((d0 + d1) * 0.5, dy1 + 3.2, z1 - 0.4), Vector3(0, 0, -1), 22.0, 4.0, "星河海洋馆", Color(0.3, 0.85, 1.0))
 		MCK.wall(pk, kit, Vector3(x0, 0, z0), Vector3(x0, 0, z1), HALL_FLOOR, Y_MALL + 4.0, Vector3(1, 0, 0), Color(0.92, 0.88, 0.8), MCK.STYLE_INTERIOR, id + 2)
 		MCK.wall(pk, kit, Vector3(x1, 0, z1), Vector3(x1, 0, z0), HALL_FLOOR, Y_MALL + 4.0, Vector3(-1, 0, 0), Color(0.92, 0.88, 0.8), MCK.STYLE_INTERIOR, id + 3)
 		# The floor: polished stone, a fountain pool in its middle.
@@ -583,10 +614,21 @@ func _build_hall() -> void:
 		var fy: float = HALL_FLOOR + 8.0
 		while fy < Y_MALL:
 			for zz in [[z0, z0 + 5.0, 1.0], [z1 - 5.0, z1, -1.0]]:
-				pk.block(kit, "tower", Vector3(x0, fy - 0.5, zz[0]), Vector3(x1, fy, zz[1]), Color(0.85, 0.82, 0.76, 5.0 / 8.0))
 				var edge: float = zz[1] if zz[2] > 0.0 else zz[0]
-				MCK.glass_rail(pk, kit, Vector3(x0, fy, edge), Vector3(x1, fy, edge), 1.1, Color(1.0, 0.85, 0.6, 0.0))
-				MCK.led_line(pk, kit, Vector3(x0, fy - 0.55, edge), Vector3(x1, fy - 0.55, edge), Color(1.0, 0.9, 0.75, 0.0), 0.12)
+				# The south walkways stop short of the aquarium's door below the floor the lap's last ramp passes (they hung
+				# 3.5m over the road there), their ends railed.
+				var runs: Array = [[x0, x1]]
+				if zz[2] < 0.0 and fy < MALL_PORTAL_Y.y + 12.0:
+					runs = [[x0, MALL_PORTAL.x - 14.0], [MALL_PORTAL.y + 14.0, x1]]
+				for run in runs:
+					var ra: float = run[0]
+					var rb: float = run[1]
+					pk.block(kit, "tower", Vector3(ra, fy - 0.5, zz[0]), Vector3(rb, fy, zz[1]), Color(0.85, 0.82, 0.76, 5.0 / 8.0))
+					MCK.glass_rail(pk, kit, Vector3(ra, fy, edge), Vector3(rb, fy, edge), 1.1, Color(1.0, 0.85, 0.6, 0.0))
+					MCK.led_line(pk, kit, Vector3(ra, fy - 0.55, edge), Vector3(rb, fy - 0.55, edge), Color(1.0, 0.9, 0.75, 0.0), 0.12)
+					if runs.size() > 1:
+						var cap_x: float = rb if ra == x0 else ra
+						MCK.glass_rail(pk, kit, Vector3(cap_x, fy, zz[0]), Vector3(cap_x, fy, zz[1]), 1.1, Color(1.0, 0.85, 0.6, 0.0))
 			fy += 8.0
 		# The glass vault over the hall: ribs and glazing, LED along the ribs.
 		var cz: float = (z0 + z1) * 0.5
@@ -635,7 +677,8 @@ func _build_hall() -> void:
 			var sx: float = x0 + 16.0
 			while sx < x1 - 16.0:
 				for side in [[z0 + 0.4, 1.0], [z1 - 0.4, -1.0]]:
-					if rng.randf() < 0.55:
+					var near_door: bool = float(side[1]) < 0.0 and sy < MALL_PORTAL_Y.y + 12.0 and sx > MALL_PORTAL.x - 18.0 and sx < MALL_PORTAL.y + 18.0
+					if rng.randf() < 0.55 and not near_door:
 						var col := Color.from_hsv(rng.randf(), 0.75, 1.0)
 						MCK.neon_sign(pk, kit, labels, Vector3(sx, sy, float(side[0])), Vector3(0, 0, float(side[1])), 7.0, 2.2, String(names[ni % names.size()]), col)
 						ni += 1
@@ -655,6 +698,30 @@ func _build_hall() -> void:
 				Color(0.25, 0.25, 0.3, 6.0 / 8.0))
 		MCK.neon_sign(pk, kit, labels, Vector3(p.x, Y_MALL + 14.0, hr.position.y - 1.2), Vector3(0, 0, -1), 18.0, 4.5, "星河汇 入口", Color(1.0, 0.4, 0.85))
 	, 2600.0)
+
+
+## A wall along x at z from xa to xb (keeping the order MCK.wall draws it in), facing `out_z` (+1 south, -1 north), with an
+## opening `hole` = [x from, x to, y from, y to] cut out of it (empty: none).
+func _x_wall(pk: PropKit, kit: Dictionary, z: float, xa: float, xb: float, y0: float, y1: float, out_z: float, tint: Color, style: int, id: int,
+		hole: Array) -> void:
+	var out := Vector3(0, 0, out_z)
+	if hole.is_empty():
+		MCK.wall(pk, kit, Vector3(xa, 0, z), Vector3(xb, 0, z), y0, y1, out, tint, style, id)
+		return
+	var lo: float = minf(xa, xb)
+	var hi: float = maxf(xa, xb)
+	var g0: float = clampf(float(hole[0]), lo, hi)
+	var g1: float = clampf(float(hole[1]), lo, hi)
+	var h0: float = clampf(float(hole[2]), y0, y1)
+	var h1: float = clampf(float(hole[3]), y0, y1)
+	# Pieces as [x from, x to, y from, y to], each drawn in the wall's own direction.
+	var pieces: Array = [[lo, g0, y0, y1], [g1, hi, y0, y1], [g0, g1, y0, h0], [g0, g1, h1, y1]]
+	for pc in pieces:
+		if float(pc[1]) - float(pc[0]) < 0.05 or float(pc[3]) - float(pc[2]) < 0.05:
+			continue
+		var pa: float = pc[0] if xa < xb else pc[1]
+		var pb: float = pc[1] if xa < xb else pc[0]
+		MCK.wall(pk, kit, Vector3(pa, 0, z), Vector3(pb, 0, z), pc[2], pc[3], out, tint, style, id, absf(pa - xa))
 
 
 # ---- The aquarium: the acrylic tunnel through the tanks -------------------------------------------------------------
@@ -728,7 +795,6 @@ func _build_aquarium(root: Node3D) -> void:
 			sr += 6.0
 		for side in [-1.0, 1.0]:
 			MCK.led_line(pk, kit, lap.pt(s0) + lap.rt(s0) * side * (road_half + 1.6), lap.pt(s1) + lap.rt(s1) * side * (road_half + 1.6), Color(0.2, 0.6, 1.0, 0.0), 0.2)
-		MCK.neon_sign(pk, kit, labels, lap.pt(s0) + Vector3(0, road_half + 5.5, 0) - lap.fw(s0) * 1.0, -lap.fw(s0), 14.0, 3.0, "星河海洋馆", Color(0.3, 0.85, 1.0))
 	, 1200.0)
 	_edge_boxes(_rails, lap, s0 - 2.0, s1 + 2.0, -(road_half + 1.2), 3.0, 0.5)
 	_edge_boxes(_rails, lap, s0 - 2.0, s1 + 2.0, road_half + 1.2, 3.0, 0.5)
@@ -1016,7 +1082,12 @@ func _build_crowds() -> void:
 	var fy: float = HALL_FLOOR + 8.0
 	while fy < Y_MALL:
 		_crowd_line(Vector3(HALL.position.x + 6.0, fy, HALL.position.y + 4.0), Vector3(HALL.end.x - 6.0, fy, HALL.position.y + 4.0), Vector3(0, 0, 1), 3.0, rng, 0.45)
-		_crowd_line(Vector3(HALL.position.x + 6.0, fy, HALL.end.y - 4.0), Vector3(HALL.end.x - 6.0, fy, HALL.end.y - 4.0), Vector3(0, 0, -1), 3.0, rng, 0.45)
+		# The south walkways stop short of the aquarium's door on the low floors (_build_hall).
+		if fy < MALL_PORTAL_Y.y + 12.0:
+			_crowd_line(Vector3(HALL.position.x + 6.0, fy, HALL.end.y - 4.0), Vector3(MALL_PORTAL.x - 16.0, fy, HALL.end.y - 4.0), Vector3(0, 0, -1), 3.0, rng, 0.45)
+			_crowd_line(Vector3(MALL_PORTAL.y + 16.0, fy, HALL.end.y - 4.0), Vector3(HALL.end.x - 6.0, fy, HALL.end.y - 4.0), Vector3(0, 0, -1), 3.0, rng, 0.45)
+		else:
+			_crowd_line(Vector3(HALL.position.x + 6.0, fy, HALL.end.y - 4.0), Vector3(HALL.end.x - 6.0, fy, HALL.end.y - 4.0), Vector3(0, 0, -1), 3.0, rng, 0.45)
 		fy += 8.0
 
 

@@ -4829,6 +4829,13 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   for the towers the lap crosses (their parapets in `_roof` have gaps where the lap passes: `open` stretches run along
   each side clockwise from above, the south side from its east end). Building walls are solid, so the lap's way out of
   the mall is a real hole in its south front and in the tanks' ends.
+- The atrium hall's walls are drawn facing in (MCK.wall draws one side), so from the mall's roof they were invisible
+  and the lap seemed to drive into an open hall, and on into a solid south wall at the aquarium (the hall's mesh holds
+  glass, so DressingColliders leaves it soft and the bots drove through). Now `_x_wall` cuts real openings: the entry
+  where the lap comes off the roof and the aquarium's door (`MALL_PORTAL`, `MALL_PORTAL_Y`: a lit frame, dark reveals to
+  the tank, its name over it); the walls' tops over the roof are clad outside with an LED line; the south walkways (and
+  their shoppers and signs) stop 14m short of the door below the floor the last ramp passes (they hung 3.5m over the
+  road, as the user found).
 - MultiMesh buffers are written by hand (`_build_fish`): on the headless renderer `set_instance_transform` stores
   nothing and the saved fish were all at the origin. `scratch/tianqiao_fish_probe.gd` (`-s`) prints them.
 - Falling off: PlayerCart respawns a cart (human or bot) once it is more than the level root's `fall_respawn_drop` meta
