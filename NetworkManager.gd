@@ -88,6 +88,7 @@ const ALL_STAGES = [
 	{"name": "Yamabushi Trail", "path": "res://levels/YamabushiLevel.tscn"},
 	{"name": "Tianqiao", "path": "res://levels/TianqiaoLevel.tscn"},
 	{"name": "Panlong Interchange", "path": "res://levels/PanlongLevel.tscn"},
+	{"name": "Wangjiang", "path": "res://levels/WangjiangLevel.tscn"},
 	# A proving ground for trying the cars (regenerate_test_track.gd): listed under "Other Courses", never picked at
 	# random or as the next stage ("test").
 	{"name": "Test Track", "path": "res://levels/TestTrackLevel.tscn", "test": true},
@@ -157,12 +158,13 @@ const GP_CUPS = {
 			"res://levels/YamabushiLevel.tscn",
 		]
 	},
-	# The Yunhai GP (云海): a made-up river megacity at night after Chongqing. Stages 1 and 2 so far.
+	# The Yunhai GP (云海): a made-up river megacity at night after Chongqing. Stages 1 to 3 so far.
 	"Yunhai GP": {
 		"name": "Yunhai GP",
 		"stages": [
 			"res://levels/TianqiaoLevel.tscn",
 			"res://levels/PanlongLevel.tscn",
+			"res://levels/WangjiangLevel.tscn",
 		]
 	}
 }

@@ -78,6 +78,14 @@ func _hammerhead(pk: PropKit, kit: Dictionary, p: Vector3, rt: Vector3, g: float
 	pk.box(kit, "tower", Transform3D(b, Vector3(p.x, top - cap * 0.5, p.z)), Vector3(w * 1.6, cap, 2.6), conc)
 
 
+## The lowest ground under a plot (its corners and middle), a little under it so the walls reach into the slope.
+func _plot_ground(r: Rect2) -> float:
+	var g := INF
+	for q in [r.position, r.end, Vector2(r.position.x, r.end.y), Vector2(r.end.x, r.position.y), r.get_center()]:
+		g = minf(g, _ground_at(q.x, q.y))
+	return minf(g, 0.0) if g < 0.5 else g - 0.5
+
+
 ## A stage's say over one of the city's plots before it is built: `d` holds "podium", "style" and "top" to change.
 func _plot_tweak(_plot: Rect2, _d: Dictionary) -> void:
 	pass
@@ -363,11 +371,13 @@ func _build_city() -> void:
 				var d: float = plot.get_center().distance_to(city_mid)
 				# Under the course the city is mid-rise (the Yunhai Center towers over it); taller toward the far clusters.
 				var tall: float = lerpf(city_tall.x, city_tall.y, clampf(d / city_near, 0.0, 1.0))
-				var top: float = rng.randf_range(tall * 0.45, tall * 1.25)
+				# On hilly ground (Wangjiang) a tower stands on the lowest ground under its plot; `top` is its roof's height.
+				var g: float = _plot_ground(plot)
+				var top: float = g + rng.randf_range(tall * 0.45, tall * 1.25)
 				var low: float = _route_low_over(plot, road_half + 14.0)
 				if low < INF:
 					top = minf(top, low - 18.0)
-				if top < 14.0:
+				if top - g < 14.0:
 					continue
 				var shrink: float = rng.randf_range(0.0, 0.18)
 				var b: Rect2 = plot.grow(-minf(plot.size.x, plot.size.y) * shrink)
@@ -389,7 +399,7 @@ func _build_city() -> void:
 				var ch: float = 3.0 if rng.randf() < 0.4 else 0.0
 				_city(key, func(pk: PropKit, kit: Dictionary, _l: Array) -> void:
 					MCK.tower(pk, kit, b.get_center(), b.size.x * 0.5 - (3.0 if podium > 0.0 else 0.0), b.size.y * 0.5 - (3.0 if podium > 0.0 else 0.0),
-							0.0, top, tint, style, id, ch, podium, corners_led, led_col, near_route)
+							g, top, tint, style, id, ch, podium, corners_led, led_col, near_route)
 				, 3200.0)
 				count += 1
 	print("  city: %d buildings round the course" % count)

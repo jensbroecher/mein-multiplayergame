@@ -4885,3 +4885,33 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
 - `fall_respawn_drop` is 9m: a cart off the coil respawns before it reaches the lawn. One that drops off an upper leg
   onto a lower stretch of the lap is on the track there and drives on (the gates then count it as having missed one).
 - Music: the night folder's two tracks (`STAGE_TRACKS["panlong"]`) until it has its own. Menu tile: `tile_panlong.jpg`.
+
+## Wangjiang (Yunhai GP, stage 3)
+
+- `regenerate_wangjiang.gd` (`regenerate_wangjiang.tscn`, headless, about 20s) builds `levels/WangjiangLevel.tscn`: one
+  4.5km run at night from the plateau (80m) down to the river (5m). The user asked for two of the ideas offered for
+  stage 2 together (racing the monorail through a block of flats, the cliff town of stilt houses by the river) as a
+  longer point-to-point race.
+- The run: Wangjiang Road east from Wangjiang station with the monorail's beam beside it (`MONO_SIDE` north,
+  `MONO_UP` over the road), both on viaducts across the Huaxi gully (`_natural`: a ravine at x 750, floor 25m, running
+  on down the slope); through the Jiayuan Building (`FLATS`), whose hole (`FLATS_HOLE_Z`, walls cut by `_z_wall`) the road
+  and the line share; through Chaoyang station, its two halves either side of a cross street (`STATION_2A`/`2B`), a
+  kicker and a 28m gap between them (`JUMP_LIP`); south down Jiefang Road; four legs along the slope (`LEGS`) joined by
+  hairpins (r20, 40m apart, the legs falling 12-13m each, the hairpins flat); the quay west to the finish plaza.
+- Heights: `KNOTS` along the run; every stretch more than 3m over `_natural` (and the hole) is an ungraded bridge.
+  The city's towers stand on the lowest ground under their plots (`YunhaiStage._plot_ground`), so they rise out of the
+  gully and step down the slope.
+- The monorail: Monorail.gd (three cars, Bloombay Dunes' car shape in white with a red band, `_car_mesh`), stops at both
+  stations and the ends, on the wall clock, so the train is wherever the clock puts it when the race passes; its beam and
+  columns (none in the building or over the cross street) are a "deck_" prop.
+- The cliff town (`_build_cliff_town`): along each leg, stilt houses on the downhill side (`_stilt_house`: timber floors
+  with lit windows, balconies at the back, a grey roof with flared corners, stilts to the slope, lanterns, a shop sign),
+  shopfronts in a retaining wall uphill (`_uphill_front`), every fourth house spanning the road on posts 6.6m up
+  (`_arcade`, its windows on the faces the drivers see), houses up the slope above the first leg, pavilions at the
+  hairpins. Window colours are kept dim (neon_emissive at energy 4 burns pale colours to white blobs).
+- The quay (`_build_quay`): the river wall, a railed promenade with lanterns and food stalls, shophouses at the hill's
+  foot, four LED-outlined tour boats, the finish's lantern gate (望江码头). The cableway over the river (`CableCar.gd`:
+  two cabins on sagging ropes shuttling on the wall clock, a jig-back) runs from the plateau's edge (`CABLE_A`) to the
+  far bank.
+- AI races (`scratch/ai_race_test`, speed=2): every bot finishes in 97-123s; the kicker is crossed at 47-56 m/s.
+- `fall_respawn_drop` 11m (the legs are 12-13m apart, so a cart off an upper leg lands on the one below and drives on).

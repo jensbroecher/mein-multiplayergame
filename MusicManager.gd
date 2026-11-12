@@ -439,6 +439,7 @@ const STAGE_TRACKS := {
 	# The Yunhai GP (Tianqiao, the night megacity): the night folder's tracks until it has its own.
 	"tianqiao": ["res://music/night/Midnight_Overdrive.mp3", "res://music/night/Apex_Drift.mp3"],
 	"panlong": ["res://music/night/Apex_Drift.mp3", "res://music/night/Midnight_Overdrive.mp3"],
+	"wangjiang": ["res://music/night/Midnight_Overdrive.mp3", "res://music/night/Apex_Drift.mp3"],
 	"kronburg": [
 		"res://music/kronburg/Schichtwechsel.mp3",
 		"res://music/kronburg/Kleeblatt.mp3",
@@ -476,6 +477,8 @@ static func _stage_track_key(path_lower: String) -> String:
 		return "tianqiao"
 	if path_lower.contains("panlong"):
 		return "panlong"
+	if path_lower.contains("wangjiang"):
+		return "wangjiang"
 	if path_lower.contains("mara"):
 		return "mara"
 	if path_lower.contains("nyota"):
