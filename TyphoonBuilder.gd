@@ -209,6 +209,12 @@ func _side_parts(b) -> void:
 			CB.M_CHROME, C_CHROME)
 
 
+## A shock's mounting eye at `c`: a short ring round a bolt along `axis`, the bolt's ends showing either side.
+func _shock_eye(b, c: Vector3, axis: Vector3, r: float) -> void:
+	b.tube(PackedVector3Array([c - axis * 0.014, c + axis * 0.014]), r, 10, CB.M_ALLOY, C_ALLOY_DARK, true, true)
+	b.tube(PackedVector3Array([c - axis * 0.026, c + axis * 0.026]), 0.0045, 8, CB.M_CHROME, C_CHROME, true, true)
+
+
 ## A round spotlight facing forward, centre `c`, lens radius `r`: a deep dark can behind a chrome bezel and a clear lens,
 ## on a stem down to `foot` (the bar it stands on) with a bracket under the can.
 func _spotlight(b, c: Vector3, r: float, foot: Vector3) -> void:
@@ -244,12 +250,24 @@ func _front_suspension(b) -> void:
 			C_ALLOY_DARK, false, true)
 	b.tube(PackedVector3Array([Vector3(0.14, 0.27, az + 0.07), Vector3(kx - 0.01, TYRE_R_F + 0.005, az + 0.05)]), 0.006, 6,
 			CB.M_DARK, C_DARK, true, true)
-	# The coil-over stands on a bar across the lower wishbone's legs (it had ended between them) and its top mount sits on
-	# the cowl's deck (it hovered a centimetre over the deck's edge).
+	# The coil-over stands on a bar across the lower wishbone's legs (it had ended between them), an eye on a bolt, and
+	# its top is bolted between two tabs on a shock tower: a plate down the cowl's flank from the deck to the frame rail
+	# (a block on the deck's edge read as not fixed to anything).
 	var shock_lo := Vector3(kx - 0.08, 0.169, az + 0.01)
 	b.tube(PackedVector3Array([Vector3(shock_lo.x, 0.163, az - 0.036), Vector3(shock_lo.x, 0.163, az + 0.034)]), 0.008, 8,
 			CB.M_ALLOY, C_ALLOY, true, true)
-	coilover(b, shock_lo, Vector3(0.185, 0.425, az + 0.07), 0.014, 0.024, 7.0, C_ALLOY, C_ALLOY_DARK, C_CHROME, C_DARK)
+	var tz := az + 0.13
+	var shock_hi := Vector3(0.250, 0.412, tz)
+	coilover(b, shock_lo, shock_hi, 0.014, 0.024, 7.0, C_ALLOY, C_ALLOY_DARK, C_CHROME, C_DARK, false)
+	_shock_eye(b, shock_lo, Vector3.BACK, 0.010)
+	_shock_eye(b, shock_hi, Vector3.BACK, 0.013)
+	b.rbox(Transform3D(Basis(), Vector3(0.219, 0.338, tz)), Vector3(0.004, 0.100, 0.032), 0.003, 1, CB.M_DARK, C_STEEL)
+	b.rbox(Transform3D(Basis(), Vector3(0.224, 0.436, tz)), Vector3(0.012, 0.004, 0.032), 0.003, 1, CB.M_DARK, C_STEEL)
+	for side in [-1.0, 1.0]:
+		b.rbox(Transform3D(Basis(), Vector3(0.240, 0.412, tz + side * 0.019)), Vector3(0.022, 0.016, 0.003), 0.003, 1,
+				CB.M_DARK, C_STEEL)
+	for by in [0.29, 0.38]:
+		b.disc(Vector3(0.2235, by, tz), Vector3.RIGHT, 0.004, 0.0, 8, CB.M_CHROME, C_CHROME)
 
 
 ## The rear corner (right): a trailing arm from the frame back to the hub, a long coil-over up to the hoop's brace,
@@ -266,11 +284,20 @@ func _rear_suspension(b) -> void:
 	b.rbox(Transform3D(Basis(), Vector3(kx, TYRE_R_R, az)), Vector3(0.018, 0.07, 0.04), 0.009, 1, CB.M_DARK, C_STEEL)
 	b.tube(PackedVector3Array([Vector3(0.07, TYRE_R_R + 0.01, az), Vector3(WHEEL_X_R - 0.10, TYRE_R_R, az)]), 0.014, 10,
 			CB.M_ALLOY, C_ALLOY_DARK, false, true)
-	# Its top on the hoop's rear brace, 30% of the way down it (it had hung between the brace and the hoop's leg).
+	# Its top is bolted between two tabs welded to the hoop's rear brace, 30% of the way down it (it had hung between the
+	# brace and the hoop's leg under a loose block); its foot is an eye on the upper link.
 	var brace_a := Vector3(0.21, 0.78, HOOP_Z + 0.01)
-	var brace_top := brace_a.lerp(Vector3(0.23, 0.30, 0.56), 0.30) + Vector3(0.006, -0.012, 0.0)
-	coilover(b, Vector3(kx - 0.02, TYRE_R_R + 0.03, az - 0.04), brace_top, 0.017, 0.028, 8.0,
-			C_ALLOY, C_ALLOY_DARK, C_CHROME, C_DARK)
+	var brace_p := brace_a.lerp(Vector3(0.23, 0.30, 0.56), 0.30)
+	var rear_hi := brace_p + Vector3(0.036, -0.004, 0.0)
+	var rear_lo := Vector3(kx - 0.02, TYRE_R_R + 0.03, az - 0.04)
+	var link_dir := (Vector3(kx, TYRE_R_R + 0.04, az - 0.01) - Vector3(0.24, 0.31, 0.06)).normalized()
+	_shock_eye(b, rear_hi, Vector3.BACK, 0.015)
+	_shock_eye(b, rear_lo, link_dir.cross(Vector3.UP).normalized(), 0.012)
+	for side in [-1.0, 1.0]:
+		b.rbox(Transform3D(Basis(), brace_p + Vector3(0.020, -0.004, side * 0.021)), Vector3(0.030, 0.016, 0.003), 0.003, 1,
+				CB.M_DARK, C_STEEL)
+	coilover(b, rear_lo, rear_hi, 0.017, 0.028, 8.0,
+			C_ALLOY, C_ALLOY_DARK, C_CHROME, C_DARK, false)
 
 
 func _centre_parts(b) -> void:
@@ -281,8 +308,13 @@ func _centre_parts(b) -> void:
 			C_SEAT, true, true)
 	b.tube(_rounded([Vector3(-0.12, 0.25, -1.00), Vector3(-0.08, 0.27, -1.15), Vector3(0.08, 0.27, -1.15),
 			Vector3(0.12, 0.25, -1.00)], 0.05), 0.014, 10, CB.M_ANODISED, Color(1, 1, 1), true, true)
-	b.rbox(Transform3D(Basis(Vector3.RIGHT, 0.35), Vector3(0.0, 0.215, -1.02)), Vector3(0.09, 0.004, 0.09), 0.003, 1,
-			CB.M_ALLOY, C_ALLOY_DARK)
+	# The skid plate guards the nose's underside on landings: tipped to the underside's slope and bolted flush to it
+	# (it had hung 2-2.5cm under it and stuck out past the nose).
+	var skid := Transform3D(Basis(Vector3.RIGHT, 0.406), Vector3(0.0, 0.229, -1.0))
+	b.rbox(skid, Vector3(0.085, 0.004, 0.055), 0.003, 1, CB.M_ALLOY, C_ALLOY_DARK)
+	for bx in [-0.06, 0.06]:
+		for bz in [-0.035, 0.035]:
+			b.disc(skid * Vector3(bx, -0.0045, bz), skid.basis * Vector3.DOWN, 0.005, 0.0, 8, CB.M_CHROME, C_CHROME)
 	# Cross tubes: under the engine, at the hoop's foot, at the duct's foot.
 	for z in [0.20, 0.62]:
 		b.tube(PackedVector3Array([Vector3(-0.25, 0.26 if z < 0.5 else 0.285, z), Vector3(0.25, 0.26 if z < 0.5 else 0.285, z)]),
@@ -290,8 +322,8 @@ func _centre_parts(b) -> void:
 	# The transaxle between the rear wheels.
 	b.rbox(Transform3D(Basis(), Vector3(0.0, TYRE_R_R + 0.01, AXLE_R)), Vector3(0.075, 0.06, 0.07), 0.02, 2, CB.M_DARK,
 			C_STEEL)
-	# A belly pan.
-	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.185, -0.30)), Vector3(0.20, 0.004, 0.55), 0.003, 1, CB.M_ALLOY, C_ALLOY_DARK)
+	# A belly pan, flush under the tub (it hung 6mm under it).
+	b.rbox(Transform3D(Basis(), Vector3(0.0, 0.191, -0.30)), Vector3(0.20, 0.004, 0.55), 0.003, 1, CB.M_ALLOY, C_ALLOY_DARK)
 	# A fuel tank across behind the hoop.
 	var vb: int = b.vertex_count()
 	var ib: int = b.index_count()
@@ -300,12 +332,24 @@ func _centre_parts(b) -> void:
 	b.orient_away_from(vb, ib, Vector3(0.0, 0.50, 0.29))
 	b.tube(PackedVector3Array([Vector3(0.08, 0.555, 0.29), Vector3(0.08, 0.575, 0.29)]), 0.016, 10, CB.M_DARK, C_DARK, false,
 			true)
+	# Its mounts (it floated 2cm clear of everything): a strap round it near each end and a bracket from each end cap
+	# forward to the hoop's leg.
+	for sx in [-1.0, 1.0]:
+		var strap := PackedVector3Array()
+		for k in 25:
+			var a: float = TAU * k / 24.0
+			strap.append(Vector3(0.10 * sx, 0.50 + sin(a) * 0.061, 0.29 + cos(a) * 0.061))
+		b.tube(strap, 0.005, 5, CB.M_DARK, C_DARK, false, false)
+		b.tube(PackedVector3Array([Vector3(0.145 * sx, 0.50, 0.29), Vector3(0.20 * sx, 0.50, 0.23),
+				Vector3(0.228 * sx, 0.50, HOOP_Z + 0.004)]), 0.009, 8, CB.M_DARK, C_STEEL, false, false)
 
 
 ## A single bucket seat on the cockpit floor, harness in the accent colour.
 func _seat(b) -> void:
 	var floor_y := 0.230
-	b.rbox(Transform3D(Basis(), Vector3(0.0, floor_y + 0.04, -0.02)), Vector3(0.115, 0.035, 0.13), 0.02, 2, CB.M_DARK, C_SEAT)
+	# The cushion sits on the floor (it hovered 5mm over it, and the seat with it).
+	b.rbox(Transform3D(Basis(), Vector3(0.0, floor_y + 0.034, -0.02)), Vector3(0.115, 0.035, 0.13), 0.02, 2, CB.M_DARK,
+			C_SEAT)
 	var rake := Basis(Vector3.RIGHT, 0.26)
 	var back_c := Vector3(0.0, floor_y + 0.22, 0.09)
 	b.rbox(Transform3D(rake, back_c), Vector3(0.115, 0.17, 0.032), 0.02, 2, CB.M_DARK, C_SEAT)
@@ -330,9 +374,9 @@ func _steering(b) -> void:
 	b.tube(PackedVector3Array([c + tilt * Vector3(-0.066, 0.0, 0.0), c + tilt * Vector3(0.066, 0.0, 0.0)]), 0.007, 6,
 			CB.M_DARK, C_DARK, false, false)
 	b.tube(PackedVector3Array([c, c + Vector3(0.0, -0.04, -0.17)]), 0.012, 8, CB.M_DARK, C_DARK, true, false)
-	b.rbox(Transform3D(Basis(Vector3.RIGHT, -0.5), Vector3(0.0, 0.49, -0.47)), Vector3(0.06, 0.025, 0.02), 0.01, 2, CB.M_DARK,
-			C_DARK)
-	b.disc(Vector3(0.0, 0.497, -0.452), Vector3(0.0, 0.48, 0.88).normalized(), 0.016, 0.0, 16, CB.M_HEADLAMP, Color(1, 1, 1))
+	b.rbox(Transform3D(Basis(Vector3.RIGHT, -0.5), Vector3(0.0, 0.478, -0.47)), Vector3(0.06, 0.025, 0.02), 0.01, 2,
+			CB.M_DARK, C_DARK)
+	b.disc(Vector3(0.0, 0.485, -0.452), Vector3(0.0, 0.48, 0.88).normalized(), 0.016, 0.0, 16, CB.M_HEADLAMP, Color(1, 1, 1))
 
 
 ## The aero engine behind the hoop: a crankcase, two finned cylinders out to the sides (a flat twin) with their heads,
@@ -419,8 +463,17 @@ func _duct(b) -> void:
 		var outline := PackedVector2Array([Vector2(z1 + 0.035, 0.30), Vector2(z1 + 0.115, 0.32), Vector2(z1 + 0.13, 0.86),
 				Vector2(z1 + 0.06, 0.90), Vector2(z1 + 0.035, 0.89)])
 		slab(b, outline, sx, 0.010, CB.M_PAINT, Color(1, 1, 1))
-		b.tube(PackedVector3Array([Vector3(sx, 0.26, z1 + 0.035), Vector3(sx, 0.94, z1 + 0.035)]), 0.008, 8, CB.M_DARK, C_STEEL,
+		# The hinge post runs from the exit ring's bottom to its top, a short arm onto the ring at each end (it had stopped
+		# 9cm short of the ring both ends, standing in the air behind the duct).
+		var ring_r: float = DUCT_R + th * 0.4
+		var dy: float = sqrt(ring_r * ring_r - sx * sx) - 0.004
+		var y_lo: float = DUCT_C.y - dy
+		var y_hi: float = DUCT_C.y + dy
+		b.tube(PackedVector3Array([Vector3(sx, y_lo, z1 + 0.035), Vector3(sx, y_hi, z1 + 0.035)]), 0.008, 8, CB.M_DARK, C_STEEL,
 				true, true)
+		for y in [y_lo, y_hi]:
+			b.tube(PackedVector3Array([Vector3(sx, y, z1), Vector3(sx, y, z1 + 0.035)]), 0.007, 8, CB.M_DARK, C_STEEL, true,
+					true)
 
 
 ## The propeller, its own mesh about its hub (the Prop node spins it about z): three carbon blades, twisted from a

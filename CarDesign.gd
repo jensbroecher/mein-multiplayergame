@@ -615,9 +615,10 @@ func face(b, q: Array, hint: Vector3, mat: int, col: Color) -> void:
 
 
 ## A coil-over shock from `lo` to `hi`: chrome shaft, damper body, spring seat and a spring in the
-## accent colour (M_ANODISED), a mount block at the top.
+## accent colour (M_ANODISED), a mount block at the top (`top_block` false leaves it off, for a car that builds its own
+## mount).
 func coilover(b, lo: Vector3, hi: Vector3, body_r: float, coil_r: float, turns: float,
-		alloy: Color, alloy_dark: Color, chrome: Color, dark: Color) -> void:
+		alloy: Color, alloy_dark: Color, chrome: Color, dark: Color, top_block := true) -> void:
 	var ax: Vector3 = (hi - lo).normalized()
 	var body_lo: Vector3 = lo.lerp(hi, 0.42)
 	b.tube(PackedVector3Array([lo, body_lo]), body_r * 0.43, 6, CB.M_CHROME, chrome, true, false)
@@ -628,7 +629,8 @@ func coilover(b, lo: Vector3, hi: Vector3, body_r: float, coil_r: float, turns: 
 			Vector2(0.004, coil_r * 1.2), Vector2(0.004, 0.0)]), 12, CB.M_ALLOY, alloy_dark)
 	b.orient_away_from(vb, ib, lo.lerp(hi, 0.16))
 	b.spring(lo.lerp(hi, 0.18), lo.lerp(hi, 0.94), coil_r, coil_r * 0.207, turns, CB.M_ANODISED, Color(1, 1, 1))
-	b.rbox(Transform3D(Basis(), hi + Vector3(-0.01, 0.012, 0.0)), Vector3(0.03, 0.01, 0.03), 0.006, 1, CB.M_DARK, dark)
+	if top_block:
+		b.rbox(Transform3D(Basis(), hi + Vector3(-0.01, 0.012, 0.0)), Vector3(0.03, 0.01, 0.03), 0.006, 1, CB.M_DARK, dark)
 
 
 # ============================================================================================
