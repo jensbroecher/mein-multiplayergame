@@ -1212,6 +1212,15 @@ in front of the water while driving (Msitu Falls, Bloombay Dunes). `canyon_river
   muddy spray off the rear wheels (the grit's particle set-up, so nothing new compiles) and splashes on entering at speed
   (`sounds/surfaces/puddle_splash_*.wav`). A top-down render against the computed map matched blob for blob.
 
+## Blasts' tumble
+
+- `apply_blast_impulse` (shockwaves, bombs, missiles) gives the car a push and a tumble (`air_angular_velocity`), which
+  only plays out in the air. A car the blast didn't lift (the shockwave's edge, a wall in the way) kept the tumble, and
+  its next jump, however much later, threw it about (the user found it). Now the tumble is dropped once the car has been
+  on the ground for `BLAST_SPIN_GROUND_LIFE` (0.3s, `_ground_settle`). `res://scratch/blast_spin_test.tscn -- [level=]
+  [wait=3] [lift=1]` (headless) blasts a car without lift and checks the tumble is gone; `lift=1` checks a real throw
+  still tumbles.
+
 ## The shield
 
 - PlayerCart's `_update_shield_visual` runs it from `is_shielded`'s changes on every peer: it forms (grows out of the car

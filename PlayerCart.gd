@@ -697,6 +697,9 @@ const MAX_DRIVABLE_SLOPE_NORMAL_Y: float = 0.75
 
 ## Mid-air tumbling angular velocity (rad/s in world space).
 var air_angular_velocity: Vector3 = Vector3.ZERO
+## How long the car has been on the ground since it last left it; a blast's tumble is dropped after BLAST_SPIN_GROUND_LIFE.
+var _ground_settle := 0.0
+const BLAST_SPIN_GROUND_LIFE := 0.3
 ## True while smoothing the car back onto its wheels after an inverted/tilted landing.
 var is_righting_on_ground: bool = false
 
@@ -2832,7 +2835,14 @@ func _physics_process(delta):
 			visuals.global_rotate(rot_axis, rot_angle)
 			air_angular_velocity = air_angular_velocity.lerp(Vector3.ZERO, 0.5 * delta)
 		is_righting_on_ground = false
+		_ground_settle = 0.0
 	else:
+		# A blast's tumble (apply_blast_impulse) is for the flight it throws the car into. A car the blast didn't lift
+		# (a shockwave's edge, a heavy car, a wall in the way) kept it, since it only ran down in the air, and the next
+		# jump, however many seconds later, threw the car about with it. On the ground for a moment, it is gone.
+		_ground_settle += delta
+		if _ground_settle > BLAST_SPIN_GROUND_LIFE:
+			air_angular_velocity = Vector3.ZERO
 		if not was_on_ground:
 			var time_since_respawn = (Time.get_ticks_msec() / 1000.0) - last_respawn_time
 			var is_descending = linear_velocity.y < -1.0 or linear_velocity.dot(-ground_normal) > 1.0
@@ -5717,6 +5727,7 @@ func apply_blast_impulse(impulse: Vector3):
 		return
 	if is_local_player or (is_ai and (multiplayer.multiplayer_peer == null or multiplayer.is_server())):
 		apply_central_impulse(impulse)
+		_ground_settle = 0.0
 		# Add rotational tumble so blast waves and explosions flip the car
 		air_angular_velocity = Vector3(
 			randf_range(-7.0, 7.0),
