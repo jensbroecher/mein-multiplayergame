@@ -3247,7 +3247,8 @@ A clip that comes out quiet (the bubble car's at -37.7 dBFS) is raised in the fi
     leg); the upper rear link has a clevis on the tub. Lights (`_spotlight`: a can, a chrome bezel, a lens, a stem and
     bracket): two spotlights on the hoop's top bar, two headlamps standing on the nose's bumper hoop (the old ones were
     inside the nose, unseen), and bigger taillamps on the duct's lower rim.
-  - The coil-overs' tops are eyes bolted between tabs (`_shock_eye`; `CarDesign.coilover(..., top_block = false)` leaves
+  - The coil-overs (`_shock`) run between eyes bolted between tabs (`_shock_eye`): the damper body stops under a domed cap
+    and the upper spring seat, a neck rising into the eye (run into the eye, its cut end read as cracked). (`_shock_eye`; `CarDesign.coilover(..., top_block = false)` leaves
     off its generic block): the fronts' on a shock tower, a plate down the cowl's flank from the deck to the frame rail;
     the rears' on the hoop's rear brace. Found floating and fixed with `scratch/loose_parts.py`: the fuel tank (now
     strapped, brackets to the hoop's legs), the rudders' hinge posts (now reaching the exit ring), the skid plate (flush

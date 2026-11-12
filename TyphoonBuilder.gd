@@ -209,6 +209,31 @@ func _side_parts(b) -> void:
 			CB.M_CHROME, C_CHROME)
 
 
+## A coil-over between two mounting eyes (centres `lo`, `hi`, bolts along `lo_axis`, `hi_axis`): the damper body stops
+## short of the top eye under a domed cap with the upper spring seat, and a short neck rises from the cap into the eye;
+## the shaft runs down into the bottom eye. (Run to the eye's centre, the body's cut end showed through the eye and
+## read as cracked.)
+func _shock(b, lo: Vector3, hi: Vector3, lo_axis: Vector3, hi_axis: Vector3, lo_r: float, hi_r: float, body_r: float,
+		coil_r: float, turns: float) -> void:
+	var ax := (hi - lo).normalized()
+	var top := hi - ax * (hi_r + 0.012)
+	coilover(b, lo, top, body_r, coil_r, turns, C_ALLOY, C_ALLOY_DARK, C_CHROME, C_DARK, false)
+	var vb: int = b.vertex_count()
+	var ib: int = b.index_count()
+	b.lathe(top, ax, PackedVector2Array([Vector2(-0.010, body_r + 0.0015), Vector2(0.0, body_r + 0.0015),
+			Vector2(0.004, body_r * 0.85), Vector2(0.007, body_r * 0.55), Vector2(0.008, 0.0)]), 14, CB.M_ALLOY,
+			C_ALLOY_DARK)
+	b.orient_away_from(vb, ib, top - ax * 0.004)
+	vb = b.vertex_count()
+	ib = b.index_count()
+	b.lathe(top - ax * 0.018, ax, PackedVector2Array([Vector2(-0.003, 0.0), Vector2(-0.003, coil_r * 1.2),
+			Vector2(0.003, coil_r * 1.2), Vector2(0.003, 0.0)]), 14, CB.M_ALLOY, C_ALLOY_DARK)
+	b.orient_away_from(vb, ib, top - ax * 0.018)
+	b.tube(PackedVector3Array([top, hi]), body_r * 0.45, 10, CB.M_ALLOY, C_ALLOY_DARK, false, false)
+	_shock_eye(b, lo, lo_axis, lo_r)
+	_shock_eye(b, hi, hi_axis, hi_r)
+
+
 ## A shock's mounting eye at `c`: a short ring round a bolt along `axis`, the bolt's ends showing either side.
 func _shock_eye(b, c: Vector3, axis: Vector3, r: float) -> void:
 	b.tube(PackedVector3Array([c - axis * 0.014, c + axis * 0.014]), r, 10, CB.M_ALLOY, C_ALLOY_DARK, true, true)
@@ -253,14 +278,15 @@ func _front_suspension(b) -> void:
 	# The coil-over stands on a bar across the lower wishbone's legs (it had ended between them), an eye on a bolt, and
 	# its top is bolted between two tabs on a shock tower: a plate down the cowl's flank from the deck to the frame rail
 	# (a block on the deck's edge read as not fixed to anything).
-	var shock_lo := Vector3(kx - 0.08, 0.169, az + 0.01)
+	var shock_lo := Vector3(kx - 0.08, 0.186, az + 0.01)
 	b.tube(PackedVector3Array([Vector3(shock_lo.x, 0.163, az - 0.036), Vector3(shock_lo.x, 0.163, az + 0.034)]), 0.008, 8,
 			CB.M_ALLOY, C_ALLOY, true, true)
+	for side in [-1.0, 1.0]:
+		b.rbox(Transform3D(Basis(), Vector3(shock_lo.x, 0.176, shock_lo.z + side * 0.016)), Vector3(0.012, 0.016, 0.003), 0.003,
+				1, CB.M_DARK, C_STEEL)
 	var tz := az + 0.13
 	var shock_hi := Vector3(0.250, 0.412, tz)
-	coilover(b, shock_lo, shock_hi, 0.014, 0.024, 7.0, C_ALLOY, C_ALLOY_DARK, C_CHROME, C_DARK, false)
-	_shock_eye(b, shock_lo, Vector3.BACK, 0.010)
-	_shock_eye(b, shock_hi, Vector3.BACK, 0.013)
+	_shock(b, shock_lo, shock_hi, Vector3.BACK, Vector3.BACK, 0.010, 0.013, 0.014, 0.024, 7.0)
 	b.rbox(Transform3D(Basis(), Vector3(0.219, 0.338, tz)), Vector3(0.004, 0.100, 0.032), 0.003, 1, CB.M_DARK, C_STEEL)
 	b.rbox(Transform3D(Basis(), Vector3(0.224, 0.436, tz)), Vector3(0.012, 0.004, 0.032), 0.003, 1, CB.M_DARK, C_STEEL)
 	for side in [-1.0, 1.0]:
@@ -291,13 +317,10 @@ func _rear_suspension(b) -> void:
 	var rear_hi := brace_p + Vector3(0.036, -0.004, 0.0)
 	var rear_lo := Vector3(kx - 0.02, TYRE_R_R + 0.03, az - 0.04)
 	var link_dir := (Vector3(kx, TYRE_R_R + 0.04, az - 0.01) - Vector3(0.24, 0.31, 0.06)).normalized()
-	_shock_eye(b, rear_hi, Vector3.BACK, 0.015)
-	_shock_eye(b, rear_lo, link_dir.cross(Vector3.UP).normalized(), 0.012)
+	_shock(b, rear_lo, rear_hi, link_dir.cross(Vector3.UP).normalized(), Vector3.BACK, 0.012, 0.015, 0.017, 0.028, 8.0)
 	for side in [-1.0, 1.0]:
 		b.rbox(Transform3D(Basis(), brace_p + Vector3(0.020, -0.004, side * 0.021)), Vector3(0.030, 0.016, 0.003), 0.003, 1,
 				CB.M_DARK, C_STEEL)
-	coilover(b, rear_lo, rear_hi, 0.017, 0.028, 8.0,
-			C_ALLOY, C_ALLOY_DARK, C_CHROME, C_DARK, false)
 
 
 func _centre_parts(b) -> void:
