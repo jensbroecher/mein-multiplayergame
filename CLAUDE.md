@@ -3239,6 +3239,9 @@ A clip that comes out quiet (the bubble car's at -37.7 dBFS) is raised in the fi
   - The wing mirrors have chrome glass on the back of the housing, turned in toward the driver (`MIRROR_YAW`) and tipped
     up (`MIRROR_TILT`): level, the glass reflected the sky's dark ground under the horizon, both from the driver's eye
     and the chase camera, and read as a black panel. Mirror glass on other cars wants the same tip up.
+  - The roll hoop's forward braces bend down onto foot plates bolted to the cowl (`BRACE_FOOT`, with a gusset): they had
+    ended square at the sill's height 2cm outboard of it, in the air. `res://scratch/mesh_ray_probe.gd` (`-s`, headless,
+    `-- <mesh.res> x,z ...`) prints every height a downward ray meets on a mesh, to seat a part on a body.
 
 ## Canyon Chasm dirt ramps, rocks, signs, tornado and houses
 

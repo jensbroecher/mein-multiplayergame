@@ -50,6 +50,8 @@ const PROP_POS := Vector3(0.0, 0.600, 0.790)
 const HOOP_Z := 0.160
 const HOOP_TOP := 0.840
 const HOOP_X := 0.205
+## Where the hoop's forward brace is bolted down on the cowl.
+const BRACE_FOOT := Vector3(0.195, 0.449, -0.575)
 
 # Tyres: half their profile, bead to tread centre: skinny ribbed fronts, smooth balloon sand tyres behind.
 const TYRE_F := [[-0.040, 0.130], [-0.044, 0.142], [-0.046, 0.160], [-0.045, 0.178], [-0.040, 0.192], [-0.028, 0.198],
@@ -163,8 +165,18 @@ func _side_parts(b) -> void:
 	b.tube(_rounded([Vector3(0.235, 0.26, HOOP_Z), Vector3(0.225, 0.62, HOOP_Z), Vector3(HOOP_X, HOOP_TOP, HOOP_Z)], 0.06),
 			0.018, 12, CB.M_ANODISED, Color(1, 1, 1), true, false)
 	# A brace from the hoop forward to the dash, one back down to the rail.
-	b.tube(PackedVector3Array([Vector3(0.22, 0.60, HOOP_Z), Vector3(0.24, 0.45, -0.45)]), 0.012, 8, CB.M_ANODISED,
-			Color(1, 1, 1), false, true)
+	# It lands on the cowl just ahead of the cockpit's opening (the deck there is about 0.447 up, 0.17-0.22 out), bolted
+	# down through a foot plate: it had ended at the sill's height 2cm outboard of it, in the air.
+	b.tube(_rounded([Vector3(0.22, 0.60, HOOP_Z), BRACE_FOOT + Vector3(0.002, 0.034, 0.024), BRACE_FOOT + Vector3(0, 0.002, -0.004)],
+			0.025), 0.012, 8, CB.M_ANODISED, Color(1, 1, 1), false, false)
+	# A gusset welded under the bend onto the plate.
+	b.rbox(Transform3D(Basis(Vector3.RIGHT, 0.5), BRACE_FOOT + Vector3(0.001, 0.014, 0.022)), Vector3(0.0025, 0.012, 0.014),
+			0.002, 1, CB.M_ANODISED, Color(1, 1, 1))
+	var foot_xf := Transform3D(Basis(Vector3.RIGHT, -0.06), BRACE_FOOT)
+	b.rbox(foot_xf, Vector3(0.020, 0.004, 0.030), 0.003, 1, CB.M_DARK, C_STEEL)
+	for bz in [-0.019, 0.019]:
+		b.lathe(foot_xf * Vector3(0.0, 0.004, bz), Vector3.UP, PackedVector2Array([Vector2(0.0, 0.0045), Vector2(0.003, 0.004),
+				Vector2(0.004, 0.0)]), 8, CB.M_CHROME, C_CHROME)
 	b.tube(PackedVector3Array([Vector3(0.21, 0.78, HOOP_Z + 0.01), Vector3(0.23, 0.30, 0.56)]), 0.012, 8, CB.M_DARK, C_STEEL,
 			false, false)
 	# The duct's struts: from the hoop's top back to its upper side, from the rail's end to its lower side.
@@ -184,7 +196,7 @@ func _side_parts(b) -> void:
 	b.rbox(Transform3D(Basis(), _duct_point(-1.15, DUCT_C.z + DUCT_D * 0.5 + 0.006)), Vector3(0.028, 0.012, 0.006), 0.004, 1,
 			CB.M_TAILLAMP, C_TAILLAMP)
 	# Mirror on a stalk off the hoop's brace.
-	b.tube(PackedVector3Array([Vector3(0.235, 0.52, -0.20), Vector3(0.30, 0.58, -0.24)]), 0.006, 6, CB.M_DARK, C_DARK, false,
+	b.tube(PackedVector3Array([Vector3(0.208, 0.528, -0.20), Vector3(0.30, 0.58, -0.24)]), 0.006, 6, CB.M_DARK, C_DARK, false,
 			false)
 	# The housing is turned in (MIRROR_YAW) halfway between straight back and the driver's head, so its glass, on the
 	# back (+z) face, shows the driver what's behind; chrome, it reflects the sky and the country round it.
