@@ -1144,7 +1144,7 @@ in front of the water while driving (Msitu Falls, Bloombay Dunes). `canyon_river
 - Music: `tools/elevenlabs/generate_music.mjs` composes tracks with ElevenLabs Music (`client.music.compose`) from
   `music.json` (name, path, prompt, seconds), always with `forceInstrumental` (the user wants no vocals or lyrics in the
   game's music), as MP3 (mp3_44100_192), skipping files already made. The Kronburg GP's three (`music/kronburg/`:
-  Schichtwechsel, Abendrot am Rhein, Kleeblatt) were made so: `MusicManager.STAGE_TRACKS["kronburg"]` and `["rheinufer"]`.
+  Schichtwechsel, Abendrot am Rhein, Kleeblatt) were made so, and the Headquarters' two (`music/headquarters/`): `MusicManager.STAGE_TRACKS["kronburg"]` and `["rheinufer"]`.
 
 ## Surfaces: skid marks, sliding sounds and spray
 
@@ -2875,6 +2875,10 @@ The menus call it the Headquarters (the main menu's tile, its HUD title, the loa
   by `scratch/garage_sound_prep.py` (mono, the lead-in cut, raised: they came 25-45 dB quiet); the clack is synthesised
   (`scratch/garage_lock_click.py`). `res://scratch/garage_sound_check.tscn` (headless, `--fixed-fps 60`) runs a lift up,
   down and reversed and the line-up out and in, and prints every sound with its level and place.
+- Music: its own laid-back playlist while it is open (`MUSIC_FOLDER`, `music/headquarters/`: Showroom Drift, a chillhop
+  groove with Rhodes, and Afternoon Light, downtempo with vibraphone; ElevenLabs Music, instrumental, `hq_*` jobs in
+  `music.json`, RMS -16 and -19 dBFS against the race tracks' -12 to -14), started in `start()`, stopped as it is
+  freed; the menu has none. `garage_flow_test` checks both.
 - Cost (M1, 2880x1800): 60 fps, 6.8-10.9ms GPU (the most at the entrance, looking through the roof). Touch has no
   controls in it yet.
 - `res://scratch/garage_shots.tscn -- <dir> [trophies=demo] walk:<name>:x,z:yaw[:pitch] inspect:<name>:<car>[:yaw:pitch:dist]

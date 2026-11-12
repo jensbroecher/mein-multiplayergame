@@ -58,5 +58,17 @@
     "path": "music/miyoshino/Above_the_Clouds.mp3",
     "prompt": "Instrumental epic racing game finale track for a hill climb up a sacred Japanese mountain through fog to a sunrise above the clouds: starts tense and misty with low taiko and a distant conch-horn-like synth, grows into a soaring heroic theme with koto, shakuhachi, big orchestral strings and a fast driving electronic beat, triumphant final chorus. 146 BPM. No vocals, no lyrics, no voice samples.",
     "seconds": 180
+  },
+  {
+    "name": "hq_showroom_drift",
+    "path": "music/headquarters/Showroom_Drift.mp3",
+    "prompt": "Instrumental laid-back chill lounge track for strolling through a sunny modern car museum and its garden plaza. Mellow chillhop groove with a soft dusty drum beat, warm round electric bass, Rhodes electric piano chords, gentle jazzy guitar licks and soft airy synth pads, relaxed and sunny, unhurried, cozy and elegant. 82 BPM. No vocals, no lyrics, no voice samples.",
+    "seconds": 180
+  },
+  {
+    "name": "hq_afternoon_light",
+    "path": "music/headquarters/Afternoon_Light.mp3",
+    "prompt": "Instrumental calm downtempo ambient track for a relaxed afternoon in a glass-roofed showroom beside a fountain and blossoming trees. Soft brushed drums and a slow head-nodding beat, warm muted bass, dreamy vibraphone and mellow piano melodies over lush evolving synth pads, a light breezy summer feel, peaceful and chill, never building to anything loud. 76 BPM. No vocals, no lyrics, no voice samples.",
+    "seconds": 180
   }
 ]

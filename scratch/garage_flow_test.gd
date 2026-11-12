@@ -29,6 +29,9 @@ func _ready() -> void:
 	_check(main.garage != null and main.garage._started, "garage opened and started")
 	var g = main.garage
 	_check(g._bays.size() == CC.CAR_PRESETS.size(), "a bay per car (%d)" % g._bays.size())
+	var ap: AudioStreamPlayer = MusicManager.active_player
+	var track: String = ap.stream.resource_path if ap and ap.stream else ""
+	_check(ap != null and ap.playing and track.begins_with("res://music/headquarters/"), "its own music plays (%s)" % track)
 	var fulmine := -1
 	for i in g._bays.size():
 		if str(CC.CAR_PRESETS[g._bays[i]["index"]].name) == "Fulmine":
@@ -50,6 +53,7 @@ func _ready() -> void:
 	print("after Esc: leaving=%s garage=%s busy=%s" % [str(g._leaving) if is_instance_valid(g) else "freed", str(main.garage), str(main.screen_transition.busy)])
 	await get_tree().create_timer(3.0).timeout
 	_check(main.garage == null and main.main_menu.visible, "Esc went back to the menu")
+	_check(not MusicManager.active_player.playing and not MusicManager.inactive_player.playing, "its music stopped on leaving")
 	# The car select screen offers the line-up only.
 	main.car_selection.show()
 	await _frames(5)

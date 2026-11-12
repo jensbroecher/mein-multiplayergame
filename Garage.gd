@@ -146,6 +146,7 @@ const STEP_LENGTH_RUN := 1.55
 const BOB_DROP := 0.018
 const BOB_SWAY := 0.009
 const BOB_RUN := 1.6
+const MUSIC_FOLDER := "res://music/headquarters/"
 const STEP_SOUNDS := ["res://sounds/garage/footstep_1.mp3", "res://sounds/garage/footstep_2.mp3"]
 const STEP_DB := -10.0
 ## The lifts' and the line-up's sounds (sounds/garage/: tools/elevenlabs' garage_* jobs readied by
@@ -275,10 +276,15 @@ func _ready() -> void:
 func start() -> void:
 	_started = true
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	# Its own laid-back music (music/headquarters/, ElevenLabs Music, instrumental), shuffled; the menu has none.
+	MusicManager._load_playlist(MUSIC_FOLDER)
+	MusicManager.play_next()
 
 
 func _exit_tree() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if _started:
+		MusicManager.stop_music()
 
 
 func _process(delta: float) -> void:
