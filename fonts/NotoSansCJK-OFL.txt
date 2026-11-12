@@ -1,4 +1,4 @@
-Copyright 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'. Noto Sans CJK SC (subset for Tianqiao's signs: NotoSansSC-Tianqiao.otf).
+Copyright 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'. Noto Sans CJK SC (subset for the Yunhai GP's signs: NotoSansSC-Yunhai.otf).
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

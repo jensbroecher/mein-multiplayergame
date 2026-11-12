@@ -4818,10 +4818,10 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
 - Buildings are `MegacityKit.gd` (game metres, world space, one `PropKit` per key) drawn by `megacity_tower.gdshader`
   (styles by COLOR.a x 8: office glass, flats, LED media facade, shop fronts, the mall's lit interior, concrete, cladding
   with an LED line; UV.x carries the building's number x 1000), neon by `neon_emissive.gdshader` and Label3D signs in
-  Noto Sans CJK SC (`fonts/NotoSansSC-Tianqiao.otf`, a subset of only the characters the generator uses, made with
-  pyftsubset from the system's NotoSansCJK-Bold.ttc, font number 2; OFL text in `fonts/NotoSansCJK-OFL.txt`; new
-  characters in signs need a new subset). The generator reads the .otf into a FontFile and saves it as
-  `generated/tianqiao_cjk_font.res` (in `_build_dressing`: the run clears the stage's old files after `_configure`).
+  Noto Sans CJK SC (see "The Yunhai GP's stage base" below).
+- The shared parts (the city, the river, the night, `_deck`, `_roof`, the font) live in `YunhaiStage.gd`; Tianqiao keeps
+  its towers, mall, aquarium, street and park, and `_plot_tweak` gives the blocks along the night-market street shop
+  podiums.
 - Runtime colliders: DressingColliders makes every prop mesh solid unless its name holds a skip word, and Level's
   collision builder gives anything named "ramp" or "loop" a convex hull (a "hall_ramp" prop became one blob filling the
   atrium). So every deck prop's key starts with "deck" or holds it (`deck_skyway_s1`, `hall_decks`, `roof_deck`, ...)
@@ -4839,3 +4839,42 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
 - Music: the night folder's two tracks (`MusicManager.STAGE_TRACKS["tianqiao"]`) until the stage has its own.
 - The menu tiles: `tile_tianqiao.jpg` (`menu_tile_shot`'s `STAGES` focus on the towers, spiral and mall) and
   `tile_yunhai_gp.jpg` (a copy of it until the cup has more stages).
+
+## The Yunhai GP's stage base (YunhaiStage.gd)
+
+- `YunhaiStage.gd` (on `MiyoshinoStage.gd`) holds what the Yunhai stages share: the flat street grid
+  (`megacity_ground.gdshader`, `grid_origin`/`grid_cell`/`grid_street`, a park's lawns `park_rect`), the river
+  (`river_pts`) under a dark mirror, hills round the far city, the night (`_environment`, which a stage can take with
+  `super()` and change), the city's blocks (`_build_city` round `city_mid` to `city_near`, kept off `_reserved` and
+  under the lap; `_plot_tweak` per plot) and skyline (`_build_skyline`), decks (`_deck`: slab, glass or concrete
+  parapets with an LED line on top, LED strips, columns kept off lower stretches of the lap by `_col_ok` and off what a
+  stage's `_col_blocked` says; `pier_style` 1 for motorway hammerhead piers), roofs (`_roof`), crowd lines.
+- The signs' font: `fonts/NotoSansSC-Yunhai.otf`, Noto Sans CJK SC Bold cut down to ASCII and the characters the Yunhai
+  generators use. After adding a sign with new characters run `scratch/yunhai_font_subset.sh` (pyftsubset, the
+  system's NotoSansCJK-Bold.ttc face 2), then regenerate. `_load_cjk_font` (in `_build_dressing`: the run clears the
+  stage's old files after `_configure`) reads it into a FontFile saved as `generated/<stem>_cjk_font.res`, so the
+  generator needs no import of it. OFL text in `fonts/NotoSansCJK-OFL.txt`.
+
+## Panlong Interchange (Yunhai GP, stage 2)
+
+- `regenerate_panlong.gd` (`regenerate_panlong.tscn`, headless, about 20s) builds `levels/PanlongLevel.tscn`: laps (3km)
+  of a made-up five-level motorway interchange at the blue hour. The user picked it from four ideas for stage 2 (the
+  interchange, a cliff town of stilt houses by the river, racing the monorail through a block of flats, the river's
+  banks in morning fog); the others are open for later stages.
+- The lap turns left eight times (`corners`), twice round, crossing itself three times: the start straight on the
+  ground (z 0) under the west leg (x -150, 22m) and the north leg (x 120, 12m), and the low leg (z -160, 12m) under the
+  west leg. Heights are `KNOTS` (plan points well clear of the crossings, lap order) interpolated round the closed lap
+  and rounded; every stretch over 2.5m is an ungraded bridge, and so is the start straight over the cutting.
+- The unfinished ramp on the top leg (z -300): a 28m gap after a kicker (`JUMP_LIP`, `JUMP_GAP`), the deck ends cut
+  square with starter bars and chevrons, red lamps, a 前方施工 ("works ahead") board.
+- Around it: the Nanbin Expressway sunk in a cutting along x 0 (`CUT_*`: the ground cut in `_natural`, walls, the grid's
+  streets crossing on bridges), the Yunhai Ring Expressway at 36m along z -60 over everything (`RING_*`, piers kept off
+  the lap's legs and the cutting), both with AutobahnTraffic.gd traffic (CampKit's vans and SUVs at PROP_SCALE with
+  head- and tail-lights added, no sound), green sign gantries over the lap (`GANTRIES`), lamp posts, four LED
+  billboards, a footbridge over the start straight with people on it, pines, maples, bamboo and a few cherries on the
+  lawns inside the knot (`KNOT_RECT`), the city round it.
+- AI races (`scratch/ai_race_test`, speed=2): every bot finishes three laps in 64-82s each; the kicker is crossed at
+  41-58 m/s and one bot in six fell short of the landing once.
+- `fall_respawn_drop` is 9m: a cart off the coil respawns before it reaches the lawn. One that drops off an upper leg
+  onto a lower stretch of the lap is on the track there and drives on (the gates then count it as having missed one).
+- Music: the night folder's two tracks (`STAGE_TRACKS["panlong"]`) until it has its own. Menu tile: `tile_panlong.jpg`.
