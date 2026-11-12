@@ -398,7 +398,7 @@ func _build_page(menu_name: String) -> void:
 				show_sub_menu("coop_config")
 			)
 			_add_tile("MULTIPLAYER", "Host or join a LAN race", "scene:multiplayer", COL_MAGENTA, _on_multiplayer_pressed)
-			_add_tile("GARAGE", "Walk your collection, pick the line-up, see your trophies", "tile_garage.jpg", COL_BRONZE, func():
+			_add_tile("HEADQUARTERS", "Walk your collection, pick the line-up, see your trophies", "tile_garage.jpg", COL_BRONZE, func():
 				garage_pressed.emit()
 			)
 			_add_tile("SPECTATOR", "Watch 6 AI racers — pick any course", "scene:spectator", COL_CYAN, func():

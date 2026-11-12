@@ -61,7 +61,7 @@ func _ready() -> void:
 	garage.start()
 	for i in 30:
 		await get_tree().process_frame
-	print("hall: concourse ends (trophy hall's front wall) at z %.2f, hall %.0fm deep" % [garage._spine_end, garage.HALL_D])
+	print("hall: concourse ends (trophy hall's front wall) at z %.2f, hall %.0fm deep" % [garage._spine_end, garage._hall_d])
 	for step in steps:
 		var p: PackedStringArray = step.split(":")
 		match p[0]:

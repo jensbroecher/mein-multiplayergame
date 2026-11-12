@@ -159,7 +159,7 @@ func _on_menu_options_pressed():
 func _on_menu_garage_pressed() -> void:
 	if screen_transition.busy or garage != null:
 		return
-	await _show_loading("Opening the garage")
+	await _show_loading("Opening the headquarters")
 	main_menu.hide()
 	garage = GARAGE_SCRIPT.new()
 	garage.name = "Garage"

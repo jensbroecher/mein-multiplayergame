@@ -641,7 +641,8 @@ func build_wheel(b, side: float) -> void:
 	# 3. Brake Rotor & Caliper
 	# -------------------------------------------------------------------------
 	# Dark ventilated brake rotor
-	b.disc(Vector3(0.025, 0.0, 0.0), Vector3.RIGHT, 0.134, 0.045, 32, CB.M_DARK, C_DARKER)
+	# Out to the barrel and in to the axle: a ring open either side showed through the wheel.
+	b.disc(Vector3(0.025, 0.0, 0.0), Vector3.RIGHT, 0.142, 0.0, 32, CB.M_DARK, C_DARKER)
 	# Racing caliper at 2 o'clock
 	var cal_angle := PI * 0.35
 	var cal_pos := Vector3(0.038, sin(cal_angle) * 0.115, cos(cal_angle) * 0.115)
@@ -659,7 +660,7 @@ func build_wheel(b, side: float) -> void:
 	var vb: int = b.vertex_count()
 	var ib: int = b.index_count()
 	b.lathe(Vector3(0.072, 0.0, 0.0), Vector3.RIGHT, PackedVector2Array([
-		Vector2(0.0, 0.036), Vector2(0.006, 0.030), Vector2(0.010, 0.018), Vector2(0.012, 0.0)
+		Vector2(0.0, 0.039), Vector2(0.006, 0.030), Vector2(0.010, 0.018), Vector2(0.012, 0.0)
 	]), 18, CB.M_DARK, C_STEEL)
 	b.orient_away_from(vb, ib, Vector3(0.05, 0.0, 0.0))
 

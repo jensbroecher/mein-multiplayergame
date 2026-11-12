@@ -2786,7 +2786,10 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
 
 ## The garage (Garage.gd)
 
-- A walk-in car collection, from the main menu's GARAGE tile (`MainMenu.garage_pressed`, `Main._on_menu_garage_pressed`:
+The menus call it the Headquarters (the main menu's tile, its HUD title, the loading text); files and code keep
+"garage" (`Garage.gd`, `tile_garage.jpg`, settings.cfg's `[garage]`).
+
+- A walk-in car collection, from the main menu's HEADQUARTERS tile (`MainMenu.garage_pressed`, `Main._on_menu_garage_pressed`:
   built under the loading screen, since it loads every car; `finished` swipes back to the menu, waiting out a swipe
   still running). Built in code in its own world (a SubViewport), like the podium; first person (a CharacterBody3D).
 - Scale: the walker and the building are life size; the cars are large-scale RC cars. On the courses people and props
@@ -2802,6 +2805,14 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   saved paint, angled toward the way in. Walls are cut into pieces of 8m at most and floors into 8m tiles, so no mesh
   takes in more lights than the mobile renderer gives one. `garage_floor.gdshader` is polished concrete (and the
   forecourt's paving) in world space.
+- The plaza (`_build_plaza`, `PLAZA_*`), seen through the foyer's glazed front (`FRONT_GLASS_*`: glass either side of
+  the doors and over them) and the glass roof: granite paving to the road, an avenue of London planes in iron tree
+  grates with benches and lamps between them, a fountain on the axis (`fountain_water.gdshader`, as Estación Seca's,
+  and its sound), the RC Vibe GP logo on a plinth facing the doors between two weeping cherries, Japanese maples in
+  planters either side of the doors, azalea beds, two RC Vibe GP flags and bollards at the kerb, birches on the lawns.
+  The trees are the courses' own (WoodlandBuilder, MiyoshinoTrees) baked by `regenerate_headquarters_trees.gd` (`-s`,
+  headless, 10s) into `generated/headquarters_tree_*.res`; they had been spheres on cylinders. Nothing outside is
+  solid (nobody walks out there).
 - `garage_sky.gdshader` is two skies: the radiance cubemap (`AT_CUBEMAP_PASS`: reflections and ambient) is the car
   select screen's studio, so the paint keeps its soft-box highlights in the closed galleries; what the eye sees through
   the roof and the doors is a summer sky with cumulus and the sun. The sun (a DirectionalLight) lights only
@@ -2825,7 +2836,8 @@ at what's needed to reach the top. Ramps and jump lips are untouched. `res://scr
   easing in and out with the speed (motion comfort: the user asked for a light one). `res://scratch/garage_steps_test.tscn`
   (headless, `--fixed-fps 60`) walks and runs with real key events and prints the cadence, dip and sway.
 - Time trial records (`TimeTrialRecords.gd`): a board per Grand Prix on the trophy hall's side walls
-  (`_build_record_boards`, `RECORD_BOARD_*`), each stage's best run and best lap, the car and date, reading round the
+  (`_build_record_boards`, `RECORD_BOARD_*`; the hall is as deep as half the cups' boards need, `_hall_d`, at least
+  `HALL_D_MIN`: at a fixed 16m the 8 cups' boards ran past the walls' ends), each stage's best run and best lap, the car and date, reading round the
   hall from the door (down the left wall, the cups, back up the right). `garage_shots ... trophies=demo` records
   made-up runs too (and prints where the hall is).
 - Trophies (`Trophies.gd`, user://trophies.cfg): `Main._show_gp_podium_impl` records one per finished Grand Prix for
@@ -3019,6 +3031,14 @@ A clip that comes out quiet (the bubble car's at -37.7 dBFS) is raised in the fi
   `scratch/antenna_check.gd` (`-s`, headless, `-- [cars=...]`) measures every car's foot against its body and anything
   in the rod's way; `scratch/car_preview.gd ... antenna=1` renders the antenna on the car. Ten cars' feet floated up to
   9cm, one was sunk 5.6cm and the Titan's rod grazed its bed rail before they were set by it.
+- Every wheel has its rim's face on the inside too: `regenerate_cars.gd` calls `CarBuilder.mirror_wheel_face(side)` on
+  each wheel it builds, which copies every non-rubber triangle on the face's half (inside the bead, or a lip a little
+  over it) mirrored across the axle's middle, pressed flatter if it would reach past the tyre's inner sidewall, and
+  gives inner-half discs facing the face (a dark well behind the spokes) a back face. The builders had built the face
+  on the outside alone, one-sided, so from the car's side (under it, on the lift, a wheel turned) the rim was hollow and
+  see-through. A builder that mirrors its faces itself says so with `wheel_faces_both_sides()` (the Typhoon).
+  `res://scratch/wheel_sides_sheet.gd` (`-s`, windowed, `--resolution 1600x2400`, `-- <out.png> [cars=apex,...] [cols=8]`)
+  renders every car's wheels from outside and inside on a magenta card: magenta between the spokes is see-through.
 - A builder with `build_rear_wheel()` gets its own rear wheel meshes (`<prefix>_rear_wheel_l/r.res`) on `Wheel_RL`/`RR`;
   the others share one wheel mesh at all four corners.
 - The Nocturne (a 917K-style short-tail coupé on slicks) keys its section like the Inferno's, but above the side runs a

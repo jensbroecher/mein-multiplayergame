@@ -4,35 +4,35 @@
 [ext_resource type="ArrayMesh" path="res://generated/cars/phantom_wheel_l.res" id="2_c7bh7"]
 [ext_resource type="ArrayMesh" path="res://generated/cars/phantom_wheel_r.res" id="3_qptdi"]
 
-[node name="Phantom" type="Node3D" unique_id=983915066]
+[node name="Phantom" type="Node3D" unique_id=420059179]
 metadata/procedural_car = true
 
-[node name="Model" type="Node3D" parent="." unique_id=747093633]
+[node name="Model" type="Node3D" parent="." unique_id=780575843]
 transform = Transform3D(-0.5, 0, -4.371139e-08, 0, 0.5, 0, 4.371139e-08, 0, -0.5, 0, 0, 0)
 
-[node name="Body" type="MeshInstance3D" parent="Model" unique_id=638177689]
+[node name="Body" type="MeshInstance3D" parent="Model" unique_id=1580087619]
 mesh = ExtResource("1_fv5nn")
 metadata/car_shader = true
 
-[node name="Wheel_FL" type="MeshInstance3D" parent="Model" unique_id=1989961781]
+[node name="Wheel_FL" type="MeshInstance3D" parent="Model" unique_id=515098891]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4575, 0.27, -0.741)
 mesh = ExtResource("2_c7bh7")
 metadata/car_shader = true
 
-[node name="Wheel_FR" type="MeshInstance3D" parent="Model" unique_id=304673830]
+[node name="Wheel_FR" type="MeshInstance3D" parent="Model" unique_id=1066765496]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.4575, 0.27, -0.741)
 mesh = ExtResource("3_qptdi")
 metadata/car_shader = true
 
-[node name="Wheel_RL" type="MeshInstance3D" parent="Model" unique_id=1401509514]
+[node name="Wheel_RL" type="MeshInstance3D" parent="Model" unique_id=1174038845]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4575, 0.27, 0.685)
 mesh = ExtResource("2_c7bh7")
 metadata/car_shader = true
 
-[node name="Wheel_RR" type="MeshInstance3D" parent="Model" unique_id=1339487024]
+[node name="Wheel_RR" type="MeshInstance3D" parent="Model" unique_id=612675646]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.4575, 0.27, 0.685)
 mesh = ExtResource("3_qptdi")
 metadata/car_shader = true
 
-[node name="AntennaPlacement" type="Node3D" parent="Model" unique_id=688337031]
+[node name="AntennaPlacement" type="Node3D" parent="Model" unique_id=669716936]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.37, 1.096, 0.9)

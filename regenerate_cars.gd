@@ -68,6 +68,11 @@ static func build_car(builder_script: Script) -> Dictionary:
 	design.build_wheel(wr, 1.0)
 	var wl := CB.new()
 	design.build_wheel(wl, -1.0)
+	# The rim's face on the inside too (CarBuilder.mirror_wheel_face), unless the builder made both itself.
+	var both_faces: bool = design.has_method("wheel_faces_both_sides") and design.wheel_faces_both_sides()
+	if not both_faces:
+		wr.mirror_wheel_face(1.0)
+		wl.mirror_wheel_face(-1.0)
 	var out := {
 		"body": body.commit(mat), "wheel_r": wr.commit(mat), "wheel_l": wl.commit(mat),
 		"material": mat, "detail": tex, "detail_image": detail, "design": design,
@@ -78,6 +83,9 @@ static func build_car(builder_script: Script) -> Dictionary:
 		design.build_rear_wheel(rr, 1.0)
 		var rl := CB.new()
 		design.build_rear_wheel(rl, -1.0)
+		if not both_faces:
+			rr.mirror_wheel_face(1.0)
+			rl.mirror_wheel_face(-1.0)
 		out["rear_wheel_r"] = rr.commit(mat)
 		out["rear_wheel_l"] = rl.commit(mat)
 		out["triangles"] += rr.triangle_count() + rl.triangle_count() - wr.triangle_count() - wl.triangle_count()

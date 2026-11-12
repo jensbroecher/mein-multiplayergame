@@ -363,6 +363,90 @@ func orient_toward(v_from: int, i_from: int, dir: Vector3) -> void:
 		flip(v_from, i_from)
 
 
+## Gives a finished wheel (its axle along x, its face toward `side`) the same face on its inside: every triangle
+## inside the tyre's bead (or its rim's lip, a little over it) that isn't rubber and lies wholly on the face's half is copied, mirrored across x = 0.
+## A face reaching out further than the tyre's inner sidewall reaches in is pressed flatter to fit inside it (its
+## depth only). The builders built the face on the outside alone, one-sided, so seen from the car's side the rim
+## was see-through between its spokes. Returns how many triangles it added.
+func mirror_wheel_face(side: float) -> int:
+	var bead := INF
+	var outer := 0.0
+	var tyre_in := 0.0
+	for k in _v.size():
+		if int(_uv2[k].x) == M_RUBBER:
+			var r: float = Vector2(_v[k].y, _v[k].z).length()
+			bead = minf(bead, r)
+			outer = maxf(outer, r)
+			tyre_in = minf(tyre_in, side * _v[k].x)
+	if bead == INF or tyre_in >= -0.005:
+		return 0
+	# The rim's lip may lie over the bead; the tread (grooves, bolts on it) is well outside.
+	var rim_reach: float = bead + 0.35 * (outer - bead)
+	var picked: Array[int] = []
+	var backed: Array[int] = []
+	var reach := 0.0
+	for t in range(0, _i.size(), 3):
+		var ok := true
+		var c := Vector3.ZERO
+		var nsum := Vector3.ZERO
+		var lo := INF
+		var hi := -INF
+		for j in 3:
+			var k: int = _i[t + j]
+			if int(_uv2[k].x) == M_RUBBER:
+				ok = false
+				break
+			c += _v[k]
+			nsum += _n[k]
+			lo = minf(lo, side * _v[k].x)
+			hi = maxf(hi, side * _v[k].x)
+		if not ok or Vector2(c.y, c.z).length() / 3.0 > rim_reach:
+			continue
+		if lo >= -1e-5:
+			picked.append(t)
+			reach = maxf(reach, hi)
+		elif hi <= 1e-5 and side * nsum.normalized().x > 0.7:
+			# On the inner half facing the face (a dark well behind the spokes): from the car's side it was culled.
+			backed.append(t)
+	if picked.is_empty() and backed.is_empty():
+		return 0
+	var room: float = -tyre_in * 0.9
+	var squash: float = 1.0 if reach <= room else room / reach
+	var remap := {}
+	var ni := _i.size()
+	for t in picked:
+		var ids: Array[int] = []
+		for j in 3:
+			var k: int = _i[t + j]
+			if not remap.has(k):
+				remap[k] = _v.size()
+				var p: Vector3 = _v[k]
+				var n: Vector3 = _n[k]
+				_v.append(Vector3(-p.x * squash, p.y, p.z))
+				_n.append(Vector3(-n.x / squash, n.y, n.z).normalized())
+				_uv.append(_uv[k])
+				_uv2.append(_uv2[k])
+				_c.append(_c[k])
+			ids.append(remap[k])
+		# Mirroring flips handedness: swap two corners to keep the faces outward.
+		_i.append(ids[0])
+		_i.append(ids[2])
+		_i.append(ids[1])
+	for t in backed:
+		var base: int = _v.size()
+		for j in 3:
+			var k: int = _i[t + j]
+			_v.append(_v[k])
+			_n.append(-_n[k])
+			_uv.append(_uv[k])
+			_uv2.append(_uv2[k])
+			_c.append(_c[k])
+		_i.append(base)
+		_i.append(base + 2)
+		_i.append(base + 1)
+	return (_i.size() - ni) / 3
+
+
 func vertex_count() -> int:
 	return _v.size()
 

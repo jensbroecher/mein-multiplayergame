@@ -545,6 +545,11 @@ func build_prop(b) -> void:
 	b.orient_away_from(vb2, ib2, Vector3(0, 0, 0.02))
 
 
+## Its wheels mirror their faces themselves (regenerate_cars.gd leaves them as they are).
+func wheel_faces_both_sides() -> bool:
+	return true
+
+
 ## Front wheels: a skinny ribbed tyre round a five-spoke alloy rim, the rim's face the same on both sides (built on
 ## the +x side, mirrored across), so the wheel reads alike from inside the car and out.
 func build_wheel(b, side: float) -> void:

@@ -1333,5 +1333,5 @@ func _build_tt_results(results_data: Array) -> void:
 	recs.add_child(_results_label("LAP RECORD  %s" % TTR.format_ms(lap_record), 0, HORIZONTAL_ALIGNMENT_RIGHT, COL_T_DIM, 15, true))
 	box.add_child(recs)
 	var runs := int(rec["runs"])
-	var sub := "%d RUN%s ON THIS STAGE  ·  RECORDS IN THE GARAGE'S HALL OF FAME" % [runs, "" if runs == 1 else "S"]
+	var sub := "%d RUN%s ON THIS STAGE  ·  RECORDS IN THE HEADQUARTERS' HALL OF FAME" % [runs, "" if runs == 1 else "S"]
 	box.add_child(_results_label(sub, 0, HORIZONTAL_ALIGNMENT_CENTER, Color(COL_T_DIM, 0.75), 12))

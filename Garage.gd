@@ -1,16 +1,16 @@
 extends Control
-## The garage: a hall the player walks through (first person) to look at their cars, choose which ones
+## The garage (the menus call it the Headquarters): a hall the player walks through (first person) to look at their cars, choose which ones
 ## the car select screen offers (the line-up, CarCollection.gd) and see the Grand Prix trophies they have
 ## won (Trophies.gd) and their time trial records (TimeTrialRecords.gd, a board per Grand Prix on the trophy
 ## hall's side walls). Built in code, in its own world in a SubViewport, like the podium; Main.gd adds it
-## from the main menu (GARAGE), calls start() once the loading screen has gone, and frees it on `finished`.
+## from the main menu (HEADQUARTERS), calls start() once the loading screen has gone, and frees it on `finished`.
 ##
 ## Everything is at life size except the cars, which are large-scale RC cars: on the courses people and
 ## props stand at 1.6 times life size beside the cars (PROP_SCALE), so here a car is its race size over 1.6
 ## (SHOW_SCALE), about 1.4m long. Each stands on a plinth on a two-post lift of its own size.
 ##
-## The hall, looking down it from the entrance doors (glass, locked: a forecourt, a road and a lawn under the
-## sky outside): the foyer with the player's own car on a turntable, then the concourse under a glass gable
+## The hall, looking down it from the entrance doors (glass, locked, in a glazed front: outside, the plaza, a road and
+## lawns under the sky, _build_plaza): the foyer with the player's own car on a turntable, then the concourse under a glass gable
 ## roof (the sky's sun lights only what is on SUN_LAYER), with a gallery per category
 ## (CarCollection.galleries()) off either side in pairs, and the trophy hall at its end. A gallery's cars
 ## stand in two rows either side of its aisle, angled toward the way in, each with a placard and a
@@ -71,7 +71,9 @@ const G_END := 2.8
 const BAY_SIDE := 2.75
 const CAR_TURN := 0.52
 const HALL_HALF := 9.0
-const HALL_D := 16.0
+const HALL_D_MIN := 16.0
+## Room either end of a wall's row of record boards.
+const RECORD_BOARD_MARGIN := 2.2
 const TROPHY_RING := 5.6
 ## The time trial record boards on the trophy hall's side walls: size, centre height, spacing, a stage's row.
 const RECORD_BOARD_SIZE := Vector2(4.6, 2.5)
@@ -95,6 +97,17 @@ const PLAQUE_LEDGE_W := 0.72
 ## The entrance doors' opening in the entrance wall.
 const ENTRY_HALF := 1.6
 const ENTRY_H := 3.3
+## The foyer's glazed front: the doors in the middle of it, glass either side and over them.
+const FRONT_GLASS_HALF := 4.1
+const FRONT_GLASS_H := 4.85
+const FRONT_MULLION_X := 2.85
+## The plaza (_build_plaza), from the entrance wall's outer face out to the road's kerb.
+const PLAZA_DEPTH := 46.0
+const PLAZA_HALF := 30.0
+const PLAZA_AVENUE_X := 14.0
+const PLAZA_AVENUE := [8.0, 18.0, 28.0, 38.0]
+const PLAZA_FOUNTAIN_Z := 19.0
+const PLAZA_LOGO_Z := 33.0
 ## The sun lights only what is on this render layer as well: the concourse, the foyer and the outside, so it
 ## never reaches into the galleries through their roofs when shadows are off.
 const SUN_LAYER := 2
@@ -183,6 +196,8 @@ var _galleries: Array = []
 ## Per gallery: {name, color, cars, side, rect (Rect2 in x/z of its floor), door_z}.
 var _rooms: Array = []
 var _spine_end := 0.0
+## The trophy hall's depth: deep enough for its side walls to hold a record board per cup (_build_hall).
+var _hall_d := HALL_D_MIN
 ## Per car on show: see _build_bay.
 var _bays: Array = []
 var _featured: Node3D
@@ -703,7 +718,7 @@ func _build_hud() -> void:
 	top.position = Vector2(48, 36)
 	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(top)
-	top.add_child(_label("GARAGE", 40, COL_TEXT, _font_title))
+	top.add_child(_label("HEADQUARTERS", 40, COL_TEXT, _font_title))
 	_hud_count = _label("", 18, COL_DIM, _font_bold)
 	top.add_child(_hud_count)
 
@@ -990,6 +1005,25 @@ func _mat(key: String) -> Material:
 			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			m.roughness = 0.5
 			m.render_priority = 0
+		"granite":
+			m.albedo_color = Color(0.56, 0.55, 0.52)
+			m.roughness = 0.7
+		"granite_dark":
+			m.albedo_color = Color(0.2, 0.2, 0.21)
+			m.roughness = 0.45
+		"iron":
+			m.albedo_color = Color(0.09, 0.095, 0.1)
+			m.metallic = 0.6
+			m.roughness = 0.5
+		"soil":
+			m.albedo_color = Color(0.13, 0.09, 0.06)
+			m.roughness = 1.0
+		"timber":
+			m.albedo_color = Color(0.45, 0.3, 0.18)
+			m.roughness = 0.75
+		"line":
+			m.albedo_color = Color(0.85, 0.85, 0.82)
+			m.roughness = 0.8
 		"asphalt":
 			m.albedo_color = Color(0.11, 0.115, 0.12)
 			m.roughness = 0.92
@@ -1008,12 +1042,16 @@ func _mat(key: String) -> Material:
 		"leaves":
 			m.albedo_color = Color(0.17, 0.33, 0.12)
 			m.roughness = 1.0
-		"floor", "paving":
+		"floor", "paving", "paving_dark":
 			var fm := ShaderMaterial.new()
 			fm.shader = FLOOR_SHADER
 			if key == "paving":
-				fm.set_shader_parameter("base_color", Color(0.46, 0.45, 0.42))
+				fm.set_shader_parameter("base_color", Color(0.5, 0.49, 0.46))
 				fm.set_shader_parameter("slab", 1.2)
+				fm.set_shader_parameter("gloss", 0.5)
+			elif key == "paving_dark":
+				fm.set_shader_parameter("base_color", Color(0.24, 0.24, 0.25))
+				fm.set_shader_parameter("slab", 0.6)
 				fm.set_shader_parameter("gloss", 0.6)
 			_mats[key] = fm
 			return fm
@@ -1210,6 +1248,8 @@ func _omni(pos: Vector3, energy: float, reach: float) -> void:
 func _build_hall() -> void:
 	var slots: int = ceili(_galleries.size() / 2.0)
 	_spine_end = -FOYER - slots * SLOT
+	var per_wall: int = ceili(NetworkManager.GP_CUPS.size() * 0.5)
+	_hall_d = maxf(HALL_D_MIN, per_wall * RECORD_BOARD_STEP + 2.0 * RECORD_BOARD_MARGIN)
 	var left_doors: Array = []
 	var right_doors: Array = []
 	for gi in _galleries.size():
@@ -1247,8 +1287,8 @@ func _build_hall() -> void:
 	_wall(false, -SPINE_HALF, _spine_end, ENTRANCE_Z, left_doors)
 	_wall(false, SPINE_HALF, _spine_end, ENTRANCE_Z, right_doors)
 	_wall(true, ENTRANCE_Z, -SPINE_HALF - WALL_T * 0.5, SPINE_HALF + WALL_T * 0.5,
-			[Vector3(-ENTRY_HALF, ENTRY_HALF, ENTRY_H)], TALL_H, true)
-	var hall_back: float = _spine_end - HALL_D
+			[Vector3(-FRONT_GLASS_HALF, FRONT_GLASS_HALF, FRONT_GLASS_H)], TALL_H, true)
+	var hall_back: float = _spine_end - _hall_d
 	_room(-HALL_HALF, HALL_HALF, hall_back, _spine_end, TALL_H)
 	_wall(true, _spine_end, -HALL_HALF - WALL_T * 0.5, HALL_HALF + WALL_T * 0.5,
 			[Vector3(-SPINE_HALF, SPINE_HALF, WALL_H)], TALL_H, true)
@@ -1347,7 +1387,7 @@ func _build_roof() -> void:
 
 
 ## The entrance: glazed double doors in an aluminium frame with a transom over them, pull handles, a mat,
-## an EXIT sign; outside, a canopy, the forecourt, a road, lawns, trees and the RC Vibe GP flag. The doors
+## an EXIT sign, in a glazed front across the foyer; outside, a canopy and the plaza (_build_plaza). The doors
 ## are locked (solid), but it all reads as the way out.
 func _build_entrance() -> void:
 	var z := ENTRANCE_Z
@@ -1388,7 +1428,28 @@ func _build_entrance() -> void:
 	_box(exit_root, Vector3(-0.42, -0.15, 0.0), Vector3(0.42, 0.15, 0.06), _glow_mat(Color(0.1, 0.75, 0.3), 1.6), false)
 	_text(exit_root, "EXIT", 0.2, Color.WHITE, Vector3(0.0, 0.0, 0.075), 0.7)
 
-	# Outside, all in the sun.
+	# The glazed front either side of the doors and over them (the wall's opening is _build_hall's): mullions, a
+	# transom at the doors' head, a header, glass. The plaza shows through it from the foyer.
+	var glaze := Node3D.new()
+	glaze.name = "GlassFront"
+	_world.add_child(glaze)
+	var gw: float = FRONT_GLASS_HALF
+	var gh: float = FRONT_GLASS_H
+	for s in [-1.0, 1.0]:
+		for x in [ENTRY_HALF, FRONT_MULLION_X, gw]:
+			var lo_y: float = ENTRY_H if is_equal_approx(x, ENTRY_HALF) else 0.0
+			_box(glaze, Vector3(s * x - f, lo_y, z - 0.08), Vector3(s * x + f, gh, z + 0.08), alu)
+		var x0: float = minf(s * ENTRY_HALF, s * gw)
+		var x1: float = maxf(s * ENTRY_HALF, s * gw)
+		_box(glaze, Vector3(x0, 0.0, z - 0.07), Vector3(x1, 0.1, z + 0.07), alu)
+		_box(glaze, Vector3(x0, 0.1, z - 0.004), Vector3(x1, ENTRY_H, z + 0.004), glass, false)
+		_solid(Vector3(x0, 0.0, z - 0.2), Vector3(x1, ENTRY_H, z + 0.2))
+	_box(glaze, Vector3(-gw, ENTRY_H - 0.05, z - 0.08), Vector3(gw, ENTRY_H + 0.05, z + 0.08), alu)
+	_box(glaze, Vector3(-gw, gh - 0.12, z - 0.1), Vector3(gw, gh, z + 0.1), alu)
+	_box(glaze, Vector3(-gw, ENTRY_H + 0.05, z - 0.004), Vector3(gw, gh - 0.12, z + 0.004), glass, false)
+	_sunlit(glaze)
+
+	# Outside, all in the sun: the canopy over the doors, then the plaza.
 	var out := Node3D.new()
 	out.name = "Outside"
 	_world.add_child(out)
@@ -1396,49 +1457,303 @@ func _build_entrance() -> void:
 	_box(out, Vector3(-3.2, 3.6, zo), Vector3(3.2, 3.75, zo + 3.6), _mat("steel"))
 	for s in [-1.0, 1.0]:
 		_box(out, Vector3(s * 3.0 - 0.07, 0.0, zo + 3.3), Vector3(s * 3.0 + 0.07, 3.6, zo + 3.44), _mat("steel"))
-	_box(out, Vector3(-40.0, 0.0, zo + 14.0), Vector3(40.0, 0.14, zo + 14.3), _mat("curb"))
-	for s in [-1.0, 1.0]:
-		_box(out, Vector3(s * 9.0 - 0.5, 0.0, zo + 1.0), Vector3(s * 9.0 + 0.5, 0.9, zo + 12.5), _mat("hedge"))
+	_build_plaza(out, zo)
 	_sunlit(out)
-	_tiles(-16.0, 16.0, zo, zo + 14.0, _mat("paving"), true)
-	_tiles(-120.0, 120.0, zo + 14.3, zo + 21.0, _mat("asphalt"), true, -0.02)
+
+
+## The plaza in front of the headquarters (all at life size, in `out`'s frame, `zo` the entrance wall's outer face):
+## granite paving out to the road, an avenue of London planes either side in iron tree grates with benches and lamps
+## between them, a round fountain on the axis (fountain_water.gdshader, as Estación Seca's), the RC Vibe GP logo on a
+## plinth beyond it facing the doors, weeping cherries flanking it, Japanese maples in stone planters either side of
+## the doors with azaleas round them, beds of azaleas along the plaza's edges, flags at the road, birches on the lawns.
+## The trees are the courses' own detailed ones, baked by regenerate_headquarters_trees.gd. Nobody walks out here (the
+## doors are locked), so nothing is solid.
+func _build_plaza(out: Node3D, zo: float) -> void:
+	var z_road: float = zo + PLAZA_DEPTH
+	var half: float = PLAZA_HALF
+	_tiles_in(out, -half, half, zo, z_road, _mat("paving"))
+	# A band of darker stone round the fountain and down the axis to the doors.
+	_tiles_in(out, -1.8, 1.8, zo + 3.6, zo + PLAZA_FOUNTAIN_Z - 5.6, _mat("paving_dark"), 0.006)
+	_box(out, Vector3(-half, 0.0, z_road - 0.3), Vector3(half, 0.15, z_road), _mat("curb"))
+	_tiles_in(out, -140.0, 140.0, z_road, z_road + 8.0, _mat("asphalt"), -0.02)
+	_box(out, Vector3(-140.0, 0.0, z_road + 8.0), Vector3(140.0, 0.15, z_road + 8.3), _mat("curb"))
+	for x in range(-12, 13, 4):
+		_box(out, Vector3(x - 0.15, 0.003, z_road + 3.92), Vector3(x + 1.6, 0.012, z_road + 4.08), _mat("line"), false)
+	_tiles_in(out, -140.0, 140.0, z_road + 8.3, z_road + 150.0, _mat("lawn"), 0.0)
 	for s in [-1.0, 1.0]:
-		var x0: float = s * 16.0
-		_tiles(minf(x0, s * 60.0), maxf(x0, s * 60.0), zo, zo + 14.0, _mat("lawn"), true)
-	_tiles(-140.0, 140.0, zo + 21.0, zo + 140.0, _mat("lawn"), true)
-	# Trees across the road.
+		var x0: float = s * half
+		var x1: float = s * 140.0
+		_tiles_in(out, minf(x0, x1), maxf(x0, x1), zo - 40.0, z_road, _mat("lawn"), 0.0)
+	var trees := {}
+	var tree := func(kind: String, pos: Vector3, yaw: float, sc: float) -> void:
+		if not trees.has(kind):
+			trees[kind] = load("res://generated/headquarters_tree_%s.res" % kind) if ResourceLoader.exists(
+					"res://generated/headquarters_tree_%s.res" % kind) else null
+		if trees[kind] == null:
+			return
+		var mi := MeshInstance3D.new()
+		mi.mesh = trees[kind]
+		mi.transform = Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * sc), pos)
+		out.add_child(mi)
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 7
-	var trunk_mesh := CylinderMesh.new()
-	trunk_mesh.top_radius = 0.16
-	trunk_mesh.bottom_radius = 0.24
-	trunk_mesh.height = 3.0
-	var crown_mesh := SphereMesh.new()
-	crown_mesh.radius = 2.4
-	crown_mesh.height = 5.0
-	crown_mesh.radial_segments = 16
-	crown_mesh.rings = 10
-	for i in 14:
-		var p := Vector3(rng.randf_range(-36.0, 36.0), 0.0, zo + rng.randf_range(25.0, 60.0))
-		var k: float = rng.randf_range(0.8, 1.3)
-		var trunk := MeshInstance3D.new()
-		trunk.mesh = trunk_mesh
-		trunk.material_override = _mat("bark")
-		trunk.position = p + Vector3(0.0, 1.5 * k, 0.0)
-		trunk.scale = Vector3.ONE * k
-		out.add_child(trunk)
-		var crown := MeshInstance3D.new()
-		crown.mesh = crown_mesh
-		crown.material_override = _mat("leaves")
-		crown.position = p + Vector3(0.0, 4.6 * k, 0.0)
-		crown.scale = Vector3(k, k * rng.randf_range(0.9, 1.2), k)
-		out.add_child(crown)
-	_sunlit(out)
-	var flag := LogoFlag.new()
-	flag.position = Vector3(6.0, 0.0, zo + 9.0)
-	flag.scale = Vector3.ONE * 0.6
-	out.add_child(flag)
-	_sunlit(flag)
+	rng.seed = 2611
+
+	# The avenue: planes in iron grates, a bench facing the axis and a lamp between each pair.
+	for s in [-1.0, 1.0]:
+		for k in PLAZA_AVENUE.size():
+			var tz: float = zo + float(PLAZA_AVENUE[k])
+			var tx: float = s * PLAZA_AVENUE_X
+			tree.call("plane_%d" % (k % 2), Vector3(tx, -0.05, tz), rng.randf() * TAU, rng.randf_range(0.82, 0.95))
+			_tree_grate(out, Vector3(tx, 0.0, tz))
+			if k + 1 < PLAZA_AVENUE.size():
+				var mz: float = zo + (float(PLAZA_AVENUE[k]) + float(PLAZA_AVENUE[k + 1])) * 0.5
+				_bench(out, Vector3(s * (PLAZA_AVENUE_X - 2.2), 0.0, mz), -s * PI * 0.5)
+				_lamp_post(out, Vector3(tx, 0.0, mz))
+	# The fountain on the axis.
+	_fountain(out, Vector3(0.0, 0.0, zo + PLAZA_FOUNTAIN_Z))
+	# The logo on its plinth beyond, facing the doors, a weeping cherry either side.
+	var lz: float = zo + PLAZA_LOGO_Z
+	_box(out, Vector3(-3.6, 0.0, lz - 0.7), Vector3(3.6, 1.1, lz + 0.7), _mat("granite"))
+	_box(out, Vector3(-3.75, 1.1, lz - 0.85), Vector3(3.75, 1.22, lz + 0.85), _mat("granite_dark"))
+	var logo_scene := load(LOGO_PATH) as PackedScene
+	if logo_scene:
+		var logo := logo_scene.instantiate() as Node3D
+		logo.position = Vector3(0.0, 1.22 + 1.6, lz)
+		logo.rotation.y = PI
+		logo.scale = Vector3.ONE * 0.72
+		out.add_child(logo)
+	for s in [-1.0, 1.0]:
+		var cp := Vector3(s * 7.6, 0.0, lz + 0.5)
+		_round_planter(out, cp, 2.6, 0.55)
+		tree.call("shidare_0", cp + Vector3(0.0, 0.45, 0.0), rng.randf() * TAU, 1.0)
+		for k in 7:
+			var a: float = TAU * k / 7.0 + rng.randf() * 0.3
+			tree.call("tsutsuji_%d" % (k % 2), cp + Vector3(cos(a) * 1.85, 0.45, sin(a) * 1.85), rng.randf() * TAU, 0.7)
+	# Japanese maples in stone planters either side of the doors, azaleas at their feet.
+	for s in [-1.0, 1.0]:
+		var mp := Vector3(s * 7.0, 0.0, zo + 4.2)
+		_square_planter(out, mp, Vector2(4.4, 3.4), 0.6)
+		tree.call("momiji_red_%d" % (0 if s < 0.0 else 1), mp + Vector3(0.0, 0.5, 0.0), rng.randf() * TAU, 0.95)
+		for k in 6:
+			var px: float = lerpf(-1.75, 1.75, float(k) / 5.0)
+			tree.call("tsutsuji_%d" % (k % 2), mp + Vector3(px, 0.5, s * 0.0 + (1.25 if k % 2 == 0 else -1.25)),
+					rng.randf() * TAU, 0.62)
+	# Beds of azaleas and a green maple at each corner of the plaza, toward the road.
+	for s in [-1.0, 1.0]:
+		var bp := Vector3(s * (half - 6.0), 0.0, z_road - 4.5)
+		_square_planter(out, bp, Vector2(9.0, 4.0), 0.45)
+		tree.call("momiji_0", bp + Vector3(s * 2.2, 0.4, 0.0), rng.randf() * TAU, 0.9)
+		for k in 9:
+			var px: float = lerpf(-4.0, 1.0, float(k) / 8.0) * s
+			tree.call("tsutsuji_%d" % (k % 2), bp + Vector3(px, 0.4, rng.randf_range(-1.2, 1.2)), rng.randf() * TAU,
+					rng.randf_range(0.6, 0.75))
+	# Flags at the plaza's front, either side of the axis.
+	for x in [-11.0, 11.0]:
+		var flag := LogoFlag.new()
+		flag.position = Vector3(x, 0.0, z_road - 1.6)
+		# Both streaming the same way (along +x), broadside to the doors.
+		flag.scale = Vector3.ONE * 0.62
+		out.add_child(flag)
+	# Bollards along the kerb.
+	var bx := -half + 1.0
+	while bx < half:
+		if absf(bx) > 2.5:
+			_bollard(out, Vector3(bx, 0.0, z_road - 0.8))
+		bx += 2.4
+	# Birches on the lawns either side of the plaza and across the road; planes further off.
+	for i in 22:
+		var side: float = -1.0 if i % 2 == 0 else 1.0
+		var p := Vector3(side * rng.randf_range(half + 5.0, half + 40.0), -0.05, zo + rng.randf_range(-6.0, PLAZA_DEPTH - 4.0))
+		tree.call("birch_%d" % (i % 2), p, rng.randf() * TAU, rng.randf_range(0.8, 1.05))
+	for i in 26:
+		var p := Vector3(rng.randf_range(-70.0, 70.0), -0.05, z_road + rng.randf_range(16.0, 75.0))
+		var kind: String = "birch_%d" % (i % 2) if i % 3 != 0 else "plane_%d" % (i % 2)
+		tree.call(kind, p, rng.randf() * TAU, rng.randf_range(0.8, 1.05))
+
+
+## Floor tiles under `parent` (not the world), at most 8m each.
+func _tiles_in(parent: Node3D, x0: float, x1: float, z0: float, z1: float, mat: Material, y := 0.0) -> void:
+	var nx := maxi(1, ceili((x1 - x0) / 8.0))
+	var nz := maxi(1, ceili((z1 - z0) / 8.0))
+	for i in nx:
+		for k in nz:
+			var a := Vector2(lerpf(x0, x1, float(i) / nx), lerpf(z0, z1, float(k) / nz))
+			var b := Vector2(lerpf(x0, x1, float(i + 1) / nx), lerpf(z0, z1, float(k + 1) / nz))
+			var mi := MeshInstance3D.new()
+			var pm := PlaneMesh.new()
+			pm.size = b - a
+			mi.mesh = pm
+			mi.position = Vector3((a.x + b.x) * 0.5, y, (a.y + b.y) * 0.5)
+			mi.material_override = mat
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			parent.add_child(mi)
+
+
+## A surface of revolution about the y axis through `profile` ([radius, height] pairs), `segs` round, at `pos`. Its
+## faces are on the right of the profile's travel: out from the axis where it runs up, up where it runs in toward the
+## axis (and down where it runs out).
+func _lathe(parent: Node3D, pos: Vector3, profile: PackedVector2Array, segs: int, mat: Material, shadow := true) -> MeshInstance3D:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for k in segs:
+		var a0: float = TAU * k / segs
+		var a1: float = TAU * (k + 1) / segs
+		for j in profile.size() - 1:
+			var p0: Vector2 = profile[j]
+			var p1: Vector2 = profile[j + 1]
+			var q := [Vector3(cos(a0) * p0.x, p0.y, sin(a0) * p0.x), Vector3(cos(a1) * p0.x, p0.y, sin(a1) * p0.x),
+				Vector3(cos(a1) * p1.x, p1.y, sin(a1) * p1.x), Vector3(cos(a0) * p1.x, p1.y, sin(a0) * p1.x)]
+			# Godot's front faces wind clockwise seen from the front.
+			for idx in [0, 1, 2, 0, 2, 3]:
+				st.add_vertex(q[idx])
+	st.generate_normals()
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = mat
+	mi.position = pos
+	if not shadow:
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mi)
+	return mi
+
+
+## The fountain: a round granite basin, a column carrying a bowl, a sheet of water falling from the bowl's lip into
+## the basin and a trickle over the top (fountain_water.gdshader: mode 0 a pool, 1 a falling sheet), and its sound.
+func _fountain(out: Node3D, c: Vector3) -> void:
+	var granite := _mat("granite")
+	_lathe(out, c, PackedVector2Array([Vector2(5.1, 0.0), Vector2(5.1, 0.55), Vector2(5.0, 0.68), Vector2(4.55, 0.68),
+			Vector2(4.45, 0.58), Vector2(4.45, 0.05)]), 64, granite)
+	_lathe(out, c, PackedVector2Array([Vector2(4.46, 0.04), Vector2(0.0, 0.04)]), 48, _mat("granite_dark"), false)
+	_lathe(out, c, PackedVector2Array([Vector2(0.62, 0.0), Vector2(0.62, 0.3), Vector2(0.42, 0.45), Vector2(0.36, 1.9),
+			Vector2(0.55, 2.05), Vector2(1.9, 2.45), Vector2(2.02, 2.62), Vector2(1.94, 2.68), Vector2(1.8, 2.55),
+			Vector2(0.0, 2.5)]), 48, granite)
+	_lathe(out, c, PackedVector2Array([Vector2(0.12, 2.5), Vector2(0.2, 2.75), Vector2(0.16, 2.9), Vector2(0.0, 2.92)]), 16, granite)
+	var sh: Shader = load("res://fountain_water.gdshader")
+	var water := func(nm: String, mesh: Mesh, mode: int, y: float, fall_r: float) -> void:
+		var m := ShaderMaterial.new()
+		m.shader = sh
+		m.set_shader_parameter("mode", mode)
+		if fall_r > 0.0:
+			m.set_shader_parameter("fall_r", fall_r)
+		var mi := MeshInstance3D.new()
+		mi.name = nm
+		mi.mesh = mesh
+		mi.material_override = m
+		mi.position = c + Vector3(0.0, y, 0.0)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		out.add_child(mi)
+	var basin := CylinderMesh.new()
+	basin.top_radius = 4.47
+	basin.bottom_radius = 4.47
+	basin.height = 0.02
+	basin.radial_segments = 64
+	basin.rings = 1
+	water.call("BasinPool", basin, 0, 0.5, 2.0)
+	var bowl := CylinderMesh.new()
+	bowl.top_radius = 1.82
+	bowl.bottom_radius = 1.82
+	bowl.height = 0.02
+	bowl.radial_segments = 40
+	bowl.rings = 1
+	water.call("BowlPool", bowl, 0, 2.6, 0.2)
+	var sheet := CylinderMesh.new()
+	sheet.top_radius = 2.0
+	sheet.bottom_radius = 2.16
+	sheet.height = 2.1
+	sheet.radial_segments = 48
+	sheet.rings = 4
+	sheet.cap_top = false
+	sheet.cap_bottom = false
+	water.call("FallingSheet", sheet, 1, 0.5 + 1.05, 0.0)
+	var jet := CylinderMesh.new()
+	jet.top_radius = 0.06
+	jet.bottom_radius = 0.34
+	jet.height = 0.6
+	jet.radial_segments = 16
+	jet.rings = 3
+	jet.cap_top = false
+	jet.cap_bottom = false
+	water.call("Trickle", jet, 1, 2.62 + 0.3, 0.0)
+	var snd := AudioStreamPlayer3D.new()
+	snd.name = "FountainSound"
+	snd.stream = load("res://sounds/Gentle_flowing_water.wav")
+	snd.position = c + Vector3(0.0, 1.0, 0.0)
+	snd.unit_size = 6.0
+	snd.volume_db = -6.0
+	snd.autoplay = true
+	out.add_child(snd)
+
+
+## An iron tree grate round a plane's foot: a dark square frame with radial bars, soil in the middle.
+func _tree_grate(out: Node3D, p: Vector3) -> void:
+	var r: float = 1.2
+	var iron := _mat("iron")
+	_box(out, p + Vector3(-r, 0.0, -r), p + Vector3(r, 0.015, r), _mat("soil"), false)
+	for s in [-1.0, 1.0]:
+		_box(out, p + Vector3(-r, 0.0, s * r - 0.08), p + Vector3(r, 0.03, s * r + 0.08), iron, false)
+		_box(out, p + Vector3(s * r - 0.08, 0.0, -r), p + Vector3(s * r + 0.08, 0.03, r), iron, false)
+	for k in 16:
+		var a: float = TAU * k / 16.0
+		var d := Vector3(cos(a), 0.0, sin(a))
+		var e: float = r / maxf(absf(d.x), absf(d.z))
+		_beam(out, p + d * 0.55 + Vector3(0.0, 0.022, 0.0), p + d * (e - 0.06) + Vector3(0.0, 0.022, 0.0), 0.05, 0.02, iron)
+	_lathe(out, p, PackedVector2Array([Vector2(0.62, 0.0), Vector2(0.62, 0.03), Vector2(0.5, 0.03)]), 24, iron, false)
+
+
+## A bench facing +z of its yaw: timber slats on two granite blocks, a backrest on steel posts.
+func _bench(out: Node3D, p: Vector3, yaw: float) -> void:
+	var root := Node3D.new()
+	root.position = p
+	root.rotation.y = yaw
+	out.add_child(root)
+	for x in [-0.85, 0.85]:
+		_box(root, Vector3(x - 0.12, 0.0, -0.25), Vector3(x + 0.12, 0.42, 0.25), _mat("granite"))
+		_box(root, Vector3(x - 0.03, 0.42, -0.3), Vector3(x + 0.03, 0.85, -0.24), _mat("iron"))
+	for k in 5:
+		var z0: float = -0.27 + k * 0.11
+		_box(root, Vector3(-1.05, 0.42, z0), Vector3(1.05, 0.46, z0 + 0.09), _mat("timber"))
+	for k in 3:
+		var y0: float = 0.52 + k * 0.11
+		_box(root, Vector3(-1.05, y0, -0.32), Vector3(1.05, y0 + 0.08, -0.28), _mat("timber"))
+
+
+## A slim lamp post: a dark pole, a flat round head with a glowing underside.
+func _lamp_post(out: Node3D, p: Vector3) -> void:
+	_lathe(out, p, PackedVector2Array([Vector2(0.11, 0.0), Vector2(0.11, 0.3), Vector2(0.065, 0.36), Vector2(0.05, 4.6),
+			Vector2(0.05, 4.7)]), 16, _mat("iron"))
+	_lathe(out, p, PackedVector2Array([Vector2(0.38, 4.8), Vector2(0.36, 4.86), Vector2(0.18, 4.96), Vector2(0.0, 4.98)]), 24,
+			_mat("iron"))
+	_lathe(out, p, PackedVector2Array([Vector2(0.0, 4.79), Vector2(0.37, 4.8)]), 24, _glow_mat(Color(1.0, 0.93, 0.8), 1.5), false)
+
+
+func _bollard(out: Node3D, p: Vector3) -> void:
+	_lathe(out, p, PackedVector2Array([Vector2(0.11, 0.0), Vector2(0.11, 0.82), Vector2(0.09, 0.9), Vector2(0.0, 0.92)]), 14,
+			_mat("iron"))
+	_lathe(out, p, PackedVector2Array([Vector2(0.112, 0.7), Vector2(0.112, 0.75)]), 14, _glow_mat(Color(1.0, 0.9, 0.7), 0.6), false)
+
+
+## A round raised planter: a granite wall `h` high round dark soil.
+func _round_planter(out: Node3D, c: Vector3, r: float, h: float) -> void:
+	_lathe(out, c, PackedVector2Array([Vector2(r, 0.0), Vector2(r, h), Vector2(r - 0.05, h + 0.05), Vector2(r - 0.35, h + 0.05),
+			Vector2(r - 0.4, h)]), 48, _mat("granite"))
+	_lathe(out, c, PackedVector2Array([Vector2(r - 0.39, h - 0.08), Vector2(0.0, h - 0.08)]), 32, _mat("soil"), false)
+
+
+## A square raised planter, `size` across in plan.
+func _square_planter(out: Node3D, c: Vector3, size: Vector2, h: float) -> void:
+	var hx: float = size.x * 0.5
+	var hz: float = size.y * 0.5
+	var t := 0.3
+	var g := _mat("granite")
+	_box(out, c + Vector3(-hx, 0.0, -hz), c + Vector3(hx, h, -hz + t), g)
+	_box(out, c + Vector3(-hx, 0.0, hz - t), c + Vector3(hx, h, hz), g)
+	_box(out, c + Vector3(-hx, 0.0, -hz + t), c + Vector3(-hx + t, h, hz - t), g)
+	_box(out, c + Vector3(hx - t, 0.0, -hz + t), c + Vector3(hx, h, hz - t), g)
+	_box(out, c + Vector3(-hx - 0.03, h, -hz - 0.03), c + Vector3(hx + 0.03, h + 0.06, -hz + t), _mat("granite_dark"))
+	_box(out, c + Vector3(-hx - 0.03, h, hz - t), c + Vector3(hx + 0.03, h + 0.06, hz + 0.03), _mat("granite_dark"))
+	_box(out, c + Vector3(-hx - 0.03, h, -hz + t), c + Vector3(-hx + t, h + 0.06, hz - t), _mat("granite_dark"))
+	_box(out, c + Vector3(hx - t, h, -hz + t), c + Vector3(hx + 0.03, h + 0.06, hz - t), _mat("granite_dark"))
+	_box(out, c + Vector3(-hx + t, 0.0, -hz + t), c + Vector3(hx - t, h - 0.08, hz - t), _mat("soil"), false)
 
 
 ## Everything at one car: the plinth and its band, the car (in `car`, whose y the lift sets), the two-post
@@ -1706,8 +2021,8 @@ func _build_featured() -> void:
 ## silver or bronze) in a glass case, or a grey ghost of one; on the back wall the logo and the tally, high
 ## enough to clear the cases seen from the door (the sign over the door names the hall).
 func _build_trophies() -> void:
-	var hall_back: float = _spine_end - HALL_D
-	var centre := Vector3(0.0, 0.0, _spine_end - HALL_D * 0.5)
+	var hall_back: float = _spine_end - _hall_d
+	var centre := Vector3(0.0, 0.0, _spine_end - _hall_d * 0.5)
 	var cups: Array = NetworkManager.GP_CUPS.keys()
 	var wins := 0
 	var podiums := 0
@@ -1748,7 +2063,7 @@ func _build_trophies() -> void:
 func _build_record_boards() -> void:
 	var cups: Array = NetworkManager.GP_CUPS.keys()
 	var left_n: int = ceili(cups.size() * 0.5)
-	var mid_z: float = _spine_end - HALL_D * 0.5
+	var mid_z: float = _spine_end - _hall_d * 0.5
 	var face: float = HALL_HALF - WALL_T * 0.5 - 0.01
 	for i in cups.size():
 		var on_left: bool = i < left_n
@@ -1759,8 +2074,11 @@ func _build_record_boards() -> void:
 		var z: float = mid_z - along if on_left else mid_z + along
 		var pos := Vector3(-face if on_left else face, RECORD_BOARD_Y, z)
 		_record_board(pos, PI * 0.5 if on_left else -PI * 0.5, cups[i])
-	_omni(Vector3(-HALL_HALF + 2.2, 3.4, mid_z), 0.5, 9.0)
-	_omni(Vector3(HALL_HALF - 2.2, 3.4, mid_z), 0.5, 9.0)
+	# A lamp over every other board along each wall.
+	for k in maxi(1, ceili(left_n * 0.5)):
+		var lz: float = mid_z + (float(k) - (ceili(left_n * 0.5) - 1) * 0.5) * RECORD_BOARD_STEP * 2.0
+		_omni(Vector3(-HALL_HALF + 2.2, 3.4, lz), 0.5, 9.0)
+		_omni(Vector3(HALL_HALF - 2.2, 3.4, lz), 0.5, 9.0)
 
 
 func _record_board(pos: Vector3, yaw: float, cup_name: String) -> void:
